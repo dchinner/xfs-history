@@ -833,6 +833,7 @@ xfs_dir_leaf_add_work(buf_t *bp, xfs_da_args_t *args, int index, int mapindex)
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
 	xfs_dir_leaf_map_t *map;
+	/* REFERENCED */
 	xfs_mount_t *mp;
 	int tmp, i;
 

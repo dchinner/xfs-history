@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.167 $"
+#ident	"$Revision: 1.168 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1923,6 +1923,7 @@ xfs_bmap_btree_to_extents(
 	int			*logflagsp, /* inode logging flags */
 	int			whichfork) /* data or attr fork */
 {
+	/* REFERENCED */
 	xfs_bmbt_block_t	*cblock;/* child btree block */
 	xfs_fsblock_t		cbno;	/* child block number */
 	buf_t			*cbp;	/* child block's buffer */
@@ -2020,6 +2021,7 @@ xfs_bmap_del_extent(
 	int			i;	/* temp state */
 	xfs_ifork_t		*ifp;	/* inode fork pointer */
 	xfs_bmbt_irec_t		new;	/* new record to be inserted */
+	/* REFERENCED */
 	xfs_extnum_t		nextents;	/* number of extents in list */
 	xfs_filblks_t		temp;	/* for indirect length calculations */
 	xfs_filblks_t		temp2;	/* for indirect length calculations */
@@ -3299,6 +3301,7 @@ xfs_bmap_read_extents(
 	int			level;	/* btree level, for checking */
 	xfs_mount_t		*mp;	/* file system mount structure */
 	xfs_bmbt_ptr_t		*pp;	/* pointer to block address */
+	/* REFERENCED */
 	xfs_extnum_t		room;	/* number of entries there's room for */
 	xfs_bmbt_rec_t		*trp;	/* target record pointer */
 

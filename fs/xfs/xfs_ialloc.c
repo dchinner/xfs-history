@@ -1,5 +1,5 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.91 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -501,6 +501,7 @@ xfs_dialloc(
 	int		i;		/* result code */
 	int		ialloced;	/* inode allocation status */
 	xfs_ino_t	ino;		/* fs-relative inode to be returned */
+	/* REFERENCED */
 	int		j;		/* result code */
 	xfs_mount_t	*mp;		/* file system mount structure */
 	int		offset;		/* index of inode in chunk */
@@ -891,6 +892,7 @@ xfs_difree(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	inode)		/* inode to be freed */
 {
+	/* REFERENCED */
 	xfs_agblock_t	agbno;	/* block number containing inode */
 	buf_t		*agbp;	/* buffer containing allocation group header */
 	xfs_agino_t	agino;	/* inode number relative to allocation group */

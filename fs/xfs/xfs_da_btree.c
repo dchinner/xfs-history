@@ -710,6 +710,7 @@ STATIC int
 xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 {
 	xfs_da_intnode_t *oldroot;
+	/* REFERENCED */
 	xfs_da_blkinfo_t *blkinfo;
 	xfs_da_args_t *args;
 	xfs_dablk_t child;

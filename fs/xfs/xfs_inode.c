@@ -1,4 +1,4 @@
-#ident "$Revision: 1.175 $"
+#ident "$Revision: 1.176 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -510,6 +510,7 @@ xfs_iformat_btree(
 {
 	xfs_bmdr_block_t	*dfp;
 	xfs_ifork_t		*ifp;
+	/* REFERENCED */
 	int			nrecs;
 	int			size;
 
