@@ -38,6 +38,7 @@
 #include <linux/kdbprivate.h>
 #include <linux/mm.h>
 #include <linux/init.h>
+#include <linux/version.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
