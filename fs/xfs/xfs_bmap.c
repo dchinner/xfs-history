@@ -2146,6 +2146,15 @@ xfs_bmap_trace_addentry(
 		(void *)r1->l2, (void *)r1->l3,
 		(void *)r2->l0, (void *)r2->l1,
 		(void *)r2->l2, (void *)r2->l3);
+	ASSERT(ip->i_xtrace);
+	ktrace_enter(ip->i_xtrace,
+		(void *)opcode, (void *)fname, (void *)desc, (void *)ip,
+		(void *)idx, (void *)cnt,
+		(void *)(ip->i_ino >> 32), (void *)(int)(ip->i_ino),
+		(void *)r1->l0, (void *)r1->l1,
+		(void *)r1->l2, (void *)r1->l3,
+		(void *)r2->l0, (void *)r2->l1,
+		(void *)r2->l2, (void *)r2->l3);
 }
 	
 /*
@@ -2159,7 +2168,7 @@ xfs_bmap_trace_delete(
 	xfs_extnum_t	idx,		/* index of entry(entries) deleted */
 	xfs_extnum_t	cnt)		/* count of entries deleted, 1 or 2 */
 {
-	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_DELETE, fname, desc, ip, idx,
+	xfs_bmap_trace_addentry(XFS_BMAP_KTRACE_DELETE, fname, desc, ip, idx,
 		cnt, &ip->i_u1.iu_extents[idx],
 		cnt == 2 ? &ip->i_u1.iu_extents[idx + 1] : NULL);
 }
@@ -2179,17 +2188,17 @@ xfs_bmap_trace_insert(
 	xfs_bmbt_irec_t	*r2)		/* inserted record 2 or null */
 {
 	xfs_bmbt_rec_t	tr1;		/* compressed record 1 */
-	xfs_bmbt_rec_t	tr2;		/* compressed record 2 or zeroes */
+	xfs_bmbt_rec_t	tr2;		/* compressed record 2 if needed */
 
 	xfs_bmbt_set_all(&tr1, r1);
 	if (cnt == 2) {
 		ASSERT(r2 != NULL);
 		xfs_bmbt_set_all(&tr2, r2);
 	} else {
+		ASSERT(cnt == 1);
 		ASSERT(r2 == NULL);
-		bzero(&tr2, sizeof(tr2));
 	}
-	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_INSERT, fname, desc, ip, idx,
+	xfs_bmap_trace_addentry(XFS_BMAP_KTRACE_INSERT, fname, desc, ip, idx,
 		cnt, &tr1, cnt == 2 ? &tr2 : NULL);
 }
 
@@ -2203,8 +2212,8 @@ xfs_bmap_trace_post_update(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx)		/* index of entry updated */
 {
-	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_POST_UP, fname, desc, ip, idx, 1,
-		&ip->i_u1.iu_extents[idx], NULL);
+	xfs_bmap_trace_addentry(XFS_BMAP_KTRACE_POST_UP, fname, desc, ip, idx,
+		1, &ip->i_u1.iu_extents[idx], NULL);
 }
 
 /*
@@ -2217,7 +2226,7 @@ xfs_bmap_trace_pre_update(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx)		/* index of entry to be updated */
 {
-	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_PRE_UP, fname, desc, ip, idx, 1,
+	xfs_bmap_trace_addentry(XFS_BMAP_KTRACE_PRE_UP, fname, desc, ip, idx, 1,
 		&ip->i_u1.iu_extents[idx], NULL);
 }
 #endif	/* DEBUG && !SIM */
@@ -2482,23 +2491,21 @@ xfs_bmap_read_extents(
 	xfs_mount_t		*mp;	/* file system mount structure */
 	xfs_bmbt_ptr_t		*pp;	/* pointer to block address */
 	xfs_extnum_t		room;	/* number of entries there's room for */
-	xfs_sb_t		*sbp;	/* super block structure */
 	xfs_bmbt_rec_t		*trp;	/* target record pointer */
 
 	bno = NULLFSBLOCK;
 	mp = ip->i_mount;
-	sbp = &mp->m_sb;
 	block = ip->i_broot;
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
-	if (level = block->bb_level) {
-		pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ip->i_broot_bytes);
-		ASSERT(*pp != NULLDFSBNO &&
-		       XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount &&
-		       XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
-		bno = *pp;
-	}
+	ASSERT(block->bb_level > 0);
+	level = block->bb_level;
+	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ip->i_broot_bytes);
+	ASSERT(*pp != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
+	bno = *pp;
 	/*
 	 * Go down the tree until leaf level is reached, following the first
 	 * pointer (leftmost) at each level.
@@ -2509,19 +2516,19 @@ xfs_bmap_read_extents(
 		ASSERT(block->bb_level == level);
 		if (level == 0)
 			break;
-		pp = XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1,
-			mp->m_bmap_dmxr[1]);
-		ASSERT(*pp != NULLDFSBNO &&
-		       XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount &&
-		       XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
+		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
+			1, mp->m_bmap_dmxr[1]);
+		ASSERT(*pp != NULLDFSBNO);
+		ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
+		ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
 		xfs_trans_brelse(tp, bp);
 	}
 	/*
 	 * Here with bp and block set to the leftmost leaf node in the tree.
 	 */
-	trp = ip->i_u1.iu_extents;
 	room = ip->i_bytes / sizeof(*trp);
+	trp = ip->i_u1.iu_extents;
 	i = 0;
 	/*
 	 * Loop over all leaf nodes.  Copy information to the extent list.
@@ -2534,8 +2541,8 @@ xfs_bmap_read_extents(
 		/*
 		 * Copy records into the extent list.
 		 */
-		frp = XFS_BTREE_REC_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1,
-			mp->m_bmap_dmxr[0]);
+		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
+			1, mp->m_bmap_dmxr[0]);
 		bcopy(frp, trp, block->bb_numrecs * sizeof(*frp));
 		trp += block->bb_numrecs;
 		i += block->bb_numrecs;
@@ -2543,12 +2550,7 @@ xfs_bmap_read_extents(
 		 * Get the next leaf block's address.
 		 */
 		nextbno = block->bb_rightsib;
-		/*
-		 * bno can only be NULLFSBLOCK if the root block is also a leaf;
-		 * we could make this illegal.
-		 */
-		if (bno != NULLFSBLOCK)
-			xfs_trans_brelse(tp, bp);
+		xfs_trans_brelse(tp, bp);
 		bno = nextbno;
 		/*
 		 * If we've reached the end, stop.
@@ -2558,6 +2560,8 @@ xfs_bmap_read_extents(
 		bp = xfs_btree_read_bufl(mp, tp, bno, 0);
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	}
+	ASSERT(i == ip->i_bytes / sizeof(*trp));
+	ASSERT(i == ip->i_d.di_nextents);
 	xfs_bmap_trace_exlist(fname, ip, i);
 	kmem_check();
 }
@@ -2573,13 +2577,14 @@ xfs_bmap_trace_exlist(
 	xfs_extnum_t	cnt)		/* count of entries in the list */
 {
 	xfs_bmbt_rec_t	*base;		/* base of extent list */
+	xfs_bmbt_rec_t	*ep;		/* current entry in extent list */
 	xfs_extnum_t	idx;		/* extent list entry number */
 	xfs_bmbt_irec_t	s;		/* extent list record */
 
 	ASSERT(cnt == ip->i_bytes / sizeof(*base));
 	base = ip->i_u1.iu_extents;
-	for (idx = 0; idx < cnt; idx++) {
-		xfs_bmbt_get_all(&base[idx], &s);
+	for (idx = 0, ep = base; idx < cnt; idx++, ep++) {
+		xfs_bmbt_get_all(ep, &s);
 		xfs_bmap_trace_insert(fname, "exlist", ip, idx, 1, &s, NULL);
 	}
 }
@@ -2639,8 +2644,8 @@ xfs_bmapi(
 	int			wasdelay;
 	int			wr;
 
-	ASSERT(*nmap >= 1 &&
-	       (*nmap <= XFS_BMAP_MAX_NMAP || !(flags & XFS_BMAPI_WRITE)));
+	ASSERT(*nmap >= 1);
+	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP || !(flags & XFS_BMAPI_WRITE));
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
