@@ -1068,11 +1068,11 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 #ifndef SIM
 		} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
 			retval = xfs_attr_leaf_lookup_int(blk->bp, state->args);
-			blk->index = state->args->aleaf_index;
-			state->args->aleaf_blkno = blk->blkno;
+			blk->index = state->args->index;
+			state->args->blkno = blk->blkno;
 #endif
 		}
-		if (((retval == ENOENT) || (retval == ENXIO)) &&
+		if (((retval == ENOENT) || (retval == ENOATTR)) &&
 		    (blk->hashval == state->args->hashval)) {
 			error = xfs_da_path_shift(state, &state->path, 1, 1,
 							 &retval);
@@ -1082,7 +1082,7 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 				continue;
 #ifndef SIM
 			} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
-				retval = ENXIO;	/* path_shift() gives ENOENT */
+				retval = ENOATTR;/* path_shift() gives ENOENT */
 #endif
 			}
 		}
@@ -1091,27 +1091,6 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 	*result = retval;
 	return(0);	
 }
-
-#ifndef SIM
-/*
- * Drop to the bottom of the btree and pick out the indicated
- * attribute's value.  Actually use an attribute work routine.
- */
-int
-xfs_da_node_getvalue(xfs_da_state_t *state)
-{
-	xfs_da_state_blk_t *blk;
-	int retval;
-
-	blk = &state->path.blk[ state->path.active-1 ];
-	ASSERT(blk->bp != NULL);
-	ASSERT(blk->magic == XFS_ATTR_LEAF_MAGIC);
-
-	retval = xfs_attr_leaf_getvalue(blk->bp, state->args);
-
-	return(retval);	
-}
-#endif /* SIM */
 
 /*========================================================================
  * Utility routines.
@@ -1501,10 +1480,6 @@ xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_args_t *args,
 		return(error);
 	}
 	ASSERT(done);
-#ifdef GROT
-	if ((bp = incore(dead_blkno)) != NULL) {
-	}
-#endif
 	xfs_trans_binval(trans, dead_buf);
 	if (args->whichfork == XFS_DATA_FORK) {
 		error = xfs_bmap_last_offset(trans, dp, &bno, args->whichfork);
@@ -1837,9 +1812,11 @@ xfsda_load_leaf(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork)
 	case XFS_ATTR_LEAF_MAGIC:
 		aleaf = (xfs_attr_leafblock_t *)info;
 		printf("count %d\n", aleaf->hdr.count);
+		break;
 	case XFS_DIR_LEAF_MAGIC:
 		dleaf = (xfs_dir_leafblock_t *)info;
 		printf("count %d\n", dleaf->hdr.count);
+		break;
 	}
 	return(0);
 }
@@ -1897,10 +1874,12 @@ typedef struct xfsda_context {
 	char		*bytemap;	/* used/free bytes in leaf blk */
 	int		usedbytes;	/* total bytes used in entries */
 	int		freebytes;	/* total free bytes for filenames */
+	int		wastedbytes;	/* total wasted bytes, remote values */
 	int		holeblks;	/* total leaves with holes */
 	int		entries;	/* total directory entries */
 	int		nodes;		/* node blocks seen */
 	int		leaves;		/* leaf blocks seen */
+	int		values;		/* "remote" value blocks seen */
 } xfsda_context_t;
 
 
@@ -1942,7 +1921,7 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 	int numblks, tmp, retval;
 
 	con = (xfsda_context_t *)kmem_zalloc(sizeof(*con), KM_SLEEP);
-	numblks = 1000;	/* GROT: this should be a calculation, not a constant */
+	numblks = 10000;/* GROT: this should be a calculation, not a constant */
 	con->maxblockmap = numblks;
 	con->blockmap = (char *)
 		kmem_zalloc(numblks * sizeof(*con->blockmap), KM_SLEEP);
@@ -1954,7 +1933,8 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 	con->bytemapsize = XFS_LBSIZE(dp->i_mount);
 	con->bytemap = (char *)
 		kmem_zalloc(con->bytemapsize * sizeof(*con->bytemap), KM_SLEEP);
-	con->usedbytes = con->freebytes = con->holeblks = con->entries = 0;
+	con->usedbytes = con->freebytes = con->wastedbytes = 0;
+	con->holeblks = con->entries = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -1963,21 +1943,37 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 	con->whichfork = whichfork;
 	con->dp = dp;
 	retval = 0;
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
-		retval = 0; /* xfsda_shortform_check(con); */
-	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
-		retval = xfsda_leaf_check(con, 0, -2);
+	if (whichfork == XFS_ATTR_FORK) {
+		if (XFS_IFORK_Q(dp) == 0) {
+			retval = 0; /* xfsda_shortform_check(con); */
+		} else if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
+			retval = 0; /* xfsda_shortform_check(con); */
+		} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
+			retval = xfsda_leaf_check(con, 0, -2);
+		} else {
+			retval = xfsda_node_check(con, (xfs_fileoff_t)0, -1, -2);
+			retval += xfsda_check_blockuse(con);
+		}
 	} else {
-		retval = xfsda_node_check(con, (xfs_fileoff_t)0, -1, -2);
-		retval += xfsda_check_blockuse(con);
+		if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+			retval = 0; /* xfsda_shortform_check(con); */
+		} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
+			retval = xfsda_leaf_check(con, 0, -2);
+		} else {
+			retval = xfsda_node_check(con, (xfs_fileoff_t)0, -1, -2);
+			retval += xfsda_check_blockuse(con);
+		}
 	}
-	printf("%d nodes, %d leaves, %d entries, ",
-		   con->nodes, con->leaves, con->entries);
+	printf("%d entries, blocks(n/l/v): %d/%d/%d, bytes(u/f/w): ",
+		   con->entries, con->nodes, con->leaves, con->values);
 	xfsda_printbytes(con->usedbytes);
-	printf(" used, ");
+	printf("/");
 	xfsda_printbytes(con->freebytes);
-	tmp = con->usedbytes + con->freebytes;
-	printf(" (%d%%) free\n", (tmp>0)?((con->freebytes*100)/tmp):0);
+	printf("/");
+	xfsda_printbytes(con->wastedbytes);
+	tmp = con->usedbytes + con->freebytes + con->wastedbytes;
+	printf(" (%d%% util)\n",
+		 (tmp>0)?(((con->freebytes+con->wastedbytes)*100)/tmp):0);
 
 	kmem_free(con->bytemap, con->bytemapsize * sizeof(*con->bytemap));
 	kmem_free(con->blockmap, con->maxblockmap * sizeof(*con->blockmap));
@@ -2102,7 +2098,7 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 	xfs_attr_leaf_map_t *map;
 	xfs_attr_leaf_name_local_t *localp;
 	xfs_attr_leaf_name_remote_t *remotep;
-	int lowest, bytes, retval, i, j, k;
+	int lowest, bytes, retval, i, j, k, n, tmp;
 	char *ch;
 
 	retval = 0;
@@ -2168,7 +2164,21 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 				for (j = 0; j < k; j++) {
 					*ch++ = 1;
 				}
-/* GROT: add code to check remote block usage (overlaps, dangling, etc) */
+
+				k = remotep->valueblk;
+				n = XFS_B_TO_FSB(con->dp->i_mount,
+						 remotep->valuelen);
+				con->wastedbytes += XFS_FSB_TO_B(con->dp->i_mount, n)
+							- remotep->valuelen;
+				for (j = 0; j < n; k++, j++) {
+					tmp = xfsda_checkblock(con, NULL, k, -1);
+					if (tmp) {
+						retval += tmp;
+						BADNEWS1(" in: leaf 0x%x\n",
+							   blkno);
+						retval--;
+					}
+				}
 			}
 		}
 		if (entry->pad2 != 0)
@@ -2521,19 +2531,25 @@ xfsda_checkname(buf_t *bp, char *name, int namelen, int index, uint hashval)
 }
 
 int
-xfsda_checkblock(xfsda_context_t *con, buf_t *bp,
-				 xfs_fileoff_t blkno, int level)
+xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
+				 int level)
 {
 	int retval;
 
 	retval = 0;
-	if ((blkno == 0) || (blkno >= con->maxblockmap))
+	if ((blkno == 0) || (blkno >= con->maxblockmap)) {
 		BADNEWS1("block number out of range: blkno 0x%x", blkno);
-	else if (con->blockmap[blkno] & 0x01)
+	} else if (con->blockmap[blkno] & 0x01) {
 		BADNEWS1("block multiply used: blkno 0x%x", blkno);
-	else {
+	} else {
 		con->blockmap[blkno] |= 0x01;
-		con->blockmap[blkno] |= (level == 0) ? 0x02 : 0x04;
+		if (level > 0) {
+			con->blockmap[blkno] |= 0x04;
+		} else if (level == 0) {
+			con->blockmap[blkno] |= 0x02;
+		} else if (level < 0) {
+			con->blockmap[blkno] |= 0x08;
+		}
 	}
 
 	return(retval);
@@ -2599,43 +2615,60 @@ xfsda_checkchain(xfsda_context_t *con, buf_t *bp,
 int
 xfsda_check_blockuse(xfsda_context_t *con)
 {
-	int leaves, nodes, retval, i;
+	int leaves, nodes, values, retval, i;
+	char *bmp;
 	buf_t *bp;
 
 	bp = NULL;
-	leaves = nodes = retval = 0;
-	for (i = 0; i < con->maxblockmap; i++) {
-		if ((con->blockmap[i] & 0x02) && (con->blockmap[i] & 0x04)) {
+	leaves = nodes = values = retval = 0;
+	bmp = con->blockmap;
+	for (i = 0; i < con->maxblockmap; bmp++, i++) {
+		if (*bmp & 0x08) {
+			values++;
+			if ((*bmp & 0x02) != 0) {
+				BADNEWS1("block 0x%x is a remote value and also a leaf\n", i);
+			}
+			if (((*bmp & 0x04) != 0) || (i == 0)) {
+				BADNEWS1("block 0x%x a remote value and is also a node\n", i);
+			}
+			if ((*bmp & 0x06) != 0) {
+				BADNEWS1("block 0x%x is both a remote value and something else\n", i);
+			}
+		}
+		if ((*bmp & 0x02) && (*bmp & 0x04)) {
 			BADNEWS1("block 0x%x is both a leaf and a node\n", i);
-		} else if ((con->blockmap[i] & 0x02) != 0) {
+		} else if ((*bmp & 0x02) != 0) {
 			leaves++;
-		} else if (((con->blockmap[i] & 0x04) != 0) || (i == 0)) {
+		} else if (((*bmp & 0x04) != 0) || (i == 0)) {
 			nodes++;
 		}
 
-		if ((con->blockmap[i] & 0x01) == 0) {
+		if (*bmp & 0x08) {
+			;
+		} else if ((*bmp & 0x01) == 0) {
 #ifdef XXX
 			if (i != 0)
 				printf("block 0x%x not referenced\n", i);
 #endif
-			if ((con->blockmap[i] & 0x80) == 1)
+			if ((*bmp & 0x80) == 1)
 				BADNEWS1("block 0x%x is someone's \"forward\"\n", i);
-			if ((con->blockmap[i] & 0x40) == 1)
+			if ((*bmp & 0x40) == 1)
 				BADNEWS1("block 0x%x is someone's \"backward\"\n", i);
-		} else if ((con->blockmap[i] & 0x20) == 0) {
-			if ((con->blockmap[i] & 0x80) == 0)
+		} else if ((*bmp & 0x20) == 0) {
+			if ((*bmp & 0x80) == 0)
 				BADNEWS1("block 0x%x not someone's \"forward\"\n", i);
-			else if ((con->blockmap[i] & 0x40) == 0)
+			else if ((*bmp & 0x40) == 0)
 				BADNEWS1("block 0x%x not someone's \"backward\"\n", i);
 		} else {
-			if ((con->blockmap[i] & 0x80) == 1)
+			if ((*bmp & 0x80) == 1)
 				BADNEWS1("block 0x%x a start/end blk but also someone's \"forward\"\n", i);
-			else if ((con->blockmap[i] & 0x40) == 1)
+			else if ((*bmp & 0x40) == 1)
 				BADNEWS1("block 0x%x a start/end blk but also someone's \"backward\"\n", i);
 		}
 	}
 	con->nodes = nodes;
 	con->leaves = leaves;
+	con->values = values;
 	return(retval);
 }
 
