@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.206 $"
+#ident	"$Revision: 1.207 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -127,7 +127,8 @@ xfs_bmap_add_extent(
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
 	int			*logflagsp, /* inode logging flags */
-	int			whichfork); /* data or attr fork */
+	int			whichfork, /* data or attr fork */
+	int			rsvd);		/* OK to allocate reserved blocks */
 
 /*
  * Called by xfs_bmap_add_extent to handle cases converting a delayed
@@ -142,7 +143,8 @@ xfs_bmap_add_extent_delay_real(
 	xfs_filblks_t		*dnew,	/* new delayed-alloc indirect blocks */
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
-	int			*logflagsp);/* inode logging flags */
+	int			*logflagsp,		/* inode logging flags */
+	int			rsvd);			/* OK to allocate reserved blocks */
 
 /*
  * Called by xfs_bmap_add_extent to handle cases converting a hole
@@ -154,7 +156,8 @@ xfs_bmap_add_extent_hole_delay(
 	xfs_extnum_t		idx,	/* extent number to update/insert */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
-	int			*logflagsp);/* inode logging flags */
+	int			*logflagsp,/* inode logging flags */
+	int			rsvd);		/* OK to allocate reserved blocks */
 
 /*
  * Called by xfs_bmap_add_extent to handle cases converting a hole
@@ -218,7 +221,8 @@ xfs_bmap_del_extent(
 	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
 	int			iflags, /* input flags (meta-data or not) */
 	int			*logflagsp,/* inode logging flags */
-	int			whichfork);/* data or attr fork */
+	int			whichfork, /* data or attr fork */
+	int			rsvd);		/* OK to allocate reserved blocks */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -516,7 +520,8 @@ xfs_bmap_add_extent(
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
 	int			*logflagsp, /* inode logging flags */
-	int			whichfork) /* data or attr fork */
+	int			whichfork, /* data or attr fork */
+	int			rsvd)		/* OK to use reserved data blocks */
 {
 	xfs_btree_cur_t		*cur;	/* btree cursor or null */
 	xfs_filblks_t		da_new; /* new count del alloc blocks used */
@@ -560,7 +565,7 @@ xfs_bmap_add_extent(
 			ASSERT((cur->bc_private.b.flags &
 				XFS_BTCUR_BPRV_WASDEL) == 0);
 		if (error = xfs_bmap_add_extent_hole_delay(ip, idx, cur, new,
-				&logflags))
+				&logflags, rsvd))
 			return error;
 	}
 	/*
@@ -594,7 +599,7 @@ xfs_bmap_add_extent(
 					XFS_BTCUR_BPRV_WASDEL);
 			if (error = xfs_bmap_add_extent_delay_real(ip, idx,
 					&cur, new, &da_new, first, flist,
-					&logflags))
+					&logflags, rsvd))
 				return error;
 			ASSERT(*curp == cur || *curp == NULL);
 		}
@@ -637,7 +642,7 @@ xfs_bmap_add_extent(
 		ASSERT(nblks <= da_old);
 		if (nblks < da_old)
 			xfs_mod_incore_sb(ip->i_mount, XFS_SBS_FDBLOCKS,
-				da_old - nblks);
+				da_old - nblks, rsvd);
 	}
 	/*
 	 * Clear out the allocated field, done with it now in any case.
@@ -663,7 +668,8 @@ xfs_bmap_add_extent_delay_real(
 	xfs_filblks_t		*dnew,	/* new delayed-alloc indirect blocks */
 	xfs_fsblock_t		*first,	/* pointer to firstblock variable */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
-	int			*logflagsp) /* inode logging flags */
+	int			*logflagsp, /* inode logging flags */
+	int			rsvd)		/* OK to use reserved data block allocation */
 {
 	xfs_bmbt_rec_t		*base;	/* base of extent entry list */
 	xfs_btree_cur_t		*cur;	/* btree cursor */
@@ -1101,7 +1107,7 @@ xfs_bmap_add_extent_delay_real(
 		diff = temp + temp2 - STARTBLOCKVAL(PREV.br_startblock) -
 			(cur ? cur->bc_private.b.allocated : 0);
 		if (diff > 0 &&
-		    xfs_mod_incore_sb(ip->i_mount, XFS_SBS_FDBLOCKS, -diff)) {
+		    xfs_mod_incore_sb(ip->i_mount, XFS_SBS_FDBLOCKS, -diff, rsvd)) {
 			/*
 			 * Ick gross gag me with a spoon.
 			 */
@@ -1112,7 +1118,7 @@ xfs_bmap_add_extent_delay_real(
 					diff--;
 					if (!diff ||
 					    !xfs_mod_incore_sb(ip->i_mount,
-						    XFS_SBS_FDBLOCKS, -diff))
+						    XFS_SBS_FDBLOCKS, -diff, rsvd))
 						break;
 				}
 				if (temp2) {
@@ -1120,7 +1126,7 @@ xfs_bmap_add_extent_delay_real(
 					diff--;
 					if (!diff ||
 					    !xfs_mod_incore_sb(ip->i_mount,
-						    XFS_SBS_FDBLOCKS, -diff))
+						    XFS_SBS_FDBLOCKS, -diff, rsvd))
 						break;
 				}
 			}
@@ -1176,7 +1182,8 @@ xfs_bmap_add_extent_hole_delay(
 	xfs_extnum_t		idx,	/* extent number to update/insert */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
-	int			*logflagsp) /* inode logging flags */
+	int			*logflagsp, /* inode logging flags */
+	int			rsvd)		/* OK to allocate reserved blocks */
 {
 	xfs_bmbt_rec_t		*base;	/* base of extent entry list */
 	xfs_bmbt_rec_t		*ep;	/* extent list entry for idx */
@@ -1319,7 +1326,7 @@ xfs_bmap_add_extent_hole_delay(
 	if (oldlen != newlen) {
 		ASSERT(oldlen > newlen);
 		xfs_mod_incore_sb(ip->i_mount, XFS_SBS_FDBLOCKS,
-			oldlen - newlen);
+			oldlen - newlen, rsvd);
 		/*
 		 * Nothing to do for disk quota accounting here.
 		 */
@@ -2092,7 +2099,8 @@ xfs_bmap_del_extent(
 	xfs_bmbt_irec_t		*del,	/* data to remove from extent list */
 	int			iflags,	/* input flags */	    
 	int			*logflagsp, /* inode logging flags */
-	int			whichfork) /* data or attr fork */
+	int			whichfork, /* data or attr fork */
+	int			rsvd)		/* OK to allocate reserved blocks */
 {
 	xfs_filblks_t		da_new;	/* new delay-alloc indirect blocks */
 	xfs_filblks_t		da_old;	/* old delay-alloc indirect blocks */
@@ -2394,7 +2402,7 @@ xfs_bmap_del_extent(
 	 */
 	ASSERT(da_old >= da_new);
 	if (da_old > da_new) 
-		xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS, da_old - da_new);
+		xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS, da_old - da_new, rsvd);
 	*logflagsp = flags;
 	return 0;
 }
@@ -3021,7 +3029,8 @@ xfs_bmap_worst_indlen(
  */
 int						/* error code */
 xfs_bmap_add_attrfork(
-	xfs_inode_t		*ip)		/* incore inode pointer */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	int				rsvd) 		/* OK to allocated reserved blocks in trans */
 {
 	int			blks;		/* space reservation */
 	int			committed;	/* xaction was committed */
@@ -3041,6 +3050,8 @@ xfs_bmap_add_attrfork(
 	ASSERT(!XFS_NOT_DQATTACHED(mp, ip));
 	tp = xfs_trans_alloc(mp, XFS_TRANS_ADDAFORK);
 	blks = XFS_ADDAFORK_SPACE_RES(mp);
+	if (rsvd)
+		tp->t_flags |= XFS_TRANS_RESERVE;
 	if (error = xfs_trans_reserve(tp, blks, XFS_ADDAFORK_LOG_RES(mp), 0,
 			XFS_TRANS_PERM_LOG_RES, XFS_ADDAFORK_LOG_COUNT))
 		goto error0;
@@ -3678,6 +3689,7 @@ xfs_bmapi(
 	char		wasdelay;	/* old extent was delayed */
 	int		whichfork;	/* data or attr fork */
 	char		wr;		/* this is a write request */
+	int			rsvd;	/* OK to allocate reserved blocks */
 #ifdef DEBUG
 	xfs_fileoff_t	orig_bno;	/* original block number value */
 	int		orig_flags;	/* original flags arg value */
@@ -3713,6 +3725,7 @@ xfs_bmapi(
 	trim = (flags & XFS_BMAPI_ENTIRE) == 0;
 	userdata = (flags & XFS_BMAPI_METADATA) == 0;
 	exact = (flags & XFS_BMAPI_EXACT) != 0;
+	rsvd = (flags & XFS_BMAPI_RSVBLOCKS) != 0;
 	ASSERT(wr || !delay);
 	logflags = 0;
 	nallocs = 0;
@@ -3798,7 +3811,7 @@ xfs_bmapi(
 				}
 				if (xfs_mod_incore_sb(ip->i_mount,
 						XFS_SBS_FDBLOCKS,
-						-(alen + indlen))) {
+						-(alen + indlen), rsvd)) {
 					if (XFS_IS_QUOTA_ON(ip->i_mount))
 						xfs_trans_unreserve_blkquota(
 							NULL, ip, (long)alen);
@@ -3892,7 +3905,7 @@ xfs_bmapi(
 			got.br_blockcount = alen;
 			if (error = xfs_bmap_add_extent(ip, lastx, &cur, &got,
 					firstblock, flist, &tmp_logflags,
-					whichfork))
+					whichfork, rsvd))
 				goto error0;
 			logflags |= tmp_logflags;
 			lastx = ifp->if_lastex;
@@ -4148,6 +4161,7 @@ xfs_bunmapi(
 	int			tmp_logflags;	/* partial logging flags */
 	int			wasdel;		/* was a delayed alloc extent */
 	int			whichfork;	/* data or attribute fork */
+	int			rsvd;		/* OK to allocate reserved blocks */
 
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
 		XFS_ATTR_FORK : XFS_DATA_FORK;
@@ -4159,6 +4173,7 @@ xfs_bunmapi(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 	async = flags & XFS_BMAPI_ASYNC;
+	rsvd = (flags & XFS_BMAPI_RSVBLOCKS) != 0;
 	ASSERT(len > 0);
 	ASSERT(nexts > 0);
 	ASSERT(ifp->if_ext_max ==
@@ -4250,7 +4265,7 @@ xfs_bunmapi(
 		if (wasdel = ISNULLSTARTBLOCK(del.br_startblock)) {
 			ASSERT(STARTBLOCKVAL(del.br_startblock) > 0);
 			xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS,
-				del.br_blockcount);
+				del.br_blockcount, rsvd);
 			if (XFS_IS_QUOTA_ON(ip->i_mount)) {
 				ASSERT(ip->i_ino != mp->m_sb.sb_uquotino);
 				ASSERT(ip->i_ino != mp->m_sb.sb_pquotino);
@@ -4288,7 +4303,7 @@ xfs_bunmapi(
 			goto error0;
 		}
 		if (error = xfs_bmap_del_extent(ip, tp, lastx, flist, cur, &del,
-				flags, &tmp_logflags, whichfork))
+				flags, &tmp_logflags, whichfork, rsvd))
 			goto error0;
 		logflags |= tmp_logflags;
 		bno = del.br_startoff - 1;
