@@ -1,4 +1,4 @@
-#ident "$Revision: 1.199 $"
+#ident "$Revision: 1.201 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1411,18 +1411,6 @@ xfs_itruncate_start(
 
 #ifdef DEBUG
 	if (new_size == 0) {
-		if (VN_DIRTY(vp) || ip->i_queued_bufs != 0 || vp->v_buf != NULL ||
-		    vp->v_pgcnt != 0) {
-			extern void xfs_print_xfsd_buflist(void);
-			
-			printf("ip 0x%x, queued_bufs 0x%x, vbuf 0x%x, "
-			       "v_pgcnt 0x%x, dbuf 0x%x, dpages 0x%x\n",
-			       ip, ip->i_queued_bufs, vp->v_buf, vp->v_pgcnt,
-			       vp->v_dbuf, vp->v_dpages);
-			if (ip->i_queued_bufs != 0) 
-				xfs_print_xfsd_buflist();
-			
-		}
 		ASSERT(!VN_DIRTY(vp));
 		ASSERT(ip->i_queued_bufs == 0);
 		ASSERT(vp->v_buf == NULL);
