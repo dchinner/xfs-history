@@ -887,26 +887,26 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		error = xfs_da_read_buf(trans, dp, bno, -1, &bp, XFS_DATA_FORK);
 		if ((error != 0) && (error != EFSCORRUPTED))
 			return(error);
-		if (bp) {
+		if (bp)
 			leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-			if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
-				xfs_dir_trace_g_dub("node: block not a leaf",
-							   dp, uio, bno);
-				xfs_trans_brelse(trans, bp);
-				bp = NULL;
-			}
-			if (leaf->entries[0].hashval > cookhash) {
-				xfs_dir_trace_g_dub("node: leaf hash too large",
-							   dp, uio, bno);
-				xfs_trans_brelse(trans, bp);
-				bp = NULL;
-			}
-			if (cookhash > leaf->entries[leaf->hdr.count - 1].hashval) {
-				xfs_dir_trace_g_dub("node: leaf hash too small",
-							dp, uio, bno);
-				xfs_trans_brelse(trans, bp);
-				bp = NULL;
-			}
+		if (bp && leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
+			xfs_dir_trace_g_dub("node: block not a leaf",
+						   dp, uio, bno);
+			xfs_trans_brelse(trans, bp);
+			bp = NULL;
+		}
+		if (bp && leaf->entries[0].hashval > cookhash) {
+			xfs_dir_trace_g_dub("node: leaf hash too large",
+						   dp, uio, bno);
+			xfs_trans_brelse(trans, bp);
+			bp = NULL;
+		}
+		if (bp &&
+		    cookhash > leaf->entries[leaf->hdr.count - 1].hashval) {
+			xfs_dir_trace_g_dub("node: leaf hash too small",
+						   dp, uio, bno);
+			xfs_trans_brelse(trans, bp);
+			bp = NULL;
 		}
 	}
 
