@@ -79,7 +79,7 @@ static struct quota_operations linvfs_qops = {
 };
 # define set_quota_ops(sb)	((sb)->s_qop = &linvfs_qops)
 #else
-# define set_quota_ops(sb)	((sb)->s_qop = NULL)
+# define set_quota_ops(sb)	do { } while (0)
 #endif
 
 static struct super_operations linvfs_sops;
@@ -852,7 +852,7 @@ linvfs_dmapi_mount(
 	return 0;
 }
 
-
+#if 0
 STATIC int linvfs_dentry_to_fh(
 	struct dentry *dentry,
 	__u32 *data,
@@ -943,7 +943,7 @@ STATIC struct dentry *linvfs_fh_to_dentry(
 	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
 	return result;
 }
-
+#endif
 
 static struct super_operations linvfs_sops = {
 	alloc_inode:		linvfs_alloc_inode,
