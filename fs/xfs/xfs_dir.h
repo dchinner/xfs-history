@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.26 $"
 
 /*
  * xfs_dir.h
@@ -62,6 +62,13 @@ int	xfs_dir_removename(struct xfs_trans *trans, struct xfs_inode *dp,
 				  xfs_fsblock_t *firstblock,
 				  struct xfs_bmap_free *flist,
 				  xfs_extlen_t total);
+#ifdef SIM
+int	xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp,
+					char *name, xfs_fsblock_t *firstblock,
+					struct xfs_bmap_free *flist,
+					xfs_extlen_t total,
+					xfs_dahash_t hashval);
+#endif /* SIM */
 
 #ifndef SIM
 int	xfs_dir_getdents(struct xfs_trans *tp, struct xfs_inode *dp,
