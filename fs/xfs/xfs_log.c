@@ -36,6 +36,7 @@
 #include <sys/sema.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
+#include <sys/uuid.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -144,7 +145,7 @@ int   xlog_debug = 1;
 dev_t xlog_devt  = 0;
 
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_LOG_TRACE)
 void
 xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
 {
@@ -227,7 +228,7 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 #else
 #define	xlog_trace_loggrant(log,tic,string)
 #define	xlog_trace_iclog(iclog,state)
-#endif /* DEBUG && !SIM */
+#endif /* XFS_LOG_TRACE */
 
 /*
  * NOTES:
@@ -454,7 +455,11 @@ xfs_log_mount(xfs_mount_t	*mp,
 	xlog_t *log;
 	int    error;
 	
+#ifdef DEBUG
 	cmn_err(CE_NOTE, "Start mounting filesystem: %s", mp->m_fsname);
+#else
+	cmn_err(CE_NOTE, "!Start mounting filesystem: %s", mp->m_fsname);
+#endif
 	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
 	if (! xlog_debug) {
@@ -1195,9 +1200,11 @@ xlog_unalloc_log(xlog_t *log)
 	for (i=0; i<log->l_iclog_bufs; i++) {
 		sv_destroy(&iclog->ic_forcesema);
 		freerbuf(iclog->ic_bp);
+#ifdef DEBUG
 		if (iclog->ic_trace != NULL) {
 			ktrace_free(iclog->ic_trace);
 		}
+#endif
 		next_iclog = iclog->ic_next;
 		kmem_free(iclog, sizeof(xlog_in_core_t));
 		iclog = next_iclog;
@@ -1219,12 +1226,14 @@ xlog_unalloc_log(xlog_t *log)
 		}
 	}
 	freerbuf(log->l_xbuf);
+#ifdef DEBUG
 	if (log->l_trace != NULL) {
 		ktrace_free(log->l_trace);
 	}
 	if (log->l_grant_trace != NULL) {
 		ktrace_free(log->l_grant_trace);
 	}
+#endif
 	log->l_mp->m_log = NULL;
 	kmem_free(log, sizeof(xlog_t));
 }	/* xlog_unalloc_log */
