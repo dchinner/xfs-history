@@ -31,9 +31,9 @@
  */
 /*
  *
- * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.9 2000/06/09 06:40:03 ananth Exp $
- * $Author: ananth $
- * $Id: xfsquotasstubs.c,v 1.9 2000/06/09 06:40:03 ananth Exp $
+ * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.10 2000/09/14 05:14:56 nathans Exp $
+ * $Author: nathans $
+ * $Id: xfsquotasstubs.c,v 1.10 2000/09/14 05:14:56 nathans Exp $
  *
  * Revision 1.8  2000/06/09 03:18:45  mostek
  * Merge of 2.3.99pre2-xfs:slinx:56126a by ananth.
@@ -52,6 +52,7 @@
 #include <linux/xfs_sema.h>
 
 struct xfs_qm *xfs_Gqm = NULL;
+mutex_t xfs_Gqm_lock;
 
 struct xfs_qm   *xfs_qm_init(void) {return NULL;}
 

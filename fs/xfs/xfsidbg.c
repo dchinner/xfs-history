@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.149 $"
+#ident	"$Revision: 1.150 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -4501,7 +4501,6 @@ xfsidbg_xperag(xfs_mount_t *mp)
 static void
 xfsidbg_xqm()
 {
-
 	if (xfs_Gqm == NULL) {
 		kdb_printf("NULL XQM!!\n");
 		return;
@@ -4514,7 +4513,7 @@ xfsidbg_xqm()
 		xfs_Gqm->qm_dqhashmask);
 	kdb_printf("&freelist 0x%p, totaldquots 0x%x nrefs 0x%x\n",
 		&xfs_Gqm->qm_dqfreelist,
-		xfs_Gqm->qm_totaldquots,
+		atomic_read(&xfs_Gqm->qm_totaldquots),
 		xfs_Gqm->qm_nrefs);
 }
 

@@ -171,10 +171,10 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 #define XFS_PURGE_INODE(ip) 		\
 	{ 				\
 	  vmap_t dqvmap;		\
-	  vnode_t dqvp;			\
+	  vnode_t *dqvp;		\
 	  dqvp = XFS_ITOV(ip);		\
 	  VMAP(dqvp, ip, dqvmap);	\
-	  VN_RELE(dqvp));		\
+	  VN_RELE(dqvp);		\
 	  vn_purge(dqvp, &dqvmap);	\
         }
 

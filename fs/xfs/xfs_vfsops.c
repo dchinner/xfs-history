@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.286 $"
+#ident  "$Revision: 1.287 $"
 
 #include <xfs_os_defs.h>
 
@@ -228,7 +228,7 @@ int
 xfs_init(int	fstype)
 {
 	extern void	xfs_init_procfs(void);
-	extern int	ncsize;
+	extern int	ndquot;
 	extern xfs_zone_t	*xfs_da_state_zone;
 	extern xfs_zone_t	*xfs_bmap_free_item_zone;
 	extern xfs_zone_t	*xfs_btree_cur_zone;
@@ -245,6 +245,7 @@ xfs_init(int	fstype)
 #endif	/* (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)) */
 #ifndef SIM
 	extern mutex_t	xfs_uuidtabmon;
+	extern mutex_t	xfs_Gqm_lock;
 	extern xfs_zone_t	*xfs_gap_zone;
 #ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
@@ -266,6 +267,8 @@ xfs_init(int	fstype)
 #endif
 #ifndef SIM
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
+	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
+	ndquot = 200 /* + (2 * numprocs) - TODO */;
 #endif	/* !SIM */
 
 	/*

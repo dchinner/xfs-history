@@ -31,9 +31,9 @@
  */
 /*
  *
- * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/.RCS/PL/linux/fs/xfs/linux/RCS/xfs_globals.c,v 1.14 2000/06/15 03:01:24 nathans Exp $
- * $Author: nathans $
- * $Id: xfs_globals.c,v 1.14 2000/06/15 03:01:24 nathans Exp $
+ * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/linux/fs/xfs/linux/RCS/xfs_globals.c,v 1.15 2000/06/15 21:42:59 jtk Exp $
+ * $Author: jtk $
+ * $Id: xfs_globals.c,v 1.15 2000/06/15 21:42:59 jtk Exp $
  *
  * Revision 1.12  2000/06/09 02:50:02  kenmcd
  * Updated copyright and license notices, ready for open source release
@@ -70,6 +70,7 @@ int     	scache_linemask = 0x1f;       /* second level cache line size mask */
 int		imon_enabled;
 prid_t		dfltprid;
 long            physmem;
+int		ndquot;
 
 #ifdef SIM
 time_t		jiffies;

@@ -32,7 +32,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.14 $"
+#ident "$Revision: 1.15 $"
 
 struct  xfs_dqhash;
 struct  xfs_inode;
@@ -114,7 +114,7 @@ typedef struct xfs_qm {
 	xfs_dqlist_t	*qm_prj_dqhtable;/* pdquot hash table */
 	uint		 qm_dqhashmask;  /* # buckets in dq hashtab - 1 */
 	xfs_frlist_t	 qm_dqfreelist;  /* freelist of dquots */
-	uint		 qm_totaldquots; /* total incore dquots */
+	atomic_t	 qm_totaldquots; /* total incore dquots */
 	uint		 qm_nrefs;	 /* file systems with quota on */
 	int		 qm_dqfree_ratio;/* ratio of free to inuse dquots */
 	xfs_zone_t		*qm_dqzone;	 /* dquot mem-alloc zone */

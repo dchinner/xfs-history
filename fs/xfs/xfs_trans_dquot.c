@@ -29,19 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.25 $"
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/kmem.h>
-#include <sys/debug.h>
-#include <sys/cmn_err.h>	
-#include <sys/systm.h>
-#ifdef _SHAREII
-#include <sys/shareIIstubs.h>
-#endif /* _SHAREII */
 
+#include <xfs_os_defs.h>
+#include <linux/xfs_cred.h>
+#include <sys/debug.h>
+
+#include "xfs_buf.h"
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -749,7 +742,7 @@ xfs_trans_dqresv(
 				 * If timer or warnings has expired,
 				 * return EDQUOT
 				 */
-				if ((btimer != 0 && time > btimer) ||
+				if ((btimer != 0 && CURRENT_TIME > btimer) ||
 				    (dqp->q_core.d_bwarns != 0 && 
 				     dqp->q_core.d_bwarns >= 
 				     XFS_QI_BWARNLIMIT(dqp->q_mount))) {
@@ -774,7 +767,7 @@ xfs_trans_dqresv(
 				 * return EDQUOT
 				 */
 				if ((dqp->q_core.d_itimer != 0 &&
-				     time > dqp->q_core.d_itimer) || 
+				     CURRENT_TIME > dqp->q_core.d_itimer) || 
 				    (dqp->q_core.d_iwarns != 0 &&
 				     dqp->q_core.d_iwarns >= 
 				     XFS_QI_IWARNLIMIT(dqp->q_mount))) {

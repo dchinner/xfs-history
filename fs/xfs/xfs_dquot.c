@@ -29,19 +29,13 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.49 $"
-#include <sys/param.h>
+
+#include <xfs_os_defs.h>
+#include <linux/xfs_cred.h>
+
 #include "xfs_buf.h"
 #include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/kmem.h>
-#include <sys/debug.h>
 #include <sys/cmn_err.h>
-#include <sys/atomic_ops.h>
-#include <sys/idbg.h>
-#include <sys/idbgentry.h>
-#include <sys/systm.h>
-#include <sys/ktrace.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -203,7 +197,7 @@ xfs_qm_dqdestroy(
 	dqp->q_trace = NULL;
 #endif
 	kmem_zone_free(xfs_Gqm->qm_dqzone, dqp);
-	atomicAddUint(&xfs_Gqm->qm_totaldquots, -1);
+	atomic_dec(&xfs_Gqm->qm_totaldquots);
 }
 
 /*
@@ -304,7 +298,7 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_bcount >= d->d_blk_softlimit)) ||
 		    (d->d_blk_hardlimit &&
 		    (d->d_bcount >= d->d_blk_hardlimit))) {
-			d->d_btimer = time + XFS_QI_BTIMELIMIT(mp);
+			d->d_btimer = CURRENT_TIME + XFS_QI_BTIMELIMIT(mp);
 		}
 	} else {
 		if ((d->d_blk_softlimit == 0 ||	
@@ -320,7 +314,7 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_icount >= d->d_ino_softlimit)) ||
 		    (d->d_ino_hardlimit &&
 		    (d->d_icount >= d->d_ino_hardlimit))) {
-			d->d_itimer = time + XFS_QI_ITIMELIMIT(mp);
+			d->d_itimer = CURRENT_TIME + XFS_QI_ITIMELIMIT(mp);
 		}
 	} else {
 		if ((d->d_ino_softlimit == 0 ||
@@ -402,9 +396,9 @@ xfs_qm_init_dquot_blk(
 
 	ASSERT(tp);
 	ASSERT(XFS_BUF_ISBUSY(bp));
-	ASSERT(valusema(&bp->b_lock) <= 0);
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 
-	d = (xfs_dqblk_t *)bp->b_addr;
+	d = (xfs_dqblk_t *)XFS_BUF_PTR(bp);
 
 	/* 
 	 * ID of the first dquot in the block - id's are zero based.
@@ -492,7 +486,7 @@ xfs_qm_dqalloc(
 			       dqp->q_blkno,
 			       XFS_QI_DQCHUNKLEN(mp),
 			       0);
-	if (!bp || (error = geterror(bp)))
+	if (!bp || (error = XFS_BUF_GETERROR(bp)))
 		goto error1;
 	/*
 	 * Make a chunk of dquots out of this buffer and log
@@ -629,7 +623,7 @@ xfs_qm_dqtobp(
 	/* 
 	 * calculate the location of the dquot inside the buffer.
 	 */
-	ddq = (xfs_disk_dquot_t *)((char *)bp->b_addr + dqp->q_bufoffset);
+	ddq = (xfs_disk_dquot_t *)((char *)XFS_BUF_PTR(bp) + dqp->q_bufoffset);
 
 	/*
 	 * A simple sanity check in case we got a corrupted dquot...
@@ -960,9 +954,7 @@ xfs_qm_dqget(
 	 * The chain is kept locked during lookup.
 	 */
 	if (xfs_qm_dqlookup(mp, id, h, O_dqpp) == 0) {
-#ifndef _IRIX62_XFS_ONLY
 		XFS_STATS_INC(xs_qm_dqcachehits);
-#endif
 		/* 
 		 * The dquot was found, moved to the front of the chain, 
 		 * taken off the freelist if it was on it, and locked
@@ -974,9 +966,7 @@ xfs_qm_dqget(
 		xfs_dqtrace_entry(*O_dqpp, "DQGET DONE (FROM CACHE)"); 
 		return (0);	/* success */
 	}
-#ifndef _IRIX62_XFS_ONLY
 	 XFS_STATS_INC(xs_qm_dqcachemisses);
-#endif
 
 	/* 
 	 * Dquot cache miss. We don't want to keep the inode lock across 
@@ -1077,9 +1067,7 @@ xfs_qm_dqget(
 			xfs_qm_dqput(tmpdqp);
 			XFS_DQ_HASH_UNLOCK(h);
 			xfs_qm_dqdestroy(dqp);
-#ifndef _IRIX62_XFS_ONLY
 			XFS_STATS_INC(xs_qm_dquot_dups); 
-#endif
 			goto again;
 		}
 	}
@@ -1308,7 +1296,7 @@ xfs_qm_dqflush(
 	 * If the buffer is pinned then push on the log so we won't
 	 * get stuck waiting in the write for too long.
 	 */
-	if (bp->b_pincount > 0) {
+	if (XFS_BUF_ISPINNED(bp)) {
 		xfs_dqtrace_entry(dqp, "DQFLUSH LOG FORCE");
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 	}
@@ -1729,12 +1717,11 @@ xfs_qm_dqflock_pushbuf_wait(
 		    XFS_INCORE_TRYLOCK);
 	if (bp != NULL) {
 		if (XFS_BUF_ISDELAYWRITE(bp)) {
-			if (bp->b_pincount > 0) {
+			if (XFS_BUF_ISPINNED(bp)) {
 				xfs_log_force(dqp->q_mount,
 					      (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);
 			}
-			XFS_UNDELAY_WRITE(bp);
 			xfs_bawrite(dqp->q_mount, bp);
 		} else {
 			xfs_buf_relse(bp);
@@ -1742,5 +1729,3 @@ xfs_qm_dqflock_pushbuf_wait(
 	}
 	xfs_dqflock(dqp);
 }
-
-

@@ -29,20 +29,16 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.39 $"
 
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/kmem.h>
-#include <sys/debug.h>
-#include <sys/cmn_err.h>
+#include <xfs_os_defs.h>
+#include <linux/xfs_cred.h>
 #include <sys/vfs.h>
-#include <sys/systm.h>
-#include <sys/ktrace.h>
+#include <sys/vnode.h>
+#include <sys/debug.h>
 #include <sys/quota.h>
-#include "xfs_macros.h"
+#include <sys/systm.h>
+
+#include "xfs_buf.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -499,10 +495,7 @@ xfs_qm_scall_trunc_qfiles(
 
 	if ((flags & XFS_DQ_USER) &&
 	    mp->m_sb.sb_uquotino != NULLFSINO) {
-		error = xfs_iget(mp, NULL, 
-				 mp->m_sb.sb_uquotino,
-				 NULL,
-				 &qip, 0);
+		error = xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 0, &qip, 0);
 		if (! error) {
 			(void) xfs_truncate_file(mp, qip);
 			VN_RELE(XFS_ITOV(qip));
@@ -511,10 +504,7 @@ xfs_qm_scall_trunc_qfiles(
 	
 	if ((flags & XFS_DQ_PROJ) &&
 	    mp->m_sb.sb_pquotino != NULLFSINO) {
-		error = xfs_iget(mp, NULL, 
-				 mp->m_sb.sb_pquotino,
-				 NULL,
-				 &qip, 0);
+		error = xfs_iget(mp, NULL, mp->m_sb.sb_pquotino, 0, &qip, 0);
 		if (! error) {
 			(void) xfs_truncate_file(mp, qip);
 			VN_RELE(XFS_ITOV(qip));
@@ -713,13 +703,11 @@ xfs_qm_scall_getqstat(
 		pip = mp->m_quotainfo->qi_pquotaip;
 	}
 	if (!uip && mp->m_sb.sb_uquotino != NULLFSINO) {
-		if (xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 0,
-			     &uip, 0) == 0) 
+		if (xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 0, &uip, 0) == 0) 
 			tempuqip = B_TRUE;
 	}
 	if (!pip && mp->m_sb.sb_pquotino != NULLFSINO) {
-		if (xfs_iget(mp, NULL, mp->m_sb.sb_pquotino, 0,
-			     &pip, 0) == 0) 
+		if (xfs_iget(mp, NULL, mp->m_sb.sb_pquotino, 0, &pip, 0) == 0) 
 			temppqip = B_TRUE;
 	}
 	if (uip) {
@@ -1594,7 +1582,7 @@ int
 xfs_qm_internalqcheck(
 	xfs_mount_t	*mp)
 {
-	ino64_t 	lastino;
+	xfs_ino_t 	lastino;
 	int 		done, count;
 	int		i;
 	xfs_dqtest_t	*d, *e;
@@ -1611,9 +1599,9 @@ xfs_qm_internalqcheck(
 		return XFS_ERROR(ESRCH);
 	
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	bflush(mp->m_dev);
+	XFS_bflush(mp->m_ddev_targ);
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	bflush(mp->m_dev);
+	XFS_bflush(mp->m_ddev_targ);
 	
 	mutex_lock(&qcheck_lock, PINOD);
 	/* There should be absolutely no quota activity while this

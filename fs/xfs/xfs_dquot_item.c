@@ -29,20 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.18 $"
 
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/kmem.h>
-#ifdef DEBUG
+#include <xfs_os_defs.h>
+#include <linux/xfs_cred.h>
 #include <sys/debug.h>
-#include <sys/kabi.h>
-#endif
-#include <sys/vfs.h>
-#include <sys/systm.h>
 
+#include "xfs_buf.h"
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -75,7 +67,6 @@
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
-#include "xfs_rw.h"
 
 STATIC uint		xfs_qm_dquot_logitem_size(xfs_dq_logitem_t *logitem);
 STATIC void		xfs_qm_dquot_logitem_format(xfs_dq_logitem_t *logitem,
@@ -228,7 +219,7 @@ xfs_qm_dquot_logitem_push(
          * lock without sleeping, then there must not have been
          * anyone in the process of flushing the dquot.
          */
-	xfs_qm_dqflush(dqp, B_DELWRI);
+	xfs_qm_dqflush(dqp, XFS_B_DELWRI);
 	xfs_dqunlock(dqp);
 
 }
@@ -318,9 +309,9 @@ xfs_qm_dquot_logitem_pushbuf(
 	    	return;
 	}
 	mp = dqp->q_mount;
-	bp = incore(mp->m_dev, qip->qli_format.qlf_blkno, 
+	bp = xfs_incore(mp->m_ddev_targ, qip->qli_format.qlf_blkno, 
 		    XFS_QI_DQCHUNKLEN(mp),
-		    INCORE_TRYLOCK);
+		    XFS_INCORE_TRYLOCK);
 	if (bp != NULL) {
 		if (XFS_BUF_ISDELAYWRITE(bp)) {
 			dopush = ((qip->qli_item.li_flags & XFS_LI_IN_AIL) && 
@@ -328,7 +319,7 @@ xfs_qm_dquot_logitem_pushbuf(
 			qip->qli_pushbuf_flag = 0;
 			xfs_dqunlock(dqp);
 
-			if (bp->b_pincount > 0) {
+			if (XFS_BUF_ISPINNED(bp)) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);
 			}
