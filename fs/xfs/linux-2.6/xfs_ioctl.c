@@ -774,7 +774,8 @@ xfs_readlink_by_handle(
 }
 
 
-int xfs_ioctl (
+int
+xfs_ioctl(
 	bhv_desc_t	*bdp,
 	struct inode	*inode,
 	struct file	*filp,
@@ -1163,6 +1164,7 @@ int xfs_ioctl (
 		error = xfs_growfs_data(mp, &in);
 		if (error)
 			return -error;
+		return error;
 	}
 
 	case XFS_IOC_FSGROWFSLOG: {
@@ -1173,6 +1175,7 @@ int xfs_ioctl (
 		error = xfs_growfs_log(mp, &in);
 		if (error)
 			return -error;
+		return error;
 	}
 
 	case XFS_IOC_FSGROWFSRT: {
@@ -1183,6 +1186,7 @@ int xfs_ioctl (
 		error = xfs_growfs_rt(mp, &in);
 		if (error)
 			return -error;
+		return error;
 	}
 
 

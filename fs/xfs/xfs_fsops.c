@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.55 $"
+#ident	"$Revision: 1.56 $"
 
 #include <xfs_os_defs.h>
 
@@ -161,8 +161,9 @@ xfs_growfs_data_private(
 	ASSERT(bp);
 	xfs_buf_relse(bp);
 
-	nb_mod = do_div(nb, mp->m_sb.sb_agblocks);
-	nagcount = nb + (nb_mod != 0);
+	new = nb;	/* use new as a temporary here */
+	nb_mod = do_div(new, mp->m_sb.sb_agblocks);
+	nagcount = new + (nb_mod != 0);
 	if (nb_mod && nb_mod < XFS_MIN_AG_BLOCKS) {
 		nagcount--;
 		nb = nagcount * mp->m_sb.sb_agblocks;
@@ -173,11 +174,10 @@ xfs_growfs_data_private(
 	oagcount = mp->m_sb.sb_agcount;
 	if (nagcount > oagcount) {
 		mrlock(&mp->m_peraglock, MR_UPDATE, PINOD);
-		mp->m_perag =
-		  XFS_kmem_realloc(mp->m_perag,
-						   sizeof(xfs_perag_t) * nagcount,
-						   sizeof(xfs_perag_t) * oagcount,
-						   KM_SLEEP);
+		mp->m_perag = XFS_kmem_realloc(mp->m_perag,
+			sizeof(xfs_perag_t) * nagcount,
+			sizeof(xfs_perag_t) * oagcount,
+			KM_SLEEP);
 		bzero(&mp->m_perag[oagcount],
 			(nagcount - oagcount) * sizeof(xfs_perag_t));
 		mrunlock(&mp->m_peraglock);
