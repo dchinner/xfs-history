@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.145 $"
+#ident	"$Revision: 1.147 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -205,7 +205,7 @@ xlog_recover_iodone(
 	xfs_mount_t	*mp;
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *));
 	
-	if (geterror(bp)) {
+	if (XFS_BUF_GETERROR(bp)) {
 		/*
 		 * We're not going to bother about retrying 
 		 * this during recovery. One strike!
@@ -1920,7 +1920,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	if (XFS_BUF_ISERROR(bp)) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
 				  mp->m_dev, imap.im_blkno);
-		error = bp->b_error;
+		error = XFS_BUF_GETERROR(bp);
 		xfs_buf_relse(bp);
 		return error;
 	}

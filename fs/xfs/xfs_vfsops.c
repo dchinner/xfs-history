@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.230 $"
+#ident  "$Revision: 1.233 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1317,7 +1317,7 @@ xfs_isdev(
 		return 1;
 
 	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
-	error = (bp->b_flags & B_ERROR) ? 1 : 0;
+	error = (XFS_BUF_ISERROR(bp)) ? 1 : 0;
 
 	if (error == 0) {
 		sbp = XFS_BUF_TO_SBP(bp);
@@ -1326,7 +1326,7 @@ xfs_isdev(
 			(sbp->sb_inprogress != 0);
 	}
 
-	bp->b_flags |= B_AGE;
+	XFS_BUF_AGE(bp);
 	xfs_buf_relse(bp);
 	return error;
 }
@@ -1461,8 +1461,9 @@ xfs_mountroot(
 			 */
 			bp = xfs_getsb(mp, 0);
 			if (bp->b_pincount == 0) {
-				bp->b_flags &= ~(B_DONE | B_READ);
-				bp->b_flags |= B_WRITE;
+				XFS_BUF_UNDONE(bp);
+				XFS_BUF_UNREAD(bp);
+				XFS_BUF_WRITE(bp);
 				ASSERT(mp->m_dev == XFS_BUF_TARGET(bp));
 				xfsbdstrat(mp, bp);
 				(void) iowait(bp);
@@ -1896,16 +1897,16 @@ devvptoxfs(
 		 * what should be on the disk.
 		 */
 		bp = incore(dev, XFS_SB_DADDR, BLKDEV_BB, 1);
-		if (bp && !(bp->b_flags & B_DELWRI)) {
-			bp->b_flags |= B_STALE;
+		if (bp && !(XFS_BUF_ISDELAYWRITE(bp))) {
+			XFS_BUF_STALE(bp);
 			xfs_buf_relse(bp);
 			bp = NULL;
 		}
 		if (!bp) {
 			bp = xfs_buf_read(&target, XFS_SB_DADDR, BLKDEV_BB, 0);
 		}
-		if (bp->b_flags & B_ERROR) {
-			error = bp->b_error;
+		if (XFS_BUF_ISERROR(bp)) {
+		  error = XFS_BUF_GETERROR(bp); 
 			xfs_buf_relse(bp);
 			bp = NULL;
 		} else
@@ -2666,7 +2667,7 @@ xfs_syncsub(
 				if ((bip != NULL) &&
 				    xfs_buf_item_dirty(bip)) {
 					if (bp->b_pincount == 0) {
-						bp->b_flags |= B_ASYNC;
+						XFS_BUF_ASYNC(bp);
 						error = xfs_bwrite(mp, bp);
 					} else {
 						xfs_buf_relse(bp);
@@ -2690,7 +2691,7 @@ xfs_syncsub(
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);
 			}
-			bp->b_flags |= fflag;
+			XFS_BUF_BFLAGS(bp) |= fflag;
 			error = xfs_bwrite(mp, bp);
 		}
 		if (error) {

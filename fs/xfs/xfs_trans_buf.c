@@ -1,4 +1,4 @@
-#ident "$Revision: 1.63 $"
+#ident "$Revision: 1.67 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -130,17 +130,16 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		ASSERT(valusema(&bp->b_lock) <= 0);
 		if (XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
 			buftrace("TRANS GET RECUR SHUT", bp);
-			bp->b_flags &= ~(B_DONE|B_DELWRI);
-			bp->b_flags |= B_STALE;
+			XFS_BUF_SUPER_STALE(bp);
 		}
 		/*
 		 * If the buffer is stale then it was binval'ed
 		 * since last read.  This doesn't matter since the
 		 * caller isn't allowed to use the data anyway.
 		 */
-		else if (bp->b_flags & B_STALE) {
+		else if (XFS_BUF_ISSTALE(bp)) {
 			buftrace("TRANS GET RECUR STALE", bp);
-			ASSERT((bp->b_flags & B_DELWRI) == 0);
+			ASSERT(XFS_BUF_ISDELAYWRITE(bp));
 		}
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
@@ -392,7 +391,7 @@ xfs_trans_read_buf(
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 		ASSERT((bp->b_flags & B_ERROR) == 0);
-		if (!(bp->b_flags & B_DONE)) {
+		if (!(XFS_BUF_ISDONE(bp))) {
 			buftrace("READ_BUF_INCORE !DONE", bp);
 #ifndef SIM
 #ifdef PAIN_IN_THE_ASS_UNDER_LINUX
@@ -464,10 +463,9 @@ xfs_trans_read_buf(
 		return 0;
 	}
 	if (geterror(bp) != 0) {
-		bp->b_flags |= B_STALE;
-		bp->b_flags &= ~(B_DONE|B_DELWRI);
+	    XFS_BUF_SUPER_STALE(bp);
 		buftrace("READ ERROR", bp);
-		error = geterror(bp);
+		error = XFS_BUF_GETERROR(bp);
 			
 		xfs_ioerror_alert("xfs_trans_read_buf", mp, 
 				  target->dev, blkno);
@@ -832,7 +830,8 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	 * inside the b_bdstrat callback so that this won't get written to
 	 * disk.
 	 */
-	bp->b_flags |= B_DELWRI | B_DONE;
+	XFS_BUF_DELAYWRITE(bp);
+	XFS_BUF_DONE(bp);
 
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 	ASSERT(bip->bli_refcount > 0);
@@ -848,8 +847,9 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		xfs_buf_item_trace("BLOG UNSTALE", bip);
 		bip->bli_flags &= ~XFS_BLI_STALE;
-		ASSERT(bp->b_flags & B_STALE);
-		bp->b_flags &= ~B_STALE;
+		/* note this will have to change for page_buf interface... unstale isn't really an option RMC */
+		ASSERT(XFS_BUF_ISSTALE(bp));
+		XFS_BUF_UNSTALE(bp);
 		bip->bli_format.blf_flags &= ~XFS_BLI_CANCEL;
 	}
 
@@ -936,8 +936,8 @@ xfs_trans_binval(
 	 * We set the stale bit in the buffer as well since we're getting
 	 * rid of it.
 	 */
-	bp->b_flags &= ~B_DELWRI;
-	bp->b_flags |= B_STALE;
+	XFS_BUF_UNDELAYWRITE(bp);
+	XFS_BUF_STALE(bp);
 	bip->bli_flags |= XFS_BLI_STALE;
 	bip->bli_flags &= ~(XFS_BLI_LOGGED | XFS_BLI_DIRTY);
 	bip->bli_format.blf_flags &= ~XFS_BLI_INODE_BUF;

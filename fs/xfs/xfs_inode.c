@@ -1,4 +1,4 @@
-#ident "$Revision: 1.257 $"
+#ident "$Revision: 1.260 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -2888,6 +2888,7 @@ xfs_iflush(
 	int			clcount;	/* count of inodes clustered */
 	vnode_t			*vp;
 	int			bufwasdelwri;
+	enum { INT_DELWRI = (1 << 0), INT_ASYNC = (1 << 1) };
 	SPLDECL(s);
 
 	XFSSTATS.xs_iflush_count++;
@@ -2960,10 +2961,10 @@ xfs_iflush(
 			break;
 		case XFS_IFLUSH_ASYNC:
 		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
-			flags = B_ASYNC;
+			flags = INT_ASYNC;
 			break;
 		case XFS_IFLUSH_DELWRI:
-			flags = B_DELWRI;
+			flags = INT_DELWRI;
 			break;
 		default:
 			ASSERT(0);
@@ -2975,10 +2976,10 @@ xfs_iflush(
 		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
 		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
 		case XFS_IFLUSH_DELWRI:
-			flags = B_DELWRI;
+			flags = INT_DELWRI;
 			break;
 		case XFS_IFLUSH_ASYNC:
-			flags = B_ASYNC;
+			flags = INT_ASYNC;
 			break;
 		case XFS_IFLUSH_SYNC:
 			flags = 0;
@@ -3088,9 +3089,9 @@ xfs_iflush(
 #ifdef SIM
 	error = xfs_bwrite(mp, bp);
 #else
-	if (flags & B_DELWRI) {
+	if (flags & INT_DELWRI) {
 		xfs_bdwrite(mp, bp);
-	} else if (flags & B_ASYNC) {
+	} else if (flags & INT_ASYNC) {
 		xfs_bawrite(mp, bp);
 	} else {
 		error = xfs_bwrite(mp, bp);

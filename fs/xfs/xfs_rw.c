@@ -1,4 +1,5 @@
-#ident "$Revision: 1.284 $"
+#ident "$Revision: 1.286 $"
+
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -4495,7 +4496,7 @@ xfs_zero_bp(
 	caddr_t	page_addr;
 	int	len;
 
-	if (BP_ISMAPPED(bp)) {
+	if (XFS_BUF_BP_ISMAPPED(bp)) {
 		bzero(XFS_BUF_PTR(bp) + data_offset, data_len);
 		return;
 	}
@@ -5707,7 +5708,7 @@ xfs_check_bp(
 	bp_len_fsb = XFS_BB_TO_FSB(mp, bp->b_offset + BTOBB(bp->b_bcount)) -
 		     XFS_BB_TO_FSBT(mp, bp->b_offset);
 	ASSERT(bp_len_fsb > 0);
-	if (bp->b_flags & B_UNINITIAL) {
+	if (XFS_BUF_ISUNINITIAL(bp)) {
 		nimaps = 2;
 		bmapi_flags = XFS_BMAPI_WRITE|XFS_BMAPI_IGSTATE;
 	} else {
@@ -6468,7 +6469,7 @@ xfs_bioerror(
 {
 
 #ifdef XFSERRORDEBUG
-	ASSERT(bp->b_flags & B_READ || bp->b_iodone);
+	ASSERT(XFS_BUF_ISREAD(bp) || bp->b_iodone);
 #endif
 
 	/*
@@ -6483,8 +6484,10 @@ xfs_bioerror(
 	 * probably is the best way since it takes care of
 	 * GRIO as well.
 	 */
-	bp->b_flags &= ~(B_READ|B_DELWRI|B_DONE);
-	bp->b_flags |= B_STALE;
+	XFS_BUF_UNREAD(bp);
+	XFS_BUF_UNDELAYWRITE(bp);
+	XFS_BUF_UNDONE(bp);
+	XFS_BUF_STALE(bp);
 
 	bp->b_bdstrat = NULL;
 	biodone(bp);
@@ -6510,7 +6513,7 @@ xfs_bioerror_relse(
 	ASSERT(bp->b_iodone != xlog_iodone);
 
 	buftrace("XFS IOERRELSE", bp);
-	fl = bp->b_flags;
+	fl = XFS_BUF_BFLAGS(bp);
 	/*
 	 * No need to wait until the buffer is unpinned.
 	 * We aren't flushing it.
@@ -6519,8 +6522,10 @@ xfs_bioerror_relse(
 	 * we actually finish the I/O or not. We don't want to
 	 * change that interface.
 	 */
-	bp->b_flags &= ~(B_READ|B_DELWRI);
-	bp->b_flags |= B_DONE|B_STALE;
+	XFS_BUF_UNREAD(bp);
+	XFS_BUF_UNDELAYWRITE(bp);
+	XFS_BUF_DONE(bp);
+	XFS_BUF_STALE(bp);
 	bp->b_iodone = NULL;
 	bp->b_bdstrat = NULL;
 	if (!(fl & B_ASYNC)) {
@@ -6565,7 +6570,7 @@ xfs_ioerror_alert(
  * the error checking stuff and the brelse if appropriate for
  * the caller, so the code can be a little leaner.
  */
-#if 1
+#if 1 /* !defined(__linux__) */
 int
 xfs_read_buf(
 	struct xfs_mount *mp,
@@ -6586,9 +6591,10 @@ xfs_read_buf(
 		*bpp = NULL;
 		if (!error)
 			error = XFS_ERROR(EIO);
-		if (bp) {	
-			bp->b_flags &= ~(B_DONE|B_DELWRI);
-			bp->b_flags |= B_STALE;
+		if (bp) {
+		    XFS_BUF_UNDONE(bp);
+		    XFS_BUF_UNDELAYWRITE(bp);
+		    XFS_BUF_STALE(bp);
 			/* 
 			 * brelse clears B_ERROR and b_error
 			 */
@@ -6603,7 +6609,7 @@ xfs_read_buf(
  * Wrapper around bwrite() so that we can trap 
  * write errors, and act accordingly.
  */
-#if 1
+#if 1 /*  !defined(__linux__) */
 int
 xfs_bwrite(
 	struct xfs_mount *mp,
@@ -6615,7 +6621,7 @@ xfs_bwrite(
 	 * XXXsup how does this work for quotas.
 	 */
 	ASSERT(bp->b_target);
-	ASSERT(bp->b_vp == NULL);
+	ASSERT(bp->b_vp == #NULL);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xfs_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE3(bp, mp);
 
@@ -6663,7 +6669,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 		 * with a transaction, and can be ignored.
 		 */
 		if (bp->b_iodone == NULL &&
-		    (bp->b_flags & B_READ) == 0)
+		    (XFS_BUF_ISREAD(bp)) == 0)
 			return (xfs_bioerror_relse(bp));
 		else
 			return (xfs_bioerror(bp));
@@ -6693,7 +6699,7 @@ xfsbdstrat(
 		 * path, and are uncontrolled. If we want to rectify
 		 * that, use griostrategy2.
 		 */
-		if ( (BUF_IS_GRIO(bp)) &&
+		if ( (XFS_BUF_IS_GRIO(bp)) &&
 				(dev_major != XLV_MAJOR) ) {
 			griostrategy(bp);
 		} else {
@@ -7194,7 +7200,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 		bp->av_forw = bp;
 		bp->av_back = bp;
 		
-		bp->b_flags |= B_STALE;
+		XFS_BUF_STALE(bp);
 		io = bp->b_private;
 		atomicAddInt(&(io->io_queued_bufs), -1);
 		bp->b_private = NULL;
@@ -7363,7 +7369,7 @@ xfs_inval_cached_pages(
  * written.  This is only used for filesystems that don't support unwritten
  * extents.
  */
-#if 1 /* !defined(__linux__) */
+#if  !defined(__linux__) 
 STATIC int
 xfs_dio_write_zero_rtarea(
 	xfs_inode_t	*ip,
@@ -7433,7 +7439,7 @@ xfs_dio_write_zero_rtarea(
 			continue;
 		}
 		remain_count = XFS_FSB_TO_B(mp, remain_count);
-		nbp->b_flags     = bp->b_flags;
+		XFS_BUF_BFLAGS(nbp)  = XFS_BUF_BFLAGS(bp);
 		nbp->b_bcount    = (bufsize < remain_count) ? bufsize :
 						remain_count;
  	    	nbp->b_error     = 0;
@@ -7473,7 +7479,7 @@ xfs_dio_write_zero_rtarea(
  * RETURNS:
  *	error 
  */
-#if 1 
+#if !defined(__linux__) 
 int
 xfs_dio_read(
 	xfs_dio_t *diop)
@@ -7752,7 +7758,7 @@ retry:
  * RETURNS:
  *	error
  */
-#if 1 
+#if !defined(__linux__)  
 int
 xfs_dio_write(
 	xfs_dio_t *diop)

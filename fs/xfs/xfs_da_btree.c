@@ -2166,7 +2166,7 @@ xfs_da_do_buf(
 		case 0:
 			bp = xfs_trans_get_buf(trans, mp->m_ddev_targp,
 				mappedbno, nmapped, 0);
-			error = bp ? geterror(bp) : XFS_ERROR(EIO);
+			error = bp ? XFS_BUF_GETERROR(bp) : XFS_ERROR(EIO);
 			break;
 		case 1:
 #ifdef XFS_REPAIR_SIM

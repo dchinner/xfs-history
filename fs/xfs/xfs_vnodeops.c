@@ -1,4 +1,4 @@
-#ident "$Revision: 1.422 $"
+#ident "$Revision: 1.424 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1329,7 +1329,7 @@ xfs_readlink(
                         byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
                         bp = xfs_buf_read(mp->m_ddev_targp, d,
 				      BTOBB(byte_cnt), 0);
-			error = geterror(bp);
+			error = XFS_BUF_GETERROR(bp);
 			if (error) {
 				xfs_buf_relse(bp);
 				goto error_return;
@@ -6552,8 +6552,9 @@ xfs_zero_remaining_bytes(
 		ASSERT(imap.br_startblock != DELAYSTARTBLOCK);
 		if (imap.br_state == XFS_EXT_UNWRITTEN)
 			continue;
-		bp->b_flags &= ~(B_DONE | B_WRITE);
-		bp->b_flags |= B_READ;
+		XFS_BUF_UNDONE(bp);	
+		XFS_BUF_UNWRITE(bp);
+		XFS_BUF_READ(bp);
 		XFS_BUF_SET_ADDR(bp, XFS_FSB_TO_DB(ip, imap.br_startblock));
 		bp_dcache_wbinval(bp);
 		xfsbdstrat(mp, bp); 
@@ -6562,8 +6563,9 @@ xfs_zero_remaining_bytes(
 		bzero(XFS_BUF_PTR(bp) +
 			(offset - XFS_FSB_TO_B(mp, imap.br_startoff)),
 		      lastoffset - offset + 1);
-		bp->b_flags &= ~(B_DONE | B_READ);
-		bp->b_flags |= B_WRITE;
+		XFS_BUF_UNDONE(bp);	
+		XFS_BUF_UNREAD(bp);
+		XFS_BUF_WRITE(bp);
 		xfsbdstrat(mp, bp);
 		if (error = iowait(bp))
 			break;

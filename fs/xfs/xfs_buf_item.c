@@ -1,4 +1,4 @@
-#ident "$Revision: 1.79 $"
+#ident "$Revision: 1.82 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -1228,7 +1228,7 @@ xfs_buf_iodone_callbacks(
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 	lip = XFS_BUF_FSPRIVATE(bp, xfs_log_item_t *);
 
-	if (geterror(bp) != 0) {
+	if (XFS_BUF_GETERROR(bp) != 0) {
 		/*
 		 * If we've already decided to shutdown the filesystem
 		 * because of IO errors, there's no point in giving this
@@ -1280,7 +1280,7 @@ xfs_buf_iodone_callbacks(
 			 * before we start the umount; we don't want these
 			 * DELWRI metadata bufs to be hanging around.
 			 */
-			XFS_BUF_ERROR(bp,0); /* errno of 0 unsets the flag */
+		  XFS_BUF_ERROR(bp,0); /* errno of 0 unsets the flag */
 
 			if (!(XFS_BUF_ISSTALE(bp))) {
 				XFS_BUF_DELAYWRITE(bp);

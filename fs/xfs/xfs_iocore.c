@@ -226,9 +226,9 @@ xfs_checklock(
 
 xfs_ioops_t	xfs_iocore_xfs = {
 #ifndef SIM
-	(xfs_dio_write_t) xfs_dio_write,
-	(xfs_dio_read_t) xfs_dio_read,
-	(xfs_strat_write_t)fs_nosys,/*(xfs_strat_write_t) xfs_strat_write, */
+    (xfs_dio_write_t)fs_nosys,   /*(xfs_dio_write_t) xfs_dio_write, */
+    (xfs_dio_read_t)fs_nosys,    /*(xfs_dio_read_t) xfs_dio_read, */
+	(xfs_strat_write_t)fs_nosys, /*(xfs_strat_write_t) xfs_strat_write, */
 #endif
 	(xfs_bmapi_t) xfs_bmapi,
 	(xfs_bmap_eof_t) xfs_bmap_eof,

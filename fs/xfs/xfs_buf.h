@@ -4,7 +4,8 @@
 #ifdef SIM
 #define _USING_BUF_T
 #else
-#define _USING_BUF_T
+#define _USING_BUF_T 
+// #define _USING_PAGEBUF_T 
 #endif
 
 #ifdef _USING_BUF_T
@@ -28,7 +29,7 @@ typedef struct buf xfs_buf_t;
 
 
 #define XFS_BUF_ERROR(x,no)      bioerror(x,no)
-#define XFS_BUF_GETERROR(x)      geterror(x);
+#define XFS_BUF_GETERROR(x)      geterror(x)
 #define XFS_BUF_ISERROR(x)       ((x)->b_flags & B_ERROR)
 
 #define XFS_BUF_DONE(x)          ((x)->b_flags |= B_DONE)
@@ -67,8 +68,14 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_ISUNINITIAL(x)   ((x)->b_flags & B_UNINITIAL)
 #define XFS_BUF_UNUNINITIAL(x)   ((x)->b_flags &= ~B_UNINITIAL)
 
+#define XFS_BUF_AGE(x)        ((x)->b_flags |= B_AGE)
+
 /* hmm what does the mean on linux? may go away */
 #define XFS_BUF_PAGEIO(x)       ((x)->b_flags & B_PAGEIO)
+
+#define XFS_BUF_BP_ISMAPPED(bp) ((bp->b_flags & (B_PAGEIO|B_MAPPED)) != B_PAGEIO)
+#define XFS_BUF_IS_IOSPL(bp) (bp->b_flags & (B_GR_BUF|B_PRV_BUF))           
+#define XFS_BUF_IS_GRIO( bp )               (bp->b_flags &   B_GR_BUF)
 
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->b_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
@@ -144,6 +151,68 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #ifdef _USING_PAGEBUF_T
 #include <linux/page_buf.h>
 
+#define XFS_BUF_BFLAGS(x)            ((x)->pb_flags)  /* debugging routines might need this */
+#define XFS_BUF_ZEROFLAGS(x)            ((x)->pb_flags = 0) 
+#define XFS_BUF_STALE(x)	     pagebuf_free_inval(x)
+#define XFS_BUF_UNSTALE(x)	     printf("errror XFS_BUF_UNSTALE not implemented\n");
+#define XFS_BUF_ISSTALE(x)	     ((x)->pb_flags & PBF_FREED)
+#define XFS_BUF_SUPER_STALE(x)    pagebuf_free_inval(x);\
+                                 (x)->pb_flags &= ~(PBF_DELWRI|PBF_COMPLETED)
+
+#define XFS_BUF_DELAYWRITE(x)	     ((x)->pb_flags |= PBF_DELWRI)
+#define XFS_BUF_UNDELAYWRITE(x)	 ((x)->pb_flags &= ~PBF_DELWRI)
+#define XFS_BUF_ISDELAYWRITE(x)	 ((x)->pb_flags & PBF_DELWRI)
+
+
+#define XFS_BUF_ERROR(x,no)      pagebuf_seterror(x,no)
+#define XFS_BUF_GETERROR(x)      pagebuf_ioerror(x)
+#define XFS_BUF_ISERROR(x)       /* error! not implemeneted yet */
+
+#define XFS_BUF_DONE(x)          ((x)->pb_flags |= PBF_COMPLETED)
+#define XFS_BUF_UNDONE(x)    	 ((x)->pb_flags &= ~PBF_COMPLETED)
+#define XFS_BUF_ISDONE(x)	     ((x)->pb_flags & PBF_COMPLETED)
+
+#define XFS_BUF_BUSY(x)          ((x)->pb_flags |= PBF_BUSY)
+#define XFS_BUF_UNBUSY(x)    	 ((x)->pb_flags &= ~PBF_BUSY)
+#define XFS_BUF_ISBUSY(x)	     ((x)->pb_flags & PBF_BUSY)
+
+#define XFS_BUF_ASYNC(x)         ((x)->pb_flags |= PBF_ASYNC)
+#define XFS_BUF_UNASYNC(x)     	 ((x)->pb_flags &= ~PBF_ASYNC)
+#define XFS_BUF_ISASYNC(x)       ((x)->pb_flags & PBF_ASYNC)
+
+#define XFS_BUF_SHUT(x)          /* error! not implemeneted yet */
+#define XFS_BUF_UNSHUT(x)     	 /* error! not implemeneted yet */
+#define XFS_BUF_ISSHUT(x)        (0)
+
+#define XFS_BUF_HOLD(x)        /* error! not implemeneted yet */  
+#define XFS_BUF_UNHOLD(x)       /* error! not implemeneted yet */
+#define XFS_BUF_ISHOLD(x)       (1)
+/* this may go away... calling iostart will define read or write */
+/* used for irix at the moment not needed for linux? */
+#define XFS_BUF_READ(x)         ((x)->pb_flags |= PBF_READ)
+#define XFS_BUF_UNREAD(x)       ((x)->pb_flags &= ~PBF_READ)
+#define XFS_BUF_ISREAD(x)       ((x)->pb_flags & PBF_READ)
+
+#define XFS_BUF_WRITE(x)        ((x)->pb_flags |= PBF_WRITE)
+#define XFS_BUF_UNWRITE(x)      ((x)->pb_flags &= ~PBF_WRITE)
+#define XFS_BUF_ISWRITE(x)      ((x)->pb_flags & PBF_WRITE)
+
+#define XFS_BUF_UNCACHED(x)      /* error! not implemeneted yet */
+#define XFS_BUF_UNUNCACHED(x)    /* error! not implemeneted yet */
+#define XFS_BUF_ISUNCACHED(x)    (0) 
+
+#define XFS_BUF_ISUNINITIAL(x)   ((x)->pb_flags & PBF_UNINITIAL)
+#define XFS_BUF_UNUNINITIAL(x)   ((x)->pb_flags &= ~PBF_UNINITIAL)
+
+#define XFS_BUF_AGE(x)        /* error! not implemeneted yet */
+
+#define XFS_BUF_BP_ISMAPPED(bp)  /* error! not implemeneted yet */
+#define XFS_BUF_IS_IOSPL(bp)      /* error! not implemeneted yet */
+#define XFS_BUF_IS_GRIO( bp )   /* error! not implemeneted yet */
+
+/* hmm what does the mean on linux? may go away */
+#define XFS_BUF_PAGEIO(x)        /* error! not implemeneted yet */
+
 typedef struct page_buf_s xfs_buf_t;
 #define xfs_buf page_buf_s
 
@@ -177,7 +246,7 @@ typedef struct buftarg {
 #define XFS_BUF_SET_FSPRIVATE2(buf, value)	\
 			(buf)->pb_fspriv2 = (void *)(value)
 #define XFS_BUF_FSPRIVATE3(buf, type)		\
-			((type)(buf)->pb_target.i_sb)
+
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
 
 #define XFS_BUF_PTR(bp)		((bp)->pb_addr)
@@ -200,6 +269,7 @@ typedef struct buftarg {
 #define xfs_bdwrite(mp, bp)			\
 			pb->pb_flags |= PBF_DELWRI; \
 			pagebuf_relse(bp)
+
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
 #define xfs_buf_relse(bp)	\
