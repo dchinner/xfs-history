@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_H
 #define	_FS_XFS_ATTR_H
 
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 /*
  * xfs_attr.h
@@ -32,6 +32,7 @@ struct cred;
 struct vnode;
 struct xfs_inode;
 struct attrlist_cursor_kern;
+struct xfs_da_args;
 
 /*
  * Overall external interface routines.
@@ -42,4 +43,10 @@ int xfs_attr_remove(bhv_desc_t *, char *, int, struct cred *);
 int xfs_attr_list(bhv_desc_t *, char *, int, int,
 			 struct attrlist_cursor_kern *, struct cred *);
 int xfs_attr_inactive(struct xfs_inode *dp);
+
+int xfs_attr_node_get(struct xfs_da_args *);
+int xfs_attr_leaf_get(struct xfs_da_args *);
+int xfs_attr_shortform_getvalue(struct xfs_da_args *);
+int xfs_attr_fetch(struct xfs_inode *, char *, char *, int);
+
 #endif	/* !_FS_XFS_ATTR_H */

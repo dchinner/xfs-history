@@ -1,4 +1,4 @@
-#ident "$Revision: 1.284 $"
+#ident "$Revision: 1.285 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -54,6 +54,7 @@
 #include <ksys/vfile.h>
 #include <sys/mode.h>
 #include <sys/var.h>
+#include <sys/mac_label.h>
 #include <sys/capability.h>
 #include <sys/flock.h>
 #include <sys/kfcntl.h>
@@ -682,6 +683,10 @@ xfs_setattr(
 
         xfs_ilock(ip, lock_flags);
 
+	if (_MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
+		code = XFS_ERROR(EACCES);
+		goto error_return;
+	}
         /*
          * Change file access modes.  Must be owner or privileged.
 	 * Also check here for xflags, extsize.
@@ -3408,7 +3413,10 @@ xfs_remove(
 		remove_which_error_return = __LINE__;
 		goto error_return;
 	}
-
+	if (error = _MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
+		remove_which_error_return = __LINE__;
+		goto error_return;
+	}
 	if (error = xfs_stickytest(dp, ip, credp)) {
 		remove_which_error_return = __LINE__;
 		goto error_return;
@@ -5175,6 +5183,11 @@ xfs_rmdir(
 	error = xfs_lock_dir_and_entry(dp, name, cdp, dir_generation,
 				       &entry_changed);
 	if (error) {
+		xfs_trans_cancel(tp, cancel_flags);
+		VN_RELE(XFS_ITOV(cdp));
+		return error;
+	}
+	if (error = _MAC_XFS_IACCESS(cdp, MACWRITE, credp)) {
 		xfs_trans_cancel(tp, cancel_flags);
 		VN_RELE(XFS_ITOV(cdp));
 		return error;
