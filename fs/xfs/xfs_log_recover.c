@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.181 $"
+#ident	"$Revision: 1.182 $"
 
 #include <xfs_os_defs.h>
 
@@ -3385,7 +3385,6 @@ xlog_recover(xlog_t *log, int readonly)
 {
 	xfs_daddr_t head_blk, tail_blk;
 	int	error;
-	xfs_mount_t *mp;
 
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk, readonly))
 		return error;
@@ -3432,7 +3431,7 @@ xlog_recover(xlog_t *log, int readonly)
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
 		if (readonly)
-			XFS_MTOVFS(mp)->vfs_flag |= VFS_RDONLY;
+		  XFS_MTOVFS(log->l_mp)->vfs_flag |= VFS_RDONLY;
 	}
 	return error;
 }	/* xlog_recover */
