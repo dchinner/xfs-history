@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.107 $"
+#ident	"$Revision: 1.108 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1329,15 +1329,24 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
 	break;
     }
     if (f->blf_type == XFS_LI_BUF) {
-	    printf("#regs:%d   start blkno:0x%llx   len:%d   bmap size:%d\n",
+	    printf("#regs:%d   start blkno:0x%llx   len:%d   bmap size:%d",
 		   f->blf_size, f->blf_blkno, f->blf_len, f->blf_map_size);
 	    blkno = (daddr_t)f->blf_blkno;
+	    i = f->blf_flags;
     } else {
-	    printf("#regs:%d   start blkno:0x%x   len:%d   bmap size:%d\n",
+	    printf("#regs:%d   start blkno:0x%x   len:%d   bmap size:%d",
 		   old_f->blf_size, old_f->blf_blkno, old_f->blf_len,
 		   old_f->blf_map_size);
 	    blkno = (daddr_t)old_f->blf_blkno;
+	    i = old_f->blf_flags;
     }
+    if (i)
+	printf("   flags: <%s%s%s%s>",
+		i & XFS_BLI_INODE_BUF ? "inode_buf " : "",
+		i & XFS_BLI_CANCEL ? "cancel " : "",
+		i & XFS_BLI_UDQUOT_BUF ? "udquot_buf " : "",
+		i & XFS_BLI_PDQUOT_BUF ? "pdquot_buf " : "");
+    printf("\n");
     num = f->blf_size-1;
     i = 1;
     while (num-- > 0) {

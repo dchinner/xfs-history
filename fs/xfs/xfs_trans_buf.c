@@ -1,4 +1,4 @@
-#ident "$Revision: 1.46 $"
+#ident "$Revision: 1.47 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -738,7 +738,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT((xfs_trans_t*)bp->b_fsprivate2 == tp);
 	ASSERT(bp->b_fsprivate != NULL);
-	ASSERT((first <= last) && (last <= bp->b_bcount));
+	ASSERT((first <= last) && (last < bp->b_bcount));
 	ASSERT((bp->b_iodone == NULL) ||
 	       (bp->b_iodone == xfs_buf_iodone_callbacks));
 
