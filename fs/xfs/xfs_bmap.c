@@ -3171,11 +3171,14 @@ xfs_bmap_finish(
 	ntp = xfs_trans_dup(*tp);
 	error = xfs_trans_commit(*tp, 0);
 	*tp = ntp;
+	*committed = 1;
+	/*
+	 * We have a new transaction, so we should return committed=1,
+	 * eventhough we're returning an error.
+	 */
 	if (error) {
-		*committed = 0;
 		return error;
 	}
-	*committed = 1;
 	if (error = xfs_trans_reserve(ntp, 0, logres, 0, XFS_TRANS_PERM_LOG_RES,
 			logcount))
 		return error;
