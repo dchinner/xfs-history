@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.201 $"
+#ident  "$Revision: 1.202 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1819,10 +1819,15 @@ xfs_sync(
 	xfs_dinode_t	*dip;
 	xfs_buf_log_item_t	*bip;
 	xfs_iptr_t	*ipointer;
+#ifdef DEBUG
 	boolean_t	ipointer_in = B_FALSE;
 
 #define IPOINTER_SET	ipointer_in = B_TRUE
 #define IPOINTER_CLR	ipointer_in = B_FALSE
+#else
+#define IPOINTER_SET
+#define IPOINTER_CLR
+#endif
 
 
 /* Insert a marker record into the inode list after inode ip. The list
@@ -1830,7 +1835,7 @@ xfs_sync(
  * longer be locked.
  */
 #define IPOINTER_INSERT(ip, mp)	{ \
-		ASSERT_ALWAYS(ipointer_in == B_FALSE); \
+		ASSERT(ipointer_in == B_FALSE); \
 		ipointer->ip_mnext = ip->i_mnext; \
 		ipointer->ip_mprev = ip; \
 		ip->i_mnext = (xfs_inode_t *)ipointer; \
@@ -1847,17 +1852,18 @@ xfs_sync(
  * past us.
  */
 #define IPOINTER_REMOVE(ip, mp)	{ \
-		ASSERT_ALWAYS (ipointer_in == B_TRUE); \
-		if (ipointer->ip_mnext == ipointer->ip_mprev) { \
-			mp->m_inodes = NULL; \
-			ip = NULL; \
-		} else { \
+		ASSERT(ipointer_in == B_TRUE); \
+		if (ipointer->ip_mnext != (xfs_inode_t *)ipointer) { \
 			ip = ipointer->ip_mnext; \
 			ip->i_mprev = ipointer->ip_mprev; \
 			ipointer->ip_mprev->i_mnext = ip; \
 			if (mp->m_inodes == (xfs_inode_t *)ipointer) { \
 				mp->m_inodes = ip; \
 			} \
+		} else { \
+			ASSERT(mp->m_inodes == (xfs_inode_t *)ipointer); \
+			mp->m_inodes = NULL; \
+			ip = NULL; \
 		} \
 		IPOINTER_CLR; \
 	}
@@ -1902,7 +1908,7 @@ xfs_sync(
 	IPOINTER_CLR;
 
 	do {
-		ASSERT_ALWAYS(ipointer_in == B_FALSE);
+		ASSERT(ipointer_in == B_FALSE);
 		ASSERT(vnode_refed == B_FALSE);
 		lock_flags = base_lock_flags;
 
@@ -2015,6 +2021,8 @@ xfs_sync(
 				continue;
 			}
 			xfs_ilock(ip, lock_flags);
+			ASSERT(vp == XFS_ITOV(ip));
+			ASSERT(ip->i_mount == mp);
 			vnode_refed = B_TRUE;
 		}
 
@@ -2046,7 +2054,7 @@ xfs_sync(
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		} else if (flags & SYNC_DELWRI) {
 			if (VN_DIRTY(vp)) {
-				/* We need to have droppped the lock here,
+				/* We need to have dropped the lock here,
 				 * so insert a marker if we have not already
 				 * done so.
 				 */
@@ -2131,6 +2139,8 @@ xfs_sync(
 						XFS_MOUNT_ILOCK(mp);
 						IPOINTER_REMOVE(ip, mp);
 						XFS_MOUNT_IUNLOCK(mp);
+						ASSERT(!(lock_flags &
+							XFS_IOLOCK_SHARED));
 						kmem_free(ipointer,
 							sizeof(xfs_iptr_t));
 						return (0);
@@ -2153,11 +2163,15 @@ xfs_sync(
 					if (ip != ipointer->ip_mprev) {
 						IPOINTER_REMOVE(ip, mp);
 						ASSERT(!vnode_refed);
+						ASSERT(!(lock_flags &
+							XFS_IOLOCK_SHARED));
 						continue;
 					}
 
+					ASSERT(ip->i_mount == mp);
 					if (xfs_ilock_nowait(ip,
 						    XFS_ILOCK_SHARED) == 0) {
+						ASSERT(ip->i_mount == mp);
 						/*
 						 * We failed to reacquire
 						 * the inode lock without
@@ -2172,6 +2186,7 @@ xfs_sync(
 						IPOINTER_REMOVE(ip_next, mp);
 					} else if ((ip->i_pincount == 0) &&
 						   xfs_iflock_nowait(ip)) {
+						ASSERT(ip->i_mount == mp);
 						/*
 						 * Since this is vfs_sync()
 						 * calling we only flush the
@@ -2188,6 +2203,7 @@ xfs_sync(
 						error = xfs_iflush(ip,
 							   XFS_IFLUSH_DELWRI);
 					} else {
+						ASSERT(ip->i_mount == mp);
 						IPOINTER_REMOVE(ip_next, mp);
 					}
 				}
@@ -2259,7 +2275,7 @@ xfs_sync(
 				IPOINTER_REMOVE(ip, mp);
 			}
 			XFS_MOUNT_IUNLOCK(mp);
-			ASSERT_ALWAYS (ipointer_in == B_FALSE);
+			ASSERT(ipointer_in == B_FALSE);
 			kmem_free(ipointer, sizeof(xfs_iptr_t));
 			return XFS_ERROR(error);
 		}
@@ -2279,11 +2295,11 @@ xfs_sync(
 			continue;
 		}
 
-		ASSERT_ALWAYS (ipointer_in == B_FALSE);
+		ASSERT(ipointer_in == B_FALSE);
 		ip = ip->i_mnext;
 	} while (ip != mp->m_inodes);
 	XFS_MOUNT_IUNLOCK(mp);
-	ASSERT_ALWAYS (ipointer_in == B_FALSE);
+	ASSERT(ipointer_in == B_FALSE);
 
 	/*
 	 * Get the Quota Manager to flush the dquots in a similar manner.
