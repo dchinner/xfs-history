@@ -45,7 +45,7 @@ mac_xfs_iaccess( xfs_inode_t *ip, mode_t mode, struct cred *cr )
 	if (xfs_attr_fetch(ip, SGI_MAC_FILE, (char *)&mac,
 			   sizeof(struct mac_label)) == 0) {
 		if ((mp = mac_add_label(&mac)) == NULL) {
-			return EACCES;
+			return mac_access(mac_high_low_lp, cr, mode);
 		}
 	}
 
