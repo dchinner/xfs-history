@@ -139,7 +139,7 @@ void
 linvfs_release_inode(struct inode *inode)
 {
 	if (inode) {
-		pagebuf_delwri_flush(inode);
+		pagebuf_delwri_flush(inode, 1);
 		pagebuf_lock_disable(inode);
 		truncate_inode_pages(&inode->i_data, 0L, TRUNC_NO_TOSS);
 		iput(inode);
@@ -422,25 +422,6 @@ linvfs_put_super(
 	kdev_t		dev = sb->s_dev;
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t		*rootvp, *cvp;
-
-
-#ifdef XFS_DELALLOC
-	int 		pb_min_save = PB_MIN_DIRTY_PAGES;
-
-	unlock_super(sb);
-
-	PB_MIN_DIRTY_PAGES = 0; /* force page cleaner to process all */
-	while (atomic_read(&pb_delalloc_pages) > 0) {
-		wake_up_interruptible(&pcd_waitq);
-		/* Sleep 10 mS - arbitrary */
-		schedule_timeout((10*HZ)/1000);
-	}
-	PB_MIN_DIRTY_PAGES = pb_min_save;
-
-	fsync_dev(sb->s_dev);
-
-	lock_super(sb);
-#endif
 
 	/*
 	 * Find the root vnode/inode, we can't

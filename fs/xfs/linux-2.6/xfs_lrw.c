@@ -1909,7 +1909,7 @@ _xfs_incore_relse(buftarg_t *targ,
 				  int	delwri_only,
 				  int	wait)
 {
-	truncate_inode_pages(&targ->inode->i_data, 0LL, TRUNC_NO_TOSS);
+	truncate_inode_pages(&targ->inode->i_data, 0LL, TRUNC_TOSS);
 	return 0;
 } 
 
@@ -2009,14 +2009,7 @@ xfs_pb_nfreer(page_buf_t *bp){
 void
 XFS_bflush(buftarg_t target)
 {
-	pagebuf_delwri_flush(target.inode);
-	run_task_queue(&tq_disk);
-}
-
-void
-XFS_pbflush(void)
-{
-//	wake_up_interruptible(&pbd_waitq);
+	pagebuf_delwri_flush(target.inode, 1);
 }
 
 dev_t
@@ -2029,8 +2022,6 @@ XFS_pb_target(page_buf_t *bp) {
 void
 xfs_trigger_io(void)
 {
-//	wake_up_interruptible(&pbd_waitq);
-
 	run_task_queue(&tq_disk);
 }
 

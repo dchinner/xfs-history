@@ -242,8 +242,6 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_bflush(buftarg)           \
             bflush(buftarg.dev) 
 
-#define XFS_pbflush(buftarg)
-
 #define xfs_incore_relse(buftarg,delwri_only,wait) \
             incore_relse(buftarg.dev,delwri_only,wait)
 
@@ -551,7 +549,6 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 
 
 extern void XFS_bflush(buftarg_t);
-extern void XFS_pbflush(void);
 
 #define xfs_incore_relse(buftarg,delwri_only,wait)	\
        _xfs_incore_relse(buftarg,delwri_only,wait)

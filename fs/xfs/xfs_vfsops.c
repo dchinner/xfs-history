@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.268 $"
+#ident  "$Revision: 1.269 $"
 
 #include <xfs_os_defs.h>
 
@@ -1797,7 +1797,7 @@ xfs_syncsub(
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 		} else if (flags & SYNC_DELWRI) {
-			if (VN_DIRTY(vp)) {
+			if (VN_DIRTY(vp) || ip->i_delayed_blks) {
 				/* We need to have dropped the lock here,
 				 * so insert a marker if we have not already
 				 * done so.
