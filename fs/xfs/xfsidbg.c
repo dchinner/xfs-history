@@ -106,6 +106,7 @@
  * External functions & data not in header files.
  */
 
+static xfs_qm_t	*xfs_Gqm = NULL;
 
 /*
  * Command table functions.
@@ -2184,7 +2185,7 @@ xfs_xnode_fork(char *name, xfs_ifork_t *f)
 	for (p = (int *)&f->if_u2;
 	     p < (int *)((char *)&f->if_u2 + XFS_INLINE_DATA);
 	     p++)
-		qprintf(" 0x%w32x", *p);
+		qprintf(" 0x%x", *p);
 	qprintf("\n");
 }
 
@@ -3929,7 +3930,6 @@ xfsidbg_xperag(xfs_mount_t *mp)
 static void
 xfsidbg_xqm()
 {
-	extern xfs_qm_t	*xfs_Gqm;
 
 	if (xfs_Gqm == NULL) {
 		qprintf("NULL XQM!!\n");
@@ -4064,7 +4064,6 @@ xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title)
 static void	
 xfsidbg_xqm_freelist(void)
 {
-	extern xfs_qm_t	*xfs_Gqm;
 	if (xfs_Gqm) {
 		xfsidbg_xqm_freelist_print(&(xfs_Gqm->qm_dqfreelist), "Freelist");
 	} else
@@ -4086,7 +4085,6 @@ xfsidbg_xqm_mplist(xfs_mount_t *mp)
 static void
 xfsidbg_xqm_htab(void)
 {
-	extern xfs_qm_t	*xfs_Gqm;
 	int		i;
 	xfs_dqhash_t	*h;
 
