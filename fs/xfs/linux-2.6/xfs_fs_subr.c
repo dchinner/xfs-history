@@ -158,7 +158,9 @@ fs_tosspages(
 	off_t		last,
 	int		fiopt)
 {
-	pagebuf_inval(BHV_TO_VNODE(bdp)->v_inode, first, last - first, 0);
+	if (BHV_TO_VNODE(bdp)->v_inode)
+		pagebuf_inval(BHV_TO_VNODE(bdp)->v_inode,
+				first, last - first, 0);
 }
 
 
@@ -172,7 +174,9 @@ fs_flushinval_pages(
 	off_t		last,
 	int		fiopt)
 {
-	pagebuf_flushinval(BHV_TO_VNODE(bdp)->v_inode, first, last - first, 0);
+	if (BHV_TO_VNODE(bdp)->v_inode)
+		pagebuf_flushinval(BHV_TO_VNODE(bdp)->v_inode,
+			first, last - first, 0);
 }
 
 
@@ -188,7 +192,9 @@ fs_flush_pages(
 	uint64_t	flags,
 	int		fiopt)
 {
-	pagebuf_flush(BHV_TO_VNODE(bdp)->v_inode, first, last - first, 0);
+	if (BHV_TO_VNODE(bdp)->v_inode)
+		pagebuf_flush(BHV_TO_VNODE(bdp)->v_inode,
+			first, last - first, 0);
 	return 0;
 }
 

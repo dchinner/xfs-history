@@ -345,6 +345,7 @@ linvfs_put_inode(
 
 	if (vp) {
 		VN_RELE(vp);
+		vp->v_inode = 0;
 	}
 }
 
