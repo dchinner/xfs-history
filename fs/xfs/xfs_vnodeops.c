@@ -71,6 +71,9 @@
 #include "sim.h"
 #endif
 
+STATIC int	xfs_truncate_file(xfs_mount_t	*mp,
+				  xfs_inode_t	*ip);
+
 STATIC void	xfs_droplink (xfs_trans_t *tp,
 			      xfs_inode_t *ip);
 
@@ -2072,6 +2075,41 @@ xfs_lock_2_inodes (
 	}
 }
 
+/*
+ * Try to truncate the given file to 0 length.
+ */
+STATIC int
+xfs_truncate_file(
+	xfs_mount_t	*mp,
+	xfs_inode_t	*ip)
+{
+	xfs_trans_t	*tp;
+	int		error;
+
+	tp = xfs_trans_alloc(mp, 0);
+	if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
+				      XFS_TRANS_PERM_LOG_RES,
+				      XFS_ITRUNCATE_LOG_COUNT)) {
+		xfs_trans_cancel(tp, 0);
+		return error;
+	}
+
+	/*
+	 * Follow the normal truncate locking protocol.  Since we
+	 * hold the inode in the transaction, we know that it's number
+	 * of references will stay constant.
+	 */
+	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t)0);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+	xfs_trans_ihold(tp, ip);
+	xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0);
+	xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+
+	return 0;
+}
 
 /*
  * xfs_remove
@@ -2091,16 +2129,32 @@ xfs_remove(vnode_t	*dir_vp,
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	int			cancel_flags;
+	int			nospace;
 
+	nospace = 0;
 	vn_trace_entry(dir_vp, "xfs_remove");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
+ retry:
 	tp = xfs_trans_alloc (mp, 0);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
         if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(mp),
 				       0, XFS_TRANS_PERM_LOG_RES,
 				       XFS_REMOVE_LOG_COUNT)) {
 		cancel_flags = 0;
-                goto error_return;
+		/*
+		 * If we can't reserve the necessary amount of space,
+		 * then try to truncate the file below (after doing
+		 * the regular error checking) and start over again.
+		 * The nospace variable indicates whether this has
+		 * happened or not.  We only want to try this once,
+		 * so if we've already tried it (nospace > 0) then
+		 * just return an error.
+		 */
+		if ((error != ENOSPC) || (nospace > 0)) {
+			goto error_return;
+		} else {
+			nospace = 1;
+		}
 	}
 
 	dp = XFS_VTOI(dir_vp);
@@ -2124,7 +2178,7 @@ xfs_remove(vnode_t	*dir_vp,
 		IHOLD (dp);
 		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
 	}
-
+ 
 	if (error = xfs_iaccess (dp, IEXEC | IWRITE, credp)) {
 		goto error_return;
 	}
@@ -2155,6 +2209,32 @@ xfs_remove(vnode_t	*dir_vp,
 			goto error_return;
 		}
 	} 
+
+	if (nospace == 1) {
+		/*
+		 * We can't reserve the space to perform the actual
+		 * remove, so try to truncate the file and start over
+		 * if we can.  We can only do this to a regular file
+		 * that has a link count of 1.  Otherwise we'd break
+		 * the regular behavior of the unlink() system call
+		 * that gets us here.
+		 */
+		if (((ip->i_d.di_mode & IFMT) == IFREG) &&
+		    (ip->i_d.di_size > 0) &&
+		    (ip->i_d.di_nlink == 1)) {
+			IHOLD(ip);
+			xfs_trans_cancel(tp, cancel_flags);
+			error = xfs_truncate_file(mp, ip);
+			IRELE(ip);
+			if (error != 0) {
+				return error;
+			}
+			nospace = 2;
+			goto retry;
+		}
+		error = ENOSPC;
+		goto error_return;
+	}
 
 	/*
 	 * Entry must exist since we did a lookup in xfs_lock_dir_and_entry.
@@ -3751,7 +3831,6 @@ xfs_reclaim(vnode_t	*vp,
 	}
 
 	dnlc_purge_vp(vp);
-	ASSERT(ip->i_iui == NULL);
 	/*
 	 * If the inode is still dirty, then flush it out synchronously.
 	 * We get the flush lock regardless, though, just to make sure
