@@ -193,6 +193,8 @@ xfs_init(vfssw_t	*vswp,
 	extern zone_t	*xfs_bmap_zone;
 	extern zone_t	*xfs_strat_write_zone;
 	extern zone_t	*xfs_bmbt_locals_zone;
+	extern zone_t	*xfs_bmalloca_zone;
+	extern zone_t	*xfs_bmapi_locals_zone;
 	extern ktrace_t	*xfs_alloc_trace_buf;
 	extern ktrace_t	*xfs_bmap_trace_buf;
 	extern ktrace_t	*xfs_bmbt_trace_buf;
@@ -226,6 +228,10 @@ xfs_init(vfssw_t	*vswp,
 		kmem_zone_init(sizeof(struct xfs_dir_state), "xfs_dir_state");
 	xfs_bmbt_locals_zone =
 		kmem_zone_init(sizeof(xfs_bmbt_locals_t), "xfs_bmbt_locals");
+	xfs_bmalloca_zone =
+		kmem_zone_init(sizeof(xfs_bmalloca_t), "xfs_bmalloca");
+	xfs_bmapi_locals_zone =
+		kmem_zone_init(sizeof(xfs_bmapi_locals_t), "xfs_bmapi_locals");
 
 	/*
 	 * Allocate global trace buffers.
