@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.146 $"
+#ident	"$Revision: 1.147 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -4262,7 +4262,6 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	int		hist_bytes = mp->m_ihsize * sizeof(int);
 	int		hist2[21];
 	void		*kmalloc(size_t, int);
-	void		kfree_s(void *, size_t);
 
 	hist = (int *) kmalloc(hist_bytes, GFP_KERNEL);
 
@@ -4313,7 +4312,7 @@ xfsidbg_xihash(xfs_mount_t *mp)
 		kdb_printf("%d - %d , ", i, hist2[i]);
 	}
 	kdb_printf("\n");
-	kfree_s(hist, hist_bytes);
+	kfree(hist);
 }
 
 /*

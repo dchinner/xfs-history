@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision: 1.36 $"
 
 #include <xfs_os_defs.h>
 
@@ -334,14 +334,6 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 
 	XFS_STATS_INC(vn_alloc);
 
-#ifdef	CONFIG_XFS_DEBUG
-	inode = iget4_noallocate(vfsp->vfs_super, inum, NULL, NULL);
-	if (inode) {
-		panic("vn_alloc: Found inode/0x%p when it shouldn't be!",
-								inode);
-	}
-#endif	/* CONFIG_XFS_DEBUG */
-
 	inode = get_empty_inode();
 
 	if (inode == NULL) {
@@ -352,7 +344,7 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 	inode->i_dev   = vfsp->vfs_super->s_dev;
 	inode->i_ino   = inum;
 	inode->i_flags = 0;
-	inode->i_count = 1;
+	atomic_set(&inode->i_count, 1);
 	inode->i_state = 0;
 
 	vn_initialize(vfsp, inode, 0);
@@ -480,7 +472,7 @@ vn_count(struct vnode *vp)
 
 	ASSERT(inode);
 
-	return inode->i_count;
+	return atomic_read(&inode->i_count);
 }
 
 

@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 0
-EXTRAVERSION = -test1
+EXTRAVERSION = -test5
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -35,8 +35,8 @@ OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
 MAKEFILES	= $(TOPDIR)/.config
 GENKSYMS	= /sbin/genksyms
-KALLSYMS	= /sbin/kallsyms
 MODFLAGS	= -DMODULE
+CFLAGS_KERNEL	=
 PERL		= perl
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
@@ -83,16 +83,8 @@ endif
 
 CPPFLAGS := -D__KERNEL__ -I$(HPATH)
 
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2
-ifndef CONFIG_FRAME_POINTER
-CFLAGS += -fomit-frame-pointer
-endif
+CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
-
-# use '-fno-strict-aliasing', but only if the compiler can take it
-CFLAGS += $(shell if $(CC) -fno-strict-aliasing -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-fno-strict-aliasing"; fi)
-
-export	CPPFLAGS CFLAGS AFLAGS
 
 #
 # ROOT_DEV specifies the default root-device when making the image.
@@ -122,19 +114,14 @@ export SVGA_MODE = -DSVGA_MODE=NORMAL_VGA
 #export RAMDISK = -DRAMDISK=512
 
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
-NETWORKS	=net/network.a
-DRIVERS		=drivers/block/block.a \
+NETWORKS	=net/network.o
+DRIVERS		=drivers/block/block.o \
 		 drivers/char/char.o \
 		 drivers/misc/misc.o \
 		 drivers/net/net.o \
 	         drivers/parport/parport.a
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=kernel drivers mm fs net ipc lib
-
-ifeq ($(CONFIG_KDB),y)
-CORE_FILES	+= kdb/kdb.o
-SUBDIRS		+= kdb
-endif
 
 DRIVERS-n :=
 DRIVERS-y :=
@@ -151,8 +138,8 @@ DRIVERS-$(CONFIG_TR) += drivers/net/tokenring/tr.a
 DRIVERS-$(CONFIG_WAN) += drivers/net/wan/wan.a
 DRIVERS-$(CONFIG_ARCNET) += drivers/net/arcnet/arcnet.a
 DRIVERS-$(CONFIG_ATM) += drivers/atm/atm.o
-DRIVERS-$(CONFIG_IDE) += drivers/ide/ide.a
-DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsi.a
+DRIVERS-$(CONFIG_IDE) += drivers/ide/idedriver.o
+DRIVERS-$(CONFIG_SCSI) += drivers/scsi/scsidrv.o
 DRIVERS-$(CONFIG_IEEE1394) += drivers/ieee1394/ieee1394.a
 
 ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFIG_PARIDE_PCD),)
@@ -161,6 +148,7 @@ endif
 
 DRIVERS-$(CONFIG_SOUND) += drivers/sound/sounddrivers.o
 DRIVERS-$(CONFIG_PCI) += drivers/pci/pci.a
+DRIVERS-$(CONFIG_MTD) += drivers/mtd/mtdlink.o
 DRIVERS-$(CONFIG_PCMCIA) += drivers/pcmcia/pcmcia.o
 DRIVERS-$(CONFIG_PCMCIA_NETCARD) += drivers/net/pcmcia/pcmcia_net.o
 DRIVERS-$(CONFIG_PCMCIA_CHRDEV) += drivers/char/pcmcia/pcmcia_char.o
@@ -177,14 +165,20 @@ DRIVERS-$(CONFIG_PARIDE) += drivers/block/paride/paride.a
 DRIVERS-$(CONFIG_HAMRADIO) += drivers/net/hamradio/hamradio.o
 DRIVERS-$(CONFIG_TC) += drivers/tc/tc.a
 DRIVERS-$(CONFIG_USB) += drivers/usb/usbdrv.o
-DRIVERS-$(CONFIG_I2O) += drivers/i2o/i2o.a
+DRIVERS-$(CONFIG_I2O) += drivers/i2o/i2o.o
 DRIVERS-$(CONFIG_IRDA) += drivers/net/irda/irda_drivers.a
-DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.a
+DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.o
 DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.a
+DRIVERS-$(CONFIG_ACPI_INTERPRETER) += drivers/acpi/acpi.o
 
 DRIVERS += $(DRIVERS-y)
 
 include arch/$(ARCH)/Makefile
+
+# use '-fno-strict-aliasing', but only if the compiler can take it
+CFLAGS += $(shell if $(CC) -fno-strict-aliasing -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-fno-strict-aliasing"; fi)
+
+export	CPPFLAGS CFLAGS AFLAGS
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 
@@ -197,36 +191,18 @@ Version: dummy
 	@rm -f include/linux/compile.h
 
 boot: vmlinux
-	@$(MAKE) -C arch/$(ARCH)/boot
-
-LD_VMLINUX	:= $(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
-			--start-group \
-			$(CORE_FILES) \
-			$(DRIVERS) \
-			$(NETWORKS) \
-			$(LIBS) \
-			--end-group
-ifeq ($(CONFIG_KALLSYMS),y)
-LD_VMLINUX_KALLSYMS	:= .tmp_kallsyms3.o
-else
-LD_VMLINUX_KALLSYMS	:=
-endif
+	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
 vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
-ifeq ($(CONFIG_KALLSYMS),y)
-	@echo kallsyms pass 1
-	$(LD_VMLINUX) -o .tmp_vmlinux1
-	@$(KALLSYMS) .tmp_vmlinux1 > .tmp_kallsyms1.o
-	@echo kallsyms pass 2
-	@$(LD_VMLINUX) .tmp_kallsyms1.o -o .tmp_vmlinux2
-	@$(KALLSYMS) .tmp_vmlinux2 > .tmp_kallsyms2.o
-	@echo kallsyms pass 3
-	@$(LD_VMLINUX) .tmp_kallsyms2.o -o .tmp_vmlinux3
-	@$(KALLSYMS) .tmp_vmlinux3 > .tmp_kallsyms3.o
-endif
-	$(LD_VMLINUX) $(LD_VMLINUX_KALLSYMS) -o vmlinux
+	$(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
+		--start-group \
+		$(CORE_FILES) \
+		$(DRIVERS) \
+		$(NETWORKS) \
+		$(LIBS) \
+		--end-group \
+		-o vmlinux
 	$(NM) vmlinux | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aU] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
-	@rm -f .tmp_vmlinux* .tmp_kallsyms*
 
 symlinks:
 	rm -f include/asm
@@ -255,8 +231,8 @@ include/config/MARKER: scripts/split-include include/linux/autoconf.h
 
 linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
 
-$(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/config/MARKER
-	$(MAKE) -C $(patsubst _dir_%, %, $@) CFLAGS="$(CFLAGS) $(PROF_FLAGS)"
+$(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
 
 $(TOPDIR)/include/linux/version.h: include/linux/version.h
 $(TOPDIR)/include/linux/compile.h: include/linux/compile.h
@@ -293,13 +269,13 @@ include/linux/version.h: ./Makefile
 	@mv -f .ver $@
 
 init/version.o: init/version.c include/linux/compile.h include/config/MARKER
-	$(CC) $(CFLAGS) -DUTS_MACHINE='"$(ARCH)"' -c -o init/version.o init/version.c
+	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) -DUTS_MACHINE='"$(ARCH)"' -c -o init/version.o init/version.c
 
 init/main.o: init/main.c include/config/MARKER
-	$(CC) $(CFLAGS) $(PROFILING) -c -o $*.o $<
+	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -c -o $*.o $<
 
 fs lib mm ipc kernel drivers net: dummy
-	$(MAKE) $(subst $@, _dir_$@, $@)
+	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 TAGS: dummy
 	etags `find include/asm-$(ARCH) -name '*.h'`
@@ -330,13 +306,15 @@ $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKE
 modules_install:
 	@( \
 	MODLIB=$(INSTALL_MOD_PATH)/lib/modules/$(KERNELRELEASE); \
+	mkdir -p $$MODLIB; \
+	rm -f $$MODLIB/build; \
+	ln -s $TOPDIR $$MODLIB/build; \
 	cd modules; \
 	MODULES=""; \
 	inst_mod() { These="`cat $$1`"; MODULES="$$MODULES $$These"; \
 		mkdir -p $$MODLIB/$$2; cp $$These $$MODLIB/$$2; \
 		echo Installing modules under $$MODLIB/$$2; \
 	}; \
-	mkdir -p $$MODLIB; \
 	\
 	if [ -f BLOCK_MODULES ]; then inst_mod BLOCK_MODULES block; fi; \
 	if [ -f NET_MODULES   ]; then inst_mod NET_MODULES   net;   fi; \
@@ -356,8 +334,10 @@ modules_install:
 	if [ -f SK98LIN_MODULES ]; then inst_mod SK98LIN_MODULES  net;   fi; \
 	if [ -f SKFP_MODULES ]; then inst_mod SKFP_MODULES   net;   fi; \
 	if [ -f USB_MODULES   ]; then inst_mod USB_MODULES   usb;   fi; \
+	if [ -f USB_STORAGE_MODULES ]; then inst_mod USB_STORAGE_MODULES   usb;   fi; \
 	if [ -f USB_SERIAL_MODULES   ]; then inst_mod USB_SERIAL_MODULES   usb;   fi; \
 	if [ -f IEEE1394_MODULES ]; then inst_mod IEEE1394_MODULES ieee1394; fi; \
+	if [ -f MTD_MODULES ]; then inst_mod MTD_MODULES     mtd;   fi; \
 	if [ -f PCMCIA_MODULES ]; then inst_mod PCMCIA_MODULES pcmcia; fi; \
 	if [ -f PCMCIA_NET_MODULES ]; then inst_mod PCMCIA_NET_MODULES pcmcia; fi; \
 	if [ -f PCMCIA_CHAR_MODULES ]; then inst_mod PCMCIA_CHAR_MODULES pcmcia; fi; \
@@ -448,13 +428,16 @@ psdocs: sgmldocs
 
 pdfdocs: sgmldocs
 	$(MAKE) -C Documentation/DocBook pdf
- 
+
+htmldocs: sgmldocs
+	$(MAKE) -C Documentation/DocBook html
+
 sums:
 	find . -type f -print | sort | xargs sum > .SUMS
 
 dep-files: scripts/mkdep archdep include/linux/version.h
 	scripts/mkdep init/*.c > .depend
-	scripts/mkdep `find $(FINDHPATH) -name SCCS -prune -or -follow -name \*.h ! -name modversions.h -print` > .hdepend
+	scripts/mkdep `find $(FINDHPATH) -name SCCS -prune -o -follow -name \*.h ! -name modversions.h -print` > .hdepend
 	$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS)) _FASTDEP_ALL_SUB_DIRS="$(SUBDIRS)"
 
 ifdef CONFIG_MODVERSIONS

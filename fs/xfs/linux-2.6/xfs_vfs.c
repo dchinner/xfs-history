@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 #include <xfs_os_defs.h>
 
@@ -79,7 +79,7 @@ void
 vfs_deallocate(vfs_t *vfsp)
 {
         VFS_FREE(vfsp);
-        kfree_s(vfsp, sizeof(vfs_t));
+        kfree(vfsp);
 }
 
 /*

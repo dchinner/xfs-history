@@ -32,7 +32,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.30 $"
 
 struct xfs_buf;
 struct ktrace;

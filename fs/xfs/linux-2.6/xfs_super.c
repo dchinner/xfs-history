@@ -213,7 +213,7 @@ linvfs_read_super(
 	cip = (struct inode *)kern_malloc(sizeof(struct inode));
 	bzero(cip, sizeof(*cip));
 
-	cip->i_count = 1;
+	atomic_set(&cip->i_count, 1);
 
 	cvp = LINVFS_GET_VN_ADDRESS(cip);
 
@@ -388,7 +388,7 @@ linvfs_delete_inode(
 
 	} else {
 printk("linvfs_delete_inode: NOVP!: inode/0x%p ino/%ld icnt/%d\n",
-inode, inode->i_ino, inode->i_count);
+inode, inode->i_ino, atomic_read(&inode->i_count));
 	BUG();
 	}
 

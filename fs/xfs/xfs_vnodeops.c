@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.467 $"
+#ident "$Revision: 1.468 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1358,7 +1358,7 @@ xfs_fsync(
 			VOP_FLUSHINVAL_PAGES(vp, start, FI_REMAPF_LOCKED);
 		}
 		ASSERT(syncall == 0 || (VN_CACHED(vp) == 0));
-	} else if (VN_DIRTY(vp)) {
+	} else if (1 /* VN_DIRTY(vp) */) {
 		/*
 		 * In the non-invalidating case, calls to fsync() do not
 		 * flush all the dirty mmap'd pages.  That requires a

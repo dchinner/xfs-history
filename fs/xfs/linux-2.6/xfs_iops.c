@@ -471,7 +471,7 @@ int linvfs_follow_link(struct dentry *dentry,
         
         uio = (uio_t*)kmalloc(sizeof(uio_t), GFP_KERNEL);
         if (!uio) {
-	        kfree_s(link, MAXNAMELEN+1);
+	        kfree(link);
                 return -ENOMEM;
         }
 
@@ -488,16 +488,16 @@ int linvfs_follow_link(struct dentry *dentry,
 
 	VOP_READLINK(vp, uio, NULL, error);
 	if (error) {
-		kfree_s(uio, sizeof(uio_t));
-		kfree_s(link, MAXNAMELEN+1);
+		kfree(uio);
+		kfree(link);
 		return error;
 	}
 
 	link[MAXNAMELEN - uio->uio_resid] = '\0';
-	kfree_s(uio, sizeof(uio_t));
+	kfree(uio);
 
         error = vfs_follow_link(nd, link);
-	kfree_s(link, MAXNAMELEN+1);
+	kfree(link);
 	return error;
 }
 
