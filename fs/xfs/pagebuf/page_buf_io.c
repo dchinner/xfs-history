@@ -413,7 +413,7 @@ pagebuf_generic_file_write(
 
 		mapping = page->mapping;
 		kaddr = kmap(page);
-		status = mapping->a_ops->prepare_write(NULL, page,
+		status = mapping->a_ops->prepare_write(filp, page,
 			offset, offset + bytes);
 			
 		if (status) {
@@ -424,7 +424,7 @@ pagebuf_generic_file_write(
 		page_fault = __copy_from_user(kaddr + offset, buf, bytes);
 		flush_dcache_page(page);
 
-		status = mapping->a_ops->commit_write(NULL, page, offset, offset + bytes);
+		status = mapping->a_ops->commit_write(filp, page, offset, offset + bytes);
 
 		if (page_fault) {
 			status = -EFAULT;
