@@ -67,11 +67,11 @@ posix_acl_default_exists(vnode_t *vp)
 STATIC int
 acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
 {
-	char *src_acl = (char*)src;
-	acl_ea_header *header;
-	int n, count;
+	char *src_acl = (char *)src;
 	xfs_acl_entry_t *dest_entry;
+	acl_ea_header *header;
 	acl_ea_entry *src_entry;
+	int n;
 
 	if (!src_acl || !dest)
 		return EINVAL;
@@ -83,16 +83,24 @@ acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
 	if (header->a_version != cpu_to_le32(ACL_EA_VERSION))
 		return EINVAL;
 
-	count = acl_ea_count(size);
-	if (count <= 0 || count > XFS_ACL_MAX_ENTRIES)
+	memset(dest, 0, sizeof(xfs_acl_t));
+	dest->acl_cnt = acl_ea_count(size);
+	if (dest->acl_cnt < 0 || dest->acl_cnt > XFS_ACL_MAX_ENTRIES)
 		return EINVAL;
 
-	memset(dest, 0, sizeof(xfs_acl_t));
-	dest->acl_cnt = count;
+	/*
+	 * acl_set_file(3) may request that we set default ACLs with
+	 * zero length -- defend (gracefully) against that here.
+	 */
+	if (!dest->acl_cnt) {
+		dest->acl_cnt = 0;
+		return 0;
+	}
+
         src_entry = (acl_ea_entry*) (src_acl + sizeof(acl_ea_header));
         dest_entry = &dest->acl_entry[0];
 
-	for (n = 0; n < count; n++, src_entry++, dest_entry++) {
+	for (n = 0; n < dest->acl_cnt; n++, src_entry++, dest_entry++) {
 		dest_entry->ae_perm = le16_to_cpu(src_entry->e_perm);
 		if (dest_entry->ae_perm & ~(ACL_READ|ACL_WRITE|ACL_EXECUTE))
 			return EINVAL;
@@ -115,6 +123,9 @@ acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
 				return EINVAL;
 		}
 	}
+	if (xfs_acl_invalid(dest))
+		return EINVAL;
+
 	return 0;
 }
 
@@ -254,6 +265,8 @@ xfs_acl_vset(vnode_t *vp, void *acl, size_t size, int kind)
 	error = acl_ext_attr_to_xfs(ext_acl, size, &xfs_acl);
 	if (error)
 		return -error;
+	if (!xfs_acl.acl_cnt)
+		return 0;
 
 	VN_HOLD(vp);
 	error = xfs_acl_allow_set(vp, kind);
