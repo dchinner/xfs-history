@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -492,6 +492,41 @@ xfs_droplink(
 }
 
 /*
+ * This gets called when the inode's version needs to be changed from 1 to 2.
+ * Currently this happens when the nlink field overflows the old 16-bit value
+ * or when chproj is called to change the project for the first time.
+ * As a side effect the superblock version will also get rev'd 
+ * to contain the NLINK bit.
+ */
+void
+xfs_bump_ino_vers2(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
+{
+	xfs_mount_t	*mp;
+	int		s;
+
+	ASSERT(ismrlocked (&ip->i_lock, MR_UPDATE));
+	ASSERT(ip->i_d.di_version == XFS_DINODE_VERSION_1);
+
+	ip->i_d.di_version = XFS_DINODE_VERSION_2;
+	ip->i_d.di_onlink = 0;
+	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
+	mp = tp->t_mountp;
+	if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
+		s = XFS_SB_LOCK(mp);
+		if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
+			XFS_SB_VERSION_ADDNLINK(&mp->m_sb);
+			XFS_SB_UNLOCK(mp, s);
+			xfs_mod_sb(tp, XFS_SB_VERSIONNUM);
+		} else {
+			XFS_SB_UNLOCK(mp, s);
+		}
+	}
+	/* Caller must log the inode */
+}
+
+/*
  * Increment the link count on an inode & log the change.
  */
 int
@@ -499,9 +534,6 @@ xfs_bumplink(
 	xfs_trans_t *tp,
 	xfs_inode_t *ip)
 {
-	xfs_mount_t	*mp;
-	int		s;
-
 	if (ip->i_d.di_nlink >= XFS_MAXLINK)
 		return XFS_ERROR(EMLINK);
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
@@ -518,20 +550,7 @@ xfs_bumplink(
 		 * system to do this, then we need to bump the superblock
 		 * version number as well.
 		 */
-		ip->i_d.di_version = XFS_DINODE_VERSION_2;
-		ip->i_d.di_onlink = 0;
-		bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
-		mp = tp->t_mountp;
-		if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
-			s = XFS_SB_LOCK(mp);
-			if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
-				XFS_SB_VERSION_ADDNLINK(&mp->m_sb);
-				XFS_SB_UNLOCK(mp, s);
-				xfs_mod_sb(tp, XFS_SB_VERSIONNUM);
-			} else {
-				XFS_SB_UNLOCK(mp, s);
-			}
-		}
+		xfs_bump_ino_vers2(tp, ip);
 	}
 
         xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
