@@ -37,9 +37,9 @@
 
 /* includes */
 
-#include <asm/byteorder.h>
 #include <linux/autoconf.h>
 #include "xfs_types.h"
+#include <endian.h>
 
 /* supported architecures */
   
@@ -50,12 +50,8 @@
 
 /* if these are wrong, it's very foncusing */
 
-#if defined(__LITTLE_ENDIAN) && defined(__BIG_ENDIAN)
-#error both __LITTLE_ENDIAN and __BIG_ENDIAN are defined!
-#endif
-
-#if (!defined(__LITTLE_ENDIAN)) && (!defined(__BIG_ENDIAN))
-#error neither __LITTLE_ENDIAN or __BIG_ENDIAN are defined!
+#if !defined(__LITTLE_ENDIAN) || !defined(__BIG_ENDIAN) || !defined(__BYTE_ORDER)
+#error endian defines are screwy
 #endif
 
 #ifndef XFS_BIG_FILESYSTEMS
@@ -67,7 +63,7 @@
 #ifdef CONFIG_X86
 #define ARCH_NOCONVERT ARCH_INTEL_IA32
 
-#ifdef __BIG_ENDIAN
+#if __BYTE_ORDER == __BIG_ENDIAN
 #error big endian X86!?
 #endif
 
@@ -243,7 +239,7 @@
  * now pick the right ones for our MACHINE ARCHITECTURE
  */
    
-#ifdef __LITTLE_ENDIAN 
+#if __BYTE_ORDER == __LITTLE_ENDIAN 
 #define INT_GET_UNALIGNED_16(pointer)       INT_GET_UNALIGNED_16_LE(pointer)
 #define INT_SET_UNALIGNED_16(pointer,value) INT_SET_UNALIGNED_16_LE(pointer,value)
 #define INT_GET_UNALIGNED_32(pointer)       INT_GET_UNALIGNED_32_LE(pointer)
@@ -407,7 +403,7 @@
     )
 #else
 /* MACHINE ARCHITECTURE dependent */
-#ifdef __LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN 
 #define DIRINO_GET_ARCH(pointer,arch) \
     DIRINO4_GET_ARCH((((__u8*)pointer)+4),arch)
 #else
