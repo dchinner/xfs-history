@@ -139,40 +139,28 @@ xfs_ialloc_log_di(
 	xfs_sb_t		*sbp;		/* superblock structure */
 	static const int	offsets[] = {	/* field offsets */
 						/* keep in sync with bits */
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_magic),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_mode),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_version),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_format),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_nlink),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_uid),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_gid),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_nextents),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_size),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_uuid),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_atime),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_mtime),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_ctime),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_gen),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_nexti),
+		offsetof(xfs_dinode_core_t, di_magic),
+		offsetof(xfs_dinode_core_t, di_mode),
+		offsetof(xfs_dinode_core_t, di_version),
+		offsetof(xfs_dinode_core_t, di_format),
+		offsetof(xfs_dinode_core_t, di_nlink),
+		offsetof(xfs_dinode_core_t, di_uid),
+		offsetof(xfs_dinode_core_t, di_gid),
+		offsetof(xfs_dinode_core_t, di_nextents),
+		offsetof(xfs_dinode_core_t, di_uuid),
+		offsetof(xfs_dinode_core_t, di_size),
+		offsetof(xfs_dinode_core_t, di_atime),
+		offsetof(xfs_dinode_core_t, di_mtime),
+		offsetof(xfs_dinode_core_t, di_ctime),
+		offsetof(xfs_dinode_core_t, di_gen),
+		offsetof(xfs_dinode_core_t, di_extsize),
+		offsetof(xfs_dinode_core_t, di_flags),
+		offsetof(xfs_dinode_core_t, di_nexti),
 		offsetof(xfs_dinode_t, di_u),
 		sizeof(xfs_dinode_t)
 	};
 
+	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
 	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	/*
@@ -237,6 +225,8 @@ xfs_ialloc_ag_alloc(
 	xfs_agino_t	nextino;	/* next inode number, for loop */
 	xfs_sb_t	*sbp;		/* filesystem superblock */
 	xfs_agino_t	thisino;	/* current inode number, for loop */
+	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
+	static uuid_t	zuuid;		/* zero uuid */
 
 	mp = tp->t_mountp;
 	agi = xfs_buf_to_agi(agbuf);
@@ -292,8 +282,6 @@ xfs_ialloc_ag_alloc(
 	 * forwards, in the natural order.
 	 */
 	nextino = NULLAGINO;
-	flag = XFS_DI_MAGIC | XFS_DI_MODE | XFS_DI_VERSION | XFS_DI_FORMAT |
-	       XFS_DI_NEXTENTS | XFS_DI_SIZE | XFS_DI_NEXTI | XFS_DI_U;
 	for (j = (int)newblocks - 1; j >= 0; j--) {
 		/*
 		 * Get the block.
@@ -310,11 +298,21 @@ xfs_ialloc_ag_alloc(
 			free->di_core.di_mode = 0;
 			free->di_core.di_version = XFS_DINODE_VERSION;
 			free->di_core.di_format = XFS_DINODE_FMT_AGINO;
+			free->di_core.di_nlink = 0;
+			free->di_core.di_uid = 0;
+			free->di_core.di_gid = 0;
 			free->di_core.di_nextents = 0;
+			free->di_core.di_uuid = zuuid;
 			free->di_core.di_size = 0;
+			free->di_core.di_atime = ztime;
+			free->di_core.di_mtime = ztime;
+			free->di_core.di_ctime = ztime;
+			free->di_core.di_gen = 0;
+			free->di_core.di_extsize = 0;
+			free->di_core.di_flags = 0;
 			free->di_core.di_nexti = nextino;
 			free->di_u.di_next = nextino;
-			xfs_ialloc_log_di(tp, fbuf, i, flag);
+			xfs_ialloc_log_di(tp, fbuf, i, XFS_DI_ALL_BITS);
 			/*
 			 * Since both loops run backwards, the first time
 			 * here, nextino is null, and we set the new last
