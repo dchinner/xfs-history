@@ -1570,14 +1570,14 @@ xfs_dm_get_destroy_dmattr(
 	value = buffer;
 
 	VOP_ATTR_GET(vp, dkattrname.dan_chars, value, &value_len,
-			ATTR_ROOT, get_current_cred(), error);
+			ATTR_ROOT, sys_cred, error);
 
 	if (error == E2BIG) {
 		alloc_size = value_len;
 		value = kmem_alloc(alloc_size, KM_SLEEP);
 
 		VOP_ATTR_GET(vp, dkattrname.dan_chars, value,
-			&value_len, ATTR_ROOT, get_current_cred(), error);
+			&value_len, ATTR_ROOT, sys_cred, error);
 	}
 	if (error) {
 		if (alloc_size)
