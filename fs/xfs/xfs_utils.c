@@ -1,4 +1,4 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -597,6 +597,7 @@ xfs_truncate_file(
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_ITRUNCATE_LOG_COUNT)) {
 		xfs_trans_cancel(tp, 0);
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		return error;
 	}
 
