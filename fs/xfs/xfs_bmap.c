@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.207 $"
+#ident	"$Revision: 1.208 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3091,12 +3091,13 @@ xfs_bmap_add_attrfork(
 		error = XFS_ERROR(EINVAL);
 		goto error0;
 	}
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	ip->i_df.if_ext_max = XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	ASSERT(ip->i_afp == NULL);
 	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
 	ip->i_afp->if_ext_max = XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	ip->i_afp->if_flags = XFS_IFEXTENTS;
-	logflags = XFS_ILOG_CORE;
+	logflags = 0;
 	XFS_BMAP_INIT(&flist, &firstblock);
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_LOCAL:
@@ -3115,7 +3116,8 @@ xfs_bmap_add_attrfork(
 			goto error2;
 		break;
 	}
-	xfs_trans_log_inode(tp, ip, logflags);
+	if (logflags)
+		xfs_trans_log_inode(tp, ip, logflags);
 	if (!XFS_SB_VERSION_HASATTR(&mp->m_sb)) {
 		s = XFS_SB_LOCK(mp);
 		if (!XFS_SB_VERSION_HASATTR(&mp->m_sb)) {
@@ -3258,6 +3260,7 @@ xfs_bmap_finish(
 	xfs_bmap_free_item_t	*free;		/* free extent list item */
 	unsigned int		logres;		/* new log reservation */
 	unsigned int		logcount;	/* new log count */
+	xfs_mount_t		*mp;		/* filesystem mount structure */
 	xfs_bmap_free_item_t	*next;		/* next item on free list */
 	xfs_trans_t		*ntp;		/* new transaction pointer */
 
@@ -3296,7 +3299,13 @@ xfs_bmap_finish(
 			 * The bmap free list will be cleaned up at a
 			 * higher level.  The EFI will be canceled when
 			 * this transaction is aborted.
+			 * Need to force shutdown here to make sure it
+			 * happens, since this transaction may not be
+			 * dirty yet.
 			 */
+			mp = ntp->t_mountp;
+			if (!XFS_FORCED_SHUTDOWN(mp))
+				xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 			return error;
 		}
 		xfs_trans_log_efd_extent(ntp, efd, free->xbfi_startblock,
@@ -3729,11 +3738,12 @@ xfs_bmapi(
 	ASSERT(wr || !delay);
 	logflags = 0;
 	nallocs = 0;
+	cur = NULL;
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
 		ASSERT(wr && tp);
 		if (error = xfs_bmap_local_to_extents(tp, ip, firstblock, total,
 				&logflags, whichfork))
-			return error;
+			goto error0;
 	}
 	if (wr && *firstblock == NULLFSBLOCK) {
 		if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE)
@@ -3744,13 +3754,12 @@ xfs_bmapi(
 		minleft = 0;
 	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
 	    (error = xfs_iread_extents(tp, ip, whichfork)))
-		return error;
+		goto error0;
 	ep = xfs_bmap_search_extents(ip, bno, whichfork, &eof, &lastx, &got,
 		&prev);
 	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
 	n = 0;
 	end = bno + len;
-	cur = NULL;
 	obno = bno;
 	bma.ip = NULL;
 	while (bno < end && n < *nmap) {
@@ -3903,11 +3912,12 @@ xfs_bmapi(
 			got.br_startoff = aoff;
 			got.br_startblock = abno;
 			got.br_blockcount = alen;
-			if (error = xfs_bmap_add_extent(ip, lastx, &cur, &got,
-					firstblock, flist, &tmp_logflags,
-					whichfork, rsvd))
-				goto error0;
+			error = xfs_bmap_add_extent(ip, lastx, &cur, &got,
+				firstblock, flist, &tmp_logflags, whichfork,
+				rsvd);
 			logflags |= tmp_logflags;
+			if (error)
+				goto error0;
 			lastx = ifp->if_lastex;
 			ep = &ifp->if_u1.if_extents[lastx];
 			nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
@@ -4028,17 +4038,20 @@ xfs_bmapi(
 	 * Transform from btree to extents, give it cur.
 	 */
 	if (tp && XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE &&
-		 XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
+	    XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
 		ASSERT(wr);
-		if (error = xfs_bmap_btree_to_extents(tp, ip, cur,
-				&tmp_logflags, whichfork, 0))
-			goto error0;
+		error = xfs_bmap_btree_to_extents(tp, ip, cur, &tmp_logflags,
+			whichfork, 0);
 		logflags |= tmp_logflags;
+		if (error)
+			goto error0;
 	}
 	ASSERT(ifp->if_ext_max ==
 	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
 	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE ||
 	       XFS_IFORK_NEXTENTS(ip, whichfork) > ifp->if_ext_max);
+	error = 0;
+error0:
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent list if we've converted to btree format.
@@ -4049,28 +4062,33 @@ xfs_bmapi(
 	else if ((logflags & XFS_ILOG_FBROOT(whichfork)) &&
 		 XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		logflags &= ~XFS_ILOG_FBROOT(whichfork);
+	/*
+	 * Log whatever the flags say, even if error.  Otherwise we might miss
+	 * detecting a case where the data is changed, there's an error,
+	 * and it's not logged so we don't shutdown when we should.
+	 */
 	if (logflags) {
 		ASSERT(tp && wr);
 		xfs_trans_log_inode(tp, ip, logflags);
 	}
 	if (cur) {
-		ASSERT(*firstblock == NULLFSBLOCK ||
-		       XFS_FSB_TO_AGNO(ip->i_mount, *firstblock) ==
-		       XFS_FSB_TO_AGNO(ip->i_mount,
-			       cur->bc_private.b.firstblock) ||
-		       (flist->xbf_low &&
-			XFS_FSB_TO_AGNO(ip->i_mount, *firstblock) < 
-			XFS_FSB_TO_AGNO(ip->i_mount,
-				cur->bc_private.b.firstblock)));
-		*firstblock = cur->bc_private.b.firstblock;
-		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
+		if (!error) {
+			ASSERT(*firstblock == NULLFSBLOCK ||
+			       XFS_FSB_TO_AGNO(ip->i_mount, *firstblock) ==
+			       XFS_FSB_TO_AGNO(ip->i_mount,
+				       cur->bc_private.b.firstblock) ||
+			       (flist->xbf_low &&
+				XFS_FSB_TO_AGNO(ip->i_mount, *firstblock) < 
+				XFS_FSB_TO_AGNO(ip->i_mount,
+					cur->bc_private.b.firstblock)));
+			*firstblock = cur->bc_private.b.firstblock;
+		}
+		xfs_btree_del_cursor(cur,
+			error ? XFS_BTREE_ERROR : XFS_BTREE_NOERROR);
 	}
-	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
-		orig_nmap, *nmap);
-	return 0;
-error0:
-	if (cur)
-		xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
+	if (!error)
+		xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
+			orig_nmap, *nmap);
 	return error;
 }
 
@@ -4302,10 +4320,11 @@ xfs_bunmapi(
 			error = XFS_ERROR(ENOSPC);
 			goto error0;
 		}
-		if (error = xfs_bmap_del_extent(ip, tp, lastx, flist, cur, &del,
-				flags, &tmp_logflags, whichfork, rsvd))
-			goto error0;
+		error = xfs_bmap_del_extent(ip, tp, lastx, flist, cur, &del,
+			flags, &tmp_logflags, whichfork, rsvd);
 		logflags |= tmp_logflags;
+		if (error)
+			goto error0;
 		bno = del.br_startoff - 1;
 		lastx = ifp->if_lastex;
 		/*
@@ -4329,10 +4348,11 @@ xfs_bunmapi(
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_NEXTENTS(ip, whichfork) > ifp->if_ext_max) {
 		ASSERT(cur == NULL);
-		if (error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist,
-				&cur, 0, &tmp_logflags, whichfork))
-			goto error0;
+		error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist,
+			&cur, 0, &tmp_logflags, whichfork);
 		logflags |= tmp_logflags;
+		if (error)
+			goto error0;
 	}
 	/*
 	 * transform from btree to extents, give it cur
@@ -4340,16 +4360,19 @@ xfs_bunmapi(
 	else if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE &&
 		 XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
 		ASSERT(cur != NULL);
-		if (error = xfs_bmap_btree_to_extents(tp, ip, cur,
-				&tmp_logflags, whichfork, async))
-			goto error0;
+		error = xfs_bmap_btree_to_extents(tp, ip, cur, &tmp_logflags,
+			whichfork, async);
 		logflags |= tmp_logflags;
+		if (error)
+			goto error0;
 	}
 	/*
 	 * transform from extents to local?
 	 */
 	ASSERT(ifp->if_ext_max ==
 	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
+	error = 0;
+error0:
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent list if we've converted to btree format.
@@ -4360,17 +4383,20 @@ xfs_bunmapi(
 	else if ((logflags & XFS_ILOG_FBROOT(whichfork)) &&
 		 XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		logflags &= ~XFS_ILOG_FBROOT(whichfork);
+	/*
+	 * Log inode even in the error case, if the transaction 
+	 * is dirty we'll need to shut down the filesystem.
+	 */
 	if (logflags)
 		xfs_trans_log_inode(tp, ip, logflags);
 	if (cur) {
-		*firstblock = cur->bc_private.b.firstblock;
-		cur->bc_private.b.allocated = 0;
-		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
+		if (!error) {
+			*firstblock = cur->bc_private.b.firstblock;
+			cur->bc_private.b.allocated = 0;
+		}
+		xfs_btree_del_cursor(cur,
+			error ? XFS_BTREE_ERROR : XFS_BTREE_NOERROR);
 	}
-	return 0;
-error0:
-	if (cur)
-		xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 	return error;
 }
 
