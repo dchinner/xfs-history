@@ -7,6 +7,7 @@
 #define XFS_ENOTSUP	4	/* Operation not supported */
 #define	XFS_ENOLSN	5	/* Can't find the lsn you asked for */
 #define XFS_ENOTFOUND	6
+#define XFS_ENOTXFS	7	/* Not xFS filesystem */
 
 #ifdef DEBUG
 #define	XFS_ERROR_NTRAP	10
