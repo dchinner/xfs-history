@@ -1,4 +1,4 @@
-#ident "$Revision: 1.342 $"
+#ident "$Revision: 1.343 $"
 
 
 #ifdef SIM
@@ -2517,7 +2517,7 @@ xfs_create(
 
 		error = xfs_dir_createname(tp, dp, name, ip->i_ino,
 					   &first_block, &free_list,
-					   MAX_EXT_NEEDED);
+					   resblks - XFS_IALLOC_SPACE_RES(mp));
 		if (error) {
 			ASSERT(error != ENOSPC);
 			goto abort_return;
@@ -3342,6 +3342,7 @@ xfs_link(
 	int			committed;
 	vnode_t 		*target_dir_vp;
 	bhv_desc_t		*src_bdp;
+	int			resblks;
 
 	target_dir_vp = BHV_TO_VNODE(target_dir_bdp);
 	vn_trace_entry(target_dir_vp, "xfs_link", (inst_t *)__return_address);
@@ -3395,9 +3396,9 @@ xfs_link(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_LINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, XFS_LINK_SPACE_RES(mp, target_name),
-				      XFS_LINK_LOG_RES(mp),
-				      0, XFS_TRANS_PERM_LOG_RES,
+	resblks = XFS_LINK_SPACE_RES(mp, target_name);
+        if (error = xfs_trans_reserve(tp, resblks, XFS_LINK_LOG_RES(mp), 0,
+				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_LINK_LOG_COUNT)) {
 		cancel_flags = 0;
                 goto error_return;
@@ -3466,7 +3467,7 @@ xfs_link(
 	XFS_BMAP_INIT(&free_list, &first_block);
 
 	error = xfs_dir_createname(tp, tdp, target_name, sip->i_ino,
-				   &first_block, &free_list, MAX_EXT_NEEDED);
+				   &first_block, &free_list, resblks);
 	if (error) {
 		goto abort_return;
 	}
@@ -3590,9 +3591,7 @@ xfs_mkdir(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
         resblks = XFS_MKDIR_SPACE_RES(mp, dir_name);
-	if (error = xfs_trans_reserve(tp,
-				      resblks,
-				      XFS_MKDIR_LOG_RES(mp), 0,
+	if (error = xfs_trans_reserve(tp, resblks, XFS_MKDIR_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_MKDIR_LOG_COUNT)) {
 		cancel_flags = 0;
@@ -3678,7 +3677,8 @@ xfs_mkdir(
 	XFS_BMAP_INIT(&free_list, &first_block);
 
 	error = xfs_dir_createname(tp, dp, dir_name, cdp->i_ino,
-				   &first_block, &free_list, MAX_EXT_NEEDED);
+				   &first_block, &free_list, 
+				   resblks - XFS_IALLOC_SPACE_RES(mp));
 	if (error) {
 		goto error1;
 	}
@@ -3857,10 +3857,17 @@ xfs_rmdir(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RMDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, XFS_REMOVE_SPACE_RES(mp),
-				      XFS_REMOVE_LOG_RES(mp),
-				      0, XFS_TRANS_PERM_LOG_RES,
+	/*
+	 * The space reservation should really be XFS_REMOVE_SPACE_RES,
+	 * which allows for directory btree deletion(s) implying
+	 * possible bmap insert(s).  We avoid this in the directory
+	 * code by, if the bmap insert tries to happen, instead trimming
+	 * the LAST block from the directory.
+	 */
+        if (error = xfs_trans_reserve(tp, 0, XFS_REMOVE_LOG_RES(mp), 0,
+				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_DEFAULT_LOG_COUNT)) {
+		ASSERT(error != ENOSPC);
 		cancel_flags = 0;
 		IRELE(cdp);
                 goto error_return;
@@ -4086,13 +4093,6 @@ xfs_readdir(
 	return error;
 }
 
-
-/*
- * The number of blocks that the directory code requires for
- * the createname operation.
- */
-#define DIR_NEEDS 7
-
 /*
  * xfs_symlink
  *
@@ -4284,7 +4284,8 @@ xfs_symlink(
 	if (XFS_IS_QUOTA_ON(mp)) {
 		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, ip, udqp, pdqp);
 	}
-	
+
+	resblks -= XFS_IALLOC_SPACE_RES(mp);
 	/*
 	 * If the symlink will fit into the inode, write it inline.
 	 */
@@ -4308,8 +4309,8 @@ xfs_symlink(
 
 		error = xfs_bmapi(tp, ip, first_fsb, fs_blocks,
 				  XFS_BMAPI_WRITE | XFS_BMAPI_METADATA,
-				  &first_block, fs_blocks+DIR_NEEDS, mval,
-				  &nmaps, &free_list);
+				  &first_block, resblks, mval, &nmaps,
+				  &free_list);
 		if (error) {
 			goto error1;
 		}
@@ -4336,12 +4337,12 @@ xfs_symlink(
 		}
 	}
 
-
 	/*
 	 * Create the directory entry for the symlink.
 	 */
 	error = xfs_dir_createname(tp, dp, link_name, ip->i_ino,
-				   &first_block, &free_list, MAX_EXT_NEEDED);
+				   &first_block, &free_list, 
+				   resblks - fs_blocks);
 	if (error) {
 		goto error1;
 	}
