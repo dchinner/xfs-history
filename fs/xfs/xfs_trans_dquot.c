@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 #ifdef SIM
 #define _KERNEL 1
 #endif
@@ -813,20 +813,25 @@ xfs_qm_check_inoquota2(
 	xfs_dquot_t 	*udqp,
 	xfs_dquot_t 	*pdqp)
 {
-	if (! XFS_IS_QUOTA_ENFORCED(mp))
-		return (0);
-	if (udqp) {
-		if (xfs_qm_check_inoquota(udqp))
-			return (EDQUOT);
-	}
-	if (pdqp) {
-		if (xfs_qm_check_inoquota(pdqp))
-			return (EDQUOT);
-	}
+	int	error;
 
-	return (0);
+	error = 0;
+	if (XFS_IS_QUOTA_ENFORCED(mp)) {
+		if (udqp) {
+			xfs_dqlock(udqp);
+			error = xfs_qm_check_inoquota(udqp);
+			xfs_dqunlock(udqp);
+			if (error)
+				return (error);
+		}
+		if (pdqp) {
+			xfs_dqlock(pdqp);
+			error = xfs_qm_check_inoquota(pdqp);
+			xfs_dqunlock(pdqp);
+		}
+	}
+	return (error);
 }
-
 
 /*
  * Returns EDQUOT if creating one more inode will exceed the hardlimit
