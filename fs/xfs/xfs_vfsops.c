@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.195 $"
+#ident  "$Revision: 1.196 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -520,9 +520,9 @@ xfs_cmountfs(
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
 #if CELL || NOTYET
-			if ((ap->version < 1) || (ap->version > 3)) {
+			if ((ap->version < 1) || (ap->version > 4)) {
 #else /* CELL || NOTYET */
-			if ((ap->version < 1) || (ap->version > 2)) {
+			if ((ap->version < 1) || (ap->version > 3)) {
 #endif /* CELL || NOTYET */
 				error = XFS_ERROR(EINVAL);
 				goto error3;
@@ -591,6 +591,21 @@ xfs_cmountfs(
 
 		if (ap->flags & XFSMNT_NOALIGN)
 			mp->m_flags |= XFS_MOUNT_NOALIGN;
+
+		if (ap->flags & XFSMNT_OSYNCISDSYNC)
+			mp->m_flags |= XFS_MOUNT_OSYNCISDSYNC;
+
+		if (ap->flags & XFSMNT_IOSIZE) {
+			if (ap->version < 3 ||
+			    ap->iosizelog > XFS_MAX_IO_LOG ||
+			    ap->iosizelog < XFS_MIN_IO_LOG) {
+				error = EINVAL;
+				goto error3;
+			}
+
+			mp->m_flags |= XFS_MOUNT_DFLT_IOSIZE;
+			mp->m_readio_log = mp->m_writeio_log = ap->iosizelog;
+		}
 
 		/*
 		 * no recovery flag requires a read-only mount
@@ -822,11 +837,10 @@ xfs_args_to_ver_2(
 	return 0;
 }
 
-#if CELL || NOTYET
 /*
  * xfs_args_to_ver_3 
  * 
- * This is used with copyin_xlate() to copy a xfs_args version 2 structure
+ * This is used with copyin_xlate() to copy a xfs_args version 3 structure
  * in from user space from a 32 bit application into a 64 bit kernel.
  */
 /*ARGSUSED*/
@@ -846,6 +860,36 @@ xfs_args_to_ver_3(
 	target->fsname = (char*)(__psint_t)source->fsname;
 	target->sunit = source->sunit;
 	target->swidth = source->swidth;
+	target->iosizelog = source->iosizelog;
+
+	return 0;
+}
+
+#if CELL || NOTYET
+/*
+ * xfs_args_to_ver_4 
+ * 
+ * This is used with copyin_xlate() to copy a xfs_args version 2 structure
+ * in from user space from a 32 bit application into a 64 bit kernel.
+ */
+/*ARGSUSED*/
+int
+xfs_args_to_ver_4(
+	enum xlate_mode	mode,
+	void		*to,
+	int		count,
+	xlate_info_t	*info)
+{
+	COPYIN_XLATE_PROLOGUE(xfs_args_ver_3, xfs_args);
+
+	target->version = source->version;
+	target->flags = source->flags;
+	target->logbufs = source->logbufs;
+	target->logbufsize = source->logbufsize;
+	target->fsname = (char*)(__psint_t)source->fsname;
+	target->sunit = source->sunit;
+	target->swidth = source->swidth;
+	target->iosizelog = source->iosizelog;
 	target->servers = (char **)(__psint_t)source->servers;
 	target->servlen = (int *)(__psint_t)source->servlen;
 	target->uuid = (char *)(__psint_t)source->uuid;
@@ -913,10 +957,14 @@ xfs_mount(
 			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
 				     xfs_args_to_ver_2, get_current_abi(),1))
 				return XFS_ERROR(EFAULT);
-#if CELL || NOTYET
 		} else if (args.version == 3) {
 			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
 				     xfs_args_to_ver_3, get_current_abi(),1))
+				return XFS_ERROR(EFAULT);
+#if CELL || NOTYET
+		} else if (args.version == 4) {
+			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
+				     xfs_args_to_ver_4, get_current_abi(),1))
 				return XFS_ERROR(EFAULT);
 #endif /* CELL || NOTYET */
 		} else
