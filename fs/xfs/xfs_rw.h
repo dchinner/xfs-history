@@ -60,12 +60,6 @@ typedef struct xfs_gap {
 #define	XFS_MAX_BMAP_LEN_BB	1024
 #define	XFS_MAX_BMAP_LEN_BYTES	524288
 
-#if 0
-#define xfs_bioerror(bp)	
-#define xfs_bwrite(mp, bp)	bwrite(bp)
-#define xfsbdstrat(mp, bp)	bdstrat(
-#endif
-
 /*
  * Convert the given file system block to a disk block.
  * We have to treat it differently based on whether the
