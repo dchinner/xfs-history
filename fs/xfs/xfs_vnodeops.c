@@ -617,6 +617,24 @@ xfs_setattr(vnode_t	*vp,
 			code = XFS_ERROR(EINVAL);	/* EFBIG? */
 			goto error_return;
 		}
+
+		/*
+		 * Can't set extent size unless the file is marked, or
+		 * about to be marked as a realtime file.	
+		 *
+		 * This check will be removed when fixed size extents
+		 * with buffered data writes is implemented.
+		 *
+		 */
+		if ( (mask & AT_EXTSIZE) 			&&
+		     (ip->i_d.di_extsize != vap->va_extsize)	&&
+		     ( !( (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)  ||
+		          ((mask & AT_XFLAGS) &&
+			   (vap->va_xflags & XFS_DIFLAG_REALTIME)) ) ) ) {
+			code = XFS_ERROR(EINVAL);
+			goto error_return;
+		}
+
 		/*
 		 * Can't change realtime flag if any extents are allocated.
 		 */
