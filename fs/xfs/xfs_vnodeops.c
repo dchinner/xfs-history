@@ -4188,6 +4188,35 @@ xfs_reclaim(vnode_t	*vp,
 	return 0;
 }
 
+/*
+ * print out error describing the problem with the fs
+ *
+ *
+ * type 1 indicates the file system ran out of data space
+ * type 2 indicates the file system ran out of realtime space
+ *
+ */
+void
+xfs_error( xfs_mount_t *mp, int type)
+{
+	register dev_t	dev;
+
+	
+	switch ( type ) {
+		case 1:
+			dev = mp->m_dev;
+			prdev("Process [%s] ran out of disk space",
+				dev, u.u_comm);
+			break;
+		case 2:
+			dev = mp->m_rtdev;
+			prdev("Process [%s] ran out of disk space",
+				dev, u.u_comm);
+
+			break;
+	}
+}
+
 #ifdef SIM
 
 struct vnodeops xfs_vnodeops = {
@@ -4277,3 +4306,4 @@ struct vnodeops xfs_vnodeops = {
 };
 
 #endif	/* SIM */
+
