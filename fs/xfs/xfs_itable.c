@@ -461,6 +461,17 @@ xfs_bulkstat(
 				/*
 				 * Recompute agbno if this is the
 				 * first inode of the cluster.
+				 * 
+				 * Careful with clustidx.   There can be 
+				 * multple clusters per chunk, a single
+				 * cluster per chunk or a cluster that has
+				 * inodes represented from several different
+				 * chunks (if blocksize is large).
+				 * 
+				 * Because of this, the starting clustidx is 
+				 * initialized to zero in this loop but must
+				 * later be reset after reading in the cluster
+				 * buffer.
 				 */
 				if ((chunkidx & (nicluster - 1)) == 0) {
 					agbno = XFS_AGINO_TO_AGBNO(mp,
@@ -492,7 +503,9 @@ xfs_bulkstat(
 							vfs_unbusy(vfsp);
 							return error;
 						}
-						clustidx = 0;  
+						clustidx = ((caddr_t)dip - 
+						          bp->b_un.b_addr)/
+						          mp->m_sb.sb_inodesize;
 					}
 				}
 				/*
