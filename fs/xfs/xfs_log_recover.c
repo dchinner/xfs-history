@@ -2895,13 +2895,10 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_ino_t	ino;
 	int		bucket;
 	int		error;
-#ifdef CONFIG_HAVE_XFS_DMAPI
 	uint		mp_dmevmask;
-#endif /* CONFIG_HAVE_XFS_DMAPI */
 
 	mp = log->l_mp;
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
 	/*
 	 * Prevent any DMAPI event from being sent while in this function.
 	 * Not a problem for xfs since the file system isn't mounted
@@ -2909,7 +2906,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	 */
 	mp_dmevmask = mp->m_dmevmask;
 	mp->m_dmevmask = 0;
-#endif /* CONFIG_HAVE_XFS_DMAPI */
 
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		/*
@@ -2957,7 +2953,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 					/* setup for the next pass */
 					agino = dip->di_next_unlinked;
 					xfs_buf_relse(ibp);
-#ifdef CONFIG_HAVE_XFS_DMAPI
 					/*
 					 * Prevent any DMAPI event from
 					 * being sent when the
@@ -2967,8 +2962,8 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 					 * isn't mounted yet.  It is a
 					 * problem for cxfs recovery.
 					 */
-					 ip->i_d.di_dmevmask = 0;
-#endif /* CONFIG_HAVE_XFS_DMAPI */
+					ip->i_d.di_dmevmask = 0;
+
 					/*
 					 * Drop our reference to the
 					 * inode.  If there are no
@@ -3020,9 +3015,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		xfs_buf_relse(agibp);
 	}
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
 	mp->m_dmevmask = mp_dmevmask;
-#endif /* CONFIG_HAVE_XFS_DMAPI */
 
 }	/* xlog_recover_process_iunlinks */
 
@@ -3228,6 +3221,16 @@ xlog_do_recovery_pass(xlog_t	*log,
 	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
 	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
 	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
+	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));	/* blocks in data section */
+
+	    if ((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
+		(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) > INT_MAX)) ||
+		(bblks <= 0) ||
+		(blk_no > log->l_logBBsize)) {
+		    error = EFSCORRUPTED;
+		    goto bread_err2;
+	    }
+
 	    if ((INT_GET(rhead->h_version, ARCH_CONVERT) & (~XLOG_VERSION_OKBITS)) != 0) {
 		xlog_warn("XFS: xlog_do_recovery_pass: unrecognised log version number.");
 		error = XFS_ERROR(EIO);

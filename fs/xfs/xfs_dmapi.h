@@ -46,13 +46,13 @@
 #ifdef	__KERNEL__
 /* Defines for determining if an event message should be sent. */
 #define	DM_EVENT_ENABLED(vfsp, ip, event) ( \
-	((vfsp)->vfs_flag & VFS_DMI) && \
+	unlikely ((vfsp)->vfs_flag & VFS_DMI) && \
 		( ((ip)->i_d.di_dmevmask & (1 << event)) || \
 		  ((ip)->i_mount->m_dmevmask & (1 << event)) ) \
 	)
 
 #define	DM_EVENT_ENABLED_IO(vfsp, io, event) ( \
-	((vfsp)->vfs_flag & VFS_DMI) && \
+	unlikely ((vfsp)->vfs_flag & VFS_DMI) && \
 		( ((io)->io_dmevmask & (1 << event)) || \
 		  ((io)->io_mount->m_dmevmask & (1 << event)) ) \
 	)
