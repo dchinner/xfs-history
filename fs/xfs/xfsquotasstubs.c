@@ -2,36 +2,36 @@
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as published
- * by the Free Software Fondation.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or (at
+ * your option) any later version.
  * 
- * This program is distributed in the hope that it would be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  Further, any license provided herein,
- * whether implied or otherwise, is limited to this program in accordance with
- * the express provisions of the GNU General Public License.  Patent licenses,
- * if any, provided herein do not apply to combinations of this program with
- * other product or programs, or any other product whatsoever.  This program is
- * distributed without any warranty that the program is delivered free of the
- * rightful claim of any third person by way of infringement or the like.  See
- * the GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
  * 
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write the Free Software Foundation, Inc., 59 Temple
- * Place - Suite 330, Boston MA 02111-1307, USA.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write the Free Software Foundation,
+ * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 /*
  *
- * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.3 2000/01/18 22:46:59 kenmcd Exp $
+ * $Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfsquotasstubs.c,v 1.4 2000/01/30 09:59:06 kenmcd Exp $
  * $Author: kenmcd $
- * $Id: xfsquotasstubs.c,v 1.3 2000/01/18 22:46:59 kenmcd Exp $
+ * $Id: xfsquotasstubs.c,v 1.4 2000/01/30 09:59:06 kenmcd Exp $
  *
  * $Log: xfsquotasstubs.c,v $
- * Revision 1.3  2000/01/18 22:46:59  kenmcd
+ * Revision 1.4  2000/01/30 09:59:06  kenmcd
  * Encumbrance review done.
  * Add copyright and license words consistent with GPL.
  * Refer to http://fsg.melbourne.sgi.com/reviews/ for details.
+ *
+ * There is a slight change in the license terms and conditions words
+ * to go with the copyrights, so most of the files are not getting
+ * new GPL's, just updated versions ... but there are 20-30 more files
+ * here as well.
  *
  * Revision 1.2  1999/09/01 00:35:47  mostek
  * Get rid of warnings (void) arguments.
