@@ -2856,12 +2856,13 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_agi_t	*agi;
 	xfs_daddr_t	agidaddr;
 	xfs_buf_t	*agibp;
+	xfs_buf_t	*ibp;
+	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 	xfs_agino_t	agino;
 	xfs_ino_t	ino;
 	int		bucket;
 	int		error;
-	xfs_ino_t	last_ino;
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	uint		mp_dmevmask;
 #endif /* CONFIG_HAVE_XFS_DMAPI */
@@ -2870,15 +2871,14 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	/*
-	 * Prevent any DMAPI event from being while in this function.
+	 * Prevent any DMAPI event from being sent while in this function.
 	 * Not a problem for xfs since the file system isn't mounted
-	 * yet.  It is a problem for cxfs.
+	 * yet.  It is a problem for cxfs recovery.
 	 */
 	mp_dmevmask = mp->m_dmevmask;
 	mp->m_dmevmask = 0;
 #endif /* CONFIG_HAVE_XFS_DMAPI */
 
-	last_ino = 0;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		/*
 		 * Find the agi for this ag.
@@ -2892,92 +2892,93 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		agi = XFS_BUF_TO_AGI(agibp);
 		ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 
-		bucket = 0;
-		while (bucket < XFS_AGI_UNLINKED_BUCKETS) {
-			/*
-			 * If there is nothing in the current bucket,
-			 * then continue on to the next one.
-			 */
+		for (bucket = 0; bucket < XFS_AGI_UNLINKED_BUCKETS; bucket++) {
+
 			agino = INT_GET(agi->agi_unlinked[bucket], ARCH_CONVERT);
-			if (agino == NULLAGINO) {
-				bucket++;
-				continue;
-			}
-
-			/*
-			 * Release the agi buffer so that it can
-			 * be acquired in the normal course of the
-			 * transaction to truncate and free the inode.
-			 */
-			xfs_buf_relse(agibp);
-
-			ino = XFS_AGINO_TO_INO(mp, agno, agino);
-			error = xfs_iget(mp, NULL, ino, 0, &ip, 0);
-
-#ifdef CONFIG_HAVE_XFS_DMAPI
-			/*
-			 * Prevent any DMAPI event from being sent when
-			 * the reference on the inode is dropped.  Not
-			 * a problem for xfs since the file system isn't
-			 * mounted yet.  It is a problem for cxfs.
-			 */
-			if (!error) {
-				ip->i_d.di_dmevmask = 0;
-			}
-#endif /* CONFIG_HAVE_XFS_DMAPI */
-
-			/*
-			 * This inode is messed up.  Just
-			 * ditch this bucket of inodes.  We
-			 * will lose some inodes and space,
-			 * but at least we won't hang.
-			 */
-			if (!error &&
-			    (ino != last_ino) &&
-			    (ip->i_d.di_nlink == 0) &&
-			    (ip->i_d.di_mode != 0)) {
-				ASSERT(ip != NULL);
-				ASSERT(ip->i_d.di_nlink == 0);
-				ASSERT(ip->i_d.di_mode != 0);
+			while (agino != NULLAGINO) {
 
 				/*
-				 * Drop our reference to the inode.  This
-				 * will send the inode to xfs_inactive()
-				 * which will truncate the file and free
-				 * the inode.
+				 * Release the agi buffer so that it can
+				 * be acquired in the normal course of the
+				 * transaction to truncate and free the inode.
 				 */
-				VN_RELE(XFS_ITOV(ip));
-				last_ino = ino;
-			} else {
-				/*
-				 * Skip this bucket if we can't read in
-				 * the inode it points to.  Call
-				 * xlog_recover_clear_agi_bucket()
-				 * to perform a transaction to clear
-				 * the inode pointer in the bucket.
-				 */
+				xfs_buf_relse(agibp);
+
+				ino = XFS_AGINO_TO_INO(mp, agno, agino);
+				error = xfs_iget(mp, NULL, ino, 0, &ip, 0);
+				ASSERT(error || (ip != NULL));
+
 				if (!error) {
-					VN_RELE(XFS_ITOV(ip));
+					/*
+					 * Get the on disk inode to find the
+					 * next inode in the bucket.
+					 */
+					error = xfs_itobp(mp, NULL, ip, &dip,
+							&ibp, 0);
+					ASSERT(error || (dip != NULL));
 				}
 
-				xlog_recover_clear_agi_bucket(mp, agno, bucket);
+				if (!error) {
+					ASSERT(ip->i_d.di_nlink == 0);
+					ASSERT(ip->i_d.di_mode != 0);
 
-				bucket++;
-			}
+					/* setup for the next pass */
+					agino = dip->di_next_unlinked;
+					xfs_buf_relse(ibp);
+#ifdef CONFIG_HAVE_XFS_DMAPI
+					/*
+					 * Prevent any DMAPI event from
+					 * being sent when the
+					 * reference on the inode is
+					 * dropped.  Not a problem for
+					 * xfs since the file system
+					 * isn't mounted yet.  It is a
+					 * problem for cxfs recovery.
+					 */
+					 ip->i_d.di_dmevmask = 0;
+#endif /* CONFIG_HAVE_XFS_DMAPI */
+					/*
+					 * Drop our reference to the
+					 * inode.  If there are no
+					 * other references, this will
+					 * send the inode to
+					 * xfs_inactive() which will
+					 * truncate the file and free
+					 * the inode.
+					 */
+					VN_RELE(XFS_ITOV(ip));
+				} else {
+					/*
+					 * We can't read in the inode
+					 * this bucket points to, or
+					 * this inode is messed up.  Just
+					 * ditch this bucket of inodes.  We
+					 * will lose some inodes and space,
+					 * but at least we won't hang.  Call
+					 * xlog_recover_clear_agi_bucket()
+					 * to perform a transaction to clear
+					 * the inode pointer in the bucket.
+					 */
+					xlog_recover_clear_agi_bucket(mp, agno,
+							bucket);
 
-			/*
-			 * Reacquire the agibuffer and continue around
-			 * the loop.
-			 */
-			agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-			agibp = xfs_buf_read(mp->m_ddev_targp,
-					 agidaddr, 1, 0);
-			if (XFS_BUF_ISERROR(agibp)) {
-				xfs_ioerror_alert("xlog_recover_process_iunlinks(agi#2)",
-						  log->l_mp, agibp, agidaddr);
+					agino = NULLAGINO;
+				}
+
+				/*
+				 * Reacquire the agibuffer and continue around
+				 * the loop.
+				 */
+				agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+				agibp = xfs_buf_read(mp->m_ddev_targp,
+						 agidaddr, 1, 0);
+				if (XFS_BUF_ISERROR(agibp)) {
+					xfs_ioerror_alert("xlog_recover_process_iunlinks(agi#2)",
+							  log->l_mp, agibp, agidaddr);
+				}
+				agi = XFS_BUF_TO_AGI(agibp);
+				ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 			}
-			agi = XFS_BUF_TO_AGI(agibp);
-			ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 		}
 
 		/*
