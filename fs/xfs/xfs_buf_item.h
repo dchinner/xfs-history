@@ -58,6 +58,10 @@ extern void	xfs_buf_item_init(buf_t *, struct xfs_mount *);
 extern void	xfs_buf_item_relse(buf_t *);
 extern void	xfs_buf_item_log(xfs_buf_log_item_t *, uint, uint);
 extern uint	xfs_buf_item_dirty(xfs_buf_log_item_t *);
-extern void	xfs_buf_iodone(buf_t *);
+extern void	xfs_buf_attach_iodone(buf_t *,
+				      void(*)(buf_t*, xfs_log_item_t *),
+				      xfs_log_item_t *);
+extern void	xfs_buf_iodone_callbacks(buf_t *);
+extern void	xfs_buf_iodone(buf_t *, xfs_buf_log_item_t *);
 
 #endif	/* _XFS_BUF_ITEM_H */
