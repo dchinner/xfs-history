@@ -130,7 +130,7 @@ int	xfs_da_node_order(buf_t *node1_bp, buf_t *node2_bp);
  * Create the initial contents of an intermediate node.
  */
 int
-xfs_da_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t blkno,
+xfs_da_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t blkno,
 			       int level, buf_t **bpp, int whichfork)
 {
 	xfs_da_intnode_t *node;
@@ -267,7 +267,7 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 				 xfs_da_state_blk_t *blk2)
 {
 	xfs_da_intnode_t *node, *oldroot;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	buf_t *bp;
 	int error;
 
@@ -318,7 +318,7 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 				 int treelevel, int *result)
 {
 	xfs_da_intnode_t *node;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	int error;
 
 	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
@@ -633,7 +633,7 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 {
 	xfs_da_intnode_t *oldroot;
 	xfs_da_blkinfo_t *blkinfo;
-	xfs_fileoff_t child;
+	xfs_dablk_t child;
 	buf_t *bp;
 	int error;
 
@@ -693,7 +693,7 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	xfs_da_state_blk_t *blk;
 	xfs_da_blkinfo_t *info;
 	int count, forward, error, retval, i;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	buf_t *bp;
 
 	/*
@@ -816,7 +816,7 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 	xfs_da_state_blk_t *blk;
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
-	uint lasthash;
+	xfs_dahash_t lasthash;
 	int level, count;
 
 	level = path->active-1;
@@ -966,9 +966,9 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 	xfs_da_blkinfo_t *current;
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	int probe, span, max, error, retval;
-	uint hashval;
+	xfs_dahash_t hashval;
 
 	/*
 	 * Descend thru the B-tree searching each level for the right
@@ -1309,7 +1309,7 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 	xfs_da_state_blk_t *blk;
 	xfs_da_blkinfo_t *info;
 	xfs_da_intnode_t *node;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	int level, error;
 
 	/*
@@ -1408,10 +1408,10 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
  * Implement a simple hash on a character string.
  * Rotate the hash value by 7 bits, then XOR each character in.
  */
-uint
+xfs_dahash_t
 xfs_da_hashname(register char *name, register int namelen)
 {
-	register uint hash;
+	register xfs_dahash_t hash;
 
 	hash = 0;
 	for (  ; namelen > 0; namelen--) {
@@ -1422,7 +1422,7 @@ xfs_da_hashname(register char *name, register int namelen)
 
 int
 xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_args_t *args, int length,
-			      xfs_fileoff_t *new_blkno)
+			      xfs_dablk_t *new_blkno)
 {
 	xfs_fileoff_t bno;
 	xfs_bmbt_irec_t map;
@@ -1438,10 +1438,10 @@ xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_args_t *args, int length,
 	nmap = 1;	/* GROT: max of 1 extent is not enough */
 	ASSERT(args->firstblock != NULL);
 	error = xfs_bmapi(trans, dp, bno, (xfs_filblks_t)length,
-			 XFS_BMAPI_AFLAG(args->whichfork) |
-			 XFS_BMAPI_WRITE|XFS_BMAPI_METADATA,
-			 args->firstblock, args->total, &map, &nmap,
-			 args->flist);
+				 XFS_BMAPI_AFLAG(args->whichfork) |
+					 XFS_BMAPI_WRITE|XFS_BMAPI_METADATA,
+				 args->firstblock, args->total, &map, &nmap,
+				 args->flist);
 	if (error) {
 		return(error);
 	}
@@ -1449,7 +1449,7 @@ xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_args_t *args, int length,
 		ASSERT(0);
 		return(XFS_ERROR(ENOSPC));
 	}
-	*new_blkno = bno;
+	*new_blkno = (xfs_dablk_t)bno;
 	if (args->whichfork == XFS_DATA_FORK) {
 		error = xfs_bmap_last_offset(trans, dp, &bno, args->whichfork);
 		if (error) {
@@ -1466,7 +1466,7 @@ xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_args_t *args, int length,
 #ifndef SIM
 int
 xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_args_t *args,
-				xfs_fileoff_t dead_blkno, int length,
+				xfs_dablk_t dead_blkno, int length,
 				buf_t *dead_buf)
 {
 	xfs_inode_t *dp;
@@ -1474,9 +1474,10 @@ xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_args_t *args,
 	xfs_fileoff_t bno;
 
 	dp = args->dp;
-	error = xfs_bunmapi(trans, dp, dead_blkno, (xfs_filblks_t)length,
+	error = xfs_bunmapi(trans, dp, (xfs_fileoff_t)dead_blkno,
+				   (xfs_filblks_t)length,
 				   XFS_BMAPI_AFLAG(args->whichfork) |
-				   XFS_BMAPI_METADATA,
+					   XFS_BMAPI_METADATA,
 				   1, args->firstblock, args->flist, &done);
 	if (error) {
 		return(error);
@@ -1496,7 +1497,7 @@ xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_args_t *args,
 #endif	/* !SIM */
 
 int
-xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
+xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 			   buf_t **bpp, int whichfork)
 {
 	xfs_bmbt_irec_t map;
@@ -1506,27 +1507,31 @@ xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 
 	nmap = 1;
 	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
-				 &firstblock, 0, &map, &nmap, 0);
+	error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
+				 XFS_BMAPI_AFLAG(whichfork), &firstblock, 0,
+				 &map, &nmap, 0);
 	if (error) {
 		return(error);
 	}
 	ASSERT(nmap == 1);
 	ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
 	       (map.br_startblock != HOLESTARTBLOCK));
-
 	ASSERT(map.br_startblock != NULLFSBLOCK);
+	if (nmap != 1)
+		return XFS_ERROR(EDIRCORRUPTED);
 	bp = xfs_trans_get_buf(trans, dp->i_mount->m_dev,
 			      XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock),
 			      dp->i_mount->m_bsize, 0);
 	ASSERT(bp);
+	if (!bp)
+		return XFS_ERROR(EDIRCORRUPTED);
 	ASSERT(!geterror(bp));
 	*bpp = bp;
-	return(0);
+	return geterror(bp);
 }
 
 int
-xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
+xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 			daddr_t mappedbno, buf_t **bpp, int whichfork)
 {
 	xfs_fsblock_t firstblock;
@@ -1537,20 +1542,20 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 	if (mappedbno == -1) {
 		nmap = 1;
 		firstblock = NULLFSBLOCK;
-		error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
+		error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
+					 XFS_BMAPI_AFLAG(whichfork),
 					 &firstblock, 0, &map, &nmap, NULL);
 		if (error) {
 			return(error);
 		}
-		if (nmap == 0) {
+		if (nmap != 1) {
 			*bpp = NULL;
-			return(0);
+			return XFS_ERROR(EDIRCORRUPTED);
 		}
-		ASSERT(nmap == 1);
 		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
 		if (map.br_startblock == HOLESTARTBLOCK) {
 			*bpp = NULL;
-			return(0);
+			return XFS_ERROR(EDIRCORRUPTED);
 		}
 		ASSERT(map.br_startblock != NULLFSBLOCK);
 		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock);
@@ -1559,24 +1564,23 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 			      mappedbno, dp->i_mount->m_bsize, 0, bpp);
 	if (error)
 		return error;
-	ASSERT(!*bpp || !geterror(*bpp));
-	if (*bpp != NULL)
-		(*bpp)->b_ref = XFS_GEN_LBTREE_REF;
-
+	ASSERT(*bpp != NULL && !geterror(*bpp));
+	(*bpp)->b_ref = XFS_GEN_LBTREE_REF;
 	info = (xfs_da_blkinfo_t *)((*bpp)->b_un.b_addr);
 	if ((info->magic != XFS_DA_NODE_MAGIC) &&
 	    (info->magic != XFS_DIR_LEAF_MAGIC) &&
 	    (info->magic != XFS_ATTR_LEAF_MAGIC)) {
 		(*bpp)->b_flags |= B_ERROR;
 		xfs_trans_brelse(trans, *bpp);
-		return(XFS_ERROR(EIO));
+		*bpp = NULL;
+		return XFS_ERROR(EDIRCORRUPTED);
 	}
 	return(0);
 }
 
 #ifndef SIM
 daddr_t
-xfs_da_reada_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
+xfs_da_reada_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 			     int whichfork)
 {
 	xfs_fsblock_t firstblock;
@@ -1586,8 +1590,9 @@ xfs_da_reada_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 
 	nmap = 1;
 	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
-				 &firstblock, 0, &map, &nmap, NULL);
+	error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
+				 XFS_BMAPI_AFLAG(whichfork), &firstblock, 0,
+				 &map, &nmap, NULL);
 	if (error || nmap == 0)
 		return rval;
 	ASSERT(nmap == 1);
@@ -1645,8 +1650,8 @@ xfs_da_state_free(xfs_da_state_t *state)
  * Load all of the block in a directory into memory so they can be seen.
  *========================================================================*/
 
-int xfsda_load_leaf(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork);
-int xfsda_load_node(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork);
+int xfsda_load_leaf(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork);
+int xfsda_load_node(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork);
 
 int
 xfsda_loaddir(xfs_inode_t *dp)
@@ -1679,7 +1684,7 @@ xfsda_loadattr(xfs_inode_t *dp)
 }
 
 int
-xfsda_load_leaf(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork)
+xfsda_load_leaf(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork)
 {
 	xfs_attr_leafblock_t *aleaf;
 	xfs_dir_leafblock_t *dleaf;
@@ -1704,7 +1709,7 @@ xfsda_load_leaf(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork)
 }
 
 int
-xfsda_load_node(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork)
+xfsda_load_node(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork)
 {
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
@@ -1746,12 +1751,12 @@ xfsda_load_node(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork)
 typedef struct xfsda_context {
 	xfs_inode_t	*dp;		/* directory inode */
 	int		whichfork;	/* checking directory or attrributes? */
-	uint		hashval;	/* last hashval seen in tree */
+	xfs_dahash_t	hashval;	/* last hashval seen in tree */
 	int		maxblockmap;	/* size of block-use map */
 	char		*blockmap;	/* map of blocks and their uses */
 	int		maxlinkmap;	/* size of forw/back link map */
-	xfs_fileoff_t	*forw_links;	/* map of forward chain links */
-	xfs_fileoff_t	*back_links;	/* map of backward chain links */
+	xfs_dablk_t	*forw_links;	/* map of forward chain links */
+	xfs_dablk_t	*back_links;	/* map of backward chain links */
 	int		bytemapsize;	/* size of used/free bytemap */
 	char		*bytemap;	/* used/free bytes in leaf blk */
 	int		usedbytes;	/* total bytes used in entries */
@@ -1765,31 +1770,31 @@ typedef struct xfsda_context {
 } xfsda_context_t;
 
 
-int xfsda_leaf_check(xfsda_context_t *con, xfs_fileoff_t blkno, int firstlast);
-int xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
+int xfsda_leaf_check(xfsda_context_t *con, xfs_dablk_t blkno, int firstlast);
+int xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 					  int firstlast);
-int xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
+int xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 					 int firstlast);
-int xfsda_node_check(xfsda_context_t *con, xfs_fileoff_t blkno,
-				     int depth, int firstlast);
+int xfsda_node_check(xfsda_context_t *con, xfs_dablk_t blkno, int depth,
+				     int firstlast);
 int xfsda_check_blockuse(xfsda_context_t *con);
-int xfsda_checkchain(xfsda_context_t *con, buf_t *bp,
-				     xfs_fileoff_t parentblk,
-				     xfs_fileoff_t blkno, int forward);
-int xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno);
+int xfsda_checkchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t parentblk,
+				     xfs_dablk_t blkno, int forward);
+int xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno);
 int xfsda_checkblock(xfsda_context_t *con, buf_t *bp,
-				     xfs_fileoff_t blkno, int level);
+				     xfs_dablk_t blkno, int level);
 int xfsda_checkname(buf_t *bp, char *name, int namelen, int index,
-			  uint hashval);
+			  xfs_dahash_t hashval);
 void xfsda_printbytes(int bytes);
 
-extern uint xfs_da_hashname(register char *name, register int namelen);
+extern xfs_dahash_t xfs_da_hashname(register char *name, register int namelen);
 
 int
 xfsda_checkdir(xfs_inode_t *dp)
 {
 	return(xfsda_check(dp, XFS_DATA_FORK));
 }
+
 int
 xfsda_checkattr(xfs_inode_t *dp)
 {
@@ -1808,9 +1813,9 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 	con->blockmap = (char *)
 		kmem_zalloc(numblks * sizeof(*con->blockmap), KM_SLEEP);
 	con->maxlinkmap = numblks;
-	con->forw_links = (xfs_fileoff_t *)
+	con->forw_links = (xfs_dablk_t *)
 		kmem_zalloc(numblks * sizeof(*con->forw_links), KM_SLEEP);
-	con->back_links = (xfs_fileoff_t *)
+	con->back_links = (xfs_dablk_t *)
 		kmem_zalloc(numblks * sizeof(*con->back_links), KM_SLEEP);
 	con->bytemapsize = XFS_LBSIZE(dp->i_mount);
 	con->bytemap = (char *)
@@ -1833,7 +1838,7 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 		} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
 			retval = xfsda_leaf_check(con, 0, -2);
 		} else {
-			retval = xfsda_node_check(con, (xfs_fileoff_t)0, -1, -2);
+			retval = xfsda_node_check(con, (xfs_dablk_t)0, -1, -2);
 			retval += xfsda_check_blockuse(con);
 		}
 	} else {
@@ -1842,7 +1847,7 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 		} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 			retval = xfsda_leaf_check(con, 0, -2);
 		} else {
-			retval = xfsda_node_check(con, (xfs_fileoff_t)0, -1, -2);
+			retval = xfsda_node_check(con, (xfs_dablk_t)0, -1, -2);
 			retval += xfsda_check_blockuse(con);
 		}
 	}
@@ -1914,7 +1919,7 @@ xfsda_shortform_check(xfsda_context_t *con)
  *========================================================================*/
 
 int
-xfsda_leaf_check(xfsda_context_t *con, xfs_fileoff_t blkno, int firstlast)
+xfsda_leaf_check(xfsda_context_t *con, xfs_dablk_t blkno, int firstlast)
 {
 	xfs_da_blkinfo_t *info;
 	int retval;
@@ -1972,7 +1977,7 @@ xfsda_leaf_check(xfsda_context_t *con, xfs_fileoff_t blkno, int firstlast)
 
 /*ARGSUSED*/
 int
-xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
+xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 				      int firstlast)
 {
 	xfs_attr_leafblock_t *leaf;
@@ -2136,7 +2141,7 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 
 /*ARGSUSED*/
 int
-xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
+xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
 				     int firstlast)
 {
 	xfs_dir_leafblock_t *leaf;
@@ -2272,7 +2277,7 @@ xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
  *========================================================================*/
 
 int
-xfsda_node_check(xfsda_context_t *con, xfs_fileoff_t blkno,
+xfsda_node_check(xfsda_context_t *con, xfs_dablk_t blkno,
 				 int depth, int firstlast)
 {
 	xfs_da_intnode_t *node;
@@ -2412,7 +2417,8 @@ xfsda_node_check(xfsda_context_t *con, xfs_fileoff_t blkno,
  *========================================================================*/
 
 int
-xfsda_checkname(buf_t *bp, char *name, int namelen, int index, uint hashval)
+xfsda_checkname(buf_t *bp, char *name, int namelen, int index,
+		      xfs_dahash_t hashval)
 {
 	int retval;
 
@@ -2424,8 +2430,7 @@ xfsda_checkname(buf_t *bp, char *name, int namelen, int index, uint hashval)
 }
 
 int
-xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
-				 int level)
+xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno, int level)
 {
 	int retval;
 
@@ -2449,7 +2454,7 @@ xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 }
 
 int
-xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno)
+xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno)
 {
 	int retval;
 
@@ -2462,11 +2467,10 @@ xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno)
 
 int
 xfsda_checkchain(xfsda_context_t *con, buf_t *bp,
-			 xfs_fileoff_t parentblk, xfs_fileoff_t blkno,
-			 int forward)
+			 xfs_dablk_t parentblk, xfs_dablk_t blkno, int forward)
 {
 	int retval, tmp, i;
-	xfs_fileoff_t *links;
+	xfs_dablk_t *links;
 
 	retval = 0;
 	if (blkno >= con->maxblockmap) {
