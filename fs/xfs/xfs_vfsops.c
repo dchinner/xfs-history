@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.39 $"
+#ident  "$Revision: 1.40 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -533,6 +533,11 @@ xfs_vfsmount(vfs_t		*vfsp,
 		ddev   = (sv_p = xlv_p->vol_p->data_subvol) ? sv_p->dev : 0;
 		logdev = (sv_p = xlv_p->vol_p->log_subvol) ? sv_p->dev : 0;
 		rtdev  = (sv_p = xlv_p->vol_p->rt_subvol) ? sv_p->dev : 0;
+
+		if (!logdev) {
+			logdev = ddev;
+		}
+
 		ASSERT(ddev && logdev);
 		XLV_IO_UNLOCK(minor(device));
 
@@ -634,12 +639,17 @@ xfs_mountroot(vfs_t		*vfsp,
 	extern dev_t	rootdev;		/* from sys/systm.h */
 	dev_t		ddev, logdev, rtdev;
 
-	
 	/*
-	 * Check that the root device holds a XFS file system.
+	 * Check that the root device holds an XFS file system.
+	 *
+	 * If the device is an XLV volume, cannot check for an
+	 * XFS superblock because the device is not yet open.
 	 */
-	if ((why == ROOT_INIT) && _xfs_isdev(rootdev))
+	if ( (why == ROOT_INIT) 		&& 
+	     (emajor(rootdev) != XLV_MAJOR)	&&
+	     (_xfs_isdev(rootdev))) {
 		return XFS_ERROR(ENOSYS);
+	}
 	
 	switch (why) {
 	  case ROOT_INIT:
@@ -684,6 +694,7 @@ xfs_mountroot(vfs_t		*vfsp,
 			XLV_IO_LOCK(minor(rootdev), MR_ACCESS);
 			xlv_p = &xlv_tab->subvolume[minor(rootdev)];
 			if (! XLV_SUBVOL_EXISTS(xlv_p)) {
+
 				XLV_IO_UNLOCK(minor(rootdev));
 				return XFS_ERROR(ENXIO);
 			}
@@ -693,7 +704,11 @@ xfs_mountroot(vfs_t		*vfsp,
 				sv_p->dev : 0;
 			rtdev  = (sv_p = xlv_p->vol_p->rt_subvol) ?
 				sv_p->dev : 0;
-			ASSERT(ddev && logdev);
+
+			if (!logdev) {
+				logdev = ddev;
+			}
+
 			XLV_IO_UNLOCK(minor(rootdev));
 		}
 	} else {
@@ -704,6 +719,7 @@ xfs_mountroot(vfs_t		*vfsp,
 		ddev = logdev = rootdev;
 		rtdev = 0;
 	}
+	ASSERT(ddev && logdev);
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, why, NULL, cr);
 
