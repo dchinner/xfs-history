@@ -122,7 +122,9 @@ xfs_inotobp(
 	 * Call the space managment code to find the location of the
 	 * inode on disk.
 	 */
-	xfs_imap(mp, tp, ino, &imap);
+	if (xfs_imap(mp, tp, ino, &imap, XFS_IMAP_LOOKUP) == 0) {
+		return NULL;
+	}
 
 	/*
 	 * If the inode number maps to a block outside the bounds of the
@@ -132,6 +134,94 @@ xfs_inotobp(
 	if ((imap.im_blkno + imap.im_len) >
 	    XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks)) {
 		return NULL;
+	}
+
+	/*
+	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
+	 * default to just a read_buf() call.
+	 */
+	dev = mp->m_dev;
+	bp = xfs_trans_read_buf(tp, dev, imap.im_blkno, (int)imap.im_len, 0);
+
+	/*
+	 * We need to come up with a disk error handling policy.
+	 */
+	if (bp->b_flags & B_ERROR) {
+		ASSERT(0);
+	}
+
+	xfs_inobp_check(mp, bp);
+
+	/*
+	 * Set *dipp to point to the on-disk inode in the buffer.
+	 */
+	*dipp = (xfs_dinode_t *)(bp->b_un.b_addr + imap.im_boffset);
+	return (bp);
+}
+
+
+/*
+ * This routine is called to map an inode to the buffer containing
+ * the on-disk version of the inode.  It returns a pointer to the
+ * buffer containing the on-disk inode, and in the dip parameter it
+ * returns a pointer to the on-disk inode within that buffer.
+ *
+ * If the inode is new and has not yet been initialized, use xfs_imap()
+ * to determine the size and location of the buffer to read from disk.
+ * If the inode has already been mapped to its buffer and read in once,
+ * then use the mapping information stored in the inode rather than
+ * calling xfs_imap().  This allows us to avoid the overhead of looking
+ * at the inode btree for small block file systems (see xfs_dilocate()).
+ * We can tell whether the inode has been mapped in before by comparing
+ * its disk block address to 0.  Only uninitialized inodes will have
+ * 0 for the disk block address.
+ */
+buf_t *
+xfs_itobp(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,	
+	xfs_dinode_t	**dipp)
+{
+	xfs_imap_t	imap;
+	buf_t		*bp;
+	dev_t		dev;
+
+	if (ip->i_blkno == (daddr_t)0) {
+		/*
+		 * Call the space managment code to find the location of the
+		 * inode on disk.
+		 */
+		if (xfs_imap(mp, tp, ip->i_ino, &imap, XFS_IMAP_LOOKUP) == 0) {
+			return NULL;
+		}
+
+		/*
+		 * If the inode number maps to a block outside the bounds
+		 * of the file system then return NULL rather than calling
+		 * read_buf and panicing when we get an error from the
+		 * driver.
+		 */
+		if ((imap.im_blkno + imap.im_len) >
+		    XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks)) {
+			return NULL;
+		}
+
+		/*
+		 * Fill in the fields in the inode that will be used to
+		 * map the inode to its buffer from now on.
+		 */
+		ip->i_blkno = imap.im_blkno;
+		ip->i_len = imap.im_len;
+		ip->i_boffset = imap.im_boffset;
+	} else {
+		/*
+		 * We've already mapped the inode once, so just use the
+		 * mapping that we saved the first time.
+		 */
+		imap.im_blkno = ip->i_blkno;
+		imap.im_len = ip->i_len;
+		imap.im_boffset = ip->i_boffset;
 	}
 
 	/*
@@ -323,10 +413,12 @@ xfs_iread(
 	/*
 	 * Get pointer's to the on-disk inode and the buffer containing it.
 	 * If the inode number refers to a block outside the file system
-	 * then xfs_inotobp() will return NULL.  In this case we should
-	 * return NULL as well.
+	 * then xfs_itobp() will return NULL.  In this case we should
+	 * return NULL as well.  Set i_blkno to 0 so that xfs_itobp() will
+	 * know that this is a new incore inode.
 	 */
-	bp = xfs_inotobp(mp, tp, ino, &dip);
+	ip->i_blkno = 0;
+	bp = xfs_itobp(mp, tp, ip, &dip);
 
 	if (bp == NULL) {
 		kmem_zone_free(xfs_inode_zone, ip);
@@ -395,7 +487,7 @@ xfs_iread(
 	/*
 	 * Use xfs_trans_brelse() to release the buffer containing the
 	 * on-disk inode, because it was acquired with xfs_trans_read_buf()
-	 * in xfs_inotobp() above.  If tp is NULL, this is just a normal
+	 * in xfs_itobp() above.  If tp is NULL, this is just a normal
 	 * brelse().  If we're within a transaction, then xfs_trans_brelse()
 	 * will only release the buffer if it is not dirty within the
 	 * transaction.  It will be OK to release the buffer in this case,
@@ -960,7 +1052,7 @@ xfs_iunlink(
 		 * Here we put the head pointer into our next pointer,
 		 * and then we fall through to point the head at us.
 		 */
-		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
+		ibp = xfs_itobp(mp, tp, ip, &dip);
 		ASSERT(dip->di_next_unlinked == NULLAGINO);
 		ASSERT(dip->di_next_unlinked != 0);
 		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
@@ -1040,7 +1132,7 @@ xfs_iunlink_remove(
 		 * of dealing with the buffer when there is no need to
 		 * change it.
 		 */
-		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
+		ibp = xfs_itobp(mp, tp, ip, &dip);
 		next_agino = dip->di_next_unlinked;
 		ASSERT(next_agino != 0);
 		if (next_agino != NULLAGINO) {
@@ -1088,7 +1180,7 @@ xfs_iunlink_remove(
 		 * Now last_ibp points to the buffer previous to us on
 		 * the unlinked list.  Pull us from the list.
 		 */
-		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
+		ibp = xfs_itobp(mp, tp, ip, &dip);
 		next_agino = dip->di_next_unlinked;
 		ASSERT(next_agino != 0);
 		if (next_agino != NULLAGINO) {
@@ -1459,20 +1551,26 @@ xfs_idata_realloc(
  * ino -- the inode number of the inode to be located
  * imap -- this structure is filled in with the information necessary
  *	 to retrieve the given inode from disk
+ * flags -- flags to pass to xfs_dilocate indicating whether or not
+ *	 lookups in the inode btree were OK or not
  */
 int
 xfs_imap(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
-	xfs_imap_t	*imap)
+	xfs_imap_t	*imap,
+	uint		flags)
 {
-	xfs_fsblock_t fsbno;
-	int off;
+	xfs_fsblock_t	fsbno;
+	int		len;
+	int		off;
 
-	xfs_dilocate(mp, tp, ino, &fsbno, &off);
+	if (xfs_dilocate(mp, tp, ino, &fsbno, &len, &off, flags) != 0) {
+		return 0;
+	}
 	imap->im_blkno = XFS_FSB_TO_DADDR(mp, fsbno);
-	imap->im_len = XFS_FSB_TO_BB(mp, 1);
+	imap->im_len = XFS_FSB_TO_BB(mp, len);
 	imap->im_agblkno = XFS_FSB_TO_AGBNO(mp, fsbno);
 	imap->im_ioffset = (ushort)off;
 	imap->im_boffset = (ushort)(off << mp->m_sb.sb_inodelog);
@@ -1786,7 +1884,7 @@ xfs_iflush(
 	/*
 	 * Get the buffer containing the on-disk inode.
 	 */
-	bp = xfs_inotobp(mp, NULL, ip->i_ino, &dip);
+	bp = xfs_itobp(mp, NULL, ip, &dip);
 
 	/*
 	 * Clear i_update_core before copying out the data.
