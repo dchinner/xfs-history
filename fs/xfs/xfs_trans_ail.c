@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.48 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -501,11 +501,11 @@ xfs_ail_insert(
 
 	next_lip = base->ail_back;
 	while ((next_lip != (xfs_log_item_t*)base) &&
-	       (next_lip->li_lsn > lip->li_lsn)) {
+	       (XFS_LSN_CMP(next_lip->li_lsn, lip->li_lsn) > 0)) {
 		next_lip = next_lip->li_ail.ail_back;
 	}
 	ASSERT((next_lip == (xfs_log_item_t*)base) ||
-	       (next_lip->li_lsn <= lip->li_lsn));
+	       (XFS_LSN_CMP(next_lip->li_lsn, lip->li_lsn) <= 0));
 	lip->li_ail.ail_forw = next_lip->li_ail.ail_forw;
 	lip->li_ail.ail_back = next_lip;
 	next_lip->li_ail.ail_forw = lip;

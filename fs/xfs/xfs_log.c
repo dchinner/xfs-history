@@ -1347,7 +1347,7 @@ xlog_grant_push_ail(xfs_mount_t	*mp,
 	/* Don't pass in an lsn greater than the lsn of the last
 	 * log record known to be on disk.
 	 */
-	if (threshold_lsn > log->l_last_sync_lsn)
+	if (XFS_LSN_CMP(threshold_lsn, log->l_last_sync_lsn) > 0)
 	    threshold_lsn = log->l_last_sync_lsn;
     }
     GRANT_UNLOCK(log, spl);
@@ -1920,7 +1920,8 @@ xlog_get_lowest_lsn(
 	do {
 	    if (!(lsn_log->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_DIRTY))) {
 		lsn = lsn_log->ic_header.h_lsn;
-		if ((lsn && !lowest_lsn) || (lsn < lowest_lsn)) {
+		if ((lsn && !lowest_lsn) ||
+		    (XFS_LSN_CMP(lsn, lowest_lsn) < 0)) {
 			lowest_lsn = lsn;
 		}
 	    }

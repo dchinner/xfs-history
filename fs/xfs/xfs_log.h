@@ -24,10 +24,41 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.40 $"
 
+#ifdef __LITTLE_ENDIAN
+/* Since the lsn comes out with the cycle number in the least significant
+ * part of the lsn as a 64 bit quantity we need to do the comparison
+ * of cycle and block numbers explicitly. On 32 bit machines this is
+ * less code than a 64 bit compare anyway.
+ */
+
+#ifndef CYCLE_LSN
+#define CYCLE_LSN(lsn)          (((uint *)&(lsn))[0])
+#define BLOCK_LSN(lsn)          (((uint *)&(lsn))[1])
+#define __REMOVE_CYCLE__
+#endif
+
+static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2)
+{
+	if (CYCLE_LSN(lsn1) != CYCLE_LSN(lsn2)) {
+		return (CYCLE_LSN(lsn1) - CYCLE_LSN(lsn2));
+	}
+
+	return (BLOCK_LSN(lsn1) - BLOCK_LSN(lsn2));
+}
+
+#ifdef __REMOVE_CYCLE__
+#undef CYCLE_LSN
+#undef BLOCK_LSN
+#endif
+
+#define	XFS_LSN_CMP(x,y)	_lsn_cmp(x, y)
+#define	XFS_LSN_DIFF(x,y)	_lsn_cmp(x, y)
+#else
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
+#endif
 
 /*
  * Macros, structures, prototypes for interface to the log manager.
