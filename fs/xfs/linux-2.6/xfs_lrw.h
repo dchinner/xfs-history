@@ -36,6 +36,9 @@
  * $Id$
  *
  * $Log$
+ * Revision 1.9  2000/04/19 04:54:48  cattelan
+ * proto  xfs_is_read_only
+ *
  * Revision 1.8  2000/03/29 01:45:59  kenmcd
  * Updated copyright and license notices, ready for open source release
  *
@@ -87,6 +90,7 @@ extern int xfs_bmap(bhv_desc_t *,off_t,ssize_t,int,pb_bmap_t *,int *);
 extern int xfs_iomap_read(xfs_iocore_t *,off_t,size_t,pb_bmap_t *,int *,struct pm *);
 extern int xfs_iomap_write(xfs_iocore_t	*,off_t,size_t,pb_bmap_t *,int *,int,struct pm *);
 
+extern int xfs_is_read_only(xlog_t *);
 /*
  * Needed by xfs_rw.c
  */

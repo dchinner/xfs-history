@@ -32,7 +32,6 @@
 
 #ident	"$Revision$"
 
-#define NEED_FS_H
 #include <xfs_os_defs.h>
 
 #ifdef SIM
@@ -3357,19 +3356,14 @@ xlog_recover(xlog_t *log, int readonly)
 		 * recovery.
 		 */
 		if (readonly) {
-			cmn_err(CE_NOTE, "XFS: WARNING: recovery required on readonly filesystem.\n");
-			mp = log->l_mp;
 #ifndef SIM
-			if (is_read_only(mp->m_dev) ||
-			    is_read_only(mp->m_logdev)) {
+		  int ret;
+		  if(ret = xfs_is_read_only(log)){
+			return ret;
+		  }
+#else
+		  return ENOSPC;
 #endif
-				cmn_err(CE_NOTE, "XFS: write access unavailable, cannot proceed.\n");
-#ifndef SIM
-				return -EROFS;
-			}
-#endif
-			cmn_err(CE_NOTE, "XFS: write access will be enabled during recovery.\n");
-			XFS_MTOVFS(mp)->vfs_flag &= ~VFS_RDONLY;
 		}
 
 #ifdef _KERNEL

@@ -50,6 +50,7 @@
 
 #include <linux/linux_to_xfs.h>
 
+#include <sys/cmn_err.h>
 #include "xfs_buf.h"
 #include <ksys/behavior.h>
 #include <sys/vnode.h>
@@ -81,6 +82,7 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_trans_space.h"
+#include "xfs_log_priv.h"
 #include "xfs_lrw.h"
 #include "xfs_quota.h"
 
@@ -2020,5 +2022,21 @@ xfs_trigger_io(void)
 	run_task_queue(&tq_disk);
 }
 
+#endif /* _USING_PAGEBUF_T */
 
-#endif
+int
+xfs_is_read_only(xlog_t *log){
+  
+  xfs_mount_t *mp;
+  
+  cmn_err(CE_NOTE, "XFS: WARNING: recovery required on readonly filesystem.\n");
+  mp = log->l_mp;
+  if (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev)) {
+	cmn_err(CE_NOTE, "XFS: write access unavailable, cannot proceed.\n");
+	return EROFS;
+  }
+  cmn_err(CE_NOTE, "XFS: write access will be enabled during recovery.\n");
+  XFS_MTOVFS(mp)->vfs_flag &= ~VFS_RDONLY;
+  return 0;
+}
+
