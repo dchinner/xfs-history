@@ -32,7 +32,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.135 $"
+#ident "$Revision: 1.136 $"
 
 struct bhv_desc;
 struct xfs_buf;
@@ -588,13 +588,13 @@ uint		xfs_ilock_map_shared(xfs_inode_t *);
 void		xfs_iunlock_map_shared(xfs_inode_t *, uint);
 void		xfs_ifunlock(xfs_inode_t *);
 void		xfs_ireclaim(xfs_inode_t *);
-int		xfs_finish_reclaim(xfs_inode_t *);
+int		xfs_finish_reclaim(xfs_inode_t *, int);
 
 /*
  * xfs_inode.c prototypes.
  */
 int		xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			    xfs_dinode_t **, struct xfs_buf **);
+			    xfs_dinode_t **, struct xfs_buf **, int *);
 int		xfs_itobp(struct xfs_mount *, struct xfs_trans *,
 			  xfs_inode_t *, xfs_dinode_t **, struct xfs_buf **,
 			  xfs_daddr_t);

@@ -114,6 +114,11 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	xfs_buf_t		*bp;
 	xfs_buf_log_item_t	*bip;
 
+	if (flags == 0)
+		flags = XFS_BUF_LOCK | XFS_BUF_MAPPED;
+	else
+		flags |= XFS_BUF_MAPPED;
+
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
 	 * Always specify the BUF_BUSY flag so that get_buf() does
@@ -128,7 +133,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		 */
 		return (get_buf(target_dev->dev, blkno, len, flags));
 #else
-		bp = xfs_buf_get(target_dev, blkno, len, flags | BUF_BUSY);
+		bp = xfs_buf_get_flags(target_dev, blkno, len, flags|BUF_BUSY);
 		return(bp);
 #endif
 	}
@@ -180,7 +185,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 #ifdef SIM
 	bp = get_buf(target_dev->dev, blkno, len, flags);
 #else
-	bp = xfs_buf_get(target_dev, blkno, len, flags | BUF_BUSY);
+	bp = xfs_buf_get_flags(target_dev, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		return NULL;
@@ -347,6 +352,11 @@ xfs_trans_read_buf(
 	xfs_buf_log_item_t	*bip;
 	int			error;
 	
+	if (flags == 0)
+		flags = XFS_BUF_LOCK | XFS_BUF_MAPPED;
+	else
+		flags |= XFS_BUF_MAPPED;
+
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
 	 * Always specify the BUF_BUSY flag so that get_buf() does
@@ -361,7 +371,7 @@ xfs_trans_read_buf(
 		 */
 		bp = read_buf(target->dev, blkno, len, flags);
 #else
-		bp = xfs_buf_read(target, blkno, len,
+		bp = xfs_buf_read_flags(target, blkno, len,
 			      flags | BUF_BUSY);
 #endif
 		if ((bp != NULL) && (XFS_BUF_GETERROR(bp) != 0)) {
@@ -462,7 +472,7 @@ xfs_trans_read_buf(
 #ifdef SIM
 	bp = read_buf(target->dev, blkno, len, flags);
 #else
-	bp = xfs_buf_read(target, blkno, len, flags | BUF_BUSY);
+	bp = xfs_buf_read_flags(target, blkno, len, flags | BUF_BUSY);
 #endif
 	if (bp == NULL) {
 		*bpp = NULL;

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.290 $"
+#ident "$Revision: 1.291 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -203,8 +203,8 @@ xfs_inobp_check(
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
 
 	for (i = 0; i < j; i++) {
-		dip = (xfs_dinode_t *)((char *)XFS_BUF_PTR(bp) +
-				       (i * mp->m_sb.sb_inodesize));
+		dip = (xfs_dinode_t *)xfs_buf_offset(bp,
+				       i * mp->m_sb.sb_inodesize);
 		if (INT_ISZERO(dip->di_next_unlinked, ARCH_CONVERT))  {
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"Detected a bogus zero next_unlinked field in incore inode buffer 0x%p.  About to pop an ASSERT.",
@@ -233,16 +233,17 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 
 
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
-	dip = (xfs_dinode_t *) XFS_BUF_PTR(bp);
 
 	for (i = 0; i < j; i++)  {
+		dip = (xfs_dinode_t *) xfs_buf_offset(bp,
+						i * mp->m_sb.sb_inodesize);
                 if (INT_GET(dip->di_core.di_magic, ARCH_CONVERT) != XFS_DINODE_MAGIC) {
 			cmn_err(CE_WARN,
 "Bad magic # 0x%x in XFS inode buffer 0x%Lx, starting blockno %Ld, offset 0x%x",
 				INT_GET(dip->di_core.di_magic, ARCH_CONVERT),
 				(__uint64_t)(__psunsigned_t) bp,
 				(__int64_t) XFS_BUF_ADDR(bp),
-				(__psint_t) dip - (__psint_t) XFS_BUF_PTR(bp));
+				xfs_buf_offset(bp, i * mp->m_sb.sb_inodesize));
 			xfs_fs_cmn_err(CE_WARN, mp,
 				"corrupt, unmount and run xfs_repair");
 		}
@@ -251,12 +252,10 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 "Bad next_unlinked field (0) in XFS inode buffer 0x%x, starting blockno %Ld, offset 0x%x",
 				(__uint64_t)(__psunsigned_t) bp,
 				(__int64_t) XFS_BUF_ADDR(bp),
-				(__psint_t) dip - (__psint_t) XFS_BUF_PTR(bp));
+				xfs_buf_offset(bp, i * mp->m_sb.sb_inodesize));
 			xfs_fs_cmn_err(CE_WARN, mp,
 				"corrupt, unmount and run xfs_repair");
 		}
-		
-		dip = (xfs_dinode_t *)((__psint_t) dip + mp->m_sb.sb_inodesize);
 	}
 
 	return;
@@ -282,7 +281,8 @@ xfs_inotobp(
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
 	xfs_dinode_t	**dipp,
-	xfs_buf_t		**bpp)
+	xfs_buf_t	**bpp,
+	int		*offset)
 {
 	int		di_ok;
 	xfs_imap_t	imap;
@@ -315,12 +315,12 @@ xfs_inotobp(
 	 * default to just a read_buf() call.
 	 */
 	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, imap.im_blkno,
-				   (int)imap.im_len, 0, &bp);
+				   (int)imap.im_len, XFS_BUF_LOCK, &bp);
 
 	if (error) {
 		return error;
 	}
-	dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp));
+	dip = (xfs_dinode_t *)xfs_buf_offset(bp, 0);
 	di_ok =
 		INT_GET(dip->di_core.di_magic, ARCH_CONVERT) == XFS_DINODE_MAGIC &&
 		XFS_DINODE_GOOD_VERSION(INT_GET(dip->di_core.di_version, ARCH_CONVERT));
@@ -335,8 +335,9 @@ xfs_inotobp(
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.
 	 */
-	*dipp = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + imap.im_boffset);
+	*dipp = (xfs_dinode_t *)xfs_buf_offset(bp, imap.im_boffset);
 	*bpp = bp;
+	*offset = imap.im_boffset;
 	return 0;
 }
 
@@ -368,7 +369,7 @@ xfs_itobp(
 	xfs_inode_t	*ip,	
 	xfs_dinode_t	**dipp,
 	xfs_buf_t	**bpp,
-	xfs_daddr_t		bno)
+	xfs_daddr_t	bno)
 {
 	xfs_buf_t	*bp;
 	int		error;
@@ -423,7 +424,7 @@ xfs_itobp(
 	 * default to just a read_buf() call.
 	 */
 	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, imap.im_blkno,
-				   (int)imap.im_len, 0, &bp);
+				   (int)imap.im_len, XFS_BUF_LOCK, &bp);
 
 	if (error) {
 		return error;
@@ -442,7 +443,7 @@ xfs_itobp(
 		int		di_ok;
 		xfs_dinode_t	*dip;
 
-		dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) +
+		dip = (xfs_dinode_t *)xfs_buf_offset(bp,
 					(i << mp->m_sb.sb_inodelog));
 		di_ok = INT_GET(dip->di_core.di_magic, ARCH_CONVERT) == XFS_DINODE_MAGIC &&
 			    XFS_DINODE_GOOD_VERSION(INT_GET(dip->di_core.di_version, ARCH_CONVERT));
@@ -468,7 +469,7 @@ xfs_itobp(
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.
 	 */
-	*dipp = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + imap.im_boffset);
+	*dipp = (xfs_dinode_t *)xfs_buf_offset(bp, imap.im_boffset);
 	*bpp = bp;
 	return 0;
 }
@@ -1076,7 +1077,7 @@ xfs_ialloc(
 	cred_t		*cr,
 	xfs_prid_t	prid,   
 	int		okalloc,
-	xfs_buf_t		**ialloc_context,
+	xfs_buf_t	**ialloc_context,
 	boolean_t	*call_again,
 	xfs_inode_t	**ipp)	   
 {
@@ -1927,7 +1928,7 @@ xfs_iunlink(
 		ASSERT(!INT_ISZERO(dip->di_next_unlinked, ARCH_CONVERT));
 		INT_SET(dip->di_next_unlinked, ARCH_CONVERT, 
                         INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT));
-		offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
+		offset = ip->i_boffset +
 			offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_inode_buf(tp, ibp);
 		xfs_trans_log_buf(tp, ibp, offset,
@@ -1963,13 +1964,13 @@ xfs_iunlink_remove(
 	xfs_buf_t	*agibp;
 	xfs_buf_t	*ibp;
 	xfs_agnumber_t	agno;
-	xfs_daddr_t		agdaddr;
+	xfs_daddr_t	agdaddr;
 	xfs_agino_t	agino;
 	xfs_agino_t	next_agino;
 	xfs_buf_t	*last_ibp;
 	xfs_dinode_t	*last_dip;
 	short		bucket_index;
-	int		offset;
+	int		offset, last_offset;
 	int		error;
 	int		agi_ok;
 
@@ -2029,7 +2030,7 @@ xfs_iunlink_remove(
 		ASSERT(next_agino != 0);
 		if (next_agino != NULLAGINO) {
 			INT_SET(dip->di_next_unlinked, ARCH_CONVERT, NULLAGINO);
-			offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
+			offset = ip->i_boffset +
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_inode_buf(tp, ibp);
 			xfs_trans_log_buf(tp, ibp, offset,
@@ -2065,7 +2066,7 @@ xfs_iunlink_remove(
 			}
 			next_ino = XFS_AGINO_TO_INO(mp, agno, next_agino);
 			error = xfs_inotobp(mp, tp, next_ino, &last_dip,
-					    &last_ibp);
+					    &last_ibp, &last_offset);
 			if (error) {
 				return error;
 			}
@@ -2086,7 +2087,7 @@ xfs_iunlink_remove(
 		ASSERT(next_agino != agino);
 		if (next_agino != NULLAGINO) {
 			INT_SET(dip->di_next_unlinked, ARCH_CONVERT, NULLAGINO);
-			offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
+			offset = ip->i_boffset +
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_inode_buf(tp, ibp);
 			xfs_trans_log_buf(tp, ibp, offset,
@@ -2100,9 +2101,7 @@ xfs_iunlink_remove(
 		 */
 		INT_SET(last_dip->di_next_unlinked, ARCH_CONVERT, next_agino);
 		ASSERT(next_agino != 0);
-		offset = ((char *)last_dip -
-			  (char *)(XFS_BUF_PTR(last_ibp))) +
-			 offsetof(xfs_dinode_t, di_next_unlinked);
+		offset = last_offset + offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_inode_buf(tp, last_ibp);
 		xfs_trans_log_buf(tp, last_ibp, offset,
 				  (offset + sizeof(xfs_agino_t) - 1));
@@ -2860,7 +2859,7 @@ xfs_iflush_fork(
 	xfs_dinode_t		*dip,
 	xfs_inode_log_item_t	*iip,
 	int			whichfork,
-	xfs_buf_t			*bp)
+	xfs_buf_t		*bp)
 {
 	char			*cp;
 	xfs_ifork_t		*ifp;
@@ -3310,7 +3309,7 @@ xfs_iflush_int(
 	}
 
 	/* set *dip = inode's place in the buffer */
-	dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + ip->i_boffset);
+	dip = (xfs_dinode_t *)xfs_buf_offset(bp, ip->i_boffset);
 
 	/*
 	 * Clear i_update_core before copying out the data.
@@ -3551,7 +3550,7 @@ xfs_iflush_all(
 
 			if (!vp) {
 				XFS_MOUNT_IUNLOCK(mp);
-				xfs_finish_reclaim(ip);
+				xfs_finish_reclaim(ip, 0);
 				purged = 1;
 				break;
 			}

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.101 $"
+#ident "$Revision: 1.102 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -250,13 +250,13 @@ xfs_buf_item_format(
 		 */
 		if (next_bit == -1) {
 			buffer_offset = first_bit * XFS_BLI_CHUNK;
-			vecp->i_addr = XFS_BUF_PTR(bp) + buffer_offset;
+			vecp->i_addr = xfs_buf_offset(bp, buffer_offset);
 			vecp->i_len = nbits * XFS_BLI_CHUNK;
 			nvecs++;
 			break;
 		} else if (next_bit != last_bit + 1) {
 			buffer_offset = first_bit * XFS_BLI_CHUNK;
-			vecp->i_addr = XFS_BUF_PTR(bp) + buffer_offset;
+			vecp->i_addr = xfs_buf_offset(bp, buffer_offset);
 			vecp->i_len = nbits * XFS_BLI_CHUNK;
 			nvecs++;
 			vecp++;

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.456 $"
+#ident "$Revision: 1.457 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -5475,6 +5475,9 @@ xfs_reclaim(
 		}
 	}
 
+#ifdef SIM
+	xfs_finish_reclaim(ip, locked);
+#else
 	{
 		xfs_ihash_t	*ih = ip->i_hash;
 		mrupdate(&ih->ih_lock);
@@ -5482,22 +5485,30 @@ xfs_reclaim(
 				XFS_ITOBHV(ip));
 		mrunlock(&ih->ih_lock);
 	}
+	if (locked) {
+		xfs_ifunlock(ip);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
+#endif
 
 	return 0;
 }
 
 int
 xfs_finish_reclaim(
-	xfs_inode_t	*ip)
+	xfs_inode_t	*ip,
+	int		locked)
 {
 	int	error;
 	xfs_ihash_t	*ih = ip->i_hash;
 
+#ifndef SIM
 	mrupdate(&ih->ih_lock);
 	if (XFS_ITOV_NULL(ip)) {
 		mrunlock(&ih->ih_lock);
 		return(0);
 	}
+#endif
 
 	/*
 	 * If the inode is still dirty, then flush it out.  If the inode
@@ -5511,15 +5522,19 @@ xfs_finish_reclaim(
 	 * we don't free it while it is being flushed.
 	 */
 	if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		if (ip->i_flags & XFS_IRECLAIM) {
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		if (!locked) {
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+#ifndef SIM
+			if (ip->i_flags & XFS_IRECLAIM) {
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
+				mrunlock(&ih->ih_lock);
+				return(1);
+			}
+			ip->i_flags |= XFS_IRECLAIM;
 			mrunlock(&ih->ih_lock);
-			return(1);
+#endif
+			xfs_iflock(ip);
 		}
-		ip->i_flags |= XFS_IRECLAIM;
-		mrunlock(&ih->ih_lock);
-		xfs_iflock(ip);
 
 		if (ip->i_update_core ||
 		    ((ip->i_itemp != NULL) &&

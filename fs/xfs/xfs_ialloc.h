@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.37 $"
 
 struct xfs_buf;
 struct xfs_dinode;
@@ -74,7 +74,7 @@ struct xfs_dinode *xfs_make_iptr(struct xfs_mount *mp, struct xfs_buf *b, int o)
 #define	XFS_MAKE_IPTR(mp,b,o) 		xfs_make_iptr(mp,b,o)
 #else
 #define	XFS_MAKE_IPTR(mp,b,o) \
-	((xfs_dinode_t *)(XFS_BUF_PTR(b) + ((o) << (mp)->m_sb.sb_inodelog)))
+	((xfs_dinode_t *)(xfs_buf_offset(b, (o) << (mp)->m_sb.sb_inodelog)))
 #endif
 
 /*

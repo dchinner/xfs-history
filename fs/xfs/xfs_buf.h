@@ -51,6 +51,8 @@ typedef struct buf xfs_buf_t;
 #define XFS_B_STALE   B_STALE
 #define XFS_BUF_TRYLOCK	BUF_TRYLOCK
 #define XFS_INCORE_TRYLOCK	INCORE_TRYLOCK
+#define XFS_BUF_LOCK	0
+#define XFS_BUF_MAPPED	0
 
 #define XFS_BUF_BFLAGS(x)            ((x)->b_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)            ((x)->b_flags = 0) 
@@ -154,6 +156,9 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->b_bcount = cnt)
 #define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
+
+#define xfs_buf_offset(bp, offset)	(XFS_BUF_PTR(bp) + (offset))
+
 #define XFS_BUF_SET_PTR(bp, val, count)		\
 			((bp)->b_un.b_addr = (val)); \
 			XFS_BUF_SET_COUNT(bp, count)
@@ -287,6 +292,10 @@ extern void pdflush(struct vnode *, uint64_t);
 #define XFS_B_STALE (1 << 31)
 #define XFS_BUF_TRYLOCK		PBF_TRYLOCK
 #define XFS_INCORE_TRYLOCK	PBF_TRYLOCK
+#define XFS_BUF_LOCK		PBF_LOCK
+#define XFS_BUF_MAPPED		PBF_MAPPED
+
+#define BUF_BUSY	0
 
 #define XFS_BUF_BFLAGS(x)        ((x)->pb_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)	\
@@ -426,7 +435,16 @@ extern void xfs_pb_nfreer(page_buf_t *);
 /* this may need to be linux caddr_t, with the define is was irix_caddr_
  * so lets convert it to xfs_caddr_t for now
  */
+
 #define XFS_BUF_PTR(bp)		(xfs_caddr_t)((bp)->pb_addr)
+
+extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
+{
+	if (bp->pb_flags & PBF_MAPPED) return XFS_BUF_PTR(bp) + offset;
+
+	return (xfs_caddr_t) pagebuf_offset(bp, offset);
+}
+
 #define XFS_BUF_SET_PTR(bp, val, count)		\
 				pagebuf_associate_memory(bp, val, count)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
@@ -467,6 +485,13 @@ extern dev_t	XFS_pb_target(page_buf_t *);
 #define xfs_buf_get(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
 				PBF_LOCK | PBF_MAPPED)
+
+#define xfs_buf_read_flags(target, blkno, len, flags) \
+		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
+				PBF_READ | flags)
+#define xfs_buf_get_flags(target, blkno, len, flags) \
+		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
+				flags)
 
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
