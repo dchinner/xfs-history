@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.39 $"
 
 struct buf;
 struct xfs_mount;
@@ -10,25 +10,17 @@ struct xfs_trans;
 
 /*
  * Freespace allocation types.  Argument to xfs_alloc_[v]extent.
- * Nonsense with double declaration is for -wlint.
  */
 typedef enum xfs_alloctype
 {
-	XFS_ALLOCTYPE_ANY_AGi,		/* allocate anywhere, use rotor */
-	XFS_ALLOCTYPE_FIRST_AGi,	/* ... start at ag 0 */
-	XFS_ALLOCTYPE_START_AGi,	/* anywhere, start in this a.g. */
-	XFS_ALLOCTYPE_THIS_AGi,		/* anywhere in this a.g. */
-	XFS_ALLOCTYPE_START_BNOi,	/* near this block else anywhere */
-	XFS_ALLOCTYPE_NEAR_BNOi,	/* in this a.g. and near this block */
-	XFS_ALLOCTYPE_THIS_BNOi		/* at exactly this block */
+	XFS_ALLOCTYPE_ANY_AG,		/* allocate anywhere, use rotor */
+	XFS_ALLOCTYPE_FIRST_AG,		/* ... start at ag 0 */
+	XFS_ALLOCTYPE_START_AG,		/* anywhere, start in this a.g. */
+	XFS_ALLOCTYPE_THIS_AG,		/* anywhere in this a.g. */
+	XFS_ALLOCTYPE_START_BNO,	/* near this block else anywhere */
+	XFS_ALLOCTYPE_NEAR_BNO,		/* in this a.g. and near this block */
+	XFS_ALLOCTYPE_THIS_BNO		/* at exactly this block */
 } xfs_alloctype_t;
-#define	XFS_ALLOCTYPE_ANY_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_ANY_AGi)
-#define	XFS_ALLOCTYPE_FIRST_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_FIRST_AGi)
-#define	XFS_ALLOCTYPE_START_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_START_AGi)
-#define	XFS_ALLOCTYPE_THIS_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_THIS_AGi)
-#define	XFS_ALLOCTYPE_START_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_START_BNOi)
-#define	XFS_ALLOCTYPE_NEAR_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_NEAR_BNOi)
-#define	XFS_ALLOCTYPE_THIS_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_THIS_BNOi)
 
 /*
  * Flags for xfs_alloc_fix_freelist.
@@ -37,7 +29,7 @@ typedef enum xfs_alloctype
 
 /*
  * Argument structure for xfs_alloc routines.
- * This is turned into a structure to avoid having 12 arguments passed
+ * This is turned into a structure to avoid having 20 arguments passed
  * down several levels of the stack.
  */
 typedef struct xfs_alloc_arg {
@@ -54,6 +46,7 @@ typedef struct xfs_alloc_arg {
 	xfs_extlen_t	prod;		/* prod value for extent size */
 	xfs_extlen_t	minleft;	/* min blocks must be left after us */
 	xfs_extlen_t	total;		/* total blocks needed in xaction */
+	xfs_extlen_t	alignment;	/* align answer to multiple of this */
 	xfs_extlen_t	len;		/* output: actual size of extent */
 	xfs_alloctype_t	type;		/* allocation type XFS_ALLOCTYPE_... */
 	xfs_alloctype_t	otype;		/* original allocation type */
@@ -100,15 +93,9 @@ xfs_alloc_compute_maxlevels(
  */
 int				/* error */
 xfs_alloc_fix_freelist(
-	struct xfs_trans *tp,	/* transaction pointer */
-	xfs_agnumber_t	agno,	/* allocation group number */
-	xfs_extlen_t	minlen,	/* minimum extent length, else reject */
-	xfs_extlen_t	total,	/* total free blocks, else reject */
-	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
-	int		flags,	/* XFS_ALLOC_FLAG_... */
-	struct xfs_perag *pag,	/* per allocation group data */
-	struct buf	**agbpp); /* buffer for the a.g. freelist header */
-				     
+	xfs_alloc_arg_t	*args,	/* allocation argument structure */
+	int		flags);	/* XFS_ALLOC_FLAG_... */
+
 /*
  * Get a block from the freelist.
  * Returns with the buffer for the block gotten.
@@ -157,7 +144,7 @@ xfs_alloc_read_agf(
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags,		/* XFS_ALLOC_FLAG_... */
-	struct buf		**bpp);	/* buffer for the ag freelist header */
+	struct buf	**bpp);		/* buffer for the ag freelist header */
 
 /*
  * Allocate an extent (variable-size).
