@@ -97,9 +97,11 @@ xfs_write_clear_setuid(
  */
 
 void
-xfs_force_shutdown(
+_xfs_force_shutdown(
 	xfs_mount_t	*mp,
-	int		flags)
+	int		flags,
+	char		*fname,
+	int		lnnum)
 {
 	int             ntries;
 	int             logerror;
@@ -113,6 +115,9 @@ xfs_force_shutdown(
 #define XFS_MAX_DRELSE_RETRIES	10
 	logerror = flags & XFS_LOG_IO_ERROR;
 
+	cmn_err(CE_NOTE,
+		"xfs_force_shutdown(%s,0x%x) called from line %d of file %s.  Return address = 0x%x",
+			mp->m_fsname,flags,lnnum,fname,__return_address); 
 	/*
 	 * No need to duplicate efforts.
 	 */

@@ -915,16 +915,25 @@ xfs_difree(
 	 */
 	agno = XFS_INO_TO_AGNO(mp, inode);
 	if (agno >= mp->m_sb.sb_agcount)  {
+		cmn_err(CE_WARN,
+			"xfs_difree: agno >= mp->m_sb.sb_agcount (%d >= %d) on %s.  Returning EINVAL.",
+			agno, mp->m_sb.sb_agcount, mp->m_fsname);
 		ASSERT(0);
 		return XFS_ERROR(EINVAL);
 	}
 	agino = XFS_INO_TO_AGINO(mp, inode);
 	if (inode != XFS_AGINO_TO_INO(mp, agno, agino))  {
+		cmn_err(CE_WARN,
+			"xfs_difree: inode != XFS_AGINO_TO_INO() (%d != %d) on %s.  Returning EINVAL.",
+			inode, XFS_AGINO_TO_INO(mp, agno, agino), mp->m_fsname);
 		ASSERT(0);
 		return XFS_ERROR(EINVAL);
 	}
 	agbno = XFS_AGINO_TO_AGBNO(mp, agino);
 	if (agbno >= mp->m_sb.sb_agblocks)  {
+		cmn_err(CE_WARN,
+			"xfs_difree: agbno >= mp->m_sb.sb_agblocks (%d >= %d) on %s.  Returning EINVAL.",
+			agbno, mp->m_sb.sb_agblocks, mp->m_fsname);
 		ASSERT(0);
 		return XFS_ERROR(EINVAL);
 	}
@@ -934,8 +943,12 @@ xfs_difree(
 	mraccess(&mp->m_peraglock);
 	error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 	mraccunlock(&mp->m_peraglock);
-	if (error)
+	if (error) {
+		cmn_err(CE_WARN,
+			"xfs_difree: xfs_ialloc_read_agi() returned an error %d on %s.  Returning error.",
+			error, mp->m_fsname);
 		return error;
+	}
 	agi = XFS_BUF_TO_AGI(agbp);
 	ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 	ASSERT(agbno < INT_GET(agi->agi_length, ARCH_CONVERT));
@@ -966,12 +979,20 @@ xfs_difree(
 	/*
 	 * Look for the entry describing this inode.
 	 */
-	if ((error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i)))
+	if ((error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i))) {
+		cmn_err(CE_WARN,
+			"xfs_difree: xfs_inobt_lookup_le returned()  an error %d on %s.  Returning error.",
+			error, mp->m_fsname);
 		goto error0;
+	}
 	XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 	if ((error = xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
-			&rec.ir_free, &i, ARCH_NOCONVERT)))
+			&rec.ir_free, &i, ARCH_NOCONVERT))) {
+		cmn_err(CE_WARN,
+			"xfs_difree: xfs_inobt_get_rec()  returned an error %d on %s.  Returning error.",
+			error, mp->m_fsname);
 		goto error0;
+	}
 	XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 	/*
 	 * Get the offset in the inode chunk.
@@ -984,8 +1005,12 @@ xfs_difree(
 	 */
 	XFS_INOBT_SET_FREE(&rec, off, ARCH_NOCONVERT);
 	rec.ir_freecount++;
-	if ((error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free)))
+	if ((error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free))) {
+		cmn_err(CE_WARN,
+			"xfs_difree: xfs_inobt_update()  returned an error %d on %s.  Returning error.",
+			error, mp->m_fsname);
 		goto error0;
+	}
 	/*
 	 * Change the inode free counts and log the ag/sb changes.
 	 */

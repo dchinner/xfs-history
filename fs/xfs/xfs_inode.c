@@ -185,6 +185,9 @@ xfs_inotobp(
 	imap.im_blkno = 0;
 	error = xfs_imap(mp, tp, ino, &imap, XFS_IMAP_LOOKUP);
 	if (error != 0) {
+		cmn_err(CE_WARN,
+	"xfs_inotobp: xfs_imap()  returned an "
+	"error %d on %s.  Returning error.", error, mp->m_fsname);
 		return error;
 	}
 
@@ -195,6 +198,10 @@ xfs_inotobp(
 	 */
 	if ((imap.im_blkno + imap.im_len) >
 	    XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks)) {
+		cmn_err(CE_WARN,
+	"xfs_inotobp: inode number (%d + %d) maps to a block outside the bounds "
+	"of the file system %s.  Returning EINVAL.", 
+			imap.im_blkno, imap.im_len,mp->m_fsname);
 		return XFS_ERROR(EINVAL);
 	}
 
@@ -206,6 +213,9 @@ xfs_inotobp(
 				   (int)imap.im_len, XFS_BUF_LOCK, &bp);
 
 	if (error) {
+		cmn_err(CE_WARN,
+	"xfs_inotobp: xfs_trans_read_buf()  returned an "
+	"error %d on %s.  Returning error.", error, mp->m_fsname);
 		return error;
 	}
 	dip = (xfs_dinode_t *)xfs_buf_offset(bp, 0);
@@ -215,6 +225,9 @@ xfs_inotobp(
 	if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
 			XFS_RANDOM_ITOBP_INOTOBP)) {
 		xfs_trans_brelse(tp, bp);
+		cmn_err(CE_WARN,
+	"xfs_inotobp: XFS_TEST_ERROR()  returned an "
+	"error on %s.  Returning EFSCORRUPTED.",  mp->m_fsname);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
@@ -1861,6 +1874,9 @@ xfs_iunlink_remove(
 	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, agdaddr,
 				   1, 0, &agibp);
 	if (error != 0) {
+		cmn_err(CE_WARN,
+			"xfs_iunlink_remove: xfs_trans_read_buf()  returned an error %d on %s.  Returning error.",
+			error, mp->m_fsname);
 		return error;
 	}
 	/*
@@ -1873,6 +1889,9 @@ xfs_iunlink_remove(
 	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IUNLINK_REMOVE,
 			XFS_RANDOM_IUNLINK_REMOVE)) {
 		xfs_trans_brelse(tp, agibp);
+		cmn_err(CE_WARN,
+			"xfs_iunlink_remove: XFS_TEST_ERROR()  returned an error on %s.  Returning EFSCORRUPTED.",
+			 mp->m_fsname);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	/*
@@ -1896,6 +1915,9 @@ xfs_iunlink_remove(
 		 */
 		error = xfs_itobp(mp, tp, ip, &dip, &ibp, 0);
 		if (error) {
+			cmn_err(CE_WARN,
+				"xfs_iunlink_remove: xfs_itobp()  returned an error %d on %s.  Returning error.",
+				error, mp->m_fsname);
 			return error;
 		}
 		next_agino = INT_GET(dip->di_next_unlinked, ARCH_CONVERT);
@@ -1940,6 +1962,9 @@ xfs_iunlink_remove(
 			error = xfs_inotobp(mp, tp, next_ino, &last_dip,
 					    &last_ibp, &last_offset);
 			if (error) {
+				cmn_err(CE_WARN,
+			"xfs_iunlink_remove: xfs_inotobp()  returned an error %d on %s.  Returning error.",
+					error, mp->m_fsname);
 				return error;
 			}
 			next_agino = INT_GET(last_dip->di_next_unlinked, ARCH_CONVERT);
@@ -1952,6 +1977,9 @@ xfs_iunlink_remove(
 		 */
 		error = xfs_itobp(mp, tp, ip, &dip, &ibp, 0);
 		if (error) {
+			cmn_err(CE_WARN,
+				"xfs_iunlink_remove: xfs_itobp()  returned an error %d on %s.  Returning error.",
+				error, mp->m_fsname);
 			return error;
 		}
 		next_agino = INT_GET(dip->di_next_unlinked, ARCH_CONVERT);

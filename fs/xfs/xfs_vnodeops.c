@@ -1937,8 +1937,12 @@ xfs_inactive(
 		 * might do that, we need to make sure.  Otherwise the
 		 * inode might be lost for a long time or forever.
 		 */
-		if (!XFS_FORCED_SHUTDOWN(tp->t_mountp))
+		if (!XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
+			cmn_err(CE_NOTE,
+				"xfs_inactive:  xfs_ifree() returned an error = %d on %s",
+				error,tp->t_mountp->m_fsname);
 			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR);
+		}
 		xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
 	} else {
 		/*
