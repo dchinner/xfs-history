@@ -11,7 +11,6 @@
 #endif /* SIM */
 #include <sys/dirent.h>
 #include <sys/user.h>
-#include <sys/proc.h>
 #ifdef SIM
 #undef _KERNEL
 #include <bstring.h>
@@ -30,6 +29,7 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
+#include <sys/proc.h>
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
