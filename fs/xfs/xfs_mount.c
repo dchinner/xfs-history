@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.127 $"
+#ident	"$Revision: 1.128 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -54,6 +54,7 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_rw.h"
+#include "xfs_quota.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -120,6 +121,9 @@ xfs_mount_free(xfs_mount_t *mp)
 	if (mp->m_fsname != NULL) {
 		kmem_free(mp->m_fsname, mp->m_fsname_len);
 	}
+	if (mp->m_quotainfo != NULL) {
+		xfs_qm_unmount_quotadestroy(mp);
+	}
 	VFS_REMOVEBHV(XFS_MTOVFS(mp), &mp->m_bhv);
 	kmem_free(mp, sizeof(xfs_mount_t));
 }	/* xfs_mount_free */
@@ -164,10 +168,11 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	__uint64_t	ret64;
 	daddr_t		d;
 	struct bdevsw	*my_bdevsw;
+	uint		quotaflags;
+	extern dev_t	rootdev;		/* from sys/systm.h */
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
-
 
 	ASSERT(mp->m_sb_bp == 0);
 
@@ -485,6 +490,14 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		error = XFS_ERROR(EINVAL);
 		goto error2;
 	}
+	/*
+	 * Clear the quota flags, but remember them. This is so that quota code
+	 * doesn't get invoked before we're ready. This can happen when an 
+	 * inode goes inactive and wants to free blocks, 
+	 * or via xfs_log_mount_finish.
+	 */
+	quotaflags = mp->m_flags & XFS_MOUNT_QUOTA_MASK;
+	mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
 
 #ifdef SIM
 	/*
@@ -566,6 +579,39 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	if (error) {
 		goto error2;
 	}
+
+	/*
+	 * If quotas are on, mark it on now. We can't do a quotacheck
+	 * when there are disk blocks changing.
+	 */
+	mp->m_flags |= quotaflags;
+
+#ifndef SIM 
+	if ((XFS_IS_QUOTA_ON(mp)) ||
+	    (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASQUOTA &&
+	     mp->m_sb.sb_qflags & (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT))) {
+#ifdef DEBUG
+		cmn_err(CE_NOTE, "Attempting to turn on disk quotas.");
+#endif
+		if (error = xfs_qm_mount_quotas(mp)) {
+			/*
+			 * If error occured, qm_mount_quotas code
+			 * has already disabled quotas. So, just finish
+			 * mounting, and get on with the boring life without
+			 * disk quotas.
+			 */
+			cmn_err(CE_WARN, "Failed to initialize disk quotas.");
+		}
+	}
+#ifdef DEBUG
+	if (! (XFS_IS_QUOTA_ON(mp))) {
+		cmn_err(CE_NOTE, "Disk quotas not turned on.");
+	} else {
+		cmn_err(CE_NOTE, "Disk quotas turned on.");
+	}
+#endif
+
+#endif /* !SIM */
 
 	/*
 	 * Initialize directory manager's entries.
@@ -667,6 +713,12 @@ xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 
 /*
  * xfs_unmountfs
+ * 
+ * This code is common to all unmounting paths: via non-root unmount,
+ * the simulator/mkfs path, and possibly the root unmount path.
+ * 
+ * This flushes out the inodes,dquots and the superblock, unmounts the
+ * log and makes sure that incore structures are freed.
  */
 int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
@@ -679,6 +731,13 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	struct bdevsw	*my_bdevsw;
 
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
+	
+#ifndef SIM
+	xfs_qm_dqflush_all(mp, XFS_QMOPT_SYNC);
+	xfs_qm_dqpurge_all(mp, 
+			   XFS_QMOPT_UQUOTA|XFS_QMOPT_PQUOTA|
+			   XFS_QMOPT_UMOUNTING);
+#endif
 	/*
 	 * Flush out the log synchronously so that we know for sure
 	 * that nothing is pinned.  This is important because bflush()
@@ -793,6 +852,10 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 		offsetof(xfs_sb_t, sb_ifree),
 		offsetof(xfs_sb_t, sb_fdblocks),
 		offsetof(xfs_sb_t, sb_frextents),
+		offsetof(xfs_sb_t, sb_uquotino),
+		offsetof(xfs_sb_t, sb_pquotino),
+		offsetof(xfs_sb_t, sb_qflags),
+		offsetof(xfs_sb_t, sb_padding),
 		sizeof(xfs_sb_t)
 	};
  
