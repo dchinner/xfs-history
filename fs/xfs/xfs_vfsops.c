@@ -97,10 +97,12 @@ xfs_init(vfssw_t	*vswp,
 	 int		fstype)
 {
 	extern lock_t	xfs_strat_lock;
+	extern sema_t	xfs_ancestormon;
 
 	xfs_type = fstype;
 
 	initnlock(&xfs_strat_lock, "xfsstrat");
+	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
 	return 0;
 }
 
