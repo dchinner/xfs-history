@@ -1,4 +1,4 @@
-#ident "$Revision: 1.52 $"
+#ident "$Revision: 1.53 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -170,6 +170,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	int		local, size;
 	uint	      	nblks;
 	xfs_mount_t	*mp;
+	int rsvd = (flags & ATTR_ROOT) != 0;
 
 	XFSSTATS.xs_attr_set++;
 
@@ -201,7 +202,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * (inode must not be locked when we call this routine)
 	 */
 	if (XFS_IFORK_Q(dp) == 0) {
-		error = xfs_bmap_add_attrfork(dp);
+		error = xfs_bmap_add_attrfork(dp, rsvd);
 		if (error)
 			return(error);
 	}
@@ -254,6 +255,15 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * the log.
 	 */
 	args.trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
+
+	/*
+	 * Root fork attributes can use reserved data blocks for this 
+	 * operation if necessary
+	 */
+
+	if (rsvd)
+		args.trans->t_flags |= XFS_TRANS_RESERVE;
+
 	if (error = xfs_trans_reserve(args.trans, (uint) nblks,
 				      XFS_ATTRSET_LOG_RES(mp, nblks),
 				      0, XFS_TRANS_PERM_LOG_RES,
@@ -464,6 +474,15 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 * the log.
 	 */
 	args.trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_RM);
+
+	/*
+	 * Root fork attributes can use reserved data blocks for this 
+	 * operation if necessary
+	 */
+
+	if (flags & ATTR_ROOT)
+		args.trans->t_flags |= XFS_TRANS_RESERVE;
+
 	if (error = xfs_trans_reserve(args.trans,
 				      XFS_ATTRRM_SPACE_RES(mp),
 				      XFS_ATTRRM_LOG_RES(mp),
