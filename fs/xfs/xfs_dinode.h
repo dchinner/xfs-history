@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.2 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e4f44	/* 'INOD' */
@@ -9,9 +9,10 @@
 /*
  * Disk inode structure.
  * This is just the header; the inode is expanded to fill a variable size
- * with the last field expanding.
+ * with the last field expanding.  It is split into the core and "other"
+ * because we only need the core part in the in-core inode.
  */
-typedef struct xfs_dinode
+typedef struct xfs_dinode_core
 {
 	__uint32_t	di_magic;	/* inode magic # = XFS_DINODE_MAGIC */
 	__uint16_t	di_mode;	/* mode and type of file */
@@ -33,6 +34,10 @@ typedef struct xfs_dinode
 	 * Should this be 64 bits? What does nfs3.0 want?
 	 */
 	__uint32_t	di_gen;		/* generation number */
+} xfs_dinode_core_t;
+
+typedef struct xfs_dinode
+	xfs_dinode_core_t	di_core;
 	union {
 		xfs_agino_t	di_next;/* next inode for freelist inodes */
 		dev_t		di_dev;	/* device for IFCHR/IFBLK */
