@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.25 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -118,6 +118,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	mp->m_sb = *sbp;
 	mp->m_bsize = xfs_btod(sbp, 1);
 	mp->m_agrotor = 0;
+	vfsp->vfs_bsize = xfs_fsb_to_b(sbp, 1);
 
 	/*
 	 * Set the default minimum read and write sizes.
