@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.122 $"
+#ident	"$Revision: 1.123 $"
 
 /*
  * High level interface routines for log manager
@@ -910,8 +910,8 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	bp->b_fsprivate2   = (void *)((unsigned long)1);
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
-	mutex_init(&log->l_icloglock, MUTEX_SPIN, "iclog");
-	mutex_init(&log->l_grant_lock, MUTEX_SPIN, "grhead_iclog");
+	spinlock_init(&log->l_icloglock, "iclog");
+	spinlock_init(&log->l_grant_lock, "grhead_iclog");
 	initnsema(&log->l_flushsema, 0, "ic-flush");
 	xlog_state_ticket_alloc(log);  /* wait until after icloglock inited */
 	
@@ -1185,8 +1185,8 @@ xlog_unalloc_log(xlog_t *log)
 		iclog = next_iclog;
 	}
 	freesema(&log->l_flushsema);
-	mutex_destroy(&log->l_icloglock);
-	mutex_destroy(&log->l_grant_lock);
+	spinlock_destroy(&log->l_icloglock);
+	spinlock_destroy(&log->l_grant_lock);
 	if (log->l_ticket_cnt != log->l_ticket_tcnt) {
 		cmn_err(CE_WARN,
 			"xlog_unalloc_log: (cnt: %d, total: %d)",
