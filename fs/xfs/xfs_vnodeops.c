@@ -1,4 +1,4 @@
-#ident "$Revision: 1.266 $"
+#ident "$Revision: 1.267 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2517,7 +2517,7 @@ xfs_create(
 
         dp = XFS_BHVTOI(dir_bdp);
 
-	vpr = VPROC_LOOKUP(current_pid(), ZNO);
+	vpr = VPROC_LOOKUP(current_pid());
 	VPROC_GETARSESS(vpr, &arsess);
 	VPROC_RELE(vpr);
 	prid = (xfs_prid_t)arsess->as_prid;
@@ -4819,7 +4819,7 @@ xfs_mkdir(
 	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
 	mp = dp->i_mount;
 
-	vpr = VPROC_LOOKUP(current_pid(), ZNO);
+	vpr = VPROC_LOOKUP(current_pid());
 	VPROC_GETARSESS(vpr, &arsess);
 	VPROC_RELE(vpr);
 	prid = (xfs_prid_t)arsess->as_prid;
@@ -5402,7 +5402,7 @@ xfs_symlink(
         }
         dp = XFS_BHVTOI(dir_bdp);
 
-	vpr = VPROC_LOOKUP(current_pid(), ZNO);
+	vpr = VPROC_LOOKUP(current_pid());
 	VPROC_GETARSESS(vpr, &arsess);
 	VPROC_RELE(vpr);
 	prid = (xfs_prid_t)arsess->as_prid;
