@@ -145,9 +145,14 @@ typedef struct xfs_inode {
 
 /*
  * Maximum file size.
- * 2^32 -1 for now. (largest positive value of xfs_fsize_t)
+ * if XFS_BIG_FILES 2^63 - 1 (largest positive value of xfs_fsize_t)
+ * else 2^40 - 1 (40=31+9) (might be an int holding a block #)
  */
-#define XFS_MAX_FILE_OFFSET	0x7fffffff
+#if XFS_BIG_FILES
+#define XFS_MAX_FILE_OFFSET	((long long)((1ULL<<63)-1ULL))
+#else
+#define	XFS_MAX_FILE_OFFSET	((1LL<<40)-1LL)
+#endif
 
 /*
  * This is used to figure out what to pass to flush/inval
