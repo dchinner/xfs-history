@@ -7,8 +7,8 @@
  * Inode number format:
  * low inopblog bits - offset in block
  * next agblklog bits - block number in ag
- * next 32 bits - ag number
- * high 32-agblklog-inopblog bits - 0
+ * next agno_log bits - ag number
+ * high agno_log-agblklog-inopblog bits - 0
  */
 typedef	__uint64_t	xfs_ino_t;	/* inode number */
 typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
@@ -21,7 +21,8 @@ typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
 #define	XFS_INO_AGBNO_BITS(mp)	((mp)->m_sb.sb_agblklog)
 #define	XFS_INO_AGINO_BITS(mp)	\
 	(XFS_INO_OFFSET_BITS(mp) + XFS_INO_AGBNO_BITS(mp))
-#define	XFS_INO_AGNO_BITS(mp)	32
+#define	XFS_INO_AGNO_BITS(mp)	((mp)->m_agno_log)
+#define	XFS_INO_BITS(mp)	(XFS_INO_AGNO_BITS(mp) + XFS_INO_AGINO_BITS(mp))
 
 #define	XFS_INO_TO_AGNO(mp,i)	\
 	((xfs_agnumber_t)((i) >> XFS_INO_AGINO_BITS(mp)))

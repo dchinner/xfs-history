@@ -508,18 +508,20 @@ xfs_ialloc(
 	case IFSOCK:
 		ip->i_d.di_format = XFS_DINODE_FMT_DEV;
 		ip->i_u2.iu_rdev = rdev;
+		ip->i_flags = 0;
 		flags |= XFS_ILOG_DEV;
 		break;
 	case IFREG:
 	case IFDIR:
 	case IFLNK:
 		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
-		ip->i_flags |= XFS_IEXTENTS;
+		ip->i_flags = XFS_IEXTENTS;
 		ip->i_bytes = ip->i_real_bytes = 0;
 		ip->i_u1.iu_extents = NULL;
 		break;
 	case IFMNT:
 		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
+		ip->i_flags = 0;
 		uuid_create(&ip->i_u2.iu_uuid, &status);
 		flags |= XFS_ILOG_UUID;
 		break;
