@@ -1,5 +1,6 @@
 
-#ident	"$Revision: 1.124 $"
+#ident	"$Revision: 1.125 $"
+
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3141,6 +3142,22 @@ xfs_bunmapi(
 		return firstblock;
 	}
 	XFSSTATS.xs_blk_unmap++;
+	mp = ip->i_mount;
+	/*
+	 * Adjust the arguments silently if this is a realtime file,
+	 * so the bno and length are on the right boundary.
+	 */
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		xfs_extlen_t	mod;
+
+		if (mod = bno % mp->m_sb.sb_rextsize) {
+			mod = mp->m_sb.sb_rextsize - mod;
+			len -= mod;
+			bno += mod;
+		}
+		if (mod = len % mp->m_sb.sb_rextsize)
+			len -= mod;
+	}
 	start = bno;
 	bno = start + len - 1;
 	ep = xfs_bmap_search_extents(ip, bno, &eof, &lastx, &got, &prev);
@@ -3154,7 +3171,6 @@ xfs_bunmapi(
 		xfs_bmbt_get_all(ep, &got);
 		bno = got.br_startoff + got.br_blockcount - 1;
 	}
-	mp = ip->i_mount;
 	logflags = 0;
 	if (ip->i_flags & XFS_IBROOT) {
 		ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE);
