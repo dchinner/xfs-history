@@ -1578,15 +1578,17 @@ pagebuf_daemon(void *data)
 	pb_marker_ptr->pb_flags = 0; 
 
 	/*  Set up the thread  */
-	exit_files(current);
 	daemonize();
 
-	spin_lock_irqsave(&current->sigmask_lock, flags);	
+	/* Avoid signals */
+	spin_lock_irq(&current->sigmask_lock);	
 	flush_signals(current);
 	sigfillset(&current->blocked);
 	recalc_sigpending(current);
-	spin_unlock_irqrestore(&current->sigmask_lock, flags);
+	spin_unlock_irq(&current->sigmask_lock);
 
+	current->session = 1;
+	current->pgrp = 1;
 	strcpy(current->comm, "pagebuf_daemon");
 	current->flags |= PF_MEMALLOC;
 
