@@ -177,8 +177,8 @@ linvfs_write(
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
         
+	VOP_WRITE(vp, file, buf, count, &pos, NULL, err);
 	*ppos = pos;
-	VOP_WRITE(vp, file, buf, count, ppos, NULL, err);
 out:
 	up(&inode->i_sem);
 
@@ -263,7 +263,6 @@ linvfs_readdir(
 	uio_t		uio;
 	iovec_t		iov;
 	int		eof = 0;
-	cred_t		cred;		/* Temporary cred workaround */
 	caddr_t		read_buf;
 	int		namelen, size = 0;
 	size_t		rlen = PAGE_CACHE_SIZE << 2;
@@ -295,7 +294,7 @@ linvfs_readdir(
 
 		start_offset = uio.uio_offset;
 		
-		VOP_READDIR(vp, &uio, &cred, &eof, error);
+		VOP_READDIR(vp, &uio, NULL, &eof, error);
 		if ((uio.uio_offset == start_offset) || error) {
 			size = 0;
 			break;

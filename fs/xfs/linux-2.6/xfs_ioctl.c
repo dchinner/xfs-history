@@ -529,7 +529,6 @@ xfs_ioctl(
 	unsigned long		arg)
 {
 	int			error;
-	cred_t			cred;	/* Temporary cred workaround */
 	vattr_t			va;
 	vnode_t			*vp;
 	xfs_inode_t		*ip;
@@ -572,7 +571,7 @@ xfs_ioctl(
 			attr_flags |= ATTR_DMI;
 
 		error = xfs_change_file_space(bdp, cmd, &bf, filp->f_pos,
-						      &cred, attr_flags);
+						      NULL, attr_flags);
 		if (error)
 			return -error;
 
@@ -688,7 +687,7 @@ xfs_ioctl(
 		struct fsxattr	fa;
 
 		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
-		VOP_GETATTR(vp, &va, 0, &cred, error);
+		VOP_GETATTR(vp, &va, 0, NULL, error);
 		if (error)
 			return -error;
 
@@ -715,7 +714,7 @@ xfs_ioctl(
 		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
 			attr_flags |= ATTR_NONBLOCK;
 
-		VOP_SETATTR(vp, &va, attr_flags, &cred, error);
+		VOP_SETATTR(vp, &va, attr_flags, NULL, error);
 		if (error)
 			return -error;
 		return 0;
@@ -725,7 +724,7 @@ xfs_ioctl(
 		struct fsxattr	fa;
 
 		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_ANEXTENTS;
-		VOP_GETATTR(vp, &va, 0, &cred, error);
+		VOP_GETATTR(vp, &va, 0, NULL, error);
 		if (error)
 			return -error;
 
@@ -745,7 +744,7 @@ xfs_ioctl(
 			return -XFS_ERROR(EFAULT);
 
 		error = xfs_set_dmattrs(bdp, dmi.fsd_dmevmask, dmi.fsd_dmstate,
-							&cred);
+							NULL);
 		if (error)
 			return -error;
 		return 0;
