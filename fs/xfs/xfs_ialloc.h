@@ -3,9 +3,14 @@
 
 #ident	"$Revision$"
 
+/*
+ * Allocation parameters.
+ * These control how many inodes are allocated at once.
+ */
 #define	XFS_IALLOC_MAX_EVER_BLOCKS	16
 #define	XFS_IALLOC_MAX_EVER_INODES	256
 #define	XFS_IALLOC_MAX_EVER(s,a)	xfs_extlen_min(XFS_IALLOC_MAX_EVER_BLOCKS, XFS_IALLOC_MAX_EVER_INODES >> (s)->sb_inopblog)
+
 #define	XFS_IALLOC_MIN_ALLOC(s,a)	1
 #define XFS_IALLOC_MAX_ALLOC(s,a)	\
 	(((a)->agi_count >> (s)->sb_inopblog) >= XFS_IALLOC_MAX_EVER(s,a) ? \
@@ -13,42 +18,36 @@
 		((a)->agi_count ? ((a)->agi_count >> (s)->sb_inopblog) : 1))
 
 /*
- * Structures for inode mapping
+ * Make an inode pointer out of the buffer/offset.
  */
-
-/*
- * Real block structures have a size equal to the file system block size.
- */
-
-#define	XFS_IALLOC_BLOCK_SIZE(lev,cur)	(1 << (cur)->bc_blocklog)
-
-#define	XFS_IALLOC_BLOCK_MAXRECS(lev,cur)	\
-	XFS_BTREE_BLOCK_MAXRECS(XFS_IALLOC_BLOCK_SIZE(lev,cur), \
-				xfs_ialloc_rec_t, lev)
-#define	XFS_IALLOC_BLOCK_MINRECS(lev,cur)	\
-	XFS_BTREE_BLOCK_MINRECS(XFS_IALLOC_BLOCK_SIZE(lev,cur), \
-				xfs_ialloc_rec_t, lev)
-
-#define	XFS_IALLOC_REC_ADDR(bb,i,cur)	\
-	XFS_BTREE_REC_ADDR(XFS_IALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
-			   xfs_ialloc_rec_t, bb, i)
-
-#define	XFS_IALLOC_PTR_ADDR(bb,i,cur)	\
-	XFS_BTREE_PTR_ADDR(XFS_IALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
-			   xfs_ialloc_rec_t, bb, i)
-
-#define	XFS_IALLOC_MAXLEVELS	5 /* ??? */
-
 #define	xfs_make_iptr(s,b,o) \
-	((xfs_dinode_t *)((caddr_t)xfs_buf_to_block(b) + ((o) << (s)->sb_inodelog)))
+	((xfs_dinode_t *)((caddr_t)xfs_buf_to_block(b) + \
+			  ((o) << (s)->sb_inodelog)))
 
 /*
  * Prototypes for per-fs routines.
  */
-xfs_ino_t xfs_dialloc(xfs_trans_t *, xfs_ino_t, int, mode_t);
-xfs_agino_t xfs_dialloc_next_free(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agino_t);
-xfs_agino_t xfs_difree(xfs_trans_t *, xfs_ino_t);
-int xfs_dilocate(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_fsblock_t *, int *);
+xfs_ino_t					/* inode number allocated */
+xfs_dialloc(xfs_trans_t *tp,			/* transaction pointer */
+	    xfs_ino_t parent,			/* parent inode (directory) */
+	    int sameag,				/* 1 => must be in same a.g. */
+	    mode_t mode);			/* mode bits for new inode */
+
+xfs_agino_t					/* ag.inode next on freelist */
+xfs_dialloc_next_free(xfs_mount_t *mp,		/* filesystem mount structure */
+		      xfs_trans_t *tp,		/* transaction pointer */
+		      buf_t *agbuf,		/* buffer for ag.inode header */
+		      xfs_agino_t agino);	/* inode to get next free for */
+
+xfs_agino_t				/* next value to be stored in di_un */
+xfs_difree(xfs_trans_t *tp,		/* transaction pointer */
+	   xfs_ino_t inode);		/* inode to be freed */
+
+void
+xfs_dilocate(xfs_mount_t *mp,		/* file system mount structure */
+	     xfs_trans_t *tp,		/* transaction pointer */
+	     xfs_ino_t ino,		/* inode to locate */
+	     xfs_fsblock_t *bno,	/* output: block containing inode */
+	     int *off);			/* output: index in block of inode */
 
 #endif	/* !_FS_XFS_IALLOC_H */
-void xfs_btree_log_agi(xfs_trans_t *, buf_t *, int);
