@@ -1924,12 +1924,12 @@ xfs_convert_extent(xfs_bmbt_rec_64_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 	xfs_dfilblks_t c;
 	int flag;
 
-	flag = (int)((rp->l0) >> (64 - 1 ));
-	o = ((xfs_fileoff_t)rp->l0 &
+	flag = (int)((INT_GET(rp->l0, ARCH_UNKNOWN)) >> (64 - 1 ));
+	o = ((xfs_fileoff_t)INT_GET(rp->l0, ARCH_UNKNOWN) &
 			   (((__uint64_t)1 << ( 64 - 1  )) - 1) ) >> 9;
-	s = (((xfs_fsblock_t)rp->l0 & (((__uint64_t)1 << ( 9 )) - 1) ) << 43) | 
-			   (((xfs_fsblock_t)rp->l1) >> 21);
-	c = (xfs_filblks_t)(rp->l1 & (((__uint64_t)1 << ( 21 )) - 1) );
+	s = (((xfs_fsblock_t)INT_GET(rp->l0, ARCH_UNKNOWN) & (((__uint64_t)1 << ( 9 )) - 1) ) << 43) | 
+			   (((xfs_fsblock_t)INT_GET(rp->l1, ARCH_UNKNOWN)) >> 21);
+	c = (xfs_filblks_t)(INT_GET(rp->l1, ARCH_UNKNOWN) & (((__uint64_t)1 << ( 21 )) - 1) );
 	*op = o;
 	*sp = s;
 	*cp = c;

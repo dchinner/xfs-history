@@ -3659,23 +3659,23 @@ xfs_bmap_trace_addentry(
 		(void *)(__psunsigned_t)(ip->i_ino >> 32), 
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
 #if BMBT_USE_64
-		(void *)(__psunsigned_t)(r1->l0 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r1->l0),
-		(void *)(__psunsigned_t)(r1->l1 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r1->l1),
-		(void *)(__psunsigned_t)(r2->l0 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r2->l0),
-		(void *)(__psunsigned_t)(r2->l1 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r2->l1)
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_UNKNOWN))
 #else	/* !BMBT_USE_64 */
-		(void *)(__psunsigned_t)(r1->l0), 
-		(void *)(__psunsigned_t)(r1->l1),
-		(void *)(__psunsigned_t)(r1->l2), 
-		(void *)(__psunsigned_t)(r1->l3),
-		(void *)(__psunsigned_t)(r2->l0), 
-		(void *)(__psunsigned_t)(r2->l1),
-		(void *)(__psunsigned_t)(r2->l2), 
-		(void *)(__psunsigned_t)(r2->l3)
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_UNKNOWN))
 #endif	/* BMBT_USE_64 */
 		);
 	ASSERT(ip->i_xtrace);
@@ -3687,23 +3687,23 @@ xfs_bmap_trace_addentry(
 		(void *)(__psunsigned_t)(ip->i_ino >> 32), 
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
 #if BMBT_USE_64
-		(void *)(__psunsigned_t)(r1->l0 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r1->l0),
-		(void *)(__psunsigned_t)(r1->l1 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r1->l1),
-		(void *)(__psunsigned_t)(r2->l0 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r2->l0),
-		(void *)(__psunsigned_t)(r2->l1 >> 32),
-		(void *)(__psunsigned_t)(unsigned)(r2->l1)
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_UNKNOWN))
 #else	/* !BMBT_USE_64 */
-		(void *)(__psunsigned_t)(r1->l0), 
-		(void *)(__psunsigned_t)(r1->l1),
-		(void *)(__psunsigned_t)(r1->l2), 
-		(void *)(__psunsigned_t)(r1->l3),
-		(void *)(__psunsigned_t)(r2->l0), 
-		(void *)(__psunsigned_t)(r2->l1),
-		(void *)(__psunsigned_t)(r2->l2), 
-		(void *)(__psunsigned_t)(r2->l3)
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_UNKNOWN)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_UNKNOWN))
 #endif	/* BMBT_USE_64 */
 		);
 }

@@ -34,6 +34,8 @@
 
 #ident "$Revision$"
 
+#include "xfs_buf.h"
+
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
 struct xfs_buf;
@@ -64,7 +66,9 @@ typedef struct xfs_bmdr_block
  *  l0:0-8 and l1:21-63 are startblock.
  *  l1:0-20 are blockcount.
  */
-#ifndef __linux__
+
+#if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS
+
 #define	BMBT_TOTAL_BITLEN	128	/* 128 bits, 16 bytes */
 #define	BMBT_EXNTFLAG_BITOFF	0
 #define	BMBT_EXNTFLAG_BITLEN	1
@@ -75,7 +79,9 @@ typedef struct xfs_bmdr_block
 #define	BMBT_BLOCKCOUNT_BITOFF	\
 	(BMBT_STARTBLOCK_BITOFF + BMBT_STARTBLOCK_BITLEN)
 #define	BMBT_BLOCKCOUNT_BITLEN	(BMBT_TOTAL_BITLEN - BMBT_BLOCKCOUNT_BITOFF)
-#else /* linux */
+
+#elif XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE && ARCH_NOCONVERT == ARCH_INTEL_IA32
+
 #define	BMBT_TOTAL_BITLEN	128	/* 128 bits, 16 bytes */
 #define	BMBT_EXNTFLAG_BITOFF	63
 #define	BMBT_EXNTFLAG_BITLEN	1
@@ -85,7 +91,13 @@ typedef struct xfs_bmdr_block
 #define	BMBT_STARTBLOCK_BITLEN	52
 #define	BMBT_BLOCKCOUNT_BITOFF	64 /* Start of second 64 bit container */
 #define	BMBT_BLOCKCOUNT_BITLEN	21
-#endif /* linux */
+
+#else
+
+#error selected architecture not yet supported here
+
+#endif
+
 
 #define	BMBT_USE_64	(_MIPS_SIM == _ABI64 || _MIPS_SIM == _ABIN32)
 
