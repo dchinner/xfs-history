@@ -1,20 +1,21 @@
 #ifndef _FS_XFS_GROW_H
 #define	_FS_XFS_GROW_H
 
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 /*
  * File system growth interfaces
  */
 
-#define	XFS_FS_GEOMETRY		0	/* get filesystem geometry */
+#define	XFS_FS_GEOMETRY_V1	0	/* get filesystem geometry pre-irix6.5*/
 #define	XFS_GROWFS_DATA		1	/* grow data area */
 #define	XFS_GROWFS_LOG		2	/* grow log, new log is internal */
 #define	XFS_GROWFS_RT		3	/* grow realtime area */
 #define	XFS_FS_COUNTS		4	/* get filesystem dynamic counts */
 #define	XFS_SET_RESBLKS		5	/* set reserved block count */
 #define	XFS_GET_RESBLKS		6	/* get reserved block counts */
-#define	XFS_FSOPS_COUNT		7	/* count of operations */
+#define	XFS_FS_GEOMETRY		7	/* get filesystem geometry irix6.5 */
+#define	XFS_FSOPS_COUNT		8	/* count of operations */
 
 /*
  * Minimum and maximum sizes need for growth checks
@@ -29,7 +30,11 @@
  * Input and output structures
  */
 
-/* Output for XFS_FS_GEOMETRY */
+/*
+ * Output for XFS_FS_GEOMETRY
+ * This version has two new fields sunit and swidth. 
+ * Added in irix6.5
+ */
 typedef struct xfs_fsop_geom
 {
 	__uint32_t	blocksize;	/* filesystem (data) block size */
@@ -48,6 +53,26 @@ typedef struct xfs_fsop_geom
 	__uint32_t	sunit;		/* stripe unit, fsblocks */
 	__uint32_t	swidth;		/* stripe width, fsblocks */
 } xfs_fsop_geom_t;
+
+/*
+ * This version of xfs_fsop_geom existed prior to Irix 6.5
+ */
+typedef struct xfs_fsop_geom_v1
+{
+	__uint32_t	blocksize;	/* filesystem (data) block size */
+	__uint32_t	rtextsize;	/* realtime extent size */
+	__uint32_t	agblocks;	/* fsblocks in an allocation group */
+	__uint32_t	agcount;	/* number of allocation groups */
+	__uint32_t	logblocks;	/* fsblocks in the log */
+	__uint32_t	sectsize;	/* (data) sector size, bytes */
+	__uint32_t	inodesize;	/* inode size in bytes */
+	__uint32_t	imaxpct;	/* max allowed space for inodes (%) */
+	__uint64_t	datablocks;	/* fsblocks in the data subvolume */
+	__uint64_t	rtblocks;	/* fsblocks in the realtime subvolume */
+	__uint64_t	rtextents;	/* rt extents in the realtime subvol */
+	__uint64_t	logstart;	/* starting fsblock of the log */
+	uuid_t		uuid;		/* unique id of the filesystem */
+} xfs_fsop_geom_v1_t;
 
 /* Output for XFS_FS_COUNTS */
 typedef struct xfs_fsop_counts
