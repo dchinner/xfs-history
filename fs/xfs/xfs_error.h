@@ -1,7 +1,7 @@
 #ifndef	_XFS_ERROR_H
 #define	_XFS_ERROR_H
 
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
@@ -69,6 +69,12 @@ int		xfs_errortag_clearall_umount(int64_t fsid, char *fsname,
  */
 #define		XFS_NO_PTAG			0LL
 #define		XFS_PTAG_IFLUSH			0x0000000000000001LL
+#define 	XFS_PTAG_LOGRES			0x0000000000000002LL
 
+struct xfs_mount;
 extern uint64_t	xfs_panic_mask;
-void		xfs_cmn_err(uint64_t panic_tag, int level, char *fmt, ...);
+/* PRINTFLIKE4 */
+void		xfs_cmn_err(uint64_t panic_tag, int level, struct xfs_mount *mp,
+			    char *fmt, ...);
+/* PRINTFLIKE3 */
+void		xfs_fs_cmn_err(int level, struct xfs_mount *mp, char *fmt, ...);
