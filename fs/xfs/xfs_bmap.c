@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.214 $"
+#ident	"$Revision: 1.215 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -207,6 +207,18 @@ xfs_bmap_btree_to_extents(
 	int			whichfork,  /* data or attr fork */
 	int			async);     /* xaction can be async */
 
+#ifdef XFSDEBUG
+/*
+ * Check that the extents list for the inode ip is in the right order.
+ */
+STATIC void
+xfs_bmap_check_extents(
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	int			whichfork);	/* data or attr fork */
+#else
+#define	xfs_bmap_check_extents(ip,w)
+#endif
+
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -222,7 +234,7 @@ xfs_bmap_del_extent(
 	int			iflags, /* input flags (meta-data or not) */
 	int			*logflagsp,/* inode logging flags */
 	int			whichfork, /* data or attr fork */
-	int			rsvd);		/* OK to allocate reserved blocks */
+	int			rsvd);	 /* OK to allocate reserved blocks */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -922,6 +934,7 @@ xfs_bmap_add_extent_delay_real(
 					&i))
 				goto done;
 			ASSERT(i == 0);
+			cur->bc_rec.b.br_state = XFS_EXT_NORM;
 			if (error = xfs_bmbt_insert(cur, &i))
 				goto done;
 			ASSERT(i == 1);
@@ -994,6 +1007,7 @@ xfs_bmap_add_extent_delay_real(
 					&i))
 				goto done;
 			ASSERT(i == 0);
+			cur->bc_rec.b.br_state = XFS_EXT_NORM;
 			if (error = xfs_bmbt_insert(cur, &i))
 				goto done;
 			ASSERT(i == 1);
@@ -1081,6 +1095,7 @@ xfs_bmap_add_extent_delay_real(
 					&i))
 				goto done;
 			ASSERT(i == 0);
+			cur->bc_rec.b.br_state = XFS_EXT_NORM;
 			if (error = xfs_bmbt_insert(cur, &i))
 				goto done;
 			ASSERT(i == 1);
@@ -1131,6 +1146,7 @@ xfs_bmap_add_extent_delay_real(
 					&i))
 				goto done;
 			ASSERT(i == 0);
+			cur->bc_rec.b.br_state = XFS_EXT_NORM;
 			if (error = xfs_bmbt_insert(cur, &i))
 				goto done;
 			ASSERT(i == 1);
@@ -1617,6 +1633,7 @@ xfs_bmap_add_extent_unwritten_real(
 					&i))
 				goto done;
 			ASSERT(i == 0);
+			cur->bc_rec.b.br_state = XFS_EXT_NORM;
 			if (error = xfs_bmbt_insert(cur, &i))
 				goto done;
 			ASSERT(i == 1);
@@ -2070,6 +2087,7 @@ xfs_bmap_add_extent_hole_real(
 				new->br_startblock, new->br_blockcount, &i))
 			return error;
 		ASSERT(i == 0);
+		cur->bc_rec.b.br_state = new->br_state;
 		if (error = xfs_bmbt_insert(cur, &i))
 			return error;
 		ASSERT(i == 1);
@@ -5329,3 +5347,29 @@ xfs_bmap_eof(
 	*eof = endoff >= startoff + blockcount;
 	return 0;
 }
+
+#ifdef XFSDEBUG
+/*
+ * Check that the extents list for the inode ip is in the right order.
+ */
+STATIC void
+xfs_bmap_check_extents(
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	int			whichfork)	/* data or attr fork */
+{
+	xfs_bmbt_rec_t		*base;		/* base of extents list */
+	xfs_bmbt_rec_t		*ep;		/* current extent entry */
+	xfs_ifork_t		*ifp;		/* inode fork pointer */
+	xfs_extnum_t		nextents;	/* number of extents in list */
+
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	ASSERT(ifp->if_flags & XFS_IFEXTENTS);
+	base = ifp->if_u1.if_extents;
+	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
+	for (ep = base; ep < &base[nextents - 1]; ep++) {
+		xfs_btree_check_rec(XFS_BTNUM_BMAP, (void *)ep,
+			(void *)(ep + 1));
+	}
+}
+
+#endif
