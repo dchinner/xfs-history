@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.206 $"
+#ident  "$Revision: 1.207 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -256,6 +256,7 @@ xfs_init(
 	extern mutex_t	xfs_refcache_lock;
 	extern int	xfs_refcache_size;
 	extern int	ncsize;
+	extern int	xfs_refcache_percent;
 	extern xfs_inode_t	**xfs_refcache;
 	extern zone_t	*xfs_da_state_zone;
 	extern zone_t	*xfs_bmap_free_item_zone;
@@ -300,11 +301,15 @@ xfs_init(
 
 	/*
 	 * Initialize the inode reference cache.
+	 * Enforce (completely arbitrary) miminum size of 100.
 	 */
 	if (ncsize == 0) {
 		xfs_refcache_size = 100;
 	} else {
-		xfs_refcache_size = ncsize;
+		xfs_refcache_size = (ncsize * xfs_refcache_percent) / 100;
+
+		if (xfs_refcache_size < 100)
+			xfs_refcache_size = 100;
 	}
 #endif	/* !SIM */
 
