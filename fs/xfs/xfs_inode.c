@@ -1,3 +1,5 @@
+#ident "$Revision$"
+
 #ifdef SIM
 #define	_KERNEL 1
 #endif
@@ -41,6 +43,7 @@
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
 #include "xfs_bmap.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
