@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.98 $"
+#ident	"$Revision: 1.99 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -225,10 +225,8 @@ xfs_ialloc_ag_alloc(
 	 * Allow space for the inode btree to split.
 	 */
 	args.minleft = XFS_IN_MAXLEVELS(args.mp) - 1;
-	error = xfs_alloc_vextent(&args);
-	if (error) {
+	if (error = xfs_alloc_vextent(&args))
 		return error;
-	}
 	if (args.fsbno == NULLFSBLOCK) {
 		*alloc = 0;
 		return 0;
@@ -253,7 +251,6 @@ xfs_ialloc_ag_alloc(
 		nbufs = (int)args.len / blks_per_cluster;
 		ninodes = blks_per_cluster * args.mp->m_sb.sb_inopblock;
 	}
-
 	/*
 	 * Figure out what version number to use in the inodes we create.
 	 * If the superblock version has caught up to the one that supports
@@ -326,15 +323,13 @@ xfs_ialloc_ag_alloc(
 	for (thisino = newino;
 	     thisino < newino + newlen;
 	     thisino += XFS_INODES_PER_CHUNK) {
-		error = xfs_inobt_lookup_eq(cur, thisino, XFS_INODES_PER_CHUNK,
-					   XFS_INOBT_ALL_FREE, &i);
-		if (error) {
+		if (error = xfs_inobt_lookup_eq(cur, thisino,
+				XFS_INODES_PER_CHUNK, XFS_INOBT_ALL_FREE, &i)) {
 			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		ASSERT(i == 0);
-		error = xfs_inobt_insert(cur, &i);
-		if (error) {
+		if (error = xfs_inobt_insert(cur, &i)) {
 			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
@@ -368,7 +363,6 @@ xfs_ialloc_ag_select(
 	buf_t		*agbp;		/* allocation group header buffer */
 	xfs_agnumber_t	agcount;	/* number of ag's in the filesystem */
 	xfs_agnumber_t	agno;		/* current ag number */
-	int		error;
 	int		flags;		/* alloc buffer locking flags */
 	xfs_extlen_t	ineed;		/* blocks needed for inode allocation */
 	xfs_extlen_t	longest;	/* longest extent available */
@@ -402,26 +396,22 @@ xfs_ialloc_ag_select(
 		mraccess(&mp->m_peraglock);
 		pag = &mp->m_perag[agno];
 		if (!pag->pagi_init) {
-			error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
-			if (error) {
+			if (xfs_ialloc_read_agi(mp, tp, agno, &agbp)) {
 				agbp = NULL;
 				mraccunlock(&mp->m_peraglock);
 				goto nextag;
 			}
-		} else {
+		} else
 			agbp = NULL;
-		}
 		if (!pag->pagf_init) {
 			if (agbp == NULL) {
-				error = xfs_ialloc_read_agi(mp, tp, agno,
-							    &agbp);
-				if (error) {
+				if (xfs_ialloc_read_agi(mp, tp, agno, &agbp)) {
 					agbp = NULL;
 					mraccunlock(&mp->m_peraglock);
 					goto nextag;
 				}
 			}
-			(void) xfs_alloc_pagf_init(mp, tp, agno, flags);
+			(void)xfs_alloc_pagf_init(mp, tp, agno, flags);
 		}
 		/*
 		 * Is there enough free space for the file plus a block
@@ -434,9 +424,8 @@ xfs_ialloc_ag_select(
 			if (pag->pagf_freeblks >= needspace + ineed &&
 			    longest >= ineed) {
 				if (agbp == NULL) {
-					error = xfs_ialloc_read_agi(mp, tp,
-							    agno, &agbp);
-					if (error) {
+					if (xfs_ialloc_read_agi(mp, tp, agno,
+							&agbp)) {
 						agbp = NULL;
 						mraccunlock(&mp->m_peraglock);
 						goto nextag;
@@ -509,6 +498,7 @@ xfs_dialloc(
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agi_t	*agi;		/* allocation group header structure */
 	xfs_btree_cur_t	*cur;		/* inode allocation btree cursor */
+	int		error;		/* error return value */
 	int		i;		/* result code */
 	int		ialloced;	/* inode allocation status */
 	xfs_ino_t	ino;		/* fs-relative inode to be returned */
@@ -522,7 +512,6 @@ xfs_dialloc(
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
 	xfs_btree_cur_t	*tcur;		/* temp cursor */
 	xfs_inobt_rec_t	trec;		/* temp inode allocation record */
-	int		error;
 
 	if (*IO_agbp == NULL) {
 		/*
@@ -566,8 +555,7 @@ xfs_dialloc(
 		/*
 		 * Try to allocate some new inodes in the allocation group.
 		 */
-		error = xfs_ialloc_ag_alloc(tp, agbp, &ialloced);
-		if (error) {
+		if (error = xfs_ialloc_ag_alloc(tp, agbp, &ialloced)) {
 			xfs_trans_brelse(tp, agbp);
 			if (error == ENOSPC) {
 				*inop = NULLFSINO;
@@ -605,9 +593,8 @@ nextag:
 		mraccess(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, tagno, &agbp);
 		mraccunlock(&mp->m_peraglock);
-		if (error) {
+		if (error)
 			goto nextag;
-		}
 		agi = XFS_BUF_TO_AGI(agbp);
 		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	}
@@ -630,18 +617,13 @@ nextag:
 	if (cur->bc_nlevels == 1) {
 		int freecount = 0;
 
-		error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
-		if (error) {
-			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-			return error;
-		}
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
+			goto error0;
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
+				&rec.ir_freecount, &rec.ir_free)) {
 			freecount += rec.ir_freecount;
-			error = xfs_inobt_increment(cur, 0, &i);
-			if (error) {
-				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-				return error;
-			}
+			if (error = xfs_inobt_increment(cur, 0, &i))
+				goto error0;
 		}
 		ASSERT(freecount == agi->agi_freecount);
 	}
@@ -650,11 +632,8 @@ nextag:
 	 * If in the same a.g. as the parent, try to get near the parent.
 	 */
 	if (pagno == agno) {
-		error = xfs_inobt_lookup_le(cur, pagino, 0, 0, &i);
-		if (error) {
-			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-			return error;
-		}
+		if (error = xfs_inobt_lookup_le(cur, pagino, 0, 0, &i))
+			goto error0;
 		if ((i != 0) &&
 		    (j = xfs_inobt_get_rec(cur, &rec.ir_startino,
 					   &rec.ir_freecount, &rec.ir_free)) &&
@@ -677,16 +656,13 @@ nextag:
 			 * Duplicate the cursor, search left & right
 			 * simultaneously.
 			 */
-			tcur = xfs_btree_dup_cursor(cur);
+			if (error = xfs_btree_dup_cursor(cur, &tcur))
+				goto error0;
 			/*
 			 * Search left with tcur, back up 1 record.
 			 */
-			error = xfs_inobt_decrement(tcur, 0, &i);
-			if (error) {
-				xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
-				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-				return error;
-			}
+			if (error = xfs_inobt_decrement(tcur, 0, &i))
+				goto error1;
 			doneleft = !i;
 			if (!doneleft) {
 				i = xfs_inobt_get_rec(tcur, &trec.ir_startino,
@@ -697,12 +673,8 @@ nextag:
 			/* 
 			 * Search right with cur, go forward 1 record.
 			 */
-			error = xfs_inobt_increment(cur, 0, &i);
-			if (error) {
-				xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
-				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-				return error;
-			}
+			if (error = xfs_inobt_increment(cur, 0, &i))
+				goto error1;
 			doneright = !i;
 			if (!doneright) {
 				i = xfs_inobt_get_rec(cur, &rec.ir_startino,
@@ -761,15 +733,9 @@ nextag:
 				 * further left.
 				 */
 				if (useleft) {
-					error = xfs_inobt_decrement(tcur, 0,
-								    &i);
-					if (error) {
-						xfs_btree_del_cursor(tcur,
-							XFS_BTREE_ERROR);
-						xfs_btree_del_cursor(cur,
-							XFS_BTREE_ERROR);
-						return error;
-					}
+					if (error = xfs_inobt_decrement(tcur, 0,
+							&i))
+						goto error1;
 					doneleft = !i;
 					if (!doneleft) {
 						i = xfs_inobt_get_rec(tcur,
@@ -784,15 +750,9 @@ nextag:
 				 * further right.
 				 */
 				else {
-					error = xfs_inobt_increment(cur, 0,
-								    &i);
-					if (error) {
-						xfs_btree_del_cursor(tcur,
-							XFS_BTREE_ERROR);
-						xfs_btree_del_cursor(cur,
-							XFS_BTREE_ERROR);
-						return error;
-					}
+					if (error = xfs_inobt_increment(cur, 0,
+							&i))
+						goto error1;
 					doneright = !i;
 					if (!doneright) {
 						i = xfs_inobt_get_rec(cur,
@@ -811,11 +771,8 @@ nextag:
 	 * See if the most recently allocated block has any free.
 	 */
 	else if (agi->agi_newino != NULLAGINO) {
-		error = xfs_inobt_lookup_eq(cur, agi->agi_newino, 0, 0, &i);
-		if (error) {
-			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-			return error;
-		}
+		if (error = xfs_inobt_lookup_eq(cur, agi->agi_newino, 0, 0, &i))
+			goto error0;
 		if ((i != 0) &&
 		    xfs_inobt_get_rec(cur, &rec.ir_startino,
 				      &rec.ir_freecount, &rec.ir_free) &&
@@ -829,24 +786,18 @@ nextag:
 		 * None left in the last group, search the whole a.g.
 		 */
 		else {
-			error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
-			if (error) {
-				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-				return error;
-			}
+			if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
+				goto error0;
 			ASSERT(i == 1);
 			for (;;) {
 				i = xfs_inobt_get_rec(cur, &rec.ir_startino,
-						      &rec.ir_freecount, &rec.ir_free);
+						      &rec.ir_freecount,
+						      &rec.ir_free);
 				ASSERT(i == 1);
 				if (rec.ir_freecount > 0)
 					break;
-				error = xfs_inobt_increment(cur, 0, &i);
-				if (error) {
-					xfs_btree_del_cursor(cur,
-						XFS_BTREE_ERROR);
-					return error;
-				}
+				if (error = xfs_inobt_increment(cur, 0, &i))
+					goto error0;
 				ASSERT(i == 1);
 			}
 		}
@@ -866,20 +817,15 @@ nextag:
 	mraccunlock(&mp->m_peraglock);
 #ifdef DEBUG
 	if (cur->bc_nlevels == 1) {
-		int freecount = 0;
+		int	freecount = 0;
 
-		error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
-		if (error) {
-			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-			return error;
-		}
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
+			goto error0;
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
+				&rec.ir_freecount, &rec.ir_free)) {
 			freecount += rec.ir_freecount;
-			error = xfs_inobt_increment(cur, 0, &i);
-			if (error) {
-				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-				return error;
-			}
+			if (error = xfs_inobt_increment(cur, 0, &i))
+				goto error0;
 		}
 		ASSERT(freecount == agi->agi_freecount);
 	}
@@ -889,6 +835,11 @@ nextag:
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	*inop = ino;
 	return 0;
+error1:
+	xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
+error0:
+	xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
+	return error;
 }
 
 #ifndef SIM
@@ -910,7 +861,7 @@ xfs_difree(
 	xfs_agnumber_t	agno;	/* allocation group number */
 	xfs_agi_t	*agi;	/* allocation group header */
 	xfs_btree_cur_t	*cur;	/* inode btree cursor */
-	int		error;
+	int		error;	/* error return value */
 	int		i;	/* result code */
 	xfs_mount_t	*mp;	/* mount structure for filesystem */
 	int		off;	/* offset of inode in inode chunk */
@@ -941,9 +892,8 @@ xfs_difree(
 	mraccess(&mp->m_peraglock);
 	error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 	mraccunlock(&mp->m_peraglock);
-	if (error) {
+	if (error)
 		return error;
-	}
 	agi = XFS_BUF_TO_AGI(agbp);
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	ASSERT(agbno < agi->agi_length);
@@ -956,16 +906,13 @@ xfs_difree(
 	if (cur->bc_nlevels == 1) {
 		int freecount = 0;
 
-		error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
-		if (error) {
+		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
 			goto error0;
-		}
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
+				&rec.ir_freecount, &rec.ir_free)) {
 			freecount += rec.ir_freecount;
-			error = xfs_inobt_increment(cur, 0, &i);
-			if (error) {
+			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
-			}
 		}
 		ASSERT(freecount == agi->agi_freecount);
 	}
@@ -973,10 +920,8 @@ xfs_difree(
 	/*
 	 * Look for the entry describing this inode.
 	 */
-	error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i);
-	if (error) {
+	if (error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i))
 		goto error0;
-	}
 	ASSERT(i == 1);
 	i = xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
 		&rec.ir_free);
@@ -1006,16 +951,13 @@ xfs_difree(
 	if (cur->bc_nlevels == 1) {
 		int freecount = 0;
 
-		error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
-		if (error) {
+		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
 			goto error0;
-		}
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
+		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
+				&rec.ir_freecount, &rec.ir_free)) {
 			freecount += rec.ir_freecount;
-			error = xfs_inobt_increment(cur, 0, &i);
-			if (error) {
+			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
-			}
 		}
 		ASSERT(freecount == agi->agi_freecount);
 	}
@@ -1025,7 +967,7 @@ xfs_difree(
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 	return 0;
 
- error0:
+error0:
 	xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 	return error;
 }
@@ -1213,10 +1155,8 @@ xfs_ialloc_read_agi(
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1, 0, &bp);
-	if (error) {
+	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1, 0, &bp))
 		return error;
-	}
 	ASSERT(bp && !geterror(bp));
 	/*
 	 * Validate the magic number of the agi block.

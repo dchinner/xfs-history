@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision: 1.39 $"
+#ident "$Revision: 1.40 $"
 
 struct buf;
 struct xfs_bmap_free;
@@ -280,9 +280,10 @@ xfs_btree_del_cursor(
  * Duplicate the btree cursor.
  * Allocate a new one, copy the record, re-get the buffers.
  */
-xfs_btree_cur_t *			/* new btree cursor */
+int					/* error */
 xfs_btree_dup_cursor(
-	xfs_btree_cur_t		*cur);	/* btree cursor */
+	xfs_btree_cur_t		*cur,	/* input cursor */
+	xfs_btree_cur_t		**ncur);/* output cursor */
 
 /*
  * Change the cursor to point to the first record in the current block

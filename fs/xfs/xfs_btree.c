@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.54 $"
+#ident	"$Revision: 1.55 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -361,64 +361,60 @@ xfs_btree_del_cursor(
  * Duplicate the btree cursor.
  * Allocate a new one, copy the record, re-get the buffers.
  */
-xfs_btree_cur_t *			/* new btree cursor */
+int					/* error */
 xfs_btree_dup_cursor(
-	xfs_btree_cur_t	*cur)		/* btree cursor */
+	xfs_btree_cur_t	*cur,		/* input cursor */
+	xfs_btree_cur_t	**ncur)		/* output cursor */
 {
 	buf_t		*bp;		/* btree block's buffer pointer */
+	int 		error;		/* error return value */
 	int		i;		/* level number of btree block */
 	xfs_mount_t	*mp;		/* mount structure for filesystem */
-	xfs_btree_cur_t	*ncur;		/* return value */
+	xfs_btree_cur_t	*new;		/* new cursor value */
 	xfs_trans_t	*tp;		/* transaction pointer, can be NULL */
-	int 		error;
 
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
 	/*
 	 * Allocate a new cursor like the old one.
 	 */
-	ncur = xfs_btree_init_cursor(mp, tp, cur->bc_private.a.agbp,
-				     cur->bc_private.a.agno, cur->bc_btnum,
-				     cur->bc_private.b.ip,
-				     cur->bc_private.b.whichfork);
+	new = xfs_btree_init_cursor(mp, tp, cur->bc_private.a.agbp,
+		cur->bc_private.a.agno, cur->bc_btnum, cur->bc_private.b.ip,
+		cur->bc_private.b.whichfork);
 	/*
 	 * Copy the record currently in the cursor.
 	 */
-	ncur->bc_rec = cur->bc_rec;
+	new->bc_rec = cur->bc_rec;
 	/*
 	 * For each level current, re-get the buffer and copy the ptr value.
 	 */
-	for (i = 0; i < ncur->bc_nlevels; i++) {
-		ncur->bc_ptrs[i] = cur->bc_ptrs[i];
-		ncur->bc_ra[i] = cur->bc_ra[i];
+	for (i = 0; i < new->bc_nlevels; i++) {
+		new->bc_ptrs[i] = cur->bc_ptrs[i];
+		new->bc_ra[i] = cur->bc_ra[i];
 		if (bp = cur->bc_bufs[i]) {
-			error = xfs_trans_read_buf(mp, tp, mp->m_dev, bp->b_blkno,
-						   mp->m_bsize, 0, &bp);
-			/* XXXNeed to fix all callers */
-			if (error) {
-				xfs_btree_del_cursor(ncur, error);
-#ifndef SIM
-				debug("Need to fix all callers");
-#endif
-				return (NULL);
+			if (error = xfs_trans_read_buf(mp, tp, mp->m_dev,
+					bp->b_blkno, mp->m_bsize, 0, &bp)) {
+				xfs_btree_del_cursor(new, error);
+				*ncur = NULL;
+				return error;
 			}
-
-			ncur->bc_bufs[i] = bp;
+			new->bc_bufs[i] = bp;
 			ASSERT(bp);
 			ASSERT(!geterror(bp));
 		} else
-			ncur->bc_bufs[i] = NULL;
+			new->bc_bufs[i] = NULL;
 	}
 	/*
 	 * For bmap btrees, copy the firstblock, flist, and flags values,
 	 * since init cursor doesn't get them.
 	 */
-	if (ncur->bc_btnum == XFS_BTNUM_BMAP) {
-		ncur->bc_private.b.firstblock = cur->bc_private.b.firstblock;
-		ncur->bc_private.b.flist = cur->bc_private.b.flist;
-		ncur->bc_private.b.flags = cur->bc_private.b.flags;
+	if (new->bc_btnum == XFS_BTNUM_BMAP) {
+		new->bc_private.b.firstblock = cur->bc_private.b.firstblock;
+		new->bc_private.b.flist = cur->bc_private.b.flist;
+		new->bc_private.b.flags = cur->bc_private.b.flags;
 	}
-	return ncur;
+	*ncur = new;
+	return 0;
 }
 
 /*
@@ -707,14 +703,12 @@ xfs_btree_read_bufl(
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
-	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
-	if (error) {
+	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
+			&bp))
 		return error;
-	}
 	ASSERT(!bp || !geterror(bp));
-	if (bp != NULL) {
+	if (bp != NULL)
 		bp->b_ref = XFS_GEN_LBTREE_REF;
-	}
 	*bpp = bp;
 	return 0;
 }
@@ -739,14 +733,12 @@ xfs_btree_read_bufs(
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
-	if (error) {
+	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
+			&bp))
 		return error;
-	}
 	ASSERT(!bp || !geterror(bp));
-	if (bp != NULL) {
+	if (bp != NULL)
 		bp->b_ref = XFS_GEN_SBTREE_REF;
-	}
 	*bpp = bp;
 	return 0;
 }
