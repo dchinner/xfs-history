@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.109 $"
+#ident	"$Revision: 1.111 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -63,6 +63,7 @@
 #include <sys/fs/xfs_bit.h>
 #include <sys/fs/xfs_quota.h>
 #include <sys/fs/xfs_dqblk.h>
+#include <sys/fs/xfs_dquot_item.h>
 #include <sys/fs/xfs_dquot.h>
 #include <sys/fs/xfs_qm.h>
 
@@ -70,10 +71,21 @@
 #include "sim.h"		/* must be last include file */
 #endif
 
-STATIC int	xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
+int		xlog_find_zeroed(struct log *log, daddr_t *blk_no);
+int		xlog_find_cycle_start(struct log *log,
+				      buf_t	*bp,	
+				      daddr_t	first_blk,
+				      daddr_t	*last_blk,
+				      uint	cycle);
+
 STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
+STATIC void	xlog_recover_print_trans(xlog_recover_t	    *trans,
+					 xlog_recover_item_t *itemq,
+					 int		     print);
+STATIC void	xlog_recover_print_item(xlog_recover_item_t *item);
+
 #ifndef SIM
 STATIC void	xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 						xlog_recover_item_t *item);
@@ -87,6 +99,11 @@ STATIC void	xlog_recover_check_ail(xfs_mount_t *mp, xfs_log_item_t *lip,
 #define	xlog_recover_check_summary(log)
 #define	xlog_recover_check_ail(mp, lip, gen)
 #endif /* DEBUG && !SIM */
+
+#ifdef SIM
+extern void 	xlog_recover_print_trans_head(xlog_recover_t *tr);
+extern void	xlog_recover_print_logitem(xlog_recover_item_t *item);
+#endif
 
 buf_t *
 xlog_get_bp(int num_bblks)
@@ -134,8 +151,8 @@ xlog_bread(xlog_t	*log,
 	iowait(bp);
 
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_ALERT, "XFS: error reading log block #%d",
-			bp->b_blkno);
+		cmn_err(CE_ALERT, "XFS: error reading log blkno 0x%x, dev 0x%x",
+			bp->b_blkno, bp->b_edev);
 		ASSERT(0);
 		return bp->b_error;
 	}
@@ -166,8 +183,8 @@ xlog_bwrite(
 	(void) bwrite(bp);
 
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_ALERT, "XFS: error writing log block #%d",
-			bp->b_blkno);
+		cmn_err(CE_ALERT, "XFS: error writing log blkno 0x%x, dev 0x%x",
+			bp->b_blkno, bp->b_edev);
 		ASSERT(0);
 		return bp->b_error;
 	}
@@ -180,7 +197,7 @@ xlog_bwrite(
  * Note that the algorithm can not be perfect because the disk will not
  * necessarily be perfect.
  */
-STATIC int
+int
 xlog_find_cycle_start(xlog_t	*log,
 		      buf_t	*bp,
 		      daddr_t	first_blk,
@@ -565,49 +582,6 @@ bp_err:
 }	/* xlog_find_head */
 
 
-#ifndef _KERNEL
-/*
- * Start is defined to be the block pointing to the oldest valid log record.
- * Used by log print code.  Don't put in xfs_log_print.c since most of the
- * bread routines live in this module only.
- */
-int
-xlog_print_find_oldest(xlog_t  *log,
-		       daddr_t *last_blk)
-{
-	buf_t	*bp;
-	daddr_t	first_blk;
-	uint	first_half_cycle, last_half_cycle;
-	int	error;
-	
-	if (xlog_find_zeroed(log, &first_blk))
-		return 0;
-
-	first_blk = 0;					/* read first block */
-	bp = xlog_get_bp(1);
-	xlog_bread(log, 0, 1, bp);
-	first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
-
-	*last_blk = log->l_logBBsize-1;			/* read last block */
-	xlog_bread(log, *last_blk, 1, bp);
-	last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
-	ASSERT(last_half_cycle != 0);
-
-	if (first_half_cycle == last_half_cycle) {/* all cycle nos are same */
-		*last_blk = 0;
-	} else {		/* have 1st and last; look for middle cycle */
-		error = xlog_find_cycle_start(log, bp, first_blk,
-					      last_blk, last_half_cycle);
-		if (error)
-			return error;
-	}
-
-	xlog_put_bp(bp);
-	return 0;
-}	/* xlog_print_find_oldest */
-#endif /* _KERNEL */
-
-
 /*
  * Find the sync block number or the tail of the log.
  *
@@ -785,9 +759,9 @@ exit:
  *	-1 => use *blk_no as the first block of the log
  *	>0 => error has occurred
  */
-STATIC int
-xlog_find_zeroed(xlog_t	 *log,
-		 daddr_t *blk_no)
+int
+xlog_find_zeroed(struct log	*log,
+		 daddr_t 	*blk_no)
 {
 	buf_t	*bp, *big_bp;
 	uint	first_cycle, last_cycle;
@@ -1226,541 +1200,6 @@ xlog_recover_unlink_tid(xlog_recover_t	**q,
 	}
 	return 0;
 }	/* xlog_recover_unlink_tid */
-
-#ifdef SIM
-STATIC void
-xlog_recover_print_trans_head(xlog_recover_t *tr)
-{
-	static char *trans_type[] = {
-		"",
-		"SETATTR",
-		"SETATTR_SIZE",
-		"INACTIVE",
-		"CREATE",
-		"CREATE_TRUNC",
-		"TRUNCATE_FILE",
-		"REMOVE",
-		"LINK",
-		"RENAME",
-		"MKDIR",
-		"RMDIR",
-		"SYMLINK",
-		"SET_DMATTRS",
-		"GROWFS",
-		"STRAT_WRITE",
-		"DIOSTRAT",
-		"WRITE_SYNC",
-		"WRITEID",
-		"ADDAFORK",
-		"ATTRINVAL",
-		"ATRUNCATE",
-		"ATTR_SET",
-		"ATTR_QM",
-		"ATTR_FLAG",
-		"CLEAR_AGI_BUCKET",
-		"QM_SBCHANGE",
-		"QM_QUOTAOFF",
-		"QM_DQALLOC",
-		"QM_SETQLIM",
-		"QM_DQCLUSTER",
-		"QM_QINOCREATE",
-		"QM_QUOTAOFF_END"
-	};
-
-	printf("TRANS: tid:0x%x  type:%s  #items:%d  trans:0x%x  q:0x%x\n",
-	       tr->r_log_tid, trans_type[tr->r_theader.th_type],
-	       tr->r_theader.th_num_items,
-	       tr->r_theader.th_tid, tr->r_itemq);
-}	/* xlog_recover_print_trans_head */
-
-
-void
-xlog_recover_print_data(caddr_t p, int len)
-{
-    extern int print_data;
-
-    if (print_data) {
-	uint *dp  = (uint *)p;
-	int  nums = len >> 2;
-	int  j = 0;
-
-	while (j < nums) {
-	    if ((j % 8) == 0)
-		printf("%2x ", j);
-	    printf("%8x ", *dp);
-	    dp++;
-	    j++;
-	    if ((j % 8) == 0)
-		printf("\n");
-	}
-	printf("\n");
-    }
-}	/* xlog_recover_print_data */
-
-
-STATIC void
-xlog_recover_print_buffer(xlog_recover_item_t *item)
-{
-    xfs_agi_t			*agi;
-    xfs_agf_t			*agf;
-    xfs_buf_log_format_v1_t	*old_f;
-    xfs_buf_log_format_t	*f;
-    caddr_t			p;
-    int				len, num, i;
-    daddr_t			blkno;
-    extern int			print_buffer;
-    xfs_disk_dquot_t		*ddq;
-
-    f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
-    old_f = (xfs_buf_log_format_v1_t *)f;
-    len = item->ri_buf[0].i_len;
-    printf("	");
-    switch (f->blf_type)  {
-    case XFS_LI_BUF: {
-	printf("BUF:  ");
-	break;
-    }
-    case XFS_LI_6_1_BUF: {
-	printf("6.1 BUF:  ");
-	break;
-    }
-    case XFS_LI_5_3_BUF:
-	printf("5.3 BUF:  ");
-	break;
-    }
-    if (f->blf_type == XFS_LI_BUF) {
-	    printf("#regs:%d   start blkno:0x%llx   len:%d   bmap size:%d",
-		   f->blf_size, f->blf_blkno, f->blf_len, f->blf_map_size);
-	    blkno = (daddr_t)f->blf_blkno;
-	    i = f->blf_flags;
-    } else {
-	    printf("#regs:%d   start blkno:0x%x   len:%d   bmap size:%d",
-		   old_f->blf_size, old_f->blf_blkno, old_f->blf_len,
-		   old_f->blf_map_size);
-	    blkno = (daddr_t)old_f->blf_blkno;
-	    i = old_f->blf_flags;
-    }
-    if (i)
-	printf("   flags: <%s%s%s%s>",
-		i & XFS_BLI_INODE_BUF ? "inode_buf " : "",
-		i & XFS_BLI_CANCEL ? "cancel " : "",
-		i & XFS_BLI_UDQUOT_BUF ? "udquot_buf " : "",
-		i & XFS_BLI_PDQUOT_BUF ? "pdquot_buf " : "");
-    printf("\n");
-    num = f->blf_size-1;
-    i = 1;
-    while (num-- > 0) {
-	p = item->ri_buf[i].i_addr;
-	len = item->ri_buf[i].i_len;
-	i++;
-	if (blkno == 0) { /* super block */
-	    printf("	SUPER Block Buffer:\n");
-	    if (!print_buffer) continue;
-	    printf("		icount:%lld  ifree:%lld  ",
-		   *(long long *)(p), *(long long *)(p+8));
-	    printf("fdblks:%lld  frext:%lld\n",
-		   *(long long *)(p+16),
-		   *(long long *)(p+24));
-	} else if (*(uint *)p == XFS_AGI_MAGIC) {
-	    agi = (xfs_agi_t *)p;
-	    printf("	AGI Buffer: (XAGI)\n");
-	    if (!print_buffer) continue;
-	    printf("		ver:%d  ", agi->agi_versionnum);
-	    printf("seq#:%d  len:%d  cnt:%d  root:%d\n",
-		   agi->agi_seqno, agi->agi_length,
-		   agi->agi_count, agi->agi_root);
-	    printf("		level:%d  free#:0x%x  newino:0x%x\n",
-		   agi->agi_level, agi->agi_freecount,
-		   agi->agi_newino);
-	} else if (*(uint *)p == XFS_AGF_MAGIC) {
-	    agf = (xfs_agf_t *)p;
-	    printf("	AGF Buffer: (XAGF)\n");
-	    if (!print_buffer) continue;
-	    printf("		ver:%d  seq#:%d  len:%d  \n",
-		   agf->agf_versionnum, agf->agf_seqno,
-		   agf->agf_length);
-	    printf("		root BNO:%d  CNT:%d\n",
-		   agf->agf_roots[XFS_BTNUM_BNOi],
-		   agf->agf_roots[XFS_BTNUM_CNTi]);
-	    printf("		level BNO:%d  CNT:%d\n",
-		   agf->agf_levels[XFS_BTNUM_BNOi],
-		   agf->agf_levels[XFS_BTNUM_CNTi]);
-	    printf("		1st:%d  last:%d  cnt:%d  freeblks:%d  longest:%d\n",
-		   agf->agf_flfirst, agf->agf_fllast, agf->agf_flcount,
-		   agf->agf_freeblks, agf->agf_longest);
-	} else if (*(uint *)p == XFS_DQUOT_MAGIC) {
-	    ddq = (xfs_disk_dquot_t *)p;
-	    printf("	DQUOT Buffer:\n");
-	    if (!print_buffer) continue;
-	    printf("		UIDs 0x%x-0x%x\n", 
-		   ddq->d_id,
-		   ddq->d_id + (BBTOB(f->blf_len) / sizeof(xfs_dqblk_t)) - 1);
-	} else {
-	    printf("	BUF DATA\n");
-	    if (!print_buffer) continue;
-	    xlog_recover_print_data(p, len);
-	}
-    }
-}	/* xlog_recover_print_buffer */
-
-STATIC void
-xlog_recover_print_quotaoff(xlog_recover_item_t *item)
-{
-	xfs_qoff_logformat_t *qoff_f;
-	char str[20];
-
-	qoff_f = (xfs_qoff_logformat_t *)item->ri_buf[0].i_addr;
-	ASSERT(qoff_f);
-	if (qoff_f->qf_flags & XFS_UQUOTA_ACCT) 
-		strcpy(str, "USER QUOTA");
-	if (qoff_f->qf_flags & XFS_PQUOTA_ACCT)
-		strcat(str, "PROJ QUOTA");
-	printf("\tQUOTAOFF: #regs:%d   type:%s\n",
-	       qoff_f->qf_size, str);
-}
-
-STATIC void
-xlog_recover_print_dquot(xlog_recover_item_t *item)
-{
-	xfs_dq_logformat_t 	*f;
-	struct xfs_disk_dquot	*d;
-	extern int print_quota;
-
-	f = (xfs_dq_logformat_t *)item->ri_buf[0].i_addr;
-	ASSERT(f);
-	ASSERT(f->qlf_len == 1);
-	d = (xfs_disk_dquot_t *)item->ri_buf[1].i_addr;
-	printf("\tDQUOT: #regs:%d  blkno:%lld  boffset:%u id: %d\n",
-	       f->qlf_size, f->qlf_blkno, f->qlf_boffset, f->qlf_id);
-	if (!print_quota)
-		return;
-	printf("\t\tmagic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n",
-	       d->d_magic, d->d_version, d->d_id, d->d_id);
-	printf("\t\tblk_hard 0x%x\tblk_soft 0x%x\tino_hard 0x%x"
-	       "\tino_soft 0x%x\n",
-		(int)d->d_blk_hardlimit, (int)d->d_blk_softlimit,
-		(int)d->d_ino_hardlimit, (int)d->d_ino_softlimit);
-	printf("\t\tbcount 0x%x (%d) icount 0x%x (%d)\n",
-		(int)d->d_bcount, (int)d->d_bcount, 
-		(int)d->d_icount, (int)d->d_icount);
-	printf("\t\tbtimer 0x%x itimer 0x%x \n",
-		(int)d->d_btimer, (int)d->d_itimer);
-}
-
-STATIC void
-xlog_recover_print_inode_core(xfs_dinode_core_t *di)
-{
-    extern int print_inode;
-
-    printf("	CORE inode:\n");
-    if (!print_inode)
-	return;
-    printf("		magic:%c%c  mode:0x%x  ver:%d  format:%d  onlink:%d\n",
-	   ((char *)&di->di_magic)[0], ((char *)&di->di_magic)[1], di->di_mode,
-	   di->di_version, di->di_format, di->di_onlink);
-    printf("		uid:%d  gid:%d  nlink:%d projid:%d\n",
-	   di->di_uid, di->di_gid, di->di_nlink, (uint)di->di_projid);
-    printf("		atime:%d  mtime:%d  ctime:%d\n",
-	   di->di_atime.t_sec, di->di_mtime.t_sec, di->di_ctime.t_sec);
-    printf("		size:0x%llx  nblks:0x%llx  exsize:%d  nextents:%d  anextents:%d\n",
-	   di->di_size, di->di_nblocks, di->di_extsize, di->di_nextents,
-	   (int)di->di_anextents);
-    printf("		forkoff:%d  dmevmask:0x%x  dmstate:%d  flags:0x%x  gen:%d\n",
-	   (int)di->di_forkoff, di->di_dmevmask, (int)di->di_dmstate, (int)di->di_flags,
-	   di->di_gen);
-}	/* xlog_recover_print_inode_core */
-
-
-STATIC void
-xlog_recover_print_inode(xlog_recover_item_t *item)
-{
-    xfs_inode_log_format_t *f;
-    int			   attr_index;
-    extern int		   print_inode, print_data;
-
-    f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
-    ASSERT(item->ri_buf[0].i_len == sizeof(xfs_inode_log_format_t));
-    printf("	INODE: #regs:%d   ino:0x%llx  flags:0x%x   dsize:%d\n",
-	   f->ilf_size, f->ilf_ino, f->ilf_fields, f->ilf_dsize);
-
-    /* core inode comes 2nd */
-    ASSERT(item->ri_buf[1].i_len == sizeof(xfs_dinode_core_t));
-    xlog_recover_print_inode_core((xfs_dinode_core_t *)item->ri_buf[1].i_addr);
-
-    /* does anything come next */
-    switch (f->ilf_fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
-	case XFS_ILOG_DEXT: {
-	    ASSERT(f->ilf_size <= 4);
-	    printf("		DATA FORK EXTENTS inode data:\n");
-	    if (print_inode && print_data) {
-		xlog_recover_print_data(item->ri_buf[2].i_addr,
-					item->ri_buf[2].i_len);
-	    }
-	    break;
-	}
-	case XFS_ILOG_DBROOT: {
-	    ASSERT(f->ilf_size == 3);
-	    printf("		DATA FORK BTREE inode data:\n");
-	    if (print_inode && print_data) {
-		xlog_recover_print_data(item->ri_buf[2].i_addr,
-					item->ri_buf[2].i_len);
-	    }
-	    break;
-	}
-	case XFS_ILOG_DDATA: {
-	    ASSERT(f->ilf_size == 3);
-	    printf("		DATA FORK LOCAL inode data:\n");
-	    if (print_inode && print_data) {
-		xlog_recover_print_data(item->ri_buf[2].i_addr,
-					item->ri_buf[2].i_len);
-	    }
-	    break;
-	}
-	case XFS_ILOG_DEV: {
-	    ASSERT(f->ilf_size == 2);
-	    printf("		DEV inode: no extra region\n");
-	    break;
-	}
-	case XFS_ILOG_UUID: {
-	    ASSERT(f->ilf_size == 2);
-	    printf("		UUID inode: no extra region\n");
-	    break;
-	}
-	case 0: {
-	    ASSERT(f->ilf_size == 2);
-	    break;
-	}
-	default: {
-	    xlog_panic("xlog_print_trans_inode: illegal inode type");
-	}
-    }
-
-    if (f->ilf_fields & XFS_ILOG_AFORK) {
-	    if (f->ilf_fields & XFS_ILOG_DFORK) {
-		    attr_index = 3;
-	    } else {
-		    attr_index = 2;
-	    }
-	    switch (f->ilf_fields & XFS_ILOG_AFORK) {
-	        case XFS_ILOG_AEXT: {
-		    ASSERT(f->ilf_size <= 4);
-		    printf("		ATTR FORK EXTENTS inode data:\n");
-		    if (print_inode && print_data) {
-			    xlog_recover_print_data(
-					    item->ri_buf[attr_index].i_addr,
-					    item->ri_buf[attr_index].i_len);
-		    }
-		    break;
-	        }
-	        case XFS_ILOG_ABROOT: {
-		    ASSERT(f->ilf_size <= 4);
-		    printf("		ATTR FORK BTREE inode data:\n");
-		    if (print_inode && print_data) {
-			    xlog_recover_print_data(
-					    item->ri_buf[attr_index].i_addr,
-					    item->ri_buf[attr_index].i_len);
-		    }
-		    break;
-	        }
-	        case XFS_ILOG_ADATA: {
-		    ASSERT(f->ilf_size <= 4);
-		    printf("		ATTR FORK LOCAL inode data:\n");
-		    if (print_inode && print_data) {
-			    xlog_recover_print_data(
-					    item->ri_buf[attr_index].i_addr,
-					    item->ri_buf[attr_index].i_len);
-		    }
-		    break;
-	        }
-	        default: {
-		    xlog_panic("xlog_print_trans_inode: illegal inode log flag");
-	        }
-	    }
-    }
-    
-}	/* xlog_recover_print_inode */
-
-
-STATIC void
-xlog_recover_print_efd(xlog_recover_item_t *item)
-{
-    xfs_efd_log_format_t *f;
-    xfs_extent_t	 *ex;
-    int			 i;
-
-    f = (xfs_efd_log_format_t *)item->ri_buf[0].i_addr;
-    /*
-     * An xfs_efd_log_format structure contains a variable length array
-     * as the last field.  Each element is of size xfs_extent_t.
-     */
-    ASSERT(item->ri_buf[0].i_len == sizeof(xfs_efd_log_format_t)+sizeof(xfs_extent_t)*(f->efd_nextents-1));
-    printf("	EFD:  #regs: %d    num_extents: %d  id: 0x%llx\n",
-	   f->efd_size, f->efd_nextents, f->efd_efi_id);
-    ex = f->efd_extents;
-    printf("	");
-    for (i=0; i< f->efd_size; i++) {
-	printf("(s: 0x%llx, l: %d) ", ex->ext_start, ex->ext_len);
-	if (i % 4 == 3) printf("\n");
-	ex++;
-    }
-    if (i % 4 != 0) printf("\n");
-    return;
-}	/* xlog_recover_print_efd */
-
-
-STATIC void
-xlog_recover_print_efi(xlog_recover_item_t *item)
-{
-    xfs_efi_log_format_t *f;
-    xfs_extent_t	 *ex;
-    int			 i;
-    
-    f = (xfs_efi_log_format_t *)item->ri_buf[0].i_addr;
-    /*
-     * An xfs_efi_log_format structure contains a variable length array
-     * as the last field.  Each element is of size xfs_extent_t.
-     */
-    ASSERT(item->ri_buf[0].i_len == sizeof(xfs_efi_log_format_t)+sizeof(xfs_extent_t)*(f->efi_nextents-1));
-
-    printf("	EFI:  #regs:%d    num_extents:%d  id:0x%llx\n",
-	   f->efi_size, f->efi_nextents, f->efi_id);
-    ex = f->efi_extents;
-    printf("	");
-    for (i=0; i< f->efi_size; i++) {
-	printf("(s: 0x%llx, l: %d) ", ex->ext_start, ex->ext_len);
-	if (i % 4 == 3) printf("\n");
-	ex++;
-    }
-    if (i % 4 != 0) printf("\n");
-    return;
-}	/* xlog_recover_print_efi */
-
-#endif /* SIM */
-
-
-STATIC void
-xlog_recover_print_item(xlog_recover_item_t *item)
-{
-	int i;
-
-	switch (ITEM_TYPE(item)) {
-	    case XFS_LI_BUF: {
-		printf("BUF");
-		break;
-	    }
-	    case XFS_LI_INODE: {
-		printf("INO");
-		break;
-	    }
-	    case XFS_LI_EFD: {
-		printf("EFD");
-		break;
-	    }
-	    case XFS_LI_EFI: {
-		printf("EFI");
-		break;
-	    }
-	    case XFS_LI_6_1_BUF:  {
-		printf("6.1 BUF");
-		break;
-	    }
-	    case XFS_LI_5_3_BUF: {
-		printf("5.3 BUF");
-		break;
-	    }
-	    case XFS_LI_6_1_INODE: {
-		printf("6.1 INO");
-		break;
-	    }
-	    case XFS_LI_5_3_INODE: {
-		printf("5.3 INO");
-		break;
-	    }
-	    case XFS_LI_DQUOT: {
-		printf("DQ ");
-		break;
-	    }
-	    case XFS_LI_QUOTAOFF: {
-		printf("QOFF");
-		break;
-	    } 
-	    default: {
-		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type\n");
-		break;
-	    }
-	}
-/*	type isn't filled in yet
-	printf("ITEM: type: %d cnt: %d total: %d ",
-	       item->ri_type, item->ri_cnt, item->ri_total);
-*/
-	printf(": cnt:%d total:%d ", item->ri_cnt, item->ri_total);
-	for (i=0; i<item->ri_cnt; i++) {
-		printf("a:0x%x len:%d ",
-		       item->ri_buf[i].i_addr, item->ri_buf[i].i_len);
-	}
-	printf("\n");
-
-#ifdef SIM
-	switch (ITEM_TYPE(item)) {
-	    case XFS_LI_BUF:
-	    case XFS_LI_6_1_BUF:
-	    case XFS_LI_5_3_BUF: {
-		xlog_recover_print_buffer(item);
-		break;
-	    }
-	    case XFS_LI_INODE:
-	    case XFS_LI_6_1_INODE:
-	    case XFS_LI_5_3_INODE: {
-		xlog_recover_print_inode(item);
-		break;
-	    }
-	    case XFS_LI_EFD: {
-		xlog_recover_print_efd(item);
-		break;
-	    }
-	    case XFS_LI_EFI: {
-		xlog_recover_print_efi(item);
-		break;
-	    }
-	    case XFS_LI_DQUOT: {
-		xlog_recover_print_dquot(item);
-		break;
-	    }
-	    case XFS_LI_QUOTAOFF: {
-		xlog_recover_print_quotaoff(item);
-		break;
-	    }
-	    default: {
-		printf("xlog_recover_print_item: illegal type\n");
-		break;
-	    }
-	}
-#endif
-}	/* xlog_recover_print_item */
-
-
-/*ARGSUSED*/
-STATIC void
-xlog_recover_print_trans(xlog_recover_t	     *trans,
-			 xlog_recover_item_t *itemq,
-			 int		     print)
-{
-	xlog_recover_item_t *first_item, *item;
-
-	if (print < 3)
-		return;
-
-	printf("======================================\n");
-#ifdef SIM
-	xlog_recover_print_trans_head(trans);
-#endif
-	item = first_item = itemq;
-	do {
-		xlog_recover_print_item(item);
-		item = item->ri_next;
-	} while (first_item != item);
-}	/* xlog_recover_print_trans */
-
 
 STATIC void
 xlog_recover_insert_item_backq(xlog_recover_item_t **q,
@@ -2330,8 +1769,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		break;
 	      default:
 		cmn_err(CE_ALERT,
-			"xfs_log_recover: unknown buffer type 0x%x\n", 
-			buf_f->blf_type);
+			"xfs_log_recover: unknown buffer type 0x%x, dev 0x%x", 
+			buf_f->blf_type, log->l_dev);
 		ASSERT(0);
 		break;
 	}
@@ -2340,8 +1779,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	bp = bread(mp->m_dev, blkno, len);
 	if (bp->b_flags & B_ERROR) {
 		cmn_err(CE_ALERT,
-			"XFS: xlog_recover_do_buffer_trans: bread error (%d)",
-			blkno);
+			"XFS: xlog_recover_do_buffer_trans: bread error (blkno 0x%x, "
+			"dev 0x%x)", blkno, mp->m_dev);
 		ASSERT(0);
 		error = bp->b_error;
 		brelse(bp);
@@ -2435,8 +1874,9 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
 	if (bp->b_flags & B_ERROR) {
 		cmn_err(CE_ALERT,
-			"XFS: xlog_recover_do_inode_trans: bread error (%d)",
-			bp->b_blkno);
+			"XFS: xlog_recover_do_inode_trans: bread error (blkno 0x%x, "
+			"dev 0x%x)",
+			bp->b_blkno, mp->m_dev);
 		ASSERT(0);
 		error = bp->b_error;
 		brelse(bp);
@@ -2465,7 +1905,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {
 			cmn_err(CE_PANIC,
-				"xfs_inode_recover: Bad reg inode 0x%x\n",
+				"xfs_inode_recover: Bad reg inode 0x%x",
 				item);
 		}
 	} else if ((dicp->di_mode & IFMT) == IFDIR) {
@@ -2473,18 +1913,18 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE) &&
 		    (dicp->di_format != XFS_DINODE_FMT_LOCAL)) {
 			cmn_err(CE_PANIC,
-				"xfs_inode_recover: Bad dir inode 0x%x\n",
+				"xfs_inode_recover: Bad dir inode 0x%x",
 				item);
 		}
 	}
 	if (dicp->di_nextents > dicp->di_nblocks) {
 		cmn_err(CE_PANIC,
-			"xfs_inode_recover: Bad inode nblocks 0x%x\n",
+			"xfs_inode_recover: Bad inode nblocks 0x%x",
 			item);
 	}
 	if (dicp->di_forkoff > mp->m_sb.sb_inodesize) {
 		cmn_err(CE_PANIC,
-			"xfs_inode_recover: Bad inode forkoff 0x%x\n",
+			"xfs_inode_recover: Bad inode forkoff 0x%x",
 			item);
 	}
 	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
@@ -2702,8 +2142,9 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		      0);
 	if (bp == NULL || bp->b_flags & B_ERROR) {
 		cmn_err(CE_WARN,
-			"XFS: xlog_recover_do_dquot_trans: bread error (%d)",
-			(int) dq_f->qlf_blkno);
+			"XFS: xlog_recover_do_dquot_trans: bread error (blkno 0x%x, "
+			"dev 0x%x)",
+			dq_f->qlf_blkno, mp->m_dev);
 		ASSERT(0);
 		error = bp->b_error;
 		brelse(bp);
@@ -3874,3 +3315,95 @@ xlog_recover_check_summary(xlog_t	*log)
 	brelse(sbbp);
 }
 #endif /* DEBUG && !SIM */
+
+
+STATIC void
+xlog_recover_print_item(xlog_recover_item_t *item)
+{
+	int i;
+
+	switch (ITEM_TYPE(item)) {
+	    case XFS_LI_BUF: {
+		printf("BUF");
+		break;
+	    }
+	    case XFS_LI_INODE: {
+		printf("INO");
+		break;
+	    }
+	    case XFS_LI_EFD: {
+		printf("EFD");
+		break;
+	    }
+	    case XFS_LI_EFI: {
+		printf("EFI");
+		break;
+	    }
+	    case XFS_LI_6_1_BUF:  {
+		printf("6.1 BUF");
+		break;
+	    }
+	    case XFS_LI_5_3_BUF: {
+		printf("5.3 BUF");
+		break;
+	    }
+	    case XFS_LI_6_1_INODE: {
+		printf("6.1 INO");
+		break;
+	    }
+	    case XFS_LI_5_3_INODE: {
+		printf("5.3 INO");
+		break;
+	    }
+	    case XFS_LI_DQUOT: {
+		printf("DQ ");
+		break;
+	    }
+	    case XFS_LI_QUOTAOFF: {
+		printf("QOFF");
+		break;
+	    } 
+	    default: {
+		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type\n");
+		break;
+	    }
+	}
+
+/*	type isn't filled in yet
+	printf("ITEM: type: %d cnt: %d total: %d ",
+	       item->ri_type, item->ri_cnt, item->ri_total);
+*/
+	printf(": cnt:%d total:%d ", item->ri_cnt, item->ri_total);
+	for (i=0; i<item->ri_cnt; i++) {
+		printf("a:0x%x len:%d ",
+		       item->ri_buf[i].i_addr, item->ri_buf[i].i_len);
+	}
+	printf("\n");
+
+#ifdef SIM
+	xlog_recover_print_logitem(item);
+#endif
+}	/* xlog_recover_print_item */
+
+/*ARGSUSED*/
+STATIC void
+xlog_recover_print_trans(xlog_recover_t	     *trans,
+			 xlog_recover_item_t *itemq,
+			 int		     print)
+{
+	xlog_recover_item_t *first_item, *item;
+
+	if (print < 3)
+		return;
+
+	printf("======================================\n");
+#ifdef SIM
+	xlog_recover_print_trans_head(trans);
+#endif
+	item = first_item = itemq;
+	do {
+		xlog_recover_print_item(item);
+		item = item->ri_next;
+	} while (first_item != item);
+}	/* xlog_recover_print_trans */
+
