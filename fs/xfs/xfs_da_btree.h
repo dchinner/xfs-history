@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision$"
 
 /*
  * xfs_da_btree.h
@@ -29,8 +29,8 @@ struct zone;
 #define XFS_ATTR_LEAF_MAGIC	0xfbee	/* magic number: attribute leaf blks */
 
 typedef struct xfs_da_blkinfo {
-	__uint32_t forw;			/* previous block in list */
-	__uint32_t back;			/* following block in list */
+	xfs_dablk_t forw;			/* previous block in list */
+	xfs_dablk_t back;			/* following block in list */
 	__uint16_t magic;			/* validity check on block */
 } xfs_da_blkinfo_t;
 
@@ -52,8 +52,8 @@ typedef struct xfs_da_intnode {
 		__uint16_t level;	/* level above leaves (leaf == 0) */
 	} hdr;
 	struct xfs_da_node_entry {
-		__uint32_t hashval;	/* hash value for this descendant */
-		__uint32_t before;	/* Btree block before this key */
+		xfs_dahash_t hashval;	/* hash value for this descendant */
+		xfs_dablk_t before;	/* Btree block before this key */
 	} btree[1];			/* variable sized array of keys */
 } xfs_da_intnode_t;
 typedef struct xfs_da_node_hdr xfs_da_node_hdr_t;
@@ -68,7 +68,7 @@ int xfs_da_node_entries(struct xfs_mount *mp);
 #define	XFS_DA_NODE_ENTRIES(mp)		((mp)->m_da_node_ents)
 #endif
 
-#define	XFS_DA_MAXHASH	((__uint32_t)-1)/* largest valid hash value */
+#define	XFS_DA_MAXHASH	((xfs_dahash_t)-1) /* largest valid hash value */
 
 /*
  * Macros used by directory code to interface to the filesystem.
@@ -89,36 +89,43 @@ int xfs_lblog(struct xfs_mount *mp);
 /*
  * Macros used to manipulate directory off_t's
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_MAKE_BNOENTRY)
+__uint32_t xfs_da_make_bnoentry(struct xfs_mount *mp, xfs_dablk_t bno,
+				int entry);
+#define	XFS_DA_MAKE_BNOENTRY(mp,bno,entry)	\
+	xfs_da_make_bnoentry(mp,bno,entry)
+#else
+#define	XFS_DA_MAKE_BNOENTRY(mp,bno,entry) \
+	(((bno) << (mp)->m_dircook_elog) | (entry))
+#endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_MAKE_COOKIE)
-off_t xfs_da_make_cookie(struct xfs_mount *mp, __uint32_t bno, int entry,
-				__uint32_t hash);
+off_t xfs_da_make_cookie(struct xfs_mount *mp, xfs_dablk_t bno, int entry,
+				xfs_dahash_t hash);
 #define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash)	\
 	xfs_da_make_cookie(mp,bno,entry,hash)
 #else
 #define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash) \
-	((((((off_t)(bno)) << (mp)->m_dircook_elog) | (entry)) \
-	  << (sizeof(__uint32_t)*NBBY)) | (hash))
+	(((off_t)XFS_DA_MAKE_BNOENTRY(mp, bno, entry) << 32) | (hash))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_HASH)
-__uint32_t xfs_da_cookie_hash(struct xfs_mount *mp, off_t cookie);
+xfs_dahash_t xfs_da_cookie_hash(struct xfs_mount *mp, off_t cookie);
 #define	XFS_DA_COOKIE_HASH(mp,cookie)		xfs_da_cookie_hash(mp,cookie)
 #else
-#define	XFS_DA_COOKIE_HASH(mp,cookie) \
-	((__uint32_t)(((off_t)(cookie)) & 0xFFFFFFFF))
+#define	XFS_DA_COOKIE_HASH(mp,cookie)	((xfs_dahash_t)(cookie))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_BNO)
-__uint32_t xfs_da_cookie_bno(struct xfs_mount *mp, off_t cookie);
+xfs_dablk_t xfs_da_cookie_bno(struct xfs_mount *mp, off_t cookie);
 #define	XFS_DA_COOKIE_BNO(mp,cookie)		xfs_da_cookie_bno(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_BNO(mp,cookie) \
-	(((off_t)(cookie)) >> ((mp)->m_dircook_elog + NBBY*sizeof(__uint32_t)))
+	((xfs_dablk_t)(((off_t)(cookie)) >> ((mp)->m_dircook_elog + 32)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_ENTRY)
 int xfs_da_cookie_entry(struct xfs_mount *mp, off_t cookie);
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie)		xfs_da_cookie_entry(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie) \
-	((((off_t)(cookie)) >> (NBBY*sizeof(__uint32_t))) & \
+	((xfs_dablk_t)((off_t)(cookie) >> 32) & \
 	 ((1 << (mp)->m_dircook_elog) - 1))
 #endif
 
@@ -136,21 +143,21 @@ typedef struct xfs_da_args {
 	char		*value;		/* set of bytes (maybe contain NULLs) */
 	int		valuelen;	/* length of value */
 	int		flags;		/* argument flags (eg: ATTR_NOCREATE) */
-	uint		hashval;	/* hash value of name */
+	xfs_dahash_t	hashval;	/* hash value of name */
 	xfs_ino_t	inumber;	/* input/output inode number */
 	struct xfs_inode *dp;		/* directory inode to manipulate */
 	xfs_fsblock_t	*firstblock;	/* ptr to firstblock for bmap calls */
 	struct xfs_bmap_free *flist;	/* ptr to freelist for bmap_finish */
 	xfs_extlen_t	total;		/* total blocks needed, for 1st bmap */
 	int		whichfork;	/* data or attribute fork */
-	int		blkno;		/* blkno of attr leaf of interest */
+	xfs_dablk_t	blkno;		/* blkno of attr leaf of interest */
 	int		index;		/* index of attr of interest in blk */
-	int		rmtblkno;	/* remote attr value starting blkno */
+	xfs_dablk_t	rmtblkno;	/* remote attr value starting blkno */
 	int		rmtblkcnt;	/* remote attr value block count */
 	int		rename;		/* T/F: this is an atomic rename op */
-	int		blkno2;		/* blkno of 2nd attr leaf of interest */
+	xfs_dablk_t	blkno2;		/* blkno of 2nd attr leaf of interest */
 	int		index2;		/* index of 2nd attr in blk */
-	int		rmtblkno2;	/* remote attr value starting blkno */
+	xfs_dablk_t	rmtblkno2;	/* remote attr value starting blkno */
 	int		rmtblkcnt2;	/* remote attr value block count */
 } xfs_da_args_t;
 
@@ -163,9 +170,9 @@ typedef struct xfs_da_args {
  */
 typedef struct xfs_da_state_blk {
 	struct buf	*bp;		/* buffer containing block */
-	xfs_fileoff_t	blkno;		/* blkno of buffer */
+	xfs_dablk_t	blkno;		/* blkno of buffer */
 	int		index;		/* relevant index into block */
-	uint		hashval;	/* last hash value in block */
+	xfs_dahash_t	hashval;	/* last hash value in block */
 	int		magic;		/* blk's magic number, ie: blk type */
 } xfs_da_state_blk_t;
 
@@ -199,7 +206,7 @@ typedef struct xfs_da_state {
  * Routines used for growing the Btree.
  */
 int	xfs_da_node_create(struct xfs_trans *trans, struct xfs_inode *dp,
-				  xfs_fileoff_t which_block, int blkno,
+				  xfs_dablk_t blkno, int level,
 				  struct buf **bpp, int whichfork);
 int	xfs_da_split(struct xfs_da_state *state);
 
@@ -233,19 +240,18 @@ int	xfs_da_blk_link(struct xfs_da_state *state,
  * Utility routines.
  */
 int	xfs_da_grow_inode(struct xfs_trans *trans, struct xfs_da_args *args,
-				 int length, xfs_fileoff_t *new_blkno);
+				 int length, xfs_dablk_t *new_blkno);
 int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			      xfs_fileoff_t bno, struct buf **bp,
-			      int whichfork);
+			      xfs_dablk_t bno, struct buf **bp, int whichfork);
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			       xfs_fileoff_t bno, daddr_t mappedbno,
+			       xfs_dablk_t bno, daddr_t mappedbno,
 			       struct buf **bpp, int whichfork);
 #ifndef SIM
 daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_fileoff_t bno, int whichfork);
+				xfs_dablk_t bno, int whichfork);
 int	xfs_da_shrink_inode(struct xfs_trans *trans, struct xfs_da_args *args,
-				   xfs_fileoff_t dead_blkno,
-				   int length, struct buf *dead_buf);
+				   xfs_dablk_t dead_blkno, int length,
+				   struct buf *dead_buf);
 #endif	/* !SIM */
 
 uint xfs_da_hashname(char *name_string, int name_length);
