@@ -1,4 +1,4 @@
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.9 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -33,9 +33,9 @@
 #include "xfs_quota.h"
 #include "xfs_dir.h"
 #include "xfs_rw.h"
+#include "xfs_itable.h"
 #include "xfs_utils.h"
 
-#ifndef SIM
 /*
  * Test the sticky attribute of a directory.  We can unlink from a sticky
  * directory that's writable by us if: we are superuser, we own the file,
@@ -652,6 +652,7 @@ xfs_truncate_file(
 	return error;
 }
 
+#if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 /*
  * for error injection
  */
@@ -660,7 +661,6 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 {
 	xfs_mount_t *mp;
 	int error;
-	extern int xfs_fd_to_mp(int fd, int reqperm, xfs_mount_t **mpp);
 
 	if (error = xfs_fd_to_mp(fd, 0, &mp))
 		return XFS_ERROR(error);
@@ -670,8 +670,7 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 
 	return 0;
 }
-
-extern int xfs_fd_to_mp(int, int, xfs_mount_t **);
+#endif /* DEBUG || INDUCE_IO_ERROR */
 
 int
 xfs_mk_sharedro(int fd)
@@ -708,4 +707,14 @@ xfs_clear_sharedro(int fd)
 
 	return 0;
 }
-#endif /* !SIM */
+
+#ifdef DEBUG
+int
+xfs_isshutdown(bhv_desc_t *bhv)
+{
+	xfs_inode_t	*ip = XFS_BHVTOI(bhv);
+	xfs_mount_t	*mp = ip->i_mount;
+
+	return XFS_FORCED_SHUTDOWN(mp) != 0;
+}
+#endif	/* DEBUG */

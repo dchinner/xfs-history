@@ -1,4 +1,4 @@
-#ident "$Revision: 1.54 $"
+#ident "$Revision: 1.55 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -111,16 +111,34 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		bp = incore_match(target_dev->dev, blkno, len, BUF_FSPRIV2, tp);
 	}
 	if (bp != NULL) {
+		ASSERT(valusema(&bp->b_lock) <= 0);
 		bp->b_target = target_dev;
 		if (XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
+#ifndef SIM
+			buftrace("TRANS GET RECUR SHUT", bp);
+#endif
 			bp->b_flags &= ~(B_DONE|B_DELWRI);
 			bp->b_flags |= B_STALE;
+		}
+		/*
+		 * If the buffer is stale then it was binval'ed
+		 * since last read.  This doesn't matter since the
+		 * caller isn't allowed to use the data anyway.
+		 */
+		else if (bp->b_flags & B_STALE) {
+#ifndef SIM
+			buftrace("TRANS GET RECUR STALE", bp);
+#endif
+			ASSERT((bp->b_flags & B_DELWRI) == 0);
 		}
 		ASSERT(bp->b_fsprivate2 == tp);
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		ASSERT(bip != NULL);
 		ASSERT(bip->bli_refcount > 0);
 		bip->bli_recur++;
+#ifndef SIM
+		buftrace("TRANS GET RECUR", bp);
+#endif
 		xfs_buf_item_trace("GET RECUR", bip);
 		return (bp);
 	}
@@ -178,6 +196,9 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 */
 	bp->b_fsprivate2 = tp;
 
+#ifndef SIM
+	buftrace("TRANS GET", bp);
+#endif
 	xfs_buf_item_trace("GET", bip);
 	return (bp);
 }
@@ -359,16 +380,22 @@ xfs_trans_read_buf(
 		bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp);
 	}
 	if (bp != NULL) {
+		ASSERT(valusema(&bp->b_lock) <= 0);
 		ASSERT(bp->b_fsprivate2 == tp);
 		ASSERT(bp->b_fsprivate != NULL);
 		ASSERT((bp->b_flags & B_ERROR) == 0);
 		bp->b_target = mp->m_ddev_targp;
+		/*
+		 * If it's stale, make sure it's not done, so
+		 * the read happens & we don't use stale data.
+		 */
+		if (bp->b_flags & B_STALE)
+			bp->b_flags &= ~B_DONE;
 		if (!(bp->b_flags & B_DONE)) {
-			ASSERT(0);
 #ifndef SIM
+			buftrace("READ_BUF_INCORE !DONE", bp);
 			SYSINFO.lread += len;
 #endif
-
 			ASSERT(!(bp->b_flags & B_ASYNC));
 			bp->b_flags |= B_READ;
 			ASSERT(bp->b_edev == dev);
@@ -377,7 +404,6 @@ xfs_trans_read_buf(
 			KTOP_UPDATE_CURRENT_INBLOCK(1);
 			SYSINFO.bread += len;
 #endif
-
 			iowait(bp);
 			if (geterror(bp) != 0) {
 				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
@@ -499,6 +525,9 @@ xfs_trans_read_buf(
 	 */
 	bp->b_fsprivate2 = tp;
 
+#ifndef SIM
+	buftrace("TRANS READ", bp);
+#endif
 	xfs_buf_item_trace("READ", bip);
 	*bpp = bp;
 	return 0;
@@ -641,7 +670,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * If the buf item is not tracking data in the log, then
 	 * we must free it before releasing the buffer back to the
 	 * free pool.  Before releasing the buffer to the free pool,
-	 * clear the transaction pointer in b_fsprivate2 to disolve
+	 * clear the transaction pointer in b_fsprivate2 to dissolve
 	 * its relation to this transaction.
 	 */
 	if (!xfs_buf_item_dirty(bip)) {
@@ -888,6 +917,9 @@ xfs_trans_binval(
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		ASSERT(lidp->lid_flags & XFS_LID_DIRTY);
 		ASSERT(tp->t_flags & XFS_TRANS_DIRTY);
+#ifndef SIM
+		buftrace("XFS_BINVAL RECUR", bp);
+#endif
 		xfs_buf_item_trace("BINVAL RECUR", bip);
 		return;
 	}
@@ -922,6 +954,9 @@ xfs_trans_binval(
 	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
 	tp->t_flags |= XFS_TRANS_DIRTY;
+#ifndef SIM
+	buftrace("XFS_BINVAL", bp);
+#endif
 	xfs_buf_item_trace("BINVAL", bip);
 }
 
