@@ -51,6 +51,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_rw.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -65,16 +66,6 @@ STATIC int	xfs_close(vnode_t	*vp,
 			  int		flag,
 			  lastclose_t	lastclose,
 			  off_t		offset,
-			  cred_t	*credp);
-
-STATIC int	xfs_read(vnode_t	*vp,
-			 uio_t		*uiop,
-			 int		ioflag,
-			 cred_t		*credp);
-
-STATIC int	xfs_write(vnode_t	*vp,
-			  uio_t		*uiop,
-			  int		ioflag,
 			  cred_t	*credp);
 
 STATIC int	xfs_ioctl(vnode_t	*vp,
@@ -200,9 +191,6 @@ STATIC int	xfs_bmap(vnode_t	*vp,
 			 struct bmapval	*bmapp,
 			 int		*nmaps);
 
-STATIC void	xfs_strategy(vnode_t	*vp,
-			     buf_t	*bp);
-
 STATIC int	xfs_map(vnode_t	*vp,
 			uint	offset,
 			preg_t	*pregp,
@@ -278,36 +266,6 @@ xfs_close(vnode_t	*vp,
 	  int		flag,
 	  lastclose_t	lastclose,
 	  off_t		offset,
-	  cred_t	*credp)
-{
-	return 0;
-}
-
-
-/*
- * xfs_read
- *
- * This is a stub.
- */
-STATIC int
-xfs_read(vnode_t	*vp,
-	 uio_t		*uiop,
-	 int		ioflag,
-	 cred_t		*credp)
-{
-	return 0;
-}
-
-
-/*
- * xfs_write
- *
- * This is a stub.
- */
-STATIC int
-xfs_write(vnode_t	*vp,
-	  uio_t		*uiop,
-	  int		ioflag,
 	  cred_t	*credp)
 {
 	return 0;
@@ -678,19 +636,6 @@ xfs_bmap(vnode_t	*vp,
 	return 0;
 }
 
-
-/*
- * xfs_strategy
- *
- * This is a stub.
- */
-STATIC void
-xfs_strategy(vnode_t	*vp,
-	     buf_t	*bp)
-{
-	bdstrat(bmajor(bp->b_edev), bp); 
-	return;
-}
 
 
 /*
