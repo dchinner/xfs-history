@@ -442,7 +442,12 @@ xfs_getattr(vnode_t	*vp,
 	 * XFS-added attributes
 	 */
 	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID)) {
-		vap->va_xflags = ip->i_d.di_flags;
+		/* convert di_flags to xflags
+		 */
+		vap->va_xflags = 0;
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			vap->va_xflags |= XFS_XFLAG_REALTIME ;
+		}
 		vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 		vap->va_nextents = (ip->i_flags & XFS_IEXTENTS) ?
 			ip->i_bytes / sizeof(xfs_bmbt_rec_t) :
@@ -624,7 +629,7 @@ xfs_setattr(vnode_t	*vp,
 			vap->va_extsize)	&&
 		     ( !( (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)  ||
 		          ((mask & AT_XFLAGS) &&
-			   (vap->va_xflags & XFS_DIFLAG_REALTIME)) ) ) ) {
+			   (vap->va_xflags & XFS_XFLAG_REALTIME)) ) ) ) {
 			code = XFS_ERROR(EINVAL);
 			goto error_return;
 		}
@@ -634,7 +639,7 @@ xfs_setattr(vnode_t	*vp,
 		 */
 		if (ip->i_d.di_nextents && (mask & AT_XFLAGS) &&
 		    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) !=
-		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
+		    (vap->va_xflags & XFS_XFLAG_REALTIME)) {
 			code = XFS_ERROR(EINVAL);	/* EFBIG? */
 			goto error_return;
 		}
@@ -647,7 +652,7 @@ xfs_setattr(vnode_t	*vp,
 
 			if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ||
 			    ((mask & AT_XFLAGS) && 
-			    (vap->va_xflags & XFS_DIFLAG_REALTIME)))
+			    (vap->va_xflags & XFS_XFLAG_REALTIME)))
 				size = mp->m_sb.sb_rextsize <<
 					mp->m_sb.sb_blocklog;
 			else
@@ -661,7 +666,7 @@ xfs_setattr(vnode_t	*vp,
 		 * If realtime flag is set then must have realtime data.
 		 */
 		if ((mask & AT_XFLAGS) &&
-		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
+		    (vap->va_xflags & XFS_XFLAG_REALTIME)) {
 			if ( (mp->m_sb.sb_rblocks == 0)  ||
 			     (mp->m_sb.sb_rextsize == 0)  ||
 			     (ip->i_d.di_extsize % mp->m_sb.sb_rextsize) ) {
@@ -798,8 +803,12 @@ xfs_setattr(vnode_t	*vp,
 			ip->i_d.di_extsize = vap->va_extsize >>
 				mp->m_sb.sb_blocklog;
 		}
-		if (mask & AT_XFLAGS)
-			ip->i_d.di_flags = vap->va_xflags & XFS_DIFLAG_ALL;
+		if (mask & AT_XFLAGS) {
+			ip->i_d.di_flags = 0;
+			if ( vap->va_xflags & XFS_XFLAG_REALTIME) {
+				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
+			}
+		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	}
 
