@@ -1,4 +1,4 @@
-#ident "$Revision: 1.310 $"
+#ident "$Revision: 1.311 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -402,6 +402,7 @@ xfs_close(
 	cred_t		*credp)
 {
 #if 0
+	extern int	grio_remove_reservations_with_proc_dev_inum(pid_t, dev_t, xfs_ino_t);
         xfs_inode_t	*ip;
 #endif
 	/* REFERENCED */
@@ -416,9 +417,14 @@ xfs_close(
 	 * no longer has the file open via another file descriptor, 
 	 * then remove any outstanding i/o rate guarantees.
 	 */
-	if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && lastclose &&
-	    !fdt_vnode_isopen(vp))
-		grio_remove_reservation(current_pid(), ip->i_dev, ip->i_ino);
+	if ((ip->i_flags & XFS_IGRIO) && lastclose &&
+	    !fdt_vnode_isopen(vp)) {
+#ifdef GRIO_DEBUG
+	printf("Calling grio_remove_reservations_with_proc_dev_inum from xfs_close\n");
+#endif /* GRIO_DEBUG */
+		grio_remove_reservations_with_proc_dev_inum(current_pid(),
+				ip->i_dev, ip->i_ino);
+	}
 #endif
 	return 0;
 }
