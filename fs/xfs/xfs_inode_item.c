@@ -1,4 +1,4 @@
-#ident "$Revision: 1.65 $"
+#ident "$Revision: 1.66 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -58,7 +58,7 @@ zone_t	*xfs_ili_zone;		/* inode log item zone */
  * inode core, and possibly one for the inode data/extents/b-tree root
  * and one for the inode attribute data/extents/b-tree root.
  */
-uint
+STATIC uint
 xfs_inode_item_size(
 	xfs_inode_log_item_t	*iip)
 {
@@ -216,7 +216,7 @@ xfs_inode_item_size(
  * and a possible third and/or fourth with the inode data/extents/b-tree
  * root and inode attributes data/extents/b-tree root.
  */
-void
+STATIC void
 xfs_inode_item_format(
 	xfs_inode_log_item_t	*iip,
 	xfs_log_iovec_t		*log_vector)
@@ -473,7 +473,7 @@ xfs_inode_item_format(
  * xfs_ipin() to bump the pin count in the inode while holding the
  * inode pin lock.
  */
-void
+STATIC void
 xfs_inode_item_pin(
 	xfs_inode_log_item_t	*iip)
 {
@@ -487,7 +487,7 @@ xfs_inode_item_pin(
  * item which was previously pinned with a call to xfs_inode_item_pin().
  * Just call xfs_iunpin() on the inode to do this.
  */
-void
+STATIC void
 xfs_inode_item_unpin(
 	xfs_inode_log_item_t	*iip)
 {
@@ -496,22 +496,22 @@ xfs_inode_item_unpin(
 
 /*
  * This is called to attempt to lock the inode associated with this
- * inode log item.  Don't sleep on the inode lock or the flush lock.
+ * inode log item, in preparation for the push routine which does the actual
+ * iflush.  Don't sleep on the inode lock or the flush lock.
+ *
  * If the flush lock is already held, indicating that the inode has
- * been or is in the process of being flushed, then see if we can
- * find the inode's buffer in the buffer cache without sleeping.  If
- * we can and it is marked delayed write, then we want to send it out.
- * We delay doing so until the push routine, though, to avoid sleeping
- * in any device strategy routines.
+ * been or is in the process of being flushed, then (ideally) we'd like to
+ * see if the inode's buffer is still incore, and if so give it a nudge.
+ * We delay doing so until the pushbuf routine, though, to avoid holding
+ * the AIL lock across a call to the blackhole which is the buffercache. 
+ * Also we don't want to sleep in any device strategy routines, which can happen
+ * if we do the subsequent bawrite in here.
  */
-uint
+STATIC uint
 xfs_inode_item_trylock(
 	xfs_inode_log_item_t	*iip)
 {
 	register xfs_inode_t	*ip;
-	xfs_mount_t		*mp;
-	buf_t			*bp;
-	int			flushed;
 
 	ip = iip->ili_inode;
 
@@ -525,46 +525,33 @@ xfs_inode_item_trylock(
 
 	if (!xfs_iflock_nowait(ip)) {
 		/*
-		 * The inode is already being flushed.  It may have been
-		 * flushed delayed write, however, and we don't want to
-		 * get stuck waiting for that to complete.  So, we check
-		 * to see if we can lock the inode's buffer without sleeping.
-		 * If we can and it is marked for delayed write, then we
-		 * hold it and send it out from the push routine.  We don't
-		 * want to do that now since we might sleep in the device
-		 * strategy routine.  Make sure to only return success
-		 * if we set iip->ili_bp ourselves.  If someone else is
-		 * doing it then we don't want to go to the push routine
-		 * and duplicate their efforts.
+		 * If someone else isn't already trying to push the inode
+		 * buffer, we get to do it.
 		 */
-		flushed = 0;
-		if (iip->ili_bp == NULL) {
-			mp = ip->i_mount;
-			bp = incore(mp->m_dev, ip->i_blkno,
-				    ip->i_len, INCORE_TRYLOCK);
-			if (bp != NULL) {
-				if (bp->b_flags & B_DELWRI) {
-					iip->ili_bp = bp;
-					iip->ili_bp_owner = get_thread_id();
-					flushed = 1;
-				} else {
-					brelse(bp);
-				}
-			}
-		}
-		/*
-		 * Make sure to set the no notify flag so iunlock
-		 * doesn't call back into the AIL code on the unlock.
-		 * That would double trip on the AIL lock.
-		 */
-		xfs_iunlock(ip, (XFS_ILOCK_SHARED | XFS_IUNLOCK_NONOTIFY));
-		if (flushed) {
-			return XFS_ITEM_SUCCESS;
+		if (iip->ili_pushbuf_flag == 0) {
+			iip->ili_pushbuf_flag = 1;
+#ifdef DEBUG
+			iip->ili_push_owner = get_thread_id();
+#endif
+			/*
+			 * Inode is left locked in shared mode.
+			 * Pushbuf routine gets to unlock it.
+			 */
+			return XFS_ITEM_PUSHBUF;
 		} else {
+			/*
+			 * We hold the AIL_LOCK, so we must specify the
+			 * NONOTIFY flag so that we won't double trip.
+			 */
+			xfs_iunlock(ip, XFS_ILOCK_SHARED|XFS_IUNLOCK_NONOTIFY);
 			return XFS_ITEM_FLUSHING;
 		}
+		/* NOTREACHED */
 	}
-
+	ASSERT(iip->ili_format.ilf_fields != 0);
+	ASSERT(iip->ili_logged == 0);
+	ASSERT(iip->ili_item.li_flags & XFS_LI_IN_AIL);
+	
 	return XFS_ITEM_SUCCESS;
 }
 
@@ -574,7 +561,7 @@ xfs_inode_item_trylock(
  * are specific to the current transaction.  If the
  * hold flags is set, do not unlock the inode.  
  */
-void
+STATIC void
 xfs_inode_item_unlock(
 	xfs_inode_log_item_t	*iip)
 {
@@ -654,7 +641,7 @@ xfs_inode_item_unlock(
  * given lsn.
  */
 /*ARGSUSED*/
-xfs_lsn_t
+STATIC xfs_lsn_t
 xfs_inode_item_committed(
 	xfs_inode_log_item_t	*iip,
 	xfs_lsn_t		lsn)
@@ -667,7 +654,7 @@ xfs_inode_item_committed(
  * must not be dirty within the transaction.  We simply unlock just
  * as if the transaction had been cancelled.
  */
-void
+STATIC void
 xfs_inode_item_abort(
 	xfs_inode_log_item_t	*iip)
 {
@@ -677,54 +664,117 @@ xfs_inode_item_abort(
 
 
 /*
+ * This gets called by xfs_trans_push_ail(), when IOP_TRYLOCK
+ * failed to get the inode flush lock but did get the inode locked SHARED.
+ * Here we're trying to see if the inode buffer is incore, and if so whether it's
+ * marked delayed write. If that's the case, we'll initiate a bawrite on that
+ * buffer to expedite the process.
+ *
+ * We aren't holding the AIL_LOCK (or the flush lock) when this gets called,
+ * so it is inherently race-y.
+ */
+STATIC void
+xfs_inode_item_pushbuf(
+	xfs_inode_log_item_t	*iip)
+{
+	xfs_inode_t	*ip;
+	xfs_mount_t 	*mp;
+	buf_t		*bp;
+	uint		dopush;
+
+	ip = iip->ili_inode;
+	
+	ASSERT(ismrlocked(&(ip->i_lock), MR_ACCESS));
+
+	/*
+	 * The ili_pushbuf_flag keeps others from
+	 * trying to duplicate our effort.
+	 */
+	ASSERT(iip->ili_pushbuf_flag != 0);
+	ASSERT(iip->ili_push_owner == get_thread_id());
+
+	/*
+	 * If flushlock isn't locked anymore, chances are that the
+	 * inode flush completed and the inode was taken off the AIL.
+	 * So, just get out.
+	 */
+	if ((valusema(&(ip->i_flock)) > 0)  ||
+	    ((iip->ili_item.li_flags & XFS_LI_IN_AIL) == 0)) {
+		iip->ili_pushbuf_flag = 0;
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	    	return;
+	}
+	
+	mp = ip->i_mount;
+	bp = incore(mp->m_dev, iip->ili_format.ilf_blkno,
+		    iip->ili_format.ilf_len, INCORE_TRYLOCK);
+
+	if (bp != NULL) {
+		if (bp->b_flags & B_DELWRI) {
+			/*
+			 * We were racing with iflush because we don't hold
+			 * the AIL_LOCK or the flush lock. However, at this point,
+			 * we have the buffer, and we know that it's dirty.
+			 * So, it's possible that iflush raced with us, and
+			 * this item is already taken off the AIL.
+			 * If not, we can flush it async.
+			 */
+			dopush = ((iip->ili_item.li_flags & XFS_LI_IN_AIL) && 
+				  (valusema(&(ip->i_flock)) <= 0));
+			iip->ili_pushbuf_flag = 0;
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+#ifndef SIM
+			buftrace("INODE ITEM PUSH", bp);
+#endif
+			if (bp->b_pincount > 0) {
+				xfs_log_force(mp, (xfs_lsn_t)0,
+					      XFS_LOG_FORCE);
+			}
+			if (dopush) {
+#ifdef XFSRACEDEBUG
+				delay_for_intr();
+				delay(300);
+#endif						
+				bawrite(bp);
+			} else {
+				brelse(bp);
+			}
+		} else {
+			iip->ili_pushbuf_flag = 0;
+			xfs_iunlock(ip, XFS_ILOCK_SHARED); 
+			brelse(bp);
+		}
+		return;
+	}
+	/*
+	 * We have to be careful about resetting pushbuf flag too early (above).
+	 * Eventhough in theory we can do it as soon as we have the buflock,
+	 * we don't want others to be doing work needlessly. They'll come to
+	 * this function thinking that pushing the buffer is there responsibility
+	 * only to find that the buffer is still locked by another doing the
+	 * same thing.XXX
+	 */
+	iip->ili_pushbuf_flag = 0;
+	xfs_iunlock(ip, XFS_ILOCK_SHARED); 
+	return;
+}
+
+
+/*
  * This is called to asynchronously write the inode associated with this
  * inode log item out to disk. The inode will already have been locked by
- * a successful call to xfs_inode_item_trylock().  If the inode still has
- * some of its fields marked as logged, then write it out.  If not, then
- * just unlock the inode.
+ * a successful call to xfs_inode_item_trylock().
  */
-void
+STATIC void
 xfs_inode_item_push(
 	xfs_inode_log_item_t	*iip)
 {
-	buf_t		*bp;
 	xfs_inode_t	*ip;
 
-	ASSERT((iip->ili_bp != NULL) ||
-	       (ismrlocked(&(iip->ili_inode->i_lock), MR_ACCESS)));
-	ASSERT((iip->ili_bp != NULL) ||
-	       (valusema(&(iip->ili_inode->i_flock)) <= 0));
-
-	/*
-	 * If the inode item's buffer pointer is non-NULL, then we were
-	 * unable to lock the inode in the trylock routine but we were
-	 * able to lock the inode's buffer and it was marked delayed write.
-	 * We didn't want to write it out from the trylock routine, because
-	 * the device strategy routine might sleep.  Instead we stored it
-	 * and write it out here.
-	 */
-	bp = iip->ili_bp;
 	ip = iip->ili_inode;
-	if ((bp != NULL) && (iip->ili_bp_owner == get_thread_id())) {
-		ASSERT(iip->ili_bp->b_flags & B_BUSY);
-		iip->ili_bp = NULL;
-		iip->ili_bp_owner = (uint64_t)-1;
-#ifndef SIM
-		buftrace("INODE ITEM PUSH", bp);
-#endif
-		/*
-		 * If the buffer is pinned then push on the log so we won't
-		 * deadlock waiting for the buffer to be unpinned while we
-		 * hold other locks.
-		 */
-		if (bp->b_pincount > 0) {
-			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
-				      XFS_LOG_FORCE);
-		}
-		bawrite(bp);
-		return;
-	}
 
+	ASSERT(ismrlocked(&(ip->i_lock), MR_ACCESS));
+	ASSERT(valusema(&(ip->i_flock)) <= 0);
 	/*
 	 * Since we were able to lock the inode's flush lock and
 	 * we found it on the AIL, the inode must be dirty.  This
@@ -737,9 +787,8 @@ xfs_inode_item_push(
 	ASSERT(iip->ili_format.ilf_fields != 0);
 
 	/*
-	 * Write out the inode.  The completion routine will
-	 * pull it from the AIL, mark it clean, and xfs_iput()
-	 * the inode.
+	 * Write out the inode.  The completion routine ('iflush_done') will
+	 * pull it from the AIL, mark it clean, unlock the flush lock.
 	 */
 	xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
@@ -757,7 +806,8 @@ struct xfs_item_ops xfs_inode_item_ops = {
 	(void(*)(xfs_log_item_t*))xfs_inode_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_inode_item_committed,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_push,
-	(void(*)(xfs_log_item_t*))xfs_inode_item_abort
+	(void(*)(xfs_log_item_t*))xfs_inode_item_abort,
+	(void(*)(xfs_log_item_t*))xfs_inode_item_pushbuf
 };
 
 
@@ -778,8 +828,13 @@ xfs_inode_item_init(
 	iip->ili_item.li_ops = &xfs_inode_item_ops;
 	iip->ili_item.li_mountp = mp;
 	iip->ili_inode = ip;
-	iip->ili_extents_buf = NULL;
-	iip->ili_bp = NULL;
+
+	/*
+	   We have bzeroed memory. No need ...
+	   iip->ili_extents_buf = NULL;
+	   iip->ili_pushbuf_flag = 0;
+	 */
+
 	iip->ili_format.ilf_type = XFS_LI_INODE;
 	iip->ili_format.ilf_ino = ip->i_ino;
 	iip->ili_format.ilf_blkno = ip->i_blkno;
