@@ -886,6 +886,7 @@ struct inode_operations linvfs_symlink_inode_operations =
   follow_link:		linvfs_follow_link,
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
+  setattr:		linvfs_notify_change,
   attr_get:		linvfs_attr_get,
   attr_set:		linvfs_attr_set,
   attr_remove:		linvfs_attr_remove,
