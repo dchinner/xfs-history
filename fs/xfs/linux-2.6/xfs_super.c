@@ -37,6 +37,7 @@
 #include <linux/namei.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
+#include "xfs_version.h"
 
 /* xfs_vfs[ops].c */
 extern int  xfs_init(int fstype);
@@ -789,7 +790,8 @@ static int __init init_xfs_fs(void)
 	int error;
 	struct sysinfo	si;
 	static char message[] __initdata =
-		KERN_INFO "SGI XFS with " XFS_BUILD_OPTIONS " enabled\n";
+		KERN_INFO "SGI XFS " XFS_VERSION_STRING " with " 
+		XFS_BUILD_OPTIONS " enabled\n";
 
 	error = init_inodecache();
 	if (error < 0)
@@ -831,5 +833,5 @@ module_init(init_xfs_fs);
 module_exit(exit_xfs_fs);
 
 MODULE_AUTHOR("SGI <sgi.com>");
-MODULE_DESCRIPTION("SGI XFS with " XFS_BUILD_OPTIONS " enabled");
+MODULE_DESCRIPTION("SGI XFS " XFS_VERSION_STRING " with " XFS_BUILD_OPTIONS " enabled");
 MODULE_LICENSE("GPL");
