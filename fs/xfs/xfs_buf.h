@@ -114,6 +114,9 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_SET_START(buf)			\
 			(buf)->b_start = lbolt
 
+#define XFS_BUF_SET_BRELSE_FUNC(buf, value) \
+            (buf)->b_relse = value
+
 #define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
 #define XFS_BUF_ADDR(bp)	((bp)->b_blkno)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
@@ -142,6 +145,12 @@ typedef struct buf xfs_buf_t;
 			(bp)->b_ref = (ref)
 
 #define XFS_BUF_ISPINNED(bp) ((bp)->b_pincount > 0)
+
+#define XFS_BUF_VALUSEMA(bp) valusema(&bp->b_lock)
+#define XFS_BUF_CPSEMA(bp)   cpsema(&bp->b_lock)
+#define XFS_BUF_PSEMA(bp,x)  psema(&bp->b_lock,x) 
+#define XFS_BUF_VSEMA(bp)    vsema(&bp->b_lock)
+#define XFS_BUF_V_IODONESEMA(bp) vsema(&bp->b_iodonesema)
 
 int
 xfs_bdstrat_cb(struct xfs_buf *bp);
@@ -172,9 +181,14 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define xfs_bp_mapin(bp)             \
             bp_mapin(bp)
 
+#define xfs_xfsd_list_evict(x)       \
+        _xfs_xfsd_list_evict(x) 
+
 #endif /* _USING_BUF_T */
 
 #ifdef _USING_PAGEBUF_T
+#include <sys/sema.h>
+#include <sys/kmem.h>
 #include <linux/page_buf.h>
 
 /* These are just for xfs_syncsub... it sets an internal variable 
@@ -286,6 +300,9 @@ typedef struct buftarg {
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
 #define XFS_BUF_SET_START(buf)
 
+#define XFS_BUF_SET_BRELSE_FUNC(buf, value) 
+
+
 #define XFS_BUF_PTR(bp)		((bp)->pb_addr)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_file_offset >> 9)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
@@ -301,6 +318,12 @@ typedef struct buftarg {
 #define XFS_BUF_SET_REF(bp, ref)
 
 #define XFS_BUF_ISPINNED(bp) 0 /* ERROR implement me */ 
+
+#define XFS_BUF_VALUSEMA(bp) 0 /* ERROR implement me */ 
+#define XFS_BUF_CPSEMA(bp)   0/* ERROR implement me */ 
+#define XFS_BUF_VSEMA(bp)   0/* ERROR implement me */ 
+#define XFS_BUF_PSEMA(bp,x)   0/* ERROR implement me */ 
+#define XFS_BUF_V_IODONESEMA(bp) 
 
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target) 
@@ -336,6 +359,8 @@ typedef struct buftarg {
 #define xfs_bp_mapin(bp)             \
         pagebuf_mapin(bp)
 
+#define xfs_xfsd_list_evict(x)       
+       
 #endif /* _USING_PAGEBUF_T */
 
 #endif

@@ -1,4 +1,5 @@
-#ident	"$Revision: 1.192 $"
+#ident	"$Revision: 1.193 $"
+
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -245,7 +246,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	/*
 	 * Initialize and read in the superblock buffer.
 	 */
-	bp->b_relse = xfs_sb_relse;
+	XFS_BUF_SET_BRELSE_FUNC(bp,xfs_sb_relse);
 	XFS_BUF_SET_ADDR(bp, XFS_SB_DADDR);
 	XFS_BUF_READ(bp);
 	XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
@@ -1024,7 +1025,8 @@ xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
 	/* REFERENCED */
 	int		unused;
-		
+
+#if !defined(__linux__)		
 #ifndef SIM
 	spec_unmounted(mp->m_ddevp);
 #endif
@@ -1041,6 +1043,7 @@ xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, cr, unused);
 		VN_RELE(mp->m_logdevp);
 	}
+#endif
 }
 
 int
@@ -1453,11 +1456,11 @@ xfs_getsb(xfs_mount_t	*mp,
 	ASSERT(mp->m_sb_bp != NULL);
 	bp = mp->m_sb_bp;
 	if (flags & XFS_BUF_TRYLOCK) {
-		if (!cpsema(&bp->b_lock)) {
+		if (!XFS_BUF_CPSEMA(bp)) {
 			return NULL;
 		}
 	} else {
-		psema(&bp->b_lock, PRIBIO);
+		XFS_BUF_PSEMA(bp, PRIBIO);
 	}
 	ASSERT(XFS_BUF_ISDONE(bp));
 	return (bp);
@@ -1495,7 +1498,7 @@ xfs_sb_relse(xfs_buf_t *bp)
 	XFS_BUF_UNREAD(bp);
 	bp->av_forw = NULL;
 	bp->av_back = NULL;
-	vsema(&bp->b_lock);
+	XFS_BUF_VSEMA(bp);
 }
 
 #ifndef SIM

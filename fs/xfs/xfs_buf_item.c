@@ -303,7 +303,7 @@ xfs_buf_item_unpin(
 	mp = bip->bli_item.li_mountp;
 	xfs_bunpin(bp);
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
-		ASSERT(valusema(&bp->b_lock) <= 0);
+		ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 		ASSERT(!(XFS_BUF_ISDELAYWRITE(bp)));
 		ASSERT(XFS_BUF_ISSTALE(bp));
 		ASSERT(bp->b_pincount == 0);
@@ -346,7 +346,7 @@ xfs_buf_item_unpin_remove(
 	 * will xfs_buf_item_unpin() call xfs_buf_item_relse()?
 	 */
 	if (bip->bli_refcount == 1 && (bip->bli_flags & XFS_BLI_STALE)) {
-		ASSERT(valusema(&bip->bli_buf->b_lock) <= 0);
+		ASSERT(XFS_BUF_VALUSEMA(bip->bli_buf) <= 0);
 		xfs_buf_item_trace("UNPIN REMOVE", bip);
 		buftrace("XFS_UNPIN_REMOVE", bp);
 		/*
@@ -389,7 +389,7 @@ xfs_buf_item_trylock(
 		return XFS_ITEM_PINNED;
 	}
 
-	if (!cpsema(&bp->b_lock)) {
+	if (!XFS_BUF_CPSEMA(bp)) {
 		return XFS_ITEM_LOCKED;
 	}
 
@@ -1171,7 +1171,7 @@ xfs_buf_attach_iodone(
 	xfs_log_item_t	*head_lip;
 
 	ASSERT(XFS_BUF_ISBUSY(bp)); 
-	ASSERT(valusema(&bp->b_lock) <= 0);
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 
 	lip->li_cb = cb;
 	if (XFS_BUF_FSPRIVATE(bp, void *) != NULL) {
@@ -1305,9 +1305,9 @@ xfs_buf_iodone_callbacks(
 			/* We actually overwrite the existing b-relse
 			   function at times, but we're gonna be shutting down
 			   anyway. */
-			bp->b_relse = xfs_buf_error_relse;
+			XFS_BUF_SET_BRELSE_FUNC(bp,xfs_buf_error_relse);
 			XFS_BUF_DONE(bp);
-			vsema(&bp->b_iodonesema);
+			XFS_BUF_V_IODONESEMA(bp);
 		}
 		return;
 	}
@@ -1349,7 +1349,7 @@ xfs_buf_error_relse(
 	xfs_buf_do_callbacks(bp, lip);
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
-	bp->b_relse = NULL;
+	XFS_BUF_SET_BRELSE_FUNC(bp,NULL);
 	xfs_buf_relse(bp);
 	return;
 
@@ -1428,7 +1428,7 @@ xfs_buf_item_trace(
 		     XFS_BUF_FSPRIVATE2(bp, void *),
 		     (void *)((unsigned long)bp->b_pincount),
 		     (void *)XFS_BUF_IODONE_FUNC(bp),
-		     (void *)((unsigned long)(valusema(&(bp->b_lock)))),
+		     (void *)((unsigned long)(XFS_BUF_VALUSEMA(bp))),
 		     (void *)bip->bli_item.li_desc,
 		     (void *)((unsigned long)bip->bli_item.li_flags));
 }

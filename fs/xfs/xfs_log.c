@@ -983,7 +983,7 @@ xlog_iodone(xfs_buf_t *bp)
 		 * Corresponding psema() will be done in bwrite().  If we don't
 		 * vsema() here, panic.
 		 */
-		vsema(&bp->b_iodonesema);
+	  XFS_BUF_V_IODONESEMA(bp);
 	}
 }	/* xlog_iodone */
 

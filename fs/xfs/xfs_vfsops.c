@@ -16,7 +16,8 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.236 $"
+#ident  "$Revision: 1.237 $"
+
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -931,9 +932,13 @@ xfs_get_vfsmount(
 	mp->m_dev    = ddev;
 	mp->m_logdev = logdev;
 	mp->m_rtdev  = rtdev;
+#if !defined(__linux__)
 	mp->m_ddevp  = NULL;
 	mp->m_logdevp = NULL;
 	mp->m_rtdevp = NULL;
+#else 
+	/* do init stuff for dummy meta data inode */
+#endif
 
 	vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
 	/* vfsp->vfs_bsize filled in later from superblock */

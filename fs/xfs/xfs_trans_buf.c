@@ -410,10 +410,10 @@ xfs_trans_read_buf(
 #endif
 #endif
 			iowait(bp);
-			if (geterror(bp) != 0) {
+			if (XFS_BUF_GETERROR(bp) != 0) {
 				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
 						  target->dev, blkno);
-				error = geterror(bp);
+				error = XFS_BUF_GETERROR(bp);
 				xfs_buf_relse(bp);
 				/*
 				 * We can gracefully recover from most
@@ -464,7 +464,7 @@ xfs_trans_read_buf(
 		*bpp = NULL;
 		return 0;
 	}
-	if (geterror(bp) != 0) {
+	if (XFS_BUF_GETERROR(bp) != 0) {
 	    XFS_BUF_SUPER_STALE(bp);
 		buftrace("READ ERROR", bp);
 		error = XFS_BUF_GETERROR(bp);

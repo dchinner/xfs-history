@@ -6526,8 +6526,8 @@ xfs_bioerror_relse(
 	XFS_BUF_UNDELAYWRITE(bp);
 	XFS_BUF_DONE(bp);
 	XFS_BUF_STALE(bp);
-	bp->b_iodone = NULL;
- 	bp->b_bdstrat = NULL;
+	XFS_BUF_CLR_IODONE_FUNC(bp);
+ 	XFS_BUF_CLR_BDSTRAT_FUNC(bp);
 	if (!(fl & XFS_B_ASYNC)) {
 		/*
 		 * Mark b_error and B_ERROR _both_.
@@ -6536,7 +6536,7 @@ xfs_bioerror_relse(
 		 * ASYNC buffers.
 		 */
 		XFS_BUF_ERROR(bp, EIO);
-		vsema(&bp->b_iodonesema);
+		XFS_BUF_V_IODONESEMA(bp);
 	} else {
 		xfs_buf_relse(bp);
 	}
@@ -6898,8 +6898,9 @@ xfs_start_daemons(void)
  * remove its buffers from the xfsd_list so it doesn't have to wait
  * for them to be pushed out to disk
  */
-#if 1
-void xfs_xfsd_list_evict(bhv_desc_t * bdp)
+#if !defined(_USING_PAGEBUF_T) 
+void 
+_xfs_xfsd_list_evict(bhv_desc_t * bdp)
 {
 	vnode_t		*vp;
 	xfs_iocore_t	*io;
