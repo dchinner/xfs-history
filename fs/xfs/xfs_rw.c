@@ -1,4 +1,4 @@
-#ident "$Revision: 1.213 $"
+#ident "$Revision: 1.214 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1541,7 +1541,7 @@ xfs_zero_last_block(
 				 */
 				if (VN_MAPPED(vp)) {
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					VOP_PAGES_SETHOLE(vp, pfdp, 1);
+					VOP_PAGES_SETHOLE(vp, pfdp, 1, 1, ctooff(offtoct(isize)));
 					xfs_ilock(ip, XFS_ILOCK_EXCL);
 				}
 			}
