@@ -65,12 +65,9 @@ xfs_ctrunc_trace(
 STATIC int
 xfs_open(
 	bhv_desc_t	*bdp,
-	vnode_t		**vpp,
-	mode_t		flag,
 	cred_t		*credp)
 {
 	int		mode;
-	int		rval = 0;
 	vnode_t		*vp;
 	xfs_inode_t	*ip;
 
@@ -89,7 +86,7 @@ xfs_open(
 		(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
 		xfs_iunlock(ip, mode);
 	}
-	return rval;
+	return 0;
 }
 
 
@@ -2073,8 +2070,6 @@ xfs_create(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
 	vattr_t		*vap,
-	int		flags,
-	int		I_mode,
 	vnode_t		**vpp,
 	cred_t		*credp)
 {
@@ -2209,15 +2204,6 @@ xfs_create(
 		ASSERT(ip == NULL);
 
 		/*
-		 * XPG4 says create cannot allocate a file if the
-		 * file size limit is set to 0.
-		 */
-		if (flags & VZFS) {
-			error = XFS_ERROR(EFBIG);
-			goto error_return;
-		}
-
-		/*
 		 * Reserve disk quota and the inode.
 		 */
 		if (XFS_IS_QUOTA_ON(mp)) {
@@ -2347,11 +2333,7 @@ xfs_create(
 		 */
 		vp = XFS_ITOV(ip);
 		if (!error) {
-			if (flags & VEXCL) {
-				error = XFS_ERROR(EEXIST);
-			} else if (vp->v_type == VDIR) {
-				error = XFS_ERROR(EISDIR);
-			} else if (vp->v_type == VREG &&
+			if (vp->v_type == VREG &&
 				(vap->va_mask & AT_SIZE) &&
 				DM_EVENT_ENABLED (vp->v_vfsp, ip,
 					DM_EVENT_TRUNCATE)) {
