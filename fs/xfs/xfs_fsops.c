@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.28 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -55,6 +55,8 @@ xfs_fs_geometry(
 	geo->rtextents = mp->m_sb.sb_rextents;
 	geo->logstart = mp->m_sb.sb_logstart;
 	geo->uuid = mp->m_sb.sb_uuid;
+	geo->sunit = mp->m_sb.sb_unit;
+	geo->swidth = mp->m_sb.sb_width;
 	return 0;
 }
 
