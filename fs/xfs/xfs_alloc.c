@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.63 $"
+#ident	"$Revision: 1.64 $"
 
 /*
  * Free space allocation for xFS.
@@ -1725,6 +1725,7 @@ xfs_alloc_fix_freelist(
 	buf_t		*agflbp;
 	xfs_alloc_arg_t	*args;
 	xfs_agblock_t	bno;
+	xfs_extlen_t	longest;
 	xfs_mount_t	*mp;
 	xfs_extlen_t	need;
 
@@ -1740,8 +1741,10 @@ xfs_alloc_fix_freelist(
 	 * If it looks like there isn't a long enough extent, or enough
 	 * total blocks, reject it.
 	 */
-	if (minlen >
-	    (pag->pagf_longest ? pag->pagf_longest : pag->pagf_flcount > 0) ||
+	longest = (pag->pagf_longest > need) ?
+		(pag->pagf_longest - need) :
+		(pag->pagf_flcount > 0 || pag->pagf_longest > 0);
+	if (minlen > longest ||
 	    (minleft &&
 	     (int)(pag->pagf_freeblks + pag->pagf_flcount - need - total) <
 	     (int)minleft)) {
@@ -1771,8 +1774,10 @@ xfs_alloc_fix_freelist(
 	/*
 	 * If there isn't enough total or single-extent, reject it.
 	 */
-	if (minlen >
-	    (agf->agf_longest ? agf->agf_longest : agf->agf_flcount > 0) ||
+	longest = (agf->agf_longest > need) ?
+		(agf->agf_longest - need) :
+		(agf->agf_flcount > 0 || agf->agf_longest > 0);
+	if (minlen > longest ||
 	    (minleft &&
 	     (int)(agf->agf_freeblks + agf->agf_flcount - need - total) <
 	     (int)minleft)) {
