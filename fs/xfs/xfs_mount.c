@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.118 $"
+#ident	"$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -346,7 +346,22 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 		mp->m_writeio_log = writeio_log;
 	}
 	mp->m_writeio_blocks = 1 << (mp->m_writeio_log - sbp->sb_blocklog);
-	
+
+	/*
+	 * Set the inode cluster size based on the physical memory
+	 * size.  This may still be overridden by the file system
+	 * block size if it is larger than the chosen cluster size.
+	 */
+#ifndef SIM
+	if (physmem <= btoc(32 * 1024 * 1024)) { /* <= 32 MB */
+		mp->m_inode_cluster_size = XFS_INODE_SMALL_CLUSTER_SIZE;
+	} else {
+		mp->m_inode_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;
+	}
+#else
+	mp->m_inode_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;
+#endif
+
 	/*
 	 * Check that the data (and log if separate) are an ok size.
 	 */
