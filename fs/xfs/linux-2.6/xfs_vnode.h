@@ -32,7 +32,64 @@
 #ifndef __XFS_VNODE_H__
 #define __XFS_VNODE_H__
 
-#include <linux/vnode.h>
+/*
+ * Vnode types (unrelated to on-disk inodes).  VNON means no type.
+ */
+typedef enum vtype {
+	VNON	= 0,
+	VREG	= 1,
+	VDIR	= 2,
+	VBLK	= 3,
+	VCHR	= 4,
+	VLNK	= 5,
+	VFIFO	= 6,
+	VBAD	= 7,
+	VSOCK	= 8
+} vtype_t;
+
+/*
+ * The prefix of a vnode struct is its freelist linkage.  The freelist
+ * header has two pointers so we can insert at either end.
+ */
+typedef struct vnlist {
+	struct vnode	*vl_next;
+	struct vnode	*vl_prev;
+} vnlist_t;
+
+typedef __u64	vnumber_t;
+
+/*
+ * Define the type of behavior head used by vnodes.
+ */
+#define vn_bhv_head_t	bhv_head_t
+
+/*
+ * MP locking protocols:
+ *	v_flag, v_count				VN_LOCK/VN_UNLOCK
+ *	v_vfsp					VN_LOCK/VN_UNLOCK
+ *	v_type					read-only or fs-dependent
+ *	v_list, v_hashp, v_hashn		freelist lock
+ */
+typedef struct vnode {
+	__u32		v_flag;			/* vnode flags (see below) */
+	enum vtype	v_type;			/* vnode type		*/
+	struct vfs	*v_vfsp;		/* ptr to containing VFS*/
+	vnumber_t	v_number;		/* in-core vnode number */
+	vn_bhv_head_t	v_bh;			/* behavior head */
+
+	spinlock_t	v_lock;			/* don't use VLOCK on Linux */
+	struct inode	v_inode;		/* linux inode */
+#ifdef	CONFIG_XFS_VNODE_TRACING
+	struct ktrace	*v_trace;		/* trace header structure    */
+#endif	/* CONFIG_XFS_VNODE_TRACING */
+} vnode_t;
+
+/*
+ * Vnode to Linux inode mapping.
+ */
+#define LINVFS_GET_VP(inode)	((vnode_t *)list_entry(inode, vnode_t, v_inode))
+#define LINVFS_GET_VPTR(inode)	LINVFS_GET_VP(inode)
+#define LINVFS_GET_IP(vp)	(&(vp)->v_inode)
 
 /*
  * Conversion between vnode types/modes and encoded type/mode as
@@ -628,9 +685,7 @@ extern void	vn_remove(struct vnode *);
 
 static inline int vn_count(struct vnode *vp)
 {
-	struct inode *ip = LINVFS_GET_IP(vp);
-
-	return atomic_read(&ip->i_count);
+	return atomic_read(&LINVFS_GET_IP(vp)->i_count);
 }
 
 /*

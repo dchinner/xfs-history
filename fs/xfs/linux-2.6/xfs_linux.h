@@ -32,9 +32,7 @@
 #ifndef __XFS_LINUX__
 #define __XFS_LINUX__
 
-#include <linux/vnode.h>
 #include <linux/mm.h>
-#include <linux/xfs_vfs.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -43,24 +41,27 @@
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/bitops.h>
+#include <linux/major.h>
+#include <linux/root_dev.h>
+
 #include <asm/page.h>
 #include <asm/div64.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
-#include <pagebuf/page_buf.h>
+#include <linux/xfs_behavior.h>
+#include <linux/xfs_vfs.h>
 #include <linux/xfs_cred.h>
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_stats.h>
 #include <linux/xfs_sysctl.h>
 #include <linux/xfs_super.h>
 #include <linux/xfs_globals.h>
-#include <linux/xfs_behavior.h>
 #include <linux/xfs_fs_subr.h>
 #include <linux/xfs_xattr.h>
-#include <linux/major.h>
-#include <linux/root_dev.h>
+
+#include <pagebuf/page_buf.h>
 
 #ifndef STATIC
 #define STATIC static
