@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -456,10 +456,10 @@ gethandle (
 struct vfs *
 altgetvfs (fsid_t *fsid)
 {
-	int s;
 	register struct vfs *vfsp;
+	int s;
 
-	s = splock(vfslock);
+	s = vfs_spinlock();
 	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
 		if (vfsp->vfs_altfsid &&
 		    vfsp->vfs_altfsid->val[0] == fsid->val[0] &&
@@ -468,6 +468,6 @@ altgetvfs (fsid_t *fsid)
 			break;
 		}
 	}
-	spunlock(vfslock, s);
+	vfs_spinunlock(s);
 	return vfsp;
 }
