@@ -33,13 +33,13 @@
 #include <xfs.h>
 
 
-STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
-STATIC uint	xfs_trans_count_vecs(xfs_trans_t *);
-STATIC void	xfs_trans_fill_vecs(xfs_trans_t *, xfs_log_iovec_t *);
-STATIC void	xfs_trans_uncommit(xfs_trans_t *, uint);
-STATIC void	xfs_trans_committed(xfs_trans_t *, int);
-STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t, int);
-STATIC void	xfs_trans_free(xfs_trans_t *);
+static void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
+static uint	xfs_trans_count_vecs(xfs_trans_t *);
+static void	xfs_trans_fill_vecs(xfs_trans_t *, xfs_log_iovec_t *);
+static void	xfs_trans_uncommit(xfs_trans_t *, uint);
+static void	xfs_trans_committed(xfs_trans_t *, int);
+static void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t, int);
+static void	xfs_trans_free(xfs_trans_t *);
 
 kmem_zone_t		*xfs_trans_zone;
 
@@ -430,7 +430,7 @@ xfs_trans_mod_sb(
  * For now we just look at each field allowed to change and change
  * it if necessary.
  */
-STATIC void
+static void
 xfs_trans_apply_sb_deltas(
 	xfs_trans_t	*tp)
 {
@@ -879,7 +879,7 @@ shut_us_down:
  * transaction header.	Ask each dirty item in turn how many
  * it needs to get the total.
  */
-STATIC uint
+static uint
 xfs_trans_count_vecs(
 	xfs_trans_t	*tp)
 {
@@ -917,7 +917,7 @@ xfs_trans_count_vecs(
  * Called from the trans_commit code when we notice that
  * the filesystem is in the middle of a forced shutdown.
  */
-STATIC void
+static void
 xfs_trans_uncommit(
 	xfs_trans_t	*tp,
 	uint		flags)
@@ -953,7 +953,7 @@ xfs_trans_uncommit(
  * As each item fills in the entries it needs, also pin the item
  * so that it cannot be flushed out until the log write completes.
  */
-STATIC void
+static void
 xfs_trans_fill_vecs(
 	xfs_trans_t		*tp,
 	xfs_log_iovec_t		*log_vector)
@@ -1085,7 +1085,7 @@ xfs_trans_cancel(
  * Free the transaction structure.  If there is more clean up
  * to do when the structure is freed, add it here.
  */
-STATIC void
+static void
 xfs_trans_free(
 	xfs_trans_t	*tp)
 {
@@ -1109,7 +1109,7 @@ xfs_trans_free(
  * Call xfs_trans_chunk_committed() to process the items in
  * each chunk.
  */
-STATIC void
+static void
 xfs_trans_committed(
 	xfs_trans_t	*tp,
 	int		abortflag)
@@ -1190,7 +1190,7 @@ xfs_trans_committed(
  * otherwise they could be immediately flushed and we'd have to race
  * with the flusher trying to pull the item from the AIL as we add it.
  */
-STATIC void
+static void
 xfs_trans_chunk_committed(
 	xfs_log_item_chunk_t	*licp,
 	xfs_lsn_t		lsn,

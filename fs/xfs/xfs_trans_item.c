@@ -33,7 +33,7 @@
 #include <xfs.h>
 
 
-STATIC int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *,
+static int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *,
 					int, int, xfs_lsn_t);
 
 /*
@@ -396,7 +396,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp, xfs_lsn_t commit_lsn)
  * items in the chunk including those with XFS_LID_SYNC_UNLOCK set.
  * Return the number of descriptors freed.
  */
-STATIC int
+static int
 xfs_trans_unlock_chunk(
 	xfs_log_item_chunk_t	*licp,
 	int			freeing_chunk,

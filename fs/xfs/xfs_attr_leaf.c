@@ -50,13 +50,13 @@
 /*
  * Routines used for growing the Btree.
  */
-STATIC int xfs_attr_leaf_add_work(xfs_dabuf_t *leaf_buffer, xfs_da_args_t *args,
+static int xfs_attr_leaf_add_work(xfs_dabuf_t *leaf_buffer, xfs_da_args_t *args,
 					      int freemap_index);
-STATIC void xfs_attr_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *leaf_buffer);
-STATIC void xfs_attr_leaf_rebalance(xfs_da_state_t *state,
+static void xfs_attr_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *leaf_buffer);
+static void xfs_attr_leaf_rebalance(xfs_da_state_t *state,
 						   xfs_da_state_blk_t *blk1,
 						   xfs_da_state_blk_t *blk2);
-STATIC int xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
+static int xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
 					   xfs_da_state_blk_t *leaf_blk_1,
 					   xfs_da_state_blk_t *leaf_blk_2,
 					   int *number_entries_in_blk1,
@@ -65,7 +65,7 @@ STATIC int xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
 /*
  * Utility routines.
  */
-STATIC void xfs_attr_leaf_moveents(xfs_attr_leafblock_t *src_leaf,
+static void xfs_attr_leaf_moveents(xfs_attr_leafblock_t *src_leaf,
 					 int src_start,
 					 xfs_attr_leafblock_t *dst_leaf,
 					 int dst_start, int move_count,
@@ -358,7 +358,7 @@ out:
 	return(error);
 }
 
-STATIC int
+static int
 xfs_attr_shortform_compare(const void *a, const void *b)
 {
 	xfs_attr_sf_sort_t *sa, *sb;
@@ -873,7 +873,7 @@ xfs_attr_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args)
 /*
  * Add a name to a leaf attribute list structure.
  */
-STATIC int
+static int
 xfs_attr_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int mapindex)
 {
 	xfs_attr_leafblock_t *leaf;
@@ -1006,7 +1006,7 @@ xfs_attr_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int mapindex)
 /*
  * Garbage collect a leaf attribute list block by copying it to a new buffer.
  */
-STATIC void
+static void
 xfs_attr_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp)
 {
 	xfs_attr_leafblock_t *leaf_s, *leaf_d;
@@ -1067,7 +1067,7 @@ xfs_attr_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp)
  * values are used in "atomic rename" operations on attributes.	 Note that
  * the "new" and "old" values can end up in different blocks.
  */
-STATIC void
+static void
 xfs_attr_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 				       xfs_da_state_blk_t *blk2)
 {
@@ -1243,7 +1243,7 @@ xfs_attr_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
  * GROT: there will always be enough room in either block for a new entry.
  * GROT: Do a double-split for this case?
  */
-STATIC int
+static int
 xfs_attr_leaf_figure_balance(xfs_da_state_t *state,
 				    xfs_da_state_blk_t *blk1,
 				    xfs_da_state_blk_t *blk2,
@@ -1936,7 +1936,7 @@ xfs_attr_leaf_getvalue(xfs_dabuf_t *bp, xfs_da_args_t *args)
  * NOTE: this routine modifies both source and destination leaves.
  */
 /*ARGSUSED*/
-STATIC void
+static void
 xfs_attr_leaf_moveents(xfs_attr_leafblock_t *leaf_s, int start_s,
 			xfs_attr_leafblock_t *leaf_d, int start_d,
 			int count, xfs_mount_t *mp)

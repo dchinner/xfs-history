@@ -41,14 +41,14 @@ ktrace_t	*xfs_bmbt_trace_buf;
  */
 
 
-STATIC int xfs_bmbt_killroot(xfs_btree_cur_t *, int);
-STATIC void xfs_bmbt_log_keys(xfs_btree_cur_t *, xfs_buf_t *, int, int);
-STATIC void xfs_bmbt_log_ptrs(xfs_btree_cur_t *, xfs_buf_t *, int, int);
-STATIC int xfs_bmbt_lshift(xfs_btree_cur_t *, int, int *);
-STATIC int xfs_bmbt_rshift(xfs_btree_cur_t *, int, int *);
-STATIC int xfs_bmbt_split(xfs_btree_cur_t *, int, xfs_fsblock_t *,
+static int xfs_bmbt_killroot(xfs_btree_cur_t *, int);
+static void xfs_bmbt_log_keys(xfs_btree_cur_t *, xfs_buf_t *, int, int);
+static void xfs_bmbt_log_ptrs(xfs_btree_cur_t *, xfs_buf_t *, int, int);
+static int xfs_bmbt_lshift(xfs_btree_cur_t *, int, int *);
+static int xfs_bmbt_rshift(xfs_btree_cur_t *, int, int *);
+static int xfs_bmbt_split(xfs_btree_cur_t *, int, xfs_fsblock_t *,
 		xfs_bmbt_key_t *, xfs_btree_cur_t **, int *);
-STATIC int xfs_bmbt_updkey(xfs_btree_cur_t *, xfs_bmbt_key_t *, int);
+static int xfs_bmbt_updkey(xfs_btree_cur_t *, xfs_bmbt_key_t *, int);
 
 
 #if defined(XFS_BMBT_TRACE)
@@ -56,7 +56,7 @@ STATIC int xfs_bmbt_updkey(xfs_btree_cur_t *, xfs_bmbt_key_t *, int);
  * Add a trace buffer entry for the arguments given to the routine,
  * generic form.
  */
-STATIC void
+static void
 xfs_bmbt_trace_enter(
 	char		*func,
 	xfs_btree_cur_t *cur,
@@ -97,7 +97,7 @@ xfs_bmbt_trace_enter(
 /*
  * Add a trace buffer entry for arguments, for a buffer & 1 integer arg.
  */
-STATIC void
+static void
 xfs_bmbt_trace_argbi(
 	char		*func,
 	xfs_btree_cur_t *cur,
@@ -114,7 +114,7 @@ xfs_bmbt_trace_argbi(
 /*
  * Add a trace buffer entry for arguments, for a buffer & 2 integer args.
  */
-STATIC void
+static void
 xfs_bmbt_trace_argbii(
 	char		*func,
 	xfs_btree_cur_t *cur,
@@ -133,7 +133,7 @@ xfs_bmbt_trace_argbii(
  * Add a trace buffer entry for arguments, for 3 block-length args
  * and an integer arg.
  */
-STATIC void
+static void
 xfs_bmbt_trace_argfffi(
 	char			*func,
 	xfs_btree_cur_t		*cur,
@@ -152,7 +152,7 @@ xfs_bmbt_trace_argfffi(
 /*
  * Add a trace buffer entry for arguments, for one integer arg.
  */
-STATIC void
+static void
 xfs_bmbt_trace_argi(
 	char		*func,
 	xfs_btree_cur_t *cur,
@@ -168,7 +168,7 @@ xfs_bmbt_trace_argi(
 /*
  * Add a trace buffer entry for arguments, for int, fsblock, key.
  */
-STATIC void
+static void
 xfs_bmbt_trace_argifk(
 	char			*func,
 	xfs_btree_cur_t		*cur,
@@ -191,7 +191,7 @@ xfs_bmbt_trace_argifk(
 /*
  * Add a trace buffer entry for arguments, for int, fsblock, rec.
  */
-STATIC void
+static void
 xfs_bmbt_trace_argifr(
 	char			*func,
 	xfs_btree_cur_t		*cur,
@@ -220,7 +220,7 @@ xfs_bmbt_trace_argifr(
 /*
  * Add a trace buffer entry for arguments, for int, key.
  */
-STATIC void
+static void
 xfs_bmbt_trace_argik(
 	char			*func,
 	xfs_btree_cur_t		*cur,
@@ -240,7 +240,7 @@ xfs_bmbt_trace_argik(
 /*
  * Add a trace buffer entry for the cursor/operation.
  */
-STATIC void
+static void
 xfs_bmbt_trace_cursor(
 	char		*func,
 	xfs_btree_cur_t *cur,
@@ -300,7 +300,7 @@ static char	EXIT[] = "exit";
 /*
  * Delete record pointed to by cur/level.
  */
-STATIC int					/* error */
+static int					/* error */
 xfs_bmbt_delrec(
 	xfs_btree_cur_t		*cur,
 	int			level,
@@ -720,7 +720,7 @@ xfs_bmbt_get_rec(
  * Insert one record/level.  Return information to the caller
  * allowing the next level up to proceed if necessary.
  */
-STATIC int					/* error */
+static int					/* error */
 xfs_bmbt_insrec(
 	xfs_btree_cur_t		*cur,
 	int			level,
@@ -909,7 +909,7 @@ xfs_bmbt_insrec(
 	return 0;
 }
 
-STATIC int
+static int
 xfs_bmbt_killroot(
 	xfs_btree_cur_t		*cur,
 	int			async)
@@ -1012,7 +1012,7 @@ xfs_bmbt_killroot(
 /*
  * Log key values from the btree block.
  */
-STATIC void
+static void
 xfs_bmbt_log_keys(
 	xfs_btree_cur_t *cur,
 	xfs_buf_t	*bp,
@@ -1051,7 +1051,7 @@ xfs_bmbt_log_keys(
 /*
  * Log pointer values from the btree block.
  */
-STATIC void
+static void
 xfs_bmbt_log_ptrs(
 	xfs_btree_cur_t *cur,
 	xfs_buf_t	*bp,
@@ -1090,7 +1090,7 @@ xfs_bmbt_log_ptrs(
 /*
  * Lookup the record.  The cursor is made to point to it, based on dir.
  */
-STATIC int				/* error */
+static int				/* error */
 xfs_bmbt_lookup(
 	xfs_btree_cur_t		*cur,
 	xfs_lookup_t		dir,
@@ -1234,7 +1234,7 @@ xfs_bmbt_lookup(
  * Move 1 record left from cur/level if possible.
  * Update cur to reflect the new path.
  */
-STATIC int					/* error */
+static int					/* error */
 xfs_bmbt_lshift(
 	xfs_btree_cur_t		*cur,
 	int			level,
@@ -1371,7 +1371,7 @@ xfs_bmbt_lshift(
  * Move 1 record right from cur/level if possible.
  * Update cur to reflect the new path.
  */
-STATIC int					/* error */
+static int					/* error */
 xfs_bmbt_rshift(
 	xfs_btree_cur_t		*cur,
 	int			level,
@@ -1512,7 +1512,7 @@ error1:
  * Determine the extent state.
  */
 /* ARGSUSED */
-STATIC xfs_exntst_t
+static xfs_exntst_t
 xfs_extent_state(
 	xfs_filblks_t		blks,
 	int			extent_flag)
@@ -1529,7 +1529,7 @@ xfs_extent_state(
  * Split cur/level block in half.
  * Return new block number and its first record (to be inserted into parent).
  */
-STATIC int					/* error */
+static int					/* error */
 xfs_bmbt_split(
 	xfs_btree_cur_t		*cur,
 	int			level,
@@ -1682,7 +1682,7 @@ xfs_bmbt_split(
 /*
  * Update keys for the record.
  */
-STATIC int
+static int
 xfs_bmbt_updkey(
 	xfs_btree_cur_t		*cur,
 	xfs_bmbt_key_t		*keyp,	/* on-disk format */

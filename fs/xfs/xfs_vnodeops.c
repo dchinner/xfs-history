@@ -46,7 +46,7 @@ extern int xfs_ioctl(bhv_desc_t *, struct inode *, struct file *,
 
 
 #ifdef XFS_RW_TRACE
-STATIC void
+static void
 xfs_ctrunc_trace(
 	int		tag,
 	xfs_inode_t	*ip);
@@ -62,7 +62,7 @@ xfs_ctrunc_trace(
  * when a new vnode is first looked up or created.
  */
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_open(
 	bhv_desc_t	*bdp,
 	cred_t		*credp)
@@ -262,7 +262,7 @@ xfs_getattr(
 /*
  * xfs_setattr
  */
-STATIC int
+static int
 xfs_setattr(
 	bhv_desc_t	*bdp,
 	vattr_t		*vap,
@@ -920,7 +920,7 @@ xfs_setattr(
  * Null conversion from vnode mode bits to inode mode bits, as in efs.
  */
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_access(
 	bhv_desc_t	*bdp,
 	int		mode,
@@ -945,7 +945,7 @@ xfs_access(
  *
  */
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_readlink(
 	bhv_desc_t	*bdp,
 	uio_t		*uiop,
@@ -1057,7 +1057,7 @@ error_return:
  * with that.
  */
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_fsync(
 	bhv_desc_t	*bdp,
 	int		flag,
@@ -1222,7 +1222,7 @@ xfs_fsync(
  * counts to 0 and frees up any memory being used to store inline data,
  * extents, or btree roots.
  */
-STATIC void
+static void
 xfs_itruncate_cleanup(
 	xfs_trans_t	**tpp,
 	xfs_inode_t	*ip,
@@ -1266,7 +1266,7 @@ xfs_itruncate_cleanup(
  * This is called by xfs_inactive to free any blocks beyond eof,
  * when the link count isn't zero.
  */
-STATIC int
+static int
 xfs_inactive_free_eofblocks(
 	xfs_mount_t	*mp,
 	xfs_inode_t	*ip)
@@ -1369,7 +1369,7 @@ xfs_inactive_free_eofblocks(
 /*
  * Free a symlink that has blocks associated with it.
  */
-STATIC int
+static int
 xfs_inactive_symlink_rmt(
 	xfs_inode_t	*ip,
 	xfs_trans_t	**tpp)
@@ -1520,7 +1520,7 @@ xfs_inactive_symlink_rmt(
 
 }
 
-STATIC int
+static int
 xfs_inactive_symlink_local(
 	xfs_inode_t	*ip,
 	xfs_trans_t	**tpp)
@@ -1559,7 +1559,7 @@ xfs_inactive_symlink_local(
 /*
  *
  */
-STATIC int
+static int
 xfs_inactive_attrs(
 	xfs_inode_t	*ip,
 	xfs_trans_t	**tpp,
@@ -1609,7 +1609,7 @@ xfs_inactive_attrs(
 }
 
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_release(
 	bhv_desc_t	*bdp)
 {
@@ -1656,7 +1656,7 @@ xfs_release(
  * kept for the inode here since the file is now closed.
  */
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_inactive(
 	bhv_desc_t	*bdp,
 	cred_t		*credp)
@@ -1876,7 +1876,7 @@ xfs_inactive(
  * xfs_lookup
  */
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_lookup(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
@@ -1920,7 +1920,7 @@ xfs_lookup(
 }
 
 #ifdef XFS_RW_TRACE
-STATIC void
+static void
 xfs_ctrunc_trace(
 	int		tag,
 	xfs_inode_t	*ip)
@@ -1956,7 +1956,7 @@ xfs_ctrunc_trace(
  *   It might still find name exists out there, though.
  *	But vpp, doens't point at a vnode.
  */
-STATIC int
+static int
 xfs_create(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
@@ -2253,7 +2253,7 @@ int xfs_rm_attempts;
  * drop the inode lock on the directory and try again. xfs_iunlock will
  * potentially push the tail if we were holding up the log.
  */
-STATIC int
+static int
 xfs_lock_dir_and_entry(
 	xfs_inode_t	*dp,
 	struct dentry	*dentry,
@@ -2467,7 +2467,7 @@ int remove_which_error_return = 0;
  * xfs_remove
  *
  */
-STATIC int
+static int
 xfs_remove(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
@@ -2761,7 +2761,7 @@ std_return:
  * xfs_link
  *
  */
-STATIC int
+static int
 xfs_link(
 	bhv_desc_t	*target_dir_bdp,
 	vnode_t		*src_vp,
@@ -2946,7 +2946,7 @@ std_return:
  * xfs_mkdir
  *
  */
-STATIC int
+static int
 xfs_mkdir(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
@@ -3195,7 +3195,7 @@ std_return:
  * xfs_rmdir
  *
  */
-STATIC int
+static int
 xfs_rmdir(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
@@ -3467,7 +3467,7 @@ std_return:
  * bufsize bytes worth of struct dirents starting at bufbase.
  */
 /*ARGSUSED*/
-STATIC int
+static int
 xfs_readdir(
 	bhv_desc_t	*dir_bdp,
 	uio_t		*uiop,
@@ -3510,7 +3510,7 @@ xfs_readdir(
  * xfs_symlink
  *
  */
-STATIC int
+static int
 xfs_symlink(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
@@ -3846,7 +3846,7 @@ std_return:
  * A fid routine that takes a pointer to a previously allocated
  * fid structure (like xfs_fast_fid) but uses a 64 bit inode number.
  */
-STATIC int
+static int
 xfs_fid2(
 	bhv_desc_t	*bdp,
 	fid_t		*fidp)
@@ -3945,7 +3945,7 @@ xfs_rwunlock(
 	return;
 }
 
-STATIC int
+static int
 xfs_inode_flush(bhv_desc_t	*bdp,
 		int		flags)
 {
@@ -4083,7 +4083,7 @@ xfs_set_dmattrs (
 /*
  * xfs_reclaim
  */
-STATIC int
+static int
 xfs_reclaim(
 	bhv_desc_t	*bdp)
 {
@@ -4456,7 +4456,7 @@ dmapi_enospc_check:
  * Zero file bytes between startoff and endoff inclusive.
  * The iolock is held exclusive and no blocks are buffered.
  */
-STATIC int
+static int
 xfs_zero_remaining_bytes(
 	xfs_inode_t		*ip,
 	xfs_off_t		startoff,
@@ -4537,7 +4537,7 @@ xfs_zero_remaining_bytes(
  *	errno on error
  *
  */
-STATIC int
+static int
 xfs_free_file_space(
 	xfs_inode_t		*ip,
 	xfs_off_t		offset,

@@ -36,7 +36,7 @@
 /*
  * Log specified fields for the inode given by bp and off.
  */
-STATIC void
+static void
 xfs_ialloc_log_di(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_buf_t	*bp,		/* inode buffer */
@@ -104,7 +104,7 @@ xfs_ialloc_log_di(
  * Allocate new inodes in the allocation group specified by agbp.
  * Return 0 for success, else error code.
  */
-STATIC int				/* error code or 0 */
+static int				/* error code or 0 */
 xfs_ialloc_ag_alloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_buf_t	*agbp,		/* alloc group buffer */
@@ -340,7 +340,7 @@ xfs_ialloc_ag_alloc(
  * Select an allocation group to look for a free inode in, based on the parent
  * inode and then mode.	 Return the allocation group buffer.
  */
-STATIC xfs_buf_t *			/* allocation group buffer */
+static xfs_buf_t *			/* allocation group buffer */
 xfs_ialloc_ag_select(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent directory inode number */

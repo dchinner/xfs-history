@@ -81,10 +81,10 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
  * Prototypes for per-ag allocation routines
  */
 
-STATIC int xfs_alloc_ag_vextent_exact(xfs_alloc_arg_t *);
-STATIC int xfs_alloc_ag_vextent_near(xfs_alloc_arg_t *);
-STATIC int xfs_alloc_ag_vextent_size(xfs_alloc_arg_t *);
-STATIC int xfs_alloc_ag_vextent_small(xfs_alloc_arg_t *,
+static int xfs_alloc_ag_vextent_exact(xfs_alloc_arg_t *);
+static int xfs_alloc_ag_vextent_near(xfs_alloc_arg_t *);
+static int xfs_alloc_ag_vextent_size(xfs_alloc_arg_t *);
+static int xfs_alloc_ag_vextent_small(xfs_alloc_arg_t *,
 	xfs_btree_cur_t *, xfs_agblock_t *, xfs_extlen_t *, int *);
 
 /*
@@ -95,7 +95,7 @@ STATIC int xfs_alloc_ag_vextent_small(xfs_alloc_arg_t *,
  * Compute aligned version of the found extent.
  * Takes alignment and min length into account.
  */
-STATIC int				/* success (>= minlen) */
+static int				/* success (>= minlen) */
 xfs_alloc_compute_aligned(
 	xfs_agblock_t	foundbno,	/* starting block in found extent */
 	xfs_extlen_t	foundlen,	/* length in found extent */
@@ -125,7 +125,7 @@ xfs_alloc_compute_aligned(
  * Compute best start block and diff for "near" allocations.
  * freelen >= wantlen already checked by caller.
  */
-STATIC xfs_extlen_t			/* difference value (absolute) */
+static xfs_extlen_t			/* difference value (absolute) */
 xfs_alloc_compute_diff(
 	xfs_agblock_t	wantbno,	/* target starting block */
 	xfs_extlen_t	wantlen,	/* target length */
@@ -187,7 +187,7 @@ xfs_alloc_compute_diff(
  * If len is too small it is returned unchanged.
  * If len hits maxlen it is left alone.
  */
-STATIC void
+static void
 xfs_alloc_fix_len(
 	xfs_alloc_arg_t *args)		/* allocation argument structure */
 {
@@ -221,7 +221,7 @@ xfs_alloc_fix_len(
  * Fix up length if there is too little space left in the a.g.
  * Return 1 if ok, 0 if too little, should give up.
  */
-STATIC int
+static int
 xfs_alloc_fix_minleft(
 	xfs_alloc_arg_t *args)		/* allocation argument structure */
 {
@@ -250,7 +250,7 @@ xfs_alloc_fix_minleft(
  * Flags are passed in indicating whether the cursors are set to the
  * relevant records.
  */
-STATIC int				/* error code */
+static int				/* error code */
 xfs_alloc_fixup_trees(
 	xfs_btree_cur_t *cnt_cur,	/* cursor for by-size btree */
 	xfs_btree_cur_t *bno_cur,	/* cursor for by-block btree */
@@ -391,7 +391,7 @@ xfs_alloc_fixup_trees(
 /*
  * Read in the allocation group free block array.
  */
-STATIC int				/* error */
+static int				/* error */
 xfs_alloc_read_agfl(
 	xfs_mount_t	*mp,		/* mount point structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -417,7 +417,7 @@ xfs_alloc_read_agfl(
 /*
  * Add an allocation trace entry for an alloc call.
  */
-STATIC void
+static void
 xfs_alloc_trace_alloc(
 	char		*name,		/* function tag string */
 	char		*str,		/* additional string */
@@ -450,7 +450,7 @@ xfs_alloc_trace_alloc(
 /*
  * Add an allocation trace entry for a free call.
  */
-STATIC void
+static void
 xfs_alloc_trace_free(
 	char		*name,		/* function tag string */
 	char		*str,		/* additional string */
@@ -476,7 +476,7 @@ xfs_alloc_trace_free(
 /*
  * Add an allocation trace entry for modifying an agf.
  */
-STATIC void
+static void
 xfs_alloc_trace_modagf(
 	char		*name,		/* function tag string */
 	char		*str,		/* additional string */
@@ -508,7 +508,7 @@ xfs_alloc_trace_modagf(
 		(void *)(__psunsigned_t)INT_GET(agf->agf_longest, ARCH_CONVERT));
 }
 
-STATIC void
+static void
 xfs_alloc_trace_busy(
 	char		*name,		/* function tag string */
 	char		*str,		/* additional string */
@@ -547,7 +547,7 @@ xfs_alloc_trace_busy(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
  */
-STATIC int			/* error */
+static int			/* error */
 xfs_alloc_ag_vextent(
 	xfs_alloc_arg_t *args)	/* argument structure for allocation */
 {
@@ -627,7 +627,7 @@ xfs_alloc_ag_vextent(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block (bno), or NULLAGBLOCK if we can't do it.
  */
-STATIC int			/* error */
+static int			/* error */
 xfs_alloc_ag_vextent_exact(
 	xfs_alloc_arg_t *args)	/* allocation argument structure */
 {
@@ -734,7 +734,7 @@ error0:
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
  */
-STATIC int				/* error */
+static int				/* error */
 xfs_alloc_ag_vextent_near(
 	xfs_alloc_arg_t *args)		/* allocation argument structure */
 {
@@ -1273,7 +1273,7 @@ xfs_alloc_ag_vextent_near(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
  */
-STATIC int				/* error */
+static int				/* error */
 xfs_alloc_ag_vextent_size(
 	xfs_alloc_arg_t *args)		/* allocation argument structure */
 {
@@ -1429,7 +1429,7 @@ error0:
  * Either return the contents of the last freespace record,
  * or allocate space from the freelist if there is nothing in the tree.
  */
-STATIC int			/* error */
+static int			/* error */
 xfs_alloc_ag_vextent_small(
 	xfs_alloc_arg_t *args,	/* allocation argument structure */
 	xfs_btree_cur_t *ccur,	/* by-size cursor */
@@ -1515,7 +1515,7 @@ error0:
 /*
  * Free the extent starting at agno/bno for length.
  */
-STATIC int			/* error */
+static int			/* error */
 xfs_free_ag_extent(
 	xfs_trans_t	*tp,	/* transaction pointer */
 	xfs_buf_t	*agbp,	/* buffer for a.g. freelist header */

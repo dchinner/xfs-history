@@ -37,12 +37,12 @@
 kmem_zone_t	*qm_dqzone;
 kmem_zone_t	*qm_dqtrxzone;
 
-STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
-STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
-STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
+static void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
+static void	xfs_qm_list_destroy(xfs_dqlist_t *);
+static int	xfs_qm_quotacheck(xfs_mount_t *);
 
-STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
-STATIC void	xfs_qm_shake(void);
+static int	xfs_qm_init_quotainos(xfs_mount_t *);
+static void	xfs_qm_shake(void);
 
 #ifdef DEBUG
 extern mutex_t	qcheck_lock;
@@ -174,7 +174,7 @@ xfs_qm_destroy(
  * global view of what's going on.
  */
 /* ARGSUSED */
-STATIC int
+static int
 xfs_qm_hold_quotafs_ref(
 	struct xfs_mount *mp)
 {
@@ -207,7 +207,7 @@ xfs_qm_hold_quotafs_ref(
  * so that we know when we need to destroy the entire quota manager.
  */
 /* ARGSUSED */
-STATIC void
+static void
 xfs_qm_rele_quotafs_ref(
 	struct xfs_mount *mp)
 {
@@ -575,7 +575,7 @@ again:
  * Release the group dquot pointers the user dquots may be
  * carrying around as a hint. mplist is locked on entry and exit.
  */
-STATIC void
+static void
 xfs_qm_detach_gdquots(
 	xfs_mount_t	*mp)
 {
@@ -692,7 +692,7 @@ xfs_qm_dqpurge_all(
 	return (nmisses);
 }
 
-STATIC int
+static int
 xfs_qm_dqattach_one(
 	xfs_inode_t	*ip,
 	xfs_dqid_t	id,
@@ -824,7 +824,7 @@ xfs_qm_dqattach_one(
  * The process is complicated more by the fact that the dquots may or may not
  * be locked on entry.
  */
-STATIC void
+static void
 xfs_qm_dqattach_grouphint(
 	xfs_dquot_t	*udq,
 	xfs_dquot_t	*gdq,
@@ -1305,10 +1305,10 @@ xfs_qm_destroy_quotainfo(
 
 
 
-/* ------------------- PRIVATE STATIC FUNCTIONS ----------------------- */
+/* ------------------- PRIVATE static FUNCTIONS ----------------------- */
 
 /* ARGSUSED */
-STATIC void
+static void
 xfs_qm_list_init(
 	xfs_dqlist_t	*list,
 	char		*str,
@@ -1320,7 +1320,7 @@ xfs_qm_list_init(
 	list->qh_nelems = 0;
 }
 
-STATIC void
+static void
 xfs_qm_list_destroy(
 	xfs_dqlist_t	*list)
 {
@@ -1333,7 +1333,7 @@ xfs_qm_list_destroy(
  * dquots attached to the inode. The rationale is that there won't be any
  * attached at the time this is called from quotacheck.
  */
-STATIC int
+static int
 xfs_qm_dqget_noattach(
 	xfs_inode_t	*ip,
 	xfs_dquot_t	**O_udqpp,
@@ -1405,7 +1405,7 @@ xfs_qm_dqget_noattach(
  * Create an inode and return with a reference already taken, but unlocked
  * This is how we create quota inodes
  */
-STATIC int
+static int
 xfs_qm_qino_alloc(
 	xfs_mount_t	*mp,
 	xfs_inode_t	**ip,
@@ -1487,7 +1487,7 @@ xfs_qm_qino_alloc(
 }
 
 
-STATIC int
+static int
 xfs_qm_reset_dqcounts(
 	xfs_mount_t	*mp,
 	xfs_buf_t	*bp,
@@ -1529,7 +1529,7 @@ xfs_qm_reset_dqcounts(
 	return (0);
 }
 
-STATIC int
+static int
 xfs_qm_dqiter_bufs(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	firstid,
@@ -1597,7 +1597,7 @@ xfs_qm_dqiter_bufs(
  * Iterate over all allocated USR/GRP dquots in the system, calling a
  * caller supplied function for every chunk of dquots that we find.
  */
-STATIC int
+static int
 xfs_qm_dqiterate(
 	xfs_mount_t	*mp,
 	xfs_inode_t	*qip,
@@ -1698,7 +1698,7 @@ xfs_qm_dqiterate(
  * so that once the quotacheck is done, we can just log all the buffers,
  * as opposed to logging numerous updates to individual dquots.
  */
-STATIC void
+static void
 xfs_qm_quotacheck_dqadjust(
 	xfs_dquot_t		*dqp,
 	xfs_qcnt_t		nblks,
@@ -1730,7 +1730,7 @@ xfs_qm_quotacheck_dqadjust(
 	dqp->dq_flags |= XFS_DQ_DIRTY;
 }
 
-STATIC int
+static int
 xfs_qm_get_rtblks(
 	xfs_inode_t	*ip,
 	xfs_qcnt_t	*O_rtblks)
@@ -1762,7 +1762,7 @@ xfs_qm_get_rtblks(
  * dquots and update them to account for resources taken by that inode.
  */
 /* ARGSUSED */
-STATIC int
+static int
 xfs_qm_dqusage_adjust(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer - NULL */
@@ -1883,7 +1883,7 @@ xfs_qm_dqusage_adjust(
  * Walk thru all the filesystem inodes and construct a consistent view
  * of the disk quota world.
  */
-STATIC int
+static int
 xfs_qm_quotacheck(
 	xfs_mount_t	*mp)
 {
@@ -1990,7 +1990,7 @@ xfs_qm_quotacheck(
  * This is called after the superblock has been read in and we're ready to
  * iget the quota inodes.
  */
-STATIC int
+static int
 xfs_qm_init_quotainos(
 	xfs_mount_t	*mp)
 {
@@ -2078,7 +2078,7 @@ error:
  * favor the lookup function ...
  * XXXsup merge this with qm_reclaim_one().
  */
-STATIC int
+static int
 xfs_qm_shake_freelist(
 	int howmany)
 {
@@ -2237,7 +2237,7 @@ xfs_qm_shake_freelist(
  * running low.
  */
 /* ARGSUSED */
-STATIC void
+static void
 xfs_qm_shake(void)
 {
 	int	ndqused, nfree, n;
@@ -2265,7 +2265,7 @@ xfs_qm_shake(void)
  * Just pop the least recently used dquot off the freelist and
  * recycle it. The returned dquot is locked.
  */
-STATIC xfs_dquot_t *
+static xfs_dquot_t *
 xfs_qm_dqreclaim_one(void)
 {
 	xfs_dquot_t	*dqpout;

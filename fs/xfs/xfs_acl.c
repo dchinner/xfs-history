@@ -33,15 +33,15 @@
 #include <xfs.h>
 #include <linux/posix_acl_xattr.h>
 
-STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *, int *);
-STATIC void	xfs_acl_filter_mode(mode_t, xfs_acl_t *);
-STATIC void	xfs_acl_get_endian(xfs_acl_t *);
-STATIC int	xfs_acl_access(uid_t, gid_t, xfs_acl_t *, mode_t, cred_t *);
-STATIC int	xfs_acl_invalid(xfs_acl_t *);
-STATIC void	xfs_acl_sync_mode(mode_t, xfs_acl_t *);
-STATIC void	xfs_acl_get_attr(vnode_t *, xfs_acl_t *, int, int, int *);
-STATIC void	xfs_acl_set_attr(vnode_t *, xfs_acl_t *, int, int *);
-STATIC int	xfs_acl_allow_set(vnode_t *, int);
+static int	xfs_acl_setmode(vnode_t *, xfs_acl_t *, int *);
+static void	xfs_acl_filter_mode(mode_t, xfs_acl_t *);
+static void	xfs_acl_get_endian(xfs_acl_t *);
+static int	xfs_acl_access(uid_t, gid_t, xfs_acl_t *, mode_t, cred_t *);
+static int	xfs_acl_invalid(xfs_acl_t *);
+static void	xfs_acl_sync_mode(mode_t, xfs_acl_t *);
+static void	xfs_acl_get_attr(vnode_t *, xfs_acl_t *, int, int, int *);
+static void	xfs_acl_set_attr(vnode_t *, xfs_acl_t *, int, int *);
+static int	xfs_acl_allow_set(vnode_t *, int);
 
 kmem_zone_t *xfs_acl_zone;
 
@@ -77,7 +77,7 @@ xfs_acl_vhasacl_default(
 /*
  * Convert from extended attribute representation to in-memory for XFS.
  */
-STATIC int
+static int
 posix_acl_xattr_to_xfs(
 	posix_acl_xattr_header	*src,
 	size_t			size,
@@ -141,7 +141,7 @@ posix_acl_xattr_to_xfs(
  * Comparison function called from qsort().
  * Primary key is ae_tag, secondary key is ae_id.
  */
-STATIC int
+static int
 xfs_acl_entry_compare(
 	const void	*va,
 	const void	*vb)
@@ -157,7 +157,7 @@ xfs_acl_entry_compare(
 /*
  * Convert from in-memory XFS to extended attribute representation.
  */
-STATIC int
+static int
 posix_acl_xfs_to_xattr(
 	xfs_acl_t		*src,
 	posix_acl_xattr_header	*dest,
@@ -358,7 +358,7 @@ xfs_acl_iaccess(
 	return error;
 }
 
-STATIC int
+static int
 xfs_acl_allow_set(
 	vnode_t		*vp,
 	int		kind)
@@ -392,7 +392,7 @@ xfs_acl_allow_set(
  *	if not owner, owning group, or matching entry in ACL, use file
  *	other bits.
  */
-STATIC int
+static int
 xfs_acl_capability_check(
 	mode_t		mode,
 	cred_t		*cr)
@@ -412,7 +412,7 @@ xfs_acl_capability_check(
  *	 done in IRIX. It is assumed that the uid and groups for the current
  *	 thread are taken from "current" instead of the cr parameter.
  */
-STATIC int
+static int
 xfs_acl_access(
 	uid_t		fuid,
 	gid_t		fgid,
@@ -514,7 +514,7 @@ xfs_acl_access(
  * ACL validity checker.
  *   This acl validation routine checks each ACL entry read in makes sense.
  */
-STATIC int
+static int
 xfs_acl_invalid(
 	xfs_acl_t	*aclp)
 {
@@ -573,7 +573,7 @@ acl_invalid:
 /*
  * Do ACL endian conversion.
  */
-STATIC void
+static void
 xfs_acl_get_endian(
 	xfs_acl_t	*aclp)
 {
@@ -591,7 +591,7 @@ xfs_acl_get_endian(
 /*
  * Get the ACL from the EA and do endian conversion.
  */
-STATIC void
+static void
 xfs_acl_get_attr(
 	vnode_t		*vp,
 	xfs_acl_t	*aclp,
@@ -613,7 +613,7 @@ xfs_acl_get_attr(
 /*
  * Set the EA with the ACL and do endian conversion.
  */
-STATIC void
+static void
 xfs_acl_set_attr(
 	vnode_t		*vp,
 	xfs_acl_t	*aclp,
@@ -741,7 +741,7 @@ xfs_acl_inherit(
  * the ACL is going to get the permissions for these entries, we must
  * synchronize the mode whenever we set the ACL on a file.
  */
-STATIC int
+static int
 xfs_acl_setmode(
 	vnode_t		*vp,
 	xfs_acl_t	*acl,
@@ -831,7 +831,7 @@ xfs_acl_setmode(
  * out the ACL.	 This routine does not add or remove special entries, it
  * simply unites each special entry with its associated set of permissions.
  */
-STATIC void
+static void
 xfs_acl_sync_mode(
 	mode_t		mode,
 	xfs_acl_t	*acl)
@@ -875,7 +875,7 @@ xfs_acl_sync_mode(
  * are no permission bits on the file then we must not give them
  * the ACL. This is what what makes umask() work with ACLs.
  */
-STATIC void
+static void
 xfs_acl_filter_mode(
 	mode_t		mode,
 	xfs_acl_t	*acl)

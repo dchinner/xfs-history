@@ -39,22 +39,22 @@
 # define qdprintk(s, args...)		do { } while (0)
 #endif
 
-STATIC int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
-STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint,
+static int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
+static int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint,
 					fs_disk_quota_t *);
-STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, fs_quota_stat_t *);
-STATIC int	xfs_qm_scall_setqlim(xfs_mount_t *, xfs_dqid_t, uint,
+static int	xfs_qm_scall_getqstat(xfs_mount_t *, fs_quota_stat_t *);
+static int	xfs_qm_scall_setqlim(xfs_mount_t *, xfs_dqid_t, uint,
 					fs_disk_quota_t *);
-STATIC int	xfs_qm_scall_quotaon(xfs_mount_t *, uint);
-STATIC int	xfs_qm_scall_quotaoff(xfs_mount_t *, uint, boolean_t);
-STATIC int	xfs_qm_log_quotaoff(xfs_mount_t *, xfs_qoff_logitem_t **, uint);
-STATIC int	xfs_qm_log_quotaoff_end(xfs_mount_t *, xfs_qoff_logitem_t *,
+static int	xfs_qm_scall_quotaon(xfs_mount_t *, uint);
+static int	xfs_qm_scall_quotaoff(xfs_mount_t *, uint, boolean_t);
+static int	xfs_qm_log_quotaoff(xfs_mount_t *, xfs_qoff_logitem_t **, uint);
+static int	xfs_qm_log_quotaoff_end(xfs_mount_t *, xfs_qoff_logitem_t *,
 					uint);
-STATIC uint	xfs_qm_import_flags(uint);
-STATIC uint	xfs_qm_export_flags(uint);
-STATIC uint	xfs_qm_import_qtype_flags(uint);
-STATIC uint	xfs_qm_export_qtype_flags(uint);
-STATIC void	xfs_qm_export_dquot(xfs_mount_t *, xfs_disk_dquot_t *,
+static uint	xfs_qm_import_flags(uint);
+static uint	xfs_qm_export_flags(uint);
+static uint	xfs_qm_import_qtype_flags(uint);
+static uint	xfs_qm_export_qtype_flags(uint);
+static void	xfs_qm_export_dquot(xfs_mount_t *, xfs_disk_dquot_t *,
 					fs_disk_quota_t *);
 
 
@@ -158,7 +158,7 @@ linvfs_setxquota(
  * incore, and modifies the ondisk dquot directly. Therefore, for example,
  * it is an error to call this twice, without purging the cache.
  */
-STATIC int
+static int
 xfs_qm_scall_quotaoff(
 	xfs_mount_t		*mp,
 	uint			flags,
@@ -369,7 +369,7 @@ xfs_qm_scall_quotaoff(
 	return (error);
 }
 
-STATIC int
+static int
 xfs_qm_scall_trunc_qfiles(
 	xfs_mount_t	*mp,
 	uint		flags)
@@ -412,7 +412,7 @@ xfs_qm_scall_trunc_qfiles(
  * Switch on (a given) quota enforcement for both root and non-root filesystems.
  * This takes effect immediately.
  */
-STATIC int
+static int
 xfs_qm_scall_quotaon(
 	xfs_mount_t	*mp,
 	uint		flags)
@@ -539,7 +539,7 @@ xfs_qm_scall_quotaon(
 /*
  * Return quota status information, such as uquota-off, enforcements, etc.
  */
-STATIC int
+static int
 xfs_qm_scall_getqstat(
 	xfs_mount_t	*mp,
 	fs_quota_stat_t *out)
@@ -616,7 +616,7 @@ xfs_qm_scall_getqstat(
 /*
  * Adjust quota limits, and start/stop timers accordingly.
  */
-STATIC int
+static int
 xfs_qm_scall_setqlim(
 	xfs_mount_t		*mp,
 	xfs_dqid_t		id,
@@ -746,7 +746,7 @@ xfs_qm_scall_setqlim(
 	return (0);
 }
 
-STATIC int
+static int
 xfs_qm_scall_getquota(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	id,
@@ -784,7 +784,7 @@ xfs_qm_scall_getquota(
 }
 
 
-STATIC int
+static int
 xfs_qm_log_quotaoff_end(
 	xfs_mount_t		*mp,
 	xfs_qoff_logitem_t	*startqoff,
@@ -817,7 +817,7 @@ xfs_qm_log_quotaoff_end(
 }
 
 
-STATIC int
+static int
 xfs_qm_log_quotaoff(
 	xfs_mount_t	       *mp,
 	xfs_qoff_logitem_t     **qoffstartp,
@@ -879,7 +879,7 @@ error0:
  * Blocks (BBs) instead of the internal FSBs, and all on-disk data has
  * to be converted to the native endianness.
  */
-STATIC void
+static void
 xfs_qm_export_dquot(
 	xfs_mount_t		*mp,
 	xfs_disk_dquot_t	*src,
@@ -940,7 +940,7 @@ xfs_qm_export_dquot(
 #endif
 }
 
-STATIC uint
+static uint
 xfs_qm_import_qtype_flags(
 	uint uflags)
 {
@@ -956,7 +956,7 @@ xfs_qm_import_qtype_flags(
 		XFS_DQ_USER : XFS_DQ_GROUP;
 }
 
-STATIC uint
+static uint
 xfs_qm_export_qtype_flags(
 	uint flags)
 {
@@ -971,7 +971,7 @@ xfs_qm_export_qtype_flags(
 		XFS_USER_QUOTA : XFS_GROUP_QUOTA;
 }
 
-STATIC uint
+static uint
 xfs_qm_import_flags(
 	uint uflags)
 {
@@ -989,7 +989,7 @@ xfs_qm_import_flags(
 }
 
 
-STATIC uint
+static uint
 xfs_qm_export_flags(
 	uint flags)
 {
@@ -1156,7 +1156,7 @@ typedef struct dqtest {
 	xfs_qcnt_t	d_icount;	/* # inodes owned by the user */
 } xfs_dqtest_t;
 
-STATIC void
+static void
 xfs_qm_hashinsert(xfs_dqhash_t *h, xfs_dqtest_t *dqp)
 {
 	xfs_dquot_t *d;
@@ -1168,7 +1168,7 @@ xfs_qm_hashinsert(xfs_dqhash_t *h, xfs_dqtest_t *dqp)
 	(h)->qh_version++;
 	(h)->qh_nelems++;
 }
-STATIC void
+static void
 xfs_qm_dqtest_print(
 	xfs_dqtest_t	*d)
 {
@@ -1181,7 +1181,7 @@ xfs_qm_dqtest_print(
 	printk("---------------------------\n");
 }
 
-STATIC void
+static void
 xfs_qm_dqtest_failed(
 	xfs_dqtest_t	*d,
 	xfs_dquot_t	*dqp,
@@ -1202,7 +1202,7 @@ xfs_qm_dqtest_failed(
 		xfs_qm_dqprint(dqp);
 }
 
-STATIC int
+static int
 xfs_dqtest_cmp2(
 	xfs_dqtest_t	*d,
 	xfs_dquot_t	*dqp)
@@ -1245,7 +1245,7 @@ xfs_dqtest_cmp2(
 	return (err);
 }
 
-STATIC void
+static void
 xfs_dqtest_cmp(
 	xfs_dqtest_t	*d)
 {
@@ -1262,7 +1262,7 @@ xfs_dqtest_cmp(
 	xfs_qm_dqput(dqp);
 }
 
-STATIC int
+static int
 xfs_qm_internalqcheck_dqget(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	id,
@@ -1291,7 +1291,7 @@ xfs_qm_internalqcheck_dqget(
 	return (0);
 }
 
-STATIC void
+static void
 xfs_qm_internalqcheck_get_dquots(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	uid,
@@ -1306,7 +1306,7 @@ xfs_qm_internalqcheck_get_dquots(
 }
 
 
-STATIC void
+static void
 xfs_qm_internalqcheck_dqadjust(
 	xfs_inode_t		*ip,
 	xfs_dqtest_t		*d)
@@ -1315,7 +1315,7 @@ xfs_qm_internalqcheck_dqadjust(
 	d->d_bcount += (xfs_qcnt_t)ip->i_d.di_nblocks;
 }
 
-STATIC int
+static int
 xfs_qm_internalqcheck_adjust(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */

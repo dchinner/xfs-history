@@ -139,7 +139,7 @@ xfs_chash_free(xfs_mount_t *mp)
  * bno -- the block number starting the buffer containing the inode,
  *	  if known (as by bulkstat), else 0.
  */
-STATIC int
+static int
 xfs_iget_core(
 	vnode_t		*vp,
 	xfs_mount_t	*mp,

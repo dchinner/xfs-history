@@ -40,7 +40,7 @@
 	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops); \
 	ASSERT(xbdp);
 
-STATIC int prohibited_mr_events(vnode_t	*vp);
+static int prohibited_mr_events(vnode_t	*vp);
 
 /* Structure used to hold the on-disk version of a dm_attrname_t.  All
    on-disk attribute names start with the 8-byte string "SGI_DMI_".
@@ -55,9 +55,9 @@ typedef struct	{
    changed!
 */
 
-STATIC	const	char	dmattr_prefix[DMATTR_PREFIXLEN + 1] = DMATTR_PREFIXSTRING;
+static	const	char	dmattr_prefix[DMATTR_PREFIXLEN + 1] = DMATTR_PREFIXSTRING;
 
-STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
+static	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 
 
 /* See xfs_dm_get_dmattr() for a description of why this is needed. */
@@ -198,7 +198,7 @@ xfs_dm_send_create_event(
  *
  */
 
-STATIC int
+static int
 prohibited_mr_events(vnode_t	*vp)
 {
 	int	prohibited;
@@ -226,7 +226,7 @@ prohibited_mr_events(vnode_t	*vp)
 
 
 #ifdef	DEBUG_RIGHTS
-STATIC int
+static int
 xfs_bdp_to_hexhandle(
 	bhv_desc_t	*bdp,
 	u_int		type,
@@ -268,7 +268,7 @@ xfs_bdp_to_hexhandle(
    happens to be non-NULL.
 */
 
-STATIC int
+static int
 xfs_copyin_attrname(
 	dm_attrname_t	*from,		/* dm_attrname_t in user space */
 	dm_dkattrname_t *to)		/* name buffer in kernel space */
@@ -299,7 +299,7 @@ xfs_copyin_attrname(
    The inode must be kept locked SHARED by the caller.
 */
 
-STATIC void
+static void
 xfs_ip_to_stat(
 	xfs_mount_t	*mp,
 	dm_stat_t	*buf,
@@ -409,7 +409,7 @@ xfs_ip_to_stat(
  * with the dm_stat structure for the file.
  */
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -476,7 +476,7 @@ xfs_dm_bulkstat_one(
 }
 
 
-STATIC int
+static int
 xfs_get_dirents(
 	xfs_inode_t	*dirp,
 	void		*bufp,
@@ -512,7 +512,7 @@ xfs_get_dirents(
 }
 
 
-STATIC int
+static int
 xfs_dirents_to_stats(
 	xfs_mount_t	*mp,
 	xfs_dirent_t	*direntp,	/* array of dirent structs */
@@ -613,7 +613,7 @@ xfs_dirents_to_stats(
 
 /* xfs_dm_f_get_eventlist - return the dm_eventset_t mask for inode vp. */
 
-STATIC int
+static int
 xfs_dm_f_get_eventlist(
 	bhv_desc_t	*bdp,
 	dm_right_t	right,
@@ -655,7 +655,7 @@ xfs_dm_f_get_eventlist(
    bits from zero to maxevent-1 are being replaced; higher bits are preserved.
 */
 
-STATIC int
+static int
 xfs_dm_f_set_eventlist(
 	bhv_desc_t	*bdp,
 	dm_right_t	right,
@@ -720,7 +720,7 @@ xfs_dm_f_set_eventlist(
 
 /* xfs_dm_fs_get_eventlist - return the dm_eventset_t mask for filesystem vfsp. */
 
-STATIC int
+static int
 xfs_dm_fs_get_eventlist(
 	bhv_desc_t	*bdp,
 	dm_right_t	right,
@@ -756,7 +756,7 @@ xfs_dm_fs_get_eventlist(
    higher bits are preserved.
 */
 
-STATIC int
+static int
 xfs_dm_fs_set_eventlist(
 	bhv_desc_t	*bdp,
 	dm_right_t	right,
@@ -789,7 +789,7 @@ xfs_dm_fs_set_eventlist(
    order for this to work!
 */
 
-STATIC int
+static int
 xfs_dm_direct_ok(
 	bhv_desc_t	*bdp,
 	dm_off_t	off,
@@ -842,7 +842,7 @@ xfs_dm_direct_ok(
    the file's pathname.	 All we have is a handle.
 */
 
-STATIC int
+static int
 xfs_dm_rdwr(
 	vnode_t		*vp,
 	uint		fflag,
@@ -966,7 +966,7 @@ found:
 }
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_clear_inherit(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -977,7 +977,7 @@ xfs_dm_clear_inherit(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_create_by_handle(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -990,7 +990,7 @@ xfs_dm_create_by_handle(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_downgrade_right(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1024,7 +1024,7 @@ xfs_dm_downgrade_right(
    buggy.)
 */
 
-STATIC int
+static int
 xfs_dm_get_allocinfo_rvp(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1141,7 +1141,7 @@ xfs_dm_get_allocinfo_rvp(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_get_bulkall_rvp(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1158,7 +1158,7 @@ xfs_dm_get_bulkall_rvp(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_get_bulkattr_rvp(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1248,7 +1248,7 @@ xfs_dm_get_bulkattr_rvp(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_get_config(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1309,7 +1309,7 @@ xfs_dm_get_config(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_get_config_events(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1342,7 +1342,7 @@ xfs_dm_get_config_events(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_get_destroy_dmattr(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1442,7 +1442,7 @@ xfs_dm_get_destroy_dmattr(
    Taken from xfs_ioctl(XFS_IOC_DIOINFO) on Linux.
 */
 
-STATIC int
+static int
 xfs_dm_get_dioinfo(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1484,7 +1484,7 @@ xfs_dm_get_dioinfo(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_get_dirattrs_rvp(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1619,7 +1619,7 @@ xfs_dm_get_dirattrs_rvp(
 }
 
 
-STATIC int
+static int
 xfs_dm_get_dmattr(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1686,7 +1686,7 @@ xfs_dm_get_dmattr(
 	return(error);
 }
 
-STATIC int
+static int
 xfs_dm_get_eventlist(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1712,7 +1712,7 @@ xfs_dm_get_eventlist(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_get_fileattr(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1750,7 +1750,7 @@ xfs_dm_get_fileattr(
    DM_REGION_WRITE, and DM_REGION_TRUNCATE flags for that single region.
 */
 
-STATIC int
+static int
 xfs_dm_get_region(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1798,7 +1798,7 @@ xfs_dm_get_region(
 }
 
 
-STATIC int
+static int
 xfs_dm_getall_dmattr(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1944,7 +1944,7 @@ xfs_dm_getall_dmattr(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_getall_inherit(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1964,7 +1964,7 @@ xfs_dm_getall_inherit(
 */
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_init_attrloc(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1982,7 +1982,7 @@ xfs_dm_init_attrloc(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_mkdir_by_handle(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -1995,7 +1995,7 @@ xfs_dm_mkdir_by_handle(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_probe_hole(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2042,7 +2042,7 @@ xfs_dm_probe_hole(
 }
 
 
-STATIC int
+static int
 xfs_dm_punch_hole(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2154,7 +2154,7 @@ xfs_dm_punch_hole(
 }
 
 
-STATIC int
+static int
 xfs_dm_read_invis_rvp(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2171,7 +2171,7 @@ xfs_dm_read_invis_rvp(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_release_right(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2195,7 +2195,7 @@ xfs_dm_release_right(
 }
 
 
-STATIC int
+static int
 xfs_dm_remove_dmattr(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2225,7 +2225,7 @@ xfs_dm_remove_dmattr(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_request_right(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2251,7 +2251,7 @@ xfs_dm_request_right(
 }
 
 
-STATIC int
+static int
 xfs_dm_set_dmattr(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2293,7 +2293,7 @@ xfs_dm_set_dmattr(
 	return(error);
 }
 
-STATIC int
+static int
 xfs_dm_set_eventlist(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2319,7 +2319,7 @@ xfs_dm_set_eventlist(
  *  This turned out not XFS-specific, but leave it here with get_fileattr.
  */
 
-STATIC int
+static int
 xfs_dm_set_fileattr(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2386,7 +2386,7 @@ xfs_dm_set_fileattr(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_set_inherit(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2397,7 +2397,7 @@ xfs_dm_set_inherit(
 }
 
 
-STATIC int
+static int
 xfs_dm_set_region(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2491,7 +2491,7 @@ xfs_dm_set_region(
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_symlink_by_handle(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2504,7 +2504,7 @@ xfs_dm_symlink_by_handle(
 }
 
 
-STATIC int
+static int
 xfs_dm_sync_by_handle (
 	vnode_t		*vp,
 	dm_right_t	right)
@@ -2520,7 +2520,7 @@ xfs_dm_sync_by_handle (
 
 
 /* ARGSUSED */
-STATIC int
+static int
 xfs_dm_upgrade_right(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2544,7 +2544,7 @@ xfs_dm_upgrade_right(
 }
 
 
-STATIC int
+static int
 xfs_dm_write_invis_rvp(
 	vnode_t		*vp,
 	dm_right_t	right,
@@ -2565,7 +2565,7 @@ xfs_dm_write_invis_rvp(
 }
 
 
-STATIC void
+static void
 xfs_dm_obj_ref_hold(
 	vnode_t		*vp)
 {
@@ -2573,7 +2573,7 @@ xfs_dm_obj_ref_hold(
 }
 
 
-STATIC fsys_function_vector_t	xfs_fsys_vector[DM_FSYS_MAX];
+static fsys_function_vector_t	xfs_fsys_vector[DM_FSYS_MAX];
 
 
 int

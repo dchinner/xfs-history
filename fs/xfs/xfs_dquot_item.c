@@ -38,7 +38,7 @@
  * returns the number of iovecs needed to log the given dquot item.
  */
 /* ARGSUSED */
-STATIC uint
+static uint
 xfs_qm_dquot_logitem_size(
 	xfs_dq_logitem_t	*logitem)
 {
@@ -51,7 +51,7 @@ xfs_qm_dquot_logitem_size(
 /*
  * fills in the vector of log iovecs for the given dquot log item.
  */
-STATIC void
+static void
 xfs_qm_dquot_logitem_format(
 	xfs_dq_logitem_t	*logitem,
 	xfs_log_iovec_t		*logvec)
@@ -74,7 +74,7 @@ xfs_qm_dquot_logitem_format(
  * Increment the pin count of the given dquot.
  * This value is protected by pinlock spinlock in the xQM structure.
  */
-STATIC void
+static void
 xfs_qm_dquot_logitem_pin(
 	xfs_dq_logitem_t *logitem)
 {
@@ -93,7 +93,7 @@ xfs_qm_dquot_logitem_pin(
  * anyone in xfs_dqwait_unpin() if the count goes to 0.	 The
  * dquot must have been previously pinned with a call to xfs_dqpin().
  */
-STATIC void
+static void
 xfs_qm_dquot_logitem_unpin(
 	xfs_dq_logitem_t *logitem)
 {
@@ -111,7 +111,7 @@ xfs_qm_dquot_logitem_unpin(
 }
 
 /* ARGSUSED */
-STATIC void
+static void
 xfs_qm_dquot_logitem_unpin_remove(
 	xfs_dq_logitem_t *logitem,
 	xfs_trans_t	 *tp)
@@ -125,7 +125,7 @@ xfs_qm_dquot_logitem_unpin_remove(
  * we simply get xfs_qm_dqflush() to do the work, and unlock the dquot
  * at the end.
  */
-STATIC void
+static void
 xfs_qm_dquot_logitem_push(
 	xfs_dq_logitem_t	*logitem)
 {
@@ -150,7 +150,7 @@ xfs_qm_dquot_logitem_push(
 }
 
 /*ARGSUSED*/
-STATIC xfs_lsn_t
+static xfs_lsn_t
 xfs_qm_dquot_logitem_committed(
 	xfs_dq_logitem_t	*l,
 	xfs_lsn_t		lsn)
@@ -202,7 +202,7 @@ xfs_qm_dqunpin_wait(
  * search the buffercache can be a time consuming thing, and AIL_LOCK is a
  * spinlock.
  */
-STATIC void
+static void
 xfs_qm_dquot_logitem_pushbuf(
 	xfs_dq_logitem_t    *qip)
 {
@@ -278,7 +278,7 @@ xfs_qm_dquot_logitem_pushbuf(
  * We delay doing so until the push routine, though, to avoid sleeping
  * in any device strategy routines.
  */
-STATIC uint
+static uint
 xfs_qm_dquot_logitem_trylock(
 	xfs_dq_logitem_t	*qip)
 {
@@ -336,7 +336,7 @@ xfs_qm_dquot_logitem_trylock(
  * are specific to the current transaction.  If the
  * hold flags is set, do not unlock the dquot.
  */
-STATIC void
+static void
 xfs_qm_dquot_logitem_unlock(
 	xfs_dq_logitem_t    *ql)
 {
@@ -366,7 +366,7 @@ xfs_qm_dquot_logitem_unlock(
  * must not be dirty within the transaction.  We simply unlock just
  * as if the transaction had been cancelled.
  */
-STATIC void
+static void
 xfs_qm_dquot_logitem_abort(
 	xfs_dq_logitem_t    *ql)
 {
@@ -379,7 +379,7 @@ xfs_qm_dquot_logitem_abort(
  * push on the dependency recorded in the dquot
  */
 /* ARGSUSED */
-STATIC void
+static void
 xfs_qm_dquot_logitem_committing(
 	xfs_dq_logitem_t	*l,
 	xfs_lsn_t		lsn)
@@ -450,7 +450,7 @@ xfs_qm_dquot_logitem_init(
  * quotaoff_log_format structure.
  */
 /*ARGSUSED*/
-STATIC uint
+static uint
 xfs_qm_qoff_logitem_size(xfs_qoff_logitem_t *qf)
 {
 	return (1);
@@ -463,7 +463,7 @@ xfs_qm_qoff_logitem_size(xfs_qoff_logitem_t *qf)
  * It is at this point that we assert that all of the extent
  * slots in the quotaoff item have been filled.
  */
-STATIC void
+static void
 xfs_qm_qoff_logitem_format(xfs_qoff_logitem_t	*qf,
 			   xfs_log_iovec_t	*log_vector)
 {
@@ -479,7 +479,7 @@ xfs_qm_qoff_logitem_format(xfs_qoff_logitem_t	*qf,
  * Pinning has no meaning for an quotaoff item, so just return.
  */
 /*ARGSUSED*/
-STATIC void
+static void
 xfs_qm_qoff_logitem_pin(xfs_qoff_logitem_t *qf)
 {
 	return;
@@ -491,14 +491,14 @@ xfs_qm_qoff_logitem_pin(xfs_qoff_logitem_t *qf)
  * not either.
  */
 /*ARGSUSED*/
-STATIC void
+static void
 xfs_qm_qoff_logitem_unpin(xfs_qoff_logitem_t *qf)
 {
 	return;
 }
 
 /*ARGSUSED*/
-STATIC void
+static void
 xfs_qm_qoff_logitem_unpin_remove(xfs_qoff_logitem_t *qf, xfs_trans_t *tp)
 {
 	return;
@@ -508,7 +508,7 @@ xfs_qm_qoff_logitem_unpin_remove(xfs_qoff_logitem_t *qf, xfs_trans_t *tp)
  * Quotaoff items have no locking, so just return success.
  */
 /*ARGSUSED*/
-STATIC uint
+static uint
 xfs_qm_qoff_logitem_trylock(xfs_qoff_logitem_t *qf)
 {
 	return XFS_ITEM_LOCKED;
@@ -519,7 +519,7 @@ xfs_qm_qoff_logitem_trylock(xfs_qoff_logitem_t *qf)
  * so that the caller doesn't bother with us.
  */
 /*ARGSUSED*/
-STATIC void
+static void
 xfs_qm_qoff_logitem_unlock(xfs_qoff_logitem_t *qf)
 {
 	return;
@@ -530,7 +530,7 @@ xfs_qm_qoff_logitem_unlock(xfs_qoff_logitem_t *qf)
  * so simply return the lsn at which it's been logged.
  */
 /*ARGSUSED*/
-STATIC xfs_lsn_t
+static xfs_lsn_t
 xfs_qm_qoff_logitem_committed(xfs_qoff_logitem_t *qf, xfs_lsn_t lsn)
 {
 	return (lsn);
@@ -541,7 +541,7 @@ xfs_qm_qoff_logitem_committed(xfs_qoff_logitem_t *qf, xfs_lsn_t lsn)
  * Just clean up after ourselves.
  * Shouldn't this never happen in the case of qoffend logitems? XXX
  */
-STATIC void
+static void
 xfs_qm_qoff_logitem_abort(xfs_qoff_logitem_t *qf)
 {
 	kmem_free(qf, sizeof(xfs_qoff_logitem_t));
@@ -552,7 +552,7 @@ xfs_qm_qoff_logitem_abort(xfs_qoff_logitem_t *qf)
  * stuck waiting for the log to be flushed to disk.
  */
 /*ARGSUSED*/
-STATIC void
+static void
 xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *qf)
 {
 	return;
@@ -560,7 +560,7 @@ xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *qf)
 
 
 /*ARGSUSED*/
-STATIC xfs_lsn_t
+static xfs_lsn_t
 xfs_qm_qoffend_logitem_committed(
 	xfs_qoff_logitem_t *qfe,
 	xfs_lsn_t lsn)
@@ -595,14 +595,14 @@ xfs_qm_qoffend_logitem_committed(
  * then maybe we don't need two.
  */
 /* ARGSUSED */
-STATIC void
+static void
 xfs_qm_qoff_logitem_committing(xfs_qoff_logitem_t *qip, xfs_lsn_t commit_lsn)
 {
 	return;
 }
 
 /* ARGSUSED */
-STATIC void
+static void
 xfs_qm_qoffend_logitem_committing(xfs_qoff_logitem_t *qip, xfs_lsn_t commit_lsn)
 {
 	return;

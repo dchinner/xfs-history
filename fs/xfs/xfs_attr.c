@@ -45,30 +45,30 @@
 /*
  * Internal routines when attribute list fits inside the inode.
  */
-STATIC int xfs_attr_shortform_addname(xfs_da_args_t *args);
+static int xfs_attr_shortform_addname(xfs_da_args_t *args);
 
 /*
  * Internal routines when attribute list is one block.
  */
-STATIC int xfs_attr_leaf_addname(xfs_da_args_t *args);
-STATIC int xfs_attr_leaf_removename(xfs_da_args_t *args);
-STATIC int xfs_attr_leaf_list(xfs_attr_list_context_t *context);
+static int xfs_attr_leaf_addname(xfs_da_args_t *args);
+static int xfs_attr_leaf_removename(xfs_da_args_t *args);
+static int xfs_attr_leaf_list(xfs_attr_list_context_t *context);
 
 /*
  * Internal routines when attribute list is more than one block.
  */
-STATIC int xfs_attr_node_addname(xfs_da_args_t *args);
-STATIC int xfs_attr_node_removename(xfs_da_args_t *args);
-STATIC int xfs_attr_node_list(xfs_attr_list_context_t *context);
-STATIC int xfs_attr_fillstate(xfs_da_state_t *state);
-STATIC int xfs_attr_refillstate(xfs_da_state_t *state);
+static int xfs_attr_node_addname(xfs_da_args_t *args);
+static int xfs_attr_node_removename(xfs_da_args_t *args);
+static int xfs_attr_node_list(xfs_attr_list_context_t *context);
+static int xfs_attr_fillstate(xfs_da_state_t *state);
+static int xfs_attr_refillstate(xfs_da_state_t *state);
 
 /*
  * Routines to manipulate out-of-line attribute values.
  */
-STATIC int xfs_attr_rmtval_get(xfs_da_args_t *args);
-STATIC int xfs_attr_rmtval_set(xfs_da_args_t *args);
-STATIC int xfs_attr_rmtval_remove(xfs_da_args_t *args);
+static int xfs_attr_rmtval_get(xfs_da_args_t *args);
+static int xfs_attr_rmtval_set(xfs_da_args_t *args);
+static int xfs_attr_rmtval_remove(xfs_da_args_t *args);
 
 #define ATTR_RMTVALUE_MAPSIZE	1	/* # of map entries at once */
 #define ATTR_RMTVALUE_TRANSBLKS 8	/* max # of blks in a transaction */
@@ -782,7 +782,7 @@ out:
  * Add a name to the shortform attribute list structure
  * This is the external routine.
  */
-STATIC int
+static int
 xfs_attr_shortform_addname(xfs_da_args_t *args)
 {
 	int newsize, retval;
@@ -1018,7 +1018,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
  * This leaf block cannot have a "remote" value, we only call this routine
  * if bmap_one_block() says there is only one block (ie: no remote blks).
  */
-STATIC int
+static int
 xfs_attr_leaf_removename(xfs_da_args_t *args)
 {
 	xfs_inode_t *dp;
@@ -1112,7 +1112,7 @@ xfs_attr_leaf_get(xfs_da_args_t *args)
 /*
  * Copy out attribute entries for attr_list(), for leaf attribute lists.
  */
-STATIC int
+static int
 xfs_attr_leaf_list(xfs_attr_list_context_t *context)
 {
 	xfs_attr_leafblock_t *leaf;
@@ -1151,7 +1151,7 @@ xfs_attr_leaf_list(xfs_attr_list_context_t *context)
  * "Remote" attribute values confuse the issue and atomic rename operations
  * add a whole extra layer of confusion on top of that.
  */
-STATIC int
+static int
 xfs_attr_node_addname(xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
@@ -1413,7 +1413,7 @@ out:
  * leaf nodes and even joining intermediate nodes up to and including
  * the root node (a special case of an intermediate node).
  */
-STATIC int
+static int
 xfs_attr_node_removename(xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
@@ -1583,7 +1583,7 @@ out:
  * This is done so that we can quickly reattach ourselves to those buffers
  * after some set of transaction commit's has released these buffers.
  */
-STATIC int
+static int
 xfs_attr_fillstate(xfs_da_state_t *state)
 {
 	xfs_da_state_path_t *path;
@@ -1631,7 +1631,7 @@ xfs_attr_fillstate(xfs_da_state_t *state)
  * This is done after some set of transaction commit's has released those
  * buffers from our grip.
  */
-STATIC int
+static int
 xfs_attr_refillstate(xfs_da_state_t *state)
 {
 	xfs_da_state_path_t *path;
@@ -1733,7 +1733,7 @@ xfs_attr_node_get(xfs_da_args_t *args)
 	return(retval);
 }
 
-STATIC int							/* error */
+static int							/* error */
 xfs_attr_node_list(xfs_attr_list_context_t *context)
 {
 	attrlist_cursor_kern_t *cursor;
@@ -1876,7 +1876,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
  * Read the value associated with an attribute from the out-of-line buffer
  * that we stored it in.
  */
-STATIC int
+static int
 xfs_attr_rmtval_get(xfs_da_args_t *args)
 {
 	xfs_bmbt_irec_t map[ATTR_RMTVALUE_MAPSIZE];
@@ -1931,7 +1931,7 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
  * Write the value associated with an attribute into the out-of-line buffer
  * that we have defined for it.
  */
-STATIC int
+static int
 xfs_attr_rmtval_set(xfs_da_args_t *args)
 {
 	xfs_mount_t *mp;
@@ -2064,7 +2064,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
  * Remove the value associated with an attribute by deleting the
  * out-of-line buffer that it is stored on.
  */
-STATIC int
+static int
 xfs_attr_rmtval_remove(xfs_da_args_t *args)
 {
 	xfs_mount_t *mp;

@@ -151,8 +151,4 @@ extern struct pbstats pbstats;
 
 #define PB_STATS_INC(count)	( count ++ )
 
-#ifndef STATIC
-# define STATIC static
-#endif
-
 #endif /* __PAGE_BUF_PRIVATE_H__ */

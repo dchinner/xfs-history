@@ -53,40 +53,40 @@
 /*
  * Routines used for growing the Btree.
  */
-STATIC int xfs_da_root_split(xfs_da_state_t *state,
+static int xfs_da_root_split(xfs_da_state_t *state,
 					    xfs_da_state_blk_t *existing_root,
 					    xfs_da_state_blk_t *new_child);
-STATIC int xfs_da_node_split(xfs_da_state_t *state,
+static int xfs_da_node_split(xfs_da_state_t *state,
 					    xfs_da_state_blk_t *existing_blk,
 					    xfs_da_state_blk_t *split_blk,
 					    xfs_da_state_blk_t *blk_to_add,
 					    int treelevel,
 					    int *result);
-STATIC void xfs_da_node_rebalance(xfs_da_state_t *state,
+static void xfs_da_node_rebalance(xfs_da_state_t *state,
 					 xfs_da_state_blk_t *node_blk_1,
 					 xfs_da_state_blk_t *node_blk_2);
-STATIC void xfs_da_node_add(xfs_da_state_t *state,
+static void xfs_da_node_add(xfs_da_state_t *state,
 				   xfs_da_state_blk_t *old_node_blk,
 				   xfs_da_state_blk_t *new_node_blk);
 
 /*
  * Routines used for shrinking the Btree.
  */
-STATIC int xfs_da_root_join(xfs_da_state_t *state,
+static int xfs_da_root_join(xfs_da_state_t *state,
 					   xfs_da_state_blk_t *root_blk);
-STATIC int xfs_da_node_toosmall(xfs_da_state_t *state, int *retval);
-STATIC void xfs_da_node_remove(xfs_da_state_t *state,
+static int xfs_da_node_toosmall(xfs_da_state_t *state, int *retval);
+static void xfs_da_node_remove(xfs_da_state_t *state,
 					      xfs_da_state_blk_t *drop_blk);
-STATIC void xfs_da_node_unbalance(xfs_da_state_t *state,
+static void xfs_da_node_unbalance(xfs_da_state_t *state,
 					 xfs_da_state_blk_t *src_node_blk,
 					 xfs_da_state_blk_t *dst_node_blk);
 
 /*
  * Utility routines.
  */
-STATIC uint	xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count);
-STATIC int	xfs_da_node_order(xfs_dabuf_t *node1_bp, xfs_dabuf_t *node2_bp);
-STATIC xfs_dabuf_t *xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra);
+static uint	xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count);
+static int	xfs_da_node_order(xfs_dabuf_t *node1_bp, xfs_dabuf_t *node2_bp);
+static xfs_dabuf_t *xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra);
 
 
 /*========================================================================
@@ -318,7 +318,7 @@ xfs_da_split(xfs_da_state_t *state)
  * parts (the split old root) that we just created.  Copy block zero to
  * the EOF, extending the inode in process.
  */
-STATIC int						/* error */
+static int						/* error */
 xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 				 xfs_da_state_blk_t *blk2)
 {
@@ -403,7 +403,7 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 /*
  * Split the node, rebalance, then add the new entry.
  */
-STATIC int						/* error */
+static int						/* error */
 xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 				 xfs_da_state_blk_t *newblk,
 				 xfs_da_state_blk_t *addblk,
@@ -491,7 +491,7 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
  *
  * NOTE: if blk2 is empty, then it will get the upper half of blk1.
  */
-STATIC void
+static void
 xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 				     xfs_da_state_blk_t *blk2)
 {
@@ -601,7 +601,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 /*
  * Add a new entry to an intermediate node.
  */
-STATIC void
+static void
 xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 			       xfs_da_state_blk_t *newblk)
 {
@@ -749,7 +749,7 @@ xfs_da_join(xfs_da_state_t *state)
  * We have only one entry in the root.	Copy the only remaining child of
  * the old root to block 0 as the new root node.
  */
-STATIC int
+static int
 xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 {
 	xfs_da_intnode_t *oldroot;
@@ -809,7 +809,7 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
  * If it can be collapsed, fill in the state structure and return 1.
  * If nothing can be done, return 0.
  */
-STATIC int
+static int
 xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 {
 	xfs_da_intnode_t *node;
@@ -987,7 +987,7 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 /*
  * Remove an entry from an intermediate node.
  */
-STATIC void
+static void
 xfs_da_node_remove(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk)
 {
 	xfs_da_intnode_t *node;
@@ -1028,7 +1028,7 @@ xfs_da_node_remove(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk)
  * Unbalance the btree elements between two intermediate nodes,
  * move all Btree elements from one node into another.
  */
-STATIC void
+static void
 xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 				     xfs_da_state_blk_t *save_blk)
 {
@@ -1360,7 +1360,7 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 /*
  * Compare two intermediate nodes for "order".
  */
-STATIC int
+static int
 xfs_da_node_order(xfs_dabuf_t *node1_bp, xfs_dabuf_t *node2_bp)
 {
 	xfs_da_intnode_t *node1, *node2;
@@ -1382,7 +1382,7 @@ xfs_da_node_order(xfs_dabuf_t *node1_bp, xfs_dabuf_t *node2_bp)
 /*
  * Pick up the last hashvalue from an intermediate node.
  */
-STATIC uint
+static uint
 xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count)
 {
 	xfs_da_intnode_t *node;
@@ -1760,7 +1760,7 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
  * last block in the file can always be removed since it can't cause
  * a bmap btree split to do that.
  */
-STATIC int
+static int
 xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		      xfs_dabuf_t **dead_bufp)
 {
@@ -2010,7 +2010,7 @@ done:
  * See if the mapping(s) for this btree block are valid, i.e.
  * don't contain holes, are logically contiguous, and cover the whole range.
  */
-STATIC int
+static int
 xfs_da_map_covers_blocks(
 	int		nmap,
 	xfs_bmbt_irec_t *mapp,
@@ -2037,7 +2037,7 @@ xfs_da_map_covers_blocks(
  * Make a dabuf.
  * Used for get_buf, read_buf, read_bufr, and reada_buf.
  */
-STATIC int
+static int
 xfs_da_do_buf(
 	xfs_trans_t	*trans,
 	xfs_inode_t	*dp,
@@ -2361,7 +2361,7 @@ lock_t		xfs_dabuf_global_lock;
  * Create a dabuf.
  */
 /* ARGSUSED */
-STATIC xfs_dabuf_t *
+static xfs_dabuf_t *
 xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 {
 	xfs_buf_t	*bp;
@@ -2422,7 +2422,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 /*
  * Un-dirty a dabuf.
  */
-STATIC void
+static void
 xfs_da_buf_clean(xfs_dabuf_t *dabuf)
 {
 	xfs_buf_t	*bp;
