@@ -15,6 +15,7 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
+#include <sys/ktrace.h>
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
@@ -42,6 +43,12 @@
 #if !defined(SIM) || !defined(XFSDEBUG)
 #define	kmem_check()		/* dummy for memory-allocation checking */
 #endif
+
+/*
+ * Allocation tracing.
+ */
+#define	XFS_ALLOC_TRACE_SIZE	10240
+ktrace_t	*xfs_alloc_trace_buf;
 
 /*
  * Prototypes for internal functions.
@@ -86,6 +93,67 @@ xfs_alloc_read_agf(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags);		/* XFS_ALLOC_FLAG_... */
+
+#if defined(DEBUG) && !defined(SIM)
+/*
+ * Put an entry in the allocation trace buffer.
+ */
+STATIC void
+xfs_alloc_trace_addentry(
+	int		tag,		/* XFS_ALLOC_KTRACE_... */
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_mount_t	*mp,		/* file system mount point */
+	int		agno,		/* allocation group number */
+	int		agbno,		/* a.g. relative block number */
+	int		minlen,		/* minimum allocation length */
+	int		maxlen,		/* maximum allocation length */
+	int		mod,		/* mod value for extent size */
+	int		prod,		/* prod value for extent size */
+	int		minleft,	/* min left in a.g. after allocation */
+	int		total,		/* total blocks needed in xaction */
+	int		len,		/* length of extent */
+	int		type,		/* allocation type */
+	int		wasdel,		/* set if allocation was prev delayed */
+	int		isfl);		/* set if is freelist allocation/free */
+
+/*
+ * Add an allocation trace entry for an alloc call.
+ */
+STATIC void
+xfs_alloc_trace_alloc(
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_alloc_arg_t	*args);		/* allocation argument structure */
+
+/*
+ * Add an allocation trace entry for a free call.
+ */
+STATIC void
+xfs_alloc_trace_free(
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_mount_t	*mp,		/* file system mount point */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	xfs_agblock_t	agbno,		/* a.g. relative block number */
+	xfs_extlen_t	len,		/* length of extent */
+	int		isfl);		/* set if is freelist allocation/free */
+
+/*
+ * Add an allocation trace entry for modifying an agf.
+ */
+STATIC void
+xfs_alloc_trace_modagf(
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_mount_t	*mp,		/* file system mount point */
+	xfs_agf_t	*agf,		/* new agf value */
+	int		flags);		/* logging flags for agf */
+#else
+#define	xfs_alloc_trace_alloc(n,s,a)
+#define	xfs_alloc_trace_free(n,s,a,b,c,d,e)
+#define	xfs_alloc_trace_modagf(n,s,a,b,c)
+#endif	/* DEBUG && !SIM */
 
 /*
  * Prototypes for per-ag allocation routines
@@ -259,6 +327,93 @@ xfs_alloc_read_agf(
 	return bp;
 }
 
+#if defined(DEBUG) && !defined(SIM)
+/*
+ * Put an entry in the allocation trace buffer.
+ */
+STATIC void
+xfs_alloc_trace_addentry(
+	int		tag,		/* XFS_ALLOC_KTRACE_... */
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_mount_t	*mp,		/* file system mount point */
+	int		agno,		/* allocation group number */
+	int		agbno,		/* a.g. relative block number */
+	int		minlen,		/* minimum allocation length */
+	int		maxlen,		/* maximum allocation length */
+	int		mod,		/* mod value for extent size */
+	int		prod,		/* prod value for extent size */
+	int		minleft,	/* min left in a.g. after allocation */
+	int		total,		/* total blocks needed in xaction */
+	int		len,		/* length of extent */
+	int		type,		/* allocation type */
+	int		wasdel,		/* set if allocation was prev delayed */
+	int		isfl)		/* set if is freelist allocation/free */
+{
+	if (xfs_alloc_trace_buf == NULL)
+		xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE);
+	ktrace_enter(xfs_alloc_trace_buf,
+		(void *)tag, (void *)name, (void *)str, (void *)mp,
+		(void *)agno, (void *)agbno, (void *)minlen, (void *)maxlen,
+		(void *)mod, (void *)prod, (void *)minleft, (void *)total,
+		(void *)len, (void *)type, (void *)wasdel, (void *)isfl);
+}
+
+/*
+ * Add an allocation trace entry for an alloc call.
+ */
+STATIC void
+xfs_alloc_trace_alloc(
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_alloc_arg_t	*args)		/* allocation argument structure */
+{
+	xfs_alloc_trace_addentry(XFS_ALLOC_KTRACE_ALLOC, name, str, args->mp,
+		(int)args->agno, (int)args->agbno, (int)args->minlen,
+		(int)args->maxlen, (int)args->mod, (int)args->prod,
+		(int)args->minleft, (int)args->total, (int)args->len,
+		(int)args->type, args->wasdel, args->isfl);
+}
+
+/*
+ * Add an allocation trace entry for a free call.
+ */
+STATIC void
+xfs_alloc_trace_free(
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_mount_t	*mp,		/* file system mount point */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	xfs_agblock_t	agbno,		/* a.g. relative block number */
+	xfs_extlen_t	len,		/* length of extent */
+	int		isfl)		/* set if is freelist allocation/free */
+{
+	xfs_alloc_trace_addentry(XFS_ALLOC_KTRACE_FREE, name, str, mp,
+		(int)agno, (int)agbno, 0, 0, 0, 0, 0, 0, (int)len, 0, 0, isfl);
+}
+
+/*
+ * Add an allocation trace entry for modifying an agf.
+ */
+STATIC void
+xfs_alloc_trace_modagf(
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_mount_t	*mp,		/* file system mount point */
+	xfs_agf_t	*agf,		/* new agf value */
+	int		flags)		/* logging flags for agf */
+{
+	xfs_alloc_trace_addentry(XFS_ALLOC_KTRACE_MODAGF, name, str, mp,
+		flags, (int)agf->agf_seqno, (int)agf->agf_length,
+		(int)agf->agf_roots[XFS_BTNUM_BNO],
+		(int)agf->agf_roots[XFS_BTNUM_CNT],
+		(int)agf->agf_levels[XFS_BTNUM_BNO],
+		(int)agf->agf_levels[XFS_BTNUM_CNT],
+		(int)agf->agf_freelist, (int)agf->agf_freecount,
+		(int)agf->agf_freeblks, (int)agf->agf_longest, 0);
+}
+#endif	/* DEBUG && !SIM */
+
 /*
  * Allocation group level functions.
  */
@@ -307,6 +462,9 @@ xfs_alloc_ag_vextent(
 		ASSERT(args->len >= args->minlen && args->len <= args->maxlen);
 		agf = XFS_BUF_TO_AGF(args->agbp);
 		agf->agf_freeblks -= args->len;
+		ASSERT(agf->agf_freeblks <= agf->agf_length);
+		xfs_alloc_trace_modagf("xfs_alloc_ag_vextent", NULL, args->mp,
+			agf, XFS_AGF_FREEBLKS);
 		xfs_alloc_log_agf(args->tp, args->agbp, XFS_AGF_FREEBLKS);
 		if (!args->isfl)
 			xfs_trans_mod_sb(args->tp,
@@ -331,6 +489,9 @@ xfs_alloc_ag_vextent_exact(
 	xfs_agblock_t	fbno;	/* start block of found extent */
 	xfs_agblock_t	fend;	/* end block of found extent */
 	xfs_extlen_t	flen;	/* length of found extent */
+#if defined(DEBUG) && !defined(SIM)
+	static char	fname[] = "xfs_alloc_ag_vextent_exact";
+#endif
 	xfs_agblock_t	maxend;	/* end of maximal extent */
 	xfs_agblock_t	minend;	/* end of minimal extent */
 	xfs_extlen_t	rlen;	/* length of returned extent */
@@ -457,6 +618,7 @@ xfs_alloc_ag_vextent_exact(
 	args->len = rlen;
 	ASSERT(args->agbno + args->len <=
 	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+	xfs_alloc_trace_alloc(fname, NULL, args);
 }
 
 /*
@@ -472,6 +634,9 @@ xfs_alloc_ag_vextent_near(
 	xfs_btree_cur_t	*bno_cur_gt;	/* cursor for bno btree, right side */
 	xfs_btree_cur_t	*bno_cur_lt;	/* cursor for bno btree, left side */
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for count btree */
+#if defined(DEBUG) && !defined(SIM)
+	static char	fname[] = "xfs_alloc_ag_vextent_near";
+#endif
 	xfs_agblock_t	gtbno;		/* start bno of right side entry */
 	xfs_extlen_t	gtdiff;		/* difference to right side entry */
 	xfs_agblock_t	gtend;		/* end bno of right side entry */
@@ -515,6 +680,7 @@ xfs_alloc_ag_vextent_near(
 			args->agbno = ltbno;
 			ASSERT(args->agbno + args->len <=
 			       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+			xfs_alloc_trace_alloc(fname, "freelist", args);
 			return;
 		}
 		/*
@@ -673,6 +839,7 @@ xfs_alloc_ag_vextent_near(
 		args->agbno = ltnew;
 		ASSERT(args->agbno + args->len <=
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+		xfs_alloc_trace_alloc(fname, "first", args);
 		return;
 	}
 	/*
@@ -1000,6 +1167,7 @@ xfs_alloc_ag_vextent_near(
 		args->agbno = ltnew;
 		ASSERT(args->agbno + args->len <=
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+		xfs_alloc_trace_alloc(fname, "lt", args);
 	}
 	/*
 	 * On the right side.
@@ -1058,6 +1226,7 @@ xfs_alloc_ag_vextent_near(
 		args->agbno = gtnew;
 		ASSERT(args->agbno + args->len <=
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+		xfs_alloc_trace_alloc(fname, "gt", args);
 	}
 }
 
@@ -1075,6 +1244,9 @@ xfs_alloc_ag_vextent_size(
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for cnt btree */
 	xfs_agblock_t	fbno;		/* start of found freespace */
 	xfs_extlen_t	flen;		/* length of found freespace */
+#if defined(DEBUG) && !defined(SIM)
+	static char	fname[] = "xfs_alloc_ag_vextent_size";
+#endif
 	xfs_extlen_t	rlen;		/* length of returned extent */
 
 	/*
@@ -1101,6 +1273,7 @@ xfs_alloc_ag_vextent_size(
 			args->agbno = fbno;
 			ASSERT(args->agbno + args->len <=
 			       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+			xfs_alloc_trace_alloc(fname, "freelist", args);
 			return;
 		} else
 			flen = 0;
@@ -1172,6 +1345,7 @@ xfs_alloc_ag_vextent_size(
 	args->agbno = fbno;
 	ASSERT(args->agbno + args->len <=
 	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+	xfs_alloc_trace_alloc(fname, "normal", args);
 }
 
 /*
@@ -1188,6 +1362,9 @@ xfs_free_ag_extent(
 {
 	xfs_btree_cur_t	*bno_cur;	/* cursor for by-block btree */
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for by-size btree */
+#if defined(DEBUG) && !defined(SIM)
+	static char	fname[] = "xfs_free_ag_extent";
+#endif
 	xfs_agblock_t	gtbno;		/* start of right neighbor block */
 	xfs_extlen_t	gtlen;		/* length of right neighbor block */
 	int		haveleft;	/* have a left neighbor block */
@@ -1369,10 +1546,13 @@ xfs_free_ag_extent(
 
 		agf = XFS_BUF_TO_AGF(agbp);
 		agf->agf_freeblks += len;
+		ASSERT(agf->agf_freeblks <= agf->agf_length);
+		xfs_alloc_trace_modagf(fname, NULL, mp, agf, XFS_AGF_FREEBLKS);
 		xfs_alloc_log_agf(tp, agbp, XFS_AGF_FREEBLKS);
 		if (!isfl)
 			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, (int)len);
 	}
+	xfs_alloc_trace_free(fname, NULL, mp, agno, bno, len, isfl);
 	return 1;
 }
 
@@ -1401,6 +1581,7 @@ xfs_alloc_ag_freeblks(
 		return 0;
 	agf = XFS_BUF_TO_AGF(agbp);
 	ASSERT(agf->agf_magicnum == XFS_AGF_MAGIC);
+	ASSERT(agf->agf_freeblks <= agf->agf_length);
 	freeblks = agf->agf_freeblks;
 	xfs_trans_brelse(tp, agbp);
 	return freeblks;
@@ -1538,9 +1719,11 @@ xfs_alloc_get_freelist(
 	xfs_alloc_block_t	*block;	/* block's data */
 	xfs_agblock_t		bno;	/* block number returned */
 	buf_t			*bp;	/* buffer for the block */
-	xfs_mount_t		*mp;	/* mount point for filesystem */
+#if defined(DEBUG) && !defined(SIM)
+	static char		fname[] = "xfs_alloc_get_freelist";
+#endif
+	xfs_agblock_t		nbno;	/* next block number on freelist */
 
-	mp = tp->t_mountp;
 	agf = XFS_BUF_TO_AGF(agbp);
 	bno = agf->agf_freelist;
 	/*
@@ -1548,13 +1731,17 @@ xfs_alloc_get_freelist(
 	 */
 	if (bno == NULLAGBLOCK)
 		return NULLAGBLOCK;
-	bp = xfs_btree_read_bufs(mp, tp, agf->agf_seqno, bno, 0);
+	bp = xfs_btree_read_bufs(tp->t_mountp, tp, agf->agf_seqno, bno, 0);
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 	agf->agf_freecount--;
 	/*
 	 * The link to the next block is stored as the first word of the block.
 	 */
-	agf->agf_freelist = *(xfs_agblock_t *)block;
+	nbno = *(xfs_agblock_t *)block;
+	ASSERT(nbno < agf->agf_length);
+	agf->agf_freelist = nbno;
+	xfs_alloc_trace_modagf(fname, NULL, tp->t_mountp, agf,
+		XFS_AGF_FREELIST | XFS_AGF_FREECOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FREELIST | XFS_AGF_FREECOUNT);
 	if (bufp)
 		*bufp = bp;
@@ -1626,6 +1813,9 @@ xfs_alloc_put_freelist(
 	xfs_agf_t		*agf;	/* a.g. freespace structure */
 	xfs_alloc_block_t	*block;	/* data of "bp" */
 	xfs_agblock_t		bno;	/* block number of bp */
+#if defined(DEBUG) && !defined(SIM)
+	static char		fname[] = "xfs_alloc_put_freelist";
+#endif
 
 	agf = XFS_BUF_TO_AGF(agbp);
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
@@ -1637,6 +1827,8 @@ xfs_alloc_put_freelist(
 	bno = XFS_DADDR_TO_AGBNO(tp->t_mountp, bp->b_blkno);
 	agf->agf_freelist = bno;
 	agf->agf_freecount++;
+	xfs_alloc_trace_modagf(fname, NULL, tp->t_mountp, agf,
+		XFS_AGF_FREELIST | XFS_AGF_FREECOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FREELIST | XFS_AGF_FREECOUNT);
 	kmem_check();
 }
