@@ -254,6 +254,7 @@ xfs_open_by_handle(
 	xfs_handle_t		handle;
 	xfs_fsop_handlereq_t	hreq;
 	xfs_inode_t		*ip;
+	vnode_t			*vp;
 
 #ifndef	PERMISSIONS_BY_USER
 	/*
@@ -343,7 +344,8 @@ xfs_open_by_handle(
 		return -XFS_ERROR(ENOENT);
 	}
 
-	inode = XFS_ITOV(ip)->v_inode;
+	vp = XFS_ITOV(ip);
+	inode = LINVFS_GET_IP(vp);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 	linvfs_set_inode_ops(inode);
@@ -582,11 +584,14 @@ xfs_readlink_by_handle(
 
 	vp = XFS_ITOV(ip);
 
-	inode = vp->v_inode;
+	inode = LINVFS_GET_IP(vp);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	linvfs_set_inode_ops(inode);
 	error = linvfs_revalidate_core(inode, ATTR_COMM);
-
+	if (error) {
+		iput(inode);
+		return -XFS_ERROR(error);
+	}
 
 	/*
 	 * Restrict handle operations to symlinks.
@@ -600,8 +605,10 @@ xfs_readlink_by_handle(
 	aiov.iov_base	= hreq.ohandle;
         
         
-	if (copy_from_user(&olen, hreq.ohandlen, sizeof(__u32)))
+	if (copy_from_user(&olen, hreq.ohandlen, sizeof(__u32))){
+	    VN_RELE(vp);
             return -XFS_ERROR(EFAULT);
+	}
 	aiov.iov_len	= olen;
 
 	auio.uio_iov	= &aiov;
@@ -611,7 +618,6 @@ xfs_readlink_by_handle(
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
-	vp = XFS_ITOV(ip);
 	VOP_READLINK(vp, &auio, get_current_cred(), error);
 
 	VN_RELE(vp);
@@ -734,16 +740,21 @@ xfs_fssetdm_by_handle(
 
 	vp = XFS_ITOV(ip);
 
-	inode = vp->v_inode;
+	inode = LINVFS_GET_IP(vp);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	linvfs_set_inode_ops(inode);
 	error = linvfs_revalidate_core(inode, ATTR_COMM);
+	if (error) {
+		iput(inode);
+		return -XFS_ERROR(error);
+	}
 
 	/* copy in the 'struct fsdmidata' */
 
-	if (copy_from_user(&fsd, dmhreq.data, sizeof(fsd)))
+	if (copy_from_user(&fsd, dmhreq.data, sizeof(fsd))){
+		iput(inode);
 		return -XFS_ERROR(EFAULT);
-
+	}
 
 	dmfcntl.dmfc_subfunc = DM_FCNTL_FSSETDM;
 	dmfcntl.u_fcntl.setdmrq.fsd_dmevmask = fsd.fsd_dmevmask;
@@ -896,11 +907,13 @@ xfs_attrctl_by_handle(
 	ops = (attr_op_t *) kmalloc(attr_hreq.count * sizeof(attr_op_t), GFP_KERNEL);
 	
 	if (!ops) {
+		iput(inode);
 		error = -ENOMEM;
 		goto unlock;
 	}
 
 	if (copy_from_user(ops, attr_hreq.ops, attr_hreq.count * sizeof(attr_op_t)) != 0) {
+		iput(inode);
 		error = -EFAULT;
 		goto free_mem;
 	}
