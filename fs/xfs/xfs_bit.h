@@ -1,11 +1,19 @@
 #ifndef _FS_XFS_BIT_H
 #define	_FS_XFS_BIT_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * xFS bit manipulation routines.
  */
+
+/*
+ * masks with n high/low bits set, 32-bit values & 64-bit values
+ */
+#define	XFS_MASK32HI(n)		((__uint32_t)-1 << (32 - (n)))
+#define	XFS_MASK64HI(n)		((__uint64_t)-1 << (64 - (n)))
+#define	XFS_MASK32LO(n)		(((__uint32_t)1 << (n)) - 1)
+#define	XFS_MASK64LO(n)		(((__uint64_t)1 << (n)) - 1)
 
 /*
  * Index of low bit number in byte, -1 for none set, 0..7 otherwise.
