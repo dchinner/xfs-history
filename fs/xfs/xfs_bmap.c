@@ -3258,7 +3258,7 @@ xfs_getbmap(
 		if (map[i].br_startblock == HOLESTARTBLOCK)
 			out.bmv_block = -1;
 		else
-			out.bmv_block = XFS_FSB_TO_BB(ip->i_mount,
+			out.bmv_block = XFS_FSB_TO_DADDR(ip->i_mount,
 				map[i].br_startblock);
 		if (copyout(&out, ap, sizeof(out))) {
 			error = XFS_ERROR(EFAULT);
