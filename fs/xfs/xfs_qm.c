@@ -1,4 +1,4 @@
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.16 $"
 
 
 #include <sys/param.h>
@@ -288,9 +288,10 @@ xfs_qm_mount_quotainit(
 	uint		flags)
 {
 	/*
-	 * User or project quotas has to be on, or we shouldn't be here
+	 * User or project quotas has to be on, or we must have the
+	 * QUOTAMAYBE flag set.
 	 */
-	ASSERT(flags & (XFSMNT_UQUOTA | XFSMNT_PQUOTA));
+	ASSERT(flags & (XFSMNT_UQUOTA | XFSMNT_PQUOTA | XFSMNT_QUOTAMAYBE));
 
 	if (G_xqm == NULL) {
 		if ((G_xqm = xfs_qm_init()) == NULL)
@@ -315,6 +316,16 @@ xfs_qm_mount_quotainit(
 		if (flags & XFSMNT_PQUOTAENF) 
 			mp->m_qflags |= XFS_PQUOTA_ENFD;
 	}
+	/*
+	 * Typically, we turn quotas off if we weren't explicitly asked to mount 
+	 * quotas. This is the mount option not to do that.
+	 * This option is handy in the miniroot, when trying to mount /root.
+	 * We can't really know what's in /etc/fstab until /root is already 
+	 * mounted! This stops quotas getting turned off in the root 
+	 * filesystem everytime the system boots up a miniroot.
+	 */
+	if (flags & XFSMNT_QUOTAMAYBE) 
+		mp->m_qflags |= XFS_QUOTA_MAYBE;
 }
 
 /*
@@ -350,7 +361,19 @@ xfs_qm_mount_quotas(
 	 * If a non-root file system had quotas running earlier, but decided
 	 * to mount without -o quota/pquota options, we revoke the quotachecked
 	 * license, and bail out.
+	 * Unless, of course the XFS_QUOTA_MAYBE flag is specified.
 	 */
+	if (mp->m_qflags & XFS_QUOTA_MAYBE) {
+		mp->m_qflags &= ~(XFS_QUOTA_MAYBE);
+		if (mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT) {
+			mp->m_qflags |= (mp->m_sb.sb_qflags & XFS_MOUNT_QUOTA_ALL);
+			mp->m_qflags |= XFS_UQUOTA_ACTIVE;
+		} 
+		if (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT) {
+			mp->m_qflags |= (mp->m_sb.sb_qflags & XFS_MOUNT_QUOTA_ALL);
+			mp->m_qflags |= XFS_PQUOTA_ACTIVE;
+		}
+	}
 	if (! XFS_IS_QUOTA_ON(mp) &&
 	    (mp->m_dev != rootdev) &&
 	    (mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT))) {
@@ -358,19 +381,18 @@ xfs_qm_mount_quotas(
 		goto write_changes;
 	}
 	    
-#ifdef _IRIX62_XFS_ONLY
 	/*
 	 * If quotas on realtime volumes is not supported, we disable
 	 * quotas immediately.
 	 */
 	if (mp->m_sb.sb_rextents) {
 		cmn_err(CE_NOTE,
-			"Cannot turn quotas on a realtime filesystem :%s",
+			"Cannot turn on quotas for realtime filesystem %s",
 			mp->m_fsname);
 		mp->m_qflags = 0;
 		goto write_changes;
 	}
-#endif
+
 	/*
 	 * If this is the root file system, mark flags in mount struct first.
 	 * We couldn't do this earlier because we didn't have the superblock
@@ -1576,7 +1598,7 @@ xfs_qm_dqiter_bufs(
 		 * we don't have bdflush, and we may fill
 		 * up all available freebufs.
 		 * The workaround here is to push on the
-		 * log and, do a bflush on the rootdev
+		 * log and do a bflush on the rootdev
 		 * periodically.
 		 */
 		if (rootfs) {
@@ -1612,6 +1634,8 @@ xfs_qm_dqiterate(
 	xfs_fileoff_t		lblkno;
 	xfs_filblks_t		maxlblkcnt;
 	xfs_dqid_t		firstid;
+	xfs_fsblock_t		rablkno;
+	xfs_filblks_t		rablkcnt;
 
 	error = 0;
 	/*
@@ -1654,6 +1678,24 @@ xfs_qm_dqiterate(
 
 			firstid = (xfs_dqid_t) map[i].br_startoff * 
 				XFS_QM_DQPERBLK(mp);
+			/*
+			 * Do a read-ahead on the next extent.
+			 */
+			if ((i+1 < nmaps) &&
+			    (map[i+1].br_startblock != HOLESTARTBLOCK)) {
+				rablkcnt =  map[i+1].br_blockcount;
+				rablkno = map[i+1].br_startblock;
+				while (rablkcnt--) {
+					baread(mp->m_dev,
+					       XFS_FSB_TO_DADDR(mp, rablkno),
+					       (int)mp->QI_DQCHUNKLEN);
+					rablkno++;
+				}
+			}
+			/*
+			 * Iterate thru all the blks in the extent and
+			 * reset the counters of all the dquots inside them.
+			 */
 			if (error = xfs_qm_dqiter_bufs(mp, 
 						       firstid,
 						       map[i].br_startblock, 
@@ -2076,7 +2118,7 @@ xfs_qm_shake_freelist(
 			xfs_qm_freelist_unlock(G_xqm);
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS) 
 				return (nreclaimed != howmany);
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dqwants++;
 #endif
 			goto tryagain;
@@ -2093,7 +2135,7 @@ xfs_qm_shake_freelist(
 			ASSERT(dqp->HL_PREVP == NULL);
 			ASSERT(dqp->MPL_PREVP == NULL);
 			ASSERT(dqp->dq_flags == 0);
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dqinact_reclaims++;
 #endif
 			goto off_freelist;
@@ -2173,7 +2215,7 @@ xfs_qm_shake_freelist(
 		XQM_FREELIST_REMOVE(dqp);
 		xfs_dqunlock(dqp);
 		nreclaimed++;
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 		XFSSTATS.xs_qm_dqshake_reclaims++;
 #endif
 		xfs_qm_dqdestroy(dqp);
@@ -2249,7 +2291,7 @@ xfs_qm_dqreclaim_one(void)
 			xfs_qm_freelist_unlock(G_xqm);
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS) 
 				return (NULL);
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dqwants++;
 #endif
 			goto startagain;
@@ -2268,7 +2310,7 @@ xfs_qm_dqreclaim_one(void)
 			XQM_FREELIST_REMOVE(dqp);
 			xfs_dqunlock(dqp);
 			dqpout = dqp;
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dqinact_reclaims++;
 #endif
 			break;
@@ -2357,7 +2399,7 @@ xfs_qm_dqalloc_incore(
 		 * Try to recycle a dquot from the freelist.
 		 */
 		if (dqp = xfs_qm_dqreclaim_one()) {
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dqreclaims++;
 #endif
 			/*
@@ -2369,7 +2411,7 @@ xfs_qm_dqalloc_incore(
 			*O_dqpp = dqp;
 			return (B_FALSE);
 		}
-#ifndef _BANYAN_XFS
+#ifndef _IRIX62_XFS_ONLY
 		XFSSTATS.xs_qm_dqreclaim_misses++;
 #endif
 	}
