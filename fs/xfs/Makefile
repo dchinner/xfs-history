@@ -2,7 +2,7 @@
 # Top-level Makefile for slinx
 #
 
-KERN_SPECS = kernel-2.4.0test1.spec
+KERN_SPECS = kernel-2.4.0.spec
 LIB_SPECS  = 
 #libdba.spec
 CMD_SPECS = 
@@ -64,20 +64,13 @@ i386cmd:
 	done
 
 clean:
-	if [ ! -d $(WORKAREA)/RPMS_${SGI_VERSION} ]; then \
-		rm -rf $(WORKAREA)/RPMS_${SGI_VERSION}; \
-		mv $(WORKAREA)/RPMS $(WORKAREA)/RPMS_${SGI_VERSION}; \
-		mkdir -p $(WORKAREA)/RPMS/{i386,i686,noarch}; \
-		rm -rf $(WORKAREA)/SRPMS_${SGI_VERSION}; \
-		mv $(WORKAREA)/SRPMS $(WORKAREA)/SRPMS_${SGI_VERSION}; \
-		mkdir -p $(WORKAREA)/SRPMS; \
-	fi
+	rm -rf RPMS SRPMS BUILD
 
 realclean: clean
-	rm -rf linux-2.4.0test1
+	rm -rf linux-2.4.0
 	rm kern
 	rm SPECS/_sgi_kvers_
-	if [ -e SPECS/kernel-2.4.0test1.spec.old ] ; then \
-		rm SPECS/kernel-2.4.0test1.spec; \
-		mv SPECS/kernel-2.4.0test1.spec.old SPECS/kernel-2.4.0test1.spec; \
+	if [ -e SPECS/kernel-2.4.0.spec.old ] ; then \
+		rm SPECS/kernel-2.4.0.spec; \
+		mv SPECS/kernel-2.4.0.spec.old SPECS/kernel-2.4.0.spec; \
 	fi
