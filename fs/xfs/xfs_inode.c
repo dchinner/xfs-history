@@ -324,10 +324,20 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
 
 /*
  * Read in extents from a btree-format inode.
+ * Allocate and fill in iu_extents.  Real work is done in xfs_bmap.c.
  */
 void
 xfs_iread_extents(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip)
 {
+	size_t size;
+
+	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE);
+	size = ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t);
+	ip->i_u1.iu_extents = kmem_alloc(size, KM_SLEEP);
+	ip->i_lastex = NULLEXTNUM;
+	ip->i_bytes = size;
+	ip->i_flags |= XFS_IEXTENTS;
+	xfs_bmap_read_extents(mp, tp, ip);
 }
 
 /*
@@ -402,7 +412,8 @@ xfs_ialloc(xfs_trans_t	*tp,
 	case IFREG:
 	case IFDIR:
 	case IFLNK:
-		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL;
+/*		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL; */
+		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 		break;
 	case IFMNT:
 		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
