@@ -22,7 +22,7 @@ checkproc:
 		mount /proc; \
 	fi
 
-tarballs: xfs-cmds
+tarballs: cmds
 	@echo "=== Making $@ `date`"; \
 	cd $(WORKAREA)/SCRIPTS; \
 	./make-tarballs; \
@@ -39,16 +39,7 @@ ifeq ($(ARCH),i386)
 endif
 	echo "=== Done Making $@ `date`";
 
-cmds: xfs-cmds
-	[ ! -d $(WORKAREA)/SRPMS ] \
-		&& mkdir $(WORKAREA)/SRPMS || exit 0
-	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.src.rpm $(WORKAREA)/SRPMS
-	[ ! -d $(WORKAREA)/RPMS/$(ARCH) ] \
-		&& mkdir -p $(WORKAREA)/RPMS/$(ARCH) || exit 0
-	cp $(WORKAREA)/cmd/xfs/build/rpm/xfs-cmds-*.$(ARCH).rpm \
-			$(WORKAREA)/RPMS/$(ARCH)
-
-xfs-cmds:
+cmds:
 	echo "=== Making $@ `date`"
 	for d in $(COMMANDS); do \
 		( cd $(WORKAREA)/$$d && ./Makepkgs verbose ) || exit 1; \
