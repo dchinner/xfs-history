@@ -450,7 +450,7 @@ xfs_rtbuf_get(
 	nmap = 1;
 	flist = NULL;
 	ip = issum ? mp->m_rsumip : mp->m_rbmip;
-	(void)xfs_bmapi(tp, ip, block, 1, 0, NULLFSBLOCK, 0, &map, &nmap, &flist);
+	(void)xfs_bmapi(tp, ip, block, 1, 0, NULLFSBLOCK, 0, &map, &nmap, flist);
 	ASSERT(nmap == 1);
 	ASSERT(flist == NULL);
 	sbp = &mp->m_sb;
