@@ -312,13 +312,11 @@ linvfs_rmdir(
 	struct inode	*dir,
 	struct dentry	*dentry)
 {
-	int		error;
-	vnode_t		*dvp,		/* directory with name to remove */
-			*pwd_vp = NULL; /* current working directory, vnode */
 	struct inode	*inode = dentry->d_inode;
+	vnode_t		*dvp = LINVFS_GET_VPTR(dir);
+	int		error;
 
-	dvp = LINVFS_GET_VPTR(dir);
-	VOP_RMDIR(dvp, dentry, pwd_vp, NULL, error);
+	VOP_RMDIR(dvp, dentry, NULL, error);
 	if (!error) {
 		validate_fields(inode);
 		validate_fields(dir);

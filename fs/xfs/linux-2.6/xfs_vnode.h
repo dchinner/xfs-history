@@ -181,8 +181,7 @@ typedef int	(*vop_rename_t)(bhv_desc_t *, struct dentry *, vnode_t *,
 				struct dentry *, struct cred *);
 typedef int	(*vop_mkdir_t)(bhv_desc_t *, struct dentry *, struct vattr *,
 				vnode_t **, struct cred *);
-typedef int	(*vop_rmdir_t)(bhv_desc_t *, struct dentry *, vnode_t *,
-				struct cred *);
+typedef	int	(*vop_rmdir_t)(bhv_desc_t *, struct dentry *, struct cred *);
 typedef int	(*vop_readdir_t)(bhv_desc_t *, struct uio *, struct cred *,
 				int *);
 typedef int	(*vop_symlink_t)(bhv_desc_t *, struct dentry *,
@@ -370,10 +369,10 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_mkdir, dp)((dp)->v_fbhv,d,vap,vpp,cr);		\
 	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
-#define VOP_RMDIR(dp,d,cdir,cr,rv)					\
+#define	VOP_RMDIR(dp,d,cr,rv)	 					\
 {									\
 	VN_BHV_READ_LOCK(&(dp)->v_bh);					\
-	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,d,cdir,cr);		\
+	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,d,cr);			\
 	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
 #define VOP_READDIR(vp,uiop,cr,eofp,rv)					\
