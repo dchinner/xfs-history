@@ -1,4 +1,4 @@
-#ident "$Revision: 1.26 $"
+#ident "$Revision: 1.27 $"
 
 
 #include <sys/param.h>
@@ -1480,7 +1480,7 @@ xfs_qm_qino_alloc(
 
 	/* XXX should the projid be 0 or dfltprid here ? */
 	if (error = xfs_dir_ialloc(&tp, mp->m_rootip, IFREG, 1, mp->m_dev,
-				   &zerocr, (xfs_prid_t) 0, ip, 
+				   &zerocr, (xfs_prid_t) 0, 1, ip,
 				   &committed)) {
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES | 
 				 XFS_TRANS_ABORT);
