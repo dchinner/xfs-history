@@ -1,4 +1,4 @@
-#ident "$Revision: 1.283 $"
+#ident "$Revision: 1.284 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -752,6 +752,17 @@ xfs_setattr(
                 } else if (vp->v_type == VBLK || vp->v_type == VCHR) {
 			code = 0;
 			goto error_return;
+		} else if (vp->v_type != VREG) {
+			code = XFS_ERROR(EINVAL);
+			goto error_return;
+		}
+		if (vp->v_flag & VISSWAP) {
+			code = XFS_ERROR(EACCES);
+			goto error_return;
+		}
+		if (!(mask & AT_SIZE_NOPERM)) {
+			if (code = xfs_iaccess(ip, IWRITE, credp))
+				goto error_return;
 		}
 		/* 
 		 * Make sure that the dquots are attached to the inode.
