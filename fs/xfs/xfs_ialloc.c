@@ -663,7 +663,9 @@ nextag:
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);
-		ASSERT(freecount == agi->agi_freecount);
+
+		ASSERT(freecount == agi->agi_freecount ||
+		       XFS_FORCED_SHUTDOWN(mp));
 	}
 #endif
 	/*
@@ -888,7 +890,8 @@ nextag:
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);
-		ASSERT(freecount == agi->agi_freecount);
+		ASSERT(freecount == agi->agi_freecount ||
+		       XFS_FORCED_SHUTDOWN(mp));
 	}
 #endif
 	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
@@ -978,7 +981,8 @@ xfs_difree(
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);
-		ASSERT(freecount == agi->agi_freecount);
+		ASSERT(freecount == agi->agi_freecount ||
+		       XFS_FORCED_SHUTDOWN(mp));
 	}
 #endif
 	/*
@@ -1026,7 +1030,8 @@ xfs_difree(
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);
-		ASSERT(freecount == agi->agi_freecount);
+		ASSERT(freecount == agi->agi_freecount ||
+		       XFS_FORCED_SHUTDOWN(mp));
 	}
 #endif
 	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
