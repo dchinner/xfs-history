@@ -1164,6 +1164,80 @@ xfs_iunpin_wait(
 
 
 /*
+ * xfs_iextents_copy()
+ *
+ * This is called to copy the REAL extents (as opposed to the delayed
+ * allocation extents) from the inode into the given buffer.  It
+ * returns the number of bytes copied into the buffer.
+ *
+ * If there are no delayed allocation extents, then we can just
+ * bcopy() the extents into the buffer.  Otherwise, we need to
+ * examine each extent in turn and skip those which are delayed.
+ */
+int
+xfs_iextents_copy(
+	xfs_inode_t	*ip,
+	char	 	*buffer)
+{
+	xfs_fsblock_t	start_block;
+	xfs_bmbt_rec_t	*ep;
+	xfs_bmbt_rec_t	*dest_ep;
+	xfs_mount_t	*mp;
+	int		nrecs;
+	int		i;
+	int		copied;
+
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
+	ASSERT(ip->i_bytes > 0);
+
+	mp = ip->i_mount;
+	nrecs = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+	ASSERT(nrecs > 0);
+	if (nrecs == ip->i_d.di_nextents) {
+		/*
+		 * There are no delayed allocation extents,
+		 * so just copy everything.
+		 */
+		ASSERT(ip->i_bytes <= XFS_LITINO(mp));
+		ASSERT(ip->i_bytes ==
+		       (ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t)));
+		bcopy(ip->i_u1.iu_extents, buffer, ip->i_bytes);
+
+		return ip->i_bytes;
+	}
+
+	/*
+	 * There are some delayed allocation extents in the
+	 * inode, so copy the extents one at a time and skip
+	 * the delayed ones.  There must be at least one
+	 * non-delayed extent.
+	 */
+	ASSERT(nrecs > ip->i_d.di_nextents);
+	ep = (xfs_bmbt_rec_t *)(ip->i_u1.iu_extents);
+	dest_ep = (xfs_bmbt_rec_t *)buffer;
+	copied = 0;
+	for (i = 0; i < nrecs; i++) {
+		start_block = xfs_bmbt_get_startblock(ep);
+		if (ISNULLSTARTBLOCK(start_block)) {
+			/*
+			 * It's a delayed allocation extent, so skip it.
+			 */
+			ep++;
+			continue;
+		}
+
+		*dest_ep = *ep;
+		dest_ep++;
+		ep++;
+		copied++;
+	}
+	ASSERT(copied != 0);
+	ASSERT((copied * sizeof(xfs_bmbt_rec_t)) <= XFS_LITINO(mp));
+
+	return (copied * sizeof(xfs_bmbt_rec_t));
+}		  
+
+/*
  * xfs_iflush() will write a modified inode's changes out to the
  * inode's on disk home.  The caller must have the inode lock held
  * in at least shared mode and the inode flush semaphore must be
@@ -1260,9 +1334,9 @@ xfs_iflush(
 		ASSERT((ip->i_u1.iu_extents == NULL) || (ip->i_bytes > 0));
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
 		    (ip->i_bytes > 0)) {
-			ASSERT(ip->i_bytes <= XFS_LITINO(mp));
-			bcopy(ip->i_u1.iu_extents, dip->di_u.di_bmx,
-			      ip->i_bytes);
+			ASSERT(ip->i_d.di_nextents > 0);
+			(void) xfs_iextents_copy(ip,
+						 (char *)dip->di_u.di_bmx);
 		}
 		break;
 	case XFS_DINODE_FMT_BTREE:
