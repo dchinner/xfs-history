@@ -95,6 +95,11 @@ STATIC void xfs_dir_leaf_moveents(xfs_dir_leafblock_t *src_leaf,
 					      int dst_start, int move_count,
 					      xfs_mount_t *mp);
 
+/*
+ * External.
+ */
+void qsort (void* base, size_t nel, size_t width,
+	    int (*compar)(const void *, const void *));
 
 /*========================================================================
  * External routines when dirsize < XFS_IFORK_DSIZE(dp).
@@ -329,6 +334,21 @@ out:
 }
 
 #ifndef SIM
+STATIC int
+xfs_dir_shortform_compare(const void *a, const void *b)
+{
+	xfs_dir_sf_sort_t *sa, *sb;
+
+	sa = (xfs_dir_sf_sort_t *)a;
+	sb = (xfs_dir_sf_sort_t *)b;
+	if (sa->hash < sb->hash)
+		return -1;
+	else if (sa->hash > sb->hash)
+		return 1;
+	else
+		return sa->entno - sb->entno;
+}
+
 /*
  * Copy out directory entries for getdents(), for shortform directories.
  */
@@ -339,134 +359,141 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				       xfs_dir_put_t *putp)
 {
 	xfs_dir_shortform_t *sf;
-	xfs_dir_sf_entry_t *sfe, *nextsfe;
-	int retval, first, i;
+	xfs_dir_sf_entry_t *sfe;
+	int retval, i, sbsize, nsbuf, lastresid;
 	xfs_mount_t *mp;
 	xfs_dahash_t cookhash, hash;
 	xfs_dir_put_args_t p;
+	xfs_dir_sf_sort_t *sbuf, *sbp;
 
 	mp = dp->i_mount;
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
+	nsbuf = sf->hdr.count + 2;
+	sbsize = (nsbuf + 1) * sizeof(*sbuf);
+	sbp = sbuf = kmem_alloc(sbsize, KM_SLEEP);
 
 	xfs_dir_trace_g_du("sf: start", dp, uio);
 
+	/*
+	 * Collect all the entries into the buffer.
+	 * Entry 0 is .
+	 */
+	sbp->entno = 0;
+	sbp->seqno = 0;
+	sbp->hash = 0;		/* special case - seekdir to 0 is 1st entry */
+	sbp->ino = dp->i_ino;
+	sbp->name = ".";
+	sbp->namelen = 1;
+	sbp++;
+	/*
+	 * Entry 1 is ..
+	 */
+	sbp->entno = 1;
+	sbp->seqno = 0;
+	sbp->hash = xfs_dir_hash_dotdot;
+	sbp->ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
+	sbp->name = "..";
+	sbp->namelen = 2;
+	sbp++;
+	/*
+	 * Scan the directory data for the rest of the entries.
+	 */
+	for (i = 0, sfe = &sf->list[0]; i < sf->hdr.count; i++) {
+		if (((char *)sfe < (char *)sf) ||
+		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
+		    (sfe->namelen >= MAXNAMELEN)) {
+			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
+			kmem_free(sbuf, sbsize);
+			return XFS_ERROR(EDIRCORRUPTED);
+		}
+		sbp->entno = i + 2;
+		sbp->seqno = 0;
+		sbp->hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
+		sbp->ino = XFS_GET_DIR_INO(mp, sfe->inumber);
+		sbp->name = (char *)sfe->name;
+		sbp->namelen = sfe->namelen;
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+		sbp++;
+	}
+	/*
+	 * Sort the entries on hash then entno.
+	 */
+	qsort(sbuf, nsbuf, sizeof(*sbuf), xfs_dir_shortform_compare);
+	/*
+	 * Stuff in last entry.
+	 */
+	sbp->entno = nsbuf;
+	sbp->hash = XFS_DA_MAXHASH;
+	sbp->seqno = 0;
+	/*
+	 * Figure out the sequence numbers in case there's a hash duplicate.
+	 */
+	for (hash = sbuf->hash, sbp = sbuf + 1; sbp < &sbuf[nsbuf + 1]; sbp++) {
+		if (sbp->hash == hash)
+			sbp->seqno = sbp[-1].seqno + 1;
+		else
+			hash = sbp->hash;
+	}
+	/*
+	 * Set up put routine.
+	 */
 	p.dbp = dbp;
 	p.put = *putp;
 	p.putp = putp;
 	p.uio = uio;
-
 	/*
-	 * Special case fakery for first 2 entries: "." and ".."
+	 * Find our place.
 	 */
-	first = (uio->uio_offset == 0);
-	if (first || (cookhash == xfs_dir_hash_dot)) {
-		XFS_PUT_COOKIE(p.cook, mp, 0, 0, xfs_dir_hash_dotdot);
-#if XFS_BIG_FILESYSTEMS
-		p.ino = dp->i_ino + mp->m_inoadd;
-#else
-		p.ino = dp->i_ino;
-#endif
-		p.name = ".";
-		p.namelen = 1;
-		retval = p.put(&p);
-		if (!p.done) {
-			uio->uio_offset =
-				XFS_DA_MAKE_COOKIE(mp, 0, 0, xfs_dir_hash_dot);
-			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
-			return(retval);
-		}
-		xfs_dir_trace_g_du("sf: added \".\"", dp, uio);
-	}
-	if (first || (cookhash == xfs_dir_hash_dotdot)) {
-		p.ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
-		if (sf->hdr.count > 0) {
-			sfe = &sf->list[0];
-			XFS_PUT_COOKIE(p.cook, mp, 0, 0,
-				xfs_da_hashname((char *)sfe->name,
-						sfe->namelen));
-		} else {
-			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
-			xfs_dir_trace_g_duc("sf: last cookie  ",
-						 dp, uio, p.cook.o);
-		}
-		p.name = "..";
-		p.namelen = 2;
-		retval = p.put(&p);
-		if (!p.done) {
-			uio->uio_offset =
-				XFS_DA_MAKE_COOKIE(mp, 0, 0,
-						   xfs_dir_hash_dotdot);
-			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
-			return(retval);
-		}
-		xfs_dir_trace_g_du("sf: added \"..\"", dp, uio);
-	}
-
-	/*
-	 * Re-find our place.
-	 */
-	sfe = &sf->list[0];
-	for (i = 0; i < sf->hdr.count; i++) {
-		if (((char *)sfe < (char *)sf) ||
-		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
-		    (sfe->namelen >= MAXNAMELEN)) {
-			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
-			return XFS_ERROR(EDIRCORRUPTED);
-		}
-		hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
-		if (hash >= cookhash) {
+	for (sbp = sbuf; sbp < &sbuf[nsbuf + 1]; sbp++) {
+		if (sbp->hash >= cookhash)
 			break;
-		}
-		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
-	if (i == sf->hdr.count) {
+	/* 
+	 * Did we fail to find anything?  We stop at the last entry,
+	 * the one we put maxhash into.
+	 */
+	if (sbp == &sbuf[nsbuf]) {
+		kmem_free(sbuf, sbsize);
 		xfs_dir_trace_g_du("sf: hash beyond end", dp, uio);
 		uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
 		*eofp = 1;
-		return(0);
+		return 0;
 	}
-	ASSERT(cookhash != XFS_DA_MAXHASH);
-	xfs_dir_trace_g_du("sf: hash found", dp, uio);
-
 	/*
-	 * Collect the rest of the directory entries.
+	 * Loop putting entries into the user buffer.
 	 */
-	for ( ; i < sf->hdr.count; i++) {
-		if (((char *)sfe < (char *)sf) ||
-		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
-		    (sfe->namelen >= MAXNAMELEN)) {
-			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
-			return XFS_ERROR(EDIRCORRUPTED);
-		}
-		p.ino = XFS_GET_DIR_INO(mp, sfe->inumber);
-		if (i < sf->hdr.count-1) {
-			nextsfe = XFS_DIR_SF_NEXTENTRY(sfe);
-			hash = xfs_da_hashname((char *)nextsfe->name,
-					       nextsfe->namelen);
-			XFS_PUT_COOKIE(p.cook, mp, 0, 0, hash);
-			xfs_dir_trace_g_duc("SF: middle cookie",
-						 dp, uio, p.cook.o);
-		} else {
-			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
-			xfs_dir_trace_g_duc("sf: last cookie  ",
-						 dp, uio, p.cook.o);
-		}
-		p.name = (char *)sfe->name;
-		p.namelen = sfe->namelen;
+	while (sbp < &sbuf[nsbuf]) {
+		/*
+		 * Save the first resid in a run of equal-hashval entries
+		 * so that we can back them out if they don't all fit.
+		 */
+		if (sbp->seqno == 0)
+			lastresid = uio->uio_resid;
+		XFS_PUT_COOKIE(p.cook, mp, 0, sbp[1].seqno, sbp[1].hash);
+#if XFS_BIG_FILESYSTEMS
+		p.ino = sbp->ino + mp->m_inoadd;
+#else
+		p.ino = sbp->ino;
+#endif
+		p.name = sbp->name;
+		p.namelen = sbp->namelen;
 		retval = p.put(&p);
 		if (!p.done) {
-			hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
-			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0, hash);
+			uio->uio_offset =
+				XFS_DA_MAKE_COOKIE(mp, 0, 0, sbp->hash);
+			kmem_free(sbuf, sbsize);
+			uio->uio_resid = lastresid;
 			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
-			return(retval);
+			return retval;
 		}
-		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+		sbp++;
 	}
+	kmem_free(sbuf, sbsize);
 	uio->uio_offset = p.cook.o;
 	*eofp = 1;
 	xfs_dir_trace_g_du("sf: E-O-F", dp, uio);
-	return(0);
+	return 0;
 }
 
 /*
@@ -1881,7 +1908,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		}
 
 		/*
-		 * Put the current entry into the ougoing buffer.  If we fail
+		 * Put the current entry into the outgoing buffer.  If we fail
 		 * then restore the UIO to the first entry in the current
 		 * run of equal-hashval entries (probably one 1 entry long).
 		 */
