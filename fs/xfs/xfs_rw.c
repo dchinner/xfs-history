@@ -2343,6 +2343,8 @@ xfs_diostrat( buf_t *bp)
 		blocks     = (xfs_extlen_t)(last_fsb - offset_fsb);
 
 		exist = 1;
+		XFS_BMAP_INIT(&free_list, &firstfsb);
+
 		if ( writeflag ) {
 			/*
  			 * In the write case, need to call bmapi() with
@@ -2402,8 +2404,6 @@ xfs_diostrat( buf_t *bp)
 				} else {
 					xfs_trans_ijoin(tp,ip,XFS_ILOCK_EXCL);
 					xfs_trans_ihold( tp, ip);
-					free_list.xbf_first = NULL;
-					free_list.xbf_count = 0;
 				}
 			} else {
 				tp = NULL;
@@ -2457,6 +2457,8 @@ xfs_diostrat( buf_t *bp)
 
 			bytes_this_req  = xfs_fsb_to_b(sbp,
 				imapp->br_blockcount) - BBTOB(blk_algn);
+
+
 			offset_this_req = xfs_fsb_to_b(sbp,
 				imapp->br_startoff) + BBTOB(blk_algn); 
 
@@ -2511,11 +2513,16 @@ xfs_diostrat( buf_t *bp)
 	     			nbp->b_error     = 0;
 	     			nbp->b_proc      = bp->b_proc;
 	     			nbp->b_edev      = bp->b_edev;
-	     			nbp->b_blkno     = xfs_fsb_to_daddr(sbp,
-					imapp->br_startblock) + blk_algn;
+				if (rt) {
+	     				nbp->b_blkno = xfs_btod(sbp,
+						imapp->br_startblock);
+				} else {
+	     				nbp->b_blkno = xfs_fsb_to_daddr(sbp,
+						imapp->br_startblock) + 
+						blk_algn;
+				}
 	     			nbp->b_bcount    = bytes_this_req;
 	     			nbp->b_un.b_addr = base;
-
 				/*
  				 * Issue I/O request.
 				 */
@@ -2549,6 +2556,7 @@ xfs_diostrat( buf_t *bp)
 			/*
 			 * update pointers for next round.
 			 */
+
 	     		base   += bytes_this_req;
 	     		offset += bytes_this_req;
 	     		count  -= bytes_this_req;
@@ -2686,7 +2694,9 @@ xfs_diordwr(vnode_t	*vp,
  	 * Free local buf structure.
  	 */
 	bp->b_flags = 0;
+#ifdef SIM
 	bp->b_un.b_addr = 0;
+#endif
 	putphysbuf(bp);
 
 	return( error );
