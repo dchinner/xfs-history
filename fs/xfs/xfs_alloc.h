@@ -38,8 +38,8 @@ typedef enum xfs_alloctype
 typedef struct xfs_alloc_arg {
 	xfs_trans_t	*tp;		/* transaction pointer */
 	xfs_mount_t	*mp;		/* file system mount point */
-	buf_t		*agbp;		/* buffer for a.g. freelist header */
 	xfs_fsblock_t	fsbno;		/* file system block number */
+	buf_t		*agbp;		/* buffer for a.g. freelist header */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agblock_t	agbno;		/* allocation group-relative block # */
 	xfs_extlen_t	minlen;		/* minimum size of extent */
@@ -130,19 +130,9 @@ xfs_alloc_put_freelist(
 /*
  * Allocate an extent (variable-size).
  */
-xfs_fsblock_t			/* extent's starting block, or NULLFSBLOCK */
+void
 xfs_alloc_vextent(
-	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_fsblock_t	bno,	/* requested starting block */
-	xfs_extlen_t	minlen,	/* minimum requested length */
-	xfs_extlen_t	maxlen,	/* maximum requested length */
-	xfs_extlen_t	*len,	/* output: actual allocated length */
-	xfs_alloctype_t	type,	/* allocation type, see above definition */
-	xfs_extlen_t	total,	/* total blocks needed in transaction */
-	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
-	int		wasdel,	/* extent was previously delayed-allocated */
-	xfs_extlen_t	mod,	/* length should be k * prod + mod unless */
-	xfs_extlen_t	prod);	/* there's nothing as big as mod */
+	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
 /*
  * Free an extent.

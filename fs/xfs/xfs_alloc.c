@@ -1620,50 +1620,38 @@ xfs_alloc_put_freelist(
  * Depending on the allocation type, we either look in a single allocation
  * group or loop over the allocation groups to find the result.
  */
-xfs_fsblock_t			/* extent's starting block, or NULLFSBLOCK */
+void
 xfs_alloc_vextent(
-	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_fsblock_t	bno,	/* requested starting block */
-	xfs_extlen_t	minlen,	/* minimum requested length */
-	xfs_extlen_t	maxlen,	/* maximum requested length */
-	xfs_extlen_t	*len,	/* output: actual allocated length */
-	xfs_alloctype_t	type,	/* allocation type, see above definition */
-	xfs_extlen_t	total,	/* total blocks needed in transaction */
-	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
-	int		wasdel,	/* extent was previously delayed-allocated */
-	xfs_extlen_t	mod,	/* length should be k * prod + mod unless */
-	xfs_extlen_t	prod)	/* there's nothing as big as mod */
+	xfs_alloc_arg_t	*args)	/* allocation argument structure */
 {
 	xfs_agblock_t	agsize;	/* allocation group size */
-	xfs_alloc_arg_t args;	/* argument structure */
 	int		flags;	/* XFS_ALLOC_FLAG_... locking flags */
+	xfs_mount_t	*mp;	/* mount structure pointer */
 	xfs_agnumber_t	sagno;	/* starting allocation group number */
+	xfs_alloctype_t	type;	/* input allocation type */
 
-	args.tp = tp;
-	args.mp = tp->t_mountp;
-	args.fsbno = bno;
-	args.agbno = NULLAGBLOCK;
-	args.minlen = minlen;
+	mp = args->mp;
+	type = args->type;
+	args->agbno = NULLAGBLOCK;
 	/*
 	 * Just fix this up, for the case where the last a.g. is shorter
 	 * (or there's only one a.g.) and the caller couldn't easily figure
 	 * that out (xfs_bmap_alloc).
 	 */
-	agsize = args.mp->m_sb.sb_agblocks;
-	args.maxlen = maxlen > agsize ? agsize : maxlen;
-	args.mod = mod;
-	args.prod = prod;
-	args.minleft = minleft;
-	args.wasdel = wasdel;
-	args.isfl = 0;
+	agsize = mp->m_sb.sb_agblocks;
+	if (args->maxlen > agsize)
+		args->maxlen = agsize;
 	/* 
 	 * These should really be asserts, left this way for now just
 	 * for the benefit of xfs_test.
 	 */
-	if (XFS_FSB_TO_AGNO(args.mp, bno) >= args.mp->m_sb.sb_agcount ||
-	    XFS_FSB_TO_AGBNO(args.mp, bno) >= args.mp->m_sb.sb_agblocks ||
-	    minlen > maxlen || minlen > agsize || len == 0 || mod >= prod)
-		return NULLFSBLOCK;
+	if (XFS_FSB_TO_AGNO(mp, args->fsbno) >= mp->m_sb.sb_agcount ||
+	    XFS_FSB_TO_AGBNO(mp, args->fsbno) >= agsize ||
+	    args->minlen > args->maxlen || args->minlen > agsize ||
+	    args->mod >= args->prod) {
+		args->fsbno = NULLFSBLOCK;
+		return;
+	}
 	switch (type) {
 	case XFS_ALLOCTYPE_THIS_AG:
 	case XFS_ALLOCTYPE_NEAR_BNO:
@@ -1671,22 +1659,20 @@ xfs_alloc_vextent(
 		/*
 		 * These three force us into a single a.g.
 		 */
-		args.agno = XFS_FSB_TO_AGNO(args.mp, bno);
-		args.agbp = xfs_alloc_fix_freelist(tp, args.agno, minlen, total,
-			minleft, 0);
-		if (!args.agbp)
+		args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
+		if (!(args->agbp = xfs_alloc_fix_freelist(args->tp, args->agno,
+				args->minlen, args->total, args->minleft, 0)))
 			break;
-		args.type = type;
-		args.agbno = XFS_FSB_TO_AGBNO(args.mp, bno);
-		xfs_alloc_ag_vextent(&args);
+		args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
+		xfs_alloc_ag_vextent(args);
 		break;
 	case XFS_ALLOCTYPE_START_BNO:
 		/*
 		 * Try near allocation first, then anywhere-in-ag after
 		 * the first a.g. fails.
 		 */
-		args.agbno = XFS_FSB_TO_AGBNO(args.mp, bno);
-		args.type = XFS_ALLOCTYPE_NEAR_BNO;
+		args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
+		args->type = XFS_ALLOCTYPE_NEAR_BNO;
 		/* FALLTHROUGH */
 	case XFS_ALLOCTYPE_ANY_AG:
 	case XFS_ALLOCTYPE_START_AG:
@@ -1698,24 +1684,24 @@ xfs_alloc_vextent(
 			/*
 			 * Start with the last place we left off.
 			 */
-			args.agno = sagno = args.mp->m_agfrotor;
-			args.type = XFS_ALLOCTYPE_THIS_AG;
+			args->agno = sagno = mp->m_agfrotor;
+			args->type = XFS_ALLOCTYPE_THIS_AG;
 			flags = XFS_ALLOC_FLAG_TRYLOCK;
 		} else if (type == XFS_ALLOCTYPE_FIRST_AG) {
 			/*
 			 * Start with allocation group given by bno.
 			 */
-			args.agno = XFS_FSB_TO_AGNO(args.mp, bno);
-			args.type = XFS_ALLOCTYPE_THIS_AG;
+			args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
+			args->type = XFS_ALLOCTYPE_THIS_AG;
 			sagno = 0;
 			flags = 0;
 		} else {
 			if (type == XFS_ALLOCTYPE_START_AG)
-				args.type = XFS_ALLOCTYPE_THIS_AG;
+				args->type = XFS_ALLOCTYPE_THIS_AG;
 			/*
 			 * Start with the given allocation group.
 			 */
-			args.agno = sagno = XFS_FSB_TO_AGNO(args.mp, bno);
+			args->agno = sagno = XFS_FSB_TO_AGNO(mp, args->fsbno);
 			flags = XFS_ALLOC_FLAG_TRYLOCK;
 		}
 		/*
@@ -1723,48 +1709,47 @@ xfs_alloc_vextent(
 		 * trylock set, second time without.
 		 */
 		for (;;) {
-			args.agbp = xfs_alloc_fix_freelist(tp, args.agno,
-				minlen, total, minleft, flags);
+			args->agbp = xfs_alloc_fix_freelist(args->tp,
+				args->agno, args->minlen, args->total,
+				args->minleft, flags);
 			/*
 			 * If we get a buffer back then the allocation will fly.
 			 */
-			if (args.agbp) {
-				xfs_alloc_ag_vextent(&args);
+			if (args->agbp) {
+				xfs_alloc_ag_vextent(args);
+				ASSERT(args->agbno != NULLAGBLOCK);
 				break;
 			}
 			/*
 			 * Didn't work, figure out the next iteration.
 			 */
-			if (args.agno == sagno &&
+			if (args->agno == sagno &&
 			    type == XFS_ALLOCTYPE_START_BNO)
-				args.type = XFS_ALLOCTYPE_THIS_AG;
-			if (++args.agno == args.mp->m_sb.sb_agcount)
-				args.agno = 0;
+				args->type = XFS_ALLOCTYPE_THIS_AG;
+			if (++(args->agno) == mp->m_sb.sb_agcount)
+				args->agno = 0;
 			/* 
 			 * Reached the starting a.g., must either be done
 			 * or switch to non-trylock mode.
 			 */
-			if (args.agno == sagno) {
+			if (args->agno == sagno) {
 				if (flags == 0)
 					break;
 				flags = 0;
 				if (type == XFS_ALLOCTYPE_START_BNO)
-					args.type = XFS_ALLOCTYPE_NEAR_BNO;
+					args->type = XFS_ALLOCTYPE_NEAR_BNO;
 			}
 		}
-		args.mp->m_agfrotor =
-			(args.agno + 1) % args.mp->m_sb.sb_agcount;
+		mp->m_agfrotor = (args->agno + 1) % mp->m_sb.sb_agcount;
 		break;
 	default:
 		ASSERT(0);
 		/* NOTREACHED */
 	}
-	if (args.agbno == NULLAGBLOCK)
-		args.fsbno = NULLFSBLOCK;
+	if (args->agbno == NULLAGBLOCK)
+		args->fsbno = NULLFSBLOCK;
 	else
-		args.fsbno = XFS_AGB_TO_FSB(args.mp, args.agno, args.agbno);
-	*len = args.len;
-	return args.fsbno;
+		args->fsbno = XFS_AGB_TO_FSB(mp, args->agno, args->agbno);
 }
 
 /*
