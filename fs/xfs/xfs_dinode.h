@@ -311,7 +311,7 @@ char *xfs_dfork_dptr_arch(xfs_dinode_t *dip, xfs_arch_t arch);
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DFORK_APTR)
 char *xfs_dfork_aptr_arch(xfs_dinode_t *dip, xfs_arch_t arch);
-#define	XFS_DFORK_APTR_ARCH(dip,arch)       xfs_dfork_aptr_asrch(dip,arch)
+#define	XFS_DFORK_APTR_ARCH(dip,arch)       xfs_dfork_aptr_arch(dip,arch)
 #define	XFS_DFORK_APTR(dip)                 XFS_DFORK_APTR_ARCH(dip,XFS_ARCH_NATIVE) 
 #else
 #define	XFS_DFORK_APTR_X(dip,f,arch)	((dip)->di_u.di_c + XFS_DFORK_BOFF_ARCH(dip, arch))
