@@ -1,4 +1,4 @@
-#ident "$Revision: 1.250 $"
+#ident "$Revision: 1.251 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5562,11 +5562,13 @@ xfsbdstrat(
 	ASSERT(mp);
 	ASSERT(bp->b_target);
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
-		/* We want priority I/Os to non-XLV disks to go thru'
+		/*
+		 * We want priority I/Os to non-XLV disks to go thru'
 		 * griostrategy(). The rest of the I/Os follow the normal
-		 * path.
+		 * path, and are uncontrolled. If we want to rectify
+		 * that, use griostrategy2.
 		 */
-		if ( (BUF_IS_PRIO(bp)) &&
+		if ( (BUF_IS_GRIO(bp)) &&
 				(dev_major != XLV_MAJOR) ) {
 			griostrategy(bp);
 		} else {
@@ -6284,8 +6286,8 @@ retry:
 				CHECK_GRIO_TIMESTAMP(bp, 40);
 
 	     			nbp->b_flags     = bp->b_flags;
-
 				nbp->b_grio_private = bp->b_grio_private;
+								/* b_iopri */
 
 	     			nbp->b_error     = 0;
 				nbp->b_target    = bp->b_target;
@@ -6310,7 +6312,7 @@ retry:
 					biowait(nbp);
 					nbp->b_flags = 0;
 		     			nbp->b_un.b_addr = 0;
-					nbp->b_grio_private = 0;
+					nbp->b_grio_private = 0; /* b_iopri */
 					putphysbuf( nbp );
 					bps[bufsissued--] = 0;
 					break;
@@ -6334,7 +6336,7 @@ retry:
 		for (j = 0; j < bufsissued ; j++) {
 	  		nbp = bps[j];
 	    		biowait(nbp);
-			nbp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
+			nbp->b_flags &= ~B_GR_BUF;	/* Why? B_PRV_BUF? */
 
 	     		if (!error)
 				error = geterror(nbp);
@@ -6355,7 +6357,7 @@ retry:
 	    	 	nbp->b_flags		= 0;
 	     		nbp->b_bcount		= 0;
 	     		nbp->b_un.b_addr	= 0;
-	     		nbp->b_grio_private	= 0;
+	     		nbp->b_grio_private	= 0; /* b_iopri */
 	    	 	putphysbuf( nbp );
 	     	}
 	} /* end of while loop */
@@ -6508,38 +6510,57 @@ xfs_diordwr(
 	}
 	bp->b_private = &dp;
 
+	bp->b_grio_private = NULL;		/* b_iopri = 0 */
+	bp->b_flags &= ~(B_GR_BUF|B_PRV_BUF);	/* lo pri queue */
+
 	/*
 	 * Check if this is a guaranteed rate I/O
 	 */
-	if (!(ioflag & IO_PRIORITY)) {
-		bp->b_grio_private = NULL;
-		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
-	} else {
+	if (ioflag & IO_PRIORITY) {
+
 		guartype = grio_io_is_guaranteed(uiop->uio_fp, &stream_id);
 
 		/*
-		 * If grio is not configed in, just give prio behavior.
+		 * Get priority level if this is a multilevel request.
+		 * The level is stored in b_iopri, except if the request
+		 * is controlled by griostrategy.
 		 */
-		if (guartype == -1) {
-			bp->b_grio_private = NULL;
-			bp->b_flags |= B_PRIO_BUF;
-		} else if (guartype) {
-			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-				bp->b_flags |= B_GR_BUF;
-			else
-				bp->b_flags |= B_PRIO_BUF;
+		if (uiop->uio_fp->vf_flag & FPRIO) {
+			bp->b_flags |= B_PRV_BUF;
+			VFILE_GETPRI(uiop->uio_fp, bp->b_iopri);
+			/*
+			 * Take care of some other thread racing
+			 * and clearing FPRIO.
+			 */
+			if (bp->b_iopri == 0) 
+				bp->b_flags &= ~B_PRV_BUF;
+		}
 
-			ASSERT(bp->b_grio_private == NULL);
+		if (guartype == -1) {
+			/*
+			 * grio is not configed into kernel, but FPRIO
+			 * is set.
+			 */
+		} else if (guartype) {
+
+			short prval = bp->b_iopri;
+
+			bp->b_flags |= B_GR_BUF;
+			ASSERT((bp->b_grio_private == NULL) || 
+						(bp->b_flags & B_PRV_BUF));
 			bp->b_grio_private = 
 				kmem_zone_alloc(grio_buf_data_zone, KM_SLEEP);
 			ASSERT(BUF_GRIO_PRIVATE(bp));
 			COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
+			SET_GRIO_IOPRI(bp, prval);
 			iosize =  uiop->uio_iov[0].iov_len;
 			index = grio_monitor_io_start(&stream_id, iosize);
 			INIT_GRIO_TIMESTAMP(bp);
 		} else {
-			bp->b_grio_private = NULL;
-			bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
+			/*
+			 * FPRIORITY|FPRIO was set when we looked,
+			 * but FPRIORITY is not set anymore.
+			 */
 		}
 	}
 
@@ -6552,21 +6573,17 @@ xfs_diordwr(
 	/*
  	 * Free local buf structure.
  	 */
-
-	if (BUF_IS_GRIO(bp) || BUF_IS_PRIO(bp)) {
-
-		if (guartype == -1)
-			bp->b_flags &= ~B_PRIO_BUF;
-		else {
+	if (ioflag & IO_PRIORITY) {
+		bp->b_flags &= ~(B_PRV_BUF|B_GR_BUF);
+		if (guartype > 0) {
 			grio_monitor_io_end(&stream_id, index);
 #ifdef GRIO_DEBUG
 			CHECK_GRIO_TIMESTAMP(bp, 400);
 #endif
 			ASSERT(BUF_GRIO_PRIVATE(bp));
 			kmem_zone_free(grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
-			bp->b_grio_private = NULL;
-			bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
 		}
+		bp->b_grio_private = NULL;
 	}
 
 	ASSERT((bp->b_flags & B_MAPPED) == 0);
