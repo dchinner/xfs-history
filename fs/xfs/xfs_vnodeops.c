@@ -2415,9 +2415,14 @@ start_over:
 				goto error_return;
 			}
 		}
+	       
+		/*
+		 * Purge all dnlc references to the old target.
+		 */
+		dnlc_purge_vp(XFS_ITOV(target_ip));
 
 		/*
-		 * Link the source inode under the target inode.
+		 * Link the source inode under the target name.
 		 * If the source inode is a directory and we are moving
 		 * it across directories, its ".." entry will be 
 		 * inconsistent until we replace that down below.
@@ -2426,10 +2431,11 @@ start_over:
 		 * name at the destination directory, remove it first.
 		 */
 		error = xfs_dir_replace (tp, target_dp, target_name,
-			target_pnp->pn_complen, target_ip->i_ino);
+			target_pnp->pn_complen, src_ip->i_ino);
 		ASSERT (!error);
 
-		dnlc_enter (src_dir_vp, target_name, XFS_ITOV(src_ip), credp);
+		dnlc_enter (target_dir_vp, target_name,
+			    XFS_ITOV(src_ip), credp);
 
 		/*
 		 * Decrement the link count on the target since the target
