@@ -621,7 +621,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 		}
 
 		if (error) {
-			cmn_err(CE_ALERT,
+			xfs_fs_cmn_err(CE_ALERT, mp,
 				"xfs_log_unmount: unmount record failed");
 		}
 
@@ -905,9 +905,8 @@ xlog_iodone(buf_t *bp)
 	 */
 	if (geterror(bp)) {
 #ifdef DEBUG
-		cmn_err(CE_ALERT, 
-			"xlog_iodone: log write error buf 0x%x",
-			bp);
+		xfs_fs_cmn_err(CE_ALERT, iclog->ic_log->l_mp,
+			"xlog_iodone: log write error buf 0x%p", bp);
 #endif
 		bp->b_flags |= B_STALE;
 		xfs_force_shutdown(iclog->ic_log->l_mp, XFS_LOG_IO_ERROR);
@@ -1462,7 +1461,7 @@ xlog_unalloc_log(xlog_t *log)
 	/* XXXsup take a look at this again. */
 	if ((log->l_ticket_cnt != log->l_ticket_tcnt)  &&
 	    !XLOG_FORCED_SHUTDOWN(log)) {
-		cmn_err(CE_WARN,
+		xfs_fs_cmn_err(CE_WARN, log->l_mp,
 			"xlog_unalloc_log: (cnt: %d, total: %d)",
 			log->l_ticket_cnt, log->l_ticket_tcnt);
 		/* ASSERT(log->l_ticket_cnt == log->l_ticket_tcnt); */
@@ -1570,9 +1569,18 @@ xlog_write(xfs_mount_t *	mp,
     }
     contwr = *start_lsn = 0;
     
-    if (ticket->t_curr_res < len)
-       xlog_panic("xfs_log_write: reservation ran out. Need to up reservation")
-    else
+    if (ticket->t_curr_res < len) {
+#ifdef DEBUG
+	xlog_panic(
+		"xfs_log_write: reservation ran out. Need to up reservation");
+#else
+	/* Customer configurable panic */
+	xfs_cmn_err(XFS_PTAG_LOGRES, CE_ALERT, mp,
+		"xfs_log_write: reservation ran out. Need to up reservation");
+	/* If we did not panic, shutdown the filesystem */
+	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
+#endif
+    } else
 	ticket->t_curr_res -= len;
     
     for (index = 0; index < nentries; ) {
@@ -1636,8 +1644,8 @@ xlog_write(xfs_mount_t *	mp,
 	    case XFS_LOG:
 		break;
 	    default:
-		cmn_err(CE_WARN,
-		    "Bad XFS transaction clientid 0x%x in ticket 0x%x\n",
+		xfs_fs_cmn_err(CE_WARN, mp,
+		    "Bad XFS transaction clientid 0x%x in ticket 0x%p",
 		    logop_head->oh_clientid, tic);
 		return XFS_ERROR(EIO);
 	    }
