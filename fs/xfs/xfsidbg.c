@@ -1271,7 +1271,7 @@ char *tab_vflags[] = {
 	"VINACTIVE_TEARDOWN",	/*     0x2000 */
 	"VSEMAPHORE",		/*     0x4000 */
 	"VUSYNC",		/*     0x8000 */
-	"INVALID0x10000",	/*    0x10000 */
+	"VMODIFIED",		/*    0x10000 */
 	"INVALID0x20000",	/*    0x20000 */
 	"INVALID0x40000",	/*    0x40000 */
 	"INVALID0x80000",	/*    0x80000 */
@@ -1465,46 +1465,6 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 						(__psint_t)ktep->val[3]);
 		break;
 
-	case XFS_ALLOC_KTRACE_UNBUSY:
-		kdb_printf("unbusy %s [%s %d] mp 0x%x\n",
-			(char *)ktep->val[1],
-			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
-			(xfs_mount_t *)ktep->val[3]);
-		kdb_printf("      agno %d slot %d tp 0x%x\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8]);
-		break;
-
-	case XFS_ALLOC_KTRACE_BUSY:
-		kdb_printf("busy %s [%s %d] mp 0x%x\n",
-			(char *)ktep->val[1],
-			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
-			(xfs_mount_t *)ktep->val[3]);
-		kdb_printf("      agno %d agbno %d len %d slot %d tp 0x%x\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[5],
-			(__psunsigned_t)ktep->val[6],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8]);
-		break;
-
-	case XFS_ALLOC_KTRACE_BUSYSEARCH:
-		kdb_printf("busy-search %s [%s %d] mp 0x%x\n",
-			(char *)ktep->val[1],
-			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
-			(xfs_mount_t *)ktep->val[3]);
-		kdb_printf("      agno %d agbno %d len %d slot %d tp 0x%x\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[5],
-			(__psunsigned_t)ktep->val[6],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8]);
-		break;
-        
 	default:
 		kdb_printf("unknown vntrace record\n");
 		return 1;
