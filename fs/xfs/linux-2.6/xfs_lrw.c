@@ -148,13 +148,16 @@ xfs_read(
 #endif /* CONFIG_XFS_DMAPI */
 
 	if (filp->f_flags & O_DIRECT) {
+		/* Flush and keep lock to keep out buffered writers */
 		fs_flush_pages(bdp, *offsetp, *offsetp + size, 0, FI_NONE);
 		ret = pagebuf_direct_file_read(filp, buf, size, offsetp,
 				linvfs_pb_bmap); 
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 	} else {
+		/* Page locking protects this case */
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 		ret = generic_file_read(filp, buf, size, offsetp);
 	}
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (!(filp->f_flags & O_INVISIBLE))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
@@ -170,7 +173,7 @@ xfs_read(
  */
 
 /* We don' want the IRIX poff */
-#define poff(x) ((x) & (PAGE_SIZE-1))
+#define poff(x) ((x) & (PAGE_CACHE_SIZE - 1))
 
 /* ARGSUSED */
 STATIC int				/* error */
@@ -312,7 +315,7 @@ xfs_zero_last_block(
 	 * Get a pagebuf for the last block, zero the part beyond the
 	 * EOF, and write it out sync.  We need to drop the ilock
 	 * while we do this so we don't deadlock when the buffer cache
-	 * calls back to us. JIMJIM is this true with pagebufs?
+	 * calls back to us.
 	 */
 	XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL| XFS_EXTSIZE_RD);
 	loff = XFS_FSB_TO_B(mp, last_fsb);
@@ -322,7 +325,7 @@ xfs_zero_last_block(
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 
 	/*
-	 * JIMJIM what about the real-time device
+	 * Realtime needs work here
 	 */
 	pb = pagebuf_get(ip, loff, lsize, 0);
 	if (!pb) {
@@ -459,7 +462,7 @@ xfs_zero_eof(
 	prev_zero_fsb = NULLFILEOFF;
 	prev_zero_count = 0;
 	/*
-	 * JIMJIM maybe change this loop to do the bmapi call and
+	 * Maybe change this loop to do the bmapi call and
 	 * loop while we split the mappings into pagebufs?
 	 */
 	while (start_zero_fsb <= end_zero_fsb) {
@@ -511,7 +514,7 @@ xfs_zero_eof(
 		loff = XFS_FSB_TO_B(mp, start_zero_fsb);
 		lsize = XFS_FSB_TO_B(mp, buf_len_fsb);
 		/*
-		 * JIMJIM what about the real-time device
+		 * real-time files need work here
 		 */
 
 		pb = pagebuf_get(ip, loff, lsize, 0);
@@ -596,8 +599,6 @@ xfs_write(
 	char 		*buf;
 	size_t		size;
 
-	locktype = (filp->f_flags & O_DIRECT) ?
-			VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
                     
         ASSERT(uiop);                   /* we only support exactly 1  */
         ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
@@ -624,10 +625,13 @@ xfs_write(
 		    (size  & mp->m_blockmask)) {
 			return XFS_ERROR(EINVAL);
 		}
+		iolock = XFS_IOLOCK_SHARED;
+		locktype = VRWLOCK_WRITE_DIRECT;
+	} else {
+		iolock = XFS_IOLOCK_EXCL;
+		locktype = VRWLOCK_WRITE;
 	}
 
-	iolock = (filp->f_flags & O_DIRECT) ?
-			XFS_IOLOCK_SHARED : XFS_IOLOCK_EXCL;
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 	isize = xip->i_d.di_size;
 
@@ -645,9 +649,6 @@ start:
 #ifdef CONFIG_XFS_DMAPI
 	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
 	    !(filp->f_flags & O_INVISIBLE) && !eventsent)) {
-		vrwlock_t	locktype;
-
-		locktype = direct ? VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
 
 		ret = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 				*offsetp, size,
@@ -839,6 +840,7 @@ retry:
 	if (!strcmp(current->comm, "nfsd"))
 		xfs_refcache_insert(xip);
 
+	/* Drop lock this way - the old refcache release is in here */
 	xfs_rwunlock(bdp, locktype);
 
 	return(ret);
@@ -964,6 +966,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 
 	ip = XFS_BHVTOI(bdp);
 	io = &ip->i_iocore;
+
 	mp = ip->i_mount;
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
@@ -1677,19 +1680,6 @@ xfs_iomap_write_delay(
 	if ((pbmapp->pbm_offset + pbmapp->pbm_bsize ) >= isize) {
 		pbmapp->pbm_flags |= PBMF_EOF;
 	}
-#ifdef DELALLOC_BUG
-	writing_bytes = pbmapp->pbm_bsize - pbmapp->pbm_delta;
-	if (writing_bytes > count) {
-		/*
-		 * The mapping is for more bytes than we're actually
-		 * going to write, so trim writing_bytes so we can
-		 * get bmapp->pbsize right.
-		 */
-		writing_bytes = count;
-	}
-	pbmapp->pbm_bsize = writing_bytes;
-#endif
-	pbmapp->pbm_flags |= PBMF_NEW;
 
 /* 	xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP,
 			    io, offset, count, bmapp, imap);         */
@@ -1968,7 +1958,6 @@ xfs_iomap_write_direct(
 		 * this is new since xfs_iomap_read
 		 * didn't find it.
 		 */
-		pbmapp->pbm_flags |= PBMF_NEW;
 		if (*npbmaps != 1) {
 			printk("NEED MORE WORK FOR MULTIPLE BMAPS (which are new)\n");
 		}
