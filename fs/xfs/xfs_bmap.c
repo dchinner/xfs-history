@@ -3365,7 +3365,7 @@ xfs_bmap_extents_to_btree(
 	 */
 	kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
-	kp->br_startoff = xfs_bmbt_get_startoff(arp);
+	INT_SET(kp->br_startoff, ARCH_UNKNOWN, xfs_bmbt_get_startoff(arp));
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 	INT_SET(*pp, ARCH_UNKNOWN, args.fsbno);
 	/*

@@ -185,7 +185,7 @@ xfs_btree_check_key(
 
 		k1 = ak1; 
 		k2 = ak2;
-		ASSERT(k1->br_startoff < k2->br_startoff);
+		ASSERT(INT_GET(k1->br_startoff, ARCH_UNKNOWN) < INT_GET(k2->br_startoff, ARCH_UNKNOWN));
 		break;
 	    }
 	case XFS_BTNUM_INO: {
@@ -297,7 +297,7 @@ xfs_btree_check_rec(
 		r1 = ar1;
 		r2 = ar2;
 		ASSERT(xfs_bmbt_get_startoff(r1) +
-		        xfs_bmbt_get_blockcount(r1) <=
+		       xfs_bmbt_get_blockcount(r1) <=
 		       xfs_bmbt_get_startoff(r2));
 		break;
 	    }

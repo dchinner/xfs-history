@@ -1824,7 +1824,7 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			printk("key %d startoff %Ld ",
-				i, k->br_startoff);
+				i, INT_GET(k->br_startoff, ARCH_UNKNOWN));
 			printk("ptr %Lx\n", INT_GET(*p, ARCH_UNKNOWN));
 		}
 	}

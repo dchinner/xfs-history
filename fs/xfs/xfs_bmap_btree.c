@@ -448,7 +448,7 @@ xfs_bmbt_delrec(
 			xfs_bmbt_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - 1);
 		}
 		if (ptr == 1) {
-			key.br_startoff = xfs_bmbt_get_startoff(rp);
+			INT_SET(key.br_startoff, ARCH_UNKNOWN, xfs_bmbt_get_startoff(rp));
 			kp = &key;
 		}
 	}
@@ -808,7 +808,7 @@ xfs_bmbt_insrec(
 	XFS_BMBT_TRACE_CURSOR(cur, ENTRY);
 	XFS_BMBT_TRACE_ARGIFR(cur, level, *bnop, recp);
 	ncur = (xfs_btree_cur_t *)0;
-	key.br_startoff = xfs_bmbt_get_startoff(recp);
+	INT_SET(key.br_startoff, ARCH_UNKNOWN, xfs_bmbt_get_startoff(recp));
 	optr = ptr = cur->bc_ptrs[level];
 	if (ptr == 0) {
 		XFS_BMBT_TRACE_CURSOR(cur, EXIT);
@@ -1219,7 +1219,7 @@ xfs_bmbt_lookup(
 				keyno = (low + high) >> 1;
 				if (level > 0) {
 					kkp = kkbase + keyno - 1;
-					startoff = kkp->br_startoff;
+					startoff = INT_GET(kkp->br_startoff, ARCH_UNKNOWN);
 				} else {
 					krp = krbase + keyno - 1;
 					startoff = xfs_bmbt_get_startoff(krp);
@@ -1401,7 +1401,7 @@ xfs_bmbt_lshift(
 	} else {
 		ovbcopy(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
 		xfs_bmbt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
-		key.br_startoff = xfs_bmbt_get_startoff(rrp);
+		INT_SET(key.br_startoff, ARCH_UNKNOWN, xfs_bmbt_get_startoff(rrp));
 		rkp = &key;
 	}
 	if (error = xfs_bmbt_updkey(cur, rkp, level + 1)) {
@@ -1515,7 +1515,7 @@ xfs_bmbt_rshift(
 		ovbcopy(rrp, rrp + 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
 		*rrp = *lrp;
 		xfs_bmbt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1);
-		key.br_startoff = xfs_bmbt_get_startoff(rrp);
+		INT_SET(key.br_startoff, ARCH_UNKNOWN, xfs_bmbt_get_startoff(rrp));
 		rkp = &key;
 	}
 	INT_MOD(left->bb_numrecs, ARCH_UNKNOWN, -1);
@@ -1678,7 +1678,7 @@ xfs_bmbt_split(
 		bcopy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rpp));
 		xfs_bmbt_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 		xfs_bmbt_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
-		*keyp = *rkp;
+		keyp->br_startoff = INT_GET(rkp->br_startoff, ARCH_UNKNOWN);
 	} else {
 		lrp = XFS_BMAP_REC_IADDR(left, i, cur);
 		rrp = XFS_BMAP_REC_IADDR(right, 1, cur);
@@ -1812,7 +1812,7 @@ xfs_bmbt_trace_argifk(
 	xfs_dfiloff_t		o;
 
 	d = (xfs_dfsbno_t)f;
-	o = k->br_startoff;
+	o = INT_GET(k->br_startoff, ARCH_UNKNOWN);
 	xfs_bmbt_trace_enter(func, cur, ARGS, XFS_BMBT_KTRACE_ARGIFK, line,
 		i, d >> 32, (int)d, o >> 32,
 		(int)o, 0, 0, 0,
@@ -1861,7 +1861,7 @@ xfs_bmbt_trace_argik(
 {
 	xfs_dfiloff_t		o;
 
-	o = k->br_startoff;
+	o = INT_GET(k->br_startoff, ARCH_UNKNOWN);
 	xfs_bmbt_trace_enter(func, cur, ARGS, XFS_BMBT_KTRACE_ARGIFK, line,
 		i, o >> 32, (int)o, 0,
 		0, 0, 0, 0,
@@ -1946,7 +1946,7 @@ xfs_bmbt_trace_enter(
 STATIC int
 xfs_bmbt_updkey(
 	xfs_btree_cur_t		*cur,
-	xfs_bmbt_key_t		*keyp,
+	xfs_bmbt_key_t		*keyp,	/* on-disk format */
 	int			level)
 {
 	xfs_bmbt_block_t	*block;
@@ -3072,7 +3072,7 @@ xfs_bmbt_update(
 		XFS_BMBT_TRACE_CURSOR(cur, EXIT);
 		return 0;
 	}
-	key.br_startoff = off;
+	INT_SET(key.br_startoff, ARCH_UNKNOWN, off);
 	if (error = xfs_bmbt_updkey(cur, &key, 1)) {
 		XFS_BMBT_TRACE_CURSOR(cur, ERROR);
 		return error;
