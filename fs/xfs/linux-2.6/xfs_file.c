@@ -166,7 +166,7 @@ linvfs_sendfile(
 	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	int			error;
 
-	VOP_SENDFILE(vp, filp, ppos, count, actor, target, NULL, error);
+	VOP_SENDFILE(vp, filp, ppos, 0, count, actor, target, NULL, error);
 
 	return error;
 }
