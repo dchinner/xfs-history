@@ -1659,7 +1659,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			 * the current di_next_unlinked field.
 			 */
 			bit += nbits;
-			bit = xfs_next_bit(data_map, map_size, bit);
+			bit = xfs_buf_item_next_bit(data_map, map_size, bit);
 
 			/*
 			 * If there are no more logged regions in the
@@ -1669,7 +1669,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 				return 0;
 			}
 
-			nbits = xfs_contig_bits(data_map, map_size,
+			nbits = xfs_buf_item_contig_bits(data_map, map_size,
 							 bit);
 			reg_buf_offset = bit << XFS_BLI_SHIFT;
 			reg_buf_bytes = nbits << XFS_BLI_SHIFT;
@@ -1748,10 +1748,10 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 	bit = 0;
 	i = 1;  /* 0 is the buf format structure */
 	while (1) {
-		bit = xfs_next_bit(data_map, map_size, bit);
+		bit = xfs_buf_item_next_bit(data_map, map_size, bit);
 		if (bit == -1)
 			break;
-		nbits = xfs_contig_bits(data_map, map_size, bit);
+		nbits = xfs_buf_item_contig_bits(data_map, map_size, bit);
 		ASSERT(item->ri_buf[i].i_addr != 0);
 		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
 		ASSERT(XFS_BUF_COUNT(bp) >=
