@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 /*
  * Free space allocation for xFS.
@@ -2371,24 +2371,45 @@ xfs_alloc_vextent(
 	xfs_agnumber_t agno;
 	xfs_agblock_t agsize;
 	xfs_mount_t *mp;
+	xfs_alloctype_t nflag = flag;
 	xfs_sb_t *sbp;
 	xfs_agnumber_t tagno;
 
 	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	agsize = sbp->sb_agblocks;
-	if (bno >= sbp->sb_dblocks || minlen > maxlen ||
-	    minlen > agsize || len == 0)
+	if (xfs_fsb_to_agno(sbp, bno) >= sbp->sb_agcount ||
+	    xfs_fsb_to_agbno(sbp, bno) >= sbp->sb_agblocks ||
+	    minlen > maxlen || minlen > agsize || len == 0)
 		return NULLFSBLOCK;
 	if (maxlen > agsize)
 		maxlen = agsize;
 	agbno = NULLAGBLOCK;
 	switch (flag) {
+	case XFS_ALLOCTYPE_START_BNO:
+		nflag = XFS_ALLOCTYPE_NEAR_BNO;
+		/* fall through */
+	case XFS_ALLOCTYPE_THIS_AG:
+	case XFS_ALLOCTYPE_NEAR_BNO:
+	case XFS_ALLOCTYPE_THIS_BNO:
+		agno = xfs_fsb_to_agno(sbp, bno);
+		agbuf = xfs_alloc_fix_freelist(tp, agno);
+		agf = xfs_buf_to_agf(agbuf);
+		if (agf->agf_longest >= minlen) {
+			agbno = xfs_fsb_to_agbno(sbp, bno);
+			agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, agbno, minlen, maxlen, len, nflag); 
+		}
+		if (agbno != NULLAGBLOCK || flag != XFS_ALLOCTYPE_START_BNO)
+			break;
+		/* fall through */
 	case XFS_ALLOCTYPE_ANY_AG:
 	case XFS_ALLOCTYPE_START_AG:
-		agno = flag == XFS_ALLOCTYPE_ANY_AG ?
-			mp->m_agrotor : xfs_fsb_to_agno(sbp, bno);
-		tagno = agno;
+		if (flag == XFS_ALLOCTYPE_ANY_AG)
+			tagno = agno = mp->m_agrotor;
+		else if (flag == XFS_ALLOCTYPE_START_AG)
+			tagno = agno = xfs_fsb_to_agno(sbp, bno);
+		else
+			tagno = (agno + 1) % sbp->sb_agcount;
 		do {
 			agbuf = xfs_alloc_fix_freelist(tp, tagno);
 			agf = xfs_buf_to_agf(agbuf);
@@ -2401,17 +2422,6 @@ xfs_alloc_vextent(
 		} while (tagno != agno);
 		agno = tagno;
 		mp->m_agrotor = (agno + 1) % sbp->sb_agcount;
-		break;
-	case XFS_ALLOCTYPE_THIS_AG:
-	case XFS_ALLOCTYPE_NEAR_BNO:
-	case XFS_ALLOCTYPE_THIS_BNO:
-		agno = xfs_fsb_to_agno(sbp, bno);
-		agbuf = xfs_alloc_fix_freelist(tp, agno);
-		agf = xfs_buf_to_agf(agbuf);
-		if (agf->agf_longest >= minlen) {
-			agbno = xfs_fsb_to_agbno(sbp, bno);
-			agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, agbno, minlen, maxlen, len, flag); 
-		}
 		break;
 	default:
 		ASSERT(0);
@@ -2443,7 +2453,9 @@ xfs_free_extent(
 	sbp = &mp->m_sb;
 	ASSERT(len != 0);
 	agno = xfs_fsb_to_agno(sbp, bno);
+	ASSERT(agno < sbp->sb_agcount);
 	agbno = xfs_fsb_to_agbno(sbp, bno);
+	ASSERT(agbno < sbp->sb_agblocks);
 	agbuf = xfs_alloc_fix_freelist(tp, agno);
 	i = xfs_free_ag_extent(tp, agbuf, agno, agbno, len);
 	return i;
