@@ -217,6 +217,7 @@ void		xfs_itruncate_finish(xfs_trans_t **, xfs_inode_t *,
 				     xfs_fsize_t);
 void		xfs_igrow(xfs_trans_t *, xfs_inode_t *,
 			  xfs_fsize_t, struct cred *);
+void		xfs_iunlink(xfs_trans_t *, xfs_inode_t *);
 
 void		xfs_idestroy(xfs_inode_t *);
 void		xfs_idata_realloc(xfs_inode_t *, int);
