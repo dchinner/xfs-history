@@ -2012,8 +2012,6 @@ xfs_diostrat( buf_t *bp)
 	int t1, t2, t3;
 
 
-printf("xfs_diostrat \n");
-
 	dp        = (struct dio_s *)bp->b_private;
 	vp        = dp->vp;
 	ip        = XFS_VTOI(vp); 
