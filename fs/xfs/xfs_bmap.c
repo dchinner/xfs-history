@@ -377,6 +377,9 @@ xfs_bmap_add_extent_delay_real(
 		LEFT_VALID,	RIGHT_VALID
 	};
 
+#define	LEFT		r[0]
+#define	RIGHT		r[1]
+#define	PREV		r[2]
 #define	MASK(b)		(1 << (b))
 #define	MASK2(a,b)	(MASK(a) | MASK(b))
 #define	MASK3(a,b,c)	(MASK2(a,b) | MASK(c))
@@ -394,40 +397,40 @@ xfs_bmap_add_extent_delay_real(
 	cur = *curp;
 	base = ip->i_u1.iu_extents;
 	ep = &base[idx];
-	xfs_bmbt_get_all(ep, r[2]);
+	xfs_bmbt_get_all(ep, PREV);
 	new_endoff = new->br_startoff + new->br_blockcount;
-	ASSERT(r[2].br_startoff <= new->br_startoff);
-	ASSERT(r[2].br_startoff + r[2].br_blockcount >= new_endoff);
+	ASSERT(PREV.br_startoff <= new->br_startoff);
+	ASSERT(PREV.br_startoff + PREV.br_blockcount >= new_endoff);
 	/*
 	 * Check and set flags if this segment has a left neighbor
 	 */
 	if (STATE_SET_TEST(LEFT_VALID, idx > 0)) {
-		xfs_bmbt_get_all(ep - 1, r[0]);
-		STATE_SET(LEFT_DELAY, ISNULLSTARTBLOCK(r[0].br_startblock));
+		xfs_bmbt_get_all(ep - 1, LEFT);
+		STATE_SET(LEFT_DELAY, ISNULLSTARTBLOCK(LEFT.br_startblock));
 	}
 	STATE_SET(LEFT_CONTIG, 
 		STATE_TEST(LEFT_VALID) && !STATE_TEST(LEFT_DELAY) &&
-		r[0].br_startoff + r[0].br_blockcount == new->br_startoff &&
-		r[0].br_startblock + r[0].br_blockcount == new->br_startblock);
+		LEFT.br_startoff + LEFT.br_blockcount == new->br_startoff &&
+		LEFT.br_startblock + LEFT.br_blockcount == new->br_startblock);
 	/*
 	 * Check and set flags if this segment has a right neighbor
 	 */
 	if (STATE_SET_TEST(RIGHT_VALID,
 		idx < ip->i_bytes / sizeof(xfs_bmbt_rec_t) - 1)) {
-		xfs_bmbt_get_all(ep + 1, r[1]);
-		STATE_SET(RIGHT_DELAY, ISNULLSTARTBLOCK(r[1].br_startblock));
+		xfs_bmbt_get_all(ep + 1, RIGHT);
+		STATE_SET(RIGHT_DELAY, ISNULLSTARTBLOCK(RIGHT.br_startblock));
 	}
 	STATE_SET(RIGHT_CONTIG, 
 		STATE_TEST(RIGHT_VALID) && !STATE_TEST(RIGHT_DELAY) &&
-		new_endoff == r[1].br_startoff &&
-		new->br_startblock + new->br_blockcount == r[1].br_startblock);
+		new_endoff == RIGHT.br_startoff &&
+		new->br_startblock + new->br_blockcount == RIGHT.br_startblock);
 	/*
 	 * Set flags determining what part of the previous delayed allocation
 	 * extent is being replaced by a real allocation.
 	 */
-	STATE_SET(LEFT_FILLING, r[2].br_startoff == new->br_startoff);
+	STATE_SET(LEFT_FILLING, PREV.br_startoff == new->br_startoff);
 	STATE_SET(RIGHT_FILLING,
-		r[2].br_startoff + r[2].br_blockcount == new_endoff);
+		PREV.br_startoff + PREV.br_blockcount == new_endoff);
 	/*
 	 * Switch out based on the FILLING and CONTIG state bits.
 	 */
@@ -439,22 +442,22 @@ xfs_bmap_add_extent_delay_real(
 		 * The left and right neighbors are both contiguous with new.
 		 */
 		xfs_bmbt_set_blockcount(ep - 1,
-			r[0].br_blockcount + r[2].br_blockcount +
-			r[1].br_blockcount);
+			LEFT.br_blockcount + PREV.br_blockcount +
+			RIGHT.br_blockcount);
 		xfs_bmap_delete_exlist(ip, idx, 2);
 		ip->i_lastex = idx - 1;
 		ip->i_d.di_nextents--;
 		if (cur == NULL)
 			rval = XFS_ILOG_CORE | XFS_ILOG_EXT;
 		else {
-			xfs_bmbt_lookup_eq(cur, r[1].br_startoff,
-				r[1].br_startblock, r[1].br_blockcount);
+			xfs_bmbt_lookup_eq(cur, RIGHT.br_startoff,
+				RIGHT.br_startblock, RIGHT.br_blockcount);
 			xfs_bmbt_delete(cur);
 			xfs_bmbt_decrement(cur, 0);
-			xfs_bmbt_update(cur, r[0].br_startoff,
-				r[0].br_startblock,
-				r[0].br_blockcount + r[2].br_blockcount +
-				r[1].br_blockcount);
+			xfs_bmbt_update(cur, LEFT.br_startoff,
+				LEFT.br_startblock,
+				LEFT.br_blockcount + PREV.br_blockcount +
+				RIGHT.br_blockcount);
 			rval = XFS_ILOG_CORE;
 		}
 		*dnew = 0;
@@ -466,17 +469,17 @@ xfs_bmap_add_extent_delay_real(
 		 * The left neighbor is contiguous, the right is not.
 		 */
 		xfs_bmbt_set_blockcount(ep - 1,
-			r[0].br_blockcount + r[2].br_blockcount);
+			LEFT.br_blockcount + PREV.br_blockcount);
 		ip->i_lastex = idx - 1;
 		xfs_bmap_delete_exlist(ip, idx, 1);
 		if (cur == NULL)
 			rval = XFS_ILOG_EXT;
 		else {
-			xfs_bmbt_lookup_eq(cur, r[0].br_startoff,
-				r[0].br_startblock, r[0].br_blockcount);
-			xfs_bmbt_update(cur, r[0].br_startoff,
-				r[0].br_startblock,
-				r[0].br_blockcount + r[2].br_blockcount);
+			xfs_bmbt_lookup_eq(cur, LEFT.br_startoff,
+				LEFT.br_startblock, LEFT.br_blockcount);
+			xfs_bmbt_update(cur, LEFT.br_startoff,
+				LEFT.br_startblock,
+				LEFT.br_blockcount + PREV.br_blockcount);
 			rval = 0;
 		}
 		*dnew = 0;
@@ -489,17 +492,17 @@ xfs_bmap_add_extent_delay_real(
 		 */
 		xfs_bmbt_set_startblock(ep, new->br_startblock);
 		xfs_bmbt_set_blockcount(ep,
-			r[2].br_blockcount + r[1].br_blockcount);
+			PREV.br_blockcount + RIGHT.br_blockcount);
 		ip->i_lastex = idx;
 		xfs_bmap_delete_exlist(ip, idx + 1, 1);
 		if (cur == NULL)
 			rval = XFS_ILOG_EXT;
 		else {
-			xfs_bmbt_lookup_eq(cur, r[1].br_startoff,
-				r[1].br_startblock, r[1].br_blockcount);
-			xfs_bmbt_update(cur, r[2].br_startoff,
+			xfs_bmbt_lookup_eq(cur, RIGHT.br_startoff,
+				RIGHT.br_startblock, RIGHT.br_blockcount);
+			xfs_bmbt_update(cur, PREV.br_startoff,
 				new->br_startblock,
-				r[2].br_blockcount + r[1].br_blockcount);
+				PREV.br_blockcount + RIGHT.br_blockcount);
 			rval = 0;
 		}
 		*dnew = 0;
@@ -531,20 +534,20 @@ xfs_bmap_add_extent_delay_real(
 		 * The left neighbor is contiguous.
 		 */
 		xfs_bmbt_set_blockcount(ep - 1,
-			r[0].br_blockcount + new->br_blockcount);
+			LEFT.br_blockcount + new->br_blockcount);
 		xfs_bmbt_set_startoff(ep,
-			r[2].br_startoff + new->br_blockcount);
-		temp = r[2].br_blockcount - new->br_blockcount;
+			PREV.br_startoff + new->br_blockcount);
+		temp = PREV.br_blockcount - new->br_blockcount;
 		xfs_bmbt_set_blockcount(ep, temp);
-		ip->i_lastex = idx;
+		ip->i_lastex = idx - 1;
 		if (cur == NULL)
 			rval = XFS_ILOG_EXT;
 		else {
-			xfs_bmbt_lookup_eq(cur, r[0].br_startoff,
-				r[0].br_startblock, r[0].br_blockcount);
-			xfs_bmbt_update(cur, r[0].br_startoff,
-				r[0].br_startblock,
-				r[0].br_blockcount + new->br_blockcount);
+			xfs_bmbt_lookup_eq(cur, LEFT.br_startoff,
+				LEFT.br_startblock, LEFT.br_blockcount);
+			xfs_bmbt_update(cur, LEFT.br_startoff,
+				LEFT.br_startblock,
+				LEFT.br_blockcount + new->br_blockcount);
 			rval = 0;
 		}
 		temp = xfs_bmap_worst_indlen(ip, temp);
@@ -558,10 +561,8 @@ xfs_bmap_add_extent_delay_real(
 		 * The left neighbor is not contiguous.
 		 */
 		xfs_bmbt_set_startoff(ep, new_endoff);
-		temp = r[2].br_blockcount - new->br_blockcount;
+		temp = PREV.br_blockcount - new->br_blockcount;
 		xfs_bmbt_set_blockcount(ep, temp);
-		*dnew = temp = xfs_bmap_worst_indlen(ip, temp);
-		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
 		xfs_bmap_insert_exlist(ip, idx, 1, new);
 		ip->i_lastex = idx;
 		ip->i_d.di_nextents++;
@@ -580,10 +581,10 @@ xfs_bmap_add_extent_delay_real(
 			rval |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 				first, flist, &cur);
 		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
-			STARTBLOCKVAL(r[0].br_startblock) -
+			STARTBLOCKVAL(PREV.br_startblock) -
 			(cur ? cur->bc_private.b.allocated : 0));
 		base = ip->i_u1.iu_extents;
-		ep = &base[idx];
+		ep = &base[idx + 1];
 		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
 		*dnew = temp;
 		break;
@@ -593,21 +594,21 @@ xfs_bmap_add_extent_delay_real(
 		 * Filling in the last part of a previous delayed allocation.
 		 * The right neighbor is contiguous with the new allocation.
 		 */
-		temp = r[2].br_blockcount - new->br_blockcount;
+		temp = PREV.br_blockcount - new->br_blockcount;
 		xfs_bmbt_set_blockcount(ep, temp);
 		xfs_bmbt_set_startoff(ep + 1, new->br_startoff);
 		xfs_bmbt_set_startblock(ep + 1, new->br_startblock);
 		xfs_bmbt_set_blockcount(ep + 1,
-			new->br_blockcount + r[1].br_blockcount);
+			new->br_blockcount + RIGHT.br_blockcount);
 		ip->i_lastex = idx + 1;
 		if (cur == NULL)
 			rval = XFS_ILOG_EXT;
 		else {
-			xfs_bmbt_lookup_eq(cur, r[1].br_startoff,
-				r[1].br_startblock, r[1].br_blockcount);
+			xfs_bmbt_lookup_eq(cur, RIGHT.br_startoff,
+				RIGHT.br_startblock, RIGHT.br_blockcount);
 			xfs_bmbt_update(cur, new->br_startoff,
 				new->br_startblock,
-				new->br_blockcount + r[1].br_blockcount);
+				new->br_blockcount + RIGHT.br_blockcount);
 			rval = 0;
 		}
 		temp = xfs_bmap_worst_indlen(ip, temp);
@@ -620,7 +621,7 @@ xfs_bmap_add_extent_delay_real(
 		 * Filling in the last part of a previous delayed allocation.
 		 * The right neighbor is not contiguous.
 		 */
-		temp = r[2].br_blockcount - new->br_blockcount;
+		temp = PREV.br_blockcount - new->br_blockcount;
 		xfs_bmbt_set_blockcount(ep, temp);
 		xfs_bmap_insert_exlist(ip, idx + 1, 1, new);
 		ip->i_lastex = idx + 1;
@@ -640,7 +641,7 @@ xfs_bmap_add_extent_delay_real(
 			rval |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 				first, flist, &cur);
 		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
-			STARTBLOCKVAL(r[0].br_startblock) -
+			STARTBLOCKVAL(PREV.br_startblock) -
 			(cur ? cur->bc_private.b.allocated : 0));
 		base = ip->i_u1.iu_extents;
 		ep = &base[idx];
@@ -654,14 +655,12 @@ xfs_bmap_add_extent_delay_real(
 		 * Contiguity is impossible here.
 		 * This case is avoided almost all the time.
 		 */
-		temp = new->br_startoff - r[2].br_startoff;
+		temp = new->br_startoff - PREV.br_startoff;
 		xfs_bmbt_set_blockcount(ep, temp);
-		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(0));
 		r[0] = *new;
 		r[1].br_startoff = new_endoff;
-		temp2 = r[2].br_startoff + r[2].br_blockcount - new_endoff;
+		temp2 = PREV.br_startoff + PREV.br_blockcount - new_endoff;
 		r[1].br_blockcount = temp2;
-		r[1].br_startblock = NULLSTARTBLOCK(0);
 		xfs_bmap_insert_exlist(ip, idx + 1, 2, &r[0]);
 		ip->i_lastex = idx + 1;
 		ip->i_d.di_nextents++;
@@ -681,9 +680,8 @@ xfs_bmap_add_extent_delay_real(
 				first, flist, &cur);
 		temp = xfs_bmap_worst_indlen(ip, temp);
 		temp2 = xfs_bmap_worst_indlen(ip, temp2);
-		diff = temp + temp2 - STARTBLOCKVAL(r[2].br_startblock);
-		if (cur)
-			diff -= cur->bc_private.b.allocated;
+		diff = temp + temp2 - STARTBLOCKVAL(PREV.br_startblock) -
+			(cur ? cur->bc_private.b.allocated : 0);
 		if (diff > 0 &&
 		    xfs_mod_incore_sb(ip->i_mount, XFS_SB_FDBLOCKS, -diff)) {
 			/*
@@ -731,6 +729,9 @@ xfs_bmap_add_extent_delay_real(
 	*curp = cur;
 	kmem_check();
 	return rval;
+#undef	LEFT
+#undef	RIGHT
+#undef	PREV
 #undef	MASK
 #undef	MASK2
 #undef	MASK3
@@ -1847,12 +1848,34 @@ xfs_bmap_search_extents(
 	return ep;
 }
 
+/*
+ * Compute the worst-case number of indirect blocks that will be used
+ * for ip's delayed extent of length "len".
+ */
 STATIC xfs_extlen_t
 xfs_bmap_worst_indlen(
-	xfs_inode_t		*ip,
-	xfs_extlen_t		len)
+	xfs_inode_t	*ip,		/* incore inode pointer */
+	xfs_extlen_t	len)		/* delayed extent length */
 {
-	return 0;
+	int		level;
+	int		maxrecs;
+	xfs_mount_t	*mp;
+	xfs_extlen_t	rval;
+	xfs_sb_t	*sbp;
+
+	mp = ip->i_mount;
+	sbp = &mp->m_sb;
+	maxrecs = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize, xfs_bmbt, 1);
+	for (level = 0, rval = 0; level < XFS_BTREE_MAXLEVELS; level++) {
+		len = (len + maxrecs - 1) / maxrecs;
+		rval += len;
+		if (len == 1)
+			return rval + (XFS_BTREE_MAXLEVELS - level - 1);
+		if (level == 0)
+			maxrecs = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
+				xfs_bmbt, 0);
+	}
+	return rval;
 }
 
 /*
@@ -2233,6 +2256,7 @@ xfs_bmapi(
 			}
 			if (delay) {
 				indlen = xfs_bmap_worst_indlen(ip, alen);
+				ASSERT(indlen > 0);
 				if (xfs_mod_incore_sb(mp, XFS_SB_FDBLOCKS,
 						      -(alen + indlen)))
 					break;
@@ -2261,6 +2285,8 @@ xfs_bmapi(
 			ep = &ip->i_u1.iu_extents[lastx];
 			nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 			xfs_bmbt_get_all(ep, got);
+			ASSERT(got.br_startoff <= aoff);
+			ASSERT(got.br_startoff + got.br_blockcount >= aoff + alen);
 			/*
 			 * Fall down into the found allocated space case.
 			 */
@@ -2282,12 +2308,13 @@ xfs_bmapi(
 		 */
 		ASSERT(ep != NULL);
 		if (trim && (got.br_startoff + got.br_blockcount > obno)) {
-			bno = MAX(bno, obno);
+			bno = xfs_fsbno_max(bno, obno);
 			ASSERT((bno >= obno) || (n == 0));
 			mval->br_startoff = bno;
-			if (ISNULLSTARTBLOCK(got.br_startblock))
+			if (ISNULLSTARTBLOCK(got.br_startblock)) {
+				ASSERT(!wr || delay);
 				mval->br_startblock = DELAYSTARTBLOCK;
-			else
+			} else
 				mval->br_startblock = got.br_startblock +
 					(bno - got.br_startoff);
 			mval->br_blockcount =
@@ -2295,8 +2322,10 @@ xfs_bmapi(
 					(bno - got.br_startoff));
 		} else {
 			*mval = got;
-			if (ISNULLSTARTBLOCK(mval->br_startblock))
+			if (ISNULLSTARTBLOCK(mval->br_startblock)) {
+				ASSERT(!wr || delay);
 				mval->br_startblock = DELAYSTARTBLOCK;
+			}
 		}
 		bno = mval->br_startoff + mval->br_blockcount;
 		len = end - bno;
