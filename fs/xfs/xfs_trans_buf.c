@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.84 $"
 
 #include <xfs_os_defs.h>
 
@@ -162,7 +162,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 		ASSERT(bip != NULL);
-		ASSERT(bip->bli_refcount > 0);
+		ASSERT(atomic_read(&bip->bli_refcount) > 0);
 		bip->bli_recur++;
 		xfs_buftrace("TRANS GET RECUR", bp);
 		xfs_buf_item_trace("GET RECUR", bip);
@@ -208,7 +208,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	(void) atomicAddInt(&bip->bli_refcount, 1);
+	atomic_inc(&bip->bli_refcount);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -260,7 +260,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	if (XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp) {
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
 		ASSERT(bip != NULL);
-		ASSERT(bip->bli_refcount > 0);
+		ASSERT(atomic_read(&bip->bli_refcount) > 0);
 		bip->bli_recur++;
 		xfs_buf_item_trace("GETSB RECUR", bip);
 		return (bp);
@@ -291,7 +291,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	(void) atomicAddInt(&bip->bli_refcount, 1);
+	atomic_inc(&bip->bli_refcount);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -445,7 +445,7 @@ xfs_trans_read_buf(
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
 		bip->bli_recur++;
 
-		ASSERT(bip->bli_refcount > 0);
+		ASSERT(atomic_read(&bip->bli_refcount) > 0);
 		xfs_buf_item_trace("READ RECUR", bip);
 		*bpp = bp;
 		return 0;
@@ -518,7 +518,7 @@ xfs_trans_read_buf(
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	(void) atomicAddInt(&bip->bli_refcount, 1);
+	atomic_inc(&bip->bli_refcount);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -608,7 +608,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 
 	/*
 	 * Find the item descriptor pointing to this buffer's
@@ -667,7 +667,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	/*
 	 * Drop our reference to the buf log item.
 	 */
-	(void) atomicAddInt(&bip->bli_refcount, -1);
+	atomic_dec(&bip->bli_refcount);
 
 	/*
 	 * If the buf item is not tracking data in the log, then
@@ -680,7 +680,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 /***
 		ASSERT(bp->b_pincount == 0);
 ***/
-		ASSERT(bip->bli_refcount == 0);
+		ASSERT(atomic_read(&bip->bli_refcount) == 0);
 		ASSERT(!(bip->bli_item.li_flags & XFS_LI_IN_AIL));
 		ASSERT(!(bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF));
 		xfs_buf_item_relse(bp);
@@ -732,7 +732,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	(void) atomicAddInt(&bip->bli_refcount, 1);
+	atomic_inc(&bip->bli_refcount);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -767,7 +767,7 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	bip->bli_flags |= XFS_BLI_HOLD;
 	xfs_buf_item_trace("BHOLD", bip);
 }
@@ -796,7 +796,7 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_CANCEL));
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
 
@@ -845,7 +845,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	XFS_BUF_DONE(bp);
 
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	XFS_BUF_SET_IODONE_FUNC(bp, xfs_buf_iodone_callbacks);
 	bip->bli_item.li_cb = (void(*)(xfs_buf_t*,xfs_log_item_t*))xfs_buf_iodone;
 
@@ -908,7 +908,7 @@ xfs_trans_binval(
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		/*
@@ -984,7 +984,7 @@ xfs_trans_inode_buf(
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 
 	bip->bli_format.blf_flags |= XFS_BLI_INODE_BUF;
 }
@@ -1011,7 +1011,7 @@ xfs_trans_inode_alloc_buf(
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	ASSERT(!(bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF));
 
 	bip->bli_flags |= XFS_BLI_INODE_ALLOC_BUF;
@@ -1044,7 +1044,7 @@ xfs_trans_dquot_buf(
 	       type == XFS_BLI_PDQUOT_BUF);
 
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 
 	bip->bli_format.blf_flags |= type;
 }

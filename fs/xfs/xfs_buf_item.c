@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.101 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -119,7 +119,7 @@ xfs_buf_item_size(
 	int	next_bit;
 	int	last_bit;
 
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		/*
 		 * The buffer is stale, so all we need to log
@@ -187,7 +187,7 @@ xfs_buf_item_format(
 	uint		nbits;
 	uint		buffer_offset;
 
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
 	       (bip->bli_flags & XFS_BLI_STALE));
 	bp = bip->bli_buf;
@@ -290,7 +290,7 @@ xfs_buf_item_pin(
 
 	bp = bip->bli_buf;
 	ASSERT(XFS_BUF_ISBUSY(bp));
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
 	       (bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("PIN", bip);
@@ -314,20 +314,20 @@ xfs_buf_item_unpin(
 {
 	xfs_mount_t	*mp;
 	xfs_buf_t	*bp;
-	int		refcount;
+	int		freed;
 	SPLDECL(s);
 
 	bp = bip->bli_buf;
 	ASSERT(bp != NULL);
 	ASSERT(XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *) == bip);
-	ASSERT(bip->bli_refcount > 0);
+	ASSERT(atomic_read(&bip->bli_refcount) > 0);
 	xfs_buf_item_trace("UNPIN", bip);
 	xfs_buftrace("XFS_UNPIN", bp);
 
-	refcount = atomicAddInt(&bip->bli_refcount, -1);
+	freed = atomic_dec_and_test(&bip->bli_refcount);
 	mp = bip->bli_item.li_mountp;
 	xfs_bunpin(bp);
-	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
+	if (freed && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 		ASSERT(!(XFS_BUF_ISDELAYWRITE(bp)));
 		ASSERT(XFS_BUF_ISSTALE(bp));
@@ -372,7 +372,8 @@ xfs_buf_item_unpin_remove(
 	/*
 	 * will xfs_buf_item_unpin() call xfs_buf_item_relse()?
 	 */
-	if (bip->bli_refcount == 1 && (bip->bli_flags & XFS_BLI_STALE)) {
+	if ((atomic_read(&bip->bli_refcount) == 1) &&
+	    (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(XFS_BUF_VALUSEMA(bip->bli_buf) <= 0);
 		xfs_buf_item_trace("UNPIN REMOVE", bip);
       	xfs_buftrace("XFS_UNPIN_REMOVE", bp);
@@ -493,7 +494,7 @@ xfs_buf_item_unlock(
 	 * the transaction is really through with the buffer.
 	 */
 	if (!(bip->bli_flags & XFS_BLI_LOGGED)) {
-		(void) atomicAddInt(&bip->bli_refcount, -1);
+		atomic_dec(&bip->bli_refcount);
 	} else {
 		/*
 		 * Clear the logged flag since this is per
@@ -1447,7 +1448,7 @@ xfs_buf_item_trace(
 		     (void *)bip->bli_buf,
 		     (void *)((unsigned long)bip->bli_flags),
 		     (void *)((unsigned long)bip->bli_recur),
-		     (void *)((unsigned long)bip->bli_refcount),
+		     (void *)((unsigned long)atomic_read(&bip->bli_refcount)),
 		     (void *)XFS_BUF_ADDR(bp),
 		     (void *)((unsigned long)XFS_BUF_COUNT(bp)),
 		     (void *)((unsigned long)(0xFFFFFFFF & (XFS_BFLAGS(bp) >> 32))),

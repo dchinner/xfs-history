@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.142 $"
+#ident	"$Revision: 1.143 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -2221,7 +2221,8 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 		return;
 	}
 	kdb_printf("buf 0x%p recur %d refcount %d flags:",
-		blip->bli_buf, blip->bli_recur, blip->bli_refcount);
+		blip->bli_buf, blip->bli_recur,
+		atomic_read(&blip->bli_refcount));
 	printflags(blip->bli_flags, bli_flags, NULL);
 	kdb_printf("\n");
 	kdb_printf("size %d blkno 0x%Lx len 0x%x map size %d map 0x%p\n",

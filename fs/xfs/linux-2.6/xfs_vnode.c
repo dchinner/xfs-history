@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.27 $"
 
 #include <xfs_os_defs.h>
 
@@ -97,13 +97,15 @@
 
 static struct xfs_zone *vn_zone;	/* vnode heap zone */
 uint64_t vn_generation;		/* vnode generation number */
-u_long	vn_vnumber;		/* # of vnodes ever allocated */
+atomic_t vn_vnumber;		/* # of vnodes ever allocated */
 int	vn_epoch;		/* # of vnodes freed */
 				/* vn_vnumber - vn_epoch == # current vnodes */
 int vn_minvn;			/* minimum # vnodes before reclaiming */
 static int vn_shaken;		/* damper for vn_alloc */
 static unsigned int vn_coin;	/* coin for vn_alloc */
 int vnode_free_ratio = 1;	/* tuneable parameter for vn_alloc */
+
+spinlock_t	vnumber_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * The following counters are used to manage the pool of allocated and
@@ -291,13 +293,16 @@ vn_initialize(struct inode *inode)
 
 	vp->v_flag = 0;
 
-	(void) atomicAddLong((long *)&vn_vnumber, 1);
+	atomic_inc(&vn_vnumber);
 
 	/* We never free the vnodes in the simulator, so these don't
 	   get destroyed either */
 	spinlock_init(&vp->v_lock, "v_lock");
 
-	vp->v_number = atomicAddUint64(&vn_generation, 1);
+	spin_lock(&vnumber_lock);
+	vn_generation += 1;
+	vp->v_number = vn_generation;
+	spin_unlock(&vnumber_lock);
 
 	ASSERT(vp->v_number);
 

@@ -32,7 +32,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.29 $"
 
 struct xfs_buf;
 struct ktrace;
@@ -103,7 +103,7 @@ typedef struct xfs_buf_log_item {
 	struct xfs_buf		*bli_buf;	/* real buffer pointer */
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
-	int			bli_refcount;	/* cnt of tp refs */
+	atomic_t		bli_refcount;	/* cnt of tp refs */
 #ifdef DEBUG
 	struct ktrace		*bli_trace;	/* event trace buf */
 #endif
