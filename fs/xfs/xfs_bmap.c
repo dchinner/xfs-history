@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.208 $"
+#ident	"$Revision: 1.210 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -400,6 +400,18 @@ xfs_bmap_validate_ret(
 #else
 #define	xfs_bmap_validate_ret(bno,len,flags,mval,onmap,nmap)
 #endif /* DEBUG */
+
+#if defined(DEBUG) && defined(XFS_RW_TRACE)
+STATIC void
+xfs_bunmap_trace(
+	xfs_inode_t		*ip,
+	xfs_fileoff_t		bno,
+	xfs_filblks_t		len,
+	int			flags,
+	inst_t			*ra);
+#else
+#define	xfs_bunmap_trace(ip, bno, len, flags, ra)
+#endif	/* DEBUG && XFS_RW_TRACE */
 
 /*
  * Bmap internal routines.
@@ -3023,6 +3035,37 @@ xfs_bmap_worst_indlen(
 	return rval;
 }
 
+#if defined(DEBUG) && defined(XFS_RW_TRACE)
+STATIC void
+xfs_bunmap_trace(
+	xfs_inode_t		*ip,
+	xfs_fileoff_t		bno,
+	xfs_filblks_t		len,
+	int			flags,
+	inst_t			*ra)
+{
+	if (ip->i_rwtrace == NULL)
+		return;
+	ktrace_enter(ip->i_rwtrace,
+		(void *)(__psint_t)XFS_BUNMAPI,
+		(void *)ip,
+		(void *)(__psint_t)((ip->i_d.di_size >> 32) & 0xffffffff),
+		(void *)(__psint_t)(ip->i_d.di_size & 0xffffffff),
+		(void *)(__psint_t)(((xfs_dfiloff_t)bno >> 32) & 0xffffffff),
+		(void *)(__psint_t)((xfs_dfiloff_t)bno & 0xffffffff),
+		(void *)(__psint_t)len,
+		(void *)(__psint_t)flags,
+		(void *)(__psint_t)private.p_cpuid,
+		(void *)ra,
+		(void *)0,
+		(void *)0,
+		(void *)0,
+		(void *)0,
+		(void *)0,
+		(void *)0);
+}
+#endif
+
 /*
  * Convert inode from non-attributed to attributed.
  * Must not be in a transaction, ip must not be locked.
@@ -4181,6 +4224,7 @@ xfs_bunmapi(
 	int			whichfork;	/* data or attribute fork */
 	int			rsvd;		/* OK to allocate reserved blocks */
 
+	xfs_bunmap_trace(ip, bno, len, flags, (inst_t *)__return_address);
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
 		XFS_ATTR_FORK : XFS_DATA_FORK;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
