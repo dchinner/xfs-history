@@ -417,7 +417,7 @@ _pagebuf_buffers_to_page(
 	pb_target_t		*target = pb->pb_target;
 	struct buffer_head	*bh, *head;
 	page_buf_daddr_t	bn;
-	size_t			offset, start, end, delta;
+	size_t			offset, start, end, delta = 0;
 	int			bbits, i = 0;
 
 	assert(target->pbr_blocksize < PAGE_CACHE_SIZE);
@@ -441,6 +441,14 @@ _pagebuf_buffers_to_page(
 	 */
 	bbits = 9;
 
+	/* Calculate the starting block number */
+	bn = pb->pb_bn;
+	if (pg_index) {
+		delta = (PAGE_CACHE_SIZE - pb->pb_offset);
+		delta += ((pg_index - 1) >> PAGE_CACHE_SHIFT);
+	}
+	bn += (delta >> 9);
+
 	if (!page_has_buffers(page))
 		create_empty_buffers(page, target->pbr_device, 1 << bbits);
 
@@ -452,21 +460,14 @@ _pagebuf_buffers_to_page(
 		if (offset >= end)
 			break;
 
-		delta = (offset - start);
-		if (pg_index) {
-			delta += (PAGE_CACHE_SIZE - pb->pb_offset);
-			delta += ((pg_index - 1) >> PAGE_CACHE_SHIFT);
-		}
-		bn = pb->pb_bn;
-		bn += (delta >> 9);
+		lock_buffer(bh);
+		assert(!waitqueue_active(&bh->b_wait));
+
 		bh->b_size = 1 << bbits;
-		bh->b_rsector = bh->b_blocknr = bn;
+		bh->b_rsector = bh->b_blocknr = (bn + i - (start >> 9));
 		bh->b_rdev = bh->b_dev = pb->pb_dev;
-		if (!buffer_mapped(bh)) {
-			init_waitqueue_head(&bh->b_wait);
-		}
+		init_waitqueue_head(&bh->b_wait);
 		atomic_set(&bh->b_count, 1);
-		set_bit(BH_Lock, &bh->b_state);
 		set_bit(BH_Mapped, &bh->b_state);
 	} while (i++, (bh = bh->b_this_page) != head);
 }
@@ -1460,6 +1461,7 @@ _pagebuf_page_io(
 			if (blk_length >= pg_offset + pg_length)
 				break;
 			assert(buffer_mapped(bh));
+			assert(buffer_locked(bh));
 			bufferlist[cnt++] = bh;
 		} while (i++, (bh = bh->b_this_page) != head);
 		goto request;
