@@ -22,6 +22,11 @@ typedef struct xfs_efi_log_format {
 } xfs_efi_log_format_t;
 
 /*
+ * Define EFI flags.
+ */
+#define	XFS_EFI_RECOVERED	0x1
+
+/*
  * This is the "extent free intention" log item.  It is used
  * to log the fact that some extents need to be free.  It is
  * used in conjunction with the "extent free done" log item
@@ -29,6 +34,7 @@ typedef struct xfs_efi_log_format {
  */
 typedef struct xfs_efi_log_item {
 	xfs_log_item_t		efi_item;
+	uint			efi_flags;	/* misc flags */
 	uint			efi_next_extent;
 	xfs_efi_log_format_t	efi_format;
 } xfs_efi_log_item_t;
