@@ -244,8 +244,8 @@ xfs_bmap_trace_addentry(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx,		/* index of entry(entries) deleted */
 	xfs_extnum_t	cnt,		/* count of entries deleted, 1 or 2 */
-	xfs_bmbt_irec_t	*r1,		/* first record */
-	xfs_bmbt_irec_t	*r2);		/* second record or null */
+	xfs_bmbt_rec_t	*r1,		/* first record */
+	xfs_bmbt_rec_t	*r2);		/* second record or null */
 
 /*
  * Add bmap trace entry prior to a call to xfs_bmap_delete_exlist.
@@ -1516,7 +1516,7 @@ xfs_bmap_btree_to_extents(
 	ASSERT(ip->i_broot == NULL);
 	ASSERT((ip->i_flags & XFS_IBROOT) == 0);
 	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
-	return XFS_ILOG_CORE;
+	return XFS_ILOG_CORE | XFS_ILOG_EXT;
 }
 
 #ifdef DEBUG
@@ -2121,41 +2121,29 @@ xfs_bmap_trace_addentry(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx,		/* index of entry(entries) deleted */
 	xfs_extnum_t	cnt,		/* count of entries deleted, 1 or 2 */
-	xfs_bmbt_irec_t	*r1,		/* first record */
-	xfs_bmbt_irec_t	*r2)		/* second record or null */
+	xfs_bmbt_rec_t	*r1,		/* first record */
+	xfs_bmbt_rec_t	*r2)		/* second record or null */
 {
-	xfs_dfsbno_t	b1;		/* first br_startblock */
-	xfs_dfsbno_t	b2;		/* second br_startblock */
-	xfs_extlen_t	c1;		/* first br_blockcount */
-	xfs_extlen_t	c2;		/* second br_blockcount */
-	xfs_dfiloff_t	o1;		/* first br_startoff */
-	xfs_dfiloff_t	o2;		/* second br_startoff */
+	xfs_bmbt_rec_t	tr2;
 
 	if (xfs_bmap_trace_buf == NULL)
 		xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE);
 	ASSERT(cnt == 1 || cnt == 2);
 	ASSERT(r1 != NULL);
-	o1 = r1->br_startoff;
-	b1 = r1->br_startblock;
-	c1 = r1->br_blockcount;
 	if (cnt == 1) {
 		ASSERT(r2 == NULL);
-		o2 = 0;
-		b2 = 0;
-		c2 = 0;
-	} else {
+		r2 = &tr2;
+		bzero(&tr2, sizeof(tr2));
+	} else
 		ASSERT(r2 != NULL);
-		o2 = r2->br_startoff;
-		b2 = r2->br_startblock;
-		c2 = r2->br_blockcount;
-	}
 	ktrace_enter(xfs_bmap_trace_buf,
 		(void *)opcode, (void *)fname, (void *)desc, (void *)ip,
 		(void *)idx, (void *)cnt,
-		(void *)(int)(o1 >> 32), (void *)(int)o1,
-		(void *)(int)(b1 >> 32), (void *)(int)b1, (void *)c1,
-		(void *)(int)(o2 >> 32), (void *)(int)o2,
-		(void *)(int)(b2 >> 32), (void *)(int)b2, (void *)c2);
+		(void *)(ip->i_ino >> 32), (void *)(int)(ip->i_ino),
+		(void *)r1->l0, (void *)r1->l1,
+		(void *)r1->l2, (void *)r1->l3,
+		(void *)r2->l0, (void *)r2->l1,
+		(void *)r2->l2, (void *)r2->l3);
 }
 	
 /*
@@ -2169,14 +2157,9 @@ xfs_bmap_trace_delete(
 	xfs_extnum_t	idx,		/* index of entry(entries) deleted */
 	xfs_extnum_t	cnt)		/* count of entries deleted, 1 or 2 */
 {
-	xfs_bmbt_irec_t	r1;		/* first deleted record */
-	xfs_bmbt_irec_t	r2;		/* second deleted record */
-
-	xfs_bmbt_get_all(&ip->i_u1.iu_extents[idx], &r1);
-	if (cnt == 2)
-		xfs_bmbt_get_all(&ip->i_u1.iu_extents[idx + 1], &r2);
 	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_DELETE, fname, desc, ip, idx,
-		cnt, &r1, cnt == 2 ? &r2 : NULL);
+		cnt, &ip->i_u1.iu_extents[idx],
+		cnt == 2 ? &ip->i_u1.iu_extents[idx + 1] : NULL);
 }
 
 /*
@@ -2193,8 +2176,19 @@ xfs_bmap_trace_insert(
 	xfs_bmbt_irec_t	*r1,		/* inserted record 1 */
 	xfs_bmbt_irec_t	*r2)		/* inserted record 2 or null */
 {
+	xfs_bmbt_rec_t	tr1;		/* compressed record 1 */
+	xfs_bmbt_rec_t	tr2;		/* compressed record 2 or zeroes */
+
+	xfs_bmbt_set_all(&tr1, r1);
+	if (cnt == 2) {
+		ASSERT(r2 != NULL);
+		xfs_bmbt_set_all(&tr2, r2);
+	} else {
+		ASSERT(r2 == NULL);
+		bzero(&tr2, sizeof(tr2));
+	}
 	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_INSERT, fname, desc, ip, idx,
-		cnt, r1, r2);
+		cnt, &tr1, cnt == 2 ? &tr2 : NULL);
 }
 
 /*
@@ -2207,11 +2201,8 @@ xfs_bmap_trace_post_update(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx)		/* index of entry updated */
 {
-	xfs_bmbt_irec_t	r;
-
-	xfs_bmbt_get_all(&ip->i_u1.iu_extents[idx], &r);
 	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_POST_UP, fname, desc, ip, idx, 1,
-		&r, NULL);
+		&ip->i_u1.iu_extents[idx], NULL);
 }
 
 /*
@@ -2224,11 +2215,8 @@ xfs_bmap_trace_pre_update(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx)		/* index of entry to be updated */
 {
-	xfs_bmbt_irec_t	r;
-
-	xfs_bmbt_get_all(&ip->i_u1.iu_extents[idx], &r);
 	xfs_bmap_trace_addentry(XFS_BMAP_TRACE_PRE_UP, fname, desc, ip, idx, 1,
-		&r, NULL);
+		&ip->i_u1.iu_extents[idx], NULL);
 }
 #endif	/* DEBUG && !SIM */
 
