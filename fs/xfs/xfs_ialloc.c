@@ -367,8 +367,11 @@ xfs_ialloc_ag_select(
 	agcount = mp->m_maxagi;
 	if (S_ISDIR(mode))
 		pagno = atomicIncWithWrap((int *)&mp->m_agirotor, agcount);
-	else
+	else {
 		pagno = XFS_INO_TO_AGNO(mp, parent);
+		if (pagno >= agcount)
+			pagno = 0;
+	}
 	ASSERT(pagno < agcount);
 	/*
 	 * Loop through allocation groups, looking for one with a little
@@ -439,7 +442,7 @@ nextag:
 		if (XFS_FORCED_SHUTDOWN(mp))
 			return (xfs_buf_t *)0;
 		agno++;
-		if (agno == agcount)
+		if (agno >= agcount)
 			agno = 0;
 		if (agno == pagno) {
 			if (flags == 0)
