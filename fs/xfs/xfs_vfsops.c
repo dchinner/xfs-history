@@ -855,7 +855,7 @@ xfs_root(
 STATIC int
 xfs_statvfs(
 	bhv_desc_t	*bdp,
-	statvfs_t	*statp,
+	struct statfs	*statp,
 	vnode_t		*vp)
 {
 	__uint64_t	fakeinos;
@@ -867,9 +867,10 @@ xfs_statvfs(
 	mp = XFS_BHVTOM(bdp);
 	sbp = &(mp->m_sb);
 
+	statp->f_type = XFS_SB_MAGIC;
+
 	s = XFS_SB_LOCK(mp);
 	statp->f_bsize = sbp->sb_blocksize;
-	statp->f_frsize = sbp->sb_blocksize;
 	lsize = sbp->sb_logstart ? sbp->sb_logblocks : 0;
 	statp->f_blocks = sbp->sb_dblocks - lsize;
 	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks;
@@ -883,16 +884,13 @@ xfs_statvfs(
 		if (!mp->m_inoadd)
 #endif
 			statp->f_files = MIN(statp->f_files, mp->m_maxicount);
-	statp->f_ffree = statp->f_favail =
+	statp->f_ffree = 
 		statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
-	statp->f_fsid = kdev_val(mp->m_dev);
-	strcpy(statp->f_basetype, XFS_NAME);
-	statp->f_namemax = MAXNAMELEN - 1;
-	bcopy((char *)&(mp->m_sb.sb_uuid), statp->f_fstr, sizeof(uuid_t));
-	bzero(&(statp->f_fstr[sizeof(uuid_t)]),
-	      (sizeof(statp->f_fstr) - sizeof(uuid_t)));
+	statp->f_fsid.val[0] = kdev_val(mp->m_dev);
+	statp->f_fsid.val[1] = 0;
+	statp->f_namelen = MAXNAMELEN - 1;
 
 	return 0;
 }
