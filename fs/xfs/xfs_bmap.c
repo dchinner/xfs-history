@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.123 $"
+#ident	"$Revision: 1.124 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -41,6 +41,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_itable.h"
 #include "xfs_extfree_item.h"
 #include "xfs_alloc.h"
 #include "xfs_bmap.h"
