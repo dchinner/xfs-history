@@ -55,7 +55,8 @@ extern int xfs_acl_vremove(struct vnode *vp, int);
 #define _ACL_INHERIT(c,v,d)	(xfs_acl_inherit(c,v,d))
 #define _ACL_GET_ACCESS(pv,pa)  (xfs_acl_vtoacl(pv,pa,NULL)==0)
 #define _ACL_GET_DEFAULT(pv,pd) (xfs_acl_vtoacl(pv,NULL,pd)==0)
-#define _ACL_XFS_IACCESS(i,m,c)	(xfs_acl_iaccess(i,m,c))
+#define _ACL_XFS_IACCESS(i,m,c)	\
+	(XFS_IFORK_Q(i) ? xfs_acl_iaccess(i,m,c) : 0)
 
 extern int posix_acl_access_exists(vnode_t *);
 extern int posix_acl_default_exists(vnode_t *);
