@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.183 $"
+#ident  "$Revision: 1.184 $"
 
 
 #include <limits.h>
@@ -72,7 +72,6 @@
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include "xfs_clnt.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -98,6 +97,13 @@
 #include "xfs_extfree_item.h"
 #include "xfs_dir.h"
 #include "xfs_quota.h"
+#if CELL || NOTYET
+#include "cxfs_clnt.h"
+#include "xfs_cxfs.h"
+#else /* CELL || NOTYET */
+#include "xfs_clnt.h"
+#endif /* CELL || NOTYET */
+
 
 #ifdef SIM
 #include "sim.h"
@@ -108,6 +114,11 @@
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
 
 static char *whymount[] = { "initial mount", "remount", "unmount" };
+
+#if (CELL_ARRAY && DEBUG)
+#define TEST_UUID_STUFF 1
+#endif 
+
 
 /*
  * prototype for xlv_get_subcolumes: should go into an
@@ -359,6 +370,14 @@ xfs_init(
 #endif /* DATAPIPE */
 
 #endif
+
+	/*
+         * Special initialization for cxfs
+	 */
+#if CELL || NOTYET
+	cxfs_arrinit();
+#endif /* CELL || NOTYET */
+
 	/*
 	 * The inode hash table is created on a per mounted
 	 * file system bases.
@@ -412,6 +431,9 @@ xfs_cmountfs(
 	int		vfs_flags;
 	size_t		n;
 	char		*tmp_fsname_buffer;
+#if CELL || NOTYET
+        int             client = 0;
+#endif /* CELL || NOTYET */
 	/*REFERENCED*/
 	int		noerr;
 
@@ -442,7 +464,7 @@ xfs_cmountfs(
 		mp->m_ddevp = ddevvp;
 
                 /* Values are in BBs */
-                if ((ap != NULL) && (ap->version == 2) && 
+                if ((ap != NULL) && (ap->version >= 2) && 
 		    (ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
                         /*
                          * At this point the superblock has not been read
@@ -492,7 +514,11 @@ xfs_cmountfs(
 		}
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
+#if CELL || NOTYET
+			if ((ap->version < 1) || (ap->version > 3)) {
+#else /* CELL || NOTYET */
 			if ((ap->version < 1) || (ap->version > 2)) {
+#endif /* CELL || NOTYET */
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -561,8 +587,34 @@ xfs_cmountfs(
 		if (ap->flags & XFSMNT_NOALIGN)
 			mp->m_flags |= XFS_MOUNT_NOALIGN;
 	}
+#if TEST_UUID_STUFF
+	if (ap && (ap->flags & XFSMNT_TESTUUID)) {
+		error = 0;
+		if (copyin(ap->uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t))) {
+			error = EFAULT;
+			goto error3;
+		}
+	}
+	else
+#endif
 
-	if (error = xfs_mountfs(vfsp, mp, ddev)) {
+	if (error = xfs_readsb(mp, ddev)) {
+		goto error3;
+	}
+#if CELL || NOTYET
+	error = cxfs_mount(mp, ap, &client);
+	if (error || client) {
+#if TEST_UUID_STUFF
+	        if (ap && (ap->flags & XFSMNT_TESTUUID)) 
+			goto error3;
+#endif
+		xfs_freesb(mp);
+		goto error3;
+	}
+	
+#endif /* CELL || NOTYET */
+
+	if (error = xfs_mountfs(vfsp, mp)) {
 		goto error3;
 	}
 
@@ -600,7 +652,12 @@ xfs_cmountfs(
 		VN_RELE(ddevvp);
 	}
  error0:
-	xfs_mount_free(mp);
+	if (error) {
+#if CELL || NOTYET
+	        cxfs_unmount(mp);
+#endif /* CELL || NOTYET */
+		xfs_mount_free(mp);
+	}
 	return error;
 }	/* end of xfs_cmountfs() */
 
@@ -695,7 +752,43 @@ xfs_args_to_ver_2(
 
 	return 0;
 }
-#endif
+
+#if CELL || NOTYET
+/*
+ * xfs_args_to_ver_3 
+ * 
+ * This is used with copyin_xlate() to copy a xfs_args version 2 structure
+ * in from user space from a 32 bit application into a 64 bit kernel.
+ */
+/*ARGSUSED*/
+int
+xfs_args_to_ver_3(
+	enum xlate_mode	mode,
+	void		*to,
+	int		count,
+	xlate_info_t	*info)
+{
+	COPYIN_XLATE_PROLOGUE(xfs_args_ver_3, xfs_args);
+
+	target->version = source->version;
+	target->flags = source->flags;
+	target->logbufs = source->logbufs;
+	target->logbufsize = source->logbufsize;
+	target->fsname = (char*)(__psint_t)source->fsname;
+	target->sunit = source->sunit;
+	target->swidth = source->swidth;
+	target->servers = (char **)(__psint_t)source->servers;
+	target->servlen = (int *)(__psint_t)source->servlen;
+	target->uuid = (char *)(__psint_t)source->uuid;
+	target->sunit = source->sunit;
+	target->scount = source->scount;
+	target->stimeout = source->stimeout;
+	target->ctimeout = source->ctimeout;
+
+	return 0;
+}
+#endif /* CELL || NOTYET */
+#endif 
 
 
 /*
@@ -733,6 +826,10 @@ xfs_mount(
 	 * Copy in XFS-specific arguments.
 	 */
 	bzero(&args, sizeof args);
+#if CELL || NOTYET
+        args.stimeout = -1;
+	args.ctimeout = -1;
+#endif /* CELL || NOTYET */
 	if (uap->datalen && uap->dataptr) { 
 
 		/* Copy in the xfs_args version number */
@@ -747,6 +844,12 @@ xfs_mount(
 			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
 				     xfs_args_to_ver_2, get_current_abi(),1))
 				return XFS_ERROR(EFAULT);
+#if CELL || NOTYET
+		} else if (args.version == 3) {
+			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
+				     xfs_args_to_ver_3, get_current_abi(),1))
+				return XFS_ERROR(EFAULT);
+#endif /* CELL || NOTYET */
 		} else
 			return XFS_ERROR(EINVAL);
 	}
@@ -774,7 +877,12 @@ xfs_mount(
         if (vfs_devsearch(ddev, VFS_FSTYPE_ANY) == NULL) {
 		ASSERT((uap->flags & MS_REMOUNT) == 0);
 	} else {
+#if TEST_UUID_STUFF
+		if ((uap->flags & MS_REMOUNT) == 0 &&
+		    (args.flags & XFSMNT_TESTUUID) == 0)
+#else 
 		if ((uap->flags & MS_REMOUNT) == 0)
+#endif
 			return XFS_ERROR(EBUSY);
 	}
 
