@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.105 $"
+#ident	"$Revision: 1.106 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2767,7 +2767,13 @@ xfs_bmapi(
 			if (l->wasdelay) {
 				l->alen = l->got.br_blockcount;
 				l->aoff = l->got.br_startoff;
-				l->minlen = (bno - l->aoff) + 1;
+				if (l->lowspace) {
+					l->minlen = 1;
+				} else {
+					l->minlen =
+					    (XFS_FILEOFF_MAX(bno, l->obno) -
+					     l->aoff) + 1;
+				}
 			} else {
 				l->alen = XFS_EXTLEN_MIN(len, MAXEXTLEN);
 				if (!l->eof)
