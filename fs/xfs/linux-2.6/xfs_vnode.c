@@ -313,8 +313,8 @@ vn_reclaim(struct vnode *vp, int flag)
 			i = 0;
 
 		cmn_err(CE_WARN,
-			"vn_reclaim: vnode 0x%x fstype %d (%s) has unreclaimed data (pgcnt %d, dbuf %d dpages 0x%x), flag:%x",
-			vp, i, vfssw[i].vsw_name ? vfssw[i].vsw_name : "?",
+			"vn_reclaim: vnode 0x%x fstype %d (xfs) has unreclaimed data (pgcnt %d, dbuf %d dpages 0x%x), flag:%x",
+			vp, i, 
 			vp->v_pgcnt, vp->v_dbuf, vp->v_dpages, vp->v_flag);
 		VOP_FLUSHINVAL_PAGES(vp, 0, LONG_MAX, FI_NONE);
 	}

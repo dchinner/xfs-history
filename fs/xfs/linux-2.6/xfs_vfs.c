@@ -30,163 +30,39 @@
  */
 
 /*#ident	"@(#)uts-comm:fs/vfs.c	1.18"*/
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision$"
 
-#if defined(__linux__)
-#include <xfs_linux.h>
-#endif
-
+#define FSID_T
 #include <sys/types.h>
-#include <sys/param.h>
-#include <sys/cmn_err.h>
-#include <sys/conf.h>
-#include <sys/cred.h>
-#include <sys/debug.h>
-#include <sys/errno.h>
-#include <ksys/vfile.h>
-#include <ksys/fdt.h>
-#include <sys/kabi.h>
-#include <sys/kmem.h>
-#include <sys/mount.h>
-#include <sys/proc.h>
-#include <sys/sema.h>
-#include <sys/statfs.h>
-#include <sys/statvfs.h>
-#include <sys/systm.h>
-#include <sys/uio.h>
+#include <linux/errno.h>
+#include "xfs_coda_oops.h"
+
+#include <linux/xfs_to_linux.h>
+
+#undef  NODEV
+#include <linux/version.h>
+#include <linux/fs.h>
+#include <linux/sched.h>
+#include <linux/locks.h>
+#include <linux/smp_lock.h>
+#include <linux/slab.h>
+
+#include <linux/linux_to_xfs.h>
+
+#include <sys/sysmacros.h>
 #include <sys/vfs.h>
+#include <sys/statvfs.h>
 #include <sys/vnode.h>
-#include <sys/vnode_private.h>
-#include <sys/buf.h>
-#include <sys/quota.h>
-#include <sys/xlate.h>
-#include <string.h>
-#include <sys/imon.h>
-#include <sys/sat.h>
-#include <sys/dnlc.h>
 
 
 /*
  * VFS global data.
  */
-vfs_t 		rootvfs_data;	/* root vfs */
-vfs_t 		*rootvfs = &rootvfs_data; 	/* pointer to root vfs; */
-                                                /*   head of VFS list. */
-lock_t 		vfslock;	/* spinlock protecting rootvfs and vfs_flag */
-zone_t          *pn_zone;       /* pathname zone */
+spinlock_t	vfslock;	/* spinlock protecting rootvfs and vfs_flag */
 sema_t 		synclock;	/* sync in progress; initialized in sinit() */
                                 
 extern void	vn_init(void);
 
-/*
- * vfs_add is called by mount to add the new vfs into the vfs list and to
- * cover the mounted-on vnode.  The mounted-on vnode's v_vfsmountedhere link
- * to vfsp must have already been set, protected by VN_LOCK and VN_UNLOCK.
- * The vfs must already have been locked by the caller.
- *
- * coveredvp is zero if this is the root.
- */
-void
-vfs_add(vnode_t *coveredvp, struct vfs *vfsp, int mflag)
-{
-	struct vfs *vfsq;
-	long s;
-
-	s = vfs_spinlock();
-	if (coveredvp != NULL) {
-		if (vfsq = rootvfs->vfs_next)
-			vfsq->vfs_prevp = &vfsp->vfs_next;
-		rootvfs->vfs_next = vfsp;
-		vfsp->vfs_next = vfsq;
-		vfsp->vfs_prevp = &rootvfs->vfs_next;
-	} else {
-		/*
-		 * This is the root of the whole world.
-		 * Some filesystems might already be 'on the list'
-		 * since they aren't really mounted and add themselves
-		 * at init time.
-		 * This essentially replaces the static 'root'
-		 * that rootvfs is initialized to
-		 */
-		if (vfsp != rootvfs) {
-			vfsp->vfs_next = rootvfs->vfs_next;
-			vfsp->vfs_prevp = NULL;
-			if (vfsq = rootvfs->vfs_next)
-				vfsq->vfs_prevp = &vfsp->vfs_next;
-			
-			rootvfs = vfsp;
-		}
-	}
-	vfsp->vfs_vnodecovered = coveredvp;
-
-	if (mflag != VFS_FLAGS_PRESET) {
-		vfsp->vfs_flag &= ~(VFS_RDONLY|VFS_NOSUID|VFS_NODEV|VFS_GRPID);
-
-		if (mflag & MS_RDONLY)
-			vfsp->vfs_flag |= VFS_RDONLY;
-
-		if (mflag & MS_NOSUID)
-			vfsp->vfs_flag |= VFS_NOSUID;
-
-		if (mflag & MS_NODEV)
-			vfsp->vfs_flag |= VFS_NODEV;
-
-		if (mflag & MS_GRPID)
-			vfsp->vfs_flag |= VFS_GRPID;
-
-		if (mflag & MS_DEFXATTR)
-			vfsp->vfs_flag |= VFS_DEFXATTR;
-
-		if (mflag & MS_DOXATTR)
-			vfsp->vfs_flag |= VFS_DOXATTR;
-	}
-
-	vfs_spinunlock(s);
-}
-
-/*
- * Remove a vfs from the vfs list, and destroy pointers to it.
- * Called by umount after it determines that an unmount is legal but
- * before it destroys the vfs.
- */
-void
-vfs_remove(struct vfs *vfsp)
-{
-	register vnode_t *vp;
-	register struct vfs *vfsq;
-	long s;
-
-	/*
-	 * Can't unmount root.  Should never happen because fs will
-	 * be busy.
-	 */
-	ASSERT(vfsp != rootvfs);
-
-	/*
-	 * Clear covered vnode pointer.  No thread can traverse vfsp's
-	 * mount point while vfsp is locked.
-	 */
-	if ((vp = vfsp->vfs_vnodecovered) != NULL) {
-		s = VN_LOCK(vp);
-		vp->v_vfsmountedhere = NULL;
-		VN_UNLOCK(vp, s);
-	}
-
-	/*
-	 * Unlink vfsp from the rootvfs list.
-	 */
-	s = vfs_spinlock();
-	if (vfsq = vfsp->vfs_next)
-		vfsq->vfs_prevp = vfsp->vfs_prevp;
-	*vfsp->vfs_prevp = vfsq;
-	vfs_spinunlock(s);
-
-	/*
-	 * Release lock and wakeup anybody waiting.
-	 * Turns off VFS_OFFLINE bit.
-	 */
-	vfs_unlock(vfsp);
-}
 
 /*
  * Allocate and initialize a new vfs
@@ -196,7 +72,8 @@ vfs_allocate(void)
 {
 	vfs_t	*vfsp;
 
-        vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
+        vfsp = kmalloc(sizeof(vfs_t), GFP_KERNEL);
+	memset(vfsp, 0, sizeof(vfs_t));
 	ASSERT(vfsp);
 	VFS_INIT(vfsp);
 	return (vfsp);
@@ -206,7 +83,7 @@ void
 vfs_deallocate(vfs_t *vfsp)
 {
         VFS_FREE(vfsp);
-        kmem_free(vfsp, sizeof(vfs_t));
+        kfree_s(vfsp, sizeof(vfs_t));
 }
 
 /*
@@ -232,9 +109,9 @@ vfs_lock_flags(struct vfs *vfsp, int flags)
 	register int error;
 	long s;
 
-	s = vfs_spinlock();
+	spin_lock_irqsave(&vfslock, s);
 	if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
-		vfs_spinunlock(s);
+		spin_unlock_irqrestore(&vfslock, s);
 		return EBUSY;
 	}
 
@@ -244,7 +121,7 @@ vfs_lock_flags(struct vfs *vfsp, int flags)
 		vfsp->vfs_flag |= VFS_MWAIT|VFS_MWANT;
 		vfsp_waitsig(vfsp, PVFS, s); /* REMOVED setting error. */
 		error = 0; /* JIMJIM always no error */
-		s = vfs_spinlock();
+		spin_lock_irqsave(&vfslock, s);
 		if (error) {
 			ASSERT(vfsp->vfs_flag & VFS_MWANT);
 			vfsp->vfs_flag &= ~VFS_MWANT;
@@ -252,7 +129,7 @@ vfs_lock_flags(struct vfs *vfsp, int flags)
 				vfsp->vfs_flag &= ~VFS_MWAIT;
 				sv_broadcast(&vfsp->vfs_wait);
 			}
-			vfs_spinunlock(s);
+			spin_unlock_irqrestore(&vfslock, s);
 			return EINTR;
 		}
 		ASSERT(vfsp->vfs_flag & VFS_MWANT);
@@ -266,7 +143,7 @@ vfs_lock_flags(struct vfs *vfsp, int flags)
 		vfsp->vfs_flag |= VFS_MLOCK|flags;
 		error = 0;
 	}
-	vfs_spinunlock(s);
+	spin_unlock_irqrestore(&vfslock, s);
 	return error;
 }
 
@@ -297,7 +174,9 @@ vfs_lock_offline(struct vfs *vfsp)
 void
 vfs_unlock(register struct vfs *vfsp)
 {
-	long s = vfs_spinlock();
+	long s;
+
+	spin_lock_irqsave(&vfslock, s);
 	ASSERT((vfsp->vfs_flag & (VFS_MWANT|VFS_MLOCK)) == VFS_MLOCK);
 	vfsp->vfs_flag &= ~(VFS_MLOCK|VFS_OFFLINE);
 
@@ -309,7 +188,7 @@ vfs_unlock(register struct vfs *vfsp)
 		vfsp->vfs_flag &= ~VFS_MWAIT;
 		sv_broadcast(&vfsp->vfs_wait);
 	}
-	vfs_spinunlock(s);
+	spin_unlock_irqrestore(&vfslock, s);
 }
 
 /*
@@ -318,22 +197,24 @@ vfs_unlock(register struct vfs *vfsp)
 int
 vfs_busy(struct vfs *vfsp)
 {
-	long s = vfs_spinlock();
+	long s;
+
+	spin_lock_irqsave(&vfslock, s);
 	ASSERT((vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)) != VFS_OFFLINE);
 	while (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
 		ASSERT(vfsp->vfs_flag & VFS_MWANT || vfsp->vfs_busycnt == 0);
 		if (vfsp->vfs_flag & VFS_OFFLINE) {
-			vfs_spinunlock(s);
+			spin_unlock_irqrestore(&vfslock, s);
 			return EBUSY;
 		}
 		vfsp->vfs_flag |= VFS_MWAIT;
 		vfsp_waitsig(vfsp, PVFS, s);	/* JIMJIM this has no sig "nificance". */
-		s = vfs_spinlock();
+		spin_lock_irqsave(&vfslock, s);
 	}
 
 	ASSERT(vfsp->vfs_busycnt >= 0);
 	vfsp->vfs_busycnt++;
-	vfs_spinunlock(s);
+	spin_unlock_irqrestore(&vfslock, s);
 
 	return 0;
 }
@@ -351,15 +232,23 @@ vfs_busydev(dev_t dev, int type)
 {
 	long s;
 	struct vfs *vfsp;
+	kdev_t	kdev = MKDEV(emajor(dev), eminor(dev));
+	struct vfsmount *entry;
+
+	lock_kernel();
+	entry = lookup_vfsmnt(kdev);
+
+	unlock_kernel();
+	if (entry) {
+		vfsp = LINVFS_GET_VFS(entry->mnt_sb);
 again:
-	s = vfs_spinlock();
-	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
+		spin_lock_irqsave(&vfslock, s);
 		if (vfsp->vfs_dev == dev &&
 		    (type == VFS_FSTYPE_ANY || type == vfsp->vfs_fstype)) {
 
 			if (vfsp->vfs_flag & VFS_OFFLINE) {
-				vfsp = NULL;
-				break;
+				spin_unlock_irqrestore(&vfslock, s);
+				return NULL;
 			}
 			if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
 				ASSERT(vfsp->vfs_flag & VFS_MWANT ||
@@ -371,22 +260,23 @@ again:
 
 			ASSERT(vfsp->vfs_busycnt >= 0);
 			vfsp->vfs_busycnt++;
-			break;
 		}
+		spin_unlock_irqrestore(&vfslock, s);
 	}
-	vfs_spinunlock(s);
 	return vfsp;
 }
 
 void
 vfs_unbusy(struct vfs *vfsp)
 {
-	long s = vfs_spinlock();
+	long s;
+
+	spin_lock_irqsave(&vfslock, s);
 	ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
 	ASSERT(vfsp->vfs_busycnt > 0);
 	if (--vfsp->vfs_busycnt == 0)
 		vfs_unbusy_wakeup(vfsp);
-	vfs_spinunlock(s);
+	spin_unlock_irqrestore(&vfslock, s);
 }
 
 void
@@ -425,9 +315,11 @@ vfs_devsearch(dev_t dev, int fstype)
 {
 	register struct vfs *vfsp;
 
-	long s = vfs_spinlock();
+	long s;
+
+	spin_lock_irqsave(&vfslock, s);
 	vfsp = vfs_devsearch_nolock(dev, fstype);
-	vfs_spinunlock(s);
+	spin_unlock_irqrestore(&vfslock, s);
 	return vfsp;
 }
 
@@ -439,12 +331,23 @@ struct vfs *
 vfs_devsearch_nolock(dev_t dev, int fstype)
 {
         register struct vfs *vfsp;
+	kdev_t	kdev = MKDEV(emajor(dev), eminor(dev));
+	struct vfsmount *entry;
 
-        for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next)
+	lock_kernel();
+	entry = lookup_vfsmnt(kdev);
+
+
+        if (entry) {
+		vfsp = LINVFS_GET_VFS(entry->mnt_sb);
                 if ((vfsp->vfs_dev == dev) &&
-                    (fstype == VFS_FSTYPE_ANY || fstype == vfsp->vfs_fstype))
-                        break;
-        return vfsp;
+                    (fstype == VFS_FSTYPE_ANY || fstype == vfsp->vfs_fstype)) {
+			unlock_kernel();
+                        return vfsp;
+		}
+	}
+	unlock_kernel();
+        return NULL;
 }
 
 /*
@@ -480,21 +383,13 @@ vfsinit(void)
 	/*
 	 * Initialize vfs stuff.
 	 */
-	spinlock_init(&vfslock, "vfslock");
+	spin_lock_init(&vfslock);
 
 	/*
 	 * Initialize vnode stuff.
 	 */
 	vn_init();
 
-	/*
-	 * Initialize the name cache.
-	 */
-	dnlc_init();
-
-	/*
-	 * Call all the init routines.
-	 */
 }
 
 /*

@@ -1046,8 +1046,6 @@ xfs_dm_rdwr(
 		SYSINFO.writech += xfer;
 		ut->ut_acct.ua_bwrit += xfer;
 	}
-	if (vp->v_vfsp != NULL)
-		vp->v_vfsp->vfs_bcount += xfer >> SCTRSHFT;
 	return error;
 }
 

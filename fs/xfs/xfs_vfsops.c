@@ -257,9 +257,7 @@ int	xfs_fstype;
  */
 /* ARGSUSED */
 int
-xfs_init(
-	vfssw_t	*vswp,
-	int	fstype)
+xfs_init(int	fstype)
 {
 	extern void	xfs_start_daemons(void);
 #ifndef SIM
@@ -964,8 +962,6 @@ xfs_get_vfsmount(
 	vfsp->vfs_fstype = xfs_fstype;
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 	vfsp->vfs_dev = ddev;
-	vfsp->vfs_nsubmounts = 0;
-	vfsp->vfs_bcount = 0;
 	/* vfsp->vfs_fsid is filled in later from superblock */
 
 	return mp;
@@ -1401,13 +1397,6 @@ xfs_mountroot(
 		return XFS_ERROR(ENOSYS);
 	}
 	
-	/*
-	 * Make sure that the "Root" vfs's version # & flags are
-	 * up to date.
-	 */
-	vfsp->vfs_opsver   = xfs_vfsops.vfs_ops_version;
-	vfsp->vfs_opsflags = xfs_vfsops.vfs_ops_flags;
-
 	switch (why) {
 	case ROOT_INIT:
 		if (xfsrootdone++)
@@ -1530,7 +1519,6 @@ xfs_mountroot(
 		vfs_unlock(vfsp);
 		goto bad;
 	}
-	vfs_add(NULL, vfsp, (vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);
 	vfs_unlock(vfsp);
 	return(0);
 bad:
@@ -1986,7 +1974,11 @@ xfs_statdevvp(
 		sp->f_ffree = sp->f_favail =
 			sp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 		sp->f_fsid = devvp->v_rdev;
+#ifdef __linux__
+		(void) strcpy(sp->f_basetype, "xfs");
+#else
 		(void) strcpy(sp->f_basetype, vfssw[xfs_fstype].vsw_name);
+#endif
 		sp->f_flag = 0;
 		sp->f_namemax = MAXNAMELEN - 1;
 		bzero(sp->f_fstr, sizeof(sp->f_fstr));
@@ -2047,7 +2039,11 @@ xfs_statvfs(
 		statp->f_flag &= ~ST_LOCAL;
 
 	statp->f_fsid = mp->m_dev;
+#ifdef __linux__
+	(void) strcpy(statp->f_basetype, "xfs");
+#else
 	(void) strcpy(statp->f_basetype, vfssw[xfs_fstype].vsw_name);
+#endif
 	statp->f_namemax = MAXNAMELEN - 1;
 	bcopy((char *)&(mp->m_sb.sb_uuid), statp->f_fstr, sizeof(uuid_t));
 	bzero(&(statp->f_fstr[sizeof(uuid_t)]),

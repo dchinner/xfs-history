@@ -3744,12 +3744,6 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 
 	if (vfsp) {
 
-		/*
-		 * Verify that this is an xfs file system.
-		 */
-#ifndef SIM
-		ASSERT(strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0);
-#endif
 		bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 		error = xfs_iget( XFS_BHVTOM( bdp ),
 				 NULL, ino, XFS_ILOCK_SHARED, &ip, 0);

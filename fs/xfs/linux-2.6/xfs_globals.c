@@ -23,10 +23,18 @@
  * $Id$
  *
  * $Log$
+ * Revision 1.9  2000/03/25 00:47:57  lord
+ * Merge of 2.3.42-xfs:slinx:44783a by ananth.
+ *
+ *   remove vfssw
+ *
  * Revision 1.8  2000/03/25 00:36:28  cattelan
  * Merge of 2.3.42-xfs:slinx:44186a by ananth.
  *
  *   Copied GPL from slinx-xfs tree.
+ *
+ * Revision 1.9  2000/02/29 16:27:44  lord
+ * remove vfssw
  *
  * Revision 1.8  2000/02/21 21:54:31  cattelan
  * Copied GPL from slinx-xfs tree.
@@ -75,7 +83,6 @@ int		imon_enabled;
 int		xfsd_pri = 0x5c;	/* priority of xfsd thread(s) */
 uint64_t	xfs_panic_mask;		/* set to cause more panics */
 int		xfs_nfs_io_units = 10;	/* Ignore for now. Affects NFS performance. */
-vfssw_t		vfssw[2] = { { "xfs" } };	/* vfssw for XFS only */
 struct var	v = {
 		  512,	/* v_buf * Nbr of I/O buffers.                  */
 		  8,	/* v_hbuf * Nbr of hash buffers to allocate.     */

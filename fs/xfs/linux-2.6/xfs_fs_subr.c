@@ -76,7 +76,6 @@ fs_dounmount(
 {
 	struct vfs 	*vfsp = bhvtovfs(bdp);
         bhv_desc_t      *fbdp = vfsp->vfs_fbhv;
-	vnode_t 	*coveredvp;
 	int 		error;
 	extern void 	nfs_purge_vfsp(struct vfs*);
 
@@ -96,16 +95,6 @@ fs_dounmount(
 		return error;
 
 	/*
-	 * Get covered vnode after vfs_lock.
-	 */
-	coveredvp = vfsp->vfs_vnodecovered;
-
-	/*
-	 * Purge all dnlc entries for this vfs.
-	 */
-	(void) dnlc_purge_vfsp(vfsp, 0);
-
-	/*
 	 * Now invoke SYNC and UNMOUNT ops, using the PVFS versions is
 	 * OK since we already have a behavior lock as a result of
 	 * being in VFS_DOUNMOUNT.  It is necessary to do things this
@@ -121,17 +110,6 @@ fs_dounmount(
 
 	if (error) {
 		vfs_unlock(vfsp);	/* clears VFS_OFFLINE flag, too */
-	} else {
-		if (coveredvp) {
-			--coveredvp->v_vfsp->vfs_nsubmounts;
-		}
-		ASSERT(vfsp->vfs_nsubmounts == 0);
-/***
-		vfs_remove(vfsp);
-***/
-		if (coveredvp) {
-			VN_RELE(coveredvp);
-		}
 	}
 	return error;
 }

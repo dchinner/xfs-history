@@ -22,8 +22,12 @@
 #ifdef SIM
 #define _USING_BUF_T
 #else
+#include <config/page/buf/meta.h>
+#if CONFIG_PAGE_BUF_META
+#define _USING_PAGEBUF_T 
+#else
 #define _USING_BUF_T 
-//#define _USING_PAGEBUF_T 
+#endif
 #endif
 
 #ifdef _USING_BUF_T

@@ -21,6 +21,7 @@
  *
  */
 
+
 /* Don't want anything from linux/capability.h. We need the stuff from IRIX */
 #define FSID_T /* wrapper hack... border files have type problems */
 #include <sys/types.h> 
@@ -30,8 +31,8 @@
 
 #include "xfs_coda_oops.h"
 
-
 #include <linux/xfs_to_linux.h>
+#include <config/page/buf/meta.h>	/* CONFIG_PAGE_BUF_META */
 
 #undef  NODEV
 #include <linux/version.h>
@@ -68,15 +69,17 @@
 
 #undef sysinfo
 
+#if !CONFIG_PAGE_BUF_META
 /* xfs_fs_bio.c */
 void binit(void);
+#endif
 
 /* xfs_vfs.c */
 
 void vfsinit(void);
 
 /* xfs_vfs.c */
-int xfs_init( vfssw_t *vswp, int fstype);
+int xfs_init(int fstype);
 
 /*
  * Global system credential structure.
@@ -214,6 +217,7 @@ linvfs_read_super(
 	vfs_t		*vfsp;
 	vnode_t		*cvp, *rootvp;
 	unsigned long	ino;
+	extern		int mountargs_xfs(char *, struct xfs_args *);
 
 	struct mounta	ap;
 	struct mounta	*uap = &ap;
@@ -225,8 +229,29 @@ linvfs_read_super(
 	u_int		disk, partition;
 
 	MOD_INC_USE_COUNT;
-	lock_super(sb);
 
+	/*  Setup the uap structure  */
+
+	memset(uap, 0, sizeof(struct mounta));
+
+	sprintf(spec, bdevname(sb->s_dev));
+	uap->spec = spec;
+
+	/*  uap->dir not needed until DMI is in place  */
+	uap->flags = MS_DATA;
+
+	memset(args, 0, sizeof(struct xfs_args));
+	if (mountargs_xfs((char *)data, args) != 0) {
+		MOD_DEC_USE_COUNT;
+		return NULL;
+	}
+
+	args->fsname = uap->spec;
+  
+	uap->dataptr = (char *)args;
+	uap->datalen = sizeof(*args);
+
+	lock_super(sb);
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 
 	vfsops = &xfs_vfsops;
@@ -237,14 +262,6 @@ linvfs_read_super(
 
 	if (sb->s_flags & MS_RDONLY)
                 vfsp->vfs_flag |= VFS_RDONLY;
-
-	vfsp->vfs_opsver = 0;
-	vfsp->vfs_opsflags = 0;
-	if (vfsops->vfs_ops_magic == VFSOPS_MAGIC) {
-		vfsp->vfs_opsver = vfsops->vfs_ops_version;
-		vfsp->vfs_opsflags = vfsops->vfs_ops_flags;
-	}
-
 
 	/*  Setup up the cvp structure  */
 
@@ -262,27 +279,6 @@ linvfs_read_super(
 	vfsp->vfs_super = sb;
 
 
-	/*  Setup the uap structure  */
-
-	memset(uap, 0, sizeof(struct mounta));
-
-	sprintf(spec, bdevname(sb->s_dev));
-	uap->spec = spec;
-
-	/*  uap->dir not needed until DMI is in place  */
-	uap->flags = MS_DATA;
-
-	/*  It's possible to teach Linux mount about the XFS args and
-		allow the user to fill in the args structure, but for now,
-		just fill in defaults here.  */
-	memset(args, 0, sizeof(struct xfs_args));
-	args->version = 3;
-	args->logbufs = -1;
-	args->logbufsize = -1;
-	args->fsname = uap->spec;
-  
-	uap->dataptr = (char *)args;
-	uap->datalen = sizeof(*args);
 	sb->s_blocksize = 512;
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
 	set_blocksize(sb->s_dev, 512);
@@ -484,15 +480,19 @@ linvfs_write_super(
 {
  	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
  	int		error; 
-	extern void bflush_bufs(dev_t);
 	irix_dev_t	dev;
+#if !CONFIG_PAGE_BUF_META
+	extern void bflush_bufs(dev_t);
+#endif
 
 
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
 		sys_cred, error);
 
+#if !CONFIG_PAGE_BUF_META
 	bflush_bufs(vfsp->vfs_dev);/* Pretend a bdflush is going off for XFS
 					specific buffers from xfs_fs_bio.c */
+#endif
 
 	sb->s_dirt = 1;  /*  Keep the syncs coming.  */
 }
@@ -583,14 +583,12 @@ int __init init_xfs_fs(void)
   physmem = btoc(si.totalram);
 
   cred_init();
-#if !defined(_USING_PAGEBUF_T)
+#if !CONFIG_PAGE_BUF_META
   binit();
-#else
-  printk("init_xfs_fs... do we need a pagebuf_init similar to the binit?\n");
 #endif
   vfsinit();
   uuid_init();
-  xfs_init(NULL, 0);
+  xfs_init(0);
   
   EXIT("init_xfs_fs"); 
   return register_filesystem(&xfs_fs_type);
