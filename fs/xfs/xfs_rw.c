@@ -1,4 +1,4 @@
-#ident "$Revision: 1.215 $"
+#ident "$Revision: 1.216 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2766,6 +2766,14 @@ xfs_write_clear_setuid(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 	ip->i_d.di_mode &= ~ISUID;
+
+	/*
+	 * Note that we don't have to worry about mandatory
+	 * file locking being disabled here because we only
+	 * clear the ISGID bit if the Group execute bit is
+	 * on, but if it was on then mandatory locking wouldn't
+	 * have been enabled.
+	 */
 	if (ip->i_d.di_mode & (IEXEC >> 3)) {
 		ip->i_d.di_mode &= ~ISGID;
 	}
@@ -5692,6 +5700,13 @@ retry:
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0){
 			ip->i_d.di_mode &= ~ISUID;
+			/*
+			 * Note that we don't have to worry about mandatory
+			 * file locking being disabled here because we only
+			 * clear the ISGID bit if the Group execute bit is
+			 * on, but if it was on then mandatory locking wouldn't
+			 * have been enabled.
+			 */
 			if (ip->i_d.di_mode & (IEXEC >> 3))
 				ip->i_d.di_mode &= ~ISGID;
 		}
