@@ -10,6 +10,9 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/debug.h>
+#include <sys/uuid.h>
+#include <sys/fcntl.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -26,16 +29,6 @@
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#ifdef SIM
-#define _KERNEL
-#endif
-#include <sys/uuid.h>
-#include <sys/grio.h>
-#include <sys/fcntl.h>
-#include <sys/cmn_err.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"

@@ -21,21 +21,13 @@
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
+#include <sys/attributes.h>
 #else
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#ifdef SIM
-#define _KERNEL
-#endif
-#include <sys/grio.h>
-#ifdef SIM
-#undef _KERNEL
-#else
-#include <sys/attributes.h>
-#endif
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
