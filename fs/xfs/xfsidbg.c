@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.63 $"
+#ident	"$Revision: 1.64 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -587,16 +587,17 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	whichfork = ((__psint_t)ktep->val[0]) >> 16;
 	ip = (xfs_inode_t *)ktep->val[3];
 	ino = ((xfs_ino_t)ktep->val[6] << 32) | ((xfs_ino_t)ktep->val[7]);
-	qprintf("%s %s:%s ip %x ino %s %cf idx %d\n",
+	qprintf("%s %s:%s ip %x ino %s %cf\n",
 		ops[opcode - 1], (char *)ktep->val[1],
 		(char *)ktep->val[2], ip, xfs_fmtino(ino, ip->i_mount),
-		"da"[whichfork], (__psint_t)ktep->val[4]);
+		"da"[whichfork]);
 	r.l0 = (xfs_bmbt_rec_base_t)ktep->val[8];
 	r.l1 = (xfs_bmbt_rec_base_t)ktep->val[9];
 	r.l2 = (xfs_bmbt_rec_base_t)ktep->val[10];
 	r.l3 = (xfs_bmbt_rec_base_t)ktep->val[11];
 	xfs_convert_extent(&r, &o, &b, &c);
-	qprintf(" offset %lld block %s", o,
+	qprintf(" idx %d offset %lld block %s", o,
+		(__psint_t)ktep->val[4],
 		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
 	qprintf(" count %lld\n", c);
 	if ((__psint_t)ktep->val[5] != 2)
@@ -619,82 +620,86 @@ static int
 xfs_bmbt_trace_entry(
 	ktrace_entry_t		*ktep)
 {
+	int			line;
 	xfs_bmbt_rec_32_t	r;
 	xfs_bmbt_irec_t		s;
 	int			type;
 	int			whichfork;
 
-	type = (__psint_t)ktep->val[0] & 0xffff;
-	whichfork = (__psint_t)ktep->val[0] >> 16;
+	type = (__psint_t)ktep->val[0] & 0xff;
 	if (type == 0)
 		return 0;
-	qprintf("%s ip 0x%x %cf cur 0x%x",
+	whichfork = ((__psint_t)ktep->val[0] >> 8) & 0xff;
+	line = ((__psint_t)ktep->val[0] >> 16) & 0xffff;
+	qprintf("%s[%s@%d] ip 0x%x %cf cur 0x%x\n",
 		(char *)ktep->val[1],
-		(xfs_inode_t *)ktep->val[2],
+		(char *)ktep->val[2],
+		line,
+		(xfs_inode_t *)ktep->val[3],
 		"da"[whichfork],
-		(xfs_btree_cur_t *)ktep->val[3]);
+		(xfs_btree_cur_t *)ktep->val[4]);
 	switch (type) {
 	case XFS_BMBT_KTRACE_ARGBI:
 		qprintf(" buf 0x%x i %d\n",
-			(buf_t *)ktep->val[4],
-			(__psint_t)ktep->val[5]);
+			(buf_t *)ktep->val[5],
+			(__psint_t)ktep->val[6]);
 		break;
 	case XFS_BMBT_KTRACE_ARGBII:
 		qprintf(" buf 0x%x i0 %d i1 %d\n",
-			(buf_t *)ktep->val[4],
-			(__psint_t)ktep->val[5],
-			(__psint_t)ktep->val[6]);
+			(buf_t *)ktep->val[5],
+			(__psint_t)ktep->val[6],
+			(__psint_t)ktep->val[7]);
 		break;
 	case XFS_BMBT_KTRACE_ARGFFF:
 		qprintf(" o 0x%x%08x b 0x%x%08x i 0x%x%08x\n",
-			(__psint_t)ktep->val[4], 
-			(__psint_t)ktep->val[5],
-			(__psint_t)ktep->val[6], 
-			(__psint_t)ktep->val[7],
+			(__psint_t)ktep->val[5], 
+			(__psint_t)ktep->val[6],
+			(__psint_t)ktep->val[7], 
 			(__psint_t)ktep->val[8],
-			(__psint_t)ktep->val[9]);
+			(__psint_t)ktep->val[9],
+			(__psint_t)ktep->val[10]);
 		break;
 	case XFS_BMBT_KTRACE_ARGI:
 		qprintf(" i 0x%x\n",
-			(__psint_t)ktep->val[4]);
+			(__psint_t)ktep->val[5]);
 		break;
 	case XFS_BMBT_KTRACE_ARGIFK:
-		qprintf(" i 0x%x f 0x%x%08x o 0x%x%08x",
-			(__psint_t)ktep->val[4],
-			(__psint_t)ktep->val[5], (__psint_t)ktep->val[6],
-			(__psint_t)ktep->val[7], (__psint_t)ktep->val[8]);
+		qprintf(" i 0x%x f 0x%x%08x o 0x%x%08x\n",
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7],
+			(__psint_t)ktep->val[8], (__psint_t)ktep->val[9]);
 		break;
 	case XFS_BMBT_KTRACE_ARGIFR:
 		qprintf(" i 0x%x f 0x%x%08x ",
-			(__psint_t)ktep->val[4],
-			(__psint_t)ktep->val[5], (__psint_t)ktep->val[6]);
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7]);
 		s.br_startoff =
-			(xfs_fileoff_t)(((xfs_dfiloff_t)ktep->val[7] << 32) |
-					(xfs_dfiloff_t)ktep->val[8]);
+			(xfs_fileoff_t)(((xfs_dfiloff_t)ktep->val[8] << 32) |
+					(xfs_dfiloff_t)ktep->val[9]);
 		s.br_startblock =
-			(xfs_fsblock_t)(((xfs_dfsbno_t)ktep->val[9] << 32) |
-					(xfs_dfsbno_t)ktep->val[10]);
+			(xfs_fsblock_t)(((xfs_dfsbno_t)ktep->val[10] << 32) |
+					(xfs_dfsbno_t)ktep->val[11]);
 		s.br_blockcount =
-			(xfs_filblks_t)(((xfs_dfilblks_t)ktep->val[11] << 32) |
-					(xfs_dfilblks_t)ktep->val[12]);
+			(xfs_filblks_t)(((xfs_dfilblks_t)ktep->val[12] << 32) |
+					(xfs_dfilblks_t)ktep->val[13]);
 		xfsidbg_xbirec(&s);
 		break;
 	case XFS_BMBT_KTRACE_ARGIK:
-		qprintf(" i 0x%x o 0x%x%08x ",
-			(__psint_t)ktep->val[4],
-			(__psint_t)ktep->val[5], (__psint_t)ktep->val[6]);
+		qprintf(" i 0x%x o 0x%x%08x\n",
+			(__psint_t)ktep->val[5],
+			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7]);
 		break;
 	case XFS_BMBT_KTRACE_CUR:
-		qprintf(" nlevels %d flags %d allocated %d\n",
-			(__psint_t)ktep->val[4] >> 16,
-			(__psint_t)ktep->val[4] & 0xffff,
-			(__psint_t)ktep->val[5]);
+		qprintf(" nlevels %d flags %d allocated %d ",
+			((__psint_t)ktep->val[5] >> 24) & 0xff,
+			((__psint_t)ktep->val[5] >> 16) & 0xff,
+			(__psint_t)ktep->val[5] & 0xffff);
 		r.l0 = (xfs_bmbt_rec_base_t)ktep->val[6];
 		r.l1 = (xfs_bmbt_rec_base_t)ktep->val[7];
 		r.l2 = (xfs_bmbt_rec_base_t)ktep->val[8];
 		r.l3 = (xfs_bmbt_rec_base_t)ktep->val[9];
 		xfsidbg_xbrec(&r);
-		qprintf("bufs 0x%x 0x%x 0x%x 0x%x ",
+		qprintf(" bufs 0x%x 0x%x 0x%x 0x%x ",
 			(buf_t *)ktep->val[10],
 			(buf_t *)ktep->val[11],
 			(buf_t *)ktep->val[12],
