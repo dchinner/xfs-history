@@ -1847,8 +1847,10 @@ xlog_recover_do_efi_trans(xlog_t		*log,
 	efip->efi_next_extent = efi_formatp->efi_nextents;
 
 	spl = AIL_LOCK(mp);
- 	xfs_trans_update_ail(mp, (xfs_log_item_t *)efip, lsn);
-	AIL_UNLOCK(mp, spl);
+	/*
+	 * xfs_trans_update_ail() drops the AIL lock.
+	 */
+ 	xfs_trans_update_ail(mp, (xfs_log_item_t *)efip, lsn, spl);
 }	/* xlog_recover_do_efi_trans */
 
 
@@ -1871,6 +1873,7 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 	xfs_log_item_t		*lip;
 	int			spl;
 	int			gen;
+	int			nexts;
 	__uint64_t		efi_id;
 
 	if (pass == XLOG_RECOVER_PASS1) {
@@ -1894,22 +1897,32 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 		if (lip->li_type == XFS_LI_EFI) {
 			efip = (xfs_efi_log_item_t *)lip;
 			if (efip->efi_format.efi_id == efi_id) {
-				xfs_trans_delete_ail(mp, lip);
+				/*
+				 * xfs_trans_delete_ail() drops the
+				 * AIL lock.
+				 */
+				xfs_trans_delete_ail(mp, lip, spl);
 				break;
 			}
 		}
 		lip = xfs_trans_next_ail(mp, lip, &gen, NULL);
 	}
-	AIL_UNLOCK(mp, spl);
+	if (lip == NULL) {
+		AIL_UNLOCK(mp, spl);
+	}
 
 	/*
 	 * If we found it, then free it up.  If it wasn't there, it
 	 * must have been overwritten in the log.  Oh well.
 	 */
 	if (lip != NULL) {
-		kmem_free(lip, sizeof(xfs_efi_log_item_t) +
-			  ((efip->efi_format.efi_nextents - 1) *
-			   sizeof(xfs_extent_t)));
+		nexts = efip->efi_format.efi_nextents;
+		if (nexts > XFS_EFI_MAX_FAST_EXTENTS) {
+			kmem_free(lip, sizeof(xfs_efi_log_item_t) +
+				  ((nexts - 1) * sizeof(xfs_extent_t)));
+		} else {
+			kmem_zone_free(xfs_efi_zone, efip);
+		}
 	}
 }	/* xlog_recover_do_efd_trans */
 
