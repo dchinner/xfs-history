@@ -499,7 +499,7 @@ linvfs_fill_super(
 
 	atomic_set(&cip->i_count, 1);
 
-	cvp = LINVFS_GET_VP(cip);
+	cvp = LINVFS_GET_VPTR(cip);
 	cvp->v_type   = VDIR;
 	cvp->v_number = 1;		/* Place holder */
 
@@ -588,7 +588,7 @@ linvfs_set_inode_ops(
 {
 	vnode_t		*vp;
 
-	vp = LINVFS_GET_VP(inode);
+	vp = LINVFS_GET_VPTR(inode);
 
 	inode->i_mode = VTTOIF(vp->v_type);
 
@@ -875,7 +875,7 @@ STATIC int linvfs_dentry_to_fh(
 	int need_parent)
 {
 	struct inode *inode = dentry->d_inode ;
-	vnode_t *vp = LINVFS_GET_VP(inode);
+	vnode_t *vp = LINVFS_GET_VPTR(inode);
 	int maxlen = *lenp;
 	xfs_fid2_t fid;
 	int error;
@@ -892,7 +892,7 @@ STATIC int linvfs_dentry_to_fh(
 		return 2 ;
 
 	inode = dentry->d_parent->d_inode ;
-	vp = LINVFS_GET_VP(inode);
+	vp = LINVFS_GET_VPTR(inode);
 
 	VOP_FID2(vp, (struct fid *)&fid, error);
 	data[2] = (__u32)fid.fid_ino;	/* 32 bits of inode is OK */

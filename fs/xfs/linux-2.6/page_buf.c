@@ -257,9 +257,7 @@ _pagebuf_initialize(
     size_t range_length,
     page_buf_flags_t flags)
 {
-	if (!target)
-		BUG();
-	
+	assert(target);
 	pb_tracking_get(pb);
 
 	memset(pb, 0, sizeof(page_buf_private_t));

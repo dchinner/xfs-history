@@ -151,7 +151,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	
 	XFS_STATS_INC(xfsstats.vn_active);
 
-	vp = LINVFS_GET_VP(inode);
+	vp = LINVFS_GET_VPTR(inode);
 
 	vp->v_flag = VMODIFIED;
 

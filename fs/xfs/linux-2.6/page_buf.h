@@ -79,26 +79,7 @@ typedef enum page_buf_rw_e {
 	PBRW_ZERO = 3			/* Zero target memory */
 } page_buf_rw_t;
 
-/*
- *	page_buf_bmap_t:  File system I/O map 
- *
- * The pbm_bn, pbm_offset and pbm_length fields are expressed in disk blocks.
- * The pbm_length field specifies the size of the underlying backing store
- * for the particular mapping.
- *
- * The pbm_bsize, pbm_size and pbm_delta fields are expressed in bytes and indicate
- * the size of the mapping, the number of bytes that are valid to access
- * (read or write), and the offset into the mapping, given the offset
- * supplied to the file I/O map routine.  pbm_delta is the offset of the
- * desired data from the beginning of the mapping.
- *
- * When a request is made to read beyond the logical end of the object,
- * pbm_size may be set to 0, but pbm_offset and pbm_length should be set to reflect
- * the actual amount of underlying storage that has been allocated, if any.
- */
-
-/* pbm_flags values */
-typedef enum {
+typedef enum {				/* pbm_flags values */
 	PBMF_EOF = 		0x01,	/* mapping contains EOF 	*/
 	PBMF_HOLE = 		0x02,	/* mapping covers a hole 	*/
 	PBMF_DELAY = 		0x04,	/* mapping covers delalloc region  */
@@ -107,24 +88,7 @@ typedef enum {
 	PBMF_NEW =		0x40	/* we just allocated this space	*/
 } bmap_flags_t;
 
-/*
- *	page_buf_t:  Buffer structure for page cache-based buffers
- *
- * This buffer structure is used by the page cache buffer management routines
- * to refer to an assembly of pages forming a logical buffer.  The actual
- * I/O is performed with kiobuf or buffer_head structures, as required by
- * drivers, for drivers which do not understand this structure.
- * The buffer structure is used on temporary basis only, and
- * discarded when released.  
- *
- * The real data storage is recorded in the page cache.  Metadata is
- * hashed to the inode for the block device on which the file system resides.
- * File data is hashed to the inode for the file.  Pages which are only
- * partially filled with data have bits set in their block_map entry
- * to indicate which disk blocks in the page are not valid.
- */
-
-typedef enum page_buf_flags_e {
+typedef enum page_buf_flags_e { 	/* pb_flags values */
 	PBF_READ = (1 << 0),	/* buffer intended for reading from device */
 	PBF_WRITE = (1 << 1),	/* buffer intended for writing to device   */
 	PBF_MAPPED = (1 << 2),  /* buffer mapped (pb_addr valid)           */
@@ -185,6 +149,25 @@ typedef struct pb_target {
 #define PBT_ADDR_SPACE(pbt)	((pbt)->pbr_mapping)
 #define PB_ADDR_SPACE(pb)  	PBT_ADDR_SPACE((pb)->pb_target)
 
+
+/*
+ *	page_buf_bmap_t:  File system I/O map 
+ *
+ * The pbm_bn, pbm_offset and pbm_length fields are expressed in disk blocks.
+ * The pbm_length field specifies the size of the underlying backing store
+ * for the particular mapping.
+ *
+ * The pbm_bsize, pbm_size and pbm_delta fields are in bytes and indicate
+ * the size of the mapping, the number of bytes that are valid to access
+ * (read or write), and the offset into the mapping, given the offset
+ * supplied to the file I/O map routine.  pbm_delta is the offset of the
+ * desired data from the beginning of the mapping.
+ *
+ * When a request is made to read beyond the logical end of the object,
+ * pbm_size may be set to 0, but pbm_offset and pbm_length should be set to
+ * the actual amount of underlying storage that has been allocated, if any.
+ */
+
 typedef struct page_buf_bmap_s {
 	page_buf_daddr_t pbm_bn;	/* block number in file system 	    */
 	pb_target_t	*pbm_target;	/* device to do I/O to		    */
@@ -195,8 +178,26 @@ typedef struct page_buf_bmap_s {
 } page_buf_bmap_t;
 
 typedef page_buf_bmap_t pb_bmap_t;
-struct page_buf_s;
 
+
+/*
+ *	page_buf_t:  Buffer structure for page cache-based buffers
+ *
+ * This buffer structure is used by the page cache buffer management routines
+ * to refer to an assembly of pages forming a logical buffer.  The actual
+ * I/O is performed with kiobuf or buffer_head structures, as required by
+ * drivers, for drivers which do not understand this structure.
+ * The buffer structure is used on temporary basis only, and
+ * discarded when released.  
+ *
+ * The real data storage is recorded in the page cache.  Metadata is
+ * hashed to the inode for the block device on which the file system resides.
+ * File data is hashed to the inode for the file.  Pages which are only
+ * partially filled with data have bits set in their block_map entry
+ * to indicate which disk blocks in the page are not valid.
+ */
+
+struct page_buf_s;
 typedef void (*page_buf_iodone_t)(struct page_buf_s *);
 			/* call-back function on I/O completion */
 typedef void (*page_buf_relse_t)(struct page_buf_s *);

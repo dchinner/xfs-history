@@ -66,6 +66,10 @@
 #define STATIC static
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,2)
+#define kdev_val(dev)	(unsigned)(dev)
+#endif
+
 typedef struct pathname {
 	char	*pn_path;	/* remaining pathname */
 	u_long	pn_hash;	/* last component's hash */
