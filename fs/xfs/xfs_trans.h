@@ -180,6 +180,7 @@ typedef struct xfs_trans {
 	int			t_fdblocks_delta; /* superblock fdblocks chg */
 	int			t_res_fdblocks_delta; /* on-disk only chg */
 	int			t_frextents_delta;/* superblock freextents chg*/
+	int			t_res_frextents_delta; /* on-disk only chg */
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
@@ -206,6 +207,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_FDBLOCKS		0x00000004
 #define	XFS_TRANS_SB_RES_FDBLOCKS	0x00000008
 #define	XFS_TRANS_SB_FREXTENTS		0x00000010
+#define	XFS_TRANS_SB_RES_FREXTENTS	0x00000020
 
 
 
