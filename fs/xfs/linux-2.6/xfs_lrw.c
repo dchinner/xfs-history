@@ -1332,7 +1332,6 @@ xfs_iomap_write(
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 	int		found; 
 	int		flags = 0;
-	int		iunlock = 1; /* Cleared if lower routine did unlock */
 
 	maps = *npbmaps;
 	if (!maps)
@@ -1376,9 +1375,7 @@ xfs_iomap_write(
 	}
 
 out:
-	if (iunlock)
-		XFS_IUNLOCK(io->io_mount, io, XFS_ILOCK_EXCL);
-
+	XFS_IUNLOCK(io->io_mount, io, XFS_ILOCK_EXCL);
 	XFS_INODE_CLEAR_READ_AHEAD(io);
 	return XFS_ERROR(error);
 }
