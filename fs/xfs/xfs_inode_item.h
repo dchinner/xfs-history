@@ -96,8 +96,7 @@ typedef struct xfs_inode_log_item {
 				 XFS_ILOG_AEXT | XFS_ILOG_ABROOT)
 
 #define	XFS_ILOG_DFORK		(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
-				 XFS_ILOG_DBROOT | XFS_ILOG_DEV | \
-				 XFS_ILOG_UUID)
+				 XFS_ILOG_DBROOT)
 
 #define	XFS_ILOG_AFORK		(XFS_ILOG_ADATA | XFS_ILOG_AEXT | \
 				 XFS_ILOG_ABROOT)
