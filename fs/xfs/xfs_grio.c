@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.14 1994/04/14 18:27:24 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.15 1994/04/14 18:47:30 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -184,7 +184,7 @@ xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
 
 	xfs_crack_file_id( fileidp, &fs_dev, &ino);
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 	if (grio_debug)
 		printf("add ticket: ino = %llx, dev = %x \n",
 					(__int64_t)ino, fs_dev);
@@ -285,7 +285,8 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 	struct reservation_id id;
 
 	xfs_crack_file_id( fileidp, &fs_dev, &ino);
-#ifdef DEBUG
+
+#if defined(DEBUG) && !defined(SIM)
 	if (grio_debug) {
 		printf("remove ticket: ino = %llx, dev = %x \n",
 				(__int64_t)ino, fs_dev);
@@ -665,7 +666,7 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 
 	xfs_crack_file_id( fileidp, &fs_dev, &ino);
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 	if (grio_debug) {
 		printf("get file extents: ino = %llx, dev = %x \n",
 				(__int64_t)ino, fs_dev);
@@ -742,7 +743,7 @@ xfs_get_file_rt( file_id_t *fileidp, int *rt)
 
 	xfs_crack_file_id( fileidp, &fs_dev, &ino);
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 	if (grio_debug) {
 		printf("get file rt: ino = %llx, dev = %x \n",
 				(__int64_t)ino, fs_dev);
@@ -925,7 +926,7 @@ xfs_mark_inode_grio( file_id_t *fileidp)
 
 	xfs_crack_file_id(fileidp, &fs_dev, &ino);
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 	if (grio_debug) {
 		printf("mark inode: ino = %llx, dev = %x \n",
 			(__int64_t)ino, fs_dev);
@@ -964,7 +965,8 @@ xfs_clear_inode_grio( file_id_t *fileidp)
 	xfs_inode_t	*ip;
 
 	xfs_crack_file_id(fileidp, &fs_dev, &ino);
-#ifdef DEBUG
+
+#if defined(DEBUG) && !defined(SIM)
 	if (grio_debug) {
 		printf("clear inode: ino = %llx, dev = %x \n",
 			(__int64_t)ino, fs_dev);
