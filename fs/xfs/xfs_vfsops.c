@@ -743,7 +743,7 @@ xfs_root(
 STATIC int
 xfs_statvfs(
 	bhv_desc_t	*bdp,
-	struct statfs	*statp,
+	xfs_statfs_t	*statp,
 	vnode_t		*vp)
 {
 	__uint64_t	fakeinos;
