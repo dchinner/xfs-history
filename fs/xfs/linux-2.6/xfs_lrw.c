@@ -183,7 +183,7 @@ xfs_zero_last_block(
 
 
 	dprintk(xfs_zlb_debug,
-	       ("zlb: ip 0x%p off 0x%Lx isize 0x%x\n",
+	       ("zlb: ip 0x%p off 0x%Lx isize 0x%Lx\n",
 		ip, offset, isize));
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE) != 0);
 	ASSERT(offset > isize);
@@ -212,7 +212,7 @@ xfs_zero_last_block(
 		if (page) {
 
 			dprintk(xfs_zlb_debug,
-			        ("zlb: memset page 0x%p paddr 0x%x from 0x%x sz 0x%x\n",
+			        ("zlb: memset page 0x%p paddr 0x%lx from 0x%lx sz 0x%lx\n",
 				page, page_address(page),
 				page_address(page) + i, PAGE_SIZE -i));
 
@@ -311,7 +311,7 @@ xfs_zero_last_block(
 	lsize = BBTOB(XFS_FSB_TO_BB(mp, 1));
 
 	dprintk(xfs_zlb_debug,
-	      ("zlb: pbget ip 0x%p loff 0x%Lx lsize 0x%x last_fsb 0x%x\n",
+	      ("zlb: pbget ip 0x%p loff 0x%Lx lsize 0x%x last_fsb 0x%Lx\n",
 		ip, loff, lsize, last_fsb));
 
 	/*
@@ -426,7 +426,7 @@ xfs_zero_eof(
 	mp = io->io_mount;
 
 	dprintk(xfs_zeof_debug,
-		("zeof ip 0x%p offset 0x%Lx size 0x%x\n",
+		("zeof ip 0x%p offset 0x%Lx size 0x%Lx\n",
 		ip, offset, isize));
 	/*
 	 * First handle zeroing the block on which isize resides.

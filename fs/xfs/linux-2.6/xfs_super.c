@@ -406,8 +406,7 @@ linvfs_write_super(
 int
 linvfs_statfs(
 	struct super_block *sb,
-	struct statfs	*buf,
-	int		size)
+	struct statfs	*buf)
 {
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t		*rootvp;

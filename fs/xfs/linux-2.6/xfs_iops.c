@@ -622,7 +622,7 @@ linvfs_notify_change(
 int
 linvfs_pb_bmap(struct inode *inode, 
 			   loff_t offset,
-			   size_t count,
+			   ssize_t count,
 			   struct page_buf_bmap_s *pbmapp,
 			   int maxpbbm, 
 			   int *retpbbm, 
