@@ -1,4 +1,4 @@
-#ident "$Revision: 1.357 $"
+#ident "$Revision: 1.358 $"
 
 
 #ifdef SIM
@@ -2454,7 +2454,7 @@ xfs_create_new(
 		return XFS_ERROR(EIO);
 
 	udqp = pdqp = NULL;
-	if (vap->va_mask == AT_PROJID)
+	if (vap->va_mask & AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else 	
 		prid = (xfs_prid_t)dfltprid;
@@ -3899,7 +3899,7 @@ xfs_mkdir(
 	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
 	mp = dp->i_mount;
 	udqp = pdqp = NULL;
-	if (vap->va_mask == AT_PROJID)
+	if (vap->va_mask & AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else 	
 		prid = (xfs_prid_t)dfltprid;
@@ -4547,7 +4547,7 @@ xfs_symlink(
 	/* Return through std_return after this point. */
 
         udqp = pdqp = NULL;
-	if (vap->va_mask == AT_PROJID)
+	if (vap->va_mask & AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else 	
 		prid = (xfs_prid_t)dfltprid;
