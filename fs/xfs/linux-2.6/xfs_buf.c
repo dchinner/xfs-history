@@ -1230,10 +1230,10 @@ void pagebuf_iodone(		/* mark buffer I/O complete	*/
 
 void pagebuf_ioerror(	/* mark buffer in error (or not) */
     page_buf_t * pb,	/* buffer to mark		*/
-    int serror)		/* error to store (0 if none)	  */
+    unsigned int error)	/* error to store (0 if none)	  */
 {
-	pb->pb_error = serror;
-	PB_TRACE(pb, PB_TRACE_REC(ioerror), serror);
+	pb->pb_error = error;
+	PB_TRACE(pb, PB_TRACE_REC(ioerror), error);
 }
 
 /*
