@@ -1,4 +1,5 @@
-#ident "$Revision: 1.319 $"
+#ident "$Revision: 1.320 $"
+
 
 #ifdef SIM
 #define _KERNEL 1
@@ -368,7 +369,7 @@ xfs_open(
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
 #endif
@@ -449,7 +450,7 @@ xfs_getattr(
 	vn_trace_entry(vp, "xfs_getattr", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif	
@@ -605,7 +606,7 @@ xfs_setattr(
 
         ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -1261,7 +1262,7 @@ xfs_readlink(
                 return XFS_ERROR(EINVAL);
 
 	ip = XFS_BHVTOI(bdp);
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
 #endif
@@ -1362,7 +1363,7 @@ xfs_fsync(
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_fsync", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
 #endif
@@ -1663,6 +1664,7 @@ xfs_inactive_free_eofblocks(
 			  &first_block, 0, &imap, &nimaps,
 			  NULL);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
 	if (!error && (nimaps != 0) &&
 	    (imap.br_startblock != HOLESTARTBLOCK)) {
 		/* 
@@ -1671,9 +1673,10 @@ xfs_inactive_free_eofblocks(
 		if (XFS_IS_QUOTA_ON(mp) &&
 		    ip->i_ino != mp->m_sb.sb_uquotino && 
 		    ip->i_ino != mp->m_sb.sb_pquotino) {
-			if (XFS_NOT_DQATTACHED(mp, ip)) 
+			if (XFS_NOT_DQATTACHED(mp, ip)) {
 				if (error = xfs_qm_dqattach(ip, 0))
 					return (error);
+			}
 		}
 		
 		/*
@@ -1724,7 +1727,7 @@ xfs_inactive_free_eofblocks(
 					 (XFS_TRANS_RELEASE_LOG_RES |
 					  XFS_TRANS_ABORT));
 		} else {
-			(void) xfs_trans_commit(tp,
+			error = xfs_trans_commit(tp,
 						XFS_TRANS_RELEASE_LOG_RES);
 		}
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
@@ -1913,6 +1916,9 @@ xfs_inactive_symlink_local(
 	return (0);
 }
 
+/*
+ *
+ */
 STATIC int
 xfs_inactive_attrs(
 	xfs_inode_t 	*ip,
@@ -1923,6 +1929,7 @@ xfs_inactive_attrs(
 	int		error;
 	xfs_mount_t	*mp;
 
+	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE));
 	tp = *tpp;
 	mp = ip->i_mount;
 	ASSERT(ip->i_d.di_forkoff != 0);
@@ -1933,6 +1940,7 @@ xfs_inactive_attrs(
 	error = xfs_attr_inactive(ip);	
 	if (error) {
 		*tpp = NULL;
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		return (error); /* goto out*/
 	}
 	
@@ -1945,6 +1953,7 @@ xfs_inactive_attrs(
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		xfs_trans_cancel(tp, 0);
 		*tpp = NULL;
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		return (error);
 	}
 	
@@ -1992,10 +2001,6 @@ xfs_inactive(
 	vn_trace_entry(vp, "xfs_inactive", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 
-#ifndef XFSBLKOUT
-	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
-		return (VN_INACTIVE_CACHE);
-#endif
 	/*
 	 * If the inode is already free, then there can be nothing
 	 * to clean up here.
@@ -2089,21 +2094,9 @@ xfs_inactive(
 		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 
 		if (error) {
-			/*
-			 * If we get an error while trying to
-			 * truncate the file, abort the truncation
-			 * transaction and just try to continue
-			 * by freeing the inode.
-			 * XXXX NO...
-			 */
 			xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			return (VN_INACTIVE_CACHE);
-			/*
-			commit_flags |= XFS_TRANS_ABORT;
-			xfs_itruncate_cleanup(&tp, ip, commit_flags,
-					      XFS_DATA_FORK);
-			commit_flags = 0; */	
 		}
 	} else if ((ip->i_d.di_mode & IFMT) == IFLNK) {
 		
@@ -2252,7 +2245,7 @@ xfs_lookup(
 	}
 
 	dp = XFS_BHVTOI(dir_bdp);
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
 		return XFS_ERROR(EIO);
 #endif
@@ -2396,7 +2389,7 @@ xfs_create(
 	}
 	
 	mp = dp->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -3091,7 +3084,7 @@ xfs_remove(
 	vn_trace_entry(dir_vp, "xfs_remove", (inst_t *)__return_address);
 	dp = XFS_BHVTOI(dir_bdp);
 	mp = dp->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -3431,7 +3424,7 @@ xfs_link(
 	}
 
 	mp = tdp->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
         if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -3606,7 +3599,7 @@ xfs_mkdir(
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
 	mp = dp->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -3785,6 +3778,7 @@ xfs_mkdir(
 
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
+		IRELE(cdp);
 		goto error2;
 	}
 
@@ -3796,6 +3790,7 @@ xfs_mkdir(
 
 	if (error) {
 		dnlc_remove(dir_vp, dir_name);
+		IRELE(cdp);
 		return error;
 	}
 
@@ -4106,7 +4101,7 @@ xfs_readdir(
 	vn_trace_entry(BHV_TO_VNODE(dir_bdp), "xfs_readdir",
 		       (inst_t *)__return_address);
         dp = XFS_BHVTOI(dir_bdp);
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
 		return XFS_ERROR(EIO);
 #endif
@@ -4191,7 +4186,7 @@ xfs_symlink(
 	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
 
 	mp = dp->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -4729,7 +4724,7 @@ xfs_allocstore(
 	ASSERT(count == NBPP);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -4945,7 +4940,7 @@ xfs_fcntl(
 	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -5127,7 +5122,7 @@ xfs_set_dmattrs (
 
         ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
@@ -5247,7 +5242,19 @@ xfs_reclaim(
 		}
 	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 		last_byte = xfs_file_last_byte(ip);
-		pflushinvalvp(vp, 0, last_byte);	
+		
+		/*
+		 * If we hit an IO error, we need to make sure that the
+		 * buffer and page caches of file data for
+		 * the file are tossed away. We don't want to use pflushinvalvp
+		 * here because we don't want dirty pages to stay attached to
+		 * the vnode, but be marked P_BAD. pdflush/vnode_pagebad
+		 * hates that.
+		 */
+		if (!XFS_FORCED_SHUTDOWN(ip->i_mount))
+			pflushinvalvp(vp, 0, last_byte);	
+		else
+			ptossvp(vp, 0, last_byte);
 		
 		ASSERT(!VN_DIRTY(vp) && 
 		       (ip->i_queued_bufs == 0) &&
@@ -5343,7 +5350,7 @@ xfs_alloc_file_space(
 		       (inst_t *)__return_address);
 	
 	mp = ip->i_mount;
-#ifndef XFSBLKOUT
+#ifndef XFSERRORDEBUG
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 #endif
