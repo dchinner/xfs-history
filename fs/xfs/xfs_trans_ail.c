@@ -401,7 +401,6 @@ xfs_trans_ail_init(
 {
 	mp->m_ail.ail_forw = (xfs_log_item_t*)&(mp->m_ail);
 	mp->m_ail.ail_back = (xfs_log_item_t*)&(mp->m_ail);
-	mp->m_ail_wait = NULL;
 }
 
 /*
