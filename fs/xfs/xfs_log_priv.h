@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.46 $"
+#ident	"$Revision: 1.47 $"
 
 #include <sys/cmn_err.h>
 
@@ -270,7 +270,7 @@ typedef struct log {
     xlog_ticket_t	*l_unmount_free;/* kmem_free these addresses */
     xlog_ticket_t	*l_tail;        /* free list of tickets */
     xlog_in_core_t	*l_iclog;       /* head log queue	*/
-    mutex_t		l_icloglock;    /* grab to change iclog state */
+    lock_t		l_icloglock;    /* grab to change iclog state */
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
     struct xfs_mount	*l_mp;	        /* mount point */
@@ -292,7 +292,7 @@ typedef struct log {
     xlog_in_core_t	*l_iclog_bak[XLOG_MAX_ICLOGS];
 
     /* The following block of fields are changed while holding grant_lock */
-    mutex_t		l_grant_lock;		/* protects below fields */
+    lock_t		l_grant_lock;		/* protects below fields */
     xlog_ticket_t	*l_reserve_headq;	/* */
     xlog_ticket_t	*l_write_headq;		/* */
     int			l_grant_reserve_cycle;	/* */

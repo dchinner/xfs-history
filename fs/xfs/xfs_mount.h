@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.58 $"
-#ident	"$Revision: 1.58 $"
+#ident	"$Revision: 1.59 $"
+#ident	"$Revision: 1.59 $"
 
 struct buf;
 struct cred;
@@ -37,11 +37,11 @@ typedef struct xfs_trans_reservations {
 typedef struct xfs_mount {
 	struct vfs		*m_vfsp;	/* ptr to vfs */
 	xfs_tid_t		m_tid;		/* next unused tid for fs */
-	mutex_t			m_ail_lock;	/* fs AIL mutex */
+	lock_t			m_ail_lock;	/* fs AIL mutex */
 	xfs_ail_entry_t		m_ail;		/* fs active log item list */
 	uint			m_ail_gen;	/* fs AIL generation count */
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
-	mutex_t			m_sb_lock;	/* sb counter mutex */
+	lock_t			m_sb_lock;	/* sb counter mutex */
 	struct buf		*m_sb_bp;	/* buffer for superblock */
 	char			*m_fsname; 	/* filesystem name */
 	int			m_fsname_len;	/* strlen of fs name */
@@ -51,7 +51,7 @@ typedef struct xfs_mount {
 	int			m_bsize;	/* fs logical block size */
 	xfs_agnumber_t		m_agfrotor;	/* last ag where space found */
 	xfs_agnumber_t		m_agirotor;	/* last ag dir inode alloced */
-	mutex_t			m_ipinlock;	/* inode pinning mutex */
+	lock_t			m_ipinlock;	/* inode pinning mutex */
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
 	uint			m_ihashmask;	/* fs inode hash size - 1 */
 	struct xfs_inode	*m_inodes;	/* active inode list */
