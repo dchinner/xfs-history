@@ -590,6 +590,7 @@ log_write(xfs_mount_t *		mp,
 	int		remains_to_copy;/* remainder to copy if split region */
 	int		need_copy;	/* # of bytes needed to bcopy */
 	int		copy_len;	/* # of bytes actually bcopy'ing */
+	int		copy_off;	/* # of bytes from entry start */
 	int		lastwr;		/* last write of in-core log? */
 	int		firstwr=0;	/* first write of transaction */
 
@@ -656,12 +657,18 @@ log_write(xfs_mount_t *		mp,
 
 		/* Partial write last time? => (remains_to_copy != 0) */
 		need_copy =
-		   reg[index].i_len - remains_to_copy + sizeof(log_op_header_t);
+		   reg[index].i_len - remains_to_copy;
 
 		/* what type of write */
+		/*
+		 * XXXajs This doesn't yet handle the case where
+		 * remains_to_copy is > 0 and need_copy doesn't
+		 * fit again.
+		 */
 		if (need_copy <= iclog->ic_size - log_offset) {/*comple write */
-		    logop_head->oh_len = need_copy - sizeof(log_op_header_t);
-		    copy_len = reg[index].i_len;
+		    logop_head->oh_len = need_copy;
+		    copy_len = reg[index].i_len - remains_to_copy;
+		    copy_off = remains_to_copy;
 		    if (remains_to_copy)
 			logop_head->oh_flags |= LOG_END_TRANS;
 		    remains_to_copy = 0;
@@ -676,12 +683,13 @@ if (iclog->ic_size - log_offset < BBSIZE) { /* no room */
 #endif
  {				/* partial write */
 		    remains_to_copy = copy_len = logop_head->oh_len =
-			  iclog->ic_size - log_offset - sizeof(log_op_header_t);
+			  iclog->ic_size - log_offset;
+		    copy_off = 0;
 		    logop_head->oh_flags |= LOG_CONTINUE_TRANS;
 	        }
 
 		/* copy region */
-		bcopy(reg[index].i_addr, ptr, copy_len);
+		bcopy(reg[index].i_addr + copy_off, ptr, copy_len);
 		log_write_adv_cnt(ptr, len, log_offset, copy_len);
 		log_state_finish_copy(log, iclog, firstwr,
 			(lastwr ?
@@ -692,7 +700,7 @@ if (iclog->ic_size - log_offset < BBSIZE) { /* no room */
 		if (remains_to_copy) {		/* copied partial region */
 		    /* already marked WANT_SYNC */
 		    log_state_release_iclog(log, iclog);
-		    continue;
+		    break;
 	        } else {		/* copied entire region */
 		    index++;
 		}
