@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.12 $"
+#ident  "$Revision: 1.13 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -34,6 +34,7 @@
 #include <sys/fs_subr.h>
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>
+#include <sys/file.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
@@ -146,6 +147,7 @@ STATIC int	_xfs_ibusy(xfs_mount_t *mp);
 
 
 
+
 /*
  * xfs_type is the number given to xfs to indicate
  * its type among vfs's.  It is initialized in xfs_init().
@@ -219,9 +221,13 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	     int		lflags)
 {
 	xfs_mount_t	*mp;
+	struct vnode 	*ddevvp, *rdevvp;
 	int		error = 0;
-	int		s;
+	int		s, vfs_flags;
 	xfs_sb_t	*sbp;
+#ifndef SIM
+	struct vnode 	*makespecvp(dev_t, vtype_t);
+#endif
 
 	/*
 	 * Remounting a XFS file system is bad. The log manager
@@ -231,12 +237,56 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		return 0;
 	
 	mp = _xfs_get_vfsmount(vfsp, ddev, rtdev);
+
+#ifndef SIM
+	/*
+ 	 * Open the data and real time devices now.
+	 */
+	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
+	if (ddev != NULL) {
+		ddevvp = makespecvp( ddev, VBLK );
+		error = VOP_OPEN(&ddevvp, vfs_flags, cr);
+		if (error) {
+			VN_RELE(ddevvp);
+			return(error);
+		}
+		mp->m_ddevp = ddevvp;
+	}
+	if (rtdev != NULL) {
+		rdevvp = makespecvp( rtdev, VBLK );
+		error = VOP_OPEN(&rdevvp, vfs_flags, cr);
+		if (error) {
+			VN_RELE(rdevvp);
+			if (ddev) {
+				VOP_CLOSE(ddevvp, vfs_flags, 1, 0, cr);
+				binval(ddev);
+				VN_RELE(ddevvp);
+			}
+			return(error);
+		}
+		mp->m_rtdevp = rdevvp;
+	}
+#else
+	mp->m_rtdevp = NULL;
+	mp->m_ddevp  = NULL;
+#endif
+
 	if (error = xfs_mountfs(vfsp, ddev)) {
 		/*
 		 * Clean up. Shouldn't need to worry about
 		 * locking stuff.
 		 */
 		kmem_free(mp, sizeof(*mp));
+		if (mp->m_rtdevp) {
+			VOP_CLOSE(mp->m_rtdevp, vfs_flags, 1, 0, cr);
+			binval(rtdev);
+			VN_RELE(mp->m_rtdevp);
+		}
+		if (mp->m_ddevp) {
+			VOP_CLOSE(mp->m_ddevp, vfs_flags, 1, 0, cr);
+			binval(ddev);
+			VN_RELE(mp->m_ddevp);
+		}
 		return error;		/* error should be in errno.h */
 	}
 
@@ -300,9 +350,11 @@ _xfs_get_vfsmount(struct vfs	*vfsp,
 		 * XXX Should the xfs_mount_t have a m_devvp for dio?
 		 */
 		mp = xfs_mount_init();
-		mp->m_vfsp = vfsp;
-		mp->m_dev = ddev;
-		mp->m_rtdev = rtdev;
+		mp->m_vfsp   = vfsp;
+		mp->m_dev    = ddev;
+		mp->m_rtdev  = rtdev;
+		mp->m_ddevp  = NULL;
+		mp->m_rtdevp = NULL;
 
 		vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
 		/* vfsp->vfs_bsize filled in later from the superblock. */
@@ -588,6 +640,7 @@ xfs_unmount(vfs_t	*vfsp,
 	xfs_inode_t	*rip, *rbmip, *rsumip;
 	vnode_t		*rvp = 0;
 	vmap_t		vmap;
+	int		vfs_flags;
 
 	if (!suser())
 		return EPERM;
@@ -651,7 +704,8 @@ xfs_unmount(vfs_t	*vfsp,
 	 * Call common unmount function to flush to disk
 	 * and free the super block buffer & mount structures.
 	 */
-	xfs_unmountfs(mp);	
+	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
+	xfs_unmountfs(mp, vfs_flags, credp);	
 
 	/*
 	 * XXX Later when xfs_unmount()'s inode freeing is implemented, do:
