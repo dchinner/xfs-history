@@ -698,6 +698,7 @@ linvfs_pb_bmap(struct inode *inode,
 
 	*retpbbm = maxpbbm;
 
+retry:
 	if (flags & PBF_FILE_ALLOCATE) {
 		VOP_STRATEGY(vp, offset, count, flags, NULL,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
@@ -705,9 +706,14 @@ linvfs_pb_bmap(struct inode *inode,
 		VOP_BMAP(vp, offset, count, flags, NULL,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
 	}
-	if (flags & PBF_WRITE)
+	if (flags & PBF_WRITE) {
+		if ((flags & PBF_DIRECT) && *retpbbm &&
+		    (pbmapp->pbm_flags & PBMF_DELAY)) {
+			flags = PBF_WRITE | PBF_FILE_ALLOCATE;
+			goto retry;
+		}
 		VMODIFY(vp);
-
+	}
 	return -error;
 }
 
