@@ -147,7 +147,6 @@ xfs_growfs_data(
 	xfs_sb_t		*sbp;
 	int			sectbb;
 	xfs_trans_t		*tp;
-	xfs_arch_t		arch;
 
 	nb = in->newblocks;
 	pct = in->imaxpct;
@@ -192,7 +191,7 @@ xfs_growfs_data(
 	/* new ag's */
 	sectbb = BTOBB(mp->m_sb.sb_sectsize);
 	bsize = mp->m_sb.sb_blocksize;
-	arch = ARCH_GET(mp->m_arch);
+
 	nfree = 0;
 	for (agno = nagcount - 1; agno >= oagcount; agno--, new -= agsize) {
 		/*
@@ -203,26 +202,26 @@ xfs_growfs_data(
 			          sectbb, 0);
 		agf = XFS_BUF_TO_AGF(bp);
 		bzero(agf, mp->m_sb.sb_sectsize);
-		INT_SET(agf->agf_magicnum, arch, XFS_AGF_MAGIC);
-		INT_SET(agf->agf_versionnum, arch, XFS_AGF_VERSION);
-		INT_SET(agf->agf_seqno, arch, agno);
+		INT_SET(agf->agf_magicnum, ARCH_CONVERT, XFS_AGF_MAGIC);
+		INT_SET(agf->agf_versionnum, ARCH_CONVERT, XFS_AGF_VERSION);
+		INT_SET(agf->agf_seqno, ARCH_CONVERT, agno);
 		if (agno == nagcount - 1)
 			agsize =
 				nb -
 				(agno * (xfs_rfsblock_t)mp->m_sb.sb_agblocks);
 		else
 			agsize = mp->m_sb.sb_agblocks;
-		INT_SET(agf->agf_length, arch, agsize);
-		INT_SET(agf->agf_roots[XFS_BTNUM_BNOi], arch, XFS_BNO_BLOCK(mp));
-		INT_SET(agf->agf_roots[XFS_BTNUM_CNTi], arch, XFS_CNT_BLOCK(mp));
-		INT_SET(agf->agf_levels[XFS_BTNUM_BNOi], arch, 1);
-		INT_SET(agf->agf_levels[XFS_BTNUM_CNTi], arch, 1);
-		INT_SET(agf->agf_flfirst, arch, 0);
-		INT_SET(agf->agf_fllast, arch, XFS_AGFL_SIZE - 1);
-		INT_SET(agf->agf_flcount, arch, 0);
+		INT_SET(agf->agf_length, ARCH_CONVERT, agsize);
+		INT_SET(agf->agf_roots[XFS_BTNUM_BNOi], ARCH_CONVERT, XFS_BNO_BLOCK(mp));
+		INT_SET(agf->agf_roots[XFS_BTNUM_CNTi], ARCH_CONVERT, XFS_CNT_BLOCK(mp));
+		INT_SET(agf->agf_levels[XFS_BTNUM_BNOi], ARCH_CONVERT, 1);
+		INT_SET(agf->agf_levels[XFS_BTNUM_CNTi], ARCH_CONVERT, 1);
+		INT_SET(agf->agf_flfirst, ARCH_CONVERT, 0);
+		INT_SET(agf->agf_fllast, ARCH_CONVERT, XFS_AGFL_SIZE - 1);
+		INT_SET(agf->agf_flcount, ARCH_CONVERT, 0);
 		tmpsize = agsize - XFS_PREALLOC_BLOCKS(mp);
-		INT_SET(agf->agf_freeblks, arch, tmpsize);
-		INT_SET(agf->agf_longest, arch, tmpsize);
+		INT_SET(agf->agf_freeblks, ARCH_CONVERT, tmpsize);
+		INT_SET(agf->agf_longest, ARCH_CONVERT, tmpsize);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -235,18 +234,18 @@ xfs_growfs_data(
 				  sectbb, 0);
 		agi = XFS_BUF_TO_AGI(bp);
 		bzero(agi, mp->m_sb.sb_sectsize);
-		INT_SET(agi->agi_magicnum, arch, XFS_AGI_MAGIC);
-		INT_SET(agi->agi_versionnum, arch, XFS_AGI_VERSION);
-		INT_SET(agi->agi_seqno, arch, agno);
-		INT_SET(agi->agi_length, arch, agsize);
-		INT_SET(agi->agi_count, arch, 0);
-		INT_SET(agi->agi_root, arch, XFS_IBT_BLOCK(mp));
-		INT_SET(agi->agi_level, arch, 1);
-		INT_SET(agi->agi_freecount, arch, 0);
-		INT_SET(agi->agi_newino, arch, NULLAGINO);
-		INT_SET(agi->agi_dirino, arch, NULLAGINO);
+		INT_SET(agi->agi_magicnum, ARCH_CONVERT, XFS_AGI_MAGIC);
+		INT_SET(agi->agi_versionnum, ARCH_CONVERT, XFS_AGI_VERSION);
+		INT_SET(agi->agi_seqno, ARCH_CONVERT, agno);
+		INT_SET(agi->agi_length, ARCH_CONVERT, agsize);
+		INT_SET(agi->agi_count, ARCH_CONVERT, 0);
+		INT_SET(agi->agi_root, ARCH_CONVERT, XFS_IBT_BLOCK(mp));
+		INT_SET(agi->agi_level, ARCH_CONVERT, 1);
+		INT_SET(agi->agi_freecount, ARCH_CONVERT, 0);
+		INT_SET(agi->agi_newino, ARCH_CONVERT, NULLAGINO);
+		INT_SET(agi->agi_dirino, ARCH_CONVERT, NULLAGINO);
 		for (bucket = 0; bucket < XFS_AGI_UNLINKED_BUCKETS; bucket++)
-			INT_SET(agi->agi_unlinked[bucket], arch, NULLAGINO);
+			INT_SET(agi->agi_unlinked[bucket], ARCH_CONVERT, NULLAGINO);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -259,15 +258,15 @@ xfs_growfs_data(
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
-		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_ABTB_MAGIC);
-		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
-		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
-		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
-                INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
+		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTB_MAGIC);
+		INT_SET(block->bb_level, ARCH_CONVERT, 0);
+		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
+		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
+                INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
-		INT_SET(arec->ar_startblock, ARCH_UNKNOWN, XFS_PREALLOC_BLOCKS(mp));
-		INT_SET(arec->ar_blockcount, ARCH_UNKNOWN, agsize - INT_GET(arec->ar_startblock, ARCH_UNKNOWN));
+		INT_SET(arec->ar_startblock, ARCH_CONVERT, XFS_PREALLOC_BLOCKS(mp));
+		INT_SET(arec->ar_blockcount, ARCH_CONVERT, agsize - INT_GET(arec->ar_startblock, ARCH_CONVERT));
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -280,16 +279,16 @@ xfs_growfs_data(
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
-		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_ABTC_MAGIC);
-		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
-		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
-		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
-                INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
+		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_ABTC_MAGIC);
+		INT_SET(block->bb_level, ARCH_CONVERT, 0);
+		INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
+		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
+                INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
-		INT_SET(arec->ar_startblock, ARCH_UNKNOWN, XFS_PREALLOC_BLOCKS(mp));
-		INT_SET(arec->ar_blockcount, ARCH_UNKNOWN, agsize - INT_GET(arec->ar_startblock, ARCH_UNKNOWN));
-		nfree += INT_GET(arec->ar_blockcount, ARCH_UNKNOWN);
+		INT_SET(arec->ar_startblock, ARCH_CONVERT, XFS_PREALLOC_BLOCKS(mp));
+		INT_SET(arec->ar_blockcount, ARCH_CONVERT, agsize - INT_GET(arec->ar_startblock, ARCH_CONVERT));
+		nfree += INT_GET(arec->ar_blockcount, ARCH_CONVERT);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -302,11 +301,11 @@ xfs_growfs_data(
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
-		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_IBT_MAGIC);
-		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
-		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 0);
-		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
-                INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
+		INT_SET(block->bb_magic, ARCH_CONVERT, XFS_IBT_MAGIC);
+		INT_SET(block->bb_level, ARCH_CONVERT, 0);
+		INT_SET(block->bb_numrecs, ARCH_CONVERT, 0);
+		INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLAGBLOCK);
+                INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLAGBLOCK);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -326,9 +325,9 @@ xfs_growfs_data(
 		}
 		ASSERT(bp);
 		agi = XFS_BUF_TO_AGI(bp);
-		INT_MOD(agi->agi_length, arch, new);
+		INT_MOD(agi->agi_length, ARCH_CONVERT, new);
 		ASSERT(agno < mp->m_sb.sb_agcount - 1 ||
-		       INT_GET(agi->agi_length, arch) == mp->m_sb.sb_agblocks);
+		       INT_GET(agi->agi_length, ARCH_CONVERT) == mp->m_sb.sb_agblocks);
 		xfs_ialloc_log_agi(tp, bp, XFS_AGI_LENGTH);
 		/*
 		 * Change agf length.
@@ -339,14 +338,14 @@ xfs_growfs_data(
 		}
 		ASSERT(bp);
 		agf = XFS_BUF_TO_AGF(bp);
-		INT_MOD(agf->agf_length, arch, new);
-		ASSERT(INT_GET(agf->agf_length, arch) ==
-				INT_GET(agi->agi_length, arch));
+		INT_MOD(agf->agf_length, ARCH_CONVERT, new);
+		ASSERT(INT_GET(agf->agf_length, ARCH_CONVERT) ==
+				INT_GET(agi->agi_length, ARCH_CONVERT));
 		/*
 		 * Free the new space.
 		 */
 		error = xfs_free_extent(tp, XFS_AGB_TO_FSB(mp, agno,
-				INT_GET(agf->agf_length, arch) - new), new);
+				INT_GET(agf->agf_length, ARCH_CONVERT) - new), new);
 		if (error) {
 			goto error0;
 		}

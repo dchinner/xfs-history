@@ -679,23 +679,22 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	xfs_dir_shortform_t	*sf;
 	xfs_dir_sf_entry_t	*sfe;
 	int			i;
-        xfs_arch_t              arch;
         
-        arch = ARCH_GET(mp->m_arch);
 
-	if ((INT_GET(dp->di_core.di_mode, arch) & IFMT) != IFDIR) {
+
+	if ((INT_GET(dp->di_core.di_mode, ARCH_CONVERT) & IFMT) != IFDIR) {
 		return 0;
 	}
-	if (INT_GET(dp->di_core.di_format, arch) != XFS_DINODE_FMT_LOCAL) {
+	if (INT_GET(dp->di_core.di_format, ARCH_CONVERT) != XFS_DINODE_FMT_LOCAL) {
 		return 0;
 	}
-	if (INT_GET(dp->di_core.di_size, arch) < sizeof(sf->hdr)) {
+	if (INT_GET(dp->di_core.di_size, ARCH_CONVERT) < sizeof(sf->hdr)) {
 		xfs_fs_cmn_err(CE_WARN, mp, "Invalid shortform size: dp 0x%p\n",
 			dp);
 		return 1;
 	}
 	sf = (xfs_dir_shortform_t *)(&dp->di_u.di_dirsf);
-	ino = XFS_GET_DIR_INO_ARCH(mp, sf->hdr.parent, arch);
+	ino = XFS_GET_DIR_INO_ARCH(mp, sf->hdr.parent, ARCH_CONVERT);
 	if (xfs_dir_ino_validate(mp, ino))
 		return 1;
 
@@ -713,7 +712,7 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	namelen_sum = 0;
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count - 1; i >= 0; i--) {
-		ino = XFS_GET_DIR_INO_ARCH(mp, sfe->inumber, arch);
+		ino = XFS_GET_DIR_INO_ARCH(mp, sfe->inumber, ARCH_CONVERT);
 		xfs_dir_ino_validate(mp, ino);
 		if (sfe->namelen >= XFS_LITINO(mp)) {
 			xfs_fs_cmn_err(CE_WARN, mp,
@@ -785,12 +784,12 @@ xfs_dir_leaf_removename(xfs_da_args_t *args, int *count, int *totallen)
 		return(retval);
 	ASSERT(bp != NULL);
 	leaf = bp->data;
-	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR_LEAF_MAGIC);
+	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
 	if (retval == EEXIST) {
 		(void)xfs_dir_leaf_remove(args->trans, bp, index);
-		*count = INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
-		*totallen = INT_GET(leaf->hdr.namebytes, ARCH_UNKNOWN);
+		*count = INT_GET(leaf->hdr.count, ARCH_CONVERT);
+		*totallen = INT_GET(leaf->hdr.namebytes, ARCH_CONVERT);
 		retval = 0;
 	}
 	xfs_da_buf_done(bp);
@@ -854,7 +853,6 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
-        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	inum = args->inumber;
 	retval = xfs_da_read_buf(args->trans, args->dp, 0, -1, &bp,
@@ -866,9 +864,9 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
 	if (retval == EEXIST) {
 		leaf = bp->data;
 		entry = &leaf->entries[index];
-		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_UNKNOWN));
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_CONVERT));
                 /* XXX - replace assert? */
-		XFS_DIR_SF_PUT_DIRINO_ARCH(&inum, &namest->inumber, arch);
+		XFS_DIR_SF_PUT_DIRINO_ARCH(&inum, &namest->inumber, ARCH_CONVERT);
 		xfs_da_log_buf(args->trans, bp, 
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		xfs_da_buf_done(bp);
@@ -1069,20 +1067,20 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			return(error);
 		if (bp)
 			leaf = bp->data;
-		if (bp && INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) != XFS_DIR_LEAF_MAGIC) {
+		if (bp && INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) != XFS_DIR_LEAF_MAGIC) {
 			xfs_dir_trace_g_dub("node: block not a leaf",
 						   dp, uio, bno);
 			xfs_da_brelse(trans, bp);
 			bp = NULL;
 		}
-		if (bp && INT_GET(leaf->entries[0].hashval, ARCH_UNKNOWN) > cookhash) {
+		if (bp && INT_GET(leaf->entries[0].hashval, ARCH_CONVERT) > cookhash) {
 			xfs_dir_trace_g_dub("node: leaf hash too large",
 						   dp, uio, bno);
 			xfs_da_brelse(trans, bp);
 			bp = NULL;
 		}
 		if (bp &&
-		    cookhash > INT_GET(leaf->entries[INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN)) {
+		    cookhash > INT_GET(leaf->entries[INT_GET(leaf->hdr.count, ARCH_CONVERT) - 1].hashval, ARCH_CONVERT)) {
 			xfs_dir_trace_g_dub("node: leaf hash too small",
 						   dp, uio, bno);
 			xfs_da_brelse(trans, bp);
@@ -1106,17 +1104,17 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			if (bp == NULL)
 				return(XFS_ERROR(EFSCORRUPTED));
 			node = bp->data;
-			if (INT_GET(node->hdr.info.magic, ARCH_UNKNOWN) != XFS_DA_NODE_MAGIC)
+			if (INT_GET(node->hdr.info.magic, ARCH_CONVERT) != XFS_DA_NODE_MAGIC)
 				break;
 			btree = &node->btree[0];
 			xfs_dir_trace_g_dun("node: node detail", dp, uio, node);
-			for (i = 0; i < INT_GET(node->hdr.count, ARCH_UNKNOWN); btree++, i++) {
-				if (INT_GET(btree->hashval, ARCH_UNKNOWN) >= cookhash) {
-					bno = INT_GET(btree->before, ARCH_UNKNOWN);
+			for (i = 0; i < INT_GET(node->hdr.count, ARCH_CONVERT); btree++, i++) {
+				if (INT_GET(btree->hashval, ARCH_CONVERT) >= cookhash) {
+					bno = INT_GET(btree->before, ARCH_CONVERT);
 					break;
 				}
 			}
-			if (i == INT_GET(node->hdr.count, ARCH_UNKNOWN)) {
+			if (i == INT_GET(node->hdr.count, ARCH_CONVERT)) {
 				xfs_da_brelse(trans, bp);
 				xfs_dir_trace_g_du("node: hash beyond EOF",
 							  dp, uio);
@@ -1139,13 +1137,13 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 */
 	for (;;) {
 		leaf = bp->data;
-		if (INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) != XFS_DIR_LEAF_MAGIC) {
+		if (INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) != XFS_DIR_LEAF_MAGIC) {
 			xfs_dir_trace_g_dul("node: not a leaf", dp, uio, leaf);
 			xfs_da_brelse(trans, bp);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		xfs_dir_trace_g_dul("node: leaf detail", dp, uio, leaf);
-		if (nextbno = INT_GET(leaf->hdr.info.forw, ARCH_UNKNOWN)) {
+		if (nextbno = INT_GET(leaf->hdr.info.forw, ARCH_CONVERT)) {
 			nextda = xfs_da_reada_buf(trans, dp, nextbno,
 						  XFS_DATA_FORK);
 		} else
@@ -1190,7 +1188,6 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 	xfs_ino_t inum;
 	int retval, error, i;
 	xfs_dabuf_t *bp;
-        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	state = xfs_da_state_alloc();
 	state->args = args;
@@ -1213,9 +1210,9 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 		bp = blk->bp;
 		leaf = bp->data;
 		entry = &leaf->entries[blk->index];
-		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_UNKNOWN));
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(entry->nameidx, ARCH_CONVERT));
                 /* XXX - replace assert ? */
-		XFS_DIR_SF_PUT_DIRINO_ARCH(&inum, &namest->inumber, arch);
+		XFS_DIR_SF_PUT_DIRINO_ARCH(&inum, &namest->inumber, ARCH_CONVERT);
 		xfs_da_log_buf(args->trans, bp,
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		xfs_da_buf_done(bp);
@@ -1278,10 +1275,10 @@ xfs_dir_trace_g_dun(char *where, xfs_inode_t *dp, uio_t *uio,
 		     (__psunsigned_t)(uio->uio_offset >> 32),
 		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
 		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)INT_GET(node->hdr.info.forw, ARCH_UNKNOWN),
-		     (__psunsigned_t)INT_GET(node->hdr.count, ARCH_UNKNOWN),
-		     (__psunsigned_t)INT_GET(node->btree[0].hashval, ARCH_UNKNOWN),
-		     (__psunsigned_t)INT_GET(node->btree[INT_GET(node->hdr.count, ARCH_UNKNOWN)-1].hashval, ARCH_UNKNOWN),
+		     (__psunsigned_t)INT_GET(node->hdr.info.forw, ARCH_CONVERT),
+		     (__psunsigned_t)INT_GET(node->hdr.count, ARCH_CONVERT),
+		     (__psunsigned_t)INT_GET(node->btree[0].hashval, ARCH_CONVERT),
+		     (__psunsigned_t)INT_GET(node->btree[INT_GET(node->hdr.count, ARCH_CONVERT)-1].hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL);
 }
 
@@ -1297,10 +1294,10 @@ xfs_dir_trace_g_dul(char *where, xfs_inode_t *dp, uio_t *uio,
 		     (__psunsigned_t)(uio->uio_offset >> 32),
 		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
 		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)INT_GET(leaf->hdr.info.forw, ARCH_UNKNOWN),
-		     (__psunsigned_t)INT_GET(leaf->hdr.count, ARCH_UNKNOWN),
-		     (__psunsigned_t)INT_GET(leaf->entries[0].hashval, ARCH_UNKNOWN),
-		     (__psunsigned_t)INT_GET(leaf->entries[ INT_GET(leaf->hdr.count, ARCH_UNKNOWN)-1 ].hashval, ARCH_UNKNOWN),
+		     (__psunsigned_t)INT_GET(leaf->hdr.info.forw, ARCH_CONVERT),
+		     (__psunsigned_t)INT_GET(leaf->hdr.count, ARCH_CONVERT),
+		     (__psunsigned_t)INT_GET(leaf->entries[0].hashval, ARCH_CONVERT),
+		     (__psunsigned_t)INT_GET(leaf->entries[ INT_GET(leaf->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL);
 }
 
@@ -1316,7 +1313,7 @@ xfs_dir_trace_g_due(char *where, xfs_inode_t *dp, uio_t *uio,
 		     (__psunsigned_t)(uio->uio_offset >> 32),
 		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
 		     (__psunsigned_t)uio->uio_resid,
-		     (__psunsigned_t)INT_GET(entry->hashval, ARCH_UNKNOWN),
+		     (__psunsigned_t)INT_GET(entry->hashval, ARCH_CONVERT),
 		     NULL, NULL, NULL, NULL, NULL, NULL);
 }
 

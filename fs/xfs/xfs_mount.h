@@ -300,7 +300,6 @@ typedef struct xfs_mount {
 						/* which bits matter in rpc
 						   log item pin masks */
 	uint			m_cxfstype;	/* mounted shared, etc. */
-        xfs_arch_t              m_arch;         /* arch of fs */
 } xfs_mount_t;
 
 /*

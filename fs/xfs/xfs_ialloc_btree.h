@@ -151,7 +151,7 @@ int xfs_inobt_is_last_rec(struct xfs_btree_cur *cur);
 #else
 #define	XFS_INOBT_IS_LAST_REC(cur)	\
 	((cur)->bc_ptrs[0] == \
-		INT_GET(XFS_BUF_TO_INOBT_BLOCK((cur)->bc_bufs[0])->bb_numrecs, ARCH_UNKNOWN))
+		INT_GET(XFS_BUF_TO_INOBT_BLOCK((cur)->bc_bufs[0])->bb_numrecs, ARCH_CONVERT))
 #endif
 
 /*

@@ -2822,17 +2822,17 @@ xfs_bmap_btree_to_extents(
 	ASSERT(ifp->if_flags & XFS_IFEXTENTS);
 	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE);
 	rblock = ifp->if_broot;
-	ASSERT(INT_GET(rblock->bb_level, ARCH_UNKNOWN) == 1);
-	ASSERT(INT_GET(rblock->bb_numrecs, ARCH_UNKNOWN) == 1);
+	ASSERT(INT_GET(rblock->bb_level, ARCH_CONVERT) == 1);
+	ASSERT(INT_GET(rblock->bb_numrecs, ARCH_CONVERT) == 1);
 	ASSERT(XFS_BMAP_BROOT_MAXRECS(ifp->if_broot_bytes) == 1);
 	mp = ip->i_mount;
 	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, ifp->if_broot_bytes);
 	*logflagsp = 0;
 #ifdef DEBUG
-	if (error = xfs_btree_check_lptr(cur, INT_GET(*pp, ARCH_UNKNOWN), 1))
+	if (error = xfs_btree_check_lptr(cur, INT_GET(*pp, ARCH_CONVERT), 1))
 		return error;
 #endif
-	cbno = INT_GET(*pp, ARCH_UNKNOWN);
+	cbno = INT_GET(*pp, ARCH_CONVERT);
 	if (error = xfs_btree_read_bufl(mp, tp, cbno, 0, &cbp,
 			XFS_BMAP_BTREE_REF))
 		return error;
@@ -3286,11 +3286,11 @@ xfs_bmap_extents_to_btree(
 	 * Fill in the root.
 	 */
 	block = ifp->if_broot;
-	INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_BMAP_MAGIC);
-	INT_SET(block->bb_level, ARCH_UNKNOWN, 1);
-	INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
-	INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLDFSBNO);
-        INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLDFSBNO);
+	INT_SET(block->bb_magic, ARCH_CONVERT, XFS_BMAP_MAGIC);
+	INT_SET(block->bb_level, ARCH_CONVERT, 1);
+	INT_SET(block->bb_numrecs, ARCH_CONVERT, 1);
+	INT_SET(block->bb_leftsib, ARCH_CONVERT, NULLDFSBNO);
+        INT_SET(block->bb_rightsib, ARCH_CONVERT, NULLDFSBNO);
 	/*
 	 * Need a cursor.  Can't allocate until bb_level is filled in.
 	 */
@@ -3346,34 +3346,34 @@ xfs_bmap_extents_to_btree(
 	 * Fill in the child block.
 	 */
 	ablock = XFS_BUF_TO_BMBT_BLOCK(abp);
-	INT_SET(ablock->bb_magic, ARCH_UNKNOWN, XFS_BMAP_MAGIC);
-	INT_ZERO(ablock->bb_level, ARCH_UNKNOWN);
-	INT_ZERO(ablock->bb_numrecs, ARCH_UNKNOWN);
-	INT_SET(ablock->bb_leftsib, ARCH_UNKNOWN, NULLDFSBNO);
-        INT_SET(ablock->bb_rightsib, ARCH_UNKNOWN, NULLDFSBNO);
+	INT_SET(ablock->bb_magic, ARCH_CONVERT, XFS_BMAP_MAGIC);
+	INT_ZERO(ablock->bb_level, ARCH_CONVERT);
+	INT_ZERO(ablock->bb_numrecs, ARCH_CONVERT);
+	INT_SET(ablock->bb_leftsib, ARCH_CONVERT, NULLDFSBNO);
+        INT_SET(ablock->bb_rightsib, ARCH_CONVERT, NULLDFSBNO);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	for (ep = ifp->if_u1.if_extents, i = 0; i < nextents; i++, ep++) {
 		if (!ISNULLSTARTBLOCK(xfs_bmbt_get_startblock(ep))) {
 			*arp++ = *ep;
-			INT_MOD(ablock->bb_numrecs, ARCH_UNKNOWN, +1);
+			INT_MOD(ablock->bb_numrecs, ARCH_CONVERT, +1);
 		}
 	}
-	ASSERT(INT_GET(ablock->bb_numrecs, ARCH_UNKNOWN) == XFS_IFORK_NEXTENTS(ip, whichfork));
+	ASSERT(INT_GET(ablock->bb_numrecs, ARCH_CONVERT) == XFS_IFORK_NEXTENTS(ip, whichfork));
 	/*
 	 * Fill in the root key and pointer.
 	 */
 	kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
-	INT_SET(kp->br_startoff, ARCH_UNKNOWN, xfs_bmbt_get_startoff(arp));
+	INT_SET(kp->br_startoff, ARCH_CONVERT, xfs_bmbt_get_startoff(arp));
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
-	INT_SET(*pp, ARCH_UNKNOWN, args.fsbno);
+	INT_SET(*pp, ARCH_CONVERT, args.fsbno);
 	/*
 	 * Do all this logging at the end so that 
 	 * the root is at the right level.
 	 */
 	xfs_bmbt_log_block(cur, abp, XFS_BB_ALL_BITS);
-	xfs_bmbt_log_recs(cur, abp, 1, INT_GET(ablock->bb_numrecs, ARCH_UNKNOWN));
+	xfs_bmbt_log_recs(cur, abp, 1, INT_GET(ablock->bb_numrecs, ARCH_CONVERT));
 	ASSERT(*curp == NULL);
 	*curp = cur;
 	*logflagsp = XFS_ILOG_CORE | XFS_ILOG_FBROOT(whichfork);
@@ -3659,23 +3659,23 @@ xfs_bmap_trace_addentry(
 		(void *)(__psunsigned_t)(ip->i_ino >> 32), 
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
 #if BMBT_USE_64
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_UNKNOWN))
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
 #else	/* !BMBT_USE_64 */
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_UNKNOWN))
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_CONVERT))
 #endif	/* BMBT_USE_64 */
 		);
 	ASSERT(ip->i_xtrace);
@@ -3687,23 +3687,23 @@ xfs_bmap_trace_addentry(
 		(void *)(__psunsigned_t)(ip->i_ino >> 32), 
 		(void *)(__psunsigned_t)(unsigned)ip->i_ino,
 #if BMBT_USE_64
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN) >> 32),
-		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_UNKNOWN))
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l0, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r1->l1, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l0, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT) >> 32),
+		(void *)(__psunsigned_t)(unsigned)(INT_GET(r2->l1, ARCH_CONVERT))
 #else	/* !BMBT_USE_64 */
-		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_UNKNOWN)),
-		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_UNKNOWN)), 
-		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_UNKNOWN))
+		(void *)(__psunsigned_t)(INT_GET(r1->l0, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l1, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r1->l2, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r1->l3, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l0, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l1, ARCH_CONVERT)),
+		(void *)(__psunsigned_t)(INT_GET(r2->l2, ARCH_CONVERT)), 
+		(void *)(__psunsigned_t)(INT_GET(r2->l3, ARCH_CONVERT))
 #endif	/* BMBT_USE_64 */
 		);
 }
@@ -4493,13 +4493,13 @@ xfs_bmap_read_extents(
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
-	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
-	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
+	ASSERT(INT_GET(block->bb_level, ARCH_CONVERT) > 0);
+	level = INT_GET(block->bb_level, ARCH_CONVERT);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
-	ASSERT(INT_GET(*pp, ARCH_UNKNOWN) != NULLDFSBNO);
-	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agblocks);
-	bno = INT_GET(*pp, ARCH_UNKNOWN);
+	ASSERT(INT_GET(*pp, ARCH_CONVERT) != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks);
+	bno = INT_GET(*pp, ARCH_CONVERT);
 	/*
 	 * Go down the tree until leaf level is reached, following the first
 	 * pointer (leftmost) at each level.
@@ -4516,8 +4516,8 @@ xfs_bmap_read_extents(
 			break;
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_UNKNOWN)), error0);
-		bno = INT_GET(*pp, ARCH_UNKNOWN);
+		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)), error0);
+		bno = INT_GET(*pp, ARCH_CONVERT);
 		xfs_trans_brelse(tp, bp);
 	}
 	/*
@@ -4535,7 +4535,7 @@ xfs_bmap_read_extents(
 		xfs_extnum_t	num_recs;
 
 
-		num_recs = INT_GET(block->bb_numrecs, ARCH_UNKNOWN);
+		num_recs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
 		if (i + num_recs > room) {
 			ASSERT(i + num_recs <= room);
 			xfs_fs_cmn_err(CE_WARN, ip->i_mount,
@@ -4549,7 +4549,7 @@ xfs_bmap_read_extents(
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
-		nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
+		nextbno = INT_GET(block->bb_rightsib, ARCH_CONVERT);
 		if (nextbno != NULLFSBLOCK)
 			xfs_btree_reada_bufl(mp, nextbno, 1);
 		/*
@@ -4794,7 +4794,7 @@ xfs_bmapi(
 	}
 	if (wr && *firstblock == NULLFSBLOCK) {
 		if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE)
-			minleft = INT_GET(ifp->if_broot->bb_level, ARCH_UNKNOWN) + 1;
+			minleft = INT_GET(ifp->if_broot->bb_level, ARCH_CONVERT) + 1;
 		else
 			minleft = 1;
 	} else
@@ -6029,10 +6029,10 @@ xfs_check_block(
 	xfs_bmbt_ptr_t		*pp, *thispa;	/* pointer to block address */
 	xfs_bmbt_key_t		*prevp, *keyp;
 
-	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
+	ASSERT(INT_GET(block->bb_level, ARCH_CONVERT) > 0);
 
 	prevp = NULL;
-	for( i = 1; i <= INT_GET(block->bb_numrecs, ARCH_UNKNOWN);i++) {
+	for( i = 1; i <= INT_GET(block->bb_numrecs, ARCH_CONVERT);i++) {
 		dmxr = mp->m_bmap_dmxr[0];
 
 		if (root) {
@@ -6057,16 +6057,16 @@ xfs_check_block(
 			pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize,
 				xfs_bmbt, block, i, dmxr);
 		}
-		for (j = i+1; j <= INT_GET(block->bb_numrecs, ARCH_UNKNOWN); j++) {
+		for (j = i+1; j <= INT_GET(block->bb_numrecs, ARCH_CONVERT); j++) {
 			if (root) {
 				thispa = XFS_BMAP_BROOT_PTR_ADDR(block, j, sz);
 			} else {
 				thispa = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize,
 					xfs_bmbt, block, j, dmxr);
 			}
-			if (INT_GET(*thispa, ARCH_UNKNOWN) == INT_GET(*pp, ARCH_UNKNOWN)) {
+			if (INT_GET(*thispa, ARCH_CONVERT) == INT_GET(*pp, ARCH_CONVERT)) {
 				printk("xfs_check_block: thispa(%d) == pp(%d) %Ld\n",
-						j, i, INT_GET(*thispa, ARCH_UNKNOWN));
+						j, i, INT_GET(*thispa, ARCH_CONVERT));
 				panic("xfs_check_block: ptrs are equal in node\n");
 			}
 		}
@@ -6107,14 +6107,14 @@ xfs_bmap_check_leaf_extents(
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
-	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
-	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
+	ASSERT(INT_GET(block->bb_level, ARCH_CONVERT) > 0);
+	level = INT_GET(block->bb_level, ARCH_CONVERT);
 	xfs_check_block(block, mp, 1, ifp->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
-	ASSERT(INT_GET(*pp, ARCH_UNKNOWN) != NULLDFSBNO);
-	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agblocks);
-	bno = INT_GET(*pp, ARCH_UNKNOWN);
+	ASSERT(INT_GET(*pp, ARCH_CONVERT) != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks);
+	bno = INT_GET(*pp, ARCH_CONVERT);
 	/*
 	 * Go down the tree until leaf level is reached, following the first
 	 * pointer (leftmost) at each level.
@@ -6145,8 +6145,8 @@ xfs_bmap_check_leaf_extents(
 		xfs_check_block(block, mp, 0, 0);
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_UNKNOWN)), error0);
-		bno = INT_GET(*pp, ARCH_UNKNOWN);
+		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_CONVERT)), error0);
+		bno = INT_GET(*pp, ARCH_CONVERT);
 		if (bp_release) {
 			bp_release = 0;
 			xfs_trans_brelse(NULL, bp);
@@ -6168,13 +6168,13 @@ xfs_bmap_check_leaf_extents(
 		xfs_extnum_t	num_recs;
 
 
-		num_recs = INT_GET(block->bb_numrecs, ARCH_UNKNOWN);
+		num_recs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
 
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
 
-		nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
+		nextbno = INT_GET(block->bb_rightsib, ARCH_CONVERT);
 
 		/*
 		 * Check all the extents to make sure they are OK.
@@ -6267,13 +6267,13 @@ xfs_bmap_count_blocks(
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
 	block = ifp->if_broot;
-	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
-	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
+	ASSERT(INT_GET(block->bb_level, ARCH_CONVERT) > 0);
+	level = INT_GET(block->bb_level, ARCH_CONVERT);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
-	ASSERT(INT_GET(*pp, ARCH_UNKNOWN) != NULLDFSBNO);
-	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agblocks);
-	bno = INT_GET(*pp, ARCH_UNKNOWN);
+	ASSERT(INT_GET(*pp, ARCH_CONVERT) != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_CONVERT)) < mp->m_sb.sb_agblocks);
+	bno = INT_GET(*pp, ARCH_CONVERT);
 
 	if (xfs_bmap_count_tree(mp, tp, bno, level, count) < 0)
 		return XFS_ERROR(EFSCORRUPTED);
@@ -6310,21 +6310,21 @@ xfs_bmap_count_tree(
 
 	if (--level) {
 		/* Not at node above leafs, count this level of nodes */
-		nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
+		nextbno = INT_GET(block->bb_rightsib, ARCH_CONVERT);
 		while (nextbno != NULLFSBLOCK) {
 			if (error = xfs_btree_read_bufl(mp, tp, nextbno, 
 				0, &nbp, XFS_BMAP_BTREE_REF))
 				return error;
 			*count += 1;
 			nextblock = XFS_BUF_TO_BMBT_BLOCK(nbp);
-			nextbno = INT_GET(nextblock->bb_rightsib, ARCH_UNKNOWN);
+			nextbno = INT_GET(nextblock->bb_rightsib, ARCH_CONVERT);
 			xfs_trans_brelse(tp, nbp);
 		}
 
 		/* Dive to the next level */
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, 
 			xfs_bmbt, block, 1, mp->m_bmap_dmxr[1]);
-		bno = INT_GET(*pp, ARCH_UNKNOWN);
+		bno = INT_GET(*pp, ARCH_CONVERT);
 		if ((error = 
 		     xfs_bmap_count_tree(mp, tp, bno, level, count)) < 0) {
 			xfs_trans_brelse(tp, bp);
@@ -6334,8 +6334,8 @@ xfs_bmap_count_tree(
 	} else {
 		/* count all level 1 nodes and their leaves */
 		for (;;) {
-			nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
-			numrecs = INT_GET(block->bb_numrecs, ARCH_UNKNOWN);
+			nextbno = INT_GET(block->bb_rightsib, ARCH_CONVERT);
+			numrecs = INT_GET(block->bb_numrecs, ARCH_CONVERT);
 			frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, 
 				xfs_bmbt, block, 1, mp->m_bmap_dmxr[0]);
 			if (xfs_bmap_count_leaves(frp, numrecs, count) < 0) {

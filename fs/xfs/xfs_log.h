@@ -36,33 +36,12 @@
 
 #ident	"$Revision$"
 
-/*
- * define lsn field order based on machine architecture and 
- * buffer architecture
- */
-
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
-
-/*
- * native mode always uses same field order (due to precedent, not logic)
- */
-
-#define LSN_FIELD_CYCLE(arch) (0)
-#define LSN_FIELD_BLOCK(arch) (1)
-
-#elif XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS
-
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?1:0)
 #define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?0:1)
 #else
-#error "big endian not supported here"
-#endif
-
-#else
-
-#error "multi architecture mode not supported here"
-
+#define LSN_FIELD_CYCLE(arch) (0)
+#define LSN_FIELD_BLOCK(arch) (1)
 #endif
 
 /* get lsn fields */

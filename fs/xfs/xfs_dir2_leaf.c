@@ -173,18 +173,18 @@ xfs_dir2_block_to_leaf(
 	block = dbp->data;
 	xfs_dir2_data_check(dp, dbp);
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_UNKNOWN);
+	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, ARCH_CONVERT);
 	/*
 	 * Set the counts in the leaf header.
 	 */
-	INT_SET(leaf->hdr.count, ARCH_UNKNOWN, INT_GET(btp->count, ARCH_UNKNOWN));
-	INT_SET(leaf->hdr.stale, ARCH_UNKNOWN, INT_GET(btp->stale, ARCH_UNKNOWN));
+	leaf->hdr.count = btp->count; /* INT_: direct copy */
+	leaf->hdr.stale = btp->stale; /* INT_: direct copy */
 	/*
 	 * Could compact these but I think we always do the conversion
 	 * after squeezing out stale entries.
 	 */
-	bcopy(blp, leaf->ents, INT_GET(btp->count, ARCH_UNKNOWN) * sizeof(xfs_dir2_leaf_entry_t));
-	xfs_dir2_leaf_log_ents(tp, lbp, 0, INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - 1);
+	bcopy(blp, leaf->ents, INT_GET(btp->count, ARCH_CONVERT) * sizeof(xfs_dir2_leaf_entry_t));
+	xfs_dir2_leaf_log_ents(tp, lbp, 0, INT_GET(leaf->hdr.count, ARCH_CONVERT) - 1);
 	needscan = 0;
 	needlog = 1;
 	/*
@@ -199,7 +199,7 @@ xfs_dir2_block_to_leaf(
 	/*
 	 * Fix up the block header, make it a data block.
 	 */
-	INT_SET(block->hdr.magic, ARCH_UNKNOWN, XFS_DIR2_DATA_MAGIC);
+	INT_SET(block->hdr.magic, ARCH_CONVERT, XFS_DIR2_DATA_MAGIC);
 	if (needscan)
 		xfs_dir2_data_freescan(mp, (xfs_dir2_data_t *)block, &needlog,
 			NULL);
@@ -207,9 +207,9 @@ xfs_dir2_block_to_leaf(
 	 * Set up leaf tail and bests table.
 	 */
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
-	INT_SET(ltp->bestcount, ARCH_UNKNOWN, 1);
-	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN);
-	INT_SET(bestsp[0], ARCH_UNKNOWN, INT_GET(block->hdr.bestfree[0].length, ARCH_UNKNOWN));
+	INT_SET(ltp->bestcount, ARCH_CONVERT, 1);
+	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
+	bestsp[0] = block->hdr.bestfree[0].length; /* INT_: direct copy */
 	/*
 	 * Log the data header and leaf bests table.
 	 */
@@ -280,7 +280,7 @@ xfs_dir2_leaf_addname(
 	index = xfs_dir2_leaf_search_hash(args, lbp);
 	leaf = lbp->data;
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
-	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN);
+	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
 	length = XFS_DIR2_DATA_ENTSIZE(args->namelen);
 	/*
 	 * See if there are any entries with the same hash value
@@ -289,14 +289,14 @@ xfs_dir2_leaf_addname(
 	 * in a data block, improving the lookup of those entries.
 	 */
 	for (use_block = -1, lep = &leaf->ents[index];
-	     index < INT_GET(leaf->hdr.count, ARCH_UNKNOWN) && INT_GET(lep->hashval, ARCH_UNKNOWN) == args->hashval;
+	     index < INT_GET(leaf->hdr.count, ARCH_CONVERT) && INT_GET(lep->hashval, ARCH_CONVERT) == args->hashval;
 	     index++, lep++) {
-		if (INT_GET(lep->address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR)
+		if (INT_GET(lep->address, ARCH_CONVERT) == XFS_DIR2_NULL_DATAPTR)
 			continue;
-		i = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_UNKNOWN));
-		ASSERT(i < INT_GET(ltp->bestcount, ARCH_UNKNOWN));
-		ASSERT(INT_GET(bestsp[i], ARCH_UNKNOWN) != NULLDATAOFF);
-		if (INT_GET(bestsp[i], ARCH_UNKNOWN) >= length) {
+		i = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_CONVERT));
+		ASSERT(i < INT_GET(ltp->bestcount, ARCH_CONVERT));
+		ASSERT(INT_GET(bestsp[i], ARCH_CONVERT) != NULLDATAOFF);
+		if (INT_GET(bestsp[i], ARCH_CONVERT) >= length) {
 			use_block = i;
 			break;
 		}
@@ -305,13 +305,13 @@ xfs_dir2_leaf_addname(
 	 * Didn't find a block yet, linear search all the data blocks.
 	 */
 	if (use_block == -1) {
-		for (i = 0; i < INT_GET(ltp->bestcount, ARCH_UNKNOWN); i++) {
+		for (i = 0; i < INT_GET(ltp->bestcount, ARCH_CONVERT); i++) {
 			/*
 			 * Remember a block we see that's missing.
 			 */
-			if (INT_GET(bestsp[i], ARCH_UNKNOWN) == NULLDATAOFF && use_block == -1)
+			if (INT_GET(bestsp[i], ARCH_CONVERT) == NULLDATAOFF && use_block == -1)
 				use_block = i;
-			else if (INT_GET(bestsp[i], ARCH_UNKNOWN) >= length) {
+			else if (INT_GET(bestsp[i], ARCH_CONVERT) >= length) {
 				use_block = i;
 				break;
 			}
@@ -321,20 +321,20 @@ xfs_dir2_leaf_addname(
 	 * How many bytes do we need in the leaf block?
 	 */
 	needbytes =
-		(INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) != 0 ? 0 : (uint)sizeof(leaf->ents[0])) +
+		(INT_GET(leaf->hdr.stale, ARCH_CONVERT) != 0 ? 0 : (uint)sizeof(leaf->ents[0])) +
 		(use_block != -1 ? 0 : (uint)sizeof(leaf->bests[0]));
 	/*
 	 * Now kill use_block if it refers to a missing block, so we
 	 * can use it as an indication of allocation needed.
 	 */
-	if (use_block != -1 && INT_GET(bestsp[use_block], ARCH_UNKNOWN) == NULLDATAOFF)
+	if (use_block != -1 && INT_GET(bestsp[use_block], ARCH_CONVERT) == NULLDATAOFF)
 		use_block = -1;
 	/*
 	 * If we don't have enough free bytes but we can make enough
 	 * by compacting out stale entries, we'll do that.
 	 */
-	if ((char *)bestsp - (char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_UNKNOWN)] < needbytes &&
-	    INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) > 1) {
+	if ((char *)bestsp - (char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_CONVERT)] < needbytes &&
+	    INT_GET(leaf->hdr.stale, ARCH_CONVERT) > 1) {
 #pragma mips_frequency_hint NEVER
 		compact = 1;
 	}
@@ -342,7 +342,7 @@ xfs_dir2_leaf_addname(
 	 * Otherwise if we don't have enough free bytes we need to
 	 * convert to node form.
 	 */
-	else if ((char *)bestsp - (char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_UNKNOWN)] <
+	else if ((char *)bestsp - (char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_CONVERT)] <
 		 needbytes) {
 #pragma mips_frequency_hint NEVER
 		/*
@@ -401,8 +401,8 @@ xfs_dir2_leaf_addname(
 	 * There are stale entries, so we'll need log-low and log-high
 	 * impossibly bad values later.
 	 */
-	else if (INT_GET(leaf->hdr.stale, ARCH_UNKNOWN)) {
-		lfloglow = INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
+	else if (INT_GET(leaf->hdr.stale, ARCH_CONVERT)) {
+		lfloglow = INT_GET(leaf->hdr.count, ARCH_CONVERT);
 		lfloghigh = -1;
 	}
 	/*
@@ -430,13 +430,13 @@ xfs_dir2_leaf_addname(
 		 * If we're adding a new data block on the end we need to
 		 * extend the bests table.  Copy it up one entry.
 		 */
-		if (use_block >= INT_GET(ltp->bestcount, ARCH_UNKNOWN)) {
+		if (use_block >= INT_GET(ltp->bestcount, ARCH_CONVERT)) {
 			bestsp--;
 			ovbcopy(&bestsp[1], &bestsp[0],
-				INT_GET(ltp->bestcount, ARCH_UNKNOWN) * sizeof(bestsp[0]));
-			INT_MOD(ltp->bestcount, ARCH_UNKNOWN, +1);
+				INT_GET(ltp->bestcount, ARCH_CONVERT) * sizeof(bestsp[0]));
+			INT_MOD(ltp->bestcount, ARCH_CONVERT, +1);
 			xfs_dir2_leaf_log_tail(tp, lbp);
-			xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_UNKNOWN) - 1);
+			xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_CONVERT) - 1);
 		}
 		/*
 		 * If we're filling in a previously empty block just log it.
@@ -444,7 +444,7 @@ xfs_dir2_leaf_addname(
 		else
 			xfs_dir2_leaf_log_bests(tp, lbp, use_block, use_block);
 		data = dbp->data;
-		INT_SET(bestsp[use_block], ARCH_UNKNOWN, INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN));
+		bestsp[use_block] = data->hdr.bestfree[0].length; /* INT_: direct copy */
 		grown = 1;
 	}
 	/*
@@ -467,8 +467,8 @@ xfs_dir2_leaf_addname(
 	 * Point to the biggest freespace in our data block.
 	 */
 	dup = (xfs_dir2_data_unused_t *)
-	      ((char *)data + INT_GET(data->hdr.bestfree[0].offset, ARCH_UNKNOWN));
-	ASSERT(INT_GET(dup->length, ARCH_UNKNOWN) >= length);
+	      ((char *)data + INT_GET(data->hdr.bestfree[0].offset, ARCH_CONVERT));
+	ASSERT(INT_GET(dup->length, ARCH_CONVERT) >= length);
 	needscan = needlog = 0;
 	/*
 	 * Mark the initial part of our freespace in use for the new entry.
@@ -480,11 +480,11 @@ xfs_dir2_leaf_addname(
 	 * Initialize our new entry (at last).
 	 */
 	dep = (xfs_dir2_data_entry_t *)dup;
-	INT_SET(dep->inumber, ARCH_UNKNOWN, args->inumber);
+	INT_SET(dep->inumber, ARCH_CONVERT, args->inumber);
 	dep->namelen = args->namelen;
 	bcopy(args->name, dep->name, dep->namelen);
 	tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
-	INT_SET(*tagp, ARCH_UNKNOWN, (xfs_dir2_data_off_t)((char *)dep - (char *)data));
+	INT_SET(*tagp, ARCH_CONVERT, (xfs_dir2_data_off_t)((char *)dep - (char *)data));
 	/*
 	 * Need to scan fix up the bestfree table.
 	 */
@@ -500,8 +500,8 @@ xfs_dir2_leaf_addname(
 	 * If the bests table needs to be changed, do it.
 	 * Log the change unless we've already done that.
 	 */
-	if (INT_GET(bestsp[use_block], ARCH_UNKNOWN) != INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN)) {
-		INT_SET(bestsp[use_block], ARCH_UNKNOWN, INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN));
+	if (INT_GET(bestsp[use_block], ARCH_CONVERT) != INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT)) {
+		bestsp[use_block] = data->hdr.bestfree[0].length; /* INT_: direct copy */
 		if (!grown)
 			xfs_dir2_leaf_log_bests(tp, lbp, use_block, use_block);
 	}
@@ -509,19 +509,19 @@ xfs_dir2_leaf_addname(
 	 * Now we need to make room to insert the leaf entry.
 	 * If there are no stale entries, we just insert a hole at index.
 	 */
-	if (INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) == 0) {
+	if (INT_GET(leaf->hdr.stale, ARCH_CONVERT) == 0) {
 		/*
 		 * lep is still good as the index leaf entry.
 		 */
-		if (index < INT_GET(leaf->hdr.count, ARCH_UNKNOWN))
+		if (index < INT_GET(leaf->hdr.count, ARCH_CONVERT))
 			ovbcopy(lep, lep + 1,
-				(INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - index) * sizeof(*lep));
+				(INT_GET(leaf->hdr.count, ARCH_CONVERT) - index) * sizeof(*lep));
 		/*
 		 * Record low and high logging indices for the leaf.
 		 */
 		lfloglow = index;
-		lfloghigh = INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
-		INT_MOD(leaf->hdr.count, ARCH_UNKNOWN, +1);
+		lfloghigh = INT_GET(leaf->hdr.count, ARCH_CONVERT);
+		INT_MOD(leaf->hdr.count, ARCH_CONVERT, +1);
 	}
 	/*
 	 * There are stale entries.
@@ -541,7 +541,7 @@ xfs_dir2_leaf_addname(
 			 */
 			for (lowstale = index - 1;
 			     lowstale >= 0 &&
-				INT_GET(leaf->ents[lowstale].address, ARCH_UNKNOWN) !=
+				INT_GET(leaf->ents[lowstale].address, ARCH_CONVERT) !=
 				XFS_DIR2_NULL_DATAPTR;
 			     lowstale--)
 				continue;
@@ -551,8 +551,8 @@ xfs_dir2_leaf_addname(
 			 * lowstale entry would be better.
 			 */
 			for (highstale = index;
-			     highstale < INT_GET(leaf->hdr.count, ARCH_UNKNOWN) &&
-				INT_GET(leaf->ents[highstale].address, ARCH_UNKNOWN) !=
+			     highstale < INT_GET(leaf->hdr.count, ARCH_CONVERT) &&
+				INT_GET(leaf->ents[highstale].address, ARCH_CONVERT) !=
 				XFS_DIR2_NULL_DATAPTR &&
 				(lowstale < 0 ||
 				 index - lowstale - 1 >= highstale - index);
@@ -563,10 +563,10 @@ xfs_dir2_leaf_addname(
 		 * If the low one is better, use it.
 		 */
 		if (lowstale >= 0 &&
-		    (highstale == INT_GET(leaf->hdr.count, ARCH_UNKNOWN) ||
+		    (highstale == INT_GET(leaf->hdr.count, ARCH_CONVERT) ||
 		     index - lowstale - 1 < highstale - index)) {
 			ASSERT(index - lowstale - 1 >= 0);
-			ASSERT(INT_GET(leaf->ents[lowstale].address, ARCH_UNKNOWN) ==
+			ASSERT(INT_GET(leaf->ents[lowstale].address, ARCH_CONVERT) ==
 			       XFS_DIR2_NULL_DATAPTR);
 			/*
 			 * Copy entries up to cover the stale entry
@@ -585,7 +585,7 @@ xfs_dir2_leaf_addname(
 		 */
 		else {
 			ASSERT(highstale - index >= 0);
-			ASSERT(INT_GET(leaf->ents[highstale].address, ARCH_UNKNOWN) ==
+			ASSERT(INT_GET(leaf->ents[highstale].address, ARCH_CONVERT) ==
 			       XFS_DIR2_NULL_DATAPTR);
 			/*
 			 * Copy entries down to copver the stale entry
@@ -599,13 +599,13 @@ xfs_dir2_leaf_addname(
 			lfloglow = MIN(index, lfloglow);
 			lfloghigh = MAX(highstale, lfloghigh);
 		}
-		INT_MOD(leaf->hdr.stale, ARCH_UNKNOWN, -1);
+		INT_MOD(leaf->hdr.stale, ARCH_CONVERT, -1);
 	}
 	/*
 	 * Fill in the new leaf entry.
 	 */
-	INT_SET(lep->hashval, ARCH_UNKNOWN, args->hashval);
-	INT_SET(lep->address, ARCH_UNKNOWN, XFS_DIR2_DB_OFF_TO_DATAPTR(mp, use_block, INT_GET(*tagp, ARCH_UNKNOWN)));
+	INT_SET(lep->hashval, ARCH_CONVERT, args->hashval);
+	INT_SET(lep->address, ARCH_CONVERT, XFS_DIR2_DB_OFF_TO_DATAPTR(mp, use_block, INT_GET(*tagp, ARCH_CONVERT)));
 	/*
 	 * Log the leaf fields and give up the buffers.
 	 */
@@ -636,30 +636,30 @@ xfs_dir2_leaf_check(
 
 	leaf = bp->data;
 	mp = dp->i_mount;
-	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAF1_MAGIC);
+	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAF1_MAGIC);
 	/*
 	 * This value is not restrictive enough.
 	 * Should factor in the size of the bests table as well.
 	 * We can deduce a value for that from di_size.
 	 */
-	ASSERT(INT_GET(leaf->hdr.count, ARCH_UNKNOWN) <= XFS_DIR2_MAX_LEAF_ENTS(mp));
+	ASSERT(INT_GET(leaf->hdr.count, ARCH_CONVERT) <= XFS_DIR2_MAX_LEAF_ENTS(mp));
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
 	/*
 	 * Leaves and bests don't overlap.
 	 */
-	ASSERT((char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_UNKNOWN)] <=
-	       (char *)XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN));
+	ASSERT((char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_CONVERT)] <=
+	       (char *)XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT));
 	/*
 	 * Check hash value order, count stale entries.
 	 */
-	for (i = stale = 0; i < INT_GET(leaf->hdr.count, ARCH_UNKNOWN); i++) {
-		if (i + 1 < INT_GET(leaf->hdr.count, ARCH_UNKNOWN))
-			ASSERT(INT_GET(leaf->ents[i].hashval, ARCH_UNKNOWN) <=
-			       INT_GET(leaf->ents[i + 1].hashval, ARCH_UNKNOWN));
-		if (INT_GET(leaf->ents[i].address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR)
+	for (i = stale = 0; i < INT_GET(leaf->hdr.count, ARCH_CONVERT); i++) {
+		if (i + 1 < INT_GET(leaf->hdr.count, ARCH_CONVERT))
+			ASSERT(INT_GET(leaf->ents[i].hashval, ARCH_CONVERT) <=
+			       INT_GET(leaf->ents[i + 1].hashval, ARCH_CONVERT));
+		if (INT_GET(leaf->ents[i].address, ARCH_CONVERT) == XFS_DIR2_NULL_DATAPTR)
 			stale++;
 	}
-	ASSERT(INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) == stale);
+	ASSERT(INT_GET(leaf->hdr.stale, ARCH_CONVERT) == stale);
 }
 #endif	/* DEBUG */
 
@@ -679,15 +679,15 @@ xfs_dir2_leaf_compact(
 	int		to;		/* target leaf index */
 
 	leaf = bp->data;
-	if (INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) == 0) {
+	if (INT_GET(leaf->hdr.stale, ARCH_CONVERT) == 0) {
 #pragma mips_frequency_hint NEVER
 		return;
 	}
 	/*
 	 * Compress out the stale entries in place.
 	 */
-	for (from = to = 0, loglow = -1; from < INT_GET(leaf->hdr.count, ARCH_UNKNOWN); from++) {
-		if (INT_GET(leaf->ents[from].address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR)
+	for (from = to = 0, loglow = -1; from < INT_GET(leaf->hdr.count, ARCH_CONVERT); from++) {
+		if (INT_GET(leaf->ents[from].address, ARCH_CONVERT) == XFS_DIR2_NULL_DATAPTR)
 			continue;
 		/*
 		 * Only actually copy the entries that are different.
@@ -702,9 +702,9 @@ xfs_dir2_leaf_compact(
 	/*
 	 * Update and log the header, log the leaf entries.
 	 */
-	ASSERT(INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) == from - to);
-	INT_MOD(leaf->hdr.count, ARCH_UNKNOWN, -(INT_GET(leaf->hdr.stale, ARCH_UNKNOWN)));
-	INT_SET(leaf->hdr.stale, ARCH_UNKNOWN, 0);
+	ASSERT(INT_GET(leaf->hdr.stale, ARCH_CONVERT) == from - to);
+	INT_MOD(leaf->hdr.count, ARCH_CONVERT, -(INT_GET(leaf->hdr.stale, ARCH_CONVERT)));
+	INT_SET(leaf->hdr.stale, ARCH_CONVERT, 0);
 	xfs_dir2_leaf_log_header(args->trans, bp);
 	if (loglow != -1)
 		xfs_dir2_leaf_log_ents(args->trans, bp, loglow, to - 1);
@@ -738,14 +738,14 @@ xfs_dir2_leaf_compact_x1(
 	int		to;		/* destination copy index */
 
 	leaf = bp->data;
-	ASSERT(INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) > 1);
+	ASSERT(INT_GET(leaf->hdr.stale, ARCH_CONVERT) > 1);
 	index = *indexp;
 	/*
 	 * Find the first stale entry before our index, if any.
 	 */
 	for (lowstale = index - 1;
 	     lowstale >= 0 &&
-		INT_GET(leaf->ents[lowstale].address, ARCH_UNKNOWN) != XFS_DIR2_NULL_DATAPTR;
+		INT_GET(leaf->ents[lowstale].address, ARCH_CONVERT) != XFS_DIR2_NULL_DATAPTR;
 	     lowstale--)
 		continue;
 	/*
@@ -753,8 +753,8 @@ xfs_dir2_leaf_compact_x1(
 	 * Stop if the answer would be worse than lowstale.
 	 */
 	for (highstale = index;
-	     highstale < INT_GET(leaf->hdr.count, ARCH_UNKNOWN) &&
-		INT_GET(leaf->ents[highstale].address, ARCH_UNKNOWN) != XFS_DIR2_NULL_DATAPTR &&
+	     highstale < INT_GET(leaf->hdr.count, ARCH_CONVERT) &&
+		INT_GET(leaf->ents[highstale].address, ARCH_CONVERT) != XFS_DIR2_NULL_DATAPTR &&
 		(lowstale < 0 || index - lowstale > highstale - index);
 	     highstale++)
 		continue;
@@ -762,7 +762,7 @@ xfs_dir2_leaf_compact_x1(
 	 * Pick the better of lowstale and highstale.
 	 */
 	if (lowstale >= 0 &&
-	    (highstale == INT_GET(leaf->hdr.count, ARCH_UNKNOWN) ||
+	    (highstale == INT_GET(leaf->hdr.count, ARCH_CONVERT) ||
 	     index - lowstale <= highstale - index))
 		keepstale = lowstale;
 	else
@@ -771,14 +771,14 @@ xfs_dir2_leaf_compact_x1(
 	 * Copy the entries in place, removing all the stale entries
 	 * except keepstale.
 	 */
-	for (from = to = 0; from < INT_GET(leaf->hdr.count, ARCH_UNKNOWN); from++) {
+	for (from = to = 0; from < INT_GET(leaf->hdr.count, ARCH_CONVERT); from++) {
 		/*
 		 * Notice the new value of index.
 		 */
 		if (index == from)
 			newindex = to;
 		if (from != keepstale &&
-		    INT_GET(leaf->ents[from].address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR) {
+		    INT_GET(leaf->ents[from].address, ARCH_CONVERT) == XFS_DIR2_NULL_DATAPTR) {
 			if (from == to)
 				*lowlogp = to;
 			continue;
@@ -806,8 +806,8 @@ xfs_dir2_leaf_compact_x1(
 	/*
 	 * Adjust the leaf header values.
 	 */
-	INT_MOD(leaf->hdr.count, ARCH_UNKNOWN, -(from - to));
-	INT_SET(leaf->hdr.stale, ARCH_UNKNOWN, 1);
+	INT_MOD(leaf->hdr.count, ARCH_CONVERT, -(from - to));
+	INT_SET(leaf->hdr.stale, ARCH_CONVERT, 1);
 	/*
 	 * Remember the low/high stale value only in the "right"
 	 * direction.
@@ -815,8 +815,8 @@ xfs_dir2_leaf_compact_x1(
 	if (lowstale >= newindex)
 		lowstale = -1;
 	else
-		highstale = INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
-	*highlogp = INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - 1;
+		highstale = INT_GET(leaf->hdr.count, ARCH_CONVERT);
+	*highlogp = INT_GET(leaf->hdr.count, ARCH_CONVERT) - 1;
 	*lowstalep = lowstale;
 	*highstalep = highstale;
 }
@@ -1125,11 +1125,11 @@ xfs_dir2_leaf_getdents(
 				while ((char *)ptr - (char *)data < byteoff) {
 					dup = (xfs_dir2_data_unused_t *)ptr;
 
-					if (INT_GET(dup->freetag, ARCH_UNKNOWN)
+					if (INT_GET(dup->freetag, ARCH_CONVERT)
 						  == XFS_DIR2_DATA_FREE_TAG) {
 
 						length = INT_GET(dup->length,
-								 ARCH_UNKNOWN);
+								 ARCH_CONVERT);
 						ptr += length;
 						continue;
 					}
@@ -1155,9 +1155,9 @@ xfs_dir2_leaf_getdents(
 		/*
 		 * No, it's unused, skip over it.
 		 */
-		if (INT_GET(dup->freetag, ARCH_UNKNOWN)
+		if (INT_GET(dup->freetag, ARCH_CONVERT)
 						== XFS_DIR2_DATA_FREE_TAG) {
-			length = INT_GET(dup->length, ARCH_UNKNOWN);
+			length = INT_GET(dup->length, ARCH_CONVERT);
 			ptr += length;
 			curoff += length;
 			continue;
@@ -1181,9 +1181,9 @@ xfs_dir2_leaf_getdents(
 		p.cook = XFS_DIR2_BYTE_TO_DATAPTR(mp, curoff);
 
 #if XFS_BIG_FILESYSTEMS
-		p.ino = INT_GET(dep->inumber, ARCH_UNKNOWN) + mp->m_inoadd;
+		p.ino = INT_GET(dep->inumber, ARCH_CONVERT) + mp->m_inoadd;
 #else
-		p.ino = INT_GET(dep->inumber, ARCH_UNKNOWN);
+		p.ino = INT_GET(dep->inumber, ARCH_CONVERT);
 #endif
 		p.name = (char *)dep->name;
 
@@ -1257,11 +1257,11 @@ xfs_dir2_leaf_init(
 	/*
 	 * Initialize the header.
 	 */
-	INT_SET(leaf->hdr.info.magic, ARCH_UNKNOWN, magic);
-	INT_ZERO(leaf->hdr.info.forw, ARCH_UNKNOWN);
-        INT_ZERO(leaf->hdr.info.back, ARCH_UNKNOWN);
-	INT_ZERO(leaf->hdr.count, ARCH_UNKNOWN);
-	INT_ZERO(leaf->hdr.stale, ARCH_UNKNOWN);
+	INT_SET(leaf->hdr.info.magic, ARCH_CONVERT, magic);
+	INT_ZERO(leaf->hdr.info.forw, ARCH_CONVERT);
+        INT_ZERO(leaf->hdr.info.back, ARCH_CONVERT);
+	INT_ZERO(leaf->hdr.count, ARCH_CONVERT);
+	INT_ZERO(leaf->hdr.stale, ARCH_CONVERT);
 	xfs_dir2_leaf_log_header(tp, bp);
 	/*
 	 * If it's a leaf-format directory initialize the tail.
@@ -1270,7 +1270,7 @@ xfs_dir2_leaf_init(
 	 */
 	if (magic == XFS_DIR2_LEAF1_MAGIC) {
 		ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
-		INT_SET(ltp->bestcount, ARCH_UNKNOWN, 0);
+		INT_SET(ltp->bestcount, ARCH_CONVERT, 0);
 		xfs_dir2_leaf_log_tail(tp, bp);
 	}
 	*bpp = bp;
@@ -1293,10 +1293,10 @@ xfs_dir2_leaf_log_bests(
 	xfs_dir2_leaf_tail_t	*ltp;		/* leaf tail structure */
 
 	leaf = bp->data;
-	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAF1_MAGIC);
+	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAF1_MAGIC);
 	ltp = XFS_DIR2_LEAF_TAIL_P(tp->t_mountp, leaf);
-	firstb = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN) + first;
-	lastb = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN) + last;
+	firstb = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT) + first;
+	lastb = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT) + last;
 	xfs_da_log_buf(tp, bp, (uint)((char *)firstb - (char *)leaf),
 		(uint)((char *)lastb - (char *)leaf + sizeof(*lastb) - 1));
 }
@@ -1316,8 +1316,8 @@ xfs_dir2_leaf_log_ents(
 	xfs_dir2_leaf_t		*leaf;		/* leaf structure */
 
 	leaf = bp->data;
-	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAF1_MAGIC ||
-	       INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC);
+	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAF1_MAGIC ||
+	       INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC);
 	firstlep = &leaf->ents[first];
 	lastlep = &leaf->ents[last];
 	xfs_da_log_buf(tp, bp, (uint)((char *)firstlep - (char *)leaf),
@@ -1335,8 +1335,8 @@ xfs_dir2_leaf_log_header(
 	xfs_dir2_leaf_t		*leaf;		/* leaf structure */
 
 	leaf = bp->data;
-	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAF1_MAGIC ||
-	       INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC);
+	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAF1_MAGIC ||
+	       INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC);
 	xfs_da_log_buf(tp, bp, (uint)((char *)&leaf->hdr - (char *)leaf),
 		(uint)(sizeof(leaf->hdr) - 1));
 }
@@ -1355,7 +1355,7 @@ xfs_dir2_leaf_log_tail(
 
 	mp = tp->t_mountp;
 	leaf = bp->data;
-	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAF1_MAGIC);
+	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAF1_MAGIC);
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
 	xfs_da_log_buf(tp, bp, (uint)((char *)ltp - (char *)leaf),
 		(uint)(mp->m_dirblksize - 1));
@@ -1401,11 +1401,11 @@ xfs_dir2_leaf_lookup(
 	 */
 	dep = (xfs_dir2_data_entry_t *)
 	      ((char *)dbp->data +
-	       XFS_DIR2_DATAPTR_TO_OFF(dp->i_mount, INT_GET(lep->address, ARCH_UNKNOWN)));
+	       XFS_DIR2_DATAPTR_TO_OFF(dp->i_mount, INT_GET(lep->address, ARCH_CONVERT)));
 	/*
 	 * Return the found inode number.
 	 */
-	args->inumber = INT_GET(dep->inumber, ARCH_UNKNOWN);
+	args->inumber = INT_GET(dep->inumber, ARCH_CONVERT);
 	xfs_da_brelse(tp, dbp);
 	xfs_da_brelse(tp, lbp);
 	return XFS_ERROR(EEXIST);
@@ -1461,17 +1461,17 @@ xfs_dir2_leaf_lookup_int(
 	 * looking to match the name.
 	 */
 	for (lep = &leaf->ents[index], dbp = NULL, curdb = -1;
-	     index < INT_GET(leaf->hdr.count, ARCH_UNKNOWN) && INT_GET(lep->hashval, ARCH_UNKNOWN) == args->hashval;
+	     index < INT_GET(leaf->hdr.count, ARCH_CONVERT) && INT_GET(lep->hashval, ARCH_CONVERT) == args->hashval;
 	     lep++, index++) {
 		/*
 		 * Skip over stale leaf entries.
 		 */
-		if (INT_GET(lep->address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR)
+		if (INT_GET(lep->address, ARCH_CONVERT) == XFS_DIR2_NULL_DATAPTR)
 			continue;
 		/*
 		 * Get the new data block number.
 		 */
-		newdb = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_UNKNOWN));
+		newdb = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_CONVERT));
 		/*
 		 * If it's not the same as the old data block number,
 		 * need to pitch the old one and read the new one.
@@ -1495,7 +1495,7 @@ xfs_dir2_leaf_lookup_int(
 		 */
 		dep = (xfs_dir2_data_entry_t *)
 		      ((char *)dbp->data +
-		       XFS_DIR2_DATAPTR_TO_OFF(mp, INT_GET(lep->address, ARCH_UNKNOWN)));
+		       XFS_DIR2_DATAPTR_TO_OFF(mp, INT_GET(lep->address, ARCH_CONVERT)));
 		/*
 		 * If it matches then return it.
 		 */
@@ -1562,14 +1562,14 @@ xfs_dir2_leaf_removename(
 	 * Point to the leaf entry, use that to point to the data entry.
 	 */
 	lep = &leaf->ents[index];
-	db = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_UNKNOWN));
+	db = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_CONVERT));
 	dep = (xfs_dir2_data_entry_t *)
-	      ((char *)data + XFS_DIR2_DATAPTR_TO_OFF(mp, INT_GET(lep->address, ARCH_UNKNOWN)));
+	      ((char *)data + XFS_DIR2_DATAPTR_TO_OFF(mp, INT_GET(lep->address, ARCH_CONVERT)));
 	needscan = needlog = 0;
-	oldbest = INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN);
+	oldbest = INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT);
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
-	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN);
-	ASSERT(INT_GET(bestsp[db], ARCH_UNKNOWN) == oldbest);
+	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
+	ASSERT(INT_GET(bestsp[db], ARCH_CONVERT) == oldbest);
 	/*
 	 * Mark the former data entry unused.
 	 */
@@ -1579,9 +1579,9 @@ xfs_dir2_leaf_removename(
 	/*
 	 * We just mark the leaf entry stale by putting a null in it.
 	 */
-	INT_MOD(leaf->hdr.stale, ARCH_UNKNOWN, +1);
+	INT_MOD(leaf->hdr.stale, ARCH_CONVERT, +1);
 	xfs_dir2_leaf_log_header(tp, lbp);
-	INT_SET(lep->address, ARCH_UNKNOWN, XFS_DIR2_NULL_DATAPTR);
+	INT_SET(lep->address, ARCH_CONVERT, XFS_DIR2_NULL_DATAPTR);
 	xfs_dir2_leaf_log_ents(tp, lbp, index, index);
 	/*
 	 * Scan the freespace in the data block again if necessary,
@@ -1595,15 +1595,15 @@ xfs_dir2_leaf_removename(
 	 * If the longest freespace in the data block has changed,
 	 * put the new value in the bests table and log that.
 	 */
-	if (INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN) != oldbest) {
-		INT_SET(bestsp[db], ARCH_UNKNOWN, INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN));
+	if (INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT) != oldbest) {
+		bestsp[db] = data->hdr.bestfree[0].length; /* INT_: direct copy */
 		xfs_dir2_leaf_log_bests(tp, lbp, db, db);
 	}
 	xfs_dir2_data_check(dp, dbp);
 	/*
 	 * If the data block is now empty then get rid of the data block.
 	 */
-	if (INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN) ==
+	if (INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT) ==
 	    mp->m_dirblksize - (uint)sizeof(data->hdr)) {
 #pragma mips_frequency_hint NEVER
 		ASSERT(db != mp->m_dirdatablk);
@@ -1627,12 +1627,12 @@ xfs_dir2_leaf_removename(
 		 * If this is the last data block then compact the
 		 * bests table by getting rid of entries.
 		 */
-		if (db == INT_GET(ltp->bestcount, ARCH_UNKNOWN) - 1) {
+		if (db == INT_GET(ltp->bestcount, ARCH_CONVERT) - 1) {
 			/*
 			 * Look for the last active entry (i).
 			 */
 			for (i = db - 1; i > 0; i--) {
-				if (INT_GET(bestsp[i], ARCH_UNKNOWN) != NULLDATAOFF)
+				if (INT_GET(bestsp[i], ARCH_CONVERT) != NULLDATAOFF)
 					break;
 			}
 			/*
@@ -1640,12 +1640,12 @@ xfs_dir2_leaf_removename(
 			 * end are removed.
 			 */
 			ovbcopy(bestsp, &bestsp[db - i],
-				(INT_GET(ltp->bestcount, ARCH_UNKNOWN) - (db - i)) * sizeof(*bestsp));
-			INT_MOD(ltp->bestcount, ARCH_UNKNOWN, -(db - i));
+				(INT_GET(ltp->bestcount, ARCH_CONVERT) - (db - i)) * sizeof(*bestsp));
+			INT_MOD(ltp->bestcount, ARCH_CONVERT, -(db - i));
 			xfs_dir2_leaf_log_tail(tp, lbp);
-			xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_UNKNOWN) - 1);
+			xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_CONVERT) - 1);
 		} else
-			INT_SET(bestsp[db], ARCH_UNKNOWN, NULLDATAOFF);
+			INT_SET(bestsp[db], ARCH_CONVERT, NULLDATAOFF);
 	}
 	/*
 	 * If the data block was not the first one, drop it.
@@ -1697,12 +1697,12 @@ xfs_dir2_leaf_replace(
 	 */
 	dep = (xfs_dir2_data_entry_t *)
 	      ((char *)dbp->data +
-	       XFS_DIR2_DATAPTR_TO_OFF(dp->i_mount, INT_GET(lep->address, ARCH_UNKNOWN)));
-	ASSERT(args->inumber != INT_GET(dep->inumber, ARCH_UNKNOWN));
+	       XFS_DIR2_DATAPTR_TO_OFF(dp->i_mount, INT_GET(lep->address, ARCH_CONVERT)));
+	ASSERT(args->inumber != INT_GET(dep->inumber, ARCH_CONVERT));
 	/*
 	 * Put the new inode number in, log it.
 	 */
-	INT_SET(dep->inumber, ARCH_UNKNOWN, args->inumber);
+	INT_SET(dep->inumber, ARCH_CONVERT, args->inumber);
 	tp = args->trans;
 	xfs_dir2_data_log_entry(tp, dbp, dep);
 	xfs_da_buf_done(dbp);
@@ -1732,18 +1732,18 @@ xfs_dir2_leaf_search_hash(
 
 	leaf = lbp->data;
 #ifdef XFS_REPAIR_SIM
-	if (INT_GET(leaf->hdr.count, ARCH_UNKNOWN) == 0)
+	if (INT_GET(leaf->hdr.count, ARCH_CONVERT) == 0)
 		return 0;
 #endif
 	/*
 	 * Note, the table cannot be empty, so we have to go through the loop.
 	 * Binary search the leaf entries looking for our hash value.
 	 */
-	for (lep = leaf->ents, low = 0, high = INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - 1,
+	for (lep = leaf->ents, low = 0, high = INT_GET(leaf->hdr.count, ARCH_CONVERT) - 1,
 		hashwant = args->hashval;
 	     low <= high; ) {
 		mid = (low + high) >> 1;
-		if ((hash = INT_GET(lep[mid].hashval, ARCH_UNKNOWN)) == hashwant)
+		if ((hash = INT_GET(lep[mid].hashval, ARCH_CONVERT)) == hashwant)
 			break;
 		if (hash < hashwant)
 			low = mid + 1;
@@ -1754,7 +1754,7 @@ xfs_dir2_leaf_search_hash(
 	 * Found one, back up through all the equal hash values.
 	 */
 	if (hash == hashwant) {
-		while (mid > 0 && INT_GET(lep[mid - 1].hashval, ARCH_UNKNOWN) == hashwant) {
+		while (mid > 0 && INT_GET(lep[mid - 1].hashval, ARCH_CONVERT) == hashwant) {
 #pragma mips_frequency_hint NEVER
 			mid--;
 		}
@@ -1803,7 +1803,7 @@ xfs_dir2_leaf_trim_data(
 	}
 #ifdef DEBUG
 	data = dbp->data;
-	ASSERT(INT_GET(data->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC);
+	ASSERT(INT_GET(data->hdr.magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC);
 #endif
 	/* this seems to be an error 
 	 * data is only valid if DEBUG is defined?
@@ -1812,9 +1812,9 @@ xfs_dir2_leaf_trim_data(
 
 	leaf = lbp->data;
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
-	ASSERT(INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN) ==
+	ASSERT(INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT) ==
 	       mp->m_dirblksize - (uint)sizeof(data->hdr));
-	ASSERT(db == INT_GET(ltp->bestcount, ARCH_UNKNOWN) - 1);
+	ASSERT(db == INT_GET(ltp->bestcount, ARCH_CONVERT) - 1);
 	/*
 	 * Get rid of the data block.
 	 */
@@ -1827,11 +1827,11 @@ xfs_dir2_leaf_trim_data(
 	/*
 	 * Eliminate the last bests entry from the table.
 	 */
-	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN);
-	INT_MOD(ltp->bestcount, ARCH_UNKNOWN, -1);
-	ovbcopy(&bestsp[0], &bestsp[1], INT_GET(ltp->bestcount, ARCH_UNKNOWN) * sizeof(*bestsp));
+	bestsp = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT);
+	INT_MOD(ltp->bestcount, ARCH_CONVERT, -1);
+	ovbcopy(&bestsp[0], &bestsp[1], INT_GET(ltp->bestcount, ARCH_CONVERT) * sizeof(*bestsp));
 	xfs_dir2_leaf_log_tail(tp, lbp);
-	xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_UNKNOWN) - 1);
+	xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_CONVERT) - 1);
 	return 0;
 }
 
@@ -1906,7 +1906,7 @@ xfs_dir2_node_to_leaf(
 		return 0;
 	lbp = state->path.blk[0].bp;
 	leaf = lbp->data;
-	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC);
+	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC);
 	/*
 	 * Read the freespace block.
 	 */
@@ -1916,15 +1916,15 @@ xfs_dir2_node_to_leaf(
 		return error;
 	}
 	free = fbp->data;
-	ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
-	ASSERT(INT_ISZERO(free->hdr.firstdb, ARCH_UNKNOWN));
+	ASSERT(INT_GET(free->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC);
+	ASSERT(INT_ISZERO(free->hdr.firstdb, ARCH_CONVERT));
 	/*
 	 * Now see if the leafn and free data will fit in a leaf1.
 	 * If not, release the buffer and give up.
 	 */
 	if ((uint)sizeof(leaf->hdr) +
-	    (INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - INT_GET(leaf->hdr.stale, ARCH_UNKNOWN)) * (uint)sizeof(leaf->ents[0]) +
-	    INT_GET(free->hdr.nvalid, ARCH_UNKNOWN) * (uint)sizeof(leaf->bests[0]) +
+	    (INT_GET(leaf->hdr.count, ARCH_CONVERT) - INT_GET(leaf->hdr.stale, ARCH_CONVERT)) * (uint)sizeof(leaf->ents[0]) +
+	    INT_GET(free->hdr.nvalid, ARCH_CONVERT) * (uint)sizeof(leaf->bests[0]) +
 	    (uint)sizeof(leaf->tail) >
 	    mp->m_dirblksize) {
 		xfs_da_brelse(tp, fbp);
@@ -1934,22 +1934,22 @@ xfs_dir2_node_to_leaf(
 	 * If the leaf has any stale entries in it, compress them out.
 	 * The compact routine will log the header.
 	 */
-	if (INT_GET(leaf->hdr.stale, ARCH_UNKNOWN))
+	if (INT_GET(leaf->hdr.stale, ARCH_CONVERT))
 		xfs_dir2_leaf_compact(args, lbp);
 	else
 		xfs_dir2_leaf_log_header(tp, lbp);
-	INT_SET(leaf->hdr.info.magic, ARCH_UNKNOWN, XFS_DIR2_LEAF1_MAGIC);
+	INT_SET(leaf->hdr.info.magic, ARCH_CONVERT, XFS_DIR2_LEAF1_MAGIC);
 	/*
 	 * Set up the leaf tail from the freespace block.
 	 */
 	ltp = XFS_DIR2_LEAF_TAIL_P(mp, leaf);
-	INT_SET(ltp->bestcount, ARCH_UNKNOWN, INT_GET(free->hdr.nvalid, ARCH_UNKNOWN));
+	ltp->bestcount = free->hdr.nvalid; /* INT_: direct copy */
 	/*
 	 * Set up the leaf bests table.
 	 */
-	bcopy(free->bests, XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN),
-		INT_GET(ltp->bestcount, ARCH_UNKNOWN) * sizeof(leaf->bests[0]));
-	xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_UNKNOWN) - 1);
+	bcopy(free->bests, XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_CONVERT),
+		INT_GET(ltp->bestcount, ARCH_CONVERT) * sizeof(leaf->bests[0]));
+	xfs_dir2_leaf_log_bests(tp, lbp, 0, INT_GET(ltp->bestcount, ARCH_CONVERT) - 1);
 	xfs_dir2_leaf_log_tail(tp, lbp);
 	xfs_dir2_leaf_check(dp, lbp);
 	/*

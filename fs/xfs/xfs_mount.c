@@ -156,7 +156,6 @@ static struct {
     { offsetof(xfs_sb_t, sb_unit),       0 },
     { offsetof(xfs_sb_t, sb_width),      0 },
     { offsetof(xfs_sb_t, sb_dirblklog),  0 },
-    { offsetof(xfs_sb_t, sb_arch),       0 },
     { offsetof(xfs_sb_t, sb_dummy),      1 },
     { sizeof(xfs_sb_t),                  0 }
 };
@@ -303,19 +302,6 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(E2BIG);
 	}
 #endif
-
-#ifndef SIM
-        printk(KERN_NOTICE "XFS Mode = " XFS_MODE ", arch=%d\n",
-                (int)(sbp->sb_arch));
-#endif
-        /* check that architecture is supported */
-        if (!ARCH_SUPPORTED(sbp->sb_arch)) {
-            /* XXX should really identify architecture type if we know it */
-            cmn_err(CE_WARN,
-"XFS: Filesystems with architecture %d are not supported on this system.\n",
-                    sbp->sb_arch);
-            return XFS_ERROR(EINVAL);
-        }
         
 #ifndef SIM
 	/*
@@ -346,7 +332,6 @@ xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch,
     caddr_t     buf_ptr;
     caddr_t     mem_ptr;
            
-    ASSERT(ARCH_SUPPORTED(arch));
     ASSERT(dir);
     ASSERT(fields);
 
@@ -441,8 +426,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 * But first do some basic consistency checking.
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
-        mp->m_arch=sbp->sb_arch; /* set architecture first */
-        xfs_xlatesb(bp, &(mp->m_sb), 1, ARCH_GET(mp->m_arch), XFS_SB_ALL_BITS);
+        xfs_xlatesb(bp, &(mp->m_sb), 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
 	if (error = xfs_mount_validate_sb(mp, &(mp->m_sb))) {
 		cmn_err(CE_WARN, "XFS: SB validate failed\n");
 		goto err;
@@ -1335,7 +1319,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
         
         /* translate/copy */
         
-        xfs_xlatesb(bp, &(mp->m_sb), -1, ARCH_GET(sbp->sb_arch), fields);
+        xfs_xlatesb(bp, &(mp->m_sb), -1, ARCH_CONVERT, fields);
 
         /* find modified range */
 

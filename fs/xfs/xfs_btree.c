@@ -115,11 +115,11 @@ xfs_btree_maxrecs(
 	switch (cur->bc_btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
-		return (int)XFS_ALLOC_BLOCK_MAXRECS(INT_GET(block->bb_h.bb_level, ARCH_UNKNOWN), cur);
+		return (int)XFS_ALLOC_BLOCK_MAXRECS(INT_GET(block->bb_h.bb_level, ARCH_CONVERT), cur);
 	case XFS_BTNUM_BMAP:
-		return (int)XFS_BMAP_BLOCK_IMAXRECS(INT_GET(block->bb_h.bb_level, ARCH_UNKNOWN), cur);
+		return (int)XFS_BMAP_BLOCK_IMAXRECS(INT_GET(block->bb_h.bb_level, ARCH_CONVERT), cur);
 	case XFS_BTNUM_INO:
-		return (int)XFS_INOBT_BLOCK_MAXRECS(INT_GET(block->bb_h.bb_level, ARCH_UNKNOWN), cur);
+		return (int)XFS_INOBT_BLOCK_MAXRECS(INT_GET(block->bb_h.bb_level, ARCH_CONVERT), cur);
 	default:
 		ASSERT(0);
 		return 0;
@@ -165,7 +165,7 @@ xfs_btree_check_key(
 
 		k1 = ak1;
 		k2 = ak2;
-		ASSERT(INT_GET(k1->ar_startblock, ARCH_UNKNOWN) < INT_GET(k2->ar_startblock, ARCH_UNKNOWN));
+		ASSERT(INT_GET(k1->ar_startblock, ARCH_CONVERT) < INT_GET(k2->ar_startblock, ARCH_CONVERT));
 		break;
 	    }
 	case XFS_BTNUM_CNT: {
@@ -174,9 +174,9 @@ xfs_btree_check_key(
 
 		k1 = ak1;
 		k2 = ak2;
-		ASSERT(INT_GET(k1->ar_blockcount, ARCH_UNKNOWN) < INT_GET(k2->ar_blockcount, ARCH_UNKNOWN) ||
-		       (INT_GET(k1->ar_blockcount, ARCH_UNKNOWN) == INT_GET(k2->ar_blockcount, ARCH_UNKNOWN) &&
-			INT_GET(k1->ar_startblock, ARCH_UNKNOWN) < INT_GET(k2->ar_startblock, ARCH_UNKNOWN)));
+		ASSERT(INT_GET(k1->ar_blockcount, ARCH_CONVERT) < INT_GET(k2->ar_blockcount, ARCH_CONVERT) ||
+		       (INT_GET(k1->ar_blockcount, ARCH_CONVERT) == INT_GET(k2->ar_blockcount, ARCH_CONVERT) &&
+			INT_GET(k1->ar_startblock, ARCH_CONVERT) < INT_GET(k2->ar_startblock, ARCH_CONVERT)));
 		break;
 	    }
 	case XFS_BTNUM_BMAP: {
@@ -185,7 +185,7 @@ xfs_btree_check_key(
 
 		k1 = ak1; 
 		k2 = ak2;
-		ASSERT(INT_GET(k1->br_startoff, ARCH_UNKNOWN) < INT_GET(k2->br_startoff, ARCH_UNKNOWN));
+		ASSERT(INT_GET(k1->br_startoff, ARCH_CONVERT) < INT_GET(k2->br_startoff, ARCH_CONVERT));
 		break;
 	    }
 	case XFS_BTNUM_INO: {
@@ -194,7 +194,7 @@ xfs_btree_check_key(
 
 		k1 = ak1;
 		k2 = ak2;
-		ASSERT(INT_GET(k1->ir_startino, ARCH_UNKNOWN) < INT_GET(k2->ir_startino, ARCH_UNKNOWN));
+		ASSERT(INT_GET(k1->ir_startino, ARCH_CONVERT) < INT_GET(k2->ir_startino, ARCH_CONVERT));
 		break;
 	    }
 	default:
@@ -219,16 +219,16 @@ xfs_btree_check_lblock(
 
 	mp = cur->bc_mp;
 	lblock_ok =
-		INT_GET(block->bb_magic, ARCH_UNKNOWN) == xfs_magics[cur->bc_btnum] &&
-		INT_GET(block->bb_level, ARCH_UNKNOWN) == level &&
-		INT_GET(block->bb_numrecs, ARCH_UNKNOWN) <=
+		INT_GET(block->bb_magic, ARCH_CONVERT) == xfs_magics[cur->bc_btnum] &&
+		INT_GET(block->bb_level, ARCH_CONVERT) == level &&
+		INT_GET(block->bb_numrecs, ARCH_CONVERT) <=
 			xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block) &&
-		INT_GET(block->bb_leftsib, ARCH_UNKNOWN) != 0 &&
-		(INT_GET(block->bb_leftsib, ARCH_UNKNOWN) == NULLDFSBNO ||
-		 XFS_FSB_SANITY_CHECK(mp, INT_GET(block->bb_leftsib, ARCH_UNKNOWN))) &&
-		INT_GET(block->bb_rightsib, ARCH_UNKNOWN) != 0 &&
-		(INT_GET(block->bb_rightsib, ARCH_UNKNOWN) == NULLDFSBNO ||
-		 XFS_FSB_SANITY_CHECK(mp, INT_GET(block->bb_rightsib, ARCH_UNKNOWN)));
+		INT_GET(block->bb_leftsib, ARCH_CONVERT) != 0 &&
+		(INT_GET(block->bb_leftsib, ARCH_CONVERT) == NULLDFSBNO ||
+		 XFS_FSB_SANITY_CHECK(mp, INT_GET(block->bb_leftsib, ARCH_CONVERT))) &&
+		INT_GET(block->bb_rightsib, ARCH_CONVERT) != 0 &&
+		(INT_GET(block->bb_rightsib, ARCH_CONVERT) == NULLDFSBNO ||
+		 XFS_FSB_SANITY_CHECK(mp, INT_GET(block->bb_rightsib, ARCH_CONVERT)));
 	if (XFS_TEST_ERROR(!lblock_ok, mp, XFS_ERRTAG_BTREE_CHECK_LBLOCK,
 			XFS_RANDOM_BTREE_CHECK_LBLOCK)) {
 #pragma mips_frequency_hint NEVER
@@ -275,8 +275,8 @@ xfs_btree_check_rec(
 
 		r1 = ar1;
 		r2 = ar2;
-		ASSERT(INT_GET(r1->ar_startblock, ARCH_UNKNOWN) + INT_GET(r1->ar_blockcount, ARCH_UNKNOWN) <=
-		       INT_GET(r2->ar_startblock, ARCH_UNKNOWN));
+		ASSERT(INT_GET(r1->ar_startblock, ARCH_CONVERT) + INT_GET(r1->ar_blockcount, ARCH_CONVERT) <=
+		       INT_GET(r2->ar_startblock, ARCH_CONVERT));
 		break;
 	    }
 	case XFS_BTNUM_CNT: {
@@ -285,9 +285,9 @@ xfs_btree_check_rec(
 		
 		r1 = ar1;
 		r2 = ar2;
-		ASSERT(INT_GET(r1->ar_blockcount, ARCH_UNKNOWN) < INT_GET(r2->ar_blockcount, ARCH_UNKNOWN) ||
-		       (INT_GET(r1->ar_blockcount, ARCH_UNKNOWN) == INT_GET(r2->ar_blockcount, ARCH_UNKNOWN) &&
-			INT_GET(r1->ar_startblock, ARCH_UNKNOWN) < INT_GET(r2->ar_startblock, ARCH_UNKNOWN)));
+		ASSERT(INT_GET(r1->ar_blockcount, ARCH_CONVERT) < INT_GET(r2->ar_blockcount, ARCH_CONVERT) ||
+		       (INT_GET(r1->ar_blockcount, ARCH_CONVERT) == INT_GET(r2->ar_blockcount, ARCH_CONVERT) &&
+			INT_GET(r1->ar_startblock, ARCH_CONVERT) < INT_GET(r2->ar_startblock, ARCH_CONVERT)));
 		break;
 	    }
 	case XFS_BTNUM_BMAP: {
@@ -307,8 +307,8 @@ xfs_btree_check_rec(
 
 		r1 = ar1;
 		r2 = ar2;
-		ASSERT(INT_GET(r1->ir_startino, ARCH_UNKNOWN) + XFS_INODES_PER_CHUNK <=
-		       INT_GET(r2->ir_startino, ARCH_UNKNOWN));
+		ASSERT(INT_GET(r1->ir_startino, ARCH_CONVERT) + XFS_INODES_PER_CHUNK <=
+		       INT_GET(r2->ir_startino, ARCH_CONVERT));
 		break;
 	    }
 	default:
@@ -335,18 +335,18 @@ xfs_btree_check_sblock(
 
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
-	agflen = INT_GET(agf->agf_length, cur->bc_mp->m_arch);
+	agflen = INT_GET(agf->agf_length, ARCH_CONVERT);
 	sblock_ok =
-		INT_GET(block->bb_magic, ARCH_UNKNOWN) == xfs_magics[cur->bc_btnum] &&
-		INT_GET(block->bb_level, ARCH_UNKNOWN) == level &&
-		INT_GET(block->bb_numrecs, ARCH_UNKNOWN) <=
+		INT_GET(block->bb_magic, ARCH_CONVERT) == xfs_magics[cur->bc_btnum] &&
+		INT_GET(block->bb_level, ARCH_CONVERT) == level &&
+		INT_GET(block->bb_numrecs, ARCH_CONVERT) <=
 			xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block) &&
-		(INT_GET(block->bb_leftsib, ARCH_UNKNOWN) == NULLAGBLOCK ||
-		 INT_GET(block->bb_leftsib, ARCH_UNKNOWN) < agflen) &&
-		INT_GET(block->bb_leftsib, ARCH_UNKNOWN) != 0 &&
-		(INT_GET(block->bb_rightsib, ARCH_UNKNOWN) == NULLAGBLOCK ||
-		 INT_GET(block->bb_rightsib, ARCH_UNKNOWN) < agflen) &&
-		INT_GET(block->bb_rightsib, ARCH_UNKNOWN) != 0;
+		(INT_GET(block->bb_leftsib, ARCH_CONVERT) == NULLAGBLOCK ||
+		 INT_GET(block->bb_leftsib, ARCH_CONVERT) < agflen) &&
+		INT_GET(block->bb_leftsib, ARCH_CONVERT) != 0 &&
+		(INT_GET(block->bb_rightsib, ARCH_CONVERT) == NULLAGBLOCK ||
+		 INT_GET(block->bb_rightsib, ARCH_CONVERT) < agflen) &&
+		INT_GET(block->bb_rightsib, ARCH_CONVERT) != 0;
 	if (XFS_TEST_ERROR(!sblock_ok, cur->bc_mp,
 			XFS_ERRTAG_BTREE_CHECK_SBLOCK,
 			XFS_RANDOM_BTREE_CHECK_SBLOCK)) {
@@ -375,7 +375,7 @@ xfs_btree_check_sptr(
 	XFS_WANT_CORRUPTED_RETURN(
 		level > 0 &&
 		ptr != NULLAGBLOCK && ptr != 0 &&
-		ptr < INT_GET(agf->agf_length, cur->bc_mp->m_arch));
+		ptr < INT_GET(agf->agf_length, ARCH_CONVERT));
 	return 0;
 }
 
@@ -498,7 +498,7 @@ xfs_btree_firstrec(
 	/*
 	 * It's empty, there is no such record.
 	 */
-	if (INT_GET(block->bb_h.bb_numrecs, ARCH_UNKNOWN) == 0)
+	if (INT_GET(block->bb_h.bb_numrecs, ARCH_CONVERT) == 0)
 		return 0;
 	/*
 	 * Set the ptr value to 1, that's the first record/key.
@@ -615,15 +615,15 @@ xfs_btree_init_cursor(
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
 		agf = XFS_BUF_TO_AGF(agbp);
-		nlevels = INT_GET(agf->agf_levels[btnum], mp->m_arch);
+		nlevels = INT_GET(agf->agf_levels[btnum], ARCH_CONVERT);
 		break;
 	case XFS_BTNUM_BMAP:
 		ifp = XFS_IFORK_PTR(ip, whichfork);
-		nlevels = INT_GET(ifp->if_broot->bb_level, mp->m_arch) + 1;
+		nlevels = INT_GET(ifp->if_broot->bb_level, ARCH_CONVERT) + 1;
 		break;
 	case XFS_BTNUM_INO:
 		agi = XFS_BUF_TO_AGI(agbp);
-		nlevels = INT_GET(agi->agi_level, mp->m_arch);
+		nlevels = INT_GET(agi->agi_level, ARCH_CONVERT);
 		break;
 	default:
 		ASSERT(0);
@@ -687,9 +687,9 @@ xfs_btree_islastblock(
 	block = xfs_btree_get_block(cur, level, &bp);
 	xfs_btree_check_block(cur, block, level, bp);
 	if (XFS_BTREE_LONG_PTRS(cur->bc_btnum))
-		return INT_GET(block->bb_u.l.bb_rightsib, ARCH_UNKNOWN) == NULLDFSBNO;
+		return INT_GET(block->bb_u.l.bb_rightsib, ARCH_CONVERT) == NULLDFSBNO;
 	else
-		return INT_GET(block->bb_u.s.bb_rightsib, ARCH_UNKNOWN) == NULLAGBLOCK;
+		return INT_GET(block->bb_u.s.bb_rightsib, ARCH_CONVERT) == NULLAGBLOCK;
 }
 
 /*
@@ -712,12 +712,12 @@ xfs_btree_lastrec(
 	/*
 	 * It's empty, there is no such record.
 	 */
-	if (INT_GET(block->bb_h.bb_numrecs, ARCH_UNKNOWN) == 0)
+	if (INT_GET(block->bb_h.bb_numrecs, ARCH_CONVERT) == 0)
 		return 0;
 	/*
 	 * Set the ptr value to numrecs, that's the last record/key.
 	 */
-	cur->bc_ptrs[level] = INT_GET(block->bb_h.bb_numrecs, ARCH_UNKNOWN);
+	cur->bc_ptrs[level] = INT_GET(block->bb_h.bb_numrecs, ARCH_CONVERT);
 	return 1;
 }
 
@@ -898,38 +898,38 @@ xfs_btree_readahead(
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
 		a = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[lev]);
-		if ((lr & XFS_BTCUR_LEFTRA) && INT_GET(a->bb_leftsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
+		if ((lr & XFS_BTCUR_LEFTRA) && INT_GET(a->bb_leftsib, ARCH_CONVERT) != NULLAGBLOCK) {
 			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.a.agno,
-				INT_GET(a->bb_leftsib, ARCH_UNKNOWN), 1);
+				INT_GET(a->bb_leftsib, ARCH_CONVERT), 1);
 			rval++;
 		}
-		if ((lr & XFS_BTCUR_RIGHTRA) && INT_GET(a->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
+		if ((lr & XFS_BTCUR_RIGHTRA) && INT_GET(a->bb_rightsib, ARCH_CONVERT) != NULLAGBLOCK) {
 			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.a.agno,
-				INT_GET(a->bb_rightsib, ARCH_UNKNOWN), 1);
+				INT_GET(a->bb_rightsib, ARCH_CONVERT), 1);
 			rval++;
 		}
 		break;
 	case XFS_BTNUM_BMAP:
 		b = XFS_BUF_TO_BMBT_BLOCK(cur->bc_bufs[lev]);
-		if ((lr & XFS_BTCUR_LEFTRA) && INT_GET(b->bb_leftsib, ARCH_UNKNOWN) != NULLDFSBNO) {
-			xfs_btree_reada_bufl(cur->bc_mp, INT_GET(b->bb_leftsib, ARCH_UNKNOWN), 1);
+		if ((lr & XFS_BTCUR_LEFTRA) && INT_GET(b->bb_leftsib, ARCH_CONVERT) != NULLDFSBNO) {
+			xfs_btree_reada_bufl(cur->bc_mp, INT_GET(b->bb_leftsib, ARCH_CONVERT), 1);
 			rval++;
 		}
-		if ((lr & XFS_BTCUR_RIGHTRA) && INT_GET(b->bb_rightsib, ARCH_UNKNOWN) != NULLDFSBNO) {
-			xfs_btree_reada_bufl(cur->bc_mp, INT_GET(b->bb_rightsib, ARCH_UNKNOWN), 1);
+		if ((lr & XFS_BTCUR_RIGHTRA) && INT_GET(b->bb_rightsib, ARCH_CONVERT) != NULLDFSBNO) {
+			xfs_btree_reada_bufl(cur->bc_mp, INT_GET(b->bb_rightsib, ARCH_CONVERT), 1);
 			rval++;
 		}
 		break;
 	case XFS_BTNUM_INO:
 		i = XFS_BUF_TO_INOBT_BLOCK(cur->bc_bufs[lev]);
-		if ((lr & XFS_BTCUR_LEFTRA) && INT_GET(i->bb_leftsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
+		if ((lr & XFS_BTCUR_LEFTRA) && INT_GET(i->bb_leftsib, ARCH_CONVERT) != NULLAGBLOCK) {
 			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.i.agno,
-				INT_GET(i->bb_leftsib, ARCH_UNKNOWN), 1);
+				INT_GET(i->bb_leftsib, ARCH_CONVERT), 1);
 			rval++;
 		}
-		if ((lr & XFS_BTCUR_RIGHTRA) && INT_GET(i->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
+		if ((lr & XFS_BTCUR_RIGHTRA) && INT_GET(i->bb_rightsib, ARCH_CONVERT) != NULLAGBLOCK) {
 			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.i.agno,
-				INT_GET(i->bb_rightsib, ARCH_UNKNOWN), 1);
+				INT_GET(i->bb_rightsib, ARCH_CONVERT), 1);
 			rval++;
 		}
 		break;
@@ -961,14 +961,14 @@ xfs_btree_setbuf(
 		return;
 	b = XFS_BUF_TO_BLOCK(bp);
 	if (XFS_BTREE_LONG_PTRS(cur->bc_btnum)) {
-		if (INT_GET(b->bb_u.l.bb_leftsib, ARCH_UNKNOWN) == NULLDFSBNO)
+		if (INT_GET(b->bb_u.l.bb_leftsib, ARCH_CONVERT) == NULLDFSBNO)
 			cur->bc_ra[lev] |= XFS_BTCUR_LEFTRA;
-		if (INT_GET(b->bb_u.l.bb_rightsib, ARCH_UNKNOWN) == NULLDFSBNO)
+		if (INT_GET(b->bb_u.l.bb_rightsib, ARCH_CONVERT) == NULLDFSBNO)
 			cur->bc_ra[lev] |= XFS_BTCUR_RIGHTRA;
 	} else {
-		if (INT_GET(b->bb_u.s.bb_leftsib, ARCH_UNKNOWN) == NULLAGBLOCK)
+		if (INT_GET(b->bb_u.s.bb_leftsib, ARCH_CONVERT) == NULLAGBLOCK)
 			cur->bc_ra[lev] |= XFS_BTCUR_LEFTRA;
-		if (INT_GET(b->bb_u.s.bb_rightsib, ARCH_UNKNOWN) == NULLAGBLOCK)
+		if (INT_GET(b->bb_u.s.bb_rightsib, ARCH_CONVERT) == NULLAGBLOCK)
 			cur->bc_ra[lev] |= XFS_BTCUR_RIGHTRA;
 	}
 }

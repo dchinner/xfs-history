@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -136,10 +136,10 @@ xlog_print_find_oldest(
 	first_blk = 0;		/* read first block */
 	bp = xlog_get_bp(1, log->l_mp);
 	xlog_bread(log, 0, 1, bp);
-	first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
+	first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
 	*last_blk = log->l_logBBsize-1;	/* read last block */
 	xlog_bread(log, *last_blk, 1, bp);
-	last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
+	last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
 	ASSERT(last_half_cycle != 0);
 
 	if (first_half_cycle == last_half_cycle) { /* all cycle nos are same */
@@ -292,54 +292,54 @@ xlog_recover_print_buffer(
 			printf("	SUPER Block Buffer:\n");
 			if (!print_buffer) continue;
 			printf("		icount:%Ld  ifree:%Ld  ",
-			       INT_GET(*(long long *)(p), ARCH_UNKNOWN), 
-                               INT_GET(*(long long *)(p+8), ARCH_UNKNOWN));
+			       INT_GET(*(long long *)(p), ARCH_CONVERT), 
+                               INT_GET(*(long long *)(p+8), ARCH_CONVERT));
 			printf("fdblks:%Ld  frext:%Ld\n",
-			       INT_GET(*(long long *)(p+16), ARCH_UNKNOWN),
-			       INT_GET(*(long long *)(p+24), ARCH_UNKNOWN));
+			       INT_GET(*(long long *)(p+16), ARCH_CONVERT),
+			       INT_GET(*(long long *)(p+24), ARCH_CONVERT));
 			printf("		sunit:%u  swidth:%u\n", 
-			       INT_GET(*(uint *)(p+56), ARCH_UNKNOWN),
-			       INT_GET(*(uint *)(p+60), ARCH_UNKNOWN));
-		} else if (INT_GET(*(uint *)p, ARCH_UNKNOWN) == XFS_AGI_MAGIC) {
+			       INT_GET(*(uint *)(p+56), ARCH_CONVERT),
+			       INT_GET(*(uint *)(p+60), ARCH_CONVERT));
+		} else if (INT_GET(*(uint *)p, ARCH_CONVERT) == XFS_AGI_MAGIC) {
 			agi = (xfs_agi_t *)p;
 			printf("	AGI Buffer: (XAGI)\n");
 			if (!print_buffer) continue;
 			printf("		ver:%d  ",
-				INT_GET(agi->agi_versionnum, ARCH_UNKNOWN));
+				INT_GET(agi->agi_versionnum, ARCH_CONVERT));
 			printf("seq#:%d  len:%d  cnt:%d  root:%d\n",
-				INT_GET(agi->agi_seqno, ARCH_UNKNOWN),
-				INT_GET(agi->agi_length, ARCH_UNKNOWN),
-				INT_GET(agi->agi_count, ARCH_UNKNOWN),
-				INT_GET(agi->agi_root, ARCH_UNKNOWN));
+				INT_GET(agi->agi_seqno, ARCH_CONVERT),
+				INT_GET(agi->agi_length, ARCH_CONVERT),
+				INT_GET(agi->agi_count, ARCH_CONVERT),
+				INT_GET(agi->agi_root, ARCH_CONVERT));
 			printf("		level:%d  free#:0x%x  newino:0x%x\n",
-				INT_GET(agi->agi_level, ARCH_UNKNOWN),
-				INT_GET(agi->agi_freecount, ARCH_UNKNOWN),
-				INT_GET(agi->agi_newino, ARCH_UNKNOWN));
-		} else if (INT_GET(*(uint *)p, ARCH_UNKNOWN) == XFS_AGF_MAGIC) {
+				INT_GET(agi->agi_level, ARCH_CONVERT),
+				INT_GET(agi->agi_freecount, ARCH_CONVERT),
+				INT_GET(agi->agi_newino, ARCH_CONVERT));
+		} else if (INT_GET(*(uint *)p, ARCH_CONVERT) == XFS_AGF_MAGIC) {
 			agf = (xfs_agf_t *)p;
 			printf("	AGF Buffer: (XAGF)\n");
 			if (!print_buffer) continue;
 			printf("		ver:%d  seq#:%d  len:%d  \n",
-				INT_GET(agf->agf_versionnum, ARCH_UNKNOWN),
-				INT_GET(agf->agf_seqno, ARCH_UNKNOWN),
-				INT_GET(agf->agf_length, ARCH_UNKNOWN));
+				INT_GET(agf->agf_versionnum, ARCH_CONVERT),
+				INT_GET(agf->agf_seqno, ARCH_CONVERT),
+				INT_GET(agf->agf_length, ARCH_CONVERT));
 			printf("		root BNO:%d  CNT:%d\n",
 				INT_GET(agf->agf_roots[XFS_BTNUM_BNOi],
-					ARCH_UNKNOWN),
+					ARCH_CONVERT),
 				INT_GET(agf->agf_roots[XFS_BTNUM_CNTi],
-					ARCH_UNKNOWN));
+					ARCH_CONVERT));
 			printf("		level BNO:%d  CNT:%d\n",
 				INT_GET(agf->agf_levels[XFS_BTNUM_BNOi],
-					ARCH_UNKNOWN),
+					ARCH_CONVERT),
 				INT_GET(agf->agf_levels[XFS_BTNUM_CNTi],
-					ARCH_UNKNOWN));
+					ARCH_CONVERT));
 			printf("		1st:%d  last:%d  cnt:%d  "
 				"freeblks:%d  longest:%d\n",
-				INT_GET(agf->agf_flfirst, ARCH_UNKNOWN),
-				INT_GET(agf->agf_fllast, ARCH_UNKNOWN),
-				INT_GET(agf->agf_flcount, ARCH_UNKNOWN),
-				INT_GET(agf->agf_freeblks, ARCH_UNKNOWN),
-				INT_GET(agf->agf_longest, ARCH_UNKNOWN));
+				INT_GET(agf->agf_flfirst, ARCH_CONVERT),
+				INT_GET(agf->agf_fllast, ARCH_CONVERT),
+				INT_GET(agf->agf_flcount, ARCH_CONVERT),
+				INT_GET(agf->agf_freeblks, ARCH_CONVERT),
+				INT_GET(agf->agf_longest, ARCH_CONVERT));
 		} else if (*(uint *)p == XFS_DQUOT_MAGIC) {
 			ddq = (xfs_disk_dquot_t *)p;
 			printf("	DQUOT Buffer:\n");

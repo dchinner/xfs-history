@@ -1739,13 +1739,13 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	}
 	broot = f->if_broot;
 	printk("block @0x%p magic %x level %d numrecs %d\n",
-		broot, INT_GET(broot->bb_magic, ARCH_UNKNOWN), INT_GET(broot->bb_level, ARCH_UNKNOWN), INT_GET(broot->bb_numrecs, ARCH_UNKNOWN));
+		broot, INT_GET(broot->bb_magic, ARCH_CONVERT), INT_GET(broot->bb_level, ARCH_CONVERT), INT_GET(broot->bb_numrecs, ARCH_CONVERT));
 	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, f->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
-	for (i = 1; i <= INT_GET(broot->bb_numrecs, ARCH_UNKNOWN); i++)
+	for (i = 1; i <= INT_GET(broot->bb_numrecs, ARCH_CONVERT); i++)
 		printk("\t%d: startoff %Ld ptr %Lx %s\n",
-			i, INT_GET(kp[i - 1].br_startoff, ARCH_UNKNOWN), INT_GET(pp[i - 1], ARCH_UNKNOWN),
-			xfs_fmtfsblock(INT_GET(pp[i - 1], ARCH_UNKNOWN), ip->i_mount));
+			i, INT_GET(kp[i - 1].br_startoff, ARCH_CONVERT), INT_GET(pp[i - 1], ARCH_CONVERT),
+			xfs_fmtfsblock(INT_GET(pp[i - 1], ARCH_CONVERT), ip->i_mount));
 }
 
 /*
@@ -1757,29 +1757,29 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 	int i;
 
 	printk("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
-		INT_GET(bt->bb_magic, ARCH_UNKNOWN), INT_GET(bt->bb_level, ARCH_UNKNOWN), INT_GET(bt->bb_numrecs, ARCH_UNKNOWN),
-		INT_GET(bt->bb_leftsib, ARCH_UNKNOWN), INT_GET(bt->bb_rightsib, ARCH_UNKNOWN));
-	if (INT_GET(bt->bb_level, ARCH_UNKNOWN) == 0) {
+		INT_GET(bt->bb_magic, ARCH_CONVERT), INT_GET(bt->bb_level, ARCH_CONVERT), INT_GET(bt->bb_numrecs, ARCH_CONVERT),
+		INT_GET(bt->bb_leftsib, ARCH_CONVERT), INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+	if (INT_GET(bt->bb_level, ARCH_CONVERT) == 0) {
 
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_alloc_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_alloc, bt, i, 0);
 			printk("rec %d startblock 0x%x blockcount %d\n",
-				i, INT_GET(r->ar_startblock, ARCH_UNKNOWN), INT_GET(r->ar_blockcount, ARCH_UNKNOWN));
+				i, INT_GET(r->ar_startblock, ARCH_CONVERT), INT_GET(r->ar_blockcount, ARCH_CONVERT));
 		}
 	} else {
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_alloc, 0);
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_alloc_key_t *k;
 			xfs_alloc_ptr_t *p;
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_alloc, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_alloc, bt, i, mxr);
 			printk("key %d startblock 0x%x blockcount %d ptr 0x%x\n",
-				i, INT_GET(k->ar_startblock, ARCH_UNKNOWN), INT_GET(k->ar_blockcount, ARCH_UNKNOWN), *p);
+				i, INT_GET(k->ar_startblock, ARCH_CONVERT), INT_GET(k->ar_blockcount, ARCH_CONVERT), *p);
 		}
 	}
 }
@@ -1793,13 +1793,13 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 	int i;
 
 	printk("magic 0x%x level %d numrecs %d leftsib %Lx ",
-		INT_GET(bt->bb_magic, ARCH_UNKNOWN),
-		INT_GET(bt->bb_level, ARCH_UNKNOWN),
-		INT_GET(bt->bb_numrecs, ARCH_UNKNOWN),
-		INT_GET(bt->bb_leftsib, ARCH_UNKNOWN));
-	printk("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_UNKNOWN));
-	if (INT_GET(bt->bb_level, ARCH_UNKNOWN) == 0) {
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
+		INT_GET(bt->bb_magic, ARCH_CONVERT),
+		INT_GET(bt->bb_level, ARCH_CONVERT),
+		INT_GET(bt->bb_numrecs, ARCH_CONVERT),
+		INT_GET(bt->bb_leftsib, ARCH_CONVERT));
+	printk("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+	if (INT_GET(bt->bb_level, ARCH_CONVERT) == 0) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_bmbt_rec_64_t *r;
 			xfs_dfiloff_t o;
 			xfs_dfsbno_t s;
@@ -1817,15 +1817,15 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_bmbt, 0);
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_bmbt_key_t *k;
 			xfs_bmbt_ptr_t *p;
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			printk("key %d startoff %Ld ",
-				i, INT_GET(k->br_startoff, ARCH_UNKNOWN));
-			printk("ptr %Lx\n", INT_GET(*p, ARCH_UNKNOWN));
+				i, INT_GET(k->br_startoff, ARCH_CONVERT));
+			printk("ptr %Lx\n", INT_GET(*p, ARCH_CONVERT));
 		}
 	}
 }
@@ -1839,30 +1839,30 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 	int i;
 
 	printk("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
-		INT_GET(bt->bb_magic, ARCH_UNKNOWN), INT_GET(bt->bb_level, ARCH_UNKNOWN), INT_GET(bt->bb_numrecs, ARCH_UNKNOWN),
-		INT_GET(bt->bb_leftsib, ARCH_UNKNOWN), INT_GET(bt->bb_rightsib, ARCH_UNKNOWN));
-	if (INT_GET(bt->bb_level, ARCH_UNKNOWN) == 0) {
+		INT_GET(bt->bb_magic, ARCH_CONVERT), INT_GET(bt->bb_level, ARCH_CONVERT), INT_GET(bt->bb_numrecs, ARCH_CONVERT),
+		INT_GET(bt->bb_leftsib, ARCH_CONVERT), INT_GET(bt->bb_rightsib, ARCH_CONVERT));
+	if (INT_GET(bt->bb_level, ARCH_CONVERT) == 0) {
 
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_inobt_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
 			printk("rec %d startino 0x%x freecount %d, free %Lx\n",
-				i, INT_GET(r->ir_startino, ARCH_UNKNOWN), INT_GET(r->ir_freecount, ARCH_UNKNOWN),
-				INT_GET(r->ir_free, ARCH_UNKNOWN));
+				i, INT_GET(r->ir_startino, ARCH_CONVERT), INT_GET(r->ir_freecount, ARCH_CONVERT),
+				INT_GET(r->ir_free, ARCH_CONVERT));
 		}
 	} else {
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_inobt, 0);
-		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_inobt_key_t *k;
 			xfs_inobt_ptr_t *p;
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_inobt, bt, i, mxr);
 			printk("key %d startino 0x%x ptr 0x%x\n",
-				i, INT_GET(k->ir_startino, ARCH_UNKNOWN), INT_GET(*p, ARCH_UNKNOWN));
+				i, INT_GET(k->ir_startino, ARCH_CONVERT), INT_GET(*p, ARCH_CONVERT));
 		}
 	}
 }
@@ -1924,12 +1924,12 @@ xfs_convert_extent(xfs_bmbt_rec_64_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 	xfs_dfilblks_t c;
 	int flag;
 
-	flag = (int)((INT_GET(rp->l0, ARCH_UNKNOWN)) >> (64 - 1 ));
-	o = ((xfs_fileoff_t)INT_GET(rp->l0, ARCH_UNKNOWN) &
+	flag = (int)((INT_GET(rp->l0, ARCH_CONVERT)) >> (64 - 1 ));
+	o = ((xfs_fileoff_t)INT_GET(rp->l0, ARCH_CONVERT) &
 			   (((__uint64_t)1 << ( 64 - 1  )) - 1) ) >> 9;
-	s = (((xfs_fsblock_t)INT_GET(rp->l0, ARCH_UNKNOWN) & (((__uint64_t)1 << ( 9 )) - 1) ) << 43) | 
-			   (((xfs_fsblock_t)INT_GET(rp->l1, ARCH_UNKNOWN)) >> 21);
-	c = (xfs_filblks_t)(INT_GET(rp->l1, ARCH_UNKNOWN) & (((__uint64_t)1 << ( 21 )) - 1) );
+	s = (((xfs_fsblock_t)INT_GET(rp->l0, ARCH_CONVERT) & (((__uint64_t)1 << ( 9 )) - 1) ) << 43) | 
+			   (((xfs_fsblock_t)INT_GET(rp->l1, ARCH_CONVERT)) >> 21);
+	c = (xfs_filblks_t)(INT_GET(rp->l1, ARCH_CONVERT) & (((__uint64_t)1 << ( 21 )) - 1) );
 	*op = o;
 	*sp = s;
 	*cp = c;
@@ -2387,21 +2387,21 @@ static void
 xfsidbg_xagf(xfs_agf_t *agf)
 {
 	printk("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
-		INT_GET(agf->agf_magicnum, ARCH_UNKNOWN),
-		INT_GET(agf->agf_versionnum, ARCH_UNKNOWN),
-		INT_GET(agf->agf_seqno, ARCH_UNKNOWN),
-		INT_GET(agf->agf_length, ARCH_UNKNOWN));
+		INT_GET(agf->agf_magicnum, ARCH_CONVERT),
+		INT_GET(agf->agf_versionnum, ARCH_CONVERT),
+		INT_GET(agf->agf_seqno, ARCH_CONVERT),
+		INT_GET(agf->agf_length, ARCH_CONVERT));
 	printk("roots b 0x%x c 0x%x levels b %d c %d\n",
-		INT_GET(agf->agf_roots[XFS_BTNUM_BNO], ARCH_UNKNOWN),
-		INT_GET(agf->agf_roots[XFS_BTNUM_CNT], ARCH_UNKNOWN),
-		INT_GET(agf->agf_levels[XFS_BTNUM_BNO], ARCH_UNKNOWN),
-		INT_GET(agf->agf_levels[XFS_BTNUM_CNT], ARCH_UNKNOWN));
+		INT_GET(agf->agf_roots[XFS_BTNUM_BNO], ARCH_CONVERT),
+		INT_GET(agf->agf_roots[XFS_BTNUM_CNT], ARCH_CONVERT),
+		INT_GET(agf->agf_levels[XFS_BTNUM_BNO], ARCH_CONVERT),
+		INT_GET(agf->agf_levels[XFS_BTNUM_CNT], ARCH_CONVERT));
 	printk("flfirst %d fllast %d flcount %d freeblks %d longest %d\n",
-		INT_GET(agf->agf_flfirst, ARCH_UNKNOWN),
-		INT_GET(agf->agf_fllast, ARCH_UNKNOWN),
-		INT_GET(agf->agf_flcount, ARCH_UNKNOWN),
-		INT_GET(agf->agf_freeblks, ARCH_UNKNOWN),
-		INT_GET(agf->agf_longest, ARCH_UNKNOWN));
+		INT_GET(agf->agf_flfirst, ARCH_CONVERT),
+		INT_GET(agf->agf_fllast, ARCH_CONVERT),
+		INT_GET(agf->agf_flcount, ARCH_CONVERT),
+		INT_GET(agf->agf_freeblks, ARCH_CONVERT),
+		INT_GET(agf->agf_longest, ARCH_CONVERT));
 }
 
 /*
@@ -2414,24 +2414,24 @@ xfsidbg_xagi(xfs_agi_t *agi)
 	int	j;
 
 	printk("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
-		INT_GET(agi->agi_magicnum, ARCH_UNKNOWN),
-		INT_GET(agi->agi_versionnum, ARCH_UNKNOWN),
-		INT_GET(agi->agi_seqno, ARCH_UNKNOWN),
-		INT_GET(agi->agi_length, ARCH_UNKNOWN));
+		INT_GET(agi->agi_magicnum, ARCH_CONVERT),
+		INT_GET(agi->agi_versionnum, ARCH_CONVERT),
+		INT_GET(agi->agi_seqno, ARCH_CONVERT),
+		INT_GET(agi->agi_length, ARCH_CONVERT));
 	printk("count 0x%x root 0x%x level 0x%x\n",
-		INT_GET(agi->agi_count, ARCH_UNKNOWN),
-		INT_GET(agi->agi_root, ARCH_UNKNOWN),
-		INT_GET(agi->agi_level, ARCH_UNKNOWN));
+		INT_GET(agi->agi_count, ARCH_CONVERT),
+		INT_GET(agi->agi_root, ARCH_CONVERT),
+		INT_GET(agi->agi_level, ARCH_CONVERT));
 	printk("freecount 0x%x newino 0x%x dirino 0x%x\n",
-		INT_GET(agi->agi_freecount, ARCH_UNKNOWN),
-		INT_GET(agi->agi_newino, ARCH_UNKNOWN),
-		INT_GET(agi->agi_dirino, ARCH_UNKNOWN));
+		INT_GET(agi->agi_freecount, ARCH_CONVERT),
+		INT_GET(agi->agi_newino, ARCH_CONVERT),
+		INT_GET(agi->agi_dirino, ARCH_CONVERT));
 
 	printk("unlinked buckets\n");
 	for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++) {
 		for (j = 0; j < 4; j++, i++) {
 			printk("0x%08x ",
-				INT_GET(agi->agi_unlinked[i], ARCH_UNKNOWN));
+				INT_GET(agi->agi_unlinked[i], ARCH_CONVERT));
 		}
 		printk("\n");
 	}
@@ -2745,50 +2745,50 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	xfs_dir2_free_t *d2free;
 
 	d = XFS_BUF_PTR(bp);
-	if (INT_GET((agf = d)->agf_magicnum, ARCH_UNKNOWN) == XFS_AGF_MAGIC) {
+	if (INT_GET((agf = d)->agf_magicnum, ARCH_CONVERT) == XFS_AGF_MAGIC) {
 		if (summary) {
 			printk("freespace hdr for AG %d (at 0x%p)\n",
-				INT_GET(agf->agf_seqno, ARCH_UNKNOWN), agf);
+				INT_GET(agf->agf_seqno, ARCH_CONVERT), agf);
 		} else {
 			printk("buf 0x%p agf 0x%p\n", bp, agf);
 			xfsidbg_xagf(agf);
 		}
-	} else if (INT_GET((agi = d)->agi_magicnum, ARCH_UNKNOWN) == XFS_AGI_MAGIC) {
+	} else if (INT_GET((agi = d)->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC) {
 		if (summary) {
 			printk("Inode hdr for AG %d (at 0x%p)\n",
-			       INT_GET(agi->agi_seqno, ARCH_UNKNOWN), agi);
+			       INT_GET(agi->agi_seqno, ARCH_CONVERT), agi);
 		} else {
 			printk("buf 0x%p agi 0x%p\n", bp, agi);
 			xfsidbg_xagi(agi);
 		}
-	} else if (INT_GET((bta = d)->bb_magic, ARCH_UNKNOWN) == XFS_ABTB_MAGIC) {
+	} else if (INT_GET((bta = d)->bb_magic, ARCH_CONVERT) == XFS_ABTB_MAGIC) {
 		if (summary) {
 			printk("Alloc BNO Btree blk, level %d (at 0x%p)\n",
-				       INT_GET(bta->bb_level, ARCH_UNKNOWN), bta);
+				       INT_GET(bta->bb_level, ARCH_CONVERT), bta);
 		} else {
 			printk("buf 0x%p abtbno 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((bta = d)->bb_magic, ARCH_UNKNOWN) == XFS_ABTC_MAGIC) {
+	} else if (INT_GET((bta = d)->bb_magic, ARCH_CONVERT) == XFS_ABTC_MAGIC) {
 		if (summary) {
 			printk("Alloc COUNT Btree blk, level %d (at 0x%p)\n",
-				       INT_GET(bta->bb_level, ARCH_UNKNOWN), bta);
+				       INT_GET(bta->bb_level, ARCH_CONVERT), bta);
 		} else {
 			printk("buf 0x%p abtcnt 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((btb = d)->bb_magic, ARCH_UNKNOWN) == XFS_BMAP_MAGIC) {
+	} else if (INT_GET((btb = d)->bb_magic, ARCH_CONVERT) == XFS_BMAP_MAGIC) {
 		if (summary) {
 			printk("Bmap Btree blk, level %d (at 0x%p)\n",
-				      INT_GET(btb->bb_level, ARCH_UNKNOWN), btb);
+				      INT_GET(btb->bb_level, ARCH_CONVERT), btb);
 		} else {
 			printk("buf 0x%p bmapbt 0x%p\n", bp, btb);
 			xfs_btbmap(btb, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((bti = d)->bb_magic, ARCH_UNKNOWN) == XFS_IBT_MAGIC) {
+	} else if (INT_GET((bti = d)->bb_magic, ARCH_CONVERT) == XFS_IBT_MAGIC) {
 		if (summary) {
 			printk("Inode Btree blk, level %d (at 0x%p)\n",
-				       INT_GET(bti->bb_level, ARCH_UNKNOWN), bti);
+				       INT_GET(bti->bb_level, ARCH_CONVERT), bti);
 		} else {
 			printk("buf 0x%p inobt 0x%p\n", bp, bti);
 			xfs_btino(bti, XFS_BUF_COUNT(bp));
@@ -2801,7 +2801,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p attr leaf 0x%p\n", bp, aleaf);
 			xfsidbg_xattrleaf(aleaf);
 		}
-	} else if (INT_GET((dleaf = d)->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR_LEAF_MAGIC) {
+	} else if (INT_GET((dleaf = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC) {
 		if (summary) {
 			printk("Dir Leaf, 1st hash 0x%x (at 0x%p)\n",
 				     dleaf->entries[0].hashval, dleaf);
@@ -2809,7 +2809,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p dir leaf 0x%p\n", bp, dleaf);
 			xfsidbg_xdirleaf(dleaf);
 		}
-	} else if (INT_GET((node = d)->hdr.info.magic, ARCH_UNKNOWN) == XFS_DA_NODE_MAGIC) {
+	} else if (INT_GET((node = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC) {
 		if (summary) {
 			printk("Dir/Attr Node, level %d, 1st hash 0x%x (at 0x%p)\n",
 			      node->hdr.level, node->btree[0].hashval, node);
@@ -2817,14 +2817,14 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p dir/attr node 0x%p\n", bp, node);
 			xfsidbg_xdanode(node);
 		}
-	} else if (INT_GET((di = d)->di_core.di_magic, ARCH_UNKNOWN) == XFS_DINODE_MAGIC) {
+	} else if (INT_GET((di = d)->di_core.di_magic, ARCH_CONVERT) == XFS_DINODE_MAGIC) {
 		if (summary) {
 			printk("Disk Inode (at 0x%p)\n", di);
 		} else {
 			printk("buf 0x%p dinode 0x%p\n", bp, di);
 			xfs_inodebuf(bp);
 		}
-	} else if (INT_GET((sb = d)->sb_magicnum, ARCH_UNKNOWN) == XFS_SB_MAGIC) {
+	} else if (INT_GET((sb = d)->sb_magicnum, ARCH_CONVERT) == XFS_SB_MAGIC) {
 		if (summary) {
 			printk("Superblock (at 0x%p)\n", sb);
 		} else {
@@ -2838,35 +2838,35 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 		printk("Quota blk starting ID [%d], type %s at 0x%p\n",
 			dqb->d_id, XFSIDBG_DQTYPESTR(dqb), dqb);
 		
-	} else if (INT_GET((d2block = d)->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_BLOCK_MAGIC) {
+	} else if (INT_GET((d2block = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC) {
 		if (summary) {
 			printk("Dir2 block (at 0x%p)\n", d2block);
 		} else {
 			printk("buf 0x%p dir2 block 0x%p\n", bp, d2block);
 			xfs_dir2data((void *)d2block, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((d2data = d)->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC) {
+	} else if (INT_GET((d2data = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC) {
 		if (summary) {
 			printk("Dir2 data (at 0x%p)\n", d2data);
 		} else {
 			printk("buf 0x%p dir2 data 0x%p\n", bp, d2data);
 			xfs_dir2data((void *)d2data, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((d2leaf = d)->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAF1_MAGIC) {
+	} else if (INT_GET((d2leaf = d)->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAF1_MAGIC) {
 		if (summary) {
 			printk("Dir2 leaf(1) (at 0x%p)\n", d2leaf);
 		} else {
 			printk("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
 			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET(d2leaf->hdr.info.magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC) {
+	} else if (INT_GET(d2leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC) {
 		if (summary) {
 			printk("Dir2 leaf(n) (at 0x%p)\n", d2leaf);
 		} else {
 			printk("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
 			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
-	} else if (INT_GET((d2free = d)->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC) {
+	} else if (INT_GET((d2free = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC) {
 		if (summary) {
 			printk("Dir2 free (at 0x%p)\n", d2free);
 		} else {
@@ -2969,12 +2969,12 @@ xfsidbg_xdanode(struct xfs_da_intnode *node)
 	h = &node->hdr;
 	i = &h->info;
 	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		INT_GET(i->forw, ARCH_UNKNOWN), INT_GET(i->back, ARCH_UNKNOWN), INT_GET(i->magic, ARCH_UNKNOWN));
+		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
 	printk("hdr count %d level %d\n",
-		INT_GET(h->count, ARCH_UNKNOWN), INT_GET(h->level, ARCH_UNKNOWN));
-	for (j = 0, e = node->btree; j < INT_GET(h->count, ARCH_UNKNOWN); j++, e++) {
+		INT_GET(h->count, ARCH_CONVERT), INT_GET(h->level, ARCH_CONVERT));
+	for (j = 0, e = node->btree; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
 		printk("btree %d hashval 0x%x before 0x%x\n",
-			j, (uint_t)INT_GET(e->hashval, ARCH_UNKNOWN), INT_GET(e->before, ARCH_UNKNOWN));
+			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->before, ARCH_CONVERT));
 	}
 }
 
@@ -3024,18 +3024,18 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	h = &leaf->hdr;
 	i = &h->info;
 	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		INT_GET(i->forw, ARCH_UNKNOWN), INT_GET(i->back, ARCH_UNKNOWN), INT_GET(i->magic, ARCH_UNKNOWN));
+		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
 	printk("hdr count %d namebytes %d firstused %d holes %d\n",
-		INT_GET(h->count, ARCH_UNKNOWN), INT_GET(h->namebytes, ARCH_UNKNOWN), INT_GET(h->firstused, ARCH_UNKNOWN), h->holes);
+		INT_GET(h->count, ARCH_CONVERT), INT_GET(h->namebytes, ARCH_CONVERT), INT_GET(h->firstused, ARCH_CONVERT), h->holes);
 	for (j = 0, m = h->freemap; j < XFS_DIR_LEAF_MAPSIZE; j++, m++) {
 		printk("hdr freemap %d base %d size %d\n",
-			j, INT_GET(m->base, ARCH_UNKNOWN), INT_GET(m->size, ARCH_UNKNOWN));
+			j, INT_GET(m->base, ARCH_CONVERT), INT_GET(m->size, ARCH_CONVERT));
 	}
-	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_UNKNOWN); j++, e++) {
-		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(e->nameidx, ARCH_UNKNOWN));
-		XFS_DIR_SF_GET_DIRINO_ARCH(&n->inumber, &ino, ARCH_UNKNOWN);
+	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
+		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(e->nameidx, ARCH_CONVERT));
+		XFS_DIR_SF_GET_DIRINO_ARCH(&n->inumber, &ino, ARCH_CONVERT);
 		printk("leaf %d hashval 0x%x nameidx %d inumber %Ld ",
-			j, (uint_t)INT_GET(e->hashval, ARCH_UNKNOWN), INT_GET(e->nameidx, ARCH_UNKNOWN), ino);
+			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->nameidx, ARCH_CONVERT), ino);
 		printk("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			printk("%c", n->name[k]);
@@ -3064,50 +3064,50 @@ xfs_dir2data(void *addr, int size)
 	db = (xfs_dir2_data_t *)addr;
 	bb = (xfs_dir2_block_t *)addr;
 	h = &db->hdr;
-	printk("hdr magic 0x%x (%s)\nhdr bestfree", INT_GET(h->magic, ARCH_UNKNOWN),
-		INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC ? "DATA" :
-			(INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_BLOCK_MAGIC ? "BLOCK" : ""));
+	printk("hdr magic 0x%x (%s)\nhdr bestfree", INT_GET(h->magic, ARCH_CONVERT),
+		INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC ? "DATA" :
+			(INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC ? "BLOCK" : ""));
 	for (j = 0, m = h->bestfree; j < XFS_DIR2_DATA_FD_COUNT; j++, m++) {
-		printk(" %d: 0x%x@0x%x", j, INT_GET(m->length, ARCH_UNKNOWN), INT_GET(m->offset, ARCH_UNKNOWN));
+		printk(" %d: 0x%x@0x%x", j, INT_GET(m->length, ARCH_CONVERT), INT_GET(m->offset, ARCH_CONVERT));
 	}
 	printk("\n");
-	if (INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC)
+	if (INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC)
 		t = (char *)db + size;
 	else {
 		/* XFS_DIR2_BLOCK_TAIL_P */
 		tail = (xfs_dir2_block_tail_t *)
 		       ((char *)bb + size - sizeof(xfs_dir2_block_tail_t));
-		l = XFS_DIR2_BLOCK_LEAF_P_ARCH(tail, ARCH_UNKNOWN);
+		l = XFS_DIR2_BLOCK_LEAF_P_ARCH(tail, ARCH_CONVERT);
 		t = (char *)l;
 	}
 	for (p = (char *)(h + 1); p < t; ) {
 		u = (xfs_dir2_data_unused_t *)p;
 		if (u->freetag == XFS_DIR2_DATA_FREE_TAG) {
 			printk("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
-				p - (char *)addr, INT_GET(u->freetag, ARCH_UNKNOWN), INT_GET(u->length, ARCH_UNKNOWN),
-				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_UNKNOWN), ARCH_UNKNOWN));
-			p += INT_GET(u->length, ARCH_UNKNOWN);
+				p - (char *)addr, INT_GET(u->freetag, ARCH_CONVERT), INT_GET(u->length, ARCH_CONVERT),
+				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_CONVERT), ARCH_CONVERT));
+			p += INT_GET(u->length, ARCH_CONVERT);
 			continue;
 		}
 		e = (xfs_dir2_data_entry_t *)p;
 		printk("0x%x entry inumber %Ld namelen %d name \"",
-			p - (char *)addr, INT_GET(e->inumber, ARCH_UNKNOWN), e->namelen);
+			p - (char *)addr, INT_GET(e->inumber, ARCH_CONVERT), e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			printk("%c", e->name[k]);
-		printk("\" tag 0x%x\n", INT_GET(*XFS_DIR2_DATA_ENTRY_TAG_P(e), ARCH_UNKNOWN));
+		printk("\" tag 0x%x\n", INT_GET(*XFS_DIR2_DATA_ENTRY_TAG_P(e), ARCH_CONVERT));
 		p += XFS_DIR2_DATA_ENTSIZE(e->namelen);
 	}
-	if (INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC)
+	if (INT_GET(h->magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC)
 		return;
-	for (j = 0; j < INT_GET(tail->count, ARCH_UNKNOWN); j++, l++) {
+	for (j = 0; j < INT_GET(tail->count, ARCH_CONVERT); j++, l++) {
 		printk("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
 			(char *)l - (char *)addr, j,
-			(uint_t)INT_GET(l->hashval, ARCH_UNKNOWN), INT_GET(l->address, ARCH_UNKNOWN),
+			(uint_t)INT_GET(l->hashval, ARCH_CONVERT), INT_GET(l->address, ARCH_CONVERT),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
-			INT_GET(l->address, ARCH_UNKNOWN) << XFS_DIR2_DATA_ALIGN_LOG);
+			INT_GET(l->address, ARCH_CONVERT) << XFS_DIR2_DATA_ALIGN_LOG);
 	}
 	printk("0x%x tail count %d\n",
-		(char *)tail - (char *)addr, INT_GET(tail->count, ARCH_UNKNOWN));
+		(char *)tail - (char *)addr, INT_GET(tail->count, ARCH_CONVERT));
 }
 
 static void
@@ -3124,25 +3124,25 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 	i = &h->info;
 	e = leaf->ents;
 	printk("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		INT_GET(i->forw, ARCH_UNKNOWN), INT_GET(i->back, ARCH_UNKNOWN), INT_GET(i->magic, ARCH_UNKNOWN));
-	printk("hdr count %d stale %d\n", INT_GET(h->count, ARCH_UNKNOWN), INT_GET(h->stale, ARCH_UNKNOWN));
-	for (j = 0; j < INT_GET(h->count, ARCH_UNKNOWN); j++, e++) {
+		INT_GET(i->forw, ARCH_CONVERT), INT_GET(i->back, ARCH_CONVERT), INT_GET(i->magic, ARCH_CONVERT));
+	printk("hdr count %d stale %d\n", INT_GET(h->count, ARCH_CONVERT), INT_GET(h->stale, ARCH_CONVERT));
+	for (j = 0; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
 		printk("0x%x ent %d hashval 0x%x address 0x%x (byte 0x%x)\n",
 			(char *)e - (char *)leaf, j,
-			(uint_t)INT_GET(e->hashval, ARCH_UNKNOWN), INT_GET(e->address, ARCH_UNKNOWN),
+			(uint_t)INT_GET(e->hashval, ARCH_CONVERT), INT_GET(e->address, ARCH_CONVERT),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
-			INT_GET(e->address, ARCH_UNKNOWN) << XFS_DIR2_DATA_ALIGN_LOG);
+			INT_GET(e->address, ARCH_CONVERT) << XFS_DIR2_DATA_ALIGN_LOG);
 	}
-	if (INT_GET(i->magic, ARCH_UNKNOWN) == XFS_DIR2_LEAFN_MAGIC)
+	if (INT_GET(i->magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC)
 		return;
 	/* XFS_DIR2_LEAF_TAIL_P */
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
-	b = XFS_DIR2_LEAF_BESTS_P_ARCH(t, ARCH_UNKNOWN);
-	for (j = 0; j < INT_GET(t->bestcount, ARCH_UNKNOWN); j++, b++) {
+	b = XFS_DIR2_LEAF_BESTS_P_ARCH(t, ARCH_CONVERT);
+	for (j = 0; j < INT_GET(t->bestcount, ARCH_CONVERT); j++, b++) {
 		printk("0x%x best %d 0x%x\n",
-			(char *)b - (char *)leaf, j, INT_GET(*b, ARCH_UNKNOWN));
+			(char *)b - (char *)leaf, j, INT_GET(*b, ARCH_CONVERT));
 	}
-	printk("tail bestcount %d\n", INT_GET(t->bestcount, ARCH_UNKNOWN));
+	printk("tail bestcount %d\n", INT_GET(t->bestcount, ARCH_CONVERT));
 }
 
 /*
@@ -3157,11 +3157,11 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	XFS_DIR_SF_GET_DIRINO_ARCH(&sfh->parent, &ino, ARCH_UNKNOWN);
+	XFS_DIR_SF_GET_DIRINO_ARCH(&sfh->parent, &ino, ARCH_CONVERT);
 	printk("hdr parent %Ld", ino);
 	printk(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &ino, ARCH_UNKNOWN);
+		XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &ino, ARCH_CONVERT);
 		printk("entry %d inumber %Ld", i, ino);
 		printk(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
@@ -3183,13 +3183,13 @@ xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, &sfh->parent, ARCH_UNKNOWN);
+	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, &sfh->parent, ARCH_CONVERT);
 	printk("hdr count %d i8count %d parent %Ld\n",
 		sfh->count, sfh->i8count, ino);
 	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
-		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, XFS_DIR2_SF_INUMBERP(sfe), ARCH_UNKNOWN);
+		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, XFS_DIR2_SF_INUMBERP(sfe), ARCH_CONVERT);
 		printk("entry %d inumber %Ld offset 0x%x namelen %d name \"",
-			i, ino, XFS_DIR2_SF_GET_OFFSET_ARCH(sfe, ARCH_UNKNOWN), sfe->namelen);
+			i, ino, XFS_DIR2_SF_GET_OFFSET_ARCH(sfe, ARCH_CONVERT), sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			printk("%c", sfe->name[j]);
 		printk("\"\n");
@@ -3206,10 +3206,10 @@ xfsidbg_xdir2free(xfs_dir2_free_t *f)
 	int	i;
 
 	printk("hdr magic 0x%x firstdb %d nvalid %d nused %d\n",
-		INT_GET(f->hdr.magic, ARCH_UNKNOWN), INT_GET(f->hdr.firstdb, ARCH_UNKNOWN), INT_GET(f->hdr.nvalid, ARCH_UNKNOWN), INT_GET(f->hdr.nused, ARCH_UNKNOWN));
-	for (i = 0; i < INT_GET(f->hdr.nvalid, ARCH_UNKNOWN); i++) {
+		INT_GET(f->hdr.magic, ARCH_CONVERT), INT_GET(f->hdr.firstdb, ARCH_CONVERT), INT_GET(f->hdr.nvalid, ARCH_CONVERT), INT_GET(f->hdr.nused, ARCH_CONVERT));
+	for (i = 0; i < INT_GET(f->hdr.nvalid, ARCH_CONVERT); i++) {
 		printk("entry %d db %d count %d\n",
-			i, i + INT_GET(f->hdr.firstdb, ARCH_UNKNOWN), INT_GET(f->bests[i], ARCH_UNKNOWN));
+			i, i + INT_GET(f->hdr.firstdb, ARCH_CONVERT), INT_GET(f->bests[i], ARCH_CONVERT));
 	}
 }
 
@@ -3298,14 +3298,14 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 
 	printk("xlog_in_core/header at 0x%p\n", iclog);
 	printk("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
-		INT_GET(iclog->ic_header.h_magicno, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_cycle, ARCH_UNKNOWN),
-		INT_GET(iclog->ic_header.h_version, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_lsn, ARCH_UNKNOWN));
+		INT_GET(iclog->ic_header.h_magicno, ARCH_CONVERT), INT_GET(iclog->ic_header.h_cycle, ARCH_CONVERT),
+		INT_GET(iclog->ic_header.h_version, ARCH_CONVERT), INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT));
 	printk("tail_lsn: 0x%Lx  len: %d  prev_block: %d  num_ops: %d\n",
-		INT_GET(iclog->ic_header.h_tail_lsn, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_len, ARCH_UNKNOWN),
-		INT_GET(iclog->ic_header.h_prev_block, ARCH_UNKNOWN), INT_GET(iclog->ic_header.h_num_logops, ARCH_UNKNOWN));
+		INT_GET(iclog->ic_header.h_tail_lsn, ARCH_CONVERT), INT_GET(iclog->ic_header.h_len, ARCH_CONVERT),
+		INT_GET(iclog->ic_header.h_prev_block, ARCH_CONVERT), INT_GET(iclog->ic_header.h_num_logops, ARCH_CONVERT));
 	printk("cycle_data: ");
 	for (i=0; i<(iclog->ic_size>>BBSHIFT); i++) {
-		printk("%x  ", INT_GET(iclog->ic_header.h_cycle_data[i], ARCH_UNKNOWN));
+		printk("%x  ", INT_GET(iclog->ic_header.h_cycle_data[i], ARCH_CONVERT));
 	}
 	printk("\n");
 	printk("--------------------------------------------------\n");

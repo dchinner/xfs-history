@@ -139,7 +139,7 @@ xfs_bulkstat_one(
 		ASSERT(dic != NULL);
                 
                 /* buffer dinode_core is in on-disk arch */
-                arch = ARCH_GET(mp->m_arch); 
+                arch = ARCH_CONVERT; 
 
 		/*
 		 * The inode format changed when we moved the link count and
@@ -281,11 +281,10 @@ xfs_bulkstat(
 	xfs_buf_t		*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
-        xfs_arch_t		arch;	/* on-disk architecture type */
 	vfs_t			*vfsp;
 	int			vfs_unbusy_needed = 0;
         
-        arch = ARCH_GET(mp->m_arch);
+
 
 	/*
 	 * Check that the device is valid/mounted and mark it busy
@@ -405,9 +404,9 @@ xfs_bulkstat(
 						gcnt++;
 				}
 				gfree |= XFS_INOBT_MASKN(0, chunkidx);
-				INT_SET(irbp->ir_startino, ARCH_UNKNOWN, gino);
-				INT_SET(irbp->ir_freecount, ARCH_UNKNOWN, gcnt);
-				INT_SET(irbp->ir_free, ARCH_UNKNOWN, gfree);
+				INT_SET(irbp->ir_startino, ARCH_CONVERT, gino);
+				INT_SET(irbp->ir_freecount, ARCH_CONVERT, gcnt);
+				INT_SET(irbp->ir_free, ARCH_CONVERT, gfree);
 				irbp++;
 				agino = gino + XFS_INODES_PER_CHUNK;
 				icount = XFS_INODES_PER_CHUNK - gcnt;
@@ -443,7 +442,7 @@ xfs_bulkstat(
 			while (error) {
 				agino += XFS_INODES_PER_CHUNK;
 				if (XFS_AGINO_TO_AGBNO(mp, agino) >=
-						INT_GET(agi->agi_length, arch))
+						INT_GET(agi->agi_length, ARCH_CONVERT))
 					break;
 				error = xfs_inobt_lookup_ge(cur, agino, 0, 0,
 							    &tmp);
@@ -463,9 +462,9 @@ xfs_bulkstat(
 			 * If this chunk has any allocated inodes, save it.
 			 */
 			if (gcnt < XFS_INODES_PER_CHUNK) {
-				INT_SET(irbp->ir_startino, ARCH_UNKNOWN, gino);
-				INT_SET(irbp->ir_freecount, ARCH_UNKNOWN, gcnt);
-				INT_SET(irbp->ir_free, ARCH_UNKNOWN, gfree);
+				INT_SET(irbp->ir_startino, ARCH_CONVERT, gino);
+				INT_SET(irbp->ir_freecount, ARCH_CONVERT, gcnt);
+				INT_SET(irbp->ir_free, ARCH_CONVERT, gfree);
 				irbp++;
 				icount += XFS_INODES_PER_CHUNK - gcnt;
 			}
@@ -497,14 +496,14 @@ xfs_bulkstat(
 				 * inodes in that cluster.
 				 */
 				for (agbno = XFS_AGINO_TO_AGBNO(mp,
-							INT_GET(irbp[1].ir_startino, ARCH_UNKNOWN)),
+							INT_GET(irbp[1].ir_startino, ARCH_CONVERT)),
 				     chunkidx = 0;
 				     chunkidx < XFS_INODES_PER_CHUNK;
 				     chunkidx += nicluster,
 				     agbno += nbcluster) {
 					if (XFS_INOBT_MASKN(chunkidx,
 							    nicluster) &
-					    ~(INT_GET(irbp[1].ir_free, ARCH_UNKNOWN)))
+					    ~(INT_GET(irbp[1].ir_free, ARCH_CONVERT)))
 						xfs_btree_reada_bufs(mp, agno,
 							agbno, nbcluster);
 				}
@@ -512,9 +511,9 @@ xfs_bulkstat(
 			/*
 			 * Now process this chunk of inodes.
 			 */
-			for (agino = INT_GET(irbp->ir_startino, ARCH_UNKNOWN), chunkidx = 0, clustidx = 0;
+			for (agino = INT_GET(irbp->ir_startino, ARCH_CONVERT), chunkidx = 0, clustidx = 0;
 			     ubleft > 0 &&
-				INT_GET(irbp->ir_freecount, ARCH_UNKNOWN) < XFS_INODES_PER_CHUNK;
+				INT_GET(irbp->ir_freecount, ARCH_CONVERT) < XFS_INODES_PER_CHUNK;
 			     chunkidx++, clustidx++, agino++) {
 				ASSERT(chunkidx < XFS_INODES_PER_CHUNK);
 				/*
@@ -534,7 +533,7 @@ xfs_bulkstat(
 				 */
 				if ((chunkidx & (nicluster - 1)) == 0) {
 					agbno = XFS_AGINO_TO_AGBNO(mp,
-							INT_GET(irbp->ir_startino, ARCH_UNKNOWN)) +
+							INT_GET(irbp->ir_startino, ARCH_CONVERT)) +
 						((chunkidx & nimask) >>
 						 mp->m_sb.sb_inopblog);
 
@@ -571,23 +570,23 @@ xfs_bulkstat(
 				/*
 				 * Skip if this inode is free.
 				 */
-				if (XFS_INOBT_MASK(chunkidx) & INT_GET(irbp->ir_free, ARCH_UNKNOWN))
+				if (XFS_INOBT_MASK(chunkidx) & INT_GET(irbp->ir_free, ARCH_CONVERT))
 					continue;
 				/*
 				 * Count used inodes as free so we can tell
 				 * when the chunk is used up.
 				 */
-				INT_MOD(irbp->ir_freecount, ARCH_UNKNOWN, +1);
+				INT_MOD(irbp->ir_freecount, ARCH_CONVERT, +1);
 				ino = XFS_AGINO_TO_INO(mp, agno, agino);
 				bno = XFS_AGB_TO_DADDR(mp, agno, agbno);
 				if (flags & BULKSTAT_FG_QUICK) {
 					dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + 
 					      (clustidx << mp->m_sb.sb_inodelog));
 
-					if (INT_GET(dip->di_core.di_magic, arch)
+					if (INT_GET(dip->di_core.di_magic, ARCH_CONVERT)
 					            != XFS_DINODE_MAGIC
 					    || !XFS_DINODE_GOOD_VERSION(
-					            INT_GET(dip->di_core.di_version, arch)))
+					            INT_GET(dip->di_core.di_version, ARCH_CONVERT)))
 						continue;
 				}
 

@@ -269,7 +269,7 @@ xlog_find_cycle_start(xlog_t	*log,
 	while (mid_blk != first_blk && mid_blk != *last_blk) {
 		if (error = xlog_bread(log, mid_blk, 1, bp))
 			return error;
-		mid_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
+		mid_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
 		if (mid_cycle == cycle) {
 			*last_blk = mid_blk;
 			/* last_half_cycle == mid_cycle */
@@ -306,7 +306,7 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 	uint	cycle;
 
 	for (i=0; i<nbblks; i++) {
-		cycle = GET_CYCLE(*bap, ARCH_UNKNOWN);
+		cycle = GET_CYCLE(*bap, ARCH_CONVERT);
 		if (cycle != stop_on_cycle_no) {
 			(*bap) += BBSIZE;
 		} else {
@@ -348,7 +348,7 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 	    ASSERT(0);
 	    return XFS_ERROR(EIO);
 	}
-	if (INT_GET(*(uint *)ba, ARCH_UNKNOWN) == XLOG_HEADER_MAGIC_NUM) {
+	if (INT_GET(*(uint *)ba, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM) {
 	    break;
 	}
 	ba -= BBSIZE;
@@ -370,7 +370,7 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
      * record do we update last_blk.
      */
     rhead = (xlog_rec_header_t *)ba;
-    if (*last_blk - i + extra_bblks != BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN))+1)
+    if (*last_blk - i + extra_bblks != BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT))+1)
 	    *last_blk = i;
     return 0;
 }	/* xlog_find_verify_log_record */
@@ -416,12 +416,12 @@ xlog_find_head(xlog_t  *log,
     bp = xlog_get_bp(1,log->l_mp);
     if (error = xlog_bread(log, 0, 1, bp))
 	goto bp_err;
-    first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
+    first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
 
     last_blk = head_blk = log_bbnum-1;		/* get cycle # of last block */
     if (error = xlog_bread(log, last_blk, 1, bp))
 	goto bp_err;
-    last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
+    last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
     ASSERT(last_half_cycle != 0);
 
     /*
@@ -766,7 +766,7 @@ xlog_find_tail(xlog_t  *log,
 	if (*head_blk == 0) {				/* special case */
 		if (error = xlog_bread(log, 0, 1, bp))
 			goto bread_err;
-		if (GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN) == 0) {
+		if (GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT) == 0) {
 			*tail_blk = 0;
 			/* leave all other log inited values alone */
 			goto exit;
@@ -780,7 +780,7 @@ xlog_find_tail(xlog_t  *log,
 	for (i=(int)(*head_blk)-1; i>=0; i--) {
 		if (error = xlog_bread(log, i, 1, bp))
 			goto bread_err;
-		if (INT_GET(*(uint *)(XFS_BUF_PTR(bp)), ARCH_UNKNOWN) == XLOG_HEADER_MAGIC_NUM) {
+		if (INT_GET(*(uint *)(XFS_BUF_PTR(bp)), ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM) {
 			found = 1;
 			break;
 		}
@@ -795,7 +795,7 @@ xlog_find_tail(xlog_t  *log,
 		for (i=log->l_logBBsize-1; i>=(int)(*head_blk); i--) {
 			if (error = xlog_bread(log, i, 1, bp))
 				goto bread_err;
-			if (INT_GET(*(uint*)(XFS_BUF_PTR(bp)), ARCH_UNKNOWN) == XLOG_HEADER_MAGIC_NUM) {
+			if (INT_GET(*(uint*)(XFS_BUF_PTR(bp)), ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM) {
 				found = 2;
 				break;
 			}
@@ -809,7 +809,7 @@ xlog_find_tail(xlog_t  *log,
 
 	/* find blk_no of tail of log */
 	rhead = (xlog_rec_header_t *)XFS_BUF_PTR(bp);
-	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn, ARCH_UNKNOWN);
+	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn, ARCH_CONVERT);
 
 	/*
 	 * Reset log values according to the state of the log when we
@@ -823,11 +823,11 @@ xlog_find_tail(xlog_t  *log,
 	 */
 	log->l_prev_block = i;
 	log->l_curr_block = (int)*head_blk;
-	log->l_curr_cycle = INT_GET(rhead->h_cycle, ARCH_UNKNOWN);
+	log->l_curr_cycle = INT_GET(rhead->h_cycle, ARCH_CONVERT);
 	if (found == 2)
 		log->l_curr_cycle++;
-	log->l_tail_lsn = INT_GET(rhead->h_tail_lsn, ARCH_UNKNOWN);
-	log->l_last_sync_lsn = INT_GET(rhead->h_lsn, ARCH_UNKNOWN);
+	log->l_tail_lsn = INT_GET(rhead->h_tail_lsn, ARCH_CONVERT);
+	log->l_last_sync_lsn = INT_GET(rhead->h_lsn, ARCH_CONVERT);
 	log->l_grant_reserve_cycle = log->l_curr_cycle;
 	log->l_grant_reserve_bytes = BBTOB(log->l_curr_block);
 	log->l_grant_write_cycle = log->l_curr_cycle;
@@ -846,7 +846,7 @@ xlog_find_tail(xlog_t  *log,
 	 */
 	after_umount_blk = (i + 2) % log->l_logBBsize;
 	tail_lsn = log->l_tail_lsn;
-	if (*head_blk == after_umount_blk && INT_GET(rhead->h_num_logops, ARCH_UNKNOWN) == 1) {
+	if (*head_blk == after_umount_blk && INT_GET(rhead->h_num_logops, ARCH_CONVERT) == 1) {
 		umount_data_blk = (i + 1) % log->l_logBBsize;
 		if (error = xlog_bread(log, umount_data_blk, 1, bp)) {
 			goto bread_err;
@@ -925,7 +925,7 @@ xlog_find_zeroed(struct log	*log,
 	bp = xlog_get_bp(1,log->l_mp);
 	if (error = xlog_bread(log, 0, 1, bp))
 		goto bp_err;
-	first_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
+	first_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
 	if (first_cycle == 0) {		/* completely zeroed log */
 		*blk_no = 0;
 		xlog_put_bp(bp);
@@ -935,7 +935,7 @@ xlog_find_zeroed(struct log	*log,
 	/* check partially zeroed log */
 	if (error = xlog_bread(log, log_bbnum-1, 1, bp))
 		goto bp_err;
-	last_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
+	last_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
 	if (last_cycle != 0) {		/* log completely written to */
 		xlog_put_bp(bp);
 		return 0;
@@ -1025,15 +1025,15 @@ xlog_write_log_records(
 	recp = (xlog_rec_header_t*)(XFS_BUF_PTR(bp));
 	curr_block = start_block;
 	for (i = 0; i < blocks; i++) {
-		INT_SET(recp->h_magicno, ARCH_UNKNOWN, XLOG_HEADER_MAGIC_NUM);
-		INT_SET(recp->h_cycle, ARCH_UNKNOWN, cycle);
-		INT_SET(recp->h_version, ARCH_UNKNOWN, 1);
-		INT_ZERO(recp->h_len, ARCH_UNKNOWN);
-		ASSIGN_ANY_LSN(recp->h_lsn, cycle, curr_block, ARCH_UNKNOWN);
-		ASSIGN_ANY_LSN(recp->h_tail_lsn, tail_cycle, tail_block, ARCH_UNKNOWN);
-		INT_ZERO(recp->h_chksum, ARCH_UNKNOWN);
-		INT_ZERO(recp->h_prev_block, ARCH_UNKNOWN);	/* unused */
-		INT_ZERO(recp->h_num_logops, ARCH_UNKNOWN);
+		INT_SET(recp->h_magicno, ARCH_CONVERT, XLOG_HEADER_MAGIC_NUM);
+		INT_SET(recp->h_cycle, ARCH_CONVERT, cycle);
+		INT_SET(recp->h_version, ARCH_CONVERT, 1);
+		INT_ZERO(recp->h_len, ARCH_CONVERT);
+		ASSIGN_ANY_LSN(recp->h_lsn, cycle, curr_block, ARCH_CONVERT);
+		ASSIGN_ANY_LSN(recp->h_tail_lsn, tail_cycle, tail_block, ARCH_CONVERT);
+		INT_ZERO(recp->h_chksum, ARCH_CONVERT);
+		INT_ZERO(recp->h_prev_block, ARCH_CONVERT);	/* unused */
+		INT_ZERO(recp->h_num_logops, ARCH_CONVERT);
 		
 		curr_block++;
 		recp = (xlog_rec_header_t*)(((char *)recp) + BBSIZE);
@@ -1740,7 +1740,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 
 		buffer_nextp = (xfs_agino_t *)((char *)(XFS_BUF_PTR(bp)) +
 					      next_unlinked_offset);
-		INT_SET(*buffer_nextp, ARCH_UNKNOWN, *logged_nextp);
+		INT_SET(*buffer_nextp, ARCH_CONVERT, *logged_nextp);
 	}
 
 	return 0;
@@ -1976,7 +1976,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	 * overlap with future reads of those inodes.
 	 */
 	error = 0;
-	if ((INT_GET(*((__uint16_t *)(XFS_BUF_PTR(bp))), ARCH_UNKNOWN) == XFS_DINODE_MAGIC) &&
+	if ((INT_GET(*((__uint16_t *)(XFS_BUF_PTR(bp))), ARCH_CONVERT) == XFS_DINODE_MAGIC) &&
 	    (XFS_BUF_COUNT(bp) != MAX(log->l_mp->m_sb.sb_blocksize,
 							 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
 	  XFS_BUF_STALE(bp);
@@ -2628,8 +2628,8 @@ xlog_recover_process_data(xlog_t	    *log,
 			  caddr_t	    dp,
 			  int		    pass)
 {
-    caddr_t		lp	   = dp+INT_GET(rhead->h_len, ARCH_UNKNOWN);
-    int			num_logops = INT_GET(rhead->h_num_logops, ARCH_UNKNOWN);
+    caddr_t		lp	   = dp+INT_GET(rhead->h_len, ARCH_CONVERT);
+    int			num_logops = INT_GET(rhead->h_num_logops, ARCH_CONVERT);
     xlog_op_header_t	*ohead;
     xlog_recover_t	*trans;
     xlog_tid_t		tid;
@@ -2639,7 +2639,7 @@ xlog_recover_process_data(xlog_t	    *log,
 
 #ifdef SIM
     printf("LOG REC AT LSN cycle 0x%x blkno 0x%x\n",
-	   CYCLE_LSN(rhead->h_lsn, ARCH_UNKNOWN), BLOCK_LSN(rhead->h_lsn, ARCH_UNKNOWN));
+	   CYCLE_LSN(rhead->h_lsn, ARCH_CONVERT), BLOCK_LSN(rhead->h_lsn, ARCH_CONVERT));
 #endif
     while (dp < lp) {
 	ASSERT(dp + sizeof(xlog_op_header_t) <= lp);
@@ -2651,14 +2651,14 @@ xlog_recover_process_data(xlog_t	    *log,
 	    ASSERT(0);
 	    return (XFS_ERROR(EIO));
         }
-	tid = INT_GET(ohead->oh_tid, ARCH_UNKNOWN);
+	tid = INT_GET(ohead->oh_tid, ARCH_CONVERT);
 	hash = XLOG_RHASH(tid);
 	trans = xlog_recover_find_tid(rhash[hash], tid);
 	if (trans == NULL) {			   /* not found; add new tid */
 	    if (ohead->oh_flags & XLOG_START_TRANS)
-		xlog_recover_new_tid(&rhash[hash], tid, INT_GET(rhead->h_lsn, ARCH_UNKNOWN));
+		xlog_recover_new_tid(&rhash[hash], tid, INT_GET(rhead->h_lsn, ARCH_CONVERT));
 	} else {
-	    ASSERT(dp+INT_GET(ohead->oh_len, ARCH_UNKNOWN) <= lp);
+	    ASSERT(dp+INT_GET(ohead->oh_len, ARCH_CONVERT) <= lp);
 	    flags = ohead->oh_flags & ~XLOG_END_TRANS;
 	    if (flags & XLOG_WAS_CONT_TRANS)
 		flags &= ~XLOG_CONTINUE_TRANS;
@@ -2674,7 +2674,7 @@ xlog_recover_process_data(xlog_t	    *log,
 		}
 		case XLOG_WAS_CONT_TRANS: {
 		    error = xlog_recover_add_to_cont_trans(trans, dp,
-				  INT_GET(ohead->oh_len, ARCH_UNKNOWN));
+				  INT_GET(ohead->oh_len, ARCH_CONVERT));
 		    break;
 		}
 		case XLOG_START_TRANS : {
@@ -2686,7 +2686,7 @@ xlog_recover_process_data(xlog_t	    *log,
 		case 0:
 		case XLOG_CONTINUE_TRANS: {
 		    error = xlog_recover_add_to_trans(trans, dp,
-				   INT_GET(ohead->oh_len, ARCH_UNKNOWN));
+				   INT_GET(ohead->oh_len, ARCH_CONVERT));
 		    break;
 		}
 		default: {
@@ -2699,7 +2699,7 @@ xlog_recover_process_data(xlog_t	    *log,
 	    if (error)
 		return error;
 	} /* if */
-	dp += INT_GET(ohead->oh_len, ARCH_UNKNOWN);
+	dp += INT_GET(ohead->oh_len, ARCH_CONVERT);
 	num_logops--;
     }
     return( 0 );
@@ -2863,7 +2863,6 @@ xlog_recover_clear_agi_bucket(
 	xfs_agi_t	*agi;
 	daddr_t		agidaddr;
 	xfs_buf_t	*agibp;
-	xfs_arch_t	arch;
 	int		offset;
 	int		error;
 
@@ -2877,15 +2876,15 @@ xlog_recover_clear_agi_bucket(
 		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		return;
 	}
-	arch = mp->m_arch;
+
 	agi = XFS_BUF_TO_AGI(agibp);
-	if (INT_GET(agi->agi_magicnum, arch) != XFS_AGI_MAGIC) {
+	if (INT_GET(agi->agi_magicnum, ARCH_CONVERT) != XFS_AGI_MAGIC) {
 		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		return;
 	}
-	ASSERT(INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC);
+	ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 
-	INT_SET(agi->agi_unlinked[bucket], arch, NULLAGINO);
+	INT_SET(agi->agi_unlinked[bucket], ARCH_CONVERT, NULLAGINO);
 	offset = offsetof(xfs_agi_t, agi_unlinked) +
 		 (sizeof(xfs_agino_t) * bucket);
 	xfs_trans_log_buf(tp, agibp, offset,
@@ -2921,10 +2920,9 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	int		bucket;
 	int		error;
 	xfs_ino_t	last_ino;
-	xfs_arch_t	arch;
 
 	mp = log->l_mp;
-	arch = ARCH_GET(mp->m_arch);
+
 	last_ino = 0;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		/*
@@ -2933,7 +2931,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
 		agi = XFS_BUF_TO_AGI(agibp);
-		ASSERT(INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC);
+		ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 
 		bucket = 0;
 		while (bucket < XFS_AGI_UNLINKED_BUCKETS) {
@@ -2941,7 +2939,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			 * If there is nothing in the current bucket,
 			 * then continue on to the next one.
 			 */
-			agino = INT_GET(agi->agi_unlinked[bucket], arch);
+			agino = INT_GET(agi->agi_unlinked[bucket], ARCH_CONVERT);
 			if (agino == NULLAGINO) {
 				bucket++;
 				continue;
@@ -3004,7 +3002,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			agibp = xfs_buf_read(mp->m_ddev_targp,
 					 agidaddr, 1, 0);
 			agi = XFS_BUF_TO_AGI(agibp);
-			ASSERT(INT_GET(agi->agi_magicnum, arch) == XFS_AGI_MAGIC);
+			ASSERT(INT_GET(agi->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
 		}
 
 		/*
@@ -3035,16 +3033,16 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 	up = (uint *)iclog->ic_data;
 	/* divide length by 4 to get # words */
 	for (i=0; i<iclog->ic_offset >> 2; i++) {
-		chksum ^= INT_GET(*up, ARCH_UNKNOWN);
+		chksum ^= INT_GET(*up, ARCH_CONVERT);
 		up++;
 	}
-	INT_SET(iclog->ic_header.h_chksum, ARCH_UNKNOWN, chksum);
+	INT_SET(iclog->ic_header.h_chksum, ARCH_CONVERT, chksum);
 #endif /* DEBUG */
 
 	dp = iclog->ic_data;
 	for (i = 0; i<BTOBB(iclog->ic_offset); i++) {
-		INT_SET(iclog->ic_header.h_cycle_data[i], ARCH_UNKNOWN, INT_GET(*(uint *)dp, ARCH_UNKNOWN));
-		INT_SET(*(uint *)dp, ARCH_UNKNOWN, CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_UNKNOWN));
+		INT_SET(iclog->ic_header.h_cycle_data[i], ARCH_CONVERT, INT_GET(*(uint *)dp, ARCH_CONVERT));
+		INT_SET(*(uint *)dp, ARCH_CONVERT, CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT));
 		dp += BBSIZE;
 	}
 }	/* xlog_pack_data */
@@ -3062,22 +3060,22 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 	uint chksum = 0;
 #endif
 
-	for (i=0; i<BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN)); i++) {
-		INT_SET(*(uint *)dp, ARCH_UNKNOWN, INT_GET(*(uint *)&rhead->h_cycle_data[i], ARCH_UNKNOWN));
+	for (i=0; i<BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT)); i++) {
+		INT_SET(*(uint *)dp, ARCH_CONVERT, INT_GET(*(uint *)&rhead->h_cycle_data[i], ARCH_CONVERT));
 		dp += BBSIZE;
 	}
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 	/* divide length by 4 to get # words */
-	for (i=0; i < INT_GET(rhead->h_len, ARCH_UNKNOWN) >> 2; i++) {
-		chksum ^= INT_GET(*up, ARCH_UNKNOWN);
+	for (i=0; i < INT_GET(rhead->h_len, ARCH_CONVERT) >> 2; i++) {
+		chksum ^= INT_GET(*up, ARCH_CONVERT);
 		up++;
 	}
-	if (chksum != INT_GET(rhead->h_chksum, ARCH_UNKNOWN)) {
-	    if (!INT_ISZERO(rhead->h_chksum, ARCH_UNKNOWN) ||
+	if (chksum != INT_GET(rhead->h_chksum, ARCH_CONVERT)) {
+	    if (!INT_ISZERO(rhead->h_chksum, ARCH_CONVERT) ||
 		((log->l_flags & XLOG_CHKSUM_MISMATCH) == 0)) {
 		    cmn_err(CE_DEBUG,
 		        "XFS: LogR chksum mismatch: was (0x%x) is (0x%x)\n",
-			    INT_GET(rhead->h_chksum, ARCH_UNKNOWN), chksum);
+			    INT_GET(rhead->h_chksum, ARCH_CONVERT), chksum);
 		    cmn_err(CE_DEBUG,
 "XFS: Disregard message if filesystem was created with non-DEBUG kernel\n");
 		    log->l_flags |= XLOG_CHKSUM_MISMATCH;
@@ -3118,9 +3116,9 @@ xlog_do_recovery_pass(xlog_t	*log,
 	    if (error = xlog_bread(log, blk_no, 1, hbp))
 		goto bread_err;
 	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
-	    ASSERT(INT_GET(rhead->h_magicno, ARCH_UNKNOWN) == XLOG_HEADER_MAGIC_NUM);
-	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN) <= INT_MAX));
-	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN));	/* blocks in data section */
+	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
+	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
+	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));	/* blocks in data section */
 	    if (bblks > 0) {
 		if (error = xlog_bread(log, blk_no+1, bblks, dbp))
 		    goto bread_err;
@@ -3145,17 +3143,17 @@ xlog_do_recovery_pass(xlog_t	*log,
 	    if (error = xlog_bread(log, blk_no, 1, hbp))
 		goto bread_err;
 	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
-	    ASSERT(INT_GET(rhead->h_magicno, ARCH_UNKNOWN) == XLOG_HEADER_MAGIC_NUM);
-	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN) <= INT_MAX));
-	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN));
+	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
+	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
+	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
 
 	    /* LR body must have data or it wouldn't have been written */
 	    ASSERT(bblks > 0);
 	    blk_no++;			/* successfully read header */
 	    ASSERT(blk_no <= log->l_logBBsize);
 
-	    if ((INT_GET(rhead->h_magicno, ARCH_UNKNOWN) != XLOG_HEADER_MAGIC_NUM) ||
-		(BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN) > INT_MAX)) ||
+	    if ((INT_GET(rhead->h_magicno, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM) ||
+		(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) > INT_MAX)) ||
 		(bblks <= 0) ||
 		(blk_no > log->l_logBBsize)) {
 		    error = EFSCORRUPTED;
@@ -3201,9 +3199,9 @@ xlog_do_recovery_pass(xlog_t	*log,
 	    if (error = xlog_bread(log, blk_no, 1, hbp))
 		goto bread_err;
 	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
-	    ASSERT(INT_GET(rhead->h_magicno, ARCH_UNKNOWN) == XLOG_HEADER_MAGIC_NUM);
-	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN) <= INT_MAX));
-	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_UNKNOWN));
+	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
+	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
+	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
 	    ASSERT(bblks > 0);
 	    if (error = xlog_bread(log, blk_no+1, bblks, dbp))
 		goto bread_err;
@@ -3496,13 +3494,12 @@ xlog_recover_check_summary(xlog_t	*log)
 	xfs_sb_t	*sbp;
 #endif
 	xfs_agnumber_t	agno;
-	xfs_arch_t	arch;
 	__uint64_t	freeblks;
 	__uint64_t	itotal;
 	__uint64_t	ifree;
 
 	mp = log->l_mp;
-	arch = ARCH_GET(mp->m_arch);
+
 	freeblks = 0LL;
 	itotal = 0LL;
 	ifree = 0LL;
@@ -3510,23 +3507,23 @@ xlog_recover_check_summary(xlog_t	*log)
 		agfdaddr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
 		agfbp = xfs_buf_read(mp->m_ddev_targp, agfdaddr, 1, 0);
 		agfp = XFS_BUF_TO_AGF(agfbp);
-		ASSERT(INT_GET(agfp->agf_magicnum, arch) == XFS_AGF_MAGIC);
-		ASSERT(XFS_AGF_GOOD_VERSION(INT_GET(agfp->agf_versionnum, arch)));
-		ASSERT(INT_GET(agfp->agf_seqno, arch) == agno);
+		ASSERT(INT_GET(agfp->agf_magicnum, ARCH_CONVERT) == XFS_AGF_MAGIC);
+		ASSERT(XFS_AGF_GOOD_VERSION(INT_GET(agfp->agf_versionnum, ARCH_CONVERT)));
+		ASSERT(INT_GET(agfp->agf_seqno, ARCH_CONVERT) == agno);
 
-		freeblks += INT_GET(agfp->agf_freeblks, arch) +
-			    INT_GET(agfp->agf_flcount, arch);
+		freeblks += INT_GET(agfp->agf_freeblks, ARCH_CONVERT) +
+			    INT_GET(agfp->agf_flcount, ARCH_CONVERT);
 		xfs_buf_relse(agfbp);
 
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		agibp = xfs_buf_read(mp->m_ddev_targp, agidaddr, 1, 0);
 		agip = XFS_BUF_TO_AGI(agibp);
-		ASSERT(INT_GET(agip->agi_magicnum, arch) == XFS_AGI_MAGIC);
-		ASSERT(XFS_AGI_GOOD_VERSION(INT_GET(agip->agi_versionnum, arch)));
-		ASSERT(INT_GET(agip->agi_seqno, arch) == agno);
+		ASSERT(INT_GET(agip->agi_magicnum, ARCH_CONVERT) == XFS_AGI_MAGIC);
+		ASSERT(XFS_AGI_GOOD_VERSION(INT_GET(agip->agi_versionnum, ARCH_CONVERT)));
+		ASSERT(INT_GET(agip->agi_seqno, ARCH_CONVERT) == agno);
 
-		itotal += INT_GET(agip->agi_count, arch);
-		ifree += INT_GET(agip->agi_freecount, arch);
+		itotal += INT_GET(agip->agi_count, ARCH_CONVERT);
+		ifree += INT_GET(agip->agi_freecount, ARCH_CONVERT);
 		xfs_buf_relse(agibp);
 	}
 

@@ -140,8 +140,7 @@ typedef struct xfs_sb
 	__uint32_t	sb_unit;	/* stripe or raid unit */
 	__uint32_t	sb_width;	/* stripe or raid width */	
 	__uint8_t	sb_dirblklog;	/* log2 of dir block size (fsbs) */
-        xfs_arch_t      sb_arch;        /* native architecture of fs */
-        __uint8_t       sb_dummy[6];    /* padding */
+        __uint8_t       sb_dummy[7];    /* padding */
 } xfs_sb_t;
 
 /*
@@ -159,7 +158,7 @@ typedef enum {
 	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS, XFS_SBS_UQUOTINO,
 	XFS_SBS_PQUOTINO, XFS_SBS_QFLAGS, XFS_SBS_FLAGS, XFS_SBS_SHARED_VN,
 	XFS_SBS_INOALIGNMT, XFS_SBS_UNIT, XFS_SBS_WIDTH, XFS_SBS_DIRBLKLOG,
-        XFS_SBS_ARCH, XFS_SBS_DUMMY,
+        XFS_SBS_DUMMY,
 	XFS_SBS_FIELDCOUNT
 } xfs_sb_field_t;
 

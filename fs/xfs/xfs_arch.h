@@ -41,14 +41,7 @@
 #include "xfs_types.h"
 #include <endian.h>
 
-/* supported architecures */
-  
-#define ARCH_MIPS	0
-#define ARCH_INTEL_IA32	1
-#define ARCH_SPARC	2
-/* ARCH_UNKNOWN is defined later */
-
-/* if these are wrong, it's very foncusing */
+/* sanity checks */
 
 #if !defined(__LITTLE_ENDIAN) || !defined(__BIG_ENDIAN) || !defined(__BYTE_ORDER)
 #error endian defines are screwy
@@ -58,128 +51,15 @@
 #error XFS_BIG_FILESYSTEMS must be defined true or false
 #endif
 
-/* select native architecture */
-  
-#ifdef CONFIG_X86
-#define ARCH_NOCONVERT ARCH_INTEL_IA32
+/* do we need conversion? */
 
-#if __BYTE_ORDER == __BIG_ENDIAN
-#error big endian X86!?
-#endif
-
-#elif defined(__sparc__)
-#define ARCH_NOCONVERT ARCH_SPARC
+#define ARCH_NOCONVERT 1
+#if __BYTE_ORDER == __LITTLE_ENDIAN 
+#define ARCH_CONVERT   0
 #else
-#error attempt to define XFS native architecture on non-supported platform
+#define ARCH_CONVERT   ARCH_NOCONVERT
 #endif
 
-/* supported modes */
-
-#define XFS_ARCH_MODE_MIPS 0
-#define XFS_ARCH_MODE_NATIVE 1
-#define XFS_ARCH_MODE_MULTI 2
-
-/*
- * development hack:
- * define one of:
- *    OVERRIDE_ARCH_MIPS
- *    OVERRIDE_ARCH_NATIVE
- *    OVERRIDE_ARCH_MULTI
- *
- * to override the CONFIG_XFS_ARCH parameters
- */
-
-#ifndef XFS_ARCH_MODE
-
-#ifdef OVERRIDE_ARCH_MIPS
-#define XFS_ARCH_MODE XFS_ARCH_MODE_MIPS
-#define XFS_MODE "O-MIPS"
-#endif
-
-#ifdef OVERRIDE_ARCH_MULTI
-#define XFS_ARCH_MODE XFS_ARCH_MODE_MULTI
-#define XFS_MODE "O-MULTI"
-#endif
-
-#ifdef OVERRIDE_ARCH_NATIVE
-#define XFS_ARCH_MODE XFS_ARCH_MODE_NATIVE
-#define XFS_MODE "O-NATIVE"
-#endif
-#endif
-
-/*
- * exactly one of these three options should be enabled:
- *
- *  #ifdef CONFIG_XFS_ARCH_MIPS
- *     - support MIPS architecture ONLY
- *  #ifdef CONFIG_XFS_ARCH_NATIVE
- *     - support NATIVE architecture ONLY
- *  #ifdef CONFIG_XFS_ARCH_MULTI
- *     - support other architectures
- */
- 
-#ifndef XFS_ARCH_MODE
-
-/* check for multiple defines */
-
-#if (defined(CONFIG_XFS_ARCH_MIPS) && defined(CONFIG_XFS_ARCH_NATIVE)) || \
-    (defined(CONFIG_XFS_ARCH_MIPS) && defined(CONFIG_XFS_ARCH_MULTI)) || \
-    (defined(CONFIG_XFS_ARCH_MULTI) && defined(CONFIG_XFS_ARCH_NATIVE)) 
-    
-#error multiple xfs architecture options enabled
-
-#endif
-
-/* check for no defines */
-
-#if defined(CONFIG_XFS)
-#if (!defined(CONFIG_XFS_ARCH_MIPS) \
-    && !defined(CONFIG_XFS_ARCH_NATIVE) \
-    && !defined(CONFIG_XFS_ARCH_MULTI))
-
-#error no xfs architecture selected
-
-#endif
-#endif
-
-#ifdef CONFIG_XFS_ARCH_MIPS
-#define XFS_ARCH_MODE XFS_ARCH_MODE_MIPS
-#define XFS_MODE "MIPS"
-#endif
-
-#ifdef CONFIG_XFS_ARCH_NATIVE
-#define XFS_ARCH_MODE XFS_ARCH_MODE_NATIVE
-#define XFS_MODE "NATIVE"
-#endif
-
-#ifdef CONFIG_XFS_ARCH_MULTI
-#error xfs architecture mode "multi" not currently supported
-/* #define XFS_ARCH_MODE XFS_ARCH_MODE_MULTI */
-/* #define XFS_MODE "MULTI" */
-#endif
-
-#endif
-
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
-#define ARCH_SUPPORTED(A)   ((A)==ARCH_MIPS||(A)==ARCH_NOCONVERT)
-#define XFS_ARCH_DEFAULT    (ARCH_NOCONVERT)
-#define ARCH_UNKNOWN        arch_unknown_not_supported
-#else
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
-#define ARCH_SUPPORTED(A)   ((A)==ARCH_NOCONVERT)
-#define XFS_ARCH_DEFAULT    (ARCH_NOCONVERT)
-#define ARCH_UNKNOWN        (ARCH_NOCONVERT)
-#else
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS
-#define ARCH_SUPPORTED(A)   ((A)==ARCH_MIPS)
-#define XFS_ARCH_DEFAULT    (ARCH_MIPS)
-#define ARCH_UNKNOWN        (ARCH_MIPS)
-#else
-#error Error in XFS architecture mode selection
-#endif
-#endif
-#endif
-   
 /* generic swapping macros */
 
 #define INT_SWAP16(A) ((typeof(A))(__swab16((__u16)A)))
@@ -256,97 +136,8 @@
 #define INT_GET_UNALIGNED_64(pointer)       INT_GET_UNALIGNED_64_BE(pointer)
 #endif
 
-/*
- *   define one of three sets of macros depending on the native
- *   and supported architectures
- *
- *       case 1 - Native only macros - no architecture conversiosn
- *       case 2 - Swapping only macros - _always_ endian swap
- *       case 3 - multiple architecture support - swap when
- *                specified architecture(s) require it.
- */
+/* define generic INT_ macros */
 
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
-
-/*
- *  case 1 - fast path - all macros support NATIVE MACHINE architecture only
- */
- 
-#define ARCH_GET(REF) (ARCH_NOCONVERT)
-
-#define INT_GET(reference,arch) \
-    (reference)
-#define INT_SET(reference,arch,valueref) \
-    ((reference) = (valueref))
-#define INT_MODX(reference,arch,code) \
-    ((reference) code)
-#define INT_MOD(reference,arch,delta) \
-    INT_MODX(reference,arch,+=(delta))
-#define INT_COPY(buf,mem,dir,arch) {\
-    ASSERT(dir); \
-    if (dir>0) (mem)=(buf); else (buf)=(mem); \
-}
-#define INT_ISZERO(reference,arch) \
-    ((reference) == 0)
-#define INT_ZERO(reference,arch) \
-    ((reference) = 0)
-    
-#define DIRINO4_GET_ARCH(pointer,arch) \
-    (INT_GET_UNALIGNED_32(pointer))
-
-#if XFS_BIG_FILESYSTEMS
-#define DIRINO_GET_ARCH(pointer,arch) \
-    INT_GET_UNALIGNED_64(pointer)
-#else
-/* MACHINE ARCHITECTURE dependent */
-#if __BYTE_ORDER == __LITTLE_ENDIAN 
-#define DIRINO_GET_ARCH(pointer,arch) \
-    DIRINO4_GET_ARCH((((__u8*)pointer)+4),arch)
-#else
-#define DIRINO_GET_ARCH(pointer,arch) \
-    DIRINO4_GET_ARCH(pointer,arch)
-#endif
-#endif    
-
-#define DIRINO_COPY_ARCH(from,to,arch) \
-    bcopy(from,to,sizeof(xfs_dir_ino_t))
-#define DIRINO4_COPY_ARCH(from,to,arch) \
-    bcopy(from,to,sizeof(xfs_dir2_ino4_t))
-    
-#define INT_GET_UNALIGNED_16_ARCH(pointer,arch) \
-    INT_GET_UNALIGNED_16(pointer)
-#define INT_SET_UNALIGNED_16_ARCH(pointer,value,arch) \
-    INT_SET_UNALIGNED_16(pointer,value)
-    
-#endif
-
-/*
- *  case 2 - support only MIPS XFS on X86. 
- *           Therefore we always endian swap and ignore the architectures
- *
- *   case 3 - support multiple architectures
- *            we have to check architectures and swap accordinly
- *
- * assumptions:
- *   - only two architectures, ARCH_MIPS and ARCH_INTEL_IA32
- *   - ARCH_NOCONVERT == ARCH_INTEL_IA32
- *   - ARCH_UNKNOWN implies ARCH_MIPS
- *
- * given only two architectures, and since we _must_ check against
- * ARCH_NOCONVERT in both cases, we can use the same macros here
- *
- */
- 
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS || XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
-
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS
-#define ARCH_GET(REF) (ARCH_MIPS)
-#endif
-    
-#if XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
-#define ARCH_GET(REF) (REF)
-#endif
- 
 #define INT_GET(reference,arch) \
     (((arch) == ARCH_NOCONVERT) \
         ? \
@@ -449,8 +240,6 @@
         INT_SET_UNALIGNED_16_BE(pointer,value); \
     }
 
-#endif
-            
 #endif /* __XFS_ARCH_H__ */
 
 
