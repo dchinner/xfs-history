@@ -2026,8 +2026,8 @@ static void	printvnode(vnode_t *vp, unsigned long addr)
 	kdb_printf("   v_trace 0x%p\n", vp->v_trace);
 #endif	/* XFS_VNODE_TRACE */
 
-	kdb_printf("   v_vfsp 0x%p v_number %Lx\n",
-		vp->v_vfsp, vp->v_number);
+	kdb_printf("   v_vfsp 0x%p v_number 0x%llx\n",
+		vp->v_vfsp, (unsigned long long)vp->v_number);
 }
 
 static int	kdbm_vnode(
