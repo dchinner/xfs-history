@@ -2644,16 +2644,24 @@ xfs_bmap_alloc(
 	    prevp->br_startblock != NULLFSBLOCK)
 		bno = prevp->br_startblock + prevp->br_blockcount;
 	else if (!eof) {
-		if (prevp->br_startblock != NULLFSBLOCK) {
+		if (prevp->br_startoff != NULLFSBLOCK &&
+		    prevp->br_startblock != NULLFSBLOCK) {
 			prevdiff = off - (prevp->br_startoff + prevp->br_blockcount);
-			prevbno = prevp->br_startblock + off - prevp->br_startoff;
+			prevbno = prevp->br_startblock + prevp->br_blockcount + prevdiff;
+			if (xfs_fsb_to_agno(sbp, prevbno) !=
+			    xfs_fsb_to_agno(sbp, prevp->br_startblock) ||
+			    xfs_fsb_to_agbno(sbp, prevbno) >= sbp->sb_dblocks)
+				prevbno = prevp->br_startblock;
 			if (!nullfb && xfs_fsb_to_agno(sbp, prevbno) != fb_agno)
 				prevbno = NULLFSBLOCK;
 		} else
 			prevbno = NULLFSBLOCK;
 		if (gotp->br_startblock != NULLFSBLOCK) {
 			gotdiff = gotp->br_startoff - off;
-			gotbno = gotp->br_startblock - asklen;
+			gotbno = gotp->br_startblock - gotdiff;
+			if (xfs_fsb_to_agno(sbp, gotbno) !=
+			    xfs_fsb_to_agno(sbp, gotp->br_startblock))
+				gotbno = gotp->br_startblock;
 			if (!nullfb && xfs_fsb_to_agno(sbp, gotbno) != fb_agno)
 				gotbno = NULLFSBLOCK;
 		} else
@@ -2671,6 +2679,7 @@ xfs_bmap_alloc(
 		askbno = firstblock;
 	type = nullfb ? XFS_ALLOCTYPE_START_BNO : XFS_ALLOCTYPE_NEAR_BNO;
 	abno = xfs_alloc_vextent(tp, askbno, 1, asklen, alen, type, total);
+	/* for debugging */ ASSERT(abno != NULLFSBLOCK);
 	return abno;
 }
 
@@ -3223,6 +3232,8 @@ xfs_bmapi(
 				abno = NULLFSBLOCK;
 			else {
 				abno = xfs_bmap_alloc(tp, ip, eof, &prev, &got, firstblock, &alen, total, bno);
+				if (abno == NULLFSBLOCK)
+					break;
 				if (firstblock == NULLFSBLOCK)
 					firstblock = abno;
 				logext = 1;
