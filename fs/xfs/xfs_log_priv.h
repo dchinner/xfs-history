@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision: 1.45 $"
 
 #include <sys/cmn_err.h>
 
@@ -258,7 +258,7 @@ typedef struct log {
     struct xfs_mount	*l_mp;	        /* mount point */
     struct buf		*l_xbuf;        /* extra buffer for log wrapping */
     dev_t		l_dev;	        /* dev_t of log */
-    int			l_logBBstart;   /* start block of log */
+    daddr_t		l_logBBstart;   /* start block of log */
     int			l_logsize;      /* size of log in bytes */
     int			l_logBBsize;    /* size of log in 512 byte chunks */
     int			l_roundoff;	/* round off error of all iclogs */
