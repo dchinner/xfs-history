@@ -470,7 +470,8 @@ xfs_iget(
 retry:
 	XFS_STATS_INC(xfsstats.xs_ig_attempts);
 
-	if ((inode = icreate(XFS_MTOVFS(mp)->vfs_super, ino))) {
+	if ((inode = icreate(XFS_MTOVFS(mp)->vfs_super, ino,
+			tp ? SLAB_NOFS : SLAB_KERNEL))) {
 		bhv_desc_t	*bdp;
 		xfs_inode_t	*ip;
 		int		newnode;
