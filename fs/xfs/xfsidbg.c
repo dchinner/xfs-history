@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.67 $"
+#ident	"$Revision: 1.68 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3052,8 +3052,10 @@ xfsidbg_xlog(xlog_t *log)
 	int rbytes;
 	int wbytes;
 	static char *t_flags[] = {
-		"CHKSUM_MISMATCH",	/* 0x1 */
-		"ACTIVE_RECOVERY",	/* 0x2 */
+		"CHKSUM_MISMATCH",	/* 0x01 */
+		"ACTIVE_RECOVERY",	/* 0x02 */
+		"RECOVERY_NEEDED",	/* 0x04 */
+		"IO_ERROR",		/* 0x08 */
 		0
 	};
 
