@@ -88,10 +88,9 @@ xfs_trans_init(
 	resp->tr_swrite = XFS_CALC_SWRITE_LOG_RES(mp);
 	resp->tr_writeid = XFS_CALC_WRITEID_LOG_RES(mp);
 	resp->tr_addafork = XFS_CALC_ADDAFORK_LOG_RES(mp);
-	resp->tr_ainval = XFS_CALC_AINVAL_LOG_RES(mp);
-	resp->tr_setattr = XFS_CALC_SETATTR_LOG_RES(mp);
-	resp->tr_rmattr = XFS_CALC_RMATTR_LOG_RES(mp);
-	resp->tr_attrflag = XFS_CALC_ATTRFLAG_LOG_RES(mp);
+	resp->tr_attrinval = XFS_CALC_ATTRINVAL_LOG_RES(mp);
+	resp->tr_attrset = XFS_CALC_ATTRSET_LOG_RES(mp);
+	resp->tr_attrrm = XFS_CALC_ATTRRM_LOG_RES(mp);
 	resp->tr_clearagi = XFS_CALC_CLEAR_AGI_BUCKET_LOG_RES(mp);
 }
 
