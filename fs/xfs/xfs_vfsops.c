@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.139 $"
+#ident  "$Revision: 1.140 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1564,6 +1564,12 @@ xfs_sync(
 			 * with the inode.  Drop the inode lock since
 			 * we can't hold it across calls to the buffer
 			 * cache.
+			 *
+			 * We don't set the VREMAPPING bit in the vnode
+			 * here, because we don't hold the vnode lock
+			 * exclusively.  It doesn't really matter, though,
+			 * because we only come here when we're shutting
+			 * down anyway.
 			 */
 			last_byte = xfs_file_last_byte(ip);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
