@@ -498,11 +498,9 @@ linvfs_statfs(
 
 	struct statfs	sfs;
 	int		error;
-	ENTER("linvfs_statfs");
 	
 	VFS_ROOT(vfsp, &rootvp, error);
 	if (error){
-	  EXIT("linvfs_statfs <ERROR>");
 	  return(-error);
 	}
 
@@ -511,7 +509,6 @@ linvfs_statfs(
 	VN_RELE(rootvp);
 
 	if (error){
-	  EXIT("linvfs_statfs <ERROR>");
 	  return(-error);
 	}
 
@@ -531,7 +528,6 @@ linvfs_statfs(
 	error = copy_to_user(statfsbuf, &sfs,
 		(size < sizeof(struct statfs)) ? size : sizeof(struct statfs));
 
-	EXIT("linvfs_statfs <OK>");
 	return(error);
 }
 
