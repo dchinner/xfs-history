@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.102 $"
+#ident	"$Revision: 1.103 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -471,6 +471,12 @@ xfs_ialloc_ag_select(
 		if (agbp)
 			xfs_trans_brelse(tp, agbp);
 nextag:		
+		/*   
+		 * No point in iterating over the rest, if we're shutting
+		 * down.
+		 */
+		if (XFS_FORCED_SHUTDOWN(mp))
+			return (buf_t *)0;
 		agno++;
 		if (agno == agcount)
 			agno = 0;
@@ -1236,8 +1242,14 @@ xfs_ialloc_read_agi(
 	if (!pag->pagi_init) {
 		pag->pagi_freecount = agi->agi_freecount;
 		pag->pagi_init = 1;
-	} else
-		ASSERT(pag->pagi_freecount == agi->agi_freecount);
+	} else {
+		/*
+		 * It's possible for these to be out of sync if
+		 * we are in the middle of a forced shutdown.
+		 */
+		ASSERT(pag->pagi_freecount == agi->agi_freecount ||
+		       XFS_FORCED_SHUTDOWN(mp));
+	}
 #ifdef DEBUG
 	for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++)
 		ASSERT(agi->agi_unlinked[i] != 0);
