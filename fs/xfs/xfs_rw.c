@@ -1765,7 +1765,7 @@ xfs_strat_write(vnode_t	*vp,
 	xfs_bmbt_irec_t	imap[XFS_STRAT_WRITE_IMAPS];
 	
 	ip = XFS_VTOI(vp);
-	mp = XFS_VFSTOM(vp->v_vfsp);
+	mp = ip->i_mount;
 	sbp = &mp->m_sb;
 	bp->b_flags |= B_STALE;
 
@@ -1792,7 +1792,8 @@ xfs_strat_write(vnode_t	*vp,
 		 * backing store for the file.
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_FILE_WRITE);
-		error = xfs_trans_reserve(tp, 0, BBTOB(128), 0, 0);
+		error = xfs_trans_reserve(tp, 0, XFS_DEFAULT_LOG_RES(sbp),
+					  0, 0);
 		ASSERT(error == 0);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
@@ -2089,7 +2090,8 @@ xfs_diostrat( buf_t *bp)
 			xfs_ilock( ip, XFS_ILOCK_EXCL );
 			tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
 			error = xfs_trans_reserve( tp, count_fsb, 
-							BBTOB(128), 0, 0 );
+						   XFS_DEFAULT_LOG_RES(sbp),
+						   0, 0 );
 
 			if (error) {
 				/*
