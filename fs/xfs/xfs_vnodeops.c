@@ -1272,6 +1272,14 @@ xfs_lookup(vnode_t	*dir_vp,
 	dp = XFS_VTOI(dir_vp);
 	lock_mode = xfs_ilock_map_shared(dp);
 
+	/*
+	 * If the directory has been removed, then fail all lookups.
+	 */
+	if (dp->i_d.di_nlink == 0) {
+		xfs_iunlock_map_shared(dp, lock_mode);
+		return ENOENT;
+	}
+
 	if (code = xfs_iaccess(dp, IEXEC, credp)) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return code;
@@ -1516,6 +1524,14 @@ try_again:
         dp = XFS_VTOI(dir_vp);
 
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
+
+	/*
+	 * If the directory has been removed, then fail all creates.
+	 */
+	if (dp->i_d.di_nlink == 0) {
+		error = ENOENT;
+		goto error_return;
+	}
 
 	if (error = xfs_iaccess(dp, IEXEC, credp))
                 goto error_return;
@@ -1783,6 +1799,16 @@ again:
 
         xfs_ilock (dp, XFS_ILOCK_EXCL);
 
+	/*
+	 * If the link count on the directory is 0, there are no
+	 * entries to lock.
+	 */
+	if (dp->i_d.di_nlink == 0) {
+		xfs_iunlock(dp, XFS_ILOCK_EXCL);
+		*ipp = NULL;
+		return ENOENT;
+	}
+
 	error = xfs_dir_lookup_int (NULL, XFS_ITOV(dp), DLF_IGET, name, 
 				    NULL, &e_inum, &ip);
         if (error) {
@@ -1898,6 +1924,15 @@ xfs_lock_for_rename(
 	 * to see if we still have the right inodes, directories, etc.
 	 */
         lock_mode = xfs_ilock_map_shared (dp1);
+
+	/*
+	 * We don't want to do lookups in unlinked directories.
+	 */
+	if (dp1->i_d.di_nlink == 0) {
+		xfs_iunlock_map_shared(dp1, lock_mode);
+		return ENOENT;
+	}
+
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp1), DLF_IGET,
 				   name1, NULL, &inum1, &ip1);
 
@@ -1915,6 +1950,15 @@ xfs_lock_for_rename(
 	ITRACE(ip1);
 
         lock_mode = xfs_ilock_map_shared (dp2);
+
+	/*
+	 * We don't want to do lookups in unlinked directories.
+	 */
+	if (dp2->i_d.di_nlink == 0) {
+		xfs_iunlock_map_shared(dp2, lock_mode);
+		return ENOENT;
+	}
+
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp2), DLF_IGET,
 				   name2, NULL, &inum2, &ip2);
 	dir_gen2 = dp2->i_gen;
@@ -2062,17 +2106,10 @@ xfs_remove(vnode_t	*dir_vp,
 	dp = XFS_VTOI(dir_vp);
         ip = NULL;
 
-	if (error = xfs_iaccess (dp, IEXEC | IWRITE, credp))
-		goto error_return;
-
 	error = xfs_lock_dir_and_entry (dp, name, &ip);
 	if (error) {
 		goto error_return;
 	}
-
-	if (error = xfs_stickytest (dp, ip, credp))
-                goto error_return;
-
 
 	/*
 	 * At this point, we've gotten both the directory and the entry
@@ -2088,6 +2125,13 @@ xfs_remove(vnode_t	*dir_vp,
 		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
 	}
 
+	if (error = xfs_iaccess (dp, IEXEC | IWRITE, credp)) {
+		goto error_return;
+	}
+
+	if (error = xfs_stickytest (dp, ip, credp)) {
+		goto error_return;
+	}
 
 	if (XFS_ITOV(ip)->v_vfsmountedhere) {
                         error = XFS_ERROR(EBUSY);
@@ -2200,6 +2244,15 @@ xfs_link(vnode_t	*target_dir_vp,
 	VN_HOLD(target_dir_vp);
 	xfs_trans_ijoin (tp, sip, XFS_ILOCK_EXCL);
         xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
+
+	/*
+	 * If the target directory has been removed, we can't link
+	 * any more files in it.
+	 */
+	if (tdp->i_d.di_nlink == 0) {
+		error = ENOENT;
+		goto error_return;
+	}
 
 	if (error = xfs_iaccess (tdp, IEXEC | IWRITE, credp))
                 goto error_return;
@@ -2496,9 +2549,7 @@ start_over:
 	 * does not exist in the source directory.
 	 */
 	src_dp = XFS_VTOI(src_dir_vp);
-	ASSERT (src_dp->i_d.di_nlink >= 2);
         target_dp = XFS_VTOI(target_dir_vp);
-	ASSERT (target_dp->i_d.di_nlink >= 2);
 	while ((error = xfs_lock_for_rename(src_dp, target_dp, src_name,
 				target_name, &src_ip, &target_ip)) == EAGAIN)
 		continue;
@@ -2541,6 +2592,19 @@ start_over:
 	/*
 	 * Make all the access checks.
 	 */
+
+	/*
+	 * If the target directory has been removed, we can't create any
+	 * more files in it.  We don't need to check the source dir,
+	 * because it was checked in xfs_lock_for_rename() while looking
+	 * for the source inode.  If it had been removed the source
+	 * dir's gen count would have been bumped removing the last entry
+	 * and then we'd have noticed that its link count had gone to zero.
+	 */
+	if (target_dp->i_d.di_nlink == 0) {
+		error = ENOENT;
+		goto error_return;
+	}
 	if (error = xfs_iaccess (src_dp, IEXEC | IWRITE, credp))
                 goto error_return;
 	if (error = xfs_stickytest (src_dp, src_ip, credp))
@@ -2969,6 +3033,15 @@ xfs_rmdir(vnode_t	*dir_vp,
         xfs_ilock (dp, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
+	/*
+	 * If the directory has been removed, we don't want to do any
+	 * lookups and we know it has no entries.
+	 */
+	if (dp->i_d.di_nlink == 0) {
+		error = ENOENT;
+		goto error_return;
+	}
+
 	if (error = xfs_iaccess (dp, IEXEC | IWRITE, credp))
                 goto error_return;
 
@@ -3163,6 +3236,15 @@ xfs_symlink(vnode_t	*dir_vp,
 
         dp = XFS_VTOI(dir_vp);
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
+
+	/*
+	 * If the directory has been removed, then we can't create
+	 * anything in it.
+	 */
+	if (dp->i_d.di_nlink == 0) {
+		error = ENOENT;
+		goto error_return;
+	}
 
 	if (error = xfs_iaccess (dp, IEXEC | IWRITE, credp))
                 goto error_return;
