@@ -1,4 +1,4 @@
-#ident "$Revision: 1.245 $"
+#ident "$Revision: 1.246 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -493,9 +493,7 @@ xfs_getattr(
 	 */
 	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
 		vap->va_rdev = 0;
-        } else if ((vp->v_type == VCHR) ||
-		   (vp->v_type == VBLK) ||
-		   (vp->v_type == VXNAM)) {
+        } else if ((vp->v_type == VCHR) || (vp->v_type == VBLK)) {
                 vap->va_rdev = ip->i_df.if_u2.if_rdev;
         } else {
                 vap->va_rdev = 0;       /* not a b/c spec. */
