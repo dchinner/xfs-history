@@ -2142,7 +2142,7 @@ xlog_recover_do_trans(xlog_t	     *log,
 
 	first_item = item = trans->r_itemq;
 	do {
-#if XFS_BIG_FILESYSTEMS
+#if !XFS_BIG_FILESYSTEMS
 		/*
 		 * Kernels that do not support big filesystems cannot
 		 * recover 64 bit buffer log records.
