@@ -2494,9 +2494,9 @@ print_pagebuf(
 		   (unsigned long long) pb->pb_file_offset,
 		   (unsigned long long) pb->pb_buffer_length,
 		   pb->pb_addr);
-	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx\n",
+	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx pb_locked %d\n",
 		   pb->pb_bn,
-		   (unsigned long) pb->pb_count_desired);
+		   (unsigned long) pb->pb_count_desired, (int)pb->pb_locked);
 	kdb_printf("  pb_flushtime %ld (%ld) pb_io_remaining %d pb_error %u\n",
 		   pb->pb_flushtime, pb->pb_flushtime - jiffies,
 		   pb->pb_io_remaining.counter, pb->pb_error);
