@@ -327,7 +327,7 @@ xfs_ip_to_stat(
 	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
 		buf->dt_rdev = 0;
 	} else if ((vp->v_type == VCHR) || (vp->v_type == VBLK) ) {
-		buf->dt_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
+		buf->dt_rdev = XFS_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 	} else {
 		buf->dt_rdev = 0;	/* not a b/c spec. */
 	}
@@ -953,12 +953,6 @@ found:
 	if (xfer >= 0) {
 		*rvp = xfer;
 		error = 0;
-		linvfs_revalidate_core(ip, ATTR_COMM);
-		if (fmode & FMODE_READ) {
-			XFS_STATS_ADD(xfsstats.xs_read_bytes, xfer);
-		} else {
-			XFS_STATS_ADD(xfsstats.xs_write_bytes, xfer);
-		}
 	} else {
 		error = -(int)xfer;
 	}
