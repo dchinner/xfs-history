@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.148 $"
+#ident	"$Revision: 1.149 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -65,6 +65,7 @@ STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int);
 STATIC void	xfs_sb_relse(buf_t *);
 #ifndef SIM
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *, int);
+STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC void	xfs_uuid_mount(xfs_mount_t *);
 STATIC void	xfs_uuid_unmount(xfs_mount_t *);
 
@@ -173,6 +174,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
 	boolean_t	needquotamount;
+	__int64_t	update_flags;
 #endif
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
@@ -255,28 +257,66 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	 * allocator alignment is within an ag, therefore ag has
 	 * to be aligned at stripe boundary.
 	 */
+#ifndef SIM
+	update_flags = 0LL;
+#endif
 	if (mp->m_dalign) {
 		/*
-		 * If stripe unit and stripe with are not multiples
+		 * If stripe unit and stripe width are not multiples
 		 * of the fs blocksize turn off alignment.
 		 */
 		if ((BBTOB(mp->m_dalign) % sbp->sb_blocksize) ||
 		    (BBTOB(mp->m_swidth) % sbp->sb_blocksize)) {
+			if (mp->m_flags & XFS_MOUNT_RETERR) {
+				error = XFS_ERROR(EINVAL);
+				goto error1;
+			}
 			mp->m_dalign = mp->m_swidth = 0;
 		} else {
 			/*
-			 * Convert the stripe unit and with to FSBs.
+			 * Convert the stripe unit and width to FSBs.
 			 */
 			mp->m_dalign = XFS_BB_TO_FSBT(mp, mp->m_dalign);
 			if (mp->m_dalign && (sbp->sb_agblocks % mp->m_dalign)) {
+				if (mp->m_flags & XFS_MOUNT_RETERR) {
+					error = XFS_ERROR(EINVAL);
+					goto error1;
+				}
 				mp->m_dalign = 0;
 				mp->m_swidth = 0;
 			} else if (mp->m_dalign) {
 				mp->m_swidth = XFS_BB_TO_FSBT(mp, mp->m_swidth);
-			} else
+			} else {
+				if (mp->m_flags & XFS_MOUNT_RETERR) {
+					error = XFS_ERROR(EINVAL);
+					goto error1;
+				}
 				mp->m_swidth = 0;
+			}
 		}
+		
+#ifndef SIM
+		/* 
+		 * Update superblock with new values
+		 * and log changes
+		 */
+		if (XFS_SB_VERSION_HASDALIGN(sbp)) { 
+			if (sbp->sb_unit != mp->m_dalign) {
+				sbp->sb_unit = mp->m_dalign;
+				update_flags |= XFS_SB_UNIT;
+			}
+			if (sbp->sb_width != mp->m_swidth) {
+				sbp->sb_width = mp->m_swidth;
+				update_flags |= XFS_SB_WIDTH;
+			}
+		}
+#endif
+	} else if ((mp->m_flags & XFS_MOUNT_NOALIGN) != XFS_MOUNT_NOALIGN &&
+		    XFS_SB_VERSION_HASDALIGN(&mp->m_sb)) {
+			mp->m_dalign = sbp->sb_unit;
+			mp->m_swidth = sbp->sb_width;
 	}
+
 
 	/*
 	 * Setup for attributes, in case they get created.
@@ -599,6 +639,13 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 
 	
 #ifndef SIM 
+	/*
+	 * If fs is not mounted readonly, then update the superblock
+	 * unit and width changes.
+	 */
+	if (update_flags && (vfsp->vfs_flag & VFS_RDONLY) != VFS_RDONLY)
+		xfs_mount_log_sbunit(mp, update_flags);	
+
 	quotaflags = 0;
 	needquotamount = B_FALSE;
 	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
@@ -945,6 +992,8 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 		offsetof(xfs_sb_t, sb_pquotino),
 		offsetof(xfs_sb_t, sb_qflags),
 		offsetof(xfs_sb_t, sb_inoalignmt),
+		offsetof(xfs_sb_t, sb_unit),
+		offsetof(xfs_sb_t, sb_width),
 		sizeof(xfs_sb_t)
 	};
  
@@ -1295,4 +1344,31 @@ xfs_mount_reset_sbqflags(
 	(void)xfs_trans_commit(tp, 0);
 }	
 
+/*
+ * Used to log changes to the superblock unit and width fields which could
+ * be altered by the mount options. Only the first superblock is updated.
+ */
+STATIC void
+xfs_mount_log_sbunit(
+	xfs_mount_t *mp,
+	__int64_t fields)
+{
+
+	xfs_trans_t *tp;
+
+	ASSERT(fields & (XFS_SB_UNIT|XFS_SB_WIDTH));
+
+	if (mp->m_sb.sb_unit == 0 && mp->m_sb.sb_width == 0)
+		return;
+
+	tp = xfs_trans_alloc(mp, XFS_TRANS_SB_UNIT);
+	if (xfs_trans_reserve(tp, 0, mp->m_sb.sb_sectsize + 128, 0, 0, 
+				XFS_DEFAULT_LOG_COUNT)) {
+		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		return;
+	}
+	xfs_mod_sb(tp, fields);
+	(void)xfs_trans_commit(tp, 0);
+}
+	
 #endif /* !SIM */
