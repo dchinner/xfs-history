@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 28
+SUBLEVEL = 29
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -112,6 +112,7 @@ NETWORKS	=net/network.a
 DRIVERS		=drivers/block/block.a \
 		 drivers/char/char.o \
 		 drivers/misc/misc.o \
+		 drivers/net/net.o \
 	         drivers/parport/parport.a
 LIBS		=$(TOPDIR)/lib/lib.a
 SUBDIRS		=kernel drivers mm fs net ipc lib
@@ -123,8 +124,6 @@ endif
 ifeq ($(CONFIG_ISDN),y)
 DRIVERS := $(DRIVERS) drivers/isdn/isdn.a
 endif
-
-DRIVERS := $(DRIVERS) drivers/net/net.a
 
 ifdef CONFIG_NET_FC
 DRIVERS := $(DRIVERS) drivers/net/fc/fc.a
@@ -364,6 +363,7 @@ modules_install:
 	if [ -f VIDEO_MODULES ]; then inst_mod VIDEO_MODULES video; fi; \
 	if [ -f FC4_MODULES   ]; then inst_mod FC4_MODULES   fc4;   fi; \
 	if [ -f IRDA_MODULES  ]; then inst_mod IRDA_MODULES  net;   fi; \
+	if [ -f SK98LIN_MODULES ]; then inst_mod SK98LIN_MODULES  net;   fi; \
 	if [ -f USB_MODULES   ]; then inst_mod USB_MODULES   usb;   fi; \
 	if [ -f PCMCIA_MODULES ]; then inst_mod PCMCIA_MODULES pcmcia; fi; \
 	if [ -f PCMCIA_NET_MODULES ]; then inst_mod PCMCIA_NET_MODULES pcmcia; fi; \
