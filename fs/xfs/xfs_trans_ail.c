@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.24 $"
 
 #include <sys/debug.h>
 #ifdef SIM
@@ -156,6 +156,13 @@ xfs_trans_push_ail(
 			break;
 		case XFS_ITEM_LOCKED:
 		case XFS_ITEM_FLUSHING:
+			/*
+			 * Flush the log in this case just in case the
+			 * item is being flushed but got stuck on a
+			 * pinned object (like flushing an inode on a
+			 * pinned buffer).
+			 */
+			flush_log = 1;
 			break;
 		default:
 			ASSERT(0);
