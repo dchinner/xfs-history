@@ -661,7 +661,7 @@ xfs_itable(
 		error = xfs_inumbers(mp, NULL, &inlast, &count, ubuffer);
 		break;
 	case SGI_FS_BULKSTAT:
-		if (count == 1)
+		if (count == 1 && inlast != 0)
 			error = xfs_bulkstat_single(mp, &inlast, &count,
 				ubuffer, &done);
 		else
