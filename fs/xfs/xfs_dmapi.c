@@ -2571,6 +2571,14 @@ xfs_dm_write_invis_rvp(
 }
 
 
+STATIC void
+xfs_dm_obj_ref_hold(
+	vnode_t		*vp)
+{
+	VN_HOLD(vp);
+}
+
+
 STATIC fsys_function_vector_t	xfs_fsys_vector[DM_FSYS_MAX];
 
 
@@ -2659,6 +2667,8 @@ xfs_dm_get_fsys_vector(
 	vecp[i++].u_fc.upgrade_right = xfs_dm_upgrade_right;
 	vecp[i].func_no = DM_FSYS_WRITE_INVIS_RVP;
 	vecp[i++].u_fc.write_invis_rvp = xfs_dm_write_invis_rvp;
+	vecp[i].func_no = DM_FSYS_OBJ_REF_HOLD;
+	vecp[i++].u_fc.obj_ref_hold = xfs_dm_obj_ref_hold;
 
 	return(0);
 }
