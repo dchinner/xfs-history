@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.55 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -141,7 +141,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	}
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;				/* bcopy structure */
-	mp->m_agrotor = 0;
+	mp->m_agfrotor = mp->m_agirotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
 	mp->m_blockmask = sbp->sb_blocksize - 1;
@@ -344,7 +344,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 		sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
 		logstart = sbp->sb_logstart;
 		xfs_log_mount(mp, logdev, XFS_FSB_TO_DADDR(mp, logstart),
-			      XFS_BTOD(mp, sbp->sb_logblocks), 0);
+			      XFS_BTOD(mp, sbp->sb_logblocks));
 	}
 
 	return mp;
