@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision: 1.39 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -2527,6 +2527,17 @@ xfs_rtfree_extent(
 	 * Mark more blocks free in the superblock.
 	 */
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FREXTENTS, (long)len);
+	/*
+	 * If we've now freed all the blocks, reset the file sequence
+	 * number to 0.
+	 */
+	if (tp->t_frextents_delta + mp->m_sb.sb_frextents ==
+	    mp->m_sb.sb_rextents) {
+		if (!(ip->i_d.di_flags & XFS_DIFLAG_NEWRTBM))
+			ip->i_d.di_flags |= XFS_DIFLAG_NEWRTBM;
+		*(__uint64_t *)&ip->i_d.di_atime = 0;
+		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	}
 	return 0;
 }
 
@@ -2611,6 +2622,7 @@ int					/* error */
 xfs_rtpick_extent(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_extlen_t	len,		/* allocation length (rtextents) */
 	xfs_rtblock_t	*pick)		/* result rt extent */
 {
 	xfs_rtblock_t	b;		/* result block */
@@ -2639,6 +2651,8 @@ xfs_rtpick_extent(
 		    (log2 + 1);
 		if (b >= mp->m_sb.sb_rextents)
 			b %= mp->m_sb.sb_rextents;
+		if (b + len > mp->m_sb.sb_rextents) 
+			b = mp->m_sb.sb_rextents - len;
 	}
 	*seqp = seq + 1;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
