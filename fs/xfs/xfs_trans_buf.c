@@ -1,4 +1,4 @@
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -25,7 +25,6 @@
 #include <sys/user.h>
 #include <sys/systm.h>
 #endif
-#include <sys/cmn_err.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -338,7 +337,10 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 
 			iowait(bp);
 			if (geterror(bp) != 0) {
-				cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
+				prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+				error = geterror(bp);
+				brelse(bp);
+				return error;
 			}
 		}
 
@@ -365,7 +367,10 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		return 0;
 	}
 	if (geterror(bp) != 0) {
-		cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
+			prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+			error = geterror(bp);
+			brelse(bp);
+			return error;
 	}
 #ifdef DEBUG
 	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
