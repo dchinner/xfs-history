@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.3 $"
 
 /*
  * Structures returned from xfs_bulkstat syssgi routine.
@@ -22,7 +22,7 @@ typedef struct xfs_bstat
 	__int64_t	bs_blocks;	/* number of blocks */
 	__uint32_t	bs_xflags;	/* extended flags */
 	__int32_t	bs_extsize;	/* extent size */
-	__int32_t	bs_nextents;	/* number of extents */
+	__int32_t	bs_extents;	/* number of extents */
 	__uint32_t	bs_gen;		/* generation count */
 	uuid_t		bs_uuid;	/* unique id of file */
 } xfs_bstat_t;
