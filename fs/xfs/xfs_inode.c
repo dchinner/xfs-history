@@ -1,4 +1,4 @@
-#ident "$Revision: 1.184 $"
+#ident "$Revision: 1.185 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2590,6 +2590,9 @@ xfs_iflush_fork(
 				(first + ifp->if_bytes - 1));
 #endif
 		}
+		if (whichfork == XFS_DATA_FORK) {
+			xfs_dir_shortform_validate_ondisk(mp, dip);
+		}
 		break;
 
 	case XFS_DINODE_FMT_EXTENTS:
@@ -2743,6 +2746,8 @@ xfs_iflush(
 	 * Make sure the place we're flushing out to really looks
 	 * like an inode!
 	 */
+	xfs_dir_shortform_validate(mp, ip);
+
 	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
 		cmn_err(CE_PANIC, "xfs_iflush: Bad inode pointer 0x%x",
 			dip);

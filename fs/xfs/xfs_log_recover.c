@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.95 $"
+#ident	"$Revision: 1.97 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2480,6 +2480,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 
 write_inode_buffer:
+	xfs_dir_shortform_validate_ondisk(mp, dip);
 	xfs_inobp_check(mp, bp);
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
 		bdwrite(bp);

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_SF_H
 #define	_FS_XFS_DIR_SF_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.8 $"
 
 /*
  * xfs_dir_sf.h
@@ -92,6 +92,12 @@ int xfs_dir_sf_allfit(int count, int totallen);
 	(sizeof(xfs_dir_sf_hdr_t) + \
 	       (sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
 #endif
+
+struct xfs_dinode;
+
+void	xfs_dir_shortform_validate(struct xfs_mount *, struct xfs_inode *);
+void	xfs_dir_shortform_validate_ondisk(struct xfs_mount *, struct xfs_dinode *);
+
 
 #ifdef XFS_ALL_TRACE
 #define	XFS_DIR_TRACE

@@ -32,6 +32,7 @@
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/fcntl.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -102,6 +103,131 @@ void qsort (void* base, size_t nel, size_t width,
  * External routines when dirsize < XFS_IFORK_DSIZE(dp).
  *========================================================================*/
 
+
+/*
+ * Validate a given inode number.
+ */
+void
+xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
+{
+	xfs_agnumber_t	agno;
+	xfs_agblock_t	agblkno;
+	int		ioff;
+
+	agno = XFS_INO_TO_AGNO(mp, ino);
+	if (agno >= mp->m_sb.sb_agcount) {
+		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
+		return;
+	}
+	agblkno = XFS_INO_TO_AGBNO(mp, ino);
+	if (agno >= mp->m_sb.sb_agblocks) {
+		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
+		return;
+	}
+	ioff = XFS_INO_TO_OFFSET(mp, ino);
+	if (agno >= (1 << mp->m_sb.sb_inopblog)) {
+		cmn_err(CE_PANIC, "Invalid inode number 0x%x\n", (long)ino);
+		return;
+	}
+	return;
+}
+/*
+ * Validate a given shortform directory inode.
+ */
+void
+xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
+{
+	xfs_ino_t		ino;
+	int			namelen_sum;
+	int			count;
+	xfs_dir_shortform_t	*sf;
+	xfs_dir_sf_entry_t	*sfe;
+	int			i;
+	
+	if ((dp->i_d.di_mode & IFMT) != IFDIR) {
+		return;
+	}
+	if (dp->i_d.di_format != XFS_DINODE_FMT_LOCAL) {
+		return;
+	}
+	if (!(dp->i_flags & XFS_IFINLINE)) {
+		return;
+	}
+	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
+	ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
+	xfs_dir_ino_validate(mp, ino);
+
+	count =	sf->hdr.count;
+	if ((count < 0) || ((count * 10) > XFS_LITINO(mp))) {
+		cmn_err(CE_PANIC, "Invalid shortform count: dp 0x%x\n", dp);
+	}
+
+	if (count == 0) {
+		return;
+	}
+
+	namelen_sum = 0;
+	sfe = &sf->list[0];
+	for (i = sf->hdr.count - 1; i >= 0; i--) {
+		ino = XFS_GET_DIR_INO(mp, sfe->inumber);
+		xfs_dir_ino_validate(mp, ino);
+		if (sfe->namelen >= XFS_LITINO(mp)) {
+			cmn_err(CE_PANIC, "Invalid shortform namelen: dp 0x%x\n", dp);
+		}
+		namelen_sum += sfe->namelen;
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
+	if (namelen_sum >= XFS_LITINO(mp)) {
+		cmn_err(CE_PANIC, "Invalid shortform namelen: dp 0x%x\n", dp);
+	}
+}
+
+void
+xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
+{
+	xfs_ino_t		ino;
+	int			namelen_sum;
+	int			count;
+	xfs_dir_shortform_t	*sf;
+	xfs_dir_sf_entry_t	*sfe;
+	int			i;
+	
+	if ((dp->di_core.di_mode & IFMT) != IFDIR) {
+		return;
+	}
+	if (dp->di_core.di_format != XFS_DINODE_FMT_LOCAL) {
+		return;
+	}
+	sf = (xfs_dir_shortform_t *)(&dp->di_u.di_dirsf);
+	ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
+	xfs_dir_ino_validate(mp, ino);
+
+	count =	sf->hdr.count;
+	if ((count < 0) || ((count * 10) > XFS_LITINO(mp))) {
+		cmn_err(CE_PANIC, "Invalid shortform count: dp 0x%x\n", dp);
+	}
+
+	if (count == 0) {
+		return;
+	}
+
+	namelen_sum = 0;
+	sfe = &sf->list[0];
+	for (i = sf->hdr.count - 1; i >= 0; i--) {
+		ino = XFS_GET_DIR_INO(mp, sfe->inumber);
+		xfs_dir_ino_validate(mp, ino);
+		if (sfe->namelen >= XFS_LITINO(mp)) {
+			cmn_err(CE_PANIC, "Invalid shortform namelen: dp 0x%x\n", dp);
+		}
+		namelen_sum += sfe->namelen;
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
+	if (namelen_sum >= XFS_LITINO(mp)) {
+		cmn_err(CE_PANIC, "Invalid shortform namelen: dp 0x%x\n", dp);
+	}
+}
+
+
 /*
  * Create the initial contents of a shortform directory.
  */
@@ -128,6 +254,7 @@ xfs_dir_shortform_create(xfs_da_args_t *args, xfs_ino_t parent)
 	hdr->count = 0;
 	dp->i_d.di_size = sizeof(*hdr);
 	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_CORE | XFS_ILOG_DDATA);
+	xfs_dir_shortform_validate(dp->i_mount, dp);
 	return(0);
 }
 
@@ -168,6 +295,7 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 
 	dp->i_d.di_size += size;
 	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_CORE | XFS_ILOG_DDATA);
+	xfs_dir_shortform_validate(dp->i_mount, dp);
 
 	return(0);
 }
@@ -209,6 +337,7 @@ xfs_dir_shortform_removename(xfs_da_args_t *args)
 	xfs_idata_realloc(dp, -size, XFS_DATA_FORK);
 	dp->i_d.di_size -= size;
 	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_CORE | XFS_ILOG_DDATA);
+	xfs_dir_shortform_validate(dp->i_mount, dp);
 
 	return(0);
 }
@@ -230,10 +359,12 @@ xfs_dir_shortform_lookup(xfs_da_args_t *args)
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
 		XFS_DIR_SF_GET_DIRINO(&sf->hdr.parent, &args->inumber);
+		xfs_dir_shortform_validate(dp->i_mount, dp);
 		return(XFS_ERROR(EEXIST));
 	}
 	if (args->namelen == 1 && args->name[0] == '.') {
 		args->inumber = dp->i_ino;
+		xfs_dir_shortform_validate(dp->i_mount, dp);
 		return(XFS_ERROR(EEXIST));
 	}
 	sfe = &sf->list[0];
@@ -242,10 +373,12 @@ xfs_dir_shortform_lookup(xfs_da_args_t *args)
 		    sfe->name[0] == args->name[0] &&
 		    bcmp(args->name, sfe->name, args->namelen) == 0) {
 			XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &args->inumber);
+			xfs_dir_shortform_validate(dp->i_mount, dp);
 			return(XFS_ERROR(EEXIST));
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
+	xfs_dir_shortform_validate(dp->i_mount, dp);
 	return(XFS_ERROR(ENOENT));
 }
 
@@ -266,6 +399,7 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 	buf_t *bp;
 
 	dp = iargs->dp;
+	xfs_dir_shortform_validate(dp->i_mount, dp);
 	size = dp->i_df.if_bytes;
 	tmpbuffer = kmem_alloc(size, KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
@@ -514,6 +648,7 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 			sizeof(xfs_ino_t)));
 		XFS_DIR_SF_PUT_DIRINO(&args->inumber, &sf->hdr.parent);
 		xfs_trans_log_inode(args->trans, dp, XFS_ILOG_DDATA);
+		xfs_dir_shortform_validate(dp->i_mount, dp);
 		return(0);
 	}
 	ASSERT(args->namelen != 1 || args->name[0] != '.');
@@ -526,10 +661,12 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 				(char *)&sfe->inumber, sizeof(xfs_ino_t)));
 			XFS_DIR_SF_PUT_DIRINO(&args->inumber, &sfe->inumber);
 			xfs_trans_log_inode(args->trans, dp, XFS_ILOG_DDATA);
+			xfs_dir_shortform_validate(dp->i_mount, dp);
 			return(0);
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
+	xfs_dir_shortform_validate(dp->i_mount, dp);
 	return(XFS_ERROR(ENOENT));
 }
 
@@ -607,6 +744,7 @@ xfs_dir_leaf_to_shortform(xfs_da_args_t *iargs)
 		XFS_DIR_SF_GET_DIRINO(&namest->inumber, &args.inumber);
 		xfs_dir_shortform_addname(&args);
 	}
+	xfs_dir_shortform_validate(dp->i_mount, dp);
 
 out:
 	kmem_free(tmpbuffer, XFS_LBSIZE(dp->i_mount));
