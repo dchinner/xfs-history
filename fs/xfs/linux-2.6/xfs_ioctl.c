@@ -480,6 +480,7 @@ xfs_readlink_by_handle(
 	void			*hanp;
 	size_t			hlen;
 	vnode_t			*vp = NULL;
+	struct inode		*inode = NULL;
 	xfs_fid_t		*xfid;
 	xfs_handle_t		*handlep;
 	xfs_handle_t		handle;
@@ -585,7 +586,10 @@ xfs_readlink_by_handle(
 
 	vp = XFS_ITOV(ip);
 
+	inode = vp->v_inode;
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	linvfs_set_inode_ops(inode);
+	error = linvfs_revalidate_core(inode, ATTR_COMM);
 
 
 	/*
@@ -611,6 +615,7 @@ xfs_readlink_by_handle(
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
+	vp = XFS_ITOV(ip);
 	VOP_READLINK(vp, &auio, get_current_cred(), error);
 
 	VN_RELE(vp);
