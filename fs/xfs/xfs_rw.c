@@ -1,4 +1,4 @@
-#ident "$Revision: 1.172 $"
+#ident "$Revision: 1.173 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1180,7 +1180,7 @@ xfs_read(
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 			xfs_iflock(ip);
 			xfs_iflush(ip, XFS_IFLUSH_SYNC);
-			xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		} else {
 			if (ioflag & IO_DSYNC) {
 				mp = ip->i_mount;
