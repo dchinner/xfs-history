@@ -11,12 +11,14 @@
 
 #define	XFS_PREALLOC_BLOCKS	((xfs_agblock_t)(XFS_IBT_BLOCK + 1))
 
-#define	XFS_IALLOC_MAX_EVER	1024
-#define	XFS_IALLOC_MIN_ALLOC(s,a)	((s)->sb_inopblock)
+#define	XFS_IALLOC_MAX_EVER_BLOCKS	16
+#define	XFS_IALLOC_MAX_EVER_INODES	256
+#define	XFS_IALLOC_MAX_EVER(s,a)	xfs_extlen_min(XFS_IALLOC_MAX_EVER_BLOCKS, XFS_IALLOC_MAX_EVER_INODES >> (s)->sb_inopblog)
+#define	XFS_IALLOC_MIN_ALLOC(s,a)	1
 #define XFS_IALLOC_MAX_ALLOC(s,a)	\
-	((a)->ag_icount > XFS_IALLOC_MAX_EVER ? \
-	XFS_IALLOC_MAX_EVER : \
-	((a)->ag_icount) ? (a)->ag_icount : XFS_IALLOC_MIN_ALLOC(s,a))
+	(((a)->ag_icount >> (s)->sb_inopblog) >= XFS_IALLOC_MAX_EVER(s,a) ? \
+		XFS_IALLOC_MAX_EVER(s,a) : \
+		((a)->ag_icount ? ((a)->ag_icount >> (s)->sb_inopblog) : 1))
 
 /*
  * Structures for inode mapping
