@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -887,9 +887,9 @@ xfs_dastate_path(xfs_da_state_path_t *p)
 	qprintf("active %d\n", p->active);
 	for (i = 0; i < XFS_DA_NODE_MAXDEPTH; i++) {
 #if XFS_BIG_FILES
-		qprintf("blk %d bp 0x%x blkno 0x%llx",
+		qprintf(" blk %d bp 0x%x blkno 0x%llx",
 #else
-		qprintf("blk %d bp 0x%x blkno 0x%x",
+		qprintf(" blk %d bp 0x%x blkno 0x%x",
 #endif
 			i, p->blk[i].bp, p->blk[i].blkno);
 		qprintf(" index %d hashval 0x%x ",
@@ -2524,13 +2524,13 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 	i = ~(ATTR_ROOT | ATTR_CREATE | ATTR_REPLACE | XFS_ATTR_INCOMPLETE);
 	if ((n->flags & i) != 0)
 		qprintf("0x%x", n->flags & i);
-	qprintf(">\n");
+	qprintf("> rename %d\n", n->rename);
 	qprintf(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
 	qprintf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno2, n->index2, n->rmtblkno2, n->rmtblkcnt2);
 	qprintf(" inumber %lld dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
-		n->inumber, n->dp, n->firstblock, n->flist, n->total);
+		  n->inumber, n->dp, n->firstblock, n->flist, n->total);
 }
 
 /*
@@ -2562,15 +2562,27 @@ xfsidbg_xdanode(struct xfs_da_intnode *node)
 static void
 xfsidbg_xdastate(xfs_da_state_t *s)
 {
+	xfs_da_state_blk_t *eblk;
+
 	qprintf("args 0x%x mp 0x%x blocksize %d inleaf %d\n",
 		s->args, s->mp, s->blocksize, s->inleaf);
 	if (s->args)
 		xfsidbg_xdaargs(s->args);
 	
-	qprintf("path ");
+	qprintf("path:  ");
 	xfs_dastate_path(&s->path);
-	qprintf("altpath ");
+
+	qprintf("altpath:  ");
 	xfs_dastate_path(&s->altpath);
+
+	eblk = &s->extrablk;
+	qprintf("extra: valid %d, after %d\n", s->extravalid, s->extraafter);
+#if XFS_BIG_FILES
+	qprintf(" bp 0x%x blkno 0x%llx ", eblk->bp, eblk->blkno);
+#else
+	qprintf(" bp 0x%x blkno 0x%x ", eblk->bp, eblk->blkno);
+#endif
+	qprintf("index %d hashval 0x%x\n", eblk->index, eblk->hashval);
 }
 
 /*
