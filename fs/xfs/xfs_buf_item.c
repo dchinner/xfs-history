@@ -299,6 +299,7 @@ xfs_buf_item_trylock(xfs_buf_log_item_t *bip)
 		notavail(bp);
 	}
 
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	return XFS_ITEM_SUCCESS;
 }
 
@@ -393,6 +394,8 @@ void
 xfs_buf_item_push(xfs_buf_log_item_t *bip)
 {
 	buf_t	*bp;
+
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 
 	bp = bip->bli_buf;
 	if (bp->b_flags & B_DELWRI) {

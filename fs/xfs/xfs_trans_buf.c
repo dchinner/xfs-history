@@ -110,6 +110,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * to 0.
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	bip->bli_recur = 0;
 
 	/*
@@ -184,6 +185,7 @@ xfs_trans_getsb(xfs_trans_t *tp)
 	 * to 0.
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	bip->bli_recur = 0;
 
 	/*
@@ -305,6 +307,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 * to 0.
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	bip->bli_recur = 0;
 
 	/*
@@ -469,6 +472,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	 */
 	xfs_buf_item_init(bp, tp->t_mountp);
 	bip = bp->b_fsprivate;
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 
 	/*
 	 * Take a reference for this transaction on the buf item.
@@ -505,6 +509,7 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 	ASSERT(bp->b_fsprivate != NULL);
 
 	bip = (xfs_buf_log_item_t*)(bp->b_fsprivate);
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	bip->bli_flags |= XFS_BLI_HOLD;
 }
 
@@ -528,6 +533,7 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
 	ASSERT(bp->b_fsprivate != NULL);
 
 	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
 
@@ -569,6 +575,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	 */
 	bp->b_flags |= B_DELWRI | B_DONE;
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	if (bp->b_iodone == NULL) {
 		bp->b_iodone = xfs_buf_iodone_callbacks;
 	}
@@ -617,6 +624,7 @@ xfs_trans_binval(
 	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 
 	if (!(bp->b_flags & B_DELWRI)) {
 		/*
