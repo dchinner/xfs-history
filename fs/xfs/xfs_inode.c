@@ -25,6 +25,7 @@
 #else
 #include <sys/systm.h>
 #endif
+#include <stddef.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -59,6 +60,25 @@ zone_t *xfs_inode_zone;
  */
 #define	XFS_ITRUNC_MAX_EXTENTS	128
 
+STATIC buf_t *
+xfs_itobp(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,
+	xfs_dinode_t	**dipp);
+
+STATIC buf_t *
+xfs_inotobp(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino,
+	xfs_dinode_t	**dipp);
+	
+STATIC void
+xfs_iunlink_remove(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip);
+
 #ifdef DEBUG
 STATIC void
 xfs_validate_extents(
@@ -69,7 +89,7 @@ xfs_validate_extents(
 #endif /* DEBUG */		     
 
 /*
- * This routine is called to map an inode number within a file
+ * This routine is called to map an inode within a file
  * system to the buffer containing the on-disk version of the
  * inode.  It returns a pointer to the buffer containing the
  * on-disk inode, and in the dip parameter it returns a pointer
@@ -79,14 +99,44 @@ xfs_validate_extents(
  * xfs_imap() since we have that information here if they are
  * not already filled in.
  *
- * Use xfs_imap() to determine the size and location of the
- * buffer to read from disk.
+ * Use xfs_inotobp() to do most of the real work.
  */
-buf_t *
+STATIC buf_t *
 xfs_itobp(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,
+	xfs_dinode_t	**dipp)
+{
+	buf_t		*bp;
+
+	bp = xfs_inotobp(mp, tp, ip->i_ino, dipp);
+
+	/*
+	 * Fill in some of the fields of ip if they're not already set.
+	 */
+	if (ip->i_dev == 0) {
+		ip->i_dev = mp->m_dev;
+	}
+
+	return (bp);
+}
+
+/*
+ * This routine is called to map an inode number within a file
+ * system to the buffer containing the on-disk version of the
+ * inode.  It returns a pointer to the buffer containing the
+ * on-disk inode, and in the dip parameter it returns a pointer
+ * to the on-disk inode within that buffer.
+ *
+ * Use xfs_imap() to determine the size and location of the
+ * buffer to read from disk.
+ */
+STATIC buf_t *
+xfs_inotobp(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino,
 	xfs_dinode_t	**dipp)
 {
 	xfs_imap_t	imap;
@@ -97,7 +147,7 @@ xfs_itobp(
 	 * Call the space managment code to find the location of the
 	 * inode on disk.
 	 */
-	xfs_imap(mp, tp, ip->i_ino, &imap);
+	xfs_imap(mp, tp, ino, &imap);
 
 	/*
 	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
@@ -111,13 +161,6 @@ xfs_itobp(
 	 */
 	if (bp->b_flags & B_ERROR) {
 		ASSERT(0);
-	}
-
-	/*
-	 * Fill in some of the fields of ip if they're not already set.
-	 */
-	if (ip->i_dev == 0) {
-		ip->i_dev = dev;
 	}
 
 	/*
@@ -701,10 +744,204 @@ xfs_igrow(
 }
 
 /*
+ * This is called when the inode's link count goes to 0.
+ * We place the on-disk inode on a list in the AGI.  It
+ * will be pulled from this list when the inode is freed.
+ */
+void
+xfs_iunlink(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
+{
+	xfs_mount_t	*mp;
+	xfs_agi_t	*agi;
+	xfs_dinode_t	*dip;
+	buf_t		*agibp;
+	buf_t		*ibp;
+	xfs_agnumber_t	agno;
+	daddr_t		agdaddr;
+	xfs_agino_t	agino;
+	short		bucket_index;
+	short		offset;
+	
+	ASSERT(ip->i_d.di_nlink == 0);
+	ASSERT(ip->i_transp == tp);
+
+	mp = tp->t_mountp;
+	agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
+	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+
+	/*
+	 * Get the agi buffer first.  It ensures lock ordering
+	 * on the list.
+	 */
+	agibp = xfs_trans_read_buf(tp, mp->m_dev, agdaddr, 1, 0);
+	agi = XFS_BUF_TO_AGI(agibp);
+	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+
+	/*
+	 * Get the index into the agi hash table for the
+	 * list this inode will go on.
+	 */
+	agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
+	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
+
+	if (agi->agi_unlinked[bucket_index] != NULLAGINO) {
+		/*
+		 * There is already another inode in the bucket we need
+		 * to add ourselves to.  Add us at the front of the list.
+		 * Here we put the head pointer into our next pointer,
+		 * and then we fall through to point the head at us.
+		 */
+		ibp = xfs_itobp(mp, tp, ip, &dip);
+		ASSERT(dip->di_next_unlinked == NULLAGINO);
+		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
+		offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
+			offsetof(xfs_dinode_t, di_next_unlinked);
+		xfs_trans_log_buf(tp, ibp, offset,
+				  (offset + sizeof(xfs_agino_t)));
+	}
+
+	/*
+	 * Point the bucket head pointer at the inode being inserted.
+	 */
+	agi->agi_unlinked[bucket_index] = agino;
+	offset = offsetof(xfs_agi_t, agi_unlinked) +
+		(sizeof(xfs_agino_t) * bucket_index);
+	xfs_trans_log_buf(tp, agibp, offset, (offset + sizeof(xfs_agino_t)));
+}	    
+
+/*
+ * Pull the on-disk inode from the AGI unlinked list.
+ */
+STATIC void
+xfs_iunlink_remove(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
+{
+	xfs_ino_t	next_ino;
+	xfs_mount_t	*mp;
+	xfs_agi_t	*agi;
+	xfs_dinode_t	*dip;
+	buf_t		*agibp;
+	buf_t		*ibp;
+	xfs_agnumber_t	agno;
+	daddr_t		agdaddr;
+	xfs_agino_t	agino;
+	xfs_agino_t	next_agino;
+	buf_t		*last_ibp;
+	xfs_dinode_t	*last_dip;
+	short		bucket_index;
+	short		offset;
+
+	/*
+	 * First pull the on-disk inode from the AGI unlinked list.
+	 */
+	mp = tp->t_mountp;
+	agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
+	agdaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+
+	/*
+	 * Get the agi buffer first.  It ensures lock ordering
+	 * on the list.
+	 */
+	agibp = xfs_trans_read_buf(tp, mp->m_dev, agdaddr, 1, 0);
+	agi = XFS_BUF_TO_AGI(agibp);
+	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+
+	/*
+	 * Get the index into the agi hash table for the
+	 * list this inode will go on.
+	 */
+	agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
+	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
+	ASSERT(agi->agi_unlinked[bucket_index] != NULLAGINO);
+
+	if (agi->agi_unlinked[bucket_index] == agino) {
+		/*
+		 * We're at the head of the list.  Get the inode's
+		 * on-disk buffer to see if there is anyone after us
+		 * on the list.  Only modify our next pointer if it
+		 * is not already NULLAGINO.  This saves us the overhead
+		 * of dealing with the buffer when there is no need to
+		 * change it.
+		 */
+		ibp = xfs_itobp(mp, tp, ip, &dip);
+		next_agino = dip->di_next_unlinked;
+		if (next_agino != NULLAGINO) {
+			dip->di_next_unlinked = NULLAGINO;
+			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
+				offsetof(xfs_dinode_t, di_next_unlinked);
+			xfs_trans_log_buf(tp, ibp, offset,
+					  (offset + sizeof(xfs_agino_t)));
+		} else {
+			xfs_trans_brelse(tp, ibp);
+		}
+		/*
+		 * Point the bucket head pointer at the next inode.
+		 */
+		agi->agi_unlinked[bucket_index] = next_agino;
+		offset = offsetof(xfs_agi_t, agi_unlinked) +
+			(sizeof(xfs_agino_t) * bucket_index);
+		xfs_trans_log_buf(tp, agibp, offset,
+				  (offset + sizeof(xfs_agino_t)));
+	} else {
+		/*
+		 * We need to search the list for the inode being freed.
+		 */
+		next_agino = agi->agi_unlinked[bucket_index];
+		last_ibp = NULL;
+		while (next_agino != agino) {
+			/*
+			 * If the last inode wasn't the one pointing to
+			 * us, then release its buffer since we're not
+			 * going to do anything with it.
+			 */
+			if (last_ibp != NULL) {
+				xfs_trans_brelse(tp, last_ibp);
+			}
+			next_ino = XFS_AGINO_TO_INO(mp, agno, next_agino);
+			last_ibp = xfs_inotobp(mp, tp, next_ino, &last_dip);
+			next_agino = last_dip->di_next_unlinked;
+			ASSERT(next_agino != NULLAGINO);
+		}
+		/*
+		 * Now last_ibp points to the buffer previous to us on
+		 * the unlinked list.  Pull us from the list.
+		 */
+		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
+		next_agino = dip->di_next_unlinked;
+		if (next_agino != NULLAGINO) {
+			dip->di_next_unlinked = NULLAGINO;
+			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
+				offsetof(xfs_dinode_t, di_next_unlinked);
+			xfs_trans_log_buf(tp, ibp, offset,
+					  (offset + sizeof(xfs_agino_t)));
+		} else {
+			xfs_trans_brelse(tp, ibp);
+		}
+		/*
+		 * Point the previous inode on the list to the next inode.
+		 */
+		last_dip->di_next_unlinked = next_agino;
+		offset = ((char *)last_dip -
+			  (char *)(last_ibp->b_un.b_addr)) +
+			 offsetof(xfs_dinode_t, di_next_unlinked);
+		xfs_trans_log_buf(tp, last_ibp, offset,
+				  (offset + sizeof(xfs_agino_t)));
+	}
+}
+
+
+/*
  * This is called to return an inode to the inode free list.
  * The inode should already be truncated to 0 length and have
  * no pages associated with it.  This routine also assumes that
  * the inode is already a part of the transaction.
+ *
+ * The on-disk copy of the inode will have been added to the list
+ * of unlinked inodes in the AGI. We need to remove the inode from
+ * that list atomically with respect to freeing it here.
  */
 void
 xfs_ifree(
@@ -717,6 +954,11 @@ xfs_ifree(
 	ASSERT(ip->i_d.di_nextents == 0);
 	ASSERT((ip->i_d.di_size == 0) ||
 	       ((ip->i_d.di_mode & IFMT) != IFREG));
+
+	/*
+	 * Pull the on-disk inode from the AGI unlinked list.
+	 */
+	xfs_iunlink_remove(tp, ip);
 
 	xfs_difree(tp, ip->i_ino);
 	ip->i_d.di_mode = 0;		/* mark incore inode as free */
