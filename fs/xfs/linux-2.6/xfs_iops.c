@@ -753,8 +753,7 @@ STATIC int linvfs_read_full_page(struct file *filp, struct page *page)
 
 STATIC int linvfs_write_full_page(struct page *page)
 {
-	int ret = pagebuf_write_full_page(page, linvfs_pb_bmap);
-	return ret < 0 ? 0 : ret;
+	return pagebuf_write_full_page(page, linvfs_pb_bmap);
 }
 
 STATIC int linvfs_prepare_write(
