@@ -986,7 +986,7 @@ log_state_release_iclog(log_t		*log,
 	    if (BLOCK_LSN(sync_lsn) == log->l_prev_block)
 		log_panic("ran out of log space");
 		
-	    blocks = log->l_logBBsize - BLOCK_LSN(sync_lsn) + log->l_prev_block;
+	    blocks = BLOCK_LSN(sync_lsn) - log->l_prev_block;
 	    if (blocks < BTOBB(iclog->ic_offset) + 1)
 		log_panic("ran out of log space");
 	}
