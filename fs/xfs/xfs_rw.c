@@ -1,4 +1,4 @@
-#ident "$Revision: 1.187 $"
+#ident "$Revision: 1.188 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1646,8 +1646,16 @@ xfs_zero_eof(
 		}
 		bp = getchunk(XFS_ITOV(ip), &bmap, credp);
 
+#ifdef _VCE_AVOIDANCE
+		if (vce_avoidance) {
+			extern void biozero(struct buf *, u_int, int);
+			biozero(bp, 0, bmap.bsize);
+		} else
+#endif
+		{	
 		bp_mapin(bp);
 		bzero(bp->b_un.b_addr, bp->b_bcount);
+	        }
 
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
 			bdwrite(bp);
@@ -5419,3 +5427,24 @@ xfs_refcache_purge_some(void)
 	}
 }
 
+#ifdef DEBUG
+void
+xfs_print_xfsd_buflist()
+{
+	int 	s, k = 0;
+	buf_t	*bp;
+
+	s = mp_mutex_spinlock(&xfsd_lock);
+	bp = xfsd_list;
+	while (bp) {
+		printf("%d. bp 0x%x, flags 0x%x\n", 
+		       k++, bp,
+		       bp->b_flags);
+		bp = bp->av_forw;
+		if (bp == xfsd_list)
+			break;
+	}
+	printf("xfsd_bufcount 0x%x\n", xfsd_bufcount);
+	mp_mutex_spinunlock(&xfsd_lock, s);
+}
+#endif
