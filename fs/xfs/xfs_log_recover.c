@@ -1003,12 +1003,12 @@ xlog_recover_print_inode_core(xfs_dinode_core_t *di)
     printf("		uid:%d  gid:%d  uuid:0x%llx\n",
 	   di->di_uid, di->di_gid, di->di_uuid);
     printf("		atime:%d  mtime:%d  ctime:%d\n",
-	   di->di_atime, di->di_mtime, di->di_ctime);
-    printf("		size:%d  nblks:%d  exsize:%d  nextents:%d  nattrext:%d\n",
+	   di->di_atime.t_sec, di->di_mtime.t_sec, di->di_ctime.t_sec);
+    printf("		size:0x%llx  nblks:0x%llx  exsize:%d  nextents:%d  nattrext:%d\n",
 	   di->di_size, di->di_nblocks, di->di_extsize, di->di_nextents,
-	   di->di_nattrextents);
+	   (int)di->di_nattrextents);
     printf("		forkoff:%d  dmevmask:0x%x  dmstate:%d  flags:0x%x  gen:%d\n",
-	   di->di_forkoff, di->di_dmevmask, di->di_dmstate, di->di_flags,
+	   (int)di->di_forkoff, di->di_dmevmask, (int)di->di_dmstate, (int)di->di_flags,
 	   di->di_gen);
 }	/* xlog_recover_print_inode_core */
 
