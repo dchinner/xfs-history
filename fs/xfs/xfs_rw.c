@@ -1,4 +1,4 @@
-#ident "$Revision: 1.183 $"
+#ident "$Revision: 1.184 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1148,6 +1148,10 @@ xfs_read(
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
+
+	if (!(ioflag & IO_ISLOCKED))
+		xfs_rwlock(bdp, VRWLOCK_READ);
+	
 	type = ip->i_d.di_mode & IFMT;
 	ASSERT(type == IFDIR ||
 	       ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
@@ -1162,14 +1166,18 @@ xfs_read(
 	if (MANDLOCK(vp, ip->i_d.di_mode) &&
 	    (error = chklock(vp, FREAD, offset, count, uiop->uio_fmode,
 					credp, fl))) {
-		return error;
+		goto out;
 	}
 #endif
 
-	if (offset < 0)
-		return XFS_ERROR(EINVAL);
-	if (count <= 0)
-		return 0;
+	if (offset < 0) {
+		error = XFS_ERROR(EINVAL);
+		goto out;
+	}
+	if (count <= 0) {
+		error = 0;
+		goto out;
+	}
 	if (ioflag & IO_RSYNC) {
 		/* First we sync the data */
 		if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
@@ -1199,7 +1207,8 @@ xfs_read(
 		 */
 		n = XFS_MAX_FILE_OFFSET - offset;
 		if (n <= 0) {
-			return 0;
+			error = 0;
+			goto out;
 		}
 		if (n < uiop->uio_resid) {
 			resid = uiop->uio_resid - n;
@@ -1217,11 +1226,12 @@ xfs_read(
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_READ) &&
 		    !(ioflag & IO_INVIS)) {
 			if (error = dm_data_event(vp, DM_READ, offset, count))
-				return error;
+				goto out;
 		}
 		if (ioflag & IO_DIRECT) {
 #ifdef PRIO_DEBUG
-			printf("xfs_read: IO_DIRECT uiop->io_flags %d\n", uiop->io_flags);
+			printf("xfs_read: IO_DIRECT uiop->io_flags %d\n", 
+			       uiop->io_flags);
 #endif
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_READ);
 #ifdef PRIO_DEBUG
@@ -1263,6 +1273,11 @@ xfs_read(
 		error = XFS_ERROR(EINVAL);
 		break;
 	}
+
+ out:
+	if (!(ioflag & IO_ISLOCKED))
+		xfs_rwunlock(bdp, VRWLOCK_READ);
+	
 	return error;
 }
 
@@ -2408,10 +2423,15 @@ xfs_write(
 	vnode_t 	*vp;
 
 	vp = BHV_TO_VNODE(bdp);
-	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
 	ip = XFS_BHVTOI(bdp);
-	type = ip->i_d.di_mode & IFMT;
 	eventsent = 0;
+
+	if (!(ioflag & IO_ISLOCKED))
+		xfs_rwlock(bdp, (ioflag & IO_DIRECT) ?
+			   VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE);
+
+	type = ip->i_d.di_mode & IFMT;
+	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
 	ASSERT(type == IFDIR ||
 	       ismrlocked(&ip->i_iolock, MR_UPDATE) ||
 	       (ismrlocked(&ip->i_iolock, MR_ACCESS) &&
@@ -2437,15 +2457,17 @@ start:
 	if (MANDLOCK(vp, ip->i_d.di_mode) &&
 	    (error = chklock(vp, FWRITE, offset, count, uiop->uio_fmode,
 			     credp, fl))) {
-		return error;
+		goto out;
 	}
 #endif
 
 	if (offset < 0) {
-		return XFS_ERROR(EINVAL);
+		error = XFS_ERROR(EINVAL);
+		goto out;
 	}
 	if (count <= 0) {
-		return 0;
+		error = 0;
+		goto out;
 	}
 
 	switch (type) {
@@ -2454,7 +2476,8 @@ start:
 			 uiop->uio_limit : XFS_MAX_FILE_OFFSET);
 		n = limit - uiop->uio_offset;
 		if (n <= 0) {
-			return XFS_ERROR(EFBIG);
+			error = XFS_ERROR(EFBIG);
+			goto out;
 		}
 		if (n < uiop->uio_resid) {
 			resid = uiop->uio_resid - n;
@@ -2466,8 +2489,9 @@ start:
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_WRITE) &&
 		    !(ioflag & IO_INVIS) &&
 		    !eventsent) {
-			if (error = dm_data_event(vp, DM_WRITE, offset, count))
-				return error;
+			error = dm_data_event(vp, DM_WRITE, offset, count);
+			if (error)
+				goto out;
 			eventsent = 1;
 		}
 		/*
@@ -2492,13 +2516,14 @@ start:
 		    !(vp->v_flag & VISSWAP)) {
 			error = xfs_write_clear_setuid(ip);
 			if (error) {
-				return error;
+				goto out;
 			}
 		}
 retry:
 		if (ioflag & IO_DIRECT) {
 #ifdef PRIO_DEBUG
-			printf("xfs_write: IO_DIRECT uiop->ioflags %d\n", uiop->io_flags);
+			printf("xfs_write: IO_DIRECT uiop->ioflags %d\n", 
+			       uiop->io_flags);
 #endif /* PRIO_DEBUG */
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
 #ifdef PRIO_DEBUG
@@ -2513,7 +2538,7 @@ retry:
 		    !(ioflag & IO_INVIS)) {
 			error = dm_data_event(vp, DM_NOSPACE, 0, 0);
 			if (error) {
-				return error;
+				goto out;
 			}
 			offset = uiop->uio_offset;
 			goto retry;
@@ -2588,18 +2613,27 @@ retry:
 		break;
 
 	case IFDIR:
-		return XFS_ERROR(EISDIR);
+		error = XFS_ERROR(EISDIR);
+		break;
 
 	case IFLNK:
-		return XFS_ERROR(EINVAL);
+		error = XFS_ERROR(EINVAL);
+		break;
 
 	case IFSOCK:
-		return XFS_ERROR(ENODEV);
+		error = XFS_ERROR(ENODEV);
+		break;
 
 	default:
 		ASSERT(0);
-		return XFS_ERROR(EINVAL);
+		error = XFS_ERROR(EINVAL);
+		break;
 	}
+
+ out:
+	if (!(ioflag & IO_ISLOCKED))
+		xfs_rwunlock(bdp, (ioflag & IO_DIRECT) ?
+			     VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE);
 
 	return error;
 }
