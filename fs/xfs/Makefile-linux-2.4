@@ -163,12 +163,7 @@ DRIVERS-y += drivers/char/char.o \
 	drivers/net/net.o \
 	drivers/media/media.o
 DRIVERS-$(CONFIG_AGP) += drivers/char/agp/agp.o
-ifeq ($(ARCH),ia64)
-DRIVERS-$(CONFIG_DRM_NEW) += drivers/char/drm/drm.o
-DRIVERS-$(CONFIG_DRM_OLD) += drivers/char/drm-4.0/drm.o
-else
 DRIVERS-$(CONFIG_DRM) += drivers/char/drm/drm.o
-endif
 DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
 DRIVERS-$(CONFIG_ISDN) += drivers/isdn/isdn.a
 DRIVERS-$(CONFIG_NET_FC) += drivers/net/fc/fc.o
