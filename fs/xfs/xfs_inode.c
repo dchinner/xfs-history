@@ -1,4 +1,4 @@
-#ident "$Revision: 1.190 $"
+#ident "$Revision: 1.191 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1601,14 +1601,12 @@ xfs_igrow_start(
 
 	error = 0;
 	isize = ip->i_d.di_size;
-	if (isize != 0) {
-		/*
-		 * Zero any pages that may have been created by
-		 * xfs_write_file() beyond the end of the file
-		 * and any blocks between the old and new file sizes.
-		 */
-		error = xfs_zero_eof(ip, new_size, isize, credp, NULL);
-	}
+	/*
+	 * Zero any pages that may have been created by
+	 * xfs_write_file() beyond the end of the file
+	 * and any blocks between the old and new file sizes.
+	 */
+	error = xfs_zero_eof(ip, new_size, isize, credp, NULL);
 	return error;
 }
 
