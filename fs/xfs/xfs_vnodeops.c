@@ -1,4 +1,4 @@
-#ident "$Revision: 1.197 $"
+#ident "$Revision: 1.198 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5034,8 +5034,8 @@ xfs_fcntl(
 				break;
 			}
 #endif
-		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64 ||
-			   cmd == F_RESVSP64 ||
+		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64   ||
+			   cmd == F_RESVSP64  || cmd == F_UNRESVSP64 || 
 			   ABI_IS_IRIX5_N32(u.u_procp->p_abi)) {
 			/* 
 			 * The n32 flock structure is the same size as the
