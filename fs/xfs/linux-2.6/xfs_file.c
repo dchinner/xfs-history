@@ -278,7 +278,7 @@ STATIC int linvfs_readdir(
 	int			eof = 0;
 	cred_t			cred;		/* Temporary cred workaround */
 	caddr_t			read_buf;
-	int			size = 0;
+	int			namelen, size = 0;
 	size_t			rlen = PAGE_CACHE_SIZE << 2;
 	off_t			start_offset;
 	dirent_t		*dbp = NULL;
@@ -317,7 +317,9 @@ STATIC int linvfs_readdir(
 		size = rlen - uio.uio_resid;
 		dbp = (dirent_t *)read_buf;
 		while (size > 0) {
-			if (filldir(dirent, dbp->d_name, dbp->d_reclen,
+			namelen = strlen(dbp->d_name);
+
+			if (filldir(dirent, dbp->d_name, namelen,
 					(off_t) dbp->d_off,
 					(linux_ino_t) dbp->d_ino,
 					DT_UNKNOWN)) {
