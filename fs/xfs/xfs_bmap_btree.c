@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision: 1.84 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1009,7 +1009,7 @@ xfs_bmbt_lookup(
 			if (bp && bp->b_blkno != d)
 				bp = (buf_t *)0;
 			if (!bp) {
-				error = xfs_trans_read_buf(tp, mp->m_dev, d,
+				error = xfs_trans_read_buf(mp, tp, mp->m_dev, d,
 						mp->m_bsize, 0, &bp);
 				if (error) {
 					return error;
@@ -1237,7 +1237,7 @@ xfs_bmbt_read_agf(
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
-	error = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1, 0, &bp);
 	if (error) {
 		return error;
 	}

@@ -1569,7 +1569,9 @@ xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno, int length,
 	if (args->whichfork == XFS_DATA_FORK) {
 		error = xfs_bmap_last_offset(args->trans, dp, &bno,
 							  args->whichfork);
-		ASSERT(error == 0);
+		if (error) {
+			return (error);
+		}
 		dp->i_d.di_size = XFS_FSB_TO_B(dp->i_mount, bno);
 	}
 
@@ -1659,8 +1661,9 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 		ASSERT(map.br_startblock == fsb);
 		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, fsb);
 	}
-	error = xfs_trans_read_buf(trans, dp->i_mount->m_dev, mappedbno,
-					  dp->i_mount->m_bsize, 0, bpp);
+	error = xfs_trans_read_buf(dp->i_mount, trans, 
+				   dp->i_mount->m_dev, mappedbno,
+				   dp->i_mount->m_bsize, 0, bpp);
 	if (error)
 		return error;
 	ASSERT(*bpp != NULL && !geterror(*bpp));

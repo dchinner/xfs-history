@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.52 $"
+#ident	"$Revision: 1.53 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -370,6 +370,7 @@ xfs_btree_dup_cursor(
 	xfs_mount_t	*mp;		/* mount structure for filesystem */
 	xfs_btree_cur_t	*ncur;		/* return value */
 	xfs_trans_t	*tp;		/* transaction pointer, can be NULL */
+	int 		error;
 
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
@@ -391,8 +392,15 @@ xfs_btree_dup_cursor(
 		ncur->bc_ptrs[i] = cur->bc_ptrs[i];
 		ncur->bc_ra[i] = cur->bc_ra[i];
 		if (bp = cur->bc_bufs[i]) {
-			(void) xfs_trans_read_buf(tp, mp->m_dev, bp->b_blkno,
-						  mp->m_bsize, 0, &bp);
+			error = xfs_trans_read_buf(mp, tp, mp->m_dev, bp->b_blkno,
+						   mp->m_bsize, 0, &bp);
+			/* XXXNeed to fix all callers */
+			if (error) {
+				xfs_btree_del_cursor(ncur, error);
+				debug("Need to fix all callers");
+				return (NULL);
+			}
+
 			ncur->bc_bufs[i] = bp;
 			ASSERT(bp);
 			ASSERT(!geterror(bp));
@@ -697,7 +705,7 @@ xfs_btree_read_bufl(
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
-	error = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
 	if (error) {
 		return error;
 	}
@@ -729,7 +737,7 @@ xfs_btree_read_bufs(
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-	error = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
 	if (error) {
 		return error;
 	}
