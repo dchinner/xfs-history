@@ -663,9 +663,11 @@ xfs_qm_scall_setqlim(
 	 * Make sure that hardlimits are >= soft limits before changing.
 	 */
 	hard = (newlim.d_fieldmask & FS_DQ_BHARD) ?
-		(xfs_qcnt_t) newlim.d_blk_hardlimit : INT_GET(ddq->d_blk_hardlimit, ARCH_CONVERT);
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_hardlimit) :
+			INT_GET(ddq->d_blk_hardlimit, ARCH_CONVERT);
 	soft = (newlim.d_fieldmask & FS_DQ_BSOFT) ?
-		(xfs_qcnt_t) newlim.d_blk_softlimit : INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT);
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_softlimit) :
+			INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT);
 	if (hard == 0 || hard >= soft) {
 		INT_SET(ddq->d_blk_hardlimit, ARCH_CONVERT, hard);
 		INT_SET(ddq->d_blk_softlimit, ARCH_CONVERT, soft);
@@ -675,9 +677,11 @@ xfs_qm_scall_setqlim(
 		printk("blkhard %Ld < blksoft %Ld\n", hard, soft);
 #endif			
 	hard = (newlim.d_fieldmask & FS_DQ_RTBHARD) ?
-		(xfs_qcnt_t) newlim.d_rtb_hardlimit : INT_GET(ddq->d_rtb_hardlimit, ARCH_CONVERT);
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit) :
+			INT_GET(ddq->d_rtb_hardlimit, ARCH_CONVERT);
 	soft = (newlim.d_fieldmask & FS_DQ_RTBSOFT) ?
-		(xfs_qcnt_t) newlim.d_rtb_softlimit : INT_GET(ddq->d_rtb_softlimit, ARCH_CONVERT);
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_softlimit) :
+			INT_GET(ddq->d_rtb_softlimit, ARCH_CONVERT);
 	if (hard == 0 || hard >= soft) {
 		INT_SET(ddq->d_rtb_hardlimit, ARCH_CONVERT, hard);
 		INT_SET(ddq->d_rtb_softlimit, ARCH_CONVERT, soft);
@@ -892,6 +896,9 @@ error0:
 
 /*
  * Translate an internal style on-disk-dquot to the exportable format.
+ * The main differences are that the counters/limits are all in Basic
+ * Blocks (BBs) instead of the internal FSBs, and all on-disk data has
+ * to be converted to the native endianness.
  */
 STATIC void
 xfs_qm_export_dquot(
@@ -900,23 +907,32 @@ xfs_qm_export_dquot(
 	struct fs_disk_quota	*dst)
 {
 	bzero(dst, sizeof(*dst));
-	dst->d_version = FS_DQUOT_VERSION;  /* different from INT_GET(src->d_version, ARCH_CONVERT) */
-	dst->d_flags = xfs_qm_export_qtype_flags(INT_GET(src->d_flags, ARCH_CONVERT));
+	dst->d_version = FS_DQUOT_VERSION;  /* different from src->d_version */
+	dst->d_flags =
+		xfs_qm_export_qtype_flags(INT_GET(src->d_flags, ARCH_CONVERT));
 	dst->d_id = INT_GET(src->d_id, ARCH_CONVERT);
-	dst->d_blk_hardlimit = (__uint64_t) INT_GET(src->d_blk_hardlimit, ARCH_CONVERT);
-	dst->d_blk_softlimit = (__uint64_t) INT_GET(src->d_blk_softlimit, ARCH_CONVERT);
-	dst->d_ino_hardlimit = (__uint64_t) INT_GET(src->d_ino_hardlimit, ARCH_CONVERT);
-	dst->d_ino_softlimit = (__uint64_t) INT_GET(src->d_ino_softlimit, ARCH_CONVERT);
-	dst->d_bcount = (__uint64_t) INT_GET(src->d_bcount, ARCH_CONVERT);
+	dst->d_blk_hardlimit = (__uint64_t)
+		XFS_FSB_TO_BB(mp, INT_GET(src->d_blk_hardlimit, ARCH_CONVERT));
+	dst->d_blk_softlimit = (__uint64_t)
+		XFS_FSB_TO_BB(mp, INT_GET(src->d_blk_softlimit, ARCH_CONVERT));
+	dst->d_ino_hardlimit = (__uint64_t)
+		INT_GET(src->d_ino_hardlimit, ARCH_CONVERT);
+	dst->d_ino_softlimit = (__uint64_t)
+		INT_GET(src->d_ino_softlimit, ARCH_CONVERT);
+	dst->d_bcount = (__uint64_t)
+		XFS_FSB_TO_BB(mp, INT_GET(src->d_bcount, ARCH_CONVERT));
 	dst->d_icount = (__uint64_t) INT_GET(src->d_icount, ARCH_CONVERT);
 	dst->d_btimer = (__uint32_t) INT_GET(src->d_btimer, ARCH_CONVERT);
 	dst->d_itimer = (__uint32_t) INT_GET(src->d_itimer, ARCH_CONVERT);
 	dst->d_iwarns = INT_GET(src->d_iwarns, ARCH_CONVERT);
 	dst->d_bwarns = INT_GET(src->d_bwarns, ARCH_CONVERT);
 
-	dst->d_rtb_hardlimit = (__uint64_t) INT_GET(src->d_rtb_hardlimit, ARCH_CONVERT);
-	dst->d_rtb_softlimit = (__uint64_t) INT_GET(src->d_rtb_softlimit, ARCH_CONVERT);
-	dst->d_rtbcount = (__uint64_t) INT_GET(src->d_rtbcount, ARCH_CONVERT);
+	dst->d_rtb_hardlimit = (__uint64_t)
+		XFS_FSB_TO_BB(mp, INT_GET(src->d_rtb_hardlimit, ARCH_CONVERT));
+	dst->d_rtb_softlimit = (__uint64_t)
+		XFS_FSB_TO_BB(mp, INT_GET(src->d_rtb_softlimit, ARCH_CONVERT));
+	dst->d_rtbcount = (__uint64_t)
+		XFS_FSB_TO_BB(mp, INT_GET(src->d_rtbcount, ARCH_CONVERT));
 	dst->d_rtbtimer = (__uint32_t) INT_GET(src->d_rtbtimer, ARCH_CONVERT);
 	dst->d_rtbwarns = INT_GET(src->d_rtbwarns, ARCH_CONVERT);
 	
