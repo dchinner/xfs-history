@@ -32,54 +32,12 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
+#include "xfs_log_priv.h"	/* depends on all above */
 
 #ifdef SIM
 #include "sim.h"		/* must be last include file */
 #endif
 
-#ifndef _LOG_DEBUG
-int
-xfs_log_reserve(xfs_mount_t	 *mp,
-		uint		 len,
-		xfs_log_ticket_t *x_ticket,
-		char		 log_client,
-		uint		 flags)
-{
-        return (0);
-}
-
-int
-xfs_log_write(xfs_mount_t *	mp,
-	      xfs_log_iovec_t	reg[],
-	      int		nentries,
-	      xfs_log_ticket_t	tic,
-	      xfs_lsn_t		*start_lsn)
-{
-	*start_lsn = 0;
-	return 0;
-}	/* xfs_log_write */
-
-xfs_lsn_t
-xfs_log_done(xfs_mount_t	*mp,
-	     xfs_log_ticket_t	tic,
-	     uint		flags)
-{
-	return 0;
-}	/* xfs_log_done */
-
-int
-xfs_log_mount(xfs_mount_t	*mp,
-	      dev_t		log_dev,
-	      int		start_block,
-	      int		num_bblocks,
-	      uint		flags)
-{
-	return 0;
-}
-#else
-
-
-#include "xfs_log_priv.h"
 
 #define log_write_adv_cnt(ptr, len, off, bytes) \
 	{ (ptr) += (bytes); \
@@ -125,9 +83,10 @@ STATIC int	log_recover(struct xfs_mount *mp, dev_t log_dev);
 STATIC void	log_verify_dest_ptr(log_t *log, psint ptr);
 STATIC void	log_verify_iclog(log_t *log, log_in_core_t *iclog, int count);
 
+int log_debug = 0;
+
 #ifdef DEBUG
 int bytes_of_ticket_used;
-int log_debug = 1;
 #endif
 
 /*
@@ -160,6 +119,9 @@ xfs_log_done(xfs_mount_t	*mp,
 	log_ticket_t	*ticket = (xfs_log_ticket_t) tic;
 	xfs_lsn_t	lsn;
 	
+	if (! log_debug)
+		return 0;
+
 	/* If nothing was ever written, don't write out commit record */
 	if ((ticket->t_flags & LOG_TIC_INITED) == 0)
 		lsn = log_commit_record(mp, ticket);
@@ -262,6 +224,9 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 {
 	log_t *log = mp->m_log;
 	
+	if (! log_debug)
+		return 0;
+
 	if (log_client != XFS_TRANSACTION_MANAGER)
 		return -1;
 	
@@ -310,6 +275,9 @@ xfs_log_mount(xfs_mount_t	*mp,
 {
 	log_t *log;
 	
+	if (! log_debug)
+		return 0;
+
 	if ((flags & XFS_LOG_RECOVER) && log_recover(mp, log_dev) != 0) {
 		return XFS_ERECOVER;
 	}
@@ -331,6 +299,11 @@ xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_ticket_t	tic,
 	      xfs_lsn_t		*start_lsn)
 {
+	if (! log_debug) {
+		*start_lsn = 0;
+		return 0;
+	}
+
 	log_write(mp, reg, nentries, tic, start_lsn, 0);
 }	/* xfs_log_write */
 
@@ -1609,6 +1582,9 @@ void xfs_log_print(xfs_mount_t	*mp,
     int  partial_read = -1;
     caddr_t partial_buf;
 
+    if (! log_debug)
+	    return;
+
     log_size = BBTOB(num_bblocks);
 
 #ifdef LOG_BREAD
@@ -1722,5 +1698,3 @@ end:
     printf("=================================\n");
 }
 #endif /* !_KERNEL */
-
-#endif /* _LOG_DEBUG */
