@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.64 $"
+#ident	"$Revision: 1.65 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3514,6 +3514,11 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	qprintf("\n");
 	qprintf("data alignment %d stripe width %d\n", mp->m_dalign,
 		mp->m_swidth);
+	if (mp->m_fsname != NULL)
+		qprintf("mountpoint \"%s\"\n", mp->m_fsname);
+	else
+		qprintf("No name!!!\n");
+		
 }
 
 
@@ -4231,6 +4236,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 	case XFS_TRANS_QM_QINOCREATE:	qprintf("QM_QINOCREATE");	break;
 	case XFS_TRANS_QM_QUOTAOFF_END:	qprintf("QM_QOFF_END");		break;
 	case XFS_TRANS_SB_UNIT:		qprintf("SB_UNIT");		break;
+	case XFS_TRANS_FSYNC_TS:	qprintf("FSYNC_TS");		break;
 
 	default:			qprintf("0x%x", tp->t_type);	break;
 	}
