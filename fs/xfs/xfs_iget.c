@@ -1,4 +1,4 @@
-#ident "$Revision: 1.94 $"
+#ident "$Revision: 1.95 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -239,6 +239,15 @@ again:
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
 	}
+
+	/*
+	 * Make sure the vnode's VENF_LOCKING flag corresponds with
+	 * the inode's mode. 
+	 */
+	if (MANDLOCK(vp, ip->i_d.di_mode))
+		VN_FLAGSET(vp, VENF_LOCKING);
+	else
+		VN_FLAGCLR(vp, VENF_LOCKING);
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
