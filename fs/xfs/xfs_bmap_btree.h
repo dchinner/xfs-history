@@ -296,6 +296,16 @@ xfs_bmbt_lookup_le(
 	xfs_filblks_t,
 	int *);
 
+/*
+ * Give the bmap btree a new root block.  Copy the old broot contents
+ * down into a real block and make the broot point to it.
+ */
+int						/* error */
+xfs_bmbt_newroot(
+	struct xfs_btree_cur	*cur,		/* btree cursor */
+	int			*logflags,	/* logging flags for inode */
+	int			*stat);		/* return status - 0 fail */
+
 #ifdef XFSDEBUG
 void
 xfs_bmbt_rcheck(
