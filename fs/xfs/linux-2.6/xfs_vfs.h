@@ -73,10 +73,6 @@ typedef struct vfs {
 #define bhvtovfs(bdp)	((struct vfs *)BHV_VOBJ(bdp))
 #define VFS_BHVHEAD(vfsp) (&(vfsp)->vfs_bh)
 
-#define VFS_FSTYPE_ANY		(-1)	/* fstype arg to vfs_devsearch* , 	
-					   vfs_busydev if the filesystem type
-					   is irrelevant for the search */
-
 #define VFS_INIT(vfsp) { \
 	sv_init(&(vfsp)->vfs_wait, SV_DEFAULT, "vfs_wait"); \
         bhv_head_init(VFS_BHVHEAD(vfsp),"vfs"); \

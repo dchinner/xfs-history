@@ -195,11 +195,6 @@ vfs_busy(struct vfs *vfsp)
 
 /*
  * Given a <dev, filesystem-type> pair, return the vfs-entry for it.
- * If the type sent in is VFS_FSTYPE_ANY, then this'll only try to
- * match the device number.
- *
- * This extra parameter was necessary since duplicate vfs entries with
- * the same vfs_dev are possible because of lofs.
  */
 struct vfs *
 vfs_busydev(dev_t dev, int type)
@@ -215,9 +210,7 @@ vfs_busydev(dev_t dev, int type)
 	vfsp = LINVFS_GET_VFS(sb);
 again:
 	spin_lock(&vfslock);
-	if (vfsp->vfs_dev == dev &&
-	    (type == VFS_FSTYPE_ANY || type == vfsp->vfs_fstype)) {
-
+	if (vfsp->vfs_dev == dev && type == vfsp->vfs_fstype) {
 		if (vfsp->vfs_flag & VFS_OFFLINE) {
 			spin_unlock(&vfslock);
 			drop_super(sb);

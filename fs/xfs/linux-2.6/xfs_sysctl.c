@@ -30,12 +30,6 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-/*
- * This file contains random functions which map IRIX stuff to a
- * Linux implemetation.  All the memory allocator mappings are
- * here, as are some procfs and ktrace routines.
- */
-
 #include <xfs.h>
 #include <linux/sysctl.h>
 #include <linux/smp_lock.h>
