@@ -1,4 +1,4 @@
-#ident "$Revision: 1.341 $"
+#ident "$Revision: 1.342 $"
 
 
 #ifdef SIM
@@ -3064,13 +3064,11 @@ xfs_remove(
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	int			cancel_flags;
-	int			nospace;
 	int			committed;
 	int			dir_generation;
 	int			entry_changed;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
-	nospace = 0;
 	vn_trace_entry(dir_vp, "xfs_remove", (inst_t *)__return_address);
 	dp = XFS_BHVTOI(dir_bdp);
 	mp = dp->i_mount;
@@ -3121,27 +3119,21 @@ xfs_remove(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_REMOVE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, XFS_REMOVE_SPACE_RES(mp),
-				      XFS_REMOVE_LOG_RES(mp),
-				      0, XFS_TRANS_PERM_LOG_RES,
-				      XFS_REMOVE_LOG_COUNT)) {
-		cancel_flags = 0;
-		/*
-		 * If we can't reserve the necessary amount of space,
-		 * then try to truncate the file below (after doing
-		 * the regular error checking) and start over again.
-		 * The nospace variable indicates whether this has
-		 * happened or not.  We only want to try this once,
-		 * so if we've already tried it (nospace > 0) then
-		 * just return an error.
-		 */
-		if ((error != ENOSPC) || (nospace > 0)) {
-			remove_which_error_return = __LINE__;
-			IRELE(ip);
-			goto error_return;
-		} else {
-			nospace = 1;
-		}
+	/*
+	 * The space reservation should really be XFS_REMOVE_SPACE_RES,
+	 * which allows for directory btree deletion(s) implying
+	 * possible bmap insert(s).  We avoid this in the directory
+	 * code by, if the bmap insert tries to happen, instead trimming
+	 * the LAST block from the directory.
+	 */
+        error = xfs_trans_reserve(tp, 0, XFS_REMOVE_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_REMOVE_LOG_COUNT);
+	if (error) {
+		ASSERT(error != ENOSPC);
+		remove_which_error_return = __LINE__;
+		xfs_trans_cancel(tp, 0);
+		IRELE(ip);
+		return error;
 	}
 
 	error = xfs_lock_dir_and_entry(dp, name, ip, dir_generation,
@@ -3218,34 +3210,6 @@ xfs_remove(
 			goto error_return;
 		}
 	} 
-
-	if (nospace == 1) {
-		/*
-		 * We can't reserve the space to perform the actual
-		 * remove, so try to truncate the file and start over
-		 * if we can.  We can only do this to a regular file
-		 * that has a link count of 1.  Otherwise we'd break
-		 * the regular behavior of the unlink() system call
-		 * that gets us here.
-		 */
-		if (((ip->i_d.di_mode & IFMT) == IFREG) &&
-		    ((ip->i_d.di_size > 0) || (ip->i_d.di_nextents != 0)) &&
-		    (ip->i_d.di_nlink == 1)) {
-			IHOLD(ip);
-			xfs_trans_cancel(tp, cancel_flags);
-			error = xfs_truncate_file(mp, ip);
-			IRELE(ip);
-			if (error) {
-				remove_which_error_return = __LINE__;
-				return error;
-			}
-			nospace = 2;
-			goto retry;
-		}
-		error = XFS_ERROR(ENOSPC);
-		remove_which_error_return = __LINE__;
-		goto error_return;
-	}
 
 	/*
 	 * Entry must exist since we did a lookup in xfs_lock_dir_and_entry.
