@@ -333,7 +333,7 @@ xfs_next_bmap(
 	xfs_fileoff_t	req_offset,
 	xfs_fsize_t	isize)
 {
-	int		extra_blocks;
+	__int64_t	extra_blocks;
 	xfs_fileoff_t	size_diff;
 	xfs_fileoff_t	ext_offset;
 	xfs_fileoff_t	last_file_fsb;
@@ -434,8 +434,9 @@ xfs_next_bmap(
 	 * end of the extent, then trim down the length
 	 * to match that of the extent.
 	 */
-	 extra_blocks = (bmapp->offset + bmapp->length) -
-	                (imapp->br_startoff + imapp->br_blockcount);   
+	 extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
+	                (__uint64_t)(imapp->br_startoff +
+				     imapp->br_blockcount);   
 	 if (extra_blocks > 0) {
 	    	bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
@@ -448,7 +449,8 @@ xfs_next_bmap(
 	 * but all data beyond the EOF must be inaccessible.
 	 */
 	last_file_fsb = XFS_B_TO_FSB(mp, isize);
-	extra_blocks = bmapp->offset + bmapp->length - last_file_fsb;
+	extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
+		       (__uint64_t)last_file_fsb;
 	if (extra_blocks > 0) {
 		bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
@@ -1144,7 +1146,7 @@ xfs_write_bmap(
 	xfs_fileoff_t	ioalign,
 	xfs_fsize_t	isize)
 {
-	int		extra_blocks;
+	__int64_t	extra_blocks;
 	xfs_fileoff_t	size_diff;
 	xfs_fileoff_t	ext_offset;
 	xfs_fileoff_t	last_file_fsb;
@@ -1186,8 +1188,9 @@ xfs_write_bmap(
 	 * If the iosize from our offset extends beyond the end of
 	 * the extent, then trim down length to match that of the extent.
 	 */
-	extra_blocks = (int)((bmapp->offset + bmapp->length) -
-		       (imapp->br_startoff + imapp->br_blockcount));
+	extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
+		       (__uint64_t)(imapp->br_startoff +
+				    imapp->br_blockcount);
 	last_imap_byte = XFS_FSB_TO_B(mp, imapp->br_startoff +
 				      imapp->br_blockcount);
 	if (extra_blocks > 0) {
@@ -1202,7 +1205,8 @@ xfs_write_bmap(
 	 * rather than the old size.
 	 */
 	last_file_fsb = XFS_B_TO_FSB(mp, isize);
-	extra_blocks = (int)((bmapp->offset + bmapp->length) - last_file_fsb);
+	extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
+		       (__uint64_t)last_file_fsb;
 
 	if (extra_blocks > 0) {
 		bmapp->length -= extra_blocks;
@@ -2663,7 +2667,7 @@ xfs_strat_read(
 	 * overwritten or be beyond the new EOF.
 	 */
 	isize = ip->i_d.di_size;
-	offset = BBTOB(bp->b_offset);
+	offset = BBTOOFF(bp->b_offset);
 	end_offset = offset + bp->b_bcount;
 
 	if (ip->i_write_offset == 0) {
@@ -2729,12 +2733,20 @@ xfs_strat_read(
 				/*
 				 * If the buffer is actually fsb
 				 * aligned then this will simply
-				 * subtract 0 and do no harm.
+				 * subtract 0 and do no harm.  If the
+				 * current mapping is for the start of
+				 * the buffer, then data offset will be
+				 * zero so we don't need to subtract out
+				 * any space at the beginning.
 				 */
-				data_offset -= BBTOB(XFS_BB_FSB_OFFSET(mp,
+				if (data_offset > 0) {
+					data_offset -= BBTOB(
+							XFS_BB_FSB_OFFSET(mp,
 							      bp->b_offset));
+				}
 
 				if (map_start_fsb == offset_fsb) {
+					ASSERT(data_offset == 0);
 					/*
 					 * This is on the first block
 					 * mapped, so it must be the start
@@ -2763,7 +2775,12 @@ xfs_strat_read(
 					 * block to be mapped.  Subtract out
 					 * from the number of bytes the bytes
 					 * between the end of the buffer and
-					 * the end of the block.
+					 * the end of the block.  It may
+					 * be the case that the buffer
+					 * extends beyond the mapping (if
+					 * it is beyond the end of the file),
+					 * in which case no adjustment
+					 * is necessary.
 					 */
 					last_bp_bb = bp->b_offset +
 						BTOBB(bp->b_bcount);
@@ -2771,10 +2788,12 @@ xfs_strat_read(
 						XFS_FSB_TO_BB(mp,
 							      (imap_offset +
 							       imap_blocks));
-					ASSERT(last_map_bb >= last_bp_bb);
-					data_bytes -=
-						BBTOB(last_map_bb -
-						      last_bp_bb);
+
+					if (last_map_bb > last_bp_bb) {
+						data_bytes -=
+							BBTOB(last_map_bb -
+							      last_bp_bb);
+					}
 
 				}
 			}
