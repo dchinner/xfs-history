@@ -200,7 +200,8 @@ again:
 	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
 	initnsema(&ip->i_pinsema, 0, makesname(name, "pino", vp->v_number));
 	xfs_inode_item_init(ip, mp);
-	xfs_ilock(ip, lock_flags);
+	if (lock_flags != 0)
+		xfs_ilock(ip, lock_flags);
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
