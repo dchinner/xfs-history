@@ -1,4 +1,4 @@
-#ident "$Revision: 1.363 $"
+#ident "$Revision: 1.364 $"
 
 
 #ifdef SIM
@@ -443,9 +443,10 @@ xfs_getattr(
                 return 0;
 	}
         vap->va_fsid = ip->i_dev;
-	vap->va_nodeid = ip->i_ino;
 #if XFS_BIG_FILESYSTEMS
-	vap->va_nodeid += mp->m_inoadd;
+	vap->va_nodeid = ip->i_ino + mp->m_inoadd;
+#else
+	vap->va_nodeid = ip->i_ino;
 #endif
         vap->va_nlink = ip->i_d.di_nlink;
 
@@ -465,15 +466,31 @@ xfs_getattr(
         vap->va_uid = ip->i_d.di_uid;
         vap->va_gid = ip->i_d.di_gid;
 	vap->va_projid = ip->i_d.di_projid;
+
 	/*
-	 * Minor optimization, check the common cases first.
+	 * Check vnode type block/char vs. everything else.
+	 * Do it with bitmask because that's faster than looking
+	 * for multiple values individually.
 	 */
-	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
+	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
 		vap->va_rdev = 0;
-        } else if ((vp->v_type == VCHR) || (vp->v_type == VBLK)) {
+		vap->va_blksize = mp->m_swidth ? 
+			/*
+			 * If the underlying volume is a stripe, then return
+			 * the stripe width in bytes as the recommended I/O
+			 * size.
+			 */
+			(mp->m_swidth << mp->m_sb.sb_blocklog) :
+			/*
+			 * Return the largest of the preferred buffer sizes
+			 * since doing small I/Os into larger buffers causes
+			 * buffers to be decommissioned.  The value returned
+			 * is in bytes.
+			 */
+			(1 << (int)MAX(ip->i_readio_log, ip->i_writeio_log));
+	} else {
                 vap->va_rdev = ip->i_df.if_u2.if_rdev;
-        } else {
-                vap->va_rdev = 0;       /* not a b/c spec. */
+                vap->va_blksize = BLKDEV_IOSIZE;
 	}
 
         vap->va_atime.tv_sec = ip->i_d.di_atime.t_sec;
@@ -482,32 +499,6 @@ xfs_getattr(
         vap->va_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec;
         vap->va_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
         vap->va_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
-
-        switch (ip->i_d.di_mode & IFMT) {
-	case IFBLK:
-	case IFCHR:
-                vap->va_blksize = BLKDEV_IOSIZE;
-                break;
-	default:
-                if (mp->m_swidth) {
-                        /*
-                         * If the underlying volume is a stripe, then return
-                         * the stripe width in bytes as the recommended I/O
-                         * size.
-                         */
-                        vap->va_blksize = mp->m_swidth << mp->m_sb.sb_blocklog;
-                } else {
-			/*
-			 * Return the largest of the preferred buffer sizes
-			 * since doing small I/Os into larger buffers causes
-			 * buffers to be decommissioned.  The value returned
-			 * is in bytes.
-			 */
-			vap->va_blksize = 1 << (int) MAX(ip->i_readio_log,
-							 ip->i_writeio_log);
-		}
-		break;
-        }
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
 
