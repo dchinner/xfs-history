@@ -1,4 +1,4 @@
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.33 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -714,6 +714,8 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		xfs_buf_item_trace("BLOG UNSTALE", bip);
 		bip->bli_flags &= ~XFS_BLI_STALE;
+		ASSERT(bp->b_flags & B_STALE);
+		bp->b_flags &= ~B_STALE;
 		bip->bli_format.blf_flags &= ~XFS_BLI_CANCEL;
 	}
 
@@ -769,6 +771,7 @@ xfs_trans_binval(
 		 * just return.
 		 */
 		ASSERT(!(bp->b_flags & B_DELWRI));
+		ASSERT(bp->b_flags & B_STALE);
 		ASSERT(!(bip->bli_flags & (XFS_BLI_LOGGED | XFS_BLI_DIRTY)));
 		ASSERT(!(bip->bli_format.blf_flags & XFS_BLI_INODE_BUF));
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
@@ -794,8 +797,12 @@ xfs_trans_binval(
 	 * about which parts of the buffer have been logged.  We also
 	 * clear the flag indicating that this is an inode buffer since
 	 * the data in the buffer will no longer be valid.
+	 *
+	 * We set the stale bit in the buffer as well since we're getting
+	 * rid of it.
 	 */
 	bp->b_flags &= ~B_DELWRI;
+	bp->b_flags |= B_STALE;
 	bip->bli_flags |= XFS_BLI_STALE;
 	bip->bli_flags &= ~(XFS_BLI_LOGGED | XFS_BLI_DIRTY);
 	bip->bli_format.blf_flags &= ~XFS_BLI_INODE_BUF;
