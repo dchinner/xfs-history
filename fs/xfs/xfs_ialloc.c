@@ -1,20 +1,10 @@
 
-#ident	"$Revision: 1.73 $"
+#ident	"$Revision: 1.74 $"
 
 #ifdef SIM
 #define _KERNEL	1
 #endif
 #include <sys/param.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/stat.h>
-#include <sys/debug.h>
-#include <sys/errno.h>
-#include <stddef.h>
-#ifdef SIM
-#define _KERNEL
-#endif
 #include <sys/vnode.h>
 #include <sys/buf.h>
 #include <sys/uuid.h>
@@ -22,6 +12,10 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
+#include <sys/stat.h>
+#include <sys/debug.h>
+#include <sys/errno.h>
+#include <stddef.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -34,6 +28,7 @@
 #include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
