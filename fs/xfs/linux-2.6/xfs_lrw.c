@@ -118,11 +118,11 @@ xfs_read(
 	if (n < size)
 		size = n;
 
-	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
+	if (XFS_FORCED_SHUTDOWN(mp)) {
 		return EIO;
 	}
 
-	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	XFS_ILOCK(mp, io, XFS_IOLOCK_SHARED);
 
 #ifdef CONFIG_XFS_DMAPI
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
@@ -135,7 +135,7 @@ xfs_read(
 					     FILP_DELAY_FLAG(filp),
 					     NULL /*&locktype*/);
 		if (error) {
-			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 			return error;
 		}
 	}
@@ -146,10 +146,10 @@ xfs_read(
 		fs_flush_pages(bdp, *offsetp, *offsetp + size, 0, FI_NONE);
 		ret = pagebuf_direct_file_read(filp, buf, size, offsetp,
 				linvfs_pb_bmap); 
-		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 	} else {
 		/* Page locking protects this case */
-		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 		ret = generic_file_read(filp, buf, size, offsetp);
 	}
 
@@ -165,7 +165,7 @@ xfs_read(
 	}
 	
 	if (!(filp->f_flags & O_INVISIBLE))
-		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+		XFS_CHGTIME(mp, io, XFS_ICHGTIME_ACC);
 
 	ASSERT (error >= 0);
 	return error;
@@ -982,13 +982,14 @@ xfs_strategy(bhv_desc_t	*bdp,
 	xfs_bmap_free_t	free_list;
 	xfs_filblks_t	count_fsb;
 	int		committed, i, loops, nimaps;
-	int		is_xfs = 1;
+	int		is_xfs = 1; /* This will be a variable at some point */
 	xfs_bmbt_irec_t	imap[XFS_MAX_RW_NBMAPS];
 	xfs_trans_t	*tp;
 
 	ip = XFS_BHVTOI(bdp);
 	io = &ip->i_iocore;
 	mp = ip->i_mount;
+	/* is_xfs = IO_IS_XFS(io); */
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((io->io_flags & XFS_IOCORE_RT) != 0));
@@ -1090,10 +1091,12 @@ xfs_strategy(bhv_desc_t	*bdp,
 			if ((map_start_fsb + count_fsb) > last_block) {
 				count_fsb = last_block - map_start_fsb;
 				if (count_fsb == 0) {
-					xfs_bmap_cancel(&free_list);
-					xfs_trans_cancel(tp,
-						(XFS_TRANS_RELEASE_LOG_RES |
-						 XFS_TRANS_ABORT));
+					if (is_xfs) {
+						xfs_bmap_cancel(&free_list);
+						xfs_trans_cancel(tp,
+						  (XFS_TRANS_RELEASE_LOG_RES |
+							 XFS_TRANS_ABORT));
+					}
 					XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL |
 							    XFS_EXTSIZE_WR);
 					return XFS_ERROR(EAGAIN);
@@ -1209,12 +1212,6 @@ _xfs_imap_to_bmap(
 		nisize = io->io_new_size;
 
 	for (im=0, pbm=0; im < imaps && pbm < pbmaps; im++,pbmapp++,imap++,pbm++) {
-#if 0
- 		 printk("_xfs_imap_to_bmap %Ld %Ld %Ld %d\n",
-			imap->br_startoff, imap->br_startblock,
-			imap->br_blockcount, imap->br_state); 
-		 if (imap->br_startblock < 0 ) BUG();
-#endif
 
 		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
@@ -1311,7 +1308,6 @@ xfs_iomap_write(
 	int		ioflag,
 	struct pm	*pmp)
 {
-	xfs_inode_t	*ip = XFS_IO_INODE(io);
 	int		maps;
 	int		error = 0;
 
@@ -1363,9 +1359,9 @@ xfs_iomap_write(
 
 out:
 	if (iunlock)
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		XFS_IUNLOCK(io->io_mount, io, XFS_ILOCK_EXCL);
 
-	XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
+	XFS_INODE_CLEAR_READ_AHEAD(io);
 	return XFS_ERROR(error);
 }
 
