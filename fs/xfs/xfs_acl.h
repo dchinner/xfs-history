@@ -32,6 +32,37 @@
 #ifndef __XFS_ACL_H__
 #define __XFS_ACL_H__
 
+/*
+ * Access Control Lists
+ */
+typedef __uint16_t	xfs_acl_perm_t;
+typedef __int32_t	xfs_acl_type_t;
+typedef __int32_t	xfs_acl_tag_t;
+typedef __int32_t	xfs_acl_id_t;
+
+#define XFS_ACL_MAX_ENTRIES 25
+#define XFS_ACL_NOT_PRESENT (-1)
+
+typedef struct xfs_acl_entry {
+	xfs_acl_tag_t	ae_tag;
+	xfs_acl_id_t	ae_id;
+	xfs_acl_perm_t	ae_perm;
+} xfs_acl_entry_t;
+
+typedef struct xfs_acl {
+	__int32_t	acl_cnt;
+	xfs_acl_entry_t	acl_entry[XFS_ACL_MAX_ENTRIES];
+} xfs_acl_t;
+
+/* On-disk XFS extended attribute names */
+#define SGI_ACL_FILE	"SGI_ACL_FILE"
+#define SGI_ACL_DEFAULT	"SGI_ACL_DEFAULT"
+#define SGI_ACL_FILE_SIZE	(sizeof(SGI_ACL_FILE)-1)
+#define SGI_ACL_DEFAULT_SIZE	(sizeof(SGI_ACL_DEFAULT)-1)
+
+
+#ifdef __KERNEL__
+
 #ifdef CONFIG_FS_POSIX_ACL
 
 #include <linux/posix_acl.h>
@@ -67,11 +98,9 @@ extern struct xfs_zone *xfs_acl_zone;
 	(XFS_IFORK_Q(i) ? xfs_acl_iaccess(i,m,c) : -1)
 
 #else
-
 #define xfs_acl_vset(v,p,sz,t)	(-ENOTSUP)
 #define xfs_acl_vget(v,p,sz,t)	(-ENOTSUP)
 #define xfs_acl_vremove(v,t)	(-ENOTSUP)
-
 #define _ACL_DECL(a)		((void)0)
 #define _ACL_ALLOC(a)		(1)	/* successfully allocate nothing */
 #define _ACL_FREE(a)		((void)0)
@@ -83,7 +112,8 @@ extern struct xfs_zone *xfs_acl_zone;
 #define _ACL_ACCESS_EXISTS	(NULL)
 #define _ACL_DEFAULT_EXISTS	(NULL)
 #define _ACL_XFS_IACCESS(i,m,c)	(-1)
-
 #endif
 
-#endif /* __XFS_ACL_H__ */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_ACL_H__ */

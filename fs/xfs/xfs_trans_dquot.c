@@ -148,7 +148,7 @@ xfs_trans_dup_dqinfo(
 /*
  * Wrap around mod_dquot to account for both user and group quotas.
  */
-int
+void
 xfs_trans_mod_dquot_byino(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,
@@ -166,7 +166,6 @@ xfs_trans_mod_dquot_byino(
 	if (XFS_IS_GQUOTA_ON(tp->t_mountp) && ip->i_gdquot) {
 		(void) xfs_trans_mod_dquot(tp, ip->i_gdquot, field, delta);
 	}
-	return (0);
 }	
 
 STATIC xfs_dqtrx_t *

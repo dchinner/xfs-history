@@ -1951,8 +1951,7 @@ xfs_inactive(
 		 * Credit the quota account(s). The inode is gone.
 		 */
 		if (XFS_IS_QUOTA_ON(tp->t_mountp)) 
-			(void) xfs_trans_mod_dquot_byino(tp, ip,
-							 XFS_TRANS_DQ_ICOUNT,
+			xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_ICOUNT,
 							 -1);   
 		
 		/*

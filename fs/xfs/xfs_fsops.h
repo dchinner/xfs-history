@@ -49,11 +49,6 @@ xfs_growfs_log(
 	xfs_growfs_log_t	*in);
 
 int
-xfs_growfs_rt(
-	xfs_mount_t		*mp,
-	xfs_growfs_rt_t		*in);
-
-int
 xfs_fs_counts(
 	xfs_mount_t		*mp,
 	xfs_fsop_counts_t	*cnt);

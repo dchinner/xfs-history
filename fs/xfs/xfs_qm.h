@@ -35,15 +35,9 @@
 struct  xfs_dqhash;
 struct  xfs_inode;
 struct  xfs_dquot;
-struct  xfs_qm;
 
-/* 
- * The global quota manager. There is only one of these for the entire
- * system, _not_ one per file system. XQM keeps track of the overall
- * quota functionality, including maintaining the freelist and hash
- * tables of dquots.
- */
-extern	struct xfs_qm		*xfs_Gqm;		
+extern xfs_zone_t	*qm_dqzone;
+extern xfs_zone_t	*qm_dqtrxzone;
 
 /*
  * Used in xfs_qm_sync called by xfs_sync to count the max times that it can

@@ -46,12 +46,6 @@ MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
 MODULE_LICENSE("GPL");
 
 /*
- * External functions & data not in header files.
- */
-
-static xfs_qm_t	*xfs_Gqm = NULL;
-
-/*
  * Command table functions.
  */
 static void	xfsidbg_xagf(xfs_agf_t *);
@@ -99,19 +93,21 @@ static void	xfsidbg_xmount(xfs_mount_t *);
 static void 	xfsidbg_xnode(xfs_inode_t *ip);
 static void 	xfsidbg_xcore(xfs_iocore_t *io);
 static void	xfsidbg_xperag(xfs_mount_t *);
-static void	xfsidbg_xqm(void);
 static void	xfsidbg_xqm_diskdq(xfs_disk_dquot_t *);
 static void	xfsidbg_xqm_dqattached_inos(xfs_mount_t *);
 static void	xfsidbg_xqm_dquot(xfs_dquot_t *);
-static void	xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title);
-static void	xfsidbg_xqm_freelist(void);
-static void	xfsidbg_xqm_htab(void);
 static void	xfsidbg_xqm_mplist(xfs_mount_t *);
 static void	xfsidbg_xqm_qinfo(xfs_mount_t *mp);
 static void	xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp);
 static void	xfsidbg_xsb(xfs_sb_t *, int convert);
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
+#ifdef	CONFIG_XFS_QUOTA
+static void	xfsidbg_xqm(void);
+static void	xfsidbg_xqm_htab(void);
+static void	xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title);
+static void	xfsidbg_xqm_freelist(void);
+#endif
 
 /* kdb wrappers */
 
@@ -1034,19 +1030,6 @@ static int	kdbm_xfs_xperag(
 	return 0;
 }
 
-static int	kdbm_xfs_xqm(
-	int	argc,
-	const char **argv,
-	const char **envp,
-	struct pt_regs *regs)
-{
-	if (argc != 0)
-		return KDB_ARGCOUNT;
-
-	xfsidbg_xqm();
-	return 0;
-}
-
 static int	kdbm_xfs_xqm_diskdq(
 	int	argc,
 	const char **argv,
@@ -1110,6 +1093,20 @@ static int	kdbm_xfs_xqm_dquot(
 	return 0;
 }
 
+#ifdef	CONFIG_XFS_QUOTA
+static int	kdbm_xfs_xqm(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	if (argc != 0)
+		return KDB_ARGCOUNT;
+
+	xfsidbg_xqm();
+	return 0;
+}
+
 static int	kdbm_xfs_xqm_freelist(
 	int	argc,
 	const char **argv,
@@ -1135,6 +1132,7 @@ static int	kdbm_xfs_xqm_htab(
 	xfsidbg_xqm_htab();
 	return 0;
 }
+#endif
 
 static int	kdbm_xfs_xqm_mplist(
 	int	argc,
@@ -2172,12 +2170,14 @@ static struct xif {
 				"Dump XFS per-allocation group data"},
   {  "xqinfo",  kdbm_xfs_xqm_qinfo,	"<xfs_mount_t>",
 				"Dump mount->m_quotainfo structure"},
+#ifdef	CONFIG_XFS_QUOTA
   {  "xqm",	kdbm_xfs_xqm,		"",
 				"Dump XFS quota manager structure"},
   {  "xqmfree",	kdbm_xfs_xqm_freelist,	"",
 				"Dump XFS global freelist of dquots"},
   {  "xqmhtab",	kdbm_xfs_xqm_htab,	"",
 				"Dump XFS hashtable of dquots"},
+#endif	/* CONFIG_XFS_QUOTA */
   {  "xqmplist",kdbm_xfs_xqm_mplist,	"<xfs_mount_t>",
 				"Dump XFS all dquots of a f/s"},
   {  "xsb",	kdbm_xfs_xsb,		"<xfs_sb_t> <cnv>",
@@ -4742,8 +4742,7 @@ xfsidbg_xperag(xfs_mount_t *mp)
 	}
 }
 
-
-
+#ifdef CONFIG_XFS_QUOTA
 static void
 xfsidbg_xqm()
 {
@@ -4762,20 +4761,27 @@ xfsidbg_xqm()
 		atomic_read(&xfs_Gqm->qm_totaldquots),
 		xfs_Gqm->qm_nrefs);
 }
+#endif
 
 static void
 xfsidbg_xqm_diskdq(xfs_disk_dquot_t *d)
 {
-	kdb_printf("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n", INT_GET(d->d_magic, ARCH_CONVERT),
-		INT_GET(d->d_version, ARCH_CONVERT), INT_GET(d->d_id, ARCH_CONVERT), INT_GET(d->d_id, ARCH_CONVERT));
-	kdb_printf("blk_hard 0x%x\tblk_soft 0x%x\tino_hard 0x%x\tino_soft 0x%x\n",
-		(int)INT_GET(d->d_blk_hardlimit, ARCH_CONVERT), (int)INT_GET(d->d_blk_softlimit, ARCH_CONVERT),
-		(int)INT_GET(d->d_ino_hardlimit, ARCH_CONVERT), (int)INT_GET(d->d_ino_softlimit, ARCH_CONVERT));
-	kdb_printf("bcount 0x%x (%d) icount 0x%x (%d)\n",
-		(int)INT_GET(d->d_bcount, ARCH_CONVERT), (int)INT_GET(d->d_bcount, ARCH_CONVERT), 
-		(int)INT_GET(d->d_icount, ARCH_CONVERT), (int)INT_GET(d->d_icount, ARCH_CONVERT));
+	kdb_printf("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n",
+		INT_GET(d->d_magic, ARCH_CONVERT),
+		INT_GET(d->d_version, ARCH_CONVERT),
+		INT_GET(d->d_id, ARCH_CONVERT),
+		INT_GET(d->d_id, ARCH_CONVERT));
+	kdb_printf("bhard 0x%llx\tbsoft 0x%llx\tihard 0x%llx\tisoft 0x%llx\n",
+		(unsigned long long)INT_GET(d->d_blk_hardlimit, ARCH_CONVERT),
+		(unsigned long long)INT_GET(d->d_blk_softlimit, ARCH_CONVERT),
+		(unsigned long long)INT_GET(d->d_ino_hardlimit, ARCH_CONVERT),
+		(unsigned long long)INT_GET(d->d_ino_softlimit, ARCH_CONVERT));
+	kdb_printf("bcount 0x%llx icount 0x%llx\n",
+		(unsigned long long)INT_GET(d->d_bcount, ARCH_CONVERT), 
+		(unsigned long long)INT_GET(d->d_icount, ARCH_CONVERT));
 	kdb_printf("btimer 0x%x itimer 0x%x \n",
-		(int)INT_GET(d->d_btimer, ARCH_CONVERT), (int)INT_GET(d->d_itimer, ARCH_CONVERT));
+		(int)INT_GET(d->d_btimer, ARCH_CONVERT),
+		(int)INT_GET(d->d_itimer, ARCH_CONVERT));
 }
 
 static void	
@@ -4858,7 +4864,7 @@ xfsidbg_xqm_dqattached_inos(xfs_mount_t	*mp)
 	kdb_printf("\nNumber of inodes with dquots attached: %d\n", n);
 }
 
-
+#ifdef	CONFIG_XFS_QUOTA
 static void
 xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title) 
 {
@@ -4885,18 +4891,6 @@ xfsidbg_xqm_freelist(void)
 		kdb_printf("NULL XQM!!\n");
 }
 
-static void	
-xfsidbg_xqm_mplist(xfs_mount_t *mp)
-{
-	if (mp->m_quotainfo == NULL) {
-		kdb_printf("NULL quotainfo\n");
-		return;
-	}
-	
-	XQMIDBG_LIST_PRINT(&(mp->m_quotainfo->qi_dqlist), MPL_NEXT);
-
-}
-
 static void
 xfsidbg_xqm_htab(void)
 {
@@ -4921,6 +4915,19 @@ xfsidbg_xqm_htab(void)
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);
 		}
 	}
+}
+#endif
+
+static void	
+xfsidbg_xqm_mplist(xfs_mount_t *mp)
+{
+	if (mp->m_quotainfo == NULL) {
+		kdb_printf("NULL quotainfo\n");
+		return;
+	}
+	
+	XQMIDBG_LIST_PRINT(&(mp->m_quotainfo->qi_dqlist), MPL_NEXT);
+
 }
 
 

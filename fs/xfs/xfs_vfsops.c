@@ -74,7 +74,6 @@ xfs_init(int	fstype)
 	extern xfs_zone_t	*xfs_efi_zone;
 	extern xfs_zone_t	*xfs_dabuf_zone;
 	extern mutex_t	        xfs_uuidtabmon;
-	extern mutex_t	        xfs_Gqm_lock;
 #ifdef DEBUG_NOT
 	extern ktrace_t	        *xfs_alloc_trace_buf;
 	extern ktrace_t	        *xfs_bmap_trace_buf;
@@ -198,8 +197,6 @@ xfs_cleanup(void)
 	extern xfs_zone_t	*xfs_efi_zone;
 	extern xfs_zone_t	*xfs_buf_item_zone;
 	extern xfs_zone_t	*xfs_chashlist_zone;
-	extern xfs_zone_t	*qm_dqzone;
-	extern xfs_zone_t	*qm_dqtrxzone;
 	extern xfs_inode_t	**xfs_refcache;
 
 	xfs_cleanup_procfs();
@@ -221,10 +218,8 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ifork_zone);
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
-	if (qm_dqzone)
-		kmem_cache_destroy(qm_dqzone);
-	if (qm_dqtrxzone)
-		kmem_cache_destroy(qm_dqtrxzone);
+	_XQM_ZONE_DESTROY(qm_dqzone);
+	_XQM_ZONE_DESTROY(qm_dqtrxzone);
 	_ACL_ZONE_DESTROY(xfs_acl_zone);
 #if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
         ktrace_uninit();
@@ -875,7 +870,7 @@ xfs_statvfs(
 	xfs_extlen_t	lsize;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
-	unsigned long		s;
+	unsigned long	s;
 
 	mp = XFS_BHVTOM(bdp);
 	sbp = &(mp->m_sb);
@@ -891,14 +886,15 @@ xfs_statvfs(
 #if XFS_BIG_FILESYSTEMS
 	fakeinos += mp->m_inoadd;
 #endif
-	statp->f_files = MIN(sbp->sb_icount + fakeinos, XFS_MAXINUMBER);
+	statp->f_files =
+	    MIN(sbp->sb_icount + fakeinos, (__uint64_t)XFS_MAXINUMBER);
 	if (mp->m_maxicount)
 #if XFS_BIG_FILESYSTEMS
 		if (!mp->m_inoadd)
 #endif
-			statp->f_files = MIN(statp->f_files, mp->m_maxicount);
-	statp->f_ffree = 
-		statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
+			statp->f_files =
+			    MIN((__uint64_t)statp->f_files, mp->m_maxicount);
+	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
 	statp->f_fsid.val[0] = kdev_val(mp->m_dev);

@@ -34,8 +34,6 @@
 #include <xfs_quota_priv.h>
 
 
-struct xfs_qm	*xfs_Gqm;
-mutex_t		xfs_Gqm_lock;
 xfs_zone_t	*qm_dqzone;
 xfs_zone_t	*qm_dqtrxzone;
 
