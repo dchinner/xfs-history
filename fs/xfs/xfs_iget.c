@@ -319,24 +319,6 @@ xfs_iput(xfs_inode_t	*ip,
 }
 
 /*
- * It's not clear what we need to do here.
- * If the link count has gone to zero, we need to truncate
- * the file.  This needs to be tied in to what we do when
- * we unlink an open file.  In this case we also need to
- * mark the inode free at this point, since we couldn't when
- * it was unlinked.
- * Perhaps this shouldn't exist and we should only have
- * xfs_inactive().  It should probably clear any read-ahead
- * hints, it needs to call remapf() if we truncate the file
- * and it was mapped, we may want to sync the inode.
- */
-void
-xfs_iinactive(xfs_inode_t *ip)
-/* ARGSUSED */
-{
-}
-
-/*
  * This routine embodies the part of the reclaim code that pulls
  * the inode from the inode hash table and the mount structure's
  * inode list.
