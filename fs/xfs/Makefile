@@ -129,16 +129,16 @@ subdir-$(CONFIG_XFS_FS)		+= pagebuf linux support
 ifeq ($(CONFIG_XFS_DMAPI),y)
   subdir-$(CONFIG_XFS_FS)	+= dmapi
   obj-y				+= dmapi/xfs_dmapi.o
+else
+  obj-y				+= xfs_dmops.o
 endif
 
 ifeq ($(CONFIG_XFS_QUOTA),y)
   subdir-$(CONFIG_XFS_FS)	+= quota
   obj-y				+= quota/xfs_quota.o
+else
+  obj-y				+= xfs_qmops.o
 endif
-
-# Quota and DMAPI stubs
-obj-y				+= xfs_dmops.o \
-				   xfs_qmops.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to
