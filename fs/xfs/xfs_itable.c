@@ -516,6 +516,7 @@ xfs_bulkstat(
 						if (XFS_TEST_ERROR(error != 0,
 								   mp, XFS_ERRTAG_BULKSTAT_READ_CHUNK,
 								   XFS_RANDOM_BULKSTAT_READ_CHUNK)) {
+							bp = NULL;
 							break;
 						}
 						clustidx = ip->i_boffset /
