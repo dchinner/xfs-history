@@ -6439,8 +6439,8 @@ xfsidbg_xlog(xlog_t *log)
 	kdb_printf("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
 		log->l_iclog_bak, log->l_iclog_size, log->l_iclog_size,
 		log->l_iclog_bufs);
-	kdb_printf("l_stripemask %d l_iclog_hsize %d l_iclog_heads %d\n",
-		log->l_stripemask, log->l_iclog_hsize, log->l_iclog_heads);
+	kdb_printf("l_iclog_hsize %d l_iclog_heads %d\n",
+		log->l_iclog_hsize, log->l_iclog_heads);
 	kdb_printf("l_sectbb_log %u l_sectbb_mask %u\n",
 		log->l_sectbb_log, log->l_sectbb_mask);
 	kdb_printf("&grant_lock: 0x%p  resHeadQ: 0x%p  wrHeadQ: 0x%p\n",
