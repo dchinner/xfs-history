@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.53 $"
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
+#ident	"$Revision: 1.54 $"
 
 struct buf;
 struct cred;
@@ -31,6 +31,7 @@ typedef struct xfs_trans_reservations {
 	uint	tr_setattr;	/* set/create an attribute */
 	uint	tr_rmattr;	/* remove an attribute */
 	uint	tr_attrflag;	/* set/clear attribute INCOMPLETE flag */
+	uint	tr_clearagi;	/* clear bad agi unlinked ino bucket */
 } xfs_trans_reservations_t;
 
 typedef struct xfs_mount {
