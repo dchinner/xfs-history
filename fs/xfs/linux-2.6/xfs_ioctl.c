@@ -630,6 +630,7 @@ xfs_attrctl_by_handle(
 	vfs_t		*vfsp,
 	xfs_mount_t	*mp)
 {
+#ifdef CONFIG_HAVE_ATTRCTL
 	int			error;
 	xfs_fsop_attr_handlereq_t attr_hreq;
 	xfs_fsop_handlereq_t	hreq;
@@ -779,6 +780,9 @@ xfs_attrctl_by_handle(
  unlock:
 	unlock_kernel();
 	return error;
+#else	/* !CONFIG_HAVE_ATTRCTL */
+	return -ENOSYS;
+#endif	/* CONFIG_HAVE_ATTRCTL */
 }
 
 

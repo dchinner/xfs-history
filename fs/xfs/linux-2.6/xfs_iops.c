@@ -453,6 +453,7 @@ int linvfs_follow_link(struct dentry *dentry,
 	return error;
 }
 
+#ifdef CONFIG_HAVE_ATTRCTL
 /*
  * Implement attrctl(2) functions.
  * Returns -ve on error (ie -ENOMEM).
@@ -533,6 +534,7 @@ int linvfs_attrctl(
 			
 	return -error;
 }
+#endif	/* CONFIG_HAVE_ATTRCTL */
 
 #ifdef CONFIG_FS_POSIX_ACL
 
@@ -783,7 +785,9 @@ struct inode_operations linvfs_file_inode_operations =
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
+#ifdef CONFIG_HAVE_ATTRCTL
   attrctl:		linvfs_attrctl,
+#endif
 #ifdef CONFIG_FS_POSIX_ACL
   acl_get:		linvfs_acl_get,
   acl_set:		linvfs_acl_set,
@@ -804,7 +808,9 @@ struct inode_operations linvfs_dir_inode_operations =
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
+#ifdef CONFIG_HAVE_ATTRCTL
   attrctl:		linvfs_attrctl,
+#endif
 #ifdef CONFIG_FS_POSIX_ACL
   acl_get:		linvfs_acl_get,
   acl_set:		linvfs_acl_set,
@@ -818,7 +824,9 @@ struct inode_operations linvfs_symlink_inode_operations =
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
+#ifdef CONFIG_HAVE_ATTRCTL
   attrctl:		linvfs_attrctl,
+#endif
 #ifdef CONFIG_FS_POSIX_ACL
   acl_get:		linvfs_acl_get,
   acl_set:		linvfs_acl_set,
