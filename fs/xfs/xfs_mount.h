@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.93 $"
+#ident	"$Revision: 1.94 $"
 
 #include <sys/buf.h>	/* for buftarg_t */
 struct cred;
@@ -136,6 +136,7 @@ typedef struct xfs_mount {
 	int			m_swidth;	/* stripe width */
 	int			m_sinoalign;	/* stripe unit inode alignmnt */
 	int			m_da_magicpct;	/* 37% of the blocksize */
+	__uint8_t		m_mk_sharedro;	/* mark shared ro on unmount */
 #if CELL_IRIX
 	char			m_export[VFS_EILIMIT];
 						/* Info to export to other
@@ -153,7 +154,7 @@ typedef struct xfs_mount {
 #define	XFS_MOUNT_INO64		0x00000002
 #endif
 #define XFS_MOUNT_ROOTQCHECK	0x00000004
-#define XFS_MOUNT_FS_IS_CLEAN	0x00000008	/* fs is truly read-only */
+			     /* 0x00000008	-- currently unused */
 #define XFS_MOUNT_FS_SHUTDOWN	0x00000010	/* atomic stop of all filesystem
 						   operations, typically for
 						   disk errors in metadata */
@@ -166,6 +167,9 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_UNSHARED      0x00000100      /* unshared mount */
 #define XFS_MOUNT_REGISTERED    0x00000200      /* registered with cxfs master
                                                    cell logic */
+#define XFS_MOUNT_NORECOVERY   	0x00000400      /* no recovery - dirty fs */
+#define XFS_MOUNT_SHARED    	0x00000800      /* shared mount */
+
 #define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 
 /*
