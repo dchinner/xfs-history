@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+# Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of version 2 of the GNU General Public License as
@@ -32,8 +32,11 @@
 # Makefile for the linux pagebuf routines.
 #
 
-ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
-	EXTRA_CFLAGS += -g -DDEBUG -DSTATIC="" -DPAGEBUF_TRACE
+ifeq ($(CONFIG_XFS_DEBUG),y)
+	EXTRA_CFLAGS += -g -DDEBUG -DSTATIC=""
+endif
+ifeq ($(CONFIG_XFS_TRACE),y)
+	EXTRA_CFLAGS += -DPAGEBUF_TRACE
 endif
 EXTRA_CFLAGS += -I..
 
