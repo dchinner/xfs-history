@@ -42,10 +42,7 @@
  *     - support other architectures
  */
  
-#include <config/xfs/arch/mips.h>
-#include <config/xfs/arch/native.h>
-#include <config/xfs/arch/multi.h>
-#include <config/x86.h>
+#include <linux/autoconf.h>
 
 /* select native architecture */
   
@@ -62,6 +59,16 @@
     (defined(CONFIG_XFS_ARCH_MULTI) && defined(CONFIG_XFS_ARCH_NATIVE)) 
     
 #error multiple xfs architecture options enabled
+
+#endif
+
+/* check for no defines */
+
+#if (!defined(CONFIG_XFS_ARCH_MIPS) \
+	&& !defined(CONFIG_XFS_ARCH_NATIVE) \
+	&& !defined(CONFIG_XFS_ARCH_MULTI))
+
+#error no xfs architecture selected
 
 #endif
    
