@@ -1,4 +1,4 @@
-#ident "$Revision: 1.56 $"
+#ident "$Revision: 1.57 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -50,6 +50,15 @@ xfs_trans_buf_item_match(
 	dev_t		dev,
 	daddr_t		blkno,
 	int		len);
+
+#ifdef DEBUG
+STATIC buf_t *
+xfs_trans_buf_item_match_all(
+	xfs_trans_t	*tp,
+	dev_t		dev,
+	daddr_t		blkno,
+	int		len);
+#endif
 
 
 /*
@@ -109,6 +118,9 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		bp = xfs_trans_buf_item_match(tp, target_dev->dev, blkno, len);
 	} else {
 		bp = incore_match(target_dev->dev, blkno, len, BUF_FSPRIV2, tp);
+		if (bp)
+			ASSERT(xfs_trans_buf_item_match_all(tp, target_dev->dev,
+				blkno, len) == bp);
 	}
 	if (bp != NULL) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
@@ -378,6 +390,9 @@ xfs_trans_read_buf(
 		bp = xfs_trans_buf_item_match(tp, dev, blkno, len);
 	} else {
 		bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp);
+		if (bp)
+			ASSERT(xfs_trans_buf_item_match_all(tp, dev, blkno,
+				len) == bp);
 	}
 	if (bp != NULL) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
@@ -1094,3 +1109,60 @@ xfs_trans_buf_item_match(
 	}
 	return bp;
 }
+
+#ifdef DEBUG
+/*
+ * Check to see if a buffer matching the given parameters is already
+ * a part of the given transaction.  Check all the chunks, we
+ * want to be thorough.
+ */
+STATIC buf_t *
+xfs_trans_buf_item_match_all(
+	xfs_trans_t	*tp,
+	dev_t		dev,
+	daddr_t		blkno,
+	int		len)
+{
+	xfs_log_item_chunk_t	*licp;
+	xfs_log_item_desc_t	*lidp;
+	xfs_buf_log_item_t	*blip;
+	buf_t			*bp;
+	int			i;
+
+	bp = NULL;
+	len = BBTOB(len);
+	for (licp = &tp->t_items; licp != NULL; licp = licp->lic_next) {
+		if (XFS_LIC_ARE_ALL_FREE(licp)) {
+			ASSERT(licp == &tp->t_items);
+			ASSERT(licp->lic_next == NULL);
+			return NULL;
+		}
+		for (i = 0; i < licp->lic_unused; i++) {
+			/*
+			 * Skip unoccupied slots.
+			 */
+			if (XFS_LIC_ISFREE(licp, i)) {
+				continue;
+			}
+
+			lidp = XFS_LIC_SLOT(licp, i);
+			blip = (xfs_buf_log_item_t *)lidp->lid_item;
+			if (blip->bli_item.li_type != XFS_LI_BUF) {
+				continue;
+			}
+
+			bp = blip->bli_buf;
+			if ((bp->b_edev == dev) &&
+			    (bp->b_blkno == blkno) &&
+			    (bp->b_bcount == len)) {
+				/*
+				 * We found it.  Break out and
+				 * return the pointer to the buffer.
+				 */
+				return bp;
+			}
+		}
+	}
+	return NULL;
+}
+#endif	/* DEBUG */
