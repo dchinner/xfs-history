@@ -79,6 +79,7 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 	uint		total_size;
 	xfs_log_iovec_t	*vecp;
 	xfs_inode_t	*ip;
+	size_t		data_bytes;
 
 	ip = iip->ili_inode;
 	vecp = log_vector;
@@ -123,9 +124,17 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 			ASSERT(ip->i_u1.iu_data != NULL);
 			ASSERT(ip->i_d.di_size > 0);
 			vecp->i_addr = (caddr_t)ip->i_u1.iu_data;
-			vecp->i_len = ip->i_bytes;
+			/*
+			 * Round i_bytes up to a word boundary.
+			 * The underlying memory is guaranteed to
+			 * to be there by xfs_idata_realloc().
+			 */
+			data_bytes = (((ip->i_bytes + 3) >> 2) << 2);
+			ASSERT((ip->i_real_bytes == 0) ||
+			       (ip->i_real_bytes == data_bytes));
+			vecp->i_len = data_bytes;
 			vecp++;
-			total_size += ip->i_bytes;
+			total_size += data_bytes;
 		}
 		break;
 
