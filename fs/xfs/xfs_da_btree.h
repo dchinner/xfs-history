@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.28 $"
 
 /*
  * xfs_da_btree.h
@@ -129,15 +129,19 @@ xfs_dablk_t xfs_da_cookie_bno(struct xfs_mount *mp, off_t cookie);
 #define	XFS_DA_COOKIE_BNO(mp,cookie)		xfs_da_cookie_bno(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_BNO(mp,cookie) \
-	((xfs_dablk_t)(((off_t)(cookie)) >> ((mp)->m_dircook_elog + 32)))
+	(((off_t)(cookie) >> 31) == -1LL ? \
+		(xfs_dablk_t)0 : \
+		(xfs_dablk_t)((off_t)(cookie) >> ((mp)->m_dircook_elog + 32)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_ENTRY)
 int xfs_da_cookie_entry(struct xfs_mount *mp, off_t cookie);
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie)		xfs_da_cookie_entry(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie) \
-	((xfs_dablk_t)((off_t)(cookie) >> 32) & \
-	 ((1 << (mp)->m_dircook_elog) - 1))
+	(((off_t)(cookie) >> 31) == -1LL ? \
+		(xfs_dablk_t)0 : \
+		(xfs_dablk_t)(((off_t)(cookie) >> 32) & \
+			      ((1 << (mp)->m_dircook_elog) - 1)))
 #endif
 
 
