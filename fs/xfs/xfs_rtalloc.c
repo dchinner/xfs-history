@@ -10,6 +10,7 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/time.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
