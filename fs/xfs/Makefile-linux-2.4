@@ -27,7 +27,7 @@ CROSS_COMPILE 	=
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
-#CC		= $(CROSS_COMPILE)gcc
+CC		= $(CROSS_COMPILE)gcc
 #===== NOTE =====
 #  egcs-2.91.66 is the recommended compiler version for building XFS.
 #  Most of the XFS developers are using that particular version for
@@ -38,7 +38,7 @@ LD		= $(CROSS_COMPILE)ld
 #  On early versions of RedHat 7.x, kgcc is the recommended compiler
 #  for building the kernel (kgcc is the same as egcs-2.91.66) - if
 #  you use such a distribution and wish to use kgcc, uncomment this:
-CC		= $(CROSS_COMPILE)kgcc 
+#CC		= $(CROSS_COMPILE)kgcc 
 #  The default gcc with RedHat 7.1 (gcc-2.96-81) also appears to
 #  generate good code, earlier versions of 2.96 are however an
 #  unknown quantity and not recommended.
