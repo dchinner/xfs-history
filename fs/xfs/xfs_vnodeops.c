@@ -1,4 +1,4 @@
-#ident "$Revision: 1.201 $"
+#ident "$Revision: 1.202 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1146,6 +1146,11 @@ xfs_fsync(
 #ifndef SIM
 					buftrace("XFS_FSYNC", bp);
 #endif
+					if (bp->b_pincount > 0) {
+						xfs_log_force(ip->i_mount,
+							      (xfs_lsn_t)0,
+							      XFS_LOG_FORCE);
+					}
 					bawrite(bp);
 				} else {
 					brelse(bp);
