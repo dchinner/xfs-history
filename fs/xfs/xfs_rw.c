@@ -4067,15 +4067,20 @@ xfs_diordwr(vnode_t	*vp,
 	int		error;
 
 	ip = XFS_VTOI(vp);
+	mp = XFS_VFSTOM(vp->v_vfsp);
 
 	/*
- 	 * Check that the user buffer address, file offset, and
- 	 * request size are all multiples of BBSIZE. This prevents
-	 * the need for read/modify/write operations.
+ 	 * Check that the user buffer address is on a BBISZE offset, 
+	 * while file offset, and
+ 	 * request size are all multiples of file system block size. 
+	 * This prevents the need for read/modify/write operations.
+	 *
+	 * This enforces the alignment restrictions indicated by 
+ 	 * the F_DIOINFO fcntl call.
  	 */
 	if ((((int)(uiop->uio_iov->iov_base)) & BBMASK) ||
-	     (uiop->uio_offset & BBMASK) ||
-	     (uiop->uio_resid & BBMASK)) {
+	     (uiop->uio_offset & mp->m_blockmask) ||
+	     (uiop->uio_resid & mp->m_blockmask)) {
 #ifndef SIM
 		return XFS_ERROR(EINVAL);
 #endif
