@@ -113,20 +113,20 @@ typedef struct xfs_ifork {
 typedef struct {
 	struct xfs_ihash	*ip_hash;	/* pointer to hash header */
 	struct xfs_inode	*ip_next;	/* inode hash link forw */
-	struct xfs_inode	**ip_prevp;	/* ptr to prev i_next */
-	struct xfs_mount	*ip_mount;	/* fs mount struct ptr */
 	struct xfs_inode	*ip_mnext;	/* next inode in mount list */
 	struct xfs_inode	*ip_mprev;	/* ptr to prev inode */
+	struct xfs_inode	**ip_prevp;	/* ptr to prev i_next */
+	struct xfs_mount	*ip_mount;	/* fs mount struct ptr */
 } xfs_iptr_t;
 
 typedef struct xfs_inode {
 	/* Inode linking and identification information. */
 	struct xfs_ihash	*i_hash;	/* pointer to hash header */
 	struct xfs_inode	*i_next;	/* inode hash link forw */
-	struct xfs_inode	**i_prevp;	/* ptr to prev i_next */
-	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
 	struct xfs_inode	*i_mnext;	/* next inode in mount list */
 	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
+	struct xfs_inode	**i_prevp;	/* ptr to prev i_next */
+	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
 	struct bhv_desc		i_bhv_desc;	/* inode behavior descriptor*/
 	struct xfs_dquot	*i_udquot;	/* user dquot */
 	struct xfs_dquot	*i_pdquot;	/* project dquot */
