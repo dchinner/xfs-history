@@ -42,6 +42,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
 #include "xfs_print.h"
+#include "xfs_rw.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -515,6 +516,7 @@ xfs_itruncate(xfs_trans_t	**tp,
 	xfs_trans_t	*ntp;
 	int		done;
 	xfs_bmap_free_t	free_list;
+	timestruc_t	tv;
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
@@ -573,7 +575,7 @@ xfs_itruncate(xfs_trans_t	**tp,
 		 * reservation and commit the old transaction.
 		 */
 		ntp = xfs_trans_dup(*tp);
-		xfs_bmap_finish(tp, &free_list, first_block);
+		(void) xfs_bmap_finish(tp, &free_list, first_block, 0);
 		xfs_trans_commit(*tp, 0);
 		*tp = ntp;
 
@@ -585,7 +587,49 @@ xfs_itruncate(xfs_trans_t	**tp,
 		xfs_trans_ihold(*tp, ip);
 	}
 	ip->i_d.di_size = new_size;
+	nanotime(&tv);
+	ip->i_d.di_ctime.t_sec = tv.tv_sec;
+	ip->i_d.di_mtime.t_sec = tv.tv_sec;
 	xfs_trans_log_inode(*tp, ip, XFS_ILOG_CORE);
+}
+
+/*
+ * xfs_igrow
+ *
+ * This routine is called to extend the size of a file.
+ * The inode must have both the iolock and the ilock locked
+ * for update and it must be a part of the current transaction.
+ */
+void
+xfs_igrow(xfs_trans_t	*tp,
+	  xfs_inode_t	*ip,
+	  __int64_t	new_size)
+{
+	__int64_t	isize;
+	timestruc_t	tv;
+
+	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
+	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE) != 0);
+	ASSERT(ip->i_transp == tp);
+	ASSERT(new_size > ip->i_d.di_size);
+
+	isize = ip->i_d.di_size;
+	if (isize != 0) {
+		/*
+		 * Zero any pages that may have been created by
+		 * xfs_write_file() beyond the end of the file.
+		 */
+		xfs_zero_eof(ip, new_size, isize);
+	}
+
+	/*
+	 * Update the file size and inode change timestamp.
+	 */
+	ip->i_d.di_size = new_size;
+	nanotime(&tv);
+	ip->i_d.di_ctime.t_sec = tv.tv_sec;
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+
 }
 
 /*
