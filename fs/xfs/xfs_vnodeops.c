@@ -1,4 +1,4 @@
-#ident "$Revision: 1.289 $"
+#ident "$Revision: 1.290 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -154,7 +154,6 @@ STATIC int
 xfs_access(
 	bhv_desc_t	*bdp,
 	int		mode,
-	int		flags,
 	cred_t		*credp);
 
 STATIC int
@@ -1099,7 +1098,6 @@ STATIC int
 xfs_access(
 	bhv_desc_t	*bdp,
 	int		mode,
-	int		flags,
 	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
@@ -5462,8 +5460,9 @@ vnodeops_t xfs_vnodeops = {
 	(vop_attr_set_t)fs_nosys,
 	(vop_attr_remove_t)fs_nosys,
 	(vop_attr_list_t)fs_nosys,
-	(vop_mount_t)fs_nosys,
+	(vop_cover_t)fs_nosys,
 	(vop_link_removed_t)fs_nosys,
+	(vop_vnode_change_t)fs_nosys,
 };
 
 #else
@@ -5514,8 +5513,9 @@ vnodeops_t xfs_vnodeops = {
 	xfs_attr_set,
 	xfs_attr_remove,
 	xfs_attr_list,
-	fs_mount,
+	fs_cover,
 	(vop_link_removed_t)fs_noval,
+	fs_vnode_change,
 };
 
 #endif /* SIM */
