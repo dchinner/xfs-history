@@ -618,7 +618,7 @@ xfs_attr_leaf_to_node(xfs_da_args_t *args)
 	if (error)
 		return(error);
 	ASSERT(bp1 != NULL);
-	error = xfs_da_get_buf(args->trans, args->dp, blkno, &bp2,
+	error = xfs_da_get_buf(args->trans, args->dp, blkno, -1, &bp2,
 					    XFS_ATTR_FORK);
 	if (error)
 		return(error);
@@ -663,7 +663,7 @@ xfs_attr_leaf_create(xfs_da_args_t *args, xfs_dablk_t blkno, buf_t **bpp)
 
 	dp = args->dp;
 	ASSERT(dp != NULL);
-	error = xfs_da_get_buf(args->trans, args->dp, blkno, &bp,
+	error = xfs_da_get_buf(args->trans, args->dp, blkno, -1, &bp,
 					    XFS_ATTR_FORK);
 	if (error)
 		return(error);
@@ -2393,7 +2393,7 @@ xfs_attr_root_inactive(xfs_trans_t **trans, xfs_inode_t *dp)
 	/*
 	 * Invalidate the incore copy of the root block.
 	 */
-	error = xfs_da_read_buf(*trans, dp, 0, blkno, &bp, XFS_ATTR_FORK);
+	error = xfs_da_get_buf(*trans, dp, 0, blkno, &bp, XFS_ATTR_FORK);
 	if (error)
 		return(error);
 	xfs_trans_binval(*trans, bp);	/* remove from cache */
@@ -2477,7 +2477,7 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, buf_t *bp,
 			 * Remove the subsidiary block from the cache
 			 * and from the log.
 			 */
-			error = xfs_da_read_buf(*trans, dp, 0, child_blkno,
+			error = xfs_da_get_buf(*trans, dp, 0, child_blkno,
 				&child_bp, XFS_ATTR_FORK);
 			if (error)
 				return(error);

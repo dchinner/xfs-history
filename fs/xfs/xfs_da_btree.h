@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 /*
  * xfs_da_btree.h
@@ -259,7 +259,8 @@ int	xfs_da_blk_link(struct xfs_da_state *state,
  */
 int	xfs_da_grow_inode(struct xfs_da_args *args, xfs_dablk_t *new_blkno);
 int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			      xfs_dablk_t bno, struct buf **bp, int whichfork);
+			      xfs_dablk_t bno, daddr_t mappedbno,
+			      struct buf **bp, int whichfork);
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			       xfs_dablk_t bno, daddr_t mappedbno,
 			       struct buf **bpp, int whichfork);

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.56 $"
+#ident "$Revision: 1.58 $"
 
 /*
  * xfs_dir_leaf.c
@@ -728,7 +728,8 @@ xfs_dir_leaf_to_node(xfs_da_args_t *args)
 	if (retval)
 		return(retval);
 	ASSERT(bp1 != NULL);
-	retval = xfs_da_get_buf(args->trans, args->dp, 1, &bp2, XFS_DATA_FORK);
+	retval = xfs_da_get_buf(args->trans, args->dp, 1, -1, &bp2,
+					     XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp2 != NULL);
@@ -772,7 +773,7 @@ xfs_dir_leaf_create(xfs_da_args_t *args, xfs_dablk_t blkno, buf_t **bpp)
 
 	dp = args->dp;
 	ASSERT(dp != NULL);
-	retval = xfs_da_get_buf(args->trans, args->dp, blkno, &bp,
+	retval = xfs_da_get_buf(args->trans, args->dp, blkno, -1, &bp,
 					     XFS_DATA_FORK);
 	if (retval)
 		return(retval);

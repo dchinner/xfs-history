@@ -128,7 +128,8 @@ xfs_da_node_create(xfs_da_args_t *args, xfs_dablk_t blkno, int level,
 	buf_t *bp;
 	int error;
 
-	error = xfs_da_get_buf(args->trans, args->dp, blkno, &bp, whichfork);
+	error = xfs_da_get_buf(args->trans, args->dp, blkno, -1, &bp,
+			       whichfork);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
@@ -361,7 +362,7 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	error = xfs_da_grow_inode(args, &blkno);
 	if (error)
 		return(error);
-	error = xfs_da_get_buf(args->trans, args->dp, blkno, &bp,
+	error = xfs_da_get_buf(args->trans, args->dp, blkno, -1, &bp,
 					    args->whichfork);
 	if (error)
 		return(error);
@@ -1726,7 +1727,7 @@ xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
 
 int
 xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
-			   buf_t **bpp, int whichfork)
+			   daddr_t mappedbno, buf_t **bpp, int whichfork)
 {
 	int error;
 	xfs_fsblock_t fsb;
@@ -1735,28 +1736,33 @@ xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	xfs_bmbt_irec_t map;
 	int nmap = 1;
 	xfs_fsblock_t firstblock = NULLFSBLOCK;
-
-	error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
-				 XFS_BMAPI_AFLAG(whichfork), &firstblock,
-				 0, &map, &nmap, 0);
-	if (!error) {
-		ASSERT(nmap == 1);
-		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
-		ASSERT(map.br_startblock != HOLESTARTBLOCK);
-		ASSERT(map.br_startblock != NULLFSBLOCK);
-	}
 #endif
-	error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
-					(xfs_fileoff_t)bno);
-	if (error) {
-		return(error);
+	if (mappedbno == -1) {
+#ifdef DEBUG
+		error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
+				  XFS_BMAPI_AFLAG(whichfork), &firstblock, 0,
+				  &map, &nmap, 0);
+		if (!error) {
+			ASSERT(nmap == 1);
+			ASSERT(map.br_startblock != DELAYSTARTBLOCK);
+			ASSERT(map.br_startblock != HOLESTARTBLOCK);
+			ASSERT(map.br_startblock != NULLFSBLOCK);
+		}
+#endif
+		error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
+					 (xfs_fileoff_t)bno);
+		if (error) {
+			return(error);
+		}
+		ASSERT(map.br_startblock == fsb);
+		if (fsb == NULLFSBLOCK) {
+			*bpp = NULL;
+			return XFS_ERROR(EFSCORRUPTED);
+		}
+		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, fsb);
 	}
-	ASSERT(map.br_startblock == fsb);
-	if (fsb == NULLFSBLOCK)
-		return XFS_ERROR(EFSCORRUPTED);
-	bp = xfs_trans_get_buf(trans, dp->i_mount->m_ddev_targp,
-				      XFS_FSB_TO_DADDR(dp->i_mount, fsb),
-				      dp->i_mount->m_bsize, 0);
+	bp = xfs_trans_get_buf(trans, dp->i_mount->m_ddev_targp, mappedbno,
+			       dp->i_mount->m_bsize, 0);
 	ASSERT(bp);
 	if (!bp)
 		return XFS_ERROR(EFSCORRUPTED);
