@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -397,7 +397,9 @@ xfs_btree_dup_cursor(
 			/* XXXNeed to fix all callers */
 			if (error) {
 				xfs_btree_del_cursor(ncur, error);
+#ifndef SIM
 				debug("Need to fix all callers");
+#endif
 				return (NULL);
 			}
 
