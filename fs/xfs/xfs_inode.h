@@ -161,6 +161,7 @@ typedef struct xfs_fid {
  * xfs_iget.c prototypes.
  */
 void		xfs_ihash_init(xfs_mount_t *);
+void		xfs_ihash_free(xfs_mount_t *);
 xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t, xfs_trans_t *);
 xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,uint);
 void		xfs_iput(xfs_inode_t *, uint);

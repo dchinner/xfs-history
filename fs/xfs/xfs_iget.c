@@ -83,6 +83,20 @@ xfs_ihash_init(xfs_mount_t *mp)
 }
 
 /*
+ * Free up structures allocated by xfs_ihash_init, at unmount time.
+ */
+void
+xfs_ihash_free(xfs_mount_t *mp)
+{
+	int	hsize, i;
+
+	hsize = mp->m_ihashmask + 1;
+	for (i = 0; i < hsize; i++)
+		freesema(&mp->m_ihash[i].ih_lock);
+	kmem_free(mp->m_ihash, hsize * sizeof(xfs_ihash_t));
+}
+
+/*
  * Look up an inode by number in the given file system.
  * The inode is looked up in the hash table for the file system
  * represented by the mount point parameter mp.  Each bucket of

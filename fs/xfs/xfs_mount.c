@@ -311,7 +311,8 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr )
 	}
 
 	brelse(bp);
-	freerbuf(bp);
+	nfreerbuf(bp);
+	xfs_ihash_free(mp);
 
 	freesplock(mp->m_ail_lock);
 	freesplock(mp->m_async_lock);
