@@ -5311,7 +5311,7 @@ xfs_strat_comp(void)
 			nimaps = 1;
 			error = xfs_bmapi(tp, ip, offset_fsb, count_fsb,
 					  XFS_BMAPI_WRITE, &firstfsb,
-					  1, &imap, &nimaps, &free_list);
+					  nres, &imap, &nimaps, &free_list);
 			if (error)
 				goto error_on_bmapi_transaction;
 
@@ -7687,7 +7687,7 @@ retry:
 			 */
 			CHECK_GRIO_TIMESTAMP(bp, 40);
 			error = xfs_bmapi(tp, ip, offset_fsb, count_fsb, 
-				  bmapi_flag, &firstfsb, 0, imapp, &reccount,
+				  bmapi_flag, &firstfsb, nres, imapp, &reccount,
 				  &free_list);
 			CHECK_GRIO_TIMESTAMP(bp, 40);
 
@@ -7869,7 +7869,7 @@ retry:
 			reccount = 1;
 			CHECK_GRIO_TIMESTAMP(bp, 40);
 			error = xfs_bmapi(tp, ip, offset_fsb, count_fsb, 
-				  XFS_BMAPI_WRITE, &firstfsb, 0, imapp,
+				  XFS_BMAPI_WRITE, &firstfsb, nres, imapp,
 				  &reccount, &free_list);
 			CHECK_GRIO_TIMESTAMP(bp, 40);
 

@@ -6368,7 +6368,8 @@ retry:
 		XFS_BMAP_INIT(&free_list, &firstfsb);
 		error = xfs_bmapi(tp, ip, startoffset_fsb, 
 				  allocatesize_fsb, xfs_bmapi_flags,
-				  &firstfsb, 0, imapp, &reccount, &free_list);
+				  &firstfsb, resblks, imapp, &reccount,
+				  &free_list);
 		if (error) {
 			goto error0;
 		}

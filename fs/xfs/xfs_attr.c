@@ -1,4 +1,4 @@
-#ident "$Revision: 1.55 $"
+#ident "$Revision$"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -1878,7 +1878,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 				  blkcnt,
 				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA |
 							XFS_BMAPI_WRITE,
-				  args->firstblock, blkcnt, &map, &nmap,
+				  args->firstblock, args->total, &map, &nmap,
 				  args->flist);
 		if (!error) {
 			error = xfs_bmap_finish(&args->trans, args->flist,

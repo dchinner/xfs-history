@@ -1,4 +1,4 @@
-#ident "$Revision: 1.27 $"
+#ident "$Revision: 1.28 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -444,7 +444,7 @@ xfs_qm_dqalloc(
 			      offset_fsb, XFS_DQUOT_CLUSTER_SIZE_FSB,
 			      XFS_BMAPI_METADATA | XFS_BMAPI_WRITE,
 			      &firstblock, 
-			      1, /* only one block */
+			      XFS_QM_DQALLOC_SPACE_RES(mp),
 			      &map, &nmaps, &flist)) {
 		goto error0;
 	}
