@@ -881,12 +881,17 @@ xfs_mount(
 						uap->dir, uap->spec);
 		}
 		if (error) {
+#if 0
+/* XXX this stuff will be done when we get back to linvfs_read_super(). */
 			/* REFERENCED */
 			int	errcode;
 
 			vfsp->vfs_flag &= ~VFS_DMI;
 			VFS_UNMOUNT(vfsp, 0, credp, errcode);
 			ASSERT (errcode == 0);
+#else
+			vfsp->vfs_flag &= ~VFS_DMI;
+#endif
 		}
 	}
 
