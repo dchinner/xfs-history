@@ -530,7 +530,7 @@ _pagebuf_lookup_pages(
 				pb->pb_locked = 1;
 		}
 		if (!pb->pb_locked)
-			UnlockPage(page);
+			unlock_page(page);
 	}
 	if (cached_page)
 		page_cache_release(cached_page);
@@ -1294,7 +1294,7 @@ _end_pagebuf_page_io(
 
 	SetPageUptodate(page);
 	if (locked)
-		UnlockPage(page);
+		unlock_page(page);
 	_pb_io_done(pb);
 }
 
@@ -1341,7 +1341,7 @@ _end_pagebuf_page_io_multi(
 		if (fullpage)
 			SetPageUptodate(page);
 		if (psync->locking)
-			UnlockPage(page);
+			unlock_page(page);
 		kfree(psync);
 		_pb_io_done(pb);
 	}
@@ -1412,7 +1412,7 @@ _pagebuf_page_io(
 					create_empty_buffers(page, dev,
 							SECTOR_SIZE);
 				}
-				UnlockPage(page);
+				unlock_page(page);
 			} else {
 				create_empty_buffers(page, dev, SECTOR_SIZE);
 			}
@@ -1542,7 +1542,7 @@ request:
 		}
 	} else {
 		if (locking)
-			UnlockPage(page);
+			unlock_page(page);
 	}
 
 	return err;

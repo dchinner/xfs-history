@@ -172,7 +172,7 @@ out:
 		if (delalloc)
 			block_flushpage(page, 0);
 		ClearPageUptodate(page);
-		UnlockPage(page);
+		unlock_page(page);
 	}
 
 	return ret;
@@ -215,7 +215,7 @@ probe_unmapped_page(
 		}
 	}
 
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	return ret;
 }
@@ -285,7 +285,7 @@ probe_page(
 				return page;
 		} while ((bh = bh->b_this_page) != head);
 	}
-	UnlockPage(page);
+	unlock_page(page);
 	page_cache_release(page);
 	return NULL;
 }
