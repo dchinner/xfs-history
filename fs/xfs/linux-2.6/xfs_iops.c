@@ -201,6 +201,11 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 	error = 0;
 	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, sys_cred, error);
 	if (!error) {
+		ip->i_nlink++;
+		ip->i_ctime = CURRENT_TIME;
+		mark_inode_dirty(ip);
+		ip->i_count++;
+		VN_HOLD(vp);
 		d_instantiate(dentry, ip);
 	}
 	return -error;
@@ -210,9 +215,11 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int		error;
+	struct inode	*inode;
 	vnode_t		*dvp;	/* directory containing name to remove */
 
 	dvp = LINVFS_GET_VP(dir);
+	inode = dentry->d_inode;
 	ASSERT(dvp);
 
 	/*
@@ -223,6 +230,10 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	error = 0;
 	VOP_REMOVE(dvp, (char *)dentry->d_name.name, sys_cred, error);
 	if (!error) {
+		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+		dir->i_version = ++event;
+		inode->i_nlink--;
+		inode->i_ctime = dir->i_ctime;
 		d_delete(dentry);       /* del and free inode */
 	}
 	return -error;
@@ -280,10 +291,10 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 			ip = iget(dir->i_sb, ino);
 			if (!ip) {
 				error = -ENOMEM;
+				VN_RELE(cvp);
 			} else {
 				d_instantiate(dentry, ip);
 			}
-			VN_RELE(cvp);
 		}
 	}
 	return -error;
@@ -345,7 +356,7 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	vnode_t		*tvp;	/* target directory */
 	pathname_t	pn;
 	pathname_t      *pnp = &pn;
-	struct inode	*ip = NULL;
+	struct inode	*new_inode = NULL;
 
 	bzero(pnp, sizeof(pathname_t));
 	pnp->pn_complen = ndentry->d_name.len;
@@ -355,11 +366,23 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	fvp = LINVFS_GET_VP(odir);
 	tvp = LINVFS_GET_VP(ndir);
 
+	new_inode = ndentry->d_inode;
+
 	VOP_RENAME(fvp, (char *)odentry->d_name.name, tvp,
 		   (char *)ndentry->d_name.name, pnp, sys_cred, error);
 	if (error)
 		return -error;
 
+	ndir->i_version = ++event;
+	odir->i_version = ++event;
+	if (new_inode) {
+		new_inode->i_nlink--;
+		new_inode->i_ctime = CURRENT_TIME;
+		mark_inode_dirty(new_inode);
+	}
+
+	odir->i_ctime = odir->i_mtime = CURRENT_TIME;
+	mark_inode_dirty(odir);
 	return 0;
 }
 
