@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.49 $"
-#ident	"$Revision: 1.51 $"
+#ident	"$Revision: 1.52 $"
+#ident	"$Revision: 1.52 $"
 
 struct buf;
 struct cred;
@@ -27,6 +27,7 @@ typedef struct xfs_trans_reservations {
 	uint	tr_swrite;	/* sync write inode trans */
 	uint	tr_addafork;	/* cvt inode to attributed trans */
 	uint	tr_writeid;	/* write setuid/setgid file */
+	uint	tr_ainval;	/* attr fork buffer invalidation */
 } xfs_trans_reservations_t;
 
 typedef struct xfs_mount {
