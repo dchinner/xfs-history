@@ -615,7 +615,7 @@ xfs_setattr(vnode_t	*vp,
          */
         if (mask & AT_SIZE) {
 		if (vap->va_size > ip->i_d.di_size) {
-			xfs_igrow (tp, ip, vap->va_size);
+			xfs_igrow (tp, ip, vap->va_size, credp);
 		} else if (vap->va_size < ip->i_d.di_size) {
 			xfs_trans_ihold(tp, ip);
 			xfs_itruncate (&tp, ip, (__int64_t)vap->va_size);
