@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.57 $"
+#ident	"$Revision: 1.61 $"
 
 /*
  * High level interface routines for log manager
@@ -1187,8 +1187,10 @@ xlog_state_get_ticket(xlog_t	*log,
 		if (flags & XFS_LOG_NOSLEEP) {
 			spunlockspl(log->l_icloglock, spl);
 			return (xfs_log_ticket_t)-1;
-		} else
+		} else {
 			xlog_panic("xlog_state_get_ticket: over reserved");
+			spunlockspl(log->l_icloglock, spl);
+		}
 	}
 	log->l_logreserved += len;
 	tic = xlog_maketicket(log, len, log_client);
@@ -1561,20 +1563,20 @@ static void
 xlog_verify_disk_cycle_no(xlog_t	    *log,
 			  xlog_in_core_t *iclog)
 {
-	buf_t	*bp;
-	uint	cycle_no;
-	daddr_t	i;
+    buf_t	*bp;
+    uint	cycle_no;
+    daddr_t	i;
 
-	if (BLOCK_LSN(iclog->ic_header.h_lsn) < 10) {
-		cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn);
-		bp = xlog_get_bp(1);
-		for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
-			xlog_bread(log, i, 1, bp);
-			if (GET_CYCLE(bp->b_dmaaddr) != cycle_no)
-				xlog_warning("xlog_verify_iclog: bad cycle no");
-		}
-		xlog_put_bp(bp);
+    if (BLOCK_LSN(iclog->ic_header.h_lsn) < 10) {
+	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn);
+	bp = xlog_get_bp(1);
+	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
+	    xlog_bread(log, i, 1, bp);
+	    if (GET_CYCLE(bp->b_dmaaddr) != cycle_no)
+		xlog_warning("xlog_verify_disk_cycle_no: bad cycle no");
 	}
+	xlog_put_bp(bp);
+    }
 }	/* xlog_verify_disk_cycle_no */
 
 
@@ -1631,14 +1633,11 @@ xlog_verify_iclog(xlog_t	 *log,
 	xlog_tid_t	 tid;
 	caddr_t		 ptr;
 	char		 clientid;
-	int		 len;
-	int		 fd;
-	int		 i;
-	int		 op_len;
-	int		 cycle_no;
+	int		 len, fd, i, op_len, cycle_no, spl;
 	buf_t		 *bp;
 
 	/* check validity of iclog pointers */
+	spl = splockspl(log->l_icloglock, splhi);
 	icptr = log->l_iclog;
 	for (i=0; i < XLOG_NUM_ICLOGS; i++) {
 		if (icptr == 0)
@@ -1647,6 +1646,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	}
 	if (icptr != log->l_iclog)
 		xlog_panic("xlog_verify_iclog: corrupt iclog ring");
+	spunlockspl(log->l_icloglock, spl);
 
 	/* check log magic numbers */
 	ptr = (caddr_t) iclog;
