@@ -660,10 +660,22 @@ xfs_ioctl(
 		return 0;
 	}
 
+	case XFS_IOC_FSGEOMETRY_V1: {
+		xfs_fsop_geom_v1_t	fsgeo;
+
+		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)&fsgeo, 3);
+		if (error)
+			return -error;
+
+		if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo, sizeof(fsgeo)))
+			return -XFS_ERROR(EFAULT);
+		return 0;
+	}
+
 	case XFS_IOC_FSGEOMETRY: {
 		xfs_fsop_geom_t	fsgeo;
 
-		error = xfs_fs_geometry(mp, &fsgeo, 3);
+		error = xfs_fs_geometry(mp, &fsgeo, 4);
 		if (error)
 			return -error;
 

@@ -162,9 +162,13 @@ xfs_parseargs(
 			}
 		} else if (!strcmp(this_char, MNTOPT_LOGBSIZE)) {
 			logbufsize = simple_strtoul(value, &eov, 10);
-			if (logbufsize != 16*1024 && logbufsize != 32*1024) {
+			if (logbufsize != 16*1024 &&
+			    logbufsize != 32*1024 &&
+			    logbufsize != 64*1024 &&
+			    logbufsize != 128*1024 &&
+			    logbufsize != 256*1024) {
 				printk(
-			"XFS: Illegal logbufsize: %d [not 16k or 32k]\n",
+			"XFS: Illegal logbufsize: %d [not 16k,32k,64k,128k or 256k]\n",
 					logbufsize);
 				return rval;
 			}
