@@ -1,4 +1,4 @@
-#ident "$Revision: 1.238 $"
+#ident "$Revision: 1.239 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3474,7 +3474,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 			== XFS_ICHGTIME_ACC))
 		return;
 
-	nanotime(&tv);
+	nanotime_syscall(&tv);
 	if (flags & XFS_ICHGTIME_MOD) {
 		ip->i_d.di_mtime.t_sec = tv.tv_sec;
 		ip->i_d.di_mtime.t_nsec = tv.tv_nsec;
