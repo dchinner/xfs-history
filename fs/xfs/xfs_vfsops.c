@@ -136,23 +136,19 @@ xfs_init(int	fstype)
 	extern xfs_zone_t	*xfs_efd_zone;
 	extern xfs_zone_t	*xfs_efi_zone;
 	extern xfs_zone_t	*xfs_dabuf_zone;
-#if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-	extern xfs_zone_t	*xfs_ktrace_hdr_zone;
-	extern xfs_zone_t	*xfs_ktrace_ent_zone;
-#endif	/* (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)) */
-	extern mutex_t	xfs_uuidtabmon;
-	extern mutex_t	xfs_Gqm_lock;
+	extern mutex_t	        xfs_uuidtabmon;
+	extern mutex_t	        xfs_Gqm_lock;
 	extern xfs_zone_t	*xfs_gap_zone;
 #ifdef DEBUG
-	extern ktrace_t	*xfs_alloc_trace_buf;
-	extern ktrace_t	*xfs_bmap_trace_buf;
-	extern ktrace_t	*xfs_bmbt_trace_buf;
-	extern ktrace_t	*xfs_dir_trace_buf;
-	extern ktrace_t	*xfs_attr_trace_buf;
-	extern ktrace_t	*xfs_dir2_trace_buf;
+	extern ktrace_t	        *xfs_alloc_trace_buf;
+	extern ktrace_t	        *xfs_bmap_trace_buf;
+	extern ktrace_t	        *xfs_bmbt_trace_buf;
+	extern ktrace_t	        *xfs_dir_trace_buf;
+	extern ktrace_t	        *xfs_attr_trace_buf;
+	extern ktrace_t	        *xfs_dir2_trace_buf;
 #endif	/* DEBUG */
 #ifdef XFS_DABUF_DEBUG
-	extern lock_t	xfs_dabuf_global_lock;
+	extern lock_t	        xfs_dabuf_global_lock;
 #endif
 
 	xfs_fstype = fstype;
@@ -198,19 +194,13 @@ xfs_init(int	fstype)
 	xfs_ili_zone = kmem_zone_init(sizeof(xfs_inode_log_item_t), "xfs_ili");
 	xfs_chashlist_zone = kmem_zone_init(sizeof(xfs_chashlist_t),
 					    "xfs_chashlist");
-
-#if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-	xfs_ktrace_hdr_zone = kmem_zone_init(sizeof(ktrace_t),
-					"xfs_ktrace_hdr");
-#ifdef  VNODE_TRACE_SIZE
-# define KTRACE_ZONE_ENTRIES VNODE_TRACE_SIZE
+        
+#ifdef CONFIG_XFS_VNODE_TRACING
+        ktrace_init(VNODE_TRACE_SIZE);
 #else
-# define KTRACE_ZONE_ENTRIES 64
+#ifdef DEBUG
+        ktrace_init(64);
 #endif
-
-	xfs_ktrace_ent_zone = kmem_zone_init(KTRACE_ZONE_ENTRIES
-					* sizeof(ktrace_entry_t),
-					"xfs_ktrace_ent");
 #endif
 
 	/*
@@ -280,10 +270,6 @@ xfs_cleanup(void)
 	extern xfs_zone_t	*xfs_efi_zone;
 	extern xfs_zone_t	*xfs_buf_item_zone;
 	extern xfs_zone_t	*xfs_chashlist_zone;
-#if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-	extern xfs_zone_t	*xfs_ktrace_hdr_zone;
-	extern xfs_zone_t	*xfs_ktrace_ent_zone;
-#endif
 
 	xfs_cleanup_procfs();
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
@@ -300,8 +286,7 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
 #if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
-	kmem_cache_destroy(xfs_ktrace_hdr_zone);
-	kmem_cache_destroy(xfs_ktrace_ent_zone);
+        ktrace_uninit();
 #endif
 }
 

@@ -706,7 +706,7 @@ extern int	vn_cached(struct vnode *);
 extern int	vn_count(struct vnode *);
 extern int	vn_mapped(struct vnode *);
 extern void	vn_purge(struct vnode *, vmap_t *);
-extern vnode_t *vn_get(struct vnode *, vmap_t *, uint);
+extern vnode_t  *vn_get(struct vnode *, vmap_t *, uint);
 extern int	vn_revalidate(struct vnode *, int);
 extern void	vn_remove(struct vnode *);
 
@@ -797,9 +797,11 @@ extern void vn_initlist(struct vnlist *);
 extern void vn_insert(struct vnode *, struct vnlist *);
 extern void vn_unlink(struct vnode *);
 
-#define	VNODE_TRACE_SIZE	16		/* number of trace entries */
 
 #if (defined(CONFIG_XFS_VNODE_TRACING))
+
+#define	VNODE_TRACE_SIZE	16		/* number of trace entries */
+
 /*
  * Tracing entries.
  */

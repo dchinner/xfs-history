@@ -88,4 +88,9 @@ typedef struct {
 } uuid_t;
 #endif
 
+/* alias kmem zones for xfs */
+
+#define xfs_zone_t kmem_zone_t
+#define xfs_zone   kmem_cache_s
+
 #endif	/* __XFS_SUPPORT_TYPES_H__ */

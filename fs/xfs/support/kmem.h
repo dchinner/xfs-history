@@ -42,13 +42,12 @@
 #define KM_NOSLEEP      0x0002	/* must match VM_NOSLEEP */
 #define KM_CACHEALIGN	0x0004	/* guarantee that memory is cache aligned */
 
-typedef struct kmem_cache_s xfs_zone_t;
-#define xfs_zone kmem_cache_s
+typedef struct kmem_cache_s kmem_zone_t;
 
-extern xfs_zone_t   *kmem_zone_init(int, char *);
-extern void	    *kmem_zone_zalloc(xfs_zone_t *, int);
-extern void	    *kmem_zone_alloc(xfs_zone_t *, int);
-extern void         kmem_zone_free(xfs_zone_t *, void *);
+extern kmem_zone_t  *kmem_zone_init(int, char *);
+extern void	    *kmem_zone_zalloc(kmem_zone_t *, int);
+extern void	    *kmem_zone_alloc(kmem_zone_t *, int);
+extern void         kmem_zone_free(kmem_zone_t *, void *);
 
 extern void	    *kmem_alloc(size_t, int);
 extern void	    *kmem_realloc(void *, size_t, size_t, int);

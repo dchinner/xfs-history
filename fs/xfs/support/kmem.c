@@ -69,7 +69,7 @@ static __inline__ void kmem_shake(int count, int line)
 	unlock_kernel();
 }
 
-static __inline__ void kmem_shake_zone(xfs_zone_t *zone, int count, int line)
+static __inline__ void kmem_shake_zone(kmem_zone_t *zone, int count, int line)
 {
 	int	shaker = 0;			/* Extreme prune */
 
@@ -185,17 +185,17 @@ kmem_check(void)
 }
 #endif	/* XFSDEBUG */
 
-xfs_zone_t *
+kmem_zone_t *
 kmem_zone_init(int size, char *zone_name)
 {
-	xfs_zone_t *rval = NULL;
+	kmem_zone_t *rval = NULL;
 
 	rval = kmem_cache_create(zone_name, size, 0, 0, NULL, NULL);
 	return rval;
 }
 
 void *
-kmem_zone_alloc(xfs_zone_t *zone, int flags)
+kmem_zone_alloc(kmem_zone_t *zone, int flags)
 {
 	int	shrink = SHAKE_COUNT;	/* # times to try to shrink cache */
 	void	*ptr = NULL;
@@ -223,7 +223,7 @@ repeat:
 }
 
 void *
-kmem_zone_zalloc(xfs_zone_t *zone, int flags)
+kmem_zone_zalloc(kmem_zone_t *zone, int flags)
 {
 	int	shrink = SHAKE_COUNT;	/* # times to try to shrink cache */
 	void	*ptr = NULL;
@@ -251,7 +251,7 @@ repeat:
 }
 
 void
-kmem_zone_free(xfs_zone_t *zone, void *ptr)
+kmem_zone_free(kmem_zone_t *zone, void *ptr)
 {
 	kmem_cache_free(zone, ptr);
 }

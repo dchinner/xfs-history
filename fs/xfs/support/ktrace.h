@@ -67,6 +67,9 @@ extern ktrace_t *ktrace_alloc(int, int);
 
 #if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 
+extern void ktrace_init(int zentries);
+extern void ktrace_uninit(void);
+
 extern void ktrace_free(ktrace_t *);
 
 extern void ktrace_enter(

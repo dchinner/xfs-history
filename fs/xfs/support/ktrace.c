@@ -42,14 +42,31 @@
 
 #if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 
-xfs_zone_t *xfs_ktrace_hdr_zone;
-xfs_zone_t *xfs_ktrace_ent_zone;
+static kmem_zone_t *ktrace_hdr_zone;
+static kmem_zone_t *ktrace_ent_zone;
+static int          ktrace_zentries;
 
-#ifdef	VNODE_TRACE_SIZE
-# define KTRACE_ZONE_ENTRIES VNODE_TRACE_SIZE
-#else
-# define KTRACE_ZONE_ENTRIES 64
-#endif
+void
+ktrace_init(int zentries)
+{
+        ktrace_zentries = zentries;
+    
+	ktrace_hdr_zone = kmem_zone_init(sizeof(ktrace_t),
+					"ktrace_hdr");
+        ASSERT(ktrace_hdr_zone);
+        
+	ktrace_ent_zone = kmem_zone_init(ktrace_zentries
+					* sizeof(ktrace_entry_t),
+					"ktrace_ent");
+        ASSERT(ktrace_ent_zone);
+}
+
+void
+ktrace_uninit(void)
+{
+	kmem_cache_destroy(ktrace_hdr_zone);
+	kmem_cache_destroy(ktrace_ent_zone);
+}       
 
 /*
  * ktrace_alloc()
@@ -63,7 +80,7 @@ ktrace_alloc(int nentries, int sleep)
         ktrace_t        *ktp;
         ktrace_entry_t  *ktep;
 
-        ktp = (ktrace_t*)kmem_zone_alloc(xfs_ktrace_hdr_zone, sleep);
+        ktp = (ktrace_t*)kmem_zone_alloc(ktrace_hdr_zone, sleep);
 
 	if (ktp == (ktrace_t*)NULL) {
 		/*
@@ -76,14 +93,14 @@ ktrace_alloc(int nentries, int sleep)
 	}
 
 	/*
-	 * Special treatment for the Vnode trace buffer.
+	 * Special treatment for buffers with the ktrace_zentries entries
 	 */
-	if (nentries == KTRACE_ZONE_ENTRIES) {
-		ktep = (ktrace_entry_t*)kmem_zone_zalloc(xfs_ktrace_ent_zone,
-									sleep);
+	if (nentries == ktrace_zentries) {
+		ktep = (ktrace_entry_t*)kmem_zone_zalloc(ktrace_ent_zone,
+							    sleep);
 	} else {
 		ktep = (ktrace_entry_t*)kmem_zalloc((nentries * sizeof(*ktep)),
-									sleep);
+							    sleep);
 	}
 
         if (ktep == NULL) {
@@ -128,15 +145,15 @@ ktrace_free(ktrace_t *ktp)
 	/*
 	 * Special treatment for the Vnode trace buffer.
 	 */
-	if (ktp->kt_nentries == KTRACE_ZONE_ENTRIES) {
-		kmem_zone_free(xfs_ktrace_ent_zone, ktp->kt_entries);
+	if (ktp->kt_nentries == ktrace_zentries) {
+		kmem_zone_free(ktrace_ent_zone, ktp->kt_entries);
 	} else {
 		entries_size = (int)(ktp->kt_nentries * sizeof(ktrace_entry_t));
 
 		kmem_free(ktp->kt_entries, entries_size);
 	}
 
-        kmem_zone_free(xfs_ktrace_hdr_zone, ktp);
+        kmem_zone_free(ktrace_hdr_zone, ktp);
 }
 
 
@@ -336,10 +353,10 @@ ktrace_skip(
         return ktep;
 }
 
+EXPORT_SYMBOL(ktrace_init);
+EXPORT_SYMBOL(ktrace_uninit);
 EXPORT_SYMBOL(ktrace_enter);
 EXPORT_SYMBOL(ktrace_free);
-EXPORT_SYMBOL(xfs_ktrace_hdr_zone);
-EXPORT_SYMBOL(xfs_ktrace_ent_zone);
 EXPORT_SYMBOL(ktrace_nentries);
 EXPORT_SYMBOL(ktrace_first);
 EXPORT_SYMBOL(ktrace_next);
