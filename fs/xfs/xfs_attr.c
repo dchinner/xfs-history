@@ -773,10 +773,15 @@ xfs_attr_leaf_get(xfs_da_args_t *args)
 	ASSERT(bp != NULL);
 
 	error = xfs_attr_leaf_lookup_int(bp, args);
-	if (error == EEXIST)  {
-		error = xfs_attr_leaf_getvalue(bp, args);
+	if (error != EEXIST)  {
+		xfs_trans_brelse(NULL, bp);
+		return(error);
 	}
+	error = xfs_attr_leaf_getvalue(bp, args);
 	xfs_trans_brelse(NULL, bp);
+	if ((error == 0) && (args->rmtblkno > 0)) {
+		error = xfs_attr_rmtval_get(args);
+	}
 	return(error);
 }
 
@@ -1332,7 +1337,8 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 	daddr_t dblkno;
 	caddr_t dst;
 	buf_t *bp;
-	int nmap, error, tmp, valuelen, lblkno, blkcnt, i;
+	int nmap, error, tmp, valuelen, blkcnt, i;
+	xfs_dablk_t lblkno;
 
 	mp = args->dp->i_mount;
 	dst = args->value;
@@ -1341,9 +1347,10 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 	while (valuelen > 0) {
 		firstblock = NULLFSBLOCK;
 		nmap = ATTR_RMTVALUE_MAPSIZE;
-		error = xfs_bmapi(NULL, args->dp, lblkno, args->rmtblkcnt,
-				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-				  &firstblock, 0, map, &nmap, NULL);
+		error = xfs_bmapi(NULL, args->dp, (xfs_fileoff_t)lblkno,
+					args->rmtblkcnt,
+					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
+					&firstblock, 0, map, &nmap, NULL);
 		if (error)
 			return(error);
 		ASSERT(nmap >= 1);
@@ -1386,7 +1393,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 	daddr_t dblkno;
 	caddr_t src;
 	buf_t *bp;
-	xfs_fileoff_t lblkno;
+	xfs_dablk_t lblkno;
 	int blkcnt, valuelen, nmap, error, tmp, committed;
 
 	mp = args->dp->i_mount;
@@ -1416,10 +1423,13 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		 * Decide where we are going to put the "remote" value.
 		 */
 		if (lblkno == 0) {
+			xfs_fileoff_t lfileoff;
+
 			error = xfs_bmap_first_unused(trans, args->dp, blkcnt,
-						     &lblkno, XFS_ATTR_FORK);
+						     &lfileoff, XFS_ATTR_FORK);
 			if (error)
 				return(error);
+			lblkno = (xfs_dablk_t)lfileoff;
 			args->rmtblkno = lblkno;
 			args->rmtblkcnt = blkcnt;
 		}
@@ -1430,10 +1440,13 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		 */
 		XFS_BMAP_INIT(&flist, &firstblock);
 		nmap = 1;
-		error = xfs_bmapi(trans, args->dp, lblkno, blkcnt,
-				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA |
-					XFS_BMAPI_WRITE,
-				  &firstblock, blkcnt, &map, &nmap, &flist);
+		error = xfs_bmapi(trans, args->dp, (xfs_fileoff_t)lblkno,
+					 blkcnt,
+					 XFS_BMAPI_ATTRFORK |
+						 XFS_BMAPI_METADATA |
+						 XFS_BMAPI_WRITE,
+					 &firstblock, blkcnt, &map, &nmap,
+					 &flist);
 		if (error) {
 			xfs_bmap_cancel(&flist);
 			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
@@ -1471,7 +1484,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		 */
 		XFS_BMAP_INIT(&flist, &firstblock);
 		nmap = 1;
-		error = xfs_bmapi(NULL, args->dp, lblkno, args->rmtblkcnt,
+		error = xfs_bmapi(NULL, args->dp, (xfs_fileoff_t)lblkno,
+					args->rmtblkcnt,
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
 					&firstblock, 0, &map, &nmap, NULL);
 		if (error)
@@ -1515,7 +1529,8 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 	xfs_bmap_free_t flist;
 	buf_t *bp;
 	daddr_t dblkno;
-	int lblkno, valuelen, blkcnt, nmap, error, done, committed;
+	xfs_dablk_t lblkno;
+	int valuelen, blkcnt, nmap, error, done, committed;
 
 	mp = args->dp->i_mount;
 
@@ -1531,7 +1546,8 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		 */
 		XFS_BMAP_INIT(&flist, &firstblock);
 		nmap = 1;
-		error = xfs_bmapi(NULL, args->dp, lblkno, args->rmtblkcnt,
+		error = xfs_bmapi(NULL, args->dp, (xfs_fileoff_t)lblkno,
+					args->rmtblkcnt,
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
 					&firstblock, 0, &map, &nmap, &flist);
 		if (error)
