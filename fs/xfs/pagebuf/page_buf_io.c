@@ -1299,9 +1299,10 @@ out:
 STATIC struct page *
 probe_page(struct inode *inode, unsigned long index)
 {
-	struct page *page;
+	struct page *page, **hash;
 
-	page = find_get_page_simple(inode->i_mapping, index);
+	hash = page_hash(inode->i_mapping, index);
+	page = __find_get_page(inode->i_mapping, index, hash);
 	if (!page)
 		return NULL;
 	if (TryLockPage(page)) {
