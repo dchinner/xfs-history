@@ -19,11 +19,7 @@
  */
 #ident  "$Revision$"
 
-#if defined(__linux__)
 #include <xfs_linux.h>
-#else
-#include <limits.h>
-#endif
 
 #ifdef SIM
 #define _KERNEL	1
@@ -210,21 +206,12 @@ xfs_get_vfsmount(
 	dev_t	logdev,
 	dev_t	rtdev);
 
-#ifdef __linux__
 extern int
 spectodevs(
 	struct super_block *sb,
 	dev_t	*ddevp,
 	dev_t   *logdevp,
         dev_t   *rtdevp);
-#else
-STATIC int
-spectodevs(
-	char	*spec,
-	dev_t	*ddevp,
-	dev_t   *logdevp,
-        dev_t   *rtdevp);
-#endif
 
 STATIC int
 xfs_isdev(
@@ -401,11 +388,6 @@ xfs_init(int	fstype)
 	xfs_dir_startup();
 	
 #ifndef SIM
-#ifndef __linux__
-	/* THIS IS BUSTED */
-	xfs_start_daemons();
-#endif /* !__linux__ */
-
 #ifdef DATAPIPE
 	fspeinit();
 #endif /* DATAPIPE */
@@ -426,103 +408,14 @@ xfs_init(int	fstype)
 	return 0;
 }
 
-#ifdef __linux__
-#ifndef SIM
-extern int	kmem_cache_destroy(zone_t *);
-
-void
-xfs_cleanup()
-{
-	extern zone_t	*xfs_bmap_free_item_zone;
-	extern zone_t	*xfs_btree_cur_zone;
-	extern zone_t	*xfs_inode_zone;
-	extern zone_t	*xfs_trans_zone;
-	extern zone_t	*xfs_gap_zone;
-	extern zone_t	*xfs_da_state_zone;
-	extern zone_t	*xfs_dabuf_zone;
-	extern zone_t	*xfs_efd_zone;
-	extern zone_t	*xfs_efi_zone;
-	extern zone_t	*xfs_buf_item_zone;
-	extern zone_t	*xfs_chashlist_zone;
-
-	kmem_cache_destroy(xfs_bmap_free_item_zone);
-	kmem_cache_destroy(xfs_btree_cur_zone);
-	kmem_cache_destroy(xfs_inode_zone);
-	kmem_cache_destroy(xfs_trans_zone);
-	kmem_cache_destroy(xfs_gap_zone);
-	kmem_cache_destroy(xfs_da_state_zone);
-	kmem_cache_destroy(xfs_dabuf_zone);
-	kmem_cache_destroy(xfs_buf_item_zone);
-	kmem_cache_destroy(xfs_efd_zone);
-	kmem_cache_destroy(xfs_efi_zone);
-	kmem_cache_destroy(xfs_ifork_zone);
-	kmem_cache_destroy(xfs_ili_zone);
-	kmem_cache_destroy(xfs_chashlist_zone);
-
-}
-
-#endif
-#endif
-
 
 #ifndef SIM
-#ifndef __linux__
-
-/* On linux, this is in linux/xfs_device.c */
-
-/*
- * Resolve path name of special file to its device.
- */
-STATIC int
-spectodevs(
-	char	*spec,
-	dev_t	*ddevp,
-	dev_t   *logdevp,
-	dev_t   *rtdevp)
-{
-	vnode_t	*bvp;
-	int	error;
-	dev_t   device;
-	dev_t	secondary;
-	int     status;
-	extern int volume_get_devts(dev_t device, dev_t *ddev, dev_t *logdev, 
-				    dev_t *rtdev, dev_t *secondary, int *status);
-
-	if (error = lookupname(spec, UIO_USERSPACE, FOLLOW, NULLVPP, &bvp, NULL))
-		return error;
-	if (bvp->v_type != VBLK) {
-		VN_RELE(bvp);
-		return XFS_ERROR(ENOTBLK);
-	}
-	device = bvp->v_rdev;
-	VN_RELE(bvp);
-
-	if ( volume_get_devts(device, ddevp, logdevp, rtdevp, 
-			      &secondary, &status) != 0 ) {
-		if (status)
-			return XFS_ERROR(ENXIO);
-	}
-
-	if (!status) {
-		/*
-		 * Not a XLV or XVM device.
-		 */
-		*ddevp = *logdevp = device;
-		*rtdevp = 0;
-	}
-
-	ASSERT(*ddevp && *logdevp);
-	return 0;
-}
-#endif /* !__linux__ */
-
 
 /*
  * xfs_fill_buftarg
  *
  * Put the "appropriate" things in a buftarg_t structure.
  */
-#ifdef __linux__
 STATIC
 void
 xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
@@ -532,47 +425,6 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 	btp->inode = linvfs_make_inode(MKDEV(emajor(dev), eminor(dev)), sb);
 	btp->dev    = dev;
 }
-#else
-STATIC
-void
-xfs_fill_buftarg(buftarg_t *btp, dev_t dev, vnode_t *vp)
-{
-	btp->specvp = vp;
-	btp->bdevsw = get_bdevsw(dev);
-	btp->dev    = dev;
-}
-#endif
-
-#ifdef __linux__
-struct vnode *make_specvp(dev_t dev, enum vtype type)
-{
-	printk("make_specvp: need to return vp\n");
-	return NULL;
-}
-
-int
-copyinstr(char *cp, char *tp, size_t sz, size_t *sz2)
-{
-	printk("copyinstr: need to write\n");
-	return 0;
-}
-
-void
-clkset(time_t oldtime)
-{
-        printk("clkset: need to write\n");
-	return;
-}
-
-#if 0
-void
-spec_mounted(vp)
-{
-	return;
-}
-#endif
-
-#endif
 
 /*
  * xfs_cmountfs
@@ -591,7 +443,7 @@ xfs_cmountfs(
 	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
-	vnode_t 	*ddevvp, *rdevvp, *ldevvp;
+	vnode_t 	*ddevvp = NULL, *rdevvp = NULL, *ldevvp = NULL;
 	int		error = 0;
 	int		vfs_flags;
 	size_t		n;
@@ -599,9 +451,7 @@ xfs_cmountfs(
         int             client = 0;
 	/*REFERENCED*/
 	int		noerr;
-#ifdef __linux__
 	extern void linvfs_release_inode(struct inode *);
-#endif
 
 	/*
 	 * The new use of remout to update various cxfs parameters
@@ -617,8 +467,8 @@ xfs_cmountfs(
 	/*
  	 * Open the data and real time devices now.
 	 */
+
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
-#ifdef __linux__
 	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
 	mp->m_ddev_targp = &mp->m_ddev_targ;
 	mp->m_rtdev = NODEV;
@@ -640,77 +490,12 @@ xfs_cmountfs(
 		mp->m_dalign = 0;
 		mp->m_swidth = 0;
 	}
-#else
-	if (ddev != 0) {
-		vnode_t *openvp;
-
-		openvp = ddevvp = make_specvp(ddev, VBLK);
-
-		VOP_OPEN(openvp, &ddevvp, vfs_flags, cr, error);
-		if (error) {
-			VN_RELE(ddevvp);
-			goto error0;
-		}
-
-		xfs_fill_buftarg(&mp->m_ddev_targ, ddev, ddevvp);
-
-                /* Values are in BBs */
-                if ((ap != NULL) && (ap->version >= 2) && 
-		    (ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
-                        /*
-                         * At this point the superblock has not been read
-                         * in, therefore we do not know the block size.
-                         * Before, the mount call ends we will convert
-                         * these to FSBs.
-                         */
-                        mp->m_dalign = ap->sunit;
-                        mp->m_swidth = ap->swidth;
-                } else {
-                        mp->m_dalign = 0;
-                        mp->m_swidth = 0;
-                }
-		mp->m_ddev_targp = &mp->m_ddev_targ;
-	} else {
-		ddevvp = NULL;
-	}
-	if (rtdev != 0) {
-		vnode_t *openvp;
-
-		openvp = rdevvp = make_specvp(rtdev, VBLK);
-
-		VOP_OPEN(openvp, &rdevvp, vfs_flags, cr, error);
-		if (error) {
-			VN_RELE(rdevvp);
-			goto error1;
-		}
-
-		xfs_fill_buftarg(&mp->m_rtdev_targ, rtdev, rdevvp);
-
-	} else {
-		mp->m_rtdev = NODEV;
-		rdevvp = NULL;
-	}
-#endif
 	if (logdev != 0) {
 		if (logdev == ddev) {
 			ldevvp = NULL;
 			mp->m_logdev_targ = mp->m_ddev_targ;
 		} else {
-#ifdef __linux__
 			ASSERT(logdev == ddev);
-#else
-			vnode_t *openvp;
-
-			openvp = ldevvp = make_specvp(logdev, VBLK);
-
-			VOP_OPEN(openvp, &ldevvp, vfs_flags, cr, error);
-			if (error) {
-				VN_RELE(ldevvp);
-				goto error2;
-			}
-
-			xfs_fill_buftarg(&mp->m_logdev_targ, logdev, ldevvp);
-#endif
 		}
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
@@ -732,25 +517,9 @@ xfs_cmountfs(
 				goto error3;
 			}
 			mp->m_logbsize = ap->logbufsize;
-#ifndef __linux__
-			tmp_fsname_buffer = kmem_alloc(PATH_MAX, KM_SLEEP);
-			if (error = copyinstr(ap->fsname, tmp_fsname_buffer,
-					      PATH_MAX - 1, &n)) {
-				if (error == ENAMETOOLONG)
-					error = XFS_ERROR(EINVAL);
-				kmem_free(tmp_fsname_buffer, PATH_MAX);
-				goto error3;
-			}
-			tmp_fsname_buffer[PATH_MAX - 1] = '\0';
-			mp->m_fsname_len = strlen(tmp_fsname_buffer) + 1;
-			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
-			strcpy(mp->m_fsname, tmp_fsname_buffer);
-			kmem_free(tmp_fsname_buffer, PATH_MAX);
-#else
 			mp->m_fsname_len = strlen(args->spec) + 1;
 			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
 			strcpy(mp->m_fsname, args->spec);
-#endif /* __linux__ */
 		} else {
 			/*
 			 * Called through vfs_mountroot/xfs_mountroot.
@@ -898,16 +667,6 @@ xfs_cmountfs(
 		}
 	}
 
-	/*
-	 * For root mounts, make sure the clock is set.  This
-	 * is just a traditional root file system thing to do.
-	 */
-        if (why == ROOT_INIT) {
-                extern int rtodc( void );
-
-                clkset( rtodc() );
-        }
-
 	spec_mounted(ddevvp);
 
 	return error;
@@ -916,44 +675,19 @@ xfs_cmountfs(
 	 * Be careful not to clobber the value of 'error' here.
 	 */
  error3:
-#ifdef __linux__
 	if (ldevvp) {
 		xfs_binval(mp->m_logdev_targ);
 		linvfs_release_inode(mp->m_logdev_targ.inode);
 	}
-#else
-	if (ldevvp) {
-		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, cr, noerr);
-		binval(logdev);
-		VN_RELE(ldevvp);
-	}
-#endif /* __linux__ */
  error2:
-#ifdef __linux__
 	if (rdevvp) {
 		xfs_binval(mp->m_rtdev_targ);
 		linvfs_release_inode(mp->m_rtdev_targ.inode);
 	}
-#else
-	if (rdevvp) {
-		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, cr, noerr);
-		binval(rtdev);
-		VN_RELE(rdevvp);
-	}
-#endif /* __linux__ */
-#ifdef __linux__
 	if (ddevvp) {
 		xfs_binval(mp->m_ddev_targ);
 		linvfs_release_inode(mp->m_ddev_targ.inode);
 	}
-#else
- error1:
-	if (ddevvp) {
-		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, cr, noerr);
-		binval(ddev);
-		VN_RELE(ddevvp);
-	}
-#endif /* __linux__ */
  error0:
 	if (error) {
 #ifdef CELL_CAPABLE
@@ -987,13 +721,6 @@ xfs_get_vfsmount(
 	mp->m_dev    = ddev;
 	mp->m_logdev = logdev;
 	mp->m_rtdev  = rtdev;
-#if !defined(__linux__)
-	mp->m_ddevp  = NULL;
-	mp->m_logdevp = NULL;
-	mp->m_rtdevp = NULL;
-#else 
-	/* do init stuff for dummy meta data inode */
-#endif
 
 	vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
 	/* vfsp->vfs_bsize filled in later from superblock */
@@ -1142,9 +869,8 @@ xfs_mountargs(
         ap->stimeout = -1;
 	ap->ctimeout = -1;
 
-#ifdef __linux__
 #define copyin(from, to, len) (memcpy(to, from, len), /*return*/0)
-#endif
+
 	if (uap->datalen && uap->dataptr) { 
 
 		/* Copy in the xfs_args version number */
@@ -1179,10 +905,8 @@ xfs_mountargs(
 			return XFS_ERROR(EINVAL);
 	}
 
-#ifdef __linux__
 	ap->fsname = uap->spec;
 #undef copyin
-#endif
 
 	return (0);
 }
@@ -1225,16 +949,8 @@ xfs_mount(
 	if (error)
 		return (error);
 
-#ifdef __linux__
 	if (error = spectodevs(vfsp->vfs_super, &ddev, &logdev, &rtdev))
 		return error;
-#else
-	/*
-	 * Resolve path name of special file being mounted.
-	 */
-	if (error = spectodevs(uap->spec, &ddev, &logdev, &rtdev))
-		return error;
-#endif
 
 	/*
 	 * Ensure that this device isn't already mounted,
@@ -1371,28 +1087,8 @@ xfs_isdev(
 	xfs_buf_t	 *bp;
 	int	 error;
 
-#if !defined(__linux__)
-	if (!bdvalid(get_bdevsw(dev)))
-		return 1;
-
-	/* this is the only place we call bread... think about changing this a bit */
-	bp = read_buf(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)), 0);
-	error = (XFS_BUF_ISERROR(bp)) ? 1 : 0;
-
-	if (error == 0) {
-		sbp = XFS_BUF_TO_SBP(bp);
-		error = (sbp->sb_magicnum != XFS_SB_MAGIC) ||
-			(!XFS_SB_GOOD_VERSION(sbp)) ||
-			(sbp->sb_inprogress != 0);
-	}
-
-	XFS_BUF_AGE(bp);
-	xfs_buf_relse(bp);
-	return error;
-#else
 	printk("DING DING DING... need to implement this once we start doing xfs root\n");
 	return 0;
-#endif
 }
 
 /*
@@ -1622,13 +1318,8 @@ xfs_ibusy(
 			}
 			
 #ifdef DEBUG
-#ifdef __linux__
-			printk("busy vp=0x%p ip=0x%p inum %u count=%d\n",
-				vp, ip, (unsigned int)ip->i_ino & 0xffffffff,
-				vp->v_count);
-#else
-			printf("busy vp=0x%x count=%d\n", vp, vp->v_count);
-#endif /* __linux__ */
+			printk("busy vp=0x%x ip=0x%x inum %d count=%d\n",
+				vp, ip, ip->i_ino & 0xffffffff, vp->v_count);
 #endif
 			busy++;
 		}
@@ -1849,187 +1540,6 @@ xfs_root(
 	return 0;
 }
 
-#ifndef __linux__
-/*
- * Get a buffer containing the superblock from an XFS filesystem given its
- * device vnode pointer.
- * Used by statfs.
- */
-static int
-devvptoxfs(
-	vnode_t		*devvp,
-	vnode_t		**vpp,
-	xfs_buf_t	**bpp,
-	xfs_sb_t	**fsp,
-	cred_t		*cr)
-{
-	int		retval;
-	xfs_buf_t	*bp;
-	dev_t		dev;
-	int		error;
-	xfs_sb_t	*fs;
-	bhv_desc_t	*vfs_bdp;
-	buftarg_t	target;
-
-	if (devvp->v_type != VBLK)
-		return XFS_ERROR(ENOTBLK);
-
-	*vpp = devvp;
-
-	VN_HOLD(devvp);				/* In case we clone	*/
-
-	VOP_OPEN(devvp, vpp, FREAD, cr, error);
-
-	if (error) {
-		VN_RELE(devvp);			/* Drop our hold	*/
-		return error;
-	}
-
-	/*
-	 * If the VBLK device cloned, we need to keep our hold on the
-	 * "clone master" vnode, as the statfs code above us is going
-	 * expect to be able to VN_RELE it.
-	 */
-	if (devvp == *vpp)			/* Did we clone?	*/
-		VN_RELE(devvp);			/* If not drop our hold */
-
-	devvp = *vpp;				/* The open may have cloned */
-
-	dev = devvp->v_rdev;
-
-	xfs_fill_buftarg(&target, dev, devvp);
-
-	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
-
-	/*
-	 * Ask specfs to check for the SMOUNTED flag in the common snode.
-	 */
-	if ((retval = spec_ismounted(devvp)) == -1) {
-		VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
-		return XFS_ERROR(ENODEV);
-	}
-
-	if (retval) {
-		extern vfsops_t xfs_vfsops;
-		struct vfs *vfsp;
-		/*
-		 * Device is mounted.  Get an empty buffer to hold a
-		 * copy of its superblock, so we don't have to worry
-		 * about racing with unmount.  Hold devvp's lock to
-		 * block unmount here.
-		 */
-
-		/* Just because it is mounted does not mean it is XFS */
-		if ((vfsp = vfs_devsearch(dev, xfs_fstype)) == NULL) {
-			VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
-			return XFS_ERROR(EINVAL);
-		}
-		
-		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
-
-		/* Race with unmount ? */
-
-		if (vfs_bdp == NULL) {
-			VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
-			return XFS_ERROR(EINVAL);
-		}
-
-		/*
-		 * If the filesystem is shutting down, typically because of
-		 * an I/O error, the SB may be inconsistent. Get outta here.
-		 */
-		if (XFS_FORCED_SHUTDOWN(XFS_BHVTOM(vfs_bdp))) {
-			VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);	
-			return XFS_ERROR(EIO);
-		}
-		bp = ngeteblkdev(dev, BBSIZE);
-		fs = (xfs_sb_t *)XFS_BUF_PTR(bp);
-		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
-	} else {
-		/*
-		 * If the buffer is already in core, it might be stale.
-		 * User might have been doing block reads, then mkfs.
-		 * Very unlikely, but would cause a buffer to contain
-		 * stale information.
-		 * If buffer is marked DELWRI, then use it since it reflects
-		 * what should be on the disk.
-		 */
-		bp = xfs_incore(target, XFS_SB_DADDR, BLKDEV_BB, 1);
-		if (bp && !(XFS_BUF_ISDELAYWRITE(bp))) {
-			XFS_BUF_STALE(bp);
-			xfs_buf_relse(bp);
-			bp = NULL;
-		}
-		if (!bp) {
-			bp = xfs_buf_read(&target, XFS_SB_DADDR, BLKDEV_BB, 0);
-		}
-		if (XFS_BUF_ISERROR(bp)) {
-		  error = XFS_BUF_GETERROR(bp); 
-			xfs_buf_relse(bp);
-			bp = NULL;
-		} else
-			fs = (xfs_sb_t *)XFS_BUF_PTR(bp);
-	}
-	VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
-	*bpp = bp;
-	*fsp = fs;
-	return error;
-}
-
-/*
- * Get file system statistics - from a device vp - used by statfs only
- */
-int
-xfs_statdevvp(
-	statvfs_t	*sp,
-	vnode_t		*devvp)
-{
-	xfs_buf_t		*bp;
-	int		error;
-	/*REFERENCED*/
-	int  		unused;
-	__uint64_t	fakeinos;
-	vnode_t		*vpp;
-	xfs_extlen_t	lsize;
-	xfs_sb_t	*sbp;
-
-	vpp = devvp;
-
-	if (error = devvptoxfs(devvp, &vpp, &bp, &sbp, get_current_cred()))
-		return error;
-
-	devvp = vpp;				/* The open may have cloned */
-
-	if (sbp->sb_magicnum == XFS_SB_MAGIC &&
-	    XFS_SB_GOOD_VERSION(sbp) &&
-	    sbp->sb_inprogress == 0) {
-		sp->f_bsize = sbp->sb_blocksize;
-		sp->f_frsize = sbp->sb_blocksize;
-		lsize = sbp->sb_logstart ? sbp->sb_logblocks : 0;
-		sp->f_blocks = sbp->sb_dblocks - lsize;
-		sp->f_bfree = sp->f_bavail = sbp->sb_fdblocks;
-		fakeinos = sp->f_bfree << sbp->sb_inopblog;
-		sp->f_files = MIN(sbp->sb_icount + fakeinos, 0xffffffffULL);
-		sp->f_ffree = sp->f_favail =
-			sp->f_files - (sbp->sb_icount - sbp->sb_ifree);
-		sp->f_fsid = devvp->v_rdev;
-#ifdef __linux__
-		(void) strcpy(sp->f_basetype, "xfs");
-#else
-		(void) strcpy(sp->f_basetype, vfssw[xfs_fstype].vsw_name);
-#endif
-		sp->f_flag = 0;
-		sp->f_namemax = MAXNAMELEN - 1;
-		bzero(sp->f_fstr, sizeof(sp->f_fstr));
-	} else {
-		error = XFS_ERROR(EINVAL);
-	}
-	xfs_buf_relse(bp);
-	VOP_CLOSE(devvp, FREAD, L_TRUE, get_current_cred(), unused);
-	return error;
-}
-#endif
-
 /*
  * xfs_statvfs
  *
@@ -2078,11 +1588,7 @@ xfs_statvfs(
 		statp->f_flag &= ~ST_LOCAL;
 
 	statp->f_fsid = mp->m_dev;
-#ifdef __linux__
 	(void) strcpy(statp->f_basetype, "xfs");
-#else
-	(void) strcpy(statp->f_basetype, vfssw[xfs_fstype].vsw_name);
-#endif
 	statp->f_namemax = MAXNAMELEN - 1;
 	bcopy((char *)&(mp->m_sb.sb_uuid), statp->f_fstr, sizeof(uuid_t));
 	bzero(&(statp->f_fstr[sizeof(uuid_t)]),
