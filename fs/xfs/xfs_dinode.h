@@ -111,6 +111,8 @@ typedef enum xfs_dinode_fmt
  * Inode size for given fs.
  */
 #define	XFS_LITINO(mp)	((mp)->m_sb.sb_inodesize - sizeof(xfs_dinode_core_t))
+#define	XFS_LITINO_BROOT(mp)	\
+	(XFS_LITINO(mp) + sizeof(xfs_bmbt_block_t) - sizeof(xfs_bmdr_block_t))
 
 /*
  * File types (mode field)
