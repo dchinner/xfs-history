@@ -286,6 +286,22 @@ xfs_growfs_rt(
 	return XFS_ERROR(ENOSYS);
 }
 
+STATIC int
+xfs_fs_counts(
+	xfs_mount_t		*mp,
+	xfs_fsop_counts_t	*cnt)
+{
+	int			s;
+
+	s = XFS_SB_LOCK(mp);
+	cnt->freedata = mp->m_sb.sb_fdblocks;
+	cnt->freertx = mp->m_sb.sb_frextents;
+	cnt->freeino = mp->m_sb.sb_ifree;
+	cnt->allocino = mp->m_sb.sb_icount;
+	XFS_SB_UNLOCK(mp, s);
+	return 0;
+}
+
 int					/* error status */
 xfs_fsoperations(
 	int		fd,		/* file descriptor for fs */
@@ -297,19 +313,21 @@ xfs_fsoperations(
 	void		*inb;
 	xfs_mount_t	*mp;
 	void		*outb;
-	static int	cisize[] =
+	static int	cisize[XFS_FSOPS_COUNT] =
 	{
 		0,				/* XFS_FS_GEOMETRY */
 		sizeof(xfs_growfs_data_t),	/* XFS_GROWFS_DATA */
 		sizeof(xfs_growfs_log_t),	/* XFS_GROWFS_LOG */
 		sizeof(xfs_growfs_rt_t),	/* XFS_GROWFS_RT */
+		0,				/* XFS_FS_COUNTS */
 	};
-	static int	cosize[] =
+	static int	cosize[XFS_FSOPS_COUNT] =
 	{
 		sizeof(xfs_fsop_geom_t),	/* XFS_FS_GEOMETRY */
 		0,				/* XFS_GROWFS_DATA */
 		0,				/* XFS_GROWFS_LOG */
 		0,				/* XFS_GROWFS_RT */
+		sizeof(xfs_fsop_counts_t),	/* XFS_FS_COUNTS */
 	};
 
 	if (opcode < 0 || opcode >= XFS_FSOPS_COUNT)
@@ -350,6 +368,9 @@ xfs_fsoperations(
 			return XFS_ERROR(EWOULDBLOCK);
 		error = xfs_growfs_rt(mp, (xfs_growfs_rt_t *)inb);
 		vsema(&mp->m_growlock);
+		break;
+	case XFS_FS_COUNTS:
+		error = xfs_fs_counts(mp, (xfs_fsop_counts_t *)outb);
 		break;
 	default:
 		error = XFS_ERROR(EINVAL);

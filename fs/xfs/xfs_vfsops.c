@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.60 $"
+#ident  "$Revision: 1.61 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -997,6 +997,7 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 {
 	buf_t		*bp;
 	int		error;
+	xfs_extlen_t	lsize;
 	xfs_sb_t	*sbp;
 
 	if (error = devvptoxfs(devvp, &bp, &sbp, u.u_cred))
@@ -1004,10 +1005,9 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 	if (sbp->sb_magicnum == XFS_SB_MAGIC) {
 		sp->f_bsize = sbp->sb_blocksize;
 		sp->f_frsize = sbp->sb_blocksize;
-		sp->f_blocks = sbp->sb_dblocks +
-			sbp->sb_rextents * sbp->sb_rextsize;
-		sp->f_bfree = sbp->sb_fdblocks +
-			sbp->sb_frextents * sbp->sb_rextsize;
+		lsize = sbp->sb_logstart ? sbp->sb_logblocks : 0;
+		sp->f_blocks = sbp->sb_dblocks - lsize;
+		sp->f_bfree = sbp->sb_fdblocks - lsize;
 		sp->f_files = sbp->sb_icount;
 		sp->f_ffree = sbp->sb_ifree;
 		sp->f_fsid = devvp->v_rdev;
@@ -1034,6 +1034,7 @@ xfs_statvfs(vfs_t	*vfsp,
 	    statvfs_t	*statp,
 	    vnode_t	*vp)
 {
+	xfs_extlen_t	lsize;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	int		s;
@@ -1044,8 +1045,9 @@ xfs_statvfs(vfs_t	*vfsp,
 	s = XFS_SB_LOCK(mp);
 	statp->f_bsize = sbp->sb_blocksize;
 	statp->f_frsize = sbp->sb_blocksize;
-	statp->f_blocks = sbp->sb_dblocks + sbp->sb_rextents * sbp->sb_rextsize;
-	statp->f_bfree = sbp->sb_fdblocks + sbp->sb_frextents * sbp->sb_rextsize;
+	lsize = sbp->sb_logstart ? sbp->sb_logblocks : 0;
+	statp->f_blocks = sbp->sb_dblocks - lsize;
+	statp->f_bfree = sbp->sb_fdblocks - lsize;
 	statp->f_files = sbp->sb_icount;
 	statp->f_ffree = sbp->sb_ifree;
 	statp->f_flag = vf_to_stf(vfsp->vfs_flag);
