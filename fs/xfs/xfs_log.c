@@ -13,6 +13,7 @@
 
 #include <sys/sysmacros.h>
 #include <sys/buf.h>
+#include <sys/vnode.h>
 
 #ifdef SIM
 #undef _KERNEL
@@ -29,7 +30,6 @@
 #include <sys/debug.h>
 #include <sys/sema.h>
 #include <sys/uuid.h>
-#include <sys/vnode.h>
 #include <sys/vfs.h>
 
 #include "xfs_inum.h"
@@ -1212,11 +1212,8 @@ xlog_write(xfs_mount_t *	mp,
     int		     need_copy;      /* # bytes need to bcopy this region */
     int		     copy_len;	     /* # bytes actually bcopy'ing */
     int		     copy_off;	     /* # bytes from entry start */
-    int		     continuedwr;    /* continued write of in-core log? */
+    int		     contwr;	     /* continued write of in-core log? */
     int		     firstwr = 0;    /* first write of transaction */
-#ifdef XFSDEBUG
-    static int			this_log_offset, last_log_offset;
-#endif
     
     partial_copy_len = partial_copy = 0;
 
@@ -1239,11 +1236,7 @@ xlog_write(xfs_mount_t *	mp,
 	ticket->t_curr_reserv -= len;
     
     for (index = 0; index < nentries; ) {
-	log_offset = xlog_state_get_iclog_space(log, len, &iclog, &continuedwr);
-#ifdef XFSDEBUG
-	last_log_offset = this_log_offset;
-	this_log_offset = log_offset;
-#endif
+	log_offset = xlog_state_get_iclog_space(log, len, &iclog, &contwr);
 	ASSERT(log_offset <= iclog->ic_size - 1);
 	ptr = (psint) &iclog->ic_data[log_offset];
 	
@@ -1311,20 +1304,17 @@ xlog_write(xfs_mount_t *	mp,
 		len += sizeof(xlog_op_header_t); /* from splitting of region */
 	    }
 
-	    if (xlog_debug > 1) {
-		ASSERT(copy_len >= 0);
-		xlog_verify_dest_ptr(log, ptr);
-	    }
-
+#ifdef XFSDEBUG
+	    ASSERT(copy_len >= 0);
+	    xlog_verify_dest_ptr(log, ptr);
+#endif
 	    /* copy region */
 	    bcopy(reg[index].i_addr + copy_off, (caddr_t)ptr, copy_len);
 	    xlog_write_adv_cnt(ptr, len, log_offset, copy_len);
 
 	    /* make copy_len total bytes copied, including headers */
 	    copy_len += start_rec_copy + sizeof(xlog_op_header_t);
-	    xlog_state_finish_copy(log, iclog, firstwr,
-				  (continuedwr ? copy_len : 0));
-
+	    xlog_state_finish_copy(log, iclog, firstwr, (contwr ? copy_len : 0));
 	    firstwr = 0;
 	    if (partial_copy) {			/* copied partial region */
 		/* already marked WANT_SYNC */
@@ -1343,16 +1333,12 @@ xlog_write(xfs_mount_t *	mp,
 			    break;
 		}
 	    } /* if (partial_copy) */
-		if (xlog_debug > 1) {
-		    iclog->ic_header.h_len = log_offset;
-		    xlog_verify_iclog(log, iclog, log_offset, B_FALSE);
-	        }
 	} /* while (index < nentries) */
     } /* for (index = 0; index < nentries; ) */
     ASSERT(len == 0);
     
 #ifndef _KERNEL
-    xlog_state_want_sync(log, iclog);   /* not needed for kernel XXXmiken */
+    xlog_state_want_sync(log, iclog);
 #endif
     
     xlog_state_release_iclog(log, iclog);
@@ -1422,6 +1408,8 @@ xlog_state_do_callback(xlog_t *log)
 			cb_next = cb->cb_next;
 			cb->cb_func(cb->cb_arg);
 		}
+		iclog->ic_callback_tail = &(iclog->ic_callback);
+		iclog->ic_callback = 0;
 
 		spl = splockspl(log->l_icloglock, splhi);
 		iclog->ic_state = XLOG_STATE_DIRTY;
