@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision: 1.29 $"
 
 /*
  * xfs_da_btree.h
@@ -32,6 +32,7 @@ typedef struct xfs_da_blkinfo {
 	xfs_dablk_t forw;			/* previous block in list */
 	xfs_dablk_t back;			/* following block in list */
 	__uint16_t magic;			/* validity check on block */
+	__uint16_t pad;				/* unused */
 } xfs_da_blkinfo_t;
 
 /*
@@ -255,8 +256,7 @@ int	xfs_da_blk_link(struct xfs_da_state *state,
 /*
  * Utility routines.
  */
-int	xfs_da_grow_inode(struct xfs_da_args *args, int length,
-				 xfs_dablk_t *new_blkno);
+int	xfs_da_grow_inode(struct xfs_da_args *args, xfs_dablk_t *new_blkno);
 int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			      xfs_dablk_t bno, struct buf **bp, int whichfork);
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
@@ -267,7 +267,7 @@ daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 				xfs_dablk_t bno, int whichfork);
 #endif	/* !SIM */
 int	xfs_da_shrink_inode(struct xfs_da_args *args, xfs_dablk_t dead_blkno,
-				   int length, struct buf *dead_buf);
+				   struct buf *dead_buf);
 
 uint xfs_da_hashname(char *name_string, int name_length);
 uint xfs_da_log2_roundup(uint i);
