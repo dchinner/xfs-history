@@ -20,8 +20,9 @@ typedef struct xfs_buf_log_format {
 #define	XFS_BLI_CHUNK		128
 #define	XFS_BLI_SHIFT		7
 #define	BIT_TO_WORD_SHIFT	5
-#define	NBWORD			32
+#define	NBWORD			(NBBY * sizeof(unsigned int))
 
+struct ktrace;
 /*
  * This is the in core log item structure used to track information
  * needed to log buffers.  It tracks how many times the lock has been
@@ -33,7 +34,8 @@ typedef struct xfs_buf_log_item {
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
 	unsigned int		bli_refcount;	/* cnt of tp refs */
-#ifdef XFSDEBUG
+	struct ktrace		*bli_trace;	/* event trace buf */
+#ifdef DEBUG
 	char			*bli_orig;	/* original buffer copy */
 	char			*bli_logged;	/* bytes to be logged */
 #endif
@@ -46,11 +48,19 @@ typedef struct xfs_buf_log_item {
 #define	XFS_BLI_HOLD	0x1
 #define	XFS_BLI_DIRTY	0x2
 #define	XFS_BLI_STALE	0x4
+#define	XFS_BLI_LOGGED	0x8
 
 /*
  * This lock guards the bli_refcount fields of the buf items.
  */
 extern lock_t	xfs_bli_reflock;
+
+#define	XFS_BLI_TRACE_SIZE	32
+#if	(defined(DEBUG) && !defined(SIM))
+void	xfs_buf_item_trace(char *, xfs_buf_log_item_t *);
+#else
+#define	xfs_buf_item_trace(id, bip)
+#endif
 
 void	xfs_buf_item_init(buf_t *, struct xfs_mount *);
 void	xfs_buf_item_relse(buf_t *);

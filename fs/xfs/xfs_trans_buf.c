@@ -81,7 +81,9 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	if ((bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp)) != NULL) {
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		ASSERT(bip != NULL);
+		ASSERT(bip->bli_refcount > 0);
 		bip->bli_recur++;
+		xfs_buf_item_trace("GET RECUR", bip);
 		return (bp);
 	}
 
@@ -111,6 +113,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+ 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
 	/*
@@ -131,6 +134,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 */
 	bp->b_fsprivate2 = tp;
 
+	xfs_buf_item_trace("GET", bip);
 	return (bp);
 }
 
@@ -167,7 +171,9 @@ xfs_trans_getsb(xfs_trans_t *tp)
 	if (bp->b_fsprivate2 == tp) {
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		ASSERT(bip != NULL);
+		ASSERT(bip->bli_refcount > 0);
 		bip->bli_recur++;
+		xfs_buf_item_trace("GETSB RECUR", bip);
 		return (bp);
 	}
 
@@ -186,6 +192,7 @@ xfs_trans_getsb(xfs_trans_t *tp)
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+ 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
 	/*
@@ -206,6 +213,7 @@ xfs_trans_getsb(xfs_trans_t *tp)
 	 */
 	bp->b_fsprivate2 = tp;
 
+	xfs_buf_item_trace("GETSB", bip);
 	return (bp);
 }
 
@@ -279,6 +287,8 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 		bip->bli_recur++;
 
+		ASSERT(bip->bli_refcount > 0);
+		xfs_buf_item_trace("READ RECUR", bip);
 		return (bp);
 	}
 
@@ -308,6 +318,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+ 	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 	bip->bli_recur = 0;
 
 	/*
@@ -328,6 +339,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 */
 	bp->b_fsprivate2 = tp;
 
+	xfs_buf_item_trace("READ", bip);
 	return (bp);
 }
 
@@ -359,6 +371,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * Default to a normal brelse() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
+		ASSERT(bp->b_fsprivate2 == NULL);
 		/*
 		 * If there's a buf log item attached to the buffer,
 		 * then let the AIL know that the buffer is being
@@ -378,6 +391,8 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
 	ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(bip->bli_refcount > 0);
+
 	/*
 	 * Find the item descriptor pointing to this buffer's
 	 * log item.  It must be there.
@@ -391,6 +406,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 */
 	if (bip->bli_recur > 0) {
 		bip->bli_recur--;
+		xfs_buf_item_trace("RELSE RECUR", bip);
 		return;
 	}
 
@@ -399,8 +415,23 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * release it until we commit.
 	 */
 	if (lidp->lid_flags & XFS_LID_DIRTY) {
+		xfs_buf_item_trace("RELSE DIRTY", bip);
 		return;
 	}
+
+	/*
+	 * If the buffer has been invalidated, then we can't release
+	 * it until the transaction commits to disk unless it is re-dirtied
+	 * as part of this transaction.  This prevents us from pulling
+	 * the item from the AIL before we should.
+	 */
+	if (bip->bli_flags & XFS_BLI_STALE) {
+		xfs_buf_item_trace("RELSE STALE", bip);
+		return;
+	}
+	 
+	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
+	xfs_buf_item_trace("RELSE", bip);
 
 	/*
 	 * Free up the log item descriptor tracking the released item.
@@ -431,6 +462,10 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * its relation to this transaction.
 	 */
 	if (!xfs_buf_item_dirty(bip)) {
+		ASSERT(!(bp->b_flags & B_DELWRI));
+		ASSERT(bp->b_pincount == 0);
+		ASSERT(bip->bli_refcount == 0);
+		ASSERT(!(bip->bli_item.li_flags & XFS_LI_IN_AIL));
 		xfs_buf_item_relse(bp);
 	}
 	bp->b_fsprivate2 = NULL;
@@ -473,6 +508,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	xfs_buf_item_init(bp, tp->t_mountp);
 	bip = bp->b_fsprivate;
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(!(bip->bli_flags & XFS_BLI_LOGGED));
 
 	/*
 	 * Take a reference for this transaction on the buf item.
@@ -491,6 +527,8 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	 * in xfs_trans_get_buf() and friends above.
 	 */
 	bp->b_fsprivate2 = tp;
+
+	xfs_buf_item_trace("BJOIN", bip);
 }
 
 /*
@@ -510,7 +548,9 @@ xfs_trans_bhold(xfs_trans_t	*tp,
 
 	bip = (xfs_buf_log_item_t*)(bp->b_fsprivate);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(bip->bli_refcount > 0);
 	bip->bli_flags |= XFS_BLI_HOLD;
+	xfs_buf_item_trace("BHOLD", bip);
 }
 
 /*
@@ -534,10 +574,12 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
 
 	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(bip->bli_refcount > 0);
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
 
 	lidp->lid_flags |= XFS_LID_SYNC_UNLOCK;
+	xfs_buf_item_trace("BHOLD UNTILC OMMIT", bip);
 }
 
 
@@ -575,18 +617,31 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	 */
 	bp->b_flags |= B_DELWRI | B_DONE;
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
+	ASSERT(bip->bli_refcount > 0);
 	if (bp->b_iodone == NULL) {
 		bp->b_iodone = xfs_buf_iodone_callbacks;
 	}
 	bip->bli_item.li_cb = (void(*)(buf_t*,xfs_log_item_t*))xfs_buf_iodone;
+
+	/*
+	 * If we invalidate the buffer within this transaction, then
+	 * cancel the invalidation now that we're dirtying the buffer
+	 * again.  There are no races with the code in xfs_buf_item_unpin(),
+	 * because we have a reference to the buffer this entire time.
+	 */
+	if (bip->bli_flags & XFS_BLI_STALE) {
+		xfs_buf_item_trace("BLOG UNSTALE", bip);
+		bip->bli_flags &= ~XFS_BLI_STALE;
+	}
 
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
 
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
+	bip->bli_flags |= XFS_BLI_LOGGED;
 	xfs_buf_item_log(bip, first, last);
+	xfs_buf_item_trace("BLOG", bip);
 }
 
 
@@ -625,46 +680,26 @@ xfs_trans_binval(
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
-
-	if (!(bp->b_flags & B_DELWRI)) {
-		/*
-		 * The buffer isn't dirty so the buf item isn't
-		 * in the AIL and the buffer isn't pinned.
-		 * In this case we can just free the buf item
-		 * and release the buffer from the transaction.
-		 */
-		ASSERT(bp->b_pincount == 0);
-		ASSERT(!(bip->bli_item.li_flags & XFS_LI_IN_AIL));
-		ASSERT(bip->bli_refcount == 1);
-		xfs_buf_item_relse(bp);
-		/*
-		 * There had better not be any log items attached to
-		 * this buffer waiting for it to be written out, because
-		 * it is never going out.
-		 */
-		ASSERT(bp->b_fsprivate == NULL);
-		/*
-		 * Free up the descriptor pointing at the buf log item.
-		 */
-		licp = XFS_LIC_DESC_TO_CHUNK(lidp);
-		XFS_LIC_RELSE(licp, XFS_LIC_DESC_TO_SLOT(lidp));
-		brelse(bp);
-		return;
-	}
+	ASSERT(bip->bli_refcount > 0);
 
 	/*
-	 * The buffer is dirty, so we can't clean it up until this
-	 * transaction is permanent on disk.  Mark the buf item descriptor
-	 * dirty so that we'll keep it around across the commit.
-	 * Clear the B_DELWRI flag in the buffer so that it won't be
-	 * written out anymore.  We set the XFS_BLI_STALE flag in the
-	 * buf log item to indicate to the xfs_buf_item_unpin() that
-	 * it should clean up when the last reference to the buf item
-	 * is given up.
+	 * Clear the dirty bit in the buffer and set the STALE flag
+	 * in the buf log item.  The STALE flag will be used in
+	 * xfs_buf_item_unpin() to determine if it should clean up
+	 * when the last reference to the buf ite is given up.
+	 * We mark the item descriptor and the transaction dirty so
+	 * that we'll hold the buffer until after the commit.
+	 *
+	 * Since we're invalidating the buffer, we also clear the state
+	 * about which parts of the buffer have been logged.
 	 */
 	bp->b_flags &= ~B_DELWRI;
 	bip->bli_flags |= XFS_BLI_STALE;
+	bip->bli_flags &= ~(XFS_BLI_LOGGED | XFS_BLI_DIRTY);
+	bzero((char *)(bip->bli_format.blf_data_map),
+	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
 	tp->t_flags |= XFS_TRANS_DIRTY;
+	xfs_buf_item_trace("BINVAL", bip);
 }
 
