@@ -375,7 +375,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 	 * Call the space management code to allocate
 	 * the on-disk inode.
 	 */
-	ino = xfs_dialloc(tp, pip->i_ino, 0, mode);
+	ino = xfs_dialloc(tp, pip ? pip->i_ino : 0, pip == NULL, mode);
 	ASSERT(ino != NULLFSINO);
 
 	/*
