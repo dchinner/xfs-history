@@ -757,8 +757,9 @@ xfs_trans_committed(xfs_trans_t *tp)
  * This is called to perform the commit processing for each
  * item described by the given chunk.
  *
- * The commit processing consists of calling the committed routine
- * of each logged item, updating the item's position in the AIL
+ * The commit processing consists of unlocking items which were
+ * held locked with the SYNC_UNLOCK attribute, calling the committed
+ * routine of each logged item, updating the item's position in the AIL
  * if necessary, and unpinning each item.  If the committed routine
  * returns -1, then do nothing further with the item because it
  * may have been freed.
@@ -791,6 +792,11 @@ xfs_trans_chunk_committed(xfs_log_item_chunk_t	*licp,
 		}
 
 		lip = lidp->lid_item;
+
+		if (lidp->lid_flags & XFS_LID_SYNC_UNLOCK) {
+			IOP_UNLOCK(lip);
+		}
+
 		item_lsn = IOP_COMMITTED(lip, lsn);
 
 		/*
