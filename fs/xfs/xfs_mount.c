@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.191 $"
+#ident	"$Revision: 1.192 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1452,7 +1452,7 @@ xfs_getsb(xfs_mount_t	*mp,
 
 	ASSERT(mp->m_sb_bp != NULL);
 	bp = mp->m_sb_bp;
-	if (flags & BUF_TRYLOCK) {
+	if (flags & XFS_BUF_TRYLOCK) {
 		if (!cpsema(&bp->b_lock)) {
 			return NULL;
 		}

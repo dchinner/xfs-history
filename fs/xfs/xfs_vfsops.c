@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.233 $"
+#ident  "$Revision: 1.236 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -2661,7 +2661,7 @@ xfs_syncsub(
 		 * if we can lock it without sleeping and it is not pinned.
 		 */
 		if (flags & SYNC_BDFLUSH) {
-			bp = xfs_getsb(mp, BUF_TRYLOCK);
+			bp = xfs_getsb(mp, XFS_BUF_TRYLOCK);
 			if (bp != NULL) {
 				bip = XFS_BUF_FSPRIVATE(bp,xfs_buf_log_item_t*);
 				if ((bip != NULL) &&

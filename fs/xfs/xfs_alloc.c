@@ -2280,7 +2280,7 @@ xfs_alloc_read_agf(
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
 	if (error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, d, 1,
-			(flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0U,
+			(flags & XFS_ALLOC_FLAG_TRYLOCK) ? XFS_BUF_TRYLOCK : 0U,
 			&bp))
 		return error;
 	ASSERT(!bp || !geterror(bp));
