@@ -827,9 +827,8 @@ struct address_space_operations linvfs_aops = {
   bmap:			linvfs_bmap,
   convertpage:		pagebuf_convert_page,
   writepage_async:	linvfs_write_full_page_async,
-	/* prepare_write: ext2_prepare_write,   */
-	/* commit_write: generic_commit_write,  */
-
+  prepare_write:	pagebuf_prepare_write,
+  commit_write:		pagebuf_commit_write,
 };
 
 struct inode_operations linvfs_file_inode_operations =
