@@ -2548,6 +2548,7 @@ static int
 kdbm_pbdelay(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
+#ifdef DEBUG
 	unsigned long	verbose = 0;
 	int	count = 0;
 	struct list_head	*curr, *next;
@@ -2583,7 +2584,9 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 				bp.pb_flushtime - jiffies);
 		}
 	}
-
+#else
+	kdb_printf("pbd_delwrite_queue inaccessible (non-debug)\n");
+#endif
 	return 0;
 }
 
@@ -2692,9 +2695,9 @@ pb_trace_core(
 			   trace->pb, event,
 			   trace->hold, trace->lock_value,
 			   trace->misc);
-		kdb_symbol_print((unsigned int)trace->ra, NULL,
+		kdb_symbol_print((unsigned long)trace->ra, NULL,
 			KDB_SP_SPACEB|KDB_SP_PAREN|KDB_SP_NEWLINE);
-		kdb_printf("    offset 0x%Lx size 0x%x task 0x%p\n",
+		kdb_printf("    offset 0x%Lx size 0x%lx task 0x%p\n",
 			   trace->offset, trace->size, trace->task);
 		kdb_printf("    flags: %s\n",
 			   pb_flags(trace->flags));
@@ -3098,24 +3101,24 @@ xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 		return 0;
 	switch ((long)ktep->val[0] & 0xffffL) {
 	case XFS_ALLOC_KTRACE_ALLOC:
-		kdb_printf("alloc %s[%s %d] mp 0x%p\n",
+		kdb_printf("alloc %s[%s %ld] mp 0x%p\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
+			(long)ktep->val[0] >> 16,
 			(xfs_mount_t *)ktep->val[3]);
 		kdb_printf(
-	"agno %d agbno %d minlen %d maxlen %d mod %d prod %d minleft %d\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[5],
-			(__psunsigned_t)ktep->val[6],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8],
-			(__psunsigned_t)ktep->val[9],
-			(__psunsigned_t)ktep->val[10]);
-		kdb_printf("total %d alignment %d len %d type %s otype %s\n",
-			(__psunsigned_t)ktep->val[11],
-			(__psunsigned_t)ktep->val[12],
-			(__psunsigned_t)ktep->val[13],
+	"agno %ld agbno %ld minlen %ld maxlen %ld mod %ld prod %ld minleft %ld\n",
+			(long)ktep->val[4],
+			(long)ktep->val[5],
+			(long)ktep->val[6],
+			(long)ktep->val[7],
+			(long)ktep->val[8],
+			(long)ktep->val[9],
+			(long)ktep->val[10]);
+		kdb_printf("total %ld alignment %ld len %ld type %s otype %s\n",
+			(long)ktep->val[11],
+			(long)ktep->val[12],
+			(long)ktep->val[13],
 			xfs_alloctype[((__psint_t)ktep->val[14]) >> 16],
 			xfs_alloctype[((__psint_t)ktep->val[14]) & 0xffff]);
 		kdb_printf("wasdel %d wasfromfl %d isfl %d userdata %d\n",
@@ -3125,76 +3128,76 @@ xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 			((__psint_t)ktep->val[15] & (1 << 0)) != 0);
 		break;
 	case XFS_ALLOC_KTRACE_FREE:
-		kdb_printf("free %s[%s %d] mp 0x%p\n",
+		kdb_printf("free %s[%s %ld] mp 0x%p\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
+			(long)ktep->val[0] >> 16,
 			(xfs_mount_t *)ktep->val[3]);
-		kdb_printf("agno %d agbno %d len %d isfl %d\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[5],
-			(__psunsigned_t)ktep->val[6],
-			(__psint_t)ktep->val[7]);
+		kdb_printf("agno %ld agbno %ld len %ld isfl %d\n",
+			(long)ktep->val[4],
+			(long)ktep->val[5],
+			(long)ktep->val[6],
+			(__psint_t)ktep->val[7] != 0);
 		break;
 	case XFS_ALLOC_KTRACE_MODAGF:
-		kdb_printf("modagf %s[%s %d] mp 0x%p\n",
+		kdb_printf("modagf %s[%s %ld] mp 0x%p\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
+			(long)ktep->val[0] >> 16,
 			(xfs_mount_t *)ktep->val[3]);
 		printflags((__psint_t)ktep->val[4], modagf_flags, "modified");
-		kdb_printf("seqno %d length %d roots b %d c %d\n",
-			(__psunsigned_t)ktep->val[5],
-			(__psunsigned_t)ktep->val[6],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8]);
-		kdb_printf("levels b %d c %d flfirst %d fllast %d flcount %d\n",
-			(__psunsigned_t)ktep->val[9],
-			(__psunsigned_t)ktep->val[10],
-			(__psunsigned_t)ktep->val[11],
-			(__psunsigned_t)ktep->val[12],
-			(__psunsigned_t)ktep->val[13]);
-		kdb_printf("freeblks %d longest %d\n",
-			(__psunsigned_t)ktep->val[14],
-			(__psunsigned_t)ktep->val[15]);
+		kdb_printf("seqno %lu length %lu roots b %lu c %lu\n",
+			(unsigned long)ktep->val[5],
+			(unsigned long)ktep->val[6],
+			(unsigned long)ktep->val[7],
+			(unsigned long)ktep->val[8]);
+		kdb_printf("levels b %lu c %lu flfirst %lu fllast %lu flcount %lu\n",
+			(unsigned long)ktep->val[9],
+			(unsigned long)ktep->val[10],
+			(unsigned long)ktep->val[11],
+			(unsigned long)ktep->val[12],
+			(unsigned long)ktep->val[13]);
+		kdb_printf("freeblks %lu longest %lu\n",
+			(unsigned long)ktep->val[14],
+			(unsigned long)ktep->val[15]);
 		break;
 
 	case XFS_ALLOC_KTRACE_UNBUSY:
-		kdb_printf("unbusy %s [%s %d] mp 0x%p\n",
+		kdb_printf("unbusy %s [%s %ld] mp 0x%p\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
+			(long)ktep->val[0] >> 16,
 			(xfs_mount_t *)ktep->val[3]);
-		kdb_printf("      agno %d slot %d tp 0x%x\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8]);
+		kdb_printf("      agno %lu slot %lu tp 0x%p\n",
+			(unsigned long)ktep->val[4],
+			(unsigned long)ktep->val[7],
+			(xfs_trans_t *)ktep->val[8]);
 		break;
 	case XFS_ALLOC_KTRACE_BUSY:
-		kdb_printf("busy %s [%s %d] mp 0x%p\n",
+		kdb_printf("busy %s [%s %ld] mp 0x%p\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
+			(long)ktep->val[0] >> 16,
 			(xfs_mount_t *)ktep->val[3]);
-		kdb_printf("      agno %d agbno %d len %d slot %d tp 0x%x\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[5],
-			(__psunsigned_t)ktep->val[6],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8]);
+		kdb_printf("      agno %lu agbno %lu len %lu slot %lu tp 0x%p\n",
+			(unsigned long)ktep->val[4],
+			(unsigned long)ktep->val[5],
+			(unsigned long)ktep->val[6],
+			(unsigned long)ktep->val[7],
+			(xfs_trans_t *)ktep->val[8]);
 		break;
 	case XFS_ALLOC_KTRACE_BUSYSEARCH:
-		kdb_printf("busy-search %s [%s %d] mp 0x%p\n",
+		kdb_printf("busy-search %s [%s %ld] mp 0x%p\n",
 			(char *)ktep->val[1],
 			ktep->val[2] ? (char *)ktep->val[2] : "",
-			(__psint_t)ktep->val[0] >> 16,
+			(long)ktep->val[0] >> 16,
 			(xfs_mount_t *)ktep->val[3]);
-		kdb_printf("      agno %d agbno %d len %d slot %d tp 0x%x\n",
-			(__psunsigned_t)ktep->val[4],
-			(__psunsigned_t)ktep->val[5],
-			(__psunsigned_t)ktep->val[6],
-			(__psunsigned_t)ktep->val[7],
-			(__psunsigned_t)ktep->val[8]);
+		kdb_printf("      agno %ld agbno %ld len %ld slot %ld tp 0x%p\n",
+			(unsigned long)ktep->val[4],
+			(unsigned long)ktep->val[5],
+			(unsigned long)ktep->val[6],
+			(unsigned long)ktep->val[7],
+			(xfs_trans_t *)ktep->val[8]);
 		break;
 	default:
 		kdb_printf("unknown alloc trace record\n");
@@ -3234,19 +3237,19 @@ xfs_attr_trace_entry(ktrace_entry_t *ktep)
 	if (!ktep->val[0])
 		return 0;
 
-	qprintf("-- %s: cursor h/b/o 0x%x/0x%x/%d, dupcnt %d, dp 0x%x\n",
+	qprintf("-- %s: cursor h/b/o 0x%lx/0x%lx/%lu, dupcnt %lu, dp 0x%p\n",
 		 (char *)ktep->val[1],
-		 (__psunsigned_t)ktep->val[3],
-		 (__psunsigned_t)ktep->val[4],
-		 (__psunsigned_t)ktep->val[5],
-		 (__psunsigned_t)ktep->val[11],
-		 (__psunsigned_t)ktep->val[2]);
-	qprintf("   alist 0x%x, size %d, count %d, firstu %d, Llen %d",
-		 (__psunsigned_t)ktep->val[6],
-		 (__psunsigned_t)ktep->val[7],
-		 (__psunsigned_t)ktep->val[8],
-		 (__psunsigned_t)ktep->val[9],
-		 (__psunsigned_t)ktep->val[10]);
+		 (unsigned long)ktep->val[3],
+		 (unsigned long)ktep->val[4],
+		 (unsigned long)ktep->val[5],
+		 (unsigned long)ktep->val[11],
+		 (xfs_inode_t *)ktep->val[2]);
+	qprintf("   alist 0x%p, size %lu, count %lu, firstu %lu, Llen %lu",
+		 (attrlist_t *)ktep->val[6],
+		 (unsigned long)ktep->val[7],
+		 (unsigned long)ktep->val[8],
+		 (unsigned long)ktep->val[9],
+		 (unsigned long)ktep->val[10]);
 	printflags((__psunsigned_t)(ktep->val[12]), attr_arg_flags, ", flags");
 	qprintf("\n");
 
@@ -3254,21 +3257,21 @@ xfs_attr_trace_entry(ktrace_entry_t *ktep)
 	case XFS_ATTR_KTRACE_L_C:
 		break;
 	case XFS_ATTR_KTRACE_L_CN:
-		qprintf("   node: count %d, 1st hash 0x%x, last hash 0x%x\n",
-			 (__psunsigned_t)ktep->val[13],
-			 (__psunsigned_t)ktep->val[14],
-			 (__psunsigned_t)ktep->val[15]);
+		qprintf("   node: count %lu, 1st hash 0x%lx, last hash 0x%lx\n",
+			 (unsigned long)ktep->val[13],
+			 (unsigned long)ktep->val[14],
+			 (unsigned long)ktep->val[15]);
 		break;
 	case XFS_ATTR_KTRACE_L_CB:
-		qprintf("   btree: hash 0x%x, blkno 0x%x\n",
-			 (__psunsigned_t)ktep->val[13],
-			 (__psunsigned_t)ktep->val[14]);
+		qprintf("   btree: hash 0x%lx, blkno 0x%lx\n",
+			 (unsigned long)ktep->val[13],
+			 (unsigned long)ktep->val[14]);
 		break;
 	case XFS_ATTR_KTRACE_L_CL:
-		qprintf("   leaf: count %d, 1st hash 0x%x, last hash 0x%x\n",
-			 (__psunsigned_t)ktep->val[13],
-			 (__psunsigned_t)ktep->val[14],
-			 (__psunsigned_t)ktep->val[15]);
+		qprintf("   leaf: count %ld, 1st hash 0x%lx, last hash 0x%lx\n",
+			 (unsigned long)ktep->val[13],
+			 (unsigned long)ktep->val[14],
+			 (unsigned long)ktep->val[15]);
 		break;
 	default:
 		qprintf("   unknown attr trace record format\n");
@@ -3312,8 +3315,8 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	r.l2 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[10];
 	r.l3 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[11];
 	xfs_convert_extent(&r, &o, &b, &c, &flag);
-	qprintf(" idx %d offset %lld block %s",
-		(__psint_t)ktep->val[4], o,
+	qprintf(" idx %ld offset %lld block %s",
+		(long)ktep->val[4], o,
 		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
 	qprintf(" count %lld flag %d\n", c, flag);
 	if ((__psint_t)ktep->val[5] != 2)
@@ -3356,40 +3359,43 @@ xfs_bmbt_trace_entry(
 		(xfs_btree_cur_t *)ktep->val[4]);
 	switch (type) {
 	case XFS_BMBT_KTRACE_ARGBI:
-		qprintf(" buf 0x%p i %d\n",
+		qprintf(" buf 0x%p i %ld\n",
 			(xfs_buf_t *)ktep->val[5],
-			(__psint_t)ktep->val[6]);
+			(long)ktep->val[6]);
 		break;
 	case XFS_BMBT_KTRACE_ARGBII:
-		qprintf(" buf 0x%p i0 %d i1 %d\n",
+		qprintf(" buf 0x%p i0 %ld i1 %ld\n",
 			(xfs_buf_t *)ktep->val[5],
-			(__psint_t)ktep->val[6],
-			(__psint_t)ktep->val[7]);
+			(long)ktep->val[6],
+			(long)ktep->val[7]);
 		break;
 	case XFS_BMBT_KTRACE_ARGFFFI:
-		qprintf(" o 0x%x%08x b 0x%x%08x i 0x%x%08x j %d\n",
-			(__psint_t)ktep->val[5],
-			(__psint_t)ktep->val[6],
-			(__psint_t)ktep->val[7],
-			(__psint_t)ktep->val[8],
-			(__psint_t)ktep->val[9],
-			(__psint_t)ktep->val[10],
-			(__psint_t)ktep->val[11]);
+		qprintf(" o 0x%x%08x b 0x%x%08x i 0x%x%08x j %ld\n",
+			(unsigned int)(long)ktep->val[5],
+			(unsigned int)(long)ktep->val[6],
+			(unsigned int)(long)ktep->val[7],
+			(unsigned int)(long)ktep->val[8],
+			(unsigned int)(long)ktep->val[9],
+			(unsigned int)(long)ktep->val[10],
+			(long)ktep->val[11]);
 		break;
 	case XFS_BMBT_KTRACE_ARGI:
-		qprintf(" i 0x%x\n",
-			(__psint_t)ktep->val[5]);
+		qprintf(" i 0x%lx\n",
+			(long)ktep->val[5]);
 		break;
 	case XFS_BMBT_KTRACE_ARGIFK:
-		qprintf(" i 0x%x f 0x%x%08x o 0x%x%08x\n",
-			(__psint_t)ktep->val[5],
-			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7],
-			(__psint_t)ktep->val[8], (__psint_t)ktep->val[9]);
+		qprintf(" i 0x%lx f 0x%x%08x o 0x%x%08x\n",
+			(long)ktep->val[5],
+			(unsigned int)(long)ktep->val[6],
+			(unsigned int)(long)ktep->val[7],
+			(unsigned int)(long)ktep->val[8],
+			(unsigned int)(long)ktep->val[9]);
 		break;
 	case XFS_BMBT_KTRACE_ARGIFR:
-		qprintf(" i 0x%x f 0x%x%08x ",
-			(__psint_t)ktep->val[5],
-			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7]);
+		qprintf(" i 0x%lx f 0x%x%08x ",
+			(long)ktep->val[5],
+			(unsigned int)(long)ktep->val[6],
+			(unsigned int)(long)ktep->val[7]);
 		s.br_startoff = (xfs_fileoff_t)
 			(((xfs_dfiloff_t)(unsigned long)ktep->val[8] << 32) |
 				(xfs_dfiloff_t)(unsigned long)ktep->val[9]);
@@ -3402,15 +3408,16 @@ xfs_bmbt_trace_entry(
 		xfsidbg_xbirec(&s);
 		break;
 	case XFS_BMBT_KTRACE_ARGIK:
-		qprintf(" i 0x%x o 0x%x%08x\n",
-			(__psint_t)ktep->val[5],
-			(__psint_t)ktep->val[6], (__psint_t)ktep->val[7]);
+		qprintf(" i 0x%lx o 0x%x%08x\n",
+			(long)ktep->val[5],
+			(unsigned int)(long)ktep->val[6],
+			(unsigned int)(long)ktep->val[7]);
 		break;
 	case XFS_BMBT_KTRACE_CUR:
-		qprintf(" nlevels %d flags %d allocated %d ",
-			((__psint_t)ktep->val[5] >> 24) & 0xff,
-			((__psint_t)ktep->val[5] >> 16) & 0xff,
-			(__psint_t)ktep->val[5] & 0xffff);
+		qprintf(" nlevels %ld flags %ld allocated %ld ",
+			((long)ktep->val[5] >> 24) & 0xff,
+			((long)ktep->val[5] >> 16) & 0xff,
+			(long)ktep->val[5] & 0xffff);
 		r.l0 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[6];
 		r.l1 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[7];
 		r.l2 = (xfs_bmbt_rec_base_t)(unsigned long)ktep->val[8];
@@ -3421,11 +3428,11 @@ xfs_bmbt_trace_entry(
 			(xfs_buf_t *)ktep->val[11],
 			(xfs_buf_t *)ktep->val[12],
 			(xfs_buf_t *)ktep->val[13]);
-		qprintf("ptrs %d %d %d %d\n",
-			(__psint_t)ktep->val[14] >> 16,
-			(__psint_t)ktep->val[14] & 0xffff,
-			(__psint_t)ktep->val[15] >> 16,
-			(__psint_t)ktep->val[15] & 0xffff);
+		qprintf("ptrs %ld %ld %ld %ld\n",
+			(long)ktep->val[14] >> 16,
+			(long)ktep->val[14] & 0xffff,
+			(long)ktep->val[15] >> 16,
+			(long)ktep->val[15] & 0xffff);
 		break;
 	default:
 		qprintf("unknown bmbt trace record\n");
@@ -3668,8 +3675,8 @@ xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 static void
 xfs_ctrunc_trace_entry(ktrace_entry_t	*ktep)
 {
-	qprintf("ip 0x%p cpu %d\n",
-		(xfs_inode_t *)(unsigned long)ktep->val[1], (int)ktep->val[2]);
+	qprintf("ip 0x%p cpu %ld\n",
+		(xfs_inode_t *)(unsigned long)ktep->val[1], (long)ktep->val[2]);
 }
 #endif
 
@@ -3715,45 +3722,45 @@ xfs_dir_trace_entry(ktrace_entry_t *ktep)
 	cookie = (__psunsigned_t)ktep->val[4];
 	cookie <<= 32;
 	cookie |= (__psunsigned_t)ktep->val[5];
-	qprintf("%s -- dp=0x%p b/e/h=%d/%d/0x%08x resid=0x%x ",
+	qprintf("%s -- dp=0x%p b/e/h=%ld/%ld/0x%08lx resid=0x%lx ",
 		    (char *)ktep->val[1],
-		    (xfs_inode_t *)(unsigned long)ktep->val[2],
-		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
-		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
-		    (__psunsigned_t)XFS_DA_COOKIE_HASH(mp, cookie),
-		    (__psint_t)ktep->val[6]);
+		    (xfs_inode_t *)ktep->val[2],
+		    (long)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (long)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		    (unsigned long)XFS_DA_COOKIE_HASH(mp, cookie),
+		    (long)ktep->val[6]);
 
 	switch ((__psint_t)ktep->val[0]) {
 	case XFS_DIR_KTRACE_G_DU:
 		break;
 	case XFS_DIR_KTRACE_G_DUB:
-		qprintf("bno=%d", (__psint_t)ktep->val[7]);
+		qprintf("bno=%ld", (long)ktep->val[7]);
 		break;
 	case XFS_DIR_KTRACE_G_DUN:
-		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
-			      (__psint_t)ktep->val[7],
-			      (__psint_t)ktep->val[8],
-			      (__psunsigned_t)ktep->val[9],
-			      (__psunsigned_t)ktep->val[10]);
+		qprintf("forw=%ld, cnt=%ld, 0x%08lx - 0x%08lx",
+			      (long)ktep->val[7],
+			      (long)ktep->val[8],
+			      (unsigned long)ktep->val[9],
+			      (unsigned long)ktep->val[10]);
 		break;
 	case XFS_DIR_KTRACE_G_DUL:
-		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
-			      (__psint_t)ktep->val[7],
-			      (__psint_t)ktep->val[8],
-			      (__psunsigned_t)ktep->val[9],
-			      (__psunsigned_t)ktep->val[10]);
+		qprintf("forw=%ld, cnt=%ld, 0x%08lx - 0x%08lx",
+			      (long)ktep->val[7],
+			      (long)ktep->val[8],
+			      (unsigned long)ktep->val[9],
+			      (unsigned long)ktep->val[10]);
 		break;
 	case XFS_DIR_KTRACE_G_DUE:
-		qprintf("entry hashval 0x%08x", (__psunsigned_t)ktep->val[7]);
+		qprintf("entry hashval 0x%08lx", (unsigned long)ktep->val[7]);
 		break;
 	case XFS_DIR_KTRACE_G_DUC:
 		cookie = (__psunsigned_t)ktep->val[7];
 		cookie <<= 32;
 		cookie |= (__psunsigned_t)ktep->val[8];
 		hash = XFS_DA_COOKIE_HASH(mp, cookie);
-		qprintf("b/e/h=%d/%d/0x%08x",
-		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
-		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		qprintf("b/e/h=%ld/%ld/0x%08x",
+		    (long)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (long)XFS_DA_COOKIE_ENTRY(mp, cookie),
 		    hash);
 		break;
 	default:
@@ -3782,7 +3789,7 @@ xfs_dir2_trace_entry(ktrace_entry_t *ktep)
 	len = min((__psint_t)ktep->val[9], (__psint_t)sizeof(ktep->val[10])*6);
 	for (i = 0; i < len; i++)
 		qprintf("%c", cp[i]);
-	qprintf("'(%d)", (__psint_t)ktep->val[9]);
+	qprintf("'(%ld)", (long)ktep->val[9]);
 	if ((__psunsigned_t)ktep->val[0] != XFS_DIR2_KTRACE_ARGS_BIBII)
 		qprintf(" hashval 0x%llx inumber %lld dp 0x%p tp 0x%p check %d",
 			(__uint64_t)(unsigned long)ktep->val[2],
@@ -3811,7 +3818,7 @@ xfs_dir2_trace_entry(ktrace_entry_t *ktep)
 			ktep->val[8]);
 		break;
 	case XFS_DIR2_KTRACE_ARGS_I:
-		qprintf(" i 0x%llx", (xfs_ino_t)(unsigned long)ktep->val[7]);
+		qprintf(" i 0x%llx", (unsigned long long)ktep->val[7]);
 		break;
 	case XFS_DIR2_KTRACE_ARGS_S:
 		qprintf(" s 0x%x", (int)(__psint_t)ktep->val[7]);
@@ -4134,15 +4141,21 @@ xfs_iomap_enter_trace_entry(ktrace_entry_t *ktep)
 {
 	qprintf("ip 0x%p size 0x%x%x offset 0x%x%x count 0x%x\n",
 		ktep->val[1],
-		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
-		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
-		(unsigned int)ktep->val[6]);
+		(unsigned int)(long)ktep->val[2],
+		(unsigned int)(long)ktep->val[3],
+		(unsigned int)(long)ktep->val[4],
+		(unsigned int)(long)ktep->val[5],
+		(unsigned int)(long)ktep->val[6]);
 	qprintf("next offset 0x%x%x io offset 0x%x%x\n",
-		(unsigned int)ktep->val[7], (unsigned int)ktep->val[8],
-		(unsigned int)ktep->val[9], (unsigned int)ktep->val[10]);
+		(unsigned int)(long)ktep->val[7],
+		(unsigned int)(long)ktep->val[8],
+		(unsigned int)(long)ktep->val[9],
+		(unsigned int)(long)ktep->val[10]);
 	qprintf("io size 0x%x last req sz 0x%x new size 0x%x%x\n",
-		(unsigned int)ktep->val[11], (unsigned int)ktep->val[12],
-		(unsigned int)ktep->val[13], (unsigned int)ktep->val[14]);
+		(unsigned int)(long)ktep->val[11],
+		(unsigned int)(long)ktep->val[12],
+		(unsigned int)(long)ktep->val[13],
+		(unsigned int)(long)ktep->val[14]);
 }
 
 /*
@@ -4153,16 +4166,22 @@ xfs_iomap_map_trace_entry(ktrace_entry_t *ktep)
 {
 	qprintf("ip 0x%p size 0x%x%x offset 0x%x%x count 0x%x\n",
 		ktep->val[1],
-		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
-		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
-		(unsigned int)ktep->val[6]);
+		(unsigned int)(long)ktep->val[2],
+		(unsigned int)(long)ktep->val[3],
+		(unsigned int)(long)ktep->val[4],
+		(unsigned int)(long)ktep->val[5],
+		(unsigned int)(long)ktep->val[6]);
 	qprintf("bmap off 0x%x%x len 0x%x pboff 0x%x pbsize 0x%x bno 0x%x\n",
-		(unsigned int)ktep->val[7], (unsigned int)ktep->val[8],
-		(unsigned int)ktep->val[9], (unsigned int)ktep->val[10],
-		(unsigned int)ktep->val[11], (unsigned int)ktep->val[12]);
+		(unsigned int)(long)ktep->val[7],
+		(unsigned int)(long)ktep->val[8],
+		(unsigned int)(long)ktep->val[9],
+		(unsigned int)(long)ktep->val[10],
+		(unsigned int)(long)ktep->val[11],
+		(unsigned int)(long)ktep->val[12]);
 	qprintf("imap off 0x%x count 0x%x block 0x%x\n",
-		(unsigned int)ktep->val[13], (unsigned int)ktep->val[14],
-		(unsigned int)ktep->val[15]);
+		(unsigned int)(long)ktep->val[13],
+		(unsigned int)(long)ktep->val[14],
+		(unsigned int)(long)ktep->val[15]);
 }
 
 /*
@@ -4171,15 +4190,19 @@ xfs_iomap_map_trace_entry(ktrace_entry_t *ktep)
 static void
 xfs_itrunc_trace_entry(ktrace_entry_t   *ktep)
 {
-	qprintf("ip 0x%p size 0x%x%x flag %d new size 0x%x%x\n",
+	qprintf("ip 0x%p size 0x%x%x flag %ld new size 0x%x%x\n",
 		ktep->val[1],
-		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
-		(int)ktep->val[4],
-		(unsigned int)ktep->val[5], (unsigned int)ktep->val[6]);
-	qprintf("toss start 0x%x%x toss finish 0x%x%x cpu id %d\n",
-		(unsigned int)ktep->val[7], (unsigned int)ktep->val[8],
-		(unsigned int)ktep->val[9], (unsigned int)ktep->val[10],
-		(int)ktep->val[11]);
+		(unsigned int)(long)ktep->val[2],
+		(unsigned int)(long)ktep->val[3],
+		(long)ktep->val[4],
+		(unsigned int)(long)ktep->val[5],
+		(unsigned int)(long)ktep->val[6]);
+	qprintf("toss start 0x%x%x toss finish 0x%x%x cpu id %ld\n",
+		(unsigned int)(long)ktep->val[7],
+		(unsigned int)(long)ktep->val[8],
+		(unsigned int)(long)ktep->val[9],
+		(unsigned int)(long)ktep->val[10],
+		(long)ktep->val[11]);
 }
 
 /*
@@ -4200,11 +4223,14 @@ xfs_bunmap_trace_entry(ktrace_entry_t   *ktep)
 		0
 	};
 
-	qprintf("ip 0x%p size 0x%x%x bno 0x%x%x len 0x%x cpu id %d\n",
+	qprintf("ip 0x%p size 0x%x%x bno 0x%x%x len 0x%x cpu id %ld\n",
 		ktep->val[1],
-		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
-		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
-		(unsigned int)ktep->val[6], (int)ktep->val[8]);
+		(unsigned int)(long)ktep->val[2],
+		(unsigned int)(long)ktep->val[3],
+		(unsigned int)(long)ktep->val[4],
+		(unsigned int)(long)ktep->val[5],
+		(unsigned int)(long)ktep->val[6],
+		(long)ktep->val[8]);
 	qprintf("ra 0x%p ", ktep->val[9]);
 	printflags((__psint_t)ktep->val[7], bunmapi_flags, "flags");
 	qprintf("\n");
@@ -4218,10 +4244,14 @@ xfs_inval_cached_trace_entry(ktrace_entry_t     *ktep)
 {
 	qprintf("ip 0x%p offset 0x%x%x len 0x%x%x first 0x%x%x last 0x%x%x\n",
 		ktep->val[1],
-		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
-		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
-		(unsigned int)ktep->val[6], (unsigned int)ktep->val[7],
-		(unsigned int)ktep->val[8], (unsigned int)ktep->val[9]);
+		(unsigned int)(long)ktep->val[2],
+		(unsigned int)(long)ktep->val[3],
+		(unsigned int)(long)ktep->val[4],
+		(unsigned int)(long)ktep->val[5],
+		(unsigned int)(long)ktep->val[6],
+		(unsigned int)(long)ktep->val[7],
+		(unsigned int)(long)ktep->val[8],
+		(unsigned int)(long)ktep->val[9]);
 }
 #endif
 
@@ -4304,16 +4334,22 @@ xfs_rw_enter_trace_entry(ktrace_entry_t *ktep)
 {
 	qprintf("ip 0x%p size 0x%x%x uio offset 0x%x%x uio count 0x%x\n",
 		ktep->val[1],
-		(unsigned int)ktep->val[2], (unsigned int)ktep->val[3],
-		(unsigned int)ktep->val[4], (unsigned int)ktep->val[5],
-		(unsigned int)ktep->val[6]);
+		(unsigned int)(long)ktep->val[2],
+		(unsigned int)(long)ktep->val[3],
+		(unsigned int)(long)ktep->val[4],
+		(unsigned int)(long)ktep->val[5],
+		(unsigned int)(long)ktep->val[6]);
 	qprintf("ioflags 0x%x next offset 0x%x%x io offset 0x%x%x\n",
-		(unsigned int)ktep->val[7],
-		(unsigned int)ktep->val[8], (unsigned int)ktep->val[9],
-		(unsigned int)ktep->val[10], (unsigned int)ktep->val[11]);
+		(unsigned int)(long)ktep->val[7],
+		(unsigned int)(long)ktep->val[8],
+		(unsigned int)(long)ktep->val[9],
+		(unsigned int)(long)ktep->val[10],
+		(unsigned int)(long)ktep->val[11]);
 	qprintf("io size 0x%x last req sz 0x%x new size 0x%x%x\n",
-		(unsigned int)ktep->val[12], (unsigned int)ktep->val[13],
-		(unsigned int)ktep->val[14], (unsigned int)ktep->val[15]);
+		(unsigned int)(long)ktep->val[12],
+		(unsigned int)(long)ktep->val[13],
+		(unsigned int)(long)ktep->val[14],
+		(unsigned int)(long)ktep->val[15]);
 }
 
 /*
@@ -4942,9 +4978,10 @@ xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 			(char *)ktep->val[0], ktep->val[1]);
 		printflags((__psint_t)(ktep->val[2]), xbli_flags, "xbli");
 		qprintf("\n");
-		qprintf("recur %d refcount %d blkno 0x%x bcount 0x%x\n",
-			(int)ktep->val[3], (int)ktep->val[4],
-			(unsigned int)ktep->val[5], (unsigned int)ktep->val[6]);
+		qprintf("recur %ld refcount %ld blkno 0x%lx bcount 0x%lx\n",
+			(long)ktep->val[3], (long)ktep->val[4],
+			(unsigned long)ktep->val[5],
+			(unsigned long)ktep->val[6]);
 		flags = (((uint64_t)(unsigned long)ktep->val[7] << 32) &
 					0xFFFFFFFF00000000ULL) |
 			(((uint64_t)(unsigned long)ktep->val[8]) &
@@ -4952,11 +4989,11 @@ xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 		qprintf("bp flags ");
 		printflags(flags, pb_flag_vals, 0);
 		qprintf("\n");
-		qprintf("fspriv 0x%x fspriv2 0x%x pincount %d iodone 0x%x\n",
-			(unsigned int)ktep->val[9], (unsigned int)ktep->val[10],
-			(int)ktep->val[11], (unsigned int)ktep->val[12]);
-		qprintf("lockval %d lid 0x%x log item flags ",
-			(int)ktep->val[13], (unsigned int)ktep->val[14]);
+		qprintf("fspriv 0x%p fspriv2 0x%p pincount %ld iodone 0x%p\n",
+			ktep->val[9], ktep->val[10],
+			(long)ktep->val[11], ktep->val[12]);
+		qprintf("lockval %ld lid 0x%lx log item flags ",
+			(long)ktep->val[13], (unsigned long)ktep->val[14]);
 		printflags((__psint_t)(ktep->val[15]), xli_flags, "xli");
 		qprintf("\n");
 
@@ -5457,38 +5494,38 @@ xfsidbg_xilock_trace_entry(ktrace_entry_t *ktep)
 			 qprintf("LOCK SHARED\n");
 		else if ((__psint_t)ktep->val[1] == 3)
 			 qprintf("UNLOCK\n");
-		qprintf("ip 0x%p %llx %d\n",
+		qprintf("ip 0x%p %llx %ld\n",
 			ktep->val[0],
-			(xfs_ino_t)((xfs_inode_t *)ktep->val[0])->i_ino,
-			(__psint_t)ktep->val[6]);
+			(unsigned long long)((xfs_inode_t*)ktep->val[0])->i_ino,
+			(long)ktep->val[6]);
 		qprintf("raddr 0x%p\n", ktep->val[3]);
-		qprintf("  Pid %d, cpu %d\n",
-			 (__psint_t)ktep->val[5],
-			 (__psint_t)ktep->val[4]);
+		qprintf("  Pid %ld, cpu %ld\n",
+			 (long)ktep->val[5],
+			 (long)ktep->val[4]);
 		qprintf("-----------------------\n");
 
 	} else if ((__psint_t)ktep->val[7] == 1) {
 		if ((__psint_t)ktep->val[1] == 1)
 			qprintf("FlushLOCK ");
 		else if ((__psint_t)ktep->val[1] == 2)
-			qprintf("FlushTRYLOCK %d ",
-				(__psint_t)ktep->val[2]);
+			qprintf("FlushTRYLOCK %ld ",
+				(long)ktep->val[2]);
 		else if ((__psint_t)ktep->val[1] == 3)
 			qprintf("FlushUNLOCK ");
 		else if ((__psint_t)ktep->val[1] == 4)
-			qprintf("FlushInode 0x%x",
-				(__psint_t)ktep->val[2]);
+			qprintf("FlushInode 0x%p",
+				ktep->val[2]);
 		else if ((__psint_t)ktep->val[1] == 5)
 			qprintf("FlushInodeInt ");
 		else     qprintf("FlushUNKNOWN ");
-		qprintf("ip 0x%x ino %llx @ %d\n",
-			(__psint_t)ktep->val[0],
-			(xfs_ino_t)((xfs_inode_t *)ktep->val[0])->i_ino,
-			(__psint_t)ktep->val[6]);
+		qprintf("ip 0x%p ino %llx @ %ld\n",
+			ktep->val[0],
+			(unsigned long long)((xfs_inode_t*)ktep->val[0])->i_ino,
+			(long)ktep->val[6]);
 		qprintf("raddr 0x%p\n", ktep->val[3]);
-		qprintf("  Pid %d, cpu %d\n",
-			(__psint_t)ktep->val[5],
-			(__psint_t)ktep->val[4]);
+		qprintf("  Pid %ld, cpu %ld\n",
+			(long)ktep->val[5],
+			(long)ktep->val[4]);
 		qprintf("-----------------------\n");
 	}
 }
@@ -5523,32 +5560,32 @@ xfsidbg_xilock_trace(xfs_inode_t *ip)
 				 qprintf("LOCK SHARED\n");
 			 else if ((__psint_t)ktep->val[1] == 3)
 				 qprintf("UNLOCK\n");
-			qprintf("ip 0x%p %lld %d\n",
+			qprintf("ip 0x%p %lld %ld\n",
 				ktep->val[0], (unsigned long long)
 				((xfs_inode_t*)ktep->val[0])->i_ino,
-				(__psint_t)ktep->val[6]);
+				(long)ktep->val[6]);
 			 qprintf("raddr 0x%p\n", ktep->val[3]);
-			 qprintf("  Pid %d, cpu %d\n",
-				 (__psint_t)ktep->val[5],
-				 (__psint_t)ktep->val[4]);
+			 qprintf("  Pid %ld, cpu %ld\n",
+				 (long)ktep->val[5],
+				 (long)ktep->val[4]);
 			 qprintf("-----------------------\n");
 		 } else if ((__psint_t)ktep->val[7] == 1) {
 			if ((__psint_t)ktep->val[1] == 1)
 				qprintf("LOCK ");
 			else if ((__psint_t)ktep->val[1] == 2)
-				qprintf("TRYLOCK %d ",
-					(__psint_t)ktep->val[2]);
+				qprintf("TRYLOCK %ld ",
+					(long)ktep->val[2]);
 			else if ((__psint_t)ktep->val[1] == 3)
 				qprintf("UNLOCK ");
 			else     qprintf("UNKNOWN ");
-			qprintf("ip 0x%p %lld %d\n",
+			qprintf("ip 0x%p %lld %ld\n",
 				ktep->val[0], (unsigned long long)
 				((xfs_inode_t*)ktep->val[0])->i_ino,
-				(__psint_t)ktep->val[6]);
+				(long)ktep->val[6]);
 			qprintf("raddr 0x%p\n", ktep->val[3]);
-			qprintf("  Pid %d, cpu %d\n",
-				(__psint_t)ktep->val[5],
-				(__psint_t)ktep->val[4]);
+			qprintf("  Pid %ld, cpu %ld\n",
+				(long)ktep->val[5],
+				(long)ktep->val[4]);
 			qprintf("-----------------------\n");
 		 }
 
@@ -6431,12 +6468,12 @@ xfsidbg_xlog_granttrace(xlog_t *log)
 		qprintf("%s\n", (char *)ktep->val[11]);
 		qprintf("  tic:0x%p resQ:0x%p wrQ:0x%p ",
 			ktep->val[0], ktep->val[1], ktep->val[2]);
-		qprintf("  GrResC:%d GrResB:%d GrWrC:%d GrWrB:%d \n",
-			(int)ktep->val[3], (int)ktep->val[4],
-			(int)ktep->val[5], (int)ktep->val[6]);
-		qprintf("  HeadC:%d HeadB:%d TailC:%d TailB:%d\n",
-			(int)ktep->val[7], (int)ktep->val[8],
-			(int)ktep->val[9], (int)ktep->val[10]);
+		qprintf("  GrResC:%ld GrResB:%ld GrWrC:%ld GrWrB:%ld \n",
+			(long)ktep->val[3], (long)ktep->val[4],
+			(long)ktep->val[5], (long)ktep->val[6]);
+		qprintf("  HeadC:%ld HeadB:%ld TailC:%ld TailB:%ld\n",
+			(long)ktep->val[7], (long)ktep->val[8],
+			(long)ktep->val[9], (long)ktep->val[10]);
 		ktep = ktrace_next(kt, &kts);
 	}
 }       /* xfsidbg_xlog_granttrace */
@@ -7312,28 +7349,28 @@ xfsidbg_xqm_pr_dqentry(ktrace_entry_t *ktep)
 		return 0;
 	switch ((__psint_t)ktep->val[0]) {
 	      case DQUOT_KTRACE_ENTRY:
-		qprintf("[%d] %s\t",
-			(__psint_t)ktep->val[12], /* pid */
+		qprintf("[%ld] %s\t",
+			(long)ktep->val[12], /* pid */
 			(char *)ktep->val[1]);
 		printflags((__psint_t)ktep->val[3], xdq_flags,"flgs ");
-		qprintf("\nnrefs = %d, "
+		qprintf("\nnrefs = %u, "
 			"flags = 0x%x, "
 			"id = %d, "
 			"res_bc = 0x%x\n"
 			"bcnt = 0x%x [0x%x | 0x%x], "
 			"icnt = 0x%x [0x%x | 0x%x]\n"
 			"@ %ld\n",
-			(__psint_t)ktep->val[2], /* nrefs */
-			(__psint_t)ktep->val[3], /* flags */
-			(__psint_t)ktep->val[11], /* ID */
-			(__psint_t)ktep->val[4], /* res_bc */
-			(__psint_t)ktep->val[5], /* bcnt */
-			(__psint_t)ktep->val[8], /* bsoft */
-			(__psint_t)ktep->val[7], /* bhard */
-			(__psint_t)ktep->val[6], /* icnt */
-			(__psint_t)ktep->val[10], /* isoft */
-			(__psint_t)ktep->val[9], /* ihard */
-			(long) ((__psint_t)ktep->val[13]) /* time */
+			(unsigned int)(long)ktep->val[2], /* nrefs */
+			(unsigned int)(long)ktep->val[3], /* flags */
+			(unsigned int)(long)ktep->val[11], /* ID */
+			(unsigned int)(long)ktep->val[4], /* res_bc */
+			(unsigned int)(long)ktep->val[5], /* bcnt */
+			(unsigned int)(long)ktep->val[8], /* bsoft */
+			(unsigned int)(long)ktep->val[7], /* bhard */
+			(unsigned int)(long)ktep->val[6], /* icnt */
+			(unsigned int)(long)ktep->val[10], /* isoft */
+			(unsigned int)(long)ktep->val[9], /* ihard */
+			(long) ktep->val[13] /* time */
 			);
 		break;
 
