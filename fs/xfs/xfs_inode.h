@@ -15,6 +15,7 @@ struct xfs_inode_log_item;
 struct xfs_mount;
 struct xfs_trans;
 struct zone;
+struct xfs_ext_attr;
 
 /*
  * This is the type used in the xfs inode hash table.
@@ -147,6 +148,7 @@ typedef struct xfs_inode {
 	int			i_queued_bufs;	/* count of xfsd queued bufs*/
 	unsigned int		i_gen;		/* generation count */
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
+	struct xfs_ext_attr	*i_ext_attr;	/* Critical ext attributes */
 
 	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
 
