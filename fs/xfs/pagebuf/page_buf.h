@@ -340,6 +340,7 @@ extern void pagebuf_trace(
 # define pagebuf_trace(pb, id, ptr, ra)	do { } while (0)
 #endif
 
+#define pagebuf_target_name(target)	bdevname((target)->pbr_kdev)
 
 /*
  * Kernel version compatibility macros
