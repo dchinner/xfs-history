@@ -129,6 +129,8 @@ xfs_trans_dup(xfs_trans_t *tp)
 	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
 	ntp->t_ticket = tp->t_ticket;
 	ntp->t_log_res = tp->t_log_res;
+	ntp->t_blk_res = tp->t_blk_res - tp->t_blk_res_used;
+	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 
 	return ntp;
 }
@@ -141,7 +143,8 @@ xfs_trans_dup(xfs_trans_t *tp)
  * This will return ENOSPC if there are not enough blocks available.
  * It will sleep waiting for available log space.
  * The only valid value for the flags parameter is XFS_RES_LOG_PERM, which
- * is used by long running transactions.
+ * is used by long running transactions.  If any one of the reservations
+ * fails then they will all be backed out.
  */
 int
 xfs_trans_reserve(xfs_trans_t	*tp,
@@ -150,18 +153,19 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		  uint		rtextents,
 		  uint		flags)
 {
-	int	status;
 	int	log_flags;
+	int	error;
 
+	error = 0;
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
 	 * the number needed from the number available.  This will
 	 * fail if the count would go below zero.
 	 */
 	if (blocks > 0) {
-		status = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
-					   -blocks);
-		if (status != 0) {
+		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
+					  -blocks);
+		if (error != 0) {
 			return (ENOSPC);
 		}
 		tp->t_blk_res = blocks;
@@ -179,15 +183,18 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		} else {
 			log_flags = 0;
 		}
-		status = xfs_log_reserve(tp->t_mountp, logspace,
-					 &tp->t_ticket,
-					 XFS_TRANSACTION_MANAGER, log_flags);
+		error = xfs_log_reserve(tp->t_mountp, logspace,
+					&tp->t_ticket,
+					XFS_TRANSACTION_MANAGER, log_flags);
 #ifdef SIM
-		if (status != 0) {
+		if (error != 0) {
 			printf("Log reservation failed\n");
 			abort();
 		}
 #endif
+		if (error) {
+			goto undo_blocks;
+		}
 		tp->t_log_res = logspace;
 	}
 
@@ -197,16 +204,42 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 	 * fail if the count would go below zero.
 	 */
 	if (rtextents > 0) {
-		status = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FREXTENTS,
-					   -rtextents);
-		if (status != 0) {
-			return (ENOSPC);
+		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FREXTENTS,
+					  -rtextents);
+		if (error) {
+			error = ENOSPC;
+			goto undo_log;
 		}
 		tp->t_rtx_res = rtextents;
 	}
 
+	return 0;
 
-	return (0);
+	/*
+	 * Error cases jump to one of these labels to undo any
+	 * reservations which have already been performed.
+	 */
+undo_log:
+	if (logspace > 0) {
+		if (flags & XFS_TRANS_PERM_LOG_RES) {
+			log_flags = XFS_LOG_REL_PERM_RESERV;
+		} else {
+			log_flags = 0;
+		}
+		xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
+		tp->t_ticket = NULL;
+		tp->t_log_res = 0;
+		tp->t_flags &= ~XFS_TRANS_PERM_LOG_RES;
+	}
+
+undo_blocks:
+	if (blocks > 0) {
+		(void) xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
+					 blocks);
+		tp->t_blk_res = 0;
+	}
+
+	return (error);
 }
 
 
