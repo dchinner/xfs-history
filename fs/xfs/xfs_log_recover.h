@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_RECOVER_H
 #define _XFS_LOG_RECOVER_H
 
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
 
 /*
  * Macros, structures, prototypes for internal log manager use.
@@ -39,5 +39,14 @@ typedef struct xlog_recover {
 } xlog_recover_t;
 
 #define ITEM_TYPE(i)	(*(ushort *)(i)->ri_buf[0].i_addr)
+
+/*
+ * This is the number of entries in the l_buf_cancel_table used during
+ * recovery.
+ */
+#define	XLOG_BC_TABLE_SIZE	64
+
+#define	XLOG_RECOVER_PASS1	1
+#define	XLOG_RECOVER_PASS2	2
 
 #endif /* _XFS_LOG_RECOVER_H */

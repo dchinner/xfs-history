@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.38 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1239,6 +1239,175 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 
 
 /*
+ * Build up the table of buf cancel records so that we don't replay
+ * cancelled data in the second pass.  For buffer records that are
+ * not cancel records, there is nothing to do here so we just return.
+ *
+ * If we get a cancel record which is already in the table, this indicates
+ * that the buffer was cancelled multiple times.  In order to ensure
+ * that during pass 2 we keep the record in the table until we reach its
+ * last occurrence in the log, we keep a reference count in the cancel
+ * record in the table to tell us how many times we expect to see this
+ * record during the second pass.
+ */
+STATIC void
+xlog_recover_do_buffer_pass1(xlog_t			*log,
+			     xfs_buf_log_format_t	*buf_f)
+{
+	xfs_buf_cancel_t	*bcp;
+	xfs_buf_cancel_t	*nextp;
+	xfs_buf_cancel_t	*prevp;
+	xfs_buf_cancel_t	**bucket;
+	daddr_t			blkno;
+	uint			len;
+
+	/*
+	 * If this isn't a cancel buffer item, then just return.
+	 */
+	if (!(buf_f->blf_flags & XFS_BLI_CANCEL)) {
+		return;
+	}
+
+	/*
+	 * Insert an xfs_buf_cancel record into the hash table of
+	 * them.  If there is already an identical record, bump
+	 * its reference count.
+	 */
+	blkno = buf_f->blf_blkno;
+	len = buf_f->blf_len;
+	bucket = &(log->l_buf_cancel_table[blkno % XLOG_BC_TABLE_SIZE]);
+	/*
+	 * If the hash bucket is empty then just insert a new record into
+	 * the bucket.
+	 */
+	if (*bucket == NULL) {
+		bcp = (xfs_buf_cancel_t*)kmem_alloc(sizeof(xfs_buf_cancel_t),
+						    KM_SLEEP);
+		bcp->bc_blkno = blkno;
+		bcp->bc_len = len;
+		bcp->bc_refcount = 1;
+		bcp->bc_next = NULL;
+		*bucket = bcp;
+		return;
+	}
+
+	/*
+	 * The hash bucket is not empty, so search for duplicates of our
+	 * record.  If we find one them just bump its refcount.  If not
+	 * then add us at the end of the list.
+	 */
+	prevp = NULL;
+	nextp = *bucket;
+	while (nextp != NULL) {
+		if (nextp->bc_blkno == blkno) {
+			ASSERT(nextp->bc_len == len);
+			nextp->bc_refcount++;
+			return;
+		}
+		prevp = nextp;
+		nextp = nextp->bc_next;
+	}
+	ASSERT(prevp != NULL);
+	bcp = (xfs_buf_cancel_t*)kmem_alloc(sizeof(xfs_buf_cancel_t),
+					    KM_SLEEP);
+	bcp->bc_blkno = blkno;
+	bcp->bc_len = len;
+	bcp->bc_refcount = 1;
+	bcp->bc_next = NULL;
+	prevp->bc_next = bcp;
+
+	return;
+}
+
+/*
+ * Check to see whether the buffer being recovered has a corresponding
+ * entry in the buffer cancel record table.  If it does then return 1
+ * so that it will be cancelled, otherwise return 0.  If the buffer is
+ * actually a buffer cancel item (XFS_BLI_CANCEL is set), then decrement
+ * the refcount on the entry in the table and remove it from the table
+ * if this is the last reference.
+ *
+ * We remove the cancel record from the table when we encounter its
+ * last occurrence in the log so that if the same buffer is re-used
+ * again after its last cancellation we actually replay the changes
+ * made at that point.
+ */
+STATIC int
+xlog_recover_do_buffer_pass2(xlog_t			*log,
+			     xfs_buf_log_format_t	*buf_f)
+{
+	xfs_buf_cancel_t	*bcp;
+	xfs_buf_cancel_t	*prevp;
+	xfs_buf_cancel_t	**bucket;
+	daddr_t			blkno;
+	uint			len;
+
+	if (log->l_buf_cancel_table == NULL) {
+		/*
+		 * There is nothing in the table built in pass one,
+		 * so this buffer must not be cancelled.
+		 */
+		ASSERT(!(buf_f->blf_flags & XFS_BLI_CANCEL));
+		return 0;
+	}
+
+	bucket = &(log->l_buf_cancel_table[buf_f->blf_blkno %
+					   XLOG_BC_TABLE_SIZE]);
+	bcp = *bucket;
+	if (bcp == NULL) {
+		/*
+		 * There is no corresponding entry in the table built
+		 * in pass one, so this buffer has not been cancelled.
+		 */
+		ASSERT(!(buf_f->blf_flags & XFS_BLI_CANCEL));
+		return 0;
+	}
+
+	/*
+	 * Search for an entry in the buffer cancel table that
+	 * matches our buffer.
+	 */
+	blkno = buf_f->blf_blkno;
+	len = buf_f->blf_len;
+	prevp = NULL;
+	while (bcp != NULL) {
+		if (bcp->bc_blkno == blkno) {
+			/*
+			 * We've go a match, so return 1 so that the
+			 * recovery of this buffer is cancelled.
+			 * If this buffer is actually a buffer cancel
+			 * log item, then decrement the refcount on the
+			 * one in the table and remove it if this is the
+			 * last reference.
+			 */
+			ASSERT(bcp->bc_len == len);
+			if (buf_f->blf_flags & XFS_BLI_CANCEL) {
+				bcp->bc_refcount--;
+				if (bcp->bc_refcount == 0) {
+					if (prevp == NULL) {
+						*bucket = bcp->bc_next;
+					} else {
+						prevp->bc_next = bcp->bc_next;
+					}
+					kmem_free(bcp,
+						  sizeof(xfs_buf_cancel_t));
+				}
+			}
+			return 1;
+		}
+		prevp = bcp;
+		bcp = bcp->bc_next;
+	}
+	/*
+	 * We didn't find a corresponding entry in the table, so
+	 * return 0 so that the buffer is NOT cancelled.
+	 */
+	ASSERT(!(buf_f->blf_flags & XFS_BLI_CANCEL));
+	return 0;
+}
+
+
+/*
  * Perform recovery for a buffer full of inodes.  In these buffers,
  * the only data which should be recovered is that which corresponds
  * to the di_next_unlinked pointers in the on disk inode structures.
@@ -1384,18 +1553,63 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 	}
 }	/* xlog_recover_do_reg_buffer */
 
-
+/*
+ * This routine replays a modification made to a buffer at runtime.
+ * There are actually two types of buffer, regular and inode, which
+ * are handled differently.  Inode buffers are handled differently
+ * in that we only recover a specific set of data from them, namely
+ * the inode di_next_unlinked fields.  This is because all other inode
+ * data is actually logged via inode records and any data we replay
+ * here which overlaps that may be stale.
+ *
+ * When meta-data buffers are freed at run time we log a buffer item
+ * with the XFS_BLI_CANCEL bit set to indicate that previous copies
+ * of the buffer in the log should not be replayed at recovery time.
+ * This is so that if the blocks covered by the buffer are reused for
+ * file data before we crash we don't end up replaying old, freed
+ * meta-data into a user's file.
+ *
+ * To handle the cancellation of buffer log items, we make two passes
+ * over the log during recovery.  During the first we build a table of
+ * those buffers which have been cancelled, and during the second we
+ * only replay those buffers which do not have corresponding cancel
+ * records in the table.  See xlog_recover_do_buffer_pass[1,2] above
+ * for more details on the implementation of the table of cancel records.
+ */
 STATIC int
 xlog_recover_do_buffer_trans(xlog_t		 *log,
-			     xlog_recover_item_t *item)
+			     xlog_recover_item_t *item,
+			     int		 pass)
 {
 	xfs_buf_log_format_t *buf_f;
 	xfs_mount_t	     *mp;
 	buf_t		     *bp;
 	int		     error, nbits, bit = 0;
+	int		     cancel;
 	int		     i = 1;	/* 0 is format structure */
 
 	buf_f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
+
+	if (pass == XLOG_RECOVER_PASS1) {
+		/*
+		 * In this pass we're only looking for buf items
+		 * with the XFS_BLI_CANCEL bit set.
+		 */
+		xlog_recover_do_buffer_pass1(log, buf_f);
+		return 0;
+	} else {
+		/*
+		 * In this pass we want to recover all the buffers
+		 * which have not been cancelled and are not
+		 * cancellation buffers themselves.  The routine
+		 * we call here will tell us whether or not to
+		 * continue with the replay of this buffer.
+		 */
+		cancel = xlog_recover_do_buffer_pass2(log, buf_f);
+		if (cancel) {
+			return 0;
+		}
+	}
 	mp = log->l_mp;
 	bp = bread(mp->m_dev, buf_f->blf_blkno, buf_f->blf_len);
 	if (bp->b_flags & B_ERROR) {
@@ -1431,7 +1645,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 
 STATIC int
 xlog_recover_do_inode_trans(xlog_t		*log,
-			    xlog_recover_item_t *item)
+			    xlog_recover_item_t *item,
+			    int			pass)
 {
 	xfs_inode_log_format_t	*in_f;
 	xfs_mount_t		*mp;
@@ -1441,6 +1656,10 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	int			len;
 	caddr_t			src;
 	int			error;
+
+	if (pass == XLOG_RECOVER_PASS1) {
+		return 0;
+	}
 
 	in_f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
 	mp = log->l_mp;
@@ -1520,12 +1739,17 @@ write_inode_buffer:
 STATIC void
 xlog_recover_do_efi_trans(xlog_t		*log,
 			  xlog_recover_item_t	*item,
-			  xfs_lsn_t		lsn)	  
+			  xfs_lsn_t		lsn,
+			  int			pass)	  
 {
 	xfs_mount_t		*mp;
 	xfs_efi_log_item_t	*efip;
 	xfs_efi_log_format_t	*efi_formatp;
 	int			spl;
+
+	if (pass == XLOG_RECOVER_PASS1) {
+		return;
+	}
 
 	efi_formatp = (xfs_efi_log_format_t *)item->ri_buf[0].i_addr;
 	ASSERT(item->ri_buf[0].i_len ==
@@ -1555,7 +1779,8 @@ xlog_recover_do_efi_trans(xlog_t		*log,
  */
 STATIC void
 xlog_recover_do_efd_trans(xlog_t		*log,
-			  xlog_recover_item_t	*item)
+			  xlog_recover_item_t	*item,
+			  int			pass)
 {
 	xfs_mount_t		*mp;
 	xfs_efd_log_format_t	*efd_formatp;
@@ -1564,6 +1789,10 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 	int			spl;
 	int			gen;
 	__uint64_t		efi_id;
+
+	if (pass == XLOG_RECOVER_PASS1) {
+		return;
+	}
 
 	efd_formatp = (xfs_efd_log_format_t *)item->ri_buf[0].i_addr;
 	ASSERT(item->ri_buf[0].i_len ==
@@ -1610,7 +1839,8 @@ xlog_recover_do_efd_trans(xlog_t		*log,
  */
 STATIC int
 xlog_recover_do_trans(xlog_t	     *log,
-		      xlog_recover_t *trans)
+		      xlog_recover_t *trans,
+		      int	     pass)
 {
 	xlog_recover_item_t *item, *first_item;
 	int		    error = 0;
@@ -1624,15 +1854,18 @@ xlog_recover_do_trans(xlog_t	     *log,
 	first_item = item = trans->r_itemq;
 	do {
 		if (ITEM_TYPE(item) == XFS_LI_BUF) {
-			if (error = xlog_recover_do_buffer_trans(log, item))
+			if (error = xlog_recover_do_buffer_trans(log, item,
+								 pass))
 				break;
 		} else if (ITEM_TYPE(item) == XFS_LI_INODE) {
-			if (error = xlog_recover_do_inode_trans(log, item))
+			if (error = xlog_recover_do_inode_trans(log, item,
+								pass))
 				break;
 		} else if (ITEM_TYPE(item) == XFS_LI_EFI) {
-			xlog_recover_do_efi_trans(log, item, trans->r_lsn);
+			xlog_recover_do_efi_trans(log, item, trans->r_lsn,
+						  pass);
 		} else if (ITEM_TYPE(item) == XFS_LI_EFD) {
-			xlog_recover_do_efd_trans(log, item);
+			xlog_recover_do_efd_trans(log, item, pass);
 		} else {
 			xlog_warn("xFS: xlog_recover_do_buffer_inode_trans");
 			ASSERT(0);
@@ -1678,13 +1911,14 @@ xlog_recover_free_trans(xlog_recover_t      *trans)
 STATIC int
 xlog_recover_commit_trans(xlog_t	 *log,
 			  xlog_recover_t **q,
-			  xlog_recover_t *trans)
+			  xlog_recover_t *trans,
+			  int		 pass)
 {
 	int error;
 
 	if (error = xlog_recover_unlink_tid(q, trans))
 		return error;
-	if (error = xlog_recover_do_trans(log, trans))
+	if (error = xlog_recover_do_trans(log, trans, pass))
 		return error;
 	xlog_recover_free_trans(trans);			/* no error */
 	return 0;
@@ -1712,7 +1946,8 @@ STATIC int
 xlog_recover_process_data(xlog_t	    *log,
 			  xlog_recover_t    *rhash[],
 			  xlog_rec_header_t *rhead,
-			  caddr_t	    dp)
+			  caddr_t	    dp,
+			  int		    pass)
 {
     caddr_t		lp	   = dp+rhead->h_len;
     int			num_logops = rhead->h_num_logops;
@@ -1745,7 +1980,8 @@ xlog_recover_process_data(xlog_t	    *log,
 		flags &= ~XLOG_CONTINUE_TRANS;
 	    switch (flags) {
 		case XLOG_COMMIT_TRANS: {
-		    error = xlog_recover_commit_trans(log, &rhash[hash], trans);
+		    error = xlog_recover_commit_trans(log, &rhash[hash],
+						      trans, pass);
 		    break;
 		}
 		case XLOG_UNMOUNT_TRANS: {
@@ -1765,7 +2001,8 @@ xlog_recover_process_data(xlog_t	    *log,
 		}
 		case 0:
 		case XLOG_CONTINUE_TRANS: {
-		    error = xlog_recover_add_to_trans(trans, dp, ohead->oh_len);
+		    error = xlog_recover_add_to_trans(trans, dp,
+						      ohead->oh_len);
 		    break;
 		}
 		default: {
@@ -2061,31 +2298,28 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 
 
 /*
- * Do the actual recovery
+ * Read the log from tail to head and process the log records found.
+ * Handle the two cases where the tail and head are in the same cycle
+ * and where the active portion of the log wraps around the end of
+ * the physical log separately.  The pass parameter is passed through
+ * to the routines called to process the data and is not looked at
+ * here.
  */
 STATIC int
-xlog_do_recover(xlog_t	*log,
-		daddr_t head_blk,
-		daddr_t tail_blk)
+xlog_do_recovery_pass(xlog_t	*log,
+		      daddr_t	head_blk,
+		      daddr_t	tail_blk,
+		      int	pass)
 {
     xlog_rec_header_t	*rhead;
     daddr_t		blk_no;
     caddr_t		bufaddr;
     buf_t		*hbp, *dbp;
-    buf_t		*bp;
-    xfs_sb_t		*sbp;
     int			error;
     int		  	bblks, split_bblks;
     xlog_recover_t	*rhash[XLOG_RHASH_SIZE];
 
     error = 0;
-    /*
-     * This first part of the routine will read in the part of the log
-     * containing data to recover.  It will replay all committed buffer and
-     * inode transactions.  Extent and iunlink transactions are processed
-     * at the end.  Buffers are reused by each read and are not used by
-     * the delayed write calls.  The write calls get their own buffers.
-     */
     hbp = xlog_get_bp(1);
     dbp = xlog_get_bp(BTOBB(XLOG_MAX_RECORD_BSIZE));
     bzero(rhash, sizeof(rhash));
@@ -2101,7 +2335,8 @@ xlog_do_recover(xlog_t	*log,
 		    goto bread_err;
 		xlog_unpack_data(rhead, dbp->b_dmaaddr, log);
 		if (error = xlog_recover_process_data(log, rhash,
-						      rhead, dbp->b_dmaaddr))
+						      rhead, dbp->b_dmaaddr,
+						      pass))
 		    return error;
 	    }
 	    blk_no += (bblks+1);
@@ -2150,7 +2385,8 @@ xlog_do_recover(xlog_t	*log,
 	    }
 	    xlog_unpack_data(rhead, dbp->b_dmaaddr, log);
 	    if (error = xlog_recover_process_data(log, rhash,
-						  rhead, dbp->b_dmaaddr))
+						  rhead, dbp->b_dmaaddr,
+						  pass))
 		goto bread_err;
 	    blk_no += bblks;
 	}
@@ -2170,7 +2406,8 @@ xlog_do_recover(xlog_t	*log,
 		goto bread_err;
 	    xlog_unpack_data(rhead, dbp->b_dmaaddr, log);
 	    if (error = xlog_recover_process_data(log, rhash,
-						  rhead, dbp->b_dmaaddr))
+						  rhead, dbp->b_dmaaddr,
+						  pass))
 		goto bread_err;
 	    blk_no += (bblks+1);
         }
@@ -2179,61 +2416,137 @@ xlog_do_recover(xlog_t	*log,
 bread_err:
     xlog_put_bp(dbp);
     xlog_put_bp(hbp);
-    if (error)
-	    return error;
+
+    return error;
+}
+
+/*
+ * Do the recovery of the log.  We actually do this in two phases.
+ * The two passes are necessary in order to implement the function
+ * of cancelling a record written into the log.  The first pass
+ * determines those things which have been cancelled, and the
+ * second pass replays log items normally except for those which
+ * have been cancelled.  The handling of the replay and cancellations
+ * takes place in the log item type specific routines.
+ *
+ * The table of items which have cancel records in the log is allocated
+ * and freed at this level, since only here do we know when all of
+ * the log recovery has been completed.
+ */
+STATIC int
+xlog_do_log_recovery(xlog_t	*log,
+		     daddr_t	head_blk,
+		     daddr_t	tail_blk)
+{
+	int		error;
+	int		i;
+
+	/*
+	 * First do a pass to find all of the cancelled buf log items.
+	 * Store them in the buf_cancel_table for use in the second pass.
+	 */
+	log->l_buf_cancel_table =
+		(xfs_buf_cancel_t **)kmem_zalloc(XLOG_BC_TABLE_SIZE *
+						 sizeof(xfs_buf_cancel_t*),
+						 KM_SLEEP);
+	error = xlog_do_recovery_pass(log, head_blk, tail_blk,
+				      XLOG_RECOVER_PASS1);
+	if (error != 0) {
+		kmem_free(log->l_buf_cancel_table,
+			  XLOG_BC_TABLE_SIZE * sizeof(xfs_buf_cancel_t*));
+		log->l_buf_cancel_table = NULL;
+		return error;
+	}
+	/*
+	 * Then do a second pass to actually recover the items in the log.
+	 * When it is complete free the table of buf cancel items.
+	 */
+	error = xlog_do_recovery_pass(log, head_blk, tail_blk,
+				      XLOG_RECOVER_PASS2);
+#ifdef	DEBUG
+	for (i = 0; i < XLOG_BC_TABLE_SIZE; i++) {
+		ASSERT(log->l_buf_cancel_table[i] == NULL);
+	}
+#endif	/* DEBUG */
+	kmem_free(log->l_buf_cancel_table,
+		  XLOG_BC_TABLE_SIZE * sizeof(xfs_buf_cancel_t*));
+	log->l_buf_cancel_table = NULL;
+
+	return error;
+}
+
+/*
+ * Do the actual recovery
+ */
+STATIC int
+xlog_do_recover(xlog_t	*log,
+		daddr_t head_blk,
+		daddr_t tail_blk)
+{
+	buf_t		*bp;
+	xfs_sb_t	*sbp;
+	int		error;
+
+	/*
+	 * First replay the images in the log.
+	 */
+	error = xlog_do_log_recovery(log, head_blk, tail_blk);
+	if (error) {
+		return error;
+	}
 
 #ifdef _KERNEL
-    bflush(log->l_mp->m_dev);    /* Flush out all the delayed write buffers */
+	bflush(log->l_mp->m_dev);    /* Flush out the delayed write buffers */
 
-    /*
-     * We now update the tail_lsn since much of the recovery has completed
-     * and there may be space available to use.  If there were no extent
-     * or iunlinks, we can free up the entire log and set the tail_lsn to be
-     * the last_sync_lsn.  This was set in xlog_find_tail to be the lsn of the
-     * last known good LR on disk.  If there are extent frees or iunlinks,
-     * they will have some entries in the AIL; so we look at the AIL to
-     * determine how to set the tail_lsn.
-     */
-    xlog_assign_tail_lsn(log->l_mp, 0);
+	/*
+	 * We now update the tail_lsn since much of the recovery has completed
+	 * and there may be space available to use.  If there were no extent
+	 * or iunlinks, we can free up the entire log and set the tail_lsn to
+	 * be the last_sync_lsn.  This was set in xlog_find_tail to be the
+	 * lsn of the last known good LR on disk.  If there are extent frees
+	 * or iunlinks they will have some entries in the AIL; so we look at
+	 * the AIL to determine how to set the tail_lsn.
+	 */
+	xlog_assign_tail_lsn(log->l_mp, 0);
 
-    /*
-     * Now that we've finished replaying all buffer and inode
-     * updates, re-read in the superblock.
-     */
-    bp = xfs_getsb(log->l_mp, 0);
-    bp->b_flags &= ~B_DONE;
-    bp->b_flags |= B_READ;
-    bdstrat(bmajor(bp->b_edev), bp);
-    if (error = iowait(bp)) {
-	ASSERT(0);
+	/*
+	 * Now that we've finished replaying all buffer and inode
+	 * updates, re-read in the superblock.
+	 */
+	bp = xfs_getsb(log->l_mp, 0);
+	bp->b_flags &= ~B_DONE;
+	bp->b_flags |= B_READ;
+	bdstrat(bmajor(bp->b_edev), bp);
+	if (error = iowait(bp)) {
+		ASSERT(0);
+		brelse(bp);
+		return error;
+	}
+	sbp = XFS_BUF_TO_SBP(bp);
+	ASSERT(sbp->sb_magicnum == XFS_SB_MAGIC);
+	ASSERT(sbp->sb_versionnum == XFS_SB_VERSION);
+	log->l_mp->m_sb = *sbp;
 	brelse(bp);
-	return error;
-    }
-    sbp = XFS_BUF_TO_SBP(bp);
-    ASSERT(sbp->sb_magicnum == XFS_SB_MAGIC);
-    ASSERT(sbp->sb_versionnum == XFS_SB_VERSION);
-    log->l_mp->m_sb = *sbp;
-    brelse(bp);
 
-    xlog_recover_check_summary(log);
+	xlog_recover_check_summary(log);
 
 
-    /* Normal transactions can now occur */
-    log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+	/* Normal transactions can now occur */
+	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
 
-    /*
-     * Now we're ready to do the transactions needed for the
-     * rest of recovery.  Start with completing all the extent
-     * free intent records and then process the unlinked inode
-     * lists.  At this point, we essentially run in normal mode
-     * except that we're still performing recovery actions
-     * rather than accepting new requests.
-     */
-    xlog_recover_process_efis(log);
-    xlog_recover_process_iunlinks(log);
-    xlog_recover_check_summary(log);
+	/*
+	 * Now we're ready to do the transactions needed for the
+	 * rest of recovery.  Start with completing all the extent
+	 * free intent records and then process the unlinked inode
+	 * lists.  At this point, we essentially run in normal mode
+	 * except that we're still performing recovery actions
+	 * rather than accepting new requests.
+	 */
+	xlog_recover_process_efis(log);
+	xlog_recover_process_iunlinks(log);
+	xlog_recover_check_summary(log);
 #endif /* _KERNEL */
-    return 0;
+	return 0;
 }	/* xlog_do_recover */
 
 

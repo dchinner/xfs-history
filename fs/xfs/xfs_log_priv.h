@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.38 $"
 
 #include <sys/cmn_err.h>
 
@@ -230,6 +230,7 @@ typedef struct xlog_in_core {
 
 #define ic_header	ic_h.hic_header
 
+struct xfs_buf_cancel;
 
 /*
  * The reservation head lsn is not made up of a cycle number and block number.
@@ -281,6 +282,7 @@ typedef struct log {
     ktrace_t		*l_trace;
     ktrace_t		*l_grant_trace;
     uint		l_flags;
+    struct xfs_buf_cancel	**l_buf_cancel_table;	
 } xlog_t;
 
 
@@ -301,5 +303,7 @@ extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
 #define XLOG_TRACE_REL_FLUSH   2
 #define XLOG_TRACE_SLEEP_FLUSH 3
 #define XLOG_TRACE_WAKE_FLUSH  4
+
+
 
 #endif	/* _XFS_LOG_PRIV_H */

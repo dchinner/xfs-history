@@ -69,11 +69,13 @@ xfs_buf_item_size(xfs_buf_log_item_t *bip)
 	ASSERT(bip->bli_refcount > 0);
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		/*
-		 * The buffer is stale, so don't bother
-		 * logging anything.
+		 * The buffer is stale, so all we need to log
+		 * is the buf log format structure with the
+		 * cancel flag in it.
 		 */
 		xfs_buf_item_trace("SIZE STALE", bip);
-		return 0;
+		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
+		return 1;
 	}
 
 	ASSERT(bip->bli_flags & XFS_BLI_LOGGED);
@@ -132,16 +134,8 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 	uint		buffer_offset;
 
 	ASSERT(bip->bli_refcount > 0);
-	if (bip->bli_flags & XFS_BLI_STALE) {
-		/*
-		 * The buffer is stale, so don't bother
-		 * logging anything.
-		 */
-		xfs_buf_item_trace("FORMAT STALE", bip);
-		return;
-	}
-
-	ASSERT(bip->bli_flags & XFS_BLI_LOGGED);
+	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
+	       (bip->bli_flags & XFS_BLI_STALE));
 	bp = bip->bli_buf;
 	ASSERT(BP_ISMAPPED(bp));
 	vecp = log_vector;
@@ -159,6 +153,18 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 	vecp->i_len = base_size;
 	vecp++;
 	nvecs = 1;
+
+	if (bip->bli_flags & XFS_BLI_STALE) {
+		/*
+		 * The buffer is stale, so all we need to log
+		 * is the buf log format structure with the
+		 * cancel flag in it.
+		 */
+		xfs_buf_item_trace("FORMAT STALE", bip);
+		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
+		bip->bli_format.blf_size = nvecs;
+		return;
+	}
 
 	/*
 	 * Fill in an iovec for each set of contiguous chunks.
@@ -267,6 +273,7 @@ xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(!(bp->b_flags & B_DELWRI));
 		ASSERT(bp->b_pincount == 0);
+		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
 		mp = bip->bli_item.li_mountp;
 		s = AIL_LOCK(mp);
@@ -351,6 +358,7 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 	if (bip->bli_flags & XFS_BLI_STALE) {
 		bip->bli_flags &= ~XFS_BLI_LOGGED;
 		xfs_buf_item_trace("UNLOCK STALE", bip);
+		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		return;
 	}
 

@@ -23,6 +23,11 @@ typedef struct xfs_buf_log_format {
  * and requires special recovery handling.
  */
 #define	XFS_BLI_INODE_BUF	0x1
+/*
+ * This flag indicates that the buffer should not be replayed
+ * during recovery because its blocks are being freed.
+ */
+#define	XFS_BLI_CANCEL		0x2
 
 #define	XFS_BLI_CHUNK		128
 #define	XFS_BLI_SHIFT		7
@@ -56,6 +61,17 @@ typedef struct xfs_buf_log_item {
 #define	XFS_BLI_DIRTY	0x2
 #define	XFS_BLI_STALE	0x4
 #define	XFS_BLI_LOGGED	0x8
+
+/*
+ * This structure is used during recovery to record the buf log
+ * items which have been canceled and should not be replayed.
+ */
+typedef struct xfs_buf_cancel {
+	daddr_t			bc_blkno;
+	uint			bc_len;
+	int			bc_refcount;
+	struct xfs_buf_cancel	*bc_next;
+} xfs_buf_cancel_t;
 
 /*
  * This lock guards the bli_refcount fields of the buf items.
