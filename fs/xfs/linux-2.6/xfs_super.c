@@ -862,3 +862,6 @@ EXPORT_NO_SYMBOLS;
 module_init(init_xfs_fs);
 module_exit(exit_xfs_fs);
 
+MODULE_AUTHOR("SGI <sgi.com>");
+MODULE_DESCRIPTION("SGI XFS with " XFS_BUILD_OPTIONS " enabled");
+MODULE_LICENSE("GPL");
