@@ -1,4 +1,4 @@
-#ident "$Revision: 1.127 $"
+#ident "$Revision: 1.128 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -207,14 +207,9 @@ xfs_diordwr(
 	int		rw);
 
 extern int
-xfs_grio_req(
-	xfs_inode_t *,
-	struct reservation_id *, 
-	uio_t *,
-	int,
-	cred_t *,
-	off_t,
-	int);
+xfs_io_is_guaranteed(
+	xfs_inode_t	*,
+	stream_id_t	*);
 
 extern void xfs_error(
 	xfs_mount_t *,
@@ -1131,7 +1126,6 @@ xfs_read(
 	int		ioflag,
 	cred_t		*credp)
 {
-	struct reservation_id id;
 	xfs_inode_t	*ip;
 	int		type;
 	off_t		offset;
@@ -1209,23 +1203,16 @@ xfs_read(
 		ASSERT((ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS) ||
 		       (ip->i_d.di_format == XFS_DINODE_FMT_BTREE));
 
-#ifdef SIM
-		/*
-		 * Need pid of client not of simulator process.
-		 * This may not always be correct.
-		 */
-		id.pid = MAKE_REQ_PID(u.u_procp->p_pid - 1, 0);
-#else
-		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
-#endif
-		id.ino = ip->i_ino;
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_READ) &&
 		    !(ioflag & IO_INVIS)) {
 			if (error = dm_data_event(vp, DM_READ, offset, count))
 				return error;
 		}
-		error = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset,
-				     UIO_READ);
+		if (ioflag & IO_DIRECT)
+			error = xfs_diordwr( vp, uiop, ioflag, credp, B_READ);
+		else
+			error = xfs_read_file( vp, uiop, ioflag, credp);
+
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		/* don't update timestamps if doing invisible I/O */
 		if (!(ioflag & IO_INVIS)) {
@@ -2233,7 +2220,6 @@ xfs_write(
 	int	ioflag,
 	cred_t	*credp)
 {
-	struct reservation_id id;
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
 	xfs_trans_t	*tp;
@@ -2316,22 +2302,10 @@ start:
 		if ((ioflag & IO_APPEND) && savedsize != ip->i_d.di_size)
 			goto start;
 retry:
-		if ((ip->i_ticket == NULL) && !(ioflag & IO_DIRECT)) {
-			error = xfs_write_file(vp, uiop, ioflag, credp);
-		} else {
-#ifdef SIM
-			/*
-			 * Need pid of client not of simulator process.
-			 * This may not always be correct.
-			 */
-			id.pid = MAKE_REQ_PID(u.u_procp->p_pid - 1, 0);
-#else
-			id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
-#endif
-			id.ino = ip->i_ino;
-			error = xfs_grio_req(ip, &id, uiop, ioflag, credp,
-					     offset, UIO_WRITE);
-		}
+		if (ioflag & IO_DIRECT)
+			error = xfs_diordwr( vp, uiop, ioflag, credp, B_WRITE);
+		else
+			error = xfs_write_file( vp, uiop, ioflag, credp );
 
 		if (error == ENOSPC &&
 		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_NOSPACE) &&
@@ -4132,7 +4106,7 @@ xfs_diostrat( buf_t *bp)
 	off_t		offset, offset_this_req, bytes_this_req, trail = 0;
 	int		i, j, error, writeflag, reccount;
 	int		end_of_file, bufsissued, totresid, exist;
-	int		ioflag, blk_algn, rt, numrtextents, rtextsize;
+	int		blk_algn, rt, numrtextents, sbrtextsize, iprtextsize;
 	int		committed;
 	uint		lock_mode;
 
@@ -4142,7 +4116,6 @@ xfs_diostrat( buf_t *bp)
 	mp 	  = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
 	base	  = bp->b_un.b_addr;
 	error     = resid = totxfer = end_of_file = 0;
-	ioflag	  = dp->ioflag;
 	offset    = BBTOOFF((off_t)bp->b_blkno);
 	blk_algn  = 0;
 	totresid  = count  = bp->b_bcount;
@@ -4152,10 +4125,14 @@ xfs_diostrat( buf_t *bp)
 	 */
 	if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
 		rt = 1;
-		rtextsize = mp->m_sb.sb_rextsize;
+		sbrtextsize = mp->m_sb.sb_rextsize;
+		iprtextsize = sbrtextsize;
+		if ( ip->i_d.di_extsize ) {
+			iprtextsize = ip->i_d.di_extsize;
+		}
 	} else {
 		numrtextents = 0;
-		rtextsize = 0;
+		iprtextsize = sbrtextsize = 0;
 		rt = 0;
 	}
 
@@ -4236,8 +4213,10 @@ xfs_diostrat( buf_t *bp)
 					/*
 					 * Round up to even number of extents.
 					 */
-					numrtextents = (count_fsb+rtextsize-1)/
-						rtextsize;
+					numrtextents = 
+						(count_fsb + iprtextsize - 1)/
+							sbrtextsize;
+
 					datablocks = 0;
 				} else {
 					/*
@@ -4411,11 +4390,7 @@ xfs_diostrat( buf_t *bp)
 	     			nbp->b_flags     = bp->b_flags;
 	     			nbp->b_flags2    = bp->b_flags2;
 
-				if (ioflag & IO_GRIO) {
-					nbp->b_flags2 |= B_GR_BUF;
-				} else {
-					nbp->b_flags2 &= ~B_GR_BUF;
-				}
+				nbp->b_grio_private = bp->b_grio_private;
 
 	     			nbp->b_error     = 0;
 	     			nbp->b_proc      = bp->b_proc;
@@ -4440,6 +4415,7 @@ xfs_diostrat( buf_t *bp)
 					iowait( nbp );
 					nbp->b_flags = 0;
 		     			nbp->b_un.b_addr = 0;
+					nbp->b_grio_private = 0;
 					putphysbuf( nbp );
 					bps[bufsissued--] = 0;
 					break;
@@ -4499,9 +4475,10 @@ xfs_diostrat( buf_t *bp)
 					totxfer += (nbp->b_bcount - resid);
 				}
 			} 
-	    	 	nbp->b_flags = 0;
-	     		nbp->b_un.b_addr = 0;
-	     		nbp->b_bcount = 0;
+	    	 	nbp->b_flags		= 0;
+	     		nbp->b_bcount		= 0;
+	     		nbp->b_un.b_addr	= 0;
+	     		nbp->b_grio_private	= 0;
 	    	 	putphysbuf( nbp );
 	     	}
 	} /* end of while loop */
@@ -4559,9 +4536,12 @@ xfs_diordwr(vnode_t	*vp,
 	 cred_t		*credp,
 	 int		rw)
 {
+	extern 		zone_t	*grio_buf_data_zone;
+
 	xfs_inode_t	*ip;
 	struct dio_s	dp;
 	xfs_mount_t	*mp;
+	uuid_t		stream_id;
 	buf_t		*bp;
 	int		error;
 
@@ -4624,9 +4604,27 @@ xfs_diordwr(vnode_t	*vp,
 	mp = XFS_VFSTOM(vp->v_vfsp);
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		bp->b_edev = mp->m_rtdev;
+
+		/*
+ 	 	 * Check if this is a guaranteed rate I/O
+	 	 */
+		if ( xfs_io_is_guaranteed( ip, &stream_id ) ) {
+			bp->b_flags2 |= B_GR_BUF;
+			ASSERT( bp->b_grio_private == NULL );
+			bp->b_grio_private = 
+				kmem_zone_alloc( grio_buf_data_zone, KM_SLEEP );
+			ASSERT( BUF_GRIO_PRIVATE( bp ) );
+			COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
+		} else {
+			bp->b_grio_private = NULL;
+			bp->b_flags2 &= ~B_GR_BUF;
+		}
 	} else {
 		bp->b_edev = mp->m_dev;
+		bp->b_grio_private = NULL;
+		bp->b_flags2 &= ~B_GR_BUF;
 	}
+
 
 	/*
  	 * Perform I/O operation.
@@ -4638,6 +4636,14 @@ xfs_diordwr(vnode_t	*vp,
  	 * Free local buf structure.
  	 */
 	bp->b_flags = 0;
+
+	if ( bp->b_flags2 & B_GR_BUF ) {
+		ASSERT( BUF_GRIO_PRIVATE(bp) );
+		kmem_zone_free( grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
+		bp->b_grio_private = NULL;
+		bp->b_flags2 &= ~B_GR_BUF;
+	}
+
 #ifdef SIM
 	bp->b_un.b_addr = 0;
 #endif
