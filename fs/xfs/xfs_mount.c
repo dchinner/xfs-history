@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.72 $"
+#ident	"$Revision: 1.73 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -406,6 +406,12 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	}
 
 	nfreerbuf(bp);
+
+	/*
+	 * All inodes from this mount point should be freed.
+	 */
+	ASSERT( mp->m_inodes == NULL );
+
 	xfs_mount_free(mp);
 }	/* xfs_unmountfs */
 
