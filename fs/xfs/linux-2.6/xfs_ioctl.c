@@ -34,7 +34,6 @@
 #include <xfs_fsops.h>
 #include <xfs_dfrag.h>
 #include <linux/xfs_iops.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/dcache.h>
 

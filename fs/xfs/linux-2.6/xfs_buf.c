@@ -58,7 +58,6 @@
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
-#include <linux/locks.h>
 #include <linux/swap.h>
 #include <asm/softirq.h>
 #include <linux/sysctl.h>
@@ -523,7 +522,7 @@ _pagebuf_lookup_pages(
 		 * thinking they all have uptodate (different) data. :(
 		 * We'll have to use a different approach for that case.
 		 */
-		if (!Page_Uptodate(cp)) {
+		if (!PageUptodate(cp)) {
 			good_pages--;
 			if (blocksize == PAGE_CACHE_SIZE) {
 				if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
@@ -533,7 +532,7 @@ _pagebuf_lookup_pages(
 			}
 		}
 		if (!pb->pb_locked)
-			UnlockPage(cp);
+			unlock_page(cp);
 	}
 	if (cached_page)
 		page_cache_release(cached_page);
@@ -1148,7 +1147,7 @@ static void bio_end_io_pagebuf(struct bio *bio)
 		}
 
 		if (pb->pb_locked) {
-			UnlockPage(page);
+			unlock_page(page);
 		} else {
 			BUG_ON(PageLocked(page));
 		}
@@ -1248,12 +1247,7 @@ int pagebuf_iorequest(		/* start real I/O               */
 			if (nbytes > size)
 				nbytes = size;
 
-			if (pb->pb_flags & PBF_READ) {
-				while (TryLockPage(page))
-					___wait_on_page(page);
-			} else {
-				lock_page(page);
-			}
+			lock_page(page);
 
 			size -= nbytes;
 			offset = 0;

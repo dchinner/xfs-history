@@ -32,7 +32,7 @@
 
 #include <xfs.h>
 #include <linux/mm.h>
-#include <linux/locks.h>
+#include <linux/pagemap.h>
 #include <linux/xfs_iops.h>
 
 /*
@@ -631,7 +631,7 @@ linvfs_get_block_core(
 
 		bh_result->b_blocknr = bn;
 		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
-		set_bit(BH_Mapped, &bh_result->b_state);
+		set_buffer_mapped(bh_result);
 	}
 
 	if (pbmap.pbm_flags & PBMF_DELAY) {
@@ -646,13 +646,13 @@ linvfs_get_block_core(
 			kunmap(page);
 		}
 		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
-		set_bit(BH_Mapped, &bh_result->b_state);
-		set_bit(BH_Uptodate, &bh_result->b_state);
-		set_bit(BH_Delay, &bh_result->b_state);
+		set_buffer_mapped(bh_result);
+		set_buffer_uptodate(bh_result);
+		set_buffer_delay(bh_result);
 	}
 
 	if (create && (pbmap.pbm_flags & PBMF_NEW))
-		set_bit(BH_New, &bh_result->b_state);
+		set_buffer_new(bh_result);
 	return 0;
 }
 
@@ -803,13 +803,15 @@ linvfs_write_full_page(
 		need_trans = 1;
 	}
 
-	if ((current->flags & (PF_FSTRANS|PF_NOIO)) && need_trans)
+	if ((current->flags & (PF_FSTRANS)) && need_trans)
 		goto out_fail;
 
+#if 0
 	if (need_trans) {
 		current->flags |= PF_NOIO;
 		flagset = 1;
 	}
+#endif
 
 	inode = page->mapping->host;
 	vp = LINVFS_GET_VP(inode);
@@ -818,13 +820,15 @@ linvfs_write_full_page(
 	}
 	error = pagebuf_write_full_page(page, nr_delalloc, linvfs_pb_bmap);
 
+#if 0
 	if (flagset)
 		current->flags &= ~PF_NOIO;
+#endif
 	return error;
 
 out_fail:
 	SetPageDirty(page);
-	UnlockPage(page);
+	unlock_page(page);
 	return 0;
 }
 
@@ -959,12 +963,12 @@ linvfs_release_page(
 	}
 
 	if (need_trans == 0) {
-		return try_to_free_buffers(page, gfp_mask);
+		return try_to_free_buffers(page);
 	}
 
 	if (gfp_mask & __GFP_FS) {
 		pagebuf_release_page(page, linvfs_pb_bmap);
-		return try_to_free_buffers(page, gfp_mask);
+		return try_to_free_buffers(page);
 	}
 	return 0;
 }

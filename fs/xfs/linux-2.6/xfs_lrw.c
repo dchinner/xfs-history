@@ -662,7 +662,7 @@ retry:
 
 		/* Flush all inode data buffers */
 
-		error = -fsync_inode_data_buffers(ip);
+		error = -filemap_fdatawrite(ip->i_mapping);
 		if (error)
 			goto out;
 		
@@ -819,7 +819,7 @@ retry:
 			switch (fsynced) {
 			case 0:
 				if (ip->i_delayed_blks) {
-					fsync_inode_data_buffers(LINVFS_GET_IP(vp));
+					filemap_fdatawrite(LINVFS_GET_IP(vp)->i_mapping);
 					fsynced = 1;
 				} else {
 					fsynced = 2;
@@ -837,7 +837,7 @@ retry:
 					goto retry;
 				}
 			case 2:
-				fsync_no_super(vp->v_vfsp->vfs_super->s_bdev);
+				sync_blockdev(vp->v_vfsp->vfs_super->s_bdev);
 
 				error = 0;
 /**

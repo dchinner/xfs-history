@@ -32,7 +32,6 @@
 
 #include <xfs.h>
 #include <linux/bitops.h>
-#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
@@ -83,6 +82,7 @@ static struct quotactl_ops linvfs_qops = {
 #endif
 
 static struct super_operations linvfs_sops;
+static struct export_operations linvfs_export_ops;
 
 #define MNTOPT_LOGBUFS  "logbufs"       /* number of XFS log buffers */
 #define MNTOPT_LOGBSIZE "logbsize"      /* size of XFS log buffers */
@@ -502,12 +502,13 @@ linvfs_fill_super(
 	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
 
-	set_blocksize(sb->s_dev, BBSIZE);
+	set_blocksize(sb->s_bdev, BBSIZE);
 	set_posix_acl(sb);
 	sb->s_xattr_flags |= XATTR_MNT_FLAG_USER;
 	set_max_bytes(sb);
 	set_quota_ops(sb);
 	sb->s_op = &linvfs_sops;
+	sb->s_export_op = &linvfs_export_ops;
 
 	LINVFS_SET_VFS(sb, vfsp);
 
@@ -722,7 +723,7 @@ linvfs_put_super(
 
 	/* Reset device block size */
 	sector_size = get_hardsect_size(dev);
-	set_blocksize(dev, sector_size);
+	set_blocksize(sb->s_bdev, sector_size);
 }
 
 void
@@ -950,6 +951,46 @@ STATIC struct dentry *linvfs_fh_to_dentry(
 	return result;
 }
 #endif
+
+struct dentry *linvfs_get_parent(struct dentry *child)
+{
+	int		error;
+	vnode_t		*vp, *cvp;
+	struct dentry	*parent;
+	pathname_t	pn;
+	pathname_t	*pnp = &pn;
+	struct inode	*ip = NULL;
+
+	bzero(pnp, sizeof(pathname_t));
+	pnp->pn_complen = 2;
+	pnp->pn_path = "..";
+
+	cvp = NULL;
+	vp = LINVFS_GET_VP(child->d_inode);
+	VOP_LOOKUP(vp, "..", &cvp, pnp, 0, NULL, NULL, error);
+
+	if (!error) {
+		ASSERT(cvp);
+		ip = LINVFS_GET_IP(cvp);
+		if (!ip) {
+			VN_RELE(cvp);
+			return ERR_PTR(-EACCES);
+		}
+		error = -linvfs_revalidate_core(ip, ATTR_COMM);
+	}
+	if (error)
+		return ERR_PTR(-error);
+	parent = d_alloc_anon(ip);
+	if (!parent) {
+		VN_RELE(cvp);
+		parent = ERR_PTR(-ENOMEM);
+	}
+	return parent;
+}
+
+static struct export_operations linvfs_export_ops = {
+	get_parent: linvfs_get_parent,
+};
 
 static struct super_operations linvfs_sops = {
 	alloc_inode:		linvfs_alloc_inode,

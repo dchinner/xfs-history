@@ -210,7 +210,7 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 	struct inode	*inode;
 
 	XFS_STATS_INC(xfsstats.vn_get);
-	inode = icreate(vmap->v_vfsp->vfs_super, vmap->v_ino);
+	inode = iget_locked(vmap->v_vfsp->vfs_super, vmap->v_ino);
 
 	/* We do not want to create new inodes via vn_get,
 	 * returning NULL here is OK.
