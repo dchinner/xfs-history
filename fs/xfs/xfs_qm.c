@@ -1,4 +1,4 @@
-#ident "$Revision: 1.27 $"
+#ident "$Revision: 1.28 $"
 
 
 #include <sys/param.h>
@@ -493,11 +493,14 @@ xfs_qm_mount_quotas(
 /*
  * Called from the vfsops layer.
  */
-void
+int
 xfs_qm_unmount_quotas(
 	xfs_mount_t	*mp)
 {
 	xfs_inode_t	*uqp, *pqp;
+	int		error;
+
+	error = 0;
 
 	/*
 	 * Release the dquots that root inode, et al might be holding,
@@ -521,14 +524,18 @@ xfs_qm_unmount_quotas(
 		if ((uqp = mp->m_quotainfo->qi_uquotaip) != NULL) {
 			xfs_ilock(uqp, XFS_ILOCK_EXCL);
 			xfs_iflock(uqp);
-			xfs_iflush(uqp, XFS_IFLUSH_SYNC);
+			error = xfs_iflush(uqp, XFS_IFLUSH_SYNC);
 			xfs_iunlock(uqp, XFS_ILOCK_EXCL);
+			if (error == EFSCORRUPTED)
+				goto out;
 		}
 		if ((pqp = mp->m_quotainfo->qi_pquotaip) != NULL) {
 			xfs_ilock(pqp, XFS_ILOCK_EXCL);
 			xfs_iflock(pqp);
-			xfs_iflush(pqp, XFS_IFLUSH_SYNC);
+			error = xfs_iflush(pqp, XFS_IFLUSH_SYNC);
 			xfs_iunlock(pqp, XFS_ILOCK_EXCL);
+			if (error == EFSCORRUPTED)
+				goto out;
 		}
 	}
 	if (uqp) {
@@ -539,6 +546,8 @@ xfs_qm_unmount_quotas(
 		XFS_PURGE_INODE(XFS_ITOV(pqp));
 		mp->m_quotainfo->qi_pquotaip = NULL;
 	}
+out:
+	return XFS_ERROR(error);
 }
 
 /*
