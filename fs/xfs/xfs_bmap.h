@@ -57,6 +57,28 @@ typedef	struct xfs_bmap_free
 	((flp)->xbf_first = NULL, (flp)->xbf_count = 0, *(fbp) = NULLFSBLOCK)
 
 /*
+ * Argument structure for xfs_bmap_alloc.
+ * This would be hidden, but we want idbg to be able to see it.
+ */
+typedef struct xfs_bmalloca {
+	struct xfs_trans	*tp;	/* transaction pointer */
+	struct xfs_inode	*ip;	/* incore inode pointer */
+	int			eof;	/* set if allocating past last extent */
+	struct xfs_bmbt_irec	*prevp;	/* extent before the new one */
+	struct xfs_bmbt_irec	*gotp;	/* extent after, or delayed */
+	xfs_fsblock_t		firstblock; /* i/o first block allocated */
+	xfs_extlen_t		alen;	/* i/o length asked/allocated */
+	xfs_extlen_t		total;	/* total blocks needed for xaction */
+	xfs_fsblock_t		off;	/* offset in file filling in */
+	int			wasdel;	/* replacing a delayed allocation */
+	int			userdata;/* set if is user data */
+	xfs_extlen_t		minlen;	/* mininum allocation size (blocks) */
+	xfs_extlen_t		minleft; /* amount must be left after alloc */
+	int			low;	/* low on space, using seq'l ags */
+	xfs_fsblock_t		rval;	/* starting block of new extent */
+} xfs_bmalloca_t;
+
+/*
  * Add the extent to the list of extents to be free at transaction end.
  * The list is maintained sorted (by block number).
  */

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.60 $"
+#ident	"$Revision: 1.61 $"
 
 /*
  * Free space allocation for xFS.
@@ -1973,7 +1973,7 @@ xfs_alloc_vextent(
 		 */
 		args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
 		if (!(args->agbp = xfs_alloc_fix_freelist(args->tp, args->agno,
-				args->minlen, args->total, args->minleft, 0)))
+				args->minlen, args->total, 0, 0)))
 			break;
 		args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
 		xfs_alloc_ag_vextent(args);
