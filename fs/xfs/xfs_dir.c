@@ -1,4 +1,4 @@
-#ident "$Revision: 1.85 $"
+#ident "$Revision: 1.86 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -286,6 +286,61 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	}
 	return(retval);
 }
+
+#ifdef SIM
+/*
+ * Like above only for removing entries with (name, hashvalue)
+ * pairs that may not be consistent (hashvalue may not be correctly
+ * set for the name)
+ */
+int							/* error */
+xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
+		   xfs_fsblock_t *firstblock, xfs_bmap_free_t *flist,
+		   xfs_extlen_t total, xfs_dahash_t hashval)
+{
+	xfs_da_args_t args;
+	int count, totallen, newsize, retval, namelen;
+
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	namelen = strlen(name);
+	if (namelen >= MAXNAMELEN) {
+		return(XFS_ERROR(EINVAL));
+	}
+
+	XFSSTATS.xs_dir_remove++;
+	/*
+	 * Fill in the arg structure for this request.
+	 */
+	args.name = name;
+	args.namelen = namelen;
+	args.hashval = hashval;
+	args.inumber = 0;
+	args.dp = dp;
+	args.firstblock = firstblock;
+	args.flist = flist;
+	args.total = total;
+	args.whichfork = XFS_DATA_FORK;
+	args.trans = trans;
+
+	/*
+	 * Decide on what work routines to call based on the inode size.
+	 */
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
+		retval = xfs_dir_shortform_removename(&args);
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
+		retval = xfs_dir_leaf_removename(&args, &count, &totallen);
+		if (retval == 0) {
+			newsize = XFS_DIR_SF_ALLFIT(count, totallen);
+			if (newsize <= XFS_IFORK_DSIZE(dp)) {
+				retval = xfs_dir_leaf_to_shortform(&args);
+			}
+		}
+	} else {
+		retval = xfs_dir_node_removename(&args);
+	}
+	return(retval);
+}
+#endif /* SIM */
 
 int							/* error */
 xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
