@@ -1,4 +1,4 @@
-#ident "$Revision: 1.125 $"
+#ident "$Revision: 1.126 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1657,7 +1657,8 @@ xfs_iomap_write(
 	 * to minimize the amount we write for good performance.
 	 */
 	if (!(ioflag & IO_SYNC) && ((offset + count) > ip->i_d.di_size)) {
-		start_fsb = last_fsb;
+		start_fsb = XFS_B_TO_FSBT(mp,
+				  ((xfs_ufsize_t)(offset + count - 1)));
 		count_fsb = mp->m_writeio_blocks;
 		while (count_fsb > 0) {
 			nimaps = XFS_WRITE_IMAPS;
