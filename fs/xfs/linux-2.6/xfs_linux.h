@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -44,6 +44,7 @@
 #include <linux/major.h>
 #include <linux/vfs.h>
 #include <linux/pagemap.h>
+#include <linux/seq_file.h>
 
 #include <asm/page.h>
 #include <asm/div64.h>
@@ -67,6 +68,10 @@
 
 #ifndef STATIC
 #define STATIC static
+#endif
+
+#ifndef EVMS_MAJOR
+#define EVMS_MAJOR 117
 #endif
 
 /*
@@ -171,6 +176,13 @@ typedef struct xfs_dirent {		/* data from readdir() */
 
 #define SYNCHRONIZE()	barrier()
 #define __return_address __builtin_return_address(0)
+
+/* IRIX (BSD) quotactl makes use of separate commands for user/group, */
+/* whereas on Linux the syscall encodes this information into the cmd */
+/* field (see the QCMD macro in quota.h).  These macros help keep the */
+/* code portable - they are not visible from the syscall interface.   */
+#define Q_XSETGQLIM	XQM_CMD(0x8)	/* set groups disk limits */
+#define Q_XGETGQUOTA	XQM_CMD(0x9)	/* get groups disk limits */
 
 /* IRIX uses a dynamic sizing algorithm (ndquot = 200 + numprocs*2) */
 /* we may well need to fine-tune this if it ever becomes an issue.  */

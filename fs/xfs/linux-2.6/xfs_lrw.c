@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -113,6 +113,7 @@ xfs_read(
 	const struct iovec	*iovp,
 	unsigned long		segs,
 	loff_t			*offp,
+	int			ioflags,
 	cred_t			*credp)
 {
 	size_t			size = 0;
@@ -179,7 +180,8 @@ xfs_read(
 		return -EIO;
 	}
 
-	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(filp->f_mode & FINVIS)) {
@@ -189,13 +191,15 @@ xfs_read(
 		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, *offp,
 				size, FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
-			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			if (!(ioflags & IO_ISLOCKED))
+				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -error;
 		}
 	}
 
 	ret = generic_file_readv(filp, iovp, segs, offp);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
 
@@ -210,6 +214,7 @@ xfs_sendfile(
 	bhv_desc_t		*bdp,
 	struct file		*filp,
 	loff_t			*offp,
+	int			ioflags,
 	size_t			count,
 	read_actor_t		actor,
 	void			*target,
@@ -237,7 +242,9 @@ xfs_sendfile(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return -EIO;
 
-	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !invisible) {
 		vrwlock_t locktype = VRWLOCK_READ;
 		int error;
@@ -245,12 +252,14 @@ xfs_sendfile(
 		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, *offp,
 				count, FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
-			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			if (!(ioflags & IO_ISLOCKED))
+				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -error;
 		}
 	}
 	ret = generic_file_sendfile(filp, offp, count, actor, target);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
 	if (!invisible)
@@ -481,6 +490,7 @@ xfs_write(
 	const struct iovec	*iovp,
 	unsigned long		segs,
 	loff_t			*offset,
+	int			ioflags,
 	cred_t			*credp)
 {
 	size_t			size = 0;
@@ -552,7 +562,11 @@ xfs_write(
 		locktype = VRWLOCK_WRITE;
 	}
 
+	if (ioflags & IO_ISLOCKED)
+		iolock = 0;
+
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
+
 	isize = xip->i_d.di_size;
 
 	if (file->f_flags & O_APPEND)
@@ -582,7 +596,7 @@ start:
 				*offset, size,
 				FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
-			xfs_iunlock(xip, iolock);
+			if (iolock) xfs_iunlock(xip, iolock);
 			return -error;
 		}
 		xfs_ilock(xip, XFS_ILOCK_EXCL);
@@ -774,7 +788,9 @@ retry:
 		}
 	} /* (ioflags & O_SYNC) */
 
-	xfs_rwunlock(bdp, locktype);
+	if (iolock)
+		xfs_rwunlock(bdp, locktype);
+
 	return(ret);
 }
 
