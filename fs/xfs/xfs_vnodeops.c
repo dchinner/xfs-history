@@ -2850,7 +2850,6 @@ xfs_create_new(
  *   *vpp has vnode found by a lookup.
  *	But *vpp might go away.
  */
-/* ARGSUSED */
 STATIC int
 xfs_create_exists(
 	bhv_desc_t	*dir_bdp,
@@ -2861,7 +2860,9 @@ xfs_create_exists(
 	vnode_t		**vpp,
 	cred_t		*credp)
 {
-	vnode_t 		*dir_vp;
+#ifdef VNODE_TRACING
+	vnode_t 		*dir_vp = BHV_TO_VNODE(dir_bdp);
+#endif
 	xfs_inode_t      	*dp, *ip;
         vnode_t		        *vp, *newvp;
 	xfs_trans_t      	*tp = NULL;
@@ -2870,7 +2871,6 @@ xfs_create_exists(
 	uint			cancel_flags;
 
 	ip = NULL;
-	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
 	vp = *vpp;
 
