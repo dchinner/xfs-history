@@ -2700,21 +2700,31 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 			return(error);
 		}
 		ASSERT(nmap == 1);
-		ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
-		       (map.br_startblock != HOLESTARTBLOCK));
-
-		dblkno = XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock),
-		dblkcnt = XFS_FSB_TO_BB(dp->i_mount, map.br_blockcount);
+		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
 
 		/*
-		 * If the "remote" value is in the cache, remove it.
+		 * The value may have already been unmapped if we're
+		 * currently processing an unlinked file during
+		 * recovery, so just skip the blocks if they're not
+		 * there.
 		 */
-		bp = incore(dp->i_mount->m_dev, dblkno, dblkcnt, 1);
-		if (bp) {
-			bp->b_flags |= B_STALE;
-			bp->b_flags &= ~B_DELWRI;
-			brelse(bp);
-			bp = NULL;
+		if (map.br_startblock != HOLESTARTBLOCK) {
+
+			dblkno = XFS_FSB_TO_DADDR(dp->i_mount,
+						  map.br_startblock);
+			dblkcnt = XFS_FSB_TO_BB(dp->i_mount,
+						map.br_blockcount);
+
+			/*
+			 * If the "remote" value is in the cache, remove it.
+			 */
+			bp = incore(dp->i_mount->m_dev, dblkno, dblkcnt, 1);
+			if (bp) {
+				bp->b_flags |= B_STALE;
+				bp->b_flags &= ~B_DELWRI;
+				brelse(bp);
+				bp = NULL;
+			}
 		}
 
 		tblkno += map.br_blockcount;
