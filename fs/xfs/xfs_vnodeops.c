@@ -1,4 +1,4 @@
-#ident "$Revision: 1.251 $"
+#ident "$Revision: 1.252 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1252,10 +1252,17 @@ xfs_fsync(
 	last_byte = xfs_file_last_byte(ip);
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_df.if_flags & XFS_IFEXTENTS && ip->i_df.if_bytes > 0) {
+			/*
+			 * Set the VREMAPPING bit so that vfault can't
+			 * race in between the remapf and the pflushinvalvp
+			 * calls.
+			 */
+			VN_FLAGSET(vp, VREMAPPING);
 			if (VN_MAPPED(vp)) {
 				remapf(vp, 0, 1);
 			}
 			pflushinvalvp(vp, 0, last_byte);
+			VN_FLAGCLR(vp, VREMAPPING);
 		}
 		ASSERT((vp->v_pgcnt == 0) && (vp->v_buf == 0));
 	} else {
@@ -2506,7 +2513,6 @@ xfs_create(
 				      XFS_CREATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_CREATE_LOG_COUNT)) {
-		ASSERT(0);
 		cancel_flags = 0;
 		dp = NULL;
 		goto error_return;
@@ -2566,7 +2572,6 @@ xfs_create(
 		if (XFS_IS_QUOTA_ON(mp)) {
 			if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks,
 						    1, 0)) {
-				ASSERT(0);
 				error = EDQUOT;
 				goto error_return;
 			}
@@ -2577,7 +2582,6 @@ xfs_create(
 				MAKEIMODE(vap->va_type,vap->va_mode), 1,
 				rdev, credp, prid, &ip, &committed);
 		if (error) {
-			ASSERT(0);
 			goto abort_return;
 		}
 		ITRACE(ip);
@@ -2608,7 +2612,6 @@ xfs_create(
 					   &first_block, &free_list,
 					   MAX_EXT_NEEDED);
 		if (error) {
-			ASSERT(0);
 			ASSERT(error != ENOSPC);
 			goto abort_return;
 		}
@@ -2667,7 +2670,6 @@ xfs_create(
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
 				goto try_again;
 			}
-			ASSERT(0);
 			goto error_return;
 		}
 
@@ -2722,7 +2724,6 @@ xfs_create(
 					      XFS_ITRUNCATE_LOG_RES(mp), 0,
 					      XFS_TRANS_PERM_LOG_RES,
 					      XFS_ITRUNCATE_LOG_COUNT)) {
-			ASSERT(0);
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 			IRELE(ip);
 			cancel_flags = 0;
@@ -2772,7 +2773,6 @@ xfs_create(
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
 		if (error) {
-			ASSERT(0);
 			xfs_ctrunc_trace(XFS_CTRUNC4, ip);
 			goto error_return;
 		}
@@ -2791,7 +2791,6 @@ xfs_create(
 							     (xfs_fsize_t)0,
 							     XFS_DATA_FORK, 0);
 				if (error) {
-					ASSERT(0);
 					ASSERT(ip->i_transp == tp);
 					xfs_trans_ihold_release(tp, ip);
 					goto abort_return;
@@ -2831,7 +2830,6 @@ xfs_create(
 			ASSERT(vp->v_count >= 2);
 			IRELE(ip);
 		}		
-		ASSERT(0);
 		goto abort_rele;
 	}
 
@@ -2847,7 +2845,6 @@ xfs_create(
 		IRELE(ip);
 	}
 	if (error) {
-		ASSERT(0);
 		IRELE(ip);
 		tp = NULL;
 		goto error_return;
