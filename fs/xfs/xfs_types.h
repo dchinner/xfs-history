@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 /*
  * XFS types
@@ -85,9 +85,11 @@ typedef	__int32_t	xfs_srtblock_t;	/* signed version of xfs_rtblock_t */
 #endif
 #if XFS_BIG_FILES
 typedef	__uint64_t	xfs_fileoff_t;	/* block number in a file */
+typedef	__int64_t	xfs_sfiloff_t;	/* signed block number in a file */
 typedef	__uint64_t	xfs_filblks_t;	/* number of blocks in a file */
 #else
 typedef	__uint32_t	xfs_fileoff_t;	/* block number in a file */
+typedef	__int32_t	xfs_sfiloff_t;	/* signed block number in a file */
 typedef	__uint32_t	xfs_filblks_t;	/* number of blocks in a file */
 #endif
 
