@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.123 $"
+#ident	"$Revision: 1.124 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1339,7 +1339,8 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	 * them.  If there is already an identical record, bump
 	 * its reference count.
 	 */
-	bucket = &(log->l_buf_cancel_table[blkno % XLOG_BC_TABLE_SIZE]);
+	bucket = &log->l_buf_cancel_table[(__uint64_t)blkno %
+					  XLOG_BC_TABLE_SIZE];
 	/*
 	 * If the hash bucket is empty then just insert a new record into
 	 * the bucket.
@@ -1431,7 +1432,8 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 		return 0;
 	}
 
-	bucket = &(log->l_buf_cancel_table[blkno % XLOG_BC_TABLE_SIZE]);
+	bucket = &log->l_buf_cancel_table[(__uint64_t)blkno %
+					  XLOG_BC_TABLE_SIZE];
 	bcp = *bucket;
 	if (bcp == NULL) {
 		/*
