@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.126 $"
+#ident	"$Revision: 1.127 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -78,7 +78,9 @@ int		xlog_find_cycle_start(struct log *log,
 				      daddr_t	*last_blk,
 				      uint	cycle);
 
+#ifndef SIM
 STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
+#endif
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
 #ifndef SIM
@@ -615,6 +617,9 @@ bp_err:
  * We could speed up search by using current head_blk buffer, but it is not
  * available.
  */
+#ifdef SIM
+/* ARGSUSED */
+#endif
 int
 xlog_find_tail(xlog_t  *log,
 	       daddr_t *head_blk,
@@ -624,12 +629,15 @@ xlog_find_tail(xlog_t  *log,
 	xlog_rec_header_t	*rhead;
 	xlog_op_header_t	*op_head;
 	buf_t			*bp;
-	int			error, i, found, clean;
+	int			error, i, found;
 	daddr_t			umount_data_blk;
 	daddr_t			after_umount_blk;
+#ifdef SIM
+	/* REFERENCED */
+#endif
 	xfs_lsn_t		tail_lsn;
 	
-	clean = found = error = 0;
+	found = error = 0;
 	/*
 	 * Find previous log record 
 	 */
@@ -739,7 +747,6 @@ xlog_find_tail(xlog_t  *log,
 			     ((long long)log->l_curr_cycle << 32) |
 			     ((uint)(after_umount_blk));
 			*tail_blk = after_umount_blk;
-			clean = 1;
 		}
 	}
 
@@ -753,9 +760,9 @@ xlog_find_tail(xlog_t  *log,
 	 * We use the lsn from before modifying it so that we'll never
 	 * overwrite the unmount record after a clean unmount.
 	 *
-	 * Do this only if we actually recovered the filesystem
+	 * Do this only if we are going to recover the filesystem
 	 */
-	if (!clean || !readonly)
+	if (!readonly)
 		error = xlog_clear_stale_blocks(log, tail_lsn);
 #endif /* !SIM */
 
@@ -871,7 +878,7 @@ bp_err:
 	return -1;
 }	/* xlog_find_zeroed */
 
-
+#ifndef SIM
 /*
  * This is simply a subroutine used by xlog_clear_stale_blocks() below
  * to initialize a buffer full of empty log record headers and write
@@ -1052,6 +1059,7 @@ xlog_clear_stale_blocks(
 
 	return 0;
 }
+#endif /* SIM */
 
 /******************************************************************************
  *
@@ -3212,23 +3220,28 @@ xlog_do_recover(xlog_t	*log,
  * Perform recovery and re-initialize some log variables in xlog_find_tail.
  *
  * Return error or zero.
- * clean set to 1 if and only if the fs was known to be cleanly unmounted
  */
 int
-xlog_recover(xlog_t *log, int readonly, int *clean)
+xlog_recover(xlog_t *log, int readonly)
 {
 	daddr_t head_blk, tail_blk;
 	int	error;
 
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk, readonly))
 		return error;
-	*clean = 1;
 	if (tail_blk != head_blk) {
 #ifdef SIM
 		extern daddr_t HEAD_BLK, TAIL_BLK;
 		head_blk = HEAD_BLK;
 		tail_blk = TAIL_BLK;
 #endif
+		/*
+		 * disallow recovery on read-only mounts.  note -- mount
+		 * checks for ENOSPC and turns it into an intelligent
+		 * error message.
+		 */
+		if (readonly)
+			return ENOSPC;
 #ifdef _KERNEL
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
@@ -3244,7 +3257,6 @@ xlog_recover(xlog_t *log, int readonly, int *clean)
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
-		*clean = 0;
 	}
 	return error;
 }	/* xlog_recover */
@@ -3260,7 +3272,7 @@ xlog_recover(xlog_t *log, int readonly, int *clean)
  * in the real-time portion of the file system.
  */
 int
-xlog_recover_finish(xlog_t *log, int *clean)
+xlog_recover_finish(xlog_t *log)
 {
 	/*
 	 * Now we're ready to do the transactions needed for the
@@ -3298,7 +3310,6 @@ xlog_recover_finish(xlog_t *log, int *clean)
 		cmn_err(CE_NOTE,
 			"!Ending clean XFS mount for filesystem: %s",
 			log->l_mp->m_fsname);
-		*clean = 1;
 	}
 	return 0;
 }	/* xlog_recover_finish */
