@@ -1048,9 +1048,7 @@ void pagebuf_rele(page_buf_t * pb)
  *	pagebuf_pin should be used by the file system when it wants be
  *	assured that no attempt will be made to force the affected
  *	memory to disk.	 It does not assure that a given logical page
- *	will not be moved to a different physical page.	 Only the
- *	raw_count field of mem_map_t can in general assure that a
- *	logical page will not be moved to a different physical page.
+ *	will not be moved to a different physical page.
  */
 
 void pagebuf_pin(	/* pin buffer in memory		*/
@@ -1710,7 +1708,7 @@ pagebuf_offset(page_buf_t *pb, off_t offset)
  *	retrieval, and a negative error code on any error (including
  *	-ENOENT when the loff_t is out of range).
  *
- *	The mem_map_t * return value may be set to NULL if the
+ *	The struct page * return value may be set to NULL if the
  *	page is outside of main memory (as in the case of memory on a controller
  *	card).	The page_buf_pgno_t may be set to PAGE_BUF_PGNO_NULL
  *	as well, if the page is not actually allocated, unless the
@@ -1722,7 +1720,7 @@ int pagebuf_segment(		/* return next segment of buffer */
     page_buf_t * pb,		/* buffer to examine		*/
     loff_t * boff_p,		/* offset in buffer of next	*/
 				/* segment (updated)		*/
-    mem_map_t ** spage_p,	/* page (updated)		*/
+    struct page ** spage_p,	/* page (updated)		*/
 				/* (NULL if not in mem_map[])	*/
     size_t * soff_p,		/* offset in page (updated)	*/
     size_t * ssize_p,		/* length of segment (updated)	*/
