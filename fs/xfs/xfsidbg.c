@@ -4310,6 +4310,9 @@ xfsidbg_xtp(xfs_trans_t *tp)
 	case XFS_TRANS_QM_QUOTAOFF_END:	qprintf("QM_QOFF_END");		break;
 	case XFS_TRANS_SB_UNIT:		qprintf("SB_UNIT");		break;
 	case XFS_TRANS_FSYNC_TS:	qprintf("FSYNC_TS");		break;
+	case XFS_TRANS_GROWFSRT_ALLOC:	qprintf("GROWFSRT_ALLOC");	break;
+	case XFS_TRANS_GROWFSRT_ZERO:	qprintf("GROWFSRT_ZERO");	break;
+	case XFS_TRANS_GROWFSRT_FREE:	qprintf("GROWFSRT_FREE");	break;
 
 	default:			qprintf("0x%x", tp->t_type);	break;
 	}
@@ -4338,6 +4341,11 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		tp->t_ag_btree_delta);
 	qprintf("dblocks delta %d agcount delta %d imaxpct delta %d\n",
 		tp->t_dblocks_delta, tp->t_agcount_delta, tp->t_imaxpct_delta);
+	qprintf("rextsize delta %d rbmblocks delta %d\n",
+		tp->t_rextsize_delta, tp->t_rbmblocks_delta);
+	qprintf("rblocks delta %d rextents delta %d rextslog delta %d\n",
+		tp->t_rblocks_delta, tp->t_rextents_delta,
+		tp->t_rextslog_delta);
 	qprintf("dqinfo 0x%x\n", tp->t_dqinfo);
 	qprintf("log items:\n");
 	licp = &tp->t_items;
@@ -4384,9 +4392,10 @@ xfsidbg_xtrans_res(
 		xtrp->tr_ichange, xtrp->tr_growdata, xtrp->tr_swrite);
 	qprintf("addafork: %d\twriteid: %d\tattrinval: %d\n",
 		xtrp->tr_addafork, xtrp->tr_writeid, xtrp->tr_attrinval);
-	qprintf("attrset: %d\tattrrm: %d\n",
-		xtrp->tr_attrset, xtrp->tr_attrrm);
-	qprintf("clearagi: %d\n", xtrp->tr_clearagi);
+	qprintf("attrset: %d\tattrrm: %d\tclearagi: %d\n",
+		xtrp->tr_attrset, xtrp->tr_attrrm, xtrp->tr_clearagi);
+	qprintf("growrtalloc: %d\tgrowrtzero: %d\tgrowrtfree: %d\n",
+		xtrp->tr_growrtalloc, xtrp->tr_growrtzero, xtrp->tr_growrtfree);
 }
 
 /*
