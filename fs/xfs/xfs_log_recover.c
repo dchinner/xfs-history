@@ -198,32 +198,28 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
  * of the last block in the given buffer.  extra_bblks contains the number
  * of blocks we would have read on a previous read.  This happens when the
  * last log record is split over the end of the physical log.
+ *
+ * extra_bblks is the number of blocks potentially verified on a previous
+ * call to this routine.
  */
 STATIC int
 xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 			    daddr_t	start_blk,
-			    daddr_t	*last_blk)
+			    daddr_t	*last_blk,
+			    int		extra_bblks)
 {
     xlog_rec_header_t *rhead;
     int		      i;
-    int		      extra_bblks = 0;
-    int		      extra = 0;
 
     ASSERT(start_blk != 0 || *last_blk != start_blk);
-
-    /* We may be verifying a split log record */
-    if (*last_blk - start_blk < BTOBB(XLOG_MAX_RECORD_BSIZE)) {
-	extra_bblks = BTOBB(XLOG_MAX_RECORD_BSIZE) - (*last_blk - start_blk);
-	extra = 1;
-    }
 
     ba -= BBSIZE;
     for (i=(*last_blk)-1; i>=0; i--) {
 	if (*(uint *)ba == XLOG_HEADER_MAGIC_NUM) {
-	    extra = 0;
 	    break;
 	} else {
 	    if (i < start_blk) {
+		/* legal log record not found */
 		xlog_warn("xFS: xlog_find_verify_log_record: need to backup");
 		ASSERT(0);
 		return XFS_ERROR(EIO);
@@ -232,7 +228,11 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 	}
     }
 
-    /* We hit the beginning of the physical log */
+    /*
+     * We hit the beginning of the physical log & still no header.  Return
+     * to caller.  If caller can handle a return of -1, then this routine
+     * will be called again for the end of the physical log.
+     */
     if (i == -1)
 	    return -1;
 
@@ -244,10 +244,8 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
      * record do we update last_blk.
      */
     rhead = (xlog_rec_header_t *)ba;
-    if (extra == 0)
-	extra_bblks = 0;
     if (*last_blk - i + extra_bblks != BTOBB(rhead->h_len)+1)
-	*last_blk = i;
+	    *last_blk = i;
     return 0;
 }	/* xlog_find_verify_log_record */
 
@@ -378,7 +376,10 @@ bad_blk:
 
 	/* start ptr at last block ptr before last_blk */
 	ba = big_bp->b_dmaaddr + XLOG_MAX_RECORD_BSIZE;
-	if ((error= xlog_find_verify_log_record(ba,start_blk,&last_blk)) == -1) {
+	if ((error = xlog_find_verify_log_record(ba,
+						 start_blk,
+						 &last_blk,
+						 0)) == -1) {
 	    error = XFS_ERROR(EIO);
 	    goto big_bp_err;
 	} else if (error)
@@ -388,7 +389,10 @@ bad_blk:
 	if (error = xlog_bread(log, start_blk, last_blk, big_bp))
 	    goto big_bp_err;
 	ba = big_bp->b_dmaaddr + BBTOB(last_blk);
-	if ((error= xlog_find_verify_log_record(ba,start_blk,&last_blk)) == -1) {
+	if ((error = xlog_find_verify_log_record(ba,
+						 start_blk,
+						 &last_blk,
+						 0)) == -1) {
 	    /* We hit the beginning of the log during our search */
 	    start_blk = log_bbnum - num_scan_bblks + last_blk;
 	    new_blk = log_bbnum;
@@ -396,8 +400,10 @@ bad_blk:
 				   big_bp))
 		goto big_bp_err;
 	    ba = big_bp->b_dmaaddr + BBTOB(log_bbnum - start_blk);
-	    if ((error = xlog_find_verify_log_record(ba, start_blk,
-						     &new_blk)) == -1) {
+	    if ((error = xlog_find_verify_log_record(ba,
+						     start_blk,
+						     &new_blk,
+						     last_blk)) == -1) {
 		error = XFS_ERROR(EIO);
 		goto big_bp_err;
 	    } else if (error)
@@ -539,13 +545,13 @@ xlog_find_tail(xlog_t  *log,
 			if (error = xlog_bread(log, i, 1, bp))
 				goto bread_err;
 			if (*(uint*)(bp->b_dmaaddr) == XLOG_HEADER_MAGIC_NUM) {
-				found = 1;
+				found = 2;
 				break;
 			}
 		}
 	}
 	if (!found) {
-		xlog_warn("xFS: xlog_find_tail: counldn't find sync record");
+		xlog_warn("xFS: xlog_find_tail: couldn't find sync record");
 		ASSERT(0);
 		return XFS_ERROR(EIO);
 	}
@@ -555,11 +561,20 @@ xlog_find_tail(xlog_t  *log,
 	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
 
 	/*
-	 * Reset log values according to the state of the log when we crashed.
+	 * Reset log values according to the state of the log when we
+	 * crashed.  In the case where head_blk == 0, we bump curr_cycle
+	 * one because the next write starts a new cycle rather than
+	 * continuing the cycle of the last good log record.  At this
+	 * point we have guaranteed that all partial log records have been
+	 * accounted for.  Therefore, we know that the last good log record
+	 * written was complete and ended exactly on the end boundary
+	 * of the physical log.
 	 */
 	log->l_prev_block = i;
 	log->l_curr_block = *head_blk;
 	log->l_curr_cycle = rhead->h_cycle;
+	if (found == 2)
+		log->l_curr_cycle++;
 	log->l_tail_lsn = rhead->h_tail_lsn;
 	log->l_last_sync_lsn = rhead->h_lsn;
 	log->l_grant_reserve_cycle = log->l_curr_cycle;
@@ -672,7 +687,7 @@ xlog_find_zeroed(xlog_t	 *log,
 	 * Potentially backup over partial log record write.  We don't need
 	 * to search the end of the log because we know it is zero.
 	 */
-	if (error = xlog_find_verify_log_record(ba, start_blk, &last_blk))
+	if (error = xlog_find_verify_log_record(ba, start_blk, &last_blk, 0))
 	    goto big_bp_err;
 
 	*blk_no = last_blk;
@@ -2576,7 +2591,7 @@ int
 xlog_recover(xlog_t *log)
 {
 	daddr_t head_blk, tail_blk;
-	int error;
+	int	error;
 
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk))
 		return error;
