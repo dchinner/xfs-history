@@ -1,0 +1,195 @@
+/*
+ * xfs_dir.h
+ *
+ * Directory layout, internal structure, access macros, etc.
+ *
+ * Large directories are structured around Btrees where all the data
+ * elements are in the leaf nodes.  Filenames are hashed into an int,
+ * then that int is used as the index into the Btree.  Since the hashval
+ * of a filename may not be unique, we may have duplicate keys.  The
+ * internal links in the Btree are logical block offsets into the file.
+ *
+ * Small directories use a different format and are packed as tightly
+ * as possible so as to fit into the literal area of the inode.
+ */
+
+/*========================================================================
+ * Directory Structure when smaller than XFS_LITINO(fs) bytes.
+ *========================================================================*/
+
+/*
+ * The parent directory has a dedicated field, and the self-pointer must
+ * be calculated on the fly.
+ *
+ * Entries are packed toward the top as tight as possible.  The header
+ * and the elements much be bcopy()'d out into a work area to get correct
+ * alignment for the inode number fields.
+ */
+struct xfs_dir_shortform {
+	struct xfs_dir_sf_hdr {		/* constant-structure header block */
+		__uint8_t parent[8];	/* parent dir inode number */
+		__uint8_t count;	/* count of active entries */
+	} hdr;
+	struct xfs_dir_sf_entry {
+		__uint8_t inumber[8];	/* referenced inode number */
+		__uint8_t namelen;	/* actual length of name (no NULL) */
+		__uint8_t name[1];	/* name */
+	} list[1];			/* variable sized array */
+};
+
+#define XFS_DIR_SF_ENTSIZE_BYNAME(LEN)		/* space a name uses */ \
+	(sizeof(struct xfs_dir_sf_entry)-1 + (LEN))
+#define XFS_DIR_SF_ENTSIZE_BYENTRY(SFEP)	/* space an entry uses */ \
+	(sizeof(struct xfs_dir_sf_entry)-1 + (SFEP)->namelen)
+#define XFS_DIR_SF_NEXTENTRY(SFEP)		/* next entry in struct */ \
+	((struct xfs_dir_sf_entry *) \
+		((char *)(SFEP) + XFS_DIR_SF_ENTSIZE_BYENTRY(SFEP)))
+#define XFS_DIR_SF_ALLFIT(COUNT, TOTALLEN)	/* will all entries fit? */ \
+	(sizeof(struct xfs_dir_sf_hdr) + \
+	       (sizeof(struct xfs_dir_sf_entry)-1)*(COUNT) + (TOTALLEN))
+
+/*========================================================================
+ * Directory Structure when equal to XFS_LBSIZE(fs) bytes.
+ *========================================================================*/
+
+/*
+ * This structure is common to both leaf nodes and non-leaf nodes in the Btree.
+ *
+ * Is is used to manage a doubly linked list of all blocks at the same
+ * level in the Btree, and to identify which type of block this is.
+ */
+#define XFS_DIR_LEAF_MAGIC	0xfeeb	/* magic number for leaf blocks */
+#define XFS_DIR_NODE_MAGIC	0xfebe	/* magic number for non-leaf blocks */
+#define XFS_DIR_FREE_MAGIC	0xbefe	/* magic number for free blocks */
+
+struct xfs_dir_blkinfo {
+	__uint32_t forw;			/* previous block in list */
+	__uint32_t back;			/* following block in list */
+	__uint16_t magic;			/* validity check on block */
+};
+
+/*
+ * This is the structure of the leaf nodes in the Btree.
+ *
+ * Struct leaf_entry's are packed from the top.  Names grow from the bottom
+ * but are not packed.  The freemap contains run-length-encoded entries
+ * for the free bytes after the leaf_entry's, but only the N largest such,
+ * smaller runs are dropped.  When the freemap doesn't show enough space
+ * for an allocation, we compact the namelist area and try again.  If we
+ * still don't have enough space, then we have to split the block.
+ *
+ * Since we have duplicate hash keys, for each key that matches, compare
+ * the actual string.  The root and intermediate node search always takes
+ * the first-in-the-block key match found, so we should only have to work
+ * "forw"ard.  If none matches, continue with the "forw"ard leaf nodes
+ * until the hash key changes or the filename is found.
+ *
+ * The parent directory and the self-pointer are explicitly represented
+ * (ie: there are entries for "." and "..").
+ *
+ * Note that the count being a __uint16_t limits us to something like a 
+ * blocksize of 1.3MB in the face of worst case (short) filenames.
+ */
+#define XFS_DIR_LEAF_MAPSIZE	3	/* how many freespace slots */
+
+struct xfs_dir_leafblock {
+	struct xfs_dir_leaf_hdr {	/* constant-structure header block */
+		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
+		__uint16_t count;	/* count of active leaf_entry's */
+		__uint16_t namebytes;	/* num bytes of name strings stored */
+		__uint16_t firstused;	/* first used byte in name area */
+		__uint8_t  holes;	/* != 0 if blk needs compaction */
+		__uint8_t  pad1;
+		struct xfs_dir_leaf_map {/* RLE map of free bytes */
+			__uint16_t base; /* base of free region */
+			__uint16_t size; /* run length of free region */
+		} freemap[XFS_DIR_LEAF_MAPSIZE]; /* N largest free regions */
+	} hdr;
+	struct xfs_dir_leaf_entry {	/* sorted on key, not name */
+		__uint32_t hashval;	/* hash value of name */
+		__uint16_t nameidx;	/* index into buffer of name */
+		__uint16_t pad2;
+	} leaves[1];			/* var sized array */
+	struct xfs_dir_leaf_name {
+		__uint8_t inumber[8];	/* inode number for this key */
+		__uint8_t namelen;	/* length of name string */
+		__uint8_t name[1];	/* name string itself */
+	} namelist[1];			/* grows from bottom of buf */
+};
+
+#define XFS_DIR_LEAF_ENTSIZE_BYNAME(LEN)	/* space a name will use */ \
+	(sizeof(struct xfs_dir_leaf_name)-1 + LEN)
+#define XFS_DIR_LEAF_ENTSIZE_BYENTRY(NAMEENT)	/* space an entry will use */ \
+	(sizeof(struct xfs_dir_leaf_name)-1 + (NAMEENT)->namelen)
+#define XFS_DIR_LEAF_NAMESTRUCT(LEAFP, OFFSET)	/* point to name struct */ \
+	((struct xfs_dir_leaf_name *)&((char *)(LEAFP))[OFFSET])
+
+/*========================================================================
+ * Directory Structure when greater than XFS_LBSIZE(fs) bytes.
+ *========================================================================*/
+
+/*
+ * This is the structure of the root and intermediate nodes in the Btree.
+ * The leaf nodes are defined above.
+ *
+ * Entries are not packed.
+ *
+ * Since we have duplicate keys, use a binary search but always follow
+ * all match in the block, not just the first match found.
+ *
+ * The root node only has the hdr.freechain and hdr.freeblks fields set.
+ * When directory blocks in the middle of the address space are freed,
+ * they are attached to the head of this list and the hdr.freeblks count
+ * is incremented.  When the count gets up to XFS_DIR_FREE_CLEANUP, we
+ * will garbage collect.
+ */
+#define	XFS_DIR_NODE_MAXDEPTH	5	/* max depth of Btree */
+
+struct xfs_dir_intnode {
+	struct xfs_dir_node_hdr {	/* constant-structure header block */
+		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
+		__uint16_t count;	/* count of active entries */
+		__uint8_t  level;	/* level above leaves (leaf == 0) */
+#ifdef GROT
+		__uint16_t freecount;	/* num blks in freechain (root only) */
+		__uint32_t freechain;	/* free block chain (root node only) */
+		__uint8_t  level;	/* level above leaves (leaf == 0) */
+		__uint8_t  pad1[5];
+#endif
+	} hdr;
+	struct xfs_dir_node_entry {
+		__uint32_t hashval;	/* hash value for this descendant */
+		__uint32_t before;	/* Btree block before this key */
+	} btree[1];			/* variable sized array of keys */
+};
+
+#define XFS_DIR_NODE_ENTSIZE_BYNAME()	/* space a name uses */ \
+	(sizeof(struct xfs_dir_node_entry))
+#define XFS_DIR_NODE_ENTRIES(FS)	/* how many entries in this block? */ \
+	((XFS_LBSIZE(FS) - sizeof(struct xfs_dir_node_hdr)) \
+		   / sizeof(struct xfs_dir_node_entry))
+#define XFS_DIR_MAXBLK		0x10000000	/* max hash value */
+
+/*
+ * The contents of a free block in the directory.
+ *
+ * Those directory blocks that are no longer in use, but are in the
+ * middle of the address space, have this format.  When the number of
+ * such blocks gets up to XFS_DIR_FREE_CLEANUP, we will shuffle the
+ * active blocks around in the address space so as to compress out
+ * the unused blocks.  Once they are at the end of the address space,
+ * the address space is truncated.
+ */
+#define XFS_DIR_FREE_CLEANUP	8	/* max free blks before compress */
+
+struct xfs_dir_freeblock {
+	struct xfs_dir_free_hdr {	/* constant-structure header block */
+		struct xfs_dir_blkinfo info;	/* block type, links, etc. */
+		__uint16_t pad;
+	} hdr;
+	__uint32_t free[1];		/* partial list of free blocks */
+};
+
+#define XFS_DIR_FREE_ENTRIES(FS)	/* how many entries in this block? */ \
+	((XFS_LBSIZE(FS) - sizeof(struct xfs_dir_free_hdr)) \
+		   / sizeof(__uint32_t))
