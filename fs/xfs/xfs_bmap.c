@@ -1943,7 +1943,7 @@ xfs_bmap_extents_to_btree(
 	ASSERT(*firstblock == NULLFSBLOCK ||
 	       args->agno == XFS_FSB_TO_AGNO(mp, *firstblock) ||
 	       (lowspace && args->agno > XFS_FSB_TO_AGNO(mp, *firstblock)));
-	*firstblock = args->fsbno;
+	*firstblock = cur->bc_private.b.firstblock = args->fsbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
 	abp = xfs_btree_get_bufl(mp, tp, args->fsbno, 0);
