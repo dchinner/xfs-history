@@ -236,10 +236,13 @@ typedef struct xlog_in_core {
  * that round off problems won't occur when releasing partial reservations.
  */
 typedef struct log {
+    sema_t		l_flushsema;    /* iclog flushing semaphore */
+    int			l_ticket_cnt;	/* free ticket count */
+    int			l_ticket_tcnt;	/* total ticket count */
     xlog_ticket_t	*l_freelist;    /* free list of tickets */
+    xlog_ticket_t	*l_unmount_free;/* kmem_free these addresses */
     xlog_ticket_t	*l_tail;        /* free list of tickets */
     xlog_in_core_t	*l_iclog;       /* head log queue	*/
-    sema_t		l_flushsema;    /* iclog flushing semaphore */
     lock_t		l_icloglock;    /* grab to change iclog state */
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
@@ -254,7 +257,7 @@ typedef struct log {
     int			l_prev_cycle;   /* Cycle # b4 last block increment */
     int			l_curr_block;   /* current logical block of log */
     int			l_prev_block;   /* previous logical block of log */
-    xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];/* for debuggin */
+    xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];/* for debugging */
     int			l_iclog_size;   /* size of log in bytes; repeat */
 
     lock_t		l_grant_lock;		/* protects below fields */
