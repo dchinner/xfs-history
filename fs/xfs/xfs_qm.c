@@ -1,4 +1,4 @@
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.25 $"
 
 
 #include <sys/param.h>
@@ -75,7 +75,7 @@ STATIC int	xfs_qm_dqiter_bufs(xfs_mount_t *, xfs_dqid_t, xfs_fsblock_t,
 STATIC int	xfs_qm_dqiterate(xfs_mount_t *, xfs_inode_t *, uint);
 STATIC void 	xfs_qm_quotacheck_dqadjust(xfs_dquot_t *, xfs_qcnt_t, xfs_qcnt_t);
 STATIC int	xfs_qm_dqusage_adjust(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, 
-				      void *, daddr_t);
+				      void *, daddr_t, int *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *, int);
@@ -1816,7 +1816,8 @@ xfs_qm_dqusage_adjust(
         xfs_trans_t     *tp,            /* transaction pointer - NULL */
         xfs_ino_t       ino,            /* inode number to get data for */
         void            *buffer,        /* not used */
-        daddr_t         bno)            /* starting block of inode cluster */
+        daddr_t         bno,            /* starting block of inode cluster */
+	int		*res)		/* result code value */
 {
 	xfs_inode_t     *ip;
 	xfs_dquot_t	*udqp, *pdqp;
@@ -1829,8 +1830,10 @@ xfs_qm_dqusage_adjust(
 	 * rootino must have its resources accounted for, not so with the quota
 	 * inodes. 
 	 */
-	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino)
-                return (0);
+	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino) {
+		*res = BULKSTAT_RV_NOTHING;
+                return XFS_ERROR(EINVAL);
+	}
 
 	/*
 	 * We don't _need_ to take the ilock EXCL. However, the xfs_qm_dqget
@@ -1838,12 +1841,15 @@ xfs_qm_dqusage_adjust(
 	 * the case in all other instances. It's OK that we do this because
 	 * quotacheck is done only at mount time.
 	 */
-        if (xfs_iget(mp, tp, ino, XFS_ILOCK_EXCL, &ip, bno))
-                return (0);
+        if (error = xfs_iget(mp, tp, ino, XFS_ILOCK_EXCL, &ip, bno)) {
+		*res = BULKSTAT_RV_NOTHING;
+                return (error);
+	}
 
         if (ip->i_d.di_mode == 0) {
                 xfs_iput(ip, XFS_ILOCK_EXCL);
-                return (0);
+		*res = BULKSTAT_RV_NOTHING;
+                return XFS_ERROR(ENOENT);
         }
 
 	/*
@@ -1854,7 +1860,8 @@ xfs_qm_dqusage_adjust(
 	 */
 	if (error = xfs_qm_dqget_noattach(ip, &udqp, &pdqp)) {
 		xfs_iput(ip, XFS_ILOCK_EXCL);
-		return -(error);
+		*res = BULKSTAT_RV_GIVEUP;
+		return (error);
 	}
 
 #ifdef  _IRIX62_XFS_ONLY
@@ -1873,7 +1880,8 @@ xfs_qm_dqusage_adjust(
 				xfs_qm_dqput(udqp);
 			if (pdqp)
 				xfs_qm_dqput(pdqp);
-			return -(error);
+			*res = BULKSTAT_RV_GIVEUP;
+			return (error);
 		}
 		nblks = (xfs_qcnt_t)ip->i_d.di_nblocks - rtblks;
 	}
@@ -1917,7 +1925,8 @@ xfs_qm_dqusage_adjust(
 	/*
 	 * Goto next inode.
 	 */
-	return (1);
+	*res = BULKSTAT_RV_DIDONE;
+	return (0);
 }
 
 /*

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -1493,27 +1493,34 @@ xfs_qm_internalqcheck_adjust(
         xfs_trans_t     *tp,            /* transaction pointer */
         xfs_ino_t       ino,            /* inode number to get data for */
         void            *buffer,        /* not used */
-        daddr_t         bno)            /* starting block of inode cluster */	
+        daddr_t         bno,            /* starting block of inode cluster */	
+	int		*res)		/* bulkstat result code */
 {
 	xfs_inode_t     	*ip;
 	xfs_dqtest_t		*ud, *pd;
 	uint			lock_flags;
 	extern	dev_t		rootdev;
 	boolean_t		ipreleased;
+	int			error;
 
 	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
 
-	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino)
-                return (0);
+	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino) {
+		*res = BULKSTAT_RV_NOTHING;
+                return XFS_ERROR(EINVAL);
+	}
 	ipreleased = B_FALSE;
  again:
 	lock_flags = XFS_ILOCK_SHARED;
-        if (xfs_iget(mp, tp, ino, lock_flags, &ip, bno))
-                return (0);
+        if (error = xfs_iget(mp, tp, ino, lock_flags, &ip, bno)) {
+		*res = BULKSTAT_RV_NOTHING;
+                return (error);
+	}
 
         if (ip->i_d.di_mode == 0) {
                 xfs_iput(ip, lock_flags);
-                return (0);
+		*res = BULKSTAT_RV_NOTHING;
+                return XFS_ERROR(ENOENT);
         }
 	
 	/*
@@ -1527,12 +1534,13 @@ xfs_qm_internalqcheck_adjust(
 		ipreleased = B_TRUE;
 		goto again;
 	}
-	if (xfs_qm_internalqcheck_get_dquots(mp, 
+	if (error = xfs_qm_internalqcheck_get_dquots(mp, 
 					     (xfs_dqid_t) ip->i_d.di_uid,
 					     (xfs_dqid_t) ip->i_d.di_projid,
 					     &ud, &pd)) {
 		xfs_iput(ip, lock_flags);
-		return (0);
+		*res = BULKSTAT_RV_NOTHING;
+		return (error);
 	}
 	if (XFS_IS_UQUOTA_ON(mp)) {
 		ASSERT(ud);
@@ -1543,7 +1551,8 @@ xfs_qm_internalqcheck_adjust(
 		(void) xfs_qm_internalqcheck_dqadjust(ip, pd);
 	}
 	xfs_iput(ip, lock_flags);
-	return (1);
+	*res = BULKSTAT_RV_DIDONE;
+	return (0);
 }
 
 
