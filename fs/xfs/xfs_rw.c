@@ -2096,7 +2096,7 @@ xfs_diostrat( buf_t *bp)
 	off_t		offset, offset_this_req;
 	int		i, j, error, writeflag, reccount;
 	int		end_of_file, bufsissued, totresid;
-	int		ioflag, blk_algn;
+	int		ioflag, blk_algn, rt, numrtextents, rtextsize;
 
 	dp        = (struct dio_s *)bp->b_private;
 	vp        = dp->vp;
@@ -2109,6 +2109,18 @@ xfs_diostrat( buf_t *bp)
 	offset    = BBTOB(bp->b_blkno);
 	blk_algn  = 0;
 	totresid  = count  = bp->b_bcount;
+
+	/*
+ 	 * Determine if this file is using the realtime volume.
+	 */
+	if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
+		rt = 1;
+		rtextsize = ip->i_d.di_extsize;
+	} else {
+		numrtextents = 0;
+		rtextsize = 0;
+		rt = 0;
+	}
 
 	ASSERT(!(bp->b_flags & B_DONE));
         ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
@@ -2167,13 +2179,21 @@ xfs_diostrat( buf_t *bp)
 			imapp = &imaps[0];
 			count_fsb = imapp->br_blockcount;
 
+			if (rt) {
+				/*
+				 * Round up to even number of extents.
+				 */
+				numrtextents = (count_fsb + rtextsize -1) / 
+					rtextsize;
+			}
+
 			/*
  			 * Setup transactions.
  			 */
 			tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
 			error = xfs_trans_reserve( tp, count_fsb, 
 						   XFS_DEFAULT_LOG_RES(sbp),
-						   0, 0 );
+						   numrtextents, 0 );
 
 			if (error) {
 				/*
