@@ -76,6 +76,11 @@ typedef enum xfs_alloctype
 } xfs_alloctype_t;
 
 /*
+ * Flags for xfs_alloc_ag_freeblks, xfs_alloc_fix_freelist
+ */
+#define	XFS_ALLOC_FLAG_TRYLOCK	0x1	/* use trylock for buffer locking */
+
+/*
  * Prototypes for visible xfs_alloc.c routines
  */
 
@@ -86,7 +91,8 @@ xfs_extlen_t			/* number of remaining free blocks */
 xfs_alloc_ag_freeblks(
 	xfs_mount_t	*mp,	/* file system mount structure */
 	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_agnumber_t	agno);	/* allocation group number */
+	xfs_agnumber_t	agno,	/* allocation group number */
+	int		flags);	/* XFS_ALLOC_FLAG_... */
 
 /*
  * Allocate an extent (fixed-size).
@@ -96,16 +102,21 @@ xfs_alloc_extent(
 	xfs_trans_t	*tp,	/* transaction pointer */
 	xfs_fsblock_t	bno,	/* requested starting block */
 	xfs_extlen_t	len,	/* requested length */
-	xfs_alloctype_t	flag);	/* allocation type, see above definition */
+	xfs_alloctype_t	type,	/* allocation type, see above definition */
+	xfs_extlen_t	total);	/* total blocks needed in transaction */
 
 /*
- * Fix up the btree freelist's size.
+ * Decide whether to use this allocation group for this allocation.
+ * If so, fix up the btree freelist's size.
  * This is external so mkfs can call it, too.
  */
 buf_t *				/* buffer for the a.g. freelist header */
 xfs_alloc_fix_freelist(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_agnumber_t	agno);	/* allocation group number */
+	xfs_agnumber_t	agno,	/* allocation group number */
+	xfs_extlen_t	minlen,	/* minimum length extent needed now */
+	xfs_extlen_t	total,	/* maximum blocks needed during transaction */
+	int		flags);	/* XFS_ALLOC_FLAG_... */
 
 /*
  * Find the next freelist block number.
@@ -127,7 +138,8 @@ xfs_alloc_vextent(
 	xfs_extlen_t	minlen,	/* minimum requested length */
 	xfs_extlen_t	maxlen,	/* maximum requested length */
 	xfs_extlen_t	*len,	/* output: actual allocated length */
-	xfs_alloctype_t	flag);	/* allocation type, see above definition */
+	xfs_alloctype_t	type,	/* allocation type, see above definition */
+	xfs_extlen_t	total);	/* total blocks needed in transaction */
 
 /*
  * Free an extent.
