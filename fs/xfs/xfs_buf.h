@@ -300,6 +300,8 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 	if (pb->pb_list.next != &pb->pb_list) {
 		pagebuf_delwri_dequeue(pb);
 		pagebuf_rele(pb);
+	} else {
+		pb->pb_flags &= ~PBF_DELWRI;
 	}
 }
 
@@ -475,7 +477,16 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 			pagebuf_mapin(bp)
 
 #define xfs_xfsd_list_evict(x)       printk("xfs_xfsd_list_evict not implemented\n")
-#define xfs_buftrace(x,y)     
+
+#ifdef PAGEBUF_TRACE
+#define PB_DEFINE_TRACES
+#include <linux/page_buf_trace.h>
+
+#define xfs_buftrace(id, bp)	PB_TRACE(bp, (void *)id)
+#else
+#define xfs_buftrace(id, bp)
+#endif
+
 
 #define xfs_biodone(pb)             \
             pagebuf_iodone(pb)
@@ -531,8 +542,6 @@ extern void XFS_bflush(buftarg_t);
 	
 
 #define XFS_pdflush(vnode,flags) printk("XFS_pdflush not implemeneted\n")
-
-#define buftrace(id, bp)
 
 #define chunkread(vnode,bmap,nmaps,cred) printk("chunkread... whaa shouldn't be here at all\n")
 #define getchunk(vnode,bmap,cred) printk("chunkread... whaa shouldn't be here at all\n")

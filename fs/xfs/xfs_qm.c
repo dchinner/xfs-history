@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.46 $"
+#ident "$Revision: 1.47 $"
 
 
 #include <sys/param.h>
@@ -1600,7 +1600,7 @@ xfs_qm_reset_dqcounts(
 	xfs_disk_dquot_t	*ddq;
 	int			j;
 
-	buftrace("RESET DQUOTS", bp);
+	xfs_buftrace("RESET DQUOTS", bp);
 	/* 
 	 * Reset all counters and timers. They'll be
 	 * started afresh by xfs_qm_quotacheck. 

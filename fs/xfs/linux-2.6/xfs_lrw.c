@@ -1271,7 +1271,7 @@ xfsbdstrat(
 		return 0;
 	}
 
-	buftrace("XFSBDSTRAT IOERROR", bp);
+	xfs_buftrace("XFSBDSTRAT IOERROR", bp);
 	return (xfs_bioerror_relse(bp));
 }
 

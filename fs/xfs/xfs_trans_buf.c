@@ -143,12 +143,10 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		 * since last read.  This doesn't matter since the
 		 * caller isn't allowed to use the data anyway.
 		 */
-#ifndef _USING_PAGEBUF_T
 		else if (XFS_BUF_ISSTALE(bp)) {
-			buftrace("TRANS GET RECUR STALE", bp);
+			xfs_buftrace("TRANS GET RECUR STALE", bp);
 			ASSERT(XFS_BUF_ISDELAYWRITE(bp));
 		}
-#endif
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 		ASSERT(bip != NULL);
@@ -211,7 +209,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 */
 	XFS_BUF_SET_FSPRIVATE2(bp, tp);
 
-    xfs_buftrace("TRANS GET", bp);
+	xfs_buftrace("TRANS GET", bp);
 	xfs_buf_item_trace("GET", bip);
 	return (bp);
 }
@@ -424,7 +422,7 @@ xfs_trans_read_buf(
 		 * brelse it either. Just get out.
 		 */
 		if (XFS_FORCED_SHUTDOWN(mp)) {
-			buftrace("READ_BUF_INCORE XFSSHUTDN", bp);
+			xfs_buftrace("READ_BUF_INCORE XFSSHUTDN", bp);
 			*bpp = NULL;
 			return XFS_ERROR(EIO);
 		}
@@ -458,7 +456,7 @@ xfs_trans_read_buf(
 	}
 	if (XFS_BUF_GETERROR(bp) != 0) {
 	    XFS_BUF_SUPER_STALE(bp);
-		buftrace("READ ERROR", bp);
+		xfs_buftrace("READ ERROR", bp);
 		error = XFS_BUF_GETERROR(bp);
 			
 		xfs_ioerror_alert("xfs_trans_read_buf", mp, 
@@ -517,7 +515,7 @@ xfs_trans_read_buf(
 	 */
 	XFS_BUF_SET_FSPRIVATE2(bp, tp);
 
-	buftrace("TRANS READ", bp);
+	xfs_buftrace("TRANS READ", bp);
 	xfs_buf_item_trace("READ", bip);
 	*bpp = bp;
 	return 0;
@@ -536,7 +534,7 @@ shutdown_abort:
 	ASSERT((XFS_BUF_BFLAGS(bp) & (XFS_B_STALE|XFS_B_DELWRI)) !=
 						(XFS_B_STALE|XFS_B_DELWRI));
 
-	buftrace("READ_BUF XFSSHUTDN", bp);
+	xfs_buftrace("READ_BUF XFSSHUTDN", bp);
 	xfs_buf_relse(bp);	
 	*bpp = NULL;
 	return XFS_ERROR(EIO);
@@ -908,7 +906,7 @@ xfs_trans_binval(
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		ASSERT(lidp->lid_flags & XFS_LID_DIRTY);
 		ASSERT(tp->t_flags & XFS_TRANS_DIRTY);
-		buftrace("XFS_BINVAL RECUR", bp);
+		xfs_buftrace("XFS_BINVAL RECUR", bp);
 		xfs_buf_item_trace("BINVAL RECUR", bip);
 		return;
 	}
@@ -943,7 +941,7 @@ xfs_trans_binval(
 	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
 	tp->t_flags |= XFS_TRANS_DIRTY;
-	buftrace("XFS_BINVAL", bp);
+	xfs_buftrace("XFS_BINVAL", bp);
 	xfs_buf_item_trace("BINVAL", bip);
 }
 

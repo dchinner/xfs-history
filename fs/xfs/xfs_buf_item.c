@@ -563,7 +563,7 @@ xfs_buf_item_abort(
 	xfs_buf_t 	*bp;
 
 	bp = bip->bli_buf;
-	buftrace("XFS_ABORT", bp);
+	xfs_buftrace("XFS_ABORT", bp);
 	XFS_BUF_SUPER_STALE(bp);
 	xfs_buf_item_unlock(bip);
 	return;
@@ -1146,7 +1146,7 @@ xfs_buf_item_relse(
 {
 	xfs_buf_log_item_t	*bip;
 
-	buftrace("XFS_RELSE", bp);
+	xfs_buftrace("XFS_RELSE", bp);
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
 	XFS_BUF_SET_FSPRIVATE(bp, bip->bli_item.li_bio_list);
 	if ((XFS_BUF_FSPRIVATE(bp, void *) == NULL) &&
@@ -1256,7 +1256,7 @@ xfs_buf_iodone_callbacks(
 		if (XFS_FORCED_SHUTDOWN(mp)) {
 			ASSERT(XFS_BUF_TARGET(bp) == mp->m_dev);
 			XFS_BUF_SUPER_STALE(bp);
-			buftrace("BUF_IODONE_CB", bp);
+			xfs_buftrace("BUF_IODONE_CB", bp);
 			xfs_buf_do_callbacks(bp, lip);
 			XFS_BUF_SET_FSPRIVATE(bp, NULL);
 			XFS_BUF_CLR_IODONE_FUNC(bp);
@@ -1306,7 +1306,7 @@ xfs_buf_iodone_callbacks(
 				XFS_BUF_SET_START(bp);
 			}
 			ASSERT(XFS_BUF_IODONE_FUNC(bp));
-			buftrace("BUF_IODONE ASYNC", bp);
+			xfs_buftrace("BUF_IODONE ASYNC", bp);
 			xfs_buf_relse(bp);
 		} else {
 			/*
@@ -1330,7 +1330,7 @@ xfs_buf_iodone_callbacks(
 		return;
 	}
 #ifdef XFSERRORDEBUG
-	buftrace("XFS BUFCB NOERR", bp);
+	xfs_buftrace("XFS BUFCB NOERR", bp);
 #endif
 	xfs_buf_do_callbacks(bp, lip);
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
@@ -1356,8 +1356,8 @@ xfs_buf_error_relse(
 	XFS_BUF_STALE(bp);
 	XFS_BUF_DONE(bp);
 	XFS_BUF_UNDELAYWRITE(bp);
-	XFS_BUF_ERROR(bp,0)
-    xfs_buftrace("BUF_ERROR_RELSE", bp);
+	XFS_BUF_ERROR(bp,0);
+	xfs_buftrace("BUF_ERROR_RELSE", bp);
 	if (! XFS_FORCED_SHUTDOWN(mp)) 		
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	/*
