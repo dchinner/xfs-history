@@ -29,13 +29,14 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_ag.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_ag.h"
 #include "xfs_bmap_btree.h"
-#include "xfs_imap.h"
+#include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_imap.h"
+#include "xfs_ialloc.h"
 #include "xfs_bmap.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
@@ -295,7 +296,6 @@ xfs_iread(
 		ip->i_d.di_magic = dip->di_core.di_magic;
 		ip->i_d.di_version = dip->di_core.di_version;
 		ip->i_d.di_gen = dip->di_core.di_gen;
-		ip->i_d.di_nexti = dip->di_core.di_nexti;
 	}	
 
 	ip->i_delayed_blks = 0;
@@ -356,13 +356,13 @@ xfs_iread_extents(
  * set according to the contents of the given cred structure.
  *
  * Use xfs_dialloc() to allocate the on-disk inode. If xfs_dialloc()
- * has a free inode available on its freelist, call xfs_iget()
+ * has a free inode available, call xfs_iget()
  * to obtain the in-core version of the allocated inode.  Finally,
  * fill in the inode and log its initial contents.  In this case,
  * ialloc_context would be set to NULL and call_again set to false.
  *
- * If xfs_dialloc() does not have an available inode on the freelist,
- * it will replenish the freelist by doing an allocation. Since we can
+ * If xfs_dialloc() does not have an available inode,
+ * it will replenish its supply by doing an allocation. Since we can
  * only do one allocation within a transaction without deadlocks, we 
  * must commit the current transaction before returning the inode itself.
  * In this case, therefore, we will set call_again to true and return.
@@ -397,28 +397,20 @@ xfs_ialloc(
 	 * Call the space management code to pick
 	 * the on-disk inode to be allocated.
 	 */
-	ino = xfs_dialloc_ino(tp, pip ? pip->i_ino : 0, pip == NULL, mode,
-			      ialloc_context, call_again);
-	if (*call_again) {
+#ifndef SIM
+	ASSERT(pip != NULL);
+#endif
+	ino = xfs_dialloc(tp, pip ? pip->i_ino : 0, pip == NULL, mode,
+			  ialloc_context, call_again);
+	if (*call_again || ino == NULLFSINO) {
                 return NULL;
         }
-	ASSERT(ino != NULLFSINO);
-	ASSERT(*ialloc_context != NULL);
+	ASSERT(*ialloc_context == NULL);
 
 	/*
 	 * Get the in-core inode with the lock held exclusively.
 	 * This is because we're setting fields here we need
 	 * to prevent others from looking at until we're done.
-	 *
-	 * We do this before the call to xfs_dialloc_finish() because
-	 * we need to get our inode/vnode before we lock the buffer
-	 * containing the inode.  This ordering is forced by xfs_reclaim()
-	 * needing the buffer to flush the inode.  The inode we want or
-	 * another one on the same buffer might try to grab the buffer
-	 * in the reclaim routine called from vn_get/alloc() called from
-	 * xfs_trans_iget() called from here.  That would deadlock, so
-	 * we get the inode/vnode before locking the buffer in
-	 * xfs_dialloc_finish().
 	 */
 	ip = xfs_trans_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL);
 	ASSERT(ip != NULL);
@@ -473,12 +465,6 @@ xfs_ialloc(
 	 * Log the new values stuffed into the inode.
 	 */
 	xfs_trans_log_inode(tp, ip, flags);
-
-	/*
-	 * Finish the on-disk portion of the allocation now that we
-	 * have the inode.
-	 */
-	xfs_dialloc_finish(tp, ino, *ialloc_context);
 	return ip;
 }
 
@@ -694,15 +680,6 @@ xfs_igrow(
  * The inode should already be truncated to 0 length and have
  * no pages associated with it.  This routine also assumes that
  * the inode is already a part of the transaction.
- *
- * We need to set the format to AGINO to be consistent with it being
- * on the free list and to set the inode mode to zero to also indicate
- * that the inode is free.  There are places in the allocation code
- * that assert that these fields are in this state, so don't change this.
- *
- * We don't do anything with the on-disk inode's pointer to the next
- * free inode.  This is entirely maintained by xfs_dialloc() and
- * xfs_difree().
  */
 void
 xfs_ifree(
@@ -717,11 +694,9 @@ xfs_ifree(
 	       ((ip->i_d.di_mode & IFMT) != IFREG));
 
 	xfs_difree(tp, ip->i_ino);
-	ip->i_d.di_format = XFS_DINODE_FMT_AGINO;
-	ip->i_d.di_mode = 0;
-	ip->i_d.di_flags = 0;
+	ip->i_d.di_mode = 0;		/* mark incore inode as free */
 	/*
-	 * Bump the generation count so noone will be confused
+	 * Bump the generation count so no one will be confused
 	 * by reincarnations of this inode.
 	 */
 	ip->i_d.di_gen++;
@@ -1311,15 +1286,6 @@ xfs_iflush(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
 			dip->di_u.di_muuid = ip->i_u2.iu_uuid;
 		}
-		break;
-
-	case XFS_DINODE_FMT_AGINO:
-		/*
-		 * The pointer to the next free inode is maintained
-		 * by xfs_dialloc() and xfs_difree() in the disk
-		 * buffer containing the inode.  Here we make sure
-		 * to not overwrite that value.
-		 */
 		break;
 
 	default:
