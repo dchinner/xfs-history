@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 #include <xfs_os_defs.h>
 
@@ -58,7 +58,6 @@
 #include <sys/vnode_private.h>
 #include <sys/mode.h>
 #include <sys/sysmacros.h>
-#include <sys/imon.h>
 #include <sys/cmn_err.h>
 
 #include <xfs_types.h>		/* for XFS_BHVTOI */

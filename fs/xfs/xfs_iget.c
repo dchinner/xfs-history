@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.118 $"
+#ident "$Revision: 1.119 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -49,7 +49,6 @@
 #include <sys/vfs.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
-#include <sys/imon.h>
 #include <sys/cmn_err.h>
 
 #ifdef SIM
@@ -608,17 +607,10 @@ finish_inode:
 
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
-	/*
-	 * Call hook for imon to see whether ip is of interest and should
-	 * have its vnodeops monitored.
-	 */
-#ifndef SIM
-	if (newnode) {
 #ifdef CELL_CAPABLE
+	if (newnode) {
 	        if (quiesce_new)
 			cxfs_inode_quiesce(ip);
-#endif
-		IMON_CHECK(vp, ip->i_dev, (xfs_ino_t)ino);
 	}
 #endif
 
