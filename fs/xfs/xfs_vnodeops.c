@@ -1,4 +1,4 @@
-#ident "$Revision: 1.282 $"
+#ident "$Revision: 1.283 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2060,7 +2060,9 @@ xfs_dir_lookup_int(
 				 */
 				if (dp->i_d.di_nlink == 0) {
 					vp = XFS_ITOV(*ipp);
+					xfs_iunlock(dp, lock_mode);
 					VN_RELE(vp);
+					xfs_ilock(dp, lock_mode);
 					return XFS_ERROR(ENOENT);
 				}
 
@@ -2069,7 +2071,9 @@ xfs_dir_lookup_int(
 
 				if (error || (curr_inum != *inum)) {
 					vp = XFS_ITOV(*ipp);
+					xfs_iunlock(dp, lock_mode);
 					VN_RELE(vp);
+					xfs_ilock(dp, lock_mode);
 					if (error) {
 						return error;
 					} else {
@@ -2100,7 +2104,9 @@ xfs_dir_lookup_int(
 			 * wrong so just get out of here.
 			 */
 			*ipp = NULL;
+			xfs_iunlock(dp, lock_mode);
 			VN_RELE(vp);
+			xfs_ilock(dp, lock_mode);
 			error = XFS_ERROR(ENOENT);
 		} else {
 			bdp = XFS_ITOBHV(*ipp);
