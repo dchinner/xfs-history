@@ -794,26 +794,37 @@ xfs_write_bmap(xfs_mount_t	*mp,
 
 
 /*
- * This routine is called to handle zeroing the buffer which overlaps
+ * This routine is called to handle zeroing the pages which overlap
  * the end of the file if the user seeks and writes beyond the EOF.
  * This is necessary because those pages in the buffer which used
  * to be beyond EOF and therefore invalid become valid when isize
  * is extended beyond them.
+ *
+ * We also zero any space left in the last block of the file so that
+ * we don't re-read garbage from it later.
  */
 void
 xfs_zero_eof(xfs_inode_t	*ip,
 	     off_t		offset,
-	     __int64_t		isize)
+	     __int64_t		isize,
+	     cred_t		*credp)
 {
+	xfs_fsblock_t	last_fsb;
 	__int64_t	last_byte;
 	off_t		page_start;
 	off_t		ioalign;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
+	buf_t		*bp;
 	int		iosize;
 	int		page_off;
 	pfd_t		*pfdp;
 	vnode_t		*vp;
+	int		nimaps;
+	int		zero_offset;
+	int		zero_len;
+	xfs_bmbt_irec_t	imap;
+	struct bmapval	bmap;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 	ASSERT(offset > isize);
@@ -852,6 +863,51 @@ xfs_zero_eof(xfs_inode_t	*ip,
 		page_off = 0;
 		page_start += NBPP;
 	}
+
+	last_fsb = xfs_b_to_fsbt(sbp, isize);
+	/*
+	 * If isize is fs block aligned, then there is no block
+	 * to zero.
+	 */
+	if (last_fsb == xfs_b_to_fsb(sbp, isize)) {
+		return;
+	}
+	nimaps = 1;
+	(void) xfs_bmapi(NULL, ip, last_fsb, 1, 0, NULLFSBLOCK, 0, &imap,
+			 &nimaps, NULL);
+	ASSERT(nimaps > 0);
+	/*
+	 * If the block underlying isize is just a hole, then there
+	 * is nothing to zero.
+	 */
+	if (imap.br_startblock == HOLESTARTBLOCK) {
+		return;
+	}
+	/*
+	 * Get a buffer for the last block, zero the part beyond the
+	 * EOF, and write it out async.  We need to drop the ilock
+	 * while we do this so we don't deadlock when the buffer cache
+	 * calls back to us.
+	 */
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	bmap.offset = xfs_fsb_to_bb(sbp, last_fsb);
+	bmap.length = xfs_fsb_to_bb(sbp, 1);
+	bmap.bsize = BBTOB(bmap.length);
+	bmap.pboff = 0;
+	bmap.pbsize = bmap.bsize;
+	bmap.eof = BMAP_EOF;
+	if (imap.br_startblock != DELAYSTARTBLOCK) {
+		bmap.bn = xfs_fsb_to_daddr(sbp, imap.br_startblock);
+	} else {
+		bmap.bn = -1;
+		bmap.eof |= BMAP_HOLE;
+	}
+	bp = chunkread(XFS_ITOV(ip), &bmap, 1, credp);
+	zero_offset = isize - xfs_fsb_to_b(sbp, last_fsb);
+	zero_len = xfs_fsb_to_b(sbp, 1) - isize;
+	xfs_zero_bp(bp, zero_offset, zero_len);
+	bawrite(bp);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	return;
 }
 
@@ -1119,7 +1175,7 @@ xfs_write_file(vnode_t	*vp,
 		if (!eof_zeroed &&
 		    (uiop->uio_offset > isize) &&
 		    (isize != 0)) {
-			xfs_zero_eof(ip, uiop->uio_offset, isize);
+			xfs_zero_eof(ip, uiop->uio_offset, isize, credp);
 			eof_zeroed = 1;
 		}
 
