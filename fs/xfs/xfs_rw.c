@@ -14,6 +14,7 @@
 #include <sys/user.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
+#include <sys/pda.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -87,6 +88,25 @@ xfs_retrieved(
 	int		count,
 	uint		*total_retrieved,
 	xfs_fsize_t	isize);
+
+#ifndef DEBUG
+
+#define	xfs_strat_write_check(ip,off,count,imap,nimap)
+
+#else /* DEBUG */
+
+STATIC void
+xfs_strat_write_check(
+	xfs_inode_t	*ip,
+	xfs_fileoff_t	offset_fsb,
+	xfs_extlen_t	buf_fsb,
+	xfs_bmbt_irec_t	*imap,
+	int		imap_count);
+
+#endif /* DEBUG */		      
+
+STATIC int
+xfsd(void);
 
 int
 xfs_diordwr(
@@ -294,9 +314,9 @@ xfs_retrieved(
  *
  * This is called to fill in the bmapval for a page which overlaps
  * the end of the file and the fs block size is less than the page
- * size.  We map the rest of the blocks up to the end of the page
- * here.  The first part of the page would have been handled in the
- * normal path, and the rest of the page is passed off to here.
+ * size.  We fill in the bmapval with zero sizes and offsets to
+ * indicate that there is nothing here to read since we're beyond
+ * the end of the file.
  */
 STATIC void
 xfs_iomap_extra(
@@ -307,7 +327,6 @@ xfs_iomap_extra(
 	int		*nbmaps)
 {
 	xfs_fileoff_t	offset_fsb;
-	xfs_fileoff_t	count_fsb;
 	xfs_fsize_t	nisize;
 	xfs_mount_t	*mp;
 
@@ -320,20 +339,15 @@ xfs_iomap_extra(
 
 	mp = ip->i_mount;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	count_fsb = XFS_B_TO_FSB(mp, count);
 
-	/*
-	 * Don't set BMAP_HOLE here because we don't want to trap
-	 * on writes to this page beyond the EOF.
-	 */
 	*nbmaps = 1;
-	bmapp->eof = BMAP_DELAY | BMAP_EOF;
+	bmapp->eof = BMAP_EOF;
 	bmapp->bn = -1;
 	bmapp->offset = XFS_FSB_TO_BB(mp, offset_fsb);
-	bmapp->length = XFS_FSB_TO_BB(mp, count_fsb);
-	bmapp->bsize = XFS_FSB_TO_B(mp, count_fsb);
-	bmapp->pboff = offset - XFS_FSB_TO_B(mp, offset_fsb);
-	bmapp->pbsize = count;
+	bmapp->length = 0;
+	bmapp->bsize = 0;
+	bmapp->pboff = 0;
+	bmapp->pbsize = 0;
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		bmapp->pbdev = mp->m_rtdev;
 	} else {
@@ -1744,67 +1758,50 @@ xfs_strat_read(
 }
 
 
+#ifdef DEBUG
 /*
- * xfs_strat_write_count
+ * xfs_strat_write_check
  *
- * Figure out the number of fs blocks underlying the given
- * delayed allocation buffer.  There may be a mix of allocated
- * and delayed allocation extents beneath the buffer, but there
- * should only be a hole (if any) at the end of the buffer.
- * The hole would be the result of the aggressive buffer allocation
- * we do (past the EOF) when writing a file.  It may even be that
- * the entire buffer sits over a hole.  This is from the case where
- * pdflush() turns one of our extra pages into a buffer.
+ * Make sure that there are blocks or delayed allocation blocks
+ * underlying the entire area given.  The imap parameter is simply
+ * given as a scratch area in order to reduce stack space.  No
+ * values are returned within it.
  */
-STATIC xfs_extlen_t
-xfs_strat_write_count(
+STATIC void
+xfs_strat_write_check(
 	xfs_inode_t	*ip,
 	xfs_fileoff_t	offset_fsb,
 	xfs_extlen_t	buf_fsb,
 	xfs_bmbt_irec_t	*imap,
 	int		imap_count)
 {
-	xfs_fileoff_t	off_fsb;
 	xfs_extlen_t	count_fsb;
 	boolean_t	done;
 	int		nimaps;
 	int		n;
 
-	ASSERT(ismrlocked(&(ip->i_lock), MR_ACCESS | MR_UPDATE) != 0);
-	off_fsb = offset_fsb;
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	count_fsb = 0;
 	done = B_FALSE;
-	while ((count_fsb < buf_fsb) && (!done)) {
+	while (count_fsb < buf_fsb) {
 		nimaps = imap_count;
-		(void) xfs_bmapi(NULL, ip, (off_fsb + count_fsb),
+		(void) xfs_bmapi(NULL, ip, (offset_fsb + count_fsb),
 				 (buf_fsb - count_fsb), 0, NULLFSBLOCK, 0,
 				 imap, &nimaps, NULL);
 		ASSERT(nimaps > 0);
 		n = 0;
 		while (n < nimaps) {
-			if (imap[n].br_startblock == HOLESTARTBLOCK) {
-				/*
-				 * We've hit the hole at the end of the
-				 * buffer, so that's it.  We assert
-				 * that the hole we've found extends
-				 * all the way to the end of the buffer.
-				 */
-				ASSERT(0);
-				ASSERT((imap[n].br_startoff +
-					imap[n].br_blockcount) ==
-				       (offset_fsb + buf_fsb));
-				done = B_TRUE;
-				break;
-			}
+			ASSERT(imap[n].br_startblock != HOLESTARTBLOCK);
 			count_fsb += imap[n].br_blockcount;
 			ASSERT(count_fsb <= buf_fsb);
 			n++;
 		}
 	}
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		
-	return count_fsb;
+	return;
 }
-
+#endif /* DEBUG */
 
 /*
  * This is the completion routine for the heap-allocated buffers
@@ -1921,31 +1918,11 @@ xfs_strat_write(
 	mp = ip->i_mount;
 	bp->b_flags |= B_STALE;
 
-	/*
-	 * Figure out what the underlying mappings look like.
-	 * We need to map out all the space underlying the
-	 * buffer to figure out whether the buffer extends
-	 * beyond the allocated (or at least reserved) space
-	 * and not to write that part.
-	 */
 	ASSERT(bp->b_blkno == -1);
 	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 	count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
-
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	count_fsb = xfs_strat_write_count(ip, offset_fsb, count_fsb, imap,
-					  XFS_STRAT_WRITE_IMAPS);
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
-	if (count_fsb == 0) {
-		/*
-		 * The buffer sits entirely over a hole.  Just mark
-		 * it done and return.
-		 */
-		iodone(bp);
-		return;
-	}
-
+	xfs_strat_write_check(ip, offset_fsb, count_fsb, imap,
+			      XFS_STRAT_WRITE_IMAPS);
 	map_start_fsb = offset_fsb;
 	while (count_fsb != 0) {
 		/*
@@ -2150,14 +2127,57 @@ xfs_strategy(
 }
 
 #ifndef SIM
+
 /*
- * This is the routine called by the xfs daemons as they enter the
- * kernel.  From here they wait in a loop for buffers which will
+ * This is called from main() to start the xfs daemons.
+ * We'll start with a minimum of 4 of them, and add 1
+ * for each 128 MB of memory up to 1 GB.  That should
+ * be enough.
+ */
+void
+xfs_start_daemons(void)
+{
+	int	num_daemons;
+	int	i;
+	int	num_pages;
+
+	num_daemons = 4;
+	do {
+		num_pages = (int)physmem - 32768;
+		if ((num_pages > 0) && (num_daemons < 13)) {
+			num_daemons++;
+		}
+	} while (num_pages > 0);
+	ASSERT(num_daemons < 13);
+
+	for (i = 0; i < num_daemons; i++) {
+		if (newproc(NP_SYSPROC, 0)) {
+#if !STAT_TIME
+			ASSERT(private.p_activetimer ==
+			       &u.u_ptimer[PTIMER_INDEX(AS_SYS_RUN)]);
+			/* u_utime, u_stime are evaluated on exit */
+			/* u_cutime, u_cstime are accumulated during wait() */
+			timerclear(&u.u_cutime);
+			timerclear(&u.u_cstime);
+#else
+			u.u_cstime = u.u_stime = u.u_cutime = u.u_utime = 0;
+#endif
+			bcopy("xfsd", u.u_psargs, 5);
+			bcopy("xfsd", u.u_comm, 4);
+			xfsd();
+		}
+	}
+	return;
+}
+
+/*
+ * This is the main loop for the xfs daemons.
+ * From here they wait in a loop for buffers which will
  * require transactions to write out and process them as they come.
  * This way we never force bdflush() to wait on one of our transactions,
  * thereby keeping the system happier and preventing buffer deadlocks.
  */
-int
+STATIC int
 xfsd(void)
 {
 	int	s;
@@ -2166,24 +2186,10 @@ xfsd(void)
 	buf_t	*back;
 
 	/*
-	 * Get rid of our address space, we're never returning to
-	 * user space.
-	 */
-	vrelvm();
-
-	/*
 	 * Make us a high non-degrading priority process like bdflush(),
 	 * since that is who we're relieving of work.
 	 */
 	setinfoRunq(u.u_procp, RQRTPRI, NDPHIMIN);
-
-	/*
-	 * We should never sleep at an interruptible priority, but
-	 * just to make sure...
-	 */
-	if (setjmp(u.u_qsav)) {
-		cmn_err(CE_PANIC, "xfsd interrupted");
-	}
 
 	s = splock(xfsd_lock);
 	xfsd_count++;
