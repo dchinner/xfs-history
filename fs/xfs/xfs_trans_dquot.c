@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -602,7 +602,7 @@ xfs_trans_unreserve_and_mod_dquots(
 					(xfs_qcnt_t)qtrx->qt_ino_res; 
 #ifdef _SHAREII
 				if (SHR_ACTIVE) 
-					inounres = (int)qtrx->qt_blk_res;
+					inounres = (int)qtrx->qt_ino_res;
 #endif /* _SHAREII */
 			}
 			
@@ -624,7 +624,7 @@ xfs_trans_unreserve_and_mod_dquots(
 				if (blkunres)
 				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 						   dqp->q_core.d_id,
-						   blkunres,
+						   (u_long) blkunres,
 						   XFS_FSB_TO_B(dqp->q_mount, 1),
 						   LI_UPDATE|LI_FREE,
 						   NULL,
@@ -632,13 +632,13 @@ xfs_trans_unreserve_and_mod_dquots(
 				if (inounres)
 				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 							dqp->q_core.d_id,
-							inounres,
+							(u_long) inounres,
 							0, LI_UPDATE|LI_FREE, NULL, NULL);
 			}
 #endif /* _SHAREII */
 			if (locked)
 				xfs_dqunlock(dqp);
-					
+
 		}
 		qa = tp->t_dqinfo->dqa_prjdquots;
 	}
@@ -768,8 +768,9 @@ xfs_trans_dqresv(
 		if (ninos != 0) {
 			if (SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
 					dqp->q_core.d_id, 
-					(u_long)1, 0,
-					LI_ALLOC|LI_ENFORCE | enforceflag,
+					(u_long) ninos, 
+					0,
+					LI_ALLOC|LI_UPDATE | enforceflag,
 					NULL,
 					NULL)) {
 				error = EDQUOT;
