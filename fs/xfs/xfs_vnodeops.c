@@ -1,4 +1,4 @@
-#ident "$Revision: 1.255 $"
+#ident "$Revision: 1.256 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -476,7 +476,8 @@ xfs_getattr(
 #endif
         vap->va_nlink = ip->i_d.di_nlink;
 
-        if (vap->va_mask == (AT_FSID|AT_NODEID|AT_NLINK)) {
+        if (vap->va_mask == (AT_FSID|AT_NODEID) || 
+	    vap->va_mask == AT_NLINK) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
