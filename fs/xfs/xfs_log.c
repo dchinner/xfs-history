@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.129 $"
+#ident	"$Revision$"
 
 /*
  * High level interface routines for log manager
@@ -764,7 +764,7 @@ xlog_iodone(buf_t *bp)
  * Low memory machines only get 2 16KB buffers.  We don't want to waste
  * memory here.  However, all other machines get at least 2 32KB buffers.
  * The number is hard coded because we don't care about the minimum
- * memory size, just 16MB systems.
+ * memory size, just 32MB systems.
  *
  * If the filesystem blocksize is too large, we may need to choose a
  * larger size since the directory code currently logs entire blocks.
@@ -829,11 +829,10 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	}
 
 	/*
-	 * We don't necessarily want the 16MB number to scale as the
-	 * minimum memory configuration scales.  If a machine has more than
-	 * the 16MB, then use more memory.
+	 * Special case machines that have less than 32MB of memory.
+	 * All machines with more memory use 32KB buffers.
 	 */
-	if (physmem <= btoc(16*1024*1024)) {
+	if (physmem <= btoc(32*1024*1024)) {
 		/* Don't change; min configuration */
 		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 16k */
 		log->l_iclog_size_log = XLOG_RECORD_BSHIFT;
@@ -893,6 +892,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_in_core_t		*iclog, *prev_iclog;
 	buf_t			*bp;
 	int			i;
+	int			iclogsize;
 
 	log = mp->m_log = (void *)kmem_zalloc(sizeof(xlog_t), 0);
 	
@@ -931,16 +931,25 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	ASSERT((bp->b_bufsize & BBMASK) == 0);
 
 	iclogp = &log->l_iclog;
+	/*
+	 * The amount of memory to allocate for the iclog structure is
+	 * rather funky due to the way the structure is defined.  It is
+	 * done this way so that we can use different sizes for machines
+	 * with different amounts of memory.  See the definition of
+	 * xlog_in_core_t in xfs_log_priv.h for details.
+	 */
+	iclogsize = sizeof(xlog_in_core_t) - 1 +
+		    log->l_iclog_size - XLOG_HEADER_SIZE;
+	ASSERT(log->l_iclog_size >= 4096);
 	for (i=0; i < log->l_iclog_bufs; i++) {
 		*iclogp = (xlog_in_core_t *)
-			kmem_zalloc(sizeof(xlog_in_core_t), VM_CACHEALIGN);
+			  kmem_zalloc(iclogsize, VM_CACHEALIGN);
 
-		ASSERT(sizeof(xlog_in_core_t) >= 4096);
 
 		iclog = *iclogp;
 		iclog->ic_prev = prev_iclog;
 		prev_iclog = iclog;
-		log->l_iclog_bak[i] = iclog;
+		log->l_iclog_bak[i] = (caddr_t)&(iclog->ic_header);
 
 		head = &iclog->ic_header;
 		head->h_magicno = XLOG_HEADER_MAGIC_NUM;
@@ -1132,7 +1141,7 @@ xlog_sync(xlog_t		*log,
 	} else {
 		iclog->ic_bwritecnt = 1;
 	}
-	bp->b_dmaaddr	= (caddr_t) iclog;
+	bp->b_dmaaddr	= (caddr_t) &(iclog->ic_header);
 	bp->b_bcount	= count;
 	bp->b_fsprivate	= iclog;		/* save for later */
 	if (flags & XFS_LOG_SYNC)
@@ -1158,13 +1167,20 @@ xlog_sync(xlog_t		*log,
 		bp->b_fsprivate2 = (void *)((unsigned long)2);
 		bp->b_blkno	= 0;		     /* logical 0 */
 		bp->b_bcount	= split;
-		bp->b_dmaaddr	= (caddr_t)((__psint_t)iclog+(__psint_t)count);
+		bp->b_dmaaddr	= (caddr_t)((__psint_t)&(iclog->ic_header)+
+					    (__psint_t)count);
 		bp->b_fsprivate = iclog;
 		if (flags & XFS_LOG_SYNC)
 			bp->b_flags |= (B_BUSY | B_HOLD);
 		else
 			bp->b_flags |= (B_BUSY | B_ASYNC);
 		dptr = bp->b_dmaaddr;
+		/*
+		 * Bump the cycle numbers at the start of each block
+		 * since this part of the buffer is at the start of
+		 * a new cycle.  Watch out for the header magic number
+		 * case, though.
+		 */
 		for (i=0; i<split; i += BBSIZE) {
 			*(uint *)dptr += 1;
 			if (*(uint *)dptr == XLOG_HEADER_MAGIC_NUM)
@@ -1206,7 +1222,9 @@ xlog_unalloc_log(xlog_t *log)
 		}
 #endif
 		next_iclog = iclog->ic_next;
-		kmem_free(iclog, sizeof(xlog_in_core_t));
+		kmem_free(iclog,
+			  (sizeof(xlog_in_core_t) - 1 +
+			   log->l_iclog_size - XLOG_HEADER_SIZE));
 		iclog = next_iclog;
 	}
 	freesema(&log->l_flushsema);
@@ -2598,11 +2616,12 @@ xlog_verify_iclog(xlog_t	 *log,
 	LOG_UNLOCK(log, spl);
 
 	/* check log magic numbers */
-	ptr = (caddr_t) iclog;
+	ptr = (caddr_t) &(iclog->ic_header);
 	if (*(uint *)ptr != XLOG_HEADER_MAGIC_NUM)
 		xlog_panic("xlog_verify_iclog: illegal magic num");
 	
-	for (ptr += BBSIZE; ptr < (caddr_t)iclog+count; ptr += BBSIZE) {
+	for (ptr += BBSIZE; ptr < ((caddr_t)&(iclog->ic_header))+count;
+	     ptr += BBSIZE) {
 		if (*(uint *)ptr == XLOG_HEADER_MAGIC_NUM)
 			xlog_panic("xlog_verify_iclog: unexpected magic num");
 	}
