@@ -10,6 +10,7 @@
 #endif
 #include <sys/mode.h>
 #include <sys/vnode.h>
+#include <sys/cred.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -24,6 +25,7 @@
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
+#include "xfs_inode_item.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -265,12 +267,14 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
 	 * entry, copy all of the inode into the in-core inode.
 	 * xfs_iformat() handles copying in the inode format
 	 * specific information.
-	 * Otherwise, just get the generation number.
+	 * Otherwise, just get the truly permanent information.
 	 */
 	if (dip->di_core.di_mode != 0) {
 		bcopy(&(dip->di_core), &(ip->i_d), sizeof(xfs_dinode_core_t));
 		xfs_iformat(mp, ip, dip);
 	} else {
+		ip->i_d.di_magic = dip->di_core.di_magic;
+		ip->i_d.di_version = dip->di_core.di_version;
 		ip->i_d.di_gen = dip->di_core.di_gen;
 	}	
 
@@ -312,17 +316,18 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
  * hand the in-core inode off to xfs_iinit() to fill in the proper
  * values and log the initial contents of the inode.
  */
-void
+xfs_inode_t *
 xfs_ialloc(xfs_trans_t	*tp,
 	   xfs_inode_t	*pip,
 	   mode_t	mode,
 	   ushort	nlink,
 	   dev_t	rdev,
-	   xfs_inode_t	**ipp,
 	   struct cred	*cr)
 {
 	xfs_ino_t	ino;
 	xfs_inode_t	*ip;
+	vnode_t		*vp;
+	uint		flags;
 
 	/*
 	 * Call the space management code to allocate
@@ -340,9 +345,54 @@ xfs_ialloc(xfs_trans_t	*tp,
 	ip = xfs_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL);
 	ASSERT(ip != NULL);
 
-	
-	
+#ifdef NOTYET
+	vp = XFS_ITOV(ip); 
+	vp->v_type = IFTOVT(mode);
+	vp->v_rdev = rdev;
+#endif
+	ip->i_d.di_mode = mode;
+	ip->i_d.di_nlink = nlink;
+	ip->i_d.di_uid = cr->cr_uid;
+	ip->i_d.di_gid = cr->cr_gid;
+	ip->i_d.di_size = 0;
+	ip->i_d.di_nextents = 0;
+#ifdef NOTYET
+	/*
+	 * Does this global actually exist?
+	 */
+	ip->i_d.di_atime = time;
+	ip->i_d.di_mtime = time;
+	ip->i_d.di_ctime = time;
+	ip->i_d.di_uuid = uuid_gen();	/* ????? */
+#endif
+	flags = XFS_ILOG_META;
+	switch (mode & IFMT) {
+	case IFIFO:
+	case IFCHR:
+	case IFBLK:
+	case IFSOCK:
+		ip->i_d.di_format = XFS_DINODE_FMT_DEV;
+		ip->i_u2.iu_rdev = rdev;
+		flags |= XFS_ILOG_DEV;
+		break;
+	case IFREG:
+	case IFDIR:
+	case IFLNK:
+		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL;
+		break;
+	case IFMNT:
+		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
+		break;
+	default:
+		ASSERT(0);
+	}
 
+	/*
+	 * Log the new values stuffed into the inode.
+	 */
+#ifdef NOTYET
+	xfs_trans_log_inode(tp, ip, flags, 0, 0);
+#endif
 }
 
 
