@@ -30,9 +30,11 @@
 #include <sys/sema.h>
 #include <sys/uuid.h>
 #include <sys/vnode.h>
+#include <sys/vfs.h>
 
 #include "xfs_inum.h"
 #include "xfs_types.h"
+#include "xfs_ag.h"		/* needed by xfs_sb.h */
 #include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
 #include "xfs_log.h"
 #include "xfs_trans.h"
@@ -294,8 +296,26 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 
 
 int
-xfs_log_stat(dev_t log_dev)
+xfs_log_stat(caddr_t mnt_pt, int *log_BBstart, int *log_BBsize)
 {
+	xfs_mount_t *xmp;
+	vnode_t *vp;
+	int error, start, size;
+	extern int xfs_type;
+
+	if (error = lookupname(mnt_pt, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp))
+		return error;
+	if (vp->v_vfsp->vfs_fstype != xfs_type) {
+		error = XFS_ENOTXFS;
+	} else {
+		xmp = (xfs_mount_t *)vp->v_vfsp->vfs_data;
+		start = XFS_FSB_TO_DADDR(xmp, xmp->m_sb.sb_logstart);
+		size  = XFS_BTOD(xmp, xmp->m_sb.sb_logblocks);
+		if ((error = copyout(&start, log_BBstart, sizeof(int))) == 0)
+			error = copyout(&size, log_BBsize, sizeof(int));
+	}
+	VN_RELE(vp);
+	return error;
 }	/* xfs_log_stat */
 
 
