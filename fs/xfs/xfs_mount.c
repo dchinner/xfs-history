@@ -649,6 +649,9 @@ xfs_sb_relse(buf_t *bp)
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT(valusema(&bp->b_lock) <= 0);
 	bp->b_flags &= ~(B_ASYNC | B_READ);
+	bp->b_flags2 = 0;
+	bp->av_forw = NULL;
+	bp->av_back = NULL;
 	vsema(&bp->b_lock);
 }
 
