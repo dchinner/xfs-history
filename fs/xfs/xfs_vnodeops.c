@@ -1,4 +1,4 @@
-#ident "$Revision: 1.329 $"
+#ident "$Revision: 1.330 $"
 
 
 #ifdef SIM
@@ -1335,6 +1335,8 @@ xfs_fsync(
 {
 	xfs_inode_t	*ip;
 	int		error;
+					/* REFERENCED */
+	int		syncall;
 	vnode_t 	*vp;
 	xfs_trans_t	*tp;
 
@@ -1342,17 +1344,21 @@ xfs_fsync(
 	vn_trace_entry(vp, "xfs_fsync", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 
+	ASSERT(start >= 0 && stop >= -1);
+
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+
+	syncall = error = 0;
+
 	if (stop == -1)  {
 		ASSERT(start >= 0);
 		if (start == 0)
-			error = -1;
+			syncall = 1;
 		stop = xfs_file_last_byte(ip);
-	} else
-		error = 0;
+	}
 
 	/*
 	 * If we're invalidating, always flush since we want to
@@ -1375,7 +1381,8 @@ xfs_fsync(
 			pflushinvalvp(vp, start, stop);
 			VN_FLAGCLR(vp, VREMAPPING);
 		}
-		ASSERT(error == 0 || ((vp->v_pgcnt == 0) && (vp->v_buf == 0)));
+		ASSERT(syncall == 0 ||
+		       (vp->v_pgcnt == 0 && vp->v_buf == 0));
 	} else if (VN_DIRTY(vp)) {
 		/*
 		 * In the non-invalidating case, calls to fsync() do not
@@ -1385,6 +1392,18 @@ xfs_fsync(
 		pflushvp(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
 	}
 
+	/*
+	 * Make sure that we flushed everything in a full sync.
+	 * We used to assert that i_delayed_blks was 0 here,
+	 * but we can't do that since xfs_allocstore() could
+	 * come in and add more even though we have the I/O
+	 * lock here.  All it needs to do so is the inode lock,
+	 * and we don't want to force it to acquire the I/O
+	 * lock unnecessarily.
+	 */
+	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
+	       syncall == 0 ||
+	       (!VN_DIRTY(vp) && (ip->i_queued_bufs == 0)));
 	/*
 	 * We always need to make sure that the required inode state
 	 * is safe on disk.  The vnode might be clean but because
@@ -1407,18 +1426,6 @@ xfs_fsync(
 	 * the update_* fields.)
 	 */
 	if (!(flag & FSYNC_DATA)) {
-		/*
-		 * We used to assert that i_delayed_blks was 0 here,
-		 * but we can't do that since xfs_allocstore() could
-		 * come in and add more even though we have the I/O
-		 * lock here.  All it needs to do so is the inode lock,
-		 * and we don't want to force it to acquire the I/O
-		 * lock unnecessarily.
-		 */
-		ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
-		       error == 0 ||
-		       (!VN_DIRTY(vp) && (ip->i_queued_bufs == 0)));
-
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 		if (ip->i_update_core == 0)  {
