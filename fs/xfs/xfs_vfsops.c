@@ -1013,7 +1013,7 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 		sp->f_fsid = devvp->v_rdev;
 		(void) strcpy(sp->f_basetype, vfssw[xfs_fstype].vsw_name);
 		sp->f_flag = 0;
-		sp->f_namemax = MAXNAMELEN;
+		sp->f_namemax = MAXNAMELEN - 1;
 		bzero(sp->f_fstr, sizeof(sp->f_fstr));
 	} else
 		error = EINVAL;
@@ -1055,7 +1055,7 @@ xfs_statvfs(vfs_t	*vfsp,
 
 	statp->f_fsid = mp->m_dev;
 	(void) strcpy(statp->f_basetype, vfssw[xfs_fstype].vsw_name);
-	statp->f_namemax = MAXNAMELEN;
+	statp->f_namemax = MAXNAMELEN - 1;
 	bcopy((char *)&(mp->m_sb.sb_uuid), statp->f_fstr, sizeof(uuid_t));
 	bzero(&(statp->f_fstr[sizeof(uuid_t)]),
 	      (sizeof(statp->f_fstr) - sizeof(uuid_t)));
