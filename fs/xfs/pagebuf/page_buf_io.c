@@ -64,45 +64,6 @@ STATIC int  pagebuf_delalloc_convert(
 		struct inode *, struct page *, pagebuf_bmap_fn_t, int, int);
 
 /*
- *	pagebuf_flush: write back cached pages to disk.
- */
-void
-pagebuf_flush(
-	struct inode		*ip,	/* inode for range              */
-	loff_t			ioff,	/* first location in range      */
-	page_buf_flags_t	bflags)	/* unused                       */
-{
-	filemap_fdatasync(ip->i_mapping);
-	fsync_inode_data_buffers(ip);
-	filemap_fdatawait(ip->i_mapping);
-}
-
-/*
- *	pagebuf_inval: invalidate from page-cache (no implied write back).
- */
-void
-pagebuf_inval(
-	struct inode		*ip,	/* inode for range              */
-	loff_t			ioff,	/* first location in range      */
-	page_buf_flags_t	bflags)	/* unused                       */
-{
-	truncate_inode_pages(ip->i_mapping, ioff);
-}
-
-/*
- *	pagebuf_flushinval: write & invalidate buffered storage
- */
-void
-pagebuf_flushinval(
-	struct inode		*ip,	/* inode for range             	*/
-	loff_t			ioff,	/* first location in range     	*/
-	page_buf_flags_t	bflags)	/* unused                       */
-{
-	pagebuf_flush(ip, ioff, bflags);
-	truncate_inode_pages(ip->i_mapping, ioff);
-}
-
-/*
  *	pagebuf_iozero
  *
  *	pagebuf_iozero clears the specified range of buffer supplied,

@@ -554,9 +554,6 @@ xfs_mount(
 
 	args = (struct xfs_args *)uap->dataptr;
 
-	if (mvp->v_type != VDIR)
-		return XFS_ERROR(ENOTDIR);
-
 	error = spectodevs(vfsp->vfs_super, args, &ddev, &logdev, &rtdev);
 	if (error)
 		return error;

@@ -1752,7 +1752,7 @@ xfs_igrow_finish(
 	 */
 	ip->i_d.di_size = new_size;
 	if (change_flag)
-	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
+		xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
 }
@@ -3580,65 +3580,6 @@ xfs_ichgtime(xfs_inode_t *ip,
 	 */
 	SYNCHRONIZE();
 	ip->i_update_core = 1;
-}
-
-/*
- * xfs_get_inode()
- *
- *	This routine takes the dev_t of a file system and an
- *	inode number on that file system, and returns a pointer
- *	to the corresponding incore xfs inode structure.
- *
- * RETURNS:
- *	xfs_inode_t pointer on success
- *	NULL on failure
- *
- */
-xfs_inode_t *
-xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
-{
-	struct vfs              *vfsp;
-	bhv_desc_t              *bdp;
-	xfs_inode_t             *ip = NULL ;
-	int                     error;
-
-	/*
-	 * Lookup the vfs structure and mark it busy.
-	 * This prevents race conditions with unmount.
-	 *
-	 * If this returns NULL, the file system may be in the process
-	 * of being unmounted. The unmount may succeed or fail.  If the
-	 * umount fails, the grio ticket will remain attached to the
-	 * inode structure. It will be cleanup when the inode structure is
-	 * freed.
-	 */
-	vfsp = vfs_busydev( fs_dev, xfs_fstype );
-
-	if (vfsp) {
-
-		bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
-		error = xfs_iget( XFS_BHVTOM( bdp ),
-				 NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
-		
-		if ( error ) {
-			ip = NULL;
-		}
-		
-		if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
-			if (ip) {
-				xfs_iunlock( ip, XFS_ILOCK_SHARED );
-			}
-			ip = NULL;
-		}
-		
-
-		/*
-		 * Decrement the vfs busy count.
-		 */
-		vfs_unbusy( vfsp );
-	}
-
-	return( ip );
 }
 
 /*

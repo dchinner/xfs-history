@@ -81,9 +81,8 @@ typedef enum {				/* pbm_flags values */
 	PBMF_EOF = 		0x01,	/* mapping contains EOF 	*/
 	PBMF_HOLE = 		0x02,	/* mapping covers a hole 	*/
 	PBMF_DELAY = 		0x04,	/* mapping covers delalloc region  */
-	PBMF_UNWRITTEN = 	0x20,	/* mapping covers allocated 	*/
+	PBMF_UNWRITTEN = 	0x20 	/* mapping covers allocated 	*/
 					/* but uninitialized XFS data 	*/
-	PBMF_NEW =		0x40	/* we just allocated this space	*/
 } bmap_flags_t;
 
 typedef enum page_buf_flags_e { 	/* pb_flags values */
@@ -324,25 +323,6 @@ extern int pagebuf_target_clear(struct pb_target *);
 
 extern void pagebuf_unlock(             /* unlock buffer                */
 		page_buf_t *);          /* buffer to unlock             */
-
-/* Buffer Management for Inodes */
-
-extern void pagebuf_flush(		/* write buffered storage	*/
-		struct inode *,		/* inode for range		*/
-		loff_t,	       		/* first location in range	*/
-		page_buf_flags_t);	/* PBF_ASYNC                    */
-
-extern void pagebuf_inval(		/* invalidate buffered data for	*/
-			  		/* inode 			*/
-		struct inode *,		/* inode for range		*/
-		loff_t,	       		/* first location in range	*/
-		page_buf_flags_t);	/* PBF_ASYNC                    */
-
-extern void pagebuf_flushinval(		/* write and invalidate */
-					/* buffered data for inode */
-		struct inode *,		/* inode for range		*/
-		loff_t,	       		/* first location in range	*/
-		page_buf_flags_t);	/* PBF_ASYNC                    */
 
 /* Buffer Utility Routines */
 
