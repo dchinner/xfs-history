@@ -39,7 +39,7 @@ EXTRA_CFLAGS += $(kbuild_2_4_nostdinc)
 # This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
 # but I am not going to change every file at the moment.
-EXTRA_CFLAGS +=  -I. -funsigned-char 
+EXTRA_CFLAGS +=  -I. 
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
