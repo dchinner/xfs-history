@@ -1,4 +1,4 @@
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.33 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -825,8 +825,7 @@ xfs_qm_scall_setqlim(
 	if (id == 0) {
 		/*
 		 * Timelimits for the super user set the relative time
-		 * the other users can be over quota for this file system.
-		 * If it is zero a default is used.
+		 * the other users can be over the quota for this file system.
 		 */
 		if (newlim.d_fieldmask & FS_DQ_BTIMER) {
 			mp->m_quotainfo->qi_btimelimit = newlim.d_btimer;
@@ -859,7 +858,7 @@ xfs_qm_scall_setqlim(
 #endif
 	} else /* if (XFS_IS_QUOTA_ENFORCED(mp)) */ {
 		/*
-		 * If the user is now over quota, start the timelimit.
+		 * If the user is now over the quota, start the timelimit.
 		 * The user will not be 'warned'. Warnings increase only
 		 * by request via Q_WARN.
 		 * Note that we keep the timers ticking, whether enforcement
