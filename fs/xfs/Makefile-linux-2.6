@@ -9,7 +9,7 @@
 
 XFS_CFLAGS	= -Wstrict-prototypes -O2 -fomit-frame-pointer
 
-EXTRA_CFLAGS += -I.. -I. -D_KERNEL
+EXTRA_CFLAGS += -g3  -I./linux -I./pseudo-inc -I. -D_KERNEL
 
 O_TARGET := xfs.o
 
@@ -19,7 +19,7 @@ LINO_OBJS   := linux/xfs_file.o  linux/xfs_super.o \
  linux/xfs_dnlc.o linux/xfs_fs_bio.o linux/xfs_fs_subr.o  linux/xfs_griostubs.o \
  linux/xfs_aclstubs.o linux/xfs_dmistubs.o linux/xfs_move.o linux/xfs_thread.o \
  linux/xfs_physio.o linux/xfs_uaccess.o linux/xfs_pathname.o linux/xfs_page.o
- 
+
 # linux/xfs_inode.o
 
 M_OBJS   := $(O_TARGET)
@@ -88,6 +88,13 @@ FS_LINKS = xfs_alloc xfs_macros xfs_types xfs_inum xfs_log \
            xfs_dir_leaf xfs_fsops xfs_attr_leaf xfs_dir2_data xfs_dir2_leaf \
            xfs_dir2_block xfs_dir2_node
 
+#FOO_LINKS   := xfs_file.c  xfs_super.c \
+#               xfs_vnode.c xfs_behavior.c xfs_vfs.c  xfs_random.c \
+#               xfs_locks.c xfs_globals.c xfs_debug.c xfs_uuid.c \
+#               xfs_dnlc.c xfs_fs_bio.c xfs_fs_subr.c  xfs_griostubs.c \
+#               xfs_aclstubs.c xfs_dmistubs.c xfs_move.c xfs_thread.c \
+#               xfs_physio.c xfs_uaccess.c xfs_pathname.c xfs_page.c
+
 O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS) libgcc.a
 
 include $(TOPDIR)/Rules.make
@@ -103,20 +110,22 @@ CFLAGS	= -Wstrict-prototypes -O2 -fomit-frame-pointer
 #	) > $(dir $@)/.$(notdir $@).flags
 
 
-links:  $(FS_LINKS) sys ksys fs 
+links:  $(FS_LINKS) $(FOO_LINKS) #sys ksys fs 
 
 libgcc.a: 
 		ln -sf `find /usr/lib/gcc-lib -name libgcc.a -print | head -1`   
 
-sys:
-		rm -f $@; ln -s linux-sys $@
+#sys:
+#		(cd pseudo-inc; rm -f $@; ln -s ../linux-sys $@)
 
-ksys:
-		rm -f $@; ln -s linux-ksys $@
+#ksys:
+#		(cd pseudo-inc; rm -f $@; ln -s ../linux-ksys $@)
 
-fs:
-		rm -f $@; ln -s linux-fs $@
+#fs:
+#		(cd pseudo-inc; rm -f $@; ln -s ../linux-fs $@)
 
 $(FS_LINKS):
-		(cd linux-sys/fs;if [ -L $@.h ]; then rm -f $@.h; fi;  ln -s ../../$@.h $@.h)
+		(cd pseudo-inc/sys/fs;if [ -L $@.h ]; then rm -f $@.h; fi;  ln -s ../../../$@.h $@.h)
 
+#$(FOO_LINKS):
+#		(if [ -L $@ ]; then rm -f $@; fi; ln -s linux/$@ $@)
