@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 34
+SUBLEVEL = 35
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -109,7 +109,6 @@ CFLAGS += $(shell if $(CC) -fno-strict-aliasing -S -o /dev/null -xc /dev/null >/
 #
 
 CORE_FILES	=kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
-FILESYSTEMS	=fs/filesystems.a
 NETWORKS	=net/network.a
 DRIVERS		=drivers/block/block.a \
 		 drivers/char/char.o \
@@ -256,7 +255,6 @@ vmlinux: $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
 	$(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
 		--start-group \
 		$(CORE_FILES) \
-		$(FILESYSTEMS) \
 		$(NETWORKS) \
 		$(DRIVERS) \
 		$(LIBS) \
