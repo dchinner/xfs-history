@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.106 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -701,7 +701,7 @@ xfs_isdev(
 	buf_t	 *bp;
 	int	 error;
 
-	if (!bdvalid(bmajor(dev)))
+	if (!bdvalid(get_bdevsw(dev)))
 		return 1;
 	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
 	error = (bp->b_flags & B_ERROR);
