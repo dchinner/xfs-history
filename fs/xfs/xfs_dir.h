@@ -18,6 +18,8 @@
  * as possible so as to fit into the literal area of the inode.
  */
 
+typedef	__uint8_t xfs_dir_ino_t[sizeof(xfs_ino_t)];
+
 /*========================================================================
  * Directory Structure when smaller than XFS_LITINO(sbp) bytes.
  *========================================================================*/
@@ -32,11 +34,11 @@
  */
 struct xfs_dir_shortform {
 	struct xfs_dir_sf_hdr {		/* constant-structure header block */
-		__uint8_t parent[8];	/* parent dir inode number */
+		xfs_dir_ino_t parent;	/* parent dir inode number */
 		__uint8_t count;	/* count of active entries */
 	} hdr;
 	struct xfs_dir_sf_entry {
-		__uint8_t inumber[8];	/* referenced inode number */
+		xfs_dir_ino_t inumber;	/* referenced inode number */
 		__uint8_t namelen;	/* actual length of name (no NULL) */
 		__uint8_t name[1];	/* name */
 	} list[1];			/* variable sized array */
@@ -116,7 +118,7 @@ struct xfs_dir_leafblock {
 		__uint16_t pad2;
 	} leaves[1];			/* var sized array */
 	struct xfs_dir_leaf_name {
-		__uint8_t inumber[8];	/* inode number for this key */
+		xfs_dir_ino_t inumber;	/* inode number for this key */
 		__uint8_t namelen;	/* length of name string */
 		__uint8_t name[1];	/* name string itself */
 	} namelist[1];			/* grows from bottom of buf */
