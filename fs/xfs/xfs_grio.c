@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.9 1994/04/05 15:14:03 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.10 1994/04/11 18:44:23 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -503,13 +503,21 @@ xfs_grio_req( xfs_inode_t *ip,
                 if ((!ret) && ticket) {
                         if (lbolt < (ticket->lastreq  + HZ)) {
                                 /*
-                                * This request cannot be
+                                 * This request cannot be
                                  * issued until the next second.
                                  */
                                 GRIO_DBPRNT(2, "request issued too soon \n");
                                 delay(ticket->lastreq + HZ - lbolt);
-                        }
-                        ticket->lastreq = lbolt;
+				/*
+ 				 * Should lastreq be set to 0 here so that a 
+				 * requestor will not be out of step forever?
+				 * The max we delay is every other time.
+ 				 */
+                        	ticket->lastreq = 0;
+			} else {
+				ticket->lastreq = lbolt;
+			}
+
                 }
         }
         /*
@@ -712,4 +720,52 @@ xfs_get_block_size(dev_t fsdev, int *fs_size)
 		ret = -1;
 	}
 	return( ret );
+}
+
+
+xfs_remove_tickets_from_fs(vfs_t *vfsp)
+{
+	xfs_mount_t *mp;
+	xfs_inode_t *ip;
+	grio_ticket_t *ticket, *nextticket;
+
+
+	mp = XFS_VFSTOM(vfsp);
+
+	for ( ip = mp->m_inodes; ip; ip = ip->i_mnext ) {
+		for (ticket = ip->i_ticket; ticket; ticket = nextticket) {
+			nextticket = ticket->nextticket;
+			kmem_free( ticket, sizeof(grio_ticket_t));
+		}
+		ip->i_ticket = NULL;
+	}
+}
+	
+
+int
+xfs_remove_all_tickets()
+{
+	extern vfs_t	*rootvfs;
+	extern lock_t	vfslock;
+	extern int	xfs_type;
+	vfs_t		*vfsp;
+	int 		s;
+
+	/*
+ 	 * for each xfs file system on the machine
+	 */
+	/*
+ 	 * remove the tickets from the inodes
+ 	 */
+	s = splock(vfslock);
+	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
+		/*
+ 		 * Is this an xfs system ?
+		 */
+		if (vfsp->vfs_fstype == xfs_type) {
+			xfs_remove_tickets_from_fs(vfsp);
+		}
+	}
+	spunlock(vfslock, s);
+	return(0);
 }
