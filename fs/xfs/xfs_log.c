@@ -604,7 +604,9 @@ log_write(xfs_mount_t *		mp,
 	    }
 	}
 
+
 	log_state_want_sync(log, iclog);   /* not needed for kernel XXXmiken */
+
 	log_state_release_iclog(log, iclog);
 }	/* log_write */
 
@@ -615,6 +617,34 @@ log_write(xfs_mount_t *		mp,
  *
  *****************************************************************************
  */
+
+/* Clean iclogs starting from the head.  This ordering must be
+ * maintained, so an iclog doesn't become ACTIVE beyond one that
+ * is SYNCING.
+ */
+void
+log_state_clean_log(log_t *log)
+{
+	log_in_core_t	*iclog;
+
+	iclog = log->l_iclog;
+	do {
+		if (iclog->ic_state == LOG_STATE_DIRTY) {
+			iclog->ic_state	= LOG_STATE_ACTIVE;
+			iclog->ic_offset       = 0;
+			iclog->ic_callback	= 0;   /* don't need to free */
+			iclog->ic_header.h_num_logops = 0;
+			bzero(iclog->ic_header.h_cycle_data,
+			      sizeof(iclog->ic_header.h_cycle_data));
+			vsema(&log->l_flushsema);
+		} else if (iclog->ic_state == LOG_STATE_ACTIVE)
+			/* do nothing */;
+		else
+			break;	/* stop cleaning */
+		iclog = iclog->ic_next;
+	} while (iclog != log->l_iclog);
+}	/* log_state_clean_log */
+
 
 /*
  * 
@@ -645,24 +675,11 @@ log_state_done_syncing(log_in_core_t	*iclog)
 	ASSERT(iclog->ic_state == LOG_STATE_CALLBACK);
 
 	iclog->ic_state		= LOG_STATE_DIRTY;
-	while (cvsema(&iclog->ic_forcesema));	/* wake up xfs_log_force() */
-	for (iclogp = log->l_iclog;
-	     iclogp != iclog;
-	     iclogp = iclogp->ic_next) {
-		if (iclogp->ic_state == LOG_STATE_DIRTY) {
-			iclogp->ic_state	= LOG_STATE_ACTIVE;
-			iclogp->ic_offset       = 0;
-			iclogp->ic_callback	= 0;   /* don't need to free */
-			iclogp->ic_header.h_num_logops = 0;
-			bzero(iclogp->ic_header.h_cycle_data,
-			      sizeof(iclogp->ic_header.h_cycle_data));
-			vsema(&log->l_flushsema);
-		} else if (iclogp->ic_state == LOG_STATE_ACTIVE) {
-			/* do nothing */
-		} else {
-			break;	/* stop cleaning */
-		}
-	}
+
+	/* wake up threads waiting in xfs_log_force() */
+	while (cvsema(&iclog->ic_forcesema));
+
+	log_state_clean_log(log);
 
 	spunlockspl(log->l_icloglock, spl);
 
@@ -729,28 +746,7 @@ restart:
 		goto restart;
 	}
 
-	/* Clean iclogs starting from the head.  This ordering must be
-	 * maintained, so an iclog doesn't become ACTIVE beyond one that
-	 * is SYNCING.
-	 */
-	for (;
-	     iclog->ic_state == LOG_STATE_DIRTY ||
-	     iclog->ic_state == LOG_STATE_ACTIVE;
-	     iclog = iclog->ic_next) {
-		if (iclog->ic_state == LOG_STATE_ACTIVE)
-			goto dont_clean;
-                iclog->ic_state			= LOG_STATE_ACTIVE;
-                iclog->ic_offset		= 0;
-		iclog->ic_callback		= 0;   /* don't need to free */
-                iclog->ic_header.h_num_logops	= 0;
-                bzero(iclog->ic_header.h_cycle_data,
-		      sizeof(iclog->ic_header.h_cycle_data));
-		vsema(&log->l_flushsema);
-dont_clean:
-		if (iclog->ic_next == log->l_iclog)	/* don't cycle */
-			break;
-	}
-	iclog = log->l_iclog;			/* reset ptr */
+	log_state_clean_log(log);
 	head = &iclog->ic_header;
 
 	iclog->ic_refcnt++;			/* prevents sync */
@@ -822,8 +818,9 @@ log_state_lsn_is_synced(log_t		   *log,
 			continue;
 		} else {
 			if ((iclog->ic_state == LOG_STATE_CALLBACK) ||
-			    (iclog->ic_state == LOG_STATE_DIRTY)) /*call it*/
+			    (iclog->ic_state == LOG_STATE_DIRTY))   /*call it*/
 				break;
+
 			/* insert callback into list */
 			cb->cb_next = iclog->ic_callback;
 			iclog->ic_callback = cb;
