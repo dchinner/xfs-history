@@ -1,3 +1,5 @@
+#ident "$Revision$"
+
 /*
  * xfs_dir_leaf.c
  *
@@ -147,7 +149,7 @@ xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 	if (dp->i_d.di_format != XFS_DINODE_FMT_LOCAL) {
 		return;
 	}
-	if (!(dp->i_flags & XFS_IFINLINE)) {
+	if (!(dp->i_df.if_flags & XFS_IFINLINE)) {
 		return;
 	}
 
