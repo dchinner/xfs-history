@@ -12,6 +12,19 @@ typedef struct xfs_ail_entry {
 	struct xfs_log_item	*ail_back;	/* AIL back pointer */
 } xfs_ail_entry_t;
 
+/*
+ * This structure is passed as a parameter to xfs_trans_push_ail()
+ * and is used to track the what LSN the waiting processes are
+ * waiting to become unused.
+ */
+typedef struct xfs_ail_ticket {
+	xfs_lsn_t		at_lsn;		/* lsn waitin for */
+	struct xfs_ail_ticket	*at_forw;	/* wait list ptr */
+	struct xfs_ail_ticket	*at_back;	/* wait list ptr */
+	sema_t			at_sema;	/* wait sema */
+} xfs_ail_ticket_t;
+	
+
 typedef struct xfs_log_item {
 	xfs_ail_entry_t			li_ail;		/* AIL pointers */
 	xfs_lsn_t			li_lsn;		/* last on-disk lsn */
@@ -59,6 +72,14 @@ typedef struct xfs_item_ops {
 #define	IOP_COMMITTED(ip, lsn)	(*(ip)->li_ops->iop_committed)(ip, lsn)
 #define	IOP_PUSH(ip)		(*(ip)->li_ops->iop_push)(ip)
 
+/*
+ * Return values for the IOP_TRYLOCK() routines.
+ */
+#define	XFS_ITEM_SUCCESS	0
+#define	XFS_ITEM_PINNED		1
+#define	XFS_ITEM_LOCKED		2
+#define	XFS_ITEM_FLUSHING	3
+ 
 
 /*
  * This structure is used to track log items associated with
@@ -299,8 +320,11 @@ void		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *, int);
 void		xfs_trans_ail_init(struct xfs_mount *);
-xfs_lsn_t	xfs_trans_push_ail(struct xfs_mount *, xfs_lsn_t);
+xfs_lsn_t	xfs_trans_push_ail(struct xfs_mount *, xfs_ail_ticket_t *,
+				   xfs_lsn_t, xfs_lsn_t);
 xfs_lsn_t	xfs_trans_tail_ail(struct xfs_mount *);
+void		xfs_trans_unlocked_item(struct xfs_mount *,
+					xfs_log_item_t *);
 
 /*
  * Not necessarily exported, but used outside a single file.
