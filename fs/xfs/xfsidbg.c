@@ -37,6 +37,7 @@
 #include <xfs_quota_priv.h>
 #include <xfs_log_recover.h>
 
+#include <linux/ctype.h>
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 #include <linux/mm.h>
@@ -1873,7 +1874,10 @@ kdbm_pbmap(int argc, const char **argv, const char **envp,
 }
 
 #ifdef	PAGEBUF_TRACE
-#include <pagebuf/page_buf_trace.h>
+#undef _PAGEBUF_TRACE_INC_
+#undef PB_DEFINE_TRACES
+
+#include "pagebuf/page_buf_trace.h"
 
 #define EV_SIZE	(sizeof(event_names)/sizeof(char *))
 
@@ -4533,8 +4537,6 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("&lock 0x%p &iolock 0x%p ni_lock_ra",
 		&ip->i_lock,
 		&ip->i_iolock);
-	kdb_symbol_print((kdb_machreg_t) ip->i_ilock_ra, NULL,
-		KDB_SP_SPACEB|KDB_SP_PAREN|KDB_SP_NEWLINE);
 	kdb_printf("&flock 0x%p (%d) &pinlock 0x%p pincount 0x%x &pinsema 0x%p\n",
 		&ip->i_flock, valusema(&ip->i_flock),
 		&ip->i_ipinlock,

@@ -33,8 +33,6 @@
 #include <xfs.h>
 
 
-void xfs_ilock_ra(xfs_inode_t *ip, uint lock_flags, void *return_address);
-
 /*
  * Initialize the inode hash table for the newly mounted file system.
  *
@@ -803,7 +801,7 @@ xfs_ilock_map_shared(
 		lock_mode = XFS_ILOCK_SHARED;
 	}
 
-	xfs_ilock_ra(ip, lock_mode, (inst_t *)__return_address);
+	xfs_ilock(ip, lock_mode);
 
 	return lock_mode;
 }
@@ -832,24 +830,17 @@ xfs_iunlock_map_shared(
  * lock_flags -- this parameter indicates the inode's locks
  *       to be locked.  It can be:
  *		XFS_IOLOCK_SHARED,
- *		XFS_IOLOCK_SHARED | XFS_IOLOCK_NESTED,
  *		XFS_IOLOCK_EXCL,
- *		XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED,
  *	 	XFS_ILOCK_SHARED,
  *		XFS_ILOCK_EXCL,
  *		XFS_IOLOCK_SHARED | XFS_ILOCK_SHARED,
  *		XFS_IOLOCK_SHARED | XFS_ILOCK_EXCL,
- *		XFS_IOLOCK_SHARED | XFS_IOLOCK_NESTED | XFS_ILOCK_SHARED,
- *		XFS_IOLOCK_SHARED | XFS_IOLOCK_NESTED | XFS_ILOCK_EXCL,
  *		XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED,
  *		XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL
- *		XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED | XFS_ILOCK_SHARED,
- *		XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED | XFS_ILOCK_EXCL
  */
 void
-xfs_ilock_ra(xfs_inode_t	*ip,
-		  uint		lock_flags,
-		  void		*return_address)
+xfs_ilock(xfs_inode_t	*ip,
+	  uint		lock_flags)
 {
 	/*
 	 * You can't set both SHARED and EXCL for the same lock,
@@ -861,33 +852,20 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
-	if (return_address == NULL)
-		return_address = (inst_t *)__return_address;
 
-	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
-		if (lock_flags & XFS_IOLOCK_EXCL) {
-			mrupdatef(&ip->i_iolock, PLTWAIT);
-		} else if (lock_flags & XFS_IOLOCK_SHARED) {
-			mraccessf(&ip->i_iolock, PLTWAIT);
-		}
+	if (lock_flags & XFS_IOLOCK_EXCL) {
+		mrupdatef(&ip->i_iolock, PLTWAIT);
+	} else if (lock_flags & XFS_IOLOCK_SHARED) {
+		mraccessf(&ip->i_iolock, PLTWAIT);
 	}
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		mrupdatef(&ip->i_lock, PLTWAIT);
-		ip->i_ilock_ra = return_address;
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
 		mraccessf(&ip->i_lock, PLTWAIT);
 	}
 #ifdef XFS_ILOCK_TRACE
 	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)return_address);
 #endif
-}
-
-void
-xfs_ilock(xfs_inode_t	*ip,
-	  uint		lock_flags)
-{
-	xfs_ilock_ra(ip, lock_flags, (inst_t *)__return_address);
 }
 
 /*
@@ -909,7 +887,6 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 {
 	int	iolocked;
 	int	ilocked;
-	int	iolock_recursive;
 
 	/*
 	 * You can't set both SHARED and EXCL for the same lock,
@@ -921,20 +898,17 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 
-	iolocked = iolock_recursive = 0;
-	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
-		if (lock_flags & XFS_IOLOCK_EXCL) {
-			iolocked = mrtryupdate(&ip->i_iolock);
-			if (!iolocked) {
-				return 0;
-			}
-		} else if (lock_flags & XFS_IOLOCK_SHARED) {
-			iolocked = mrtryaccess(&ip->i_iolock);
-			if (!iolocked) {
-				return 0;
-			}
+	iolocked = 0;
+	if (lock_flags & XFS_IOLOCK_EXCL) {
+		iolocked = mrtryupdate(&ip->i_iolock);
+		if (!iolocked) {
+			return 0;
+		}
+	} else if (lock_flags & XFS_IOLOCK_SHARED) {
+		iolocked = mrtryaccess(&ip->i_iolock);
+		if (!iolocked) {
+			return 0;
 		}
 	}
 	if (lock_flags & XFS_ILOCK_EXCL) {
@@ -945,7 +919,6 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			}
 			return 0;
 		}
-		ip->i_ilock_ra = (inst_t *) __return_address;
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
 		ilocked = mrtryaccess(&ip->i_lock);
 		if (!ilocked) {
@@ -988,16 +961,13 @@ xfs_iunlock(xfs_inode_t	*ip,
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~(XFS_LOCK_MASK | XFS_IUNLOCK_NONOTIFY)) == 0);
 	ASSERT(lock_flags != 0);
-	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 
-	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
-		if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
-			ASSERT(!(lock_flags & XFS_IOLOCK_SHARED) ||
-			       (ismrlocked(&ip->i_iolock, MR_ACCESS)));
-			ASSERT(!(lock_flags & XFS_IOLOCK_EXCL) ||
-			       (ismrlocked(&ip->i_iolock, MR_UPDATE)));
-			mrunlock(&ip->i_iolock);
-		}
+	if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
+		ASSERT(!(lock_flags & XFS_IOLOCK_SHARED) ||
+		       (ismrlocked(&ip->i_iolock, MR_ACCESS)));
+		ASSERT(!(lock_flags & XFS_IOLOCK_EXCL) ||
+		       (ismrlocked(&ip->i_iolock, MR_UPDATE)));
+		mrunlock(&ip->i_iolock);
 	}
 
 	if (lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) {
@@ -1005,8 +975,6 @@ xfs_iunlock(xfs_inode_t	*ip,
 		       (ismrlocked(&ip->i_lock, MR_ACCESS)));
 		ASSERT(!(lock_flags & XFS_ILOCK_EXCL) ||
 		       (ismrlocked(&ip->i_lock, MR_UPDATE)));
-		if (lock_flags & XFS_ILOCK_EXCL)
-			ip->i_ilock_ra = NULL;
 		mrunlock(&ip->i_lock);
 	}
 
