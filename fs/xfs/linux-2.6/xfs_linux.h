@@ -67,10 +67,6 @@
 #define STATIC static
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,19)
-#define kdev_val(dev)	(unsigned)(dev)
-#endif
-
 typedef struct xfs_dirent {		/* data from readdir() */
 	xfs_ino_t d_ino;	/* inode number of entry */
 	xfs_off_t d_off;	/* offset of disk directory entry */
@@ -162,7 +158,7 @@ typedef struct xfs_dirent {		/* data from readdir() */
 
 #define SYNCHRONIZE()	barrier()
 #define lbolt		jiffies
-#define rootdev		to_kdev_t(ROOT_DEV)
+#define rootdev		ROOT_DEV
 #define __return_address __builtin_return_address(0)
 #define LONGLONG_MAX	9223372036854775807LL	/* max "long long int" */
 #define nopkg()		( ENOSYS )

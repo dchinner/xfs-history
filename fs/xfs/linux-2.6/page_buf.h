@@ -140,7 +140,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 #define PBR_ALIGNED_ONLY 2	/* only use aligned I/O */
 
 typedef struct pb_target {
-	kdev_t			pbr_device;
 	int			pbr_flags;
 	struct block_device	*pbr_bdev;
 	struct address_space	*pbr_mapping;
@@ -317,7 +316,7 @@ extern int pagebuf_lock_disable(	/* disable buffer locking	*/
 		struct pb_target *);	/* inode for buffers		*/
 
 extern struct pb_target *pagebuf_lock_enable(
-		kdev_t,
+		dev_t,
 		struct super_block *);
 
 extern void pagebuf_target_blocksize(

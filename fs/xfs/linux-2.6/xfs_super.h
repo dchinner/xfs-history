@@ -86,7 +86,7 @@ struct xfs_mount_args;
 extern int
 linvfs_fill_buftarg(
 	struct buftarg	*btp,
-	kdev_t		dev,
+	dev_t		dev,
 	struct super_block *sb,
 	int		data);
 
@@ -114,8 +114,8 @@ extern int
 spectodevs(
 	struct super_block *sb,
 	struct xfs_mount_args *args,
-	kdev_t		*ddevp,
-	kdev_t		*logdevp,
-	kdev_t		*rtdevp);
+	dev_t		*ddevp,
+	dev_t		*logdevp,
+	dev_t		*rtdevp);
 
 #endif	/* __XFS_SUPER_H__ */

@@ -276,16 +276,18 @@ STATIC int
 spectodev(
 	const char	*name,
 	const char	*id,
-	kdev_t		*dev)
+	dev_t		*dev)
 {
 	struct nameidata nd;
-	int	rval = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	int		error;
 
-	if (!rval) {
-		*dev = nd.dentry->d_inode->i_rdev;
-		path_release(&nd);
-	}
-	return rval;
+	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	if (error)
+		return error;
+
+	*dev = kdev_t_to_nr(nd.dentry->d_inode->i_rdev);
+	path_release(&nd);
+	return 0;
 }
 
 /*
@@ -295,19 +297,23 @@ int
 spectodevs(
 	struct super_block *sb,
 	struct xfs_mount_args *args,
-	kdev_t		*ddevp,
-	kdev_t		*logdevp,
-	kdev_t		*rtdevp)
+	dev_t		*ddevp,
+	dev_t		*logdevp,
+	dev_t		*rtdevp)
 {
 	int		rval = 0;
 
-	*ddevp = *logdevp = to_kdev_t(sb->s_dev);
+	*ddevp = sb->s_dev;
+
 	if (args->logname[0])
 		rval = spectodev(args->logname, "log", logdevp);
+	else
+		*logdevp = sb->s_dev;
+
 	if (args->rtname[0] && !rval)
 		rval = spectodev(args->rtname, "realtime", rtdevp);
 	else
-		*rtdevp = NODEV;
+		*rtdevp = 0;
 	return rval;
 }
 
@@ -327,7 +333,7 @@ spectodevs(
 int
 linvfs_fill_buftarg(
 	struct buftarg		*btp,
-	kdev_t			dev,
+	dev_t			dev,
 	struct super_block	*sb,
 	int			data)
 {
@@ -335,13 +341,12 @@ linvfs_fill_buftarg(
 	struct block_device	*bdev = NULL;
 
 	if (!data) {
-		bdev = bdget(kdev_t_to_nr(dev));
+		bdev = bdget(dev);
 		if (!bdev)
 			return -ENOMEM;
 		rval = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
 		if (rval) {
-			printk("XFS: blkdev_get failed on device %d\n",
-				kdev_t_to_nr(dev));
+			printk("XFS: blkdev_get failed on device %d\n", dev);
 			bdput(bdev);
 			return rval;
 		}
