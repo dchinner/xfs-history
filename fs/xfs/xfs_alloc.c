@@ -2012,8 +2012,10 @@ xfs_alloc_vextent(
 			 * or switch to non-trylock mode.
 			 */
 			if (args->agno == sagno) {
-				if (flags == 0)
+				if (flags == 0) {
+					args->agbno = NULLAGBLOCK;
 					break;
+				}
 				flags = 0;
 				if (type == XFS_ALLOCTYPE_START_BNO)
 					args->type = XFS_ALLOCTYPE_NEAR_BNO;
