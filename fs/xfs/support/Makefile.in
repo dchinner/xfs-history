@@ -30,23 +30,9 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-ifeq ($(CONFIG_XFS_DEBUG),y)
-	EXTRA_CFLAGS += -DDEBUG
-endif
+extra_cflags_all($(XFS_EXTRA_CFLAGS))
+objlink(support_xfs.o debug.o kmem.o ktrace.o mrlock.o mutex.o move.o
+	qsort.o sv.o uuid.o)
 
-O_TARGET			:= support_xfs.o
-ifneq ($(MAKECMDGOALS),modules_install)
-  obj-m				:= $(O_TARGET)
-endif
-
-obj-y				:= debug.o \
-				   kmem.o \
-				   ktrace.o \
-				   move.o \
-				   mrlock.o \
-				   mutex.o \
-				   qsort.o \
-				   sv.o \
-				   uuid.o
-
-include $(TOPDIR)/Rules.make
+# No select() for xfs/support in this directory.  It is a sub-component of XFS,
+# see fs/xfs/Makefile.in for the objlink.

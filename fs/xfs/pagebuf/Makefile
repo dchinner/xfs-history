@@ -8,7 +8,6 @@
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
 # Debug options:
-#	-DCONFIG_AVL_DEBUG
 #	-DPAGEBUF_TRACKING
 #	-DPAGEBUF_LOCKING
 #	-DPAGEBUF_DEBUG
@@ -17,6 +16,7 @@ ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" \
 			-DPAGEBUF_DEBUG -DPAGEBUF_TRACKING -DPAGEBUF_TRACE
 endif
+EXTRA_CFLAGS += -I..
 
 O_TARGET			:= pagebuf.o
 

@@ -62,7 +62,10 @@
 #include <asm/softirq.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
-#include <linux/xfs_support/support.h>
+
+#include <support/types.h>
+#include <support/time.h>
+#include <support/kmem.h>
 
 #include "page_buf_internal.h"
 

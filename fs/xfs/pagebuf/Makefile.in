@@ -8,7 +8,6 @@ objlink(pagebuf.o avl.o page_buf.o page_buf_io.o page_buf_locking.o)
 # see fs/xfs/Makefile.in for the objlink.
 
 # Debug options:
-#	-DCONFIG_AVL_DEBUG
 #	-DPAGEBUF_TRACKING
 #	-DPAGEBUF_LOCKING
 #	-DPAGEBUF_DEBUG
