@@ -83,20 +83,17 @@ posix_acl_xattr_to_xfs(
 	size_t			size,
 	xfs_acl_t		*dest)
 {
-	int			n;
-	char			*src_acl = (char *)src;
-	posix_acl_xattr_header	*header;
 	posix_acl_xattr_entry	*src_entry;
 	xfs_acl_entry_t		*dest_entry;
+	int			n;
 
-	if (!src_acl || !dest)
+	if (!src || !dest)
 		return EINVAL;
 
 	if (size < sizeof(posix_acl_xattr_header))
 		return EINVAL;
 
-	header = (posix_acl_xattr_header *)src;
-	if (header->a_version != cpu_to_le32(POSIX_ACL_XATTR_VERSION))
+	if (src->a_version != cpu_to_le32(POSIX_ACL_XATTR_VERSION))
 		return EINVAL;
 
 	memset(dest, 0, sizeof(xfs_acl_t));
@@ -111,7 +108,7 @@ posix_acl_xattr_to_xfs(
 	if (!dest->acl_cnt)
 		return 0;
 
-	src_entry = (posix_acl_xattr_entry *)(src_acl + sizeof(*header));
+	src_entry = (posix_acl_xattr_entry *)((char *)src + sizeof(*src));
 	dest_entry = &dest->acl_entry[0];
 
 	for (n = 0; n < dest->acl_cnt; n++, src_entry++, dest_entry++) {
