@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.106 $"
+#ident	"$Revision: 1.107 $"
 
 /*
  * High level interface routines for log manager
@@ -460,6 +460,22 @@ xfs_log_mount(xfs_mount_t	*mp,
 	return error;
 }	/* xfs_log_mount */
 
+/*
+ * Finish the recovery of the file system.  This is separate from
+ * the xfs_log_mount() call, because it depends on the code in
+ * xfs_mountfs() to read in the root and real-time bitmap inodes
+ * between calling xfs_log_mount() and here.
+ *
+ * mp		- ubiquitous xfs mount point structure
+ */
+int
+xfs_log_mount_finish(xfs_mount_t *mp)
+{
+	int	error;
+
+	error = xlog_recover_finish(mp->m_log);
+	return error;
+}
 
 /*
  * Unmount a log filesystem.

@@ -149,6 +149,7 @@
  */
 #define XLOG_CHKSUM_MISMATCH	0x1	/* used only during recovery */
 #define XLOG_ACTIVE_RECOVERY	0x2	/* in the middle of recovery */
+#define	XLOG_RECOVERY_NEEDED	0x4	/* log was recovered */     
 
 
 typedef void * xlog_tid_t;
@@ -294,6 +295,7 @@ extern int	 xlog_find_tail(xlog_t	*log,
 				daddr_t *tail_blk);
 extern int	 xlog_print_find_oldest(xlog_t *log, daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log);
+extern int	 xlog_recover_finish(xlog_t *log);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
 extern buf_t *	 xlog_get_bp(int);
 extern void	 xlog_put_bp(buf_t *);
