@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.35 1994/09/21 21:12:05 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.36 1994/11/11 17:28:16 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -51,7 +51,7 @@
  *
  */
 
-#define LESS_THAN_ONE_SECOND(tv, nexttv)	\
+#define TIME_IS_LESS(tv, nexttv)	\
       	(( tv.tv_sec < nexttv.tv_sec) ||	\
 	       ((tv.tv_sec == nexttv.tv_sec) && (tv.tv_nsec < nexttv.tv_nsec)))
 
@@ -495,14 +495,32 @@ retry_request:
         		nexttv.tv_sec  = ticket->lastreq.tv_sec + 1;
         		nexttv.tv_nsec = ticket->lastreq.tv_nsec;
 			
-			if ( !(LESS_THAN_ONE_SECOND( tv, nexttv )) ) {
+			/* 
+			 * Check if it has been less than 1 second
+			 * since the last I/O request.
+			 */
+			if ( !(TIME_IS_LESS( tv, nexttv )) ) {
 				/*
 			 	 * It has been more than 1 second	
 			 	 * since the last request on this ticket.
 			 	 */
 				ticket->iothissecond    = 0;
-				ticket->lastreq.tv_sec  = tv.tv_sec;
-				ticket->lastreq.tv_nsec = tv.tv_nsec;
+
+				nexttv.tv_sec += 1;
+				/*
+				 * Check if it has been more than 2 seconds
+				 * since the last I/O request.
+				 *
+				 * NB: this tries to correct for
+				 *     outward time skew, for closely
+				 *     timed requests
+				 */
+				if ( TIME_IS_LESS(tv, nexttv) )  {
+					ticket->lastreq.tv_sec  += 1;
+				} else {
+					ticket->lastreq.tv_sec  = tv.tv_sec;
+					ticket->lastreq.tv_nsec = tv.tv_nsec;
+				}
 			}
 
 			/*
