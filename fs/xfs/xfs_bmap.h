@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.21 $"
 
 /*
  * List of extents to be free "later".
@@ -31,6 +31,13 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_WRITE		0x1	/* write operation: allocate space */
 #define	XFS_BMAPI_DELAY		0x2	/* delayed write operation */
 #define	XFS_BMAPI_ENTIRE	0x4	/* return entire extent, not trimmed */
+
+/*
+ * Special values for xfs_bmbt_irec_t br_startblock field.
+ */
+#define	DELAYSTARTBLOCK		((xfs_fsblock_t)-1LL)
+#define	HOLESTARTBLOCK		((xfs_fsblock_t)-2LL)
+
 
 /*
  * Add the extent to the list of extents to be free at transaction end.
