@@ -42,7 +42,6 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
-#include "xfs_imap.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -318,7 +317,6 @@ xfs_inode_item_trylock(
 {
 	register xfs_inode_t	*ip;
 	xfs_mount_t		*mp;
-	xfs_imap_t		imap;
 	buf_t			*bp;
 	int			flushed;
 
@@ -349,9 +347,8 @@ xfs_inode_item_trylock(
 		flushed = 0;
 		if (iip->ili_bp == NULL) {
 			mp = ip->i_mount;
-			xfs_imap(mp, NULL, ip->i_ino, &imap);
-			bp = incore(mp->m_dev, imap.im_blkno,
-				    (int)imap.im_len, INCORE_TRYLOCK);
+			bp = incore(mp->m_dev, ip->i_blkno,
+				    ip->i_len, INCORE_TRYLOCK);
 			if (bp != NULL) {
 				if (bp->b_flags & B_DELWRI) {
 					iip->ili_bp = bp;
@@ -565,6 +562,9 @@ xfs_inode_item_init(
 	iip->ili_bp = NULL;
 	iip->ili_format.ilf_type = XFS_LI_INODE;
 	iip->ili_format.ilf_ino = ip->i_ino;
+	iip->ili_format.ilf_blkno = ip->i_blkno;
+	iip->ili_format.ilf_len = ip->i_len;
+	iip->ili_format.ilf_boffset = ip->i_boffset;
 }
 
 
