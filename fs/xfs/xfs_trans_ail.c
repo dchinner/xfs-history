@@ -1,4 +1,4 @@
-#ident "$Revision: 1.39 $"
+#ident "$Revision: 1.40 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -366,12 +366,15 @@ _xfs_trans_delete_ail(
 			AIL_UNLOCK(mp, s);
 		}
 	}
-#ifdef DEBUG
 	else {
-		ASSERT(XFS_FORCED_SHUTDOWN(mp));
-		AIL_UNLOCK(mp, s);
+		/*
+		 * If the file system is not being shutdown, we are in
+		 * serious trouble if we get to this stage.
+		 */
+		if (XFS_FORCED_SHUTDOWN(mp))
+			AIL_UNLOCK(mp, s);
+		
 	}
-#endif
 }
 
 
