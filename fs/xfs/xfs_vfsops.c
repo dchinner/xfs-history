@@ -480,7 +480,7 @@ xfs_mount(
 	}
 	if (rtdev)
 		xfs_setsize_buftarg(mp->m_rtdev_targp, mp->m_sb.sb_blocksize,
-				    mp->m_sb.sb_blocksize);
+				    mp->m_sb.sb_sectsize);
 
 	if (!(error = XFS_IOINIT(vfsp, args, flags)))
 		return 0;
