@@ -795,6 +795,7 @@ xfs_dir2_sf_getdents(
 #endif
 		p.name = ".";
 		p.namelen = 1;
+		p.type = DT_DIR;
 
 		error = p.put(&p);
 
@@ -829,6 +830,7 @@ xfs_dir2_sf_getdents(
 #endif
 		p.name = "..";
 		p.namelen = 2;
+		p.type = DT_DIR;
 
 		error = p.put(&p);
 
@@ -874,6 +876,7 @@ xfs_dir2_sf_getdents(
 				XFS_DIR2_SF_INUMBERP(sfep), ARCH_CONVERT);
 #endif
 		p.name = (char *)sfep->name;
+		p.type = DT_UNKNOWN;
 
 		error = p.put(&p);
 

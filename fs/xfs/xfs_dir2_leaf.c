@@ -1135,6 +1135,7 @@ xfs_dir2_leaf_getdents(
 		p.ino = INT_GET(dep->inumber, ARCH_CONVERT);
 #endif
 		p.name = (char *)dep->name;
+		p.type = DT_UNKNOWN;
 
 		error = p.put(&p);
 

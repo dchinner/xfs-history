@@ -535,6 +535,7 @@ xfs_dir2_block_getdents(
 		 * Set up argument structure for put routine.
 		 */
 		p.namelen = dep->namelen;
+		p.type = DT_UNKNOWN;
 
 		/*
 		 * NOTE! Linux "filldir" semantics require that the

@@ -551,6 +551,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 #endif
 		p.name = sbp->name;
 		p.namelen = sbp->namelen;
+		p.type = DT_UNKNOWN;
 
 		retval = p.put(&p);
 
@@ -2146,6 +2147,7 @@ xfs_dir_leaf_getdents_int(
 #endif
 		p.name = (char *)namest->name;
 		p.namelen = entry->namelen;
+		p.type = DT_UNKNOWN;
 
 		retval = p.put(&p);
 
@@ -2233,9 +2235,8 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
 
-	namelen = pa->namelen;
         retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-				pa->name, namelen, offset, ino, DT_UNKNOWN);
+				pa->name, namelen, offset, ino, pa->type);
 
 	if (retval == -EINVAL) {
 		pa->done = 0;
@@ -2296,7 +2297,7 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
         uio = pa->uio;
 
         retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-				pa->name, namelen, offset, ino, DT_UNKNOWN);
+				pa->name, namelen, offset, ino, pa->type);
 
 	if (retval == -EINVAL) {
 		pa->done = 0;
