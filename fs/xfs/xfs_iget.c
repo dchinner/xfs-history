@@ -1,4 +1,4 @@
-#ident "$Revision: 1.56 $"
+#ident "$Revision: 1.58 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -100,6 +100,8 @@ xfs_ihash_free(xfs_mount_t *mp)
 	for (i = 0; i < hsize; i++)
 		mutex_destroy(&mp->m_ihash[i].ih_lock);
 	kmem_free(mp->m_ihash, hsize * sizeof(xfs_ihash_t));
+	mp->m_ihash = NULL;
+	mp->m_ihashmask = 0;
 }
 
 /*
