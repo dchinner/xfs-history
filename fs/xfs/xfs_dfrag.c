@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: xfs_dfrag.c,v 1.16 2000/06/13 20:06:43 jtk Exp $"
+#ident "$Id: xfs_dfrag.c,v 1.17 2000/06/15 03:01:24 nathans Exp $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -83,6 +83,7 @@
 #include "xfs_dfrag.h"
 #include "xfs_error.h"
 #include "xfs_cxfs.h"
+#include "xfs_rw.h"
 
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
 extern int getf(int, struct vfile **);
@@ -214,6 +215,10 @@ xfs_swapext(
 		error = XFS_ERROR(EINVAL);
 		goto error0;
 	}
+
+	if (VN_CACHED(tvp) != 0)
+		xfs_inval_cached_pages(XFS_ITOV(tip), &(tip->i_iocore),
+						0, tip->i_d.di_size, NULL);
 
 	/* Verify O_DIRECT for ftmp */
 	if (VN_CACHED(tvp) != 0) {
