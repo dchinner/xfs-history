@@ -1234,7 +1234,8 @@ xfs_inactive(vnode_t	*vp,
 		(void) xfs_bmapi(NULL, ip, end_fsb, map_len, 0, NULLFSBLOCK,
 				 0, &imap, &nimaps, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-		if (nimaps != 0) {
+		if ((nimaps != 0) &&
+		    (imap.br_startblock != HOLESTARTBLOCK)) {
 			/*
 			 * There are blocks after the end of file.
 			 * Free them up now by truncating the file to
@@ -2291,6 +2292,7 @@ xfs_truncate_file(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 	xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)0);
+	xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 

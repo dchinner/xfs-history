@@ -816,9 +816,6 @@ xfs_itruncate_finish(
 	}
 	xfs_isize_check(mp, ip, new_size);
 	ip->i_d.di_size = new_size;
-	nanotime(&tv);
-	ip->i_d.di_ctime.t_sec = tv.tv_sec;
-	ip->i_d.di_mtime.t_sec = tv.tv_sec;
 	xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 	ASSERT((new_size != 0) ||
 	       (!VN_DIRTY(ip->i_vnode) &&
