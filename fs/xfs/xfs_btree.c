@@ -278,6 +278,10 @@ xfs_btree_dup_cursor(xfs_btree_cur_t *cur)
 		} else
 			newcur->bc_bufs[i] = 0;
 	}
+	if (newcur->bc_btnum == XFS_BTNUM_BMAP) {
+		newcur->bc_private.b.firstblock = cur->bc_private.b.firstblock;
+		newcur->bc_private.b.flist = cur->bc_private.b.flist;
+	}
 	return newcur;
 }
 

@@ -773,6 +773,7 @@ xfs_bmbt_insrec(
 			 * Copy the root into a real block.
 			 */
 			askbno = cur->bc_private.b.firstblock;
+			ASSERT(askbno != NULLFSBLOCK);
 			cbno = xfs_alloc_extent(tp, askbno, 1, XFS_ALLOCTYPE_START_BNO, 0, 0);
 			if (cbno == NULLFSBLOCK)
 				return 0;
@@ -1447,6 +1448,7 @@ xfs_bmbt_split(
 	xfs_bmbt_key_t		*keyp,
 	xfs_btree_cur_t		**curp)
 {
+	xfs_fsblock_t		bno;
 	daddr_t			d;
 	int			first;
 	int			i;
@@ -1480,8 +1482,9 @@ xfs_bmbt_split(
 	lbuf = cur->bc_bufs[level];
 	lbno = xfs_daddr_to_fsb(sbp, lbuf->b_blkno);
 	left = xfs_buf_to_lblock(lbuf);
-	rbno = xfs_alloc_extent(tp, cur->bc_private.b.firstblock, 1,
-				XFS_ALLOCTYPE_START_BNO, 0, 0);
+	bno = cur->bc_private.b.firstblock;
+	ASSERT(bno != NULLFSBLOCK);
+	rbno = xfs_alloc_extent(tp, bno, 1, XFS_ALLOCTYPE_START_BNO, 0, 0);
 	if (rbno == NULLFSBLOCK)
 		return 0;
 	cur->bc_private.b.allocated++;
@@ -1696,8 +1699,17 @@ xfs_bmbt_insert(
 	pcur = cur;
 	do {
 		i = xfs_bmbt_insrec(pcur, level++, &nbno, &nrec, &ncur);
+		ASSERT(i == 1);
 		if (pcur != cur && (ncur || nbno == NULLFSBLOCK)) {
 			cur->bc_nlevels = pcur->bc_nlevels;
+			cur->bc_private.b.allocated +=
+				pcur->bc_private.b.allocated;
+			pcur->bc_private.b.allocated = 0;
+			ASSERT(cur->bc_private.b.firstblock != NULLFSBLOCK &&
+			       cur->bc_private.b.firstblock ==
+			       pcur->bc_private.b.firstblock);
+			ASSERT(cur->bc_private.b.flist ==
+			       pcur->bc_private.b.flist);
 			xfs_btree_del_cursor(pcur);
 		}
 		if (ncur) {
