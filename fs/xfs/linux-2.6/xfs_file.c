@@ -32,6 +32,8 @@
 
 #include <xfs.h>
 #include <linux/dcache.h>
+#include <linux/pagemap.h>
+#include <linux/slab.h>
 
 
 STATIC long long linvfs_file_lseek(
@@ -250,42 +252,77 @@ STATIC int linvfs_fsync(
  * We need to build a uio, cred, ...
  */
 
+#define nextdp(dp)      ((struct dirent *)((char *)(dp) + (dp)->d_reclen))
+
 STATIC int linvfs_readdir(
 	struct file *filp,
 	void *dirent,
 	filldir_t filldir)
 {
-	struct inode		*inode;
 	int			error = 0;
 	vnode_t			*vp;
 	uio_t			uio;
 	iovec_t			iov;
-	int			eof;
+	int			eof = 0;
 	cred_t			cred;		/* Temporary cred workaround */
-
-	if (!filp || !filp->f_dentry ||
-			!(inode = filp->f_dentry->d_inode) ||
-					!S_ISDIR(inode->i_mode))
-		return -EBADF;
+	caddr_t			read_buf;
+	int			size = 0;
+	size_t			rlen = PAGE_CACHE_SIZE << 2;
+	off_t			start_offset;
+	dirent_t		*dbp = NULL;
 
         vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 
 	ASSERT(vp);
+	/* Try fairly hard to get memory */
+	do {
+		if ((read_buf = (caddr_t)kmalloc(rlen, GFP_KERNEL)))
+			break;
+		rlen >>= 1;
+	} while (rlen >= 1024);
 
-	iov.iov_base = dirent;
-	iov.iov_len = sizeof(dirent); /* Arbitrary. The real size is held in
-					the abstract structure pointed to by dirent */
-				      /* filldir will return an error if we go
-				      	beyond the buffer. */
+	if (read_buf == NULL)
+		return -ENOMEM;
+
 	uio.uio_iov = &iov;
-	uio.uio_copy = (uio_copy_t)filldir;
 	uio.uio_fmode = filp->f_mode;
+	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_offset = filp->f_pos;
-	uio.uio_segflg = UIO_USERSPACE;
-	uio.uio_resid = 0;
 
-	VOP_READDIR(vp, &uio, &cred, &eof, error);
-	filp->f_pos = uio.uio_offset;
+	while (!eof) {
+		uio.uio_resid = iov.iov_len = rlen;
+		iov.iov_base = read_buf;
+		uio.uio_iovcnt = 1;
+
+		start_offset = uio.uio_offset;
+		
+		VOP_READDIR(vp, &uio, &cred, &eof, error);
+		if ((uio.uio_offset == start_offset) || error) {
+			size = 0;
+			break;
+		}
+
+		size = rlen - uio.uio_resid;
+		dbp = (dirent_t *)read_buf;
+		while (size > 0) {
+			size -= dbp->d_reclen;
+			if (filldir(dirent, dbp->d_name, dbp->d_reclen,
+					dbp->d_off, (linux_ino_t) dbp->d_ino,
+					DT_UNKNOWN)) {
+				goto done;
+			}
+			dbp = nextdp(dbp);
+		}
+	}
+done:
+	if (!error) {
+		if (size == 0)
+			filp->f_pos = uio.uio_offset;
+		else if (dbp)
+			filp->f_pos = dbp->d_off;
+	}
+
+	kfree(read_buf);
 	return -error;
 }
 

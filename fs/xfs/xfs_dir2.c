@@ -379,10 +379,26 @@ xfs_dir2_getdents(
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(xfs32_off_t) : sizeof(xfs_off_t)) - 1;
-	dbp = NULL;
-	put = is32 ?
-		xfs_dir2_put_dirent32_uio :
-		xfs_dir2_put_dirent64_uio;
+	if ((uio->uio_iovcnt == 1) &&
+#if CELL_CAPABLE
+	    !KT_CUR_ISXTHREAD() &&
+#endif
+	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
+	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
+		dbp = NULL;
+		if (uio->uio_segflg == UIO_SYSSPACE) {
+			put = xfs_dir2_put_dirent64_direct;
+		} else {
+			put = is32 ?
+				xfs_dir2_put_dirent32_direct :
+				xfs_dir2_put_dirent64_direct;
+		}
+	} else {
+		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
+		put = is32 ?
+			xfs_dir2_put_dirent32_uio :
+			xfs_dir2_put_dirent64_uio;
+	}
 	*eofp = 0;
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -396,6 +412,8 @@ xfs_dir2_getdents(
 		rval = xfs_dir2_block_getdents(tp, dp, uio, eofp, dbp, put);
 	else
 		rval = xfs_dir2_leaf_getdents(tp, dp, uio, eofp, dbp, put);
+	if (dbp != NULL)
+		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
 	return rval;
 }
 
@@ -774,10 +792,9 @@ xfs_dir2_put_dirent32_uio(
 {
 	irix5_dirent_t		*idbp;		/* dirent pointer */
 	int			namelen;	/* entry name length */
+	int			reclen;		/* entry total length */
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
-	linux_off_t		offset = (linux_off_t )pa->cook;
-	linux_ino_t		ino = (linux_ino_t) pa->ino;
 
 #if XFS_BIG_FILESYSTEMS
 	/*
@@ -790,14 +807,23 @@ xfs_dir2_put_dirent32_uio(
 	}
 #endif
 	namelen = pa->namelen;
+	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
-	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-			pa->name, namelen, offset, ino, pa->type);
-	if (rval == -EINVAL) {
+	/*
+	 * Won't fit in the remaining space.
+	 */
+	if (reclen > uio->uio_resid) {
 		pa->done = 0;
 		return 0;
 	}
-	pa->done = 1;
+	idbp = (irix5_dirent_t *)pa->dbp;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook;
+	idbp->d_name[namelen] = '\0';
+	bcopy(pa->name, idbp->d_name, namelen);
+	rval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	pa->done = (rval == 0);
 	return rval;
 }
 
@@ -848,21 +874,30 @@ xfs_dir2_put_dirent64_uio(
 {
 	dirent_t		*idbp;		/* dirent pointer */
 	int			namelen;	/* entry name length */
+	int			reclen;		/* entry total length */
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
 	linux_off_t		offset = (linux_off_t )pa->cook;
 	linux_ino_t		ino = (linux_ino_t) pa->ino;
 
 	namelen = pa->namelen;
+	reclen = DIRENTSIZE(namelen);
 	uio = pa->uio;
-
-	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-			pa->name, namelen, offset, ino, pa->type);
-	if (rval == -EINVAL) {
+	/*
+	 * Won't fit in the remaining space.
+	 */
+	if (reclen > uio->uio_resid) {
 		pa->done = 0;
 		return 0;
 	}
-	pa->done = 1;
+	idbp = pa->dbp;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook;
+	idbp->d_name[namelen] = '\0';
+	bcopy(pa->name, idbp->d_name, namelen);
+	rval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	pa->done = (rval == 0);
 	return rval;
 }
 

@@ -429,7 +429,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 static int							/* error */
 xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
-	xfs_caddr_t lockaddr;
+	dirent_t *dbp;
 	int locklen = 0, alignment, retval, is32;
 	xfs_dir_put_t put;
 	int error;
@@ -444,10 +444,26 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(xfs32_off_t) : sizeof(xfs_off_t)) - 1;
-
-	put = is32 ?
-		xfs_dir_put_dirent32_uio :
-		xfs_dir_put_dirent64_uio;
+	if ((uio->uio_iovcnt == 1) &&
+#if CELL_CAPABLE
+	    !KT_CUR_ISXTHREAD() &&
+#endif
+	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
+	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
+		dbp = NULL;
+		if (uio->uio_segflg == UIO_SYSSPACE) {
+			put = xfs_dir_put_dirent64_direct;
+		} else {
+			put = is32 ?
+				xfs_dir_put_dirent32_direct :
+				xfs_dir_put_dirent64_direct;
+		}
+	} else {
+		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
+		put = is32 ?
+			xfs_dir_put_dirent32_uio :
+			xfs_dir_put_dirent64_uio;
+	}
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -455,12 +471,14 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	*eofp = 0;
 
 	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
-		retval = xfs_dir_shortform_getdents(dp, uio, eofp, NULL, put);
+		retval = xfs_dir_shortform_getdents(dp, uio, eofp, dbp, put);
 	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
-		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, NULL, put);
+		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp, put);
 	} else {
-		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, NULL, put);
+		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp, put);
 	}
+	if (dbp != NULL)
+		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
 
 	return(retval);
 }

@@ -551,7 +551,6 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 #endif
 		p.name = sbp->name;
 		p.namelen = sbp->namelen;
-		p.type = DT_UNKNOWN;
 
 		retval = p.put(&p);
 
@@ -2147,7 +2146,6 @@ xfs_dir_leaf_getdents_int(
 #endif
 		p.name = (char *)namest->name;
 		p.namelen = entry->namelen;
-		p.type = DT_UNKNOWN;
 
 		retval = p.put(&p);
 
@@ -2221,8 +2219,6 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 	int		retval, reclen, namelen;
 	irix5_dirent_t	*idbp;
 	uio_t		*uio;
-	linux_off_t	offset = (linux_off_t )pa->cook.s.h;
-	linux_ino_t	ino = (linux_ino_t) pa->ino;
 
 #if XFS_BIG_FILESYSTEMS
 	if (pa->ino > XFS_MAXINUMBER_32) {
@@ -2234,17 +2230,18 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 	namelen = pa->namelen;
 	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
-
-        retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-				pa->name, namelen, offset, ino, pa->type);
-
-	if (retval == -EINVAL) {
+	if (reclen > uio->uio_resid) {
 		pa->done = 0;
 		return 0;
 	}
-
-	pa->done = 1;
-
+	idbp = (irix5_dirent_t *)pa->dbp;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	bcopy(pa->name, idbp->d_name, namelen);
+	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	pa->done = (retval == 0);
 	return retval;
 }
 
@@ -2289,22 +2286,21 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 	int		retval, reclen, namelen;
 	dirent_t	*idbp;
 	uio_t		*uio;
-	linux_off_t	offset = (linux_off_t )pa->cook.s.h;
-	linux_ino_t	ino = (linux_ino_t) pa->ino;
 
 	namelen = pa->namelen;
 	reclen = DIRENTSIZE(namelen);
         uio = pa->uio;
-
-        retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-				pa->name, namelen, offset, ino, pa->type);
-
-	if (retval == -EINVAL) {
+	if (reclen > uio->uio_resid) {
 		pa->done = 0;
 		return 0;
 	}
-
-	pa->done = 1;
-
+	idbp = pa->dbp;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	bcopy(pa->name, idbp->d_name, namelen);
+	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	pa->done = (retval == 0);
 	return retval;
 }
