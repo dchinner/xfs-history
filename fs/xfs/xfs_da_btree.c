@@ -1570,7 +1570,7 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 	    (info->magic != XFS_ATTR_LEAF_MAGIC)) {
 		(*bpp)->b_flags |= B_ERROR;
 		xfs_trans_brelse(trans, *bpp);
-		return(EIO);
+		return(XFS_ERROR(EIO));
 	}
 	return(0);
 }
@@ -2411,6 +2411,17 @@ xfsda_node_check(xfsda_context_t *con, xfs_fileoff_t blkno,
 	 * Check the header fields.
 	 */
 	retval = 0;
+	if (info->magic == XFS_ATTR_LEAF_MAGIC) {
+		/*
+		 * check leaf, may have "remote" value (why we ended up here)
+		 */
+		if (blkno != 0) {
+			BADNEWS1("leaf block not block 0: bp 0x%x\n", bp);
+		} else {
+			retval = xfsda_leaf_check(con, 0, -2);
+		}
+		return(retval);
+	}
 	if (info->magic != XFS_DA_NODE_MAGIC) {
 		BADNEWS1("not an int node: blkno 0x%x\n", blkno);
 		return(retval);
