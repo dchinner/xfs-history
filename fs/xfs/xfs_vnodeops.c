@@ -288,6 +288,7 @@ xfs_getattr(vnode_t	*vp,
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
+	xfs_sb_t	*sbp;
 
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
@@ -334,6 +335,8 @@ xfs_getattr(vnode_t	*vp,
         vap->va_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
 
 	mp = XFS_VFSTOM(vp->v_vfsp);
+	sbp = &(mp->m_sb);
+
         switch (ip->i_d.di_mode & IFMT) {
           case IFBLK:
           case IFCHR:
@@ -367,7 +370,7 @@ xfs_getattr(vnode_t	*vp,
 	 */
 	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID)) {
 		vap->va_xflags = ip->i_d.di_flags;
-		vap->va_extsize = ip->i_d.di_extsize;
+		vap->va_extsize = ip->i_d.di_extsize << sbp->sb_blocklog;
 		vap->va_nextents = ip->i_d.di_nextents;
 		vap->va_uuid = ip->i_d.di_uuid;
 	}
@@ -664,8 +667,12 @@ xfs_setattr(vnode_t	*vp,
 	 * Change XFS-added attributes.
 	 */
 	if (mask & (AT_EXTSIZE|AT_XFLAGS)) {
-		if (mask & AT_EXTSIZE)
-			ip->i_d.di_extsize = vap->va_extsize;
+		if (mask & AT_EXTSIZE) {
+			/*
+ 			 * Converting bytes to fs blocks.
+			 */
+			ip->i_d.di_extsize = vap->va_extsize>>sbp->sb_blocklog;
+		}
 		if (mask & AT_XFLAGS)
 			ip->i_d.di_flags = vap->va_xflags & XFS_DIFLAG_ALL;
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
