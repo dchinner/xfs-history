@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.25 $"
 
 #include <xfs_os_defs.h>
 
@@ -38,7 +38,6 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/systm.h>
-// #include <linux/xfs_cred.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
 #include <sys/dmi.h>
@@ -71,9 +70,6 @@
 #include "xfs_dir_leaf.h"
 #include "xfs_dmapi.h"
 
-#ifndef SIM
-mutex_t	xfs_ancestormon;		/* initialized in xfs_init */
-#endif
 
 
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
@@ -449,134 +445,6 @@ xfs_lock_for_rename(
 	return 0;
 }
 
-/*
- * xfs_rename_ancestor_check.
- *
- * Routine called by xfs_rename to make sure that we are not moving
- * a directory under one of its children. This would have the effect
- * of orphaning the whole directory subtree.
- *
- * If two calls to xfs_rename_ancestor_check overlapped execution, the 
- * partially completed work of one call could be invalidated by the
- * rename that activated the other.  To avoid this, we serialize
- * using xfs_ancestormon.
- *
- * The caller, xfs_rename(), must have already acquired the
- * xfs_ancestormon mutex and unlocked the inodes.  It is up
- * to xfs_rename() to re-validate its inodes after this call
- * returns since they have been unlocked.
- */
-/*ARGSUSED*/
-STATIC int
-xfs_rename_ancestor_check(
-	xfs_inode_t *src_dp, 
-	xfs_inode_t *src_ip,
-	xfs_inode_t *target_dp,
-	xfs_inode_t *target_ip)
-{
-	xfs_mount_t		*mp;
-	xfs_inode_t		*ip;
-	xfs_ino_t		parent_ino;
-	xfs_ino_t		root_ino;
-	int			error = 0;
-
-	mp = src_dp->i_mount;
-	root_ino = mp->m_sb.sb_rootino;
-
-	/*
-	 * We know that all the inodes other than target_ip are directories
-	 * at this point.  We can treat target_ip like a directory whether
-	 * it is or not, though, since if it is not i_gen won't change.
-	 */
-	ASSERT((src_dp->i_d.di_mode & IFMT) == IFDIR);
-	ASSERT((target_dp->i_d.di_mode & IFMT) == IFDIR);
-	ASSERT((src_ip == NULL) || ((src_ip->i_d.di_mode & IFMT) == IFDIR));
-
-	/*
-	 * Assert that all the relationships that were checked by our
-	 * caller are true!
-	 */
-	ASSERT(src_ip != src_dp);
-	ASSERT(target_ip != target_dp);
-	ASSERT(src_ip != target_ip);
-	ASSERT(src_dp != target_dp);
-
-	/*
-	 * Ascend the target_dp's ancestor line, stopping if we
-	 * either encounter src_ip (failed check), or reached the
-	 * root of the filesystem.
-	 * If we discover an anomaly, e.g., ".." missing, return
-	 * ENOENT.
-	 *
-	 * In this loop we need to lock the inodes exclusively since
-	 * we can't really get at the xfs_ilock_map_shared() interface
-	 * through xfs_dir_lookup_int() and xfs_iget().
-	 */
-	ip = target_dp;
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-
-	while (ip->i_ino != root_ino) {
-
-		if (ip == src_ip) {
-			error = XFS_ERROR(EINVAL);
-			break;
-		}
-		if (ip->i_d.di_nlink == 0) {
-			/*
-			 * The directory has been removed, don't do
-			 * any lookups in it.
-			 */
-			error = XFS_ERROR(ENOENT);
-			break;
-		}
-		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(ip), 0, "..",
-				NULL, &parent_ino, NULL, NULL);
-		if (error) {
-			break;
-		}
-		if (parent_ino == ip->i_ino) {
-			prdev("Directory inode %Ld has bad parent link",
-                              ip->i_dev, ip->i_ino);
-                        error = XFS_ERROR(ENOENT);
-                        break;
-		}
-
-		/*
-		 * Now release ip and get its parent inode.
-		 * If we're on the first pass through this loop and
-		 * ip == target_dp, then we do not want to release
-		 * the vnode reference.
-		 */
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		if (ip != target_dp)
-			IRELE(ip);
-
-		error = xfs_iget(mp, NULL, parent_ino, XFS_ILOCK_EXCL, &ip, 0);
-		if (error) {
-			goto error_return;
-		}
-		ASSERT(ip != NULL);
-		if (((ip->i_d.di_mode & IFMT) != IFDIR) ||
-		    (ip->i_d.di_nlink == 0)) {
-                        prdev("Ancestor inode %Ld is not a directory",
-			      ip->i_dev, ip->i_ino);
-                        error = XFS_ERROR(ENOTDIR);
-                        break;
-                }
-	}
-
-	/*
-	 * Release the lock on the inode, taking care to decrement the 
-	 * vnode reference count only if ip != target_dp.
-	 */
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	if (ip != target_dp) {
-		IRELE(ip);
-	}
-
- error_return:
-	return error;
-}
 
 int rename_which_error_return = 0;
 
@@ -808,7 +676,6 @@ xfs_rename(
 	int		cancel_flags;
 	int		committed;
 	int		status;
-	int		ancestor_checked;
 	xfs_inode_t	*inodes[4];
 	int		gencounts[4];
 	int		target_ip_dropped = 0;	/* dropped target_ip link? */
@@ -911,37 +778,6 @@ xfs_rename(
 	 * array when we called xfs_lock_for_rename().
 	 */
 	xfs_rename_unlock4(inodes, XFS_ILOCK_SHARED);
-	if (src_is_directory && new_parent) {
-		/*
-		 * Check whether the rename would orphan the tree
-		 * rooted at src_ip by moving it under itself.
-		 *
-		 * We use the xfs_ancestormon mutex to serialize all
-		 * renames that might be doing this.  This prevents
-		 * simultaneous renames from tricking each other into
-		 * thinking that things are OK when they are not.
-		 * In order for the serialization to work, we need to
-		 * reacquire the inode locks before dropping the
-		 * mutex.  We can't do that until after starting up
-		 * the transaction and acquiring our log reservation.
-		 *
-		 * It is OK to hold the mutex across the log reservation
-		 * call, because we don't hold any resources when
-		 * obtaining the mutex.  This means that we can't hold
-		 * anyone up as we wait for the mutex.
-		 */
-		mutex_lock(&xfs_ancestormon, PINOD);
-		error = xfs_rename_ancestor_check(src_dp, src_ip,
-						  target_dp, target_ip);
-		if (error) {
-			rename_which_error_return = __LINE__;
-			mutex_unlock(&xfs_ancestormon);
-			goto rele_return;
-		}
-		ancestor_checked = 1;
-	} else {
-		ancestor_checked = 0;
-	}
 
 	XFS_BMAP_INIT(&free_list, &first_block);
 	mp = src_dp->i_mount;
@@ -958,9 +794,6 @@ xfs_rename(
 	if (error) {
 		rename_which_error_return = __LINE__;
 		xfs_trans_cancel(tp, 0);
-		if (ancestor_checked) {
-			mutex_unlock(&xfs_ancestormon);
-		}
                 goto rele_return;
 	}
 
@@ -971,8 +804,6 @@ xfs_rename(
 		if (error = xfs_qm_vop_rename_dqattach(inodes)) {
 			xfs_trans_cancel(tp, cancel_flags);
 			rename_which_error_return = __LINE__;
-			if (ancestor_checked) 
-				mutex_unlock(&xfs_ancestormon);
 			goto rele_return;
 		}
 	}
@@ -983,9 +814,6 @@ xfs_rename(
 	 * we cancel the transaction and start over from the top.
 	 */
 	xfs_lock_inodes(inodes, num_inodes, 0, XFS_ILOCK_EXCL);
-	if (ancestor_checked) {
-		mutex_unlock(&xfs_ancestormon);
-	}		
 
 	if (xfs_rename_compare_gencounts(inodes, gencounts)) {
 
@@ -995,8 +823,7 @@ xfs_rename(
 		 * to start over.
 		 */
 
-		if(ancestor_checked || 
-			!xfs_rename_check_ok(src_dp, target_dp, src_name,
+		if(!xfs_rename_check_ok(src_dp, target_dp, src_name,
 				target_name, src_ip, target_ip)) {
 			xfs_trans_cancel(tp, cancel_flags);
 			xfs_rename_unlock4(inodes, XFS_ILOCK_EXCL);
@@ -1288,13 +1115,6 @@ xfs_rename(
 	if (target_ip_dropped) {
 		VOP_LINK_REMOVED(XFS_ITOV(target_ip), target_dir_vp, 
 					target_link_zero);
-
-		if (src_is_directory) {
-			xfs_post_rmdir(XFS_ITOV(target_ip), target_link_zero);
-		} else {
-			xfs_post_remove(XFS_ITOV(target_ip), target_link_zero);
-		}
-
 		IRELE(target_ip);
 	}
 

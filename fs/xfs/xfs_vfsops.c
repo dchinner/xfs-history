@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.272 $"
+#ident  "$Revision: 1.273 $"
 
 #include <xfs_os_defs.h>
 
@@ -244,7 +244,6 @@ xfs_init(int	fstype)
 #endif	/* (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)) */
 #ifndef SIM
 	extern lock_t	xfsd_lock;
-	extern mutex_t	xfs_ancestormon;
 	extern mutex_t	xfs_uuidtabmon;
 	extern xfs_zone_t	*xfs_gap_zone;
 #ifdef DEBUG
@@ -267,7 +266,6 @@ xfs_init(int	fstype)
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
 #endif
 #ifndef SIM
-	mutex_init(&xfs_ancestormon, MUTEX_DEFAULT, "xfs_ancestor");
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 	spinlock_init(&xfsd_lock, "xfsd");
 #endif	/* !SIM */

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.459 $"
+#ident "$Revision: 1.460 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -2909,12 +2909,9 @@ xfs_create_broken(
 #ifdef SIM
 	abort();
 #else
-#ifndef __linux__
 #ifdef	DEBUG
-	debug_stop_all_cpus((void *)-1LL);
-	debug("xfs");
+	BUG();
 #endif	/* DEBUG */
-#endif
 #endif
 }
 
@@ -3558,8 +3555,6 @@ xfs_remove(
 	 * Let interposed file systems know about removed links.
 	 */
 	VOP_LINK_REMOVED(XFS_ITOV(ip), dir_vp, link_zero);
-
-	xfs_post_remove(XFS_ITOV(ip), link_zero);
 
 	IRELE(ip);
 
@@ -4391,9 +4386,6 @@ xfs_rmdir(
 	 * Let interposed file systems know about removed links.
 	 */
 	VOP_LINK_REMOVED(XFS_ITOV(cdp), dir_vp, last_cdp_link);
-
-	/* Now do any generic cleanup which might be necessary */
-	xfs_post_rmdir(XFS_ITOV(cdp), last_cdp_link);
 
 	IRELE(cdp);
 

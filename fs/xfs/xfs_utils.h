@@ -152,9 +152,6 @@ xfs_clear_sharedro(
 extern int      xfs_pre_rename(struct vnode *vp);
 extern int      xfs_pre_remove(struct vnode *vp);
 extern int      xfs_pre_rmdir(struct vnode *vp);
-extern void     xfs_post_rename(struct vnode *vp);
-extern void     xfs_post_remove(struct vnode * vp, int last_unlink);
-extern void     xfs_post_rmdir(struct vnode * vp, int last_unlink);
 
 
 #ifdef DEBUG
