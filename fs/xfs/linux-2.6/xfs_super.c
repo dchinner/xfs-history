@@ -500,7 +500,6 @@ linvfs_fill_super(
 	vn_trace_entry(cvp, "linvfs_read_super", (inst_t *)__return_address);
 #endif /* CONFIG_XFS_VNODE_TRACING */
 
-        cvp->v_flag |= VMOUNTING;
 	vn_bhv_head_init(VN_BHV_HEAD(cvp), "vnode");	/* for DMAPI */
 	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
@@ -778,10 +777,8 @@ linvfs_remount(
 {
 	struct xfs_args	args;
 	vfs_t		*vfsp;
-	vnode_t		*cvp;
 
 	vfsp = LINVFS_GET_VFS(sb);
-	cvp = LINVFS_GET_CVP(sb);
 
 	set_posix_acl(sb);
 	sb->s_xattr_flags |= XATTR_MNT_FLAG_USER;

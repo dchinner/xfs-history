@@ -103,7 +103,7 @@ vn_reclaim(struct vnode *vp, int flag)
 
 	VN_LOCK(vp);
 
-	vp->v_flag &= (VRECLM|VWAIT|VLOCK);
+	vp->v_flag &= (VRECLM|VWAIT);
 	VN_UNLOCK(vp, 0);
 
 	vp->v_type = VNON;
@@ -391,13 +391,6 @@ vn_rele(struct vnode *vp)
 	 */
 	if (vcnt == 0) {
 		/*
-		 * It is absolutely, positively the case that
-		 * the lock manager will not be releasing vnodes
-		 * without first having released all of its locks.
-		 */
-		ASSERT(!(vp->v_flag & VLOCKHOLD));
-
-		/*
 		 * As soon as we turn this on, noone can find us in vn_get
 		 * until we turn off VINACT or VRECLM
 		 */
@@ -419,7 +412,7 @@ vn_rele(struct vnode *vp)
 			}
 		}
 
-		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE|VMODIFIED);
+		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VMODIFIED);
 
 	}
 
