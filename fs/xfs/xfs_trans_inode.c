@@ -312,12 +312,6 @@ xfs_trans_ihold(xfs_trans_t	*tp,
  * The values for fieldmask are defined in xfs_inode_item.h.  We always
  * log all of the core inode if any of it has changed, and we always log
  * all of the inline data/extents/b-tree root if any of them has changed.
- *
- * If this is the first time the inode has been logged since it was
- * last flushed or brought in from disk, then take an extra reference
- * on the inode.  This keeps the inode from being recycled until
- * it is clean.  This should help to keep us from sleeping too much
- * in the reclaim routine trying to flush out the inode.
  */
 void
 xfs_trans_log_inode(xfs_trans_t	*tp,
@@ -336,10 +330,6 @@ xfs_trans_log_inode(xfs_trans_t	*tp,
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
 
-	if (ip->i_item.ili_format.ilf_fields == 0) {
-		ASSERT(ip->i_item.ili_logged == 0);
-		vn_hold(XFS_ITOV(ip));
-	}
 	ip->i_item.ili_format.ilf_fields |= flags;
 }
 
