@@ -1249,7 +1249,7 @@ xfs_ialloc_read_agi(
 			XFS_RANDOM_IALLOC_READ_AGI)) {
 		xfs_trans_brelse(tp, bp);
 		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d\n",
+			"EFSCORRUPTED returned from file %s line %d",
 			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
 	}

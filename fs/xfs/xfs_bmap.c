@@ -4669,7 +4669,7 @@ xfs_bmapi(
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL) {
 		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d\n",
+			"EFSCORRUPTED returned from file %s line %d",
 			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -5159,7 +5159,7 @@ xfs_bmapi_single(
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS) {
 		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d\n",
+			"EFSCORRUPTED returned from file %s line %d",
 			__FILE__, __LINE__);
 	       return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -5235,7 +5235,7 @@ xfs_bunmapi(
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE) {
 		cmn_err(CE_NOTE,
-		    	"EFSCORRUPTED returned from file %s line %d\n",
+		    	"EFSCORRUPTED returned from file %s line %d",
 			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -5627,7 +5627,7 @@ xfs_getbmap(
 		} else if (ip->i_d.di_aformat != 0 &&
 			   ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS) {
 			cmn_err(CE_NOTE,
-			    	"EFSCORRUPTED returned from file %s line %d\n",
+			    	"EFSCORRUPTED returned from file %s line %d",
 				__FILE__, __LINE__);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
@@ -6200,7 +6200,7 @@ xfs_bmap_count_blocks(
 			ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t), 
 			count) < 0) {
 				cmn_err(CE_NOTE,
-				    	"EFSCORRUPTED returned from file %s line %d\n",
+				    	"EFSCORRUPTED returned from file %s line %d",
 					__FILE__, __LINE__);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
@@ -6221,7 +6221,7 @@ xfs_bmap_count_blocks(
 
 	if (xfs_bmap_count_tree(mp, tp, bno, level, count) < 0) {
 		cmn_err(CE_NOTE,
-		    	"EFSCORRUPTED returned from file %s line %d\n",
+		    	"EFSCORRUPTED returned from file %s line %d",
 			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -6277,7 +6277,7 @@ xfs_bmap_count_tree(
 		     xfs_bmap_count_tree(mp, tp, bno, level, count)) < 0) {
 			xfs_trans_brelse(tp, bp);
 			cmn_err(CE_NOTE,
-			    	"EFSCORRUPTED returned from file %s line %d\n",
+			    	"EFSCORRUPTED returned from file %s line %d",
 				__FILE__, __LINE__);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
@@ -6292,7 +6292,7 @@ xfs_bmap_count_tree(
 			if (xfs_bmap_count_leaves(frp, numrecs, count) < 0) {
 				xfs_trans_brelse(tp, bp);
 				cmn_err(CE_NOTE,
-				    	"EFSCORRUPTED returned from file %s line %d\n",
+				    	"EFSCORRUPTED returned from file %s line %d",
 					__FILE__, __LINE__);
 				return XFS_ERROR(EFSCORRUPTED);
 			}

@@ -195,7 +195,7 @@ xfs_btree_check_lblock(
 		if (bp)
 			xfs_buftrace("LBTREE ERROR", bp);
 		cmn_err(CE_NOTE,
-			"EFSCORRUPTED returned from file %s line %d\n",
+			"EFSCORRUPTED returned from file %s line %d",
 			__FILE__, __LINE__);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
