@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.115 $"
+#ident "$Revision: 1.116 $"
 
 struct bhv_desc;
 struct buf;
@@ -26,7 +26,7 @@ struct xfs_dquot;
  */
 typedef struct xfs_ihash {
 	struct xfs_inode	*ih_next;	
-	mutex_t			ih_lock;
+	mrlock_t		ih_lock;
 	uint			ih_version;
 } xfs_ihash_t;
 
