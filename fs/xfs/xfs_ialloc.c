@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision: 1.37 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -473,38 +473,44 @@ xfs_ialloc_ag_select(
  * xfs_dialloc() is designed to be called twice if it has to do an
  * allocation to replenish the inode freelist.  On the first call,
  * IO_agbuf should be set to NULL. If the freelist is not empty,
- * i.e., xfs_dialloc() did not need to do an allocation, an inode
- * number is returned.  In this case, IO_agbuf would be set to NULL and
- * alloc_done set to false.
+ * i.e., xfs_dialloc_ino() did not need to do an allocation, an inode
+ * number is returned.  In this case, IO_agbuf would be set to the 
+ * current ag_buf and alloc_done set to false.
  * If an allocation needed to be done, xfs_dialloc would return
  * the current ag_buf in IO_agbuf and set alloc_done to true.
  * The caller should then commit the current transaction, allocate a new
- * transaction, and call xfs_dialloc() again, passing in the previous
+ * transaction, and call xfs_dialloc_ino() again, passing in the previous
  * value of IO_agbuf.  IO_agbuf should be held across the transactions.
  * Since the agbuf is locked across the two calls, the second call is
  * guaranteed to have something on the freelist.
+ *
+ * Once we successfully pick an inode its number is returned and the
+ * IO_agbuf parameter contains the ag_buf for the inode's ag.  The caller
+ * should get its reference to the in-core inode/vnode for the given ino
+ * and then call xfs_dialloc_finish() to finalize the allocation.  This
+ * must be done to satisfy the ordering of the inode/vnode locking with
+ * that of the on-disk inode's buffer.  Since xfs_reclaim() must be able
+ * to flush a potentially free inode, it forces the order of inode/vnode
+ * locking before inode buffer locking.
  */
 xfs_ino_t				/* inode number allocated */
-xfs_dialloc(
+xfs_dialloc_ino(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	int		sameag,		/* 1 => must be in same a.g. */
 	mode_t		mode,		/* mode bits for new inode */
-	buf_t		**IO_agbuf,	/* allocation group header's buffer */
+	buf_t		**IO_agbuf,	/* in/out ag header's buffer */
 	boolean_t	*alloc_done)	/* true if we needed to replenish
 					   inode freelist */
 {
-	xfs_agblock_t	agbno;		/* starting block number of inodes */
 	xfs_agnumber_t	agcount;	/* number of allocation groups */
 	buf_t		*agbuf;		/* allocation group header's buffer */
 	xfs_agino_t	agino;		/* ag-relative inode to be returned */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agi_t	*agi;		/* allocation group header structure */
-	buf_t		*fbuf;		/* buffer containing inode */
-	xfs_dinode_t	*free;		/* pointer into fbuf for our dinode */
+
 	xfs_ino_t	ino;		/* fs-relative inode to be returned */
 	xfs_mount_t	*mp;		/* mount point structure */
-	int		off;		/* index of our inode in fbuf */
 	xfs_sb_t	*sbp;		/* superblock structure */
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
 
@@ -587,11 +593,50 @@ xfs_dialloc(
 	/*
 	 * Here with an allocation group that has a free inode.
 	 */
-	agno = tagno;
+	*IO_agbuf = agbuf;
 	agino = agi->agi_freelist;
-	ASSERT(agino != NULLAGINO);
-	agbno = xfs_agino_to_agbno(sbp, agino);
-	off = xfs_agino_to_offset(sbp, agino);
+	ino = xfs_agino_to_ino(sbp, tagno, agino);
+	return ino;
+}
+
+
+/*
+ * Finalize the allocation of an on-disk inode.  We need the
+ * inode number returned by a previous call to xfs_dialloc_ino()
+ * and the agi buffer returned in that call as well.  Here we
+ * actually remove the on-disk inode from the free list and modify
+ * the count of free inodes in the agi.
+ *
+ * We didn't do this earlier as part of xfs_dialloc_ino(), because the
+ * in-core inode must be obtained BEFORE the on-disk buffer.  This
+ * ordering is forced by xfs_reclaim() needing to flush out a dirty
+ * inode (thereby locking the buffer for its on-disk copy) after the
+ * vnode's RECLAIM bit is set and the inode is locked.
+ */
+void
+xfs_dialloc_finish(
+	xfs_trans_t	*tp,		/* transaction structure */
+	xfs_ino_t	ino,		/* ino chosen by xfs_dialloc_ino() */
+	buf_t		*agbuf)		/* agi buf from xfs_dialloc_ino() */
+{	 
+	xfs_mount_t	*mp;		/* mount point structure */
+	xfs_sb_t	*sbp;		/* superblock structure */
+	buf_t		*fbuf;		/* buffer containing inode */
+	xfs_dinode_t	*free;		/* pointer into fbuf for dinode */
+       	int		off;		/* index of free in fbuf */
+	xfs_agi_t	*agi;		/* allocation group header */
+	xfs_agblock_t	agbno;		/* starting block number of inode */
+	xfs_agnumber_t	agno;		/* allocation group number */
+
+
+
+	mp = tp->t_mountp;
+	sbp = &(mp->m_sb);
+	agno = xfs_ino_to_agno(sbp, ino);
+	agbno = xfs_ino_to_agbno(sbp, ino);
+	off = xfs_ino_to_offset(sbp, ino);
+	agi = xfs_buf_to_agi(agbuf);
+	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	/*
 	 * Get a buffer containing the free inode.
 	 */
@@ -603,7 +648,9 @@ xfs_dialloc(
 	/*
 	 * Remove the inode from the freelist, and decrement the counts.
 	 */
-	ASSERT((free->di_u.di_next == NULLAGINO) == (agi->agi_freecount == 1));
+	ASSERT((free->di_u.di_next == NULLAGINO) ==
+	       (agi->agi_freecount == 1));
+
 	agi->agi_freelist = free->di_u.di_next;
 	/*
 	 * Mark the inode in-buffer as free by setting its di_next to
@@ -614,8 +661,7 @@ xfs_dialloc(
 	agi->agi_freecount--;
 	xfs_ialloc_log_agi(tp, agbuf, XFS_AGI_FREECOUNT | XFS_AGI_FREELIST);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
-	ino = xfs_agino_to_ino(sbp, agno, agino);
-	return ino;
+	return;
 }
 
 /*
