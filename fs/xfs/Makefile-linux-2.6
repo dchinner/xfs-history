@@ -133,7 +133,8 @@ xfs-y				+= $(addprefix $(XFS_LINUX)/, \
 				   xfs_vfs.o \
 				   xfs_vnode.o \
 				   xfs_buf.o \
-				   xfs_ksyms.o)
+				   xfs_ksyms.o \
+				   kmem.o)
 
 # Objects in support/
 xfs-y				+= $(addprefix support/, \
