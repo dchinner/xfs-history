@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.10 1994/04/11 18:44:23 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.11 1994/04/11 19:53:19 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -757,7 +757,9 @@ xfs_remove_all_tickets()
 	/*
  	 * remove the tickets from the inodes
  	 */
+#ifndef SIM
 	s = splock(vfslock);
+#endif
 	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
 		/*
  		 * Is this an xfs system ?
@@ -766,6 +768,8 @@ xfs_remove_all_tickets()
 			xfs_remove_tickets_from_fs(vfsp);
 		}
 	}
+#ifndef SIM
 	spunlock(vfslock, s);
+#endif
 	return(0);
 }
