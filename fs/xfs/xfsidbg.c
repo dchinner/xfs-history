@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision: 1.72 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1329,8 +1329,9 @@ xfs_inodebuf(buf_t *bp)
 	vfs_t *vfsp;
 	bhv_desc_t *bdp;
 	xfs_mount_t *mp;
+	extern int  xfs_fstype;
 
-	vfsp = vfs_devsearch_nolock(bp->b_edev);
+	vfsp = vfs_devsearch_nolock(bp->b_edev, xfs_fstype);
 	if (!vfsp)
 		return;
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);

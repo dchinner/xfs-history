@@ -1,4 +1,4 @@
-#ident "$Revision: 1.220 $"
+#ident "$Revision: 1.221 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3565,6 +3565,7 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 	bhv_desc_t              *bdp;
 	xfs_inode_t             *ip = NULL ;
 	int                     error;
+	extern	int		xfs_fstype;
 
 	/*
 	 * Lookup the vfs structure and mark it busy.
@@ -3576,7 +3577,7 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 	 * inode structure. It will be cleanup when the inode structure is
 	 * freed.
 	 */
-	vfsp = vfs_busydev( fs_dev );
+	vfsp = vfs_busydev( fs_dev, xfs_fstype );
 
 	if (vfsp) {
 
@@ -3584,25 +3585,23 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 		 * Verify that this is an xfs file system.
 		 */
 #ifndef SIM
-		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0)
+		ASSERT(strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0);
 #endif
-		{
-
-			bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
-			error = xfs_iget( XFS_BHVTOM( bdp ),
-					NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
-
-			if ( error ) {
-				ip = NULL;
-			}
-
-			if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
-				if (ip) {
-					xfs_iunlock( ip, XFS_ILOCK_SHARED );
-				}
-				ip = NULL;
-			}
+		bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+		error = xfs_iget( XFS_BHVTOM( bdp ),
+				 NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+		
+		if ( error ) {
+			ip = NULL;
 		}
+		
+		if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
+			if (ip) {
+				xfs_iunlock( ip, XFS_ILOCK_SHARED );
+			}
+			ip = NULL;
+		}
+		
 
 		/*
 		 * Decrement the vfs busy count.

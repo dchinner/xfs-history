@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.175 $"
+#ident  "$Revision: 1.176 $"
 
 
 #include <limits.h>
@@ -770,7 +770,7 @@ xfs_mount(
 	 * Ensure that this device isn't already mounted,
 	 * unless this is a REMOUNT request
 	 */
-        if (vfs_devsearch(ddev) == NULL) {
+        if (vfs_devsearch(ddev, VFS_FSTYPE_ANY) == NULL) {
 		ASSERT((uap->flags & MS_REMOUNT) == 0);
 	} else {
 		if ((uap->flags & MS_REMOUNT) == 0)
@@ -1296,7 +1296,8 @@ devvptoxfs(
 		 * about racing with unmount.  Hold devvp's lock to
 		 * block unmount here.
 		 */
-		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfs_devsearch(dev)),
+		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfs_devsearch(dev, 
+							  xfs_fstype)),
 					      &xfs_vfsops);
 		/*
 		 * If the filesystem is shutting down, typically because of

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.51 $"
+#ident	"$Revision: 1.52 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -644,7 +644,8 @@ xfs_fd_to_mp(
 	vfile_t		*fp;
 	vfs_t		*vfsp;
 	vnode_t		*vp;
-	bhv_desc_t *bdp;
+	bhv_desc_t 	*bdp;
+	extern int	xfs_fstype;
 
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);
@@ -659,7 +660,7 @@ xfs_fd_to_mp(
 			dev = chartoblock(vp->v_rdev);
 		else
 			dev = vp->v_rdev;
-		vfsp = vfs_devsearch(dev);
+		vfsp = vfs_devsearch(dev, xfs_fstype);
 		if (vfsp == NULL)
 			vfsp = vp->v_vfsp;
 	} else {

@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.75 1997/04/29 00:59:14 singal Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.76 1997/06/24 07:01:27 sup Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -250,12 +250,12 @@ xfs_get_block_size(
 	dev_t		fs_dev;
 	caddr_t		fs_size;
 	struct vfs	*vfsp;
-
+	extern int	xfs_fstype;
 
 	fs_dev 		= (dev_t)sysarg_fs_dev;
 	fs_size		= (caddr_t)sysarg_fs_size;
 
-	if ( vfsp = vfs_devsearch( fs_dev ) ) {
+	if ( vfsp = vfs_devsearch( fs_dev, xfs_fstype ) ) {
 		if ( copyout(	&(vfsp->vfs_bsize), 
 				(caddr_t)fs_size, 
 				sizeof(u_int)) ) {
