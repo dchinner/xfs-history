@@ -1,4 +1,4 @@
-#ident "$Revision: 1.119 $"
+#ident "$Revision: 1.120 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1552,7 +1552,8 @@ xfs_iomap_write(
 	off_t		offset,
 	size_t		count,
 	struct bmapval	*bmapp,
-	int		*nbmaps)
+	int		*nbmaps,
+	int		ioflag)		
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	ioalign;
@@ -1562,6 +1563,7 @@ xfs_iomap_write(
 	xfs_fileoff_t	last_file_fsb;
 	off_t		aligned_offset;
 	xfs_fsize_t	isize;
+	__uint64_t	last_page_offset;
 	int		nimaps;
 	unsigned int	iosize;
 	unsigned int	writing_bytes;
@@ -1600,8 +1602,11 @@ xfs_iomap_write(
 	 * bytes that are written are on a different extent then the extra
 	 * blocks we allocate there will be no buffer created over the
 	 * extra delayed allocation blocks.  That's not allowed.
+	 *
+	 * We don't bother with this for sync writes, because we need
+	 * to minimize the amount we write for good performance.
 	 */
-	if ((offset + count) > ip->i_d.di_size) {
+	if (!(ioflag & IO_SYNC) && ((offset + count) > ip->i_d.di_size)) {
 		nimaps = 1;
 		(void) xfs_bmapi(NULL, ip,
 				 XFS_B_TO_FSBT(mp, (offset + count - 1)),
@@ -1632,9 +1637,32 @@ xfs_iomap_write(
 		return ENOSPC;
 	}
 
-	iosize = mp->m_writeio_blocks;
-	aligned_offset= XFS_WRITEIO_ALIGN(mp, offset);
-	ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
+	if (!(ioflag & IO_SYNC) ||
+	    ((last_fsb - offset_fsb) >= mp->m_writeio_blocks)) {
+		/*
+		 * For normal or large sync writes, align everything
+		 * into m_writeio_blocks sized chunks.
+		 */
+		iosize = mp->m_writeio_blocks;
+		aligned_offset = XFS_WRITEIO_ALIGN(mp, offset);
+		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
+	} else {
+		/*
+		 * For small sync writes try to minimize the amount
+		 * of I/O we do.  Round down and up to the larger of
+		 * page or block boundaries.
+		 */
+		if (NBPP > mp->m_sb.sb_blocksize) {
+			aligned_offset = ctooff(offtoct(offset));
+			ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
+			last_page_offset = ctob64(btoc64(offset + count));
+			iosize = XFS_B_TO_FSBT(mp, last_page_offset -
+					       aligned_offset);
+		} else {
+			ioalign = offset_fsb;
+			iosize = last_fsb - offset_fsb;
+		}
+	}
 
 	/*
 	 * Now map our desired I/O size and alignment over the
@@ -1924,7 +1952,8 @@ xfs_write_file(
 
 		nbmaps = XFS_WRITE_BMAPS;
 		error = xfs_iomap_write(ip, uiop->uio_offset,
-					uiop->uio_resid, bmaps, &nbmaps);
+					uiop->uio_resid, bmaps, &nbmaps,
+					ioflag);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		if (error || (bmaps[0].pbsize == 0)) {
@@ -2353,7 +2382,7 @@ xfs_bmap(
 	} else {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 		ASSERT(ip->i_d.di_size >= (offset + count));
-		error = xfs_iomap_write(ip, offset, count, bmapp, nbmaps);
+		error = xfs_iomap_write(ip, offset, count, bmapp, nbmaps, 0);
 	}
 
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
