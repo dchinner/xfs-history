@@ -55,19 +55,6 @@ STATIC int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 STATIC int _xfs_imap_to_bmap(xfs_iocore_t *, xfs_off_t, xfs_bmbt_irec_t *,
 			pb_bmap_t *, int, int);
 
-#ifndef DEBUG
-#define xfs_strat_write_check(io,off,count,imap,nimap)
-#else /* DEBUG */
-void
-xfs_strat_write_check(
-	xfs_iocore_t	*io,
-	xfs_fileoff_t	offset_fsb,
-	xfs_filblks_t	buf_fsb,
-	xfs_bmbt_irec_t *imap,
-	int		imap_count);
-
-#endif /* DEBUG */
-
 
 /*
  *	xfs_iozero
@@ -143,12 +130,10 @@ xfs_read(
 	ssize_t		ret;
 	xfs_fsize_t	n;
 	xfs_inode_t	*ip;
-	xfs_iocore_t	*io;
 	xfs_mount_t	*mp;
 
 	ip = XFS_BHVTOI(bdp);
-	io = &(ip->i_iocore);
-	mp = io->io_mount;
+	mp = ip->i_mount;
 
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 
@@ -156,7 +141,7 @@ xfs_read(
 		if (((__psint_t)buf & BBMASK) ||
 		    (*offset & mp->m_blockmask) ||
 		    (size & mp->m_blockmask)) {
-			if (*offset == XFS_SIZE(mp, io)) {
+			if (*offset == ip->i_d.di_size) {
 				return (0);
 			}
 			return -XFS_ERROR(EINVAL);
@@ -175,7 +160,7 @@ xfs_read(
 		return -EIO;
 	}
 
-	XFS_ILOCK(mp, io, XFS_IOLOCK_SHARED);
+	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(file->f_mode & FINVIS)) {
@@ -187,18 +172,18 @@ xfs_read(
 					     FILP_DELAY_FLAG(file),
 					     &locktype);
 		if (error) {
-			XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
+			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -error;
 		}
 	}
 
 	ret = generic_file_read(file, buf, size, offset);
-	XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
 
 	if (!(file->f_mode & FINVIS))
-		XFS_CHGTIME(mp, io, XFS_ICHGTIME_ACC);
+		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
 	return ret;
 }
@@ -662,7 +647,15 @@ retry:
 	XFS_STATS_ADD(xfsstats.xs_write_bytes, ret);
 
 	if (*offset > xip->i_d.di_size) {
-		XFS_SETSIZE(mp, io, *offset);
+		xfs_ilock(xip, XFS_ILOCK_EXCL);
+		if (*offset > xip->i_d.di_size) {
+			struct inode	*inode = LINVFS_GET_IP(vp);
+
+			inode->i_size = xip->i_d.di_size = *offset;
+			xip->i_update_core = 1;
+			xip->i_update_size = 1;
+		}
+		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 	}
 
 	/* Handle various SYNC-type writes */
@@ -1253,56 +1246,6 @@ out:
 	XFS_IUNLOCK(io->io_mount, io, XFS_ILOCK_EXCL);
 	return XFS_ERROR(error);
 }
-
-#ifdef DEBUG
-/*
- * xfs_strat_write_check
- *
- * Make sure that there are blocks or delayed allocation blocks
- * underlying the entire area given.  The imap parameter is simply
- * given as a scratch area in order to reduce stack space.  No
- * values are returned within it.
- */
-void
-xfs_strat_write_check(
-	xfs_iocore_t	*io,
-	xfs_fileoff_t	offset_fsb,
-	xfs_filblks_t	buf_fsb,
-	xfs_bmbt_irec_t *imap,
-	int		imap_count)
-{
-	xfs_filblks_t	count_fsb;
-	xfs_fsblock_t	firstblock;
-	xfs_mount_t	*mp;
-	int		nimaps;
-	int		n;
-	int		error;
-
-	if (!IO_IS_XFS(io)) return;
-
-	mp = io->io_mount;
-	count_fsb = 0;
-	while (count_fsb < buf_fsb) {
-		nimaps = imap_count;
-		firstblock = NULLFSBLOCK;
-		error = XFS_BMAPI(mp, NULL, io, (offset_fsb + count_fsb),
-				  (buf_fsb - count_fsb), 0, &firstblock, 0,
-				  imap, &nimaps, NULL);
-		if (error) {
-			return;
-		}
-		ASSERT(nimaps > 0);
-		n = 0;
-		while (n < nimaps) {
-			ASSERT(imap[n].br_startblock != HOLESTARTBLOCK);
-			count_fsb += imap[n].br_blockcount;
-			ASSERT(count_fsb <= buf_fsb);
-			n++;
-		}
-	}
-	return;
-}
-#endif /* DEBUG */
 
 /*
  * Map the given I/O size and I/O alignment over the given extent.

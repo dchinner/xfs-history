@@ -487,44 +487,6 @@ typedef struct vnodeops {
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 
-#define IO_APPEND	0x00001 /* append write (VOP_WRITE) */
-#define IO_SYNC		0x00002 /* sync file I/O (VOP_WRITE) */
-#define IO_DIRECT	0x00004 /* bypass page cache */
-#define IO_IGNCACHE	0x00008 /* ignore page cache coherency when doing i/o
-							   (IO_DIRECT) */
-#define IO_GRIO		0x00010 /* this is a guaranteed rate request */
-#define IO_INVIS	0x00020 /* don't update inode timestamps */
-#define IO_DSYNC	0x00040 /* sync data I/O (VOP_WRITE) */
-#define IO_RSYNC	0x00080 /* sync data I/O (VOP_READ) */
-#define IO_NFS		0x00100 /* I/O from the NFS v2 server */
-#define IO_TRUSTEDDIO	0x00200 /* direct I/O from a trusted client
-				   so block zeroing is unnecessary */
-#define IO_PRIORITY	0x00400 /* I/O is priority */
-#define IO_ISLOCKED	0x00800 /* for VOP_READ/WRITE, VOP_RWLOCK/RWUNLOCK is
-				   being done by higher layer - file system
-				   shouldn't do locking */
-#define IO_BULK		0x01000 /* loosen semantics for sequential bandwidth */
-#define IO_NFS3		0x02000 /* I/O from the NFS v3 server */
-#define IO_UIOSZ	0x04000 /* respect i/o size flags in uio struct */
-#define IO_ONEPAGE	0x08000 /* I/O must be fit into one page */
-#define IO_MTTHREAD	0x10000 /* I/O coming from threaded application, only
-				   used by paging to indicate that fs can
-				   return EAGAIN if this would deadlock. */
-
-#ifdef CELL_CAPABLE
-#define IO_PFUSE_SAFE	0x20000 /* VOP_WRITE/VOP_READ: vnode can take addr's,
-				   kvatopfdat them, bump pf_use, and continue
-				   to reference data after return from VOP_.
-				   If IO_SYNC, only concern is kvatopfdat
-				   returns legal pfdat. */
-#define IO_PAGE_DIRTY	0x40000 /* Pageing I/O writing to page */
-#define IO_TOKEN_MASK  0xF80000 /* Mask for CXFS to encode tokens in ioflag */
-#define IO_TOKEN_SHIFT	19
-#define IO_TOKEN_SET(i) (((i) & IO_TOKEN_MASK) >> IO_TOKEN_SHIFT)
-#define IO_NESTEDLOCK  0x1000000 /* Indicates that XFS_IOLOCK_NESTED was used*/
-#define IO_LOCKED_EXCL 0x2000000 /* Indicates that iolock is held EXCL */
-#endif
-
 /*
  * Flush/Invalidate options for VOP_TOSS_PAGES, VOP_FLUSHINVAL_PAGES and
  *	VOP_FLUSH_PAGES.

@@ -40,7 +40,7 @@ struct cred;
 struct super_block;
 struct fid;
 struct dm_fcntl_vector;
-struct xfs_args;
+struct xfs_mount_args;
 
 typedef struct vfs {
 	u_int		vfs_flag;	/* flags */
@@ -111,7 +111,8 @@ typedef struct vfsops {
 #ifdef CELL_CAPABLE
 	bhv_position_t	vf_position;	/* position within behavior chain */
 #endif
-	int	(*vfs_mount)(struct vfs *, struct xfs_args *, struct cred *);
+	int	(*vfs_mount)(struct vfs *, struct xfs_mount_args *,
+					struct cred *);
 					/* mount file system */
 	int	(*vfs_dounmount)(bhv_desc_t *, int, struct vnode *,
 				 struct cred *);

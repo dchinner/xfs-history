@@ -225,7 +225,7 @@ typedef __uint64_t bhv_posmask_t;
  * Note that the callouts will occur in the context of the last
  * accessor unlocking the behavior.
  */
-typedef void bhv_ucallout_t(bhv_head_t *bhp, void *, void *, caddr_t, cell_size_t);
+typedef void bhv_ucallout_t(bhv_head_t *bhp, void *, void *, caddr_t, size_t);
 
 #define BHV_WRITE_LOCK_CALLOUT(bhp, flags, func, arg1, arg2, argv, argvsz) \
 	bhv_queue_ucallout(bhp, flags, func, arg1, arg2, argv, argvsz)

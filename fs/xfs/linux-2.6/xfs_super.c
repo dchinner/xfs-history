@@ -42,12 +42,6 @@
 extern int  xfs_init(int fstype);
 extern void xfs_cleanup(void);
 
-#ifdef CELL_CAPABLE
-extern int cxfs_parseargs(char *, int, struct xfs_args *);
-#else
-# define cxfs_parseargs(opt,flag,xargs) (0) /* success */
-#endif
-
 /* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
 # define set_max_bytes(sb)	((sb)->s_maxbytes = XFS_MAX_FILE_OFFSET)
@@ -103,7 +97,7 @@ STATIC int
 xfs_parseargs(
 	char		*options,
 	int		flags,
-	struct xfs_args *args)
+	struct xfs_mount_args *args)
 {
 	char		*this_char, *value, *eov;
 	int		logbufs = -1;
@@ -113,7 +107,7 @@ xfs_parseargs(
 	int		rval = 1;	/* failure is default */
 
 	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
-	memset(args, 0, sizeof(struct xfs_args));
+	memset(args, 0, sizeof(struct xfs_mount_args));
 	args->slcount = args->stimeout = args->ctimeout = -1;
 	args->mtpt[0] = '\0';
 
@@ -271,8 +265,7 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 	args->logbufs = logbufs;
 	args->logbufsize = logbufsize;
 
-	rval = cxfs_parseargs(options, flags, args);
-	return rval;
+	return 0;
 }
 
 /*
@@ -301,7 +294,7 @@ spectodev(
 int
 spectodevs(
 	struct super_block *sb,
-	struct xfs_args *args,
+	struct xfs_mount_args *args,
 	kdev_t		*ddevp,
 	kdev_t		*logdevp,
 	kdev_t		*rtdevp)
@@ -444,11 +437,11 @@ linvfs_fill_super(
 	vfsops_t	*vfsops;
 	vnode_t		*rootvp;
 	struct inode	*ip;
-	struct xfs_args *args;
+	struct xfs_mount_args *args;
 	struct statfs	statvfs;
 	int		error;
 
-	args = (struct xfs_args *)kmalloc(sizeof(struct xfs_args), GFP_KERNEL);
+	args = (struct xfs_mount_args *)kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
 	if (!args)
 		return	-EINVAL;
 	strncpy(args->fsname, sb->s_id, MAXNAMELEN);
@@ -691,12 +684,12 @@ linvfs_remount(
 	int		*flags,
 	char		*options)
 {
-	struct xfs_args *args;
+	struct xfs_mount_args *args;
 	vfs_t		*vfsp;
 	xfs_mount_t	*mp;
 	int		error = 0;
 
-	args = (struct xfs_args *)kmalloc(sizeof(struct xfs_args), GFP_KERNEL);
+	args = (struct xfs_mount_args *)kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
 	if (!args)
 		return -ENOMEM;
 

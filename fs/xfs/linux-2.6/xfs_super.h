@@ -81,7 +81,7 @@
 
 
 struct buftarg;
-struct xfs_args;
+struct xfs_mount_args;
 
 extern int
 linvfs_fill_buftarg(
@@ -113,7 +113,7 @@ fs_dounmount(
 extern int
 spectodevs(
 	struct super_block *sb,
-	struct xfs_args *args,
+	struct xfs_mount_args *args,
 	kdev_t		*ddevp,
 	kdev_t		*logdevp,
 	kdev_t		*rtdevp);
