@@ -493,9 +493,14 @@ xfs_getattr(
 			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
 		vap->va_uuid = ip->i_d.di_uuid;
-		vap->va_anextents = (ip->i_afp->if_flags & XFS_IFEXTENTS) ?
-			ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t) :
-			ip->i_d.di_anextents;
+		if (ip->i_afp != NULL) {
+			vap->va_anextents =
+				(ip->i_afp->if_flags & XFS_IFEXTENTS) ?
+				 ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t) :
+				 ip->i_d.di_anextents;
+		} else {
+			vap->va_anextents = 0;
+		}
 	}
 
 	xfs_iunlock (ip, XFS_ILOCK_SHARED);
