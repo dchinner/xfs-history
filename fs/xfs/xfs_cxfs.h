@@ -13,7 +13,7 @@
 #ifndef __FS_XFS_XFS_CXFS_H__
 #define __FS_XFS_XFS_CXFS_H__
 
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
  * xfs_cxfs.h -- Interface cxfs presents to non-cell xfs code
@@ -34,6 +34,7 @@ extern void cxfs_arrinit(void); /* Initialization for array mount logic. */
 extern int cxfs_mount(	        /* For any specia mount handling. */
 		struct xfs_mount    *mp,
                 struct xfs_args     *ap,
+		dev_t		    dev,
 		int	            *client);
 extern void cxfs_unmount(       /* For any special unmount handling. */
 		struct xfs_mount    *mp);
