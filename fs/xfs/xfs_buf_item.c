@@ -1,4 +1,4 @@
-#ident "$Revision: 1.43 $"
+#ident "$Revision: 1.44 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -53,6 +53,11 @@ STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
 
 #define		xfs_buf_item_log_debug(x,y,z)
 #define 	xfs_buf_item_log_check(x)
+
+STATIC void
+xfs_buf_error_relse(
+	buf_t	*bp);
+
 
 /*
  * This returns the number of log iovecs needed to log the
@@ -1119,10 +1124,46 @@ xfs_buf_iodone_callbacks(buf_t *bp)
 {
 	xfs_log_item_t	*lip;
 	xfs_log_item_t	*nlip;
+	static time_t	lasttime;
+	static dev_t	lastdev;
 
 	ASSERT(bp->b_fsprivate != NULL);
 	if (geterror(bp) != 0) {
-		cmn_err(CE_PANIC, "XFS dev 0x%x: write error in file system meta-data", bp->b_edev);
+		if ((bp->b_edev != lastdev) || ((lbolt - lasttime) > 500)) {
+			prdev("XFS write error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+			lasttime = lbolt;
+		}
+		lastdev = bp->b_edev;
+
+		if (bp->b_flags & B_ASYNC) {
+			/*
+			 * If the write was asynchronous then noone will be
+			 * looking for the error.  Clear the error state
+			 * and write the buffer out again delayed write.
+			 */
+			bp->b_error = 0;
+			bp->b_flags &= ~B_ERROR;
+			bp->b_flags |= B_DELWRI | B_DONE;
+			bp->b_start = lbolt;
+			brelse(bp);
+		} else {
+			/*
+			 * If the write of the buffer was not asynchronous,
+			 * then we wan't to make sure to return the error
+			 * to the caller of bwrite().  Because of this we
+			 * cannot clear the B_ERROR state at this point.
+			 * Instead we install a callback function that
+			 * will be called when the buffer is released, and
+			 * that routine will clear the error state and
+			 * set the buffer to be written out again after
+			 * some delay.
+			 */
+			ASSERT(bp->b_relse == NULL);
+			bp->b_relse = xfs_buf_error_relse;
+			bp->b_flags |= B_DONE;
+			vsema(&bp->b_iodonesema);
+		}
+		return;
 	}
 
 	lip = (xfs_log_item_t *)bp->b_fsprivate;
@@ -1143,6 +1184,28 @@ xfs_buf_iodone_callbacks(buf_t *bp)
 
 	bp->b_iodone = NULL;
 	iodone(bp);
+}
+
+/*
+ * This is a callback routine attached to a buffer which gets an error
+ * when being written out synchronously.  If the buffer is not made stale
+ * by the code doing the write, then it clears the error state in the buffer
+ * and writes it out again delayed write.  It is up to the code doing the
+ * bwrite() to clean up the buffer if it marks it stale.
+ */
+STATIC void
+xfs_buf_error_relse(
+	buf_t	*bp)
+{
+	if (!(bp->b_flags & B_STALE)) {
+		bp->b_flags &= ~B_ERROR;
+		bp->b_error = 0;
+		bp->b_flags |= B_DELWRI | B_DONE;
+		bp->b_start = lbolt;
+	}
+
+	bp->b_relse = NULL;
+	brelse(bp);
 }
 
 /*
