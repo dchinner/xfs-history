@@ -1,4 +1,4 @@
-#ident "$Revision: 1.162 $"
+#ident "$Revision: 1.164 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -623,8 +623,6 @@ xfs_iread(
 
 	ip->i_delayed_blks = 0;
 
-	ASSERT(ip->i_d.di_nlink >= 0);
-
 	/*
 	 * Mark the buffer containing the inode as something to keep
 	 * around for a while.  This helps to keep recently accessed
@@ -714,7 +712,7 @@ xfs_ialloc(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*pip,
 	mode_t		mode,
-	ushort		nlink,
+	nlink_t		nlink,
 	dev_t		rdev,
 	cred_t		*cr,
 	buf_t		**ialloc_context,
@@ -762,7 +760,8 @@ xfs_ialloc(
 	vp->v_type = IFTOVT(mode);
 	vp->v_rdev = rdev;
 	ip->i_d.di_mode = (__uint16_t)mode;
-	ip->i_d.di_nlink = (__int16_t)nlink;
+	ip->i_d.di_nlink = nlink;
+	ASSERT(ip->i_d.di_nlink == nlink);
 	ip->i_d.di_uid = cr->cr_uid;
 	ip->i_d.di_gid = cr->cr_gid;
 
