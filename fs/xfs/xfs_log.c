@@ -1386,6 +1386,8 @@ xlog_sync(xlog_t		*log,
 	}
 	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
 		unsigned sunit = BTOBB(log->l_mp->m_sb.sb_logsunit);
+		if (!sunit)
+			sunit = 1;
 
 		count = BTOBB(log->l_iclog_hsize + iclog->ic_offset);
 		if (count & (sunit - 1)) {
