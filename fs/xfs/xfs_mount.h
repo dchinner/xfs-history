@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.46 $"
+#ident	"$Revision: 1.47 $"
 
 struct buf;
 struct cred;
@@ -29,7 +29,7 @@ typedef struct xfs_trans_reservations {
 typedef struct xfs_mount {
 	struct vfs		*m_vfsp;	/* ptr to vfs */
 	xfs_tid_t		m_tid;		/* next unused tid for fs */
-	lock_t			m_ail_lock;	/* fs AIL mutex */
+	mutex_t			m_ail_lock;	/* fs AIL mutex */
 	xfs_ail_entry_t		m_ail;		/* fs active log item list */
 	uint			m_ail_gen;	/* fs AIL generation count */
 	xfs_ail_ticket_t	*m_ail_wait;	/* list of AIL push waiters*/
@@ -45,7 +45,7 @@ typedef struct xfs_mount {
 	int			m_bsize;	/* fs logical block size */
 	xfs_agnumber_t		m_agfrotor;	/* last ag where space found */
 	xfs_agnumber_t		m_agirotor;	/* last ag dir inode alloced */
-	lock_t			m_ipinlock;	/* inode pinning mutex */
+	mutex_t			m_ipinlock;	/* inode pinning mutex */
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
 	uint			m_ihashmask;	/* fs inode hash size - 1 */
 	struct xfs_inode	*m_inodes;	/* active inode list */
@@ -131,9 +131,8 @@ typedef struct xfs_mod_sb {
 #define	XFS_SB_LOCK(mp)		splockspl((mp)->m_sb_lock, splhi)
 #define	XFS_SB_UNLOCK(mp,s)	spunlockspl((mp)->m_sb_lock,(s))
 
-#define	AIL_LOCK(mp)		(splockspl((mp)->m_ail_lock, splhi))
-#define	AIL_TRYLOCK(mp)		(_trylock((mp)->m_ail_lock, splhi))
-#define	AIL_UNLOCK(mp,s)	(spunlockspl((mp)->m_ail_lock, s))
+#define	AIL_LOCK(mp)		mutex_spinlock(&(mp)->m_ail_lock)
+#define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
 
 
 #ifdef SIM
