@@ -1,14 +1,34 @@
-/**************************************************************************
- *                                                                        *
- *               Copyright (C) 1994, Silicon Graphics, Inc.               *
- *                                                                        *
- *  These coded instructions, statements, and computer programs  contain  *
- *  unpublished  proprietary  information of Silicon Graphics, Inc., and  *
- *  are protected by Federal copyright law.  They  may  not be disclosed  *
- *  to  third  parties  or copied or duplicated in any form, in whole or  *
- *  in part, without the prior written consent of Silicon Graphics, Inc.  *
- *                                                                        *
- **************************************************************************/
+/*
+ * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * 
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it would be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * 
+ * Further, this software is distributed without any warranty that it is
+ * free of the rightful claim of any third person regarding infringement
+ * or the like.  Any license provided herein, whether implied or
+ * otherwise, applies only to this software file.  Patent licenses, if
+ * any, provided herein do not apply to combinations of this program with
+ * other software, or any other product whatsoever.
+ * 
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write the Free Software Foundation, Inc., 59
+ * Temple Place - Suite 330, Boston MA 02111-1307, USA.
+ * 
+ * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
+ * Mountain View, CA  94043, or:
+ * 
+ * http://www.sgi.com 
+ * 
+ * For further information regarding this notice, see: 
+ * 
+ * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
+ */
 
 #ident "$Revision: 1.17 $"
 
@@ -69,6 +89,7 @@
 #include <sys/sysmacros.h>
 #include <sys/file.h>
 #include <sys/attributes.h>
+#include <linux/file.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -481,7 +502,7 @@ xfs_ip_to_stat(
 	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
 		buf->dt_rdev = 0;
 	} else if ((vp->v_type == VCHR) || (vp->v_type == VBLK) ) {
-		buf->dt_rdev = ip->i_df.if_u2.if_rdev;
+		buf->dt_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 	} else {
 		buf->dt_rdev = 0;       /* not a b/c spec. */
 	}
@@ -1004,9 +1025,6 @@ xfs_dm_direct_ok(
    pathname.  All we have is a handle.  Hopefully someday rdwr() and rwv()
    can be restructured such that all the file descriptor code stays in rwv().
    That way we could call rdwr() directly from here.
-*/
-
-/* Linux: linvfs_read, linvfs_write, xfs_read, xfs_write, xfs_rdwr
 */
 
 STATIC int
