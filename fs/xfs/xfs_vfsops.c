@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.194 $"
+#ident  "$Revision: 1.195 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -179,7 +179,7 @@ xfs_statvfs(
 STATIC int
 xfs_sync(
 	bhv_desc_t	*bdp,
-	short		flags,
+	int		flags,
 	cred_t		*credp);
 
 STATIC int
@@ -1739,7 +1739,7 @@ xfs_statvfs(
 STATIC int
 xfs_sync(
 	bhv_desc_t	*bdp,
-	short		flags,
+	int		flags,
 	cred_t		*credp)
 {
 	xfs_mount_t	*mp;
