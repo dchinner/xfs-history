@@ -417,8 +417,9 @@ _pagebuf_lookup_pages(
 	unsigned long		page_count, pi, index;
 	struct page		*cp, *cached_page;
 	int			gfp_mask, retry_count = 0, rval = 0;
-	int			all_mapped, good_pages;
-	size_t			blocksize;
+	int			all_mapped, good_pages, nbytes;
+	size_t			blocksize, size, offset;
+
 
 	/* For pagebufs where we want to map an address, do not use
 	 * highmem pages - so that we do not need to use kmap resources
@@ -461,7 +462,10 @@ _pagebuf_lookup_pages(
 
 	rval = pi = 0;
 	cached_page = NULL;
+
 	blocksize = pb->pb_target->pbr_blocksize;
+	size = pb->pb_count_desired;
+	offset = pb->pb_offset;
 
 	/* enter the pages in the page list */
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
@@ -504,6 +508,11 @@ _pagebuf_lookup_pages(
 			lock_page(cp);
 		}
 
+		nbytes = PAGE_CACHE_SIZE - offset;
+		if (nbytes > size)
+			nbytes = size;
+		size -= nbytes;
+
 		/* Test for the page being valid. There is a special case
 		 * in here for the case where we are reading a pagebuf
 		 * smaller than a page. We want to populate the whole page
@@ -520,16 +529,34 @@ _pagebuf_lookup_pages(
 		 * We'll have to use a different approach for that case.
 		 */
 		if (!PageUptodate(cp)) {
-			good_pages--;
 			if (blocksize == PAGE_CACHE_SIZE) {
 				if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
 				    (flags & PBF_READ) && !PageSlab(cp)) {
 					pb->pb_locked = 1;
 				}
+				good_pages--;
+			} else if (!PagePrivate(cp)) {
+				unsigned long i, range = (offset + nbytes) >> 9;
+
+				assert(blocksize < PAGE_CACHE_SIZE);
+				assert(!(pb->pb_flags & _PBF_PRIVATE_BH));
+				/*
+				 * In this case page->private holds a bitmap
+				 * of uptodate sectors (512) within the page
+				 */
+				for (i = offset >> 9; i < range; i++)
+					if (!test_bit(i, &cp->private))
+						break;
+				if (i != range)
+					good_pages--;
+			}
+			else {
+				good_pages--;
 			}
 		}
 		if (!pb->pb_locked)
 			unlock_page(cp);
+		offset = 0;
 	}
 	if (cached_page)
 		page_cache_release(cached_page);
@@ -1146,20 +1173,31 @@ int pagebuf_iostart(		/* start I/O on a buffer          */
 
 static void bio_end_io_pagebuf(struct bio *bio)
 {
-	int	i;
-	page_buf_t *pb = (page_buf_t *)bio->bi_private;
-	struct bio_vec *bvec = bio->bi_io_vec;
+	page_buf_t	*pb = (page_buf_t *)bio->bi_private;
+	unsigned int	i, blocksize = pb->pb_target->pbr_blocksize;
+	struct bio_vec	*bvec = bio->bi_io_vec;
 
 	if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
 		pb->pb_error = EIO;
 
 	for (i = 0; i < bio->bi_vcnt; i++, bvec++) {
-		struct page *page = bvec->bv_page;
+		struct page	*page = bvec->bv_page;
 
 		if (pb->pb_error) {
 			SetPageError(page);
-		} else {
+		} else if (blocksize == PAGE_CACHE_SIZE) {
 			SetPageUptodate(page);
+		} else if (!PagePrivate(page)) {
+			unsigned int	j, range;
+
+			assert(blocksize < PAGE_CACHE_SIZE);
+			assert(!(pb->pb_flags & _PBF_PRIVATE_BH));
+
+			range = (bvec->bv_offset + bvec->bv_len) >> 9;
+			for (j = bvec->bv_offset >> 9; j < range; j++)
+				set_bit(j, &page->private);
+			if (page->private == (unsigned long)(PAGE_CACHE_SIZE-1))
+				SetPageUptodate(page);
 		}
 
 		if (pb->pb_locked) {
@@ -1206,6 +1244,7 @@ int pagebuf_iorequest(		/* start real I/O               */
 	int offset = pb->pb_offset;
 	int size = pb->pb_count_desired;
 	sector_t sector = pb->pb_bn;
+	size_t blocksize = pb->pb_target->pbr_blocksize;
 	int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0 &&
 			(pb->pb_locked == 0);
 
@@ -1224,12 +1263,14 @@ int pagebuf_iorequest(		/* start real I/O               */
 	 */
 	atomic_set(&PBP(pb)->pb_io_remaining, 1);
 
-	/* Special code path for reading a sub page size pagebuf in,
+	/* Special code path for reading a sub page size pagebuf in --
 	 * we populate up the whole page, and hence the other metadata
-	 * in the same page.
+	 * in the same page.  This optimization is only valid when the
+	 * filesystem block size and the page size are equal.
 	 */
 	if (unlikely((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
-	    (pb->pb_flags & PBF_READ) && pb->pb_locked)) {
+	    (pb->pb_flags & PBF_READ) && pb->pb_locked &&
+	    (blocksize == PAGE_CACHE_SIZE))) {
 		bio = bio_alloc(GFP_NOIO, 1);
 
 		bio->bi_bdev = pb->pb_target->pbr_bdev;
@@ -1257,8 +1298,8 @@ int pagebuf_iorequest(		/* start real I/O               */
 	/* Lock down the pages which we need to for the request */
 	if (locking) {
 		for (i = 0; size; i++) {
-			int nbytes = PAGE_SIZE - offset;
-			struct page *page = pb->pb_pages[i];
+			int		nbytes = PAGE_CACHE_SIZE - offset;
+			struct page	*page = pb->pb_pages[i];
 
 			if (nbytes > size)
 				nbytes = size;
@@ -1274,7 +1315,6 @@ int pagebuf_iorequest(		/* start real I/O               */
 	}
 
 	total_nr_pages = pb->pb_page_count;
-
 	map_i = 0;
 
 next_chunk:
@@ -1286,7 +1326,7 @@ next_chunk:
 	bio = bio_alloc(GFP_NOIO, nr_pages);
 
 	BUG_ON(bio == NULL);
-
+	bio_init(bio);
 	bio->bi_bdev = pb->pb_target->pbr_bdev;
 	bio->bi_sector = sector;
 	bio->bi_end_io = bio_end_io_pagebuf;
@@ -1295,7 +1335,7 @@ next_chunk:
 	bvec = bio->bi_io_vec;
 
 	for (; size && nr_pages; nr_pages--, bvec++, map_i++) {
-		int nbytes = PAGE_SIZE - offset;
+		int	nbytes = PAGE_CACHE_SIZE - offset;
 
 		if (nbytes > size)
 			nbytes = size;
