@@ -109,12 +109,15 @@ void
 xfs_btree_check_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block,	/* generic btree block pointer */
-	int			level)	/* level of the btree block */
+	int			level,	/* level of the btree block */
+	buf_t			*bp)	/* buffer containing block, if any */
 {
 	if (XFS_BTREE_LONG_PTRS(cur->bc_btnum))
-		xfs_btree_check_lblock(cur, (xfs_btree_lblock_t *)block, level);
+		xfs_btree_check_lblock(cur, (xfs_btree_lblock_t *)block, level,
+			bp);
 	else
-		xfs_btree_check_sblock(cur, (xfs_btree_sblock_t *)block, level);
+		xfs_btree_check_sblock(cur, (xfs_btree_sblock_t *)block, level,
+			bp);
 }
 
 /*
@@ -172,11 +175,13 @@ xfs_btree_check_key(
 /*
  * Checking routine: check that long form block header is ok.
  */
+/* ARGSUSED */
 int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_lblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
-	int			level)	/* level of the btree block */
+	int			level,	/* level of the btree block */
+	buf_t			*bp)	/* buffer for block, if any */
 {
 	int			lblock_ok; /* block passes checks */
 	xfs_mount_t		*mp;	/* file system mount point */
@@ -197,7 +202,8 @@ xfs_btree_check_lblock(
 			XFS_RANDOM_BTREE_CHECK_LBLOCK)) {
 #ifndef SIM
 #pragma mips_frequency_hint NEVER
-		buftrace("LBTREE ERROR", cur->bc_bufs[level]);
+		if (bp)
+			buftrace("LBTREE ERROR", bp);
 #endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -283,11 +289,13 @@ xfs_btree_check_rec(
 /*
  * Checking routine: check that block header is ok.
  */
+/* ARGSUSED */
 int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_sblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_sblock_t	*block,	/* btree short form block pointer */
-	int			level)	/* level of the btree block */
+	int			level,	/* level of the btree block */
+	buf_t			*bp)	/* buffer containing block */
 {
 	buf_t			*agbp;	/* buffer for ag. freespace struct */
 	xfs_agf_t		*agf;	/* ag. freespace structure */
@@ -311,7 +319,8 @@ xfs_btree_check_sblock(
 			XFS_RANDOM_BTREE_CHECK_SBLOCK)) {
 #ifndef SIM
 #pragma mips_frequency_hint NEVER
-		buftrace("SBTREE ERROR", cur->bc_bufs[level]);
+		if (bp)
+			buftrace("SBTREE ERROR", bp);
 #endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -449,12 +458,13 @@ xfs_btree_firstrec(
 	int			level)	/* level to change */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
+	buf_t			*bp;	/* buffer containing block */
 
 	/*
 	 * Get the block pointer for this level.
 	 */
-	block = xfs_btree_get_block(cur, level);
-	xfs_btree_check_block(cur, block, level);
+	block = xfs_btree_get_block(cur, level, &bp);
+	xfs_btree_check_block(cur, block, level, bp);
 	/*
 	 * It's empty, there is no such record.
 	 */
@@ -474,9 +484,11 @@ xfs_btree_firstrec(
 xfs_btree_block_t *			/* generic btree block pointer */
 xfs_btree_get_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	int			level)	/* level in btree */
+	int			level,	/* level in btree */
+	buf_t			**bpp)	/* buffer containing the block */
 {
 	xfs_btree_block_t	*block;	/* return value */
+	buf_t			*bp;	/* return buffer */
 	xfs_ifork_t		*ifp;	/* inode fork pointer */
 	int			whichfork; /* data or attr fork */
 
@@ -484,9 +496,13 @@ xfs_btree_get_block(
 		whichfork = cur->bc_private.b.whichfork;
 		ifp = XFS_IFORK_PTR(cur->bc_private.b.ip, whichfork);
 		block = (xfs_btree_block_t *)ifp->if_broot;
-	} else
-		block = XFS_BUF_TO_BLOCK(cur->bc_bufs[level]);
+		bp = NULL;
+	} else {
+		bp = cur->bc_bufs[level];
+		block = XFS_BUF_TO_BLOCK(bp);
+	}
 	ASSERT(block != NULL);
+	*bpp = bp;
 	return block;
 }
 
@@ -634,9 +650,10 @@ xfs_btree_islastblock(
 	int			level)	/* level to check */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
+	buf_t			*bp;	/* buffer containing block */
 
-	block = xfs_btree_get_block(cur, level);
-	xfs_btree_check_block(cur, block, level);
+	block = xfs_btree_get_block(cur, level, &bp);
+	xfs_btree_check_block(cur, block, level, bp);
 	if (XFS_BTREE_LONG_PTRS(cur->bc_btnum))
 		return block->bb_u.l.bb_rightsib == NULLDFSBNO;
 	else
@@ -653,12 +670,13 @@ xfs_btree_lastrec(
 	int			level)	/* level to change */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
+	buf_t			*bp;	/* buffer containing block */
 
 	/*
 	 * Get the block pointer for this level.
 	 */
-	block = xfs_btree_get_block(cur, level);
-	xfs_btree_check_block(cur, block, level);
+	block = xfs_btree_get_block(cur, level, &bp);
+	xfs_btree_check_block(cur, block, level, bp);
 	/*
 	 * It's empty, there is no such record.
 	 */

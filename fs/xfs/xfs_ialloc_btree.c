@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision: 1.35 $"
 
 /*
  * Inode allocation management for XFS.
@@ -233,7 +233,7 @@ xfs_inobt_delrec(
 	bp = cur->bc_bufs[level];
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level, bp))
 		return error;
 #endif
 	/*
@@ -399,7 +399,7 @@ xfs_inobt_delrec(
 		rbp = tcur->bc_bufs[level];
 		right = XFS_BUF_TO_INOBT_BLOCK(rbp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, right, level))
+		if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 			goto error0;
 #endif
 		/*
@@ -459,7 +459,7 @@ xfs_inobt_delrec(
 		lbp = tcur->bc_bufs[level];
 		left = XFS_BUF_TO_INOBT_BLOCK(lbp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, left, level))
+		if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 			goto error0;
 #endif
 		/*
@@ -517,7 +517,7 @@ xfs_inobt_delrec(
 				XFS_INO_BTREE_REF))
 			return error;
 		left = XFS_BUF_TO_INOBT_BLOCK(lbp);
-		if (error = xfs_btree_check_sblock(cur, left, level))
+		if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 			return error;
 	}
 	/*
@@ -538,7 +538,7 @@ xfs_inobt_delrec(
 				XFS_INO_BTREE_REF))
 			return error;
 		right = XFS_BUF_TO_INOBT_BLOCK(rbp);
-		if (error = xfs_btree_check_sblock(cur, right, level))
+		if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 			return error;
 	}
 	/*
@@ -607,7 +607,7 @@ xfs_inobt_delrec(
 				&rrbp, XFS_INO_BTREE_REF))
 			return error;
 		rrblock = XFS_BUF_TO_INOBT_BLOCK(rrbp);
-		if (error = xfs_btree_check_sblock(cur, rrblock, level))
+		if (error = xfs_btree_check_sblock(cur, rrblock, level, rrbp))
 			return error;
 		rrblock->bb_leftsib = lbno;
 		xfs_inobt_log_block(cur->bc_tp, rrbp, XFS_BB_LEFTSIB);
@@ -724,7 +724,7 @@ xfs_inobt_insrec(
 	bp = cur->bc_bufs[level];
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level, bp))
 		return error;
 	/* 
 	 * Check that the new entry is being inserted in the right place.
@@ -777,7 +777,7 @@ xfs_inobt_insrec(
 					block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
 					if (error = xfs_btree_check_sblock(cur,
-							block, level))
+							block, level, bp))
 						return error;
 #endif
 					ptr = cur->bc_ptrs[level];
@@ -1031,7 +1031,8 @@ xfs_inobt_lookup(
 			 * Point to the btree block, now that we have the buffer
 			 */
 			block = XFS_BUF_TO_INOBT_BLOCK(bp);
-			if (error = xfs_btree_check_sblock(cur, block, level))
+			if (error = xfs_btree_check_sblock(cur, block, level,
+					bp))
 				return error;
 		} else
 			block = XFS_BUF_TO_INOBT_BLOCK(bp);
@@ -1204,7 +1205,7 @@ xfs_inobt_lshift(
 	rbp = cur->bc_bufs[level];
 	right = XFS_BUF_TO_INOBT_BLOCK(rbp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, right, level))
+	if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 		return error;
 #endif
 	/*
@@ -1230,7 +1231,7 @@ xfs_inobt_lshift(
 			XFS_INO_BTREE_REF))
 		return error;
 	left = XFS_BUF_TO_INOBT_BLOCK(lbp);
-	if (error = xfs_btree_check_sblock(cur, left, level))
+	if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 		return error;
 	/*
 	 * If it's full, it can't take another entry.
@@ -1380,7 +1381,7 @@ xfs_inobt_newroot(
 	bp = cur->bc_bufs[cur->bc_nlevels - 1];
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, cur->bc_nlevels - 1))
+	if (error = xfs_btree_check_sblock(cur, block, cur->bc_nlevels - 1, bp))
 		return error;
 #endif
 	if (block->bb_rightsib != NULLAGBLOCK) {
@@ -1397,7 +1398,7 @@ xfs_inobt_newroot(
 		bp = rbp;
 		right = XFS_BUF_TO_INOBT_BLOCK(rbp);
 		if (error = xfs_btree_check_sblock(cur, right,
-				cur->bc_nlevels - 1))
+				cur->bc_nlevels - 1, rbp))
 			return error;
 		nptr = 1;
 	} else {
@@ -1414,7 +1415,7 @@ xfs_inobt_newroot(
 		bp = lbp;
 		left = XFS_BUF_TO_INOBT_BLOCK(lbp);
 		if (error = xfs_btree_check_sblock(cur, left,
-				cur->bc_nlevels - 1))
+				cur->bc_nlevels - 1, lbp))
 			return error;
 		nptr = 2;
 	}
@@ -1489,7 +1490,7 @@ xfs_inobt_rshift(
 	lbp = cur->bc_bufs[level];
 	left = XFS_BUF_TO_INOBT_BLOCK(lbp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, left, level))
+	if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 		return error;
 #endif
 	/*
@@ -1515,7 +1516,7 @@ xfs_inobt_rshift(
 			XFS_INO_BTREE_REF))
 		return error;
 	right = XFS_BUF_TO_INOBT_BLOCK(rbp);
-	if (error = xfs_btree_check_sblock(cur, right, level))
+	if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 		return error;
 	/*
 	 * If it's full, it can't take another entry.
@@ -1649,7 +1650,7 @@ xfs_inobt_split(
 	 */
 	left = XFS_BUF_TO_INOBT_BLOCK(lbp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, left, level))
+	if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 		return error;
 #endif
 	/*
@@ -1719,7 +1720,7 @@ xfs_inobt_split(
 				XFS_INO_BTREE_REF))
 			return error;
 		rrblock = XFS_BUF_TO_INOBT_BLOCK(rrbp);
-		if (error = xfs_btree_check_sblock(cur, rrblock, level))
+		if (error = xfs_btree_check_sblock(cur, rrblock, level, rrbp))
 			return error;
 		rrblock->bb_leftsib = args.agbno;
 		xfs_inobt_log_block(args.tp, rrbp, XFS_BB_LEFTSIB);
@@ -1775,7 +1776,7 @@ xfs_inobt_updkey(
 		bp = cur->bc_bufs[level];
 		block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, block, level))
+		if (error = xfs_btree_check_sblock(cur, block, level, bp))
 			return error;
 #endif
 		ptr = cur->bc_ptrs[level];
@@ -1822,7 +1823,8 @@ xfs_inobt_decrement(
 	 */
 	block = XFS_BUF_TO_INOBT_BLOCK(cur->bc_bufs[level]);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level,
+			cur->bc_bufs[level]))
 		return error;
 #endif
 	/*
@@ -1865,7 +1867,7 @@ xfs_inobt_decrement(
 		lev--;
 		xfs_btree_setbuf(cur, lev, bp);
 		block = XFS_BUF_TO_INOBT_BLOCK(bp);
-		if (error = xfs_btree_check_sblock(cur, block, lev))
+		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
 		cur->bc_ptrs[lev] = block->bb_numrecs;
 	}
@@ -1934,7 +1936,7 @@ xfs_inobt_get_rec(
 	ptr = cur->bc_ptrs[0];
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, 0))
+	if (error = xfs_btree_check_sblock(cur, block, 0, bp))
 		return error;
 #endif
 	/*
@@ -1981,7 +1983,7 @@ xfs_inobt_increment(
 	bp = cur->bc_bufs[level];
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level, bp))
 		return error;
 #endif
 	/*
@@ -2007,7 +2009,7 @@ xfs_inobt_increment(
 		bp = cur->bc_bufs[lev];
 		block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, block, lev))
+		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
 #endif
 		if (++cur->bc_ptrs[lev] <= block->bb_numrecs)
@@ -2038,7 +2040,7 @@ xfs_inobt_increment(
 		lev--;
 		xfs_btree_setbuf(cur, lev, bp);
 		block = XFS_BUF_TO_INOBT_BLOCK(bp);
-		if (error = xfs_btree_check_sblock(cur, block, lev))
+		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
 		cur->bc_ptrs[lev] = 1;
 	}
@@ -2182,7 +2184,7 @@ xfs_inobt_update(
 	bp = cur->bc_bufs[0];
 	block = XFS_BUF_TO_INOBT_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, 0))
+	if (error = xfs_btree_check_sblock(cur, block, 0, bp))
 		return error;
 #endif
 	/*

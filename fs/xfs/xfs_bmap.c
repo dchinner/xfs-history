@@ -2040,7 +2040,7 @@ xfs_bmap_btree_to_extents(
 			XFS_BMAP_BTREE_REF))
 		return error;
 	cblock = XFS_BUF_TO_BMBT_BLOCK(cbp);
-	if (error = xfs_btree_check_lblock(cur, cblock, 0))
+	if (error = xfs_btree_check_lblock(cur, cblock, 0, cbp))
 		return error;
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
 	if (!async)

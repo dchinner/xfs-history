@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.43 $"
 
 /*
  * Free space allocation for XFS.
@@ -228,7 +228,7 @@ xfs_alloc_delrec(
 	bp = cur->bc_bufs[level];
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level, bp))
 		return error;
 #endif
 	/*
@@ -410,7 +410,7 @@ xfs_alloc_delrec(
 		rbp = tcur->bc_bufs[level];
 		right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, right, level))
+		if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 			goto error0;
 #endif
 		/*
@@ -474,7 +474,7 @@ xfs_alloc_delrec(
 		lbp = tcur->bc_bufs[level];
 		left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, left, level))
+		if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 			goto error0;
 #endif
 		/*
@@ -532,7 +532,7 @@ xfs_alloc_delrec(
 				XFS_ALLOC_BTREE_REF))
 			return error;
 		left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
-		if (error = xfs_btree_check_sblock(cur, left, level))
+		if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 			return error;
 	}
 	/*
@@ -553,7 +553,7 @@ xfs_alloc_delrec(
 				XFS_ALLOC_BTREE_REF))
 			return error;
 		right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
-		if (error = xfs_btree_check_sblock(cur, right, level))
+		if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 			return error;
 	}
 	/*
@@ -637,7 +637,7 @@ xfs_alloc_delrec(
 				&rrbp, XFS_ALLOC_BTREE_REF))
 			return error;
 		rrblock = XFS_BUF_TO_ALLOC_BLOCK(rrbp);
-		if (error = xfs_btree_check_sblock(cur, rrblock, level))
+		if (error = xfs_btree_check_sblock(cur, rrblock, level, rrbp))
 			return error;
 		rrblock->bb_leftsib = lbno;
 		xfs_alloc_log_block(cur->bc_tp, rrbp, XFS_BB_LEFTSIB);
@@ -729,7 +729,7 @@ xfs_alloc_insrec(
 	bp = cur->bc_bufs[level];
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level, bp))
 		return error;
 	/* 
 	 * Check that the new entry is being inserted in the right place.
@@ -783,7 +783,7 @@ xfs_alloc_insrec(
 #ifdef DEBUG
 					if (error =
 						xfs_btree_check_sblock(cur,
-							block, level))
+							block, level, bp))
 						return error;
 #endif
 					ptr = cur->bc_ptrs[level];
@@ -1065,7 +1065,8 @@ xfs_alloc_lookup(
 			 * Point to the btree block, now that we have the buffer
 			 */
 			block = XFS_BUF_TO_ALLOC_BLOCK(bp);
-			if (error = xfs_btree_check_sblock(cur, block, level))
+			if (error = xfs_btree_check_sblock(cur, block, level,
+					bp))
 				return error;
 		} else
 			block = XFS_BUF_TO_ALLOC_BLOCK(bp);
@@ -1245,7 +1246,7 @@ xfs_alloc_lshift(
 	rbp = cur->bc_bufs[level];
 	right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, right, level))
+	if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 		return error;
 #endif
 	/*
@@ -1271,7 +1272,7 @@ xfs_alloc_lshift(
 			XFS_ALLOC_BTREE_REF))
 		return error;
 	left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
-	if (error = xfs_btree_check_sblock(cur, left, level))
+	if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 		return error;
 	/*
 	 * If it's full, it can't take another entry.
@@ -1418,7 +1419,7 @@ xfs_alloc_newroot(
 	lbp = cur->bc_bufs[cur->bc_nlevels - 1];
 	left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, left, cur->bc_nlevels - 1))
+	if (error = xfs_btree_check_sblock(cur, left, cur->bc_nlevels - 1, lbp))
 		return error;
 #endif
 	if (left->bb_rightsib != NULLAGBLOCK) {
@@ -1433,7 +1434,7 @@ xfs_alloc_newroot(
 			return error;
 		right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
 		if (error = xfs_btree_check_sblock(cur, right,
-				cur->bc_nlevels - 1))
+				cur->bc_nlevels - 1, rbp))
 			return error;
 		nptr = 1;
 	} else {
@@ -1450,7 +1451,7 @@ xfs_alloc_newroot(
 			return error;
 		left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 		if (error = xfs_btree_check_sblock(cur, left,
-				cur->bc_nlevels - 1))
+				cur->bc_nlevels - 1, lbp))
 			return error;
 		nptr = 2;
 	}
@@ -1532,7 +1533,7 @@ xfs_alloc_rshift(
 	lbp = cur->bc_bufs[level];
 	left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, left, level))
+	if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 		return error;
 #endif
 	/*
@@ -1558,7 +1559,7 @@ xfs_alloc_rshift(
 			XFS_ALLOC_BTREE_REF))
 		return error;
 	right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
-	if (error = xfs_btree_check_sblock(cur, right, level))
+	if (error = xfs_btree_check_sblock(cur, right, level, rbp))
 		return error;
 	/*
 	 * If it's full, it can't take another entry.
@@ -1683,7 +1684,7 @@ xfs_alloc_split(
 	lbp = cur->bc_bufs[level];
 	left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, left, level))
+	if (error = xfs_btree_check_sblock(cur, left, level, lbp))
 		return error;
 #endif
 	/*
@@ -1763,7 +1764,7 @@ xfs_alloc_split(
 				&rrbp, XFS_ALLOC_BTREE_REF))
 			return error;
 		rrblock = XFS_BUF_TO_ALLOC_BLOCK(rrbp);
-		if (error = xfs_btree_check_sblock(cur, rrblock, level))
+		if (error = xfs_btree_check_sblock(cur, rrblock, level, rrbp))
 			return error;
 		rrblock->bb_leftsib = rbno;
 		xfs_alloc_log_block(cur->bc_tp, rrbp, XFS_BB_LEFTSIB);
@@ -1819,7 +1820,7 @@ xfs_alloc_updkey(
 		bp = cur->bc_bufs[level];
 		block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, block, level))
+		if (error = xfs_btree_check_sblock(cur, block, level, bp))
 			return error;
 #endif
 		ptr = cur->bc_ptrs[level];
@@ -1866,7 +1867,8 @@ xfs_alloc_decrement(
 	 */
 	block = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[level]);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level,
+			cur->bc_bufs[level]))
 		return error;
 #endif
 	/*
@@ -1909,7 +1911,7 @@ xfs_alloc_decrement(
 		lev--;
 		xfs_btree_setbuf(cur, lev, bp);
 		block = XFS_BUF_TO_ALLOC_BLOCK(bp);
-		if (error = xfs_btree_check_sblock(cur, block, lev))
+		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
 		cur->bc_ptrs[lev] = block->bb_numrecs;
 	}
@@ -1972,7 +1974,7 @@ xfs_alloc_get_rec(
 	ptr = cur->bc_ptrs[0];
 	block = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[0]);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, 0))
+	if (error = xfs_btree_check_sblock(cur, block, 0, cur->bc_bufs[0]))
 		return error;
 #endif
 	/*
@@ -2022,7 +2024,7 @@ xfs_alloc_increment(
 	bp = cur->bc_bufs[level];
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, level))
+	if (error = xfs_btree_check_sblock(cur, block, level, bp))
 		return error;
 #endif
 	/*
@@ -2048,7 +2050,7 @@ xfs_alloc_increment(
 		bp = cur->bc_bufs[lev];
 		block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sblock(cur, block, lev))
+		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
 #endif
 		if (++cur->bc_ptrs[lev] <= block->bb_numrecs)
@@ -2079,7 +2081,7 @@ xfs_alloc_increment(
 		lev--;
 		xfs_btree_setbuf(cur, lev, bp);
 		block = XFS_BUF_TO_ALLOC_BLOCK(bp);
-		if (error = xfs_btree_check_sblock(cur, block, lev))
+		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
 		cur->bc_ptrs[lev] = 1;
 	}
@@ -2213,7 +2215,7 @@ xfs_alloc_update(
 	 */
 	block = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[0]);
 #ifdef DEBUG
-	if (error = xfs_btree_check_sblock(cur, block, 0))
+	if (error = xfs_btree_check_sblock(cur, block, 0, cur->bc_bufs[0]))
 		return error;
 #endif
 	/*

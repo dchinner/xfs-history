@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision: 1.40 $"
+#ident "$Revision: 1.42 $"
 
 struct buf;
 struct xfs_bmap_free;
@@ -197,7 +197,8 @@ void
 xfs_btree_check_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block,	/* generic btree block pointer */
-	int			level);	/* level of the btree block */
+	int			level,	/* level of the btree block */
+	struct buf		*bp);	/* buffer containing block, if any */
 
 /*
  * Debug routine: check that keys are in the right order.
@@ -217,7 +218,7 @@ xfs_btree_check_rec(
 	void			*ar1,	/* pointer to left (lower) record */
 	void			*ar2);	/* pointer to right (higher) record */
 #else
-#define	xfs_btree_check_block(a,b,c)
+#define	xfs_btree_check_block(a,b,c,d)
 #define	xfs_btree_check_key(a,b,c)
 #define	xfs_btree_check_rec(a,b,c)
 #endif	/* DEBUG */
@@ -229,7 +230,8 @@ int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_lblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
-	int			level);	/* level of the btree block */
+	int			level,	/* level of the btree block */
+	struct buf		*bp);	/* buffer containing block, if any */
 
 /*
  * Checking routine: check that (long) pointer is ok.
@@ -247,7 +249,8 @@ int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_sblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_sblock_t	*block,	/* btree short form block pointer */
-	int			level);	/* level of the btree block */
+	int			level,	/* level of the btree block */
+	struct buf		*bp);	/* buffer containing block */
 
 /*
  * Checking routine: check that (short) pointer is ok.
@@ -297,7 +300,8 @@ xfs_btree_firstrec(
 xfs_btree_block_t *			/* generic btree block pointer */
 xfs_btree_get_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	int			level);	/* level in btree */
+	int			level,	/* level in btree */
+	struct buf		**bpp);	/* buffer containing the block */
 
 /*
  * Get a buffer for the block, return it with no data read.
