@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.107 $"
+#ident	"$Revision: 1.111 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3238,6 +3238,7 @@ xfs_getbmap(
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	if (ip->i_delayed_blks)
 		pflushvp(vp, (off_t)ip->i_d.di_size, 0);
+	ASSERT(ip->i_delayed_blks == 0);
 	lock = xfs_ilock_map_shared(ip);
 	/*
 	 * Don't let nex be bigger than the number of extents
