@@ -1,7 +1,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #include "xfs_quota.h"
 
@@ -126,6 +126,8 @@ typedef struct xfs_dqtrx {
 	struct xfs_dquot *qt_dquot;	  /* the dquot this refers to */
 	ulong		qt_blk_res;	  /* blks reserved on a dquot */
 	ulong		qt_blk_res_used;  /* blks used from the reservation */
+	ulong		qt_ino_res;	  /* inode reserved on a dquot */
+	ulong		qt_ino_res_used;  /* inodes used from the reservation */
 	long		qt_bcount_delta;  /* dquot blk count changes */
 	long		qt_delbcnt_delta; /* delayed dquot blk count changes */
 	long		qt_icount_delta;  /* dquot inode count changes */
