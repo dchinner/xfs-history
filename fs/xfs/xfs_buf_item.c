@@ -18,6 +18,7 @@
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
+#include "xfs_mount.h"
 #ifdef SIM
 #include <bstring.h>
 #include "sim.h"
