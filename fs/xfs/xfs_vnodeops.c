@@ -1,4 +1,4 @@
-#ident "$Revision: 1.358 $"
+#ident "$Revision: 1.359 $"
 
 
 #ifdef SIM
@@ -2772,6 +2772,9 @@ xfs_create_new(
 				xfs_ichgtime(ip,
 					XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 			}
+#ifdef CELL
+			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
+#endif
 
 		}
 		xfs_ctrunc_trace(XFS_CTRUNC6, ip);
