@@ -30,6 +30,7 @@
 #ifdef SIM
 #include "sim.h"
 #include "bstring.h"
+#include <stdio.h>
 #endif
 
 
@@ -285,7 +286,9 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
 		ip->i_d.di_gen = dip->di_core.di_gen;
 	}	
 
+/*
 	ASSERT(!((ip->i_d.di_nlink == 0) && (ip->i_d.di_mode == 0)));
+*/
 	ASSERT(ip->i_d.di_nlink >= 0);
 
 	/*
@@ -351,7 +354,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 	 * This is because we're setting fields here we need
 	 * to prevent others from looking at until we're done.
 	 */
-	ip = xfs_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL);
+	ip = xfs_trans_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL);
 	ASSERT(ip != NULL);
 
 #ifdef NOTYET
@@ -715,3 +718,66 @@ xfs_iflush(xfs_inode_t *ip)
 {
 	return;
 }
+
+
+void
+xfs_iprint(xfs_inode_t *ip)
+{
+	xfs_dinode_core_t *dip;
+
+	printf("Inode %x\n", ip);
+	printf("    i_dev %x\n", (uint)ip->i_dev);
+	printf("    i_ino %x\n", (uint)ip->i_ino);
+	printf("    i_bno %x\n", (uint)ip->i_bno);
+	printf("    i_index %d\n", ip->i_index);
+
+	printf("    i_flags %x ", ip->i_flags);
+	if (ip->i_flags & XFS_IEXTENTS) {
+		printf("EXTENTS ");
+	}
+	printf("\n");
+
+	printf("    i_vcode %x\n", ip->i_vcode);
+	printf("    i_mapcnt %x\n", ip->i_mapcnt);
+	printf("    i_bytes %d\n", ip->i_bytes);
+	printf("    i_u1.iu_extents/iu_data %x\n", ip->i_u1.iu_extents);
+	printf("    i_broot %x\n", ip->i_broot);
+	printf("    i_broot_bytes %x\n", ip->i_broot_bytes);
+
+	dip = &(ip->i_d);
+	printf("\nOn disk portion\n");
+	printf("    di_magic %x\n", dip->di_magic);
+	printf("    di_mode %o\n", dip->di_mode);
+	printf("    di_version %x\n", (uint)dip->di_version);
+	switch (ip->i_d.di_format) {
+	case XFS_DINODE_FMT_LOCAL:
+		printf("    Inline inode\n");
+		break;
+	case XFS_DINODE_FMT_EXTENTS:
+		printf("    Extents inode\n");
+		break;
+	case XFS_DINODE_FMT_BTREE:
+		printf("    B-tree inode\n");
+		break;
+	default:
+		printf("    Other inode\n");
+		break;
+	}
+	printf("   di_nlink %x\n", dip->di_nlink);
+	printf("   di_uid %d\n", dip->di_uid); 
+	printf("   di_gid %d\n", dip->di_gid);
+	printf("   di_size %d\n", (int)dip->di_size);
+	printf("   di_nextents %d\n", (int)dip->di_nextents);
+	printf("   di_gen %x\n", dip->di_gen);
+}
+	
+
+
+
+
+
+
+
+
+
+
