@@ -327,12 +327,12 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	error = 0;
 	VOP_RMDIR(dvp, (char *)dentry->d_name.name, pwd_vp, &cred, error);
 	if (!error) {
-		dir->i_nlink = 0;
-		dir->i_size = 0;
-		dir->i_version = ++event;
-		mark_inode_dirty(dir);
+		struct inode *inode = dentry->d_inode;
+		inode->i_nlink = 0;
+		inode->i_size = 0;
+		inode->i_version = ++event;
+		mark_inode_dirty(inode);
 		dir->i_nlink--;
-		dir->i_version = ++event;
 		dir->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		mark_inode_dirty(dir);
 		d_delete(dentry);       /* del and free inode */
