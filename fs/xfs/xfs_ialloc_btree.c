@@ -1752,7 +1752,7 @@ xfs_inobt_split(
 			right->bb_rightsib, 0);
 		rrblock = XFS_BUF_TO_INOBT_BLOCK(rrbp);
 		xfs_btree_check_sblock(cur, rrblock, level);
-		rrblock->bb_leftsib = args.agno;
+		rrblock->bb_leftsib = args.agbno;
 		xfs_inobt_log_block(args.tp, rrbp, XFS_BB_LEFTSIB);
 	}
 	/*
