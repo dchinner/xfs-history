@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.101 $"
+#ident "$Revision: 1.102 $"
 
 struct bhv_desc;
 struct buf;
@@ -154,8 +154,6 @@ typedef struct xfs_inode {
 	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
 
 #ifdef DEBUG
-	unsigned long		i_mapcnt;	/* count of mapped pages */
-
 	/* Trace buffers per inode. */
 	struct ktrace		*i_xtrace;	/* inode extent list trace */
 	struct ktrace		*i_btrace;	/* inode bmap btree trace */
