@@ -1308,6 +1308,15 @@ xfs_dir_ialloc(
 			 &ialloc_context, &call_again);
 
 	/*
+	 * Return an error if we were unable to allocate a new inode.
+	 * This should only happen if we run out of space on disk.
+	 */
+	if (!call_again && (ip == NULL)) {
+		*ipp = NULL;
+		return ENOSPC;
+	}
+
+	/*
 	 * If call_again is set, then we were unable to get an
 	 * inode in one operation.  We need to commit the current
 	 * transaction and call xfs_ialloc() again.  It is guaranteed
@@ -1445,6 +1454,7 @@ try_again:
 				       XFS_CREATE_LOG_RES(mp), 0,
 				       XFS_TRANS_PERM_LOG_RES)) {
 		commit_flags = 0;
+		dp = NULL;
 		goto error_return;
 	}
 
@@ -1690,7 +1700,7 @@ error_return:
 	if (tp != NULL)
 		xfs_trans_cancel (tp, commit_flags);
 
-	if (! dp_joined_to_trans)
+	if (! dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock (dp, XFS_ILOCK_EXCL);
 	ASSERT(!truncated);
 
