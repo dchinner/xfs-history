@@ -289,8 +289,8 @@ xfs_growfs_data_private(
 		ASSERT(bp);
 		agi = XFS_BUF_TO_AGI(bp);
 		INT_MOD(agi->agi_length, ARCH_CONVERT, new);
-		ASSERT(agno < mp->m_sb.sb_agcount - 1 ||
-		       INT_GET(agi->agi_length, ARCH_CONVERT) == mp->m_sb.sb_agblocks);
+		ASSERT(nagcount == oagcount
+		       || INT_GET(agi->agi_length, ARCH_CONVERT) == mp->m_sb.sb_agblocks);
 		xfs_ialloc_log_agi(tp, bp, XFS_AGI_LENGTH);
 		/*
 		 * Change agf length.
