@@ -493,7 +493,7 @@ void		xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t, __int64_t);
 
 void		xfs_start_freeze(xfs_mount_t *, int);
 void		xfs_finish_freeze(xfs_mount_t *);
-void		xfs_check_frozen(xfs_mount_t *, bhv_desc_t *, int, int);
+void		xfs_check_frozen(xfs_mount_t *, bhv_desc_t *, int);
 
 extern	struct vfsops xfs_vfsops;
 

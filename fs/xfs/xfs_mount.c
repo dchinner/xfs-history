@@ -1723,40 +1723,20 @@ void
 xfs_check_frozen(
 	xfs_mount_t *mp,
 	bhv_desc_t *bdp,
-	int	ioflag,
 	int	level)
 {
 	SPLDECL(s);
-	int	do_lock = 0;
 
-	if (!mp->m_frozen) {
-		if (level == XFS_FREEZE_TRANS)
-			atomic_inc(&mp->m_active_trans);
-		return;
+	if (mp->m_frozen) {
+		s = mutex_spinlock(&mp->m_freeze_lock);
+
+		if (mp->m_frozen < level) {
+			mutex_spinunlock(&mp->m_freeze_lock, s);
+		} else {
+			sv_wait(&mp->m_wait_unfreeze, 0, &mp->m_freeze_lock, s);
+		}
 	}
 
-	s = mutex_spinlock(&mp->m_freeze_lock);
-
-	if (mp->m_frozen < level) {
-		mutex_spinunlock(&mp->m_freeze_lock, s);
-		if (level == XFS_FREEZE_TRANS)
-			atomic_inc(&mp->m_active_trans);
-		return;
-	}
-
-	if ((level == XFS_FREEZE_WRITE) && (ioflag & IO_ISLOCKED)) {
-		xfs_rwunlock(bdp, (ioflag & IO_DIRECT) ?
-				VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE);
-		do_lock = 1;
-	}
-
-	sv_wait(&mp->m_wait_unfreeze, PINOD, &mp->m_freeze_lock, s);
 	if (level == XFS_FREEZE_TRANS)
 		atomic_inc(&mp->m_active_trans);
-
-	if (do_lock) {
-		xfs_rwlock(bdp, (ioflag & IO_DIRECT) ?
-			VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE);
-	}
 }
-

@@ -593,7 +593,6 @@ int
 xfs_fs_thaw(
 	xfs_mount_t	*mp)
 {
-	xfs_unmountfs_writesb(mp);
 	xfs_finish_freeze(mp);
 	return 0;
 }

@@ -103,7 +103,7 @@ xfs_trans_alloc(
 	xfs_mount_t	*mp,
 	uint		type)
 {
-	xfs_check_frozen(mp, NULL, 0, XFS_FREEZE_TRANS);
+	xfs_check_frozen(mp, NULL, XFS_FREEZE_TRANS);
 	return (_xfs_trans_alloc(mp, type));
 
 }
