@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.33 1994/09/20 15:55:50 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.34 1994/09/20 18:57:17 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -148,7 +148,7 @@ xfs_get_inode(  dev_t fs_dev, int ino)
 		 */
 		vfs_unbusy( vfsp );
         } 
-#ifdef DEBUG
+#ifdef GRIO_DEBUG
 	else {
 		printf("grio vfs_busydev failed \n");
 	}
