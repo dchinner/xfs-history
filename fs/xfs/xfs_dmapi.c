@@ -2940,7 +2940,7 @@ static	int		initialized = 0;
  */
 
 /* ARGSUSED */
-STATIC int
+int
 xfs_dm_mapevent(
 	bhv_desc_t	*bdp,
 	int		flags,
@@ -3010,6 +3010,7 @@ xfs_dm_mapevent(
 
 
 
+#ifdef __sgi
 /*	xfs_dm_testevent() - test if events needed for a memory mapped file.
  *
  *	xfs_dm_testevent() is called when a page from a memory mapped
@@ -3069,6 +3070,7 @@ xfs_dm_testevent(
 	}
 	return 0;
 }
+#endif
 
 
 /* ARGSUSED */
@@ -3083,23 +3085,20 @@ xfs_dm_fcntl(
 {
 	dm_fcntl_t	*dmfcntlp;
 
-#ifdef __sgi
-	if (!cap_able_cred(credp, CAP_DEVICE_MGT))
-		return(EPERM);
-#else
 	if (!capable(CAP_MKNOD))
 		return(EPERM);
-#endif
 
 	dmfcntlp = (dm_fcntl_t *)arg;
 
 	switch (dmfcntlp->dmfc_subfunc) {
 	case DM_FCNTL_FSYSVECTOR:
 		return(xfs_dm_get_fsys_vector(dmfcntlp));
+#ifdef __sgi
 	case DM_FCNTL_MAPEVENT:
 		return(xfs_dm_mapevent(bdp, flags, offset, dmfcntlp));
 	case DM_FCNTL_TESTEVENT:
 		return(xfs_dm_testevent(bdp, flags, offset, dmfcntlp));
+#endif
 	case DM_FCNTL_FSSETDM:
 		return xfs_set_dmattrs(bdp, dmfcntlp->u_fcntl.setdmrq.fsd_dmevmask,
 					dmfcntlp->u_fcntl.setdmrq.fsd_dmstate,
