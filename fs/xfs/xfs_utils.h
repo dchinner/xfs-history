@@ -10,11 +10,6 @@
 #define	DLF_NODNLC	0x02	/* don't use the dnlc */
 #define	DLF_LOCK_SHARED	0x04	/* directory locked shared */
 
-/*
- * Max number of extents needed for directory create + symlink.
- */
-#define MAX_EXT_NEEDED 9
-
 #ifndef SIM
 extern int
 xfs_rename(
