@@ -3466,12 +3466,13 @@ xfs_iflush_all(
 
 
 /*
- * xfs_iaccess: check accessibility of inode/cred for mode.
+ * xfs_iaccess: check accessibility of inode for mode.
  */
 int
 xfs_iaccess(
 	xfs_inode_t	*ip,
-	mode_t		mode)
+	mode_t		mode,
+	cred_t		*cr)
 {
 	int error;
 	mode_t orgmode = mode;
@@ -3479,7 +3480,7 @@ xfs_iaccess(
 	/*
 	 * Verify that the MAC policy allows the requested access.
 	 */
-	if (error = _MAC_XFS_IACCESS(ip, mode))
+	if (error = _MAC_XFS_IACCESS(ip, mode, cr))
 		return XFS_ERROR(error);
 	
 	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip)))
@@ -3489,7 +3490,7 @@ xfs_iaccess(
 	 * If there's an Access Control List it's used instead of
 	 * the mode bits.
 	 */
-	if ((error = _ACL_XFS_IACCESS(ip, mode)) != -1)
+	if ((error = _ACL_XFS_IACCESS(ip, mode, cr)) != -1)
 		return error ? XFS_ERROR(error) : 0;
 
 	if (current->fsuid != ip->i_d.di_uid) {
@@ -3497,13 +3498,13 @@ xfs_iaccess(
 		if (!in_group_p((gid_t)ip->i_d.di_gid))
 			mode >>= 3;
 	}
-	if (((ip->i_d.di_mode & mode) == mode) || capable(CAP_DAC_OVERRIDE))
+	if (((ip->i_d.di_mode & mode) == mode) || capable_cred(cr, CAP_DAC_OVERRIDE))
 		return 0;
 
 	if ((orgmode == IREAD) ||
 	    (((ip->i_d.di_mode & IFMT) == IFDIR) &&
 	     (!(orgmode & ~(IWRITE|IEXEC))))) {
-		if (capable(CAP_DAC_READ_SEARCH))
+		if (capable_cred(cr, CAP_DAC_READ_SEARCH))
 			return 0;
 #ifdef	NOISE
 		cmn_err(CE_NOTE, "Ick: mode=%o, orgmode=%o", mode, orgmode);

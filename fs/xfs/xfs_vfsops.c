@@ -240,6 +240,12 @@ xfs_init(int	fstype)
 	 * The inode hash table is created on a per mounted
 	 * file system bases.
 	 */
+
+	/*
+	 * turn ACLs on
+	 */
+	xfs_acl_init ();
+
 	return 0;
 }
 

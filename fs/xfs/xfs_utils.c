@@ -41,7 +41,8 @@
 int
 xfs_stickytest(
 	xfs_inode_t	*dp,
-	xfs_inode_t	*ip)
+	xfs_inode_t	*ip,
+	cred_t		*cr)
 {
         if (!(dp->i_d.di_mode & ISVTX))
 		return 0;
@@ -49,11 +50,11 @@ xfs_stickytest(
 		return 0;
 	if (current->fsuid == dp->i_d.di_uid)
 		return 0;
-	if (!capable(CAP_FOWNER)) {
+	if (!capable_cred(cr, CAP_FOWNER)) {
 		if (xpg4_sticky_dir) {
 			return XFS_ERROR(EACCES);
 		} else {
-			return xfs_iaccess(ip, IWRITE);
+			return xfs_iaccess(ip, IWRITE, cr);
 		}
         }
         return 0;

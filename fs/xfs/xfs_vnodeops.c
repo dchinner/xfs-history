@@ -544,7 +544,7 @@ xfs_setattr(
 
         xfs_ilock(ip, lock_flags);
 
-	if (_MAC_XFS_IACCESS(ip, MACWRITE)) {
+	if (_MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
 		code = XFS_ERROR(EACCES);
 		goto error_return;
 	}
@@ -685,7 +685,7 @@ xfs_setattr(
 		}
 #if 0
 		if (!(mask & AT_SIZE_NOPERM)) {
-			if (code = xfs_iaccess(ip, IWRITE))
+			if (code = xfs_iaccess(ip, IWRITE, credp))
 				goto error_return;
 		}
 #endif
@@ -709,7 +709,7 @@ xfs_setattr(
 				goto error_return;
 			}
 /***
-			if ((code = xfs_iaccess(ip, IWRITE)) &&
+			if ((code = xfs_iaccess(ip, IWRITE, credp)) &&
 			    !capable(CAP_FOWNER)) {
 				goto error_return;
 			}
@@ -1097,7 +1097,7 @@ xfs_access(
 
 	ip = XFS_BHVTOI(bdp);
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	error = xfs_iaccess(ip, mode);
+	error = xfs_iaccess(ip, mode, credp);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return error;
 }
@@ -2193,7 +2193,7 @@ xfs_lookup(
 	}
 
 #if 0
-	if (error = xfs_iaccess(dp, IEXEC)) {
+	if (error = xfs_iaccess(dp, IEXEC, credp)) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return error;
 	}
@@ -2218,7 +2218,7 @@ xfs_lookup(
 		 * then its permissions may have changed.  Make sure
 		 * that it is OK to give this inode back to the caller.
 		 */
-		if (error = xfs_iaccess(dp, IEXEC)) {
+		if (error = xfs_iaccess(dp, IEXEC, credp)) {
 			xfs_iunlock_map_shared(dp, lock_mode);
 			VN_RELE(vp);
 			return error;
@@ -2387,7 +2387,7 @@ xfs_create(
 	}
 
 #if 0
-	if (error = xfs_iaccess(dp, IEXEC))
+	if (error = xfs_iaccess(dp, IEXEC, credp))
                 goto error_return;
 #endif
 
@@ -2414,7 +2414,7 @@ xfs_create(
 		ASSERT(ip == NULL);
 
 #if 0
-		if (error = xfs_iaccess(dp, IWRITE)) {
+		if (error = xfs_iaccess(dp, IWRITE, credp)) {
 			goto error_return;
 		}
 #endif
@@ -2623,7 +2623,7 @@ xfs_create(
 			
 #if 0
 		if (I_mode) {
-			error = xfs_iaccess(ip, I_mode);
+			error = xfs_iaccess(ip, I_mode, credp);
 		}
 #endif
 			
@@ -3339,17 +3339,17 @@ xfs_remove(
 	}
  
 #if 0
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
 #endif
-	if (error = _MAC_XFS_IACCESS(ip, MACWRITE)) {
+	if (error = _MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
 #if 0
-	if (error = xfs_stickytest(dp, ip)) {
+	if (error = xfs_stickytest(dp, ip, credp)) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
@@ -3633,7 +3633,7 @@ xfs_link(
 	}
 
 #if 0
-	if (error = xfs_iaccess(tdp, IEXEC | IWRITE)) {
+	if (error = xfs_iaccess(tdp, IEXEC | IWRITE, credp)) {
                 goto error_return;
 	}
 #endif
@@ -3845,7 +3845,7 @@ xfs_mkdir(
 	/*
 	 * check access.
 	 */
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
                 goto error_return;
 	}
 #endif
@@ -4122,7 +4122,7 @@ xfs_rmdir(
 		IRELE(cdp);
 		goto std_return;
 	}
-	if (error = _MAC_XFS_IACCESS(cdp, MACWRITE)) {
+	if (error = _MAC_XFS_IACCESS(cdp, MACWRITE, credp)) {
 		xfs_trans_cancel(tp, cancel_flags);
 		IRELE(cdp);
 		goto std_return;
@@ -4153,11 +4153,11 @@ xfs_rmdir(
 	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
 
 #if 0
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
                 goto error_return;
 	}
 
-	if (error = xfs_stickytest(dp, cdp)) {
+	if (error = xfs_stickytest(dp, cdp, credp)) {
                 goto error_return;
 	}
 #endif
@@ -4492,7 +4492,7 @@ xfs_symlink(
 	}
 
 #if 0
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
                 goto error_return;
 	}
 #endif
@@ -5021,7 +5021,7 @@ xfs_get_uiosize(
 {
 	int error;
 
-	if (error = xfs_iaccess(ip, IREAD))
+	if (error = xfs_iaccess(ip, IREAD, credp))
 		return error;
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -5055,7 +5055,7 @@ xfs_set_uiosize(
 	int	memlimit;
 	int	error;
 
-	if (error = xfs_iaccess(ip, IWRITE))
+	if (error = xfs_iaccess(ip, IWRITE, credp))
 		return error;
 
 	memlimit = NBPP;
@@ -5945,7 +5945,7 @@ xfs_change_file_space(
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
-	if (error = xfs_iaccess(ip, IWRITE)) {
+	if (error = xfs_iaccess(ip, IWRITE, credp)) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return error;
 	}
@@ -6120,6 +6120,8 @@ vnodeops_t xfs_vnodeops = {
 	(vop_attr_set_t)xfs_attr_set,
 	(vop_attr_remove_t)xfs_attr_remove,
 	(vop_attr_list_t)xfs_attr_list,
+	(vop_acl_get_t)xfs_acl_get,
+	(vop_acl_set_t)xfs_acl_set,
 	(vop_link_removed_t)fs_noval,
 	fs_vnode_change,
 	fs_tosspages,

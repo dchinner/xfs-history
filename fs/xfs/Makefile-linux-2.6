@@ -105,9 +105,11 @@ else
   xfs-objs			+= xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
 endif
 
-xfs-objs			+= xfs_alloc.o \
+xfs-objs			+= xfs_acl.o \
+				   xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
+				   xfs_attr_fetch.o \
 				   xfs_attr_leaf.o \
 				   xfs_bit.o \
 				   xfs_bmap.o \

@@ -47,6 +47,7 @@
 #include <linux/page_buf.h>
 #include <linux/file.h>
 #include <linux/attributes.h>
+#include <linux/acl.h>
 
 #include <xfs_buf.h>
 #include <linux/xqm.h>
@@ -56,7 +57,6 @@
 #include <linux/xfs_vfs.h>
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_fs_subr.h>
-#include <pseudo-inc/sys/acl.h>
 
 #include <linux/slab.h>
 #include <linux/errno.h>
@@ -106,6 +106,7 @@
 #include <xfs_dir2_block.h>
 #include <xfs_dir2_node.h>
 #include <xfs_dir2_trace.h>
+#include <xfs_acl.h>
 #include <xfs_attr.h>
 #include <xfs_attr_leaf.h>
 #include <xfs_inode_item.h>

@@ -234,6 +234,8 @@ typedef	void	(*vop_ptossvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef	void	(*vop_pflushinvalvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef	int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);
 typedef	void	(*vop_sethole_t)(bhv_desc_t *, void *, int, int, xfs_off_t);
+typedef int	(*vop_acl_get_t)(vnode_t *, struct acl *, struct acl *);
+typedef int	(*vop_acl_set_t)(vnode_t *, struct acl *, struct acl *);
 
 
 typedef struct vnodeops {
@@ -275,6 +277,8 @@ typedef struct vnodeops {
 	vop_attr_set_t		vop_attr_set;
 	vop_attr_remove_t	vop_attr_remove;
 	vop_attr_list_t		vop_attr_list;
+	vop_acl_get_t		vop_acl_get;
+	vop_acl_set_t		vop_acl_set;
 	vop_link_removed_t	vop_link_removed;
 	vop_vnode_change_t	vop_vnode_change;
 	vop_ptossvp_t		vop_tosspages;
@@ -491,6 +495,18 @@ typedef struct vnodeops {
         VN_BHV_READ_LOCK(&(vp)->v_bh);       				\
         (void)_VOP_(vop_link_removed, vp)((vp)->v_fbhv, dvp, linkzero); \
         VN_BHV_READ_UNLOCK(&(vp)->v_bh); 				\
+}
+#define	VOP_ACL_GET(vp, acl, dacl, rv)					\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_acl_get, vp)((vp),acl,dacl);			\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define	VOP_ACL_SET(vp, acl, dacl, rv)					\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_acl_set, vp)((vp),acl,dacl);			\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define	VOP_VNODE_CHANGE(vp, cmd, val)					\
 {									\

@@ -181,9 +181,15 @@ int mac_xfs_attr_set(void)
 	/* NOTREACHED */ return 0;
 }
 
-int mac_xfs_iaccess(struct xfs_inode *a, mode_t b)
+int mac_xfs_iaccess(struct xfs_inode *a, mode_t b, struct cred *c)
 {
 	DOPANIC("mac_xfs_iaccess stub");
+	/* NOTREACHED */ return 0;
+}
+
+int mac_xfs_vaccess(vnode_t *a, struct cred *b, mode_t c)
+{
+	DOPANIC("mac_xfs_vaccess stub");
 	/* NOTREACHED */ return 0;
 }
 

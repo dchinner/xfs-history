@@ -139,20 +139,20 @@ xfs_swapext(
 	xfs_lock_inodes(ips, 2, 0, lock_flags);
 
 	/* Check permissions */
-        if (error = _MAC_XFS_IACCESS(ip, MACWRITE)) {
+        if (error = _MAC_XFS_IACCESS(ip, MACWRITE, NULL)) {
 		goto error0;
 	}
-        if (error = _MAC_XFS_IACCESS(tip, MACWRITE)) {
+        if (error = _MAC_XFS_IACCESS(tip, MACWRITE, NULL)) {
 		goto error0;
 	}
 	if ((current->fsuid != ip->i_d.di_uid) &&
-	    (error = xfs_iaccess(ip, IWRITE)) &&
-	    !capable(CAP_FOWNER)) {
+	    (error = xfs_iaccess(ip, IWRITE, NULL)) &&
+	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;
 	}	
 	if ((current->fsuid != tip->i_d.di_uid) &&
-	    (error = xfs_iaccess(tip, IWRITE)) &&
-	    !capable(CAP_FOWNER)) {
+	    (error = xfs_iaccess(tip, IWRITE, NULL)) &&
+	    !capable_cred(NULL, CAP_FOWNER)) {
 		goto error0;
 	}	
 

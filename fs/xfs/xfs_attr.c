@@ -119,7 +119,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	 * Do we answer them, or ignore them?
 	 */
 	xfs_ilock(args.dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD)) {
+	if (error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD, cred)) {
 		xfs_iunlock(args.dp, XFS_ILOCK_SHARED);
                 return(XFS_ERROR(error));
 	}
@@ -180,7 +180,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		return (EIO);
 
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(dp, IWRITE)) {
+	if (error = xfs_iaccess(dp, IWRITE, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
                 return(XFS_ERROR(error));
 	}
@@ -438,7 +438,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 		return (EIO);
 
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(dp, IWRITE)) {
+	if (error = xfs_iaccess(dp, IWRITE, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);	
                 return(XFS_ERROR(error));
 	} else if (XFS_IFORK_Q(dp) == 0 ||
@@ -618,7 +618,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	 * Do they have permission?
 	 */
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(dp, IREAD)) {
+	if (error = xfs_iaccess(dp, IREAD, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
                 return(XFS_ERROR(error));
 	}

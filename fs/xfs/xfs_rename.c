@@ -441,28 +441,28 @@ xfs_rename_error_checks(
 		goto error_return;
 	}
 #if 0
-	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE)) {
+	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE, credp)) {
 		*status = __LINE__;
                 goto error_return;
 	}
-	if (error = xfs_stickytest(src_dp, src_ip)) {
+	if (error = xfs_stickytest(src_dp, src_ip, credp)) {
 		*status = __LINE__;
 		goto error_return;
 	}
 
 	if (target_dp && (src_dp != target_dp)) {
-		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE)) {
+		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE, credp)) {
 			*status = __LINE__;
 			goto error_return;
 		}
 		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(target_dp, target_ip))) {
+		    (error = xfs_stickytest(target_dp, target_ip, credp))) {
 			*status = __LINE__;
 			goto error_return;
 		}
 	} else {
 		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(src_dp, target_ip))) {
+		    (error = xfs_stickytest(src_dp, target_ip, credp))) {
 			*status = __LINE__;
                         goto error_return;
 		}
