@@ -1610,6 +1610,8 @@ _pagebuf_page_io(
 			blk_length = 1;
 			break;
 		}
+	case PBR_SECTOR_ONLY:
+		/* Fallthrough, same as default */
 	default:
 		sector = SECTOR_SIZE;
 	}
