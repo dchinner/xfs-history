@@ -42,8 +42,8 @@
 #include <linux/sched.h>
 #include <linux/bitops.h>
 #include <linux/major.h>
-#include <linux/vfs.h>
 #include <linux/pagemap.h>
+#include <linux/vfs.h>
 #include <linux/seq_file.h>
 
 #include <asm/page.h>
@@ -68,10 +68,6 @@
 
 #ifndef STATIC
 #define STATIC static
-#endif
-
-#ifndef EVMS_MAJOR
-#define EVMS_MAJOR 117
 #endif
 
 /*
@@ -165,10 +161,12 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define SYNCHRONIZE()	barrier()
 #define __return_address __builtin_return_address(0)
 
-/* IRIX (BSD) quotactl makes use of separate commands for user/group, */
-/* whereas on Linux the syscall encodes this information into the cmd */
-/* field (see the QCMD macro in quota.h).  These macros help keep the */
-/* code portable - they are not visible from the syscall interface.   */
+/*
+ * IRIX (BSD) quotactl makes use of separate commands for user/group,
+ * whereas on Linux the syscall encodes this information into the cmd 
+ * field (see the QCMD macro in quota.h).  These macros help keep the
+ * code portable - they are not visible from the syscall interface.
+ */
 #define Q_XSETGQLIM	XQM_CMD(0x8)	/* set groups disk limits */
 #define Q_XGETGQUOTA	XQM_CMD(0x9)	/* get groups disk limits */
 
