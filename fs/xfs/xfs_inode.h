@@ -120,6 +120,12 @@ typedef struct xfs_inode {
 #define	XFS_IBROOT	0x0004	/* i_broot points to the bmap b-tree root */
 
 /*
+ * Flags for iget.
+ */
+#define	XFS_ILOCK_EXCL		MR_UPDATE
+#define	XFS_ILOCK_SHARED	MR_ACCESS
+
+/*
  * Maximum number of extent pointers in i_u1.iu_extents.
  */
 #define	XFS_MAX_INCORE_EXTENTS	32768
