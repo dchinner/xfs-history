@@ -2746,6 +2746,7 @@ xfs_diostrat( buf_t *bp)
 		for ( j = 0; j < bufsissued ; j++) {
 	  		nbp = bps[j];
 	    		iowait( nbp );
+			nbp->b_flags2 &= ~B_GR_BUF;
 
 	     		if (!error)
 				error = geterror( nbp );
