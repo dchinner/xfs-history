@@ -208,13 +208,13 @@ xfs_flush_space(
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			*fsynced = 1;
 		} else {
-			*ioflags |= PBF_SYNC;
+			*ioflags |= BMAP_SYNC;
 			*fsynced = 2;
 		}
 		return 0;
 	case 1:
 		*fsynced = 2;
-		*ioflags |= PBF_SYNC;
+		*ioflags |= BMAP_SYNC;
 		return 0;
 	case 2:
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
