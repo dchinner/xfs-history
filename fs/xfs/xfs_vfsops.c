@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.280 $"
+#ident  "$Revision: 1.282 $"
 
 #include <xfs_os_defs.h>
 
@@ -2179,6 +2179,17 @@ xfs_syncsub(
 	 * to disk or the filesystem can appear corrupt from the PROM.
 	 */
 	if ((flags & (SYNC_CLOSE|SYNC_WAIT)) == (SYNC_CLOSE|SYNC_WAIT)) {
+             
+	  /* write an unmount record - log should be clean */
+	  /* XXX - how can we _check_ it's clean? */
+	  xfs_log_unmount_write(mp);            
+	  
+	  /* force the log out */
+	  xfs_log_force(mp, (xfs_lsn_t)0,
+					XFS_LOG_FORCE | XFS_LOG_SYNC);
+	  
+	  /* now force pagebuf to flush */
+                 
 		XFS_bflush(mp->m_ddev_targ);
 		if (mp->m_rtdev != NODEV) {
 			XFS_bflush(mp->m_rtdev_targ);

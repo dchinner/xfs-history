@@ -191,6 +191,11 @@ linvfs_read_super(
 		MOD_DEC_USE_COUNT;
 		return NULL;
 	}
+    /* check to see if kio is suppose to be on for this mount */
+    if(args->flags & MS_KIOBUFIO){
+	  sb->s_flags |= MS_KIOBUFIO;
+	  printk("XFS (dev: %d/%d) mounting with KIOBIFIO\n",MAJOR(sb->s_dev),MINOR(sb->s_dev));
+	}
 
 	args->fsname = uap->spec;
   
@@ -553,14 +558,23 @@ linvfs_remount(
 
 	if (*flags & MS_RDONLY || args.flags & MS_RDONLY) {
 		int error;
-
-		printk("XFS: Remounting read-only\n");
-		vfsp->vfs_flag |= VFS_RDONLY;
+		int save = sb->s_flags;
 		sb->s_flags |= MS_RDONLY;
-		PVFS_SYNC(vfsp->vfs_fbhv, SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
-			  sys_cred, error);
-		if (error)
-			printk("XFS: PVFS_SYNC failed!\n");
+		printk("XFS: Flushing for read-only remount\n");
+		
+		PVFS_SYNC(vfsp->vfs_fbhv, SYNC_ATTR|SYNC_DELWRI|
+				  SYNC_WAIT|SYNC_CLOSE,
+				  sys_cred, error);
+		
+		if (error) {
+		  sb->s_flags=save;
+		  printk("XFS: Failed to sync for read-only remount\n");
+		  return 1;
+		}
+		
+		printk("XFS: Marking FS read-only\n");
+		
+		vfsp->vfs_flag |= VFS_RDONLY;
 	} else {
 		printk("XFS: Remounting read-write\n");
 		vfsp->vfs_flag &= ~VFS_RDONLY;
