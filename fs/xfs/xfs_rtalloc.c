@@ -2029,7 +2029,7 @@ xfs_rtallocate_extent(
 	 * If it worked, update the superblock.
 	 */
 	if (r != NULLRTBLOCK) {
-		int	slen = (int)*len;
+		long	slen = (long)*len;
 
 		ASSERT(*len >= minlen && *len <= maxlen);
 		if (wasdel)
@@ -2091,7 +2091,7 @@ xfs_rtfree_extent(
 	/*
 	 * Mark more blocks free in the superblock.
 	 */
-	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FREXTENTS, (int)len);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FREXTENTS, (long)len);
 	return 0;
 }
 

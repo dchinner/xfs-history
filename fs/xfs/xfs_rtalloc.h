@@ -1,24 +1,21 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision$"
 
 struct xfs_mount;
 struct xfs_trans;
 
 /* Min and max rt extent sizes, specified in bytes */
 #define	XFS_MAX_RTEXTSIZE	(1024 * 1024 * 1024)	/* 1GB */
+#define	XFS_DFL_RTEXTSIZE	(64 * 1024)	        /* 64KB */
 #define	XFS_MIN_RTEXTSIZE	(4 * 1024)		/* 4KB */
 
 /*
  * Constants for bit manipulations.
  */
 #define	XFS_NBBYLOG	3		/* log2(NBBY) */
-#if XFS_RTWORD_LL
-#define	XFS_WORDLOG	3		/* log2(sizeof(xfs_rtword_t)) */
-#else
 #define	XFS_WORDLOG	2		/* log2(sizeof(xfs_rtword_t)) */
-#endif
 #define	XFS_NBWORDLOG	(XFS_NBBYLOG + XFS_WORDLOG)
 #define	XFS_NBWORD	(1 << XFS_NBWORDLOG)
 #define	XFS_WORDMASK	((1 << XFS_WORDLOG) - 1)
@@ -45,13 +42,8 @@ struct xfs_trans;
 #define	XFS_RTMIN(a,b)	((a) < (b) ? (a) : (b))
 #define	XFS_RTMAX(a,b)	((a) > (b) ? (a) : (b))
 
-#if XFS_RTWORD_LL
-#define	XFS_RTLOBIT(w)	xfs_lowbit64(w)
-#define	XFS_RTHIBIT(w)	xfs_highbit64(w)
-#else
 #define	XFS_RTLOBIT(w)	xfs_lowbit32(w)
 #define	XFS_RTHIBIT(w)	xfs_highbit32(w)
-#endif
 
 #if XFS_BIG_FILESYSTEMS
 #define	XFS_RTBLOCKLOG(b)	xfs_highbit64(b)
