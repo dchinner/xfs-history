@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.196 $"
+#ident  "$Revision: 1.197 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1307,6 +1307,12 @@ xfs_ibusy(
 	}
 
 	do {
+		/* Skip markers inserted by xfs_sync */
+		if (ip->i_mount == NULL) {
+			ip = ip->i_mnext;
+			continue;
+		}
+
 		vp = XFS_ITOV(ip);
 		if (vp->v_count != 0) {
 			if ((vp->v_count == 1) && (ip == mp->m_rootip)) {
@@ -1791,15 +1797,14 @@ xfs_sync(
 	cred_t		*credp)
 {
 	xfs_mount_t	*mp;
-	xfs_inode_t	*ip;
+	xfs_inode_t	*ip = NULL;
+	xfs_inode_t	*ip_next;
 	buf_t		*bp;
 	vnode_t		*vp;
 	vmap_t		vmap;
 	int		error;
 	int		last_error;
 	uint64_t	fflag;
-	int		ireclaims;
-	int		restarts;
 	uint		lock_flags;
 	uint		base_lock_flags;
 	uint		log_flags;
@@ -1807,10 +1812,48 @@ xfs_sync(
 	boolean_t	vnode_refed;
 	xfs_fsize_t	last_byte;
 	int		preempt;
-	int		i;
 	xfs_dinode_t	*dip;
 	xfs_buf_log_item_t	*bip;
-#define	RESTART_LIMIT	10
+	xfs_iptr_t	*ipointer;
+#ifdef DEBUG
+	boolean_t	ipointer_in = B_FALSE;
+
+#define IPOINTER_SET	ipointer_in = B_TRUE
+#define IPOINTER_CLR	ipointer_in = B_FALSE
+#else
+#define IPOINTER_SET
+#define IPOINTER_CLR
+#endif
+
+
+#define IPOINTER_INSERT(ip, mp)	{ \
+		ASSERT(ipointer_in == B_FALSE); \
+		ipointer->ip_mnext = ip->i_mnext; \
+		ipointer->ip_mprev = ip; \
+		ip->i_mnext = (xfs_inode_t *)ipointer; \
+		ipointer->ip_mnext->i_mprev = (xfs_inode_t *)ipointer; \
+		preempt = 0; \
+		XFS_MOUNT_IUNLOCK(mp); \
+		mount_locked = B_FALSE; \
+		IPOINTER_SET; \
+	}
+
+#define IPOINTER_REMOVE(ip, mp)	{ \
+		ASSERT(ipointer_in == B_TRUE); \
+		if (ipointer->ip_mnext == ipointer->ip_mprev) { \
+			mp->m_inodes = NULL; \
+			ip = NULL; \
+		} else { \
+			ip = ipointer->ip_mnext; \
+			ip->i_mprev = ipointer->ip_mprev; \
+			ipointer->ip_mprev->i_mnext = ip; \
+			if (mp->m_inodes == (xfs_inode_t *)ipointer) { \
+				mp->m_inodes = ip; \
+			} \
+		} \
+		IPOINTER_CLR; \
+	}
+
 #define PREEMPT_MASK	0x7f
 
 	mp = XFS_BHVTOM(bdp);
@@ -1819,7 +1862,9 @@ xfs_sync(
 	error = 0;
 	last_error = 0;
 	preempt = 0;
-	restarts = 0;
+
+	/* Allocate a reference marker */
+	ipointer = (xfs_iptr_t *)kmem_zalloc(sizeof(xfs_iptr_t), KM_SLEEP);
 
 	fflag = B_ASYNC;		/* default is don't wait */
 	if (flags & SYNC_BDFLUSH)
@@ -1842,12 +1887,15 @@ xfs_sync(
 	 */
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 
- loop:
 	XFS_MOUNT_ILOCK(mp);
+	ip = mp->m_inodes;
 	mount_locked = B_TRUE;
 	vnode_refed = B_FALSE;
-	ip = mp->m_inodes;
+	IPOINTER_CLR;
+
 	do {
+		ASSERT(ipointer_in == B_FALSE);
+		ASSERT(vnode_refed == B_FALSE);
 		lock_flags = base_lock_flags;
 
 		/*
@@ -1856,6 +1904,14 @@ xfs_sync(
 		 */
 		if (ip == NULL) {
 			break;
+		}
+
+		/*
+		 * We found another sync thread marker - skip it
+		 */
+		if (ip->i_mount == NULL) {
+			ip = ip->i_mnext;
+			continue;
 		}
 
 		vp = XFS_ITOV(ip);
@@ -1871,6 +1927,7 @@ xfs_sync(
 
 		if (XFS_FORCED_SHUTDOWN(mp) && !(flags & SYNC_CLOSE)) {
 			XFS_MOUNT_IUNLOCK(mp);
+			kmem_free(ipointer, sizeof(xfs_iptr_t));
 			return 0;
 		}
 
@@ -1930,30 +1987,23 @@ xfs_sync(
 			 * in taking a snapshot of the vnode version number
 			 * for use in calling vn_get().
 			 */
-			ireclaims = mp->m_ireclaims;
+
+
 			VMAP(vp, vmap);
-			XFS_MOUNT_IUNLOCK(mp);
-			mount_locked = B_FALSE;
+			IPOINTER_INSERT(ip, mp);
 			vp = vn_get(vp, &vmap, 0);
 			if (vp == NULL) {
 				/*
 				 * The vnode was reclaimed once we let go
-				 * of the inode list lock.  Start again
-				 * at the beginning of the list.
-				 * If the caller didn't want to wait
-				 * anyway, then only spend so much
-				 * time trying to get through
-				 * the entire list.  This keeps
-				 * us from spending all day here
-				 * on busy file systems.
+				 * of the inode list lock.  Skip to the
+				 * next list entry.
 				 */
-				if (!(flags & SYNC_WAIT) &&
-				    (restarts == RESTART_LIMIT)) {
-					XFS_MOUNT_ILOCK(mp);
-					break;
-				}
-				restarts++;
-				goto loop;
+
+				XFS_MOUNT_ILOCK(mp);
+				mount_locked = B_TRUE;
+				vnode_refed = B_FALSE;
+				IPOINTER_REMOVE(ip, mp);
+				continue;
 			}
 			xfs_ilock(ip, lock_flags);
 			vnode_refed = B_TRUE;
@@ -1984,9 +2034,7 @@ xfs_sync(
 		} else if (flags & SYNC_DELWRI) {
 			if (VN_DIRTY(vp)) {
 				if (mount_locked) {
-					ireclaims = mp->m_ireclaims;
-					XFS_MOUNT_IUNLOCK(mp);
-					mount_locked = B_FALSE;
+					IPOINTER_INSERT(ip, mp);
 				}
 
 				/*
@@ -2005,9 +2053,7 @@ xfs_sync(
 		if (flags & SYNC_PDFLUSH) {
 			if (vp->v_dpages) {
 				if (mount_locked) {
-					ireclaims = mp->m_ireclaims;
-					XFS_MOUNT_IUNLOCK(mp);
-					mount_locked = B_FALSE;
+					IPOINTER_INSERT(ip, mp);
 				}
 
 				/*
@@ -2025,9 +2071,7 @@ xfs_sync(
 			     ((ip->i_itemp != NULL) &&
 			      (ip->i_itemp->ili_format.ilf_fields != 0)))) {
 				if (mount_locked) {
-					ireclaims = mp->m_ireclaims;
-					XFS_MOUNT_IUNLOCK(mp);
-					mount_locked = B_FALSE;
+					IPOINTER_INSERT(ip, mp);
 				}
 
 				/*
@@ -2057,6 +2101,11 @@ xfs_sync(
 					if (!error) {
 						brelse(bp);
 					} else {
+						XFS_MOUNT_ILOCK(mp);
+						IPOINTER_REMOVE(ip, mp);
+						XFS_MOUNT_IUNLOCK(mp);
+						kmem_free(ipointer,
+							sizeof(xfs_iptr_t));
 						return (0);
 					}
 
@@ -2064,46 +2113,19 @@ xfs_sync(
 					 * Since we dropped the inode lock,
 					 * the inode may have been reclaimed.
 					 * Therefore, we reacquire the mount
-					 * lock and start from the beginning
-					 * again if any inodes were
-					 * reclaimed.
+					 * lock and check to see if we were the
+					 * inode reclaimed. If this happened
+					 * then the ipointer marker will no
+					 * longer point back at us.
 					 */
 					XFS_MOUNT_ILOCK(mp);
-					if (mp->m_ireclaims != ireclaims) {
-						XFS_MOUNT_IUNLOCK(mp);
-
-						/*
-						 * A vnode was reclaimed
-						 * once we let go of the
-						 * inode list lock.  Start
-						 * again at the beginning
-						 * of the list. If the
-						 * caller didn't want to
-						 * wait anyway, then only
-						 * spend so much time
-						 * trying to get through
-						 * the entire list.  This
-						 * keeps us from spending
-						 * all day here on busy
-						 * file systems.
-						 */
-						if (!(flags & SYNC_WAIT) &&
-						    (restarts ==
-						     RESTART_LIMIT)) {
-							XFS_MOUNT_ILOCK(mp);
-							break;
-						}
-						/*
-						 * This is the bdflush case,
-						 * so we never should have
-						 * acquired a ref to the
-						 * vnode above.
-						 */
-						ASSERT(!vnode_refed);
-						restarts++;
-						goto loop;
-					}
 					mount_locked = B_TRUE;
+					if (ip != ipointer->ip_mprev) {
+						IPOINTER_REMOVE(ip, mp);
+						ASSERT(!vnode_refed);
+						continue;
+					}
+
 					if (xfs_ilock_nowait(ip,
 						    XFS_ILOCK_SHARED) == 0) {
 						/*
@@ -2118,6 +2140,7 @@ xfs_sync(
 						 * the mount lock so that we
 						 */
 						lock_flags &= ~XFS_ILOCK_SHARED;
+						IPOINTER_REMOVE(ip_next, mp);
 					} else if ((ip->i_pincount == 0) &&
 						   xfs_iflock_nowait(ip)) {
 						/*
@@ -2130,11 +2153,12 @@ xfs_sync(
 						 * that we don't hold it for
 						 * too long.
 						 */
-						ireclaims = mp->m_ireclaims;
 						XFS_MOUNT_IUNLOCK(mp);
 						mount_locked = B_FALSE;
 						error = xfs_iflush(ip,
 							   XFS_IFLUSH_DELWRI);
+					} else {
+						IPOINTER_REMOVE(ip_next, mp);
 					}
 				}
 
@@ -2146,9 +2170,7 @@ xfs_sync(
 			     ((ip->i_itemp != NULL) &&
 			      (ip->i_itemp->ili_format.ilf_fields != 0)))) {
 				if (mount_locked) {
-					ireclaims = mp->m_ireclaims;
-					XFS_MOUNT_IUNLOCK(mp);
-					mount_locked = B_FALSE;
+					IPOINTER_INSERT(ip, mp);
 				}
 
 				if (flags & SYNC_WAIT) {
@@ -2190,9 +2212,7 @@ xfs_sync(
 			 * inactive code.
 			 */
 			if (mount_locked) {
-				ireclaims = mp->m_ireclaims;
-				XFS_MOUNT_IUNLOCK(mp);
-				mount_locked = B_FALSE;
+				IPOINTER_INSERT(ip, mp);
 			}
 			VN_RELE(vp);
 			vnode_refed = B_FALSE;
@@ -2204,61 +2224,30 @@ xfs_sync(
 		 * bail out if the filesystem is corrupted.
 		 */
 		if (error == EFSCORRUPTED)  {
-			if (mount_locked)
-				XFS_MOUNT_IUNLOCK(mp);
+			if (!mount_locked) {
+				XFS_MOUNT_ILOCK(mp);
+				IPOINTER_REMOVE(ip, mp);
+			}
+			XFS_MOUNT_IUNLOCK(mp);
+			kmem_free(ipointer, sizeof(xfs_iptr_t));
 			return XFS_ERROR(error);
 		}
 		if ((++preempt & PREEMPT_MASK) == 0) {
 			if (mount_locked) {
-				ireclaims = mp->m_ireclaims;
-				XFS_MOUNT_IUNLOCK(mp);
-				mount_locked = B_FALSE;
+				IPOINTER_INSERT(ip, mp);
 			}
 		}
-		if (!mount_locked) {
+		if (mount_locked == B_FALSE) {
 			XFS_MOUNT_ILOCK(mp);
-			if (mp->m_ireclaims != ireclaims) {
-				if (!(flags & SYNC_WAIT) &&
-				    (restarts == RESTART_LIMIT)) {
-					/*
-					 * If the caller didn't want to wait
-					 * anyway, then only spend so much
-					 * time trying to get through
-					 * the entire list.  This keeps
-					 * us from spending all day here
-					 * on busy file systems.
-					 */
-					break;
-				}
-				restarts++;
-				XFS_MOUNT_IUNLOCK(mp);
-				goto loop;
-			}
 			mount_locked = B_TRUE;
+			IPOINTER_REMOVE(ip, mp);
+			continue;
 		}
 
 		ip = ip->i_mnext;
 	} while (ip != mp->m_inodes);
-	if ((restarts == RESTART_LIMIT) && !(flags & SYNC_WAIT) &&
-	    (mp->m_inodes != NULL)) {
-		/*
-		 * We may have missed some of the inodes at the end
-		 * of the list.  Rotate the list so that some of the
-		 * inodes at the tail of the list are now at the head
-		 * so that they get looked at eventually.  This is
-		 * actually necessary and not just nice since we depend
-		 * on vfs_sync() to push out dirty inodes eventually
-		 * as part of guaranteeing that the tail of the log
-		 * will move forward eventually.
-		 */
-		ip = mp->m_inodes;
-		for (i = 0; i < 10; i++) {
-			ip = ip->i_mprev;
-		}
-		ASSERT(ip != NULL);
-		mp->m_inodes = ip;
-	}
 	XFS_MOUNT_IUNLOCK(mp);
+	ASSERT(ipointer_in == B_FALSE);
 
 	
 	/*
@@ -2271,8 +2260,10 @@ xfs_sync(
 			 * So, there's nothing more for us to do here.
 			 */
 			ASSERT(error != EIO || XFS_FORCED_SHUTDOWN(mp));
-			if (XFS_FORCED_SHUTDOWN(mp))
+			if (XFS_FORCED_SHUTDOWN(mp)) {
+				kmem_free(ipointer, sizeof(xfs_iptr_t));
 				return XFS_ERROR(error);
+			}
 		}
 	}
 	/*
@@ -2341,6 +2332,7 @@ xfs_sync(
 		xfs_refcache_purge_some();
 	}
 
+	kmem_free(ipointer, sizeof(xfs_iptr_t));
 	return XFS_ERROR(last_error);
 }
 
