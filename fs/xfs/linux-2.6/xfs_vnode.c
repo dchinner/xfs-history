@@ -149,10 +149,8 @@ vn_address(struct inode *inode)
 	vnode_t		*vp;
 
 
-	vp = (vnode_t *)(&((inode)->u.xfs_i.vnode));
+	vp = LINVFS_GET_VN_ADDRESS(inode);
 
-	if (vp->v_inode == NULL)
-		return NULL;
 	/*
 	 * Catch half-constructed linux-inode/vnode/xfs-inode setups.
 	 */
@@ -173,8 +171,6 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	XFS_STATS_INC(xfsstats.vn_active);
 
 	vp = LINVFS_GET_VN_ADDRESS(inode);
-
-	vp->v_inode = inode;
 
 	vp->v_flag = VMODIFIED;
 
@@ -252,7 +248,7 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 	struct inode	*inode;
 
 	XFS_STATS_INC(xfsstats.vn_get);
-	inode = icreate(vmap->v_vfsp->vfs_super, vmap->v_ino, SLAB_KERNEL);
+	inode = icreate(vmap->v_vfsp->vfs_super, vmap->v_ino);
 
 	/* We do not want to create new inodes via vn_get,
 	 * returning NULL here is OK.
@@ -532,8 +528,6 @@ vn_remove(struct vnode *vp)
 	VMAP(vp, XFS_BHVTOI(vp->v_fbhv), vmap);
 
 	vn_purge(vp, &vmap);
-
-	vp->v_inode = NULL;		/* No more references to inode */
 }
 
 
@@ -544,7 +538,7 @@ vn_remove(struct vnode *vp)
 /*  0 */		(void *)(__psint_t)(vk),		\
 /*  1 */		(void *)(s),				\
 /*  2 */		(void *)(__psint_t) line,		\
-/*  3 */		(void *)((vp)->v_inode ? vn_count((vp)): -9), \
+/*  3 */		(void *)(vn_count(vp)), \
 /*  4 */		(void *)(ra),				\
 /*  5 */		(void *)(__psunsigned_t)(vp)->v_flag,	\
 /*  6 */		(void *)(__psint_t)smp_processor_id(),	\

@@ -212,7 +212,7 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 		validate_fields(ip);
 		d_instantiate(dentry, ip);
 		mark_inode_dirty(ip);
-		mark_inode_dirty(tdvp->v_inode);
+		mark_inode_dirty(LINVFS_GET_IP(tdvp));
 	}
 	return -error;
 }
@@ -238,7 +238,7 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 		validate_fields(dir);	/* For size only */
 		validate_fields(inode);
 		mark_inode_dirty(inode);
-		mark_inode_dirty(dvp->v_inode);
+		mark_inode_dirty(LINVFS_GET_IP(dvp));
 	}
 
 	return -error;

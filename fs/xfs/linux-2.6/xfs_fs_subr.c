@@ -139,8 +139,8 @@ fs_tosspages(
 {
 	vnode_t	*vp = BHV_TO_VNODE(bdp);
 
-	if (vp->v_inode && VN_CACHED(vp))
-		pagebuf_inval(vp->v_inode, first, 0);
+	if (VN_CACHED(vp))
+		pagebuf_inval(LINVFS_GET_IP(vp), first, 0);
 }
 
 
@@ -157,8 +157,8 @@ fs_flushinval_pages(
 {
 	vnode_t	*vp = BHV_TO_VNODE(bdp);
 
-	if (vp->v_inode && VN_CACHED(vp))
-		pagebuf_flushinval(vp->v_inode, first, 0);
+	if (VN_CACHED(vp))
+		pagebuf_flushinval(LINVFS_GET_IP(vp), first, 0);
 }
 
 
@@ -177,8 +177,8 @@ fs_flush_pages(
 {
 	vnode_t	*vp = BHV_TO_VNODE(bdp);
 
-	if (vp->v_inode && VN_CACHED(vp))
-		pagebuf_flush(vp->v_inode, first, 0);
+	if (VN_CACHED(vp))
+		pagebuf_flush(LINVFS_GET_IP(vp), first, 0);
 	return 0;
 }
 

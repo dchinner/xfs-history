@@ -409,7 +409,7 @@ xfs_zero_eof(
 	xfs_fsize_t	end_size,	/* terminal inode size */
 	struct pm       *pmp)
 {
-	struct inode	*ip = vp->v_inode;
+	struct inode	*ip = LINVFS_GET_IP(vp);
 	xfs_fileoff_t	start_zero_fsb;
 	xfs_fileoff_t	end_zero_fsb;
 	xfs_fileoff_t	prev_zero_fsb;
@@ -942,7 +942,7 @@ retry:
 			switch (fsynced) {
 			case 0:
 				if (ip->i_delayed_blks) {
-					fsync_inode_buffers(vp->v_inode);
+					fsync_inode_buffers(LINVFS_GET_IP(vp));
 					fsynced = 1;
 				} else {
 					fsynced = 2;

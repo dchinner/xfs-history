@@ -394,6 +394,61 @@ linvfs_release_buftarg(
 	}
 }
 
+static kmem_cache_t * linvfs_inode_cachep;
+
+#define XFS_TRANS_MAGIC 0x5452414E
+
+static __inline__ unsigned int gfp_mask(void)
+{
+        /* If we're not in a transaction, FS activity is ok */
+        if (!current->journal_info) return GFP_KERNEL;
+        /* could be set from some other filesystem */
+        if ((int)current->journal_info != XFS_TRANS_MAGIC)
+                return GFP_KERNEL;
+        return GFP_NOFS;
+}
+
+
+static struct inode *linvfs_alloc_inode(struct super_block *sb)
+{
+	vnode_t	*vp;
+
+	vp = (vnode_t *)kmem_cache_alloc(linvfs_inode_cachep, gfp_mask());
+	if (!vp)
+		return NULL;
+	return LINVFS_GET_IP(vp);
+}
+
+static void linvfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(linvfs_inode_cachep, LINVFS_GET_VN_ADDRESS(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	vnode_t *vp = (vnode_t *)foo;
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(LINVFS_GET_IP(vp));
+}
+
+static int init_inodecache(void)
+{
+	linvfs_inode_cachep = kmem_cache_create("linvfs_icache",
+				sizeof(vnode_t), 0, SLAB_HWCACHE_ALIGN,
+				init_once, NULL);
+
+	if (linvfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(linvfs_inode_cachep))
+		printk(KERN_INFO "linvfs_inode_cache: not all structures were freed\n");
+}
+
 struct super_block *
 linvfs_read_super(
 	struct super_block *sb,
@@ -433,19 +488,17 @@ linvfs_read_super(
 
 	/*  Setup up the cvp structure  */
 
-	cip = (struct inode *)kmem_alloc(sizeof(struct inode),0);
+	cip = linvfs_alloc_inode(sb);
 	if (!cip) { 
 		vfs_deallocate(vfsp);
 		return NULL;
 	} 
 
-	bzero(cip, sizeof(*cip));
 	atomic_set(&cip->i_count, 1);
 
 	cvp = LINVFS_GET_VN_ADDRESS(cip);
 	cvp->v_type   = VDIR;
 	cvp->v_number = 1;		/* Place holder */
-	cvp->v_inode  = cip;
 
 #ifdef CONFIG_XFS_VNODE_TRACING
 	cvp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, KM_SLEEP);
@@ -522,7 +575,7 @@ fail_vfsop:
 	cvp->v_trace = NULL;
 #endif  /* CONFIG_XFS_VNODE_TRACING */
 
-	kfree(cvp->v_inode);
+	linvfs_destroy_inode(LINVFS_GET_IP(cvp));
 	return(NULL);
 }
 
@@ -661,7 +714,7 @@ linvfs_put_super(
 	ktrace_free(cvp->v_trace);
 	cvp->v_trace = NULL;
 #endif  /* CONFIG_XFS_VNODE_TRACING */
-	kfree(cvp->v_inode);
+	linvfs_destroy_inode(LINVFS_GET_IP(cvp));
 
 	/*  Do something to get rid of the VNODE/VFS layer here  */
 
@@ -895,6 +948,8 @@ STATIC struct dentry *linvfs_fh_to_dentry(
 
 
 static struct super_operations linvfs_sops = {
+	alloc_inode:		linvfs_alloc_inode,
+	destroy_inode:		linvfs_destroy_inode,
 	read_inode:		linvfs_read_inode,
 	write_inode:		linvfs_write_inode,
 #ifdef CONFIG_HAVE_XFS_DMAPI
@@ -925,9 +980,14 @@ static int __init init_xfs_fs(void)
 	static char message[] __initdata =
 		KERN_INFO "SGI XFS with " XFS_BUILD_OPTIONS " enabled\n";
 
-	error = pagebuf_init();
+	error = init_inodecache();
 	if (error < 0)
 		return error;
+
+	error = pagebuf_init();
+	if (error < 0)
+		goto out;
+
 	si_meminfo(&si);
 	xfs_physmem = si.totalram;
 
@@ -938,7 +998,14 @@ static int __init init_xfs_fs(void)
 	xfs_init(0);
 	xfs_grio_init();
 
-	return register_filesystem(&xfs_fs_type);
+	error = register_filesystem(&xfs_fs_type);
+	if (error)
+		goto out;
+	return 0;
+
+out:
+	destroy_inodecache();
+	return error;
 }
 
 
@@ -948,6 +1015,7 @@ static void __exit exit_xfs_fs(void)
 	xfs_cleanup();
         unregister_filesystem(&xfs_fs_type);
 	pagebuf_terminate();
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;
