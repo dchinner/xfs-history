@@ -72,8 +72,12 @@
 
 #ifdef CONFIG_XFS_DMAPI
 # define XFS_DMAPI_STRING	"dmapi support, "
+# define XFS_DM_INIT(fstype)	xfs_dm_init(fstype)
+# define XFS_DM_EXIT(fstype)	xfs_dm_exit(fstype)
 #else
 # define XFS_DMAPI_STRING
+# define XFS_DM_INIT(fstype)
+# define XFS_DM_EXIT(fstype)
 #endif
 
 #ifdef DEBUG
@@ -107,6 +111,9 @@ extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
 
 extern void xfs_flush_inode(struct xfs_inode *);
 extern void xfs_flush_device(struct xfs_inode *);
+
+extern void xfs_dm_init(struct file_system_type *);
+extern void xfs_dm_exit(struct file_system_type *);
 
 extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
 				struct block_device **);
