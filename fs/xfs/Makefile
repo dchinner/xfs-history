@@ -42,7 +42,7 @@ cmds: builddirs
 	echo "=== Making $@ `date`"
 	for d in $(COMMANDS); do \
 		( cd $(WORKAREA)/$$d && ./Makepkgs verbose ) || exit 1; \
-		( rpm -Uh $(WORKAREA)/$$d/build/rpm/*.$(ARCH).rpm ) || exit 1; \
+		( rpm -Uh --replacefiles --replacepkgs $(WORKAREA)/$$d/build/rpm/*.$(ARCH).rpm ) || exit 1; \
 	done
 	for d in $(COMMANDS); do \
 		( cd $(WORKAREA) && cp $$d/build/rpm/*.src.rpm SRPMS ) \
