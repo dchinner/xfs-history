@@ -140,10 +140,10 @@ xfs_chash_init(xfs_mount_t *mp)
 	int	i;
 
 	/*
-	 * m_chash size is based on m_ishash
-	 * with a minimum of 32 entries
+	 * m_chash size is based on m_ihash
+	 * with a minimum of 37 entries
 	 */
-	mp->m_chsize = (37*(mp)->m_sb.sb_agcount-1) /
+	mp->m_chsize = (XFS_BUCKETS(mp)) /
 		         (XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog);
 	if (mp->m_chsize < 37) {
 		mp->m_chsize = 37;

@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.58 $"
 
 /*
  * Inode allocation management for XFS.
@@ -1959,7 +1959,7 @@ xfs_inobt_get_rec(
 	__int32_t		*fcnt,	/* output: number of free inodes */
 	xfs_inofree_t		*free,	/* output: free inode mask */
 	int			*stat,	/* output: success/failure */
-        xfs_arch_t              arch)   /* output: architecture */
+        xfs_arch_t              arch)   /* input: architecture */
 {
 	xfs_inobt_block_t	*block;	/* btree block */
 	xfs_buf_t		*bp;	/* buffer containing btree block */
