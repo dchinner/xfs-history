@@ -59,6 +59,13 @@ typedef struct xfs_da_intnode {
 typedef struct xfs_da_node_hdr xfs_da_node_hdr_t;
 typedef struct xfs_da_node_entry xfs_da_node_entry_t;
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_DA_INTNODE)
+xfs_da_intnode_t *xfs_buf_to_da_intnode(struct buf *bp);
+#define	XFS_BUF_TO_DA_INTNODE(bp)	xfs_buf_to_da_intnode(bp)
+#else
+#define	XFS_BUF_TO_DA_INTNODE(bp) ((xfs_da_intnode_t *)((bp)->b_un.b_addr))
+#endif
+
 #define XFS_DA_NODE_ENTSIZE_BYNAME	/* space a name uses */ \
 	(sizeof(xfs_da_node_entry_t))
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_NODE_ENTRIES)
@@ -85,6 +92,10 @@ int xfs_lblog(struct xfs_mount *mp);
 #else
 #define	XFS_LBLOG(mp)	((mp)->m_sb.sb_blocklog)
 #endif
+
+/*
+ * Macros used by directory code to interface to the kernel
+ */
 
 /*
  * Macros used to manipulate directory off_t's
