@@ -529,7 +529,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 						     ip->i_broot_bytes);
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(new_broot, 1, new_size);
-		bcopy(op, np, new_max * (int)sizeof(xfs_bmbt_rec_t));	
+		bcopy(op, np, new_max * (int)sizeof(xfs_agblock_t));	
 	}
 	kmem_free(ip->i_broot, ip->i_broot_bytes);
 	ip->i_broot = new_broot;
