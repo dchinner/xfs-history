@@ -1,7 +1,7 @@
 #ifndef _XFS_HANDLE_H
 #define _XFS_HANDLE_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 
 /*
  *  Ok.  This file contains stuff that defines a general handle
@@ -51,6 +51,9 @@ int		vp_to_handle (vnode_t *vp, handle_t *handlep);
 int	path_to_handle		(char *path, void **hanp, size_t *hlen);
 int	path_to_fshandle	(char *path, void **hanp, size_t *hlen);
 int	fd_to_handle		(int	 fd, void **hanp, size_t *hlen);
+int	handle_to_fshandle	(void *hanp, size_t hlen, void **fshanp,
+				 size_t *fshlen);
+void	free_handle		(void *hanp, size_t hlen);
 int	open_by_handle		(void *hanp, size_t hlen, int rw);
 int	readlink_by_handle	(void *hanp, size_t hlen, void *buf, size_t bs);
 
