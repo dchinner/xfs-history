@@ -162,6 +162,7 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 #define	XFS_BMBT_KTRACE_ARGIK	7
 #define	XFS_BMBT_KTRACE_CUR	8
 
+#define	XFS_BMBT_KTRACE_SIZE	32	/* size of per-inode trace buffer */
 /*
  * Prototypes for xfs_bmap.c to call.
  */
