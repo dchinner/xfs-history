@@ -1,4 +1,4 @@
-#ident "$Revision: 1.194 $"
+#ident "$Revision: 1.197 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2326,6 +2326,7 @@ xfs_write_file(
 				if (uiop->uio_offset > ip->i_d.di_size) {
 					ip->i_d.di_size = uiop->uio_offset;
 					ip->i_update_core = 1;
+					ip->i_update_size = 1;
 					isize = uiop->uio_offset;
 				}
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -4003,6 +4004,7 @@ xfs_strat_write(
 				bp->b_error = error;
 				goto error0;
 			}
+
 			error = xfs_trans_commit(tp,
 						 XFS_TRANS_RELEASE_LOG_RES);
 			if (error) {
@@ -5055,6 +5057,7 @@ retry:
 							offset_this_req + 
 							bytes_this_req;
 						ip->i_update_core = 1;
+						ip->i_update_size = 1;
 					}
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				} else {
