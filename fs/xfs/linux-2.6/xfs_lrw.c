@@ -336,6 +336,10 @@ xfs_zero_last_block(
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		return error;
 	}
+	if (io->io_flags & XFS_IOCORE_RT) {
+		pb->pb_dev = mp->m_rtdev;
+	}
+
 	if ((imap.br_startblock > 0) &&
 	    (imap.br_startblock != DELAYSTARTBLOCK)) {
 		pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
@@ -1212,7 +1216,11 @@ _xfs_imap_to_bmap(
 		nisize = io->io_new_size;
 
 	for (im=0, pbm=0; im < imaps && pbm < pbmaps; im++,pbmapp++,imap++,pbm++) {
-
+		if (io->io_flags & XFS_IOCORE_RT) {
+			pbmapp->pbm_dev = mp->m_rtdev;
+		} else {
+			pbmapp->pbm_dev = mp->m_dev;
+		}
 		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
