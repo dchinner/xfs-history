@@ -323,7 +323,7 @@ xfs_getattr(vnode_t	*vp,
         vap->va_nodeid = ip->i_ino;
 
         if (vap->va_mask == (AT_FSID|AT_NODEID)) {
-		xfs_iunlock (ip, XFS_ILOCK_EXCL);
+		xfs_iunlock (ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
 
@@ -656,8 +656,7 @@ error_return:
 
 /*
  * xfs_access
- *
- * This is a stub.
+ * Null conversion from vnode mode bits to inode mode bits, as in efs.
  */
 STATIC int
 xfs_access(vnode_t	*vp,
@@ -665,7 +664,14 @@ xfs_access(vnode_t	*vp,
 	   int		flags,
 	   cred_t	*credp)
 {
-	return 0;
+	xfs_inode_t	*ip;
+	int		error;
+
+	ip = XFS_VTOI(vp);
+	xfs_ilock (ip, XFS_ILOCK_SHARED);
+	error = xfs_iaccess(ip, mode, credp);
+	xfs_iunlock (ip, XFS_ILOCK_SHARED);
+	return error;
 }
 
 /*
