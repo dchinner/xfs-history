@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.89 $"
+#ident "$Revision$"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -27,9 +27,10 @@
 
 #if defined(__linux__)
 #include <xfs_linux.h>
+#else
+#include <limits.h>
 #endif
 
-#include <limits.h>
 #ifdef SIM
 #define _KERNEL 1
 #endif

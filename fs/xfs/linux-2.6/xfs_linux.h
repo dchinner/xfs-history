@@ -76,18 +76,17 @@
 #include <linux/string.h>   /* to get memcpy, and friends */
 #endif
 
-/* #include <sys/syslog.h> */
-
 #include <asm/page.h>
 #include <asm/byteorder.h>
-#define _PAGESZ PAGE_SIZE
-// #include <asm/semaphore.h> */
-//#include <asm/spinlock.h>
+#define _PAGESZ		PAGE_SIZE
+#define NBPP		PAGE_SIZE 
+#define DPPSHFT		(PAGE_SHIFT - 9)
+#define NDPP		(1 << (PAGE_SHIFT - 9))
+#define dtop(DD)	(((DD) + NDPP - 1) >> DPPSHFT)
+#define dtopt(DD)	((DD) >> DPPSHFT)
+#define dpoff(DD)	((DD) & (NDPP-1))
 
 #include <sys/ksa.h>
-//#include <sys/uio.h>
-//#include <stdarg.h>
-//#include <time.h>
 
 
 /* sys/errno.h */
@@ -145,10 +144,7 @@ struct strbuf {
 
 #define DIOCGETVOLDEV	_DIOC_(36)	/* NEW: retrieve subvolume devices */
 
-#define NBPP _PAGESZ 
 
-/* sys/kt
-   ypes.h */
 typedef long int            irix5_off_t;
 
 

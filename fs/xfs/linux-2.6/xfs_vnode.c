@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -48,7 +48,6 @@
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
 #include <sys/pda.h>
-#include <sys/pfdat.h>
 #include <sys/sat.h>
 #include <sys/imon.h>
 #include <sys/cmn_err.h>
@@ -561,6 +560,7 @@ alloc:
 	/* We never free the vnodes in the simulator, so these don't
 	   get destroyed either */
 	init_mutex(&vp->v_filocksem, MUTEX_DEFAULT, "vfl", (long)vp);
+	spinlock_init(&vp->v_lock, "v_lock");
 	vp->v_mreg = vp->v_mregb = (struct pregion *)vp;
 
 gotit:
@@ -588,6 +588,7 @@ gotit:
 	vp->v_type = type;
 	vp->v_rdev = dev;
 	vp->v_next = vp->v_prev = vp;
+
 
 	return vp;
 }
@@ -1051,15 +1052,6 @@ vn_relink(
 	vlist->vl_prev = prev;
 	prev->v_next = (struct vnode *)vlist;
 }
-
-pfd_t *
-vnode_pfind(vnode_t *vp, pgno_t pgno, int acquire)
-{
-	printk("XFS: vnode_pfind NOT IMPLEMENTED\n");
-	return(NULL);
-}
-
-/*typedef void *ckpt_handle_t; */
 
 int
 lookupname(char *fnamep,                /* user pathname */

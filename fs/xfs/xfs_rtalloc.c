@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.54 $"
+#ident	"$Revision$"
 
 /*
  * Free realtime space allocation for XFS.
@@ -2704,7 +2704,7 @@ xfs_rtprint_range(
 {
 	xfs_extlen_t	i;		/* block number in the extent */
 
-	printf("%lld: ", start);
+	printf("%Ld: ", start);
 	for (i = 0; i < len; i++)
 		printf("%d", xfs_rtcheck_bit(mp, tp, start + i, 1));
 	printf("\n");
@@ -2731,13 +2731,13 @@ xfs_rtprint_summary(
 			(void)xfs_rtget_summary(mp, tp, l, i, &sumbp, &sb, &c);
 			if (c) {
 				if (!p) {
-					printf("%lld-%lld:", 1LL << l,
+					printf("%Ld-%Ld:", 1LL << l,
 						XFS_RTMIN((1LL << l) +
 							  ((1LL << l) - 1LL),
 							 mp->m_sb.sb_rextents));
 					p = 1;
 				}
-				printf(" %lld:%d", i, c);
+				printf(" %Ld:%d", i, c);
 			}
 		}
 		if (p)

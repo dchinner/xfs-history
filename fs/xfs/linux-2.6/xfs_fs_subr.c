@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision$"
 
 #include <xfs_linux.h>
 #include <sys/types.h>
@@ -44,7 +44,6 @@
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
 #include <sys/dirent.h>
-#include <sys/pfdat.h>
 #include <string.h>
 #include <limits.h>
 
@@ -311,7 +310,7 @@ fs_invalfree_pages(
 void
 fs_pages_sethole(
         bhv_desc_t	*bdp,
-	pfd_t		*pfd,
+	void		*pfd,
 	int		cnt,
 	int		doremap,
 	off_t		remap_offset)

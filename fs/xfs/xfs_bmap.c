@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.237 $"
+#ident	"$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -49,7 +49,6 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
-#include <sys/pfdat.h>
 #include <sys/ksa.h>
 #include <sys/sysinfo.h>
 #include <sys/cred.h>
@@ -4531,7 +4530,7 @@ xfs_bmap_read_extents(
 		if (i + num_recs > room) {
 			ASSERT(i + num_recs <= room);
 			xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-	"corrupt dinode %llu, (btree extents). Unmount and run xfs_repair.",
+	"corrupt dinode %Lu, (btree extents). Unmount and run xfs_repair.",
 			ip->i_ino);
 			goto error0;
 		}
@@ -6012,7 +6011,7 @@ xfs_check_block(
 					xfs_bmbt, block, j, dmxr);
 			}
 			if (*thispa == *pp) {
-				printk("xfs_check_block: thispa(%d) == pp(%d) %lld\n",
+				printk("xfs_check_block: thispa(%d) == pp(%d) %Ld\n",
 						j, i, *thispa);
 				panic("xfs_check_block: ptrs are equal in node\n");
 			}

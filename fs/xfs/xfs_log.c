@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.195 $"
+#ident	"$Revision$"
 
 /*
  * High level interface routines for log manager
@@ -1223,7 +1223,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	ASSERT(log->l_iclog_size >= 4096);
 	for (i=0; i < log->l_iclog_bufs; i++) {
 		*iclogp = (xlog_in_core_t *)
-			  kmem_zalloc(iclogsize, VM_CACHEALIGN);
+			  kmem_zalloc(iclogsize, KM_CACHEALIGN);
 
 
 		iclog = *iclogp;

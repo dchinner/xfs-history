@@ -17,7 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *									  *
  **************************************************************************/
-#ident "$Id: xfs_behavior.c,v 1.3 1999/09/10 18:00:00 cattelan Exp $"
+#ident "$Id$"
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized 
@@ -33,7 +33,6 @@
 #define	_KERNEL	1
 
 #include <sys/types.h>
-#include <sys/cpumask.h>
 #include <ksys/behavior.h>
 #include <sys/errno.h>
 #include <sys/kmem.h>

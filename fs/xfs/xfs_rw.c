@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.298 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -29,7 +29,6 @@
 #include <sys/vnode.h>
 #include <sys/cred.h>
 #include <sys/sysmacros.h>
-#include <sys/pfdat.h>
 #include <sys/uuid.h>
 #include <sys/major.h>
 #include <sys/grio.h>
@@ -467,7 +466,7 @@ debug_print_vnmaps(vnmap_t *vnmap, int numvnmaps, int vnmap_flags)
 
 	for (i = 0; i < numvnmaps; i++, vnmap++) {
 		cmn_err(CE_DEBUG,
-"vaddr = 0x%llx, len = 0x%llx, flags = 0x%x\n  ovvaddr = 0x%llx len = 0x%llx offset = %lld\n",
+"vaddr = 0x%Lx, len = 0x%Lx, flags = 0x%x\n  ovvaddr = 0x%Lx len = 0x%Lx offset = %Ld\n",
 			(uint64_t)vnmap->vnmap_vaddr,
 			(uint64_t)vnmap->vnmap_len,
 			vnmap->vnmap_flags,
@@ -476,7 +475,7 @@ debug_print_vnmaps(vnmap_t *vnmap, int numvnmaps, int vnmap_flags)
 			vnmap->vnmap_ovoffset);
 	}
 }
-#endif /* __linux__ */
+#endif
 #endif
 
 /*
@@ -690,7 +689,7 @@ xfs_retrieved(
  * This behavior is tied to the code in the VM/chunk cache (do_pdflush())
  * that will call here.
  */
-#if 1 /* !defined(__linux__) */
+#if !defined(__linux__) 
 STATIC int					/* error */
 xfs_iomap_extra(
 	xfs_iocore_t	*io,
@@ -4505,7 +4504,7 @@ xfs_overlap_bp(
  * Zero the given bp from data_offset from the start of it for data_len
  * bytes.
  */
-#if 1 /* !defined(__linux__) */
+#if !defined(__linux__) 
 STATIC void
 xfs_zero_bp(
 	xfs_buf_t	*bp,

@@ -17,13 +17,14 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident  "$Revision: 1.243 $"
+#ident  "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
+#else
+#include <limits.h>
 #endif
 
-#include <limits.h>
 #ifdef SIM
 #define _KERNEL	1
 #endif
@@ -31,7 +32,6 @@
 #include "xfs_buf.h"
 #include <sys/cred.h>
 #include <sys/vfs.h>
-#include <sys/pfdat.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
@@ -563,6 +563,9 @@ xfs_cmountfs(
         int             client = 0;
 	/*REFERENCED*/
 	int		noerr;
+#ifdef __linux__
+	extern linvfs_release_inode(struct inode *);
+#endif
 
 	/*
 	 * The new use of remout to update various cxfs parameters
@@ -583,6 +586,8 @@ xfs_cmountfs(
 	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
 	mp->m_ddev_targp = &mp->m_ddev_targ;
 	mp->m_rtdev = NODEV;
+	mp->m_rtdev_targ.inode = NULL;
+	mp->m_logdev_targ.inode = NULL;
 
 	/* Values are in BBs */
 	if ((ap != NULL) && (ap->version >= 2) && 
@@ -878,6 +883,7 @@ xfs_cmountfs(
 #ifdef __linux__
 	if (ldevvp) {
 		xfs_binval(mp->m_logdev_targ);
+		linvfs_release_inode(mp->m_logdev_targ.inode);
 	}
 #else
 	if (ldevvp) {
@@ -890,6 +896,7 @@ xfs_cmountfs(
 #ifdef __linux__
 	if (rdevvp) {
 		xfs_binval(mp->m_rtdev_targ);
+		linvfs_release_inode(mp->m_rtdev_targ.inode);
 	}
 #else
 	if (rdevvp) {
@@ -898,9 +905,10 @@ xfs_cmountfs(
 		VN_RELE(rdevvp);
 	}
 #endif /* __linux__ */
- #ifdef __linux__
+#ifdef __linux__
 	if (ddevvp) {
 		xfs_binval(mp->m_ddev_targ);
+		linvfs_release_inode(mp->m_ddev_targ.inode);
 	}
 #else
  error1:

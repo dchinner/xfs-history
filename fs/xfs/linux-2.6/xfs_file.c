@@ -95,8 +95,6 @@ static ssize_t linvfs_read(
 	vnode_t *vp;
 	int rv;
 	
-/* 	printk("ENTER linvfs_read\n"); */
-
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
 		printk("EXIT linvfs_read -EBADF\n");
@@ -107,7 +105,6 @@ static ssize_t linvfs_read(
 	vp = LINVFS_GET_VP(inode);
 
 	VOP_READ(vp, filp, buf, size, offset, rv);
-/* 	printk("EXIT  linvfs_read %d\n", rv); */
 	return(rv);
 }
 
@@ -250,10 +247,7 @@ struct file_operations linvfs_file_operations =
 	NULL,	 		/*  flush - called from close */
 	linvfs_release,		/* called on last close */
 	linvfs_fsync,
-	NULL,	 /*  fasync  */
-	NULL,	 /*  check_media_change  */
-	NULL,	/* revalidate */
-	NULL	/* lock */
+	NULL	 /*  fasync  */
 };
 
 struct file_operations linvfs_dir_operations = {
@@ -268,10 +262,7 @@ struct file_operations linvfs_dir_operations = {
 	NULL,	 /*  flush  */
 	linvfs_release,
 	linvfs_fsync,
-	NULL,	 /*  fasync  */
-	NULL,	 /*  check_media_change  */
-	NULL,	/* revalidate */
-	NULL	/* lock */
+	NULL	 /*  fasync  */
 };
 
 

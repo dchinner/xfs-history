@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.41 $"
+#ident "$Revision: 1.42 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include "xfs_buf.h"
@@ -368,10 +368,10 @@ xfs_qm_dqwarn(
 	}
 #ifdef QUOTADEBUG
 	if (d->d_iwarns)
-		printf("--------@@Inode warnings running : %llu >= %llu\n", 
+		printf("--------@@Inode warnings running : %Lu >= %Lu\n", 
 		       d->d_icount, d->d_ino_softlimit);
 	if (d->d_bwarns)
-		printf("--------@@Blks warnings running : %llu >= %llu\n",
+		printf("--------@@Blks warnings running : %Lu >= %Lu\n",
 		       d->d_bcount, d->d_blk_softlimit);
 #endif
 	return (warned);
@@ -1670,22 +1670,22 @@ xfs_qm_dqprint(xfs_dquot_t *dqp)
 	printf( "---- fs        =  0x%x\n", dqp->q_mount);
 	printf( "---- blkno     =  0x%x\n", (int) dqp->q_blkno);
 	printf( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);
-	printf( "---- blkhlimit	=  %llu (0x%x)\n", 
+	printf( "---- blkhlimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_blk_hardlimit,
 	       (int) dqp->q_core.d_blk_hardlimit);
-	printf( "---- blkslimit	=  %llu (0x%x)\n", 
+	printf( "---- blkslimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_blk_softlimit,
 	       (int)dqp->q_core.d_blk_softlimit);
-	printf( "---- inohlimit	=  %llu (0x%x)\n", 
+	printf( "---- inohlimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_ino_hardlimit,
 	       (int)dqp->q_core.d_ino_hardlimit);
-	printf( "---- inoslimit	=  %llu (0x%x)\n", 
+	printf( "---- inoslimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_ino_softlimit,
 	       (int)dqp->q_core.d_ino_softlimit);
-	printf( "---- bcount	=  %llu (0x%x)\n", 
+	printf( "---- bcount	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_bcount,
 	       (int)dqp->q_core.d_bcount);
-	printf( "---- icount	=  %llu (0x%x)\n", 
+	printf( "---- icount	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_icount,
 	       (int)dqp->q_core.d_icount);
 	printf( "---- btimer	=  %d\n", (int)dqp->q_core.d_btimer);

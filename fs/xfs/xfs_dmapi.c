@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.15 $"
+#ident "$Revision$"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -33,7 +33,6 @@
 #include <sys/kmem.h>
 #include <sys/ksa.h>
 #include <sys/param.h>
-#include <sys/pfdat.h>
 #include <sys/proc.h>
 #include <os/as/region.h>
 #include <sys/sysmacros.h>

@@ -15,7 +15,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  **************************************************************************/
-#ident	"$Revision: 1.114 $"
+#ident	"$Revision$"
 
 #define FSID_T
 #include <sys/types.h>
@@ -24,6 +24,7 @@
 #include <linux/kdb.h>
 
 #include <linux/xfs_to_linux.h>
+#include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/linux_to_xfs.h>
 
@@ -1967,7 +1968,7 @@ xfs_fmtuuid(uuid_t *uu)
 #ifndef __linux__
 	sprintf(rval, "%32x:%w32x:%w32x:%w32x", ip[0], ip[1], ip[2], ip[3]);
 #else
-	sprintf(rval, "%x:%x:%x:%x", ip[0], ip[1], ip[2], ip[3]);
+	sprintf(rval, "%32x:%32x:%32x:%32x", ip[0], ip[1], ip[2], ip[3]);
 #endif
 	return rval;
 }

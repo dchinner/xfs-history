@@ -1,4 +1,4 @@
-#ident "$Id: xfs_dfrag.c,v 1.7 1999/10/28 10:27:04 lord Exp $"
+#ident "$Id$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -13,7 +13,6 @@
 #include <sys/vnode.h>
 #include <sys/cred.h>
 
-#include <sys/immu.h>
 #include <sys/time.h>
 #include <sys/kabi.h>
 #include <ksys/vfile.h>

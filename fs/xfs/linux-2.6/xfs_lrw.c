@@ -31,9 +31,11 @@
 #undef  NODEV
 #include <linux/version.h>
 #include <linux/fs.h>
+#include <asm/uaccess.h>
 #include <linux/page_buf.h>
-#include <linux/linux_to_xfs.h>
 #include <linux/pagemap.h>
+
+#include <linux/linux_to_xfs.h>
 
 #include "xfs_buf.h"
 #include <ksys/behavior.h>
@@ -74,7 +76,6 @@
 #define XFS_WRITEIO_ALIGN(io,off)       (((off) >> io->io_writeio_log) \
                                                 << io->io_writeio_log)
 
-
 ssize_t
 xfs_rdwr(
 	bhv_desc_t	*bdp,
@@ -86,8 +87,6 @@ xfs_rdwr(
 {
 	ssize_t ret;
 	struct xfs_inode *xip;
-
-/* 	printk("ENTER xfs_rdwr %x %d %d\n", (unsigned int)filp, size, read); */
 
 	xip = XFS_BHVTOI(bdp);
 	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
@@ -102,13 +101,12 @@ xfs_rdwr(
 
 	if (read) {
 		ret = pagebuf_generic_file_read(filp, buf, size, offsetp); 
-/* 		ret = generic_file_read(filp, buf, size, offsetp); */
 	} else {
 		/* last zero eof */
-		ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
+		ret = pagebuf_generic_file_write(filp, buf, size, offsetp,
+					pagebuf_write_partial_page);
 	}
 out:
-/* 	printk("EXIT xfs_rdwr %d %d %X\n", read, ret, *offsetp); */
 	return(ret);
 }
 
@@ -135,7 +133,6 @@ xfs_read(
  */
 
 /* We don' want the IRIX poff */
-#undef poff
 #define poff(x) ((x) & (PAGE_SIZE-1))
 
 /* ARGSUSED */
@@ -184,8 +181,8 @@ xfs_zero_last_block(
 		struct page *page;
 		struct page ** hash;
 
-		hash = page_hash(ip, isize & PAGE_CACHE_MASK);
-		page = __find_page(ip, isize & PAGE_CACHE_MASK, *hash);
+		hash = page_hash(&ip->i_data, isize & PAGE_CACHE_MASK);
+		page = __find_lock_page(&ip->i_data, isize & PAGE_CACHE_MASK, hash);
 		if (page) {
 			memset((void *)page_address(page)+i, 0, PAGE_SIZE-i);
 
@@ -210,6 +207,7 @@ xfs_zero_last_block(
 						  &firstblock, 0, &imap,
 						  &nimaps, NULL);
 				if (error) {
+					clear_bit(PG_locked, &page->flags);
 					page_cache_release(page);
 					return error;
 				}
@@ -240,6 +238,7 @@ xfs_zero_last_block(
 				}
 #endif
 			}
+			clear_bit(PG_locked, &page->flags);
 			page_cache_release(page);
 		}
 	}
@@ -482,7 +481,7 @@ xfs_zero_eof(
 		/*
 		 * JIMJIM what about the real-time device
 		 */
-		printk("xfs_zero_eof: NEW CODE doing %lld starting at %d\n",
+		printk("xfs_zero_eof: NEW CODE doing %Ld starting at %d\n",
 			loff, lsize);
 
 		pb = pagebuf_get(ip, loff, lsize, 0);
@@ -586,7 +585,7 @@ xfs_write(
 
 	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
 	if (ret > 0 && *offsetp > xip->i_d.di_size) {
-		XFS_SETSIZE(mp, &(xip->i_iocore), *offsetp);
+		XFS_SETSIZE(mp, io, *offsetp);
 	}
 	xfs_rwunlock(bdp, VRWLOCK_WRITE);
 	return(ret);
@@ -598,11 +597,11 @@ xfs_write(
  */
 int
 xfs_bmap(bhv_desc_t	*bdp,
-		off_t		offset,
-		ssize_t		count,
-		int		flags,
-		pb_bmap_t	*pbmapp,
-		int		*npbmaps)
+	loff_t		offset,
+	ssize_t		count,
+	int		flags,
+	pb_bmap_t	*pbmapp,
+	int		*npbmaps)
 {
 	xfs_inode_t	*ip;
 	int		error;
@@ -671,9 +670,9 @@ _xfs_imap_to_bmap(
 		nisize = io->io_new_size;
 
 	for (i=0; i < maps; i++, pbmapp++, imap++) {
-/* 		printk("_xfs_imap_to_bmap %lld %lld %lld %d\n",
+/* 		printk("_xfs_imap_to_bmap %Ld %Ld %Ld %d\n",
 			imap->br_startoff, imap->br_startblock,
-			imap->br_blockcount, imap->br_state); */
+			imap->br_blockcount, imap->br_state);  */
 
 		pbmapp->pbm_offset = offset - XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp,imap->br_blockcount);
@@ -703,7 +702,7 @@ _xfs_imap_to_bmap(
 int
 xfs_iomap_read(
 	xfs_iocore_t	*io,
-	off_t		offset,
+	loff_t		offset,
 	size_t		count,
 	pb_bmap_t	*pbmapp,
 	int		*npbmaps,
@@ -726,16 +725,16 @@ xfs_iomap_read(
 
 	mp = io->io_mount;
 	nisize = io->io_new_size;
-/*	printk("nisize %d XFS_SIZE(mp, io) %d\n", nisize, XFS_SIZE(mp, io)); */
+/*	printk("nisize %Ld XFS_SIZE(mp, io) %Ld\n", nisize, XFS_SIZE(mp, io)); */
 	if (nisize < XFS_SIZE(mp, io)) {
 		nisize = XFS_SIZE(mp, io);
 	}
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = sizeof(imap) / sizeof(imap[0]);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)nisize));
-/*	printk("offset %d nisize %d\n", offset, nisize); */
+/*	printk("offset %Ld nisize %dL\n", offset, nisize); */
 	if (offset >= nisize) {
-		printk("xfs_iomap_read about to call EXTRA!! %lld %lld\n",
+		printk("xfs_iomap_read about to call EXTRA!! %Ld %Ld\n",
 			offset, nisize);
 		/*
 		 * The VM/chunk code is trying to map a page or part
@@ -789,7 +788,7 @@ xfs_iomap_read(
 STATIC int
 xfs_iomap_write(
 	xfs_iocore_t	*io,
-	off_t		offset,
+	loff_t		offset,
 	size_t		count,
 	pb_bmap_t	*pbmapp,
 	int		*npbmaps,
@@ -836,7 +835,6 @@ xfs_iomap_write(
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	count_fsb = last_fsb - offset_fsb;
 
-
 	/*
 	 * If we aren't converting delalloc, we are
 	 * looking to allocate (delay or otherwise).
@@ -878,7 +876,7 @@ xfs_iomap_write(
 		int eof;
 		xfs_fileoff_t new_last_fsb;
 		new_last_fsb = roundup(last_fsb, mp->m_dalign);
-		printk("xfs_iomap_write: about to XFS_BMAP_EOF %lld\n",
+		printk("xfs_iomap_write: about to XFS_BMAP_EOF %Ld\n",
 			new_last_fsb);
 		error = XFS_BMAP_EOF(mp, io, new_last_fsb, XFS_DATA_FORK, &eof);
 		if (error) {
@@ -1231,9 +1229,7 @@ int
 xfsbdstrat( struct xfs_mount 	*mp,
 			struct xfs_buf		*bp)
 {
-#if !defined(_USING_PAGEBUF_T)
   	int		dev_major = emajor(bp->b_edev);
-#endif
 
 	ASSERT(mp);
 	ASSERT(bp->b_target);

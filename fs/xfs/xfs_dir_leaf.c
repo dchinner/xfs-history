@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.73 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir_leaf.c
@@ -150,7 +150,7 @@ xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
 	if (XFS_TEST_ERROR(!ino_ok, mp, XFS_ERRTAG_DIR_INO_VALIDATE,
 			XFS_RANDOM_DIR_INO_VALIDATE)) {
 		xfs_fs_cmn_err(CE_WARN, mp,
-			"Invalid inode number 0x%llx\n", ino);
+			"Invalid inode number 0x%Lx\n", ino);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;

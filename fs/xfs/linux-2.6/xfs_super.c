@@ -179,7 +179,7 @@ int spectodevs(
 	return 0;
 }
 
-static struct inode_operations xfs_meta_ops = {
+static struct inode_operations linvfs_meta_ops = {
 	NULL,			/* default file-ops */
         NULL,                   /* create */
         NULL,                   /* lookup */
@@ -197,28 +197,30 @@ static struct inode_operations xfs_meta_ops = {
         NULL,                   /* bmap */
         NULL,                   /* truncate */
         NULL,                   /* permission */
-        NULL,                   /* smap */
         NULL,                   /* updatepage */
-        NULL,                   /* revalidate */
-	NULL,			/* pagebuf_bmap */
-	NULL			/* pagebuf_ioinitiate */
+        NULL                    /* revalidate */
 };
 
 struct inode *
 linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 {
-	struct inode *inode = (struct inode *)kern_malloc(sizeof(struct inode));
+	struct inode *inode = get_empty_inode();
 
 	inode->i_dev = kdev;
-	inode->i_op = &xfs_meta_ops;
-	inode->i_pages = NULL;
-	inode->i_nrpages = 0;
+	inode->i_op = &linvfs_meta_ops;
 	inode->i_sb = sb;
 
 	pagebuf_lock_enable(inode);
 
 	return inode;
 }
+
+linvfs_release_inode(struct inode *inode)
+{
+	pagebuf_lock_disable(inode);
+	iput(inode);
+}
+
 
 struct super_block *
 linvfs_read_super(
@@ -239,7 +241,6 @@ linvfs_read_super(
 	int		error, locked = 1;
 	statvfs_t	statvfs;
 	vattr_t		attr;
-	dev_t		dev;
 	u_int		disk, partition;
 
 	MOD_INC_USE_COUNT;
@@ -346,11 +347,6 @@ linvfs_read_super(
 	if (error)
 		goto fail_unmount;
 
-/***
-	sb->s_blocksize = statvfs.f_bsize;
-	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
-	set_blocksize(sb->s_dev, sb->s_blocksize);
-***/
 	sb->s_magic = XFS_SB_MAGIC;
 	sb->s_dirt = 1;  /*  Make sure we get regular syncs  */
 	LINVFS_SET_VFS(sb, vfsp);
@@ -366,7 +362,6 @@ linvfs_read_super(
 		goto fail_vnrele;
 
 	ino = (unsigned long) attr.va_nodeid;
-	sb->s_dev = dev;
 	sb->s_op = &linvfs_sops;
 	unlock_super(sb);
 	locked = 0;
@@ -430,13 +425,7 @@ linvfs_read_inode(
 	else if (S_ISLNK(inode->i_mode))
 		inode->i_op = &linvfs_symlink_inode_operations;
 	else if (S_ISBLK(inode->i_mode))
-		inode->i_op = &blkdev_inode_operations;
-	else if (S_ISCHR(inode->i_mode))
-		inode->i_op = &chrdev_inode_operations;
-	else if (S_ISFIFO(inode->i_mode))
-		init_fifo(inode);
-	else
-		panic("XFS:  unknown file type:  %d\n", inode->i_mode);
+		init_special_inode(inode, inode->i_mode, inode->i_rdev);
 }
 
 
@@ -654,6 +643,7 @@ int __init init_xfs_fs(void)
   si_meminfo(&si);
 
   physmem = btoc(si.totalram);
+
   cred_init();
 #if !defined(_USING_PAGEBUF_T)
   binit();

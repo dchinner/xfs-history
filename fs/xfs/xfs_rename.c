@@ -1,4 +1,4 @@
-#ident "$Revision: 1.15 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -513,7 +513,7 @@ xfs_rename_ancestor_check(
 			break;
 		}
 		if (parent_ino == ip->i_ino) {
-			prdev("Directory inode %lld has bad parent link",
+			prdev("Directory inode %Ld has bad parent link",
                               ip->i_dev, ip->i_ino);
                         error = XFS_ERROR(ENOENT);
                         break;

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.433 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -41,7 +41,6 @@
 #include <sys/uuid.h>
 #include <sys/unistd.h>
 #include <sys/grio.h>
-#include <sys/pfdat.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/dmi.h>
@@ -2360,7 +2359,7 @@ xfs_lookup(
 	 * If vnode is a device return special vnode instead.
 	 */
 	if (ISVDEV(vp->v_type)) {
-		newvp = spec_vp(vp, vp->v_rdev, vp->v_type, credp);
+		newvp = (vnode_t *)spec_vp(vp, vp->v_rdev, vp->v_type, credp);
 		VN_RELE(vp);
 		if (newvp == NULL) {
 			return XFS_ERROR(ENOSYS);
@@ -2928,7 +2927,7 @@ xfs_create_new(
          * If vnode is a device, return special vnode instead.
          */
         if (ISVDEV(vp->v_type)) {
-                newvp = spec_vp(vp, vp->v_rdev, vp->v_type, credp);
+                newvp = (vnode_t *)spec_vp(vp, vp->v_rdev, vp->v_type, credp);
                 VN_RELE(vp);
                 if (newvp == NULL) {
 			error = XFS_ERROR(ENOSYS);
@@ -3006,7 +3005,7 @@ xfs_create_broken(
 	uint dir_unlocked)
 {
 	cmn_err(CE_WARN,
-		"xfs_create looping, dir ino 0x%llx, ino 0x%llx, %s\n",
+		"xfs_create looping, dir ino 0x%Lx, ino 0x%Lx, %s\n",
 		dp->i_ino, e_inum_saved, mp->m_fsname);
 #ifdef SIM
 	abort();
@@ -3220,7 +3219,7 @@ xfs_create_exists(
 	 * If vnode is a device, return special vnode instead.
 	 */
 	if (ISVDEV(vp->v_type)) {
-		newvp = spec_vp(vp, vp->v_rdev, vp->v_type, credp);
+		newvp = (vnode_t *)spec_vp(vp, vp->v_rdev, vp->v_type, credp);
 
 		VN_RELE(vp);
 		if (newvp == NULL)

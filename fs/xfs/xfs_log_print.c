@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -24,6 +24,7 @@
  */
 #ifdef SIM
 #define _KERNEL 1
+#define __KERNEL__ 1
 #endif
 
 #include <sys/types.h>
@@ -37,6 +38,7 @@
 
 #ifdef SIM
 #undef _KERNEL
+#undef __KERNEL__
 #include <bstring.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,7 +120,7 @@ xlog_print_find_oldest(
 		return 0;
 
 	first_blk = 0;		/* read first block */
-	bp = xlog_get_bp(1);
+	bp = xlog_get_bp(1, log->l_mp);
 	xlog_bread(log, 0, 1, bp);
 	first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
 	*last_blk = log->l_logBBsize-1;	/* read last block */
@@ -257,7 +259,7 @@ xlog_recover_print_buffer(
 		break;
 	} 
 	if (f->blf_type == XFS_LI_BUF) {
-		printf("#regs:%d   start blkno:0x%llx   len:%d   bmap size:%d\n",
+		printf("#regs:%d   start blkno:0x%Lx   len:%d   bmap size:%d\n",
 		       f->blf_size, f->blf_blkno, f->blf_len, f->blf_map_size);
 		blkno = (daddr_t)f->blf_blkno;
 	} else {
@@ -275,9 +277,9 @@ xlog_recover_print_buffer(
 		if (blkno == 0) { /* super block */
 			printf("	SUPER Block Buffer:\n");
 			if (!print_buffer) continue;
-			printf("		icount:%lld  ifree:%lld  ",
+			printf("		icount:%Ld  ifree:%Ld  ",
 			       *(long long *)(p), *(long long *)(p+8));
-			printf("fdblks:%lld  frext:%lld\n",
+			printf("fdblks:%Ld  frext:%Ld\n",
 			       *(long long *)(p+16),
 			       *(long long *)(p+24));
 			printf("		sunit:%u  swidth:%u\n", 
@@ -358,7 +360,7 @@ xlog_recover_print_dquot(
 	ASSERT(f);
 	ASSERT(f->qlf_len == 1);
 	d = (xfs_disk_dquot_t *)item->ri_buf[1].i_addr;
-	printf("\tDQUOT: #regs:%d  blkno:%lld  boffset:%u id: %d\n",
+	printf("\tDQUOT: #regs:%d  blkno:%Ld  boffset:%u id: %d\n",
 	       f->qlf_size, f->qlf_blkno, f->qlf_boffset, f->qlf_id);
 	if (!print_quota)
 		return;
@@ -392,7 +394,7 @@ xlog_recover_print_inode_core(
 	       di->di_uid, di->di_gid, di->di_nlink, (uint)di->di_projid);
 	printf("		atime:%d  mtime:%d  ctime:%d\n",
 	       di->di_atime.t_sec, di->di_mtime.t_sec, di->di_ctime.t_sec);
-	printf("		size:0x%llx  nblks:0x%llx  exsize:%d  nextents:%d"
+	printf("		size:0x%Lx  nblks:0x%Lx  exsize:%d  nextents:%d"
 	       "  anextents:%d\n",
 	       di->di_size, di->di_nblocks, di->di_extsize, di->di_nextents,
 	       (int)di->di_anextents);
@@ -415,7 +417,7 @@ xlog_recover_print_inode(
 
 	f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
 	ASSERT(item->ri_buf[0].i_len == sizeof(xfs_inode_log_format_t));
-	printf("	INODE: #regs:%d   ino:0x%llx  flags:0x%x   dsize:%d\n",
+	printf("	INODE: #regs:%d   ino:0x%Lx  flags:0x%x   dsize:%d\n",
 	       f->ilf_size, f->ilf_ino, f->ilf_fields, f->ilf_dsize);
 
 	/* core inode comes 2nd */
@@ -534,12 +536,12 @@ xlog_recover_print_efd(
 	ASSERT(item->ri_buf[0].i_len == 
 	       sizeof(xfs_efd_log_format_t) + sizeof(xfs_extent_t) *
 	       (f->efd_nextents-1));
-	printf("	EFD:  #regs: %d    num_extents: %d  id: 0x%llx\n",
+	printf("	EFD:  #regs: %d    num_extents: %d  id: 0x%Lx\n",
 	       f->efd_size, f->efd_nextents, f->efd_efi_id);
 	ex = f->efd_extents;
 	printf("	");
 	for (i=0; i < f->efd_size; i++) {
-		printf("(s: 0x%llx, l: %d) ", ex->ext_start, ex->ext_len);
+		printf("(s: 0x%Lx, l: %d) ", ex->ext_start, ex->ext_len);
 		if (i % 4 == 3)
 			printf("\n");
 		ex++;
@@ -566,12 +568,12 @@ xlog_recover_print_efi(
 	       sizeof(xfs_efi_log_format_t) + sizeof(xfs_extent_t) *
 	       (f->efi_nextents-1));
 	
-	printf("	EFI:  #regs:%d    num_extents:%d  id:0x%llx\n",
+	printf("	EFI:  #regs:%d    num_extents:%d  id:0x%Lx\n",
 	       f->efi_size, f->efi_nextents, f->efi_id);
 	ex = f->efi_extents;
 	printf("	");
 	for (i=0; i< f->efi_nextents; i++) {
-		printf("(s: 0x%llx, l: %d) ", ex->ext_start, ex->ext_len);
+		printf("(s: 0x%Lx, l: %d) ", ex->ext_start, ex->ext_len);
 		if (i % 4 == 3) printf("\n");
 		ex++;
 	}

@@ -775,7 +775,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-#ifdef SIM
+#if defined(SIM) || defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
 	if (return_address == NULL)
@@ -788,7 +788,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 			mraccessf(&ip->i_iolock, PLTWAIT);
 		}
 	}
-#ifndef SIM
+#if !defined(SIM) && !defined(__linux__)
 	else {
 #pragma mips_frequency_hint NEVER
 		ASSERT(XFST_ISNESTED_ENABLED());
@@ -796,10 +796,10 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 			XFST_NESTED_INCR();
 		else
 			cmn_err(CE_PANIC,
-				"i/o lock recursion loop, inode 0x%llx",
+				"i/o lock recursion loop, inode 0x%Lx",
 				(uint64_t) ip);
 	}
-#endif /* !SIM */
+#endif /* !SIM && !__linux__ */
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		mrupdatef(&ip->i_lock, PLTWAIT);
 		ip->i_ilock_ra = return_address;
@@ -849,7 +849,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-#ifdef SIM
+#if defined(SIM) || defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
 
@@ -867,7 +867,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			}
 		}
 	}
-#ifndef SIM
+#if !defined(SIM) && !defined(__linux__)
 	else {
 #pragma mips_frequency_hint NEVER
 		ASSERT(XFST_ISNESTED_ENABLED());
@@ -876,7 +876,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			iolock_recursive = 1;
 		} else
 			cmn_err(CE_PANIC,
-				"i/o lock recursion loop, inode 0x%llx",
+				"i/o lock recursion loop, inode 0x%Lx",
 				(uint64_t) ip);
 	}
 #endif /* !SIM */
@@ -885,8 +885,11 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 		if (!ilocked) {
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
-			} else if (iolock_recursive)
+			}
+#ifndef __linux__
+			else if (iolock_recursive)
 				XFST_NESTED_DECR();
+#endif
 			return 0;
 		}
 		ip->i_ilock_ra = (inst_t *) __return_address;
@@ -895,8 +898,11 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 		if (!ilocked) {
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
-			} else if (iolock_recursive)
+			}
+#ifndef __linux__
+			else if (iolock_recursive)
 				XFST_NESTED_DECR();
+#endif
 			return 0;
 		}
 	}
@@ -933,7 +939,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~(XFS_LOCK_MASK | XFS_IUNLOCK_NONOTIFY)) == 0);
 	ASSERT(lock_flags != 0);
-#ifdef SIM
+#if defined(SIM) || defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
 
@@ -946,7 +952,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 			mrunlock(&ip->i_iolock);
 		}
 	}
-#ifndef SIM
+#if !defined(SIM) && !defined(__linux__)
 	else {
 #pragma mips_frequency_hint NEVER
 		ASSERT_ALWAYS(XFST_ISNESTED_ENABLED());
@@ -996,7 +1002,9 @@ xfs_ilock_demote(xfs_inode_t	*ip,
 		mrdemote(&ip->i_lock);
 	}
 	if (lock_flags & XFS_IOLOCK_EXCL) {
+#ifndef __linux__
 		ASSERT(!XFST_ISNESTED_USED());
+#endif
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE));
 		mrdemote(&ip->i_iolock);
 	}

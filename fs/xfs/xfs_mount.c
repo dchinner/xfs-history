@@ -1,10 +1,11 @@
-#ident	"$Revision: 1.200 $"
+#ident	"$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
+#else
+#include <limits.h>
 #endif
 
-#include <limits.h>
 #ifdef SIM
 #define _KERNEL	1
 #endif /* SIM */
@@ -1026,7 +1027,7 @@ xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	/* REFERENCED */
 	int		unused;
 
-#if !defined(__linux__)		
+#if !defined(__linux__)	|| defined(SIM)
 #ifndef SIM
 	spec_unmounted(mp->m_ddevp);
 #endif
@@ -1042,6 +1043,19 @@ xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	if (mp->m_logdevp && mp->m_logdevp != mp->m_ddevp) {
 		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, cr, unused);
 		VN_RELE(mp->m_logdevp);
+	}
+#else
+	extern void	linvfs_release_inode(struct inode *);
+
+	if (mp->m_ddev_targ.inode) {
+		linvfs_release_inode(mp->m_ddev_targ.inode);
+	}
+	if (mp->m_rtdev_targ.inode) {
+		linvfs_release_inode(mp->m_rtdev_targ.inode);
+	}
+	if (mp->m_logdev_targ.inode &&
+	    mp->m_logdev_targ.inode != mp->m_ddev_targ.inode) {
+		linvfs_release_inode(mp->m_logdev_targ.inode);
 	}
 #endif
 }

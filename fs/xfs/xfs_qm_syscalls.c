@@ -1,11 +1,10 @@
-#ident "$Revision: 1.31 $"
+#ident "$Revision: 1.32 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include "xfs_buf.h"
 #include <sys/ksa.h>
 #include <sys/vnode.h>
-#include <sys/pfdat.h>
 #include <sys/uuid.h>
 #include <sys/capability.h>
 #include <sys/cred.h>
@@ -1351,10 +1350,10 @@ xfs_qm_dqtest_print(
 	printf( "---- type      =  %s\n", XFS_QM_ISUDQ(d) ? "USR" :
 	       "PRJ");
 	printf( "---- fs        =  0x%x\n", d->q_mount);
-	printf( "---- bcount	=  %llu (0x%x)\n", 
+	printf( "---- bcount	=  %Lu (0x%x)\n", 
 	       d->d_bcount,
 	       (int)d->d_bcount);
-	printf( "---- icount	=  %llu (0x%x)\n", 
+	printf( "---- icount	=  %Lu (0x%x)\n", 
 	       d->d_icount,
 	       (int)d->d_icount);
 	printf( "---------------------------\n");

@@ -30,7 +30,9 @@
 #include <sys/buf.h>
 #include <sys/sema.h>
 #include <sys/kmem.h>
+#ifndef SIM
 #include <linux/page_buf.h>
+#endif
 
 typedef struct buf xfs_buf_t;
 #define xfs_buf buf

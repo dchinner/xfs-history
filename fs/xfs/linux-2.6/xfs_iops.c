@@ -440,169 +440,12 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	return base;
 }
 
-/*
- * The following is used to get a list of blocks of the given
- * size from a pagebuf_bmap_t returned by VOP_BMAP.
- */
 
-static void
-_linvfs_set_blocks(
-	int		*blocks,	/* Array of blocknos to fill in */
-	int		nblocks,	/* number of elms in blocks array */
-	pb_bmap_t	*pbmap,		/* mappings of blocks (big for XFS) */
-	int		npbmaps,	/* number of pbmap entries */
-	int		block_bits,	/* bits (max size) of blocks e.g. 9 for 512 */
-	ssize_t		blocksize)	/* size of block */
-{
-	int i, *p, bmaps, blockno;
-
-	i = nblocks;
-        p = blocks;
-
-	/* Zero out all the blocks, first */
-	while(i) {
-		*p++ = 0;
-		i--;
-	}
-
-        i = nblocks;
-	p = blocks;
-
-	/*
-	 * We need to walk the bmaps to cover the case where this page
-	 * spans extents.
-	 */
-
-	for(bmaps = 0; bmaps < npbmaps && i; bmaps++, pbmap++) {
-
-		/*
-		 * While we have room in this bmap, bump the block number if real.
-		 * If the block number is a hole or unwritten, make the blockno 0.
-		 * This will cause a clearing of the associated memory.
-		 */
-		while(pbmap->pbm_bsize && i) {
-			blockno = (long)pbmap->pbm_bn;
-			if (pbmap->pbm_flags & (PBMF_HOLE|PBMF_UNWRITTEN)) {
-				printk("_linvfs_set_blocks have HOLE or UNWRITTEN\n");
-				blockno = 0;
-			} else if (pbmap->pbm_offset) {
-				if ( pbmap->pbm_offset % blocksize) {
-					printk("_linvfs_set_blocks: this shouldn't happen %lld %d!\n",
-					   pbmap->pbm_offset, blocksize);
-				}
-				blockno += pbmap->pbm_offset >> block_bits;
-				pbmap->pbm_offset = 0;
-				pbmap->pbm_bn = blockno;
-			}
-
-			*p = blockno;
-			p++;
-			i--;
-			if (pbmap->pbm_bn > 0) {
-				pbmap->pbm_bn++;
-			}
-			pbmap->pbm_bsize -= blocksize;
-		}
-        }
-	return;
-}
-
-
-int linvfs_readpage(struct file *filp, struct page *page)
-{
-	int rval;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	struct dentry	*dentry = filp->f_dentry;
-	struct inode	*inode = dentry->d_inode;
-	vnode_t		*vp;
-	int		nr[PAGE_SIZE/512];
-#define LINBMAP_MAX 4
-	pb_bmap_t	pbmap[LINBMAP_MAX], *pbmapp = &pbmap[0];
-	int		npbmaps = LINBMAP_MAX, map, pgoff, sz;
-	int		error;
-
-	atomic_inc(&page->count);
-	set_bit(PG_locked, &page->flags);
-	set_bit(PG_free_after, &page->flags);
-	
-	vp = LINVFS_GET_VP(inode);
-
-	VOP_RWLOCK(vp, VRWLOCK_READ);
-	VOP_BMAP(vp, page->offset, PAGE_SIZE, B_READ, pbmapp, &npbmaps, error);
-	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-
-	if (error) {
-		set_bit(PG_error, &page->flags);
-		clear_bit(PG_locked, &page->flags);
-		atomic_dec(&page->count);
-		return -EIO;
-	}
-
-	/*
-	 * While the page isn't done, move through the mappings either zero'ing
-	 * out or reading real blocks. This will usually just deal with one
-	 * one mapping, but ...
-	 */
-
-	pgoff = 0;
-	sz = PAGE_SIZE;
-	map = 0;
-	while(sz > 0 && map < npbmaps) {
-		int msize;
-
-		if (pgoff) {
-			printk("linvfs_readpage: iterating?? JIMJIM remove me %d\n",
-				pgoff);
-		}
-		pbmapp = &pbmap[map];
-		msize = pbmapp->pbm_bsize - pbmapp->pbm_offset;
-		if (msize > (PAGE_SIZE - pgoff)) {
-			msize = PAGE_SIZE - pgoff;
-		}
-
-		if (pbmapp->pbm_flags & (PBMF_HOLE|PBMF_UNWRITTEN)) {
-			memset((void *)(page_address(page) + pgoff), 0, msize);
-			set_bit(PG_uptodate, &page->flags);
-			clear_bit(PG_locked, &page->flags);
-			wake_up(&page->wait);
-			rval = 0;
-		} else {
-			_linvfs_set_blocks(nr, PAGE_SIZE/512, pbmapp, npbmaps - map,
-				inode->i_sb->s_blocksize_bits, inode->i_sb->s_blocksize);
-	
-			/* IO start */
-			rval = brw_page(READ, page, inode->i_dev, nr,
-				inode->i_sb->s_blocksize, 1);
-		}
-		sz -= msize;
-		pgoff += msize;
-		if (msize == pbmapp->pbm_bsize - pbmapp->pbm_offset) {
-			map++;
-		}
-	}
-#else
-	rval = block_read_full_page(filp, page);
-#endif
-	return(rval);
-}
-
-int linvfs_writepage(struct file *filp, struct page *page)
-{
-	int rval;
-	rval = -ENOSYS;
-	printk("linvfs_writepage: NOT IMPLEMENTED\n");
-	return(rval);
-}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-int linvfs_bmap(struct inode *inode, int block)
-#else
 int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_result, int create)
-#endif
 {
 	vnode_t		*vp;
 	int		block_shift = inode->i_sb->s_blocksize_bits;
-	off_t		offset = block << block_shift;
+	loff_t		offset = block << block_shift;
 	ssize_t		count = inode->i_sb->s_blocksize;
 	pb_bmap_t	pbmap;
 	int		npbmaps = 1;
@@ -630,18 +473,14 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	if (blockno < 0) return 0;
 	if (pbmap.pbm_offset) {
 		if ( pbmap.pbm_offset % count) {
-			printk("linvfs_bmap: this shouldn't happen %lld %d!\n",
+			printk("linvfs_bmap: this shouldn't happen %Ld %d!\n",
 				pbmap.pbm_offset,
 				count);
 		}
 		blockno += pbmap.pbm_offset >> block_shift;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	return(blockno >> (block_shift - 9));
-#else
 	if (!create) {
-		bh_result->b_dev = inode->i_dev;
 		bh_result->b_blocknr = blockno >> (block_shift - 9);
 		bh_result->b_state |= (1UL << BH_Mapped);
 
@@ -649,103 +488,6 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	}
 
 	return -EIO;
-#endif
-}
-
-/*
- * JIMJIM have linvfs_updatepage use a new VOP if we are going to keep it
- * around. We might just want to use _pagebuf_file_write and the bmap, ...
- * instead of having this interface.
- */
-
-int
-linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
-	unsigned long offset, unsigned int bytes, int sync)
-{
-	vnode_t		*vp;
-	struct dentry	*dentry = filp->f_dentry;
-	struct inode	*inode = dentry->d_inode;
-	unsigned	long block;
-	int		*p, nr[PAGE_SIZE/512], error;
-	int		wrote = 0, status, i, bmaps, block_bits;
-	pb_bmap_t	pbmap[2];
-	int		npbmaps = 2;
-	long		blockno;
-
-	/* printk("linvfs_updatepage(%s/%s %d@%ld, sync=%d)\n",
-		dentry->d_parent->d_name.name, dentry->d_name.name,
-		bytes, page->offset+offset, sync); */
-	
-	vp = LINVFS_GET_VP(inode);
-
-	VOP_BMAP(vp, page->offset, offset+bytes, B_WRITE,
-		(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
-	if (error)
-		return -EIO;
-
-	atomic_inc(&page->count);
-
-        set_bit(PG_locked, &page->flags);
-        set_bit(PG_free_after, &page->flags);
-
-	_linvfs_set_blocks(nr, PAGE_SIZE/512, &pbmap[0], npbmaps,
-		inode->i_sb->s_blocksize_bits, inode->i_sb->s_blocksize);
-
-	/* bytes can't be more than one page. */
-	ASSERT(bytes <= PAGE_CACHE_SIZE);
-
-	/*
-	 * Clear the page up to starting offset in the page we
-	 * are updating if that offset is beyond EOF.
-	 * Otherwise, it has good data. We need to skip any good
-	 * data within the page, too.
-	 */
-
-	if (offset && ((page->offset+offset) > inode->i_size)) {
-		int good_bytes;
-
-		/*
-		 * Figure out how many bytes in the page are within
-		 * the file and don't zero those.
-		 */
-		if (inode->i_size > page->offset) {
-			good_bytes = inode->i_size - page->offset;
-		} else {
-			good_bytes = 0;
-		}
-
-		if (good_bytes >= PAGE_SIZE) {
-			printk("linvfs_updatepage: NEW CODE no clear, good bytes %d\n",
-				good_bytes);
-		} else {
-			memset((void *)(page_address(page)+good_bytes), 0, offset);
-		}
-	}
-
-	/* Copy down the user's data */
-	bytes -= copy_from_user((unsigned long *)(page_address(page) + offset),
-						buf, bytes);
-	
-
-out_error:
-	if (!bytes) {
-		wrote = -EFAULT;
-		clear_bit(PG_locked, &page->flags);
-		clear_bit(PG_uptodate, &page->flags);
-		goto out;
-	}
-
-	/* Now, write out the page to the right spot */
-	status = brw_page(WRITE, page, inode->i_dev, nr, inode->i_sb->s_blocksize, 1);
-
-	if (status < 0) /* Return error below if this failed */
-		wrote = status;
-	else
-		wrote = bytes;
-
-out:
-	wake_up(&page->wait);
-	return(wrote); /* The amount written */
 }
 
 /* Brute force approach for now - copy data into linux inode
@@ -781,7 +523,7 @@ int linvfs_revalidate(struct dentry *dentry)
 int
 linvfs_pb_bmap(struct inode *inode, 
 			   loff_t offset,
-			   size_t count,
+			   ssize_t count,
 			   pb_bmap_t *pbmapp,
 			   int maxpbbm, 
 			   int *retpbbm, 
@@ -836,22 +578,11 @@ struct inode_operations linvfs_file_inode_operations =
   NULL,	 /*  rename  */
   NULL,	 /*  readlink  */
   NULL,	 /*  follow_link  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-  linvfs_readpage,
-  linvfs_writepage,
-  linvfs_bmap,
-#else
   linvfs_get_block,
-  linvfs_readpage,
-  linvfs_writepage,
-  block_flushpage,
-#endif
+  pagebuf_read_full_page,
+  pagebuf_write_full_page,
   NULL,	 /*  truncate  */
   NULL,  /*  permission  */
-  NULL,	 /*  smap  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-  linvfs_updatepage,  /*  updatepage  */
-#endif
   linvfs_revalidate,
   linvfs_pb_bmap
 };
@@ -875,7 +606,6 @@ struct inode_operations linvfs_dir_inode_operations =
   NULL,	 /*  bmap  */
   NULL,	 /*  truncate  */
   NULL,  /*  permission  */
-  NULL,  /*  smap  */
   NULL,  /*  updatepage  */
   linvfs_revalidate
 };
@@ -899,7 +629,6 @@ struct inode_operations linvfs_symlink_inode_operations =
   NULL,	 /*  bmap  */
   NULL,	 /*  truncate  */
   NULL,	 /*  permission  */
-  NULL,	 /*  smap  */
   NULL,  /*  updatepage  */
   linvfs_revalidate
 };

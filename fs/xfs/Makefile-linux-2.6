@@ -9,8 +9,8 @@
 #CFLAGS := $(filter-out -Wall,$(CFLAGS))
 EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -Wno-parentheses \
                 -Wno-uninitialized -I./linux -I./pseudo-inc -I. -D_KERNEL \
-		-funsigned-char
-		
+		-funsigned-char 
+
 # -DDEBUG -DXFSDEBUG
 
 ALL_SUB_DIRS = linux
@@ -19,7 +19,7 @@ SUB_DIRS = ${ALL_SUB_DIRS}
 
 O_TARGET := xfs.o
 
-xfs.o:	sub_dirs
+xfs.o:	links sub_dirs
 
 ifeq ($(CONFIG_XFS_FS),m)
   M_OBJS   := $(O_TARGET)
@@ -103,6 +103,7 @@ O_OBJS += linux/linux_xfs.o
 
 
 include $(TOPDIR)/Rules.make
+
 
 links:  $(FS_LINKS) $(FOO_LINKS) #sys ksys fs 
 

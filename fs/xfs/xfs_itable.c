@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.70 $"
+#ident	"$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #include <sys/sysmacros.h>
@@ -28,7 +28,6 @@
 #include <sys/vnode.h>
 #include <sys/systm.h>
 #include <sys/sema.h>
-#include <sys/immu.h>
 #include <sys/kmem.h>
 #include <sys/time.h>
 #include <sys/debug.h>
