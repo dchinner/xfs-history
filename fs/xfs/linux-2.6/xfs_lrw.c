@@ -388,10 +388,6 @@ xfs_zero_last_block(
 		pagebuf_rele(pb);
 		goto out_lock;
 	}
-	if (error = pagebuf_iostart(pb, PBF_WRITE)) {
-		pagebuf_rele(pb);
-		goto out_lock;
-	}
 
 	/*
 	 * We don't want to start a transaction here, so don't
@@ -408,8 +404,11 @@ xfs_zero_last_block(
 
 	if (imap.br_startblock == DELAYSTARTBLOCK ||
 	    imap.br_state == XFS_EXT_UNWRITTEN) {
-		printk("xfs_zero_last_block: We want DELWRI? not waiting?\n");
-		/* XFS_bdwrite(bp);*/
+		/** XFS_bdwrite(bp); **/
+	} else {
+		XFS_BUF_WRITE(pb);
+		XFS_BUF_ASYNC(pb);
+		XFS_bwrite(pb);
 	}
 
 out_lock:
@@ -601,14 +600,14 @@ xfs_zero_eof(
 				pagebuf_rele(pb);
 				goto out_lock;
 			}
-			if (error = pagebuf_iostart(pb, PBF_WRITE)) {
-				pagebuf_rele(pb);
-				goto out_lock;
-			}
 			if (imap.br_startblock == DELAYSTARTBLOCK ||
 			    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
 				dprintk(xfs_zeof_debug,
 					("xfs_zero_eof: need to allocate? delwri\n"));
+			} else {
+				XFS_BUF_WRITE(pb);
+				XFS_BUF_ASYNC(pb);
+				XFS_bwrite(pb);
 			}
 		}
 		if (error) {
