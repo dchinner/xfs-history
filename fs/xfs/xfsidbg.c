@@ -6923,8 +6923,6 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		(xfs_dfiloff_t)mp->m_dirfreeblk);
 	kdb_printf("chsize %d chash 0x%p\n",
 		mp->m_chsize, mp->m_chash);
-	kdb_printf("m_frozen %d m_active_trans %d\n",
-		mp->m_frozen, mp->m_active_trans.counter);
 	if (mp->m_fsname != NULL)
 		kdb_printf("mountpoint \"%s\"\n", mp->m_fsname);
 	else

@@ -116,6 +116,7 @@ typedef int	(*vfs_quotactl_t)(bhv_desc_t *, int, int, caddr_t);
 typedef void	(*vfs_init_vnode_t)(bhv_desc_t *,
 				struct vnode *, bhv_desc_t *, int);
 typedef void	(*vfs_force_shutdown_t)(bhv_desc_t *, int, char *, int);
+typedef void	(*vfs_freeze_t)(bhv_desc_t *);
 typedef	struct inode * (*vfs_get_inode_t)(bhv_desc_t *, xfs_ino_t, int);
 
 typedef struct vfsops {
@@ -134,6 +135,7 @@ typedef struct vfsops {
 	vfs_get_inode_t		vfs_get_inode;	/* bhv specific iget */
 	vfs_init_vnode_t	vfs_init_vnode;	/* initialize a new vnode */
 	vfs_force_shutdown_t	vfs_force_shutdown;	/* crash and burn */
+	vfs_freeze_t		vfs_freeze;	/* freeze fs for snapshot */
 } vfsops_t;
 
 /*
@@ -154,6 +156,7 @@ typedef struct vfsops {
 #define VFS_GET_INODE(v, ino, fl)	( vfs_get_inode(VHEAD(v), ino,fl) )
 #define VFS_INIT_VNODE(v, vp,b,ul)	( vfs_init_vnode(VHEAD(v), vp,b,ul) )
 #define VFS_FORCE_SHUTDOWN(v, fl,f,l)	( vfs_force_shutdown(VHEAD(v), fl,f,l) )
+#define VFS_FREEZE(v)			( vfs_freeze(VHEAD(v)) )
 
 /*
  * PVFS's.  Operates on behavior descriptor pointers.
@@ -172,6 +175,7 @@ typedef struct vfsops {
 #define PVFS_GET_INODE(b, ino,fl)	( vfs_get_inode(b, ino,fl) )
 #define PVFS_INIT_VNODE(b, vp,b2,ul)	( vfs_init_vnode(b, vp,b2,ul) )
 #define PVFS_FORCE_SHUTDOWN(b, fl,f,l)	( vfs_force_shutdown(b, fl,f,l) )
+#define PVFS_FREEZE(b)			( vfs_freeze(b) )
 
 extern int vfs_mount(bhv_desc_t *, struct xfs_mount_args *, struct cred *);
 extern int vfs_parseargs(bhv_desc_t *, char *, struct xfs_mount_args *, int);
@@ -187,6 +191,7 @@ extern int vfs_quotactl(bhv_desc_t *, int, int, caddr_t);
 extern struct inode *vfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void vfs_init_vnode(bhv_desc_t *, struct vnode *, bhv_desc_t *, int);
 extern void vfs_force_shutdown(bhv_desc_t *, int, char *, int);
+extern void vfs_freeze(bhv_desc_t *);
 
 #define XFS_DMOPS		"xfs_dm_operations"	/* Data Migration */
 #define XFS_QMOPS		"xfs_qm_operations"	/* Quota Manager  */
@@ -226,5 +231,9 @@ extern void vfs_insertbhv(vfs_t *, bhv_desc_t *, vfsops_t *, void *);
 extern void bhv_insert_all_vfsops(struct vfs *);
 extern void bhv_remove_all_vfsops(struct vfs *, int);
 extern void bhv_remove_vfsops(struct vfs *, int);
+
+#define fs_frozen(vfsp)		((vfsp)->vfs_super->s_frozen)
+#define fs_check_frozen(vfsp, level) \
+	vfs_check_frozen(vfsp->vfs_super, level);
 
 #endif	/* __XFS_VFS_H__ */

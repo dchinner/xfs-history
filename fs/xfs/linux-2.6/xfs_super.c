@@ -553,6 +553,13 @@ linvfs_remount(
 	return -error;
 }
 
+STATIC void
+linvfs_freeze_fs(
+	struct super_block	*sb)
+{
+	VFS_FREEZE(LINVFS_GET_VFS(sb));
+}
+
 STATIC struct dentry *
 linvfs_get_parent(
 	struct dentry		*child)
@@ -793,6 +800,7 @@ STATIC struct super_operations linvfs_sops = {
 	.put_super		= linvfs_put_super,
 	.write_super		= linvfs_write_super,
 	.sync_fs		= linvfs_sync_super,
+	.write_super_lockfs	= linvfs_freeze_fs,
 	.statfs			= linvfs_statfs,
 	.remount_fs		= linvfs_remount,
 	.show_options		= linvfs_show_options,
