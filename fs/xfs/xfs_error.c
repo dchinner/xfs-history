@@ -1,25 +1,16 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include "sys/types.h"
 #include "sys/pda.h"
 #include "sys/errno.h"
+#include "sys/debug.h"
 #ifdef SIM
 #include <stdlib.h>
-#else
-#include "sys/systm.h"
 #endif
 #include "xfs_error.h"
 
 #ifdef DEBUG
-int	xfs_etrap[XFS_ERROR_NTRAP] = { EIO, EINVAL };
-
-#ifndef SIM
-extern void panicspin(void);
-#endif
-
-#if EVEREST
-extern void idbg_stop(void);
-#endif
+int	xfs_etrap[XFS_ERROR_NTRAP] = { EIO };
 
 int
 xfs_error_trap(int e)
@@ -40,18 +31,7 @@ xfs_error_trap(int e)
 #ifdef SIM
 		abort();
 #else
-#if EVEREST
-		idbg_stop();
-#else
-		for (cpu = 0; cpu < maxcpus; cpu++) {
-			if (((id = pdaindr[cpu].CpuId) != -1) && (id != cpuid())) {
-
-				cpuaction(id, (cpuacfunc_t)panicspin, A_NOW);
-
-			}
-		}
-#endif
-		debug("ring");
+		debug_stop_all_cpus();
 #endif
 		break;
 	}
