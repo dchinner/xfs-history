@@ -1,6 +1,7 @@
 #ident	"$Revision: 1.62 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
+#include <sys/sysmacros.h>
 #endif
 
 #include <sys/param.h>
