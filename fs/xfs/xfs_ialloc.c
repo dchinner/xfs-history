@@ -1116,13 +1116,15 @@ xfs_ialloc_ag_alloc(xfs_btree_cur_t *cur)
 		for (i = inopb - 1; i >= 0; i--) {
 			free = xfs_make_iptr(sbp, fbuf, i);
 			foffset = (caddr_t)free - (caddr_t)xfs_buf_to_dinode(fbuf);
-			free->di_magic = XFS_DINODE_MAGIC;
-			free->di_mode = 0;
-			free->di_version = XFS_DINODE_VERSION;
-			free->di_format = XFS_DINODE_FMT_AGINO;
-			first = foffset + offsetof(xfs_dinode_t, di_magic);
-			last = foffset + offsetof(xfs_dinode_t, di_format) +
-				sizeof(free->di_format) - 1;
+			free->di_core.di_magic = XFS_DINODE_MAGIC;
+			free->di_core.di_mode = 0;
+			free->di_core.di_version = XFS_DINODE_VERSION;
+			free->di_core.di_format = XFS_DINODE_FMT_AGINO;
+			first = foffset + offsetof(xfs_dinode_t, di_core) +
+				offsetof(xfs_dinode_core_t, di_magic);
+			last = foffset + offsetof(xfs_dinode_t, di_core) +
+				offsetof(xfs_dinode_core_t, di_format) +
+				sizeof(free->di_core.di_format) - 1;
 			xfs_trans_log_buf(tp, fbuf, first, last);
 			free->di_u.di_next = agp->ag_iflist;
 			first = foffset + offsetof(xfs_dinode_t, di_u);
@@ -1283,11 +1285,13 @@ xfs_ialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, int mode)
 	ASSERT(free->di_magic == XFS_DINODE_MAGIC);
 	ASSERT(free->di_mode == 0);
 	agp->ag_iflist = free->di_u.di_next;
-	free->di_mode = mode;
-	free->di_version = XFS_DINODE_VERSION;
-	first = (caddr_t)&free->di_mode - (caddr_t)xfs_buf_to_dinode(fbuf);
-	last = (caddr_t)&free->di_version - (caddr_t)xfs_buf_to_dinode(fbuf) +
-		sizeof(free->di_version) - 1;
+	free->di_core.di_mode = mode;
+	free->di_core.di_version = XFS_DINODE_VERSION;
+	first = (caddr_t)&free->di_core.di_mode -
+		(caddr_t)xfs_buf_to_dinode(fbuf);
+	last = (caddr_t)&free->di_core.di_version -
+		(caddr_t)xfs_buf_to_dinode(fbuf) +
+		sizeof(free->di_core.di_version) - 1;
 	xfs_trans_log_buf(tp, fbuf, first, last);
 	agp->ag_ifcount--;
 	first = offsetof(xfs_aghdr_t, ag_ifcount);
@@ -1361,11 +1365,13 @@ xfs_ifree(xfs_trans_t *tp, xfs_ino_t inode)
 	free = xfs_make_iptr(sbp, fbuf, off);
 	ASSERT(free->di_magic == XFS_DINODE_MAGIC);
 	ASSERT(free->di_mode);
-	free->di_mode = 0;
-	free->di_format = XFS_DINODE_FMT_AGINO;
-	first = (caddr_t)&free->di_mode - (caddr_t)xfs_buf_to_dinode(fbuf);
-	last = (caddr_t)&free->di_format - (caddr_t)xfs_buf_to_dinode(fbuf) +
-		sizeof(free->di_format) - 1;
+	free->di_core.di_mode = 0;
+	free->di_core.di_format = XFS_DINODE_FMT_AGINO;
+	first = (caddr_t)&free->di_core.di_mode -
+		(caddr_t)xfs_buf_to_dinode(fbuf);
+	last = (caddr_t)&free->di_core.di_format -
+		(caddr_t)xfs_buf_to_dinode(fbuf) +
+		sizeof(free->di_core.di_format) - 1;
 	xfs_trans_log_buf(tp, fbuf, first, last);
 	free->di_u.di_next = agp->ag_iflist;
 	first = (caddr_t)&free->di_u - (caddr_t)xfs_buf_to_dinode(fbuf);
