@@ -1,4 +1,4 @@
-#ident "$Revision: 1.279 $"
+#ident "$Revision: 1.280 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -96,7 +96,9 @@
 #endif
 
 /* data pipe functions */
+#ifdef TO_LOOK_AT_LATER
 extern	int fspe_get_ops(void *);
+#endif /* TO_LOOK_AT_LATER */
 extern	int xfs_prio_set_bw(void *);
 extern	int xfs_prio_get_bw(void *);
 int         xfs_fspe_dioinfo(struct vnode *, struct dioattr *);
@@ -6132,9 +6134,9 @@ xfs_fcntl(
 	mp = ip->i_mount;
 	switch (cmd) {
 	case F_GETOPS:
-#ifdef TO_FIX_LATER
+#ifdef TO_LOOK_AT_LATER
 		fspe_get_ops(arg);
-#endif /* TO_FIX_LATER */
+#endif /* TO_LOOK_AT_LATER */
 		break;
 	case F_SETBW:
 		error = xfs_prio_set_bw(arg);
