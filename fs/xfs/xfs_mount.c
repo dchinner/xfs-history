@@ -308,7 +308,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		VN_RELE(mp->m_rtdevp);
 	}
 
-	brelse(bp);
 	nfreerbuf(bp);
 	xfs_ihash_free(mp);
 

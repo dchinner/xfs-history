@@ -77,7 +77,7 @@ int	xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *leaf_buffer,
 /*
  * Routines used for shrinking the Btree.
  */
-void	xfs_dir_join(struct xfs_dir_state *state);
+int	xfs_dir_join(struct xfs_dir_state *state);
 void	xfs_dir_fixhashpath(struct xfs_dir_state *state,
 				   struct xfs_dir_state_path *path_to_to_fix,
 				   int level_in_path);
