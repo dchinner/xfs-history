@@ -1,4 +1,4 @@
-#ident "$Revision: 1.181 $"
+#ident "$Revision: 1.182 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1220,7 +1220,14 @@ xfs_read(
 				return error;
 		}
 		if (ioflag & IO_DIRECT) {
+#ifdef PRIO_DEBUG
+			printf("xfs_read: IO_DIRECT uiop->io_flags %d\n", uiop->io_flags);
+#endif
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_READ);
+#ifdef PRIO_DEBUG
+			printf("xfs_read: xfs_diordwr returns %d\n", error);
+#endif
+
 		} else {
 			error = xfs_read_file(bdp, uiop, ioflag, credp);
 		}
@@ -1345,15 +1352,19 @@ xfs_zero_last_block(
 	struct pm	*pmp)
 {
 	xfs_fileoff_t	last_fsb;
+	xfs_fileoff_t	next_fsb;
+	xfs_fileoff_t	end_fsb;
 	xfs_fsblock_t	firstblock;
 	xfs_mount_t	*mp;
 	buf_t		*bp;
+	vnode_t		*vp;
 	int		nimaps;
 	int		zero_offset;
 	int		zero_len;
 	int		isize_fsb_offset;
 	int		i;
 	int		error;
+	int		hole;
 	pfd_t		*pfdp;
 	xfs_bmbt_irec_t	imap;
 	struct bmapval	bmap;
@@ -1362,21 +1373,69 @@ xfs_zero_last_block(
 	ASSERT(offset > isize);
 
 	mp = ip->i_mount;
+	vp = XFS_ITOV(ip);
 
 	/*
 	 * If the file system block size is less than the page size,
 	 * then there could be bytes in the last page after the last
 	 * fsblock containing isize which have not been initialized.
 	 * Since if such a page is in memory it will be marked P_DONE
-	 * and my now be fully accessible, we need to zero any part of
+	 * and may now be fully accessible, we need to zero any part of
 	 * it which is beyond the old file size.  We don't need to send
 	 * this out to disk, we're just iniitializing it to zeroes like
 	 * we would have done in xfs_strat_read() had the size been bigger.
 	 */
 	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
-		pfdp = pfind(XFS_ITOV(ip), offtoct(isize), VM_ATTACH);
+		pfdp = pfind(vp, offtoct(isize), VM_ATTACH);
 		if (pfdp != NULL) {
 			page_zero(pfdp, NOCOLOR, i, (NBPP - i));
+
+			/*
+			 * Now we check to see if there are any holes in the
+			 * page over the end of the file that are beyond the
+			 * end of the file.  If so, we want to set the P_HOLE
+			 * flag in the page and blow away any active mappings
+			 * to it so that future faults on the page will cause
+			 * the space where the holes are to be allocated.
+			 * This keeps us from losing updates that are beyond
+			 * the current end of file when the page is already
+			 * in memory.
+			 */
+			next_fsb = XFS_B_TO_FSBT(mp, isize);
+			end_fsb = XFS_B_TO_FSB(mp, ctooff(offtoc(isize)));
+			hole = 0;
+			while (next_fsb < end_fsb) {
+				nimaps = 1;
+				firstblock = NULLFSBLOCK;
+				error = xfs_bmapi(NULL, ip, next_fsb, 1, 0,
+						  &firstblock, 0, &imap,
+						  &nimaps, NULL);
+				if (error) {
+					pagefree(pfdp);
+					return error;
+				}
+				ASSERT(nimaps > 0);
+				if (imap.br_startblock == HOLESTARTBLOCK) {
+					hole = 1;
+					break;
+				}
+				next_fsb++;
+			}
+			if (hole) {
+				vnode_pages_sethole(vp, pfdp, 1);
+				/*
+				 * In order to make processes notice the
+				 * newly set P_HOLE flag, blow away any
+				 * mappings to the file.  We have to drop
+				 * the inode lock while doing this to avoid
+				 * deadlocks with the chunk cache.
+				 */
+				if (VN_MAPPED(vp)) {
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
+					remapf(vp, ctooff(offtoct(isize)), 1);
+					xfs_ilock(ip, XFS_ILOCK_EXCL);
+				}
+			}
 			pagefree(pfdp);
 		}
 	}
@@ -1431,7 +1490,7 @@ xfs_zero_last_block(
 		bmap.bn = -1;
 		bmap.eof |= BMAP_DELAY;
 	}
-	bp = chunkread(XFS_ITOV(ip), &bmap, 1, credp);
+	bp = chunkread(vp, &bmap, 1, credp);
 	if (bp->b_flags & B_ERROR) {
 		error = geterror(bp);
 		brelse(bp);
@@ -1503,7 +1562,7 @@ xfs_zero_eof(
 	 * Calculate the range between the new size and the old
 	 * where blocks needing to be zeroed may exist.  To get the
 	 * block where the last byte in the file currently resides,
-	 * we need to subtrace one from the size and truncate back
+	 * we need to subtract one from the size and truncate back
 	 * to a block boundary.  We subtract 1 in case the size is
 	 * exactly on a block boundary.
 	 */
@@ -2418,7 +2477,13 @@ start:
 		}
 retry:
 		if (ioflag & IO_DIRECT) {
+#ifdef PRIO_DEBUG
+			printf("xfs_write: IO_DIRECT uiop->ioflags %d\n", uiop->io_flags);
+#endif /* PRIO_DEBUG */
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
+#ifdef PRIO_DEBUG
+			printf("xfs_write: xfs_diordwr returns %d\n", error);
+#endif
 		} else {
 			error = xfs_write_file(bdp, uiop, ioflag, credp);
 		}
@@ -4714,6 +4779,11 @@ retry:
 	     			bps[bufsissued++]= nbp = getphysbuf();
 				CHECK_GRIO_TIMESTAMP(bp, 40);
 
+#ifdef PRIO_DEBUG
+				if (BUF_IS_PRIORITY(nbp))
+					printf("xfs_diostrat: BUF_IS_PRIORITY %llx\n", nbp);
+#endif
+
 	     			nbp->b_flags     = bp->b_flags;
 	     			nbp->b_flags2    = bp->b_flags2;
 
@@ -4787,6 +4857,7 @@ retry:
 	  		nbp = bps[j];
 	    		biowait(nbp);
 			nbp->b_flags2 &= ~B_GR_BUF;
+			nbp->b_flags2 &= ~B_PRIO_BUF;
 
 	     		if (!error)
 				error = geterror(nbp);
@@ -4971,6 +5042,16 @@ xfs_diordwr(
 		bp->b_flags2 &= ~B_GR_BUF;
 	}
 
+	/*
+	 * If this is a "priority" I/O, set the Priority I/O flag in the buf_t
+	 */
+	if (UIOP_IS_PRIORITY(uiop)) {
+#ifdef PRIO_DEBUG
+	  printf("xfs_diordwr: UIOP_IS_PRIORITY\n");
+#endif /* PRIO_DEBUG */
+	  bp->b_flags2 |= B_PRIO_BUF;
+	} else
+	  bp->b_flags2 &= ~B_PRIO_BUF;
 
 	/*
  	 * Perform I/O operation.
@@ -4994,6 +5075,9 @@ xfs_diordwr(
 		bp->b_grio_private = NULL;
 		bp->b_flags2 &= ~B_GR_BUF;
 	}
+
+	/* Reset the Priority I/O flag */
+	bp->b_flags2 &= ~B_PRIO_BUF;
 
 #ifdef SIM
 	bp->b_un.b_addr = 0;
