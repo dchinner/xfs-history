@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.32 1994/09/15 21:55:27 ajs Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.33 1994/09/20 15:55:50 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -105,12 +105,27 @@ extern void timestruc_fix( timestruc_t *);
 xfs_inode_t *
 xfs_get_inode(  dev_t fs_dev, int ino)
 {
+	int			ret;
         struct vfs		*vfsp;
         xfs_inode_t		*ip = NULL ;
 	extern struct vfs	*vfs_devsearch( dev_t );
 
-        vfsp = vfs_devsearch( fs_dev );
+
+
+	/*
+	 * Lookup the vfs structure and mark it busy.
+	 * This prevents race conditions with unmount.
+	 *
+	 * If this returns NULL, the file system may be in the process
+	 * of being unmounted. The unmount may succeed or fail.  If the 
+	 * umount fails, the grio ticket will remain attached to the
+	 * inode structure. It will be cleanup when the inode structure is
+	 * freed.
+	 */
+        vfsp = vfs_busydev( fs_dev );
+
         if (vfsp) {
+		
 		/*
 		 * Verify that this is an xfs file system.
 		 */
@@ -127,10 +142,15 @@ xfs_get_inode(  dev_t fs_dev, int ino)
 #endif
 
 		}
+
+		/*
+		 * Decrement the vfs busy count.
+		 */
+		vfs_unbusy( vfsp );
         } 
 #ifdef DEBUG
 	else {
-		printf("vfs_devsearch failed \n");
+		printf("grio vfs_busydev failed \n");
 	}
 #endif
         return( ip );
@@ -143,6 +163,9 @@ xfs_get_inode(  dev_t fs_dev, int ino)
  *	Add another ticket to the inode ticket list. The inode must
  *	be locked to perform this.
  *
+ *  RETURNS:
+ *	EAGAIN if a ticket with the given id already exists
+ *	0 on success
  */
 int
 xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
@@ -154,7 +177,7 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
  	 * Check if ticket with this id is already on the list.
  	 */
 	if (xfs_io_is_guaranteed( ip, id, &s ) ) {
-		ret = -1;
+		ret = EAGAIN;
 	} else {
 		if (ticket = kmem_zalloc( sizeof( grio_ticket_t), KM_SLEEP)) {
 			ticket->sz     = sz;
@@ -315,16 +338,37 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 }
 
 /*
+ * xfs_free_remaining_tickets()
+ *
+ * 	This routine is called from xfs_idestroy(). It frees the
+ *	memory associated with any tickets still attached to the inode.
+ *	There may be tickets still attached to the inode if a REMOVE_TICKET
+ *	call failed due to the file system being in the process of being 
+ *	unmounted.
+ *
+ *
+ *
+ * RETURNS:
+ *	none
+ */
+void
+xfs_free_remaining_tickets( xfs_inode_t *ip )
+{
+	int		s;
+	grio_ticket_t	*ticket;
+
+	s = ticket_lock( ip );
+	while ( ticket = ip->i_ticket ) {
+		ip->i_ticket = ticket->nextticket;
+		kmem_free( ticket, sizeof( grio_ticket_t ) );
+	}
+	ticket_unlock( ip , s );
+}
+
+/*
  * xfs_io_is_guaranteed()
  *
- *	Check if a process using the given pid and fd has
- *	a ticket for guaranteed rate I/O on the given xfs
- *	file. If it does, check if the I/O size requested is
- *	within the guaranteed amount.
- *
- *	If the requested I/O is larger than the guaranteed 
- *	I/O, issue part of the request and put the requestor to
- *	sleep.
+ *	Check if a ticket with the given id is already on the list.
  *
  * RETURNS:
  *	0 if there is no guarantee
