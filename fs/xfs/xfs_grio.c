@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.54 1995/05/09 21:21:37 doucette Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.55 1995/05/21 16:44:16 tap Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -42,6 +42,7 @@
 #include <sys/fs/xfs_inode_item.h>
 #include <sys/fs/xfs_inode.h>
 #include <sys/fs/xfs_itable.h>
+#include <sys/fs/xfs_error.h>
 #include <sys/pda.h>
 
 #ifdef SIM
@@ -142,30 +143,36 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
  *
  *  RETURNS:
  *	0 on success
- *	~0 on failure
+ *	non zero on failure
  */
 int
 xfs_get_file_extents(
-	sysarg_t sysarg_fs_dev, 
-	sysarg_t sysarg_inum, 
+	sysarg_t sysarg_file_id,
 	sysarg_t sysarg_extents_addr,
 	sysarg_t sysarg_count)
 {
-	int			i, recsize, num_extents = 0, ret = 0;
+	int			i, recsize, num_extents = 0;
+	int			error = 0;
 	dev_t			fs_dev;
 	xfs_ino_t		ino;
 	xfs_inode_t 		*ip;
 	xfs_bmbt_rec_t 		*ep;
 	xfs_bmbt_irec_t 	thisrec;
 	grio_bmbt_irec_t	*grec;
+	grio_file_id_t		fileid;
 	caddr_t			extents, count;
 
+	if ( copyin((caddr_t)sysarg_file_id, &fileid, sizeof(grio_file_id_t))) {
+		error = XFS_ERROR(EFAULT);
+		return( error );
+	}
+
+	fs_dev 		= fileid.fs_dev;
+	ino		= fileid.ino;
 
 	/*
 	 * Get sysarg arguements
 	 */
-	ino		= sysarg_inum;
-	fs_dev		= sysarg_fs_dev;
 	extents		= (caddr_t)sysarg_extents_addr;
 	count		= (caddr_t)sysarg_count;
 
@@ -173,14 +180,14 @@ xfs_get_file_extents(
  	 * Get the inode
 	 */
 	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
-		ret = ENOENT;
+		error = XFS_ERROR(ENOENT);
 		if (copyout( 	&num_extents, 
 				(caddr_t)count, 
 				sizeof( num_extents))) {
 
-			ret = EFAULT;
+			error = XFS_ERROR(EFAULT);
 		}
-		return( ret );
+		return( error );
 	}
 
 	/*
@@ -199,8 +206,8 @@ xfs_get_file_extents(
 		 * Read in the file extents from disk if necessary.
 		 */
 		if (!(ip->i_df.if_flags & XFS_IFEXTENTS)) {
-			ret = xfs_iread_extents(NULL, ip, XFS_DATA_FORK);
-			if (ret) {
+			error = xfs_iread_extents(NULL, ip, XFS_DATA_FORK);
+			if (error) {
 				goto out;
 			}
 		}
@@ -223,7 +230,7 @@ xfs_get_file_extents(
 		}
 
 		if (copyout(grec, (caddr_t)extents, recsize )) {
-			ret = EFAULT;
+			error = XFS_ERROR(EFAULT);
 		}
 		kmem_free(grec, recsize);
 	}
@@ -232,13 +239,13 @@ xfs_get_file_extents(
 	 * copyout to user space along with count.
  	 */
 	if (copyout( &num_extents, (caddr_t)count, sizeof( num_extents))) {
-		ret = EFAULT;
+		error = XFS_ERROR(EFAULT);
 	}
 
  out:
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	IRELE( ip );
-	return( ret );
+	return( error );
 }
 
 /*
@@ -250,29 +257,35 @@ xfs_get_file_extents(
  *
  * RETURNS:
  *	0 on success
- *	1 on failure 
+ *	non zero on failure
  */
 xfs_get_file_rt( 
-	sysarg_t sysarg_fs_dev, 
-	sysarg_t sysarg_inum, 
+	sysarg_t sysarg_file_id,
 	sysarg_t sysarg_rt)
 {
-	int 		inodert = 0, ret = 0;
+	int 		inodert = 0, error = 0;
 	dev_t		fs_dev;
 	xfs_ino_t	ino;
 	xfs_inode_t 	*ip;
 	caddr_t		rt;
+	grio_file_id_t	fileid;
 
 
-	fs_dev		= sysarg_fs_dev;
-	ino		= sysarg_inum;
+	if ( copyin((caddr_t)sysarg_file_id, &fileid, sizeof(grio_file_id_t))) {
+		error = XFS_ERROR(EFAULT);
+		return( error );
+	}
+
 	rt		= (caddr_t)sysarg_rt;
+	fs_dev 		= fileid.fs_dev;
+	ino		= fileid.ino;
 
 	/*
  	 * Get the inode.
 	 */
 	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
-		return( ENOENT );
+		error = XFS_ERROR( ENOENT );
+		return( error );
 	}
 
 	/*
@@ -286,12 +299,12 @@ xfs_get_file_rt(
  	 * Copy the results to user space.
  	 */
 	if ( copyout( &inodert, (caddr_t)rt, sizeof(int)) ) {
-		ret = EFAULT;
+		error = XFS_ERROR(EFAULT);
 	}
 
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	IRELE( ip );
-	return( ret );
+	return( error );
 
 }
 
@@ -303,13 +316,13 @@ xfs_get_file_rt(
  *
  * RETURNS:
  *	0 on success
- *	-1 on failure
+ *	non zero on failure
  */
 xfs_get_block_size(
 	sysarg_t sysarg_fs_dev, 
 	sysarg_t sysarg_fs_size)
 {
-	int 		ret = 0;
+	int 		error = 0;
 	dev_t		fs_dev;
 	caddr_t		fs_size;
 	struct vfs	*vfsp;
@@ -323,12 +336,12 @@ xfs_get_block_size(
 				(caddr_t)fs_size, 
 				sizeof(u_int)) ) {
 
-			ret = EFAULT;
+			error = XFS_ERROR(EFAULT);
 		}
 	} else {
-		ret = -1;
+		error = XFS_ERROR( EIO );
 	}
-	return( ret );
+	return( error );
 }
 
 
@@ -379,7 +392,6 @@ xfs_grio_get_inumber( int fdes )
 	xfs_inode_t	*ip;
 
 	if ( getf( fdes, &fp ) != 0 ) {
-		ASSERT( 0 );
 		return( (xfs_ino_t)0 );
 	}
 
@@ -407,7 +419,6 @@ xfs_grio_get_fs_dev( int fdes )
 	xfs_inode_t	*ip;
 
 	if ( getf( fdes, &fp ) != 0 ) {
-		ASSERT( 0 );
 		return( 0 );
 	}
 
