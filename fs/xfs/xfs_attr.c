@@ -1862,8 +1862,8 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 			if (error)
 				return(error);
 
-			tmp = (valuelen < bp->b_bufsize)
-				? valuelen : bp->b_bufsize;
+			tmp = (valuelen < XFS_BUF_SIZE(bp))
+				? valuelen : XFS_BUF_SIZE(bp);
 			bcopy(XFS_BUF_PTR(bp), dst, tmp);
 			xfs_buf_relse(bp);
 			dst += tmp;
@@ -1991,10 +1991,11 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		ASSERT(bp);
 		ASSERT(!geterror(bp));
 
-		tmp = (valuelen < bp->b_bufsize) ? valuelen : bp->b_bufsize;
+		tmp = (valuelen < XFS_BUF_SIZE(bp)) ? valuelen :
+							XFS_BUF_SIZE(bp);
 		bcopy(src, XFS_BUF_PTR(bp), tmp);
-		if (tmp < bp->b_bufsize)
-			bzero(XFS_BUF_PTR(bp) + tmp, bp->b_bufsize - tmp);
+		if (tmp < XFS_BUF_SIZE(bp))
+			bzero(XFS_BUF_PTR(bp) + tmp, XFS_BUF_SIZE(bp) - tmp);
 		if (error = xfs_bwrite(mp, bp)) {/* GROT: NOTE: synchronous write */
 			return (error);
 		}

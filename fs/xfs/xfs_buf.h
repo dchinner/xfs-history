@@ -114,6 +114,10 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->b_bcount = cnt)
 
+#define XFS_BUF_SIZE(bp)	((bp)->b_bufsize)
+#define XFS_BUF_SET_SIZE(bp, cnt)		\
+			((bp)->b_bufsize = cnt)
+
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target)		\
 			(bp)->b_target = target; \
@@ -259,6 +263,9 @@ typedef struct buftarg {
 #define XFS_BUF_COUNT(bp)	((bp)->pb_count_desired)
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->pb_count_desired = cnt)
+#define XFS_BUF_SIZE(bp)	((bp)->pb_buffer_length)
+#define XFS_BUF_SET_SIZE(bp, cnt)		\
+			((bp)->pb_buffer_length = cnt)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)

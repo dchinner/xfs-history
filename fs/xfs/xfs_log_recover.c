@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.147 $"
+#ident	"$Revision: 1.148 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -145,7 +145,7 @@ xlog_bread(xlog_t	*log,
 	int error;
 
 	ASSERT(nbblks > 0);
-	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
+	ASSERT(BBTOB(nbblks) <= XFS_BUF_SIZE(bp));
 
 	XFS_BUF_SET_ADDR(bp, log->l_logBBstart + blk_no);
 	XFS_BUF_READ(bp);
@@ -181,7 +181,7 @@ xlog_bwrite(
 	int 	error;
 
 	ASSERT(nbblks > 0);
-	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
+	ASSERT(BBTOB(nbblks) <= XFS_BUF_SIZE(bp));
 
 	XFS_BUF_SET_ADDR(bp, log->l_logBBstart + blk_no);
 	XFS_BUF_ZEROFLAGS(bp);

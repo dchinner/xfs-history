@@ -1177,7 +1177,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_get_iclog_buffer_size(mp, log);
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
 	XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
-	bp->b_bufsize	   = log->l_iclog_size;
+	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
@@ -1189,7 +1189,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_state_ticket_alloc(log);  /* wait until after icloglock inited */
 	
 	/* log record size must be multiple of BBSIZE; see xlog_rec_header_t */
-	ASSERT((bp->b_bufsize & BBMASK) == 0);
+	ASSERT((XFS_BUF_SIZE(bp) & BBMASK) == 0);
 
 	iclogp = &log->l_iclog;
 	/*
@@ -1220,12 +1220,12 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
 		XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
-		bp->b_bufsize = log->l_iclog_size;
+		XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 
-		iclog->ic_size = bp->b_bufsize - XLOG_HEADER_SIZE;
+		iclog->ic_size = XFS_BUF_SIZE(bp) - XLOG_HEADER_SIZE;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
 		iclog->ic_log = log;
 		iclog->ic_refcnt = 0;
