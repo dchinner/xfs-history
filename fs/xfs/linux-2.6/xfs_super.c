@@ -224,7 +224,7 @@ mountargs_xfs(
 		} else if (!strcmp(this_char, MNTOPT_KIO)) {
 			args->flags |= MS_KIOBUFIO;
 		} else if (!strcmp(this_char, MNTOPT_KIOCLUSTER)) {
-			args->flags |= MS_KIOBUFIO|MS_KIOCLUSTER;
+			args->flags |= MS_KIOBUFIO;
 		} else {
 			printk(
 			"mount: unknown mount option \"%s\".\n", this_char);
@@ -324,11 +324,11 @@ linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 void
 linvfs_release_inode(struct inode *inode)
 {
-    int pincount; /* not used here */
+	int	pincount; /* not used here */
 	if (inode) {
 		pagebuf_delwri_flush(inode, PBDF_WAIT,&pincount);
 		pagebuf_lock_disable(inode);
-		truncate_inode_pages(&inode->i_data, 0L, TRUNC_NO_TOSS);
+		truncate_inode_pages(&inode->i_data, 0L);
 		iput(inode);
 	}
 }
@@ -376,12 +376,8 @@ linvfs_read_super(
 		sb->s_flags |= MS_KIOBUFIO;
 		printk("XFS (dev: %d/%d) mounting with KIOBUFIO%s\n",
 				MAJOR(sb->s_dev),MINOR(sb->s_dev),
-				(args->flags & MS_KIOCLUSTER) ? " (clustering)":
+				(args->flags & MS_KIOBUFIO) ? " (kiobuf I/O)":
 				"");
-		/* Allow clustering under kiobuf I/O */
-		if (args->flags & MS_KIOCLUSTER){
-			sb->s_flags |= MS_KIOCLUSTER;
-		}
 	}
 
 	args->fsname = uap->spec;

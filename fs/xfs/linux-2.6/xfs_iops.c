@@ -759,7 +759,7 @@ struct address_space_operations linvfs_aops = {
   writepage:		pagebuf_write_full_page,
   sync_page:		block_sync_page,
   bmap:			linvfs_bmap,
-  convertpage:		pagebuf_convert_page,
+  toss_page:		pagebuf_toss_page,
   prepare_write:	pagebuf_prepare_write,
   commit_write:		pagebuf_commit_write,
 };
