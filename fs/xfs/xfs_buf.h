@@ -45,7 +45,7 @@
 #define XFS_BUF_LOCK		PBF_LOCK
 #define XFS_BUF_MAPPED		PBF_MAPPED
 
-#define BUF_BUSY	0
+#define BUF_BUSY	PBF_DONT_BLOCK
 
 #define XFS_BUF_BFLAGS(x)        ((x)->pb_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)	\
