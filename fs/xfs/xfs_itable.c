@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -178,9 +178,9 @@ xfs_bulkstat(
 	*ubcountp = 0;
 	*done = 0;
 	ubufp = ubuffer;
-	nicluster = mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE ?
+	nicluster = mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE(mp) ?
 		mp->m_sb.sb_inopblock :
-		(XFS_INODE_CLUSTER_SIZE >> mp->m_sb.sb_inodelog);
+		(XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog);
 	nimask = ~(nicluster - 1);
 	nbcluster = nicluster >> mp->m_sb.sb_inopblog;
 	/* 
