@@ -640,9 +640,10 @@ pagebuf_read_full_page(
 		
 		error = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
 				PAGE_CACHE_SIZE, &map, 1, &nmaps, PBF_READ);
-
-		if (error)
+		if (error) {
+			UnlockPage(page);
 			return error;
+		}
 		hook_buffers_to_page(target, inode, page, &map, nmaps);
 		bh = head = page->buffers;
 		if (map.pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
