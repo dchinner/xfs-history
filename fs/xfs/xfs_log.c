@@ -3353,7 +3353,7 @@ xlog_verify_iclog(xlog_t	 *log,
 			clientid = ophead->oh_clientid;
 		} else {
 			idx = BTOBB(&ophead->oh_clientid - iclog->ic_data);
-			clientid = INT_GET(iclog->ic_header.h_cycle_data[idx], ARCH_UNKNOWN) >> 24;
+			clientid = GET_CLIENT_ID(iclog->ic_header.h_cycle_data[idx], ARCH_UNKNOWN);
 		}
 		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
 			xlog_panic("xlog_verify_iclog: illegal client");

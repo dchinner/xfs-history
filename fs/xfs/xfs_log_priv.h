@@ -95,6 +95,33 @@ int xlog_btolrbb(int b);
          INT_GET(*((uint *)(ptr)+1), arch) : \
          INT_GET(*(uint *)(ptr), arch) \
     )
+    
+/*
+ * get client id from packed copy.
+ *
+ * this hack is here because the xlog_pack code copies four bytes
+ * of xlog_op_header containing the fields oh_clientid, oh_flags 
+ * and oh_res2 into the packed copy.
+ *
+ * later on this four byte chunk is treated as an int and the 
+ * client id is pulled out.
+ *
+ * this has endian issues, of course.
+ */	
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define GET_CLIENT_ID(i,arch) \
+    ((arch==ARCH_NOCONVERT) ? \
+        ((i) & 0xff) : \
+        ((i) >> 24) \
+    )
+#else
+#define GET_CLIENT_ID(i,arch) \
+    ((arch==ARCH_NOCONVERT) ? \
+        ((i) >> 24) : \
+        ((i) >> 0xff) \
+    )
+#endif
    
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XLOG_GRANT_SUB_SPACE)
 void xlog_grant_sub_space(struct log *log, int bytes, int type);

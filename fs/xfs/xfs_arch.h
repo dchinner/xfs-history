@@ -46,7 +46,7 @@
 #define ARCH_MIPS	0
 #define ARCH_INTEL_IA32	1
 #define ARCH_SPARC	2
-#define ARCH_UNKNOWN    127
+/* ARCH_UNKNOWN is defined later */
 
 /* if these are wrong, it's very foncusing */
 
@@ -161,16 +161,19 @@
 #endif
 
 #if XFS_ARCH_MODE == XFS_ARCH_MODE_MULTI
-#define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS||(A)==ARCH_NOCONVERT)
-#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
+#define ARCH_SUPPORTED(A)   ((A)==ARCH_MIPS||(A)==ARCH_NOCONVERT)
+#define XFS_ARCH_DEFAULT    (ARCH_NOCONVERT)
+#define ARCH_UNKNOWN        arch_unknown_not_supported
 #else
 #if XFS_ARCH_MODE == XFS_ARCH_MODE_NATIVE
-#define ARCH_SUPPORTED(A) ((A)==ARCH_NOCONVERT)
-#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
+#define ARCH_SUPPORTED(A)   ((A)==ARCH_NOCONVERT)
+#define XFS_ARCH_DEFAULT    (ARCH_NOCONVERT)
+#define ARCH_UNKNOWN        (ARCH_NOCONVERT)
 #else
 #if XFS_ARCH_MODE == XFS_ARCH_MODE_MIPS
-#define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS)
-#define XFS_ARCH_DEFAULT (ARCH_MIPS)
+#define ARCH_SUPPORTED(A)   ((A)==ARCH_MIPS)
+#define XFS_ARCH_DEFAULT    (ARCH_MIPS)
+#define ARCH_UNKNOWN        (ARCH_MIPS)
 #else
 #error Error in XFS architecture mode selection
 #endif
