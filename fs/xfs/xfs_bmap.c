@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.106 $"
+#ident	"$Revision: 1.107 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1445,18 +1445,20 @@ xfs_bmap_alloc(
 		args->tp = ap->tp;
 		args->mp = mp;
 		args->fsbno = ap->rval;
-		args->minlen = ap->minlen;
 		args->maxlen = ap->alen;
 		if (nullfb) {
 			args->type = XFS_ALLOCTYPE_START_BNO;
 			args->total = ap->total;
-		}
-		else if (ap->low) {
+			args->minlen = ap->alen;
+		} else if (ap->low) {
 			args->type = XFS_ALLOCTYPE_FIRST_AG;
 			args->total = 1;
+			ASSERT(ap->minlen == 1);
+			args->minlen = 1;
 		} else {
 			args->type = XFS_ALLOCTYPE_NEAR_BNO;
 			args->total = ap->total;
+			args->minlen = ap->minlen;
 		}
 		if (ap->ip->i_d.di_extsize) {
 			args->prod = ap->ip->i_d.di_extsize;
@@ -1474,6 +1476,13 @@ xfs_bmap_alloc(
 		args->isfl = 0;
 		args->userdata = ap->userdata;
 		xfs_alloc_vextent(args);
+		if (args->fsbno == NULLFSBLOCK && nullfb &&
+		    ap->alen > ap->minlen) {
+			args->minlen = ap->minlen;
+			args->type = XFS_ALLOCTYPE_START_BNO;
+			args->fsbno = ap->rval;
+			xfs_alloc_vextent(args);
+		}
 		if (args->fsbno == NULLFSBLOCK && nullfb) {
 			args->fsbno = 0;
 			args->minlen = 1;
@@ -1481,19 +1490,21 @@ xfs_bmap_alloc(
 			args->total = 1;
 			args->minleft = 0;
 			xfs_alloc_vextent(args);
-			ap->rval = args->fsbno;
 			ap->low = 1;
-		} else
-			ap->rval = args->fsbno;
-		if (ap->rval != NULLFSBLOCK) {
-			ap->firstblock = ap->rval;
+		}
+		if (args->fsbno != NULLFSBLOCK) {
+			ap->firstblock = ap->rval = args->fsbno;
+			ASSERT(nullfb || fb_agno == args->agno ||
+			       (ap->low && fb_agno < args->agno));
 			ap->alen = args->len;
 			ap->ip->i_d.di_nblocks += args->len;
 			xfs_trans_log_inode(ap->tp, ap->ip, XFS_ILOG_CORE);
 			if (ap->wasdel)
 				ap->ip->i_delayed_blks -= args->len;
-		} else
+		} else {
+			ap->rval = NULLFSBLOCK;
 			ap->alen = 0;
+		}
 		xfs_alloc_arg_free(args);
 	}
 	kmem_check();
@@ -1907,6 +1918,9 @@ xfs_bmap_extents_to_btree(
 	 * Allocation can't fail, the space was reserved.
 	 */
 	ASSERT(args->fsbno != NULLFSBLOCK);
+	ASSERT(*firstblock == NULLFSBLOCK ||
+	       args->agno == XFS_FSB_TO_AGNO(mp, *firstblock) ||
+	       (lowspace && args->agno > XFS_FSB_TO_AGNO(mp, *firstblock)));
 	*firstblock = args->fsbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
@@ -2805,7 +2819,6 @@ xfs_bmapi(
 					bma->gotp = &l->got;
 					bma->total = total;
 					bma->userdata = l->userdata;
-					bma->minleft = l->minleft;
 				}
 				/*
 				 * Fill in changeable bma fields.
@@ -2817,6 +2830,7 @@ xfs_bmapi(
 				bma->wasdel = l->wasdelay;
 				bma->minlen = l->minlen;
 				bma->low = l->lowspace;
+				bma->minleft = l->minleft;
 				/*
 				 * Call allocator.
 				 */
@@ -2825,9 +2839,23 @@ xfs_bmapi(
 				 * Copy out result fields.
 				 */
 				l->abno = bma->rval;
-				firstblock = bma->firstblock;
+				if (l->lowspace = bma->low)
+					l->minleft = 0;
 				l->alen = bma->alen;
-				l->lowspace = bma->low;
+				ASSERT(firstblock == NULLFSBLOCK ||
+				       XFS_FSB_TO_AGNO(ip->i_mount,
+					       firstblock) ==
+				       XFS_FSB_TO_AGNO(ip->i_mount,
+					       bma->firstblock) ||
+				       (l->lowspace &&
+				        XFS_FSB_TO_AGNO(ip->i_mount,
+						firstblock) <
+					XFS_FSB_TO_AGNO(ip->i_mount,
+						bma->firstblock)));
+				firstblock = bma->firstblock;
+				if (l->cur)
+					l->cur->bc_private.b.firstblock =
+						firstblock;
 				if (l->abno == NULLFSBLOCK)
 					break;
 				if ((ip->i_flags & XFS_IBROOT) && !l->cur) {
@@ -2987,6 +3015,14 @@ xfs_bmapi(
 	if (l->logflags)
 		xfs_trans_log_inode(tp, ip, l->logflags);
 	if (l->cur) {
+		ASSERT(firstblock == NULLFSBLOCK ||
+		       XFS_FSB_TO_AGNO(ip->i_mount, firstblock) ==
+		       XFS_FSB_TO_AGNO(ip->i_mount,
+			       l->cur->bc_private.b.firstblock) ||
+		       (l->lowspace &&
+			XFS_FSB_TO_AGNO(ip->i_mount, firstblock) < 
+			XFS_FSB_TO_AGNO(ip->i_mount,
+				l->cur->bc_private.b.firstblock)));
 		firstblock = l->cur->bc_private.b.firstblock;
 		xfs_btree_del_cursor(l->cur);
 	}
