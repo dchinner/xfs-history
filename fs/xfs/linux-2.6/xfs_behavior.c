@@ -17,7 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *									  *
  **************************************************************************/
-#ident "$Id: xfs_behavior.c,v 1.7 2000/06/09 01:50:04 nathans Exp $"
+#ident "$Id: xfs_behavior.c,v 1.8 2000/06/09 01:51:10 lord Exp $"
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized 
@@ -35,7 +35,6 @@
 #include <sys/types.h>
 #include <ksys/behavior.h>
 #include <sys/kmem.h>
-#include <ksys/kern_heap.h>
 #include <sys/debug.h>
 
 #include "xfs_sim.h"

@@ -107,7 +107,7 @@
 #define ENTER(x) printk("Entering %s\n",x);
 #define EXIT(x)  printk("Exiting  %s\n",x);
 
-#ifdef KERNEL
+#ifdef __KERNEL__
 #ifndef KDB_REASON_ENTER
 struct pt_regs;
 extern int   kdb(int reason, int error_code, struct pt_regs *);

@@ -35,7 +35,6 @@
 #include <sys/types.h>
 #include <ksys/behavior.h>
 #include <sys/kmem.h>
-#include <ksys/kern_heap.h>
 #include <sys/debug.h>
 
 #include "xfs_sim.h"

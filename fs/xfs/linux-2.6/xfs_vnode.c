@@ -28,8 +28,8 @@
 #include <sys/file.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
-#include <ksys/kern_heap.h>
 #include <sys/param.h>
+#include <sys/kmem.h>
 #include <sys/pathname.h>
 #include <linux/xfs_sema.h>
 #include <sys/systm.h>
