@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -61,9 +61,9 @@ typedef xfs_bmbt_rec_32_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
 /*
  * Values and macros for delayed-allocation startblock fields.
  */
-#define	STARTBLOCKVALBITS	16
-#define	STARTBLOCKMASKBITS	(16 + XFS_BIG_FILESYSTEMS * 20)
-#define	DSTARTBLOCKMASKBITS	(16 + 20)
+#define	STARTBLOCKVALBITS	17
+#define	STARTBLOCKMASKBITS	(15 + XFS_BIG_FILESYSTEMS * 20)
+#define	DSTARTBLOCKMASKBITS	(15 + 20)
 #define	STARTBLOCKMASK		\
 	(((((xfs_fsblock_t)1) << STARTBLOCKMASKBITS) - 1) << STARTBLOCKVALBITS)
 #define	DSTARTBLOCKMASK		\
