@@ -1,4 +1,4 @@
-#ident "$Revision: 1.353 $"
+#ident "$Revision: 1.354 $"
 
 
 #ifdef SIM
@@ -1973,14 +1973,13 @@ xfs_inactive(
 {
 	xfs_inode_t	*ip;
 			/* REFERENCED */
-	int		truncate;
 	vnode_t 	*vp;
 #ifndef SIM
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
 	int		error;
 	int		commit_flags;
-
+	int		truncate;
 #endif
 
 	vp = BHV_TO_VNODE(bdp);
@@ -1997,8 +1996,7 @@ xfs_inactive(
 		return VN_INACTIVE_CACHE;
 	}
 
-	mp = ip->i_mount;
-
+#ifndef SIM
 	/*
 	 * Only do a truncate if it's a regular file with
 	 * some actual space in it.  It's OK to look at the
@@ -2009,7 +2007,8 @@ xfs_inactive(
 	    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
 	    ((ip->i_d.di_mode & IFMT) == IFREG));
 
-#ifndef SIM
+	mp = ip->i_mount;
+
 	if (ip->i_d.di_nlink == 0 &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_DESTROY)) {
 		(void) dm_send_destroy_event(bdp, DM_RIGHT_NULL);
@@ -2181,7 +2180,7 @@ xfs_inactive(
 	 * someone might be in xfs_sync() where we play with
 	 * inodes without taking references.  Of course, this is only
 	 * necessary if it is a regular file since no other inodes
-	 * use the read ahead state.  Also reset the read/writ io
+	 * use the read ahead state.  Also reset the read/write io
 	 * sizes.  Like read-ahead, only regular files override the
 	 * default read/write io sizes.
 	 * Bug 516806: We do not need the ilock around the clearing
@@ -2191,9 +2190,8 @@ xfs_inactive(
 	 */
 	if (vp->v_type == VREG) {
 		XFS_INODE_CLEAR_READ_AHEAD(ip);
-
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
 #ifndef SIM
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		ASSERT(mp->m_readio_log <= 0xff);
 		ASSERT(mp->m_writeio_log <= 0xff);
 		ip->i_readio_log = (uchar_t) mp->m_readio_log;
@@ -2201,9 +2199,8 @@ xfs_inactive(
 		ip->i_max_io_log = (uchar_t) mp->m_writeio_log;
 		ip->i_readio_blocks = mp->m_readio_blocks;
 		ip->i_writeio_blocks = mp->m_writeio_blocks;
-#endif /* !SIM */
-
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+#endif /* !SIM */
 	}
 
 	return VN_INACTIVE_CACHE;
