@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.22 $"
+#ident "$Revision: 1.23 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -26,6 +26,7 @@
 #include <sys/vnode.h>
 #include <sys/sat.h>
 #include "xfs_handle.h"
+#include <ksys/fdt.h>
 #include <sys/debug.h>
 
 
