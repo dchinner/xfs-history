@@ -2102,7 +2102,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	ASSERT(!(fields & XFS_ILOG_DFORK) ||
 	       (len == in_f->ilf_dsize));
 
-	switch (fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
+	switch (fields & XFS_ILOG_DFORK) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
 		bcopy(src, &dip->di_u, len);
@@ -2116,10 +2116,9 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 	default:
 		/*
-		 * There are no data fork, dev or uuid flags set.
+		 * There are no data fork flags set.
 		 */
-		ASSERT((fields &
-			(XFS_ILOG_DFORK|XFS_ILOG_DEV|XFS_ILOG_UUID)) == 0);
+		ASSERT((fields & XFS_ILOG_DFORK) == 0);
 		break;
 	}
 
