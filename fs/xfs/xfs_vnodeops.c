@@ -5180,7 +5180,7 @@ xfs_reclaim(
 	 * reclaim enough.  The vnode cache then grows far too large.
 	 */
 	if (!(flag & FSYNC_INVAL)) {
-		if (ip->i_iocore.io_queued_bufs > 0) {
+		if (VN_DIRTY(vp) || ip->i_iocore.io_queued_bufs > 0) {
 			return XFS_ERROR(EAGAIN);
 		}
 		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {

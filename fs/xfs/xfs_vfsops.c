@@ -1598,7 +1598,7 @@ xfs_syncsub(
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 		} else if ((flags & SYNC_DELWRI) && (vp != NULL)) {
-			if (ip->i_delayed_blks) {
+			if (VN_DIRTY(vp)) {
 				/* We need to have dropped the lock here,
 				 * so insert a marker if we have not already
 				 * done so.
