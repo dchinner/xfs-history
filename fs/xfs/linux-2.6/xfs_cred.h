@@ -34,7 +34,7 @@
 #define __XFS_CRED_H__
 
 #include <asm/param.h>		/* For NGROUPS */
-#ifndef SIM
+#ifdef __KERNEL__
 #include <linux/capability.h>
 #include <linux/sched.h>
 #else
