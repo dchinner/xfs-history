@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -23,6 +23,7 @@
 #include <sys/systm.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/kmem.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -39,10 +40,16 @@
 #include "xfs_extfree_item.h"
 #include "xfs_inode_item.h"
 #include "xfs_bmap.h"
-#include "xfs_dir.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
-#include "xfs_dir_btree.h"
+#include <attributes.h>
+#include "xfs_da_btree.h"
+#include "xfs_attr.h"
+#include "xfs_attr_leaf.h"
+#include "xfs_dir.h"
+#include "xfs_dir_leaf.h"
 #include "xfs_log_priv.h"
 #include "xfs_log_recover.h"
 #include "xfs_rw.h"
@@ -98,11 +105,13 @@ void	idbg_xbxitrace(xfs_inode_t *);
 void	idbg_xbxstrace(xfs_inode_t *);
 #endif
 void 	idbg_xchksum(uint *);
-void	idbg_xdirlf(xfs_dir_leafblock_t *);
-void	idbg_xdirnd(xfs_dir_intnode_t *);
+void	idbg_xattrleaf(xfs_attr_leafblock_t *);
+void	idbg_xattrsf(xfs_attr_shortform_t *);
+void	idbg_xdirleaf(xfs_dir_leafblock_t *);
 void	idbg_xdirsf(xfs_dir_shortform_t *);
-void	idbg_xdname(xfs_dir_name_t *);
-void	idbg_xdstate(xfs_dir_state_t *);
+void	idbg_xdanode(xfs_da_intnode_t *);
+void	idbg_xdaname(xfs_da_name_t *);
+void	idbg_xdastate(xfs_da_state_t *);
 void	idbg_xexlist(xfs_inode_t *);
 void	idbg_xflist(xfs_bmap_free_t *);
 void	idbg_xgaplist(xfs_inode_t *);
@@ -180,11 +189,13 @@ static struct xif {
     "xbxstrc",	VD idbg_xbxstrace,	"Dump XFS bmap extent inode trace",
 #endif
     "xchksum",	VD idbg_xchksum,	"Dump chksum",
-    "xdirlf",	VD idbg_xdirlf,		"Dump XFS directory leaf block",
-    "xdirnd",	VD idbg_xdirnd,		"Dump XFS directory node block",
-    "xdirsf",	VD idbg_xdirsf,		"Dump XFS shortform directory",
-    "xdname",	VD idbg_xdname,		"Dump XFS directory name structure",
-    "xdstate",	VD idbg_xdstate,	"Dump XFS directory state_blk struct",
+    "xattrlf",	VD idbg_xattrleaf,	"Dump XFS attribute leaf block",
+    "xattrsf",	VD idbg_xattrsf,	"Dump XFS attribute shortform",
+    "xdirlf",	VD idbg_xdirleaf,	"Dump XFS directory leaf block",
+    "xdirsf",	VD idbg_xdirsf,		"Dump XFS directory shortform",
+    "xdanode",	VD idbg_xdanode,	"Dump XFS dir/attr node block",
+    "xdaname",	VD idbg_xdaname,	"Dump XFS dir/attr name structure",
+    "xdastate",	VD idbg_xdastate,	"Dump XFS dir/attr state_blk struct",
     "xexlist",	VD idbg_xexlist,	"Dump XFS bmap extents in inode",
     "xflist",	VD idbg_xflist,		"Dump XFS to-be-freed extent list",
     "xgaplst",	VD idbg_xgaplist,	"Dump inode gap list",
@@ -276,7 +287,7 @@ static void xfs_iomap_map_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_prdinode(xfs_dinode_t *di, int coreonly);
 static void xfs_prdinode_core(xfs_dinode_core_t *dip);
-static void xfs_prdir_state_path(char *f, xfs_dir_state_path_t *p);
+static void xfs_dastate_path(char *f, xfs_da_state_path_t *p);
 #ifdef DEBUG
 static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
 static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
@@ -945,22 +956,6 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		dip->di_dmevmask, dip->di_dmstate);
 	printflags(dip->di_flags, diflags, "flags");
 	qprintf("gen 0x%x\n", dip->di_gen);
-}
-
-/*
- * Print an xfs_dir_state_path structure.
- */
-static void
-xfs_prdir_state_path(char *f, xfs_dir_state_path_t *p)
-{
-	int i;
-
-	qprintf("%s active %d\n", f, p->active);
-	for (i = 0; i < XFS_DIR_NODE_MAXDEPTH; i++) {
-		qprintf("blk %d bp 0x%x blkno %llx index %d hashval 0x%x leafblk %d\n",
-			i, p->blk[i].bp, p->blk[i].blkno,
-			p->blk[i].index, p->blk[i].hashval, p->blk[i].leafblk);
-	}
 }
 
 #ifdef DEBUG
@@ -1692,8 +1687,9 @@ idbg_xbuf(buf_t *bp)
 	xfs_alloc_block_t *bta;
 	xfs_bmbt_block_t *btb;
 	xfs_inobt_block_t *bti;
-	xfs_dir_leafblock_t *leaf;
-	xfs_dir_intnode_t *node;
+	xfs_attr_leafblock_t *aleaf;
+	xfs_dir_leafblock_t *dleaf;
+	xfs_da_intnode_t *node;
 	xfs_dinode_t *di;
 
 	d = bp->b_un.b_addr;
@@ -1715,12 +1711,15 @@ idbg_xbuf(buf_t *bp)
 	} else if ((bti = d)->bb_magic == XFS_IBT_MAGIC) {
 		qprintf("buf 0x%x inobt 0x%x\n", bp, bti);
 		xfs_btino(bti, BBTOB(bp->b_bcount));
-	} else if ((leaf = d)->hdr.info.magic == XFS_DIR_LEAF_MAGIC) {
-		qprintf("buf 0x%x dirleaf 0x%x\n", bp, leaf);
-		idbg_xdirlf(leaf);
-	} else if ((node = d)->hdr.info.magic == XFS_DIR_NODE_MAGIC) {
-		qprintf("buf 0x%x dirnode 0x%x\n", bp, node);
-		idbg_xdirnd(node);
+	} else if ((aleaf = d)->hdr.info.magic == XFS_ATTR_LEAF_MAGIC) {
+		qprintf("buf 0x%x attr leaf 0x%x\n", bp, aleaf);
+		idbg_xattrleaf(aleaf);
+	} else if ((dleaf = d)->hdr.info.magic == XFS_DIR_LEAF_MAGIC) {
+		qprintf("buf 0x%x dir leaf 0x%x\n", bp, dleaf);
+		idbg_xdirleaf(dleaf);
+	} else if ((node = d)->hdr.info.magic == XFS_DA_NODE_MAGIC) {
+		qprintf("buf 0x%x dir/attr node 0x%x\n", bp, node);
+		idbg_xdanode(node);
 	} else if ((di = d)->di_core.di_magic == XFS_DINODE_MAGIC) {
 		qprintf("buf 0x%x dinode 0x%x\n", bp, di);
 		xfs_inodebuf(bp);
@@ -1849,13 +1848,87 @@ idbg_xchksum(uint *addr)
 }	/* idbg_xchksum */
 
 /*
+ * Print attribute leaf block.
+ */
+void
+idbg_xattrleaf(struct xfs_attr_leafblock *leaf)
+{
+	struct xfs_attr_leaf_hdr *h;
+	struct xfs_da_blkinfo *i;
+	struct xfs_attr_leaf_map *m;
+	struct xfs_attr_leaf_entry *e;
+	struct xfs_attr_leaf_name_local *l;
+	struct xfs_attr_leaf_name_remote *r;
+	int j, k;
+
+	h = &leaf->hdr;
+	i = &h->info;
+	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+		i->forw, i->back, i->magic);
+	qprintf("hdr count %d usedbytes %d firstused %d holes %d\n",
+		h->count, h->usedbytes, h->firstused, h->holes);
+	for (j = 0, m = h->freemap; j < XFS_ATTR_LEAF_MAPSIZE; j++, m++) {
+		qprintf("hdr freemap %d base %d size %d\n",
+			j, m->base, m->size);
+	}
+	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
+		qprintf("[%2d] hash 0x%x nameidx %d local %d\n     name \"",
+			j, e->hashval, e->nameidx, e->local);
+		if (e->local) {
+			l = XFS_ATTR_LEAF_NAME_LOCAL(leaf, j);
+			for (k = 0; k < l->namelen; k++)
+				qprintf("%c", l->nameval[k]);
+			qprintf("\"(%d) value \"",
+				  l->namelen, l->valuelen);
+			for (k = 0; (k < l->valuelen) && (k < 32); k++)
+				qprintf("%c", l->nameval[l->namelen + k]);
+			if (k == 32)
+				qprintf("...");
+			qprintf("\"(%d)\n", l->valuelen);
+		} else {
+			r = XFS_ATTR_LEAF_NAME_REMOTE(leaf, j);
+			for (k = 0; k < r->namelen; k++)
+				qprintf("%c", r->name[k]);
+			qprintf("\"(%d) value blk 0x%x len %d\n",
+				   r->namelen, r->valueblk, r->valuelen);
+		}
+	}
+}
+
+/*
+ * Print a shortform attribute list.
+ */
+void
+idbg_xattrsf(struct xfs_attr_shortform *s)
+{
+	struct xfs_attr_sf_hdr *sfh;
+	struct xfs_attr_sf_entry *sfe;
+	int i, j;
+
+	sfh = &s->hdr;
+	qprintf("hdr count %d\n", sfh->count);
+	for (i = 0, sfe = s->list; i < sfh->count; i++) {
+		qprintf("entry %d namelen %d name \"", i, sfe->namelen);
+		for (j = 0; j < sfe->namelen; j++)
+			qprintf("%c", sfe->nameval[j]);
+		qprintf("\" valuelen %d value \"");
+		for (j = 0; (j < sfe->valuelen) && (j < 32); j++)
+			qprintf("%c", sfe->nameval[sfe->namelen + j]);
+		if (j == 32)
+			qprintf("...");
+		qprintf("\"\n");
+		sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
+	}
+}
+
+/*
  * Print a directory leaf block.
  */
 void
-idbg_xdirlf(xfs_dir_leafblock_t *leaf)
+idbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 {
 	xfs_dir_leaf_hdr_t *h;
-	xfs_dir_blkinfo_t *i;
+	xfs_da_blkinfo_t *i;
 	xfs_dir_leaf_map_t *m;
 	xfs_dir_leaf_entry_t *e;
 	xfs_dir_leaf_name_t *n;
@@ -1872,38 +1945,15 @@ idbg_xdirlf(xfs_dir_leafblock_t *leaf)
 		qprintf("hdr freemap %d base %d size %d\n",
 			j, m->base, m->size);
 	}
-	for (j = 0, e = leaf->leaves; j < h->count; j++, e++) {
+	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
 		bcopy(n->inumber, (char *)&ino, sizeof(ino));
-		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld namelen %d name '",
-			j, e->hashval, e->nameidx, ino,
-			e->namelen);
+		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld",
+			j, e->hashval, e->nameidx, ino);
+		qprintf("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			qprintf("%c", n->name[k]);
-		qprintf("'\n");
-	}
-}
-
-/*
- * Print a directory internal node block.
- */
-void
-idbg_xdirnd(xfs_dir_intnode_t *node)
-{
-	xfs_dir_node_hdr_t *h;
-	xfs_dir_blkinfo_t *i;
-	xfs_dir_node_entry_t *e;
-	int j;
-
-	h = &node->hdr;
-	i = &h->info;
-	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		i->forw, i->back, i->magic);
-	qprintf("hdr count %d level %d\n",
-		h->count, h->level);
-	for (j = 0, e = node->btree; j < h->count; j++, e++) {
-		qprintf("btree %d hashval 0x%x before 0x%x\n",
-			j, e->hashval, e->before);
+		qprintf("\"\n");
 	}
 }
 
@@ -1920,48 +1970,102 @@ idbg_xdirsf(xfs_dir_shortform_t *s)
 
 	sfh = &s->hdr;
 	bcopy(sfh->parent, &ino, sizeof(ino));
-	qprintf("hdr parent %lld count %d\n",
-		ino, sfh->count);
+	qprintf("hdr parent %lld", ino);
+	qprintf(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
 		bcopy(sfe->inumber, &ino, sizeof(ino));
-		qprintf("entry %d inumber %lld namelen %d name '",
-			i, ino, sfe->namelen);
+		qprintf("entry %d inumber %lld", i, ino);
+		qprintf(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			qprintf("%c", sfe->name[j]);
-		qprintf("'\n");
+		qprintf("\"\n");
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 }
 
 /*
- * Print an xfs_dir_name structure.
+ * Print a directory/attribute internal node block.
  */
 void
-idbg_xdname(xfs_dir_name_t *n)
+idbg_xdanode(struct xfs_da_intnode *node)
+{
+	xfs_da_node_hdr_t *h;
+	xfs_da_blkinfo_t *i;
+	xfs_da_node_entry_t *e;
+	int j;
+
+	h = &node->hdr;
+	i = &h->info;
+	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+		i->forw, i->back, i->magic);
+	qprintf("hdr count %d level %d\n",
+		h->count, h->level);
+	for (j = 0, e = node->btree; j < h->count; j++, e++) {
+		qprintf("btree %d hashval 0x%x before 0x%x\n",
+			j, e->hashval, e->before);
+	}
+}
+
+/*
+ * Print an xfs_da_name structure.
+ */
+void
+idbg_xdaname(xfs_da_name_t *n)
 {
 	int i;
 
-	qprintf("name '");
+	qprintf(" hashval 0x%x inumber %lld", n->hashval, n->inumber);
+	qprintf(" namelen %d name \"", n->namelen);
 	for (i = 0; i < n->namelen; i++)
 		qprintf("%c", n->name[i]);
-	qprintf("' namelen %d hashval 0x%x inumber %lld\n",
-		n->namelen, n->hashval, n->inumber);
-	qprintf("dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
+	qprintf("\" valuelen %d value \"", n->valuelen);
+	for (i = 0; (i < n->valuelen) && (i < 32); i++)
+		qprintf("%c", n->value[i]);
+	if (i == 32)
+		qprintf("...");
+	qprintf("\"\n dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
 		n->dp, n->firstblock, n->flist, n->total);
 }
 
 /*
- * Print an xfs_dir_state_blk structure.
+ * Print an xfs_da_state_path structure.
+ */
+static void
+xfs_dastate_path(char *f, xfs_da_state_path_t *p)
+{
+	int i;
+
+	qprintf("%s active %d\n", f, p->active);
+	for (i = 0; i < XFS_DA_NODE_MAXDEPTH; i++) {
+#if XFS_BIG_FILES
+		qprintf("blk %d bp 0x%x blkno 0x%llx",
+#else
+		qprintf("blk %d bp 0x%x blkno 0x%x",
+#endif
+			i, p->blk[i].bp, p->blk[i].blkno);
+		qprintf(" index %d hashval 0x%x ",
+			p->blk[i].index, p->blk[i].hashval);
+		switch(p->blk[i].magic) {
+		case XFS_DA_NODE_MAGIC:		qprintf("NODE\n");	break;
+		case XFS_DIR_LEAF_MAGIC:	qprintf("DIR\n");	break;
+		case XFS_ATTR_LEAF_MAGIC:	qprintf("ATTR\n");	break;
+		default:			qprintf("type ??\n");	break;
+		}
+	}
+}
+
+/*
+ * Print an xfs_da_state_blk structure.
  */
 void
-idbg_xdstate(xfs_dir_state_t *s)
+idbg_xdastate(xfs_da_state_t *s)
 {
 	qprintf("args 0x%x mp 0x%x trans 0x%x blocksize %d inleaf %d\n",
 		s->args, s->mp, s->trans, s->blocksize, s->inleaf);
 	if (s->args)
-		idbg_xdname(s->args);
-	xfs_prdir_state_path("path", &s->path);
-	xfs_prdir_state_path("altpath", &s->altpath);
+		idbg_xdaname(s->args);
+	xfs_dastate_path("path", &s->path);
+	xfs_dastate_path("altpath", &s->altpath);
 }
 
 /*
