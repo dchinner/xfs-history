@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.40 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -22,8 +22,8 @@
 #else
 #include <sys/sysinfo.h>
 #include <sys/kmem.h>
+#include <sys/kthread.h>
 #include <sys/conf.h>
-#include <sys/user.h>
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"
@@ -354,7 +354,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 			bdstrat(my_bdevsw, bp);
 
 #ifndef SIM
-			u.u_ior++;
+			KTOP_UPDATE_CURRENT_INBLOCK(1);
 			SYSINFO.bread += len;
 #endif
 
