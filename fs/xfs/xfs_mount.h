@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 struct xfs_ihash;
 
@@ -15,7 +15,7 @@ typedef struct xfs_mount {
 	uint			m_log_thresh;	/* log head/tail separation */
 	xfs_trans_t		*m_async_trans;	/* list of async transactions */
 	lock_t			m_async_lock;	/* async trans list mutex */
-	xfs_sb_t		*m_sb;		/* ptr to fs superblock */
+	xfs_sb_t		m_sb;		/* ptr to fs superblock */
 	dev_t			m_dev;		/* dev of fs meta-data */
 	int			m_bsize;	/* fs logical block size */
 	xfs_agnumber_t		m_agrotor;	/* last ag where space found */
