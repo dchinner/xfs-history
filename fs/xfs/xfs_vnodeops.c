@@ -972,7 +972,8 @@ xfs_fsync(vnode_t	*vp,
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-	last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+	last_byte = XFS_ISIZE_MAX(ip);
+	last_byte = XFS_B_TO_FSB(mp, last_byte);
 	last_byte = XFS_FSB_TO_B(mp, last_byte);
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_flags & XFS_IEXTENTS && ip->i_bytes > 0) {
@@ -1004,6 +1005,7 @@ xfs_fsync(vnode_t	*vp,
 
 #endif	/* !SIM */
 
+
 /*
  * xfs_inactive
  *
@@ -1027,6 +1029,11 @@ xfs_inactive(vnode_t	*vp,
 	int		commit_flags;
 	xfs_fsblock_t	first_block;
 	xfs_bmap_free_t	free_list;
+	xfs_fileoff_t	end_fsb;
+	xfs_fileoff_t	last_fsb;
+	xfs_extlen_t	map_len;
+	int		nimaps;
+	xfs_bmbt_irec_t	imap;
 
 	vn_trace_entry(vp, "xfs_inactive");
 	ip = XFS_VTOI(vp);
@@ -1060,8 +1067,8 @@ xfs_inactive(vnode_t	*vp,
 	ASSERT(ip->i_d.di_nlink > 0);
 #else
 	ASSERT(ip->i_d.di_nlink >= 0);
+	mp = ip->i_mount;
 	if (ip->i_d.di_nlink == 0) {
-		mp = ip->i_mount;
 		tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 
 		if (truncate) {
@@ -1193,6 +1200,54 @@ xfs_inactive(vnode_t	*vp,
 
 		xfs_trans_commit(tp , commit_flags);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+	} else if (((ip->i_d.di_mode & IFMT) == IFREG) &&
+		   (ip->i_d.di_size > 0) &&
+		   (ip->i_flags & XFS_IEXTENTS)) {
+		/*
+		 * Figure out if there are any blocks beyond the end
+		 * of the file.  If not, then there is nothing to do.
+		 */
+		end_fsb = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+		last_fsb = XFS_B_TO_FSBT(mp, XFS_MAX_FILE_OFFSET);
+		map_len = last_fsb - end_fsb;
+		nimaps = 1;
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+		(void) xfs_bmapi(NULL, ip, end_fsb, map_len, 0, NULLFSBLOCK,
+				 0, &imap, &nimaps, NULL);
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		if (nimaps != 0) {
+			/*
+			 * There are blocks after the end of file.
+			 * Free them up now by truncating the file to
+			 * its current size.
+			 */
+			tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
+
+			/*
+			 * Do the xfs_itruncate_start() call before
+			 * reserving any log space because itruncate_start
+			 * will call into the buffer cache and we can't
+			 * do that within a transaction.
+			 */
+			xfs_ilock(ip, XFS_IOLOCK_EXCL);
+			xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE,
+					    ip->i_d.di_size);
+
+			status = xfs_trans_reserve(tp, 0,
+					XFS_ITRUNCATE_LOG_RES(mp),
+					0, XFS_TRANS_PERM_LOG_RES,
+					XFS_ITRUNCATE_LOG_COUNT);
+			ASSERT(status == 0);
+
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+			xfs_trans_ijoin(tp, ip,
+					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+
+			xfs_itruncate_finish(&tp, ip, ip->i_d.di_size);
+			xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+		}
 	}
 #endif	/* !SIM */
 
@@ -4004,7 +4059,7 @@ xfs_fcntl(vnode_t	*vp,
 			break;
 		}
 		da.d_mem = BBSIZE;
-		
+
 		/* this only really needs to be BBSIZE.
 		 * it is set to the file system block size to
 		 * avoid having to do block zeroing on short writes.
@@ -4131,12 +4186,14 @@ xfs_reclaim(vnode_t	*vp,
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
 	xfs_fsize_t		last_byte;
+	int			locked;
 
 	vn_trace_entry(vp, "xfs_reclaim");
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
 	ASSERT(ip->i_queued_bufs >= 0);
+	locked = 0;
 
 	/*
 	 * If this is not an unmount (flag == 0) and there are dirty
@@ -4160,11 +4217,27 @@ xfs_reclaim(vnode_t	*vp,
 	 * It is OK to return an error here.  The vnode cache will just
 	 * come back later.
 	 */
-	if (!(flag & FSYNC_INVAL) &&
-	    (VN_DIRTY(vp) || (ip->i_queued_bufs > 0))) {
-		return EAGAIN;
-	} else if (((ip->i_d.di_mode & IFMT) == IFREG) &&
-		   (ip->i_d.di_size > 0)) {
+	if (!(flag & FSYNC_INVAL)) {
+		if (VN_DIRTY(vp) || (ip->i_queued_bufs > 0)) {
+			return EAGAIN;
+		}
+		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
+			return EAGAIN;
+		}
+		if (!xfs_iflock_nowait(ip)) {
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			return EAGAIN;
+		}
+		if ((ip->i_item.ili_format.ilf_fields != 0) ||
+		    (ip->i_item.ili_last_fields != 0)) {
+			xfs_iflush(ip, XFS_IFLUSH_DELWRI);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			return EAGAIN;
+		}
+		locked = 1;
+	}
+	if (((ip->i_d.di_mode & IFMT) == IFREG) &&
+	    (ip->i_d.di_size > 0)) {
 		/*
 		 * Flush and invalidate any data left around that is
 		 * a part of this file.
@@ -4178,8 +4251,14 @@ xfs_reclaim(vnode_t	*vp,
 		 * cannot be any mapped file references to this vnode
 		 * since it is being reclaimed.
 		 */
-		last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+		last_byte = XFS_ISIZE_MAX(ip);
+		last_byte = XFS_B_TO_FSB(mp, last_byte);
 		last_byte = XFS_FSB_TO_B(mp, last_byte);
+		if (locked) {
+			xfs_ifunlock(ip);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			locked = 0;
+		}
 	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 		pflushinvalvp(vp, 0, last_byte);			     
 		ASSERT(!VN_DIRTY(vp) &&
@@ -4204,8 +4283,10 @@ xfs_reclaim(vnode_t	*vp,
 	 * We get the flush lock regardless, though, just to make sure
 	 * we don't free it while it is being flushed.
 	 */
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	xfs_iflock(ip);
+	if (!locked) {
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		xfs_iflock(ip);
+	}
 	if (ip->i_update_core || (ip->i_item.ili_format.ilf_fields != 0)) {
 		xfs_iflush(ip, XFS_IFLUSH_DELWRI_ELSE_SYNC);
 	}
