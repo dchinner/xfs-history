@@ -5,7 +5,7 @@
 WORKAREA ?= `pwd`
 
 KERN_SPEC = kernel-2.4.spec
-KERNEL_VERSION = 2.4.0-test8
+KERNEL_VERSION = 2.4.0-test9
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
@@ -54,7 +54,7 @@ xfs-cmds:
 	cd $(WORKAREA)/cmd/xfs && ./Makepkgs verbose
 
 clean:
-	rm -rf RPMS SRPMS BUILD SOURCES/linux-2.4.0-test8-xfs-alpha.patch
+	rm -rf RPMS SRPMS BUILD SOURCES/linux-${KERNEL_VERSION}-xfs-alpha.patch
 	cd $(WORKAREA)/cmd/xfs && make clean
 
 realclean: clean
