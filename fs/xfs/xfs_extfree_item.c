@@ -1,4 +1,4 @@
-#ident "$Revision: 1.18 $"
+#ident "$Revision$"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -154,14 +154,17 @@ xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
 }
 
 /*
- * Efi items have no locking or pushing, so return failure
- * so that the caller doesn't bother with us.
+ * Efi items have no locking or pushing.  However, since EFIs are
+ * pulled from the AIL when their corresponding EFDs are committed
+ * to disk, their situation is very similar to being pinned.  Return
+ * XFS_ITEM_PINNED so that the caller will eventually flush the log.
+ * This should help in getting the EFI out of the AIL.
  */
 /*ARGSUSED*/
 STATIC uint
 xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
 {
-	return XFS_ITEM_LOCKED;
+	return XFS_ITEM_PINNED;
 }
 
 /*

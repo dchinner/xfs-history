@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.14 $"
+#ident "$Revision: 1.15 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -340,6 +340,7 @@ vp_to_handle (
 {
 	int		error;
 	struct	fid	*fidp = NULL;
+	struct	fid	fid;
 	int		hsize;
 
 	if (vp->v_vfsp->vfs_altfsid == NULL)
@@ -352,7 +353,12 @@ vp_to_handle (
 		default:
 			return EBADF;
 	}
+#ifdef SMALLFIDS
 	error = VOP_FID (vp, &fidp);
+#else
+	error = VOP_FID2 (vp, &fid);
+	fidp = &fid;
+#endif /* SMALLFIDS */
 	if (error)
 		return error;
 	if (fidp == NULL)
@@ -362,7 +368,9 @@ vp_to_handle (
 	bcopy (fidp, &handlep->ha_fid, fidp->fid_len + sizeof fidp->fid_len);
 	hsize = HSIZE (*handlep);
 	bzero ((char *) handlep + hsize, sizeof *handlep - hsize);
+#ifdef SMALLFIDS
 	freefid (fidp);
+#endif
 	return 0;
 }
 
