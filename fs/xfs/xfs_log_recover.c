@@ -862,7 +862,7 @@ xlog_recover_print_trans_head(xlog_recover_t *tr)
 }	/* xlog_recover_print_trans_head */
 
 
-STATIC void
+void
 xlog_recover_print_data(caddr_t p, int len)
 {
     extern int print_data;
