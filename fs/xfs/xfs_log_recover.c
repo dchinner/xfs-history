@@ -199,7 +199,7 @@ xlog_recover_iodone(
 		 * this during recovery. One strike!
 		 */
 		mp = (xfs_mount_t *)bp->b_fsprivate;
-		xfs_force_shutdown(mp);
+		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	}
 	bp->b_fsprivate = NULL;
 	bp->b_iodone = NULL;
@@ -754,7 +754,6 @@ xlog_find_tail(xlog_t  *log,
 	 */
 	if (!clean || !readonly)
 		error = xlog_clear_stale_blocks(log, tail_lsn);
-
 bread_err:
 exit:
 	xlog_put_bp(bp);
@@ -2473,15 +2472,7 @@ xlog_recover_process_data(xlog_t	    *log,
 	if (ohead->oh_clientid != XFS_TRANSACTION &&
 	    ohead->oh_clientid != XFS_LOG) {
 	    xlog_warn("XFS: xlog_recover_process_data: bad clientid ");
-#if defined(XFSERRORDEBUG) && !defined(SIM)
-	    printf("rhead 0x%x, ohead 0x%x, dp 0x%x, lp 0x%x client 0x%x\n", 
-		   rhead, ohead, dp, lp, ohead->oh_clientid);
-	    printf("LOG REC AT LSN cycle 0x%x blkno 0x%x\n",
-		   CYCLE_LSN(rhead->h_lsn), BLOCK_LSN(rhead->h_lsn));
-	    debug("");
-#else
 	    ASSERT(0);
-#endif
 	    return (XFS_ERROR(EIO));
         }
 	tid = ohead->oh_tid;
@@ -2922,7 +2913,6 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
  * to the routines called to process the data and is not looked at
  * here.
  */
-int xfsrecdebug = 1;
 STATIC int
 xlog_do_recovery_pass(xlog_t	*log,
 		      daddr_t	head_blk,
@@ -3003,32 +2993,16 @@ xlog_do_recovery_pass(xlog_t	*log,
 		    ASSERT(blk_no <= INT_MAX);
 		    split_bblks = log->l_logBBsize - (int)blk_no;
 		    ASSERT(split_bblks > 0);
-#ifdef XFSERRORDEBUG
-		    if (xfsrecdebug)
-		    printf("some data is before physical end of log "
-			   "blk_no 0x%x split 0x%x\n",
-			   blk_no, split_bblks);
-#endif
 		    if (error = xlog_bread(log, blk_no, split_bblks, dbp))
 			goto bread_err;
 		}
 		bufaddr = dbp->b_dmaaddr;
 		dbp->b_dmaaddr += BBTOB(split_bblks);
-#ifdef XFSERRORDEBUG
-		if (xfsrecdebug)
-		printf("bufaddr 0x%x dmaddr now 0x%x\n", bufaddr, dbp->b_dmaaddr);
-#endif
 		if (error = xlog_bread(log, 0, bblks - split_bblks, dbp))
 		    goto bread_err;
 		dbp->b_dmaaddr = bufaddr;
 	    }
 	    xlog_unpack_data(rhead, dbp->b_dmaaddr, log);
-#ifdef XFSERRORDEBUG
-	    if (xfsrecdebug)
-		    printf("blk_no 0x%x, dmaddr 0x%x, l_logBBsize 0x%x, "
-			   "bblks 0x%x\n",
-			   blk_no, dbp->b_dmaaddr, log->l_logBBsize, bblks);
-#endif
 	    if (error = xlog_recover_process_data(log, rhash,
 						  rhead, dbp->b_dmaaddr,
 						  pass))
