@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.2 $
+# $Revision: 1.4 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -15,6 +15,7 @@ XFS_CSRCS=	byte_to_bits.c \
 		xfs_alloc.c \
 		xfs_bio.c \
 		xfs_bmap.c \
+		xfs_bmap_btree.c \
 		xfs_btree.c \
 		xfs_buf_item.c \
 		xfs_extfree_item.c \
@@ -43,6 +44,7 @@ HFILES=	xfs_ag.h \
 	xfs_alloc.h \
 	xfs_bio.h \
 	xfs_bmap.h \
+	xfs_bmap_btree.h \
 	xfs_btree.h \
 	xfs_buf_item.h \
 	xfs_dinode.h \
