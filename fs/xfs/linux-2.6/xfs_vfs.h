@@ -143,8 +143,6 @@ typedef struct vfsops {
                                         /* flush files */
 	int	(*vfs_vget)(bhv_desc_t *, struct vnode **, struct fid *);
 					/* get vnode from fid */
-        int     (*vfs_get_vnode)(bhv_desc_t *, struct vnode **, xfs_ino_t);
-                                        /* get vnode using an ino_t */
 	int	(*vfs_dmapi_mount)(struct vfs *, struct vnode *,
 				   char *, char *, struct vfsmount *);
 					/* send dmapi mount event */
@@ -191,12 +189,6 @@ typedef struct vfsops {
 {       \
         BHV_READ_LOCK(&(vfsp)->vfs_bh); \
         rv = (*(VFS_FOPS(vfsp)->vfs_vget))((vfsp)->vfs_fbhv, vpp, fidp);  \
-        BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
-}
-#define VFS_GET_VNODE(vfsp, vpp, ino, rv) \
-{       \
-        BHV_READ_LOCK(&(vfsp)->vfs_bh); \
-        rv = (*(VFS_FOPS(vfsp)->vfs_get_vnode))((vfsp)->vfs_fbhv, vpp, ino);        \
         BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
 #define VFS_DMAPI_FSYS_VECTOR(vfsp, df, rv) \

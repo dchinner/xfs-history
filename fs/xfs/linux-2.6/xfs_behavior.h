@@ -326,44 +326,4 @@ extern void             bhv_queue_ucallout_unlocked(bhv_head_t *bhp,
                              int flags, bhv_ucallout_t *func,
                              void *, void *, caddr_t, size_t);
 #endif /* CELL_CAPABLE */
-
-/*
- * Prototypes for interruptible sleep requests
- * Noop on non-cell kernels.
- */
-#ifdef CELL_CAPABLE
-#define      BLA_ACCESS              0
-#define      BLA_UPDATE              1
-#define BLA_RWMASK           1
-#define BLA_TRY                      4
-#define BLA_INTERRUPT                8
-#ifdef BLALOG
-#define bla_push(mr,rw,ra)   CELL_ONLY(_bla_push(mr,rw,ra))
-extern void                  _bla_push(mrlock_t *mrp, int rw, void *ra);
-#else
-#define bla_push(mr,rw,ra)   CELL_ONLY(_bla_push(mr,rw))
-extern void                  _bla_push(mrlock_t *mrp, int rw);
-#endif
-#define      bla_pop(mrp)    CELL_ONLY(_bla_pop(mrp))
-extern void                  _bla_pop(mrlock_t *mrp);
-
-#define      bla_isleep()    CELL_ONLY(_bla_isleep())
-extern void                  _bla_isleep(void);
-
-#define      bla_iunsleep()  CELL_ONLY(_bla_iunsleep())
-extern void                  _bla_iunsleep(void);
-
-#define      bla_wait_for_mrlock(mrp)   CELL_IF(_bla_wait_for_mrlock(mrp), 0)
-extern uint_t                           _bla_wait_for_mrlock(mrlock_t *mrp);
-
-#define      bla_got_mrlock(rv)         CELL_ONLY(_bla_got_mrlock(rv))
-extern void                             _bla_got_mrlock(uint_t rv);
-
-#define bla_curlocksheld()   \
-             CELL_MUST((private.p_blaptr - (curthreadp)->k_blap->kb_lockp))
-             
-#define bla_klocksheld(kt)   \
-             CELL_MUST(((kt)->k_blap->kb_lockpp - (kt)->k_blap->kb_lockp))
-#endif
-
 #endif /* __XFS_BEHAVIOR_H__ */
