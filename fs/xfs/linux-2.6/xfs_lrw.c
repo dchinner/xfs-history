@@ -442,10 +442,6 @@ xfs_write(
 	unsigned int	mode;
 
 
-	ASSERT(uiop);			/* we only support exactly 1  */
-	ASSERT(uiop->uio_iovcnt == 1);	/* iov in a uio on linux      */
-	ASSERT(uiop->uio_iov);
-        
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
 
@@ -606,7 +602,6 @@ retry:
 
 	/*
 	 * ret > 0 == number of bytes written by pagebuf_generic_file_write()
-	 * Keep track of any unwritten bytes in uio_resid.
 	 */
 
 	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
