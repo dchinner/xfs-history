@@ -1018,6 +1018,9 @@ xfs_inobt_lookup(
 	int			keyno;	/* current key number */
 	int			level;	/* level in the btree */
 	xfs_mount_t		*mp;	/* file system mount point */
+        xfs_arch_t              arch;   /* fs arch */
+        
+        arch=ARCH_GET(mp->m_arch);
 
 	/*
 	 * Get the allocation group header, and the root block number.
@@ -1027,8 +1030,8 @@ xfs_inobt_lookup(
 		xfs_agi_t	*agi;	/* a.g. inode header */
 
 		agi = XFS_BUF_TO_AGI(cur->bc_private.i.agbp);
-		agno = INT_GET(agi->agi_seqno, mp->m_arch);
-		agbno = INT_GET(agi->agi_root, mp->m_arch);
+		agno = INT_GET(agi->agi_seqno, arch);
+		agbno = INT_GET(agi->agi_root, arch);
 	}
 	/*
 	 * Iterate over each level in the btree, starting at the root.
@@ -1095,7 +1098,7 @@ xfs_inobt_lookup(
 			 * Set low and high entry numbers, 1-based.
 			 */
 			low = 1;
-			if (!(high = INT_GET(block->bb_numrecs, ARCH_UNKNOWN))) {
+			if (!(high = INT_GET(block->bb_numrecs, arch))) {
 				/*
 				 * If the block is empty, the tree must
 				 * be an empty leaf.
@@ -1122,12 +1125,12 @@ xfs_inobt_lookup(
 					xfs_inobt_key_t	*kkp;
 
 					kkp = kkbase + keyno - 1;
-					startino = INT_GET(kkp->ir_startino, ARCH_UNKNOWN);
+					startino = INT_GET(kkp->ir_startino, arch);
 				} else {
 					xfs_inobt_rec_t	*krp;
 
 					krp = krbase + keyno - 1;
-					startino = INT_GET(krp->ir_startino, ARCH_UNKNOWN);
+					startino = INT_GET(krp->ir_startino, arch);
 				}
 				/*
 				 * Compute difference to get next direction.
@@ -1161,7 +1164,7 @@ xfs_inobt_lookup(
 			 */
 			if (diff > 0 && --keyno < 1)
 				keyno = 1;
-			agbno = INT_GET(*XFS_INOBT_PTR_ADDR(block, keyno, cur), ARCH_UNKNOWN);
+			agbno = INT_GET(*XFS_INOBT_PTR_ADDR(block, keyno, cur), arch);
 #ifdef DEBUG
 			if (error = xfs_btree_check_sptr(cur, agbno, level))
 				return error;
@@ -1180,8 +1183,8 @@ xfs_inobt_lookup(
 		 * not the last block, we're in the wrong block.
 		 */
 		if (dir == XFS_LOOKUP_GE &&
-		    keyno > INT_GET(block->bb_numrecs, ARCH_UNKNOWN) &&
-		    INT_GET(block->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
+		    keyno > INT_GET(block->bb_numrecs, arch) &&
+		    INT_GET(block->bb_rightsib, arch) != NULLAGBLOCK) {
 			int	i;
 
 			cur->bc_ptrs[0] = keyno;
@@ -1198,7 +1201,7 @@ xfs_inobt_lookup(
 	/*
 	 * Return if we succeeded or not.
 	 */
-	if (keyno == 0 || keyno > INT_GET(block->bb_numrecs, ARCH_UNKNOWN))
+	if (keyno == 0 || keyno > INT_GET(block->bb_numrecs, arch))
 		*stat = 0;
 	else
 		*stat = ((dir != XFS_LOOKUP_EQ) || (diff == 0));
@@ -1419,14 +1422,14 @@ xfs_inobt_newroot(
 	if (error = xfs_btree_check_sblock(cur, block, cur->bc_nlevels - 1, bp))
 		return error;
 #endif
-	if (INT_GET(block->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
+	if (INT_GET(block->bb_rightsib, arch) != NULLAGBLOCK) {
 		/*
 		 * Our block is left, pick up the right block.
 		 */
 		lbp = bp;
 		lbno = XFS_DADDR_TO_AGBNO(args.mp, XFS_BUF_ADDR(lbp));
 		left = block;
-		rbno = INT_GET(left->bb_rightsib, ARCH_UNKNOWN);
+		rbno = INT_GET(left->bb_rightsib, arch);
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
 				rbno, 0, &rbp, XFS_INO_BTREE_REF))
 			return error;
@@ -1443,7 +1446,7 @@ xfs_inobt_newroot(
 		rbp = bp;
 		rbno = XFS_DADDR_TO_AGBNO(args.mp, XFS_BUF_ADDR(rbp));
 		right = block;
-		lbno = INT_GET(right->bb_leftsib, ARCH_UNKNOWN);
+		lbno = INT_GET(right->bb_leftsib, arch);
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
 				lbno, 0, &lbp, XFS_INO_BTREE_REF))
 			return error;
@@ -1457,33 +1460,33 @@ xfs_inobt_newroot(
 	/*
 	 * Fill in the new block's btree header and log it.
 	 */
-	INT_SET(new->bb_magic, ARCH_UNKNOWN, xfs_magics[cur->bc_btnum]);
-	INT_SET(new->bb_level, ARCH_UNKNOWN, (__uint16_t)cur->bc_nlevels);
-	INT_SET(new->bb_numrecs, ARCH_UNKNOWN, 2);
-	INT_SET(new->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
-        INT_SET(new->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
+	INT_SET(new->bb_magic, arch, xfs_magics[cur->bc_btnum]);
+	INT_SET(new->bb_level, arch, (__uint16_t)cur->bc_nlevels);
+	INT_SET(new->bb_numrecs, arch, 2);
+	INT_SET(new->bb_leftsib, arch, NULLAGBLOCK);
+        INT_SET(new->bb_rightsib, arch, NULLAGBLOCK);
 	xfs_inobt_log_block(args.tp, nbp, XFS_BB_ALL_BITS);
 	ASSERT(lbno != NULLAGBLOCK && rbno != NULLAGBLOCK);
 	/*
 	 * Fill in the key data in the new root.
 	 */
 	kp = XFS_INOBT_KEY_ADDR(new, 1, cur);
-	if (INT_GET(left->bb_level, ARCH_UNKNOWN) > 0) {
+	if (INT_GET(left->bb_level, arch) > 0) {
 		kp[0] = *XFS_INOBT_KEY_ADDR(left, 1, cur); /* INT_: struct copy */
 		kp[1] = *XFS_INOBT_KEY_ADDR(right, 1, cur); /* INT_: struct copy */
 	} else {
 		rp = XFS_INOBT_REC_ADDR(left, 1, cur);
-		INT_SET(kp[0].ir_startino, ARCH_UNKNOWN, INT_GET(rp->ir_startino, ARCH_UNKNOWN));
+		INT_SET(kp[0].ir_startino, arch, INT_GET(rp->ir_startino, arch));
 		rp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		INT_SET(kp[1].ir_startino, ARCH_UNKNOWN, INT_GET(rp->ir_startino, ARCH_UNKNOWN));
+		INT_SET(kp[1].ir_startino, arch, INT_GET(rp->ir_startino, arch));
 	}
 	xfs_inobt_log_keys(cur, nbp, 1, 2);
 	/*
 	 * Fill in the pointer data in the new root.
 	 */
 	pp = XFS_INOBT_PTR_ADDR(new, 1, cur);
-	INT_SET(pp[0], ARCH_UNKNOWN, lbno);
-	INT_SET(pp[1], ARCH_UNKNOWN, rbno);
+	INT_SET(pp[0], arch, lbno);
+	INT_SET(pp[1], arch, rbno);
 	xfs_inobt_log_ptrs(cur, nbp, 1, 2);
 	/*
 	 * Fix up the cursor.
