@@ -1270,8 +1270,7 @@ __pagebuf_iodone(
 
 STATIC __inline__ void
 __pagebuf_schedule_iodone(
-	page_buf_t		*pb,
-	int			dataio)
+	page_buf_t		*pb)
 {
 	struct pb_iodaemon	*iodaemon;
 	unsigned long		flags;
@@ -1306,7 +1305,7 @@ pagebuf_iodone(
 
 	if ((pb->pb_iodone) || (pb->pb_flags & PBF_ASYNC)) {
 		if (schedule)
-			__pagebuf_schedule_iodone(pb, dataio);
+			__pagebuf_schedule_iodone(pb);
 		else
 			__pagebuf_iodone(pb);
 	} else {
