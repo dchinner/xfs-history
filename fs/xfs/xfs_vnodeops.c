@@ -429,8 +429,11 @@ xfs_setattr(
 			if ((vap->va_mode & ISGID) &&
 			    !in_group_p((gid_t)ip->i_d.di_gid))
 				m |= ISGID;
+#if 0
+			/* Linux allows this, Irix doesn't. */
 			if ((vap->va_mode & ISVTX) && vp->v_type != VDIR)
 				m |= ISVTX;
+#endif
 			if (m && !capable(CAP_FSETID))
 				vap->va_mode &= ~m;
 		}
