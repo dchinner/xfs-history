@@ -133,6 +133,8 @@ typedef enum xfs_dinode_fmt
  */
 #define	XFS_DIFLAG_REALTIME	0x1	/* file's blocks come from rt area */
 
+#define	XFS_DIFLAG_ALL	(XFS_DIFLAG_REALTIME)
+
 #define	xfs_buf_to_dinode(buf)	((xfs_dinode_t *)(buf->b_un.b_addr))
 
 #endif	/* _FS_XFS_DINODE_H */
