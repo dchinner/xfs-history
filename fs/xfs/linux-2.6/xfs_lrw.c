@@ -230,7 +230,7 @@ xfs_zero_last_block(
 	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
 		struct page *page;
 
-		page = find_lock_page(&ip->i_data, isize >> PAGE_CACHE_SHIFT);
+		page = find_lock_page(ip->i_mapping, isize >> PAGE_CACHE_SHIFT);
 		if (page) {
 			memset((void *)kmap(page)+i, 0, PAGE_SIZE-i);
 			kunmap(page);
