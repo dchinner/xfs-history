@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 39
+SUBLEVEL = 40
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -158,6 +158,10 @@ ifeq ($(CONFIG_SCSI),y)
 DRIVERS := $(DRIVERS) drivers/scsi/scsi.a
 endif
 
+ifeq ($(CONFIG_IEEE1394),y)
+DRIVERS := $(DRIVERS) drivers/ieee1394/ieee1394.a
+endif
+
 ifneq ($(CONFIG_CD_NO_IDESCSI)$(CONFIG_BLK_DEV_IDECD)$(CONFIG_BLK_DEV_SR)$(CONFIG_PARIDE_PCD),)
 DRIVERS := $(DRIVERS) drivers/cdrom/cdrom.a
 endif
@@ -202,7 +206,7 @@ ifdef CONFIG_PPC
 DRIVERS := $(DRIVERS) drivers/macintosh/macintosh.a
 endif
 
-ifeq ($(CONFIG_PNP),y)
+ifeq ($(CONFIG_ISAPNP),y)
 DRIVERS := $(DRIVERS) drivers/pnp/isa-pnp.o
 endif
 
@@ -397,6 +401,7 @@ modules_install:
 	if [ -f IRDA_MODULES  ]; then inst_mod IRDA_MODULES  net;   fi; \
 	if [ -f SK98LIN_MODULES ]; then inst_mod SK98LIN_MODULES  net;   fi; \
 	if [ -f USB_MODULES   ]; then inst_mod USB_MODULES   usb;   fi; \
+	if [ -f IEEE1394_MODULES ]; then inst_mod IEEE1394_MODULES ieee1394; fi; \
 	if [ -f PCMCIA_MODULES ]; then inst_mod PCMCIA_MODULES pcmcia; fi; \
 	if [ -f PCMCIA_NET_MODULES ]; then inst_mod PCMCIA_NET_MODULES pcmcia; fi; \
 	if [ -f PCMCIA_CHAR_MODULES ]; then inst_mod PCMCIA_CHAR_MODULES pcmcia; fi; \
@@ -482,7 +487,7 @@ depend dep: dep-files $(MODVERFILE)
 
 # make checkconfig: Prune 'scripts' directory to avoid "false positives".
 checkconfig:
-	perl -w scripts/checkconfig.pl `find * -path 'scripts' -prune -o -name '*.[hcS]' -print | sort`
+	find * -name '*.[hcS]' -type f -print | grep -v scripts/ | sort | xargs perl -w scripts/checkconfig.pl
 
 checkhelp:
 	perl -w scripts/checkhelp.pl `find * -name [cC]onfig.in -print`
