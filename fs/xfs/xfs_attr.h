@@ -61,10 +61,10 @@
 #define ATTR_ROOT	0x0002	/* use attrs in root namespace, not user */
 #define ATTR_CREATE	0x0010	/* pure create: fail if attr already exists */
 #define ATTR_REPLACE	0x0020	/* pure set: fail if attr does not exist */
-#define ATTR_KERNOTIME	0x1000	/* [kernel] don't update inode timestamps */
-#define ATTR_KERNOVAL	0x1010	/* [kernel] get attr size only, not value */
-#define ATTR_KERNAMELS	0x1020	/* [kernel] list attr names (simple list) */
-#define ATTR_KERNFULLS	0x1040	/* [kernel] full attr list, ie. root+user */
+#define ATTR_KERNOTIME	0x0100	/* [kernel] don't update inode timestamps */
+#define ATTR_KERNOVAL	0x0200	/* [kernel] get attr size only, not value */
+#define ATTR_KERNAMELS	0x0400	/* [kernel] list attr names (simple list) */
+#define ATTR_KERNFULLS	0x0800	/* [kernel] full attr list, ie. root+user */
 
 /*
  * The maximum size (into the kernel or returned from the kernel) of an
