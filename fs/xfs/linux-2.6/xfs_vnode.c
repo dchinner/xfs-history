@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.38 $"
+#ident	"$Revision: 1.39 $"
 
 #include <xfs_os_defs.h>
 
@@ -254,6 +254,11 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 		vp->v_type  = IFTOVT(ip->i_d.di_mode);
 
 		linvfs_set_inode_ops(inode);
+		{ int error;
+		error = linvfs_revalidate_core(inode);
+		if(error)
+		  printk("vn_initialize: linvfs_revalidate_core error %d\n",error);
+		}
 	}
 
 	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
