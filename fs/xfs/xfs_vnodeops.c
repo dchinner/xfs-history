@@ -1,4 +1,4 @@
-#ident "$Revision: 1.317 $"
+#ident "$Revision: 1.318 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -689,17 +689,52 @@ xfs_setattr(
 		code = XFS_ERROR(EACCES);
 		goto error_return;
 	}
-        /*
-         * Change file access modes.  Must be owner or privileged.
-	 * Also check here for xflags, extsize.
-         */
+
+	/* boolean: are we the file owner? */
 	file_owner = (credp->cr_uid == ip->i_d.di_uid);
 
-        if (mask & (AT_MODE|AT_XFLAGS|AT_EXTSIZE)) {
+	/*
+	 * Change various properties of a file.
+	 * Only the owner or users with CAP_FOWNER
+	 * capability may do these things.
+	 */
+        if (mask & (AT_MODE|AT_XFLAGS|AT_EXTSIZE|AT_UID|AT_GID|AT_PROJID)) {
+		/*
+		 * CAP_FOWNER overrides the following restrictions:
+		 *
+		 * The user ID of the calling process must be equal
+		 * to the file owner ID, except in cases where the
+		 * CAP_FSETID capability is applicable.
+		 */
                 if (!file_owner && !cap_able_cred(credp, CAP_FOWNER)) {
                         code = XFS_ERROR(EPERM);
                         goto error_return;
                 }
+
+		/*
+		 * CAP_FSETID overrides the following restrictions:
+		 *
+		 * The effective user ID of the calling process shall match
+		 * the file owner when setting the set-user-ID and
+		 * set-group-ID bits on that file.
+		 *
+		 * The effective group ID or one of the supplementary group
+		 * IDs of the calling process shall match the group owner of
+		 * the file when setting the set-group-ID bit on that file
+		 */
+		if (mask & AT_MODE) {
+			mode_t m = 0;
+
+			if ((vap->va_mode & ISUID) && !file_owner)
+				m |= ISUID;
+			if ((vap->va_mode & ISGID) &&
+			    !groupmember(ip->i_d.di_gid, credp))
+				m |= ISGID;
+			if ((vap->va_mode & ISVTX) && vp->v_type != VDIR)
+				m |= ISVTX;
+			if (m && !cap_able_cred(credp, CAP_FSETID))
+				vap->va_mode &= ~m;
+		}
         }
 
         /*
@@ -723,16 +758,23 @@ xfs_setattr(
 		uid = (mask & AT_UID) ? vap->va_uid : iuid;
 		projid = (mask & AT_PROJID) ? (xfs_prid_t)vap->va_projid : 
 			 iprojid;
-		
-                /* XXXsup How does restricted chown affect projid ??? */
-		if (!file_owner && !cap_able_cred(credp, CAP_FOWNER)) {
-			code = XFS_ERROR(EPERM);
-			goto error_return;
-		}
 
+		/*
+		 * CAP_CHOWN overrides the following restrictions:
+		 *
+		 * If _POSIX_CHOWN_RESTRICTED is defined, this capability
+		 * shall override the restriction that a process cannot
+		 * change the user ID of a file it owns and the restriction
+		 * that the group ID supplied to the chown() function
+		 * shall be equal to either the group ID or one of the
+		 * supplementary group IDs of the calling process.
+		 *
+		 * XXX: How does restricted_chown affect projid?
+		 */
 		if (restricted_chown &&
-		    (ip->i_d.di_uid != uid || !groupmember(gid, credp)) &&
-		    !cap_able_cred(credp, CAP_FOWNER)) {
+		    (iuid != uid || (igid != gid &&
+				     !groupmember(gid, credp))) &&
+		    !cap_able_cred(credp, CAP_CHOWN)) {
 			code = XFS_ERROR(EPERM);
 			goto error_return;
 		}
@@ -954,21 +996,6 @@ xfs_setattr(
 
                 ip->i_d.di_mode &= IFMT;
                 ip->i_d.di_mode |= vap->va_mode & ~IFMT;
-                /*
-                 * A non-privileged user can set the sticky and sgid
-                 * bits on a directory.
-                 */
-
-		if (vp->v_type != VDIR &&
-		    (ip->i_d.di_mode & ISVTX) &&
-		    !cap_able_cred(credp, CAP_FOWNER))
-                	ip->i_d.di_mode &= ~ISVTX;
-
-		if (!groupmember(ip->i_d.di_gid, credp) && 
-		    (ip->i_d.di_mode & ISGID) &&
-		    !cap_able_cred(credp, CAP_FOWNER))
-			ip->i_d.di_mode &= ~ISGID;
-
 
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -989,8 +1016,14 @@ xfs_setattr(
          * or she is a member.
          */
         if (mask & (AT_UID|AT_GID|AT_PROJID)) {
-                if ((ip->i_d.di_mode & ~(ISUID|ISGID)) && 
-		    !cap_able_cred(credp, CAP_FOWNER)) {
+		/*
+		 * CAP_FSETID overrides the following restrictions:
+		 *
+		 * The set-user-ID and set-group-ID bits of a file will be
+		 * cleared upon successful return from chown()
+		 */
+                if ((ip->i_d.di_mode & (ISUID|ISGID)) && 
+		    !cap_able_cred(credp, CAP_FSETID)) {
                         ip->i_d.di_mode &= ~(ISUID|ISGID);
                 }
                 
