@@ -1,4 +1,4 @@
-#ident "$Revision: 1.212 $"
+#ident "$Revision: 1.213 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2186,6 +2186,7 @@ xfs_write_file(
 	xfs_fsize_t	isize;
 	xfs_fsize_t	new_size;
 	xfs_mount_t	*mp;
+	int		fsynced;
 	extern void	chunkrelse(buf_t*);
 
 	vp = BHV_TO_VNODE(bdp);
@@ -2269,6 +2270,7 @@ xfs_write_file(
 		offset = ip->i_d.di_size;
 		count = uiop->uio_offset + uiop->uio_resid - offset;
 	}
+	fsynced = 0;
 
 	do {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -2319,10 +2321,39 @@ xfs_write_file(
 					ioflag, uiop->uio_pmp);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
+		if (error == ENOSPC) {
+			switch (fsynced) {
+			case 0:
+				VOP_FLUSH_PAGES(vp, 0,
+					(off_t)xfs_file_last_byte(ip), 0,
+					FI_NONE, error);
+				error = 0;
+				fsynced = 1;
+				continue;
+			case 1:
+				fsynced = 2;
+				if (!(ioflag & IO_SYNC)) {
+					ioflag |= IO_SYNC;
+					error = 0;
+					continue;
+				}
+				/* FALLTHROUGH */
+			case 2:
+			case 3:
+				VFS_SYNC(vp->v_vfsp,
+					SYNC_NOWAIT|SYNC_BDFLUSH|SYNC_FSDATA,
+					get_current_cred(), error);
+				error = 0;
+				delay(HZ);
+				fsynced++;
+				continue;
+			}
+		}
 		if (error || (bmaps[0].pbsize == 0)) {
 			break;
 		}
 
+		fsynced = 0;
 		bmapp = &bmaps[0];
 		/*
 		 * Each pass through the loop writes another buffer
