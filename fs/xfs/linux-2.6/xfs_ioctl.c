@@ -292,7 +292,6 @@ xfs_open_by_handle(
 	struct dentry		*dentry;
 	vnode_t			*vp;
 	xfs_fsop_handlereq_t	hreq;
-	struct list_head	*lp;
 
 	error = xfs_vget_fsop_handlereq(mp, parinode, CAP_SYS_ADMIN, arg,
 					sizeof(xfs_fsop_handlereq_t),
