@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.38 1994/11/15 22:16:54 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.39 1994/12/13 00:04:25 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -293,7 +293,7 @@ xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
 				previousticket = ticket;
 				ticket = ticket->nextticket;
 			}
-			if (ticket) 
+			if (ticket)
 				previousticket->nextticket = ticket->nextticket;
 		}
 		if (ticket) {
@@ -945,6 +945,7 @@ xfs_remove_all_tickets()
 	/*
  	 * For each file system on the machine.
 	 */
+loop:
 #ifndef SIM
 	s = splock(vfslock);
 #endif
@@ -954,9 +955,57 @@ xfs_remove_all_tickets()
 		 */
 		if (vfsp->vfs_fstype == xfs_fstype) {
 			/*
- 	 		 * Remove the tickets from the inodes.
- 	 		 */
-			xfs_remove_tickets_from_fs(vfsp);
+			 * check if the file system is in the process
+			 * of being mounted or unmounted.
+			 */
+  			if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
+                        	ASSERT(vfsp->vfs_flag & VFS_MWANT ||
+                               		vfsp->vfs_busycnt == 0);
+                        	vfsp->vfs_flag |= VFS_MWAIT;
+                        	if (spunlock_psema(vfslock, s, 
+					&vfsp->vfs_wait, PZERO)) {
+                                	return EINTR;
+                        	}
+                        	goto loop;
+			} else {
+#ifndef SIM
+				vfsp->vfs_busycnt++;
+				spunlock(vfslock, s);
+#endif
+
+				/*
+ 	 			 * Remove the tickets from the inodes.
+ 	 			 */
+				xfs_remove_tickets_from_fs(vfsp);
+
+
+#ifndef SIM
+				s = splock(vfslock);
+			        ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
+        			ASSERT(vfsp->vfs_busycnt > 0);
+        			if (--vfsp->vfs_busycnt == 0) {
+					/*
+					 * If there's an updater (mount/unmount)
+					 *  waiting for the vfs lock, wake up 
+					 * only it.  Updater should be the first
+					 *  on the sema queue.
+					 *
+					 * Otherwise, wake all accessors 
+					 * (traverse() or vfs_syncall())
+					 * waiting for the lock to clear.
+					 */
+       			 		if (vfsp->vfs_flag & VFS_MWANT) {
+  		              			vsema(&vfsp->vfs_wait);
+        				} else if (vfsp->vfs_flag & VFS_MWAIT) {
+                				vfsp->vfs_flag &= ~VFS_MWAIT;
+                				while (cvsema(&vfsp->vfs_wait))
+                        				;
+        				}
+
+				}
+				
+#endif
+			}
 		}
 	}
 #ifndef SIM
