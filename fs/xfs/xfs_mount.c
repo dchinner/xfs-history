@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.69 $"
+#ident	"$Revision: 1.70 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -221,6 +221,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_ihash_init(mp);
 
 	/*
+	 * Allocate and initialize the per-ag data.
+	 */
+	mp->m_perag =
+		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
+
+	/*
 	 * Call the log's mount-time initialization.  Will perform recovery
 	 * if needed.
 	 */
@@ -230,19 +236,16 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error > 0) {
 			error = XFS_ERROR(error);
+			kmem_free(mp->m_perag,
+				  sbp->sb_agcount * sizeof(xfs_perag_t));
 			return error;
 		}
 	} else {	/* No log has been defined */
 		error = XFS_ERROR(EINVAL);
+		kmem_free(mp->m_perag,
+			  sbp->sb_agcount * sizeof(xfs_perag_t));
 		return error;
 	}
-
-	/*
-	 * Allocate and initialize the per-ag data.
-	 */
-	mp->m_perag =
-		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
-
 
 #ifdef SIM
 	/*
