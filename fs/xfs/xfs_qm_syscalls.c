@@ -1,4 +1,4 @@
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -77,19 +77,18 @@ STATIC void	xfs_qm_export_dquot(xfs_mount_t *, xfs_disk_dquot_t *,
  * The main distribution switch of all XFS quotactl system calls.
  */
 int
-xfs_qm_sysent(
-	struct	vfs	*vfsp,
+xfs_quotactl(
+	struct bhv_desc *bdp,
 	int		cmd,
 	int		id,
 	caddr_t		addr)
 {
 	xfs_mount_t	*mp;
 	int 		error;
-	bhv_desc_t 	*bdp;
+	struct vfs	*vfsp;
 
-	ASSERT(vfsp);
-	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
         mp = XFS_BHVTOM(bdp);
+	vfsp = bhvtovfs(bdp);
 
 #ifdef DEBUG		
 	/*
@@ -98,9 +97,11 @@ xfs_qm_sysent(
 	if (cmd == 50) 
 		return (xfs_qm_internalqcheck(mp));
 #endif
-	if (addr == NULL)
+	if (addr == NULL && cmd != Q_SYNC)
 		return XFS_ERROR(EINVAL);
-	
+	if (id < 0 && cmd != Q_SYNC)
+		return XFS_ERROR(EINVAL);
+
 	/*
 	 * The following commands are valid even when quotaoff.
 	 */
