@@ -1,4 +1,4 @@
-#ident "$Revision: 1.268 $"
+#ident "$Revision: 1.270 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -527,13 +527,22 @@ xfs_getattr(
                 vap->va_blksize = BLKDEV_IOSIZE;
                 break;
 	default:
-		/*
-		 * We use the read buffer size as a recommended I/O
-		 * size.  This should always be larger than the
-		 * write buffer size, so it should be OK.
-		 * The value returned is in bytes.
-		 */
-		vap->va_blksize = 1 << mp->m_readio_log;
+                if (mp->m_swidth) {
+                        /*
+                         * If the underlying volume is a stripe, then return
+                         * the stripe width in bytes as the recommended I/O
+                         * size.
+                         */
+                        vap->va_blksize = mp->m_swidth << mp->m_sb.sb_blocklog;
+                } else {
+			/*
+			 * We use the read buffer size as a recommended I/O
+			 * size.  This should always be larger than the
+			 * write buffer size, so it should be OK.
+			 * The value returned is in bytes.
+			 */
+			vap->va_blksize = 1 << mp->m_readio_log;
+		}
 		break;
         }
 
