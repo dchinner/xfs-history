@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.291 $"
+#ident "$Revision: 1.292 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -3145,15 +3145,6 @@ xfs_iflush(
 		    ((iip == NULL) ||
 		     !(iip->ili_format.ilf_fields & XFS_ILOG_ALL)) &&
 		    iq->i_pincount == 0) {
-			continue;
-		}
-
-		/*
-		 * We don't mess with swap files from here since it is
-		 * too easy to deadlock on memory.
-		 */
-		vp = XFS_ITOV_NULL(iq);
-		if (!vp || vp->v_flag & VISSWAP) {
 			continue;
 		}
 
