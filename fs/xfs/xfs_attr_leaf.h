@@ -218,7 +218,6 @@ int	xfs_attr_leaf_lookup_int(struct buf *leaf, struct xfs_da_args *args);
 int	xfs_attr_leaf_getvalue(struct buf *bp, struct xfs_da_args *args);
 int	xfs_attr_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
 				 struct xfs_da_args *args);
-int	xfs_attr_leaf_addname(struct xfs_da_args *args);
 int	xfs_attr_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 				    struct xfs_da_args *args);
 int	xfs_attr_leaf_list_int(struct buf *bp, struct attrlist *alist,

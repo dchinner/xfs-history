@@ -62,6 +62,7 @@ STATIC int xfs_attr_shortform_addname(xfs_trans_t *trans, xfs_da_args_t *args);
  * Internal routines when attribute list is one block.
  */
 STATIC int xfs_attr_leaf_get(xfs_da_args_t *args);
+STATIC int xfs_attr_leaf_addname(xfs_da_args_t *args);
 STATIC int xfs_attr_leaf_removename(xfs_da_args_t *args);
 STATIC int xfs_attr_leaf_list(xfs_inode_t *dp, attrlist_t *alist, int flags,
 					  attrlist_cursor_kern_t *cursor);
@@ -454,7 +455,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
  * Add a name to the shortform attribute list structure
  * This is the external routine.
  */
-int
+STATIC int
 xfs_attr_shortform_addname(xfs_trans_t *trans, xfs_da_args_t *args)
 {
 	int newsize, retval;
@@ -493,7 +494,7 @@ xfs_attr_shortform_addname(xfs_trans_t *trans, xfs_da_args_t *args)
  * This leaf block cannot have a "remote" value, we only call this routine
  * if bmap_one_block() says there is only one block (ie: no remote blks).
  */
-int
+STATIC int
 xfs_attr_leaf_addname(xfs_da_args_t *args)
 {
 	xfs_trans_t *trans;
