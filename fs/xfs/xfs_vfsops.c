@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.114 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -26,7 +26,6 @@
 #include <sys/buf.h>
 #include <sys/vfs.h>
 #include <sys/pfdat.h>
-#include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
 #include <sys/dmi.h>
@@ -39,6 +38,7 @@
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/fs_subr.h>
+#include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>
 #include <sys/file.h>
@@ -53,7 +53,6 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <sys/proc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>
 #include <sys/uio.h>
@@ -610,7 +609,7 @@ xfs_vfsmount(
 	dev_t		rtdev;
 	int		error;
 
-	if (!_CAP_ABLE(CAP_MOUNT_MGT))
+	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
 	if (mvp->v_type != VDIR)
 		return XFS_ERROR(ENOTDIR);
@@ -623,7 +622,7 @@ xfs_vfsmount(
 	 */
 	bzero(&args, sizeof args);
 	if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
-			 irix5_to_xfs_args, curprocp->p_abi, 1))
+			 irix5_to_xfs_args, get_current_abi(), 1))
 		return XFS_ERROR(EFAULT);
 
 	/*
@@ -762,7 +761,7 @@ xfs_mountroot(
 {
 	int		error = ENOSYS;
 	static int	xfsrootdone;
-	struct cred	*cr = curprocp->p_cred;
+	struct cred	*cr = get_current_cred();
 	dev_t		ddev, logdev, rtdev;
 	xfs_mount_t	*mp;
 	buf_t		*bp;
@@ -1001,7 +1000,7 @@ xfs_unmount(
 	int		sendunmountevent = 0;
 	int		error;
 
-	if (!_CAP_ABLE(CAP_MOUNT_MGT))
+	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
 
 	mp = XFS_VFSTOM(vfsp);
@@ -1184,7 +1183,7 @@ xfs_statdevvp(
 	xfs_extlen_t	lsize;
 	xfs_sb_t	*sbp;
 
-	if (error = devvptoxfs(devvp, &bp, &sbp, curprocp->p_cred))
+	if (error = devvptoxfs(devvp, &bp, &sbp, get_current_cred()))
 		return error;
 	if (sbp->sb_magicnum == XFS_SB_MAGIC &&
 	    XFS_SB_GOOD_VERSION(sbp->sb_versionnum) &&
@@ -1207,7 +1206,7 @@ xfs_statdevvp(
 		error = EINVAL;
 	}
 	brelse(bp);
-	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, curprocp->p_cred);
+	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, get_current_cred());
 	return error;
 }
 
