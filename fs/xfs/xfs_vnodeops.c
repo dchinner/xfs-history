@@ -2530,6 +2530,7 @@ xfs_create(
 			goto abort_return;
 		}
 		xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+		xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
 
 		/*
 		 * If this is a synchronous mount, make sure that the
@@ -4381,6 +4382,7 @@ xfs_symlink(
 		goto error1;
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+	xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
 
         dnlc_enter(dir_vp, link_name, XFS_ITOBHV(ip), NOCRED);
 
