@@ -1,4 +1,4 @@
-#ident "$Revision: 1.144 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2297,7 +2297,7 @@ xfs_write(
 	int		type;
 	off_t		offset;
 	size_t		count;
-	int		error;
+	int		error, transerror;
 	off_t		n;
 	int		resid;
 	off_t		savedsize;
@@ -2447,11 +2447,12 @@ retry:
 		if ((ioflag & IO_SYNC) && !(vp->v_flag & VISSWAP)) {
 			mp = ip->i_mount;
 			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
-			if (error = xfs_trans_reserve(tp, 0,
+			if (transerror = xfs_trans_reserve(tp, 0,
 						      XFS_SWRITE_LOG_RES(mp),
 						      0, 0, 0)) {
 				ASSERT(0);
 				xfs_trans_cancel(tp, 0);
+				error = transerror;
 				break;
 			}
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -2459,7 +2460,9 @@ retry:
 			xfs_trans_ihold(tp, ip);
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			xfs_trans_set_sync(tp);
-			error = xfs_trans_commit(tp, 0);
+			transerror = xfs_trans_commit(tp, 0);
+			if ( transerror )
+				error = transerror;
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 		if ((ioflag & IO_DSYNC) && !(vp->v_flag & VISSWAP)) {
@@ -4278,6 +4281,7 @@ xfs_diostrat( buf_t *bp)
 
 		tp = NULL;
 		exist = 1;
+retry:
 		XFS_BMAP_INIT(&free_list, &firstfsb);
 
 		if ( writeflag ) {
@@ -4426,11 +4430,13 @@ xfs_diostrat( buf_t *bp)
 		}
 
                 /*
-                 * xfs_bmapi() was unable to allocate space
+                 * xfs_bmapi() did not return an error but the 
+ 		 * reccount was zero. This means that a delayed write is
+		 * in progress and it is necessary to call xfs_bmapi() again
+		 * to map the correct portion of the file.
                  */
-                if (reccount == 0) {
-                        error = XFS_ERROR(ENOSPC);
-                        break;
+                if( (!error) && (reccount == 0) ) {
+			goto retry;
                 }
 
 		/*
