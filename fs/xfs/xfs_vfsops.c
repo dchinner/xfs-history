@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.14 $"
+#ident  "$Revision: 1.15 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -343,7 +343,7 @@ _xfs_get_vfsmount(struct vfs	*vfsp,
 	 */
 	if (vfsp->vfs_flag & VFS_REMOUNT) {
 		mp = XFS_VFSTOM(vfsp);
-		(void) xfs_iflush_all(mp);
+		(void) xfs_iflush_all(mp, XFS_FLUSH_ALL);
 	} else {
 		/*
 		 * Allocate VFS private data (xfs mount structure).

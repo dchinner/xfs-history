@@ -278,15 +278,13 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
  * xfs_unmountfs
  */
 int
-xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr )
+xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
 	buf_t	*bp;
 	dev_t	dev;
 	int	error;
 
-	xfs_iflush_all(mp);
-	/* XXX someone needs to free the inodes' memory */
-
+	xfs_iflush_all(mp, 0);
 	bflush(mp->m_dev);
 	if (mp->m_rtdev)
 		bflush(mp->m_rtdev);
@@ -331,24 +329,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr )
 void
 xfs_umount(xfs_mount_t *mp)
 {
-	xfs_inode_t	*ip;
-	vnode_t		*vp;
-	int		error = 0;
-
-	/* need to give up if vnodes are referenced */
-	XFS_MOUNT_ILOCK(mp);
-	for (ip = mp->m_inodes; ip && !error; ip = ip->i_mnext) {
-		vp = XFS_ITOV(ip);
-		if (vp->v_count != 0) {
-			if ((vp->v_count == 1) && (ip == mp->m_rootip))
-				continue;
-			error++;
-		}
-	}
-	XFS_MOUNT_IUNLOCK(mp);
-
-	if (error == 0)
-		error = xfs_unmountfs(mp, 0, NULL);
+	xfs_unmountfs(mp, 0, NULL);
 }
 #endif
 
