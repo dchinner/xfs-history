@@ -848,6 +848,20 @@ xfs_inode_item_push(
 }
 
 /*
+ * XXX rcc - this one really has to do something.  Probably needs
+ * to stamp in a new field in the incore inode.
+ */
+/* ARGSUSED */
+STATIC void
+xfs_inode_item_committing(
+	xfs_inode_log_item_t	*iip,
+	xfs_lsn_t		lsn)
+{
+	iip->ili_last_lsn = lsn;
+	return;
+}
+
+/*
  * This is the ops vector shared by all buf log items.
  */
 struct xfs_item_ops xfs_inode_item_ops = {
@@ -861,7 +875,8 @@ struct xfs_item_ops xfs_inode_item_ops = {
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_inode_item_committed,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_push,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_abort,
-	(void(*)(xfs_log_item_t*))xfs_inode_item_pushbuf
+	(void(*)(xfs_log_item_t*))xfs_inode_item_pushbuf,
+	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_inode_item_committing
 };
 
 

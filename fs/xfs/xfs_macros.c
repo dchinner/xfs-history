@@ -1721,9 +1721,9 @@ xfs_inobt_set_free(xfs_inobt_rec_t *rp, int i)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_INODE_CLEAR_READ_AHEAD)
 void
-xfs_inode_clear_read_ahead(xfs_inode_t *ip)
+xfs_inode_clear_read_ahead(xfs_iocore_t *io)
 {
-	XFS_INODE_CLEAR_READ_AHEAD(ip);
+	XFS_INODE_CLEAR_READ_AHEAD(io);
 }
 #endif
 

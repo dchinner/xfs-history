@@ -1,4 +1,4 @@
-#ident "$Revision: 1.9 $"
+#ident "$Revision: 1.10 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -55,9 +55,13 @@ STATIC void		xfs_qm_dquot_logitem_unpin(xfs_dq_logitem_t *logitem);
 STATIC void		xfs_qm_dquot_logitem_unpin_remove(
 						xfs_dq_logitem_t *logitem,
 						xfs_trans_t *tp);
-STATIC xfs_lsn_t 	xfs_qm_dquot_logitem_committed(xfs_dq_logitem_t *logitem, 
-						 xfs_lsn_t lsn);
+STATIC xfs_lsn_t 	xfs_qm_dquot_logitem_committed(
+						xfs_dq_logitem_t *logitem, 
+						xfs_lsn_t lsn);
 STATIC void		xfs_qm_dquot_logitem_push(xfs_dq_logitem_t *logitem);
+STATIC void 		xfs_qm_dquot_logitem_committing(
+						xfs_dq_logitem_t *logitem, 
+						xfs_lsn_t lsn);
 
 
 STATIC uint		xfs_qm_qoff_logitem_size(xfs_qoff_logitem_t *logitem);
@@ -67,12 +71,20 @@ STATIC void		xfs_qm_qoff_logitem_unpin(xfs_qoff_logitem_t *logitem);
 STATIC void		xfs_qm_qoff_logitem_unpin_remove(
 						xfs_qoff_logitem_t *logitem,
 						xfs_trans_t *tp);
-STATIC xfs_lsn_t 	xfs_qm_qoff_logitem_committed(xfs_qoff_logitem_t *logitem, 
-						 xfs_lsn_t lsn);
+STATIC xfs_lsn_t 	xfs_qm_qoff_logitem_committed(
+						xfs_qoff_logitem_t *logitem, 
+						xfs_lsn_t lsn);
 STATIC void		xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *logitem);
+STATIC void	 	xfs_qm_qoff_logitem_committing(
+						xfs_qoff_logitem_t *logitem, 
+						xfs_lsn_t lsn);
 
-STATIC xfs_lsn_t	xfs_qm_qoffend_logitem_committed(xfs_qoff_logitem_t *qfe,
-							 xfs_lsn_t lsn);
+STATIC xfs_lsn_t	xfs_qm_qoffend_logitem_committed(
+							xfs_qoff_logitem_t *qfe,
+							xfs_lsn_t lsn);
+STATIC void		xfs_qm_qoffend_logitem_committing(
+							xfs_qoff_logitem_t *qfe,
+							xfs_lsn_t lsn);
 
 /*
  * returns the number of iovecs needed to log the given dquot item.
@@ -348,8 +360,8 @@ xfs_qm_dquot_logitem_trylock(
                  * hold it and send it out from the push routine.  We don't
                  * want to do that now since we might sleep in the device
                  * strategy routine.  We also don't want to grab the buffer lock
-		 * here because we'd like not to call into the buffer cache while
-		 * holding the AIL_LOCK.
+		 * here because we'd like not to call into the buffer cache
+		 * while holding the AIL_LOCK.
 		 * Make sure to only return PUSHBUF if we set pushbuf_flag
 		 * ourselves.  If someone else is doing it then we don't 
 		 * want to go to the push routine and duplicate their efforts.
@@ -419,6 +431,20 @@ xfs_qm_dquot_logitem_abort(
         return;
 }
 
+/*
+ * this needs to stamp an lsn into the dquot, I think.
+ * rpc's that look at user dquot's would then have to
+ * push on the dependency recorded in the dquot
+ */
+/* ARGSUSED */
+STATIC void
+xfs_qm_dquot_logitem_committing(
+	xfs_dq_logitem_t	*l,
+	xfs_lsn_t		lsn)
+{
+	return;
+}
+
 
 /*
  * This is the ops vector for dquots
@@ -435,7 +461,8 @@ struct xfs_item_ops xfs_dquot_item_ops = {
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_dquot_logitem_committed,
 	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_push,
 	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_abort,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pushbuf
+	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pushbuf,
+	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_dquot_logitem_committing
 };
 
 /*
@@ -606,6 +633,34 @@ xfs_qm_qoffend_logitem_committed(
 	return (xfs_lsn_t)-1;
 }
 
+/*
+ * XXX rcc - don't know quite what to do with this.  I think we can
+ * just ignore it.  The only time that isn't the case is if we allow
+ * the client to somehow see that quotas have been turned off in which
+ * we can't allow that to get back until the quotaoff hits the disk.
+ * So how would that happen?  Also, do we need different routines for
+ * quotaoff start and quotaoff end?  I suspect the answer is yes but
+ * to be sure, I need to look at the recovery code and see how quota off
+ * recovery is handled (do we roll forward or back or do something else).
+ * If we roll forwards or backwards, then we need two separate routines,
+ * one that does nothing and one that stamps in the lsn that matters
+ * (truly makes the quotaoff irrevocable).  If we do something else,
+ * then maybe we don't need two.
+ */
+/* ARGSUSED */
+STATIC void
+xfs_qm_qoff_logitem_committing(xfs_qoff_logitem_t *qip, xfs_lsn_t commit_lsn)
+{
+	return;
+}
+
+/* ARGSUSED */
+STATIC void
+xfs_qm_qoffend_logitem_committing(xfs_qoff_logitem_t *qip, xfs_lsn_t commit_lsn)
+{
+	return;
+}
+
 struct xfs_item_ops xfs_qm_qoffend_logitem_ops = {
 	(uint(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_size,
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_qm_qoff_logitem_format,
@@ -616,7 +671,9 @@ struct xfs_item_ops xfs_qm_qoffend_logitem_ops = {
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoffend_logitem_committed,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort
+	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
+	NULL,
+	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoffend_logitem_committing
 };
 
 /*
@@ -632,7 +689,9 @@ struct xfs_item_ops xfs_qm_qoff_logitem_ops = {
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoff_logitem_committed,
 	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_push,
-	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort
+	(void(*)(xfs_log_item_t*))xfs_qm_qoff_logitem_abort,
+	NULL,
+	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_qoff_logitem_committing
 };
 
 /*
@@ -659,4 +718,3 @@ xfs_qm_qoff_logitem_init(
 	qf->qql_start_lip = start;
 	return (qf);
 }
-

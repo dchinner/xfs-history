@@ -58,9 +58,7 @@
 #include "xfs_rw.h"
 #include "xfs_quota.h"
 #include "xfs_fsops.h"
-#if CELL || NOTYET
 #include "xfs_cxfs.h"
-#endif
 
 #ifdef SIM
 #include "sim.h"
@@ -108,7 +106,9 @@ xfs_mount_init(void)
  * initialized.
  */
 void
-xfs_mount_free(xfs_mount_t *mp)
+xfs_mount_free(
+	xfs_mount_t *mp,
+        int	    remove_bhv)
 {
 	if (mp->m_ihash)
 		xfs_ihash_free(mp);
@@ -140,7 +140,10 @@ xfs_mount_free(xfs_mount_t *mp)
 	if (mp->m_quotainfo != NULL) {
 		xfs_qm_unmount_quotadestroy(mp);
 	}
-	VFS_REMOVEBHV(XFS_MTOVFS(mp), &mp->m_bhv);
+
+	if (remove_bhv) {
+		VFS_REMOVEBHV(XFS_MTOVFS(mp), &mp->m_bhv);
+	}
 	kmem_free(mp, sizeof(xfs_mount_t));
 }	/* xfs_mount_free */
 
@@ -280,24 +283,32 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
  *	- init directory manager
  *	- perform recovery and init the log manager
  *
- *	- if read_rootinos is set to 1 (typical case), the
- *		root inodes will be read in.  The flag is set
- *		to 0 only in special cases when the filesystem
- *		is thought to be corrupt but we want a mount
- *		structure set up so we can use the XFS_* macros.
- *		If read_rootinos is 0, the superblock *must* be good.
- *		and the filesystem should be unmounted and remounted
+ *	- if XFS_MFSI_RRINODES is set (typical case), the root
+ *		inodes will be read in.  The flag is not set only
+ *		in special cases when the filesystem is thought
+ *		to be corrupt but we want a mount structure set up
+ *		so we can use the XFS_* macros.  If XFS_MFSI_RRINODES
+ *		is not set, the superblock *must* be good. and
+ *		the filesystem should be unmounted and remounted
  *		before any real xfs filesystem code can be run against
  *		the filesystem.  This flag is used only by simulation
  *		code for fixing up the filesystem btrees.
  *
- *	- if cxfs_mount is set to 1 then we are actually importing an
- *		already mounted filesystem into a cell. We do not go
+ *	- if XFS_MFSI_CLIENT is set then we are doing an import
+ *              or an enterprise mount in client mode.  We do not go
  *		near the log, and do not mess with a bunch of stuff.
+ *
+ *      - If XFS_MFSI_SECOND is set then we are doing a secondary 
+ *              mount operation for cxfs which may be client mode
+ *              import or enterprise or a server-mode secondary 
+ *              mount operation as part of relocation or recovery.
  */
 int
-xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
-	int cxfs_mount)
+xfs_mountfs_int(
+        vfs_t 		*vfsp, 
+	xfs_mount_t 	*mp, 
+	dev_t 		dev, 
+	int             mfsi_flags)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp = &(mp->m_sb);
@@ -310,6 +321,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	vmap_t		vmap;
 	daddr_t		d;
 	extern dev_t	rootdev;		/* from sys/systm.h */
+	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
 #ifndef SIM
 	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
@@ -317,9 +329,6 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	__int64_t	update_flags;
 #endif
 	int		noio;
-
-	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
-		return 0;
 
 	noio = dev == 0 && mp->m_sb_bp != NULL;
 	if (mp->m_sb_bp == NULL) {
@@ -347,7 +356,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 #ifndef SIM
 	update_flags = 0LL;
 #endif
-	if (mp->m_dalign && !cxfs_mount) {
+	if (mp->m_dalign && !(mfsi_flags & XFS_MFSI_SECOND)) {
 		/*
 		 * If stripe unit and stripe width are not multiples
 		 * of the fs blocksize turn off alignment.
@@ -469,7 +478,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	 * partition volume/filesystem.
 	 */
 #ifndef SIM
-	if (!cxfs_mount) {
+	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
 		xfs_uuid_mount(mp);	/* make sure it's really unique */
 		ret64 = uuid_hash64(&sbp->sb_uuid, (uint *)&i);
 		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
@@ -584,7 +593,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 		}
 	}
 
-	if (!noio && !cxfs_mount && mp->m_logdev && mp->m_logdev != mp->m_dev) {
+	if (!noio && ((mfsi_flags & XFS_MFSI_CLIENT) == 0) &&
+	    mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
 			error = XFS_ERROR(E2BIG);
@@ -608,11 +618,14 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 		goto error1;
 
 	/*
-	 * For cxfs case we are done now
+	 * For client case we are done now
 	 */
-	if (cxfs_mount) {
+	if (mfsi_flags & XFS_MFSI_CLIENT) {
 		return(0);
 	}
+
+	/* Initialize the I/O function vector with XFS functions */
+	mp->m_io_ops = xfs_iocore_xfs;
 
 	/*
 	 *  Copies the low order bits of the timestamp and the randomly
@@ -655,7 +668,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	 */
 	xfs_trans_init(mp);
 	if (noio) {
-		ASSERT(read_rootinos == 0 && cxfs_mount == 0);
+		ASSERT(((mfsi_flags & XFS_MFSI_RRINODES) == 0) &&
+		       ((mfsi_flags & XFS_MFSI_CLIENT) == 0));
 		return 0;
 	}
 
@@ -691,7 +705,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	/*
 	 * Mkfs calls mount before the root inode is allocated.
 	 */
-	if (read_rootinos == 1 && sbp->sb_rootino != NULLFSINO) {
+	if ((mfsi_flags & XFS_MFSI_RRINODES) && sbp->sb_rootino != NULLFSINO) {
 		/*
 		 * Get and sanity-check the root inode.
 		 * Save the pointer to it in the mount structure.
@@ -721,7 +735,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	/*
 	 * Initialize realtime inode pointers in the mount structure
 	 */
-	if (read_rootinos == 1 && (error = xfs_rtmount_inodes(mp))) {
+	if ((mfsi_flags & XFS_MFSI_RRINODES) && 
+	     (error = xfs_rtmount_inodes(mp))) {
 		/*
 		 * Free up the root inode.
 		 */
@@ -791,7 +806,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	 * were consistently read in.
 	 */
 #ifndef SIM
-	error = xfs_log_mount_finish(mp);
+	error = xfs_log_mount_finish(mp, mfsi_flags);
 #endif
 	if (error) {
 		goto error2;
@@ -823,14 +838,6 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	}
 #endif
 
-	/* Make superblock exportable in cellular case */
-#if CELL_IRIX
-	{
-		extern	void	cxfs_export(vfs_t *, xfs_mount_t *);
-
-		cxfs_export(vfsp, mp);
-	}
-#endif
 	return (0);
 
  error2:
@@ -851,7 +858,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 int
 xfs_mountfs(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev)
 {
-	return(xfs_mountfs_int(vfsp, mp, dev, 1, 0));
+	return(xfs_mountfs_int(vfsp, mp, dev, XFS_MFSI_RRINODES));
 }
 
 #ifdef SIM
@@ -861,6 +868,7 @@ xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 	int		error;
 	xfs_mount_t	*mp;
 	vfs_t		*vfsp;
+        int             mfsi_flags = 0;
 
 	mp = xfs_mount_init();
 	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
@@ -871,8 +879,10 @@ xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 	mp->m_logdev = logdev;
 	mp->m_ddev_targp = &mp->m_ddev_targ;
 	vfsp->vfs_dev = dev;
+	if (read_rootinos)
+		mfsi_flags |= XFS_MFSI_RRINODES;
 
-	error = xfs_mountfs_int(vfsp, mp, dev, read_rootinos, 0);
+	error = xfs_mountfs_int(vfsp, mp, dev, mfsi_flags);
 	if (error) {
 		kmem_free(mp, sizeof(*mp));
 		return 0;
@@ -928,12 +938,6 @@ xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-	buf_t		*sbp;
-	xfs_sb_t	*sb;
-	/* REFERENCED */
-	int		error;
-	/* REFERENCED */
-	int		unused;
 #ifndef SIM
 	int		ndquots;
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
@@ -970,6 +974,79 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	if (mp->m_rtdev != NODEV) {
 		binval(mp->m_rtdev);
 	}
+
+	(void) xfs_unmountfs_writesb(mp);
+
+	xfs_log_unmount(mp);			/* Done! No more fs ops. */
+
+	xfs_unmountfs_close(mp, vfs_flags, cr);
+
+	xfs_freesb(mp);
+
+	/*
+	 * All inodes from this mount point should be freed.
+	 */
+	ASSERT(mp->m_inodes == NULL);
+
+#ifndef SIM
+	/*
+	 * We may have bufs that are in the process of getting written still.
+	 * We must wait for the I/O completion of those. The sync flag here
+	 * does a two pass iteration thru the bufcache.
+	 */
+	if (XFS_FORCED_SHUTDOWN(mp)) {
+		(void)incore_relse(mp->m_dev, 0, 1); /* synchronous */
+	}
+	xfs_uuid_unmount(mp);
+
+#if defined(DEBUG) || defined(INDUCE_IO_ERROR)
+	/*
+	 * clear all error tags on this filesystem
+	 */
+	bcopy(&(XFS_MTOVFS(mp)->vfs_fsid), &fsid, sizeof(int64_t));
+	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
+#endif
+
+#endif /* !SIM */
+
+#ifdef CELL_CAPABLE
+	cxfs_unmount(mp);
+#endif
+	xfs_mount_free(mp, 1);
+	return 0;
+}	/* xfs_unmountfs */
+
+void
+xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
+{
+	/* REFERENCED */
+	int		unused;
+		
+#ifndef SIM
+	spec_unmounted(mp->m_ddevp);
+#endif
+
+	if (mp->m_ddevp) {
+		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, cr, unused);
+		VN_RELE(mp->m_ddevp);
+	}
+	if (mp->m_rtdevp) {
+		VOP_CLOSE(mp->m_rtdevp, vfs_flags, L_TRUE, cr, unused);
+		VN_RELE(mp->m_rtdevp);
+	}
+	if (mp->m_logdevp && mp->m_logdevp != mp->m_ddevp) {
+		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, cr, unused);
+		VN_RELE(mp->m_logdevp);
+	}
+}
+
+int
+xfs_unmountfs_writesb(xfs_mount_t *mp)
+{
+	buf_t		*sbp;
+	xfs_sb_t	*sb;
+	int		error = 0;
+
 	/*
 	 * skip superblock write if fs is read-only, or
 	 * if we are doing a forced umount.
@@ -999,62 +1076,10 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		if (error && mp->m_mk_sharedro)
 			xfs_fs_cmn_err(CE_ALERT, mp, "Superblock write error detected while unmounting.  Filesystem may not be marked shared readonly");
 	}
+	brelse(sbp);
+	return (error);
+}
 	
-	xfs_log_unmount(mp);			/* Done! No more fs ops. */
-
-#ifndef SIM
-	spec_unmounted(mp->m_ddevp);
-#endif
-
-	if (mp->m_ddevp) {
-		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, cr, unused);
-		VN_RELE(mp->m_ddevp);
-	}
-	if (mp->m_rtdevp) {
-		VOP_CLOSE(mp->m_rtdevp, vfs_flags, L_TRUE, cr, unused);
-		VN_RELE(mp->m_rtdevp);
-	}
-	if (mp->m_logdevp && mp->m_logdevp != mp->m_ddevp) {
-		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, cr, unused);
-		VN_RELE(mp->m_logdevp);
-	}
-
-	nfreerbuf(sbp);
-
-	/*
-	 * All inodes from this mount point should be freed.
-	 */
-	ASSERT(mp->m_inodes == NULL);
-
-#ifndef SIM
-	/*
-	 * We may have bufs that are in the process of getting written still.
-	 * We must wait for the I/O completion of those. The sync flag here
-	 * does a two pass iteration thru the bufcache.
-	 */
-	if (XFS_FORCED_SHUTDOWN(mp)) {
-		(void)incore_relse(mp->m_dev, 0, 1); /* synchronous */
-	}
-	xfs_uuid_unmount(mp);
-
-#if defined(DEBUG) || defined(INDUCE_IO_ERROR)
-	/*
-	 * clear all error tags on this filesystem
-	 */
-	bcopy(&(XFS_MTOVFS(mp)->vfs_fsid), &fsid, sizeof(int64_t));
-	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
-#endif
-
-#endif /* !SIM */
-#if CELL || NOTYET
-	cxfs_unmount(mp);
-#endif /* CELL || NOTYET */
-	xfs_mount_free(mp);
-	return 0;
-}	/* xfs_unmountfs */
-		
-
-
 #ifdef SIM
 /*
  * xfs_umount is the function used by the simulation environment

@@ -2777,7 +2777,7 @@ xlog_recover_clear_agi_bucket(
  * freeing of the inode and its removal from the list must be
  * atomic.
  */
-STATIC void
+void
 xlog_recover_process_iunlinks(xlog_t	*log)
 {
 	xfs_mount_t	*mp;
@@ -2838,7 +2838,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 				ASSERT(ip != NULL);
 				ASSERT(ip->i_d.di_nlink == 0);
 				ASSERT(ip->i_d.di_mode != 0);
-				ASSERT(XFS_ITOV(ip)->v_count == 1);
 
 				/*
 				 * Drop our reference to the inode.  This
@@ -2859,8 +2858,9 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 				if (!error) {
 					VN_RELE(XFS_ITOV(ip));
 				}
-				xlog_recover_clear_agi_bucket(mp, agno,
-							      bucket);
+
+				xlog_recover_clear_agi_bucket(mp, agno, bucket);
+
 				bucket++;
 			}
 
@@ -3160,6 +3160,7 @@ xlog_do_recover(xlog_t	*log,
 	xfs_sb_t	*sbp;
 #endif
 	int		error;
+	bfidev_t        bfid;
 
 	/*
 	 * First replay the images in the log.
@@ -3170,7 +3171,10 @@ xlog_do_recover(xlog_t	*log,
 	}
 
 #ifdef _KERNEL
-	bflush(log->l_mp->m_dev);    /* Flush out the delayed write buffers */
+	bfid.bfid_dev = log->l_mp->m_dev;
+	bfid.bfid_flags = BFID_NOVNBUF;
+	bflush_dev(&bfid);    /* Flush out the delayed write buffers */
+
 	/*
 	 * If IO errors happened during recovery, bail out.
 	 */
@@ -3276,7 +3280,7 @@ xlog_recover(xlog_t *log, int readonly)
  * in the real-time portion of the file system.
  */
 int
-xlog_recover_finish(xlog_t *log)
+xlog_recover_finish(xlog_t *log, int mfsi_flags)
 {
 	/*
 	 * Now we're ready to do the transactions needed for the
@@ -3297,8 +3301,14 @@ xlog_recover_finish(xlog_t *log)
 		 */
 		xfs_log_force(log->l_mp, (xfs_lsn_t)0,
 			      (XFS_LOG_FORCE | XFS_LOG_SYNC));
-		xlog_recover_process_iunlinks(log);
+
+		if ( (mfsi_flags & XFS_MFSI_NOUNLINK) == 0 ) {
+
+			xlog_recover_process_iunlinks(log);
+		}
+
 		xlog_recover_check_summary(log);
+
 #endif /* _KERNEL */
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,

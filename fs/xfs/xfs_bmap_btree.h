@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.37 $"
+#ident "$Revision$"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -581,5 +581,22 @@ xfs_bmbt_get_rec(
 	xfs_exntst_t *,
 	int *);
 #endif
+
+
+/*
+ * Search an extent list for the extent which includes block
+ * bno.
+ */
+xfs_bmbt_rec_t *
+xfs_bmap_do_search_extents(
+        xfs_bmbt_rec_t *,
+        xfs_extnum_t,
+        xfs_extnum_t,
+        xfs_fileoff_t,
+        int *,
+        xfs_extnum_t *,
+        xfs_bmbt_irec_t	*,
+        xfs_bmbt_irec_t	*);
+
 
 #endif	/* _FS_XFS_BMAP_BTREE_H */

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DMAPI_H
 #define _FS_XFS_DMAPI_H
 
-#ident  "$Revision: 1.2 $"
+#ident  "$Revision$"
 
 /*	Values used to define the on-disk version of dm_attrname_t. All
  *	on-disk attribute names start with the 8-byte string "SGI_DMI_".
@@ -20,6 +20,12 @@
 	((vfsp)->vfs_flag & VFS_DMI) && \
 		( ((ip)->i_d.di_dmevmask & (1 << event)) || \
 		  ((ip)->i_mount->m_dmevmask & (1 << event)) ) \
+	)
+
+#define	DM_EVENT_ENABLED_IO(vfsp, io, event) ( \
+	((vfsp)->vfs_flag & VFS_DMI) && \
+		( ((io)->io_dmevmask & (1 << event)) || \
+		  ((io)->io_mount->m_dmevmask & (1 << event)) ) \
 	)
 
 /*

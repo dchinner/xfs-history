@@ -177,6 +177,7 @@ static void	xfsidbg_xlog_tic(xlog_ticket_t *);
 static void	xfsidbg_xlogitem(xfs_log_item_t *);
 static void	xfsidbg_xmount(xfs_mount_t *);
 static void 	xfsidbg_xnode(xfs_inode_t *ip);
+static void 	xfsidbg_xcore(xfs_iocore_t *io);
 static void	xfsidbg_xperag(xfs_mount_t *);
 
 static void	xfsidbg_xqm();
@@ -315,6 +316,7 @@ static struct xif {
     "xlogitm",	VD xfsidbg_xlogitem,	"Dump XFS log item structure",
     "xmount",	VD xfsidbg_xmount,	"Dump XFS mount structure",
     "xnode",	VD xfsidbg_xnode,	"Dump XFS inode",
+    "xiocore",	VD xfsidbg_xcore,	"Dump XFS iocore",
     "xperag",	VD xfsidbg_xperag,	"Dump XFS per-allocation group data",
     "xqinfo",   VD xfsidbg_xqm_qinfo,	"Dump mount->m_quotainfo structure",
     "xqm",	VD xfsidbg_xqm,		"Dump XFS quota manager structure",
@@ -3361,14 +3363,14 @@ xfsidbg_xflist(xfs_bmap_free_t *flist)
 }
 
 /*
- * Print out the list of xfs_gap_ts in ip->i_gap_list.
+ * Print out the list of xfs_gap_ts in ip->i_iocore.io_gap_list.
  */
 static void
 xfsidbg_xgaplist(xfs_inode_t *ip)
 {
 	xfs_gap_t	*curr_gap;
 
-	curr_gap = ip->i_gap_list;
+	curr_gap = ip->i_iocore.io_gap_list;
 	if (curr_gap == NULL) {
 		qprintf("Gap list is empty for inode 0x%x\n", ip);
 		return;
@@ -4172,33 +4174,35 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		&ip->i_ipinlock,
 		ip->i_pincount,
 		&ip->i_pinsema);
-	qprintf("&rlock 0x%x\n", &ip->i_rlock);
+	qprintf("&rlock 0x%x\n", &ip->i_iocore.io_rlock);
 #ifdef NOTYET
 	qprintf("range lock splock 0x%x sleep 0x%x list head 0x%x\n",
 		&ip->i_range_lock.r_spinlock, &ip->i_range_lock.r_sleep,
 		ip->i_range_lock.r_range_list);
 #endif
-	qprintf("next_offset %llx ", ip->i_next_offset);
+	qprintf("next_offset %llx ", ip->i_iocore.io_next_offset);
 	qprintf("io_offset %llx reada_blkno %s io_size 0x%x\n",
-		ip->i_io_offset,
-		xfs_fmtfsblock(ip->i_reada_blkno, ip->i_mount),
-		ip->i_io_size);
+		ip->i_iocore.io_offset,
+		xfs_fmtfsblock(ip->i_iocore.io_reada_blkno, ip->i_mount),
+		ip->i_iocore.io_size);
 	qprintf("last_req_sz 0x%x new_size %llx\n",
-		ip->i_last_req_sz, ip->i_new_size);
+		ip->i_iocore.io_last_req_sz, ip->i_iocore.io_new_size);
 	qprintf("write off %llx gap list 0x%x\n",
-		ip->i_write_offset, ip->i_gap_list);
+		ip->i_iocore.io_write_offset, ip->i_iocore.io_gap_list);
 	qprintf(
 "readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
-		(unsigned int) ip->i_readio_log, ip->i_readio_blocks,
-		(unsigned int) ip->i_writeio_log, ip->i_writeio_blocks,
-		(unsigned int) ip->i_max_io_log);
+		(unsigned int) ip->i_iocore.io_readio_log,
+		ip->i_iocore.io_readio_blocks,
+		(unsigned int) ip->i_iocore.io_writeio_log,
+		ip->i_iocore.io_writeio_blocks,
+		(unsigned int) ip->i_iocore.io_max_io_log);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
 	qprintf("update_core 0x%x update size 0x%x\n",
 		(int)(ip->i_update_core), (int) ip->i_update_size);
 	qprintf("gen 0x%x qbufs %d delayed blks %d",
 		ip->i_gen,
-		ip->i_queued_bufs,
+		ip->i_iocore.io_queued_bufs,
 		ip->i_delayed_blks);
 #ifdef	DEBUG
 	qprintf(" &traces = 0x%x", &(ip->i_xtrace));
@@ -4212,6 +4216,37 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	xfs_xnode_fork("attr", ip->i_afp);
 	qprintf("\n");
 	xfs_prdinode_core(&ip->i_d);
+}
+
+static void
+xfsidbg_xcore(xfs_iocore_t *io)
+{
+	if (IO_IS_XFS(io)) {
+		qprintf("io_obj 0x%x (xinode) io_mount 0x%x\n",
+			io->io_obj, io->io_mount);
+	} else {
+		qprintf("io_obj 0x%x (dcxvn) io_mount 0x%x\n",
+			io->io_obj, io->io_mount);
+	}
+	qprintf("&lock 0x%x &iolock 0x%x &flock 0x%x &rlock 0x%x\n",
+		io->io_lock, io->io_iolock,
+		io->io_flock, &io->io_rlock);
+	qprintf("next_offset %llx ", io->io_next_offset);
+	qprintf("io_offset %llx reada_blkno %s io_size 0x%x\n",
+		io->io_offset,
+		xfs_fmtfsblock(io->io_reada_blkno, io->io_mount),
+		io->io_size);
+	qprintf("last_req_sz 0x%x new_size %llx\n",
+		io->io_last_req_sz, io->io_new_size);
+	qprintf("write off %llx gap list 0x%x\n",
+		io->io_write_offset, io->io_gap_list);
+	qprintf(
+"readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
+		(unsigned int) io->io_readio_log,
+		io->io_readio_blocks,
+		(unsigned int) io->io_writeio_log,
+		io->io_writeio_blocks,
+		(unsigned int) io->io_max_io_log);
 }
 
 /*

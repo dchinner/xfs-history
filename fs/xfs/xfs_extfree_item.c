@@ -282,6 +282,20 @@ xfs_efi_item_push(xfs_efi_log_item_t *efip)
 }
 
 /*
+ * The EFI dependency tracking op doesn't do squat.  It can't because
+ * it doesn't know where the free extent is coming from.  The dependency
+ * tracking has to be handled by the "enclosing" metadata object.  For
+ * example, for inodes, the inode is locked throughout the extent freeing
+ * so the dependency should be recorded there.
+ */
+/*ARGSUSED*/
+STATIC void
+xfs_efi_item_committing(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
+{
+	return;
+}
+
+/*
  * This is the ops vector shared by all efi log items.
  */
 struct xfs_item_ops xfs_efi_item_ops = {
@@ -295,7 +309,8 @@ struct xfs_item_ops xfs_efi_item_ops = {
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efi_item_committed,
 	(void(*)(xfs_log_item_t*))xfs_efi_item_push,
 	(void(*)(xfs_log_item_t*))xfs_efi_item_abort,
-	NULL
+	NULL,
+	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efi_item_committing
 };
 
 
@@ -590,6 +605,20 @@ xfs_efd_item_push(xfs_efd_log_item_t *efdp)
 }
 
 /*
+ * The EFD dependency tracking op doesn't do squat.  It can't because
+ * it doesn't know where the free extent is coming from.  The dependency
+ * tracking has to be handled by the "enclosing" metadata object.  For
+ * example, for inodes, the inode is locked throughout the extent freeing
+ * so the dependency should be recorded there.
+ */
+/*ARGSUSED*/
+STATIC void
+xfs_efd_item_committing(xfs_efd_log_item_t *efip, xfs_lsn_t lsn)
+{
+	return;
+}
+
+/*
  * This is the ops vector shared by all efd log items.
  */
 struct xfs_item_ops xfs_efd_item_ops = {
@@ -603,7 +632,8 @@ struct xfs_item_ops xfs_efd_item_ops = {
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efd_item_committed,
 	(void(*)(xfs_log_item_t*))xfs_efd_item_push,
 	(void(*)(xfs_log_item_t*))xfs_efd_item_abort,
-	NULL
+	NULL,
+	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efd_item_committing
 };
 
 
@@ -638,8 +668,3 @@ xfs_efd_init(xfs_mount_t	*mp,
 
 	return (efdp);
 }
-
-
-
-
-

@@ -551,12 +551,12 @@ xfs_log_mount(xfs_mount_t	*mp,
  * mp		- ubiquitous xfs mount point structure
  */
 int
-xfs_log_mount_finish(xfs_mount_t *mp)
+xfs_log_mount_finish(xfs_mount_t *mp, int mfsi_flags)
 {
 	int	error;
 
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
-		error = xlog_recover_finish(mp->m_log);
+		error = xlog_recover_finish(mp->m_log, mfsi_flags);
 	else {
 		error = 0;
 		ASSERT(XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
@@ -566,12 +566,27 @@ xfs_log_mount_finish(xfs_mount_t *mp)
 }
 
 /*
- * Unmount a log filesystem.
- *
- * Mark the filesystem clean as unmount happens.
+ * Unmount processing for the log.
  */
 int
 xfs_log_unmount(xfs_mount_t *mp)
+{
+	int		error;
+
+	error = xfs_log_unmount_write(mp);
+	xfs_log_unmount_dealloc(mp);
+	return (error);
+}
+
+/*
+ * Final log writes as part of unmount.
+ *
+ * Mark the filesystem clean as unmount happens.  Note that during relocation
+ * this routine needs to be executed as part of source-bag while the 
+ * deallocation must not be done until source-end.
+ */
+int
+xfs_log_unmount_write(xfs_mount_t *mp)
 {
 	xlog_t		 *log = mp->m_log;
 	xlog_in_core_t	 *iclog;
@@ -593,10 +608,8 @@ xfs_log_unmount(xfs_mount_t *mp)
 	 * Don't write out unmount record on read-only mounts.
 	 * Or, if we are doing a forced umount (typically because of IO errors).
 	 */
-	if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) {
-		xlog_unalloc_log(log);
+	if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) 
 		return 0;
-	}
 
 	xfs_log_force(mp, 0, XFS_LOG_FORCE|XFS_LOG_SYNC);
 
@@ -689,11 +702,17 @@ xfs_log_unmount(xfs_mount_t *mp)
 		}
 	}
 
-	xlog_unalloc_log(log);
-
 	return 0;
-}	/* xfs_log_unmount */
+}	/* xfs_log_unmount_write */
 
+/*
+ * Deallocate log structures for unmount/relocation.
+ */
+void
+xfs_log_unmount_dealloc(xfs_mount_t *mp)
+{
+	xlog_unalloc_log(mp->m_log);
+}
 
 /*
  * Write region vectors to log.  The write happens using the space reservation
@@ -981,19 +1000,11 @@ xlog_bdstrat_cb(struct buf *bp)
 	iclog = (xlog_in_core_t *)(bp->b_fsprivate);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
-#ifdef CELL_IRIX
-		vnode_t *vp;
-
-		vp = bp->b_target->specvp;
-		ASSERT(vp);
-		VOP_STRATEGY(vp, bp);
-#else
 		struct bdevsw	*my_bdevsw;
 
 		my_bdevsw = bp->b_target->bdevsw;
 		ASSERT(my_bdevsw != NULL);
 		bdstrat(my_bdevsw, bp);
-#endif
 		return 0;
 	} 
 
@@ -3470,3 +3481,4 @@ xlog_iclogs_empty(xlog_t *log)
 	} while (iclog != log->l_iclog);
 	return(1);
 }
+

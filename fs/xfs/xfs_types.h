@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision$"
 
 /*
  * XFS types
@@ -109,6 +109,8 @@ typedef	__uint32_t	xfs_filblks_t;	/* number of blocks in a file */
 #define	NULLAGBLOCK	((xfs_agblock_t)-1)
 #define	NULLAGNUMBER	((xfs_agnumber_t)-1)
 #define	NULLEXTNUM	((xfs_extnum_t)-1)
+
+#define NULLCOMMITLSN	((xfs_lsn_t)-1)
 
 /*
  * Max values for extlen, extnum, aextnum.

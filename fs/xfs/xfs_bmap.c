@@ -3304,7 +3304,6 @@ done:
 	return error;
 }
 
-STATIC
 xfs_bmbt_rec_t *			/* pointer to found extent entry */
 xfs_bmap_do_search_extents(
 	xfs_bmbt_rec_t	*base,		/* base of extent list */

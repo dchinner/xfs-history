@@ -787,7 +787,12 @@ shut_us_down:
 		tp->t_lsn = trans_lsn++;
 	}
 #else
-	/* This is the regular case */
+	/*
+	 * This is the regular case.  At this point (after the call finishes),
+	 * the transaction is committed incore and could go out to disk at
+	 * any time.  However, all the items associated with the transaction
+	 * are still locked and pinned in memory.
+	 */
 	commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
 #endif
 
@@ -813,12 +818,15 @@ shut_us_down:
 	 * This will free descriptors pointing to items which were
 	 * not logged since there is nothing more to do with them.
 	 * For items which were logged, we will keep pointers to them
-	 * so they can be unpinned after the transaction commits.
+	 * so they can be unpinned after the transaction commits to disk.
+	 * This will also stamp each modified meta-data item with
+	 * the commit lsn of this transaction for dependency tracking
+	 * purposes.
 	 */
-	xfs_trans_unlock_items(tp);
+	xfs_trans_unlock_items(tp, commit_lsn);
 
 	/*
-	 * Once the transaction has been committed, unused
+	 * Once the transaction has committed, unused
 	 * reservations need to be released and changes to
 	 * the superblock need to be reflected in the in-core
 	 * version.  Do that now.
@@ -826,11 +834,18 @@ shut_us_down:
 	xfs_trans_unreserve_and_mod_sb(tp);
 
 	sync = tp->t_flags & XFS_TRANS_SYNC;
+
 	/*
  	 * Tell the LM to call the transaction completion routine
-	 * when the log write with LSN commit_lsn completes.
+	 * when the log write with LSN commit_lsn completes (e.g.
+	 * when the transaction commit really hits the on-disk log).
 	 * After this call we cannot reference tp, because the call
-	 * can happen at any time and tp can be freed.
+	 * can happen at any time and the call will free the transaction
+	 * structure pointed to by tp.  The only case where we call
+	 * the completion routine (xfs_trans_committed) directly is
+	 * if the log is turned off on a debug kernel or we're
+	 * running in simulation mode (the log is explicitly turned
+	 * off).
 	 */
 #if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 	if (xlog_debug) {

@@ -575,6 +575,12 @@ xfs_buf_item_push(
 	}
 }
 
+/* ARGSUSED */
+void
+xfs_buf_item_committing(xfs_buf_log_item_t *bip, xfs_lsn_t commit_lsn)
+{
+}
+
 /*
  * This is the ops vector shared by all buf log items.
  */
@@ -589,7 +595,8 @@ struct xfs_item_ops xfs_buf_item_ops = {
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_buf_item_committed,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_push,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_abort,
-	NULL
+	NULL,
+	(void(*)(xfs_log_item_t*, xfs_lsn_t))xfs_buf_item_committing
 };
 
 

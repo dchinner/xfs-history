@@ -437,11 +437,12 @@ extern int	 xlog_find_tail(xlog_t	*log,
 				int readonly);
 extern int	 xlog_print_find_oldest(xlog_t *log, daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log, int readonly);
-extern int	 xlog_recover_finish(xlog_t *log);
+extern int	 xlog_recover_finish(xlog_t *log, int mfsi_flags);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
 extern struct buf *xlog_get_bp(int);
 extern void	 xlog_put_bp(struct buf *);
 extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, struct buf *bp);
+extern void	 xlog_recover_process_iunlinks(xlog_t *log);
 
 #define XLOG_TRACE_GRAB_FLUSH  1
 #define XLOG_TRACE_REL_FLUSH   2

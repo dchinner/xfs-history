@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision$"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -95,7 +95,7 @@ int	  xfs_log_mount(struct xfs_mount *mp,
 			dev_t		 log_dev,
 			daddr_t		 start_block,
 			int		 num_bblocks);
-int	  xfs_log_mount_finish(struct xfs_mount *mp);
+int	  xfs_log_mount_finish(struct xfs_mount *mp, int);
 void	  xfs_log_move_tail(struct xfs_mount	*mp,
 			    xfs_lsn_t		tail_lsn);
 void	  xfs_log_notify(struct xfs_mount	*mp,
@@ -113,6 +113,8 @@ int	  xfs_log_write(struct xfs_mount *mp,
 			xfs_log_ticket_t ticket,
 			xfs_lsn_t	 *start_lsn);
 int	  xfs_log_unmount(struct xfs_mount *mp);
+int	  xfs_log_unmount_write(struct xfs_mount *mp);
+void      xfs_log_unmount_dealloc(struct xfs_mount *mp);
 int	  xfs_log_force_umount(struct xfs_mount *mp, int logerror);
 
 /* Log manager utility interfaces */

@@ -49,6 +49,7 @@
 #include "xfs_inode.h"
 #include "xfs_quota.h"
 #include "xfs_utils.h"
+#include "xfs_cxfs.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -61,12 +62,6 @@ void
 xfs_ilock_ra(xfs_inode_t	*ip,
 		  uint		lock_flags,
 		  void		*return_address);
-
-/*
- * Inode hashing and hash bucket locking.
- */
-#define XFS_BUCKETS(mp) (37*(mp)->m_sb.sb_agcount-1)
-#define XFS_IHASH(mp,ino) ((mp)->m_ihash + (ino % (mp)->m_ihsize))
 
 /*
  * Initialize the inode hash table for the newly mounted file system.
@@ -196,6 +191,7 @@ xfs_iget(
 	int		error;
 	/* REFERENCED */
 	int		newnode;
+	int		quiesce_new;
 	vmap_t		vmap;
 	xfs_chash_t	*ch;
 	xfs_chashlist_t	*chl, *chlnew;
@@ -208,7 +204,7 @@ xfs_iget(
 again:
 	mraccess(&ih->ih_lock);
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
-		if (ip->i_ino == ino) {
+  		if (ip->i_ino == ino) {
 			vp = XFS_ITOV(ip);
 			VMAP(vp, vmap);
 			/*
@@ -253,6 +249,8 @@ again:
 			}
 
 			newnode = (ip->i_d.di_mode == 0);
+			quiesce_new = 0;
+			ITRACE(ip);
 			goto return_ip;
 		}
 	}
@@ -280,15 +278,17 @@ again:
 	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
 	vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
 
-	mrlock_init(&ip->i_lock, MRLOCK_ALLOW_EQUAL_PRI, "xfsino", (long)vp->v_number);
-	mrlock_init(&ip->i_iolock, MRLOCK_BARRIER, "xfsio", (long)vp->v_number);
-#ifdef NOTYET
-	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
-#endif /* NOTYET */
-	init_sema(&ip->i_flock, 1, "xfsfino", (long)vp->v_number);
-	init_sv(&ip->i_pinsema, SV_DEFAULT, "xfspino", (long)vp->v_number);
-	spinlock_init(&ip->i_ipinlock, "xfs_ipin");
-	mutex_init(&ip->i_rlock, MUTEX_DEFAULT, "xfs_rlock");
+	xfs_inode_lock_init(ip, vp);
+	xfs_iocore_inode_init(ip);
+
+#ifdef CELL_CAPABLE
+	quiesce_new = 0;
+#ifndef SIM
+	if (mp->m_inode_quiesce)
+		quiesce_new = cxfs_inode_qset(ip);
+#endif
+#endif
+
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
 	}
@@ -301,6 +301,14 @@ again:
 		VN_FLAGSET(vp, VENF_LOCKING);
 	else
 		VN_FLAGCLR(vp, VENF_LOCKING);
+
+	/*
+	 * If this is a shared mountpoint (cluster), make sure
+	 * to disable swapping on the vnode.
+	 */
+	if (mp->m_cxfstype != XFS_CXFS_NOT) {
+		VN_FLAGSET(vp, VNOSWAP);
+	}
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
@@ -406,6 +414,9 @@ again:
 		ip->i_mprev = ip;
 	}
 	mp->m_inodes = ip;
+	ASSERT((quiesce_new == 0) || (mp->m_inode_quiesce != 0));
+
+
 	XFS_MOUNT_IUNLOCK(mp);
 
 	newnode = 1;
@@ -419,11 +430,33 @@ again:
 	 */
 #ifndef SIM
 	if (newnode) {
+#ifdef CELL_CAPABLE
+	        if (quiesce_new)
+			cxfs_inode_quiesce(ip);
+#endif
 		IMON_CHECK(vp, ip->i_dev, (ino_t)ino);
 	}
 #endif
 	*ipp = ip;
 	return 0;
+}
+
+/*
+ * Do the setup for the various locvks within the incore inode.
+ */
+void
+xfs_inode_lock_init(
+	xfs_inode_t	*ip,
+	vnode_t		*vp)
+{
+	mrlock_init(&ip->i_lock, MRLOCK_ALLOW_EQUAL_PRI, "xfsino", (long)vp->v_number);
+	mrlock_init(&ip->i_iolock, MRLOCK_BARRIER, "xfsio", vp->v_number);
+#ifdef NOTYET
+	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
+#endif /* NOTYET */
+	init_sema(&ip->i_flock, 1, "xfsfino", vp->v_number);
+	init_sv(&ip->i_pinsema, SV_DEFAULT, "xfspino", vp->v_number);
+	spinlock_init(&ip->i_ipinlock, "xfs_ipin");
 }
 
 /*
@@ -509,15 +542,10 @@ xfs_ireclaim(xfs_inode_t *ip)
 	SPLDECL(s);
 
 	/*
-	 * Remove from old hash list.
+	 * Remove from old hash list and mount list.
 	 */
 	XFSSTATS.xs_ig_reclaims++;
-	ih = ip->i_hash;
-	mrupdate(&ih->ih_lock);
-	if (iq = ip->i_next) {
-		iq->i_prevp = ip->i_prevp;
-	}
-	*ip->i_prevp = iq;
+	xfs_iextract(ip);
 
 	/*
 	 * Remove from cluster hash list
@@ -565,30 +593,6 @@ xfs_ireclaim(xfs_inode_t *ip)
 		ip->i_cnext = __return_address;
 	}
 	mutex_spinunlock(&ch->ch_lock, s);
-	mrunlock(&ih->ih_lock);
-
-	/*
-	 * Remove from mount's inode list.
-	 */
-	XFS_MOUNT_ILOCK(mp);
-	ASSERT((ip->i_mnext != NULL) && (ip->i_mprev != NULL));
-	iq = ip->i_mnext;
-	iq->i_mprev = ip->i_mprev;
-	ip->i_mprev->i_mnext = iq;
-
-	/*
-	 * Fix up the head pointer if it points to the inode being deleted.
-	 */
-	if (mp->m_inodes == ip) {
-		if (ip == iq) {
-			mp->m_inodes = NULL;
-		} else {
-			mp->m_inodes = iq;
-		}
-	}
-	
-	mp->m_ireclaims++;
-	XFS_MOUNT_IUNLOCK(mp);
 
 	/*
 	 * Here we do a spurious inode lock in order to coordinate with
@@ -622,6 +626,54 @@ xfs_ireclaim(xfs_inode_t *ip)
 	xfs_idestroy(ip);
 }
 
+/*
+ * This routine removes an about-to-be-destoryed inode from 
+ * all of the lists in which it is lcoated with the exception
+ * of the behavior chain.  It is used by xfs_ireclaim and
+ * by cxfs relocation cocde, in which case, we are removing 
+ * the xfs_inode but leaving the vnode alone since it has
+ * been transformed into a client vnode.
+ */
+void
+xfs_iextract(
+	xfs_inode_t	*ip)
+{
+	xfs_ihash_t	*ih;
+	xfs_inode_t	*iq;
+	xfs_mount_t	*mp;
+ 
+	ih = ip->i_hash;
+	mrupdate(&ih->ih_lock);
+	if (iq = ip->i_next) {
+		iq->i_prevp = ip->i_prevp;
+	}
+	*ip->i_prevp = iq;
+	mrunlock(&ih->ih_lock);
+
+	/*
+	 * Remove from mount's inode list.
+	 */
+	mp = ip->i_mount;
+	XFS_MOUNT_ILOCK(mp);
+	ASSERT((ip->i_mnext != NULL) && (ip->i_mprev != NULL));
+	iq = ip->i_mnext;
+	iq->i_mprev = ip->i_mprev;
+	ip->i_mprev->i_mnext = iq;
+
+	/*
+	 * Fix up the head pointer if it points to the inode being deleted.
+	 */
+	if (mp->m_inodes == ip) {
+		if (ip == iq) {
+			mp->m_inodes = NULL;
+		} else {
+			mp->m_inodes = iq;
+		}
+	}
+	
+	mp->m_ireclaims++;
+	XFS_MOUNT_IUNLOCK(mp);
+}
 
 /*
  * This is a wrapper routine around the xfs_ilock() routine
@@ -671,20 +723,6 @@ xfs_iunlock_map_shared(
 	xfs_iunlock(ip, lock_mode);
 }
 
-#ifndef SIM
-/*
- * private #define's to isolate the curuthread references and
- * make the Cellular Irix merge easier
- */
-#define XFST_ISNESTED_ENABLED()	(curuthread->ut_vnlock & UT_FSNESTED)
-#define XFST_ISNESTED_MAX()	(curuthread->ut_vnlock == UT_FSNESTED_MAX)
-#define XFST_NESTED_INCR()	(curuthread->ut_vnlock++)
-#define XFST_NESTED_DECR()	(curuthread->ut_vnlock--)
-#define XFST_ISNESTED_USED()	(curuthread->ut_vnlock & ~UT_FSNESTED)
-#else
-#define XFST_NESTED_DECR()
-#endif /* !SIM */
-
 /*
  * The xfs inode contains 2 locks: a multi-reader lock called the
  * i_iolock and a multi-reader lock called the i_lock.  This routine
@@ -725,11 +763,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 	       (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL));
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
-	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
-				XFS_IOLOCK_NESTED | XFS_ILOCK_SHARED |
-				XFS_ILOCK_EXCL)) == 0);
-	ASSERT(lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
-		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
+	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
 #ifdef SIM
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
@@ -803,11 +837,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 	       (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL));
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
-	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
-				XFS_IOLOCK_NESTED |
-				XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
-	ASSERT(lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
-		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
+	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
 #ifdef SIM
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
 #endif
@@ -890,10 +920,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 	       (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL));
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
-	ASSERT((lock_flags &
-		~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED |
-		  XFS_ILOCK_SHARED | XFS_ILOCK_EXCL |
-		  XFS_IUNLOCK_NONOTIFY)) == 0);
+	ASSERT((lock_flags & ~(XFS_LOCK_MASK | XFS_IUNLOCK_NONOTIFY)) == 0);
 	ASSERT(lock_flags != 0);
 #ifdef SIM
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));

@@ -32,7 +32,7 @@
 #else
 #include <sys/systm.h>
 #endif
-#ifdef CELL
+#ifdef CELL_CAPABLE
 #include <sys/kthread.h>
 #endif
 #include <string.h>
@@ -60,9 +60,6 @@
 #include "xfs_da_btree.h"
 #include "xfs_dir_leaf.h"
 #include "xfs_error.h"
-#if	CELL
-#include <sys/kthread.h>
-#endif	/* CELL */
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -583,7 +580,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
 	if ((uio->uio_iovcnt == 1) &&
-#if CELL
+#if CELL_CAPABLE
 	    !KT_CUR_ISXTHREAD() &&
 #endif
 	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&

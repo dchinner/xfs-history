@@ -13,7 +13,7 @@
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/buf.h>
-
+#include <ksys/fsc_notify.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -621,6 +621,13 @@ xfs_rename_error_checks(
 		goto error_return;
 	}
 
+	/* Do some generic error tests now that we have the lock */
+	if (error = xfs_pre_rename(XFS_ITOV(src_ip))) {
+		error = XFS_ERROR(error);
+		*status = __LINE__;
+		goto error_return;
+	}
+
 	/*
 	 * Source and target are identical.
 	 */
@@ -715,13 +722,19 @@ xfs_rename_target_checks(
 			goto error_return;
 		}
 
-		if (XFS_ITOV(target_ip)->v_vfsmountedhere) {
-			error = XFS_ERROR(EBUSY);
+		if (error = xfs_pre_rmdir(XFS_ITOV(target_ip))) {
+			error = XFS_ERROR(error);
 			rename_which_error_return = __LINE__;
 			goto error_return;
 		}
 
 	} else {
+		if (error = xfs_pre_remove(XFS_ITOV(target_ip))) {
+			error = XFS_ERROR(error);
+			rename_which_error_return = __LINE__;
+			goto error_return;
+		}
+
 		if (src_is_directory) {
 			error = XFS_ERROR(ENOTDIR);
 			rename_which_error_return = __LINE__;
@@ -772,10 +785,10 @@ xfs_rename(
 	xfs_inode_t	*inodes[4];
 	int		gencounts[4];
 	int		target_ip_dropped = 0;	/* dropped target_ip link? */
-	int		src_dp_dropped = 0;	/* dropped src_dp link? */
 	vnode_t 	*src_dir_vp;
 	bhv_desc_t	*target_dir_bdp;
 	int		spaceres;
+	int 		target_link_zero = 0;
 	int		num_inodes;
 	int		src_namelen;
 	int		target_namelen;
@@ -1111,6 +1124,9 @@ xfs_rename(
 		}
 		target_ip_dropped = 1;
 
+		/* Do this test while we still hold the locks */
+		target_link_zero = (target_ip)->i_d.di_nlink==0;
+
 		if (src_is_directory) {
 			/*
 			 * Drop the link from the old "." entry.
@@ -1173,7 +1189,6 @@ xfs_rename(
 			rename_which_error_return = __LINE__;
 			goto abort_return;
 		}
-		src_dp_dropped = 1;
 	}
 
 	error = XFS_DIR_REMOVENAME(mp, tp, src_dp, src_name, src_namelen,
@@ -1217,17 +1232,16 @@ xfs_rename(
 	}
 
 	/*
-	 * Take refs. for vop_link_removed calls below.  No need to worry 
+	 * Take refs. for vop_link_removed calls below.  No need to worry
 	 * about directory refs. because the caller holds them.
 	 *
 	 * Do holds before the xfs_bmap_finish since it might rele them down
 	 * to zero.
 	 */
 
-	if (target_ip_dropped) 
+	if (target_ip_dropped)
 		IHOLD(target_ip);
-	if (src_dp_dropped)
-		IHOLD(src_ip);
+	IHOLD(src_ip);
 
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
@@ -1240,11 +1254,10 @@ xfs_rename(
 		if (target_ip_dropped) {
 			IRELE(target_ip);
 		}
-		if (src_dp_dropped) {
-			IRELE(src_ip);
-		}
+		IRELE(src_ip);
 		goto std_return;
 	}
+
 	/*
 	 * trans_commit will unlock src_ip, target_ip & decrement
 	 * the vnode references.
@@ -1260,15 +1273,21 @@ xfs_rename(
 	 * Let interposed file systems know about removed links.
 	 */
 	if (target_ip_dropped) {
-		VOP_LINK_REMOVED(XFS_ITOV(target_ip), target_dir_vp, 
-				 (target_ip)->i_d.di_nlink==0);
+		FSC_NOTIFY_LINK_REMOVED(XFS_ITOV(target_ip), target_dir_vp, 
+					target_link_zero);
+
+		if (src_is_directory) {
+			xfs_post_rmdir(XFS_ITOV(target_ip), target_link_zero);
+		} else {
+			xfs_post_remove(XFS_ITOV(target_ip), target_link_zero);
+		}
+
 		IRELE(target_ip);
 	}
-	if (src_dp_dropped) {
-		VOP_LINK_REMOVED(src_dir_vp, XFS_ITOV(src_ip), 
-				 (src_dp)->i_d.di_nlink==0);
-		IRELE(src_ip);
-	}
+
+	FSC_NOTIFY_NAME_CHANGED(XFS_ITOV(src_ip));
+
+	IRELE(src_ip);
 
 	/* Fall through to std_return with error = 0 or errno from
 	 * xfs_trans_commit	 */

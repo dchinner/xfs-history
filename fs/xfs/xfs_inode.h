@@ -19,6 +19,133 @@ struct xfs_trans;
 struct zone;
 struct xfs_dquot;
 
+
+struct xfs_ioops;
+struct xfs_bmap_free;
+struct xfs_inode;
+struct xfs_trans;
+struct xfs_bmbt_irec;
+struct xfs_mount;
+struct cred;
+struct buf;
+struct flid;
+struct pm;
+
+
+/*
+ * This structure is used to communicate which extents of a file
+ * were holes when a write started from xfs_write_file() to
+ * xfs_strat_read().  This is necessary so that we can know which
+ * blocks need to be zeroed when they are read in in xfs_strat_read()
+ * if they weren\'t allocated when the buffer given to xfs_strat_read()
+ * was mapped.
+ *
+ * We keep a list of these attached to the inode.  The list is
+ * protected by the inode lock and the fact that the io lock is
+ * held exclusively by writers.
+ */
+typedef struct xfs_gap {
+	struct xfs_gap	*xg_next;
+	xfs_fileoff_t	xg_offset_fsb;
+	xfs_extlen_t	xg_count_fsb;
+} xfs_gap_t;
+
+struct pm;
+
+/*
+ * This structure is used to hold common pieces of the buffer
+ * and file for xfs_dio_write and xfs_dio_read.
+ */
+typedef	struct xfs_dio {
+	struct buf	*xd_bp;
+	bhv_desc_t	*xd_bdp;
+	struct xfs_inode *xd_ip;
+	struct xfs_iocore *xd_io;
+	struct cred	*xd_cr;
+	struct pm	*xd_pmp;
+	int		xd_blkalgn;
+	int		xd_ioflag;
+	off_t		xd_start;
+	size_t		xd_length;
+} xfs_dio_t;
+
+
+
+typedef struct xfs_iocore {
+	void			*io_obj;	/* pointer to container
+						 * inode or dcxvn structure */
+	struct xfs_mount	*io_mount;	/* fs mount struct ptr */
+	mrlock_t		*io_lock;	/* inode lock */
+	mrlock_t		*io_iolock;	/* inode IO lock */
+	sema_t			*io_flock;	/* inode flush lock */
+	mutex_t			io_rlock;	/* inode readahead mutex */
+
+	/* I/O state */
+	off_t			io_offset;	/* last buf offset */
+	off_t			io_next_offset;	/* seq read detector */
+	unsigned int		io_last_req_sz;	/* last read size */
+	unsigned int		io_size;	/* file io buffer len */
+	xfs_fsize_t		io_new_size;	/* sz when write completes */
+	off_t			io_write_offset;
+						/* start off of curr write */
+	xfs_fileoff_t		io_reada_blkno;	/* next blk to start ra */
+	xfs_gap_t		*io_gap_list;	/* hole list in write range */
+	unsigned int		io_readio_blocks;	/* read buffer size */
+	unsigned int		io_writeio_blocks;	/* write buffer size */
+	uchar_t			io_readio_log;	/* log2 of read buffer size */
+	uchar_t			io_writeio_log;	/* log2 of write buffer size */
+	uchar_t			io_max_io_log;	/* max r/w io value */
+	int			io_queued_bufs;	/* count of xfsd queued bufs*/
+
+	/* Miscellaneous state. */
+	unsigned int		io_flags;	/* IO related flags */
+
+	/* DMAPI state */
+	__uint32_t	io_dmevmask;	/* DMIG event mask */
+	__uint16_t	io_dmstate;	/* DMIG state info */
+} xfs_iocore_t;
+
+#define XFS_IO_INODE(io)	((xfs_inode_t *) ((io)->io_obj))
+#define XFS_IO_DCXVN(io)	((dcxvn_t *) ((io)->io_obj))
+
+/*
+ * Flags in the flags field
+ */
+
+#define XFS_IOCORE_ISXFS	0x01
+#define XFS_IOCORE_ISCXFS	0x02
+#define XFS_IOCORE_RT		0x04
+#define XFS_IOCORE_UIOSZ	0x08
+
+#define IO_IS_XFS(io)	((io)->io_flags & XFS_IOCORE_ISXFS)
+
+/*
+ * Clear out the read-ahead state in the in-core inode.
+ * We actually only need to clear i_next_offset and
+ * i_last_req_sz to get the effect of making all the
+ * read ahead state unusable.
+ */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INODE_CLEAR_READ_AHEAD)
+void xfs_inode_clear_read_ahead(xfs_iocore_t *io);
+#define XFS_INODE_CLEAR_READ_AHEAD(io)          xfs_inode_clear_read_ahead(io)
+#else
+#define XFS_INODE_CLEAR_READ_AHEAD(io)  {       \
+		mutex_lock(&((io)->io_rlock), PINOD);    \
+		(io)->io_next_offset = 0;          \
+		(io)->io_last_req_sz = 0;          \
+		mutex_unlock(&((io)->io_rlock)); }
+#endif
+
+
+/*
+ * xfs_iocore prototypes
+ */
+
+extern void xfs_iocore_inode_init(struct xfs_inode *);
+extern void xfs_iocore_reset(xfs_iocore_t *);
+extern void xfs_iocore_destroy(xfs_iocore_t *);
+
+
 /*
  * This is the type used in the xfs inode hash table.
  * An array of these is allocated for each mounted
@@ -32,6 +159,12 @@ typedef struct xfs_ihash {
 #if defined(MP)
 #pragma set type attribute xfs_ihash align=128
 #endif
+
+/*
+ * Inode hashing and hash bucket locking.
+ */
+#define XFS_BUCKETS(mp) (37*(mp)->m_sb.sb_agcount-1)
+#define XFS_IHASH(mp,ino) ((mp)->m_ihash + (ino % (mp)->m_ihsize))
 
 /*
  * This is the xfs inode cluster hash.  This hash is used by xfs_iflush to
@@ -173,7 +306,6 @@ typedef struct xfs_inode {
 	unsigned int		i_pincount;	/* inode pin count */
 	sv_t			i_pinsema;	/* inode pin sema */
 	lock_t			i_ipinlock;	/* inode pinning mutex */
-	mutex_t			i_rlock;	/* inode readahead mutex */
 #ifdef NOTYET
 	xfs_range_lock_t	i_range_lock;	/* range lock base */
 #endif /* NOTYET */
@@ -181,25 +313,12 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_release;	/* inode to unref */
 
 	/* I/O state */
-	off_t			i_io_offset;	/* last buf offset */
-	off_t			i_next_offset;	/* seq read detector */
-	unsigned int		i_last_req_sz;	/* last read size */
-	unsigned int		i_io_size;	/* file io buffer len */
-	xfs_fsize_t		i_new_size;	/* sz when write completes */
-	off_t			i_write_offset;	/* start off of curr write */
-	xfs_fileoff_t		i_reada_blkno;	/* next blk to start ra */
-	struct xfs_gap		*i_gap_list;	/* hole list in write range */
-	unsigned int		i_readio_blocks;	/* read buffer size */
-	unsigned int		i_writeio_blocks;	/* write buffer size */
-	uchar_t			i_readio_log;	/* log2 of read buffer size */
-	uchar_t			i_writeio_log;	/* log2 of write buffer size */
-	uchar_t			i_max_io_log;	/* max r/w io value */
+	xfs_iocore_t		i_iocore;	/* I/O core */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
 	unsigned short		i_update_core;	/* timestamps/size is dirty */
 	unsigned short		i_update_size;	/* di_size field is dirty */
-	int			i_queued_bufs;	/* count of xfsd queued bufs*/
 	unsigned int		i_gen;		/* generation count */
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
 	struct xfs_ext_attr	*i_ext_attr;	/* Critical ext attributes */
@@ -284,6 +403,7 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
  */
 #define XFS_IGRIO	0x0001  /* inode will be used for guaranteed rate i/o */
 #define XFS_IUIOSZ	0x0002  /* inode i/o sizes have been explicitly set */
+#define XFS_IQUIESCE    0x0004  /* we have started quiescing for this inode */
 
 /*
  * Per-fork incore inode flags.
@@ -295,12 +415,41 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 /*
  * Flags for inode locking.
  */
-#define	XFS_IOLOCK_EXCL		0x01
-#define	XFS_IOLOCK_SHARED	0x02
-#define	XFS_ILOCK_EXCL		0x04
-#define	XFS_ILOCK_SHARED	0x08
-#define	XFS_IUNLOCK_NONOTIFY	0x10
-#define XFS_IOLOCK_NESTED	0x20
+#define	XFS_IOLOCK_EXCL		0x001
+#define	XFS_IOLOCK_SHARED	0x002
+#define	XFS_ILOCK_EXCL		0x004
+#define	XFS_ILOCK_SHARED	0x008
+#define	XFS_IUNLOCK_NONOTIFY	0x010
+#define XFS_IOLOCK_NESTED	0x020
+#define XFS_EXTENT_TOKEN_RD	0x040
+#define XFS_SIZE_TOKEN_RD	0x080
+#define XFS_EXTSIZE_RD		(XFS_EXTENT_TOKEN_RD|XFS_SIZE_TOKEN_RD)
+#define XFS_WILLLEND		0x100	/* Always acquire tokens for lending */
+#define XFS_EXTENT_TOKEN_WR	(XFS_EXTENT_TOKEN_RD | XFS_WILLLEND)
+#define XFS_SIZE_TOKEN_WR       (XFS_SIZE_TOKEN_RD | XFS_WILLLEND)
+#define XFS_EXTSIZE_WR		(XFS_EXTSIZE_RD | XFS_WILLLEND)
+
+
+#define XFS_LOCK_MASK	\
+	(XFS_IOLOCK_EXCL | XFS_IOLOCK_SHARED | XFS_ILOCK_EXCL | \
+	 XFS_IOLOCK_NESTED | \
+	 XFS_ILOCK_SHARED | XFS_EXTENT_TOKEN_RD | XFS_SIZE_TOKEN_RD | \
+	 XFS_WILLLEND)
+
+#ifndef SIM
+/*
+ * private #define's to isolate the curuthread references and
+ * make the Cellular Irix merge easier
+ */
+#define XFST_ISNESTED_ENABLED() (curuthread->ut_vnlock & UT_FSNESTED)
+#define XFST_ISNESTED_MAX()     (curuthread->ut_vnlock == UT_FSNESTED_MAX)
+#define XFST_NESTED_INCR()      (curuthread->ut_vnlock++)
+#define XFST_NESTED_DECR()      (curuthread->ut_vnlock--)
+#define XFST_ISNESTED_USED()    (curuthread->ut_vnlock & ~UT_FSNESTED)
+#else
+#define XFST_NESTED_DECR()
+#endif /* !SIM */
+
 
 /*
  * Flags for xfs_iflush()
@@ -377,23 +526,6 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
 #define BHV_IS_XFS(bdp)		(BHV_OPS(bdp) == &xfs_vnodeops)
 
 /*
- * Clear out the read-ahead state in the in-core inode.
- * We actually only need to clear i_next_offset and
- * i_last_req_sz to get the effect of making all the
- * read ahead state unusable.
- */
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INODE_CLEAR_READ_AHEAD)
-void xfs_inode_clear_read_ahead(xfs_inode_t *ip);
-#define	XFS_INODE_CLEAR_READ_AHEAD(ip)		xfs_inode_clear_read_ahead(ip)
-#else
-#define	XFS_INODE_CLEAR_READ_AHEAD(ip)	{	\
-		mutex_lock(&((ip)->i_rlock), PINOD);	\
-		ip->i_next_offset = 0;		\
-		ip->i_last_req_sz = 0; 		\
-		mutex_unlock(&((ip)->i_rlock)); }
-#endif
-
-/*
  * XFS file identifiers.  The xfs_fid_ino_t type is because NFS 2 won't
  * take more than 10 bytes of stuff past fid_len.  xfs_fid2_t is solely
  * to get a full 64 bit inode number.
@@ -429,6 +561,7 @@ void		xfs_chash_init(struct xfs_mount *);
 void		xfs_chash_free(struct xfs_mount *);
 xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 				  struct xfs_trans *);
+void            xfs_inode_lock_init(xfs_inode_t *, struct vnode *);
 int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			 uint, xfs_inode_t **, daddr_t);
 void		xfs_iput(xfs_inode_t *, uint);
@@ -472,6 +605,7 @@ void		xfs_igrow_finish(struct xfs_trans *, xfs_inode_t *,
 void		xfs_idestroy_fork(xfs_inode_t *, int);
 void		xfs_idestroy(xfs_inode_t *);
 void		xfs_idata_realloc(xfs_inode_t *, int, int);
+void		xfs_iextract(xfs_inode_t *);
 void		xfs_iext_realloc(xfs_inode_t *, int, int);
 void		xfs_iroot_realloc(xfs_inode_t *, int, int);
 void		xfs_ipin(xfs_inode_t *);
@@ -480,6 +614,7 @@ unsigned int	xfs_ipincount(xfs_inode_t *);
 int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *, int);
 int		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(struct xfs_mount *, int);
+int             xfs_ibusy_check(xfs_inode_t *, int);
 #ifdef SIM
 void		xfs_iprint(xfs_inode_t *);
 #endif

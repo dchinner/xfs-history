@@ -809,6 +809,7 @@ xfs_dm_f_set_eventlist(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 
 	ip->i_d.di_dmevmask = (eventset & max_mask) | (ip->i_d.di_dmevmask & ~max_mask);
+	ip->i_iocore.io_dmevmask = ip->i_d.di_dmevmask;
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	VN_HOLD(vp);
@@ -2497,6 +2498,7 @@ xfs_dm_set_region(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 
 	ip->i_d.di_dmevmask = (ip->i_d.di_dmevmask & ~mr_mask) | new_mask;
+	ip->i_iocore.io_dmevmask = ip->i_d.di_dmevmask;
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	VN_HOLD(BHV_TO_VNODE(bdp));
@@ -2728,7 +2730,7 @@ xfs_dm_mapevent(
 	/* Set file size to work with. */
 
 	ip = XFS_BHVTOI(bdp);
-	filesize = ip->i_new_size;
+	filesize = ip->i_iocore.io_new_size;
 	if (filesize < ip->i_d.di_size) {
 		filesize = ip->i_d.di_size;
 	}

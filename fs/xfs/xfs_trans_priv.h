@@ -1,7 +1,7 @@
 #ifndef _XFS_TRANS_PRIV_H
 #define	_XFS_TRANS_PRIV_H
 
-#ident "$Revision: 1.11 $"
+#ident "$Revision$"
 
 struct xfs_log_item;
 struct xfs_log_item_desc;
@@ -21,7 +21,8 @@ struct xfs_log_item_desc	*xfs_trans_first_item(struct xfs_trans *);
 struct xfs_log_item_desc	*xfs_trans_next_item(struct xfs_trans *,
 					     struct xfs_log_item_desc *);
 void				xfs_trans_free_items(struct xfs_trans *, int);
-void				xfs_trans_unlock_items(struct xfs_trans *);
+void				xfs_trans_unlock_items(struct xfs_trans *,
+							xfs_lsn_t);
 
 
 /*

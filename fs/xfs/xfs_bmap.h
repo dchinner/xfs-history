@@ -47,6 +47,10 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_IGSTATE	0x200	/* Ignore state - */
 					/* combine contig. space */
 #define	XFS_BMAPI_CONTIG	0x400	/* must allocate only one extent */
+#define XFS_BMAPI_DIRECT_IO	0x800	/* Flag from cxfs client, not used
+					 * by xfs directly. Indicates alloc
+					 * request is for direct I/O not
+					 * extent conversion by server */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAPI_AFLAG)
 int xfs_bmapi_aflag(int w);

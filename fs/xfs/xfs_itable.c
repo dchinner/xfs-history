@@ -12,6 +12,7 @@
 #include <sys/debug.h>
 #include <ksys/vfile.h>
 #include <ksys/fdt.h>
+#include <ksys/cell_config.h>
 #include <sys/vfs.h>
 #include <sys/syssgi.h>
 #include <sys/capability.h>
@@ -40,6 +41,8 @@
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
 #include "xfs_error.h"
+#include "xfs_cxfs.h"
+
 
 /*
  * Return stat information for one inode.
@@ -198,7 +201,7 @@ xfs_bulkstat(
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
 	size_t			statstruct_size, /* sizeof struct filling */
 	caddr_t			ubuffer, /* buffer with inode stats */
-	int			flag, 	/* BULKSTAT_FG_QUICK|BULKSTAT_FG_IGET */
+	int			flags, 	/* defined in xfs_itable.h */
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_agblock_t		agbno;	/* allocation group block number */
@@ -236,14 +239,18 @@ xfs_bulkstat(
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
 	vfs_t			*vfsp;
+	int			vfs_unbusy_needed = 0;
 
 	/*
 	 * Check that the device is valid/mounted and mark it busy
 	 * for the duration of this call.
 	 */
 	vfsp = XFS_MTOVFS(mp);
-	if (error = vfs_busy(vfsp))
-		return error;
+	if (!(flags & BULKSTAT_FG_VFSLOCKED)) {
+		if (error = vfs_busy(vfsp))
+			return error;
+		vfs_unbusy_needed = 1;
+	}
 	
 	/*
 	 * Get the last inode value, see if there's nothing to do.
@@ -256,7 +263,9 @@ xfs_bulkstat(
 	    ino != XFS_AGINO_TO_INO(mp, agno, agino)) {
 		*done = 1;
 		*ubcountp = 0;
-		vfs_unbusy(vfsp);
+		if (vfs_unbusy_needed) {
+			vfs_unbusy(vfsp);
+		}
 		return 0;
 	}
 	ubcount = ubleft = *ubcountp;
@@ -276,7 +285,9 @@ xfs_bulkstat(
 	if (ubuffer &&
 	    (error = useracc(ubuffer, ubcount * statstruct_size,
 			(B_READ|B_PHYS), NULL))) {
-		vfs_unbusy(vfsp);
+		if (vfs_unbusy_needed) {
+			vfs_unbusy(vfsp);
+		}
 		return error;
 	}
 	/*
@@ -479,7 +490,7 @@ xfs_bulkstat(
 						((chunkidx & nimask) >>
 						 mp->m_sb.sb_inopblog);
 
-					if (flag == BULKSTAT_FG_QUICK) {
+					if (flags & BULKSTAT_FG_QUICK) {
 						ino = XFS_AGINO_TO_INO(mp, agno,
 						                       agino);
 						bno = XFS_AGB_TO_DADDR(mp, agno,
@@ -500,7 +511,9 @@ xfs_bulkstat(
 						                  &dip, &bp, bno);
 						kmem_zone_free(xfs_inode_zone, ip);
 						if (error != 0) {
-							vfs_unbusy(vfsp);
+							if (vfs_unbusy_needed) {
+								vfs_unbusy(vfsp);
+							}
 							return error;
 						}
 						clustidx = ((caddr_t)dip - 
@@ -520,7 +533,7 @@ xfs_bulkstat(
 				irbp->ir_freecount++;
 				ino = XFS_AGINO_TO_INO(mp, agno, agino);
 				bno = XFS_AGB_TO_DADDR(mp, agno, agbno);
-				if (flag == BULKSTAT_FG_QUICK) {
+				if (flags & BULKSTAT_FG_QUICK) {
 					dip = (xfs_dinode_t *)(bp->b_un.b_addr + 
 					      (clustidx << mp->m_sb.sb_inodelog));
 
@@ -588,7 +601,9 @@ xfs_bulkstat(
 		*done = 1;
 	} else
 		*lastinop = (ino64_t)lastino;
-	vfs_unbusy(vfsp);
+	if (vfs_unbusy_needed) {
+		vfs_unbusy(vfsp);
+	}
 	return rval;
 }
 
@@ -806,8 +821,16 @@ xfs_fd_to_mp(
 		vfsp = vp->v_vfsp;
 	}
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
-	if (!bdp)
+	if (!bdp) {
+#if CELL_CAPABLE
+		if (cell_enabled && (rperm == 0)) {
+			*mpp = get_cxfs_mountp(vfsp);
+			if (*mpp)
+				return 0;
+		}
+#endif
 		return XFS_ERROR(EINVAL);
+	}
 	*mpp = XFS_BHVTOM(bdp);
 	return 0;
 }

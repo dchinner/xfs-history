@@ -100,15 +100,14 @@
 #include "xfs_dmapi.h"
 #include "xfs_dir2_trace.h"
 
-#if CELL || NOTYET
-#include "cxfs_clnt.h"
-#include "xfs_cxfs.h"
-#else /* CELL || NOTYET */
 #include "xfs_clnt.h"
-#endif /* CELL || NOTYET */
+#include "xfs_cxfs.h"
+#include "xfs_utils.h"
 
 #ifdef SIM
 #include "sim.h"
+#else
+#include <fs/fs_bhv_id.h>
 #endif
 
 #ifndef SIM
@@ -117,18 +116,13 @@
 
 static char *whymount[] = { "initial mount", "remount", "unmount" };
 
-#if (CELL_ARRAY && DEBUG)
-#define TEST_UUID_STUFF 1
-#endif 
-
-
 /*
  * prototype for xlv_get_subcolumes: should go into an
  * "XLV exported functions" file (maybe the one that lists ioctls).
  */
 int
 xlv_get_subvolumes(
-	dev_t		 device,
+	dev_t		device,
 	dev_t		*ddev,
 	dev_t		*logdev,
 	dev_t		*rtdev
@@ -211,9 +205,11 @@ xfs_get_vfsmount(
 	dev_t	rtdev);
 
 STATIC int
-spectodev(
+spectodevs(
 	char	*spec,
-	dev_t	*devp);
+	dev_t	*ddevp,
+	dev_t   *logdevp,
+        dev_t   *rtdevp);
 
 STATIC int
 xfs_isdev(
@@ -398,12 +394,12 @@ xfs_init(
 
 #endif
 
+#ifdef CELL_CAPABLE
 	/*
          * Special initialization for cxfs
 	 */
-#if CELL || NOTYET
 	cxfs_arrinit();
-#endif /* CELL || NOTYET */
+#endif
 
 	/*
 	 * The inode hash table is created on a per mounted
@@ -418,12 +414,19 @@ xfs_init(
  * Resolve path name of special file to its device.
  */
 STATIC int
-spectodev(
+spectodevs(
 	char	*spec,
-	dev_t	*devp)
+	dev_t	*ddevp,
+	dev_t   *logdevp,
+	dev_t   *rtdevp)
 {
 	vnode_t	*bvp;
 	int	error;
+	dev_t   device;
+	dev_t	secondary;
+	int     status;
+	extern int volume_get_devts(dev_t device, dev_t *ddev, dev_t *logdev, 
+				    dev_t *rtdev, dev_t *secondary, int *status);
 
 	if (error = lookupname(spec, UIO_USERSPACE, FOLLOW, NULLVPP, &bvp, NULL))
 		return error;
@@ -431,9 +434,40 @@ spectodev(
 		VN_RELE(bvp);
 		return XFS_ERROR(ENOTBLK);
 	}
-	*devp = bvp->v_rdev;
+	device = bvp->v_rdev;
 	VN_RELE(bvp);
+
+	if ( volume_get_devts(device, ddevp, logdevp, rtdevp, 
+			      &secondary, &status) != 0 ) {
+		if (status)
+			return XFS_ERROR(ENXIO);
+	}
+
+	if (!status) {
+		/*
+		 * Not a XLV or XVM device.
+		 */
+		*ddevp = *logdevp = device;
+		*rtdevp = 0;
+	}
+
+	ASSERT(*ddevp && *logdevp);
 	return 0;
+}
+
+
+/*
+ * xfs_fill_buftarg
+ *
+ * Put the "appropriate" things in a buftarg_t structure.
+ */
+STATIC
+void
+xfs_fill_buftarg(buftarg_t *btp, dev_t dev, vnode_t *vp)
+{
+	btp->dev    = dev;
+	btp->specvp = vp;
+	btp->bdevsw = get_bdevsw(dev);
 }
 
 
@@ -459,21 +493,20 @@ xfs_cmountfs(
 	int		vfs_flags;
 	size_t		n;
 	char		*tmp_fsname_buffer;
-#if CELL || NOTYET
         int             client = 0;
-#endif /* CELL || NOTYET */
 	/*REFERENCED*/
 	int		noerr;
 
 	/*
-	 * Remounting a XFS file system is bad. The log manager
-	 * automatically handles recovery so no action is required.
+	 * The new use of remout to update various cxfs parameters
+	 * should of already been picked of before this.  If anything
+         * has gotten by, it shouldn't have.
 	 */
-	if (vfsp->vfs_flag & VFS_REMOUNT)
-		return 0;
-	
-	vfsp->vfs_flag |= VFS_CELLULAR;
-	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
+        ASSERT((vfsp->vfs_flag & VFS_REMOUNT) == 0); 
+	if (vfsp->vfs_flag & VFS_REMOUNT) 
+	                return 0;
+
+        mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
 	/*
  	 * Open the data and real time devices now.
@@ -489,8 +522,8 @@ xfs_cmountfs(
 			VN_RELE(ddevvp);
 			goto error0;
 		}
-		mp->m_ddevp = ddevvp;
-		mp->m_ddev_targ.bdevsw = get_bdevsw(ddev);
+
+		xfs_fill_buftarg(&mp->m_ddev_targ, ddev, ddevvp);
 
                 /* Values are in BBs */
                 if ((ap != NULL) && (ap->version >= 2) && 
@@ -521,8 +554,9 @@ xfs_cmountfs(
 			VN_RELE(rdevvp);
 			goto error1;
 		}
-		mp->m_rtdevp = rdevvp;
-		mp->m_rtdev_targ.bdevsw = get_bdevsw(rtdev);
+
+		xfs_fill_buftarg(&mp->m_rtdev_targ, rtdev, rdevvp);
+
 	} else {
 		mp->m_rtdev = NODEV;
 		rdevvp = NULL;
@@ -541,16 +575,13 @@ xfs_cmountfs(
 				VN_RELE(ldevvp);
 				goto error2;
 			}
-			mp->m_logdevp = ldevvp;
-			mp->m_logdev_targ.bdevsw = get_bdevsw(logdev);
+
+			xfs_fill_buftarg(&mp->m_logdev_targ, logdev, ldevvp);
+
 		}
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
-#if CELL || NOTYET
 			if ((ap->version < 1) || (ap->version > 4)) {
-#else /* CELL || NOTYET */
-			if ((ap->version < 1) || (ap->version > 3)) {
-#endif /* CELL || NOTYET */
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -657,16 +688,6 @@ xfs_cmountfs(
 			mp->m_flags |= XFS_MOUNT_NORECOVERY;
 		}
 	}
-#if TEST_UUID_STUFF
-	if (ap && (ap->flags & XFSMNT_TESTUUID)) {
-		error = 0;
-		if (copyin(ap->uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t))) {
-			error = XFS_ERROR(EFAULT);
-			goto error3;
-		}
-	}
-	else
-#endif
 
 	/*
 	 * read in superblock to check read-only flags and shared
@@ -722,21 +743,20 @@ xfs_cmountfs(
 		}
 	}
 
-#if CELL || NOTYET
+	/* Default to local- cxfs_arrmount will change this if necessary. */
+	mp->m_cxfstype = XFS_CXFS_NOT;
+
+#ifdef CELL_CAPABLE
 	error = cxfs_mount(mp, ap, ddev, &client);
-	if (error || client) {
-#if TEST_UUID_STUFF
-	        if (ap && (ap->flags & XFSMNT_TESTUUID)) 
-			goto error3;
 #endif
-		xfs_freesb(mp);
+	if (error) {
 		goto error3;
 	}
-	
-#endif /* CELL || NOTYET */
 
-	if (error = xfs_mountfs(vfsp, mp, ddev)) {
-		goto error3;
+	if (client == 0) {
+		if (error = xfs_mountfs(vfsp, mp, ddev)) {
+			goto error3;
+		}
 	}
 
 	/*
@@ -776,10 +796,10 @@ xfs_cmountfs(
 	}
  error0:
 	if (error) {
-#if CELL || NOTYET
+#ifdef CELL_CAPABLE
 	        cxfs_unmount(mp);
-#endif /* CELL || NOTYET */
-		xfs_mount_free(mp);
+#endif
+		xfs_mount_free(mp, 1);
 	}
 	return error;
 }	/* end of xfs_cmountfs() */
@@ -838,7 +858,7 @@ xfs_args_to_ver_1(
 	int		count,
 	xlate_info_t	*info)
 {
-	COPYIN_XLATE_PROLOGUE(xfs_args_ver_1, xfs_args);
+	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_1, xfs_args);
 
 	target->version = source->version;
 	target->flags = source->flags;
@@ -863,7 +883,7 @@ xfs_args_to_ver_2(
 	int		count,
 	xlate_info_t	*info)
 {
-	COPYIN_XLATE_PROLOGUE(xfs_args_ver_2, xfs_args);
+	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_2, xfs_args);
 
 	target->version = source->version;
 	target->flags = source->flags;
@@ -890,7 +910,7 @@ xfs_args_to_ver_3(
 	int		count,
 	xlate_info_t	*info)
 {
-	COPYIN_XLATE_PROLOGUE(xfs_args_ver_3, xfs_args);
+	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_3, xfs_args);
 
 	target->version = source->version;
 	target->flags = source->flags;
@@ -904,11 +924,10 @@ xfs_args_to_ver_3(
 	return 0;
 }
 
-#if CELL || NOTYET
 /*
  * xfs_args_to_ver_4 
  * 
- * This is used with copyin_xlate() to copy a xfs_args version 2 structure
+ * This is used with copyin_xlate() to copy a xfs_args version 4 structure
  * in from user space from a 32 bit application into a 64 bit kernel.
  */
 /*ARGSUSED*/
@@ -919,7 +938,7 @@ xfs_args_to_ver_4(
 	int		count,
 	xlate_info_t	*info)
 {
-	COPYIN_XLATE_PROLOGUE(xfs_args_ver_3, xfs_args);
+	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_4, xfs_args);
 
 	target->version = source->version;
 	target->flags = source->flags;
@@ -929,18 +948,72 @@ xfs_args_to_ver_4(
 	target->sunit = source->sunit;
 	target->swidth = source->swidth;
 	target->iosizelog = source->iosizelog;
-	target->servers = (char **)(__psint_t)source->servers;
-	target->servlen = (int *)(__psint_t)source->servlen;
-	target->uuid = (char *)(__psint_t)source->uuid;
+	target->servlist = (char **)(__psint_t)source->servlist;
+	target->servlistlen = (int *)(__psint_t)source->servlistlen;
 	target->sunit = source->sunit;
-	target->scount = source->scount;
+	target->slcount = source->slcount;
 	target->stimeout = source->stimeout;
 	target->ctimeout = source->ctimeout;
+	target->server = (char *)(__psint_t)source->server;
+	target->servlen = source->servlen;
+	target->servcell = source->servcell;
 
 	return 0;
 }
-#endif /* CELL || NOTYET */
-#endif 
+#endif
+
+/*
+ * xfs_mountargs -- Copy in xfs mount arguments
+ *
+ * Does the intialization and copying of xfs mount arguments taking account 
+ * of the various xfs argument versions and abi's.
+ *
+ * The value returned is an error code.
+ */
+int
+xfs_mountargs(
+	struct mounta	*uap,
+        struct xfs_args *ap)
+{
+	bzero(ap, sizeof (struct xfs_args));
+	ap->slcount = -1;
+        ap->stimeout = -1;
+	ap->ctimeout = -1;
+	if (uap->datalen && uap->dataptr) { 
+
+		/* Copy in the xfs_args version number */
+		if (copyin(uap->dataptr, ap, sizeof(ap->version)))
+			return XFS_ERROR(EFAULT);
+
+		if (ap->version == 1) {
+			if (COPYIN_XLATE(uap->dataptr, ap, 
+					 sizeof(struct xfs_args_ver_1),
+					 xfs_args_to_ver_1, 
+					 get_current_abi(), 1))
+				return XFS_ERROR(EFAULT);
+		} else if (ap->version == 2) {
+			if (COPYIN_XLATE(uap->dataptr, ap, 
+					 sizeof(struct xfs_args_ver_2),
+					 xfs_args_to_ver_2, 
+					 get_current_abi(), 1))
+				return XFS_ERROR(EFAULT);
+		} else if (ap->version == 3) {
+			if (COPYIN_XLATE(uap->dataptr, ap, 
+					 sizeof(struct xfs_args_ver_3),
+					 xfs_args_to_ver_3, 
+					 get_current_abi(), 1))
+				return XFS_ERROR(EFAULT);
+		} else if (ap->version == 4) {
+			if (COPYIN_XLATE(uap->dataptr, ap, 
+					 sizeof(struct xfs_args),
+					 xfs_args_to_ver_4, 
+					 get_current_abi(), 1))
+				return XFS_ERROR(EFAULT);
+		} else
+			return XFS_ERROR(EINVAL);
+	}
+	return (0);
+}
 
 /*
  * xfs_mount
@@ -959,7 +1032,6 @@ xfs_mount(
 	cred_t		*credp)
 {
 	struct xfs_args	args;			/* xfs mount arguments */
-	dev_t		device;			/* device: block or logical */
 	dev_t		ddev;
 	dev_t		logdev;
 	dev_t		rtdev;
@@ -977,54 +1049,15 @@ xfs_mount(
 	/*
 	 * Copy in XFS-specific arguments.
 	 */
-	bzero(&args, sizeof args);
-#if CELL || NOTYET
-        args.stimeout = -1;
-	args.ctimeout = -1;
-#endif /* CELL || NOTYET */
-	if (uap->datalen && uap->dataptr) { 
-
-		/* Copy in the xfs_args version number */
-		if (copyin(uap->dataptr, &args, sizeof(args.version)))
-			return XFS_ERROR(EFAULT);
-
-		if (args.version == 1) {
-			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
-				     xfs_args_to_ver_1, get_current_abi(), 1))
-				return XFS_ERROR(EFAULT);
-		} else if (args.version == 2) {
-			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
-				     xfs_args_to_ver_2, get_current_abi(),1))
-				return XFS_ERROR(EFAULT);
-		} else if (args.version == 3) {
-			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
-				     xfs_args_to_ver_3, get_current_abi(),1))
-				return XFS_ERROR(EFAULT);
-#if CELL || NOTYET
-		} else if (args.version == 4) {
-			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
-				     xfs_args_to_ver_4, get_current_abi(),1))
-				return XFS_ERROR(EFAULT);
-#endif /* CELL || NOTYET */
-		} else
-			return XFS_ERROR(EINVAL);
-	}
+	error = xfs_mountargs(uap, &args);
+	if (error)
+		return (error);
 
 	/*
 	 * Resolve path name of special file being mounted.
 	 */
-	if (error = spectodev(uap->spec, &device))
+	if (error = spectodevs(uap->spec, &ddev, &logdev, &rtdev))
 		return error;
-	if (emajor(device) == XLV_MAJOR) {
-		/* logical volume */
-		if (xlv_get_subvolumes(device, &ddev, &logdev, &rtdev) != 0) {
-			return XFS_ERROR(ENXIO);
-		}
-	} else { /* block device */
-		ddev = logdev = device;
-		rtdev = 0;			/* no realtime */
-	}
-	ASSERT(ddev && logdev);
 
 	/*
 	 * Ensure that this device isn't already mounted,
@@ -1033,12 +1066,7 @@ xfs_mount(
         if (vfs_devsearch(ddev, VFS_FSTYPE_ANY) == NULL) {
 		ASSERT((uap->flags & MS_REMOUNT) == 0);
 	} else {
-#if TEST_UUID_STUFF
-		if ((uap->flags & MS_REMOUNT) == 0 &&
-		    (args.flags & XFSMNT_TESTUUID) == 0)
-#else 
 		if ((uap->flags & MS_REMOUNT) == 0)
-#endif
 			return XFS_ERROR(EBUSY);
 	}
 
@@ -1091,10 +1119,18 @@ xfs_vfsmount(
 	char 		*attrs,
         cred_t          *credp)
 {
-	return(xfs_mount(vfsp, mvp, uap, credp));
+        int		error;
+
+	vfs_lock(vfsp);
+	error = xfs_mount(vfsp, mvp, uap, credp);
+	vfs_unlock(vfsp);
+	return (error);
 }
 
-/* VFS_MNTUPDATE */
+/*
+ * xfs_mntupdate -- Use VFS_MNTUPDATE to update mount arguments 
+ */
+/* ARGSUSED */
 STATIC int
 xfs_mntupdate(
 	bhv_desc_t	*bdp,
@@ -1102,7 +1138,44 @@ xfs_mntupdate(
         struct mounta   *uap,
         cred_t          *credp)
 {
-	return(xfs_mount(bhvtovfs(bdp), mvp, uap, credp));
+        vfs_t           *vfsp = bhvtovfs(bdp);
+	xfs_mount_t     *mp = XFS_BHVTOM(bdp);
+        struct xfs_args args;
+	int		error;
+	 
+	if (!cap_able_cred(credp, CAP_MOUNT_MGT))
+		return XFS_ERROR(EPERM);
+	if (mvp->v_type != VDIR)
+		return XFS_ERROR(ENOTDIR);
+
+	/*
+	 * Get the xfs arguments.
+	 */
+	ASSERT((uap->flags & MS_REMOUNT) && (vfsp->vfs_flag & VFS_REMOUNT));
+	if (uap->flags != (MS_RDONLY | MS_REMOUNT | MS_FSS | MS_DATA))
+		return (EINVAL);
+	error = xfs_mountargs(uap, &args);
+	if (error)
+		return (error);
+
+	/*
+	 * Check for a NULL spec as a way of supporting mount's check
+	 * for supported versions on remount as well as normal mount.
+	 */
+	if (uap->spec == NULL)
+		return EFAULT;
+
+#ifdef CELL_CAPABLE
+	/*
+         * Note that calling cxfs_remount_server may involve relocation.  
+         * Thus, it may be that the xfs_mount structure may not exist when 
+	 * it returns.  You *must* not touch it upon return.
+	 */
+	error = cxfs_remount_server(mp, uap, &args);
+#endif
+	mp = NULL;
+
+	return (error);
 }
 
 
@@ -1123,6 +1196,7 @@ xfs_isdev(
 
 	if (!bdvalid(get_bdevsw(dev)))
 		return 1;
+
 	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
 	error = (bp->b_flags & B_ERROR) ? 1 : 0;
 
@@ -1178,17 +1252,28 @@ xfs_mountroot(
 		return XFS_ERROR(ENOSYS);
 	}
 	
+	/*
+	 * Make sure that the "Root" vfs's version # & flags are
+	 * up to date.
+	 */
+	vfsp->vfs_opsver   = xfs_vfsops.vfs_ops_version;
+	vfsp->vfs_opsflags = xfs_vfsops.vfs_ops_flags;
+
 	switch (why) {
 	case ROOT_INIT:
 		if (xfsrootdone++)
 			return XFS_ERROR(EBUSY);
+
 		if (rootdev == NODEV)
 			return XFS_ERROR(ENODEV);
+
 		vfsp->vfs_dev = rootdev;
 		break;
+
 	case ROOT_REMOUNT:
 		vfs_setflag(vfsp, VFS_REMOUNT);
 		break;
+
 	case ROOT_UNMOUNT:
 		mp = XFS_BHVTOM(bdp);
 		if (xfs_ibusy(mp)) {
@@ -1354,25 +1439,7 @@ xfs_ibusy(
 
 		vp = XFS_ITOV(ip);
 		if (vp->v_count != 0) {
-			if ((vp->v_count == 1) && (ip == mp->m_rootip)) {
-				ip = ip->i_mnext;
-				continue;
-			}
-			if ((vp->v_count == 1) && (ip == mp->m_rbmip)) {
-				ip = ip->i_mnext;
-				continue;
-			}
-			if ((vp->v_count == 1) && (ip == mp->m_rsumip)) {
-				ip = ip->i_mnext;
-				continue;
-			}
-			if (mp->m_quotainfo &&
-			    ip->i_ino == mp->m_sb.sb_uquotino) {
-				ip = ip->i_mnext;
-				continue;
-			}
-			if (mp->m_quotainfo &&
-			   ip->i_ino == mp->m_sb.sb_pquotino) {
+		  	if (xfs_ibusy_check(ip, vp->v_count) == 0) {
 				ip = ip->i_mnext;
 				continue;
 			}
@@ -1403,7 +1470,7 @@ xfs_unmount(
 	cred_t	*credp)
 {
 	xfs_mount_t	*mp;
-	xfs_inode_t	*rip, *rbmip, *rsumip;
+	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
 	vmap_t		vmap;
 	int		vfs_flags;
@@ -1452,61 +1519,13 @@ xfs_unmount(
 	}
 	
 	bflush(mp->m_dev);
-	xfs_ilock(rip, XFS_ILOCK_EXCL);
-	xfs_iflock(rip);
-
-	/*
-	 * Flush out the real time inodes.
-	 */
-	if ((rbmip = mp->m_rbmip) != NULL) {
-		xfs_ilock(rbmip, XFS_ILOCK_EXCL);
-		xfs_iflock(rbmip);
-		error = xfs_iflush(rbmip, XFS_IFLUSH_SYNC);
-		xfs_iunlock(rbmip, XFS_ILOCK_EXCL);
-		if (error == EFSCORRUPTED)
-			goto fscorrupt_out;
-		ASSERT(XFS_ITOV(rbmip)->v_count == 1);
-
-		rsumip = mp->m_rsumip;
-		xfs_ilock(rsumip, XFS_ILOCK_EXCL);
-		xfs_iflock(rsumip);
-		error = xfs_iflush(rsumip, XFS_IFLUSH_SYNC);
-		xfs_iunlock(rsumip, XFS_ILOCK_EXCL);
-		if (error == EFSCORRUPTED)
-			goto fscorrupt_out;
-		ASSERT(XFS_ITOV(rsumip)->v_count == 1);
-	}
-
-	/*
-	 * synchronously flush root inode to disk
-	 */
-	error = xfs_iflush(rip, XFS_IFLUSH_SYNC);
-	if (error == EFSCORRUPTED)
-		goto fscorrupt_out2;
-	if (rvp->v_count != 1) {
-		xfs_iunlock(rip, XFS_ILOCK_EXCL);
-		error = XFS_ERROR(EBUSY);
+	error = xfs_unmount_flush(mp, 0);
+	if (error)
 		goto out;
-	}
-	/*
-	 * Release dquot that rootinode, rbmino and rsumino might be holding,
-	 * flush and purge the quota inodes.
-	 */
-	error = xfs_qm_unmount_quotas(mp);
-	if (error == EFSCORRUPTED)
-		goto fscorrupt_out2;
 
-	if (rbmip) {
-		VN_RELE(XFS_ITOV(rbmip));
-		VN_RELE(XFS_ITOV(rsumip));
-	}
-
-	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 	VMAP(rvp, vmap);
 	VN_RELE(rvp);
 	vn_purge(rvp, &vmap);
-
-	error = 0;
 
 	/*
 	 * If we're forcing a shutdown, typically because of a media error,
@@ -1544,6 +1563,77 @@ out:
 	}
 	return XFS_ERROR(error);
 
+}
+
+/*
+ * xfs_unmount_flush implements a set of flush operation on special 
+ * inodes, which are needed as a separate set of operations so that
+ * they can be called as part of relocation process.
+ */
+int 
+xfs_unmount_flush(
+	xfs_mount_t	*mp,		/* Mount structure we are getting 
+					   rid of. */
+	int             relocation)	/* Called from vfs relocation. */
+{
+	xfs_inode_t	*rip = mp->m_rootip;
+        xfs_inode_t     *rbmip;
+	xfs_inode_t     *rsumip;
+	vnode_t         *rvp = XFS_ITOV(rip);
+	int             error;
+
+	xfs_ilock(rip, XFS_ILOCK_EXCL);
+	xfs_iflock(rip);
+
+	/*
+	 * Flush out the real time inodes.
+	 */
+	if ((rbmip = mp->m_rbmip) != NULL) {
+		xfs_ilock(rbmip, XFS_ILOCK_EXCL);
+		xfs_iflock(rbmip);
+		error = xfs_iflush(rbmip, XFS_IFLUSH_SYNC);
+		xfs_iunlock(rbmip, XFS_ILOCK_EXCL);
+		if (error == EFSCORRUPTED)
+			goto fscorrupt_out;
+		ASSERT(XFS_ITOV(rbmip)->v_count == 1);
+
+		rsumip = mp->m_rsumip;
+		xfs_ilock(rsumip, XFS_ILOCK_EXCL);
+		xfs_iflock(rsumip);
+		error = xfs_iflush(rsumip, XFS_IFLUSH_SYNC);
+		xfs_iunlock(rsumip, XFS_ILOCK_EXCL);
+		if (error == EFSCORRUPTED)
+			goto fscorrupt_out;
+		ASSERT(XFS_ITOV(rsumip)->v_count == 1);
+	}
+
+	/*
+	 * synchronously flush root inode to disk
+	 */
+	error = xfs_iflush(rip, XFS_IFLUSH_SYNC);
+	if (error == EFSCORRUPTED)
+		goto fscorrupt_out2;
+	if (rvp->v_count != 1 && !relocation) {
+		xfs_iunlock(rip, XFS_ILOCK_EXCL);
+		error = XFS_ERROR(EBUSY);
+		return (error);
+	}
+	/*
+	 * Release dquot that rootinode, rbmino and rsumino might be holding,
+	 * flush and purge the quota inodes.
+	 */
+	error = xfs_qm_unmount_quotas(mp);
+	if (error == EFSCORRUPTED)
+		goto fscorrupt_out2;
+
+	if (rbmip) {
+		VN_RELE(XFS_ITOV(rbmip));
+		VN_RELE(XFS_ITOV(rsumip));
+	}
+
+	xfs_iunlock(rip, XFS_ILOCK_EXCL);
+	return (0);
+
 fscorrupt_out:
 	xfs_ifunlock(rip);
 
@@ -1551,9 +1641,8 @@ fscorrupt_out2:
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
 	error = XFS_ERROR(EFSCORRUPTED);
-	goto out;
+	return (error);
 }
-
 
 /*
  * xfs_root extracts the root vnode from a vfs.
@@ -1585,6 +1674,7 @@ xfs_root(
 static int
 devvptoxfs(
 	vnode_t		*devvp,
+	vnode_t		**vpp,
 	buf_t		**bpp,
 	xfs_sb_t	**fsp,
 	cred_t		*cr)
@@ -1594,21 +1684,37 @@ devvptoxfs(
 	dev_t		dev;
 	int		error;
 	xfs_sb_t	*fs;
-	vnode_t		*openvp;
 	bhv_desc_t	*vfs_bdp;
 	buftarg_t	target;
 
 	if (devvp->v_type != VBLK)
 		return XFS_ERROR(ENOTBLK);
-	openvp = devvp;
-	VOP_OPEN(openvp, &devvp, FREAD, cr, error);
-	if (error)
+
+	*vpp = devvp;
+
+	VN_HOLD(devvp);				/* In case we clone	*/
+
+	VOP_OPEN(devvp, vpp, FREAD, cr, error);
+
+	if (error) {
+		VN_RELE(devvp);			/* Drop our hold	*/
 		return error;
+	}
+
+	/*
+	 * If the VBLK device cloned, we need to keep our hold on the
+	 * "clone master" vnode, as the statfs code above us is going
+	 * expect to be able to VN_RELE it.
+	 */
+	if (devvp == *vpp)			/* Did we clone?	*/
+		VN_RELE(devvp);			/* If not drop our hold */
+
+	devvp = *vpp;				/* The open may have cloned */
+
 	dev = devvp->v_rdev;
 
-	target.specvp = devvp;
-	target.dev = dev;
-	target.bdevsw = get_bdevsw(dev);
+	xfs_fill_buftarg(&target, dev, devvp);
+
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 
 	/*
@@ -1700,11 +1806,17 @@ xfs_statdevvp(
 	/*REFERENCED*/
 	int  		unused;
 	__uint64_t	fakeinos;
+	vnode_t		*vpp;
 	xfs_extlen_t	lsize;
 	xfs_sb_t	*sbp;
 
-	if (error = devvptoxfs(devvp, &bp, &sbp, get_current_cred()))
+	vpp = devvp;
+
+	if (error = devvptoxfs(devvp, &vpp, &bp, &sbp, get_current_cred()))
 		return error;
+
+	devvp = vpp;				/* The open may have cloned */
+
 	if (sbp->sb_magicnum == XFS_SB_MAGIC &&
 	    XFS_SB_GOOD_VERSION(sbp) &&
 	    sbp->sb_inprogress == 0) {
@@ -1836,6 +1948,33 @@ xfs_sync(
 	cred_t		*credp)
 {
 	xfs_mount_t	*mp;
+
+	mp = XFS_BHVTOM(bdp);
+	return (xfs_syncsub(mp, flags, 0, NULL));
+}
+
+/*
+ * xfs sync routine for internal use
+ *
+ * This routine supports all of the flags defined for the generic VFS_SYNC
+ * interface as explained above under xys_sync.  In the interests of not
+ * changing interfaces within the 6.5 family, additional internallly-
+ * required functions are specified within a separate xflags parameter,
+ * only available by calling this routine.
+ *
+ * xflags:
+ * 	XFS_XSYNC_RELOC - Sync for relocation.  Don't try to get behavior
+ *                        locks as this will cause you to hang.  Not all
+ *                        combinations of flags are necessarily supported
+ *                        when this is specified.
+ */
+int
+xfs_syncsub(
+	xfs_mount_t	*mp,
+	int		flags,
+	int             xflags,
+	int             *bypassed)
+{
 	xfs_inode_t	*ip = NULL;
 	xfs_inode_t	*ip_next;
 	buf_t		*bp;
@@ -1905,7 +2044,8 @@ xfs_sync(
 
 #define PREEMPT_MASK	0x7f
 
-	mp = XFS_BHVTOM(bdp);
+	if (bypassed)
+		*bypassed = 0;
 	if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)
 		return 0;
 	error = 0;
@@ -2082,9 +2222,24 @@ xfs_sync(
 			last_byte = xfs_file_last_byte(ip);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			if (XFS_FORCED_SHUTDOWN(mp)) {
-				VOP_TOSS_PAGES(vp, 0, last_byte - 1, FI_REMAPF);
+                                if (xflags & XFS_XSYNC_RELOC) {
+					fs_tosspages(XFS_ITOBHV(ip), 0,
+						     last_byte - 1, FI_REMAPF);
+				}
+				else {
+					VOP_TOSS_PAGES(vp, 0, last_byte - 1, 
+					               FI_REMAPF);
+				}
 			} else {
-				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte - 1, FI_REMAPF);
+                                if (xflags & XFS_XSYNC_RELOC) {
+					fs_flushinval_pages(XFS_ITOBHV(ip),
+							    0, last_byte - 1,
+							    FI_REMAPF);
+				}
+				else {
+					VOP_FLUSHINVAL_PAGES(vp, 0, last_byte - 1, 
+							     FI_REMAPF);
+				}
 			}
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		} else if (flags & SYNC_DELWRI) {
@@ -2104,7 +2259,7 @@ xfs_sync(
 				last_byte = xfs_file_last_byte(ip);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 				VOP_FLUSH_PAGES(vp, (off_t)0, last_byte - 1,
-						 fflag, FI_NONE, error);
+						fflag, FI_NONE, error);
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
 
@@ -2276,6 +2431,8 @@ xfs_sync(
 						error = xfs_iflush(ip,
 							   XFS_IFLUSH_DELWRI);
 					}
+					else if (bypassed)
+						(*bypassed)++;
 				}
 			}
 		}
@@ -2518,10 +2675,6 @@ xfs_vget(
         return 0;
 }
 
-#if CELL_IRIX
-extern	int	cxfs_import(vfs_t *);
-#endif /* CELL_IRIX */
-
 int
 xfs_force_pinned(bdp)
 bhv_desc_t	*bdp;
@@ -2535,7 +2688,7 @@ bhv_desc_t	*bdp;
 
 
 vfsops_t xfs_vfsops = {
-	BHV_IDENTITY_INIT_POSITION(VFS_POSITION_BASE),
+	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
 	xfs_vfsmount,
 	xfs_rootinit,
 	xfs_mntupdate,
@@ -2547,20 +2700,16 @@ vfsops_t xfs_vfsops = {
 	xfs_vget,
 	xfs_vfsmountroot,
 	fs_realvfsops,	
-#if	CELL_IRIX
-	cxfs_import,	/* setup cxfs filesystem */
-#else	/* CELL_IRIX */
-	fs_import,	/* noop import */
-#endif	/* CELL_IRIX */
+	fs_import,	
 	xfs_quotactl,
 	xfs_force_pinned,
 	VFSOPS_MAGIC,
-	0,		/* ops version */
-	0,		/* ops flags */
+	VFS_OPSVER_GROVE,/* interface version */
+        VFS_OPSFL_FRLOCK2/* interface flags */
 };
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
-	BHV_IDENTITY_INIT_POSITION(VFS_POSITION_BASE),
+	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
 	0,
 	0,
 	0,
@@ -2576,10 +2725,19 @@ vfsops_t xfs_vfsops = {
 	0,
 	0,
         VFSOPS_MAGIC,
-        0,              /* ops version */
-        0,              /* ops flags */
+	VFS_OPSVER_GROVE,/* interface version */
+        VFS_OPSFL_FRLOCK2/* interface flags */
 };
 
 #endif	/* !SIM */
+
+
+
+
+
+
+
+
+
 
 

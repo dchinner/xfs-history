@@ -15,6 +15,7 @@
 #include <sys/kabi.h>
 #include <ksys/vfile.h>
 #include <ksys/fdt.h>
+#include <ksys/cell_config.h>
 #include <sys/vfs.h>
 #include <sys/syssgi.h>
 #include <sys/mac_label.h>
@@ -48,6 +49,7 @@
 #include "xfs_itable.h"
 #include "xfs_dfrag.h"
 #include "xfs_error.h"
+#include "xfs_cxfs.h"
 
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
 	
@@ -74,6 +76,7 @@ xfs_swapext(
 	int		error = 0;
 	xfs_ifork_t	tempif, *ifp, *tifp;
 	__uint64_t	tmp;
+	__uint64_t	cxfs_val;
 
 	if (copyin(sxp, &sx, sizeof sx))
 		return XFS_ERROR(EFAULT);
@@ -126,6 +129,8 @@ xfs_swapext(
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
+
+	CELL_ONLY(cxfs_val = cfs_start_defrag(vp));
 
 	/* quit if either is the swap file */
 	if (vp->v_flag & VISSWAP && vp->v_type == VREG)
@@ -353,9 +358,11 @@ xfs_swapext(
 
         error = xfs_trans_commit(tp, XFS_TRANS_SWAPEXT, NULL);
 
+	CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
 	return error;
 
  error0:
+	CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
 	xfs_iunlock(ip,  lock_flags);
 	xfs_iunlock(tip, lock_flags);
 	return error;

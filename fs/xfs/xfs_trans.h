@@ -55,17 +55,18 @@ typedef struct xfs_log_item {
 /*
  * Log item types.
  */
-#define	XFS_LI_5_3_BUF		0x1234
-#define	XFS_LI_5_3_INODE	0x1235
+#define	XFS_LI_5_3_BUF		0x1234	/* v1 bufs, 1-block inode buffers */
+#define	XFS_LI_5_3_INODE	0x1235	/* 1-block inode buffers */
 #define	XFS_LI_EFI		0x1236
 #define	XFS_LI_EFD		0x1237
 #define	XFS_LI_IUNLINK		0x1238
-#define	XFS_LI_6_1_INODE	0x1239
-#define	XFS_LI_6_1_BUF		0x123a
-#define	XFS_LI_INODE		0x123b
-#define	XFS_LI_BUF		0x123c
+#define	XFS_LI_6_1_INODE	0x1239	/* 4K non-aligned inode bufs */
+#define	XFS_LI_6_1_BUF		0x123a	/* v1, 4K inode buffers */
+#define	XFS_LI_INODE		0x123b	/* aligned ino chunks, var-size ibufs */
+#define	XFS_LI_BUF		0x123c	/* v2 bufs, variable sized inode bufs */
 #define	XFS_LI_DQUOT		0x123d
 #define	XFS_LI_QUOTAOFF		0x123e
+#define	XFS_LI_RPC		0x123f	/* CXFS RPC return info */
 
 /*
  * Transaction types.  Used to distinguish types of buffers.
@@ -127,6 +128,7 @@ typedef struct xfs_item_ops {
 	void (*iop_push)(xfs_log_item_t *);
 	void (*iop_abort)(xfs_log_item_t *);
 	void (*iop_pushbuf)(xfs_log_item_t *);
+	void (*iop_committing)(xfs_log_item_t *, xfs_lsn_t);
 } xfs_item_ops_t;
 
 #define	IOP_SIZE(ip)		(*(ip)->li_ops->iop_size)(ip)
@@ -140,6 +142,7 @@ typedef struct xfs_item_ops {
 #define	IOP_PUSH(ip)		(*(ip)->li_ops->iop_push)(ip)
 #define	IOP_ABORT(ip)		(*(ip)->li_ops->iop_abort)(ip)
 #define IOP_PUSHBUF(ip)         (*(ip)->li_ops->iop_pushbuf)(ip)
+#define IOP_COMMITTING(ip, lsn) (*(ip)->li_ops->iop_committing)(ip, lsn)
 
 /*
  * Return values for the IOP_TRYLOCK() routines.
@@ -930,6 +933,8 @@ void		xfs_trans_log_efd_extent(xfs_trans_t *,
 					 struct xfs_efd_log_item *,
 					 xfs_fsblock_t,
 					 xfs_extlen_t);
+void		xfs_trans_log_create_rpc(xfs_trans_t *, int, xfs_ino_t);
+void		xfs_trans_log_setattr_rpc(xfs_trans_t *, int); 
 int		xfs_trans_commit(xfs_trans_t *, uint flags, xfs_lsn_t *);
 void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *, int);

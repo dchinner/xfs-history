@@ -1,4 +1,4 @@
-#ident "$Revision: 1.37 $"
+#ident "$Revision: 1.38 $"
 
 
 #include <sys/param.h>
@@ -2017,7 +2017,9 @@ xfs_qm_quotacheck(
 		 */
 		if (error = xfs_bulkstat(mp, NULL, &lastino, &count, 
 				     xfs_qm_dqusage_adjust,
-				     structsz, NULL, BULKSTAT_FG_IGET, &done))
+				     structsz, NULL, 
+				     BULKSTAT_FG_IGET|BULKSTAT_FG_VFSLOCKED,
+				     &done))
 			break;
 	} while (! done);
 	

@@ -29,6 +29,32 @@ xfs_rename(
 	struct cred	*credp);
 
 extern int
+xfs_link(
+	bhv_desc_t	*target_dir_bdp,
+	struct vnode	*src_vp,
+	char		*target_name,
+	struct cred	*credp);
+
+#ifdef	CELL_CAPABLE
+extern int
+cxfs_rename(
+	struct bhv_desc	*src_dir_bdp,
+	char		*src_name,
+	struct vnode	*target_dir_vp,
+	char		*target_name,
+	struct pathname	*target_pnp,
+	struct cred	*credp);
+
+extern int
+cxfs_link(
+	bhv_desc_t	*target_dir_bdp,
+	struct vnode	*src_vp,
+	char		*target_name,
+	struct cred	*credp);
+
+#endif	/* CELL_CAPABLE */
+
+extern int
 xfs_dir_lookup_int(
 	struct xfs_trans	*tp,
 	struct bhv_desc		*dir_bdp,
@@ -94,6 +120,14 @@ xfs_mk_sharedro(
 extern int
 xfs_clear_sharedro(
 	int		fd);
+
+extern int      xfs_pre_rename(struct vnode *vp);
+extern int      xfs_pre_remove(struct vnode *vp);
+extern int      xfs_pre_rmdir(struct vnode *vp);
+extern void     xfs_post_rename(struct vnode *vp);
+extern void     xfs_post_remove(struct vnode * vp, int last_unlink);
+extern void     xfs_post_rmdir(struct vnode * vp, int last_unlink);
+
 
 #ifdef DEBUG
 extern int

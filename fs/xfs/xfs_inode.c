@@ -872,17 +872,6 @@ xfs_iread(
 	ip->i_delayed_blks = 0;
 
 	/*
-	 * initialize read/write io sizes
-	 */
-	ASSERT(mp->m_readio_log <= 0xff);
-	ASSERT(mp->m_writeio_log <= 0xff);
-	ip->i_readio_log = (uchar_t) mp->m_readio_log;
-	ip->i_writeio_log = (uchar_t) mp->m_writeio_log;
-	ip->i_max_io_log = (uchar_t) mp->m_writeio_log;
-	ip->i_readio_blocks = mp->m_readio_blocks;
-	ip->i_writeio_blocks = mp->m_writeio_blocks;
-
-	/*
 	 * Mark the buffer containing the inode as something to keep
 	 * around for a while.  This helps to keep recently accessed
 	 * meta-data in-core longer.
@@ -1136,7 +1125,9 @@ xfs_ialloc(
 	else
 		VN_FLAGCLR(vp, VENF_LOCKING);
 
-	ASSERT(!(vp->v_flag & (VNOSWAP |
+#if DEBUG
+	{
+		uint	badflags = VNOSWAP |
 			       VISSWAP |
 			       VREPLICABLE |
 			   /*  VNONREPLICABLE | XXX uncomment this */
@@ -1145,7 +1136,17 @@ xfs_ialloc(
 			       VSEMAPHORE |
 			       VUSYNC |
 			       VREMAPPING |
-			       VMOUNTING)));
+			       VMOUNTING;
+		
+		/* 
+		 * For shared mounts, VNOSWAP is set in xfs_iget
+		 */
+		if (tp->t_mountp->m_cxfstype != XFS_CXFS_NOT)
+			badflags &= ~VNOSWAP;
+
+		ASSERT(!(vp->v_flag & badflags));
+	}
+#endif /* DEBUG */
 
 	/*
 	 * Log the new values stuffed into the inode.
@@ -1244,7 +1245,7 @@ xfs_file_last_byte(
 	if (last_byte < 0) {
 		return XFS_MAX_FILE_OFFSET;
 	}
-	last_byte += (1 << ip->i_max_io_log);
+	last_byte += (1 << ip->i_iocore.io_max_io_log);
 	if (last_byte < 0) {
 		return XFS_MAX_FILE_OFFSET;
 	}
@@ -1368,7 +1369,7 @@ xfs_itruncate_start(
 #ifdef DEBUG
 	if (new_size == 0) {
 		ASSERT(!VN_DIRTY(vp));
-		ASSERT(ip->i_queued_bufs == 0);
+		ASSERT(ip->i_iocore.io_queued_bufs == 0);
 		ASSERT(vp->v_buf == NULL);
 		ASSERT(vp->v_pgcnt == 0);
 	}
@@ -1663,7 +1664,7 @@ xfs_itruncate_finish(
 	       (fork == XFS_ATTR_FORK) ||
 	       (!VN_DIRTY(XFS_ITOV(ip)) &&
 		(ip->i_delayed_blks == 0) &&
-		(ip->i_queued_bufs == 0) &&
+		(ip->i_iocore.io_queued_bufs == 0) &&
 		(XFS_ITOV(ip)->v_buf == NULL)));
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||
@@ -1703,7 +1704,8 @@ xfs_igrow_start(
 	 * xfs_write_file() beyond the end of the file
 	 * and any blocks between the old and new file sizes.
 	 */
-	error = xfs_zero_eof(ip, new_size, isize, credp, NULL);
+	error = xfs_zero_eof(XFS_ITOV(ip), &ip->i_iocore, new_size, isize,
+								credp, NULL);
 	return error;
 }
 
@@ -2481,7 +2483,7 @@ xfs_idestroy(
 	freesema(&ip->i_flock);
 	sv_destroy(&ip->i_pinsema);
 	spinlock_destroy(&ip->i_ipinlock);
-	mutex_destroy(&ip->i_rlock);
+	xfs_iocore_destroy(&ip->i_iocore);
 #ifndef SIM
 #ifdef XFS_BMAP_TRACE
 	ktrace_free(ip->i_xtrace);
@@ -3778,6 +3780,31 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 #endif
 
 	return( ip );
+}
+
+/*
+ * xfs_ibusy_check -- Checks whether inode reference count allows unmount
+ *
+ * The value returned is one if the reference count would prevent an unmount.
+ */
+int
+xfs_ibusy_check(
+	xfs_inode_t	*ip,
+        int             refs)
+{
+        xfs_mount_t     *mp = ip->i_mount;
+
+        if ((refs == 1) && (ip == mp->m_rootip)) 
+		return (0);
+	if ((refs == 1) && (ip == mp->m_rbmip)) 
+		return (0);
+	if ((refs == 1) && (ip == mp->m_rsumip)) 
+		return (0);
+	if (mp->m_quotainfo && ip->i_ino == mp->m_sb.sb_uquotino) 
+		return (0);
+	if (mp->m_quotainfo && ip->i_ino == mp->m_sb.sb_pquotino) 
+		return (0);
+	return (1);
 }
 
 #ifdef XFS_ILOCK_TRACE

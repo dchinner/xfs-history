@@ -12,40 +12,11 @@ struct flid;
 struct uio;
 struct vnode;
 struct xfs_inode;
+struct xfs_iocore;
 struct xfs_mount;
 struct xfs_trans;
+struct xfs_dio;
 struct pm;
-
-/*
- * This structure is used to communicate which extents of a file
- * were holes when a write started from xfs_write_file() to
- * xfs_strat_read().  This is necessary so that we can know which
- * blocks need to be zeroed when they are read in in xfs_strat_read()
- * if they weren\'t allocated when the buffer given to xfs_strat_read()
- * was mapped.
- *
- * We keep a list of these attached to the inode.  The list is
- * protected by the inode lock and the fact that the io lock is
- * held exclusively by writers.
- */
-typedef struct xfs_gap {
-	struct xfs_gap	*xg_next;
-	xfs_fileoff_t	xg_offset_fsb;
-	xfs_extlen_t	xg_count_fsb;
-} xfs_gap_t;
-
-/*
- * This structure is used to hold common pieces of the buffer
- * and file for xfs_dio_write and xfs_dio_read.
- */
-typedef	struct xfs_dio {
-	buf_t		*xd_bp;
-	struct dio_s	*xd_dp;
-	struct vnode	*xd_vp;
-	struct xfs_inode *xd_ip;
-	xfs_mount_t	*xd_mp;
-	int		xd_blkalgn;
-} xfs_dio_t;
 
 /*
  * used for mmap i/o page lockdown code
@@ -96,6 +67,11 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 		 (daddr_t)XFS_FSB_TO_BB((ip)->i_mount, (fsb)) : \
 		 XFS_FSB_TO_DADDR((ip)->i_mount, (fsb)))
 #endif
+
+#define XFS_FSB_TO_DB_IO(io,fsb) \
+		(((io)->io_flags & XFS_IOCORE_RT) ? \
+		 XFS_FSB_TO_BB((io)->io_mount, (fsb)) : \
+		 XFS_FSB_TO_DADDR((io)->io_mount, (fsb)))
 
 #define	xfs_bdwrite(mp, bp) \
           { ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
@@ -191,6 +167,9 @@ void
 xfs_strategy(struct bhv_desc	*bdp,
 	     struct buf		*bp);
 
+void
+xfs_strat_write_iodone(struct buf *bp);
+
 int
 xfs_bmap(struct bhv_desc	*bdp,
 	 off_t			offset,
@@ -201,7 +180,8 @@ xfs_bmap(struct bhv_desc	*bdp,
 	 int			*nbmaps);
 
 int
-xfs_zero_eof(struct xfs_inode	*ip,
+xfs_zero_eof(vnode_t		*vp,
+	     struct xfs_iocore	*io,
 	     off_t		offset,
 	     xfs_fsize_t	isize,
 	     struct cred	*credp,
@@ -209,7 +189,8 @@ xfs_zero_eof(struct xfs_inode	*ip,
 
 void
 xfs_inval_cached_pages(
-	struct xfs_inode	*ip,
+	struct vnode		*vp,
+	struct xfs_iocore	*io,
 	off_t			offset,
 	off_t			len,
 	void			*dio);
@@ -231,6 +212,42 @@ xfs_refcache_purge_some(void);
 
 int
 xfs_bioerror(struct buf *b);
+
+#ifndef SIM
+/*
+ * XFS I/O core functions
+ */
+
+struct vnmap;
+
+extern int xfs_dio_read(struct xfs_dio *);
+extern int xfs_dio_write(struct xfs_dio *);
+extern int xfs_read_core(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
+                        struct cred *, struct flid *, int,
+			struct vnmap *, int, const uint,
+			xfs_uaccmap_t *, xfs_fsize_t, int,
+			vrwlock_t *);
+extern int xfs_diostrat(struct buf *);
+extern int xfs_diordwr(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
+                        struct cred *, uint64_t, off_t *, size_t *);
+extern int xfs_strat_read(struct xfs_iocore *, struct buf *);
+extern int xfs_strat_write(struct xfs_iocore *, struct buf *);
+extern int xfs_strat_write_core(struct xfs_iocore *, struct buf *, int);
+extern int xfs_iomap_read(struct xfs_iocore *, off_t, size_t, struct bmapval *,
+                        int *, struct pm *, int *, unsigned int);
+extern int xfs_bioerror_relse(struct buf *);
+extern void xfs_strat_core(struct xfs_iocore *, struct buf *);
+extern int xfs_write_file(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
+			 struct cred *, xfs_lsn_t *, struct vnmap *, int,
+			 const uint, xfs_uaccmap_t *);
+extern int xfs_strat_write_unwritten(struct xfs_iocore *, struct buf *);
+extern int xfs_check_mapped_io(struct vnode *, uio_t *, struct vnmap**,
+			int *, int *, int *, xfs_fsize_t *, xfs_uaccmap_t **);
+extern int xfs_is_nested_locking_enabled(void);
+extern void xfs_enable_nested_locking(void);
+extern void xfs_disable_nested_locking(void);
+#endif
+
 
 void
 xfs_xfsd_list_evict(bhv_desc_t *bdp);

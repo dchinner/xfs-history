@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-#ident "$Revision: 1.30 $"
+#ident "$Revision$"
 
 struct buf;
 struct proc;
@@ -67,6 +67,7 @@ typedef struct xfs_inode_log_item {
 	xfs_log_item_t		ili_item;	   /* common portion */
 	struct xfs_inode	*ili_inode;	   /* inode ptr */
 	xfs_lsn_t		ili_flush_lsn;	   /* lsn at last flush */
+	xfs_lsn_t		ili_last_lsn;	   /* lsn at last transaction */
 	unsigned short		ili_ilock_recur;   /* lock recursion count */
 	unsigned short		ili_iolock_recur;  /* lock recursion count */
 	unsigned short		ili_flags;	   /* misc flags */

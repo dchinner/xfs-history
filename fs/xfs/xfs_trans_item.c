@@ -1,4 +1,4 @@
-#ident "$Revision: 1.18 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -24,7 +24,8 @@
 #include "sim.h"
 #endif
 
-STATIC int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *, int, int);
+STATIC int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *,
+					int, int, xfs_lsn_t);
 
 /*
  * This is called to add the given log item to the transaction's
@@ -304,7 +305,7 @@ xfs_trans_free_items(
 	 * Special case the embedded chunk so we don't free it below.
 	 */
 	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
-		(void) xfs_trans_unlock_chunk(licp, 1, abort);
+		(void) xfs_trans_unlock_chunk(licp, 1, abort, NULLCOMMITLSN);
 		XFS_LIC_ALL_FREE(licp);
 		licp->lic_unused = 0;
 	}
@@ -315,7 +316,7 @@ xfs_trans_free_items(
 	 */
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
-		(void) xfs_trans_unlock_chunk(licp, 1, abort);
+		(void) xfs_trans_unlock_chunk(licp, 1, abort, NULLCOMMITLSN);
 		next_licp = licp->lic_next;
 		kmem_free(licp, sizeof(xfs_log_item_chunk_t));
 		licp = next_licp;
@@ -337,7 +338,7 @@ xfs_trans_free_items(
  * when the transaction commits.
  */ 
 void
-xfs_trans_unlock_items(xfs_trans_t *tp)
+xfs_trans_unlock_items(xfs_trans_t *tp, xfs_lsn_t commit_lsn)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_chunk_t	*next_licp;
@@ -351,7 +352,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 	 * Special case the embedded chunk so we don't free.
 	 */
 	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
-		freed = xfs_trans_unlock_chunk(licp, 0, 0);
+		freed = xfs_trans_unlock_chunk(licp, 0, 0, commit_lsn);
 	}
 	licpp = &(tp->t_items.lic_next);
 	licp = licp->lic_next;
@@ -362,7 +363,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 	 */
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
-		freed += xfs_trans_unlock_chunk(licp, 0, 0);
+		freed += xfs_trans_unlock_chunk(licp, 0, 0, commit_lsn);
 		next_licp = licp->lic_next;
 		if (XFS_LIC_ARE_ALL_FREE(licp)) {
 			*licpp = next_licp;
@@ -383,6 +384,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 
 /*
  * Unlock each item pointed to by a descriptor in the given chunk.
+ * Stamp the commit lsn into each item if necessary.
  * Free descriptors pointing to items which are not dirty if freeing_chunk
  * is zero. If freeing_chunk is non-zero, then we need to unlock all
  * items in the chunk including those with XFS_LID_SYNC_UNLOCK set.
@@ -392,7 +394,8 @@ STATIC int
 xfs_trans_unlock_chunk(
 	xfs_log_item_chunk_t	*licp,
 	int			freeing_chunk,
-	int			abort)
+	int			abort,
+	xfs_lsn_t		commit_lsn)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_log_item_t		*lip;
@@ -407,6 +410,10 @@ xfs_trans_unlock_chunk(
 		}
 		lip = lidp->lid_item;
 		lip->li_desc = NULL;
+
+		if (commit_lsn != NULLCOMMITLSN)
+			IOP_COMMITTING(lip, commit_lsn);
+
 		/* XXXsup */
 		if (abort)
 			lip->li_flags |= XFS_LI_ABORTED;
@@ -433,15 +440,3 @@ xfs_trans_unlock_chunk(
 
 	return (freed);
 }
-
-
-
-
-
-
-
-
-
-
-
-

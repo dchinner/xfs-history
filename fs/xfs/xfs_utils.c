@@ -742,6 +742,121 @@ xfs_clear_sharedro(int fd)
 	return 0;
 }
 
+/* Called by filesystems VOP_RENAME
+ * once it has found the source vnode to
+ * unlink.  Note that an the VOP_RENAME
+ * should also call vn_pre_{remove,rmdir} if the
+ * target node exists (and therefore it is being removed).
+ */
+int
+xfs_pre_rename( struct vnode *vp )
+{
+        if (vp->v_flag & VISSWAP && vp->v_type == VREG) {
+                return EBUSY;
+        }
+        if (vp->v_vfsmountedhere || vp->v_flag & VMOUNTING) {
+                return EBUSY;
+        }
+        return 0;
+}
+
+/* Called by every filesystems VOP_REMOVE
+ * once it has the vnode that it is going to unlink.
+ * Verifies generic rules about whether such an
+ * unlink is legal.
+ * Also called by VOP_RENAME if the target exists and
+ * therefore will be removed.
+ */
+int
+xfs_pre_remove( struct vnode *vp )
+{
+        if (vp->v_type == VDIR) { return EPERM; }
+        if (vp->v_flag & VISSWAP && vp->v_type == VREG) {
+                return EBUSY;
+        }
+        if (vp->v_vfsmountedhere || vp->v_flag & VMOUNTING) {
+                return EBUSY;
+        }
+        return 0;
+}
+
+/* Called by every filesystem's VOP_REMOVE once
+ * it has committed do remove the link. The
+ * vnode must still have a reference at the time
+ * of the call.
+ *
+ * last_unlink may only be true on the unlink which
+ * actually descremented the link count to zero.
+ *
+ * NOTE: There is no guarantee that two racing
+ * unlinks on the same inode will not call this
+ * routine simultaneously.  Only one may have
+ * last_unlink set.
+ *
+ * Also called by VOP_RENAME if the target existed and
+ * therefore was removed.
+ */
+void
+xfs_post_remove(struct vnode * vp, int last_unlink)
+{
+	extern int psema_indirect_unlink(struct vnode * vp);
+
+        if (last_unlink && (vp->v_flag & VSEMAPHORE)) {
+                /*
+                 * If vnode represents a named semaphore,
+                 * clean it up on last unlink.
+                 *
+                 * Note that this call may only be made after we have committed
+                 * to the deletion of the file.  Otherwise there would be a
+                 * security hole where a semaphore might be deleted even
+                 * if the file was not.
+                 */
+                psema_indirect_unlink(vp);
+        }
+}
+
+
+/* Called by every filesystems VOP_RMDIR
+ * once it has the vnode that it is going to unlink.
+ * Verifies generic rules about whether such an
+ * unlink is legal.
+ *
+ * Also called by VOP_RENAME if the target exists and
+ * therefore will be removed.
+ */
+int
+xfs_pre_rmdir( struct vnode *vp )
+{
+        if (vp->v_type != VDIR) { return EPERM; }
+        if (vp->v_vfsmountedhere || vp->v_flag & VMOUNTING) {
+                return EBUSY;
+        }
+        return 0;
+}
+
+/* Called by every filesystem's VOP_RMDIR once
+ * it has committed do remove the link. The
+ * vnode must still have a reference at the time
+ * of the call.
+ *
+ * last_unlink may only be true on the unlink which
+ * actually descremented the link count to zero.
+ *
+ * NOTE: There is no guarantee that two racing
+ * unlinks on the same inode will not call this
+ * routine simultaneously.  Only one may have
+ * last_unlink set.
+ *
+ * Also called by VOP_RENAME if the target existed and
+ * therefore was removed.
+ */
+void
+xfs_post_rmdir(struct vnode * vp, int last_unlink)
+{
+        xfs_post_remove(vp, last_unlink);
+}
+
+
 #ifdef DEBUG
 int
 xfs_isshutdown(bhv_desc_t *bhv)

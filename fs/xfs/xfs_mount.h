@@ -4,14 +4,20 @@
 #ident	"$Revision$"
 
 struct cred;
+struct mounta;
 struct vfs;
 struct vnode;
+struct xfs_args;
 struct xfs_ihash;
 struct xfs_chash;
 struct xfs_inode;
 struct xfs_perag;
 struct xfs_qm;
 struct xfs_quotainfo;
+struct xfs_iocore;
+struct xfs_dio;
+struct xfs_bmbt_irec;
+struct xfs_bmap_free;
 
 #if defined(INTERRUPT_LATENCY_TESTING)
 #define	SPLDECL(s)	       
@@ -52,6 +58,109 @@ typedef struct xfs_trans_reservations {
 	uint	tr_growrtzero;	/* grow realtime zeroing */
 	uint	tr_growrtfree;	/* grow realtime freeing */
 } xfs_trans_reservations_t;
+
+
+/* Prototypes and functions for I/O core modularization, a vector
+ * of functions is used to indirect from xfs/cxfs independent code
+ * to the xfs/cxfs dependent code.
+ * The vector is placed in the mount structure so that we can
+ * minimize the number of memory indirections involved.
+ */
+
+typedef int		(*xfs_dio_write_t)(struct xfs_dio *);
+typedef int		(*xfs_dio_read_t)(struct xfs_dio *);
+typedef int		(*xfs_strat_write_t)(struct xfs_iocore *, struct buf *);
+typedef int		(*xfs_bmapi_t)(struct xfs_trans *, void *,
+				xfs_fileoff_t, xfs_filblks_t, int,
+				xfs_fsblock_t *, xfs_extlen_t,
+				struct xfs_bmbt_irec *, int *,
+				struct xfs_bmap_free *);
+typedef int		(*xfs_bmap_eof_t)(void *, xfs_fileoff_t, int, int *);
+typedef int		(*xfs_rsync_t)(void *, int, off_t, off_t);
+typedef uint		(*xfs_lck_map_shared_t)(void *);
+typedef void		(*xfs_lock_t)(void *, uint);
+typedef void		(*xfs_lock_demote_t)(void *, uint);
+typedef int		(*xfs_lock_nowait_t)(void *, uint);
+typedef void		(*xfs_unlk_t)(void *, unsigned int);
+typedef void		(*xfs_chgtime_t)(void *, int);
+typedef xfs_fsize_t	(*xfs_size_t)(void *);
+typedef xfs_fsize_t	(*xfs_setsize_t)(void *, off_t);
+typedef xfs_fsize_t	(*xfs_lastbyte_t)(void *);
+
+
+
+typedef struct xfs_ioops {
+#ifndef SIM
+	xfs_dio_write_t		xfs_dio_write_func;
+	xfs_dio_read_t		xfs_dio_read_func;
+	xfs_strat_write_t	xfs_strat_write_func;
+#endif
+	xfs_bmapi_t		xfs_bmapi_func;
+	xfs_bmap_eof_t		xfs_bmap_eof_func;
+	xfs_rsync_t		xfs_rsync_func;
+	xfs_lck_map_shared_t	xfs_lck_map_shared;
+	xfs_lock_t		xfs_ilock;
+#ifndef SIM
+	xfs_lock_demote_t	xfs_ilock_demote;
+#endif
+	xfs_lock_nowait_t	xfs_ilock_nowait;
+	xfs_unlk_t		xfs_unlock;
+	xfs_chgtime_t		xfs_chgtime;	
+	xfs_size_t		xfs_size_func;
+	xfs_setsize_t		xfs_setsize_func;
+	xfs_lastbyte_t		xfs_lastbyte;
+} xfs_ioops_t;
+
+
+#define XFS_DIO_WRITE(mp, diop) \
+	(*(mp)->m_io_ops.xfs_dio_write_func)(diop)
+
+#define XFS_DIO_READ(mp, diop) \
+	(*(mp)->m_io_ops.xfs_dio_read_func)(diop)
+
+#define XFS_STRAT_WRITE(mp, io, bp) \
+	(*(mp)->m_io_ops.xfs_strat_write_func)(io, bp)
+
+#define XFS_BMAPI(mp, trans,io,bno,len,f,first,tot,mval,nmap,flist)	\
+	(*(mp)->m_io_ops.xfs_bmapi_func) \
+		(trans,(io)->io_obj,bno,len,f,first,tot,mval,nmap,flist)
+
+#define XFS_BMAP_EOF(mp, io, endoff, whichfork, eof) \
+	(*(mp)->m_io_ops.xfs_bmap_eof_func) \
+		((io)->io_obj, endoff, whichfork, eof)
+
+#define XFS_RSYNC(mp, io, ioflag, start, end) \
+	(*(mp)->m_io_ops.xfs_rsync_func)((io)->io_obj, ioflag, start, end)
+
+#define XFS_LCK_MAP_SHARED(mp, io) \
+	(*(mp)->m_io_ops.xfs_lck_map_shared)((io)->io_obj)
+
+#define XFS_UNLK_MAP_SHARED(mp, io, mode) \
+	(*(mp)->m_io_ops.xfs_unlock)((io)->io_obj, mode)
+
+#define XFS_ILOCK(mp, io, mode) \
+	(*(mp)->m_io_ops.xfs_ilock)((io)->io_obj, mode)
+
+#define XFS_ILOCK_NOWAIT(mp, io, mode) \
+	(*(mp)->m_io_ops.xfs_ilock_nowait)((io)->io_obj, mode)
+
+#define XFS_IUNLOCK(mp, io, mode) \
+	(*(mp)->m_io_ops.xfs_unlock)((io)->io_obj, mode)
+
+#define XFS_ILOCK_DEMOTE(mp, io, mode) \
+	(*(mp)->m_io_ops.xfs_ilock_demote)((io)->io_obj, mode)
+
+#define XFS_CHGTIME(mp, io, flags) \
+	(*(mp)->m_io_ops.xfs_chgtime)((io)->io_obj, flags)
+
+#define XFS_SIZE(mp, io) \
+	(*(mp)->m_io_ops.xfs_size_func)((io)->io_obj)
+
+#define XFS_SETSIZE(mp, io, newsize) \
+	(*(mp)->m_io_ops.xfs_setsize_func)((io)->io_obj, newsize)
+
+#define XFS_LASTBYTE(mp, io) \
+	(*(mp)->m_io_ops.xfs_lastbyte)((io)->io_obj)
 
 typedef struct xfs_mount {
 	bhv_desc_t		m_bhv;		/* vfs xfs behavior */
@@ -121,7 +230,7 @@ typedef struct xfs_mount {
 	uint			m_dmevmask;	/* DMI events for this FS */
 	uint			m_flags;	/* global mount flags */
 	uint			m_attroffset;	/* inode attribute offset */
-	int			m_da_node_ents;	/* how many entries in danode */
+ 	int			m_da_node_ents;	/* how many entries in danode */
 	int			m_ialloc_inos;	/* inodes in inode allocation */
 	int			m_ialloc_blks;	/* blocks in inode allocation */
 	int			m_litino;	/* size of inode union area */
@@ -140,6 +249,8 @@ typedef struct xfs_mount {
 	int			m_attr_magicpct;/* 37% of the blocksize */
 	int			m_dir_magicpct;	/* 37% of the dir blocksize */
 	__uint8_t		m_mk_sharedro;	/* mark shared ro on unmount */
+        __uint8_t               m_inode_quiesce;/* call quiesce on new inodes.
+                                                   field governed by m_ilock */
 	__uint8_t		m_dirversion;	/* 1 or 2 */
 	xfs_dirops_t		m_dirops;	/* table of dir funcs */
 	int			m_dirblksize;	/* directory block sz--bytes */
@@ -150,11 +261,13 @@ typedef struct xfs_mount {
 	int			m_chsize;	/* size of next field */
 	struct xfs_chash	*m_chash;	/* fs private inode per-cluster
 						 * hash table */
-#if CELL_IRIX
-	int			m_export[VFS_EILIMIT/sizeof(int)];
-						/* Info to export to other
-						 * cells. */
-#endif
+	struct xfs_ioops	m_io_ops;	/* vector of I/O ops */
+        struct xfs_expinfo      *m_expinfo;     /* info to export to other 
+                                                   cells. */
+	uint64_t		m_shadow_pinmask;
+						/* which bits matter in rpc
+						   log item pin masks */
+	uint			m_cxfstype;	/* mounted shared, etc. */
 } xfs_mount_t;
 
 /*
@@ -177,13 +290,21 @@ typedef struct xfs_mount {
                                                    user */
 #define XFS_MOUNT_NOALIGN	0x00000080	/* turn off stripe alignment 
 						   allocations */
-#define XFS_MOUNT_UNSHARED      0x00000100      /* unshared mount */
+			     /* 0x00000100      -- currently unused */
 #define XFS_MOUNT_REGISTERED    0x00000200      /* registered with cxfs master
                                                    cell logic */
 #define XFS_MOUNT_NORECOVERY   	0x00000400      /* no recovery - dirty fs */
 #define XFS_MOUNT_SHARED    	0x00000800      /* shared mount */
 #define XFS_MOUNT_DFLT_IOSIZE  	0x00001000      /* set default i/o size */
 #define XFS_MOUNT_OSYNCISDSYNC 	0x00002000      /* treat o_sync like o_dsync */
+
+/*
+ * Flags for m_cxfstype
+ */
+#define XFS_CXFS_NOT		0x00000001	/* local mount */
+#define XFS_CXFS_SERVER		0x00000002	/* we're the CXFS server */
+#define XFS_CXFS_CLIENT		0x00000004	/* We're a CXFS client */
+#define XFS_CXFS_REC_ENABLED	0x00000008	/* recovery is enabled */
 
 #define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 
@@ -235,6 +356,25 @@ typedef struct xfs_mount {
 #define XFS_LOG_IO_ERROR	0x2
 #define XFS_FORCE_UMOUNT	0x4
 #define XFS_CORRUPT_INCORE	0x8	/* corrupt in-memory data structures */
+#if CELL_CAPABLE
+#define XFS_SHUTDOWN_REMOTE_REQ	0x10	/* shutdown req came from remote cell */
+#endif
+
+/*
+ * xflags for xfs_syncsub
+ */
+#define XFS_XSYNC_RELOC		0x01
+
+/*
+ * Flags for xfs_mountfs_int
+ */
+#define XFS_MFSI_SECOND         0x01	/* Is a cxfs secondary mount -- skip */
+					/* stuff which should only be done */
+					/* once. */
+#define XFS_MFSI_CLIENT         0x02    /* Is a client -- skip lots of stuff */
+#define XFS_MFSI_RRINODES       0x04    /* Read root indoes */
+#define XFS_MFSI_NOUNLINK	0x08	/* Skip unlinked inode processing in */
+					/* log recovery */
 
 /*
  * Macros for getting from mount to vfs and back.
@@ -273,14 +413,22 @@ void		xfs_umount(xfs_mount_t *);
 
 void		xfs_mod_sb(xfs_trans_t *, __int64_t);
 xfs_mount_t	*xfs_mount_init(void);
-void		xfs_mount_free(xfs_mount_t *mp);
+void		xfs_mount_free(xfs_mount_t *mp, int remove_bhv);
 int		xfs_mountfs(struct vfs *, xfs_mount_t *mp, dev_t);
+int		xfs_mountfs_int(struct vfs *, xfs_mount_t *mp, dev_t, 
+				int);
+int		xfs_mountargs(struct mounta *, struct xfs_args *);
+
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
+void		xfs_unmountfs_close(xfs_mount_t *, int, struct cred *);
+int             xfs_unmountfs_writesb(xfs_mount_t *);
+int             xfs_unmount_flush(xfs_mount_t *, int);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint, int);
 int		xfs_readsb(xfs_mount_t *mp, dev_t);
 struct buf	*xfs_getsb(xfs_mount_t *, int);
 void            xfs_freesb(xfs_mount_t *);
 void		xfs_force_shutdown(struct xfs_mount *, int);
+int		xfs_syncsub(xfs_mount_t *, int, int, int *);
 extern	struct vfsops xfs_vfsops;
 #endif	/* !_FS_XFS_MOUNT_H */

@@ -118,8 +118,9 @@ typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
 /*
  * Values for bulkstat flag argument.
  */
-#define	BULKSTAT_FG_IGET	0	/* Go through the buffer cache */
-#define	BULKSTAT_FG_QUICK	1	/* No iget, walk the dinode cluster */
+#define	BULKSTAT_FG_IGET	0x1	/* Go through the buffer cache */
+#define	BULKSTAT_FG_QUICK	0x2	/* No iget, walk the dinode cluster */
+#define BULKSTAT_FG_VFSLOCKED	0x4	/* Already have vfs lock */
 
 /*
  * Return stat information in bulk (by-inode) for the filesystem.
@@ -133,7 +134,7 @@ xfs_bulkstat(
 	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
 	size_t		statstruct_size,/* sizeof struct that we're filling */
 	caddr_t		ubuffer,	/* buffer with inode stats */
-	int		flag,		/* flag to control access method */
+	int		flags,		/* flag to control access method */
 	int		*done);		/* 1 if there're more stats to get */
 
 #endif	/* _KERNEL */
