@@ -511,6 +511,8 @@ xfs_trans_apply_sb_deltas(
 		xfs_trans_log_buf(tp, bp, offsetof(xfs_sb_t, sb_icount),
 				  offsetof(xfs_sb_t, sb_frextents) +
 				  sizeof(sbp->sb_frextents) - 1);
+
+	XFS_MTOVFS(tp->t_mountp)->vfs_super->s_dirt = 1;
 }
 
 /*

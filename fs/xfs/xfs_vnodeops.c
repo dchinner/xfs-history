@@ -803,14 +803,14 @@ xfs_setattr(
 	/*
          * Change file access or modified times.
          */
-        if (mask & (AT_ATIME|AT_MTIME)) {
-                if (mask & AT_ATIME) {
-                        ip->i_d.di_atime.t_sec = vap->va_atime.tv_sec;
-                        ip->i_d.di_atime.t_nsec = vap->va_atime.tv_nsec;
+	if (mask & (AT_ATIME|AT_MTIME)) {
+		if (mask & AT_ATIME) {
+			ip->i_d.di_atime.t_sec = vap->va_atime.tv_sec;
+			ip->i_d.di_atime.t_nsec = vap->va_atime.tv_nsec;
 			ip->i_update_core = 1;
 			timeflags &= ~XFS_ICHGTIME_ACC;
 		}
-                if (mask & AT_MTIME) {
+		if (mask & AT_MTIME) {
 			ip->i_d.di_mtime.t_sec = vap->va_mtime.tv_sec;
 			ip->i_d.di_mtime.t_nsec = vap->va_mtime.tv_nsec;
 			timeflags &= ~XFS_ICHGTIME_MOD;
@@ -4601,6 +4601,61 @@ xfs_seek(
 	}
 }
 
+STATIC int
+xfs_inode_flush(bhv_desc_t	*bdp)
+{
+	xfs_inode_t	*ip;
+	xfs_dinode_t	*dip;
+	xfs_mount_t	*mp;
+	xfs_buf_t	*bp;
+	int		error;
+
+	ip = XFS_BHVTOI(bdp);
+	mp = ip->i_mount;
+
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return XFS_ERROR(EIO);
+
+	/* Bypass inodes which have already been cleaned by
+	 * the inode flush clustering code inside xfs_iflush
+	 */
+	if ((ip->i_update_core == 0) &&
+	    ((ip->i_itemp == NULL) ||
+	     !(ip->i_itemp->ili_format.ilf_fields & XFS_ILOG_ALL)))
+		return 0;
+
+	/* We make this non-blocking if the inode is contended,
+	 * return EAGAIN to indicate to the caller that they
+	 * did not succeed. This prevents the flush path from
+	 * blocking on inodes inside another operation right
+	 * now, they get caught later by xfs_sync.
+	 */
+	if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED)) {
+		if ((xfs_ipincount(ip) == 0) && xfs_iflock_nowait(ip)) {
+			xfs_ifunlock(ip);
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+			error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
+			if (error)
+				goto eagain;
+			xfs_buf_relse(bp);
+
+			if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED) == 0)
+				goto eagain;
+
+			if ((xfs_ipincount(ip) == 0) && xfs_iflock_nowait(ip))
+				error = xfs_iflush(ip, XFS_IFLUSH_DELWRI);
+		} else {
+			error = EAGAIN;
+		}
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	} else {
+eagain:
+		error = EAGAIN;
+	}
+
+	return error;
+}
+
 
 #ifdef CELL_CAPABLE
 /*
@@ -5764,4 +5819,5 @@ vnodeops_t xfs_vnodeops = {
 	vop_flushinval_pages:	fs_flushinval_pages,
 	vop_flush_pages:	fs_flush_pages,
 	vop_release:		xfs_release,
+	vop_iflush:		xfs_inode_flush,
 };
