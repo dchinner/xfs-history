@@ -54,7 +54,7 @@ xfs-cmds:
 	cd $(WORKAREA)/cmd/xfs && ./Makepkgs verbose
 
 clean:
-	rm -rf RPMS SRPMS BUILD SOURCES/linux-${KERNEL_VERSION}-xfs-alpha.patch
+	rm -rf RPMS SRPMS BUILD SOURCES/linux-${KERNEL_VERSION}-xfs.patch
 	cd $(WORKAREA)/cmd/xfs && make clean
 
 realclean: clean
