@@ -44,26 +44,11 @@ STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
-STATIC int	xfs_qm_shake(int);
+STATIC void	xfs_qm_shake(void);
 
 #ifdef DEBUG
 extern mutex_t	qcheck_lock;
 #endif
-
-/*
- * quotacheck can shoot itself in the foot if we're not careful.
- * In IRIX, low memory conditions are catered for using a shaked
- * callback - xfs_qm_shake - there is no equivalent in Linux.
- * For filesystems with lots of unique uid/gid's, quotacheck does
- * alot of allocs - on Linux, we need to ensure we don't alloc
- * without bound.
- */
-#define XQM_CHECK_FREE							\
-	do {								\
-		if (!start_aggressive_readahead(GFP_HIGHUSER)) {	\
-			xfs_qm_shake((0));				\
-		}							\
-	} while (0)
 
 #ifdef QUOTADEBUG
 #define XQM_LIST_PRINT(l, NXT, title) \
@@ -134,10 +119,7 @@ xfs_qm_init(void)
 	} else
 		xqm->qm_dqzone = qm_dqzone;
 
-#ifdef SHAKEMGR_MEMORY	/* not defined in Linux */
-	/* Ideally, we need a more generic low-memory callback facility */
-	shake_register(SHAKEMGR_MEMORY, xfs_qm_shake);
-#endif
+	kmem_shake_register(xfs_qm_shake);
 
 	/*
 	 * The t_dqinfo portion of transactions.
@@ -169,6 +151,7 @@ xfs_qm_destroy(
 
 	ASSERT(xqm != NULL);
 	ASSERT(xqm->qm_nrefs == 0);
+	kmem_shake_deregister(xfs_qm_shake);
         hsize = xqm->qm_dqhashmask + 1;
 	for (i = 0; i < hsize; i++) {
 		xfs_qm_list_destroy(&(xqm->qm_usr_dqhtable[i]));
@@ -1975,8 +1958,6 @@ xfs_qm_quotacheck(
 				     &done)))
 			break;
 
-		XQM_CHECK_FREE;
-
 	} while (! done);
 	
 	/*
@@ -2273,13 +2254,13 @@ xfs_qm_shake_freelist(
  * running low.
  */
 /* ARGSUSED */
-STATIC int
-xfs_qm_shake(int level)
+STATIC void
+xfs_qm_shake(void)
 {
-	int 		ndqused, nfree, n;
+	int 	ndqused, nfree, n;
 
-	if (xfs_Gqm == NULL)
-		return (0);
+	if (!xfs_Gqm)
+		return;
 
 	nfree = xfs_Gqm->qm_dqfreelist.qh_nelems; /* free dquots */
 	/* incore dquots in all f/s's */
@@ -2288,12 +2269,12 @@ xfs_qm_shake(int level)
 	ASSERT(ndqused >= 0);
 	
 	if (nfree <= ndqused && nfree < ndquot)
-		return 0;
+		return;
 
 	ndqused *= xfs_Gqm->qm_dqfree_ratio;	/* target # of free dquots */
 	n = nfree - ndqused - ndquot;		/* # over target */
 	
-	return xfs_qm_shake_freelist(MAX(nfree, n));
+	(void) xfs_qm_shake_freelist(MAX(nfree, n));
 }
 
 
@@ -2463,8 +2444,6 @@ xfs_qm_dqalloc_incore(
 		}
 		XFS_STATS_INC(xfsstats.xs_qm_dqreclaim_misses);
 	}
-
-	XQM_CHECK_FREE;
 
 	/*
 	 * Allocate a brand new dquot on the kernel heap and return it
