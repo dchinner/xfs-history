@@ -1,4 +1,4 @@
-#ident "$Revision: 1.198 $"
+#ident "$Revision: 1.199 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -256,7 +256,7 @@ STATIC int	xfs_fcntl(vnode_t	*vp,
 
 STATIC int	xfs_set_dmattrs (vnode_t	*vp,
 			 u_int		evmask,
-			 u_int		state);
+			 u_int16_t	state);
 
 STATIC int 	xfs_change_file_space( vnode_t *,
 			int,
@@ -5000,13 +5000,13 @@ xfs_fcntl(
 	    }
 
 	case F_FSSETDM: {
-		u_int	values [2];
+		struct fsdmidata d;
 
-		if (copyin (arg, values, sizeof values)) {
+		if (copyin(arg, &d, sizeof d)) {
 			error = XFS_ERROR (EFAULT);
 			break;
 		}
-		error = xfs_set_dmattrs(vp, values [0], values [1]);
+		error = xfs_set_dmattrs(vp, d.fsd_dmevmask, d.fsd_dmstate);
 		break;
 	    }
 
@@ -5077,9 +5077,9 @@ xfs_fcntl(
 
 int
 xfs_set_dmattrs (
-	vnode_t *vp,
-	u_int	evmask,
-	u_int	state)
+	vnode_t 	*vp,
+	u_int		evmask,
+	u_int16_t	state)
 {
         xfs_inode_t     *ip;
 	xfs_trans_t	*tp;
