@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.64 $"
+#ident "$Revision: 1.65 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -42,6 +42,7 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_EXACT		0x10	/* allocate only to spec'd bounds */
 #define	XFS_BMAPI_ATTRFORK	0x20	/* use attribute fork not data */
 #define	XFS_BMAPI_ASYNC		0x40	/* bunmapi xactions can be async */
+#define XFS_BMAPI_RSVBLOCKS 0x80      /* OK to allocate reserved data blocks */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAPI_AFLAG)
 int xfs_bmapi_aflag(int w);
@@ -114,7 +115,8 @@ typedef struct xfs_bmalloca {
  */
 int					/* error code */
 xfs_bmap_add_attrfork(
-	struct xfs_inode	*ip);	/* incore inode pointer */
+	struct xfs_inode	*ip,	/* incore inode pointer */
+	int					rsvd);	/* flag for reserved block allocation */
 
 /*
  * Add the extent to the list of extents to be free at transaction end.
