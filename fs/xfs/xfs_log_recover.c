@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.127 $"
+#ident	"$Revision: 1.128 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -971,8 +971,8 @@ xlog_clear_stale_blocks(
 		 * the distance from the beginning of the log to the
 		 * tail.
 		 */
-		ASSERT(head_block >= tail_block);
-		ASSERT(head_block < log->l_logBBsize);
+		if (head_block < tail_block || head_block >= log->l_logBBsize)
+			return XFS_ERROR(EFSCORRUPTED);
 		tail_distance = tail_block +
 				(log->l_logBBsize - head_block);
 	} else {
@@ -981,8 +981,8 @@ xlog_clear_stale_blocks(
 		 * so the distance from the head to the tail is just
 		 * the tail block minus the head block.
 		 */
-		ASSERT(head_block < tail_block);
-		ASSERT(head_cycle == (tail_cycle + 1));
+		if (head_block >= tail_block || head_cycle != (tail_cycle + 1))
+			return XFS_ERROR(EFSCORRUPTED);
 		tail_distance = tail_block - head_block;
 	}
 
