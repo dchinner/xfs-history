@@ -185,7 +185,7 @@ xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
 	 * Unlock the inode if XFS_ILI_HOLD was not set.
 	 */
 	if (!hold) {
-		xfs_iunlock(iip->ili_inode);
+		xfs_iput(iip->ili_inode);
 	}
 }
 
