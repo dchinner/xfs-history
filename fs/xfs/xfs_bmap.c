@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.125 $"
+#ident	"$Revision: 1.126 $"
 
 
 #include <sys/param.h>
@@ -490,7 +490,7 @@ xfs_bmap_add_extent_delay_real(
 	xfs_bmbt_irec_t		r[3];	/* neighbor extent entries */
 					/* left is 0, right is 1, prev is 2 */
 	int			rval;	/* return value */
-	int			state;	/* state bits, accessed thru macros */
+	int			state = 0;/* state bits, accessed thru macros */
 	xfs_extlen_t		temp;	/* value for dnew calculations */
 	xfs_extlen_t		temp2;	/* value for dnew calculations */
 	enum {				/* bit number definitions for state */
@@ -922,7 +922,7 @@ xfs_bmap_add_extent_hole_delay(
 	xfs_extlen_t		newlen;	/* new indirect size */
 	xfs_extlen_t		oldlen;	/* old indirect size */
 	xfs_bmbt_irec_t		right;	/* right neighbor extent entry */
-	int			state;	/* state bits, accessed thru macros */
+	int			state;  /* state bits, accessed thru macros */
 	xfs_extlen_t		temp;	/* temp for indirect calculations */
 	enum {				/* bit number definitions for state */
 		LEFT_CONTIG,	RIGHT_CONTIG,
@@ -940,6 +940,7 @@ xfs_bmap_add_extent_hole_delay(
 
 	base = ip->i_u1.iu_extents;
 	ep = &base[idx];
+	state = 0;
 	ASSERT(ISNULLSTARTBLOCK(new->br_startblock));
 	/*
 	 * Check and set flags if this segment has a left neighbor
@@ -1094,6 +1095,7 @@ xfs_bmap_add_extent_hole_real(
 
 	ASSERT(idx <= ip->i_bytes / sizeof(xfs_bmbt_rec_t));
 	ep = &ip->i_u1.iu_extents[idx];
+	state = 0;
 	/*
 	 * Check and set flags if this segment has a left neighbor.
 	 */
@@ -1232,6 +1234,7 @@ xfs_bmap_add_extent_hole_real(
 #undef	STATE_TEST
 #undef	STATE_SET_TEST
 #undef	SWITCH_STATE
+	return( 0 );
 }
 
 /*
@@ -1343,7 +1346,7 @@ xfs_bmap_alloc(
 			      mp->m_sb.sb_agblocks)) ||
 			    (rt && prevbno >= mp->m_sb.sb_rextents)) {
 				prevbno -= adjust;
-				prevdiff +- adjust;
+				prevdiff += adjust;
 			}
 			/*
 			 * If the firstblock forbids it, can't use it, 
@@ -2233,22 +2236,37 @@ xfs_bmap_trace_addentry(
 	} else
 		ASSERT(r2 != NULL);
 	ktrace_enter(xfs_bmap_trace_buf,
-		(void *)opcode, (void *)fname, (void *)desc, (void *)ip,
-		(void *)idx, (void *)cnt,
-		(void *)(ip->i_ino >> 32), (void *)(int)(ip->i_ino),
-		(void *)r1->l0, (void *)r1->l1,
-		(void *)r1->l2, (void *)r1->l3,
-		(void *)r2->l0, (void *)r2->l1,
-		(void *)r2->l2, (void *)r2->l3);
+		(void *)((unsigned long)opcode), 
+		(void *)fname, (void *)desc, (void *)ip,
+		(void *)((unsigned long)idx), 
+		(void *)((unsigned long)cnt),
+		(void *)((unsigned long)(ip->i_ino >> 32)), 
+		(void *)(ip->i_ino),
+		(void *)((unsigned long)r1->l0), 
+		(void *)((unsigned long)r1->l1),
+		(void *)((unsigned long)r1->l2), 
+		(void *)((unsigned long)r1->l3),
+		(void *)((unsigned long)r2->l0), 
+		(void *)((unsigned long)r2->l1),
+		(void *)((unsigned long)r2->l2), 
+		(void *)((unsigned long)r2->l3));
+
 	ASSERT(ip->i_xtrace);
 	ktrace_enter(ip->i_xtrace,
-		(void *)opcode, (void *)fname, (void *)desc, (void *)ip,
-		(void *)idx, (void *)cnt,
-		(void *)(ip->i_ino >> 32), (void *)(int)(ip->i_ino),
-		(void *)r1->l0, (void *)r1->l1,
-		(void *)r1->l2, (void *)r1->l3,
-		(void *)r2->l0, (void *)r2->l1,
-		(void *)r2->l2, (void *)r2->l3);
+		(void *)((unsigned long)opcode), 
+		(void *)fname, (void *)desc, (void *)ip,
+		(void *)((unsigned long)idx), 
+		(void *)((unsigned long)cnt),
+		(void *)((unsigned long)(ip->i_ino >> 32)), 
+		(void *)(ip->i_ino),
+		(void *)((unsigned long)r1->l0), 
+		(void *)((unsigned long)r1->l1),
+		(void *)((unsigned long)r1->l2), 
+		(void *)((unsigned long)r1->l3),
+		(void *)((unsigned long)r2->l0), 
+		(void *)((unsigned long)r2->l1),
+		(void *)((unsigned long)r2->l2), 
+		(void *)((unsigned long)r2->l3));
 }
 	
 /*
@@ -2462,7 +2480,6 @@ xfs_bmap_finish(
 	xfs_bmap_free_item_t	*free;
 	unsigned int		logres;
 	unsigned int		logcount;
-	xfs_mount_t		*mp;
 	xfs_bmap_free_item_t	*next;
 	xfs_trans_t		*ntp;
 	xfs_bmap_free_item_t	*prev;
@@ -2476,7 +2493,6 @@ xfs_bmap_finish(
 	if (flist->xbf_count == 0)
 		return 0;
 	ntp = *tp;
-	mp = ntp->t_mountp;
 	efi = xfs_trans_get_efi(ntp, flist->xbf_count);
 	for (free = flist->xbf_first; free; free = free->xbfi_next)
 		xfs_trans_log_efi_extent(ntp, efi, free->xbfi_startblock,
