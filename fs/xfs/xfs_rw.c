@@ -1,4 +1,4 @@
-#ident "$Revision: 1.244 $"
+#ident "$Revision: 1.245 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3116,7 +3116,9 @@ start:
 		 * setgid binaries.  Don't allow this to happen if this
 		 * file is a swap file (I know, weird).
 		 */
-		if (((ip->i_d.di_mode & (ISUID | ISGID)) &&
+		if (((ip->i_d.di_mode & ISUID) ||
+		    ((ip->i_d.di_mode & (ISGID | (IEXEC >> 3))) ==
+			(ISGID | (IEXEC >> 3))) &&
 		     (credp->cr_uid != 0)) &&
 		    !(vp->v_flag & VISSWAP)) {
 			error = xfs_write_clear_setuid(ip);
