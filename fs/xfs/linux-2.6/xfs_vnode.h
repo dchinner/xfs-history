@@ -141,8 +141,6 @@ typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
  * Return values for VOP_INACTIVE.  A return value of
  * VN_INACTIVE_NOCACHE implies that the file system behavior
  * has disassociated its state and bhv_desc_t from the vnode.
- * To return VN_INACTIVE_NOCACHE, the vnode must have the
- * VINACTIVE_TEARDOWN flag set.
  */
 #define VN_INACTIVE_CACHE	0
 #define VN_INACTIVE_NOCACHE	1
@@ -438,7 +436,6 @@ typedef struct vnodeops {
 }
 #define VOP_RECLAIM(vp, flag, rv)					\
 {	/* vnode not reference-able, so no need to lock chain */	\
-	ASSERT(!((vp)->v_flag & VINACTIVE_TEARDOWN));			\
 	rv = _VOP_(vop_reclaim, vp)((vp)->v_fbhv, flag);		\
 }
 #define VOP_ATTR_GET(vp, name, val, vallenp, fl, cred, rv)		\

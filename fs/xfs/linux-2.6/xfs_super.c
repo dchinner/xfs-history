@@ -50,6 +50,12 @@ extern void xfs_cleanup(void);
 # define set_max_bytes(sb)	do { } while (0)
 #endif
 
+#ifdef CONFIG_FS_POSIX_ACL
+# define set_posix_acl(sb)	((sb)->s_flags |= MS_POSIXACL)
+#else
+# define set_posix_acl(sb)	do { } while (0)
+#endif
+
 #ifdef CONFIG_XFS_QUOTA
 static struct quotactl_ops linvfs_qops = {
 	.get_xstate		= linvfs_getxstate,
@@ -489,6 +495,7 @@ linvfs_fill_super(
 			goto fail_vnrele;
 		}
 	}
+	set_posix_acl(sb);
 
 	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
 
@@ -671,6 +678,7 @@ linvfs_remount(
 		error = -EINVAL;
 		goto out;
 	}
+	set_posix_acl(sb);
 
 	if (args->flags & XFSMNT_NOATIME)
 		mp->m_flags |= XFS_MOUNT_NOATIME;

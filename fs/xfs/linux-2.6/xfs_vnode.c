@@ -145,7 +145,6 @@ vn_initialize(vfs_t *vfsp, struct inode *inode)
 
 	XFS_STATS_INC(xfsstats.vn_active);
 
-	_ACL_SET_IFLAG(inode);
 	vp->v_flag = VMODIFIED;
 	spinlock_init(&vp->v_lock, "v_lock");
 
@@ -411,7 +410,6 @@ vn_remove(struct vnode *vp)
 	VMAP(vp, XFS_BHVTOI(vp->v_fbhv), vmap);
 
 	vn_purge(vp, &vmap);
-	_ACL_CLEAR_IFLAG(LINVFS_GET_IP(vp));
 }
 
 

@@ -93,8 +93,8 @@ linvfs_mknod(
 #ifdef CONFIG_FS_POSIX_ACL
 	/*
 	 * Conditionally compiled so that the ACL base kernel changes can be
-	 * split out into separate patches - remove this once the S_POSIXACL
-	 * flag is accepted, or some other way to implement this exists.
+	 * split out into separate patches - remove this once MS_POSIXACL is
+	 * accepted, or some other way to implement this exists.
 	 */
 	if (IS_POSIXACL(dir) && !have_default_acl && has_fs_struct(current))
 		mode &= ~current->fs->umask;
