@@ -2053,7 +2053,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	 * Make sure the place we're flushing out to really looks
 	 * like an inode!
 	 */
-	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
+	if (INT_GET(dip->di_core.di_magic, ARCH_CONVERT) != XFS_DINODE_MAGIC) {
 		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode magic number, dino ptr = 0x%p, dino bp = 0x%p, ino = %Ld",
@@ -2114,7 +2114,13 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <=
 			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
-	bcopy(item->ri_buf[1].i_addr, dip, item->ri_buf[1].i_len);
+        
+        /* The core is in in-core format */
+        xfs_xlate_dinode_core(dip, item->ri_buf[1].i_addr, -1, ARCH_CONVERT);
+        /* the rest is in on-disk format */
+	bcopy(item->ri_buf[1].i_addr + sizeof(xfs_dinode_core_t), 
+              dip                    + sizeof(xfs_dinode_core_t), 
+              item->ri_buf[1].i_len  - sizeof(xfs_dinode_core_t));
 
 	if (in_f->ilf_size == 2)
 		goto write_inode_buffer;
@@ -3335,10 +3341,13 @@ xlog_do_recover(xlog_t	*log,
 		xfs_buf_relse(bp);
 		return error;
 	}
-	sbp = XFS_BUF_TO_SBP(bp);
+        
+        /* convert superblock from on-disk format */
+        
+        sbp=&log->l_mp->m_sb;
+        xfs_xlatesb(XFS_BUF_TO_SBP(bp), sbp, 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
 	ASSERT(sbp->sb_magicnum == XFS_SB_MAGIC);
 	ASSERT(XFS_SB_GOOD_VERSION(sbp));
-	log->l_mp->m_sb = *sbp;
 	xfs_buf_relse(bp);
 
 	xlog_recover_check_summary(log);
