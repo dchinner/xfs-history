@@ -254,8 +254,7 @@ extern void		xfs_trans_log_dquot(struct xfs_trans *tp,
 					    struct xfs_dquot *dqp);
 extern void		xfs_trans_dqjoin(struct xfs_trans *tp, 
 					 struct xfs_dquot *dqp);
-
-
+extern void		xfs_qm_dqrele_all_inodes(struct xfs_mount *, uint);
 
 /* 
  * Regular disk block quota reservations 
