@@ -1,18 +1,11 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 /*
  * xfs_da_btree.h
  */
-
-struct buf;
-struct xfs_bmap_free;
-struct xfs_inode;
-struct xfs_mount;
-struct xfs_trans;
-struct zone;
 
 /*========================================================================
  * Directory Structure when greater than XFS_LBSIZE(mp) bytes.
@@ -87,6 +80,13 @@ typedef struct xfs_da_node_entry xfs_da_node_entry_t;
  * Btree searching and modification structure definitions.
  *========================================================================*/
 
+struct buf;
+struct xfs_bmap_free;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
+struct zone;
+
 /*
  * Structure to ease passing around component names.
  */
@@ -148,9 +148,8 @@ typedef struct xfs_da_state {
  * Routines used for growing the Btree.
  */
 int	xfs_da_node_create(struct xfs_trans *trans, struct xfs_inode *dp,
-				  xfs_fileoff_t which_block,
-				  int leaf_block_next,
-				  struct buf **bpp);
+				  xfs_fileoff_t which_block, int blkno,
+				  struct buf **bpp, int whichfork);
 int	xfs_da_split(struct xfs_da_state *state);
 
 /*
@@ -184,15 +183,17 @@ int	xfs_da_blk_link(struct xfs_da_state *state,
  * Utility routines.
  */
 int	xfs_da_grow_inode(struct xfs_trans *trans, struct xfs_da_name *args,
-				 xfs_fileoff_t *new_blkno);
+				 int length, xfs_fileoff_t *new_blkno);
 int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			      xfs_fileoff_t bno, struct buf **bp);
+			      xfs_fileoff_t bno, struct buf **bp,
+			      int whichfork);
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			       xfs_fileoff_t bno, struct buf **bpp);
+			       xfs_fileoff_t bno, struct buf **bpp,
+			       int whichfork);
 #ifndef SIM
 int	xfs_da_shrink_inode(struct xfs_trans *trans, struct xfs_da_name *args,
 				   xfs_fileoff_t dead_blkno,
-				   struct buf *dead_buf);
+				   int length, struct buf *dead_buf);
 #endif	/* !SIM */
 
 uint xfs_da_hashname(char *name_string, int name_length);
@@ -211,7 +212,7 @@ extern struct zone *xfs_da_state_zone;
 #define xfs_trans_brelse(T,B)	xfsda_t_brelse(T,B,__FILE__,__LINE__)
 #define xfs_trans_log_buf(T,B,F,L) xfsda_t_log_buf(T,B,F L,__FILE__,__LINE__)
 #define xfs_trans_log_inode(T,I,F) xfsda_t_log_inode(T,I,F,__FILE__,__LINE__)
-#define xfs_da_read_buf(T,I,B) xfsda_t_da_read_buf(T,I,B,__FILE__,__LINE__)
+#define xfs_da_read_buf(T,I,B,W) xfsda_t_da_read_buf(T,I,B,W,__FILE__,__LINE__)
 #endif /* !XFSDABDEBUG */
 void xfsda_t_reinit(char *description, char *file, int line);
 void xfsda_t_binval(struct xfs_trans *tp, struct buf *bp, char *file, int line);
@@ -221,7 +222,7 @@ void xfsda_t_log_buf(struct xfs_trans *tp, struct buf *bp, uint first,
 void xfsda_t_log_inode(struct xfs_trans *tp, struct xfs_inode *ip, uint flags,
 			      char *file, int line);
 struct buf *xfsda_t_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-				       xfs_fileoff_t bno,
+				       xfs_fileoff_t bno, int whichfork,
 				       char *file, int line);
 #define BUFTRACEMAX	128
 typedef struct xfsda_buftrace {
