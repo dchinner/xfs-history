@@ -461,6 +461,7 @@ STATIC int linvfs_ioctl(
 
 struct file_operations linvfs_file_operations =
 {
+	llseek:		generic_file_llseek,
 	read:		linvfs_read,  
 	write:		linvfs_write,
 	ioctl:		linvfs_ioctl,

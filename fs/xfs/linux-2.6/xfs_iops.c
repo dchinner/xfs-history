@@ -674,12 +674,12 @@ linvfs_notify_change(
 	}
 
 	VOP_SETATTR(vp, &vattr, 0, sys_cred, error);
+	if (error)
+		return(-error);	/* Positive error up from XFS */
 
-	if (!error) {
-		inode_setattr(inode, attr);
-	}
-
-	return(-error);
+	error = inode_setattr(inode, attr);
+	
+	return(error);
 }
 
 int
