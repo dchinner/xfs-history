@@ -1032,7 +1032,7 @@ xfs_dm_direct_ok(
 }
 
 
-/* We need to be able to select various combinations of FINVIS, O_NONBLOCK,
+/* We need to be able to select various combinations of O_NONBLOCK,
    O_DIRECT, and O_SYNC, yet we don't have a file descriptor and we don't have
    the file's pathname.	 All we have is a handle.
 */
@@ -1051,13 +1051,12 @@ xfs_dm_rdwr(
 	int		oflags;
 	ssize_t		xfer;
 	struct file	*file;
-	struct inode	*inode;
+	struct inode	*inode = LINVFS_GET_IP(vp);
 	struct dentry	*dentry;
 	bhv_desc_t	*xbdp;
-	int		have_write_access = 0;
 
-	if (off < 0 || vp->v_type != VREG)
-		return(EINVAL);
+	if ((off < 0) || (off > i_size_read(inode)) || !S_ISREG(inode->i_mode))
+		return EINVAL;
 
 	if (fmode & FMODE_READ) {
 		oflags = O_RDONLY;
@@ -1067,8 +1066,7 @@ xfs_dm_rdwr(
 
 	/*
 	 * Build file descriptor flags and I/O flags.  O_NONBLOCK is needed so
-	 * that we don't block on mandatory file locks.	 IO_INVIS is needed so
-	 * that we don't change any file timestamps.
+	 * that we don't block on mandatory file locks.
 	 */
 
 	oflags |= O_LARGEFILE | O_NONBLOCK;
@@ -1079,10 +1077,9 @@ xfs_dm_rdwr(
 	if (fflag & O_SYNC)
 		oflags |= O_SYNC;
 
-	inode = LINVFS_GET_IP(vp);
 	if (inode->i_fop == NULL) {
 		/* no iput; caller did get, and will do put */
-		return(EINVAL);
+		return EINVAL;
 	}
 
 	igrab(inode);
@@ -1093,24 +1090,9 @@ xfs_dm_rdwr(
 		return ENOMEM;
 	}
 
-	/* If the file is an executable, and some proc is trying to execute it
-	 * then get_write_access() will return ETXTBUSY.
-	 * We know that all threads, including any trying to execute
-	 * the file, are blocked on WRITE and READ events waiting for this
-	 * file to come online.
-	 */
-	if (fmode & FMODE_WRITE) {
-		error = -get_write_access(inode);
-		if (!error)
-			have_write_access = 1;
-	}
-
 	file = dentry_open(dentry, NULL, oflags);
 	if (IS_ERR(file)) {
-		/* dentry_open did the dput */
-		if (fmode & FMODE_WRITE)
-			put_write_access(inode);
-		return EINVAL;
+		return -PTR_ERR(file);
 	}
 	file->f_op = &linvfs_invis_file_operations;
 
@@ -1128,11 +1110,7 @@ xfs_dm_rdwr(
 		error = -(int)xfer;
 	}
 
-	if (file->f_op->release)
-		file->f_op->release(file->f_dentry->d_inode, file);
-	if ((fmode & FMODE_WRITE) && have_write_access)
-		put_write_access(inode);
-	dput(dentry);
+	fput(file);
 	return error;
 }
 
