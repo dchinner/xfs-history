@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.47 1995/03/22 20:58:52 doucette Exp $"
+#ident "$Revision: 1.48 $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -12,7 +12,7 @@
 #include <sys/sema.h>
 #include <sys/lock.h>
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL 1
 #endif
 #include <sys/vnode.h>
 #include <sys/grio.h>
@@ -35,6 +35,7 @@
 #include <sys/fs/xfs_bmap_btree.h>
 #include <sys/fs/xfs_ialloc_btree.h>
 #include <sys/fs/xfs_btree.h>
+#include <sys/fs/xfs_dir.h>
 #include <sys/fs/xfs_dinode.h>
 #include <sys/fs/xfs_inode_item.h>
 #include <sys/fs/xfs_inode.h>
@@ -42,7 +43,7 @@
 
 #ifdef SIM
 #include "sim.h"
-#include "stdio.h"
+#include <stdio.h>
 #endif
 
 /*
