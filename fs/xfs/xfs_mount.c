@@ -169,7 +169,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	__uint64_t	ret64;
 	daddr_t		d;
 	struct bdevsw	*my_bdevsw;
-	uint		quotaflags, quotaondisk;
+	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
 	boolean_t	needquotamount;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 
@@ -574,16 +574,26 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	
 #ifndef SIM 
 	quotaflags = 0;
+	needquotamount = B_FALSE;
 	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT);
-	needquotamount = B_FALSE;
+	/*
+	 * Figure out if we'll need to do a quotacheck.
+	 * The requirements are a little different depending on whether
+	 * this fs is root or not.
+	 */
+	rootqcheck = (mp->m_dev == rootdev && quotaondisk && 
+		      ((mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT &&
+			(mp->m_sb.sb_qflags & XFS_UQUOTA_CHKD) == 0) ||
+		       (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT &&
+			(mp->m_sb.sb_qflags & XFS_PQUOTA_CHKD) == 0)));
+	needquotacheck = rootqcheck ||  XFS_QM_NEED_QUOTACHECK(mp);
 	if (XFS_IS_QUOTA_ON(mp) || quotaondisk) {
 		/*
 		 * Call mount_quotas at this point only if we won't have to do
 		 * a quotacheck.
 		 */
-		if (XFS_IS_QUOTA_ON(mp) && quotaondisk &&
-		    (! XFS_QM_NEED_QUOTACHECK(mp))) {
+		if (quotaondisk && !needquotacheck) {
 			/*
 			 * If xfsquotas pkg isn't not installed,
 			 * we have to reset the quotachk'd bit.
@@ -643,6 +653,13 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	 */
 	xfs_dir_mount(mp);
 
+#ifdef QUOTADEBUG
+	if (XFS_IS_QUOTA_ON(mp)) {
+		extern int	xfs_qm_internalqcheck(xfs_mount_t *mp);
+		if (xfs_qm_internalqcheck(mp))
+			debug("qcheck failed");
+	}
+#endif
 	return (0);
 
  error2:
