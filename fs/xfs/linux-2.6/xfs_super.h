@@ -98,6 +98,7 @@ struct block_device;
 
 extern int  xfs_parseargs(bhv_desc_t *, char *, struct xfs_mount_args *, int);
 extern int  xfs_showargs(bhv_desc_t *, struct seq_file *);
+extern struct inode *xfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
 
 extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
@@ -110,9 +111,5 @@ extern void xfs_free_buftarg(struct pb_target *);
 
 extern void xfs_setsize_buftarg(struct pb_target *, unsigned int, unsigned int);
 extern unsigned int xfs_getsize_buftarg(struct pb_target *);
-
-extern void bhv_insert_all_vfsops(struct vfs *);
-extern void bhv_remove_all_vfsops(struct vfs *, int);
-extern void bhv_remove_vfsops(struct vfs *, int);
 
 #endif	/* __XFS_SUPER_H__ */
