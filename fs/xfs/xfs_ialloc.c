@@ -1113,8 +1113,8 @@ xfs_dilocate(
 		*len = blks_per_cluster;
 		return 0;
 	}
-	if (mp->m_inoalign) {
-		offset_agbno = agbno % mp->m_inoalign;
+	if (mp->m_inoalign_mask) {
+		offset_agbno = agbno & mp->m_inoalign_mask;
 		chunk_agbno = agbno - offset_agbno;
 	} else {
 		mraccess(&mp->m_peraglock);
