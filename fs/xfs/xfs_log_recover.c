@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.17 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -160,7 +160,7 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 {
 	int	i;
 	uint	cycle;
-	daddr_t last_blk = start_blk + nbblks;
+	daddr_t last_blk = start_blk + nbblks - 1;
 
 	for (i=0; i<nbblks; i++) {
 		cycle = GET_CYCLE(*bap);
