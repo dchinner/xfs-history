@@ -482,7 +482,7 @@ xfs_iread(
 	 * around for a while.  This helps to keep recently accessed
 	 * meta-data in-core longer.
 	 */
-	bp->b_ref = XFS_INOREF;
+	bp->b_ref = XFS_INO_REF;
 
 	/*
 	 * Use xfs_trans_brelse() to release the buffer containing the
