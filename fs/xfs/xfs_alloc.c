@@ -5,10 +5,10 @@
  */
 
 #include <sys/param.h>
-#include <sys/sysinfo.h>
 #ifdef SIM
 #define _KERNEL 1
 #endif
+#include <sys/sysinfo.h>
 #include <sys/buf.h>
 #include <sys/ksa.h>
 #ifdef SIM
@@ -86,16 +86,6 @@ xfs_alloc_fix_len(
 STATIC int
 xfs_alloc_fix_minleft(
 	xfs_alloc_arg_t	*args);		/* allocation argument structure */
-
-/*
- * Read in the allocation group header (free/alloc section).
- */
-STATIC buf_t *				/* buffer for the ag freelist header */
-xfs_alloc_read_agf(
-	xfs_mount_t	*mp,		/* mount point structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_agnumber_t	agno,		/* allocation group number */
-	int		flags);		/* XFS_ALLOC_FLAG_... */
 
 /*
  * Read in the allocation group free block array.
@@ -315,51 +305,6 @@ xfs_alloc_fix_minleft(
 		return 1;
 	args->agbno = NULLAGBLOCK;
 	return 0;
-}
-
-/*
- * Read in the allocation group header (free/alloc section).
- */
-STATIC buf_t *				/* buffer for the ag freelist header */
-xfs_alloc_read_agf(
-	xfs_mount_t	*mp,		/* mount point structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_agnumber_t	agno,		/* allocation group number */
-	int		flags)		/* XFS_ALLOC_FLAG_... */
-{
-	xfs_agf_t	*agf;		/* ag freelist header */
-	buf_t		*bp;		/* return value */
-	daddr_t		d;		/* disk block address */
-	xfs_perag_t	*pag;		/* per allocation group data */
-
-	ASSERT(agno != NULLAGNUMBER);
-	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
-	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1,
-		(flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0U);
-	ASSERT(!bp || !geterror(bp));
-	if (!bp)
-		return NULL;
-	pag = &mp->m_perag[agno];
-	agf = XFS_BUF_TO_AGF(bp);
-	if (!pag->pagf_init) {
-		pag->pagf_freeblks = agf->agf_freeblks;
-		pag->pagf_flcount = agf->agf_flcount;
-		pag->pagf_longest = agf->agf_longest;
-		pag->pagf_levels[XFS_BTNUM_BNOi] =
-			agf->agf_levels[XFS_BTNUM_BNOi];
-		pag->pagf_levels[XFS_BTNUM_CNTi] =
-			agf->agf_levels[XFS_BTNUM_CNTi];
-		pag->pagf_init = 1;
-	} else {
-		ASSERT(pag->pagf_freeblks == agf->agf_freeblks);
-		ASSERT(pag->pagf_flcount == agf->agf_flcount);
-		ASSERT(pag->pagf_longest == agf->agf_longest);
-		ASSERT(pag->pagf_levels[XFS_BTNUM_BNOi] ==
-		       agf->agf_levels[XFS_BTNUM_BNOi]);
-		ASSERT(pag->pagf_levels[XFS_BTNUM_CNTi] ==
-		       agf->agf_levels[XFS_BTNUM_CNTi]);
-	}
-	return bp;
 }
 
 /*
@@ -1996,6 +1941,51 @@ xfs_alloc_put_freelist(
 }
 
 /*
+ * Read in the allocation group header (free/alloc section).
+ */
+buf_t *					/* buffer for the ag freelist header */
+xfs_alloc_read_agf(
+	xfs_mount_t	*mp,		/* mount point structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	int		flags)		/* XFS_ALLOC_FLAG_... */
+{
+	xfs_agf_t	*agf;		/* ag freelist header */
+	buf_t		*bp;		/* return value */
+	daddr_t		d;		/* disk block address */
+	xfs_perag_t	*pag;		/* per allocation group data */
+
+	ASSERT(agno != NULLAGNUMBER);
+	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1,
+		(flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0U);
+	ASSERT(!bp || !geterror(bp));
+	if (!bp)
+		return NULL;
+	pag = &mp->m_perag[agno];
+	agf = XFS_BUF_TO_AGF(bp);
+	if (!pag->pagf_init) {
+		pag->pagf_freeblks = agf->agf_freeblks;
+		pag->pagf_flcount = agf->agf_flcount;
+		pag->pagf_longest = agf->agf_longest;
+		pag->pagf_levels[XFS_BTNUM_BNOi] =
+			agf->agf_levels[XFS_BTNUM_BNOi];
+		pag->pagf_levels[XFS_BTNUM_CNTi] =
+			agf->agf_levels[XFS_BTNUM_CNTi];
+		pag->pagf_init = 1;
+	} else {
+		ASSERT(pag->pagf_freeblks == agf->agf_freeblks);
+		ASSERT(pag->pagf_flcount == agf->agf_flcount);
+		ASSERT(pag->pagf_longest == agf->agf_longest);
+		ASSERT(pag->pagf_levels[XFS_BTNUM_BNOi] ==
+		       agf->agf_levels[XFS_BTNUM_BNOi]);
+		ASSERT(pag->pagf_levels[XFS_BTNUM_CNTi] ==
+		       agf->agf_levels[XFS_BTNUM_CNTi]);
+	}
+	return bp;
+}
+
+/*
  * Allocate an extent (variable-size).
  * Depending on the allocation type, we either look in a single allocation
  * group or loop over the allocation groups to find the result.
@@ -2044,12 +2034,16 @@ xfs_alloc_vextent(
 		 * These three force us into a single a.g.
 		 */
 		args->agno = XFS_FSB_TO_AGNO(mp, args->fsbno);
+		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		args->pag = &mp->m_perag[args->agno];
 		if (!(args->agbp = xfs_alloc_fix_freelist(args->tp, args->agno,
-				args->minlen, args->total, 0, 0, args->pag)))
+				args->minlen, args->total, 0, 0, args->pag))) {
+			mrunlock(&mp->m_peraglock);
 			break;
+		}
 		args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
 		xfs_alloc_ag_vextent(args);
+		mrunlock(&mp->m_peraglock);
 		break;
 	case XFS_ALLOCTYPE_START_BNO:
 		/*
@@ -2094,6 +2088,7 @@ xfs_alloc_vextent(
 		 * trylock set, second time without.
 		 */
 		for (;;) {
+			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 			args->pag = &mp->m_perag[args->agno];
 			args->agbp = xfs_alloc_fix_freelist(args->tp,
 				args->agno, args->minlen, args->total,
@@ -2104,8 +2099,10 @@ xfs_alloc_vextent(
 			if (args->agbp) {
 				xfs_alloc_ag_vextent(args);
 				ASSERT(args->agbno != NULLAGBLOCK);
+				mrunlock(&mp->m_peraglock);
 				break;
 			}
+			mrunlock(&mp->m_peraglock);
 			xfs_alloc_trace_alloc(fname, "loopfailed", args);
 			/*
 			 * Didn't work, figure out the next iteration.
@@ -2168,18 +2165,24 @@ xfs_free_extent(
 	xfs_agf_t	*agf;	/* a.g. freespace header */
 #endif
 	xfs_agnumber_t	agno;	/* allocation group number */
+	xfs_mount_t	*mp;	/* file system mount structure */
 	xfs_perag_t	*pag;	/* per allocation group data */
+	int		rval;	/* return value */
 
 	ASSERT(len != 0);
-	agno = XFS_FSB_TO_AGNO(tp->t_mountp, bno);
-	ASSERT(agno < tp->t_mountp->m_sb.sb_agcount);
-	agbno = XFS_FSB_TO_AGBNO(tp->t_mountp, bno);
-	pag = &tp->t_mountp->m_perag[agno];
+	mp = tp->t_mountp;
+	agno = XFS_FSB_TO_AGNO(mp, bno);
+	ASSERT(agno < mp->m_sb.sb_agcount);
+	agbno = XFS_FSB_TO_AGBNO(mp, bno);
+	mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+	pag = &mp->m_perag[agno];
 	agbp = xfs_alloc_fix_freelist(tp, agno, 0, 0, 0, 0, pag);
 #ifdef DEBUG
 	ASSERT(agbp != NULL);
 	agf = XFS_BUF_TO_AGF(agbp);
 	ASSERT(agbno + len <= agf->agf_length);
 #endif
-	return xfs_free_ag_extent(tp, agbp, agno, agbno, len, 0);
+	rval = xfs_free_ag_extent(tp, agbp, agno, agbno, len, 0);
+	mrunlock(&mp->m_peraglock);
+	return rval;
 }
