@@ -28,7 +28,7 @@ typedef struct xfs_dinode_core
 	__uint16_t	di_gid;		/* owner's group id */
 	__int64_t	di_size;	/* number of bytes in file */
 	uuid_t		di_uuid;	/* file unique id */
-	__int64_t	di_nextents;	/* number of extents in file */
+	xfs_extnum_t	di_nextents;	/* number of extents in file */
 	/*
 	 * While these fields hold 64 bit values, we will only
 	 * be using the upper 32 bits for now.  The t_nsec
