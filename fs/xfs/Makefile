@@ -50,6 +50,7 @@ xfs-cmds:
 		ln -s $(WORKAREA)/linux/include/asm-i386 \
 			$(WORKAREA)/linux/include/asm || exit 0
 	cd $(WORKAREA)/cmd/xfs && ./Makepkgs verbose
+	rm -f $(WORKAREA)/linux/include/asm
 
 clean:
 	rm -rf RPMS SRPMS BUILD SOURCES/linux-2.4.0-test5-xfs-alpha.patch
