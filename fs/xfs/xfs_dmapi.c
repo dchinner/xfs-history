@@ -940,7 +940,10 @@ xfs_dm_direct_ok(
 }
 
 
-/* get a well-connected dentry.  borrowed from nfsd_iget() */
+/* Get a well-connected dentry.  Borrowed from a version of nfsd_iget(),
+ * and slightly modified.  The thread that calls this has to clean up
+ * the dentry before going back to userspace.
+ */
 static struct dentry *dmapi_dget(struct inode *inode)
 {
 	struct list_head *lp;
@@ -951,15 +954,14 @@ static struct dentry *dmapi_dget(struct inode *inode)
 		result = list_entry(lp,struct dentry, d_alias);
 		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
 			dget_locked(result);
+			result->d_vfs_flags |= DCACHE_REFERENCED;
 			spin_unlock(&dcache_lock);
-			/*iput(inode);*/
 			return result;
 		}
 	}
 	spin_unlock(&dcache_lock);
 	result = d_alloc_root(inode);
 	if (result == NULL) {
-		/*iput(inode);*/
 		return NULL;
 	}
 	result->d_flags |= DCACHE_NFSD_DISCONNECTED;

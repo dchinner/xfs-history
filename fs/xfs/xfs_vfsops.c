@@ -33,6 +33,7 @@
  */
 
 #include <xfs.h>
+#include <linux/xfs_iops.h>
 
 
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
@@ -1933,27 +1934,18 @@ xfs_vget(
 	fid_t		*fidp)
 {
         xfs_fid_t	*xfid;
-	xfs_fid2_t	*xfid2;
         xfs_inode_t	*ip;
 	int		error;
 	xfs_ino_t	ino;
 	unsigned int	igen;
 	xfs_mount_t	*mp;
+	struct inode	*inode = NULL;
 
 	xfid  = (struct xfs_fid *)fidp;
-	xfid2 = (struct xfs_fid2 *)fidp;
-#if 0
-	if (xfid->fid_len == sizeof *xfid - sizeof xfid->fid_len) {
-	  /*
-	   * The 10 byte fid used by NFS, using 48 bits of inode number
-	   */
-		ino  = (xfs_ino_t)xfid->fid_ino | ((xfs_ino_t)xfid->fid_pad << 32);
-		igen = xfid->fid_gen;
-	} else 
-#endif
-	if (xfid2->fid_len == sizeof *xfid2 - sizeof xfid2->fid_len) {
-		ino  = xfid2->fid_ino;
-		igen = xfid2->fid_gen;
+
+	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
+		ino  = xfid->xfs_fid_ino;
+		igen = xfid->xfs_fid_gen;
 	} else {
 		/*
 		 * Invalid.  Since handles can be created in user space
@@ -1976,11 +1968,19 @@ xfs_vget(
 	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
 		xfs_iput(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
-		return 0;
+		return XFS_ERROR(ENOENT);
         }
 
-        xfs_iunlock(ip, XFS_ILOCK_SHARED);
         *vpp = XFS_ITOV(ip);
+	inode = LINVFS_GET_IP((*vpp));
+        xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+	linvfs_set_inode_ops(inode);
+	error = linvfs_revalidate_core(inode, ATTR_COMM);
+	if (error) {
+		iput(inode);
+		return XFS_ERROR(error);
+	}
         return 0;
 }
 
