@@ -261,6 +261,9 @@ extern __uint32_t xfs_magics[];
 #define	xfs_extlen_min(a,b)	((xfs_extlen_t)(a) < (xfs_extlen_t)(b) ? (xfs_extlen_t)(a) : (xfs_extlen_t)(b))
 #define	xfs_extlen_max(a,b)	((xfs_extlen_t)(a) > (xfs_extlen_t)(b) ? (xfs_extlen_t)(a) : (xfs_extlen_t)(b))
 
+#define	xfs_agbno_min(a,b)	((xfs_agblock_t)(a) < (xfs_agblock_t)(b) ? (xfs_agblock_t)(a) : (xfs_agblock_t)(b))
+#define	xfs_agbno_max(a,b)	((xfs_agblock_t)(a) > (xfs_agblock_t)(b) ? (xfs_agblock_t)(a) : (xfs_agblock_t)(b))
+
 #define	xfs_fsbno_min(a,b)	((xfs_fsblock_t)(a) < (xfs_fsblock_t)(b) ? (xfs_fsblock_t)(a) : (xfs_fsblock_t)(b))
 #define	xfs_fsbno_max(a,b)	((xfs_fsblock_t)(a) > (xfs_fsblock_t)(b) ? (xfs_fsblock_t)(a) : (xfs_fsblock_t)(b))
 
