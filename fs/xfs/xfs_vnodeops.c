@@ -4481,9 +4481,8 @@ xfs_finish_reclaim(
 	int		locked,
 	int		sync_mode)
 {
-	int	error;
 	xfs_ihash_t	*ih = ip->i_hash;
-	int	sync_mode;
+	int		error;
 
 	if (!locked)
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
