@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 struct xfs_ihash;
 
@@ -46,7 +46,7 @@ typedef struct xfs_mount {
 /*
  * Macros for getting from mount to vfs and back.
  */
-#define	XFS_MTOVFS(mp)	((mp)->m_vfsp)
+#define	XFS_MTOVFS(mp)		((mp)->m_vfsp)
 #define	XFS_VFSTOM(vfsp)	((vfsp)->vfs_data)
 
  
@@ -69,7 +69,11 @@ typedef struct xfs_mod_sb {
 #define	AIL_UNLOCK(mp,s)	(spunlockspl((mp)->m_ail_lock, s))
 
 void		xfs_mod_sb(xfs_trans_t *, int);
+xfs_mount_t	*xfs_mount_init(void);
+int		xfs_mountfs(struct vfs *, dev_t);
+#ifdef SIM
 xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
+#endif
 void		xfs_umount(xfs_mount_t *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
