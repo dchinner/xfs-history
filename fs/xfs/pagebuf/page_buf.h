@@ -186,8 +186,6 @@ typedef struct pb_target {
 	unsigned int		pbr_blocksize;
 	unsigned int 		pbr_blocksize_bits;
 	struct address_space 	*pbr_addrspace;
-	avl_handle_t		pbr_buffers;
-	spinlock_t		pbr_lock;
 } pb_target_t;
 
 #define PB_ADDR_SPACE(pb)  (&(pb)->pb_target->pbr_addrspace)
@@ -199,8 +197,6 @@ typedef struct pb_target {
 	unsigned int		pbr_blocksize;
 	unsigned int 		pbr_blocksize_bits;
 	struct inode	 	*pbr_inode;
-	avl_handle_t		pbr_buffers;
-	spinlock_t		pbr_lock;
 } pb_target_t;
 
 #define PB_ADDR_SPACE(pb)  ((pb)->pb_target->pbr_inode->i_mapping)
@@ -223,8 +219,9 @@ typedef int (pagebuf_bmap_fn_t) (struct inode *, loff_t, ssize_t,
 typedef struct page_buf_s {
 	struct list_head	pb_list;
 	page_buf_flags_t	pb_flags;	/* status flags */
+	struct list_head	pb_hash_list;
 	struct pb_target	*pb_target;	/* logical object */
-	unsigned int		pb_hold;	/* reference count */
+	atomic_t		pb_hold;	/* reference count */
 	page_buf_daddr_t	pb_bn;		/* block number for I/O */
 	kdev_t			pb_dev;
 	loff_t			pb_file_offset;	/* offset in file */
@@ -234,125 +231,18 @@ typedef struct page_buf_s {
 	page_buf_iodone_t	pb_iodone;	/* I/O completion function */
 	page_buf_relse_t	pb_relse;	/* releasing function */
 	page_buf_bdstrat_t	pb_strat;	/* pre-write function */
-	int			pb_error;	/* error code on I/O */
+	struct semaphore	pb_iodonesema;	/* Semaphore for I/O waiters */
 	void			*pb_fspriv;
 	void			*pb_fspriv2;
 	void			*pb_fspriv3;
-	int			pb_page_count;	/* size of page array */
-	int			pb_locked;	/* page array is locked */
-	int			pb_offset;	/* page offset in first page */
+	short			pb_error;	/* error code on I/O */
+	short			pb_page_count;	/* size of page array */
+	short			pb_offset;	/* page offset in first page */
+	unsigned char		pb_locked;	/* page array is locked */
+	unsigned char		pb_hash_index;	/* hash table index	*/
 	struct page		**pb_pages;	/* array of page pointers */
 	struct page		*pb_page_array[PB_PAGES]; /* inline pages */
 } page_buf_t;
-
-typedef struct page_buf_private_s {
-	page_buf_t		pb_common;	/* public part of structure */
-	spinlock_t		pb_lock;
-	struct semaphore	pb_sema;	/* semaphore for lockables  */
-	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
-	atomic_t		pb_io_remaining;/* #outstanding I/O requests */
-	struct semaphore	pb_iodonesema;	/* Semaphore for I/O waiters */
-	atomic_t		pb_pin_count;	/* pin count                */
-	wait_queue_head_t	pb_waiters;	/* unpin waiters            */
-#ifdef PAGEBUF_LOCK_TRACKING
-	int			pb_last_holder;
-#endif
-} page_buf_private_t;
-
-#define PBC(pb) (&((pb)->pb_common))
-#define PBP(pb) ((page_buf_private_t *) (pb))
-
-#ifdef PAGEBUF_LOCK_TRACKING
-#define PB_SET_OWNER(pb)	(PBP(pb)->pb_last_holder = current->pid)
-#define PB_CLEAR_OWNER(pb)	(PBP(pb)->pb_last_holder = -1)
-#define PB_GET_OWNER(pb)	(PBP(pb)->pb_last_holder)
-#else
-#define PB_SET_OWNER(pb)
-#define PB_CLEAR_OWNER(pb)
-#define PB_GET_OWNER(pb)
-#endif /* PAGEBUF_LOCK_TRACKING */
-
-/* Tracing utilities for pagebuf */
-typedef struct {
-	int			event;
-	unsigned long		pb;
-	page_buf_flags_t	flags;
-	unsigned short		hold;
-	unsigned short		lock_value;
-	void			*task;
-	void			*misc;
-	void			*ra;
-	loff_t			offset;
-	size_t			size;
-} pagebuf_trace_t;
-
-struct pagebuf_trace_buf {
-        pagebuf_trace_t		*buf;
-        volatile int		start;
-        volatile int		end;
-};
-
-#define PB_TRACE_BUFSIZE	1024
-#define CIRC_INC(i)     (((i) + 1) & (PB_TRACE_BUFSIZE - 1))
-
-typedef struct pagebuf_daemon {
-	int			active;
-	spinlock_t		pb_delwrite_lock;
-	struct list_head	pb_delwrite_l;
-	int			pb_delwri_cnt;
-} pagebuf_daemon_t;
-	
-typedef struct pagebuf_marker_s {
-	struct list_head	pb_list;
-	page_buf_flags_t	pb_flags;	
-} pagebuf_marker_t;
-
-/*
- * Tunable pagebuf parameters
- */
-
-#define P_PARAM	4
-
-typedef union pagebuf_param {
-	struct {
-		ulong	flush_interval;	/* interval between runs of the
-					 * delwri flush daemon.  */
-		ulong	age_buffer;	/* time for buffer to age before
-					 * we flush it.  */
-		ulong	max_dio;	/* maximum pages locked in a dio call */
-		ulong	debug;		/* debug tracing on or off */
-	} p_un;
-	ulong data[P_PARAM];
-} pagebuf_param_t;
-
-enum {
-        PB_FLUSH_INT = 1,
-        PB_FLUSH_AGE = 2,
-	PB_DIO_MAX = 3,
-        PB_DEBUG = 4
-};
-
-extern pagebuf_param_t	pb_params;
-
-/*
- * Pagebuf statistics
- */
-
-struct pbstats {
-	u_int32_t	pb_get;
-	u_int32_t	pb_create;
-	u_int32_t	pb_get_locked;
-	u_int32_t	pb_get_locked_waited;
-	u_int32_t	pb_busy_locked;
-	u_int32_t	pb_miss_locked;
-	u_int32_t	pb_page_alloc;
-	u_int32_t	pb_page_found;
-	u_int32_t	pb_get_read;
-};
-
-extern struct pbstats pbstats;
-
-#define PB_STATS_INC(count)	( count ++ )
 
 
 /* 
@@ -480,8 +370,7 @@ extern void pagebuf_flushinval(		/* write and invalidate */
 
 /* Buffer Utility Routines */
 
-extern int pagebuf_geterror(		/* return buffer error		*/
-		page_buf_t *);		/* buffer 			*/
+#define pagebuf_geterror(pb)    ((pb)->pb_error)
 
 extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 		page_buf_t *);		/* buffer to mark		*/
@@ -629,25 +518,6 @@ extern void pagebuf_delwri_flush(
 		unsigned long,
 		int *);
 
-extern int _pagebuf_get_object(
-		struct pb_target *,
-		loff_t,
-		size_t,
-		page_buf_flags_t,
-		page_buf_t **);
-
-extern void _pagebuf_free_object(	/* deallocate a buffer		*/
-		page_buf_t *,		/* buffer to deallocate		*/
-		unsigned long);		/* interrupt flags		*/
-
-extern int _pagebuf_lookup_pages(
-		page_buf_t *,
-		struct address_space *,
-		page_buf_flags_t);
-
-extern int pagebuf_locking_init(void);
-extern void pagebuf_locking_terminate(void);
-
 extern int pagebuf_init(void);
 extern void pagebuf_terminate(void);
 
@@ -659,22 +529,5 @@ static __inline__ int __pagebuf_iorequest(page_buf_t *pb)
 }
 
 extern size_t pagebuf_max_direct(void);
-
-
-#undef assert
-#ifdef PAGEBUF_DEBUG
-# define assert(expr) \
-	if (!(expr)) {                                          \
-		printk("Assertion failed: %s\n%s::%s line %d\n",\
-		#expr,__FILE__,__FUNCTION__,__LINE__);          \
-		BUG();                                          \
-	}
-#else
-# define assert(x)	do { } while (0)
-#endif
-
-#ifndef STATIC
-# define STATIC	static
-#endif
 
 #endif /* __PAGE_BUF_H__ */

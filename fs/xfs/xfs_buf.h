@@ -60,11 +60,13 @@
 
 static inline void xfs_buf_undelay(page_buf_t *pb)
 {
-	if (pb->pb_list.next != &pb->pb_list) {
-		pagebuf_delwri_dequeue(pb);
-		pagebuf_rele(pb);
-	} else {
-		pb->pb_flags &= ~PBF_DELWRI;
+	if (pb->pb_flags & PBF_DELWRI) {
+		if (pb->pb_list.next != &pb->pb_list) {
+			pagebuf_delwri_dequeue(pb);
+			pagebuf_rele(pb);
+		} else {
+			pb->pb_flags &= ~PBF_DELWRI;
+		}
 	}
 }
 
@@ -174,7 +176,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 #define XFS_BUF_CPSEMA(bp)   	(pagebuf_cond_lock(bp) == 0)
 #define XFS_BUF_VSEMA(bp)   	pagebuf_unlock(bp)
 #define XFS_BUF_PSEMA(bp,x)	pagebuf_lock(bp)
-#define XFS_BUF_V_IODONESEMA(bp) up(&PBP(bp)->pb_iodonesema);
+#define XFS_BUF_V_IODONESEMA(bp) up(&bp->pb_iodonesema);
 
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target)	\

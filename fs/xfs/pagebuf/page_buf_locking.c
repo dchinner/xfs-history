@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -42,12 +42,11 @@
  *	for I/O.  The page_buf_locking module adds support for locking such
  *      page buffers.
  *
- *      Written by William J. Earl and Steve Lord at SGI 
+ *      Written by Steve Lord at SGI 
  *
  *
  */
 
-#include <linux/module.h>
 #include <linux/stddef.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
@@ -56,41 +55,11 @@
 #include <linux/pagemap.h>
 #include <linux/init.h>
 
-#include "avl.h"
-#include "page_buf.h"
-#define _PAGE_BUF_INTERNAL_
-#define PB_DEFINE_TRACES
-#include "page_buf_trace.h"
+#include "page_buf_internal.h"
 
-/*
- *	Locking model:
- *
- *	Buffers associated with inodes for which buffer locking
- *	is not enabled are not protected by semaphores, and are
- *	assumed to be exclusively owned by the caller.  There is
- *	spinlock in the buffer, for use by the caller when concurrent
- *	access is possible.
- *
- *	Buffers asociated with inodes for which buffer locking is
- *	enabled are protected by semaphores in the page_buf_lockable_t
- *	structure, but only between different callers.  For a given
- *	caller, the buffer is exclusively owned by the caller, but
- *	the caller must still use the spinlock when concurrent access
- *	is possible.
- *
- *	Internally, when implementing buffer locking, page_buf uses
- *	a rwlock_t to protect the pagebuf_registered_inodes tree,
- *	a spinlock_t to protect the buffer tree associated with an inode,
- *	as well as to protect the hold count in the page_buf_lockable_t.
- *	The locking order is the pagebuf_registered_inodes tree lock
- *	first, then the page_buf_registration_t lock.  The semaphore
- *	in the page_buf_lockable_t should be acquired only after acquiring
- *	a hold on the page_buf_lockable_t (and of course releasing the
- *	page_buf_registration_t spinlock_t).
- */
+pb_hash_t	pbhash[NHASH];
 
 static kmem_cache_t *pagebuf_registration_cache = NULL;
-
 
 /*
  *	Initialization and Termination
@@ -102,18 +71,43 @@ static kmem_cache_t *pagebuf_registration_cache = NULL;
 
 int __init pagebuf_locking_init(void)
 {
+	int	i;
+
 	if (pagebuf_registration_cache == NULL) {
 		pagebuf_registration_cache = kmem_cache_create("page_buf_reg_t",
-						  sizeof(pb_target_t),
-						  0,
-						  SLAB_HWCACHE_ALIGN,
-						  NULL,
-						  NULL);
+						sizeof(pb_target_t),
+						0, 0, NULL, NULL);
 		if (pagebuf_registration_cache == NULL)
 			return(-ENOMEM);
 	}
 
+	for (i = 0; i < NHASH; i++) {
+		spin_lock_init(&pbhash[i].pb_hash_lock);
+		INIT_LIST_HEAD(&pbhash[i].pb_hash);
+	}
+
 	return(0);
+}
+
+/*
+ * Hash calculation
+ */
+
+static int
+_bhash(kdev_t d, loff_t b)
+{
+        int bit, hval;
+
+	b >>= 9;
+        /*
+         * dev_t is 32 bits, daddr_t is always 64 bits
+         */
+        b ^= (unsigned)d;
+        for (bit = hval = 0; b != 0 && bit < sizeof(b) * 8; bit += NBITS) {
+                hval ^= (int)b & (NHASH-1);
+                b >>= NBITS;
+	}
+        return hval;
 }
 
 
@@ -132,82 +126,9 @@ static void
 _pagebuf_registration_free(pb_target_t *target)
 {
 	if (target != NULL) {
-		if (target->pbr_buffers != NULL) 
-			avl_destroy(target->pbr_buffers);
 		kmem_cache_free(pagebuf_registration_cache, target);
 	}
 }
-
-
-int
-_pagebuf_free_lockable_buffer(page_buf_t *pb, unsigned long flags)
-{
-	pb_target_t *target = pb->pb_target;
-	int	status;
-
-	PB_TRACE(pb, PB_TRACE_REC(free_lk), 0);
-
-	spin_lock(&target->pbr_lock);
-	spin_lock(&PBP(pb)->pb_lock);
-	status = (avl_delete(target->pbr_buffers,
-			  (avl_key_t) pb, (avl_value_t) pb));
-
-	spin_unlock_irqrestore(&target->pbr_lock, flags);
-
-	PB_TRACE(pb, PB_TRACE_REC(freed_l), status);
-
-	return status;
-}
-
-
-
-/*
- *	_pagebuf_lockable_compare
- */
-
-static int
-_pagebuf_lockable_compare_key(avl_key_t key_a,
-			      avl_key_t key_b)
-{
-	page_buf_t *pb_a = (page_buf_t *) key_a;
-	page_buf_t *pb_b = (page_buf_t *) key_b;
-	int	ret;
-
-	if (pb_b == NULL) {
-		if (pb_a == NULL)
-			return(0);
-		else
-			return(-1);
-	}
-
-	//assert(pb_a->pb_target == pb_b->pb_target);
-	if (pb_a->pb_file_offset == pb_b->pb_file_offset)
-		ret = 0;
-	else if (pb_a->pb_file_offset < pb_b->pb_file_offset)
-		ret = -1;
-	else
-		ret = 1;
-
-	return ret;
-}
-
-/*
- *	_pagebuf_lockable_increment_key
- */
-
-static void
-_pagebuf_lockable_increment_key(avl_key_t *next_key,avl_key_t key)
-{
-	page_buf_t *next_pb = (page_buf_t *) (*next_key);
-	page_buf_t *pb = (page_buf_t *) key;
-
-	assert((next_pb != NULL) && \
-	       (next_pb->pb_flags & _PBF_NEXT_KEY) && \
-	       (pb != NULL));
-	
-	next_pb->pb_file_offset = pb->pb_file_offset + pb->pb_buffer_length;
-}
-
 
 /*
  *	_pagebuf_get_lockable_buffer
@@ -218,11 +139,6 @@ _pagebuf_lockable_increment_key(avl_key_t *next_key,avl_key_t key)
  *	released before the new buffer is created and locked,
  *	which may imply that this call will block until those buffers
  *	are unlocked.  No I/O is implied by this call.
- *
- *	The caller must have previously called _pagebuf_check_lockable()
- *	successfully, and must pass in the page_buf_registration_t pointer
- *	obtained via that call, with the pbr_lock spinlock held and interrupts
- *	disabled.
  */
 
 int
@@ -230,129 +146,92 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 			     loff_t range_base,
 			     size_t range_length,
 			     page_buf_flags_t flags,
-			     page_buf_t **pb_p)
+			     page_buf_t **pb_p,
+			     page_buf_t *new_pb)
 {
-	page_buf_t next_key_buf;
-	page_buf_t *pb;
-	avl_key_t next_key;
-	avl_key_t key;
-	avl_value_t value;
-	int	not_locked;
+	int			hval = _bhash(target->pbr_device, range_base);
+	pb_hash_t		*h = &pbhash[hval];
+	struct list_head	*p;
+	page_buf_t		*pb;
+	int			not_locked;
 
-	next_key_buf.pb_flags = _PBF_NEXT_KEY;
-	next_key_buf.pb_file_offset = range_base;
-	next_key_buf.pb_buffer_length = range_length;
-	next_key = (avl_key_t) &next_key_buf;
-	while (avl_lookup_next(target->pbr_buffers,
-			       &next_key,
-			       &key,
-			       &value) == 0) {
-		pb = (page_buf_t *)value;
-		assert(pb != NULL);
+	spin_lock_irq(&h->pb_hash_lock);
+	list_for_each(p, &h->pb_hash) {
+		pb = list_entry(p, page_buf_t, pb_hash_list);
 
-		if (pb->pb_file_offset >= (range_base + range_length))
-			break;	/* no overlap found - allocate buffer */
-
-		if (pb->pb_flags & PBF_FREED)
-			continue;
-
-		spin_lock(&PBP(pb)->pb_lock);
-		if (pb->pb_flags & PBF_FREED) {
-			spin_unlock(&PBP(pb)->pb_lock);
-			continue;
+		if ((target->pbr_device == pb->pb_dev) &&
+		    (pb->pb_file_offset == range_base) &&
+		    (pb->pb_buffer_length == range_length)) {
+			if (pb->pb_flags & PBF_FREED)
+				break;
+			/* If we look at something bring it to the
+			 * front of the list for next time
+			 */
+			list_del(&pb->pb_hash_list);
+			list_add(&pb->pb_hash_list, &h->pb_hash);
+			goto found;
 		}
-		pb->pb_hold++;
-
-		PB_TRACE(pb, PB_TRACE_REC(avl_ret), 0);
-
-		/* Attempt to get the semaphore without sleeping,
-		 * if this does not work then we need to drop the
-		 * spinlocks and do a hard attempt on the semaphore.
-		 */
-		not_locked = down_trylock(&PBP(pb)->pb_sema);
-		if (not_locked) {
-			spin_unlock(&PBP(pb)->pb_lock);
-			spin_unlock_irq(&(target->pbr_lock));
-
-			if (!(flags & PBF_TRYLOCK)) {
-				/* wait for buffer ownership */
-				PB_TRACE(pb, PB_TRACE_REC(get_lk), 0);
-				pagebuf_lock(pb);
-				PB_STATS_INC(pbstats.pb_get_locked_waited);
-			} else {
-				/* We asked for a trylock and failed, no need
-				 * to look at file offset and length here, we
-				 * know that this pagebuf at least overlaps our
-				 * pagebuf and is locked, therefore our buffer
-				 * either does not exist, or is this buffer
-				 */
-
-				if (down_trylock(&PBP(pb)->pb_sema)) {
-					pagebuf_rele(pb);
-
-					PB_STATS_INC(pbstats.pb_busy_locked);
-					return -EBUSY;
-				}
-				PB_SET_OWNER(pb);
-			}
-		} else {
-			/* trylock worked */
-			PB_SET_OWNER(pb);
-			spin_unlock(&target->pbr_lock);
-		}
-
-
-		if (pb->pb_file_offset == range_base &&
-		    pb->pb_buffer_length == range_length) {
-			if (not_locked)
-				spin_lock_irq(&PBP(pb)->pb_lock);
-			if (!(pb->pb_flags & PBF_FREED)) {
-				if (pb->pb_flags & PBF_STALE)
-					pb->pb_flags &=	PBF_MAPPABLE | \
-						PBF_MAPPED | \
-						_PBF_LOCKABLE | \
-						_PBF_ALL_PAGES_MAPPED | \
-						_PBF_SOME_INVALID_PAGES | \
-						_PBF_ADDR_ALLOCATED | \
-						_PBF_MEM_ALLOCATED;
-				spin_unlock_irq(&PBP(pb)->pb_lock);
-				PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
-				*pb_p = pb;
-				PB_STATS_INC(pbstats.pb_get_locked);
-				return(0);
-			}
-			spin_unlock_irq(&PBP(pb)->pb_lock);
-		} else if (!not_locked) {
-			spin_unlock_irq(&PBP(pb)->pb_lock);
-		}
-
-		/* Let go of the buffer - if the count goes to zero
-		 * this will remove it from the tree. The problem here
-		 * is that if there is a hold on the pagebuf without a
-		 * lock then we just threw away the contents....
-		 * Which means that if someone else comes along and
-		 * locks the pagebuf which they have a hold on they
-		 * can discover that the memory has gone away on them.
-		 */
-		PB_CLEAR_OWNER(pb);
-		PB_TRACE(pb, PB_TRACE_REC(skip), 0);
-		up(&PBP(pb)->pb_sema);
-		if (pb->pb_flags & PBF_STALE) {
-			pagebuf_rele(pb);
-			continue;
-		}
-
-		pagebuf_rele(pb);
-
-		return -EBUSY;
 	}
 
-	spin_unlock_irq(&target->pbr_lock);
-
 	/* No match found */
-	PB_STATS_INC(pbstats.pb_miss_locked);
-	*pb_p = NULL;
+	if (new_pb) {
+		_pagebuf_initialize(new_pb, target, range_base,
+				range_length, flags | _PBF_LOCKABLE);
+		new_pb->pb_hash_index = hval;
+		h->pb_count++;
+		list_add(&new_pb->pb_hash_list, &h->pb_hash);
+	} else {
+		PB_STATS_INC(pbstats.pb_miss_locked);
+	}
+
+	spin_unlock_irq(&h->pb_hash_lock);
+	*pb_p = new_pb;
 	return 0;
+
+found:
+	atomic_inc(&pb->pb_hold);
+	spin_unlock_irq(&h->pb_hash_lock);
+
+	/* Attempt to get the semaphore without sleeping,
+	 * if this does not work then we need to drop the
+	 * spinlock and do a hard attempt on the semaphore.
+	 */
+	not_locked = down_trylock(&PBP(pb)->pb_sema);
+	if (not_locked) {
+		if (!(flags & PBF_TRYLOCK)) {
+			/* wait for buffer ownership */
+			PB_TRACE(pb, PB_TRACE_REC(get_lk), 0);
+			pagebuf_lock(pb);
+			PB_STATS_INC(pbstats.pb_get_locked_waited);
+		} else {
+			/* We asked for a trylock and failed, no need
+			 * to look at file offset and length here, we
+			 * know that this pagebuf at least overlaps our
+			 * pagebuf and is locked, therefore our buffer
+			 * either does not exist, or is this buffer
+			 */
+
+			pagebuf_rele(pb);
+			PB_STATS_INC(pbstats.pb_busy_locked);
+			return -EBUSY;
+		}
+	} else {
+		/* trylock worked */
+		PB_SET_OWNER(pb);
+	}
+
+	if (pb->pb_flags & PBF_STALE)
+		pb->pb_flags &=	PBF_MAPPABLE | \
+				PBF_MAPPED | \
+				_PBF_LOCKABLE | \
+				_PBF_ALL_PAGES_MAPPED | \
+				_PBF_SOME_INVALID_PAGES | \
+				_PBF_ADDR_ALLOCATED | \
+				_PBF_MEM_ALLOCATED;
+	PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
+	*pb_p = pb;
+	PB_STATS_INC(pbstats.pb_get_locked);
+	return(0);
 }
 
 int
@@ -363,53 +242,21 @@ _pagebuf_get_lockable_buffer(pb_target_t *target,
 			     page_buf_t **pb_p)
 {
 	int	status;
-	page_buf_t *pb;
+	page_buf_t *pb = __pagebuf_allocate(flags);
 
-retry_scan:
-	spin_lock_irq(&target->pbr_lock);
 	status = _pagebuf_find_lockable_buffer(target, range_base,
-				range_length, flags, pb_p);
+				range_length, flags, pb_p, pb);
 
-	if (status)
+	if (status) {
+		kmem_cache_free(pagebuf_cache, pb);
 		return status;
-
-	if (*pb_p)
-		return 0;
-
-
-	status = _pagebuf_get_object(target, range_base, range_length,
-				     flags | _PBF_LOCKABLE, &pb);
-	if (status != 0) {
-		return(status);
 	}
 
-
-	/* Tree manipulation requires the registration spinlock */
-	spin_lock_irq(&target->pbr_lock);
-	status = avl_insert(target->pbr_buffers,
-			    (avl_key_t) pb,
-			    (avl_value_t) pb);
-	spin_unlock_irq(&target->pbr_lock);
-	PB_TRACE(pb, PB_TRACE_REC(avl_ins), status);
-	if (status != 0) {
-		unsigned long flags;
-
-		spin_lock_irqsave(&PBP(pb)->pb_lock, flags);
-		pb->pb_flags &= ~_PBF_LOCKABLE;	/* we are not in the avl */
-		_pagebuf_free_object(pb, flags);
-		if (status == -EEXIST) {
-			/* Race condition with another thread - try again,
-			 * set up locking state first.
-			 */
-			*pb_p = NULL;
-
-			goto retry_scan;
-		}
-		return(status);
+	if (*pb_p != pb) {
+		kmem_cache_free(pagebuf_cache, pb);
 	}
 
-	*pb_p = pb;
-	return(0);
+	return 0;
 }
 
 /*
@@ -509,34 +356,15 @@ pagebuf_lock(                        	/* lock buffer                  */
  *	pagebuf_lock_disable
  *
  *	pagebuf_lock_disable disables buffer object locking for an inode.
- *	This call fails with -EBUSY if buffers are still in use and locked for
- *	this inode.
  */
 
 int
 pagebuf_lock_disable(			/* disable buffer locking	*/
 		     pb_target_t *target)  /* inode for buffers	        */
 {
-	avl_key_t next_key;
-	avl_key_t key;
-	avl_value_t value;
-
-	spin_lock_irq(&target->pbr_lock);
-	if (target->pbr_buffers != NULL) {
-		next_key = 0;
-		if (avl_lookup_next(target->pbr_buffers,
-				    &next_key,
-				    &key,
-				    &value) == 0) {
-			spin_unlock_irq(&target->pbr_lock);
-			return(-EBUSY);
-		}
-	}
 	destroy_buffers(target->pbr_device);
 	truncate_inode_pages(target->pbr_inode->i_mapping, 0LL);
 	_pagebuf_registration_free(target);
-	local_irq_enable();
-	MOD_DEC_USE_COUNT;
 
 	return(0);
 }
@@ -559,7 +387,6 @@ pagebuf_lock_enable(
 	kdev_t kdev,
 	struct super_block *sb)
 {
-	int	status = 0;
 	pb_target_t	*target;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,13)
@@ -574,7 +401,6 @@ pagebuf_lock_enable(
 	if (target == NULL) {
 		return(NULL);
 	}
-	spin_lock_init(&target->pbr_lock);
 	target->pbr_device = kdev;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,13)
 	target->pbr_inode = bdev->bd_inode;
@@ -590,16 +416,6 @@ pagebuf_lock_enable(
 #endif
 	target->pbr_addrspace.a_ops = &pagebuf_aops;
 #endif
-
-	status = avl_create(&target->pbr_buffers,
-			    avl_opt_nolock,
-			    _pagebuf_lockable_compare_key,
-			    _pagebuf_lockable_increment_key);
-	if (status) {
-		_pagebuf_registration_free(target);
-		return(NULL);
-	}
-	MOD_INC_USE_COUNT;
 
 	return(target);
 }
@@ -654,17 +470,3 @@ void pagebuf_locking_terminate(void)
 		kmem_cache_destroy(pagebuf_registration_cache);
 }
 
-
-/*
- *	Module management
- */
-
-EXPORT_SYMBOL(pagebuf_cond_lock);
-EXPORT_SYMBOL(pagebuf_lock);
-EXPORT_SYMBOL(pagebuf_is_locked);
-EXPORT_SYMBOL(pagebuf_lock_value);
-EXPORT_SYMBOL(pagebuf_lock_disable);
-EXPORT_SYMBOL(pagebuf_lock_enable);
-EXPORT_SYMBOL(pagebuf_unlock);
-EXPORT_SYMBOL(pagebuf_target_blocksize);
-EXPORT_SYMBOL(pagebuf_target_clear);

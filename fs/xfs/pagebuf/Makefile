@@ -29,8 +29,7 @@ ifneq ($(MAKECMDGOALS),modules_install)
 endif
 
 export-objs			+= page_buf.o page_buf_io.o page_buf_locking.o
-obj-y				+= avl.o \
-				   page_buf.o \
+obj-y				+= page_buf.o \
 				   page_buf_io.o \
 				   page_buf_locking.o
 

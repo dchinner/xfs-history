@@ -121,6 +121,7 @@ xlog_bwrite(
 	XFS_BUF_ZEROFLAGS(bp);
 	XFS_BUF_BUSY(bp);
 	XFS_BUF_HOLD(bp);
+	XFS_BUF_PSEMA(bp, PRIBIO);
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
 	XFS_BUF_SET_TARGET(bp, &log->l_mp->m_logdev_targ);
 
@@ -1934,6 +1935,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	 * overlap with future reads of those inodes.
 	 */
 	error = 0;
+
 	if ((INT_GET(*((__uint16_t *)(xfs_buf_offset(bp, 0))), ARCH_CONVERT) == XFS_DINODE_MAGIC) &&
 	    (XFS_BUF_COUNT(bp) != MAX(log->l_mp->m_sb.sb_blocksize,
 			(__uint32_t)XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 

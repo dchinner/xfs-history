@@ -36,6 +36,7 @@
 #include <xfs.h>
 #include <xfs_quota_priv.h>
 #include <xfs_log_recover.h>
+#include "pagebuf/page_buf_internal.h"
 
 #include <linux/ctype.h>
 #include <linux/kdb.h>
@@ -1803,8 +1804,12 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf("page_buf_t at 0x%lx\n", addr);
 	kdb_printf("  pb_flags %s\n", pb_flags(bp.pb_common.pb_flags));
 	kdb_printf("  pb_target 0x%p pb_hold %d pb_next 0x%p pb_prev 0x%p\n",
-		   bp.pb_common.pb_target, bp.pb_common.pb_hold,
+		   bp.pb_common.pb_target, bp.pb_common.pb_hold.counter,
 		   bp.pb_common.pb_list.next, bp.pb_common.pb_list.prev);
+	kdb_printf("  pb_hash_index %d pb_hash_next 0x%p pb_hash_prev 0x%p\n",
+		   bp.pb_common.pb_hash_index,
+		   bp.pb_common.pb_hash_list.next,
+		   bp.pb_common.pb_hash_list.prev);
 	kdb_printf("  pb_file_offset 0x%llx pb_buffer_length 0x%llx pb_addr 0x%p\n",
 		   (unsigned long long) bp.pb_common.pb_file_offset,
 		   (unsigned long long) bp.pb_common.pb_buffer_length,
@@ -1819,12 +1824,14 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 		bp.pb_common.pb_pages);
 #ifdef PAGEBUF_LOCK_TRACKING
 	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d) last holder %d\n",
-		   bp.pb_iodonesema.count.counter, bp.pb_iodonesema.sleepers,
+		   bp.pb_common.pb_iodonesema.count.counter,
+		   bp.pb_common.pb_iodonesema.sleepers,
 		   bp.pb_sema.count.counter, bp.pb_sema.sleepers,
 		   bp.pb_pin_count.counter, bp.pb_last_holder);
 #else
 	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
-		   bp.pb_iodonesema.count.counter, bp.pb_iodonesema.sleepers,
+		   bp.pb_common.pb_iodonesema.count.counter,
+		   bp.pb_common.pb_iodonesema.sleepers,
 		   bp.pb_sema.count.counter, bp.pb_sema.sleepers,
 		   bp.pb_pin_count.counter);
 #endif
@@ -1976,9 +1983,9 @@ pb_trace_core(
 		if ((match != 0) && (trace->pb != match))
 			continue;
 
-		if ((trace->event < EV_SIZE) && event_names[trace->event]) {
+		if ((trace->event < EV_SIZE-1) && event_names[trace->event]) {
 			event = event_names[trace->event];
-		} else if (trace->event == 1000) {
+		} else if (trace->event == EV_SIZE) {
 			event = (char *)trace->misc;
 		} else {
 			event = value;

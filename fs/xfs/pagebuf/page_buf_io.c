@@ -52,8 +52,7 @@
 #include <linux/locks.h>
 #include <linux/swap.h>
 
-#include "avl.h"
-#include "page_buf.h"
+#include "page_buf_internal.h"
 
 #define PAGE_CACHE_MASK_LL	(~((long long)(PAGE_CACHE_SIZE-1)))
 #define PAGE_CACHE_ALIGN_LL(addr) \
@@ -636,19 +635,17 @@ pagebuf_read_full_page(
 
 	bh = head = page->buffers;
 	if (!bh || !buffer_mapped(bh)) {
-		page_buf_bmap_t	maps[PBF_MAX_MAPS];
+		page_buf_bmap_t	map;
 		int		nmaps;
+		
+		error = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
+				PAGE_CACHE_SIZE, &map, 1, &nmaps, PBF_READ);
 
-		error = bmap(inode,
-				((loff_t)page->index << PAGE_CACHE_SHIFT),
-				PAGE_CACHE_SIZE, maps, PBF_MAX_MAPS, &nmaps,
-			 	PBF_READ);
 		if (error)
 			BUG();
-		if (maps[0].pbm_bn >= 0) {
-			hook_buffers_to_page(target, inode, page, maps, nmaps);
-			bh = head = page->buffers;
-		} else if (maps[0].pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
+		hook_buffers_to_page(target, inode, page, &map, nmaps);
+		bh = head = page->buffers;
+		if (map.pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
 			memset(kmap(page), 0, PAGE_CACHE_SIZE);
 			flush_dcache_page(page);
 			kunmap(page);
@@ -759,9 +756,8 @@ hook_buffers_to_page_delay(
 {
 	struct buffer_head 	*bh;
 
-	if (page->buffers)
-		BUG();
-	create_empty_buffers(page, target->pbr_device, PAGE_CACHE_SIZE);
+	if (!page->buffers)
+		create_empty_buffers(page, target->pbr_device, PAGE_CACHE_SIZE);
 	bh = page->buffers;
 	bh->b_state = (1 << BH_Delay) | (1 << BH_Mapped);
 	__mark_buffer_dirty(bh);
@@ -783,26 +779,28 @@ hook_buffers_to_page(
 
 	if (!page->buffers)
 		create_empty_buffers(page, target->pbr_device, PAGE_CACHE_SIZE);
-	bh = page->buffers;
 	/*
 	 * pbm_offset:pbm_bn :: (page's offset):???
 	 * 
 	 * delta = offset of _this_ page in extent.
 	 * pbm_offset = offset in file corresponding to pbm_bn.
 	 */
-	delta = page->index;	    /* do computations in 64 bit ...   */
-	delta <<= PAGE_CACHE_SHIFT; /* delta now offset from 0 of page */
-	delta -= mp->pbm_offset;    /* delta now offset in extent of page */
 
-	bn = mp->pbm_bn >>
-		(PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
-	bn += (delta >> PAGE_CACHE_SHIFT);
-	lock_buffer(bh);
-	bh->b_blocknr = bn;
-	bh->b_dev = target->pbr_device;
-	set_bit(BH_Mapped, &bh->b_state);
-	clear_bit(BH_Delay, &bh->b_state);
-	unlock_buffer(bh);
+	if (mp->pbm_bn >= 0) {
+		delta = page->index;	    /* do computations in 64 bit  */
+		delta <<= PAGE_CACHE_SHIFT; /* delta is offset from 0 of page */
+		delta -= mp->pbm_offset;    /* delta is offset in extent */
+		bn = mp->pbm_bn >>
+			(PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
+		bn += (delta >> PAGE_CACHE_SHIFT);
+		bh = page->buffers;
+		lock_buffer(bh);
+		bh->b_blocknr = bn; 
+		bh->b_dev = target->pbr_device;
+		set_bit(BH_Mapped, &bh->b_state);
+		clear_bit(BH_Delay, &bh->b_state);
+		unlock_buffer(bh);
+	}
 }
 
 STATIC void
@@ -814,13 +812,9 @@ set_buffer_dirty_uptodate(
 	int need_balance_dirty = 0;
 
 #ifdef PAGEBUF_DEBUG
-	/* negative blocknr is always bad; if it's zero, and the
-	 * inode & bh are on different devices, it could be an
-	 * xfs realtime file, which would be OK.  Either that
-	 * or something is seriously wrong!
+	/* negative blocknr is always bad; 
 	 */
-	if ((bh->b_blocknr < 0) || 
-	    ((bh->b_blocknr == 0) && (inode->i_dev == bh->b_dev))) {
+	if (bh->b_blocknr < 0) {
 		printk("Warning: buffer 0x%p with weird blockno (%ld)\n",
 			bh, bh->b_blocknr);
 	}
@@ -865,8 +859,7 @@ __pb_block_prepare_write_async(
 	 * go get some space.
 	 */
 	bh = page->buffers;
-	if ((!bh || buffer_delay(bh)) && (!dp || (flags & PBF_FILE_ALLOCATE)))
-	{
+	if (!bh || !buffer_mapped(bh)) {
 		if (!mp) {
 			mp = maps;
 			err = bmap(inode,
@@ -877,10 +870,8 @@ __pb_block_prepare_write_async(
 				goto out;
 			}
 		}
-		if (mp->pbm_bn >= 0) {
-			hook_buffers_to_page(target, inode, page, mp, nmaps);
-			bh = page->buffers;
-		}
+		hook_buffers_to_page(target, inode, page, mp, nmaps);
+		bh = page->buffers;
 	}
 
 	/* Is the write over the entire page?  */
@@ -968,9 +959,9 @@ __pb_block_commit_write_async(
 	 * parts of page not covered by from/to. Page is now fully valid.
 	 */
 	SetPageUptodate(page);
-	if ((bh = page->buffers) && !buffer_delay(bh)) {
+	if ((bh = page->buffers) && buffer_mapped(bh)) {
 		set_buffer_dirty_uptodate(inode, page->buffers, partial);
-	} else if (!DelallocPage(page)) {
+	} else {
 		hook_buffers_to_page_delay(target, inode, page);
 	}
 }
@@ -1375,7 +1366,7 @@ convert_page(
 	/* Three possible conditions - page with delayed buffers,
 	 * page with real buffers, or page with no buffers (mmap)
 	 */
-	if (!bh || DelallocPage(page)) {
+	if (!bh || DelallocPage(page) || !buffer_mapped(bh)) {
 		hook_buffers_to_page(target, inode, page, mp, nmaps);
 	}
 
@@ -1439,7 +1430,8 @@ pagebuf_delalloc_convert(
 	loff_t			rounded_offset;
 
 	/* Fast path for mapped page */
-	if (page->buffers && !buffer_delay(page->buffers)) {
+	if (page->buffers && !buffer_delay(page->buffers) &&
+	    buffer_mapped(page->buffers)) {
 		if (async_write) {
 			submit_page_io(page);
 		}
