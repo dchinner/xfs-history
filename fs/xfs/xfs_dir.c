@@ -1595,7 +1595,12 @@ xfs_dir_put_dirent(
 		target_abi = ABI_IRIX5_64;
 	}
 
-	if (ABI_IS(ABI_IRIX5_64 | ABI_IRIX5_N32, target_abi)) {
+#ifdef REDWOOD
+	if (ABI_IS_IRIX5_64(target_abi))
+#else
+	if (ABI_IS(ABI_IRIX5_64 | ABI_IRIX5_N32, target_abi))
+#endif
+	{
 		if ((dbp->d_reclen = DIRENTSIZE(namelen)) > uio->uio_resid) {
 			*done = 0;
 			retval = 0;
