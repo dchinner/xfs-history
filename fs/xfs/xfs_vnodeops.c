@@ -4089,11 +4089,6 @@ xfs_rmdir(
 		IRELE(cdp);
 		goto std_return;
 	}
-	if (error = _MAC_XFS_IACCESS(cdp, MACWRITE, credp)) {
-		xfs_trans_cancel(tp, cancel_flags);
-		IRELE(cdp);
-		goto std_return;
-	}
 
 	/*
 	 * If the inode we found in the first pass is no longer
@@ -4119,11 +4114,11 @@ xfs_rmdir(
 	ITRACE(cdp);
 	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
 
-#if 0
-	if (error = xfs_stickytest(dp, cdp, credp)) {
-                goto error_return;
+	if (error = _MAC_XFS_IACCESS(cdp, MACWRITE, credp)) {
+		xfs_trans_cancel(tp, cancel_flags);
+		IRELE(cdp);
+		goto std_return;
 	}
-#endif
 
 	if ((cdp == dp) || (XFS_ITOV(cdp) == current_dir_vp)) {
 		error = XFS_ERROR(EINVAL);
