@@ -687,8 +687,7 @@ linvfs_read_full_page(
 
 STATIC int
 linvfs_write_full_page(
-	struct page *page,
-	int wait)
+	struct page *page)
 {
 	vnode_t		*vp;
 	struct inode	*inode = (struct inode*)page->mapping->host;
@@ -700,8 +699,6 @@ linvfs_write_full_page(
 	VN_BHV_READ_LOCK(&(vp)->v_bh);
 	if (!VOP_RWLOCK_TRY(vp, VRWLOCK_TRY_WRITE)) {
 		VN_BHV_READ_UNLOCK(&(vp)->v_bh);
-		if (!wait)
-			return -EBUSY;
 
 		ASSERT(atomic_read(&page->count));
 		UnlockPage(page);
@@ -712,20 +709,6 @@ linvfs_write_full_page(
 	UnlockPage(page);
 	VOP_RWUNLOCK(vp, VRWLOCK_WRITE);
 	return error;
-}
-
-int
-linvfs_write_full_page_sync(
-	struct page *page)
-{
-	return(linvfs_write_full_page(page, 1));
-}
-
-int
-linvfs_write_full_page_async(
-	struct page *page)
-{
-	return(linvfs_write_full_page(page, 0));
 }
 
 void linvfs_file_read(
@@ -789,11 +772,10 @@ int linvfs_bmap(struct address_space *mapping, long block)
 
 struct address_space_operations linvfs_aops = {
   readpage:		linvfs_read_full_page,
-  writepage:		linvfs_write_full_page_sync,
+  writepage:		linvfs_write_full_page,
   sync_page:		block_sync_page,
   bmap:			linvfs_bmap,
   convertpage:		pagebuf_convert_page,
-  writepage_async:	linvfs_write_full_page_async,
   prepare_write:	pagebuf_prepare_write,
   commit_write:		pagebuf_commit_write,
 };
