@@ -1,4 +1,4 @@
-#ident "$Revision: 1.220 $"
+#ident "$Revision: 1.221 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1095,9 +1095,11 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 
 	/*
 	 * prohibit iomap read from giving us back our data in
-	 * two buffers but let it set up read-ahead.
+	 * two buffers but let it set up read-ahead.  Shut read-ahead
+	 * off for NFSv2.  It's I/O sizes are too small to be of any
+	 * real benefit (8K reads, 32K read buffers).
 	 */
-	nmaps = 2;
+	nmaps = (ioflags & IO_NFS) ? 1 : 2;
 	error = xfs_iomap_read(ip, offset, len, bmaps, &nmaps, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
