@@ -1500,27 +1500,34 @@ int
 xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 			   buf_t **bpp, int whichfork)
 {
-	xfs_bmbt_irec_t map;
-	int nmap, error;
-	xfs_fsblock_t firstblock;
+	int error;
+	xfs_fsblock_t fsb;
 	buf_t *bp;
+#ifdef DEBUG
+	xfs_bmbt_irec_t map;
+	int nmap = 1;
+	xfs_fsblock_t firstblock = NULLFSBLOCK;
 
-	nmap = 1;
-	firstblock = NULLFSBLOCK;
 	error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
 				 XFS_BMAPI_AFLAG(whichfork), &firstblock, 0,
 				 &map, &nmap, 0);
+	if (!error) {
+		ASSERT(nmap == 1);
+		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
+		ASSERT(map.br_startblock != HOLESTARTBLOCK);
+		ASSERT(map.br_startblock != NULLFSBLOCK);
+	}
+#endif
+	error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
+				 (xfs_fileoff_t)bno);
 	if (error) {
 		return(error);
 	}
-	ASSERT(nmap == 1);
-	ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
-	       (map.br_startblock != HOLESTARTBLOCK));
-	ASSERT(map.br_startblock != NULLFSBLOCK);
-	if (nmap != 1)
+	ASSERT(map.br_startblock == fsb);
+	if (fsb == NULLFSBLOCK)
 		return XFS_ERROR(EDIRCORRUPTED);
 	bp = xfs_trans_get_buf(trans, dp->i_mount->m_dev,
-			      XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock),
+			      XFS_FSB_TO_DADDR(dp->i_mount, fsb),
 			      dp->i_mount->m_bsize, 0);
 	ASSERT(bp);
 	if (!bp)
@@ -1534,31 +1541,39 @@ int
 xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 			daddr_t mappedbno, buf_t **bpp, int whichfork)
 {
-	xfs_fsblock_t firstblock;
+	xfs_fsblock_t fsb;
 	xfs_da_blkinfo_t *info;
+	int error;
+#ifdef DEBUG
 	xfs_bmbt_irec_t map;
-	int nmap, error;
+	int nmap = 1;
+	xfs_fsblock_t firstblock = NULLFSBLOCK;
+#endif
 
 	if (mappedbno == -1) {
-		nmap = 1;
-		firstblock = NULLFSBLOCK;
+#ifdef DEBUG
 		error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
 					 XFS_BMAPI_AFLAG(whichfork),
-					 &firstblock, 0, &map, &nmap, NULL);
+					 &firstblock, 0, &map, &nmap, 0);
+		if (!error) {
+			ASSERT(nmap == 0 || nmap == 1);
+			if (nmap == 1) {
+				ASSERT(map.br_startblock != DELAYSTARTBLOCK);
+				ASSERT(map.br_startblock != NULLFSBLOCK);
+			}
+		}
+#endif
+		error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
+					 (xfs_fileoff_t)bno);
 		if (error) {
 			return(error);
 		}
-		if (nmap != 1) {
+		if (fsb == NULLFSBLOCK) {
 			*bpp = NULL;
-			return XFS_ERROR(EDIRCORRUPTED);
+			return 0;
 		}
-		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
-		if (map.br_startblock == HOLESTARTBLOCK) {
-			*bpp = NULL;
-			return XFS_ERROR(EDIRCORRUPTED);
-		}
-		ASSERT(map.br_startblock != NULLFSBLOCK);
-		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock);
+		ASSERT(map.br_startblock == fsb);
+		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, fsb);
 	}
 	error = xfs_trans_read_buf(trans, dp->i_mount->m_dev, 
 			      mappedbno, dp->i_mount->m_bsize, 0, bpp);
@@ -1583,26 +1598,32 @@ daddr_t
 xfs_da_reada_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 			     int whichfork)
 {
-	xfs_fsblock_t firstblock;
+	xfs_fsblock_t fsb;
+	int error;
+	daddr_t rval;
+#ifdef DEBUG
 	xfs_bmbt_irec_t map;
-	int nmap, error;
-	daddr_t rval = -1;
+	int nmap = 1;
+	xfs_fsblock_t firstblock = NULLFSBLOCK;
 
-	nmap = 1;
-	firstblock = NULLFSBLOCK;
 	error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
 				 XFS_BMAPI_AFLAG(whichfork), &firstblock, 0,
-				 &map, &nmap, NULL);
-	if (error || nmap == 0)
-		return rval;
-	ASSERT(nmap == 1);
-	ASSERT(map.br_startblock != DELAYSTARTBLOCK);
-	if (map.br_startblock == HOLESTARTBLOCK)
-		return rval;
-	ASSERT(map.br_startblock != NULLFSBLOCK);
-	baread(dp->i_mount->m_dev,
-		(rval = XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock)),
-		dp->i_mount->m_bsize);
+				 &map, &nmap, 0);
+	if (!error) {
+		ASSERT(nmap == 0 || nmap == 1);
+		if (nmap == 1) {
+			ASSERT(map.br_startblock != DELAYSTARTBLOCK);
+			ASSERT(map.br_startblock != NULLFSBLOCK);
+		}
+	}
+#endif
+	error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
+				 (xfs_fileoff_t)bno);
+	if (error || fsb == NULLFSBLOCK)
+		return -1;
+	ASSERT(map.br_startblock == fsb);
+	rval = XFS_FSB_TO_DADDR(dp->i_mount, fsb);
+	baread(dp->i_mount->m_dev, rval, dp->i_mount->m_bsize);
 	return rval;
 }
 #endif	/* !SIM */

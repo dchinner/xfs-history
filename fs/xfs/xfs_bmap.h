@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.54 $"
+#ident "$Revision$"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -217,7 +217,7 @@ xfs_bmap_trace_exlist(
  * must be remembered and presented to subsequent calls in "firstblock".
  * An upper bound for the number of blocks to be allocated is supplied to
  * the first call in "total"; if no allocation group has that many free
- * blocks then  the call will fail (return NULLFSBLOCK in "firstblock"). 
+ * blocks then the call will fail (return NULLFSBLOCK in "firstblock"). 
  */
 int						/* error */
 xfs_bmapi(
@@ -232,6 +232,21 @@ xfs_bmapi(
 	struct xfs_bmbt_irec	*mval,		/* output: map values */
 	int			*nmap,		/* i/o: mval size/count */
 	xfs_bmap_free_t		*flist);	/* i/o: list extents to free */
+
+/*
+ * Map file blocks to filesystem blocks, simple version.
+ * One block only, read-only.
+ * For flags, only the XFS_BMAPI_ATTRFORK flag is examined.
+ * For the other flag values, the effect is as if XFS_BMAPI_METADATA
+ * was set and all the others were clear.
+ */
+int						/* error */
+xfs_bmapi_single(
+	struct xfs_trans	*tp,		/* transaction pointer */
+	struct xfs_inode	*ip,		/* incore inode */
+	int			whichfork,	/* data or attr fork */
+	xfs_fsblock_t		*fsb,		/* output: mapped block */
+	xfs_fileoff_t		bno);		/* starting file offs. mapped */
 
 #ifndef SIM
 /*
