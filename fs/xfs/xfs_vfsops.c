@@ -96,10 +96,6 @@ xfs_init(void)
 #endif	/* DEBUG */
 #ifdef XFS_DABUF_DEBUG
 	extern lock_t	        xfs_dabuf_global_lock;
-#endif
-	extern int		xfs_refcache_size;
-
-#ifdef XFS_DABUF_DEBUG
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
 #endif
 
@@ -176,8 +172,6 @@ xfs_init(void)
 
 	xfs_init_procfs();
 	xfs_sysctl_register();
-
-	xfs_refcache_size = xfs_params.refcache_size;
 
 	/*
 	 * The inode hash table is created on a per mounted
