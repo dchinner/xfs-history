@@ -43,7 +43,6 @@
 #define NESTED_VN_UNLOCK(vp)    spin_unlock(&(vp)->v_lock)
 
 uint64_t vn_generation;		/* vnode generation number */
-atomic_t vn_vnumber;		/* # of vnodes ever allocated */
 
 spinlock_t	vnumber_lock = SPIN_LOCK_UNLOCKED;
 
@@ -155,8 +154,6 @@ struct vnode *
 vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 {
 	struct vnode	*vp;
-	xfs_inode_t	*ip;
-	xfs_mount_t	*mp;
 	int		s = 0;
 
 	
@@ -167,8 +164,6 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	vp->v_inode = inode;
 
 	vp->v_flag = VMODIFIED;
-
-	atomic_inc(&vn_vnumber);
 
 	spinlock_init(&vp->v_lock, "v_lock");
 	if (from_readinode)
@@ -196,23 +191,11 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	 * together right now.
 	 */
 	if (from_readinode) {
-		mp = XFS_BHVTOM(vfsp->vfs_fbhv);	ASSERT(mp);
 
-		if (xfs_vn_iget(vp, mp, (xfs_ino_t)inode->i_ino, &ip)) {
-			panic("vn_initialize: vp/0x%p inode/0x%p bad xfs_iget!",
-								vp, inode);
-		}
-
-		vp->v_vfsp  = vfsp;
-		vp->v_inode = inode;
-		vp->v_type  = IFTOVT(ip->i_d.di_mode);
-
-		linvfs_set_inode_ops(inode);
-		{ int error;
-		error = linvfs_revalidate_core(inode, ATTR_COMM);
-		if(error)
-			printk("vn_initialize: linvfs_revalidate_core "
-				"error %d\n",error);
+		if (xfs_vn_iget(vfsp, vp, (xfs_ino_t)inode->i_ino)) {
+			make_bad_inode(inode);
+		} else {
+			linvfs_set_inode_ops(inode);
 		}
 		VN_UNLOCK(vp, s);
 	}
@@ -221,43 +204,6 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 
 	return vp;
 }
-
-struct vnode *
-vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type)
-{
-	struct inode	*inode;
-	struct vnode	*vp;
-	xfs_ino_t	inum = (xfs_ino_t) ino;
-
-	XFS_STATS_INC(xfsstats.vn_alloc);
-
-	inode = get_empty_inode();
-
-	if (inode == NULL)
-		return NULL;
-
-	inode->i_sb    = vfsp->vfs_super;
-	inode->i_dev   = vfsp->vfs_super->s_dev;
-	inode->i_ino   = inum;
-	inode->i_flags = 0;
-	atomic_set(&inode->i_count, 1);
-	inode->i_state = 0;
-
-	vn_initialize(vfsp, inode, 0);
-
-	vp = LINVFS_GET_VN_ADDRESS(inode);
-
-	ASSERT((vp->v_flag & VPURGE) == 0);
-
-	vp->v_vfsp  = vfsp;
-	vp->v_type  = type;
-	vp->v_inode = inode;
-
-	vn_trace_exit(vp, "vn_alloc", (inst_t *)__return_address);
-
-	return vp;
-}
-
 
 /*
  * Free an isolated vnode.
@@ -289,45 +235,27 @@ vnode_t *
 vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 {
 	struct inode	*inode;
-	xfs_ino_t	inum;
 
 	XFS_STATS_INC(xfsstats.vn_get);
+	inode = icreate(vmap->v_vfsp->vfs_super, vmap->v_ino);
 
-	inode = ihold(vmap->v_vfsp->vfs_super, vmap->v_ino);
+	/* We do not want to create new inodes via vn_get,
+	 * returning NULL here is OK.
+	 */
+	if (inode->i_state & I_NEW) {
+		make_bad_inode(inode);
+		unlock_new_inode(inode);
+		iput(inode);
+		return NULL;
+	}
 
 	if (inode == NULL)		/* Inode not present */
 		return NULL;
 
-	inum = inode->i_ino;
-
-	/*
-	 * Verify that the linux inode we just 'grabbed'
-	 * is still the one we want.
-	 */
-	if (vmap->v_number != vp->v_number) {
-printk("vn_get: vp/0x%p inode/0x%p v_number %Ld/%Ld\n",
-vp, inode, vmap->v_number, vp->v_number);
-
-		goto fail;
-	}
-
-	if (vmap->v_ino != inum) {
-printk("vn_get: vp/0x%p inode/0x%p v_ino %Ld/%Ld\n",
-vp, inode, vmap->v_ino, inum);
-
-		goto fail;
-	}
-
 	vn_trace_exit(vp, "vn_get", (inst_t *)__return_address);
-
 	ASSERT((vp->v_flag & VPURGE) == 0);
 
 	return vp;
-
-fail:
-	iput(inode);
-
-	return NULL;
 }
 
 
@@ -348,28 +276,6 @@ vn_count(struct vnode *vp)
 
 	return atomic_read(&inode->i_count);
 }
-
-/*
- * "hash" the linux inode.
- */
-void
-vn_insert_in_linux_hash(struct vnode *vp)
-{
-	struct inode *inode;
-
-	vn_trace_entry(vp, "vn_insert_in_linux_hash",
-				(inst_t *)__return_address);
-
-	inode = LINVFS_GET_IP(vp);
-
-	ASSERT(inode);
-
-	ASSERT(list_empty(&inode->i_hash));
-
-	insert_inode_hash(inode);	/* Add to i_hash	*/
-	mark_inode_dirty(inode);	/* Add to i_list	*/
-}
-
 
 /*
  * "revalidate" the linux inode.

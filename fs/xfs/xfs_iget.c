@@ -161,7 +161,7 @@ xfs_iget_vnode_init(
  */
 int
 xfs_iget_core(
-	vnode_t		*preallocated_vnode,
+	vnode_t		*vp,
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
@@ -169,11 +169,10 @@ xfs_iget_core(
 	xfs_inode_t	**ipp,
 	xfs_daddr_t	bno)
 {
-	int		vn_alloc_used = 0;
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
 	xfs_inode_t	*iq;
-	vnode_t		*vp;
+	vnode_t		*inode_vp;
 	ulong		version;
 	int		error;
 	/* REFERENCED */
@@ -181,12 +180,10 @@ xfs_iget_core(
 #ifdef CELL_CAPABLE
 	int		quiesce_new = 0;
 #endif
-	vmap_t		vmap;
 	xfs_chash_t	*ch;
 	xfs_chashlist_t	*chl, *chlnew;
 	SPLDECL(s);
 
-	XFS_STATS_INC(xfsstats.xs_ig_attempts);
 
 	ih = XFS_IHASH(mp, ino);
 
@@ -196,9 +193,9 @@ again:
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
   		if (ip->i_ino == ino) {
 
-			vp = XFS_ITOV_NULL(ip);
+			inode_vp = XFS_ITOV_NULL(ip);
 
-			if (vp == NULL) {
+			if (inode_vp == NULL) {
 				if (ip->i_flags & XFS_IRECLAIM) {
 					mrunlock(&ih->ih_lock);
 					delay(1);
@@ -207,53 +204,26 @@ again:
 					goto again;
 				}
 					
-				if (preallocated_vnode) {
-					/*
-					 * Vnode provided by vn_initialize.
-					 */
-					vp = preallocated_vnode;
+				xfs_iget_vnode_init(mp, vp, ip);
 
-					xfs_iget_vnode_init(mp, vp, ip);
+				vn_trace_exit(vp, "xfs_iget.alloc",
+					(inst_t *)__return_address);
 
-					vn_trace_exit(vp, "xfs_iget.alloc",
-						(inst_t *)__return_address);
+				bhv_desc_init(&(ip->i_bhv_desc), ip, vp,
+							&xfs_vnodeops);
+				vn_bhv_insert_initial(VN_BHV_HEAD(vp),
+							&(ip->i_bhv_desc));
 
-					bhv_desc_init(&(ip->i_bhv_desc), ip, vp,
-								&xfs_vnodeops);
-					vn_bhv_insert_initial(VN_BHV_HEAD(vp),
-								&(ip->i_bhv_desc));
+				XFS_STATS_INC(xfsstats.xs_ig_found);
 
-					XFS_STATS_INC(xfsstats.xs_ig_found);
+				mrunlock(&ih->ih_lock);
+				goto finish_inode;
 
-					mrunlock(&ih->ih_lock);
-
-					goto finish_inode;
-
-				} else {
-					mrunlock(&ih->ih_lock);
-					vp = vn_alloc(XFS_MTOVFS(mp), ino,
-						      IFTOVT(ip->i_d.di_mode));
-
-					preallocated_vnode = vp;
-					if (!vp && vn_alloc_used)
-						delay(1);
-					vn_alloc_used = 1;
-					goto again;
-				}
-
-			} else if (preallocated_vnode) {
-				if (vn_alloc_used) {
-					vn_rele(preallocated_vnode);
-					preallocated_vnode = NULL;
-					vn_alloc_used = 0;
-				} else if (preallocated_vnode != vp) {
-					cmn_err(CE_PANIC,
+			} else if (vp != inode_vp) {
+				cmn_err(CE_PANIC,
 			"xfs_iget_core: ambiguous vns: vp/0x%p, invp/0x%p",
-						vp, preallocated_vnode);
-				}
+						inode_vp, vp);
 			}
-
-			VMAP(vp, ip, vmap);
 
 			/*
 			 * Inode cache hit: if ip is not at the front of
@@ -261,7 +231,7 @@ again:
 			 * Do this with the lock held for update, but
 			 * do statistics after releasing the lock.
 			 */
-			if (   ip->i_prevp != &ih->ih_next
+			if (ip->i_prevp != &ih->ih_next
 			    && mrtrypromote(&ih->ih_lock)) {
 
 				if ((iq = ip->i_next)) {
@@ -281,30 +251,9 @@ again:
 			XFS_STATS_INC(xfsstats.xs_ig_found);
 
 			/*
-			 * Get a reference to the vnode/inode.
-			 * vn_get() takes care of coordination with
-			 * the file system inode release and reclaim
-			 * functions.  If it returns NULL, the inode
-			 * has been reclaimed so just start the search
-			 * over again.  We probably won't find it,
-			 * but we could be racing with another cpu
-			 * looking for the same inode so we have to at
-			 * least look.
+			 * Make sure the vnode and the inode are hooked up
 			 */
-			if (preallocated_vnode) {
-				/*
-				 * Vnode provided by vn_initialize.
-				 */
-				vp = preallocated_vnode;
-
-				xfs_iget_vnode_init(mp, vp, ip);
-			} else {
-				if ( ! (vp = vn_get(vp, &vmap, 0))) {
-					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
-
-					goto again;
-				}
-			}
+			xfs_iget_vnode_init(mp, vp, ip);
 
 finish_inode:
 			if (lock_flags != 0) {
@@ -346,21 +295,11 @@ finish_inode:
 		return error;
 	}
 
-	if (preallocated_vnode) {
-		/*
-		 * Vnode provided by vn_initialize.
-		 */
-		vp = preallocated_vnode;
+	/*
+	 * Vnode provided by vn_initialize.
+	 */
 
-		xfs_iget_vnode_init(mp, vp, ip);
-	} else {
-		while (!(vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode))))
-		{
-			delay(1);
-		}
-		vn_alloc_used = 1;
-		preallocated_vnode = vp;
-	}
+	xfs_iget_vnode_init(mp, vp, ip);
 
 	vn_trace_exit(vp, "xfs_iget.alloc", (inst_t *)__return_address);
 
@@ -392,15 +331,7 @@ finish_inode:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				mrunlock(&ih->ih_lock);
-				if (vn_alloc_used) {
-					vn_bhv_remove(VN_BHV_HEAD(vp),
-						&(ip->i_bhv_desc));
-					vn_free(vp);
-					vn_alloc_used = 0;
-					preallocated_vnode = NULL;
-				} else {
-					vn_rele(vp);
-				}
+				vn_rele(vp);
 				xfs_idestroy(ip);
 
 				XFS_STATS_INC(xfsstats.xs_ig_dup);
@@ -519,16 +450,8 @@ finish_inode:
 	}
 #endif
 
-	error = vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);	/* Update the linux inode */
-
-	/*
-	 * If we got this vnode via vn_alloc, it's been
-	 * allocated, & initialized by now, we need
-	 * to insert the linux inode into the visible
-	 * hashed namespace.
-	 */
-	if (vn_alloc_used)
-		vn_insert_in_linux_hash(vp);
+	/* Update the linux inode */
+	error = vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
 
 	*ipp = ip;
 
@@ -549,7 +472,51 @@ xfs_iget(
 	xfs_inode_t	**ipp,
 	xfs_daddr_t	bno)
 {
-	return xfs_iget_core(NULL, mp, tp, ino, lock_flags, ipp, bno);
+	struct inode	*inode;
+	vnode_t		*vp = NULL;
+	int		error;
+
+	XFS_STATS_INC(xfsstats.xs_ig_attempts);
+
+	if ((inode = icreate(XFS_MTOVFS(mp)->vfs_super, ino))) {
+		bhv_desc_t	*bdp;
+		xfs_inode_t	*ip;
+		int		newnode;
+
+		XFS_STATS_INC(xfsstats.xs_ig_found);
+
+		vp = LINVFS_GET_VN_ADDRESS(inode);
+		if (!(inode->i_state & I_NEW)) {
+			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
+			ip = XFS_BHVTOI(bdp);
+			if (lock_flags != 0) {
+				xfs_ilock(ip, lock_flags);
+			}
+			newnode = (ip->i_d.di_mode == 0);
+			if (newnode) {
+				ip->i_flags &= ~XFS_IRECLAIM;
+				xfs_iocore_inode_reinit(ip);
+			}
+			vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
+			*ipp = ip;
+			return 0;
+		}
+
+		vn_initialize(XFS_MTOVFS(mp), inode, 0);
+	}
+
+	error = xfs_iget_core(vp, mp, tp, ino, lock_flags, ipp, bno);
+	if (inode && (inode->i_state & I_NEW)) {
+		if (error) {
+			make_bad_inode(inode);
+		}
+		unlock_new_inode(inode);
+		if (error) {
+			iput(inode);
+		}
+	}
+
+	return error;
 }
 
 
@@ -559,12 +526,17 @@ xfs_iget(
  */
 int
 xfs_vn_iget(
+	vfs_t		*vfsp,
 	struct vnode	*vp,
-	xfs_mount_t	*mp,
-	xfs_ino_t	ino,
-	xfs_inode_t	**ipp)
+	xfs_ino_t	ino)
 {
-	return xfs_iget_core(vp, mp, NULL, ino, 0, ipp, 0);
+	xfs_inode_t	*ip;
+	xfs_mount_t	*mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+	int error;
+
+	error = xfs_iget_core(vp, mp, NULL, ino, 0, &ip, 0);
+
+	return error;
 }
 
 
