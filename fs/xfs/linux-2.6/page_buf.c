@@ -1973,3 +1973,10 @@ void pagebuf_terminate(void)
 	remove_proc_entry("fs/pagebuf", NULL);
 #endif
 }
+
+
+/*
+ *	Module management
+ */
+
+EXPORT_SYMBOL(pagebuf_offset);
