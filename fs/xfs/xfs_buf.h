@@ -147,13 +147,13 @@ extern void xfs_pb_nfreer(page_buf_t *);
 
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
-			pagebuf_set_iodone(buf, func)
+			(buf)->pb_iodone = (func)
 #define XFS_BUF_CLR_IODONE_FUNC(buf)		\
-			pagebuf_set_iodone(buf, NULL)
+			(buf)->pb_iodone = NULL
 #define XFS_BUF_SET_BDSTRAT_FUNC(buf, func)	\
-			pagebuf_set_bdstrat(buf, func)
+			(buf)->pb_strat = (func)
 #define XFS_BUF_CLR_BDSTRAT_FUNC(buf)		\
-			pagebuf_set_bdstrat(buf, NULL)
+			(buf)->pb_strat = NULL
 
 #define XFS_BUF_FSPRIVATE(buf, type)		\
 			((type)(buf)->pb_fspriv)
@@ -229,8 +229,10 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 {
-	int	ret;
+	extern int	xfs_bdstrat_cb(struct xfs_buf *);
+	int ret;
 
+	bp->pb_strat = xfs_bdstrat_cb;
 	xfs_buf_undelay(bp);
 	if ((ret = pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)) == 0)
 		run_task_queue(&tq_disk);
@@ -274,8 +276,6 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 #define xfs_biozero(pb, off, len) \
 	    pagebuf_iomove((pb), (off), (len), NULL, PBRW_ZERO)
 
-extern void xfs_trigger_io(void);
-
 
 static inline int	XFS_bwrite(page_buf_t *pb)
 {
@@ -292,7 +292,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 		error = pagebuf_iowait(pb);
 		xfs_buf_relse(pb);
 	} else {
-		xfs_trigger_io();
+		run_task_queue(&tq_disk);
 		error = 0;
 	}
 
@@ -303,7 +303,14 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 #define XFS_bdwrite(pb)              \
             pagebuf_iostart(pb, PBF_DELWRI | PBF_ASYNC)
 
-#define xfs_bdwrite(mp, bp)	XFS_bdwrite(bp)
+static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
+{
+	extern int	xfs_bdstrat_cb(struct xfs_buf *);
+
+	bp->pb_strat = xfs_bdstrat_cb;
+
+	return pagebuf_iostart(bp, PBF_DELWRI | PBF_ASYNC);
+}
 
 #define XFS_bdstrat(bp)  pagebuf_iorequest(bp)
 

@@ -2020,10 +2020,10 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 	
 	vfsp = LINVFS_GET_VFS(bp->pb_target->i_sb);
 	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-	  if (!XFS_FORCED_SHUTDOWN(mp)) {
+	if (!XFS_FORCED_SHUTDOWN(mp)) {
 		pagebuf_iorequest(bp);
 		return 0;
-	  } else {
+	} else {
 		xfs_buftrace("XFS__BDSTRAT IOERROR", bp);
 		/*
 		 * Metadata write that didn't get logged but 
@@ -2032,9 +2032,9 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 		 */
 		if (XFS_BUF_IODONE_FUNC(bp) == NULL &&
 		    (XFS_BUF_ISREAD(bp)) == 0)
-		  return (xfs_bioerror_relse(bp));
+			return (xfs_bioerror_relse(bp));
 		else
-		  return (xfs_bioerror(bp));
+			return (xfs_bioerror(bp));
 	}
 }
 /*
@@ -2138,13 +2138,6 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 	/* Ok now write out an unmount record */
 	xfs_log_unmount_write(mp);            
 }
-
-void
-xfs_trigger_io(void)
-{
-	run_task_queue(&tq_disk);
-}
-
 
 /*
  * In these two situations we disregard the readonly mount flag and
