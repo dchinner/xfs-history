@@ -4254,6 +4254,8 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 		"noatime",		/* XFS_DIFLAG_NOATIME */
 		"nodump",		/* XFS_DIFLAG_NODUMP */
 		"rtinherit",		/* XFS_DIFLAG_RTINHERIT */
+		"projinherit",		/* XFS_DIFLAG_PROJINHERIT */
+		"nosymlinks",		/* XFS_DIFLAG_NOSYMLINKS */
 		NULL
 	};
 
