@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.173 $"
+#ident	"$Revision: 1.175 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2511,8 +2511,9 @@ xfs_bmap_insert_exlist(
 
 /*
  * Convert a local file to an extents file.
- * This code is sort of bogus, since the file data needs to get 
- * logged so it won't be lost.  The bmap-level manipulations are ok, though.
+ * This code is out of bounds for data forks of regular files,
+ * since the file data needs to get logged so things will stay consistent.
+ * (The bmap-level manipulations are ok, though).
  */
 STATIC int				/* error */
 xfs_bmap_local_to_extents(
@@ -2529,7 +2530,12 @@ xfs_bmap_local_to_extents(
 	static char	fname[] = "xfs_bmap_local_to_extents";
 #endif
 	xfs_ifork_t	*ifp;
-
+	/*
+	 * We don't want to deal with the case of keeping inode data inline yet.
+	 * So sending the data fork of a regular inode is illegal.
+	 */
+	ASSERT(!((ip->i_d.di_mode & IFMT) == IFREG && 
+		 (whichfork == XFS_DATA_FORK)));
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL);
 	if (ifp->if_bytes) {
@@ -2568,6 +2574,7 @@ xfs_bmap_local_to_extents(
 		bp = xfs_btree_get_bufl(args.mp, tp, args.fsbno, 0);
 		bcopy(ifp->if_u1.if_data, (char *)bp->b_un.b_addr,
 			ifp->if_bytes);
+		xfs_trans_log_buf(tp, bp, 0, ifp->if_bytes - 1);
 		xfs_idata_realloc(ip, -ifp->if_bytes, whichfork);
 		xfs_iext_realloc(ip, 1, whichfork);
 		ep = ifp->if_u1.if_extents;
