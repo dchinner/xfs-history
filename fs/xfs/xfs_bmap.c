@@ -51,6 +51,10 @@ zone_t *xfs_bmap_free_item_zone;
  * Prototypes for internal bmap routines.
  */
 
+/*
+ * Called by xfs_bmapi to update extent list structure and the btree
+ * after allocating space (or doing a delayed allocation).
+ */
 STATIC int				/* inode logging flags */
 xfs_bmap_add_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
@@ -58,39 +62,55 @@ xfs_bmap_add_extent(
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new);	/* new data to put in extent list */
 
-STATIC int
+/*
+ * Called by xfs_bmap_add_extent to handle cases converting a delayed
+ * allocation to a real allocation.
+ */
+STATIC int				/* inode logging flags */
 xfs_bmap_add_extent_delay_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new);	/* new data to put in extent list */
 
-STATIC int
+/*
+ * Called by xfs_bmap_add_extent to handle cases converting a hole
+ * to a delayed allocation.
+ */
+STATIC int				/* inode logging flags */
 xfs_bmap_add_extent_hole_delay(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new);	/* new data to put in extent list */
 
-STATIC int
+/*
+ * Called by xfs_bmap_add_extent to handle cases converting a hole
+ * to a real allocation.
+ */
+STATIC int				/* inode logging flags */
 xfs_bmap_add_extent_hole_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new);	/* new data to put in extent list */
 
-STATIC xfs_fsblock_t
+/*
+ * xfs_bmap_alloc is called by xfs_bmapi to allocate an extent for a file.
+ * It figures out where to ask the underlying allocator to put the new extent.
+ */
+STATIC xfs_fsblock_t			/* starting block of new extent */
 xfs_bmap_alloc(
-	xfs_trans_t		*tp,
-	xfs_inode_t		*ip,
-	int			eof,
-	xfs_bmbt_irec_t		*prevp,
-	xfs_bmbt_irec_t		*gotp,
-	xfs_fsblock_t		*firstblock,
-	xfs_extlen_t		*alen,
-	xfs_extlen_t		total,
-	xfs_fsblock_t		off,
-	int			wasdel);
+	xfs_trans_t		*tp,	/* transaction pointer */
+	xfs_inode_t		*ip,	/* incore inode pointer */
+	int			eof,	/* set if allocating past last extent */
+	xfs_bmbt_irec_t		*prevp,	/* extent before the new one */
+	xfs_bmbt_irec_t		*gotp,	/* extent after, or delayed */
+	xfs_fsblock_t		*firstblock, /* i/o first block allocated */
+	xfs_extlen_t		*alen,	/* i/o length asked/allocated */
+	xfs_extlen_t		total,	/* total blocks needed for xaction */
+	xfs_fsblock_t		off,	/* offset in file filling in */
+	int			wasdel);/* replacing a delayed allocation */
 
 STATIC int
 xfs_bmap_btree_to_extents(
@@ -126,11 +146,11 @@ xfs_bmap_delete_exlist(
 	xfs_extnum_t	idx,
 	xfs_extnum_t	count);
 
-STATIC xfs_fsblock_t
+STATIC int
 xfs_bmap_extents_to_btree(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,
-	xfs_fsblock_t	firstblock,
+	xfs_fsblock_t	*firstblock,
 	xfs_bmap_free_t	*flist);
 
 STATIC void
@@ -140,11 +160,11 @@ xfs_bmap_insert_exlist(
 	xfs_extnum_t	count,
 	xfs_bmbt_irec_t	*new);
 
-STATIC xfs_fsblock_t
+STATIC int
 xfs_bmap_local_to_extents(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,
-	xfs_fsblock_t	firstblock,
+	xfs_fsblock_t	*firstblock,
 	xfs_extlen_t	total);
  
 STATIC xfs_bmbt_rec_t *
@@ -224,7 +244,7 @@ xfs_bmap_add_extent(
  * Called by xfs_bmap_add_extent to handle cases converting a delayed
  * allocation to a real allocation.
  */
-STATIC int
+STATIC int				/* inode logging flags */
 xfs_bmap_add_extent_delay_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -493,7 +513,7 @@ xfs_bmap_add_extent_delay_real(
  * Called by xfs_bmap_add_extent to handle cases converting a hole
  * to a delayed allocation.
  */
-STATIC int
+STATIC int				/* inode logging flags */
 xfs_bmap_add_extent_hole_delay(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -615,7 +635,7 @@ xfs_bmap_add_extent_hole_delay(
  * Called by xfs_bmap_add_extent to handle cases converting a hole
  * to a real allocation.
  */
-STATIC int
+STATIC int				/* inode logging flags */
 xfs_bmap_add_extent_hole_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -787,18 +807,22 @@ xfs_bmap_add_extent_hole_real(
 	}
 }
 
-STATIC xfs_fsblock_t
+/*
+ * xfs_bmap_alloc is called by xfs_bmapi to allocate an extent for a file.
+ * It figures out where to ask the underlying allocator to put the new extent.
+ */
+STATIC xfs_fsblock_t			/* starting block of new extent */
 xfs_bmap_alloc(
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip,
-	int		eof,
-	xfs_bmbt_irec_t	*prevp,
-	xfs_bmbt_irec_t	*gotp,
-	xfs_fsblock_t	*firstblock,
-	xfs_extlen_t	*alen,
-	xfs_extlen_t	total,
-	xfs_fsblock_t	off,
-	int		wasdel)
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_inode_t	*ip,		/* incore inode pointer */
+	int		eof,		/* set if allocating past last extent */
+	xfs_bmbt_irec_t	*prevp,		/* extent before the new one */
+	xfs_bmbt_irec_t	*gotp,		/* extent after, or delayed */
+	xfs_fsblock_t	*firstblock,	/* i/o first block allocated variable */
+	xfs_extlen_t	*alen,		/* i/o length asked/allocated */
+	xfs_extlen_t	total,		/* total blocks needed for xaction */
+	xfs_fsblock_t	off,		/* offset in file filling in */
+	int		wasdel)		/* replacing a delayed allocation */
 {
 	xfs_fsblock_t	abno;
 	xfs_fsblock_t	askbno;
@@ -922,14 +946,45 @@ xfs_bmap_alloc(
 	return abno;
 }
 
+/*
+ * Transform a btree format file with only one leaf node, where the
+ * extents list will fit in the inode, into an extents format file.
+ * Since the extent list is already in-core, all we have to do is
+ * give up the space for the btree root and pitch the leaf block.
+ */
 STATIC int
 xfs_bmap_btree_to_extents(
 	xfs_trans_t		*tp,
 	xfs_inode_t		*ip,
 	xfs_btree_cur_t		*cur)
 {
-	/* return logflags */
-	return 0;
+	xfs_bmbt_ptr_t		cbno;
+	xfs_mount_t		*mp;
+	xfs_btree_lblock_t	*rblock;
+	xfs_sb_t		*sbp;
+
+	ASSERT(ip->i_flags & XFS_IEXTENTS);
+	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE);
+	rblock = ip->i_broot;
+	ASSERT(rblock->bb_level == 1);
+	ASSERT(rblock->bb_numrecs == 1);
+	mp = ip->i_mount;
+	sbp = &mp->m_sb;
+	cbno = *XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, sbp->sb_inodesize);
+#ifdef XFSDEBUG
+	{
+		xfs_btree_lblock_t	*cblock;
+		buf_t			*cbuf;
+
+		cbuf = xfs_btree_read_bufl(mp, tp, cbno, 0);
+		cblock = xfs_buf_to_lblock(cbuf);
+		ASSERT(cblock->bb_level == 0);
+	}
+#endif
+	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist);
+	xfs_iroot_realloc(ip, -1);
+	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
+	return XFS_ILOG_CORE;
 }
 
 #ifdef XFSDEBUG
@@ -1105,11 +1160,11 @@ xfs_bmap_delete_exlist(
 	kmem_check();
 }
 
-STATIC xfs_fsblock_t
+STATIC int
 xfs_bmap_extents_to_btree(
 	xfs_trans_t		*tp,
 	xfs_inode_t		*ip,
-	xfs_fsblock_t		firstblock,
+	xfs_fsblock_t		*firstblock,
 	xfs_bmap_free_t		*flist)
 {
 	xfs_btree_lblock_t	*ablock;
@@ -1147,26 +1202,26 @@ xfs_bmap_extents_to_btree(
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
 	cur = xfs_btree_init_cursor(mp, tp, NULL, 0, XFS_BTNUM_BMAP, ip);
-	cur->bc_private.b.firstblock = firstblock;
+	cur->bc_private.b.firstblock = *firstblock;
 	cur->bc_private.b.flist = flist;
 	/*
 	 * Convert to a btree with two levels, one record in root.
 	 */
 	ip->i_d.di_format = XFS_DINODE_FMT_BTREE;
-	if (firstblock == NULLFSBLOCK) {
+	if (*firstblock == NULLFSBLOCK) {
 		type = XFS_ALLOCTYPE_START_BNO;
 		abno = xfs_ino_to_fsb(sbp, ip->i_ino);
 	} else {
 		type = XFS_ALLOCTYPE_NEAR_BNO;
-		abno = firstblock;
+		abno = *firstblock;
 	}
 	abno = xfs_alloc_extent(tp, abno, 1, type, 0, 0);
 	/*
 	 * Allocation can't fail, the space was reserved.
 	 */
 	ASSERT(abno != NULLFSBLOCK);
-	if (firstblock == NULLFSBLOCK)	
-		firstblock = abno;
+	if (*firstblock == NULLFSBLOCK)	
+		*firstblock = abno;
 	ip->i_d.di_nblocks++;
 	abuf = xfs_btree_get_bufl(mp, tp, abno, 0);
 	/*
@@ -1200,12 +1255,11 @@ xfs_bmap_extents_to_btree(
 	 */
 	xfs_bmbt_log_block(cur, abuf, XFS_BB_ALL_BITS);
 	xfs_bmbt_log_recs(cur, abuf, 1, ablock->bb_numrecs);
-	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE | XFS_ILOG_BROOT);
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_kcheck(cur);
 	xfs_btree_del_cursor(cur);
 	kmem_check();
-	return firstblock;
+	return XFS_ILOG_CORE | XFS_ILOG_BROOT;
 }
 
 STATIC void
@@ -1236,11 +1290,11 @@ xfs_bmap_insert_exlist(
  * This code is sort of bogus, since the file data needs to get 
  * logged so it won't be lost.
  */
-STATIC xfs_fsblock_t
+STATIC int
 xfs_bmap_local_to_extents(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,
-	xfs_fsblock_t	firstblock,
+	xfs_fsblock_t	*firstblock,
 	xfs_extlen_t	total)
 {
 	xfs_fsblock_t	askbno;
@@ -1262,12 +1316,12 @@ xfs_bmap_local_to_extents(
 		 * Allocate a block.  We know we need only one, since the
 		 * file currently fits in an inode.
 		 */
-		if (firstblock == NULLFSBLOCK) {
+		if (*firstblock == NULLFSBLOCK) {
 			askbno = xfs_ino_to_fsb(sbp, ip->i_ino);
 			type = XFS_ALLOCTYPE_START_BNO;
 			total++;
 		} else {
-			askbno = firstblock;
+			askbno = *firstblock;
 			type = XFS_ALLOCTYPE_NEAR_BNO;
 			total = 0;
 		}
@@ -1276,8 +1330,8 @@ xfs_bmap_local_to_extents(
 		 * Can't fail, the space was reserved.
 		 */
 		ASSERT(bno != NULLFSBLOCK);
-		if (firstblock == NULLFSBLOCK)
-			firstblock = bno;
+		if (*firstblock == NULLFSBLOCK)
+			*firstblock = bno;
 		buf = xfs_btree_get_bufl(mp, tp, bno, 0);
 		cp = (char *)buf->b_un.b_addr;
 		bcopy(ip->i_u1.iu_data, cp, ip->i_bytes);
@@ -1296,9 +1350,8 @@ xfs_bmap_local_to_extents(
 	ip->i_flags |= XFS_IEXTENTS;
 	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 	flags |= XFS_ILOG_CORE;
-	xfs_trans_log_inode(tp, ip, flags);
 	kmem_check();
-	return firstblock;
+	return flags;
 }
 
 /*
@@ -1698,6 +1751,7 @@ xfs_bmapi(
 	delay = (flags & XFS_BMAPI_DELAY) != 0;
 	trim = (flags & XFS_BMAPI_ENTIRE) == 0;
 	ASSERT(wr || !delay);
+	logflags = 0;
 	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		if (!wr) {
 			/* change to assert later */
@@ -1705,8 +1759,8 @@ xfs_bmapi(
 			kmem_check();
 			return firstblock;
 		}
-		firstblock = xfs_bmap_local_to_extents(tp, ip, firstblock, total);
-		logflags |= XFS_ILOG_CORE;
+		logflags |= xfs_bmap_local_to_extents(tp, ip, &firstblock,
+			total);
 	}
 	if (firstblock == NULLFSBLOCK) {
 		type = XFS_ALLOCTYPE_START_BNO;
@@ -1724,7 +1778,7 @@ xfs_bmapi(
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
-	logflags = n = 0;
+	n = 0;
 	end = bno + len;
 	cur = NULL;
 	obno = bno;
@@ -1860,11 +1914,15 @@ xfs_bmapi(
 	 * Convert to a btree if necessary.
 	 */
 	if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
-	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize)) {
-		firstblock = xfs_bmap_extents_to_btree(tp, ip, firstblock,
+	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		logflags |= xfs_bmap_extents_to_btree(tp, ip, &firstblock,
 			flist);
-		logflags |= XFS_ILOG_CORE;
-	}
+	/*
+	 * transform from btree to extents, give it cur
+	 */
+	else if (ip->i_d.di_format == XFS_DINODE_FMT_BTREE &&
+		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		logflags |= xfs_bmap_btree_to_extents(tp, ip, cur);
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent list if we've converted to btree format.
@@ -1872,11 +1930,15 @@ xfs_bmapi(
 	if ((logflags & XFS_ILOG_EXT) &&
 	    ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS)
 		logflags &= ~XFS_ILOG_EXT;
+	else if ((logflags & XFS_ILOG_BROOT) &&
+		 ip->i_d.di_format != XFS_DINODE_FMT_BTREE)
+		logflags &= ~XFS_ILOG_BROOT;
 	if (logflags)
 		xfs_trans_log_inode(tp, ip, logflags);
-	/* logging of the BROOT happens elsewhere */
-	if (cur)
+	if (cur) {
+		firstblock = cur->bc_private.b.firstblock;
 		xfs_btree_del_cursor(cur);
+	}
 	kmem_check();
 	return firstblock;
 }
@@ -1993,19 +2055,15 @@ xfs_bunmapi(
 	 * Convert to a btree if necessary.
 	 */
 	if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
-	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize)) {
-		firstblock = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist);
-		logflags |= XFS_ILOG_CORE;
-	} 
-	/* transform from btree to extents, give it cur */
+	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		logflags |= xfs_bmap_extents_to_btree(tp, ip, &firstblock, flist);
+	/*
+	 * transform from btree to extents, give it cur
+	 */
 	else if (ip->i_d.di_format == XFS_DINODE_FMT_BTREE &&
-		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize)) {
-		xfs_bmap_btree_to_extents(tp, ip, cur);
-		logflags |= XFS_ILOG_CORE | XFS_ILOG_EXT;
-	}
+		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		logflags |= xfs_bmap_btree_to_extents(tp, ip, cur);
 	/* transform from extents to local */
-	if (cur)
-		firstblock = cur->bc_private.b.firstblock;
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent list if we've converted to btree format.
@@ -2013,11 +2071,15 @@ xfs_bunmapi(
 	if ((logflags & XFS_ILOG_EXT) &&
 	    ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS)
 		logflags &= ~XFS_ILOG_EXT;
+	else if ((logflags & XFS_ILOG_BROOT) &&
+		 ip->i_d.di_format != XFS_DINODE_FMT_BTREE)
+		logflags &= ~XFS_ILOG_BROOT;
 	if (logflags)
 		xfs_trans_log_inode(tp, ip, logflags);
-	/* logging of the BROOT happens elsewhere */
-	if (cur)
+	if (cur) {
+		firstblock = cur->bc_private.b.firstblock;
 		xfs_btree_del_cursor(cur);
+	}
 	kmem_check();
 	return firstblock;
 }
