@@ -41,10 +41,10 @@
 # EXTRA_MKDEP_OPTIONS = -v
 
 EXTRA_FIND_DIRECTORIES = linux support
-ifeq ($(CONFIG_XFS_GRIO),y)
-#	EXTRA_FIND_DIRECTORIES += grio
+ifneq ($(CONFIG_XFS_GRIO),)
+	EXTRA_FIND_DIRECTORIES += grio
 endif
-ifeq ($(CONFIG_XFS_DMAPI),y)
+ifneq ($(CONFIG_XFS_DMAPI),)
 	EXTRA_FIND_DIRECTORIES += dmapi
 endif
 EXTRA_INCLUDE_DIRECTORIES = -I.
@@ -57,122 +57,119 @@ EXTRA_CFLAGS += $(shell if $(CC) -Wno-unknown-pragmas -S -o /dev/null -xc /dev/n
 
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
-EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
+	EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
 endif
 
-ALL_SUB_DIRS=linux support
-SUB_DIRS=linux
-ifeq ($(CONFIG_XFS_GRIO),y)
-#	ALL_SUB_DIRS += grio
-#	SUB_DIRS += grio
-endif
-ifeq ($(CONFIG_XFS_DMAPI),y)
-	ALL_SUB_DIRS += dmapi
-	SUB_DIRS += dmapi
-endif
+subdir-$(CONFIG_XFS_FS)		+= linux
+# Uncomment when grio directory created
+# subdir-$(CONFIG_XFS_GRIO)	+= grio		
+subdir-$(CONFIG_XFS_DMAPI)	+= dmapi
+subdir-$(CONFIG_XFS_SUPPORT)	+= support
 
-ifeq ($(CONFIG_XFS_SUPPORT),y)
-	SUB_DIRS += support
+obj-y :=
+obj-m :=
+obj-n :=
+obj-  :=
+
+# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
+ifeq ($(CONFIG_XFS_FS),y)
+  O_TARGET			:= xfs.o
 else
-	ifeq ($(CONFIG_XFS_SUPPORT),m)
-		MOD_SUB_DIRS += support
-	endif
+  list-multi			:= xfs.o
+  obj-$(CONFIG_XFS_FS)		:= xfs.o
 endif
 
-O_TARGET := xfs.o
-
-xfs.o:	links sub_dirs
-
-ifeq ($(CONFIG_XFS_FS),m)
-  M_OBJS   := $(O_TARGET)
-  ifeq ($(CONFIG_KDB),y)
-    M_OBJS += xfsidbg.o
-  endif
-else
+# xfsidbg is always a module, but only if kdb is available.
 ifeq ($(CONFIG_KDB),y)
-  M_OBJS := xfsidbg.o
-endif
+  obj-m				+= xfsidbg.o
 endif
 
-ifeq ($(CONFIG_XFS_GRIO),y)
-XFS_GRIO_OBJS=xfs_rtalloc.o xfs_rtbit.o xfs_grio.o
+ifeq ($(CONFIG_XFS_GRIO),)
+  xfs-objs			+= xfsrtstubs.o
 else
-XFS_GRIO_OBJS=xfsrtstubs.o
+  xfs-objs			+= xfs_rtalloc.o xfs_rtbit.o xfs_grio.o
 endif
-ifeq ($(CONFIG_XFS_DMAPI),y)
-XFS_DMAPI_OBJS=dmapi/dmapi.o xfs_dmapi.o
+
+ifeq ($(CONFIG_XFS_DMAPI),)
+  xfs-objs			+= xfsdmapistubs.o
 else
-XFS_DMAPI_OBJS=xfsdmapistubs.o
+  xfs-objs			+= dmapi/dmapi.o xfs_dmapi.o
 endif
-ifeq ($(CONFIG_XFS_QUOTA),y)
-XFS_QUOTA_OBJS=xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
+
+ifeq ($(CONFIG_XFS_QUOTA),)
+  xfs-objs			+= xfsquotasstubs.o
 else
-XFS_QUOTA_OBJS=xfsquotasstubs.o
+  xfs-objs			+= xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
 endif
 
-XFS_OBJS  :=    $(XFS_GRIO_OBJS) \
-                $(XFS_DMAPI_OBJS) \
-                $(XFS_QUOTA_OBJS) \
-                xfs_alloc.o \
-                xfs_alloc_btree.o \
-                xfs_attr.o \
-                xfs_attr_leaf.o \
-                xfs_bit.o \
-                xfs_bmap.o \
-                xfs_bmap_btree.o \
-                xfs_btree.o \
-                xfs_buf_item.o \
-                xfs_da_btree.o \
-                xfs_dir.o \
-                xfs_dir2.o \
-                xfs_dir2_block.o \
-                xfs_dir2_data.o \
-                xfs_dir2_leaf.o \
-                xfs_dir2_node.o \
-                xfs_dir2_sf.o \
-                xfs_dir2_trace.o \
-                xfs_dir_leaf.o \
-                xfs_error.o \
-                xfs_extfree_item.o \
-                xfs_fsops.o \
-                xfs_ialloc.o \
-                xfs_ialloc_btree.o \
-                xfs_iget.o \
-                xfs_inode.o \
-                xfs_inode_item.o \
-                xfs_iocore.o \
-                xfs_itable.o \
-                xfs_dfrag.o \
-                xfs_log.o \
-                xfs_log_recover.o \
-                xfs_macros.o \
-                xfs_mount.o \
-                xfs_rename.o \
-                xfs_trans.o \
-                xfs_trans_ail.o \
-                xfs_trans_buf.o \
-                xfs_trans_extfree.o \
-                xfs_trans_inode.o \
-                xfs_trans_item.o \
-                xfs_utils.o \
-                xfs_vfsops.o \
-                xfs_vnodeops.o \
-                xfs_rw.o \
-                macstubs.o
+xfs-objs			+= xfs_alloc.o \
+				   xfs_alloc_btree.o \
+				   xfs_attr.o \
+				   xfs_attr_leaf.o \
+				   xfs_bit.o \
+				   xfs_bmap.o \
+				   xfs_bmap_btree.o \
+				   xfs_btree.o \
+				   xfs_buf_item.o \
+				   xfs_da_btree.o \
+				   xfs_dir.o \
+				   xfs_dir2.o \
+				   xfs_dir2_block.o \
+				   xfs_dir2_data.o \
+				   xfs_dir2_leaf.o \
+				   xfs_dir2_node.o \
+				   xfs_dir2_sf.o \
+				   xfs_dir2_trace.o \
+				   xfs_dir_leaf.o \
+				   xfs_error.o \
+				   xfs_extfree_item.o \
+				   xfs_fsops.o \
+				   xfs_ialloc.o \
+				   xfs_ialloc_btree.o \
+				   xfs_iget.o \
+				   xfs_inode.o \
+				   xfs_inode_item.o \
+				   xfs_iocore.o \
+				   xfs_itable.o \
+				   xfs_dfrag.o \
+				   xfs_log.o \
+				   xfs_log_recover.o \
+				   xfs_macros.o \
+				   xfs_mount.o \
+				   xfs_rename.o \
+				   xfs_trans.o \
+				   xfs_trans_ail.o \
+				   xfs_trans_buf.o \
+				   xfs_trans_extfree.o \
+				   xfs_trans_inode.o \
+				   xfs_trans_item.o \
+				   xfs_utils.o \
+				   xfs_vfsops.o \
+				   xfs_vnodeops.o \
+				   xfs_rw.o \
+				   macstubs.o
 
-
-O_OBJS :=  $(XFS_OBJS) 
-
-O_OBJS += linux/linux_xfs.o
+# Objects not built in this directory
+xfs-objs			+= linux/linux_xfs.o
 ifeq ($(CONFIG_XFS_SUPPORT),y)
-	O_OBJS += support/xfs_support.o
+  xfs-objs			+= support/xfs_support.o
 endif
 
-include $(TOPDIR)/Rules.make
+# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
+ifeq ($(CONFIG_XFS_FS),y)
+  obj-y				:= $(xfs-objs)
+else
+  ifeq ($(CONFIG_XFS_FS)$(MAKING_MODULES),m1)
+  obj-m				+= $(xfs-objs)
+# This is really nasty, but Rules.make was never designed for multi directory
+# modules.  Keith Owens.
+xfs.o: $(xfs-objs) $(patsubst %,_modsubdir_%,$(subdir-m))
+	$(LD) -r -o $@ $(xfs-objs)
+  endif
+endif
+
+include $(TOPDIR)/Rules.make.new
 
 ifneq ($(wildcard .hdepend),)
 include .hdepend
 endif
-
-links:
-

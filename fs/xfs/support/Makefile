@@ -44,10 +44,34 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
 endif
 
-O_TARGET := xfs_support.o
-O_OBJS   :=
-OX_OBJS  := support.o qsort.o kmem.o ktrace.o debug.o mrlock.o sv.o mutex.o \
-		move.o uuid.o
-M_OBJS   := $(O_TARGET)
+obj-y :=
+obj-m :=
+obj-n :=
+obj-  :=
 
-include $(TOPDIR)/Rules.make
+# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
+ifeq ($(CONFIG_XFS_SUPPORT),y)
+  O_TARGET			:= xfs_support.o
+else
+  list-multi			:= xfs_support.o
+  obj-$(CONFIG_XFS_SUPPORT)	:= xfs_support.o
+endif
+
+export-objs			:= support.o qsort.o kmem.o ktrace.o debug.o \
+				   mrlock.o sv.o mutex.o move.o uuid.o
+
+xfs_support-objs		:= support.o qsort.o kmem.o ktrace.o debug.o \
+				   mrlock.o sv.o mutex.o move.o uuid.o
+
+# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
+ifeq ($(CONFIG_XFS_SUPPORT),y)
+  obj-y				:= $(xfs_support-objs)
+else
+  ifeq ($(CONFIG_XFS_SUPPORT)$(MAKING_MODULES),m1)
+  obj-m				+= $(xfs_support-objs)
+xfs_support.o: $(xfs_support-objs)
+	$(LD) -r -o $@ $(xfs_support-objs)
+  endif
+endif
+
+include $(TOPDIR)/Rules.make.new
