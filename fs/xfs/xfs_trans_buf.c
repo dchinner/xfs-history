@@ -1,4 +1,4 @@
-#ident "$Revision: 1.55 $"
+#ident "$Revision: 1.56 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -385,12 +385,6 @@ xfs_trans_read_buf(
 		ASSERT(bp->b_fsprivate != NULL);
 		ASSERT((bp->b_flags & B_ERROR) == 0);
 		bp->b_target = mp->m_ddev_targp;
-		/*
-		 * If it's stale, make sure it's not done, so
-		 * the read happens & we don't use stale data.
-		 */
-		if (bp->b_flags & B_STALE)
-			bp->b_flags &= ~B_DONE;
 		if (!(bp->b_flags & B_DONE)) {
 #ifndef SIM
 			buftrace("READ_BUF_INCORE !DONE", bp);
