@@ -335,7 +335,7 @@ xfs_growfs_data_private(
 	for (agno = 1; agno < nagcount; agno++) {
 	        error = xfs_read_buf(mp, mp->m_ddev_targp,
 				  XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
-				  BTOBB(bsize), 0, &bp);
+				  sectbb, 0, &bp);
 		if (error) {
 			xfs_fs_cmn_err(CE_WARN, mp,
 			"error %d reading secondary superblock for ag %d\n",
