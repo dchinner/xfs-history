@@ -232,10 +232,6 @@ void		xfs_trans_mod_sb(xfs_trans_t *, uint, int);
 buf_t		*xfs_trans_get_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
 buf_t		*xfs_trans_getsb(xfs_trans_t *);
 buf_t		*xfs_trans_read_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
-buf_t		*xfs_trans_getchunk(xfs_trans_t *, vnode_t *, struct bmapval *,
-				    struct cred *);
-buf_t		*xfs_trans_chunkread(xfs_trans_t *, vnode_t *, struct bmapval *,
-				     struct cred *);
 void		xfs_trans_brelse(xfs_trans_t *, buf_t *);
 void		xfs_trans_bjoin(xfs_trans_t *, buf_t *);
 void		xfs_trans_bhold(xfs_trans_t *, buf_t *);
