@@ -490,6 +490,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		ASSERT(!(bip->bli_item.li_flags & XFS_LI_IN_AIL));
 		ASSERT(!(bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF));
 		xfs_buf_item_relse(bp);
+		bip = NULL;
 	}
 	bp->b_fsprivate2 = NULL;
 
@@ -497,7 +498,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * If we've still got a buf log item on the buffer, then
 	 * tell the AIL that the buffer is being unlocked.
 	 */
-	if (bp->b_fsprivate != NULL) {
+	if (bip != NULL) {
 		xfs_trans_unlocked_item(bip->bli_item.li_mountp,
 					(xfs_log_item_t*)bip);
 	}
