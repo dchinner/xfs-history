@@ -1,6 +1,7 @@
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #include "sys/types.h"
+#include "sys/systm.h"
 #include "sys/pda.h"
 #include "sys/errno.h"
 #include "sys/debug.h"
@@ -32,6 +33,7 @@ xfs_error_trap(int e)
 		abort();
 #else
 		debug_stop_all_cpus();
+		debug("xfs");
 #endif
 		break;
 	}
