@@ -1000,22 +1000,20 @@ xfs_iflush(xfs_inode_t	*ip,
 		ASSERT(0);
 		break;
 	}
-
+	
 	/*
-	 * If ili_fields is set, then set ili_logged so that xfs_iflush_done()
-	 * will know to drop the reference taken on the inode in
-	 * xfs_trans_log_inode().  The ili_logged field is guarded by
-	 * the inode's i_flock.  Then we're done looking at
-	 * ili_fields, so clear it.  We can do this since the lock
-	 * must be held exclusively in order to set bits in this field.
+	 * We're done looking at ili_fields, so clear it.  We can do
+	 * this since the lock must be held exclusively in order to
+	 * set bits in this field. Set ili_logged so the flush done
+	 * routine can tell whether or not to look in the AIL.
 	 * Also, store the current LSN of the inode so that we can tell
 	 * whether the item has moved in the AIL from xfs_iflush_done().
 	 * In order to read the lsn we need the AIL lock, because
 	 * it is a 64 bit value that cannot be read atomically.
 	 */
 	if (iip->ili_format.ilf_fields != 0) {
-		iip->ili_logged = 1;
 		iip->ili_format.ilf_fields = 0;
+		iip->ili_logged = 1;
 	}
 	ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't need lock if it shrinks */
 	s = AIL_LOCK(ip->i_mount);
