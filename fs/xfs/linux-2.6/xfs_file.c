@@ -127,6 +127,7 @@ STATIC ssize_t linvfs_write(
 	loff_t	pos;
 	vnode_t *vp;
 	int	err;
+	int	pb_flags = 0; /* Flags to pass bmap calls */
 
         uio_t uio;
         iovec_t iov;
@@ -156,6 +157,15 @@ STATIC ssize_t linvfs_write(
 	if (filp->f_flags & O_APPEND)
 		pos = inode->i_size;
 
+	/*
+	 * Handle O_SYNC writes
+	 * The real work gets done in xfs_write()
+	 */
+	 
+	if (filp->f_flags & O_SYNC) {
+		pb_flags |= PBF_SYNC;
+	}
+
 	XFS_STATS_INC(xs_write_calls);
 	XFS_STATS64_ADD(xs_write_bytes, size);
 
@@ -170,7 +180,7 @@ STATIC ssize_t linvfs_write(
         uio.uio_iov->iov_base = (void *)buf;
         uio.uio_iov->iov_len = uio.uio_resid = size;
         
-	VOP_WRITE(vp, &uio, 0, NULL, NULL, err);
+	VOP_WRITE(vp, &uio, pb_flags, NULL, NULL, err);
         *offset = pos = uio.uio_offset;
         
 out:
