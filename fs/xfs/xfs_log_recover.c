@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.47 $"
+#ident	"$Revision: 1.48 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -43,6 +43,7 @@
 #include "xfs_imap.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_ialloc.h"
 #include "xfs_error.h"
 #include "xfs_log_priv.h"	/* depends on all above */
 #include "xfs_buf_item.h"
@@ -1024,7 +1025,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
     f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
     ASSERT(item->ri_buf[0].i_len == sizeof(xfs_inode_log_format_t));
     printf("	INODE: #regs:%d   ino:0x%llx  flags:0x%x   dsize:%d\n",
-	   f->ilf_size, f->ilf_ino, f->ilf_fields, f->ilf_dsize);
+		   f->ilf_size, f->ilf_ino, f->ilf_fields, f->ilf_dsize);
 
     /* core inode comes 2nd */
     ASSERT(item->ri_buf[1].i_len == sizeof(xfs_dinode_core_t));
@@ -1134,8 +1135,13 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 	int i;
 
 	switch (ITEM_TYPE(item)) {
-	    case XFS_LI_BUF: {
+	    case XFS_LI_BUF:
+	    case XFS_LI_OBUF: {
 		printf("BUF");
+		break;
+	    }
+	    case XFS_LI_OINODE: {
+		printf("OINO");
 		break;
 	    }
 	    case XFS_LI_INODE: {
@@ -1168,11 +1174,13 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 
 #ifdef SIM
 	switch (ITEM_TYPE(item)) {
-	    case XFS_LI_BUF: {
+	    case XFS_LI_BUF:
+	    case XFS_LI_OBUF: {
 		xlog_recover_print_buffer(item);
 		break;
 	    }
-	    case XFS_LI_INODE: {
+	    case XFS_LI_INODE:
+	    case XFS_LI_OINODE: {
 		xlog_recover_print_inode(item);
 		break;
 	    }
@@ -1253,11 +1261,13 @@ xlog_recover_reorder_trans(xlog_t	  *log,
     do {
 	itemq_next = itemq->ri_next;
 	switch (ITEM_TYPE(itemq)) {
-	    case XFS_LI_BUF: {
+	    case XFS_LI_BUF:
+	    case XFS_LI_OBUF: {
 		xlog_recover_insert_item_frontq(&trans->r_itemq, itemq);
 		break;
 	    }
 	    case XFS_LI_INODE:
+	    case XFS_LI_OINODE:
 	    case XFS_LI_EFD:
 	    case XFS_LI_EFI: {
 		xlog_recover_insert_item_backq(&trans->r_itemq, itemq);
@@ -1669,8 +1679,18 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	/*
 	 * Perform delayed write on the buffer.  Asynchronous writes will be
 	 * slower when taking into account all the buffers to be flushed.
+	 * If it is an old, unclustered inode buffer, then make sure to
+	 * keep it out of the buffer cache so that it doesn't overlap with
+	 * future reads of those inodes.
 	 */
-	bdwrite(bp);
+	if ((log->l_mp->m_sb.sb_blocksize < XFS_INODE_CLUSTER_SIZE) &&
+	    (bp->b_bcount < XFS_INODE_CLUSTER_SIZE) &&
+	    (*((__uint16_t *)(bp->b_un.b_addr)) == XFS_DINODE_MAGIC)) {
+		bp->b_flags |= B_STALE;
+		bwrite(bp);
+	} else {
+		bdwrite(bp);
+	}
 
 	/*
 	 * Once bdwrite() is called, we lose track of the buffer.  Therefore,
@@ -1701,7 +1721,23 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 	in_f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
 	mp = log->l_mp;
-	xfs_imap(log->l_mp, 0, in_f->ilf_ino, &imap);
+	if (ITEM_TYPE(item) == XFS_LI_INODE) {
+		imap.im_blkno = (daddr_t)in_f->ilf_blkno;
+		imap.im_len = in_f->ilf_len;
+		imap.im_boffset = in_f->ilf_boffset;
+	} else {
+		/*
+		 * It's an old inode format record.  We don't know where
+		 * its cluster is located on disk, and we can't allow
+		 * xfs_imap() to figure it out because the inode btrees
+		 * are not ready to be used.  Therefore do not pass the
+		 * XFS_IMAP_LOOKUP flag to xfs_imap().  This will give
+		 * us only the single block in which the inode lives
+		 * rather than its cluster, so we must make sure to
+		 * invalidate the buffer when we write it out below.
+		 */
+		xfs_imap(log->l_mp, 0, in_f->ilf_ino, &imap, 0);
+	}
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
 	if (bp->b_flags & B_ERROR) {
 		cmn_err(CE_WARN,
@@ -1756,7 +1792,13 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 
 write_inode_buffer:
 	xfs_inobp_check(mp, bp);
-	bdwrite(bp);
+	if (ITEM_TYPE(item) == XFS_LI_INODE) {
+		bdwrite(bp);
+	} else {
+		bp->b_flags |= B_STALE;
+		bwrite(bp);
+	}
+
 	/*
 	 * Once bdwrite() is called, we lose track of the buffer.  Therefore,
 	 * if we want to keep track of buffer errors, we need to add a
@@ -1891,11 +1933,13 @@ xlog_recover_do_trans(xlog_t	     *log,
 
 	first_item = item = trans->r_itemq;
 	do {
-		if (ITEM_TYPE(item) == XFS_LI_BUF) {
+		if ((ITEM_TYPE(item) == XFS_LI_BUF) ||
+		    (ITEM_TYPE(item) == XFS_LI_OBUF)) {
 			if (error = xlog_recover_do_buffer_trans(log, item,
 								 pass))
 				break;
-		} else if (ITEM_TYPE(item) == XFS_LI_INODE) {
+		} else if ((ITEM_TYPE(item) == XFS_LI_INODE) ||
+			   (ITEM_TYPE(item) == XFS_LI_OINODE)) {
 			if (error = xlog_recover_do_inode_trans(log, item,
 								pass))
 				break;
@@ -1905,7 +1949,7 @@ xlog_recover_do_trans(xlog_t	     *log,
 		} else if (ITEM_TYPE(item) == XFS_LI_EFD) {
 			xlog_recover_do_efd_trans(log, item, pass);
 		} else {
-			xlog_warn("xFS: xlog_recover_do_buffer_inode_trans");
+			xlog_warn("xFS: xlog_recover_do_trans");
 			ASSERT(0);
 			error = XFS_ERROR(EIO);
 			break;
