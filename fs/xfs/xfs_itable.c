@@ -33,19 +33,6 @@
 #include "xfs_itable.h"
 #include "xfs_error.h"
 
-
-/* 
- * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
- * structures (by the dmi library). This is a pointer to a formatter function
- * that will iget the inode and fill in the appropriate structure.
- * see xfs_bulkstat_one() and dm_bulkstat_one() in dmi_xfs.c
- */
-typedef int (*bulkstat_one_pf)(xfs_mount_t	*mp, 
-			       xfs_trans_t	*tp,
-			       xfs_ino_t   	ino,
-			       void	     	*buffer);
-
-
 /*
  * Return stat information for one inode.
  * Return 1 for success, 0 for failure.
