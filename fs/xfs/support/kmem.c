@@ -42,7 +42,7 @@
 
 static __inline__ unsigned int flag_convert(int flags)
 {
-	return (flags & KM_NOSLEEP) ? GFP_ATOMIC : GFP_BUFFER;
+	return (flags & KM_NOSLEEP) ? GFP_ATOMIC : GFP_PAGE_IO;
 }
 
 
@@ -102,7 +102,7 @@ kmem_alloc(size_t size, int flags)
 repeat:
 	if (MAX_SLAB_SIZE < size && !(flags & KM_PHYSCONTIG)) {
 		/* Avoid doing filesystem sensitive stuff to get this */
-		rval = __vmalloc(size, GFP_BUFFER, PAGE_KERNEL);
+		rval = __vmalloc(size, GFP_PAGE_IO, PAGE_KERNEL);
 	} else {
 		rval = kmalloc(size, flag_convert(flags));
 	}
