@@ -1,4 +1,4 @@
-#ident "$Revision: 1.168 $"
+#ident "$Revision: 1.169 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4147,7 +4147,7 @@ xfs_start_daemons(void)
 	ASSERT(num_daemons <= 13);
 
 	for (i = 0; i < num_daemons; i++) {
-		sthread_create("xfsd", 0, 0, 0, NDPHIMIN,
+		sthread_create("xfsd", 0, 0, 0, 128, KT_PS|KT_PRMPT,
 				(st_func_t *)xfsd, 0, 0, 0, 0);
 	}
 	return;
