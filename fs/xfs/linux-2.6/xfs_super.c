@@ -791,8 +791,14 @@ struct dentry *linvfs_get_parent(struct dentry *child)
 	return parent;
 }
 
+static struct super_block *linvfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, linvfs_fill_super);
+}
+
 static struct export_operations linvfs_export_ops = {
-	get_parent: linvfs_get_parent,
+	.get_parent		= linvfs_get_parent,
 };
 
 static struct super_operations linvfs_sops = {
@@ -809,18 +815,12 @@ static struct super_operations linvfs_sops = {
 	.remount_fs		= linvfs_remount,
 };
 
-static struct super_block *linvfs_get_sb(struct file_system_type *fs_type,
-	int flags, char *dev_name, void *data)
-{
-	return get_sb_bdev(fs_type, flags, dev_name, data, linvfs_fill_super);
-}
-
 static struct file_system_type xfs_fs_type = {
-	.owner		= THIS_MODULE,
-	.name		= "xfs",
-	.get_sb		= linvfs_get_sb,
-	.kill_sb	= kill_block_super,
-	.fs_flags	= FS_REQUIRES_DEV,
+	.owner			= THIS_MODULE,
+	.name			= "xfs",
+	.get_sb			= linvfs_get_sb,
+	.kill_sb		= kill_block_super,
+	.fs_flags		= FS_REQUIRES_DEV,
 };
 
 static int __init init_xfs_fs(void)
