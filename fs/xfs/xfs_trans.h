@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.63 $"
+#ident "$Revision: 1.66 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -81,6 +81,7 @@ typedef struct xfs_log_item {
 #define XFS_TRANS_DIOSTRAT		16
 #define	XFS_TRANS_WRITE_SYNC		17
 #define	XFS_TRANS_WRITEID		18
+#define	XFS_TRANS_ADDAFORK		19
 
 
 typedef struct xfs_item_ops {
@@ -532,7 +533,7 @@ typedef struct xfs_trans {
      	((mp)->m_sb.sb_inodesize + 128)
 
 #define	XFS_SWRITE_LOG_RES(mp)	((mp)->m_reservations.tr_swrite)
-     
+
 /*
  * Logging the inode mode bits when writing a setuid/setgid file
  *	inode
@@ -541,7 +542,23 @@ typedef struct xfs_trans {
      	((mp)->m_sb.sb_inodesize + 128)
 
 #define	XFS_WRITEID_LOG_RES(mp)	((mp)->m_reservations.tr_swrite)
-     
+
+/*
+ * Converting the inode from non-attributed to attributed.
+ *	the inode being converted: inode size
+ *	agf block and superblock (for block allocation)
+ *	the new block
+ *	allocation btrees	
+ */
+#define	XFS_CALC_ADDAFORK_LOG_RES(mp)	\
+	((mp)->m_sb.sb_inodesize + \
+	 (mp)->m_sb.sb_sectsize * 2 + \
+	 XFS_FSB_TO_B(mp, 1) + \
+	 (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	 (128 * (3 + 2 * XFS_AG_MAXLEVELS(mp))))
+
+#define	XFS_ADDAFORK_LOG_RES(mp)	((mp)->m_reservations.tr_addafork)
+
 /*
  * Various log count values.
  */

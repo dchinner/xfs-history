@@ -1,4 +1,4 @@
-#ident "$Revision: 1.62 $"
+#ident "$Revision: 1.63 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -86,6 +86,7 @@ xfs_trans_init(
 	resp->tr_growdata = XFS_CALC_GROWDATA_LOG_RES(mp);
 	resp->tr_swrite = XFS_CALC_SWRITE_LOG_RES(mp);
 	resp->tr_writeid = XFS_CALC_WRITEID_LOG_RES(mp);
+	resp->tr_addafork = XFS_CALC_ADDAFORK_LOG_RES(mp);
 }
 
 /*
