@@ -106,7 +106,7 @@ kmem_alloc(size_t size, int flags)
 	void	*rval;
 
 repeat:
-	if (size > (2 * PAGE_SIZE)) {
+	if (MAX_SLAB_SIZE < size) {
 		/* Avoid doing filesystem sensitive stuff to get this */
 		rval = __vmalloc(size, flag_convert(flags), PAGE_KERNEL);
 	} else {
