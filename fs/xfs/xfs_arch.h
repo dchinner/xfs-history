@@ -121,8 +121,8 @@
    ((__u32)((((__u8*)(pointer))[0] << 24) | (((__u8*)(pointer))[1] << 16) \
            |(((__u8*)(pointer))[2] << 8)  | (((__u8*)(pointer))[3]      )))
 #define INT_GET_UNALIGNED_64_BE(pointer) \
-   (((__u64)(INT_GET_UNALIGNED_32(((__u8*)(pointer))  )) << 32  ) \
-   |((__u64)(INT_GET_UNALIGNED_32(((__u8*)(pointer))+4))        ))
+   (((__u64)(INT_GET_UNALIGNED_32_BE(((__u8*)(pointer))  )) << 32  ) \
+   |((__u64)(INT_GET_UNALIGNED_32_BE(((__u8*)(pointer))+4))        ))
    
 /*
  * now pick the right ones for our MACHINE ARCHITECTURE
