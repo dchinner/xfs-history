@@ -1,4 +1,4 @@
-#ident "$Revision: 1.166 $"
+#ident "$Revision: 1.167 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -326,21 +326,21 @@ xfs_close(vnode_t	*vp,
 	  off_t		offset,
 	  cred_t	*credp)
 {
-	extern int 	xfs_remove_grio_guarantee(xfs_inode_t *, pid_t);
+	extern int	xfs_remove_grio_guarantee(xfs_inode_t *, pid_t);
 
-	struct ufchunk  *ufp;
+	struct ufchunk	*ufp;
 	struct file	*fp;
-        xfs_inode_t	*ip;
+	xfs_inode_t	*ip;
 	proc_t		*p  = u.u_procp;
 	shaddr_t	*sa = p->p_shaddr;
 	int		isshd, nofiles;
 	int		i, vpcount;
 
 	vn_trace_entry(vp, "xfs_close");
-        ip = XFS_VTOI(vp);
+	ip = XFS_VTOI(vp);
 
 	/*
- 	 * If this is a last close and the file was marked 
+	 * If this is a last close and the file was marked
 	 * as being used for grio, check for tickets to remove.
 	 */
 	if (lastclose && (ip->i_flags & XFS_IGRIO)) {
@@ -381,7 +381,7 @@ xfs_close(vnode_t	*vp,
 
 			if (fp)  {
 #else
-			if ((fp = ufgetfast( i,nofiles, ufp))) {
+				if ((fp = ufgetfast( i,nofiles, ufp))) {
 #endif
 				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
 					vpcount++;
@@ -400,8 +400,8 @@ xfs_close(vnode_t	*vp,
 #endif
 
 		/*
-		 * If this process is nolonger accessing 
- 		 * this file, remove any guarantees that
+		 * If this process is nolonger accessing
+		 * this file, remove any guarantees that
 		 * were made by this process on this file.
 		 */
 		if (!vpcount) {
@@ -409,12 +409,12 @@ xfs_close(vnode_t	*vp,
 		}
 	}
 
-        xfs_ilock(ip, XFS_ILOCK_SHARED);
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 
-        cleanlocks(vp, u.u_procp->p_epid, u.u_procp->p_sysid);
-        xfs_iunlock(ip, XFS_ILOCK_SHARED);
-        return 0;
+	cleanlocks(vp, u.u_procp->p_epid, u.u_procp->p_sysid);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	return 0;
 }
 
 
@@ -4764,8 +4764,16 @@ xfs_fcntl(vnode_t	*vp,
 
 	case F_ALLOCSP:
 	case F_FREESP:
+
+	case F_RESVSP:
+	case F_UNRESVSP:
+
 	case F_ALLOCSP64:
 	case F_FREESP64:
+
+	case F_RESVSP64:
+	case F_UNRESVSP64:
+
 		cmd = cmd;
 		if ((flags & FWRITE) == 0) {
 			error = EBADF;
@@ -4778,7 +4786,7 @@ xfs_fcntl(vnode_t	*vp,
 				break;
 			}
 #endif
-		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64 ||
+		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64 || cmd == F_RESVSP64 ||
 			ABI_IS_IRIX5_N32(u.u_procp->p_abi)) {
 			/* 
 			 * The n32 flock structure is the same size as the
@@ -5233,8 +5241,9 @@ xfs_change_file_space(
 	cred_t  	*credp)
 {
 	int			error;
-	int			allocspace;
+	int			allocspace, resvspace = 0;
 	off_t			startoffset, len;
+	vattr_t			va;
 	xfs_inode_t		*ip;
 
 	vn_trace_entry(vp, "xfs_change_file_space");
@@ -5256,18 +5265,25 @@ xfs_change_file_space(
 	}
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
-	switch (cmd) {
-	case F_ALLOCSP:
-	case F_ALLOCSP64:
-		allocspace = 1;
-		break;
-	case F_FREESP:
-	case F_FREESP64:
-		allocspace = 0;
-		break;
-	default:
-		ASSERT(0);
-		return EINVAL;
+	switch ( cmd ) {
+		case F_RESVSP:
+		case F_RESVSP64:
+			resvspace = 1;
+		case F_ALLOCSP:
+		case F_ALLOCSP64:
+			allocspace = 1;
+			break;
+
+		case F_UNRESVSP:
+		case F_UNRESVSP64:
+			resvspace = 1;
+		case F_FREESP:
+		case F_FREESP64:
+			allocspace = 0;
+			break;
+		default:
+			ASSERT(0);
+			return( EINVAL );
 	}
 
 
@@ -5293,8 +5309,25 @@ xfs_change_file_space(
 		return EINVAL;
 	}
 
-	if (allocspace) {
-		error = xfs_alloc_file_space(vp, startoffset, len);
+	/*
+	 * F_RESVSP and F_UNRESVSP will reserve or unreserve file space.
+	 * these calls do NOT zero the data space allocated
+	 * to the file, nor do they change the file size.
+ 	 *
+	 * F_ALLOCSP and F_FREESP will allocate and free file space.
+	 * these calls cause the new file data to be zeroed and the file
+	 * size to be changed.
+	 */
+	if ( allocspace ) {
+		error = xfs_alloc_file_space( vp, startoffset, len);
+		if ((!error) && (!resvspace)) {
+			/*
+			 * zero pages, and change file size
+			 */
+			va.va_mask = AT_SIZE;
+			va.va_size = startoffset + len;
+			error = xfs_setattr( vp, &va, 0, credp );
+		}
 	} else {
 		/*
 		 * len is currently assumed to be zero,
@@ -5304,13 +5337,24 @@ xfs_change_file_space(
 			/*
 			 * freeing after end-of-file means to extend the file.
 			 */
-			error = xfs_alloc_file_space(vp, ip->i_d.di_size,
-					    (startoffset - ip->i_d.di_size));
+			error = xfs_alloc_file_space( vp, 
+					ip->i_d.di_size,
+					(startoffset - ip->i_d.di_size));
+
+			if ((!error) && (!resvspace)) {
+				/*
+				 * zero pages and change file size
+				 */
+				va.va_mask = AT_SIZE;
+				va.va_size = startoffset;
+				error = xfs_setattr( vp, &va, 0, credp );
+			}
+
 		} else {
 			/*
 			 * free from startoffset to end-of-file
 			 */
-			error = xfs_free_file_space(vp,	startoffset, 0);
+			error = xfs_free_file_space( vp, startoffset, 0);
 		}
 	}
 
