@@ -395,8 +395,6 @@ vn_rele(struct vnode *vp)
 	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
 	vcnt = vn_count(vp);
 
-	ASSERT(vcnt > 0);
-
 	/*
 	 * Since we always get called from put_inode we know 
 	 * that i_count won't be decremented after we
