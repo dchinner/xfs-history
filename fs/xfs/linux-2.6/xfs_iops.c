@@ -184,8 +184,10 @@ linvfs_lookup(
 			return ERR_PTR(-EACCES);
 		}
 		linvfs_set_inode_ops(ip);
-		error = linvfs_revalidate_core(ip, ATTR_COMM);
+		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 	}
+	if (error && (error != ENOENT))
+		return (-error);
 	d_add(dentry, ip);	/* Negative entry goes in if ip is NULL */
 	return NULL;
 }

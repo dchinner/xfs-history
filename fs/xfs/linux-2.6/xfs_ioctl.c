@@ -269,7 +269,8 @@ xfs_vget_fsop_handlereq(
 	error = linvfs_revalidate_core(inodep, ATTR_COMM);
 	if (error) {
 		iput(inodep);
-		return XFS_ERROR(error);
+		/* this error is (-) but our callers expect + */
+		return XFS_ERROR(-error);
 	}
 
 	*vp = vpp;
