@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -38,7 +38,8 @@ typedef struct xfs_bstat
 	__int32_t	bs_extsize;	/* extent size */
 	__int32_t	bs_extents;	/* number of extents */
 	__uint32_t	bs_gen;		/* generation count */
-	char		bs_pad[16];	/* pad space, unused */
+	u_int16_t	bs_projid;	/* project id */
+	char		bs_pad[14];	/* pad space, unused */
 	__uint32_t	bs_dmevmask;	/* DMIG event mask */
 	ushort_t	bs_dmstate;	/* DMIG state info */
 	ushort_t	bs_aextents;	/* attribute number of extents */

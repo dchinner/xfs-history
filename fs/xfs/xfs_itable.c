@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.40 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -55,12 +55,6 @@ xfs_bulkstat_one(
 	xfs_inode_t	*ip;		/* incore inode pointer */
 
 	buf = (xfs_bstat_t *)buffer;
-
-	/*
-	 * We don't return information about the realtime inodes or the
-	 * quota inodes in bulkstat. We wouldn't want those 'dumped' and 
-	 * 'restore'd for example.
-	 */
 	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
 	    (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASQUOTA && 
 	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino))) {
@@ -81,6 +75,7 @@ xfs_bulkstat_one(
 	buf->bs_nlink = ip->i_d.di_nlink;
 	buf->bs_uid = ip->i_d.di_uid;
 	buf->bs_gid = ip->i_d.di_gid;
+	buf->bs_projid = ip->i_d.di_projid;
 	buf->bs_size = ip->i_d.di_size;
 	buf->bs_atime.tv_sec = ip->i_d.di_atime.t_sec;
 	buf->bs_atime.tv_nsec = ip->i_d.di_atime.t_nsec;
