@@ -665,6 +665,7 @@ typedef struct vattr {
  * a VOP_RECLAIM, of course).  In this case, the vn_epoch value is
  * incremented to define a new vnode epoch.
  */
+extern void	vn_init(void);
 extern void	vn_free(struct vnode *);
 extern vnode_t  *vn_address(struct inode *);
 extern vnode_t  *vn_initialize(struct vfs *, struct inode *, int);

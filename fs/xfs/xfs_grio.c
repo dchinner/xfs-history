@@ -226,7 +226,6 @@ xfs_get_block_size(
 	dev_t		fs_dev;
 	xfs_caddr_t		fs_size;
 	struct vfs	*vfsp;
-	extern int	xfs_fstype;
 
 	fs_dev 		= (dev_t)sysarg_fs_dev;
 	fs_size		= (xfs_caddr_t)SYSARG_TO_PTR(sysarg_fs_size);

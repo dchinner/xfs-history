@@ -43,8 +43,6 @@ xfs_stickytest(
 	xfs_inode_t	*dp,
 	xfs_inode_t	*ip)
 {
-	extern int	xpg4_sticky_dir;
-
         if (!(dp->i_d.di_mode & ISVTX))
 		return 0;
 	if (current->fsuid == ip->i_d.di_uid)

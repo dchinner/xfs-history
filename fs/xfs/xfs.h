@@ -50,21 +50,18 @@
 #include <linux/file.h>
 #include <asm/uaccess.h>
 
-#include <pseudo-inc/sys/kmem.h>
 #include <xfs_buf.h>
-#include <pseudo-inc/ksys/cell_config.h>
-#include <pseudo-inc/ksys/behavior.h>
+#include <linux/xfs_random.h>
+#include <linux/xfs_behavior.h>
 #include <linux/xfs_vfs.h>
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_fs_subr.h>
-#include <pseudo-inc/sys/ktrace.h>
 #include <linux/xfs_move.h>
 #include <pseudo-inc/sys/quota.h>
 #include <pseudo-inc/sys/dirent.h>
 #include <pseudo-inc/sys/attributes.h>
 #include <pseudo-inc/sys/acl.h>
 #include <pseudo-inc/sys/kabi.h>
-#include <pseudo-inc/ksys/fsc_notify.h>
 
 #include <linux/slab.h>
 #include <linux/errno.h>
@@ -132,6 +129,7 @@
 #endif
 
 #include <linux/xfs_lrw.h>
+#include <linux/xfs_super.h>
 #include <linux/xfs_globals.h>
 
 #endif	/* __XFS_H__ */

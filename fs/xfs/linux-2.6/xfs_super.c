@@ -119,7 +119,6 @@ linvfs_read_super(
 	extern vfsops_t xfs_vfsops;
 	vfs_t		*vfsp;
 	vnode_t		*cvp, *rootvp;
-	extern		int mountargs_xfs(char *, struct xfs_args *);
 
 	struct mounta	ap;
 	struct mounta	*uap = &ap;
@@ -618,8 +617,6 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	extern void xfs_cleanup(void);
-
         dmapi_uninit();
 #ifdef CONFIG_XFS_GRIO
         xfs_grio_uninit();

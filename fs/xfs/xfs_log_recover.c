@@ -30,11 +30,9 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-
 #include <xfs.h>
 #include <xfs_log_recover.h>
 
-extern int xfs_is_read_only(xlog_t *);
 
 int		xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
 int		xlog_find_cycle_start(struct log *log,

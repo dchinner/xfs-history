@@ -41,8 +41,6 @@
 spinlock_t	vfslock;	/* spinlock protecting rootvfs and vfs_flag */
 sema_t 		synclock;	/* sync in progress; initialized in sinit() */
                                 
-extern void	vn_init(void);
-
 
 /*
  * Allocate and initialize a new vfs

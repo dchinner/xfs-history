@@ -809,7 +809,6 @@ xfs_fd_to_mp(
 	vfs_t		*vfsp;
 	vnode_t		*vp;
 	bhv_desc_t 	*bdp;
-	extern int	xfs_fstype;
 
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);

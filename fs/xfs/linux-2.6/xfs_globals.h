@@ -40,6 +40,7 @@
 extern int	mac_enabled;
 extern int	acl_enabled;
 extern int	xpg4_sticky_dir;	/* see xfs_stickytest */
+extern int	xfs_fstype;
 extern uint64_t	xfs_panic_mask;		/* set to cause more panics */
 
 extern dev_t	rootdev;

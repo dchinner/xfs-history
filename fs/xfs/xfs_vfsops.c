@@ -107,14 +107,6 @@ xfs_get_vfsmount(
 	dev_t	logdev,
 	dev_t	rtdev);
 
-extern int
-spectodevs(
-	struct super_block *sb,
-	struct xfs_args *args,
-	dev_t	*ddevp,
-	dev_t   *logdevp,
-        dev_t   *rtdevp);
-
 STATIC int
 xfs_ibusy(
 	xfs_mount_t	*mp);
@@ -140,7 +132,6 @@ int	xfs_fstype;
 int
 xfs_init(int	fstype)
 {
-	extern void	xfs_init_procfs(void);
 	extern xfs_zone_t	*xfs_da_state_zone;
 	extern xfs_zone_t	*xfs_bmap_free_item_zone;
 	extern xfs_zone_t	*xfs_btree_cur_zone;
@@ -277,8 +268,6 @@ STATIC
 void
 xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 {
-	extern struct inode *linvfs_make_inode(kdev_t, struct super_block *);
-
 	btp->inode = linvfs_make_inode(dev, sb);
 	btp->dev    = dev;
 }
@@ -286,8 +275,6 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 void
 xfs_cleanup(void)
 {
-	extern void	xfs_cleanup_procfs(void);
-
 	extern xfs_zone_t	*xfs_bmap_free_item_zone;
 	extern xfs_zone_t	*xfs_btree_cur_zone;
 	extern xfs_zone_t	*xfs_inode_zone;
@@ -346,7 +333,6 @@ xfs_cmountfs(
 	size_t		n;
 	char		*tmp_fsname_buffer;
         int             client = 0;
-	extern void linvfs_release_inode(struct inode *);
 
 	/*
 	 * The new use of remount to update various cxfs parameters

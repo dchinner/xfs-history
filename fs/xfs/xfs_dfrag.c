@@ -33,8 +33,6 @@
 #include <xfs.h>
 #include <xfs_dfrag.h>
 
-extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
-extern int xfs_bmap_count_blocks( xfs_trans_t *, xfs_inode_t *, int, int *); 
 
 /*
  * Syssgi interface for swapext

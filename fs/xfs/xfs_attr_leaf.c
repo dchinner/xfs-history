@@ -70,11 +70,6 @@ STATIC void xfs_attr_leaf_moveents(xfs_attr_leafblock_t *src_leaf,
 					 xfs_attr_leafblock_t *dst_leaf,
 					 int dst_start, int move_count,
 					 xfs_mount_t *mp);
-/*
- * External.
- */
-void qsort (void* base, size_t nel, size_t width,
-		  int (*compar)(const void *, const void *));
 
 
 /*========================================================================

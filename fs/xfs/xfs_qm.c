@@ -345,7 +345,6 @@ xfs_qm_mount_quotas(
 	int		s;
 	int		error;
 	uint		sbf;
-	extern dev_t	rootdev;
 
 	error = 0;
 	/*
@@ -1473,7 +1472,6 @@ xfs_qm_qino_alloc(
 	int		error, s;
 	cred_t		zerocr;
 	int		committed;
-	/* extern 		prid_t	dfltprid; */
 
 	tp = xfs_trans_alloc(mp,XFS_TRANS_QM_QINOCREATE);
 	if (error = xfs_trans_reserve(tp,
@@ -2298,7 +2296,6 @@ STATIC int
 xfs_qm_shake(int level)
 {
 	int 		ndqused, nfree, n;
-	extern int 	ndquot; 		/* mtune variable */
 
 	if (xfs_Gqm == NULL)
 		return (0);
@@ -2463,7 +2460,6 @@ xfs_qm_dqalloc_incore(
 	xfs_dquot_t **O_dqpp)
 {
 	xfs_dquot_t 	*dqp;
-	extern int 	ndquot; 			/* mtune variable */
 
 	/* 
 	 * Check against high water mark to see if we want to pop

@@ -75,11 +75,6 @@ STATIC void xfs_dir_leaf_moveents(xfs_dir_leafblock_t *src_leaf,
 					      int dst_start, int move_count,
 					      xfs_mount_t *mp);
 
-/*
- * External.
- */
-void qsort (void* base, size_t nel, size_t width,
-	    int (*compar)(const void *, const void *));
 
 /*========================================================================
  * External routines when dirsize < XFS_IFORK_DSIZE(dp).

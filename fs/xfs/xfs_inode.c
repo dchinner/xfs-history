@@ -3650,7 +3650,6 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 	bhv_desc_t              *bdp;
 	xfs_inode_t             *ip = NULL ;
 	int                     error;
-	extern	int		xfs_fstype;
 
 	/*
 	 * Lookup the vfs structure and mark it busy.

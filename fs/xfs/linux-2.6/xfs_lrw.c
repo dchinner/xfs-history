@@ -81,7 +81,6 @@ xfs_rdwr(
 {
 	ssize_t ret;
 	struct xfs_inode *xip;
-	extern int delay_alloc;
 
 	xip = XFS_BHVTOI(bdp);
 	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {

@@ -34,8 +34,6 @@
 #include <xfs_quota_priv.h>
 
 
-extern int 	xfs_fstype;
-
 STATIC int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
 STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint, xfs_caddr_t);
 STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, xfs_caddr_t);

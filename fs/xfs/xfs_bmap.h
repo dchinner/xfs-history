@@ -375,6 +375,16 @@ xfs_bmap_eof(
         int                     *eof);
 
 /*
+ * Count fsblocks of the given fork.
+ */
+int
+xfs_bmap_count_blocks(
+	xfs_trans_t		*tp,
+	xfs_inode_t		*ip,
+	int			whichfork,
+	int			*count);
+
+/*
  * Check an extent list, which has just been read, for
  * any bit in the extent flag field.
  */

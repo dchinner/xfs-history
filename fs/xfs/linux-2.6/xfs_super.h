@@ -29,12 +29,22 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef XFS_LINUX_OPS_SUPER_DOT_H
-#define XFS_LINUX_OPS_SUPER_DOT_H
+#ifndef __XFS_SUPER_H__
+#define __XFS_SUPER_H__
 
 void
 linvfs_inode_attr_in(
 	struct inode	*inode);
+
+void
+linvfs_release_inode(
+	struct inode	*inode);
+
+struct inode *
+linvfs_make_inode(
+	kdev_t		dev,
+	struct super_block *sb);
+
 int
 fs_dounmount(
         bhv_desc_t      *bdp,
@@ -42,6 +52,12 @@ fs_dounmount(
         vnode_t         *rootvp,
         cred_t          *cr);
 
-#endif  /*  XFS_LINUX_OPS_SUPER_DOT_H  */
+int
+spectodevs(
+	struct super_block *sb,
+        struct xfs_args	*args,
+        dev_t  		*ddevp,
+        dev_t		*logdevp,
+        dev_t		*rtdevp);
 
-
+#endif	/* __XFS_SUPER_H__ */

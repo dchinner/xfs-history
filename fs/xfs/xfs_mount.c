@@ -1084,8 +1084,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 void
 xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-	extern void	linvfs_release_inode(struct inode *);
-
 	if (mp->m_ddev_targ.inode) {
 		linvfs_release_inode(mp->m_ddev_targ.inode);
 	}

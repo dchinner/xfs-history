@@ -215,6 +215,16 @@ typedef __uint32_t	xfs_dev_t;
 #define ovbcopy(from,to,count)	memmove(to,from,count)
 
 
+#ifndef CELL_CAPABLE
+#define CELL_ONLY(x)
+#define CELL_NOT(x)	(x)
+#define CELL_IF(a, b)	(b)
+#define CELL_MUST(a)   	ASSERT(0)
+#define CELL_ASSERT(x)
+#define FSC_NOTIFY_NAME_CHANGED(vp)
+#endif
+
+
 /*
  * XXX these need real values in errno.h. asm-i386/errno.h won't 
  * return errnos out of its known range in errno.
@@ -225,12 +235,9 @@ typedef __uint32_t	xfs_dev_t;
 #define	EWRONGFS	1011	/* Mount with wrong filesystem type */
 
 #define SYNCHRONIZE()	((void)0)
-#define ENTER(x)	printk("Entering %s\n",x);
-#define EXIT(x)		printk("Exiting  %s\n",x);
 #define lbolt		jiffies
 #define __return_address __builtin_return_address(0)
 #define LONGLONG_MAX	9223372036854775807LL	/* max "long long int" */
-#define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)
 #define nopkg()		( ENOPKG )
 #define getf(fd,fpp)	( printk("getf not implemented\n"), ASSERT(0), 0 )
 
@@ -260,6 +267,8 @@ typedef __uint32_t	xfs_dev_t;
 
 struct xfs_args;
 extern int  mountargs_xfs (char *, struct xfs_args *);
+extern void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
+extern void xfs_cleanup(void);
 
 
 static inline void delay(long ticks)

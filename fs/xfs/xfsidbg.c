@@ -2535,7 +2535,6 @@ xfs_inodebuf(xfs_buf_t *bp)
 	vfs_t *vfsp;
 	bhv_desc_t *bdp;
 	xfs_mount_t *mp;
-	extern int  xfs_fstype;
 
 	vfsp = LINVFS_GET_VFS(bp->pb_target->i_sb);
 	if (!vfsp)

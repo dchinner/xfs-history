@@ -40,6 +40,7 @@
 int		mac_enabled = 0;
 int		acl_enabled = 0;
 int		xpg4_sticky_dir = 1;	/* see xfs_stickytest */
+int		xfs_fstype;
 uint64_t	xfs_panic_mask;		/* set to cause more panics */
 
 dev_t           rootdev = NODEV;
@@ -49,4 +50,3 @@ prid_t		dfltprid;
 long            physmem;
 int		ncsize = 792;
 int		ndquot;
-
