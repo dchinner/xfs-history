@@ -1,4 +1,4 @@
-#ident "$Revision: 1.162 $"
+#ident "$Revision: 1.163 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1121,7 +1121,7 @@ xfs_read_file(
  */
 int
 xfs_read(
-	pvnode_t	*pvp,
+	bhv_desc_t	*bdp,
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp,
@@ -1135,7 +1135,7 @@ xfs_read(
 	int		error;
 	xfs_mount_t	*mp;
 	size_t		resid;
-	vnode_t 	*vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = BHV_TO_VNODE(bdp);
 
 	ip = XFS_VTOI(vp);
 	type = ip->i_d.di_mode & IFMT;
@@ -2276,7 +2276,7 @@ xfs_write_clear_setuid(
  */
 int
 xfs_write(
-	pvnode_t *pvp,
+	bhv_desc_t *bdp,
 	uio_t	*uiop,
 	int	ioflag,
 	cred_t	*credp,
@@ -2293,7 +2293,7 @@ xfs_write(
 	int		resid;
 	off_t		savedsize;
 	xfs_fsize_t	limit;
-	vnode_t 	*vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = BHV_TO_VNODE(bdp);
 	int		eventsent = 0;
 
 
@@ -2501,7 +2501,7 @@ retry:
 /*ARGSUSED*/
 int
 xfs_bmap(
-	pvnode_t	*pvp,
+	bhv_desc_t	*bdp,
 	off_t		offset,
 	ssize_t		count,
 	int		flags,
@@ -2509,7 +2509,7 @@ xfs_bmap(
 	struct bmapval	*bmapp,
 	int		*nbmaps)
 {
-	vnode_t 	*vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = BHV_TO_VNODE(bdp);
 	xfs_inode_t	*ip;
 	int		error;
 
@@ -4012,12 +4012,12 @@ xfs_strat_write(
  */
 void
 xfs_strategy(
-	pvnode_t *pvp,
+	bhv_desc_t *bdp,
 	buf_t	*bp)
 {
 	int		s;
 	struct bdevsw	*my_bdevsw;
-	vnode_t 	*vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = BHV_TO_VNODE(bdp);
 
 	/*
 	 * If this is just a buffer whose underlying disk space

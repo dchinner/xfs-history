@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.23 $"
 
 struct bmapval;
 struct buf;
@@ -115,25 +115,25 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
  * Prototypes for functions in xfs_rw.c.
  */
 int
-xfs_read(pvnode_t	*pvp,
+xfs_read(bhv_desc_t	*bdp,
 	 struct uio	*uiop,
 	 int		ioflag,
 	 struct cred	*credp,
 	 struct flid	*fl);
 
 int
-xfs_write(pvnode_t	*pvp,
+xfs_write(bhv_desc_t	*bdp,
 	  struct uio	*uiop,
 	  int		ioflag,
 	  struct cred	*credp,
 	  struct flid	*fl);
 
 void
-xfs_strategy(pvnode_t	*pvp,
-	     struct buf		*bp);
+xfs_strategy(bhv_desc_t	*bdp,
+	     struct buf	*bp);
 
 int
-xfs_bmap(pvnode_t	*pvp,
+xfs_bmap(bhv_desc_t	*bdp,
 	 off_t		offset,
 	 ssize_t	count,
 	 int		flags,
