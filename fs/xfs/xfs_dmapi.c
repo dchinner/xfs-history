@@ -10,13 +10,14 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
 #include <sys/attributes.h>
 #include <ksys/behavior.h>
 #include <sys/buf.h>
+#include <sys/capability.h>
 #include <sys/conf.h>
 #include <sys/cred.h>
 #include <sys/debug.h>
@@ -41,7 +42,6 @@
 #include <sys/var.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-/* KCM#include <specfs/snode.h>*/
 #include <sys/handle.h>  /* not really a XFS-dependent include */
 
 #include <string.h>
@@ -405,7 +405,6 @@ xfs_ip_to_stat(
 {
 	vnode_t		*vp = XFS_ITOV(ip);
 
-	/* KCM XFS_FORCED_SHUTDOWN(mp) ? */
 	buf->dt_size = ip->i_d.di_size;
 	buf->dt_dev = ip->i_dev;
 
@@ -526,7 +525,7 @@ xfs_bulkstat_one(
 
 	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino) {
 		*res = BULKSTAT_RV_NOTHING;
-		return EINVAL;	/* KCM - Correct errno ? */
+		return EINVAL;
 	}
 	error = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED, &ip, bno);
 	if (error) {
@@ -999,19 +998,19 @@ xfs_dm_rdwr(
 
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
+	uio.uio_fmode = fflag;
 	uio.uio_offset = off;
 	uio.uio_segflg = UIO_USERSPACE;
-	uio.uio_fmode = fflag;
-	uio.uio_limit = getfsizelimit();
-	uio.uio_resid = iov.iov_len;
-	uio.uio_pmp = NULL;
-	uio.uio_readiolog = 0;/* KCM ?? */
-	uio.uio_writeiolog = 0;/* KCM ?? */
-	/* KCM - other new fields */
 	uio.uio_pio = 0;
-	uio.uio_pbuf = 0;
 	uio.uio_sigpipe = 0;
-	/* KCM - uio.uio_fp - only set a few places. */
+	uio.uio_readiolog = 0;
+	uio.uio_writeiolog = 0;
+	uio.uio_resid = iov.iov_len;
+	uio.uio_limit = getfsizelimit();
+	uio.uio_pmp = NULL;
+	uio.uio_pbuf = NULL;
+	uio.uio_fp = NULL;	
+
 	count = uio.uio_resid;
 
 	if (fflag & FREAD) {
@@ -1019,7 +1018,7 @@ xfs_dm_rdwr(
 				&ut->ut_flid, error);
 	} else {
 		VOP_WRITE(vp, &uio, ioflag, get_current_cred(),
-				&ut->ut_flid, error);/* KCM */
+				&ut->ut_flid, error);
 	}
 
 	xfer = count - uio.uio_resid;
@@ -2834,6 +2833,9 @@ xfs_dm_fcntl(
 	rval_t		*rvalp)
 {
 	dm_fcntl_t	*dmfcntlp;
+
+	if (!_CAP_CRABLE(credp, CAP_DEVICE_MGT))
+		return(EPERM);
 
 	dmfcntlp = (dm_fcntl_t *)arg;
 
