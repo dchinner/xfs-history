@@ -1,14 +1,14 @@
 #ifndef _FS_XFS_IALLOC_BTREE_H
 #define	_FS_XFS_IALLOC_BTREE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.3 $"
 
 /*
  * Inode map on-disk structures
  */
 
-struct xfs_btree_sblock_t;
 struct xfs_btree_cur;
+struct xfs_btree_sblock;
 
 /*
  * There is a btree for the inode map per allocation group.
