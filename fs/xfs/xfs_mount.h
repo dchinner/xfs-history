@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 struct xfs_ihash;
 
@@ -36,6 +36,7 @@ typedef struct xfs_mount {
 	uint			m_rsumsize;	/* size of rt summary, bytes */
 	struct xfs_inode	*m_rbmip;	/* pointer to bitmap inode */
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
+	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
 } xfs_mount_t;
 
 /*

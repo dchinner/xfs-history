@@ -4,6 +4,7 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
+#include <sys/dirent.h>
 #include <sys/debug.h>
 #ifdef SIM
 #include <bstring.h>
@@ -2131,4 +2132,46 @@ xfs_dir_leaf_print_int(buf_t *bp, xfs_inode_t *dp)
 		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
 		printf("%20lld  %*.*s\n", ino, namest->namelen, namest->namelen, namest->name);
 	}
+}
+
+/*
+ * Copy out directory entries for getdents(), for leaf directories.
+ */
+int
+xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
+				dirent_t *buf)
+{
+	int retval, done, entno, i;
+	xfs_mount_t *mp;
+	xfs_ino_t ino;
+	__uint32_t bno;
+	struct xfs_dir_leafblock *leaf;
+	struct xfs_dir_leaf_entry *entry;
+	struct xfs_dir_leaf_name *namest;
+
+	mp = dp->i_mount;
+	bno = (__uint32_t)XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
+	entno = XFS_DIR_COOKIE_ENTRY(mp, uio->uio_offset);
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
+	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
+	if (entno >= leaf->hdr.count) {
+		*eobp = 0;
+		return(ENOENT);
+	}
+	entry = &leaf->leaves[entno];
+	for (i = entno; i < leaf->hdr.count; entry++, i++) {
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
+		retval = xfs_dir_put_dirent(mp, buf, ino, namest->name,
+						namest->namelen, bno, i, uio,
+						&done);
+		if (!done) {
+			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, i);
+			*eobp = 0;
+			return(retval);
+		}
+	}
+	uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, i);
+	*eobp = 1;
+	return(0);
 }

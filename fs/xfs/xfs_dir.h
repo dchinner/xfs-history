@@ -208,12 +208,25 @@ struct xfs_dir_freeblock {
 #define	XFS_LBLOG(sbp)	((sbp)->sb_blocklog)
 #define	XFS_LITINO(sbp)	((sbp)->sb_inodesize - sizeof(xfs_dinode_core_t))
 
+/*
+ * Macros used to manipulate directory off_t's
+ */
+#define	XFS_DIR_MAKE_COOKIE(mp, bno, entry) \
+	(((bno) << (mp)->m_dircook_elog) | (entry))
+#define	XFS_DIR_COOKIE_BNO(mp, cookie) \
+	((cookie) >> (mp)->m_dircook_elog)
+#define	XFS_DIR_COOKIE_ENTRY(mp, cookie) \
+	((cookie) & ((1 << (mp)->m_dircook_elog) - 1))
+
 
 /*========================================================================
  * Function prototypes for the kernel.
  *========================================================================*/
 
 struct xfs_dir_name;
+struct uio;
+struct dirent;
+struct xfs_bmap_free;
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(sbp).
@@ -240,10 +253,15 @@ buf_t	*xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
 buf_t	*xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
+int	xfs_dir_put_dirent(xfs_mount_t *mp, struct dirent *buf, xfs_ino_t ino,
+				char *name, int namelen, __uint32_t bno,
+				int entry, uio_t *uio, int *done);
 
 /*
  * Overall external interface routines.
  */
+void	xfs_dir_mount(xfs_mount_t *mp);
+
 int	xfs_dir_isempty(xfs_inode_t *dp);
 
 int	xfs_dir_init(xfs_trans_t *trans,
@@ -255,14 +273,14 @@ int	xfs_dir_createname(xfs_trans_t *trans,
 			   char *name_string,
 			   xfs_ino_t inode_number,
 			   xfs_fsblock_t *firstblock,
-			   xfs_bmap_free_t *flist,
+			   struct xfs_bmap_free *flist,
 			   xfs_extlen_t total);
 
 int	xfs_dir_removename(xfs_trans_t *trans,
 			   xfs_inode_t *dp,
 			   char *name_string,
 			   xfs_fsblock_t *firstblock,
-			   xfs_bmap_free_t *flist,
+			   struct xfs_bmap_free *flist,
 			   xfs_extlen_t total);
 
 int	xfs_dir_lookup(xfs_trans_t *tp,
@@ -274,6 +292,9 @@ int	xfs_dir_lookup(xfs_trans_t *tp,
 void	xfs_dir_print(xfs_trans_t *tp,
 		      xfs_inode_t *dp);
 
-int	xfs_dir_getdents(void);
+int	xfs_dir_getdents(xfs_trans_t *tp,
+			 xfs_inode_t *dp,
+			 struct uio *uiop,
+			 int *eofp);
 
 #endif	/* !_FS_XFS_DIR_H */

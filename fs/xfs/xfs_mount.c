@@ -37,6 +37,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_dir.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -165,6 +166,11 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 		mp->m_rsumip = xfs_iget(mp, NULL, sbp->sb_rsumino, XFS_ILOCK_SHARED);
 		xfs_iunlock(mp->m_rsumip, XFS_ILOCK_SHARED);
 	}
+
+	/*
+	 * Initialize directory manager's entries.
+	 */
+	xfs_dir_mount(mp);
 
 	/*
 	 * Call the log's mount-time initialization.
