@@ -1,4 +1,4 @@
-#ident "$Revision: 1.286 $"
+#ident "$Revision: 1.287 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -6668,7 +6668,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 		 * written delayed anyway. These aren't associated
 		 * with a transaction, and can be ignored.
 		 */
-		if (bp->b_iodone == NULL &&
+		if (XFS_BUF_IODONE_FUNC(bp) == NULL &&
 		    (XFS_BUF_ISREAD(bp)) == 0)
 			return (xfs_bioerror_relse(bp));
 		else

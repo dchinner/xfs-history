@@ -227,8 +227,8 @@ typedef struct buftarg {
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
 			if ((buf)->pb_iodone == NULL) { \
 				pagebuf_hold(buf); \
-				(buf)->pb_iodone = (func); \
-			}
+			}				\
+			(buf)->pb_iodone = (func)
 #define XFS_BUF_CLR_IODONE_FUNC(buf)		\
 			if ((buf)->pb_iodone) { \
 				(buf)->pb_iodone = NULL; \
