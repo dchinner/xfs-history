@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -70,18 +70,16 @@ STATIC int prohibited_mr_events(bhv_desc_t	*bdp);
    on-disk attribute names start with the 8-byte string "SGI_DMI_".
 */
 
-#define	DMATTR_PREFIXLEN	8
-
 typedef	struct	{
 	char	dan_chars[DMATTR_PREFIXLEN + DM_ATTR_NAME_SIZE + 1];
 } dm_dkattrname_t;
 
 /* In the on-disk inode, DMAPI attribute names consist of the user-provided
-   name with the dmattr_prefix string pre-pended.  This string must NEVER be
+   name with the DMATTR_PREFIXSTRING pre-pended.  This string must NEVER be
    changed!
 */
 
-STATIC	const	char	dmattr_prefix[DMATTR_PREFIXLEN + 1] = "SGI_DMI_";
+STATIC	const	char	dmattr_prefix[DMATTR_PREFIXLEN + 1] = DMATTR_PREFIXSTRING;
 
 STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 

@@ -3,6 +3,18 @@
 
 #ident  "$Revision: 1.1 $"
 
+/*	Values used to define the on-disk version of dm_attrname_t. All
+ *	on-disk attribute names start with the 8-byte string "SGI_DMI_".
+ *
+ *      In the on-disk inode, DMAPI attribute names consist of the user-provided
+ *      name with the DMATTR_PREFIXSTRING pre-pended.  This string must NEVER be
+ *      changed.
+ */
+
+#define DMATTR_PREFIXLEN	8
+#define DMATTR_PREFIXSTRING	"SGI_DMI_"
+
+#ifdef	_KERNEL
 /* Defines for determining if an event message should be sent. */
 #define	DM_EVENT_ENABLED(vfsp, ip, event) ( \
 	((vfsp)->vfs_flag & VFS_DMI) && \
@@ -51,5 +63,7 @@ xfs_dm_map(
         off_t           offset,
         size_t          length,
         dm_eventtype_t  max_event);
+
+#endif	/* _KERNEL */
 
 #endif  /* _FS_XFS_DMAPI_H */
