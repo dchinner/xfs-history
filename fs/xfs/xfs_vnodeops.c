@@ -2892,21 +2892,21 @@ start_over:
 		if ((target_ip->i_d.di_mode & IFMT) == IFDIR) {
 
 			/*
-			 * Make sure target dir is empty.
-			 */
-			if (! (xfs_dir_isempty(target_dp)) || 
-			    (target_ip->i_d.di_nlink > 2)) {
-				error = XFS_ERROR(EEXIST);
-                                goto error_return;
-                        }
-
-			/*
 			 * Make sure src is a directory.
 			 */
 			if (! src_is_directory) {
 				error = XFS_ERROR(EISDIR);
 				goto error_return;
 			}
+
+			/*
+			 * Make sure target dir is empty.
+			 */
+			if (! (xfs_dir_isempty(target_ip)) || 
+			    (target_ip->i_d.di_nlink > 2)) {
+				error = XFS_ERROR(EEXIST);
+                                goto error_return;
+                        }
 
 			if (ABI_IS_SVR4(u.u_procp->p_abi) &&
                             XFS_ITOV(target_ip)->v_vfsmountedhere) {
