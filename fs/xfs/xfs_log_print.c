@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision: 1.12 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -52,40 +52,40 @@
 #include <sys/uuid.h>
 #include <stddef.h>
 
-#include <sys/fs/xfs_macros.h>
-#include <sys/fs/xfs_types.h>
-#include <sys/fs/xfs_inum.h>
-#include <sys/fs/xfs_log.h>
-#include <sys/fs/xfs_ag.h>		/* needed by xfs_sb.h */
-#include <sys/fs/xfs_sb.h>		/* depends on xfs_types.h, xfs_inum.h*/
-#include <sys/fs/xfs_trans.h>
-#include <sys/fs/xfs_dir.h>
-#include <sys/fs/xfs_dir2.h>
-#include <sys/fs/xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
-#include <sys/fs/xfs_bmap_btree.h>
-#include <sys/fs/xfs_alloc.h>
-#include <sys/fs/xfs_attr_sf.h>
-#include <sys/fs/xfs_dir_sf.h>
-#include <sys/fs/xfs_dir2_sf.h>
-#include <sys/fs/xfs_dinode.h>
-#include <sys/fs/xfs_imap.h>
-#include <sys/fs/xfs_inode_item.h>
-#include <sys/fs/xfs_inode.h>
-#include <sys/fs/xfs_ialloc_btree.h>
-#include <sys/fs/xfs_ialloc.h>
-#include <sys/fs/xfs_error.h>
-#include <sys/fs/xfs_log_priv.h>	/* depends on all above */
-#include <sys/fs/xfs_buf_item.h>
-#include <sys/fs/xfs_alloc_btree.h>
-#include <sys/fs/xfs_log_recover.h>
-#include <sys/fs/xfs_extfree_item.h>
-#include <sys/fs/xfs_trans_priv.h>
-#include <sys/fs/xfs_bit.h>
-#include <sys/fs/xfs_quota.h>
-#include <sys/fs/xfs_dqblk.h>
-#include <sys/fs/xfs_dquot_item.h>
-#include <sys/fs/xfs_dquot.h>
-#include <sys/fs/xfs_qm.h>
+#include <xfs_macros.h>
+#include <xfs_types.h>
+#include <xfs_inum.h>
+#include <xfs_log.h>
+#include <xfs_ag.h>		/* needed by xfs_sb.h */
+#include <xfs_sb.h>		/* depends on xfs_types.h, xfs_inum.h*/
+#include <xfs_trans.h>
+#include <xfs_dir.h>
+#include <xfs_dir2.h>
+#include <xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
+#include <xfs_bmap_btree.h>
+#include <xfs_alloc.h>
+#include <xfs_attr_sf.h>
+#include <xfs_dir_sf.h>
+#include <xfs_dir2_sf.h>
+#include <xfs_dinode.h>
+#include <xfs_imap.h>
+#include <xfs_inode_item.h>
+#include <xfs_inode.h>
+#include <xfs_ialloc_btree.h>
+#include <xfs_ialloc.h>
+#include <xfs_error.h>
+#include <xfs_log_priv.h>	/* depends on all above */
+#include <xfs_buf_item.h>
+#include <xfs_alloc_btree.h>
+#include <xfs_log_recover.h>
+#include <xfs_extfree_item.h>
+#include <xfs_trans_priv.h>
+#include <xfs_bit.h>
+#include <xfs_quota.h>
+#include <xfs_dqblk.h>
+#include <xfs_dquot_item.h>
+#include <xfs_dquot.h>
+#include <xfs_qm.h>
 
 #ifdef SIM
 #include "sim.h"		/* must be last include file */
