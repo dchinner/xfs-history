@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.11 $"
+#ident "$Revision: 1.12 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -164,12 +164,8 @@ readlink_by_handle (
 	auio.uio_iov	= &aiov;
 	auio.uio_iovcnt	= 1;
 
-#ifdef REDWOOD
-	/* no uio_pio or uio_pbuf members in redwood */
-#else
 	auio.uio_pio	= 0;
 	auio.uio_pbuf	= 0;
-#endif
 
 	auio.uio_fmode	= FINVIS;		/* not used otherwise */
 	auio.uio_offset	= 0;
@@ -220,16 +216,6 @@ open_by_handle (
 	if (vp == NULL)
 		return EINVAL;
 
-#ifdef REDWOOD
-	/*
-	 * redwood uses 5.2-based shared file descriptor
-	 * handling so we use shdf(un)lock() instead of
-	 * just falloc() and then fready().
-	 */
-
-	shdflock();
-#endif
-
 	switch (vp->v_type) {
 		case VDIR:
 		case VREG:
@@ -243,16 +229,12 @@ open_by_handle (
 	if (error)
 		goto out;
 
-#ifdef REDWOOD
-	/* redwood doesn't use the usema u_openfp hack */
-#else
 	/*
 	 * a kludge for the usema device - it really needs to know
 	 * the 'fp' for it opening file - we use u_openfp to mark
 	 * this.
 	 */
 	u.u_openfp = fp;
-#endif
 
 	if ((filemode & FWRITE) == 0)
 		_SAT_PNALLOC(SAT_OPEN_RO);
@@ -261,31 +243,17 @@ open_by_handle (
 
 	error = vp_open (vp, filemode);
 
-#ifdef REDWOOD
-	/* redwood doesn't use the usema u_openfp hack */
-#else
 	u.u_openfp = NULL;
-#endif
 	if (error) {
 		setf (fd, NULLFP);
 		unfalloc (fp);
 	} else {
 		fp->f_vnode = vp;
 		rvp->r_val1 = fd;
-#ifdef REDWOOD
-		/* no fready call in redwood */
-#else
 		fready (fp);
-#endif
 	}
 
 out:
-#ifdef REDWOOD
-	/* no fready call, instead we unlock before leaving */
-
-	shdfunlock();
-#endif
-
 	if (error)
 		VN_RELE (vp);
 	_SAT_OPEN (rvp->r_val1, (filemode&FCREAT), sat_flags, error);
