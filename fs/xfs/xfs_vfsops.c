@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.282 $"
+#ident  "$Revision: 1.283 $"
 
 #include <xfs_os_defs.h>
 
@@ -1434,8 +1434,6 @@ xfs_statvfs(
  *		       inodes.  SYNC_WAIT and SYNC_BDFLUSH are used to
  *		       determine if they should be flushed sync, async, or
  *		       delwri.
- *	SYNC_PDFLUSH - Make sure that dirty pages are kept moving by
- *		       calling pdflush() on those inodes that have them.
  *      SYNC_CLOSE   - This flag is passed when the system is being
  *		       unmounted.  We should sync and invalidate everthing.
  *      SYNC_FSDATA  - This indicates that the caller would like to make
@@ -1566,7 +1564,7 @@ xfs_syncsub(
 		fflag = 0;		/* synchronous overrides all */
 
 	base_lock_flags = XFS_ILOCK_SHARED;
-	if (flags & (SYNC_DELWRI | SYNC_CLOSE | SYNC_PDFLUSH)) {
+	if (flags & (SYNC_DELWRI | SYNC_CLOSE)) {
 		/*
 		 * We need the I/O lock if we're going to call any of
 		 * the flush/inval routines.
@@ -1681,11 +1679,6 @@ xfs_syncsub(
 			    (ip->i_update_core == 0)) {
 				ip = ip->i_mnext;
 				continue;
-			    }
-		} else if (flags & SYNC_PDFLUSH) {
-			if (!vp || (vp->v_dpages == NULL)) {
-				ip = ip->i_mnext;
-				continue;
 			}
 		}
 
@@ -1794,7 +1787,7 @@ xfs_syncsub(
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 		} else if ((flags & SYNC_DELWRI) && (vp != NULL)) {
-			if (VN_DIRTY(vp) || ip->i_delayed_blks) {
+			if (ip->i_delayed_blks) {
 				/* We need to have dropped the lock here,
 				 * so insert a marker if we have not already
 				 * done so.
@@ -1816,32 +1809,7 @@ xfs_syncsub(
 
 		}
 
-		if ((flags & SYNC_PDFLUSH) && (vp != NULL)) {
-			if (vp->v_dpages) {
-				/* Insert marker and drop lock if not already
-				 * done.
-				 */
-				if (mount_locked) {
-					IPOINTER_INSERT(ip, mp);
-				}
-
-				/*
-				 * Drop the inode lock since we can't hold it
-				 * across calls to the buffer cache.
-				 */
-
-				ASSERT(vp->v_type == VREG);
-				if (vp->v_type == VREG) {
-					xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
-					XFS_pdflush(vp, XFS_B_DELWRI);
-
-					xfs_ilock(ip, XFS_ILOCK_SHARED);
-				}
-			}
-
-		} else if (flags & SYNC_BDFLUSH) {
-
+		if (flags & SYNC_BDFLUSH) {
 			if ((flags & SYNC_ATTR) &&
 			    ((ip->i_update_core) ||
 			     ((ip->i_itemp != NULL) &&

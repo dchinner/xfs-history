@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.87 $"
+#ident	"$Revision: 1.88 $"
 
 #include <xfs_os_defs.h>
 #include <sys/sysmacros.h>
@@ -855,7 +855,7 @@ xfs_fd_to_mp(
 	if (vp->v_type == VBLK || vp->v_type == VCHR) {
 		if (wperm && !(fp->vf_flag & FWRITE))
 			return XFS_ERROR(EPERM);
-		dev = vp->v_rdev;
+		dev = 0; /* broken */
 		vfsp = vfs_devsearch(dev, xfs_fstype);
 		if (vfsp == NULL)
 			vfsp = vp->v_vfsp;

@@ -29,16 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision: 1.38 $"
 
 #include <xfs_os_defs.h>
 
 #include <xfs_linux.h>
 
-#ifdef SIM
-#include <stdio.h>
-#define _KERNEL 1
-#endif
 #include <linux/config.h>
 #include <sys/types.h>
 #include <sys/debug.h>
@@ -51,26 +47,21 @@
 #include <linux/xfs_cred.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include <sys/vfs.h>
-#include <sys/vnode_private.h>
 #include <sys/mode.h>
 #include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 
-#include <xfs_types.h>		/* for XFS_BHVTOI */
-#include <xfs_bmap_btree.h>	/* for XFS_BHVTOI */
-#include <xfs_inum.h>		/* for XFS_BHVTOI */
-#include <xfs_dir_sf.h>		/* for XFS_BHVTOI */
-#include <xfs_dir.h>		/* for XFS_BHVTOI */
-#include <xfs_dir2.h>		/* for XFS_BHVTOI */
-#include <xfs_dir2_sf.h>	/* for XFS_BHVTOI */
-#include <xfs_attr_sf.h>	/* for XFS_BHVTOI */
-#include <xfs_dinode.h>		/* for XFS_BHVTOI */
-#include <xfs_inode.h>		/* for XFS_BHVTOI */
-
+#include <xfs_types.h>
+#include <xfs_bmap_btree.h>
+#include <xfs_inum.h>
+#include <xfs_dir_sf.h>
+#include <xfs_dir.h>
+#include <xfs_dir2.h>
+#include <xfs_dir2_sf.h>
+#include <xfs_attr_sf.h>
+#include <xfs_dinode.h>
+#include <xfs_inode.h>
 #include <xfs_log.h>
 #include <xfs_trans.h>
 #include <xfs_sb.h>
@@ -81,58 +72,26 @@
 #include <sys/ktrace.h>
 #endif	/* CONFIG_XFS_VNODE_TRACING */
 
-#ifdef SIM
-#include "sim.h"
-#endif
-
-#define	VFREELIST(count)	&vfreelist[count].vf_freelist
-
-#define LOCK_VFREELIST(list)	mutex_spinlock(&vfreelist[list].vf_lock)
-#define UNLOCK_VFREELIST(l,s)	mutex_spinunlock(&vfreelist[l].vf_lock, s)
-
 #define LOCK_VFP(listp)	       	mutex_spinlock(&(listp)->vf_lock)
 #define UNLOCK_VFP(listp,s)	mutex_spinunlock(&(listp)->vf_lock, s)
 #define	NESTED_LOCK_VFP(listp)	nested_spinlock(&(listp)->vf_lock)
 #define	NESTED_UNLOCK_VFP(listp) nested_spinunlock(&(listp)->vf_lock)
 
+/*
+ * Private vnode spinlock manipulation.
+ *
+ * Nested means there is no need to deal with interrupts (disable/enable)
+ * so we can be quick about it.
+ */
+#define NESTED_VN_LOCK(vp)      spin_lock(&(vp)->v_lock)
+#define NESTED_VN_UNLOCK(vp)    spin_unlock(&(vp)->v_lock)
+
+
 static struct xfs_zone *vn_zone;	/* vnode heap zone */
 uint64_t vn_generation;		/* vnode generation number */
 atomic_t vn_vnumber;		/* # of vnodes ever allocated */
-int	vn_epoch;		/* # of vnodes freed */
-				/* vn_vnumber - vn_epoch == # current vnodes */
-int vn_minvn;			/* minimum # vnodes before reclaiming */
-static int vn_shaken;		/* damper for vn_alloc */
-static unsigned int vn_coin;	/* coin for vn_alloc */
-int vnode_free_ratio = 1;	/* tuneable parameter for vn_alloc */
 
 spinlock_t	vnumber_lock = SPIN_LOCK_UNLOCKED;
-
-/*
- * The following counters are used to manage the pool of allocated and
- * free vnodes.  vnode_free_ratio is the target ratio of free vnodes
- * to in-use vnodes.
- *
- * Whenever a vnode is needed and the number of free vnodes is above
- * (vn_vnumber - vn_epoch) * vnode_free_ratio, an attempt is made t
- * reclaim a vnode from a vnod freelist.  Otherwise, or if a short search
- * of a freelist doesn't produce a reclaimable vnode, a vnode is
- * constructed from the heap.
- *
- * It is up to vn_shake to and deconstruct free vnodes.
- */
-
-vfreelist_t	*vfreelist;	/* pointer to array of freelist structs */
-static int	vfreelistmask;	/* number of free-lists - 1 */
-
-typedef struct vhash {
-	struct vnode	*vh_vnode;
-	lock_t		 vh_lock;
-} vhash_t;
-
-vhash_t	*vhash;			/* hash buckets for active vnodes */
-
-#define VHASHMASK 127
-#define VHASH(vnumber)		(&vhash[(vnumber) & VHASHMASK])
 
 /*
  * Dedicated vnode inactive/reclaim sync semaphores.
@@ -188,28 +147,6 @@ vn_reclaim(struct vnode *vp, int flag)
 			return error;
 	}
 	ASSERT(vp->v_fbhv == NULL);
-
-	/*
-	 * File system erred somewhere along the line, and there
-	 * are still pages associated with the object.
-	 * Remove the debris and print a warning.
-	 * XXX LONG_MAX won't work for 64-bit offsets!
-	 */
-	if (VN_CACHED(vp) || vp->v_dpages) {
-		int i;
-
-		if (vp->v_vfsp)
-			i = vp->v_vfsp->vfs_fstype;
-		else
-			i = 0;
-
-		cmn_err(CE_WARN,
-			"vn_reclaim: vnode 0x%x fstype %d (xfs) has unreclaimed data (pgcnt %d, dbuf %d dpages 0x%x), flag:%x",
-			vp, i, 
-			VN_CACHED(vp), vp->v_dbuf, vp->v_dpages, vp->v_flag);
-	}
-
-	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && VN_CACHED(vp) == 0);
 
 	s = VN_LOCK(vp);
 
@@ -289,7 +226,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 
 	ASSERT(vp->v_number);
 
-	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && VN_CACHED(vp) == 0);
+	ASSERT(VN_CACHED(vp) == 0);
 
 	/* Initialize the first behavior and the behavior chain head. */
 	vn_bhv_head_init(VN_BHV_HEAD(vp), "vnode");
@@ -315,7 +252,6 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 		vp->v_vfsp  = vfsp;
 		vp->v_inode = inode;
 		vp->v_type  = IFTOVT(ip->i_d.di_mode);
-		vp->v_rdev  = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 
 		linvfs_set_inode_ops(inode);
 	}
@@ -355,7 +291,6 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 
 	vp->v_vfsp  = vfsp;
 	vp->v_type  = type;
-	vp->v_rdev  = dev;
 	vp->v_inode = inode;
 
 	vn_trace_exit(vp, "vn_alloc", (inst_t *)__return_address);
@@ -365,7 +300,7 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 
 
 /*
- * Free an isolated vnode, putting it at the front of a vfreelist.
+ * Free an isolated vnode.
  * The vnode must not have any other references.
  */
 void
@@ -412,13 +347,6 @@ vp, inode, vmap->v_number, vp->v_number);
 		goto fail;
 	}
 
-	if (vmap->v_epoch != vn_epoch) {
-printk("vn_get: vp/0x%p inode/0x%p v_epoch %d/%d\n",
-vp, inode, vmap->v_epoch, vn_epoch);
-
-		goto fail;
-	}
-
 	if (vmap->v_ino != inum) {
 printk("vn_get: vp/0x%p inode/0x%p v_ino %Ld/%Ld\n",
 vp, inode, vmap->v_ino, inum);
@@ -440,14 +368,16 @@ fail:
 
 
 /*
- * "put" the linux inode.
+ * rele the vnode - this has to go to iput on linux
  */
 void
-vn_put(struct vnode *vp)
+vn_rele(struct vnode *vp)
 {
 	struct inode *inode;
 
-	vn_trace_entry(vp, "vn_put", (inst_t *)__return_address);
+	XFS_STATS_INC(vn_rele);
+
+	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
 
 	inode = LINVFS_GET_IP(vp);
 
@@ -675,14 +605,13 @@ vn_hold(struct vnode *vp)
  * VOP_INACTIVE on last reference.
  */
 void
-vn_rele(struct vnode *vp)
+vn_put(struct vnode *vp)
 {
 	int	s;
 	int	vcnt;
 	/* REFERENCED */
 	int cache;
 
-	XFS_STATS_INC(vn_rele);
 
 	s = VN_LOCK(vp);
 
@@ -722,14 +651,18 @@ vn_rele(struct vnode *vp)
 
 		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE);
 
+		vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
+
 		VN_UNLOCK(vp, s);
 
-		vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
+		iput(LINVFS_GET_IP(vp));
 
 		return;
 	}
 
 	VN_UNLOCK(vp, s);
+
+	iput(LINVFS_GET_IP(vp));
 
 	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 }

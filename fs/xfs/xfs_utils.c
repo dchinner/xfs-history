@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.31 $"
 
 #include <xfs_os_defs.h>
 #include <linux/errno.h>
@@ -668,6 +668,7 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 }
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
+#ifndef __linux__
 int
 xfs_mk_sharedro(int fd)
 {
@@ -703,6 +704,7 @@ xfs_clear_sharedro(int fd)
 
 	return 0;
 }
+#endif
 
 /* Called by filesystems VOP_RENAME
  * once it has found the source vnode to

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.469 $"
+#ident "$Revision: 1.470 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1358,7 +1358,7 @@ xfs_fsync(
 			VOP_FLUSHINVAL_PAGES(vp, start, FI_REMAPF_LOCKED);
 		}
 		ASSERT(syncall == 0 || (VN_CACHED(vp) == 0));
-	} else if (1 /* VN_DIRTY(vp) */) {
+	} else {
 		/*
 		 * In the non-invalidating case, calls to fsync() do not
 		 * flush all the dirty mmap'd pages.  That requires a
@@ -1383,8 +1383,7 @@ xfs_fsync(
 	 * lock unnecessarily.
 	 */
 	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
-	       syncall == 0 ||
-	       (!VN_DIRTY(vp) && (ip->i_iocore.io_queued_bufs == 0)));
+	       syncall == 0 || (ip->i_iocore.io_queued_bufs == 0));
 
 	/*
 	 * We always need to make sure that the required inode state
@@ -5354,7 +5353,7 @@ xfs_reclaim(
 	 * reclaim enough.  The vnode cache then grows far too large.
 	 */
 	if (!(flag & FSYNC_INVAL)) {
-		if (VN_DIRTY(vp) || (ip->i_iocore.io_queued_bufs > 0)) {
+		if (ip->i_iocore.io_queued_bufs > 0) {
 			return XFS_ERROR(EAGAIN);
 		}
 		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
@@ -5410,8 +5409,7 @@ xfs_reclaim(
 				VOP_TOSS_PAGES(vp, 0, FI_NONE);
 			}
 			
-			ASSERT(!VN_DIRTY(vp) && 
-			       (ip->i_iocore.io_queued_bufs == 0) &&
+			ASSERT((ip->i_iocore.io_queued_bufs == 0) &&
 			       (VN_CACHED(vp) == 0));
 			ASSERT(XFS_FORCED_SHUTDOWN(ip->i_mount) ||
 			       ip->i_delayed_blks == 0);
@@ -5422,8 +5420,7 @@ xfs_reclaim(
 			 * shutting down.
 			 */
 			VOP_TOSS_PAGES(vp, 0, FI_NONE);
-			ASSERT(!VN_DIRTY(vp) && 
-			       (ip->i_iocore.io_queued_bufs == 0) &&
+			ASSERT((ip->i_iocore.io_queued_bufs == 0) &&
 			       (VN_CACHED(vp) == 0));
 		}
 	}

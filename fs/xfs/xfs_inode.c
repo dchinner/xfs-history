@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.298 $"
+#ident "$Revision: 1.299 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1118,7 +1118,6 @@ xfs_ialloc(
 
 	vp = XFS_ITOV(ip); 
 	vp->v_type = IFTOVT(mode);
-	vp->v_rdev = rdev;
 	ip->i_d.di_mode = (__uint16_t)mode;
 	ip->i_d.di_onlink = 0;
 	ip->i_d.di_nlink = nlink;
@@ -1474,7 +1473,6 @@ xfs_itruncate_start(
 
 #ifdef DEBUG
 	if (new_size == 0) {
-		ASSERT(!VN_DIRTY(vp));
 		ASSERT(ip->i_iocore.io_queued_bufs == 0);
 		ASSERT(VN_CACHED(vp) == 0);
 	}
@@ -1767,8 +1765,7 @@ xfs_itruncate_finish(
 	xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||
-	       (!VN_DIRTY(XFS_ITOV(ip)) &&
-		(ip->i_delayed_blks == 0) &&
+	       ((ip->i_delayed_blks == 0) &&
 		(ip->i_iocore.io_queued_bufs == 0)));
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||

@@ -349,21 +349,9 @@ linvfs_read_inode(
 
 
 /*
- * The put method maps onto a real VN_RELE, the write method is only used to
+ * The write method is only used to
  * trace interesting events in the life of a vnode.
  */
-void
-linvfs_put_inode(
-	struct inode	*inode)
-{
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-
-	if (vp) {
-		vn_trace_entry(vp, "linvfs_put_inode",
-					(inst_t *)__return_address);
-		vn_rele(vp);
-	}
-}
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 
@@ -595,7 +583,6 @@ linvfs_remount(
 
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
-	put_inode:		linvfs_put_inode,
 #ifdef	CONFIG_XFS_VNODE_TRACING
 	write_inode:		linvfs_write_inode,
 #endif

@@ -32,7 +32,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.138 $"
+#ident "$Revision: 1.140 $"
 
 struct bhv_desc;
 struct xfs_buf;
@@ -112,12 +112,12 @@ typedef struct xfs_iocore {
 	mutex_t			io_rlock;	/* inode readahead mutex */
 
 	/* I/O state */
-	xfs_off_t			io_offset;	/* last buf offset */
-	xfs_off_t			io_next_offset;	/* seq read detector */
+	xfs_off_t		io_offset;	/* last buf offset */
+	xfs_off_t		io_next_offset;	/* seq read detector */
 	unsigned int		io_last_req_sz;	/* last read size */
 	unsigned int		io_size;	/* file io buffer len */
 	xfs_fsize_t		io_new_size;	/* sz when write completes */
-	xfs_off_t			io_write_offset;
+	xfs_off_t		io_write_offset;
 						/* start off of curr write */
 	xfs_fileoff_t		io_reada_blkno;	/* next blk to start ra */
 	xfs_gap_t		*io_gap_list;	/* hole list in write range */
@@ -207,7 +207,7 @@ typedef struct xfs_ihash {
 typedef struct xfs_chashlist {
 	struct xfs_chashlist	*chl_next;
 	struct xfs_inode	*chl_ip;
-    xfs_daddr_t			chl_blkno;	/* starting block number of 
+	xfs_daddr_t		chl_blkno;	/* starting block number of 
 						 * the cluster */
 #ifdef DEBUG
 	struct xfs_buf		*chl_buf;	/* debug: the inode buffer */
@@ -320,7 +320,7 @@ typedef struct xfs_inode {
 
 	/* Inode location stuff */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
-	xfs_daddr_t			i_blkno;	/* blkno of inode buffer */
+	xfs_daddr_t		i_blkno;	/* blkno of inode buffer */
 	dev_t			i_dev;		/* dev for this inode */
 	ushort			i_len;		/* len of inode buffer */
 	ushort			i_boffset;	/* off of inode in buffer */

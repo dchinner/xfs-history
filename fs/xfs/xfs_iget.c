@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.124 $"
+#ident "$Revision: 1.125 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -185,7 +185,6 @@ xfs_iget_vnode_init(
 	vp->v_vfsp  = XFS_MTOVFS(mp);
 	vp->v_inode = LINVFS_GET_IP(vp);
 	vp->v_type  = IFTOVT(ip->i_d.di_mode);
-	vp->v_rdev  = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
 #endif	/* !SIM */
 }
 
