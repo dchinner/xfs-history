@@ -1,4 +1,4 @@
-#ident "$Revision: 1.173 $"
+#ident "$Revision: 1.174 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1992,6 +1992,15 @@ xfs_create(
 		ASSERT(ip == NULL);
 
 		if (error = xfs_iaccess(dp, IWRITE, credp)) {
+			goto error_return;
+		}
+
+		/*
+		 * XPG4 says create cannot allocate a file if the
+		 * file size limit is set to 0.
+		 */
+		if (u.u_rlimit[RLIMIT_FSIZE].rlim_cur == 0) {
+			error = EFBIG;
 			goto error_return;
 		}
 
