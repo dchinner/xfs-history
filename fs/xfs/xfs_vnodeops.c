@@ -744,6 +744,17 @@ xfs_setattr(
          * Truncate file.  Must have write permission and not be a directory.
          */
         if (mask & AT_SIZE) {
+		/* Short circuit the truncate case for zero length files */
+		if ((vap->va_size == 0) && 
+		   (ip->i_d.di_size == 0) && (ip->i_d.di_nextents == 0)) {
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			lock_flags &= ~XFS_ILOCK_EXCL;
+			if (mask & AT_CTIME)
+				xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
+			code = 0;
+			goto error_return;
+		}
+
                 if (vp->v_type == VDIR) {
                         code = XFS_ERROR(EISDIR);
                         goto error_return;
