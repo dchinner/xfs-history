@@ -45,6 +45,7 @@ typedef struct xfs_alloc_rec
 /* block numbers in the AG; SB is block 0, AGH is block 1 */
 #define	XFS_BNO_BLOCK	((xfs_agblock_t)(XFS_AGH_BLOCK + 1))
 #define	XFS_CNT_BLOCK	((xfs_agblock_t)(XFS_BNO_BLOCK + 1))
+#define	XFS_PREALLOC_BLOCKS	((xfs_agblock_t)(XFS_CNT_BLOCK + 1))
 
 #define	XFS_ALLOC_REC_ADDR(bb,i,cur)	\
 	XFS_BTREE_REC_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
