@@ -30,7 +30,7 @@
  *  
  */
 
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -45,7 +45,7 @@
 #include <sys/file.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
-#include <sys/kmem.h>
+#include <ksys/kern_heap.h>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.217 $"
+#ident  "$Revision: 1.218 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -208,7 +208,14 @@ xfs_get_vfsmount(
 	dev_t	logdev,
 	dev_t	rtdev);
 
-#ifndef __linux__
+#ifdef __linux__
+extern int
+spectodevs(
+	struct super_block *sb,
+	dev_t	*ddevp,
+	dev_t   *logdevp,
+        dev_t   *rtdevp);
+#else
 STATIC int
 spectodevs(
 	char	*spec,
@@ -392,7 +399,10 @@ xfs_init(
 	xfs_dir_startup();
 	
 #ifndef SIM
+#ifndef __linux__
+	/* THIS IS BUSTED */
 	xfs_start_daemons();
+#endif /* !__linux__ */
 
 #ifdef DATAPIPE
 	fspeinit();
@@ -416,18 +426,10 @@ xfs_init(
 
 
 #ifndef SIM
-#ifdef __linux__
-STATIC int
-spectodevs(
-	char	*spec,
-	dev_t	*ddevp,
-	dev_t   *logdevp,
-	dev_t   *rtdevp)
-{
-	printk("spectodevs: BUILD ME for LINUX!!!\n");
-	return(ENOENT);
-}
-#else
+#ifndef __linux__
+
+/* On linux, this is in linux/xfs_device.c */
+
 /*
  * Resolve path name of special file to its device.
  */
@@ -472,7 +474,7 @@ spectodevs(
 	ASSERT(*ddevp && *logdevp);
 	return 0;
 }
-#endif
+#endif /* !__linux__ */
 
 
 /*
@@ -488,8 +490,6 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, vnode_t *vp)
 	btp->specvp = vp;
 #ifndef __linux__
 	btp->bdevsw = get_bdevsw(dev);
-#else
-	printk("xfs_fill_buftarg: add get_bdevsw !!!\n");
 #endif
 }
 
@@ -564,6 +564,11 @@ xfs_cmountfs(
  	 * Open the data and real time devices now.
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
+#ifdef __linux__
+	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, NULL);
+	mp->m_ddev_targp = &mp->m_ddev_targ;
+	mp->m_rtdev = NODEV;
+#else
 	if (ddev != 0) {
 		vnode_t *openvp;
 
@@ -613,11 +618,15 @@ xfs_cmountfs(
 		mp->m_rtdev = NODEV;
 		rdevvp = NULL;
 	}
+#endif
 	if (logdev != 0) {
 		if (logdev == ddev) {
 			ldevvp = NULL;
 			mp->m_logdev_targ = mp->m_ddev_targ;
 		} else {
+#ifdef __linux__
+			ASSERT(logdev == ddev);
+#else
 			vnode_t *openvp;
 
 			openvp = ldevvp = make_specvp(logdev, VBLK);
@@ -629,7 +638,7 @@ xfs_cmountfs(
 			}
 
 			xfs_fill_buftarg(&mp->m_logdev_targ, logdev, ldevvp);
-
+#endif
 		}
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
@@ -829,23 +838,41 @@ xfs_cmountfs(
 	 * Be careful not to clobber the value of 'error' here.
 	 */
  error3:
+#ifdef __linux__
+	if (ldevvp) {
+		binval(logdev);
+	}
+#else
 	if (ldevvp) {
 		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, cr, noerr);
 		binval(logdev);
 		VN_RELE(ldevvp);
 	}
+#endif /* __linux__ */
  error2:
+#ifdef __linux__
+	if (rdevvp) {
+		binval(rtdev);
+	}
+#else
 	if (rdevvp) {
 		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, cr, noerr);
 		binval(rtdev);
 		VN_RELE(rdevvp);
 	}
+#endif /* __linux__ */
+ #ifdef __linux__
+	if (ddevvp) {
+		binval(ddev);
+	}
+#else
  error1:
 	if (ddevvp) {
 		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, cr, noerr);
 		binval(ddev);
 		VN_RELE(ddevvp);
 	}
+#endif /* __linux__ */
  error0:
 	if (error) {
 #ifdef CELL_CAPABLE
@@ -1113,11 +1140,16 @@ xfs_mount(
 	if (error)
 		return (error);
 
+#ifdef __linux__
+	if (error = spectodevs(vfsp->vfs_super, &ddev, &logdev, &rtdev))
+		return error;
+#else
 	/*
 	 * Resolve path name of special file being mounted.
 	 */
 	if (error = spectodevs(uap->spec, &ddev, &logdev, &rtdev))
 		return error;
+#endif
 
 	/*
 	 * Ensure that this device isn't already mounted,

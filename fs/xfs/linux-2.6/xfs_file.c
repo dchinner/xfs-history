@@ -17,42 +17,120 @@
 #include "xfs_file.h"
 #include <sys/vnode.h>
 #include <sys/mode.h>
+#include <sys/uuid.h>
 #include <xfs_linux.h>
 
+static long long linvfs_file_lseek(
+	struct file *file,
+	long long offset,
+	int origin)
+{
+	struct inode *inode = file->f_dentry->d_inode;
+	vnode_t *vp;
+	struct vattr vattr;
+	long long old_off = offset;
+	int error;
 
-ssize_t linvfs_read(struct file *filp, const char *buf, size_t size, loff_t *offset)
+	vp = LINVFS_GET_VP(inode);
+
+	switch (origin) {
+		case 2:
+			vattr.va_mask = AT_SIZE;
+			VOP_GETATTR(vp, &vattr, 0, get_current_cred(), error);
+			if (error)
+				return -error;
+
+			offset += vattr.va_size;
+			break;
+		case 1:
+			offset += file->f_pos;
+	}
+
+	/* All for the sake of seeing if we are too big */
+	VOP_SEEK(vp, old_off, &offset, error);
+
+	if (error)
+		return -error;
+
+	return offset;
+}
+
+static ssize_t linvfs_read(
+	struct file *filp,
+	const char *buf,
+	size_t size,
+	loff_t *offset)
 {
   return(-ENOSYS);
 }
 
 
-ssize_t linvfs_write(struct file *filp, const char *buf, size_t size, loff_t *offset)
+static ssize_t linvfs_write(
+	struct file *filp,
+	const char *buf,
+	size_t size,
+	loff_t *offset)
 {
   return(-ENOSYS);
 }
 
 
-int linvfs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg)
+static int linvfs_ioctl(
+	struct inode *inode,
+	struct file *filp,
+	unsigned int cmd,
+	unsigned long arg)
 {
   return(-ENOSYS);
 }
 
 
-int linvfs_open(struct inode *inode, struct file *filp)
+static int linvfs_open(
+	struct inode *inode,
+	struct file *filp)
+{
+	vnode_t *vp = LINVFS_GET_VP(inode);
+	vnode_t *newvp;
+	int	error;
+
+	VOP_OPEN(vp, &newvp, 0, get_current_cred(), error);
+
+	if (error)
+		return -error;
+
+	return 0;
+}
+
+
+static int linvfs_release(
+	struct inode *inode,
+	struct file *filp)
 {
   return(-ENOSYS);
 }
 
 
-int linvfs_release(struct inode *inode, struct file *filp)
+static int linvfs_fsync(
+	struct file *filp,
+	struct dentry *dentry)
 {
-  return(-ENOSYS);
+	struct inode *inode = filp->f_dentry->d_inode;
+	vnode_t *vp = LINVFS_GET_VP(inode);
+	int	error;
+
+	VOP_FSYNC(vp, FSYNC_WAIT, get_current_cred(),
+		(off_t)0, (off_t)-1, error);
+
+	if (error)
+		return -error;
+
+	return 0;
 }
 
-
-int linvfs_fsync(struct file *filp, struct dentry *dentry)
+static ssize_t linvfs_dir_read (struct file * filp, char * buf,
+				size_t count, loff_t *ppos)
 {
-  return(-ENOSYS);
+	return -EISDIR;
 }
 
 /*
@@ -60,7 +138,10 @@ int linvfs_fsync(struct file *filp, struct dentry *dentry)
  * We need to build a uio, cred, ...
  */
 
-int linvfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+static int linvfs_readdir(
+	struct file *filp,
+	void *dirent,
+	filldir_t filldir)
 {
 	struct inode		*inode;
 	int			error = 0;
@@ -93,39 +174,41 @@ int linvfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 }
 
 
-static struct file_operations linvfs_file_operations =
+struct file_operations linvfs_file_operations =
 {
-  NULL,  /*  lseek  */
-  linvfs_read,  
-  linvfs_write,
-  NULL,  /*  readdir  */
-  NULL,  /*  poll  */
-  linvfs_ioctl,
-  generic_file_mmap,
-  linvfs_open,
-  NULL,	 /*  flush  */
-  linvfs_release,
-  linvfs_fsync,
-  NULL,	 /*  fasync  */
-  NULL,	 /*  check_media_change  */
-  NULL	 /*  revalidate  */
+	linvfs_file_lseek,
+	linvfs_read,  
+	linvfs_write,
+	NULL,  /*  readdir  */
+	NULL,  /*  poll  */
+	linvfs_ioctl,
+	generic_file_mmap,
+	linvfs_open,
+	NULL,	 		/*  flush - called from close */
+	linvfs_release,		/* called on last close */
+	linvfs_fsync,
+	NULL,	 /*  fasync  */
+	NULL,	 /*  check_media_change  */
+	NULL,	/* revalidate */
+	NULL	/* lock */
 };
 
-static struct file_operations linvfs_dir_operations = {
-  NULL,  /*  lseek  */
-  NULL,	 /*  read  */
-  NULL,	 /*  write  */
-  linvfs_readdir,
-  NULL,	 /*  poll  */
-  linvfs_ioctl,
-  NULL,  /*  mmap  */
-  linvfs_open,
-  NULL,	 /*  flush  */
-  linvfs_release,
-  linvfs_fsync,
-  NULL,	 /*  fasync  */
-  NULL,	 /*  check_media_change  */
-  NULL	/*  revalidate  */
+struct file_operations linvfs_dir_operations = {
+	NULL,  /*  lseek  */
+	linvfs_dir_read,
+	NULL,	 /*  write  */
+	linvfs_readdir,
+	NULL,	 /*  poll  */
+	linvfs_ioctl,
+	NULL,  /*  mmap  */
+	NULL,
+	NULL,	 /*  flush  */
+	linvfs_release,
+	linvfs_fsync,
+	NULL,	 /*  fasync  */
+	NULL,	 /*  check_media_change  */
+	NULL,	/* revalidate */
+	NULL	/* lock */
 };
 
 

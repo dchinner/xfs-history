@@ -1,10 +1,13 @@
 /*
  *
- * $Header: /isms/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_globals.c,v 1.3 1999/09/02 22:24:14 cattelan Exp $
- * $Author: cattelan $
- * $Id: xfs_globals.c,v 1.3 1999/09/02 22:24:14 cattelan Exp $
+ * $Header: /plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_globals.c,v 1.5 1999/09/03 00:40:44 mostek Exp $
+ * $Author: mostek $
+ * $Id: xfs_globals.c,v 1.5 1999/09/03 00:40:44 mostek Exp $
  *
  * $Log: xfs_globals.c,v $
+ * Revision 1.5  1999/09/03 00:40:44  mostek
+ * A bunch more (physmem, maxdmasz, lbolt, ...
+ *
  * Revision 1.3  1999/09/02 22:24:14  cattelan
  * No Message Supplied
  *
@@ -37,10 +40,9 @@ uint64_t	xfs_panic_mask;		/* set to cause more panics */
 int		xfs_nfs_io_units = 10;	/* Ignore for now. Affects NFS performance. */
 vfssw_t		vfssw[2] = { { "xfs" } };	/* vfssw for XFS only */
 struct var	v = {
-			500 /* JIMJIM set these up if needed */
-		  /* int     v_buf * Nbr of I/O buffers.                  */
-		  /* int     v_hbuf * Nbr of hash buffers to allocate.     */
-		  /* int	v_maxdmaszi * Max dma unbroken dma transfer size. */
+		  512,	/* v_buf * Nbr of I/O buffers.                  */
+		  8,	/* v_hbuf * Nbr of hash buffers to allocate.     */
+		  /* v_maxdmaszi * Max dma unbroken dma transfer size. */
 		};
 
 struct syswait	syswait;

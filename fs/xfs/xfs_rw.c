@@ -1,4 +1,4 @@
-#ident "$Revision: 1.271 $"
+#ident "$Revision: 1.273 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -5381,6 +5381,11 @@ xfs_strat_comp(void)
 	int		s;
 	bhv_desc_t	*bdp;
 
+#ifdef __linux__
+	daemonize();
+	set_thread_name("xfsc");
+#endif /* __linux__ */
+
 	s = mp_mutex_spinlock(&xfsc_lock);
 	xfsc_count++;
 
@@ -7110,6 +7115,11 @@ xfsd(void)
 	buf_t		*forw;
 	buf_t		*back;
 	xfs_iocore_t	*io;
+
+#ifdef __linux__
+	daemonize();
+	set_thread_name("xfsd");
+#endif /* __linux__ */
 
 	s = mp_mutex_spinlock(&xfsd_lock);
 	xfsd_count++;

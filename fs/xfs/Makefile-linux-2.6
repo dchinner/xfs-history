@@ -13,7 +13,7 @@ EXTRA_CFLAGS += -g3  -I./linux -I./pseudo-inc -I. -D_KERNEL
 
 O_TARGET := xfs.o
 
-LINO_OBJS   := linux/xfs_file.o  linux/xfs_super.o \
+LINO_OBJS   := linux/xfs_file.o  linux/xfs_super.o linux/xfs_bdstrat.o \
  linux/xfs_vnode.o linux/xfs_behavior.o linux/xfs_vfs.o  linux/xfs_random.o \
  linux/xfs_locks.o linux/xfs_globals.o linux/xfs_debug.o linux/xfs_uuid.o \
  linux/xfs_dnlc.o linux/xfs_fs_bio.o linux/xfs_fs_subr.o  linux/xfs_griostubs.o \

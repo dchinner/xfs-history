@@ -45,6 +45,8 @@
  */
 cred_t	sys_cred_val, *sys_cred = &sys_cred_val;
 
+extern struct super_operations linvfs_sops;
+
 /*
  * Initialize credentials data structures.
  */
@@ -125,6 +127,18 @@ linvfs_inode_attr_in(
 	EXIT("linvfs_inode_attr_in");
 }
 
+int spectodevs(
+	struct super_block *sb,
+	dev_t	*ddevp,
+	dev_t	*logdevp,
+	dev_t	*rtdevp)
+{
+	*ddevp = *logdevp = sb->s_dev;
+	*rtdevp = 0;
+
+	return 0;
+}
+
 
 struct super_block *
 linvfs_read_super(
@@ -145,12 +159,14 @@ linvfs_read_super(
 	int		error;
 	statvfs_t	statvfs;
 	vattr_t		attr;
+	dev_t		dev;
+	u_int		disk, partition;
 
 
-	MOD_INC_USE_COUNT;
 	ENTER("linvfs_read_super");
 	printk ("sb 0x%x sb->s_dev 0x%x\n",sb,(u_int)sb->s_dev);
 
+	MOD_INC_USE_COUNT;
 	lock_super(sb);
 
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
@@ -186,6 +202,7 @@ linvfs_read_super(
 		chain for this vnode  */
 
 	LINVFS_GET_CVP(sb) = cvp;
+	vfsp->vfs_super = sb;
 
 
 	/*  Setup the uap structure  */
@@ -193,36 +210,40 @@ linvfs_read_super(
 	memset(uap, 0, sizeof(struct mounta));
 
 	switch (MAJOR(sb->s_dev)) {
-	case 8: {  /*  SCSI  */
-	  u_int disk, partition;
+	case 8:  /*  SCSI  */
 
 		disk = MINOR(sb->s_dev) / 16;
 		partition = MINOR(sb->s_dev) % 16;
 
 		if (partition){
-		  sprintf(spec, "/dev/sd%c%d", 'a' + disk, partition);
+			sprintf(spec, "/dev/sd%c%d", 'a' + disk, partition);
 		} else {		  
-		  sprintf(spec, "/dev/sd%c", 'a' + disk);
+			sprintf(spec, "/dev/sd%c", 'a' + disk);
 		}
-		printk("sb->s_dev %u disk %u partion %u\n",sb->s_dev,disk,partition);
-		printk ("Using device %s\n",spec);
-	}
-    
-	break;
-	case 3:{ /* hd */
-	  int disk, partition;
-	  
-	  disk = MINOR(sb->s_dev) / 16;
-	  partition = MINOR(sb->s_dev) % 16;
-	  
-	  sprintf(spec, "/dev/hd%c%d", 'a' + disk, partition);
-	  printk("sb->s_dev %u disk %u partion %u\n",sb->s_dev,disk,partition);
-	  printk ("Using device %s\n",spec);
-	}
-	break;
+		break;
+	case 3: /* hd */
+	case 22:
 
-		panic("FixMe!!!  (uap->spec)\n");
-	};
+		disk = MINOR(sb->s_dev) / 64;
+		if (MAJOR(sb->s_dev) == 22)
+			disk += 2;
+		partition = MINOR(sb->s_dev) % 64;
+
+		if (partition)
+			sprintf(spec, "/dev/hd%c%d", 'a' + disk, partition);
+		else
+			sprintf(spec, "/dev/hd%c", 'a' + disk);
+		break;
+	case 2: /* floppy */
+
+		disk = MINOR(sb->s_dev);
+
+		sprintf(spec, "/dev/fd%c", '0' + disk);
+		break;
+	default:
+		strcpy(spec, "FixMe!!!  (uap->spec)");
+	}
+	printk ("Using device %s\n",spec);
 	uap->spec = spec;
 
 	/*  uap->dir not needed until DMI is in place  */
@@ -241,6 +262,8 @@ linvfs_read_super(
 	uap->dataptr = (char *)args;
 	uap->datalen = sizeof(*args);
 
+	/* Tell device driver layers we want 512 byte resolution */
+	set_blocksize(sb->s_dev, BBSIZE);
 
 	VFSOPS_MOUNT(vfsops, vfsp, cvp, uap, NULL, sys_cred, error);
 	if (error)
@@ -269,12 +292,15 @@ linvfs_read_super(
 	if (error)
 		goto fail_vnrele;
 
+	sb->s_dev = dev;
+	sb->s_op = &linvfs_sops;
 	sb->s_root = d_alloc_root(iget(sb, attr.va_nodeid), NULL);
 	if (!sb->s_root)
 		goto fail_vnrele;
 
 
 	unlock_super(sb);
+	EXIT("linvfs_read_super <SUCCESS>");
 
 	EXIT("linvfs_read_super <OK>");
 	return(NULL);
@@ -450,6 +476,7 @@ linvfs_write_super(
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
 	int		error;
 
+
 	ENTER("linvfs_write_super");
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
 		sys_cred, error);
@@ -548,25 +575,6 @@ static struct super_operations linvfs_sops = {
 	NULL			/*  unmount_begin  */
 };
 
-#if 0
-static struct file_system_type linvfs_fs_type = {
-	"xfs", 
-	FS_REQUIRES_DEV,
-	linvfs_read_super, 
-	NULL
-};
-
-
-__initfunc(int init_linvfs_fs(void))
-{
-  ENTER("init_linvfs_fs"); 
-  cred_init();
-  
-  EXIT("init_linvfs_fs"); 
-  return register_filesystem(&linvfs_fs_type);
-}
-#endif
-
 static struct file_system_type xfs_fs_type = {
 	"xfs", 
 	FS_REQUIRES_DEV,
@@ -574,23 +582,25 @@ static struct file_system_type xfs_fs_type = {
 	NULL
 };
 
-
 __initfunc(int init_xfs_fs(void))
 {
   ENTER("init_xfs_fs"); 
-
   cred_init();
+  binit();
+  vfsinit();
+  xfs_init(NULL, 0);
   
   EXIT("init_xfs_fs"); 
   return register_filesystem(&xfs_fs_type);
 }
+
 
 #ifdef MODULE
 EXPORT_NO_SYMBOLS;
 
 int init_module(void)
 {
-	return init_linvfs_fs();
+	return init_xfs_fs();
 }
 
 void cleanup_module(void)
