@@ -131,11 +131,6 @@ xfs_iformat(xfs_mount_t		*mp,
 	register int		size;
 	register int		nex;
 	register int		nrecs;
-	register char		*cp;
-	int			csize;
-	xfs_btree_lblock_t	*rootbp;
-	xfs_bmbt_rec_t		*recp;
-	xfs_fsblock_t		*ptrp;
 	int			dinode_size;
 	int			real_size;
 
@@ -227,32 +222,12 @@ xfs_iformat(xfs_mount_t		*mp,
 			dinode_size = mp->m_sb.sb_inodesize;
 
 			/*
-			 * Copy the btree block header first.
+			 * Copy and convert from the on-disk structure
+			 * to the in-memory structure.
 			 */
-			rootbp = &(dip->di_u.di_bmbt);
-			cp = (char *)ip->i_broot;
-			csize = sizeof(xfs_btree_lblock_t);
-			bcopy(rootbp, cp, csize);
-
-			/*
-			 * Get the addr of the first record into recp
-			 * and copy the records.
-			 */
-			recp = XFS_BMAP_BROOT_REC_ADDR(rootbp, 1, dinode_size);
-			cp = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1,
-							     size);
-			csize = nrecs * (int)sizeof(xfs_bmbt_rec_t);
-			bcopy(recp, cp, csize);
-
-			/*
-			 * Get the addr of the first pointer into ptrp
-			 * and copy the pointers.
-			 */
-			ptrp = XFS_BMAP_BROOT_PTR_ADDR(rootbp, 1, dinode_size);
-			cp = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
-							     size);
-			csize = nrecs * (int)sizeof(*ptrp);
-			bcopy(ptrp, cp, csize);
+			xfs_bmdr_to_bmbt(&dip->di_u.di_bmbt,
+				XFS_BMAP_BROOT_SIZE(dinode_size),
+				ip->i_broot, size);
 			ip->i_flags |= XFS_IBROOT;
 			return;
 
@@ -584,9 +559,7 @@ xfs_itruncate(xfs_trans_t	**tp,
 		 * will tell us whether it freed the entire range or
 		 * not.
 		 */
-		first_block = NULLFSBLOCK;
-		free_list.xbf_first = NULL;
-		free_list.xbf_count = 0;
+		XFS_BMAP_INIT(&free_list, &first_block);
 		first_block = xfs_bunmapi(*tp, ip, first_unmap_block,
 					  unmap_len, XFS_ITRUNC_MAX_EXTENTS,
 					  first_block, &free_list, &done);
@@ -1127,11 +1100,7 @@ xfs_iflush(xfs_inode_t	*ip,
 {
 	xfs_inode_log_item_t	*iip;
 	buf_t			*bp;
-	int			brsize;
 	xfs_dinode_t		*dip;
-	int			nr;
-	char			*pd;
-	char			*pi;
 	int			s;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
@@ -1215,29 +1184,9 @@ xfs_iflush(xfs_inode_t	*ip,
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
-			/*
-			 * First copy over the btree block header.
-			 */
-			bcopy(ip->i_broot, &(dip->di_u.di_bmbt),
-			      sizeof(xfs_btree_lblock_t));
-			/*
-			 * Now copy records and pointers, if there are any.
-			 */
-			if (nr = ip->i_broot->bb_numrecs) {
-				brsize = XFS_BMAP_BROOT_SIZE(ip->i_mount->m_sb.sb_inodesize);
-				/*
-				 * First copy the records.
-				 */
-				pi = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1, ip->i_broot_bytes);
-				pd = (char *)XFS_BMAP_BROOT_REC_ADDR(&dip->di_u.di_bmbt, 1, brsize);
-				bcopy(pi, pd, nr * sizeof(xfs_bmbt_rec_t));
-				/*
-				 * Next copy the pointers.
-				 */
-				pi = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1, ip->i_broot_bytes);
-				pd = (char *)XFS_BMAP_BROOT_PTR_ADDR(&dip->di_u.di_bmbt, 1, brsize);
-				bcopy(pi, pd, nr * sizeof(xfs_fsblock_t));
-			}
+			xfs_bmbt_to_bmdr(ip->i_broot, ip->i_broot_bytes,
+			   &(dip->di_u.di_bmbt),
+			   XFS_BMAP_BROOT_SIZE(ip->i_mount->m_sb.sb_inodesize));
 		}
 		break;
 
