@@ -112,7 +112,7 @@ xfs_trans_dup(xfs_trans_t *tp)
 {
 	xfs_trans_t	*ntp;
 
-	ntp = kmem_zone_alloc(xfs_trans_zone, KM_SLEEP);
+	ntp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP);
 
 	/*
 	 * Initialize the new transaction structure.
