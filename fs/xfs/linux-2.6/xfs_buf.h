@@ -49,6 +49,9 @@
 #include <linux/smp_lock.h>
 #include <linux/uio.h>
 
+enum xfs_buffer_state { BH_Delay = BH_PrivateStart };
+BUFFER_FNS(Delay, delay);
+
 /*
  * Turn this on to get pagebuf lock ownership
 #define PAGEBUF_LOCK_TRACKING
