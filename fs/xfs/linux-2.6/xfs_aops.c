@@ -725,7 +725,6 @@ page_state_convert(
 								p_offset);
 			}
 			if (iomp && startio) {
-				ASSERT(iomp->iomap_flags & IOMAP_UNWRITTEN);
 				if (!bh->b_end_io) {
 					err = map_unwritten(inode, page,
 							head, bh, p_offset,
