@@ -294,7 +294,7 @@ xlog_find_verify_cycle( xlog_t 		*log,
     	xfs_buf_t		*bp;
     	char                    *buf        = NULL;
 	int			error       = 0;
-	int			bufblks	    = nbblks;
+	xfs_daddr_t		bufblks	    = nbblks;
 
 	while (!(bp = xlog_get_bp(bufblks, log->l_mp))) {
                 /* can't get enough memory to do everything in one big buffer */
