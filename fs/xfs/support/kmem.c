@@ -41,12 +41,23 @@
 #define DEF_PRIORITY	(6)
 #define MAX_SLAB_SIZE	0x10000
 
-static __inline__ unsigned int flag_convert(int flags)
+static __inline unsigned int flag_convert(int flags)
 {
-	if (flags & KM_NOSLEEP) return GFP_ATOMIC;
+#if DEBUG
+	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP))) {
+		printk(KERN_WARNING
+		    "XFS: memory allocation with wrong flags (%x)\n", flags);
+		BUG();
+	}
+#endif
+
+	if (flags & KM_NOSLEEP)
+		return GFP_ATOMIC;
 	/* If we're in a transaction, FS activity is not ok */
-	if (current->flags & PF_FSTRANS) return GFP_NOFS;
-	return GFP_KERNEL;
+	else if (current->flags & PF_FSTRANS)
+		return GFP_NOFS;
+	else
+		return GFP_KERNEL;
 }
 
 #define MAX_SHAKE 8
