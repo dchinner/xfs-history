@@ -1,3 +1,7 @@
+/*
+ * xfs_dir_btree.c
+ */
+
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -35,26 +39,7 @@
 #include "xfs_inode.h"
 #include "xfs_dir.h"
 #include "xfs_dir_btree.h"
-#ifdef SIM
-#include "sim.h"
-#endif
-
-/*
- * xfs_dir_btree.c
- *
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_dir.h"
-#include "xfs_dir_btree.h"
+#include "xfs_error.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -371,7 +356,7 @@ xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, struct xfs_dir_name *args,
 	 * and we should just give up.
 	 */
 	if (!hdr->holes)
-		return(ENOSPC);
+		return(XFS_ERROR(ENOSPC));
 
 	/*
 	 * Compact the entries to coalesce free space.
@@ -395,7 +380,7 @@ xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, struct xfs_dir_name *args,
 		}
 	}
 
-	return(ENOSPC);
+	return(XFS_ERROR(ENOSPC));
 }
 
 /*
@@ -1032,7 +1017,6 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 	int retval;
 	buf_t *bp;
 
-	retval = 0;
 	oldroot = (struct xfs_dir_intnode *)drop_blk->bp->b_un.b_addr;
 	ASSERT(oldroot->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	if (oldroot->hdr.count > 1)
@@ -1593,12 +1577,12 @@ xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
 					bcopy(namest->inumber,
 					      (char *)&args->inumber,
 					      sizeof(xfs_ino_t));
-					return(EEXIST);
+					return(XFS_ERROR(EEXIST));
 				}
 			}
 		}
 		*index = i;
-		return(ENOENT);
+		return(XFS_ERROR(ENOENT));
 	}
 
 	/*
@@ -1631,7 +1615,7 @@ xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
 	}
 	if ((probe == leaf->hdr.count) || (entry->hashval != args->hashval)) {
 		*index = probe;
-		return(ENOENT);
+		return(XFS_ERROR(ENOENT));
 	}
 
 	/*
@@ -1650,13 +1634,13 @@ xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
 			bcopy(namest->inumber, (char *)&args->inumber,
 					       sizeof(xfs_ino_t));
 			*index = probe;
-			return(EEXIST);
+			return(XFS_ERROR(EEXIST));
 		}
 		entry++;
 		probe++;
 	}
 	*index = probe;
-	return(ENOENT);
+	return(XFS_ERROR(ENOENT));
 }
 
 /*
@@ -1680,7 +1664,7 @@ xfs_dir_node_lookup_int(struct xfs_dir_state *state)
 	xfs_dir_findpath(state, &state->path, state->args->hashval,
 				XFS_DIR_MAXBLK);
 	if (state->path.active >= XFS_DIR_NODE_MAXDEPTH)
-		return(EFBIG);
+		return(XFS_ERROR(EFBIG));
 
 	/*
 	 * Read up the leaf node and have it searched,
@@ -2168,7 +2152,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	if (entno >= leaf->hdr.count) {
 		*eobp = 0;
-		return(ENOENT);
+		return(XFS_ERROR(ENOENT));
 	}
 	entry = &leaf->leaves[entno];
 	for (i = entno; i < leaf->hdr.count; entry++, i++) {
