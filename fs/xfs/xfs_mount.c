@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.55 $"
+#ident	"$Revision: 1.56 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -365,8 +365,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	bflush(mp->m_dev);
 	if (mp->m_rtdev)
 		bflush(mp->m_rtdev);
-	if (mp->m_logdev && mp->m_logdev != mp->m_dev)
-		bflush(mp->m_logdev);
 	bp = xfs_getsb(mp);
 	bp->b_flags &= ~(B_DONE | B_READ);
 	bp->b_flags |= B_WRITE;
