@@ -744,25 +744,13 @@ int linvfs_bmap(struct address_space *mapping, long block)
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
 	xfs_inode = XFS_BHVTOI(vp->v_fbhv);
-	mp = XFS_BHVTOM(vp->v_fbhv);
+	mp = xfs_inode->i_mount;
 
 	/* The blockno passed is in terms of basic blocks */
-#if 0
-	printk("mp: %p, blocklog: %u, BBSHIFT: %d, blkbblog: %lu\n",
-	       mp, (unsigned int)(mp->m_sb.sb_blocklog), BBSHIFT,
-	       (unsigned long)mp->m_blkbb_log);
-#endif
 	xfsblock = XFS_BB_TO_FSBT(mp, block);
 
 	error = xfs_bmapi(NULL, xfs_inode, xfsblock, 1, 0, NULL, 0, &mval,
 			  &nmaps, NULL);
-
-#if 0
-	printk("bmapi.br_startoff  : %u\n", (int)(mval.br_startoff));
-	printk("bmapi.br_startblock: %u\n", (int)(mval.br_startblock));
-	printk("bmapi.br_blockcount: %u\n", (int)(mval.br_blockcount));
-	printk("extent: %d\n", (int)(mval.br_startblock + (block - mval.br_startoff)));
-#endif
 
 	if (error) {
 		printk("error (%d)!\n", error);
@@ -774,9 +762,6 @@ int linvfs_bmap(struct address_space *mapping, long block)
 	} else {
 		output = XFS_FSB_TO_DB(xfs_inode, mval.br_startblock) +
 			 XFS_BB_FSB_OFFSET(mp, block);
-#if 0
-		printk("bmapi: %ld\n", output);
-#endif
 		return (int)output;
 	}
 }
