@@ -145,6 +145,7 @@ xfs_growfs_data_private(
 			KM_SLEEP);
 		bzero(&mp->m_perag[oagcount],
 			(nagcount - oagcount) * sizeof(xfs_perag_t));
+		mp->m_flags |= XFS_MOUNT_32BITINODES;
 		xfs_initialize_perag(mp, nagcount);
 		mrunlock(&mp->m_peraglock);
 	}
