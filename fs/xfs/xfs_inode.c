@@ -3410,7 +3410,7 @@ xfs_iflush_all(
 				    (ip == mp->m_rootip ||
 				     (mp->m_quotainfo && 
 				      (ip->i_ino == mp->m_sb.sb_uquotino ||
-				       ip->i_ino == mp->m_sb.sb_pquotino)))) {
+				       ip->i_ino == mp->m_sb.sb_gquotino)))) {
 
 					ip = ip->i_mnext;
 					continue;
@@ -3705,7 +3705,7 @@ xfs_ibusy_check(
 		return (0);
 	if (mp->m_quotainfo && ip->i_ino == mp->m_sb.sb_uquotino) 
 		return (0);
-	if (mp->m_quotainfo && ip->i_ino == mp->m_sb.sb_pquotino) 
+	if (mp->m_quotainfo && ip->i_ino == mp->m_sb.sb_gquotino) 
 		return (0);
 	return (1);
 }

@@ -444,7 +444,7 @@ xfs_setattr(
 	int		privileged;
 	int 		mandlock_before, mandlock_after;
 	uint		qflags;
-	struct xfs_dquot *udqp, *pdqp, *olddquot1, *olddquot2;
+	struct xfs_dquot *udqp, *gdqp, *olddquot1, *olddquot2;
 	int 		file_owner;
 
 	vp = BHV_TO_VNODE(bdp);
@@ -478,17 +478,17 @@ xfs_setattr(
         }
 
 	olddquot1 = olddquot2 = NULL;
-	udqp = pdqp = NULL;
+	udqp = gdqp = NULL;
 	
 	/*
 	 * If disk quotas is on, we make sure that the dquots do exist on disk,
 	 * before we start any other transactions. Trying to do this later
-	 * is messy. We don't care  to take a readlock to look at the ids
+	 * is messy. We don't care to take a readlock to look at the ids
 	 * in inode here, because we can't hold it across the trans_reserve.
 	 * If the IDs do change before we take the ilock, we're covered
 	 * because the i_*dquot fields will get updated anyway.
 	 */
-	if (XFS_IS_QUOTA_ON(mp) && (mask & (AT_UID|AT_PROJID))) {
+	if (XFS_IS_QUOTA_ON(mp) && (mask & (AT_UID|AT_GID))) {
 		qflags = 0;
 		if (mask & AT_UID) {
 			uid = vap->va_uid;
@@ -496,21 +496,21 @@ xfs_setattr(
 		} else {
 			uid = ip->i_d.di_uid;
 		}
-		if (mask & AT_PROJID) {
-			projid = (xfs_prid_t)vap->va_projid;
-			qflags |= XFS_QMOPT_PQUOTA;
+		if (mask & AT_GID) {
+			gid = vap->va_gid;
+			qflags |= XFS_QMOPT_GQUOTA;
 		}  else {
-			projid = ip->i_d.di_projid;
+			gid = ip->i_d.di_gid;
 		}
 		/*
-		 * We take a reference when we initialize udqp and pdqp,
+		 * We take a reference when we initialize udqp and gdqp,
 		 * so it is important that we never blindly double trip on
 		 * the same variable. See xfs_create() for an example.
 		 */
 		ASSERT(udqp == NULL);
-		ASSERT(pdqp == NULL);
-		if (code = xfs_qm_vop_dqalloc(mp, ip, uid, projid, qflags,
-						    &udqp, &pdqp)) 
+		ASSERT(gdqp == NULL);
+		if (code = xfs_qm_vop_dqalloc(mp, ip, uid, gid, qflags,
+						    &udqp, &gdqp)) 
 			return (code);
 	}
 
@@ -638,17 +638,17 @@ xfs_setattr(
 			goto error_return;
 		}
 		/*
-		 * Do a quota reservation only if uid or projid is actually
+		 * Do a quota reservation only if uid or gid is actually
 		 * going to change.
 		 */
 		if ((XFS_IS_UQUOTA_ON(mp) && iuid != uid) ||
-		    (XFS_IS_PQUOTA_ON(mp) && iprojid != projid)) {
+		    (XFS_IS_GQUOTA_ON(mp) && igid != gid)) {
 			ASSERT(tp);
 			/*
 			 * XXX:casey - This may result in unnecessary auditing.
 			 */
 			privileged = capable(CAP_FOWNER);
-			if (code = xfs_qm_vop_chown_reserve(tp, ip, udqp, pdqp,
+			if (code = xfs_qm_vop_chown_reserve(tp, ip, udqp, gdqp,
 							  privileged ?
 							  XFS_QMOPT_FORCE_RES :
 							  0))
@@ -904,16 +904,17 @@ xfs_setattr(
 			}
 			ip->i_d.di_uid = uid;
 		}
-		if (iprojid != projid) {
-			if (XFS_IS_PQUOTA_ON(mp)) {
-				ASSERT(mask & AT_PROJID);
-				ASSERT(pdqp);
-				ASSERT(xfs_qm_dqid(pdqp) == (xfs_dqid_t)projid);
+		if (igid != gid) {
+			if (XFS_IS_GQUOTA_ON(mp)) {
+				ASSERT(mask & AT_GID);
+				ASSERT(gdqp);
+				ASSERT(xfs_qm_dqid(gdqp) == gid);
 				olddquot2 = xfs_qm_vop_chown(tp, ip, 
-							     &ip->i_pdquot, 
-							     pdqp);
-				
+							     &ip->i_gdquot, 
+							     gdqp);
 			}
+		}
+		if (iprojid != projid) {
 			ip->i_d.di_projid = projid;
 			/*
 			 * We may have to rev the inode as well as
@@ -923,8 +924,6 @@ xfs_setattr(
 			if (ip->i_d.di_version == XFS_DINODE_VERSION_1)
 				xfs_bump_ino_vers2(tp, ip);
 		}
-		if (igid != gid)
-			ip->i_d.di_gid = gid;
 
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
@@ -1033,8 +1032,8 @@ xfs_setattr(
 		xfs_qm_dqrele(olddquot2); 
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 
 	if (code) {
 		return code;
@@ -1054,8 +1053,8 @@ xfs_setattr(
  error_return:
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 	if (tp) {
 		xfs_trans_cancel(tp, commit_flags);
 	}
@@ -1539,7 +1538,7 @@ xfs_inactive_free_eofblocks(
 		 */
 		if (XFS_IS_QUOTA_ON(mp) &&
 		    ip->i_ino != mp->m_sb.sb_uquotino && 
-		    ip->i_ino != mp->m_sb.sb_pquotino) {
+		    ip->i_ino != mp->m_sb.sb_gquotino) {
 			if (XFS_NOT_DQATTACHED(mp, ip)) {
 				if (error = xfs_qm_dqattach(ip, 0))
 					return (error);
@@ -1968,7 +1967,7 @@ xfs_inactive(
 
 	if (XFS_IS_QUOTA_ON(mp) && 
 	    ip->i_ino != mp->m_sb.sb_uquotino && 
-	    ip->i_ino != mp->m_sb.sb_pquotino) {
+	    ip->i_ino != mp->m_sb.sb_gquotino) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0))
 				return (VN_INACTIVE_CACHE);
@@ -2104,7 +2103,7 @@ xfs_inactive(
 	/*	
 	 * Release the dquots held by inode, if any.
 	 */
-	if (ip->i_udquot || ip->i_pdquot)
+	if (ip->i_udquot || ip->i_gdquot)
 		xfs_qm_dqdettach_inode(ip);
 	
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
@@ -2286,7 +2285,7 @@ xfs_create(
 	int			committed;
 	uint			dir_unlocked;
 	xfs_prid_t		prid;
-	struct xfs_dquot	*udqp, *pdqp;
+	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
 	int			dm_di_mode;
 	int			xfs_create_retries = 0;
@@ -2318,7 +2317,7 @@ xfs_create(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	udqp = pdqp = NULL;
+	udqp = gdqp = NULL;
 	if (vap->va_mask & AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else 	
@@ -2328,9 +2327,10 @@ xfs_create(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid, prid,
+		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid,
+					       current->fsgid,
 					       XFS_QMOPT_QUOTALL,
-					       &udqp, &pdqp)) 
+					       &udqp, &gdqp)) 
 			goto std_return;
 	}
 
@@ -2407,7 +2407,7 @@ xfs_create(
 		 * Reserve disk quota and the inode.
 		 */
 		if (XFS_IS_QUOTA_ON(mp)) {
-			if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks,
+			if (xfs_trans_reserve_quota(tp, udqp, gdqp, resblks,
 						    1, 0)) {
 				error = EDQUOT;
 				goto error_return;
@@ -2474,7 +2474,7 @@ xfs_create(
 		 */
 		if (XFS_IS_QUOTA_ON(mp)) 
 			xfs_qm_vop_dqattach_and_dqmod_newinode(tp, ip, udqp, 
-							       pdqp);
+							       gdqp);
 		created = B_TRUE;
 	} else {
 		e_inum_saved = e_inum;
@@ -2687,8 +2687,8 @@ xfs_create(
 
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 
 #ifdef	CELL_CAPABLE
 	/*
@@ -2730,8 +2730,8 @@ std_return:
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 
 	goto std_return;
 
@@ -2747,8 +2747,8 @@ std_return:
 	
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 
 	goto std_return;
 }
@@ -3719,7 +3719,7 @@ xfs_mkdir(
 	boolean_t		created = B_FALSE;
 	int			dm_event_sent = 0;
 	xfs_prid_t		prid;
-	struct xfs_dquot	*udqp, *pdqp;
+	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
 	int			dm_di_mode;
 	int			dir_namelen;
@@ -3751,7 +3751,7 @@ xfs_mkdir(
 	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
 
 	mp = dp->i_mount;
-	udqp = pdqp = NULL;
+	udqp = gdqp = NULL;
 	if (vap->va_mask & AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else 	
@@ -3761,9 +3761,10 @@ xfs_mkdir(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid, prid,
+		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid,
+					       current->fsgid,
 					       XFS_QMOPT_QUOTALL,
-					       &udqp, &pdqp)) 
+					       &udqp, &gdqp)) 
 			goto std_return;
 	}
 	
@@ -3820,7 +3821,7 @@ xfs_mkdir(
 	 * Reserve disk quota and the inode.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks, 1, 0)) {
+		if (xfs_trans_reserve_quota(tp, udqp, gdqp, resblks, 1, 0)) {
 			error = XFS_ERROR(EDQUOT);
 			goto error_return;
 		}
@@ -3893,7 +3894,7 @@ xfs_mkdir(
 	 * Attach the dquots to the new inode and modify the icount incore.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, cdp, udqp, pdqp);
+		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, cdp, udqp, gdqp);
 	}
 	
 	/*
@@ -3914,8 +3915,8 @@ xfs_mkdir(
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (udqp)
 		 xfs_qm_dqrele(udqp);
-	if (pdqp)
-		 xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		 xfs_qm_dqrele(gdqp);
 
 	if (error) {
 		IRELE(cdp);
@@ -3947,8 +3948,8 @@ std_return:
 
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 	
 	if (!dp_joined_to_trans && (dp != NULL)) {
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -4331,13 +4332,13 @@ xfs_symlink(
 	xfs_filblks_t		fs_blocks;
 	int			nmaps;
 	xfs_bmbt_irec_t		mval[SYMLINK_MAPS];
-	xfs_daddr_t			d;
+	xfs_daddr_t		d;
 	char			*cur_chunk;
 	int			byte_cnt;
 	int			n;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	xfs_prid_t		prid;
-	struct xfs_dquot	*udqp, *pdqp;
+	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
 	int			link_namelen;
 
@@ -4402,7 +4403,7 @@ xfs_symlink(
 
 	/* Return through std_return after this point. */
 
-        udqp = pdqp = NULL;
+        udqp = gdqp = NULL;
 	if (vap->va_mask & AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else 	
@@ -4412,9 +4413,10 @@ xfs_symlink(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid, prid,
+		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid,
+					       current->fsgid,
 					       XFS_QMOPT_QUOTALL,
-					       &udqp, &pdqp)) 
+					       &udqp, &gdqp)) 
 			goto std_return;
 	}
 
@@ -4470,7 +4472,7 @@ xfs_symlink(
 	 * Reserve disk quota : blocks and inode.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks, 1, 0)) {
+		if (xfs_trans_reserve_quota(tp, udqp, gdqp, resblks, 1, 0)) {
 			error = XFS_ERROR(EDQUOT);
 			goto error_return;
 		}
@@ -4510,7 +4512,7 @@ xfs_symlink(
 	 * Also attach the dquot(s) to it, if applicable.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, ip, udqp, pdqp);
+		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, ip, udqp, gdqp);
 	}
 
 	if (resblks)
@@ -4609,8 +4611,8 @@ xfs_symlink(
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 	
 	/* Fall through to std_return with error = 0 or errno from
 	 * xfs_trans_commit	*/
@@ -4643,8 +4645,8 @@ std_return:
 	xfs_trans_cancel(tp, cancel_flags);
 	if (udqp)
 		xfs_qm_dqrele(udqp);
-	if (pdqp)
-		xfs_qm_dqrele(pdqp);
+	if (gdqp)
+		xfs_qm_dqrele(gdqp);
 
 	if (!dp_joined_to_trans && (dp != NULL)) {
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -5511,7 +5513,7 @@ retry:
 		if (XFS_IS_QUOTA_ON(mp)) {
 			if (xfs_trans_reserve_quota(tp, 
 						    ip->i_udquot, 
-						    ip->i_pdquot,
+						    ip->i_gdquot,
 						    resblks, 0, 0)) {
 				error = XFS_ERROR(EDQUOT);
 				goto error1;
@@ -5813,7 +5815,7 @@ xfs_free_file_space(
 		if (XFS_IS_QUOTA_ON(mp)) {
 			if (xfs_trans_reserve_quota(tp, 
 						    ip->i_udquot, 
-						    ip->i_pdquot,
+						    ip->i_gdquot,
 						    resblks, 0, 0)) {
 				error = XFS_ERROR(EDQUOT);
 				goto error1;

@@ -33,7 +33,7 @@
 #define __XFS_DQUOT_H__
 
 /* 
- * Dquots are structures that hold quota information about a user or a project,
+ * Dquots are structures that hold quota information about a user or a group,
  * much like inodes are for files. In fact, dquots share many characteristics
  * with inodes. However, dquots can also be a centralized resource, relative
  * to a collection of inodes. In this respect, dquots share some characteristics
@@ -90,7 +90,7 @@ typedef struct xfs_dquot {
 	int		 q_bufoffset;	/* off of dq in buffer (# dquots) */
 	xfs_fileoff_t    q_fileoffset;	/* offset in quotas file */
 
-	struct xfs_dquot*q_pdquot; 	/* proj dquot, hint only */
+	struct xfs_dquot*q_gdquot; 	/* group dquot, hint only */
 	xfs_disk_dquot_t q_core;	/* actual usage & quotas */
 	xfs_dq_logitem_t q_logitem;	/* dquot log item */
 	xfs_qcnt_t	 q_res_bcount;	/* total regular nblks used+reserved */
@@ -117,23 +117,23 @@ typedef struct xfs_dquot {
 /*
  * Quota Accounting flags
  */
-#define XFS_ALL_QUOTA_ACCT	(XFS_UQUOTA_ACCT | XFS_PQUOTA_ACCT)
-#define XFS_ALL_QUOTA_ENFD	(XFS_UQUOTA_ENFD | XFS_PQUOTA_ENFD)
-#define XFS_ALL_QUOTA_CHKD	(XFS_UQUOTA_CHKD | XFS_PQUOTA_CHKD)
-#define XFS_ALL_QUOTA_ACTV	(XFS_UQUOTA_ACTIVE | XFS_PQUOTA_ACTIVE)
+#define XFS_ALL_QUOTA_ACCT	(XFS_UQUOTA_ACCT | XFS_GQUOTA_ACCT)
+#define XFS_ALL_QUOTA_ENFD	(XFS_UQUOTA_ENFD | XFS_GQUOTA_ENFD)
+#define XFS_ALL_QUOTA_CHKD	(XFS_UQUOTA_CHKD | XFS_GQUOTA_CHKD)
+#define XFS_ALL_QUOTA_ACTV	(XFS_UQUOTA_ACTIVE | XFS_GQUOTA_ACTIVE)
 #define XFS_ALL_QUOTA_ACCT_ENFD	(XFS_UQUOTA_ACCT|XFS_UQUOTA_ENFD|\
-				 XFS_PQUOTA_ACCT|XFS_PQUOTA_ENFD)	
+				 XFS_GQUOTA_ACCT|XFS_GQUOTA_ENFD)	
 
 #define	XFS_IS_QUOTA_RUNNING(mp)  ((mp)->m_qflags & XFS_ALL_QUOTA_ACCT)
 #define XFS_IS_UQUOTA_RUNNING(mp) ((mp)->m_qflags & XFS_UQUOTA_ACCT)
-#define XFS_IS_PQUOTA_RUNNING(mp) ((mp)->m_qflags & XFS_PQUOTA_ACCT)
+#define XFS_IS_GQUOTA_RUNNING(mp) ((mp)->m_qflags & XFS_GQUOTA_ACCT)
 
 /* 
  * Quota Limit Enforcement flags
  */
 #define	XFS_IS_QUOTA_ENFORCED(mp) 	((mp)->m_qflags & XFS_ALL_QUOTA_ENFD)
 #define XFS_IS_UQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_UQUOTA_ENFD)
-#define XFS_IS_PQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_PQUOTA_ENFD)
+#define XFS_IS_GQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_GQUOTA_ENFD)
 
 #ifdef DEBUG
 #define XFS_DQ_IS_LOCKED(dqp)		((dqp)->q_qlock.state < 1)
@@ -162,11 +162,11 @@ typedef struct xfs_dquot {
 #define XFS_DQ_TO_QINF(dqp)	((dqp)->q_mount->m_quotainfo)
 #define XFS_DQ_TO_QIP(dqp)  	(XFS_QM_ISUDQ(dqp) ? \
 				 XFS_DQ_TO_QINF(dqp)->qi_uquotaip : \
-				 XFS_DQ_TO_QINF(dqp)->qi_pquotaip)
+				 XFS_DQ_TO_QINF(dqp)->qi_gquotaip)
 
 #define XFS_IS_THIS_QUOTA_OFF(d) (! (XFS_QM_ISUDQ(d) ? \
 				     (XFS_IS_UQUOTA_ON((d)->q_mount)) : \
-				     (XFS_IS_PQUOTA_ON((d)->q_mount))))
+				     (XFS_IS_GQUOTA_ON((d)->q_mount))))
 #ifdef DQUOT_TRACING
 /*
  * Dquot Tracing stuff.

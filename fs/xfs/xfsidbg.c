@@ -3002,7 +3002,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
 #define XFSIDBG_DQTYPESTR(d)     \
 	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_USER) ? "USR" : \
-	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_PROJ) ? "PRJ" : "???"))
+	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_GROUP) ? "GRP" : "???"))
 		kdb_printf("Quota blk starting ID [%d], type %s at 0x%p\n",
 			INT_GET(dqb->d_id, ARCH_CONVERT), XFSIDBG_DQTYPESTR(dqb), dqb);
 		
@@ -3694,7 +3694,7 @@ xfsidbg_xlog_buf_logitem(xlog_recover_item_t *item)
 	if (buf_f->blf_flags & XFS_BLI_INODE_BUF) {
 		kdb_printf("\tINODE BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
-	} else if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_PDQUOT_BUF)) {
+	} else if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_GDQUOT_BUF)) {
 		kdb_printf("\tDQUOT BUF <blkno=0x%Lx, len=0x%x>\n",
 			buf_f->blf_blkno, buf_f->blf_len);
 	} else {
@@ -3961,11 +3961,13 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"UQ",		/* 0x0001 */
 		"UQE", 		/* 0x0002 */
 		"UQCHKD",     	/* 0x0004 */
-		"PQ",		/* 0x0008 */
-		"PQE", 		/* 0x0010 */
-		"PQCHKD",     	/* 0x0020 */
-		"UQACTV",	/* 0x0040 */
-		"PQACTV",	/* 0x0080 */
+		"PQ",		/* 0x0008 (IRIX ondisk) */
+		"GQE",		/* 0x0010 */
+		"GQCHKD", 	/* 0x0020 */
+		"GQ",     	/* 0x0040 */
+		"UQACTV",	/* 0x0080 */
+		"GQACTV",	/* 0x0100 */
+		"QMAYBE",	/* 0x0200 */
 		0
 	};
 
@@ -4027,10 +4029,10 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("\n");
 #endif
 	if (mp->m_quotainfo)
-		kdb_printf("quotainfo 0x%p (uqip = 0x%p, pqip = 0x%p)\n",
+		kdb_printf("quotainfo 0x%p (uqip = 0x%p, gqip = 0x%p)\n",
 			mp->m_quotainfo, 
 			mp->m_quotainfo->qi_uquotaip,
-			mp->m_quotainfo->qi_pquotaip);
+			mp->m_quotainfo->qi_gquotaip);
 	else 
 		kdb_printf("quotainfo NULL\n");
 	printflags(mp->m_qflags, quota_flags,"quotaflags");
@@ -4163,8 +4165,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		&ip->i_ipinlock,
 		ip->i_pincount,
 		&ip->i_pinsema);
-	kdb_printf("udquotp 0x%p pdquotp 0x%p\n",
-		ip->i_udquot, ip->i_pdquot);
+	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
+		ip->i_udquot, ip->i_gdquot);
 	kdb_printf("&rlock 0x%p\n", &ip->i_iocore.io_rlock);
 	kdb_printf("next_offset %Lx ", ip->i_iocore.io_next_offset);
 	kdb_printf("io_offset %Lx reada_blkno %s io_size 0x%x\n",
@@ -4311,9 +4313,9 @@ xfsidbg_xqm()
 		return;
 	}
 
-	kdb_printf("usrhtab 0x%p\tprjhtab 0x%p\tndqfree 0x%x\thashmask 0x%x\n",
+	kdb_printf("usrhtab 0x%p\tgrphtab 0x%p\tndqfree 0x%x\thashmask 0x%x\n",
 		xfs_Gqm->qm_usr_dqhtable,
-		xfs_Gqm->qm_prj_dqhtable,
+		xfs_Gqm->qm_grp_dqhtable,
 		xfs_Gqm->qm_dqfreelist.qh_nelems,
 		xfs_Gqm->qm_dqhashmask);
 	kdb_printf("&freelist 0x%p, totaldquots 0x%x nrefs 0x%x\n",
@@ -4342,7 +4344,7 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 {
 	static char *qflags[] = {
 		"USR",
-		"PRJ",
+		"GRP",
 		"LCKD",
 		"FLKD",
 		"DIRTY",
@@ -4351,10 +4353,10 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		"MARKER",
 		0
 	};
-	kdb_printf("mount 0x%p hash 0x%p pdquotp 0x%p HL_next 0x%p HL_prevp 0x%p\n",
+	kdb_printf("mount 0x%p hash 0x%p gdquotp 0x%p HL_next 0x%p HL_prevp 0x%p\n",
 		dqp->q_mount,
 		dqp->q_hash,
-		dqp->q_pdquot,
+		dqp->q_gdquot,
 		dqp->HL_NEXT,
 		dqp->HL_PREVP);
 	kdb_printf("MPL_next 0x%p MPL_prevp 0x%p FL_next 0x%p FL_prev 0x%p\n",
@@ -4407,15 +4409,14 @@ xfsidbg_xqm_dqattached_inos(xfs_mount_t	*mp)
 			ip = ip->i_mnext;
 			continue;
 		}
-		if (ip->i_udquot || ip->i_pdquot) {
+		if (ip->i_udquot || ip->i_gdquot) {
 			n++;
-			kdb_printf("inode = 0x%p, ino %d: udq 0x%p, pdq 0x%p\n", 
-				ip, (int) ip->i_ino, ip->i_udquot, ip->i_pdquot);
+			kdb_printf("inode = 0x%p, ino %d: udq 0x%p, gdq 0x%p\n", 
+				ip, (int)ip->i_ino, ip->i_udquot, ip->i_gdquot);
 		}
 		ip = ip->i_mnext;
 	} while (ip != mp->m_inodes);
 	kdb_printf("\nNumber of inodes with dquots attached: %d\n", n);
-
 }
 
 
@@ -4475,9 +4476,9 @@ xfsidbg_xqm_htab(void)
 		}
 	}
 	for (i = 0; i <= xfs_Gqm->qm_dqhashmask; i++) {
-		h = &xfs_Gqm->qm_prj_dqhtable[i];
+		h = &xfs_Gqm->qm_grp_dqhtable[i];
 		if (h->qh_next) {
-			kdb_printf("PRJ %d: ", i);
+			kdb_printf("GRP %d: ", i);
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);
 		}
 	}
@@ -4492,9 +4493,9 @@ xfsidbg_xqm_qinfo(xfs_mount_t *mp)
 		return;
 	}
 	
-	kdb_printf("uqip 0x%p, pqip 0x%p, &pinlock 0x%p &dqlist 0x%p\n",
+	kdb_printf("uqip 0x%p, gqip 0x%p, &pinlock 0x%p &dqlist 0x%p\n",
 		mp->m_quotainfo->qi_uquotaip,
-		mp->m_quotainfo->qi_pquotaip,
+		mp->m_quotainfo->qi_gquotaip,
 		&mp->m_quotainfo->qi_pinlock,
 		&mp->m_quotainfo->qi_dqlist);
 
@@ -4540,8 +4541,8 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 				(int) q->qt_icount_delta);
 		}
 		if (j == 0) {
-			qa = tp->t_dqinfo->dqa_prjdquots;
-			kdb_printf("PRJ: \n");
+			qa = tp->t_dqinfo->dqa_grpdquots;
+			kdb_printf("GRP: \n");
 		}
 	}
 				
@@ -4599,7 +4600,7 @@ xfsidbg_xsb(xfs_sb_t *sbp, int convert)
 		INT_GET(sbp->sb_fdblocks, arch),
 		INT_GET(sbp->sb_frextents, arch));
 	kdb_printf("uquotino %s ", xfs_fmtino(INT_GET(sbp->sb_uquotino, arch), NULL));
-	kdb_printf("pquotino %s ", xfs_fmtino(INT_GET(sbp->sb_pquotino, arch), NULL));
+	kdb_printf("gquotino %s ", xfs_fmtino(INT_GET(sbp->sb_gquotino, arch), NULL));
 	kdb_printf("qflags 0x%x flags 0x%x shared_vn %d inoaligmt %d\n",
 		INT_GET(sbp->sb_qflags, arch), INT_GET(sbp->sb_flags, arch), INT_GET(sbp->sb_shared_vn, arch),
 		INT_GET(sbp->sb_inoalignmt, arch));

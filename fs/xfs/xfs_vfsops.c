@@ -453,7 +453,7 @@ xfs_cmountfs(
 		if (ap->flags & XFSMNT_NOATIME)
 			mp->m_flags |= XFS_MOUNT_NOATIME;
 		
-		if (ap->flags & (XFSMNT_UQUOTA | XFSMNT_PQUOTA | 
+		if (ap->flags & (XFSMNT_UQUOTA | XFSMNT_GQUOTA | 
 				 XFSMNT_QUOTAMAYBE)) 
 			xfs_qm_mount_quotainit(mp, ap->flags);
 		
@@ -816,10 +816,10 @@ xfs_mountroot(
 			if (mp->m_quotainfo) {
 				xfs_qm_dqrele_all_inodes(mp, 
 							 XFS_UQUOTA_ACCT |
-							 XFS_PQUOTA_ACCT);
+							 XFS_GQUOTA_ACCT);
 				xfs_qm_dqpurge_all(mp, 
 						   XFS_QMOPT_UQUOTA|
-						   XFS_QMOPT_PQUOTA|
+						   XFS_QMOPT_GQUOTA|
 						   XFS_QMOPT_UMOUNTING);
 			}
 			/*

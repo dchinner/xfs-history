@@ -1917,7 +1917,7 @@ xfs_iomap_write_direct(
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (xfs_trans_reserve_quota(tp, 
 					    ip->i_udquot, 
-					    ip->i_pdquot,
+					    ip->i_gdquot,
 					    resblks, 0, 0)) {
 			error = (EDQUOT);
 			goto error1;

@@ -966,14 +966,14 @@ xfs_trans_inode_alloc_buf(
  * The only thing that makes dquot buffers different from regular
  * buffers is that we must not replay dquot bufs when recovering
  * if a _corresponding_ quotaoff has happened. We also have to distinguish
- * between user dquot bufs and proj dquot bufs, because user and proj quotas
+ * between usr dquot bufs and grp dquot bufs, because usr and grp quotas
  * can be turned off independently.
  */
 /* ARGSUSED */
 void
 xfs_trans_dquot_buf(
 	xfs_trans_t	*tp,
-	xfs_buf_t		*bp,
+	xfs_buf_t	*bp,
 	uint		type)
 {
 	xfs_buf_log_item_t	*bip;
@@ -982,7 +982,7 @@ xfs_trans_dquot_buf(
 	ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 	ASSERT(type == XFS_BLI_UDQUOT_BUF ||
-	       type == XFS_BLI_PDQUOT_BUF);
+	       type == XFS_BLI_GDQUOT_BUF);
 
 	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 	ASSERT(atomic_read(&bip->bli_refcount) > 0);

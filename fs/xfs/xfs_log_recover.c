@@ -1749,12 +1749,12 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		       ((uint)bit << XFS_BLI_SHIFT)+(nbits<<XFS_BLI_SHIFT));
 		
 		/*
-		 * Do a sanity check if this is a dquot buffer. Just checking the 
-		 * first dquot in the buffer should do. XXXThis is
+		 * Do a sanity check if this is a dquot buffer. Just checking
+		 * the first dquot in the buffer should do. XXXThis is
 		 * probably a good thing to do for other buf types also.
 		 */
 		error = 0;
-		if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF|XFS_BLI_PDQUOT_BUF)) {
+		if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF|XFS_BLI_GDQUOT_BUF)) {
 			/* OK, if this returns nopkg() */
 			error = xfs_qm_dqcheck((xfs_disk_dquot_t *)
 					       item->ri_buf[i].i_addr,
@@ -1777,7 +1777,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 /*
  * Perform a dquot buffer recovery.
  * Simple algorithm: if we have found a QUOTAOFF logitem of the same type
- * (ie. USR or PRJ), then just toss this buffer away; don't recover it.
+ * (ie. USR or GRP), then just toss this buffer away; don't recover it.
  * Else, treat it as a regular buffer and do recovery.
  */
 STATIC void
@@ -1797,16 +1797,15 @@ xlog_recover_do_dquot_buffer(
 	 * if it already is. (so, we have to replay dquot log records
 	 * when MAYBE flag's set).
 	 */
-	if (mp->m_qflags == 0 &&
-	    mp->m_dev != rootdev) {
+	if (mp->m_qflags == 0 && mp->m_dev != rootdev) {
 		return;
 	}
 	
 	type = 0;
 	if (buf_f->blf_flags & XFS_BLI_UDQUOT_BUF)
 		type |= XFS_DQ_USER;
-	if (buf_f->blf_flags & XFS_BLI_PDQUOT_BUF)
-		type |= XFS_DQ_PROJ;
+	if (buf_f->blf_flags & XFS_BLI_GDQUOT_BUF)
+		type |= XFS_DQ_GROUP;
 	/*
 	 * This type of quotas was turned off, so ignore this buffer
 	 */
@@ -1914,7 +1913,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	error = 0;
 	if (flags & XFS_BLI_INODE_BUF) {
 		error = xlog_recover_do_inode_buffer(mp, item, bp, buf_f);
-	} else if (flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_PDQUOT_BUF)) {
+	} else if (flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_GDQUOT_BUF)) {
 		xlog_recover_do_dquot_buffer(mp, log, item, bp, buf_f);
 	} else {
 		xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
@@ -2211,12 +2210,12 @@ xlog_recover_do_quotaoff_trans(xlog_t			*log,
 
 	/*
 	 * The logitem format's flag tells us if this was user quotaoff, 
-	 * project quotaoff or both. 
+	 * group quotaoff or both. 
 	 */
 	if (qoff_f->qf_flags & XFS_UQUOTA_ACCT) 
 		log->l_quotaoffs_flag |= XFS_DQ_USER;
-	if (qoff_f->qf_flags & XFS_PQUOTA_ACCT)
-		log->l_quotaoffs_flag |= XFS_DQ_PROJ;
+	if (qoff_f->qf_flags & XFS_GQUOTA_ACCT)
+		log->l_quotaoffs_flag |= XFS_DQ_GROUP;
 	
 	return (0);
 }
@@ -2259,7 +2258,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	/*
 	 * This type of quotas was turned off, so ignore this record.
 	 */
-	type = INT_GET(recddq->d_flags, ARCH_CONVERT)&(XFS_DQ_USER|XFS_DQ_PROJ);
+	type = INT_GET(recddq->d_flags, ARCH_CONVERT)&(XFS_DQ_USER|XFS_DQ_GROUP);
 	ASSERT(type);
 	if (log->l_quotaoffs_flag & type) 
 		return (0);

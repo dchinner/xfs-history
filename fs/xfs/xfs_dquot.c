@@ -42,8 +42,8 @@
    xqm dquot freelist lock  (freelistlock
    mount's dquot list lock  (mplistlock)
    user dquot lock - lock ordering among dquots is based on the uid or prid
-   proj dquot lock - similar to udquots. Between the two dquots, the udquot 
-                     has to be locked first.
+   group dquot lock - similar to udquots. Between the two dquots, the udquot 
+                      has to be locked first.
    pin lock - the dquot lock must be held to take this lock. 
    flush lock - ditto. 
 */
@@ -118,7 +118,7 @@ xfs_qm_dqinit(
 		 dqp->q_bufoffset = 0;
 		 dqp->q_fileoffset = 0;
 		 dqp->q_transp = NULL;
-		 dqp->q_pdquot = NULL;
+		 dqp->q_gdquot = NULL;
 		 dqp->q_res_bcount = 0;
 		 dqp->q_res_icount = 0;
 		 dqp->q_res_rtbcount = 0;
@@ -371,9 +371,8 @@ xfs_qm_init_dquot_blk(
 	xfs_trans_dquot_buf(tp, bp, 
 			    type & XFS_DQ_USER ?
 			    XFS_BLI_UDQUOT_BUF :
-			    XFS_BLI_PDQUOT_BUF);
+			    XFS_BLI_GDQUOT_BUF);
 	xfs_trans_log_buf(tp, bp, 0, BBTOB(XFS_QI_DQCHUNKLEN(mp)) - 1);
-
 }
 
 
@@ -453,7 +452,7 @@ xfs_qm_dqalloc(
 	 * the entire thing.
 	 */
 	xfs_qm_init_dquot_blk(tp, mp, INT_GET(dqp->q_core.d_id, ARCH_CONVERT), 
-			      dqp->dq_flags & (XFS_DQ_USER|XFS_DQ_PROJ),
+			      dqp->dq_flags & (XFS_DQ_USER|XFS_DQ_GROUP),
 			      bp);
 
 	if (error = xfs_bmap_finish(&tp, &flist, firstblock, &committed)) {
@@ -589,7 +588,7 @@ xfs_qm_dqtobp(
 	 * A simple sanity check in case we got a corrupted dquot...
 	 */
 	if (xfs_qm_dqcheck(ddq, id, 
-			   dqp->dq_flags & (XFS_DQ_USER|XFS_DQ_PROJ), 
+			   dqp->dq_flags & (XFS_DQ_USER|XFS_DQ_GROUP), 
 			   flags & (XFS_QMOPT_DQREPAIR|XFS_QMOPT_DOWARN),
 			   "dqtobp")) {
 		if (!(flags & XFS_QMOPT_DQREPAIR)) {
@@ -625,7 +624,7 @@ xfs_qm_dqread(
 
 	/* 
 	 * get a pointer to the on-disk dquot and the buffer containing it
-	 * dqp already knows its own type (PROJ/USER).
+	 * dqp already knows its own type (GROUP/USER).
 	 */
 	xfs_dqtrace_entry(dqp, "DQREAD");
 	if (error = xfs_qm_dqtobp(tp, dqp, &ddqp, &bp, flags)) {
@@ -668,7 +667,6 @@ xfs_qm_dqread(
 }
 
 
-
 /*
  * allocate an incore dquot from the kernel heap,
  * and fill its core with quota information kept on disk.
@@ -678,8 +676,8 @@ xfs_qm_dqread(
 STATIC int
 xfs_qm_idtodq(
 	xfs_mount_t  	*mp,
-	xfs_dqid_t   	id,	 /* prid or uid, depending on type */
-	uint	     	type,	 /* UDQUOT or PDQUOT */
+	xfs_dqid_t   	id,	 /* gid or uid, depending on type */
+	uint	     	type,	 /* UDQUOT or GDQUOT */
 	uint	     	flags, 	 /* DQALLOC, DQREPAIR */
 	xfs_dquot_t  	**O_dqpp)/* OUT : incore dquot, not locked */
 {
@@ -742,7 +740,7 @@ xfs_qm_idtodq(
 
 /*
  * Lookup a dquot in the incore dquot hashtable. We keep two separate
- * hashtables for user and project dquots; and, these are global tables
+ * hashtables for user and group dquots; and, these are global tables
  * inside the XQM, not per-filesystem tables.
  * The hash chain must be locked by caller, and it is left locked
  * on return. Returning dquot is locked.
@@ -857,7 +855,7 @@ xfs_qm_dqlookup(
 }
 
 /*
- * Given the file system, inode OR id, and type (UDQUOT/PDQUOT), return a 
+ * Given the file system, inode OR id, and type (UDQUOT/GDQUOT), return a 
  * a locked dquot, doing an allocation (if requested) as needed.
  * When both an inode and an id are given, the inode's id takes precedence.
  * That is, if the id changes while we dont hold the ilock inside this
@@ -868,8 +866,8 @@ int
 xfs_qm_dqget(
 	xfs_mount_t  	*mp,
 	xfs_inode_t	*ip,   	  /* locked inode (optional) */
-	xfs_dqid_t   	id,       /* prid or uid, depending on type */
-	uint	     	type,  	  /* UDQUOT or PDQUOT */
+	xfs_dqid_t   	id,       /* gid or uid, depending on type */
+	uint	     	type,  	  /* UDQUOT or GDQUOT */
 	uint	     	flags,    /* DQALLOC, DQSUSER, DQREPAIR, DOWARN */
 	xfs_dquot_t  	**O_dqpp) /* OUT : locked incore dquot */
 {
@@ -880,7 +878,7 @@ xfs_qm_dqget(
 
 	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
 	if ((! XFS_IS_UQUOTA_ON(mp) && type == XFS_DQ_USER) ||
-	    (! XFS_IS_PQUOTA_ON(mp) && type == XFS_DQ_PROJ)) {
+	    (! XFS_IS_GQUOTA_ON(mp) && type == XFS_DQ_GROUP)) {
 		return (ESRCH);
 	}
 	h = XFS_DQ_HASH(mp, id, type);
@@ -898,13 +896,13 @@ xfs_qm_dqget(
  again:
 
 #ifdef DEBUG
-	ASSERT(type == XFS_DQ_USER || type == XFS_DQ_PROJ);
+	ASSERT(type == XFS_DQ_USER || type == XFS_DQ_GROUP);
 	if (ip) {
 		ASSERT(XFS_ISLOCKED_INODE_EXCL(ip));
 		if (type == XFS_DQ_USER)
 			ASSERT(ip->i_udquot == NULL);
 		else
-			ASSERT(ip->i_pdquot == NULL);
+			ASSERT(ip->i_gdquot == NULL);
 	}
 #endif
 	XFS_DQ_HASH_LOCK(h);
@@ -926,7 +924,7 @@ xfs_qm_dqget(
 		xfs_dqtrace_entry(*O_dqpp, "DQGET DONE (FROM CACHE)"); 
 		return (0);	/* success */
 	}
-	 XFS_STATS_INC(xs_qm_dqcachemisses);
+	XFS_STATS_INC(xs_qm_dqcachemisses);
 
 	/* 
 	 * Dquot cache miss. We don't want to keep the inode lock across 
@@ -961,7 +959,7 @@ xfs_qm_dqget(
 
 	/*
 	 * See if this is mount code calling to look at the overall quota limits
-	 * which are stored in the id == 0 user or project's dquot.
+	 * which are stored in the id == 0 user or group's dquot.
 	 * Since we may not have done a quotacheck by this point, just return
 	 * the dquot without attaching it to any hashtables, lists, etc, or even
 	 * taking a reference.
@@ -972,7 +970,7 @@ xfs_qm_dqget(
 		ASSERT(! ip);
 		goto dqret;
 	}
-		
+
 	/* 
 	 * Dquot lock comes after hashlock in the lock ordering 
 	 */
@@ -982,7 +980,7 @@ xfs_qm_dqget(
 		if (! XFS_IS_DQTYPE_ON(mp, type)) {
 			/* inode stays locked on return */
 			xfs_qm_dqdestroy(dqp);
-			return (ESRCH);
+			return XFS_ERROR(ESRCH);
 		}
 		/*
 		 * A dquot could be attached to this inode by now, since
@@ -996,15 +994,14 @@ xfs_qm_dqget(
 				goto dqret;
 			}
 		} else {
-			if (ip->i_pdquot) {
+			if (ip->i_gdquot) {
 				xfs_qm_dqdestroy(dqp);
-				dqp = ip->i_pdquot;
+				dqp = ip->i_gdquot;
 				xfs_dqlock(dqp);
 				goto dqret;
 			}
 		}
 	}
-	
 	
 	/*
 	 * Hashlock comes after ilock in lock order
@@ -1034,7 +1031,7 @@ xfs_qm_dqget(
 	
 	/* 
 	 * Put the dquot at the beginning of the hash-chain and mp's list
-	 * LOCK ORDER: hashlock, freelistlock, mplistlock, udqlock, pdqlock ..
+	 * LOCK ORDER: hashlock, freelistlock, mplistlock, udqlock, gdqlock ..
 	 */
 	ASSERT(XFS_DQ_IS_HASH_LOCKED(h)); 
 	dqp->q_hash = h;
@@ -1066,7 +1063,7 @@ xfs_qm_dqget(
 
 /* 
  * Release a reference to the dquot (decrement ref-count)
- * and unlock it. If there is a project quota attached to this 
+ * and unlock it. If there is a group quota attached to this 
  * dquot, carefully release that too without tripping over 
  * deadlocks'n'stuff.
  */
@@ -1074,7 +1071,7 @@ void
 xfs_qm_dqput(
 	xfs_dquot_t	*dqp)
 {
-	xfs_dquot_t	*pdqp;
+	xfs_dquot_t	*gdqp;
 
 	ASSERT(dqp->q_nrefs > 0);
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
@@ -1098,7 +1095,7 @@ xfs_qm_dqput(
 	}
 
 	while (1) {
-		pdqp = NULL;
+		gdqp = NULL;
 		
 		/* We can't depend on nrefs being == 1 here */	
 		if (--dqp->q_nrefs == 0) {
@@ -1110,16 +1107,16 @@ xfs_qm_dqput(
 
 			/* 
 			 * If we just added a udquot to the freelist, then
-			 * we want to release the pdquot reference that
+			 * we want to release the gdquot reference that
 			 * it (probably) has. Otherwise it'll keep the 
-			 * pdquot from getting reclaimed.
+			 * gdquot from getting reclaimed.
 			 */
-			if (pdqp = dqp->q_pdquot) {
+			if (gdqp = dqp->q_gdquot) {
 				/* 
 				 * Avoid a recursive dqput call 
 				 */
-				xfs_dqlock(pdqp);
-				dqp->q_pdquot = NULL;
+				xfs_dqlock(gdqp);
+				dqp->q_gdquot = NULL;
 			}
 		
 			/* xfs_qm_freelist_print(&(xfs_Gqm->qm_dqfreelist),
@@ -1129,14 +1126,12 @@ xfs_qm_dqput(
 		xfs_dqunlock(dqp);	
 		
 		/*
-		 * If we had a proj quota inside the user quota as a hint, 
+		 * If we had a group quota inside the user quota as a hint, 
 		 * release it now.
 		 */
-		if (! pdqp)
+		if (! gdqp)
 			break;
-		
-		dqp = pdqp;
-		
+		dqp = gdqp;
 	}
 	xfs_qm_freelist_unlock(xfs_Gqm);
 }
@@ -1164,14 +1159,13 @@ xfs_qm_dqrele(
 
 
 /* 
- * write a modified dquot to disk.
+ * Write a modified dquot to disk.
  * The dquot must be locked and the flush lock too taken by caller.
  * The flush lock will not be unlocked until the dquot reaches the disk,
  * but the dquot is free to be unlocked and modified by the caller
  * in the interim. Dquot is still locked on return. This behavior is
  * identical to that of inodes.
  */
-
 int
 xfs_qm_dqflush(
 	xfs_dquot_t 		*dqp,
@@ -1314,7 +1308,6 @@ xfs_qm_dqflush_done(
                                              (xfs_log_item_t*)qip, s);
                 else 
                         AIL_UNLOCK(dqp->q_mount, s);
-                
         }
 
 	/*
@@ -1557,7 +1550,7 @@ xfs_qm_dqcheck(
 		errs++;
 	}
 	
-	if (INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_USER && INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_PROJ) {
+	if (INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_USER && INT_GET(ddq->d_flags, ARCH_CONVERT) != XFS_DQ_GROUP) {
 		if (flags & XFS_QMOPT_DOWARN)
 			cmn_err(CE_ALERT, 
 			"%s : XFS dquot ID 0x%x, unknown flags 0x%x",
@@ -1603,7 +1596,7 @@ xfs_qm_dqcheck(
 		return (errs);
 
 	if (flags & XFS_QMOPT_DOWARN)
-	    cmn_err(CE_NOTE, "Re-initializing dquot ID 0x%x", id);
+		cmn_err(CE_NOTE, "Re-initializing dquot ID 0x%x", id);
 
 	/*
 	 * Typically, a repair is only requested by quotacheck.
@@ -1621,8 +1614,7 @@ xfs_qm_dqprint(xfs_dquot_t *dqp)
 {
 	printk( "-----------KERNEL DQUOT----------------\n");
 	printk( "---- dquot ID	=  %d\n", (int) INT_GET(dqp->q_core.d_id, ARCH_CONVERT));
-	printk( "---- type      =  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" :
-	       "PRJ");
+	printk( "---- type      =  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" : "GRP");
 	printk( "---- fs        =  0x%p\n", dqp->q_mount);
 	printk( "---- blkno     =  0x%x\n", (int) dqp->q_blkno);
 	printk( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);

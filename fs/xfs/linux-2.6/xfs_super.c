@@ -73,10 +73,8 @@ static struct super_operations linvfs_sops;
 #define MNTOPT_NOQUOTA  "noquota"       /* no quotas */
 #define MNTOPT_UQUOTA   "usrquota"      /* user quota enabled */
 #define MNTOPT_GQUOTA   "grpquota"      /* group quota enabled */
-#define MNTOPT_PQUOTA   "prjquota"      /* project quota enabled */
 #define MNTOPT_UQUOTANOENF "uqnoenforce"/* user quota limit enforcement */
 #define MNTOPT_GQUOTANOENF "gqnoenforce"/* group quota limit enforcement */
-#define MNTOPT_PQUOTANOENF "pqnoenforce"/* project quota limit enforcement */
 #define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
 #define MNTOPT_RO       "ro"            /* read only */
 #define MNTOPT_RW       "rw"            /* read/write */
@@ -211,6 +209,11 @@ mountargs_xfs(
 			args->flags &= ~XFSMNT_UQUOTAENF;
 		} else if (!strcmp(this_char, MNTOPT_MRQUOTA)) {
 			args->flags |= XFSMNT_QUOTAMAYBE;
+		} else if (!strcmp(this_char, MNTOPT_GQUOTA)) {
+			args->flags |= XFSMNT_GQUOTA | XFSMNT_GQUOTAENF;
+		} else if (!strcmp(this_char, MNTOPT_GQUOTANOENF)) {
+			args->flags |= XFSMNT_GQUOTA;
+			args->flags &= ~XFSMNT_GQUOTAENF;
 		} else if (!strcmp(this_char, MNTOPT_NOALIGN)) {
 			args->flags |= XFSMNT_NOALIGN;
 		} else if (!strcmp(this_char, MNTOPT_SUNIT)) {
@@ -823,7 +826,7 @@ linvfs_quotactl(
 	if (type == USRQUOTA)
 		type = XFS_DQ_USER;
 	else if (type == GRPQUOTA)
-		return -ENOSYS;	/* type = XFS_DQ_GROUP; -- NYI */
+		type = XFS_DQ_GROUP;
 	else
 		return sts;
 

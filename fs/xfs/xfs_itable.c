@@ -59,7 +59,7 @@ xfs_bulkstat_one(
 
 	if (! buf || ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
 	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino))) {
+	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_gquotino))) {
 		*stat = BULKSTAT_RV_NOTHING;
 		return XFS_ERROR(EINVAL);
 	}

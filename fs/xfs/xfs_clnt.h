@@ -189,10 +189,10 @@ struct xfs_args_ver_3 {
 #define	XFSMNT_INO64		0x00000004	/* move inode numbers up
 						 * past 2^32 */
 #define XFSMNT_UQUOTA		0x00000008	/* user quota accounting */
-#define XFSMNT_PQUOTA		0x00000010	/* project quota accounting */
+#define XFSMNT_PQUOTA		0x00000010	/* IRIX prj quota accounting */
 #define XFSMNT_UQUOTAENF	0x00000020	/* user quota limit
 						 * enforcement */
-#define XFSMNT_PQUOTAENF	0x00000040	/* project quota limit
+#define XFSMNT_PQUOTAENF	0x00000040	/* IRIX project quota limit
 						 * enforcement */
 #define XFSMNT_QUOTAMAYBE	0x00000080	/* don't turn off if SB
 						 * has quotas on */
@@ -218,5 +218,8 @@ struct xfs_args_ver_3 {
 #define XFSMNT_NOTSERVER        0x00100000      /* give up being the server */
                                                 /* (remount only) */
 #define XFSMNT_DMAPI		0x00200000	/* enable dmapi/xdsm */
+#define XFSMNT_GQUOTA		0x00400000	/* group quota accounting */
+#define XFSMNT_GQUOTAENF	0x00800000	/* group quota limit
+						 * enforcement */
 
 #endif	/* __XFS_CLNT_H__ */

@@ -109,7 +109,7 @@ typedef struct xfs_frlist {
  */
 typedef struct xfs_qm {
 	xfs_dqlist_t	*qm_usr_dqhtable;/* udquot hash table */
-	xfs_dqlist_t	*qm_prj_dqhtable;/* pdquot hash table */
+	xfs_dqlist_t	*qm_grp_dqhtable;/* gdquot hash table */
 	uint		 qm_dqhashmask;  /* # buckets in dq hashtab - 1 */
 	xfs_frlist_t	 qm_dqfreelist;  /* freelist of dquots */
 	atomic_t	 qm_totaldquots; /* total incore dquots */
@@ -125,7 +125,7 @@ typedef struct xfs_qm {
  */
 typedef struct xfs_quotainfo {
  	xfs_inode_t	*qi_uquotaip;	 /* user quota inode */
-	xfs_inode_t	*qi_pquotaip;	 /* project quota inode */
+	xfs_inode_t	*qi_gquotaip;	 /* group quota inode */
 	lock_t           qi_pinlock;     /* dquot pinning mutex */
 	xfs_dqlist_t	 qi_dqlist;      /* all dquots in filesys */
 	int		 qi_dqreclaims;  /* a change here indicates
@@ -162,14 +162,14 @@ typedef struct xfs_dqtrx {
 } xfs_dqtrx_t;
  
 /*
- * We keep the usr and prj dquots separately so that locking will be easier
+ * We keep the usr and grp dquots separately so that locking will be easier
  * to do at commit time. All transactions that we know of at this point
  * affect no more than two dquots of one type. Hence, the TRANS_MAXDQS value.
  */
 #define XFS_QM_TRANS_MAXDQS		2
 typedef struct xfs_dquot_acct {
 	xfs_dqtrx_t	dqa_usrdquots[XFS_QM_TRANS_MAXDQS];
-	xfs_dqtrx_t	dqa_prjdquots[XFS_QM_TRANS_MAXDQS];
+	xfs_dqtrx_t	dqa_grpdquots[XFS_QM_TRANS_MAXDQS];
 } xfs_dquot_acct_t;
 
 /*
@@ -188,8 +188,7 @@ typedef struct xfs_dquot_acct {
 #define XFS_QM_HOLD(xqm)	((xqm)->qm_nrefs++)
 #define XFS_QM_RELE(xqm)	((xqm)->qm_nrefs--)
 
-#if DEBUG
-extern int 		xfs_quotadebug;
+#ifdef DEBUG
 extern int		xfs_qm_internalqcheck(xfs_mount_t *);
 #endif 
 

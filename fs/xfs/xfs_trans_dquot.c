@@ -151,13 +151,13 @@ xfs_trans_dup_dqinfo(
 			oq->qt_ino_res = oq->qt_ino_res_used;
 			
 		}
-		oqa = otp->t_dqinfo->dqa_prjdquots;
-		nqa = ntp->t_dqinfo->dqa_prjdquots;
+		oqa = otp->t_dqinfo->dqa_grpdquots;
+		nqa = ntp->t_dqinfo->dqa_grpdquots;
 	}
 }
 
 /*
- * Wrap around mod_dquot to account for both user and proj quotas.
+ * Wrap around mod_dquot to account for both user and group quotas.
  */
 int
 xfs_trans_mod_dquot_byino(
@@ -174,8 +174,8 @@ xfs_trans_mod_dquot_byino(
 	if (XFS_IS_UQUOTA_ON(tp->t_mountp) && ip->i_udquot) {
 		(void) xfs_trans_mod_dquot(tp, ip->i_udquot, field, delta);
 	}
-	if (XFS_IS_PQUOTA_ON(tp->t_mountp) && ip->i_pdquot) {
-		(void) xfs_trans_mod_dquot(tp, ip->i_pdquot, field, delta);
+	if (XFS_IS_GQUOTA_ON(tp->t_mountp) && ip->i_gdquot) {
+		(void) xfs_trans_mod_dquot(tp, ip->i_gdquot, field, delta);
 	}
 	return (0);
 }	
@@ -303,8 +303,8 @@ xfs_trans_mod_dquot(
 /*
  * Given an array of dqtrx structures, lock all the dquots associated
  * and join them to the transaction, provided they have been modified.
- * We know that the highest number of dquots (of one type - usr OR prj),
- * involved in a transaction is 2 and that both usr and prj combined - 3.
+ * We know that the highest number of dquots (of one type - usr OR grp),
+ * involved in a transaction is 2 and that both usr and grp combined - 3.
  * So, we don't attempt to make this very generic.
  */
 STATIC void
@@ -323,7 +323,6 @@ xfs_trans_dqlockedjoin(
 		xfs_trans_dqjoin(tp, q[1].qt_dquot);
 	}
 }
-
 
 
 /*
@@ -349,7 +348,7 @@ xfs_trans_apply_dquot_deltas(
 	qa = tp->t_dqinfo->dqa_usrdquots;
 	for (j = 0; j < 2; j++) {
 		if (qa[0].qt_dquot == NULL) {
-			qa = tp->t_dqinfo->dqa_prjdquots;
+			qa = tp->t_dqinfo->dqa_grpdquots;
 			continue;
 		}
 
@@ -503,9 +502,9 @@ xfs_trans_apply_dquot_deltas(
 			ASSERT(dqp->q_res_rtbcount >= INT_GET(dqp->q_core.d_rtbcount, ARCH_CONVERT));
 		}
 		/*
-		 * Do the project quotas next
+		 * Do the group quotas next
 		 */
-		qa = tp->t_dqinfo->dqa_prjdquots;
+		qa = tp->t_dqinfo->dqa_grpdquots;
 	}
 }
 
@@ -570,7 +569,7 @@ xfs_trans_unreserve_and_mod_dquots(
 				xfs_dqunlock(dqp);
 
 		}
-		qa = tp->t_dqinfo->dqa_prjdquots;
+		qa = tp->t_dqinfo->dqa_grpdquots;
 	}
 }
 
@@ -714,7 +713,7 @@ error_return:
 /*
  * Given a dquot(s), make disk block and/or inode reservations against them.
  * The fact that this does the reservation against both the usr and
- * prj quotas is important, because this follows a both-or-nothing
+ * grp quotas is important, because this follows a both-or-nothing
  * approach.
  * 
  * flags = XFS_QMOPT_DQLOCK indicate if dquot(s) need to be locked.
@@ -723,12 +722,11 @@ error_return:
  * 	   XFS_TRANS_DQ_RES_RTBLKS reserves realtime disk blocks
  * dquots are unlocked on return, if they were not locked by caller.
  */
-
 int
 xfs_trans_reserve_quota_bydquots(
 	xfs_trans_t 	*tp,
 	xfs_dquot_t 	*udqp,
-	xfs_dquot_t 	*pdqp,	
+	xfs_dquot_t 	*gdqp,	
 	long		nblks,
 	long		ninos,
 	uint		flags)
@@ -747,8 +745,8 @@ xfs_trans_reserve_quota_bydquots(
 		resvd = 1;
 	}
 	
-	if (pdqp) {
-		if (xfs_trans_dqresv(tp, pdqp, nblks, ninos, flags)) {
+	if (gdqp) {
+		if (xfs_trans_dqresv(tp, gdqp, nblks, ninos, flags)) {
 			/* 
 			 * can't do it, so backout previous reservation
 			 */
@@ -787,8 +785,8 @@ xfs_trans_reserve_quota_nblks(
 #ifdef QUOTADEBUG
 	if (ip->i_udquot)
 		ASSERT(! XFS_DQ_IS_LOCKED(ip->i_udquot));
-	if (ip->i_pdquot)
-		ASSERT(! XFS_DQ_IS_LOCKED(ip->i_pdquot));
+	if (ip->i_gdquot)
+		ASSERT(! XFS_DQ_IS_LOCKED(ip->i_gdquot));
 #endif
 
 	ASSERT(XFS_ISLOCKED_INODE_EXCL(ip));
@@ -800,11 +798,10 @@ xfs_trans_reserve_quota_nblks(
 	 * Reserve nblks against these dquots, with trans as the mediator.
 	 */
 	error = xfs_trans_reserve_quota_bydquots(tp, 
-						 ip->i_udquot, ip->i_pdquot,
+						 ip->i_udquot, ip->i_gdquot,
 						 nblks, ninos,
 						 type);
 	return (error);
-	
 }
 
 /*

@@ -50,7 +50,7 @@
 
 #define XFS_QI_MPLRECLAIMS(mp)	((mp)->m_quotainfo->qi_dqreclaims)
 #define XFS_QI_UQIP(mp)		((mp)->m_quotainfo->qi_uquotaip)
-#define XFS_QI_PQIP(mp)		((mp)->m_quotainfo->qi_pquotaip)
+#define XFS_QI_GQIP(mp)		((mp)->m_quotainfo->qi_gquotaip)
 #define XFS_QI_DQCHUNKLEN(mp)	((mp)->m_quotainfo->qi_dqchunklen)
 #define XFS_QI_BTIMELIMIT(mp)	((mp)->m_quotainfo->qi_btimelimit)
 #define XFS_QI_RTBTIMELIMIT(mp)	((mp)->m_quotainfo->qi_rtbtimelimit)
@@ -91,10 +91,10 @@
 #define XFS_DQ_HASH(mp, id, type)   (type == XFS_DQ_USER ? \
 				     (xfs_Gqm->qm_usr_dqhtable + \
 				      XFS_DQ_HASHVAL(mp, id)) : \
-				     (xfs_Gqm->qm_prj_dqhtable + \
+				     (xfs_Gqm->qm_grp_dqhtable + \
 				      XFS_DQ_HASHVAL(mp, id)))
 #define XFS_IS_DQTYPE_ON(mp, type)   (type == XFS_DQ_USER ? \
-				      XFS_IS_UQUOTA_ON(mp):XFS_IS_PQUOTA_ON(mp))
+				      XFS_IS_UQUOTA_ON(mp):XFS_IS_GQUOTA_ON(mp))
 #define XFS_IS_DQUOT_UNINITIALIZED(dqp)	( \
 	INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT) == 0ULL && \
 	INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) == 0ULL && \
@@ -164,7 +164,7 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 
 #define XFS_QM_DQP_TO_DQACCT(tp, dqp)	(XFS_QM_ISUDQ(dqp) ? \
 					 (tp)->t_dqinfo->dqa_usrdquots : \
-					 (tp)->t_dqinfo->dqa_prjdquots)
+					 (tp)->t_dqinfo->dqa_grpdquots)
 #define XFS_IS_SUSER_DQUOT(dqp)		\
 	(INT_GET((dqp)->q_core.d_id, ARCH_CONVERT) == 0)
 
@@ -178,7 +178,7 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 	}
 
 #define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
-				 (((d)->dq_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
+				 (((d)->dq_flags & XFS_DQ_GROUP) ? "GRP" : "???"))
 #define DQFLAGTO_DIRTYSTR(d)	(XFS_DQ_IS_DIRTY(d) ? "DIRTY" : "NOTDIRTY")
 
 #endif	/* __XFS_QUOTA_PRIV_H__ */

@@ -108,10 +108,10 @@ struct xfs_dquot *xfs_qm_vop_chown(struct xfs_trans *a,
 		struct xfs_inode *b, struct xfs_dquot **c,
 		struct xfs_dquot *d) { return NULL; }
 int	xfs_qm_vop_dqalloc(struct xfs_mount *a, struct xfs_inode *b,
-		uid_t c, xfs_prid_t d, uint e, struct xfs_dquot **f,
+		uid_t c, gid_t d, uint e, struct xfs_dquot **f,
 		struct xfs_dquot **g) { return nopkg(); }
 int	xfs_qm_vop_chown_dqalloc(struct xfs_mount *a,
-		struct xfs_inode *b, int c, uid_t d, xfs_prid_t e,
+		struct xfs_inode *b, int c, uid_t d, gid_t e,
 		struct xfs_dquot **f, struct xfs_dquot **g) { return nopkg(); }
 int	xfs_qm_vop_chown_reserve(struct xfs_trans *a,
 		struct xfs_inode *b, struct xfs_dquot *c, struct xfs_dquot *d,

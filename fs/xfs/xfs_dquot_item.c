@@ -155,8 +155,6 @@ xfs_qm_dquot_logitem_unpin_remove(
 	xfs_trans_t	 *tp)
 {
 	xfs_qm_dquot_logitem_unpin(logitem);
-
-	return;
 }
 
 /*
@@ -187,7 +185,6 @@ xfs_qm_dquot_logitem_push(
          */
 	xfs_qm_dqflush(dqp, XFS_B_DELWRI);
 	xfs_dqunlock(dqp);
-
 }
 
 /*ARGSUSED*/
@@ -230,7 +227,6 @@ xfs_qm_dqunpin_wait(
 	}
 	sv_wait(&(dqp->q_pinwait), PINOD,
 		&(XFS_DQ_TO_QINF(dqp)->qi_pinlock), s);
-	return;
 }
 
 /*
@@ -250,7 +246,7 @@ xfs_qm_dquot_logitem_pushbuf(
 {
 	xfs_dquot_t	*dqp;
 	xfs_mount_t	*mp;
-        xfs_buf_t	 	*bp;
+	xfs_buf_t 	*bp;
 	uint		dopush;
 
 	dqp = qip->qli_dquot;
@@ -308,7 +304,6 @@ xfs_qm_dquot_logitem_pushbuf(
 
 	qip->qli_pushbuf_flag = 0;
 	xfs_dqunlock(dqp);	
-	return;
 }
 
 /*
@@ -323,7 +318,7 @@ xfs_qm_dquot_logitem_pushbuf(
  */
 STATIC uint
 xfs_qm_dquot_logitem_trylock(
-        xfs_dq_logitem_t    *qip)
+        xfs_dq_logitem_t	*qip)
 {
 	xfs_dquot_t	        *dqp;
 	uint			retval;
@@ -414,7 +409,6 @@ xfs_qm_dquot_logitem_abort(
         xfs_dq_logitem_t    *ql)
 {
         xfs_qm_dquot_logitem_unlock(ql);
-        return;
 }
 
 /*

@@ -136,7 +136,7 @@ xfs_quotactl(
 
 /*
  * Turn off quota accounting and/or enforcement for all udquots and/or
- * pdquots. Called only at unmount time.
+ * gdquots. Called only at unmount time.
  *
  * This assumes that there are no dquots of this file system cached 
  * incore, and modifies the ondisk dquot directly. Therefore, for example,
@@ -172,7 +172,7 @@ xfs_qm_scall_quotaoff(
 	/* 
 	 * We don't want to deal with two quotaoffs messing up each other,
 	 * so we're going to serialize it. quotaoff isn't exactly a performance
-	 * critical thing. XXXcurrently, we also take the vfslock.
+	 * critical thing.
 	 * If quotaoff, then we must be dealing with the root filesystem.
 	 */
 	ASSERT(mp->m_quotainfo || mp->m_dev == rootdev);
@@ -200,19 +200,19 @@ xfs_qm_scall_quotaoff(
 			
 		if ((sbflags & flags) != (mp->m_qflags & flags)) {
 			/* 
-			 * This can happen only with proj+usr quota 
+			 * This can happen only with grp+usr quota 
 			 * combination. Note: 1) accounting cannot be turned
 			 * off without enforcement also getting turned off.
-			 * 2) Every flag that exist in mpqflags MUST exist
+			 * 2) Every flag that exists in mpqflags MUST exist
 			 * in sbqflags (but not vice versa).
-			 * which means at this point sbqflags = UQ+PQ+..,
-			 * and mpqflags = UQ or PQ.
+			 * which means at this point sbqflags = UQ+GQ+..,
+			 * and mpqflags = UQ or GQ.
 			 */
-			ASSERT(sbflags & XFS_PQUOTA_ACCT);
+			ASSERT(sbflags & XFS_GQUOTA_ACCT);
 			ASSERT((sbflags & XFS_ALL_QUOTA_ACCT) != 
 			       (mp->m_qflags & XFS_ALL_QUOTA_ACCT));
 			
-			/* XXX TBD Finish this for proj quota support */
+			/* XXX TBD Finish this for group quota support */
 			/* We need to update the SB and mp separately */
 			return XFS_ERROR(EINVAL);
 		}
@@ -247,10 +247,10 @@ xfs_qm_scall_quotaoff(
 		flags |= (XFS_UQUOTA_CHKD | XFS_UQUOTA_ENFD);
 		inactivate_flags |= XFS_UQUOTA_ACTIVE;
 	}
-	if (flags & XFS_PQUOTA_ACCT) {
-		dqtype |= XFS_QMOPT_PQUOTA;
-		flags |= (XFS_PQUOTA_CHKD | XFS_PQUOTA_ENFD);
-		inactivate_flags |= XFS_PQUOTA_ACTIVE;
+	if (flags & XFS_GQUOTA_ACCT) {
+		dqtype |= XFS_QMOPT_GQUOTA;
+		flags |= (XFS_GQUOTA_CHKD | XFS_GQUOTA_ENFD);
+		inactivate_flags |= XFS_GQUOTA_ACTIVE;
 	}
 	
 	/*
@@ -284,7 +284,7 @@ xfs_qm_scall_quotaoff(
 	/*
 	 * Give back all the dquot reference(s) held by inodes.
 	 * Here we go thru every single incore inode in this file system, and
-	 * do a dqrele on the i_udquot/i_pdquot that it may have.
+	 * do a dqrele on the i_udquot/i_gdquot that it may have.
 	 * Essentially, as long as somebody has an inode locked, this guarantees
 	 * that quotas will not be turned off. This is handy because in a
 	 * transaction once we lock the inode(s) and check for quotaon, we can
@@ -338,15 +338,13 @@ xfs_qm_scall_quotaoff(
 	 * Release our quotainode references, and vn_purge them,
 	 * if we don't need them anymore.
 	 */
-	if ((dqtype & XFS_QMOPT_UQUOTA) &&
-	    XFS_QI_UQIP(mp)) {
+	if ((dqtype & XFS_QMOPT_UQUOTA) && XFS_QI_UQIP(mp)) {
 		XFS_PURGE_INODE(XFS_QI_UQIP(mp));
 		XFS_QI_UQIP(mp) = NULL;
 	}
-	if ((dqtype & XFS_QMOPT_PQUOTA) && 
-	    XFS_QI_PQIP(mp)) {
-		XFS_PURGE_INODE(XFS_QI_PQIP(mp));
-		XFS_QI_PQIP(mp) = NULL;
+	if ((dqtype & XFS_QMOPT_GQUOTA) && XFS_QI_GQIP(mp)) {
+		XFS_PURGE_INODE(XFS_QI_GQIP(mp));
+		XFS_QI_GQIP(mp) = NULL;
 	}
 	mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 
@@ -367,8 +365,7 @@ xfs_qm_scall_trunc_qfiles(
 	if (!XFS_SB_VERSION_HASQUOTA(&mp->m_sb) || flags == 0)
 		return XFS_ERROR(EINVAL);
 
-	if ((flags & XFS_DQ_USER) &&
-	    mp->m_sb.sb_uquotino != NULLFSINO) {
+	if ((flags & XFS_DQ_USER) && mp->m_sb.sb_uquotino != NULLFSINO) {
 		error = xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 0, &qip, 0);
 		if (! error) {
 			(void) xfs_truncate_file(mp, qip);
@@ -376,9 +373,8 @@ xfs_qm_scall_trunc_qfiles(
 		}
 	}
 	
-	if ((flags & XFS_DQ_PROJ) &&
-	    mp->m_sb.sb_pquotino != NULLFSINO) {
-		error = xfs_iget(mp, NULL, mp->m_sb.sb_pquotino, 0, &qip, 0);
+	if ((flags & XFS_DQ_GROUP) && mp->m_sb.sb_gquotino != NULLFSINO) {
+		error = xfs_iget(mp, NULL, mp->m_sb.sb_gquotino, 0, &qip, 0);
 		if (! error) {
 			(void) xfs_truncate_file(mp, qip);
 			VN_RELE(XFS_ITOV(qip));
@@ -444,9 +440,9 @@ xfs_qm_scall_quotaon(
 	    (mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT) == 0 &&
 	    (flags & XFS_UQUOTA_ENFD))
 	    ||
-	    ((flags & XFS_PQUOTA_ACCT) == 0 &&
-	    (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT) == 0 &&
-	    (flags & XFS_PQUOTA_ENFD))) {
+	    ((flags & XFS_GQUOTA_ACCT) == 0 &&
+	    (mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT) == 0 &&
+	    (flags & XFS_GQUOTA_ENFD))) {
 #ifdef QUOTADEBUG
 		printk("Can't enforce without accounting.\n");
 #endif		
@@ -468,7 +464,7 @@ xfs_qm_scall_quotaon(
 		s = XFS_SB_LOCK(mp);
 		XFS_SB_VERSION_ADDQUOTA(&mp->m_sb);
 		mp->m_sb.sb_uquotino = NULLFSINO;
-		mp->m_sb.sb_pquotino = NULLFSINO;
+		mp->m_sb.sb_gquotino = NULLFSINO;
 		mp->m_sb.sb_qflags = 0;
 		XFS_SB_UNLOCK(mp, s);
 #ifdef DEBUG
@@ -477,7 +473,7 @@ xfs_qm_scall_quotaon(
 			oldv, mp->m_sb.sb_versionnum);
 #endif
 		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
-			    XFS_SB_PQUOTINO | XFS_SB_QFLAGS);
+			    XFS_SB_GQUOTINO | XFS_SB_QFLAGS);
 	}
 
 	/*
@@ -533,18 +529,18 @@ xfs_qm_scall_getqstat(
 	xfs_caddr_t	addr)
 {
 	fs_quota_stat_t	out;
-	xfs_inode_t	*uip, *pip;
-	boolean_t	tempuqip, temppqip;
+	xfs_inode_t	*uip, *gip;
+	boolean_t	tempuqip, tempgqip;
 	__uint16_t	sbflags;
 
-	uip = pip = NULL;
-	tempuqip = temppqip = B_FALSE;
+	uip = gip = NULL;
+	tempuqip = tempgqip = B_FALSE;
 	bzero(&out, sizeof(fs_quota_stat_t));
 
 	out.qs_version = FS_QSTAT_VERSION;
 	if (! XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
 		out.qs_uquota.qfs_ino = NULLFSINO;
-		out.qs_aquota.qfs_ino = NULLFSINO;
+		out.qs_gquota.qfs_ino = NULLFSINO;
 		goto done;
 	}
 	out.qs_flags = (__uint16_t) xfs_qm_export_flags(mp->m_qflags & 
@@ -566,18 +562,18 @@ xfs_qm_scall_getqstat(
 
 	out.qs_pad = 0;
 	out.qs_uquota.qfs_ino = mp->m_sb.sb_uquotino;
-	out.qs_aquota.qfs_ino = mp->m_sb.sb_pquotino;
+	out.qs_gquota.qfs_ino = mp->m_sb.sb_gquotino;
 	if (mp->m_quotainfo) {
 		uip = mp->m_quotainfo->qi_uquotaip;
-		pip = mp->m_quotainfo->qi_pquotaip;
+		gip = mp->m_quotainfo->qi_gquotaip;
 	}
 	if (!uip && mp->m_sb.sb_uquotino != NULLFSINO) {
 		if (xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 0, &uip, 0) == 0) 
 			tempuqip = B_TRUE;
 	}
-	if (!pip && mp->m_sb.sb_pquotino != NULLFSINO) {
-		if (xfs_iget(mp, NULL, mp->m_sb.sb_pquotino, 0, &pip, 0) == 0) 
-			temppqip = B_TRUE;
+	if (!gip && mp->m_sb.sb_gquotino != NULLFSINO) {
+		if (xfs_iget(mp, NULL, mp->m_sb.sb_gquotino, 0, &gip, 0) == 0) 
+			tempgqip = B_TRUE;
 	}
 	if (uip) {
 		out.qs_uquota.qfs_nblks = uip->i_d.di_nblocks;
@@ -585,11 +581,11 @@ xfs_qm_scall_getqstat(
 		if (tempuqip)
 			VN_RELE(XFS_ITOV(uip));
 	}
-	if (pip) {
-		out.qs_aquota.qfs_nblks = pip->i_d.di_nblocks;
-		out.qs_aquota.qfs_nextents = pip->i_d.di_nextents;
-		if (temppqip)
-			VN_RELE(XFS_ITOV(pip));
+	if (gip) {
+		out.qs_gquota.qfs_nblks = gip->i_d.di_nblocks;
+		out.qs_gquota.qfs_nextents = gip->i_d.di_nextents;
+		if (tempgqip)
+			VN_RELE(XFS_ITOV(gip));
 	}
 	if (mp->m_quotainfo) {
 		out.qs_incoredqs = XFS_QI_MPLNDQUOTS(mp);
@@ -771,10 +767,6 @@ xfs_qm_scall_getquota(
 	fs_disk_quota_t	out;
 	int 		error;
 
-	if ((type == XFS_DQ_USER) &&
-			(id != current->uid &&
-			!capable(CAP_SYS_ADMIN)))
-		return XFS_ERROR(EPERM);
 	/*
 	 * Try to get the dquot. We don't want it allocated on disk, so
 	 * we aren't passing the XFS_QMOPT_DOALLOC flag. If it doesn't
@@ -889,9 +881,7 @@ error0:
 	} 
 	*qoffstartp = qoffi;
 	return (error);
-
 }
-
 
 
 /*
@@ -974,13 +964,13 @@ xfs_qm_import_qtype_flags(
 	/*
 	 * Can't be both at the same time.
 	 */
-	if (((uflags & (XFS_PROJ_QUOTA | XFS_USER_QUOTA)) ==
-	     (XFS_PROJ_QUOTA | XFS_USER_QUOTA)) ||
-	    ((uflags & (XFS_PROJ_QUOTA | XFS_USER_QUOTA)) == 0))
+	if (((uflags & (XFS_GROUP_QUOTA | XFS_USER_QUOTA)) ==
+	     (XFS_GROUP_QUOTA | XFS_USER_QUOTA)) ||
+	    ((uflags & (XFS_GROUP_QUOTA | XFS_USER_QUOTA)) == 0))
 		return (0);
 
 	return (uflags & XFS_USER_QUOTA) ? 
-		XFS_DQ_USER : XFS_DQ_PROJ;
+		XFS_DQ_USER : XFS_DQ_GROUP;
 }
 
 STATIC uint
@@ -990,12 +980,12 @@ xfs_qm_export_qtype_flags(
 	/*
 	 * Can't be both at the same time.
 	 */
-	ASSERT((flags & (XFS_PROJ_QUOTA | XFS_USER_QUOTA)) !=
-		(XFS_PROJ_QUOTA | XFS_USER_QUOTA));
-	ASSERT((flags & (XFS_PROJ_QUOTA | XFS_USER_QUOTA)) != 0);
+	ASSERT((flags & (XFS_GROUP_QUOTA | XFS_USER_QUOTA)) !=
+		(XFS_GROUP_QUOTA | XFS_USER_QUOTA));
+	ASSERT((flags & (XFS_GROUP_QUOTA | XFS_USER_QUOTA)) != 0);
 
 	return (flags & XFS_DQ_USER) ? 
-		XFS_USER_QUOTA : XFS_PROJ_QUOTA;
+		XFS_USER_QUOTA : XFS_GROUP_QUOTA;
 }
 
 STATIC uint
@@ -1010,12 +1000,12 @@ xfs_qm_import_flags(
 	flags = 0;
 	if (uflags & XFS_QUOTA_UDQ_ACCT)
 		flags |= XFS_UQUOTA_ACCT;
-	if (uflags & XFS_QUOTA_PDQ_ACCT)
-		flags |= XFS_PQUOTA_ACCT;
+	if (uflags & XFS_QUOTA_GDQ_ACCT)
+		flags |= XFS_GQUOTA_ACCT;
 	if (uflags & XFS_QUOTA_UDQ_ENFD)
 		flags |= XFS_UQUOTA_ENFD;
-	if (uflags & XFS_QUOTA_PDQ_ENFD)
-		flags |= XFS_PQUOTA_ENFD;
+	if (uflags & XFS_QUOTA_GDQ_ENFD)
+		flags |= XFS_GQUOTA_ENFD;
 	return (flags);
 }
 
@@ -1029,12 +1019,12 @@ xfs_qm_export_flags(
 	uflags = 0;
 	if (flags & XFS_UQUOTA_ACCT)
 		uflags |= XFS_QUOTA_UDQ_ACCT;
-	if (flags & XFS_PQUOTA_ACCT)
-		uflags |= XFS_QUOTA_PDQ_ACCT;
+	if (flags & XFS_GQUOTA_ACCT)
+		uflags |= XFS_QUOTA_GDQ_ACCT;
 	if (flags & XFS_UQUOTA_ENFD)
 		uflags |= XFS_QUOTA_UDQ_ENFD;
-	if (flags & XFS_PQUOTA_ENFD)
-		uflags |= XFS_QUOTA_PDQ_ENFD;
+	if (flags & XFS_GQUOTA_ENFD)
+		uflags |= XFS_QUOTA_GDQ_ENFD;
 	return (uflags);
 }
 
@@ -1078,9 +1068,9 @@ again:
 		/*
 		 * Rootinode, rbmip and rsumip have blocks associated with it.
 		 */
-		if (ip == XFS_QI_UQIP(mp) || ip == XFS_QI_PQIP(mp)) {
+		if (ip == XFS_QI_UQIP(mp) || ip == XFS_QI_GQIP(mp)) {
 			ASSERT(ip->i_udquot == NULL);
-			ASSERT(ip->i_pdquot == NULL);
+			ASSERT(ip->i_gdquot == NULL);
 			ip = ip->i_mnext;
 			continue;
 		}
@@ -1115,9 +1105,9 @@ again:
 			xfs_qm_dqrele(ip->i_udquot);
 			ip->i_udquot = NULL;
 		}
-		if ((flags & XFS_PQUOTA_ACCT) && ip->i_pdquot) {
-			xfs_qm_dqrele(ip->i_pdquot);
-			ip->i_pdquot = NULL;
+		if ((flags & XFS_GQUOTA_ACCT) && ip->i_gdquot) {
+			xfs_qm_dqrele(ip->i_gdquot);
+			ip->i_gdquot = NULL;
 		}
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		/*
@@ -1141,19 +1131,18 @@ again:
 	} while (ip != mp->m_inodes);
 
 	XFS_MOUNT_IUNLOCK(mp);
-	return;
 }
 
 /*------------------------------------------------------------------------*/
 #ifdef DEBUG
 /*
  * This contains all the test functions for XFS disk quotas.
- * Currently it does an quota accounting check. ie. it walks through
+ * Currently it does a quota accounting check. ie. it walks through
  * all inodes in the file system, calculating the dquot accounting fields,	
  * and prints out any inconsistencies. 
  */
 xfs_dqhash_t *qmtest_udqtab;
-xfs_dqhash_t *qmtest_pdqtab;
+xfs_dqhash_t *qmtest_gdqtab;
 int	      qmtest_hashmask;
 int	      qmtest_nfails;
 mutex_t	      qcheck_lock;
@@ -1165,7 +1154,7 @@ mutex_t	      qcheck_lock;
 #define DQTEST_HASH(mp, id, type)   ((type & XFS_DQ_USER) ? \
 				     (qmtest_udqtab + \
 				      DQTEST_HASHVAL(mp, id)) : \
-				     (qmtest_pdqtab + \
+				     (qmtest_gdqtab + \
 				      DQTEST_HASHVAL(mp, id)))
 
 #define DQTEST_LIST_PRINT(l, NXT, title) \
@@ -1175,17 +1164,15 @@ mutex_t	      qcheck_lock;
 	  for (dqp = (xfs_dqtest_t *)(l)->qh_next; dqp != NULL; \
 	       dqp = (xfs_dqtest_t *)dqp->NXT) { \
 	    printk("\t%d\.\t\"%d (%s)\"\t bcnt = %d, icnt = %d\n", \
-			 ++i, (int) INT_GET(dqp->d_id, ARCH_CONVERT), \
-		         DQFLAGTO_TYPESTR(dqp),      \
-			 (int) INT_GET(dqp->d_bcount, ARCH_CONVERT), \
-			 (int) INT_GET(dqp->d_icount, ARCH_CONVERT)); } \
+			 ++i, dqp->d_id, DQFLAGTO_TYPESTR(dqp),      \
+			 dqp->d_bcount, dqp->d_icount); } \
 }
 	
 typedef struct dqtest {
 	xfs_dqmarker_t	q_lists;
 	xfs_dqhash_t	*q_hash;        /* the hashchain header */
 	xfs_mount_t	*q_mount;	/* filesystem this relates to */
-	xfs_dqid_t	d_id;		/* user id or proj id */
+	xfs_dqid_t	d_id;		/* user id or group id */
 	xfs_qcnt_t	d_bcount;	/* # disk blocks owned by the user */
 	xfs_qcnt_t	d_icount;	/* # inodes owned by the user */
 } xfs_dqtest_t;
@@ -1206,18 +1193,13 @@ STATIC void
 xfs_qm_dqtest_print(
 	xfs_dqtest_t	*d)
 {
-	printk( "-----------DQTEST DQUOT----------------\n");
-	printk( "---- dquot ID	=  %d\n", (int) INT_GET(d->d_id, ARCH_CONVERT));
-	printk( "---- type      =  %s\n", XFS_QM_ISUDQ(d) ? "USR" :
-	       "PRJ");
-	printk( "---- fs        =  0x%p\n", d->q_mount);
-	printk( "---- bcount	=  %Lu (0x%x)\n", 
-	       INT_GET(d->d_bcount, ARCH_CONVERT),
-	       (int)INT_GET(d->d_bcount, ARCH_CONVERT));
-	printk( "---- icount	=  %Lu (0x%x)\n", 
-	       INT_GET(d->d_icount, ARCH_CONVERT),
-	       (int)INT_GET(d->d_icount, ARCH_CONVERT));
-	printk( "---------------------------\n");
+	printk("-----------DQTEST DQUOT----------------\n");
+	printk("---- dquot ID =  %d\n", d->d_id);
+	printk("---- type     =  %s\n", XFS_QM_ISUDQ(d) ? "USR" : "GRP");
+	printk("---- fs       =  0x%p\n", d->q_mount);
+	printk("---- bcount   =  %Lu (0x%x)\n", d->d_bcount, (int)d->d_bcount);
+	printk("---- icount   =  %Lu (0x%x)\n", d->d_icount, (int)d->d_icount);
+	printk("---------------------------\n");
 }
 
 STATIC void
@@ -1247,14 +1229,14 @@ xfs_dqtest_cmp2(
 	xfs_dquot_t	*dqp)
 {
 	int err = 0;
-	if (INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) != INT_GET(d->d_icount, ARCH_CONVERT)) {
+	if (INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) != d->d_icount) {
 		xfs_qm_dqtest_failed(d, dqp, "icount mismatch", 
-				     INT_GET(dqp->q_core.d_icount, ARCH_CONVERT), INT_GET(d->d_icount, ARCH_CONVERT), 0);
+				     INT_GET(dqp->q_core.d_icount, ARCH_CONVERT), d->d_icount, 0);
 		err++;
 	}
-	if (INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) != INT_GET(d->d_bcount, ARCH_CONVERT)) {
+	if (INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) != d->d_bcount) {
 		xfs_qm_dqtest_failed(d, dqp, "bcount mismatch", 
-				     INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT), INT_GET(d->d_bcount, ARCH_CONVERT), 0);
+				     INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT), d->d_bcount, 0);
 		err++;
 	}
 	if (INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) &&
@@ -1262,7 +1244,7 @@ xfs_dqtest_cmp2(
 		if (INT_GET(dqp->q_core.d_btimer, ARCH_CONVERT) == 0 &&
 		    INT_GET(dqp->q_core.d_id, ARCH_CONVERT) != 0) {
 			printk("%d [%s] [0x%p] BLK TIMER NOT STARTED\n", 
-			       (int) INT_GET(d->d_id, ARCH_CONVERT), DQFLAGTO_TYPESTR(d), d->q_mount);
+			       d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
 		}
 	}
@@ -1271,15 +1253,14 @@ xfs_dqtest_cmp2(
 		if (INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT) == 0 &&
 		    INT_GET(dqp->q_core.d_id, ARCH_CONVERT) != 0) {
 			printk("%d [%s] [0x%p] INO TIMER NOT STARTED\n", 
-			       (int) INT_GET(d->d_id, ARCH_CONVERT), DQFLAGTO_TYPESTR(d), 
-			       d->q_mount);
+			       d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
 		}
 	}
 #if 0
 	if (!err) {
 		printk("%d [%s] [0x%p] qchecked\n", 
-		       (int) INT_GET(d->d_id, ARCH_CONVERT), XFS_QM_ISUDQ(d) ? "USR" : "PRJ", d->q_mount);
+		       d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "GRP", d->q_mount);
 	}
 #endif
 	return (err);
@@ -1293,7 +1274,7 @@ xfs_dqtest_cmp(
 	int		error;
 
 	/* xfs_qm_dqtest_print(d); */
-	if (error = xfs_qm_dqget(d->q_mount, NULL, INT_GET(d->d_id, ARCH_CONVERT), d->dq_flags, 0,
+	if (error = xfs_qm_dqget(d->q_mount, NULL, d->d_id, d->dq_flags, 0,
 				 &dqp)) {
 		xfs_qm_dqtest_failed(d, NULL, "dqget failed", 0, 0, error);
 		return;
@@ -1316,14 +1297,14 @@ xfs_qm_internalqcheck_dqget(
 	for (d = (xfs_dqtest_t *) h->qh_next; d != NULL; 
 	     d = (xfs_dqtest_t *) d->HL_NEXT) {
 		/* DQTEST_LIST_PRINT(h, HL_NEXT, "@@@@@ dqtestlist @@@@@"); */
-		if (INT_GET(d->d_id, ARCH_CONVERT) == id && mp == d->q_mount) {
+		if (d->d_id == id && mp == d->q_mount) {
 			*O_dq = d;
 			return (0);
 		}
 	}
 	d = kmem_zalloc(sizeof(xfs_dqtest_t), KM_SLEEP);
 	d->dq_flags = type;
-	INT_SET(d->d_id, ARCH_CONVERT, id);
+	d->d_id = id;
 	d->q_mount = mp;
 	d->q_hash = h;
 	xfs_qm_hashinsert(h, d);
@@ -1331,33 +1312,30 @@ xfs_qm_internalqcheck_dqget(
 	return (0);
 }	
 
-STATIC int
+STATIC void
 xfs_qm_internalqcheck_get_dquots(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	uid,
-	xfs_dqid_t	prid,
+	xfs_dqid_t	gid,
 	xfs_dqtest_t 	**ud,
-	xfs_dqtest_t 	**pd)
+	xfs_dqtest_t 	**gd)
 {
 	if (XFS_IS_UQUOTA_ON(mp)) 
 		xfs_qm_internalqcheck_dqget(mp, uid, XFS_DQ_USER, ud);
-	if (XFS_IS_PQUOTA_ON(mp)) 
-		xfs_qm_internalqcheck_dqget(mp, prid, XFS_DQ_PROJ, pd);
-	return (0);
+	if (XFS_IS_GQUOTA_ON(mp)) 
+		xfs_qm_internalqcheck_dqget(mp, gid, XFS_DQ_GROUP, gd);
 }
 
 
-STATIC int
+STATIC void
 xfs_qm_internalqcheck_dqadjust(
 	xfs_inode_t		*ip,
 	xfs_dqtest_t        	*d)
 {
-	INT_MOD(d->d_icount, ARCH_CONVERT, +1);
-	INT_MOD(d->d_bcount, ARCH_CONVERT, (xfs_qcnt_t)ip->i_d.di_nblocks);
-	return (0);
+	d->d_icount++;
+	d->d_bcount += (xfs_qcnt_t)ip->i_d.di_nblocks;
 }
 
-/* ARGSUSED */
 STATIC int
 xfs_qm_internalqcheck_adjust(
 	xfs_mount_t     *mp,            /* mount point for filesystem */
@@ -1369,14 +1347,14 @@ xfs_qm_internalqcheck_adjust(
 	int		*res)		/* bulkstat result code */
 {
 	xfs_inode_t     	*ip;
-	xfs_dqtest_t		*ud, *pd;
+	xfs_dqtest_t		*ud, *gd;
 	uint			lock_flags;
 	boolean_t		ipreleased;
 	int			error;
 
 	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
 
-	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino) {
+	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_gquotino) {
 		*res = BULKSTAT_RV_NOTHING;
                 return XFS_ERROR(EINVAL);
 	}
@@ -1405,21 +1383,17 @@ xfs_qm_internalqcheck_adjust(
 		ipreleased = B_TRUE;
 		goto again;
 	}
-	if (error = xfs_qm_internalqcheck_get_dquots(mp, 
-					     (xfs_dqid_t) ip->i_d.di_uid,
-					     (xfs_dqid_t) ip->i_d.di_projid,
-					     &ud, &pd)) {
-		xfs_iput(ip, lock_flags);
-		*res = BULKSTAT_RV_NOTHING;
-		return (error);
-	}
+	xfs_qm_internalqcheck_get_dquots(mp, 
+					(xfs_dqid_t) ip->i_d.di_uid,
+					(xfs_dqid_t) ip->i_d.di_gid,
+					&ud, &gd);
 	if (XFS_IS_UQUOTA_ON(mp)) {
 		ASSERT(ud);
-		(void) xfs_qm_internalqcheck_dqadjust(ip, ud);
+		xfs_qm_internalqcheck_dqadjust(ip, ud);
 	}
-	if (XFS_IS_PQUOTA_ON(mp)) {
-		ASSERT(pd);
-		(void) xfs_qm_internalqcheck_dqadjust(ip, pd);
+	if (XFS_IS_GQUOTA_ON(mp)) {
+		ASSERT(gd);
+		xfs_qm_internalqcheck_dqadjust(ip, gd);
 	}
 	xfs_iput(ip, lock_flags);
 	*res = BULKSTAT_RV_DIDONE;
@@ -1458,7 +1432,7 @@ xfs_qm_internalqcheck(
 	   is going on. */
 	qmtest_udqtab = kmem_zalloc(qmtest_hashmask *
 				    sizeof(xfs_dqhash_t), KM_SLEEP);
-	qmtest_pdqtab = kmem_zalloc(qmtest_hashmask *
+	qmtest_gdqtab = kmem_zalloc(qmtest_hashmask *
 				    sizeof(xfs_dqhash_t), KM_SLEEP);
 	do {
 		/*
@@ -1484,7 +1458,7 @@ xfs_qm_internalqcheck(
 			kmem_free(d, sizeof(xfs_dqtest_t)); 
 			d = e;
 		}
-		h1 = &qmtest_pdqtab[i];
+		h1 = &qmtest_gdqtab[i];
 		for (d = (xfs_dqtest_t *) h1->qh_next; d != NULL; ) {
 			xfs_dqtest_cmp(d);
 			e = (xfs_dqtest_t *) d->HL_NEXT;
@@ -1500,7 +1474,7 @@ xfs_qm_internalqcheck(
 		printk("**************  quotacheck successful! **************\n");
 	}
 	kmem_free(qmtest_udqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));
-	kmem_free(qmtest_pdqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));
+	kmem_free(qmtest_gdqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));
 	mutex_unlock(&qcheck_lock);
 	return (qmtest_nfails);
 }

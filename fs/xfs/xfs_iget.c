@@ -421,7 +421,7 @@ finish_inode:
 	ip->i_next = iq;
 	ip->i_prevp = &ih->ih_next;
 	ih->ih_next = ip;
-	ip->i_udquot = ip->i_pdquot = NULL;
+	ip->i_udquot = ip->i_gdquot = NULL;
 	ih->ih_version++;
 
 	/*
@@ -694,7 +694,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 * Release dquots (and their references) if any. An inode may escape 
 	 * xfs_inactive and get here via vn_alloc->vn_reclaim path.
 	 */
-	if (ip->i_udquot || ip->i_pdquot) {
+	if (ip->i_udquot || ip->i_gdquot) {
 		xfs_qm_dqdettach_inode(ip);
 	}
 	

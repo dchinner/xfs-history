@@ -86,7 +86,7 @@ static struct {
     { offsetof(xfs_sb_t, sb_fdblocks),   0 },
     { offsetof(xfs_sb_t, sb_frextents),  0 },
     { offsetof(xfs_sb_t, sb_uquotino),   0 },
-    { offsetof(xfs_sb_t, sb_pquotino),   0 },
+    { offsetof(xfs_sb_t, sb_gquotino),   0 },
     { offsetof(xfs_sb_t, sb_qflags),     0 },
     { offsetof(xfs_sb_t, sb_flags),      0 },
     { offsetof(xfs_sb_t, sb_shared_vn),  0 },
@@ -726,6 +726,16 @@ xfs_mountfs(
 	}
 
 	/*
+	 * Disallow mount attempts with (IRIX) project quota enabled
+	 */
+	if (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
+	    (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT)) {
+		cmn_err(CE_WARN, "XFS: IRIX project quota are enabled");
+		error = XFS_ERROR(ENOSYS);
+		goto error1;
+	}
+
+	/*
 	 * Initialize realtime fields in the mount structure
 	 */
 	if (error = xfs_rtmount_init(mp)) {
@@ -871,7 +881,7 @@ xfs_mountfs(
 	quotaflags = 0;
 	needquotamount = B_FALSE;
 	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT);
+		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT);
 	/*
 	 * Figure out if we'll need to do a quotacheck.
 	 * The requirements are a little different depending on whether
@@ -880,8 +890,8 @@ xfs_mountfs(
 	rootqcheck = (mp->m_dev == rootdev && quotaondisk && 
 		      ((mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT &&
 			(mp->m_sb.sb_qflags & XFS_UQUOTA_CHKD) == 0) ||
-		       (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT &&
-			(mp->m_sb.sb_qflags & XFS_PQUOTA_CHKD) == 0)));
+		       (mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT &&
+			(mp->m_sb.sb_qflags & XFS_GQUOTA_CHKD) == 0)));
 	needquotacheck = rootqcheck ||  XFS_QM_NEED_QUOTACHECK(mp);
 	if (XFS_IS_QUOTA_ON(mp) || quotaondisk) {
 		/*
@@ -890,7 +900,7 @@ xfs_mountfs(
 		 */
 		if (quotaondisk && !needquotacheck) {
 			/*
-			 * If xfsquotas pkg isn't not installed,
+			 * If the xfs quota code isn't installed,
 			 * we have to reset the quotachk'd bit.
 			 * If an error occured, qm_mount_quotas code
 			 * has already disabled quotas. So, just finish
@@ -988,7 +998,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	if (mp->m_quotainfo) {
 		while (ndquots = xfs_qm_dqpurge_all(mp, 
 						  XFS_QMOPT_UQUOTA|
-						  XFS_QMOPT_PQUOTA|
+						  XFS_QMOPT_GQUOTA|
 						  XFS_QMOPT_UMOUNTING)) {
 			delay(ndquots * 10);
 		}
