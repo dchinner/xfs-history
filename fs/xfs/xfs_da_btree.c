@@ -2027,6 +2027,7 @@ xfsda_leaf_check(xfsda_context_t *con, xfs_fileoff_t blkno, int firstlast)
 	return(retval);
 }
 
+/*ARGSUSED*/
 int
 xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 				      int firstlast)
@@ -2081,7 +2082,7 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 			if (entry->local) {
 				localp = XFS_ATTR_LEAF_NAME_LOCAL(leaf, i);
 				retval += xfsda_checkname(bp,
-							  localp->nameval,
+							  (char *)localp->nameval,
 							  localp->namelen, i,
 							  entry->hashval);
 				k = XFS_ATTR_LEAF_ENTSIZE_LOCAL(localp->namelen, localp->valuelen);
@@ -2093,7 +2094,7 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 			} else {
 				remotep = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
 				retval += xfsda_checkname(bp,
-							  remotep->name,
+							  (char *)remotep->name,
 							  remotep->namelen, i,
 							  entry->hashval);
 				k = XFS_ATTR_LEAF_ENTSIZE_REMOTE(remotep->namelen);
@@ -2175,6 +2176,7 @@ xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 	return(retval);
 }
 
+/*ARGSUSED*/
 int
 xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_fileoff_t blkno,
 				     int firstlast)
