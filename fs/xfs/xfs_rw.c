@@ -1,4 +1,4 @@
-#ident "$Revision: 1.218 $"
+#ident "$Revision: 1.219 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5582,7 +5582,7 @@ retry:
  				 * Setup I/O request for this extent.
 				 */
 				CHECK_GRIO_TIMESTAMP(bp, 40);
-	     			bps[bufsissued++]= nbp = getphysbuf();
+	     			bps[bufsissued++]= nbp = getphysbuf(bp->b_edev);
 				CHECK_GRIO_TIMESTAMP(bp, 40);
 
 	     			nbp->b_flags     = bp->b_flags;
@@ -5591,7 +5591,7 @@ retry:
 				nbp->b_grio_private = bp->b_grio_private;
 
 	     			nbp->b_error     = 0;
-	     			nbp->b_edev      = bp->b_edev;
+/*	     			nbp->b_edev      = bp->b_edev; */
 				if (rt) {
 	     				nbp->b_blkno = XFS_FSB_TO_BB(mp,
 						imapp->br_startblock);
@@ -5819,12 +5819,11 @@ xfs_diordwr(
 	/*
  	 * Allocate local buf structure.
 	 */
-	bp = getphysbuf();
-	bp->b_private = &dp;
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-		bp->b_edev = mp->m_rtdev;
+		bp = getphysbuf(mp->m_rtdev);
 	else
-		bp->b_edev = mp->m_dev;
+		bp = getphysbuf(mp->m_dev);
+	bp->b_private = &dp;
 
 	/*
 	 * Check if this is a guaranteed rate I/O
