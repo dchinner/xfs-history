@@ -31,7 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/smp_lock.h>
 
 
 STATIC spinlock_t	vfslock = SPIN_LOCK_UNLOCKED; /* protecting vfs_flag */

@@ -31,8 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/smp_lock.h>
-#include <linux/time.h>
 #include <linux/proc_fs.h>
 
 #ifdef CONFIG_PROC_FS

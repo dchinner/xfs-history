@@ -32,7 +32,6 @@
 
 #include <xfs.h>
 #include <linux/bitops.h>
-#include <linux/smp_lock.h>
 #include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
 #include <linux/namei.h>

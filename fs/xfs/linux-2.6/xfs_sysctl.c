@@ -32,8 +32,6 @@
 
 #include <xfs.h>
 #include <linux/sysctl.h>
-#include <linux/smp_lock.h>
-#include <linux/time.h>
 #include <linux/proc_fs.h>
 
 /*
