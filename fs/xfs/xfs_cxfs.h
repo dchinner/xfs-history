@@ -44,7 +44,7 @@
 struct xfs_inode;
 struct xfs_mount;
 struct xfs_args;
-struct mounta;
+struct cell_mounta;
 struct vfs;
 struct vfsops;
 struct vnode;
@@ -64,7 +64,7 @@ extern void cxfs_unmount(       /* For any special unmount handling. */
 
 extern int cxfs_remount_server(             /* Modify mount parameters.  This */
                 struct xfs_mount    *mp,    /* may result in vfs relocation. */
-                struct mounta       *uap,   /* There are separate implementa- */
+                struct cell_mounta  *uap,   /* There are separate implementa- */
                 struct xfs_args     *ap);   /* tions for arrays and ssi as */
                                             /* well as a stub for non-CELL. */
 
