@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.17 $"
 
 struct bmapval;
 struct buf;
@@ -92,9 +92,15 @@ typedef struct xfs_gap {
  * file is a real time file or not, because the bmap code
  * does.
  */
-#define	XFS_FSB_TO_DB(mp, ip, fsb) \
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FSB_TO_DB)
+daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
+#define	XFS_FSB_TO_DB(ip,fsb)	xfs_fsb_to_db(ip,fsb)
+#else
+#define	XFS_FSB_TO_DB(ip,fsb) \
 		(((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME) ? \
-		 XFS_FSB_TO_BB((mp), (fsb)) : XFS_FSB_TO_DADDR((mp), (fsb)))
+		 XFS_FSB_TO_BB((ip)->i_mount, (fsb)) : \
+		 XFS_FSB_TO_DADDR((ip)->i_mount, (fsb)))
+#endif
      
 /*
  * Defines for the trace mechanisms in xfs_rw.c.
