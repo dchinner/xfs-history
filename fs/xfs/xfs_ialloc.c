@@ -258,7 +258,7 @@ xfs_ialloc_ag_alloc(
 	for (;;) {
 		newfsbno = xfs_alloc_vextent(tp, newfsbno, minnewblocks, maxnewblocks,
 					     &newblocks, XFS_ALLOCTYPE_NEAR_BNO,
-					     maxnewblocks);
+					     maxnewblocks, 0);
 		if (newfsbno != NULLFSBLOCK)
 			break;
 		maxnewblocks >>= 1;
@@ -342,8 +342,8 @@ xfs_ialloc_ag_alloc(
 	/*
 	 * Modify/log superblock values for inode count and inode free count.
 	 */
-	xfs_trans_mod_sb(tp, XFS_SB_ICOUNT, newlen);
-	xfs_trans_mod_sb(tp, XFS_SB_IFREE, newlen);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_ICOUNT, newlen);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, newlen);
 	return 1;
 }
 
@@ -530,7 +530,7 @@ xfs_dialloc(
 	agi->agi_freelist = free->di_u.di_next;
 	agi->agi_freecount--;
 	xfs_ialloc_log_agi(tp, agbuf, XFS_AGI_FREECOUNT | XFS_AGI_FREELIST);
-	xfs_trans_mod_sb(tp, XFS_SB_IFREE, -1);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	ino = xfs_agino_to_ino(sbp, agno, agino);
 	return ino;
 }
@@ -648,7 +648,7 @@ xfs_difree(
 	agi->agi_freecount++;
 	flags |= XFS_AGI_FREECOUNT;
 	xfs_ialloc_log_agi(tp, agbuf, flags);
-	xfs_trans_mod_sb(tp, XFS_SB_IFREE, 1);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 	/*
 	 * Return the value to be stored in the incore inode's union.
 	 * The caller must set the format field to XFS_DINODE_FMT_AGINO.
