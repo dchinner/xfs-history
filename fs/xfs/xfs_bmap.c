@@ -1720,6 +1720,11 @@ xfs_bmapi(
 			ASSERT(mval->br_startoff ==
 			       mval[-1].br_startoff + mval[-1].br_blockcount);
 			mval[-1].br_blockcount += mval->br_blockcount;
+		} else if (n > 0 && mval->br_startblock == NULLSTARTBLOCK &&
+			   mval[-1].br_startblock == NULLSTARTBLOCK &&
+			   mval->br_startoff ==
+			   mval[-1].br_startoff + mval[-1].br_blockcount) {
+			mval[-1].br_blockcount += mval->br_blockcount;
 		} else {
 			mval++;
 			n++;
