@@ -120,7 +120,6 @@
 #include "sim.h"
 #endif
 #include <fs/fs_bhv_id.h>
-#include <fs/specfs/spec_lsnode.h>
 
 
 extern prid_t dfltprid;
@@ -2250,7 +2249,7 @@ xfs_lookup(
 	cred_t		*credp)
 {
 	xfs_inode_t		*dp, *ip;
-	struct vnode		*vp, *newvp;
+	struct vnode		*vp;
 	xfs_ino_t		e_inum;
 	int			error;
 	uint			lock_mode;
@@ -2320,18 +2319,6 @@ xfs_lookup(
 
 	xfs_iunlock_map_shared(dp, lock_mode);
 
-	/*
-	 * If vnode is a device return special vnode instead.
-	 */
-	if (ISVDEV(vp->v_type)) {
-		newvp = (vnode_t *)spec_vp(vp, vp->v_rdev, vp->v_type, credp);
-		VN_RELE(vp);
-		if (newvp == NULL) {
-			return XFS_ERROR(ENOSYS);
-		}
-		vp = newvp;
-	}
-
 #if XFS_BIG_FILESYSTEMS
 	vp->v_nodeid = ip->i_ino + ip->i_mount->m_inoadd;
 #else
@@ -2393,7 +2380,7 @@ xfs_create(
 {
 	vnode_t 		*dir_vp;
 	xfs_inode_t      	*dp, *ip;
-        vnode_t		        *vp, *newvp;
+        vnode_t		        *vp;
 	xfs_trans_t      	*tp;
 	xfs_ino_t		e_inum;
         xfs_mount_t	        *mp;
@@ -2847,20 +2834,6 @@ xfs_create(
 			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
 	}
 #endif	/* CELL_CAPABLE */
-
-        /*
-         * If vnode is a device, return special vnode instead.
-         */
-        if (ISVDEV(vp->v_type)) {
-                newvp = (vnode_t *)spec_vp(vp, vp->v_rdev, vp->v_type, credp);
-		ASSERT(vp == newvp); /* On linux this better be equal*/
-                VN_RELE(vp);
-                if (newvp == NULL) {
-			error = XFS_ERROR(ENOSYS);
-			goto std_return;
-		}
-                vp = newvp;
-        }
 
 #if XFS_BIG_FILESYSTEMS
 	vp->v_nodeid = ip->i_ino + mp->m_inoadd;

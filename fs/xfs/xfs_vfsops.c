@@ -116,7 +116,6 @@
 #include "sim.h"
 #endif
 #include <fs/fs_bhv_id.h>
-#include <fs/specfs/spec_lsnode.h>
 
 #ifndef SIM
 #define	whymount_t	whymountroot_t

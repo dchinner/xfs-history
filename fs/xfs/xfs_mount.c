@@ -54,7 +54,6 @@
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/var.h>
-#include <fs/specfs/spec_lsnode.h>
 #endif /* SIM */
 #include <stddef.h>
 #include "xfs_macros.h"

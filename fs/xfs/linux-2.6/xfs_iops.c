@@ -97,7 +97,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	if (tp == VREG) {
 		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
 							&cred, error);
-	} else if ((tp == VBLK) || (tp == VCHR)) {
+	} else if (ISVDEV(tp)) {
 		/*
 		 * Get the real type from the mode
 		 */
@@ -326,6 +326,10 @@ int linvfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 		tp = VCHR;
 	} else if (S_ISBLK(mode)) {
 		tp = VBLK;
+	} else if (S_ISFIFO(mode)) {
+		tp = VFIFO;
+	} else if (S_ISSOCK(mode)) {
+		tp = VSOCK;
 	} else {
 		error = -EINVAL;
 	}
