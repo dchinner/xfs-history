@@ -1,4 +1,4 @@
-#ident "$Revision: 1.325 $"
+#ident "$Revision: 1.326 $"
 
 
 #ifdef SIM
@@ -365,10 +365,10 @@ xfs_open(
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
-#endif
+
 	mode = vp->v_type == VDIR && ip->i_d.di_nextents ?
 		XFS_ILOCK_EXCL : XFS_ILOCK_SHARED;
 	xfs_ilock(ip, mode);
@@ -403,7 +403,6 @@ xfs_close(
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_close", (inst_t *)__return_address);
-
 	return 0;
 }
 
@@ -427,10 +426,10 @@ xfs_getattr(
 	vn_trace_entry(vp, "xfs_getattr", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif	
+
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 	vap->va_size = ip->i_d.di_size;
@@ -584,10 +583,10 @@ xfs_setattr(
 
         ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
         /*
          * Timestamps do not need to be logged and hence do not
          * need to be done within a transaction.
@@ -1240,10 +1239,10 @@ xfs_readlink(
                 return XFS_ERROR(EINVAL);
 
 	ip = XFS_BHVTOI(bdp);
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
-#endif
+
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 	ASSERT((ip->i_d.di_mode & IFMT) == IFLNK);
@@ -1341,10 +1340,9 @@ xfs_fsync(
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_fsync", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
-#endif
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	if (stop == -1)  {
@@ -1792,8 +1790,14 @@ xfs_inactive_symlink_rmt(
 	ASSERT(done);
 	error = xfs_bmap_finish(&tp, &free_list,
 				first_block, &committed);
-	if (error)
-		goto error1;
+	/*
+	 * We don't have the inode added to the new transaction.
+	 * So trans_cancel won't do the unlocking for us.
+	 */
+	if (error) {
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+		goto error0;
+	}
 
 	if (committed) {
 		/*
@@ -1817,8 +1821,13 @@ xfs_inactive_symlink_rmt(
 	 * we'll simply fall down and free the inode
 	 * using the already duped transaction.
 	 */
-	(void) xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0);
 	tp = ntp;
+	if (error) {
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+		goto error0;
+	}
+
 	if (ip->i_df.if_bytes) {
 		xfs_idata_realloc(ip,
 				  -(ip->i_df.if_bytes),
@@ -1830,8 +1839,7 @@ xfs_inactive_symlink_rmt(
 				  0, XFS_TRANS_PERM_LOG_RES,
 				  XFS_ITRUNCATE_LOG_COUNT);
 	if (error) {
-		/* Don't call itruncate_cleanup */
-		ASSERT(XFS_FORCED_SHUTDOWN(mp));
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 		goto error0;
 	}
 	*tpp = tp;
@@ -1840,17 +1848,8 @@ xfs_inactive_symlink_rmt(
  error1:
 	xfs_bmap_cancel(&free_list);
  error0:
-	xfs_iunlock(ip, XFS_IOLOCK_EXCL |
-		    XFS_ILOCK_EXCL);
 	xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES |
 			      XFS_TRANS_ABORT));
-	
-	/*
-	   xfs_itruncate_cleanup(&tp, ip,
-			      (XFS_TRANS_RELEASE_LOG_RES |
-			       XFS_TRANS_ABORT),
-			      XFS_DATA_FORK);
-			      */
 	*tpp = NULL;
 	return (error);
 
@@ -1874,8 +1873,6 @@ xfs_inactive_symlink_local(
 				  XFS_ITRUNCATE_LOG_COUNT);
 	
 	if (error) {
-		/* Don't call itruncate_cleanup */
-		ASSERT(XFS_FORCED_SHUTDOWN(ip->i_mount));
 		xfs_trans_cancel(*tpp, 0);
 		*tpp = NULL;
 		return (error);
@@ -2080,8 +2077,7 @@ xfs_inactive(
 		
 		/*
 		 * If we get an error while cleaning up a
-		 * symlink we jump to freeing the attribute fork
-		 * of the inode. XXX NOOOO.
+		 * symlink we bail out.
 		 */
 		error = (ip->i_d.di_size > XFS_IFORK_DSIZE(ip)) ?
 			xfs_inactive_symlink_rmt(ip, &tp) :
@@ -2223,10 +2219,10 @@ xfs_lookup(
 	}
 
 	dp = XFS_BHVTOI(dir_bdp);
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
 		return XFS_ERROR(EIO);
-#endif
+
 	lock_mode = xfs_ilock_map_shared(dp);
 
 	/*
@@ -2367,10 +2363,10 @@ xfs_create(
 	}
 	
 	mp = dp->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	udqp = pdqp = NULL;
 	if (vap->va_mask == AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
@@ -3062,10 +3058,10 @@ xfs_remove(
 	vn_trace_entry(dir_vp, "xfs_remove", (inst_t *)__return_address);
 	dp = XFS_BHVTOI(dir_bdp);
 	mp = dp->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_REMOVE)) {
 		error = dm_namesp_event(DM_REMOVE, dir_vp, NULL,
 					name, NULL, 0, 0);
@@ -3402,10 +3398,10 @@ xfs_link(
 	}
 
 	mp = tdp->i_mount;
-#ifndef XFSERRORDEBUG
+
         if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	if (XFS_IS_QUOTA_ON(mp)) {
 		error = 0;
 		if (XFS_NOT_DQATTACHED(mp, sip)) 
@@ -3577,10 +3573,10 @@ xfs_mkdir(
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
 	mp = dp->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	tp = NULL;
 	dp_joined_to_trans = B_FALSE;
 
@@ -4079,10 +4075,10 @@ xfs_readdir(
 	vn_trace_entry(BHV_TO_VNODE(dir_bdp), "xfs_readdir",
 		       (inst_t *)__return_address);
         dp = XFS_BHVTOI(dir_bdp);
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
 		return XFS_ERROR(EIO);
-#endif
+
         lock_mode = xfs_ilock_map_shared(dp);
 
         if ((dp->i_d.di_mode & IFMT) != IFDIR) {
@@ -4164,10 +4160,10 @@ xfs_symlink(
 	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
 
 	mp = dp->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	/*
 	 * Check component lengths of the target path name.
          */
@@ -4702,10 +4698,10 @@ xfs_allocstore(
 	ASSERT(count == NBPP);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 
@@ -4918,10 +4914,10 @@ xfs_fcntl(
 	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	switch (cmd) {
 #ifdef DATAPIPE
 	case F_GETOPS:
@@ -5100,10 +5096,10 @@ xfs_set_dmattrs (
 
         ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SET_DMATTRS);
 	error = xfs_trans_reserve(tp, 0, XFS_ICHANGE_LOG_RES (mp), 0, 0, 0);
 	if (error) {
@@ -5198,51 +5194,62 @@ xfs_reclaim(
 		}
 		locked = 1;
 	}
-	if (((ip->i_d.di_mode & IFMT) == IFREG) &&
-	    (ip->i_d.di_size > 0)) {
-		/*
-		 * Flush and invalidate any data left around that is
-		 * a part of this file.
-		 *
-		 * Get the inode's i/o lock so that buffers are pushed
-		 * out while holding the proper lock.  We can't hold
-		 * the inode lock here since flushing out buffers may
-		 * cause us to try to get the lock in xfs_strategy().
-		 *
-		 * We don't have to call remapf() here, because there
-		 * cannot be any mapped file references to this vnode
-		 * since it is being reclaimed.
-		 */
-		if (locked) {
-			xfs_ifunlock(ip);
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			locked = 0;
+	if ((ip->i_d.di_mode & IFMT) == IFREG) {
+		if (ip->i_d.di_size > 0) {
+			/*
+			 * Flush and invalidate any data left around that is
+			 * a part of this file.
+			 *
+			 * Get the inode's i/o lock so that buffers are pushed
+			 * out while holding the proper lock.  We can't hold
+			 * the inode lock here since flushing out buffers may
+			 * cause us to try to get the lock in xfs_strategy().
+			 *
+			 * We don't have to call remapf() here, because there
+			 * cannot be any mapped file references to this vnode
+			 * since it is being reclaimed.
+			 */
+			if (locked) {
+				xfs_ifunlock(ip);
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
+				locked = 0;
+			}
+			xfs_ilock(ip, XFS_IOLOCK_EXCL);
+			last_byte = xfs_file_last_byte(ip);
+			
+			/*
+			 * If we hit an IO error, we need to make sure that the
+			 * buffer and page caches of file data for
+			 * the file are tossed away. We don't want to use 
+			 * pflushinvalvp here because we don't want dirty
+			 * pages to stay attached to the vnode, but be
+			 * marked P_BAD. pdflush/vnode_pagebad
+			 * hates that.
+			 */
+			if (!XFS_FORCED_SHUTDOWN(ip->i_mount))
+				pflushinvalvp(vp, 0, last_byte);	
+			else
+				ptossvp(vp, 0, XFS_MAX_FILE_OFFSET);
+			
+			ASSERT(!VN_DIRTY(vp) && 
+			       (ip->i_queued_bufs == 0) &&
+			       (vp->v_pgcnt == 0) &&
+			       (vp->v_buf == NULL));
+			ASSERT(XFS_FORCED_SHUTDOWN(ip->i_mount) ||
+			       ip->i_delayed_blks == 0);
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+		} else if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
+			/* 
+			 * di_size field may not be quite accurate if we're
+			 * shutting down.
+			 */
+			ptossvp(vp, 0, XFS_MAX_FILE_OFFSET);
+			ASSERT(!VN_DIRTY(vp) && 
+			       (ip->i_queued_bufs == 0) &&
+			       (vp->v_pgcnt == 0) &&
+			       (vp->v_buf == NULL));
 		}
-	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		last_byte = xfs_file_last_byte(ip);
-		
-		/*
-		 * If we hit an IO error, we need to make sure that the
-		 * buffer and page caches of file data for
-		 * the file are tossed away. We don't want to use pflushinvalvp
-		 * here because we don't want dirty pages to stay attached to
-		 * the vnode, but be marked P_BAD. pdflush/vnode_pagebad
-		 * hates that.
-		 */
-		if (!XFS_FORCED_SHUTDOWN(ip->i_mount))
-			pflushinvalvp(vp, 0, last_byte);	
-		else
-			ptossvp(vp, 0, last_byte);
-		
-		ASSERT(!VN_DIRTY(vp) && 
-		       (ip->i_queued_bufs == 0) &&
-		       (vp->v_pgcnt == 0) &&
-		       (vp->v_buf == NULL));
-		ASSERT(XFS_FORCED_SHUTDOWN(ip->i_mount) ||
-		       ip->i_delayed_blks == 0);
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	}
-
 #ifndef SIM
 	dnlc_purge_vp(vp);
 #endif	/* !SIM */
@@ -5266,9 +5273,15 @@ xfs_reclaim(
 		    ((ip->i_itemp != NULL) &&
 		     (ip->i_itemp->ili_format.ilf_fields != 0))) {
 			error = xfs_iflush(ip, XFS_IFLUSH_DELWRI_ELSE_SYNC);
+			/*
+			 * If we hit an error, typically because of filesystem
+			 * shutdown, we don't need to let vn_reclaim to know
+			 * because we're gonna reclaim the inode anyway.
+			 */
 			if (error) {
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				return error;
+				xfs_ireclaim(ip);
+				return (0);
 			}
 		}
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -5328,10 +5341,10 @@ xfs_alloc_file_space(
 		       (inst_t *)__return_address);
 	
 	mp = ip->i_mount;
-#ifndef XFSERRORDEBUG
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
-#endif
+
 	/*
 	 * determine if this is a realtime file
 	 */
