@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.46 1995/03/17 00:52:24 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.47 1995/03/22 20:58:52 doucette Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -693,6 +693,7 @@ xfs_grio_issue_io( vnode_t *vp,
  * RETURNS:
  *	The current spl level.
  */
+/*ARGSUSED*/
 int
 ticket_lock(xfs_inode_t *ip)
 {
@@ -711,6 +712,7 @@ ticket_lock(xfs_inode_t *ip)
  * RETURNS:
  *	none
  */
+/*ARGSUSED*/
 void
 ticket_unlock(xfs_inode_t *ip, int s)
 {
