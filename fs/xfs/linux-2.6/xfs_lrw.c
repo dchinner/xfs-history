@@ -128,12 +128,12 @@ xfs_read(
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(filp->f_flags & (O_INVISIBLE))) {
 
-		/*vrwlock_t locktype = VRWLOCK_READ;*/
+		vrwlock_t locktype = VRWLOCK_READ;
 
 		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
 					     *offsetp, size,
 					     FILP_DELAY_FLAG(filp),
-					     NULL /*&locktype*/);
+					     &locktype);
 		if (error) {
 			XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 			return error;
