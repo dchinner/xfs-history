@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -630,7 +630,7 @@ xfs_rtfind_back(
 	len = start - limit + 1;
 	want = (*b & ((xfs_rtword_t)1 << bit)) ? -1 : 0;
 	if (bit < XFS_NBWORD - 1) {
-		firstbit = XFS_RTMAX(bit - len + 1, 0);
+		firstbit = XFS_RTMAX((xfs_srtblock_t)(bit - len + 1), 0);
 		mask = (((xfs_rtword_t)1 << (bit - firstbit + 1)) - 1) << firstbit;
 		if (wdiff = (*b ^ want) & mask) {
 			xfs_trans_brelse(tp, bp);
