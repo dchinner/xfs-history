@@ -503,6 +503,13 @@ xfs_refcache_insert(
 	}
 
 	/*
+	 * If we tuned the refcache down to zero, don't do anything.
+	 */
+	 if (!xfs_refcache_size) {
+	 	return;
+	}
+
+	/*
 	 * The inode is already in the refcache, so don't bother
 	 * with it.
 	 */
@@ -519,7 +526,7 @@ xfs_refcache_insert(
 	 * waste the memory on systems not being used as NFS servers.
 	 */
 	if (xfs_refcache == NULL) {
-		refcache = (xfs_inode_t **)kmem_zalloc(xfs_refcache_size *
+		refcache = (xfs_inode_t **)kmem_zalloc(XFS_REFCACHE_SIZE_MAX *
 						       sizeof(xfs_inode_t *),
 						       KM_SLEEP);
 	} else {
@@ -553,7 +560,7 @@ xfs_refcache_insert(
 		 */
 		if (refcache != NULL) {
 			kmem_free(refcache,
-				  xfs_refcache_size * sizeof(xfs_inode_t *));
+				  XFS_REFCACHE_SIZE_MAX * sizeof(xfs_inode_t *));
 		}
 		return;
 	}
@@ -587,7 +594,7 @@ xfs_refcache_insert(
 	 */
 	if (refcache != NULL) {
 		kmem_free(refcache,
-			  xfs_refcache_size * sizeof(xfs_inode_t *));
+			  XFS_REFCACHE_SIZE_MAX * sizeof(xfs_inode_t *));
 	}
 	return;
 }
@@ -695,14 +702,16 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	int		error, i;
 	xfs_inode_t	*ip;
 	int		iplist_index;
-#define	XFS_REFCACHE_PURGE_COUNT	10
-	xfs_inode_t	*iplist[XFS_REFCACHE_PURGE_COUNT];
+	xfs_inode_t	**iplist;
 
 	if ((xfs_refcache == NULL) || (xfs_refcache_count == 0)) {
 		return;
 	}
 
 	iplist_index = 0;
+	iplist = (xfs_inode_t **)kmem_zalloc(xfs_params.xfs_un.refcache_purge * 
+				          sizeof(xfs_inode_t *), KM_SLEEP);
+
 	spin_lock(&xfs_refcache_lock);
 
 	/*
@@ -713,7 +722,7 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	 * forward as we go so that we are sure to eventually clear
 	 * out the entire cache when the system goes idle.
 	 */
-	for (i = 0; i < XFS_REFCACHE_PURGE_COUNT; i++) {
+	for (i = 0; i < xfs_params.xfs_un.refcache_purge; i++) {
 		ip = xfs_refcache[xfs_refcache_index];
 		if (ip != NULL) {
 			xfs_refcache[xfs_refcache_index] = NULL;
@@ -751,5 +760,82 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	for (i = 0; i < iplist_index; i++) {
 		VOP_RELEASE(XFS_ITOV(iplist[i]), error);
 		VN_RELE(XFS_ITOV(iplist[i]));
+	}
+
+	kmem_free(iplist, xfs_params.xfs_un.refcache_purge *
+			  sizeof(xfs_inode_t *));
+}
+
+/*
+ * This is called when the refcache is dynamically resized
+ * via a sysctl.
+ *
+ * If the new size is smaller than the old size, purge all
+ * entries in slots greater than the new size, and move
+ * the index if necessary.
+ *
+ * If the refcache hasn't even been allocated yet, or the
+ * new size is larger than the old size, just set the value
+ * of xfs_refcache_size.
+ */
+
+void
+xfs_refcache_resize(int xfs_refcache_new_size)
+{
+	int 		i;
+	xfs_inode_t	*ip;
+	int		iplist_index = 0;
+	xfs_inode_t	**iplist;
+	int		error;
+
+	/*
+	 * If the new size is smaller than the current size,
+	 * purge entries to create smaller cache, and
+	 * reposition index if necessary.
+	 * Don't bother if no refcache yet.
+	 */
+	if (xfs_refcache && (xfs_refcache_new_size < xfs_refcache_size)) {
+
+		iplist = (xfs_inode_t **)kmem_zalloc(XFS_REFCACHE_SIZE_MAX * 
+				sizeof(xfs_inode_t *), KM_SLEEP);
+
+		spin_lock(&xfs_refcache_lock);
+
+		for (i = xfs_refcache_new_size; i < xfs_refcache_size; i++) {
+			ip = xfs_refcache[i];
+			if (ip != NULL) {
+				xfs_refcache[i] = NULL;
+				ip->i_refcache = NULL;
+				xfs_refcache_count--;
+				ASSERT(xfs_refcache_count >= 0);
+				iplist[iplist_index] = ip;
+				iplist_index++;
+			}
+		}
+
+		xfs_refcache_size = xfs_refcache_new_size;
+
+		/* 
+		 * Move index to beginning of cache if it's now past the end
+		 */
+		if (xfs_refcache_index >= xfs_refcache_new_size)
+			xfs_refcache_index = 0;
+
+		spin_unlock(&xfs_refcache_lock);
+
+		/*
+		 * Now drop the inodes we collected.
+		 */
+		for (i = 0; i < iplist_index; i++) {
+			VOP_RELEASE(XFS_ITOV(iplist[i]), error);
+			VN_RELE(XFS_ITOV(iplist[i]));
+		}
+
+		kmem_free(iplist, XFS_REFCACHE_SIZE_MAX *
+				  sizeof(xfs_inode_t *));
+	} else {
+		spin_lock(&xfs_refcache_lock);
+		xfs_refcache_size = xfs_refcache_new_size;
+		spin_unlock(&xfs_refcache_lock);
 	}
 }

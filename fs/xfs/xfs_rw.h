@@ -73,6 +73,12 @@ struct pm;
 #define	XFS_MAX_BMAP_LEN_BYTES	524288
 
 /*
+ * Maximum size (in inodes) for the nfs refcache
+ */
+#define XFS_REFCACHE_SIZE_MAX	512
+
+
+/*
  * Convert the given file system block to a disk block.
  * We have to treat it differently based on whether the
  * file is a real time file or not, because the bmap code
@@ -168,6 +174,9 @@ void
 xfs_refcache_purge_some(
 	struct xfs_mount	*mp);
 
+void
+xfs_refcache_resize(
+	int			xfs_refcache_new_size);
 
 int
 xfs_bioerror(

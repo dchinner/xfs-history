@@ -173,8 +173,9 @@ xfs_init(int	fstype)
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
 	xfs_init_procfs();
+	xfs_sysctl_register();
 
-	xfs_refcache_size = 512;
+	xfs_refcache_size = xfs_params.xfs_un.refcache_size;
 
 	/*
 	 * The inode hash table is created on a per mounted
@@ -202,9 +203,10 @@ xfs_cleanup(void)
 	extern xfs_inode_t	**xfs_refcache;
 
 	xfs_cleanup_procfs();
+	xfs_sysctl_unregister();
 	if (xfs_refcache) {
 		kmem_free(xfs_refcache, 
-			512 * sizeof(xfs_inode_t *));
+			XFS_REFCACHE_SIZE_MAX * sizeof(xfs_inode_t *));
 	}
 
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
