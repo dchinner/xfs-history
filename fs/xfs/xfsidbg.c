@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -540,7 +540,6 @@ xfs_dir_trace_entry(ktrace_entry_t *ktep)
 	xfs_mount_t *mp;
 	__uint32_t hash;
 	off_t cookie;
-	char *pos;
 
 	if (!ktep->val[0] || !ktep->val[1])
 		return 0;
