@@ -1,4 +1,4 @@
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 
 #include <sys/param.h>
@@ -302,23 +302,22 @@ xfs_qm_mount_quotainit(
 	}
 
 	/*
-	 * Initialize the flags in the mount structure.
-	 * From this point onwards we look at m_flags to figure out if quotas
-	 * is ON/OFF, etc.
+	 * Initialize the flags in the mount structure. From this point
+	 * onwards we look at m_qflags to figure out if quotas's ON/OFF, etc.
 	 * Note that we enforce nothing if accounting is off.
 	 * ie.  XFSMNT_*QUOTA must be ON for XFSMNT_*QUOTAENF.
 	 * It isn't necessary to take the quotaoff lock to do this; this is
 	 * called from mount.
 	 */
 	if (flags & XFSMNT_UQUOTA) {
-		mp->m_flags |= (XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_UDQ_ACTIVE);
+		mp->m_qflags |= (XFS_UQUOTA_ACCT | XFS_UQUOTA_ACTIVE);
 		if (flags & XFSMNT_UQUOTAENF) 
-			mp->m_flags |= XFS_MOUNT_UDQ_ENFD;
+			mp->m_qflags |= XFS_UQUOTA_ENFD;
 	}
 	if (flags & XFSMNT_PQUOTA) {
-		mp->m_flags |= (XFS_MOUNT_PDQ_ACCT | XFS_MOUNT_PDQ_ACTIVE);
+		mp->m_qflags |= (XFS_PQUOTA_ACCT | XFS_PQUOTA_ACTIVE);
 		if (flags & XFSMNT_PQUOTAENF) 
-			mp->m_flags |= XFS_MOUNT_PDQ_ENFD;
+			mp->m_qflags |= XFS_PQUOTA_ENFD;
 	}
 }
 
@@ -358,11 +357,24 @@ xfs_qm_mount_quotas(
 	 */
 	if (! XFS_IS_QUOTA_ON(mp) &&
 	    (mp->m_dev != rootdev) &&
-	    (mp->m_sb.sb_qflags & (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT))) {
-		mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
+	    (mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT))) {
+		mp->m_qflags = 0;
 		goto write_changes;
 	}
 	    
+#ifdef _IRIX62_XFS_ONLY
+	/*
+	 * If quotas on realtime volumes is not supported, we disable
+	 * quotas immediately.
+	 */
+	if (mp->m_sb.sb_rextents) {
+		cmn_err(CE_NOTE,
+			"Cannot turn quotas on a realtime filesystem :%s",
+			mp->m_fsname);
+		mp->m_qflags = 0;
+		goto write_changes;
+	}
+#endif
 	/*
 	 * If this is the root file system, mark flags in mount struct first.
 	 * We couldn't do this earlier because we didn't have the superblock
@@ -371,20 +383,19 @@ xfs_qm_mount_quotas(
 	if (mp->m_dev == rootdev) {
 		ASSERT(XFS_SB_VERSION_HASQUOTA(&mp->m_sb));
 		ASSERT(mp->m_sb.sb_qflags & 
-		       (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT));
+		       (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT));
 		if (G_xqm == NULL) {
 			if ((G_xqm = xfs_qm_init()) == NULL) {	
-				mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
+				mp->m_qflags = 0;
 				error = EINVAL;
 				goto write_changes;
 			}
 		}
-		mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
-		mp->m_flags |= mp->m_sb.sb_qflags & XFS_MOUNT_QUOTA_ALL;
-		if (mp->m_flags & XFS_MOUNT_UDQ_ACCT)
-			mp->m_flags |= XFS_MOUNT_UDQ_ACTIVE;
-		if (mp->m_flags & XFS_MOUNT_PDQ_ACCT)
-			mp->m_flags |= XFS_MOUNT_PDQ_ACTIVE;
+		mp->m_qflags = mp->m_sb.sb_qflags;
+		if (mp->m_qflags & XFS_UQUOTA_ACCT)
+			mp->m_qflags |= XFS_UQUOTA_ACTIVE;
+		if (mp->m_qflags & XFS_PQUOTA_ACCT)
+			mp->m_qflags |= XFS_PQUOTA_ACTIVE;
 		/*
 		 * The quotainode of the root file system may or may not
 		 * exist at this point.
@@ -402,7 +413,7 @@ xfs_qm_mount_quotas(
 		 */
 		ASSERT(mp->m_quotainfo == NULL);
 		ASSERT(G_xqm != NULL);
-		mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
+		mp->m_qflags = 0;
 		goto write_changes;
 	}
 	/*
@@ -423,7 +434,7 @@ xfs_qm_mount_quotas(
 			ASSERT(mp->m_quotainfo != NULL);
 			ASSERT(G_xqm != NULL);
 			xfs_qm_destroy_quotainfo(mp);
-			mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
+			mp->m_qflags = 0;
 			goto write_changes;
 		}
 #ifdef DEBUG
@@ -437,10 +448,10 @@ xfs_qm_mount_quotas(
 	 */
 	s = XFS_SB_LOCK(mp);
 	sbf = mp->m_sb.sb_qflags;
-	mp->m_sb.sb_qflags = mp->m_flags & XFS_MOUNT_QUOTA_ALL;
+	mp->m_sb.sb_qflags = mp->m_qflags & XFS_MOUNT_QUOTA_ALL;
 	XFS_SB_UNLOCK(mp, s);
 	
-	if (sbf != (mp->m_flags & XFS_MOUNT_QUOTA_ALL)) {
+	if (sbf != (mp->m_qflags & XFS_MOUNT_QUOTA_ALL)) {
 		if (xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS)) {
 			/*
 			 * We could only have been turning quotas off.
@@ -1211,7 +1222,7 @@ xfs_qm_init_quotainfo(
 	 * Tell XQM that we exist.
 	 */
 	xfs_qm_hold_quotafs_ref(mp);
-	mp->m_flags |= (mp->m_sb.sb_qflags & XFS_ALL_QUOTA_CHKD);
+	mp->m_qflags |= (mp->m_sb.sb_qflags & XFS_ALL_QUOTA_CHKD);
 	
 	/*
 	 * We try to get the limits from the superuser's limits fields.
@@ -1842,6 +1853,9 @@ xfs_qm_dqusage_adjust(
 		return (0);
 	}
 
+#ifdef  _IRIX62_XFS_ONLY
+	ASSERT(! XFS_IS_REALTIME_INODE(ip));
+#endif
 	rtblks = 0;
 	if (! XFS_IS_REALTIME_INODE(ip)) {
 		nblks = (xfs_qcnt_t)ip->i_d.di_nblocks;
@@ -1978,7 +1992,7 @@ xfs_qm_quotacheck(
 					     XFS_QMOPT_UQUOTA | XFS_QMOPT_DOLOG,
 					     NULL))
 			return (error);
-		flags |= XFS_MOUNT_UDQ_CHKD;
+		flags |= XFS_UQUOTA_CHKD;
 	}
 	
 	if (pip) {
@@ -1986,7 +2000,7 @@ xfs_qm_quotacheck(
 					     XFS_QMOPT_PQUOTA | XFS_QMOPT_DOLOG,
 					     NULL))
 			return (error);
-		flags |= XFS_MOUNT_PDQ_CHKD;
+		flags |= XFS_PQUOTA_CHKD;
 	}
 	
 	/*
@@ -1994,8 +2008,8 @@ xfs_qm_quotacheck(
 	 * quotachecked status, since we won't be doing accounting for
 	 * that type anymore.
 	 */	
-	mp->m_flags &= ~(XFS_MOUNT_PDQ_CHKD | XFS_MOUNT_UDQ_CHKD);
-	mp->m_flags |= flags;
+	mp->m_qflags &= ~(XFS_PQUOTA_CHKD | XFS_UQUOTA_CHKD);
+	mp->m_qflags |= flags;
 
 #ifdef QUOTADEBUG
 	XQM_LIST_PRINT(&(mp->QI_MPL_LIST), MPL_NEXT, "++++ Mp list +++"); 
@@ -2372,14 +2386,19 @@ xfs_qm_dqreclaim_one(void)
  * the user asking us to do so, and try to continue. The attempt is to
  * not halt the entire system because of quota problems.
  */
-/* ARGSUSED */
 void
 xfs_qm_force_quotaoff(
 	xfs_mount_t	*mp)
 {
 	cmn_err(CE_WARN, 
-		"quotas error: must disable quotas\n");
-	debug("quotaerr");
+		"Quota Error: disabling quotas :%s\n",
+		mp->m_fsname);
+	/*
+	 * Caller must assure us that we're not in the middle of a
+	 * transaction. We just call the regular quotaoff routine
+	 * with the FORCE option.
+	 */
+	(void) xfs_qm_scall_quotaoff(mp, mp->m_qflags, B_TRUE);
 }
 
 
@@ -2448,7 +2467,9 @@ xfs_qm_write_sb_changes(
 	int 		error;
 	
 #ifdef QUOTADEBUG	
-	printf("Writing superblock quota changes\n");
+	cmn_err(CE_NOTE, 	
+		"Writing superblock quota changes :%s\n",
+		mp->m_fsname);
 #endif
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SBCHANGE);
 	if (error = xfs_trans_reserve(tp, 0, 
