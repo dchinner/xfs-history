@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.22 1994/05/13 22:14:00 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.23 1994/05/23 15:32:05 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -43,7 +43,6 @@
 #include "sim.h"
 #include "stdio.h"
 #endif
-
 
 /*
  * These routines determine if a griven file read or write request 
@@ -138,6 +137,12 @@ xfs_get_inode(  dev_t fs_dev, int ino)
         return( ip );
 }
 
+#ifdef ROTATE_DEBUG
+int grio_rotate = 0;
+int grio_rotate_count = 0;
+int grio_rotate_set	= 6;
+#endif
+
 /*
  * xfs_add_ticket_to_inode()
  *
@@ -159,11 +164,35 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 	} else {
 		if (ticket = kmem_zalloc( sizeof( grio_ticket_t), KM_SLEEP)) {
 			ticket->sz = sz;
+			ticket->type = NON_ROTATE_TYPE;
 			ticket->id.ino = id->ino;
 			ticket->id.pid = id->pid;
 			ticket->lastreq.tv_sec  = 0;
 			ticket->lastreq.tv_nsec = 0;
 			ticket->iothissecond    = 0;
+			if (id->vod_rotate_slot != NULL_VOD_SLOT) {
+				ticket->rotator_slot = id->vod_rotate_slot;
+				ticket->rotator_group_size = id->vod_group_size;
+			}
+#ifdef ROTATE_DEBUG
+			if (grio_rotate) {
+				ticket->type = ROTATE_TYPE;
+
+				if (grio_rotate_count < grio_rotate_set) 
+					ticket->rotator_slot = 0;
+				else if (grio_rotate_count < (2*grio_rotate_set)) 
+					ticket->rotator_slot = 1;
+				else if (grio_rotate_count < (3*grio_rotate_set)) 
+					ticket->rotator_slot = 2;
+				else
+					ticket->rotator_slot = 3;
+
+				grio_rotate_count++;
+
+				ticket->rotator_group_size = 4;
+			}
+#endif
+
 			if (ip->i_ticket) 
 				ticket->nextticket = ip->i_ticket;
 			/*
@@ -389,13 +418,20 @@ xfs_grio_req( xfs_inode_t *ip,
 	uio_t *uiop, 
 	int ioflag,
 	cred_t *credp,
+	off_t	offset,
 	int rw)
 {
-	int 		sz, ret = 0, remainingio, thisioreq;
+	int 		sz, ret = 0, remainingio, thisioreq, r_size; 
+	int		which_disk, current_disk, num_sec, sec, delay_ticks;
 	vnode_t 	*vp;
+	time_t		snap_lbolt;
 	grio_ticket_t 	*ticket;
 	timestruc_t	tv, nexttv;
 	struct	timeval	tvl;
+
+int	loopcnt = 0;
+
+retry_request:
 
         /*
          * Determine if this request has a guaranteed rate of I/O.
@@ -405,6 +441,48 @@ xfs_grio_req( xfs_inode_t *ip,
  		 * Mark this request as being rate guaranteed. 
 		 */
 		ioflag |= IO_GRIO;
+
+		if ( ROTATE_TICKET(ticket) ) {
+			ASSERT(uiop->uio_resid == ticket->sz);
+
+			snap_lbolt 	= lbolt;
+			r_size 		= ticket->rotator_group_size;
+			sec 		= (snap_lbolt / HZ) % r_size;
+
+			which_disk 	= (offset / ticket->sz) % r_size;
+			current_disk 	= (sec + ticket->rotator_slot) % r_size;
+
+			if (which_disk == current_disk) {
+				/*
+				 * Fall thru and issue the request.
+				 * This is the correct disk.
+				 */
+				;
+			} else {
+
+#ifdef CLOSER_TIMING
+				if (current_disk > which_disk) {
+					num_sec =  r_size - 1 - 
+						current_disk + which_disk;
+				} else {
+					ASSERT( which_disk > current_disk );
+					num_sec = which_disk - current_disk - 1;
+				}
+
+				delay_ticks = HZ - (snap_lbolt % HZ);
+				delay_ticks += ( num_sec * HZ);
+
+#else
+				delay_ticks = 2;
+#endif
+
+                        	ticket_unlock(ip);
+		                delay( delay_ticks );
+				goto retry_request;
+			}
+        		ticket->lastreq.tv_sec  = 0;
+        		ticket->lastreq.tv_nsec = 0;
+		}
 
 		/*
 	 	 * 1) Determine the time of the last request.
@@ -554,7 +632,12 @@ xfs_grio_req( xfs_inode_t *ip,
 	} else {
        		ticket_unlock(ip);
 		vp = XFS_ITOV(ip);
+
+     		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		xfs_grio_issue_io(vp, uiop, ioflag, credp, rw);
+     		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
+
+
 	}
         return (ret) ;
 }
