@@ -149,7 +149,8 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
  * mount structure.
  */
 buf_t *
-xfs_trans_getsb(xfs_trans_t *tp)
+xfs_trans_getsb(xfs_trans_t	*tp,
+		int		flags)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
@@ -160,7 +161,7 @@ xfs_trans_getsb(xfs_trans_t *tp)
 	 * if tp is NULL.
 	 */
 	if (tp == NULL) {
-		return (xfs_getsb(tp->t_mountp));
+		return (xfs_getsb(tp->t_mountp, flags));
 	}
 
 	/*
@@ -179,7 +180,10 @@ xfs_trans_getsb(xfs_trans_t *tp)
 		return (bp);
 	}
 
-	bp = xfs_getsb(tp->t_mountp);
+	bp = xfs_getsb(tp->t_mountp, flags);
+	if (bp == NULL) {
+		return NULL;
+	}
 
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
@@ -366,6 +370,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		 buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
+	xfs_log_item_t		*lip;
 	xfs_log_item_desc_t	*lidp;
 	int			s;
 
@@ -380,10 +385,13 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		 * unlocked.
 		 */
 		if (bp->b_fsprivate != NULL) {
-			bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
-			ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
-			xfs_trans_unlocked_item(bip->bli_item.li_mountp,
-						(xfs_log_item_t*)bip);
+			lip = (xfs_log_item_t *)bp->b_fsprivate;
+			if (lip->li_type == XFS_LI_BUF) {
+				bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+				xfs_trans_unlocked_item(
+						bip->bli_item.li_mountp,
+						lip);
+			}
 		}
 		brelse(bp);
 		return;
@@ -464,7 +472,6 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * its relation to this transaction.
 	 */
 	if (!xfs_buf_item_dirty(bip)) {
-		ASSERT(!(bp->b_flags & B_DELWRI));
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_refcount == 0);
 		ASSERT(!(bip->bli_item.li_flags & XFS_LI_IN_AIL));
