@@ -1,4 +1,4 @@
-#ident "$Revision: 1.195 $"
+#ident "$Revision: 1.196 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1239,7 +1239,6 @@ xfs_atruncate_start(
 	return error;
 }
 
-
 /*
  * Start the truncation of the file to new_size.  The new size
  * must be smaller than the current size.  This routine will
@@ -1330,11 +1329,27 @@ xfs_itruncate_start(
 		}
 		VN_FLAGCLR(vp, VREMAPPING);
 	}
-	ASSERT((new_size != 0) ||
-	       (!VN_DIRTY(vp) &&
-		(ip->i_queued_bufs == 0) &&
-		(vp->v_buf == NULL) &&
-		(vp->v_pgcnt == 0)));
+
+#ifdef DEBUG
+	if (new_size == 0) {
+		if (VN_DIRTY(vp) || ip->i_queued_bufs != 0 || vp->v_buf != NULL ||
+		    vp->v_pgcnt != 0) {
+			extern void xfs_print_xfsd_buflist(void);
+			
+			printf("ip 0x%x, queued_bufs 0x%x, vbuf 0x%x, "
+			       "v_pgcnt 0x%x, dbuf 0x%x, dpages 0x%x\n",
+			       ip, ip->i_queued_bufs, vp->v_buf, vp->v_pgcnt,
+			       vp->v_dbuf, vp->v_dpages);
+			if (ip->i_queued_bufs != 0) 
+				xfs_print_xfsd_buflist();
+			
+		}
+		ASSERT(!VN_DIRTY(vp));
+		ASSERT(ip->i_queued_bufs == 0);
+		ASSERT(vp->v_buf == NULL);
+		ASSERT(vp->v_pgcnt == 0);
+	}
+#endif
 }		    
 
 /*
