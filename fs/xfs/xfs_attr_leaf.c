@@ -348,7 +348,8 @@ xfs_attr_shortform_to_leaf(xfs_da_args_t *args)
 	error = 0;
 
 out:
-	xfs_da_buf_done(bp);
+	if(bp)
+		xfs_da_buf_done(bp);
 	kmem_free(tmpbuffer, size);
 	return(error);
 }
