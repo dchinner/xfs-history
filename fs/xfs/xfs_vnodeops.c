@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.218 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -362,7 +362,7 @@ xfs_close(
 	extern 	int	grio_remove_reservation( pid_t, dev_t, gr_ino_t);
 	int		isshd, nofiles, vpcount, i;
 	proc_t		*p = curprocp;
-	shaddr_t	*sa = p->p_shaddr;
+	shaddr_t	*sa;
         xfs_inode_t	*ip;
 	struct file	*fp;
 	struct ufchunk	*ufp;
@@ -378,7 +378,8 @@ xfs_close(
 
 		vpcount = 0;
 
-		if (isshd = ISSHDFD(p, sa)) {
+		if (isshd = ISSHDFD(p)) {
+			sa = p->p_shaddr;
 			mrlock(&sa->s_fsync, MR_ACCESS, PZERO);
 			ufp = sa->s_flist;
 			nofiles  = sa->s_nofiles;
