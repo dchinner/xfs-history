@@ -1,4 +1,4 @@
-#ident "$Revision: 1.299 $"
+#ident "$Revision: 1.301 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -13,7 +13,7 @@
 #ifdef	OLDSPECFS
 #include <fs/specfs/snode.h>
 #else	/* ! OLDSPECFS */
-#include <fs/specfs/spec_asnode.h>
+#include <fs/specfs/spec_lsnode.h>
 #endif	/* ! OLDSPECFS */
 #include <sys/systm.h>
 #include <sys/dnlc.h>
@@ -3110,6 +3110,8 @@ xfs_remove(
 #ifndef SIM
 	xfs_refcache_purge_ip(ip);
 #endif
+
+	vn_trace_entry(XFS_ITOV(ip), "xfs_remove", (inst_t *)__return_address);
 
 	/*
 	 * Let interposed file systems know about removed links.
