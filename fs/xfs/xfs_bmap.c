@@ -333,14 +333,17 @@ xfs_bmap_add_extent(
 		xfs_extlen_t	nblks;
 
 		nblks = da_new;
-		if (cur) {
+		if (cur)
 			nblks += cur->bc_private.b.allocated;
-			cur->bc_private.b.allocated = 0;
-		}
 		ASSERT(nblks <= da_old);
 		if (nblks < da_old)
 			xfs_mod_incore_sb(mp, XFS_SB_FDBLOCKS, da_old - nblks);
 	}
+	/*
+	 * Clear out the allocated field, done with it now in any case.
+	 */
+	if (cur)
+		cur->bc_private.b.allocated = 0;
 	return logflags;
 }
 

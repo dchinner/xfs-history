@@ -1259,6 +1259,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		xfs_trans_brelse(trans, bp);
 		if (bno == 0)
 			break;
+		uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, 0);
 		bp = xfs_dir_read_buf(trans, dp, bno);
 	}
 	*eofp = 1;
