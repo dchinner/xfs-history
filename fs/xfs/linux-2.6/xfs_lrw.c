@@ -79,7 +79,7 @@ xfs_rdwr(
 	loff_t		*offsetp,
 	int		read)	/* set if read, otherwise this is write */
 {
-	ssize_t ret;
+	ssize_t		ret;
 	struct xfs_inode *xip;
 
 	xip = XFS_BHVTOI(bdp);
@@ -112,10 +112,12 @@ xfs_read(
 	size_t		size,
 	loff_t		*offsetp)
 {
-	ssize_t ret;
+	ssize_t		ret;
 	xfs_fsize_t	n;
+#ifdef CONFIG_XFS_DMAPI
 	vnode_t		*vp;
 	xfs_inode_t	*ip;
+#endif
 
 	n = XFS_MAX_FILE_OFFSET - *offsetp;
 	if (n <= 0)
@@ -164,7 +166,7 @@ STATIC int				/* error */
 xfs_zero_last_block(
 	struct inode	*ip,
 	xfs_iocore_t	*io,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	xfs_fsize_t	isize,
 	struct pm	*pmp)
 {
@@ -614,17 +616,19 @@ xfs_write(
 	size_t		size,
 	loff_t		*offsetp)
 {
-	xfs_inode_t *xip;
-	struct dentry *dentry = filp->f_dentry;
-	struct inode *ip = dentry->d_inode;
-	struct xfs_mount *mp;
-	ssize_t ret;
+	xfs_inode_t	*xip;
+	struct dentry	*dentry = filp->f_dentry;
+	struct inode	*ip = dentry->d_inode;
+	xfs_mount_t	*mp;
+	ssize_t		ret;
 	xfs_fsize_t     isize;
 	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
 	xfs_iocore_t    *io;
 	vnode_t		*vp;
+#ifdef CONFIG_XFS_DMAPI
 	int		eventsent = 0;
 	loff_t		savedsize = *offsetp;
+#endif
 
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
@@ -859,7 +863,7 @@ unlock:
 int
 _xfs_imap_to_bmap(
 	xfs_iocore_t    *io,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	xfs_bmbt_irec_t *imap,
 	pb_bmap_t	*pbmapp,
 	int		imaps,			/* Number of imap entries */
@@ -1221,7 +1225,7 @@ xfs_iomap_write_delay(
 	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	start_fsb;
 	xfs_filblks_t	count_fsb;
-	xfs_off_t		aligned_offset;
+	xfs_off_t	aligned_offset;
 	xfs_fsize_t	isize;
 	xfs_fsblock_t	firstblock;
 	__uint64_t	last_page_offset;
