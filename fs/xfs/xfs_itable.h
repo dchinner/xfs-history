@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.20 $"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -105,6 +105,7 @@ typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
 			       xfs_ino_t   	ino,
 			       void	     	*buffer,
 			       daddr_t		bno,
+			       void		*dip,
 			       int		*stat);
 /*
  * Values for stat return value.
@@ -112,6 +113,12 @@ typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
 #define	BULKSTAT_RV_NOTHING	0
 #define	BULKSTAT_RV_DIDONE	1
 #define	BULKSTAT_RV_GIVEUP	2
+
+/*
+ * Values for bulkstat flag argument.
+ */
+#define	BULKSTAT_FG_IGET	0	/* Go through the buffer cache */
+#define	BULKSTAT_FG_QUICK	1	/* No iget, walk the dinode cluster */
 
 /*
  * Return stat information in bulk (by-inode) for the filesystem.
@@ -125,6 +132,7 @@ xfs_bulkstat(
 	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
 	size_t		statstruct_size,/* sizeof struct that we're filling */
 	caddr_t		ubuffer,	/* buffer with inode stats */
+	int		flag,		/* flag to control access method */
 	int		*done);		/* 1 if there're more stats to get */
 
 #endif	/* _KERNEL */
