@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.97 $"
+#ident	"$Revision: 1.98 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2085,6 +2085,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 	xfs_buf_log_format_v1_t	*obuf_f;
 	unsigned int		*data_map;
 	unsigned int		map_size;
+	int                     error;
 
 	switch (buf_f->blf_type) {
 	case XFS_LI_BUF:
@@ -2109,7 +2110,21 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
 		ASSERT(bp->b_bcount >=
 		       ((uint)bit << XFS_BLI_SHIFT)+(nbits<<XFS_BLI_SHIFT));
-		bcopy(item->ri_buf[i].i_addr,		           /* source */
+		
+		/*
+		 * Do a sanity check if this is a dquot buffer. Just checking the 
+		 * first dquot in the buffer should do. XXXThis is
+		 * probably a good thing to do for other buf types also.
+		 */
+		error = 0;
+		if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF|XFS_BLI_PDQUOT_BUF)) {
+			error = xfs_qm_dqcheck((xfs_disk_dquot_t *)
+					       item->ri_buf[i].i_addr,
+					       -1, 0, XFS_QMOPT_DOWARN,
+					       "dquot_buf_recover");
+		}
+		if (!error)
+		    bcopy(item->ri_buf[i].i_addr,	           /* source */
 		      bp->b_un.b_addr+((uint)bit << XFS_BLI_SHIFT),  /* dest */
 		      nbits<<XFS_BLI_SHIFT);			   /* length */
 		i++;
@@ -2567,7 +2582,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	ASSERT(dq_f);
 	if (xfs_qm_dqcheck(recddq, 
 			   dq_f->qlf_id,
-			   0, NULL,
+			   0, XFS_QMOPT_DOWARN,
 			   "xlog_recover_do_dquot_trans (log copy)")) {
 		return XFS_ERROR(EIO);
 	}
@@ -2593,10 +2608,10 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	 * was among a chunk of dquots created earlier, and we did some
 	 * minimal initialization then.
 	 */
-	if (xfs_qm_dqcheck(ddq, dq_f->qlf_id, 0, NULL,
+	if (xfs_qm_dqcheck(ddq, dq_f->qlf_id, 0, XFS_QMOPT_DOWARN,
 			   "xlog_recover_do_dquot_trans")) {
 		brelse(bp);
-		return (EIO);
+		return XFS_ERROR(EIO);
 	}
 	ASSERT((caddr_t)ddq + item->ri_buf[1].i_len <=
 	       bp->b_dmaaddr + bp->b_bcount);
