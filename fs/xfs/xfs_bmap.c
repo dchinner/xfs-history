@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.147 $"
+#ident	"$Revision: 1.155 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3918,6 +3918,7 @@ xfs_bunmapi(
 	int			tmp_logflags;
 	int			whichfork;
 
+	error = 0;
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
 		XFS_ATTR_FORK : XFS_DATA_FORK;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
