@@ -3007,6 +3007,7 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 {
 	int	i;
 	xfs_caddr_t dp;
+	uint	cycle_lsn;
 #ifdef DEBUG
 	uint	*up;
 	uint	chksum = 0;
@@ -3020,10 +3021,12 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 	INT_SET(iclog->ic_header.h_chksum, ARCH_CONVERT, chksum);
 #endif /* DEBUG */
 
+	cycle_lsn = CYCLE_LSN_NOCONV(iclog->ic_header.h_lsn, ARCH_CONVERT);
 	dp = iclog->ic_data;
 	for (i = 0; i<BTOBB(iclog->ic_offset); i++) {
-		INT_SET(iclog->ic_header.h_cycle_data[i], ARCH_CONVERT, INT_GET(*(uint *)dp, ARCH_CONVERT));
-		INT_SET(*(uint *)dp, ARCH_CONVERT, CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT));
+		/* both on-disk, don't endian flip twice */
+		iclog->ic_header.h_cycle_data[i] = *(uint *)dp;
+		*(uint *)dp = cycle_lsn;
 		dp += BBSIZE;
 	}
 }	/* xlog_pack_data */
@@ -3042,7 +3045,8 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 #endif
 
 	for (i=0; i<BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT)); i++) {
-		INT_SET(*(uint *)dp, ARCH_CONVERT, INT_GET(*(uint *)&rhead->h_cycle_data[i], ARCH_CONVERT));
+		/* these are both on-disk, so don't endian flip twice */
+		*(uint *)dp = *(uint *)&rhead->h_cycle_data[i];
 		dp += BBSIZE;
 	}
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)

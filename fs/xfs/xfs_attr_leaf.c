@@ -473,8 +473,8 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 			xfs_da_hashname((char *)sfe->nameval, sfe->namelen));
 		sbp->name = (char *)sfe->nameval;
 		sbp->namelen = sfe->namelen;
-		INT_SET(sbp->valuelen, ARCH_CONVERT,
-					INT_GET(sfe->valuelen, ARCH_CONVERT));
+		/* These are bytes, and both on-disk, don't endian-flip */
+		sbp->valuelen = sfe->valuelen;
 		sbp->flags = sfe->flags;
 		sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
 		sbp++;
@@ -680,10 +680,9 @@ xfs_attr_leaf_to_node(xfs_da_args_t *args)
 	leaf = bp2->data;
 	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
 						== XFS_ATTR_LEAF_MAGIC);
-	INT_SET(node->btree[0].hashval, ARCH_CONVERT,
-			INT_GET(leaf->entries[INT_GET(leaf->hdr.count,
-						ARCH_CONVERT)-1 ].hashval,
-								ARCH_CONVERT));
+	/* both on-disk, don't endian-flip twice */
+	node->btree[0].hashval = 
+		leaf->entries[INT_GET(leaf->hdr.count, ARCH_CONVERT)-1 ].hashval;
 	INT_SET(node->btree[0].before, ARCH_CONVERT, blkno);
 	INT_SET(node->hdr.count, ARCH_CONVERT, 1);
 	xfs_da_log_buf(args->trans, bp1, 0, XFS_LBSIZE(dp->i_mount) - 1);
@@ -975,8 +974,8 @@ xfs_attr_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int mapindex)
 	 */
 	if (INT_GET(entry->nameidx, ARCH_CONVERT)
 				< INT_GET(hdr->firstused, ARCH_CONVERT)) {
-		INT_SET(hdr->firstused, ARCH_CONVERT,
-					INT_GET(entry->nameidx, ARCH_CONVERT));
+		/* both on-disk, don't endian-flip twice */
+		hdr->firstused = entry->nameidx;
 	}
 	ASSERT(INT_GET(hdr->firstused, ARCH_CONVERT)
 				>= ((INT_GET(hdr->count, ARCH_CONVERT)
@@ -1554,8 +1553,8 @@ xfs_attr_leaf_remove(xfs_dabuf_t *bp, xfs_da_args_t *args)
 			INT_MOD(map->size, ARCH_CONVERT, entsize);
 		} else {
 			map = &hdr->freemap[after];
-			INT_SET(map->base, ARCH_CONVERT,
-					INT_GET(entry->nameidx, ARCH_CONVERT));
+			/* both on-disk, don't endian flip twice */
+			map->base = entry->nameidx;
 			INT_MOD(map->size, ARCH_CONVERT, entsize);
 		}
 	} else {
@@ -2011,11 +2010,10 @@ xfs_attr_leaf_moveents(xfs_attr_leafblock_t *leaf_s, int start_s,
 		} else {
 #endif /* GROT */
 			INT_MOD(hdr_d->firstused, ARCH_CONVERT, -tmp);
-			INT_SET(entry_d->hashval, ARCH_CONVERT,
-				    INT_GET(entry_s->hashval, ARCH_CONVERT));
-			INT_SET(entry_d->nameidx, ARCH_CONVERT,
-						INT_GET(hdr_d->firstused,
-								ARCH_CONVERT));
+			/* both on-disk, don't endian flip twice */
+			entry_d->hashval = entry_s->hashval;
+			/* both on-disk, don't endian flip twice */
+			entry_d->nameidx = hdr_d->firstused;
 			entry_d->flags = entry_s->flags;
 			ASSERT(INT_GET(entry_d->nameidx, ARCH_CONVERT) + tmp
 							<= XFS_LBSIZE(mp));
@@ -2819,9 +2817,8 @@ xfs_attr_leaf_inactive(xfs_trans_t **trans, xfs_inode_t *dp, xfs_dabuf_t *bp)
 		    && ((entry->flags & XFS_ATTR_LOCAL) == 0)) {
 			name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
 			if (!INT_ISZERO(name_rmt->valueblk, ARCH_CONVERT)) {
-				INT_SET(lp->valueblk, ARCH_CONVERT,
-						INT_GET(name_rmt->valueblk,
-								ARCH_CONVERT));
+				/* both on-disk, don't endian flip twice */
+				lp->valueblk = name_rmt->valueblk;
 				INT_SET(lp->valuelen, ARCH_CONVERT,
 						XFS_B_TO_FSB(dp->i_mount,
 						    INT_GET(name_rmt->valuelen,

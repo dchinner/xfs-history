@@ -1838,8 +1838,8 @@ xfs_iunlink(
 		}
 		ASSERT(INT_GET(dip->di_next_unlinked, ARCH_CONVERT) == NULLAGINO);
 		ASSERT(!INT_ISZERO(dip->di_next_unlinked, ARCH_CONVERT));
-		INT_SET(dip->di_next_unlinked, ARCH_CONVERT, 
-                        INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT));
+		/* both on-disk, don't endian flip twice */
+		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
 		offset = ip->i_boffset +
 			offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_inode_buf(tp, ibp);
