@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.31 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -65,10 +65,11 @@ typedef struct xfs_dinode
 	union {
 		xfs_bmdr_block_t di_bmbt;	/* btree root block */
 		xfs_bmbt_rec_32_t di_bmx[1];	/* extent list */
+		xfs_dir_shortform_t di_dirsf;	/* shortform directory */
+		xfs_attr_shortform_t di_attrsf;	/* shortform attribute list */
 		char		di_c[1];	/* local contents */
 		dev_t		di_dev;		/* device for IFCHR/IFBLK */
 		uuid_t		di_muuid;	/* mount point value */
-		xfs_dir_shortform_t di_sfdir;	/* local directory */
 		char		di_symlink[1];	/* local symbolic link */
 	}		di_u;
 } xfs_dinode_t;
