@@ -1,4 +1,4 @@
-#ident "$Revision: 1.152 $"
+#ident "$Revision: 1.153 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -966,6 +966,191 @@ xfs_itrunc_trace(
 #endif
 
 #ifndef SIM
+
+/*
+ * This routine is used to log buffer cancel records for all of
+ * the blocks in the attribute fork.  This needs to be done, because
+ * we don't know which of the blocks in the attribute fork might
+ * currently be in the log.  We can't allow any of them to be recovered
+ * after we free the blocks.  Doing so might re-write the data logged
+ * in the block into a user file block.
+ *
+ * We process an entire array of extent descriptors gotten from xfs_bmapi(),
+ * and we try to bunch the buffer invalidations into transactions to
+ * avoid the cost of lots of transactions.
+ */
+int
+xfs_atruncate_invalidate(
+	xfs_mount_t	*mp,			 
+	xfs_bmbt_irec_t	*imaps,
+	int		nimaps)			 
+{
+	xfs_trans_t	*tp;
+	int		error;
+	buf_t		*bp;
+	daddr_t		start_bb;
+	long		count_bb;
+	int		cancelled_bufs;
+	int		n;
+
+
+	tp = NULL;
+	cancelled_bufs = 0;
+	for (n = 0; n < nimaps; n++) {
+		ASSERT(imaps[n].br_startblock != DELAYSTARTBLOCK);
+		/*
+		 * Skip over any holes.
+		 */
+		if (imaps[n].br_startblock == HOLESTARTBLOCK) {
+			continue;
+		}
+		start_bb = XFS_FSB_TO_DADDR(mp, imaps[n].br_startblock);
+		count_bb = XFS_FSB_TO_BB(mp, imaps[n].br_blockcount);
+		while (count_bb > 0) {
+			if (tp == NULL) {
+				tp = xfs_trans_alloc(mp, XFS_TRANS_AINVAL);
+				error = xfs_trans_reserve(tp, 0,
+						  XFS_AINVAL_LOG_RES(mp),
+						  0, 0,
+						  XFS_AINVAL_LOG_COUNT);
+				if (error) {
+					xfs_trans_cancel(tp, 0);
+					return error;
+				}
+			}
+
+			/*
+			 * Find the buffer for the current block in the
+			 * buffer cache or create one.  We need a buffer
+			 * for the current block so that we can cancel any
+			 * entries for this block in the log by logging
+			 * a buffer cancel record.
+			 */
+			bp = xfs_trans_get_buf(tp, mp->m_dev, start_bb,
+					       XFS_FSB_TO_BB(mp, 1), 0);
+			xfs_trans_binval(tp, bp);
+
+			/*
+			 * We try to do up to XFS_ATRUNC_MAX_BUFS in a single
+			 * transaction.  This reduces the total number of
+			 * transactions.  These transactions don't need to
+			 * be synchronous, because the case we are worried
+			 * about is when the blocks are reallocated to a
+			 * file.  If the reallocation makes it to the
+			 * log then the freeing of the blocks and the
+			 * cancellation of the buffer writes will have
+			 * made it as well.
+			 */
+			cancelled_bufs++;
+			if (cancelled_bufs == XFS_ATRUNC_MAX_BUFS) {
+				error = xfs_trans_commit(tp, 0);
+				if (error) {
+					return error;
+				}
+				cancelled_bufs = 0;
+				tp = NULL;
+			}
+			start_bb++;
+			count_bb--;
+			ASSERT(count_bb >= 0);
+		}
+	}
+	/*
+	 * Commit any remaining buffer cancellations.
+	 */
+	if (tp != NULL) {
+		ASSERT(cancelled_bufs > 0);
+		error = xfs_trans_commit(tp, 0);
+		if (error) {
+			return error;
+		}
+	}
+	return 0;
+}
+
+	
+/*
+ * Start the truncation of the file's attributes to 0 length.
+ * This routine will clear the buffer cache of any data from
+ * the attribute fork of the inode.  It must cancel any entries
+ * in the transaction log for these attribute buffers, because
+ * when we free the space used by the attribute fork it becomes
+ * usable for user data.
+ *
+ * In calling this routine either the i/o lock must be held
+ * exclusively or the inode must be inactive.  The caller should
+ * call xfs_itruncate_finish() after this routine to actually
+ * free the blocks of the attribute fork of the file.  The inode
+ * lock must not be held when calling this routine.
+ *
+ * Since this is a part of an operation to free the blocks in the
+ * attribute fork, at some point we need to make sure that the
+ * unlink of the inode is permanent before we free its blocks.
+ * We delay this until the xfs_itruncate_finish() call in the hope
+ * that we can bunch up anything logged here along with what we
+ * log synchronously in xfs_itruncate_finish().  It is safe to log
+ * the invalidation records here even if the unlink is not yet
+ * permanent, because they will come after the unlink in the log
+ * and they don't pull the cancelled buffer from the AIL until the
+ * cancel is committed to the on disk log.
+ */
+int
+xfs_atruncate_start(
+	xfs_inode_t	*ip)
+{
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t	last_fsb;
+	xfs_filblks_t	count_fsb;
+	xfs_fsblock_t	first_block;
+	int		error;
+	int		nimaps;
+#define	XFS_ATRUNC_IMAPS	4
+	xfs_bmbt_irec_t	imaps[XFS_ATRUNC_IMAPS];
+#ifdef DEBUG
+	int		loops = 0;
+#endif
+
+	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) ||
+	       (ip->i_vnode->v_flag & VINACT));
+
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	error = xfs_bmap_last_offset(NULL, ip, &last_fsb, XFS_ATTR_FORK);
+	if (error) {
+		goto out;
+	}
+
+	offset_fsb = (xfs_fileoff_t)0;
+	count_fsb = last_fsb;
+	while (offset_fsb < last_fsb) {
+		first_block = NULLFSBLOCK;
+		nimaps = XFS_ATRUNC_IMAPS;
+		error = xfs_bmapi(NULL, ip, offset_fsb, count_fsb,
+				  XFS_BMAPI_ATTRFORK, &first_block, 0, imaps,
+				  &nimaps, NULL);
+		if (error) {
+			goto out;
+		}
+		ASSERT(nimaps > 0);
+
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		error = xfs_atruncate_invalidate(ip->i_mount, imaps, nimaps);
+		if (error) {
+			return error;
+		}
+		offset_fsb = imaps[nimaps - 1].br_startoff +
+			     imaps[nimaps - 1].br_blockcount;
+		ASSERT(offset_fsb <= last_fsb);
+		count_fsb = last_fsb - offset_fsb;
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+		ASSERT(loops++ <= last_fsb);
+	}
+
+ out:
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	return error;
+}
+
+
 /*
  * Start the truncation of the file to new_size.  The new size
  * must be smaller than the current size.  This routine will
@@ -1060,7 +1245,8 @@ xfs_itruncate_start(
  * Shrink the file to the given new_size.  The new
  * size must be smaller than the current size.
  * This will free up the underlying blocks
- * in the removed range after a call to xfs_itrunc_start().
+ * in the removed range after a call to xfs_itruncate_start()
+ * or xfs_atruncate_start().
  *
  * The transaction passed to this routine must have made
  * a permanent log reservation of at least XFS_ITRUNCATE_LOG_RES.
@@ -1074,12 +1260,24 @@ xfs_itruncate_start(
  * return the inode will be "held" within the returned transaction.
  * This routine does NOT require any disk space to be reserved
  * for it within the transaction.
+ * 
+ * The fork parameter must be either xfs_attr_fork or xfs_data_fork,
+ * and it indicates the fork which is to be truncated.  For the
+ * attribute fork we only support truncation to size 0.  When truncating
+ * the attribute fork we use the sync parameter to indicate whether or
+ * not the first transaction we perform needs to be synchronous.  It
+ * needs to be so if the unlink of the inode is not yet known to be
+ * permanent in the log.  This keeps us from freeing and reusing the
+ * blocks of the attribute fork before the unlink of the inode becomes
+ * permanent.
  */
 int
 xfs_itruncate_finish(
 	xfs_trans_t	**tp,
 	xfs_inode_t	*ip,
-	xfs_fsize_t	new_size)
+	xfs_fsize_t	new_size,
+	int		fork,
+	int		sync)		     
 {
 	xfs_fsblock_t	first_block;
 	xfs_fileoff_t	first_unmap_block;
@@ -1100,8 +1298,15 @@ xfs_itruncate_finish(
 	ASSERT(ip->i_transp == *tp);
 	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
 
+
 	ntp = *tp;
 	mp = (ntp)->t_mountp;
+	/*
+	 * We only support truncating the entire attribute fork.
+	 */
+	if (fork == XFS_ATTR_FORK) {
+		new_size = 0LL;
+	}
 	first_unmap_block = XFS_B_TO_FSB(mp, (xfs_ufsize_t)new_size);
 	xfs_itrunc_trace(XFS_ITRUNC_FINISH1, ip, 0, new_size, 0, 0);
 	/*
@@ -1122,14 +1327,29 @@ xfs_itruncate_finish(
 	 * 0, then we know that the unlinking transaction was a synchronous
 	 * one.  Thus no user will ever see this data again after a crash
 	 * and we do not need to do another synchronous transaction here.
+	 *
+	 * For the attribute fork we allow the caller to tell us whether
+	 * the unlink of the inode that led to this call is yet permanent
+	 * in the on disk log.  If it is not and we will be freeing extents
+	 * in this inode then we make the first transaction synchronous
+	 * to make sure that the unlink is permanent by the time we free
+	 * the blocks.
 	 */
-	if (ip->i_d.di_nblocks > 0) {
-		ip->i_d.di_size = new_size;
-		if ((ip->i_d.di_nlink > 0) ||
-		    !(mp->m_flags & XFS_MOUNT_WSYNC)) {
+	if (fork == XFS_DATA_FORK) {
+		if (ip->i_d.di_nextents > 0) {
+			ip->i_d.di_size = new_size;
+			if ((ip->i_d.di_nlink > 0) ||
+			    !(mp->m_flags & XFS_MOUNT_WSYNC)) {
+				xfs_trans_set_sync(ntp);
+			}
+		}
+	} else if (sync) {
+		ASSERT(!(mp->m_flags & XFS_MOUNT_WSYNC));
+		if (ip->i_d.di_anextents > 0) {
 			xfs_trans_set_sync(ntp);
 		}
 	}
+		
 
 	/*
 	 * Since it is possible for space to become allocated beyond
@@ -1156,7 +1376,7 @@ xfs_itruncate_finish(
 		 */
 		XFS_BMAP_INIT(&free_list, &first_block);
 		error = xfs_bunmapi(ntp, ip, first_unmap_block,
-				    unmap_len, 0,
+				    unmap_len, XFS_BMAPI_AFLAG(fork),
 				    XFS_ITRUNC_MAX_EXTENTS,
 				    &first_block, &free_list, &done);
 		if (error) {
@@ -1237,10 +1457,18 @@ xfs_itruncate_finish(
 		xfs_trans_ijoin(ntp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 		xfs_trans_ihold(ntp, ip);
 	}
-	xfs_isize_check(mp, ip, new_size);
-	ip->i_d.di_size = new_size;
+	/*
+	 * Only update the size in the case of the data fork, but
+	 * always re-log the inode so that our permanent transaction
+	 * can keep on rolling it forward in the log.
+	 */
+	if (fork == XFS_DATA_FORK) {
+		xfs_isize_check(mp, ip, new_size);
+		ip->i_d.di_size = new_size;
+	}
 	xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 	ASSERT((new_size != 0) ||
+	       (fork == XFS_ATTR_FORK) ||
 	       (!VN_DIRTY(ip->i_vnode) &&
 		(ip->i_delayed_blks == 0) &&
 		(ip->i_queued_bufs == 0) &&
@@ -1607,6 +1835,9 @@ xfs_ifree(
 	ip->i_d.di_mode = 0;		/* mark incore inode as free */
 	ip->i_d.di_flags = 0;
 	ip->i_d.di_dmevmask = 0;
+	ip->i_d.di_forkoff = 0;		/* mark the attr fork not in use */
+	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
+	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 
 	/*
 	 * Bump the generation count so no one will be confused
@@ -1725,7 +1956,7 @@ xfs_iroot_realloc(
 	 */
 	if (new_max > 0) {
 		/*
-		  * First copy the records.
+		 * First copy the records.
 		 */
 		op = (char *)XFS_BMAP_BROOT_REC_ADDR(ifp->if_broot, 1,
 						     ifp->if_broot_bytes);
@@ -1756,7 +1987,7 @@ xfs_iroot_realloc(
  * ext_diff parameter.
  *
  * If the amount of space needed has decreased below the size of the
- * inline buffer, then switch to using the inline buffer.  Othewise,
+ * inline buffer, then switch to using the inline buffer.  Otherwise,
  * use kmem_realloc() or kmem_alloc() to adjust the size of the buffer
  * to what is needed.
  *
@@ -1840,7 +2071,7 @@ xfs_iext_realloc(
  * byte_diff parameter.
  *
  * If the amount of space needed has decreased below the size of the
- * inline buffer, then switch to using the inline buffer.  Othewise,
+ * inline buffer, then switch to using the inline buffer.  Otherwise,
  * use kmem_realloc() or kmem_alloc() to adjust the size of the buffer
  * to what is needed.
  *
@@ -1960,7 +2191,7 @@ xfs_imap(
 	return 0;
 }
 
-STATIC void
+void
 xfs_idestroy_fork(
 	xfs_inode_t	*ip,
 	int		whichfork)
@@ -2018,8 +2249,7 @@ xfs_idestroy(
 		xfs_idestroy_fork(ip, XFS_DATA_FORK);
 		break;
 	}
-	if (XFS_IFORK_Q(ip))
-		xfs_idestroy_fork(ip, XFS_ATTR_FORK);
+	xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 #ifdef NOTYET
 	if (ip->i_range_lock.r_sleep != NULL) {
 		freesema(ip->i_range_lock.r_sleep);
