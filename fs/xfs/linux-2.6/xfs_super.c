@@ -66,7 +66,7 @@
 #undef MS_REMOUNT
 #include <sys/mount.h>
 #endif
-#define	MS_DATA		0x04	/* 6-argument mount */
+#define	MS_DATA		0x04
 
 
 #include <xfs_clnt.h>
@@ -93,7 +93,7 @@ cred_t	sys_cred_val, *sys_cred = &sys_cred_val;
 extern struct super_operations linvfs_sops;
 
 /*
- * Initialize credentials data structures.
+ * Initialize the global system credential structure.
  */
 static void
 cred_init(void)
