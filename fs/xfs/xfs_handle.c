@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.19 $"
+#ident "$Revision: 1.20 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -281,6 +281,7 @@ vp_open (
 	struct vnode *tvp;
 	register int mode;
 	register int error;
+	struct vnode *openvp;
 
 	tvp = (struct vnode *) NULL;
 	mode = 0;
@@ -323,7 +324,8 @@ vp_open (
 	/*
 	 * Do opening protocol.
 	 */
-	VOP_OPEN (vp, &vp, filemode, crp, error);
+	openvp = vp;
+	VOP_OPEN (openvp, &vp, filemode, crp, error);
 	if (!error) {
 		if (tvp)
 			VN_RELE (tvp);

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.123 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -400,8 +400,10 @@ xfs_cmountfs(
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	if (ddev != 0) {
-		ddevvp = makespecvp( ddev, VBLK );
-		VOP_OPEN(ddevvp, &ddevvp, vfs_flags, cr, error);
+		vnode_t *openvp;
+
+		openvp = ddevvp = makespecvp( ddev, VBLK );
+		VOP_OPEN(openvp, &ddevvp, vfs_flags, cr, error);
 		if (error) {
 			VN_RELE(ddevvp);
 			goto error0;
@@ -411,8 +413,10 @@ xfs_cmountfs(
 		ddevvp = NULL;
 	}
 	if (rtdev != 0) {
-		rdevvp = makespecvp( rtdev, VBLK );
-		VOP_OPEN(rdevvp, &rdevvp, vfs_flags, cr, error);
+		vnode_t *openvp;
+
+		openvp = rdevvp = makespecvp( rtdev, VBLK );
+		VOP_OPEN(openvp, &rdevvp, vfs_flags, cr, error);
 		if (error) {
 			VN_RELE(rdevvp);
 			goto error1;
@@ -426,8 +430,10 @@ xfs_cmountfs(
 			ldevvp = NULL;
 			mp->m_logdevp = ddevvp;
 		} else {
-			ldevvp = makespecvp( logdev, VBLK );
-			VOP_OPEN(ldevvp, &ldevvp, vfs_flags, cr, error);
+			vnode_t *openvp;
+
+			openvp = ldevvp = makespecvp( logdev, VBLK );
+			VOP_OPEN(openvp, &ldevvp, vfs_flags, cr, error);
 			if (error) {
 				VN_RELE(ldevvp);
 				goto error2;
@@ -1092,10 +1098,12 @@ devvptoxfs(
 	dev_t		dev;
 	int		error;
 	xfs_sb_t	*fs;
+	vnode_t		*openvp;
 
 	if (devvp->v_type != VBLK)
 		return ENOTBLK;
-	VOP_OPEN(devvp, &devvp, FREAD, cr, error);
+	openvp = devvp;
+	VOP_OPEN(openvp, &devvp, FREAD, cr, error);
 	if (error)
 		return error;
 	dev = devvp->v_rdev;
@@ -1148,7 +1156,9 @@ xfs_statdevvp(
 	vnode_t		*devvp)
 {
 	buf_t		*bp;
-	int		error, unused;
+	int		error;
+	/*REFERENCED*/
+	int  		unused;
 	__uint64_t	fakeinos;
 	xfs_extlen_t	lsize;
 	xfs_sb_t	*sbp;
