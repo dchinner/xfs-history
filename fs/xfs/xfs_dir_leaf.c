@@ -373,10 +373,16 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	}
 	if (first || (cookhash == xfs_da_hashname("..", 2))) {
 		bcopy(sf->hdr.parent, (char *)&ino, sizeof(ino));
-		sfe = &sf->list[0];
-		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0,
-					  xfs_da_hashname((char *)sfe->name,
-							  sfe->namelen));
+		if (sf->hdr.count > 0) {
+			sfe = &sf->list[0];
+			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0,
+					      xfs_da_hashname((char *)sfe->name,
+							      sfe->namelen));
+		} else {
+			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+			xfs_dir_trace_g_duc("sf: last cookie  ",
+						 dp, uio, nextcook);
+		}
 		retval = xfs_dir_put_dirent(mp, dbp, ino, "..", 2, nextcook,
 						uio, &done);
 		if (!done) {
@@ -406,9 +412,10 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 	if (i == sf->hdr.count) {
-		xfs_dir_trace_g_du("sf: hash not found", dp, uio);
+		xfs_dir_trace_g_du("sf: hash beyond end", dp, uio);
+		uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
 		*eofp = 1;
-		return(XFS_ERROR(ENOENT));
+		return(0);
 	}
 	ASSERT(cookhash != XFS_DA_MAXHASH);
 	xfs_dir_trace_g_du("sf: hash found", dp, uio);
@@ -1788,7 +1795,9 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 	}
 	if (i == leaf->hdr.count) {
 		xfs_dir_trace_g_du("leaf: hash not found", dp, uio);
-		return(XFS_ERROR(ENOENT));
+		uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+		*eobp = 0;
+		return(0);
 	}
 	xfs_dir_trace_g_due("leaf: hash found", dp, uio, entry);
 
