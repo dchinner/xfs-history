@@ -2968,7 +2968,7 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	XFS_DIR_SF_GET_DIRINO(&sfh->parent, &ino);
+	XFS_DIR_SF_GET_DIRINO_ARCH(&sfh->parent, &ino, ARCH_UNKNOWN);
 	printk("hdr parent %Ld", ino);
 	printk(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
