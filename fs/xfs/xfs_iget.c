@@ -1,4 +1,4 @@
-#ident "$Revision: 1.103 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -194,7 +194,9 @@ xfs_iget(
 	int		error;
 	/* REFERENCED */
 	int		newnode;
+#ifdef CELL_CAPABLE
 	int		quiesce_new = 0;
+#endif
 	vmap_t		vmap;
 	xfs_chash_t	*ch;
 	xfs_chashlist_t	*chl, *chlnew;
@@ -254,7 +256,9 @@ again:
 			}
 
 			newnode = (ip->i_d.di_mode == 0);
+#ifdef CELL_CAPABLE
 			quiesce_new = 0;
+#endif
 			ITRACE(ip);
 			goto return_ip;
 		}
@@ -419,7 +423,9 @@ again:
 		ip->i_mprev = ip;
 	}
 	mp->m_inodes = ip;
+#ifdef CELL_CAPABLE
 	ASSERT((quiesce_new == 0) || (mp->m_inode_quiesce != 0));
+#endif
 
 
 	XFS_MOUNT_IUNLOCK(mp);
