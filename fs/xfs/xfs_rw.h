@@ -32,6 +32,10 @@ xfs_bmap(vnode_t	*vp,
 	 struct bmapval	*bmapp,
 	 int		*nbmaps);
 
+void
+xfs_zero_eof(xfs_inode_t	*ip,
+	     off_t		offset,
+	     __int64_t		isize);
 
 
 
