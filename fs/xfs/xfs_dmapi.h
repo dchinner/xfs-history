@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_DMAPI_H
 #define _FS_XFS_DMAPI_H
 
-#ident  "$Revision$"
+#ident  "$Revision: 1.9 $"
 
 #include <linux/xfs_cred.h>
 
@@ -75,7 +75,7 @@ extern int
 xfs_dm_send_data_event(
 	dm_eventtype_t	event, 
 	bhv_desc_t	*bdp,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		length, 
 	int		flags,
 	vrwlock_t	*locktype);
@@ -92,16 +92,16 @@ xfs_dm_fcntl(
 	bhv_desc_t	*bdp,
 	void		*arg,
 	int		flags,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	cred_t		*credp,
-	union rval	*rvalp);
+	int		*rvalp);
 
 extern int
-xfs_dm_map(
+xfs_dm_mapevent(
 	bhv_desc_t	*bdp,
-        xfs_off_t           offset,
-        size_t          length,
-        dm_eventtype_t  max_event);
+	int		flags,
+        xfs_off_t	offset,
+        dm_fcntl_t	*dmfcntlp);
 
 /*
  *	Function defined in xfs_vnodeops.c used by DMAPI as well as by xfs_vnodeops.c
