@@ -5150,13 +5150,32 @@ xfs_bunmapi(
 	if (isrt) {
 		xfs_extlen_t	mod;	/* modulus value for rt allocation */
 
-		if (mod = (xfs_extlen_t)(bno % mp->m_sb.sb_rextsize)) {
-			mod = (xfs_extlen_t)(mp->m_sb.sb_rextsize - mod);
-			len -= mod;
-			bno += mod;
+		ep = xfs_bmap_search_extents(ip, bno, whichfork, &eof, 
+						&lastx, &got, &prev);
+		if (!eof && bno > got.br_startoff) {
+			mod = (xfs_extlen_t)(bno - got.br_startoff);
+			if (mod = (xfs_extlen_t)(mod % mp->m_sb.sb_rextsize)) {
+				mod = (xfs_extlen_t)(mp->m_sb.sb_rextsize-mod);
+				bno += mod;
+				len = len < mod  ? 0 : (len - mod);
+			}
+			if (len < mp->m_sb.sb_rextsize) {
+				*done = 1;
+				return 0;
+			}
 		}
-		if (mod = (xfs_extlen_t)(len % mp->m_sb.sb_rextsize))
-			len -= mod;
+		ep = xfs_bmap_search_extents(ip, bno+len, whichfork, &eof, 
+						&lastx, &got, &prev);
+		if (!eof && ((bno+len) > got.br_startoff)) {
+			mod = (xfs_extlen_t)((bno+len) - got.br_startoff);
+			if (mod = (xfs_extlen_t)(mod % mp->m_sb.sb_rextsize)) {
+				len = len < mod  ? 0 : (len - mod);
+			}
+			if (len < mp->m_sb.sb_rextsize) {
+				*done = 1;
+				return 0;
+			}
+		}
 	}
 	start = bno;
 	bno = start + len - 1;
@@ -5369,7 +5388,6 @@ xfs_getbmap(
 						/* extents listed seperately */
 	int			bmapi_flags;	/* flags for xfs_bmapi */
 	__int32_t		oflags;		/* getbmapx bmv_oflags field */
-	xfs_agblock_t		rtextsize;	/* realtime extent size */
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -5477,15 +5495,7 @@ xfs_getbmap(
 	for (error = i = 0; i < nmap && bmv->bmv_length; i++) {
 		oflags = 0;
 		out.bmv_offset = XFS_FSB_TO_BB(mp, map[i].br_startoff);
-		if (!(ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
-			out.bmv_length = 
-				XFS_FSB_TO_BB(mp, map[i].br_blockcount);
-		} else {		/* realtime extent allocation */
-			rtextsize = mp->m_sb.sb_rextsize;
-			out.bmv_length = 
-				XFS_FSB_TO_BB(mp, (((map[i].br_blockcount +
-				rtextsize -1) / rtextsize) * rtextsize));
-		}
+		out.bmv_length = XFS_FSB_TO_BB(mp, map[i].br_blockcount);
 		ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
 		if (prealloced && 
 		    map[i].br_startblock == HOLESTARTBLOCK &&

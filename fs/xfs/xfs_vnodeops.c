@@ -6544,7 +6544,10 @@ xfs_zero_remaining_bytes(
 		ASSERT(imap[0].br_startblock != DELAYSTARTBLOCK);
 		bp->b_flags &= ~(B_DONE | B_WRITE);
 		bp->b_flags |= B_READ;
-		bp->b_blkno = XFS_FSB_TO_DADDR(mp, imap[0].br_startblock);
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+			bp->b_blkno = XFS_FSB_TO_BB(mp,imap[0].br_startblock);
+		else
+			bp->b_blkno = XFS_FSB_TO_DADDR(mp,imap[0].br_startblock);
 		bp_dcache_wbinval(bp);
 		xfsbdstrat(mp, bp); 
 		if (error = iowait(bp))
@@ -6583,7 +6586,7 @@ xfs_free_file_space(
 {
 	int			committed;
 	int			done;
-	xfs_fileoff_t		endoffset_fsb;
+	xfs_fileoff_t		endoffset_fsb, endzero_fsb;
 	int			error;
 	xfs_fsblock_t		firstfsb;
 	xfs_bmap_free_t		free_list;
@@ -6594,7 +6597,7 @@ xfs_free_file_space(
 	int			rounding;
 	int			rtextsize;
 	int			rt;
-	xfs_fileoff_t		startoffset_fsb;
+	xfs_fileoff_t		startoffset_fsb, startzero_fsb;
 	off_t			end_dmi_offset;
 	xfs_trans_t		*tp;
 
@@ -6614,9 +6617,9 @@ xfs_free_file_space(
 	if (len <= 0)	/* if nothing being freed */
 		return error;
 
-	startoffset_fsb	= XFS_B_TO_FSB(mp, offset);
+	startoffset_fsb	= startzero_fsb = XFS_B_TO_FSB(mp, offset);
 	end_dmi_offset = offset + len;
-	endoffset_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
+	endoffset_fsb = endzero_fsb = XFS_B_TO_FSBT(mp, end_dmi_offset);
 
 	if ( offset < ip->i_d.di_size &&
 		(attr_flags&ATTR_DMI) == 0  &&
@@ -6643,28 +6646,28 @@ xfs_free_file_space(
 	xfs_inval_cached_pages(XFS_ITOV(ip), &(ip->i_iocore),
 				ioffset, ilen, NULL);
 	if (rt) {
-		if (startoffset_fsb & (rtextsize - 1)) {
-			startoffset_fsb += rtextsize & ~(rtextsize - 1);
-		}
-		endoffset_fsb = endoffset_fsb & ~(rtextsize - 1);
+		startzero_fsb = startoffset_fsb + rtextsize;
+		endzero_fsb = endoffset_fsb < rtextsize ? 0 :
+				endoffset_fsb - rtextsize;
 	}
 	/* need to zero the stuff we're not freeing, on disk */
-	if (done = endoffset_fsb <= startoffset_fsb)
+	if ((done = endoffset_fsb <= startoffset_fsb) ||
+	    (endzero_fsb <= startzero_fsb))
 		/*
-		 * No full blocks, one contiguous piece to clear
+		 * One contiguous piece to clear
 		 */
 		error = xfs_zero_remaining_bytes(ip, offset, offset + len - 1);
 	else {
 		/*
 		 * Some full blocks, possibly two pieces to clear
 		 */
-		if (offset < XFS_FSB_TO_B(mp, startoffset_fsb))
+		if (offset < XFS_FSB_TO_B(mp, startzero_fsb))
 			error = xfs_zero_remaining_bytes(ip, offset,
-				XFS_FSB_TO_B(mp, startoffset_fsb) - 1);
+				XFS_FSB_TO_B(mp, startzero_fsb) - 1);
 		if (!error && !done &&
-		    XFS_FSB_TO_B(mp, endoffset_fsb) < offset + len)
+		    XFS_FSB_TO_B(mp, endzero_fsb) < offset + len)
 			error = xfs_zero_remaining_bytes(ip,
-				XFS_FSB_TO_B(mp, endoffset_fsb),
+				XFS_FSB_TO_B(mp, endzero_fsb),
 				offset + len - 1);
 	}
 
