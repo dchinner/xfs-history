@@ -1585,7 +1585,7 @@ int pagebuf_iowait(page_buf_t * pb) /* buffer to wait on              */
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
 	run_task_queue(&tq_disk);
 	down(&pb->pb_iodonesema);
-	PB_TRACE(pb, PB_TRACE_REC(iowaited), pb->pb_error);
+	PB_TRACE(pb, PB_TRACE_REC(iowaited), (int)pb->pb_error);
 	return (pb->pb_error);
 }
 
