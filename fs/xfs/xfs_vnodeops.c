@@ -6065,7 +6065,9 @@ xfs_fcntl(
 	mp = ip->i_mount;
 	switch (cmd) {
 	case F_GETOPS:
+#ifdef TO_FIX_LATER
 		fspe_get_ops(arg);
+#endif /* TO_FIX_LATER */
 		break;
 	case F_SETBW:
 		error = xfs_prio_set_bw(arg);
