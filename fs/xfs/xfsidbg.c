@@ -29,16 +29,16 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.142 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
 
 #include <xfs_os_defs.h>
 
-#include <sys/types.h>
-#include <linux/version.h>
+#include <linux/config.h>
 #include <linux/module.h>
+#include <sys/types.h>
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 

@@ -29,10 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.83 2000/06/09 06:40:03 ananth Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.84 2000/06/16 01:49:13 kaos Exp $"
 
 #include <xfs_os_defs.h>
 
+#include <linux/config.h>
+#include <linux/module.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/debug.h>
@@ -74,7 +76,6 @@
 #include <xfs_error.h>
 #include <asm/uaccess.h>
 #include <linux/miscdevice.h>
-#include <linux/module.h>
 #include <linux/file.h>
 
 #ifdef SIM
