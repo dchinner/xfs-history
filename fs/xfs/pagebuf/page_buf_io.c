@@ -821,10 +821,18 @@ set_buffer_dirty_uptodate(
 {
 	int need_balance_dirty = 0;
 
-	if (bh->b_blocknr <= 0) {
+#ifdef PAGEBUF_DEBUG
+	/* negative blocknr is always bad; if it's zero, and the
+	 * inode & bh are on different devices, it could be an
+	 * xfs realtime file, which would be OK.  Either that
+	 * or something is seriously wrong!
+	 */
+	if ((bh->b_blocknr < 0) || 
+	    (bh->b_blocknr == 0) && (inode->i_dev == bh->b_dev)) {
 		printk("Warning: buffer 0x%p with weird blockno (%ld)\n",
 			bh, bh->b_blocknr);
 	}
+#endif /* PAGEBUF_DEBUG */
 	set_bit(BH_Uptodate, &bh->b_state);
 	if (!buffer_dirty(bh)) {
 		need_balance_dirty = 1;
@@ -868,7 +876,7 @@ __pb_block_prepare_write_async(struct inode *inode, struct page *page,
 				goto out;
 			}
 		}
-		if (mp->pbm_bn > 0) {
+		if (mp->pbm_bn >= 0) {
 			hook_buffers_to_page(inode, page, mp);
 			if (dp)
 				_unmark_delalloc(page);
