@@ -564,7 +564,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		    (sfe->namelen >= MAXNAMELEN)) {
 			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
 			kmem_free(sbuf, sbsize);
-			return XFS_ERROR(EDIRCORRUPTED);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 		sbp->entno = i + 2;
 		sbp->seqno = 0;
@@ -1981,7 +1981,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		    ((char *)namest >= (char *)leaf + bp->b_bcount) ||
 		    (entry->namelen >= MAXNAMELEN)) {
 			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);
-			return XFS_ERROR(EDIRCORRUPTED);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 		if (entry->hashval >= cookhash) {
 			if ((entno > 0) && (entry->hashval == cookhash)) {
@@ -2029,7 +2029,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		    ((char *)namest >= (char *)leaf + bp->b_bcount) ||
 		    (entry->namelen >= MAXNAMELEN)) {
 			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);
-			return XFS_ERROR(EDIRCORRUPTED);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 
 		/*
@@ -2054,7 +2054,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 			leaf2 = (xfs_dir_leafblock_t *)bp2->b_un.b_addr;
 			if ((leaf2->hdr.info.magic != XFS_DIR_LEAF_MAGIC) ||
 			    (leaf2->hdr.info.back != bno)) {	/* GROT */
-				return(XFS_ERROR(EDIRCORRUPTED));
+				return(XFS_ERROR(EFSCORRUPTED));
 			}
 			XFS_PUT_COOKIE(p.cook, mp, leaf->hdr.info.forw, 0,
 				       leaf2->entries[0].hashval);

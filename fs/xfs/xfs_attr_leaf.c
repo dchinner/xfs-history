@@ -430,7 +430,7 @@ xfs_attr_shortform_list(xfs_attr_list_context_t *context)
 		    (sfe->namelen >= MAXNAMELEN)) {
 			xfs_attr_trace_l_c("sf corrupted", context);
 			kmem_free(sbuf, sbsize);
-			return XFS_ERROR(EDIRCORRUPTED);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 		if (((context->flags & ATTR_ROOT) != 0) !=
 		    ((sfe->flags & XFS_ATTR_ROOT) != 0)) {

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.42 $"
+#ident "$Revision: 1.43 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -998,7 +998,7 @@ xfs_attr_leaf_list(xfs_attr_list_context_t *context)
 	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
 	if (leaf->hdr.info.magic != XFS_ATTR_LEAF_MAGIC) {
 		xfs_trans_brelse(NULL, bp);
-		return(XFS_ERROR(EDIRCORRUPTED));
+		return(XFS_ERROR(EFSCORRUPTED));
 	}
 
 	(void)xfs_attr_leaf_list_int(bp, context);
@@ -1576,7 +1576,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 	if (cursor->blkno > 0) {
 		error = xfs_da_read_buf(NULL, context->dp, cursor->blkno, -1,
 					      &bp, XFS_ATTR_FORK);
-		if ((error != 0) && (error != EDIRCORRUPTED))
+		if ((error != 0) && (error != EFSCORRUPTED))
 			return(error);
 		if (bp) {
 			node = (xfs_da_intnode_t *)bp->b_un.b_addr;
@@ -1624,13 +1624,13 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 			if (error)
 				return(error);
 			if (bp == NULL)
-				return(XFS_ERROR(EDIRCORRUPTED));
+				return(XFS_ERROR(EFSCORRUPTED));
 			node = (xfs_da_intnode_t *)bp->b_un.b_addr;
 			if (node->hdr.info.magic == XFS_ATTR_LEAF_MAGIC)
 				break;
 			if (node->hdr.info.magic != XFS_DA_NODE_MAGIC) {
 				xfs_trans_brelse(NULL, bp);
-				return(XFS_ERROR(EDIRCORRUPTED));
+				return(XFS_ERROR(EFSCORRUPTED));
 			}
 			btree = node->btree;
 			for (i = 0; i < node->hdr.count; btree++, i++) {
@@ -1659,7 +1659,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 		leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
 		if (leaf->hdr.info.magic != XFS_ATTR_LEAF_MAGIC) {
 			xfs_trans_brelse(NULL, bp);
-			return(XFS_ERROR(EDIRCORRUPTED));
+			return(XFS_ERROR(EFSCORRUPTED));
 		}
 		error = xfs_attr_leaf_list_int(bp, context);
 		if (error || (leaf->hdr.info.forw == 0))
@@ -1671,7 +1671,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 		if (error)
 			return(error);
 		if (bp == NULL)
-			return(XFS_ERROR(EDIRCORRUPTED));
+			return(XFS_ERROR(EFSCORRUPTED));
 	}
 	xfs_trans_brelse(NULL, bp);
 	return(0);
