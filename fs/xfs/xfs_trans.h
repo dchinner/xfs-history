@@ -2,11 +2,11 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#include "xfs_types.h"
+#include "xfs_inum.h"
 
 struct xfs_item_ops;
 struct xfs_log_item_desc;
-
+struct xfs_mount;
 
 typedef struct xfs_log_item {
 	xfs_lsn_t			li_lsn;
