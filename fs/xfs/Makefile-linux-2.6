@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.33 $
+# $Revision: 1.34 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -22,13 +22,16 @@ KCOPTS=-fullwarn $(XFSCOPTS)
 XFS_NAME=xfs.a
 XFS_CSRCS=	xfs_alloc.c \
 		xfs_alloc_btree.c \
+		xfs_attr.c \
+		xfs_attr_leaf.c \
 		xfs_bit.c \
 		xfs_bmap.c \
 		xfs_bmap_btree.c \
 		xfs_btree.c \
 		xfs_buf_item.c \
+		xfs_da_btree.c \
 		xfs_dir.c \
-		xfs_dir_btree.c \
+		xfs_dir_leaf.c \
 		xfs_error.c \
 		xfs_extfree_item.c \
 		xfs_fsops.c \
@@ -67,6 +70,9 @@ CFILES=$(XFS_CSRCS) $(XIDBG_CSRCS)
 HFILES=	xfs_ag.h \
 	xfs_alloc.h \
 	xfs_alloc_btree.h \
+	xfs_attr.h \
+	xfs_attr_leaf.h \
+	xfs_attr_sf.h \
 	xfs_bit.h \
 	xfs_bmap.h \
 	xfs_bmap_btree.h \
@@ -74,8 +80,10 @@ HFILES=	xfs_ag.h \
 	xfs_buf_item.h \
 	xfs_clnt.h \
 	xfs_dinode.h \
+	xfs_da_btree.h \
 	xfs_dir.h \
-	xfs_dir_btree.h \
+	xfs_dir_leaf.h \
+	xfs_dir_sf.h \
 	xfs_error.h \
 	xfs_extfree_item.h \
 	xfs_fsops.h \
