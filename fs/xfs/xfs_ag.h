@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 
 /*
  * Allocation group header
@@ -144,6 +144,8 @@ typedef struct xfs_perag
 #define	XFS_AG_MIN_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MIN_BYTES >> bl))
 #define	XFS_AG_BEST_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_BEST_BYTES >> bl))
 #define	XFS_AG_MAX_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MAX_BYTES >> bl))
+
+#define	XFS_MAX_AGNUMBER	((xfs_agnumber_t)(NULLAGNUMBER - 1))
 
 #define	XFS_AG_MIN(a,b)		((a) < (b) ? (a) : (b))
 #define	XFS_AG_MAXLEVELS(mp)	((mp)->m_ag_maxlevels)
