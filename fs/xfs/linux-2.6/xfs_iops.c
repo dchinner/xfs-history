@@ -756,7 +756,7 @@ linvfs_write_full_page(
 	struct vnode	*vp;
 	struct inode	*inode;
 
-	if ((current->flags & PF_FSTRANS) && DelallocPage(page))
+	if ((current->flags & PF_FSTRANS) && PageDelalloc(page))
 		goto out_fail;
 
 	if ((current->flags & (PF_FSTRANS|PF_NOIO)) &&
