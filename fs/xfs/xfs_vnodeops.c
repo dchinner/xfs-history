@@ -436,7 +436,7 @@ xfs_getattr(
         vap->va_uid = ip->i_d.di_uid;
         vap->va_gid = ip->i_d.di_gid;
         vap->va_nlink = ip->i_d.di_nlink;
-        vap->va_vcode = ip->i_vcode;
+        vap->va_vcode = 0L;
 	/*
 	 * Minor optimization, check the common cases first.
 	 */
@@ -625,10 +625,11 @@ xfs_setattr(
 			goto error_return;
 		}
 
-                /* XXX Check for write access to inode */
-
-                if (vp->v_type == VREG && (code = fs_vcode(vp, &ip->i_vcode)))
-                        goto error_return;
+                /*
+		 * There used to be a call to fs_vcode() here, but
+		 * that will only be necessary if we ever support
+		 * RFS.  Ha!
+		 */
         }
 
         /*
@@ -4609,6 +4610,7 @@ xfs_addmap(
 	uint		flags,
 	cred_t		*credp)
 {
+#ifdef DEBUG
 	xfs_inode_t	*ip;
 
 	ip = XFS_VTOI(vp);
@@ -4616,6 +4618,7 @@ xfs_addmap(
 	ASSERT(vp->v_mreg);
 	ip->i_mapcnt += btoc(len);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+#endif /* DEBUG */
 	return 0;
 }
 
@@ -4625,8 +4628,8 @@ xfs_addmap(
  *
  * This is called when mappings to the given file are deleted.  All
  * we do is decrement our count of the number of pages mapped in this
- * file.  This count is only used in xfs_frlock() in deciding whether
- * to accept a call.
+ * file.  This count used to be used in xfs_frlock(), but now it is
+ * used only for debugging.
  */
 /*ARGSUSED*/
 STATIC int
@@ -4641,6 +4644,7 @@ xfs_delmap(
 	uint		flags,
 	cred_t		*credp)
 {
+#ifdef DEBUG
 	xfs_inode_t	*ip;
 
 	ip = XFS_VTOI(vp);
@@ -4648,6 +4652,7 @@ xfs_delmap(
 	ip->i_mapcnt -= btoc(len);
 	ASSERT(((long)ip->i_mapcnt) >= 0);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+#endif /* DEBUG */
 	return 0;
 }
 
@@ -5602,8 +5607,8 @@ struct vnodeops xfs_vnodeops = {
 	fs_nosys,
 	xfs_inactive,
 	fs_nosys,
-	(void (*)(vnode_t *, int))fs_nosys,
-	(void (*)(vnode_t *, int))fs_nosys,
+	(void (*)(vnode_t *, vrwlock_t))fs_nosys,
+	(void (*)(vnode_t *, vrwlock_t))fs_nosys,
 	fs_nosys,
 	fs_nosys,
 	fs_nosys,
