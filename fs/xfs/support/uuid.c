@@ -44,7 +44,6 @@
 #include <xfs_arch.h>
 #include "time.h"
 #include "move.h"
-#include "arch.h"
 #include "uuid.h"
 
 #ifndef CONFIG_NET
