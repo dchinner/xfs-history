@@ -54,17 +54,6 @@
 #include <sys/imon.h>
 
 /*
- * Cover a vnode.  Implementation routine for VOP_COVER.
- */
-/*ARGSUSED3*/
-int
-fs_cover(bhv_desc_t *bdp, struct mounta *uap, char *attrs, struct cred *cred)
-{
-	printk("XFS: fs_cover() NOT IMPLEMENTED\n");
-	return 0;
-}
-
-/*
  * Implementation for VFS_DOUNMOUNT.
  */
 int
@@ -115,17 +104,6 @@ fs_dounmount(
 }
 
 /*
- * fs_realvfsop()
- * base file system vfs_realvfsops() uses this.
- */
-/* ARGSUSED */
-int
-fs_realvfsops(vfs_t *vfsp, struct mounta *uap, vfsops_t **vfsop)
-{
-	return(0);
-}
-	
-/*
  * Stub for no-op vnode operations that return error status.
  */
 int
@@ -144,46 +122,12 @@ fs_nosys()
 }
 
 /*
- * For VOP's, like VOP_MAP, that wish to return ENODEV.
- */
-int
-fs_nodev()
-{
-	return ENODEV;
-}
-
-/*
  * Stub for inactive, strategy, and read/write lock/unlock.  Does nothing.
  */
 /* ARGSUSED */
 void
 fs_noval()
 {
-}
-
-/*
- * Compare given vnodes.
- */
-int
-fs_cmp(bhv_desc_t * bdp, vnode_t * vp2)
-{
-	vnode_t *vp1 = BHV_TO_VNODE(bdp);
-	return vp1 == vp2;
-}
-
-/* ARGSUSED */
-int
-fs_frlock(
-	register bhv_desc_t *bdp,
-	int cmd,
-	struct flock *bfp,
-	int flag,
-	off_t offset,
-	vrwlock_t vrwlock,
-	cred_t *cr)
-{
-	printk("XFS: fs_frlock() NOT IMPLEMENTED\n");
-	return 0;
 }
 
 /*
@@ -272,17 +216,6 @@ fs_flush_pages(
 
 
 /*
- * vnode pcache layer for vnode_invalfree_pages.
- */
-void
-fs_invalfree_pages(
-        bhv_desc_t	*bdp,
-	off_t		filesize)
-{
-	printk("XFS: fs_invalfree_pages() NOT IMPLEMENTED\n");
-}
-
-/*
  * vnode pcache layer for vnode_pages_sethole.
  */
 void
@@ -294,54 +227,4 @@ fs_pages_sethole(
 	off_t		remap_offset)
 {
 	printk("XFS: fs_pages_sethole() NOT IMPLEMENTED\n");
-}
-
-
-/*
- * Return requested answer when non-device files poll()'ed.
- */
-/* ARGSUSED */
-int
-fs_poll(bhv_desc_t *bdp,
-	short events,
-	int anyyet,
-	short *reventsp,
-	struct pollhead **phpp,
-	unsigned int *genp)
-{
-	printk("XFS: fs_cover() NOT IMPLEMENTED\n");
-	return 0;
-}
-
-/* ARGSUSED */
-int
-fs_pathconf(bhv_desc_t *bdp, int cmd, long *valp, struct cred *cr)
-{
-	printk("XFS: fs_pathconf() NOT IMPLEMENTED\n");
-	return 0;
-}
-
-int
-fs_strgetmsg(bhv_desc_t *bdp,
-        struct strbuf   *mctl,
-        struct strbuf   *mdata,
-        unsigned char   *prip,
-        int             *flagsp,
-        int             fmode,
-        union rval      *rvp)
-{
-	printk("XFS: fs_strgetmsg() NOT IMPLEMENTED\n");
-	return(ENOSYS);
-}
-
-int
-fs_strputmsg(bhv_desc_t *bdp,
-        struct strbuf   *mctl,
-        struct strbuf   *mdata,
-        unsigned char   pri,
-        int             flag,
-        int             fmode)
-{
-	printk("XFS: fs_strputmsg() NOT IMPLEMENTED\n");
-	return(ENOSYS);
 }

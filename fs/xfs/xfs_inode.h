@@ -636,11 +636,6 @@ void		xfs_inobp_check(struct xfs_mount *, struct xfs_buf *);
 #define	xfs_inobp_check(mp, bp)
 #endif /* DEBUG && !XFS_REPAIR_SIM */
 
-/*
- * xfs_vnodeops.c prototypes.
- */
-int		xfs_fast_fid(struct bhv_desc *, xfs_fid_t *);
-
 extern struct zone	*xfs_ifork_zone;
 extern struct zone	*xfs_inode_zone;
 extern struct zone	*xfs_ili_zone;
