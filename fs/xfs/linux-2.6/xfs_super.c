@@ -655,27 +655,6 @@ linvfs_write_inode(
 }
 
 void
-linvfs_delete_inode(
-	struct inode	*inode)
-{
-	vnode_t	*vp = LINVFS_GET_VP(inode);
-
-	if (vp) {
-		vn_rele(vp);
-		vn_trace_entry(vp, "linvfs_delete_inode",
-					(inst_t *)__return_address);
-		/*
-		 * Remove the vnode, the nlink count
-		 * is zero & the unlink will complete.
-		 */
-		vp->v_flag |= VPURGE;
-		vn_remove(vp);
-	}
-
-	clear_inode(inode);
-}
-
-void
 linvfs_clear_inode(
 	struct inode	*inode)
 {
@@ -999,6 +978,16 @@ static struct export_operations linvfs_export_ops = {
 	get_parent: linvfs_get_parent,
 };
 
+/*
+ * Yes, we really do want delete_inode to be clear_inode, because
+ * under the covers in XFS, we do the same thing whether we're
+ * deleting or clearing; tests for deleted inodes happen along
+ * the same path.  Linux expects the delete_inode method to
+ * call clear_inode, so let's just do that directly.  Then
+ * linvfs_clear_inode will handle cleaning up the XFS vnode
+ * in both the delete & clear cases.
+ */
+
 static struct super_operations linvfs_sops = {
 	alloc_inode:		linvfs_alloc_inode,
 	destroy_inode:		linvfs_destroy_inode,
@@ -1008,7 +997,7 @@ static struct super_operations linvfs_sops = {
 	dmapi_mount_event:	linvfs_dmapi_mount,
 #endif
 	put_inode:		linvfs_put_inode,
-	delete_inode:		linvfs_delete_inode,
+	delete_inode:		clear_inode,
 	clear_inode:		linvfs_clear_inode,
 	put_super:		linvfs_put_super,
 	write_super:		linvfs_write_super,
