@@ -1,4 +1,4 @@
-#ident "$Revision: 1.42 $"
+#ident "$Revision: 1.44 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -903,6 +903,36 @@ xfs_trans_inode_alloc_buf(
 	bip->bli_flags |= XFS_BLI_INODE_ALLOC_BUF;
 }
 
+
+/*
+ * Similar to xfs_trans_inode_buf(), this marks the buffer as a cluster of
+ * dquots. However, unlike in inode buffer recovery, dquot buffers get
+ * recovered in their entirety. (Hence, no XFS_BLI_DQUOT_ALLOC_BUF flag).
+ * The only thing that makes dquot buffers different from regular
+ * buffers is that we must not replay dquot bufs when recovering
+ * if a _corresponding_ quotaoff has happened. We also have to distinguish
+ * between user dquot bufs and proj dquot bufs, because user and proj quotas
+ * can be turned off independently.
+ */
+void
+xfs_trans_dquot_buf(
+	xfs_trans_t	*tp,
+	buf_t		*bp,
+	uint		type)
+{
+	xfs_buf_log_item_t	*bip;
+
+	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT((xfs_trans_t*)(bp->b_fsprivate2) == tp);
+	ASSERT(bp->b_fsprivate != NULL);
+	ASSERT(type == XFS_BLI_UDQUOT_BUF ||
+	       type == XFS_BLI_PDQUOT_BUF);
+
+	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
+	ASSERT(bip->bli_refcount > 0);
+
+	bip->bli_format.blf_flags |= type;
+}
 
 /*
  * Check to see if a buffer matching the given parameters is already
