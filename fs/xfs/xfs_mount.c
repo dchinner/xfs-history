@@ -845,7 +845,7 @@ xfs_mountfs(
 	error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL, &rip, 0);
 	if (error) {
   	        cmn_err(CE_WARN, "XFS: failed to read root inode");
-		goto error2;
+		goto error3;
 	}
 
 	ASSERT(rip != NULL);
@@ -855,11 +855,12 @@ xfs_mountfs(
 		VMAP(rvp, rip, vmap);
 		prdev("Root inode %Ld is not a directory",
 		      (int)rip->i_dev, rip->i_ino);
+		rvp->v_flag |= VPURGE;
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
 		error = XFS_ERROR(EFSCORRUPTED);
-		goto error2;
+		goto error3;
 	}
 	VN_FLAGSET(rvp, VROOT);
 	mp->m_rootip = rip;	/* save it */
@@ -874,10 +875,11 @@ xfs_mountfs(
 		 * Free up the root inode.
 		 */
   		cmn_err(CE_WARN, "XFS: failed to read RT inodes");
+		rvp->v_flag |= VPURGE;
 		VMAP(rvp, rip, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
-		goto error2;
+		goto error3;
 	}
 
 	/*
@@ -940,7 +942,7 @@ xfs_mountfs(
 	error = xfs_log_mount_finish(mp, mfsi_flags);
 	if (error) {
   		cmn_err(CE_WARN, "XFS: log mount finish failed");
-		goto error2;
+		goto error3;
 	}
 
 	if (needquotamount) {
@@ -970,6 +972,8 @@ xfs_mountfs(
 
 	return (0);
 
+ error3:
+	xfs_log_unmount_dealloc(mp);
  error2:
 	xfs_ihash_free(mp);
 	xfs_chash_free(mp);
