@@ -1967,13 +1967,7 @@ xfs_strat_write(vnode_t	*vp,
 		 * backing store for the file.
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_FILE_WRITE);
-/*
 		error = xfs_trans_reserve(tp, 0, XFS_DEFAULT_LOG_RES(mp),
-					  0, 0);
-
-		For now reserve some space as a work-around.
-*/
-		error = xfs_trans_reserve(tp, 20, XFS_DEFAULT_LOG_RES(mp),
 					  0, 0);
 		ASSERT(error == 0);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
