@@ -38,15 +38,8 @@
  * memory management routines
  */
 #define KM_SLEEP	0x0001
-#define KM_NOSLEEP	0x0002	/* must match VM_NOSLEEP */
-#define KM_PHYSCONTIG	0x0008
-#define KM_CACHEALIGN	0x0010	/* guarantee that memory is cache aligned */
-
-#define VM_NOSLEEP	KM_NOSLEEP
-#define VM_PHYSCONTIG	KM_PHYSCONTIG
-#define VM_CACHEALIGN	KM_CACHEALIGN
-#define VM_DIRECT	KM_PHYSCONTIG
-#define VM_UNCACHED	0x0020
+#define KM_NOSLEEP	0x0002
+#define KM_NOFS		0x0004
 
 #define	kmem_zone	kmem_cache_s
 #define kmem_zone_t	kmem_cache_t
