@@ -1,4 +1,4 @@
-#ident "$Revision: 1.211 $"
+#ident "$Revision: 1.212 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2493,15 +2493,6 @@ xfs_write_file(
 			}
 
 			/*
-			 * If we've grown the file, get back the
-			 * inode lock and move di_size up to the
-			 * new size.  It may be that someone else
-			 * made it even bigger, so be careful not
-			 * to shrink it.
-			 *
-			 * No one could have shrunken the file, because
-			 * we are holding the iolock shared.
-			 *
 			 * reset offset/count to reflect the biomove
 			 */
 			if (!fillhole)  {
@@ -2517,17 +2508,6 @@ xfs_write_file(
 				offset = BBTOOFF(bmapp->offset) +
 					 bmapp->pboff + bmapp->pbsize;
 				count -= bmapp->pbsize;
-			}
-
-			if (offset > isize) {
-				xfs_ilock(ip, XFS_ILOCK_EXCL);
-				if (offset > ip->i_d.di_size) {
-					ip->i_d.di_size = offset;
-					ip->i_update_core = 1;
-					ip->i_update_size = 1;
-					isize = offset;
-				}
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			}
 
 			/*
@@ -2552,6 +2532,44 @@ xfs_write_file(
 				error = bwrite(bp);
 			} else {
 				bdwrite(bp);
+			}
+
+			/*
+			 * If we've grown the file, get back the
+			 * inode lock and move di_size up to the
+			 * new size.  It may be that someone else
+			 * made it even bigger, so be careful not
+			 * to shrink it.
+			 *
+			 * No one could have shrunk the file, because
+			 * we are holding the iolock exclusive.
+			 *
+			 * Have to update di_size after brelsing the buffer
+			 * because if we are running low on buffers and 
+			 * xfsd is trying to push out a delalloc buffer for
+			 * our inode, then it grabs the ilock in exclusive 
+			 * mode to do an allocation, and calls get_buf to 
+			 * get to read in a metabuffer (agf, agfl). If the
+			 * metabuffer is in the buffer cache, but it gets 
+			 * reused before we can grab the cpsema(), then
+			 * we will sleep in get_buf waiting for it to be
+			 * released whilst holding the ilock.
+			 * If it so happens that the buffer was reused by
+			 * the above code path, then we end up holding this 
+			 * buffer locked whilst we try to get the ilock so we 
+			 * end up deadlocking. (bug 504578).
+			 * For the IO_SYNC writes, the di_size now gets logged
+			 * and synced to disk in the transaction in xfs_write().
+			 */  
+			if (offset > isize) {
+				xfs_ilock(ip, XFS_ILOCK_EXCL);
+				if (offset > ip->i_d.di_size) {
+					ip->i_d.di_size = offset;
+					ip->i_update_core = 1;
+					ip->i_update_size = 1;
+					isize = offset;
+				}
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			}
 
 			XFSSTATS.xs_write_bufs++;
