@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.96 $"
+#ident	"$Revision: 1.97 $"
 
 /*
  * High level interface routines for log manager
@@ -1835,8 +1835,8 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	 */
 	if (iclog->ic_state == XLOG_STATE_ACTIVE ||
 	    iclog->ic_state == XLOG_STATE_DIRTY) {
-
-		/* If the head is dirty or (active and empty), then
+		/*
+		 * If the head is dirty or (active and empty), then
 		 * we need to look at the previous iclog.  If the previous
 		 * iclog is active or dirty we are done.  There is nothing
 		 * to sync out.  Otherwise, we attach ourselves to the
@@ -1872,8 +1872,11 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 					goto no_sleep;
 			} else {
 				/* Someone else is writing to this iclog.
-				 * Use its call to flush out the data.
+				 * Use its call to flush out the data.  However,
+				 * the other thread may not force out this LR,
+				 * so we mark it WANT_SYNC.
 				 */
+				xlog_state_switch_iclogs(log, iclog, 0);
 				goto maybe_sleep;
 			}
 		}
