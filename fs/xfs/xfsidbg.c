@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.54 $"
+#ident	"$Revision: 1.55 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2353,6 +2353,7 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 	xfs_dir_leafblock_t *dleaf;
 	xfs_da_intnode_t *node;
 	xfs_dinode_t *di;
+	xfs_disk_dquot_t *dqb;
 
 	d = bp->b_un.b_addr;
 	if ((agf = d)->agf_magicnum == XFS_AGF_MAGIC) {
@@ -2441,6 +2442,13 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 			qprintf("buf 0x%x sb 0x%x\n", bp, sb);
 			xfsidbg_xsb(sb);
 		}
+	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
+#define XFSIDBG_DQTYPESTR(d)     (((d)->d_flags & XFS_DQ_USER) ? "USR" : \
+                                 (((d)->d_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
+
+		qprintf("Quota blk starting ID [%d], type %s at 0x%x\n",
+			dqb->d_id, XFSIDBG_DQTYPESTR(dqb), dqb);
+		
 	} else {
 		qprintf("buf 0x%x unknown 0x%x\n", bp, d);
 	}
