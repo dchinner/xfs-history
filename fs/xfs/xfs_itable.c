@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.46 $"
+#ident	"$Revision: 1.47 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -174,7 +174,8 @@ xfs_bulkstat(
 	ino = (xfs_ino_t)*lastinop;
 	agno = XFS_INO_TO_AGNO(mp, ino);
 	agino = XFS_INO_TO_AGINO(mp, ino);
-	if (agno >= mp->m_sb.sb_agcount) {
+	if (agno >= mp->m_sb.sb_agcount ||
+	    ino != XFS_AGINO_TO_INO(mp, agno, agino)) {
 		*done = 1;
 		*ubcountp = 0;
 		return 0;
