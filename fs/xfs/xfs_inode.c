@@ -71,10 +71,11 @@ zone_t *xfs_inode_zone;
  * buffer to read from disk.
  */
 buf_t *
-xfs_itobp(xfs_mount_t	*mp,
-	  xfs_trans_t	*tp,
-	  xfs_inode_t	*ip,
-	  xfs_dinode_t	**dipp)
+xfs_itobp(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,
+	xfs_dinode_t	**dipp)
 {
 	xfs_imap_t	imap;
 	buf_t		*bp;
@@ -124,9 +125,10 @@ xfs_itobp(xfs_mount_t	*mp,
  * is first referenced (see xfs_iread_extents()).
  */
 void
-xfs_iformat(xfs_mount_t		*mp,
-	    xfs_inode_t		*ip,
-	    xfs_dinode_t	*dip)
+xfs_iformat(
+	xfs_mount_t	*mp,
+	xfs_inode_t	*ip,
+	xfs_dinode_t	*dip)
 {
 	register int		size;
 	register int		nex;
@@ -257,9 +259,10 @@ xfs_iformat(xfs_mount_t		*mp,
  * already has them (it will not if the inode has no links).
  */
 xfs_inode_t *
-xfs_iread(xfs_mount_t	*mp,
-	  xfs_trans_t	*tp,
-	  xfs_ino_t	ino)
+xfs_iread(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino)
 {
 	buf_t		*bp;
 	xfs_dinode_t	*dip;
@@ -330,8 +333,9 @@ xfs_iread(xfs_mount_t	*mp,
  * Allocate and fill in iu_extents.  Real work is done in xfs_bmap.c.
  */
 void
-xfs_iread_extents(xfs_trans_t	*tp,
-		  xfs_inode_t	*ip)
+xfs_iread_extents(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
 {
 	size_t size;
 
@@ -371,14 +375,15 @@ xfs_iread_extents(xfs_trans_t	*tp,
  * the commit and pass it back into this routine on the second call.
  */
 xfs_inode_t *
-xfs_ialloc(xfs_trans_t	*tp,
-	   xfs_inode_t	*pip,
-	   mode_t	mode,
-	   ushort	nlink,
-	   dev_t	rdev,
-	   struct cred	*cr,
-	   buf_t	**ialloc_context,
-	   boolean_t	*call_again)
+xfs_ialloc(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*pip,
+	mode_t		mode,
+	ushort		nlink,
+	dev_t		rdev,
+	cred_t		*cr,
+	buf_t		**ialloc_context,
+	boolean_t	*call_again)
 {
 	xfs_ino_t	ino;
 	xfs_inode_t	*ip;
@@ -475,11 +480,79 @@ xfs_ialloc(xfs_trans_t	*tp,
 }
 
 /*
+ * Start the truncation of the file to new_size.  The new size
+ * must be smaller than the current size.  This routine will
+ * clear the buffer and page caches of file data in the removed
+ * range, and xfs_itruncate_finish() will remove the underlying
+ * disk blocks.
+ *
+ * The inode must have its I/O lock locked EXCLUSIVELY, and it
+ * must NOT have the inode lock held at all.  This is because we're
+ * calling into the buffer/page cache code and we can't hold the
+ * inode lock when we do so.
+ *
+ * The flags parameter can have either the value XFS_ITRUNC_DEFINITE
+ * or XFS_ITRUNC_MAYBE.  The XFS_ITRUNC_MAYBE value should be used
+ * in the case that the caller is locking things out of order and
+ * may not be able to call xfs_itruncate_finish() with the inode lock
+ * held without dropping the I/O lock.  If the caller must drop the
+ * I/O lock before calling xfs_itruncate_finish(), then xfs_itruncate_start()
+ * must be called again with all the same restrictions as the initial
+ * call.
+ */
+void
+xfs_itruncate_start(
+	xfs_inode_t	*ip,
+	uint		flags,		    
+	xfs_fsize_t	new_size)
+{
+	xfs_fsblock_t	first_block;
+	xfs_fsblock_t	first_unmap_block;
+	xfs_fsblock_t	last_block;
+	xfs_fsize_t	last_byte;
+	off_t		toss_start;
+	xfs_extlen_t	unmap_len;
+	xfs_mount_t	*mp;
+	xfs_trans_t	*ntp;
+	int		done;
+	xfs_bmap_free_t	free_list;
+	timestruc_t	tv;
+
+	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
+	ASSERT(new_size < ip->i_d.di_size);
+	ASSERT((flags == XFS_ITRUNC_DEFINITE) ||
+	       (flags == XFS_ITRUNC_MAYBE));
+
+	mp = ip->i_mount;
+	/*
+	 * Call ptossvp() or pflushinvalvp() to get rid of pages and buffers
+	 * overlapping the region being removed.  We have to use
+	 * the less efficient pflushinvalvp() in the case that the
+	 * caller may not be able to finish the truncate without
+	 * dropping the inode's I/O lock.  Make sure
+	 * to catch any pages brought in by buffers overlapping
+	 * the EOF by searching out beyond the isize by our
+	 * writeio size. We round new_size up to a block boundary
+	 * so that we don't toss things on the same block as
+	 * new_size but before it.
+	 */
+	toss_start = XFS_B_TO_FSB(mp, new_size);
+	toss_start = XFS_FSB_TO_B(mp, toss_start);
+	last_byte = ip->i_d.di_size + (1 << mp->m_writeio_log);
+	if (last_byte > toss_start) {
+		if (flags & XFS_ITRUNC_DEFINITE) {
+			ptossvp(XFS_ITOV(ip), toss_start, last_byte);
+		} else {
+			pflushinvalvp(XFS_ITOV(ip), toss_start, last_byte);
+		}
+	}
+}		    
+
+/*
  * Shrink the file to the given new_size.  The new
  * size must be smaller than the current size.
- * This will free up the underlying blocks and clear
- * the buffer and page caches of file data in the
- * removed range.
+ * This will free up the underlying blocks
+ * in the removed range after a call to xfs_itrunc_start().
  *
  * The transaction passed to this routine must have made
  * a permanent log reservation of at least XFS_ITRUNCATE_LOG_RES.
@@ -495,15 +568,14 @@ xfs_ialloc(xfs_trans_t	*tp,
  * for it within the transaction.
  */
 void
-xfs_itruncate(xfs_trans_t	**tp,
-	      xfs_inode_t	*ip,
-	      __int64_t		new_size)
+xfs_itruncate_finish(
+	xfs_trans_t	**tp,
+	xfs_inode_t	*ip,
+	xfs_fsize_t	new_size)
 {
 	xfs_fsblock_t	first_block;
 	xfs_fsblock_t	first_unmap_block;
 	xfs_fsblock_t	last_block;
-	__int64_t	last_byte;
-	off_t		toss_start;
 	xfs_extlen_t	unmap_len;
 	xfs_mount_t	*mp;
 	xfs_trans_t	*ntp;
@@ -520,22 +592,6 @@ xfs_itruncate(xfs_trans_t	**tp,
 	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
 
 	mp = (*tp)->t_mountp;
-	/*
-	 * Call ptossvp() to get rid of pages and buffers
-	 * overlapping the region being removed.  Make sure
-	 * to catch any pages brought in by buffers overlapping
-	 * the EOF by searching out beyond the isize by our
-	 * writeio size. We round new_size up to a block boundary
-	 * so that we don't toss things on the same block as
-	 * new_size but before it.
-	 */
-	toss_start = XFS_B_TO_FSB(mp, new_size);
-	toss_start = XFS_FSB_TO_B(mp, toss_start);
-	last_byte = ip->i_d.di_size + (1 << mp->m_writeio_log);
-	if (last_byte > toss_start) {
-		ptossvp(XFS_ITOV(ip), toss_start, last_byte);
-	}
-
 	first_unmap_block = XFS_B_TO_FSB(mp, new_size);
 	/*
 	 * Subtract 1 from the size so that we get the correct
@@ -597,12 +653,13 @@ xfs_itruncate(xfs_trans_t	**tp,
  * for update and it must be a part of the current transaction.
  */
 void
-xfs_igrow(xfs_trans_t	*tp,
-	  xfs_inode_t	*ip,
-	  __int64_t	new_size,
-	  cred_t	*credp)
+xfs_igrow(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip,
+	xfs_fsize_t	new_size,
+	cred_t	*credp)
 {
-	__int64_t	isize;
+	xfs_fsize_t	isize;
 	timestruc_t	tv;
 
 	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE) != 0);
@@ -645,8 +702,9 @@ xfs_igrow(xfs_trans_t	*tp,
  * xfs_difree().
  */
 void
-xfs_ifree(xfs_trans_t	*tp,
-	  xfs_inode_t	*ip)
+xfs_ifree(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
 {
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 	ASSERT(ip->i_transp == tp);
@@ -681,7 +739,9 @@ xfs_ifree(xfs_trans_t	*tp,
  *	 requested for the i_broot array.
  */
 void
-xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
+xfs_iroot_realloc(
+	xfs_inode_t 	*ip,
+	int 		rec_diff)
 {
 	int			cur_max;
 	int			new_max;
@@ -802,8 +862,9 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
  *	 requested for the iu_extents array.
  */
 void
-xfs_iext_realloc(xfs_inode_t	*ip,
-		 int		ext_diff)
+xfs_iext_realloc(
+	xfs_inode_t	*ip,
+	int		ext_diff)
 {
 	int	byte_diff;
 	int	new_size;
@@ -882,8 +943,9 @@ xfs_iext_realloc(xfs_inode_t	*ip,
  *	 requested for the iu_data array.
  */
 void
-xfs_idata_realloc(xfs_inode_t	*ip,
-		  int		byte_diff)
+xfs_idata_realloc(
+	xfs_inode_t	*ip,
+	int		byte_diff)
 {
 	int	new_size;
 	int	real_size;
@@ -963,10 +1025,11 @@ xfs_idata_realloc(xfs_inode_t	*ip,
  *	 to retrieve the given inode from disk
  */
 int
-xfs_imap(xfs_mount_t	*mp,
-	 xfs_trans_t	*tp,
-	 xfs_ino_t	ino,
-	 xfs_imap_t	*imap)
+xfs_imap(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino,
+	xfs_imap_t	*imap)
 {
 	xfs_fsblock_t fsbno;
 	int off;
@@ -987,7 +1050,8 @@ xfs_imap(xfs_mount_t	*mp,
  * associated with the inode.
  */
 void
-xfs_idestroy(xfs_inode_t *ip)
+xfs_idestroy(
+	xfs_inode_t	*ip)
 {
 	switch (ip->i_d.di_mode & IFMT) {
 	case IFREG:
@@ -1035,7 +1099,8 @@ xfs_idestroy(xfs_inode_t *ip)
  * This value is protected by ipinlock spinlock in the mount structure.
  */
 void
-xfs_ipin(xfs_inode_t *ip)
+xfs_ipin(
+	xfs_inode_t	*ip)
 {
 	int		s;
 	xfs_mount_t	*mp;
@@ -1055,7 +1120,8 @@ xfs_ipin(xfs_inode_t *ip)
  * inode must have been previoulsy pinned with a call to xfs_ipin().
  */
 void
-xfs_iunpin(xfs_inode_t *ip)
+xfs_iunpin(
+	xfs_inode_t	*ip)
 {
 	int		s;
 	xfs_mount_t	*mp;
@@ -1086,7 +1152,8 @@ xfs_iunpin(xfs_inode_t *ip)
  * sleep until the inode is unpinned.
  */
 void
-xfs_iunpin_wait(xfs_inode_t *ip)
+xfs_iunpin_wait(
+	xfs_inode_t	*ip)
 {
 	int		s;
 	xfs_mount_t	*mp;
@@ -1120,8 +1187,9 @@ xfs_iunpin_wait(xfs_inode_t *ip)
  * written out (0 indicating a synchronous write).
  */
 void
-xfs_iflush(xfs_inode_t	*ip,
-	   uint		flags)
+xfs_iflush(
+	xfs_inode_t	*ip,
+	uint		flags)
 {
 	xfs_inode_log_item_t	*iip;
 	buf_t			*bp;
@@ -1288,7 +1356,9 @@ xfs_iflush(xfs_inode_t	*ip,
  * were found, false otherwise.
  */
 int
-xfs_iflush_all(xfs_mount_t *mp, int flag)
+xfs_iflush_all(
+	xfs_mount_t	*mp,
+	int		flag)
 {
 	int		busy;
 	int		done;
@@ -1338,7 +1408,8 @@ xfs_iflush_all(xfs_mount_t *mp, int flag)
 
 #ifdef SIM
 void
-xfs_iprint(xfs_inode_t *ip)
+xfs_iprint(
+	xfs_inode_t	*ip)
 {
 	xfs_dinode_core_t *dip;
 	xfs_bmbt_rec_t *ep;
@@ -1411,7 +1482,10 @@ xfs_iprint(xfs_inode_t *ip)
  * xfs_iaccess: check accessibility of inode/cred for mode.
  */
 int
-xfs_iaccess(xfs_inode_t *ip, mode_t mode, cred_t *cr)
+xfs_iaccess(
+	xfs_inode_t	*ip,
+	mode_t		mode,
+	cred_t		*cr)
 {
 #if 0
 	/*
@@ -1439,7 +1513,8 @@ xfs_iaccess(xfs_inode_t *ip, mode_t mode, cred_t *cr)
  * xfs_iroundup: round up argument to next power of two
  */
 uint
-xfs_iroundup(uint v)
+xfs_iroundup(
+	uint	v)
 {
 	int i;
 	uint m;
