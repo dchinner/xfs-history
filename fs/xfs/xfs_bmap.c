@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.187 $"
+#ident	"$Revision: 1.188 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1795,8 +1795,10 @@ xfs_bmap_alloc(
 				pag = &mp->m_perag[ag];
 				if (!pag->pagf_init &&
 				    (error = xfs_alloc_pagf_init(mp, args.tp,
-					    ag, XFS_ALLOC_FLAG_TRYLOCK)))
+					    ag, XFS_ALLOC_FLAG_TRYLOCK))) {
+					mrunlock(&mp->m_peraglock);
 					return error;
+				}
 				if (pag->pagf_init) {
 					need = XFS_MIN_FREELIST_PAG(pag, mp);
 					longest = pag->pagf_longest;
