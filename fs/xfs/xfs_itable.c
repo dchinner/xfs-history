@@ -490,6 +490,8 @@ xfs_bulkstat(
 							xfs_trans_brelse(tp, bp);
 						error = xfs_itobp(mp, tp, ip,
 								  &dip, &bp, bno);
+						if (!error)
+							clustidx = ip->i_boffset / mp->m_sb.sb_inodesize;
 						kmem_zone_free(xfs_inode_zone, ip);
 						if (XFS_TEST_ERROR(error != 0,
 								   mp, XFS_ERRTAG_BULKSTAT_READ_CHUNK,
@@ -497,8 +499,6 @@ xfs_bulkstat(
 							bp = NULL;
 							break;
 						}
-						clustidx = ip->i_boffset /
-							  mp->m_sb.sb_inodesize;
 					}
 				}
 				/*
