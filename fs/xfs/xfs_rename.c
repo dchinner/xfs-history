@@ -411,6 +411,7 @@ int rename_which_error_return = 0;
  * Do all the mundane error checking for xfs_rename().  The code
  * assumes that all of the non-NULL inodes have already been locked.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_rename_error_checks(
 	xfs_inode_t	*src_dp,
@@ -422,85 +423,19 @@ xfs_rename_error_checks(
 	cred_t		*credp,
 	int		*status)			
 {
-	int	src_is_directory;
-	int	error;
-
-	*status = 0;
-	error = 0;
-	/*
-	 * If the target directory has been removed, we can't create any
-	 * more files in it.  We don't need to check the source dir,
-	 * because it was checked in xfs_lock_for_rename() while looking
-	 * for the source inode.  If it had been removed the source
-	 * dir's gen count would have been bumped removing the last entry
-	 * and then we'd have noticed that its link count had gone to zero.
-	 */
-	if (target_dp->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		*status = __LINE__;
-		goto error_return;
-	}
-
-	if ((src_ip == src_dp) || (target_ip == target_dp)) {
-		error = XFS_ERROR(EINVAL);
-		*status = __LINE__;
-		goto error_return;
-	}
-
-	/*
-	 * Source and target are identical.
-	 */
-	if (src_ip == target_ip) {
-		/*
-		 * There is no error in this case, but we want to get
-		 * out anyway.  Set error to 0 so that no error will
-		 * be returned, but set *status so that the caller
-		 * will know that it should give up on the rename.
-		 */
-		error = 0;
-		*status = __LINE__;
-		goto error_return;
-	}
-
-	/*
-	 * Directory renames require special checks.
-	 */
-	src_is_directory = ((src_ip->i_d.di_mode & IFMT) == IFDIR);
-
-	if (src_is_directory) {
-
-		ASSERT(src_ip->i_d.di_nlink >= 2);
-
+	if ((src_ip->i_d.di_mode & IFMT) == IFDIR) {
 		/*
 		 * Check for link count overflow on target_dp
 		 */
 		if (target_ip == NULL && (src_dp != target_dp) &&
 		    target_dp->i_d.di_nlink >= XFS_MAXLINK) {
-			error = XFS_ERROR(EMLINK);
 			*status = __LINE__;
-			goto error_return;
+			return XFS_ERROR(EMLINK);
 		}
-		    
-		/*
-		 * Cannot rename ".."
-		 */
-		if ((src_name[0] == '.') && (src_name[1] == '.') &&
-		    (src_name[2] == '\0')) {
-			error = XFS_ERROR(EINVAL);
-			*status = __LINE__;
-			goto error_return;
-		}
-                if ((target_name[0] == '.') && (target_name[1] == '.') &&
-                    (target_name[2] == '\0')) {
-                        error = XFS_ERROR(EINVAL);
-			*status = __LINE__;
-                        goto error_return;
-                }
-
 	}
 
- error_return:
-	return error;
+	*status = 0;
+	return 0;
 }
 
 /*
@@ -575,7 +510,6 @@ xfs_rename(
 	struct dentry	*src_dentry,
 	vnode_t		*target_dir_vp,
 	struct dentry	*target_dentry,
-	pathname_t	*target_pnp,
 	cred_t		*credp)
 {
 	xfs_trans_t	*tp;
@@ -863,9 +797,8 @@ xfs_rename(
 		 * name at the destination directory, remove it first.
 		 */
 		error = XFS_DIR_REPLACE(mp, tp, target_dp, target_name,
-			((target_pnp != NULL) ? target_pnp->pn_complen :
-			 target_namelen), src_ip->i_ino, &first_block,
-			 &free_list, spaceres);
+			target_namelen, src_ip->i_ino, &first_block,
+			&free_list, spaceres);
 		if (error) {
 			rename_which_error_return = __LINE__;
 			goto abort_return;

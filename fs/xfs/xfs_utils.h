@@ -43,7 +43,6 @@
 
 struct bhv_desc;
 struct cred;
-struct pathname;
 struct vnode;
 struct xfs_inode;
 struct xfs_mount;
@@ -55,7 +54,6 @@ xfs_rename(
 	struct dentry	*src_dentry,
 	struct vnode	*target_dir_vp,
 	struct dentry	*target_dentry,
-	struct pathname	*target_pnp,
 	struct cred	*credp);
 
 extern int
@@ -72,7 +70,6 @@ cxfs_rename(
 	char		*src_name,
 	struct vnode	*target_dir_vp,
 	char		*target_name,
-	struct pathname	*target_pnp,
 	struct cred	*credp);
 
 extern int
