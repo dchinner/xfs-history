@@ -1155,6 +1155,37 @@ int xfs_ioctl (
                 return copy_to_user((char *)arg, &out, sizeof(xfs_fsop_resblks_t));
         }
 
+	case XFS_IOC_FSGROWFSDATA: {
+		xfs_growfs_data_t in;
+		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_data_t));
+		if (error)
+			return -error;
+		error = xfs_growfs_data(mp, &in);
+		if (error)
+			return -error;
+	}
+
+	case XFS_IOC_FSGROWFSLOG: {
+		xfs_growfs_log_t in;
+		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_log_t));
+		if (error)
+			return -error;
+		error = xfs_growfs_log(mp, &in);
+		if (error)
+			return -error;
+	}
+
+	case XFS_IOC_FSGROWFSRT: {
+		xfs_growfs_rt_t in;
+		error = copy_from_user(&in, (char *)arg, sizeof(xfs_growfs_rt_t));
+		if (error)
+			return -error;
+		error = xfs_growfs_rt(mp, &in);
+		if (error)
+			return -error;
+	}
+
+
 	default:
 		return -EINVAL;
 	}
