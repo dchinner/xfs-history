@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision$"
 
 #define	XFS_MACRO_C
 
@@ -233,6 +233,7 @@ xfs_alloc_block_minrecs(int lev, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_ALLOC_BLOCK_SIZE)
+/*ARGSUSED1*/
 int
 xfs_alloc_block_size(int lev, xfs_btree_cur_t *cur)
 {
@@ -241,6 +242,7 @@ xfs_alloc_block_size(int lev, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_ALLOC_KEY_ADDR)
+/*ARGSUSED3*/
 xfs_alloc_key_t *
 xfs_alloc_key_addr(xfs_alloc_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
@@ -257,6 +259,7 @@ xfs_alloc_ptr_addr(xfs_alloc_block_t *bb, int i, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_ALLOC_REC_ADDR)
+/*ARGSUSED3*/
 xfs_alloc_rec_t *
 xfs_alloc_rec_addr(xfs_alloc_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
@@ -401,6 +404,7 @@ xfs_bmap_block_isize(int lev, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_BROOT_KEY_ADDR)
+/*ARGSUSED3*/
 xfs_bmbt_key_t *
 xfs_bmap_broot_key_addr(xfs_bmbt_block_t *bb, int i, int sz)
 {
@@ -433,6 +437,7 @@ xfs_bmap_broot_ptr_addr(xfs_bmbt_block_t *bb, int i, int sz)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_BROOT_REC_ADDR)
+/*ARGSUSED3*/
 xfs_bmbt_rec_t *
 xfs_bmap_broot_rec_addr(xfs_bmbt_block_t *bb, int i, int sz)
 {
@@ -457,6 +462,7 @@ xfs_bmap_broot_space_calc(int nrecs)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_IBLOCK_SIZE)
+/*ARGSUSED1*/
 int
 xfs_bmap_iblock_size(int lev, xfs_btree_cur_t *cur)
 {
@@ -465,6 +471,7 @@ xfs_bmap_iblock_size(int lev, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_KEY_DADDR)
+/*ARGSUSED3*/
 xfs_bmbt_key_t *
 xfs_bmap_key_daddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
@@ -473,6 +480,7 @@ xfs_bmap_key_daddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_KEY_IADDR)
+/*ARGSUSED3*/
 xfs_bmbt_key_t *
 xfs_bmap_key_iaddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
@@ -497,6 +505,7 @@ xfs_bmap_ptr_iaddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_RBLOCK_DSIZE)
+/*ARGSUSED1*/
 int
 xfs_bmap_rblock_dsize(int lev, xfs_btree_cur_t *cur)
 {
@@ -505,6 +514,7 @@ xfs_bmap_rblock_dsize(int lev, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_RBLOCK_ISIZE)
+/*ARGSUSED1*/
 int
 xfs_bmap_rblock_isize(int lev, xfs_btree_cur_t *cur)
 {
@@ -513,6 +523,7 @@ xfs_bmap_rblock_isize(int lev, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_REC_DADDR)
+/*ARGSUSED3*/
 xfs_bmbt_rec_t *
 xfs_bmap_rec_daddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
@@ -521,6 +532,7 @@ xfs_bmap_rec_daddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_REC_IADDR)
+/*ARGSUSED3*/
 xfs_bmbt_rec_t *
 xfs_bmap_rec_iaddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
@@ -737,6 +749,7 @@ xfs_cnt_block(xfs_mount_t *mp)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_HASH)
+/*ARGSUSED1*/
 __uint32_t
 xfs_da_cookie_hash(xfs_mount_t *mp, off_t cookie)
 {
@@ -1297,6 +1310,7 @@ xfs_inobt_block_minrecs(int lev, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_INOBT_BLOCK_SIZE)
+/*ARGSUSED1*/
 int
 xfs_inobt_block_size(int lev, xfs_btree_cur_t *cur)
 {
@@ -1329,6 +1343,7 @@ xfs_inobt_is_last_rec(xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_INOBT_KEY_ADDR)
+/*ARGSUSED3*/
 xfs_inobt_key_t *
 xfs_inobt_key_addr(xfs_inobt_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
@@ -1361,6 +1376,7 @@ xfs_inobt_ptr_addr(xfs_inobt_block_t *bb, int i, xfs_btree_cur_t *cur)
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_INOBT_REC_ADDR)
+/*ARGSUSED3*/
 xfs_inobt_rec_t *
 xfs_inobt_rec_addr(xfs_inobt_block_t *bb, int i, xfs_btree_cur_t *cur)
 {
