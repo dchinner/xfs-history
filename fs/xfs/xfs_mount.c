@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.173 $"
+#ident	"$Revision: 1.174 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -69,9 +69,6 @@
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int, int);
 STATIC void	xfs_sb_relse(buf_t *);
 #ifndef SIM
-#ifdef DEBUG
-STATIC void	xfs_check_fsprivate(dev_t);
-#endif
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC void	xfs_uuid_mount(xfs_mount_t *);
@@ -120,7 +117,15 @@ xfs_mount_free(xfs_mount_t *mp)
 		kmem_free(mp->m_perag,
 			  sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
 	}
-	
+
+#if 0
+	/*
+	 * XXXdpd - Doesn't work now for shutdown case.
+	 * Should at least free the memory.
+	 */
+	ASSERT(mp->m_ail.ail_back == (xfs_log_item_t*)&(mp->m_ail));
+	ASSERT(mp->m_ail.ail_forw == (xfs_log_item_t*)&(mp->m_ail));
+#endif
 	AIL_LOCK_DESTROY(&mp->m_ail_lock);
 	spinlock_destroy(&mp->m_sb_lock);
 	mutex_destroy(&mp->m_ilock);
@@ -886,24 +891,6 @@ xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 }
 #endif /* SIM */
 
-#if !defined(SIM) && defined(DEBUG)
-STATIC void
-xfs_check_fsprivate(dev_t dev)
-{
-	buf_t	*bp;
-	int	i;
-
-	for (bp = &global_buf_table[0], i = 0; i < v.v_buf; i++, bp++) {
-		if (bp->b_edev != dev)
-			continue;
-		psema(&bp->b_lock, PRIBIO);
-		if (bp->b_edev == dev)
-			ASSERT(bp->b_fsprivate2 == NULL);
-		vsema(&bp->b_lock);
-	}
-}
-#endif
-
 /*
  * xfs_unmountfs
  * 
@@ -1020,12 +1007,9 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 * We must wait for the I/O completion of those. The sync flag here
 	 * does a two pass iteration thru the bufcache.
 	 */
-	if (XFS_FORCED_SHUTDOWN(mp))
-		incore_delwri_relse(mp->m_dev, 1); /* synchronous */
-
-#ifdef DEBUG
-	xfs_check_fsprivate(mp->m_dev);
-#endif
+	if (XFS_FORCED_SHUTDOWN(mp)) {
+		(void)incore_relse(mp->m_dev, 0, 1); /* synchronous */
+	}
 	xfs_uuid_unmount(mp);
 
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
