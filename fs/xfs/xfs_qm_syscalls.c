@@ -1,4 +1,4 @@
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -75,7 +75,7 @@ STATIC uint	xfs_qm_import_qtype_flags(uint *);
 STATIC uint	xfs_qm_export_qtype_flags(uint);
 STATIC void	xfs_qm_export_dquot(xfs_mount_t *, xfs_disk_dquot_t *,
 				    struct fs_disk_quota *);
-STATIC void	xfs_qm_dqrele_all_inodes(xfs_mount_t *, uint);
+
 
 /*
  * The main distribution switch of all XFS quotactl system calls.
@@ -245,6 +245,7 @@ xfs_qm_scall_quotaoff(
 	xfs_qoff_logitem_t 	*qoffstart;
 	uint 			sbflags, newflags;
 	extern dev_t		rootdev;
+	int			nculprits;
 
 	if (!force && !_CAP_ABLE(CAP_QUOTA_MGT))
 		return (EPERM);
@@ -395,12 +396,15 @@ xfs_qm_scall_quotaoff(
 
 	/*
 	 * Go through all the dquots of this file system and purge them,
-	 * according to what was turned off.
-	 * At this point if everybody played according to the rules and didnt
-	 * slip thru the cracks, we should be able to free every single dquot
-	 * that is affected by this quotaoff all the time.
+	 * according to what was turned off. We may not be able to get rid
+	 * of all dquots, because dquots can have temporary references that
+	 * are not attached to inodes. eg. xfs_setattr, xfs_create.
+	 * So, if we couldn't purge all the dquots from the filesystem,
+	 * we can't get rid of the incore data structures.
 	 */
-	(void) xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF);
+	while (nculprits = xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF)) {
+		delay(10 * nculprits);
+	}
 
 	/*
 	 * Transactions that had started before ACTIVE state bit was cleared 
@@ -504,35 +508,42 @@ xfs_qm_scall_quotaon(
 	extern dev_t	rootdev;
 	int		error, s;
 	uint		qf;
+	uint		accflags;
 	__int64_t	sbflags;
 	boolean_t	rootfs;
 	boolean_t	delay;
-
+	
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
 		return (EPERM);
 
 	rootfs = (boolean_t) (mp->m_dev == rootdev);
-	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
+
 #ifdef _NOPROJQUOTAS
 	flags &= (XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD);
 #else
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
 #endif	
+	/*
+	 * If caller wants to turn on accounting on /, but accounting
+	 * is already turned on, ignore ACCTing flags.
+	 * Switching on quota accounting for non-root filesystems
+	 * must be done at mount time.
+	 */
+	accflags = flags & XFS_ALL_QUOTA_ACCT;
+	if (!rootfs || 
+	    (accflags && rootfs && ((mp->m_qflags & accflags) == accflags))) {
+		flags &= ~(XFS_ALL_QUOTA_ACCT);
+	}
+
 	sbflags = 0;
+	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
 
 	if (flags == 0)
 		return (EINVAL);
-	/*
-	 * Switching on quota accounting for non-root filesystems
-	 * must be done at mount time. OTOH, root filesystem doesn't
-	 * take a mount time option to enable quotas.
-	 */
-	if (!rootfs && delay) {
-#ifdef QUOTADEBUG
-		printf("NON-root fs. Must enable acctg @ mount time\n");
-#endif
-		return (EINVAL);
-	}
+
+	/* Only rootfs can turn on quotas with a delayed effect */
+	ASSERT(!delay || rootfs);
+
 	/*
 	 * Can't enforce without accounting. We check the superblock
 	 * qflags here instead of m_qflags because rootfs can have
@@ -1158,15 +1169,14 @@ xfs_qm_export_flags(
 
 /* 
  * Go thru all the inodes in the file system, releasing their dquots.
- * This is only called as a result of turning off user or project (or both)
- * quota accounting.
- * Note that the mount structure gets modified to indicate that quotas is off
- * AFTER this.
+ * Note that the mount structure gets modified to indicate that quotas are off
+ * AFTER this, in the case of quotaoff. This also gets called from 
+ * xfs_rootumount.
  */
-STATIC void
+void
 xfs_qm_dqrele_all_inodes(
-	xfs_mount_t	*mp,
-	uint		flags)
+	struct xfs_mount *mp,
+	uint		 flags)
 {
 	vmap_t 		vmap;
 	xfs_inode_t	*ip, *topino;
@@ -1179,8 +1189,10 @@ xfs_qm_dqrele_all_inodes(
 again:
 	XFS_MOUNT_ILOCK(mp);
 	ip = mp->m_inodes;
-	if (ip == NULL)
-		goto out;
+	if (ip == NULL) {
+		XFS_MOUNT_IUNLOCK(mp);
+		return;
+	}
         do {		
 		/*
 		 * Rootinode, rbmip and rsumip have blocks associated with it.
@@ -1252,7 +1264,7 @@ again:
 		}
 		ip = ip->i_mnext;
 	} while (ip != mp->m_inodes);
- out:
+
 	XFS_MOUNT_IUNLOCK(mp);
 	return;
 }
