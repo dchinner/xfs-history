@@ -2294,7 +2294,7 @@ xfs_diostrat( buf_t *bp)
 	 */
 	if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
 		rt = 1;
-		rtextsize = ip->i_d.di_extsize;
+		rtextsize = mp->m_sb.sb_rextsize;
 	} else {
 		numrtextents = 0;
 		rtextsize = 0;
@@ -2383,7 +2383,8 @@ xfs_diostrat( buf_t *bp)
  				 * Setup transactions.
  				 */
 				tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
-				error = xfs_trans_reserve( tp, count_fsb, 
+				error = xfs_trans_reserve( tp, 
+					   XFS_BM_MAXLEVELS(mp) + count_fsb, 
 					   XFS_DEFAULT_LOG_RES(mp),
 					   numrtextents, 0 );
 
@@ -2502,8 +2503,11 @@ xfs_diostrat( buf_t *bp)
 	     			nbp->b_flags     = bp->b_flags;
 	     			nbp->b_flags2    = bp->b_flags2;
 
-				if (ioflag & IO_GRIO)
+				if (ioflag & IO_GRIO) {
 					nbp->b_flags2 |= B_GR_BUF;
+				} else {
+					nbp->b_flags2 &= ~B_GR_BUF;
+				}
 
 	     			nbp->b_error     = 0;
 	     			nbp->b_proc      = bp->b_proc;
