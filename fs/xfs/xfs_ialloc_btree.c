@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 /*
  * Inode allocation management for xFS.
@@ -1307,7 +1307,7 @@ xfs_inobt_newroot(
 		nfsbno = XFS_AGB_TO_FSB(cur->bc_mp, cur->bc_private.i.agno,
 			agi->agi_root);
 		nfsbno = xfs_alloc_extent(cur->bc_tp, nfsbno, 1,
-			XFS_ALLOCTYPE_NEAR_BNO, 0, 0);
+			XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0);
 		/*
 		 * None available, we fail.
 		 */
@@ -1676,7 +1676,7 @@ xfs_inobt_split(
 		rfsbno = XFS_AGB_TO_FSB(cur->bc_mp, cur->bc_private.i.agno,
 			lbno);
 		rfsbno = xfs_alloc_extent(cur->bc_tp, rfsbno, 1,
-			XFS_ALLOCTYPE_NEAR_BNO, 0, 0);
+			XFS_ALLOCTYPE_NEAR_BNO, 0, 0, 0);
 		if (rfsbno == NULLFSBLOCK) {
 			kmem_check();
 			return 0;

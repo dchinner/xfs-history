@@ -1454,10 +1454,10 @@ xfs_bmap_alloc(
 				mod = prod - mod;
 		}
 		abno = xfs_alloc_vextent(tp, askbno, minlen, asklen, alen, type,
-			total, wasdel, mod, prod);
+			total, minlen, wasdel, mod, prod);
 		if (abno == NULLFSBLOCK && nullfb) {
 			abno = xfs_alloc_vextent(tp, 0, 1, asklen, alen,
-				XFS_ALLOCTYPE_FIRST_AG, 1, wasdel,
+				XFS_ALLOCTYPE_FIRST_AG, 1, 0, wasdel,
 				mod, prod);
 			*low = 1;
 		}
@@ -1870,7 +1870,7 @@ xfs_bmap_extents_to_btree(
 		type = XFS_ALLOCTYPE_NEAR_BNO;
 		abno = *firstblock;
 	}
-	abno = xfs_alloc_extent(tp, abno, 1, type, 0, wasdel);
+	abno = xfs_alloc_extent(tp, abno, 1, type, 0, 0, wasdel);
 	/*
 	 * Allocation can't fail, the space was reserved.
 	 */
@@ -1980,13 +1980,11 @@ xfs_bmap_local_to_extents(
 		if (*firstblock == NULLFSBLOCK) {
 			askbno = XFS_INO_TO_FSB(mp, ip->i_ino);
 			type = XFS_ALLOCTYPE_START_BNO;
-			total++;
 		} else {
 			askbno = *firstblock;
 			type = XFS_ALLOCTYPE_NEAR_BNO;
-			total = 0;
 		}
-		bno = xfs_alloc_extent(tp, askbno, 1, type, total, 0);
+		bno = xfs_alloc_extent(tp, askbno, 1, type, total, 0, 0);
 		/* 
 		 * Can't fail, the space was reserved.
 		 */

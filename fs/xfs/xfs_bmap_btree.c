@@ -647,7 +647,7 @@ xfs_bmbt_insrec(
 				type = XFS_ALLOCTYPE_START_BNO;
 			} else
 				type = XFS_ALLOCTYPE_NEAR_BNO;
-			cbno = xfs_alloc_extent(tp, askbno, 1, type, 0,
+			cbno = xfs_alloc_extent(tp, askbno, 1, type, 0, 0,
 				cur->bc_private.b.wasdel);
 			if (cbno == NULLFSBLOCK) {
 				xfs_bmbt_trace_cursor("xfs_bmbt_insrec exit1",
@@ -1427,7 +1427,8 @@ xfs_bmbt_split(
 		type = XFS_ALLOCTYPE_START_BNO;
 	} else
 		type = XFS_ALLOCTYPE_NEAR_BNO;
-	rbno = xfs_alloc_extent(tp, bno, 1, type, 0, cur->bc_private.b.wasdel);
+	rbno = xfs_alloc_extent(tp, bno, 1, type, 0, 0,
+		cur->bc_private.b.wasdel);
 	if (rbno == NULLFSBLOCK) {
 		xfs_bmbt_trace_cursor("xfs_bmbt_split exit0", cur);
 		return 0;

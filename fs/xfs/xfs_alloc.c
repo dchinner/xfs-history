@@ -108,7 +108,8 @@ xfs_alloc_ag_vextent(
 	int		wasdel,	/* set if allocation was previously delayed */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl);	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft);/* min blocks must be left afterwards */
 
 /*
  * Allocate a variable extent at exactly agno/bno.
@@ -127,7 +128,8 @@ xfs_alloc_ag_vextent_exact(
 	xfs_extlen_t	*len,	/* output: size of extent */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl);	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft);/* min blocks must be left afterwards */
 
 /*
  * Allocate a variable extent near bno in the allocation group agno.
@@ -146,7 +148,8 @@ xfs_alloc_ag_vextent_near(
 	xfs_extlen_t	*len,	/* output: size of extent */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl);	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft);/* min blocks must be left afterwards */
 
 /*
  * Allocate a variable extent anywhere in the allocation group agno.
@@ -164,7 +167,8 @@ xfs_alloc_ag_vextent_size(
 	xfs_extlen_t	*len,	/* output: size of extent */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl);	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft);/* min blocks must be left afterwards */
 
 /*
  * Free the extent starting at agno/bno for length.
@@ -291,7 +295,8 @@ xfs_alloc_ag_vextent(
 	int		wasdel,	/* set if allocation was previously delayed */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl)	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft)/* min blocks must be left afterwards */
 {
 	xfs_agf_t	*agf;	/* allocation group freelist header */
 	xfs_agblock_t	r;	/* return value (starting block) */
@@ -304,15 +309,15 @@ xfs_alloc_ag_vextent(
 	switch (type) {
 	case XFS_ALLOCTYPE_THIS_AG:
 		r = xfs_alloc_ag_vextent_size(tp, agbp, agno, minlen, maxlen,
-			len, mod, prod, isfl);
+			len, mod, prod, isfl, minleft);
 		break;
 	case XFS_ALLOCTYPE_NEAR_BNO:
 		r = xfs_alloc_ag_vextent_near(tp, agbp, agno, bno, minlen,
-			maxlen, len, mod, prod, isfl);
+			maxlen, len, mod, prod, isfl, minleft);
 		break;
 	case XFS_ALLOCTYPE_THIS_BNO:
 		r = xfs_alloc_ag_vextent_exact(tp, agbp, agno, bno, minlen,
-			maxlen, len, mod, prod, isfl);
+			maxlen, len, mod, prod, isfl, minleft);
 		break;
 	default:
 		ASSERT(0);
@@ -354,10 +359,11 @@ xfs_alloc_ag_vextent_exact(
 	xfs_extlen_t	*len,	/* output: size of extent */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl)	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft)/* min blocks must be left afterwards */
 {
-	xfs_btree_cur_t	*bno_cur;	/* by block-number btree cursor */
-	xfs_btree_cur_t	*cnt_cur;	/* by count btree cursor */
+	xfs_btree_cur_t	*bno_cur;/* by block-number btree cursor */
+	xfs_btree_cur_t	*cnt_cur;/* by count btree cursor */
 	xfs_agblock_t	end;	/* end of allocated extent */
 	xfs_agblock_t	fbno;	/* start block of found extent */
 	xfs_agblock_t	fend;	/* end block of found extent */
@@ -408,6 +414,26 @@ xfs_alloc_ag_vextent_exact(
 	 * Fix the length according to mod and prod if given.
 	 */
 	rlen = xfs_alloc_fix_len(mod, prod, end - bno, minlen, maxlen);
+	/*
+	 * Check if there is too little space left in the a.g.
+	 */
+	if (minleft) {
+		xfs_agf_t	*agf;	/* a.g. freelist header */
+		int		diff;	/* free space difference */
+
+		agf = XFS_BUF_TO_AGF(agbp);
+		diff = agf->agf_freeblks + agf->agf_freecount - rlen - minleft;
+		if (diff < 0) {
+			rlen += diff;	/* shrink the allocated space */
+			/*
+			 * Can't do the allocation with these parameters.
+			 */
+			if (rlen < minlen) {
+				xfs_btree_del_cursor(bno_cur);
+				return NULLAGBLOCK;
+			}
+		}
+	}
 	end = bno + rlen;
 	/*
 	 * We are allocating bno for rlen [bno .. end)
@@ -499,7 +525,8 @@ xfs_alloc_ag_vextent_near(
 	xfs_extlen_t	*len,	/* output: size of extent */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl)	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft)/* min blocks must be left afterwards */
 {
 	xfs_btree_cur_t	*bno_cur_gt;	/* cursor for bno btree, right side */
 	xfs_btree_cur_t	*bno_cur_lt;	/* cursor for bno btree, left side */
@@ -613,6 +640,28 @@ xfs_alloc_ag_vextent_near(
 		ltend = ltbno + ltlen;
 		rlen = XFS_EXTLEN_MIN(ltlen, maxlen);
 		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
+		/*
+		 * Check if there is too little space left in the a.g.
+		 */
+		if (minleft) {
+			xfs_agf_t	*agf;	/* a.g. freelist header */
+			int		diff;	/* free space difference */
+
+			agf = XFS_BUF_TO_AGF(agbp);
+			diff = agf->agf_freeblks + agf->agf_freecount - rlen -
+				minleft;
+			if (diff < 0) {
+				rlen += diff;	/* shrink the allocated space */
+				/*
+				 * Can't do the allocation with these
+				 * parameters.
+				 */
+				if (rlen < minlen) {
+					xfs_btree_del_cursor(cnt_cur);
+					return NULLAGBLOCK;
+				}
+			}
+		}
 		/*
 		 * Delete that entry from the by-size tree.
 		 */
@@ -950,6 +999,29 @@ xfs_alloc_ag_vextent_near(
 		ltend = ltbno + ltlen;
 		rlen = XFS_EXTLEN_MIN(ltlen, maxlen);
 		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
+		/*
+		 * Check if there is too little space left in the a.g.
+		 */
+		if (minleft) {
+			xfs_agf_t	*agf;	/* a.g. freelist header */
+			int		diff;	/* free space difference */
+
+			agf = XFS_BUF_TO_AGF(agbp);
+			diff = agf->agf_freeblks + agf->agf_freecount - rlen -
+				minleft;
+			if (diff < 0) {
+				rlen += diff;	/* shrink the allocated space */
+				/*
+				 * Can't do the allocation with these
+				 * parameters.
+				 */
+				if (rlen < minlen) {
+					xfs_btree_del_cursor(bno_cur_lt);
+					xfs_btree_del_cursor(cnt_cur);
+					return NULLAGBLOCK;
+				}
+			}
+		}
 		ltdiff = xfs_alloc_compute_diff(bno, rlen, ltbno, ltlen,
 			&ltnew);
 		ltnewend = ltnew + rlen;
@@ -1019,6 +1091,29 @@ xfs_alloc_ag_vextent_near(
 		gtend = gtbno + gtlen;
 		rlen = XFS_EXTLEN_MIN(gtlen, maxlen);
 		rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
+		/*
+		 * Check if there is too little space left in the a.g.
+		 */
+		if (minleft) {
+			xfs_agf_t	*agf;	/* a.g. freelist header */
+			int		diff;	/* free space difference */
+
+			agf = XFS_BUF_TO_AGF(agbp);
+			diff = agf->agf_freeblks + agf->agf_freecount - rlen -
+				minleft;
+			if (diff < 0) {
+				rlen += diff;	/* shrink the allocated space */
+				/*
+				 * Can't do the allocation with these
+				 * parameters.
+				 */
+				if (rlen < minlen) {
+					xfs_btree_del_cursor(bno_cur_gt);
+					xfs_btree_del_cursor(cnt_cur);
+					return NULLAGBLOCK;
+				}
+			}
+		}
 		gtdiff = xfs_alloc_compute_diff(bno, rlen, gtbno, gtlen,
 			&gtnew);
 		gtnewend = gtnew + rlen;
@@ -1076,7 +1171,8 @@ xfs_alloc_ag_vextent_size(
 	xfs_extlen_t	*len,	/* output: size of extent */
 	xfs_extlen_t	mod,	/* mod value for extent size */
 	xfs_extlen_t	prod,	/* prod value for extent size */
-	int		isfl)	/* set if is freelist blocks - no sb acctg */
+	int		isfl,	/* set if is freelist blocks - no sb acctg */
+	xfs_extlen_t	minleft)/* min blocks must be left afterwards */
 {
 	xfs_btree_cur_t	*bno_cur;	/* cursor for bno btree */
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for cnt btree */
@@ -1129,6 +1225,26 @@ xfs_alloc_ag_vextent_size(
 	 * Fix up the length.
 	 */
 	rlen = xfs_alloc_fix_len(mod, prod, rlen, minlen, maxlen);
+	/*
+	 * Check if there is too little space left in the a.g.
+	 */
+	if (minleft) {
+		xfs_agf_t	*agf;	/* a.g. freelist header */
+		int		diff;	/* free space difference */
+
+		agf = XFS_BUF_TO_AGF(agbp);
+		diff = agf->agf_freeblks + agf->agf_freecount - rlen - minleft;
+		if (diff < 0) {
+			rlen += diff;	/* shrink the allocated space */
+			/*
+			 * Can't do the allocation with these parameters.
+			 */
+			if (rlen < minlen) {
+				xfs_btree_del_cursor(cnt_cur);
+				return NULLAGBLOCK;
+			}
+		}
+	}
 	/*
 	 * Delete the entry from the by-size btree.
 	 */
@@ -1432,13 +1548,14 @@ xfs_alloc_extent(
 	xfs_extlen_t	len,	/* requested length */
 	xfs_alloctype_t	type,	/* allocation type, see above defn */
 	xfs_extlen_t	total,	/* total blocks needed in transaction */
+	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
 	int		wasdel)	/* extent was previously del-alloced */
 {
 	xfs_extlen_t	rlen;	/* returned length from xfs_alloc_vextent */
 	xfs_fsblock_t	rval;	/* return value */
 
-	rval = xfs_alloc_vextent(tp, bno, len, len, &rlen, type, total, wasdel,
-		0, 1);
+	rval = xfs_alloc_vextent(tp, bno, len, len, &rlen, type, total, minleft,
+		wasdel, 0, 1);
 	if (rval != NULLFSBLOCK)
 		ASSERT(rlen == len);
 	return rval;
@@ -1455,6 +1572,7 @@ xfs_alloc_fix_freelist(
 	xfs_agnumber_t	agno,	/* allocation group number */
 	xfs_extlen_t	minlen,	/* minimum extent length, else reject */
 	xfs_extlen_t	total,	/* total free blocks, else reject */
+	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
 	int		flags)	/* XFS_ALLOC_FLAG_... */
 {
 	xfs_agblock_t	agbno;
@@ -1479,14 +1597,12 @@ xfs_alloc_fix_freelist(
 	agf = XFS_BUF_TO_AGF(agbp);
 	need = XFS_MIN_FREELIST(agf, mp);
 	/*
-	 * Adjust total blocks to be allocated, if it's given.
-	 */
-	if (total && agf->agf_freecount < need)
-		total += need - agf->agf_freecount;
-	/*
 	 * If there isn't enough total or single-extent, reject it.
 	 */
-	if (minlen > agf->agf_longest || total > agf->agf_freeblks) {
+	if (minlen > agf->agf_longest ||
+	    (minleft &&
+	     (int)(agf->agf_freeblks + agf->agf_freecount - need - total) <
+	     minleft)) {
 		xfs_trans_brelse(tp, agbp);
 		return NULL;
 	}
@@ -1508,7 +1624,7 @@ xfs_alloc_fix_freelist(
 		 * Allocate as many blocks as possible at once.
 		 */
 		agbno = xfs_alloc_ag_vextent(tp, agbp, agno, 0, 1, i, &i,
-			XFS_ALLOCTYPE_THIS_AG, 0, 0, 1, 1);
+			XFS_ALLOCTYPE_THIS_AG, 0, 0, 1, 1, 0);
 		/*
 		 * Stop if we run out.  Won't happen if callers are obeying
 		 * the restrictions correctly.
@@ -1659,6 +1775,7 @@ xfs_alloc_vextent(
 	xfs_extlen_t	*len,	/* output: actual allocated length */
 	xfs_alloctype_t	type,	/* allocation type, see above definition */
 	xfs_extlen_t	total,	/* total blocks needed in transaction */
+	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
 	int		wasdel,	/* extent was previously delayed-allocated */
 	xfs_extlen_t	mod,	/* length should be k * prod + mod unless */
 	xfs_extlen_t	prod)	/* there's nothing as big as mod */
@@ -1702,12 +1819,13 @@ xfs_alloc_vextent(
 		 * These three force us into a single a.g.
 		 */
 		agno = XFS_FSB_TO_AGNO(mp, bno);
-		agbp = xfs_alloc_fix_freelist(tp, agno, minlen, total, 0);
+		agbp = xfs_alloc_fix_freelist(tp, agno, minlen, total,
+			minleft, 0);
 		if (!agbp)
 			break;
 		agbno = XFS_FSB_TO_AGBNO(mp, bno);
 		agbno = xfs_alloc_ag_vextent(tp, agbp, agno, agbno, minlen,
-			maxlen, len, type, wasdel, mod, prod, 0); 
+			maxlen, len, type, wasdel, mod, prod, 0, minleft); 
 		break;
 	case XFS_ALLOCTYPE_START_BNO:
 		/*
@@ -1749,14 +1867,14 @@ xfs_alloc_vextent(
 		 */
 		for (;;) {
 			agbp = xfs_alloc_fix_freelist(tp, tagno, minlen,
-				total, flags);
+				total, minleft, flags);
 			/*
 			 * If we get a buffer back then the allocation will fly.
 			 */
 			if (agbp) {
 				agbno = xfs_alloc_ag_vextent(tp, agbp, tagno,
 					agbno, minlen, maxlen, len, ntype,
-					wasdel, mod, prod, 0); 
+					wasdel, mod, prod, 0, minleft); 
 				break;
 			}
 			/*
@@ -1815,7 +1933,7 @@ xfs_free_extent(
 	ASSERT(agno < sbp->sb_agcount);
 	agbno = XFS_FSB_TO_AGBNO(mp, bno);
 	ASSERT(agbno < sbp->sb_agblocks);
-	agbp = xfs_alloc_fix_freelist(tp, agno, 0, 0, 0);
+	agbp = xfs_alloc_fix_freelist(tp, agno, 0, 0, 0, 0);
 	ASSERT(agbp != NULL);
 	return xfs_free_ag_extent(tp, agbp, agno, agbno, len, 0);
 }

@@ -62,6 +62,7 @@ xfs_alloc_extent(
 	xfs_extlen_t	len,		/* requested length */
 	xfs_alloctype_t	type,		/* allocation type, see above defn */
 	xfs_extlen_t	total,		/* total blocks needed in transaction */
+	xfs_extlen_t	minleft,	/* min blocks must be left afterwards */
 	int		wasdel);	/* extent was previously del-alloced */
 
 /*
@@ -75,6 +76,7 @@ xfs_alloc_fix_freelist(
 	xfs_agnumber_t	agno,	/* allocation group number */
 	xfs_extlen_t	minlen,	/* minimum length extent needed now */
 	xfs_extlen_t	total,	/* maximum blocks needed during transaction */
+	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
 	int		flags);	/* XFS_ALLOC_FLAG_... */
 
 /*
@@ -127,6 +129,7 @@ xfs_alloc_vextent(
 	xfs_extlen_t	*len,	/* output: actual allocated length */
 	xfs_alloctype_t	type,	/* allocation type, see above definition */
 	xfs_extlen_t	total,	/* total blocks needed in transaction */
+	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
 	int		wasdel,	/* extent was previously delayed-allocated */
 	xfs_extlen_t	mod,	/* length should be k * prod + mod unless */
 	xfs_extlen_t	prod);	/* there's nothing as big as mod */
