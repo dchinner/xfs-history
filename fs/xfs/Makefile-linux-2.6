@@ -57,29 +57,17 @@ else
   xfs-objs			+= xfs_dmapi.o
 endif
 
-ifeq ($(CONFIG_XFS_RT),y)
-  xfs-objs			+= xfs_rtalloc.o
-endif
+obj-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 
-ifeq ($(CONFIG_XFS_QUOTA),y)
-  xfs-objs			+= xfs_dquot.o \
+obj-$(CONFIG_XFS_QUOTA)		+= xfs_dquot.o \
 				   xfs_dquot_item.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
 				   xfs_qm.o
-endif
 
-ifneq ($(CONFIG_FS_POSIX_ACL),)
-  xfs-objs			+= xfs_acl.o
-endif
-
-ifneq ($(CONFIG_FS_POSIX_CAP),)
-  xfs-objs			+= xfs_cap.o
-endif
-
-ifneq ($(CONFIG_FS_POSIX_MAC),)
-  xfs-objs			+= xfs_mac.o
-endif
+obj-$(CONFIG_FS_POSIX_ACL)	+= xfs_acl.o
+obj-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
+obj-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
 
 xfs-objs			+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
