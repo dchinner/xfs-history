@@ -106,9 +106,6 @@ xfs_do_force_shutdown(
 	if (XFS_FORCED_SHUTDOWN(mp) && !logerror)
 		return;
 
-	if (XFS_MTOVFS(mp)->vfs_dev == rootdev)
-		cmn_err(CE_PANIC, "Fatal error on root filesystem");
-
 	/*
 	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
 	 * queue up anybody new on the log reservations, and wakes up
