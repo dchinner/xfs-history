@@ -42,6 +42,7 @@ typedef enum {				/* iomap_flags values */
 	IOMAP_EOF =		0x01,	/* mapping contains EOF   */
 	IOMAP_HOLE =		0x02,	/* mapping covers a hole  */
 	IOMAP_DELAY =		0x04,	/* mapping covers delalloc region  */
+	IOMAP_REALTIME =	0x10,	/* mapping on the realtime device  */
 	IOMAP_UNWRITTEN =	0x20,	/* mapping covers allocated */
 					/* but uninitialized file data  */
 	IOMAP_NEW =		0x40	/* just allocate */
