@@ -1604,8 +1604,10 @@ static int	kdbm_vn(
 	unsigned long	addr;
 	struct inode	*ip;
 /*	bhv_desc_t	*bh; */
-/*	ktrace_entry_t	*ktep; */
-/*	ktrace_snap_t	kts; */
+#ifdef	CONFIG_XFS_VNODE_TRACING
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+#endif
 	vnode_t		*vp;
 
 	if (argc != 1)
@@ -1627,6 +1629,7 @@ static int	kdbm_vn(
 	printvnode(vp);
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
+
 	kdb_printf("--> Vntrace @ 0x%p/0x%p\n", vp, vp->v_trace);
 
 	if (vp->v_trace == NULL)
