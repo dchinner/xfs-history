@@ -207,8 +207,8 @@ extern int		xfs_qm_dqhashlock_nowait(xfs_dquot_t *);
 /* system call interface */
 extern int linvfs_getxstate(struct super_block *, struct fs_quota_stat *);
 extern int linvfs_setxstate(struct super_block *, unsigned int, int);
-extern int linvfs_getxquota(struct super_block *, short, qid_t, struct fs_disk_quota *);
-extern int linvfs_setxquota(struct super_block *, short, qid_t, struct fs_disk_quota *);
+extern int linvfs_getxquota(struct super_block *, int, qid_t, struct fs_disk_quota *);
+extern int linvfs_setxquota(struct super_block *, int, qid_t, struct fs_disk_quota *);
 
 #ifdef DEBUG
 extern int		xfs_qm_internalqcheck(xfs_mount_t *);

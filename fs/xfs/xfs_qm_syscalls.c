@@ -109,7 +109,7 @@ linvfs_setxstate(
 int
 linvfs_getxquota(
 	struct super_block	*sb,
-	short			type,
+	int			type,
 	qid_t			id,
 	struct fs_disk_quota	*fdq)
 {
@@ -128,7 +128,7 @@ linvfs_getxquota(
 int
 linvfs_setxquota(
 	struct super_block	*sb,
-	short			type,
+	int			type,
 	qid_t			id,
 	struct fs_disk_quota	*fdq)
 {
