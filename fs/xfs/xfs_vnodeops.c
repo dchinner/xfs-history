@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.471 $"
+#ident "$Revision: 1.472 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -226,6 +226,11 @@ xfs_symlink(
 	char		*target_path,
 	vnode_t		**vpp,
 	cred_t		*credp);
+
+STATIC int
+xfs_fid2(
+	bhv_desc_t	*bdp,
+	fid_t		*fidp);
 
 STATIC int
 xfs_seek(
@@ -4822,6 +4827,40 @@ std_return:
 	goto std_return;
 }
 
+
+/*
+ * xfs_fid2
+ *
+ * A fid routine that takes a pointer to a previously allocated
+ * fid structure (like xfs_fast_fid) but uses a 64 bit inode number.
+ */
+STATIC int
+xfs_fid2(
+	bhv_desc_t	*bdp,
+	fid_t		*fidp)
+{
+	xfs_inode_t	*ip;
+	xfs_fid2_t	*xfid;
+
+	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_fid2",
+		       (inst_t *)__return_address);
+	ASSERT(sizeof(fid_t) >= sizeof(xfs_fid2_t));
+
+	xfid = (xfs_fid2_t *)fidp;
+	ip = XFS_BHVTOI(bdp);
+	xfid->fid_len = sizeof(xfs_fid2_t) - sizeof(xfid->fid_len);
+	xfid->fid_pad = 0;
+	/*
+	 * use bcopy because the inode is a long long and there's no
+	 * assurance that xfid->fid_ino is properly aligned.
+	 */
+	bcopy(&ip->i_ino, &xfid->fid_ino, sizeof xfid->fid_ino);
+	xfid->fid_gen = ip->i_d.di_gen;	
+
+	return 0;
+}
+
+
 /*
  * xfs_rwlock
  */
@@ -6284,7 +6323,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_readlink,
 	xfs_fsync,
 	xfs_inactive,
-	(vop_fid2_t)fs_nosys,
+	xfs_fid2,
 	xfs_release,
 	xfs_rwlock,/* fs_nosys, */
 	xfs_rwunlock,/* fs_nosys, */
