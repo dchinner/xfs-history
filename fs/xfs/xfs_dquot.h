@@ -1,7 +1,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -13,49 +13,7 @@
  * to not be a bottleneck when quotas are on, and have minimal impact, if at all,
  * when quotas are off.
  */
-#define XFS_DQUOT_MAGIC	 	0x4451	 	/* 'DQ' */
-#define XFS_DQUOT_VERSION	(__int8_t)0x01	/* latest version number */
 
-/* 
- * This is the main portion of the on-disk representation of quota 
- * information for a user. This is the q_core of the xfs_dquot_t that
- * is kept in kernel memory. We pad this with some more expansion room
- * to construct the on disk structure.
- */
-typedef struct	xfs_disk_dquot {
-/*16*/	__uint16_t	d_magic;	/* dquot magic = XFS_DQUOT_MAGIC */
-/*8 */	__int8_t	d_version;	/* dquot version */
-/*8 */	__int8_t	d_flags;	/* misc flags: type(USR/PRJ) for now */
-/*32*/	xfs_dqid_t	d_id;		/* user id or proj id */
-/*64*/	xfs_qcnt_t	d_blk_hardlimit;/* absolute limit on disk blks */
-/*64*/	xfs_qcnt_t	d_blk_softlimit;/* preferred limit on disk blks */
-/*64*/	xfs_qcnt_t	d_ino_hardlimit;/* maximum # allocated inodes */
-/*64*/	xfs_qcnt_t	d_ino_softlimit;/* preferred inode limit */
-/*64*/	xfs_qcnt_t	d_bcount;	/* disk blocks owned by the user */
-/*64*/	xfs_qcnt_t	d_icount;	/* inodes owned by the user */
-/*32*/	__int32_t	d_itimer;	/* zero if within inode limits if not, 
-					   this is when we refuse service */
-/*32*/	__int32_t	d_btimer;	/* similar to above; for disk blocks */
-/*16*/	xfs_qwarncnt_t  d_iwarns;       /* warnings issued wrt num inodes */
-/*16*/	xfs_qwarncnt_t  d_bwarns;       /* warnings issued wrt disk blocks */
-/*64*/	xfs_qcnt_t	d_rtb_hardlimit;/* absolute limit on realtime blks */
-/*64*/	xfs_qcnt_t	d_rtb_softlimit;/* preferred limit on RT disk blks */
-/*64*/	xfs_qcnt_t	d_rtbcount;	/* realtime blocks owned */
-/*32*/	__int32_t	d_rtbtimer;	/* similar to above; for RT disk blocks */
-/*16*/	xfs_qwarncnt_t  d_rtbwarns;     /* warnings issued wrt RT disk blocks */
-/*16*/	__uint16_t	d_pad;
-} xfs_disk_dquot_t;
-
-/*
- * This is what goes on disk. This is separated from the xfs_disk_dquot because
- * carrying the unnecessary padding would be a waste of memory.
- */
-typedef struct xfs_dqblk {
-	xfs_disk_dquot_t  dd_diskdq;
-	char              dd_fill[32];	/* filling for posterity */
-} xfs_dqblk_t;
-
-#ifdef _KERNEL
 /* 
  * The hash chain headers (hash buckets)
  */
@@ -63,9 +21,6 @@ typedef struct xfs_dqhash {
 	struct xfs_dquot *qh_next;
 	mutex_t		  qh_lock;
 	uint		  qh_version;	/* ever increasing version */
-#ifdef QUOTADEBUG
-	uint		  qh_flags;	/* XXXtmp: for debugging */
-#endif
 	uint		  qh_nelems;	/* number of dquots on the list */
 } xfs_dqhash_t;
 
@@ -85,9 +40,8 @@ typedef struct xfs_dq_logformat {
 	__uint16_t		qlf_size;      /* size of this item */
 	xfs_dqid_t		qlf_id;	       /* usr/proj id number : 32 bits */
 	__int64_t		qlf_blkno;     /* blkno of dquot buffer */
-	__int16_t		qlf_len;       /* len of dquot buffer */
-	__int16_t		qlf_boffset;   /* off of dquot in buffer */
-	char			qlf_padding[4];/* for future use */
+	__int32_t		qlf_len;       /* len of dquot buffer */
+	__uint32_t		qlf_boffset;   /* off of dquot in buffer */
 } xfs_dq_logformat_t;
 
 typedef struct xfs_dq_logitem {
@@ -135,8 +89,9 @@ typedef struct xfs_dquot {
 	struct xfs_dquot*q_pdquot; 	/* proj dquot, hint only */
 	xfs_disk_dquot_t q_core;	/* actual usage & quotas */
 	xfs_dq_logitem_t q_logitem;	/* dquot log item */
-	xfs_qcnt_t	 q_res_bcount;	/* total nblks used + nblks reserved */
-	xfs_qcnt_t	 q_res_rtbcount;/* total inodes used + reserved */
+	xfs_qcnt_t	 q_res_bcount;	/* total regular nblks used + reserved */
+	xfs_qcnt_t	 q_res_icount;	/* total inos allocd + reserved */
+	xfs_qcnt_t	 q_res_rtbcount;/* total realtime blks used + reserved */
 	mutex_t 	 q_qlock;       /* quota lock */
 	sema_t           q_flock;       /* flush lock */
 	uint             q_pincount;    /* pin count for this dquot */
@@ -145,20 +100,6 @@ typedef struct xfs_dquot {
 	struct ktrace   *q_trace;       /* trace header structure */
 #endif
 } xfs_dquot_t;
-
-#endif	/* _KERNEL */
-
-/*
- * flags for q_flags field in the dquot.
- */
-#define XFS_DQ_USER	 	0x0001		/* a user quota */
-#define XFS_DQ_PROJ	 	0x0002		/* a project quota */
-#define XFS_DQ_LOCKED		0x0004		/* dquot is locked */
-#define XFS_DQ_FLOCKED		0x0008		/* flush lock taken */
-#define XFS_DQ_DIRTY		0x0010		/* dquot is dirty */
-#define XFS_DQ_WANT		0x0020		/* for lookup/reclaim race */
-#define XFS_DQ_INACTIVE		0x0040		/* dq off mplist & hashlist */
-#define XFS_DQ_MARKER		0x0080		/* sentinel */
 
 
 #define dq_flnext	q_lists.dqm_flnext
@@ -236,8 +177,6 @@ extern void 		xfs_qm_dqprint(xfs_dquot_t *);
 #define xfs_qm_dqprint(a)
 #endif
 
-
-#ifdef _KERNEL
 extern xfs_dquot_t 	*xfs_qm_dqinit(xfs_mount_t *, xfs_dqid_t, uint);
 extern void		xfs_qm_dqdestroy(xfs_dquot_t *);
 extern int		xfs_qm_dqflush(xfs_dquot_t *, uint);
@@ -251,7 +190,5 @@ extern void 		xfs_qm_dqflock_pushbuf_wait(xfs_dquot_t *dqp);
 extern void		xfs_qm_adjust_dqtimers(xfs_mount_t *,
 					       xfs_disk_dquot_t	*);
 extern int		xfs_qm_dqwarn(xfs_disk_dquot_t *, uint);
-#endif /* _KERNEL */
-
 
 #endif /* _XFS_DQUOT__H_ */
