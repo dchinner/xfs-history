@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_BTREE_H
 #define	_FS_XFS_ALLOC_BTREE_H
 
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.13 $"
 
 /*
  * Freespace on-disk structures
@@ -176,17 +176,6 @@ xfs_alloc_insert(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	int			*stat);	/* success/failure */
 
-#ifdef XFSDEBUG
-/*
- * Check key consistency in the btree given by cur.
- */
-void
-xfs_alloc_kcheck(
-	struct xfs_btree_cur	*cur);	/* btree cursor */
-#else
-#define	xfs_alloc_kcheck(a)
-#endif
-
 /*
  * Lookup the record equal to [bno, len] in the btree given by cur.
  */
@@ -219,18 +208,6 @@ xfs_alloc_lookup_le(
 	xfs_extlen_t		len,	/* length of extent */
 	int			*stat);	/* success/failure */
  
-#ifdef XFSDEBUG
-/*
- * Check consistency in the given btree.
- * Checks header consistency and that keys/records are in the right order.
- */
-void
-xfs_alloc_rcheck(
-	struct xfs_btree_cur	*cur);	/* btree cursor */
-#else
-#define	xfs_alloc_rcheck(a)
-#endif	/* XFSDEBUG */
-
 /*
  * Update the record referred to by cur, to the value given by [bno, len].
  */
