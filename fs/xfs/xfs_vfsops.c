@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.197 $"
+#ident  "$Revision: 1.198 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -2249,7 +2249,6 @@ xfs_sync(
 	XFS_MOUNT_IUNLOCK(mp);
 	ASSERT(ipointer_in == B_FALSE);
 
-	
 	/*
 	 * Get the Quota Manager to flush the dquots in a similar manner.
 	 */
@@ -2332,6 +2331,35 @@ xfs_sync(
 		xfs_refcache_purge_some();
 	}
 
+	/*
+	 * Now check to see if the log needs a "dummy" transaction.
+	 */
+
+	if (xfs_log_need_covered(mp)) {
+		xfs_trans_t *tp;
+
+		/*
+		 * Put a dummy transaction in the log to tell
+		 * recovery that all others are OK.
+		 */
+		tp = xfs_trans_alloc(mp, XFS_TRANS_DUMMY1);
+		if (error = xfs_trans_reserve(tp, 0,
+				XFS_ICHANGE_LOG_RES(mp),
+				0, 0, 0))  {
+			xfs_trans_cancel(tp, 0);
+			kmem_free(ipointer, sizeof(xfs_iptr_t));
+			return error;
+		}
+
+		ip = mp->m_rootip;
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+		xfs_trans_ihold(tp, ip);
+		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+		error = xfs_trans_commit(tp, 0);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
 	kmem_free(ipointer, sizeof(xfs_iptr_t));
 	return XFS_ERROR(last_error);
 }
