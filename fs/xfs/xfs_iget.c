@@ -104,8 +104,10 @@ again:
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
 		if (ip->i_ino == ino) {
 			XFS_IGETINFO.ig_found++;
+#ifdef NOTYET
 			vp = XFS_ITOV(ip);
 			VMAP(vp, vmap);
+#endif
 			XFS_IHUNLOCK(ih);
 			/*
 			 * Get a reference to the vnode/inode.
@@ -118,10 +120,12 @@ again:
 			 * looking for the same inode so we have to at
 			 * least look.
 			 */
+#ifdef NOTYET
 			if (!(vp = vn_get(vp, &vmap))) {
 				XFS_IGETINFO.ig_frecycle++;
 				goto again;
 			}
+#endif
 
 			/*
 			 * Inode cache hit: if ip is not at the front of
@@ -160,8 +164,10 @@ again:
 	 * i_bno, and i_index;
 	 */
 	ip = xfs_iread(mp, tp, ino);
+#ifdef NOTYET
 	vp = vn_alloc(&xfs_vnodeops, mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
 		      ip->i_u2.iu_rdev, ip);
+#endif
 
 	mrinit(&ip->i_lock, makesname(name, "xino", vp->v_number));
 	xfs_ilock(ip, flags);
@@ -175,7 +181,9 @@ again:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				XFS_IHUNLOCK(ih);
+#ifdef NOTYET
 				vn_free(vp);
+#endif
 				xfs_idestroy(ip);
 				XFS_IGETINFO.ig_dup++;
 				goto again;
@@ -216,57 +224,15 @@ out:
 
 
 /*
- * This is called when the amount of space needed for iu_extents
- * or iu_data is increased or decreased.  This code if pretty abusive
- * of the fact that these point to the same thing and are the same
- * size (along with iu_inline_ext and iu_inline_data).  If this is too
- * bad we can always just write xfs_irealloc_data().
- *
- * If the amount of space needed has decreased below the size of the
- * inline buffer, then switch to using the inline buffer.  Othewise,
- * use kmem_realloc() or kmem_alloc() to adjust the size of the buffer
- * to what is needed.
- */
-void
-xfs_irealloc(xfs_inode_t *ip, size_t bytes)
-{
-	/*
-	 * If the valid extents/data can fit in iu_inline_ext/data,
-	 * copy them from the malloc'd vector and free it.
-	 */
-	if (bytes <= sizeof(ip->i_u2.iu_inline_ext)) {
-		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
-			bcopy(ip->i_u1.iu_extents, ip->i_u2.iu_inline_ext,
-			      bytes);
-			kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
-			ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
-		}
-	} else {
-		/*
-		 * Stuck with malloc/realloc.
-		 */
-		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
-			ip->i_u1.iu_extents = (xfs_extdesc_t *)
-					      kmem_realloc(ip->i_u1.iu_extents,
-							   bytes, KM_SLEEP);
-		} else {
-			ip->i_u1.iu_extents = (xfs_extdesc_t *)
-					      kmem_alloc(bytes, KM_SLEEP);
-			bcopy(ip->i_u2.iu_inline_ext, ip->i_u1.iu_extents,
-			      sizeof(ip->i_u2.iu_inline_ext));
-		}
-	}
-	ip->i_bytes = bytes;
-}
-
-/*
  * Decrement reference count of an inode structure and unlock it.
  */
 void
 xfs_iput(xfs_inode_t *ip)
 {
 	xfs_iunlock(ip);
+#ifdef NOTYET
 	vn_rele(XFS_ITOV(ip));
+#endif
 }
 
 /*
