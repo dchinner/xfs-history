@@ -630,11 +630,24 @@ STATIC int linvfs_read_full_page(struct file *filp, struct page *page)
 
 STATIC int linvfs_write_full_page(struct page *page)
 {
-	if ((current->flags & PF_FSTRANS) && DelallocPage(page))
+	int	ret;
+	int	flagset = 0;
+
+	if ((current->flags & (PF_FSTRANS|PF_NOIO)) &&
+	    (!page->buffers || buffer_delay(page->buffers)))
 		goto out_fail;
 
-	return pagebuf_write_full_page(page, linvfs_pb_bmap);
+	if (!page->buffers || buffer_delay(page->buffers)) {
+		current->flags |= PF_NOIO;
+		flagset = 1;
+	}
 
+	ret = pagebuf_write_full_page(page, linvfs_pb_bmap);
+
+	if (flagset)
+		current->flags &= ~PF_NOIO;
+
+	return ret;
 out_fail:
 	SetPageDirty(page);
 	UnlockPage(page);
@@ -650,11 +663,30 @@ STATIC int linvfs_prepare_write(
 	return pagebuf_prepare_write(file, page, from, to, linvfs_pb_bmap);
 }
 
+/* This gets a page into cleanable state - page locked on entry
+ * kept locked on exit.
+ */
+STATIC int linvfs_release_page(
+	struct page *page,
+	int gfp_mask)
+{
+	if (page->buffers && !buffer_delay(page->buffers)) {
+		return 1;
+	}
+
+	if (gfp_mask & __GFP_FS) {
+		pagebuf_release_page(page, linvfs_pb_bmap);
+		return 1;
+	}
+	return 0;
+}
+
 
 struct address_space_operations linvfs_aops = {
 	readpage:		linvfs_read_full_page,
 	writepage:		linvfs_write_full_page,
 	sync_page:		block_sync_page,
+	releasepage:		linvfs_release_page,
 	bmap:			linvfs_bmap,
 	prepare_write:		linvfs_prepare_write,
 	commit_write:		pagebuf_commit_write,
