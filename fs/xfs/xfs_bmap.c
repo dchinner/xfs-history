@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.191 $"
+#ident	"$Revision: 1.193 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1532,6 +1532,8 @@ xfs_bmap_add_extent_hole_real(
 	return 0;
 }
 
+#define XFS_ALLOC_GAP_UNITS	4
+
 /*
  * xfs_bmap_alloc is called by xfs_bmapi to allocate an extent for a file.
  * It figures out where to ask the underlying allocator to put the new extent.
@@ -1632,7 +1634,7 @@ xfs_bmap_alloc(
 			 * allocating, or using it gives us an illegal block
 			 * number, then just use the end of the previous block.
 			 */
-			if (prevdiff <= 2 * ap->alen &&
+			if (prevdiff <= XFS_ALLOC_GAP_UNITS * ap->alen &&
 			    ISLEGAL(prevbno + prevdiff,
 				    ap->prevp->br_startblock))
 				prevbno += adjust;
@@ -1672,7 +1674,7 @@ xfs_bmap_alloc(
 			 * number, then just use the start of the next block
 			 * offset by our length.
 			 */
-			if (gotdiff <= 2 * ap->alen &&
+			if (gotdiff <= XFS_ALLOC_GAP_UNITS * ap->alen &&
 			    ISLEGAL(gotbno - gotdiff, gotbno))
 				gotbno -= adjust;
 			else if (ISLEGAL(gotbno - ap->alen, gotbno)) {
