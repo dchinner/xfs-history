@@ -18,6 +18,7 @@
 #include <sys/mode.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
+#include <sys/ktrace.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
@@ -291,9 +292,18 @@ xfs_iread(
 
 	/*
 	 * Get pointer's to the on-disk inode and the buffer containing it.
-	 * Pass in ip so it can fill in i_dev, i_bno, and i_index.
+	 * Pass in ip so it can fill in i_dev.
 	 */
 	bp = xfs_itobp(mp, tp, ip, &dip);
+
+#ifndef SIM
+	/*
+	 * Initialize inode's trace buffers.
+	 * Do this before xfs_iformat in case it adds entries.
+	 */
+	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE);
+	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE);
+#endif
 
 	/*
 	 * If the on-disk inode is already linked to a directory
@@ -360,6 +370,7 @@ xfs_iread_extents(
 	ip->i_bytes = ip->i_real_bytes = size;
 	ip->i_flags |= XFS_IEXTENTS;
 	xfs_bmap_read_extents(tp, ip);
+	xfs_validate_extents(ip->i_u1.iu_extents, ip->i_d.di_nextents);
 }
 
 /*
@@ -1057,6 +1068,7 @@ xfs_idestroy(
 	case IFLNK:
 		if (ip->i_broot != NULL) {
 			kmem_free(ip->i_broot, ip->i_broot_bytes);
+			ip->i_broot = NULL;
 		}
 
 		/*
@@ -1081,6 +1093,9 @@ xfs_idestroy(
 			ip->i_u1.iu_extents = NULL;
 			ip->i_real_bytes = 0;
 		}
+		ASSERT(ip->i_u1.iu_extents == NULL ||
+		       ip->i_u1.iu_extents == ip->i_u2.iu_inline_ext);
+		ASSERT(ip->i_real_bytes == 0);
 		break;
 	}
 	mrfree(&ip->i_lock);
@@ -1088,6 +1103,10 @@ xfs_idestroy(
 	mrfree(&ip->i_ticketlock);
 	freesema(&ip->i_flock);
 	freesema(&ip->i_pinsema);
+#ifndef SIM
+	ktrace_free(ip->i_btrace);
+	ktrace_free(ip->i_xtrace);
+#endif
 	kmem_zone_free(xfs_inode_zone, ip);
 }
 
