@@ -49,7 +49,16 @@ extern size_t strlen(const char *);
  */
 xfs_dir_isempty(xfs_inode_t *dp)
 {
-	return(dp->i_d.di_size == 0);
+	xfs_sb_t *sbp;
+	struct xfs_dir_sf_hdr *hdr;
+
+	if (dp->i_d.di_size == 0)
+		return(1);
+	sbp = &dp->i_mount->m_sb;
+	if (dp->i_d.di_size > XFS_LITINO(sbp))
+		return(0);
+	hdr = (struct xfs_dir_sf_hdr *)dp->i_u1.iu_data;
+	return(hdr->count == 0);
 }
 
 /*
