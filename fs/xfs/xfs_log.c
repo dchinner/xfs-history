@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.73 $"
+#ident	"$Revision: 1.74 $"
 
 /*
  * High level interface routines for log manager
@@ -121,8 +121,9 @@ ktrace_t	*xlog_trace_buf = 0;
 
 #ifdef DEBUG
 int bytes_of_ticket_used;
+#endif
 
-#ifndef SIM
+#if defined(DEBUG) && !defined(SIM)
 void
 xlog_trace_log(xlog_t *log)
 {
@@ -179,8 +180,7 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 #else
 #define	xlog_trace_log(log)
 #define	xlog_trace_iclog(iclog,state)
-#endif /* !SIM */
-#endif /* DEBUG */
+#endif /* DEBUG && !SIM */
 
 /*
  * NOTES:
