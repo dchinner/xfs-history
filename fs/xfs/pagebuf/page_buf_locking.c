@@ -351,9 +351,9 @@ pagebuf_lock_enable(
 		target->pbr_device = kdev;
 		pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
 		target->pbr_mapping = target->pbr_bdev->bd_inode->i_mapping;
-		if ((MAJOR(kdev) == MD_MAJOR) || (MAJOR(kdev) == EVMS_MAJOR)) 
+		if ((major(kdev) == MD_MAJOR) || (major(kdev) == EVMS_MAJOR)) 
 			target->pbr_flags = PBR_ALIGNED_ONLY;
-		else if (MAJOR(kdev) == LVM_BLK_MAJOR)
+		else if (major(kdev) == LVM_BLK_MAJOR)
 			target->pbr_flags = PBR_SECTOR_ONLY;
 		else
 			target->pbr_flags = 0;
