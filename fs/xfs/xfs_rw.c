@@ -1,4 +1,4 @@
-#ident "$Revision: 1.184 $"
+#ident "$Revision: 1.186 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1230,8 +1230,7 @@ xfs_read(
 		}
 		if (ioflag & IO_DIRECT) {
 #ifdef PRIO_DEBUG
-			printf("xfs_read: IO_DIRECT uiop->io_flags %d\n", 
-			       uiop->io_flags);
+			printf("xfs_read: IO_DIRECT ioflag %d IO_PRIORITY %x\n", ioflag, IO_PRIORITY);
 #endif
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_READ);
 #ifdef PRIO_DEBUG
@@ -2522,8 +2521,7 @@ start:
 retry:
 		if (ioflag & IO_DIRECT) {
 #ifdef PRIO_DEBUG
-			printf("xfs_write: IO_DIRECT uiop->ioflags %d\n", 
-			       uiop->io_flags);
+			printf("xfs_write: IO_DIRECT ioflag %d IO_PRIORITY %x\n", ioflag, IO_PRIORITY);
 #endif /* PRIO_DEBUG */
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
 #ifdef PRIO_DEBUG
@@ -4320,7 +4318,7 @@ xfs_start_daemons(void)
 	ASSERT(num_daemons <= 13);
 
 	for (i = 0; i < num_daemons; i++) {
-		sthread_create("xfsd", 0, 0, 0, 128, KT_PS|KT_PRMPT,
+		sthread_create("xfsd", 0, 0, 0, 174, KT_PS|KT_PRMPT,
 				(st_func_t *)xfsd, 0, 0, 0, 0);
 	}
 	return;
@@ -4834,8 +4832,8 @@ retry:
 				CHECK_GRIO_TIMESTAMP(bp, 40);
 
 #ifdef PRIO_DEBUG
-				if (BUF_IS_PRIORITY(nbp))
-					printf("xfs_diostrat: BUF_IS_PRIORITY %llx\n", nbp);
+				if (BP_IS_PRIORITY(nbp))
+					printf("xfs_diostrat: BP_IS_PRIORITY %llx\n", nbp);
 #endif
 
 	     			nbp->b_flags     = bp->b_flags;
@@ -5099,9 +5097,9 @@ xfs_diordwr(
 	/*
 	 * If this is a "priority" I/O, set the Priority I/O flag in the buf_t
 	 */
-	if (UIOP_IS_PRIORITY(uiop)) {
+	if (ioflag & IO_PRIORITY) {
 #ifdef PRIO_DEBUG
-	  printf("xfs_diordwr: UIOP_IS_PRIORITY\n");
+	  printf("xfs_diordwr: IO_PRIORITY flag set in ioflag\n");
 #endif /* PRIO_DEBUG */
 	  bp->b_flags2 |= B_PRIO_BUF;
 	} else
