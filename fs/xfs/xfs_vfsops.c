@@ -2319,7 +2319,6 @@ xfs_get_vnode(bhv_desc_t *bdp,
 
 
 vfsops_t xfs_vfsops = {
-	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
 	xfs_vfsmount,
 	xfs_rootinit,
 	fs_dounmount,
@@ -2332,7 +2331,6 @@ vfsops_t xfs_vfsops = {
 };
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
- 	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
 	0,
 	0,
 	0,
