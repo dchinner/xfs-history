@@ -161,7 +161,7 @@
         INT_SET(reference, arch, reference) \
     )
 #define INT_COPY(srcref,srcarch,dstref,dstarch) \
-    (dstref) = INT_GET(srcref,srcarch) \
+    (dstref) = INT_GET(srcref,srcarch)
 #define INT_ISZERO(reference,arch) \
 	((reference) == 0)
 #define INT_ZERO(reference,arch) \
