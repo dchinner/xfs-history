@@ -32,40 +32,44 @@
 # Makefile for XFS on Linux.
 #
 
+
+# we also have source in the subdirectories..
+vpath %.c =  . linux pagebuf support
+
+
 # This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
 # but I am not going to change every file at the moment.
-
 EXTRA_CFLAGS +=	 -I. -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
-	KTRACE_DEBUG = y
-else
-  ifeq ($(CONFIG_XFS_VNODE_TRACING),y)
-	KTRACE_DEBUG = y
-  endif
+endif
+ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
+	EXTRA_CFLAGS += -DPAGEBUF_TRACE
 endif
 
-vpath %.c =  . linux pagebuf support
+export-objs			:= page_buf.o ktrace.o xfs_globals.o
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
-obj-$(CONFIG_XFS_DMAPI)		+= xfs_dmapi.o
 
-obj-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
+xfs-obj-$(CONFIG_XFS_DMAPI)	+= xfs_dmapi.o
 
-obj-$(CONFIG_XFS_QUOTA)		+= xfs_dquot.o \
+xfs-obj-$(CONFIG_XFS_RT)	+= xfs_rtalloc.o
+
+xfs-obj-$(CONFIG_XFS_QUOTA)	+= xfs_dquot.o \
 				   xfs_dquot_item.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
 				   xfs_qm.o
 
-obj-$(CONFIG_FS_POSIX_ACL)	+= xfs_acl.o
-obj-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
-obj-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
+xfs-obj-$(CONFIG_FS_POSIX_ACL)	+= xfs_acl.o
+xfs-obj-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
+xfs-obj-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
 
-xfs-objs			+= xfs_alloc.o \
+xfs-objs			+= $(xfs-obj-y) \
+				   xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
 				   xfs_attr_fetch.o \
@@ -113,27 +117,11 @@ xfs-objs			+= xfs_alloc.o \
 				   xfs_rw.o
 
 # Objects in pagebuf/
-
-# Debug options:
-#	-DPAGEBUF_TRACKING
-#	-DPAGEBUF_LOCKING
-#	-DPAGEBUF_DEBUG
-#	-DPAGEBUF_TRACE
-ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
-	EXTRA_CFLAGS += -g -DSTATIC="" \
-			-DPAGEBUF_DEBUG -DPAGEBUF_TRACKING -DPAGEBUF_TRACE
-endif
-
-export-objs			+= page_buf.o
-
 xfs-objs			+= page_buf.o \
 				   page_buf_io.o \
 				   page_buf_locking.o
 
 # Objects in linux/
-
-export-objs			+= xfs_globals.o
-
 xfs-objs			+= xfs_behavior.o \
 				   xfs_cred.o \
 				   xfs_file.o \
@@ -150,13 +138,6 @@ xfs-objs			+= xfs_behavior.o \
 				   xfs_xattr.o
 
 # Objects in support/
-
-ifneq ($(KTRACE_DEBUG),)
-  export-objs			+= ktrace.o
-else
-  xfs-objs			+= ktrace.o
-endif
-
 xfs-objs			+= debug.o \
 				   kmem.o \
 				   ktrace.o \
@@ -181,4 +162,3 @@ endif
 CFLAGS_xfsidbg.o += -I $(TOPDIR)/arch/$(ARCH)/kdb
 
 include $(TOPDIR)/Rules.make
-
