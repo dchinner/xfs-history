@@ -153,6 +153,7 @@ xfs_da_split(xfs_da_state_t *state)
 {
 	xfs_da_state_blk_t *oldblk, *newblk, *addblk;
 	xfs_da_intnode_t *node;
+	buf_t *bp;
 	int max, action, error, i;
 
 	/*
@@ -293,13 +294,40 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 		return(error);	/* GROT: dir is inconsistent */
 
 	/*
-	 * Update the backward pointer in the second child node.  It was
-	 * set to zero in node_link() because it WAS block 0.
+	 * Update pointers to the node which used to be block 0 and
+	 * just got bumped because of the addition of a new root node.
+	 * There might be three blocks involved if a double split occurred,
+	 * and the original block 0 could be at any position in the list.
 	 */
-	node = (xfs_da_intnode_t *)addblk->bp->b_un.b_addr;
-	node->hdr.info.back = oldblk->blkno;
-	xfs_trans_log_buf(state->args->trans, addblk->bp,
-	    XFS_DA_LOGRANGE(node, &node->hdr.info, sizeof(node->hdr.info)));
+
+	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
+	if (node->hdr.info.forw) {
+		if (node->hdr.info.forw == addblk->blkno) {
+			bp = addblk->bp;
+		} else {
+			ASSERT(state->extravalid);
+			bp = state->extrablk.bp;
+		}
+		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+		node->hdr.info.back = oldblk->blkno;
+		xfs_trans_log_buf(state->args->trans, bp,
+		    XFS_DA_LOGRANGE(node, &node->hdr.info,
+		    sizeof(node->hdr.info)));
+	}
+	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
+	if (node->hdr.info.back) {
+		if (node->hdr.info.back == addblk->blkno) {
+			bp = addblk->bp;
+		} else {
+			ASSERT(state->extravalid);
+			bp = state->extrablk.bp;
+		}
+		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+		node->hdr.info.forw = oldblk->blkno;
+		xfs_trans_log_buf(state->args->trans, bp,
+		    XFS_DA_LOGRANGE(node, &node->hdr.info,
+		    sizeof(node->hdr.info)));
+	}
 
 #ifdef XFSDADEBUG
 	if (xfsda_debug && ((xfsda_debug_cnt % xfsda_debug) == 0))
