@@ -194,9 +194,11 @@ xfs_btree_check_lblock(
 			XFS_RANDOM_BTREE_CHECK_LBLOCK)) {
 		if (bp)
 			xfs_buftrace("LBTREE ERROR", bp);
+#ifdef __KERNEL__	/* additional, temporary, debugging code */
 		cmn_err(CE_NOTE,
 			"EFSCORRUPTED returned from file %s line %d",
 			__FILE__, __LINE__);
+#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;
@@ -315,15 +317,17 @@ xfs_btree_check_sblock(
 			XFS_RANDOM_BTREE_CHECK_SBLOCK)) {
 		if (bp)
 			xfs_buftrace("SBTREE ERROR", bp);
+#ifdef __KERNEL__	/* additional, temporary, debugging code */
 		cmn_err(CE_NOTE,
 			"xfs_btree_check_sblock: Not OK:");
 		cmn_err(CE_NOTE,
 			"magic 0x%x level %d numrecs %d leftsib %d rightsib %d",
-			block->bb_magic,
-			block->bb_level,
-			block->bb_numrecs,
-			block->bb_leftsib,
-			block->bb_rightsib);
+			INT_GET(block->bb_magic, ARCH_CONVERT),
+			INT_GET(block->bb_level, ARCH_CONVERT),
+			INT_GET(block->bb_numrecs, ARCH_CONVERT),
+			INT_GET(block->bb_leftsib, ARCH_CONVERT),
+			INT_GET(block->bb_rightsib, ARCH_CONVERT));
+#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;
