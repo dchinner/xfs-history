@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.21 $"
+#ident "$Revision$"
 
 struct bmapval;
 struct buf;
@@ -12,44 +12,6 @@ struct vnode;
 struct xfs_inode;
 struct xfs_mount;
 struct xfs_trans;
-
-/*
- * This is a structure used to hold the local variables used
- * in xfs_strat_write().  We dynamically allocate this to reduce
- * the amount of stack space we use.  This is here in the public
- * header file since it is exported to xfs_init() so it can
- * initialize the zone allocator.
- */
-typedef struct xfs_strat_write_locals {
-	xfs_fileoff_t		offset_fsb;
-	xfs_fileoff_t  		map_start_fsb;
-	xfs_fileoff_t		imap_offset;
-	xfs_fsblock_t		first_block;
-	xfs_fsize_t		real_size;
-	xfs_filblks_t		count_fsb;
-	xfs_extlen_t		imap_blocks;
-	off_t			last_rbp_offset;
-	xfs_extlen_t		last_rbp_bcount;
-	daddr_t			last_rbp_blkno;
-	int			rbp_count;
-	int			x;
-	caddr_t			datap;
-	struct buf		*rbp;
-	struct xfs_mount	*mp;
-	struct xfs_inode	*ip;
-	struct xfs_trans	*tp;
-	int			error;
-	xfs_bmap_free_t		free_list;
-	xfs_bmbt_irec_t		*imapp;
-	int			rbp_offset;
-	int			rbp_len;
-	int			set_lead;
-	int			s;
-	int			loops;
-	int			imap_index;
-	int			nimaps;
-	xfs_bmbt_irec_t		imap[XFS_BMAP_MAX_NMAP];
-} xfs_strat_write_locals_t;
 
 /*
  * This structure is used to communicate which extents of a file
@@ -70,10 +32,18 @@ typedef struct xfs_gap {
 } xfs_gap_t;
 
 /*
- * Count of bmaps allocated in one call to the xfs_bmap_zone
- * allocator.
+ * Maximum count of bmaps used by read and write paths.
  */
-#define	XFS_ZONE_NBMAPS	4
+#define	XFS_MAX_RW_NBMAPS	4
+
+/*
+ * Counts of readahead buffers to use based on physical memory size.
+ * None of these should be more than XFS_MAX_RW_NBMAPS.
+ */
+#define	XFS_RW_NREADAHEAD_16MB	2
+#define	XFS_RW_NREADAHEAD_32MB	3
+#define	XFS_RW_NREADAHEAD_K32	4
+#define	XFS_RW_NREADAHEAD_K64	4
 
 /*
  * Maximum size of a buffer that we\'ll map.  Making this
