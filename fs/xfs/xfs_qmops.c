@@ -29,7 +29,7 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#include <xfs.h>
+#include "xfs.h"
 
 #ifndef CONFIG_XFS_QUOTA
 STATIC struct xfs_dquot *
