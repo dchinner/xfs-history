@@ -45,15 +45,17 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		char		 log_client,
 		uint		 flags)
 {
-        return (1);
+        return (0);
 }
 
 int
 xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_iovec_t	reg[],
 	      int		nentries,
-	      xfs_log_ticket_t	tic)
+	      xfs_log_ticket_t	tic,
+	      xfs_lsn_t		*start_lsn)
 {
+	*start_lsn = 0;
 	return 0;
 }	/* xfs_log_write */
 
@@ -64,6 +66,14 @@ xfs_log_done(xfs_mount_t	*mp,
 {
 	return 0;
 }	/* xfs_log_done */
+
+int
+xfs_log_mount(xfs_mount_t	*mp,
+	      dev_t		log_dev,
+	      uint		flags)
+{
+	return 0;
+}
 #else
 
 
@@ -811,7 +821,8 @@ log_state_lsn_is_synced(log_t		   *log,
 			iclog = iclog->ic_next;
 			continue;
 		} else {
-			if (iclog->ic_state == LOG_STATE_CALLBACK) /* call it */
+			if ((iclog->ic_state == LOG_STATE_CALLBACK) ||
+			    (iclog->ic_state == LOG_STATE_DIRTY)) /*call it*/
 				break;
 			/* insert callback into list */
 			cb->cb_next = iclog->ic_callback;
