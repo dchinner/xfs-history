@@ -133,6 +133,7 @@ xfs_rdwr(
 {
 	ssize_t ret;
 	struct xfs_inode *xip;
+	extern int delay_alloc;
 
 	xip = XFS_BHVTOI(bdp);
 	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
@@ -150,7 +151,19 @@ xfs_rdwr(
 		/* if (!(ioflag & IO_INVIS)) add this somehow with DMAPI */
 			xfs_ichgtime(xip, XFS_ICHGTIME_ACC);
 	} else {
+		/* last zero eof */
+#ifdef XFS_DELALLOC
+		if ((filp->f_flags & O_SYNC) || (delay_alloc == 0)) {
+			ret = pagebuf_generic_file_write(filp,
+						buf, size, offsetp);
+		} else {
+			ret = pagebuf_generic_file_write_async(filp,
+						buf, size, offsetp);
+		}
+#else
 		ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
+#endif
+	
 	}
 out:
 	return(ret);
@@ -325,7 +338,13 @@ xfs_zero_last_block(
 	 * If the block underlying isize is just a hole, then there
 	 * is nothing to zero.
 	 */
-	if (imap.br_startblock == HOLESTARTBLOCK) {
+#ifdef XFS_DELALLOC
+	if (imap.br_startblock == HOLESTARTBLOCK ||
+		imap.br_startblock == DELAYSTARTBLOCK)
+#else
+	if (imap.br_startblock == HOLESTARTBLOCK)
+#endif
+	{
 		return 0;
 	}
 	/*
@@ -516,7 +535,13 @@ xfs_zero_eof(
 		}
 		ASSERT(nimaps > 0);
 
-		if (imap.br_startblock == HOLESTARTBLOCK) {
+#ifdef XFS_DELALLOC
+		if (imap.br_startblock == HOLESTARTBLOCK ||
+			imap.br_startblock == DELAYSTARTBLOCK)
+#else
+		if (imap.br_startblock == HOLESTARTBLOCK)
+#endif
+		{
 			/* 
 			 * This loop handles initializing pages that were
 			 * partially initialized by the code below this 
@@ -733,6 +758,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 	ASSERT((flags & PBF_READ) || (flags & PBF_WRITE));
 
+
 	if (XFS_FORCED_SHUTDOWN(ip->i_iocore.io_mount))
 		return (EIO);
 
@@ -851,6 +877,9 @@ _xfs_imap_to_bmap(
 		}
 		
 		offset += pbmapp->pbm_bsize;
+		if (pbmapp->pbm_bsize == pbmapp->pbm_offset) {
+			printk("bmap too small pbmap 0x%p\n", pbmapp);
+		}
 	}
 	return(pbm);	/* Return the number filled */
 }
@@ -970,6 +999,9 @@ xfs_iomap_write(
 		if (!(pbmapp->pbm_flags & not_ok_flags)) {
 			*npbmaps = 1; /* Only checked the first one. */
 					/* We could check more, ... */
+			if (pbmapp->pbm_bsize == pbmapp->pbm_offset) {
+				printk("xfsiomapw_read: bmap too small pbmap 0x%p\n", pbmapp);
+			}
 			goto out;
 		}
 	}
@@ -980,13 +1012,24 @@ xfs_iomap_write(
 		error = xfs_iomap_write_convert(io, offset, count, pbmapp,
 					npbmaps, ioflag, found);
 		iunlock = 0;	/* xfs_iomap_write_convert unlocks inode */
+		if (pbmapp->pbm_bsize == pbmapp->pbm_offset) {
+			printk("xfsiomapw_convert: bmap too small pbmap 0x%p error %d\n", pbmapp, error);
+		}
 	} else {
-		if (ioflag & PBF_DIRECT)
+		if (ioflag & PBF_DIRECT) {
 			error = xfs_iomap_write_direct(io, offset, count, pbmapp,
 						npbmaps, ioflag, found);
-		else
+			if (pbmapp->pbm_bsize == pbmapp->pbm_offset) {
+				printk("xfsiomapw_direct: bmap too small pbmap 0x%p error %d\n", pbmapp, error);
+			}
+		} else {
 			error = xfs_iomap_write_delay(io, offset, count, pbmapp,
 					npbmaps, ioflag, found); 
+			if (pbmapp->pbm_bsize == pbmapp->pbm_offset) {
+				printk("xfsiomapw_delay: bmap too small pbmap 0x%p error %d\n", pbmapp, error);
+			}
+		}
+
 	}
 
 out:
@@ -995,6 +1038,9 @@ out:
 
 out_no_unlock:
 	XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
+	if (pbmapp->pbm_bsize == pbmapp->pbm_offset) {
+		printk("xfsiomapw: bmap too small pbmap 0x%p\n", pbmapp);
+	}
 	return error;
 }
 
@@ -1120,9 +1166,10 @@ xfs_write_bmap(
 		ASSERT(length > 0);
 	}
 
-	pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, length);
+	pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imapp->br_blockcount);
 }
 
+int iomapwd_debug = 0;
 
 int
 xfs_iomap_write_delay(
@@ -1179,8 +1226,9 @@ xfs_iomap_write_delay(
 	aeof = 0;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
-	printk("xfs_iomap_write_delay: allocating from offset %Ld to %Ld\n",
-			offset_fsb, last_fsb);
+	dprintk(iomapwd_debug,
+		("xfs_iomap_write_delay: allocating from offset %Ld to %Ld\n",
+			offset_fsb, last_fsb));
 	/*
 	 * If the caller is doing a write at the end of the file,
 	 * then extend the allocation (and the buffer used for the write)
@@ -1288,6 +1336,7 @@ xfs_iomap_write_delay(
 		aligned_offset = XFS_WRITEIO_ALIGN(io, offset);
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		small_write = 0;
+		/* XXX - Are we shrinking? XXXXX  */
 	} else {
 		/*
 		 * For small sync writes try to minimize the amount
@@ -1309,6 +1358,7 @@ xfs_iomap_write_delay(
 			iosize = last_fsb - offset_fsb;
 		}
 		small_write = 1;
+		/* XXX - Are we shrinking? XXXXX  */
 	}
 
 	/*
@@ -1316,8 +1366,9 @@ xfs_iomap_write_delay(
 	 * extents returned by xfs_bmapi().
 	 */
 	xfs_write_bmap(mp, io, imap, pbmapp, iosize, ioalign, isize);
-	ASSERT((pbmapp->pbm_bsize > 0) &&
-	       (pbmapp->pbm_bsize - pbmapp->pbm_offset > 0));
+
+	ASSERT((pbmapp->pbm_bsize > 0)
+		&& (pbmapp->pbm_bsize - pbmapp->pbm_offset > 0));
 
 	/*
 	 * A bmap is the EOF bmap when it reaches to or beyond the new
@@ -1326,6 +1377,7 @@ xfs_iomap_write_delay(
 	if ((offset + pbmapp->pbm_offset + pbmapp->pbm_bsize ) >= isize) {
 		pbmapp->pbm_flags |= PBMF_EOF;
 	}
+#ifdef DELALLOC_BUG
 	writing_bytes = pbmapp->pbm_bsize - pbmapp->pbm_offset;
 	if (writing_bytes > count) {
 		/*
@@ -1336,6 +1388,7 @@ xfs_iomap_write_delay(
 		writing_bytes = count;
 	}
 	pbmapp->pbm_bsize = writing_bytes;
+#endif
 	pbmapp->pbm_flags |= PBMF_NEW;
 
 /* 	xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP,
@@ -1345,6 +1398,10 @@ xfs_iomap_write_delay(
 		just handle one for now. To find the code on IRIX,
 		look in xfs_iomap_write() in xfs_rw.c. */
 
+	if (pbmapp->pbm_bsize == pbmapp->pbm_offset) {
+		printk("xfsiomapw_delay_return: bmap too small pbmap 0x%p\n",
+			pbmapp);
+	}
 	*npbmaps = 1;
 	return 0;
 }
@@ -1864,7 +1921,7 @@ _xfs_incore_relse(buftarg_t *targ,
 				  int	delwri_only,
 				  int	wait)
 {
-	truncate_inode_pages(&targ->inode->i_data, 0LL);
+	truncate_inode_pages(&targ->inode->i_data, 0LL, TRUNC_NO_TOSS);
 	return 0;
 } 
 

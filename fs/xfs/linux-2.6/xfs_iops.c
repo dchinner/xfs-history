@@ -227,6 +227,20 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	vnode_t		*dvp;	/* directory containing name to remove */
 	cred_t		cred;	/* Temporary cred workaround */
 
+#ifdef DELALLOC_PURGE
+	/* XXX ---------- DELALLOC --------------- XXX */
+	extern atomic_t	pb_delalloc_pages;
+	extern wait_queue_head_t pcd_waitq;
+
+	while (atomic_read(&pb_delalloc_pages) > 0) {
+		wake_up_interruptible(&pcd_waitq);
+		/* Sleep 10 mS - arbitrary */
+		schedule_timeout((10*HZ)/1000);
+	}
+	/* XXX ---------- DELALLOC --------------- XXX */
+#endif
+
+
 	dvp = LINVFS_GET_VP(dir);
 	inode = dentry->d_inode;
 	ASSERT(dvp);
@@ -581,13 +595,35 @@ linvfs_pb_bmap(struct inode *inode,
 	int		npbmaps = 1;
 	int		error;
 	long		blockno;
+	xfs_inode_t	*ip;
 
 	vp = LINVFS_GET_VP(inode);
 
 	*retpbbm = maxpbbm;
 
+#ifdef XFS_DELALLOC
+	if (flags & PBF_BMAP_TRY_ILOCK) {
+		bhv_desc_t	*bdp;
+
+		vp = LINVFS_GET_VP(inode);
+		ASSERT(vp);
+		bdp = VNODE_TO_FIRST_BHV(vp);
+		ASSERT(bdp);
+		ip = XFS_BHVTOI(bdp);
+
+		if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL))
+			return EAGAIN;
+	}
+#endif
+
 	VOP_BMAP(vp, offset, count, flags,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
+
+#ifdef XFS_DELALLOC
+	if (flags & PBF_BMAP_TRY_ILOCK)
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+#endif
+
 
 	return error;
 }

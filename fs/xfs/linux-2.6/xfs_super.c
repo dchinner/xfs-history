@@ -145,7 +145,7 @@ linvfs_release_inode(struct inode *inode)
 {
 	if (inode) {
 		pagebuf_lock_disable(inode);
-		truncate_inode_pages(&inode->i_data, 0L);
+		truncate_inode_pages(&inode->i_data, 0L, TRUNC_NO_TOSS);
 		iput(inode);
 	}
 }
@@ -172,6 +172,8 @@ linvfs_read_super(
 	statvfs_t	statvfs;
 	vattr_t		attr;
 	u_int		disk, partition;
+	extern	int	page_cleaner_daemon_started; 
+	extern  void	page_cleaner_daemon_start(void);
 
 	MOD_INC_USE_COUNT;
 
@@ -182,6 +184,11 @@ linvfs_read_super(
 			goto fail_vnrele;
 		}
 	}
+#endif
+
+#ifdef XFS_DELALLOC
+	if (!page_cleaner_daemon_started)
+		page_cleaner_daemon_start();
 #endif
 
 	/*  Setup the uap structure  */
@@ -345,6 +352,19 @@ linvfs_put_inode(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	if (vp) {
+#ifdef DELALLOC_PURGE
+		/* XXX ---------- DELALLOC --------------- XXX */
+		extern atomic_t	pb_delalloc_pages;
+		extern wait_queue_head_t pcd_waitq;
+
+		while (atomic_read(&pb_delalloc_pages) > 0) {
+			wake_up_interruptible(&pcd_waitq);
+			/* Sleep 10 mS - arbitrary */
+			schedule_timeout((10*HZ)/1000);
+		}
+		/* XXX ---------- DELALLOC --------------- XXX */
+#endif
+
 		VN_RELE(vp);
 		vp->v_inode = 0;
 	}
@@ -360,6 +380,23 @@ linvfs_put_super(
 	int		error;
 	int		sector_size = 512;
 	kdev_t		dev = sb->s_dev;
+
+
+#ifdef XFS_DELALLOC
+	extern atomic_t	pb_delalloc_pages;
+	extern wait_queue_head_t pcd_waitq;
+
+	unlock_super(sb);
+
+	while (atomic_read(&pb_delalloc_pages) > 0) {
+		wake_up_interruptible(&pcd_waitq);
+		/* Sleep 10 mS - arbitrary */
+		schedule_timeout((10*HZ)/1000);
+	}
+
+	fsync_dev(sb->s_dev);
+	lock_super(sb);
+#endif
 
 	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
 	if (error)
