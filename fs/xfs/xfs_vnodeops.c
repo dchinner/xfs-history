@@ -37,6 +37,7 @@
 #include <sys/region.h>
 #include <fs/specfs/snode.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <sys/mode.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
@@ -51,6 +52,7 @@
 #include "xfs_alloc_btree.h"
 #include "xfs_ialloc.h"
 #include "xfs_ag.h"
+#include "xfs_bio.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_bmap.h"
 #include "xfs_btree.h"
@@ -309,6 +311,7 @@ xfs_getattr(vnode_t	*vp,
 	xfs_mount_t	*mp;
 
 	ip = XFS_VTOI(vp);
+	xfs_ilock (ip, XFS_ILOCK_SHARED);
 
 	vap->va_size = (ulong) ip->i_d.di_size;
         if (vap->va_mask == AT_SIZE)
@@ -319,8 +322,10 @@ xfs_getattr(vnode_t	*vp,
 
         vap->va_nodeid = ip->i_ino;
 
-        if (vap->va_mask == (AT_FSID|AT_NODEID))
+        if (vap->va_mask == (AT_FSID|AT_NODEID)) {
+		xfs_iunlock (ip, XFS_ILOCK_EXCL);
                 return 0;
+	}
 
 	/*
          * Copy from in-core inode.
@@ -363,6 +368,8 @@ xfs_getattr(vnode_t	*vp,
 	 */
         vap->va_nblocks = BTOBB((u_long) (ip->i_d.di_size));
 
+	xfs_iunlock (ip, XFS_ILOCK_EXCL);
+
 	return 0;
 }
 
@@ -393,43 +400,49 @@ xfs_setattr(vnode_t	*vp,
 
         ip = XFS_VTOI(vp);
 
-	/*
-	 * Timestamps do not need to be logged and hence do not
-	 * need to be done within a transaction.
-	 */
-	if (mask & AT_UPDTIMES) {
-		/*
-		 * NOTE: Although we set all 64 bits of the timestamp,
-		 * the underlying code will ignore the low order 32
-		 * bits.  The low order 32 bits will always be zero
-		 * on disk.
-		 */
+        /*
+         * Timestamps do not need to be logged and hence do not
+         * need to be done within a transaction.
+         */
+        if (mask & AT_UPDTIMES) {
+                /*
+                 * NOTE: Although we set all 64 bits of the timestamp,
+                 * the underlying code will ignore the low order 32
+                 * bits.  The low order 32 bits will always be zero
+                 * on disk.
+                 */
                 ASSERT((mask & ~AT_UPDTIMES) == 0);
                 nanotime(&tv);
 
                 if (mask & AT_UPDATIME) {
                         ip->i_d.di_atime.t_sec = tv.tv_sec;
-			ip->i_d.di_atime.t_nsec = tv.tv_nsec;
-		}
+                        ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+                }
                 if (mask & AT_UPDCTIME) {
-			ip->i_d.di_ctime.t_sec = tv.tv_sec;
+                        ip->i_d.di_ctime.t_sec = tv.tv_sec;
                         ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
-		}
+                }
                 if (mask & AT_UPDMTIME) {
-			ip->i_d.di_mtime.t_sec = tv.tv_sec;
+                        ip->i_d.di_mtime.t_sec = tv.tv_sec;
                         ip->i_d.di_mtime.t_nsec = tv.tv_nsec;
-		}
+                }
         }
 
-	tp = xfs_trans_alloc (XFS_VFSTOM((XFS_ITOV(ip))->v_vfsp),
-                        XFS_TRANS_WAIT);
-	if (code = xfs_trans_reserve (tp, 10, 10, 0, 0)) {
-		xfs_trans_cancel (tp, 0);
-		return code;
-	}
 
-	xfs_ilock (ip, XFS_ILOCK_EXCL);
-	xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+	/*
+	 * For the other attributes, we acquire the inode lock and
+	 * first do an error checking pass.
+	 */
+        tp = xfs_trans_alloc (XFS_VFSTOM((XFS_ITOV(ip))->v_vfsp),
+                        XFS_TRANS_WAIT);
+        if (code = xfs_trans_reserve (tp, 10, 10, 0, 0)) {
+                xfs_trans_cancel (tp, 0);
+                return code;
+        }
+
+        xfs_ilock (ip, XFS_ILOCK_EXCL);
+        xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+
 
         /*
          * Change file access modes.  Must be owner or privileged.
@@ -439,6 +452,69 @@ xfs_setattr(vnode_t	*vp,
                         code = EPERM;
                         goto error_return;
                 }
+        }
+
+        /*
+         * Change file ownership.  Must be the owner or privileged.
+         * If the system was configured with the "restricted_chown"
+         * option, the owner is not permitted to give away the file,
+         * and can change the group id only to a group of which he
+         * or she is a member.
+         */
+        if (mask & (AT_UID|AT_GID)) {
+                uid_t uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
+                gid_t gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
+
+                if (!crsuser(credp)) {
+                        if (credp->cr_uid != ip->i_d.di_uid ||
+                                (restricted_chown &&
+                                (ip->i_d.di_uid != uid ||
+                                 !groupmember(gid, credp)))) {
+                                code = EPERM;
+                                goto error_return;
+                        }
+                }
+        }
+
+        /*
+         * Truncate file.  Must have write permission and not be a directory.
+         */
+        if (mask & AT_SIZE) {
+                if (vp->v_type == VDIR) {
+                        code = EISDIR;
+                        goto error_return;
+                }
+
+                /* XXX Check for write access to inode */
+
+                if (vp->v_type == VREG && (code = fs_vcode(vp, &ip->i_vcode)))
+                        goto error_return;
+        }
+
+        /*
+         * Change file access or modified times.
+         */
+        if (mask & (AT_ATIME|AT_MTIME)) {
+                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
+                        if (flags & ATTR_UTIME) {
+                                code = EPERM;
+                                goto error_return;
+                        }
+
+                        /* Check for WRITE access */
+                }
+        }
+
+
+	/*
+	 * Now we can make the changes.
+	 */
+
+
+        /*
+         * Change file access modes.
+         */
+        if (mask & AT_MODE) {
                 ip->i_d.di_mode &= IFMT;
                 ip->i_d.di_mode |= vap->va_mode & ~IFMT;
                 /*
@@ -467,13 +543,6 @@ xfs_setattr(vnode_t	*vp,
                 gid_t gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
 
                 if (!crsuser(credp)) {
-                        if (credp->cr_uid != ip->i_d.di_uid ||
-                                (restricted_chown &&
-                                (ip->i_d.di_uid != uid || 
-				 !groupmember(gid, credp)))) {
-                                code = EPERM;
-                                goto error_return;
-                        }
                         ip->i_d.di_mode &= ~(ISUID|ISGID);
                 }
                 if (ip->i_d.di_uid == uid) {
@@ -492,15 +561,6 @@ xfs_setattr(vnode_t	*vp,
          * Truncate file.  Must have write permission and not be a directory.
          */
         if (mask & AT_SIZE) {
-                if (vp->v_type == VDIR) {
-                        code = EISDIR;
-                        goto error_return;
-                }
-
-		/* XXX Check for write access to inode */
-
-                if (vp->v_type == VREG && (code = fs_vcode(vp, &ip->i_vcode)))
-                        goto error_return;
 
 		/* Call xfs_itrunc to vap->va_size */
 		ASSERT (0);
@@ -511,14 +571,6 @@ xfs_setattr(vnode_t	*vp,
          * Change file access or modified times.
          */
         if (mask & (AT_ATIME|AT_MTIME)) {
-                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
-			if (flags & ATTR_UTIME) {
-				code = EPERM;
-				goto error_return;
-			}
-
-			/* Check for WRITE access */
-                }
                 /*
                  * since utime() always updates both mtime and atime
                  * ctime will always be set, as it need to be so there
@@ -539,10 +591,8 @@ xfs_setattr(vnode_t	*vp,
 
 	XFS_IGETINFO.ig_attrchg++;
 
-	if (tp) {
-		IHOLD (ip);
-		xfs_trans_commit (tp, 0);
-	}
+	IHOLD (ip);
+	xfs_trans_commit (tp, 0);
 
 	return 0;
 
@@ -576,18 +626,113 @@ xfs_access(vnode_t	*vp,
 	return 0;
 }
 
+/*
+ * The maximum pathlen is 1024 bytes. Since the minimum file system
+ * blocksize is 512 bytes, we can get a max of 2 extents back from
+ * bmapi.
+ */
+#define SYMLINK_MAPS 2
+
 
 /*
  * xfs_readlink
  *
- * This is a stub.
  */
 STATIC int
 xfs_readlink(vnode_t	*vp,
 	     uio_t	*uiop,
 	     cred_t	*credp)
 {
-	return 0;
+        xfs_mount_t     *mp;
+        xfs_inode_t     *ip;
+	int		count;
+	off_t		offset;
+	int		pathlen;
+	timestruc_t     tv;
+        int             error = 0;
+
+	if (vp->v_type != VLNK)
+                return EINVAL;
+
+	ip = XFS_VTOI(vp);
+	xfs_ilock (ip, XFS_ILOCK_SHARED);
+
+	ASSERT ((ip->i_d.di_mode & IFMT) == IFLNK);
+
+	offset = uiop->uio_offset;
+        count = uiop->uio_resid;
+
+	if (MANDLOCK(vp, ip->i_d.di_mode)
+            && (error = chklock(vp, FREAD, offset, count, uiop->uio_fmode))) {
+                goto error_return;
+        }
+	if (offset < 0) {
+                error = EINVAL;
+		goto error_return;
+	}
+        if (count <= 0) {
+                error = 0;
+		goto error_return;
+	}
+
+	nanotime(&tv);
+	ip->i_d.di_atime.t_sec = tv.tv_sec;
+	ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+
+	/*
+	 * See if the symlink is stored inline.
+	 */
+	pathlen = (int) ip->i_d.di_size;
+
+	if (ip->i_flags & XFS_IINLINE) {
+		error = uiomove (ip->i_u1.iu_data, pathlen, UIO_READ, uiop);
+	}
+	else {
+		/*
+		 * Symlink not inline.  Call bmap to get it in.
+		 */
+		xfs_trans_t	*tp = NULL;
+		xfs_mount_t	*mp;
+                xfs_fsblock_t   first_fsb;
+                xfs_extlen_t    fs_blocks;
+                int             nmaps;
+                xfs_bmbt_irec_t mval [SYMLINK_MAPS];
+                daddr_t         d;
+                char            *cur_chunk;
+                int             byte_cnt, n;
+                struct          buf *bp;
+		xfs_sb_t        *sbp;
+		xfs_bmap_free_t free_list;
+
+		mp = XFS_VFSTOM(vp->v_vfsp);
+                first_fsb = 0;
+                fs_blocks = xfs_b_to_fsb(sbp, pathlen);
+                nmaps = SYMLINK_MAPS;
+
+                (void) xfs_bmapi (tp, ip, first_fsb, fs_blocks,
+                         0, NULLFSBLOCK, 0, mval, &nmaps, &free_list);
+
+                for (n = 0; n < nmaps; n++) {
+                        d = xfs_fsb_to_daddr(sbp, mval[n].br_startblock);
+                        byte_cnt = xfs_fsb_to_b(sbp, mval[n].br_blockcount);
+                        bp = xfs_read_buf (mp->m_dev, d, BTOBB(byte_cnt), 0);
+                        if (pathlen < byte_cnt)
+                                byte_cnt = pathlen;
+                        pathlen -= byte_cnt;
+
+                        error = uiomove (bp->b_un.b_addr, byte_cnt,
+					 UIO_READ, uiop);
+			brelse (bp);
+                }
+
+	}
+
+
+error_return:
+
+	xfs_iunlock (ip, XFS_ILOCK_SHARED);
+
+	return error;
 }
 
 
@@ -2138,13 +2283,6 @@ xfs_readdir(vnode_t	*dir_vp,
 	return status;
 }
 
-
-/*
- * The maximum pathlen is 1024 bytes. Since the minimum file system
- * blocksize is 512 bytes, we can get a max of 2 extents back from
- * bmapi.
- */
-#define SYMLINK_MAPS 2
 
 /*
  * XXX The number of blocks that the directory code requires for
