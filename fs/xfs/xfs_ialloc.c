@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.61 $"
+#ident	"$Revision: 1.63 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -638,7 +638,9 @@ xfs_dialloc(
 	}
 	offset = XFS_IALLOC_FIND_FREE(&rec.ir_free);
 	ASSERT(offset >= 0);
-	ASSERT(XFS_AGINO_TO_OFFSET(mp, rec.ir_startino) == 0);
+	ASSERT(offset < XFS_INODES_PER_CHUNK);
+	ASSERT((XFS_AGINO_TO_OFFSET(mp, rec.ir_startino) %
+				   XFS_INODES_PER_CHUNK) == 0);
 	ino = XFS_AGINO_TO_INO(mp, agno, rec.ir_startino + offset);
 	XFS_INOBT_CLR_FREE(&rec, offset);
 	rec.ir_freecount--;
