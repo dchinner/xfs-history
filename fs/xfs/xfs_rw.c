@@ -33,6 +33,9 @@
 #include <sys/uuid.h>
 #include <sys/param.h>
 #include <sys/file.h>
+#include <sys/region.h>
+#include <sys/runq.h>
+#include <sys/schedctl.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -55,8 +58,20 @@
 
 /*
  * This lock is used by xfs_strat_write().
+ * The xfs_strat_lock is initialized in xfs_init().
  */
 lock_t	xfs_strat_lock;
+
+/*
+ * Variables for coordination with the xfsd daemons.
+ * The xfsd_lock and xfsd_wait variables are initialized
+ * in xfs_init();
+ */
+static int	xfsd_count;
+static buf_t	*xfsd_list;
+static int	xfsd_bufcount;
+lock_t		xfsd_lock;
+sema_t		xfsd_wait;
 
 STATIC void
 xfs_zero_bp(buf_t	*bp,
@@ -77,8 +92,14 @@ xfs_diordwr(vnode_t	*vp,
 	 cred_t		*credp,
 	 int		rw);
 
-extern int xfs_grio_req( xfs_inode_t *, struct reservation_id *, 
-	uio_t *, int, cred_t *, int);
+extern int
+xfs_grio_req(xfs_inode_t *,
+	     struct reservation_id *, 
+	     uio_t *,
+	     int,
+	     cred_t *,
+	     int);
+
 /*
  * Round the given file offset down to the nearest read/write
  * size boundary.
@@ -1823,6 +1844,8 @@ xfs_strat_write_relse(buf_t	*rbp)
 	forw = (buf_t*)rbp->b_fsprivate2;
 	back = (buf_t*)rbp->b_fsprivate;
 	ASSERT(back != NULL);
+	ASSERT(back->b_fsprivate2 == rbp);
+	ASSERT((forw == NULL) || (forw->b_fsprivate == rbp));
 
 	/*
 	 * Pull ourselves from the list.
@@ -1846,7 +1869,6 @@ xfs_strat_write_relse(buf_t	*rbp)
 			leader->b_flags |= B_ERROR;
 			leader->b_error = rbp->b_error;
 		}
-		leader->b_flags |= B_DONE;
 		leader->b_flags &= ~B_LEADER;
 		spunlockspl(xfs_strat_lock, s);
 
@@ -2092,6 +2114,7 @@ xfs_strategy(vnode_t	*vp,
 {
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
+	int		s;
 
 	mp = XFS_VFSTOM(vp->v_vfsp);
 	sbp = &(mp->m_sb);
@@ -2117,17 +2140,104 @@ xfs_strategy(vnode_t	*vp,
 
 	/*
 	 * Here we're writing the file and probably need to allocate
-	 * some underlying disk space.  In the real version this will
-	 * need to queue the buffer for an xfsd if it is an ASYNC write.
-	 * For now we'll just do the allocation regardless.
+	 * some underlying disk space. If the buffer is being written
+	 * asynchronously by bdflush() then we queue if for the xfsds
+	 * so that we won't put bdflush() to sleep.
 	 */
-	if (bp->b_flags & B_ASYNC) {
+	if ((bp->b_flags & (B_ASYNC | B_BDFLUSH)) == (B_ASYNC | B_BDFLUSH) &&
+	    (xfsd_count > 0)) {
+		s = splock(xfsd_lock);
 		/*
-		 * Here's where we'll queue it.
+		 * Queue the buffer at the end of the list.
 		 */
-		xfs_strat_write(vp, bp);
+		if (xfsd_list == NULL) {
+			bp->av_forw = bp;
+			bp->av_back = bp;
+			xfsd_list = bp;
+		} else {
+			bp->av_back = xfsd_list->av_back;
+			xfsd_list->av_back->av_forw = bp;
+			xfsd_list->av_back = bp;
+			bp->av_forw = xfsd_list;
+		}
+		xfsd_bufcount++;
+		cvsema(&xfsd_wait);
+		spunlock(xfsd_lock, s);
 	} else {
 		xfs_strat_write(vp, bp);
+	}
+}
+
+/*
+ * This is the routine called by the xfs daemons as they enter the
+ * kernel.  From here they wait in a loop for buffers which will
+ * require transactions to write out and process them as they come.
+ * This way we never force bdflush() to wait on one of our transactions,
+ * thereby keeping the system happier and preventing buffer deadlocks.
+ */
+int
+xfsd(void)
+{
+	int	s;
+	buf_t	*bp;
+	buf_t	*forw;
+	buf_t	*back;
+
+	/*
+	 * Get rid of our address space, we're never returning to
+	 * user space.
+	 */
+	vrelvm();
+
+	/*
+	 * Make us a high non-degrading priority process like bdflush(),
+	 * since that is who we're relieving of work.
+	 */
+	setinfoRunq(u.u_procp, RQRTPRI, NDPHIMIN);
+
+	/*
+	 * We should never sleep at an interruptible priority, but
+	 * just to make sure...
+	 */
+	if (setjmp(u.u_qsav)) {
+		cmn_err(CE_PANIC, "xfsd interrupted");
+	}
+
+	s = splock(xfsd_lock);
+	xfsd_count++;
+
+	while (1) {
+		while (xfsd_list == NULL) {
+			(void) spunlock_psema(xfsd_lock, s, &xfsd_wait,
+					      PRIBIO);
+			s = splock(xfsd_lock);
+		}
+
+		/*
+		 * Pull a buffer off of the list.
+		 */
+		bp = xfsd_list;
+		forw = bp->av_forw;
+		back = bp->av_back;
+		forw->av_back = back;
+		back->av_forw = forw;
+		if (forw == bp) {
+			xfsd_list = NULL;
+		} else {
+			xfsd_list = forw;
+		}
+		bp->av_forw = bp;
+		bp->av_back = bp;
+		xfsd_bufcount--;;
+		ASSERT(xfsd_bufcount >= 0);
+
+		spunlock(xfsd_lock, s);
+
+		ASSERT((bp->b_flags & (B_BUSY | B_ASYNC | B_READ)) ==
+		       (B_BUSY | B_ASYNC));
+		xfs_strat_write(bp->b_vp, bp);
+
+		s = splock(xfsd_lock);
 	}
 }
 
