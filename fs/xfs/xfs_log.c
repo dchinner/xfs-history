@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.75 $"
+#ident	"$Revision: 1.76 $"
 
 /*
  * High level interface routines for log manager
@@ -1505,7 +1505,6 @@ xlog_state_sync(xlog_t	  *log,
 		return xlog_state_sync_all(log, flags);
 
 	spl = splockspl(log->l_icloglock, splhi);
-
 	iclog = log->l_iclog;
 	do {
 		if (iclog->ic_header.h_lsn != lsn) {
@@ -1513,15 +1512,27 @@ xlog_state_sync(xlog_t	  *log,
 		} else {
 		    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
 			    xlog_state_switch_iclogs(log, iclog, 0);
+			    if (iclog->ic_refcnt == 0) {
+				    iclog->ic_header.h_cycle= log->l_curr_cycle;
+				    iclog->ic_refcnt++;
+				    ASSIGN_LSN(iclog->ic_header.h_lsn, log);
+				    ASSERT(log->l_curr_block >= 0);
+				    spunlockspl(log->l_icloglock, spl);
+				    xlog_state_release_iclog(log, iclog);
+				    spl = splockspl(log->l_icloglock, splhi);
+			    }
 		    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			    spunlockspl(log->l_icloglock, spl);
 			    return 0;
 		    }
-		    if (flags & XFS_LOG_SYNC)		/* sleep */
+		    if ((flags & XFS_LOG_SYNC) &&		    /* sleep */
+			!(iclog->ic_state == XLOG_STATE_ACTIVE ||
+			  iclog->ic_state == XLOG_STATE_DIRTY)) {
 			    spunlockspl_psema(log->l_icloglock, spl,
 					      &iclog->ic_forcesema, 0);
-		    else				/* just return */
+		    } else {				/* just return */
 			    spunlockspl(log->l_icloglock, spl);
+		    }
 		    return 0;
 		}
 	} while (iclog != log->l_iclog);
