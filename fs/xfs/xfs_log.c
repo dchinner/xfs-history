@@ -937,10 +937,16 @@ xlog_iodone(xfs_buf_t *bp)
 	 * Race to shutdown the filesystem if we see an error.
 	 */
 	if (XFS_BUF_GETERROR(bp)) {
+		/* Some versions of cpp barf on the recursive definition of
+		 * ic_log -> hic_fields.ic_log and expand ic_log twice when
+		 * it is passed through two macros.  Workaround for broken cpp
+		 */
+		struct log *l;
 		xfs_ioerror_alert("xlog_iodone",
 				  iclog->ic_log->l_mp, bp, XFS_BUF_ADDR(bp));
 		XFS_BUF_STALE(bp);
-		xfs_force_shutdown(iclog->ic_log->l_mp, XFS_LOG_IO_ERROR);
+		l = iclog->ic_log;
+		xfs_force_shutdown(l->l_mp, XFS_LOG_IO_ERROR);
 		/*
 		 * This flag will be propagated to the trans-committed
 		 * callback routines to let them know that the log-commit
