@@ -634,7 +634,7 @@ xfs_itruncate_start(
 	timestruc_t	tv;
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
-	ASSERT((new_size == 0) || (new_size < ip->i_d.di_size));
+	ASSERT((new_size == 0) || (new_size <= ip->i_d.di_size));
 	ASSERT((flags == XFS_ITRUNC_DEFINITE) ||
 	       (flags == XFS_ITRUNC_MAYBE));
 
@@ -660,7 +660,8 @@ xfs_itruncate_start(
 	 */
 	toss_start = XFS_B_TO_FSB(mp, new_size);
 	toss_start = XFS_FSB_TO_B(mp, toss_start);
-	last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+	last_byte = XFS_ISIZE_MAX(ip);
+	last_byte = XFS_B_TO_FSB(mp, last_byte);
 	last_byte = XFS_FSB_TO_B(mp, last_byte);
 	if (last_byte > toss_start) {
 		if (flags & XFS_ITRUNC_DEFINITE) {
@@ -720,7 +721,7 @@ xfs_itruncate_finish(
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
-	ASSERT((new_size == 0) || (new_size < ip->i_d.di_size));
+	ASSERT((new_size == 0) || (new_size <= ip->i_d.di_size));
 	ASSERT(*tp != NULL);
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 	ASSERT(ip->i_transp == *tp);
@@ -1722,9 +1723,7 @@ xfs_iextents_copy(
  * held as well.  The inode lock will still be held upon return from
  * the call and the caller is free to unlock it.
  * The inode flush lock will be unlocked when the inode reaches the disk.
- * The flags can be one of B_ASYNC, B_DELWRI, or 0.
- * These indicate the way in which the inode's buffer should be
- * written out (0 indicating a synchronous write).
+ * The flags indicate how the inode's buffer should be written out.
  */
 void
 xfs_iflush(
@@ -1895,22 +1894,22 @@ xfs_iflush(
 				      xfs_iflush_done, (xfs_log_item_t *)iip);
 
 		/*
-		 * As much as we'd like to, doing B_DELWRI flushes of the
-		 * inode while holding the inode flush lock is just a
-		 * bad idea.  If the inode gets reclaimed, then we get
-		 * stuck waiting in xfs_reclaim() for the flush lock on
-		 * an inode waiting for a DELWRI buffer to complete.  That
-		 * can be quite a while.
+		 * Flush out the inode buffer according to the directions
+		 * of the caller.  In the cases where the caller has given
+		 * us a choice choose the non-delwri case.  This is because
+		 * the inode is in the AIL and we need to get it out soon.
 		 */
 		switch (flags) {
-		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
 		case XFS_IFLUSH_SYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
 			flags = 0;
 			break;
-		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
-		case XFS_IFLUSH_DELWRI:
 		case XFS_IFLUSH_ASYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
 			flags = B_ASYNC;
+			break;
+		case XFS_IFLUSH_DELWRI:
+			flags = B_DELWRI;
 			break;
 		default:
 			ASSERT(0);
