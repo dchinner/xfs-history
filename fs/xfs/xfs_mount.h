@@ -397,7 +397,6 @@ typedef struct xfs_mount {
 					/* stuff which should only be done */
 					/* once. */
 #define XFS_MFSI_CLIENT         0x02    /* Is a client -- skip lots of stuff */
-#define XFS_MFSI_RRINODES       0x04    /* Read root indoes */
 #define XFS_MFSI_NOUNLINK	0x08	/* Skip unlinked inode processing in */
 					/* log recovery */
 
