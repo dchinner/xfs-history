@@ -102,20 +102,6 @@ typedef struct {
 #define io_error	io_rdesc.error
 
 
-static void
-_unmark_delalloc(struct page *page)
-{
-	struct buffer_head *bh = page->buffers;
-
-	if (!PageLocked(page))
-		PAGE_BUG(page);
-	if (!bh || !buffer_delay(bh))
-		BUG();
-	lock_buffer(bh);
-	clear_bit(BH_Delay, &bh->b_state);
-	unlock_buffer(bh);
-}
-
 static inline int
 pagebuf_commit_write_core(
 	struct inode *inode,
@@ -361,7 +347,8 @@ _pb_direct_io(
 
 	pb = pagebuf_lookup(inode, rounded_offset, pb_size, pb_flags);
 	if (!pb) {
-		rdp->io_error = -ENOMEM;
+		if (rdp)
+			rdp->io_error = -ENOMEM;
 		return 0;
 	}
 
@@ -374,7 +361,8 @@ _pb_direct_io(
 	if (!kp) {
 		pb->pb_flags &= ~_PBF_LOCKABLE;
 		pagebuf_rele(pb);
-		rdp->io_error = -ENOMEM;
+		if (rdp)
+			rdp->io_error = -ENOMEM;
 		return 0;
 	}
 	memset(kp, 0, sizeof(struct kiobuf));
@@ -880,9 +868,12 @@ __pb_block_prepare_write_async(struct inode *inode, struct page *page,
 		}
 		if (mp->pbm_bn >= 0) {
 			hook_buffers_to_page(inode, page, mp);
-			if (dp)
-				_unmark_delalloc(page);
 			bh = page->buffers;
+			if (dp) {
+				lock_buffer(bh);
+				clear_bit(BH_Delay, &bh->b_state);
+				unlock_buffer(bh);
+			}
 		}
 	}
 
