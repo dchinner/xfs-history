@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.3 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -89,11 +89,36 @@ typedef struct xfs_bmbt_irec
 
 #define	XFS_BMAP_PTR_ADDR(bb,i,bl,cur) XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_SIZE(bl,(bb)->bb_level,cur), xfs_bmbt_rec_t, bb, i)
 
+/*
+ * These are to be used when we know the size of the block and
+ * we don't have a cursor.
+ */
+#define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - offsetof(xfs_dinode_t, di_u)) 
+#define	XFS_BMAP_BROOT_REC_ADDR(bb,i,isz) XFS_BTREE_REC_ADDR(isz,xfs_bmbt_rec_t,bb,i)
+#define XFS_BMAP_BROOT_PTR_ADDR(bb,i,isz) XFS_BTREE_PTR_ADDR(isz,xfs_bmbt_rec_t,bb,i)
+
+#define	XFS_BMAP_BROOT_NUMRECS(bb) ((bb)->bb_numrecs)
+#define	XFS_BMAP_BROOT_SPACE(bb) (sizeof(xfs_btree_block_t) + ((bb)->bb_numrecs * (sizeof(xfs_bmbt_rec_t) + sizeof(xfs_agblock_t))))
+
 #define	XFS_BMAP_MAXLEVELS	5	/* ??? */
 
 #define	xfs_bmbt_get_block(cur, level)	\
 	((level) < (cur)->bc_nlevels - 1 ? \
 	 xfs_buf_to_block((cur)->bc_bufs[level]) : \
 	 (cur)->bc_private.b.ip->i_broot)
+
+/*
+ * This is the structure passed to xfs_imap() to map
+ * an inode number to its on disk location.
+ */
+typedef struct xfs_imap {
+	daddr_t		im_blkno;	/* starting BB of inode chunk */
+	uint		im_len;		/* length in BBs of inode chunk */
+	xfs_agblock_t	im_agblkno;	/* logical block of inode chunk in ag */
+	ushort		im_ioffset;	/* inode offset in block in "inodes" */
+	ushort		im_boffset;	/* inode offset in block in bytes */
+} xfs_imap_t;
+	
+void	xfs_imap(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_imap_t *);
 
 #endif	/* _FS_XFS_BMAP_H */
