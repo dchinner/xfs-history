@@ -76,7 +76,6 @@ linvfs_inode_attr_in(
 	vattr_t		attr;
 	int		error;
 
-	ENTER("linvfs_inode_attr_in");
 	memset(&attr, 0, sizeof(vattr_t));
 	attr.va_mask = AT_STAT;
 
@@ -126,7 +125,6 @@ linvfs_inode_attr_in(
 	inode->i_blksize = attr.va_blksize;
 	inode->i_blocks = attr.va_nblocks;
 	inode->i_version = ++event;
-	EXIT("linvfs_inode_attr_in");
 }
 
 int spectodevs(
@@ -158,16 +156,11 @@ linvfs_read_super(
 	struct mounta	*uap = &ap;
 	char		spec[256];
 	struct xfs_args	arg, *args = &arg;
-	char		fsname[256];
 	int		error, locked = 1;
 	statvfs_t	statvfs;
 	vattr_t		attr;
 	dev_t		dev;
 	u_int		disk, partition;
-
-
-	ENTER("linvfs_read_super");
-	printk ("sb 0x%x sb->s_dev 0x%x\n",sb,(u_int)sb->s_dev);
 
 	MOD_INC_USE_COUNT;
 	lock_super(sb);
@@ -245,7 +238,6 @@ linvfs_read_super(
 	default:
 		strcpy(spec, "FixMe!!!  (uap->spec)");
 	}
-	printk ("Using device %s\n",spec);
 	uap->spec = spec;
 
 	/*  uap->dir not needed until DMI is in place  */
@@ -258,8 +250,7 @@ linvfs_read_super(
 	args->version = 3;
 	args->logbufs = -1;
 	args->logbufsize = -1;
-	strcpy(fsname, "hoopy");  /*  fixMe!!!  */
-	args->fsname = fsname;
+	args->fsname = uap->spec;
   
 	uap->dataptr = (char *)args;
 	uap->datalen = sizeof(*args);
@@ -304,7 +295,6 @@ linvfs_read_super(
 	if (is_bad_inode(sb->s_root))
 		goto fail_vnrele;
 
-	EXIT("linvfs_read_super <OK>");
 	return(sb);
 
 fail_vnrele:
@@ -322,7 +312,6 @@ fail_vfsop:
 		unlock_super(sb);
 	MOD_DEC_USE_COUNT;
 
-	EXIT("linvfs_read_super <ERROR>");
 	return(NULL);
 }
 
@@ -474,15 +463,10 @@ linvfs_write_super(
 	int		error;
 
 
-	ENTER("linvfs_write_super");
-#ifdef notyet
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
 		sys_cred, error);
-#endif
-
 
 	sb->s_dirt = 1;  /*  Keep the syncs coming.  */
-	EXIT("linvfs_write_super");
 }
 
 

@@ -517,7 +517,6 @@ clkset(time_t oldtime)
 void
 spec_mounted(vp)
 {
-        printk("spec_mounted: need to write\n");
 	return;
 }
 
@@ -660,6 +659,7 @@ xfs_cmountfs(
 				goto error3;
 			}
 			mp->m_logbsize = ap->logbufsize;
+#ifndef __linux__
 			tmp_fsname_buffer = kmem_alloc(PATH_MAX, KM_SLEEP);
 			if (error = copyinstr(ap->fsname, tmp_fsname_buffer,
 					      PATH_MAX - 1, &n)) {
@@ -673,6 +673,11 @@ xfs_cmountfs(
 			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
 			strcpy(mp->m_fsname, tmp_fsname_buffer);
 			kmem_free(tmp_fsname_buffer, PATH_MAX);
+#else
+			mp->m_fsname_len = strlen(args->spec) + 1;
+			mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
+			strcpy(mp->m_fsname, args->spec);
+#endif /* __linux__ */
 		} else {
 			/*
 			 * Called through vfs_mountroot/xfs_mountroot.
@@ -1095,11 +1100,13 @@ xfs_mountargs(
 		} else
 			return XFS_ERROR(EINVAL);
 	}
-	return (0);
 
 #ifdef __linux__
+	ap->fsname = uap->spec;
 #undef copyin
 #endif
+
+	return (0);
 }
 
 /*

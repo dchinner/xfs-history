@@ -1,4 +1,4 @@
-#ident "$Revision: 1.106 $"
+#ident "$Revision: 1.108 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -585,6 +585,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
+#ifndef __linux__
 	if ((uio->uio_iovcnt == 1) &&
 #if CELL_CAPABLE
 	    !KT_CUR_ISXTHREAD() &&
@@ -616,6 +617,12 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 			xfs_dir_put_dirent32_uio :
 			xfs_dir_put_dirent64_uio;
 	}
+#else
+	dbp = NULL;
+	put = is32 ?
+		xfs_dir_put_dirent32_uio :
+		xfs_dir_put_dirent64_uio;
+#endif /* __linux__ */
 
 	/*
 	 * Decide on what work routines to call based on the inode size.

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * xfs_dir_leaf.h
@@ -101,8 +101,13 @@ typedef union {
 	 * Watch the order here (endian-ness dependent).
 	 */
 	struct {
+#ifdef __linux__
+		xfs_dahash_t	h;	/* hash value */
+		__uint32_t	be;	/* block and entry */
+#else
 		__uint32_t	be;	/* block and entry */
 		xfs_dahash_t	h;	/* hash value */
+#endif /* __linux__ */
 	} s;
 } xfs_dircook_t;
 

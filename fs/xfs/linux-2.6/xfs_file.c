@@ -61,7 +61,7 @@ static long long linvfs_file_lseek(
 
 static ssize_t linvfs_read(
 	struct file *filp,
-	const char *buf,
+	char *buf,
 	size_t size,
 	loff_t *offset)
 {
@@ -166,7 +166,7 @@ static int linvfs_readdir(
 				      /* filldir will return an error if we go
 				      	beyond the buffer. */
 	uio.uio_iov = &iov;
-	uio.uio_copy = filldir;
+	uio.uio_copy = (uio_copy_t)filldir;
 	uio.uio_fmode = filp->f_mode;
 	uio.uio_offset = filp->f_pos;
 	uio.uio_segflg = UIO_USERSPACE;
@@ -174,6 +174,7 @@ static int linvfs_readdir(
 	uio.uio_limit = PAGE_SIZE;	/* JIMJIM OK for now? */
 
 	VOP_READDIR(vp, &uio, sys_cred, &eof, error);
+	filp->f_pos = uio.uio_offset;
 	return -error;
 }
 
@@ -198,7 +199,7 @@ struct file_operations linvfs_file_operations =
 };
 
 struct file_operations linvfs_dir_operations = {
-	NULL,  /*  lseek  */
+	linvfs_file_lseek,
 	linvfs_dir_read,
 	NULL,	 /*  write  */
 	linvfs_readdir,

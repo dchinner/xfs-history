@@ -150,7 +150,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 		}
 	}
 	d_add(dentry, ip);	/* Negative entry goes in if ip is NULL */
-	return dentry;
+	return NULL;
 }
 
 
@@ -431,5 +431,5 @@ struct inode_operations linvfs_symlink_inode_operations =
   NULL,	 /*  permission  */
   NULL,	 /*  smap  */
   NULL,  /*  updatepage  */
-  NULL  /*  revalidate  */
+  linvfs_revalidate
 };
