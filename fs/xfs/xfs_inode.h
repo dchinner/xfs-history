@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.91 $"
+#ident "$Revision: 1.92 $"
 
 struct buf;
 struct cred;
@@ -11,6 +11,7 @@ struct vnode;
 struct xfs_bmbt_block;
 struct xfs_gap;
 struct xfs_inode;
+struct xfs_inode_log_item;
 struct xfs_mount;
 struct xfs_trans;
 struct zone;
@@ -118,7 +119,7 @@ typedef struct xfs_inode {
 
 	/* Transaction and locking information. */
 	struct xfs_trans	*i_transp;	/* ptr to owning transaction*/
-	xfs_inode_log_item_t	*i_itemp;	/* logging information */
+	struct xfs_inode_log_item *i_itemp;	/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
 	mrlock_t		i_iolock;	/* inode IO lock */
 	sema_t			i_flock;	/* inode flush lock */
