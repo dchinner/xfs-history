@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.199 $"
+#ident	"$Revision: 1.200 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -239,7 +239,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 * This will be kept around at all time to optimize
 	 * access to the superblock.
 	 */
-	bp = XFS_ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
+	bp = XFS_ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))),mp);
 	ASSERT(bp != NULL);
 	ASSERT(XFS_BUF_ISBUSY(bp) && valusema(&bp->b_lock) <= 0);
 

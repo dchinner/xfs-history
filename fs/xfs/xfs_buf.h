@@ -248,10 +248,11 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_pdflush(vnode,flags) \
             pdflush(vnode,flags)
 
-#define XFS_getrbuf(sleep)\
+/* mp isn't needed for irix just pagebuf at this point */
+#define XFS_getrbuf(sleep,mp)\
             getrbuf(sleep)
 
-#define XFS_ngetrbuf(len)\
+#define XFS_ngetrbuf(len,mp)\
             ngetrbuf(len)
 
 #define XFS_freerbuf(bp) \
@@ -300,9 +301,9 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_UNDONE(x)    	 ((x)->pb_flags |= PBF_PARTIAL|PBF_NONE)
 #define XFS_BUF_ISDONE(x)	 (!(PBF_NOT_DONE(x)))
 
-#define XFS_BUF_BUSY(x)          
-#define XFS_BUF_UNBUSY(x)    	 
-#define XFS_BUF_ISBUSY(x)	     1 /* only checked in asserts... keep it from tripping any */
+#define XFS_BUF_BUSY(x)          ((x)->pb_flags |= PBF_FORCEIO)
+#define XFS_BUF_UNBUSY(x)    	 ((x)->pb_flags &= ~PBF_FORCEIO)
+#define XFS_BUF_ISBUSY(x)	     ((x)->pb_flags & PBF_FORCEIO)
 
 #define XFS_BUF_ASYNC(x)         ((x)->pb_flags |= PBF_ASYNC)
 #define XFS_BUF_UNASYNC(x)     	 ((x)->pb_flags &= ~PBF_ASYNC)
@@ -336,7 +337,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 
 #define XFS_BUF_BP_ISMAPPED(bp)  1 /* error! not implemeneted yet */
 #define XFS_BUF_IS_IOSPL(bp)     1 /* error! not implemeneted yet */
-#define XFS_BUF_IS_GRIO(bp)      1 /* error! not implemeneted yet */
+#define XFS_BUF_IS_GRIO(bp)      ((bp)->pb_flags & PBF_GRIO)
 
 /* hmm what does the mean on linux? may go away */
 #define XFS_BUF_PAGEIO(x)        /* error! not implemeneted yet */
@@ -428,7 +429,7 @@ typedef struct bfidev {
 
 #define xfs_buf_read(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
-				PBF_LOCK | PBF_READ)
+				PBF_LOCK | PBF_READ |((len > PAGE_SIZE)?PBF_MAPPED:0))
 #define xfs_buf_get(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
 				PBF_LOCK)
@@ -497,13 +498,13 @@ typedef struct bfidev {
 #define chunkread(vnode,bmap,nmaps,cred) printk("chunkread... whaa shouldn't be here at all\n")
 #define getchunk(vnode,bmap,cred) printk("chunkread... whaa shouldn't be here at all\n")
 
-#define XFS_getrbuf(sleep) printk("XFS_getrbuf! Dude better get to this\n")
+#define XFS_getrbuf(sleep,mp) xfs_pb_getr(sleep,mp)
 
-#define XFS_ngetrbuf(len) printk("XFS_ngetrbuf! Dude better get to this\n")
+#define XFS_ngetrbuf(len,mp) xfs_pb_ngetr(len,mp) 
 
-#define XFS_freerbuf(bp)  printk("XFS_freerbuf! Dube Better get to this\n")
+#define XFS_freerbuf(bp)  xfs_pb_freer(bp) 
 
-#define XFS_nfreerbuf(bp) printk("XFS_nfreerbuf! Dude Better get to this\n")
+#define XFS_nfreerbuf(bp) xfs_pb_nfreer(bp)
 
 
 #endif /* _USING_PAGEBUF_T */

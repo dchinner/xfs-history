@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.432 $"
+#ident "$Revision: 1.433 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -6554,7 +6554,7 @@ xfs_zero_remaining_bytes(
 	xfs_fileoff_t		offset_fsb;
 
 	mp = ip->i_mount;
-	bp = XFS_ngetrbuf(mp->m_sb.sb_blocksize);
+	bp = XFS_ngetrbuf(mp->m_sb.sb_blocksize,mp);
 	ASSERT(!geterror(bp));
 
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {

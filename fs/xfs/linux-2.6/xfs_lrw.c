@@ -1231,7 +1231,9 @@ int
 xfsbdstrat( struct xfs_mount 	*mp,
 			struct xfs_buf		*bp)
 {
+#if !defined(_USING_PAGEBUF_T)
   	int		dev_major = emajor(bp->b_edev);
+#endif
 
 	ASSERT(mp);
 	ASSERT(bp->b_target);
@@ -1266,4 +1268,33 @@ xfsbdstrat( struct xfs_mount 	*mp,
 
 	buftrace("XFSBDSTRAT IOERROR", bp);
 	return (xfs_bioerror_relse(bp));
+}
+
+#define BREAKPOINT() asm("   int $3")
+
+page_buf_t *
+xfs_pb_getr(int sleep, xfs_mount_t *mp){
+  
+  printk("xfs_pb_nget DUDE!\n");
+  return pagebuf_get_empty(sleep,mp->m_ddev_targ.inode);
+}
+
+page_buf_t *
+xfs_pb_ngetr(int len, xfs_mount_t *mp){
+  page_buf_t *bp;
+  bp = pagebuf_get_no_daddr(len,mp->m_ddev_targ.inode);
+/*   printk("xfs_pb_ngetr DUDE! len:%d 0x%x\n",len,bp); */
+  return bp;
+}
+
+void
+xfs_pb_freer(page_buf_t *bp) {
+ /*  printk("xfs_pb_freer DUDE!\n"); */
+  pagebuf_free(bp);
+}
+
+void
+xfs_pb_nfreer(page_buf_t *bp){
+/*   printk("xfs_pb_nfreer DUDE!\n"); */
+  pagebuf_free(bp);
 }

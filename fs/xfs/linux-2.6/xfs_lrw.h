@@ -1,10 +1,13 @@
 /*
  *
- * $Header: /ptools/plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_lrw.h,v 1.1 1999/12/29 21:14:01 cattelan Exp $
- * $Author: cattelan $
- * $Id: xfs_lrw.h,v 1.1 1999/12/29 21:14:01 cattelan Exp $
+ * $Header: /ptools/plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_lrw.h,v 1.3 2000/02/08 04:47:02 mostek Exp $
+ * $Author: mostek $
+ * $Id: xfs_lrw.h,v 1.3 2000/02/08 04:47:02 mostek Exp $
  *
  * $Log: xfs_lrw.h,v $
+ * Revision 1.3  2000/02/08 04:47:02  mostek
+ * Fix warnings.
+ *
  * Revision 1.1  1999/12/29 21:14:01  cattelan
  * new file
  *
@@ -48,6 +51,22 @@ xfs_rwunlockf(
 	bhv_desc_t	*bdp,
 	vrwlock_t	write_lock,
 	int		flags);
+
+page_buf_t *
+xfs_pb_getr(
+			int sleep, 
+			xfs_mount_t *mp);
+page_buf_t *
+xfs_pb_ngetr(
+			 int len, 
+			 xfs_mount_t *mp);
+
+void
+xfs_pb_freer(
+			 page_buf_t *bp); 
+void
+xfs_pb_nfreer(
+			  page_buf_t *bp);
 
 #define XFS_FSB_TO_DB_IO(io,fsb) \
 		(((io)->io_flags & XFS_IOCORE_RT) ? \

@@ -17,7 +17,7 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 
-#ident	"$Revision: 1.153 $"
+#ident	"$Revision: 1.154 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -134,12 +134,12 @@ STATIC void	xlog_recover_print_item(xlog_recover_item_t *item);
 
 
 xfs_buf_t *
-xlog_get_bp(int num_bblks)
+xlog_get_bp(int num_bblks,xfs_mount_t *mp)
 {
 	xfs_buf_t   *bp;
 
 	ASSERT(num_bblks > 0);
-	bp = XFS_ngetrbuf(BBTOB(num_bblks));
+	bp = XFS_ngetrbuf(BBTOB(num_bblks),mp);
 	return bp;
 }	/* xlog_get_bp */
 
@@ -400,7 +400,7 @@ xlog_find_head(xlog_t  *log,
 	return error;
 
     first_blk = 0;				/* get cycle # of 1st block */
-    bp = xlog_get_bp(1);
+    bp = xlog_get_bp(1,log->l_mp);
     if (error = xlog_bread(log, 0, 1, bp))
 	goto bp_err;
     first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
@@ -482,7 +482,7 @@ xlog_find_head(xlog_t  *log,
      * we actually look at the block size of the filesystem.
      */
     num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
-    big_bp = xlog_get_bp(num_scan_bblks);
+	big_bp = xlog_get_bp(num_scan_bblks,log->l_mp);
     if (head_blk >= num_scan_bblks) {
 	/*
 	 * We are guaranteed that the entire check can be performed
@@ -670,7 +670,7 @@ xlog_find_tail(xlog_t  *log,
 	if (error = xlog_find_head(log, head_blk))
 		return error;
 
-	bp = xlog_get_bp(1);
+	bp = xlog_get_bp(1,log->l_mp);
 	if (*head_blk == 0) {				/* special case */
 		if (error = xlog_bread(log, 0, 1, bp))
 			goto bread_err;
@@ -827,7 +827,7 @@ xlog_find_zeroed(struct log	*log,
 
 	error = 0;
 	/* check totally zeroed log */
-	bp = xlog_get_bp(1);
+	bp = xlog_get_bp(1,log->l_mp);
 	if (error = xlog_bread(log, 0, 1, bp))
 		goto bp_err;
 	first_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
@@ -867,7 +867,7 @@ xlog_find_zeroed(struct log	*log,
 	 */
 	num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
 	ASSERT(num_scan_bblks <= INT_MAX);
-	big_bp = xlog_get_bp((int)num_scan_bblks);
+	big_bp = xlog_get_bp((int)num_scan_bblks,log->l_mp);
 	if (last_blk < num_scan_bblks)
 		num_scan_bblks = last_blk;
 	start_blk = last_blk - num_scan_bblks;
@@ -1028,7 +1028,7 @@ xlog_clear_stale_blocks(
 	 * for no reason.
 	 */
 	max_distance = MIN(max_distance, tail_distance);
-	bp = xlog_get_bp(max_distance);
+	bp = xlog_get_bp(max_distance,log->l_mp);
 	
 	if ((head_block + max_distance) <= log->l_logBBsize) {
 		/*
@@ -3004,8 +3004,8 @@ xlog_do_recovery_pass(xlog_t	*log,
     xlog_recover_t	*rhash[XLOG_RHASH_SIZE];
 
     error = 0;
-    hbp = xlog_get_bp(1);
-    dbp = xlog_get_bp(BTOBB(XLOG_MAX_RECORD_BSIZE));
+    hbp = xlog_get_bp(1,log->l_mp);
+    dbp = xlog_get_bp(BTOBB(XLOG_MAX_RECORD_BSIZE),log->l_mp);
     bzero(rhash, sizeof(rhash));
     if (tail_blk <= head_blk) {
 	for (blk_no = tail_blk; blk_no < head_blk; ) {

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.194 $"
+#ident	"$Revision: 1.195 $"
 
 /*
  * High level interface routines for log manager
@@ -1193,7 +1193,8 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_quotaoffs_flag = 0;      /* XFS_LI_QUOTAOFF logitems */
 
 	xlog_get_iclog_buffer_size(mp, log);
-	bp = log->l_xbuf   = XFS_getrbuf(0);	/* get my locked buffer */
+	bp = log->l_xbuf   = XFS_getrbuf(0,mp);	/* get my locked buffer */ /* mp need for pagebuf/linux only */
+	
 	XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
 	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
@@ -1236,7 +1237,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		head->h_lsn = 0;
 		head->h_tail_lsn = 0;
 
-		bp = iclog->ic_bp = XFS_getrbuf(0);		/* my locked buffer */
+		bp = iclog->ic_bp = XFS_getrbuf(0,mp);		/* my locked buffer */ /* mp need for pagebuf/linux only */
 		XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
 		XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
