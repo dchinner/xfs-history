@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.93 $"
+#ident	"$Revision: 1.94 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1495,7 +1495,7 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 static void
 xfs_rw_enter_trace_entry(ktrace_entry_t	*ktep)
 {
-	qprintf("ip 0x%x size 0x%x%x uio offset 0x%x%x uio count %x\n",
+	qprintf("ip 0x%x size 0x%x%x uio offset 0x%x%x uio count 0x%x\n",
 		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4],
 		ktep->val[5], ktep->val[6]);
 	qprintf("ioflags 0x%x next offset 0x%x%x io offset 0x%x%x\n",
@@ -2485,7 +2485,7 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 				       bta->bb_level, bta);
 		} else {
 			qprintf("buf 0x%x abtbno 0x%x\n", bp, bta);
-			xfs_btalloc(bta, BBTOB(bp->b_bcount));
+			xfs_btalloc(bta, bp->b_bcount);
 		}
 	} else if ((bta = d)->bb_magic == XFS_ABTC_MAGIC) {
 		if (summary) {
@@ -2493,7 +2493,7 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 				       bta->bb_level, bta);
 		} else {
 			qprintf("buf 0x%x abtcnt 0x%x\n", bp, bta);
-			xfs_btalloc(bta, BBTOB(bp->b_bcount));
+			xfs_btalloc(bta, bp->b_bcount);
 		}
 	} else if ((btb = d)->bb_magic == XFS_BMAP_MAGIC) {
 		if (summary) {
@@ -2501,7 +2501,7 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 				      btb->bb_level, btb);
 		} else {
 			qprintf("buf 0x%x bmapbt 0x%x\n", bp, btb);
-			xfs_btbmap(btb, BBTOB(bp->b_bcount));
+			xfs_btbmap(btb, bp->b_bcount);
 		}
 	} else if ((bti = d)->bb_magic == XFS_IBT_MAGIC) {
 		if (summary) {
@@ -2509,7 +2509,7 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 				       bti->bb_level, bti);
 		} else {
 			qprintf("buf 0x%x inobt 0x%x\n", bp, bti);
-			xfs_btino(bti, BBTOB(bp->b_bcount));
+			xfs_btino(bti, bp->b_bcount);
 		}
 	} else if ((aleaf = d)->hdr.info.magic == XFS_ATTR_LEAF_MAGIC) {
 		if (summary) {

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.252 $"
+#ident "$Revision: 1.253 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5491,7 +5491,12 @@ xfs_bwrite(
 
 	if (error = bwrite(bp)) {
 		ASSERT(mp);
-		buftrace("XFSBWRITE IOERROR", bp);
+		/* 
+		 * Cannot put a buftrace here since if the buffer is not 
+		 * B_HOLD then we will brelse() the buffer before returning 
+		 * from bwrite and we could be tracing a buffer that has 
+		 * been reused.
+		 */
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	}
 	return (error);
