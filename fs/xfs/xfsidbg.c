@@ -444,7 +444,7 @@ xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 		NULL
 	};
 
-	if ((__psint_t)ktep->val[0] & 0xffff == 0)
+	if (((__psint_t)ktep->val[0] & 0xffff) == 0)
 		return 0;
 	switch ((long)ktep->val[0] & 0xffffL) {
 	case XFS_ALLOC_KTRACE_ALLOC:
