@@ -617,9 +617,11 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	int			nvec;
 	xfs_log_item_desc_t	*start_desc;
 	xfs_log_item_desc_t	*desc;
+	xfs_mount_t		*mp;
 	xfs_lsn_t		commit_lsn;
 	int			error;
 	int			log_flags;
+	int			sync;
 	static xfs_lsn_t	trans_lsn = 1;
 
 	/*
@@ -632,6 +634,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	} else {
 		log_flags = 0;
 	}
+	mp = tp->t_mountp;
 
 	/*
 	 * If there is nothing to be logged by the transaction,
@@ -643,7 +646,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
 		if (tp->t_ticket) {
-			xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
+			xfs_log_done(mp, tp->t_ticket, log_flags);
 		}
 		xfs_trans_free_items(tp);
 		xfs_trans_free(tp);
@@ -672,12 +675,11 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 * then write the transaction to the log.
 	 */
 	xfs_trans_fill_vecs(tp, log_vector);
-	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket,
+	error = xfs_log_write(mp, log_vector, nvec, tp->t_ticket,
 			      &(tp->t_lsn));
 	ASSERT(error == 0);
 	if (xlog_debug) {
-		commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket,
-					  log_flags);
+		commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
 	} else {
 		tp->t_lsn = trans_lsn++;
 	}
@@ -702,6 +704,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 */
 	xfs_trans_unreserve_and_mod_sb(tp);
 
+	sync = tp->t_flags & XFS_TRANS_SYNC;
 	/*
  	 * Tell the LM to call the transaction completion routine
 	 * when the log write with LSN commit_lsn completes.
@@ -711,93 +714,20 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	if (xlog_debug) {
 		tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
 		tp->t_logcb.cb_arg = tp;
-		xfs_log_notify(tp->t_mountp, commit_lsn, &(tp->t_logcb));
+		xfs_log_notify(mp, commit_lsn, &(tp->t_logcb));
 	} else {
 		xfs_trans_committed(tp);
 	}
+
+	/*
+	 * If the transaction needs to be synchronous, then force the
+	 * log out now and wait for it.
+	 */
+	if (sync) {
+		xfs_log_force(mp, commit_lsn, XFS_LOG_FORCE | XFS_LOG_SYNC);
+	}
 }
 
-#if 0
-
-STATIC void
-xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
-/* ARGSUSED */
-{
-	xfs_log_iovec_t		*log_vector;
-	uint			nvec;
-	int			error;
-	static xfs_lsn_t	trans_lsn = 1;
-	/*
-	 * If there is nothing to be logged by the transaction,
-	 * then unlock all of the items associated with the
-	 * transaction and free the transaction structure.
-	 * Also make sure to return any reserved blocks to
-	 * the free pool.
-	 */
-	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
-		xfs_trans_unreserve_and_mod_sb(tp);
-		xfs_trans_free_items(tp);
-		xfs_trans_free(tp);
-		return;
-	}
-
-	/*
-	 * If we need to update the superblock, then do it now.
-	 */
-	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
-		xfs_trans_apply_sb_deltas(tp);
-	}
-
-	/*
-	 * Ask each log item how many log_vector entries it will
-	 * need so we can figure out how many to allocate.
-	 */
-	nvec = xfs_trans_count_vecs(tp);
-	ASSERT(nvec > 1);
-
-	log_vector = (xfs_log_iovec_t *)kmem_alloc(nvec *
-						   sizeof(xfs_log_iovec_t),
-						   KM_SLEEP);
-
-	/*
-	 * Fill in the log_vector and pin the logged items, and
-	 * then write the transaction to the log.
-	 */
-	xfs_trans_fill_vecs(tp, log_vector);
-	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket,
-			      &(tp->t_lsn));
-	ASSERT(error == 0);
-	tp->t_lsn = trans_lsn++;
-/*
-	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
-*/
-
-	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
-
-	/*
-	 * Instead of writing items into the log, just release
-	 * them delayed write. They'll be written out eventually. 
-	 */
-	xfs_trans_unlock_items(tp);
-
-	/*
-	 * Once the transaction has been committed, unused
-	 * reservations need to be released and changes to
-	 * the superblock need to be reflected in the in-core
-	 * version.  Do that now.
-	 */
-	xfs_trans_unreserve_and_mod_sb(tp);
-
-	/*
- 	 * Tell the LM to call the transaction completion routine
-	 * when the log write with LSN commit_lsn completes.
-	 * After this call we cannot reference tp, because the call
-	 * can happen at any time and tp can be freed.
-	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
-	 */
-	xfs_trans_committed(tp);
-}
-#endif /* 0 */
 
 /*
  * Total up the number of log iovecs needed to commit this
