@@ -39,6 +39,7 @@
 #include "xfs_attr_leaf.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
+#include "xfs_quota.h"
 
 /*
  * xfs_attr.c
@@ -155,11 +156,13 @@ int								/* error */
 xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		     struct cred *cred)
 {
-	xfs_da_args_t args;
-	xfs_inode_t *dp;
-	xfs_fsblock_t firstblock;
+	xfs_da_args_t 	args;
+	xfs_inode_t 	*dp;
+	xfs_fsblock_t 	firstblock;
 	xfs_bmap_free_t flist;
-	int error, committed;
+	int 		error, committed;
+	uint	      	nblks;
+	boolean_t	quotainprogress;
 
 	XFSSTATS.xs_attr_set++;
 
@@ -174,6 +177,14 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	}
 	xfs_iunlock(dp, XFS_ILOCK_SHARED);
 
+	/*
+	 * Attach the dquots to the inode.
+	 */
+	if (quotainprogress = (boolean_t) XFS_IS_QUOTA_ON(dp->i_mount)) {
+		if (xfs_qm_dqattach(dp, 0))
+			quotainprogress = B_FALSE;
+	}
+	
 	/*
 	 * If the inode doesn't have an attribute fork, add one.
 	 * (inode must not be locked when we call this routine)
@@ -211,8 +222,9 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * the log.
 	 */
 	args.trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_SET);
+	nblks = 10 + XFS_B_TO_FSB(dp->i_mount, valuelen);
 	if (error = xfs_trans_reserve(args.trans,
-				      10 + XFS_B_TO_FSB(dp->i_mount, valuelen),
+				      nblks,
 				      XFS_ATTRSET_LOG_RES(dp->i_mount),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRSET_LOG_COUNT)) {
@@ -220,6 +232,15 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		return(error);
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
+
+	if (quotainprogress && XFS_IS_QUOTA_ON(dp->i_mount)) {
+		if (error = xfs_trans_reserve_blkquota(args.trans, dp, nblks)) {
+			xfs_iunlock(dp, XFS_ILOCK_EXCL);
+			xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+			return (error);
+		}
+	}
+
 	xfs_trans_ijoin(args.trans, dp, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(args.trans, dp);
 
@@ -384,6 +405,14 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	args.whichfork = XFS_ATTR_FORK;
 
 	/*
+	 * Attach the dquots to the inode.
+	 */
+	if (XFS_IS_QUOTA_ON(dp->i_mount)) {
+		if (XFS_NOT_DQATTACHED(dp->i_mount, dp)) {
+		    (void) xfs_qm_dqattach(dp, 0);
+	    }
+	}
+	/*
 	 * Start our first transaction of the day.
 	 *
 	 * All future transactions during this code must be "chained" off
@@ -400,8 +429,14 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 				      XFS_ATTRRM_LOG_COUNT)) {
 		xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
 		return(error);
+	
 	}
+
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
+	/* 
+	 * No need to make quota reservations here. We expect to release some
+	 * blocks not allocate in the common case.
+	 */
 	xfs_trans_ijoin(args.trans, dp, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(args.trans, dp);
 
@@ -537,6 +572,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	xfs_trans_t *trans;
 	int error;
 
+	ASSERT(! XFS_NOT_DQATTACHED(dp->i_mount, dp));
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 	if ((XFS_IFORK_Q(dp) == 0) ||
 	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)) {
@@ -564,6 +600,15 @@ xfs_attr_inactive(xfs_inode_t *dp)
 		return(error);
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
+	
+	if (XFS_IS_QUOTA_ON(dp->i_mount)) {
+		if (error = xfs_trans_reserve_blkquota(trans, dp, 16)) {
+			xfs_iunlock(dp, XFS_ILOCK_EXCL);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return (error);
+		}
+	}
+	
 	xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(trans, dp);
 
