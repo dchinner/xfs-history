@@ -1,4 +1,4 @@
-#ident "$Revision: 1.231 $"
+#ident "$Revision: 1.232 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4719,6 +4719,9 @@ xfs_force_shutdown(
 {
 	int ntries;
 	int logerror;
+#ifndef SIM
+	extern dev_t rootdev;		/* from sys/systm.h */
+#endif /* !SIM */
 
 #define XFS_MAX_DRELSE_RETRIES	10
 	logerror = flags & XFS_LOG_IO_ERROR;
@@ -4728,6 +4731,11 @@ xfs_force_shutdown(
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp) && !logerror)
 		return;
+
+#ifndef SIM
+	if (XFS_MTOVFS(mp)->vfs_dev == rootdev)
+		cmn_err(CE_PANIC, "Fatal error on root filesystem");
+#endif /* !SIM */
 
 	/*
 	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
