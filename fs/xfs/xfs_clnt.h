@@ -123,6 +123,7 @@ struct xfs_args {
 #define XFSMNT_NOUUID		0x01000000	/* Ignore fs uuid */
 #define XFSMNT_32BITINODES	0x02000000	/* restrict inodes to 32
 						 * bits of address space */
+#define XFSMNT_IRIXSGID		0x04000000	/* Irix-style sgid inheritance */
 
 /* Did we get any args for CXFS to consume? */
 #define XFSARGS_FOR_CXFSARR(ap)		\
