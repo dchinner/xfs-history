@@ -55,202 +55,222 @@
 #include "xfs_log_recover.h"
 #include "xfs_rw.h"
 #include "xfs_bit.h"
-#include "xfsidbg.h"
 
 /*
  * External functions & data not in header files.
  */
-extern vfs_t		*devtovfs(dev_t);
-extern char		*fmtuuid(uuid_t *);
 #ifdef DEBUG
 extern ktrace_entry_t	*ktrace_first(ktrace_t *, ktrace_snap_t *);
 extern int		ktrace_nentries(ktrace_t *);
 extern ktrace_entry_t	*ktrace_next(ktrace_t *, ktrace_snap_t *);
 extern ktrace_entry_t	*ktrace_skip(ktrace_t *, int, ktrace_snap_t *);
-#endif
-extern char		*padstr(char *, int);
-extern void		printflags(unsigned int, char **, char *);
-
 extern char		*tab_bflags[];
 extern char		*tab_bflags2[];
+#endif
 
-void	idbg_xagf(xfs_agf_t *);
-void	idbg_xagi(xfs_agi_t *);
+extern struct vfsops	xfs_vfsops;
+extern struct vnodeops	xfs_vnodeops;
+
+/*
+ * Command table functions.
+ */
+static void	xfsidbg_xagf(xfs_agf_t *);
+static void	xfsidbg_xagi(xfs_agi_t *);
 #ifdef DEBUG
-void	idbg_xalatrace(int);
-void	idbg_xalbtrace(xfs_agblock_t);
-void	idbg_xalgtrace(xfs_agnumber_t );
+static void	xfsidbg_xalatrace(int);
+static void	xfsidbg_xalbtrace(xfs_agblock_t);
+static void	xfsidbg_xalgtrace(xfs_agnumber_t );
 #endif
-void	idbg_xalloc(xfs_alloc_arg_t *);
+static void	xfsidbg_xalloc(xfs_alloc_arg_t *);
 #ifdef DEBUG
-void	idbg_xalmtrace(xfs_mount_t *);
-void	idbg_xalttrace(int);
+static void	xfsidbg_xalmtrace(xfs_mount_t *);
+static void	xfsidbg_xalttrace(int);
 #endif
-void 	idbg_xarg(int);
-void 	idbg_xbirec(xfs_bmbt_irec_t *r);
+static void 	xfsidbg_xarg(int);
+static void	xfsidbg_xattrcontext(xfs_attr_list_context_t *);
+static void	xfsidbg_xattrleaf(xfs_attr_leafblock_t *);
+static void	xfsidbg_xattrsf(xfs_attr_shortform_t *);
 #ifdef DEBUG
-void	idbg_xblitrace(xfs_buf_log_item_t *);
+static void	xfsidbg_xattrtrace(int);
 #endif
-void	idbg_xbmalla(xfs_bmalloca_t *);
+static void 	xfsidbg_xbirec(xfs_bmbt_irec_t *r);
 #ifdef DEBUG
-void	idbg_xbmatrace(int);
-void	idbg_xbmitrace(xfs_inode_t *);
-void	idbg_xbmstrace(xfs_inode_t *);
+static void	xfsidbg_xblitrace(xfs_buf_log_item_t *);
 #endif
-void	idbg_xbrec(xfs_bmbt_rec_32_t *);
-void	idbg_xbroot(xfs_inode_t *);
-void	idbg_xbroota(xfs_inode_t *);
-void	idbg_xbtcur(xfs_btree_cur_t *);
-void	idbg_xbuf(buf_t *);
+static void	xfsidbg_xbmalla(xfs_bmalloca_t *);
 #ifdef DEBUG
-void	idbg_xbxatrace(int);
-void	idbg_xbxitrace(xfs_inode_t *);
-void	idbg_xbxstrace(xfs_inode_t *);
+static void	xfsidbg_xbmatrace(int);
+static void	xfsidbg_xbmitrace(xfs_inode_t *);
+static void	xfsidbg_xbmstrace(xfs_inode_t *);
 #endif
-void 	idbg_xchksum(uint *);
-void	idbg_xattrleaf(xfs_attr_leafblock_t *);
-void	idbg_xattrsf(xfs_attr_shortform_t *);
-void	idbg_xattrcontext(xfs_attr_list_context_t *);
-void	idbg_xdirleaf(xfs_dir_leafblock_t *);
-void	idbg_xdirsf(xfs_dir_shortform_t *);
-void	idbg_xdanode(xfs_da_intnode_t *);
-void	idbg_xdaargs(xfs_da_args_t *);
-void	idbg_xdastate(xfs_da_state_t *);
+static void	xfsidbg_xbrec(xfs_bmbt_rec_32_t *);
+static void	xfsidbg_xbroot(xfs_inode_t *);
+static void	xfsidbg_xbroota(xfs_inode_t *);
+static void	xfsidbg_xbtcur(xfs_btree_cur_t *);
+static void	xfsidbg_xbuf(buf_t *);
 #ifdef DEBUG
-void	idbg_xdirtrace(int);
-void	idbg_xattrtrace(int);
+static void	xfsidbg_xbxatrace(int);
+static void	xfsidbg_xbxitrace(xfs_inode_t *);
+static void	xfsidbg_xbxstrace(xfs_inode_t *);
+#endif
+static void 	xfsidbg_xchksum(uint *);
+static void	xfsidbg_xdaargs(xfs_da_args_t *);
+static void	xfsidbg_xdanode(xfs_da_intnode_t *);
+static void	xfsidbg_xdastate(xfs_da_state_t *);
+static void	xfsidbg_xdirleaf(xfs_dir_leafblock_t *);
+static void	xfsidbg_xdirsf(xfs_dir_shortform_t *);
+#ifdef DEBUG
+static void	xfsidbg_xdirtrace(int);
 #endif /* DEBUG */
-void	idbg_xexlist(xfs_inode_t *);
-void	idbg_xfindi(__psunsigned_t);
-void	idbg_xflist(xfs_bmap_free_t *);
-void	idbg_xgaplist(xfs_inode_t *);
-void	idbg_xhelp(int);
-void 	idbg_xiclog(xlog_in_core_t *);
-void	idbg_xiclogall(xlog_in_core_t *);
-void	idbg_xiclogcb(xlog_in_core_t *);
+static void	xfsidbg_xexlist(xfs_inode_t *);
+static void	xfsidbg_xfindi(__psunsigned_t);
+static void	xfsidbg_xflist(xfs_bmap_free_t *);
+static void	xfsidbg_xgaplist(xfs_inode_t *);
+static void	xfsidbg_xhelp(void);
+static void 	xfsidbg_xiclog(xlog_in_core_t *);
+static void	xfsidbg_xiclogall(xlog_in_core_t *);
+static void	xfsidbg_xiclogcb(xlog_in_core_t *);
 #ifdef DEBUG
-void	idbg_xiclogtrace(xlog_in_core_t *);
+static void	xfsidbg_xiclogtrace(xlog_in_core_t *);
 #endif
-void	idbg_xinodes(xfs_mount_t *mp);
-void	idbg_xlog(xlog_t *);
+static void	xfsidbg_xinodes(xfs_mount_t *mp);
+static void	xfsidbg_xlog(xlog_t *);
 #ifdef DEBUG
-void	idbg_xlog_granttrace(xlog_t *);
+static void	xfsidbg_xlog_granttrace(xlog_t *);
 #endif
-void	idbg_xlog_ritem(xlog_recover_item_t *);
-void	idbg_xlog_rtrans(xlog_recover_t *);
-void	idbg_xlog_tic(xlog_ticket_t *);
-void	idbg_xlogitem(xfs_log_item_t *);
-void	idbg_xmount(xfs_mount_t *);
-void	idbg_xtrans_res(xfs_mount_t *);
-void 	idbg_xnode(xfs_inode_t *ip);
-void	idbg_xperag(xfs_mount_t *);
+static void	xfsidbg_xlog_ritem(xlog_recover_item_t *);
+static void	xfsidbg_xlog_rtrans(xlog_recover_t *);
+static void	xfsidbg_xlog_tic(xlog_ticket_t *);
+static void	xfsidbg_xlogitem(xfs_log_item_t *);
+static void	xfsidbg_xmount(xfs_mount_t *);
+static void 	xfsidbg_xnode(xfs_inode_t *ip);
+static void	xfsidbg_xperag(xfs_mount_t *);
 #ifdef NOTYET
-void	idbg_xrange(xfs_range_t *);
-void	idbg_xrangelocks(xfs_inode_t *);
+static void	xfsidbg_xrange(xfs_range_t *);
+static void	xfsidbg_xrangelocks(xfs_inode_t *);
 #endif
 #ifdef DEBUG
-void 	idbg_xrwtrace(xfs_inode_t *);
+static void 	xfsidbg_xrwtrace(xfs_inode_t *);
 #endif
-void	idbg_xsb(xfs_sb_t *);
+static void	xfsidbg_xsb(xfs_sb_t *);
 #ifdef DEBUG
-void 	idbg_xstrat_atrace(int);
-void 	idbg_xstrat_itrace(xfs_inode_t *);
-void 	idbg_xstrat_strace(xfs_inode_t	*);
+static void 	xfsidbg_xstrat_atrace(int);
+static void 	xfsidbg_xstrat_itrace(xfs_inode_t *);
+static void 	xfsidbg_xstrat_strace(xfs_inode_t *);
 #endif
-void	idbg_xtp(xfs_trans_t *);
+static void	xfsidbg_xtp(xfs_trans_t *);
+static void	xfsidbg_xtrans_res(xfs_mount_t *);
 
-#define	VD	(void (*)(int))
+#define	VD	(void (*)())
 
 static struct xif {
 	char	*name;
-	void	(*func)(int);
+	void	(*func)();
 	char	*help;
 } xfsidbg_funcs[] = {
-    "xagf",	VD idbg_xagf,		"Dump XFS allocation group freespace",
-    "xagi",	VD idbg_xagi,		"Dump XFS allocation group inode",
+    "xagf",	VD xfsidbg_xagf,	"Dump XFS allocation group freespace",
+    "xagi",	VD xfsidbg_xagi,	"Dump XFS allocation group inode",
 #ifdef DEBUG
-    "xalatrc",	VD idbg_xalatrace,	"Dump XFS alloc count trace",
-    "xalbtrc",	VD idbg_xalbtrace,	"Dump XFS alloc block trace",
-    "xalgtrc",	VD idbg_xalgtrace,	"Dump XFS alloc alloc-group trace",
+    "xalatrc",	VD xfsidbg_xalatrace,	"Dump XFS alloc count trace",
+    "xalbtrc",	VD xfsidbg_xalbtrace,	"Dump XFS alloc block trace",
+    "xalgtrc",	VD xfsidbg_xalgtrace,	"Dump XFS alloc alloc-group trace",
 #endif
-    "xalloc",	VD idbg_xalloc,		"Dump XFS allocation args structure",
+    "xalloc",	VD xfsidbg_xalloc,	"Dump XFS allocation args structure",
 #ifdef DEBUG
-    "xalmtrc",	VD idbg_xalmtrace,	"Dump XFS alloc mount-point trace",
-    "xalttrc",	VD idbg_xalttrace,	"Dump XFS alloc entry-type trace",
+    "xalmtrc",	VD xfsidbg_xalmtrace,	"Dump XFS alloc mount-point trace",
+    "xalttrc",	VD xfsidbg_xalttrace,	"Dump XFS alloc entry-type trace",
 #endif
-    "xarg",	VD idbg_xarg,		"Input XFS argument for next function",
-    "xbirec",	VD idbg_xbirec,		"Dump XFS bmap incore record",
+    "xarg",	VD xfsidbg_xarg,	"Input XFS argument for next function",
+    "xattrcx",	VD xfsidbg_xattrcontext,"Dump XFS attr_list context struct",
+    "xattrlf",	VD xfsidbg_xattrleaf,	"Dump XFS attribute leaf block",
+    "xattrsf",	VD xfsidbg_xattrsf,	"Dump XFS attribute shortform",
 #ifdef DEBUG
-    "xblitrc",	VD idbg_xblitrace,	"Dump XFS buf log item trace",
+    "xattrtr",	VD xfsidbg_xattrtrace,	"Dump XFS attribute attr_list() trace",
 #endif
-    "xbmalla",	VD idbg_xbmalla,	"Dump XFS bmalloc args structure",
+    "xbirec",	VD xfsidbg_xbirec,	"Dump XFS bmap incore record",
 #ifdef DEBUG
-    "xbmatrc",	VD idbg_xbmatrace,	"Dump XFS bmap btree count trace",
-    "xbmitrc",	VD idbg_xbmitrace,	"Dump XFS bmap btree per-inode trace",
-    "xbmstrc",	VD idbg_xbmstrace, 	"Dump XFS bmap btree inode trace",
+    "xblitrc",	VD xfsidbg_xblitrace,	"Dump XFS buf log item trace",
 #endif
-    "xbrec",	VD idbg_xbrec, 		"Dump XFS bmap record",
-    "xbroot",	VD idbg_xbroot, 	"Dump XFS bmap btree root (data)",
-    "xbroota",	VD idbg_xbroota, 	"Dump XFS bmap btree root (attr)",
-    "xbtcur",	VD idbg_xbtcur,		"Dump XFS btree cursor",
-    "xbuf",	VD idbg_xbuf,		"Dump XFS data from a buffer",
+    "xbmalla",	VD xfsidbg_xbmalla,	"Dump XFS bmalloc args structure",
 #ifdef DEBUG
-    "xbxatrc",	VD idbg_xbxatrace,	"Dump XFS bmap extent count trace",
-    "xbxitrc",	VD idbg_xbxitrace,	"Dump XFS bmap extent per-inode trace",
-    "xbxstrc",	VD idbg_xbxstrace,	"Dump XFS bmap extent inode trace",
+    "xbmatrc",	VD xfsidbg_xbmatrace,	"Dump XFS bmap btree count trace",
+    "xbmitrc",	VD xfsidbg_xbmitrace,	"Dump XFS bmap btree per-inode trace",
+    "xbmstrc",	VD xfsidbg_xbmstrace, 	"Dump XFS bmap btree inode trace",
 #endif
-    "xchksum",	VD idbg_xchksum,	"Dump chksum",
-    "xattrlf",	VD idbg_xattrleaf,	"Dump XFS attribute leaf block",
-    "xattrsf",	VD idbg_xattrsf,	"Dump XFS attribute shortform",
-    "xattrcx",	VD idbg_xattrcontext,	"Dump XFS attr_list context struct",
-    "xdirlf",	VD idbg_xdirleaf,	"Dump XFS directory leaf block",
-    "xdirsf",	VD idbg_xdirsf,		"Dump XFS directory shortform",
-    "xdanode",	VD idbg_xdanode,	"Dump XFS dir/attr node block",
-    "xdaargs",	VD idbg_xdaargs,	"Dump XFS dir/attr args structure",
-    "xdastat",	VD idbg_xdastate,	"Dump XFS dir/attr state_blk struct",
+    "xbrec",	VD xfsidbg_xbrec, 	"Dump XFS bmap record",
+    "xbroot",	VD xfsidbg_xbroot, 	"Dump XFS bmap btree root (data)",
+    "xbroota",	VD xfsidbg_xbroota, 	"Dump XFS bmap btree root (attr)",
+    "xbtcur",	VD xfsidbg_xbtcur,	"Dump XFS btree cursor",
+    "xbuf",	VD xfsidbg_xbuf,	"Dump XFS data from a buffer",
 #ifdef DEBUG
-    "xdirtrc",	VD idbg_xdirtrace,	"Dump XFS directory getdents() trace",
-    "xattrtr",	VD idbg_xattrtrace,	"Dump XFS attribute attr_list() trace",
+    "xbxatrc",	VD xfsidbg_xbxatrace,	"Dump XFS bmap extent count trace",
+    "xbxitrc",	VD xfsidbg_xbxitrace,	"Dump XFS bmap extent per-inode trace",
+    "xbxstrc",	VD xfsidbg_xbxstrace,	"Dump XFS bmap extent inode trace",
 #endif
-    "xexlist",	VD idbg_xexlist,	"Dump XFS bmap extents in inode",
-    "xfindi",	VD idbg_xfindi,		"Find XFS inode by inum",
-    "xflist",	VD idbg_xflist,		"Dump XFS to-be-freed extent list",
-    "xgaplst",	VD idbg_xgaplist,	"Dump inode gap list",
-    "xhelp",	VD idbg_xhelp,		"Print idbg-xfs help",
-    "xicall",	VD idbg_xiclogall,	"Dump All XFS in-core logs",
-    "xiclog",	VD idbg_xiclog,		"Dump XFS in-core log",
+    "xchksum",	VD xfsidbg_xchksum,	"Dump chksum",
+    "xdaargs",	VD xfsidbg_xdaargs,	"Dump XFS dir/attr args structure",
+    "xdanode",	VD xfsidbg_xdanode,	"Dump XFS dir/attr node block",
+    "xdastat",	VD xfsidbg_xdastate,	"Dump XFS dir/attr state_blk struct",
+    "xdirlf",	VD xfsidbg_xdirleaf,	"Dump XFS directory leaf block",
+    "xdirsf",	VD xfsidbg_xdirsf,	"Dump XFS directory shortform",
 #ifdef DEBUG
-    "xictrc",	VD idbg_xiclogtrace,	"Dump XFS in-core log trace",
+    "xdirtrc",	VD xfsidbg_xdirtrace,	"Dump XFS directory getdents() trace",
 #endif
-    "xinodes",	VD idbg_xinodes, 	"Dump XFS inodes per mount",
+    "xexlist",	VD xfsidbg_xexlist,	"Dump XFS bmap extents in inode",
+    "xfindi",	VD xfsidbg_xfindi,	"Find XFS inode by inum",
+    "xflist",	VD xfsidbg_xflist,	"Dump XFS to-be-freed extent list",
+    "xgaplst",	VD xfsidbg_xgaplist,	"Dump inode gap list",
+    "xhelp",	VD xfsidbg_xhelp,	"Print idbg-xfs help",
+    "xicall",	VD xfsidbg_xiclogall,	"Dump All XFS in-core logs",
+    "xiclog",	VD xfsidbg_xiclog,	"Dump XFS in-core log",
 #ifdef DEBUG
-    "xl_grtr",	VD idbg_xlog_granttrace,"Dump XFS log grant trace",
+    "xictrc",	VD xfsidbg_xiclogtrace,	"Dump XFS in-core log trace",
 #endif
-    "xl_rcit",	VD idbg_xlog_ritem,	"Dump XFS recovery item",
-    "xl_rctr",	VD idbg_xlog_rtrans,	"Dump XFS recovery transaction",
-    "xl_tic",	VD idbg_xlog_tic,	"Dump XFS log ticket",
-    "xlog",	VD idbg_xlog,		"Dump XFS log",
-    "xlogcb",	VD idbg_xiclogcb,	"Dump XFS in-core log callbacks",
-    "xlogitm",	VD idbg_xlogitem,	"Dump XFS log item structure",
-    "xmount",	VD idbg_xmount,		"Dump XFS mount structure",
-    "xtrres",	VD idbg_xtrans_res,	"Dump XFS reservation values",
-    "xnode",	VD idbg_xnode,		"Dump XFS inode",
-    "xperag",	VD idbg_xperag,		"Dump XFS per-allocation group data",
+    "xinodes",	VD xfsidbg_xinodes, 	"Dump XFS inodes per mount",
+#ifdef DEBUG
+    "xl_grtr",	VD xfsidbg_xlog_granttrace,"Dump XFS log grant trace",
+#endif
+    "xl_rcit",	VD xfsidbg_xlog_ritem,	"Dump XFS recovery item",
+    "xl_rctr",	VD xfsidbg_xlog_rtrans,	"Dump XFS recovery transaction",
+    "xl_tic",	VD xfsidbg_xlog_tic,	"Dump XFS log ticket",
+    "xlog",	VD xfsidbg_xlog,	"Dump XFS log",
+    "xlogcb",	VD xfsidbg_xiclogcb,	"Dump XFS in-core log callbacks",
+    "xlogitm",	VD xfsidbg_xlogitem,	"Dump XFS log item structure",
+    "xmount",	VD xfsidbg_xmount,	"Dump XFS mount structure",
+    "xnode",	VD xfsidbg_xnode,	"Dump XFS inode",
+    "xperag",	VD xfsidbg_xperag,	"Dump XFS per-allocation group data",
 #ifdef NOTYET
-    "xrange",   VD idbg_xrange,		"Dump an xfs_range structure",
-    "xranges",  VD idbg_xrangelocks,	"Dump all range locks of an inode",
+    "xrange",   VD xfsidbg_xrange,	"Dump an xfs_range structure",
+    "xranges",  VD xfsidbg_xrangelocks,	"Dump all range locks of an inode",
 #endif
 #ifdef DEBUG
-    "xrwtrc",	VD idbg_xrwtrace,	"Dump XFS inode read/write trace",
+    "xrwtrc",	VD xfsidbg_xrwtrace,	"Dump XFS inode read/write trace",
 #endif
-    "xsb",	VD idbg_xsb,		"Dump XFS superblock",
+    "xsb",	VD xfsidbg_xsb,		"Dump XFS superblock",
 #ifdef DEBUG
-    "xstrata",  VD idbg_xstrat_atrace,	"Dump xfs_strat trace for all inodes",
-    "xstrati",  VD idbg_xstrat_itrace,	"Dump xfs_strat trace for an inode",
-    "xstrats",  VD idbg_xstrat_strace,	"Dump xfs_strat global trace for inode",
+    "xstrata",  VD xfsidbg_xstrat_atrace,"Dump xfs_strat trace for all inodes",
+    "xstrati",  VD xfsidbg_xstrat_itrace,"Dump xfs_strat trace for an inode",
+    "xstrats",  VD xfsidbg_xstrat_strace,"Dump xfs_strat glbl trace for inode",
 #endif
-    "xtp",	VD idbg_xtp,		"Dump XFS transaction structure",
+    "xtp",	VD xfsidbg_xtp,		"Dump XFS transaction structure",
+    "xtrres",	VD xfsidbg_xtrans_res,	"Dump XFS reservation values",
     0,		0,	0
+};
+
+/* 
+ * Filesystem switch functions.
+ */
+static void	xfsidbg_vfs_data_print(void *);
+static void	xfsidbg_vfs_vnodes_print(vfs_t *, int);
+static void	xfsidbg_vnode_data_print(void *);
+static vnode_t	*xfsidbg_vnode_find(vfs_t *, long);
+
+static idbgfssw_t xfsidbgfssw = {
+	NULL, "xfs", &xfs_vnodeops, &xfs_vfsops,
+	xfsidbg_vfs_data_print,
+	xfsidbg_vfs_vnodes_print,
+	xfsidbg_vnode_data_print,
+	xfsidbg_vnode_find
 };
 
 /*
@@ -262,7 +282,18 @@ xfsidbginit(void)
 	struct xif	*p;
 
 	for (p = xfsidbg_funcs; p->name; p++)
-		idbg_addfunc(p->name, (void (*)())(p->func));
+		idbg_addfunc(p->name, p->func);
+	idbg_addfssw(&xfsidbgfssw);
+}
+
+/*
+ * Unload routine.
+ */
+int
+xfsidbgunload(void)
+{
+	idbg_delfssw(&xfsidbgfssw);
+	return 0;
 }
 
 /*
@@ -280,10 +311,9 @@ static int xargument = 0;
  */
 #ifdef DEBUG
 static int xfs_alloc_trace_entry(ktrace_entry_t *ktep);
+static int xfs_attr_trace_entry(ktrace_entry_t *ktep);
 static int xfs_bmap_trace_entry(ktrace_entry_t *ktep);
 static int xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
-static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
-static int xfs_attr_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f);
 static void xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
@@ -292,6 +322,10 @@ static void xfs_btino(xfs_inobt_block_t *bt, int bsz);
 static void xfs_buf_item_print(xfs_buf_log_item_t *blip);
 static void xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op,
 			       xfs_dfsbno_t *sp, xfs_dfilblks_t *cp);
+static void xfs_dastate_path(xfs_da_state_path_t *p);
+#ifdef DEBUG
+static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
+#endif
 static void xfs_efd_item_print(xfs_efd_log_item_t *efdp);
 static void xfs_efi_item_print(xfs_efi_log_item_t *efip);
 static char *xfs_fmtformat(xfs_dinode_fmt_t f);
@@ -300,6 +334,7 @@ static char *xfs_fmtino(xfs_ino_t ino, xfs_mount_t *mp);
 static char *xfs_fmtlsn(xfs_lsn_t *lsnp);
 static char *xfs_fmtmode(int m);
 static char *xfs_fmtsize(size_t i);
+static char *xfs_fmtuuid(uuid_t *);
 static void xfs_inode_item_print(xfs_inode_log_item_t *ilip);
 static void xfs_inodebuf(buf_t *bp);
 #ifdef DEBUG
@@ -308,7 +343,6 @@ static void xfs_iomap_map_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_prdinode(xfs_dinode_t *di, int coreonly);
 static void xfs_prdinode_core(xfs_dinode_core_t *dip);
-static void xfs_dastate_path(xfs_da_state_path_t *p);
 #ifdef DEBUG
 static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
 static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
@@ -389,6 +423,75 @@ xfs_alloc_trace_entry(ktrace_entry_t *ktep)
 		break;
 	default:
 		qprintf("unknown alloc trace record\n");
+		break;
+	}
+	return 1;
+}
+
+/*
+ * Print xfs a directory trace buffer entry.
+ */
+static int
+xfs_attr_trace_entry(ktrace_entry_t *ktep)
+{
+	static char *attr_arg_flags[] = {
+		"DONTFOLLOW",	/* 0x0001 */
+		"?",		/* 0x0002 */
+		"?",		/* 0x0004 */
+		"?",		/* 0x0008 */
+		"CREATE",	/* 0x0010 */
+		"?",		/* 0x0020 */
+		"?",		/* 0x0040 */
+		"?",		/* 0x0080 */
+		"?",		/* 0x0100 */
+		"?",		/* 0x0200 */
+		"?",		/* 0x0420 */
+		"?",		/* 0x0800 */
+		"KERNOTIME",	/* 0x1000 */
+		NULL
+	};
+
+	if (!ktep->val[0])
+		return 0;
+
+	qprintf("-- %s: cursor h/b/o 0x%x/0x%x/%d, dupcnt %d, dp 0x%x\n",
+		 (char *)ktep->val[1],
+		 (__psunsigned_t)ktep->val[3],
+		 (__psunsigned_t)ktep->val[4],
+		 (__psunsigned_t)ktep->val[5],
+		 (__psunsigned_t)ktep->val[11],
+		 (__psunsigned_t)ktep->val[2]);
+	qprintf("   alist 0x%x, size %d, count %d, firstu %d, Llen %d",
+		 (__psunsigned_t)ktep->val[6],
+		 (__psunsigned_t)ktep->val[7],
+		 (__psunsigned_t)ktep->val[8],
+		 (__psunsigned_t)ktep->val[9],
+		 (__psunsigned_t)ktep->val[10]);
+	printflags((__psunsigned_t)(ktep->val[12]), attr_arg_flags, ", flags");
+	qprintf("\n");
+
+	switch ((__psint_t)ktep->val[0]) {
+	case XFS_ATTR_KTRACE_L_C:
+		break;
+	case XFS_ATTR_KTRACE_L_CN:
+		qprintf("   node: count %d, 1st hash 0x%x, last hash 0x%x\n",
+			 (__psunsigned_t)ktep->val[13],
+			 (__psunsigned_t)ktep->val[14],
+			 (__psunsigned_t)ktep->val[15]);
+		break;
+	case XFS_ATTR_KTRACE_L_CB:
+		qprintf("   btree: hash 0x%x, blkno 0x%x\n",
+			 (__psunsigned_t)ktep->val[13],
+			 (__psunsigned_t)ktep->val[14]);
+		break;
+	case XFS_ATTR_KTRACE_L_CL:
+		qprintf("   leaf: count %d, 1st hash 0x%x, last hash 0x%x\n",
+			 (__psunsigned_t)ktep->val[13],
+			 (__psunsigned_t)ktep->val[14],
+			 (__psunsigned_t)ktep->val[15]);
+		break;
+	default:
+		qprintf("   unknown attr trace record format\n");
 		break;
 	}
 	return 1;
@@ -506,7 +609,7 @@ xfs_bmbt_trace_entry(
 		s.br_blockcount =
 			(xfs_filblks_t)(((xfs_dfilblks_t)ktep->val[11] << 32) |
 					(xfs_dfilblks_t)ktep->val[12]);
-		idbg_xbirec(&s);
+		xfsidbg_xbirec(&s);
 		break;
 	case XFS_BMBT_KTRACE_ARGIK:
 		qprintf(" i 0x%x o 0x%x%08x ",
@@ -522,7 +625,7 @@ xfs_bmbt_trace_entry(
 		r.l1 = (xfs_bmbt_rec_base_t)ktep->val[7];
 		r.l2 = (xfs_bmbt_rec_base_t)ktep->val[8];
 		r.l3 = (xfs_bmbt_rec_base_t)ktep->val[9];
-		idbg_xbrec(&r);
+		xfsidbg_xbrec(&r);
 		qprintf("bufs 0x%x 0x%x 0x%x 0x%x ",
 			(buf_t *)ktep->val[10],
 			(buf_t *)ktep->val[11],
@@ -540,145 +643,12 @@ xfs_bmbt_trace_entry(
 	}
 	return 1;
 }
-
-/*
- * Print xfs a directory trace buffer entry.
- */
-static int
-xfs_dir_trace_entry(ktrace_entry_t *ktep)
-{
-	xfs_mount_t *mp;
-	__uint32_t hash;
-	off_t cookie;
-
-	if (!ktep->val[0] || !ktep->val[1])
-		return 0;
-
-	mp = (xfs_mount_t *)ktep->val[3];
-	cookie = (__psunsigned_t)ktep->val[4];
-	cookie <<= 32;
-	cookie |= (__psunsigned_t)ktep->val[5];
-	qprintf("%s -- dp=0x%x b/e/h=%d/%d/0x%08x resid=0x%x ",
-		    (char *)ktep->val[1], (xfs_inode_t *)ktep->val[2],
-		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
-		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
-		    (__psunsigned_t)XFS_DA_COOKIE_HASH(mp, cookie),
-		    (__psint_t)ktep->val[6]);
-
-	switch ((__psint_t)ktep->val[0]) {
-	case XFS_DIR_KTRACE_G_DU:
-		break;
-	case XFS_DIR_KTRACE_G_DUB:
-		qprintf("bno=%d", (__psint_t)ktep->val[7]);
-		break;
-	case XFS_DIR_KTRACE_G_DUN:
-		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
-			      (__psint_t)ktep->val[7],
-			      (__psint_t)ktep->val[8],
-			      (__psunsigned_t)ktep->val[9],
-			      (__psunsigned_t)ktep->val[10]);
-		break;
-	case XFS_DIR_KTRACE_G_DUL:
-		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
-			      (__psint_t)ktep->val[7],
-			      (__psint_t)ktep->val[8],
-			      (__psunsigned_t)ktep->val[9],
-			      (__psunsigned_t)ktep->val[10]);
-		break;
-	case XFS_DIR_KTRACE_G_DUE:
-		qprintf("entry hashval 0x%08x", (__psunsigned_t)ktep->val[7]);
-		break;
-	case XFS_DIR_KTRACE_G_DUC:
-		cookie = (__psunsigned_t)ktep->val[7];
-		cookie <<= 32;
-		cookie |= (__psunsigned_t)ktep->val[8];
-		hash = XFS_DA_COOKIE_HASH(mp, cookie);
-		qprintf("b/e/h=%d/%d/0x%08x",
-		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
-		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
-		    hash);
-		break;
-	default:
-		qprintf("unknown dir trace record format");
-		break;
-	}
-	return 1;
-}
-
-/*
- * Print xfs a directory trace buffer entry.
- */
-static int
-xfs_attr_trace_entry(ktrace_entry_t *ktep)
-{
-	static char *attr_arg_flags[] = {
-		"DONTFOLLOW",	/* 0x0001 */
-		"?",		/* 0x0002 */
-		"?",		/* 0x0004 */
-		"?",		/* 0x0008 */
-		"CREATE",	/* 0x0010 */
-		"?",		/* 0x0020 */
-		"?",		/* 0x0040 */
-		"?",		/* 0x0080 */
-		"?",		/* 0x0100 */
-		"?",		/* 0x0200 */
-		"?",		/* 0x0420 */
-		"?",		/* 0x0800 */
-		"KERNOTIME",	/* 0x1000 */
-		NULL
-	};
-
-	if (!ktep->val[0])
-		return 0;
-
-	qprintf("-- %s: cursor h/b/o 0x%x/0x%x/%d, dupcnt %d, dp 0x%x\n",
-		 (char *)ktep->val[1],
-		 (__psunsigned_t)ktep->val[3],
-		 (__psunsigned_t)ktep->val[4],
-		 (__psunsigned_t)ktep->val[5],
-		 (__psunsigned_t)ktep->val[11],
-		 (__psunsigned_t)ktep->val[2]);
-	qprintf("   alist 0x%x, size %d, count %d, firstu %d, Llen %d",
-		 (__psunsigned_t)ktep->val[6],
-		 (__psunsigned_t)ktep->val[7],
-		 (__psunsigned_t)ktep->val[8],
-		 (__psunsigned_t)ktep->val[9],
-		 (__psunsigned_t)ktep->val[10]);
-	printflags((__psunsigned_t)(ktep->val[12]), attr_arg_flags, ", flags");
-	qprintf("\n");
-
-	switch ((__psint_t)ktep->val[0]) {
-	case XFS_ATTR_KTRACE_L_C:
-		break;
-	case XFS_ATTR_KTRACE_L_CN:
-		qprintf("   node: count %d, 1st hash 0x%x, last hash 0x%x\n",
-			 (__psunsigned_t)ktep->val[13],
-			 (__psunsigned_t)ktep->val[14],
-			 (__psunsigned_t)ktep->val[15]);
-		break;
-	case XFS_ATTR_KTRACE_L_CB:
-		qprintf("   btree: hash 0x%x, blkno 0x%x\n",
-			 (__psunsigned_t)ktep->val[13],
-			 (__psunsigned_t)ktep->val[14]);
-		break;
-	case XFS_ATTR_KTRACE_L_CL:
-		qprintf("   leaf: count %d, 1st hash 0x%x, last hash 0x%x\n",
-			 (__psunsigned_t)ktep->val[13],
-			 (__psunsigned_t)ktep->val[14],
-			 (__psunsigned_t)ktep->val[15]);
-		break;
-	default:
-		qprintf("   unknown attr trace record format\n");
-		break;
-	}
-	return 1;
-}
 #endif	/* DEBUG */
 
 /*
  * Print an xfs in-inode bmap btree root.
  */
-void
+static void
 xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 {
 	xfs_bmbt_block_t	*broot;
@@ -878,6 +848,111 @@ xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 	*cp = c;
 }
 
+#ifdef DEBUG
+/*
+ * Print itrunc entry trace.
+ */
+static void
+xfs_ctrunc_trace_entry(ktrace_entry_t	*ktep)
+{
+	qprintf("ip 0x%x cpu %d\n",
+		ktep->val[1], ktep->val[2]);
+}
+#endif	/* DEBUG */
+
+/*
+ * Print an xfs_da_state_path structure.
+ */
+static void
+xfs_dastate_path(xfs_da_state_path_t *p)
+{
+	int i;
+
+	qprintf("active %d\n", p->active);
+	for (i = 0; i < XFS_DA_NODE_MAXDEPTH; i++) {
+#if XFS_BIG_FILES
+		qprintf("blk %d bp 0x%x blkno 0x%llx",
+#else
+		qprintf("blk %d bp 0x%x blkno 0x%x",
+#endif
+			i, p->blk[i].bp, p->blk[i].blkno);
+		qprintf(" index %d hashval 0x%x ",
+			p->blk[i].index, p->blk[i].hashval);
+		switch(p->blk[i].magic) {
+		case XFS_DA_NODE_MAGIC:		qprintf("NODE\n");	break;
+		case XFS_DIR_LEAF_MAGIC:	qprintf("DIR\n");	break;
+		case XFS_ATTR_LEAF_MAGIC:	qprintf("ATTR\n");	break;
+		default:			qprintf("type ??\n");	break;
+		}
+	}
+}
+
+#ifdef DEBUG
+/*
+ * Print xfs a directory trace buffer entry.
+ */
+static int
+xfs_dir_trace_entry(ktrace_entry_t *ktep)
+{
+	xfs_mount_t *mp;
+	__uint32_t hash;
+	off_t cookie;
+
+	if (!ktep->val[0] || !ktep->val[1])
+		return 0;
+
+	mp = (xfs_mount_t *)ktep->val[3];
+	cookie = (__psunsigned_t)ktep->val[4];
+	cookie <<= 32;
+	cookie |= (__psunsigned_t)ktep->val[5];
+	qprintf("%s -- dp=0x%x b/e/h=%d/%d/0x%08x resid=0x%x ",
+		    (char *)ktep->val[1], (xfs_inode_t *)ktep->val[2],
+		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		    (__psunsigned_t)XFS_DA_COOKIE_HASH(mp, cookie),
+		    (__psint_t)ktep->val[6]);
+
+	switch ((__psint_t)ktep->val[0]) {
+	case XFS_DIR_KTRACE_G_DU:
+		break;
+	case XFS_DIR_KTRACE_G_DUB:
+		qprintf("bno=%d", (__psint_t)ktep->val[7]);
+		break;
+	case XFS_DIR_KTRACE_G_DUN:
+		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
+			      (__psint_t)ktep->val[7],
+			      (__psint_t)ktep->val[8],
+			      (__psunsigned_t)ktep->val[9],
+			      (__psunsigned_t)ktep->val[10]);
+		break;
+	case XFS_DIR_KTRACE_G_DUL:
+		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
+			      (__psint_t)ktep->val[7],
+			      (__psint_t)ktep->val[8],
+			      (__psunsigned_t)ktep->val[9],
+			      (__psunsigned_t)ktep->val[10]);
+		break;
+	case XFS_DIR_KTRACE_G_DUE:
+		qprintf("entry hashval 0x%08x", (__psunsigned_t)ktep->val[7]);
+		break;
+	case XFS_DIR_KTRACE_G_DUC:
+		cookie = (__psunsigned_t)ktep->val[7];
+		cookie <<= 32;
+		cookie |= (__psunsigned_t)ktep->val[8];
+		hash = XFS_DA_COOKIE_HASH(mp, cookie);
+		qprintf("b/e/h=%d/%d/0x%08x",
+		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		    hash);
+		break;
+	default:
+		qprintf("unknown dir trace record format");
+		break;
+	}
+	return 1;
+}
+#endif	/* DEBUG */
+
 /*
  * Print an efd log item.
  */
@@ -1037,6 +1112,21 @@ xfs_fmtsize(size_t i)
 }
 
 /*
+ * Format a uuid into a static buffer & return it.  This doesn't
+ * use the formatted value, it probably should (see C library).
+ */
+static char *
+xfs_fmtuuid(uuid_t *uu)
+{
+	static char rval[40];
+	uint *ip = (uint *)uu;
+
+	ASSERT(sizeof(*uu) == 16);
+	sprintf(rval, "%w32x:%w32x:%w32x:%w32x", ip[0], ip[1], ip[2], ip[3]);
+	return rval;
+}
+
+/*
  * Print an inode log item.
  */
 static void
@@ -1099,7 +1189,7 @@ xfs_inodebuf(buf_t *bp)
 	vfs_t *vfsp;
 	xfs_mount_t *mp;
 
-	vfsp = devtovfs(bp->b_edev);
+	vfsp = vfs_devsearch_nolock(bp->b_edev);
 	if (!vfsp)
 		return;
 	mp = (xfs_mount_t *)vfsp->vfs_data;
@@ -1141,6 +1231,20 @@ xfs_iomap_map_trace_entry(ktrace_entry_t *ktep)
 		ktep->val[11], ktep->val[12]);
 	qprintf("imap off 0x%x count 0x%x block 0x%x\n",
 		ktep->val[13], ktep->val[14], ktep->val[15]);
+}
+
+/*
+ * Print itrunc entry trace.
+ */
+static void
+xfs_itrunc_trace_entry(ktrace_entry_t	*ktep)
+{
+	qprintf("ip 0x%x size 0x%x%x flag %d new size 0x%x%x\n",
+		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4],
+		ktep->val[5], ktep->val[6]);
+	qprintf("toss start 0x%x%x toss finish 0x%x%x cpu id %d\n",
+		ktep->val[7], ktep->val[8], ktep->val[9], ktep->val[10],
+		ktep->val[11]);
 }
 #endif	/* DEBUG */
 
@@ -1206,30 +1310,6 @@ xfs_rw_enter_trace_entry(ktrace_entry_t	*ktep)
 		ktep->val[11]);
 	qprintf("io size 0x%x last req sz 0x%x new size 0x%x%x\n",
 		ktep->val[12], ktep->val[13], ktep->val[14], ktep->val[15]);
-}
-
-/*
- * Print itrunc entry trace.
- */
-static void
-xfs_itrunc_trace_entry(ktrace_entry_t	*ktep)
-{
-	qprintf("ip 0x%x size 0x%x%x flag %d new size 0x%x%x\n",
-		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4],
-		ktep->val[5], ktep->val[6]);
-	qprintf("toss start 0x%x%x toss finish 0x%x%x cpu id %d\n",
-		ktep->val[7], ktep->val[8], ktep->val[9], ktep->val[10],
-		ktep->val[11]);
-}
-
-/*
- * Print itrunc entry trace.
- */
-static void
-xfs_ctrunc_trace_entry(ktrace_entry_t	*ktep)
-{
-	qprintf("ip 0x%x cpu %d\n",
-		ktep->val[1], ktep->val[2]);
 }
 
 /*
@@ -1447,8 +1527,8 @@ xfs_xnode_fork(char *name, xfs_ifork_t *f)
 /*
  * Print xfs allocation group freespace header.
  */
-void
-idbg_xagf(xfs_agf_t *agf)
+static void
+xfsidbg_xagf(xfs_agf_t *agf)
 {
 	qprintf("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
 		agf->agf_magicnum,
@@ -1468,8 +1548,8 @@ idbg_xagf(xfs_agf_t *agf)
 /*
  * Print xfs allocation group inode header.
  */
-void
-idbg_xagi(xfs_agi_t *agi)
+static void
+xfsidbg_xagi(xfs_agi_t *agi)
 {
     	int	i;
 	int	j;
@@ -1496,8 +1576,8 @@ idbg_xagi(xfs_agi_t *agi)
  * Print out the last "count" entries in the allocation trace buffer.
  * The "a" is for "all" entries.
  */
-void
-idbg_xalatrace(int count)
+static void
+xfsidbg_xalatrace(int count)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1542,8 +1622,8 @@ idbg_xalatrace(int count)
  * Print out all the entries in the alloc trace buf corresponding
  * to the given block number.
  */
-void
-idbg_xalbtrace(xfs_agblock_t bno)
+static void
+xfsidbg_xalbtrace(xfs_agblock_t bno)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1575,8 +1655,8 @@ idbg_xalbtrace(xfs_agblock_t bno)
  * Print out all the entries in the alloc trace buf corresponding
  * to the given allocation group.
  */
-void
-idbg_xalgtrace(xfs_agnumber_t agno)
+static void
+xfsidbg_xalgtrace(xfs_agnumber_t agno)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1602,8 +1682,8 @@ idbg_xalgtrace(xfs_agnumber_t agno)
 /*
  * Print an allocation argument structure for XFS.
  */
-void
-idbg_xalloc(xfs_alloc_arg_t *args)
+static void
+xfsidbg_xalloc(xfs_alloc_arg_t *args)
 {
 	qprintf("tp 0x%x mp 0x%x agbp 0x%x fsbno %s\n",
 		args->tp, args->mp, args->agbp,
@@ -1622,8 +1702,8 @@ idbg_xalloc(xfs_alloc_arg_t *args)
  * Print out all the entries in the alloc trace buf corresponding
  * to the given mount point.
  */
-void
-idbg_xalmtrace(xfs_mount_t *mp)
+static void
+xfsidbg_xalmtrace(xfs_mount_t *mp)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1648,8 +1728,8 @@ idbg_xalmtrace(xfs_mount_t *mp)
  * Print out all the entries in the alloc trace buf corresponding
  * to the given entry type.
  */
-void
-idbg_xalttrace(int tag)
+static void
+xfsidbg_xalttrace(int tag)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1674,20 +1754,184 @@ idbg_xalttrace(int tag)
 /*
  * Set xtra argument, used by xchksum.
  */
-void
-idbg_xarg(int xarg)
+static void
+xfsidbg_xarg(int xarg)
 {
 	if (xarg == -1)
 		qprintf("xargument: %d\n", xargument);
 	else
 		xargument = xarg;
-}	/* idbg_xarg */
+}	/* xfsidbg_xarg */
+
+/*
+ * Print an attr_list() context structure.
+ */
+static void
+xfsidbg_xattrcontext(struct xfs_attr_list_context *context)
+{
+	static char *attr_arg_flags[] = {
+		"DONTFOLLOW",	/* 0x0001 */
+		"?",		/* 0x0002 */
+		"?",		/* 0x0004 */
+		"?",		/* 0x0008 */
+		"CREATE",	/* 0x0010 */
+		"?",		/* 0x0020 */
+		"?",		/* 0x0040 */
+		"?",		/* 0x0080 */
+		"?",		/* 0x0100 */
+		"?",		/* 0x0200 */
+		"?",		/* 0x0400 */
+		"?",		/* 0x0800 */
+		"KERNOTIME",	/* 0x1000 */
+		NULL
+	};
+
+	qprintf("dp 0x%x, dupcnt %d, resynch %d",
+		    context->dp, context->dupcnt, context->resynch);
+	printflags((__psunsigned_t)context->flags, attr_arg_flags, ", flags");
+	qprintf("\ncursor h/b/o 0x%x/0x%x/%d -- p/p/i 0x%x/0x%x/0x%x\n",
+			  context->cursor->hashval, context->cursor->blkno,
+			  context->cursor->offset, context->cursor->pad1,
+			  context->cursor->pad2, context->cursor->initted);
+	qprintf("alist 0x%x, bufsize 0x%x, count %d, firstu 0x%x\n",
+		       context->alist, context->bufsize, context->count,
+		       context->firstu);
+}
+
+/*
+ * Print attribute leaf block.
+ */
+static void
+xfsidbg_xattrleaf(struct xfs_attr_leafblock *leaf)
+{
+	struct xfs_attr_leaf_hdr *h;
+	struct xfs_da_blkinfo *i;
+	struct xfs_attr_leaf_map *m;
+	struct xfs_attr_leaf_entry *e;
+	struct xfs_attr_leaf_name_local *l;
+	struct xfs_attr_leaf_name_remote *r;
+	int j, k;
+
+	h = &leaf->hdr;
+	i = &h->info;
+	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+		i->forw, i->back, i->magic);
+	qprintf("hdr count %d usedbytes %d firstused %d holes %d\n",
+		h->count, h->usedbytes, h->firstused, h->holes);
+	for (j = 0, m = h->freemap; j < XFS_ATTR_LEAF_MAPSIZE; j++, m++) {
+		qprintf("hdr freemap %d base %d size %d\n",
+			j, m->base, m->size);
+	}
+	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
+		qprintf("[%2d] hash 0x%x nameidx %d flags <",
+			j, e->hashval, e->nameidx, e->flags);
+		if (e->flags & XFS_ATTR_LOCAL)
+			qprintf("LOCAL ");
+		if (e->flags & XFS_ATTR_ROOT)
+			qprintf("ROOT ");
+		if (e->flags & XFS_ATTR_INCOMPLETE)
+			qprintf("INCOMPLETE ");
+		k = ~(XFS_ATTR_LOCAL | XFS_ATTR_ROOT | XFS_ATTR_INCOMPLETE);
+		if ((e->flags & k) != 0)
+			qprintf("0x%x", e->flags & k);
+		qprintf(">\n     name \"");
+		if (e->flags & XFS_ATTR_LOCAL) {
+			l = XFS_ATTR_LEAF_NAME_LOCAL(leaf, j);
+			for (k = 0; k < l->namelen; k++)
+				qprintf("%c", l->nameval[k]);
+			qprintf("\"(%d) value \"", l->namelen);
+			for (k = 0; (k < l->valuelen) && (k < 32); k++)
+				qprintf("%c", l->nameval[l->namelen + k]);
+			if (k == 32)
+				qprintf("...");
+			qprintf("\"(%d)\n", l->valuelen);
+		} else {
+			r = XFS_ATTR_LEAF_NAME_REMOTE(leaf, j);
+			for (k = 0; k < r->namelen; k++)
+				qprintf("%c", r->name[k]);
+			qprintf("\"(%d) value blk 0x%x len %d\n",
+				   r->namelen, r->valueblk, r->valuelen);
+		}
+	}
+}
+
+/*
+ * Print a shortform attribute list.
+ */
+static void
+xfsidbg_xattrsf(struct xfs_attr_shortform *s)
+{
+	struct xfs_attr_sf_hdr *sfh;
+	struct xfs_attr_sf_entry *sfe;
+	int i, j;
+
+	sfh = &s->hdr;
+	qprintf("hdr count %d\n", sfh->count);
+	for (i = 0, sfe = s->list; i < sfh->count; i++) {
+		qprintf("entry %d namelen %d name \"", i, sfe->namelen);
+		for (j = 0; j < sfe->namelen; j++)
+			qprintf("%c", sfe->nameval[j]);
+		qprintf("\" valuelen %d value \"", sfe->valuelen);
+		for (j = 0; (j < sfe->valuelen) && (j < 32); j++)
+			qprintf("%c", sfe->nameval[sfe->namelen + j]);
+		if (j == 32)
+			qprintf("...");
+		qprintf("\"\n");
+		sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
+	}
+}
+
+#ifdef DEBUG
+/*
+ * Print out the last "count" entries in the attribute trace buffer.
+ */
+static void
+xfsidbg_xattrtrace(int count)
+{
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+	int		nentries;
+	int		skip_entries;
+	extern ktrace_t	*xfs_attr_trace_buf;
+
+	if (xfs_attr_trace_buf == NULL) {
+		qprintf("The xfs attribute trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_attr_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_attr_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_attr_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		xfs_attr_trace_entry(ktep);
+		ktep = ktrace_next(xfs_attr_trace_buf, &kts);
+	}
+}
+#endif /* DEBUG */
 
 /*
  * Print xfs bmap internal record
  */
-void
-idbg_xbirec(xfs_bmbt_irec_t *r)
+static void
+xfsidbg_xbirec(xfs_bmbt_irec_t *r)
 {
 	qprintf("startoff %lld ", r->br_startoff);
 	qprintf("startblock %llx ", r->br_startblock);
@@ -1698,8 +1942,8 @@ idbg_xbirec(xfs_bmbt_irec_t *r)
 /*
  * Print out the buf log item trace for the given buf log item.
  */
-void
-idbg_xblitrace(xfs_buf_log_item_t *bip)
+static void
+xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1756,8 +2000,8 @@ idbg_xblitrace(xfs_buf_log_item_t *bip)
 /*
  * Print a bmap alloc argument structure for XFS.
  */
-void
-idbg_xbmalla(xfs_bmalloca_t *a)
+static void
+xfsidbg_xbmalla(xfs_bmalloca_t *a)
 {
 	qprintf("tp 0x%x ip 0x%x eof %d prevp 0x%x\n",
 		a->tp, a->ip, a->eof, a->prevp);
@@ -1776,8 +2020,8 @@ idbg_xbmalla(xfs_bmalloca_t *a)
  * Print out the last "count" entries in the bmap btree trace buffer.
  * The "a" is for "all" inodes.
  */
-void
-idbg_xbmatrace(int count)
+static void
+xfsidbg_xbmatrace(int count)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1821,8 +2065,8 @@ idbg_xbmatrace(int count)
 /*
  * Print out the bmap btree trace buffer attached to the given inode.
  */
-void
-idbg_xbmitrace(xfs_inode_t *ip)
+static void
+xfsidbg_xbmitrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1844,8 +2088,8 @@ idbg_xbmitrace(xfs_inode_t *ip)
  * Print out all the entries in the bmap btree trace buf corresponding
  * to the given inode.  The "s" is for "single" inode.
  */
-void
-idbg_xbmstrace(xfs_inode_t *ip)
+static void
+xfsidbg_xbmstrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -1870,8 +2114,8 @@ idbg_xbmstrace(xfs_inode_t *ip)
 /*
  * Print xfs bmap record
  */
-void
-idbg_xbrec(xfs_bmbt_rec_32_t *r)
+static void
+xfsidbg_xbrec(xfs_bmbt_rec_32_t *r)
 {
 	xfs_dfiloff_t o;
 	xfs_dfsbno_t s;
@@ -1886,8 +2130,8 @@ idbg_xbrec(xfs_bmbt_rec_32_t *r)
 /*
  * Print an xfs in-inode bmap btree root (data fork).
  */
-void
-idbg_xbroot(xfs_inode_t *ip)
+static void
+xfsidbg_xbroot(xfs_inode_t *ip)
 {
 	xfs_broot(ip, &ip->i_df);
 }
@@ -1895,8 +2139,8 @@ idbg_xbroot(xfs_inode_t *ip)
 /*
  * Print an xfs in-inode bmap btree root (attribute fork).
  */
-void
-idbg_xbroota(xfs_inode_t *ip)
+static void
+xfsidbg_xbroota(xfs_inode_t *ip)
 {
 	if (ip->i_afp)
 		xfs_broot(ip, ip->i_afp);
@@ -1905,8 +2149,8 @@ idbg_xbroota(xfs_inode_t *ip)
 /* 
  * Print xfs btree cursor.
  */
-void
-idbg_xbtcur(xfs_btree_cur_t *c)
+static void
+xfsidbg_xbtcur(xfs_btree_cur_t *c)
 {
 	int l;
 
@@ -1915,7 +2159,7 @@ idbg_xbtcur(xfs_btree_cur_t *c)
 		c->bc_mp);
 	if (c->bc_btnum == XFS_BTNUM_BMAP) {
 		qprintf("rec.b ");
-		idbg_xbirec(&c->bc_rec.b);
+		xfsidbg_xbirec(&c->bc_rec.b);
 	} else if (c->bc_btnum == XFS_BTNUM_INO) {
 		qprintf("rec.i startino 0x%x freecount 0x%x free %llx\n",
 			c->bc_rec.i.ir_startino, c->bc_rec.i.ir_freecount,
@@ -1967,8 +2211,8 @@ idbg_xbtcur(xfs_btree_cur_t *c)
  * Figure out what kind of xfs block the buffer contains, 
  * and invoke a print routine.
  */
-void
-idbg_xbuf(buf_t *bp)
+static void
+xfsidbg_xbuf(buf_t *bp)
 {
 	void *d;
 	xfs_agf_t *agf;
@@ -1985,10 +2229,10 @@ idbg_xbuf(buf_t *bp)
 	d = bp->b_un.b_addr;
 	if ((agf = d)->agf_magicnum == XFS_AGF_MAGIC) {
 		qprintf("buf 0x%x agf 0x%x\n", bp, agf);
-		idbg_xagf(agf);
+		xfsidbg_xagf(agf);
 	} else if ((agi = d)->agi_magicnum == XFS_AGI_MAGIC) {
 		qprintf("buf 0x%x agi 0x%x\n", bp, agi);
-		idbg_xagi(agi);
+		xfsidbg_xagi(agi);
 	} else if ((bta = d)->bb_magic == XFS_ABTB_MAGIC) {
 		qprintf("buf 0x%x abtbno 0x%x\n", bp, bta);
 		xfs_btalloc(bta, BBTOB(bp->b_bcount));
@@ -2003,19 +2247,19 @@ idbg_xbuf(buf_t *bp)
 		xfs_btino(bti, BBTOB(bp->b_bcount));
 	} else if ((aleaf = d)->hdr.info.magic == XFS_ATTR_LEAF_MAGIC) {
 		qprintf("buf 0x%x attr leaf 0x%x\n", bp, aleaf);
-		idbg_xattrleaf(aleaf);
+		xfsidbg_xattrleaf(aleaf);
 	} else if ((dleaf = d)->hdr.info.magic == XFS_DIR_LEAF_MAGIC) {
 		qprintf("buf 0x%x dir leaf 0x%x\n", bp, dleaf);
-		idbg_xdirleaf(dleaf);
+		xfsidbg_xdirleaf(dleaf);
 	} else if ((node = d)->hdr.info.magic == XFS_DA_NODE_MAGIC) {
 		qprintf("buf 0x%x dir/attr node 0x%x\n", bp, node);
-		idbg_xdanode(node);
+		xfsidbg_xdanode(node);
 	} else if ((di = d)->di_core.di_magic == XFS_DINODE_MAGIC) {
 		qprintf("buf 0x%x dinode 0x%x\n", bp, di);
 		xfs_inodebuf(bp);
 	} else if ((sb = d)->sb_magicnum == XFS_SB_MAGIC) {
 		qprintf("buf 0x%x sb 0x%x\n", bp, sb);
-		idbg_xsb(sb);
+		xfsidbg_xsb(sb);
 	} else {
 		qprintf("buf 0x%x unknown 0x%x\n", bp, d);
 	}
@@ -2026,8 +2270,8 @@ idbg_xbuf(buf_t *bp)
  * Print out the last "count" entries in the bmap extent trace buffer.
  * The "a" is for "all" inodes.
  */
-void
-idbg_xbxatrace(int count)
+static void
+xfsidbg_xbxatrace(int count)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2071,8 +2315,8 @@ idbg_xbxatrace(int count)
 /*
  * Print out the bmap extent trace buffer attached to the given inode.
  */
-void
-idbg_xbxitrace(xfs_inode_t *ip)
+static void
+xfsidbg_xbxitrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2093,8 +2337,8 @@ idbg_xbxitrace(xfs_inode_t *ip)
  * Print out all the entries in the bmap extent trace buf corresponding
  * to the given inode.  The "s" is for "single" inode.
  */
-void
-idbg_xbxstrace(xfs_inode_t *ip)
+static void
+xfsidbg_xbxstrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2119,8 +2363,8 @@ idbg_xbxstrace(xfs_inode_t *ip)
 /*
  * Compute & print buffer's checksum.
  */
-void
-idbg_xchksum(uint *addr)
+static void
+xfsidbg_xchksum(uint *addr)
 {
 	uint i, chksum;
 
@@ -2134,262 +2378,13 @@ idbg_xchksum(uint *addr)
 		}
 		qprintf("chksum (0x%x)  length (%d)\n", chksum, xargument);
 	}
-}	/* idbg_xchksum */
-
-/*
- * Print attribute leaf block.
- */
-void
-idbg_xattrleaf(struct xfs_attr_leafblock *leaf)
-{
-	struct xfs_attr_leaf_hdr *h;
-	struct xfs_da_blkinfo *i;
-	struct xfs_attr_leaf_map *m;
-	struct xfs_attr_leaf_entry *e;
-	struct xfs_attr_leaf_name_local *l;
-	struct xfs_attr_leaf_name_remote *r;
-	int j, k;
-
-	h = &leaf->hdr;
-	i = &h->info;
-	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		i->forw, i->back, i->magic);
-	qprintf("hdr count %d usedbytes %d firstused %d holes %d\n",
-		h->count, h->usedbytes, h->firstused, h->holes);
-	for (j = 0, m = h->freemap; j < XFS_ATTR_LEAF_MAPSIZE; j++, m++) {
-		qprintf("hdr freemap %d base %d size %d\n",
-			j, m->base, m->size);
-	}
-	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
-		qprintf("[%2d] hash 0x%x nameidx %d flags <",
-			j, e->hashval, e->nameidx, e->flags);
-		if (e->flags & XFS_ATTR_LOCAL)
-			qprintf("LOCAL ");
-		if (e->flags & XFS_ATTR_ROOT)
-			qprintf("ROOT ");
-		if (e->flags & XFS_ATTR_INCOMPLETE)
-			qprintf("INCOMPLETE ");
-		k = ~(XFS_ATTR_LOCAL | XFS_ATTR_ROOT | XFS_ATTR_INCOMPLETE);
-		if ((e->flags & k) != 0)
-			qprintf("0x%x", e->flags & k);
-		qprintf(">\n     name \"");
-		if (e->flags & XFS_ATTR_LOCAL) {
-			l = XFS_ATTR_LEAF_NAME_LOCAL(leaf, j);
-			for (k = 0; k < l->namelen; k++)
-				qprintf("%c", l->nameval[k]);
-			qprintf("\"(%d) value \"", l->namelen);
-			for (k = 0; (k < l->valuelen) && (k < 32); k++)
-				qprintf("%c", l->nameval[l->namelen + k]);
-			if (k == 32)
-				qprintf("...");
-			qprintf("\"(%d)\n", l->valuelen);
-		} else {
-			r = XFS_ATTR_LEAF_NAME_REMOTE(leaf, j);
-			for (k = 0; k < r->namelen; k++)
-				qprintf("%c", r->name[k]);
-			qprintf("\"(%d) value blk 0x%x len %d\n",
-				   r->namelen, r->valueblk, r->valuelen);
-		}
-	}
-}
-
-/*
- * Print a shortform attribute list.
- */
-void
-idbg_xattrsf(struct xfs_attr_shortform *s)
-{
-	struct xfs_attr_sf_hdr *sfh;
-	struct xfs_attr_sf_entry *sfe;
-	int i, j;
-
-	sfh = &s->hdr;
-	qprintf("hdr count %d\n", sfh->count);
-	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		qprintf("entry %d namelen %d name \"", i, sfe->namelen);
-		for (j = 0; j < sfe->namelen; j++)
-			qprintf("%c", sfe->nameval[j]);
-		qprintf("\" valuelen %d value \"", sfe->valuelen);
-		for (j = 0; (j < sfe->valuelen) && (j < 32); j++)
-			qprintf("%c", sfe->nameval[sfe->namelen + j]);
-		if (j == 32)
-			qprintf("...");
-		qprintf("\"\n");
-		sfe = XFS_ATTR_SF_NEXTENTRY(sfe);
-	}
-}
-
-/*
- * Print an attr_list() context structure.
- */
-void
-idbg_xattrcontext(struct xfs_attr_list_context *context)
-{
-	static char *attr_arg_flags[] = {
-		"DONTFOLLOW",	/* 0x0001 */
-		"?",		/* 0x0002 */
-		"?",		/* 0x0004 */
-		"?",		/* 0x0008 */
-		"CREATE",	/* 0x0010 */
-		"?",		/* 0x0020 */
-		"?",		/* 0x0040 */
-		"?",		/* 0x0080 */
-		"?",		/* 0x0100 */
-		"?",		/* 0x0200 */
-		"?",		/* 0x0420 */
-		"?",		/* 0x0800 */
-		"KERNOTIME",	/* 0x1000 */
-		NULL
-	};
-
-	qprintf("dp 0x%x, dupcnt %d, resynch %d",
-		    context->dp, context->dupcnt, context->resynch);
-	printflags((__psunsigned_t)context->flags, attr_arg_flags, ", flags");
-	qprintf("\ncursor h/b/o 0x%x/0x%x/%d -- p/p/i 0x%x/0x%x/0x%x\n",
-			  context->cursor->hashval, context->cursor->blkno,
-			  context->cursor->offset, context->cursor->pad1,
-			  context->cursor->pad2, context->cursor->initted);
-	qprintf("alist 0x%x, bufsize 0x%x, count %d, firstu 0x%x\n",
-		       context->alist, context->bufsize, context->count,
-		       context->firstu);
-}
-
-#ifdef DEBUG
-/*
- * Print out the last "count" entries in the attribute trace buffer.
- */
-void
-idbg_xattrtrace(int count)
-{
-	ktrace_entry_t	*ktep;
-	ktrace_snap_t	kts;
-	int		nentries;
-	int		skip_entries;
-	extern ktrace_t	*xfs_attr_trace_buf;
-
-	if (xfs_attr_trace_buf == NULL) {
-		qprintf("The xfs attribute trace buffer is not initialized\n");
-		return;
-	}
-	nentries = ktrace_nentries(xfs_attr_trace_buf);
-	if (count == -1) {
-		count = nentries;
-	}
-	if ((count <= 0) || (count > nentries)) {
-		qprintf("Invalid count.  There are %d entries.\n", nentries);
-		return;
-	}
-
-	ktep = ktrace_first(xfs_attr_trace_buf, &kts);
-	if (count != nentries) {
-		/*
-		 * Skip the total minus the number to look at minus one
-		 * for the entry returned by ktrace_first().
-		 */
-		skip_entries = nentries - count - 1;
-		ktep = ktrace_skip(xfs_attr_trace_buf, skip_entries, &kts);
-		if (ktep == NULL) {
-			qprintf("Skipped them all\n");
-			return;
-		}
-	}
-	while (ktep != NULL) {
-		xfs_attr_trace_entry(ktep);
-		ktep = ktrace_next(xfs_attr_trace_buf, &kts);
-	}
-}
-#endif /* DEBUG */
-
-/*
- * Print a directory leaf block.
- */
-void
-idbg_xdirleaf(xfs_dir_leafblock_t *leaf)
-{
-	xfs_dir_leaf_hdr_t *h;
-	xfs_da_blkinfo_t *i;
-	xfs_dir_leaf_map_t *m;
-	xfs_dir_leaf_entry_t *e;
-	xfs_dir_leaf_name_t *n;
-	int j, k;
-	xfs_ino_t ino;
-
-	h = &leaf->hdr;
-	i = &h->info;
-	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		i->forw, i->back, i->magic);
-	qprintf("hdr count %d namebytes %d firstused %d holes %d\n",
-		h->count, h->namebytes, h->firstused, h->holes);
-	for (j = 0, m = h->freemap; j < XFS_DIR_LEAF_MAPSIZE; j++, m++) {
-		qprintf("hdr freemap %d base %d size %d\n",
-			j, m->base, m->size);
-	}
-	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
-		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
-		*(xfs_dir_ino_t *)&ino = n->inumber;
-		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld ",
-			j, e->hashval, e->nameidx, ino);
-		qprintf("namelen %d name \"", e->namelen);
-		for (k = 0; k < e->namelen; k++)
-			qprintf("%c", n->name[k]);
-		qprintf("\"\n");
-	}
-}
-
-/*
- * Print a shortform directory.
- */
-void
-idbg_xdirsf(xfs_dir_shortform_t *s)
-{
-	xfs_dir_sf_hdr_t *sfh;
-	xfs_dir_sf_entry_t *sfe;
-	xfs_ino_t ino;
-	int i, j;
-
-	sfh = &s->hdr;
-	*(xfs_dir_ino_t *)&ino = sfh->parent;
-	qprintf("hdr parent %lld", ino);
-	qprintf(" count %d\n", sfh->count);
-	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		*(xfs_dir_ino_t *)&ino = sfe->inumber;
-		qprintf("entry %d inumber %lld", i, ino);
-		qprintf(" namelen %d name \"", sfe->namelen);
-		for (j = 0; j < sfe->namelen; j++)
-			qprintf("%c", sfe->name[j]);
-		qprintf("\"\n");
-		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
-	}
-}
-
-/*
- * Print a directory/attribute internal node block.
- */
-void
-idbg_xdanode(struct xfs_da_intnode *node)
-{
-	xfs_da_node_hdr_t *h;
-	xfs_da_blkinfo_t *i;
-	xfs_da_node_entry_t *e;
-	int j;
-
-	h = &node->hdr;
-	i = &h->info;
-	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
-		i->forw, i->back, i->magic);
-	qprintf("hdr count %d level %d\n",
-		h->count, h->level);
-	for (j = 0, e = node->btree; j < h->count; j++, e++) {
-		qprintf("btree %d hashval 0x%x before 0x%x\n",
-			j, e->hashval, e->before);
-	}
-}
+}	/* xfsidbg_xchksum */
 
 /*
  * Print an xfs_da_args structure.
  */
-void
-idbg_xdaargs(xfs_da_args_t *n)
+static void
+xfsidbg_xdaargs(xfs_da_args_t *n)
 {
 	char *ch;
 	int i;
@@ -2439,42 +2434,38 @@ idbg_xdaargs(xfs_da_args_t *n)
 }
 
 /*
- * Print an xfs_da_state_path structure.
+ * Print a directory/attribute internal node block.
  */
 static void
-xfs_dastate_path(xfs_da_state_path_t *p)
+xfsidbg_xdanode(struct xfs_da_intnode *node)
 {
-	int i;
+	xfs_da_node_hdr_t *h;
+	xfs_da_blkinfo_t *i;
+	xfs_da_node_entry_t *e;
+	int j;
 
-	qprintf("active %d\n", p->active);
-	for (i = 0; i < XFS_DA_NODE_MAXDEPTH; i++) {
-#if XFS_BIG_FILES
-		qprintf("blk %d bp 0x%x blkno 0x%llx",
-#else
-		qprintf("blk %d bp 0x%x blkno 0x%x",
-#endif
-			i, p->blk[i].bp, p->blk[i].blkno);
-		qprintf(" index %d hashval 0x%x ",
-			p->blk[i].index, p->blk[i].hashval);
-		switch(p->blk[i].magic) {
-		case XFS_DA_NODE_MAGIC:		qprintf("NODE\n");	break;
-		case XFS_DIR_LEAF_MAGIC:	qprintf("DIR\n");	break;
-		case XFS_ATTR_LEAF_MAGIC:	qprintf("ATTR\n");	break;
-		default:			qprintf("type ??\n");	break;
-		}
+	h = &node->hdr;
+	i = &h->info;
+	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+		i->forw, i->back, i->magic);
+	qprintf("hdr count %d level %d\n",
+		h->count, h->level);
+	for (j = 0, e = node->btree; j < h->count; j++, e++) {
+		qprintf("btree %d hashval 0x%x before 0x%x\n",
+			j, e->hashval, e->before);
 	}
 }
 
 /*
  * Print an xfs_da_state_blk structure.
  */
-void
-idbg_xdastate(xfs_da_state_t *s)
+static void
+xfsidbg_xdastate(xfs_da_state_t *s)
 {
 	qprintf("args 0x%x mp 0x%x trans 0x%x blocksize %d inleaf %d\n",
 		s->args, s->mp, s->trans, s->blocksize, s->inleaf);
 	if (s->args)
-		idbg_xdaargs(s->args);
+		xfsidbg_xdaargs(s->args);
 	
 	qprintf("path ");
 	xfs_dastate_path(&s->path);
@@ -2482,12 +2473,74 @@ idbg_xdastate(xfs_da_state_t *s)
 	xfs_dastate_path(&s->altpath);
 }
 
+/*
+ * Print a directory leaf block.
+ */
+static void
+xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
+{
+	xfs_dir_leaf_hdr_t *h;
+	xfs_da_blkinfo_t *i;
+	xfs_dir_leaf_map_t *m;
+	xfs_dir_leaf_entry_t *e;
+	xfs_dir_leaf_name_t *n;
+	int j, k;
+	xfs_ino_t ino;
+
+	h = &leaf->hdr;
+	i = &h->info;
+	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+		i->forw, i->back, i->magic);
+	qprintf("hdr count %d namebytes %d firstused %d holes %d\n",
+		h->count, h->namebytes, h->firstused, h->holes);
+	for (j = 0, m = h->freemap; j < XFS_DIR_LEAF_MAPSIZE; j++, m++) {
+		qprintf("hdr freemap %d base %d size %d\n",
+			j, m->base, m->size);
+	}
+	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
+		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
+		*(xfs_dir_ino_t *)&ino = n->inumber;
+		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld ",
+			j, e->hashval, e->nameidx, ino);
+		qprintf("namelen %d name \"", e->namelen);
+		for (k = 0; k < e->namelen; k++)
+			qprintf("%c", n->name[k]);
+		qprintf("\"\n");
+	}
+}
+
+/*
+ * Print a shortform directory.
+ */
+static void
+xfsidbg_xdirsf(xfs_dir_shortform_t *s)
+{
+	xfs_dir_sf_hdr_t *sfh;
+	xfs_dir_sf_entry_t *sfe;
+	xfs_ino_t ino;
+	int i, j;
+
+	sfh = &s->hdr;
+	*(xfs_dir_ino_t *)&ino = sfh->parent;
+	qprintf("hdr parent %lld", ino);
+	qprintf(" count %d\n", sfh->count);
+	for (i = 0, sfe = s->list; i < sfh->count; i++) {
+		*(xfs_dir_ino_t *)&ino = sfe->inumber;
+		qprintf("entry %d inumber %lld", i, ino);
+		qprintf(" namelen %d name \"", sfe->namelen);
+		for (j = 0; j < sfe->namelen; j++)
+			qprintf("%c", sfe->name[j]);
+		qprintf("\"\n");
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
+}
+
 #ifdef DEBUG
 /*
  * Print out the last "count" entries in the directory trace buffer.
  */
-void
-idbg_xdirtrace(int count)
+static void
+xfsidbg_xdirtrace(int count)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2532,8 +2585,8 @@ idbg_xdirtrace(int count)
 /*
  * Print xfs extent list.
  */
-void
-idbg_xexlist(xfs_inode_t *ip)
+static void
+xfsidbg_xexlist(xfs_inode_t *ip)
 {
 	xfs_xexlist_fork(ip, XFS_DATA_FORK);
 	if (XFS_IFORK_Q(ip))
@@ -2541,10 +2594,38 @@ idbg_xexlist(xfs_inode_t *ip)
 }
 
 /*
+ * Find any incore XFS inodes with the given inode number.
+ * We can only handle 64 bit inode numbers in 64 bit kernels.
+ */
+static void
+xfsidbg_xfindi(__psunsigned_t ino)
+{
+	xfs_ino_t	xino;
+	vfs_t		*vfsp;
+	xfs_mount_t	*mp;
+	xfs_inode_t	*ip;
+
+	xino = (xfs_ino_t)ino;
+
+	for (vfsp = rootvfs; (vfsp != NULL); vfsp = vfsp->vfs_next) {
+		if (vfsp->vfs_op == &xfs_vfsops) {
+			mp = XFS_VFSTOM(vfsp);
+			ip = mp->m_inodes;
+			do {
+				if (ip->i_ino == xino) {
+					xfsidbg_xnode(ip);
+				}
+				ip = ip->i_mnext;
+			} while (ip != mp->m_inodes);
+		}
+	}
+}
+
+/*
  * Print an xfs free-extent list.
  */
-void
-idbg_xflist(xfs_bmap_free_t *flist)
+static void
+xfsidbg_xflist(xfs_bmap_free_t *flist)
 {
 	xfs_bmap_free_item_t	*item;
 
@@ -2560,8 +2641,8 @@ idbg_xflist(xfs_bmap_free_t *flist)
 /*
  * Print out the list of xfs_gap_ts in ip->i_gap_list.
  */
-void
-idbg_xgaplist(xfs_inode_t *ip)
+static void
+xfsidbg_xgaplist(xfs_inode_t *ip)
 {
 	xfs_gap_t	*curr_gap;
 
@@ -2582,9 +2663,8 @@ idbg_xgaplist(xfs_inode_t *ip)
 /*
  * Print out the help messages for these functions.
  */
-/*ARGSUSED*/
-void
-idbg_xhelp(int dummy)
+static void
+xfsidbg_xhelp(void)
 {
 	struct xif	*p;
 
@@ -2592,28 +2672,11 @@ idbg_xhelp(int dummy)
 		qprintf("%s %s\n", padstr(p->name, 16), p->help);
 }
 
-
-/*
- * Print out the callback structures attached to an iclog.
- */
-void
-idbg_xiclogcb(xlog_in_core_t *iclog)
-{
-	xfs_log_callback_t	*cb;
-	void prsymoff(void *, char *, char *);
-
-	for (cb = iclog->ic_callback; cb != NULL; cb = cb->cb_next) {
-		qprintf("func ");
-		prsymoff((void *)cb->cb_func, NULL, NULL);
-		qprintf(" arg 0x%x next 0x%x\n", cb->cb_arg, cb->cb_next);
-	}
-}
-
 /*
  * Print out an XFS in-core log structure.
  */
-void
-idbg_xiclog(xlog_in_core_t *iclog)
+static void
+xfsidbg_xiclog(xlog_in_core_t *iclog)
 {
 	int i;
 	static char *ic_flags[] = {
@@ -2660,30 +2723,45 @@ idbg_xiclog(xlog_in_core_t *iclog)
 	else
 		qprintf("ILLEGAL");
 	qprintf("\n");
-}	/* idbg_xiclog */
+}	/* xfsidbg_xiclog */
 
 
 /*
  * Print all incore logs.
  */
-void
-idbg_xiclogall(xlog_in_core_t *iclog)
+static void
+xfsidbg_xiclogall(xlog_in_core_t *iclog)
 {
     xlog_in_core_t *first_iclog = iclog;
 
     do {
-	idbg_xiclog(iclog);
+	xfsidbg_xiclog(iclog);
 	qprintf("=================================================\n");
 	iclog = iclog->ic_next;
     } while (iclog != first_iclog);
-}	/* idbg_xiclogall */
+}	/* xfsidbg_xiclogall */
+
+/*
+ * Print out the callback structures attached to an iclog.
+ */
+static void
+xfsidbg_xiclogcb(xlog_in_core_t *iclog)
+{
+	xfs_log_callback_t	*cb;
+
+	for (cb = iclog->ic_callback; cb != NULL; cb = cb->cb_next) {
+		qprintf("func ");
+		prsymoff((void *)cb->cb_func, NULL, NULL);
+		qprintf(" arg 0x%x next 0x%x\n", cb->cb_arg, cb->cb_next);
+	}
+}
 
 #ifdef DEBUG
 /*
  * Print trace from incore log.
  */
-void
-idbg_xiclogtrace(xlog_in_core_t *iclog)
+static void
+xfsidbg_xiclogtrace(xlog_in_core_t *iclog)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2714,14 +2792,14 @@ idbg_xiclogtrace(xlog_in_core_t *iclog)
 		}
 		ktep = ktrace_next(kt, &kts);
 	}
-}	/* idbg_xiclogtrace */
+}	/* xfsidbg_xiclogtrace */
 #endif	/* DEBUG */
 
 /*
  * Print all of the inodes attached to the given mount structure.
  */
-void
-idbg_xinodes(xfs_mount_t *mp)
+static void
+xfsidbg_xinodes(xfs_mount_t *mp)
 {
 	xfs_inode_t	*ip;
 
@@ -2730,7 +2808,7 @@ idbg_xinodes(xfs_mount_t *mp)
 	if (ip != NULL) {
 		do {
 			qprintf("\n");
-			idbg_xnode(ip);
+			xfsidbg_xnode(ip);
 			ip = ip->i_mnext;
 		} while (ip != mp->m_inodes);
 	}
@@ -2738,39 +2816,10 @@ idbg_xinodes(xfs_mount_t *mp)
 }
 
 /*
- * Find any incore XFS inodes with the given inode number.
- * We can only handle 64 bit inode numbers in 64 bit kernels.
- */
-void
-idbg_xfindi(__psunsigned_t ino)
-{
-	xfs_ino_t	xino;
-	vfs_t		*vfsp;
-	xfs_mount_t	*mp;
-	xfs_inode_t	*ip;
-	extern struct vfsops	xfs_vfsops;
-
-	xino = (xfs_ino_t)ino;
-
-	for (vfsp = rootvfs; (vfsp != NULL); vfsp = vfsp->vfs_next) {
-		if (vfsp->vfs_op == &xfs_vfsops) {
-			mp = XFS_VFSTOM(vfsp);
-			ip = mp->m_inodes;
-			do {
-				if (ip->i_ino == xino) {
-					idbg_xnode(ip);
-				}
-				ip = ip->i_mnext;
-			} while (ip != mp->m_inodes);
-		}
-	}
-}
-
-/*
  * Print out an XFS log structure.
  */
-void
-idbg_xlog(xlog_t *log)
+static void
+xfsidbg_xlog(xlog_t *log)
 {
 	int rbytes;
 	int wbytes;
@@ -2814,14 +2863,14 @@ idbg_xlog(xlog_t *log)
 	qprintf("trace: 0x%x  grant_trace: use xlog value\n",
 		log->l_trace);
 #endif
-}	/* idbg_xlog */
+}	/* xfsidbg_xlog */
 
 #ifdef DEBUG
 /*
  * Print grant trace for a log.
  */
-void
-idbg_xlog_granttrace(xlog_t *log)
+static void
+xfsidbg_xlog_granttrace(xlog_t *log)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -2848,14 +2897,14 @@ idbg_xlog_granttrace(xlog_t *log)
 		qprintf("%s\n", ktep->val[11]);
 		ktep = ktrace_next(kt, &kts);
 	}
-}	/* idbg_xlog_granttrace */
+}	/* xfsidbg_xlog_granttrace */
 #endif	/* DEBUG */
 
 /*
  * Print out an XFS recovery transaction
  */
-void
-idbg_xlog_ritem(xlog_recover_item_t *item)
+static void
+xfsidbg_xlog_ritem(xlog_recover_item_t *item)
 {
 	int i = XLOG_MAX_REGIONS_IN_ITEM;
 
@@ -2871,13 +2920,13 @@ idbg_xlog_ritem(xlog_recover_item_t *item)
 			item->ri_buf[XLOG_MAX_REGIONS_IN_ITEM-i].i_len);
 	}
 	qprintf("\n");
-}	/* idbg_xlog_ritem */
+}	/* xfsidbg_xlog_ritem */
 
 /*
  * Print out an XFS recovery transaction
  */
-void
-idbg_xlog_rtrans(xlog_recover_t *trans)
+static void
+xfsidbg_xlog_rtrans(xlog_recover_t *trans)
 {
 	xlog_recover_item_t *rip, *first_rip;
 
@@ -2895,13 +2944,13 @@ idbg_xlog_rtrans(xlog_recover_t *trans)
 			rip = rip->ri_next;
 		} while (rip != first_rip);
 	}
-}	/* idbg_xlog_rtrans */
+}	/* xfsidbg_xlog_rtrans */
 
 /*
  * Print out an XFS ticket structure.
  */
-void
-idbg_xlog_tic(xlog_ticket_t *tic)
+static void
+xfsidbg_xlog_tic(xlog_ticket_t *tic)
 {
 	static char *t_flags[] = {
 		"INIT",		/* 0x1 */
@@ -2919,13 +2968,13 @@ idbg_xlog_tic(xlog_ticket_t *tic)
 	qprintf("clientid: %c  \n", tic->t_clientid);
 	printflags(tic->t_flags, t_flags,"ticket");
 	qprintf("\n");
-}	/* idbg_xlog_tic */
+}	/* xfsidbg_xlog_tic */
 
 /*
  * Print out a single log item.
  */
-void
-idbg_xlogitem(xfs_log_item_t *lip)
+static void
+xfsidbg_xlogitem(xfs_log_item_t *lip)
 {
 	xfs_log_item_t	*bio_lip;
 	static char *lid_type[] = {
@@ -2988,8 +3037,8 @@ idbg_xlogitem(xfs_log_item_t *lip)
 /*
  * Print xfs mount structure.
  */
-void
-idbg_xmount(xfs_mount_t *mp)
+static void
+xfsidbg_xmount(xfs_mount_t *mp)
 {
 	static char *xmount_flags[] = {
 		"wsync",	/* 0x1 */
@@ -3052,34 +3101,11 @@ idbg_xmount(xfs_mount_t *mp)
 #endif
 }
 
-void
-idbg_xtrans_res(
-	xfs_mount_t	*mp)
-{
-	xfs_trans_reservations_t	*xtrp;
-
-	xtrp = &mp->m_reservations;
-	qprintf("write: %d\ttruncate: %d\trename: %d\n",
-		xtrp->tr_write, xtrp->tr_itruncate, xtrp->tr_rename);
-	qprintf("link: %d\tremove: %d\tsymlink: %d\n",
-		xtrp->tr_link, xtrp->tr_remove, xtrp->tr_symlink);
-	qprintf("create: %d\tmkdir: %d\tifree: %d\n",
-		xtrp->tr_create, xtrp->tr_mkdir, xtrp->tr_ifree);
-	qprintf("ichange: %d\tgrowdata: %d\tswrite: %d\n",
-		xtrp->tr_ichange, xtrp->tr_growdata, xtrp->tr_swrite);
-	qprintf("addafork: %d\twriteid: %d\tainval: %d\n",
-		xtrp->tr_addafork, xtrp->tr_writeid, xtrp->tr_ainval);
-	qprintf("setattr: %d\trmattr: %d\tattrflag: %d\n",
-		xtrp->tr_setattr, xtrp->tr_rmattr, xtrp->tr_attrflag);
-	qprintf("clearagi: %d\n", xtrp->tr_clearagi);
-}
-		
-
 /*
  * Command to print xfs inodes: kp xnode <addr>
  */
-void
-idbg_xnode(xfs_inode_t *ip)
+static void
+xfsidbg_xnode(xfs_inode_t *ip)
 {
 	static char *tab_flags[] = {
 		"grio",		/* XFS_IGRIO */
@@ -3147,8 +3173,8 @@ idbg_xnode(xfs_inode_t *ip)
 /*
  * Print xfs per-ag data structures for filesystem.
  */
-void
-idbg_xperag(xfs_mount_t *mp)
+static void
+xfsidbg_xperag(xfs_mount_t *mp)
 {
 	xfs_agnumber_t	agno;
 	xfs_perag_t	*pag;
@@ -3173,8 +3199,8 @@ idbg_xperag(xfs_mount_t *mp)
 /*
  * Print out a single xfs_range_t.
  */
-void
-idbg_xrange(xfs_range_t *rp)
+static void
+xfsidbg_xrange(xfs_range_t *rp)
 {
 	qprintf("range lock 0x%x forw 0x%x back 0x%x\n",
 		rp, rp->r_forw, rp->r_back);
@@ -3185,8 +3211,8 @@ idbg_xrange(xfs_range_t *rp)
 /*
  * Print out the list of range locks held for a given inode.
  */
-void
-idbg_xrangelocks(xfs_inode_t *ip)
+static void
+xfsidbg_xrangelocks(xfs_inode_t *ip)
 {
 	xfs_range_lock_t	*rlp;
 	xfs_range_t		*rp;
@@ -3204,20 +3230,20 @@ idbg_xrangelocks(xfs_inode_t *ip)
 
 	rp = firstp;
 	do {
-		idbg_xrange(rp);
+		xfsidbg_xrange(rp);
 		rp = rp->r_forw;
 	} while (rp != firstp);
 }
 #endif /* NOTYET */
 
 #ifdef DEBUG
-
 int	rwentries = 64;
+
 /*
  * Print out the read/write trace buffer attached to the given inode.
  */
-void
-idbg_xrwtrace(xfs_inode_t *ip)
+static void
+xfsidbg_xrwtrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -3264,15 +3290,15 @@ idbg_xrwtrace(xfs_inode_t *ip)
 /*
  * Print xfs superblock.
  */
-void
-idbg_xsb(xfs_sb_t *sbp)
+static void
+xfsidbg_xsb(xfs_sb_t *sbp)
 {
 	qprintf("magicnum 0x%x blocksize 0x%x dblocks %lld rblocks %lld\n",
 		sbp->sb_magicnum, sbp->sb_blocksize,
 		sbp->sb_dblocks, sbp->sb_rblocks);
 	qprintf("rextents %lld uuid %s logstart %s\n",
 		sbp->sb_rextents,
-		fmtuuid(&sbp->sb_uuid),
+		xfs_fmtuuid(&sbp->sb_uuid),
 		xfs_fmtfsblock(sbp->sb_logstart, NULL));
 	qprintf("rootino %s ",
 		xfs_fmtino(sbp->sb_rootino, NULL));
@@ -3312,8 +3338,8 @@ idbg_xsb(xfs_sb_t *sbp)
 /*
  * Print all xfs strategy trace entries.
  */
-void
-idbg_xstrat_atrace(int count)
+static void
+xfsidbg_xstrat_atrace(int count)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -3357,8 +3383,8 @@ idbg_xstrat_atrace(int count)
 /*
  * Print xfs strategy trace per-inode.
  */
-void
-idbg_xstrat_itrace(xfs_inode_t *ip)
+static void
+xfsidbg_xstrat_itrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -3379,8 +3405,8 @@ idbg_xstrat_itrace(xfs_inode_t *ip)
 /*
  * Print global strategy trace entries for a particular inode.
  */
-void
-idbg_xstrat_strace(xfs_inode_t *ip)
+static void
+xfsidbg_xstrat_strace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -3404,13 +3430,12 @@ idbg_xstrat_strace(xfs_inode_t *ip)
 }
 #endif	/* DEBUG */
 
-
 /*
  * Print out an XFS transaction structure.  Print summaries for
  * each of the items.
  */
-void
-idbg_xtp(xfs_trans_t *tp)
+static void
+xfsidbg_xtp(xfs_trans_t *tp)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_desc_t	*lidp;
@@ -3507,45 +3532,54 @@ idbg_xtp(xfs_trans_t *tp)
 			qprintf("flags ");
 			printflags(lidp->lid_flags, lid_flags,"lic");
 			qprintf("\n");
-			idbg_xlogitem(lidp->lid_item);
+			xfsidbg_xlogitem(lidp->lid_item);
 		}
 		chunk++;
 		licp = licp->lic_next;
 	}
 }
 
-/*
- * Routines called from main idbg.
- */
-
-/*
- * Find vnode by number in xfs filesystem
- * Called from vnode command.
- */
-vnode_t *
-xidbg_findvnum(vfs_t *vfsp, long vnum)
+static void
+xfsidbg_xtrans_res(
+	xfs_mount_t	*mp)
 {
-	xfs_mount_t	*mp;
-	xfs_inode_t	*xp;
+	xfs_trans_reservations_t	*xtrp;
 
-	mp = XFS_VFSTOM(vfsp);
-	xp = mp->m_inodes;
-	if (xp != NULL) {
-		do {
-			if (XFS_ITOV(xp)->v_number == vnum)
-				return XFS_ITOV(xp);
-			xp = xp->i_mnext;
-		} while (xp != mp->m_inodes);
-	}
-	return NULL;
+	xtrp = &mp->m_reservations;
+	qprintf("write: %d\ttruncate: %d\trename: %d\n",
+		xtrp->tr_write, xtrp->tr_itruncate, xtrp->tr_rename);
+	qprintf("link: %d\tremove: %d\tsymlink: %d\n",
+		xtrp->tr_link, xtrp->tr_remove, xtrp->tr_symlink);
+	qprintf("create: %d\tmkdir: %d\tifree: %d\n",
+		xtrp->tr_create, xtrp->tr_mkdir, xtrp->tr_ifree);
+	qprintf("ichange: %d\tgrowdata: %d\tswrite: %d\n",
+		xtrp->tr_ichange, xtrp->tr_growdata, xtrp->tr_swrite);
+	qprintf("addafork: %d\twriteid: %d\tainval: %d\n",
+		xtrp->tr_addafork, xtrp->tr_writeid, xtrp->tr_ainval);
+	qprintf("setattr: %d\trmattr: %d\tattrflag: %d\n",
+		xtrp->tr_setattr, xtrp->tr_rmattr, xtrp->tr_attrflag);
+	qprintf("clearagi: %d\n", xtrp->tr_clearagi);
+}
+
+/*
+ * Routines for idbgfssw.
+ */
+
+/*
+ * Print private data for vfs.
+ */
+static void
+xfsidbg_vfs_data_print(void *p)
+{
+	xfsidbg_xmount((xfs_mount_t *)p);
 }
 
 /*
  * Given a vfs print all its vnodes.
  * Called from vlist command.
  */
-void
-xidbg_prvfsvn(vfs_t *vfsp, int all)
+static void
+xfsidbg_vfs_vnodes_print(vfs_t *vfsp, int all)
 {
 	xfs_mount_t *mp;
 	xfs_inode_t *xp;
@@ -3564,8 +3598,30 @@ xidbg_prvfsvn(vfs_t *vfsp, int all)
  * Print xfs inode corresponding to this vnode.
  * Called from vnode command.
  */
-void
-xidbg_prvnode(vnode_t *vp)
+static void
+xfsidbg_vnode_data_print(void *p)
 {
-	idbg_xnode(XFS_VTOI(vp));
+	xfsidbg_xnode((xfs_inode_t *)p);
+}
+
+/*
+ * Find vnode by number in xfs filesystem
+ * Called from vnode command.
+ */
+static vnode_t *
+xfsidbg_vnode_find(vfs_t *vfsp, long vnum)
+{
+	xfs_mount_t	*mp;
+	xfs_inode_t	*xp;
+
+	mp = XFS_VFSTOM(vfsp);
+	xp = mp->m_inodes;
+	if (xp != NULL) {
+		do {
+			if (XFS_ITOV(xp)->v_number == vnum)
+				return XFS_ITOV(xp);
+			xp = xp->i_mnext;
+		} while (xp != mp->m_inodes);
+	}
+	return NULL;
 }
