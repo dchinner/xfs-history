@@ -90,6 +90,7 @@ static void	xfsidbg_xiclogall(xlog_in_core_t *);
 static void	xfsidbg_xiclogcb(xlog_in_core_t *);
 static void	xfsidbg_xihash(xfs_mount_t *mp);
 static void	xfsidbg_xinodes(xfs_mount_t *);
+static void	xfsidbg_delayed_blocks(xfs_mount_t *);
 static void	xfsidbg_xinodes_quiesce(xfs_mount_t *);
 static void	xfsidbg_xlog(xlog_t *);
 static void	xfsidbg_xlog_ritem(xlog_recover_item_t *);
@@ -782,6 +783,28 @@ static int	kdbm_xfs_xinodes(
 	xfsidbg_xinodes((xfs_mount_t *) addr);
 	return 0;
 }
+
+static int	kdbm_xfs_delayed_blocks(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+	if (diag)
+		return diag;
+
+	xfsidbg_delayed_blocks((xfs_mount_t *) addr);
+	return 0;
+}
+
 
 static int	kdbm_xfs_xinodes_quiesce(
 	int	argc,
@@ -2096,6 +2119,8 @@ static struct xif {
 				"Dump XFS dir/attr node block"},
   {  "xdastat",	kdbm_xfs_xdastate,	"<xfs_da_state_t>",
 				"Dump XFS dir/attr state_blk struct"},
+  {  "xdelay",	kdbm_xfs_delayed_blocks,	"<xfs_mount_t>",
+			 	"Dump delayed block totals"},
   {  "xdirlf",	kdbm_xfs_xdirleaf,	"<xfs_dir_leafblock_t>",
 				"Dump XFS directory leaf block"},
   {  "xdirsf",	kdbm_xfs_xdirsf,	"<xfs_dir_shortform_t>",
@@ -3947,6 +3972,30 @@ xfsidbg_xinodes(xfs_mount_t *mp)
 		} while (ip != mp->m_inodes);
 	}
 	kdb_printf("\nEnd of Inodes\n");
+}
+
+static void
+xfsidbg_delayed_blocks(xfs_mount_t *mp)
+{
+	xfs_inode_t	*ip;
+	unsigned int	total = 0;
+	unsigned int	icount = 0;
+
+	ip = mp->m_inodes;
+	if (ip != NULL) {
+		do {
+			if (ip->i_mount == NULL) {
+				ip = ip->i_mnext;
+				continue;
+			}
+			if (ip->i_delayed_blks) {
+				total += ip->i_delayed_blks;
+				icount++;
+			}
+			ip = ip->i_mnext;
+		} while (ip != mp->m_inodes);
+	}
+	kdb_printf("delayed blocks total: %d in %d inodes\n", total, icount);
 }
 
 static void
