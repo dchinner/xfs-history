@@ -259,6 +259,7 @@ EXPORT_SYMBOL(vn_get);
 EXPORT_SYMBOL(vn_hold);
 EXPORT_SYMBOL(vn_initialize);
 EXPORT_SYMBOL(vn_revalidate);
+EXPORT_SYMBOL(vn_revalidate_core);
 EXPORT_SYMBOL(vn_purge);
 EXPORT_SYMBOL(vttoif_tab);
 
