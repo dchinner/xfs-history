@@ -1,9 +1,10 @@
-
 #ifndef	_XFS_EXTFREE_ITEM_H
 #define	_XFS_EXTFREE_ITEM_H
 
+#ident	"$Revision: 1.3 $"
+
 typedef struct xfs_extent {
-	xfs_fsblock_t	ext_start;
+	xfs_dfsbno_t	ext_start;
 	xfs_extlen_t	ext_len;
 } xfs_extent_t;
 
