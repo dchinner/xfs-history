@@ -1518,7 +1518,6 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 			map->base = entry->nameidx;
 			map->size = entsize;
 		}
-		hdr->holes = 1;		/* mark as needing compaction */
 	}
 
 	/*
@@ -1537,9 +1536,8 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	xfs_trans_log_buf(trans, bp, XFS_DA_LOGRANGE(leaf, namest, entsize));
 
 	hdr->namebytes -= entry->namelen;
-	tmp = (hdr->count - 1 - index) * sizeof(xfs_dir_leaf_entry_t);
-	if (tmp > 0)
-		bcopy((char *)(entry+1), (char *)entry, tmp);
+	tmp = (hdr->count - index) * sizeof(xfs_dir_leaf_entry_t);
+	bcopy((char *)(entry+1), (char *)entry, tmp);
 	hdr->count--;
 	xfs_trans_log_buf(trans, bp,
 	    XFS_DA_LOGRANGE(leaf, entry, tmp + sizeof(*entry)));
@@ -1564,6 +1562,8 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 		hdr->firstused = tmp;
 		if (hdr->firstused == 0)
 			hdr->firstused = tmp - 1;
+	} else {
+		hdr->holes = 1;		/* mark as needing compaction */
 	}
 
 	xfs_trans_log_buf(trans, bp, XFS_DA_LOGRANGE(leaf, hdr, sizeof(*hdr)));
