@@ -1,7 +1,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.16 $"
 
 struct buf;
 struct ktrace;
@@ -22,6 +22,21 @@ typedef struct xfs_buf_log_format {
 	unsigned int	blf_data_map[1];/* variable size bitmap of */
 					/*   regions of buffer in this item */
 } xfs_buf_log_format_t;
+
+/*
+ * This is a form of the above structure with a 64 bit blkno field.
+ * We use this when logging buffers that sit out beyond 1 TB on disk.
+ */
+typedef struct xfs_buf_log_format64 {
+	unsigned short	blf_type;	/* buf log item type indicator */
+	unsigned short	blf_size;	/* size of this item */
+	ushort		blf_flags;	/* misc state */
+	ushort		blf_len;	/* number of blocks in this buf */
+	__int64_t	blf_blkno;	/* starting blkno of this buf */
+	unsigned int	blf_map_size;	/* size of data bitmap in words */
+	unsigned int	blf_data_map[1];/* variable size bitmap of */
+					/*   regions of buffer in this item */
+} xfs_buf_log_format64_t;
 
 /*
  * This flag indicates that the buffer contains on disk inodes
@@ -50,6 +65,9 @@ typedef struct xfs_buf_log_item {
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
 	int			bli_refcount;	/* cnt of tp refs */
+#if XFS_BIG_FILESYSTEMS	
+	xfs_buf_log_format64_t	*bli_format64;	/* 64 bit blf if necessary */
+#endif	
 	struct ktrace		*bli_trace;	/* event trace buf */
 #ifdef DEBUG
 	char			*bli_orig;	/* original buffer copy */

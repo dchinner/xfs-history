@@ -959,22 +959,33 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
     xfs_agi_t			*agi;
     xfs_agf_t			*agf;
     xfs_buf_log_format_t	*f;
+    xfs_buf_log_format64_t	*f64;
     caddr_t			p;
     int				len, num, i;
+    daddr_t			blkno;
     extern int			print_buffer;
 
     f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
+    f = (xfs_buf_log_format64_t *)item->ri_buf[0].i_addr;
     len = item->ri_buf[0].i_len;
     printf("	");
-    printf("BUF:  #regs:%d   start blkno:0x%x   len:%d   bmap size:%d\n",
-	   f->blf_size, f->blf_blkno, f->blf_len, f->blf_map_size);
+    if ((f->blf_type == XFS_LI_BUF) || (f->blf_type == XFS_LI_OBUF)) {
+	    printf("BUF:  #regs:%d   start blkno:0x%x   len:%d   bmap size:%d\n",
+		   f->blf_size, f->blf_blkno, f->blf_len, f->blf_map_size);
+	    blkno = (daddr_t)f->blf_blkno;
+    } else {
+	    printf("BUF:  #regs:%d   start blkno:0x%llx   len:%d   bmap size:%d\n",
+		   f64->blf_size, f64->blf_blkno, f64->blf_len,
+		   f64->blf_map_size);
+	    blkno = f64->blf_blkno;
+    }
     num = f->blf_size-1;
     i = 1;
     while (num-- > 0) {
 	p = item->ri_buf[i].i_addr;
 	len = item->ri_buf[i].i_len;
 	i++;
-	if (f->blf_blkno == 0) { /* super block */
+	if (blkno == 0) { /* super block */
 	    printf("	SUPER Block Buffer:\n");
 	    if (!print_buffer) continue;
 	    printf("		icount:%lld  ifree:%lld  ",
@@ -1222,6 +1233,10 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 		printf("BUF");
 		break;
 	    }
+	    case XFS_LI_BUF64: {
+		printf("BUF64");
+		break;
+	    }
 	    case XFS_LI_OINODE: {
 		printf("OINO");
 		break;
@@ -1257,6 +1272,7 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 #ifdef SIM
 	switch (ITEM_TYPE(item)) {
 	    case XFS_LI_BUF:
+	    case XFS_LI_BUF64:
 	    case XFS_LI_OBUF: {
 		xlog_recover_print_buffer(item);
 		break;
@@ -1344,6 +1360,7 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 	itemq_next = itemq->ri_next;
 	switch (ITEM_TYPE(itemq)) {
 	    case XFS_LI_BUF:
+	    case XFS_LI_BUF64:
 	    case XFS_LI_OBUF: {
 		xlog_recover_insert_item_frontq(&trans->r_itemq, itemq);
 		break;
@@ -1388,13 +1405,26 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	xfs_buf_cancel_t	*nextp;
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
+	xfs_buf_log_format64_t	*buf64_f;
 	daddr_t			blkno;
 	uint			len;
+	ushort			flags;
+
+	if (buf_f->blf_type == XFS_LI_BUF64) {
+		buf64_f = (xfs_buf_log_format64_t*)buf_f;
+		blkno = buf64_f->blf_blkno;
+		len = buf64_f->blf_blkno;
+		flags = buf64_f->blf_flags;
+	} else {
+		blkno = buf_f->blf_blkno;
+		len = buf_f->blf_len;
+		flags = buf_f->blf_flags;
+	}
 
 	/*
 	 * If this isn't a cancel buffer item, then just return.
 	 */
-	if (!(buf_f->blf_flags & XFS_BLI_CANCEL)) {
+	if (!(flags & XFS_BLI_CANCEL)) {
 		return;
 	}
 
@@ -1403,8 +1433,6 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	 * them.  If there is already an identical record, bump
 	 * its reference count.
 	 */
-	blkno = buf_f->blf_blkno;
-	len = buf_f->blf_len;
 	bucket = &(log->l_buf_cancel_table[blkno % XLOG_BC_TABLE_SIZE]);
 	/*
 	 * If the hash bucket is empty then just insert a new record into
@@ -1469,26 +1497,38 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	xfs_buf_cancel_t	*bcp;
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
+	xfs_buf_log_format64_t	*buf64_f;
 	daddr_t			blkno;
+	int			len;
+	ushort			flags;
 
+	if (buf_f->blf_type == XFS_LI_BUF64) {
+		buf64_f = (xfs_buf_log_format64_t*)buf_f;
+		blkno = buf64_f->blf_blkno;
+		len = buf64_f->blf_blkno;
+		flags = buf64_f->blf_flags;
+	} else {
+		blkno = buf_f->blf_blkno;
+		len = buf_f->blf_len;
+		flags = buf_f->blf_flags;
+	}
 	if (log->l_buf_cancel_table == NULL) {
 		/*
 		 * There is nothing in the table built in pass one,
 		 * so this buffer must not be cancelled.
 		 */
-		ASSERT(!(buf_f->blf_flags & XFS_BLI_CANCEL));
+		ASSERT(!(flags & XFS_BLI_CANCEL));
 		return 0;
 	}
 
-	bucket = &(log->l_buf_cancel_table[buf_f->blf_blkno %
-					   XLOG_BC_TABLE_SIZE]);
+	bucket = &(log->l_buf_cancel_table[blkno % XLOG_BC_TABLE_SIZE]);
 	bcp = *bucket;
 	if (bcp == NULL) {
 		/*
 		 * There is no corresponding entry in the table built
 		 * in pass one, so this buffer has not been cancelled.
 		 */
-		ASSERT(!(buf_f->blf_flags & XFS_BLI_CANCEL));
+		ASSERT(!(flags & XFS_BLI_CANCEL));
 		return 0;
 	}
 
@@ -1496,7 +1536,6 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	 * Search for an entry in the buffer cancel table that
 	 * matches our buffer.
 	 */
-	blkno = buf_f->blf_blkno;
 	prevp = NULL;
 	while (bcp != NULL) {
 		if (bcp->bc_blkno == blkno) {
@@ -1508,8 +1547,8 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 			 * one in the table and remove it if this is the
 			 * last reference.
 			 */
-			ASSERT(bcp->bc_len == buf_f->blf_len);
-			if (buf_f->blf_flags & XFS_BLI_CANCEL) {
+			ASSERT(bcp->bc_len == len);
+			if (flags & XFS_BLI_CANCEL) {
 				bcp->bc_refcount--;
 				if (bcp->bc_refcount == 0) {
 					if (prevp == NULL) {
@@ -1530,7 +1569,7 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	 * We didn't find a corresponding entry in the table, so
 	 * return 0 so that the buffer is NOT cancelled.
 	 */
-	ASSERT(!(buf_f->blf_flags & XFS_BLI_CANCEL));
+	ASSERT(!(flags & XFS_BLI_CANCEL));
 	return 0;
 }
 
@@ -1554,17 +1593,28 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			     buf_t			*bp,
 			     xfs_buf_log_format_t	*buf_f)
 {
-	int		i;
-	int		item_index;
-	int		bit;
-	int		nbits;
-	int		reg_buf_offset;
-	int		reg_buf_bytes;
-	int		next_unlinked_offset;
-	int		inodes_per_buf;
-	xfs_agino_t	*logged_nextp;
-	xfs_agino_t	*buffer_nextp;
+	int			i;
+	int			item_index;
+	int			bit;
+	int			nbits;
+	int			reg_buf_offset;
+	int			reg_buf_bytes;
+	int			next_unlinked_offset;
+	int			inodes_per_buf;
+	xfs_agino_t		*logged_nextp;
+	xfs_agino_t		*buffer_nextp;
+	xfs_buf_log_format64_t	*buf64_f;
+	unsigned int		*data_map;
+	unsigned int		map_size;
 
+	if (buf_f->blf_type == XFS_LI_BUF64) {
+		buf64_f = (xfs_buf_log_format64_t*)buf_f;
+		data_map = buf64_f->blf_data_map;
+		map_size = buf64_f->blf_map_size;
+	} else {
+		data_map = buf_f->blf_data_map;
+		map_size = buf_f->blf_map_size;
+	}
 	/*
 	 * Set the variables corresponding to the current region to
 	 * 0 so that we'll initialize them on the first pass through
@@ -1589,9 +1639,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			 * the current di_next_unlinked field.
 			 */
 			bit += nbits;
-			bit = xfs_buf_item_next_bit(buf_f->blf_data_map,
-						    buf_f->blf_map_size,
-						    bit);
+			bit = xfs_buf_item_next_bit(data_map, map_size, bit);
 
 			/*
 			 * If there are no more logged regions in the
@@ -1601,8 +1649,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 				return;
 			}
 
-			nbits = xfs_buf_item_contig_bits(buf_f->blf_data_map,
-							 buf_f->blf_map_size,
+			nbits = xfs_buf_item_contig_bits(data_map, map_size,
 							 bit);
 			reg_buf_offset = bit << XFS_BLI_SHIFT;
 			reg_buf_bytes = nbits << XFS_BLI_SHIFT;
@@ -1649,21 +1696,28 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 			   buf_t		*bp,
 			   xfs_buf_log_format_t	*buf_f)
 {
-	int	i;
-	int	bit;
-	int	nbits;
+	int			i;
+	int			bit;
+	int			nbits;
+	xfs_buf_log_format64_t	*buf64_f;
+	unsigned int		*data_map;
+	unsigned int		map_size;
 
+	if (buf_f->blf_type == XFS_LI_BUF64) {
+		buf64_f = (xfs_buf_log_format64_t*)buf_f;
+		data_map = buf64_f->blf_data_map;
+		map_size = buf64_f->blf_map_size;
+	} else {
+		data_map = buf_f->blf_data_map;
+		map_size = buf_f->blf_map_size;
+	}
 	bit = 0;
 	i = 1;  /* 0 is the buf format structure */
 	while (1) {
-		bit = xfs_buf_item_next_bit(buf_f->blf_data_map,
-					    buf_f->blf_map_size,
-					    bit);
+		bit = xfs_buf_item_next_bit(data_map, map_size, bit);
 		if (bit == -1)
 			break;
-		nbits = xfs_buf_item_contig_bits(buf_f->blf_data_map,
-						 buf_f->blf_map_size,
-						 bit);
+		nbits = xfs_buf_item_contig_bits(data_map, map_size, bit);
 		ASSERT(item->ri_buf[i].i_addr != 0);
 		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
 		ASSERT(bp->b_bcount >=
@@ -1710,11 +1764,15 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 			     xlog_recover_item_t *item,
 			     int		 pass)
 {
-	xfs_buf_log_format_t *buf_f;
-	xfs_mount_t	     *mp;
-	buf_t		     *bp;
-	int		     error;
-	int		     cancel;
+	xfs_buf_log_format_t	*buf_f;
+	xfs_buf_log_format64_t	*buf64_f;
+	xfs_mount_t	     	*mp;
+	buf_t		     	*bp;
+	int		     	error;
+	int		     	cancel;
+	daddr_t			blkno;
+	int			len;
+	ushort			flags;
 
 	buf_f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
 
@@ -1738,19 +1796,29 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 			return 0;
 		}
 	}
+	if (buf_f->blf_type == XFS_LI_BUF64) {
+		buf64_f = (xfs_buf_log_format64_t*)buf_f;
+		blkno = buf64_f->blf_blkno;
+		len = buf64_f->blf_len;
+		flags = buf64_f->blf_flags;
+	} else {
+		blkno = buf_f->blf_blkno;
+		len = buf_f->blf_len;
+		flags = buf_f->blf_flags;
+	}
 	mp = log->l_mp;
-	bp = bread(mp->m_dev, buf_f->blf_blkno, buf_f->blf_len);
+	bp = bread(mp->m_dev, blkno, len);
 	if (bp->b_flags & B_ERROR) {
 		cmn_err(CE_WARN,
 			"XFS: xlog_recover_do_buffer_trans: bread error (%d)",
-			buf_f->blf_blkno);
+			blkno);
 		ASSERT(0);
 		error = bp->b_error;
 		brelse(bp);
 		return error;
 	}
 
-	if (buf_f->blf_flags & XFS_BLI_INODE_BUF) {
+	if (flags & XFS_BLI_INODE_BUF) {
 		xlog_recover_do_inode_buffer(mp, item, bp, buf_f);
 	} else {
 		xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
@@ -2074,7 +2142,19 @@ xlog_recover_do_trans(xlog_t	     *log,
 
 	first_item = item = trans->r_itemq;
 	do {
+#if XFS_BIG_FILESYSTEMS
+		/*
+		 * Kernels that do not support big filesystems cannot
+		 * recover 64 bit buffer log records.
+		 */
+		if (ITEM_TYPE(item) == XFS_LI_BUF64) {
+			xlog_warn("XFS: File systems greater than 1TB not supported on this system");
+			error = XFS_ERROR(E2BIG);
+			break;
+		}
+#endif
 		if ((ITEM_TYPE(item) == XFS_LI_BUF) ||
+		    (ITEM_TYPE(item) == XFS_LI_BUF64) ||
 		    (ITEM_TYPE(item) == XFS_LI_OBUF)) {
 			if (error = xlog_recover_do_buffer_trans(log, item,
 								 pass))
