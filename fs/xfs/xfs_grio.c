@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.21 1994/05/12 16:02:59 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.22 1994/05/13 22:14:00 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -525,7 +525,19 @@ xfs_grio_req( xfs_inode_t *ip,
 		 	 * I/O was taking place.
 		 	 */
 			if (( ticket = xfs_io_is_guaranteed( ip, id)) == NULL) {
-				break;
+       				ticket_unlock(ip);
+				if (ret) {
+		        		uiop->uio_resid += remainingio;
+				} else {
+                			uiop->uio_resid          = remainingio;
+					uiop->uio_iov[0].iov_len = remainingio;
+					if (uiop->uio_resid) {
+						vp = XFS_ITOV(ip);
+						xfs_grio_issue_io(vp, uiop, 
+							ioflag, credp, rw);
+					}
+				}
+				return(ret);
 			}
                 }
 
