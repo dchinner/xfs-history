@@ -51,11 +51,7 @@ vpath %.c =  . linux pagebuf support
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
-ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
-  xfs-objs			+= xfsdmapistubs.o
-else
-  xfs-objs			+= xfs_dmapi.o
-endif
+obj-$(CONFIG_XFS_DMAPI)		+= xfs_dmapi.o
 
 obj-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 
@@ -137,10 +133,6 @@ xfs-objs			+= page_buf.o \
 # Objects in linux/
 
 export-objs			+= xfs_globals.o
-
-ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
-  xfs-objs			+= xfs_dmistubs.o
-endif
 
 xfs-objs			+= xfs_behavior.o \
 				   xfs_cred.o \

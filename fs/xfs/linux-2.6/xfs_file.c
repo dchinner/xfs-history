@@ -253,7 +253,7 @@ linvfs_file_mmap(
 	int		error;
 
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
-		error = -xfs_dmapi_mmap_event(vma, 0);
+		error = -xfs_dm_send_mmap_event(vma, 0);
 		if (error)
 			return error;
 	}
@@ -301,7 +301,7 @@ linvfs_mprotect(
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
 		if ((vma->vm_flags & VM_MAYSHARE) &&
 		    (newflags & PROT_WRITE) && !(vma->vm_flags & PROT_WRITE)){
-			error = xfs_dmapi_mmap_event(vma, VM_WRITE);
+			error = xfs_dm_send_mmap_event(vma, VM_WRITE);
 		    }
 	}
 	return error;

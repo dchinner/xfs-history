@@ -159,10 +159,17 @@ xfs_parseargs(
 			strncpy(args->logname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_MTPT)) {
 			strncpy(args->mtpt, value, MAXNAMELEN);
+#if CONFIG_XFS_DMAPI
 		} else if (!strcmp(this_char, MNTOPT_DMAPI)) {
 			args->flags |= XFSMNT_DMAPI;
 		} else if (!strcmp(this_char, MNTOPT_XDSM)) {
 			args->flags |= XFSMNT_DMAPI;
+#else
+		} else if (!strcmp(this_char, MNTOPT_DMAPI) ||
+			   !strcmp(this_char, MNTOPT_XDSM)) {
+			printk("XFS: this kernel does not support dmapi/xdsm.\n");
+			return rval;
+#endif
 		} else if (!strcmp(this_char, MNTOPT_RTDEV)) {
 			strncpy(args->rtname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {

@@ -38,7 +38,7 @@
 # define XFS_ACL_STRING
 #endif
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
+#ifdef CONFIG_XFS_DMAPI
 # define XFS_DMAPI_STRING	"DMAPI, "
 #else
 # define XFS_DMAPI_STRING
