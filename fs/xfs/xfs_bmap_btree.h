@@ -150,6 +150,20 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
  */
 #define	XFS_BM_MAXLEVELS(mp)		((mp)->m_bm_maxlevels)
 
+#ifdef DEBUG
+/*
+ * Trace buffer entry types.
+ */
+#define	XFS_BMBT_KTRACE_ARGBI	1
+#define	XFS_BMBT_KTRACE_ARGBII	2
+#define	XFS_BMBT_KTRACE_ARGFFI	3
+#define	XFS_BMBT_KTRACE_ARGI	4
+#define	XFS_BMBT_KTRACE_ARGIFK	5
+#define	XFS_BMBT_KTRACE_ARGIFR	6
+#define	XFS_BMBT_KTRACE_ARGIK	7
+#define	XFS_BMBT_KTRACE_CUR	8
+#endif
+
 /*
  * Prototypes for xfs_bmap.c to call.
  */
