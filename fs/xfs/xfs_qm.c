@@ -264,10 +264,9 @@ xfs_qm_mount_quotainit(
 	uint		flags)
 {
 	/*
-	 * User or group quotas has to be on, or we must have the
-	 * QUOTAMAYBE flag set.
+	 * User or group quotas has to be on.
 	 */
-	ASSERT(flags & (XFSMNT_UQUOTA | XFSMNT_GQUOTA | XFSMNT_QUOTAMAYBE));
+	ASSERT(flags & (XFSMNT_UQUOTA | XFSMNT_GQUOTA));
 
 	/*
 	 * Initialize the flags in the mount structure. From this point
@@ -287,16 +286,6 @@ xfs_qm_mount_quotainit(
 		if (flags & XFSMNT_GQUOTAENF)
 			mp->m_qflags |= XFS_GQUOTA_ENFD;
 	}
-	/*
-	 * Typically, we turn quotas off if we weren't explicitly asked to mount
-	 * quotas. This is the mount option not to do that.
-	 * This option is handy in the miniroot, when trying to mount /root.
-	 * We can't really know what's in /etc/fstab until /root is already
-	 * mounted! This stops quotas getting turned off in the root
-	 * filesystem everytime the system boots up a miniroot.
-	 */
-	if (flags & XFSMNT_QUOTAMAYBE)
-		mp->m_qflags |= XFS_QUOTA_MAYBE;
 }
 
 /*
@@ -330,19 +319,7 @@ xfs_qm_mount_quotas(
 	 * If a non-root file system had quotas running earlier, but decided
 	 * to mount without -o quota/pquota options, revoke the quotachecked
 	 * license, and bail out.
-	 * Unless, of course the XFS_QUOTA_MAYBE flag is specified.
 	 */
-	if (mp->m_qflags & XFS_QUOTA_MAYBE) {
-		mp->m_qflags &= ~(XFS_QUOTA_MAYBE);
-		if (mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT) {
-			mp->m_qflags |= (mp->m_sb.sb_qflags & XFS_MOUNT_QUOTA_ALL);
-			mp->m_qflags |= XFS_UQUOTA_ACTIVE;
-		}
-		if (mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT) {
-			mp->m_qflags |= (mp->m_sb.sb_qflags & XFS_MOUNT_QUOTA_ALL);
-			mp->m_qflags |= XFS_GQUOTA_ACTIVE;
-		}
-	}
 	if (! XFS_IS_QUOTA_ON(mp) &&
 	    (mp->m_dev != rootdev) &&
 	    (mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT))) {

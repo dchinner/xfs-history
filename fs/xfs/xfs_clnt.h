@@ -90,8 +90,6 @@ struct xfs_mount_args {
 						 * enforcement */
 #define XFSMNT_PQUOTAENF	0x00000040	/* IRIX project quota limit
 						 * enforcement */
-#define XFSMNT_QUOTAMAYBE	0x00000080	/* don't turn off if SB
-						 * has quotas on */
 #define XFSMNT_NOATIME		0x00000100	/* don't modify access
 						 * times on reads */
 #define XFSMNT_NOALIGN		0x00000200	/* don't allocate at

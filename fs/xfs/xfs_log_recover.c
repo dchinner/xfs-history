@@ -1825,10 +1825,7 @@ xlog_recover_do_dquot_buffer(
 
 	/*
 	 * Non-root filesystems are required to send in quota flags
-	 * at mount time. However, we may also get QUOTA_MAYBE flag set,
-	 * indicating that quota should stay on (and stay consistent),
-	 * if it already is. (so, we have to replay dquot log records
-	 * when MAYBE flag's set).
+	 * at mount time.
 	 */
 	if (mp->m_qflags == 0 && mp->m_dev != rootdev) {
 		return;
@@ -2278,10 +2275,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 
 	/*
 	 * Non-root filesystems are required to send in quota flags
-	 * at mount time. However, we may also get QUOTA_MAYBE flag set,
-	 * indicating that quota should stay on (and stay consistent),
-	 * if it already is. (so, we have to replay dquot log records
-	 * when MAYBE flag's set).
+	 * at mount time.
 	 */
 	if (mp->m_qflags == 0 && mp->m_dev != rootdev) {
 		return (0);
