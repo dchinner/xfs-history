@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 8
+SUBLEVEL = 9
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -162,6 +162,10 @@ ifdef CONFIG_PNP
 DRIVERS := $(DRIVERS) drivers/pnp/pnp.a
 endif
 
+ifdef CONFIG_SGI
+DRIVERS := $(DRIVERS) drivers/sgi/sgi.a
+endif
+
 ifdef CONFIG_VT
 DRIVERS := $(DRIVERS) drivers/video/video.a
 endif
@@ -172,6 +176,10 @@ endif
 
 ifdef CONFIG_HAMRADIO
 DRIVERS := $(DRIVERS) drivers/net/hamradio/hamradio.a
+endif
+
+ifeq ($(CONFIG_TC),y)
+DRIVERS := $(DRIVERS) drivers/tc/tc.a
 endif
 
 ifeq ($(CONFIG_USB),y)
@@ -394,8 +402,6 @@ sums:
 dep-files: scripts/mkdep archdep include/linux/version.h
 	scripts/mkdep init/*.c > .depend
 	scripts/mkdep `find $(FINDHPATH) -follow -name \*.h ! -name modversions.h -print` > .hdepend
-#	set -e; for i in $(SUBDIRS); do $(MAKE) -C $$i fastdep ;done
-# let this be made through the fastdep rule in Rules.make
 	$(MAKE) $(patsubst %,_sfdep_%,$(SUBDIRS)) _FASTDEP_ALL_SUB_DIRS="$(SUBDIRS)"
 
 MODVERFILE :=
