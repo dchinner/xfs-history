@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -231,12 +231,12 @@ xfs_ialloc_ag_alloc(
 	 * For small block sizes, manipulate the inodes in buffers
 	 * which are multiples of the blocks size.
 	 */
-	if (args.mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE) {
+	if (args.mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE(args.mp)) {
 		blks_per_cluster = 1;
 		nbufs = (int)args.len;
 		ninodes = args.mp->m_sb.sb_inopblock;
 	} else {
-		blks_per_cluster = XFS_INODE_CLUSTER_SIZE /
+		blks_per_cluster = XFS_INODE_CLUSTER_SIZE(args.mp) /
 			           args.mp->m_sb.sb_blocksize;
 		nbufs = (int)args.len / blks_per_cluster;
 		ninodes = blks_per_cluster * args.mp->m_sb.sb_inopblock;
@@ -1050,7 +1050,7 @@ xfs_dilocate(
 	}
 
 	error = 0;
-	if ((mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE) ||
+	if ((mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE(mp)) ||
 	    !(flags & XFS_IMAP_LOOKUP)) {
 		offset = XFS_INO_TO_OFFSET(mp, ino);
 		ASSERT(offset < mp->m_sb.sb_inopblock);
@@ -1063,7 +1063,7 @@ xfs_dilocate(
 		cluster_agbno = XFS_FSB_TO_AGBNO(mp, *bno);
 		*off = ((agbno - cluster_agbno) * mp->m_sb.sb_inopblock) +
 			offset;
-		*len = XFS_INODE_CLUSTER_SIZE >> mp->m_sb.sb_blocklog;
+		*len = XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_blocklog;
 	} else {
 		agino = XFS_INO_TO_AGINO(mp, ino);
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
@@ -1087,7 +1087,7 @@ xfs_dilocate(
 			chunk_agbno = XFS_AGINO_TO_AGBNO(mp, chunk_agino);
 			ASSERT(agbno >= chunk_agbno);
 			offset_agbno = agbno - chunk_agbno;
-			blks_per_cluster = XFS_INODE_CLUSTER_SIZE >>
+			blks_per_cluster = XFS_INODE_CLUSTER_SIZE(mp) >>
 				           mp->m_sb.sb_blocklog;
 			cluster_agbno = chunk_agbno +
 				        ((offset_agbno / blks_per_cluster) *
