@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 /*
  * xfs_dir_leaf.h
@@ -83,6 +83,14 @@ typedef struct xfs_dir_leaf_hdr xfs_dir_leaf_hdr_t;
 typedef struct xfs_dir_leaf_map xfs_dir_leaf_map_t;
 typedef struct xfs_dir_leaf_entry xfs_dir_leaf_entry_t;
 typedef struct xfs_dir_leaf_name xfs_dir_leaf_name_t;
+
+/*
+ * Length of name for which a 512-byte block filesystem
+ * can get a double split.
+ */
+#define	XFS_DIR_LEAF_CAN_DOUBLE_SPLIT_LEN	\
+	(512 - sizeof(xfs_dir_leaf_hdr_t) - sizeof(xfs_dir_leaf_entry_t) * 2 - \
+	 sizeof(xfs_dir_leaf_name_t) * 2 - (MAXNAMELEN - 2) + 1 + 1)
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_LEAFDIRBLK)
 xfs_dir_leafblock_t *xfs_buf_to_leafdirblk(struct buf *bp);
