@@ -35,8 +35,10 @@
  */
 #include <xfs.h>
 
-struct xfs_qm *xfs_Gqm = NULL;
-mutex_t xfs_Gqm_lock;
+struct xfs_qm	*xfs_Gqm;
+mutex_t		xfs_Gqm_lock;
+xfs_zone_t	*qm_dqzone;
+xfs_zone_t	*qm_dqtrxzone;
 
 /*
  * Quota Manager Interface.

@@ -34,8 +34,10 @@
 #include <xfs_quota_priv.h>
 
 
-struct xfs_qm	*xfs_Gqm = NULL;
+struct xfs_qm	*xfs_Gqm;
 mutex_t		xfs_Gqm_lock;
+xfs_zone_t	*qm_dqzone;
+xfs_zone_t	*qm_dqtrxzone;
 
 STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
 STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
@@ -84,8 +86,6 @@ xfs_qm_init(void)
 {
 	xfs_qm_t	 	*xqm;
 	int			hsize, i;
-	static xfs_zone_t	*qm_dqzone = NULL;
-	static xfs_zone_t	*qm_dqtrxzone = NULL;
 
 	xqm = kmem_zalloc(sizeof(xfs_qm_t), KM_SLEEP);
 	ASSERT(xqm);

@@ -207,6 +207,8 @@ xfs_cleanup(void)
 	extern xfs_zone_t	*xfs_efi_zone;
 	extern xfs_zone_t	*xfs_buf_item_zone;
 	extern xfs_zone_t	*xfs_chashlist_zone;
+	extern xfs_zone_t	*qm_dqzone;
+	extern xfs_zone_t	*qm_dqtrxzone;
 
 	xfs_cleanup_procfs();
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
@@ -221,6 +223,10 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ifork_zone);
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
+	if (qm_dqzone)
+		kmem_cache_destroy(qm_dqzone);
+	if (qm_dqtrxzone)
+		kmem_cache_destroy(qm_dqtrxzone);
 #if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
         ktrace_uninit();
 #endif
