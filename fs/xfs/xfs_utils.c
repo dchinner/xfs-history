@@ -1,4 +1,4 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -81,7 +81,7 @@ xfs_dir_lookup_int(
 	struct ncfastdata	*fd,
 	uint			*dir_unlocked)
 {
-		vnode_t		*vp;
+	vnode_t		*vp;
 	vnode_t		*dir_vp;	   
 	xfs_inode_t	*dp;
 	xfs_ino_t	curr_inum;
@@ -139,6 +139,7 @@ xfs_dir_lookup_int(
 			xfs_ilock(dp, lock_mode);
 		}
 		if (bdp && dir_gen == dp->i_gen) {
+			ITRACE(XFS_BHVTOI(bdp));
 			*inum = XFS_BHVTOI(bdp)->i_ino;
 			if (do_iget) {
 				*ipp = XFS_BHVTOI(bdp);
@@ -161,7 +162,12 @@ xfs_dir_lookup_int(
 			}
 			return 0;
 		}
-        }
+		/*
+		 * Need to VN_RELE bdp but it's not safe to do this
+		 * until the directory is unlocked.
+		 */
+        } else
+		bdp = NULL;
 
 	/*
 	 * If all else fails, call the directory code.
@@ -187,6 +193,11 @@ xfs_dir_lookup_int(
 			dir_gen = dp->i_gen;
 			xfs_iunlock(dp, lock_mode);
 
+			if (bdp) {
+				VN_RELE(BHV_TO_VNODE(bdp));
+				bdp = NULL;
+			}
+				
 			error = xfs_iget(dp->i_mount, NULL, *inum,
 					 0, ipp, 0);
 
@@ -273,9 +284,11 @@ xfs_dir_lookup_int(
 			bdp = XFS_ITOBHV(*ipp);
 			ASSERT(!(flags & DLF_NODNLC));
 			dnlc_enter_fast(dir_vp, fd, bdp, NOCRED);
+			bdp = NULL;
 		}
 	}
-
+	if (bdp)
+		VN_RELE(BHV_TO_VNODE(bdp));
 	return error;
 }
 
