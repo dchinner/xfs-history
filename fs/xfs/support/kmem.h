@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -78,7 +78,7 @@ static __inline unsigned int kmem_flags_convert(int flags)
         lflags = (flags & KM_NOSLEEP) ? GFP_ATOMIC : GFP_KERNEL;
         
         /* avoid recusive callbacks to filesystem during transactions */
-	if (PFLAGS_TEST_FSTRANS())
+	if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))
 		lflags &= ~__GFP_FS;
         
         return lflags;
