@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.170 $"
+#ident	"$Revision: 1.171 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -464,27 +464,34 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 #endif
 
 	/*
-	 * Set the default minimum read and write sizes.
+	 * Set the default minimum read and write sizes unless
+	 * already specified in a mount option.
 	 * We use smaller I/O sizes when the file system
 	 * is being used for NFS service (wsync mount option).
 	 */
-	if (mp->m_flags & XFS_MOUNT_WSYNC) {
-		readio_log = XFS_WSYNC_READIO_LOG;
-		writeio_log = XFS_WSYNC_WRITEIO_LOG;
-	} else {
-#if !defined(SIM) && _MIPS_SIM != _ABI64
-		if (physmem <= 8192) {		/* <= 32MB */
-			readio_log = XFS_READIO_LOG_SMALL;
-			writeio_log = XFS_WRITEIO_LOG_SMALL;
+	if (!(mp->m_flags & XFS_MOUNT_DFLT_IOSIZE)) {
+		if (mp->m_flags & XFS_MOUNT_WSYNC) {
+			readio_log = XFS_WSYNC_READIO_LOG;
+			writeio_log = XFS_WSYNC_WRITEIO_LOG;
 		} else {
+#if !defined(SIM) && _MIPS_SIM != _ABI64
+			if (physmem <= 8192) {		/* <= 32MB */
+				readio_log = XFS_READIO_LOG_SMALL;
+				writeio_log = XFS_WRITEIO_LOG_SMALL;
+			} else {
+				readio_log = XFS_READIO_LOG_LARGE;
+				writeio_log = XFS_WRITEIO_LOG_LARGE;
+			}
+#else
 			readio_log = XFS_READIO_LOG_LARGE;
 			writeio_log = XFS_WRITEIO_LOG_LARGE;
-		}
-#else
-		readio_log = XFS_READIO_LOG_LARGE;
-		writeio_log = XFS_WRITEIO_LOG_LARGE;
 #endif
+		}
+	} else {
+		readio_log = mp->m_readio_log;
+		writeio_log = mp->m_writeio_log;
 	}
+
 #if !defined(SIM) && _MIPS_SIM != _ABI64
 	/*
 	 * Set the number of readahead buffers to use based on
