@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.61 $"
+#ident	"$Revision: 1.64 $"
 
 /*
  * High level interface routines for log manager
@@ -608,7 +608,7 @@ xlog_push_buffers_to_disk(xfs_mount_t *mp)
 	    ((uint *)&(threshhold_lsn))[0] = CYCLE_LSN(tail_lsn);
 	}
 	((uint *)&(threshhold_lsn))[1] = threshhold_block;
-	xfs_trans_push_ail(mp, threshhold_lsn);
+	xfs_trans_push_ail(mp, NULL, threshhold_lsn, (xfs_lsn_t)0);
     }
 }	/* xlog_push_buffers_to_disk */
 
