@@ -1,4 +1,4 @@
-#ident "$Revision: 1.89 $"
+#ident "$Revision: 1.90 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -74,10 +74,12 @@
 STATIC int xfs_dir_leaf_lookup(xfs_da_args_t *args);
 STATIC int xfs_dir_leaf_removename(xfs_da_args_t *args, int *number_entries,
 						 int *total_namebytes);
+#ifndef SIM
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp,
 					     xfs_dir_put_t put);
+#endif
 STATIC int xfs_dir_leaf_replace(xfs_da_args_t *args);
 
 /*
@@ -86,10 +88,12 @@ STATIC int xfs_dir_leaf_replace(xfs_da_args_t *args);
 STATIC int xfs_dir_node_addname(xfs_da_args_t *args);
 STATIC int xfs_dir_node_lookup(xfs_da_args_t *args);
 STATIC int xfs_dir_node_removename(xfs_da_args_t *args);
+#ifndef SIM
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp,
 					     xfs_dir_put_t put);
+#endif
 STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
 
 /*

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.96 $"
+#ident	"$Revision: 1.97 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -349,8 +349,8 @@ xfs_ialloc_ag_alloc(
 	/*
 	 * Modify/log superblock values for inode count and inode free count.
 	 */
-	xfs_trans_mod_sb(tp, XFS_TRANS_SB_ICOUNT, newlen);
-	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, newlen);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_ICOUNT, (long)newlen);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, (long)newlen);
 	*alloc = 1;
 	return 0;
 }

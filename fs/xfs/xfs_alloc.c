@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.97 $"
+#ident	"$Revision: 1.98 $"
 
 /*
  * Free space allocation for XFS.
@@ -422,7 +422,7 @@ xfs_alloc_fixup_trees(
 	xfs_agblock_t	nfbno2;		/* second new free startblock */
 	xfs_extlen_t	nflen1;		/* first new free length */
 	xfs_extlen_t	nflen2;		/* second new free length */
-#define	WANT(x)	do { ASSERT(x); if (!(x)) { *stat = 0; return 0; }} while (0)
+#define	WANT(x)	{ ASSERT(x); if (!(x)) { *stat = 0; return 0; } }
 
 	/*
 	 * Look up the record in the by-size tree if necessary.

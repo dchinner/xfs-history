@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.180 $"
+#ident	"$Revision: 1.182 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1583,6 +1583,7 @@ xfs_bmap_alloc(
 	xfs_agnumber_t	fb_agno;	/* ag number of ap->firstblock */
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		nullfb;		/* true if ap->firstblock isn't set */
+	/* REFERENCED */
 	xfs_extlen_t	prod;		/* product factor for allocators */
 	xfs_extlen_t	rotor;		/* rt rotor value */
 	int		rt;		/* true if inode is realtime */
@@ -3798,7 +3799,7 @@ xfs_bmapi(
 				 */
 				if (XFS_IS_QUOTA_ON(ip->i_mount)) {
 					if (xfs_trans_reserve_blkquota(NULL, ip,
-							       alen)) {
+							       (long)alen)) {
 						if (n == 0) {
 							*nmap = 0;
 							return (EDQUOT);

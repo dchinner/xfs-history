@@ -105,10 +105,12 @@ xfs_iformat_btree(
 	xfs_dinode_t	*dip,
 	int		whichfork);
 
+#ifndef SIM
 STATIC int
 xfs_iunlink_remove(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip);
+#endif
 
 #ifdef DEBUG
 STATIC void
@@ -394,7 +396,7 @@ xfs_itobp(
 		 if (dip->di_core.di_magic != XFS_DINODE_MAGIC ||
 		     !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
 #ifdef DEBUG
-			prdev("bad inode magic/vsn daddr %lld #%d", dev,
+			prdev("bad inode magic/vsn daddr %lld #%d", (int)dev,
 				(long long)imap.im_blkno, i);
 #endif
 			bp->b_flags |= B_ERROR;
@@ -1830,6 +1832,7 @@ xfs_iunlink(
 	return 0;
 }	    
 
+#ifndef SIM
 /*
  * Pull the on-disk inode from the AGI unlinked list.
  */
@@ -1989,7 +1992,7 @@ xfs_iunlink_remove(
 	}
 	return 0;
 }
-
+#endif	/* !SIM */
 
 /*
  * This is called to return an inode to the inode free list.
@@ -2490,6 +2493,7 @@ xfs_ipin(
 	xfs_inode_t	*ip)
 {
 	int		s;
+	/* REFERENCED */
 	xfs_mount_t	*mp;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
@@ -2498,7 +2502,6 @@ xfs_ipin(
 	s = mutex_spinlock(&mp->m_ipinlock);
 	ip->i_pincount++;
 	mutex_spinunlock(&mp->m_ipinlock, s);
-	return;
 }
 
 /*
@@ -2511,6 +2514,7 @@ xfs_iunpin(
 	xfs_inode_t	*ip)
 {
 	int		s;
+	/* REFERENCED */
 	xfs_mount_t	*mp;
 
 	ASSERT(ip->i_pincount > 0);
@@ -2522,7 +2526,6 @@ xfs_iunpin(
 		sv_broadcast(&ip->i_pinsema);
 	}
 	mutex_spinunlock(&mp->m_ipinlock, s);
-	return;
 }
 
 /*
@@ -3197,7 +3200,6 @@ xfs_iprint(
 	xfs_bmbt_rec_t *ep;
 	xfs_extnum_t i;
 	xfs_extnum_t nextents;
-	xfs_mount_t *mp;
 
 	printf("Inode %x\n", ip);
 	printf("    i_dev %x\n", (uint)ip->i_dev);
@@ -3213,7 +3215,6 @@ xfs_iprint(
 	printf("    i_df.if_u1.if_extents/if_data %x\n", ip->i_df.if_u1.if_extents);
 	if (ip->i_df.if_flags & XFS_IFEXTENTS) {
 		nextents = ip->i_df.if_bytes / sizeof(*ep);
-		mp = ip->i_mount;
 		for (ep = ip->i_df.if_u1.if_extents, i = 0; i < nextents; i++, ep++) {
 			xfs_bmbt_irec_t rec;
 
@@ -3293,7 +3294,7 @@ xfs_iaccess(
 	 */
 	if (cr->cr_uid != ip->i_d.di_uid) {
 		mode >>= 3;
-		if (!groupmember(ip->i_d.di_gid, cr))
+		if (!groupmember((gid_t)ip->i_d.di_gid, cr))
 			mode >>= 3;
 	}
 	if ((ip->i_d.di_mode & mode) == mode)

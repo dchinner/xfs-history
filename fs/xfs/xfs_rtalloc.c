@@ -200,6 +200,7 @@ xfs_rtcheck_free_range(
 	int		*stat);		/* out: 1 for free, 0 for not */
 #endif
 
+#if !defined(SIM) || defined(DEBUG)
 /*
  * Check that the given range is either all allocated (val = 0) or 
  * all free (val = 1).
@@ -212,6 +213,7 @@ xfs_rtcheck_range(
 	int		val,		/* 1 for free, 0 for allocated */
 	xfs_rtblock_t	*new,		/* out: first block not matching */
 	int		*stat);		/* out: 1 for matches, 0 for not */
+#endif	/* !SIM */
 
 /*
  * Searching backward from start to limit, find the first block whose
@@ -1058,6 +1060,7 @@ xfs_rtcheck_free_range(
 }
 #endif
 
+#if !defined(SIM) || defined(DEBUG)
 /*
  * Check that the given range is either all allocated (val = 0) or 
  * all free (val = 1).
@@ -1234,6 +1237,7 @@ xfs_rtcheck_range(
 	*stat = 1;
 	return 0;
 }
+#endif	/* !SIM && !DEBUG */
 
 /*
  * Searching backward from start to limit, find the first block whose

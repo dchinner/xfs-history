@@ -1,4 +1,4 @@
-#ident "$Revision: 1.51 $"
+#ident "$Revision: 1.52 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -577,7 +577,7 @@ xfs_buf_item_init(
 	bip->bli_buf = bp;
 	bip->bli_format.blf_type = XFS_LI_BUF;
 	bip->bli_format.blf_blkno = (__int64_t)bp->b_blkno;
-	bip->bli_format.blf_len = BTOBB(bp->b_bcount);
+	bip->bli_format.blf_len = (ushort)BTOBB(bp->b_bcount);
 	bip->bli_format.blf_map_size = map_size;
 #ifdef XFS_BLI_TRACE
 	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, 0);
@@ -1143,7 +1143,7 @@ xfs_buf_iodone_callbacks(
 	ASSERT(bp->b_fsprivate != NULL);
 	if (geterror(bp) != 0) {
 		if ((bp->b_edev != lastdev) || ((lbolt - lasttime) > 500)) {
-			prdev("XFS write error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+			prdev("XFS write error in file system meta-data block %ld", (int)bp->b_edev, bp->b_blkno);
 			lasttime = lbolt;
 		}
 		lastdev = bp->b_edev;

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.78 $"
+#ident "$Revision: 1.79 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -152,6 +152,7 @@ xfs_iget(
 	vnode_t		*vp;
 	ulong		version;
 	int		error;
+	/* REFERENCED */
 	int		newnode;
 	vmap_t		vmap;
 

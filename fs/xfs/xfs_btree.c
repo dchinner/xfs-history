@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.51 $"
+#ident	"$Revision: 1.52 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -745,13 +745,16 @@ xfs_btree_read_bufs(
  * Read-ahead the block, don't wait for it, don't return a buffer.
  * Long-form addressing.
  */
+/* ARGSUSED */
 void
 xfs_btree_reada_bufl(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_fsblock_t	fsbno,		/* file system block number */
 	xfs_extlen_t	count)		/* count of filesystem blocks */
 {
+#ifndef SIM
 	daddr_t		d;
+#endif
 
 	ASSERT(fsbno != NULLFSBLOCK);
 #ifndef SIM
@@ -764,6 +767,7 @@ xfs_btree_reada_bufl(
  * Read-ahead the block, don't wait for it, don't return a buffer.
  * Short-form addressing.
  */
+/* ARGSUSED */
 void
 xfs_btree_reada_bufs(
 	xfs_mount_t	*mp,		/* file system mount point */
@@ -771,7 +775,9 @@ xfs_btree_reada_bufs(
 	xfs_agblock_t	agbno,		/* allocation group block number */
 	xfs_extlen_t	count)		/* count of filesystem blocks */
 {
+#ifndef SIM
 	daddr_t		d;
+#endif
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);

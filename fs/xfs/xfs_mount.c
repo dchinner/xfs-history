@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.142 $"
+#ident	"$Revision: 1.143 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -166,12 +166,14 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	int		readio_log;
 	int		writeio_log;
 	vmap_t		vmap;
-	__uint64_t	ret64;
 	daddr_t		d;
 	struct bdevsw	*my_bdevsw;
+	extern dev_t	rootdev;		/* from sys/systm.h */
+#ifndef SIM
+	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
 	boolean_t	needquotamount;
-	extern dev_t	rootdev;		/* from sys/systm.h */
+#endif
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
@@ -552,7 +554,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
 			VMAP(rvp, vmap);
 			prdev("Root inode %d is not a directory",
-			      rip->i_dev, rip->i_ino);
+			      (int)rip->i_dev, rip->i_ino);
 			xfs_iunlock(rip, XFS_ILOCK_EXCL);
 			VN_RELE(rvp);
 			vn_purge(rvp, &vmap);
@@ -800,7 +802,9 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	/* REFERENCED */
 	int		unused;
 	struct bdevsw	*my_bdevsw;
+#ifndef SIM
 	int		ndquots;
+#endif
 
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
 	

@@ -1737,7 +1737,7 @@ zone_t *xfs_da_state_zone;	/* anchor for state struct zone */
  * We don't put them on the stack since they're large.
  */
 xfs_da_state_t *
-xfs_da_state_alloc()
+xfs_da_state_alloc(void)
 {
 	return kmem_zone_zalloc(xfs_da_state_zone, KM_SLEEP);
 }

@@ -315,7 +315,6 @@ xfs_ioctl(
 	int		flag,
 	cred_t		*credp,
 	int		*rvalp);
-#endif	/* !SIM */
 
 STATIC void
 xfs_itruncate_cleanup(
@@ -323,16 +322,19 @@ xfs_itruncate_cleanup(
 	xfs_inode_t	*ip,
 	int		commit_flags,
 	int		fork);
+#endif	/* !SIM */
 
 STATIC int
 xfs_inactive(
 	bhv_desc_t	*bdp,
 	cred_t		*credp);
 
+#ifndef SIM
 STATIC void
 xfs_inactive_free_eofblocks(
 	xfs_mount_t	*mp,
 	xfs_inode_t	*ip);
+#endif	/* !SIM */
 
 STATIC int
 xfs_reclaim(
@@ -1320,9 +1322,7 @@ xfs_fsync(
 				    INCORE_TRYLOCK);
 			if (bp != NULL) {
 				if (bp->b_flags & B_DELWRI) {
-#ifndef SIM
 					buftrace("XFS_FSYNC", bp);
-#endif
 					if (bp->b_pincount > 0) {
 						xfs_log_force(ip->i_mount,
 							      (xfs_lsn_t)0,
@@ -1347,7 +1347,6 @@ xfs_fsync(
 	return error;
 }
 
-#endif	/* !SIM */
 
 
 /*
@@ -1395,7 +1394,6 @@ xfs_itruncate_cleanup(
 	xfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);
 }
 
-#ifndef SIM
 /*
  * This is called by xfs_inactive to free any blocks beyond eof,
  * when the link count isn't zero.
@@ -1510,10 +1508,13 @@ xfs_inactive(
 	cred_t		*credp)
 {
 	xfs_inode_t	*ip;
+			/* REFERENCED */
+	int		truncate;
+	vnode_t 	*vp;
+#ifndef SIM
 	xfs_trans_t	*tp;
 	xfs_trans_t	*ntp;
 	xfs_mount_t	*mp;
-	int		truncate;
 	int		error;
 	int		done;
 	int		committed;
@@ -1524,8 +1525,8 @@ xfs_inactive(
 	int		nmaps;
 	int		i;
 	int		size;
-	vnode_t 	*vp;
 	buf_t		*bp;
+#endif
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_inactive", (inst_t *)__return_address);
@@ -1844,8 +1845,8 @@ xfs_inactive(
 		   (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC)) ) { 
 		xfs_inactive_free_eofblocks(mp, ip);
 	}
-#endif /* !SIM */
  out:
+#endif /* !SIM */
 	/*
 	 * Clear all the inode's read-ahead state.  We need to take
 	 * the lock here even though the inode is inactive, because

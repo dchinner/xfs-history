@@ -1,4 +1,4 @@
-#ident "$Revision: 1.47 $"
+#ident "$Revision: 1.48 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -306,7 +306,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
 #endif
 		if ((bp != NULL) && (geterror(bp) != 0)) {
-			prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+			prdev("XFS read error in file system meta-data block %ld", (int)bp->b_edev, bp->b_blkno);
 			error = geterror(bp);
 			brelse(bp);
 			return error;
@@ -361,7 +361,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 
 			iowait(bp);
 			if (geterror(bp) != 0) {
-				prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+				prdev("XFS read error in file system meta-data block %ld", (int)bp->b_edev, bp->b_blkno);
 				error = geterror(bp);
 				brelse(bp);
 				return error;
@@ -395,7 +395,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		return 0;
 	}
 	if (geterror(bp) != 0) {
-			prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+			prdev("XFS read error in file system meta-data block %ld", (int)bp->b_edev, bp->b_blkno);
 			error = geterror(bp);
 			brelse(bp);
 			return error;

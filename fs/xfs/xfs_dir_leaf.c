@@ -249,11 +249,13 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	}
 }
 #else
+/* ARGSUSED */
 void
 xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 {
 }
 
+/* ARGSUSED */
 void
 xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 {
