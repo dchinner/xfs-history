@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.130 $"
+#ident	"$Revision: 1.131 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2627,7 +2627,7 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 	}
 
 	efip->efi_flags |= XFS_EFI_RECOVERED;
-	xfs_trans_commit(tp, 0);
+	xfs_trans_commit(tp, 0, NULL);
 }	/* xlog_recover_process_efi */
 #endif	/* !SIM */
 
@@ -2758,7 +2758,7 @@ xlog_recover_clear_agi_bucket(
 	xfs_trans_log_buf(tp, agibp, offset,
 			  (offset + sizeof(xfs_agino_t) - 1));
 
-	(void) xfs_trans_commit(tp, 0);
+	(void) xfs_trans_commit(tp, 0, NULL);
 }	/* xlog_recover_clear_agi_bucket */
 
 
