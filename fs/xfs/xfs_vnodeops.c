@@ -942,6 +942,17 @@ xfs_inactive(vnode_t	*vp,
 	xfs_bmap_free_t	free_list;
 
 	ip = XFS_VTOI(vp);
+
+	/*
+	 * If the inode is already free, then there can be nothing
+	 * to clean up here.
+	 */
+	if (ip->i_d.di_mode == 0) {
+		ASSERT(ip->i_bytes == 0);
+		ASSERT(ip->i_broot_bytes == 0);
+		return;
+	}
+
 	/*
 	 * Only do a truncate if it's a regular file with
 	 * some actual space in it.  It's OK to look at the
@@ -982,39 +993,52 @@ xfs_inactive(vnode_t	*vp,
 			 * a new one to free the inode with.
 			 */
 			tp = xfs_trans_alloc(mp, 0);
-		} else if (((ip->i_d.di_mode & IFMT) == IFLNK) &&
-			   (ip->i_d.di_size > XFS_LITINO(mp))) {
-			/*
-			 * We're freeing a symlink that has some blocks
-			 * allocated to it.  Free the blocks here.  We
-			 * know that we've got either 1 or 2 extents and
-			 * that we can free them all in one bunmapi call.
-			 */
-			ASSERT((ip->i_d.di_nextents > 0) &&
-			       (ip->i_d.di_nextents <= 2));
-			status = xfs_trans_reserve(tp, 0,
+		} else if ((ip->i_d.di_mode & IFMT) == IFLNK) {
+			if (ip->i_d.di_size > XFS_LITINO(mp)) {
+				/*
+				 * We're freeing a symlink that has some
+				 * blocks allocated to it.  Free the
+				 * blocks here.  We know that we've got
+				 * either 1 or 2 extents and that we can
+				 * free them all in one bunmapi call.
+				 */
+				ASSERT((ip->i_d.di_nextents > 0) &&
+				       (ip->i_d.di_nextents <= 2));
+				status = xfs_trans_reserve(tp, 0,
 						   XFS_ITRUNCATE_LOG_RES(mp),
 						   0, 0);
-			ASSERT(status == 0);
+				ASSERT(status == 0);
+				
+				xfs_trans_ijoin(tp, ip,
+						XFS_ILOCK_EXCL |
+						XFS_IOLOCK_EXCL);
+				xfs_trans_ihold(tp, ip);
 
-			xfs_trans_ijoin(tp, ip,
-					XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-			xfs_trans_ihold(tp, ip);
-
-			done = 0;
-			XFS_BMAP_INIT(&free_list, &first_block);
-			first_block = xfs_bunmapi(tp, ip, 0, 2, 2,
+				done = 0;
+				XFS_BMAP_INIT(&free_list, &first_block);
+				first_block = xfs_bunmapi(tp, ip, 0, 2, 2,
 						  first_block, &free_list,
 						  &done);
-			ASSERT(done);
-			(void) xfs_bmap_finish(&tp, &free_list,
-					       first_block, 0);
-			xfs_trans_commit(tp, 0);
-			/*
-			 * Since we used up the first transaction, allocate
-			 * a new one to free the inode with.
-			 */
-			tp = xfs_trans_alloc(mp, 0);
+				ASSERT(done);
+				(void) xfs_bmap_finish(&tp, &free_list,
+						       first_block, 0);
+				xfs_trans_commit(tp, 0);
+				ASSERT(ip->i_bytes == 0);
+				/*
+				 * Since we used up the first transaction,
+				 * allocate a new one to free the inode with.
+				 */
+				tp = xfs_trans_alloc(mp, 0);
+			} else {
+				/*
+				 * We're freeing a symlink which fit into
+				 * the inode.  Just free the memory used
+				 * to hold the old symlink.
+				 */
+				ASSERT(ip->i_bytes > 0);
+				xfs_idata_realloc(ip, -(ip->i_bytes));
+				ASSERT(ip->i_bytes == 0);
+			}
 		}
 
 		status = xfs_trans_reserve(tp, 0, XFS_IFREE_LOG_RES(mp),
@@ -1024,23 +1048,13 @@ xfs_inactive(vnode_t	*vp,
 		/*
 		 * Free the inode and clean up the iunlink item that
 		 * was logged when the link count went to 0. 
-		 * It may be that we were actually just looked at by
-		 * xfs_sync() and that we've already been through
-		 * here before.  If that's the case then ip->i_d.di_mode
-		 * will be 0 and we should just get out without
-		 * doing any harm.
 		 */
-		if (ip->i_d.di_mode != 0) {
-			xfs_trans_ijoin(tp, ip,
-					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-			xfs_trans_ihold(tp, ip);
-			xfs_trans_log_iui_done(tp, ip);
-			xfs_ifree(tp, ip);
+		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+		xfs_trans_ihold(tp, ip);
+		xfs_trans_log_iui_done(tp, ip);
+		xfs_ifree(tp, ip);
 
-			xfs_trans_commit(tp , 0);
-		} else {
-			xfs_trans_cancel(tp, 0);
-		}
+		xfs_trans_commit(tp , 0);
 	}
 
 	/*
