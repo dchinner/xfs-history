@@ -2248,6 +2248,7 @@ xfs_iroundup(
 			return v + 1;
 	}
 	ASSERT(0);
+	return( 0 );
 }
 
 /*
