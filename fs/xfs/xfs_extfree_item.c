@@ -119,12 +119,13 @@ xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
 }
 
 /*
- * Efi items have no locking, so just return success.
+ * Efi items have no locking or pushing, so return failure
+ * so that the caller doesn't bother with us.
  */
 STATIC uint
 xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
 {
-	return (1);
+	return 0;
 }
 
 /*
@@ -305,11 +306,12 @@ xfs_efd_item_unpin(xfs_efd_log_item_t *efdp)
 STATIC uint
 xfs_efd_item_trylock(xfs_efd_log_item_t *efdp)
 {
-	return 1;
+	return 0;
 }
 
 /*
- * Efd items have no locking, so just return.
+ * Efd items have no locking or pushing, so return failure
+ * so that the caller doesn't bother with us.
  */
 STATIC void
 xfs_efd_item_unlock(xfs_efd_log_item_t *efdp)
