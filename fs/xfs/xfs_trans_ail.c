@@ -1,9 +1,15 @@
 
 #include <sys/param.h>
-#include <sys/buf.h>
-#include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#ifdef SIM
+#define _KERNEL
+#endif
+#include <sys/buf.h>
+#include <sys/vnode.h>
+#ifdef SIM
+#undef _KERNEL
+#endif
 #ifndef SIM
 #include <sys/systm.h>
 #endif
@@ -30,6 +36,37 @@ STATIC void	xfs_ail_check(xfs_ail_entry_t *);
 #else
 #define	xfs_ail_check(a)
 #endif /* XFSDEBUG */
+
+
+/*
+ * This is called by the log manager code to determine the LSN
+ * of the tail of the log.  This is exactly the LSN of the first
+ * item in the AIL.  If the AIL is empty, then this function
+ * returns 0.
+ *
+ * We need the AIL lock in order to get a coherent read of the
+ * lsn of the last item in the AIL.
+ */
+xfs_lsn_t
+xfs_trans_tail_ail(xfs_mount_t *mp)
+{
+	int		s;
+	xfs_lsn_t	lsn;
+	xfs_log_item_t	*lip;
+
+	s = AIL_LOCK(mp);
+	lip = xfs_ail_min(&(mp->m_ail));
+	if (lip == NULL) {
+		lsn = (xfs_lsn_t)0;
+	} else {
+		lsn = lip->li_lsn;
+	}
+	AIL_UNLOCK(mp, s);
+
+	return lsn;
+}
+
+
 
 /*
  * This will be called from xfs_trans_do_commit() after a transaction
