@@ -1,4 +1,4 @@
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.9 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -511,7 +511,7 @@ xfs_qm_dqtobp(
 	xfs_dquot_t    		*dqp,
 	xfs_disk_dquot_t	**O_ddpp,
 	buf_t          		**O_bpp,
-	uint			doalloc)
+	uint			flags)
 {
 	xfs_fsblock_t   firstblock;
 	xfs_bmbt_irec_t map;
@@ -534,7 +534,7 @@ xfs_qm_dqtobp(
 	 */
 	if (dqp->q_blkno == (daddr_t) 0) {
 		/* We use the id as an index */
-		dqp->q_fileoffset = (xfs_fileoff_t) ((uint) id / 
+		dqp->q_fileoffset = (xfs_fileoff_t) ((uint)id / 
 						     XFS_QM_DQPERBLK(mp));
 		nmaps = 1;
 		quotip = XFS_DQ_TO_QIP(dqp);
@@ -572,7 +572,7 @@ xfs_qm_dqtobp(
 			/*
 			 * We don't allocate unless we're asked to 
 			 */
-			if (!doalloc)
+			if (!(flags & XFS_QMOPT_DQALLOC))
 				return (ENOENT);
 
 			ASSERT(tp);
@@ -617,9 +617,13 @@ xfs_qm_dqtobp(
 	/*
 	 * A simple sanity check in case we got a corrupted dquot...
 	 */
-	if (xfs_qm_dqcheck(ddq, id, "dqtobp")) {
-		xfs_trans_brelse(tp, bp);
-		return XFS_ERROR(EIO);
+	if (xfs_qm_dqcheck(ddq, id, 
+			   dqp->dq_flags & (XFS_DQ_USER|XFS_DQ_PROJ), 
+			   flags & XFS_QMOPT_DQREPAIR, "dqtobp")) {
+		if (!(flags & XFS_QMOPT_DQREPAIR)) {
+			xfs_trans_brelse(tp, bp);
+			return XFS_ERROR(EIO);
+		}
 	}
 
 	*O_bpp = bp;
@@ -640,7 +644,7 @@ xfs_qm_dqread(
 	xfs_trans_t	*tp,
 	xfs_dqid_t	id,
 	xfs_dquot_t 	*dqp, 	/* dquot to get filled in */
-	uint        	newdquot)
+	uint        	flags)
 {
 	xfs_disk_dquot_t *ddqp;
 	buf_t		 *bp;
@@ -651,7 +655,7 @@ xfs_qm_dqread(
 	 * dqp already knows its own type (PROJ/USER).
 	 */
 	xfs_dqtrace_entry(dqp, "DQREAD");
-	if (error = xfs_qm_dqtobp(tp, dqp, &ddqp, &bp, newdquot)) {
+	if (error = xfs_qm_dqtobp(tp, dqp, &ddqp, &bp, flags)) {
 		return (error);
 	}
 
@@ -692,7 +696,7 @@ xfs_qm_dqread(
 /*
  * allocate an incore dquot from the kernel heap,
  * and fill its core with quota information kept on disk.
- * If 'doalloc' is TRUE, it'll allocate a dquot on disk
+ * If XFS_QMOPT_DQALLOC is set, it'll allocate a dquot on disk
  * if it wasn't already allocated.
  */
 STATIC int
@@ -700,7 +704,7 @@ xfs_qm_idtodq(
 	xfs_mount_t  	*mp,
 	xfs_dqid_t   	id,	 /* prid or uid, depending on type */
 	uint	     	type,	 /* UDQUOT or PDQUOT */
-	uint	     	doalloc, /* if dquot's not on-disk, alloc it or not */
+	uint	     	flags, 	 /* DQALLOC, DQREPAIR */
 	xfs_dquot_t  	**O_dqpp)/* OUT : incore dquot, not locked */
 {
 	xfs_dquot_t 	*dqp;
@@ -710,10 +714,8 @@ xfs_qm_idtodq(
 
 	dqp = xfs_qm_dqinit(mp, id, type);
 	tp = NULL;
-	if (doalloc) {
+	if (flags & XFS_QMOPT_DQALLOC) {
 		tp = xfs_trans_alloc(mp, XFS_TRANS_QM_DQALLOC);
-
-		/* XXXsup */
 		if (error = xfs_trans_reserve(tp,
 				       mp->m_bm_maxlevels[XFS_DATA_FORK] + 
 					      XFS_DQUOT_CLUSTER_SIZE_FSB,
@@ -733,7 +735,7 @@ xfs_qm_idtodq(
 	 * Read it from disk; xfs_dqread() takes care of
 	 * all the necessary initialization of dquot's fields (locks, etc) 
 	 */
-	if (error = xfs_qm_dqread(tp, id, dqp, doalloc)) {
+	if (error = xfs_qm_dqread(tp, id, dqp, flags)) {
 		/*
 		 * This can happen if quotas got turned off (ESRCH),
 		 * or if the dquot didn't exist on disk and we ask to 
@@ -893,7 +895,7 @@ xfs_qm_dqget(
 	xfs_inode_t	*ip,   	  /* locked inode (optional) */
 	xfs_dqid_t   	id,       /* prid or uid, depending on type */
 	uint	     	type,  	  /* UDQUOT or PDQUOT */
-	uint	     	flags,    /* DQALLOC, DQSUSER */
+	uint	     	flags,    /* DQALLOC, DQSUSER, DQREPAIR */
 	xfs_dquot_t  	**O_dqpp) /* OUT : locked incore dquot */
 {
 	xfs_dquot_t 	*dqp;
@@ -967,7 +969,8 @@ xfs_qm_dqget(
 	 * This can return ENOENT if dquot didn't exist on disk and we didn't
 	 * ask it to allocate; ESRCH if quotas got turned off suddenly.
 	 */
-	if (error = xfs_qm_idtodq(mp, id, type, flags & XFS_QMOPT_DQALLOC,
+	if (error = xfs_qm_idtodq(mp, id, type, 
+				  flags & (XFS_QMOPT_DQALLOC|XFS_QMOPT_DQREPAIR),
 				  &dqp)) {
 		if (ip)
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1235,13 +1238,15 @@ xfs_qm_dqflush(
          * Make sure the location we're flushing out to really looks
          * like a dquot. Ditto for the dquot being flushed to disk.
          */
-	if (xfs_qm_dqcheck(ddqp, dqp->q_core.d_id, "dqflush (disk buf)")) {
+	if (xfs_qm_dqcheck(ddqp, dqp->q_core.d_id, 0, NULL, 
+			   "dqflush (disk buf)")) {
 		xfs_dqtrace_entry(dqp, "DQTOBP FAIL DQCHECK1");
 		brelse(bp);
 		xfs_dqfunlock(dqp);
 		return XFS_ERROR(EIO);
 	}
-	if (xfs_qm_dqcheck(&dqp->q_core, ddqp->d_id, "dqflush (disk copy)")) {
+	if (xfs_qm_dqcheck(&dqp->q_core, ddqp->d_id, 0, NULL, 
+			   "dqflush (disk copy)")) {
 		xfs_dqtrace_entry(dqp, "DQTOBP FAIL DQCHECK2");
 		brelse(bp);
 		xfs_dqfunlock(dqp);
@@ -1529,6 +1534,8 @@ int
 xfs_qm_dqcheck(
 	xfs_disk_dquot_t *ddq,
 	xfs_dqid_t	 id,
+	uint		 type,	  /* used only when IO_dorepair is true */
+	uint		 dorepair,/* repair if bad */
 	char		 *str)
 {
 	int errs;
@@ -1536,34 +1543,66 @@ xfs_qm_dqcheck(
 	errs = 0;
 	if (ddq->d_magic != XFS_DQUOT_MAGIC) {
 		cmn_err(CE_ALERT, 
-			"%s : ondisk-dquot 0x%x, magic 0x%x != 0x%x\n",
-			str, ddq, ddq->d_magic, XFS_DQUOT_MAGIC);
+			"%s : XFS dquot ID 0x%x, magic 0x%x != 0x%x",
+			str, id, ddq->d_magic, XFS_DQUOT_MAGIC);
 		errs++;
 	}
 	if (ddq->d_version != XFS_DQUOT_VERSION) {
 		cmn_err(CE_ALERT, 
-			"%s : ondisk-dquot 0x%x, version 0x%x != 0x%x\n",
-			str, ddq, ddq->d_magic, XFS_DQUOT_VERSION);
+			"%s : XFS dquot ID 0x%x, version 0x%x != 0x%x",
+			str, id, ddq->d_magic, XFS_DQUOT_VERSION);
 		errs++;
 	}
 
-	if (ddq->d_flags != XFS_DQ_USER &&
-	    ddq->d_flags != XFS_DQ_PROJ) {
+	if (ddq->d_flags != XFS_DQ_USER && ddq->d_flags != XFS_DQ_PROJ) {
 		cmn_err(CE_ALERT, 
-			"%s : ondisk-dquot 0x%x, unknown flags 0x%x\n",
-			str, ddq, ddq->d_flags);
+			"%s : XFS dquot ID 0x%x, unknown flags 0x%x",
+			str, id, ddq->d_flags);
 		errs++;
 	}
 	
-	if (id != -1) {
-		if (id != ddq->d_id) {
-			cmn_err(CE_ALERT, 
-				"%s : ondisk-dquot 0x%x, ID mismatch: "
-				"0x%x expected, found id 0x%x\n",
-				str, ddq, id, ddq->d_id);
-			errs++;
+	if (id != ddq->d_id) {
+		cmn_err(CE_ALERT, 
+			"%s : ondisk-dquot 0x%x, ID mismatch: "
+			"0x%x expected, found id 0x%x",
+			str, ddq, id, ddq->d_id);
+		errs++;
+	}
+
+#ifdef DEBUG
+	if (! errs) {
+		if (ddq->d_blk_softlimit &&
+		    ddq->d_bcount >= ddq->d_blk_softlimit) {
+			if (ddq->d_btimer == 0 && ddq->d_id != 0) {
+				cmn_err(CE_ALERT,
+					"%s : Dquot ID 0x%x (0x%x) "
+					"BLK TIMER NOT STARTED", 
+					str, (int) ddq->d_id, ddq);
+				errs++;
+			}
+		}
+		if (ddq->d_ino_softlimit &&
+		    ddq->d_icount >= ddq->d_ino_softlimit) {
+			if (ddq->d_itimer == 0 && ddq->d_id != 0) {
+				cmn_err(CE_ALERT,
+					"%s : Dquot ID 0x%x (0x%x) "
+					"INODE TIMER NOT STARTED", 
+					str, (int) ddq->d_id, ddq);
+				errs++;
+			}
 		}
 	}
+#endif
+	if (!errs || !dorepair)
+		return (errs);
+	
+	cmn_err(CE_NOTE,
+		"Re-initializing dquot ID 0x%x", id);
+	/*
+	 * Typically, a repair is only requested by quotacheck.
+	 */
+	bzero(ddq, sizeof(xfs_dqblk_t));
+	xfs_qm_dqinit_core(id, type, (xfs_dqblk_t *)ddq);
 	return (errs);
 }
 
