@@ -13,6 +13,6 @@ typedef struct xfs_imap {
 	ushort		im_boffset;	/* inode offset in block in bytes */
 } xfs_imap_t;
 	
-int	xfs_imap(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_imap_t *);
+int	xfs_imap(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_imap_t *, uint);
 
 #endif	/* !_FS_XFS_IMAP_H */
