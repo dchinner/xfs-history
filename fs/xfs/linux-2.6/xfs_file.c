@@ -305,12 +305,13 @@ STATIC int linvfs_readdir(
 		size = rlen - uio.uio_resid;
 		dbp = (dirent_t *)read_buf;
 		while (size > 0) {
-			size -= dbp->d_reclen;
 			if (filldir(dirent, dbp->d_name, dbp->d_reclen,
-					dbp->d_off, (linux_ino_t) dbp->d_ino,
+					(off_t) dbp->d_off,
+					(linux_ino_t) dbp->d_ino,
 					DT_UNKNOWN)) {
 				goto done;
 			}
+			size -= dbp->d_reclen;
 			dbp = nextdp(dbp);
 		}
 	}
