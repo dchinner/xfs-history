@@ -59,7 +59,7 @@
 #endif /* SIM */
 
 
-STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, __int64_t, int);
+STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int);
 STATIC void	xfs_sb_relse(buf_t *);
 
 /*
@@ -771,7 +771,8 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 	bp = xfs_trans_getsb(tp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
 	xfs_btree_offsets(fields, offsets, XFS_SB_NUM_BITS, &first, &last);
-	bcopy((caddr_t)&mp->m_sb + first, (caddr_t)sbp + first, last - first + 1);
+	bcopy((caddr_t)&mp->m_sb + first, (caddr_t)sbp + first,
+		last - first + 1);
 	xfs_trans_log_buf(tp, bp, first, last);
 }
 
@@ -786,7 +787,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
  * The SB_LOCK must be held when this routine is called.
  */
 STATIC int
-xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
+xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
 {
 	register int		scounter; /* short counter for 32 bit fields */
 	register long long	lcounter; /* long counter for 64 bit fields */
@@ -798,7 +799,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 	 * 0, then do not apply the delta and return EINVAL.
 	 */
 	switch (field) {
-	case XFS_SB_ICOUNT:
+	case XFS_SBS_ICOUNT:
 		lcounter = mp->m_sb.sb_icount;
 		lcounter += delta;
 		if (lcounter < 0) {
@@ -807,7 +808,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 		}
 		mp->m_sb.sb_icount = lcounter;
 		return (0);
-	case XFS_SB_IFREE:
+	case XFS_SBS_IFREE:
 		lcounter = mp->m_sb.sb_ifree;
 		lcounter += delta;
 		if (lcounter < 0) {
@@ -816,7 +817,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 		}
 		mp->m_sb.sb_ifree = lcounter;
 		return (0);
-	case XFS_SB_FDBLOCKS:
+	case XFS_SBS_FDBLOCKS:
 		lcounter = mp->m_sb.sb_fdblocks;
 		lcounter += delta;
 		if (lcounter < 0) {
@@ -824,7 +825,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 		}
 		mp->m_sb.sb_fdblocks = lcounter;
 		return (0);
-	case XFS_SB_FREXTENTS:
+	case XFS_SBS_FREXTENTS:
 		lcounter = mp->m_sb.sb_frextents;
 		lcounter += delta;
 		if (lcounter < 0) {
@@ -832,7 +833,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 		}
 		mp->m_sb.sb_frextents = lcounter;
 		return (0);
-	case XFS_SB_DBLOCKS:
+	case XFS_SBS_DBLOCKS:
 		lcounter = mp->m_sb.sb_dblocks;
 		lcounter += delta;
 		if (lcounter < 0) {
@@ -841,7 +842,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 		}
 		mp->m_sb.sb_dblocks = lcounter;
 		return (0);
-	case XFS_SB_AGCOUNT:
+	case XFS_SBS_AGCOUNT:
 		scounter = mp->m_sb.sb_agcount;
 		scounter += delta;
 		if (scounter < 0) {
@@ -850,7 +851,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 		}
 		mp->m_sb.sb_agcount = scounter;
 		return (0);
-	case XFS_SB_IMAX_PCT:
+	case XFS_SBS_IMAX_PCT:
 		scounter = mp->m_sb.sb_imax_pct;
 		scounter += delta;
 		if (scounter < 0) {
@@ -872,7 +873,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
  * routine to do the work.
  */
 int
-xfs_mod_incore_sb(xfs_mount_t *mp, __int64_t field, int delta)
+xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta)
 {
 	int	s;
 	int	status;
@@ -992,6 +993,3 @@ xfs_sb_relse(buf_t *bp)
 	bp->av_back = NULL;
 	vsema(&bp->b_lock);
 }
-
-
-
