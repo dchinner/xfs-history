@@ -1274,23 +1274,23 @@ static int	kdbm_xfs_xtrans_res(
  */
 char *tab_vflags[] = {
 	/* local only flags */
-	"INVALID0x01",		/*	 0x01 */
-	"VINACT",		/*	 0x02 */
-	"VRECLM",		/*	 0x04 */
-	"INVALID0x08",		/*	 0x08 */
+	"VINACT",		/*	 0x01 */
+	"VRECLM",		/*	 0x02 */
+	"VWAIT",		/*	 0x04 */
+	"VMODIFIED",		/*	 0x08 */
 	"INVALID0x10",		/*	 0x10 */
-	"VWAIT",		/*	 0x20 */
+	"INVALID0x20",		/*	 0x20 */
 	"INVALID0x40",		/*	 0x40 */
-	"VGONE",		/*	 0x80 */
-	"VREMAPPING",		/*	0x100 */
-	"VMOUNTING",		/*	0x200 */
-	"VLOCKHOLD",		/*	0x400 */
+	"INVALID0x80",		/*	 0x80 */
+	"INVALID0x100",		/*	0x100 */
+	"INVALID0x200",		/*	0x200 */
+	"INVALID0x400",		/*	0x400 */
 	"INVALID0x800",		/*	0x800 */
 	"INVALID0x1000",	/*     0x1000 */
-	"VINACTIVE_TEARDOWN",	/*     0x2000 */
-	"VSEMAPHORE",		/*     0x4000 */
-	"VUSYNC",		/*     0x8000 */
-	"VMODIFIED",		/*    0x10000 */
+	"INVALID0x2000",	/*     0x2000 */
+	"INVALID0x4000",	/*     0x4000 */
+	"INVALID0x8000",	/*     0x8000 */
+	"INVALID0x10000",	/*    0x10000 */
 	"INVALID0x20000",	/*    0x20000 */
 	"INVALID0x40000",	/*    0x40000 */
 	"INVALID0x80000",	/*    0x80000 */

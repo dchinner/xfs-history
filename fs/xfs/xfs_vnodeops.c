@@ -1760,11 +1760,6 @@ xfs_inactive(
 	    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_DESTROY)) {
 		(void) dm_send_destroy_event(bdp, DM_RIGHT_NULL);
 	}
-	/*
-	 * We don't mark the TEARDOWN flag, so
-	 * xfs_inactive always returns VN_INACTIVE_CACHE.
-	 */
-	ASSERT(! (vp->v_flag & VINACTIVE_TEARDOWN));
 
 	error = 0;
 	if (ip->i_d.di_nlink != 0) {

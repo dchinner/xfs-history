@@ -1156,11 +1156,7 @@ xfs_ialloc(
 			       VREPLICABLE |
 			   /*  VNONREPLICABLE | XXX uncomment this */
 			       VDOCMP |
-			       VFRLOCKS |
-			       VSEMAPHORE |
-			       VUSYNC |
-			       VREMAPPING |
-			       VMOUNTING;
+			       VFRLOCKS;
 
 		/*
 		 * For shared mounts, VNOSWAP is set in xfs_iget
