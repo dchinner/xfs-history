@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 #define	XFS_MACRO_C
 
@@ -346,6 +346,14 @@ int
 xfs_attr_sf_totsize(xfs_inode_t *dp)
 {
 	return XFS_ATTR_SF_TOTSIZE(dp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BHVTOI)
+xfs_inode_t *
+xfs_bhvtoi(bhv_desc_t *bhvp)
+{
+	return XFS_BHVTOI(bhvp);
 }
 #endif
 
@@ -1424,6 +1432,14 @@ void
 xfs_inode_clear_read_ahead(xfs_inode_t *ip)
 {
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_ITOBHV)
+bhv_desc_t *
+xfs_itobhv(xfs_inode_t *ip)
+{
+	return XFS_ITOBHV(ip);
 }
 #endif
 

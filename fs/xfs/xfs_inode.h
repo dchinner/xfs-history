@@ -1,21 +1,22 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.100 $"
+#ident "$Revision: 1.101 $"
 
+struct bhv_desc;
 struct buf;
 struct cred;
 struct grio_ticket;
 struct ktrace;
 struct vnode;
 struct xfs_bmbt_block;
+struct xfs_ext_attr;
 struct xfs_gap;
 struct xfs_inode;
 struct xfs_inode_log_item;
 struct xfs_mount;
 struct xfs_trans;
 struct zone;
-struct xfs_ext_attr;
 
 /*
  * This is the type used in the xfs inode hash table.
@@ -293,13 +294,26 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define	XFS_MAX_FILE_OFFSET	((1LL<<40)-1LL)
 #endif
 
-#if 0
-#define	XFS_VTOI(vp)		((xfs_inode_t *)((vp)->v_data))
-#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ITOV)
+struct vnode *xfs_itov(xfs_inode_t *ip);
+#define	XFS_ITOV(ip)		xfs_itov(ip)
+#else
 #define	XFS_ITOV(ip)		BHV_TO_VNODE(XFS_ITOBHV(ip))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ITOBHV)
+struct bhv_desc *xfs_itobhv(xfs_inode_t *ip);
+#define	XFS_ITOBHV(ip)		xfs_itobhv(ip)
+#else
 #define	XFS_ITOBHV(ip)		((struct bhv_desc *)(&((ip)->i_bhv_desc)))
-#define	XFS_BHVTOI(bhvp)	((xfs_inode_t *)(BHV_PDATA(bhvp)))
-
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BHVTOI)
+xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
+#define	XFS_BHVTOI(bhvp)	xfs_bhvtoi(bhvp)
+#else
+#define	XFS_BHVTOI(bhvp)	\
+	((xfs_inode_t *)((char *)(bhvp) - \
+			 (char *)&(((xfs_inode_t *)0)->i_bhv_desc)))
+#endif
 
 /*
  * Clear out the read-ahead state in the in-core inode.
