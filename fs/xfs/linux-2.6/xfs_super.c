@@ -409,7 +409,7 @@ linvfs_read_super(
 		goto fail_unmount;
 
 	sb->s_magic = XFS_SB_MAGIC;
-	sb->s_dirt = 1;  /*  Make sure we get regular syncs  */
+	sb->s_dirt = 1;
 
 	/* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
@@ -512,11 +512,11 @@ linvfs_read_inode(
 
 
 /*
- * The write method is only used to
- * trace interesting events in the life of a vnode.
+ * We do not actually write the inode here, just mark the
+ * super block dirty so that sync_supers calls us and
+ * forces the flush.
  */
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
 
 void
 linvfs_write_inode(
@@ -529,8 +529,8 @@ linvfs_write_inode(
 		vn_trace_entry(vp, "linvfs_write_inode",
 					(inst_t *)__return_address);
 	}
+	inode->i_sb->s_dirt = 1;
 }
-#endif	/* CONFIG_XFS_VNODE_TRACING */
 
 
 void
@@ -630,14 +630,13 @@ linvfs_write_super(
  	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
  	int		error; 
 
+	sb->s_dirt = 0;
 	if (sb->s_flags & MS_RDONLY) {
 		return;
 	}
 
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
 		sys_cred, error);
-
-	sb->s_dirt = 1;  /*  Keep the syncs coming.  */
 }
 
 
@@ -819,9 +818,7 @@ linvfs_quotactl(
 
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
-#ifdef	CONFIG_XFS_VNODE_TRACING
 	write_inode:		linvfs_write_inode,
-#endif
 #ifdef CONFIG_XFS_DMAPI
 	dmapi_mount_event:	linvfs_dmapi_mount,
 #endif

@@ -223,27 +223,28 @@ vfs_busydev(dev_t dev, int type)
 	
 	vfsp = LINVFS_GET_VFS(sb);
 again:
-		spin_lock_irqsave(&vfslock, s);
-		if (vfsp->vfs_dev == dev &&
-		    (type == VFS_FSTYPE_ANY || type == vfsp->vfs_fstype)) {
+	spin_lock_irqsave(&vfslock, s);
+	if (vfsp->vfs_dev == dev &&
+	    (type == VFS_FSTYPE_ANY || type == vfsp->vfs_fstype)) {
 
-			if (vfsp->vfs_flag & VFS_OFFLINE) {
-				spin_unlock_irqrestore(&vfslock, s);
-				return NULL;
-			}
-			if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
-				ASSERT(vfsp->vfs_flag & VFS_MWANT ||
-				       vfsp->vfs_busycnt == 0);
-				vfsp->vfs_flag |= VFS_MWAIT;
-				vfsp_wait(vfsp, 0, s);	 /* JIMJIM removed PZERO */
-				goto again;
-			}
-
-			ASSERT(vfsp->vfs_busycnt >= 0);
-			vfsp->vfs_busycnt++;
+		if (vfsp->vfs_flag & VFS_OFFLINE) {
+			spin_unlock_irqrestore(&vfslock, s);
+			drop_super(sb);
+			return NULL;
 		}
-		spin_unlock_irqrestore(&vfslock, s);
-		return vfsp;
+		if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
+			ASSERT(vfsp->vfs_flag & VFS_MWANT ||
+			       vfsp->vfs_busycnt == 0);
+			vfsp->vfs_flag |= VFS_MWAIT;
+			vfsp_wait(vfsp, 0, s);	 /* JIMJIM removed PZERO */
+			goto again;
+		}
+
+		ASSERT(vfsp->vfs_busycnt >= 0);
+		vfsp->vfs_busycnt++;
+	}
+	spin_unlock_irqrestore(&vfslock, s);
+	return vfsp;
 }
 
 STATIC void
@@ -280,6 +281,7 @@ vfs_devsearch_nolock(dev_t dev, int fstype)
 
 	if (sb) {
 		vfsp = LINVFS_GET_VFS(sb);
+		drop_super(sb);
                 if ((vfsp->vfs_dev == dev) &&
                     (fstype == VFS_FSTYPE_ANY || fstype == vfsp->vfs_fstype)) {
 			unlock_kernel();
@@ -295,6 +297,7 @@ vfs_unbusy(struct vfs *vfsp)
 {
 	long s;
 
+	drop_super(vfsp->vfs_super);
 	spin_lock_irqsave(&vfslock, s);
 	ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
 	ASSERT(vfsp->vfs_busycnt > 0);

@@ -132,6 +132,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 		validate_fields(dir);
 		d_instantiate(dentry, ip);
+		mark_inode_dirty(ip);
 	}
 
         if (!error && have_default_acl) {
@@ -210,6 +211,8 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 		VN_HOLD(vp);
 		validate_fields(ip);
 		d_instantiate(dentry, ip);
+		mark_inode_dirty(ip);
+		mark_inode_dirty(tdvp->v_inode);
 	}
 	return -error;
 }
@@ -236,6 +239,8 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 		inode->i_ctime = dir->i_ctime;
 		validate_fields(dir);	/* For size only */
 		validate_fields(inode);
+		mark_inode_dirty(inode);
+		mark_inode_dirty(dvp->v_inode);
 	}
 
 	return -error;
@@ -273,6 +278,8 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 			error = -linvfs_revalidate_core(ip, ATTR_COMM);
 			d_instantiate(dentry, ip);
 			validate_fields(dir);
+			mark_inode_dirty(ip);
+			mark_inode_dirty(dir);
 		}
 	}
 	return -error;
@@ -308,6 +315,8 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 		validate_fields(dir);
 		inode->i_version = ++event;
 		inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+		mark_inode_dirty(inode);
+		mark_inode_dirty(dir);
 	}
 	return -error;
 }
@@ -375,6 +384,7 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	validate_fields(odir);
 	if (ndir != odir)
 		validate_fields(ndir);
+	mark_inode_dirty(ndir);
 	return 0;
 }
 

@@ -667,6 +667,7 @@ xfs_vfsmount(
 	return (error);
 }
 
+#ifndef __linux__
 
 /*
  * xfs_mountroot() mounts the root file system.
@@ -843,6 +844,7 @@ xfs_vfsmountroot(
 {
 	return(xfs_mountroot(bhvtovfs(bdp), bdp, why));
 }
+#endif /* __linux__ */
 
 /*
  * xfs_ibusy searches for a busy inode in the mounted file system.
@@ -2023,14 +2025,12 @@ xfs_get_vnode(bhv_desc_t *bdp,
 
 vfsops_t xfs_vfsops = {
 	vfs_mount:		xfs_vfsmount,
-	vfs_rootinit:		xfs_rootinit,
 	vfs_dounmount:		fs_dounmount,
 	vfs_unmount:		xfs_unmount,
 	vfs_root:		xfs_root,
 	vfs_statvfs:		xfs_statvfs,
 	vfs_sync:		xfs_sync,
 	vfs_vget:		xfs_vget,
-	vfs_mountroot:		xfs_vfsmountroot,
 	vfs_get_vnode:		xfs_get_vnode,
 	vfs_dmapi_mount:	xfs_dm_mount
 };
