@@ -77,7 +77,7 @@
  * This lock is used by xfs_strat_write().
  * The xfs_strat_lock is initialized in xfs_init().
  */
-mutex_t	xfs_strat_lock;
+lock_t	xfs_strat_lock;
 
 /*
  * Variables for coordination with the xfsd daemons.
@@ -87,7 +87,7 @@ mutex_t	xfs_strat_lock;
 static int	xfsd_count;
 static buf_t	*xfsd_list;
 static int	xfsd_bufcount;
-mutex_t		xfsd_lock;
+lock_t		xfsd_lock;
 sv_t		xfsd_wait;
 
 /*
@@ -113,10 +113,13 @@ zone_t		*xfs_strat_write_zone;
  */
 zone_t		*xfs_gap_zone;
 
+#if defined(DEBUG) && !defined(SIM)
 /*
  * Global trace buffer for xfs_strat_write() tracing.
  */
 ktrace_t	*xfs_strat_trace_buf;
+#endif
+
 #ifndef DEBUG 
 #define	xfs_strat_write_bp_trace(tag, ip, bp)
 #define	xfs_strat_write_subbp_trace(tag, ip, bp, rbp, loff, lcnt, lblk)
@@ -245,7 +248,7 @@ xfs_delalloc_cleanup(
 #define	XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \
 					        << mp->m_writeio_log)
 
-#ifndef DEBUG
+#if !defined(DEBUG) || defined(SIM)
 #define	xfs_rw_enter_trace(tag, ip, uiop, ioflags)
 #define	xfs_iomap_enter_trace(tag, ip, offset, count);
 #define	xfs_iomap_map_trace(tag, ip, offset, count, bmapp, imapp)
@@ -344,7 +347,7 @@ xfs_iomap_map_trace(
 		     (void*)((unsigned long)(imapp->br_blockcount)),
 		     (void*)(__psint_t)(imapp->br_startblock));
 }
-#endif	/* DEBUG */
+#endif	/* DEBUG && !SIM*/
 	     
 /*
  * Fill in the bmap structure to indicate how the next bp
@@ -3243,7 +3246,7 @@ xfs_strat_read(
 }
 
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 
 void
 xfs_strat_write_bp_trace(
@@ -3343,7 +3346,9 @@ xfs_strat_write_subbp_trace(
 		     (void*)((unsigned long)(last_bcount)),
 		     (void*)(last_blkno));
 }
+#endif /* DEBUG && !SIM */
 
+#ifdef DEBUG
 /*
  * xfs_strat_write_check
  *
@@ -4891,7 +4896,7 @@ xfs_diordwr(vnode_t	*vp,
 
 
 
-mutex_t		xfs_refcache_lock;
+lock_t		xfs_refcache_lock;
 xfs_inode_t	**xfs_refcache;
 int		xfs_refcache_size;
 int		xfs_refcache_index;

@@ -224,8 +224,8 @@ xfs_init(
 	extern zone_t	*xfs_efd_zone;
 	extern zone_t	*xfs_efi_zone;
 #ifndef SIM
-	extern mutex_t	xfs_strat_lock;
-	extern mutex_t	xfsd_lock;
+	extern lock_t	xfs_strat_lock;
+	extern lock_t	xfsd_lock;
 	extern sv_t	xfsd_wait;
 	extern mutex_t	xfs_ancestormon;
 	extern zone_t	*xfs_bmap_zone;
@@ -243,9 +243,9 @@ xfs_init(
 	xfs_fstype = fstype;
 
 #ifndef SIM
-	mutex_init(&xfs_strat_lock, MUTEX_SPIN, "xfsstrat");
+	spinlock_init(&xfs_strat_lock, "xfsstrat");
 	mutex_init(&xfs_ancestormon, MUTEX_DEFAULT, "xfs_ancestor");
-	mutex_init(&xfsd_lock, MUTEX_SPIN, "xfsd");
+	spinlock_init(&xfsd_lock, "xfsd");
 	sv_init(&xfsd_wait, SV_DEFAULT, "xfsd");
 
 	/*
@@ -1224,7 +1224,7 @@ xfs_statvfs(
 	statp->f_blocks = sbp->sb_dblocks - lsize;
 	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks;
 	fakeinos = statp->f_bfree << sbp->sb_inopblog;
-	statp->f_files = MIN(sbp->sb_icount + fakeinos, 0xffffffffULL);
+	statp->f_files = MIN(sbp->sb_icount + fakeinos, XFS_MAXINUMBER);
 	statp->f_ffree = statp->f_favail =
 		statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	statp->f_flag = vf_to_stf(vfsp->vfs_flag);
