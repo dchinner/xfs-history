@@ -392,7 +392,7 @@ xfs_efd_init(xfs_mount_t	*mp,
 	efdp->efd_item.li_mountp = mp;
 	efdp->efd_efip = efip;
 	efdp->efd_format.efd_nextents = nextents;
-	efdp->efd_format.efd_efi_id = (__uint64_t)efip;
+	efdp->efd_format.efd_efi_id = efip->efi_format.efi_id;
 
 	return (efdp);
 }
