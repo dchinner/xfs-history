@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.57 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1036,6 +1036,7 @@ xfs_bmbt_lookup(
 				ASSERT(bp);
 				ASSERT(!geterror(bp));
 				xfs_btree_setbuf(cur, level, bp);
+				bp->b_ref = XFS_BMAP_BTREE_REF;
 			}
 			ASSERT(cur->bc_bufs[level]);
 		}
@@ -1306,6 +1307,7 @@ xfs_bmbt_read_agf(
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
 	ASSERT(bp);
 	ASSERT(!geterror(bp));
+	bp->b_ref = XFS_AGF_REF;
 	return bp;
 }
 

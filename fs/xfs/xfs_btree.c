@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.38 $"
+#ident	"$Revision: 1.39 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -681,6 +681,9 @@ xfs_btree_read_bufl(
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
 	ASSERT(!bp || !geterror(bp));
+	if (bp != NULL) {
+		bp->b_ref = XFS_GEN_LBTREE_REF;
+	}
 	return bp;
 }
 
@@ -704,6 +707,9 @@ xfs_btree_read_bufs(
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
 	ASSERT(!bp || !geterror(bp));
+	if (bp != NULL) {
+		bp->b_ref = XFS_GEN_SBTREE_REF;
+	}
 	return bp;
 }
 

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 /*
  * Free space allocation for xFS.
@@ -1081,6 +1081,7 @@ xfs_alloc_lookup(
 				mp->m_bsize, 0);
 			ASSERT(bp && !geterror(bp));
 			xfs_btree_setbuf(cur, level, bp);
+			bp->b_ref = XFS_ALLOC_BTREE_REF;
 		}
 		/*
 		 * Point to the btree block, now that we have the buffer.

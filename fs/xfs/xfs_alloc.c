@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.75 $"
+#ident	"$Revision: 1.76 $"
 
 /*
  * Free space allocation for xFS.
@@ -324,6 +324,7 @@ xfs_alloc_read_agfl(
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
 	ASSERT(bp);
 	ASSERT(!geterror(bp));
+	bp->b_ref = XFS_AGFL_REF;
 	return bp;
 }
 
@@ -1980,6 +1981,7 @@ xfs_alloc_read_agf(
 		ASSERT(pag->pagf_levels[XFS_BTNUM_CNTi] ==
 		       agf->agf_levels[XFS_BTNUM_CNTi]);
 	}
+	bp->b_ref = XFS_AGF_REF;
 	return bp;
 }
 
