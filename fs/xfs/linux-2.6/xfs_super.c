@@ -501,7 +501,7 @@ linvfs_fill_super(
 	vfsp->vfs_super = sb;
 
 	sb->s_blocksize = BBSIZE;
-	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
+	sb->s_blocksize_bits = BBSHIFT;
 	set_blocksize(sb->s_dev, BBSIZE);
 	set_posix_acl(sb);
 	sb->s_xattr_flags |= XATTR_MNT_FLAG_USER;
