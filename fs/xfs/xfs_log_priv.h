@@ -4,8 +4,6 @@
  * Macros, structures, prototypes for internal log manager use.
  */
 
-
-
 #define XLOG_NUM_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* need to outlaw as cycle XXX*/
@@ -24,6 +22,10 @@
 #define CYCLE_LSN(lsn)		(((uint *)&(lsn))[0])
 #define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1])
 #define XLOG_SET(f,b)		(((f) & (b)) == (b))
+#define GET_CYCLE(ptr)	(*(uint *)(ptr) == XLOG_HEADER_MAGIC_NUM ? *((uint *)(ptr)+1) : *(uint *)(ptr))
+
+#define BLK_AVG(blk1, blk2)	((blk1+blk2) >> 1)
+
 
 #ifdef _KERNEL
 #define xlog_panic(s)		{panic(s); }
@@ -193,36 +195,11 @@ typedef struct log {
 /* common routines */
 extern daddr_t	xlog_find_head(xlog_t *log);
 extern daddr_t  xlog_print_find_oldest(xlog_t *log);
+extern int	xlog_recover(xlog_t *log);
+extern void	xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
+extern buf_t *	xlog_get_bp(int);
+extern void	xlog_put_bp(buf_t *);
+extern void	xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
 
-typedef struct xlog_recover_item {
-	struct xlog_recover_item *ri_next;
-	struct xlog_recover_item *ri_prev;
-	int			 ri_type;
-	int			 ri_cnt;
-	int			 ri_total;	/* total regions */
-	void *			 ri_desc;
-	int			 ri_desc_len;
-	void *			 ri_buf1;
-	int			 ri_buf1_len;
-	void *			 ri_buf2;
-	int			 ri_buf2_len;
-} xlog_recover_item_t;
-
-typedef struct xlog_recover {
-	struct xlog_recover *r_next;
-	xlog_tid_t	    r_tid;
-	uint		    r_type;
-	int		    r_items;		/* number of items */
-	xfs_trans_id_t	    r_trans_tid;	/* internal transaction tid */
-	uint		    r_state;		/* not needed */
-	xlog_recover_item_t *r_transq;
-} xlog_recover_t;
-
-
-#define XLOG_RHASH_BITS  4
-#define XLOG_RHASH_SIZE	16
-#define XLOG_RHASH_SHIFT 2
-#define XLOG_RHASH(tid)	\
-	((((uint)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1))
 
 #endif	/* _XFS_LOG_PRIV_H */
