@@ -37,55 +37,15 @@
  *
  */
 
-#include <xfs_os_defs.h>
-
-#define FSID_T
-#include <sys/types.h>
-#include <linux/errno.h>
+#include <xfs.h>
 
 #undef  NODEV
 #include <linux/version.h>
-#include <linux/fs.h>
-#include <linux/sched.h>	/* To get current */
 #include <linux/locks.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
-
-#include <sys/sysmacros.h>
-#include <sys/vfs.h>
-#include <sys/pvfs.h>
-#include <sys/vnode.h>
-#include <ksys/behavior.h>
-#include <sys/mode.h>
-#include <sys/attributes.h>
-#include <linux/xfs_linux.h>
-#include <linux/xfs_cred.h>
+#include <linux/xfs_iops.h>
 #include <linux/xfs_file.h>
-#include <linux/page_buf.h>
-#include <xfs_buf.h>
-#include <xfs_iops.h>
-#include <xfs_types.h>
-#include <xfs_inum.h>
-#include <xfs_bmap_btree.h>
-#include <xfs_bmap.h>
-#include <xfs_dir.h>
-#include <xfs_dir_sf.h>
-#include <xfs_dir2.h>
-#include <xfs_dir2_sf.h>
-#include <xfs_attr_sf.h>
-#include <xfs_dinode.h>
-#include <xfs_inode.h>
-
-#include <xfs_bit.h> /* xfs_ag.h depends on xfs_bit.h */
-#include <xfs_ag.h> /* xfs_sb.h depends on xfs_ag.h */
-#include <xfs_sb.h> /* xfs_rw.h depends on xfs_sb.h */
-#include <xfs_rw.h> /* for XFS_FSB_TO_DB */
-
-#include <xfs_log.h> /* xfs_trans.h depends on xfs_log.h */
-#include <xfs_trans.h> /* xfs_mount.h depends on xfs_trans.h */
-#include <xfs_mount.h> /* for xfs_mount_t */
-
-#include <asm/uaccess.h> /* For copy_from_user */
 
 
 /*
@@ -748,8 +708,6 @@ linvfs_pb_bmap(struct inode *inode,
 
 	return -error;
 }
-
-extern int xfs_ilock_nowait(xfs_inode_t *, uint lock_flags);
 
 int xfs_hit_full_page, xfs_hit_nowait, xfs_hit_nowait_done;
 

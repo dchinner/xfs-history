@@ -29,38 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
-#include <xfs_os_defs.h>
 
-#ifdef SIM
-#define _KERNEL	1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/sysmacros.h>
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#else
-#include <sys/kmem.h>
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_trans_priv.h"
-#include "xfs_extfree_item.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
+#include <xfs.h>
 
 /*
  * This routine is called to allocate an "extent free intention"

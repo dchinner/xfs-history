@@ -30,41 +30,9 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
-#include <sys/debug.h>
+#include <xfs.h>
+#include <xfs_quota_priv.h>
 
-#include "xfs_buf.h"
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_trans_priv.h"
-#include "xfs_buf_item.h"
-#include "xfs_quota.h"
-#include "xfs_dqblk.h"
-#include "xfs_dquot_item.h"
-#include "xfs_dquot.h"
-#include "xfs_qm.h"
-#include "xfs_quota_priv.h"
 
 STATIC
 int		xfs_trans_dqresv( xfs_trans_t	*tp,
@@ -540,7 +508,7 @@ xfs_trans_apply_dquot_deltas(
 
 #ifdef QUOTADEBUG
 			if (qtrx->qt_rtblk_res != 0)
-				printf("RT res %d for 0x%x\n",
+				printk("RT res %d for 0x%x\n",
 				      (int) qtrx->qt_rtblk_res,
 				      dqp);
 #endif

@@ -1,7 +1,4 @@
-#ifndef __SYS_XFS_CLNT_H__
-#define __SYS_XFS_CLNT_H__
-
-/**************************************************************************
+/*
  *									  *
  * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -32,12 +29,10 @@
  * For further information regarding this notice, see: 
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
- *									  *
- **************************************************************************/
-#ident "$Revision: 1.19 $"
+ */
+#ifndef __XFS_CLNT_H__
+#define __XFS_CLNT_H__
 
-#include <sys/types.h>
- 
 /*
  * XFS arguments to the mount system call.
  */
@@ -87,14 +82,8 @@ struct xfs_args {
         int     servcell;       /* Server cell (internal testing only) */
 };
 
-#ifdef _KERNEL
+#ifdef __KERNEL__
 
-#ifndef __linux__
-#include <fs/xfs/xfs_types.h>
-#else
-#include <xfs_types.h>
-#endif
- 
 struct xfs_args32_ver_1 {
 	__int32_t	version;
 	__int32_t	flags;
@@ -189,7 +178,7 @@ struct xfs_args_ver_3 {
 	 (ap)->stimeout >= 0 || (ap)->ctimeout >= 0 || \
 	 (ap)->flags & (XFSMNT_CLNTONLY | XFSMNT_UNSHARED))
 
-#endif /* _KERNEL */
+#endif	/* __KERNEL__ */
 
 /*
  * XFS mount option flags
@@ -230,4 +219,4 @@ struct xfs_args_ver_3 {
                                                 /* (remount only) */
 #define XFSMNT_DMAPI		0x00200000	/* enable dmapi/xdsm */
 
-#endif /* !__SYS_XFS_CLNT_H__ */
+#endif	/* __XFS_CLNT_H__ */

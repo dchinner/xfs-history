@@ -29,27 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.20 $"
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
-
-#include <sys/types.h>
-#undef sysinfo
-#include <linux/kernel.h> /* for printk... remove later if needed */
-#include <linux/page_buf.h>
-#include <sys/cmn_err.h>
-#include <sys/debug.h>
-#include <ksys/vfile.h>
-#include <sys/fs_subr.h>
-#include <sys/kabi.h>
-#include <sys/param.h>
-#include <sys/poll.h>
-#include <sys/sysmacros.h>
-#include <sys/systm.h>
-#include <sys/vfs.h>
-#include <sys/pvfs.h>
-#include <sys/vnode.h>
+#include <xfs.h>
 
 /*
  * Implementation for VFS_DOUNMOUNT.
@@ -64,7 +45,6 @@ fs_dounmount(
 	struct vfs 	*vfsp = bhvtovfs(bdp);
         bhv_desc_t      *fbdp = vfsp->vfs_fbhv;
 	int 		error;
-	extern void 	nfs_purge_vfsp(struct vfs*);
 
 	/*
          * Wait for sync to finish and lock vfsp.  This also sets the

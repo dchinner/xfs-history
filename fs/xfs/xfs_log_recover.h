@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_LOG_RECOVER_H
-#define _XFS_LOG_RECOVER_H
-
-#ident	"$Revision$"
+#ifndef	__XFS_LOG_RECOVER_H__
+#define __XFS_LOG_RECOVER_H__
 
 /*
  * Macros, structures, prototypes for internal log manager use.
@@ -80,4 +78,4 @@ typedef struct xlog_recover {
 #define	XLOG_RECOVER_PASS1	1
 #define	XLOG_RECOVER_PASS2	2
 
-#endif /* _XFS_LOG_RECOVER_H */
+#endif	/* __XFS_LOG_RECOVER_H__ */

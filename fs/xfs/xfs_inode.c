@@ -29,77 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.301 $"
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define __KERNEL__ 1
-#define	_KERNEL 1
-#endif
-#include <sys/param.h>
-#include <sys/sysmacros.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#include <sys/acl.h>
-#ifdef SIM
-#undef __KERNEL__
-#undef _KERNEL
-#endif
-#include <sys/vfs.h>
-#include <sys/mode.h>
-#include <sys/kmem.h>
-#include <sys/ktrace.h>
-#include <sys/cmn_err.h>
-#ifdef SIM
-#include <stdio.h>
-#include <string.h>
-#include <sys/stat.h>
-#else
-#include <sys/systm.h>
-#endif
-#include <stddef.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_imap.h"
-#include "xfs_alloc.h"
-#include "xfs_ialloc.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_buf_item.h"
-#include "xfs_rw.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#include "xfs_dir2_trace.h"
-#include "xfs_utils.h"
-#ifdef DEBUG
-#include "xfs_quota.h"
-#endif
-#ifdef SIM
-#include "sim.h"
-#endif
-
-#include "xfs_arch.h"
 
 xfs_zone_t *xfs_ifork_zone;
 xfs_zone_t *xfs_inode_zone;
@@ -148,12 +80,10 @@ xfs_iformat_btree(
 	xfs_dinode_t	*dip,
 	int		whichfork);
 
-#ifndef SIM
 STATIC int
 xfs_iunlink_remove(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip);
-#endif
 
 #ifdef DEBUG
 STATIC void
@@ -179,16 +109,14 @@ xfs_itrunc_trace(
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
 #endif /* DEBUG */		     
 
-#ifndef SIM
 xfs_inode_t *
 xfs_get_inode(dev_t , xfs_ino_t);
-#endif /* SIM */
 
 /*
  * Check that none of the inode's in the buffer have a next
  * unlinked field of 0.
  */
-#if defined(DEBUG) && !defined(XFS_REPAIR_SIM)
+#if defined(DEBUG)
 void
 xfs_inobp_check(
 	xfs_mount_t	*mp,
@@ -202,7 +130,7 @@ xfs_inobp_check(
 
 	for (i = 0; i < j; i++) {
 		dip = (xfs_dinode_t *)xfs_buf_offset(bp,
-				       i * mp->m_sb.sb_inodesize);
+					i * mp->m_sb.sb_inodesize);
 		if (INT_ISZERO(dip->di_next_unlinked, ARCH_CONVERT))  {
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"Detected a bogus zero next_unlinked field in incore inode buffer 0x%p.  About to pop an ASSERT.",
@@ -211,9 +139,8 @@ xfs_inobp_check(
 		}
 	}
 }
-#endif /* DEBUG && !XFS_REPAIR_SIM */
+#endif
 
-#ifndef SIM
 /*
  * called from bwrite on xfs inode buffers
  */
@@ -258,7 +185,6 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 
 	return;
 }
-#endif /* !SIM */
 
 /*
  * This routine is called to map an inode number within a file
@@ -372,7 +298,7 @@ xfs_itobp(
 	xfs_buf_t	*bp;
 	int		error;
 	xfs_imap_t	imap;
-#ifndef XFS_REPAIR_SIM
+#ifdef __KERNEL__
 	int		i;
 	int		ni;
 #endif
@@ -427,12 +353,12 @@ xfs_itobp(
 	if (error) {
 		return error;
 	}
-#ifndef XFS_REPAIR_SIM
+#ifdef __KERNEL__
 	/*
 	 * Validate the magic number and version of every inode in the buffer
 	 * (if DEBUG kernel) or the first inode in the buffer, otherwise.
 	 */
-#if defined(DEBUG)
+#ifdef DEBUG
 	ni = BBTOB(imap.im_len) >> mp->m_sb.sb_inodelog;
 #else
 	ni = 1;
@@ -450,13 +376,13 @@ xfs_itobp(
 #ifdef DEBUG
 			prdev("bad inode magic/vsn daddr 0x%Lx #%d (magic=%x)", 
 				mp->m_dev, imap.im_blkno, i,
-                                INT_GET(dip->di_core.di_magic, ARCH_CONVERT));
+				INT_GET(dip->di_core.di_magic, ARCH_CONVERT));
 #endif
 			xfs_trans_brelse(tp, bp);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 	}
-#endif /* !XFS_REPAIR_SIM */
+#endif	/* __KERNEL__ */
 
 	xfs_inobp_check(mp, bp);
 
@@ -890,7 +816,6 @@ xfs_iread(
 	 * Initialize inode's trace buffers.
 	 * Do this before xfs_iformat in case it adds entries.
 	 */
-#ifndef SIM
 #ifdef XFS_BMAP_TRACE
 	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE, KM_SLEEP);
 #endif
@@ -909,7 +834,6 @@ xfs_iread(
 #ifdef XFS_DIR2_TRACE
 	ip->i_dir_trace = ktrace_alloc(XFS_DIR2_KTRACE_SIZE, KM_SLEEP);
 #endif
-#endif /* !SIM */
 
 	/*
 	 * If we got something that isn't an inode it means someone
@@ -1084,7 +1008,6 @@ xfs_ialloc(
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
 	uint		flags;
-	uint_t		status;
 	int		error;
 	int		i;
 
@@ -1092,7 +1015,7 @@ xfs_ialloc(
 	 * Call the space management code to pick
 	 * the on-disk inode to be allocated.
 	 */
-#ifndef SIM
+#ifdef __KERNEL__
 	ASSERT(pip != NULL);
 #endif
 	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode, okalloc,
@@ -1143,13 +1066,13 @@ xfs_ialloc(
 		 */
 	}
 
-#ifndef SIM
+#ifdef __KERNEL__
 	/*
 	 * Project ids won't be stored on disk if we are using a version 1 inode.
 	 */ 
 	if ( (prid != 0) && (ip->i_d.di_version == XFS_DINODE_VERSION_1))
 		xfs_bump_ino_vers2(tp, ip);
-#endif /* SIM */
+#endif
 
 	/*
 	 * For multiple groups support: if ISGID bit is set in the parent
@@ -1209,7 +1132,7 @@ xfs_ialloc(
 	case IFMNT:
 		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
 		ip->i_df.if_flags = 0;
-		uuid_create(&ip->i_df.if_u2.if_uuid, &status);
+		uuid_create(&ip->i_df.if_u2.if_uuid);
 		flags |= XFS_ILOG_UUID;
 		break;
 	default:
@@ -1391,8 +1314,6 @@ xfs_itrunc_trace(
 		     (void*)0);
 }
 #endif
-
-#ifndef SIM
 
 /*
  * Start the truncation of the file to new_size.  The new size
@@ -1774,7 +1695,6 @@ xfs_itruncate_finish(
 	xfs_itrunc_trace(XFS_ITRUNC_FINISH2, ip, 0, new_size, 0, 0);
 	return 0;
 }
-#endif	/* !SIM */
 
 
 /*
@@ -1844,7 +1764,6 @@ xfs_igrow_finish(
 }
 
 
-#ifndef SIM
 /*
  * This is called when the inode's link count goes to 0.
  * We place the on-disk inode on a list in the AGI.  It
@@ -1943,7 +1862,6 @@ xfs_iunlink(
 	return 0;
 }	    
 
-#ifndef SIM
 /*
  * Pull the on-disk inode from the AGI unlinked list.
  */
@@ -2104,7 +2022,6 @@ xfs_iunlink_remove(
 	}
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * This is called to return an inode to the inode free list.
@@ -2161,7 +2078,6 @@ xfs_ifree(
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * Reallocate the space for if_broot based on the number of records
@@ -2294,8 +2210,8 @@ xfs_iroot_realloc(
 		XFS_IFORK_SIZE(ip, whichfork) + XFS_BROOT_SIZE_ADJ);
 	return;
 }
-	
-	
+
+
 /*
  * This is called when the amount of space needed for if_extents
  * is increased or decreased.  The change in size is indicated by
@@ -2592,7 +2508,6 @@ xfs_idestroy(
 	sv_destroy(&ip->i_pinsema);
 	spinlock_destroy(&ip->i_ipinlock);
 	xfs_iocore_destroy(&ip->i_iocore);
-#ifndef SIM
 #ifdef XFS_BMAP_TRACE
 	ktrace_free(ip->i_xtrace);
 #endif
@@ -2610,7 +2525,6 @@ xfs_idestroy(
 #endif
 #ifdef XFS_DIR2_TRACE
 	ktrace_free(ip->i_dir_trace);
-#endif
 #endif
 	if (ip->i_itemp) {
 		/* XXXdpd should be able to assert this but shutdown
@@ -2933,7 +2847,8 @@ xfs_iflush_fork(
 	case XFS_DINODE_FMT_UUID:
 		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
 			ASSERT(whichfork == XFS_DATA_FORK);
-			dip->di_u.di_muuid = ip->i_df.if_u2.if_uuid;
+			bcopy(&ip->i_df.if_u2.if_uuid, &dip->di_u.di_muuid,
+				sizeof(uuid_t));
 		}
 		break;
 
@@ -3160,9 +3075,6 @@ xfs_iflush(
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 	}
 
-#ifdef SIM
-	error = xfs_bwrite(mp, bp);
-#else
 	if (flags & INT_DELWRI) {
 		xfs_bdwrite(mp, bp);
 	} else if (flags & INT_ASYNC) {
@@ -3170,8 +3082,6 @@ xfs_iflush(
 	} else {
 		error = xfs_bwrite(mp, bp);
 	}
-#endif /* SIM */
-
 	return error;
 
 corrupt_out:
@@ -3560,75 +3470,6 @@ xfs_iflush_all(
 	return !busy;
 }
 
-#if defined(SIM) && defined(DEBUG)
-void
-xfs_iprint(
-	xfs_inode_t	*ip)
-{
-	xfs_dinode_core_t *dip;
-	xfs_bmbt_rec_t *ep;
-	xfs_extnum_t i;
-	xfs_extnum_t nextents;
-
-	printf("Inode %p\n", ip);
-	printf("    i_dev %x\n", (uint)ip->i_dev);
-	printf("    i_ino %Lx\n", ip->i_ino);
-
-	printf("    i_flags %x ", (int)ip->i_flags);
-	if (ip->i_df.if_flags & XFS_IFEXTENTS) {
-		printf("EXTENTS ");
-	}
-	printf("\n");
-
-	printf("    i_df.if_bytes %d\n", ip->i_df.if_bytes);
-	printf("    i_df.if_u1.if_extents/if_data %p\n", ip->i_df.if_u1.if_extents);
-	if (ip->i_df.if_flags & XFS_IFEXTENTS) {
-		nextents = ip->i_df.if_bytes / (uint)sizeof(*ep);
-		for (ep = ip->i_df.if_u1.if_extents, i = 0; i < nextents; i++, ep++) {
-			xfs_bmbt_irec_t rec;
-
-			xfs_bmbt_get_all(ep, &rec);
-			printf("\t%d: startoff %Lu, startblock 0x%Lx,"
-			" blockcount %Lu, state %d\n",
-				i, (xfs_dfiloff_t)rec.br_startoff,
-				(xfs_dfsbno_t)rec.br_startblock,
-				(xfs_dfilblks_t)rec.br_blockcount,
-				(int)rec.br_state);
-		}
-	}
-	printf("    i_df.if_broot %p\n", ip->i_df.if_broot);
-	printf("    i_df.if_broot_bytes %x\n", ip->i_df.if_broot_bytes);
-
-	dip = &(ip->i_d);
-	printf("\nOn disk portion\n");
-	printf("    di_magic %x\n", dip->di_magic);
-	printf("    di_mode %o\n", dip->di_mode);
-	printf("    di_version %x\n", (uint)dip->di_version);
-	switch (ip->i_d.di_format) {
-	case XFS_DINODE_FMT_LOCAL:
-		printf("    Inline inode\n");
-		break;
-	case XFS_DINODE_FMT_EXTENTS:
-		printf("    Extents inode\n");
-		break;
-	case XFS_DINODE_FMT_BTREE:
-		printf("    B-tree inode\n");
-		break;
-	default:
-		printf("    Other inode\n");
-		break;
-	}
-	printf("   di_nlink %x\n", dip->di_nlink);
-	printf("   di_uid %d\n", dip->di_uid); 
-	printf("   di_gid %d\n", dip->di_gid);
-	printf("   di_nextents %d\n", dip->di_nextents);
-	printf("   di_size %Ld\n", dip->di_size);
-	printf("   di_gen %x\n", dip->di_gen);
-	printf("   di_extsize %d\n", dip->di_extsize);
-	printf("   di_flags %x\n", dip->di_flags);
-	printf("   di_nblocks %Ld\n", dip->di_nblocks);
-}
-#endif	/* SIM && DEBUG */
 
 /*
  * xfs_iaccess: check accessibility of inode/cred for mode.
@@ -3639,8 +3480,8 @@ xfs_iaccess(
 	mode_t		mode)
 {
 	int error;
-#ifndef SIM
 	mode_t orgmode = mode;
+
 	/*
 	 * Verify that the MAC policy allows the requested access.
 	 */
@@ -3675,7 +3516,6 @@ xfs_iaccess(
 #endif	/* NOISE */
 		return XFS_ERROR(EACCES);
 	}
-#endif
 	return XFS_ERROR(EACCES);
 }
 
@@ -3747,7 +3587,6 @@ xfs_ichgtime(xfs_inode_t *ip,
 	     int flags)
 {
 	timespec_t	tv;
-	extern void	nanotime_syscall(timespec_t *);
 
 	/*
 	 * We're not supposed to change timestamps in readonly-mounted
@@ -3765,7 +3604,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 			== XFS_ICHGTIME_ACC))
 		return;
 
-	nanotime_syscall(&tv);
+	nanotime(&tv);
 	if (flags & XFS_ICHGTIME_MOD) {
 		ip->i_d.di_mtime.t_sec = (__int32_t)tv.tv_sec;
 		ip->i_d.di_mtime.t_nsec = (__int32_t)tv.tv_nsec;
@@ -3792,7 +3631,6 @@ xfs_ichgtime(xfs_inode_t *ip,
 	ip->i_update_core = 1;
 }
 
-#ifndef SIM
 /*
  * xfs_get_inode()
  *
@@ -3893,5 +3731,3 @@ xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, inst_t *ra)
 		     
 }
 #endif /* ILOCK_TRACE */
-
-#endif /* SIM */

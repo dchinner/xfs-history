@@ -29,53 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: xfs_dfrag.c,v 1.21 2000/07/31 16:16:28 lord Exp $"
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
-#include <linux/file.h>
-
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <linux/xfs_sema.h>
-#include <sys/debug.h>
-#include <sys/kmem.h>
-#include <sys/systm.h>
-#include <sys/vnode.h>
-
-#include <sys/kabi.h>
-#include <ksys/cell_config.h>
-#include <sys/vfs.h>
-#include <sys/uuid.h>
-#include <sys/mode.h>
-
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_ag.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_ialloc.h"
-#include "xfs_itable.h"
-#include "xfs_dfrag.h"
-#include "xfs_error.h"
-#include "xfs_cxfs.h"
-#include "xfs_rw.h"
+#include <xfs.h>
+#include <xfs_dfrag.h>
 
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
 extern int xfs_bmap_count_blocks( xfs_trans_t *, xfs_inode_t *, int, int *); 

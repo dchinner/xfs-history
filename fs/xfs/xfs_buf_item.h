@@ -29,14 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_BUF_ITEM_H
-#define	_XFS_BUF_ITEM_H
-
-#ident "$Revision: 1.30 $"
-
-struct xfs_buf;
-struct ktrace;
-struct xfs_mount;
+#ifndef	__XFS_BUF_ITEM_H__
+#define	__XFS_BUF_ITEM_H__
 
 /*
  * This is the structure used to lay out a buf log item in the
@@ -94,6 +88,22 @@ typedef struct xfs_buf_log_format_t {
 #define	NBWORD			(NBBY * sizeof(unsigned int))
 
 /*
+ * buf log item flags
+ */
+#define	XFS_BLI_HOLD		0x01
+#define	XFS_BLI_DIRTY		0x02
+#define	XFS_BLI_STALE		0x04
+#define	XFS_BLI_LOGGED		0x08
+#define	XFS_BLI_INODE_ALLOC_BUF	0x10
+
+
+#ifdef __KERNEL__
+
+struct xfs_buf;
+struct ktrace;
+struct xfs_mount;
+
+/*
  * This is the in core log item structure used to track information
  * needed to log buffers.  It tracks how many times the lock has been
  * locked, and which 128 byte chunks of the buffer are dirty.
@@ -115,15 +125,6 @@ typedef struct xfs_buf_log_item {
 } xfs_buf_log_item_t;
 
 /*
- * buf log item flags
- */
-#define	XFS_BLI_HOLD		0x01
-#define	XFS_BLI_DIRTY		0x02
-#define	XFS_BLI_STALE		0x04
-#define	XFS_BLI_LOGGED		0x08
-#define	XFS_BLI_INODE_ALLOC_BUF	0x10
-
-/*
  * This structure is used during recovery to record the buf log
  * items which have been canceled and should not be replayed.
  */
@@ -141,7 +142,7 @@ typedef struct xfs_buf_cancel {
 #define	XFS_BLI_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_BLI_TRACE
 #endif
 
@@ -174,4 +175,6 @@ xfs_buf_item_flush_log_debug(
 #define	xfs_buf_item_flush_log_debug(bp, first, last)
 #endif
 
-#endif	/* _XFS_BUF_ITEM_H */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_BUF_ITEM_H__ */

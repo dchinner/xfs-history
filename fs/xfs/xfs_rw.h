@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_RW_H
-#define	_XFS_RW_H
-
-#ident "$Revision: 1.54 $"
+#ifndef	__XFS_RW_H__
+#define	__XFS_RW_H__
 
 struct bhv_desc;
 struct bmapval;
@@ -128,7 +126,7 @@ xfs_daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #define	XFS_STRAT_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_RW_TRACE
 #undef XFS_STRAT_TRACE
 #endif
@@ -136,56 +134,15 @@ xfs_daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 /*
  * Prototypes for functions in xfs_rw.c.
  */
-int
-xfs_read(struct bhv_desc	*bdp,
-	 struct uio		*uiop,
-	 int			ioflag,
-	 struct cred		*credp,
-	 struct flid		*fl);
 
 int
 xfs_write_clear_setuid(
 	struct xfs_inode	*ip);
 
-int
-xfs_write(struct bhv_desc	*bdp,
-	  struct uio		*uiop,
-	  int			ioflag,
-	  struct cred		*credp,
-	  struct flid		*fl);
-
 int 
 xfs_bwrite(
 	struct xfs_mount 	*mp,
 	struct xfs_buf		*bp);
-int
-xfsbdstrat(
-	struct xfs_mount 	*mp,
-	struct xfs_buf		*bp);
-
-void
-xfs_strategy(struct bhv_desc	*bdp,
-	     struct xfs_buf		*bp);
-
-void
-xfs_strat_write_iodone(struct xfs_buf *bp);
-
-int
-xfs_bmap(struct bhv_desc	*bdp,
-	 xfs_off_t		offset,
-	 ssize_t		count,
-	 int			flags,
-	 struct cred		*credp,
-	 struct bmapval		*bmapp,
-	 int			*nbmaps);
-
-int
-xfs_zero_eof(
-	vnode_t			*vp,
-	struct xfs_iocore	*io,
-	xfs_off_t		offset,
-	xfs_fsize_t		isize,
-	struct pm		*pmp);
 
 void
 xfs_inval_cached_pages(
@@ -196,17 +153,13 @@ xfs_inval_cached_pages(
 	void			*dio);
 
 int
-xfs_bioerror(struct xfs_buf *b);
+xfs_bioerror(
+	struct xfs_buf		*b);
 
-#ifndef SIM
 /*
  * XFS I/O core functions
  */
-
-extern int xfs_iomap_read(struct xfs_iocore *, xfs_off_t, size_t,
-	struct bmapval *, int *, struct pm *, int *, unsigned int);
 extern int xfs_bioerror_relse(struct xfs_buf *);
-#endif
 
 
 /*
@@ -250,4 +203,4 @@ xfs_ioerror_alert(
 	dev_t			dev,
 	xfs_daddr_t			blkno);
 	  
-#endif /* _XFS_RW_H */
+#endif /* __XFS_RW_H__ */

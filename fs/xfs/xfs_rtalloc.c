@@ -29,71 +29,19 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.60 $"
 
 /*
  * Free realtime space allocation for XFS.
  */
-#include <xfs_os_defs.h>
 
-#ifdef SIM
-#define _KERNEL	1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/uuid.h>
+#include <xfs.h>
 #include <linux/grio.h>
-#include <sys/debug.h>
-#include <sys/vnode.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <stddef.h>
-#include <sys/cmn_err.h>
-#ifdef SIM
-#include <stdlib.h>
-#include <stdio.h>
-#else
-#include <sys/kmem.h>
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_bit.h"
-#include "xfs_rtalloc.h"
-#include "xfs_error.h"
-#include "xfs_rw.h"
-#include "xfs_inode_item.h"
-#include "xfs_trans_space.h"
-#ifdef SIM
-#include "sim.h"
-#endif
+
 
 /*
  * Prototypes for internal functions.
  */
 
-#ifndef SIM
 /*
  * Allocate space to the bitmap or summary file, and zero it, for growfs.
  */
@@ -205,7 +153,6 @@ xfs_rtany_summary(
 	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	int		*stat);		/* out: any good extents here? */
-#endif	/* !SIM */
 
 /*
  * Get a buffer for the bitmap or summary file block specified.
@@ -257,7 +204,7 @@ xfs_rtcheck_free_range(
 	int		*stat);		/* out: 1 for free, 0 for not */
 #endif
 
-#if !defined(SIM) || defined(DEBUG)
+#if defined(DEBUG)
 /*
  * Check that the given range is either all allocated (val = 0) or 
  * all free (val = 1).
@@ -271,9 +218,8 @@ xfs_rtcheck_range(
 	int		val,		/* 1 for free, 0 for allocated */
 	xfs_rtblock_t	*new,		/* out: first block not matching */
 	int		*stat);		/* out: 1 for matches, 0 for not */
-#endif	/* !SIM */
+#endif	/* */
 
-#ifndef SIM
 /*
  * Copy and transform the summary file, given the old and new
  * parameters in the mount structures.
@@ -283,7 +229,6 @@ xfs_rtcopy_summary(
 	xfs_mount_t	*omp,		/* old file system mount point */
 	xfs_mount_t	*nmp,		/* new file system mount point */
 	xfs_trans_t	*tp);		/* transaction pointer */
-#endif	/* !SIM */
 
 /*
  * Searching backward from start to limit, find the first block whose
@@ -322,7 +267,7 @@ xfs_rtfree_range(
 	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb);		/* in/out: summary block number */
 
-#if defined(DEBUG) || !defined(SIM)
+#if defined(DEBUG)
 /*
  * Read and return the summary information for a given extent size,
  * bitmap block combination.
@@ -338,7 +283,7 @@ xfs_rtget_summary(
 	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_suminfo_t	*sum);		/* out: summary info for this block */
-#endif	/* DEBUG || !SIM */
+#endif	/* DEBUG */
 
 /*
  * Set the given range of bitmap bits to the given value.
@@ -392,7 +337,6 @@ xfs_rtprint_summary(
  * Internal functions.
  */
 
-#ifndef SIM
 /*
  * Allocate space to the bitmap or summary file, and zero it, for growfs.
  */
@@ -1157,7 +1101,6 @@ xfs_rtany_summary(
 	*stat = 0;
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * Get a buffer for the bitmap or summary file block specified.
@@ -1273,7 +1216,7 @@ xfs_rtcheck_free_range(
 }
 #endif
 
-#if !defined(SIM) || defined(DEBUG)
+#if defined(DEBUG)
 /*
  * Check that the given range is either all allocated (val = 0) or 
  * all free (val = 1).
@@ -1449,9 +1392,8 @@ xfs_rtcheck_range(
 	*stat = 1;
 	return 0;
 }
-#endif	/* !SIM && !DEBUG */
+#endif	/* DEBUG */
 
-#ifndef SIM
 /*
  * Copy and transform the summary file, given the old and new
  * parameters in the mount structures.
@@ -1493,7 +1435,6 @@ xfs_rtcopy_summary(
 	}
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * Searching backward from start to limit, find the first block whose
@@ -1914,7 +1855,7 @@ xfs_rtfree_range(
 	return error;
 }
 
-#if defined(DEBUG) || !defined(SIM)
+#if defined(DEBUG)
 /*
  * Read and return the summary information for a given extent size,
  * bitmap block combination.
@@ -1983,7 +1924,7 @@ xfs_rtget_summary(
 		xfs_trans_brelse(tp, bp);
 	return 0;
 }
-#endif	/* DEBUG || !SIM */
+#endif	/* DEBUG */
 
 /*
  * Set the given range of bitmap bits to the given value.
@@ -2212,7 +2153,6 @@ xfs_rtmodify_summary(
  * Visible (exported) functions.
  */
 
-#ifndef SIM
 /*
  * Grow the realtime area of the filesystem.
  */
@@ -2515,7 +2455,6 @@ xfs_rtallocate_extent(
 	*rtblock = r;
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * Free an extent in the realtime subvolume.  Length is expressed in 
@@ -2541,7 +2480,7 @@ xfs_rtfree_extent(
 	if (error) {
 		return error;
 	}
-#ifdef DEBUG
+#if defined(__KERNEL__) && defined(DEBUG)
 	/*
 	 * Check to see that this whole range is currently allocated.
 	 */
@@ -2588,18 +2527,19 @@ int				/* error */
 xfs_rtmount_init(
 	xfs_mount_t	*mp)	/* file system mount structure */
 {
-	xfs_buf_t		*bp;	/* buffer for last block of subvolume */
-	xfs_daddr_t		d;	/* address of last block of subvolume */
+	xfs_buf_t	*bp;	/* buffer for last block of subvolume */
+	xfs_daddr_t	d;	/* address of last block of subvolume */
 	int		error;	/* error return value */
 	xfs_sb_t	*sbp;	/* filesystem superblock copy in mount */
 
 	sbp = &mp->m_sb;
 	if (sbp->sb_rblocks == 0)
 		return 0;
-	if (mp->m_rtdev == NODEV) {
-  		cmn_err(CE_WARN, "XFS: This FS has an RT subvol - specify -o rtdev on mount\n");
-		return XFS_ERROR(E2BIG);
-        }
+	if (!mp->m_rtdev) {
+		printk(KERN_WARNING
+		"XFS: This FS has an RT subvol - specify -o rtdev on mount\n");
+		return XFS_ERROR(ENODEV);
+	}
 	mp->m_rsumlevels = sbp->sb_rextslog + 1;
 	mp->m_rsumsize =
 		(uint)sizeof(xfs_suminfo_t) * mp->m_rsumlevels *
@@ -2611,18 +2551,18 @@ xfs_rtmount_init(
 	 */
 	d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
 	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_rblocks) {
-  		cmn_err(CE_WARN, "XFS: RT mount - %d != %d\n",
-                        XFS_BB_TO_FSB(mp, d), mp->m_sb.sb_rblocks);
+		printk(KERN_WARNING "XFS: RT mount - %llu != %llu\n",
+			XFS_BB_TO_FSB(mp, d), mp->m_sb.sb_rblocks);
 		return XFS_ERROR(E2BIG);
-        }
+	}
 	error = xfs_read_buf(mp, &mp->m_rtdev_targ, d - 1, 1, 0, &bp);
-        if (error) {
-  		cmn_err(CE_WARN, "XFS: RT mount - xfs_read_buf returned %d\n",
-                        error);
-    	        if (error == ENOSPC)
-		    return XFS_ERROR(E2BIG);
+	if (error) {
+		printk(KERN_WARNING
+			"XFS: RT mount - xfs_read_buf returned %d\n", error);
+		if (error == ENOSPC)
+			return XFS_ERROR(E2BIG);
 		return error;
-        }
+	}
 	xfs_buf_relse(bp);
 	return 0;
 }
@@ -2661,7 +2601,6 @@ xfs_rtmount_inodes(
 	return 0;
 }
 
-#ifndef SIM
 /*
  * Pick an extent for allocation at the start of a new realtime file.
  * Use the sequence number stored in the atime field of the bitmap inode.
@@ -2710,7 +2649,6 @@ xfs_rtpick_extent(
 	*pick = b;
 	return 0;
 }
-#endif	/* !SIM */
 
 #ifdef DEBUG
 /*

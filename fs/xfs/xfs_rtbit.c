@@ -29,14 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.6 $"
 
 /*
  * XFS bit manipulation routines, used only in realtime code.
  */
 
-#include <sys/types.h>
-#include "xfs_bit.h"
+#include <xfs.h>
 
 /*
  * xfs_lowbit32: get low bit set out of 32-bit argument, -1 if none set.

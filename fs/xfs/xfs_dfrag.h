@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DFRAG_H
-#define	_FS_XFS_DFRAG_H
-
-#ident "$Id$"
+#ifndef __XFS_DFRAG_H__
+#define	__XFS_DFRAG_H__
 
 /*
  * Structure passed to xfs_swapext
@@ -43,8 +41,8 @@ typedef struct xfs_swapext
 	__int64_t	sx_version;	/* version */	
 	__int64_t	sx_fdtarget;	/* fd of target file */
 	__int64_t	sx_fdtmp;	/* fd of tmp file */
-	xfs_off_t		sx_offset; 	/* offset into file */
-	xfs_off_t		sx_length; 	/* leng from offset */
+	xfs_off_t	sx_offset; 	/* offset into file */
+	xfs_off_t	sx_length; 	/* leng from offset */
 	char		sx_pad[16];	/* pad space, unused */
 	xfs_bstat_t	sx_stat;	/* stat of target b4 copy */
 } xfs_swapext_t;
@@ -54,17 +52,16 @@ typedef struct xfs_swapext
  */
 #define XFS_SX_VERSION		0
 
-
-#ifdef _KERNEL
+#ifdef __KERNEL__
 /*
  * Prototypes for visible xfs_dfrag.c routines.
  */
 
 /*
- * Syssgi interface for xfs_swapext
+ * Syscall interface for xfs_swapext
  */
 int	xfs_swapext(struct xfs_swapext *sx);
 
-#endif	/* _KERNEL */
+#endif	/* __KERNEL__ */
 
-#endif	/* !_FS_XFS_DFRAG_H */
+#endif	/* __XFS_DFRAG_H__ */

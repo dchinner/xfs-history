@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.87 $"
 
 /*
  * xfs_dir_leaf.c
@@ -37,56 +36,8 @@
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#include <sys/uuid.h>
-#include <sys/cmn_err.h>
-#ifdef SIM
-#undef _KERNEL
-#include <string.h>
-#endif
-#include <sys/vnode.h>
-#include <sys/kmem.h>
-#include <sys/dirent.h>
-#ifdef SIM
-#include <stdio.h>
-#else
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
-#include "xfs_arch.h"
 
 /*
  * xfs_dir_leaf.c
@@ -248,7 +199,6 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 	return(0);
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove a name from the shortform directory structure.
  */
@@ -302,7 +252,6 @@ xfs_dir_shortform_removename(xfs_da_args_t *args)
 
 	return(0);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Look up a name in a shortform directory structure.
@@ -445,7 +394,6 @@ out:
 	return(retval);
 }
 
-#ifndef SIM
 STATIC int
 xfs_dir_shortform_compare(const void *a, const void *b)
 {
@@ -635,9 +583,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 
 	return 0;
 }
-#endif	/* !SIM */
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Look up a name in a shortform directory structure, replace the inode number.
  */
@@ -769,7 +715,6 @@ out:
 	kmem_free(tmpbuffer, XFS_LBSIZE(dp->i_mount));
 	return(retval);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Convert from using a single leaf to a root node and a leaf.
@@ -1372,7 +1317,6 @@ xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
  * Routines used for shrinking the Btree.
  *========================================================================*/
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Check a leaf block and its neighbors to see if the block should be
  * collapsed into one or the other neighbor.  Always keep the block
@@ -1742,7 +1686,6 @@ xfs_dir_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 */
 	save_blk->hashval = INT_GET(save_leaf->entries[ INT_GET(save_leaf->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*========================================================================
  * Routines used for finding things in the Btree.
@@ -1988,7 +1931,6 @@ xfs_dir_leaf_lasthash(xfs_dabuf_t *bp, int *count)
 	return(INT_GET(leaf->entries[ INT_GET(leaf->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT));
 }
 
-#ifndef SIM
 /*
  * Copy out directory entries for getdents(), for leaf directories.
  */
@@ -2370,4 +2312,3 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 
 	return retval;
 }
-#endif	/* !SIM */

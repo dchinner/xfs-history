@@ -29,14 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef __XFS_TYPES_H
-#define	__XFS_TYPES_H
-
-#ident	"$Revision: 1.46 $"
-
-/*
- * XFS types
- */
+#ifndef __XFS_TYPES_H__
+#define	__XFS_TYPES_H__
 
 /*
  * Some types are conditional based on the selected configuration.
@@ -132,6 +126,12 @@ typedef __uint8_t       xfs_arch_t;     /* architecutre of an xfs fs */
 #define	MAXEXTLEN	((xfs_extlen_t)0x001fffff)	/* 21 bits */
 #define	MAXEXTNUM	((xfs_extnum_t)0x7fffffff)	/* signed int */
 #define	MAXAEXTNUM	((xfs_aextnum_t)0x7fff)		/* signed short */
+
+/*
+ * MAXNAMELEN is the length (including the terminating null) of
+ * the longest permissible file (component) name.
+ */
+#define MAXNAMELEN	256
 
 typedef enum {
 	XFS_LOOKUP_EQi, XFS_LOOKUP_LEi, XFS_LOOKUP_GEi
@@ -258,6 +258,9 @@ struct xfsstats {
 # define XFS_STATS64_ADD(count, inc)
 #endif	/* !CONFIG_PROC_FS */
 
+
+#ifdef __KERNEL__
+
 /* juggle IRIX device numbers - still used in ondisk structures */
 
 #define IRIX_DEV_BITSMAJOR      14
@@ -274,9 +277,6 @@ struct xfsstats {
 #define IRIX_DEV_TO_DEVT(dev)   ((IRIX_DEV_MAJOR(dev)<<8)|IRIX_DEV_MINOR(dev))
 
 /* __psint_t is the same size as a pointer */
-
-#ifndef SIM
-
 #if (BITS_PER_LONG == 32)
 typedef __int32_t __psint_t;
 typedef __uint32_t __psunsigned_t;
@@ -287,6 +287,6 @@ typedef __uint64_t __psunsigned_t;
 #error BITS_PER_LONG must be 32 or 64
 #endif
 
-#endif
+#endif	/* __KERNEL__ */
 
 #endif	/* !__XFS_TYPES_H */

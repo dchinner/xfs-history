@@ -29,13 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR2_LEAF_H
-#define	_FS_XFS_DIR2_LEAF_H
-
-#ident "$Revision$"
+#ifndef __XFS_DIR2_LEAF_H__
+#define	__XFS_DIR2_LEAF_H__
 
 /*
- * xfs_dir2_leaf.h
  * Directory version 2, leaf block structures.
  */
 
@@ -320,12 +317,10 @@ extern void
 				 int *lowstalep, int *highstalep, int *lowlogp,
 				 int *highlogp);
 
-#ifndef SIM
 extern int
 	xfs_dir2_leaf_getdents(struct xfs_trans *tp, struct xfs_inode *dp,
 			       struct uio *uio, int *eofp, struct dirent *dbp,
 			       xfs_dir2_put_t put);
-#endif
 
 extern int
 	xfs_dir2_leaf_init(struct xfs_da_args *args, xfs_dir2_db_t bno,
@@ -348,13 +343,11 @@ extern void
 extern int
 	xfs_dir2_leaf_lookup(struct xfs_da_args *args);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_leaf_removename(struct xfs_da_args *args);
 
 extern int
 	xfs_dir2_leaf_replace(struct xfs_da_args *args);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 extern int
 	xfs_dir2_leaf_search_hash(struct xfs_da_args *args,
@@ -362,9 +355,7 @@ extern int
 extern int
 	xfs_dir2_leaf_trim_data(struct xfs_da_args *args, struct xfs_dabuf *lbp,				xfs_dir2_db_t db);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_node_to_leaf(struct xfs_da_state *state);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
-#endif	/* !_FS_XFS_DIR2_LEAF_H */
+#endif	/* __XFS_DIR2_LEAF_H__ */

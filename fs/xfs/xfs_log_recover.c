@@ -30,81 +30,10 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.188 $"
-
-#include <xfs_os_defs.h>
-
-#ifdef SIM
-#define _KERNEL 1
-#define __KERNEL__ 1
-#endif
-
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/sysmacros.h>
-#include "xfs_buf.h"
-#include <linux/xfs_sema.h>
-#include <sys/vnode.h>
-#include <sys/debug.h>
-#include <sys/cmn_err.h>
-
-#ifdef SIM
-#undef _KERNEL
-#undef __KERNEL__
-#include <stdio.h>
-#include <stdlib.h>
-#else
-#include <sys/systm.h>
-#endif
-
-#include <sys/kmem.h>
-#include <sys/ktrace.h>
-#include <sys/vfs.h>
-#include <sys/uuid.h>
-#include <stddef.h>
-
-#include <xfs_macros.h>
-#include <xfs_types.h>
-#include <xfs_inum.h>
-#include <xfs_log.h>
-#include <xfs_ag.h>		/* needed by xfs_sb.h */
-#include <xfs_sb.h>		/* depends on xfs_types.h, xfs_inum.h */
-#include <xfs_trans.h>
-#include <xfs_dir.h>
-#include <xfs_dir2.h>
-#include <xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
-#include <xfs_error.h>
-#include <xfs_bmap_btree.h>
-#include <xfs_alloc.h>
-#include <xfs_attr_sf.h>
-#include <xfs_dir_sf.h>
-#include <xfs_dir2_sf.h>
-#include <xfs_dinode.h>
-#include <xfs_imap.h>
-#include <xfs_inode_item.h>
-#include <xfs_inode.h>
-#include <xfs_ialloc_btree.h>
-#include <xfs_ialloc.h>
-#include <xfs_error.h>
-#include <xfs_log_priv.h>	/* depends on all above */
-#include <xfs_buf_item.h>
-#include <xfs_alloc_btree.h>
+#include <xfs.h>
 #include <xfs_log_recover.h>
-#include <xfs_extfree_item.h>
-#include <xfs_trans_priv.h>
-#include <xfs_bit.h>
-#include <xfs_quota.h>
-#include <xfs_dqblk.h>
-#include <xfs_dquot_item.h>
-#include <xfs_dquot.h>
-#include <xfs_qm.h>
-#include <xfs_rw.h>
 
 extern int xfs_is_read_only(xlog_t *);
-
-#ifdef SIM
-#include "sim.h"		/* must be last include file */
-#endif
 
 int		xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
 int		xlog_find_cycle_start(struct log *log,
@@ -113,34 +42,20 @@ int		xlog_find_cycle_start(struct log *log,
 				      xfs_daddr_t	*last_blk,
 				      uint	cycle);
 
-#ifndef SIM
 STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
-#endif
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
-#ifndef SIM
 STATIC void	xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 						xlog_recover_item_t *item);
-#endif /* !SIM */
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(DEBUG)
 STATIC void	xlog_recover_check_summary(xlog_t *log);
 STATIC void	xlog_recover_check_ail(xfs_mount_t *mp, xfs_log_item_t *lip,
 				       int gen);
 #else
 #define	xlog_recover_check_summary(log)
 #define	xlog_recover_check_ail(mp, lip, gen)
-#endif /* DEBUG && !SIM */
-
-#ifdef SIM
-extern void 	xlog_recover_print_trans_head(xlog_recover_t *tr);
-extern void	xlog_recover_print_logitem(xlog_recover_item_t *item);
-
-STATIC void	xlog_recover_print_trans(xlog_recover_t	    *trans,
-					 xlog_recover_item_t *itemq,
-					 int		     print);
-STATIC void	xlog_recover_print_item(xlog_recover_item_t *item);
-#endif
+#endif /* DEBUG */
 
 
 xfs_buf_t *
@@ -224,7 +139,6 @@ xlog_bwrite(
 	return (error);
 }	/* xlog_bwrite */
 
-#ifndef SIM
 STATIC void
 xlog_recover_iodone(
 	struct xfs_buf 	*bp)
@@ -244,7 +158,6 @@ xlog_recover_iodone(
 	XFS_BUF_CLR_IODONE_FUNC(bp);
 	xfs_biodone(bp);
 }
-#endif
 
 /*
  * This routine finds (to an approximation) the first block in the physical
@@ -295,7 +208,7 @@ xlog_find_cycle_start(xlog_t	*log,
  * since we don't ever expect logs to get this large.
  */
 STATIC xfs_daddr_t
-xlog_find_verify_cycle(xfs_caddr_t	*bap,		/* update ptr as we go */
+xlog_find_verify_cycle(xfs_caddr_t	*bap,	/* update ptr as we go */
 		       xfs_daddr_t	start_blk,
 		       int	nbblks,
 		       uint	stop_on_cycle_no)
@@ -413,7 +326,7 @@ xlog_find_head(xlog_t  *log,
     first_blk = 0;				/* get cycle # of 1st block */
     bp = xlog_get_bp(1,log->l_mp);
     if (!bp)
-        return -ENOMEM;
+	return -ENOMEM;
     if (error = xlog_bread(log, 0, 1, bp))
 	goto bp_err;
     first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
@@ -497,10 +410,10 @@ xlog_find_head(xlog_t  *log,
     num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
     big_bp = xlog_get_bp(num_scan_bblks,log->l_mp);
     if (!big_bp) {
-        error = -ENOMEM;
-        goto bp_err;
+	error = -ENOMEM;
+	goto bp_err;
     }
-        
+
     if (head_blk >= num_scan_bblks) {
 	/*
 	 * We are guaranteed that the entire check can be performed
@@ -662,7 +575,6 @@ xlog_test_footer(xlog_t *log)
     int error = 0;
     xfs_buf_t *bp;
     xlog_volume_footer_t *rfoot;
-    uint_t status;
 
     /* do we have an external log? */
     if (log->l_mp->m_sb.sb_logstart != 0)
@@ -686,9 +598,9 @@ xlog_test_footer(xlog_t *log)
          * be backwards compatible, we ignore the version number here
          */
 
-        if (uuid_compare(&rfoot->f_magic, XFS_EXTERNAL_LOG_MAGIC, &status)) {
+        if (uuid_compare(&rfoot->f_magic, XFS_EXTERNAL_LOG_MAGIC)) {
             xlog_warn("XFS: bad external log (incorrect magic number)");
-        } else if (uuid_compare(&log->l_mp->m_origuuid, &rfoot->f_uuid, &status)) {
+        } else if (uuid_compare(&log->l_mp->m_origuuid, &rfoot->f_uuid)) {
             xlog_warn("XFS: mismatched external log (incorrect uuid)");
         } else {
             /* footer checks out */
@@ -726,9 +638,6 @@ xlog_test_footer(xlog_t *log)
  * We could speed up search by using current head_blk buffer, but it is not
  * available.
  */
-#ifdef SIM
-/* ARGSUSED */
-#endif
 int
 xlog_find_tail(xlog_t  *log,
 	       xfs_daddr_t *head_blk,
@@ -741,9 +650,6 @@ xlog_find_tail(xlog_t  *log,
 	int			error, i, found;
 	xfs_daddr_t		umount_data_blk;
 	xfs_daddr_t		after_umount_blk;
-#ifdef SIM
-	/* REFERENCED */
-#endif
 	xfs_lsn_t		tail_lsn;
 	
 	found = error = 0;
@@ -755,8 +661,8 @@ xlog_find_tail(xlog_t  *log,
 		return error;
 
 	bp = xlog_get_bp(1,log->l_mp);
-        if (!bp) 
-            return -ENOMEM;
+	if (!bp)
+		return -ENOMEM;
 	if (*head_blk == 0) {				/* special case */
 		if (error = xlog_bread(log, 0, 1, bp))
 			goto bread_err;
@@ -860,7 +766,7 @@ xlog_find_tail(xlog_t  *log,
 		}
 	}
 
-#ifndef SIM
+#ifdef __KERNEL__
 	/*
 	 * Make sure that there are no blocks in front of the head
 	 * with the same cycle number as the head.  This can happen
@@ -874,7 +780,7 @@ xlog_find_tail(xlog_t  *log,
 	 */
 	if (!readonly)
 		error = xlog_clear_stale_blocks(log, tail_lsn);
-#endif /* !SIM */
+#endif
 
 bread_err:
 exit:
@@ -917,8 +823,8 @@ xlog_find_zeroed(struct log	*log,
 	error = 0;
 	/* check totally zeroed log */
 	bp = xlog_get_bp(1,log->l_mp);
-        if (!bp)
-            return -ENOMEM;
+	if (!bp)
+		return -ENOMEM;
 	if (error = xlog_bread(log, 0, 1, bp))
 		goto bp_err;
 	first_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
@@ -959,10 +865,10 @@ xlog_find_zeroed(struct log	*log,
 	num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
 	ASSERT(num_scan_bblks <= INT_MAX);
 	big_bp = xlog_get_bp((int)num_scan_bblks,log->l_mp);
-        if (!big_bp) {
-            error = -ENOMEM;
-            goto bp_err;
-        }
+	if (!big_bp) {
+		error = -ENOMEM;
+		goto bp_err;
+	}
         ASSERT(big_bp);
         
 	if (last_blk < num_scan_bblks)
@@ -1001,7 +907,6 @@ bp_err:
 	return -1;
 }	/* xlog_find_zeroed */
 
-#ifndef SIM
 /*
  * This is simply a subroutine used by xlog_clear_stale_blocks() below
  * to initialize a buffer full of empty log record headers and write
@@ -1184,7 +1089,6 @@ xlog_clear_stale_blocks(
 
 	return 0;
 }
-#endif /* SIM */
 
 /******************************************************************************
  *
@@ -1376,8 +1280,6 @@ xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 	}
 }	/* xlog_recover_insert_item_backq */
 
-
-#ifndef SIM
 STATIC void
 xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 				xlog_recover_item_t *item)
@@ -1386,8 +1288,6 @@ xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 	*q = item;
 }	/* xlog_recover_insert_item_frontq */
 
-
-/*ARGSUSED*/
 STATIC int
 xlog_recover_reorder_trans(xlog_t	  *log,
 			   xlog_recover_t *trans)
@@ -1520,8 +1420,6 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	bcp->bc_refcount = 1;
 	bcp->bc_next = NULL;
 	prevp->bc_next = bcp;
-
-	return;
 }
 
 /*
@@ -2120,11 +2018,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-#ifndef __linux__
-	ASSERT((xfs_caddr_t)dip+item->ri_buf[1].i_len <=
-			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
-#endif
-        
         /* The core is in in-core format */
         xfs_xlate_dinode_core((xfs_caddr_t)&dip->di_core, 
                               (xfs_dinode_core_t*)item->ri_buf[1].i_addr, 
@@ -2149,10 +2042,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	switch (fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
-#ifndef __linux__
-		ASSERT((xfs_caddr_t)&dip->di_u+len <=
-			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
-#endif
 		bcopy(src, &dip->di_u, len);
 		break;
 
@@ -2200,9 +2089,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		case XFS_ILOG_ADATA:
 		case XFS_ILOG_AEXT:
 			dest = XFS_DFORK_APTR(dip);
-#ifndef __linux__
-			ASSERT(dest+len <= XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
-#endif
 			ASSERT(len <= XFS_DFORK_ASIZE(dip, mp));
 			bcopy(src, dest, len);
 			break;
@@ -2366,10 +2252,6 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		xfs_buf_relse(bp);
 		return XFS_ERROR(EIO);
 	}
-#ifndef __linux__
-	ASSERT((xfs_caddr_t)ddq + item->ri_buf[1].i_len <=
-	       XFS_BUF_PTR(bp) + XFS_BUF_COUNT(bp));
-#endif
 
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
 
@@ -2497,8 +2379,6 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 	}
 	}
 }	/* xlog_recover_do_efd_trans */
-#endif /* !SIM */
-
 
 /*
  * Perform the transaction
@@ -2506,30 +2386,16 @@ xlog_recover_do_efd_trans(xlog_t		*log,
  * If the transaction modifies a buffer or inode, do it now.  Otherwise,
  * EFIs and EFDs get queued up by adding entries into the AIL for them.
  */
-#ifndef _KERNEL
-/* ARGSUSED */
-#endif
 STATIC int
 xlog_recover_do_trans(xlog_t	     *log,
 		      xlog_recover_t *trans,
 		      int	     pass)
 {
 	int		    error = 0;
-#ifdef _KERNEL
 	xlog_recover_item_t *item, *first_item;
-#endif
-#ifdef SIM
-	if (pass == XLOG_RECOVER_PASS1)
-		xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug);
-#endif
 
-#ifdef _KERNEL
 	if (error = xlog_recover_reorder_trans(log, trans))
 		return error;
-#ifdef SIM
-	if (pass == XLOG_RECOVER_PASS1)
-		xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug+1);
-#endif
 	first_item = item = trans->r_itemq;
 	do {
 		/*
@@ -2574,7 +2440,6 @@ xlog_recover_do_trans(xlog_t	     *log,
 		}
 		item = item->ri_next;
 	} while (first_item != item);
-#endif /* _KERNEL */
 
 	return error;
 }	/* xlog_recover_do_trans */
@@ -2662,9 +2527,12 @@ xlog_recover_process_data(xlog_t	    *log,
     unsigned long	hash;
     uint		flags;
 
-#ifdef SIM
-    printf("LOG REC AT LSN cycle 0x%x blkno 0x%x\n",
-	   CYCLE_LSN(rhead->h_lsn, ARCH_CONVERT), BLOCK_LSN(rhead->h_lsn, ARCH_CONVERT));
+#ifndef __KERNEL__
+    printf("\nLOG REC AT LSN cycle %d block %d (0x%x, 0x%x)\n",
+	   CYCLE_LSN(rhead->h_lsn, ARCH_CONVERT), 
+           BLOCK_LSN(rhead->h_lsn, ARCH_CONVERT),
+	   CYCLE_LSN(rhead->h_lsn, ARCH_CONVERT), 
+           BLOCK_LSN(rhead->h_lsn, ARCH_CONVERT));
 #endif
     while (dp < lp) {
 	ASSERT(dp + sizeof(xlog_op_header_t) <= lp);
@@ -2731,7 +2599,6 @@ xlog_recover_process_data(xlog_t	    *log,
 }	/* xlog_recover_process_data */
 
 
-#ifndef SIM
 /*
  * Process an extent free intent item that was recovered from
  * the log.  We need to free the extents that it describes.
@@ -2784,14 +2651,13 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 	efip->efi_flags |= XFS_EFI_RECOVERED;
 	xfs_trans_commit(tp, 0, NULL);
 }	/* xlog_recover_process_efi */
-#endif	/* !SIM */
 
 
 /*
  * Verify that once we've encountered something other than an EFI
  * in the AIL that there are no more EFIs in the AIL.
  */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(DEBUG)
 STATIC void
 xlog_recover_check_ail(xfs_mount_t	*mp,
 		       xfs_log_item_t	*lip,
@@ -2812,10 +2678,9 @@ xlog_recover_check_ail(xfs_mount_t	*mp,
 		ASSERT(gen == orig_gen);
 	} while (lip != NULL);
 }
-#endif	/* DEBUG && !SIM */
+#endif	/* DEBUG */
 
 
-#ifndef SIM
 /*
  * When this is called, all of the EFIs which did not have
  * corresponding EFDs should be in the AIL.  What we do now
@@ -3037,7 +2902,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		xfs_buf_relse(agibp);
 	}
 }	/* xlog_recover_process_iunlinks */
-#endif /* !SIM */
 
 
 /*
@@ -3135,11 +2999,11 @@ xlog_do_recovery_pass(xlog_t	*log,
     error = 0;
     hbp = xlog_get_bp(1,log->l_mp);
     if (!hbp)
-        return -ENOMEM;
+	return -ENOMEM;
     dbp = xlog_get_bp(BTOBB(XLOG_MAX_RECORD_BSIZE),log->l_mp);
     if (!dbp) {
-        xlog_put_bp(hbp);
-        return -ENOMEM;
+	xlog_put_bp(hbp);
+	return -ENOMEM;
     }
     bzero(rhash, sizeof(rhash));
     if (tail_blk <= head_blk) {
@@ -3317,12 +3181,9 @@ xlog_do_recover(xlog_t	*log,
 		xfs_daddr_t head_blk,
 		xfs_daddr_t tail_blk)
 {
-#ifdef _KERNEL
+	int		error;
 	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp;
-#endif
-	int		error;
-	bfidev_t        bfid;
 
 	/*
 	 * First replay the images in the log.
@@ -3332,7 +3193,6 @@ xlog_do_recover(xlog_t	*log,
 		return error;
 	}
 
-#ifdef _KERNEL
 	XFS_bflush(log->l_mp->m_ddev_targ);
 
 	/*
@@ -3379,7 +3239,6 @@ xlog_do_recover(xlog_t	*log,
 
 	/* Normal transactions can now occur */
 	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
-#endif /* _KERNEL */
 	return 0;
 }	/* xlog_do_recover */
 
@@ -3405,7 +3264,7 @@ xlog_recover(xlog_t *log, int readonly)
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk, readonly))
 		return error;
 	if (tail_blk != head_blk) {
-#ifdef SIM
+#ifndef __KERNEL__
 		extern xfs_daddr_t HEAD_BLK, TAIL_BLK;
 		head_blk = HEAD_BLK;
 		tail_blk = TAIL_BLK;
@@ -3421,7 +3280,7 @@ xlog_recover(xlog_t *log, int readonly)
 		 * recovery.
 		 */
 		if (readonly) {
-#ifndef SIM
+#ifdef __KERNEL__
 		  int ret;
 		  if(ret = xfs_is_read_only(log)){
 			return ret;
@@ -3431,7 +3290,7 @@ xlog_recover(xlog_t *log, int readonly)
 #endif
 		}
 
-#ifdef _KERNEL
+#ifdef __KERNEL__
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
 			"Starting XFS recovery on filesystem: %s (dev: %d/%d)",
@@ -3474,7 +3333,6 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 	 * rather than accepting new requests.
 	 */
 	if (log->l_flags & XLOG_RECOVERY_NEEDED) {
-#ifdef _KERNEL
 		xlog_recover_process_efis(log);
 		/*
 		 * Sync the log to get all the EFIs out of the AIL.
@@ -3492,7 +3350,6 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 
 		xlog_recover_check_summary(log);
 
-#endif /* _KERNEL */
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
 			"Ending XFS recovery on filesystem: %s (dev: %d/%d)",
@@ -3514,7 +3371,7 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 }	/* xlog_recover_finish */
 
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(DEBUG)
 /*
  * Read all of the agf and agi counters and check that they
  * are consistent with the superblock counters.
@@ -3591,93 +3448,4 @@ xlog_recover_check_summary(xlog_t	*log)
 #endif
 	xfs_buf_relse(sbbp);
 }
-#endif /* DEBUG && !SIM */
-
-
-#ifdef SIM
-
-STATIC void
-xlog_recover_print_item(xlog_recover_item_t *item)
-{
-	int i;
-
-	switch (ITEM_TYPE(item)) {
-	    case XFS_LI_BUF: {
-		printf("BUF");
-		break;
-	    }
-	    case XFS_LI_INODE: {
-		printf("INO");
-		break;
-	    }
-	    case XFS_LI_EFD: {
-		printf("EFD");
-		break;
-	    }
-	    case XFS_LI_EFI: {
-		printf("EFI");
-		break;
-	    }
-	    case XFS_LI_6_1_BUF:  {
-		printf("6.1 BUF");
-		break;
-	    }
-	    case XFS_LI_5_3_BUF: {
-		printf("5.3 BUF");
-		break;
-	    }
-	    case XFS_LI_6_1_INODE: {
-		printf("6.1 INO");
-		break;
-	    }
-	    case XFS_LI_5_3_INODE: {
-		printf("5.3 INO");
-		break;
-	    }
-	    case XFS_LI_DQUOT: {
-		printf("DQ ");
-		break;
-	    }
-	    case XFS_LI_QUOTAOFF: {
-		printf("QOFF");
-		break;
-	    } 
-	    default: {
-		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type");
-		break;
-	    }
-	}
-
-/*	type isn't filled in yet
-	printf("ITEM: type: %d cnt: %d total: %d ",
-	       item->ri_type, item->ri_cnt, item->ri_total);
-*/
-	printf(": cnt:%d total:%d ", item->ri_cnt, item->ri_total);
-	for (i=0; i<item->ri_cnt; i++) {
-		printf("a:0x%x len:%d ",
-		       item->ri_buf[i].i_addr, item->ri_buf[i].i_len);
-	}
-	printf("\n");
-	xlog_recover_print_logitem(item);
-}	/* xlog_recover_print_item */
-
-/*ARGSUSED*/
-STATIC void
-xlog_recover_print_trans(xlog_recover_t	     *trans,
-			 xlog_recover_item_t *itemq,
-			 int		     print)
-{
-	xlog_recover_item_t *first_item, *item;
-
-	if (print < 3)
-		return;
-
-	printf("======================================\n");
-	xlog_recover_print_trans_head(trans);
-	item = first_item = itemq;
-	do {
-		xlog_recover_print_item(item);
-		item = item->ri_next;
-	} while (first_item != item);
-}	/* xlog_recover_print_trans */
-#endif
+#endif /* DEBUG */

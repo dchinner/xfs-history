@@ -1,5 +1,4 @@
-/**************************************************************************
- *									  *
+/*
  * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -29,13 +28,10 @@
  * For further information regarding this notice, see: 
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
- *									  *
- **************************************************************************/
+ */
 
-#ifndef __FS_XFS_XFS_CXFS_H__
-#define __FS_XFS_XFS_CXFS_H__
-
-#ident "$Revision: 1.6 $"
+#ifndef __XFS_CXFS_H__
+#define __XFS_CXFS_H__
 
 /*
  * xfs_cxfs.h -- Interface cxfs presents to non-cell xfs code
@@ -89,4 +85,4 @@ extern void	cfs_end_defrag(
 		struct vnode    	*vp,
 		__uint64_t		handle);
 		
-#endif /* __FS_XFS_XFS_CXFS_H__ */
+#endif /* __XFS_CXFS_H__ */

@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_ALLOC_BTREE_H
-#define	_FS_XFS_ALLOC_BTREE_H
-
-#ident	"$Revision$"
+#ifndef __XFS_ALLOC_BTREE_H__
+#define	__XFS_ALLOC_BTREE_H__
 
 /*
  * Freespace on-disk structures
@@ -250,4 +248,4 @@ xfs_alloc_update(
 	xfs_agblock_t		bno,	/* starting block of extent */
 	xfs_extlen_t		len);	/* length of extent */
 
-#endif	/* !_FS_XFS_ALLOC_BTREE_H */
+#endif	/* __XFS_ALLOC_BTREE_H__ */

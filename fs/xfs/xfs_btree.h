@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_BTREE_H
-#define	_FS_XFS_BTREE_H
-
-#ident "$Revision$"
+#ifndef __XFS_BTREE_H__
+#define	__XFS_BTREE_H__
 
 struct xfs_buf;
 struct xfs_bmap_free;
@@ -201,6 +199,9 @@ typedef struct xfs_btree_cur
 	}		bc_private;	/* per-btree type data */
 } xfs_btree_cur_t;
 
+#define	XFS_BTREE_NOERROR	0
+#define	XFS_BTREE_ERROR		1
+
 /*
  * Convert from buffer to btree block header.
  */
@@ -222,6 +223,8 @@ xfs_btree_sblock_t *xfs_buf_to_sblock(struct xfs_buf *bp);
 #else
 #define	XFS_BUF_TO_SBLOCK(bp)	((xfs_btree_sblock_t *)(XFS_BUF_PTR(bp)))
 #endif
+
+#ifdef __KERNEL__
 
 #ifdef DEBUG
 /*
@@ -302,12 +305,6 @@ void
 xfs_btree_del_cursor(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			error);	/* del because of error */
-
-/*
- * Values for the error parameter of xfs_btree_del_cursor().
- */
-#define	XFS_BTREE_NOERROR	0
-#define	XFS_BTREE_ERROR		1
 
 /*
  * Duplicate the btree cursor.
@@ -470,6 +467,9 @@ xfs_btree_setbuf(
 	int			lev,	/* level in btree */
 	struct xfs_buf		*bp);	/* new buffer to set */
 
+#endif	/* __KERNEL__ */
+
+
 /*
  * Min and max functions for extlen, agblock, fileoff, and filblks types.
  */
@@ -570,4 +570,4 @@ int xfs_fsb_sanity_check(struct xfs_mount *mp, xfs_fsblock_t fsb);
 			return XFS_ERROR(EFSCORRUPTED); \
 	}
 
-#endif	/* !_FS_XFS_BTREE_H */
+#endif	/* __XFS_BTREE_H__ */

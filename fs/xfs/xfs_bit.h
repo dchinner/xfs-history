@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_BIT_H
-#define	_FS_XFS_BIT_H
-
-#ident "$Revision$"
+#ifndef __XFS_BIT_H__
+#define	__XFS_BIT_H__
 
 /*
  * XFS bit manipulation routines.
@@ -101,4 +99,4 @@ extern int xfs_lowbit64(__uint64_t v);
  */
 extern int xfs_highbit64(__uint64_t);
 
-#endif	/* _FS_XFS_BIT_H */
+#endif	/* __XFS_BIT_H__ */

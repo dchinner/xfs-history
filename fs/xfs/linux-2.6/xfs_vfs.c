@@ -30,25 +30,12 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.16 $"
-
-#include <xfs_os_defs.h>
-
-#define FSID_T
-#include <sys/types.h>
-#include <linux/errno.h>
+#include <xfs.h>
 
 #undef  NODEV
 #include <linux/version.h>
-#include <linux/fs.h>
-#include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
-#include <linux/slab.h>
-
-#include <sys/sysmacros.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
 
 
 /*

@@ -29,12 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DINODE_H
-#define	_FS_XFS_DINODE_H
+#ifndef __XFS_DINODE_H__
+#define	__XFS_DINODE_H__
 
 #include <xfs_arch.h>
-
-#ident "$Revision$"
 
 struct xfs_buf;
 struct xfs_mount;
@@ -477,4 +475,4 @@ xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);
 #define XFS_DIFLAG_ALL  \
 	(XFS_DIFLAG_REALTIME|XFS_DIFLAG_PREALLOC|XFS_DIFLAG_NEWRTBM)
 
-#endif	/* _FS_XFS_DINODE_H */
+#endif	/* __XFS_DINODE_H__ */

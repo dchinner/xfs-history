@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_IALLOC_H
-#define	_FS_XFS_IALLOC_H
-
-#ident	"$Revision: 1.37 $"
+#ifndef __XFS_IALLOC_H__
+#define	__XFS_IALLOC_H__
 
 struct xfs_buf;
 struct xfs_dinode;
@@ -87,6 +85,9 @@ int xfs_ialloc_find_free(xfs_inofree_t *fp);
 #define	XFS_IALLOC_FIND_FREE(fp)	xfs_lowbit64(*(fp))
 #endif
 
+
+#ifdef __KERNEL__
+
 /*
  * Prototypes for visible xfs_ialloc.c routines.
  */
@@ -123,7 +124,7 @@ xfs_dialloc(
 	boolean_t	*alloc_done,	/* an allocation was done to replenish
 					   the free inodes */
 	xfs_ino_t	*inop);		/* inode number allocated */
-#ifndef SIM
+
 /*
  * Free disk inode.  Carefully avoids touching the incore inode, all
  * manipulations incore are the caller's responsibility.
@@ -134,7 +135,6 @@ int					/* error */
 xfs_difree(
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	inode);		/* inode to be freed */
-#endif	/* !SIM */
 
 /*
  * Return the location of the inode in bno/len/off,
@@ -176,4 +176,6 @@ xfs_ialloc_read_agi(
 	xfs_agnumber_t	agno,		/* allocation group number */
 	struct xfs_buf	**bpp);		/* allocation group hdr buf */
 
-#endif	/* !_FS_XFS_IALLOC_H */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_IALLOC_H__ */

@@ -31,103 +31,13 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.288 $"
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifndef SIM
-#define FSID_T
-#include <linux/fs.h>
-#else
-#define _KERNEL	1
-#endif
-#include <sys/mode.h>
-#include "xfs_buf.h"
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <linux/xfs_fs.h>
-#include <linux/dmapi_kern.h>
-#include <sys/kmem.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/cmn_err.h>
-#include <sys/debug.h>
-#include <sys/fs_subr.h>
-#include <sys/kabi.h>
-#include <sys/sysmacros.h>
-#include <ksys/vfile.h>
-#ifdef SIM
-#include <stdio.h>
-#else
-#include <sys/systm.h>
-#endif
-#include <sys/param.h>
-#include <linux/xfs_sema.h>
-#include <linux/xfs_cred.h>
-#include <sys/statvfs.h>
-#include <sys/uio.h>
-#include <sys/dirent.h>
-#include <sys/ktrace.h>
 
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_ialloc.h"
-#include "xfs_alloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_ag.h"
-#include "xfs_error.h"
-#include "xfs_bmap.h"
-#include "xfs_da_btree.h"
-#include "xfs_rw.h"
-#include "xfs_buf_item.h"
-#include "xfs_extfree_item.h"
-#include "xfs_quota.h"
-#include "xfs_dmapi.h"
-#include "xfs_dir2_trace.h"
-
-#include "xfs_clnt.h"
-#include "xfs_cxfs.h"
-#include "xfs_utils.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
-
-#ifndef SIM
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
 #define	whymount_t	whymountroot_t
 static char *whymount[] = { "initial mount", "remount", "unmount" };
-
-/*
- * prototype for xlv_get_subcolumes: should go into an
- * "XLV exported functions" file (maybe the one that lists ioctls).
- */
-int
-xlv_get_subvolumes(
-	dev_t		device,
-	dev_t		*ddev,
-	dev_t		*logdev,
-	dev_t		*rtdev
-);
 
 /*
  * Static function prototypes.
@@ -209,8 +119,6 @@ STATIC int
 xfs_ibusy(
 	xfs_mount_t	*mp);
 
-#endif	/* !SIM */
-
 
 /*
  * xfs_fstype is the number given to xfs to indicate
@@ -233,7 +141,6 @@ int
 xfs_init(int	fstype)
 {
 	extern void	xfs_init_procfs(void);
-	extern int	ndquot;
 	extern xfs_zone_t	*xfs_da_state_zone;
 	extern xfs_zone_t	*xfs_bmap_free_item_zone;
 	extern xfs_zone_t	*xfs_btree_cur_zone;
@@ -248,7 +155,6 @@ xfs_init(int	fstype)
 	extern xfs_zone_t	*xfs_ktrace_hdr_zone;
 	extern xfs_zone_t	*xfs_ktrace_ent_zone;
 #endif	/* (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)) */
-#ifndef SIM
 	extern mutex_t	xfs_uuidtabmon;
 	extern mutex_t	xfs_Gqm_lock;
 	extern xfs_zone_t	*xfs_gap_zone;
@@ -260,7 +166,6 @@ xfs_init(int	fstype)
 	extern ktrace_t	*xfs_attr_trace_buf;
 	extern ktrace_t	*xfs_dir2_trace_buf;
 #endif	/* DEBUG */
-#endif	/* !SIM */
 #ifdef XFS_DABUF_DEBUG
 	extern lock_t	xfs_dabuf_global_lock;
 #endif
@@ -270,11 +175,9 @@ xfs_init(int	fstype)
 #ifdef XFS_DABUF_DEBUG
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
 #endif
-#ifndef SIM
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
 	ndquot = 200 /* + (2 * numprocs) - TODO */;
-#endif	/* !SIM */
 
 	/*
 	 * Initialize all of the zone allocators we use.
@@ -285,9 +188,7 @@ xfs_init(int	fstype)
 					    "xfs_btree_cur");
 	xfs_inode_zone = kmem_zone_init(sizeof(xfs_inode_t), "xfs_inode");
 	xfs_trans_zone = kmem_zone_init(sizeof(xfs_trans_t), "xfs_trans");
-#ifndef SIM
 	xfs_gap_zone = kmem_zone_init(sizeof(xfs_gap_t), "xfs_gap");
-#endif
 	xfs_da_state_zone =
 		kmem_zone_init(sizeof(xfs_da_state_t), "xfs_da_state");
 	xfs_dabuf_zone = kmem_zone_init(sizeof(xfs_dabuf_t), "xfs_dabuf");
@@ -313,7 +214,7 @@ xfs_init(int	fstype)
 	xfs_chashlist_zone = kmem_zone_init(sizeof(xfs_chashlist_t),
 					    "xfs_chashlist");
 
-#if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
+#if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 	xfs_ktrace_hdr_zone = kmem_zone_init(sizeof(ktrace_t),
 					"xfs_ktrace_hdr");
 #ifdef  VNODE_TRACE_SIZE
@@ -357,18 +258,15 @@ xfs_init(int	fstype)
 	 */
 	cxfs_arrinit();
 #endif
-#ifndef	SIM
+
 	xfs_init_procfs();
-#endif
+
 	/*
 	 * The inode hash table is created on a per mounted
 	 * file system bases.
 	 */
 	return 0;
 }
-
-
-#ifndef SIM
 
 /*
  * xfs_fill_buftarg
@@ -384,9 +282,6 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 	btp->inode = linvfs_make_inode(dev, sb);
 	btp->dev    = dev;
 }
-
-#ifndef SIM
-extern int	kmem_cache_destroy(xfs_zone_t *);
 
 void
 xfs_cleanup(void)
@@ -404,14 +299,12 @@ xfs_cleanup(void)
 	extern xfs_zone_t	*xfs_efi_zone;
 	extern xfs_zone_t	*xfs_buf_item_zone;
 	extern xfs_zone_t	*xfs_chashlist_zone;
-#if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
+#if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 	extern xfs_zone_t	*xfs_ktrace_hdr_zone;
 	extern xfs_zone_t	*xfs_ktrace_ent_zone;
 #endif
 
-#ifndef	SIM
 	xfs_cleanup_procfs();
-#endif
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
 	kmem_cache_destroy(xfs_inode_zone);
@@ -425,13 +318,11 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ifork_zone);
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
-#if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
+#if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 	kmem_cache_destroy(xfs_ktrace_hdr_zone);
 	kmem_cache_destroy(xfs_ktrace_ent_zone);
 #endif
-
 }
-#endif
 
 /*
  * xfs_cmountfs
@@ -658,8 +549,8 @@ xfs_cmountfs(
 		}
 
 		/*
-		 * For 6.5, shared mounts must have
-		 * the shared version bit set, have the persistent readonly
+		 * For IRIX 6.5, shared mounts must have the shared
+		 * version bit set, have the persistent readonly
 		 * field set, must be version 0 and can only be mounted
 		 * read-only.
 		 */
@@ -698,7 +589,7 @@ xfs_cmountfs(
 	}
 
 	if (client == 0) {
-		if (error = xfs_mountfs(vfsp, mp, ddev)) {
+		if (error = xfs_mountfs(vfsp, mp, ddev, 0)) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "xfs: xfs_mountfs failed: error %d.",
 				error);
@@ -731,7 +622,7 @@ xfs_cmountfs(
 		xfs_mount_free(mp, 1);
 	}
 	return error;
-}	/* end of xfs_cmountfs() */
+}
 
 
 /*
@@ -765,7 +656,7 @@ xfs_get_vfsmount(
 	/* vfsp->vfs_fsid is filled in later from superblock */
 
 	return mp;
-}	/* end of xfs_get_vfsmount() */
+}
 
 /*
  * xfs_mountargs -- Copy in xfs mount arguments
@@ -897,7 +788,7 @@ xfs_mount(
 
 	return error;
 
-}	/* end of xfs_mount() */
+}
 
 
 /* VFS_MOUNT */
@@ -944,8 +835,7 @@ xfs_mountroot(
 	struct cred	*cr = get_current_cred();
 	dev_t		ddev, logdev, rtdev;
 	xfs_mount_t	*mp;
-	xfs_buf_t		*bp;
-	extern dev_t	rootdev;		/* from sys/systm.h */
+	xfs_buf_t	*bp;
 
 	/*
 	 * Check that the root device holds an XFS file system.
@@ -957,7 +847,7 @@ xfs_mountroot(
 	     (xfs_isdev(rootdev))) {
 		return XFS_ERROR(ENOSYS);
 	}
-	 */
+	*/
 	
 	switch (why) {
 	case ROOT_INIT:
@@ -1076,8 +966,7 @@ bad:
 	cmn_err(CE_WARN, "%s of root device %V failed with errno %d\n",
 		whymount[why], rootdev, error);
 	return error;
-
-} /* end of xfs_mountroot() */
+}
 
 
 /* VFS_ROOTINIT */
@@ -1149,10 +1038,6 @@ xfs_ibusy(
 }
 
 
-/*
- * xfs_unmount
- *
- */
 /*ARGSUSED*/
 STATIC int
 xfs_unmount(
@@ -1174,7 +1059,6 @@ xfs_unmount(
 	rip = mp->m_rootip;
 	rvp = XFS_ITOV(rip);
 
-#ifndef SIM
 	if (vfsp->vfs_flag & VFS_DMI) {
 		bhv_desc_t	*rbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rvp), &xfs_vnodeops);
 
@@ -1189,7 +1073,6 @@ xfs_unmount(
 		unmount_event_flags = (mp->m_dmevmask & (1 << DM_EVENT_UNMOUNT)) != 0 ?
 					0 : DM_FLAGS_UNWANTED;
 	}
-#endif
 
 	/*
 	 * Make sure there are no active users.
@@ -1233,7 +1116,6 @@ out:
 	 *	Then do xfs_unmountfs() if needed.
 	 *	Then return error (or zero).
 	 */
-#ifndef SIM
 	if (unmount_event_wanted) {
 		/* Note: mp structure must still exist for 
 		 * dm_send_unmount_event() call.
@@ -1241,7 +1123,6 @@ out:
 		dm_send_unmount_event(vfsp, error == 0 ? rvp : NULL,
 			DM_RIGHT_NULL, 0, error, unmount_event_flags);
 	}
-#endif
 	if (xfs_unmountfs_needed) {
 		/*
 		 * Call common unmount function to flush to disk
@@ -1352,14 +1233,12 @@ fscorrupt_out2:
 STATIC int
 xfs_root(
 	bhv_desc_t	*bdp,
-	vnode_t	**vpp)
+	vnode_t		**vpp)
 {
 	vnode_t	*vp;
 
 	vp = XFS_ITOV((XFS_BHVTOM(bdp))->m_rootip);	
-
 	VN_HOLD(vp);
-
 	*vpp = vp;
 
 	return 0;
@@ -1372,7 +1251,6 @@ xfs_root(
  * the superblock lock in the mount structure to ensure a consistent
  * snapshot of the counters returned.
  */
-/*ARGSUSED*/
 STATIC int
 xfs_statvfs(
 	bhv_desc_t	*bdp,
@@ -1384,7 +1262,7 @@ xfs_statvfs(
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	int		s;
-	struct vfs *vfsp = bhvtovfs(bdp);
+	struct vfs	*vfsp = bhvtovfs(bdp);
 
 	mp = XFS_BHVTOM(bdp);
 	sbp = &(mp->m_sb);
@@ -1410,7 +1288,7 @@ xfs_statvfs(
 	XFS_SB_UNLOCK(mp, s);
 
 	statp->f_fsid = mp->m_dev;
-	(void) strcpy(statp->f_basetype, "xfs");
+	strcpy(statp->f_basetype, "xfs");
 	statp->f_namemax = MAXNAMELEN - 1;
 	bcopy((char *)&(mp->m_sb.sb_uuid), statp->f_fstr, sizeof(uuid_t));
 	bzero(&(statp->f_fstr[sizeof(uuid_t)]),
@@ -2287,18 +2165,3 @@ vfsops_t xfs_vfsops = {
 	xfs_vfsmountroot,
 	xfs_get_vnode,
 };
-#else	/* SIM */
-vfsops_t xfs_vfsops = {
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-};
-
-#endif	/* !SIM */

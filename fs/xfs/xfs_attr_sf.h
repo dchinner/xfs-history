@@ -29,14 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_ATTR_SF_H
-#define	_FS_XFS_ATTR_SF_H
-
-#ident	"$Revision: 1.11 $"
+#ifndef __XFS_ATTR_SF_H__
+#define	__XFS_ATTR_SF_H__
 
 /*
- * xfs_attr_sf.h
- *
  * Attribute storage when stored inside the inode.
  *
  * Small attribute lists are packed as tightly as possible so as
@@ -111,7 +107,7 @@ int xfs_attr_sf_totsize(struct xfs_inode *dp);
 #define	XFS_ATTR_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef	XFS_ATTR_TRACE
 #endif
 
@@ -157,4 +153,4 @@ void xfs_attr_trace_enter(int type, char *where,
 #define	xfs_attr_trace_l_cl(w,c,l)
 #endif /* XFS_ATTR_TRACE */
 
-#endif	/* !FS_XFS_ATTR_SF_H */
+#endif	/* __XFS_ATTR_SF_H__ */

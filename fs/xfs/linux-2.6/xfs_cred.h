@@ -34,7 +34,7 @@
 #define __XFS_CRED_H__
 
 #include <asm/param.h>		/* For NGROUPS */
-#ifndef SIM
+#ifdef __KERNEL__
 #include <linux/capability.h>
 #include <linux/sched.h>
 #else
@@ -94,12 +94,16 @@ typedef struct mac_label {
 /* Data types required by POSIX P1003.1eD15 */
 typedef struct mac_label * mac_t;
 
+#ifdef __KERNEL__
 extern int mac_enabled;
+extern mac_label *mac_high_low_lp;
 static __inline void mac_never(void) {}
 struct xfs_inode;
 extern int mac_xfs_iaccess(struct xfs_inode *, mode_t);
 #define _MAC_XFS_IACCESS(i,m)	\
 	(mac_enabled? (mac_never(), mac_xfs_iaccess(i,m)): 0)
+#endif	/* __KERNEL__ */
+
 #define MACWRITE	00200
 #define SGI_MAC_FILE "/dev/null"
 #define SGI_MAC_FILE_SIZE 10
@@ -141,8 +145,10 @@ typedef struct cred {
 	gid_t	cr_groups[NGROUPS];	/* supplementary group list */
 } cred_t;
 
+#ifdef __KERNEL__
 extern void cred_init(void);
-extern cred_t *get_current_cred(void);
+static __inline cred_t *get_current_cred(void) { return NULL; }
 extern struct cred *sys_cred;
+#endif	/* __KERNEL__ */
 
-#endif  /* _XFS_CRED_H */
+#endif  /* __XFS_CRED_H__ */

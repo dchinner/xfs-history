@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_MACROS_H
-#define	_FS_XFS_MACROS_H
-
-#ident 	"$Revision$"
+#ifndef __XFS_MACROS_H__
+#define	__XFS_MACROS_H__
 
 /*
  * Set for debug kernels and simulation, and 32-bit kernels,
@@ -104,4 +102,4 @@
 #define	XFSSO_XLOG_GRANT_ADD_SPACE 1
 #define	XFSSO_XLOG_GRANT_SUB_SPACE 1
 
-#endif	/* _FS_XFS_MACROS_H */
+#endif	/* __XFS_MACROS_H__ */

@@ -29,53 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.138 $"
 
-#include <xfs_os_defs.h>
-#include <linux/stat.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL	1
-#endif
-#include <sys/param.h>
-#include <sys/vnode.h>
-#include "xfs_buf.h"
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#ifndef SIM
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_alloc.h"
-#include "xfs_bit.h"
-#include "xfs_rtalloc.h"
-#include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
-#include "xfs_arch.h"
 
 /*
  * Prototypes for internal routines.
@@ -975,7 +931,6 @@ error0:
 	return error;
 }
 
-#ifndef SIM
 /*
  * Free disk inode.  Carefully avoids touching the incore inode, all
  * manipulations incore are the caller's responsibility.
@@ -1113,7 +1068,6 @@ error0:
 	xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 	return error;
 }
-#endif	/* !SIM */
 
 /*
  * Return the location of the inode in bno/off, for mapping it into a buffer.

@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_RTALLOC_H
-#define	_FS_XFS_RTALLOC_H
-
-#ident	"$Revision: 1.18 $"
+#ifndef __XFS_RTALLOC_H__
+#define	__XFS_RTALLOC_H__
 
 struct xfs_mount;
 struct xfs_trans;
@@ -87,7 +85,6 @@ struct xfs_trans;
  * Function prototypes for exported functions.
  */
 
-#ifndef SIM
 /*
  * Allocate an extent in the realtime subvolume, with the usual allocation
  * parameters.  The length units are all in realtime extents, as is the
@@ -104,7 +101,6 @@ xfs_rtallocate_extent(
 	int			wasdel,	/* was a delayed allocation extent */
 	xfs_extlen_t		prod,	/* extent product factor */
 	xfs_rtblock_t		*rtblock); /* out: start block allocated */
-#endif	/* !SIM */
 
 /*
  * Free an extent in the realtime subvolume.  Length is expressed in
@@ -131,7 +127,6 @@ int					/* error */
 xfs_rtmount_inodes(
 	struct xfs_mount	*mp);	/* file system mount structure */
 
-#ifndef SIM
 /*
  * Pick an extent for allocation at the start of a new realtime file.
  * Use the sequence number stored in the atime field of the bitmap inode.
@@ -145,7 +140,6 @@ xfs_rtpick_extent(
 	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_extlen_t		len,	/* allocation length (rtextents) */
 	xfs_rtblock_t		*pick);	/* result rt extent */
-#endif	/* !SIM */
 
 #ifdef XFSDEBUG
 /*
@@ -167,4 +161,4 @@ xfs_rtprint_summary(
 	struct xfs_trans	*tp);	/* transaction pointer */
 #endif	/* XFSDEBUG */
 
-#endif	/* !_FS_XFS_RTALLOC_H */
+#endif	/* __XFS_RTALLOC_H__ */

@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_EXTFREE_ITEM_H
-#define	_XFS_EXTFREE_ITEM_H
-
-#ident	"$Revision$"
+#ifndef	__XFS_EXTFREE_ITEM_H__
+#define	__XFS_EXTFREE_ITEM_H__
 
 struct xfs_mount;
 struct xfs_zone;
@@ -54,6 +52,22 @@ typedef struct xfs_efi_log_format {
 	__uint64_t		efi_id;		/* efi identifier */
 	xfs_extent_t		efi_extents[1];	/* array of extents to free */
 } xfs_efi_log_format_t;
+
+/*
+ * This is the structure used to lay out an efd log item in the
+ * log.  The efd_extents array is a variable size array whose
+ * size is given by efd_nextents;
+ */
+typedef struct xfs_efd_log_format {
+	unsigned short		efd_type;	/* efd log item type */
+	unsigned short		efd_size;	/* size of this item */
+	uint			efd_nextents;	/* # of extents freed */
+	__uint64_t		efd_efi_id;	/* id of corresponding efi */
+	xfs_extent_t		efd_extents[1];	/* array of extents freed */
+} xfs_efd_log_format_t;
+
+
+#ifdef __KERNEL__
 
 /*
  * Max number of extents in fast allocation path.
@@ -81,19 +95,6 @@ typedef struct xfs_efi_log_item {
 } xfs_efi_log_item_t;
 
 /*
- * This is the structure used to lay out an efd log item in the
- * log.  The efd_extents array is a variable size array whose
- * size is given by efd_nextents;
- */
-typedef struct xfs_efd_log_format {
-	unsigned short		efd_type;	/* efd log item type */
-	unsigned short		efd_size;	/* size of this item */
-	uint			efd_nextents;	/* # of extents freed */
-	__uint64_t		efd_efi_id;	/* id of corresponding efi */
-	xfs_extent_t		efd_extents[1];	/* array of extents freed */
-} xfs_efd_log_format_t;
-
-/*
  * This is the "extent free done" log item.  It is used to log
  * the fact that some extents earlier mentioned in an efi item
  * have been freed.
@@ -117,4 +118,6 @@ xfs_efi_log_item_t	*xfs_efi_init(struct xfs_mount *, uint);
 xfs_efd_log_item_t	*xfs_efd_init(struct xfs_mount *, xfs_efi_log_item_t *,
 				      uint);
 
-#endif	/* _XFS_EXTFREE_ITEM_H */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_EXTFREE_ITEM_H__ */

@@ -29,14 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_ATTR_LEAF_H
-#define	_FS_XFS_ATTR_LEAF_H
-
-#ident	"$Revision: 1.24 $"
+#ifndef __XFS_ATTR_LEAF_H__
+#define	__XFS_ATTR_LEAF_H__
 
 /*
- * xfs_attr_leaf.h
- *
  * Attribute storage layout, internal structure, access macros, etc.
  *
  * Attribute lists are structured around Btrees where all the data
@@ -306,4 +302,4 @@ int	xfs_attr_put_listent(struct xfs_attr_list_context *context,
 				    char *name, int namelen, int valuelen);
 int	xfs_attr_rolltrans(struct xfs_trans **transp, struct xfs_inode *dp);
 
-#endif	/* !FS_XFS_ATTR_LEAF_H */
+#endif	/* __XFS_ATTR_LEAF_H__ */

@@ -29,27 +29,26 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_IMAP_H
-#define	_FS_XFS_IMAP_H
-
-#ident "$Revision$"
-
-struct xfs_mount;
-struct xfs_trans;
+#ifndef __XFS_IMAP_H__
+#define	__XFS_IMAP_H__
 
 /*
  * This is the structure passed to xfs_imap() to map
  * an inode number to its on disk location.
  */
 typedef struct xfs_imap {
- 	xfs_daddr_t		im_blkno;	/* starting BB of inode chunk */
+ 	xfs_daddr_t	im_blkno;	/* starting BB of inode chunk */
 	uint		im_len;		/* length in BBs of inode chunk */
 	xfs_agblock_t	im_agblkno;	/* logical block of inode chunk in ag */
 	ushort		im_ioffset;	/* inode offset in block in "inodes" */
 	ushort		im_boffset;	/* inode offset in block in bytes */
 } xfs_imap_t;
 	
+#ifdef __KERNEL__
+struct xfs_mount;
+struct xfs_trans;
 int	xfs_imap(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 		 xfs_imap_t *, uint);
+#endif
 
-#endif	/* !_FS_XFS_IMAP_H */
+#endif	/* __XFS_IMAP_H__ */

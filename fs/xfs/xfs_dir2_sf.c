@@ -29,62 +29,17 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.17 $"
 
 /*
  * xfs_dir2_sf.c
  * Shortform directory implementation for v2 directories.
  */
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#include <sys/uuid.h>
-#ifdef SIM
-#undef _KERNEL
-#include <string.h>
-#endif
-#include <sys/vnode.h>
-#include <sys/kmem.h>
-#include <sys/dirent.h>
-#include <stddef.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_error.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_dir2_trace.h"
-#ifdef SIM
-#include "sim.h"
-#endif
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM) && 0
-#include "asm/kdb.h"
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && 0
+
 #undef xfs_dir2_print_args
 #define xfs_dir2_print_args(ARGS) \
     printk("    inumber=%Ld, name=\"%*.*s\", hashval=0x%x, dir inumber=%Ld\n", \
@@ -102,6 +57,7 @@
     printk("[%s] (0x%p, %d, 0x%p)\n", A, B, C, D); \
     xfs_dir2_print_args(B); \
 }
+
 #endif
 
 /*
@@ -122,13 +78,10 @@ static void xfs_dir2_sf_check(xfs_da_args_t *args);
 #define	xfs_dir2_sf_check(args)
 #endif /* DEBUG */
 #if XFS_BIG_FILESYSTEMS
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 static void xfs_dir2_sf_toino4(xfs_da_args_t *args);
-#endif /* XFS_REPAIR_SIM || !SIM */
 static void xfs_dir2_sf_toino8(xfs_da_args_t *args);
 #endif /* XFS_BIG_FILESYSTEMS */
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Given a block directory (dp/block), calculate its size as a shortform (sf)
  * directory and a header for the sf directory, if it will fit it the
@@ -327,7 +280,6 @@ out:
 	kmem_free(block, mp->m_dirblksize);
 	return error;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Add a name to a shortform directory.
@@ -769,7 +721,6 @@ xfs_dir2_sf_create(
 	return 0;
 }
 
-#ifndef SIM
 int						/* error */
 xfs_dir2_sf_getdents(
 	xfs_inode_t		*dp,		/* incore directory inode */
@@ -943,7 +894,6 @@ xfs_dir2_sf_getdents(
 
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * Lookup an entry in a shortform directory.
@@ -1012,7 +962,6 @@ xfs_dir2_sf_lookup(
 	return XFS_ERROR(ENOENT);
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from a shortform directory.
  */
@@ -1231,10 +1180,8 @@ xfs_dir2_sf_replace(
 	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_DDATA);
 	return 0;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 #if XFS_BIG_FILESYSTEMS
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Convert from 8-byte inode numbers to 4-byte inode numbers.
  * The last 8-byte inode number is gone, but the count is still 1.
@@ -1310,7 +1257,6 @@ xfs_dir2_sf_toino4(
 	dp->i_d.di_size = newsize;
 	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_CORE | XFS_ILOG_DDATA);
 }
-#endif /* XFS_REPAIR_SIM || !defined(SIM) */
 
 /*
  * Convert from 4-byte inode numbers to 8-byte inode numbers.

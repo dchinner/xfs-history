@@ -29,56 +29,15 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
 
 /*
  * xfs_dir2_data.c
  * Core data block handling routines for XFS V2 directories.
  * See xfs_dir2_data.h for data structures.
  */
-#include <xfs_os_defs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/vnode.h>
-#ifdef SIM
-#include <stdio.h>
-#else
-#include <sys/systm.h>
-#endif
-#include <stddef.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
+#include <xfs.h>
+
 
 #ifdef DEBUG
 /*
@@ -219,13 +178,13 @@ xfs_dir2_data_freefind(
 {
 	xfs_dir2_data_free_t	*dfp;		/* bestfree entry */
 	xfs_dir2_data_aoff_t	off;		/* offset value needed */
-#if defined(DEBUG) && !defined(XFS_REPAIR_SIM)
+#if defined(DEBUG) && defined(__KERNEL__)
 	int			matched;	/* matched the value */
 	int			seenzero;	/* saw a 0 bestfree entry */
 #endif
 
 	off = (xfs_dir2_data_aoff_t)((char *)dup - (char *)d);
-#if defined(DEBUG) && !defined(XFS_REPAIR_SIM)
+#if defined(DEBUG) && defined(__KERNEL__)
 	/*
 	 * Validate some consistency in the bestfree table.
 	 * Check order, non-overlapping entries, and if we find the
@@ -289,7 +248,7 @@ xfs_dir2_data_freeinsert(
 	xfs_dir2_data_free_t	*dfp;		/* bestfree table pointer */
 	xfs_dir2_data_free_t	new;		/* new bestfree entry */
 
-#ifndef XFS_REPAIR_SIM
+#ifdef __KERNEL__
 	ASSERT(INT_GET(d->hdr.magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC ||
 	       INT_GET(d->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC);
 #endif
@@ -329,7 +288,7 @@ xfs_dir2_data_freeremove(
 	xfs_dir2_data_free_t	*dfp,		/* bestfree entry pointer */
 	int			*loghead)	/* out: log data header */
 {
-#ifndef XFS_REPAIR_SIM
+#ifdef __KERNEL__
 	ASSERT(INT_GET(d->hdr.magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC ||
 	       INT_GET(d->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC);
 #endif
@@ -374,7 +333,7 @@ xfs_dir2_data_freescan(
 	char			*endp;		/* end of block's data */
 	char			*p;		/* current entry pointer */
 
-#ifndef XFS_REPAIR_SIM
+#ifdef __KERNEL__
 	ASSERT(INT_GET(d->hdr.magic, ARCH_CONVERT) == XFS_DIR2_DATA_MAGIC ||
 	       INT_GET(d->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC);
 #endif

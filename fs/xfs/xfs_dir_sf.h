@@ -29,14 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR_SF_H
-#define	_FS_XFS_DIR_SF_H
-
-#ident	"$Revision$"
+#ifndef __XFS_DIR_SF_H__
+#define	__XFS_DIR_SF_H__
 
 /*
- * xfs_dir_sf.h
- *
  * Directory layout when stored internal to an inode.
  *
  * Small directories are packed as tightly as possible so as to
@@ -134,7 +130,7 @@ int xfs_dir_sf_allfit(int count, int totallen);
 #define	XFS_DIR_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_DIR_TRACE
 #endif
 
@@ -187,5 +183,6 @@ void xfs_dir_trace_enter(int type, char *where,
 #define	xfs_dir_trace_g_dul(w,d,u,l)
 #define	xfs_dir_trace_g_due(w,d,u,e)
 #define	xfs_dir_trace_g_duc(w,d,u,c)
-#endif /* DEBUG && !SIM */
-#endif	/* !_FS_XFS_DIR_SF_H */
+#endif /* DEBUG */
+
+#endif	/* __XFS_DIR_SF_H__ */

@@ -29,63 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.115 $"
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/sysmacros.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/vnode.h>
-#include <sys/kmem.h>
-#include <sys/cmn_err.h>
-#include <sys/uuid.h>
-#include <stddef.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_error.h"
-#include "xfs_trans_priv.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_quota.h"
-#include "xfs_dqblk.h" /* XFS_DQUOT_LOGRES(mp) */
-#include "xfs_trans_space.h"
-#include "xfs_arch.h"
-
-#ifdef SIM
-#include "sim.h"
-#include <stdio.h>
-#include <stdlib.h>
-#endif
 
 STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
 STATIC uint	xfs_trans_count_vecs(xfs_trans_t *);
@@ -202,7 +148,7 @@ xfs_trans_dup(
 
 	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
 
-#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+#if defined(XLOG_NOLOG) || defined(DEBUG)
 	ASSERT(!xlog_debug || tp->t_ticket != NULL);
 #else
 	ASSERT(tp->t_ticket != NULL);
@@ -284,12 +230,6 @@ xfs_trans_reserve(
 		error = xfs_log_reserve(tp->t_mountp, logspace, logcount,
 					&tp->t_ticket,
 					XFS_TRANSACTION, log_flags);
-#ifdef SIM
-		if (error != 0) {
-			printf("Log reservation failed\n");
-			abort();
-		}
-#endif
 		if (error) {
 			goto undo_blocks;
 		}
@@ -702,7 +642,7 @@ xfs_trans_commit(
 	int			sync;
 #define	XFS_TRANS_LOGVEC_COUNT	16
 	xfs_log_iovec_t		log_vector_fast[XFS_TRANS_LOGVEC_COUNT];
-#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+#if defined(XLOG_NOLOG) || defined(DEBUG)
 	static xfs_lsn_t	trans_lsn = 1;
 #endif
 	int			shutdown;
@@ -739,9 +679,7 @@ shut_us_down:
 		 * reservations that need to be unreserved.
 		 */
 		if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY)) {
-#ifndef SIM
 			xfs_trans_unreserve_and_mod_dquots(tp);
-#endif
 		}
 		if (tp->t_ticket) {
 			commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
@@ -755,7 +693,7 @@ shut_us_down:
 			*commit_lsn_p = commit_lsn;
 		return (shutdown);
 	}
-#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+#if defined(XLOG_NOLOG) || defined(DEBUG)
 	ASSERT(!xlog_debug || tp->t_ticket != NULL);
 #else
 	ASSERT(tp->t_ticket != NULL);
@@ -768,9 +706,7 @@ shut_us_down:
 		xfs_trans_apply_sb_deltas(tp);
 	}
 	if (tp->t_flags & XFS_TRANS_DQ_DIRTY) {
-#ifndef SIM
 		xfs_trans_apply_dquot_deltas(tp);
-#endif
 	}
 
 	/*
@@ -808,7 +744,7 @@ shut_us_down:
 	error = xfs_log_write(mp, log_vector, nvec, tp->t_ticket,
 			     &(tp->t_lsn));
 	
-#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+#if defined(XLOG_NOLOG) || defined(DEBUG)
 	if (xlog_debug) {
 		commit_lsn = xfs_log_done(mp, tp->t_ticket,
 					  log_flags);
@@ -877,7 +813,7 @@ shut_us_down:
 	 * running in simulation mode (the log is explicitly turned
 	 * off).
 	 */
-#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+#if defined(XLOG_NOLOG) || defined(DEBUG)
 	if (xlog_debug) {
 		tp->t_logcb.cb_func = (void(*)(void*, int))xfs_trans_committed;
 		tp->t_logcb.cb_arg = tp;
@@ -968,9 +904,7 @@ xfs_trans_uncommit(
 
 	xfs_trans_unreserve_and_mod_sb(tp);
 	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY)) {
-#ifndef SIM
 		xfs_trans_unreserve_and_mod_dquots(tp);
-#endif
 	}
 	
 	xfs_trans_free_items(tp, flags);

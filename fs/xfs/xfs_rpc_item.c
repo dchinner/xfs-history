@@ -29,38 +29,14 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.7 $"
-#include <xfs_os_defs.h>
 
 /*
  * Implementation of CXFS RPC log items -- needed to implement
  * atomic rpc's for CXFS
  */
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
+#include <xfs.h>
 
-#include <sys/param.h>
-#include <sys/kmem.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/debug.h>
-
-#ifdef SIM
-#undef _KERNEL
-#endif
-
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_rpc_item.h"
 
 zone_t *xfs_rpcli_zone;		/* rpc log item zone */
 

@@ -29,16 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-/*
- *
- * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/.RCS/PL/linux/fs/xfs/linux/RCS/xfs_lrw.h,v 1.10 2000/06/09 06:40:03 ananth Exp $
- * $Author: ananth $
- * $Id: xfs_lrw.h,v 1.10 2000/06/09 06:40:03 ananth Exp $
- *
- */
 
-#ifndef _XFS_LRW_H
-#define _XFS_LRW_H
+#ifndef __XFS_LRW_H__
+#define __XFS_LRW_H__
 
 #define XFS_IOMAP_READ_ENTER	3
 /*
@@ -46,60 +39,27 @@
  */
 #define	XFS_MAX_RW_NBMAPS	4
 
-extern int xfs_bmap(bhv_desc_t *,loff_t,ssize_t,int,pb_bmap_t *,int *);
-extern int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int,
-			  pb_bmap_t *, int *, struct pm *);
-extern int xfs_iomap_write(xfs_iocore_t	*,loff_t,size_t,pb_bmap_t *,int *,int,struct pm *);
+extern int xfs_bmap (bhv_desc_t *,loff_t,ssize_t,int,pb_bmap_t *,int *);
+extern int xfs_iomap_read (xfs_iocore_t *, loff_t, size_t, int,
+				pb_bmap_t *, int *, struct pm *);
+extern int xfs_iomap_write (xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
+				int *, int, struct pm *);
+extern int xfsbdstrat (struct xfs_mount *, struct xfs_buf *);
+extern int xfs_bdstrat_cb (struct xfs_buf *);
 
-extern int xfs_is_read_only(xlog_t *);
-extern void XFS_log_write_unmount_ro(bhv_desc_t	*);
-/*
- * Needed by xfs_rw.c
- */
+extern int xfs_zero_eof (vnode_t *, struct xfs_iocore *, xfs_off_t,
+				xfs_fsize_t, struct pm *);
+extern ssize_t xfs_read (bhv_desc_t *, struct file *, char *,
+				size_t, loff_t *);
+extern ssize_t xfs_write (bhv_desc_t *, struct file *, char *,
+				size_t, loff_t *);
 
-void
-xfs_rwlock(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock);
-
-void
-xfs_rwlockf(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock,
-	int		flags);
-
-void
-xfs_rwunlock(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock);
-
-void
-xfs_rwunlockf(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock,
-	int		flags);
-
-#if 0
-page_buf_t *
-xfs_pb_getr(
-			int sleep, 
-			xfs_mount_t *mp);
-page_buf_t *
-xfs_pb_ngetr(
-			 int len, 
-			 xfs_mount_t *mp);
-
-void
-xfs_pb_freer(
-			 page_buf_t *bp); 
-void
-xfs_pb_nfreer(
-			  page_buf_t *bp);
-#endif
+extern int xfs_is_read_only (xlog_t *);
+extern void XFS_log_write_unmount_ro (bhv_desc_t *);
 
 #define XFS_FSB_TO_DB_IO(io,fsb) \
 		(((io)->io_flags & XFS_IOCORE_RT) ? \
 		 XFS_FSB_TO_BB((io)->io_mount, (fsb)) : \
 		 XFS_FSB_TO_DADDR((io)->io_mount, (fsb)))
 
-#endif /* _XFS_LRW_H */
+#endif	/* __XFS_LRW_H__ */

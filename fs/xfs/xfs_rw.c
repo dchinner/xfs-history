@@ -29,62 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.325 $"
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/uio.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/sysmacros.h>
-#include <sys/uuid.h>
-#include <linux/grio.h>
-#include <sys/cmn_err.h>
-#include <sys/debug.h>
-#include <sys/systm.h>
-#include <sys/kmem.h>
-#include <linux/xfs_sema.h>
-#include <ksys/vfile.h>
-#include <sys/fs_subr.h>
-#include <linux/xfs_fs.h>
-#include <linux/dmapi_kern.h>
-#include <sys/ktrace.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_itable.h"
-#include "xfs_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#include "xfs_rw.h"
-#include "xfs_quota.h"
-#include "xfs_trans_space.h"
-#include "xfs_dmapi.h"
-#include "xfs_cxfs.h"
-#if defined(XFSDEBUG) && defined(CONFIG_KDB)
-#include "asm/kdb.h"
-#endif
 
 /*
  * Zone allocator for xfs_gap_t structures.
@@ -114,9 +61,6 @@ xfs_delalloc_cleanup(
 	xfs_inode_t	*ip,
 	xfs_fileoff_t	start_fsb,
 	xfs_filblks_t	count_fsb);
-
-extern void xfs_buf_iodone_callbacks(struct xfs_buf *);
-extern void xlog_iodone(struct xfs_buf *);
 
 /*
  * Round the given file offset down to the nearest read/write
@@ -473,8 +417,7 @@ xfs_force_shutdown(
 {
 	int             ntries;
 	int             logerror;
-	extern dev_t    rootdev;		/* from sys/systm.h */
-        
+
 #if defined(XFSDEBUG) && 0
         printk("xfs_force_shutdown entered [0x%p, %d]\n",
                 mp, flags);

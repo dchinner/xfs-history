@@ -29,15 +29,11 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_ERROR_H
-#define	_XFS_ERROR_H
+#ifndef	__XFS_ERROR_H__
+#define	__XFS_ERROR_H__
 
-#ident "$Revision: 1.13 $"
-
-#ifndef SIM
 #define prdev(fmt,dev,args...) \
      printk("XFS: device 0x%x- " fmt "\n", dev, ## args)
-#endif
 
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
@@ -55,8 +51,6 @@ extern int	xfs_error_trap(int);
 #else
 #define	XFS_ERROR(e)	(e)
 #endif
-
-#endif	/* _XFS_ERROR_H */
 
 
 /*
@@ -104,7 +98,7 @@ extern int	xfs_error_trap(int);
 #define	XFS_RANDOM_DIR_INO_VALIDATE			XFS_RANDOM_DEFAULT
 #define	XFS_RANDOM_BULKSTAT_READ_CHUNK			XFS_RANDOM_DEFAULT
 
-#if !defined(SIM) && (defined(DEBUG) || defined(INDUCE_IO_ERROR))
+#if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 extern int	xfs_error_test(int, int *, char *, int, char *, unsigned long);
 
 #define	XFS_NUM_INJECT_ERROR				10
@@ -129,7 +123,7 @@ int		xfs_errortag_clearall_umount(__int64_t fsid, char *fsname,
 						int loud);
 #else
 #define XFS_TEST_ERROR(expr, mp, tag, rf)	(expr)
-#endif /* !SIM && (DEBUG || INDUCE_IO_ERROR) */
+#endif /* (DEBUG || INDUCE_IO_ERROR) */
 
 /*
  * XFS panic tags -- allow a call to xfs_cmn_err() be turned into
@@ -148,3 +142,5 @@ void		xfs_cmn_err(__uint64_t panic_tag, int level, struct xfs_mount *mp,
 			    char *fmt, ...);
 /* PRINTFLIKE3 */
 void		xfs_fs_cmn_err(int level, struct xfs_mount *mp, char *fmt, ...);
+
+#endif	/* __XFS_ERROR_H__ */

@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.108 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -38,52 +37,12 @@
  * transaction routines.
  */
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/vnode.h>
-#include <sys/kmem.h>
-#ifdef SIM
-#include <stdio.h>
-#else
-#include <sys/systm.h>
-#endif
-#include <sys/ktrace.h>
-#include <sys/cmn_err.h>
-#include <sys/uuid.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_buf_item.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_trans_priv.h"
-#include "xfs_rw.h" 
-#include "xfs_bit.h"
-#include "xfs_error.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
 
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
 
 xfs_zone_t	*xfs_buf_item_zone;
-
-#if 0
-STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
-#endif
 
 #ifdef	XFS_TRANS_DEBUG
 STATIC void
@@ -1129,27 +1088,6 @@ xfs_buf_item_next_bit(
 	return (-1);
 }
 
-#if 0
-/*
- * Set the specified bit in the given bitmap.
- */
-/*ARGSUSED*/
-STATIC void
-xfs_buf_item_set_bit(
-	uint	*map,
-	uint	size,
-	uint	bit)
-{
-	uint	*wordp;
-	int	word_bit;
-
-	wordp = map + (bit >> BIT_TO_WORD_SHIFT);
-	word_bit = bit & (NBWORD - 1);
-
-	*wordp |= 1 << word_bit;
-}
-#endif
-		
 /*
  * Return 1 if the buffer has some data that has been logged (at any
  * point, not just the current transaction) and 0 if not.

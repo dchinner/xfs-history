@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR2_BLOCK_H
-#define	_FS_XFS_DIR2_BLOCK_H
-
-#ident "$Revision$"
+#ifndef __XFS_DIR2_BLOCK_H__
+#define	__XFS_DIR2_BLOCK_H__
 
 /*
  * xfs_dir2_block.h
@@ -106,31 +104,25 @@ struct xfs_dir2_leaf_entry *xfs_dir2_block_leaf_p_arch(
 extern int
 	xfs_dir2_block_addname(struct xfs_da_args *args);
 
-#ifndef SIM
 extern int
 	xfs_dir2_block_getdents(struct xfs_trans *tp, struct xfs_inode *dp,
 				struct uio *uio, int *eofp, struct dirent *dbp,
 				xfs_dir2_put_t put);
-#endif
 
 extern int
 	xfs_dir2_block_lookup(struct xfs_da_args *args);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_block_removename(struct xfs_da_args *args);
 
 extern int
 	xfs_dir2_block_replace(struct xfs_da_args *args);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_leaf_to_block(struct xfs_da_args *args, struct xfs_dabuf *lbp,
 			       struct xfs_dabuf *dbp);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 extern int
 	xfs_dir2_sf_to_block(struct xfs_da_args *args);
 
-#endif	/* !_FS_XFS_DIR2_BLOCK_H */
+#endif	/* __XFS_DIR2_BLOCK_H__ */

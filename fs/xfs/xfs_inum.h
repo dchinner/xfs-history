@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_INUM_H
-#define	_FS_XFS_INUM_H
-
-#ident	"$Revision$"
+#ifndef __XFS_INUM_H__
+#define	__XFS_INUM_H__
 
 /*
  * Inode number format:
@@ -42,7 +40,6 @@
  * high agno_log-agblklog-inopblog bits - 0
  */
 
-/* typedef	__uint64_t	xfs_ino_t;*/	/* inode number */
 typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
 
 /*
@@ -173,4 +170,4 @@ xfs_agino_t xfs_offbno_to_agino(struct xfs_mount *mp, xfs_agblock_t b, int o);
 #endif
 #define	XFS_MAXINUMBER_32	((xfs_ino_t)((1ULL << 32) - 1ULL))
 
-#endif	/* !_FS_XFS_INUM_H */
+#endif	/* __XFS_INUM_H__ */

@@ -29,55 +29,13 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.133 $"
 
 /*
  * Free space allocation for XFS.
  */
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/ktrace.h>
-#include <sys/kmem.h>
-#include <sys/uuid.h>
-
-#include <stddef.h>
-#ifdef SIM
-#include <stdlib.h>
-#else
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_alloc.h"
-#include "xfs_bit.h"
-#include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
-
-#if defined(DEBUG) && !defined(SIM)
+#if defined(DEBUG)
 /*
  * Allocation tracing.
  */
@@ -595,7 +553,7 @@ xfs_alloc_read_agfl(
 	xfs_buf_t	**bpp)		/* buffer for the ag free block array */
 {
 	xfs_buf_t	*bp;		/* return value */
-	xfs_daddr_t		d;		/* disk block address */
+	xfs_daddr_t	d;		/* disk block address */
 	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);
@@ -930,18 +888,15 @@ xfs_alloc_ag_vextent_near(
 	xfs_extlen_t	ltlena;		/* aligned ... */
 	xfs_agblock_t	ltnew;		/* useful start bno of left side */
 	xfs_extlen_t	rlen;		/* length of returned extent */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(DEBUG) && defined(__KERNEL__)
 	/*
 	 * Randomly don't execute the first algorithm.
 	 */
 	static int	seed;		/* randomizing seed value */
 	int		dofirst;	/* set to do first algorithm */
 	timespec_t	now;		/* current time */
-	extern ulong_t	random(void);
 
 	if (!seed) {
-		extern void nanotime(struct timespec *);
-
 		nanotime(&now);
 		seed = (int)now.tv_sec ^ (int)now.tv_nsec;
 	}
@@ -990,7 +945,7 @@ xfs_alloc_ag_vextent_near(
 		xfs_extlen_t	blen;
 		xfs_agblock_t	bnew;
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(DEBUG) && defined(__KERNEL__)
 		if (!dofirst)
 			break;
 #endif
@@ -2323,7 +2278,7 @@ xfs_alloc_read_agf(
 	xfs_agf_t	*agf;		/* ag freelist header */
 	int		agf_ok;		/* set if agf is consistent */
 	xfs_buf_t	*bp;		/* return value */
-	xfs_daddr_t		d;		/* disk block address */
+	xfs_daddr_t	d;		/* disk block address */
 	int		error;
 	xfs_perag_t	*pag;		/* per allocation group data */
 

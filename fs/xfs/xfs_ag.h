@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_AG_H
-#define	_FS_XFS_AG_H
-
-#ident	"$Revision: 1.35 $"
+#ifndef __XFS_AG_H__
+#define	__XFS_AG_H__
 
 /*
  * Allocation group header
@@ -342,4 +340,4 @@ void xfs_ag_check_daddr(struct xfs_mount *mp, xfs_daddr_t d, xfs_extlen_t len);
 	           XFS_DADDR_TO_AGNO(mp, (d) + (len) - 1)))
 #endif
 
-#endif	/* !_FS_XFS_AG_H */
+#endif	/* __XFS_AG_H__ */

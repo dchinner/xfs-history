@@ -29,16 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_INODE_ITEM_H
-#define	_XFS_INODE_ITEM_H
-
-#ident "$Revision$"
-
-struct xfs_buf;
-struct proc;
-struct xfs_bmbt_rec_32;
-struct xfs_inode;
-struct xfs_mount;
+#ifndef	__XFS_INODE_ITEM_H__
+#define	__XFS_INODE_ITEM_H__
 
 /*
  * This is the structure used to lay out an inode log item in the
@@ -94,6 +86,51 @@ typedef struct xfs_inode_log_format_v1 {
 	} ilf_u;
 } xfs_inode_log_format_t_v1;
 
+/*
+ * Flags for xfs_trans_log_inode flags field.
+ */
+#define	XFS_ILOG_CORE	0x001	/* log standard inode fields */
+#define	XFS_ILOG_DDATA	0x002	/* log i_df.if_data */
+#define	XFS_ILOG_DEXT	0x004	/* log i_df.if_extents */
+#define	XFS_ILOG_DBROOT	0x008	/* log i_df.i_broot */
+#define	XFS_ILOG_DEV	0x010	/* log the dev field */
+#define	XFS_ILOG_UUID	0x020	/* log the uuid field */
+#define	XFS_ILOG_ADATA	0x040	/* log i_af.if_data */
+#define	XFS_ILOG_AEXT	0x080	/* log i_af.if_extents */
+#define	XFS_ILOG_ABROOT	0x100	/* log i_af.i_broot */
+
+#define	XFS_ILOG_NONCORE	(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
+				 XFS_ILOG_DBROOT | XFS_ILOG_DEV | \
+				 XFS_ILOG_UUID | XFS_ILOG_ADATA | \
+				 XFS_ILOG_AEXT | XFS_ILOG_ABROOT)
+
+#define	XFS_ILOG_DFORK		(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
+				 XFS_ILOG_DBROOT)
+
+#define	XFS_ILOG_AFORK		(XFS_ILOG_ADATA | XFS_ILOG_AEXT | \
+				 XFS_ILOG_ABROOT)
+
+#define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DDATA | \
+				 XFS_ILOG_DEXT | XFS_ILOG_DBROOT | \
+				 XFS_ILOG_DEV | XFS_ILOG_UUID | \
+				 XFS_ILOG_ADATA | XFS_ILOG_AEXT | \
+				 XFS_ILOG_ABROOT)
+
+#define	XFS_ILI_HOLD		0x1
+#define	XFS_ILI_IOLOCKED_EXCL	0x2
+#define	XFS_ILI_IOLOCKED_SHARED	0x4
+
+#define	XFS_ILI_IOLOCKED_ANY   (XFS_ILI_IOLOCKED_EXCL | XFS_ILI_IOLOCKED_SHARED)
+
+
+#ifdef __KERNEL__
+
+struct xfs_buf;
+struct xfs_bmbt_rec_32;
+struct xfs_inode;
+struct xfs_mount;
+
+
 typedef struct xfs_inode_log_item {
 	xfs_log_item_t		ili_item;	   /* common portion */
 	struct xfs_inode	*ili_inode;	   /* inode ptr */
@@ -118,24 +155,6 @@ typedef struct xfs_inode_log_item {
 	xfs_inode_log_format_t	ili_format;	   /* logged structure */
 } xfs_inode_log_item_t;
 
-#define	XFS_ILI_HOLD		0x1
-#define	XFS_ILI_IOLOCKED_EXCL	0x2
-#define	XFS_ILI_IOLOCKED_SHARED	0x4
-
-#define	XFS_ILI_IOLOCKED_ANY   (XFS_ILI_IOLOCKED_EXCL | XFS_ILI_IOLOCKED_SHARED)
-
-/*
- * Flags for xfs_trans_log_inode flags field.
- */
-#define	XFS_ILOG_CORE	0x001	/* log standard inode fields */
-#define	XFS_ILOG_DDATA	0x002	/* log i_df.if_data */
-#define	XFS_ILOG_DEXT	0x004	/* log i_df.if_extents */
-#define	XFS_ILOG_DBROOT	0x008	/* log i_df.i_broot */
-#define	XFS_ILOG_DEV	0x010	/* log the dev field */
-#define	XFS_ILOG_UUID	0x020	/* log the uuid field */
-#define	XFS_ILOG_ADATA	0x040	/* log i_af.if_data */
-#define	XFS_ILOG_AEXT	0x080	/* log i_af.if_extents */
-#define	XFS_ILOG_ABROOT	0x100	/* log i_af.i_broot */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ILOG_FDATA)
 int xfs_ilog_fdata(int w);
@@ -144,6 +163,9 @@ int xfs_ilog_fdata(int w);
 #define	XFS_ILOG_FDATA(w)	\
 	((w) == XFS_DATA_FORK ? XFS_ILOG_DDATA : XFS_ILOG_ADATA)
 #endif
+
+#endif	/* __KERNEL__ */
+
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ILOG_FBROOT)
 int xfs_ilog_fbroot(int w);
 #define	XFS_ILOG_FBROOT(w)	xfs_ilog_fbroot(w)
@@ -159,27 +181,13 @@ int xfs_ilog_fext(int w);
 	((w) == XFS_DATA_FORK ? XFS_ILOG_DEXT : XFS_ILOG_AEXT)
 #endif
 
-#define	XFS_ILOG_NONCORE	(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
-				 XFS_ILOG_DBROOT | XFS_ILOG_DEV | \
-				 XFS_ILOG_UUID | XFS_ILOG_ADATA | \
-				 XFS_ILOG_AEXT | XFS_ILOG_ABROOT)
+#ifdef __KERNEL__
 
-#define	XFS_ILOG_DFORK		(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
-				 XFS_ILOG_DBROOT)
-
-#define	XFS_ILOG_AFORK		(XFS_ILOG_ADATA | XFS_ILOG_AEXT | \
-				 XFS_ILOG_ABROOT)
-
-#define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DDATA | \
-				 XFS_ILOG_DEXT | XFS_ILOG_DBROOT | \
-				 XFS_ILOG_DEV | XFS_ILOG_UUID | \
-				 XFS_ILOG_ADATA | XFS_ILOG_AEXT | \
-				 XFS_ILOG_ABROOT)
-
-     
 void	xfs_inode_item_init(struct xfs_inode *, struct xfs_mount *);
 void	xfs_inode_item_destroy(struct xfs_inode *);
 void	xfs_iflush_done(struct xfs_buf *, xfs_inode_log_item_t *);
 void	xfs_iflush_abort(struct xfs_inode *);
 
-#endif	/* _XFS_INODE_ITEM_H */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_INODE_ITEM_H__ */

@@ -29,12 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DMAPI_H
-#define _FS_XFS_DMAPI_H
+#ifndef __XFS_DMAPI_H__
+#define __XFS_DMAPI_H__
 
-#ident  "$Revision: 1.9 $"
-
-#include <linux/xfs_cred.h>
+#include <linux/dmapi_kern.h>
 
 /*	Values used to define the on-disk version of dm_attrname_t. All
  *	on-disk attribute names start with the 8-byte string "SGI_DMI_".
@@ -47,7 +45,7 @@
 #define DMATTR_PREFIXLEN	8
 #define DMATTR_PREFIXSTRING	"SGI_DMI_"
 
-#ifdef	_KERNEL
+#ifdef	__KERNEL__
 /* Defines for determining if an event message should be sent. */
 #define	DM_EVENT_ENABLED(vfsp, ip, event) ( \
 	((vfsp)->vfs_flag & VFS_DMI) && \
@@ -113,6 +111,6 @@ xfs_set_dmattrs(
         u_int16_t       state,
         cred_t          *credp);
 
-#endif	/* _KERNEL */
+#endif	/* __KERNEL__ */
 
-#endif  /* _FS_XFS_DMAPI_H */
+#endif  /* __XFS_DMAPI_H__ */

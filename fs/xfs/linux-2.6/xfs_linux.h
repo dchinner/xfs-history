@@ -30,21 +30,14 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
  
-#ifndef __XFS_LINUX_
-#define __XFS_LINUX_
+#ifndef __XFS_LINUX__
+#define __XFS_LINUX__
 
+#include <asm/types.h>		/* Need BITS_PER_LONG */
 
 #ifndef STATIC
 #define STATIC
 #endif
-
-#ifdef	__KERNEL__
-# include <asm/types.h>		/* Need BITS_PER_LONG */
-#else	/* __KERNEL__ */
-# define __KERNEL__
-# include <asm/types.h>		/* Need BITS_PER_LONG */
-# undef  __KERNEL__
-#endif	/* __KERNEL__ */
 
 #if (BITS_PER_LONG == 32)
 #define XFS_64	0
@@ -54,17 +47,10 @@
 #error BITS_PER_LONG must be 32 or 64
 #endif
 
-#include <sys/types.h>
-
-#ifndef SIM
+#include <pseudo-inc/sys/types.h>
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/string.h>   /* to get memcpy, and friends */
-#else
-#include <time.h>
-#include <stdio.h>
-#endif
-
 #include <asm/page.h>
 #include <asm/param.h>
 #include <asm/byteorder.h>
@@ -75,16 +61,14 @@
 #define dtop(DD)	(((DD) + NDPP - 1) >> DPPSHFT)
 #define dtopt(DD)	((DD) >> DPPSHFT)
 #define dpoff(DD)	((DD) & (NDPP-1))
+#define NBBY    8       /* number of bits per byte */
 
-#ifndef SIM
 #define ENOTSUP		1008	/* Not supported (POSIX 1003.1b) */
-#endif
 
 /*
  * XXX these need real values in errno.h. asm-i386/errno.h won't 
  * return errnos out of its known range in errno.
  */
-
 #define ENOATTR         ENODATA /* Attribute not found */
 #define EFSCORRUPTED    1010    /* Filesystem is corrupted */
 #define	EWRONGFS	1011	/* Mount with wrong filesystem type */
@@ -93,26 +77,26 @@
 #define ENTER(x) printk("Entering %s\n",x);
 #define EXIT(x)  printk("Exiting  %s\n",x);
 
-#ifdef __KERNEL__
-extern int get_thread_id(void);
-#endif
+typedef struct timespec	timespec_t;
+extern void nanotime (timespec_t *);
+
+extern int	copyout (void *,void *, int);
+extern int	copyin (void *, void *, int);
+extern int	nopkg (void);
+extern void	delay (long);
+
+extern int get_thread_id (void);
+
+struct xfs_args;
+extern int mountargs_xfs (char *, struct xfs_args *);
 
 #ifndef _LINUX_SCHED_H
 extern unsigned long volatile jiffies;
 #endif
 #define lbolt		jiffies
 
-
 #define __return_address __builtin_return_address(0)
 
 #define LONGLONG_MAX        9223372036854775807LL /* max "long long int" */
 
-
-typedef struct timespec	timespec_t;
-
-#ifndef NBBY
-#define NBBY    8       /* number of bits per byte */
-#endif  /* NBBY */
-
-
-#endif /* __XFS_LINUX_ */
+#endif /* __XFS_LINUX__ */

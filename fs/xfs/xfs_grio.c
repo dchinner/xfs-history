@@ -29,63 +29,11 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.84 2000/06/16 01:49:13 kaos Exp $"
 
-#include <xfs_os_defs.h>
-
-#include <linux/config.h>
-#include <linux/module.h>
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/debug.h>
-#include "xfs_buf.h"
-#include <linux/xfs_sema.h>
-#if 0 /* XXX PORT */
-#include <sys/lock.h>
-#endif
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/uuid.h>
-#include <xfs_grio.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/kmem.h>
-#include <sys/vnode.h>
-#include <xfs_grio.h>
-#include <xfs_macros.h>
-#include <xfs_types.h>
-#include <xfs_log.h>
-#include <xfs_inum.h>
-#include <xfs_trans.h>
-#include <xfs_sb.h>
-#include <xfs_dir.h>
-#include <xfs_dir2.h>
-#include <xfs_mount.h>
-#include <xfs_alloc_btree.h>
-#include <xfs_bmap_btree.h>
-#include <xfs_ialloc_btree.h>
-#include <xfs_btree.h>
-#include <xfs_attr_sf.h>
-#include <xfs_dir_sf.h>
-#include <xfs_dir2_sf.h>
-#include <xfs_dinode.h>
-#include <xfs_inode.h>
-#include <xfs_itable.h>
-#include <xfs_error.h>
-#include <asm/uaccess.h>
-#include <linux/miscdevice.h>
-#include <linux/file.h>
-
-#ifdef SIM
-#include "sim.h"
-#include <stdio.h>
-#endif
+#include <xfs.h>
 
 #define IRELE(ip)		VN_RELE(XFS_ITOV(ip))
 
-extern xfs_inode_t 			*xfs_get_inode ( dev_t, xfs_ino_t);
 extern void grioinit(void);
 
 /*
@@ -433,13 +381,13 @@ void xfs_grio_init(void)
 {
         printk("xfs_grio_init\n");
         printk("sizeof(grio_cmd_t)=%d\n", sizeof(grio_cmd_t));
-    printk("%d %d %d %d %d\n", 
+        printk("%d %d %d %d %d\n", 
             offsetof(grio_cmd_t,gr_fp),
             offsetof(grio_cmd_t,other_end),
             offsetof(grio_cmd_t,memloc),
             offsetof(grio_cmd_t,cmd_info),
             offsetof(grio_cmd_t,gr_usecs_bw));
-    printk("%d %d %d %d\n", 
+        printk("%d %d %d %d\n", 
             offsetof(struct end_info,gr_end_type),
             offsetof(struct end_info,gr_dev),
             offsetof(struct end_info,gr_ino),

@@ -29,13 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR2_NODE_H
-#define	_FS_XFS_DIR2_NODE_H
-
-#ident "$Revision$"
+#ifndef __XFS_DIR2_NODE_H__
+#define	__XFS_DIR2_NODE_H__
 
 /*
- * xfs_dir2_node.h
  * Directory version 2, btree node format structures
  */
 
@@ -136,7 +133,6 @@ extern int
 			     struct xfs_da_state_blk *oldblk,
 			     struct xfs_da_state_blk *newblk);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_leafn_toosmall(struct xfs_da_state *state, int *action);
 
@@ -144,7 +140,6 @@ extern void
 	xfs_dir2_leafn_unbalance(struct xfs_da_state *state,
 				 struct xfs_da_state_blk *drop_blk,
 				 struct xfs_da_state_blk *save_blk);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 extern int
 	xfs_dir2_node_addname(struct xfs_da_args *args);
@@ -152,7 +147,6 @@ extern int
 extern int
 	xfs_dir2_node_lookup(struct xfs_da_args *args);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_node_removename(struct xfs_da_args *args);
 
@@ -162,6 +156,5 @@ extern int
 extern int
 	xfs_dir2_node_trim_free(struct xfs_da_args *args, xfs_fileoff_t fo,
 				int *rvalp);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
-#endif	/* !_FS_XFS_DIR2_NODE_H */
+#endif	/* __XFS_DIR2_NODE_H__ */

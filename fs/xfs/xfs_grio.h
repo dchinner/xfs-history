@@ -30,9 +30,8 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident "$Revision: 1.50 $"
-#ifndef _XFS_GRIO_H_
-#define _XFS_GRIO_H_
+#ifndef __XFS_GRIO_H__
+#define __XFS_GRIO_H__
 
 #include <xfs_buf.h>
 #include <linux/grio.h>
@@ -55,4 +54,4 @@ void grio_iodone(xfs_buf_t *);
  */
 grio_disk_info_t	*grio_disk_info(dev_t gdev);
 
-#endif /* _XFS_GRIO_H_ */
+#endif	/* __XFS_GRIO_H__ */

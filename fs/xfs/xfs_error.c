@@ -29,55 +29,14 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define	_KERNEL 1
-#endif
-#include <sys/types.h>
-#include <sys/uuid.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/kmem.h>
-#include <sys/cmn_err.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/debug.h>
-#ifdef SIM
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include "sim.h"
-#else
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#ifndef SIM
-#include "xfs_cxfs.h"
-#endif
-#include "xfs_sb.h"
-#include "xfs_trans.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_utils.h"
-#include "xfs_error.h"
 
 #ifdef DEBUG
 
 int	xfs_etrap[XFS_ERROR_NTRAP] = {
-#ifdef SIM
-	EFSCORRUPTED,
-#else
 	0,
-#endif
 };
 
 int
@@ -92,25 +51,20 @@ xfs_error_trap(int e)
 			break;
 		if (e != xfs_etrap[i])
 			continue;
-#ifdef SIM
-		abort();
-#else
 		cmn_err(CE_NOTE, "xfs_error_trap: error %d", e);
 		debug_stop_all_cpus((void *)-1LL);
 		BUG();
-#endif
 		break;
 	}
 	return e;
 }
 #endif
 
-#if !defined(SIM) && (defined(DEBUG) || defined(INDUCE_IO_ERROR))
+#if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 
 int	xfs_etest[XFS_NUM_INJECT_ERROR];
 int64_t	xfs_etest_fsid[XFS_NUM_INJECT_ERROR];
 char *	xfs_etest_fsname[XFS_NUM_INJECT_ERROR];
-extern int xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid);
 
 void
 xfs_error_test_init(void)
@@ -124,8 +78,6 @@ int
 xfs_error_test(int error_tag, int *fsidp, char *expression,
 	       int line, char *file, unsigned long randfactor)
 {
-	extern unsigned long random(void);
-
 	int i;
 	int64_t fsid;
 
@@ -254,7 +206,6 @@ xfs_errortag_clearall(int fd)
 }
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
-#ifndef SIM
 static void
 xfs_fs_vcmn_err(int level, xfs_mount_t *mp, char *fmt, va_list ap)
 {
@@ -286,11 +237,9 @@ xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 	    && (level & CE_ALERT)) {
 		level &= ~CE_ALERT;
 		level |= CE_PANIC;
-		cmn_err(CE_ALERT|CE_SYNC,
-			"Transforming an alert into a panic.");
+		cmn_err(CE_ALERT, "Transforming an alert into a panic.");
 	}
 	va_start(ap, fmt);
 	xfs_fs_vcmn_err(level, mp, fmt, ap);
 	va_end(ap);
 }
-#endif

@@ -29,45 +29,14 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.42 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
  * and xfs_efd_log_item items.
  */
-#include <xfs_os_defs.h>
 
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL	1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/kmem.h>
-#include <sys/uuid.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_buf_item.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_trans_priv.h"
-#include "xfs_extfree_item.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
 
 xfs_zone_t	*xfs_efi_zone;
 xfs_zone_t	*xfs_efd_zone;

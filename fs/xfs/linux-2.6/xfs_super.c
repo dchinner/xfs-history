@@ -29,53 +29,23 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#include <xfs_os_defs.h>
 
-#define FSID_T /* wrapper hack... border files have type problems */
-#include <sys/types.h> 
-
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/errno.h>
+#include <xfs.h>
 
 #undef  NODEV
 #include <linux/version.h>
-#include <linux/fs.h>
 #include <linux/bitops.h>
-#include <linux/sched.h>
 #include <linux/locks.h>
-#include <linux/slab.h>
 #include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
-
-#include <sys/systm.h>
-#include <sys/sysmacros.h>
-#include <sys/vfs.h>
-#include <sys/pvfs.h>
-#include <sys/vnode.h>
-#include <sys/mode.h>
-#include <ksys/behavior.h>
-#include <sys/statvfs.h>
-#include <sys/ktrace.h>
-#include <sys/kmem.h>
-#include <asm/uaccess.h>
 #include <linux/init.h>
 #include <linux/page_buf.h>
 
-#include <linux/xfs_cred.h>
-#include <xfs_grio.h>
-
 #define	MS_DATA		0x04
 
-
-#include <xfs_clnt.h>
-#include <xfs_inum.h>
-#include <sys/uuid.h>
-#include <sys/pvfs.h>
-#include <xfs_iops.h>
-#include <xfs_sb.h>
-
+#ifdef sysinfo
 #undef sysinfo
+#endif
 
 /* xfs_vfs.c */
 
@@ -87,8 +57,7 @@ int xfs_init(int fstype);
 void dmapi_init(void );
 void dmapi_uninit(void );
 
-extern struct super_operations linvfs_sops;
-
+static struct super_operations linvfs_sops;
 
 
 int spectodevs(
@@ -109,8 +78,6 @@ int spectodevs(
                 *rtdevp = 0;
 	return 0;
 }
-
-extern int xfs_bdstrat_cb(page_buf_t *);
 
 static struct inode_operations linvfs_meta_ops = {
 	pagebuf_ioinitiate:	xfs_bdstrat_cb,
@@ -561,8 +528,6 @@ linvfs_remount(
 	extern vfsops_t xfs_vfsops;
 	vfs_t *vfsp;
 	vnode_t *cvp;
-	extern int mountargs_xfs(char *options, struct xfs_args *args);
-	extern void XFS_log_write_unmount_ro(bhv_desc_t	*);
 
 	vfsp = LINVFS_GET_VFS(sb);
 	cvp = LINVFS_GET_CVP(sb);
@@ -629,7 +594,6 @@ static struct file_system_type xfs_fs_type = {
 
 int __init init_xfs_fs(void)
 {
-	extern void uuid_init(void);
 	struct sysinfo	si;
 
 	si_meminfo(&si);

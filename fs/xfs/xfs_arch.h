@@ -1,6 +1,3 @@
-#ifndef __XFS_ARCH_H__
-#define __XFS_ARCH_H__
-
 /*
  * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -32,25 +29,26 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
+#ifndef __XFS_ARCH_H__
+#define __XFS_ARCH_H__
 
-#ident "$Id$"
+#ifdef __KERNEL__
 
-/* includes */
-
-#include "xfs_types.h"
-#ifdef SIM
-#include <endian.h>
-#else
+#include <xfs_types.h>
 #include <asm/byteorder.h>
 
 #ifdef __LITTLE_ENDIAN
-#define __BYTE_ORDER	__LITTLE_ENDIAN
+# define __BYTE_ORDER	__LITTLE_ENDIAN
 #endif
 #ifdef __BIG_ENDIAN
-#define __BYTE_ORDER	__BIG_ENDIAN
-#endif
+# define __BYTE_ORDER	__BIG_ENDIAN
 #endif
 
+#else
+
+#include <linux/byteorder/swab.h>
+
+#endif	/* __KERNEL__ */
 
 #ifndef XFS_BIG_FILESYSTEMS
 #error XFS_BIG_FILESYSTEMS must be defined true or false
@@ -245,6 +243,4 @@
         INT_SET_UNALIGNED_16_BE(pointer,value); \
     }
 
-#endif /* __XFS_ARCH_H__ */
-
-
+#endif	/* __XFS_ARCH_H__ */

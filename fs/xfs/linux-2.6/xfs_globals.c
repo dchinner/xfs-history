@@ -29,50 +29,24 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-/*
- *
- * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/linux/fs/xfs/linux/RCS/xfs_globals.c,v 1.15 2000/06/15 21:42:59 jtk Exp $
- * $Author: jtk $
- * $Id: xfs_globals.c,v 1.15 2000/06/15 21:42:59 jtk Exp $
- *
- * Revision 1.12  2000/06/09 02:50:02  kenmcd
- * Updated copyright and license notices, ready for open source release
- * Merge of 2.3.99pre2-xfs:slinx:55821a by ananth.
- *
- */
 
 /*
  * This file contains globals needed by XFS that were normally defined
  * somewhere else in IRIX.
  */
 
-#include <xfs_os_defs.h>
-
-#include <sys/types.h>
-#include <sys/vfs.h>
-#include <linux/xfs_cred.h>
+#include <xfs.h>
 
 int		mac_enabled = 0;
 int		acl_enabled = 0;
-int		ncsize = 792;
-int		xpg4_sticky_dir = 1; /* see xfs_stickytest */
-int		imon_enabled;
+int		xpg4_sticky_dir = 1;	/* see xfs_stickytest */
 uint64_t	xfs_panic_mask;		/* set to cause more panics */
-int		xfs_nfs_io_units = 10;	/* Ignore for now. Affects NFS performance. */
-struct var {
-	int	v_buf;	/* Nbr of I/O buffers.             */
-	int	v_hbuf;	/* Nbr of hash buffers to allocate */
-} v = { 512, 8 };
 
 dev_t           rootdev = NODEV;
 int             restricted_chown = 0;
 int     	scache_linemask = 0x1f;       /* second level cache line size mask */
-int		imon_enabled;
 prid_t		dfltprid;
 long            physmem;
+int		ncsize = 792;
 int		ndquot;
-
-#ifdef SIM
-time_t		jiffies;
-#endif
 

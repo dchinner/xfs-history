@@ -29,32 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
-#include <xfs_os_defs.h>
 
-#ifdef SIM
-#define	_KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/kmem.h>
-#ifndef SIM
-#include <sys/cmn_err.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
+#include <xfs.h>
 
-#ifdef SIM
-#include "sim.h"
-#endif
 
 STATIC int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *,
 					int, int, xfs_lsn_t);
@@ -255,11 +232,7 @@ xfs_trans_first_item(xfs_trans_t *tp)
 
 		return (XFS_LIC_SLOT(licp, i));
 	}
-#ifndef SIM
 	cmn_err(CE_WARN, "xfs_trans_first_item() -- no first item");
-#else
-	ASSERT(0);
-#endif
 	return(NULL);
 }
 

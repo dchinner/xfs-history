@@ -29,81 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.256 $"
 
-#include <xfs_os_defs.h>
-
-#ifdef SIM
-#define	_KERNEL 1
-#endif
-#include <sys/param.h>
-#include <linux/xfs_sema.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#include <string.h>
-#endif
-#include <sys/kmem.h>
-#include <sys/ktrace.h>
-#include <sys/cmn_err.h>
-#ifdef SIM
-#include <stddef.h>
-#else
-#include <sys/systm.h>
-#endif
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-
-#include <linux/xfs_fs.h>
-#include <linux/dmapi_kern.h>
-
-
-
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_dmapi.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_itable.h"
-#include "xfs_extfree_item.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_rtalloc.h"
-#include "xfs_error.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_bit.h"
-#include "xfs_rw.h"
-#include "xfs_quota.h"
-#include "xfs_trans_space.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
+#include <xfs.h>
 
 #ifdef DEBUG
 ktrace_t	*xfs_bmap_trace_buf;
@@ -259,7 +186,6 @@ xfs_bmap_check_extents(
 #define	xfs_bmap_check_extents(ip,w)
 #endif
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -276,7 +202,6 @@ xfs_bmap_del_extent(
 	int			*logflagsp,/* inode logging flags */
 	int			whichfork, /* data or attr fork */
 	int			rsvd);	 /* OK to allocate reserved blocks */
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -2216,7 +2141,7 @@ xfs_bmap_alloc(
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		nullfb;		/* true if ap->firstblock isn't set */
 	int		rt;		/* true if inode is realtime */
-#ifndef SIM
+#ifdef __KERNEL__
 	xfs_extlen_t	prod;		/* product factor for allocators */
 	xfs_extlen_t	ralen;		/* realtime allocation length */
 #endif
@@ -2235,7 +2160,7 @@ xfs_bmap_alloc(
 	nullfb = ap->firstblock == NULLFSBLOCK;
 	rt = (ap->ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && ap->userdata;
 	fb_agno = nullfb ? NULLAGNUMBER : XFS_FSB_TO_AGNO(mp, ap->firstblock);
-#ifndef SIM
+#ifdef __KERNEL__
 	if (rt) {
 		xfs_extlen_t	extsz;		/* file extent size for rt */
 		xfs_fileoff_t	nexto;		/* next file offset */
@@ -2270,7 +2195,6 @@ xfs_bmap_alloc(
 		/*
 		 * Same adjustment for the end of the requested area.
 		 */
-
 		if (temp = (ap->alen % extsz))
 			ap->alen += extsz - temp;
 		/*
@@ -2384,7 +2308,7 @@ xfs_bmap_alloc(
 #else
 	if (rt)
 		ap->rval = 0;
-#endif	/* !SIM */
+#endif	/* __KERNEL__ */
 	else if (nullfb)
 		ap->rval = XFS_INO_TO_FSB(mp, ap->ip->i_ino);
 	else
@@ -2525,7 +2449,7 @@ xfs_bmap_alloc(
 	 * Realtime allocation, done through xfs_rtallocate_extent.
 	 */
 	if (rt) {
-#ifdef SIM
+#ifndef __KERNEL__
 		ASSERT(0);
 #else
 		xfs_rtblock_t	rtb;
@@ -2566,7 +2490,7 @@ xfs_bmap_alloc(
 					(long)ralen);
 		} else
 			ap->alen = 0;
-#endif	/* SIM */
+#endif	/* __KERNEL__ */
 	}
 	/*
 	 * Normal allocation, done through xfs_alloc_vextent.
@@ -2908,7 +2832,6 @@ xfs_bmap_btree_to_extents(
 	return 0;
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -3252,7 +3175,6 @@ done:
 	*logflagsp = flags;
 	return error;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -4434,49 +4356,6 @@ xfs_bmap_last_offset(
 	return 0;
 }
 
-#ifdef SIM
-/*
- * Given a block number in a fork, return the next valid block number
- * (not a hole).
- * If this is the last block number then NULLFILEOFF is returned.
- */
-int
-xfs_bmap_next_offset(
-	xfs_trans_t	*tp,			/* transaction pointer */
-	xfs_inode_t	*ip,			/* incore inode */
-	xfs_fileoff_t	*bnop,			/* current block */
-	int		whichfork)		/* data or attr fork */
-{
-	xfs_fileoff_t	bno;			/* current block */
-	int		eof;			/* hit end of file */
-	int		error;			/* error return value */
-	xfs_bmbt_irec_t	got;			/* current extent value */
-	xfs_ifork_t	*ifp;			/* inode fork pointer */
-	xfs_extnum_t	lastx;			/* last extent used */
-	xfs_bmbt_irec_t	prev;			/* previous extent value */
-
-	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
-	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
-	       return XFS_ERROR(EIO);
-	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
-		*bnop = NULLFILEOFF;
-		return 0;
-	}
-	ifp = XFS_IFORK_PTR(ip, whichfork);
-	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
-	    (error = xfs_iread_extents(tp, ip, whichfork)))
-		return error;
-	bno = *bnop + 1;
-	xfs_bmap_search_extents(ip, bno, whichfork, &eof, &lastx, &got, &prev);
-	if (eof)
-		*bnop = NULLFILEOFF;
-	else
-		*bnop = got.br_startoff < bno ? bno : got.br_startoff;
-	return 0;
-}
-#endif	/* SIM */
-	
 /*
  * Returns whether the selected fork of the inode has exactly one
  * block or not.  For the data fork we check this matches di_size,
@@ -5316,7 +5195,6 @@ xfs_bmapi_single(
 	return 0;
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -5680,9 +5558,7 @@ error0:
 	}
 	return error;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
-#ifndef SIM
 /*
  * Fcntl interface to xfs_bmapi.
  */
@@ -5913,7 +5789,6 @@ unlock_and_return:
 
 	return error;
 }
-#endif	/* !SIM */
 
 /*
  * Check the last inode extent to determine whether this allocation will result 

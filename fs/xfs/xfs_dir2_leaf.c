@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.14 $"
 
 /*
  * xfs_dir2_leaf.c
@@ -39,57 +38,10 @@
  * XFS_DIR2_LEAF1 block containing the hash table and freespace map.
  */
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#include <string.h>
-#endif
-#include <sys/kmem.h>
-#include <sys/vnode.h>
-#include <sys/dirent.h>
-#include <stddef.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_dir2_node.h"
-#include "xfs_dir2_trace.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#ifdef SIM
-#include "sim.h"
-#endif
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM) && 0
-#include "asm/kdb.h"
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && 0
 
 #undef xfs_dir2_print_args
 #define xfs_dir2_print_args(ARGS) \
@@ -663,7 +615,6 @@ xfs_dir2_leaf_check(
 }
 #endif	/* DEBUG */
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Compact out any stale entries in the leaf.
  * Log the header and changed leaf entries, if any.
@@ -709,7 +660,6 @@ xfs_dir2_leaf_compact(
 	if (loglow != -1)
 		xfs_dir2_leaf_log_ents(args->trans, bp, loglow, to - 1);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Compact the leaf entries, removing stale ones.
@@ -821,7 +771,6 @@ xfs_dir2_leaf_compact_x1(
 	*highstalep = highstale;
 }
 
-#ifndef SIM
 /*
  * Getdents (readdir) for leaf and node directories.
  * This reads the data blocks only, so is the same for both forms.
@@ -1217,7 +1166,6 @@ xfs_dir2_leaf_getdents(
 		xfs_da_brelse(tp, bp);
 	return error;
 }
-#endif	/* !SIM */
 
 /*
  * Initialize a new leaf block, leaf1 or leafn magic accepted.
@@ -1517,7 +1465,6 @@ xfs_dir2_leaf_lookup_int(
 	return XFS_ERROR(ENOENT);
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from a leaf format directory.
  */
@@ -1710,7 +1657,6 @@ xfs_dir2_leaf_replace(
 	xfs_da_brelse(tp, lbp);
 	return 0;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Return index in the leaf block (lbp) which is either the first
@@ -1731,7 +1677,7 @@ xfs_dir2_leaf_search_hash(
 	int			mid;		/* current leaf index */
 
 	leaf = lbp->data;
-#ifdef XFS_REPAIR_SIM
+#ifndef __KERNEL__
 	if (INT_GET(leaf->hdr.count, ARCH_CONVERT) == 0)
 		return 0;
 #endif
@@ -1767,7 +1713,6 @@ xfs_dir2_leaf_search_hash(
 	return mid;
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Trim off a trailing data block.  We know it's empty since the leaf
  * freespace table says so.
@@ -1977,4 +1922,3 @@ xfs_dir2_node_to_leaf(
 	state->path.blk[0].bp = NULL;
 	return error;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */

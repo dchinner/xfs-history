@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _XFS_DQBLK_H_
-#define _XFS_DQBLK_H_
-
-#ident "$Revision: 1.4 $"
+#ifndef __XFS_DQBLK_H__
+#define __XFS_DQBLK_H__
 
 /*
  * The ondisk form of a dquot structure.
@@ -98,4 +96,4 @@ typedef struct xfs_dqblk {
  */
 #define XFS_DQUOT_LOGRES(mp)	(sizeof(xfs_disk_dquot_t) * 3)
 
-#endif
+#endif	/* __XFS_DQBLK_H__ */

@@ -29,15 +29,14 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_LOG_PRIV_H
-#define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.73 $"
+#ifndef	__XFS_LOG_PRIV_H__
+#define __XFS_LOG_PRIV_H__
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_LOG_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_LOG_TRACE
 #endif
 
@@ -52,11 +51,7 @@ struct xfs_mount;
  */
 
 #define XLOG_NUM_ICLOGS		2
-#ifdef __linux__
 #define XLOG_MAX_ICLOGS		4
-#else
-#define XLOG_MAX_ICLOGS		8
-#endif
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
 #define XLOG_RECORD_BSIZE	(16*1024)	/* eventually 32k */
@@ -96,6 +91,10 @@ int xlog_btolrbb(int b);
          INT_GET(*(uint *)(ptr), arch) \
     )
     
+#define BLK_AVG(blk1, blk2)	((blk1+blk2) >> 1)
+
+
+#ifdef __KERNEL__
 /*
  * get client id from packed copy.
  *
@@ -187,23 +186,15 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 	(tic)->t_flags &= ~XLOG_TIC_IN_Q;		\
     }
 
-#define BLK_AVG(blk1, blk2)	((blk1+blk2) >> 1)
 
 #define GRANT_LOCK(log)		mutex_spinlock(&(log)->l_grant_lock)
 #define GRANT_UNLOCK(log, s)	mutex_spinunlock(&(log)->l_grant_lock, s)
 #define LOG_LOCK(log)		mutex_spinlock(&(log)->l_icloglock)
 #define LOG_UNLOCK(log, s)	mutex_spinunlock(&(log)->l_icloglock, s)
 
-#ifdef SIM
-#define xlog_panic(s)		{printf("%s\n", s); abort();}
-#define xlog_exit(s)		{printf("%s\n", s); exit(1);}
-#define xlog_warn(s)		{printf("%s\n", s); }
-#else
 #define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
 #define xlog_exit(s)		{cmn_err(CE_PANIC, s); }
 #define xlog_warn(s)		{cmn_err(CE_WARN, s); }
-#endif
-
 
 /*
  * In core log state
@@ -219,6 +210,7 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define XLOG_STATE_IOERROR   0x0080 /* IO error happened in sync'ing log */
 #define XLOG_STATE_ALL	     0x7FFF /* All possible valid flags */
 #define XLOG_STATE_NOTUSED   0x8000 /* This IC log not being used */
+#endif	/* __KERNEL__ */
 
 /*
  * Flags to log operation header
@@ -241,12 +233,14 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 				 XLOG_WAS_CONT_TRANS | XLOG_END_TRANS | \
 				 XLOG_UNMOUNT_TRANS)
 
+#ifdef __KERNEL__
 /*
  * Flags to log ticket
  */
 #define XLOG_TIC_INITED		0x1	/* has been initialized */
 #define XLOG_TIC_PERM_RESERV	0x2	/* permanent reservation */
 #define XLOG_TIC_IN_Q		0x4
+#endif	/* __KERNEL__ */
 
 #define XLOG_UNMOUNT_TYPE	0x556e	/* Un for Unmount */
 
@@ -258,7 +252,10 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define	XLOG_RECOVERY_NEEDED	0x4	/* log was recovered */     
 #define XLOG_IO_ERROR		0x8	/* log hit an I/O error, and being
 					   shutdown */
+typedef __uint32_t xlog_tid_t;
 
+
+#ifdef __KERNEL__
 /*
  * Below are states for covering allocation transactions.
  * By covering, we mean changing the h_tail_lsn in the last on-disk
@@ -334,9 +331,6 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 
 #define XLOG_COVER_OPS		5
 
-
-typedef __uint32_t xlog_tid_t;
-
 typedef struct xlog_ticket {
 	sv_t		   t_sema;	 /* sleep on this semaphore	 :20 */
 	struct xlog_ticket *t_next;	 /*			         : 4 */
@@ -349,6 +343,7 @@ typedef struct xlog_ticket {
 	char		   t_clientid;	 /* who does this belong to;	 : 1 */
 	char		   t_flags;	 /* properties of reservation	 : 1 */
 } xlog_ticket_t;
+#endif
 
 
 typedef struct xlog_op_header {
@@ -389,6 +384,7 @@ typedef struct xlog_volume_footer {
 } xlog_volume_footer_t;
 
 
+#ifdef __KERNEL__
 /*
  * - A log record header is 512 bytes.  There is plenty of room to grow the
  *	xlog_rec_header_t into the reserved space.
@@ -476,7 +472,7 @@ typedef struct log {
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
     struct xfs_mount	*l_mp;	        /* mount point */
-    struct xfs_buf		*l_xbuf;        /* extra buffer for log wrapping */
+    struct xfs_buf	*l_xbuf;        /* extra buffer for log wrapping */
     dev_t		l_dev;	        /* dev_t of log */
     xfs_daddr_t		l_logBBstart;   /* start block of log */
     int			l_logsize;      /* size of log in bytes */
@@ -535,4 +531,6 @@ extern void	 xlog_recover_process_iunlinks(xlog_t *log);
 #define XLOG_TRACE_SLEEP_FLUSH 3
 #define XLOG_TRACE_WAKE_FLUSH  4
 
-#endif	/* _XFS_LOG_PRIV_H */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_LOG_PRIV_H__ */

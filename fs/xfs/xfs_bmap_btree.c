@@ -29,66 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.114 $"
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-
-#include <xfs_os_defs.h>
-
-#include <sys/param.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#include <string.h>
-#endif
-#include <sys/vnode.h>
-#include <sys/kmem.h>
-#include <stddef.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include "xfs_buf.h"
-#include <sys/uuid.h>
-#include <sys/ktrace.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_itable.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_alloc.h"
-#include "xfs_bit.h"
-#include "xfs_bmap.h"
-#include "xfs_error.h"
-#include "xfs_quota.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
+#include <xfs.h>
 
 #ifdef DEBUG
 ktrace_t	*xfs_bmbt_trace_buf;

@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.13 $"
 
 /*
  * xfs_dir2_block.c
@@ -37,54 +36,11 @@
  * See xfs_dir2_block.h for the format.
  */
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#include <string.h>
-#endif
-#include <sys/vnode.h>
-#include <sys/dirent.h>
-#include <stddef.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_dir2_trace.h"
-#include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
+extern void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM) && 0
-#include "asm/kdb.h"
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && 0
 
 #undef xfs_dir2_print_args
 #define xfs_dir2_print_args(ARGS) \
@@ -115,11 +71,6 @@ static void xfs_dir2_block_log_tail(xfs_trans_t *tp, xfs_dabuf_t *bp);
 static int xfs_dir2_block_lookup_int(xfs_da_args_t *args, xfs_dabuf_t **bpp,
 				     int *entno);
 static int xfs_dir2_block_sort(const void *a, const void *b);
-
-/*
- * Can't include stdlib.h (which defines this) and systm.h together.
- */
-extern void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
 
 /*
  * Add an entry to a block directory.
@@ -495,7 +446,6 @@ xfs_dir2_block_addname(
 	return 0;
 }
 
-#ifndef SIM
 /*
  * Readdir for block directories.
  */
@@ -633,7 +583,6 @@ xfs_dir2_block_getdents(
 
 	return 0;
 }
-#endif	/* !SIM */
 
 /*
  * Log leaf entries from the block.
@@ -818,7 +767,6 @@ xfs_dir2_block_lookup_int(
 	return XFS_ERROR(ENOENT);
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from a block format directory.
  * If that makes the block small enough to fit in shortform, transform it.
@@ -949,7 +897,6 @@ xfs_dir2_block_replace(
 	xfs_da_buf_done(bp);
 	return 0;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Qsort comparison routine for the block leaf entries.
@@ -968,7 +915,6 @@ xfs_dir2_block_sort(
 		(INT_GET(la->hashval, ARCH_CONVERT) > INT_GET(lb->hashval, ARCH_CONVERT) ? 1 : 0);
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Convert a V2 leaf directory to a V2 block directory if possible.
  */
@@ -1114,7 +1060,6 @@ out:
 		xfs_da_buf_done(dbp);
 	return error;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Convert the shortform directory to block form.

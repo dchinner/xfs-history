@@ -32,8 +32,6 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.15 $"
-
 struct  xfs_dqhash;
 struct  xfs_inode;
 struct  xfs_dquot;

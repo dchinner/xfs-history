@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_ATTR_H
-#define	_FS_XFS_ATTR_H
-
-#ident	"$Revision$"
+#ifndef __XFS_ATTR_H__
+#define	__XFS_ATTR_H__
 
 /*
  * xfs_attr.h
@@ -51,7 +49,7 @@
 #define	XFS_ATTR_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_ATTR_TRACE
 #endif
 
@@ -81,4 +79,4 @@ int xfs_attr_leaf_get(struct xfs_da_args *);
 int xfs_attr_shortform_getvalue(struct xfs_da_args *);
 int xfs_attr_fetch(struct xfs_inode *, char *, char *, int);
 
-#endif	/* !_FS_XFS_ATTR_H */
+#endif	/* __XFS_ATTR_H__ */

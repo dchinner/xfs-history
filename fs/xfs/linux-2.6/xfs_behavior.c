@@ -33,19 +33,12 @@
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized 
- * objects.  See ksys/behavior.h for more information about behaviors, etc.
+ * objects.  See behavior.h for more information about behaviors, etc.
  *
  * The implementation is split between functions in this file and macros
  * in behavior.h.
  */
-#include <xfs_os_defs.h>
-
-#define	_KERNEL	1
-
-#include <sys/types.h>
-#include <ksys/behavior.h>
-#include <sys/kmem.h>
-#include <sys/debug.h>
+#include <xfs.h>
 
 xfs_zone_t	*bhv_global_zone;
 

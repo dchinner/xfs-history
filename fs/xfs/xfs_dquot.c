@@ -30,49 +30,9 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
+#include <xfs.h>
+#include <xfs_quota_priv.h>
 
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/cmn_err.h>
-
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_trans_priv.h"
-#include "xfs_buf_item.h"
-#include "xfs_itable.h"
-#include "xfs_bit.h"
-#include "xfs_quota.h"
-#include "xfs_dqblk.h"
-#include "xfs_dquot_item.h"
-#include "xfs_dquot.h"
-#include "xfs_qm.h"
-#include "xfs_quota_priv.h"
-#include "xfs_rw.h"
-#include "xfs_trans_space.h"
 
 /*
    LOCK ORDER
@@ -370,10 +330,10 @@ xfs_qm_dqwarn(
 	}
 #ifdef QUOTADEBUG
 	if (d->d_iwarns)
-		printf("--------@@Inode warnings running : %Lu >= %Lu\n", 
+		printk("--------@@Inode warnings running : %Lu >= %Lu\n", 
 		       d->d_icount, d->d_ino_softlimit);
 	if (d->d_bwarns)
-		printf("--------@@Blks warnings running : %Lu >= %Lu\n",
+		printk("--------@@Blks warnings running : %Lu >= %Lu\n",
 		       d->d_bcount, d->d_blk_softlimit);
 #endif
 	return (warned);
@@ -618,7 +578,7 @@ xfs_qm_dqtobp(
 			return XFS_ERROR(error);
 	}
 	ASSERT(XFS_BUF_ISBUSY(bp));
-	ASSERT(valusema(&bp->b_lock) <= 0);
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 
 	/* 
 	 * calculate the location of the dquot inside the buffer.
@@ -701,7 +661,7 @@ xfs_qm_dqread(
 	 * brelse it because we have the changes incore.
 	 */
 	ASSERT(XFS_BUF_ISBUSY(bp));
-	ASSERT(valusema(&bp->b_lock) <= 0);
+	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
 	xfs_trans_brelse(tp, bp);
 
 	return (error);
@@ -929,7 +889,7 @@ xfs_qm_dqget(
 	if (xfs_do_dqerror) {
 		if (xfs_dqerror_dev == mp->m_dev &&
 		    (xfs_dqreq_num++ % xfs_dqerror_mod) == 0) {
-			printf("Returning error in dqget\n");
+			printk("Returning error in dqget\n");
 			return (EIO);
 		}
 	}
@@ -1659,35 +1619,35 @@ xfs_qm_dqcheck(
 void
 xfs_qm_dqprint(xfs_dquot_t *dqp)
 {
-	printf( "-----------KERNEL DQUOT----------------\n");
-	printf( "---- dquot ID	=  %d\n", (int) dqp->q_core.d_id);
-	printf( "---- type      =  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" :
+	printk( "-----------KERNEL DQUOT----------------\n");
+	printk( "---- dquot ID	=  %d\n", (int) dqp->q_core.d_id);
+	printk( "---- type      =  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" :
 	       "PRJ");
-	printf( "---- fs        =  0x%x\n", dqp->q_mount);
-	printf( "---- blkno     =  0x%x\n", (int) dqp->q_blkno);
-	printf( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);
-	printf( "---- blkhlimit	=  %Lu (0x%x)\n", 
+	printk( "---- fs        =  0x%x\n", dqp->q_mount);
+	printk( "---- blkno     =  0x%x\n", (int) dqp->q_blkno);
+	printk( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);
+	printk( "---- blkhlimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_blk_hardlimit,
 	       (int) dqp->q_core.d_blk_hardlimit);
-	printf( "---- blkslimit	=  %Lu (0x%x)\n", 
+	printk( "---- blkslimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_blk_softlimit,
 	       (int)dqp->q_core.d_blk_softlimit);
-	printf( "---- inohlimit	=  %Lu (0x%x)\n", 
+	printk( "---- inohlimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_ino_hardlimit,
 	       (int)dqp->q_core.d_ino_hardlimit);
-	printf( "---- inoslimit	=  %Lu (0x%x)\n", 
+	printk( "---- inoslimit	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_ino_softlimit,
 	       (int)dqp->q_core.d_ino_softlimit);
-	printf( "---- bcount	=  %Lu (0x%x)\n", 
+	printk( "---- bcount	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_bcount,
 	       (int)dqp->q_core.d_bcount);
-	printf( "---- icount	=  %Lu (0x%x)\n", 
+	printk( "---- icount	=  %Lu (0x%x)\n", 
 	       dqp->q_core.d_icount,
 	       (int)dqp->q_core.d_icount);
-	printf( "---- btimer	=  %d\n", (int)dqp->q_core.d_btimer);
-	printf( "---- itimer	=  %d\n", (int)dqp->q_core.d_itimer);
+	printk( "---- btimer	=  %d\n", (int)dqp->q_core.d_btimer);
+	printk( "---- itimer	=  %d\n", (int)dqp->q_core.d_itimer);
 
-	printf( "---------------------------\n");
+	printk( "---------------------------\n");
 }
 #endif
 

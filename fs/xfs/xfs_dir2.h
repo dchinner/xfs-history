@@ -29,14 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR2_H
-#define	_FS_XFS_DIR2_H
-
-#ident 	"$Revision$"
-
-/*
- * xfs_dir2.h
- */
+#ifndef __XFS_DIR2_H__
+#define	__XFS_DIR2_H__
 
 struct dirent;
 struct uio;
@@ -109,10 +103,8 @@ extern int
 extern int
 	xfs_dir2_isleaf(struct xfs_trans *tp, struct xfs_inode *dp, int *vp);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_shrink_inode(struct xfs_da_args *args, xfs_dir2_db_t db,
 			      struct xfs_dabuf *bp);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
-#endif	/* !_FS_XFS_DIR2_H */
+#endif	/* __XFS_DIR2_H__ */

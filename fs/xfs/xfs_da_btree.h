@@ -29,14 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DA_BTREE_H
-#define	_FS_XFS_DA_BTREE_H
-
-#ident	"$Revision: 1.38 $"
-
-/*
- * xfs_da_btree.h
- */
+#ifndef __XFS_DA_BTREE_H__
+#define	__XFS_DA_BTREE_H__
 
 struct xfs_buf;
 struct xfs_bmap_free;
@@ -308,10 +302,8 @@ int	xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 /*
  * Utility routines.
  */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 int	xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 					 xfs_da_state_blk_t *save_blk);
-#endif /* XFS_REPAIR_SIM || !SIM */
 int	xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 				       xfs_da_state_blk_t *new_blk);
 
@@ -325,15 +317,8 @@ int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			       xfs_dablk_t bno, xfs_daddr_t mappedbno,
 			       xfs_dabuf_t **bpp, int whichfork);
-#ifdef XFS_REPAIR_SIM
-int	xfs_da_read_bufr(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_dablk_t bno, xfs_daddr_t mappedbno,
-				xfs_dabuf_t **bpp, int whichfork);
-#endif	/* XFS_REPAIR_SIM */
-#ifndef SIM
 xfs_daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			xfs_dablk_t bno, int whichfork);
-#endif	/* !SIM */
 int	xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
 					  xfs_dabuf_t *dead_buf);
 
@@ -349,13 +334,7 @@ void xfs_da_log_buf(struct xfs_trans *tp, xfs_dabuf_t *dabuf, uint first,
 void xfs_da_brelse(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 void xfs_da_binval(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 xfs_daddr_t xfs_da_blkno(xfs_dabuf_t *dabuf);
-#ifdef XFS_REPAIR_SIM
-void xfs_da_bhold(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
-void xfs_da_bjoin(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
-#endif	/* XFS_REPAIR_SIM */
 
-#ifdef _KERNEL
 extern struct xfs_zone *xfs_da_state_zone;
-#endif /* _KERNEL */
 
-#endif	/* !FS_XFS_DA_BTREE_H */
+#endif	/* __XFS_DA_BTREE_H__ */

@@ -29,14 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR_LEAF_H
-#define	_FS_XFS_DIR_LEAF_H
-
-#ident	"$Revision$"
+#ifndef __XFS_DIR_LEAF_H__
+#define	__XFS_DIR_LEAF_H__
 
 /*
- * xfs_dir_leaf.h
- *
  * Directory layout, internal structure, access macros, etc.
  *
  * Large directories are structured around Btrees where all the data
@@ -199,10 +195,8 @@ int xfs_dir_shortform_addname(struct xfs_da_args *args);
 int xfs_dir_shortform_lookup(struct xfs_da_args *args);
 int xfs_dir_shortform_to_leaf(struct xfs_da_args *args);
 int xfs_dir_shortform_removename(struct xfs_da_args *args);
-#ifndef SIM
 int xfs_dir_shortform_getdents(struct xfs_inode *dp, struct uio *uio, int *eofp,
 				      struct dirent *dbp, xfs_dir_put_t put);
-#endif	/* !SIM */
 int xfs_dir_shortform_replace(struct xfs_da_args *args);
 
 /*
@@ -228,22 +222,18 @@ int	xfs_dir_leaf_lookup_int(struct xfs_dabuf *leaf_buffer,
 int	xfs_dir_leaf_remove(struct xfs_trans *trans,
 				   struct xfs_dabuf *leaf_buffer,
 				   int index_to_remove);
-#ifndef SIM
 int	xfs_dir_leaf_getdents_int(struct xfs_dabuf *bp, struct xfs_inode *dp,
 					 xfs_dablk_t bno, struct uio *uio,
 					 int *eobp, struct dirent *dbp,
 					 xfs_dir_put_t put, xfs_daddr_t nextda);
-#endif	/* !SIM */
 
 /*
  * Routines used for shrinking the Btree.
  */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 int	xfs_dir_leaf_toosmall(struct xfs_da_state *state, int *retval);
 void	xfs_dir_leaf_unbalance(struct xfs_da_state *state,
 					     struct xfs_da_state_blk *drop_blk,
 					     struct xfs_da_state_blk *save_blk);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Utility routines.
@@ -263,4 +253,4 @@ int	xfs_dir_ino_validate(struct xfs_mount *mp, xfs_ino_t ino);
  */
 extern xfs_dahash_t	xfs_dir_hash_dot, xfs_dir_hash_dotdot;
 
-#endif /* !FS_XFS_DIR_LEAF_H */
+#endif /* __XFS_DIR_LEAF_H__ */

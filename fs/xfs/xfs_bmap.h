@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_BMAP_H
-#define	_FS_XFS_BMAP_H
-
-#ident "$Revision: 1.72 $"
+#ifndef __XFS_BMAP_H__
+#define	__XFS_BMAP_H__
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -111,7 +109,7 @@ int xfs_bmapi_aflag(int w);
 #define	XFS_BMAP_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef	XFS_BMAP_TRACE
 #endif
 
@@ -127,7 +125,6 @@ void xfs_bmap_init(xfs_bmap_free_t *flp, xfs_fsblock_t *fbp);
 
 /*
  * Argument structure for xfs_bmap_alloc.
- * This would be hidden, but we want idbg to be able to see it.
  */
 typedef struct xfs_bmalloca {
 	xfs_fsblock_t		firstblock; /* i/o first block allocated */
@@ -149,6 +146,7 @@ typedef struct xfs_bmalloca {
 	int			prealloc;/* pre-allocate request */
 } xfs_bmalloca_t;
 
+#ifdef __KERNEL__
 /*
  * Convert inode from non-attributed to attributed.
  * Must not be in a transaction, ip must not be locked.
@@ -246,20 +244,6 @@ xfs_bmap_last_offset(
 	xfs_fileoff_t		*unused,	/* last block num */
 	int			whichfork);	/* data or attr fork */
 
-#ifdef SIM
-/*
- * Given a block number in a fork, return the next valid block number
- * (not a hole).
- * If this is the last block number then NULLFILEOFF is returned.
- */
-int
-xfs_bmap_next_offset(
-	struct xfs_trans	*tp,		/* transaction pointer */
-	struct xfs_inode	*ip,		/* incore inode */
-	xfs_fileoff_t		*bnop,		/* current block */
-	int			whichfork);	/* data or attr fork */
-#endif	/* SIM */
-
 /*
  * Returns whether the selected fork of the inode has exactly one
  * block or not.  For the data fork we check this matches di_size,
@@ -337,7 +321,6 @@ xfs_bmapi_single(
 	xfs_fsblock_t		*fsb,		/* output: mapped block */
 	xfs_fileoff_t		bno);		/* starting file offs. mapped */
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -356,9 +339,7 @@ xfs_bunmapi(
 						   controls a.g. for allocs */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	int			*done);		/* set if not done yet */
-#endif /* XFS_REPAIR_SIM || !SIM */
 
-#ifndef SIM
 /*
  * Fcntl interface to xfs_bmapi.
  */
@@ -368,8 +349,6 @@ xfs_getbmap(
 	struct getbmap		*bmv,		/* user bmap structure */
 	void			*ap,		/* pointer to user's array */
 	int			iflags);	/* interface flags */
-
-#endif	/* !SIM */
 
 /*
  * Check the last inode extent to determine whether this allocation will result
@@ -404,4 +383,6 @@ xfs_check_nostate_extents(
 	xfs_bmbt_rec_t		*ep,
 	xfs_extnum_t		num);
 
-#endif	/* _FS_XFS_BMAP_H */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_BMAP_H__ */

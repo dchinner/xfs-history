@@ -29,56 +29,11 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.125 $"
 
-#include <xfs_os_defs.h>
-#include <linux/stat.h>
-#include <linux/sched.h>
+#include <xfs.h>
 
 
-#include <sys/param.h>
-#include <sys/mode.h>
-#include "xfs_buf.h"
-#include <sys/sysmacros.h>
-#include <sys/vnode.h>
-#include <sys/vfs.h>
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#include <sys/cmn_err.h>
-
-#include <sys/kmem.h>
-#include <sys/systm.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_quota.h"
-#include "xfs_utils.h"
-#include "xfs_cxfs.h"
-
-extern vnodeops_t xfs_vnodeops;
-extern xfs_zone_t *xfs_chashlist_zone;
-
-void
-xfs_ilock_ra(xfs_inode_t	*ip,
-		  uint		lock_flags,
-		  void		*return_address);
+void xfs_ilock_ra(xfs_inode_t *ip, uint lock_flags, void *return_address);
 
 /*
  * Initialize the inode hash table for the newly mounted file system.
@@ -420,26 +375,6 @@ finish_inode:
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
 	}
-
-#ifndef __linux__
-	/* meaningless on Linux */
-	/*
-	 * Make sure the vnode's VENF_LOCKING flag corresponds with
-	 * the inode's mode. 
-	 */
-	if (MANDLOCK(vp, ip->i_d.di_mode))
-		VN_FLAGSET(vp, VENF_LOCKING);
-	else
-		VN_FLAGCLR(vp, VENF_LOCKING);
-
-	/*
-	 * If this is a shared mountpoint (cluster), make sure
-	 * to disable swapping on the vnode.
-	 */
-	if (mp->m_cxfstype != XFS_CXFS_NOT) {
-		VN_FLAGSET(vp, VNOSWAP);
-	}
-#endif
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
@@ -947,9 +882,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-#if defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
-#endif
 	if (return_address == NULL)
 		return_address = (inst_t *)__return_address;
 
@@ -960,18 +893,6 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 			mraccessf(&ip->i_iolock, PLTWAIT);
 		}
 	}
-#if !defined(__linux__)
-	else {
-#pragma mips_frequency_hint NEVER
-		ASSERT(XFST_ISNESTED_ENABLED());
-		if (!XFST_ISNESTED_MAX())
-			XFST_NESTED_INCR();
-		else
-			cmn_err(CE_PANIC,
-				"i/o lock recursion loop, inode 0x%Lx",
-				(uint64_t) ip);
-	}
-#endif /* !__linux__ */
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		mrupdatef(&ip->i_lock, PLTWAIT);
 		ip->i_ilock_ra = return_address;
@@ -1021,9 +942,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
-#if defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
-#endif
 
 	iolocked = iolock_recursive = 0;
 	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
@@ -1039,29 +958,12 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			}
 		}
 	}
-#if !defined(__linux__)
-	else {
-#pragma mips_frequency_hint NEVER
-		ASSERT(XFST_ISNESTED_ENABLED());
-		if (!XFST_ISNESTED_MAX()) {
-			XFST_NESTED_INCR();
-			iolock_recursive = 1;
-		} else
-			cmn_err(CE_PANIC,
-				"i/o lock recursion loop, inode 0x%Lx",
-				(uint64_t) ip);
-	}
-#endif /* !__linux__ */
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		ilocked = mrtryupdate(&ip->i_lock);
 		if (!ilocked) {
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
 			}
-#ifndef __linux__
-			else if (iolock_recursive)
-				XFST_NESTED_DECR();
-#endif
 			return 0;
 		}
 		ip->i_ilock_ra = (inst_t *) __return_address;
@@ -1071,10 +973,6 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
 			}
-#ifndef __linux__
-			else if (iolock_recursive)
-				XFST_NESTED_DECR();
-#endif
 			return 0;
 		}
 	}
@@ -1111,9 +1009,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~(XFS_LOCK_MASK | XFS_IUNLOCK_NONOTIFY)) == 0);
 	ASSERT(lock_flags != 0);
-#if defined(__linux__)
 	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
-#endif
 
 	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
 		if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
@@ -1124,14 +1020,6 @@ xfs_iunlock(xfs_inode_t	*ip,
 			mrunlock(&ip->i_iolock);
 		}
 	}
-#if !defined(__linux__)
-	else {
-#pragma mips_frequency_hint NEVER
-		ASSERT_ALWAYS(XFST_ISNESTED_ENABLED());
-		ASSERT_ALWAYS(XFST_ISNESTED_USED());
-		XFST_NESTED_DECR();
-	}
-#endif /* !__linux__ */
 
 	if (lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) {
 		ASSERT(!(lock_flags & XFS_ILOCK_SHARED) ||
@@ -1173,9 +1061,6 @@ xfs_ilock_demote(xfs_inode_t	*ip,
 		mrdemote(&ip->i_lock);
 	}
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-#ifndef __linux__
-		ASSERT(!XFST_ISNESTED_USED());
-#endif
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE));
 		mrdemote(&ip->i_iolock);
 	}

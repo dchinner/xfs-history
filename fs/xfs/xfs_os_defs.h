@@ -29,24 +29,21 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
+#ifndef __XFS_OS_DEFS_H__
+#define __XFS_OS_DEFS_H__
+
 #include <linux/xfs_linux.h>
 #include <xfs_arch.h>
-
-#ifdef NEED_FS_H
-# include <linux/fs.h>
-#endif
-
-#ifndef SIM
 #include <asm/div64.h>
 
 typedef __u64    xfs_off_t;
 typedef __s32    xfs32_off_t;
-typedef	__u64    xfs_ino_t;		/* <inode> type */
+typedef	__u64    xfs_ino_t;	/* <inode> type */
 typedef	__s64    xfs_daddr_t;	/* <disk address> type */
-typedef	char *	 xfs_caddr_t;	/* ?<core address> type */
-
-typedef off_t linux_off_t;
-typedef __kernel_ino_t linux_ino_t;
+typedef	char *	 xfs_caddr_t;	/* <core address> type */
+typedef off_t	linux_off_t;
+typedef __kernel_ino_t	linux_ino_t;
+typedef __uint32_t	xfs_dev_t;
 
 #undef bzero
 #define bzero(p,s) memset((p), 0, (s))
@@ -58,7 +55,6 @@ typedef __kernel_ino_t linux_ino_t;
 
 
 /* Move the kernel do_div definition off to one side */
-
 static inline __u32 xfs_do_div(void *a, __u32 b, int n)
 {
 	__u32	mod;
@@ -98,22 +94,6 @@ static inline __u32 xfs_do_mod(void *a, __u32 b, int n)
 #define do_div(a, b)	xfs_do_div(&(a), (b), sizeof(a))
 #define do_mod(a, b)	xfs_do_mod(&(a), (b), sizeof(a))
 
-#else
-typedef loff_t  xfs_off_t;
-typedef __s32   xfs32_off_t;
-typedef	__u64	xfs_ino_t;		/* <inode> type */
-typedef __s64   xfs_daddr_t;
-typedef	char *	xfs_caddr_t;	/* ?<core address> type */
-typedef ino_t   linux_ino_t;
-typedef off_t   linux_off_t;
-
-#define do_mod(a, b)	((a) % (b))
-#define do_div(n,base) ({ \
-        int __res; \
-        __res = ((unsigned long) n) % (unsigned) base; \
-        n = ((unsigned long) n) / (unsigned) base; \
-        __res; })
-
-#endif
-
 #define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)
+
+#endif	/* __XFS_OS_DEFS_H__ */

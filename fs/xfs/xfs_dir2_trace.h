@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR2_TRACE_H
-#define _FS_XFS_DIR2_TRACE_H
-
-#ident "$Revision$"
+#ifndef __XFS_DIR2_TRACE_H__
+#define __XFS_DIR2_TRACE_H__
 
 /*
  * Tracing for xfs v2 directories.
@@ -46,9 +44,9 @@ struct xfs_da_args;
 #define XFS_DIR2_TRACE
 #endif	/* XFS_ALL_TRACE */
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_DIR2_TRACE
-#endif	/* !DEBUG || SIM */
+#endif	/* !DEBUG */
 
 #define	XFS_DIR2_GTRACE_SIZE		4096	/* global buffer */
 #define	XFS_DIR2_KTRACE_SIZE		32	/* per-inode buffer */
@@ -94,4 +92,4 @@ void xfs_dir2_trace_args_sb(char *where, struct xfs_da_args *args, int s,
 
 extern struct ktrace *xfs_dir2_trace_buf;
 
-#endif	/* !_FS_XFS_DIR2_TRACE_H */
+#endif	/* __XFS_DIR2_TRACE_H__ */

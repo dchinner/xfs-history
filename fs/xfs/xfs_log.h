@@ -29,12 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_LOG_H
-#define _XFS_LOG_H
+#ifndef	__XFS_LOG_H__
+#define __XFS_LOG_H__
 
 #include <xfs_arch.h>
-
-#ident	"$Revision$"
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?1:0)
@@ -49,11 +47,11 @@
 #define CYCLE_LSN(lsn,arch) (INT_GET(((uint *)&(lsn))[LSN_FIELD_CYCLE(arch)], arch))
 #define BLOCK_LSN(lsn,arch) (INT_GET(((uint *)&(lsn))[LSN_FIELD_BLOCK(arch)], arch))
 
+#ifdef __KERNEL__
 /*
  * By comparing each compnent, we don't have to worry about extra
  * endian issues in treating two 32 bit numbers as one 64 bit number
  */
-
 static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch)
 {
 	if (CYCLE_LSN(lsn1, arch) != CYCLE_LSN(lsn2, arch))
@@ -113,14 +111,7 @@ static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch
 #define XFS_LOG_FORCE		0x2
 #define XFS_LOG_URGE		0x4
 
-
-/*
- * Flags to xfs_log_print()
- *
- */
-#define XFS_LOG_PRINT_EXIT	0x1
-#define XFS_LOG_PRINT_NO_DATA	0x2
-#define XFS_LOG_PRINT_NO_PRINT	0x4
+#endif	/* __KERNEL__ */
 
 
 /* Log Clients */
@@ -146,6 +137,7 @@ typedef struct xfs_log_callback {
 } xfs_log_callback_t;
 
 
+#ifdef __KERNEL__
 /* Log manager interfaces */
 struct xfs_mount;
 xfs_lsn_t xfs_log_done(struct xfs_mount *mp,
@@ -180,18 +172,14 @@ int	  xfs_log_unmount(struct xfs_mount *mp);
 int	  xfs_log_unmount_write(struct xfs_mount *mp);
 void      xfs_log_unmount_dealloc(struct xfs_mount *mp);
 int	  xfs_log_force_umount(struct xfs_mount *mp, int logerror);
+int	  xfs_log_need_covered(struct xfs_mount *mp);
 
-/* Log manager utility interfaces */
-void xfs_log_print(struct xfs_mount *mp,
-		   dev_t	    log_dev,
-		   xfs_daddr_t	    start_block,
-		   int		    num_bblocks,
-		   int		    start_print_block,
-		   uint		    flags);
+void	  xlog_iodone(struct xfs_buf *);
+
+#endif
 
 
 extern int xlog_debug;		/* set to 1 to enable real log */
 
-extern int xfs_log_need_covered(struct xfs_mount *mp);
 
-#endif	/* _XFS_LOG_H */
+#endif	/* __XFS_LOG_H__ */

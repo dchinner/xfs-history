@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _XFS_TRANS_PRIV_H
-#define	_XFS_TRANS_PRIV_H
-
-#ident "$Revision$"
+#ifndef __XFS_TRANS_PRIV_H__
+#define	__XFS_TRANS_PRIV_H__
 
 struct xfs_log_item;
 struct xfs_log_item_desc;
@@ -79,4 +77,4 @@ struct xfs_log_item	*xfs_trans_next_ail(struct xfs_mount *,
 				     struct xfs_log_item *, int *, int *);
 
 
-#endif	/* _XFS_TRANS_PRIV_H */
+#endif	/* __XFS_TRANS_PRIV_H__ */

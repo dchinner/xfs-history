@@ -30,49 +30,12 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.59 $"
-
 /*
  * Inode allocation management for XFS.
  */
-#include <xfs_os_defs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <stddef.h>
-#ifdef SIM
-#include <stdlib.h>
-#include <string.h>
-#else
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_alloc.h"
-#ifdef SIM
-#include "sim.h"
-#endif
+#include <xfs.h>
+
 
 /*
  * Prototypes for internal functions.
@@ -1017,8 +980,6 @@ xfs_inobt_lookup(
 	int			keyno;	/* current key number */
 	int			level;	/* level in the btree */
 	xfs_mount_t		*mp;	/* file system mount point */
-        
-
 
 	/*
 	 * Get the allocation group header, and the root block number.

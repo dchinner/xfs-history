@@ -29,87 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.472 $"
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
+#include <xfs.h>
 #include <asm/fcntl.h>
-#include <linux/xfs_fs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/types.h>
-#include "xfs_buf.h"
-#include <sys/uio.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/systm.h>
-#include <sys/sysmacros.h>
-#include <linux/xfs_fs.h>
-#include <linux/dmapi_kern.h>
-#include <sys/debug.h>
-#include <sys/kmem.h>
-#include <sys/cmn_err.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/fs_subr.h>
-#include <sys/ktrace.h>
-#ifndef SIM
-#endif
-#include <sys/kabi.h>
-#include <sys/kmem.h>
-#include <sys/param.h>
-#include <sys/pathname.h>
-#include <linux/xfs_sema.h>
-#include <ksys/vfile.h>
-#include <sys/mode.h>
-#include <sys/dirent.h>
-#include <sys/attributes.h>
-#include <ksys/fsc_notify.h>
-#include <ksys/cell_config.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_itable.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_attr.h"
-#include "xfs_rw.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#include "xfs_quota.h"
-#include "xfs_utils.h"
-#include "xfs_trans_space.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_dmapi.h"
-#ifdef SIM
-#include "sim.h"
-#endif
-
-
-extern prid_t dfltprid;
-extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
 
 /*
  * The maximum pathlen is 1024 bytes. Since the minimum file system
@@ -118,8 +41,6 @@ extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
  */
 #define SYMLINK_MAPS 2
 
-
-#ifndef SIM
 STATIC int
 xfs_open(
 	bhv_desc_t	*bdp,
@@ -255,19 +176,15 @@ xfs_ioctl(
 	unsigned int	cmd,
 	unsigned long	arg);
 
-#endif	/* !SIM */
-
 STATIC int
 xfs_inactive(
 	bhv_desc_t	*bdp,
 	cred_t		*credp);
 
-#ifndef SIM
 STATIC int
 xfs_inactive_free_eofblocks(
 	xfs_mount_t	*mp,
 	xfs_inode_t	*ip);
-#endif	/* !SIM */
 
 STATIC int
 xfs_reclaim(
@@ -283,7 +200,6 @@ xfs_ctrunc_trace(
 #define	xfs_ctrunc_trace(tag, ip)
 #endif /* DEBUG */
 
-#ifndef SIM
 /*
  * For xfs, we check that the file isn't too big to be opened by this kernel.
  * No other open action is required for regular files.  Devices are handled
@@ -616,7 +532,6 @@ xfs_setattr(
 			goto error_return;
 		}
 	} else {
-#ifndef SIM
 		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE) &&
 		    !(flags & ATTR_DMI)) {
 			code = xfs_dm_send_data_event (DM_EVENT_TRUNCATE, bdp,
@@ -626,7 +541,6 @@ xfs_setattr(
 				goto error_return;
 			}
 		}
-#endif
 		lock_flags |= XFS_IOLOCK_EXCL;
 	}
 
@@ -1140,14 +1054,12 @@ xfs_setattr(
 		return code;
 	}
 
-#ifndef SIM
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_ATTRIBUTE) &&
 	    !(flags & ATTR_DMI)) {
 		(void) dm_send_namesp_event (DM_EVENT_ATTRIBUTE, bdp, DM_RIGHT_NULL,
 				NULL, DM_RIGHT_NULL, NULL, NULL,
 			0, 0, AT_DELAY_FLAG(flags));
 	}
-#endif
 	return 0;
 
  abort_return:
@@ -1987,8 +1899,6 @@ xfs_release(
 	return 0;
 }
 
-#endif	/* !SIM */
-
 /*
  * xfs_inactive
  *
@@ -2006,13 +1916,11 @@ xfs_inactive(
 	xfs_inode_t	*ip;
 			/* REFERENCED */
 	vnode_t 	*vp;
-#ifndef SIM
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
 	int		error;
 	int		commit_flags;
 	int		truncate;
-#endif
 
 	vp = BHV_TO_VNODE(bdp);
 
@@ -2030,7 +1938,6 @@ xfs_inactive(
 		return VN_INACTIVE_CACHE;
 	}
 
-#ifndef SIM
 	/*
 	 * Only do a truncate if it's a regular file with
 	 * some actual space in it.  It's OK to look at the
@@ -2085,9 +1992,6 @@ xfs_inactive(
 		 * do that within a transaction.
 		 */
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-
-		/* Evict buffers on the xfsd's list. */		 
-		xfs_xfsd_list_evict(bdp);
 
 		xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, 0);
 
@@ -2215,7 +2119,6 @@ xfs_inactive(
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 
  out:
-#endif /* !SIM */
 	/*
 	 * Clear all the inode's read-ahead state.  We need to take
 	 * the lock here even though the inode is inactive, because
@@ -2232,22 +2135,17 @@ xfs_inactive(
 	 */
 	if (vp->v_type == VREG) {
 		XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
-#ifndef SIM
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		xfs_iocore_reset(&ip->i_iocore);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-#endif /* !SIM */
 	}
 
 	return VN_INACTIVE_CACHE;
 }
 
 
-#ifndef SIM
-
 /*
  * xfs_lookup
- *
  */
 /*ARGSUSED*/
 STATIC int
@@ -2422,15 +2320,13 @@ xfs_create(
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(EINVAL);
 
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = xfs_dm_send_create_event(dir_bdp, name,
 				dm_di_mode, &dm_event_sent);
 		if (error)
 			return error;
 	}
-#endif
-	
+
 	/* Return through std_return after this point. */
 	
 	mp = dp->i_mount;
@@ -2667,12 +2563,14 @@ xfs_create(
 				error = XFS_ERROR(EEXIST);
 			} else if (vp->v_type == VDIR) {
 				error = XFS_ERROR(EISDIR);
-#ifndef SIM
-			} else if (vp->v_type == VREG && (vap->va_mask & AT_SIZE) &&
-				DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_TRUNCATE)) {
-					error = xfs_dm_send_data_event (DM_EVENT_TRUNCATE,
-						XFS_ITOBHV(ip), vap->va_size, 0, 0, NULL);
-#endif
+			} else if (vp->v_type == VREG &&
+				(vap->va_mask & AT_SIZE) &&
+				DM_EVENT_ENABLED (vp->v_vfsp, ip,
+					DM_EVENT_TRUNCATE)) {
+					error = xfs_dm_send_data_event(
+						DM_EVENT_TRUNCATE,
+						XFS_ITOBHV(ip),
+						vap->va_size, 0, 0, NULL);
 			}
 		}
 
@@ -2841,7 +2739,6 @@ xfs_create(
 	/* Fallthrough to std_return with error = 0  */
 
 std_return:
-#ifndef SIM
 	if ( (created || (error != 0 && dm_event_sent != 0)) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp), 
 							DM_EVENT_POSTCREATE)) {
@@ -2851,7 +2748,6 @@ std_return:
 			DM_RIGHT_NULL, name, NULL,
 			dm_di_mode, error, 0);
 	}
-#endif
 	return error;
 
  abort_return:
@@ -2907,13 +2803,9 @@ xfs_create_broken(
 	cmn_err(CE_WARN,
 		"xfs_create looping, dir ino 0x%Lx, ino 0x%Lx, %s\n",
 		dp->i_ino, e_inum_saved, mp->m_fsname);
-#ifdef SIM
-	abort();
-#else
 #ifdef	DEBUG
 	BUG();
 #endif	/* DEBUG */
-#endif
 }
 
 
@@ -3337,7 +3229,6 @@ xfs_remove(
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(EINVAL);
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = dm_send_namesp_event(DM_EVENT_REMOVE, dir_bdp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
@@ -3345,7 +3236,6 @@ xfs_remove(
 		if (error)
 			return error;
 	}
-#endif
 
 	/* From this point on, return through std_return */
  retry:
@@ -3561,7 +3451,6 @@ xfs_remove(
 /*	Fall through to std_return with error = 0 */
 
 std_return:
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
 						DM_EVENT_POSTREMOVE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTREMOVE,
@@ -3569,7 +3458,6 @@ std_return:
 				NULL, DM_RIGHT_NULL, 
 			      	name, NULL, dm_di_mode, error, 0);
 	}
-#endif
 	return error;
 
  error1:
@@ -3662,7 +3550,6 @@ xfs_link(
         if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-#ifndef SIM
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_EVENT_LINK)) {
 		error = dm_send_namesp_event(DM_EVENT_LINK,
 					target_dir_bdp, DM_RIGHT_NULL,
@@ -3671,7 +3558,6 @@ xfs_link(
 		if (error)
 			return error;
 	}
-#endif
 
 	/* Return through std_return after this point. */
         
@@ -3810,7 +3696,6 @@ xfs_link(
 
 	/* Fall through to std_return with error = 0. */
 std_return:
-#ifndef SIM
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, sip,
 						DM_EVENT_POSTLINK)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTLINK,
@@ -3818,7 +3703,6 @@ std_return:
 				src_bdp, DM_RIGHT_NULL,
 				target_name, NULL, 0, error, 0);
 	}
-#endif
 	return error;
 
  abort_return:
@@ -3883,14 +3767,12 @@ xfs_mkdir(
 	dp_joined_to_trans = B_FALSE;
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
 
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = xfs_dm_send_create_event(dir_bdp, dir_name,
 					dm_di_mode, &dm_event_sent);
 		if (error)
 			return error;
 	}
-#endif
 
 	/* Return through std_return after this point. */
 
@@ -4079,7 +3961,6 @@ xfs_mkdir(
 	 * xfs_trans_commit. */
 
 std_return:
-#ifndef SIM
 	if ( (created || (error != 0 && dm_event_sent != 0)) &&
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 						DM_EVENT_POSTCREATE)) {
@@ -4090,7 +3971,6 @@ std_return:
 					dir_name, NULL,
 					dm_di_mode, error, 0);
 	}
-#endif
 	return error;
 
  error2:
@@ -4155,7 +4035,6 @@ xfs_rmdir(
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(EINVAL);
 
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = dm_send_namesp_event(DM_EVENT_REMOVE,
 					dir_bdp, DM_RIGHT_NULL,
@@ -4164,7 +4043,6 @@ xfs_rmdir(
 		if (error)
 			return XFS_ERROR(error);
 	}
-#endif
 
 	/* Return through std_return after this point. */
 
@@ -4391,7 +4269,6 @@ xfs_rmdir(
 	/* Fall through to std_return with error = 0 or the errno
 	 * from xfs_trans_commit. */
 std_return:
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
 						DM_EVENT_POSTREMOVE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTREMOVE,
@@ -4400,7 +4277,6 @@ std_return:
 					name, NULL, dm_di_mode,
 					error, 0);
 	}
-#endif
 	return error;
 
  error1:
@@ -4556,7 +4432,6 @@ xfs_symlink(
 		}
         }
 
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_SYMLINK)) {
 		error = dm_send_namesp_event(DM_EVENT_SYMLINK, dir_bdp, DM_RIGHT_NULL,
 						NULL, DM_RIGHT_NULL,
@@ -4565,7 +4440,6 @@ xfs_symlink(
 		if (error)
 			return error;
 	}
-#endif
 
 	/* Return through std_return after this point. */
 
@@ -4787,7 +4661,6 @@ xfs_symlink(
 	/* Fall through to std_return with error = 0 or errno from
 	 * xfs_trans_commit	*/
 std_return:
-#ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 			     DM_EVENT_POSTSYMLINK)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTSYMLINK,
@@ -4797,7 +4670,6 @@ std_return:
 						link_name, target_path,
 						0, error, 0);
 	}
-#endif
 
 	if (!error) {
 		vnode_t *vp;
@@ -5335,7 +5207,6 @@ xfs_set_dmattrs (
 	return error;
 }
 
-#endif	/* !SIM */
 
 /*
  * xfs_reclaim
@@ -5349,6 +5220,7 @@ xfs_reclaim(
 	int		locked;
 	int		error;
 	vnode_t 	*vp;
+	xfs_ihash_t	*ih;
 
 	vp = BHV_TO_VNODE(bdp);
 
@@ -5464,21 +5336,15 @@ xfs_reclaim(
 		}
 	}
 
-#ifdef SIM
-	xfs_finish_reclaim(ip, locked);
-#else
-	{
-		xfs_ihash_t	*ih = ip->i_hash;
-		mrupdate(&ih->ih_lock);
-		vn_bhv_remove(VN_BHV_HEAD(vp),
-				XFS_ITOBHV(ip));
-		mrunlock(&ih->ih_lock);
-	}
+	ih = ip->i_hash;
+	mrupdate(&ih->ih_lock);
+	vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
+	mrunlock(&ih->ih_lock);
+
 	if (locked) {
 		xfs_ifunlock(ip);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
-#endif
 
 	return 0;
 }
@@ -5491,7 +5357,6 @@ xfs_finish_reclaim(
 	int	error;
 	xfs_ihash_t	*ih = ip->i_hash;
 
-#ifndef SIM
 	mrupdate(&ih->ih_lock);
 	if (XFS_ITOV_NULL(ip)) {
 		mrunlock(&ih->ih_lock);
@@ -5501,7 +5366,6 @@ xfs_finish_reclaim(
 		ip->i_flags |= XFS_IRECLAIM;
 		mrunlock(&ih->ih_lock);
 	}
-#endif
 
 	/*
 	 * If the inode is still dirty, then flush it out.  If the inode
@@ -5517,7 +5381,6 @@ xfs_finish_reclaim(
 	if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
 		if (!locked) {
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
-#ifndef SIM
 			if (ip->i_flags & XFS_IRECLAIM) {
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				mrunlock(&ih->ih_lock);
@@ -5525,7 +5388,6 @@ xfs_finish_reclaim(
 			}
 			ip->i_flags |= XFS_IRECLAIM;
 			mrunlock(&ih->ih_lock);
-#endif
 			xfs_iflock(ip);
 		}
 
@@ -5553,10 +5415,8 @@ xfs_finish_reclaim(
 		       ip->i_itemp->ili_format.ilf_fields == 0);
 		ASSERT(ip->i_iocore.io_queued_bufs == 0);
 	}
-#ifndef SIM
 	else if (!locked) 
 		mrunlock(&ih->ih_lock);
-#endif
 
 	xfs_ireclaim(ip);
 	return 0;
@@ -5627,14 +5487,12 @@ xfs_alloc_file_space(
         } else
                 rtextsize = 0;
 
-#ifndef SIM
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0))
 				return error;
 		}
 	}
-#endif
 
 	if (len <= 0)
 		return XFS_ERROR(EINVAL);
@@ -5647,9 +5505,7 @@ xfs_alloc_file_space(
 	startoffset_fsb	= XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
 
-#ifndef SIM
-/*	Generate a DMAPI event if needed.	*/
-
+	/*	Generate a DMAPI event if needed.	*/
 	if (alloc_type != 0 && offset < ip->i_d.di_size &&
 			(attr_flags&ATTR_DMI) == 0  &&
 			DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_WRITE)) {
@@ -5664,14 +5520,11 @@ xfs_alloc_file_space(
 		if (error)
 			return(error);
 	}
-#endif
 
 	/*
 	 * allocate file space until done or until there is an error	
  	 */
-#ifndef SIM
 retry:
-#endif
 	while (allocatesize_fsb && !error) {
 		/*
 		 * determine if reserving space on
@@ -5716,7 +5569,6 @@ retry:
 			break;
 		}
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-#ifndef SIM
 		if (XFS_IS_QUOTA_ON(mp)) {
 			if (xfs_trans_reserve_quota(tp, 
 						    ip->i_udquot, 
@@ -5726,7 +5578,6 @@ retry:
 				goto error1;
 			}
 		}	
-#endif
 
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
@@ -5769,7 +5620,6 @@ retry:
 		allocatesize_fsb -= allocated_fsb;
 	}
 dmapi_enospc_check:
-#ifndef SIM
 	if (error == ENOSPC && (attr_flags&ATTR_DMI) == 0 &&
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_NOSPACE)) {
 
@@ -5781,21 +5631,17 @@ dmapi_enospc_check:
 			goto retry;	/* Maybe DMAPI app. has made space */
 		/* else fall through with error = xfs_dm_send_data_event result. */
 	}
-#endif
 
 	return error;
 
  error0:
 	xfs_bmap_cancel(&free_list);
-#ifndef SIM
  error1:
-#endif
 	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	goto dmapi_enospc_check;
 }
 
-#ifndef SIM
 /*
  * Zero file bytes between startoff and endoff inclusive.
  * The iolock is held exclusive and no blocks are buffered.
@@ -6256,53 +6102,6 @@ xfs_change_file_space(
 	return error;
 }
 
-#endif	/* !SIM */
-
-#ifdef SIM
-
-vnodeops_t xfs_vnodeops = {
-	(vop_open_t)fs_noerr,
-	(vop_close_t)fs_nosys,
-	(vop_read_t)fs_nosys,
-	(vop_write_t)fs_nosys,
-	(vop_getattr_t)fs_nosys,
-	(vop_setattr_t)fs_nosys,
-	(vop_access_t)fs_nosys,
-	(vop_lookup_t)fs_nosys,
-	(vop_create_t)fs_nosys,
-	(vop_remove_t)fs_nosys,
-	(vop_link_t)fs_nosys,
-	(vop_rename_t)fs_nosys,
-	(vop_mkdir_t)fs_nosys,
-	(vop_rmdir_t)fs_nosys,
-	(vop_readdir_t)fs_nosys,
-	(vop_symlink_t)fs_nosys,
-	(vop_readlink_t)fs_nosys,
-	(vop_fsync_t)fs_nosys,
-	xfs_inactive,
-	(vop_fid2_t)fs_nosys,
-	(vop_release_t)fs_nosys,
-	(vop_rwlock_t)fs_nosys,
-	(vop_rwunlock_t)fs_nosys,
-	(vop_seek_t)fs_nosys,
-	(vop_realvp_t)fs_nosys,
-	(vop_bmap_t)fs_nosys,
-	(vop_fcntl_t)fs_nosys,
-	xfs_reclaim,
-	(vop_attr_get_t)fs_nosys,
-	(vop_attr_set_t)fs_nosys,
-	(vop_attr_remove_t)fs_nosys,
-	(vop_attr_list_t)fs_nosys,
-	(vop_link_removed_t)fs_nosys,
-	(vop_vnode_change_t)fs_nosys,
-	(vop_ptossvp_t)fs_nosys,
-	(vop_pflushinvalvp_t)fs_nosys,
-	(vop_pflushvp_t)fs_nosys,
-	(vop_sethole_t)fs_nosys,
-	(vop_ioctl_t)fs_nosys,
-};
-
-#else
 vnodeops_t xfs_vnodeops = {
 	xfs_open,
 	xfs_close,
@@ -6325,8 +6124,8 @@ vnodeops_t xfs_vnodeops = {
 	xfs_inactive,
 	xfs_fid2,
 	xfs_release,
-	xfs_rwlock,/* fs_nosys, */
-	xfs_rwunlock,/* fs_nosys, */
+	xfs_rwlock,
+	xfs_rwunlock,
 	xfs_seek,
 	(vop_realvp_t)fs_nosys,
 	(vop_bmap_t)xfs_bmap,
@@ -6344,4 +6143,3 @@ vnodeops_t xfs_vnodeops = {
 	fs_pages_sethole,
 	xfs_ioctl,
 };
-#endif /* SIM */

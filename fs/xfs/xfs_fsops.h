@@ -29,8 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_FSOPS_H
-#define	_FS_XFS_FSOPS_H
+#ifndef __XFS_FSOPS_H__
+#define	__XFS_FSOPS_H__
 
 int
 xfs_fs_geometry(
@@ -60,8 +60,8 @@ xfs_fs_counts(
 
 int
 xfs_reserve_blocks(
-	xfs_mount_t *mp, 
-	__uint64_t *inval, 
-	xfs_fsop_resblks_t *outval);
+	xfs_mount_t		*mp, 
+	__uint64_t		*inval, 
+	xfs_fsop_resblks_t	*outval);
 
-#endif	/* _FS_XFS_FSOPS_H */
+#endif	/* __XFS_FSOPS_H__ */

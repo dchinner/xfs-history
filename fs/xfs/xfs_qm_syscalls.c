@@ -30,51 +30,9 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/debug.h>
-#include <sys/quota.h>
-#include <sys/systm.h>
+#include <xfs.h>
+#include <xfs_quota_priv.h>
 
-#include "xfs_buf.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_buf_item.h"
-#include "xfs_da_btree.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_itable.h"
-#include "xfs_trans_priv.h"
-#include "xfs_bit.h"
-#include "xfs_clnt.h"
-#include "xfs_quota.h"
-#include "xfs_dqblk.h"
-#include "xfs_dquot_item.h"
-#include "xfs_dquot.h"
-#include "xfs_qm.h"
-#include "xfs_quota_priv.h"
 
 extern int 	xfs_fstype;
 
@@ -272,7 +230,6 @@ xfs_qm_scall_quotaoff(
 	uint			inactivate_flags;
 	xfs_qoff_logitem_t 	*qoffstart;
 	uint 			sbflags, newflags;
-	extern dev_t		rootdev;
 	int			nculprits;
 
 	if (!force && !capable(CAP_SYS_ADMIN))
@@ -482,10 +439,6 @@ xfs_qm_scall_trunc_qfiles(
 {
 	int 		error;
 	xfs_inode_t	*qip;
-	/*
-	 * Function stolen from xfs_vnodeops.c 
-	 */
-	extern int  xfs_truncate_file(xfs_mount_t *mp, xfs_inode_t *ip);
 
 	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
@@ -527,7 +480,6 @@ xfs_qm_scall_quotaon(
 	xfs_mount_t	*mp,
 	uint		flags)
 {
-	extern dev_t	rootdev;
 	int		error, s;
 	uint		qf;
 	uint		accflags;
@@ -579,7 +531,7 @@ xfs_qm_scall_quotaon(
 	    (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT) == 0 &&
 	    (flags & XFS_PQUOTA_ENFD))) {
 #ifdef QUOTADEBUG
-		printf("Can't enforce without accounting.\n");
+		printk("Can't enforce without accounting.\n");
 #endif		
 		return XFS_ERROR(EINVAL);
 	}
@@ -805,7 +757,7 @@ xfs_qm_scall_setqlim(
 	}
 #ifdef QUOTADEBUG
 	else 
-		printf("blkhard 0x%x < blksoft 0x%x\n", hard, soft);
+		printk("blkhard 0x%x < blksoft 0x%x\n", hard, soft);
 #endif			
 	hard = (newlim.d_fieldmask & FS_DQ_RTBHARD) ?
 		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit) :
@@ -819,7 +771,7 @@ xfs_qm_scall_setqlim(
 	}
 #ifdef QUOTADEBUG
 	else 
-		printf("rtbhard 0x%x < rtbsoft 0x%x\n", hard, soft);
+		printk("rtbhard 0x%x < rtbsoft 0x%x\n", hard, soft);
 #endif	
 	
 	hard = (newlim.d_fieldmask & FS_DQ_IHARD) ?
@@ -832,7 +784,7 @@ xfs_qm_scall_setqlim(
 	}
 #ifdef QUOTADEBUG
 	else 
-		printf("ihard 0x%x < isoft 0x%x\n", hard, soft);
+		printk("ihard 0x%x < isoft 0x%x\n", hard, soft);
 #endif		
 	if (id == 0) {
 		/*
@@ -1320,10 +1272,10 @@ mutex_t	      qcheck_lock;
 #define DQTEST_LIST_PRINT(l, NXT, title) \
 { \
 	  xfs_dqtest_t	*dqp; int i = 0;\
-	  printf("%s (#%d)\n", title, (int) (l)->qh_nelems); \
+	  printk("%s (#%d)\n", title, (int) (l)->qh_nelems); \
 	  for (dqp = (xfs_dqtest_t *)(l)->qh_next; dqp != NULL; \
 	       dqp = (xfs_dqtest_t *)dqp->NXT) { \
-	    printf("\t%d\.\t\"%d (%s)\"\t bcnt = %d, icnt = %d\n", \
+	    printk("\t%d\.\t\"%d (%s)\"\t bcnt = %d, icnt = %d\n", \
 			 ++i, (int) dqp->d_id, \
 		         DQFLAGTO_TYPESTR(dqp),      \
 			 (int) dqp->d_bcount, \
@@ -1355,18 +1307,18 @@ STATIC void
 xfs_qm_dqtest_print(
 	xfs_dqtest_t	*d)
 {
-	printf( "-----------DQTEST DQUOT----------------\n");
-	printf( "---- dquot ID	=  %d\n", (int) d->d_id);
-	printf( "---- type      =  %s\n", XFS_QM_ISUDQ(d) ? "USR" :
+	printk( "-----------DQTEST DQUOT----------------\n");
+	printk( "---- dquot ID	=  %d\n", (int) d->d_id);
+	printk( "---- type      =  %s\n", XFS_QM_ISUDQ(d) ? "USR" :
 	       "PRJ");
-	printf( "---- fs        =  0x%x\n", d->q_mount);
-	printf( "---- bcount	=  %Lu (0x%x)\n", 
+	printk( "---- fs        =  0x%p\n", d->q_mount);
+	printk( "---- bcount	=  %Lu (0x%x)\n", 
 	       d->d_bcount,
 	       (int)d->d_bcount);
-	printf( "---- icount	=  %Lu (0x%x)\n", 
+	printk( "---- icount	=  %Lu (0x%x)\n", 
 	       d->d_icount,
 	       (int)d->d_icount);
-	printf( "---------------------------\n");
+	printk( "---------------------------\n");
 }
 
 STATIC void
@@ -1380,10 +1332,10 @@ xfs_qm_dqtest_failed(
 {	
 	qmtest_nfails++;
 	if (error)
-		printf("quotacheck failed for %d, error = %d\nreason = %s\n",
+		printk("quotacheck failed for %d, error = %d\nreason = %s\n",
 		       d->d_id, error, reason);
 	else
-		printf("quotacheck failed for %d (%s) [%d != %d]\n",
+		printk("quotacheck failed for %d (%s) [%d != %d]\n",
 		       d->d_id, reason, (int)a, (int)b);
 	xfs_qm_dqtest_print(d);
 	if (dqp)
@@ -1410,7 +1362,7 @@ xfs_dqtest_cmp2(
 	    dqp->q_core.d_bcount >= dqp->q_core.d_blk_softlimit) {
 		if (dqp->q_core.d_btimer == 0 &&
 		    dqp->q_core.d_id != 0) {
-			printf("%d [%s] [0x%x] BLK TIMER NOT STARTED\n", 
+			printk("%d [%s] [0x%p] BLK TIMER NOT STARTED\n", 
 			       (int) d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
 		}
@@ -1419,7 +1371,7 @@ xfs_dqtest_cmp2(
 	    dqp->q_core.d_icount >= dqp->q_core.d_ino_softlimit) {
 		if (dqp->q_core.d_itimer == 0 &&
 		    dqp->q_core.d_id != 0) {
-			printf("%d [%s] [0x%x] INO TIMER NOT STARTED\n", 
+			printk("%d [%s] [0x%p] INO TIMER NOT STARTED\n", 
 			       (int) d->d_id, DQFLAGTO_TYPESTR(d), 
 			       d->q_mount);
 			err++;
@@ -1427,7 +1379,7 @@ xfs_dqtest_cmp2(
 	}
 #if 0
 	if (!err) {
-		printf("%d [%s] [0x%x] qchecked\n", 
+		printk("%d [%s] [0x%p] qchecked\n", 
 		       (int) d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "PRJ", d->q_mount);
 	}
 #endif
@@ -1520,7 +1472,6 @@ xfs_qm_internalqcheck_adjust(
 	xfs_inode_t     	*ip;
 	xfs_dqtest_t		*ud, *pd;
 	uint			lock_flags;
-	extern	dev_t		rootdev;
 	boolean_t		ipreleased;
 	int			error;
 
@@ -1622,10 +1573,10 @@ xfs_qm_internalqcheck(
 		}
 	} while (! done);
 	if (error) {
-		printf("Bulkstat returned error 0x%x\n", 
+		printk("Bulkstat returned error 0x%x\n", 
 		       error);
 	}
-	printf("Checking results against system dquots\n");
+	printk("Checking results against system dquots\n");
 	for (i = 0; i < qmtest_hashmask; i++) {
 		h1 = &qmtest_udqtab[i];
 		for (d = (xfs_dqtest_t *) h1->qh_next; d != NULL; ) {
@@ -1644,10 +1595,10 @@ xfs_qm_internalqcheck(
 	}
 
 	if (qmtest_nfails) {
-		printf("**************  quotacheck failed  **************\n");
-		printf("failures = %d\n", qmtest_nfails);
+		printk("**************  quotacheck failed  **************\n");
+		printk("failures = %d\n", qmtest_nfails);
 	} else {
-		printf("**************  quotacheck successful! **************\n");
+		printk("**************  quotacheck successful! **************\n");
 	}
 	kmem_free(qmtest_udqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));
 	kmem_free(qmtest_pdqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));

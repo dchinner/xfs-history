@@ -29,14 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR2_SF_H
-#define	_FS_XFS_DIR2_SF_H
-
-#ident	"$Revision$"
+#ifndef __XFS_DIR2_SF_H__
+#define	__XFS_DIR2_SF_H__
 
 /*
- * xfs_dir2_sf.h
- *
  * Directory layout when stored internal to an inode.
  *
  * Small directories are packed as tightly as possible so as to
@@ -234,11 +230,9 @@ extern int
 			      struct xfs_dir2_block *block,
 			      xfs_dir2_sf_hdr_t *sfhp);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_block_to_sf(struct xfs_da_args *args, struct xfs_dabuf *bp,
 			     int size, xfs_dir2_sf_hdr_t *sfhp);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 extern int
 	xfs_dir2_sf_addname(struct xfs_da_args *args);
@@ -246,21 +240,17 @@ extern int
 extern int
 	xfs_dir2_sf_create(struct xfs_da_args *args, xfs_ino_t pino);
 
-#ifndef SIM
 extern int
 	xfs_dir2_sf_getdents(struct xfs_inode *dp, struct uio *uio, int *eofp,
 			     struct dirent *dbp, xfs_dir2_put_t put);
-#endif /* !SIM */
 
 extern int
 	xfs_dir2_sf_lookup(struct xfs_da_args *args);
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 extern int
 	xfs_dir2_sf_removename(struct xfs_da_args *args);
 
 extern int
 	xfs_dir2_sf_replace(struct xfs_da_args *args);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
-#endif	/* !_FS_XFS_DIR2_SF_H */
+#endif	/* __XFS_DIR2_SF_H__ */

@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_SB_H
-#define	_FS_XFS_SB_H
-
-#ident	"$Revision: 1.46 $"
+#ifndef __XFS_SB_H__
+#define	__XFS_SB_H__
 
 /*
  * Super block
@@ -213,7 +211,7 @@ int xfs_sb_good_version(xfs_sb_t *sbp);
 	  ((sbp)->sb_versionnum <= XFS_SB_VERSION_3)) || \
 	 ((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
 	  !((sbp)->sb_versionnum & ~XFS_SB_VERSION_OKREALBITS)
-#ifndef XFS_REPAIR_SIM
+#ifdef __KERNEL__
 #define	XFS_SB_GOOD_VERSION(sbp)	\
 	(XFS_SB_GOOD_VERSION_INT(sbp) && \
 	  (sbp)->sb_shared_vn <= XFS_SB_MAX_SHARED_VN) ))
@@ -228,7 +226,7 @@ int xfs_sb_good_version(xfs_sb_t *sbp);
 	(XFS_SB_GOOD_VERSION_INT(sbp) && \
 	  (!((sbp)->sb_versionnum & XFS_SB_VERSION_SHAREDBIT) || \
 	   (sbp)->sb_shared_vn <= XFS_SB_MAX_SHARED_VN)) ))
-#endif /* XFS_REPAIR_SIM */
+#endif /* __KERNEL__ */
 #endif
 
 #define	XFS_SB_GOOD_SASH_VERSION(sbp)	\
@@ -489,4 +487,4 @@ xfs_sb_t *xfs_buf_to_sbp(struct xfs_buf *bp);
 #define	XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)XFS_BUF_PTR(bp))
 #endif
 
-#endif	/* !_FS_XFS_SB_H */
+#endif	/* __XFS_SB_H__ */

@@ -29,48 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.89 $"
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL	1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/sysmacros.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#ifdef SIM
-#ifdef DEBUG
-#include <stdio.h>
-#endif
-#else
-#include <sys/kmem.h>
-#include <sys/systm.h>
-#include <sys/cmn_err.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_buf_item.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_trans_priv.h"
-#include "xfs_error.h"
-#include "xfs_rw.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
 
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
@@ -125,15 +86,8 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * the buffer cache.
 	 */
 	if (tp == NULL) {
-#ifdef SIM
-		/*
-		 * There's no bdflush daemon in simulation.
-		 */
-		return (get_buf(target_dev->dev, blkno, len, flags));
-#else
 		bp = xfs_buf_get_flags(target_dev, blkno, len, flags|BUF_BUSY);
 		return(bp);
-#endif
 	}
 
 	/*
@@ -180,11 +134,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * easily deadlock with our current transaction as well as cause
 	 * us to run out of stack space.
 	 */
-#ifdef SIM
-	bp = get_buf(target_dev->dev, blkno, len, flags);
-#else
 	bp = xfs_buf_get_flags(target_dev, blkno, len, flags | BUF_BUSY);
-#endif
 	if (bp == NULL) {
 		return NULL;
 	}
@@ -361,15 +311,8 @@ xfs_trans_read_buf(
 	 * the buffer cache.
 	 */
 	if (tp == NULL) {
-#ifdef SIM
-		/*
-		 * There's no bdflush daemon in simulation.
-		 */
-		bp = read_buf(target->dev, blkno, len, flags);
-#else
 		bp = xfs_buf_read_flags(target, blkno, len,
 			      flags | BUF_BUSY);
-#endif
 		if ((bp != NULL) && (XFS_BUF_GETERROR(bp) != 0)) {
 			xfs_ioerror_alert("xfs_trans_read_buf", mp,
 					  target->dev, blkno);
@@ -382,9 +325,7 @@ xfs_trans_read_buf(
 			if (xfs_error_dev == target->dev) {
 				if (((xfs_req_num++) % xfs_error_mod) == 0) {
 					xfs_buf_relse(bp);
-#ifndef SIM
 					printk("Returning error!\n");
-#endif
 					return XFS_ERROR(EIO);
 				}
 			}
@@ -465,11 +406,7 @@ xfs_trans_read_buf(
 	 * easily deadlock with our current transaction as well as cause
 	 * us to run out of stack space.
 	 */
-#ifdef SIM
-	bp = read_buf(target->dev, blkno, len, flags);
-#else
 	bp = xfs_buf_read_flags(target, blkno, len, flags | BUF_BUSY);
-#endif
 	if (bp == NULL) {
 		*bpp = NULL;
 		return 0;
@@ -493,9 +430,7 @@ xfs_trans_read_buf(
 				xfs_force_shutdown(tp->t_mountp, 
 						   XFS_METADATA_IO_ERROR);
 				xfs_buf_relse(bp);
-#ifndef SIM
 				printk("Returning error in trans!\n");
-#endif
 				return XFS_ERROR(EIO);
 			}
 		}
@@ -549,7 +484,7 @@ shutdown_abort:
 	 * shut down.  So we should leave the b_flags alone since
 	 * the buffer's not staled and just get out.
 	 */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(DEBUG)
 	if (XFS_BUF_ISSTALE(bp) && XFS_BUF_ISDELAYWRITE(bp))
 		cmn_err(CE_NOTE, "about to pop assert, bp == 0x%x\n", bp);
 #endif

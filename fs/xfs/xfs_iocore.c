@@ -29,71 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.18 $"
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/uio.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/sysmacros.h>
-#include <sys/uuid.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/cmn_err.h>
-#include <sys/debug.h>
-#ifdef SIM
-#include <stdio.h>
-#else
-#include <sys/systm.h>
-#endif
-#include <sys/kmem.h>
-#include <linux/xfs_sema.h>
-#include <ksys/vfile.h>
-#include <sys/fs_subr.h>
-#include <linux/xfs_fs.h>
-#include <linux/dmapi_kern.h>
-#include <sys/ktrace.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_itable.h"
-#include "xfs_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#include "xfs_rw.h"
-#include "xfs_quota.h"
-#include "xfs_trans_space.h"
-#include "xfs_dmapi.h"
-
-#ifdef SIM
-#include "sim.h"
-#endif
 
 /* ARGSUSED */
 static int
@@ -153,19 +91,15 @@ xfs_setsize_fn(
 
 
 xfs_ioops_t	xfs_iocore_xfs = {
-#ifndef SIM
-    (xfs_dio_write_t)fs_nosys,   /*(xfs_dio_write_t) xfs_dio_write, */
-    (xfs_dio_read_t)fs_nosys,    /*(xfs_dio_read_t) xfs_dio_read, */
+	(xfs_dio_write_t)fs_nosys,   /*(xfs_dio_write_t) xfs_dio_write, */
+	(xfs_dio_read_t)fs_nosys,    /*(xfs_dio_read_t) xfs_dio_read, */
 	(xfs_strat_write_t)fs_nosys, /*(xfs_strat_write_t) xfs_strat_write, */
-#endif
 	(xfs_bmapi_t) xfs_bmapi,
 	(xfs_bmap_eof_t) xfs_bmap_eof,
 	(xfs_rsync_t) xfs_rsync_fn,
 	(xfs_lck_map_shared_t) xfs_ilock_map_shared,
 	(xfs_lock_t) xfs_ilock,
-#ifndef SIM
 	(xfs_lock_demote_t) xfs_ilock_demote,
-#endif
 	(xfs_lock_nowait_t) xfs_ilock_nowait,
 	(xfs_unlk_t) xfs_iunlock,
 	(xfs_chgtime_t) xfs_ichgtime,

@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _XFS_TRANS_SPACE_H
-#define _XFS_TRANS_SPACE_H
-
-#ident "$Revision$"
+#ifndef __XFS_TRANS_SPACE_H__
+#define __XFS_TRANS_SPACE_H__
 
 /*
  * Components of space reservations.
@@ -104,4 +102,4 @@
 #define	XFS_SYMLINK_SPACE_RES(mp,nl,b)	\
 	(XFS_IALLOC_SPACE_RES(mp) + XFS_DIRENTER_SPACE_RES(mp,nl) + (b))
 
-#endif	/* _XFS_TRANS_SPACE_H */
+#endif	/* __XFS_TRANS_SPACE_H__ */

@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.14 $"
 
 /*
  * xfs_dir2_node.c
@@ -37,56 +36,10 @@
  * See data structures in xfs_dir2_node.h and xfs_da_btree.h.
  */
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#include <sys/uuid.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-#include <sys/vnode.h>
-#include <sys/dirent.h>
-#ifdef SIM
-#include <stdio.h>
-#include <string.h>
-#else
-#include <sys/systm.h>
-#endif
-#include <stddef.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_dir2_node.h"
-#include "xfs_dir2_trace.h"
-#include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM) && 0
-#include "asm/kdb.h"
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && 0
 
 #undef xfs_dir2_print_args
 #define xfs_dir2_print_args(ARGS) \
@@ -136,11 +89,9 @@ static void xfs_dir2_leafn_moveents(xfs_da_args_t *args, xfs_dabuf_t *bp_s,
 static void xfs_dir2_leafn_rebalance(xfs_da_state_t *state,
 				     xfs_da_state_blk_t *blk1,
 				     xfs_da_state_blk_t *blk2);
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 static int xfs_dir2_leafn_remove(xfs_da_args_t *args, xfs_dabuf_t *bp,
 				 int index, xfs_da_state_blk_t *dblk,
 				 int *rval);
-#endif /* XFS_REPAIR_SIM || !SIM */
 static int xfs_dir2_node_addname_int(xfs_da_args_t *args,
 				     xfs_da_state_blk_t *fblk);
 
@@ -496,9 +447,9 @@ xfs_dir2_leafn_lookup_int(
 	mp = dp->i_mount;
 	leaf = bp->data;
 	ASSERT(INT_GET(leaf->hdr.info.magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC);
-#ifndef XFS_REPAIR_SIM
+#ifdef __KERNEL__
 	ASSERT(INT_GET(leaf->hdr.count, ARCH_CONVERT) > 0);
-#endif /* !XFS_REPAIR_SIM */
+#endif
 	xfs_dir2_leafn_check(dp, bp);
 	/*
 	 * Look up the hash value in the leaf entries.
@@ -902,7 +853,6 @@ xfs_dir2_leafn_rebalance(
 		blk2->index = blk1->index - INT_GET(leaf1->hdr.count, ARCH_CONVERT);
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from a node directory.
  * This removes the leaf entry and the data entry,
@@ -1114,7 +1064,6 @@ xfs_dir2_leafn_remove(
 		mp->m_dir_magicpct;
 	return 0;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Split the leaf entries in the old block into old and new blocks.
@@ -1180,7 +1129,6 @@ xfs_dir2_leafn_split(
 	return error;
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Check a leaf block and its neighbors to see if the block should be
  * collapsed into one or the other neighbor.  Always keep the block
@@ -1358,7 +1306,6 @@ xfs_dir2_leafn_unbalance(
 	save_blk->hashval = INT_GET(save_leaf->ents[INT_GET(save_leaf->hdr.count, ARCH_CONVERT) - 1].hashval, ARCH_CONVERT);
 	xfs_dir2_leafn_check(args->dp, save_blk->bp);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Top-level node form directory addname routine.
@@ -1886,7 +1833,6 @@ xfs_dir2_node_lookup(
 	return rval;
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from a node-format directory.
  */
@@ -2096,4 +2042,3 @@ xfs_dir2_node_trim_free(
 	*rvalp = 1;
 	return 0;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */

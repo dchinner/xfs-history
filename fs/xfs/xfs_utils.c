@@ -29,46 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.31 $"
 
-#include <xfs_os_defs.h>
-#include <linux/errno.h>
+#include <xfs.h>
 
-#include <sys/types.h>
-#include "xfs_buf.h"
-#include <sys/uuid.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/systm.h>
-#include <linux/xfs_cred.h>
-#include <sys/param.h>
-#include <sys/pathname.h>
-#include <linux/dmapi_kern.h>
-#include <sys/cmn_err.h>
-#include <sys/sysmacros.h>
-
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_quota.h"
-#include "xfs_rw.h"
-#include "xfs_itable.h"
-#include "xfs_utils.h"
 
 /*
  * Test the sticky attribute of a directory.  We can unlink from a sticky
@@ -667,44 +630,6 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 	return 0;
 }
 #endif /* DEBUG || INDUCE_IO_ERROR */
-
-#ifndef __linux__
-int
-xfs_mk_sharedro(int fd)
-{
-	int error;
-	xfs_mount_t *mp;
-
-	if (error = xfs_fd_to_mp(fd, 1, &mp, 1))
-		return XFS_ERROR(error);
-
-	mp->m_mk_sharedro = 1;
-
-	cmn_err(CE_NOTE,
-		"Filesystem \"%s\" will be marked shared read-only on unmount",
-		mp->m_fsname);
-
-	return 0;
-}
-
-int
-xfs_clear_sharedro(int fd)
-{
-	int error;
-	xfs_mount_t *mp;
-
-	if (error = xfs_fd_to_mp(fd, 1, &mp, 1))
-		return XFS_ERROR(error);
-
-	mp->m_mk_sharedro = 0;
-
-	cmn_err(CE_NOTE,
-	"Filesystem \"%s\" will not be marked shared read-only on unmount",
-		mp->m_fsname);
-
-	return 0;
-}
-#endif
 
 /* Called by filesystems VOP_RENAME
  * once it has found the source vnode to

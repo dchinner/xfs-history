@@ -29,70 +29,18 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.150 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
+#include <xfs_quota_priv.h>
+#include <xfs_log_recover.h>
 
-#include <linux/config.h>
-#include <linux/module.h>
-#include <sys/types.h>
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
-
 #include <linux/mm.h>
-#include <linux/fs.h>
 
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/attributes.h>
-#include <sys/uuid.h>
-#include "sys/ktrace.h"
-#include "xfs_buf.h"
-
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc.h"
-#include "xfs_ag.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_buf_item.h"
-#include "xfs_extfree_item.h"
-#include "xfs_inode_item.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#include "xfs_attr.h"
-#include "xfs_attr_leaf.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_dir2_node.h"
-#include "xfs_log_priv.h"
-#include "xfs_log_recover.h"
-#include "xfs_rw.h"
-#include "xfs_bit.h"
-#include "xfs_quota.h"
-#include "xfs_dqblk.h"
-#include "xfs_dquot_item.h"
-#include "xfs_dquot.h"
-#include "xfs_qm.h"
-#include "xfs_quota_priv.h"
 
 #if     (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
 
@@ -1437,7 +1385,7 @@ static int	kdbm_xfs_xtrans_res(
 
 /*
  * Vnode descriptor dump.
- * This table is a string version of all the flags defined in sys/vnode.h.
+ * This table is a string version of all the flags defined in vnode.h.
  */
 char *tab_vflags[] = {
 	/* local only flags */
@@ -4261,8 +4209,6 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	int		*hist;
 	int		hist_bytes = mp->m_ihsize * sizeof(int);
 	int		hist2[21];
-	void		*kmalloc(size_t, int);
-	void		kfree(void *);
 
 	hist = (int *) kmalloc(hist_bytes, GFP_KERNEL);
 

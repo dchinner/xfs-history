@@ -33,71 +33,27 @@
  *  fs/xfs/linux/xfs_lrw.c (Linux Read Write stuff)
  *
  */
-#include <xfs_os_defs.h>
 
-#define FSID_T
-#include <sys/types.h>
-#include <sys/sysmacros.h>
-#include <sys/systm.h>
-#include <linux/errno.h>
+#include <xfs.h>
+#include <linux/xfs_lrw.h>
 
 #undef  NODEV
 #include <linux/version.h>
-#include <linux/fs.h>
-#include <asm/uaccess.h>
 #include <linux/page_buf.h>
 #include <linux/pagemap.h>
 #include <linux/capability.h>
 
-#include <sys/cmn_err.h>
-#include "xfs_buf.h"
-#include <ksys/behavior.h>
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_arch.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_itable.h"
-#include "xfs_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#include "xfs_trans_space.h"
-#include "xfs_log_priv.h"
-#include "xfs_lrw.h"
-#include "xfs_quota.h"
 
-#define min(a, b) ((a) < (b) ? (a) :  (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
 #define XFS_WRITEIO_ALIGN(io,off)       (((off) >> io->io_writeio_log) \
                                                 << io->io_writeio_log)
 
-extern int xfs_write_clear_setuid(struct xfs_inode *);
 int xfs_iomap_write_delay(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 			int *, int, int);
 int xfs_iomap_write_convert(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 			int *, int, int);
 int xfs_iomap_write_direct(xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
 			int *, int, int);
-extern int xfs_bioerror_relse(xfs_buf_t *);
 
 #ifndef DEBUG
 #define	xfs_strat_write_check(io,off,count,imap,nimap)
@@ -1947,8 +1903,6 @@ _xfs_incore_match(buftarg_t     *targ,
 int
 xfs_bdstrat_cb(struct xfs_buf *bp)
 {
-	extern int xfs_bioerror(struct xfs_buf *b);
-
 	xfs_mount_t	*mp;
 	vfs_t *vfsp;
 	

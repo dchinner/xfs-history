@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_ALLOC_H
-#define	_FS_XFS_ALLOC_H
-
-#ident	"$Revision$"
+#ifndef __XFS_ALLOC_H__
+#define	__XFS_ALLOC_H__
 
 struct xfs_buf;
 struct xfs_mount;
@@ -88,6 +86,9 @@ typedef struct xfs_alloc_arg {
 	char		userdata;	/* set if this is user data */
 } xfs_alloc_arg_t;
 
+
+#ifdef __KERNEL__
+
 /*
  * Types for alloc tracing.
  */
@@ -103,7 +104,7 @@ typedef struct xfs_alloc_arg {
 #define	XFS_ALLOC_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef	XFS_ALLOC_TRACE
 #endif
 
@@ -193,5 +194,7 @@ xfs_free_extent(
 	struct xfs_trans *tp,	/* transaction pointer */
 	xfs_fsblock_t	bno,	/* starting block number of extent */
 	xfs_extlen_t	len);	/* length of extent */
-#endif	/* !SIM */
 
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_ALLOC_H__ */

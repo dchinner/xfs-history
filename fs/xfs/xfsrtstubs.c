@@ -29,33 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.9 $"
-/*
- * xfsrt stubs
- */
  
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#include <sys/types.h>
-#include <sys/uuid.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/cmn_err.h>
-#include "xfs_buf.h"
-#include <ksys/behavior.h>
-#include <xfs_types.h>
-#include <xfs_inum.h>
-#include <xfs_inum.h>
-#include <xfs_sb.h>
-#include <xfs_log.h>
-#include <xfs_trans.h>
-#include <xfs_dir.h>
-#include <xfs_mount.h>
-#include <xfs_alloc.h>
-
-#include <xfs_rtalloc.h>
-
-extern int nopkg(void);
 
 int	
 xfs_rtallocate_extent(

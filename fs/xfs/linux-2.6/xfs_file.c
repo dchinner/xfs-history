@@ -29,13 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#include <xfs_os_defs.h>
-#define FSID_T
-#include <linux/sched.h>
-#include <linux/fs.h>
+
+#include <xfs.h>
 #include <linux/dcache.h>
-#include <linux/xfs_cred.h>
-#include <sys/vnode.h>
+
 
 STATIC long long linvfs_file_lseek(
 	struct file *file,

@@ -29,10 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _XFS_DQUOT__H_
-#define _XFS_DQUOT__H_
-
-#ident "$Revision: 1.15 $"
+#ifndef __XFS_DQUOT_H__
+#define __XFS_DQUOT_H__
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -41,7 +39,7 @@
  * to a collection of inodes. In this respect, dquots share some characteristics
  * of the superblock.
  * XFS dquots exploit both those in its algorithms. They make every attempt
- * to not be a bottleneck when quotas are on, and have minimal impact, if at all,
+ * to not be a bottleneck when quotas are on and have minimal impact, if any,
  * when quotas are off.
  */
 
@@ -71,7 +69,7 @@ struct xfs_trans;
  * iterations because of locking considerations.
  */
 typedef struct xfs_dqmarker {
-	struct xfs_dquot*dqm_flnext;	/* link to the freelist: must be first */
+	struct xfs_dquot*dqm_flnext;	/* link to freelist: must be first */
 	struct xfs_dquot*dqm_flprev;
 	xfs_dqlink_t	 dqm_mplist;	/* link to mount's list of dquots */
 	xfs_dqlink_t	 dqm_hashlist;	/* link to the hash chain */
@@ -137,7 +135,8 @@ typedef struct xfs_dquot {
 #define XFS_IS_UQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_UQUOTA_ENFD)
 #define XFS_IS_PQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_PQUOTA_ENFD)
 
-#define XFS_DQ_IS_LOCKED(dqp)	(mutex_mine(&(dqp)->q_qlock))
+/*#define XFS_DQ_IS_LOCKED(dqp)	(mutex_mine(&(dqp)->q_qlock))*/
+#define XFS_DQ_IS_LOCKED(dqp)	((dqp)->q_qlock.state)
 
 /*
  * The following three routines simply manage the q_flock
@@ -202,4 +201,4 @@ extern void		xfs_qm_adjust_dqtimers(xfs_mount_t *,
 					       xfs_disk_dquot_t	*);
 extern int		xfs_qm_dqwarn(xfs_disk_dquot_t *, uint);
 
-#endif /* _XFS_DQUOT__H_ */
+#endif /* __XFS_DQUOT_H__ */

@@ -30,58 +30,12 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs_os_defs.h>
-#include <linux/xfs_cred.h>
-#include <sys/debug.h>
-#include <sys/quota.h>
-#include <sys/vnode.h>
-#include <sys/cmn_err.h>
+#include <xfs.h>
+#include <xfs_quota_priv.h>
 
-#include "xfs_buf.h"
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_buf_item.h"
-#include "xfs_da_btree.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_trans_priv.h"
-#include "xfs_bit.h"
-#include "xfs_clnt.h"
-#include "xfs_quota.h"
-#include "xfs_dqblk.h"
-#include "xfs_dquot_item.h"
-#include "xfs_dquot.h"
-#include "xfs_qm.h"
-#include "xfs_quota_priv.h"
-#include "xfs_itable.h"
-#include "xfs_utils.h"
-#include "xfs_trans_space.h"
 
-extern int      ncsize;
 struct xfs_qm	*xfs_Gqm = NULL;
 mutex_t		xfs_Gqm_lock;
-extern time_t	time;
 
 STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
 STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
@@ -118,9 +72,9 @@ extern mutex_t	qcheck_lock;
 #define XQM_LIST_PRINT(l, NXT, title) \
 { \
 	  xfs_dquot_t	*dqp; int i = 0;\
-	  printf("%s (#%d)\n", title, (int) (l)->qh_nelems); \
+	  printk("%s (#%d)\n", title, (int) (l)->qh_nelems); \
 	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) { \
-	    printf("\t%d.\t\"%d (%s)\"\t bcnt = %d, icnt = %d refs = %d\n", \
+	    printk("\t%d.\t\"%d (%s)\"\t bcnt = %d, icnt = %d refs = %d\n", \
 			 ++i, (int) dqp->q_core.d_id, \
 		         DQFLAGTO_TYPESTR(dqp),      \
 			 (int) dqp->q_core.d_bcount, \
@@ -1597,7 +1551,7 @@ xfs_qm_qino_alloc(
 STATIC int
 xfs_qm_reset_dqcounts(
 	xfs_mount_t	*mp,
-	xfs_buf_t		*bp,
+	xfs_buf_t	*bp,
 	xfs_dqid_t	id,
 	uint		type)
 {
@@ -1609,9 +1563,10 @@ xfs_qm_reset_dqcounts(
 	 * Reset all counters and timers. They'll be
 	 * started afresh by xfs_qm_quotacheck. 
 	 */
-	ASSERT(XFS_QM_DQPERBLK(mp) == 
-	       XFS_FSB_TO_B(mp, XFS_DQUOT_CLUSTER_SIZE_FSB) / 
-	       sizeof(xfs_dqblk_t));
+#ifdef DEBUG
+	j = XFS_FSB_TO_B(mp, XFS_DQUOT_CLUSTER_SIZE_FSB);
+	ASSERT(XFS_QM_DQPERBLK(mp) == do_div(j, sizeof(xfs_dqblk_t)));
+#endif
 	ddq = (xfs_disk_dquot_t *)XFS_BUF_PTR(bp);
 	for (j = 0; j < XFS_QM_DQPERBLK(mp); j++) {
 		/*
@@ -2196,7 +2151,7 @@ xfs_qm_shake_freelist(
 	nflushes = 0;
 
 #ifdef QUOTADEBUG
-	printf("Shake free 0x%x\n", howmany);
+	printk("Shake free 0x%x\n", howmany);
 #endif
 	/* lock order is : hashchainlock, freelistlock, mplistlock */
  tryagain:
@@ -2309,7 +2264,7 @@ xfs_qm_shake_freelist(
 		}
 		xfs_dqtrace_entry(dqp, "DQSHAKE: UNLINKING");
 #ifdef QUOTADEBUG
-		printf("Shake 0x%x, ID 0x%x\n", dqp, dqp->q_core.d_id);
+		printk("Shake 0x%x, ID 0x%x\n", dqp, dqp->q_core.d_id);
 #endif
 		ASSERT(dqp->q_nrefs == 0);
 		nextdqp = dqp->dq_flnext;
@@ -2911,7 +2866,7 @@ xfs_qm_freelist_destroy(xfs_frlist_t *ql)
 		xfs_dqlock(dqp);	
 		nextdqp = dqp->dq_flnext;
 #ifdef QUOTADEBUG
-		printf("FREELIST destroy 0x%x\n", dqp);
+		printk("FREELIST destroy 0x%x\n", dqp);
 #endif
 		XQM_FREELIST_REMOVE(dqp);
 		xfs_dqunlock(dqp);
@@ -2956,9 +2911,9 @@ xfs_qm_freelist_print(xfs_frlist_t *qlist, char *title)
 {
 	xfs_dquot_t *dq;
 	int i = 0;
-	printf("%s (#%d)\n", title, (int) qlist->qh_nelems);	
+	printk("%s (#%d)\n", title, (int) qlist->qh_nelems);	
 	FOREACH_DQUOT_IN_FREELIST(dq, qlist) {
-		printf("\t%d.\t\"%d (%s:0x%x)\"\t bcnt = %d, icnt = %d "
+		printk("\t%d.\t\"%d (%s:0x%x)\"\t bcnt = %d, icnt = %d "
 		       "refs = %d\n",  
 		       ++i, (int) dq->q_core.d_id,
 		       DQFLAGTO_TYPESTR(dq), dq,     

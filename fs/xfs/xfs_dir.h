@@ -29,14 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR_H
-#define	_FS_XFS_DIR_H
-
-#ident	"$Revision$"
+#ifndef __XFS_DIR_H__
+#define	__XFS_DIR_H__
 
 /*
- * xfs_dir.h
- *
  * Large directories are structured around Btrees where all the data
  * elements are in the leaf nodes.  Filenames are hashed into an int,
  * then that int is used as the index into the Btree.  Since the hashval
@@ -51,7 +47,7 @@
 #define	XFS_DIR_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_DIR_TRACE
 #endif
 
@@ -89,7 +85,6 @@ typedef int	(*xfs_dir_lookup_t)(struct xfs_trans *tp,
 				    char *name,
 				    int namelen,
 				    xfs_ino_t *inum);
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 typedef int	(*xfs_dir_removename_t)(struct xfs_trans *tp,
 					struct xfs_inode *dp,
 					char *name,
@@ -98,24 +93,10 @@ typedef int	(*xfs_dir_removename_t)(struct xfs_trans *tp,
 					xfs_fsblock_t *first,
 					struct xfs_bmap_free *flist,
 					xfs_extlen_t total);
-#endif /* XFS_REPAIR_SIM || !SIM */
-#ifdef XFS_REPAIR_SIM
-typedef int	(*xfs_dir_bogus_removename_t)(struct xfs_trans *tp,
-					      struct xfs_inode *dp,
-					      char *name,
-					      xfs_fsblock_t *first,
-					      struct xfs_bmap_free *flist,
-					      xfs_extlen_t total,
-					      xfs_dahash_t hash,
-					      int namelen);
-#endif	/* XFS_REPAIR_SIM */
-#ifndef SIM
 typedef int	(*xfs_dir_getdents_t)(struct xfs_trans *tp,
 				      struct xfs_inode *dp,
 				      struct uio *uio,
 				      int *eofp);
-#endif	/* !SIM */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 typedef int	(*xfs_dir_replace_t)(struct xfs_trans *tp,
 				     struct xfs_inode *dp,
 				     char *name,
@@ -124,7 +105,6 @@ typedef int	(*xfs_dir_replace_t)(struct xfs_trans *tp,
 				     xfs_fsblock_t *first,
 				     struct xfs_bmap_free *flist,
 				     xfs_extlen_t total);
-#endif /* XFS_REPAIR_SIM || !SIM */
 typedef int	(*xfs_dir_canenter_t)(struct xfs_trans *tp,
 				      struct xfs_inode *dp,
 				      char *name,
@@ -139,18 +119,9 @@ typedef struct xfs_dirops {
 	xfs_dir_init_t				xd_init;
 	xfs_dir_createname_t			xd_createname;
 	xfs_dir_lookup_t			xd_lookup;
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 	xfs_dir_removename_t			xd_removename;
-#endif /* XFS_REPAIR_SIM || !SIM */
-#ifdef XFS_REPAIR_SIM
-	xfs_dir_bogus_removename_t		xd_bogus_removename;
-#endif /* XFS_REPAIR_SIM */
-#ifndef SIM
 	xfs_dir_getdents_t			xd_getdents;
-#endif /* !SIM */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 	xfs_dir_replace_t			xd_replace;
-#endif /* XFS_REPAIR_SIM || !SIM */
 	xfs_dir_canenter_t			xd_canenter;
 	xfs_dir_shortform_validate_ondisk_t	xd_shortform_validate_ondisk;
 	xfs_dir_shortform_to_single_t		xd_shortform_to_single;
@@ -172,23 +143,12 @@ void	xfs_dir_startup(void);	/* called exactly once */
 				      total))
 #define	XFS_DIR_LOOKUP(mp,tp,dp,name,namelen,inum)	\
 	((mp)->m_dirops.xd_lookup(tp,dp,name,namelen,inum))
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 #define	XFS_DIR_REMOVENAME(mp,tp,dp,name,namelen,ino,first,flist,total)	\
 	((mp)->m_dirops.xd_removename(tp,dp,name,namelen,ino,first,flist,total))
-#endif /* XFS_REPAIR_SIM || !SIM */
-#ifdef XFS_REPAIR_SIM
-#define	XFS_DIR_BOGUS_REMOVENAME(mp,tp,dp,name,first,flist,total,hash,namelen)	\
-	((mp)->m_dirops.xd_bogus_removename(tp,dp,name,first,flist,total,\
-					    hash,namelen))
-#endif
-#ifndef SIM
 #define	XFS_DIR_GETDENTS(mp,tp,dp,uio,eofp)	\
 	((mp)->m_dirops.xd_getdents(tp,dp,uio,eofp))
-#endif /* !SIM */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 #define	XFS_DIR_REPLACE(mp,tp,dp,name,namelen,inum,first,flist,total)	\
 	((mp)->m_dirops.xd_replace(tp,dp,name,namelen,inum,first,flist,total))
-#endif /* XFS_REPAIR_SIM || !SIM */
 #define	XFS_DIR_CANENTER(mp,tp,dp,name,namelen)	\
 	((mp)->m_dirops.xd_canenter(tp,dp,name,namelen))
 #define	XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp,dip)	\
@@ -199,4 +159,4 @@ void	xfs_dir_startup(void);	/* called exactly once */
 #define	XFS_DIR_IS_V1(mp)	((mp)->m_dirversion == 1)
 extern xfs_dirops_t xfsv1_dirops;
 
-#endif	/* !_FS_XFS_DIR_H */
+#endif	/* __XFS_DIR_H__ */

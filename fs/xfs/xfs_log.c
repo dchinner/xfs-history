@@ -29,61 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.221 $"
 
 /*
  * High level interface routines for log manager
  */
 
-#include <xfs_os_defs.h>
-#include <sys/param.h>
-
-#ifdef SIM
-#define _KERNEL 1
-#endif
-
-#include <sys/sysmacros.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-
-#ifdef SIM
-#undef _KERNEL
-#include <stdio.h>
-#include <stdlib.h>
-#else
-#include <sys/systm.h>
-#endif
-
-#include <sys/cmn_err.h>
-#include <sys/kmem.h>
-#include <sys/ktrace.h>
-#include <sys/debug.h>
-#include <linux/xfs_sema.h>
-#include <sys/sysmacros.h>
-#include <sys/vfs.h>
-#include <sys/uuid.h>
-
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_ag.h"		/* needed by xfs_sb.h */
-#include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
-#include "xfs_error.h"
-#include "xfs_log_priv.h"	/* depends on all above */
-#include "xfs_buf_item.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_log_recover.h"
-#include "xfs_bit.h"
-#include "xfs_rw.h"
-#include "xfs_trans_priv.h"
-
-#ifdef SIM
-#include "sim.h"		/* must be last include file */
-#endif
+#include <xfs.h>
 
 
 #define xlog_write_adv_cnt(ptr, len, off, bytes) \
@@ -159,7 +110,6 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
-extern void ktrace_free(struct ktrace *ktp);
 #ifdef XFSDEBUG
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
 #endif
@@ -191,7 +141,7 @@ int xlog_error_mod = 33;
  * 1 => enable log manager
  * 2 => enable log manager and log debugging
  */
-#if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
+#if defined(XLOG_NOLOG) || defined(DEBUG)
 int   xlog_debug = 1;
 dev_t xlog_devt  = 0;
 #endif
@@ -310,7 +260,7 @@ xfs_log_done(xfs_mount_t	*mp,
 	xlog_ticket_t	*ticket = (xfs_log_ticket_t) xtic;
 	xfs_lsn_t	lsn	= 0;
 	
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 #endif
@@ -374,7 +324,7 @@ xfs_log_force(xfs_mount_t *mp,
 	int	rval;
 	xlog_t *log = mp->m_log;
 
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 #endif
@@ -412,7 +362,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 	xlog_t *log = mp->m_log;
 	int	abortflg;
 
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return;
 #endif
@@ -457,7 +407,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	xlog_ticket_t	*internal_ticket;
 	int		retval;
 
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 #endif
@@ -521,7 +471,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 
 	mp->m_log = log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug) {
 		cmn_err(CE_NOTE, "log dev: 0x%x", log_dev);
 		return 0;
@@ -622,7 +572,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
             __uint32_t pad2; /* may as well make it 64 bits */
         } magic = { XLOG_UNMOUNT_TYPE, 0, 0 };
         
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 #endif
@@ -751,7 +701,7 @@ xfs_log_write(xfs_mount_t *	mp,
 {
 	int	error;
 	xlog_t *log = mp->m_log;
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 
 	if (! xlog_debug && xlog_devt == log->l_dev) {
 		*start_lsn = 0;
@@ -776,7 +726,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	xlog_t		*log = mp->m_log; 
 	int		need_bytes, free_bytes, cycle, bytes, spl;
 
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	if (!xlog_debug && xlog_devt == log->l_dev)
 		return;
 #endif
@@ -1055,7 +1005,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 {
 	int size;
 
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 	/*
 	 * When logbufs == 0, someone has disabled the log from the FSTAB
 	 * file.  This is not a documented feature.  We need to set xlog_debug
@@ -1080,7 +1030,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 		else
 			log->l_iclog_bufs = mp->m_logbufs;
 
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
+#if defined(DEBUG) || defined(XLOG_NOLOG)
 		/* We are reactivating a filesystem after it was active */
 		if (log->l_dev == xlog_devt) {
 			xlog_devt = 1;
@@ -1778,11 +1728,7 @@ xlog_write(xfs_mount_t *	mp,
 	} /* while (index < nentries) */
     } /* for (index = 0; index < nentries; ) */
     ASSERT(len == 0);
-    
-#ifndef _KERNEL
-    xlog_state_want_sync(log, iclog);
-#endif
-    
+ 
     return (xlog_state_release_iclog(log, iclog));
 }	/* xlog_write */
 
@@ -1813,21 +1759,6 @@ xlog_state_clean_log(xlog_t *log)
 #endif
 	iclog = log->l_iclog;
 	do {
-#if defined(DEBUG) && !defined(__linux__)
-		/*
-		 * This is to track down an elusive log bug
-		 * where processes sleeping on ic_forcesema don't
-		 * get woken up. #459136
-		 */
-		if (iclog->ic_state & (XLOG_STATE_DIRTY|
-				       XLOG_STATE_ACTIVE)) {
-			if ((kthread_t *)((&(iclog->ic_forcesema))->sv_queue & 
-					  ~(0x7))) {
-				if (++niclogws > 1)
-					debug("iclog");
-			}
-		}
-#endif
 		if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			iclog->ic_state	= XLOG_STATE_ACTIVE;
 			iclog->ic_offset       = 0;
@@ -3301,11 +3232,8 @@ xlog_verify_iclog(xlog_t	 *log,
 {
 	xlog_op_header_t	*ophead;
 	xlog_in_core_t		*icptr;
-#ifndef _KERNEL
-	xlog_tid_t		tid;
-#endif
-	xfs_caddr_t			ptr;
-	xfs_caddr_t			base_ptr;
+	xfs_caddr_t		ptr;
+	xfs_caddr_t		base_ptr;
 	__psint_t		field_offset;
 	char			clientid;
 	int			len, i, op_len, spl;
@@ -3353,23 +3281,6 @@ xlog_verify_iclog(xlog_t	 *log,
 		}
 		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
 			xlog_panic("xlog_verify_iclog: illegal client");
-
-#ifndef _KERNEL
-		/* check tids */
-		field_offset = (__psint_t)
-			       ((xfs_caddr_t)&(ophead->oh_tid) - base_ptr);
-		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
-			tid = INT_GET(ophead->oh_tid, ARCH_CONVERT);
-		} else {
-			idx = BTOBB((__psint_t)&ophead->oh_tid - 
-				    (__psint_t)iclog->ic_data);
-			tid = (xlog_tid_t)(INT_GET(iclog->ic_header.h_cycle_data[idx], ARCH_CONVERT));
-		}
-
-		/* This is a user space check */
-		if ((__psint_t)tid < 0x10000000 || (__psint_t)tid > 0x20000000)
-			xlog_panic("xlog_verify_iclog: illegal tid");
-#endif
 
 		/* check length */
 		field_offset = (__psint_t)

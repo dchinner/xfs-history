@@ -1,5 +1,4 @@
 #
-#
 # Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
 # 
 # This program is free software; you can redistribute it and/or modify it
@@ -41,17 +40,17 @@
 
 # EXTRA_MKDEP_OPTIONS = -v
 
-EXTRA_FIND_DIRECTORIES = linux pseudo-inc
+EXTRA_FIND_DIRECTORIES = linux
 ifeq ($(CONFIG_XFS_GRIO),y)
-	EXTRA_FIND_DIRECTORIES += grio
+#	EXTRA_FIND_DIRECTORIES += grio
 endif
 ifeq ($(CONFIG_XFS_DMAPI),y)
 	EXTRA_FIND_DIRECTORIES += dmapi
 endif
-EXTRA_INCLUDE_DIRECTORIES = -I./linux -I./pseudo-inc -I.
+EXTRA_INCLUDE_DIRECTORIES = -I.
 
 EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-parentheses \
-                -Wno-uninitialized ${EXTRA_INCLUDE_DIRECTORIES} -D_KERNEL \
+                -Wno-uninitialized ${EXTRA_INCLUDE_DIRECTORIES} \
 		-funsigned-char 
 
 EXTRA_CFLAGS += $(shell if $(CC) -Wno-unknown-pragmas -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-Wno-unknown-pragmas"; fi)
@@ -64,8 +63,8 @@ endif
 ALL_SUB_DIRS=linux
 SUB_DIRS=linux
 ifeq ($(CONFIG_XFS_GRIO),y)
-	ALL_SUB_DIRS += grio
-	SUB_DIRS += grio
+#	ALL_SUB_DIRS += grio
+#	SUB_DIRS += grio
 endif
 ifeq ($(CONFIG_XFS_DMAPI),y)
 	ALL_SUB_DIRS += dmapi
@@ -87,26 +86,26 @@ ifeq ($(CONFIG_KDB),y)
 endif
 endif
 
-ifeq ($(CONFIG_XFS_RT),y)
-XFS_RT_OBJS=xfs_rtalloc.o xfs_rtbit.o
-else
-XFS_RT_OBJS=xfsrtstubs.o
-endif
 ifeq ($(CONFIG_XFS_GRIO),y)
-XFS_GRIO_OBJS=xfs_grio.o 
+XFS_GRIO_OBJS=xfs_rtalloc.o xfs_rtbit.o xfs_grio.o
 else
-XFS_GRIO_OBJS=
+XFS_GRIO_OBJS=xfsrtstubs.o
 endif
 ifeq ($(CONFIG_XFS_DMAPI),y)
 XFS_DMAPI_OBJS=dmapi/dmapi.o xfs_dmapi.o
 else
 XFS_DMAPI_OBJS=xfsdmapistubs.o
 endif
+ifeq ($(CONFIG_XFS_QUOTA),y)
+XFS_QUOTA_OBJS=xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
+else
+XFS_QUOTA_OBJS=xfsquotasstubs.o
+endif
 
-XFS_OBJS  :=    $(XFS_RT_OBJS) \
-		$(XFS_GRIO_OBJS) \
-		$(XFS_DMAPI_OBJS) \
-		xfs_alloc.o \
+XFS_OBJS  :=    $(XFS_GRIO_OBJS) \
+                $(XFS_DMAPI_OBJS) \
+                $(XFS_QUOTA_OBJS) \
+                xfs_alloc.o \
                 xfs_alloc_btree.o \
                 xfs_attr.o \
                 xfs_attr_leaf.o \
@@ -151,15 +150,7 @@ XFS_OBJS  :=    $(XFS_RT_OBJS) \
                 xfs_vfsops.o \
                 xfs_vnodeops.o \
                 xfs_rw.o \
-		xfsquotasstubs.o \
-		macstubs.o \
-		oplockstubs.o
-
-#                xfs_qm.o \
-#                xfs_qm_syscalls.o \
-#                xfs_dquot.o \
-#                xfs_dquot_item.o \
-#                xfs_trans_dquot.o
+                macstubs.o
 
 
 O_OBJS :=  $(XFS_OBJS) 

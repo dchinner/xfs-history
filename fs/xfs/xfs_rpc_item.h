@@ -29,6 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
+#ifndef __XFS_RPC_ITEM_H__
+#define __XFS_RPC_ITEM_H__
 
 /*
  * CXFS RPC Log Format - data structures for logging RPC ops
@@ -148,3 +150,4 @@ typedef struct xfs_rpc_log_item {
 #define RPCLI_OP_FCNTL		11	/* for F_FSSETXATTR */
 #define RPCLI_OP_CHANGESP	12	/* ALLOCSP/RESVP/FREESP/UNRESVP fcntl */
 
+#endif	/* __XFS_RPC_ITEM_H__ */

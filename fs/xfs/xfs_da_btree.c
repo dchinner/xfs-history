@@ -30,69 +30,10 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs_os_defs.h>
-
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#include <string.h>
-#endif
-#include <sys/vnode.h>
-#include <sys/kmem.h>
-#include <sys/dirent.h>
-#include <sys/uuid.h>
-#ifdef SIM
-#include <stdio.h>
-#include <sys/attributes.h>
-#else
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_alloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_da_btree.h"
-#ifndef SIM
-#include "xfs_attr.h"
-#include "xfs_attr_leaf.h"
-#endif
-#include "xfs_dir_leaf.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_dir2_node.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#ifdef SIM
-#include "sim.h"
-#endif
+#include <xfs.h>
 
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM)
-#include "asm/kdb.h"
+#if defined(XFSDEBUG) && defined(CONFIG_KDB)
 
 #undef xfs_buftrace
 #define xfs_buftrace(A,B) \
@@ -133,7 +74,6 @@ STATIC void xfs_da_node_add(xfs_da_state_t *state,
 /*
  * Routines used for shrinking the Btree.
  */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 STATIC int xfs_da_root_join(xfs_da_state_t *state,
 					   xfs_da_state_blk_t *root_blk);
 STATIC int xfs_da_node_toosmall(xfs_da_state_t *state, int *retval);
@@ -142,7 +82,6 @@ STATIC void xfs_da_node_remove(xfs_da_state_t *state,
 STATIC void xfs_da_node_unbalance(xfs_da_state_t *state,
 					 xfs_da_state_blk_t *src_node_blk,
 					 xfs_da_state_blk_t *dst_node_blk);
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Utility routines.
@@ -224,7 +163,7 @@ xfs_da_split(xfs_da_state_t *state)
 		 */
 		switch (oldblk->magic) {
 		case XFS_ATTR_LEAF_MAGIC:
-#ifdef SIM
+#ifndef __KERNEL__
 			return(ENOTTY);
 #else
 			error = xfs_attr_leaf_split(state, oldblk, newblk);
@@ -705,7 +644,6 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
  * Routines used for shrinking the Btree.
  *========================================================================*/
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Deallocate an empty leaf node, remove it from its parent,
  * possibly deallocating that block, etc...
@@ -737,7 +675,7 @@ xfs_da_join(xfs_da_state_t *state)
 		 */
 		switch (drop_blk->magic) {
 		case XFS_ATTR_LEAF_MAGIC:
-#ifdef SIM
+#ifndef __KERNEL__
 			error = ENOTTY;
 #else
 			error = xfs_attr_leaf_toosmall(state, &action);
@@ -746,7 +684,7 @@ xfs_da_join(xfs_da_state_t *state)
 				return(error);
 			if (action == 0)
 				return(0);
-#ifndef SIM
+#ifdef __KERNEL__
 			xfs_attr_leaf_unbalance(state, drop_blk, save_blk);
 #endif
 			break;
@@ -987,7 +925,6 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	*action = 1;
 	return(0);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Walk back up the tree adjusting hash values as necessary,
@@ -1005,7 +942,7 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 	level = path->active-1;
 	blk = &path->blk[ level ];
 	switch (blk->magic) {
-#ifndef SIM
+#ifdef __KERNEL__
 	case XFS_ATTR_LEAF_MAGIC:
 		lasthash = xfs_attr_leaf_lasthash(blk->bp, &count);
 		if (count == 0)
@@ -1044,7 +981,6 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 	}
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from an intermediate node.
  */
@@ -1144,7 +1080,6 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 */
 	save_blk->hashval = INT_GET(save_node->btree[ INT_GET(save_node->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*========================================================================
  * Routines used for finding things in the Btree.
@@ -1165,7 +1100,7 @@ int							/* error */
 xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 {
 	xfs_da_state_blk_t *blk;
-	xfs_da_blkinfo_t *current;
+	xfs_da_blkinfo_t *curr;
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
 	xfs_dablk_t blkno;
@@ -1198,16 +1133,16 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 			return(error);
 		}
 		ASSERT(blk->bp != NULL);
-		current = blk->bp->data;
-		ASSERT(INT_GET(current->magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC ||
-		       INT_GET(current->magic, ARCH_CONVERT) == XFS_DIRX_LEAF_MAGIC(state->mp) ||
-		       INT_GET(current->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC);
+		curr = blk->bp->data;
+		ASSERT(INT_GET(curr->magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC ||
+		       INT_GET(curr->magic, ARCH_CONVERT) == XFS_DIRX_LEAF_MAGIC(state->mp) ||
+		       INT_GET(curr->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC);
 
 		/*
 		 * Search an intermediate node for a match.
 		 */
-		blk->magic = INT_GET(current->magic, ARCH_CONVERT);
-		if (INT_GET(current->magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC) {
+		blk->magic = INT_GET(curr->magic, ARCH_CONVERT);
+		if (INT_GET(curr->magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC) {
 			node = blk->bp->data;
 			blk->hashval = INT_GET(node->btree[ INT_GET(node->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT);
 
@@ -1254,17 +1189,17 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 				blkno = INT_GET(btree->before, ARCH_CONVERT);	
 			}
 		}
-#ifndef SIM
-		else if (INT_GET(current->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC) {
+#ifdef __KERNEL__
+		else if (INT_GET(curr->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC) {
 			blk->hashval = xfs_attr_leaf_lasthash(blk->bp, NULL);
 			break;
 		}
 #endif
-		else if (INT_GET(current->magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC) {
+		else if (INT_GET(curr->magic, ARCH_CONVERT) == XFS_DIR_LEAF_MAGIC) {
 			blk->hashval = xfs_dir_leaf_lasthash(blk->bp, NULL);
 			break;
 		}
-		else if (INT_GET(current->magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC) {
+		else if (INT_GET(curr->magic, ARCH_CONVERT) == XFS_DIR2_LEAFN_MAGIC) {
 			blk->hashval = xfs_dir2_leafn_lasthash(blk->bp, NULL);
 			break;
 		}
@@ -1286,7 +1221,7 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 			retval = xfs_dir2_leafn_lookup_int(blk->bp, state->args,
 							&blk->index, state);
 		}
-#ifndef SIM
+#ifdef __KERNEL__
 		else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
 			retval = xfs_attr_leaf_lookup_int(blk->bp, state->args);
 			blk->index = state->args->index;
@@ -1302,7 +1237,7 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 			if (retval == 0) {
 				continue;
 			}
-#ifndef SIM
+#ifdef __KERNEL__
 			else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
 				/* path_shift() gives ENOENT */
 				retval = XFS_ERROR(ENOATTR);
@@ -1346,7 +1281,7 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 	ASSERT(old_blk->magic == new_blk->magic);
 
 	switch (old_blk->magic) {
-#ifndef SIM
+#ifdef __KERNEL__
 	case XFS_ATTR_LEAF_MAGIC:
 		before = xfs_attr_leaf_order(old_blk->bp, new_blk->bp);
 		break;
@@ -1458,7 +1393,6 @@ xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count)
 	return(INT_GET(node->btree[ INT_GET(node->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT));
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Unlink a block from a doubly linked list of blocks.
  */
@@ -1534,7 +1468,6 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	xfs_da_log_buf(args->trans, save_blk->bp, 0, sizeof(*save_info) - 1);
 	return(0);
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Move a path "forward" or "!forward" one block at the current level.
@@ -1623,7 +1556,7 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 			ASSERT(level == path->active-1);
 			blk->index = 0;
 			switch(blk->magic) {
-#ifndef SIM
+#ifdef __KERNEL__
 			case XFS_ATTR_LEAF_MAGIC:
 				blk->hashval = xfs_attr_leaf_lasthash(blk->bp,
 								      NULL);
@@ -1821,7 +1754,6 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 	return 0;
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Ick.  We need to always be able to remove a btree block, even
  * if there's no space reservation because the filesystem is full.
@@ -2075,7 +2007,6 @@ done:
 	xfs_da_binval(tp, dead_buf);
 	return error;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * See if the mapping(s) for this btree block are valid, i.e.
@@ -2216,20 +2147,20 @@ xfs_da_do_buf(
 			error = bp ? XFS_BUF_GETERROR(bp) : XFS_ERROR(EIO);
 			break;
 		case 1:
-#ifdef XFS_REPAIR_SIM
+#ifndef __KERNEL__
 		case 2:
-#endif /* XFS_REPAIR_SIM */
+#endif
 			bp = NULL;
 			error = xfs_trans_read_buf(mp, trans, mp->m_ddev_targp,
 				mappedbno, nmapped, 0, &bp);
 			break;
-#ifndef SIM
+#ifdef __KERNEL__
 		case 3:
 			xfs_baread(mp->m_ddev_targp, mappedbno, nmapped);
 			error = 0;
 			bp = NULL;
 			break;
-#endif /* !SIM */
+#endif
 		}
 		if (error) {
 #pragma mips_frequency_hint NEVER
@@ -2349,26 +2280,6 @@ xfs_da_read_buf(
 		(inst_t *)__return_address);
 }
 
-#ifdef XFS_REPAIR_SIM
-/*
- * Get a buffer for the dir/attr block, fill in the contents.
- * Don't check magic number, the caller will (it's xfs_repair).
- */
-int
-xfs_da_read_bufr(
-	xfs_trans_t	*trans,
-	xfs_inode_t	*dp,
-	xfs_dablk_t	bno,
-	xfs_daddr_t		mappedbno,
-	xfs_dabuf_t	**bpp,
-	int		whichfork)
-{
-	return xfs_da_do_buf(trans, dp, bno, &mappedbno, bpp, whichfork, 2,
-		(inst_t *)__return_address);
-}
-#endif /* XFS_REPAIR_SIM */
-
-#ifndef SIM
 /*
  * Readahead the dir/attr block.
  */
@@ -2388,7 +2299,6 @@ xfs_da_reada_buf(
 	else
 		return rval;
 }
-#endif	/* !SIM */
 
 /*
  * Calculate the number of bits needed to hold i different values.
@@ -2649,32 +2559,6 @@ xfs_da_brelse(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 	if (bplist != &bp)
 		kmem_free(bplist, nbuf * sizeof(*bplist));
 }
-
-#ifdef XFS_REPAIR_SIM
-/*
- * Hold dabuf at transaction commit.
- */
-void
-xfs_da_bhold(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
-{
-	int	i;
-
-	for (i = 0; i < dabuf->nbuf; i++)
-		xfs_trans_bhold(tp, dabuf->bps[i]);
-}
-
-/*
- * Join dabuf to transaction.
- */
-void
-xfs_da_bjoin(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
-{
-	int	i;
-
-	for (i = 0; i < dabuf->nbuf; i++)
-		xfs_trans_bjoin(tp, dabuf->bps[i]);
-}
-#endif	/* XFS_REPAIR_SIM */
 
 /*
  * Invalidate dabuf from a transaction.

@@ -29,51 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.91 $"
 
-#include <xfs_os_defs.h>
-#include <sys/sysmacros.h>
-
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/vnode.h>
-#include <sys/systm.h>
-#include <linux/xfs_sema.h>
-#include <linux/xfs_cred.h>
-#include <sys/kmem.h>
-#include <sys/debug.h>
-#include <ksys/vfile.h>
-#include <sys/vfs.h>
-#include <sys/uuid.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_ag.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_ialloc.h"
-#include "xfs_itable.h"
-#include "xfs_error.h"
-#include "xfs_arch.h"
-#ifdef CELL_CAPABLE
-#include "xfs_cxfs.h"
-#endif
-
-#include <linux/xfs_fs.h>
-
+#include <xfs.h>
 
 /*
  * Return stat information for one inode.
@@ -85,7 +42,7 @@ xfs_bulkstat_one(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* buffer to place output in */
-	xfs_daddr_t		bno,		/* starting bno of inode cluster */
+	xfs_daddr_t	bno,		/* starting bno of inode cluster */
 	void		*dibuff,	/* on-disk inode buffer */
 	int		*stat)		/* BULKSTAT_RV_... */
 {

@@ -34,7 +34,6 @@
  * 	spec.
  */
 
-extern int nopkg(void);
 
 int	xfs_dm_fcntl(void) { return nopkg(); }
 

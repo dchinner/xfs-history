@@ -32,15 +32,10 @@
 #ifndef __XFS_DQUOT_ITEM_H__
 #define __XFS_DQUOT_ITEM_H__
 
-#ident "$Revision: 1.4 $"
-
 /*
  * These are the structures used to lay out dquots and quotaoff
  * records on the log. Quite similar to those of inodes.
  */
-struct xfs_dquot;
-struct xfs_trans;
-struct xfs_mount;
 
 /*
  * log format struct for dquots.
@@ -55,18 +50,6 @@ typedef struct xfs_dq_logformat {
 	__int32_t		qlf_len;       /* len of dquot buffer */
 	__uint32_t		qlf_boffset;   /* off of dquot in buffer */
 } xfs_dq_logformat_t;
-
-typedef struct xfs_dq_logitem {
-	xfs_log_item_t		 qli_item;	   /* common portion */
-	struct xfs_dquot	*qli_dquot;	   /* dquot ptr */
-	xfs_lsn_t		 qli_flush_lsn;	   /* lsn at last flush */
-	unsigned short           qli_pushbuf_flag; /* one bit used in push_ail */
-#ifdef DEBUG
-	uint64_t                 qli_push_owner;
-#endif
-	xfs_dq_logformat_t	 qli_format;	   /* logged structure */
-} xfs_dq_logitem_t;
-
 
 /*
  * log format struct for QUOTAOFF records.
@@ -83,6 +66,24 @@ typedef struct xfs_qoff_logformat {
 	char			qf_pad[12];	/* padding for future */
 } xfs_qoff_logformat_t;
 
+
+#ifdef __KERNEL__
+
+struct xfs_dquot;
+struct xfs_trans;
+struct xfs_mount;
+typedef struct xfs_dq_logitem {
+	xfs_log_item_t		 qli_item;	   /* common portion */
+	struct xfs_dquot	*qli_dquot;	   /* dquot ptr */
+	xfs_lsn_t		 qli_flush_lsn;	   /* lsn at last flush */
+	unsigned short           qli_pushbuf_flag; /* one bit used in push_ail */
+#ifdef DEBUG
+	uint64_t                 qli_push_owner;
+#endif
+	xfs_dq_logformat_t	 qli_format;	   /* logged structure */
+} xfs_dq_logitem_t;
+
+
 typedef struct xfs_qoff_logitem {
 	xfs_log_item_t		 qql_item;	/* common portion */
 	struct xfs_qoff_logitem	*qql_start_lip;	/* qoff-start logitem, if any */
@@ -97,4 +98,7 @@ extern xfs_qoff_logitem_t *xfs_trans_get_qoff_item(struct xfs_trans *,
 						   xfs_qoff_logitem_t *, uint);
 extern void		   xfs_trans_log_quotaoff_item(struct xfs_trans *,
 						       xfs_qoff_logitem_t *);
-#endif
+
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_DQUOT_ITEM_H__ */

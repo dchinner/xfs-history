@@ -29,59 +29,26 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef	_XFS_TRANS_H
-#define	_XFS_TRANS_H
-
-#ident "$Revision: 1.105 $"
-
-struct xfs_buf;
-struct buftarg;
-struct xfs_efd_log_item;
-struct xfs_efi_log_item;
-struct xfs_inode;
-struct xfs_item_ops;
-struct xfs_log_iovec;
-struct xfs_log_item;
-struct xfs_log_item_desc;
-struct xfs_mount;
-struct xfs_trans;
-struct xfs_dquot_acct;
-
-typedef struct xfs_ail_entry {
-	struct xfs_log_item	*ail_forw;	/* AIL forw pointer */
-	struct xfs_log_item	*ail_back;	/* AIL back pointer */
-} xfs_ail_entry_t;
+#ifndef	__XFS_TRANS_H__
+#define	__XFS_TRANS_H__
 
 /*
- * This structure is passed as a parameter to xfs_trans_push_ail()
- * and is used to track the what LSN the waiting processes are
- * waiting to become unused.
+ * This is the structure written in the log at the head of
+ * every transaction. It identifies the type and id of the
+ * transaction, and contains the number of items logged by
+ * the transaction so we know how many to expect during recovery.
+ *
+ * Do not change the below structure without redoing the code in
+ * xlog_recover_add_to_trans() and xlog_recover_add_to_cont_trans().
  */
-typedef struct xfs_ail_ticket {
-	xfs_lsn_t		at_lsn;		/* lsn waitin for */
-	struct xfs_ail_ticket	*at_forw;	/* wait list ptr */
-	struct xfs_ail_ticket	*at_back;	/* wait list ptr */
-	sv_t			at_sema;	/* wait sema */
-} xfs_ail_ticket_t;
+typedef struct xfs_trans_header {
+	uint		th_magic;		/* magic number */
+	uint		th_type;		/* transaction type */
+	__int32_t	th_tid;			/* transaction id (unused) */
+	uint		th_num_items;		/* num items logged by trans */
+} xfs_trans_header_t;
 
-
-typedef struct xfs_log_item {
-	xfs_ail_entry_t			li_ail;		/* AIL pointers */
-	xfs_lsn_t			li_lsn;		/* last on-disk lsn */
-	struct xfs_log_item_desc	*li_desc;	/* ptr to current desc*/
-	struct xfs_mount		*li_mountp;	/* ptr to fs mount */
-	uint				li_type;	/* item type */
-	uint				li_flags;	/* misc flags */
-	struct xfs_log_item		*li_bio_list;	/* buffer item list */
-	void				(*li_cb)(struct xfs_buf *,
-						 struct xfs_log_item *);
-							/* buffer item iodone */
-							/* callback func */
-	struct xfs_item_ops		*li_ops;	/* function list */
-} xfs_log_item_t;
-
-#define	XFS_LI_IN_AIL	0x1
-#define XFS_LI_ABORTED	0x2
+#define	XFS_TRANS_HEADER_MAGIC	0x5452414e	/* TRAN */
 
 /*
  * Log item types.
@@ -146,6 +113,58 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_GROWFSRT_ZERO		38
 #define	XFS_TRANS_GROWFSRT_FREE		39
 #define	XFS_TRANS_SWAPEXT		40
+/* new transaction types need to be reflected in xfs_logprint(8) */
+
+
+#ifdef __KERNEL__
+struct xfs_buf;
+struct buftarg;
+struct xfs_efd_log_item;
+struct xfs_efi_log_item;
+struct xfs_inode;
+struct xfs_item_ops;
+struct xfs_log_iovec;
+struct xfs_log_item;
+struct xfs_log_item_desc;
+struct xfs_mount;
+struct xfs_trans;
+struct xfs_dquot_acct;
+
+typedef struct xfs_ail_entry {
+	struct xfs_log_item	*ail_forw;	/* AIL forw pointer */
+	struct xfs_log_item	*ail_back;	/* AIL back pointer */
+} xfs_ail_entry_t;
+
+/*
+ * This structure is passed as a parameter to xfs_trans_push_ail()
+ * and is used to track the what LSN the waiting processes are
+ * waiting to become unused.
+ */
+typedef struct xfs_ail_ticket {
+	xfs_lsn_t		at_lsn;		/* lsn waitin for */
+	struct xfs_ail_ticket	*at_forw;	/* wait list ptr */
+	struct xfs_ail_ticket	*at_back;	/* wait list ptr */
+	sv_t			at_sema;	/* wait sema */
+} xfs_ail_ticket_t;
+
+
+typedef struct xfs_log_item {
+	xfs_ail_entry_t			li_ail;		/* AIL pointers */
+	xfs_lsn_t			li_lsn;		/* last on-disk lsn */
+	struct xfs_log_item_desc	*li_desc;	/* ptr to current desc*/
+	struct xfs_mount		*li_mountp;	/* ptr to fs mount */
+	uint				li_type;	/* item type */
+	uint				li_flags;	/* misc flags */
+	struct xfs_log_item		*li_bio_list;	/* buffer item list */
+	void				(*li_cb)(struct xfs_buf *,
+						 struct xfs_log_item *);
+							/* buffer item iodone */
+							/* callback func */
+	struct xfs_item_ops		*li_ops;	/* function list */
+} xfs_log_item_t;
+
+#define	XFS_LI_IN_AIL	0x1
+#define XFS_LI_ABORTED	0x2
 
 typedef struct xfs_item_ops {
 	uint (*iop_size)(xfs_log_item_t *);
@@ -184,6 +203,8 @@ typedef struct xfs_item_ops {
 #define	XFS_ITEM_FLUSHING	3
 #define XFS_ITEM_PUSHBUF      	4
 
+#endif	/* __KERNEL__ */
+
 /*
  * This structure is used to track log items associated with
  * a transaction.  It points to the log item and keeps some
@@ -218,6 +239,7 @@ typedef struct xfs_log_item_chunk {
 
 #define	XFS_LIC_MAX_SLOT	(XFS_LIC_NUM_SLOTS - 1)
 #define	XFS_LIC_FREEMASK	((1 << XFS_LIC_NUM_SLOTS) - 1)
+
 
 /*
  * Initialize the given chunk.  Set the chunk's free descriptor mask
@@ -304,29 +326,12 @@ xfs_log_item_chunk_t *xfs_lic_desc_to_chunk(xfs_log_item_desc_t *dp);
 					0)->lic_descs)))
 #endif
 
+#ifdef __KERNEL__
 /*
  * This is the type of function which can be given to xfs_trans_callback()
  * to be called upon the transaction's commit to disk.
  */
 typedef void (*xfs_trans_callback_t)(struct xfs_trans *, void *);
-
-/*
- * This is the structure written in the log at the head of
- * every transaction. It identifies the type and id of the
- * transaction, and contains the number of items logged by
- * the transaction so we know how many to expect during recovery.
- *
- * Do not change the below structure without redoing the code in
- * xlog_recover_add_to_trans() and xlog_recover_add_to_cont_trans().
- */
-typedef struct xfs_trans_header {
-	uint		th_magic;		/* magic number */
-	uint		th_type;		/* transaction type */
-	__int32_t	th_tid;			/* transaction id (unused) */
-	uint		th_num_items;		/* num items logged by trans */
-} xfs_trans_header_t;
-
-#define	XFS_TRANS_HEADER_MAGIC	0x5452414e	/* TRAN */
 
 /*
  * This is the structure maintained for every active transaction.
@@ -373,6 +378,9 @@ typedef struct xfs_trans {
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
 } xfs_trans_t;
 
+#endif	/* __KERNEL__ */
+
+
 #define	XFS_TRANS_MAGIC		0x5452414E	/* 'TRAN' */
 /*
  * Values for t_flags.
@@ -382,7 +390,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_PERM_LOG_RES	0x04	/* xact took a permanent log res */
 #define	XFS_TRANS_SYNC		0x08	/* make commit synchronous */
 #define XFS_TRANS_DQ_DIRTY	0x10	/* at least one dquot in trx dirty */
-#define XFS_TRANS_RESERVE   0x20    /* OK to use reserved data blocks */
+#define XFS_TRANS_RESERVE	0x20    /* OK to use reserved data blocks */
 
 /*
  * Values for call flags parameter.
@@ -409,6 +417,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_RBLOCKS		0x00000800
 #define	XFS_TRANS_SB_REXTENTS		0x00001000
 #define	XFS_TRANS_SB_REXTSLOG		0x00002000
+
 
 /*
  * Various log reservation values.
@@ -868,6 +877,7 @@ typedef struct xfs_trans {
 
 #define	XFS_CLEAR_AGI_BUCKET_LOG_RES(mp)  ((mp)->m_reservations.tr_clearagi)
 
+
 /*
  * Various log count values.
  */
@@ -902,6 +912,7 @@ typedef struct xfs_trans {
 #define	XFS_INO_REF		1
 #define	XFS_DQUOT_REF		1
 
+#ifdef __KERNEL__
 /*
  * XFS transaction mechanism exported interfaces that are
  * actually macros.
@@ -984,4 +995,6 @@ void		xfs_trans_unlocked_item(struct xfs_mount *,
  */
 int		xfs_trans_lsn_danger(struct xfs_mount *, xfs_lsn_t);
 
-#endif	/* _XFS_TRANS_H */
+#endif	/* __KERNEL__ */
+
+#endif	/* __XFS_TRANS_H__ */

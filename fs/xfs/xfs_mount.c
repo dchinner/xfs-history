@@ -29,70 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.237 $"
 
-#include <xfs_os_defs.h>
-
-#ifdef SIM
-#define _KERNEL	1
-#endif /* SIM */
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/sysmacros.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/uuid.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif /* SIM */
-#include <sys/kmem.h>
-#include <linux/xfs_fs.h>
-#include <linux/xfs_sema.h>
-#include <sys/cmn_err.h>
-#ifndef SIM
-#include <sys/systm.h>
-#endif /* SIM */
-#include <stddef.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_alloc.h"
-#include "xfs_rtalloc.h"
-#include "xfs_bmap.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#include "xfs_rw.h"
-#include "xfs_quota.h"
-#include "xfs_cxfs.h"
-#include "xfs_arch.h"
-
-
-#ifdef SIM
-#include "sim.h"
-#endif /* SIM */
+#include <xfs.h>
 
 
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int, int);
 STATIC void	xfs_sb_relse(xfs_buf_t *);
-#ifndef SIM
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC void	xfs_uuid_mount(xfs_mount_t *);
@@ -101,8 +43,7 @@ mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
 STATIC int	xfs_uuidtab_size;
 STATIC uuid_t	*xfs_uuidtab;
 
-void	xfs_uuid_unmount(xfs_mount_t *);
-#endif	/* !SIM */
+STATIC void	xfs_uuid_unmount(xfs_mount_t *);
 
 void xfs_xlatesb(void *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
 
@@ -225,7 +166,7 @@ xfs_mount_free(
 		VFS_REMOVEBHV(XFS_MTOVFS(mp), &mp->m_bhv);
 	}
 	kmem_free(mp, sizeof(xfs_mount_t));
-}	/* xfs_mount_free */
+}
 
 
 /*
@@ -301,15 +242,11 @@ xfs_mount_validate_sb(
 	}
 #endif
         
-#ifndef SIM
-	/*
-	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
-	 */
 	if (sbp->sb_inprogress) {
 		cmn_err(CE_WARN, "XFS: file system busy");
 		return XFS_ERROR(EFSCORRUPTED);
         }
-#endif	
+
 	/*
 	 * Until this is fixed only page-sized data blocks work.
 	 */
@@ -391,12 +328,11 @@ xfs_xlatesb(void *data, xfs_sb_t *sb, int dir, xfs_arch_t arch,
     
 }
 
-
 /*
  * xfs_readsb 
  * 
  * Does the initial read of the superblock.  This has been split out from
- * xfs_mountfs_int so that the cxfs v1 array mount code can get at the
+ * xfs_mountfs so that the cxfs v1 array mount code can get at the
  * unique id for the file system before deciding whether we are going
  * to mount things as a cxfs client or server.
  */
@@ -520,41 +456,27 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
 }
 
-
 /*
- * xfs_mountfs_int
+ * xfs_mountfs
  *
  * This function does the following on an initial mount of a file system:
  *	- reads the superblock from disk and init the mount struct
- *	- if we're an o32 kernel, do a size check on the superblock
+ *	- if we're a 32-bit kernel, do a size check on the superblock
  *		so we don't mount terabyte filesystems
  *	- init mount struct realtime fields
  *	- allocate inode hash table for fs
  *	- init directory manager
  *	- perform recovery and init the log manager
- *
- *	- if XFS_MFSI_RRINODES is set (typical case), the root
- *		inodes will be read in.  The flag is not set only
- *		in special cases when the filesystem is thought
- *		to be corrupt but we want a mount structure set up
- *		so we can use the XFS_* macros.  If XFS_MFSI_RRINODES
- *		is not set, the superblock *must* be good. and
- *		the filesystem should be unmounted and remounted
- *		before any real xfs filesystem code can be run against
- *		the filesystem.  This flag is used only by simulation
- *		code for fixing up the filesystem btrees.
- *
  *	- if XFS_MFSI_CLIENT is set then we are doing an import
  *              or an enterprise mount in client mode.  We do not go
  *		near the log, and do not mess with a bunch of stuff.
- *
  *      - If XFS_MFSI_SECOND is set then we are doing a secondary 
  *              mount operation for cxfs which may be client mode
  *              import or enterprise or a server-mode secondary 
  *              mount operation as part of relocation or recovery.
  */
 int
-xfs_mountfs_int(
+xfs_mountfs(
         vfs_t 		*vfsp, 
 	xfs_mount_t 	*mp, 
 	dev_t 		dev, 
@@ -569,15 +491,11 @@ xfs_mountfs_int(
 	int		writeio_log;
 	vmap_t		vmap;
 	xfs_daddr_t	d;
-	extern dev_t	rootdev;		/* from sys/systm.h */
 	extern xfs_ioops_t xfs_iocore_xfs;	/* from xfs_iocore.c */
-	uint_t		status;
-#ifndef SIM
 	__uint64_t	ret64;
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
 	boolean_t	needquotamount;
 	__int64_t	update_flags;
-#endif
 	int		noio;
         int             uuid_mounted = 0;
 
@@ -595,9 +513,7 @@ xfs_mountfs_int(
 	 * allocator alignment is within an ag, therefore ag has
 	 * to be aligned at stripe boundary.
 	 */
-#ifndef SIM
 	update_flags = 0LL;
-#endif
 	if (mp->m_dalign && !(mfsi_flags & XFS_MFSI_SECOND)) {
 		/*
 		 * If stripe unit and stripe width are not multiples
@@ -658,7 +574,6 @@ xfs_mountfs_int(
 			}
 		}
 		
-#ifndef SIM
 		/* 
 		 * Update superblock with new values
 		 * and log changes
@@ -673,7 +588,6 @@ xfs_mountfs_int(
 				update_flags |= XFS_SB_WIDTH;
 			}
 		}
-#endif
 	} else if ((mp->m_flags & XFS_MOUNT_NOALIGN) != XFS_MOUNT_NOALIGN &&
 		    XFS_SB_VERSION_HASDALIGN(&mp->m_sb)) {
 			mp->m_dalign = sbp->sb_unit;
@@ -708,15 +622,12 @@ xfs_mountfs_int(
 	 * since a single partition filesystem is identical to a single
 	 * partition volume/filesystem.
 	 */
-#ifndef SIM
 	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
-		uint	i;
                 uuid_mounted=1;
 		xfs_uuid_mount(mp);	/* make sure it's really unique */
-		ret64 = uuid_hash64(&sbp->sb_uuid, &i);
+		ret64 = uuid_hash64(&sbp->sb_uuid);
 		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
 	}
-#endif
 
 	/*
 	 * Set the default minimum read and write sizes unless
@@ -729,7 +640,6 @@ xfs_mountfs_int(
 			readio_log = XFS_WSYNC_READIO_LOG;
 			writeio_log = XFS_WSYNC_WRITEIO_LOG;
 		} else {
-#if !defined(SIM)
 			if (physmem <= 8192) {		/* <= 32MB */
 				readio_log = XFS_READIO_LOG_SMALL;
 				writeio_log = XFS_WRITEIO_LOG_SMALL;
@@ -737,17 +647,12 @@ xfs_mountfs_int(
 				readio_log = XFS_READIO_LOG_LARGE;
 				writeio_log = XFS_WRITEIO_LOG_LARGE;
 			}
-#else
-			readio_log = XFS_READIO_LOG_LARGE;
-			writeio_log = XFS_WRITEIO_LOG_LARGE;
-#endif
 		}
 	} else {
 		readio_log = mp->m_readio_log;
 		writeio_log = mp->m_writeio_log;
 	}
 
-#if !defined(SIM)
 	/*
 	 * Set the number of readahead buffers to use based on
 	 * physical memory size.
@@ -758,9 +663,6 @@ xfs_mountfs_int(
 		mp->m_nreadaheads = XFS_RW_NREADAHEAD_32MB;
 	else
 		mp->m_nreadaheads = XFS_RW_NREADAHEAD_K32;
-#else
-	mp->m_nreadaheads = XFS_RW_NREADAHEAD_K64;
-#endif
 	if (sbp->sb_blocklog > readio_log) {
 		mp->m_readio_log = sbp->sb_blocklog;
 	} else {
@@ -779,15 +681,11 @@ xfs_mountfs_int(
 	 * size.  This may still be overridden by the file system
 	 * block size if it is larger than the chosen cluster size.
 	 */
-#if !defined(SIM)
 	if (physmem <= btoc(32 * 1024 * 1024)) { /* <= 32 MB */
 		mp->m_inode_cluster_size = XFS_INODE_SMALL_CLUSTER_SIZE;
 	} else {
 		mp->m_inode_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;
 	}
-#else
-	mp->m_inode_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;
-#endif
 	/*
 	 * Set whether we're using inode alignment.
 	 */
@@ -907,8 +805,7 @@ xfs_mountfs_int(
 	 */
 	xfs_trans_init(mp);
 	if (noio) {
-		ASSERT(((mfsi_flags & XFS_MFSI_RRINODES) == 0) &&
-		       ((mfsi_flags & XFS_MFSI_CLIENT) == 0));
+		ASSERT((mfsi_flags & XFS_MFSI_CLIENT) == 0);
 		return 0;
 	}
 
@@ -944,42 +841,37 @@ xfs_mountfs_int(
 	}
 
 	/*
-	 * Mkfs calls mount before the root inode is allocated.
+	 * Get and sanity-check the root inode.
+	 * Save the pointer to it in the mount structure.
 	 */
-	if ((mfsi_flags & XFS_MFSI_RRINODES) && sbp->sb_rootino != NULLFSINO) {
-		/*
-		 * Get and sanity-check the root inode.
-		 * Save the pointer to it in the mount structure.
-		 */
-		error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL,
-				 &rip, 0);
-		if (error) {
-  		        cmn_err(CE_WARN, "XFS: failed to read root inode");
-			goto error2;
-		}
-		ASSERT(rip != NULL);
-		rvp = XFS_ITOV(rip);
-		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
-  		        cmn_err(CE_WARN, "XFS: corrupted root inode");
-			VMAP(rvp, rip, vmap);
-			prdev("Root inode %Ld is not a directory",
-			      (int)rip->i_dev, rip->i_ino);
-			xfs_iunlock(rip, XFS_ILOCK_EXCL);
-			VN_RELE(rvp);
-			vn_purge(rvp, &vmap);
-			error = XFS_ERROR(EFSCORRUPTED);
-			goto error2;
-		}
-		VN_FLAGSET(rvp, VROOT);
-		mp->m_rootip = rip;				/* save it */
-		xfs_iunlock(rip, XFS_ILOCK_EXCL);
+	error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL, &rip, 0);
+	if (error) {
+  	        cmn_err(CE_WARN, "XFS: failed to read root inode");
+		goto error2;
 	}
+
+	ASSERT(rip != NULL);
+	rvp = XFS_ITOV(rip);
+	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
+		cmn_err(CE_WARN, "XFS: corrupted root inode");
+		VMAP(rvp, rip, vmap);
+		prdev("Root inode %Ld is not a directory",
+		      (int)rip->i_dev, rip->i_ino);
+		xfs_iunlock(rip, XFS_ILOCK_EXCL);
+		VN_RELE(rvp);
+		vn_purge(rvp, &vmap);
+		error = XFS_ERROR(EFSCORRUPTED);
+		goto error2;
+	}
+	VN_FLAGSET(rvp, VROOT);
+	mp->m_rootip = rip;	/* save it */
+
+	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
 	/*
 	 * Initialize realtime inode pointers in the mount structure
 	 */
-	if ((mfsi_flags & XFS_MFSI_RRINODES) && 
-	     (error = xfs_rtmount_inodes(mp))) {
+	if (error = xfs_rtmount_inodes(mp)) {
 		/*
 		 * Free up the root inode.
 		 */
@@ -990,16 +882,13 @@ xfs_mountfs_int(
 		goto error2;
 	}
 
-	
-#ifndef SIM 
 	/*
 	 * Check if a new uuid was created, and if the new uuid was
 	 * overwritten by replaying the log
 	 */
 	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
-		if (!uuid_is_nil(&mp->m_newuuid, &status)) {
-			if (!uuid_equal(&mp->m_sb.sb_uuid, &mp->m_newuuid,
-				&status)) {
+		if (!uuid_is_nil(&mp->m_newuuid)) {
+			if (!uuid_equal(&mp->m_sb.sb_uuid, &mp->m_newuuid)) {
 				bcopy(&mp->m_newuuid, &mp->m_sb.sb_uuid,
 					sizeof(uuid_t));
 			}
@@ -1007,9 +896,10 @@ xfs_mountfs_int(
 			 * uuid was updated... log it...
 			 */
 			update_flags |= XFS_SB_UUID;
+			/* XXXnathans TODO - if we get in here and we have */
+			/* an external log, we're in deep trouble on Linux */
 		}
 	}
-
 
 	/*
 	 * If fs is not mounted readonly, then update the superblock
@@ -1062,22 +952,18 @@ xfs_mountfs_int(
 			needquotamount = B_TRUE;
 		}
 	}
-#endif		
+
 	/*
 	 * Finish recovering the file system.  This part needed to be
 	 * delayed until after the root and real-time bitmap inodes
 	 * were consistently read in.
 	 */
-#ifndef SIM
 	error = xfs_log_mount_finish(mp, mfsi_flags);
-#endif
 	if (error) {
   		cmn_err(CE_WARN, "XFS: log mount finish failed");
 		goto error2;
 	}
 
-
-#ifndef SIM 
 	if (needquotamount) {
 		ASSERT(mp->m_qflags == 0);
 		mp->m_qflags = quotaflags; 
@@ -1092,11 +978,9 @@ xfs_mountfs_int(
 		xfs_fs_cmn_err(CE_NOTE, mp, "Disk quotas turned on");
 	}
 #endif
-#endif /* !SIM */
 
 #ifdef QUOTADEBUG
 	if (XFS_IS_QUOTA_ON(mp)) {
-		extern int	xfs_qm_internalqcheck(xfs_mount_t *mp);
 		if (xfs_qm_internalqcheck(mp))
 			debug("qcheck failed");
 	}
@@ -1112,93 +996,14 @@ xfs_mountfs_int(
 	mp->m_perag = NULL;
 	/* FALLTHROUGH */
  error1:
-#ifndef SIM
-        if (uuid_mounted)
-	    xfs_uuid_unmount(mp);
-#endif /* !SIM */
+	if (uuid_mounted)
+		xfs_uuid_unmount(mp);
 	xfs_freesb(mp);
 	return error;
-}	/* xfs_mountfs_int */
-
-/*
- * wrapper routine for the kernel
- */
-int
-xfs_mountfs(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev)
-{
-	return(xfs_mountfs_int(vfsp, mp, dev, XFS_MFSI_RRINODES));
 }
-
-#ifdef SIM
-STATIC xfs_mount_t *
-xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
-{
-	int		error;
-	xfs_mount_t	*mp;
-	vfs_t		*vfsp;
-        int             mfsi_flags = 0;
-
-	mp = xfs_mount_init();
-	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
-	VFS_INIT(vfsp);
-	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	mp->m_dev = dev;
-	mp->m_rtdev = rtdev;
-	mp->m_logdev = logdev;
-	mp->m_ddev_targp = &mp->m_ddev_targ;
-	vfsp->vfs_dev = dev;
-	if (read_rootinos)
-		mfsi_flags |= XFS_MFSI_RRINODES;
-
-	error = xfs_mountfs_int(vfsp, mp, dev, mfsi_flags);
-	if (error) {
-		kmem_free(mp, sizeof(*mp));
-		return 0;
-	}
-
-	/*
-	 * Call the log's mount-time initialization.
-	 */
-	if (logdev) {
-		xfs_sb_t *sbp;
-		xfs_fsblock_t logstart;
-
-		sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
-		logstart = sbp->sb_logstart;
-		xfs_log_mount(mp, logdev, XFS_FSB_TO_DADDR(mp, logstart),
-			      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
-	}
-
-	return mp;
-}
-
-/*
- * xfs_mount is the function used by the simulation environment
- * to start the file system.
- */
-xfs_mount_t *
-xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
-{
-	return(xfs_mount_int(dev, logdev, rtdev, 1));
-}
-
-/*
- * xfs_mount_setup is used by the simulation environment to
- * mount a filesystem where everything but the superblock
- * might be trashed.  Beware:  the root inodes are NOT read in.
- */
-xfs_mount_t *
-xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
-{
-	return(xfs_mount_int(dev, logdev, rtdev, 0));
-}
-#endif /* SIM */
 
 /*
  * xfs_unmountfs
- * 
- * This code is common to all unmounting paths: via non-root unmount,
- * the simulator/mkfs path, and possibly the root unmount path.
  * 
  * This flushes out the inodes,dquots and the superblock, unmounts the
  * log and makes sure that incore structures are freed.
@@ -1206,16 +1011,13 @@ xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-#ifndef SIM
 	int		ndquots;
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
 	int64_t		fsid;
 #endif
-#endif
 
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
-	
-#ifndef SIM
+
 	/*
 	 * Purge the dquot cache. 
 	 * None of the dquots should really be busy at this point.
@@ -1228,7 +1030,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 			delay(ndquots * 10);
 		}
 	}
-#endif
+
 	/*
 	 * Flush out the log synchronously so that we know for sure
 	 * that nothing is pinned.  This is important because bflush()
@@ -1241,7 +1043,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		xfs_binval(mp->m_rtdev_targ);
 	}
 
-	(void) xfs_unmountfs_writesb(mp);
+	xfs_unmountfs_writesb(mp);
 
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
@@ -1254,7 +1056,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 */
 	ASSERT(mp->m_inodes == NULL);
 
-#ifndef SIM
 	/*
 	 * We may have bufs that are in the process of getting written still.
 	 * We must wait for the I/O completion of those. The sync flag here
@@ -1273,36 +1074,16 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
 #endif
 
-#endif /* !SIM */
-
 #ifdef CELL_CAPABLE
 	cxfs_unmount(mp);
 #endif
 	xfs_mount_free(mp, 1);
 	return 0;
-}	/* xfs_unmountfs */
+}
 
 void
 xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-	/* REFERENCED */
-	int		unused;
-
-#if !defined(__linux__)	|| defined(SIM)
-
-	if (mp->m_ddevp) {
-		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, cr, unused);
-		VN_RELE(mp->m_ddevp);
-	}
-	if (mp->m_rtdevp) {
-		VOP_CLOSE(mp->m_rtdevp, vfs_flags, L_TRUE, cr, unused);
-		VN_RELE(mp->m_rtdevp);
-	}
-	if (mp->m_logdevp && mp->m_logdevp != mp->m_ddevp) {
-		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, cr, unused);
-		VN_RELE(mp->m_logdevp);
-	}
-#else
 	extern void	linvfs_release_inode(struct inode *);
 
 	if (mp->m_ddev_targ.inode) {
@@ -1315,13 +1096,12 @@ xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	    mp->m_logdev_targ.inode != mp->m_ddev_targ.inode) {
 		linvfs_release_inode(mp->m_logdev_targ.inode);
 	}
-#endif
 }
 
 int
 xfs_unmountfs_writesb(xfs_mount_t *mp)
 {
-	xfs_buf_t		*sbp;
+	xfs_buf_t	*sbp;
 	xfs_sb_t	*sb;
 	int		error = 0;
 
@@ -1358,19 +1138,6 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 	xfs_buf_relse(sbp);
 	return (error);
 }
-	
-#ifdef SIM
-/*
- * xfs_umount is the function used by the simulation environment
- * to stop the file system.
- */
-void
-xfs_umount(xfs_mount_t *mp)
-{
-	xfs_unmountfs(mp, 0, NULL);
-}
-#endif /* SIM */
-
 
 /*
  * xfs_mod_sb() can be used to copy arbitrary changes to the
@@ -1414,7 +1181,6 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
         
 	xfs_trans_log_buf(tp, bp, first, last);
 }
-
 
 /*
  * xfs_mod_incore_sb_unlocked() is a utility routine common used to apply
@@ -1600,8 +1366,6 @@ xfs_mod_incore_sb(xfs_mount_t *mp, xfs_sb_field_t field, int delta, int rsvd)
 	return (status);
 }
 
-
-
 /*
  * xfs_mod_incore_sb_batch() is used to change more than one field
  * in the in-core superblock structure at a time.  This modification
@@ -1663,7 +1427,6 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
 	return (status);
 }
 
-		
 /*
  * xfs_getsb() is called to obtain the buffer for the superblock.
  * The buffer is returned locked and read in from disk.
@@ -1695,7 +1458,7 @@ xfs_getsb(xfs_mount_t	*mp,
 /*
  * Used to free the superblock along various error paths.
  */
-void 
+void
 xfs_freesb(
         xfs_mount_t	*mp)
 {
@@ -1725,7 +1488,6 @@ xfs_sb_relse(xfs_buf_t *bp)
 	XFS_BUF_VSEMA(bp);
 }
 
-#ifndef SIM
 /*
  * See if the uuid is unique among mounted xfs filesystems.
  * If it's not, allocate a new one so it is.
@@ -1735,20 +1497,19 @@ xfs_uuid_mount(xfs_mount_t *mp)
 {
 	int	hole;
 	int	i;
-	uint_t	status;
-        
+ 
         mp->m_origuuid = mp->m_sb.sb_uuid;
 
-	uuid_create_nil(&mp->m_newuuid, &status);
+	uuid_create_nil(&mp->m_newuuid);
 	mutex_lock(&xfs_uuidtabmon, PVFS);
 	for (i = 0, hole = -1; i < xfs_uuidtab_size; i++) {
-		if (uuid_is_nil(&xfs_uuidtab[i], &status)) {
+		if (uuid_is_nil(&xfs_uuidtab[i])) {
 			hole = i;
 			continue;
 		}
-		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i], &status))
+		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i]))
 			continue;
-		uuid_create(&mp->m_sb.sb_uuid, &status);
+		uuid_create(&mp->m_sb.sb_uuid);
 		bcopy(&mp->m_sb.sb_uuid, &mp->m_newuuid, sizeof(uuid_t));
 		XFS_BUF_TO_SBP(mp->m_sb_bp)->sb_uuid = mp->m_sb.sb_uuid;
 		xfs_fs_cmn_err(CE_NOTE, mp, "Created a new filesystem uuid.");
@@ -1769,19 +1530,18 @@ xfs_uuid_mount(xfs_mount_t *mp)
 /*
  * Remove filesystem from the uuid table.
  */
-void
+STATIC void
 xfs_uuid_unmount(xfs_mount_t *mp)
 {
 	int	i;
-	uint_t	status;
 
 	mutex_lock(&xfs_uuidtabmon, PVFS);
 	for (i = 0; i < xfs_uuidtab_size; i++) {
-		if (uuid_is_nil(&xfs_uuidtab[i], &status))
+		if (uuid_is_nil(&xfs_uuidtab[i]))
 			continue;
-		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i], &status))
+		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i]))
 			continue;
-		uuid_create_nil(&xfs_uuidtab[i], &status);
+		uuid_create_nil(&xfs_uuidtab[i]);
 		break;
 	}
 	ASSERT(i < xfs_uuidtab_size);
@@ -1851,5 +1611,3 @@ xfs_mount_log_sbunit(
 	xfs_mod_sb(tp, fields);
 	(void)xfs_trans_commit(tp, 0, NULL);
 }
-	
-#endif /* !SIM */

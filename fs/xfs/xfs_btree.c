@@ -29,50 +29,12 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.85 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
  */
-#include <xfs_os_defs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/uuid.h>
-#include <sys/vnode.h>
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_ialloc.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode.h"
-#include "xfs_bit.h"
-#include "xfs_error.h"
-#ifdef SIM
-#include "sim.h"
-#endif
+#include <xfs.h>
 
 /*
  * Cursor allocation zone.
@@ -839,15 +801,11 @@ xfs_btree_reada_bufl(
 	xfs_fsblock_t	fsbno,		/* file system block number */
 	xfs_extlen_t	count)		/* count of filesystem blocks */
 {
-#ifndef SIM
 	xfs_daddr_t		d;
-#endif
 
 	ASSERT(fsbno != NULLFSBLOCK);
-#ifndef SIM
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
 	xfs_baread(mp->m_ddev_targp, d, mp->m_bsize * count);
-#endif
 }
 
 /*
@@ -862,16 +820,12 @@ xfs_btree_reada_bufs(
 	xfs_agblock_t	agbno,		/* allocation group block number */
 	xfs_extlen_t	count)		/* count of filesystem blocks */
 {
-#ifndef SIM
 	xfs_daddr_t		d;
-#endif
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
-#ifndef SIM
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
 	xfs_baread(mp->m_ddev_targp, d, mp->m_bsize * count);
-#endif
 }
 
 /*

@@ -29,13 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_DIR2_DATA_H
-#define	_FS_XFS_DIR2_DATA_H
-
-#ident "$Revision$"
+#ifndef __XFS_DIR2_DATA_H__
+#define	__XFS_DIR2_DATA_H__
 
 /*
- * xfs_dir2_data.h
  * Directory format 2, data block structures.
  */
 
@@ -232,4 +229,4 @@ extern void
 			       xfs_dir2_data_aoff_t len, int *needlogp,
 			       int *needscanp);
 
-#endif	/* !_FS_XFS_DIR2_DATA_H */
+#endif	/* __XFS_DIR2_DATA_H__ */

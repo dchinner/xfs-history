@@ -30,67 +30,13 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#include <xfs_os_defs.h>
-
-#define FSID_T
-#include <sys/types.h>
-#include <linux/errno.h>
-
-#undef  NODEV
-#include <linux/version.h>
-#include <linux/fs.h>
-#include <linux/sched.h>	/* To get current */
-#include <linux/locks.h>
-#include <linux/slab.h>
-
-#include <sys/sysmacros.h>
-#include <sys/vfs.h>
-#include <sys/pvfs.h>
-#include <sys/vnode.h>
-#include <ksys/behavior.h>
-#include <sys/mode.h>
-#include <linux/xfs_linux.h>
-#include <linux/xfs_cred.h>
-#include <linux/xfs_file.h>
-#include <linux/page_buf.h>
-#include <xfs_buf.h>
-#include <xfs_types.h>
-#include <xfs_inum.h>
-#include <xfs_bmap_btree.h>
-#include <xfs_bmap.h>
-#include <xfs_dir.h>
-#include <xfs_dir_sf.h>
-#include <xfs_dir2.h>
-#include <xfs_dir2_sf.h>
-#include <xfs_attr_sf.h>
-#include <xfs_dinode.h>
-#include <xfs_inode.h>
-#include <xfs_log.h>
-#include <xfs_trans.h>
-#include <xfs_sb.h>
-#include <xfs_mount.h>
+#include <xfs.h>
 #include <xfs_fsops.h>
-#include <xfs_error.h>
-#include <xfs_itable.h>
-#include <xfs_iops.h>
-#include <linux/dmapi_kern.h>
-#include <xfs_dmapi.h>
 #include <xfs_dfrag.h>
-
+#include <linux/xfs_iops.h>
+#include <linux/locks.h>
 #include <linux/smp_lock.h>
-
 #include <linux/dcache.h>
-#include <linux/file.h>
-#include <linux/stat.h>
-#include <linux/xfs_fs.h>
-
-#include <ksys/vfile.h>
-
-#include <asm/uaccess.h> /* For copy_from_user */
-
-#include <sys/uuid.h>
-
-#define BREAKPOINT() asm("   int $3");
 
 
 /*

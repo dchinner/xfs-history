@@ -29,45 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.56 $"
 
-#include <xfs_os_defs.h>
-
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#include <ksys/vfile.h>
-#include <sys/kmem.h>
-#include <linux/xfs_fs.h>
-#include <linux/xfs_sema.h>
-#include <sys/systm.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/cmn_err.h>
-#include <sys/uuid.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_mount.h"
-#include "xfs_ag.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_ialloc_btree.h"
-#include "xfs_btree.h"
-#include "xfs_error.h"
-#include "xfs_alloc.h"
-#include "xfs_ialloc.h"
-#include "xfs_fsops.h"
-#include "xfs_itable.h"
-#include "xfs_rw.h"
-#include "xfs_trans_space.h"
-#include "xfs_rtalloc.h"
-
-#include <linux/xfs_fs.h>
+#include <xfs.h>
 
 /*
  * File system operations

@@ -29,72 +29,17 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.21 $"
 
 /*
  * XFS v2 directory implmentation.
  * Top-level and utility routines.
  */
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#ifdef SIM
-#define _KERNEL 1
-#endif /* SIM */
-#include <sys/param.h>
-#include "xfs_buf.h"
-#include <sys/debug.h>
-#ifdef SIM
-#undef _KERNEL
-#endif /* SIM */
-#include <sys/vnode.h>
-#include <sys/kabi.h>
-#include <sys/kmem.h>
-#ifdef SIM
-#define _KERNEL 1
-#endif /* SIM */
-#include <sys/dirent.h>
-#include <sys/uuid.h>
-#ifdef SIM
-#undef _KERNEL
-#else
-#include <sys/systm.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_ag.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_bmap.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_dir2_data.h"
-#include "xfs_dir2_leaf.h"
-#include "xfs_dir2_block.h"
-#include "xfs_dir2_node.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dir2_trace.h"
-#include "xfs_error.h"
-#include "xfs_bit.h"
-#ifdef SIM
-#include "sim.h"
-#endif
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM) && 0
-#include "asm/kdb.h"
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && 0
+
 #undef xfs_dir2_trace_args
 #define xfs_dir2_trace_args(A,B) \
     printk("[%s] (0x%p)\n", A, B);
@@ -106,6 +51,7 @@
 #undef xfs_dir2_trace_args_db
 #define xfs_dir2_trace_args_db(A,B,C,D) \
     printk("[%s] (0x%p, %d, 0x%p)\n", A, B, C, D);
+
 #endif
 
 /*
@@ -121,29 +67,16 @@ static int	xfs_dir2_createname(xfs_trans_t *tp, xfs_inode_t *dp,
 				    xfs_bmap_free_t *flist, xfs_extlen_t total);
 static int	xfs_dir2_lookup(xfs_trans_t *tp, xfs_inode_t *dp, char *name,
 				int namelen, xfs_ino_t *inum);
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 static int	xfs_dir2_removename(xfs_trans_t *tp, xfs_inode_t *dp,
 				    char *name, int namelen, xfs_ino_t ino,
 				    xfs_fsblock_t *first,
 				    xfs_bmap_free_t *flist, xfs_extlen_t total);
-#endif /* XFS_REPAIR_SIM || !SIM */
-#ifdef XFS_REPAIR_SIM
-static int	xfs_dir2_bogus_removename(xfs_trans_t *tp, xfs_inode_t *dp,
-					  char *name, xfs_fsblock_t *first,
-					  xfs_bmap_free_t *flist,
-					  xfs_extlen_t total, xfs_dahash_t hash,
-					  int namelen);
-#endif /* XFS_REPAIR_SIM */
-#ifndef SIM
 static int	xfs_dir2_getdents(xfs_trans_t *tp, xfs_inode_t *dp, uio_t *uio,
 				  int *eofp);
-#endif /* !SIM */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 static int	xfs_dir2_replace(xfs_trans_t *tp, xfs_inode_t *dp, char *name,
 				 int namelen, xfs_ino_t inum,
 				 xfs_fsblock_t *first, xfs_bmap_free_t *flist,
 				 xfs_extlen_t total);
-#endif /* XFS_REPAIR_SIM || !SIM */
 static int	xfs_dir2_canenter(xfs_trans_t *tp, xfs_inode_t *dp, char *name,
 				  int namelen);
 static int	xfs_dir2_shortform_validate_ondisk(xfs_mount_t *mp,
@@ -152,12 +85,10 @@ static int	xfs_dir2_shortform_validate_ondisk(xfs_mount_t *mp,
 /*
  * Utility routine declarations.
  */
-#ifndef SIM
 static int	xfs_dir2_put_dirent32_direct(xfs_dir2_put_args_t *pa);
 static int	xfs_dir2_put_dirent32_uio(xfs_dir2_put_args_t *pa);
 static int	xfs_dir2_put_dirent64_direct(xfs_dir2_put_args_t *pa);
 static int	xfs_dir2_put_dirent64_uio(xfs_dir2_put_args_t *pa);
-#endif /* !SIM */
 
 /*
  * Directory operations vector.
@@ -168,18 +99,9 @@ xfs_dirops_t	xfsv2_dirops = {
 	xfs_dir2_init,
 	xfs_dir2_createname,
 	xfs_dir2_lookup,
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 	xfs_dir2_removename,
-#endif /* XFS_REPAIR_SIM || !SIM */
-#ifdef XFS_REPAIR_SIM
-	xfs_dir2_bogus_removename,
-#endif
-#ifndef SIM
 	xfs_dir2_getdents,
-#endif /* !SIM */
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 	xfs_dir2_replace,
-#endif /* XFS_REPAIR_SIM || !SIM */
 	xfs_dir2_canenter,
 	xfs_dir2_shortform_validate_ondisk,
 	xfs_dir2_sf_to_block,
@@ -375,7 +297,6 @@ xfs_dir2_lookup(
 	return rval;
 }
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from a directory.
  */
@@ -429,66 +350,7 @@ xfs_dir2_removename(
 		rval = xfs_dir2_node_removename(&args);
 	return rval;
 }
-#endif /* XFS_REPAIR_SIM || !defined(SIM) */
 
-#ifdef XFS_REPAIR_SIM
-/*
- * Repair's special removename entry: pass in the hash value.
- */
-static int				/* error */
-xfs_dir2_bogus_removename(
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_inode_t	*dp,		/* incore directory inode */
-	char		*name,		/* name of entry to remove */
-	xfs_fsblock_t	*first,		/* bmap's firstblock */
-	xfs_bmap_free_t	*flist,		/* bmap's freeblock list */
-	xfs_extlen_t	total,		/* bmap's total block count */
-	xfs_dahash_t	hash,		/* name's real hash value */
-	int		namelen)	/* entry's name length */
-{
-	xfs_da_args_t	args;		/* operation arguments */
-	int		rval;		/* return value */
-	int		v;		/* type-checking value */
-
-	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	if (namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
-	XFS_STATS_INC(xs_dir_remove);
-	/*
-	 * Fill in the arg structure for this request.
-	 */
-	args.name = name;
-	args.namelen = namelen;
-	args.hashval = hash;
-	args.inumber = 0;
-	args.dp = dp;
-	args.firstblock = first;
-	args.flist = flist;
-	args.total = total;
-	args.whichfork = XFS_DATA_FORK;
-	args.trans = tp;
-	args.justcheck = args.addname = 0;
-	args.oknoent = 1;
-	/*
-	 * Decide on what work routines to call based on the inode size.
-	 */
-	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL)
-		rval = xfs_dir2_sf_removename(&args);
-	else if (rval = xfs_dir2_isblock(tp, dp, &v))
-		return rval;
-	else if (v)
-		rval = xfs_dir2_block_removename(&args);
-	else if (rval = xfs_dir2_isleaf(tp, dp, &v))
-		return rval;
-	else if (v)
-		rval = xfs_dir2_leaf_removename(&args);
-	else
-		rval = xfs_dir2_node_removename(&args);
-	return rval;
-}
-#endif	/* XFS_REPAIR_SIM */
-
-#ifndef SIM
 /*
  * Read a directory.
  */
@@ -517,57 +379,10 @@ xfs_dir2_getdents(
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(xfs32_off_t) : sizeof(xfs_off_t)) - 1;
-#ifndef __linux__
-	if ((uio->uio_iovcnt == 1) &&
-#if CELL_CAPABLE
-	    !KT_CUR_ISXTHREAD() &&
-#endif
-	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
-	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
-		dbp = NULL;
-		/*
-		 * Caller is system (e.g. NFS).
-		 */
-		if (uio->uio_segflg == UIO_SYSSPACE) {
-			ASSERT(!is32);
-			locklen = 0;
-			put = xfs_dir2_put_dirent64_direct;
-		}
-		/*
-		 * Caller is user.
-		 */
-		else {
-			if (rval = useracc(uio->uio_iov[0].iov_base,
-					   uio->uio_iov[0].iov_len,
-					   (B_READ|B_PHYS), NULL)) {
-#pragma mips_frequency_hint NEVER
-				*eofp = 0;
-				return XFS_ERROR(rval);
-			}
-			lockaddr = uio->uio_iov[0].iov_base;
-			locklen = uio->uio_iov[0].iov_len;
-			put = is32 ?
-				xfs_dir2_put_dirent32_direct :
-				xfs_dir2_put_dirent64_direct;
-		}
-	}
-	/*
-	 * Can't use buffer directly, allocate a one-entry buffer.
-	 * Put routine will use uiomove to the caller's real buffer.
-	 */
-	else {
-#pragma mips_frequency_hint NEVER
-		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
-		put = is32 ?
-			xfs_dir2_put_dirent32_uio :
-			xfs_dir2_put_dirent64_uio;
-	}
-#else
 	dbp = NULL;
 	put = is32 ?
 		xfs_dir2_put_dirent32_uio :
 		xfs_dir2_put_dirent64_uio;
-#endif /* __linux__ */
 	*eofp = 0;
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -581,17 +396,9 @@ xfs_dir2_getdents(
 		rval = xfs_dir2_block_getdents(tp, dp, uio, eofp, dbp, put);
 	else
 		rval = xfs_dir2_leaf_getdents(tp, dp, uio, eofp, dbp, put);
-#ifndef __linux__
-	if (dbp != NULL)
-		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
-	else if (locklen)
-		unuseracc(lockaddr, locklen, B_READ|B_PHYS);
-#endif /* __linux__ */
 	return rval;
 }
-#endif	/* !SIM */
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Replace the inode number of a directory entry.
  */
@@ -652,7 +459,6 @@ xfs_dir2_replace(
 		rval = xfs_dir2_node_replace(&args);
 	return rval;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * See if this entry can be added to the directory without allocating space.
@@ -911,7 +717,6 @@ xfs_dir2_isleaf(
 	return 0;
 }
 
-#ifndef SIM
 /*
  * Getdents put routine for 32-bit ABI, direct form.
  */
@@ -972,10 +777,8 @@ xfs_dir2_put_dirent32_uio(
 	int			reclen;		/* entry total length */
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
-#ifdef __linux__
 	linux_off_t		offset = (linux_off_t )pa->cook;
 	linux_ino_t		ino = (linux_ino_t) pa->ino;
-#endif /* __linux__ */
 
 #if XFS_BIG_FILESYSTEMS
 	/*
@@ -990,7 +793,6 @@ xfs_dir2_put_dirent32_uio(
 	namelen = pa->namelen;
 	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
-#ifdef __linux__
 	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
 			pa->name, namelen, offset, ino);
 	if (rval == -EINVAL) {
@@ -998,25 +800,6 @@ xfs_dir2_put_dirent32_uio(
 		return 0;
 	}
 	pa->done = 1;
-#else
-	/*
-	 * Won't fit in the remaining space.
-	 */
-	if (reclen > uio->uio_resid) {
-#pragma mips_frequency_hint NEVER
-		pa->done = 0;
-		return 0;
-	}
-
-	idbp = (irix5_dirent_t *)pa->dbp;
-	idbp->d_reclen = reclen;
-	idbp->d_ino = pa->ino;
-	idbp->d_off = pa->cook;
-	idbp->d_name[namelen] = '\0';
-	bcopy(pa->name, idbp->d_name, namelen);
-	rval = uiomove((xfs_caddr_t)idbp, reclen, UIO_READ, uio);
-	pa->done = (rval == 0);
-#endif /* __linux__ */
 	return rval;
 }
 
@@ -1070,16 +853,13 @@ xfs_dir2_put_dirent64_uio(
 	int			reclen;		/* entry total length */
 	int			rval;		/* return value */
 	uio_t			*uio;		/* I/O control */
-#ifdef __linux__
 	linux_off_t		offset = (linux_off_t )pa->cook;
 	linux_ino_t		ino = (linux_ino_t) pa->ino;
-#endif /* __linux__ */
 
 	namelen = pa->namelen;
 	reclen = DIRENTSIZE(namelen);
 	uio = pa->uio;
 
-#ifdef __linux__
 	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
 			pa->name, namelen, offset, ino);
 	if (rval == -EINVAL) {
@@ -1087,29 +867,9 @@ xfs_dir2_put_dirent64_uio(
 		return 0;
 	}
 	pa->done = 1;
-#else
-	/*
-	 * Won't fit in the remaining space.
-	 */
-	if (reclen > uio->uio_resid) {
-#pragma mips_frequency_hint NEVER
-		pa->done = 0;
-		return 0;
-	}
-	idbp = pa->dbp;
-	idbp->d_reclen = reclen;
-	idbp->d_ino = pa->ino;
-	idbp->d_off = pa->cook;
-	idbp->d_name[namelen] = '\0';
-	bcopy(pa->name, idbp->d_name, namelen);
-	rval = uiomove((xfs_caddr_t)idbp, reclen, UIO_READ, uio);
-	pa->done = (rval == 0);
-#endif /* __linux__ */
 	return rval;
 }
-#endif	/* !SIM */
 
-#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove the given block from the directory.
  * This routine is used for data and free blocks, leaf/node are done
@@ -1191,4 +951,3 @@ xfs_dir2_shrink_inode(
 	xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
 	return 0;
 }
-#endif /* XFS_REPAIR_SIM || !SIM */

@@ -29,50 +29,9 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.26 $"
 
-#include <xfs_os_defs.h>
+#include <xfs.h>
 
-#include <sys/types.h>
-#include <sys/uuid.h>
-#include <sys/vfs.h>
-#include <sys/vnode.h>
-#include <sys/systm.h>
-#include <sys/param.h>
-#include <sys/pathname.h>
-#include <linux/xfs_fs.h>
-#include <linux/dmapi_kern.h>
-#include "xfs_buf.h"
-#include <ksys/fsc_notify.h>
-#include "xfs_macros.h"
-#include "xfs_types.h"
-#include "xfs_inum.h"
-#include "xfs_log.h"
-#include "xfs_trans.h"
-#include "xfs_sb.h"
-#include "xfs_dir.h"
-#include "xfs_dir2.h"
-#include "xfs_mount.h"
-#include "xfs_bmap_btree.h"
-#include "xfs_bmap.h"
-#include "xfs_attr_sf.h"
-#include "xfs_dir_sf.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
-#include "xfs_error.h"
-#include "xfs_quota.h"
-#include "xfs_rw.h"
-#include "xfs_utils.h"
-#include "xfs_trans_space.h"
-#include "xfs_da_btree.h"
-#include "xfs_dir_leaf.h"
-#include "xfs_dmapi.h"
-
-
-
-extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
 
 /*
  * Given an array of up to 4 inode pointers, unlock the pointed to inodes.
@@ -712,7 +671,6 @@ xfs_rename(
 		return XFS_ERROR(EINVAL);
 	src_dp = XFS_BHVTOI(src_dir_bdp);
         target_dp = XFS_BHVTOI(target_dir_bdp);
-#ifndef SIM
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_RENAME) ||
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
 			     	target_dp, DM_EVENT_RENAME)) {
@@ -725,7 +683,6 @@ xfs_rename(
 			return error;
 		}
 	}
-#endif
 	/* Return through std_return after this point. */
 
 #ifdef DEBUG
@@ -1125,7 +1082,6 @@ xfs_rename(
 	/* Fall through to std_return with error = 0 or errno from
 	 * xfs_trans_commit	 */
 std_return:
-#ifndef SIM
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_POSTRENAME) ||
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
 			     	target_dp, DM_EVENT_POSTRENAME)) {
@@ -1135,7 +1091,6 @@ std_return:
 					src_name, target_name,
 					0, error, 0);
 	}
-#endif
 	return error;
 
  abort_return:

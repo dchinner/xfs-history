@@ -29,48 +29,10 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.42 $"
 
-#include <xfs_os_defs.h>
-
-#include <xfs_linux.h>
-
-#include <linux/config.h>
-#include <sys/types.h>
-#include <sys/debug.h>
-#include <sys/file.h>
-#include <sys/fs_subr.h>
-#include <sys/param.h>
-#include <sys/kmem.h>
-#include <sys/pathname.h>
-#include <linux/xfs_sema.h>
-#include <linux/xfs_cred.h>
-#include <sys/systm.h>
-#include <sys/uio.h>
-#include <sys/vfs.h>
-#include <sys/mode.h>
-#include <sys/sysmacros.h>
-#include <sys/cmn_err.h>
-
-#include <xfs_types.h>
-#include <xfs_bmap_btree.h>
-#include <xfs_inum.h>
-#include <xfs_dir_sf.h>
-#include <xfs_dir.h>
-#include <xfs_dir2.h>
-#include <xfs_dir2_sf.h>
-#include <xfs_attr_sf.h>
-#include <xfs_dinode.h>
-#include <xfs_inode.h>
-#include <xfs_log.h>
-#include <xfs_trans.h>
-#include <xfs_sb.h>
-#include <xfs_mount.h>
-#include <xfs_iops.h>
-
-#ifdef	CONFIG_XFS_VNODE_TRACING
-#include <sys/ktrace.h>
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+#include <xfs.h>
+#include <linux/xfs_linux.h>
+#include <linux/xfs_iops.h>
 
 /*
  * Private vnode spinlock manipulation.

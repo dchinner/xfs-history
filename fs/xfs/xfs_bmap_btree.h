@@ -29,16 +29,11 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef _FS_XFS_BMAP_BTREE_H
-#define	_FS_XFS_BMAP_BTREE_H
-
-#ident "$Revision: 1.48 $"
-
-#include "xfs_buf.h"
+#ifndef __XFS_BMAP_BTREE_H__
+#define	__XFS_BMAP_BTREE_H__
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
-struct xfs_buf;
 struct xfs_btree_cur;
 struct xfs_btree_lblock;
 struct xfs_mount;
@@ -464,7 +459,7 @@ int xfs_bmap_sanity_check(struct xfs_mount *mp, xfs_bmbt_block_t *bb,
 #define	XFS_BMBT_TRACE
 #endif
 
-#if !defined(DEBUG) || defined(SIM)
+#if !defined(DEBUG)
 #undef XFS_BMBT_TRACE
 #endif
 
@@ -663,4 +658,4 @@ xfs_bmap_do_search_extents(
         xfs_bmbt_irec_t	*);
 
 
-#endif	/* _FS_XFS_BMAP_BTREE_H */
+#endif	/* __XFS_BMAP_BTREE_H__ */
