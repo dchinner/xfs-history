@@ -30,7 +30,8 @@
 #include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
-#include <io/dmi/dmi_kern.h>
+#include <sys/dmi.h>
+#include <sys/dmi_kern.h>
 #include <specfs/snode.h>
 #ifdef SIM
 #undef _KERNEL

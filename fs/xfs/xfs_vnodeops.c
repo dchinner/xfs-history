@@ -21,7 +21,8 @@
 #include <sys/pfdat.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
-#include <io/dmi/dmi_kern.h>
+#include <sys/dmi.h>
+#include <sys/dmi_kern.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
