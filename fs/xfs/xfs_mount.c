@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -173,31 +173,39 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 */
 	xfs_ihash_init(mp);
 
+#ifdef SIM
 	/*
-	 * Get and sanity-check the root inode.
-	 * Save the pointer to it in the mount structure.
+	 * Mkfs calls mount before the root inode is allocated.
 	 */
-	rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
-	rvp = XFS_ITOV(rip);
-	ASSERT(IFDIR == (rip->i_d.di_mode & IFMT));
-	if ((rip->i_d.di_mode & IFMT) != IFDIR) {
-		vmap_t vmap;
+	if (sbp->sb_rootino != NULLFSINO)
+#endif
+	{
+		/*
+		 * Get and sanity-check the root inode.
+		 * Save the pointer to it in the mount structure.
+		 */
+		rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
+		rvp = XFS_ITOV(rip);
+		ASSERT(IFDIR == (rip->i_d.di_mode & IFMT));
+		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
+			vmap_t vmap;
 
-		VMAP(rvp, vmap);
-		VN_RELE(rvp);
-		vn_purge(rvp, &vmap);
+			VMAP(rvp, vmap);
+			VN_RELE(rvp);
+			vn_purge(rvp, &vmap);
 
-		prdev("Root inode %d is not a directory",
-		      rip->i_dev, rip->i_ino);
+			prdev("Root inode %d is not a directory",
+			      rip->i_dev, rip->i_ino);
 
-		error = EINVAL;
-		goto bad;
+			error = EINVAL;
+			goto bad;
+		}
+		s = VN_LOCK(rvp);
+		rvp->v_flag |= VROOT;
+		VN_UNLOCK(rvp, s);
+		mp->m_rootip = rip;				/* save it */
+		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 	}
-	s = VN_LOCK(rvp);
-	rvp->v_flag |= VROOT;
-	VN_UNLOCK(rvp, s);
-	mp->m_rootip = rip;				/* save it */
-	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 
 	/*
 	 * Initialize realtime inode pointers in the mount structure
