@@ -430,7 +430,7 @@ xfs_setattr(
 	}
 
 	/* boolean: are we the file owner? */
-	file_owner = (current->fsuid == ip->i_d.di_uid);
+	file_owner = (current_fsuid(credp) == ip->i_d.di_uid);
 
 	/*
 	 * Change various properties of a file.
@@ -2004,7 +2004,8 @@ xfs_create(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+	error = XFS_QM_DQVOPALLOC(mp, dp,
+			current_fsuid(credp), current_fsgid(credp),
 			XFS_QMOPT_QUOTALL|XFS_QMOPT_INHERIT, &udqp, &gdqp);
 	if (error)
 		goto std_return;
@@ -2915,7 +2916,8 @@ xfs_mkdir(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+	error = XFS_QM_DQVOPALLOC(mp, dp,
+			current_fsuid(credp), current_fsgid(credp),
 			XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT, &udqp, &gdqp);
 	if (error)
 		goto std_return;
@@ -3472,7 +3474,8 @@ xfs_symlink(
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
-	error = XFS_QM_DQVOPALLOC(mp, dp, current->fsuid, current->fsgid,
+	error = XFS_QM_DQVOPALLOC(mp, dp,
+			current_fsuid(credp), current_fsgid(credp),
 			XFS_QMOPT_QUOTALL | XFS_QMOPT_INHERIT, &udqp, &gdqp);
 	if (error)
 		goto std_return;
