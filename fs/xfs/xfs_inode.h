@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.109 $"
+#ident "$Revision: 1.110 $"
 
 struct bhv_desc;
 struct buf;
@@ -149,6 +149,7 @@ typedef struct xfs_inode {
 	unsigned int		i_writeio_blocks;	/* write buffer size */
 	uchar_t			i_readio_log;	/* log2 of read buffer size */
 	uchar_t			i_writeio_log;	/* log2 of write buffer size */
+	uchar_t			i_max_io_log;	/* max r/w io value */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
