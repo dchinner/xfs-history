@@ -30,42 +30,14 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-/*
- *	page_buf_io.c
- *
- *	See generic comments about page_bufs in page_buf.c. This file deals with
- *	file I/O (reads & writes) including delayed allocation & direct IO.
- *
- *	Written by Steve Lord, Jim Mostek, Russell Cattelan
- *		    and Rajagopal Ananthanarayanan ("ananth") at SGI.
- *
- */
-
-#include <linux/stddef.h>
-#include <linux/errno.h>
-#include <linux/slab.h>
 #include <linux/pagemap.h>
+#include <xfs.h>
 
-#include <pagebuf/page_buf.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
 #define page_buffers(page)	((page)->buffers)
 #define page_has_buffers(page)	((page)->buffers)
 #endif
-
-#undef assert
-#ifdef PAGEBUF_DEBUG
-# define assert(expr) \
-	if (!(expr)) {						\
-		printk("Assertion failed: %s\n%s::%s line %d\n",\
-		#expr,__FILE__,__FUNCTION__,__LINE__);		\
-		BUG();						\
-	}
-#else
-# define assert(x)	do { } while (0)
-#endif
-
-
 
 /*
  * External declarations.
@@ -75,14 +47,14 @@ extern int linvfs_pb_bmap(struct inode *, loff_t, ssize_t, page_buf_bmap_t *, in
 /*
  * Forward declarations.
  */
-static int  pagebuf_delalloc_convert(struct inode *, struct page *, int, int);
+STATIC int  pagebuf_delalloc_convert(struct inode *, struct page *, int, int);
 
 /*
  * __pb_match_offset_to_mapping
  * Finds the corresponding mapping in block @map array of the
  * given @offset within a @page.
  */
-static page_buf_bmap_t *
+STATIC page_buf_bmap_t *
 __pb_match_offset_to_mapping(
 	struct page		*page,
 	page_buf_bmap_t		*map,
@@ -90,7 +62,7 @@ __pb_match_offset_to_mapping(
 {
 	loff_t			full_offset;	/* offset from start of file */
 
-	assert(offset < PAGE_CACHE_SIZE);
+	ASSERT(offset < PAGE_CACHE_SIZE);
 
 	full_offset = page->index;		/* NB: using 64bit number */
 	full_offset <<= PAGE_CACHE_SHIFT;	/* offset from file start */
@@ -103,7 +75,7 @@ __pb_match_offset_to_mapping(
 	return NULL;
 }
 
-static void
+STATIC void
 __pb_map_buffer_at_offset(
 	struct page		*page,
 	struct buffer_head	*bh,
@@ -115,10 +87,10 @@ __pb_map_buffer_at_offset(
 	loff_t			delta;
 	int			sector_shift;
 
-	assert(!(mp->pbm_flags & PBMF_HOLE));
-	assert(!(mp->pbm_flags & PBMF_DELAY));
-	assert(!(mp->pbm_flags & PBMF_UNWRITTEN));
-	assert(mp->pbm_bn != PAGE_BUF_DADDR_NULL);
+	ASSERT(!(mp->pbm_flags & PBMF_HOLE));
+	ASSERT(!(mp->pbm_flags & PBMF_DELAY));
+	ASSERT(!(mp->pbm_flags & PBMF_UNWRITTEN));
+	ASSERT(mp->pbm_bn != PAGE_BUF_DADDR_NULL);
 
 	delta = page->index;
 	delta <<= PAGE_CACHE_SHIFT;
@@ -129,7 +101,7 @@ __pb_map_buffer_at_offset(
 	sector_shift = block_bits - 9;
 	bn = mp->pbm_bn >> sector_shift;
 	bn += delta;
-	assert((bn << sector_shift) >= mp->pbm_bn);
+	ASSERT((bn << sector_shift) >= mp->pbm_bn);
 
 	lock_buffer(bh);
 	bh->b_blocknr = bn;
@@ -219,7 +191,7 @@ out:
  * Look for a page at index which is unlocked and not mapped
  * yet - clustering for mmap write case.
  */
-static unsigned int
+STATIC unsigned int
 probe_unmapped_page(
 	struct address_space	*mapping,
 	unsigned long		index,
@@ -257,7 +229,7 @@ probe_unmapped_page(
 	return ret;
 }
 
-static unsigned int
+STATIC unsigned int
 probe_unmapped_cluster(
 	struct inode		*inode,
 	struct page		*startpage,
@@ -300,7 +272,7 @@ probe_unmapped_cluster(
  * Probe for a given page (index) in the inode & test if it is delayed.
  * Returns page locked and with an extra reference count.
  */
-static struct page *
+STATIC struct page *
 probe_page(
 	struct inode		*inode,
 	unsigned long		index)
@@ -327,7 +299,7 @@ probe_page(
 	return NULL;
 }
 
-static void
+STATIC void
 submit_page(
 	struct page		*page,
 	struct buffer_head	*bh_arr[],
@@ -354,7 +326,7 @@ submit_page(
 		end_page_writeback(page);
 }
 
-static int
+STATIC int
 map_page(
 	struct inode		*inode,
 	struct page		*page,
@@ -390,8 +362,8 @@ map_page(
 		tmp = __pb_match_offset_to_mapping(page, mp, offset);
 		if (!tmp)
 			continue;
-		assert(!(tmp->pbm_flags & PBMF_HOLE));
-		assert(!(tmp->pbm_flags & PBMF_DELAY));
+		ASSERT(!(tmp->pbm_flags & PBMF_HOLE));
+		ASSERT(!(tmp->pbm_flags & PBMF_DELAY));
 		__pb_map_buffer_at_offset(page, bh, offset, bbits, tmp);
 		if (startio && (offset < end)) {
 			bh_arr[index++] = bh;
@@ -409,7 +381,7 @@ map_page(
  * delalloc pages only, for the original page it is possible that
  * the page has no mapping at all.
  */
-static void
+STATIC void
 convert_page(
 	struct inode		*inode,
 	struct page		*page,
@@ -433,7 +405,7 @@ convert_page(
  * Convert & write out a cluster of pages in the same extent as defined
  * by mp and following the start page.
  */
-static void
+STATIC void
 cluster_write(
 	struct inode		*inode,
 	unsigned long		tindex,
@@ -460,7 +432,7 @@ cluster_write(
  * EOF and therefore need to allocate space for unmapped portions of the
  * page.
  */
-static int
+STATIC int
 pagebuf_delalloc_convert(
 	struct inode		*inode,		/* inode containing page */
 	struct page		*page,		/* page to convert - locked */

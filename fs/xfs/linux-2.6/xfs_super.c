@@ -37,6 +37,7 @@
 #include <linux/namei.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
+#include <linux/seq_file.h>
 #include "xfs_version.h"
 
 /* xfs_vfs[ops].c */
@@ -742,6 +743,78 @@ static struct export_operations linvfs_export_ops = {
 	.get_parent		= linvfs_get_parent,
 };
 
+int
+linvfs_show_options(struct seq_file *m, struct vfsmount *mnt)
+{
+	vfs_t		*vfsp;
+	xfs_mount_t	*mp;
+	static struct proc_xfs_info {
+		int flag;
+		char *str;
+	} xfs_info[] = {
+		/* the few simple ones we can get from the mount struct */
+		{ XFS_MOUNT_NOALIGN,		",noalign" },
+		{ XFS_MOUNT_NORECOVERY,		",norecovery" },
+		{ XFS_MOUNT_OSYNCISOSYNC,	",osyncisosync" },
+		{ XFS_MOUNT_NOUUID,		",nouuid" },
+		{ XFS_MOUNT_IRIXSGID,		",irixsgid" },
+		{ 0, NULL }
+	};
+
+	struct proc_xfs_info *xfs_infop;
+
+	vfsp = LINVFS_GET_VFS(mnt->mnt_sb);
+	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+
+	for (xfs_infop = xfs_info; xfs_infop->flag; xfs_infop++) {
+		if (mp->m_flags & xfs_infop->flag)
+			seq_puts(m, xfs_infop->str);
+	}
+
+	if (mp->m_qflags & XFS_UQUOTA_ACCT) {
+		seq_puts(m, ",uquota");
+		if (!(mp->m_qflags & XFS_UQUOTA_ENFD))
+			seq_puts(m, ",uqnoenforce");
+	}
+
+	if (mp->m_qflags & XFS_GQUOTA_ACCT) {
+		seq_puts(m, ",gquota");
+		if (!(mp->m_qflags & XFS_GQUOTA_ENFD))
+			seq_puts(m, ",gqnoenforce");
+	}
+
+	if (mp->m_flags & XFS_MOUNT_DFLT_IOSIZE)
+		seq_printf(m, ",biosize=%d", mp->m_writeio_log);
+
+	if (mp->m_logbufs > 0)
+		seq_printf(m, ",logbufs=%d", mp->m_logbufs);
+
+	if (mp->m_logbsize > 0)
+		seq_printf(m, ",logbsize=%d", mp->m_logbsize);
+
+	if (mp->m_ddev_targp->pbr_dev != mp->m_logdev_targp->pbr_dev)
+		seq_printf(m, ",logdev=%s",
+				bdevname(mp->m_logdev_targp->pbr_bdev));
+
+	if (mp->m_rtdev_targp &&
+	    mp->m_ddev_targp->pbr_dev != mp->m_rtdev_targp->pbr_dev)
+		seq_printf(m, ",rtdev=%s",
+				bdevname(mp->m_rtdev_targp->pbr_bdev));
+
+	if (mp->m_dalign > 0)
+		seq_printf(m, ",sunit=%d",
+				(int)XFS_FSB_TO_BB(mp, mp->m_dalign));
+
+	if (mp->m_swidth > 0)
+		seq_printf(m, ",swidth=%d",
+				(int)XFS_FSB_TO_BB(mp, mp->m_swidth));
+
+	if (vfsp->vfs_flag & VFS_DMI)
+		seq_puts(m, ",dmapi");
+
+	return 0;
+}
+
 static struct super_operations linvfs_sops = {
 	.alloc_inode		= linvfs_alloc_inode,
 	.destroy_inode		= linvfs_destroy_inode,
@@ -754,6 +827,7 @@ static struct super_operations linvfs_sops = {
 	.unlockfs		= linvfs_unfreeze_fs,
 	.statfs			= linvfs_statfs,
 	.remount_fs		= linvfs_remount,
+	.show_options		= linvfs_show_options,
 };
 
 static struct file_system_type xfs_fs_type = {

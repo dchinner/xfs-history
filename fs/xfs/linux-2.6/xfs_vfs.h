@@ -44,8 +44,6 @@ struct xfs_mount_args;
 
 typedef struct vfs {
 	u_int		vfs_flag;	/* flags */
-	dev_t		vfs_dev;	/* device of mounted VFS */
-	u_int		vfs_bsize;	/* native block size */
 	fsid_t		vfs_fsid;	/* file system id */
 	fsid_t		*vfs_altfsid;	/* An ID fixed for life of FS */
 	bhv_head_t	vfs_bh;		/* head of vfs behavior chain */
