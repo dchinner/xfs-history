@@ -1,7 +1,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 struct buf;
 struct ktrace;
@@ -68,7 +68,7 @@ typedef struct xfs_buf_log_item {
 	unsigned int		bli_recur;	/* lock recursion count */
 	int			bli_refcount;	/* cnt of tp refs */
 	struct ktrace		*bli_trace;	/* event trace buf */
-#ifdef DEBUG
+#ifdef XFS_TRANS_DEBUG
 	char			*bli_orig;	/* original buffer copy */
 	char			*bli_logged;	/* bytes to be logged */
 #endif
@@ -114,5 +114,15 @@ void	xfs_buf_attach_iodone(struct buf *,
 			      xfs_log_item_t *);
 void	xfs_buf_iodone_callbacks(struct buf *);
 void	xfs_buf_iodone(struct buf *, xfs_buf_log_item_t *);
+
+#ifdef XFS_TRANS_DEBUG
+void
+xfs_buf_item_flush_log_debug(
+	buf_t	*bp,			     
+	uint	first,
+	uint	last);
+#else
+#define	xfs_buf_item_flush_log_debug(bip, first, last)
+#endif
 
 #endif	/* _XFS_BUF_ITEM_H */

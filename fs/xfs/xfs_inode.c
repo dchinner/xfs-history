@@ -1,4 +1,4 @@
-#ident "$Revision: 1.164 $"
+#ident "$Revision: 1.165 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -73,7 +73,8 @@ xfs_iflush_fork(
 	xfs_inode_t		*ip,
 	xfs_dinode_t		*dip,
 	xfs_inode_log_item_t	*iip,
-	int			whichfork);
+	int			whichfork,
+	buf_t			*bp);
 
 STATIC void
 xfs_iformat(
@@ -1574,6 +1575,7 @@ xfs_iunlink(
 	int		error;
 	
 	ASSERT(ip->i_d.di_nlink == 0);
+	ASSERT(ip->i_d.di_mode != 0);
 	ASSERT(ip->i_transp == tp);
 
 	mp = tp->t_mountp;
@@ -2286,8 +2288,9 @@ xfs_idestroy(
 	ktrace_free(ip->i_rwtrace);
 	ktrace_free(ip->i_strat_trace);
 #endif
-	if (ip->i_itemp)
-		kmem_zone_free(xfs_ili_zone, ip->i_itemp);
+	if (ip->i_itemp) {
+		xfs_inode_item_destroy(ip);
+	}
 	kmem_zone_free(xfs_inode_zone, ip);
 }
 
@@ -2488,16 +2491,21 @@ xfs_iextents_copy(
  * In these cases, the format always takes precedence, because the
  * format indicates the current state of the fork.
  */
+/*ARGSUSED*/
 STATIC void
 xfs_iflush_fork(
 	xfs_inode_t		*ip,
 	xfs_dinode_t		*dip,
 	xfs_inode_log_item_t	*iip,
-	int			whichfork)
+	int			whichfork,
+	buf_t			*bp)
 {
 	char			*cp;
 	xfs_ifork_t		*ifp;
 	xfs_mount_t		*mp;
+#ifdef XFS_TRANS_DEBUG
+	int			first;
+#endif
 	static const short	brootflag[2] =
 		{ XFS_ILOG_DBROOT, XFS_ILOG_ABROOT };
 	static const short	dataflag[2] =
@@ -2517,6 +2525,11 @@ xfs_iflush_fork(
 			ASSERT(ifp->if_u1.if_data != NULL);
 			ASSERT(ifp->if_bytes <= XFS_IFORK_SIZE(ip, whichfork));
 			bcopy(ifp->if_u1.if_data, cp, ifp->if_bytes);
+#ifdef XFS_TRANS_DEBUG
+			first = cp - bp->b_un.b_addr;
+			xfs_buf_item_flush_log_debug(bp, first,
+				(first + ifp->if_bytes - 1));
+#endif
 		}
 		break;
 
@@ -2530,6 +2543,15 @@ xfs_iflush_fork(
 			ASSERT(XFS_IFORK_NEXTENTS(ip, whichfork) > 0);
 			(void)xfs_iextents_copy(ip, (xfs_bmbt_rec_32_t *)cp,
 				whichfork);
+#ifdef XFS_TRANS_DEBUG
+			/*
+			 * Just give up and assume we wrote over the entire
+			 * fork.
+			 */
+			first = cp - bp->b_un.b_addr;
+			xfs_buf_item_flush_log_debug(bp, first,
+				(first + XFS_IFORK_SIZE(ip, whichfork) - 1));
+#endif
 		}
 		break;
 
@@ -2543,6 +2565,15 @@ xfs_iflush_fork(
 			xfs_bmbt_to_bmdr(ifp->if_broot, ifp->if_broot_bytes,
 				(xfs_bmdr_block_t *)cp,
 				XFS_DFORK_SIZE(dip, mp, whichfork));
+#ifdef XFS_TRANS_DEBUG
+			/*
+			 * Just give up and assume we wrote over the entire
+			 * fork.
+			 */
+			first = cp - bp->b_un.b_addr;
+			xfs_buf_item_flush_log_debug(bp, first,
+				(first + XFS_IFORK_SIZE(ip, whichfork) - 1));
+#endif
 		}
 		break;
 
@@ -2550,6 +2581,12 @@ xfs_iflush_fork(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
 			ASSERT(whichfork == XFS_DATA_FORK);
 			dip->di_u.di_dev = ip->i_df.if_u2.if_rdev;
+#ifdef XFS_TRANS_DEBUG
+			first = (char*)&(dip->di_u.di_dev) -
+				bp->b_un.b_addr;
+			xfs_buf_item_flush_log_debug(bp, first,
+				(first + sizeof(dip->di_u.di_dev) - 1));
+#endif
 		}
 		break;
 		
@@ -2557,6 +2594,12 @@ xfs_iflush_fork(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
 			ASSERT(whichfork == XFS_DATA_FORK);
 			dip->di_u.di_muuid = ip->i_df.if_u2.if_uuid;
+#ifdef XFS_TRANS_DEBUG
+			first = (char*)&(dip->di_u.di_muuid) -
+				bp->b_un.b_addr;
+			xfs_buf_item_flush_log_debug(bp, first,
+				(first + sizeof(dip->di_u.di_muuid) - 1));
+#endif
 		}
 		break;
 
@@ -2586,6 +2629,9 @@ xfs_iflush(
 	xfs_mount_t		*mp;
 	int			s;
 	int			error;
+#ifdef XFS_TRANS_DEBUG
+	int			first;
+#endif
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
@@ -2639,10 +2685,15 @@ xfs_iflush(
 	 * be.
 	 */
 	bcopy(&(ip->i_d), &(dip->di_core), sizeof(xfs_dinode_core_t));
+#ifdef XFS_TRANS_DEBUG
+	first = (char*)&(dip->di_core) - bp->b_un.b_addr;
+	xfs_buf_item_flush_log_debug(bp, first,
+				     (first + sizeof(xfs_dinode_core_t) - 1));
+#endif
 
-	xfs_iflush_fork(ip, dip, iip, XFS_DATA_FORK);
+	xfs_iflush_fork(ip, dip, iip, XFS_DATA_FORK, bp);
 	if (XFS_IFORK_Q(ip))
-		xfs_iflush_fork(ip, dip, iip, XFS_ATTR_FORK);
+		xfs_iflush_fork(ip, dip, iip, XFS_ATTR_FORK, bp);
 	xfs_inobp_check(mp, bp);
 	
 	/*

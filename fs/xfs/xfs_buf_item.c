@@ -1,4 +1,4 @@
-#ident "$Revision: 1.45 $"
+#ident "$Revision: 1.46 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -48,8 +48,20 @@ zone_t	*xfs_buf_item_zone;
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
 #endif
 
+#ifdef	XFS_TRANS_DEBUG
+STATIC void
+xfs_buf_item_log_debug(
+	xfs_buf_log_item_t	*bip,
+	uint			first,
+	uint			last);
+
+STATIC void
+xfs_buf_item_log_check(
+	xfs_buf_log_item_t	*bip);
+#else
 #define		xfs_buf_item_log_debug(x,y,z)
 #define 	xfs_buf_item_log_check(x)
+#endif
 
 STATIC void
 xfs_buf_error_relse(
@@ -67,7 +79,8 @@ xfs_buf_error_relse(
  * If the XFS_BLI_STALE flag has been set, then log nothing.
  */
 uint
-xfs_buf_item_size(xfs_buf_log_item_t *bip)
+xfs_buf_item_size(
+	xfs_buf_log_item_t	*bip)
 {
 	uint	nvecs;
 	int	next_bit;
@@ -127,8 +140,9 @@ xfs_buf_item_size(xfs_buf_log_item_t *bip)
  * within the buffer.
  */
 void
-xfs_buf_item_format(xfs_buf_log_item_t	*bip,
-		    xfs_log_iovec_t	*log_vector)
+xfs_buf_item_format(
+	xfs_buf_log_item_t	*bip,
+	xfs_log_iovec_t		*log_vector)
 {
 	uint		base_size;
 	uint		nvecs;
@@ -235,7 +249,8 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
  * on the buffer to do this.
  */
 void
-xfs_buf_item_pin(xfs_buf_log_item_t *bip)
+xfs_buf_item_pin(
+	xfs_buf_log_item_t	*bip)
 {
 	buf_t	*bp;
 
@@ -259,7 +274,8 @@ xfs_buf_item_pin(xfs_buf_log_item_t *bip)
  * then free up the buf log item and unlock the buffer.
  */
 void
-xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
+xfs_buf_item_unpin(
+	xfs_buf_log_item_t	*bip)
 {
 	xfs_mount_t	*mp;
 	buf_t		*bp;
@@ -300,7 +316,8 @@ xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
  * buffer from the free list, mark it busy, and return 1.
  */
 uint
-xfs_buf_item_trylock(xfs_buf_log_item_t *bip)
+xfs_buf_item_trylock(
+	xfs_buf_log_item_t	*bip)
 {
 	buf_t	*bp;
 
@@ -345,7 +362,8 @@ xfs_buf_item_trylock(xfs_buf_log_item_t *bip)
  * XFS_BLI_HOLD field is cleared if we don't free the item.
  */
 void
-xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
+xfs_buf_item_unlock(
+	xfs_buf_log_item_t	*bip)
 {
 	buf_t	*bp;
 	uint	hold;
@@ -430,8 +448,9 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
  * the current one.
  */
 xfs_lsn_t
-xfs_buf_item_committed(xfs_buf_log_item_t	*bip,
-		       xfs_lsn_t		lsn)
+xfs_buf_item_committed(
+	xfs_buf_log_item_t	*bip,
+	xfs_lsn_t		lsn)
 /* ARGSUSED */
 {
 	xfs_buf_item_trace("COMMITTED", bip);
@@ -463,7 +482,8 @@ xfs_buf_item_abort(
  * If not, then just release the buffer.
  */
 void
-xfs_buf_item_push(xfs_buf_log_item_t *bip)
+xfs_buf_item_push(
+	xfs_buf_log_item_t	*bip)
 {
 	buf_t	*bp;
 
@@ -502,8 +522,9 @@ struct xfs_item_ops xfs_buf_item_ops = {
  * buf log item at the front.
  */
 void
-xfs_buf_item_init(buf_t		*bp,
-		  xfs_mount_t	*mp)
+xfs_buf_item_init(
+	buf_t		*bp,
+	xfs_mount_t	*mp)
 {
 	xfs_log_item_t		*lip;
 	xfs_buf_log_item_t	*bip;
@@ -576,9 +597,10 @@ xfs_buf_item_init(buf_t		*bp,
  * item's bitmap.
  */
 void
-xfs_buf_item_log(xfs_buf_log_item_t	*bip,
-		 uint			first,
-		 uint			last)
+xfs_buf_item_log(
+	xfs_buf_log_item_t	*bip,
+	uint			first,
+	uint			last)
 {
 	uint		first_bit;
 	uint		last_bit;
@@ -670,9 +692,10 @@ xfs_buf_item_log(xfs_buf_log_item_t	*bip,
  * simple algorithm to check that every byte is accounted for.
  */
 STATIC void
-xfs_buf_item_log_debug(xfs_buf_log_item_t	*bip,
-		       uint			first,
-		       uint			last)
+xfs_buf_item_log_debug(
+	xfs_buf_log_item_t	*bip,
+	uint			first,
+	uint			last)
 {
 	char	*logged;
 	uint	x;
@@ -704,6 +727,36 @@ xfs_buf_item_log_debug(xfs_buf_log_item_t	*bip,
 }
 
 /*
+ * This function is called when we flush something into a buffer without
+ * logging it.  This happens for things like inodes which are logged
+ * separately from the buffer.
+ */
+void
+xfs_buf_item_flush_log_debug(
+	buf_t	*bp,
+	uint	first,
+	uint	last)
+{
+	xfs_buf_log_item_t	*bip;
+	char			*logged;
+	uint			x;
+	uint			nbytes;
+
+	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+	if ((bip == NULL) || (bip->bli_item.li_type != XFS_LI_BUF)) {
+		return;
+	}
+
+	ASSERT(bip->bli_logged != NULL);
+	logged = bip->bli_logged + first;	/* pointer arithmetic */
+	nbytes = last - first + 1;
+	for (x = 0; x < nbytes; x++) { 
+		*logged = 1;
+		logged++;
+	}
+}
+
+/*
  * This function is called to verify that our caller's have logged
  * all the bytes that they changed.
  *
@@ -713,7 +766,8 @@ xfs_buf_item_log_debug(xfs_buf_log_item_t	*bip,
  * array of the buf log item.
  */
 STATIC void
-xfs_buf_item_log_check(xfs_buf_log_item_t *bip)
+xfs_buf_item_log_check(
+	xfs_buf_log_item_t	*bip)
 {
 	char	*logged;
 	char	*orig;
@@ -751,9 +805,10 @@ xfs_buf_item_log_check(xfs_buf_log_item_t *bip)
  * xfs_countbit[3] == 2, etc.
  */
 int
-xfs_buf_item_bits(uint	*map,
-		  uint	size,
-		  uint	start_bit)
+xfs_buf_item_bits(
+	uint	*map,
+	uint	size,
+	uint	start_bit)
 {
 	register int	bits;
 	register char	*bytep;
@@ -804,9 +859,10 @@ xfs_buf_item_bits(uint	*map,
  * bits for that value using the xfs_countbit array, i.e.
  */
 int
-xfs_buf_item_contig_bits(uint	*map,
-			 uint	size,
-			 uint	start_bit)
+xfs_buf_item_contig_bits(
+	uint	*map,
+	uint	size,
+	uint	start_bit)
 {
 	register int	bits;
 	register uint	*wordp;
@@ -872,9 +928,10 @@ xfs_buf_item_contig_bits(uint	*map,
  * Size is the number of words, not bytes, in the bitmap.
  */
 int
-xfs_buf_item_next_bit(uint	*map,
-		      uint	size,
-		      uint	start_bit)
+xfs_buf_item_next_bit(
+	uint	*map,
+	uint	size,
+	uint	start_bit)
 {
 	int	next_bit;
 	uint	*wordp;
@@ -956,9 +1013,10 @@ xfs_buf_item_next_bit(uint	*map,
  */
 /*ARGSUSED*/
 STATIC void
-xfs_buf_item_set_bit(uint	*map,
-		     uint	size,
-		     uint	bit)
+xfs_buf_item_set_bit(
+	uint	*map,
+	uint	size,
+	uint	bit)
 {
 	uint	*wordp;
 	int	word_bit;
@@ -975,7 +1033,8 @@ xfs_buf_item_set_bit(uint	*map,
  * point, not just the current transaction) and 0 if not.
  */
 uint
-xfs_buf_item_dirty(xfs_buf_log_item_t *bip)
+xfs_buf_item_dirty(
+	xfs_buf_log_item_t	*bip)
 {
 	return (bip->bli_flags & XFS_BLI_DIRTY);
 }
@@ -988,7 +1047,8 @@ xfs_buf_item_dirty(xfs_buf_log_item_t *bip)
  * xfs_buf_attach_iodone() below).
  */
 void
-xfs_buf_item_relse(buf_t *bp)
+xfs_buf_item_relse(
+	buf_t	*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -1022,9 +1082,10 @@ xfs_buf_item_relse(buf_t *bp)
  * assumes that the buf log item is first.
  */
 void
-xfs_buf_attach_iodone(buf_t		*bp,
-		      void		(*cb)(buf_t *, xfs_log_item_t *),
-		      xfs_log_item_t	*lip)
+xfs_buf_attach_iodone(
+	buf_t		*bp,
+	void		(*cb)(buf_t *, xfs_log_item_t *),
+	xfs_log_item_t	*lip)
 {
 	xfs_log_item_t	*head_lip;
 
@@ -1055,7 +1116,8 @@ xfs_buf_attach_iodone(buf_t		*bp,
  * is unlocked with a call to iodone().
  */
 void
-xfs_buf_iodone_callbacks(buf_t *bp)
+xfs_buf_iodone_callbacks(
+	buf_t	*bp)
 {
 	xfs_log_item_t	*lip;
 	xfs_log_item_t	*nlip;
@@ -1152,8 +1214,9 @@ xfs_buf_error_relse(
  */ 
 /* ARGSUSED */
 void
-xfs_buf_iodone(buf_t			*bp,
-	       xfs_buf_log_item_t	*bip)
+xfs_buf_iodone(
+	buf_t			*bp,
+	xfs_buf_log_item_t	*bip)
 {
 	struct xfs_mount	*mp;
 	int			s;
