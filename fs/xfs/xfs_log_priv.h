@@ -128,6 +128,7 @@ typedef struct log_in_core {
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
+	int			ic_bwritecnt;
 	char	  		ic_state;
 } log_in_core_t;
 

@@ -534,13 +534,15 @@ log_sync(log_t		*log,
 	if (bp->b_blkno + BTOBB(count) > log->l_logBBsize) {
 		split = count - (BBTOB(log->l_logBBsize - bp->b_blkno));
 		count = BBTOB(log->l_logBBsize - bp->b_blkno);
-		iclog->ic_refcnt = 2;	/* split into 2 writes */
+		iclog->ic_bwritecnt = 2;	/* split into 2 writes */
+	} else {
+		iclog->ic_bwritecnt = 1;
 	}
 	bp->b_dmaaddr	= (caddr_t) iclog;
 	bp->b_bcount	= bp->b_bufsize	= count;
 	bp->b_iodone	= log_iodone;
 	bp->b_edev	= log->l_dev;
-	bp->b_fsprivate	= iclog;
+	bp->b_fsprivate	= iclog;		/* save for later */
 	if (flags & XFS_LOG_SYNC)
 		bp->b_flags |= (B_BUSY | B_HOLD);
 	else
@@ -802,13 +804,12 @@ log_state_done_syncing(log_in_core_t	*iclog)
 	spl = splockspl(log->l_icloglock, splhi);
 
 	ASSERT(iclog->ic_state == LOG_STATE_SYNCING);
-	ASSERT(iclog->ic_refcnt >= 0);
+	ASSERT(iclog->ic_refcnt == 0);
+	ASSERT(iclog->ic_bwritecnt == 1 || iclog->ic_bwritecnt == 2);
 
-	if (iclog->ic_refcnt > 0) {
-		if (--iclog->ic_refcnt > 0) {
-			spunlockspl(log->l_icloglock, spl);
-			return;
-		}
+	if (--iclog->ic_bwritecnt == 1) {
+		spunlockspl(log->l_icloglock, spl);
+		return;
 	}
 
 	iclog->ic_state = LOG_STATE_CALLBACK;
