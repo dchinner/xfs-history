@@ -476,13 +476,16 @@ _linvfs_set_blocks(
 
 	for(bmaps = 0; bmaps < npbmaps && i; bmaps++, pbmap++) {
 
-		/* While we have room in this bmap, bump the block number */
+		/*
+		 * While we have room in this bmap, bump the block number if real.
+		 * If the block number is a hole or unwritten, make the blockno 0.
+		 * This will cause a clearing of the associated memory.
+		 */
 		while(pbmap->pbm_bsize && i) {
 			blockno = (long)pbmap->pbm_bn;
-			if (blockno < 0) {
-				printk("_linvfs_set_blocks have negative block %d\n",
-						blockno);
-				return;
+			if (pbmap->pbm_flags & (PBMF_HOLE|PBMF_UNWRITTEN)) {
+				printk("_linvfs_set_blocks have HOLE or UNWRITTEN\n");
+				blockno = 0;
 			} else if (pbmap->pbm_offset) {
 				if ( pbmap->pbm_offset % blocksize) {
 					printk("_linvfs_set_blocks: this shouldn't happen %lld %d!\n",
@@ -496,7 +499,9 @@ _linvfs_set_blocks(
 			*p = blockno;
 			p++;
 			i--;
-			pbmap->pbm_bn++;
+			if (pbmap->pbm_bn > 0) {
+				pbmap->pbm_bn++;
+			}
 			pbmap->pbm_bsize -= blocksize;
 		}
         }
@@ -513,8 +518,8 @@ int linvfs_readpage(struct file *filp, struct page *page)
 	vnode_t		*vp;
 	int		nr[PAGE_SIZE/512];
 #define LINBMAP_MAX 4
-	pb_bmap_t	pbmap[LINBMAP_MAX];
-	int		npbmaps = LINBMAP_MAX;
+	pb_bmap_t	pbmap[LINBMAP_MAX], *pbmapp = &pbmap[0];
+	int		npbmaps = LINBMAP_MAX, map, pgoff, sz;
 	int		error;
 
 	atomic_inc(&page->count);
@@ -524,17 +529,54 @@ int linvfs_readpage(struct file *filp, struct page *page)
 	vp = LINVFS_GET_VP(inode);
 
 	VOP_RWLOCK(vp, VRWLOCK_READ);
-	VOP_BMAP(vp, page->offset, PAGE_SIZE, B_READ,(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
+	VOP_BMAP(vp, page->offset, PAGE_SIZE, B_READ, pbmapp, &npbmaps, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 
 	if (error)
 		return -EIO;
 
-	_linvfs_set_blocks(nr, PAGE_SIZE/512, &pbmap[0], npbmaps,
-		inode->i_sb->s_blocksize_bits, inode->i_sb->s_blocksize);
+	/*
+	 * While the page isn't done, move through the mappings either zero'ing
+	 * out or reading real blocks. This will usually just deal with one
+	 * one mapping, but ...
+	 */
 
-	/* IO start */
-	rval = brw_page(READ, page, inode->i_dev, nr, inode->i_sb->s_blocksize, 1);
+	pgoff = 0;
+	sz = PAGE_SIZE;
+	map = 0;
+	while(sz > 0 && map < npbmaps) {
+		int msize;
+
+		if (pgoff) {
+			printk("linvfs_readpage: iterating?? JIMJIM remove me %d\n",
+				pgoff);
+		}
+		pbmapp = &pbmap[map];
+		msize = pbmapp->pbm_bsize - pbmapp->pbm_offset;
+		if (msize > (PAGE_SIZE - pgoff)) {
+			msize = PAGE_SIZE - pgoff;
+		}
+
+		if (pbmapp->pbm_flags & (PBMF_HOLE|PBMF_UNWRITTEN)) {
+			memset((void *)(page_address(page) + pgoff), 0, msize);
+			set_bit(PG_uptodate, &page->flags);
+			clear_bit(PG_locked, &page->flags);
+			wake_up(&page->wait);
+			rval = 0;
+		} else {
+			_linvfs_set_blocks(nr, PAGE_SIZE/512, pbmapp, npbmaps - map,
+				inode->i_sb->s_blocksize_bits, inode->i_sb->s_blocksize);
+	
+			/* IO start */
+			rval = brw_page(READ, page, inode->i_dev, nr,
+				inode->i_sb->s_blocksize, 1);
+		}
+		sz -= msize;
+		pgoff += msize;
+		if (msize == pbmapp->pbm_bsize - pbmapp->pbm_offset) {
+			map++;
+		}
+	}
 #else
 	rval = block_read_full_page(filp, page);
 #endif
@@ -651,18 +693,46 @@ linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
 	/* bytes can't be more than one page. */
 	ASSERT(bytes <= PAGE_CACHE_SIZE);
 
+	/*
+	 * Clear the page up to starting offset in the page we
+	 * are updating if that offset is beyond EOF.
+	 * Otherwise, it has good data. We need to skip any good
+	 * data within the page, too.
+	 */
+
+	if (offset && ((page->offset+offset) > inode->i_size)) {
+		int good_bytes;
+
+		/*
+		 * Figure out how many bytes in the page are within
+		 * the file and don't zero those.
+		 */
+		if (inode->i_size > page->offset) {
+			good_bytes = inode->i_size - page->offset;
+		} else {
+			good_bytes = 0;
+		}
+
+		if (good_bytes >= PAGE_SIZE) {
+			printk("linvfs_updatepage: NEW CODE no clear, good bytes %d\n",
+				good_bytes);
+		} else {
+			memset((void *)(page_address(page)+good_bytes), 0, offset);
+		}
+	}
+
 	/* Copy down the user's data */
 	bytes -= copy_from_user((unsigned long *)(page_address(page) + offset),
 						buf, bytes);
+	
 
+out_error:
 	if (!bytes) {
 		wrote = -EFAULT;
 		clear_bit(PG_locked, &page->flags);
 		clear_bit(PG_uptodate, &page->flags);
 		goto out;
 	}
-
-	/* set_bit(PG_uptodate, &page->flags); who set's this? */
 
 	/* Now, write out the page to the right spot */
 	status = brw_page(WRITE, page, inode->i_dev, nr, inode->i_sb->s_blocksize, 1);

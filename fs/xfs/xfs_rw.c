@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision$"
+#ident "$Revision: 1.296 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -180,6 +180,7 @@ ktrace_t	*xfs_strat_trace_buf;
 #define	xfs_strat_write_subbp_trace(tag, io, bp, rbp, loff, lcnt, lblk)
 #endif	/* !XFS_STRAT_TRACE */
 
+#if !defined(__linux__)
 STATIC int
 xfs_zero_last_block(
 	vnode_t		*vp,
@@ -194,6 +195,7 @@ xfs_zero_bp(
 	xfs_buf_t	*bp,
 	int	data_offset,
 	int	data_len);
+#endif /* !defined(__linux__) */
 
 STATIC int
 xfs_retrieved(
@@ -2539,7 +2541,7 @@ xfs_write_bmap(
  * and we don't want anyone to read the garbage on the disk.
  */
 /* ARGSUSED */
-#if 1
+#if !defined(__linux__)
 STATIC int				/* error */
 xfs_zero_last_block(
 	vnode_t		*vp,
@@ -2725,7 +2727,6 @@ xfs_zero_last_block(
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	return error;
 }
-#endif /* !defined(__linux__) */
 /*
  * Zero any on disk space between the current EOF and the new,
  * larger EOF.  This handles the normal case of zeroing the remainder
@@ -2736,7 +2737,6 @@ xfs_zero_last_block(
  * then any holes in the range are filled and zeroed.  If not, the holes
  * are left alone as holes.
  */
-#if 1
 int					/* error */
 xfs_zero_eof(
 	vnode_t		*vp,
@@ -2927,9 +2927,7 @@ xfs_zero_eof(
 
 	return 0;
 }
-#endif /* !defined(__linux__) */
 
-#if 1
 STATIC int
 xfs_iomap_write(
 	xfs_iocore_t	*io,
@@ -6396,7 +6394,7 @@ xfs_strat_write_core(
  * the shop, make sure that absolutely nothing persistent happens to
  * this filesystem after this point. 
  */
-#if 1
+
 void
 xfs_force_shutdown(
 	xfs_mount_t	*mp,
@@ -6479,7 +6477,6 @@ xfs_force_shutdown(
 	}
 #endif /* CELL_CAPABLE */
 }
-#endif /* !defined(__linux__) */
 
 
 /*
@@ -6595,7 +6592,7 @@ xfs_ioerror_alert(
  * the error checking stuff and the brelse if appropriate for
  * the caller, so the code can be a little leaner.
  */
-#if 1 /* !defined(__linux__) */
+
 int
 xfs_read_buf(
 	struct xfs_mount *mp,
@@ -6628,13 +6625,11 @@ xfs_read_buf(
 	}
 	return (error);
 }
-#endif /* !defined(__linux__) */
 	
 /*
  * Wrapper around bwrite() so that we can trap 
  * write errors, and act accordingly.
  */
-#if 1 /*  !defined(__linux__) */
 int
 xfs_bwrite(
 	struct xfs_mount *mp,
@@ -6662,7 +6657,7 @@ xfs_bwrite(
 	}
 	return (error);
 }
-#endif /* !defined(__linux__) */
+
 /*
  * All xfs metadata buffers except log state machine buffers
  * get this attached as their b_bdstrat callback function. 
@@ -8641,7 +8636,6 @@ xfs_refcache_insert(
  * If the given inode is in the reference cache, purge its entry and
  * release the reference on the vnode.
  */
-#if 1 
 void
 xfs_refcache_purge_ip(
 	xfs_inode_t	*ip)
@@ -8680,7 +8674,6 @@ xfs_refcache_purge_ip(
 
 	return;
 }
-#endif /* !defined(__linux__) */
 
 /*
  * This is called from the XFS unmount code to purge all entries for the

@@ -38,6 +38,7 @@
 #include <linux/fs.h>
 #include <linux/page_buf.h>
 #include <linux/linux_to_xfs.h>
+#include <linux/pagemap.h>
 
 #include "xfs_buf.h"
 #include <ksys/behavior.h>
@@ -124,7 +125,424 @@ xfs_read(
 	size_t		size,
 	loff_t		*offsetp)
 {
-	return(xfs_rdwr(bdp, filp, buf, size, offsetp, 1));
+	ssize_t ret;
+	xfs_rwlockf(bdp, VRWLOCK_READ, 0);
+	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 1);
+	xfs_rwunlockf(bdp, VRWLOCK_READ, 0);
+	return(ret);
+}
+
+/*
+ * This routine is called to handle zeroing any space in the last
+ * block of the file that is beyond the EOF.  We do this since the
+ * size is being increased without writing anything to that block
+ * and we don't want anyone to read the garbage on the disk.
+ */
+
+/* We don' want the IRIX poff */
+#undef poff
+#define poff(x) ((x) & (PAGE_SIZE-1))
+
+/* ARGSUSED */
+STATIC int				/* error */
+xfs_zero_last_block(
+	struct inode	*ip,
+	xfs_iocore_t	*io,
+	off_t		offset,
+	xfs_fsize_t	isize,
+	struct pm	*pmp)
+{
+	xfs_fileoff_t	last_fsb;
+	xfs_fileoff_t	next_fsb;
+	xfs_fileoff_t	end_fsb;
+	xfs_fsblock_t	firstblock;
+	xfs_mount_t	*mp;
+	page_buf_t	*pb;
+	int		nimaps;
+	int		zero_offset;
+	int		zero_len;
+	int		isize_fsb_offset;
+	int		i;
+	int		error;
+	int		hole;
+	xfs_bmbt_irec_t	imap;
+	loff_t		loff;
+	size_t		lsize;
+
+
+	ASSERT(ismrlocked(io->io_lock, MR_UPDATE) != 0);
+	ASSERT(offset > isize);
+
+	mp = io->io_mount;
+
+	/*
+	 * If the file system block size is less than the page size,
+	 * then there could be bytes in the last page after the last
+	 * fsblock containing isize which have not been initialized.
+	 * Since if such a page is in memory it will be
+	 * fully accessible, we need to zero any part of
+	 * it which is beyond the old file size.  We don't need to send
+	 * this out to disk, we're just initializing it to zeroes like
+	 * we would have done in xfs_strat_read() had the size been bigger.
+	 */
+	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
+		struct page *page;
+		struct page ** hash;
+
+		hash = page_hash(ip, isize & PAGE_CACHE_MASK);
+		page = __find_page(ip, isize & PAGE_CACHE_MASK, *hash);
+		if (page) {
+			memset((void *)page_address(page)+i, 0, PAGE_SIZE-i);
+
+			/*
+			 * Now we check to see if there are any holes in the
+			 * page over the end of the file that are beyond the
+			 * end of the file.  If so, we want to set the P_HOLE
+			 * flag in the page and blow away any active mappings
+			 * to it so that future faults on the page will cause
+			 * the space where the holes are to be allocated.
+			 * This keeps us from losing updates that are beyond
+			 * the current end of file when the page is already
+			 * in memory.
+			 */
+			next_fsb = XFS_B_TO_FSBT(mp, isize);
+			end_fsb = XFS_B_TO_FSB(mp, ctooff(offtoc(isize)));
+			hole = 0;
+			while (next_fsb < end_fsb) {
+				nimaps = 1;
+				firstblock = NULLFSBLOCK;
+				error = XFS_BMAPI(mp, NULL, io, next_fsb, 1, 0,
+						  &firstblock, 0, &imap,
+						  &nimaps, NULL);
+				if (error) {
+					page_cache_release(page);
+					return error;
+				}
+				ASSERT(nimaps > 0);
+				if (imap.br_startblock == HOLESTARTBLOCK) {
+					hole = 1;
+					break;
+				}
+				next_fsb++;
+			}
+			if (hole) {
+				printk("xfs_zero_last_block: hole found? need more implementation\n");
+#ifndef linux
+				/*
+				 * In order to make processes notice the
+				 * newly set P_HOLE flag, blow away any
+				 * mappings to the file.  We have to drop
+				 * the inode lock while doing this to avoid
+				 * deadlocks with the chunk cache.
+				 */
+				if (VN_MAPPED(vp)) {
+					XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL |
+							    XFS_EXTSIZE_RD);
+					VOP_PAGES_SETHOLE(vp, pfdp, 1, 1,
+						ctooff(offtoct(isize)));
+					XFS_ILOCK(mp, io, XFS_ILOCK_EXCL |
+							  XFS_EXTSIZE_RD);
+				}
+#endif
+			}
+			page_cache_release(page);
+		}
+	}
+
+	isize_fsb_offset = XFS_B_FSB_OFFSET(mp, isize);
+	if (isize_fsb_offset == 0) {
+		/*
+		 * There are no extra bytes in the last block on disk to
+		 * zero, so return.
+		 */
+		return 0;
+	}
+
+	last_fsb = XFS_B_TO_FSBT(mp, isize);
+	nimaps = 1;
+	firstblock = NULLFSBLOCK;
+	error = XFS_BMAPI(mp, NULL, io, last_fsb, 1, 0, &firstblock, 0, &imap,
+			  &nimaps, NULL);
+	if (error) {
+		return error;
+	}
+	ASSERT(nimaps > 0);
+	/*
+	 * If the block underlying isize is just a hole, then there
+	 * is nothing to zero.
+	 */
+	if (imap.br_startblock == HOLESTARTBLOCK) {
+		return 0;
+	}
+	/*
+	 * Get a pagebuf for the last block, zero the part beyond the
+	 * EOF, and write it out sync.  We need to drop the ilock
+	 * while we do this so we don't deadlock when the buffer cache
+	 * calls back to us. JIMJIM is this true with pagebufs?
+	 */
+	XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL| XFS_EXTSIZE_RD);
+	loff = XFS_FSB_TO_B(mp, last_fsb);
+	lsize = BBTOB(XFS_FSB_TO_BB(mp, 1));
+	/*
+	 * JIMJIM what about the real-time device
+	 */
+	pb = pagebuf_get(ip, loff, lsize, 0);
+	if (!pb) {
+		error = -ENOMEM;
+		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+		return error;
+	}
+	if (imap.br_startblock > 0) {
+		pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
+		if (imap.br_state == XFS_EXT_UNWRITTEN) {
+			printk("xfs_zero_last_block: unwritten?\n");
+		}
+	} else {
+		printk("xfs_zero_last_block: delay alloc???\n");
+		error = -ENOSYS;
+		goto out_lock;
+	}
+
+	if (PBF_NOT_DONE(pb)) {
+		if (error = pagebuf_iostart(pb, PBF_READ)) {
+			goto out_lock;
+		}
+	}
+
+	zero_offset = isize_fsb_offset;
+	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
+	if (error = pagebuf_iozero(pb, zero_offset, zero_len)) {
+		goto out_lock;
+	}
+	pb->pb_flags &= ~PBF_READ;
+	pb->pb_flags |= PBF_WRITE;
+	/* JIMJIM maybe use iostart? What about DELWRI?? */
+	if (error = pagebuf_iorequest(pb)) {
+		goto out_lock;
+	}
+
+	/*
+	 * We don't want to start a transaction here, so don't
+	 * push out a buffer over a delayed allocation extent.
+	 * Also, we can get away with it since the space isn't
+	 * allocated so it's faster anyway.
+	 *
+	 * We don't bother to call xfs_b*write here since this is
+	 * just userdata, and we don't want to bring the filesystem
+	 * down if they hit an error. Since these will go through
+	 * xfsstrategy anyway, we have control over whether to let the
+	 * buffer go thru or not, in case of a forced shutdown.
+	 */
+
+	if (imap.br_startblock == DELAYSTARTBLOCK ||
+	    imap.br_state == XFS_EXT_UNWRITTEN) {
+		printk("xfs_zero_last_block: We want DELWRI? not waiting?\n");
+		/* XFS_bdwrite(bp);*/
+		error = pagebuf_iowait(pb); /* REMOVE ME WHEN DELWRI EXISTS */
+	} else {
+		error = pagebuf_iowait(pb);
+	}
+
+out_lock:
+	pagebuf_rele(pb);
+	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	return error;
+}
+
+/*
+ * Zero any on disk space between the current EOF and the new,
+ * larger EOF.  This handles the normal case of zeroing the remainder
+ * of the last block in the file and the unusual case of zeroing blocks
+ * out beyond the size of the file.  This second case only happens
+ * with fixed size extents and when the system crashes before the inode
+ * size was updated but after blocks were allocated.  If fill is set,
+ * then any holes in the range are filled and zeroed.  If not, the holes
+ * are left alone as holes.
+ */
+
+int					/* error */
+xfs_zero_eof(
+	struct inode	*ip,
+	xfs_iocore_t	*io,
+	off_t		offset,
+	xfs_fsize_t	isize,
+	struct pm       *pmp)
+{
+	xfs_fileoff_t	start_zero_fsb;
+	xfs_fileoff_t	end_zero_fsb;
+	xfs_fileoff_t	prev_zero_fsb;
+	xfs_fileoff_t	zero_count_fsb;
+	xfs_fileoff_t	last_fsb;
+	xfs_fsblock_t	firstblock;
+	xfs_extlen_t	buf_len_fsb;
+	xfs_extlen_t	prev_zero_count;
+	xfs_mount_t	*mp;
+	page_buf_t	*pb;
+	int		nimaps;
+	int		error = 0;
+	xfs_bmbt_irec_t	imap;
+	int		i;
+	int		length;
+	loff_t		loff;
+	size_t		lsize;
+
+	ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
+	ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
+
+	mp = io->io_mount;
+
+	/*
+	 * First handle zeroing the block on which isize resides.
+	 * We only zero a part of that block so it is handled specially.
+	 */
+	error = xfs_zero_last_block(ip, io, offset, isize, pmp);
+	if (error) {
+		ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
+		ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
+		return error;
+	}
+
+	/*
+	 * Calculate the range between the new size and the old
+	 * where blocks needing to be zeroed may exist.  To get the
+	 * block where the last byte in the file currently resides,
+	 * we need to subtract one from the size and truncate back
+	 * to a block boundary.  We subtract 1 in case the size is
+	 * exactly on a block boundary.
+	 */
+	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize - 1) : (xfs_fileoff_t)-1;
+	start_zero_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
+	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
+	ASSERT((xfs_sfiloff_t)last_fsb < (xfs_sfiloff_t)start_zero_fsb);
+	if (last_fsb == end_zero_fsb) {
+		/*
+		 * The size was only incremented on its last block.
+		 * We took care of that above, so just return.
+		 */
+		return 0;
+	}
+
+	ASSERT(start_zero_fsb <= end_zero_fsb);
+	prev_zero_fsb = NULLFILEOFF;
+	prev_zero_count = 0;
+	/*
+	 * JIMJIM maybe change this loop to do the bmapi call and
+	 * loop while we split the mappings into pagebufs?
+	 */
+	while (start_zero_fsb <= end_zero_fsb) {
+		nimaps = 1;
+		zero_count_fsb = end_zero_fsb - start_zero_fsb + 1;
+		firstblock = NULLFSBLOCK;
+		error = XFS_BMAPI(mp, NULL, io, start_zero_fsb, zero_count_fsb,
+				  0, &firstblock, 0, &imap, &nimaps, NULL);
+		if (error) {
+			ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
+			ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
+			return error;
+		}
+		ASSERT(nimaps > 0);
+
+		if (imap.br_startblock == HOLESTARTBLOCK) {
+			/* 
+			 * This loop handles initializing pages that were
+			 * partially initialized by the code below this 
+			 * loop. It basically zeroes the part of the page
+			 * that sits on a hole and sets the page as P_HOLE
+			 * and calls remapf if it is a mapped file.
+			 */	
+			if ((prev_zero_fsb != NULLFILEOFF) && 
+			    (dtopt(XFS_FSB_TO_BB(mp, prev_zero_fsb)) ==
+			     dtopt(XFS_FSB_TO_BB(mp, imap.br_startoff)) ||
+			     dtopt(XFS_FSB_TO_BB(mp, prev_zero_fsb + 
+						     prev_zero_count)) ==
+			     dtopt(XFS_FSB_TO_BB(mp, imap.br_startoff)))) {
+			     	printk("xfs_zero_eof: look for pages to zero? HOLE\n");
+			}
+		   	prev_zero_fsb = NULLFILEOFF;
+			prev_zero_count = 0;
+		   	start_zero_fsb = imap.br_startoff +
+					 imap.br_blockcount;
+			ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
+			continue;
+		}
+
+		/*
+		 * There are blocks in the range requested.
+		 * Zero them a single write at a time.  We actually
+		 * don't zero the entire range returned if it is
+		 * too big and simply loop around to get the rest.
+		 * That is not the most efficient thing to do, but it
+		 * is simple and this path should not be exercised often.
+		 */
+		buf_len_fsb = XFS_FILBLKS_MIN(imap.br_blockcount,
+					      io->io_writeio_blocks);
+		/*
+		 * Drop the inode lock while we're doing the I/O.
+		 * We'll still have the iolock to protect us.
+		 */
+		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+
+		loff = XFS_FSB_TO_B(mp, last_fsb);
+		lsize = XFS_FSB_TO_B(mp, buf_len_fsb);
+		/*
+		 * JIMJIM what about the real-time device
+		 */
+		printk("xfs_zero_eof: NEW CODE doing %lld starting at %d\n",
+			loff, lsize);
+
+		pb = pagebuf_get(ip, loff, lsize, 0);
+		if (!pb) {
+			error = -ENOMEM;
+			goto out_lock;
+		}
+
+		if (imap.br_startblock == DELAYSTARTBLOCK) {
+			printk("xfs_zero_eof: hmmm what do we do here?\n");
+			error = -ENOSYS;
+			goto out_lock;
+		} else {
+			pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
+			if (imap.br_state == XFS_EXT_UNWRITTEN) {
+				printk("xfs_zero_eof: unwritten? what do we do here?\n");
+			}
+		}
+		if (io->io_flags & XFS_IOCORE_RT) {
+			printk("xfs_zero_eof: real time device? use diff inode\n");
+		}
+
+		if (error = pagebuf_iozero(pb, loff, lsize)) {
+			goto out_lock;
+		}
+		pb->pb_flags |= PBF_WRITE;
+		if (error = pagebuf_iorequest(pb)) {
+			goto out_lock;
+		}
+		if (imap.br_startblock == DELAYSTARTBLOCK ||
+		    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
+			printk("xfs_zero_eof: need to allocate? delwri\n");
+			error = pagebuf_iowait(pb);
+		} else { /* Sync */
+			error = pagebuf_iowait(pb);
+		}
+		if (error) {
+			goto out_lock;
+		}
+		pagebuf_rele(pb);
+
+		prev_zero_fsb = start_zero_fsb;
+		prev_zero_count = buf_len_fsb;
+		start_zero_fsb = imap.br_startoff + buf_len_fsb;
+		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
+
+		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	}
+
+	return 0;
+
+out_lock:
+
+	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
+	return error;
 }
 
 ssize_t
@@ -136,17 +554,46 @@ xfs_write(
 	loff_t		*offsetp)
 {
 	xfs_inode_t *xip;
+	struct dentry *dentry = filp->f_dentry;
+	struct inode *ip = dentry->d_inode;
 	struct xfs_mount *mp;
 	ssize_t ret;
+	xfs_fsize_t     isize;
+	xfs_iocore_t    *io;
+
+	xfs_rwlockf(bdp, VRWLOCK_WRITE, 0);
+	xip = XFS_BHVTOI(bdp);
+	io = &(xip->i_iocore);
+	mp = io->io_mount;
+	isize = XFS_SIZE(mp, io); /* JIMJIM do we need to lock for this? */
+
+	/*
+	 * If the offset is beyond the size of the file, we have a couple
+	 * of things to do. First, if there is already space allocated
+	 * we need to either create holes or zero the disk or ...
+	 *
+	 * If there is a page where the previous size lands, we need
+	 * to zero it out up to the new size.
+	 */
+	
+	if (*offsetp > isize && isize) {
+		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_RD);
+		io->io_writeio_blocks = mp->m_writeio_blocks;
+		ret = xfs_zero_eof(ip, io, *offsetp, isize, NULL);
+		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_RD);
+		if (ret) {
+			xfs_rwunlock(bdp, VRWLOCK_WRITE);
+			return(ret); /* JIMJIM should this be negative? */
+		}
+	}
 
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 0);
 
-	xip = XFS_BHVTOI(bdp);
-	/* JIMJIM Lock around the stuff below if Linux doesn't lock above */
+	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
 	if (ret > 0 && *offsetp > xip->i_d.di_size) {
-		mp = xip->i_iocore.io_mount;
 		XFS_SETSIZE(mp, &(xip->i_iocore), *offsetp);
 	}
+	xfs_rwunlock(bdp, VRWLOCK_WRITE);
 	return(ret);
 }
 
@@ -170,6 +617,8 @@ xfs_bmap(bhv_desc_t	*bdp,
 /*	printk("ENTER xfs_bmap\n"); */
 	ip = XFS_BHVTOI(bdp);
 	ASSERT((ip->i_d.di_mode & FMT) == IFREG);
+	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
+	       ((ip->i_iocore.io_flags & XFS_IOCORE_RT) != 0));
 	ASSERT((flags == XFS_B_READ) || (flags == XFS_B_WRITE));
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_iocore.io_mount))
@@ -219,23 +668,21 @@ _xfs_imap_to_bmap(
 	xfs_mount_t     *mp;
 	xfs_fsize_t	nisize;
 	int		i;
-	xfs_fsblock_t	start_block = 0;
+	xfs_fsblock_t	start_block;
 
 	mp = io->io_mount;
-	nisize = io->io_new_size;
+	nisize = XFS_SIZE(mp, io);
+	if (io->io_new_size > nisize)
+		nisize = io->io_new_size;
 
 	for (i=0; i < maps; i++, pbmapp++, imap++) {
-/*		printk("_xfs_imap_to_bmap %lld %lld %lld %d\n",
+/* 		printk("_xfs_imap_to_bmap %lld %lld %lld %d\n",
 			imap->br_startoff, imap->br_startblock,
 			imap->br_blockcount, imap->br_state); */
-		if (imap->br_startblock != -1) {
-			imap->br_startblock =
-				XFS_FSB_TO_DB_IO(io, imap->br_startblock);
-		}
-		pbmapp->pbm_offset =
-				offset - XFS_FSB_TO_B(mp, imap->br_startoff);
 
+		pbmapp->pbm_offset = offset - XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp,imap->br_blockcount);
+		pbmapp->pbm_flags = 0;
 
 		if (XFS_FSB_TO_B(mp, pbmapp->pbm_offset + pbmapp->pbm_bsize)
 								>= nisize) {
@@ -250,28 +697,15 @@ _xfs_imap_to_bmap(
 			pbmapp->pbm_bn = -1;
 			pbmapp->pbm_flags = PBMF_DELAY;
 		} else {
-			pbmapp->pbm_bn = start_block;
+			pbmapp->pbm_bn = XFS_FSB_TO_DB_IO(io, start_block);
 			pbmapp->pbm_flags = 0;
-		if (imap->br_state == XFS_EXT_UNWRITTEN)
-			pbmapp->pbm_flags |= PBMF_UNWRITTEN;
+			if (imap->br_state == XFS_EXT_UNWRITTEN)
+				pbmapp->pbm_flags |= PBMF_UNWRITTEN;
 		}
-#if 0
-		switch(imap->br_state){
-		case XFS_EXT_NORM:
-	/* 		printk("XFS_EXT_NORM:\n"); */
-			break;
-		case XFS_EXT_UNWRITTEN:
-	/* 		printk("XFS_EXT_UNWRITTEN:\n"); */
-			break;
-		case XFS_EXT_DMAPI_OFFLINE:
-	/* 		printk("XFS_EXT_NORM:\n"); */
-			break;
-		}
-#endif
 	}
 }
 
-STATIC int
+int
 xfs_iomap_read(
 	xfs_iocore_t	*io,
 	off_t		offset,
@@ -425,8 +859,16 @@ xfs_iomap_write(
 		error = xfs_iomap_read(io, offset, count,
 					pbmapp, npbmaps, NULL);
 
-		if (*npbmaps) {	/* Let the caller write these
-					and call us again. */
+		/*
+		 * If we found mappings and they can just have data written
+		 * without conversion,
+		 * let the caller write these and call us again.
+		 *
+		 * If we have a HOLE or UNWRITTEN, proceed down lower to
+		 * get the space or to convert to written.
+		 */
+
+		if (*npbmaps && !(pbmapp->pbm_flags & (PBMF_HOLE|PBMF_UNWRITTEN))) {
 			goto out;
 		}
 	}
