@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.30 $"
+#ident  "$Revision: 1.31 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -68,6 +68,7 @@
 #undef _KERNEL
 #endif
 #include <sys/uuid.h>
+#include <sys/dirent.h>
 #include <sys/ktrace.h>
 #ifndef SIM
 #include <sys/xlv_base.h>
@@ -85,6 +86,7 @@
 #include "xfs_ialloc_btree.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_alloc.h"
 #include "xfs_ialloc.h"
 #include "xfs_alloc.h"
 #include "xfs_dinode.h"
@@ -93,6 +95,8 @@
 #include "xfs_ag.h"
 #include "xfs_error.h"
 #include "xfs_bmap.h"
+#include "xfs_dir.h"
+#include "xfs_dir_btree.h"
 #include "xfs_rw.h"
 
 #ifdef SIM
@@ -180,6 +184,7 @@ xfs_init(vfssw_t	*vswp,
 	extern sema_t	xfs_ancestormon;
 	extern lock_t	xfsd_lock;
 	extern sema_t	xfsd_wait;
+	extern zone_t	*xfs_dir_state_zone;
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
 	extern zone_t	*xfs_inode_zone;
@@ -197,7 +202,7 @@ xfs_init(vfssw_t	*vswp,
 	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
 	initnlock(&xfsd_lock, "xfsd");
 	initnsema(&xfsd_wait, 0, "xfsd");
-
+	
 	/*
 	 * Initialize all of the zone allocators we use.
 	 */
@@ -213,6 +218,10 @@ xfs_init(vfssw_t	*vswp,
 					sizeof(struct bmapval)), "xfs_bmap");
 	xfs_strat_write_zone = kmem_zone_init(sizeof(xfs_strat_write_locals_t),
 					      "xfs_strat_write");
+	xfs_alloc_arg_zone =
+		kmem_zone_init(sizeof(xfs_alloc_arg_t), "xfs_alloc_arg");
+	xfs_dir_state_zone =
+		kmem_zone_init(sizeof(struct xfs_dir_state), "xfs_dir_state");
 
 	/*
 	 * Allocate global trace buffers.
