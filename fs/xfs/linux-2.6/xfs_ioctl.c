@@ -73,6 +73,7 @@
 #include <xfs_fsops.h>
 #include <xfs_error.h>
 #include <xfs_itable.h>
+#include <xfs_iops.h>
 #include <linux/dmapi_kern.h>
 #include <xfs_dmapi.h>
 
@@ -356,7 +357,7 @@ xfs_open_by_handle(
 	/*
 	 * Make a unique name for dcache.
 	 */
-	cpi = (char *)hanp;
+	cpi = (char *)handlep;
 	cpo = sname;
 
 	for (i = 0; i < hlen && i < MAXFIDSZ; i++) {
@@ -394,45 +395,43 @@ xfs_open_by_handle(
 
 	up(&parinode->i_sem);
 
-
 	/*
 	 * Handle 'negative' & 'new' dentries.
 	 */
 	inode = dentry->d_inode;
 
+	/*
+	 * Get the XFS inode, building a vnode to go with it.
+	 */
+	error = xfs_iget(mp, NULL, inode?inode->i_ino:ino, XFS_ILOCK_SHARED, &ip, 0);
+
+	if (error) {
+		error = -error;
+
+		goto cleanup_dentry;
+	}
+
+	if (ip == NULL) {
+		error = -XFS_ERROR(EIO);
+
+		goto cleanup_dentry;
+	}
+
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+
+		xfs_iput(ip, XFS_ILOCK_SHARED);
+
+		error = -XFS_ERROR(ENOENT);
+
+		goto cleanup_dentry;
+	}
+
+	vp = XFS_ITOV(ip);
+
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+
 	if (inode == NULL) {
-
-		/*
-		 * Get the XFS inode, building a vnode to go with it.
-		 */
-		error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
-
-		if (error) {
-			error = -error;
-
-			goto cleanup_dentry;
-		}
-
-		if (ip == NULL) {
-			error = -XFS_ERROR(EIO);
-
-			goto cleanup_dentry;
-		}
-
-		if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
-
-			xfs_iput(ip, XFS_ILOCK_SHARED);
-
-			error = -XFS_ERROR(ENOENT);
-
-			goto cleanup_dentry;
-		}
-
-		vp = XFS_ITOV(ip);
-
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
-
 		inode = vp->v_inode;
 
 		if (! inode) {
@@ -443,6 +442,10 @@ xfs_open_by_handle(
 			goto cleanup_dentry;
 		}
 
+		/*
+		 * Set xfs inode ops.
+		 */
+		linvfs_set_inode_ops(inode);
 		d_add(dentry, inode);
 	}
 
@@ -526,6 +529,8 @@ xfs_open_by_handle(
 	filp->f_reada  = 0;
 	filp->f_op     = inode->i_fop;
 
+	
+	
 	if (inode->i_sb)
 		file_move(filp, &inode->i_sb->s_files);
 
@@ -539,8 +544,12 @@ xfs_open_by_handle(
 
 	filp->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
 
-	fd_install(newfd, filp);
 
+	if (klocked)
+		unlock_kernel();
+	klocked = 0;
+
+	fd_install(newfd, filp);
 
 	return newfd;
 
