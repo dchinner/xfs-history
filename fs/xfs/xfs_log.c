@@ -2574,14 +2574,16 @@ xlog_verify_iclog(xlog_t	 *log,
 		  boolean_t	 syncing)
 {
 #ifdef DEBUG
-	xlog_op_header_t  *ophead;
-	xlog_in_core_t	 *icptr;
+	xlog_op_header_t	*ophead;
+	xlog_in_core_t		*icptr;
 #ifndef _KERNEL
-	xlog_tid_t	 tid;
+	xlog_tid_t		tid;
 #endif
-	caddr_t		 ptr;
-	char		 clientid;
-	int		 len, i, op_len, spl;
+	caddr_t			ptr;
+	caddr_t			base_ptr;
+	__psint_t		field_offset;
+	char			clientid;
+	int			len, i, op_len, spl;
 
 	/* check validity of iclog pointers */
 	spl = LOG_LOCK(log);
@@ -2608,13 +2610,15 @@ xlog_verify_iclog(xlog_t	 *log,
 	/* check fields */
 	len = iclog->ic_header.h_len;
 	ptr = iclog->ic_data;
+	base_ptr = ptr;
 	ophead = (xlog_op_header_t *)ptr;
 	for (i=0; i<iclog->ic_header.h_num_logops; i++) {
 		ophead = (xlog_op_header_t *)ptr;
 
 		/* clientid is only 1 byte */
-		if (syncing == B_FALSE ||
-		    ((__psint_t)&ophead->oh_clientid & 0x1ff))
+		field_offset = (__psint_t)
+			       ((caddr_t)&(ophead->oh_clientid) - base_ptr);
+		if (syncing == B_FALSE || (field_offset & 0x1ff))
 			clientid = ophead->oh_clientid;
 		else
 			clientid = iclog->ic_header.h_cycle_data[BTOBB(&ophead->oh_clientid - iclog->ic_data)]>>24;
@@ -2623,8 +2627,9 @@ xlog_verify_iclog(xlog_t	 *log,
 
 #ifndef _KERNEL
 		/* check tids */
-		if (syncing == B_FALSE ||
-		    ((__psint_t)&ophead->oh_tid & 0x1ff))
+		field_offset = (__psint_t)
+			       ((caddr_t)&(ophead->oh_tid) - base_ptr);
+		if (syncing == B_FALSE || (field_offset & 0x1ff))
 			tid = ophead->oh_tid;
 		else
 			tid = (xlog_tid_t)(iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_tid - (__psint_t)iclog->ic_data)]);
@@ -2635,8 +2640,9 @@ xlog_verify_iclog(xlog_t	 *log,
 #endif
 
 		/* check length */
-		if (syncing == B_FALSE ||
-		    ((__psint_t)&ophead->oh_len & 0x1ff))
+		field_offset = (__psint_t)
+			       ((caddr_t)&(ophead->oh_len) - base_ptr);
+		if (syncing == B_FALSE || (field_offset & 0x1ff))
 			op_len = ophead->oh_len;
 		else
 			op_len = iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_len - (__psint_t)iclog->ic_data)];
