@@ -31,6 +31,7 @@
  */
 
 #include <xfs.h>
+#include <linux/init.h>
 #include "xfs_qm.h"
 
 #define MNTOPT_QUOTA	"quota"		/* disk quotas (user) */
