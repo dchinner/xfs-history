@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.99 $"
+#ident	"$Revision: 1.100 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -183,6 +183,8 @@ xfs_ialloc_ag_alloc(
 	xfs_agino_t	thisino;	/* current inode number, for loop */
 	int		version;	/* inode version number to use */
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
+	int		isaligned;	/* inode allocation at stripe unit */
+					/* boundary */
 
 	args.tp = tp;
 	args.mp = tp->t_mountp;
@@ -197,11 +199,18 @@ xfs_ialloc_ag_alloc(
 	args.minlen = args.maxlen = XFS_IALLOC_BLOCKS(args.mp);
 	/*
 	 * Set the alignment for the allocation.
+	 * If stripe alignment is turned on then align at stripe unit
+	 * boundary.
 	 * If the cluster size is smaller than a filesystem block 
 	 * then we're doing I/O for inodes in filesystem block size pieces,
 	 * so don't need alignment anyway.
 	 */
-	if (XFS_SB_VERSION_HASALIGN(&args.mp->m_sb) &&
+	isaligned = 0;
+	if (XFS_SB_VERSION_HASDALIGN(&args.mp->m_sb) && args.mp->m_dalign) {
+		ASSERT(!(args.mp->m_flags & XFS_MOUNT_NOALIGN));
+		args.alignment = args.mp->m_dalign;
+		isaligned = 1;
+	} else if (XFS_SB_VERSION_HASALIGN(&args.mp->m_sb) &&
 	    args.mp->m_sb.sb_inoalignmt >= 
 	    XFS_B_TO_FSBT(args.mp, XFS_INODE_CLUSTER_SIZE(args.mp)))
 		args.alignment = args.mp->m_sb.sb_inoalignmt;
@@ -227,6 +236,25 @@ xfs_ialloc_ag_alloc(
 	args.minleft = XFS_IN_MAXLEVELS(args.mp) - 1;
 	if (error = xfs_alloc_vextent(&args))
 		return error;
+
+	/*
+	 * If stripe alignment is turned on, then try again with cluster
+	 * alignment.
+	 */
+	if (isaligned && args.fsbno == NULLFSBLOCK) {
+		args.type = XFS_ALLOCTYPE_NEAR_BNO;
+		args.agbno = agi->agi_root;
+		args.fsbno = XFS_AGB_TO_FSB(args.mp,agi->agi_seqno, args.agbno);
+		if (XFS_SB_VERSION_HASALIGN(&args.mp->m_sb) &&
+	    		args.mp->m_sb.sb_inoalignmt >= 
+	    		XFS_B_TO_FSBT(args.mp, XFS_INODE_CLUSTER_SIZE(args.mp)))
+				args.alignment = args.mp->m_sb.sb_inoalignmt;
+		else
+			args.alignment = 1;
+		if (error = xfs_alloc_vextent(&args))
+       		         return error;
+	}
+	
 	if (args.fsbno == NULLFSBLOCK) {
 		*alloc = 0;
 		return 0;
