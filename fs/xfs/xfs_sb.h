@@ -166,12 +166,27 @@ int xfs_sb_version_num(xfs_sb_t *sbp);
 int xfs_sb_good_version(xfs_sb_t *sbp);
 #define	XFS_SB_GOOD_VERSION(sbp)	xfs_sb_good_version(sbp)
 #else
-#define	XFS_SB_GOOD_VERSION(sbp)	\
+#define	XFS_SB_GOOD_VERSION_INT(sbp)	\
 	((((sbp)->sb_versionnum >= XFS_SB_VERSION_1) && \
 	  ((sbp)->sb_versionnum <= XFS_SB_VERSION_3)) || \
 	 ((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
-	  !((sbp)->sb_versionnum & ~XFS_SB_VERSION_OKREALBITS) && \
-	  ((sbp)->sb_shared_vn <= XFS_SB_MAX_SHARED_VN)))
+	  !((sbp)->sb_versionnum & ~XFS_SB_VERSION_OKREALBITS)
+#ifndef XFS_REPAIR_SIM
+#define	XFS_SB_GOOD_VERSION(sbp)	\
+	(XFS_SB_GOOD_VERSION_INT(sbp) && \
+	  (sbp)->sb_shared_vn <= XFS_SB_MAX_SHARED_VN) ))
+#else
+/*
+ * extra 2 paren's here (( to unconfuse paren-matching editors
+ * like vi because XFS_SB_GOOD_VERSION_INT is a partial expression
+ * and the two XFS_SB_GOOD_VERSION's each 2 more close paren's to
+ * complete the expression.
+ */
+#define XFS_SB_GOOD_VERSION(sbp)	\
+	(XFS_SB_GOOD_VERSION_INT(sbp) && \
+	  (!((sbp)->sb_versionnum & XFS_SB_VERSION_SHAREDBIT) || \
+	   (sbp)->sb_shared_vn <= XFS_SB_MAX_SHARED_VN)) ))
+#endif /* XFS_REPAIR_SIM */
 #endif
 
 #define	XFS_SB_GOOD_SASH_VERSION(sbp)	\
