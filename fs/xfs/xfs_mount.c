@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.115 $"
+#ident	"$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -52,6 +52,7 @@
 #include "xfs_bmap.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
+#include "xfs_rw.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -319,6 +320,20 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 		writeio_log = XFS_WRITEIO_LOG_LARGE;
 #endif
 	}
+#ifdef _K32U64
+	/*
+	 * Set the number of readahead buffers to use based on
+	 * physical memory size.
+	 */
+	if (physmem <= 4096)		/* <= 16MB */
+		mp->m_nreadaheads = XFS_RW_NREADAHEAD_16MB;
+	else if (physmem <= 8192)	/* <= 32MB */
+		mp->m_nreadaheads = XFS_RW_NREADAHEAD_32MB;
+	else
+		mp->m_nreadaheads = XFS_RW_NREADAHEAD_K32;
+#else
+	mp->m_nreadaheads = XFS_RW_NREADAHEAD_K64;
+#endif
 	if (sbp->sb_blocklog > readio_log) {
 		mp->m_readio_log = sbp->sb_blocklog;
 	} else {
