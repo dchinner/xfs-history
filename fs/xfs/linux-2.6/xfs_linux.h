@@ -242,7 +242,13 @@ typedef __uint32_t	xfs_dev_t;
 #define nopkg()		( ENOSYS )
 #define getf(fd,fpp)	( printk("getf not implemented\n"), ASSERT(0), 0 )
 
-#define ncsize		( files_stat.nr_files )
+/* IRIX uses a dynamic sizing algorithm (ndquot = 200 + numprocs*2) */
+/* we may well need to fine-tune this if it ever becomes an issue.  */
+#define DQUOT_MAX_HEURISTIC	NR_DQUOTS
+
+/* IRIX uses the current size of the name cache to guess a good value */
+/* - this isn't the same but is a good enough starting point for now. */
+#define DQUOT_HASH_HEURISTIC	files_stat.nr_files
 
 #define MAXNAMELEN      256
 #define	MAXPATHLEN	1024

@@ -591,6 +591,40 @@ linvfs_dmapi_mount(
 }
 
 
+int
+linvfs_quotactl(
+	struct super_block *sb,
+	int		cmd,
+	int		type,
+	int		id,
+	caddr_t		addr)
+{
+	xfs_mount_t	*mp;
+	vfs_t		*vfsp;
+	int		sts = -EINVAL;
+
+#ifdef DEBUG
+	printk("linvfs_quotactl cmd=0x%x, type=%d, id=%d\n", cmd, type, id);
+#endif
+
+	if (!IS_XQM_CMD(cmd))
+		return sts;
+
+	if (type == USRQUOTA)
+		type = XFS_DQ_USER;
+	else if (type == GRPQUOTA)
+		type = XFS_DQ_PROJ;     /* nathans TODO - need XFS_DQ_GROUP */
+	else
+		return sts;
+
+	vfsp = LINVFS_GET_VFS(sb);
+	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+	ASSERT(mp);
+
+	return xfs_quotactl(mp, vfsp, cmd, id, type, addr);
+}
+
+
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 #ifdef	CONFIG_XFS_VNODE_TRACING
@@ -598,6 +632,9 @@ static struct super_operations linvfs_sops = {
 #endif
 #ifdef CONFIG_XFS_DMAPI
 	dmapi_mount_event:	linvfs_dmapi_mount,
+#endif
+#ifdef CONFIG_XFS_QUOTA
+	quotactl:		linvfs_quotactl,
 #endif
 	put_inode:		linvfs_put_inode,
 	delete_inode:		linvfs_delete_inode,
