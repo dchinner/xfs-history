@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -147,7 +147,6 @@ void 	idbg_xstrat_atrace(int);
 void 	idbg_xstrat_itrace(xfs_inode_t *);
 void 	idbg_xstrat_strace(xfs_inode_t	*);
 #endif
-void	idbg_xstrat_write(xfs_strat_write_locals_t *);
 void	idbg_xtp(xfs_trans_t *);
 
 #define	VD	(void (*)(int))
@@ -227,7 +226,6 @@ static struct xif {
     "xrwtrc",	VD idbg_xrwtrace,	"Dump XFS inode read/write trace",
 #endif
     "xsb",	VD idbg_xsb,		"Dump XFS superblock",
-    "xstrat",   VD idbg_xstrat_write,	"Dump xfs_strat_write locals structure",
 #ifdef DEBUG
     "xstrata",  VD idbg_xstrat_atrace,	"Dump xfs_strat trace for all inodes",
     "xstrati",  VD idbg_xstrat_itrace,	"Dump xfs_strat trace for an inode",
@@ -1635,6 +1633,10 @@ idbg_xbmitrace(xfs_inode_t *ip)
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
 
+#ifndef DEBUG
+	qprintf("Tracing only supported in DEBUG kernels\n");
+	return;
+#else
 	if (ip->i_btrace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
 		return;
@@ -1646,6 +1648,7 @@ idbg_xbmitrace(xfs_inode_t *ip)
 			qprintf("\n");
 		ktep = ktrace_next(ip->i_btrace, &kts);
 	}
+#endif /* DEBUG */
 }
 
 /*
@@ -1882,7 +1885,10 @@ idbg_xbxitrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
-
+#ifndef DEBUG
+	qprintf("Tracing only supported in DEBUG kernels\n");
+	return;
+#else
 	if (ip->i_xtrace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
 		return;
@@ -1894,6 +1900,7 @@ idbg_xbxitrace(xfs_inode_t *ip)
 			qprintf("\n");
 		ktep = ktrace_next(ip->i_xtrace, &kts);
 	}
+#endif /* DEBUG */
 }
 
 /*
@@ -2682,12 +2689,15 @@ idbg_xnode(xfs_inode_t *ip)
 		ip->i_new_size);
 	qprintf("write off %llx gap list 0x%x ",
 		ip->i_write_offset, ip->i_gap_list);
-	printflags(ip->i_flags, tab_flags, "flags");
+	printflags((int)ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
-	qprintf("vcode 0x%x mapcnt 0x%x update_core 0x%x\n",
-		ip->i_vcode,
+#ifdef DEBUG
+	qprintf("mapcnt 0x%x update_core 0x%x\n",
 		ip->i_mapcnt,
-		ip->i_update_core);
+		(int)(ip->i_update_core));
+#else
+	qprintf("update_core 0x%x\n", (int)(ip->i_update_core));
+#endif
 	qprintf("gen 0x%x qbufs %d delayed blks %d\n",
 		ip->i_gen,
 		ip->i_queued_bufs,
@@ -2957,44 +2967,6 @@ idbg_xstrat_strace(xfs_inode_t *ip)
 }
 #endif	/* DEBUG */
 
-/*
- * Print out the locals of an instance of xfs_strat_write().
- */
-void
-idbg_xstrat_write(xfs_strat_write_locals_t *locals)
-{
-	int	i;
-
-	qprintf("locals 0x%x\n");
-	qprintf("offset_fsb %llx ",
-		(__int64_t)locals->offset_fsb);
-	qprintf("map_start_fsb %llx ",
-		(__int64_t)locals->map_start_fsb);
-	qprintf("imap_offset %llx\n", 
-		(__int64_t)locals->imap_offset);
-	qprintf("first_block %llx ",
-		(__int64_t)locals->first_block);
-	qprintf("real_size %llx count_fsb 0x%x\n",
-		locals->real_size, locals->count_fsb);
-	qprintf("imap_blocks 0x%x x %d datap 0x%x rbp 0x%x\n",
-		locals->imap_blocks, locals->x, locals->datap, locals->rbp);
-	qprintf("mp 0x%x ip 0x%x tp 0x%x error %d\n",
-		locals->mp, locals->ip, locals->tp, locals->error);
-	qprintf("&free_list 0x%x imapp 0x%x rbp_offset 0x%x\n",
-		&(locals->free_list), locals->imapp, locals->rbp_offset);
-	qprintf("rbp_len 0x%x set_lead %d s 0x%x imap_index %d\n",
-		locals->rbp_len, locals->set_lead,
-		locals->s, locals->imap_index);
-	qprintf("rbp count %d last rbp offset %llx bcount %x blkno 0x%x\n",
-		locals->rbp_count, locals->last_rbp_offset,
-		locals->last_rbp_bcount, locals->last_rbp_blkno);
-	qprintf("nimaps %d &imap 0x%x\n",
-		locals->nimaps, &(locals->imap));
-	for (i = 0; i < XFS_BMAP_MAX_NMAP; i++) {
-		qprintf("imap[%d]\n", i);
-		idbg_xbirec(&(locals->imap[i]));
-	}
-}
 
 /*
  * Print out an XFS transaction structure.  Print summaries for

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.150 $"
+#ident "$Revision: 1.151 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -555,6 +555,7 @@ xfs_iread(
 	}
 
 #ifndef SIM
+#ifdef DEBUG
 	/*
 	 * Initialize inode's trace buffers.
 	 * Do this before xfs_iformat in case it adds entries.
@@ -563,6 +564,7 @@ xfs_iread(
 	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE, 0);
 	ip->i_rwtrace = ktrace_alloc(XFS_RW_KTRACE_SIZE, 0);
 	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, 0);
+#endif
 #endif
 
 	/*
@@ -2613,14 +2615,15 @@ xfs_iprint(
 	printf("    i_dev %x\n", (uint)ip->i_dev);
 	printf("    i_ino %llx\n", ip->i_ino);
 
-	printf("    i_flags %x ", ip->i_flags);
+	printf("    i_flags %x ", (int)ip->i_flags);
 	if (ip->i_df.if_flags & XFS_IFEXTENTS) {
 		printf("EXTENTS ");
 	}
 	printf("\n");
 
-	printf("    i_vcode %x\n", ip->i_vcode);
+#ifdef DEBUG
 	printf("    i_mapcnt %x\n", ip->i_mapcnt);
+#endif
 	printf("    i_df.if_bytes %d\n", ip->i_df.if_bytes);
 	printf("    i_df.if_u1.if_extents/if_data %x\n", ip->i_df.if_u1.if_extents);
 	if (ip->i_df.if_flags & XFS_IFEXTENTS) {
