@@ -1755,7 +1755,10 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 	 */
 	target_abi = uio->uio_segflg == UIO_USERSPACE ?
 		u.u_procp->p_abi : ABI_IRIX5_64;
-	if (ABI_IS(ABI_IRIX5_64 | ABI_IRIX5_N32, target_abi)) {
+	switch(target_abi) {
+#if (_MIPS_SIM == _MIPS_SIM_ABI64)
+	case ABI_IRIX5_64:
+	   {
 		dirent_t *idbp;
 
 		reclen = DIRENTSIZE(namelen);
@@ -1789,7 +1792,49 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 		 * Unaligned or non-single-iovec buffer.
 		 */
 		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
-	} else {
+		break;
+	   }
+#endif
+	case ABI_IRIX5_N32:
+	   {
+		irix5_n32_dirent_t *idbp;
+
+		reclen = IRIX5_N32_DIRENTSIZE(namelen);
+		if (reclen > uio->uio_resid) {
+			*done = 0;
+			return 0;
+		}
+		iovp = uio->uio_iov;
+		if (dbp != NULL)
+			idbp = (irix5_n32_dirent_t *)dbp;
+		else
+			idbp = (irix5_n32_dirent_t *)iovp->iov_base;
+		idbp->d_reclen = reclen;
+		idbp->d_ino = ino;
+		bcopy(name, idbp->d_name, namelen);
+		idbp->d_name[namelen] = '\0';
+		idbp->d_off = doff;
+		if (dbp == NULL) {
+			/*
+			 * Our caller is either in the kernel
+			 * (probably NFS) or has locked the user
+			 * buffer down, so work directly in its buffer.
+			 */
+			iovp->iov_base += reclen;
+			iovp->iov_len -= reclen;
+			uio->uio_resid -= reclen;
+			*done = 1;
+			return 0;
+		}
+		/*
+		 * Unaligned or non-single-iovec buffer.
+		 */
+		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
+		break;
+	   }
+
+	case ABI_IRIX5:
+	   {
 		irix5_dirent_t *idbp;
 
 		reclen = IRIX5_DIRENTSIZE(namelen);
@@ -1818,6 +1863,8 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 		 * Unaligned or non-single-iovec buffer.
 		 */
 		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
+		break;
+	   }
 	}
 	*done = (retval == 0);
 	return retval;
