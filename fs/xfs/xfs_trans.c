@@ -407,6 +407,17 @@ xfs_trans_unreserve_and_mod_sb(xfs_trans_t *tp)
 	}
 
 	/*
+	 * Release any reserved real time extents .  Any that were 
+	 * allocated will be taken back again by frextents_delta below.
+	 */
+	if (tp->t_rtx_res > 0) {
+		msbp->msb_field = XFS_SB_FREXTENTS;
+		msbp->msb_delta = tp->t_rtx_res;
+		msbp++;
+		n++;
+	}
+
+	/*
 	 * Apply any superblock modifications to the in-core version.
 	 * The t_res_fdblocks_delta and t_res_frextents_delta fields are
 	 * explicity NOT applied to the in-core superblock.
