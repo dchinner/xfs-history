@@ -1960,6 +1960,19 @@ pagebuf_iodone_daemon(
 	return 0;
 }
 
+STATIC void
+pagebuf_runall_queues(
+	struct list_head	pagebuf_iodone_tq[])
+{
+	int	pcpu, cpu;
+
+	for (cpu = 0; cpu < min(smp_num_cpus, MAX_IO_DAEMONS); cpu++) {
+		pcpu = CPU_TO_DAEMON(cpu_logical_map(cpu));
+
+		run_task_queue(&pagebuf_iodone_tq[pcpu]);
+	}
+}
+
 STATIC int
 pagebuf_logiodone_daemon(
 	void			*__bind_cpu)
@@ -2085,9 +2098,12 @@ pagebuf_delwri_flush(
 	page_buf_t		*pb;
 	struct list_head	*curr, *next, tmp;
 	int			pincount = 0;
+	int			flush_cnt = 0;
 
 	spin_lock(&pbd_delwrite_lock);
 	INIT_LIST_HEAD(&tmp);
+
+	pagebuf_runall_queues(pagebuf_dataiodone_tq);
 
 	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
 		pb = list_entry(curr, page_buf_t, pb_list);
@@ -2130,6 +2146,10 @@ pagebuf_delwri_flush(
 		pb->pb_flags |= PBF_WRITE;
 
 		__pagebuf_iorequest(pb);
+		if (++flush_cnt > 32) {
+			pagebuf_run_queues(NULL);
+			flush_cnt = 0;
+		}
 
 		spin_lock(&pbd_delwrite_lock);
 	}
