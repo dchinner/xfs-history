@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.124 $"
+#ident	"$Revision: 1.125 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -614,7 +614,7 @@ xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 	mp = xfs_mount_init();
 	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
 	VFS_INIT(vfsp);
-	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp, BHV_BASE_POSITION);
+	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 	mp->m_dev = dev;
 	mp->m_rtdev = rtdev;
 	mp->m_logdev = logdev;

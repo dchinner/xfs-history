@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.131 $"
+#ident  "$Revision: 1.132 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -584,7 +584,7 @@ xfs_get_vfsmount(
 	vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
 	/* vfsp->vfs_bsize filled in later from superblock */
 	vfsp->vfs_fstype = xfs_fstype;
-	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp, BHV_BASE_POSITION);
+	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 	vfsp->vfs_dev = ddev;
 	vfsp->vfs_nsubmounts = 0;
 	vfsp->vfs_bcount = 0;
@@ -1174,7 +1174,7 @@ devvptoxfs(
 
 	sp = (struct snode *)BHV_PDATA(bdp);
 	if (sp->s_flag & SMOUNTED) {
-		extern struct vfsops xfs_vfsops;
+		extern vfsops_t xfs_vfsops;
 		/*
 		 * Device is mounted.  Get an empty buffer to hold a
 		 * copy of its superblock, so we don't have to worry
@@ -1183,7 +1183,8 @@ devvptoxfs(
 		 */
 		bp = ngeteblk(BBSIZE);
 		fs = (xfs_sb_t *)bp->b_un.b_addr;
-		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfs_devsearch(dev)), &xfs_vfsops);
+		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfs_devsearch(dev)),
+					      &xfs_vfsops);
 		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
 	} else {
 		/*
@@ -1930,9 +1931,8 @@ xfs_vget(
         return 0;
 }
 
-
-
-struct vfsops xfs_vfsops = {
+vfsops_t xfs_vfsops = {
+	VFS_POSITION_BASE,
 	xfs_vfsmount,
 	xfs_rootinit,
 	xfs_mntupdate,
@@ -1945,5 +1945,5 @@ struct vfsops xfs_vfsops = {
 	fs_nosys,	/* swapvp */
 };
 #else	/* SIM */
-struct vfsops xfs_vfsops;
+vfsops_t xfs_vfsops;
 #endif	/* !SIM */

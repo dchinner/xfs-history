@@ -1,4 +1,4 @@
-#ident "$Revision: 1.234 $"
+#ident "$Revision: 1.235 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -6310,7 +6310,8 @@ xfs_error(
 
 #ifdef SIM
 
-struct vnodeops xfs_vnodeops = {
+vnodeops_t xfs_vnodeops = {
+	VNODE_POSITION_BASE,
 	fs_noerr,	/* open */
 	fs_nosys,	/* close */
 	fs_nosys,	/* read */
@@ -6359,7 +6360,8 @@ struct vnodeops xfs_vnodeops = {
 
 #else
 
-struct vnodeops xfs_vnodeops = {
+vnodeops_t xfs_vnodeops = {
+	VNODE_POSITION_BASE,
 	xfs_open,
 	xfs_close,
 	xfs_read,

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.67 $"
+#ident "$Revision: 1.68 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -44,7 +44,7 @@
 #include "sim.h"
 #endif /* SIM */
 
-extern struct vnodeops xfs_vnodeops;
+extern vnodeops_t xfs_vnodeops;
 
 /*
  * Inode hashing and hash bucket locking.
@@ -227,7 +227,7 @@ again:
 	}
 	vp = vn_alloc(XFS_MTOVFS(mp), IFTOVT(ip->i_d.di_mode),
 		      ip->i_df.if_u2.if_rdev);
-	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops, 0);
+	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
 	bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
 
 	init_mrlock(&ip->i_lock, "xfsino", vp->v_number);
