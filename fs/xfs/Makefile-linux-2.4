@@ -258,9 +258,6 @@ symlinks:
 	@if [ ! -d include/linux/modules ]; then \
 		mkdir include/linux/modules; \
 	fi
-	if [ -d fs/xfs ]; then \
-		(cd fs/xfs; $(MAKE) links)\
-	fi
 	
 oldconfig: symlinks
 	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
