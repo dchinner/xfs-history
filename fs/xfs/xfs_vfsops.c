@@ -893,7 +893,7 @@ xfs_statvfs(
 		if (!mp->m_inoadd)
 #endif
 			statp->f_files =
-			    MIN((__uint64_t)statp->f_files, mp->m_maxicount);
+			    MIN(statp->f_files, (long)mp->m_maxicount);
 	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
