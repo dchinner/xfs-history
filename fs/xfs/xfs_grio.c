@@ -353,13 +353,11 @@ static atomic_t xfs_grio_isopen = ATOMIC_INIT(0);
 
 static int xfs_grio_open(struct inode *inode, struct file *file)
 {
-        MOD_INC_USE_COUNT;
         return 0;
 }
 
 static int xfs_grio_release(struct inode *inode, struct file *file)
 {
-        MOD_DEC_USE_COUNT;
         return 0;
 }
 
