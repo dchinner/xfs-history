@@ -39,7 +39,6 @@
 
 #include <xfs_arch.h>
 
-#include <support/kmem.h>
 #include <support/mrlock.h>
 #include <support/qsort.h>
 #include <support/spin.h>
@@ -52,14 +51,16 @@
 #include <support/uuid.h>
 #include <support/time.h>
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#include <linux-2.6/kmem.h>
 #include <linux-2.6/xfs_linux.h>
 #else
+#include <linux-2.4/kmem.h>
 #include <linux-2.4/xfs_linux.h>
 #endif
 
 
 #include <xfs_fs.h> 
-#include <xfs_buf.h>
+/* #include <xfs_buf.h> */
 
 #endif	/* __XFS_H__ */

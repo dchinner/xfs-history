@@ -44,7 +44,6 @@ endif
 export-objs			:= ktrace.o
 
 obj-y				:= debug.o \
-				   kmem.o \
 				   move.o \
 				   mrlock.o \
 				   qsort.o \

@@ -30,7 +30,9 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-EXTRA_CFLAGS +=	 -Ifs/xfs -funsigned-char
+EXTRA_CFLAGS +=	 -Ifs/xfs -Ifs/xfs/linux-2.6 -funsigned-char
+
+XFS_LINUX := linux-2.6
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
@@ -91,8 +93,8 @@ xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
 xfs-$(CONFIG_XFS_POSIX_CAP)	+= xfs_cap.o
 xfs-$(CONFIG_XFS_POSIX_MAC)	+= xfs_mac.o
-xfs-$(CONFIG_PROC_FS)		+= linux/xfs_stats.o
-xfs-$(CONFIG_SYSCTL)		+= linux/xfs_sysctl.o
+xfs-$(CONFIG_PROC_FS)		+= $(XFS_LINUX)/xfs_stats.o
+xfs-$(CONFIG_SYSCTL)		+= $(XFS_LINUX)/xfs_sysctl.o
 
 
 xfs-y				+= xfs_alloc.o \
@@ -138,7 +140,7 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_utils.o \
 				   xfs_vfsops.o \
 				   xfs_vnodeops.o \
-				   xfs_rw.o
+				   xfs_rw.o \
 				   xfs_behavior.o \
 				   xfs_iomap.o
 
@@ -147,7 +149,7 @@ xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
 
 # Objects in linux/
-xfs-y				+= $(addprefix linux-2.6/, \
+xfs-y				+= $(addprefix $(XFS_LINUX)/, \
 				   xfs_aops.o \
 				   xfs_file.o \
 				   xfs_fs_subr.o \
@@ -157,7 +159,8 @@ xfs-y				+= $(addprefix linux-2.6/, \
 				   xfs_lrw.o \
 				   xfs_super.o \
 				   xfs_vfs.o \
-				   xfs_vnode.o)
+				   xfs_vnode.o \
+				   xfs_buf.o)
 
 # Objects in support/
 xfs-y				+= $(addprefix support/, \

@@ -40,9 +40,11 @@
 
 
 #if USE_RW_WAIT_QUEUE_SPINLOCK
-# define wq_write_lock	write_lock
+# define wq_write_lock		write_lock
+# define wq_write_unlock	write_unlock
 #else
-# define wq_write_lock	spin_lock
+# define wq_write_lock		spin_lock
+# define wq_write_unlock	spin_unlock
 #endif
 
 /*
