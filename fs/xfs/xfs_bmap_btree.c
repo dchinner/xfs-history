@@ -645,15 +645,18 @@ xfs_bmbt_insrec(
 				xfs_btree_check_lptr(cur, *pp, level);
 				askbno = *pp;
 				type = XFS_ALLOCTYPE_START_BNO;
-			} else
+			} else if (cur->bc_private.b.flags & XFS_BTCUR_BPRV_LOWSPC)
+				type = XFS_ALLOCTYPE_FIRST_AG;
+			else
 				type = XFS_ALLOCTYPE_NEAR_BNO;
 			cbno = xfs_alloc_extent(tp, askbno, 1, type, 0, 0,
-				cur->bc_private.b.wasdel);
+				cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL);
 			if (cbno == NULLFSBLOCK) {
 				xfs_bmbt_trace_cursor("xfs_bmbt_insrec exit1",
 					cur);
 				return 0;
 			}
+			cur->bc_private.b.firstblock = cbno;
 			cur->bc_private.b.allocated++;
 			ip->i_d.di_nblocks++;
 			bp = xfs_btree_get_bufl(mp, tp, cbno, 0);
@@ -1425,14 +1428,17 @@ xfs_bmbt_split(
 	if ((bno = cur->bc_private.b.firstblock) == NULLFSBLOCK) {
 		bno = lbno;
 		type = XFS_ALLOCTYPE_START_BNO;
-	} else
+	} else if (cur->bc_private.b.flags & XFS_BTCUR_BPRV_LOWSPC)
+		type = XFS_ALLOCTYPE_FIRST_AG;
+	else
 		type = XFS_ALLOCTYPE_NEAR_BNO;
 	rbno = xfs_alloc_extent(tp, bno, 1, type, 0, 0,
-		cur->bc_private.b.wasdel);
+		cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL);
 	if (rbno == NULLFSBLOCK) {
 		xfs_bmbt_trace_cursor("xfs_bmbt_split exit0", cur);
 		return 0;
 	}
+	cur->bc_private.b.firstblock = rbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
@@ -1641,7 +1647,7 @@ xfs_bmbt_trace_cursor(
 
 	xfs_bmbt_set_all(&r, &cur->bc_rec.b);
 	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_CUR,
-		(cur->bc_nlevels << 16) | cur->bc_private.b.wasdel,
+		(cur->bc_nlevels << 16) | cur->bc_private.b.flags,
 		cur->bc_private.b.allocated,
 		r.l0, r.l1, r.l2, r.l3,
 		(int)cur->bc_bufs[0], (int)cur->bc_bufs[1],
@@ -2044,8 +2050,8 @@ xfs_bmbt_insert(
 			ASSERT((cur->bc_private.b.firstblock != NULLFSBLOCK) ||
 			       (cur->bc_private.b.ip->i_d.di_flags & 
 				XFS_DIFLAG_REALTIME));
-			ASSERT(cur->bc_private.b.firstblock ==
-			       pcur->bc_private.b.firstblock);
+			cur->bc_private.b.firstblock =
+				pcur->bc_private.b.firstblock;
 			ASSERT(cur->bc_private.b.flist ==
 			       pcur->bc_private.b.flist);
 			xfs_btree_del_cursor(pcur);

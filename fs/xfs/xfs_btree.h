@@ -138,7 +138,9 @@ typedef struct xfs_btree_cur
 			xfs_fsblock_t	firstblock;	/* 1st blk allocated */
 			struct xfs_bmap_free *flist;	/* list to free after */
 			int		allocated;	/* count of alloced */
-			int		wasdel;		/* was-delayed flag */
+			int		flags;		/* flags */
+#define	XFS_BTCUR_BPRV_WASDEL	1			/* was delayed */
+#define	XFS_BTCUR_BPRV_LOWSPC	2			/* in low-space mode */
 		} b;
 		struct {			/* needed for INO */
 			buf_t		*agbp;	/* agi buffer pointer */

@@ -1599,7 +1599,8 @@ xfs_alloc_fix_freelist(
 	/*
 	 * If there isn't enough total or single-extent, reject it.
 	 */
-	if (minlen > agf->agf_longest ||
+	if (minlen >
+	    (agf->agf_longest ? agf->agf_longest : agf->agf_freecount > 0) ||
 	    (minleft &&
 	     (int)(agf->agf_freeblks + agf->agf_freecount - need - total) <
 	     minleft)) {
