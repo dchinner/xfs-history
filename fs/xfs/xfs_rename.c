@@ -564,7 +564,7 @@ xfs_rename_ancestor_check(
 		ASSERT(ip != NULL);
 		if (((ip->i_d.di_mode & IFMT) != IFDIR) ||
 		    (ip->i_d.di_nlink == 0)) {
-                        prdev("Ancestor inode %d is not a directory",
+                        prdev("Ancestor inode %Ld is not a directory",
 			      ip->i_dev, ip->i_ino);
                         error = XFS_ERROR(ENOTDIR);
                         break;
