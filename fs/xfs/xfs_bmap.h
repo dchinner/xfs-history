@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -95,10 +95,12 @@ typedef struct xfs_bmbt_irec
  */
 #define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - offsetof(xfs_dinode_t, di_u)) 
 #define	XFS_BMAP_BROOT_REC_ADDR(bb,i,isz) XFS_BTREE_REC_ADDR(isz,xfs_bmbt_rec_t,bb,i)
-#define XFS_BMAP_BROOT_PTR_ADDR(bb,i,isz) XFS_BTREE_PTR_ADDR(isz,xfs_bmbt_rec_t,bb,i)
+#define XFS_BMAP_BROOT_PTR_ADDR(bb,i,isz) XFS_BTREE_ROOT_PTR_ADDR(isz,xfs_bmbt_rec_t,bb,i)
 
 #define	XFS_BMAP_BROOT_NUMRECS(bb) ((bb)->bb_numrecs)
+#define	XFS_BMAP_BROOT_MAXRECS(sz) XFS_BTREE_BLOCK_MAXRECS(sz,xfs_bmbt_rec_t,1)
 #define	XFS_BMAP_BROOT_SPACE(bb) (sizeof(xfs_btree_block_t) + ((bb)->bb_numrecs * (sizeof(xfs_bmbt_rec_t) + sizeof(xfs_agblock_t))))
+#define	XFS_BMAP_BROOT_SPACE_CALC(nrecs) (sizeof(xfs_btree_block_t) + ((nrecs) * (sizeof(xfs_bmbt_rec_t) + sizeof(xfs_agblock_t))))
 
 #define	XFS_BMAP_MAXLEVELS	5	/* ??? */
 
