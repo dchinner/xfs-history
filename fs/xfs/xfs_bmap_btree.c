@@ -179,7 +179,7 @@ xfs_bmbt_split(
 	xfs_bmbt_key_t		*keyp,
 	xfs_btree_cur_t		**curp);
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 /*
  * Add a trace buffer entry for arguments, for a buffer & 1 integer arg.
  */
@@ -291,7 +291,7 @@ xfs_bmbt_trace_enter(
 #define	xfs_bmbt_trace_argifr(n,c,i,f,r)
 #define	xfs_bmbt_trace_argik(n,c,i,k)
 #define	xfs_bmbt_trace_cursor(n,c)
-#endif
+#endif	/* DEBUG && !SIM */
 
 /*
  * Update keys for the record.
@@ -1492,7 +1492,7 @@ xfs_bmbt_split(
 	return 1;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(SIM)
 /*
  * Add a trace buffer entry for arguments, for a buffer & 1 integer arg.
  */
@@ -1679,7 +1679,7 @@ xfs_bmbt_trace_enter(
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
 		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
 }
-#endif
+#endif	/* DEBUG && !SIM */
 
 /*
  * Update keys for the record.
