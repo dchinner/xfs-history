@@ -49,16 +49,8 @@ linvfs_read(
 	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	ASSERT(vp);
 
-	XFS_STATS_INC(xfsstats.xs_read_calls);
-	XFS_STATS_ADD(xfsstats.xs_read_bytes, size);
-        
 	VOP_READ(vp, filp, buf, size, offset, NULL, error);
 
-	/*
-	 * If we got a return value, it was an error
-	 * Flip to negative & return that
-	 * Otherwise, return bytes actually read
-	 */
 	return(error);
 }
 
@@ -170,9 +162,6 @@ linvfs_write(
 	err = 0;
 	if (count == 0)
 		goto out;
-
-	XFS_STATS_INC(xfsstats.xs_write_calls);
-	XFS_STATS_ADD(xfsstats.xs_write_bytes, count);
 
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);

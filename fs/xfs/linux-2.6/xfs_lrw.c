@@ -68,6 +68,69 @@ xfs_strat_write_check(
 
 #endif /* DEBUG */
 
+
+/*
+ *	pagebuf_iozero
+ *
+ *	pagebuf_iozero clears the specified range of buffer supplied,
+ *	and marks all the affected blocks as valid and modified.  If
+ *	an affected block is not allocated, it will be allocated.  If
+ *	an affected block is not completely overwritten, and is not
+ *	valid before the operation, it will be read from disk before
+ *	being partially zeroed. 
+ */
+STATIC int
+pagebuf_iozero(
+	struct inode		*ip,	/* inode owning buffer		*/
+	page_buf_t		*pb,	/* buffer to zero               */
+	off_t			boff,	/* offset in buffer             */
+	size_t			bsize,	/* size of data to zero         */
+	loff_t			end_size)	/* max file size to set	*/
+{
+	loff_t			cboff, pos;
+	size_t			cpoff, csize;
+	struct page		*page;
+	struct address_space	*mapping;
+	char			*kaddr;
+
+	cboff = boff;
+	boff += bsize; /* last */
+
+	/* check range */
+	if (boff > pb->pb_buffer_length)
+		return (-ENOENT);
+
+	while (cboff < boff) {
+		if (pagebuf_segment(pb, &cboff, &page, &cpoff, &csize, 0)) {
+			return (-ENOMEM);
+		}
+		ASSERT(((csize + cpoff) <= PAGE_CACHE_SIZE));
+		lock_page(page);
+
+		mapping = page->mapping;
+
+		kaddr = kmap(page);
+		mapping->a_ops->prepare_write(NULL, page, cpoff, cpoff+csize);
+
+		memset((void *) (kaddr + cpoff), 0, csize);
+		flush_dcache_page(page);
+		mapping->a_ops->commit_write(NULL, page, cpoff, cpoff+csize);
+		pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) +
+			cpoff + csize;
+		if (pos > ip->i_size)
+			ip->i_size = pos < end_size ? pos : end_size;
+
+		kunmap(page);
+		unlock_page(page);
+	}
+
+	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
+	pb->pb_flags &= ~(PBF_PARTIAL | PBF_NONE);
+
+	return (0);
+}
+
+
 ssize_t				/* error (positive) */
 xfs_read(
         bhv_desc_t      *bdp,
@@ -80,7 +143,6 @@ xfs_read(
 	ssize_t		ret;
 	xfs_fsize_t	n;
 	xfs_inode_t	*ip;
-	struct inode	*linux_ip = file->f_dentry->d_inode;
 	xfs_iocore_t	*io;
 	xfs_mount_t	*mp;
         
@@ -88,8 +150,10 @@ xfs_read(
 	io = &(ip->i_iocore);
 	mp = io->io_mount;
 
+	XFS_STATS_INC(xfsstats.xs_read_calls);
+
 	if (file->f_flags & O_DIRECT) {
-		if (((__psint_t)buf & (linux_ip->i_sb->s_blocksize - 1)) ||
+		if (((__psint_t)buf & BBMASK) ||
 		    (*offset & mp->m_blockmask) ||
 		    (size & mp->m_blockmask)) {
 			if (*offset == XFS_SIZE(mp, io)) {
@@ -130,6 +194,8 @@ xfs_read(
 
 	ret = generic_file_read(file, buf, size, offset);
 	XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
+
+	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
 
 	if (!(file->f_mode & FINVIS))
 		XFS_CHGTIME(mp, io, XFS_ICHGTIME_ACC);
@@ -421,9 +487,7 @@ xfs_write(
         cred_t          *credp)
 {
 	xfs_inode_t	*xip;
-	struct inode	*ip = file->f_dentry->d_inode;
 	xfs_mount_t	*mp;
-	xfs_trans_t	*tp;
 	ssize_t		ret;
 	int		error = 0;
 	xfs_fsize_t     isize, new_size;
@@ -433,10 +497,9 @@ xfs_write(
 	int		iolock;
 	int		direct = file->f_flags & O_DIRECT;
 	int		eventsent = 0;
-	loff_t		savedsize = *offset;
 	vrwlock_t	locktype;
-	unsigned int	mode;
 
+	XFS_STATS_INC(xfsstats.xs_write_calls);
 
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
@@ -454,7 +517,7 @@ xfs_write(
 	}
 
 	if (direct) {
-		if (((__psint_t)buf & (ip->i_sb->s_blocksize - 1)) ||
+		if (((__psint_t)buf & BBMASK) ||
 		    (*offset & mp->m_blockmask) ||
 		    (size  & mp->m_blockmask)) {
 			return XFS_ERROR(EINVAL);
@@ -468,6 +531,9 @@ xfs_write(
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 	isize = xip->i_d.di_size;
+
+	if (file->f_flags & O_APPEND)
+		*offset = isize;
 
 start:
 	n = limit - *offset;
@@ -483,8 +549,9 @@ start:
 		io->io_new_size = new_size;
 	}
 
-	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
+	if ((DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_WRITE) &&
 	    !(file->f_mode & FINVIS) && !eventsent)) {
+		loff_t		savedsize = *offset;
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 		error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
@@ -542,10 +609,27 @@ start:
 	}
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
 
+	/*
+	 * If we're writing the file then make sure to clear the
+	 * setuid and setgid bits if the process is not being run
+	 * by root.  This keeps people from modifying setuid and
+	 * setgid binaries.
+	 */
+
+	if (((xip->i_d.di_mode & ISUID) ||
+	    ((xip->i_d.di_mode & (ISGID | (IEXEC >> 3))) ==
+		(ISGID | (IEXEC >> 3)))) &&
+	     !capable(CAP_FSETID)) {
+		error = xfs_write_clear_setuid(xip);
+		if (error) {
+			xfs_iunlock(xip, iolock);
+			return error;
+		}
+	}
+
 retry:
 	if (direct) {
-		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset,
-			(xfs_off_t) size, (void *)vp, 1);
+		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 
 	/*
@@ -563,17 +647,17 @@ retry:
 #endif
 
 	if ((ret == -ENOSPC) &&
-	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
+	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
 	    !(file->f_mode & FINVIS)) {
 
 		xfs_rwunlock(bdp, locktype);
 		error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
 				DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
 				0, 0, 0); /* Delay flag intentionally  unused */
-		xfs_rwlock(bdp, locktype);
 		if (error)
 			return error;
-		*offset = ip->i_size;
+		xfs_rwlock(bdp, locktype);
+		*offset = xip->i_d.di_size;
 		goto retry;
 		
 	}
@@ -587,31 +671,18 @@ retry:
 		return ret;
 	}
 
-	/*
-	 * ret > 0 == number of bytes written by pagebuf_generic_file_write()
-	 */
+	XFS_STATS_ADD(xfsstats.xs_write_bytes, ret);
 
-	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
-		
-	/* set S_IGID if S_IXGRP is set, and always set S_ISUID */
-	mode = (ip->i_mode & S_IXGRP)*(S_ISGID/S_IXGRP) | S_ISUID;
-
-	/* were any of the uid bits set? */
-	mode &= ip->i_mode;
-	if (mode && !capable(CAP_FSETID)) {
-		ip->i_mode &= ~mode;
-		xfs_write_clear_setuid(xip);
-	}
 	if (*offset > xip->i_d.di_size) {
 		XFS_SETSIZE(mp, io, *offset);
 	}
 	
 	/* Handle various SYNC-type writes */
-	if ((file->f_flags & O_SYNC) || IS_SYNC(ip)) {
+	if ((file->f_flags & O_SYNC) || IS_SYNC(file->f_dentry->d_inode)) {
 
 		/* Flush all inode data buffers */
 
-		error = -filemap_fdatawrite(ip->i_mapping);
+		error = -filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
 		if (error)
 			goto out;
 		
@@ -656,6 +727,8 @@ retry:
 			}
 
 		} else {
+			xfs_trans_t	*tp;
+
 			/*
 			 * O_SYNC or O_DSYNC _with_ a size update are handled 
 			 * the same way.
