@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision: 1.93 $"
 
 /*
  * Free space allocation for XFS.
@@ -971,6 +971,7 @@ xfs_alloc_ag_vextent_near(
 	xfs_agblock_t	ltbno;		/* start bno of left side entry */
 	xfs_agblock_t	ltbnoa;		/* aligned ... */
 	xfs_extlen_t	ltdiff;		/* difference to left side entry */
+	/*REFERENCED*/
 	xfs_agblock_t	ltend;		/* end bno of left side entry */
 	xfs_extlen_t	ltlen;		/* length of left side entry */
 	xfs_extlen_t	ltlena;		/* aligned ... */
