@@ -1,4 +1,4 @@
-#ident "$Revision: 1.207 $"
+#ident "$Revision: 1.209 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1531,7 +1531,6 @@ xfs_zero_last_block(
 				next_fsb++;
 			}
 			if (hole) {
-				vnode_pages_sethole(vp, pfdp, 1);
 				/*
 				 * In order to make processes notice the
 				 * newly set P_HOLE flag, blow away any
@@ -1541,7 +1540,7 @@ xfs_zero_last_block(
 				 */
 				if (VN_MAPPED(vp)) {
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					remapf(vp, ctooff(offtoct(isize)), 1);
+					VOP_PAGES_SETHOLE(vp, pfdp, 1);
 					xfs_ilock(ip, XFS_ILOCK_EXCL);
 				}
 			}
@@ -4155,7 +4154,7 @@ xfs_strat_write(
 	/*
 	 * Drop the count of queued buffers. We need to do
 	 * this before the bdstrat(s) because callers of
-	 * pflushinvalvp(), for example, may expect the queued_buf
+	 * VOP_FLUSHINVAL_PAGES(), for example, may expect the queued_buf
 	 * count to be down when it rturns. See xfs_itruncate_start.
 	 */
 	atomicAddInt(&(ip->i_queued_bufs), -1);
@@ -5007,22 +5006,6 @@ xfs_inval_cached_pages(
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	}
 	/*
-	 * Set the VREMAPPING bit so that vfault can't
-	 * race in between the remapf and the pflushinvalvp
-	 * calls.
-	 */
-	VN_FLAGSET(vp, VREMAPPING);
-	if (VN_MAPPED(vp)) {
-		/*
-		 * Blow away mmap mappings to the files pages
-		 * since we're going to invalidate the pages.
-		 * Round the offset down to a page boundary since
-		 * remapf() rounds it up and we don't want it to
-		 * miss anything.
-		 */
-		remapf(vp, ctooff(offtoct(offset)), 1);
-	}
-	/*
 	 * Round up to the next page boundary and then back
 	 * off by one byte.  We back off by one because this
 	 * is a first byte/last byte interface rather than
@@ -5039,8 +5022,8 @@ xfs_inval_cached_pages(
 	if (flush_end > (__uint64_t)LONGLONG_MAX) {
 		flush_end = LONGLONG_MAX;
 	}
-	pflushinvalvp(vp, ctooff(offtoct(offset)), (off_t)flush_end);
-	VN_FLAGCLR(vp, VREMAPPING);
+	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), (off_t)flush_end,
+			FI_REMAPF_LOCKED);
 	if (relock) {
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);

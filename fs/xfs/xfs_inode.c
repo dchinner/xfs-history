@@ -1,4 +1,4 @@
-#ident "$Revision: 1.219 $"
+#ident "$Revision: 1.220 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1406,9 +1406,9 @@ xfs_itruncate_start(
 	mp = ip->i_mount;
 	vp = XFS_ITOV(ip);
 	/*
-	 * Call ptossvp() or pflushinvalvp() to get rid of pages and buffers
+	 * Call VOP_TOSS_PAGES() or VOP_FLUSHINVAL_PAGES() to get rid of pages and buffers
 	 * overlapping the region being removed.  We have to use
-	 * the less efficient pflushinvalvp() in the case that the
+	 * the less efficient VOP_FLUSHINVAL_PAGES() in the case that the
 	 * caller may not be able to finish the truncate without
 	 * dropping the inode's I/O lock.  Make sure
 	 * to catch any pages brought in by buffers overlapping
@@ -1417,10 +1417,10 @@ xfs_itruncate_start(
 	 * so that we don't toss things on the same block as
 	 * new_size but before it.
 	 *
-	 * Before calling ptossvp() or pflushinvalvp(), make sure to
+	 * Before calling VOP_TOSS_PAGES() or VOP_FLUSHINVAL_PAGES(), make sure to
 	 * call remapf() over the same region if the file is mapped.
 	 * This frees up mapped file references to the pages in the
-	 * given range and for the pflushinvalvp() case it ensures
+	 * given range and for the VOP_FLUSHINVAL_PAGES() case it ensures
 	 * that we get the latest mapped changes flushed out.
 	 */
 	toss_start = XFS_B_TO_FSB(mp, (xfs_ufsize_t)new_size);
@@ -1437,24 +1437,11 @@ xfs_itruncate_start(
 	xfs_itrunc_trace(XFS_ITRUNC_START, ip, flags, new_size, toss_start,
 			 last_byte);
 	if (last_byte > toss_start) {
-		/*
-		 * Set the VREMAPPING bit so that vfault can't
-		 * race in between the remapf and the pflushinvalvp
-		 * calls.
-		 */
-		VN_FLAGSET(vp, VREMAPPING);
 		if (flags & XFS_ITRUNC_DEFINITE) {
-			if (VN_MAPPED(vp)) {
-				remapf(vp, toss_start, 0);
-			}
-			ptossvp(vp, toss_start, last_byte);
+			VOP_TOSS_PAGES(vp, toss_start, last_byte, FI_REMAPF_LOCKED);
 		} else {
-			if (VN_MAPPED(vp)) {
-				remapf(vp, toss_start, 1);
-			}
-			pflushinvalvp(vp, toss_start, last_byte);
+			VOP_FLUSHINVAL_PAGES(vp, toss_start, last_byte, FI_REMAPF_LOCKED);
 		}
-		VN_FLAGCLR(vp, VREMAPPING);
 	}
 
 #ifdef DEBUG

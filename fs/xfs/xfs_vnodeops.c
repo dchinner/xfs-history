@@ -1,4 +1,4 @@
-#ident "$Revision: 1.333 $"
+#ident "$Revision: 1.334 $"
 
 
 #ifdef SIM
@@ -1335,6 +1335,8 @@ xfs_fsync(
 {
 	xfs_inode_t	*ip;
 	int		error;
+	/* REFERENCED */
+	int		error2;
 					/* REFERENCED */
 	int		syncall;
 	vnode_t 	*vp;
@@ -1368,18 +1370,7 @@ xfs_fsync(
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_df.if_flags & XFS_IFEXTENTS &&
 		    ip->i_df.if_bytes > 0) {
-			/*
-			 * Set the VREMAPPING bit so that vfault can't
-			 * race in between the remapf and the pflushinvalvp
-			 * calls.
-			 */
-
-			VN_FLAGSET(vp, VREMAPPING);
-			if (VN_MAPPED(vp)) {
-				remapf(vp, start, 1);
-			}
-			pflushinvalvp(vp, start, stop);
-			VN_FLAGCLR(vp, VREMAPPING);
+			VOP_FLUSHINVAL_PAGES(vp, start, stop, FI_REMAPF_LOCKED);
 		}
 		ASSERT(syncall == 0 ||
 		       (vp->v_pgcnt == 0 && vp->v_buf == 0));
@@ -1389,7 +1380,8 @@ xfs_fsync(
 		 * flush all the dirty mmap'd pages.  That requires a
 		 * call to msync().
 		 */
-		pflushvp(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
+		VOP_FLUSH_PAGES(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : B_ASYNC,
+				FI_NONE, error2);
 	}
 
 	/*
@@ -1401,9 +1393,10 @@ xfs_fsync(
 	 * and we don't want to force it to acquire the I/O
 	 * lock unnecessarily.
 	 */
-	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
+	/*ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
 	       syncall == 0 ||
 	       (!VN_DIRTY(vp) && (ip->i_queued_bufs == 0)));
+	       */
 	/*
 	 * We always need to make sure that the required inode state
 	 * is safe on disk.  The vnode might be clean but because
@@ -5175,7 +5168,7 @@ xfs_reclaim(
 	 * the inode to be reclaimed.  This is to avoid many different
 	 * deadlocks.
 	 *
-	 * Doing the pflushinvalvp() can cause
+	 * Doing the VOP_FLUSHINVAL_PAGES() can cause
 	 * us to wait in the buffer cache.  We can be called here via
 	 * vn_alloc() from xfs_iget().  We can be holding any number of
 	 * locks at that point in the middle of a transaction, so we
@@ -5247,15 +5240,16 @@ xfs_reclaim(
 			 * If we hit an IO error, we need to make sure that the
 			 * buffer and page caches of file data for
 			 * the file are tossed away. We don't want to use 
-			 * pflushinvalvp here because we don't want dirty
+			 * VOP_FLUSHINVAL_PAGES here because we don't want dirty
 			 * pages to stay attached to the vnode, but be
 			 * marked P_BAD. pdflush/vnode_pagebad
 			 * hates that.
 			 */
-			if (!XFS_FORCED_SHUTDOWN(ip->i_mount))
-				pflushinvalvp(vp, 0, last_byte);	
-			else
-				ptossvp(vp, 0, XFS_MAX_FILE_OFFSET);
+			if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
+				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte, FI_NONE);	
+			} else {
+				VOP_TOSS_PAGES(vp, 0, XFS_MAX_FILE_OFFSET, FI_NONE);
+			}
 			
 			ASSERT(!VN_DIRTY(vp) && 
 			       (ip->i_queued_bufs == 0) &&
@@ -5269,7 +5263,7 @@ xfs_reclaim(
 			 * di_size field may not be quite accurate if we're
 			 * shutting down.
 			 */
-			ptossvp(vp, 0, XFS_MAX_FILE_OFFSET);
+			VOP_TOSS_PAGES(vp, 0, XFS_MAX_FILE_OFFSET, FI_NONE);
 			ASSERT(!VN_DIRTY(vp) && 
 			       (ip->i_queued_bufs == 0) &&
 			       (vp->v_pgcnt == 0) &&
@@ -5920,6 +5914,11 @@ vnodeops_t xfs_vnodeops = {
 	(vop_cover_t)fs_nosys,
 	(vop_link_removed_t)fs_nosys,
 	(vop_vnode_change_t)fs_nosys,
+	fs_tosspages,
+	fs_flushinval_pages,
+	fs_flush_pages,
+	fs_invalfree_pages,
+	fs_pages_sethole,
 };
 
 #else
@@ -5973,6 +5972,11 @@ vnodeops_t xfs_vnodeops = {
 	fs_cover,
 	(vop_link_removed_t)fs_noval,
 	fs_vnode_change,
+	fs_tosspages,
+	fs_flushinval_pages,
+	fs_flush_pages,
+	fs_invalfree_pages,
+	fs_pages_sethole,
 };
 
 #endif /* SIM */

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.174 $"
+#ident  "$Revision: 1.175 $"
 
 
 #include <limits.h>
@@ -1263,7 +1263,7 @@ devvptoxfs(
 	xfs_sb_t	**fsp,
 	cred_t		*cr)
 {
-	int	retval;
+	int		retval;
 	buf_t		*bp;
 	dev_t		dev;
 	int		error;
@@ -1670,13 +1670,10 @@ xfs_sync(
 			 */
 			last_byte = xfs_file_last_byte(ip);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-			if (VN_MAPPED(vp)) {
-				remapf(vp, 0, 1);
-			}
 			if (XFS_FORCED_SHUTDOWN(mp)) {
-				ptossvp(vp, 0, last_byte);
+				VOP_TOSS_PAGES(vp, 0, last_byte, FI_REMAPF);
 			} else {
-				pflushinvalvp(vp, 0, last_byte);
+				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte, FI_REMAPF);
 			}
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		} else if (flags & SYNC_DELWRI) {
@@ -1693,8 +1690,8 @@ xfs_sync(
 				 */
 				last_byte = xfs_file_last_byte(ip);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				error = pflushvp(vp, (off_t)0, last_byte,
-						 fflag);
+				VOP_FLUSH_PAGES(vp, (off_t)0, last_byte,
+						 fflag, FI_NONE, error);
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
 

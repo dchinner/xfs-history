@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.193 $"
+#ident	"$Revision: 1.194 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -4304,15 +4304,8 @@ xfs_getbmap(
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	if (whichfork == XFS_DATA_FORK && ip->i_delayed_blks) {
 		last_byte = xfs_file_last_byte(ip);
-		if (VN_MAPPED(vp)) {
-			/*
-			 * Force any dirty mmap pages to be flushed as
-			 * well so that we eliminate all delayed allocation
-			 * extents.
-			 */
-			remapf(vp, 0, 1);
-		}
-		pflushvp(vp, (off_t)0, (off_t)last_byte, 0);
+		VOP_FLUSH_PAGES(vp, (off_t)0, (off_t)last_byte, 0, 
+			FI_REMAPF, error);
 	}
 	ASSERT(whichfork == XFS_ATTR_FORK || ip->i_delayed_blks == 0);
 	lock = xfs_ilock_map_shared(ip);
