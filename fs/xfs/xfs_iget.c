@@ -1,4 +1,4 @@
-#ident "$Revision: 1.63 $"
+#ident "$Revision: 1.65 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -65,7 +65,6 @@ xfs_ihash_init(xfs_mount_t *mp)
 {
 	int	i;
 	ulong	hsize;	
-	char	name[8];
 	extern int	ncsize;
 
 	/*
@@ -83,8 +82,8 @@ xfs_ihash_init(xfs_mount_t *mp)
 						 KM_SLEEP);
 	ASSERT(mp->m_ihash != NULL);
 	for (i = 0; i < hsize; i++) {
-		mutex_init(&(mp->m_ihash[i].ih_lock), MUTEX_DEFAULT,
-			  makesname(name, "xih", i));
+		init_mutex(&(mp->m_ihash[i].ih_lock), MUTEX_DEFAULT,
+			   "xihash", i);
 	}
 }
 
@@ -152,7 +151,6 @@ xfs_iget(
 	int		error;
 	int		newnode;
 	vmap_t		vmap;
-	char		name[8];
 
 	SYSINFO.iget++;
 	XFSSTATS.xs_ig_attempts++;
@@ -229,14 +227,13 @@ again:
 	vp = vn_alloc(&xfs_vnodeops, mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
 		      ip->i_df.if_u2.if_rdev, ip);
 
-	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
-	mrinit(&ip->i_iolock, makesname(name, "xio", (int)vp->v_number));
+	init_mrlock(&ip->i_lock, "xfsino", vp->v_number);
+	init_mrlock(&ip->i_iolock, "xfsio", vp->v_number);
 #ifdef NOTYET
 	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
 #endif /* NOTYET */
-	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
-	sv_init(&ip->i_pinsema, SV_DEFAULT,
-		makesname(name, "pino", vp->v_number));
+	init_sema(&ip->i_flock, 1, "xfsfino", vp->v_number);
+	init_sv(&ip->i_pinsema, SV_DEFAULT, "xfspino", vp->v_number);
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
 	}
