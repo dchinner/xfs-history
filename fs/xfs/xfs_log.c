@@ -260,8 +260,10 @@ xfs_log_done(xfs_mount_t	*mp,
 	xlog_ticket_t	*ticket = (xfs_log_ticket_t) xtic;
 	xfs_lsn_t	lsn	= 0;
 	
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
+#endif
 
 	/* If nothing was ever written, don't write out commit record */
 	if ((ticket->t_flags & XLOG_TIC_INITED) == 0)
@@ -310,8 +312,10 @@ xfs_log_force(xfs_mount_t *mp,
 {
 	xlog_t *log = mp->m_log;
 
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
+#endif
 	if (flags & XFS_LOG_FORCE) {
 		return(xlog_state_sync(log, lsn, flags));
 	} else if (flags & XFS_LOG_URGE) {
@@ -339,8 +343,10 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 {
 	xlog_t *log = mp->m_log;
 
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return;
+#endif
 	cb->cb_next = 0;
 	if (xlog_state_lsn_is_synced(log, lsn, cb))
 		cb->cb_func(cb->cb_arg);
@@ -381,17 +387,14 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	xlog_t		*log = mp->m_log;
 	xlog_ticket_t	*internal_ticket;
 	
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
+#endif
 
-	if (client != XFS_TRANSACTION && client != XFS_LOG)
-		return -1;
-	
-	if (flags & XFS_LOG_NOSLEEP) {
-		xlog_panic("xfs_log_reserve: not implemented");
-		return XFS_ENOTSUP;
-	}
-	
+	ASSERT(client == XFS_TRANSACTION || client == XFS_LOG);
+	ASSERT((flags & XFS_LOG_NOSLEEP) == 0);
+
 	if (*ticket != NULL) {
 		ASSERT(flags & XFS_LOG_PERM_RESERV);
 		internal_ticket = (xlog_ticket_t *)*ticket;
@@ -514,8 +517,10 @@ xfs_log_unmount(xfs_mount_t *mp)
 	int		 error;
 	int		 spl;
 
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
+#endif
 
 	if (xfs_log_force(mp, 0, XFS_LOG_FORCE|XFS_LOG_SYNC))
 		xlog_panic("xfs_log_unmount: log force failed");
@@ -566,12 +571,14 @@ xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_ticket_t	tic,
 	      xfs_lsn_t		*start_lsn)
 {
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	xlog_t *log = mp->m_log;
-	
+
 	if (! xlog_debug && xlog_devt == log->l_dev) {
 		*start_lsn = 0;
 		return 0;
 	}
+#endif
 
 	return xlog_write(mp, reg, nentries, tic, start_lsn, 0);
 }	/* xfs_log_write */
@@ -585,8 +592,10 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	xlog_t		*log = mp->m_log; 
 	int		need_bytes, free_bytes, cycle, bytes, spl;
 
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (!xlog_debug && xlog_devt == log->l_dev)
 		return;
+#endif
 	if (tail_lsn == 0) {
 		/* needed since sync_lsn is 64 bits */
 		spl = LOG_LOCK(log);
@@ -780,6 +789,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 {
 	int size;
 
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	/*
 	 * When logbufs == 0, someone has disabled the log from the FSTAB
 	 * file.  This is not a documented feature.  We need to set xlog_debug
@@ -792,7 +802,9 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 		xlog_debug = 0;
 		xlog_devt = log->l_dev;
 		log->l_iclog_bufs = XLOG_NUM_ICLOGS;
-	} else {
+	} else
+#endif
+	{
 		/*
 		 * This is the normal path.  If m_logbufs == -1, then the
 		 * admin has chosen to use the system defaults for logbuffers.
