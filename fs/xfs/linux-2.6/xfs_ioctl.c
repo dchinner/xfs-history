@@ -34,8 +34,9 @@
 #include <xfs_fsops.h>
 #include <xfs_dfrag.h>
 #include <linux/dcache.h>
-#include <linux/pagemap.h>
+#include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/pagemap.h>
 
 
 extern int xfs_change_file_space(bhv_desc_t *, int,

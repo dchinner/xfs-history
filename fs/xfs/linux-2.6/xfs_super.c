@@ -39,6 +39,7 @@
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/seq_file.h>
+#include <linux/mount.h>
 #include "xfs_version.h"
 
 /* xfs_vfs[ops].c */
@@ -421,9 +422,12 @@ xfs_revalidate_inode(
 	inode->i_size	= ip->i_d.di_size;
 	inode->i_blocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-	inode->i_atime	= ip->i_d.di_atime.t_sec;
-	inode->i_mtime	= ip->i_d.di_mtime.t_sec;
-	inode->i_ctime	= ip->i_d.di_ctime.t_sec;
+	inode->i_atime.tv_sec	= ip->i_d.di_atime.t_sec;
+	inode->i_atime.tv_nsec	= ip->i_d.di_atime.t_nsec;
+	inode->i_mtime.tv_sec	= ip->i_d.di_mtime.t_sec;
+	inode->i_mtime.tv_nsec	= ip->i_d.di_mtime.t_nsec;
+	inode->i_ctime.tv_sec	= ip->i_d.di_ctime.t_sec;
+	inode->i_ctime.tv_nsec	= ip->i_d.di_ctime.t_nsec;
 
 	vp->v_flag &= ~VMODIFIED;
 }
@@ -462,31 +466,20 @@ xfs_initialize_vnode(
 	}
 }
 
-/*ARGSUSED*/
 int
 xfs_blkdev_get(
 	xfs_mount_t		*mp,
 	const char		*name,
 	struct block_device	**bdevp)
 {
-	struct nameidata	nd;
-	int			error;
+	int			error = 0;
 
-	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
-	if (error) {
+	*bdevp = open_bdev_excl(name, 0, BDEV_FS, mp);
+	if (IS_ERR(*bdevp)) {
+		error = PTR_ERR(*bdevp);
 		printk("XFS: Invalid device [%s], error=%d\n", name, error);
-		return -error;
 	}
 
-	/* I think we actually want bd_acquire here..  --hch */
-	*bdevp = bdget(kdev_t_to_nr(nd.dentry->d_inode->i_rdev));
-	if (*bdevp) {
-		error = blkdev_get(*bdevp, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-	} else {
-		error = -ENOMEM;
-	}
-
-	path_release(&nd);
 	return -error;
 }
 
@@ -495,7 +488,7 @@ xfs_blkdev_put(
 	struct block_device	*bdev)
 {
 	if (bdev)
-		blkdev_put(bdev, BDEV_FS);
+		close_bdev_excl(bdev, BDEV_FS);
 }
 
 void
