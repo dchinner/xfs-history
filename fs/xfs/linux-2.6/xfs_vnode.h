@@ -194,8 +194,6 @@ typedef int	(*vop_strategy_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred
 #ifdef CELL_CAPABLE
 typedef int	(*vop_allocstore_t)(bhv_desc_t *, xfs_off_t, size_t, struct cred *);
 #endif
-typedef int	(*vop_fcntl_t)(bhv_desc_t *, int, void *, int, xfs_off_t,
-				struct cred *, union rval *);
 typedef int	(*vop_reclaim_t)(bhv_desc_t *, int);
 typedef int	(*vop_attr_get_t)(bhv_desc_t *, char *, char *, int *, int,
 				struct cred *);
@@ -245,7 +243,6 @@ typedef struct vnodeops {
 #ifdef CELL_CAPABLE
 	vop_allocstore_t	vop_allocstore;
 #endif
-	vop_fcntl_t		vop_fcntl;
 	vop_reclaim_t		vop_reclaim;
 	vop_attr_get_t		vop_attr_get;
 	vop_attr_set_t		vop_attr_set;
@@ -426,12 +423,6 @@ typedef struct vnodeops {
 	VN_BHV_READ_LOCK(&(vp1)->v_bh);					\
 	rv = _VOP_(vop_realvp, vp1)((vp1)->v_fbhv, vp2);		\
 	VN_BHV_READ_UNLOCK(&(vp1)->v_bh);				\
-}
-#define VOP_FCNTL(vp,cmd,a,f,of,cr,rvp,rv)				\
-{									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_fcntl, vp)((vp)->v_fbhv,cmd,a,f,of,cr,rvp);	\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_RECLAIM(vp, flag, rv)					\
 {	/* vnode not reference-able, so no need to lock chain */	\
