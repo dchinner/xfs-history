@@ -511,6 +511,33 @@ xfs_reserve_blocks(
 	return(0);
 }
 
+void
+xfs_fs_log_dummy(xfs_mount_t *mp) 
+{
+	xfs_trans_t *tp;
+	xfs_inode_t *ip;
+	int error;
+
+
+	tp = _xfs_trans_alloc(mp, XFS_TRANS_DUMMY1);
+	atomic_inc(&mp->m_active_trans);
+	if (error = xfs_trans_reserve(tp, 0,
+			XFS_ICHANGE_LOG_RES(mp),
+			0, 0, 0))  {
+		xfs_trans_cancel(tp, 0);
+		return;
+	}
+
+	ip = mp->m_rootip;
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+	xfs_trans_ihold(tp, ip);
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	error = xfs_trans_commit(tp, XFS_TRANS_SYNC, NULL);
+
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+}
 
 int
 xfs_fs_freeze(
@@ -549,6 +576,7 @@ xfs_fs_freeze(
 	/* Push the superblock and write an unmount record */
 	xfs_log_unmount_write(mp);
 	xfs_unmountfs_writesb(mp);
+	xfs_fs_log_dummy(mp);
 
 	return 0;
 }

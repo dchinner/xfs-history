@@ -103,10 +103,17 @@ xfs_trans_alloc(
 	xfs_mount_t	*mp,
 	uint		type)
 {
-	xfs_trans_t	*tp;
-
 	xfs_check_frozen(mp, NULL, 0, XFS_FREEZE_TRANS);
+	return (_xfs_trans_alloc(mp, type));
 
+}
+
+xfs_trans_t *
+_xfs_trans_alloc(
+	xfs_mount_t	*mp,
+	uint		type)
+{
+	xfs_trans_t	*tp;
 	ASSERT(xfs_trans_zone != NULL);
 	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP_IO);
 	tp->t_dqinfo = NULL;
