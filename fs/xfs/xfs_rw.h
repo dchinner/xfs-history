@@ -32,7 +32,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.53 $"
+#ident "$Revision: 1.54 $"
 
 struct bhv_desc;
 struct bmapval;
@@ -172,7 +172,7 @@ xfs_strat_write_iodone(struct xfs_buf *bp);
 
 int
 xfs_bmap(struct bhv_desc	*bdp,
-	 xfs_off_t			offset,
+	 xfs_off_t		offset,
 	 ssize_t		count,
 	 int			flags,
 	 struct cred		*credp,
@@ -180,19 +180,19 @@ xfs_bmap(struct bhv_desc	*bdp,
 	 int			*nbmaps);
 
 int
-xfs_zero_eof(vnode_t		*vp,
-	     struct xfs_iocore	*io,
-	     xfs_off_t		offset,
-	     xfs_fsize_t	isize,
-	     struct cred	*credp,
-	     struct pm		*pmp);
+xfs_zero_eof(
+	vnode_t			*vp,
+	struct xfs_iocore	*io,
+	xfs_off_t		offset,
+	xfs_fsize_t		isize,
+	struct pm		*pmp);
 
 void
 xfs_inval_cached_pages(
 	struct vnode		*vp,
 	struct xfs_iocore	*io,
-	xfs_off_t			offset,
-	xfs_off_t			len,
+	xfs_off_t		offset,
+	xfs_off_t		len,
 	void			*dio);
 
 int

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.324 $"
+#ident "$Revision: 1.325 $"
 
 #include <xfs_os_defs.h>
 
@@ -772,8 +772,7 @@ xfs_inval_cached_pages(
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		isize = XFS_SIZE(mp, io);
 		if (offset > isize) {
-			xfs_zero_eof(vp, io, offset, isize, diop->xd_cr,
-					diop->xd_pmp);
+			xfs_zero_eof(vp, io, offset, isize, diop->xd_pmp);
 		}
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	}

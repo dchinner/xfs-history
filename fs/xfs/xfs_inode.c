@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.300 $"
+#ident "$Revision: 1.301 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1806,8 +1806,7 @@ xfs_igrow_start(
 	 * xfs_write_file() beyond the end of the file
 	 * and any blocks between the old and new file sizes.
 	 */
-	error = xfs_zero_eof(XFS_ITOV(ip), &ip->i_iocore, new_size, isize,
-								credp, NULL);
+	error = xfs_zero_eof(XFS_ITOV(ip), &ip->i_iocore, new_size, isize, NULL);
 	return error;
 }
 
