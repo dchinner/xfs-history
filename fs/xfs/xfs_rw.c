@@ -1,4 +1,4 @@
-#ident "$Revision: 1.210 $"
+#ident "$Revision: 1.211 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5374,21 +5374,28 @@ retry:
  				 	 * If trying to read past end of
  				 	 * file, shorten the request size.
 					 */
-					if (ip->i_d.di_size > offset_this_req) {
+					xfs_ilock(ip, XFS_ILOCK_SHARED);
+					if (new_size > ip->i_d.di_size) {
+					   if (ip->i_d.di_size > 
+							offset_this_req) {
 						trail = ip->i_d.di_size - 
 							offset_this_req;
 						bytes_this_req = trail;
 						bytes_this_req &= ~BBMASK;
 						bytes_this_req += BBSIZE;
-					} else {
+					   } else {
 						bytes_this_req =  0;
-					}
+					   }
 
-					end_of_file = 1;
+					   end_of_file = 1;
 
-					if (!bytes_this_req) {
+					   if (!bytes_this_req) {
+						xfs_iunlock(ip, 
+							XFS_ILOCK_SHARED);
 						break;
+					   }
 					}
+					xfs_iunlock(ip, XFS_ILOCK_SHARED);
 				}
 			}
 
