@@ -3810,11 +3810,18 @@ xfs_bmap_add_attrfork(
 			XFS_TRANS_PERM_LOG_RES, XFS_ADDAFORK_LOG_COUNT)))
 		goto error0;
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	if (XFS_IS_QUOTA_ON(mp) &&
-	    (error = xfs_trans_reserve_blkquota(tp, ip, blks))) {
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
-		return error;
+	if (XFS_IS_QUOTA_ON(mp)) {
+		if (rsvd) {
+			error = xfs_trans_reserve_blkquota_force(tp, ip, blks);
+		} else {
+			error = xfs_trans_reserve_blkquota(tp, ip, blks);
+		}
+
+		if (error) {
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+			return error;
+		}
 	}
 	if (XFS_IFORK_Q(ip))
 		goto error1;

@@ -780,8 +780,8 @@ xfs_trans_reserve_quota_nblks(
 
 	ASSERT(XFS_ISLOCKED_INODE_EXCL(ip));
 	ASSERT(XFS_IS_QUOTA_RUNNING(ip->i_mount));
-	ASSERT(type == XFS_TRANS_DQ_RES_RTBLKS ||
-	       type == XFS_TRANS_DQ_RES_BLKS);
+	ASSERT((type & ~XFS_QMOPT_FORCE_RES) == XFS_TRANS_DQ_RES_RTBLKS ||
+	       (type & ~XFS_QMOPT_FORCE_RES) == XFS_TRANS_DQ_RES_BLKS);
 
 	/*
 	 * Reserve nblks against these dquots, with trans as the mediator.

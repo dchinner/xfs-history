@@ -272,7 +272,14 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if ((error = xfs_trans_reserve_blkquota(args.trans, dp, nblks))) {
+		if (rsvd) {
+			error = xfs_trans_reserve_blkquota_force(args.trans,
+					dp, nblks);
+		} else {
+			error = xfs_trans_reserve_blkquota(args.trans,
+					dp, nblks);
+		}
+		if (error) {
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 			xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
 			return (error);
