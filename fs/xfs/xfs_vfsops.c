@@ -359,7 +359,13 @@ xfs_init(int	fstype)
 #if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
 	xfs_ktrace_hdr_zone = kmem_zone_init(sizeof(ktrace_t),
 					"xfs_ktrace_hdr");
-	xfs_ktrace_ent_zone = kmem_zone_init(VNODE_TRACE_SIZE
+#ifdef  VNODE_TRACE_SIZE
+# define KTRACE_ZONE_ENTRIES VNODE_TRACE_SIZE
+#else
+# define KTRACE_ZONE_ENTRIES 64
+#endif
+
+	xfs_ktrace_ent_zone = kmem_zone_init(KTRACE_ZONE_ENTRIES
 					* sizeof(ktrace_entry_t),
 					"xfs_ktrace_ent");
 #endif
