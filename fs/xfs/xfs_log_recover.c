@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.124 $"
+#ident	"$Revision: 1.125 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -741,6 +741,7 @@ xlog_find_tail(xlog_t  *log,
 		}
 	}
 
+#ifndef SIM
 	/*
 	 * Make sure that there are no blocks in front of the head
 	 * with the same cycle number as the head.  This can happen
@@ -754,6 +755,8 @@ xlog_find_tail(xlog_t  *log,
 	 */
 	if (!clean || !readonly)
 		error = xlog_clear_stale_blocks(log, tail_lsn);
+#endif /* !SIM */
+
 bread_err:
 exit:
 	xlog_put_bp(bp);
