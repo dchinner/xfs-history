@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.32 $"
+#ident	"$Revision: 1.33 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -554,7 +554,7 @@ STATIC void
 xfs_sb_relse(buf_t *bp)
 {
 	ASSERT(bp->b_flags & B_BUSY);
-	ASSERT(valusema(&bp->b_lock) == 0);
+	ASSERT(valusema(&bp->b_lock) <= 0);
 	bp->b_flags &= ~(B_ASYNC);
 	vsema(&bp->b_lock);
 }
