@@ -445,20 +445,27 @@ linvfs_fill_super(
 	vnode_t		*rootvp;
 	struct inode	*ip;
 	struct mounta	ap;
-	struct xfs_args	args;
+	struct xfs_args	*args;
 	struct statfs	statvfs;
 	int		error;
 
-	if (xfs_parseargs((char *)data, sb->s_flags, &args))
+	args = (struct xfs_args *)kmalloc(sizeof(struct xfs_args), GFP_KERNEL);
+	if (!args)
 		return  -EINVAL;
-	strncpy(args.fsname, sb->s_id, MAXNAMELEN);
-	/* args.rtdev and args.logdev done in xfs_parseargs */
+	strncpy(args->fsname, sb->s_id, MAXNAMELEN);
+
+	if (xfs_parseargs((char *)data, sb->s_flags, args)) {
+		error = EINVAL;
+		goto out_null;
+	}
+	strncpy(args->fsname, bdevname(sb->s_bdev), MAXNAMELEN);
+	/* args->rtdev and args->logdev done in xfs_parseargs */
 
 	/*  Setup the generic "mounta" structure  */
 	memset(&ap, 0, sizeof(struct mounta));
-	ap.dataptr = (char *)&args;
+	ap.dataptr = (char *)args;
 	ap.datalen = sizeof(struct xfs_args);
-	ap.spec = args.fsname;
+	ap.spec = args->fsname;
 
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 	vfsops = &xfs_vfsops;
@@ -466,7 +473,7 @@ linvfs_fill_super(
 	/*  Set up the vfs_t structure  */
 	vfsp = vfs_allocate();
 	if (!vfsp) 
-		return  -EINVAL; 
+		goto out_null; 
 
 	if (sb->s_flags & MS_RDONLY)
 		vfsp->vfs_flag |= VFS_RDONLY;
@@ -509,9 +516,9 @@ linvfs_fill_super(
 	/* Don't set the VFS_DMI flag until here because we don't want
 	 * to send events while replaying the log.
 	 */
-	if (args.flags & XFSMNT_DMAPI) {
+	if (args->flags & XFSMNT_DMAPI) {
 		vfsp->vfs_flag |= VFS_DMI;
-		VFSOPS_DMAPI_MOUNT(vfsops, vfsp, args.mtpt, args.fsname,
+		VFSOPS_DMAPI_MOUNT(vfsops, vfsp, args->mtpt, args->fsname,
 				   error);
 
 		if (error) {
@@ -523,7 +530,8 @@ linvfs_fill_super(
 
 	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
 
-	return(0);
+	kfree(args);
+	return 0;
 
 fail_vnrele:
 	if (sb->s_root) {
@@ -539,6 +547,9 @@ fail_unmount:
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
+
+out_null:
+	kfree(args);
 	return -error;
 }
 
@@ -685,17 +696,24 @@ linvfs_remount(
 	int		*flags,
 	char		*options)
 {
-	struct xfs_args	args;
+	struct xfs_args	*args;
 	vfs_t		*vfsp;
 	xfs_mount_t	*mp;
+	int		error = 0;
+
+	args = (struct xfs_args *)kmalloc(sizeof(struct xfs_args), GFP_KERNEL);
+	if (!args)
+		return -ENOMEM;
 
 	vfsp = LINVFS_GET_VFS(sb);
 	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
 
-	if (xfs_parseargs(options, *flags, &args))
-		return -EINVAL;
+	if (xfs_parseargs(options, *flags, args)) {
+		error = -EINVAL;
+		goto out;
+	}
 
-	if (args.flags & XFSMNT_NOATIME)
+	if (args->flags & XFSMNT_NOATIME)
 		mp->m_flags |= XFS_MOUNT_NOATIME;
 	else
 		mp->m_flags &= ~XFS_MOUNT_NOATIME;
@@ -703,7 +721,7 @@ linvfs_remount(
 	linvfs_write_super(sb);
 
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
-		return 0;
+		goto out;
 
 	if (*flags & MS_RDONLY) {
 		sb->s_flags |= MS_RDONLY;
@@ -713,7 +731,9 @@ linvfs_remount(
 		vfsp->vfs_flag &= ~VFS_RDONLY;
 	}
 
-	return 0;
+out:
+	kfree(args);
+	return error;
 }
 
 void
