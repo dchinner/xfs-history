@@ -2209,20 +2209,20 @@ static struct ctl_table_header *pagebuf_table_header;
 
 static ctl_table pagebuf_table[] = {
 	{PB_FLUSH_INT, "flush_int", &pb_params.data[0],
-	sizeof(int), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[0], &pagebuf_max[0]},
 
 	{PB_FLUSH_AGE, "flush_age", &pb_params.data[1],
-	sizeof(int), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[1], &pagebuf_max[1]},
 
 	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[3],
-	sizeof(int), 0644, NULL, &pb_stats_clear_handler,
+	sizeof(ulong), 0644, NULL, &pb_stats_clear_handler,
 	&sysctl_intvec, NULL, &pagebuf_min[3], &pagebuf_max[3]},
 
 #ifdef PAGEBUF_TRACE
 	{PB_DEBUG, "debug", &pb_params.data[4],
-	sizeof(int), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[4], &pagebuf_max[4]},
 #endif
 	{0}
