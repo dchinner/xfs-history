@@ -2168,7 +2168,7 @@ xfs_create(
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = xfs_dm_send_create_event(dir_bdp, name,
@@ -3063,7 +3063,7 @@ xfs_remove(
 
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = dm_send_namesp_event(DM_EVENT_REMOVE, dir_bdp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
@@ -3363,7 +3363,7 @@ xfs_link(
 
 	target_namelen = strlen(target_name);
 	if (target_namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 	/*
 	 * Get the real vnode.
 	 */
@@ -3601,7 +3601,7 @@ xfs_mkdir(
 
 	dir_namelen = strlen(dir_name);
 	if (dir_namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 
 	tp = NULL;
 	dp_joined_to_trans = B_FALSE;
@@ -3866,7 +3866,7 @@ xfs_rmdir(
 		return XFS_ERROR(EIO);
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = dm_send_namesp_event(DM_EVENT_REMOVE,
@@ -4221,7 +4221,7 @@ xfs_symlink(
 
 	link_namelen = strlen(link_name);
 	if (link_namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 	/*
 	 * Check component lengths of the target path name.
          */
