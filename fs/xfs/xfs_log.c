@@ -5,7 +5,9 @@
 #include <sys/types.h>
 
 #include <sys/param.h>
+#ifdef SIM
 #define _KERNEL
+#endif
 #include <sys/sysmacros.h>
 #include <sys/buf.h>
 #ifdef SIM
@@ -14,9 +16,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#endif
-
+#else
 #include <sys/kmem.h>
+#endif
 #include <sys/sema.h>
 #include <sys/uuid.h>
 #include <sys/vnode.h>
