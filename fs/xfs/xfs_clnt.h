@@ -103,7 +103,8 @@ struct xfs_args {
 						 * read-only mount */
 #define XFSMNT_SHARED		0x00001000	/* shared XFS mount */
 #define XFSMNT_IOSIZE		0x00002000	/* optimize for I/O size */
-#define XFSMNT_OSYNCISDSYNC	0x00004000	/* treat o_sync like o_dsync */
+#define XFSMNT_OSYNCISOSYNC	0x00004000	/* o_sync is REALLY o_sync */
+						/* (osyncisdsync is now default) */
 #define XFSMNT_CLNTONLY         0x00008000	/* cxfs mount as client only */
 #define XFSMNT_UNSHARED         0x00010000	/* cxfs filesystem mounted
                                                  * unshared */

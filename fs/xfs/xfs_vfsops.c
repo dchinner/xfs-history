@@ -358,8 +358,8 @@ xfs_cmountfs(
 		if (ap->flags & XFSMNT_NOALIGN)
 			mp->m_flags |= XFS_MOUNT_NOALIGN;
 
-		if (ap->flags & XFSMNT_OSYNCISDSYNC)
-			mp->m_flags |= XFS_MOUNT_OSYNCISDSYNC;
+		if (ap->flags & XFSMNT_OSYNCISOSYNC)
+			mp->m_flags |= XFS_MOUNT_OSYNCISOSYNC;
 
 		if (ap->flags & XFSMNT_32BITINODES)
 			mp->m_flags |= XFS_MOUNT_32BITINODES;
