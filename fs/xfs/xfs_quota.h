@@ -58,37 +58,39 @@ typedef __uint16_t      xfs_qwarncnt_t;
  * to a single function. None of these XFS_QMOPT_* flags are meant to have
  * persistent values (ie. their values can and will change between versions)
  */
-#define XFS_QMOPT_DQLOCK	0x000001 /* dqlock */
-#define XFS_QMOPT_DQALLOC	0x000002 /* alloc dquot ondisk if needed */
-#define XFS_QMOPT_UQUOTA	0x000004 /* user dquot requested */
-#define XFS_QMOPT_PQUOTA	0x000008 /* proj dquot requested */
-#define XFS_QMOPT_FORCE_RES	0x000010 /* ignore quota limits */
-#define XFS_QMOPT_DQSUSER	0x000020 /* don't cache super users dquot */
-#define XFS_QMOPT_SBVERSION	0x000040 /* change superblock version num */
-#define XFS_QMOPT_QUOTAOFF	0x000080 /* quotas are being turned off */
-#define XFS_QMOPT_UMOUNTING	0x000100 /* filesys is being unmounted */
-#define XFS_QMOPT_DOLOG		0x000200 /* log buf changes (in quotacheck) */
-#define XFS_QMOPT_DOWARN        0x000400 /* increase warning cnt if necessary */
-#define XFS_QMOPT_ILOCKED	0x000800 /* Inode is already locked (excl) */
+#define XFS_QMOPT_DQLOCK	0x0000001 /* dqlock */
+#define XFS_QMOPT_DQALLOC	0x0000002 /* alloc dquot ondisk if needed */
+#define XFS_QMOPT_UQUOTA	0x0000004 /* user dquot requested */
+#define XFS_QMOPT_PQUOTA	0x0000008 /* proj dquot requested */
+#define XFS_QMOPT_FORCE_RES	0x0000010 /* ignore quota limits */
+#define XFS_QMOPT_DQSUSER	0x0000020 /* don't cache super users dquot */
+#define XFS_QMOPT_SBVERSION	0x0000040 /* change superblock version num */
+#define XFS_QMOPT_QUOTAOFF	0x0000080 /* quotas are being turned off */
+#define XFS_QMOPT_UMOUNTING	0x0000100 /* filesys is being unmounted */
+#define XFS_QMOPT_DOLOG		0x0000200 /* log buf changes (in quotacheck) */
+#define XFS_QMOPT_DOWARN        0x0000400 /* increase warning cnt if necessary */
+#define XFS_QMOPT_ILOCKED	0x0000800 /* inode is already locked (excl) */
+#define XFS_QMOPT_DQREPAIR	0x0001000 /* repair dquot, if damaged. */
+
 /* 
  * flags to xfs_trans_mod_dquot to indicate which field needs to be
  * modified.
  */
-#define XFS_QMOPT_RES_REGBLKS 	0x001000
-#define XFS_QMOPT_RES_RTBLKS	0x002000
-#define XFS_QMOPT_BCOUNT	0x004000
-#define XFS_QMOPT_ICOUNT	0x008000
-#define XFS_QMOPT_RTBCOUNT	0x010000
-#define XFS_QMOPT_DELBCOUNT	0x020000
-#define XFS_QMOPT_DELRTBCOUNT	0x040000
-#define XFS_QMOPT_RES_INOS	0x080000
+#define XFS_QMOPT_RES_REGBLKS 	0x0010000
+#define XFS_QMOPT_RES_RTBLKS	0x0020000
+#define XFS_QMOPT_BCOUNT	0x0040000
+#define XFS_QMOPT_ICOUNT	0x0080000
+#define XFS_QMOPT_RTBCOUNT	0x0100000
+#define XFS_QMOPT_DELBCOUNT	0x0200000
+#define XFS_QMOPT_DELRTBCOUNT	0x0400000
+#define XFS_QMOPT_RES_INOS	0x0800000
 
 /*
  * flags for dqflush and dqflush_all.
  */
-#define XFS_QMOPT_SYNC		0x100000
-#define XFS_QMOPT_ASYNC		0x200000
-#define XFS_QMOPT_DELWRI	0x400000
+#define XFS_QMOPT_SYNC		0x1000000
+#define XFS_QMOPT_ASYNC		0x2000000
+#define XFS_QMOPT_DELWRI	0x4000000
 
 /* 
  * flags to xfs_trans_mod_dquot.
@@ -169,7 +171,7 @@ extern int		xfs_qm_dqget(struct xfs_mount *mp,
 				      uint type, uint doalloc, 
 				      struct xfs_dquot **O_dqpp);
 extern int 		xfs_qm_dqcheck(struct xfs_disk_dquot *, 
-				       xfs_dqid_t, char *);
+				       xfs_dqid_t, uint, uint, char *);
 
 /*
  * Vnodeops specific code that should actually be _in_ xfs_vnodeops.c, but
