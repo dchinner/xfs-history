@@ -2444,8 +2444,8 @@ xfs_attr_leaf_inactive(xfs_inode_t *dp, buf_t *bp)
 			 * Free up the "remote" value extent(s).
 			 */
 			error = xfs_attr_leaf_freextent(dp,
-						(int)name_rmt->valueblk,
-						(int)name_rmt->valuelen);
+				(int)name_rmt->valueblk,
+				XFS_B_TO_FSB(dp->i_mount, name_rmt->valuelen));
 			if (!retval)
 				retval = error;
 		}
