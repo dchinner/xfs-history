@@ -303,10 +303,6 @@ xfs_zero_last_block(
 	 * If the block underlying isize is just a hole, then there
 	 * is nothing to zero.
 	 */
-/**
-	if ((imap.br_startblock == HOLESTARTBLOCK) ||
-	    (imap.br_startblock == DELAYSTARTBLOCK))
-***/
 	if (imap.br_startblock == HOLESTARTBLOCK)
 	{
 		return 0;
@@ -339,21 +335,18 @@ xfs_zero_last_block(
 		if (imap.br_state == XFS_EXT_UNWRITTEN) {
 			printk("xfs_zero_last_block: unwritten?\n");
 		}
+		if (PBF_NOT_DONE(pb)) {
+			if (error = pagebuf_iostart(pb, PBF_READ)) {
+				pagebuf_rele(pb);
+				goto out_lock;
+			}
+		}
 	} else {
 		pb->pb_bn = PAGE_BUF_DADDR_NULL;
-		error = pagebuf_iozero(pb, zero_offset, zero_len);
-		pagebuf_rele(pb);
-		goto out_lock;
 	}
 
-	if (PBF_NOT_DONE(pb)) {
-		if (error = pagebuf_iostart(pb, PBF_READ)) {
-			pagebuf_rele(pb);
-			goto out_lock;
-		}
-	}
 
-	if (error = pagebuf_iozero(pb, zero_offset, zero_len)) {
+	if (error = pagebuf_iozero(ip, pb, zero_offset, zero_len)) {
 		pagebuf_rele(pb);
 		goto out_lock;
 	}
@@ -373,7 +366,7 @@ xfs_zero_last_block(
 
 	if (imap.br_startblock == DELAYSTARTBLOCK ||
 	    imap.br_state == XFS_EXT_UNWRITTEN) {
-		/** XFS_bdwrite(bp); **/
+		pagebuf_rele(pb);
 	} else {
 		XFS_BUF_WRITE(pb);
 		XFS_BUF_ASYNC(pb);
@@ -525,8 +518,6 @@ xfs_zero_eof(
 
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
 			pb->pb_bn = PAGE_BUF_DADDR_NULL;
-			error = pagebuf_iozero(pb, 0, lsize);
-			pagebuf_rele(pb);
 		} else {
 			pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
 			if (imap.br_state == XFS_EXT_UNWRITTEN) {
@@ -535,19 +526,19 @@ xfs_zero_eof(
 			if (io->io_flags & XFS_IOCORE_RT) {
 				printk("xfs_zero_eof: real time device? use diff inode\n");
 			}
+		}
 
-			if (error = pagebuf_iozero(pb, 0, lsize)) {
-				pagebuf_rele(pb);
-				goto out_lock;
-			}
-			if (imap.br_startblock == DELAYSTARTBLOCK ||
-			    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
-				printk("xfs_zero_eof: need to allocate? delwri\n");
-			} else {
-				XFS_BUF_WRITE(pb);
-				XFS_BUF_ASYNC(pb);
-				XFS_bwrite(pb);
-			}
+		if (error = pagebuf_iozero(ip, pb, 0, lsize)) {
+			pagebuf_rele(pb);
+			goto out_lock;
+		}
+		if (imap.br_startblock == DELAYSTARTBLOCK ||
+		    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
+			pagebuf_rele(pb);
+		} else {
+			XFS_BUF_WRITE(pb);
+			XFS_BUF_ASYNC(pb);
+			XFS_bwrite(pb);
 		}
 		if (error) {
 			goto out_lock;
@@ -904,7 +895,7 @@ retry:
 					pbmapp, npbmaps, flags, NULL);
 		/* xfs_iomap_write unlocks/locks/unlocks */
 
-		if (error == ENOSPC) {
+		if ((error == ENOSPC) && strcmp(current->comm, "nfsd")) {
 			switch (fsynced) {
 			case 0:
 				VOP_FLUSH_PAGES(vp, 0, -1, 0, FI_NONE, error);
@@ -2115,7 +2106,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 	 * and the loop above has pushed everything out.
 	 * write out the superblock which should be the last of 
 	 * transactions
-	*/
+	 */
 	xfs_unmountfs_writesb(mp);
 
 	do {
