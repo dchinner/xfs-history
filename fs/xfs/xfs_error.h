@@ -136,7 +136,6 @@ int		xfs_errortag_clearall_umount(__int64_t fsid, char *fsname,
 #define 	XFS_PTAG_AILDELETE		0x0000000000000004LL
 
 struct xfs_mount;
-extern __uint64_t	xfs_panic_mask;
 /* PRINTFLIKE4 */
 void		xfs_cmn_err(__uint64_t panic_tag, int level, struct xfs_mount *mp,
 			    char *fmt, ...);

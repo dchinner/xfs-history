@@ -51,6 +51,7 @@
 #include <xfs_buf.h>
 #include <linux/xqm.h>
 #include <linux/xfs_random.h>
+#include <linux/xfs_globals.h>
 #include <linux/xfs_behavior.h>
 #include <linux/xfs_vfs.h>
 #include <linux/xfs_vnode.h>
@@ -123,6 +124,5 @@
 
 #include <linux/xfs_lrw.h>
 #include <linux/xfs_super.h>
-#include <linux/xfs_globals.h>
 
 #endif	/* __XFS_H__ */
