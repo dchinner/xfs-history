@@ -433,7 +433,7 @@ typedef struct xlog_in_core {
 		xlog_rec_header_t hic_header;
 		char		  hic_sector[XLOG_HEADER_SIZE];
 	} ic_h2;
-	char		       ic_data[1];
+	__uint8_t		  ic_data[1];
 } xlog_in_core_t;
 
 /*

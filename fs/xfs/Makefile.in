@@ -79,7 +79,7 @@ endif
 # pick up #include <xfs_support/xxx>, the support files should really be in
 # linux/include/xfs_support, not hidden under fs.  Keith Owens.
 
-XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs) $(src_includelist /fs) -funsigned-char
+XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs)
 ifsel(CONFIG_XFS_DEBUG)
   XFS_EXTRA_CFLAGS	+= -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif

@@ -400,7 +400,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		int		 unit_bytes,
 		int		 cnt,
 		xfs_log_ticket_t *ticket,
-		char		 client,
+		__uint8_t	 client,
 		uint		 flags)
 {
 	xlog_t		*log = mp->m_log;
@@ -3289,7 +3289,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	xfs_caddr_t		ptr;
 	xfs_caddr_t		base_ptr;
 	__psint_t		field_offset;
-	char			clientid;
+	__uint8_t		clientid;
 	int			len, i, op_len, spl;
 	int			idx;
 
