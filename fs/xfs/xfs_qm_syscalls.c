@@ -1,4 +1,4 @@
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -136,7 +136,17 @@ xfs_qm_sysent(
 		if (addr == NULL)
 			return XFS_ERROR(EINVAL);
 		return (xfs_qm_scall_quotaon(mp,
-					     xfs_qm_import_flags((uint *)addr)));
+					  xfs_qm_import_flags((uint *)addr)));
+	      case Q_QUOTAOFF:
+		if (mp->m_dev == rootdev) {
+			return (xfs_qm_scall_quotaoff(mp,
+					    xfs_qm_import_flags((uint *)addr),
+					    B_FALSE));
+		}
+		break;
+		
+	      default:
+		break;
 	}
 
 	if (! XFS_IS_QUOTA_ON(mp))
@@ -145,8 +155,8 @@ xfs_qm_sysent(
 	switch (cmd) {
 	      case Q_QUOTAOFF:
 		error = xfs_qm_scall_quotaoff(mp,
-					      xfs_qm_import_flags((uint *)addr),
-					      B_FALSE);
+					    xfs_qm_import_flags((uint *)addr),
+					    B_FALSE);
 		break;
 
 		/* 
@@ -230,6 +240,7 @@ xfs_qm_scall_quotaoff(
 	int			error;
 	uint			inactivate_flags;
 	xfs_qoff_logitem_t 	*qoffstart;
+	uint 			sbflags, newflags;
 	extern dev_t		rootdev;
 
 	if (!force && !_CAP_ABLE(CAP_QUOTA_MGT))
@@ -261,11 +272,10 @@ xfs_qm_scall_quotaoff(
 	 * We have to perform the quotaoff accordingly.
 	 */
 	if (mp->m_dev == rootdev) {
-		uint sbflags, newflags;
 		s = XFS_SB_LOCK(mp);
 		sbflags = mp->m_sb.sb_qflags;
 		if ((mp->m_qflags & flags) == 0) {
-			mp->m_sb.sb_qflags &= flags;
+			mp->m_sb.sb_qflags &= ~(flags);
 			newflags = mp->m_sb.sb_qflags;
 			XFS_SB_UNLOCK(mp, s);
 			mutex_unlock(&mp->QI_QOFFLOCK);
@@ -276,15 +286,20 @@ xfs_qm_scall_quotaoff(
 		XFS_SB_UNLOCK(mp, s);
 			
 		if ((sbflags & flags) != (mp->m_qflags & flags)) {
-			/*
-			 * Something must have been turned on, with
-			 * delayed effect. ie. Something's in the SB,
-			 * but not in the incore mount struct.
+			/* 
+			 * This can happen only with proj+usr quota 
+			 * combination. Note: 1) accounting cannot be turned
+			 * off without enforcement also getting turned off.
+			 * 2) Every flag that exist in mpqflags MUST exist
+			 * in sbqflags (but not vice versa).
+			 * which means at this point sbqflags = UQ+PQ+..,
+			 * and mpqflags = UQ or PQ.
 			 */
+			ASSERT(sbflags & XFS_PQUOTA_ACCT);
 			ASSERT((sbflags & XFS_ALL_QUOTA_ACCT) != 
 			       (mp->m_qflags & XFS_ALL_QUOTA_ACCT));
 			
-			/* XXX TBD */
+			/* XXX TBD Finish this for proj quota support */
 			/* We need to update the SB and mp separately */
 			return (EINVAL);
 		}
@@ -510,16 +525,18 @@ xfs_qm_scall_quotaon(
 #endif
 		return (EINVAL);
 	}
+	/*
+	 * Can't enforce without accounting. We check the superblock
+	 * qflags here instead of m_qflags because rootfs can have
+	 * quota acct on ondisk without m_qflags' knowing.
+	 */
 	if (((flags & XFS_UQUOTA_ACCT) == 0 &&
-	    (mp->m_qflags & XFS_UQUOTA_ACCT) == 0 &&
+	    (mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT) == 0 &&
 	    (flags & XFS_UQUOTA_ENFD))
 	    ||
 	    ((flags & XFS_PQUOTA_ACCT) == 0 &&
-	    (mp->m_qflags & XFS_PQUOTA_ACCT) == 0 &&
+	    (mp->m_sb.sb_qflags & XFS_PQUOTA_ACCT) == 0 &&
 	    (flags & XFS_PQUOTA_ENFD))) {
-		/*
-		 * Can't enforce without accounting.
-		 */
 #ifdef QUOTADEBUG
 		printf("Can't enforce without accounting.\n");
 #endif		
@@ -554,7 +571,8 @@ xfs_qm_scall_quotaon(
 	}
 
 	/*
-	 * Change sb_qflags on disk but not incore, if this is the root f/s.
+	 * Change sb_qflags on disk but not incore mp->qflags
+	 * if this is the root filesystem.
 	 */
 	s = XFS_SB_LOCK(mp);
 	qf = mp->m_sb.sb_qflags;
@@ -574,7 +592,9 @@ xfs_qm_scall_quotaon(
 	 * If we had just turned on quotas (ondisk) for rootfs, or if we aren't
 	 * trying to switch on quota enforcement, we are done.
 	 */
-	if (delay ||
+	if (delay || 
+	    ((mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT) != 
+	     (mp->m_qflags & XFS_UQUOTA_ACCT)) ||
 	    (flags & XFS_ALL_QUOTA_ENFD) == 0)
 		return (0);
 	
