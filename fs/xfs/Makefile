@@ -3,11 +3,13 @@
 #
 
 KERN_SPECS = kernel-2.4.0.spec
-CMD_SPECS = xfs-cmds.spec
+CMD_SPECS = 
+#xfs-cmds.spec
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-default all: tarballs headers i686kernel i386cmd
+default all: tarballs headers i686kernel
+# i386cmd
 
 tarballs:
 	@echo "=== Making $@ `date`"; \
@@ -45,13 +47,13 @@ i386cmd:
 	done
 
 clean:
-	rm -rf RPMS SRPMS BUILD
+	rm -rf RPMS SRPMS BUILD SOURCES/xfs-patch
 
 realclean: clean
 	rm -rf linux-2.4.0
 	rm -f kern
 	rm -f SPECS/_sgi_kvers_
-	rm -f SOURCES/xfs-patch SOURCES/linux-2.4.0.tar.bz2 SOURCES/pcmcia-cs-3.1.8.tar.gz SOURCES/ibcs-2.1-981105.tar.gz
+	rm -f SOURCES/linux-2.4.0.tar.bz2 SOURCES/pcmcia-cs-3.1.8.tar.gz SOURCES/ibcs-2.1-981105.tar.gz
 	if [ -e SPECS/kernel-2.4.0.spec.old ] ; then \
 		rm SPECS/kernel-2.4.0.spec; \
 		mv SPECS/kernel-2.4.0.spec.old SPECS/kernel-2.4.0.spec; \
