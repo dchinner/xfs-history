@@ -181,16 +181,18 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 }	/* xlog_find_verify_cycle */
 
 
+/*
+ * Potentially backup over partial log record write
+ */
 STATIC daddr_t
-xlog_find_verify_log_record(caddr_t	ba,	/* update ptr as we go */
+xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 			    daddr_t	start_blk,
 			    daddr_t	last_blk)
 {
     xlog_rec_header_t *rhead;
-    int		  i;
+    int		      i;
 
-    if (last_blk == start_blk)
-	xlog_panic("xlog_find_verify_log_record: need to backup");
+    ASSERT(start_blk != 0 || last_blk != start_blk);
 
     ba -= BBSIZE;
     for (i=last_blk-1; i>=0; i--) {
@@ -426,15 +428,23 @@ xlog_find_tail(xlog_t  *log,
 	rhead = (xlog_rec_header_t *)bp->b_dmaaddr;
 	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
 
+	/*
+	 * Reset log values according to the state of the log when we crashed.
+	 */
 	log->l_prev_block = i;
 	log->l_curr_block = *head_blk;
 	log->l_curr_cycle = rhead->h_cycle;
 	log->l_tail_lsn = rhead->h_tail_lsn;
-	log->l_last_sync_lsn = log->l_tail_lsn;
+	log->l_last_sync_lsn = rhead->h_lsn;
 	log->l_grant_reserve_cycle = log->l_curr_cycle;
 	log->l_grant_reserve_bytes = BBTOB(log->l_curr_block);
 	log->l_grant_write_cycle = log->l_curr_cycle;
 	log->l_grant_write_bytes = BBTOB(log->l_curr_block);
+
+	/*
+	 * Look for unmount record.  If we find it, then we know there
+	 * was a clean unmount.
+	 */
 	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
 		if (error = xlog_bread(log, i+1, 1, bp))
 			goto exit;
@@ -854,10 +864,16 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		i++;
 		bit += nbits;
 	}
+
+	/*
+	 * Perform delayed write on the buffer.  Asynchronous writes will be
+	 * slower when taking into account all the buffers to be flushed.
+	 */
 	bp->b_flags = (B_BUSY | B_HOLD);	/* synchronous */
 	bdwrite(bp);
 	if (bp->b_flags & B_ERROR)
 		xlog_panic("xlog_recover_do_buffer_trans: bwrite error");
+
 	/* Shouldn't be any more regions */
 	if (i < XLOG_MAX_REGIONS_IN_ITEM) {
 		ASSERT(item->ri_buf[i].i_addr == 0);
@@ -1412,7 +1428,11 @@ xlog_do_recover(xlog_t	*log,
 	    blk_no += (bblks+1);
 	}
     } else {
-	/* read last part of physical log */
+	/*
+	 * Perform recovery around the end of the physical log.  When the head
+	 * is not on the same cycle number as the tail, we can't do a sequential
+	 * recovery as above.
+	 */
 	blk_no = tail_blk;
 	while (blk_no < log->l_logBBsize) {
 
@@ -1469,7 +1489,19 @@ xlog_do_recover(xlog_t	*log,
 	xlog_put_bp(dbp);
 	xlog_put_bp(hbp);
     }
-    bflush(log->l_mp->m_dev);
+
+    bflush(log->l_mp->m_dev);    /* Flush out all the delayed write buffers */
+
+    /*
+     * We now update the tail_lsn since much of the recovery has completed
+     * and there may be space available to use.  If there were no extent
+     * or iunlinks, we can free up the entire log and set the tail_lsn to be
+     * the last_sync_lsn.  This was set in xlog_find_tail to be the lsn of the
+     * last known good LR on disk.  If there are extent frees or iunlinks,
+     * they will have some entries in the AIL; so we look at the AIL to
+     * determine how to set the tail_lsn.
+     */
+    xlog_assign_tail_lsn(log->l_mp, 0);
 
     /*
      * Now that we've finished replaying all buffer and inode
