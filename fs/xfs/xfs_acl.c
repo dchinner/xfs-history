@@ -31,7 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/acl_ea.h>
 
 STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *);
 STATIC void     xfs_acl_filter_mode(mode_t, xfs_acl_t *);
@@ -55,7 +54,7 @@ xfs_acl_vhasacl_access(
 {
 	int		error;
 
-	xfs_acl_get_attr(vp, NULL, ACL_TYPE_ACCESS, ATTR_KERNOVAL, &error);
+	xfs_acl_get_attr(vp, NULL, _ACL_TYPE_ACCESS, ATTR_KERNOVAL, &error);
 	return (error == 0);
 }
 
@@ -70,7 +69,7 @@ xfs_acl_vhasacl_default(
 
 	if (vp->v_type != VDIR)
 		return 0;
-	xfs_acl_get_attr(vp, NULL, ACL_TYPE_DEFAULT, ATTR_KERNOVAL, &error);
+	xfs_acl_get_attr(vp, NULL, _ACL_TYPE_DEFAULT, ATTR_KERNOVAL, &error);
 	return (error == 0);
 }
 
@@ -78,29 +77,29 @@ xfs_acl_vhasacl_default(
  * Convert from extended attribute representation to in-memory for XFS.
  */
 STATIC int
-acl_ext_attr_to_xfs(
-	acl_ea_header	*src,
-	size_t		size,
-	xfs_acl_t	*dest)
+posix_acl_xattr_to_xfs(
+	posix_acl_xattr_header	*src,
+	size_t			size,
+	xfs_acl_t		*dest)
 {
-	int		n;
-	char		*src_acl = (char *)src;
-	acl_ea_header	*header;
-	acl_ea_entry	*src_entry;
-	xfs_acl_entry_t	*dest_entry;
+	int			n;
+	char			*src_acl = (char *)src;
+	posix_acl_xattr_header	*header;
+	posix_acl_xattr_entry	*src_entry;
+	xfs_acl_entry_t		*dest_entry;
 
 	if (!src_acl || !dest)
 		return EINVAL;
 
-	if (size < sizeof(acl_ea_header))
+	if (size < sizeof(posix_acl_xattr_header))
 		return EINVAL;
 
-	header = (acl_ea_header *)src;
-	if (header->a_version != cpu_to_le32(ACL_EA_VERSION))
+	header = (posix_acl_xattr_header *)src;
+	if (header->a_version != cpu_to_le32(POSIX_ACL_XATTR_VERSION))
 		return EINVAL;
 
 	memset(dest, 0, sizeof(xfs_acl_t));
-	dest->acl_cnt = acl_ea_count(size);
+	dest->acl_cnt = posix_acl_xattr_count(size);
 	if (dest->acl_cnt < 0 || dest->acl_cnt > XFS_ACL_MAX_ENTRIES)
 		return EINVAL;
 
@@ -111,12 +110,12 @@ acl_ext_attr_to_xfs(
 	if (!dest->acl_cnt)
 		return 0;
 
-        src_entry = (acl_ea_entry*) (src_acl + sizeof(acl_ea_header));
-        dest_entry = &dest->acl_entry[0];
+	src_entry = (posix_acl_xattr_entry *)(src_acl + sizeof(*header));
+	dest_entry = &dest->acl_entry[0];
 
 	for (n = 0; n < dest->acl_cnt; n++, src_entry++, dest_entry++) {
 		dest_entry->ae_perm = le16_to_cpu(src_entry->e_perm);
-		if (dest_entry->ae_perm & ~(ACL_READ|ACL_WRITE|ACL_EXECUTE))
+		if (_ACL_PERM_INVALID(dest_entry->ae_perm))
 			return EINVAL;
 		dest_entry->ae_tag  = le16_to_cpu(src_entry->e_tag);
 		switch(dest_entry->ae_tag) {
@@ -145,7 +144,7 @@ acl_ext_attr_to_xfs(
  * Primary key is ae_tag, secondary key is ae_id.  
  */
 STATIC int
-acl_entry_compare(
+xfs_acl_entry_compare(
 	const void	*va,
 	const void	*vb)
 {
@@ -161,29 +160,29 @@ acl_entry_compare(
  * Convert from in-memory XFS to extended attribute representation.
  */
 STATIC int
-acl_xfs_to_ext_attr(
-	xfs_acl_t	*src,
-	acl_ea_header	*ext_acl,
-	size_t		size)
+posix_acl_xfs_to_xattr(
+	xfs_acl_t		*src,
+	posix_acl_xattr_header	*dest,
+	size_t			size)
 {
-	int		n;
-	size_t		new_size = acl_ea_size(src->acl_cnt);
-	acl_ea_entry	*dest_entry;
-	xfs_acl_entry_t	*src_entry;
+	int			n;
+	size_t			new_size = posix_acl_xattr_size(src->acl_cnt);
+	posix_acl_xattr_entry	*dest_entry;
+	xfs_acl_entry_t		*src_entry;
 
 	if (size < new_size)
 		return -ERANGE;	
 
 	/* Need to sort src XFS ACL by <ae_tag,ae_id> */
 	qsort(src->acl_entry, src->acl_cnt, sizeof(src->acl_entry[0]),
-		acl_entry_compare);
+		xfs_acl_entry_compare);
 
-	ext_acl->a_version = cpu_to_le32(ACL_EA_VERSION);
-	dest_entry = &ext_acl->a_entries[0];
+	dest->a_version = cpu_to_le32(POSIX_ACL_XATTR_VERSION);
+	dest_entry = &dest->a_entries[0];
 	src_entry = &src->acl_entry[0];
 	for (n = 0; n < src->acl_cnt; n++, dest_entry++, src_entry++) {
 		dest_entry->e_perm = cpu_to_le16(src_entry->ae_perm);
-		if (src_entry->ae_perm & ~(ACL_READ|ACL_WRITE|ACL_EXECUTE))
+		if (_ACL_PERM_INVALID(src_entry->ae_perm))
 			return -EINVAL;
 		dest_entry->e_tag  = cpu_to_le16(src_entry->ae_tag);
 		switch (src_entry->ae_tag) {
@@ -211,9 +210,9 @@ xfs_acl_vget(
 	size_t		size,
 	int		kind)
 {
-	int		error;
-	_ACL_DECL	(xfs_acl);
-	acl_ea_header	*ext_acl = acl;
+	int			error;
+	xfs_acl_t		*xfs_acl;
+	posix_acl_xattr_header	*ext_acl = acl;
 
 	VN_HOLD(vp);
 	if ((error = _MAC_VACCESS(vp, get_current_cred(), VREAD)))
@@ -229,13 +228,13 @@ xfs_acl_vget(
 		goto out;
 
 	if (!size) {
-		error = -acl_ea_size(XFS_ACL_MAX_ENTRIES);
+		error = -posix_acl_xattr_size(XFS_ACL_MAX_ENTRIES);
 	} else {
 		if (xfs_acl_invalid(xfs_acl)) {
 			error = EINVAL;
 			goto out;
 		}
-		if (kind == ACL_TYPE_ACCESS) {
+		if (kind == _ACL_TYPE_ACCESS) {
 			vattr_t	va;
 
 			va.va_mask = AT_MODE;
@@ -244,7 +243,7 @@ xfs_acl_vget(
 				goto out;
 			xfs_acl_sync_mode(va.va_mode, xfs_acl);
 		}
-		error = -acl_xfs_to_ext_attr(xfs_acl, ext_acl, size);
+		error = -posix_acl_xfs_to_xattr(xfs_acl, ext_acl, size);
 	}
 out:
 	VN_RELE(vp);
@@ -262,7 +261,7 @@ xfs_acl_vremove(
 	VN_HOLD(vp);
 	error = xfs_acl_allow_set(vp, kind);
 	if (!error) {
-		VOP_ATTR_REMOVE(vp, kind == ACL_TYPE_DEFAULT?
+		VOP_ATTR_REMOVE(vp, kind == _ACL_TYPE_DEFAULT?
 				SGI_ACL_DEFAULT: SGI_ACL_FILE,
 				ATTR_ROOT, sys_cred, error);
 		if (error == ENOATTR)
@@ -274,14 +273,14 @@ xfs_acl_vremove(
 
 int
 xfs_acl_vset(
-	vnode_t		*vp,
-	void		*acl,
-	size_t		size,
-	int		kind)
+	vnode_t			*vp,
+	void			*acl,
+	size_t			size,
+	int			kind)
 {
-	acl_ea_header	*ext_acl = acl;
-	_ACL_DECL	(xfs_acl);
-	int		error;
+	posix_acl_xattr_header	*ext_acl = acl;
+	xfs_acl_t		*xfs_acl;
+	int			error;
 
 	if (!acl)
 		return -EINVAL;
@@ -289,7 +288,7 @@ xfs_acl_vset(
 	if (!(_ACL_ALLOC(xfs_acl)))
 		return -ENOMEM;
 
-	error = acl_ext_attr_to_xfs(ext_acl, size, xfs_acl);
+	error = posix_acl_xattr_to_xfs(ext_acl, size, xfs_acl);
 	if (error) {
 		_ACL_FREE(xfs_acl);
 		return -error;
@@ -305,7 +304,7 @@ xfs_acl_vset(
 		goto out;
 
 	/* Incoming ACL exists, set file mode based on its value */
-	if (kind == ACL_TYPE_ACCESS)
+	if (kind == _ACL_TYPE_ACCESS)
 		xfs_acl_setmode(vp, xfs_acl);
 	xfs_acl_set_attr(vp, xfs_acl, kind, &error);
 out:
@@ -320,7 +319,7 @@ xfs_acl_iaccess(
 	mode_t		mode,
 	cred_t		*cr)
 {
-	_ACL_DECL	(acl);
+	xfs_acl_t	*acl;
 	int		error;
 
 	if (!(_ACL_ALLOC(acl)))
@@ -355,7 +354,7 @@ xfs_acl_allow_set(
 	vattr_t		va;
 	int		error;
 
-	if (kind == ACL_TYPE_DEFAULT && vp->v_type != VDIR)
+	if (kind == _ACL_TYPE_DEFAULT && vp->v_type != VDIR)
 		return ENOTDIR;
 	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
 		return EROFS;
@@ -591,8 +590,9 @@ xfs_acl_get_attr(
 	int		len = sizeof(xfs_acl_t);
 
 	flags |= ATTR_ROOT;
-	VOP_ATTR_GET(vp, kind==ACL_TYPE_ACCESS ? SGI_ACL_FILE : SGI_ACL_DEFAULT,
-		     (char *)aclp, &len, flags, sys_cred, *error);
+	VOP_ATTR_GET(vp,
+		kind == _ACL_TYPE_ACCESS ? SGI_ACL_FILE : SGI_ACL_DEFAULT,
+		(char *)aclp, &len, flags, sys_cred, *error);
 	if (*error || (flags & ATTR_KERNOVAL))
 		return;
 	xfs_acl_get_endian(aclp);
@@ -609,7 +609,7 @@ xfs_acl_set_attr(
 	int		*error)
 {
 	xfs_acl_entry_t	*ace, *newace, *end;
-	_ACL_DECL	(newacl);
+	xfs_acl_t	*newacl;
 	int		len;
 
 	if (!(_ACL_ALLOC(newacl))) {
@@ -628,8 +628,9 @@ xfs_acl_set_attr(
 		INT_SET(newace->ae_perm, ARCH_CONVERT, ace->ae_perm);
 	}
 	INT_SET(newacl->acl_cnt, ARCH_CONVERT, aclp->acl_cnt);
-	VOP_ATTR_SET(vp, kind==ACL_TYPE_ACCESS ? SGI_ACL_FILE: SGI_ACL_DEFAULT, 
-		     	(char *)newacl, len, ATTR_ROOT, sys_cred, *error);
+	VOP_ATTR_SET(vp,
+		kind == _ACL_TYPE_ACCESS ? SGI_ACL_FILE: SGI_ACL_DEFAULT, 
+		(char *)newacl, len, ATTR_ROOT, sys_cred, *error);
 	_ACL_FREE(newacl);
 }
 
@@ -647,7 +648,7 @@ xfs_acl_vtoacl(
 		 * Get the Access ACL and the mode.  If either cannot
 		 * be obtained for some reason, invalidate the access ACL.
 		 */
-		xfs_acl_get_attr(vp, access_acl, ACL_TYPE_ACCESS, 0, &error);
+		xfs_acl_get_attr(vp, access_acl, _ACL_TYPE_ACCESS, 0, &error);
 		if (!error) {
 			/* Got the ACL, need the mode... */
 			va.va_mask = AT_MODE;
@@ -661,7 +662,7 @@ xfs_acl_vtoacl(
 	}
 
 	if (default_acl) {
-		xfs_acl_get_attr(vp, default_acl, ACL_TYPE_DEFAULT, 0, &error);
+		xfs_acl_get_attr(vp, default_acl, _ACL_TYPE_DEFAULT, 0, &error);
 		if (error)
 			default_acl->acl_cnt = XFS_ACL_NOT_PRESENT;
 	}
@@ -678,7 +679,7 @@ xfs_acl_inherit(
 	vattr_t		*vap,
 	xfs_acl_t	*pdaclp)
 {
-	_ACL_DECL	(cacl);
+	xfs_acl_t	*cacl;
 	int		error = 0;
 
 	/*
@@ -713,9 +714,9 @@ xfs_acl_inherit(
 	 * the containing directory's default ACL.
 	 */
 	if (vp->v_type == VDIR)
-		xfs_acl_set_attr(vp, pdaclp, ACL_TYPE_DEFAULT, &error);
+		xfs_acl_set_attr(vp, pdaclp, _ACL_TYPE_DEFAULT, &error);
 	if (!error)
-		xfs_acl_set_attr(vp, cacl, ACL_TYPE_ACCESS, &error);
+		xfs_acl_set_attr(vp, cacl, _ACL_TYPE_ACCESS, &error);
 	_ACL_FREE(cacl);
 	return error;
 }
