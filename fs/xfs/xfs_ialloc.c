@@ -588,30 +588,36 @@ xfs_dialloc(
 	 */
 	*alloc_done = B_FALSE;
 	while (agi->agi_freecount == 0) {
-		/*
-		 * Try to allocate some new inodes in the allocation group.
+		/* 
+		 * Don't do anything if we're not supposed to allocate
+		 * any blocks, just go on to the next ag.
 		 */
-		ASSERT(okalloc);
-		if (error = xfs_ialloc_ag_alloc(tp, agbp, &ialloced)) {
-			xfs_trans_brelse(tp, agbp);
-			if (error == ENOSPC) {
+		if (okalloc) {
+			/*
+			 * Try to allocate some new inodes in the allocation
+			 * group.
+			 */
+			if (error = xfs_ialloc_ag_alloc(tp, agbp, &ialloced)) {
+				xfs_trans_brelse(tp, agbp);
+				if (error == ENOSPC) {
+					*inop = NULLFSINO;
+					return 0;
+				} else
+					return error;
+			}
+			if (ialloced) {
+				/*
+				 * We successfully allocated some inodes, return
+				 * the current context to the caller so that it
+				 * can commit the current transaction and call
+				 * us again where we left off.
+				 */
+				ASSERT(agi->agi_freecount > 0);
+				*alloc_done = B_TRUE;
+				*IO_agbp = agbp;
 				*inop = NULLFSINO;
 				return 0;
-			} else
-				return error;
-		}
-		if (ialloced) {
-			/*
-			 * We successfully allocated some inodes, return
-			 * the current context to the caller so that it
-			 * can commit the current transaction and call
-			 * us again where we left off.
-			 */
-			ASSERT(agi->agi_freecount > 0);
-			*alloc_done = B_TRUE;
-			*IO_agbp = agbp;
-			*inop = NULLFSINO;
-			return 0;
+			}
 		}
 		/*
 		 * If it failed, give up on this ag.
