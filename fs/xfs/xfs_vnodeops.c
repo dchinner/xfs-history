@@ -106,7 +106,6 @@ xfs_create(
 STATIC int
 xfs_remove(
 	bhv_desc_t	*dir_bdp,
-	vnode_t		*vp,
 	char		*name,
 	cred_t		*credp);
 
@@ -127,7 +126,6 @@ xfs_mkdir(
 STATIC int
 xfs_rmdir(
 	bhv_desc_t	*dir_bdp,
-	vnode_t		*vp,
 	char		*name,
 	vnode_t		*current_dir_vp,
 	cred_t		*credp);
@@ -3196,7 +3194,6 @@ int remove_which_error_return = 0;
 STATIC int
 xfs_remove(
 	bhv_desc_t	*dir_bdp,
-	vnode_t		*vp,
 	char		*name,
 	cred_t		*credp)
 {
@@ -4002,7 +3999,6 @@ std_return:
 STATIC int
 xfs_rmdir(
 	bhv_desc_t	*dir_bdp,
-	vnode_t		*vp,
 	char		*name,
 	vnode_t		*current_dir_vp,
 	cred_t		*credp)
@@ -6086,6 +6082,9 @@ xfs_change_file_space(
 }
 
 vnodeops_t xfs_vnodeops = {
+#ifdef CELL_CAPABLE
+        BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
+#endif
 	xfs_open,
 	xfs_close,
 	(vop_read_t)xfs_read,
@@ -6112,6 +6111,9 @@ vnodeops_t xfs_vnodeops = {
 	xfs_seek,
 	(vop_realvp_t)fs_nosys,
 	(vop_bmap_t)xfs_bmap,
+#ifdef CELL_CAPABLE
+        xfs_allocstore,
+#endif
 	(vop_fcntl_t)fs_nosys,
 	xfs_reclaim,
 	(vop_attr_get_t)xfs_attr_get,

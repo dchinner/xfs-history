@@ -121,22 +121,26 @@
 
 #include <linux/behavior.h>
 
-// /*
-//  * Define stuff for behavior position masks
-//  */
-// typedef __uint64_t bhv_posmask_t;
-// #define BHV_POSMASK_NULL	((bhv_posmask_t) 0)
-// #define BHV_POSMASK_ONE(a)      (((bhv_posmask_t) 1) << (a))
-// #define BHV_POSMASK_RANGE(a, b) (((((bhv_posmask_t) 1) << ((b)-(a)))-1) << (a))
-// #define BHV_POSMASK_TEST(a, b)  ((a) & BHV_POSMASK(b))
-// #define BHV_POMASK_TESTID(a, b) BHV_POS_MASK((b)->bi_position)
+/*
+ * Define stuff for behavior position masks
+ */
+#ifdef CELL_CAPABLE
+typedef __uint64_t bhv_posmask_t;
+#define BHV_POSMASK_NULL        ((bhv_posmask_t) 0)
+#define BHV_POSMASK_ONE(a)      (((bhv_posmask_t) 1) << (a))
+#define BHV_POSMASK_RANGE(a, b) (((((bhv_posmask_t) 1) << ((b)-(a)))-1) << (a))
+#define BHV_POSMASK_TEST(a, b)  ((a) & BHV_POSMASK(b))
+#define BHV_POMASK_TESTID(a, b) BHV_POS_MASK((b)->bi_position)
+#endif
 
-// /*
-//  * Plumbing macros.
-//  */
+/*
+ * Plumbing macros.
+ */
 #define BHV_HEAD_FIRST(bhp)	(ASSERT((bhp)->bh_first), (bhp)->bh_first)
-// #define BHV_NEXT(bdp)		(ASSERT((bdp)->bd_next), (bdp)->bd_next)
-// #define BHV_NEXTNULL(bdp)	((bdp)->bd_next)
+#ifdef CELL_CAPABLE
+#define BHV_NEXT(bdp)		(ASSERT((bdp)->bd_next), (bdp)->bd_next)
+#define BHV_NEXTNULL(bdp)	((bdp)->bd_next)
+#endif
 #define BHV_VOBJ(bdp)		(ASSERT((bdp)->bd_vobj), (bdp)->bd_vobj)
 #define BHV_VOBJNULL(bdp)	((bdp)->bd_vobj)
 #define BHV_PDATA(bdp)		(bdp)->bd_pdata
@@ -156,137 +160,103 @@
 
 #ifdef CELL_CAPABLE
 
-// /* 
-//  * Macros for manipulation of behavior locks. The following
-//  * macros operate on the lock itself. Currently, BHV locks are
-//  * simply mrlocks but this implementation could change in the
-//  * future. These macros should insulate us from this change.
-//  *	These macros take a mrlock_t* as an argument.
-//  */
+/* 
+ * Macros for manipulation of behavior locks. The following
+ * macros operate on the lock itself. Currently, BHV locks are
+ * simply mrlocks but this implementation could change in the
+ * future. These macros should insulate us from this change.
+ *   These macros take a mrlock_t* as an argument.
+ */
 
-// #define BHV_MRACCESS(l)			mraccess(l)
-// #define BHV_MRACCUNLOCK(l)		mraccunlock(l)
-// #define BHV_MRTRYACCESS(l)		mrtryaccess(l)
-// #define BHV_MRTRYPROMOTE(l)		mrtrypromote(l)
+#define BHV_MRACCESS(l)                 mraccess(l)
+#define BHV_MRACCUNLOCK(l)              mraccunlock(l)
+#define BHV_MRTRYACCESS(l)              mrtryaccess(l)
+#define BHV_MRTRYPROMOTE(l)             mrtrypromote(l)
 
-// #define BHV_MRUPDATE(l)			mrupdate(l)
-// #define BHV_MRTRYUPDATE(l)		mrtryupdate(l)
-// #define BHV_MRUNLOCK(l)			mrunlock(l)
-// #define BHV_MRDEMOTE(l)			mrdemote(l)
-// #define BHV_MRDIVEST(l)                 mrdivest(l)
+#define BHV_MRUPDATE(l)                 mrupdate(l)
+#define BHV_MRTRYUPDATE(l)              mrtryupdate(l)
+#define BHV_MRUNLOCK(l)                 mrunlock(l)
+#define BHV_MRDEMOTE(l)                 mrdemote(l)
+#define BHV_MRDIVEST(l)                 mrdivest(l)
 
-// #define BHV_MR_IS_READ_LOCKED(l) 	mrislocked_access(l)
-// #define BHV_MR_NOT_READ_LOCKED(l) 	(!mrislocked_access(l))
-// #define BHV_MR_IS_WRITE_LOCKED(l) 	mrislocked_update(l)
-// #define BHV_MR_NOT_WRITE_LOCKED(l) 	(!mrislocked_update(l))
-// #define BHV_MR_IS_EITHER_LOCKED(l)	mrislocked_any(l)
-// #define BHV_MR_NOT_EITHER_LOCKED(l)	(!mrislocked_any(l))
-// #define BHV_MR_LOCK_MINE(l)             mrlock_mine(l,curthreadp)
+#define BHV_MR_IS_READ_LOCKED(l)        mrislocked_access(l)
+#define BHV_MR_NOT_READ_LOCKED(l)       (!mrislocked_access(l))
+#define BHV_MR_IS_WRITE_LOCKED(l)       mrislocked_update(l)
+#define BHV_MR_NOT_WRITE_LOCKED(l)      (!mrislocked_update(l))
+#define BHV_MR_IS_EITHER_LOCKED(l)      mrislocked_any(l)
+#define BHV_MR_NOT_EITHER_LOCKED(l)     (!mrislocked_any(l))
+#define BHV_MR_LOCK_MINE(l)             mrlock_mine(l,curthreadp)
 
-// /* 
-//  * Behavior chain lock macros - typically used by ops-in-progress to 
-//  * synchronize with behavior insertion and object migration.
-//  *	Theses macros take a behavior (bhv_head_t*) as an 
-//  *	argument.
-//  */
-// #define BH_LOCK(bhp)			(&(bhp)->bh_lockp->bhl_lock)	
+/* 
+ * Behavior chain lock macros - typically used by ops-in-progress to 
+ * synchronize with behavior insertion and object migration.
+ *   Theses macros take a behavior (bhv_head_t*) as an 
+ *   argument.
+ */
+#define BH_LOCK(bhp)                    (&(bhp)->bh_lockp->bhl_lock)    
 
 #define BHV_READ_LOCK(bhp)		CELL_ONLY(BHV_MRACCESS(BH_LOCK(bhp)))
 #define BHV_READ_UNLOCK(bhp)		CELL_ONLY(BHV_MRACCUNLOCK(BH_LOCK(bhp)))
-// #define BHV_TRYACCESS(bhp)		CELL_MUST(BHV_MRTRYACCESS(BH_LOCK(bhp)))
-// #define BHV_TRYPROMOTE(bhp)		CELL_MUST(BHV_MRTRYPROMOTE(BH_LOCK(bhp)))
+#define BHV_TRYACCESS(bhp)              CELL_MUST(BHV_MRTRYACCESS(BH_LOCK(bhp)))
+#define BHV_TRYPROMOTE(bhp)             CELL_MUST(BHV_MRTRYPROMOTE(BH_LOCK(bhp)))
 
-// #define BHV_WRITE_LOCK(bhp)		CELL_ONLY(BHV_MRUPDATE(BH_LOCK(bhp)))
-// #define BHV_WRITE_UNLOCK(bhp)		CELL_ONLY(BHV_MRUNLOCK(BH_LOCK(bhp)))
-// #define BHV_TRYUPDATE(bhp)		CELL_MUST(BHV_MRTRYUPDATE(BH_LOCK(bhp)))
-// #define BHV_WRITE_TO_READ(bhp)		CELL_ONLY(BHV_MRDEMOTE(BH_LOCK(bhp)))
-// #define BHV_DEMOTE(bhp)			CELL_MUST(BHV_MRDEMOTE(BH_LOCK(bhp)))
+#define BHV_WRITE_LOCK(bhp)             CELL_ONLY(BHV_MRUPDATE(BH_LOCK(bhp)))
+#define BHV_WRITE_UNLOCK(bhp)           CELL_ONLY(BHV_MRUNLOCK(BH_LOCK(bhp)))
+#define BHV_TRYUPDATE(bhp)              CELL_MUST(BHV_MRTRYUPDATE(BH_LOCK(bhp)))
+#define BHV_WRITE_TO_READ(bhp)          CELL_ONLY(BHV_MRDEMOTE(BH_LOCK(bhp)))
+#define BHV_DEMOTE(bhp)                 CELL_MUST(BHV_MRDEMOTE(BH_LOCK(bhp)))
 
 #define BHV_IS_READ_LOCKED(bhp) 	CELL_IF(BHV_MR_IS_READ_LOCKED(BH_LOCK(bhp)), 1)
 #define BHV_NOT_READ_LOCKED(bhp) 	CELL_IF(BHV_MR_NOT_READ_LOCKED(BH_LOCK(bhp)), 1)
 #define BHV_IS_WRITE_LOCKED(bhp) 	CELL_IF(BHV_MR_IS_WRITE_LOCKED(BH_LOCK(bhp)), 1)
 #define BHV_NOT_WRITE_LOCKED(bhp) 	CELL_IF(BHV_MR_NOT_WRITE_LOCKED(BH_LOCK(bhp)), 1)
-// #define BHV_IS_EITHER_LOCKED(bhp) 	CELL_IF(BHV_MR_IS_EITHER_LOCKED(BH_LOCK(bhp)), 1)
-// #define BHV_NOT_EITHER_LOCKED(bhp) 	CELL_IF(BHV_MR_NOT_EITHER_LOCKED(BH_LOCK(bhp)), 1)
-// #define BHV_LOCK_MINE(bhp) 		CELL_IF(BHV_MR_LOCK_MINE(BH_LOCK(bhp)), 1)
-/* #define BHV_AM_WRITE_OWNER(bhp) \
+#define BHV_IS_EITHER_LOCKED(bhp)       CELL_IF(BHV_MR_IS_EITHER_LOCKED(BH_LOCK(bhp)), 1)
+#define BHV_NOT_EITHER_LOCKED(bhp)      CELL_IF(BHV_MR_NOT_EITHER_LOCKED(BH_LOCK(bhp)), 1)
+#define BHV_LOCK_MINE(bhp)              CELL_IF(BHV_MR_LOCK_MINE(BH_LOCK(bhp)), 1)
+#define BHV_AM_WRITE_OWNER(bhp) \
    	CELL_IF(BHV_MR_IS_WRITE_LOCKED(BH_LOCK(bhp)) && \
                  BHV_MR_LOCK_MINE(BH_LOCK(bhp)), 1)
-*/
 
-// /*
-//  * Request a callout to be made ((*func)(bhp, arg1, arg2, arg3, argv, argvsz))
-//  * with the behavior chain update locked.
-//  *
-//  * Must have read lock before calling this routine.
-//  * Note that the callouts will occur in the context of the last
-//  * accessor unlocking the behavior.
-//  */
-// typedef void bhv_ucallout_t(bhv_head_t *bhp, void *, void *, caddr_t, size_t);
+/*
+ * Request a callout to be made ((*func)(bhp, arg1, arg2, arg3, argv, argvsz))
+ * with the behavior chain update locked.
+ *
+ * Must have read lock before calling this routine.
+ * Note that the callouts will occur in the context of the last
+ * accessor unlocking the behavior.
+ */
+typedef void bhv_ucallout_t(bhv_head_t *bhp, void *, void *, caddr_t, size_t);
 
-
-
-/* #define BHV_WRITE_LOCK_CALLOUT(bhp, flags, func, arg1, arg2, argv, argvsz) \
+#define BHV_WRITE_LOCK_CALLOUT(bhp, flags, func, arg1, arg2, argv, argvsz) \
  	bhv_queue_ucallout(bhp, flags, func, arg1, arg2, argv, argvsz)
-*/
-// #define bhv_lock_init(bhp,name)		CELL_ONLY(mrbhinit(BH_LOCK(bhp), (name)))
-// #define bhv_lock_free(bhp)		CELL_ONLY(mrfree(BH_LOCK(bhp)))
+
+#define bhv_lock_init(bhp,name)		CELL_ONLY(mrbhinit(BH_LOCK(bhp), (name)))
+#define bhv_lock_free(bhp)		CELL_ONLY(mrfree(BH_LOCK(bhp)))
 
 
-
-#elif BHV_PREPARE
-
-// /*
-//  * Not running a CELL system. If BHV_PREPARE is defined, then the
-//  * read/write BHV locking macros should call external routines. This
-//  * is currently done for 3rd party drivers.
-//  * Otherwise, just NOOP the calls.
-//  */
-
-#define BHV_READ_LOCK(bhp)              bhv_read_lock(&(bhp)->bh_lockp);
-#define BHV_READ_UNLOCK(bhp)		bhv_read_unlock(&(bhp)->bh_lockp);
-// #define BHV_WRITE_LOCK(bhp)		bhv_write_lock(&(bhp)->bh_lockp);
-// #define BHV_WRITE_UNLOCK(bhp)		bhv_write_unlock(&(bhp)->bh_lockp);
-
-// extern void bhv_read_lock(bhv_head_lock_t **);
-// extern void bhv_read_unlock(bhv_head_lock_t **);
-// extern void bhv_write_lock(bhv_head_lock_t **);
-// extern void bhv_write_unlock(bhv_head_lock_t **);
-
-#else	/* not CELL_CAPABLE or BHV_PREPARE, ie non-cell kernel */
+#else	/* not CELL_CAPABLE ie non-cell kernel */
 
 #define BHV_READ_LOCK(bhp)
 #define BHV_READ_UNLOCK(bhp)
-// #define BHV_WRITE_LOCK(bhp)
-// #define BHV_WRITE_UNLOCK(bhp)
-
-
-// #define BHV_WRITE_TO_READ(bhp)
-// #define BHV_WRITE_LOCK_CALLOUT(bhp, func, arg1, arg2, argv, argvsz)
-// #define BHV_IS_READ_LOCKED(bhp)		1
 #define BHV_NOT_READ_LOCKED(bhp)	1
 #define BHV_IS_WRITE_LOCKED(bhp)	1
-// #define BHV_LOCK_MINE(bhp) 		1
 #define BHV_NOT_WRITE_LOCKED(bhp)	1
-// #define bhv_lock_init(bhp,name)
-// #define bhv_lock_free(bhp)
-// #define bhv_ucq_init(bhp,name)
-// #define bhv_ucq_free(bhp)
 
 #endif /* CELL_CAPABLE */
-#if defined(CELL_CAPABLE) && !defined(_MASTER_C)
-// extern int			bhv_try_deferred_ucalloutp(bhv_head_lock_t *bhl);
 
-// static __inline int
-// bhv_try_deferred_ucallout(mrlock_t *mrp)
-// {
-// 	bhv_head_lock_t	*bhl;
+#ifdef CELL_CAPABLE 
+extern int                   bhv_try_deferred_ucalloutp(bhv_head_lock_t *bhl);
 
-// 	bhl = MR_TO_BHVL(mrp);
-// 	if (kcallout_isempty(&bhl->bhl_ucallout))
-// 		return 0;
-// 	return bhv_try_deferred_ucalloutp(bhl);
-// }
+static __inline int
+bhv_try_deferred_ucallout(mrlock_t *mrp)
+{
+     bhv_head_lock_t *bhl;
+
+     bhl = MR_TO_BHVL(mrp);
+     if (kcallout_isempty(&bhl->bhl_ucallout))
+             return 0;
+     return bhv_try_deferred_ucalloutp(bhl);
+}
 
 #endif
 
@@ -295,14 +265,14 @@ extern void bhv_head_destroy(bhv_head_t *);
 extern void bhv_head_reinit(bhv_head_t *);
 extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
 
-// /*
-//  * Initialize a new behavior descriptor.
-//  * Arguments:
-//  * 	bdp - pointer to behavior descriptor
-//  *	pdata - pointer to behavior's private data
-//  *	vobj - pointer to associated virtual object
-//  *	ops - pointer to ops for this behavior
-//  */
+/*
+ * Initialize a new behavior descriptor.
+ * Arguments:
+ *   bdp - pointer to behavior descriptor
+ *   pdata - pointer to behavior's private data
+ *   vobj - pointer to associated virtual object
+ *   ops - pointer to ops for this behavior
+ */
 #define bhv_desc_init(bdp, pdata, vobj, ops)		\
  {							\
  	(bdp)->bd_pdata = pdata;			\
@@ -311,9 +281,9 @@ extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
  	(bdp)->bd_next = NULL;				\
  }
 
-// /*
-//  * Remove a behavior descriptor from a behavior chain.
-//  */
+/*
+ * Remove a behavior descriptor from a behavior chain.
+ */
 #define bhv_remove(bhp, bdp)				\
  {							\
  	if ((bhp)->bh_first == (bdp)) {			\
@@ -329,90 +299,71 @@ extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
 	(bdp)->bd_vobj = NULL;				\
  }
 
-// /*
-//  * Behavior module prototypes.
-//  */
-// extern int      	bhv_insert(bhv_head_t *bhp, bhv_desc_t *bdp);
-// extern int      	bhv_forced_insert(bhv_head_t *bhp, bhv_desc_t *bdp);
-// extern int      	bhv_append(bhv_head_t *bhp, bhv_desc_t *bdp);
-// extern int      	bhv_truncate(bhv_head_t *bhp, bhv_desc_t *bdp);
+/*
+ * Behavior module prototypes.
+ */
+#ifdef CELL_CAPABLE
+extern int              bhv_insert(bhv_head_t *bhp, bhv_desc_t *bdp);
+extern int              bhv_forced_insert(bhv_head_t *bhp, bhv_desc_t *bdp);
+extern int              bhv_append(bhv_head_t *bhp, bhv_desc_t *bdp);
+extern int              bhv_truncate(bhv_head_t *bhp, bhv_desc_t *bdp);
+#endif
 extern void		bhv_remove_not_first(bhv_head_t *bhp, bhv_desc_t *bdp);
-extern bhv_desc_t 	*bhv_lookup(bhv_head_t *bhp, void *ops);
-extern bhv_desc_t 	*bhv_lookup_unlocked(bhv_head_t *bhp, void *ops);
-// extern bhv_desc_t 	*bhv_lookup_range(bhv_head_t *bhp, int lpos, int hpos);
-extern bhv_desc_t	*bhv_base_unlocked(bhv_head_t *bhp);
-
-// extern void		bhv_global_init(void);
-// extern struct zone	*bhv_global_zone;
+extern bhv_desc_t *     bhv_lookup(bhv_head_t *bhp, void *ops);
+extern bhv_desc_t *     bhv_lookup_unlocked(bhv_head_t *bhp, void *ops);
+#ifdef CELL_CAPABLE
+extern bhv_desc_t *     bhv_lookup_range(bhv_head_t *bhp, int lpos, int hpos);
+#endif
+extern bhv_desc_t *     bhv_base_unlocked(bhv_head_t *bhp);
 
 #ifdef CELL_CAPABLE
-// extern void		bhv_queue_ucallout(bhv_head_t *bhp,
-// 				int flags, bhv_ucallout_t *func,
-// 				void *, void *, caddr_t, size_t);
-// extern void		bhv_queue_ucallout_unlocked(bhv_head_t *bhp,
-// 				int flags, bhv_ucallout_t *func,
-// 				void *, void *, caddr_t, size_t);
+extern void             bhv_global_init(void);
+extern struct zone *    bhv_global_zone;
+extern void             bhv_queue_ucallout(bhv_head_t *bhp,
+                             int flags, bhv_ucallout_t *func,
+                             void *, void *, caddr_t, size_t);
+extern void             bhv_queue_ucallout_unlocked(bhv_head_t *bhp,
+                             int flags, bhv_ucallout_t *func,
+                             void *, void *, caddr_t, size_t);
 #endif /* CELL_CAPABLE */
 
-// /*
-//  * Prototypes for interruptible sleep requests
-//  * Noop on non-cell kernels.
-//  */
-// #ifdef CELL_CAPABLE
-// #define	BLA_ACCESS		0
-// #define	BLA_UPDATE		1
-// #define BLA_RWMASK		1
-// #define BLA_TRY			4
-// #define BLA_INTERRUPT		8
-// #ifdef BLALOG
-// #define bla_push(mr,rw,ra)	CELL_ONLY(_bla_push(mr,rw,ra))
-// extern void			_bla_push(mrlock_t *mrp, int rw, void *ra);
-// #else
-// #define bla_push(mr,rw,ra)	CELL_ONLY(_bla_push(mr,rw))
-// extern void			_bla_push(mrlock_t *mrp, int rw);
-// #endif
-// #define	bla_pop(mrp)		CELL_ONLY(_bla_pop(mrp))
-// extern void			_bla_pop(mrlock_t *mrp);
+/*
+ * Prototypes for interruptible sleep requests
+ * Noop on non-cell kernels.
+ */
+#ifdef CELL_CAPABLE
+#define      BLA_ACCESS              0
+#define      BLA_UPDATE              1
+#define BLA_RWMASK           1
+#define BLA_TRY                      4
+#define BLA_INTERRUPT                8
+#ifdef BLALOG
+#define bla_push(mr,rw,ra)   CELL_ONLY(_bla_push(mr,rw,ra))
+extern void                  _bla_push(mrlock_t *mrp, int rw, void *ra);
+#else
+#define bla_push(mr,rw,ra)   CELL_ONLY(_bla_push(mr,rw))
+extern void                  _bla_push(mrlock_t *mrp, int rw);
+#endif
+#define      bla_pop(mrp)    CELL_ONLY(_bla_pop(mrp))
+extern void                  _bla_pop(mrlock_t *mrp);
 
-// #define	bla_isleep()		CELL_ONLY(_bla_isleep())
-// extern void			_bla_isleep(void);
+#define      bla_isleep()    CELL_ONLY(_bla_isleep())
+extern void                  _bla_isleep(void);
 
-// #define	bla_iunsleep()		CELL_ONLY(_bla_iunsleep())
-// extern void 			_bla_iunsleep(void);
+#define      bla_iunsleep()  CELL_ONLY(_bla_iunsleep())
+extern void                  _bla_iunsleep(void);
 
-// #define	bla_wait_for_mrlock(mrp) CELL_IF(_bla_wait_for_mrlock(mrp), 0)
-// extern uint_t			_bla_wait_for_mrlock(mrlock_t *mrp);
+#define      bla_wait_for_mrlock(mrp)   CELL_IF(_bla_wait_for_mrlock(mrp), 0)
+extern uint_t                           _bla_wait_for_mrlock(mrlock_t *mrp);
 
-// #define	bla_got_mrlock(rv)	CELL_ONLY(_bla_got_mrlock(rv))
-// extern void			_bla_got_mrlock(uint_t rv);
+#define      bla_got_mrlock(rv)         CELL_ONLY(_bla_got_mrlock(rv))
+extern void                             _bla_got_mrlock(uint_t rv);
 
-/* #define bla_curlocksheld()	\
- 		CELL_MUST((private.p_blaptr - (curthreadp)->k_blap->kb_lockp))
-*/		
-/* #define bla_klocksheld(kt)	\
- 		CELL_MUST(((kt)->k_blap->kb_lockpp - (kt)->k_blap->kb_lockp))
-*/
-// #else
-// #define bla_push(mrp,rw,ra)
-// #define bla_pop(mrp)
-// #define bla_isleep()
-// #define bla_iunsleep()
-// #define bla_wait_for_mrlock(mrp) 0
-// #define bla_got_mrlock(mrp)
-// #define bla_curlocksheld()	0
-// #define bla_klocksheld(kt)	0
-// #endif /* CELL_CAPABLE */
-// #ifdef CELL_CAPABLE
-// extern void			bla_prevent_starvation(int);
-// extern int			bla_test_defer_barrier(mrlock_t *mrp);
-// #define bla_is_curlocksheld_0()	(private.p_blaptr == (curthreadp)->k_blap->kb_lockp)
-/* #define bla_do_deferred_barrier() ((kt)->k_blap->kb_deferred_barrier &&	\
- 					bla_is_curlocksheld_0())
-					*/
-// #ifdef DEBUG
-// extern void		bhv_print_ucallout(bhv_head_t *bhp);
-// #endif
-// #endif
-
+#define bla_curlocksheld()   \
+             CELL_MUST((private.p_blaptr - (curthreadp)->k_blap->kb_lockp))
+             
+#define bla_klocksheld(kt)   \
+             CELL_MUST(((kt)->k_blap->kb_lockpp - (kt)->k_blap->kb_lockp))
+#endif
 
 #endif /* __XFS_BEHAVIOR_H__ */

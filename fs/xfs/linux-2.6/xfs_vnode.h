@@ -177,13 +177,13 @@ struct attrlist_cursor_kern;
 struct file;
 struct page_buf_bmap_s;
 
-typedef	int	(*vop_bmap_t)(bhv_desc_t *, loff_t, ssize_t, int, struct page_buf_bmap_s *, int *);
-typedef	ssize_t	(*vop_read_t)(bhv_desc_t *, struct file *, char *,
-				size_t, loff_t *);
-typedef	ssize_t	(*vop_write_t)(bhv_desc_t *, struct file *, const char *,
-				size_t, loff_t *);
 typedef	int	(*vop_open_t)(bhv_desc_t *, vnode_t **, mode_t, struct cred *);
 typedef	int	(*vop_close_t)(bhv_desc_t *, int, lastclose_t, struct cred *);
+typedef	ssize_t	(*vop_read_t)(bhv_desc_t *, struct uio *, int, struct cred *,
+                                struct flid *);
+typedef	ssize_t	(*vop_write_t)(bhv_desc_t *, struct uio *, int, struct cred *,
+                                struct flid *);
+typedef	int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 typedef	int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
 typedef	int	(*vop_setattr_t)(bhv_desc_t *, struct vattr *, int,
@@ -194,13 +194,13 @@ typedef	int	(*vop_lookup_t)(bhv_desc_t *, char *, vnode_t **,
 				struct cred *);
 typedef	int	(*vop_create_t)(bhv_desc_t *, char *, struct vattr *, int, int,
 				vnode_t **, struct cred *);
-typedef	int	(*vop_remove_t)(bhv_desc_t *, vnode_t *, char *, struct cred *);
+typedef	int	(*vop_remove_t)(bhv_desc_t *, char *, struct cred *);
 typedef	int	(*vop_link_t)(bhv_desc_t *, vnode_t *, char *, struct cred *);
 typedef	int	(*vop_rename_t)(bhv_desc_t *, char *, vnode_t *, char *,
 				struct pathname *npnp, struct cred *);
 typedef	int	(*vop_mkdir_t)(bhv_desc_t *, char *, struct vattr *, vnode_t **,
 				struct cred *);
-typedef	int	(*vop_rmdir_t)(bhv_desc_t *, vnode_t *, char *, vnode_t *, struct cred *);
+typedef	int	(*vop_rmdir_t)(bhv_desc_t *, char *, vnode_t *, struct cred *);
 typedef	int	(*vop_readdir_t)(bhv_desc_t *, struct uio *, struct cred *,
 				int *);
 typedef	int	(*vop_symlink_t)(bhv_desc_t *, char *, struct vattr *, char *,
@@ -214,6 +214,10 @@ typedef	int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	int	(*vop_seek_t)(bhv_desc_t *, xfs_off_t, xfs_off_t*);
 typedef	int	(*vop_realvp_t)(bhv_desc_t *, vnode_t **);
+typedef	int	(*vop_bmap_t)(bhv_desc_t *, loff_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
+#ifdef CELL_CAPABLE
+typedef int     (*vop_allocstore_t)(bhv_desc_t *, xfs_off_t, size_t, struct cred *);
+#endif
 typedef	int	(*vop_fcntl_t)(bhv_desc_t *, int, void *, int, xfs_off_t,
 				struct cred *, union rval *);
 typedef	int	(*vop_reclaim_t)(bhv_desc_t *, int);
@@ -230,7 +234,7 @@ typedef	void	(*vop_ptossvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef	void	(*vop_pflushinvalvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
 typedef	int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);
 typedef	void	(*vop_sethole_t)(bhv_desc_t *, void *, int, int, xfs_off_t);
-typedef	int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
+
 
 typedef struct vnodeops {
 #ifdef CELL_CAPABLE
@@ -262,6 +266,9 @@ typedef struct vnodeops {
 	vop_seek_t		vop_seek;
 	vop_realvp_t		vop_realvp;
 	vop_bmap_t		vop_bmap;
+#ifdef CELL_CAPABLE
+        vop_allocstore_t        vop_allocstore;
+#endif
 	vop_fcntl_t		vop_fcntl;
 	vop_reclaim_t		vop_reclaim;
 	vop_attr_get_t		vop_attr_get;
@@ -287,22 +294,22 @@ typedef struct vnodeops {
  * original vnode and VOP_OPEN semantic allows the new vnode to be returned
  * in vpp. The practice of passing &vp for vpp just doesn't work.
  */
-#define VOP_READ(vp,filp,buf,size,offset,rv) 				\
+#define VOP_READ(vp,uiop,iof,cr,fl,rv) 				        \
 {       								\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-        rv = _VOP_(vop_read, vp)((vp)->v_fbhv,filp,buf,size,offset);	\
+        rv = _VOP_(vop_read, vp)((vp)->v_fbhv,uiop,iof,cr,fl);	        \
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define	VOP_WRITE(vp,filp,buf,size,offset,rv) 				\
+#define	VOP_WRITE(vp,uiop,iof,cr,fl,rv) 				\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,filp,buf,size,offset);	\
+	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,uiop,iof,cr,fl);	        \
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define	VOP_BMAP(vp,of,sz,rw,b,n,rv) 				\
+#define	VOP_BMAP(vp,of,sz,rw,cr,b,n,rv) 				\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_bmap, vp)((vp)->v_fbhv,of,sz,rw,b,n);	        \
+	rv = _VOP_(vop_bmap, vp)((vp)->v_fbhv,of,sz,rw,cr,b,n);	        \
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define	VOP_OPEN(vp, vpp, mode, cr, rv) 				\
@@ -348,10 +355,10 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_create, dvp)((dvp)->v_fbhv,p,vap,ex,mode,vpp,cr);\
 	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
-#define	VOP_REMOVE(dvp,vp,p,cr,rv) 					\
+#define	VOP_REMOVE(dvp,p,cr,rv) 					\
 {									\
 	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
-	rv = _VOP_(vop_remove, dvp)((dvp)->v_fbhv,vp,p,cr);		\
+	rv = _VOP_(vop_remove, dvp)((dvp)->v_fbhv,p,cr);		\
 	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
 #define	VOP_LINK(tdvp,fvp,p,cr,rv) 					\
@@ -372,10 +379,10 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_mkdir, dp)((dp)->v_fbhv,p,vap,vpp,cr);		\
 	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
-#define	VOP_RMDIR(dp,vp,p,cdir,cr,rv) 					\
+#define	VOP_RMDIR(dp,p,cdir,cr,rv) 					\
 {									\
 	VN_BHV_READ_LOCK(&(dp)->v_bh);					\
-	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,vp,p,cdir,cr);		\
+	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,p,cdir,cr);		\
 	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
 #define	VOP_READDIR(vp,uiop,cr,eofp,rv) 				\

@@ -106,11 +106,12 @@ out:
 
 ssize_t
 xfs_read(
-	bhv_desc_t	*bdp,
-	struct file	*filp,
-	char 		*buf,
-	size_t		size,
-	loff_t		*offsetp)
+        bhv_desc_t      *bdp,
+        uio_t           *uiop,
+        int             ioflag,
+        cred_t          *credp,
+        flid_t          *fl)
+        
 {
 	ssize_t		ret;
 	xfs_fsize_t	n;
@@ -118,6 +119,20 @@ xfs_read(
 	vnode_t		*vp;
 	xfs_inode_t	*ip;
 #endif
+        
+	struct file	*filp;
+	char 		*buf;
+	size_t		size;
+	loff_t		*offsetp;
+        
+        ASSERT(uiop);                   /* we only support exactly 1  */
+        ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
+        ASSERT(uiop->uio_iov);      
+        
+        filp = uiop->uio_fp;
+        buf = uiop->uio_iov->iov_base;
+        size = uiop->uio_iov->iov_len;
+        offsetp = &uiop->uio_offset;
 
 	n = XFS_MAX_FILE_OFFSET - *offsetp;
 	if (n <= 0)
@@ -610,15 +625,17 @@ int xfsw_debug = 0;
 
 ssize_t
 xfs_write(
-	bhv_desc_t	*bdp,
-	struct file	*filp,
-	char		*buf,
-	size_t		size,
-	loff_t		*offsetp)
+        bhv_desc_t      *bdp,
+        uio_t           *uiop,
+        int             ioflag,
+        cred_t          *credp,
+        flid_t          *fl)
 {
 	xfs_inode_t	*xip;
+	struct file	*filp = uiop->uio_fp;
 	struct dentry	*dentry = filp->f_dentry;
 	struct inode	*ip = dentry->d_inode;
+        loff_t          *offsetp = &uiop->uio_offset;   
 	xfs_mount_t	*mp;
 	ssize_t		ret;
 	xfs_fsize_t     isize;
@@ -629,7 +646,17 @@ xfs_write(
 	int		eventsent = 0;
 	loff_t		savedsize = *offsetp;
 #endif
-
+                    
+	char 		*buf;
+	size_t		size;
+        
+        ASSERT(uiop);                   /* we only support exactly 1  */
+        ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
+        ASSERT(uiop->uio_iov);      
+        
+        buf = uiop->uio_iov->iov_base;
+        size = uiop->uio_iov->iov_len;
+        
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
 	io = &(xip->i_iocore);
@@ -641,7 +668,9 @@ xfs_write(
 	     ("xfsw(%d): ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
 		current->pid, ip, ip->i_size, *offsetp, size));
 
+#ifdef CONFIG_XFS_DMAPI
 start:
+#endif
 	n = limit - *offsetp;
 	if (n <= 0) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
@@ -712,7 +741,9 @@ start:
 	}
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
 
+#ifdef CONFIG_XFS_DMAPI
 retry:
+#endif
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 0);
 
 #ifdef CONFIG_XFS_DMAPI
@@ -765,7 +796,8 @@ int
 xfs_bmap(bhv_desc_t	*bdp,
 	loff_t		offset,
 	ssize_t		count,
-	int		flags,
+	int		flags, 
+        struct cred     *cred,
 	pb_bmap_t	*pbmapp,
 	int		*npbmaps)
 {

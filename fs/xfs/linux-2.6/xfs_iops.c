@@ -206,18 +206,15 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	int		error;
 	struct inode	*inode;
 	vnode_t		*dvp;	/* directory containing name to remove */
-	vnode_t		*vp;
-
 
 	inode = dentry->d_inode;
 
-	vp = LINVFS_GET_VP(inode);
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
 
 	error = 0;
 
-	VOP_REMOVE(dvp, vp, (char *)dentry->d_name.name, NULL, error);
+	VOP_REMOVE(dvp, (char *)dentry->d_name.name, NULL, error);
 
 	if (!error) {
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -279,10 +276,8 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	int		error;
 	vnode_t		*dvp,		/* directory with name to remove */
 			*pwd_vp;	/* current working directory, vnode */
-	vnode_t		*vp;
 	struct inode *inode = dentry->d_inode;
 
-	vp = LINVFS_GET_VP(inode);
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
 
@@ -294,7 +289,7 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	 */
 
 	error = 0;
-	VOP_RMDIR(dvp, vp, (char *)dentry->d_name.name, pwd_vp, NULL, error);
+	VOP_RMDIR(dvp, (char *)dentry->d_name.name, pwd_vp, NULL, error);
 	if (!error) {
 		validate_fields(inode);
 		validate_fields(dir);
@@ -652,7 +647,7 @@ linvfs_pb_bmap(struct inode *inode,
 
 	*retpbbm = maxpbbm;
 
-	VOP_BMAP(vp, offset, count, flags,
+	VOP_BMAP(vp, offset, count, flags, NULL,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
 
 	return -error;
@@ -776,7 +771,7 @@ int linvfs_bmap(struct address_space *mapping, long block)
 			return -1;
 	}
 
-	VOP_BMAP(vp, block << 9, 1, PBF_READ|PBF_BMAP_TRY_ILOCK, 
+	VOP_BMAP(vp, block << 9, 1, PBF_READ|PBF_BMAP_TRY_ILOCK, NULL,
 		&bmap, &nbm, error);
 	if (error)
 	return -1;

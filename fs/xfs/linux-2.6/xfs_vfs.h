@@ -58,6 +58,7 @@ typedef struct vfs {
 	bhv_head_t	vfs_bh;		/* head of vfs behavior chain */
 	struct super_block *vfs_super;	/* pointer to super block structure */
 #if CELL_CAPABLE
+        __uint64_t      vfs_opsflags;           /* vfsops/vnodeops flags */
         struct vfs      *vfs_next;              /* next VFS in VFS list */
         struct vfs      **vfs_prevp;            /* ptr to previous vfs_next */
         struct vnode    *vfs_vnodecovered;      /* vnode mounted on */
@@ -151,6 +152,11 @@ typedef struct vfsops {
 	int	(*vfs_dmapi_mount)(struct vfs *, struct vnode *,
 				   char *, char *);
 					/* send dmapi mount event */
+#ifdef CELL_CAPABLE
+        int     vfs_ops_magic;          /* magic number for intfc extensions */
+        __uint64_t   vfs_ops_version;   /* interface version number */
+        __uint64_t   vfs_ops_flags;     /* interface flags */
+#endif
 } vfsops_t;
 
 #define VFS_DOUNMOUNT(vfsp,f,vp,cr, rv) \

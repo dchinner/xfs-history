@@ -39,7 +39,7 @@
  */
 #define	XFS_MAX_RW_NBMAPS	4
 
-extern int xfs_bmap (bhv_desc_t *,loff_t,ssize_t,int,pb_bmap_t *,int *);
+extern int xfs_bmap (bhv_desc_t *, loff_t, ssize_t, int, struct cred *, pb_bmap_t *, int *);
 extern int xfs_iomap_read (xfs_iocore_t *, loff_t, size_t, int,
 				pb_bmap_t *, int *, struct pm *);
 extern int xfs_iomap_write (xfs_iocore_t *, loff_t, size_t, pb_bmap_t *,
@@ -49,10 +49,18 @@ extern int xfs_bdstrat_cb (struct xfs_buf *);
 
 extern int xfs_zero_eof (vnode_t *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, struct pm *);
-extern ssize_t xfs_read (bhv_desc_t *, struct file *, char *,
-				size_t, loff_t *);
-extern ssize_t xfs_write (bhv_desc_t *, struct file *, char *,
-				size_t, loff_t *);
+extern ssize_t xfs_read (
+         struct bhv_desc        *bdp,
+         struct uio             *uiop,
+         int                    ioflag,
+         struct cred            *credp,
+         struct flid            *fl);
+extern ssize_t xfs_write (
+         struct bhv_desc        *bdp,
+         struct uio             *uiop,
+         int                    ioflag,
+         struct cred            *credp,
+         struct flid            *fl);
 
 extern int xfs_is_read_only (xlog_t *);
 extern void XFS_log_write_unmount_ro (bhv_desc_t *);

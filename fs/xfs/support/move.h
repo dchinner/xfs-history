@@ -53,8 +53,11 @@ typedef struct uio {
 	xfs_off_t       uio_offset;     /* file offset */
 	short           uio_segflg;     /* address space (kernel or user) */
 	ssize_t         uio_resid;      /* residual count */
+        
+        struct file *   uio_fp;         /* file associated with io */
+        
+        /* added for linux - hold filldir routine */
 	uio_copy_t	uio_copy;	/* Routine to copy with */
-			/* added for linux... hold filldir routine */
 } uio_t; 
 
 /*

@@ -86,6 +86,8 @@ STATIC ssize_t linvfs_read(
 	struct inode *inode;
 	vnode_t *vp;
 	int rv;
+        uio_t uio;
+        iovec_t iov;
 	
 	XFS_STATS_INC(xs_read_calls);
 	XFS_STATS64_ADD(xs_read_bytes, size);
@@ -101,7 +103,16 @@ STATIC ssize_t linvfs_read(
 
 	ASSERT(vp);
 
-	VOP_READ(vp, filp, buf, size, offset, rv);
+        uio.uio_iov = &iov;
+        uio.uio_offset = *offset;
+        uio.uio_fp = filp;
+        uio.uio_iovcnt = 1;
+        uio.uio_iov->iov_base = buf;
+        uio.uio_iov->iov_len = uio.uio_resid = size;
+        
+	VOP_READ(vp, &uio, 0, NULL, NULL, rv);
+        *offset = uio.uio_offset;
+        
 	return(rv);
 }
 
@@ -116,6 +127,9 @@ STATIC ssize_t linvfs_write(
 	loff_t	pos;
 	vnode_t *vp;
 	int	err;
+
+        uio_t uio;
+        iovec_t iov;
 	
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
@@ -148,10 +162,17 @@ STATIC ssize_t linvfs_write(
 	vp = LINVFS_GET_VP(inode);
 
 	ASSERT(vp);
-
-	VOP_WRITE(vp, (void *)filp, buf, size, &pos, err);
-
-	*offset = pos;
+        
+        uio.uio_iov = &iov;
+        uio.uio_offset = pos;
+        uio.uio_fp = filp;
+        uio.uio_iovcnt = 1;
+        uio.uio_iov->iov_base = buf;
+        uio.uio_iov->iov_len = uio.uio_resid = size;
+        
+	VOP_WRITE(vp, &uio, 0, NULL, NULL, err);
+        *offset = pos = uio.uio_offset;
+        
 out:
 	up(&inode->i_sem);
 	return(err);
