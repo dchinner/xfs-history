@@ -691,6 +691,10 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	__uint32_t bno;
 	off_t nextcook;
 
+	if (uio->uio_offset == dp->i_d.di_size) {
+		*eofp = 1;
+		return(0);
+	}
 	mp = dp->i_mount;
 	bno = (__uint32_t)XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
 	if (bno != 0)
@@ -1025,6 +1029,8 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 
 	if (XFS_DIR_COOKIE_BNO(dp->i_mount, uio->uio_offset) > 0) {
 		*eofp = 1;
+		if (uio->uio_offset == XFS_DIR_MAKE_COOKIE(dp->i_mount, 1, 0))
+			return(0);
 		return(XFS_ERROR(ENOENT));
 	}
 	bp = xfs_dir_read_buf(trans, dp, 0);
@@ -1274,7 +1280,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 {
 	struct xfs_dir_leafblock *leaf;
 	xfs_mount_t *mp;
-	__uint32_t bno;
+	__uint32_t bno, maxbno;
 	int retval, eob;
 	buf_t *bp;
 
@@ -1296,6 +1302,15 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		}
 	} else {
 		bno = XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
+		maxbno = XFS_B_TO_FSBT(mp, dp->i_d.di_size);
+		if (bno >= maxbno) {
+			if (bno == maxbno &&
+			    XFS_DIR_COOKIE_ENTRY(mp, uio->uio_offset) == 0) {
+				*eofp = 1;
+				return(0);
+			} else
+				return(XFS_ERROR(ENOENT));
+		}
 		bp = xfs_dir_read_buf(trans, dp, bno);
 		if (bp == NULL)
 			return(XFS_ERROR(ENOENT));
