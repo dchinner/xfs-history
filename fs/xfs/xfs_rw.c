@@ -1,4 +1,4 @@
-#ident "$Revision: 1.229 $"
+#ident "$Revision: 1.230 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3895,6 +3895,7 @@ xfs_strat_read(
 						block_off;
 				rbp->b_flags |= B_READ;
 				rbp->b_flags &= ~B_ASYNC;
+				rbp->b_target = bp->b_target;
 
 				xfs_check_rbp(ip, bp, rbp, 1);
 				(void) xfsbdstrat(mp, rbp);
@@ -4606,6 +4607,7 @@ xfs_strat_write(
 				XFS_FSB_TO_DB(ip, imapp->br_startblock);
 			rbp->b_offset = XFS_FSB_TO_BB(mp,
 						      imap_offset);
+			rbp->b_target = bp->b_target;
 			xfs_strat_write_subbp_trace(XFS_STRAT_SUB,
 						    ip, bp,
 						    rbp,
@@ -4903,7 +4905,7 @@ xfs_ioerror_alert(
 int
 xfs_read_buf(
 	struct xfs_mount *mp,
-	dev_t		 dev,
+	buftarg_t	 *target,
         daddr_t 	 blkno,
         int              len,
         uint             flags,
@@ -4912,7 +4914,7 @@ xfs_read_buf(
 	buf_t		 *bp;
 	int 		 error;
 	
-	bp = read_buf(dev, blkno, len, flags);
+	bp = read_buf_targ(target, blkno, len, flags);
 	error = geterror(bp);
 	if (bp && !error && !XFS_FORCED_SHUTDOWN(mp)) {
 		*bpp = bp;
@@ -4946,6 +4948,7 @@ xfs_bwrite(
 	/*
 	 * XXXsup how does this work for quotas.
 	 */
+	ASSERT(bp->b_target);
 	ASSERT(bp->b_vp == NULL);
 	bp->b_bdstrat = xfs_bdstrat_cb;
 	bp->b_fsprivate3 = mp;
@@ -4967,16 +4970,26 @@ xfs_bwrite(
 int
 xfs_bdstrat_cb(struct buf *bp)
 {
-	struct bdevsw	*my_bdevsw;
+
 	xfs_mount_t	*mp;
 
 	mp = bp->b_fsprivate3;
 
+	ASSERT(bp->b_target);
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
-		my_bdevsw = get_bdevsw(bp->b_edev);
+#if CELL_IRIX
+		vnode_t	*vp;
+		vp = bp->b_target->specvp;
+		ASSERT(vp);
+		bp->b_bdstrat = NULL;
+		VOP_STRATEGY(vp, bp);
+#else
+		struct bdevsw *my_bdevsw;
+		my_bdevsw =  bp->b_target->bdevsw;
 		ASSERT(my_bdevsw != NULL);
 		bp->b_bdstrat = NULL;
 		bdstrat(my_bdevsw, bp);
+#endif /* CELL_IRIX */
 		return 0;
 	} else { 
 		buftrace("XFS__BDSTRAT IOERROR", bp);
@@ -5004,12 +5017,10 @@ xfsbdstrat(
 	struct xfs_mount 	*mp,
 	struct buf		*bp)
 {
-	struct bdevsw	*my_bdevsw;
 	int		dev_major = emajor(bp->b_edev);
 
 	ASSERT(mp);
-	my_bdevsw = get_bdevsw(bp->b_edev);
-	ASSERT(my_bdevsw != NULL);
+	ASSERT(bp->b_target);
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
 		/* We want priority I/Os to non-XLV disks to go thru'
 		 * griostrategy(). The rest of the I/Os follow the normal
@@ -5018,8 +5029,21 @@ xfsbdstrat(
 		if ( (BUF_IS_PRIO(bp)) &&
 				(dev_major != XLV_MAJOR) ) {
 			griostrategy(bp);
-		} else
+		} else {
+#if CELL_IRIX
+			vnode_t	*vp;
+
+			vp = bp->b_target->specvp;
+			ASSERT(vp);
+			VOP_STRATEGY(vp, bp);
+#else
+			struct bdevsw	*my_bdevsw;
+
+			my_bdevsw = bp->b_target->bdevsw;
+			ASSERT(my_bdevsw != NULL);
 			bdstrat(my_bdevsw, bp);
+#endif
+		}
 		return 0;
 	}
 
@@ -5046,8 +5070,12 @@ xfs_strategy(
 {
 	int		s;
 	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
 
 	ip = XFS_BHVTOI(bdp);
+	mp = ip->i_mount;
+	bp->b_target = (bp->b_edev == mp->m_dev) ? mp->m_ddev_targp :
+						   &mp->m_rtdev_targ;
 	/*
 	 * If this is just a buffer whose underlying disk space
 	 * is already allocated, then just do the requested I/O.
@@ -5673,7 +5701,7 @@ retry:
 				nbp->b_grio_private = bp->b_grio_private;
 
 	     			nbp->b_error     = 0;
-/*	     			nbp->b_edev      = bp->b_edev; */
+				nbp->b_target    = bp->b_target;
 				if (rt) {
 	     				nbp->b_blkno = XFS_FSB_TO_BB(mp,
 						imapp->br_startblock);
@@ -5900,10 +5928,13 @@ xfs_diordwr(
 	/*
  	 * Allocate local buf structure.
 	 */
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		bp = getphysbuf(mp->m_rtdev);
-	else
+		bp->b_target = &mp->m_rtdev_targ;
+	} else {
 		bp = getphysbuf(mp->m_dev);
+		bp->b_target = mp->m_ddev_targp;
+	}
 	bp->b_private = &dp;
 
 	/*
