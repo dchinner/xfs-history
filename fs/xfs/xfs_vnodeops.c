@@ -3136,12 +3136,25 @@ xfs_fid(vnode_t	*vp,
 	fid_t	**fidpp)
 {
 	xfs_fid_t	*fid;
+	xfs_mount_t	*mp;
+	xfs_inode_t	*ip;
 
+	mp = XFS_VFSTOM(vp->v_vfsp);
+	if (XFS_INO_BITS(mp) > (NBBY * sizeof(xfs_fid_ino_t))) {
+		/*
+		 * If the ino won't fit into the __uint32_t that's
+		 * in our xfs_fid structure, then return an error.
+		 */
+		*fidpp = NULL;
+		return EFBIG;
+	}
+	
 	fid = (xfs_fid_t *) kmem_alloc (sizeof(xfs_fid_t), KM_SLEEP);
 	fid->fid_len = sizeof(xfs_fid_t) - sizeof(fid->fid_len);
 	fid->fid_pad = 0;
-	fid->fid_gen = XFS_VTOI(vp)->i_gen;
-	fid->fid_ino = XFS_VTOI(vp)->i_ino;
+	ip = XFS_VTOI(vp);
+	fid->fid_gen = ip->i_gen;
+	fid->fid_ino = (xfs_fid_ino_t)ip->i_ino;
 
 	*fidpp = (struct fid *)fid;
 
