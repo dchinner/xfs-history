@@ -145,7 +145,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode)
 	
 	XFS_STATS_INC(xfsstats.vn_active);
 
-	set_acl_flag(inode);
+	_ACL_SET_IFLAG(inode);
 	vp->v_flag = VMODIFIED;
 	spinlock_init(&vp->v_lock, "v_lock");
 
@@ -218,10 +218,8 @@ vn_revalidate(struct vnode *vp, int flags)
 
 	if (! error) {
 		inode = LINVFS_GET_IP(vp);
-
 		ASSERT(inode);
 
-		set_acl_flag(inode);
 		inode->i_mode       = VTTOIF(va.va_type) | va.va_mode;
 		inode->i_nlink      = va.va_nlink;
 		inode->i_uid        = va.va_uid;
@@ -414,7 +412,7 @@ vn_remove(struct vnode *vp)
 	VMAP(vp, XFS_BHVTOI(vp->v_fbhv), vmap);
 
 	vn_purge(vp, &vmap);
-	clear_acl_flag(LINVFS_GET_IP(vp));
+	_ACL_CLEAR_IFLAG(LINVFS_GET_IP(vp));
 }
 
 
