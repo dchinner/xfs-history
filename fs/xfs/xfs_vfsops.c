@@ -755,7 +755,7 @@ xfs_mount(
 #if 0
 	if (uap->flags & MS_DMI) {
 #else
-	if (args.flags & XFSMNT_DMAPI) {
+	if (uap->dir && (args.flags & XFSMNT_DMAPI)) {
 #endif
 		vfsp->vfs_flag |= VFS_DMI;
 		/* Always send mount event (when mounted with dmi option) */
