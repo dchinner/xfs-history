@@ -24,15 +24,16 @@
 /*
  * Flags to xfs_log_reserve()
  *
- *	XFS_LOG_SLEEP:	 If space is not available, sleep
+ *	XFS_LOG_SLEEP:	 If space is not available, sleep (default)
  *	XFS_LOG_NOSLEEP: If space is not available, return error
  *	XFS_LOG_PERM_RESERV: Permanent reservation.  When writes are
  *		performed against this type of reservation, the reservation
  *		is not decreased.  Long running transactions should use this.
  */
-#define XFS_LOG_SLEEP		0x1
-#define XFS_LOG_NOSLEEP		0x2
-#define XFS_LOG_PERM_RESERV	0x4
+#define XFS_LOG_SLEEP		0x0
+#define XFS_LOG_NOSLEEP		0x1
+#define XFS_LOG_PERM_RESERV	0x2
+#define XFS_LOG_RESV_ALL	(XFS_LOG_NOSLEEP|XFS_LOG_PERM_RESERV)
 
 
 /*
@@ -105,6 +106,7 @@ int	  xfs_log_write(struct xfs_mount *mp,
 			int		 nentries,
 			xfs_log_ticket_t ticket,
 			xfs_lsn_t	 *start_lsn);
+int	  xfs_log_unmount(struct xfs_mount *mp);
 
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp,
