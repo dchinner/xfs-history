@@ -1,4 +1,4 @@
-#ident "$Revision: 1.90 $"
+#ident "$Revision: 1.91 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -487,7 +487,7 @@ xfs_ilock_map_shared(
 		lock_mode = XFS_ILOCK_SHARED;
 	}
 
-	xfs_ilock_ra(ip, lock_mode, __return_address);
+	xfs_ilock_ra(ip, lock_mode, (inst_t *)__return_address);
 
 	return lock_mode;
 }
@@ -545,7 +545,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 	ASSERT(lock_flags != 0);
 
 	if (return_address == NULL)
-		return_address = __return_address;
+		return_address = (inst_t *)__return_address;
 
 	if (lock_flags & XFS_IOLOCK_EXCL) {
 		mrupdate(&ip->i_iolock);
@@ -560,7 +560,7 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 		mraccess(&ip->i_lock);
 	}
 #ifdef XFS_ILOCK_TRACE
-	xfs_ilock_trace(ip, 1, lock_flags,  (inst_t *)__return_address);
+	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)__return_address);
 #endif
 }
 
@@ -568,7 +568,7 @@ void
 xfs_ilock(xfs_inode_t	*ip,
 	  uint		lock_flags)
 {
-	xfs_ilock_ra(ip, lock_flags, __return_address);
+	xfs_ilock_ra(ip, lock_flags, (inst_t *)__return_address);
 }
 
 /*
@@ -625,7 +625,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			}
 			return 0;
 		}
-		ip->i_ilock_ra = __return_address;
+		ip->i_ilock_ra = (inst_t *) __return_address;
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
 		ilocked = mrtryaccess(&ip->i_lock);
 		if (!ilocked) {
@@ -636,7 +636,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 		}
 	}
 #ifdef XFS_ILOCK_TRACE
-	xfs_ilock_trace(ip, 2, lock_flags,  (inst_t *)__return_address);
+	xfs_ilock_trace(ip, 2, lock_flags, (inst_t *)__return_address);
 #endif
 	return 1;
 }
@@ -700,7 +700,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 					(xfs_log_item_t*)(ip->i_itemp));
 	}
 #ifdef XFS_ILOCK_TRACE
-	xfs_ilock_trace(ip, 3, lock_flags,  (inst_t *)__return_address);
+	xfs_ilock_trace(ip, 3, lock_flags, (inst_t *)__return_address);
 #endif
 }
 
