@@ -1819,11 +1819,27 @@ try_again:
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 		/*
+		 * Since we're at a good, clean point, check for any
+		 * obvious problems and get out if they occur.
+		 */
+		vp = XFS_ITOV(ip);
+		if (excl == EXCL) {
+                        error = XFS_ERROR(EEXIST);
+		} else if (vp->v_type == VDIR) {
+                        error = XFS_ERROR(EISDIR);
+		}
+
+		if (error) {
+			dp = NULL;
+			IRELE(ip);
+			goto error_return;
+		}
+
+		/*
 		 * We need to do the xfs_itruncate_start call before
 		 * reserving any log space in the transaction.
 		 */
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		vp = XFS_ITOV(ip);
 		if ((vp->v_type == VREG) &&
 		    (vap->va_mask & AT_SIZE) &&
 		    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents != 0))) {
@@ -1873,10 +1889,6 @@ try_again:
 		 */
 		if (dp->i_d.di_nlink == 0) {
 			error = ENOENT;
-		} else 	if (excl == EXCL) {
-                        error = XFS_ERROR(EEXIST);
-		} else if (vp->v_type == VDIR && (I_mode & IWRITE)) {
-                        error = XFS_ERROR(EISDIR);
 		} else if (I_mode) {
 			error = xfs_iaccess(ip, I_mode, credp);
 		}
