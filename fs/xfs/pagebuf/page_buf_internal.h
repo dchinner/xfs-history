@@ -142,7 +142,7 @@ struct pbstats {
 	u_int32_t	pb_get_locked_waited;
 	u_int32_t	pb_busy_locked;
 	u_int32_t	pb_miss_locked;
-	u_int32_t	pb_page_alloc;
+	u_int32_t	pb_page_retries;
 	u_int32_t	pb_page_found;
 	u_int32_t	pb_get_read;
 };
