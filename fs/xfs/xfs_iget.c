@@ -292,6 +292,8 @@ again:
 	newnode = 1;
 
  return_ip:
+	ASSERT(ip->i_df.if_ext_max ==
+	       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
 	/*
 	 * Call hook for imon to see whether ip is of interest and should
 	 * have its vnodeops monitored.

@@ -90,6 +90,8 @@ xfs_inode_item_size(
 		break;
 
 	case XFS_DINODE_FMT_BTREE:
+		ASSERT(ip->i_df.if_ext_max ==
+		       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
 		iip->ili_format.ilf_fields &=
 			~(XFS_ILOG_DDATA | XFS_ILOG_DEXT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID);
