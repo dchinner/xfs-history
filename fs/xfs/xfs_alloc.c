@@ -1997,15 +1997,20 @@ xfs_free_extent(
 {
 	xfs_agblock_t	agbno;	/* bno relative to allocation group */
 	buf_t		*agbp;	/* buffer for a.g. freespace header */
+#ifdef DEBUG
+	xfs_agf_t	*agf;	/* a.g. freespace header */
+#endif
 	xfs_agnumber_t	agno;	/* allocation group number */
 
 	ASSERT(len != 0);
-	XFS_AG_CHECK_DADDR(tp->t_mountp, bno, len);
 	agno = XFS_FSB_TO_AGNO(tp->t_mountp, bno);
 	ASSERT(agno < tp->t_mountp->m_sb.sb_agcount);
 	agbno = XFS_FSB_TO_AGBNO(tp->t_mountp, bno);
-	ASSERT(agbno < tp->t_mountp->m_sb.sb_agblocks);
 	agbp = xfs_alloc_fix_freelist(tp, agno, 0, 0, 0, 0);
+#ifdef DEBUG
 	ASSERT(agbp != NULL);
+	agf = XFS_BUF_TO_AGF(agbp);
+	ASSERT(agbno + len <= agf->agf_length);
+#endif
 	return xfs_free_ag_extent(tp, agbp, agno, agbno, len, 0);
 }
