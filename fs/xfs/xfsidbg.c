@@ -2905,17 +2905,17 @@ xfs_dir2data(void *addr, int size)
 			p - (char *)addr, INT_GET(e->inumber, ARCH_UNKNOWN), e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			printk("%c", e->name[k]);
-		printk("\" tag 0x%x\n", *XFS_DIR2_DATA_ENTRY_TAG_P(e));
+		printk("\" tag 0x%x\n", INT_GET(*XFS_DIR2_DATA_ENTRY_TAG_P(e), ARCH_UNKNOWN));
 		p += XFS_DIR2_DATA_ENTSIZE(e->namelen);
 	}
 	if (INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC)
 		return;
-	for (j = 0; j < tail->count; j++, l++) {
+	for (j = 0; j < INT_GET(tail->count, ARCH_UNKNOWN); j++, l++) {
 		printk("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
 			(char *)l - (char *)addr, j,
 			(uint_t)INT_GET(l->hashval, ARCH_UNKNOWN), INT_GET(l->address, ARCH_UNKNOWN),
 			/* XFS_DIR2_DATAPTR_TO_BYTE */
-			l->address << XFS_DIR2_DATA_ALIGN_LOG);
+			INT_GET(l->address, ARCH_UNKNOWN) << XFS_DIR2_DATA_ALIGN_LOG);
 	}
 	printk("0x%x tail count %d\n",
 		(char *)tail - (char *)addr, INT_GET(tail->count, ARCH_UNKNOWN));
