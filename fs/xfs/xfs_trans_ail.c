@@ -156,6 +156,7 @@ xfs_trans_push_ail(
 			break;
 		case XFS_ITEM_LOCKED:
 		case XFS_ITEM_FLUSHING:
+#ifdef NOTYET
 			/*
 			 * Flush the log in this case just in case the
 			 * item is being flushed but got stuck on a
@@ -163,6 +164,7 @@ xfs_trans_push_ail(
 			 * pinned buffer).
 			 */
 			flush_log = 1;
+#endif
 			break;
 		default:
 			ASSERT(0);
