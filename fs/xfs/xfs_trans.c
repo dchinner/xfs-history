@@ -708,7 +708,7 @@ xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT((xfs_trans_t*)bp->b_fsprivate2 == tp);
 	ASSERT(bp->b_fsprivate != NULL);
-	ASSERT((first > 0) && (first <= last) && (last <= bp->b_bcount));
+	ASSERT((first >= 0) && (first <= last) && (last <= bp->b_bcount));
 	ASSERT((bp->b_iodone == NULL) || (bp->b_iodone == xfs_buf_iodone));
 
 	/*
