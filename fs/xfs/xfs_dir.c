@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.114 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -44,7 +44,6 @@
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/ktrace.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/fcntl.h>
 #ifdef SIM

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.30 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -34,7 +34,6 @@
 #ifdef SIM
 #undef _KERNEL
 #else
-#include <sys/sysinfo.h>
 #include <sys/kmem.h>
 #include <sys/conf.h>
 #include <sys/systm.h>

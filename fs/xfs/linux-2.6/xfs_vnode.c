@@ -46,7 +46,6 @@
 #endif
 #include <sys/vfs.h>
 #include <sys/vnode_private.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>

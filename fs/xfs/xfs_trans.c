@@ -27,7 +27,6 @@
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/sysmacros.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #ifdef SIM

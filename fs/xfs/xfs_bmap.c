@@ -50,7 +50,6 @@
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/ksa.h>
-#include <sys/sysinfo.h>
 #include <sys/cred.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>

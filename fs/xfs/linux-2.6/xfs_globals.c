@@ -23,6 +23,10 @@
  * $Id$
  *
  * $Log$
+ * Revision 1.10  2000/03/25 01:15:49  lord
+ * use linux security mechanisms
+ * Merge of 2.3.42-xfs:slinx:46379a by ananth.
+ *
  * Revision 1.9  2000/03/25 00:47:57  lord
  * Merge of 2.3.42-xfs:slinx:44783a by ananth.
  *
@@ -33,8 +37,8 @@
  *
  *   Copied GPL from slinx-xfs tree.
  *
- * Revision 1.9  2000/02/29 16:27:44  lord
- * remove vfssw
+ * Revision 1.10  2000/03/18 22:51:26  lord
+ * use linux security mechanisms
  *
  * Revision 1.8  2000/02/21 21:54:31  cattelan
  * Copied GPL from slinx-xfs tree.
@@ -70,7 +74,6 @@
 #include <sys/types.h>
 #include <sys/var.h>
 #include <sys/vfs.h>
-#include <sys/sysinfo.h>
 #include <sys/cred.h>
 
 int    		xfs_refcache_percent = 100;
@@ -89,7 +92,6 @@ struct var	v = {
 		  /* v_maxdmaszi * Max dma unbroken dma transfer size. */
 		};
 
-struct syswait	syswait;
 dev_t           rootdev = NODEV;
 int             restricted_chown = 0;
 int     	scache_linemask = 0x1f;       /* second level cache line size mask */

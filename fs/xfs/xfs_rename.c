@@ -609,32 +609,34 @@ xfs_rename_error_checks(
 		*status = __LINE__;
 		goto error_return;
 	}
-	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE, credp)) {
+#if 0
+	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE)) {
 		*status = __LINE__;
                 goto error_return;
 	}
-	if (error = xfs_stickytest(src_dp, src_ip, credp)) {
+	if (error = xfs_stickytest(src_dp, src_ip)) {
 		*status = __LINE__;
 		goto error_return;
 	}
 
 	if (target_dp && (src_dp != target_dp)) {
-		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE, credp)) {
+		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE)) {
 			*status = __LINE__;
 			goto error_return;
 		}
 		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(target_dp, target_ip, credp))) {
+		    (error = xfs_stickytest(target_dp, target_ip))) {
 			*status = __LINE__;
 			goto error_return;
 		}
 	} else {
 		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(src_dp, target_ip, credp))) {
+		    (error = xfs_stickytest(src_dp, target_ip))) {
 			*status = __LINE__;
                         goto error_return;
 		}
 	}
+#endif
 
 	if ((src_ip == src_dp) || (target_ip == target_dp)) {
 		error = XFS_ERROR(EINVAL);

@@ -69,10 +69,8 @@
 
 #define _MIPS_SIM _ABIN32
 
-#ifdef DEBUG
+#ifndef STATIC
 #define STATIC
-#else
-#define STATIC static 
 #endif
 #include <sys/types.h>
 

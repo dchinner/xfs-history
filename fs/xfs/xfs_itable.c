@@ -846,7 +846,7 @@ xfs_fd_to_mp(
 		if (vfsp == NULL)
 			vfsp = vp->v_vfsp;
 	} else {
-		if (rperm && !_CAP_ABLE(CAP_DEVICE_MGT))
+		if (rperm && !capable(CAP_SYS_ADMIN))
 			return XFS_ERROR(EPERM);
 		vfsp = vp->v_vfsp;
 	}

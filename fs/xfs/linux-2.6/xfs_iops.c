@@ -76,10 +76,6 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 
 	vp = NULL;
 
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
 
 	bzero(&va, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
@@ -154,11 +150,6 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	ASSERT(vp);
 
 	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
-
-	/*
 	 * Initialize a pathname_t to pass down.
 	 */
 	bzero(pnp, sizeof(pathname_t));
@@ -203,11 +194,6 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 	tdvp = LINVFS_GET_VP(dir);
 	ASSERT(tdvp);
 
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
-
 	ip = old_dentry->d_inode;	/* inode being linked to */
 	vp = LINVFS_GET_VP(ip);
 
@@ -235,11 +221,6 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	dvp = LINVFS_GET_VP(dir);
 	inode = dentry->d_inode;
 	ASSERT(dvp);
-
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
 
 	/*
 	 * Someday we could pass the dentry->d_inode into VOP_REMOVE so
@@ -273,11 +254,6 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
-
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
 
 	bzero(&va, sizeof(va));
 	va.va_type = VLNK;
@@ -344,11 +320,6 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	ASSERT(dvp);
 	ASSERT(current->fs->pwd->d_inode);
 
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
-
 	pwd_vp = LINVFS_GET_VP(current->fs->pwd->d_inode);
 
 	/*
@@ -391,11 +362,6 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	struct inode	*new_inode = NULL;
 	cred_t		cred;		/* Temporary cred workaround */
 
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
-
 	bzero(pnp, sizeof(pathname_t));
 	pnp->pn_complen = ndentry->d_name.len;
 	pnp->pn_hash = ndentry->d_name.hash;
@@ -433,11 +399,6 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	int	error = 0;
 	cred_t	cred;		/* Temporary cred workaround */
 
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
-
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	iov.iov_base = buf;
 	iov.iov_len = size;
@@ -466,11 +427,6 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	int	error = 0;
 	char	*link = kmalloc(MAXNAMELEN+1, GFP_KERNEL); 
 	cred_t	cred;		/* Temporary cred workaround */
-
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
 
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	iov.iov_base = link;
@@ -545,6 +501,19 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	return -EIO;
 }
 
+int linvfs_permission(struct inode *ip, int mode)
+{
+	cred_t	cred;		/* Temporary cred workaround */
+        vnode_t *vp;
+	int	error;
+
+	mode <<= 6;
+        vp = LINVFS_GET_VP(ip);
+	VOP_ACCESS(vp, mode, &cred, error);
+
+	return error;
+}
+
 /* Brute force approach for now - copy data into linux inode
  * from the results of a getattr. This gets called out of things
  * like stat.
@@ -557,11 +526,6 @@ int linvfs_revalidate(struct dentry *dentry)
         int     error;
 	cred_t	cred;		/* Temporary cred workaround */
 
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
-
         vp = LINVFS_GET_VP(inode);
         va.va_mask = AT_STAT;
         VOP_GETATTR(vp, &va, 0, &cred, error);
@@ -572,8 +536,8 @@ int linvfs_revalidate(struct dentry *dentry)
         inode->i_gid = va.va_gid;
         inode->i_rdev = MKDEV(emajor(va.va_rdev), eminor(va.va_rdev));
         inode->i_size = va.va_size;
-        inode->i_blocks = va.va_nblocks;
-        inode->i_blksize = va.va_blksize;
+        inode->i_blocks = va.va_nblocks >> (PAGE_SHIFT - 9);
+        inode->i_blksize = PAGE_SIZE;
         inode->i_atime = va.va_atime.tv_sec;
         inode->i_mtime = va.va_mtime.tv_sec;
         inode->i_ctime = va.va_ctime.tv_sec;
@@ -584,7 +548,7 @@ int linvfs_revalidate(struct dentry *dentry)
 int
 linvfs_pb_bmap(struct inode *inode, 
 			   loff_t offset,
-			   ssize_t count,
+			   size_t count,
 			   pb_bmap_t *pbmapp,
 			   int maxpbbm, 
 			   int *retpbbm, 
@@ -631,8 +595,9 @@ struct inode_operations linvfs_file_inode_operations =
   get_block:		linvfs_get_block,
   readpage:		pagebuf_read_full_page,
   writepage:		pagebuf_write_full_page,
+  permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
-  pagebuf_bmap:		linvfs_pb_bmap
+  pagebuf_bmap:		linvfs_pb_bmap,
 };
 
 struct inode_operations linvfs_dir_inode_operations =
@@ -647,6 +612,7 @@ struct inode_operations linvfs_dir_inode_operations =
   rmdir:		linvfs_rmdir,	
   mknod:		linvfs_mknod,	
   rename:		linvfs_rename,	
+  permission:		linvfs_permission,
   revalidate:		linvfs_revalidate
 };
 
@@ -654,5 +620,6 @@ struct inode_operations linvfs_symlink_inode_operations =
 {
   readlink:		linvfs_readlink,
   follow_link:		linvfs_follow_link,
+  permission:		linvfs_permission,
   revalidate:		linvfs_revalidate
 };

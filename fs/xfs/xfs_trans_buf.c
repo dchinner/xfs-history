@@ -42,7 +42,6 @@
 #include <stdio.h>
 #endif
 #else
-#include <sys/sysinfo.h>
 #include <sys/kmem.h>
 #include <sys/kthread.h>
 #include <sys/conf.h>
@@ -405,20 +404,9 @@ xfs_trans_read_buf(
 		ASSERT((XFS_BUF_ISERROR(bp)) == 0);
 		if (!(XFS_BUF_ISDONE(bp))) {
 			xfs_buftrace("READ_BUF_INCORE !DONE", bp);
-#ifndef SIM
-#ifdef PAIN_IN_THE_ASS_UNDER_LINUX
-			SYSINFO.lread += len;
-#endif
-#endif
 			ASSERT(!XFS_BUF_ISASYNC(bp));
 			XFS_BUF_READ(bp);
 			xfsbdstrat(tp->t_mountp, bp);
-#ifndef SIM
-#ifdef PAIN_IN_THE_ASS_UNDER_LINUX
-			KTOP_UPDATE_CURRENT_INBLOCK(1);
-			SYSINFO.bread += len;
-#endif
-#endif
 			xfs_iowait(bp);
 			if (XFS_BUF_GETERROR(bp) != 0) {
 				xfs_ioerror_alert("xfs_trans_read_buf", mp, 

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.50 $"
+#ident	"$Revision$"
 
 /*
  * Free space allocation for XFS.
@@ -30,7 +30,6 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/sysinfo.h>
 #include "xfs_buf.h"
 #include <sys/ksa.h>
 #include <sys/debug.h>

@@ -15,7 +15,6 @@
 #include <sys/vfs.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #include <sys/imon.h>
@@ -202,9 +201,6 @@ xfs_iget(
 	xfs_chashlist_t	*chl, *chlnew;
 	SPLDECL(s);
 
-#if 0 /* conflicting with linux sysinfo... clean up later RMC */
-	SYSINFO.iget++; 
-#endif
 	XFSSTATS.xs_ig_attempts++;
 
 	ih = XFS_IHASH(mp, ino);

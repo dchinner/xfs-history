@@ -240,9 +240,6 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define xfs_binval(buftarg)             \
             binval(buftarg.dev)
 
-#define xfs_bflushed(buftarg)           \
-            bflushed(buftarg.dev) 
-
 #define XFS_bflush(buftarg)           \
             bflush(buftarg.dev) 
 
@@ -516,14 +513,6 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 			      * wants to flush all delay write buffers
 			      * on device...  how do we do this with pagebuf? */
 
-/* This is debug only - lets not bother for now */
-
-#ifdef DEBUG
-#define xfs_bflushed(buftarg) printk("XFS_bflushed not implemented\n")
-#else
-#define xfs_bflushed(buftarg)
-#endif
-/* assert the buffers for dev are really flushed */
 
 extern void XFS_bflush(buftarg_t);
 
@@ -547,6 +536,14 @@ extern void XFS_bflush(buftarg_t);
 
 #define chunkread(vnode,bmap,nmaps,cred) printk("chunkread... whaa shouldn't be here at all\n")
 #define getchunk(vnode,bmap,cred) printk("chunkread... whaa shouldn't be here at all\n")
+
+struct xfs_mount;
+
+page_buf_t * xfs_pb_getr(int sleep, struct xfs_mount *mp);
+page_buf_t * xfs_pb_ngetr(int len, struct xfs_mount *mp); 
+void xfs_pb_freer(page_buf_t *bp);
+void xfs_pb_nfreer(page_buf_t *bp);
+
 
 #define XFS_getrbuf(sleep,mp) xfs_pb_getr(sleep,mp)
 

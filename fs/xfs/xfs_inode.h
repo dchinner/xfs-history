@@ -619,7 +619,7 @@ int             xfs_ibusy_check(xfs_inode_t *, int);
 #ifdef SIM
 void		xfs_iprint(xfs_inode_t *);
 #endif
-int		xfs_iaccess(xfs_inode_t *, mode_t, struct cred *);
+int		xfs_iaccess(xfs_inode_t *, mode_t);
 uint		xfs_iroundup(uint);
 void		xfs_ichgtime(xfs_inode_t *, int);
 xfs_fsize_t	xfs_file_last_byte(xfs_inode_t *);

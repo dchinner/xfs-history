@@ -52,7 +52,6 @@
 #include <sys/schedctl.h>
 #include <sys/atomic_ops.h>
 #include <sys/ktrace.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <ksys/sthread.h>
 #include "xfs_macros.h"

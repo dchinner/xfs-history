@@ -29,7 +29,6 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #ifdef SIM

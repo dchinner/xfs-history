@@ -51,9 +51,8 @@ typedef struct cred {
 #define	NOCRED	((struct cred *)(__psint_t)0)
 
 extern void cred_init(void);
-extern void cred_fill_from_current(cred_t *);
 extern cred_t *get_current_cred(void);
+extern void cred_fill_from_current(cred_t *);
 extern struct cred *sys_cred;
-extern int groupmember(gid_t, cred_t *);
 
 #endif  /* _XFS_CRED_H */

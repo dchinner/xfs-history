@@ -34,7 +34,6 @@
 #include <sys/sysmacros.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 
 #ifdef SIM

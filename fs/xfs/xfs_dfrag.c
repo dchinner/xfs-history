@@ -96,7 +96,6 @@ xfs_swapext(
         bhv_desc_t      *bdp, *tbdp;
         vn_bhv_head_t   *bhp, *tbhp;
 	xfs_fsize_t	last_byte;
-	cred_t		*credp = get_current_cred();
 	uint		lock_flags;
 	int		ilf_fields, tilf_fields;
 	int		error = 0;
@@ -177,20 +176,20 @@ xfs_swapext(
 	xfs_lock_inodes(ips, 2, 0, lock_flags);
 
 	/* Check permissions */
-        if (error = _MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
+        if (error = _MAC_XFS_IACCESS(ip, MACWRITE)) {
 		goto error0;
 	}
-        if (error = _MAC_XFS_IACCESS(tip, MACWRITE, credp)) {
+        if (error = _MAC_XFS_IACCESS(tip, MACWRITE)) {
 		goto error0;
 	}
-	if ((credp->cr_uid != ip->i_d.di_uid) &&
-	    (error = xfs_iaccess(ip, IWRITE, credp)) &&
-	    !cap_able_cred(credp, CAP_FOWNER)) {
+	if ((current->fsuid != ip->i_d.di_uid) &&
+	    (error = xfs_iaccess(ip, IWRITE)) &&
+	    !capable(CAP_FOWNER)) {
 		goto error0;
 	}	
-	if ((credp->cr_uid != tip->i_d.di_uid) &&
-	    (error = xfs_iaccess(tip, IWRITE, credp)) &&
-	    !cap_able_cred(credp, CAP_FOWNER)) {
+	if ((current->fsuid != tip->i_d.di_uid) &&
+	    (error = xfs_iaccess(tip, IWRITE)) &&
+	    !capable(CAP_FOWNER)) {
 		goto error0;
 	}	
 

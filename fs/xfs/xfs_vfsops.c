@@ -685,8 +685,6 @@ xfs_cmountfs(
 		}
 	}
 
-	spec_mounted(ddevvp);
-
 	return error;
 
 	/*
@@ -950,8 +948,6 @@ xfs_mount(
 	vnode_t		*rootvp;
 	int		error;
 
-	if (!cap_able_cred(credp, CAP_MOUNT_MGT))
-		return XFS_ERROR(EPERM);
 	if (mvp->v_type != VDIR)
 		return XFS_ERROR(ENOTDIR);
 	if (((uap->flags & MS_REMOUNT) == 0) &&
@@ -1281,8 +1277,8 @@ xfs_ibusy(
 				continue;
 			}
 #ifdef DEBUG
-			printk("busy vp=0x%x ip=0x%x inum %d count=%d\n",
-				vp, ip, ip->i_ino & 0xffffffff, vp->v_count);
+			printk("busy vp=0x%p ip=0x%p inum %Ld count=%d\n",
+				vp, ip, ip->i_ino, vp->v_count);
 #endif
 			busy++;
 		}
@@ -1316,9 +1312,6 @@ xfs_unmount(
 	int		unmount_event_flags = 0;
 	int		xfs_unmountfs_needed = 0;
 	int		error;
-
-	if (!cap_able_cred(credp, CAP_MOUNT_MGT))
-		return XFS_ERROR(EPERM);
 
 	mp = XFS_BHVTOM(bdp);
 	rip = mp->m_rootip;

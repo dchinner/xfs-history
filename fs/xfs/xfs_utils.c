@@ -66,19 +66,21 @@
 int
 xfs_stickytest(
 	xfs_inode_t	*dp,
-	xfs_inode_t	*ip,
-	cred_t		*cr)
+	xfs_inode_t	*ip)
 {
 	extern int	xpg4_sticky_dir;
 
-        if ((dp->i_d.di_mode & ISVTX) &&
-	    cr->cr_uid != ip->i_d.di_uid &&
-	    cr->cr_uid != dp->i_d.di_uid &&
-	    !cap_able_cred(cr, CAP_DAC_WRITE)) {
+        if (!(dp->i_d.di_mode & ISVTX))
+		return 0;
+	if (current->fsuid == ip->i_d.di_uid)
+		return 0;
+	if (current->fsuid == dp->i_d.di_uid)
+		return 0;
+	if (!capable(CAP_FOWNER)) {
 		if (xpg4_sticky_dir) {
 			return XFS_ERROR(EACCES);
 		} else {
-			return xfs_iaccess(ip, IWRITE, cr);
+			return xfs_iaccess(ip, IWRITE);
 		}
         }
         return 0;

@@ -1,7 +1,6 @@
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 #include <sys/param.h>
-#include <sys/sysinfo.h>
 #include "xfs_buf.h"
 #include <sys/ksa.h>
 #include <sys/vnode.h>
@@ -255,7 +254,7 @@ xfs_qm_scall_quotaoff(
 	extern dev_t		rootdev;
 	int			nculprits;
 
-	if (!force && !_CAP_ABLE(CAP_QUOTA_MGT))
+	if (!force && !capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 	/*
 	 * Only root file system can have quotas enabled on disk but not
@@ -467,7 +466,7 @@ xfs_qm_scall_trunc_qfiles(
 	 */
 	extern int  xfs_truncate_file(xfs_mount_t *mp, xfs_inode_t *ip);
 
-	if (!_CAP_ABLE(CAP_QUOTA_MGT))
+	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 	error = 0;
 	if (!XFS_SB_VERSION_HASQUOTA(&mp->m_sb) || flags == 0)
@@ -521,7 +520,7 @@ xfs_qm_scall_quotaon(
 	boolean_t	rootfs;
 	boolean_t	delay;
 	
-	if (!_CAP_ABLE(CAP_QUOTA_MGT))
+	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 
 	rootfs = (boolean_t) (mp->m_dev == rootdev);
@@ -741,7 +740,7 @@ xfs_qm_scall_setqlim(
 	int			error;
 	xfs_qcnt_t		hard, soft;
 
-	if (!_CAP_ABLE(CAP_QUOTA_MGT))
+	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 	if (copyin(addr, &newlim, sizeof newlim))
 		return XFS_ERROR(EFAULT);
@@ -909,7 +908,7 @@ xfs_qm_scall_getquota(
 	fs_disk_quota_t	out;
 	int 		error;
 
-	if (id != get_current_cred()->cr_ruid && !_CAP_ABLE(CAP_QUOTA_MGT))
+	if ((id != current->uid) && !capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 	/*
 	 * Try to get the dquot. We don't want it allocated on disk, so

@@ -215,11 +215,6 @@ static int linvfs_readdir(
 					!S_ISDIR(inode->i_mode))
 		return -EBADF;
 
-	/*
-	 * Temporary workaround for creds
-	 */
-	cred_fill_from_current(&cred);
-
         vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	iov.iov_base = dirent;
 	iov.iov_len = sizeof(dirent); /* Arbitrary. The real size is held in

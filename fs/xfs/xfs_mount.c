@@ -974,7 +974,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 	
 	xfs_binval(mp->m_ddev_targ);
-	xfs_bflushed(mp->m_ddev_targ);
 	if (mp->m_rtdev != NODEV) {
 		xfs_binval(mp->m_rtdev_targ);
 	}
@@ -1028,9 +1027,6 @@ xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	int		unused;
 
 #if !defined(__linux__)	|| defined(SIM)
-#ifndef SIM
-	spec_unmounted(mp->m_ddevp);
-#endif
 
 	if (mp->m_ddevp) {
 		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, cr, unused);

@@ -1016,8 +1016,8 @@ xfs_ialloc(
 	ip->i_d.di_onlink = 0;
 	ip->i_d.di_nlink = nlink;
 	ASSERT(ip->i_d.di_nlink == nlink);
-	ip->i_d.di_uid = cr->cr_uid;
-	ip->i_d.di_gid = cr->cr_gid;
+	ip->i_d.di_uid = current->fsuid;
+	ip->i_d.di_gid = current->fsgid;
 	ip->i_d.di_projid = prid;
 	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
 
@@ -1056,13 +1056,7 @@ xfs_ialloc(
 	 * cleared.
 	 */
 	if (ip->i_d.di_mode & ISGID) {
-		for (i = 0; i < cr->cr_ngroups; i++) {
-			if (ip->i_d.di_gid == cr->cr_groups[i]) {
-				break;
-			}
-		}
-		if ((ip->i_d.di_gid != cr->cr_gid) &&
-		    (i >= cr->cr_ngroups)) {
+		if (!in_group_p((gid_t)ip->i_d.di_gid)) {
 			ip->i_d.di_mode &= ~ISGID;
 		}
 	}
@@ -3550,49 +3544,46 @@ xfs_iprint(
 int
 xfs_iaccess(
 	xfs_inode_t	*ip,
-	mode_t		mode,
-	cred_t		*cr)
+	mode_t		mode)
 {
 	int error;
+#ifndef SIM
 	mode_t orgmode = mode;
 	/*
 	 * Verify that the MAC policy allows the requested access.
 	 */
-	if (error = _MAC_XFS_IACCESS(ip, mode, cr))
+	if (error = _MAC_XFS_IACCESS(ip, mode))
 		return XFS_ERROR(error);
 	
-	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip), cr))
+	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip)))
 		return XFS_ERROR(EROFS);
 
 	/*
 	 * If there's an Access Control List it's used instead of
 	 * the mode bits.
 	 */
-	if ((error = _ACL_XFS_IACCESS(ip, mode, cr)) != -1)
+	if ((error = _ACL_XFS_IACCESS(ip, mode)) != -1)
 		return error ? XFS_ERROR(error) : 0;
 
-	/*
-	 * changed this to a (set of) CAP checks.
-	 *
-	 * if (cr->cr_uid == 0)
-	 *	return 0;
-	 */
-	if (cr->cr_uid != ip->i_d.di_uid) {
+	if (current->fsuid != ip->i_d.di_uid) {
 		mode >>= 3;
-		if (!groupmember((gid_t)ip->i_d.di_gid, cr))
+		if (!in_group_p((gid_t)ip->i_d.di_gid))
 			mode >>= 3;
 	}
-	if ((ip->i_d.di_mode & mode) == mode)
+	if (((ip->i_d.di_mode & mode) == mode) || capable(CAP_DAC_OVERRIDE))
 		return 0;
 
-	if (((orgmode & IWRITE) && !cap_able_cred(cr, CAP_DAC_WRITE)) ||
-	    ((orgmode & IREAD) && !cap_able_cred(cr, CAP_DAC_READ_SEARCH)) ||
-	    ((orgmode & IEXEC) && !cap_able_cred(cr, CAP_DAC_EXECUTE))) {
+	if ((orgmode == IREAD) ||
+	    (((ip->i_d.di_mode & IFMT) == IFDIR) &&
+	     (!(orgmode & ~(IWRITE|IEXEC))))) {
+		if (capable(CAP_DAC_READ_SEARCH))
+			return 0;
 #ifdef	NOISE
 		cmn_err(CE_NOTE, "Ick: mode=%o, orgmode=%o", mode, orgmode);
 #endif	/* NOISE */
 		return XFS_ERROR(EACCES);
 	}
+#endif
 	return 0;
 }
 

@@ -38,7 +38,6 @@
 #include <sys/uuid.h>
 #include <sys/unistd.h>
 #include <sys/grio.h>
-#include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
@@ -55,7 +54,9 @@
 #include <sys/errno.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
+#ifndef SIM
 #include <sys/fcntl.h>
+#endif
 #include <sys/ktrace.h>
 #ifdef SIM
 #include <bstring.h>
@@ -75,8 +76,6 @@
 #include <sys/var.h>
 #include <sys/mac_label.h>
 #include <sys/capability.h>
-#include <sys/flock.h>
-#include <sys/kfcntl.h>
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <sys/major.h>
@@ -178,6 +177,12 @@ xfs_setattr(
 	bhv_desc_t	*bdp,
 	vattr_t		*vap,
 	int		flags,
+	cred_t		*credp);
+
+STATIC int
+xfs_access(
+	bhv_desc_t	*bdp,
+	int		mode,
 	cred_t		*credp);
 
 STATIC int
@@ -647,13 +652,13 @@ xfs_setattr(
 
         xfs_ilock(ip, lock_flags);
 
-	if (_MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
+	if (_MAC_XFS_IACCESS(ip, MACWRITE)) {
 		code = XFS_ERROR(EACCES);
 		goto error_return;
 	}
 
 	/* boolean: are we the file owner? */
-	file_owner = (credp->cr_uid == ip->i_d.di_uid);
+	file_owner = (current->fsuid == ip->i_d.di_uid);
 
 	/*
 	 * Change various properties of a file.
@@ -668,7 +673,7 @@ xfs_setattr(
 		 * to the file owner ID, except in cases where the
 		 * CAP_FSETID capability is applicable.
 		 */
-                if (!file_owner && !cap_able_cred(credp, CAP_FOWNER)) {
+                if (!file_owner && !capable(CAP_FOWNER)) {
                         code = XFS_ERROR(EPERM);
                         goto error_return;
                 }
@@ -690,11 +695,11 @@ xfs_setattr(
 			if ((vap->va_mode & ISUID) && !file_owner)
 				m |= ISUID;
 			if ((vap->va_mode & ISGID) &&
-			    !groupmember(ip->i_d.di_gid, credp))
+			    !in_group_p((gid_t)ip->i_d.di_gid))
 				m |= ISGID;
 			if ((vap->va_mode & ISVTX) && vp->v_type != VDIR)
 				m |= ISVTX;
-			if (m && !cap_able_cred(credp, CAP_FSETID))
+			if (m && !capable(CAP_FSETID))
 				vap->va_mode &= ~m;
 		}
         }
@@ -735,8 +740,8 @@ xfs_setattr(
 		 */
 		if (restricted_chown &&
 		    (iuid != uid || (igid != gid &&
-				     !groupmember(gid, credp))) &&
-		    !cap_able_cred(credp, CAP_CHOWN)) {
+				     !in_group_p((gid_t)gid))) &&
+		    !capable(CAP_CHOWN)) {
 			code = XFS_ERROR(EPERM);
 			goto error_return;
 		}
@@ -750,7 +755,7 @@ xfs_setattr(
 			/*
 			 * XXX:casey - This may result in unnecessary auditing.
 			 */
-			privileged = cap_able_cred(credp, CAP_FOWNER);
+			privileged = capable(CAP_FOWNER);
 			if (code = xfs_qm_vop_chown_reserve(tp, ip, udqp, pdqp,
 							  privileged ?
 							  XFS_QMOPT_FORCE_RES :
@@ -775,10 +780,12 @@ xfs_setattr(
 			code = XFS_ERROR(EACCES);
 			goto error_return;
 		}
+#if 0
 		if (!(mask & AT_SIZE_NOPERM)) {
-			if (code = xfs_iaccess(ip, IWRITE, credp))
+			if (code = xfs_iaccess(ip, IWRITE))
 				goto error_return;
 		}
+#endif
 		/* 
 		 * Make sure that the dquots are attached to the inode.
 		 */
@@ -794,14 +801,16 @@ xfs_setattr(
         if (mask & (AT_ATIME|AT_MTIME)) {
 		if (!file_owner) {
 			if ((flags & ATTR_UTIME) &&
-			    !cap_able_cred(credp, CAP_FOWNER)) {
+			    !capable(CAP_FOWNER)) {
 				code = XFS_ERROR(EPERM);
 				goto error_return;
 			}
-			if ((code = xfs_iaccess(ip, IWRITE, credp)) &&
-			    !cap_able_cred(credp, CAP_FOWNER)) {
+/***
+			if ((code = xfs_iaccess(ip, IWRITE)) &&
+			    !capable(CAP_FOWNER)) {
 				goto error_return;
 			}
+***/
 		}
         }
 
@@ -981,7 +990,7 @@ xfs_setattr(
 		 * cleared upon successful return from chown()
 		 */
                 if ((ip->i_d.di_mode & (ISUID|ISGID)) && 
-		    !cap_able_cred(credp, CAP_FSETID)) {
+		    !capable(CAP_FSETID)) {
                         ip->i_d.di_mode &= ~(ISUID|ISGID);
                 }
                 
@@ -1165,6 +1174,30 @@ xfs_setattr(
 	}
 	return code;
 } /* xfs_setattr */
+
+
+/*
+ * xfs_access
+ * Null conversion from vnode mode bits to inode mode bits, as in efs.
+ */
+/*ARGSUSED*/
+STATIC int
+xfs_access(
+	bhv_desc_t	*bdp,
+	int		mode,
+	cred_t		*credp)
+{
+	xfs_inode_t	*ip;
+	int		error;
+
+	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_access",
+		       (inst_t *)__return_address);
+	ip = XFS_BHVTOI(bdp);
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	error = xfs_iaccess(ip, mode);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	return error;
+}
 
 
 /*
@@ -2226,10 +2259,12 @@ xfs_lookup(
 		return XFS_ERROR(ENOENT);
 	}
 
-	if (error = xfs_iaccess(dp, IEXEC, credp)) {
+#if 0
+	if (error = xfs_iaccess(dp, IEXEC)) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return error;
 	}
+#endif
 
 	lookup_flags = DLF_IGET;
 	if (lock_mode == XFS_ILOCK_SHARED) {
@@ -2250,7 +2285,7 @@ xfs_lookup(
 		 * then its permissions may have changed.  Make sure
 		 * that it is OK to give this inode back to the caller.
 		 */
-		if (error = xfs_iaccess(dp, IEXEC, credp)) {
+		if (error = xfs_iaccess(dp, IEXEC)) {
 			xfs_iunlock_map_shared(dp, lock_mode);
 			VN_RELE(vp);
 			return error;
@@ -2439,7 +2474,7 @@ xfs_create_new(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_vop_dqalloc(mp, dp, credp->cr_uid, prid,
+		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid, prid,
 					       XFS_QMOPT_QUOTALL,
 					       &udqp, &pdqp)) 
 			goto std_return;
@@ -2482,8 +2517,10 @@ xfs_create_new(
 		goto error_return;
 	}
 
-	if (error = xfs_iaccess(dp, IEXEC, credp))
+#if 0
+	if (error = xfs_iaccess(dp, IEXEC))
                 goto error_return;
+#endif
 
 	/*
 	 * At this point we cannot do an xfs_iget() of the entry named
@@ -2507,9 +2544,11 @@ xfs_create_new(
 
 		ASSERT(ip == NULL);
 
-		if (error = xfs_iaccess(dp, IWRITE, credp)) {
+#if 0
+		if (error = xfs_iaccess(dp, IWRITE)) {
 			goto error_return;
 		}
+#endif
 
 		/*
 		 * XPG4 says create cannot allocate a file if the
@@ -2718,9 +2757,11 @@ xfs_create_new(
 		 */
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 			
+#if 0
 		if (I_mode) {
-			error = xfs_iaccess(ip, I_mode, credp);
+			error = xfs_iaccess(ip, I_mode);
 		}
+#endif
 			
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
@@ -2982,6 +3023,7 @@ xfs_create_exists(
 			error = xfs_qm_dqattach(ip, 0);
 	}
 
+#if 0
 	/*
 	 * Check permissions if needed.
 	 */
@@ -2991,9 +3033,10 @@ xfs_create_exists(
 		 */
 			
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		error = xfs_iaccess(ip, I_mode, credp);
+		error = xfs_iaccess(ip, I_mode);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
+#endif
 
 	if (error)
 		goto error_return;
@@ -3686,18 +3729,22 @@ xfs_remove(
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	}
  
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
+#if 0
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
-	if (error = _MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
+#endif
+	if (error = _MAC_XFS_IACCESS(ip, MACWRITE)) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
-	if (error = xfs_stickytest(dp, ip, credp)) {
+#if 0
+	if (error = xfs_stickytest(dp, ip)) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
+#endif
 
 	if (error = xfs_pre_remove(XFS_ITOV(ip))) {
 		error = XFS_ERROR(error);
@@ -3996,9 +4043,11 @@ xfs_link(
 		goto error_return;
 	}
 
-	if (error = xfs_iaccess(tdp, IEXEC | IWRITE, credp)) {
+#if 0
+	if (error = xfs_iaccess(tdp, IEXEC | IWRITE)) {
                 goto error_return;
 	}
+#endif
 
 	/*
 	 * Make sure that nothing with the given name exists in the
@@ -4161,7 +4210,7 @@ xfs_mkdir(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_vop_dqalloc(mp, dp, credp->cr_uid, prid,
+		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid, prid,
 					       XFS_QMOPT_QUOTALL,
 					       &udqp, &pdqp)) 
 			goto std_return;
@@ -4218,12 +4267,14 @@ xfs_mkdir(
                 goto error_return;
 	}
 
+#if 0
 	/*
 	 * check access.
 	 */
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
                 goto error_return;
 	}
+#endif
 	
 	/*
 	 * Reserve disk quota and the inode.
@@ -4508,7 +4559,7 @@ xfs_rmdir(
 		IRELE(cdp);
 		goto std_return;
 	}
-	if (error = _MAC_XFS_IACCESS(cdp, MACWRITE, credp)) {
+	if (error = _MAC_XFS_IACCESS(cdp, MACWRITE)) {
 		xfs_trans_cancel(tp, cancel_flags);
 		IRELE(cdp);
 		goto std_return;
@@ -4538,13 +4589,15 @@ xfs_rmdir(
 	ITRACE(cdp);
 	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
 
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
+#if 0
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
                 goto error_return;
 	}
 
-	if (error = xfs_stickytest(dp, cdp, credp)) {
+	if (error = xfs_stickytest(dp, cdp)) {
                 goto error_return;
 	}
+#endif
 
 	if ((cdp == dp) || (XFS_ITOV(cdp) == current_dir_vp)) {
 		error = XFS_ERROR(EINVAL);
@@ -4840,7 +4893,7 @@ xfs_symlink(
 	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
-		if (error = xfs_qm_vop_dqalloc(mp, dp, credp->cr_uid, prid,
+		if (error = xfs_qm_vop_dqalloc(mp, dp, current->fsuid, prid,
 					       XFS_QMOPT_QUOTALL,
 					       &udqp, &pdqp)) 
 			goto std_return;
@@ -4881,9 +4934,11 @@ xfs_symlink(
 		goto error_return;
 	}
 
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
+#if 0
+	if (error = xfs_iaccess(dp, IEXEC | IWRITE)) {
                 goto error_return;
 	}
+#endif
 
 	/*
 	 * Since we've already started a transaction, we cannot allow
@@ -5421,7 +5476,7 @@ xfs_get_uiosize(
 {
 	int error;
 
-	if (error = xfs_iaccess(ip, IREAD, credp))
+	if (error = xfs_iaccess(ip, IREAD))
 		return error;
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -5455,7 +5510,7 @@ xfs_set_uiosize(
 	int	memlimit;
 	int	error;
 
-	if (error = xfs_iaccess(ip, IWRITE, credp))
+	if (error = xfs_iaccess(ip, IWRITE))
 		return error;
 
 	memlimit = NBPP;
@@ -5546,7 +5601,7 @@ xfs_set_uiosize(
 	return 0;
 }
 
-
+#ifndef SIM
 /*
  * xfs_fcntl
  */
@@ -5846,6 +5901,7 @@ xfs_fcntl(
 	}
 	return error;
 }
+#endif
 
 int
 xfs_set_dmattrs (
@@ -5859,7 +5915,7 @@ xfs_set_dmattrs (
 	xfs_mount_t	*mp;
 	int		error;
 
-	if (!cap_able_cred(credp, CAP_DEVICE_MGT))
+	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 
         ip = XFS_BHVTOI(bdp);
@@ -6615,7 +6671,7 @@ xfs_change_file_space(
 		return XFS_ERROR(EINVAL);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(ip, IWRITE, credp)) {
+	if (error = xfs_iaccess(ip, IWRITE)) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return error;
 	}
@@ -6745,6 +6801,7 @@ vnodeops_t xfs_vnodeops = {
 	(vop_write_t)fs_nosys,
 	(vop_getattr_t)fs_nosys,
 	(vop_setattr_t)fs_nosys,
+	(vop_access_t)fs_nosys,
 	(vop_lookup_t)fs_nosys,
 	(vop_create_t)fs_nosys,
 	(vop_remove_t)fs_nosys,
@@ -6784,6 +6841,7 @@ vnodeops_t xfs_vnodeops = {
 	(vop_write_t)xfs_write,
 	xfs_getattr,
 	xfs_setattr,
+	xfs_access,
 	xfs_lookup,
 	xfs_create,
 	xfs_remove,

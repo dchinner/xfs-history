@@ -15,7 +15,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -58,7 +58,7 @@
 #include "xfs_attr.h"
 
 int
-acl_xfs_iaccess( xfs_inode_t *ip, mode_t mode, struct cred *cr )
+acl_xfs_iaccess( xfs_inode_t *ip, mode_t mode )
 {
 	struct acl acl;
 
@@ -79,5 +79,5 @@ acl_xfs_iaccess( xfs_inode_t *ip, mode_t mode, struct cred *cr )
 	 */
 	acl_sync_mode(ip->i_d.di_mode, &acl);
 
-	return acl_access(ip->i_d.di_uid, ip->i_d.di_gid, &acl, mode, cr);
+	return acl_access(ip->i_d.di_uid, ip->i_d.di_gid, &acl, mode);
 }

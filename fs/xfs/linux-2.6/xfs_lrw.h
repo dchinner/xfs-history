@@ -23,10 +23,17 @@
  * $Id$
  *
  * $Log$
+ * Revision 1.6  2000/03/25 01:15:49  lord
+ * use linux security mechanisms
+ * Merge of 2.3.42-xfs:slinx:46379a by ananth.
+ *
  * Revision 1.5  2000/03/25 00:36:28  cattelan
  * Merge of 2.3.42-xfs:slinx:44186a by ananth.
  *
  *   Copied GPL from slinx-xfs tree.
+ *
+ * Revision 1.6  2000/03/18 22:51:26  lord
+ * use linux security mechanisms
  *
  * Revision 1.5  2000/02/21 21:54:31  cattelan
  * Copied GPL from slinx-xfs tree.
@@ -86,6 +93,7 @@ xfs_rwunlockf(
 	vrwlock_t	write_lock,
 	int		flags);
 
+#if 0
 page_buf_t *
 xfs_pb_getr(
 			int sleep, 
@@ -101,6 +109,7 @@ xfs_pb_freer(
 void
 xfs_pb_nfreer(
 			  page_buf_t *bp);
+#endif
 
 #define XFS_FSB_TO_DB_IO(io,fsb) \
 		(((io)->io_flags & XFS_IOCORE_RT) ? \
