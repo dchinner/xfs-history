@@ -1,4 +1,4 @@
-#ident "$Revision: 1.86 $"
+#ident "$Revision: 1.87 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -226,6 +226,7 @@ again:
 	init_sema(&ip->i_flock, 1, "xfsfino", (long)vp->v_number);
 	init_sv(&ip->i_pinsema, SV_DEFAULT, "xfspino", (long)vp->v_number);
 	spinlock_init(&ip->i_ipinlock, "xfs_ipin");
+	mutex_init(&ip->i_rlock, MUTEX_DEFAULT, "xfs_rlock");
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
 	}
