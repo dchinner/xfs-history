@@ -78,6 +78,11 @@ xfs_dm_mount(
 	char		*dir_name,
 	char		*fsname);
 
+int
+xfs_dm_get_fsys_vector(
+	bhv_desc_t	*bdp,
+	dm_fcntl_t	*dmfcntlp);
+
 extern int
 xfs_dm_send_data_event(
 	dm_eventtype_t	event, 

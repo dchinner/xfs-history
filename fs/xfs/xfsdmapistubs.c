@@ -40,9 +40,12 @@
 int	xfs_dm_fcntl(bhv_desc_t *bdp, void *arg, int flags, xfs_off_t offset,
 		cred_t *credp, int *rvalp)	{ return nopkg(); }
 
+int	xfs_dm_get_fsys_vector(bhv_desc_t *bdp, dm_fcntl_t *dmfcntlp)
+		{ return nopkg(); }
+
 int	xfs_dm_send_create_event(bhv_desc_t *dir_bdp, char *name,
 		mode_t new_mode, int *good_event_sent)	{ return 0; }
 
 int	xfs_dm_send_data_event(dm_eventtype_t  event, bhv_desc_t *bdp,
-		xfs_off_t offset, size_t length, int flags, vrwlock_t *locktype)
-		{ return nopkg(); }
+		xfs_off_t offset, size_t length, int flags,
+		vrwlock_t *locktype) { return nopkg(); }

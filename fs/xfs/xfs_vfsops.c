@@ -1758,5 +1758,6 @@ vfsops_t xfs_vfsops = {
 	vfs_sync:		xfs_sync,
 	vfs_vget:		xfs_vget,
 	vfs_get_vnode:		xfs_get_vnode,
-	vfs_dmapi_mount:	xfs_dm_mount
+	vfs_dmapi_mount:	xfs_dm_mount,
+	vfs_dmapi_fsys_vector:	xfs_dm_get_fsys_vector,
 };

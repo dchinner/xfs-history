@@ -2834,11 +2834,12 @@ xfs_dm_write_invis_rvp(
 STATIC fsys_function_vector_t	xfs_fsys_vector[DM_FSYS_MAX];
 
 
-STATIC int
+int
 xfs_dm_get_fsys_vector(
+	bhv_desc_t	*bdp,
 	dm_fcntl_t	*dmfcntlp)
 {
-static	int		initialized = 0;
+	static	int		initialized = 0;
 	fsys_function_vector_t *vecp;
 	int		i = 0;
 
@@ -3088,9 +3089,9 @@ xfs_dm_fcntl(
 	dmfcntlp = (dm_fcntl_t *)arg;
 
 	switch (dmfcntlp->dmfc_subfunc) {
+#ifdef __sgi
 	case DM_FCNTL_FSYSVECTOR:
 		return(xfs_dm_get_fsys_vector(dmfcntlp));
-#ifdef __sgi
 	case DM_FCNTL_MAPEVENT:
 		return(xfs_dm_mapevent(bdp, flags, offset, dmfcntlp));
 	case DM_FCNTL_TESTEVENT:
