@@ -143,6 +143,7 @@ int				pb_resv_bh_cnt = 0;	/* # of bh available */
 
 STATIC void pagebuf_daemon_wakeup(int);
 STATIC int _pagebuf_segment_apply(page_buf_t *);
+STATIC void pagebuf_delwri_queue(page_buf_t *, int);
 
 /*
  * Pagebuf module configuration parameters, exported via
@@ -1910,7 +1911,7 @@ STATIC int pbd_active = 1;
 STATIC LIST_HEAD(pbd_delwrite_queue);
 STATIC spinlock_t pbd_delwrite_lock = SPIN_LOCK_UNLOCKED;
 
-void
+STATIC void
 pagebuf_delwri_queue(
 	page_buf_t		*pb,
 	int			unlock)
