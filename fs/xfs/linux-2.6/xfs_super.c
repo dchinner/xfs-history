@@ -143,6 +143,8 @@ xfs_parseargs(
 	if (flags & MS_NOATIME)
 		args->flags |= XFSMNT_NOATIME;
 
+	args->flags |= XFSMNT_32BITINODES;
+	
 	for (this_char = strtok (options, ",");
 	     this_char != NULL;
 	     this_char = strtok (NULL, ",")) {
