@@ -1,9 +1,10 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.36 $"
 
 #define	XFS_DINODE_VERSION	1
+#define XFS_DINODE_GOOD_VERSION(v)	((v) == XFS_DINODE_VERSION)
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
 
 /*
