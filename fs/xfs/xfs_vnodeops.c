@@ -293,8 +293,10 @@ xfs_getattr(vnode_t	*vp,
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
 
 	vap->va_size = (ulong) ip->i_d.di_size;
-        if (vap->va_mask == AT_SIZE)
+        if (vap->va_mask == AT_SIZE) {
+		xfs_iunlock (ip, XFS_ILOCK_SHARED);
                 return 0;
+	}
         vap->va_fsid = ip->i_dev;
 
 	/* XXX trunc to 32 bits for now. */
