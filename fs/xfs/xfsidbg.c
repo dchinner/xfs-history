@@ -22,6 +22,7 @@
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kdb.h>
+#include <linux/kdbprivate.h>
 
 #include <linux/xfs_to_linux.h>
 #include <linux/slab.h>
