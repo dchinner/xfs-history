@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_LEAF_H
 #define	_FS_XFS_ATTR_LEAF_H
 
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.4 $"
 
 /*
  * xfs_attr_leaf.h
@@ -89,9 +89,12 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
 /*
  * Flags used in the leaf_entry[i].flags field.
  */
-#define XFS_ATTR_LOCAL		0x01	/* attr is stored locally */
-#define XFS_ATTR_ROOT		0x02	/* limit access to attr to userid 0 */
-#define XFS_ATTR_INCOMPLETE	0x80	/* attr in middle of create/delete */
+#define	XFS_ATTR_LOCAL_BIT	0	/* attr is stored locally */
+#define	XFS_ATTR_ROOT_BIT	1	/* limit access to attr to userid 0 */
+#define	XFS_ATTR_INCOMPLETE_BIT	7	/* attr in middle of create/delete */
+#define XFS_ATTR_LOCAL		(1 << XFS_ATTR_LOCAL_BIT)
+#define XFS_ATTR_ROOT		(1 << XFS_ATTR_ROOT_BIT)
+#define XFS_ATTR_INCOMPLETE	(1 << XFS_ATTR_INCOMPLETE_BIT)
 
 /*
  * Cast typed pointers for "local" and "remote" name/value structs.
