@@ -900,8 +900,6 @@ xfs_dm_direct_ok(
 	dm_size_t	len,
 	void		*bufp)
 {
-#ifdef __sgi
-
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
 
@@ -920,6 +918,7 @@ xfs_dm_direct_ok(
 	if (!dm_min_dio_xfer || len < dm_min_dio_xfer)
 		return(0);
 
+#if 0
 	/* If the request is not well-formed or is too large, use
 	   buffered I/O.
 	*/
@@ -937,7 +936,7 @@ xfs_dm_direct_ok(
 
 	return(1);
 #else
-	return 0;
+	return(0);
 #endif
 }
 
@@ -1618,6 +1617,7 @@ xfs_dm_get_destroy_dmattr(
 
 /* This code was taken from xfs_fcntl(F_DIOINFO) and modified slightly because
    we don't have a flags parameter (no open file).
+   Taken from xfs_ioctl(XFS_IOC_DIOINFO) on Linux.
 */
 
 STATIC int
@@ -1629,13 +1629,14 @@ xfs_dm_get_dioinfo(
 	dm_dioinfo_t	dio;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
-#ifdef __sgi
+
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
+#ifdef __sgi
 	/*
 	 * We align to the secondary cache line size so that we
 	 * don't have to worry about nasty writeback caches on
@@ -1662,6 +1663,7 @@ xfs_dm_get_dioinfo(
 #else
 		dio.d_mem = scache_linemask + 1;
 #endif
+#endif /* __sgi */
 
 	/*
 	 * this only really needs to be BBSIZE.
@@ -1671,6 +1673,7 @@ xfs_dm_get_dioinfo(
 	dio.d_miniosz = mp->m_sb.sb_blocksize;
 	dio.d_maxiosz = XFS_FSB_TO_B(mp,
 			    XFS_B_TO_FSBT(mp, pagebuf_max_direct()));
+	dio.d_mem = 512;
 
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		dio.d_dio_only = DM_TRUE;
@@ -1686,9 +1689,6 @@ xfs_dm_get_dioinfo(
 		return(EFAULT);
 #endif
 	return(0);
-#else
-	return ENOSYS;
-#endif
 }
 
 
