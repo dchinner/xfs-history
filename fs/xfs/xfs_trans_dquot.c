@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision: 1.12 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -9,10 +9,9 @@
 #include <sys/cmn_err.h>	
 #include <sys/atomic_ops.h>
 #include <sys/systm.h>
-#ifdef	_SHAREII
-#include <sys/proc.h>
+#ifdef _SHAREII
 #include <sys/shareIIstubs.h>
-#endif	/* _SHAREII */
+#endif /* _SHAREII */
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -432,7 +431,7 @@ xfs_trans_apply_dquot_deltas(
 			/*
 			 * SHAREII doesn't distinguish between RT and reg blks.
 			 */
-			if (IsShareRunning) {
+			if (SHshareActive) {
 				oldresbcnt = dqp->q_res_bcount + 
 					dqp->q_res_rtbcount;
 				oldresicnt = dqp->q_res_icount;
@@ -516,7 +515,7 @@ xfs_trans_apply_dquot_deltas(
 			ASSERT(dqp->q_res_icount >= dqp->q_core.d_icount);
 			ASSERT(dqp->q_res_rtbcount >= dqp->q_core.d_rtbcount);
 #ifdef _SHAREII
-			if (IsShareRunning) {
+			if (SHshareActive) {
 				if (dqp->q_res_bcount + dqp->q_res_rtbcount -
 				    oldresbcnt) {
 				      (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
@@ -525,14 +524,14 @@ xfs_trans_apply_dquot_deltas(
 							 dqp->q_res_rtbcount -
 							 oldresbcnt),
 						   XFS_FSB_TO_B(dqp->q_mount, 1),
-						   LI_UPDATE, NULL);
+						   LI_UPDATE, NULL, NULL);
 			        }
 				if (dqp->q_res_icount - oldresicnt) {
 				     (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
 							dqp->q_core.d_id,
 							(int)(dqp->q_res_icount -
 							      oldresicnt),
-							0, LI_UPDATE, NULL);
+							0, LI_UPDATE, NULL, NULL);
 				}
 			}	
 #endif /* _SHAREII */
@@ -588,7 +587,7 @@ xfs_trans_unreserve_and_mod_dquots(
 				dqp->q_res_bcount -= 
 					(xfs_qcnt_t)qtrx->qt_blk_res; 
 #ifdef _SHAREII
-				if (IsShareRunning)
+				if (SHshareActive)
 					blkunres = (int)qtrx->qt_blk_res;
 #endif /* _SHAREII */
 			}
@@ -600,7 +599,7 @@ xfs_trans_unreserve_and_mod_dquots(
 				dqp->q_res_icount -= 
 					(xfs_qcnt_t)qtrx->qt_ino_res; 
 #ifdef _SHAREII
-				if (IsShareRunning) 
+				if (SHshareActive) 
 					inounres = (int)qtrx->qt_blk_res;
 #endif /* _SHAREII */
 			}
@@ -613,26 +612,27 @@ xfs_trans_unreserve_and_mod_dquots(
 				dqp->q_res_rtbcount -= 
 					(xfs_qcnt_t)qtrx->qt_rtblk_res; 
 #ifdef _SHAREII
-				if (IsShareRunning)
+				if (SHshareActive)
 					blkunres += (int)qtrx->qt_blk_res;
 #endif /* _SHAREII */
 			}
 			
 #ifdef _SHAREII
 			/* Undo the SHAREII reservation. */
-			if (IsShareRunning) {
+			if (SHshareActive) {
 				if (blkunres)
 				     (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
 						   dqp->q_core.d_id,
 						   -blkunres,
 						   XFS_FSB_TO_B(dqp->q_mount, 1),
 						   LI_UPDATE,
+						   NULL,
 						   NULL);
 				if (inounres)
 				     (void) SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
 							dqp->q_core.d_id,
 							-inounres,
-							0, LI_UPDATE, NULL);
+							0, LI_UPDATE, NULL, NULL);
 			}
 #endif /* _SHAREII */
 			if (locked)
@@ -746,7 +746,7 @@ xfs_trans_dqresv(
 	}
 
 #ifdef _SHAREII
-	if (IsShareRunning) {
+	if (SHshareActive) {
 		if ((flags & XFS_QMOPT_FORCE_RES) == 0  &&
 		    dqp->q_core.d_id != 0) 
 			enforceflag = LI_ENFORCE;
@@ -758,6 +758,7 @@ xfs_trans_dqresv(
 				(int) nblks,
 				XFS_FSB_TO_B(dqp->q_mount, 1),
 				LI_UPDATE | enforceflag,
+				NULL,
 				NULL)) {
 			error = EDQUOT;
 			goto error_return;
@@ -768,6 +769,7 @@ xfs_trans_dqresv(
 					dqp->q_core.d_id, 
 					1, 0,
 					LI_ENFORCE | enforceflag,
+					NULL,
 					NULL)) {
 				error = EDQUOT;
 				goto error_return;
