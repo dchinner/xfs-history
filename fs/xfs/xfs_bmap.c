@@ -1,4 +1,5 @@
-#ident	"$Revision: 1.113 $"
+
+#ident	"$Revision: 1.115 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3250,6 +3251,8 @@ xfs_getbmap(
 	int			nmap;		/* number of map entries */
 	struct getbmap		out;		/* output structure */
 	xfs_trans_t		*tp;		/* transaction pointer */
+	xfs_mount_t		*mp;		/* mount pointer */
+	xfs_fsize_t		last_byte;	/* last cached byte */
 
 	ip = XFS_VTOI(vp);
 	if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&
@@ -3267,8 +3270,12 @@ xfs_getbmap(
 		return 0;
 	}
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
-	if (ip->i_delayed_blks)
-		pflushvp(vp, (off_t)ip->i_d.di_size, 0);
+	if (ip->i_delayed_blks) {
+		mp = ip->i_mount;
+		last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+		last_byte = XFS_FSB_TO_B(mp, last_byte);
+		pflushvp(vp, (off_t)last_byte, 0);
+	}
 	ASSERT(ip->i_delayed_blks == 0);
 	lock = xfs_ilock_map_shared(ip);
 	/*
