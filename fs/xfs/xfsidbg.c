@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.86 $"
+#ident	"$Revision: 1.87 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -253,6 +253,13 @@ static struct xif {
 #ifdef DEBUG
     "xdirtrc",	VD xfsidbg_xdirtrace,	"Dump XFS directory getdents() trace",
 #endif
+    "xdiskdq",	VD xfsidbg_xqm_diskdq,	"Dump XFS ondisk dquot (quota) struct",
+    "xdqatt",	VD xfsidbg_xqm_dqattached_inos, "All incore inodes with dquots",
+    "xdqinfo",	VD xfsidbg_xqm_tpdqinfo, "Dump dqinfo structure of a trans",
+#ifdef DQUOT_TRACING
+    "xdqtrace", VD xfsidbg_xqm_dqtrace,	"Dump trace of a given dquot",
+#endif
+    "xdquot",	VD xfsidbg_xqm_dquot,	"Dump XFS dquot (quota) structure",
     "xexlist",	VD xfsidbg_xexlist,	"Dump XFS bmap extents in inode",
     "xfindi",	VD xfsidbg_xfindi,	"Find XFS inode by inum",
     "xflist",	VD xfsidbg_xflist,	"Dump XFS to-be-freed extent list",
@@ -262,10 +269,12 @@ static struct xif {
     "xiclog",	VD xfsidbg_xiclog,	"Dump XFS in-core log",
 #ifdef DEBUG
     "xictrc",	VD xfsidbg_xiclogtrace,	"Dump XFS in-core log trace",
+#endif
+    "xihash",	VD xfsidbg_xihash, 	"Dump XFS inode hash statistics",
+#ifdef DEBUG
     "xilocktrc",VD xfsidbg_xilock_trace,"Dump XFS ilock trace",
 #endif
     "xinodes",	VD xfsidbg_xinodes, 	"Dump XFS inodes per mount",
-    "xihash",	VD xfsidbg_xihash, 	"Dump XFS inode hash statistics",
 #ifdef DEBUG
     "xl_grtr",	VD xfsidbg_xlog_granttrace,"Dump XFS log grant trace",
 #endif
@@ -279,18 +288,11 @@ static struct xif {
     "xmount",	VD xfsidbg_xmount,	"Dump XFS mount structure",
     "xnode",	VD xfsidbg_xnode,	"Dump XFS inode",
     "xperag",	VD xfsidbg_xperag,	"Dump XFS per-allocation group data",
- "xqm",	VD xfsidbg_xqm,		"Dump XFS quota manager structure",
-    "xdiskdq",	VD xfsidbg_xqm_diskdq,	"Dump XFS ondisk dquot (quota) structure",
-    "xdqatt",	VD xfsidbg_xqm_dqattached_inos, "All incore inodes with dquots",
-    "xdquot",	VD xfsidbg_xqm_dquot,	"Dump XFS dquot (quota) structure",
+    "xqinfo",   VD xfsidbg_xqm_qinfo,	"Dump mount->m_quotainfo structure",
+    "xqm",	VD xfsidbg_xqm,		"Dump XFS quota manager structure",
     "xqmfree",	VD xfsidbg_xqm_freelist,"Dump XFS global freelist of dquots",
     "xqmhtab",	VD xfsidbg_xqm_htab,	"Dump XFS hashtable of dquots",
     "xqmplist",	VD xfsidbg_xqm_mplist,	"Dump XFS all dquots of a f/s",
-#ifdef DQUOT_TRACING
-    "xdqtrace", VD xfsidbg_xqm_dqtrace,	"Dump trace of a given dquot",
-#endif
-    "xqinfo",   VD xfsidbg_xqm_qinfo,	"Dump mount->m_quotainfo structure",
-    "xdqinfo",	VD xfsidbg_xqm_tpdqinfo, "Dump dqinfo structure of a trans",
 #ifdef NOTYET
     "xrange",   VD xfsidbg_xrange,	"Dump an xfs_range structure",
     "xranges",  VD xfsidbg_xrangelocks,	"Dump all range locks of an inode",
@@ -1390,6 +1392,44 @@ xfs_itrunc_trace_entry(ktrace_entry_t	*ktep)
 		ktep->val[7], ktep->val[8], ktep->val[9], ktep->val[10],
 		ktep->val[11]);
 }
+
+/*
+ * Print bunmap entry trace.
+ */
+static void
+xfs_bunmap_trace_entry(ktrace_entry_t	*ktep)
+{
+	static char *bunmapi_flags[] = {
+		"write",	/* 0x01 */
+		"delay",	/* 0x02 */
+		"entire",	/* 0x04 */
+		"metadata",	/* 0x08 */
+		"exact",	/* 0x10 */
+		"attrfork",	/* 0x20 */
+		"async",	/* 0x40 */
+		"rsvblocks",	/* 0x80 */
+		0
+	};
+
+	qprintf("ip 0x%x size 0x%x%x bno 0x%x%x len 0x%x cpu id %d\n",
+		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4], 
+		ktep->val[5], ktep->val[6], ktep->val[8]);
+	qprintf("ra 0x%x ", ktep->val[9]);
+	printflags((__psint_t)ktep->val[7], bunmapi_flags, "flags");
+	qprintf("\n");
+}
+
+/*
+ * Print inval_cached_pages entry trace.
+ */
+static void
+xfs_inval_cached_trace_entry(ktrace_entry_t	*ktep)
+{
+	qprintf("ip 0x%x offset 0x%x%x len 0x%x%x first 0x%x%x last 0x%x%x\n",
+		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4],
+		ktep->val[5], ktep->val[6], ktep->val[7], ktep->val[8],
+		ktep->val[9]);
+}
 #endif	/* DEBUG */
 
 /*
@@ -1527,6 +1567,14 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		qprintf("CTRUNC6:\n");
 		xfs_ctrunc_trace_entry(ktep);
 		break;
+	case XFS_BUNMAPI:
+		qprintf("BUNMAPI:\n");
+		xfs_bunmap_trace_entry(ktep);
+		break;
+	case XFS_INVAL_CACHED:
+		qprintf("INVAL CACHED:\n");
+		xfs_inval_cached_trace_entry(ktep);
+		break;
 
 	default:
 		return 0;
@@ -1548,8 +1596,8 @@ xfs_strat_enter_trace_entry(ktrace_entry_t *ktep)
 	qprintf("bp offset 0x%x%x bcount 0x%x bufsize 0x%x blkno 0x%x\n",
 		ktep->val[5], ktep->val[6], ktep->val[7], ktep->val[8],
 		ktep->val[9]);
-	flags = (((uint64_t)ktep->val[10] << 32) & 0xFFFFFFFF00000000LL) |
-		(((uint64_t)ktep->val[11]) & 0x00000000FFFFFFFFLL);
+	flags = (((uint64_t)ktep->val[10] << 32) & 0xFFFFFFFF00000000ULL) |
+		(((uint64_t)ktep->val[11]) & 0x00000000FFFFFFFFULL);
 	qprintf("bp flags ");
 	printflags(flags, tab_bflags,"bflags");
 	qprintf("\n");
@@ -2129,8 +2177,8 @@ xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 			ktep->val[3], ktep->val[4],
 			ktep->val[5], ktep->val[6]);
 		flags = (((uint64_t)ktep->val[7] << 32) &
-					0xFFFFFFFF00000000LL) |
-			(((uint64_t)ktep->val[8]) & 0x00000000FFFFFFFFLL);
+					0xFFFFFFFF00000000ULL) |
+			(((uint64_t)ktep->val[8]) & 0x00000000FFFFFFFFULL);
 		qprintf("bp flags ");
 		printflags(flags, tab_bflags,0);
 		qprintf("\n");
@@ -3937,6 +3985,7 @@ xfsidbg_xqm_htab(void)
 		}
 	}
 }
+
 #ifdef DQUOT_TRACING
 /* ARGSUSED */
 static int
@@ -4283,7 +4332,7 @@ xfsidbg_xstrat_itrace(xfs_inode_t *ip)
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
 
-	if (ip->i_rwtrace == NULL) {
+	if (ip->i_strat_trace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
 		return;
 	}
