@@ -71,13 +71,13 @@ extern int cxfs_parseargs(char *, int, struct xfs_args *);
 #endif
 
 #ifdef CONFIG_XFS_QUOTA
-static struct quota_operations linvfs_qops = {
-	getxstate:		linvfs_getxstate,
-	setxstate:		linvfs_setxstate,
-	getxquota:		linvfs_getxquota,
-	setxquota:		linvfs_setxquota,
+static struct quotactl_ops linvfs_qops = {
+	get_xstate:		linvfs_getxstate,
+	set_xstate:		linvfs_setxstate,
+	get_xquota:		linvfs_getxquota,
+	set_xquota:		linvfs_setxquota,
 };
-# define set_quota_ops(sb)	((sb)->s_qop = &linvfs_qops)
+# define set_quota_ops(sb)	((sb)->s_qcop = &linvfs_qops)
 #else
 # define set_quota_ops(sb)	do { } while (0)
 #endif
