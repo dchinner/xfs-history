@@ -5353,6 +5353,7 @@ xfs_bunmapi(
 	int			wasdel;		/* was a delayed alloc extent */
 	int			whichfork;	/* data or attribute fork */
 	int			rsvd;		/* OK to allocate reserved blocks */
+	xfs_fsblock_t		sum;
 
 	xfs_bunmap_trace(ip, bno, len, flags, (inst_t *)__return_address);
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
@@ -5440,9 +5441,9 @@ xfs_bunmapi(
 		}
 		if (del.br_startoff + del.br_blockcount > bno + 1)
 			del.br_blockcount = bno + 1 - del.br_startoff;
+		sum = del.br_startblock + del.br_blockcount;
 		if (isrt &&
-		    (mod = do_mod(del.br_startblock + del.br_blockcount,
-						   mp->m_sb.sb_rextsize))) {
+		    (mod = do_mod(sum, mp->m_sb.sb_rextsize))) {
 			/*
 			 * Realtime extent not lined up at the end.
 			 * The extent could have been split into written
