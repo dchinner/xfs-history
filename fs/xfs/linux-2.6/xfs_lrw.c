@@ -735,11 +735,11 @@ retry:
 	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
 	    !(filp->f_flags & O_INVISIBLE)) {
 
-		xfs_rwunlockf(bdp, locktype, 0);
+		xfs_rwunlock(bdp, locktype);
 		error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
 				DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
 				0, 0, 0); /* Delay flag intentionally  unused */
-		xfs_rwlockf(bdp, locktype, 0);
+		xfs_rwlock(bdp, locktype);
 		if (error)
 			return error;
 		*offsetp = ip->i_size;
