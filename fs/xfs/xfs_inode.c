@@ -886,7 +886,7 @@ xfs_iflush(xfs_inode_t *ip, uint flags)
 	/*
 	 * If ili_fields is set, then set ili_ref so that xfs_iflush_done()
 	 * will know to drop the reference taken on the inode in
-	 * xfs_trans_log_inode().  The ili_ref field is guared by
+	 * xfs_trans_log_inode().  The ili_ref field is guarded by
 	 * the inode's i_flock.  Then we're done looking at
 	 * ili_fields, so clear it.  We can do this since the lock
 	 * must be held exclusively in order to set bits in this field.
