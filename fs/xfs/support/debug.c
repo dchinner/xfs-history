@@ -36,7 +36,9 @@
 #include <linux/sched.h>
 #include <linux/kernel.h>
 
-int		doass = 1;
+int			doass = 1;
+static char		message[256];	/* keep it off the stack */
+static spinlock_t 	xfs_err_lock = SPIN_LOCK_UNLOCKED;
 
 void
 assfail(char *a, char *f, int l)
@@ -78,9 +80,9 @@ void
 cmn_err(register int level, char *fmt, ...)
 {
 	char	*fp = fmt;
-	char	message[256];
 	va_list ap;
 
+	spin_lock(&xfs_err_lock);
 	va_start(ap, fmt);
 	if (*fmt == '!') fp++;
 	vsprintf(message, fp, ap);
@@ -96,6 +98,7 @@ cmn_err(register int level, char *fmt, ...)
 		break;
 	}
 	va_end(ap);
+	spin_unlock(&xfs_err_lock);
 
 	if (level == CE_PANIC)
 		BUG();
@@ -105,8 +108,7 @@ cmn_err(register int level, char *fmt, ...)
 void
 icmn_err(register int level, char *fmt, va_list ap)
 {
-	char	message[256];
-
+	spin_lock(&xfs_err_lock);
 	vsprintf(message, fmt, ap);
 	switch (level) {
 	case CE_CONT:
@@ -120,4 +122,5 @@ icmn_err(register int level, char *fmt, va_list ap)
 		printk("%s\n", message);
 		break;
 	}
+	spin_unlock(&xfs_err_lock);
 }
