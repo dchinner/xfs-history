@@ -3121,7 +3121,7 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 		INT_GET(dip->di_mtime.t_nsec, convert),
 		INT_GET(dip->di_ctime.t_sec, convert),
 		INT_GET(dip->di_ctime.t_nsec, convert));
-	kdb_printf("size 0x%Ld ", INT_GET(dip->di_size, convert));
+	kdb_printf("size %Ld ", INT_GET(dip->di_size, convert));
 	kdb_printf("nblocks %Ld extsize 0x%x nextents 0x%x anextents 0x%x\n",
 		INT_GET(dip->di_nblocks, convert),
 		INT_GET(dip->di_extsize, convert),
