@@ -846,11 +846,11 @@ static int __init init_xfs_fs(void)
 	struct sysinfo	si;
 
 	si_meminfo(&si);
-
 	physmem = si.totalram;
 
-	cred_init();
+	printk(KERN_INFO "SGI XFS with " XFS_BUILD_OPTIONS " enabled\n");
 
+	cred_init();
 	vfsinit();
 	xfs_init(0);
 

@@ -32,6 +32,61 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
+
+#ifdef CONFIG_FS_POSIX_ACL
+# define XFS_ACL_STRING		"ACLs, "
+#else
+# define XFS_ACL_STRING
+#endif
+
+#ifdef CONFIG_HAVE_ATTRCTL
+# define XFS_EA_STRING		"EAs, "
+#else
+# define XFS_EA_STRING
+#endif
+
+#ifdef CONFIG_XFS_DMAPI
+# define XFS_DMAPI_STRING	"DMAPI, "
+#else
+# define XFS_DMAPI_STRING
+#endif
+
+#ifdef CONFIG_XFS_QUOTA
+# define XFS_QUOTA_STRING	"quota, "
+#else
+# define XFS_QUOTA_STRING
+#endif
+
+#ifdef CONFIG_XFS_GRIO
+# define XFS_GRIO_STRING	"GRIO, "
+#else
+# define XFS_GRIO_STRING
+#endif
+
+#ifdef CONFIG_XFS_RT
+# define XFS_RT_STRING		"realtime, "
+#else
+# define XFS_RT_STRING
+#endif
+
+#ifdef CONFIG_XFS_VNODE_TRACING
+# define XFS_VNTRACE_STRING	"VN-trace, "
+#else
+# define XFS_VNTRACE_STRING
+#endif
+
+#ifdef CONFIG_XFS_DEBUG
+# define XFS_DBG_STRING		"debug"
+#else
+# define XFS_DBG_STRING		"no debug"
+#endif
+
+#define XFS_BUILD_OPTIONS	XFS_ACL_STRING XFS_EA_STRING XFS_DMAPI_STRING \
+				XFS_GRIO_STRING XFS_RT_STRING \
+				XFS_QUOTA_STRING XFS_VNTRACE_STRING \
+				XFS_DBG_STRING /* must be last */
+
+
 struct xfs_args;
 
 void
