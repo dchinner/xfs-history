@@ -1,4 +1,4 @@
-#ident "$Revision: 1.324 $"
+#ident "$Revision: 1.325 $"
 
 
 #ifdef SIM
@@ -460,6 +460,7 @@ xfs_getattr(
         vap->va_gid = ip->i_d.di_gid;
 	vap->va_projid = ip->i_d.di_projid;
         vap->va_vcode = 0L;
+	vap->va_gencount = ip->i_d.di_gen;
 	/*
 	 * Minor optimization, check the common cases first.
 	 */
