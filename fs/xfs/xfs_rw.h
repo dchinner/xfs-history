@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.33 $"
 
 struct bhv_desc;
 struct bdevsw;
@@ -129,6 +129,17 @@ xfs_read(struct bhv_desc	*bdp,
 	 int			ioflag,
 	 struct cred		*credp,
 	 struct flid		*fl);
+
+int
+xfs_vop_readbuf(bhv_desc_t 	*bdp,
+		off_t		offset,
+		ssize_t		len,
+		int		ioflags,
+		struct cred	*creds,
+		struct flid	*fl,
+		struct buf	**rbuf,
+		int		*pboff,
+		int		*pbsize);
 
 int
 xfs_write_clear_setuid(
