@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.14 $"
 
 struct xfs_ihash;
 
@@ -19,6 +19,7 @@ typedef struct xfs_mount {
 	lock_t			m_sb_lock;	/* sb counter mutex */
 	buf_t			*m_sb_bp;	/* buffer for superblock */
 	dev_t			m_dev;		/* dev of fs meta-data */
+	dev_t			m_rtdev;	/* dev of fs realtime data */
 	int			m_bsize;	/* fs logical block size */
 	xfs_agnumber_t		m_agrotor;	/* last ag where space found */
 	lock_t			m_ipinlock;	/* inode pinning mutex */
@@ -27,6 +28,10 @@ typedef struct xfs_mount {
 	struct xfs_inode	*m_inodes;	/* active inode list */
 	lock_t			m_ilock;	/* inode list mutex */
 	void			*m_log;		/* log specific stuff */
+	uint			m_rsumlevels;	/* rt summary levels */
+	uint			m_rsumsize;	/* size of rt summary, bytes */
+	struct xfs_inode	*m_rbmip;	/* pointer to bitmap inode */
+	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
 } xfs_mount_t;
 
 /*
@@ -55,7 +60,7 @@ typedef struct xfs_mod_sb {
 #define	AIL_UNLOCK(mp,s)	(spunlockspl((mp)->m_ail_lock, s))
 
 void		xfs_mod_sb(xfs_trans_t *, int);
-xfs_mount_t	*xfs_mount(dev_t);
+xfs_mount_t	*xfs_mount(dev_t, dev_t);
 void		xfs_umount(xfs_mount_t *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
