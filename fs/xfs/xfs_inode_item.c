@@ -12,10 +12,10 @@
 #define _KERNEL
 #endif
 #include <sys/buf.h>
+#include <sys/vnode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
 #ifndef SIM
@@ -146,7 +146,7 @@ xfs_inode_item_trylock(xfs_inode_log_item_t *iip)
 	}
 
 	if (!xfs_iflock_nowait(ip)) {
-		xfs_iunlock(ip);
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return (0);
 	}
 
@@ -163,7 +163,14 @@ void
 xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
 {
 	uint	hold;
+	uint	iolocked;
+	uint	lock_flags;
 
+	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), MR_UPDATE));
+	ASSERT((!(iip->ili_inode->i_item.ili_flags & XFS_ILI_IOLOCKED_EXCL)) ||
+	       ismrlocked(&(iip->ili_inode->i_iolock), MR_UPDATE));
+	ASSERT((!(iip->ili_inode->i_item.ili_flags & XFS_ILI_IOLOCKED_SHARED))||
+	       ismrlocked(&(iip->ili_inode->i_iolock), MR_ACCESS));
 	/*
 	 * Clear the transaction pointer in the inode.
 	 */
@@ -175,17 +182,30 @@ xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
 	hold = iip->ili_flags & XFS_ILI_HOLD;
 
 	/*
+	 * Before clearing out the flags, remember whether we
+	 * are holding the inode's IO lock.
+	 */
+	iolocked = iip->ili_flags & XFS_ILI_IOLOCKED_ANY;
+
+	/*
 	 * Clear out the fields of the inode log item particular
 	 * to the current transaction.
 	 */
-	iip->ili_recur = 0;
+	iip->ili_ilock_recur = 0;
+	iip->ili_iolock_recur = 0;
 	iip->ili_flags = 0;
 
 	/*
 	 * Unlock the inode if XFS_ILI_HOLD was not set.
 	 */
 	if (!hold) {
-		xfs_iput(iip->ili_inode);
+		lock_flags = XFS_ILOCK_EXCL;
+		if (iolocked & XFS_ILI_IOLOCKED_EXCL) {
+			lock_flags |= XFS_IOLOCK_EXCL;
+		} else if (iolocked & XFS_ILI_IOLOCKED_SHARED) {
+			lock_flags |= XFS_IOLOCK_SHARED;
+		}
+		xfs_iput(iip->ili_inode, lock_flags);
 	}
 }
 
@@ -330,9 +350,7 @@ xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
 	 * code if we have one.
 	 */
 	if (drop_ref) {
-#ifdef NOTYET
 		vn_rele(XFS_ITOV(ip));
-#endif
 	}
 		
 	return;
