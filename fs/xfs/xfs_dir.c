@@ -1,4 +1,4 @@
-#ident "$Revision: 1.93 $"
+#ident "$Revision: 1.94 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -412,6 +412,9 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
 	if ((uio->uio_iovcnt == 1) &&
+#if CELL
+	    !KT_CUR_ISXTHREAD() &&
+#endif
 	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
 	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
 		dbp = NULL;
