@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision: 1.38 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -332,11 +332,10 @@ xfs_umount(xfs_mount_t *mp)
 {
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
-	int		s;
 	int		error = 0;
 
 	/* need to give up if vnodes are referenced */
-	s = XFS_MOUNT_ILOCK(mp);
+	XFS_MOUNT_ILOCK(mp);
 	for (ip = mp->m_inodes; ip && !error; ip = ip->i_mnext) {
 		vp = XFS_ITOV(ip);
 		if (vp->v_count != 0) {
@@ -345,7 +344,7 @@ xfs_umount(xfs_mount_t *mp)
 			error++;
 		}
 	}
-	XFS_MOUNT_IUNLOCK(mp, s);
+	XFS_MOUNT_IUNLOCK(mp);
 
 	if (error == 0)
 		error = xfs_unmountfs(mp, 0, NULL);
