@@ -10,6 +10,7 @@
 #include <sys/vnode.h>
 #include <sys/systm.h>
 #include <sys/dnlc.h>
+#include <sys/sysmacros.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -25,7 +26,6 @@
 */
 #else
 #include <sys/kmem.h>
-#include <sys/sysmacros.h>
 #endif
 #include <sys/mount.h>
 #include <sys/param.h>
@@ -686,6 +686,7 @@ STATIC void
 xfs_strategy(vnode_t	*vp,
 	     buf_t	*bp)
 {
+	bdstrat(bmajor(bp->b_edev), bp); 
 	return;
 }
 
