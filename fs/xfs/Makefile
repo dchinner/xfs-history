@@ -47,7 +47,7 @@ i386cmd:
 	done
 
 clean:
-	rm -rf RPMS SRPMS BUILD SOURCES/xfs-patch
+	rm -rf RPMS SRPMS BUILD SOURCES/linux-2.4.0-test5-xfs-alpha.patch
 
 realclean: clean
 	rm -rf linux-2.4.0
