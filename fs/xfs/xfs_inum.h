@@ -30,6 +30,8 @@ typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
 	 xfs_ino_mask(xfs_ino_agbno_bits(s)))
 #define	xfs_ino_to_offset(s,i)	\
 	((int)(i) & xfs_ino_mask(xfs_ino_offset_bits(s)))
+#define	xfs_ino_to_fsb(s,i)	\
+	xfs_agb_to_fsb(s, xfs_ino_to_agno(s,i), xfs_ino_to_agbno(s,i))
 
 #define	xfs_agino_to_ino(s,a,i)	\
 	(((xfs_ino_t)(a) << xfs_ino_agino_bits(s)) | (i))
