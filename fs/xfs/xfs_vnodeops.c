@@ -566,7 +566,10 @@ xfs_setattr(vnode_t	*vp,
                 if (vp->v_type == VDIR) {
                         code = XFS_ERROR(EISDIR);
                         goto error_return;
-                }
+                } else if (vp->v_type == VBLK || vp->v_type == VCHR) {
+			code = 0;
+			goto error_return;
+		}
 
                 /* XXX Check for write access to inode */
 
