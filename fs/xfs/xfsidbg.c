@@ -6212,9 +6212,8 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 	kdb_printf("data: 0x%p  &forcesema: 0x%p  next: 0x%p bp: 0x%p\n",
 		iclog->ic_datap, &iclog->ic_forcesema, iclog->ic_next,
 		iclog->ic_bp);
-	kdb_printf("log: 0x%p  callb: 0x%p  callb_tail: 0x%p  roundoff: %d\n",
-		iclog->ic_log, iclog->ic_callback, iclog->ic_callback_tail,
-		iclog->ic_roundoff);
+	kdb_printf("log: 0x%p  callb: 0x%p  callb_tail: 0x%p\n",
+		iclog->ic_log, iclog->ic_callback, iclog->ic_callback_tail);
 	kdb_printf("size: %d (OFFSET: %d) trace: 0x%p refcnt: %d bwritecnt: %d",
 		iclog->ic_size, iclog->ic_offset,
 #ifdef XFS_LOG_TRACE
@@ -6409,8 +6408,6 @@ xfsidbg_get_cstate(int state)
 static void
 xfsidbg_xlog(xlog_t *log)
 {
-	int rbytes;
-	int wbytes;
 	static char *t_flags[] = {
 		"CHKSUM_MISMATCH",	/* 0x01 */
 		"ACTIVE_RECOVERY",	/* 0x02 */
@@ -6428,8 +6425,8 @@ xfsidbg_xlog(xlog_t *log)
 	kdb_printf("&icloglock: 0x%p  tail_lsn: %s  last_sync_lsn: %s \n",
 		&log->l_icloglock, xfs_fmtlsn(&log->l_tail_lsn),
 		xfs_fmtlsn(&log->l_last_sync_lsn));
-	kdb_printf("mp: 0x%p  xbuf: 0x%p  roundoff: %d  l_covered_state: %s \n",
-		log->l_mp, log->l_xbuf, log->l_roundoff,
+	kdb_printf("mp: 0x%p  xbuf: 0x%p  l_covered_state: %s \n",
+		log->l_mp, log->l_xbuf,
 			xfsidbg_get_cstate(log->l_covered_state));
 	kdb_printf("flags: ");
 	printflags(log->l_flags, t_flags,"log");
@@ -6451,11 +6448,11 @@ xfsidbg_xlog(xlog_t *log)
 	kdb_printf("GResCycle: %d  GResBytes: %d  GWrCycle: %d  GWrBytes: %d\n",
 		log->l_grant_reserve_cycle, log->l_grant_reserve_bytes,
 		log->l_grant_write_cycle, log->l_grant_write_bytes);
-	rbytes = log->l_grant_reserve_bytes + log->l_roundoff;
-	wbytes = log->l_grant_write_bytes + log->l_roundoff;
 	qprintf("GResBlocks: %d GResRemain: %d  GWrBlocks: %d GWrRemain: %d\n",
-	       rbytes / BBSIZE, rbytes % BBSIZE,
-	       wbytes / BBSIZE, wbytes % BBSIZE);
+		(int)BTOBBT(log->l_grant_reserve_bytes),
+		log->l_grant_reserve_bytes % BBSIZE,
+		(int)BTOBBT(log->l_grant_write_bytes),
+		log->l_grant_write_bytes % BBSIZE);
 #ifdef XFS_LOG_TRACE
 	qprintf("trace: 0x%p  grant_trace: use xlog value\n", log->l_trace);
 #endif
