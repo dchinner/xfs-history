@@ -1,4 +1,4 @@
-#ident "$Revision: 1.233 $"
+#ident "$Revision: 1.234 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -6404,6 +6404,7 @@ struct vnodeops xfs_vnodeops = {
 	xfs_attr_set,	/* attr_set */
 	xfs_attr_remove,/* attr_remove */
 	xfs_attr_list,	/* attr_list */
+	fs_mount,
 };
 
 #endif	/* SIM */
