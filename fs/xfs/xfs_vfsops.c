@@ -107,6 +107,18 @@
 static char *whymount[] = { "initial mount", "remount", "unmount" };
 
 /*
+ * prototype for xlv_get_subcolumes: should go into an
+ * "XLV exported functions" file (maybe the one that lists ioctls).
+ */
+int
+xlv_get_subvolumes(
+	dev_t		 device,
+	dev_t		*ddev,
+	dev_t		*logdev,
+	dev_t		*rtdev
+);
+
+/*
  * Static function prototypes.
  */
 STATIC int
@@ -641,41 +653,15 @@ xfs_vfsmount(
 	if (error = spectodev(uap->spec, &device))
 		return error;
 	if (emajor(device) == XLV_MAJOR) {
-		/*
-		 * logical volume
-		 */
-		xlv_tab_subvol_t *xlv_p;
-		xlv_tab_subvol_t *sv_p;
-
-		/*
-		 * XXX This XLV section should be moved to a xlv function
-		 * that can be stub'ed when xlv does not exist.
-		 */
-		if ((xlv_tab == NULL) || (xlv_tab->num_subvols == 0) ||
-		    (minor(device) >= xlv_tab->max_subvols))
-			return XFS_ERROR(ENXIO);
-
-		XLV_IO_LOCK(minor(device), MR_ACCESS);
-		xlv_p = &xlv_tab->subvolume[minor(device)];
-		if (! XLV_SUBVOL_EXISTS(xlv_p)) {
-			XLV_IO_UNLOCK(minor(device));
+		/* logical volume */
+		if (xlv_get_subvolumes(device, &ddev, &logdev, &rtdev) != 0) {
 			return XFS_ERROR(ENXIO);
 		}
-		ddev   = (sv_p = xlv_p->vol_p->data_subvol) ? sv_p->dev : 0;
-		logdev = (sv_p = xlv_p->vol_p->log_subvol) ? sv_p->dev : 0;
-		rtdev  = (sv_p = xlv_p->vol_p->rt_subvol) ? sv_p->dev : 0;
-
-		if (!logdev) {
-			logdev = ddev;
-		}
-
-		ASSERT(ddev && logdev);
-		XLV_IO_UNLOCK(minor(device));
-
 	} else { /* block device */
 		ddev = logdev = device;
 		rtdev = 0;			/* no realtime */
 	}
+	ASSERT(ddev && logdev);
 
 	/*
 	 * Ensure that this device isn't already mounted,
@@ -882,36 +868,8 @@ xfs_mountroot(
 		/*
 		 * logical volume
 		 */
-		xlv_tab_subvol_t *xlv_p;
-		xlv_tab_subvol_t *sv_p;
-
-		/*
-		 * XXX This XLV section should be moved to a xlv function
-		 * that can be stub'ed when xlv does not exist.
-		 */
-		if (xlv_tab == NULL) {
-			cmn_err(CE_WARN, "logical volume info not present");
-			ddev = rootdev;
-			logdev = rtdev = 0;
-		} else {
-			XLV_IO_LOCK(minor(rootdev), MR_ACCESS);
-			xlv_p = &xlv_tab->subvolume[minor(rootdev)];
-			if (! XLV_SUBVOL_EXISTS(xlv_p)) {
-				XLV_IO_UNLOCK(minor(rootdev));
-				return XFS_ERROR(ENXIO);
-			}
-			ddev   = (sv_p = xlv_p->vol_p->data_subvol) ?
-				sv_p->dev : 0;
-			logdev = (sv_p = xlv_p->vol_p->log_subvol) ?
-				sv_p->dev : 0;
-			rtdev  = (sv_p = xlv_p->vol_p->rt_subvol) ?
-				sv_p->dev : 0;
-
-			if (!logdev) {
-				logdev = ddev;
-			}
-
-			XLV_IO_UNLOCK(minor(rootdev));
+		if (xlv_get_subvolumes(rootdev, &ddev, &logdev, &rtdev) != 0) {
+			return XFS_ERROR(ENXIO);
 		}
 	} else {
 		/*
