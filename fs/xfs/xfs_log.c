@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.154 $"
+#ident	"$Revision: 1.155 $"
 
 /*
  * High level interface routines for log manager
@@ -672,7 +672,8 @@ xfs_log_unmount(xfs_mount_t *mp)
 		spl = LOG_LOCK(log);
 
 		if ( ! (   iclog->ic_state == XLOG_STATE_ACTIVE
-		        || iclog->ic_state == XLOG_STATE_DIRTY) ) {
+		        || iclog->ic_state == XLOG_STATE_DIRTY
+			|| iclog->ic_state == XLOG_STATE_IOERROR) ) {
 
 				sv_wait(&iclog->ic_forcesema, PMEM, 
 					&log->l_icloglock, spl);
