@@ -956,7 +956,8 @@ xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
 	nmap = 1;
 	(void)xfs_bmapi(trans, dp, bno, 1, 0, NULLFSBLOCK, 0, &map, &nmap, 0);
 	ASSERT(nmap == 1);
-	ASSERT(map.br_startblock != NULLSTARTBLOCK);
+	ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
+	       (map.br_startblock != HOLESTARTBLOCK));
 	return(xfs_btree_get_bufl(dp->i_mount, trans, map.br_startblock, 0));
 }
 
@@ -969,6 +970,7 @@ xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
 	nmap = 1;
 	(void)xfs_bmapi(trans, dp, bno, 1, 0, NULLFSBLOCK, 0, &map, &nmap, 0);
 	ASSERT(nmap == 1);
-	ASSERT(map.br_startblock != NULLSTARTBLOCK);
+	ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
+	       (map.br_startblock != HOLESTARTBLOCK));
 	return(xfs_btree_read_bufl(dp->i_mount, trans, map.br_startblock, 0));
 }
