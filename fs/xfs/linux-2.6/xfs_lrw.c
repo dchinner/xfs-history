@@ -1348,7 +1348,6 @@ xfs_iomap_write(
 
 out:
 	XFS_IUNLOCK(io->io_mount, io, XFS_ILOCK_EXCL);
-	XFS_INODE_CLEAR_READ_AHEAD(io);
 	return XFS_ERROR(error);
 }
 
