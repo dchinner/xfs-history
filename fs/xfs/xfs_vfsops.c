@@ -356,25 +356,25 @@ xfs_init(int	fstype)
 	 * Allocate global trace buffers.
 	 */
 #ifdef XFS_ALLOC_TRACE
-	xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE, 0);
+	xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_BMAP_TRACE
-	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE, 0);
+	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_BMBT_TRACE
-	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, 0);
+	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_STRAT_TRACE
-	xfs_strat_trace_buf = ktrace_alloc(XFS_STRAT_GTRACE_SIZE, 0);
+	xfs_strat_trace_buf = ktrace_alloc(XFS_STRAT_GTRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_DIR_TRACE
-	xfs_dir_trace_buf = ktrace_alloc(XFS_DIR_TRACE_SIZE, 0);
+	xfs_dir_trace_buf = ktrace_alloc(XFS_DIR_TRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_ATTR_TRACE
-	xfs_attr_trace_buf = ktrace_alloc(XFS_ATTR_TRACE_SIZE, 0);
+	xfs_attr_trace_buf = ktrace_alloc(XFS_ATTR_TRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_DIR2_TRACE
-	xfs_dir2_trace_buf = ktrace_alloc(XFS_DIR2_GTRACE_SIZE, 0);
+	xfs_dir2_trace_buf = ktrace_alloc(XFS_DIR2_GTRACE_SIZE, KM_SLEEP);
 #endif
 
 	xfs_dir_startup();
@@ -424,6 +424,9 @@ extern int	kmem_cache_destroy(zone_t *);
 void
 xfs_cleanup(void)
 {
+#if !CONFIG_PAGE_BUF_META
+	extern zone_t	*buf_zone;
+#endif
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
 	extern zone_t	*xfs_inode_zone;
@@ -436,6 +439,9 @@ xfs_cleanup(void)
 	extern zone_t	*xfs_buf_item_zone;
 	extern zone_t	*xfs_chashlist_zone;
 
+#if !CONFIG_PAGE_BUF_META
+	kmem_cache_destroy(buf_zone);
+#endif
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
 	kmem_cache_destroy(xfs_inode_zone);
@@ -479,7 +485,7 @@ xfs_cmountfs(
 	extern void linvfs_release_inode(struct inode *);
 
 	/*
-	 * The new use of remout to update various cxfs parameters
+	 * The new use of remount to update various cxfs parameters
 	 * should of already been picked of before this.  If anything
          * has gotten by, it shouldn't have.
 	 */
@@ -1293,6 +1299,7 @@ out:
 		vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 		xfs_unmountfs(mp, vfs_flags, credp);
 	}
+
 	return XFS_ERROR(error);
 
 }
@@ -1325,6 +1332,7 @@ xfs_unmount_flush(
 		xfs_iflock(rbmip);
 		error = xfs_iflush(rbmip, XFS_IFLUSH_SYNC);
 		xfs_iunlock(rbmip, XFS_ILOCK_EXCL);
+
 		if (error == EFSCORRUPTED)
 			goto fscorrupt_out;
 		ASSERT(XFS_ITOV(rbmip)->v_count == 1);
@@ -1334,6 +1342,7 @@ xfs_unmount_flush(
 		xfs_iflock(rsumip);
 		error = xfs_iflush(rsumip, XFS_IFLUSH_SYNC);
 		xfs_iunlock(rsumip, XFS_ILOCK_EXCL);
+
 		if (error == EFSCORRUPTED)
 			goto fscorrupt_out;
 		ASSERT(XFS_ITOV(rsumip)->v_count == 1);
@@ -1343,6 +1352,7 @@ xfs_unmount_flush(
 	 * synchronously flush root inode to disk
 	 */
 	error = xfs_iflush(rip, XFS_IFLUSH_SYNC);
+
 	if (error == EFSCORRUPTED)
 		goto fscorrupt_out2;
 	if (rvp->v_count != 1 && !relocation) {
@@ -1393,8 +1403,11 @@ xfs_root(
 	vnode_t	*vp;
 
 	vp = XFS_ITOV((XFS_BHVTOM(bdp))->m_rootip);	
+
 	VN_HOLD(vp);
+
 	*vpp = vp;
+
 	return 0;
 }
 

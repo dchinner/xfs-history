@@ -203,7 +203,7 @@ void
 xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
 {
 	if (! log->l_grant_trace)
-		log->l_grant_trace = ktrace_alloc(1024, 0);
+		log->l_grant_trace = ktrace_alloc(1024, KM_SLEEP);
 
 	ktrace_enter(log->l_grant_trace,
 		     (void *)tic,
@@ -228,7 +228,7 @@ void
 xlog_trace_tic(xlog_t *log, xlog_ticket_t *tic)
 {
 	if (! log->l_trace)
-		log->l_trace = ktrace_alloc(256, 0);
+		log->l_trace = ktrace_alloc(256, KM_SLEEP);
 
 	ktrace_enter(log->l_trace,
 		     (void *)tic,
@@ -257,7 +257,7 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 	pid = current_pid();
 
 	if (!iclog->ic_trace)
-		iclog->ic_trace = ktrace_alloc(256, 0);
+		iclog->ic_trace = ktrace_alloc(256, KM_SLEEP);
 	ktrace_enter(iclog->ic_trace,
 		     (void *)((unsigned long)state),
 		     (void *)((unsigned long)pid),

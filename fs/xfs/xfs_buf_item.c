@@ -688,7 +688,7 @@ xfs_buf_item_init(
 	bip->bli_format.blf_len = (ushort)BTOBB(XFS_BUF_COUNT(bp));
 	bip->bli_format.blf_map_size = map_size;
 #ifdef XFS_BLI_TRACE
-	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, 0);
+	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, KM_SLEEP);
 #endif
 
 #ifdef XFS_TRANS_DEBUG

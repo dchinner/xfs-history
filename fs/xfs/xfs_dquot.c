@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.45 $"
+#ident "$Revision: 1.46 $"
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/ksa.h>
@@ -150,7 +150,7 @@ xfs_qm_dqinit(
 		sv_init(&dqp->q_pinwait, SV_DEFAULT, "pdq");
 
 #ifdef DQUOT_TRACING
-		dqp->q_trace = ktrace_alloc(DQUOT_TRACE_SIZE, 0);
+		dqp->q_trace = ktrace_alloc(DQUOT_TRACE_SIZE, KM_SLEEP);
 		xfs_dqtrace_entry(dqp, "DQINIT");
 #endif	
 	} else {

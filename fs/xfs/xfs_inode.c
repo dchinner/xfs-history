@@ -906,22 +906,22 @@ xfs_iread(
 	 */
 #ifndef SIM
 #ifdef XFS_BMAP_TRACE
-	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE, 0);
+	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_BMBT_TRACE
-	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE, 0);
+	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_RW_TRACE
-	ip->i_rwtrace = ktrace_alloc(XFS_RW_KTRACE_SIZE, 0);
+	ip->i_rwtrace = ktrace_alloc(XFS_RW_KTRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_STRAT_TRACE
-	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, 0);
+	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_ILOCK_TRACE
-	ip->i_lock_trace = ktrace_alloc(XFS_ILOCK_KTRACE_SIZE, 0);
+	ip->i_lock_trace = ktrace_alloc(XFS_ILOCK_KTRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_DIR2_TRACE
-	ip->i_dir_trace = ktrace_alloc(XFS_DIR2_KTRACE_SIZE, 0);
+	ip->i_dir_trace = ktrace_alloc(XFS_DIR2_KTRACE_SIZE, KM_SLEEP);
 #endif
 #endif /* !SIM */
 

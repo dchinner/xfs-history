@@ -32,10 +32,11 @@
 
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <linux/kernel.h>
 /*
  * Mandatory Access Control stubs.
  */
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #ifdef DEBUG
 #define DOPANIC(s) panic(s)
