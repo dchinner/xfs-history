@@ -1697,7 +1697,7 @@ xfs_iomap_write_convert(
 			if (offset_fsb >= imap[i].br_startoff && 
 				(offset_fsb < (imap[i].br_startoff + imap[i].br_blockcount))) {
 				XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_WR);
-				maps = min(nimaps - i, *npbmaps);
+				maps = min(nimaps, *npbmaps);
 				*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[i],
 					pbmapp, maps, *npbmaps);
 				XFS_STATS_INC(xs_xstrat_quick);
