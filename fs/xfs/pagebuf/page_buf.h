@@ -207,7 +207,7 @@ typedef struct page_buf_s {
 	size_t			pb_buffer_length; /* size of buffer in bytes */
 	size_t			pb_count_desired; /* desired transfer size */
 	void			*pb_addr;	/* virtual address of buffer */
-	struct tq_struct	pb_iodone_sched;
+	struct list_head	pb_iodone_queue;
 	atomic_t		pb_io_remaining;/* #outstanding I/O requests */
 	page_buf_iodone_t	pb_iodone;	/* I/O completion function */
 	page_buf_relse_t	pb_relse;	/* releasing function */
