@@ -9,7 +9,9 @@
 EXTRA_CFLAGS += -I.. -I.
 O_TARGET := xfs.o
 LINO_OBJS   := linux/xfs_file.o  linux/xfs_super.o \
- linux/xfs_vnode.o linux/xfs_behavior.o linux/xfs_vfs.o  linux/xfs_random.o  
+ linux/xfs_vnode.o linux/xfs_behavior.o linux/xfs_vfs.o  linux/xfs_random.o \
+ linux/xfs_locks.o linux/xfs_globals.o linux/xfs_debug.o linux/xfs_uuid.o
+
 # xfs_linux_ops_inode.o
 # fs_bio.o
 M_OBJS   := $(O_TARGET)
@@ -58,7 +60,8 @@ XFS_OBJS  :=   xfs_alloc.o \
                 xfs_trans_item.o \
                 xfs_utils.o \
                 xfs_vfsops.o \
-                xfs_vnodeops.o 
+                xfs_vnodeops.o \
+		xfsquotasstubs.o
 #               xfs_rw.o 
 #                xfs_rpc_item.o
  
