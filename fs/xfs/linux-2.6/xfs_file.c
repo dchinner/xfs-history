@@ -120,7 +120,7 @@ linvfs_open(
 		return -EFBIG;
 
 	ASSERT(vp);
-	VOP_OPEN(vp, &newvp, 0, get_current_cred(), error);
+	VOP_OPEN(vp, &newvp, 0, NULL, error);
 	return -error;
 }
 
@@ -155,8 +155,7 @@ linvfs_fsync(
 
 	ASSERT(vp);
 
-	VOP_FSYNC(vp, flags, get_current_cred(),
-		(off_t)0, (off_t)-1, error);
+	VOP_FSYNC(vp, flags, NULL, (off_t)0, (off_t)-1, error);
 
 	return -error;
 }

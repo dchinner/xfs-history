@@ -369,7 +369,7 @@ vn_rele(struct vnode *vp)
 		 * are no behaviors attached to the vnode to call.
 		 */
 		if (vp->v_fbhv != NULL) {
-			VOP_INACTIVE(vp, get_current_cred(), cache);
+			VOP_INACTIVE(vp, NULL, cache);
 		}
 
 		VN_LOCK(vp);

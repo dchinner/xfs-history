@@ -420,8 +420,7 @@ xfs_fssetdm_by_handle(
 	}
 
 	bdp = bhv_base_unlocked(VN_BHV_HEAD(vp));
-	error = xfs_set_dmattrs(bdp, fsd.fsd_dmevmask, fsd.fsd_dmstate,
-				get_current_cred());
+	error = xfs_set_dmattrs(bdp, fsd.fsd_dmevmask, fsd.fsd_dmstate, NULL);
 
 	VN_RELE(vp);
 	if (error)

@@ -63,7 +63,6 @@ typedef struct cred {
 #define MACREAD		00400
 
 extern void cred_init(void);
-static __inline cred_t *get_current_cred(void) { return NULL; }
 /*
  * XXX: tes
  * This is a hack.
