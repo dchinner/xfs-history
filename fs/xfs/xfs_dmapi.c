@@ -451,7 +451,7 @@ xfs_dm_bulkstat_one(
 	 * Make the handle and the link to the next dm_stat buffer
 	 */
 	dm_vp_to_handle(XFS_ITOV(ip), &handle);
-	bcopy(&handle, buf+1, sizeof(handle));	/* handle follows stat struct */
+	memcpy(buf+1, &handle, sizeof(handle));	/* handle follows stat struct */
 
 	buf->dt_handle.vd_offset = (ssize_t) sizeof(dm_stat_t);
 	buf->dt_handle.vd_length = (size_t) XFS_HSIZE(handle);
@@ -467,7 +467,7 @@ xfs_dm_bulkstat_one(
 	/*
 	 * This is unused in bulkstat - so we zero it out.
 	 */
-	bzero((void *) &buf->dt_compname, sizeof(dm_vardata_t));
+	memset((void *) &buf->dt_compname, 0, sizeof(dm_vardata_t));
 
 	xfs_iput(ip, XFS_ILOCK_SHARED);
 
@@ -583,7 +583,7 @@ xfs_dirents_to_stats(
 		 * Directory entry name is guaranteed to be
 		 * null terminated; the copy gets the '\0' too.
 		 */
-		bcopy(p->d_name, (char *) statp + statp->_link, namelen);
+		memcpy((char *) statp + statp->_link, p->d_name, namelen);
 
 		/* Word-align the record */
 		statp->_link = (statp->_link + namelen + (DM_STAT_ALIGN - 1))
@@ -1416,7 +1416,7 @@ xfs_dm_get_destroy_dmattr(
 			printk("%s/%d: kmalloc returned NULL\n", __FUNCTION__, __LINE__);
 			return(ENOMEM);
 		}
-		bcopy(buffer, value, value_len);
+		memcpy(value, buffer, value_len);
 	} else if (value_len > DM_MAX_ATTR_BYTES_ON_DESTROY) {
 		int	value_len2 = DM_MAX_ATTR_BYTES_ON_DESTROY;
 		char	*value2;
@@ -1427,7 +1427,7 @@ xfs_dm_get_destroy_dmattr(
 			kfree(value);
 			return(ENOMEM);
 		}
-		bcopy(value, value2, value_len2);
+		memcpy(value2, value, value_len2);
 		kfree(value);
 		value = value2;
 		value_len = value_len2;
@@ -1777,7 +1777,7 @@ xfs_dm_get_region(
 	   covers the entire file, i.e. set rg_offset and rg_size to zero.
 	*/
 
-	bzero((char *)&region, sizeof(region));
+	memset((char *)&region, 0, sizeof(region));
 
 	if (evmask & (1 << DM_EVENT_READ))
 		region.rg_flags |= DM_REGION_READ;
@@ -1836,7 +1836,7 @@ xfs_dm_getall_dmattr(
 
 	/* Initialize all the structures and variables for the main loop. */
 
-	bzero(&cursor, sizeof(cursor));
+	memset(&cursor, 0, sizeof(cursor));
 	attrlist = (attrlist_t *)kmem_alloc(list_size, KM_SLEEP);
 	total_size = 0;
 	ulist = (dm_attrlist_t *)bufp;
