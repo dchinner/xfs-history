@@ -1897,6 +1897,10 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 	iovec_t		*iovp;
 
 	target_abi = GETDENTS_ABI(u.u_procp->p_abi, uio);
+#if XFS_BIG_FILESYSTEMS
+	if (mp->m_flags & XFS_MOUNT_INO64)
+		ino += XFS_INO64_OFFSET;
+#endif
 	switch(target_abi) {
 	case ABI_IRIX5_64:
 	   {

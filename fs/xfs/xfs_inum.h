@@ -124,6 +124,7 @@ xfs_agino_t xfs_offbno_to_agino(struct xfs_mount *mp, xfs_agblock_t b, int o);
 
 #if XFS_BIG_FILESYSTEMS
 #define	XFS_MAXINUMBER	((xfs_ino_t)((1ULL << 56) - 1ULL))
+#define	XFS_INO64_OFFSET	((xfs_ino_t)(1ULL << 32))
 #else
 #define	XFS_MAXINUMBER	((xfs_ino_t)((1ULL << 32) - 1ULL))
 #endif

@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.59 $"
-#ident	"$Revision: 1.59 $"
+#ident	"$Revision: 1.60 $"
+#ident	"$Revision: 1.60 $"
 
 struct buf;
 struct cred;
@@ -108,6 +108,9 @@ typedef struct xfs_mount {
  * Flags for m_flags.
  */
 #define	XFS_MOUNT_WSYNC	0x00000001
+#if XFS_BIG_FILESYSTEMS
+#define	XFS_MOUNT_INO64	0x00000002
+#endif
 
 /*
  * Default minimum read and write sizes.

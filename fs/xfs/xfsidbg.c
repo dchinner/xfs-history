@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2780,6 +2780,7 @@ idbg_xmount(xfs_mount_t *mp)
 {
 	static char *xmount_flags[] = {
 		"wsync",	/* 0x1 */
+		"ino64",	/* 0x2 */
 		0
 		};
 
