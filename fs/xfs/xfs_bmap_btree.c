@@ -169,7 +169,6 @@ xfs_bmbt_delrec(
 	xfs_bmbt_ptr_t		*cpp;
 	int			first;
 	int			i;
-	xfs_inode_t		*ip;
 	xfs_bmbt_key_t		key;
 	xfs_bmbt_key_t		*kp;
 	int			last;
@@ -238,11 +237,15 @@ xfs_bmbt_delrec(
 	if (level > 0)
 		xfs_bmbt_decrement(cur, level);
 	/*
-	 * We're at the root level.  Try to get rid of the next level down.
+	 * We're at the root level.
+	 * First, shrink the root block in-memory.
+	 * Try to get rid of the next level down.
 	 * If we can't then there's nothing left to do.
 	 */
-	if (level == cur->bc_nlevels - 1)
+	if (level == cur->bc_nlevels - 1) {
+		xfs_iroot_realloc(cur->bc_private.b.ip, -1);
 		return xfs_bmbt_killroot(cur);
+	}
 	if (ptr == 1)
 		xfs_bmbt_updkey(cur, kp, level + 1);
 	xfs_bmbt_rcheck(cur);
@@ -424,6 +427,7 @@ xfs_bmbt_insrec(
 	int			ptr;
 	xfs_bmbt_rec_t		*rp;
 	xfs_trans_t		*tp;
+	xfs_alloctype_t		type;
 
 	ASSERT(level < cur->bc_nlevels);
 	xfs_bmbt_rcheck(cur);
@@ -459,9 +463,15 @@ xfs_bmbt_insrec(
 			/*
 			 * Copy the root into a real block.
 			 */
+			pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 			askbno = cur->bc_private.b.firstblock;
-			ASSERT(askbno != NULLFSBLOCK);
-			cbno = xfs_alloc_extent(tp, askbno, 1, XFS_ALLOCTYPE_START_BNO, 0, 0);
+			if (askbno == NULLFSBLOCK) {
+				xfs_btree_check_lptr(cur, *pp, level);
+				askbno = *pp;
+				type = XFS_ALLOCTYPE_START_BNO;
+			} else
+				type = XFS_ALLOCTYPE_NEAR_BNO;
+			cbno = xfs_alloc_extent(tp, askbno, 1, type, 0, 0);
 			if (cbno == NULLFSBLOCK)
 				return 0;
 			cur->bc_private.b.allocated++;
@@ -476,7 +486,6 @@ xfs_bmbt_insrec(
 			kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 			ckp = XFS_BMAP_KEY_IADDR(cblock, 1, cur);
 			bcopy(kp, ckp, cblock->bb_numrecs * (int)sizeof(*kp));
-			pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 			cpp = XFS_BMAP_PTR_IADDR(cblock, 1, cur);
 #ifdef DEBUG
 			for (i = 0; i < cblock->bb_numrecs; i++)
@@ -652,6 +661,8 @@ xfs_bmbt_killroot(
 	ASSERT(cblock->bb_leftsib == NULLDFSBNO);
 	ASSERT(cblock->bb_rightsib == NULLDFSBNO);
 	ip = cur->bc_private.b.ip;
+	ASSERT(XFS_BMAP_BLOCK_IMAXRECS(level, cur) ==
+	       XFS_BMAP_BROOT_MAXRECS(ip->i_broot_bytes));
 	i = (int)(cblock->bb_numrecs - XFS_BMAP_BLOCK_IMAXRECS(level, cur));
 	if (i) {
 		xfs_iroot_realloc(ip, i);
@@ -1168,6 +1179,7 @@ xfs_bmbt_split(
 	buf_t			*rrbuf;
 	xfs_bmbt_rec_t		*rrp;
 	xfs_trans_t		*tp;
+	xfs_alloctype_t		type;
 
 	xfs_bmbt_rcheck(cur);
 	tp = cur->bc_tp;
@@ -1177,8 +1189,12 @@ xfs_bmbt_split(
 	lbno = XFS_DADDR_TO_FSB(mp, lbuf->b_blkno);
 	left = XFS_BUF_TO_BMBT_BLOCK(lbuf);
 	bno = cur->bc_private.b.firstblock;
-	ASSERT(bno != NULLFSBLOCK);
-	rbno = xfs_alloc_extent(tp, bno, 1, XFS_ALLOCTYPE_START_BNO, 0, 0);
+	if ((bno = cur->bc_private.b.firstblock) == NULLFSBLOCK) {
+		bno = lbno;
+		type = XFS_ALLOCTYPE_START_BNO;
+	} else
+		type = XFS_ALLOCTYPE_NEAR_BNO;
+	rbno = xfs_alloc_extent(tp, bno, 1, type, 0, 0);
 	if (rbno == NULLFSBLOCK)
 		return 0;
 	cur->bc_private.b.allocated++;

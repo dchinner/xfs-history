@@ -1820,7 +1820,7 @@ xfs_remove(vnode_t	*dir_vp,
 	release_res = B_TRUE;
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, 0);
-        if (error = xfs_trans_reserve (tp, 0, XFS_REMOVE_LOG_RES(mp), 0,
+        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(mp), 0,
 				       XFS_TRANS_PERM_LOG_RES)) 
                 goto error_return;
 
