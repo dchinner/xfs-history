@@ -3,8 +3,6 @@
 
 #ident	"$Revision$"
 
-#include <sys/types.h>
-
 #define	XFS_INODE_LOWBITS	32
 #define	XFS_INODE_HIGHBITS	32
 

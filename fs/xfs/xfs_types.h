@@ -3,8 +3,6 @@
 
 #ident	"$Revision: 1.3 $"
 
-#include <sys/types.h>
-
 /*
  * xFS types
  */

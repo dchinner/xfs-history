@@ -2,8 +2,6 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#include "xfs_inum.h"
-
 struct xfs_item_ops;
 struct xfs_log_item_desc;
 struct xfs_mount;

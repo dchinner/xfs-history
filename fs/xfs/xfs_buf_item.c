@@ -9,15 +9,17 @@
 
 #include <sys/param.h>
 #define _KERNEL
-#include <sys/sema.h>
 #include <sys/buf.h>
 #undef _KERNEL
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include "xfs_types.h"
+#include "xfs_inum.h"
 #include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
+#include "xfs_sb.h"
 #include "xfs_mount.h"
 #ifdef SIM
 #include <bstring.h>

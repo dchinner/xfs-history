@@ -1,12 +1,14 @@
 
 #include <sys/param.h>
-#include <sys/sema.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include "xfs_types.h"
+#include "xfs_inum.h"
 #include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_trans_priv.h"
+#include "xfs_sb.h"
 #include "xfs_mount.h"
 
 #ifdef SIM

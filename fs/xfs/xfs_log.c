@@ -1,8 +1,8 @@
 
 #include <sys/types.h>
-#include <sys/sema.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
+#include "xfs_inum.h"
 #include "xfs.h"
 #include "xfs_trans.h"
 

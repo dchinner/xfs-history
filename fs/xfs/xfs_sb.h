@@ -3,10 +3,6 @@
 
 #ident	"$Revision: 1.3 $"
 
-#include <sys/param.h>
-#include "xfs_types.h"
-#include "xfs_inum.h"
-
 /*
  * Super block
  */

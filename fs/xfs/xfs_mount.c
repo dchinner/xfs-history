@@ -1,14 +1,19 @@
 #ident	"$Revision$"
 
-#include <sys/types.h>
+#include <sys/param.h>
 #define _KERNEL
 #include <sys/buf.h>
 #undef _KERNEL
+#include <sys/vnode.h>
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs.h"
+#include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_mount.h"
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
-#include "xfs_mount.h"
 
 #ifdef SIM
 #include "sim.h"

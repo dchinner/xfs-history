@@ -1,20 +1,26 @@
 
 #include <sys/param.h>
 #define _KERNEL
-#include <sys/sema.h>
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
 #undef _KERNEL
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include "xfs_types.h"
+#include "xfs_inum.h"
 #include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_trans_priv.h"
-#include "xfs_inode.h"
 #include "xfs_bio.h"
 #include "xfs_log.h"
+#include "xfs_sb.h"
+#include "xfs_ag.h"
 #include "xfs_mount.h"
+#include "xfs_btree.h"
+#include "xfs_bmap.h"
+#include "xfs_dinode.h"
+#include "xfs_inode.h"
 
 #ifdef SIM
 #include "sim.h"
