@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -77,9 +77,6 @@
    flush lock - ditto. 
 */
 
-int xfs_quotadebug = 0;
-int dquot_do_trace = 0;
-
 STATIC int		xfs_qm_dqlookup(xfs_mount_t *, xfs_dqid_t,
 					xfs_dqhash_t *,	xfs_dquot_t **);
 STATIC int		xfs_qm_idtodq(xfs_mount_t *, xfs_dqid_t,
@@ -130,10 +127,8 @@ xfs_qm_dqinit(
 		sv_init(&dqp->q_pinwait, SV_DEFAULT, "pdq");
 
 #ifdef DQUOT_TRACING
-		if (dquot_do_trace) {
-			dqp->q_trace = ktrace_alloc(DQUOT_TRACE_SIZE, 0);
-			xfs_dqtrace_entry(dqp, "DQINIT");
-		}
+		dqp->q_trace = ktrace_alloc(DQUOT_TRACE_SIZE, 0);
+		xfs_dqtrace_entry(dqp, "DQINIT");
 #endif	
 	} else {
 		/*
@@ -182,6 +177,7 @@ xfs_qm_dqdestroy(
 #ifdef DQUOT_TRACING
 	if (dqp->q_trace)
 	     ktrace_free(dqp->q_trace);
+	dqp->q_trace = NULL;
 #endif
 	kmem_zone_free(G_xqm->qm_dqzone, dqp);
 	atomicAddUint(&G_xqm->qm_totaldquots, -1);
@@ -208,16 +204,16 @@ xfs_qm_dqinit_core(
 /*
  * Dquot tracing for debugging.
  */
+/* ARGSUSED */
 void
 xfs_dqtrace_entry(
 	xfs_dquot_t *dqp, 
 	char *func)
 {
+#if 0
 	extern time_t	time;
 
-        if (!dquot_do_trace)
-                return;
-
+	ASSERT(dqp->q_trace);
         ktrace_enter(dqp->q_trace, 
 		     (void *)(__psint_t)DQUOT_KTRACE_ENTRY, 
 		     (void *)func,
@@ -234,6 +230,7 @@ xfs_dqtrace_entry(
 		     (void *)(__psint_t)curprocp->p_pid,
 		     (void *)(__psint_t)time,
 		     0, 0);
+#endif
 	return;
 }
 #endif
@@ -266,9 +263,17 @@ xfs_qm_adjust_dqtimers(
 	if (d->d_id == 0)
 		return;
 
+#ifdef QUOTADEBUG
+	if (d->d_blk_hardlimit)
+		ASSERT(d->d_blk_softlimit <= d->d_blk_hardlimit);
+	if (d->d_ino_hardlimit)
+		ASSERT(d->d_ino_softlimit <= d->d_ino_hardlimit);
+#endif
 	if (d->d_btimer == 0) {
-		if (d->d_blk_softlimit &&
-		    (d->d_bcount >= d->d_blk_softlimit)) {
+		if ((d->d_blk_softlimit &&
+		    (d->d_bcount >= d->d_blk_softlimit)) ||
+		    (d->d_blk_hardlimit &&
+		    (d->d_bcount >= d->d_blk_hardlimit))) {
 #ifdef QUOTADEBUG
 		printf("----@@ starting btimer: %llu >= %llu \n",
 			       d->d_bcount, d->d_blk_softlimit);
@@ -276,8 +281,10 @@ xfs_qm_adjust_dqtimers(
 			d->d_btimer = time + mp->QI_BTIMELIMIT;
 		}
 	} else {
-		if (d->d_blk_softlimit == 0 ||	
-		    (d->d_bcount < d->d_blk_softlimit)) {
+		if ((d->d_blk_softlimit == 0 ||	
+		    (d->d_bcount < d->d_blk_softlimit)) &&
+		    (d->d_blk_hardlimit == 0 ||	
+		    (d->d_bcount < d->d_blk_hardlimit))) {
 #ifdef QUOTADEBUG
 			printf("----@@ stopping btimer: %llu < %llu\n",
 			        d->d_bcount, d->d_blk_softlimit);
@@ -287,8 +294,10 @@ xfs_qm_adjust_dqtimers(
 	}
 
 	if (d->d_itimer == 0) {
-		if (d->d_ino_softlimit > 0 &&
-		    (d->d_icount >= d->d_ino_softlimit)) {
+		if ((d->d_ino_softlimit &&
+		    (d->d_icount >= d->d_ino_softlimit)) ||
+		    (d->d_ino_hardlimit &&
+		    (d->d_icount >= d->d_ino_hardlimit))) {
 #ifdef QUOTADEBUG
 			printf("----@@ starting itimer: %llu >= %llu\n",
 			       d->d_icount, d->d_ino_softlimit);
@@ -296,8 +305,10 @@ xfs_qm_adjust_dqtimers(
 			d->d_itimer = time + mp->QI_ITIMELIMIT;
 		}
 	} else {
-		if ((d->d_ino_softlimit == 0) ||
-		    (d->d_icount < d->d_ino_softlimit)) {
+		if ((d->d_ino_softlimit == 0 ||
+		    (d->d_icount < d->d_ino_softlimit))  &&
+		    (d->d_ino_hardlimit == 0 ||	
+		    (d->d_icount < d->d_ino_hardlimit))) {
 #ifdef QUOTADEBUG
 			printf("----@@ stopping itimer: %llu < %llu\n",
 			       d->d_icount, d->d_ino_softlimit);
@@ -936,7 +947,9 @@ xfs_qm_dqget(
 	 * The chain is kept locked during lookup.
 	 */
 	if (xfs_qm_dqlookup(mp, id, h, O_dqpp) == 0) {
+#ifndef _BANYAN_XFS
 		XFSSTATS.xs_qm_dqcachehits++;
+#endif
 		/* 
 		 * The dquot was found, moved to the front of the chain, 
 		 * taken off the freelist if it was on it, and locked
@@ -948,7 +961,9 @@ xfs_qm_dqget(
 		xfs_dqtrace_entry(*O_dqpp, "DQGET DONE (FROM CACHE)"); 
 		return (0);	/* success */
 	}
+#ifndef _BANYAN_XFS
 	 XFSSTATS.xs_qm_dqcachemisses++;
+#endif
 
 	/* 
 	 * Dquot cache miss. We don't want to keep the inode lock across 
@@ -1045,7 +1060,9 @@ xfs_qm_dqget(
 			xfs_qm_dqput(tmpdqp);
 			XFS_DQ_HASH_UNLOCK(h);
 			xfs_qm_dqdestroy(dqp);
+#ifndef _BANYAN_XFS
 			XFSSTATS.xs_qm_dquot_dups++; 
+#endif
 			goto again;
 		}
 	}
@@ -1440,32 +1457,6 @@ xfs_qm_dqid(
 	return (dqp->q_core.d_id);
 }
 
-/*
- * Given a dquot, dqput the proj dquot (if any) attached to it.
- */
-void
-xfs_qm_dettach_pdquot(
-	xfs_dquot_t	*dqp)
-{
-	xfs_dquot_t 	*pdqp;
-
-	xfs_dqlock(dqp);	
-	if (pdqp = dqp->q_pdquot) {
-		xfs_dqlock(pdqp);
-		dqp->q_pdquot = NULL;
-	}
-	xfs_dqunlock(dqp);
-	if (pdqp) {
-#ifdef QUOTADEBUG
-		printf("mplist PROJ RELE: dquot id = \'%d\' (%s), "
-		       "nrefs %d\n", 
-		       (int)dqp->q_core.d_id,  
-		       DQFLAGTO_TYPESTR(dqp),
-		       (int)dqp->q_nrefs);
-#endif
-		xfs_qm_dqput(pdqp);
-	}
-}
 
 /*
  * Take a dquot out of the mount's dqlist as well as the hashlist.
@@ -1475,8 +1466,7 @@ xfs_qm_dettach_pdquot(
  */
 xfs_dquot_t *
 xfs_qm_dqpurge(
-	xfs_dquot_t	*dqp,
-	uint		flags)
+	xfs_dquot_t	*dqp)
 {
 	xfs_dquot_t 	*nextdqp;
 	xfs_dqhash_t	*thishash;
@@ -1496,7 +1486,8 @@ xfs_qm_dqpurge(
 	 * quotaoff code, and didn't let the mountlock go.
 	 */
 	ASSERT(dqp->q_nrefs == 0);
-	
+	ASSERT(XFS_DQ_IS_ON_FREELIST(dqp));
+
 	/*
 	 * If we're turning off quotas, we have to make sure that, for
 	 * example, we don't delete quota disk blocks while dquots are
@@ -1514,12 +1505,11 @@ xfs_qm_dqpurge(
 	}
 
 	/*
-	 * If we're turning this type of quotas off, we don't care
+	 * XXXIf we're turning this type of quotas off, we don't care
 	 * about the dirty metadata sitting in this dquot. OTOH, if 
 	 * we're unmounting, we do care, so we flush it and wait.
 	 */
-	if (XFS_DQ_IS_DIRTY(dqp) &&
-	    ((flags & XFS_QMOPT_QUOTAOFF) == 0)) {
+	if (XFS_DQ_IS_DIRTY(dqp)) {
 		xfs_dqtrace_entry(dqp, "DQPURGE ->DQFLUSH: DQDIRTY");
 		/* dqflush unlocks dqflock */	
 		/*
@@ -1530,7 +1520,13 @@ xfs_qm_dqpurge(
 		(void) xfs_qm_dqflush(dqp, XFS_QMOPT_SYNC);
 		xfs_dqflock(dqp); 
 	}
-	
+	ASSERT(dqp->q_pincount == 0);
+	ASSERT(! (dqp->q_logitem.qli_item.li_flags & XFS_LI_IN_AIL));
+
+
+
+#if 0
+	/* THis shouldn't happen anymore... */
 	/*
 	 * If this is pinned, then wait until the log write completes
 	 * and it gets unpinned. We don't want the IOP_UNPIN code find
@@ -1563,6 +1559,10 @@ xfs_qm_dqpurge(
 		printf("DQPURGEALL: DELETE AIL 0x%x\n", dqp);
 #endif
 	}
+#endif
+
+
+
 	nextdqp = dqp->MPL_NEXT;	
 	thishash = dqp->q_hash;
 	XQM_HASHLIST_REMOVE(thishash, dqp);
