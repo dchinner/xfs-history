@@ -959,20 +959,25 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 
 	if (error = devvptoxfs(devvp, &bp, &sbp, u.u_cred))
 		return error;
-	sp->f_bsize = sbp->sb_blocksize;
-	sp->f_frsize = sbp->sb_blocksize;
-	sp->f_blocks = sbp->sb_dblocks + sbp->sb_rextents * sbp->sb_rextsize;
-	sp->f_bfree = sbp->sb_fdblocks + sbp->sb_frextents * sbp->sb_rextsize;
-	sp->f_files = sbp->sb_icount;
-	sp->f_ffree = sbp->sb_ifree;
-	sp->f_fsid = devvp->v_rdev;
-	(void) strcpy(sp->f_basetype, vfssw[xfs_fstype].vsw_name);
-	sp->f_flag = 0;
-	sp->f_namemax = MAXNAMELEN;
-	bzero(sp->f_fstr, sizeof(sp->f_fstr));
+	if (sbp->sb_magicnum == XFS_SB_MAGIC) {
+		sp->f_bsize = sbp->sb_blocksize;
+		sp->f_frsize = sbp->sb_blocksize;
+		sp->f_blocks = sbp->sb_dblocks +
+			sbp->sb_rextents * sbp->sb_rextsize;
+		sp->f_bfree = sbp->sb_fdblocks +
+			sbp->sb_frextents * sbp->sb_rextsize;
+		sp->f_files = sbp->sb_icount;
+		sp->f_ffree = sbp->sb_ifree;
+		sp->f_fsid = devvp->v_rdev;
+		(void) strcpy(sp->f_basetype, vfssw[xfs_fstype].vsw_name);
+		sp->f_flag = 0;
+		sp->f_namemax = MAXNAMELEN;
+		bzero(sp->f_fstr, sizeof(sp->f_fstr));
+	} else
+		error = EINVAL;
 	brelse(bp);
 	(void) VOP_CLOSE(devvp, FREAD, 1, 0, u.u_cred);
-	return 0;
+	return error;
 }
 
 /*
