@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.104 $"
+#ident	"$Revision: 1.105 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1625,6 +1625,7 @@ xlog_recover_print_efi(xlog_recover_item_t *item)
     if (i % 4 != 0) printf("\n");
     return;
 }	/* xlog_recover_print_efi */
+
 #endif /* SIM */
 
 
@@ -2973,6 +2974,10 @@ xlog_recover_process_data(xlog_t	    *log,
     unsigned long	hash;
     uint		flags;
 
+#ifdef SIM
+    printf("LOG REC AT LSN cycle 0x%x blkno 0x%x\n",
+	   CYCLE_LSN(rhead->h_lsn), BLOCK_LSN(rhead->h_lsn));
+#endif
     while (dp < lp) {
 	ASSERT(dp + sizeof(xlog_op_header_t) <= lp);
 	ohead = (xlog_op_header_t *)dp;
