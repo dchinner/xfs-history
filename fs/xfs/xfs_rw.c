@@ -419,8 +419,7 @@ xfs_inval_cached_pages(
 	}
 	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
 	if (relock) {
-		XFS_IUNLOCK(mp, io, XFS_IOLOCK_EXCL);
-		XFS_ILOCK(mp, io, XFS_IOLOCK_SHARED);
+		XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);
 	}
 }
 
