@@ -77,7 +77,7 @@ vn_reclaim(
 {
 	int		error;
 
-	XFS_STATS_INC(xfsstats.vn_reclaim);
+	XFS_STATS_INC(vn_reclaim);
 	vn_trace_entry(vp, "vn_reclaim", (inst_t *)__return_address);
 
 	/*
@@ -137,8 +137,8 @@ vn_initialize(
 {
 	struct vnode	*vp = LINVFS_GET_VP(inode);
 
-	XFS_STATS_INC(xfsstats.vn_active);
-	XFS_STATS_INC(xfsstats.vn_alloc);
+	XFS_STATS_INC(vn_active);
+	XFS_STATS_INC(vn_alloc);
 
 	vp->v_flag = VMODIFIED;
 	spinlock_init(&vp->v_lock, "v_lock");
@@ -172,7 +172,7 @@ vn_get(
 {
 	struct inode	*inode;
 
-	XFS_STATS_INC(xfsstats.vn_get);
+	XFS_STATS_INC(vn_get);
 	inode = LINVFS_GET_IP(vp);
 	if (inode->i_state & I_FREEING)
 		return NULL;
@@ -264,7 +264,7 @@ again:
 		return;
 	}
 
-	XFS_STATS_DEC(xfsstats.vn_active);
+	XFS_STATS_DEC(vn_active);
 	vp->v_flag |= VRECLM;
 	VN_UNLOCK(vp, 0);
 
@@ -292,7 +292,7 @@ vn_hold(
 {
 	struct inode	*inode;
 
-	XFS_STATS_INC(xfsstats.vn_hold);
+	XFS_STATS_INC(vn_hold);
 
 	VN_LOCK(vp);
 	inode = igrab(LINVFS_GET_IP(vp));
@@ -312,7 +312,7 @@ vn_rele(
 	int		vcnt;
 	int		cache;
 
-	XFS_STATS_INC(xfsstats.vn_rele);
+	XFS_STATS_INC(vn_rele);
 
 	VN_LOCK(vp);
 
@@ -364,7 +364,7 @@ vn_remove(
 	if (!(vp->v_fbhv))
 		return;
 
-	XFS_STATS_INC(xfsstats.vn_remove);
+	XFS_STATS_INC(vn_remove);
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
 
 	/*

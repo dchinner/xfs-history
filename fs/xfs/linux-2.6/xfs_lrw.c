@@ -168,7 +168,7 @@ xfs_read(
 	mp = ip->i_mount;
 	vn_trace_entry(vp, "xfs_read", (inst_t *)__return_address);
 
-	XFS_STATS_INC(xfsstats.xs_read_calls);
+	XFS_STATS_INC(xs_read_calls);
 
 	/* START copy & waste from filemap.c */
 	for (seg = 0; seg < segs; seg++) {
@@ -234,7 +234,7 @@ xfs_read(
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (ret > 0)
-		XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
+		XFS_STATS_ADD(xs_read_bytes, ret);
 
 	if (!invisible)
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
@@ -265,7 +265,7 @@ xfs_sendfile(
 	mp = ip->i_mount;
 	vn_trace_entry(vp, "xfs_sendfile", (inst_t *)__return_address);
 
-	XFS_STATS_INC(xfsstats.xs_read_calls);
+	XFS_STATS_INC(xs_read_calls);
 
 	n = XFS_MAXIOFFSET(mp) - *offset;
 	if ((n <= 0) || (count == 0))
@@ -296,7 +296,7 @@ xfs_sendfile(
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
-	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
+	XFS_STATS_ADD(xs_read_bytes, ret);
 	if (!invisible)
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 	return ret;
@@ -546,7 +546,7 @@ xfs_write(
 	int			eventsent = 0;
 	vrwlock_t		locktype;
 
-	XFS_STATS_INC(xfsstats.xs_write_calls);
+	XFS_STATS_INC(xs_write_calls);
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_write", (inst_t *)__return_address);
@@ -735,7 +735,7 @@ retry:
 		return ret;
 	}
 
-	XFS_STATS_ADD(xfsstats.xs_write_bytes, ret);
+	XFS_STATS_ADD(xs_write_bytes, ret);
 
 	/* Handle various SYNC-type writes */
 	if ((file->f_flags & O_SYNC) || IS_SYNC(file->f_dentry->d_inode)) {
