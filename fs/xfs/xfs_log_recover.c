@@ -1,5 +1,5 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.86 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -819,7 +819,7 @@ xlog_find_zeroed(xlog_t	 *log,
 		 */
 	xlog_warn("XFS: (xlog_find_zeroed): last cycle = 0; first cycle != 1");
 		ASSERT(first_cycle == 1);
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 
 	/* we have a partially zeroed log */

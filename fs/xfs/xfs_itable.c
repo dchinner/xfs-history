@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -447,7 +447,7 @@ xfs_bulkstat_single(
 	if (copyout(&bstat, buffer, sizeof(bstat))) {
 		*done = 0;
 		*count = 0;
-		return EFAULT;
+		return XFS_ERROR(EFAULT);
 	}
 	*done = 0;
 	*count = 1;
@@ -542,7 +542,7 @@ xfs_inumbers(
 		if (bufidx == bcount) {
 			if (copyout((caddr_t)buffer, ubuffer,
 					bufidx * sizeof(*buffer))) {
-				error = EFAULT;
+				error = XFS_ERROR(EFAULT);
 				break;
 			}
 			ubuffer += bufidx * sizeof(*buffer);
@@ -569,7 +569,7 @@ xfs_inumbers(
 		if (bufidx) {
 			if (copyout((caddr_t)buffer, ubuffer,
 					bufidx * sizeof(*buffer)))
-				error = EFAULT;
+				error = XFS_ERROR(EFAULT);
 			else
 				*count += bufidx;
 		}

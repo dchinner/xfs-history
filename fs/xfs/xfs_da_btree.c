@@ -1165,7 +1165,8 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 				continue;
 #ifndef SIM
 			} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
-				retval = ENOATTR;/* path_shift() gives ENOENT */
+				/* path_shift() gives ENOENT */
+				retval = XFS_ERROR(ENOATTR);
 #endif
 			}
 		}

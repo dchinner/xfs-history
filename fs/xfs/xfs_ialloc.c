@@ -1046,7 +1046,7 @@ xfs_dilocate(
 	agbno = XFS_INO_TO_AGBNO(mp, ino);
 	if ((agno >= mp->m_sb.sb_agcount) ||
 	    (agbno >= mp->m_sb.sb_agblocks)) {
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 
 	error = 0;
@@ -1082,7 +1082,7 @@ xfs_dilocate(
 		}
 		if (!xfs_inobt_get_rec(cur, &chunk_agino, &chunk_cnt,
 				       &chunk_free)) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 		} else {
 			chunk_agbno = XFS_AGINO_TO_AGBNO(mp, chunk_agino);
 			ASSERT(agbno >= chunk_agbno);
@@ -1205,7 +1205,7 @@ xfs_ialloc_read_agi(
 	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
-		return EIO;
+		return XFS_ERROR(EIO);
 	}
 	pag = &mp->m_perag[agno];
 	if (!pag->pagi_init) {

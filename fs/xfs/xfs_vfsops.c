@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.124 $"
+#ident  "$Revision: 1.125 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -453,7 +453,7 @@ xfs_cmountfs(
 			if (error = copyinstr(ap->fsname, tmp_fsname_buffer,
 					      PATH_MAX - 1, &n)) {
 				if (error == ENAMETOOLONG)
-					error = EINVAL;
+					error = XFS_ERROR(EINVAL);
 				kmem_free(tmp_fsname_buffer, PATH_MAX);
 				goto error3;
 			}
@@ -763,7 +763,7 @@ xfs_mountroot(
 	vfs_t			*vfsp,
 	enum whymountroot	why)
 {
-	int		error = ENOSYS;
+	int		error;
 	static int	xfsrootdone;
 	struct cred	*cr = get_current_cred();
 	dev_t		ddev, logdev, rtdev;
@@ -862,7 +862,7 @@ xfs_mountroot(
 				bdstrat(my_bdevsw, bp);
 				(void) iowait(bp);
 			}
-			return EBUSY;
+			return XFS_ERROR(EBUSY);
 		}
 		error = xfs_unmount(vfsp, 0, NULL);
 		return error;
@@ -1031,7 +1031,7 @@ xfs_unmount(
 	xfs_iflush(rip, XFS_IFLUSH_SYNC);   /* synchronously flush to disk */
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
-		error = EBUSY;
+		error = XFS_ERROR(EBUSY);
 		goto out;
 	}
 
@@ -1102,7 +1102,7 @@ devvptoxfs(
 	vnode_t		*openvp;
 
 	if (devvp->v_type != VBLK)
-		return ENOTBLK;
+		return XFS_ERROR(ENOTBLK);
 	openvp = devvp;
 	VOP_OPEN(openvp, &devvp, FREAD, cr, error);
 	if (error)
@@ -1184,7 +1184,7 @@ xfs_statdevvp(
 		sp->f_namemax = MAXNAMELEN - 1;
 		bzero(sp->f_fstr, sizeof(sp->f_fstr));
 	} else {
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 	}
 	brelse(bp);
 	VOP_CLOSE(devvp, FREAD, L_TRUE, 0, get_current_cred(), NULL, unused);

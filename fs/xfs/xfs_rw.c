@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.160 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1698,7 +1698,7 @@ xfs_iomap_write(
 	if (nimaps == 0) {
 		xfs_iomap_enter_trace(XFS_IOMAP_WRITE_NOSPACE,
 				      ip, offset, count);
-		return ENOSPC;
+		return XFS_ERROR(ENOSPC);
 	}
 
 	if (!(ioflag & IO_SYNC) ||
@@ -1960,7 +1960,7 @@ xfs_write_file(
 	 */
 	if ((ip->i_d.di_extsize) || 
 	    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME))  {
-		return( EINVAL );
+		return( XFS_ERROR(EINVAL) );
 	}
 
 	error = 0;

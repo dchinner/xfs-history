@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -25,9 +25,10 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/sat.h>
-#include "xfs_handle.h"
 #include <ksys/fdt.h>
 #include <sys/debug.h>
+#include "xfs_handle.h"
+#include "xfs_error.h"
 
 
 /*
@@ -49,16 +50,16 @@ copyout_handle (
 	size_t		*hlen)		/* user's data buffer's size */
 {
 	if (copyout (handle, hbuf, (int) hsize))
-		return EFAULT;
+		return XFS_ERROR(EFAULT);
 #ifdef _K64U64
 	if (ABI_IS_64BIT(get_current_abi())) {
 		if (copyout(&hsize, hlen, sizeof *hlen))
-			return EFAULT;
+			return XFS_ERROR(EFAULT);
 		return 0;
 	}
 #endif
 	if (suword(hlen, (int) hsize))
-		return EFAULT;
+		return XFS_ERROR(EFAULT);
 	return 0;
 }
 
@@ -158,9 +159,9 @@ readlink_by_handle (
 		return error;
 	vp = handle_to_vp (&handle);
 	if (vp == NULL)
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	if (vp->v_type != VLNK) {
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 		goto out;
         }
 
@@ -211,7 +212,7 @@ open_by_handle (
 	filemode -= FOPEN;
 	filemode &= (FREAD|FWRITE);
 	if ((filemode & (FREAD|FWRITE)) == 0)
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	filemode |= FINVIS;
 
 	error = gethandle (hanp, hlen, &handle);
@@ -219,14 +220,14 @@ open_by_handle (
 		return error;
 	vp = handle_to_vp (&handle);
 	if (vp == NULL)
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 
 	switch (vp->v_type) {
 		case VDIR:
 		case VREG:
 			break;
 		default:
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			goto out;
 	}
 
@@ -304,15 +305,15 @@ vp_open (
 	 */
 	if (filemode & FWRITE) {
 		if (vp->v_type == VDIR) {
-			error = EISDIR;
+			error = XFS_ERROR(EISDIR);
 			goto out;
 		}
 		if (vp->v_vfsp->vfs_flag & VFS_RDONLY) {
-			error = EROFS;
+			error = XFS_ERROR(EROFS);
 			goto out;
 		}
 		if ((vp->v_flag & VISSWAP) && vp->v_type == VREG) {
-			error = EBUSY;
+			error = XFS_ERROR(EBUSY);
 			goto out;
 		}
 	}
@@ -354,14 +355,14 @@ vp_to_handle (
 	int		hsize;
 
 	if (vp->v_vfsp->vfs_altfsid == NULL)
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	switch (vp->v_type) {
 		case VREG:
 		case VDIR:
 		case VLNK:
 			break;
 		default:
-			return EBADF;
+			return XFS_ERROR(EBADF);
 	}
 #ifdef SMALLFIDS
 	VOP_FID (vp, &fidp, error);
@@ -372,7 +373,7 @@ vp_to_handle (
 	if (error)
 		return error;
 	if (fidp == NULL)
-		return EIO;		/* FIX: what real errno? */
+		return XFS_ERROR(EIO);		/* FIX: what real errno? */
 	bcopy (vp->v_vfsp->vfs_altfsid, &handlep->ha_fsid, sizeof (fsid_t));
 	/* Copy only the currently used part of the fid struct */
 	bcopy (fidp, &handlep->ha_fid, fidp->fid_len + sizeof fidp->fid_len);
@@ -421,9 +422,9 @@ gethandle (
 	handle_t	*hp)		/* output, copy of data */
 {
 	if (hlen < sizeof hp->ha_fsid || hlen > sizeof *hp)
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	if (copyin (hanp, hp, hlen))
-		return EFAULT;
+		return XFS_ERROR(EFAULT);
 	if (hlen < sizeof *hp)
 		bzero (((char *) hp) + hlen, sizeof *hp - hlen);
 	if (hlen == sizeof hp->ha_fsid)	
@@ -431,7 +432,7 @@ gethandle (
 	if (hp->ha_fid.fid_len != (hlen - sizeof hp->ha_fsid -
 	    sizeof hp->ha_fid.fid_len) || *((short *) hp->ha_fid.fid_data))
 	{
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 	return 0;
 }

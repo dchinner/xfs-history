@@ -1600,7 +1600,7 @@ xfs_stickytest(
 	    cr->cr_uid != ip->i_d.di_uid &&
 	    cr->cr_uid != dp->i_d.di_uid) {
 		if (xpg4_sticky_dir) {
-			return EACCES;
+			return XFS_ERROR(EACCES);
 		} else {
 			return xfs_iaccess(ip, IWRITE, cr);
 		}
@@ -3611,7 +3611,7 @@ xfs_rename_error_checks(
 	 * and then we'd have noticed that its link count had gone to zero.
 	 */
 	if (target_dp->i_d.di_nlink == 0) {
-		error = ENOENT;
+		error = XFS_ERROR(ENOENT);
 		*status = __LINE__;
 		goto error_return;
 	}
@@ -6115,7 +6115,7 @@ xfs_ioctl(
 	cred_t *cr,
 	int *rvalp)
 {
-	return ENOTTY;
+	return XFS_ERROR(ENOTTY);
 }
 
 /*

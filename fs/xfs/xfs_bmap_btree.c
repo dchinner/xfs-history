@@ -51,6 +51,7 @@
 #include "xfs_alloc.h"
 #include "xfs_bit.h"
 #include "xfs_bmap.h"
+#include "xfs_error.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -1113,7 +1114,7 @@ xfs_bmbt_lookup(
 				    xfs_magics[cur->bc_btnum]) {
 					bp->b_flags |= B_ERROR;
 					xfs_trans_brelse(tp, bp);
-					return EIO;
+					return XFS_ERROR(EIO);
 				}
 				xfs_btree_setbuf(cur, level, bp);
 				bp->b_ref = XFS_BMAP_BTREE_REF;
@@ -1420,7 +1421,7 @@ xfs_bmbt_read_agf(
 	    !XFS_AGF_GOOD_VERSION(agf->agf_versionnum)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
-		return EIO;
+		return XFS_ERROR(EIO);
 	}
 	bp->b_ref = XFS_AGF_REF;
 	*bpp = bp;

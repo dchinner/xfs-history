@@ -39,6 +39,7 @@
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
 #include "xfs_alloc.h"
+#include "xfs_error.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -1210,7 +1211,7 @@ xfs_alloc_lookup(
 			if (block->bb_magic != xfs_magics[cur->bc_btnum]) {
 				bp->b_flags |= B_ERROR;
 				xfs_trans_brelse(cur->bc_tp, bp);
-				return EIO;
+				return XFS_ERROR(EIO);
 			}
 
 			xfs_btree_setbuf(cur, level, bp);

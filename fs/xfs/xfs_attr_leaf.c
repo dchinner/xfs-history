@@ -1646,7 +1646,7 @@ xfs_attr_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args)
 	}
 	if ((probe == leaf->hdr.count) || (entry->hashval != hashval)) {
 		args->index = probe;
-		return(ENOATTR);
+		return(XFS_ERROR(ENOATTR));
 	}
 
 	/*
@@ -1676,7 +1676,7 @@ xfs_attr_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args)
 			    ((entry->flags & XFS_ATTR_ROOT) != 0))
 				continue;
 			args->index = probe;
-			return(EEXIST);
+			return(XFS_ERROR(EEXIST));
 		} else {
 			name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, probe);
 			if (name_rmt->namelen != args->namelen)
@@ -1691,11 +1691,11 @@ xfs_attr_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args)
 			args->rmtblkno = name_rmt->valueblk;
 			args->rmtblkcnt = XFS_B_TO_FSB(args->dp->i_mount,
 						       name_rmt->valuelen);
-			return(EEXIST);
+			return(XFS_ERROR(EEXIST));
 		}
 	}
 	args->index = probe;
-	return(ENOATTR);
+	return(XFS_ERROR(ENOATTR));
 }
 
 /*
@@ -1723,7 +1723,7 @@ xfs_attr_leaf_getvalue(buf_t *bp, xfs_da_args_t *args)
 		ASSERT(bcmp(args->name, name_loc->nameval, args->namelen) == 0);
 		if (args->valuelen < name_loc->valuelen) {
 			args->valuelen = name_loc->valuelen;
-			return(E2BIG);
+			return(XFS_ERROR(E2BIG));
 		}
 		args->valuelen = name_loc->valuelen;
 		bcopy(&name_loc->nameval[args->namelen], args->value,
@@ -1737,7 +1737,7 @@ xfs_attr_leaf_getvalue(buf_t *bp, xfs_da_args_t *args)
 					       name_rmt->valuelen);
 		if (args->valuelen < name_rmt->valuelen) {
 			args->valuelen = name_rmt->valuelen;
-			return(E2BIG);
+			return(XFS_ERROR(E2BIG));
 		}
 		args->valuelen = name_rmt->valuelen;
 	}

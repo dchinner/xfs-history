@@ -131,7 +131,7 @@ xfs_attr_get(pvnode_t *pvp, char *name, char *value, int *valuelenp, int flags,
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	if (XFS_IFORK_Q(args.dp) == 0) {
-		error = ENOATTR;
+		error = XFS_ERROR(ENOATTR);
 	} else if (args.dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
 		error = xfs_attr_shortform_getvalue(&args);
 	} else if (xfs_bmap_one_block(args.dp, XFS_ATTR_FORK)) {
@@ -615,10 +615,10 @@ xfs_attr_shortform_addname(xfs_da_args_t *args)
 
 	retval = xfs_attr_shortform_lookup(args);
 	if ((args->flags & ATTR_REPLACE) && (retval == ENOATTR)) {
-		return(ENOATTR);
+		return(retval);
 	} else if (retval == EEXIST) {
 		if (args->flags & ATTR_CREATE)
-			return(EEXIST);
+			return(retval);
 		retval = xfs_attr_shortform_remove(args);
 		ASSERT(retval == 0);
 	}
@@ -631,7 +631,7 @@ xfs_attr_shortform_addname(xfs_da_args_t *args)
 		retval = xfs_attr_shortform_add(args);
 		ASSERT(retval == 0);
 	} else {
-		return(ENOSPC);
+		return(XFS_ERROR(ENOSPC));
 	}
 	return(0);
 }
@@ -671,10 +671,10 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 	 */
 	retval = xfs_attr_leaf_lookup_int(bp, args);
 	if ((args->flags & ATTR_REPLACE) && (retval == ENOATTR)) {
-		return(XFS_ERROR(ENOATTR));
+		return(retval);
 	} else if (retval == EEXIST) {
 		if (args->flags & ATTR_CREATE) {	/* pure create op */
-			return(XFS_ERROR(EEXIST));
+			return(retval);
 		}
 		args->rename = 1;			/* an atomic rename */
 		args->blkno2 = args->blkno;		/* set 2nd entry info */
@@ -855,7 +855,7 @@ xfs_attr_leaf_removename(xfs_da_args_t *args)
 	ASSERT(bp != NULL);
 	error = xfs_attr_leaf_lookup_int(bp, args);
 	if (error == ENOATTR) {
-		return(XFS_ERROR(ENOATTR));
+		return(error);
 	}
 
 	(void)xfs_attr_leaf_remove(bp, args);
@@ -1221,9 +1221,6 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 	if (error || (retval != EEXIST)) {
 		if (error == 0)
 			error = retval;
-#ifdef DEBUG	/* avoid compile error when DEBUG is not defined */
-		XFS_ERROR(error);
-#endif /* DEBUG */
 		goto out;
 	}
 

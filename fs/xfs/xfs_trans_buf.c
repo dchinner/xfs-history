@@ -36,6 +36,7 @@
 #include "xfs_ag.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -316,7 +317,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 				if (((xfs_req_num++) % xfs_error_mod) == 0) {
 					brelse(bp);
 					printf("Returning error!\n");
-					return EIO;
+					return XFS_ERROR(EIO);
 				}
 			}
 		}
@@ -405,7 +406,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
 				brelse(bp);
 				printf("Returning error in trans!\n");
-				return EIO;
+				return XFS_ERROR(EIO);
 			}
 		}
 	}

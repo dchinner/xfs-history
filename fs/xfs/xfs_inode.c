@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.175 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -194,7 +194,7 @@ xfs_inotobp(
 	 */
 	if ((imap.im_blkno + imap.im_len) >
 	    XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks)) {
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 
 	/*
@@ -213,7 +213,7 @@ xfs_inotobp(
 	    !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
-		return EIO;
+		return XFS_ERROR(EIO);
 	}
 
 	xfs_inobp_check(mp, bp);
@@ -281,7 +281,7 @@ xfs_itobp(
 		 */
 		if ((imap.im_blkno + imap.im_len) >
 		    XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks)) {
-			return EINVAL;
+			return XFS_ERROR(EINVAL);
 		}
 
 		/*
@@ -318,7 +318,7 @@ xfs_itobp(
 	    !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
-		return EIO;
+		return XFS_ERROR(EIO);
 	}
 
 	xfs_inobp_check(mp, bp);
@@ -1649,7 +1649,7 @@ xfs_iunlink(
 	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
 		agibp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, agibp);
-		return EIO;
+		return XFS_ERROR(EIO);
 	}
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 
@@ -1744,7 +1744,7 @@ xfs_iunlink_remove(
 	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
 		agibp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, agibp);
-		return EIO;
+		return XFS_ERROR(EIO);
 	}
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 
@@ -3155,7 +3155,7 @@ xfs_swappable(
 	error = xfs_bmap_first_unused(NULL, ip, 1, &first_hole_offset_fsb,
 		XFS_DATA_FORK);
 	if ((error == 0) && (first_hole_offset_fsb < end_fsb)) {
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 	}
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 

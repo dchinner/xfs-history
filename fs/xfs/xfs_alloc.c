@@ -42,6 +42,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_alloc.h"
 #include "xfs_bit.h"
+#include "xfs_error.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -2410,7 +2411,7 @@ xfs_alloc_read_agf(
 	    !XFS_AGF_GOOD_VERSION(agf->agf_versionnum)) {
 		bp->b_flags |= B_ERROR;
 		xfs_trans_brelse(tp, bp);
-		return EIO;
+		return XFS_ERROR(EIO);
 	}
 	pag = &mp->m_perag[agno];
 	if (!pag->pagf_init) {

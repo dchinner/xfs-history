@@ -1598,7 +1598,7 @@ xfs_dir_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args, int *index)
 	}
 	if ((probe == leaf->hdr.count) || (entry->hashval != hashval)) {
 		*index = probe;
-		return(ENOENT);
+		return(XFS_ERROR(ENOENT));
 	}
 
 	/*
@@ -1617,7 +1617,7 @@ xfs_dir_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args, int *index)
 		probe++;
 	}
 	*index = probe;
-	return(ENOENT);
+	return(XFS_ERROR(ENOENT));
 }
 
 /*========================================================================
