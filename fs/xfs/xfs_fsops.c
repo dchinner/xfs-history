@@ -510,7 +510,7 @@ xfs_fsoperations(
 
 	if (opcode < 0 || opcode >= XFS_FSOPS_COUNT)
 		return XFS_ERROR(EINVAL);
-	if (error = xfs_fd_to_mp(fd, wperm[opcode], &mp))
+	if (error = xfs_fd_to_mp(fd, wperm[opcode], &mp, wperm[opcode]))
 		return error;
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return (EIO);

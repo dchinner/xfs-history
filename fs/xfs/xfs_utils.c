@@ -1,4 +1,4 @@
-#ident "$Revision: 1.13 $"
+#ident "$Revision$"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -685,7 +685,7 @@ xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
 	xfs_mount_t *mp;
 	int error;
 
-	if (error = xfs_fd_to_mp(fd, 0, &mp))
+	if (error = xfs_fd_to_mp(fd, 0, &mp, 1))
 		return XFS_ERROR(error);
 
 	*fsname = mp->m_fsname;
@@ -701,7 +701,7 @@ xfs_mk_sharedro(int fd)
 	int error;
 	xfs_mount_t *mp;
 
-	if (error = xfs_fd_to_mp(fd, 1, &mp))
+	if (error = xfs_fd_to_mp(fd, 1, &mp, 1))
 		return XFS_ERROR(error);
 
 	if (emajor(mp->m_dev) != XLV_MAJOR) {
@@ -723,7 +723,7 @@ xfs_clear_sharedro(int fd)
 	int error;
 	xfs_mount_t *mp;
 
-	if (error = xfs_fd_to_mp(fd, 1, &mp))
+	if (error = xfs_fd_to_mp(fd, 1, &mp, 1))
 		return XFS_ERROR(error);
 
 	if (emajor(mp->m_dev) != XLV_MAJOR) {

@@ -757,7 +757,8 @@ int						/* error status */
 xfs_fd_to_mp(
 	int		fd,			/* file descriptor to convert */
 	int		wperm,			/* need write perm on device */
-	xfs_mount_t	**mpp)			/* return mount pointer */
+	xfs_mount_t	**mpp,			/* return mount pointer */
+	int		rperm)			/* set if root per on file fd */
 {
 	dev_t		dev;
 	int		error;
@@ -784,7 +785,7 @@ xfs_fd_to_mp(
 		if (vfsp == NULL)
 			vfsp = vp->v_vfsp;
 	} else {
-		if (!_CAP_ABLE(CAP_DEVICE_MGT))
+		if (rperm && !_CAP_ABLE(CAP_DEVICE_MGT))
 			return XFS_ERROR(EPERM);
 		vfsp = vp->v_vfsp;
 	}
@@ -816,7 +817,7 @@ xfs_itable(
 					   again. This is unused in syssgi
 					   but used in dmi */
 
-	if (error = xfs_fd_to_mp(fd, 0, &mp))
+	if (error = xfs_fd_to_mp(fd, 0, &mp, 1))
 		return error;
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);

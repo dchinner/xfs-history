@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision$"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -80,7 +80,8 @@ int					/* error status */
 xfs_fd_to_mp(
 	int			fd,	/* file descriptor */
 	int			wperm,	/* need write perm on device fd */
-	struct xfs_mount	**mpp);	/* output: mount structure pointer */
+	struct xfs_mount	**mpp,	/* output: mount structure pointer */
+	int			rperm);	/* need root perm on file fd */
 
 /*
  * Syssgi interface for bulkstat and inode-table.
