@@ -57,6 +57,8 @@ typedef struct xfs_ihash {
  * Other state kept in the in-core inode is used for identification,
  * locking, transactional updating, etc of the inode.
  */
+#define	XFS_INLINE_EXTS	2
+#define	XFS_INLINE_DATA	32
 typedef struct xfs_inode {
 	/* Inode linking and identification information. */
 	struct xfs_ihash	*i_hash;	/* pointer to hash header */
@@ -74,9 +76,7 @@ typedef struct xfs_inode {
 	/* Transaction and locking information. */
 	xfs_trans_t		*i_transp;	/* ptr to owning transaction */
 	xfs_inode_log_item_t	i_item;		/* logging information */
-	pid_t			i_lockpid;	/* pid of owner process */
-	sema_t			i_lock;		/* inode lock */
-	unsigned short		i_locktrips;	/* inode lock trip count */
+	mrlock_t		i_lock;		/* inode lock */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
@@ -91,9 +91,12 @@ typedef struct xfs_inode {
 		char		*iu_data;	/* inline file data */
 	} i_u1;
 	xfs_btree_block_t	*i_broot;	/* file's incore btree root */
+	size_t			i_broot_bytes;	/* bytes allocated for root */
 	union {
-		xfs_extdesc_t	iu_inline_ext[2];/* very small file extents */
-		char		iu_inline_data[32];/* very small file data */
+		xfs_extdesc_t	iu_inline_ext[XFS_INLINE_EXTS];
+						/* very small file extents */
+		char		iu_inline_data[XFS_INLINE_DATA];
+						/* very small file data */
 		dev_t		iu_rdev;	/* dev number if special */
 		xfs_uuid_t	iu_uuid;	/* mount point value */
 	} i_u2;
@@ -112,9 +115,9 @@ typedef struct xfs_inode {
 /*
  * In-core inode flags.
  */
-#define	I_LOCKED	0x0001	/* Inode is locked */
-#define	I_INCORE	0x0002	/* iu_extents/iu_data is read in and valid */
-#define	I_AINCORE	0x0004	/* i_aextents/iu_adata is read in and valid */
+#define	XFS_IINLINE	0x0001	/* Inline data is read in */
+#define	XFS_IEXTENTS	0x0002	/* All extent pointers are read in */
+#define	XFS_IBROOT	0x0004	/* i_broot points to the bmap b-tree root */
 
 /*
  * Maximum number of extent pointers in i_u1.iu_extents.
@@ -123,9 +126,25 @@ typedef struct xfs_inode {
 
 #define	XFS_ITOV(ip)	((ip)->i_vnode)
 
+/*
+ * Value for inode buffers' b_ref field.
+ */
+#define XFS_INOREF	1
 
+
+/*
+ * xfs_iget.c prototypes.
+ */
 extern xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t, void *);
-extern xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_ino_t);
+extern xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,uint);
+extern void		xfs_ilock(xfs_inode_t *, int);
+extern int		xfs_ilock_nowait(xfs_inode_t *, int);
+extern void		xfs_iunlock(xfs_inode_t *);
 
+/*
+ * xfs_inode.c prototypes.
+ */
+extern xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
+extern void		xfs_idestroy(xfs_inode_t *);
 
 #endif	/* _XFS_INODE_H */
