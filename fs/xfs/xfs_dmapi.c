@@ -2986,9 +2986,9 @@ xfs_dm_get_fsys_vector(
 }
 
 
-/*	xfs_dm_mapevent - send events needed for memory mapping a file.
+/*	xfs_dm_send_mmap_event - send events needed for memory mapping a file.
  *
- *	xfs_dm_map is a workaround called for files that are about to be
+ *	This is a workaround called for files that are about to be
  *	mapped.	 DMAPI events are not being generated at a low enough level
  *	in the kernel for page reads/writes to generate the correct events.
  *	So for memory-mapped files we generate read  or write events for the
@@ -2999,76 +2999,6 @@ xfs_dm_get_fsys_vector(
  *	is still mapped.
  */
 
-/* ARGSUSED */
-static int
-xfs_dm_mapevent(
-	bhv_desc_t	*bdp,
-	int		flags,
-	xfs_off_t	offset,
-	dm_fcntl_mapevent_t *mapevp)
-{
-	xfs_fsize_t	filesize;		/* event read/write "size" */
-	xfs_inode_t	*ip;
-	xfs_off_t	end_of_area, evsize;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
-	struct vfs	*vfsp = vp->v_vfsp;
-
-	/* Returns positive errors to XFS */
-
-	/* exit immediately if not regular file in a DMAPI file system */
-
-	mapevp->error = 0;			/* assume success */
-
-	if ((vp->v_type != VREG) || !(vfsp->vfs_flag & VFS_DMI))
-		return 0;
-
-	if (mapevp->max_event != DM_EVENT_WRITE &&
-		mapevp->max_event != DM_EVENT_READ)
-			return 0;
-
-	/* Set file size to work with. */
-
-	ip = XFS_BHVTOI(bdp);
-	filesize = ip->i_iocore.io_new_size;
-	if (filesize < ip->i_d.di_size) {
-		filesize = ip->i_d.di_size;
-	}
-
-	/* Set first byte number beyond the map area. */
-
-	if (mapevp->length) {
-		end_of_area = offset + mapevp->length;
-		if (end_of_area > filesize)
-			end_of_area = filesize;
-	} else {
-		end_of_area = filesize;
-	}
-
-	/* Set the real amount being mapped. */
-	evsize = end_of_area - offset;
-	if (evsize < 0)
-		evsize = 0;
-
-	/* If write possible, try a DMAPI write event */
-	if (mapevp->max_event == DM_EVENT_WRITE &&
-		DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_WRITE)) {
-		mapevp->error = xfs_dm_send_data_event(DM_EVENT_WRITE, vp,
-				offset, evsize, 0, NULL);
-		return(0);
-	}
-
-	/* Try a read event if max_event was != DM_EVENT_WRITE or if it
-	 * was DM_EVENT_WRITE but the WRITE event was not enabled.
-	 */
-	if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_READ)) {
-		mapevp->error = xfs_dm_send_data_event(DM_EVENT_READ, vp,
-				offset, evsize, 0, NULL);
-	}
-
-	return 0;
-}
-
-
 int
 xfs_dm_send_mmap_event(
 	struct vm_area_struct *vma,
@@ -3077,9 +3007,12 @@ xfs_dm_send_mmap_event(
 	vnode_t		*vp;
 	xfs_inode_t	*ip;
 	bhv_desc_t	*bdp;
-	int		ret = 0;
-	dm_fcntl_mapevent_t maprq;
+	int		error = 0;
 	dm_eventtype_t	max_event = DM_EVENT_READ;
+	vrwlock_t	locktype;
+	xfs_fsize_t	filesize;
+	xfs_off_t	length, end_of_area, evsize, offset;
+	int		iolock;
 
 	/* Returns negative errors to linvfs layer */
 
@@ -3107,20 +3040,50 @@ xfs_dm_send_mmap_event(
 		return -EACCES;
 	}
 
-	maprq.max_event = max_event;
-
-	/* Figure out how much of the file is being requested by the user. */
-	maprq.length = 0; /* whole file, for now */
-
 	XFS_BHV_LOOKUP(vp, bdp);
 	ip = XFS_BHVTOI(bdp);
 
-	if(DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
-		xfs_dm_mapevent(bdp, 0, 0, &maprq);
-		ret = maprq.error;
+	/* Figure out how much of the file is being requested by the user. */
+	offset = 0; /* beginning of file, for now */
+	length = 0; /* whole file, for now */
+
+	filesize = ip->i_iocore.io_new_size;
+	if (filesize < ip->i_d.di_size) {
+		filesize = ip->i_d.di_size;
 	}
 
-	return -ret; /* Return negative error to linvfs layer */
+	/* Set first byte number beyond the map area. */
+
+	if (length) {
+		end_of_area = offset + length;
+		if (end_of_area > filesize)
+			end_of_area = filesize;
+	} else {
+		end_of_area = filesize;
+	}
+
+	/* Set the real amount being mapped. */
+	evsize = end_of_area - offset;
+	if (evsize < 0)
+		evsize = 0;
+
+	if (max_event == DM_EVENT_READ) {
+		locktype = VRWLOCK_READ;
+		iolock = XFS_IOLOCK_SHARED;
+	}
+	else {
+		locktype = VRWLOCK_WRITE;
+		iolock = XFS_IOLOCK_EXCL;
+	}
+
+	xfs_ilock(ip, iolock);
+	if(DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
+		error = xfs_dm_send_data_event(max_event, vp, offset,
+					       evsize, 0, &locktype);
+	}
+	xfs_iunlock(ip, iolock);
+
+	return -error; /* Return negative error to linvfs layer */
 }
 
 
