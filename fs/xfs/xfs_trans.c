@@ -103,6 +103,36 @@ xfs_trans_alloc(xfs_mount_t	*mp,
 }
 
 /*
+ * This is called to create a new transaction which will share the
+ * permanent log reservation of the given transaction.  Other
+ * reservations, locks, etc are not inherited.
+ */
+xfs_trans_t *
+xfs_trans_dup(xfs_trans_t *tp)
+{
+	xfs_trans_t	*ntp;
+
+	ntp = kmem_zone_alloc(xfs_trans_zone, KM_SLEEP);
+
+	/*
+	 * Initialize the new transaction structure.
+	 */
+	ntp->t_tid = xfs_trans_id_alloc(tp->t_mountp);
+	ntp->t_type = tp->t_type;
+	ntp->t_mountp = tp->t_mountp;
+	initnsema(&(ntp->t_sema), 0, "xfs_trans");
+	ntp->t_items_free = XFS_LIC_NUM_SLOTS;
+	XFS_LIC_INIT(&(ntp->t_items));
+
+	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
+	ASSERT(tp->t_ticket != NULL);
+	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
+	ntp->t_ticket = tp->t_ticket;
+
+	return ntp;
+}
+
+/*
  * This is called to reserve free disk blocks and log space for the
  * given transaction.  This must be done before allocating any resources
  * within the transaction.
@@ -119,7 +149,8 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		  uint		rtextents,
 		  uint		flags)
 {
-	int		status;
+	int	status;
+	int	log_flags;
 
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
@@ -139,9 +170,17 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 	 * Reserve the log space needed for this transaction.
 	 */
 	if (logspace > 0) {
+		ASSERT(tp->t_ticket == NULL);
+		ASSERT(!(tp->t_flags & XFS_TRANS_PERM_LOG_RES));
+		if (flags & XFS_TRANS_PERM_LOG_RES) {
+			log_flags = XFS_LOG_PERM_RESERV;
+			tp->t_flags |= XFS_TRANS_PERM_LOG_RES;
+		} else {
+			log_flags = 0;
+		}
 		status = xfs_log_reserve(tp->t_mountp, logspace,
 					 &tp->t_ticket,
-					 XFS_TRANSACTION_MANAGER, flags);
+					 XFS_TRANSACTION_MANAGER, log_flags);
 #ifdef SIM
 		if (status != 0) {
 			printf("Log reservation failed\n");
@@ -478,6 +517,18 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	xfs_log_item_desc_t	*desc;
 	xfs_lsn_t		commit_lsn;
 	int			error;
+	int			log_flags;
+
+	/*
+	 * Determine whether this commit is releasing a permanent
+	 * log reservation or not.
+	 */
+	if (flags & XFS_TRANS_RELEASE_LOG_RES) {
+		ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
+		log_flags = XFS_LOG_REL_PERM_RESERV;
+	} else {
+		log_flags = 0;
+	}
 
 	/*
 	 * If there is nothing to be logged by the transaction,
@@ -488,8 +539,9 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 */
 	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
-		if (tp->t_ticket)
-			xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
+		if (tp->t_ticket) {
+			xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
+		}
 		xfs_trans_free_items(tp);
 		xfs_trans_free(tp);
 		return;
@@ -520,7 +572,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket,
 			      &(tp->t_lsn));
 	ASSERT(error == 0);
-	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
+	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
 
 	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
 
@@ -701,7 +753,14 @@ xfs_trans_fill_vecs(xfs_trans_t		*tp,
 			lidp = xfs_trans_next_item(tp, lidp);
 			continue;
 		}
-		nitems++;
+		/*
+		 * The item may be marked dirty but not log anything.
+		 * This can be used to get called when a transaction
+		 * is committed.
+		 */
+		if (lidp->lid_size) {
+			nitems++;
+		}
 		IOP_FORMAT(lidp->lid_item, vecp);
 		vecp += lidp->lid_size;		/* pointer arithmetic */
 		IOP_PIN(lidp->lid_item);
@@ -725,28 +784,40 @@ xfs_trans_fill_vecs(xfs_trans_t		*tp,
  * Unlock all of the transaction's items and free the transaction.
  * The transaction must not have modified any of its items, because
  * there is no way to restore them to their previous state.
+ *
+ * If the transaction has made a log reservation, make sure to release
+ * it as well.
  */
 void
-xfs_trans_cancel(xfs_trans_t *tp)
+xfs_trans_cancel(xfs_trans_t	*tp,
+		 int		flags)
 {
+	int	log_flags;
+
 	ASSERT(!(tp->t_flags & XFS_TRANS_DIRTY));
 
 	xfs_trans_unreserve_and_mod_sb(tp);
+	if (tp->t_ticket) {
+		if (flags & XFS_TRANS_RELEASE_LOG_RES) {
+			ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
+			log_flags = XFS_LOG_REL_PERM_RESERV;
+		} else {
+			log_flags = 0;
+		}
+		xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
+	}
 	xfs_trans_free_items(tp);
 	xfs_trans_free(tp);
 }
 
 
 /*
- * Free the log reservation taken by this transaction and
- * free the transaction structure itself.
+ * Free the transaction structure.  If there is more clean up
+ * to do when the structure is freed, add it here.
  */
 STATIC void
 xfs_trans_free(xfs_trans_t *tp)
 {
-/*
-	xfs_log_unreserve(tp->t_mountp, tp->t_log_res);
-*/
 	kmem_zone_free(xfs_trans_zone, tp);
 }
 
