@@ -158,7 +158,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	struct vnode	*vp;
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
-	int		s;
+	int		s = 0;
 
 	
 	XFS_STATS_INC(vn_active);
