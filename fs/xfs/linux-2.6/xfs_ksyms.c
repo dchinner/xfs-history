@@ -260,7 +260,6 @@ EXPORT_SYMBOL(vn_hold);
 EXPORT_SYMBOL(vn_initialize);
 EXPORT_SYMBOL(vn_revalidate);
 EXPORT_SYMBOL(vn_revalidate_core);
-EXPORT_SYMBOL(vn_purge);
 EXPORT_SYMBOL(vttoif_tab);
 
 #if defined(CONFIG_XFS_POSIX_ACL)
@@ -309,7 +308,6 @@ EXPORT_SYMBOL(xfs_iextract);
 EXPORT_SYMBOL(xfs_iflock);
 EXPORT_SYMBOL(xfs_iflock_nowait);
 EXPORT_SYMBOL(xfs_iflush);
-EXPORT_SYMBOL(xfs_iflush_all);
 EXPORT_SYMBOL(xfs_ifunlock);
 EXPORT_SYMBOL(xfs_iget);
 EXPORT_SYMBOL(xfs_igrow_start);
