@@ -1,4 +1,4 @@
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.33 $"
 
 
 #include <sys/param.h>
@@ -488,14 +488,15 @@ xfs_qm_mount_quotas(
 			 * off, but the on disk superblock doesn't know that !
 			 */
 			ASSERT(!(XFS_IS_QUOTA_RUNNING(mp)));
-			cmn_err(CE_ALERT,
+			xfs_fs_cmn_err(CE_ALERT, mp,
 				"XFS mount_quotas: Superblock update failed!"
 				);
 		}
 	}
 
 	if (error) {
-		cmn_err(CE_WARN, "Failed to initialize disk quotas.");
+		xfs_fs_cmn_err(CE_WARN, mp,
+			"Failed to initialize disk quotas.");
 	}
 	return XFS_ERROR(error);
 }
@@ -1551,7 +1552,7 @@ xfs_qm_qino_alloc(
 	xfs_mod_sb(tp, sbfields);
 
 	if (error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES)) {
-		cmn_err(CE_ALERT,
+		xfs_fs_cmn_err(CE_ALERT, mp,
 			"XFS qino_alloc failed!"
 			);
 		return (error);

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision: 1.29 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -298,9 +298,9 @@ xfs_growfs_data(
 				  XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
 				  BTOBB(bsize), 0, &bp);
 		if (error) {
-			cmn_err(CE_WARN,
-"filesystem %s - error %d reading secondary superblock for ag %d\n",
-				mp->m_fsname, error, agno);
+			xfs_fs_cmn_err(CE_WARN, mp,
+			"error %d reading secondary superblock for ag %d\n",
+				error, agno);
 			break;
 		}
 		sbp = XFS_BUF_TO_SBP(bp);
@@ -313,9 +313,9 @@ xfs_growfs_data(
 		if (!(error = xfs_bwrite(mp, bp))) {
 			continue;
 		} else {
-			cmn_err(CE_WARN,
-"filesystem %s - write error %d updating secondary superblock for ag %d\n",
-				mp->m_fsname, error, agno);
+			xfs_fs_cmn_err(CE_WARN, mp,
+		"write error %d updating secondary superblock for ag %d\n",
+				error, agno);
 			break; /* no point in continuing */
 		}
 	}

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.169 $"
+#ident	"$Revision: 1.170 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -768,9 +768,9 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 	if (! (XFS_IS_QUOTA_ON(mp))) {
-		cmn_err(CE_NOTE, "Disk quotas not turned on: %s", mp->m_fsname);
+		xfs_fs_cmn_err(CE_NOTE, mp, "Disk quotas not turned on");
 	} else {
-		cmn_err(CE_NOTE, "Disk quotas turned on: %s", mp->m_fsname);
+		xfs_fs_cmn_err(CE_NOTE, mp, "Disk quotas turned on");
 	}
 #endif
 #endif /* !SIM */
@@ -945,9 +945,8 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 				sb->sb_flags |= XFS_SBF_READONLY;
 			if (!XFS_SB_VERSION_HASSHARED(sb))
 				XFS_SB_VERSION_ADDSHARED(sb);
-			cmn_err(CE_NOTE,
-			"Unmounting filesystem \"%s\", marking shared read-only",
-				mp->m_fsname);
+			xfs_fs_cmn_err(CE_NOTE, mp,
+				"Unmounting, marking shared read-only");
 		}
 		sbp->b_flags &= ~(B_DONE | B_READ);
 		sbp->b_flags |= B_WRITE;
@@ -957,7 +956,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		/* Nevermind errors we might get here. */
 		error = iowait(sbp);
 		if (error && mp->m_mk_sharedro)
-			cmn_err(CE_ALERT, "Superblock write error detected while unmounting filesystem \"%s\".  Filesystem may not be marked shared readonly", mp->m_fsname);
+			xfs_fs_cmn_err(CE_ALERT, mp, "Superblock write error detected while unmounting.  Filesystem may not be marked shared readonly");
 	}
 	
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
@@ -1479,9 +1478,7 @@ xfs_mount_reset_sbqflags(
 	if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)
 		return;
 #ifdef QUOTADEBUG	
-	cmn_err(CE_NOTE, 	
-		"Writing superblock quota changes :%s\n",
-		mp->m_fsname);
+	xfs_fs_cmn_err(CE_NOTE, mp, "Writing superblock quota changes");
 #endif
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SBCHANGE);
 	if (xfs_trans_reserve(tp, 0, mp->m_sb.sb_sectsize + 128, 0, 0, 
