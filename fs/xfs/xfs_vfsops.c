@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.77 $"
+#ident  "$Revision: 1.78 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -497,6 +497,7 @@ xfs_get_vfsmount(struct vfs	*vfsp,
 	return mp;
 }	/* end of xfs_get_vfsmount() */
 
+#if _K64U64
 /*
  * irix5_to_xfs_args
  * 
@@ -520,6 +521,7 @@ irix5_to_xfs_args(
 
 	return 0;
 }
+#endif
 
 /*
  * xfs_vfsmount
