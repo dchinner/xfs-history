@@ -321,9 +321,9 @@ xfs_iomap_map_trace(
 		     (void*)((unsigned long)(bmapp->pboff)),
 		     (void*)((unsigned long)(bmapp->pbsize)),
 		     (void*)(bmapp->bn),
-		     (void*)(imapp->br_startoff),
+		     (void*)(__psint_t)(imapp->br_startoff),
 		     (void*)((unsigned long)(imapp->br_blockcount)),
-		     (void*)(imapp->br_startblock));
+		     (void*)(__psint_t)(imapp->br_startblock));
 }
 #endif	/* DEBUG */
 	     
