@@ -3,14 +3,6 @@
 
 #ident	"$Revision$"
 
-/*
- * block numbers in the AG; SB is block 0, AGH is block 1, free btree roots
- * are 2 and 3.
- */
-#define	XFS_IBT_BLOCK	((xfs_agblock_t)(XFS_CNT_BLOCK + 1))
-
-#define	XFS_PREALLOC_BLOCKS	((xfs_agblock_t)(XFS_IBT_BLOCK + 1))
-
 #define	XFS_IALLOC_MAX_EVER_BLOCKS	16
 #define	XFS_IALLOC_MAX_EVER_INODES	256
 #define	XFS_IALLOC_MAX_EVER(s,a)	xfs_extlen_min(XFS_IALLOC_MAX_EVER_BLOCKS, XFS_IALLOC_MAX_EVER_INODES >> (s)->sb_inopblog)
@@ -23,17 +15,6 @@
 /*
  * Structures for inode mapping
  */
-#define	XFS_IBT_MAGIC	0x58494254	/* 'XIBT' */
-
-/*
- * Data record/key structure
- */
-typedef struct xfs_ialloc_rec
-{
-	xfs_agino_t	ir_startinode;	/* starting inode number */
-	xfs_agblock_t	ir_startblock;	/* starting block number */
-	xfs_agino_t	ir_inodecount;	/* number of inodes */
-} xfs_ialloc_rec_t;
 
 /*
  * Real block structures have a size equal to the file system block size.
