@@ -266,7 +266,7 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	size = XFS_DIR_SF_ENTSIZE_BYNAME(args->namelen);
 	xfs_idata_realloc(dp, size);
 	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
-	sfe = &sf->list[sf->hdr.count];
+	sfe = (struct xfs_dir_sf_entry *)((char *)sf + offset);
 
 	bcopy((char *)&args->inumber, sfe->inumber, sizeof(xfs_ino_t));
 	sfe->namelen = args->namelen;
