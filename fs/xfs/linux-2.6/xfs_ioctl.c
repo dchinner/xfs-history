@@ -356,7 +356,6 @@ xfs_open_by_handle(
 	/* Create file pointer. */
 	filp = dentry_open(dentry, parfilp->f_vfsmnt, hreq.oflags);
 	if (IS_ERR(filp)) {
-		dput(dentry);
 		put_unused_fd(new_fd);
 		return -XFS_ERROR(-PTR_ERR(filp));
 	}
