@@ -1,4 +1,4 @@
-#ident "$Revision: 1.383 $"
+#ident "$Revision: 1.384 $"
 
 
 #ifdef SIM
@@ -4979,7 +4979,8 @@ xfs_symlink(
 	 * xfs_trans_commit	*/
 std_return:
 #ifndef SIM
-	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_POSTSYMLINK)) {
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
+			     DM_EVENT_POSTSYMLINK)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTSYMLINK,
 						dir_bdp, DM_RIGHT_NULL,
 						error? NULL:XFS_ITOBHV(ip),
