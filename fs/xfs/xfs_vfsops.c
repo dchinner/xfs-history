@@ -27,6 +27,7 @@
 #include <sys/vfs.h>
 #include <sys/pfdat.h>
 #include <sys/vnode.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
@@ -58,7 +59,6 @@
 #include <sys/uio.h>
 #include <sys/dirent.h>
 #include <sys/ktrace.h>
-#include <sys/uuid.h>
 #ifndef SIM
 #include <sys/xlv_base.h>
 #include <sys/xlv_tab.h>
@@ -303,12 +303,22 @@ xfs_init(
 	/*
 	 * Allocate global trace buffers.
 	 */
-#if defined(DEBUG) && !defined(SIM)
+#ifdef XFS_ALLOC_TRACE
 	xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE, 0);
+#endif
+#ifdef XFS_BMAP_TRACE
 	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE, 0);
+#endif
+#ifdef XFS_BMBT_TRACE
 	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, 0);
+#endif
+#ifdef XFS_STRAT_TRACE
 	xfs_strat_trace_buf = ktrace_alloc(XFS_STRAT_GTRACE_SIZE, 0);
+#endif
+#ifdef XFS_DIR_TRACE
 	xfs_dir_trace_buf = ktrace_alloc(XFS_DIR_TRACE_SIZE, 0);
+#endif
+#ifdef XFS_ATTR_TRACE
 	xfs_attr_trace_buf = ktrace_alloc(XFS_ATTR_TRACE_SIZE, 0);
 #endif
 
