@@ -365,9 +365,9 @@ xfs_bmbt_get_rec(xfs_btree_cur_t *cur, xfs_fsblock_t *off, xfs_fsblock_t *bno, x
 	if (ptr > block->bb_numrecs || ptr <= 0)
 		return 0;
 	rp = XFS_BMAP_REC_IADDR(block, ptr, cur);
-	*off = xfs_offset_ptox(rp->br_startoff);
-	*bno = xfs_blkno_ptox(rp->br_startblock);
-	*len = xfs_extlen_ptox(rp->br_blockcount);
+	*off = xfs_bmbt_get_startoff(rp);
+	*bno = xfs_bmbt_get_startblock(rp);
+	*len = xfs_bmbt_get_blockcount(rp);
 	return 1;
 }
 
@@ -427,7 +427,9 @@ xfs_bmbt_insert(xfs_btree_cur_t *cur)
 
 	level = 0;
 	nbno = NULLAGBLOCK;
-	xfs_xtoprec(&cur->bc_rec.b, &nrec);
+	xfs_bmbt_set_startoff(&nrec, cur->bc_rec.b.br_startoff);
+	xfs_bmbt_set_startblock(&nrec, cur->bc_rec.b.br_startblock);
+	xfs_bmbt_set_blockcount(&nrec, cur->bc_rec.b.br_blockcount);
 	ncur = (xfs_btree_cur_t *)0;
 	pcur = cur;
 	do {
@@ -751,7 +753,7 @@ xfs_bmbt_lookup(xfs_btree_cur_t *cur, xfs_lookup_t dir)
 			while (low <= high) {
 				keyno = (low + high) >> 1;
 				kp = kbase + keyno - 1;
-				diff = (int)(xfs_offset_ptox(kp->br_startoff) - rp->br_startoff);
+				diff = (int)(xfs_bmbt_get_startoff(kp) - rp->br_startoff);
 				if (diff < 0)
 					low = keyno + 1;
 				else if (diff > 0)
@@ -1194,9 +1196,9 @@ xfs_bmbt_update(xfs_btree_cur_t *cur, xfs_fsblock_t off, xfs_fsblock_t bno, xfs_
 	ptr = cur->bc_ptrs[0];
 	tp = cur->bc_tp;
 	rp = XFS_BMAP_REC_IADDR(block, ptr, cur);
-	xfs_offset_xtop(rp->br_startoff, off);
-	xfs_blkno_xtop(rp->br_startblock, bno);
-	xfs_extlen_xtop(rp->br_blockcount, len);
+	xfs_bmbt_set_startoff(rp, off);
+	xfs_bmbt_set_startblock(rp, bno);
+	xfs_bmbt_set_blockcount(rp, len);
 	if (cur->bc_nlevels > 1) {
 		first = (caddr_t)rp - (caddr_t)block;
 		last = first + (int)sizeof(*rp) - 1;
@@ -1269,12 +1271,14 @@ xfs_bmbt_map(xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno, xfs_extlen_t l
 	xfs_fsblock_t prevbno = NULLFSBLOCK;
 	xfs_extlen_t prevlen;
 	xfs_fsblock_t prevoff = NULLFSBLOCK;
+	xfs_sb_t *sbp;
 
 	ASSERT(*nmap >= 1);
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE);
 	mp = ip->i_mount;
+	sbp = &mp->m_sb;
 	end = bno + len;
-	agno = xfs_ino_to_agno(ip->i_ino);
+	agno = xfs_ino_to_agno(sbp, ip->i_ino);
 	agbuf = xfs_btree_bread(mp, tp, agno, XFS_AGH_BLOCK);
 	cur = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_BMAP, ip);
 	eof = 0;
