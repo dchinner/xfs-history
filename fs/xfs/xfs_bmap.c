@@ -66,10 +66,6 @@
 #include "sim.h"
 #endif
 
-#if !defined(SIM) || !defined(XFSDEBUG)
-#define	kmem_check()	/* dummy for memory-allocation checking */
-#endif
-
 #ifdef DEBUG
 ktrace_t	*xfs_bmap_trace_buf;
 #endif
@@ -301,7 +297,7 @@ xfs_bmap_search_extents(
 	xfs_bmbt_irec_t	*gotp,		/* out: extent entry found */
 	xfs_bmbt_irec_t	*prevp);	/* out: previous extent entry found */
 
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
@@ -525,7 +521,7 @@ xfs_bmap_add_extent(
 	xfs_filblks_t		da_new; /* new count del alloc blocks used */
 	xfs_filblks_t		da_old; /* old count del alloc blocks used */
 	int			error;
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_add_extent";
 #endif
 	xfs_ifork_t		*ifp;	/* inode fork ptr */
@@ -552,7 +548,6 @@ xfs_bmap_add_extent(
 		xfs_bmap_insert_exlist(ip, 0, 1, new, whichfork);
 		ASSERT(cur == NULL);
 		ifp->if_lastex = 0;
-		kmem_check();
 		if (!ISNULLSTARTBLOCK(new->br_startblock)) {
 			XFS_IFORK_NEXT_SET(ip, whichfork, 1);
 			logflags = XFS_ILOG_CORE | XFS_ILOG_FEXT(whichfork);
@@ -644,7 +639,7 @@ xfs_bmap_add_extent(
 	 */
 	if (da_old || da_new) {
 		xfs_filblks_t	nblks;
-		
+
 		nblks = da_new;
 		if (cur)
 			nblks += cur->bc_private.b.allocated;
@@ -684,7 +679,7 @@ xfs_bmap_add_extent_delay_real(
 	int			diff;	/* temp value */
 	xfs_bmbt_rec_t		*ep;	/* extent entry for idx */
 	int			error;
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_add_extent_delay_real";
 #endif
 	int			i;	/* temp state */
@@ -1183,7 +1178,6 @@ xfs_bmap_add_extent_delay_real(
 		ASSERT(0);
 	}
 	*curp = cur;
-	kmem_check();
 	*logflagsp = rval;
 	return 0;
 #undef	LEFT
@@ -1214,7 +1208,7 @@ xfs_bmap_add_extent_hole_delay(
 {
 	xfs_bmbt_rec_t		*base;	/* base of extent entry list */
 	xfs_bmbt_rec_t		*ep;	/* extent list entry for idx */
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_add_extent_hole_delay";
 #endif
 	xfs_bmbt_irec_t		left;	/* left neighbor extent entry */
@@ -1358,7 +1352,6 @@ xfs_bmap_add_extent_hole_delay(
 		 * Nothing to do for disk quota accounting here.
 		 */
 	}
-	kmem_check();
 	*logflagsp = 0;
 	return 0;
 #undef	MASK
@@ -1384,7 +1377,7 @@ xfs_bmap_add_extent_hole_real(
 {
 	xfs_bmbt_rec_t		*ep;	/* pointer to extent entry ins. point */
 	int			error;
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_add_extent_hole_real";
 #endif
 	int			i;	/* temp state */
@@ -1469,7 +1462,6 @@ xfs_bmap_add_extent_hole_real(
 		ifp->if_lastex = idx - 1;
 		XFS_IFORK_NEXT_SET(ip, whichfork,
 			XFS_IFORK_NEXTENTS(ip, whichfork) - 1);
-		kmem_check();
 		if (cur == NULL) {
 			*logflagsp = XFS_ILOG_CORE | XFS_ILOG_FEXT(whichfork);
 			return 0;
@@ -1491,7 +1483,6 @@ xfs_bmap_add_extent_hole_real(
 		xfs_bmbt_update(cur, left.br_startoff, left.br_startblock,
 			left.br_blockcount + new->br_blockcount +
 			right.br_blockcount);
-		kmem_check();
 		*logflagsp = XFS_ILOG_CORE;
 		return 0;
 
@@ -1506,7 +1497,6 @@ xfs_bmap_add_extent_hole_real(
 			left.br_blockcount + new->br_blockcount);
 		xfs_bmap_trace_post_update(fname, "LC", ip, idx - 1, whichfork);
 		ifp->if_lastex = idx - 1;
-		kmem_check();
 		if (cur == NULL) {
 			*logflagsp = XFS_ILOG_FEXT(whichfork);
 			return 0;
@@ -1519,7 +1509,6 @@ xfs_bmap_add_extent_hole_real(
 		}
 		xfs_bmbt_update(cur, left.br_startoff, left.br_startblock,
 			left.br_blockcount + new->br_blockcount);
-		kmem_check();
 		*logflagsp = 0;
 		return 0;
 
@@ -1534,7 +1523,6 @@ xfs_bmap_add_extent_hole_real(
 			new->br_blockcount + right.br_blockcount);
 		xfs_bmap_trace_post_update(fname, "RC", ip, idx, whichfork);
 		ifp->if_lastex = idx;
-		kmem_check();
 		if (cur == NULL) {
 			*logflagsp = XFS_ILOG_FEXT(whichfork);
 			return 0;
@@ -1547,7 +1535,6 @@ xfs_bmap_add_extent_hole_real(
 		}
 		xfs_bmbt_update(cur, new->br_startoff, new->br_startblock,
 			new->br_blockcount + right.br_blockcount);
-		kmem_check();
 		*logflagsp = 0;
 		return 0;
 
@@ -1563,7 +1550,6 @@ xfs_bmap_add_extent_hole_real(
 		ifp->if_lastex = idx;
 		XFS_IFORK_NEXT_SET(ip, whichfork,
 			XFS_IFORK_NEXTENTS(ip, whichfork) + 1);
-		kmem_check();
 		if (cur == NULL) {
 			*logflagsp = XFS_ILOG_CORE | XFS_ILOG_FEXT(whichfork);
 			return 0;
@@ -1578,7 +1564,6 @@ xfs_bmap_add_extent_hole_real(
 		if (error) {
 			return error;
 		}
-		kmem_check();
 		*logflagsp = XFS_ILOG_CORE;
 		return 0;
 	}
@@ -1880,7 +1865,7 @@ xfs_bmap_alloc(
 		}
 		args.minleft = ap->minleft;
 		args.wasdel = ap->wasdel;
-		args.isfl = 0;
+		args.alignment = args.isfl = 0;
 		args.userdata = ap->userdata;
 		error = xfs_alloc_vextent(&args);
 		if (error) {
@@ -1935,7 +1920,6 @@ xfs_bmap_alloc(
 			ap->alen = 0;
 		}
 	}
-	kmem_check();
 	return 0;
 }
 
@@ -1983,14 +1967,14 @@ xfs_bmap_btree_to_extents(
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
 	xfs_trans_set_sync(tp);
 	ip->i_d.di_nblocks--;
-	
+
 	if (XFS_IS_QUOTA_ON(mp) &&
 	    ip->i_ino != mp->m_sb.sb_uquotino &&
 	    ip->i_ino != mp->m_sb.sb_pquotino) {
 		xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_BCOUNT,
 					  (long) -1);
 	}
-	
+
 	xfs_trans_binval(tp, cbp);
 	if (cur->bc_bufs[0] == cbp)
 		cur->bc_bufs[0] = NULL;
@@ -2050,7 +2034,7 @@ xfs_bmap_del_extent(
 	xfs_bmbt_rec_t		*ep;	/* current extent entry pointer */
 	int			error;
 	int			flags;	/* inode logging flags */
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_del_extent";
 #endif
 	xfs_bmbt_irec_t		got;	/* current extent entry */
@@ -2063,17 +2047,19 @@ xfs_bmap_del_extent(
 	xfs_filblks_t		temp;	/* for indirect length calculations */
 	xfs_filblks_t		temp2;	/* for indirect length calculations */
 	xfs_mount_t		*mp;
-
+	
 	XFSSTATS.xs_del_exlist++;
-	mp = ip->i_mount;
+	mp = ip->i_mount;	
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
 	ASSERT(idx >= 0 && idx < nextents);
 	ASSERT(del->br_blockcount > 0);
 	ep = &ifp->if_u1.if_extents[idx];
 	xfs_bmbt_get_all(ep, &got);
+	ASSERT(got.br_startoff <= del->br_startoff);
 	del_endoff = del->br_startoff + del->br_blockcount;
 	got_endoff = got.br_startoff + got.br_blockcount;
+	ASSERT(got_endoff >= del_endoff);
 	delay = ISNULLSTARTBLOCK(got.br_startblock);
 	ASSERT(ISNULLSTARTBLOCK(del->br_startblock) == delay);
 	flags = 0;
@@ -2107,7 +2093,7 @@ xfs_bmap_del_extent(
 				xfs_trans_mod_dquot_byino(tp, ip,
 							XFS_TRANS_DQ_RTBCOUNT,
 							(long) -nblks);
-			}		
+			}
 		}
 		/*
 		 * Ordinary allocation.  Add it to list of extents to be
@@ -2302,11 +2288,11 @@ xfs_bmap_del_extent(
 	}
 	/*
 	 * Account for change in delayed indirect blocks.
+	 * Nothing to do for disk quota accounting here.
 	 */
 	ASSERT(da_old >= da_new);
-	if (da_old > da_new)
+	if (da_old > da_new) 
 		xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS, da_old - da_new);
-	kmem_check();
 	*logflagsp = flags;
 	return 0;
 }
@@ -2327,7 +2313,6 @@ xfs_bmap_del_free(
 		flist->xbf_first = free->xbfi_next;
 	flist->xbf_count--;
 	kmem_zone_free(xfs_bmap_free_item_zone, free);
-	kmem_check();
 }
 
 /*
@@ -2353,7 +2338,6 @@ xfs_bmap_delete_exlist(
 	ovbcopy(&base[idx + count], &base[idx],
 		(nextents - idx) * sizeof(*base));
 	xfs_iext_realloc(ip, -count, whichfork);
-	kmem_check();
 }
 
 /*
@@ -2432,7 +2416,7 @@ xfs_bmap_extents_to_btree(
 		args.fsbno = *firstblock;
 	}
 	args.minlen = args.maxlen = args.prod = 1;
-	args.total = args.minleft = args.mod = args.isfl = 0;
+	args.total = args.minleft = args.alignment = args.mod = args.isfl = 0;
 	args.wasdel = wasdel;
 	error = xfs_alloc_vextent(&args);
 	if (error) {
@@ -2488,10 +2472,7 @@ xfs_bmap_extents_to_btree(
 	 */
 	xfs_bmbt_log_block(cur, abp, XFS_BB_ALL_BITS);
 	xfs_bmbt_log_recs(cur, abp, 1, ablock->bb_numrecs);
-	xfs_bmbt_rcheck(cur);
-	xfs_bmbt_kcheck(cur);
 	*curp = cur;
-	kmem_check();
 	*logflagsp = XFS_ILOG_CORE | XFS_ILOG_FBROOT(whichfork);
 	return 0;
 
@@ -2526,7 +2507,6 @@ xfs_bmap_insert_exlist(
 		(nextents - (idx + count)) * sizeof(*base));
 	for (to = idx; to < idx + count; to++, new++)
 		xfs_bmbt_set_all(&base[to], new);
-	kmem_check();
 }
 
 /*
@@ -2545,7 +2525,7 @@ xfs_bmap_local_to_extents(
 {
 	int		error;
 	int		flags = 0;
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 	static char	fname[] = "xfs_bmap_local_to_extents";
 #endif
 	xfs_ifork_t	*ifp;
@@ -2572,7 +2552,8 @@ xfs_bmap_local_to_extents(
 			args.type = XFS_ALLOCTYPE_NEAR_BNO;
 		}
 		args.total = total;
-		args.mod = args.minleft = args.wasdel = args.isfl = 0;
+		args.mod = args.minleft = args.alignment = args.wasdel =
+			args.isfl = 0;
 		args.minlen = args.maxlen = args.prod = 1;
 		error = xfs_alloc_vextent(&args);
 		if (error) {
@@ -2609,7 +2590,6 @@ xfs_bmap_local_to_extents(
 	ifp->if_flags |= XFS_IFEXTENTS;
 	XFS_IFORK_FMT_SET(ip, whichfork, XFS_DINODE_FMT_EXTENTS);
 	flags |= XFS_ILOG_CORE;
-	kmem_check();
 	*logflagsp = flags;
 	return 0;
 }
@@ -2688,7 +2668,6 @@ xfs_bmap_search_extents(
 				*eofp = 0;
 				*lastxp = lastx;
 				*gotp = got;
-				kmem_check();
 				return ep;
 			}
 		}
@@ -2716,11 +2695,10 @@ xfs_bmap_search_extents(
 		got.br_startblock = xfs_bmbt_get_startblock(ep);
 	*lastxp = lastx;
 	*gotp = got;
-	kmem_check();
 	return ep;
 }
 
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
@@ -2951,7 +2929,7 @@ xfs_bmap_add_attrfork(
 			XFS_TRANS_PERM_LOG_RES, XFS_ADDAFORK_LOG_COUNT))
 		goto error0;
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	
+
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (error = xfs_trans_reserve_blkquota(tp, ip, (long)1)) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -3017,10 +2995,10 @@ xfs_bmap_add_attrfork(
 		break;
 	}
 	xfs_trans_log_inode(tp, ip, logflags);
-	if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASATTR) {
+	if (!XFS_SB_VERSION_HASATTR(&mp->m_sb)) {
 		s = XFS_SB_LOCK(mp);
-		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASATTR) {
-			mp->m_sb.sb_versionnum = XFS_SB_VERSION_HASATTR;
+		if (!XFS_SB_VERSION_HASATTR(&mp->m_sb)) {
+			XFS_SB_VERSION_ADDATTR(&mp->m_sb);
 			XFS_SB_UNLOCK(mp, s);
 			xfs_mod_sb(tp, XFS_SB_VERSIONNUM);
 		} else {
@@ -3092,7 +3070,6 @@ xfs_bmap_add_free(
 		flist->xbf_first = new;
 	new->xbfi_next = cur;
 	flist->xbf_count++;
-	kmem_check();
 }
 
 /* 
@@ -3213,7 +3190,6 @@ xfs_bmap_finish(
 			free->xbfi_blockcount);
 		xfs_bmap_del_free(flist, NULL, free);
 	}
-	kmem_check();
 	return 0;
 #endif
 }
@@ -3381,7 +3357,7 @@ xfs_bmap_read_extents(
 	xfs_fsblock_t		bno;	/* block # of "block" */
 	buf_t			*bp;	/* buffer for "block" */
 	int			error;
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_bmap_read_extents";
 #endif
 	xfs_extnum_t		i;	/* index into the extents list */
@@ -3472,11 +3448,10 @@ xfs_bmap_read_extents(
 	ASSERT(i == ifp->if_bytes / sizeof(*trp));
 	ASSERT(i == XFS_IFORK_NEXTENTS(ip, whichfork));
 	xfs_bmap_trace_exlist(fname, ip, i, whichfork);
-	kmem_check();
 	return 0;
 }
 
-#if defined(XFS_BMAP_TRACE)
+#ifdef XFS_BMAP_TRACE
 /*
  * Add bmap trace insert entries for all the contents of the extent list.
  */
@@ -3715,7 +3690,7 @@ xfs_bmapi(
 			if (delay) {
 				indlen = xfs_bmap_worst_indlen(ip, alen);
 				ASSERT(indlen > 0);
-				
+
 				/*
 				 * Make a transaction-less quota reservation for
 				 * delayed allocation blocks. This number gets
@@ -3737,11 +3712,10 @@ xfs_bmapi(
 				if (xfs_mod_incore_sb(ip->i_mount,
 						XFS_SBS_FDBLOCKS,
 						-(alen + indlen))) {
-					
+
 					if (XFS_IS_QUOTA_ON(ip->i_mount)) {
 						xfs_trans_unreserve_blkquota(
-							      NULL, ip,
-							      (long) alen);
+							NULL, ip, (long) alen);
 					}
 					break;
 				}
@@ -4009,7 +3983,6 @@ xfs_bmapi(
 	}
 	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
 		orig_nmap, *nmap);
-	kmem_check();
 	return 0;
 }
 
@@ -4200,7 +4173,7 @@ xfs_bunmapi(
 			ASSERT(STARTBLOCKVAL(del.br_startblock) > 0);
 			xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS,
 				del.br_blockcount);
-			
+
 			if (XFS_IS_QUOTA_ON(ip->i_mount)) {
 				ASSERT(ip->i_ino != mp->m_sb.sb_uquotino);
 				ASSERT(ip->i_ino != mp->m_sb.sb_pquotino);
@@ -4302,7 +4275,6 @@ xfs_bunmapi(
 		cur->bc_private.b.allocated = 0;
 		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	}
-	kmem_check();
 	return 0;
 }
 
