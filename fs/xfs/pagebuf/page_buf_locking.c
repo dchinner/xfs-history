@@ -55,8 +55,13 @@
 #include <linux/string.h>
 #include <linux/pagemap.h>
 #include <linux/init.h>
+#include <linux/major.h>
 
 #include "page_buf_internal.h"
+
+#ifndef EVMS_MAJOR
+#define EVMS_MAJOR      117
+#endif
 
 pb_hash_t	pbhash[NHASH];
 
@@ -346,6 +351,12 @@ pagebuf_lock_enable(
 		target->pbr_device = kdev;
 		pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
 		target->pbr_mapping = target->pbr_bdev->bd_inode->i_mapping;
+		if ((MAJOR(kdev) == MD_MAJOR) || (MAJOR(kdev) == EVMS_MAJOR)) 
+			target->pbr_flags = PBR_ALIGNED_ONLY;
+		else if (MAJOR(kdev) == LVM_BLK_MAJOR)
+			target->pbr_flags = PBR_SECTOR_ONLY;
+		else
+			target->pbr_flags = 0;
 	}
 
 	return target;

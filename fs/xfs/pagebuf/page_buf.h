@@ -132,9 +132,12 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 #define PBF_NOT_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) != 0)
 #define PBF_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) == 0)
 
+#define PBR_SECTOR_ONLY	1	/* only use sector size buffer heads */
+#define PBR_ALIGNED_ONLY 2	/* only use aligned I/O */
 
 typedef struct pb_target {
 	kdev_t			pbr_device;
+	int			pbr_flags;
 	struct block_device	*pbr_bdev;
 	struct address_space	*pbr_mapping;
 	unsigned int		pbr_blocksize;

@@ -508,29 +508,13 @@ _pagebuf_lookup_pages(
 			lock_page(page);
 		}
 
-		/* Test for the page being valid. There is a special case
-		 * in here for the case where we are reading a pagebuf
-		 * smaller than a page. We want to populate the whole page
-		 * here rather than just the part the caller wanted. That
-		 * way we do not need to deal with partially valid pages.
-		 * We keep the page locked, and in the read path fake out
-		 * the lower layers to issue an I/O for the whole page.
-		 *
-		 * This doesn't work for filesystem blocksizes which are
-		 * smaller than the pagesize.  We can have metadata blocks
-		 * on these block device inode pages overlapping with file
-		 * data...  so it would be possible to have multiple pages
-		 * thinking they all have uptodate (different) data. :(
-		 * We'll have to use a different approach for that case.
-		 */
+		/* If we need to do I/O on a page record the fact */
 		if (!Page_Uptodate(page)) {
 			good_pages--;
 			if ((blocksize == PAGE_CACHE_SIZE) &&
 			    (flags & PBF_READ))
 				pb->pb_locked = 1;
 		}
-		if (!pb->pb_locked)
-			unlock_page(page);
 	}
 	if (cached_page)
 		page_cache_release(cached_page);
@@ -563,6 +547,11 @@ mapit:
 		pb->pb_flags &= ~(PBF_NONE);
 		if (good_pages != page_count) {
 			pb->pb_flags |= PBF_PARTIAL;
+		}
+	}
+	if (!pb->pb_locked) {
+		for (pi = 0; pi < page_count; pi++) {
+			unlock_page(pb->pb_pages[pi]);
 		}
 	}
 
@@ -1455,15 +1444,19 @@ _pagebuf_page_io(
 	/* This will attempt to make a request bigger than the sector
 	 * size if we are well aligned.
 	 */
-	if ((MAJOR(dev) != LVM_BLK_MAJOR) && (MAJOR(dev) != MD_MAJOR)) {
+	switch (pb->pb_target->pbr_flags) {
+	case 0:
 		sector = blk_length << SECTOR_SHIFT;
 		blk_length = 1;
-	 } else if ((MAJOR(dev) == MD_MAJOR) && (pg_offset == 0) &&
-		   (pg_length == PAGE_CACHE_SIZE) &&
-		   (((unsigned int) bn) & BN_ALIGN_MASK) == 0) {
-		sector = blk_length << SECTOR_SHIFT;
-		blk_length = 1;
-	} else {
+		break;
+	case PBR_ALIGNED_ONLY:
+		if ((pg_offset == 0) && (pg_length == PAGE_CACHE_SIZE) &&
+		    (((unsigned int) bn) & BN_ALIGN_MASK) == 0) {
+			sector = blk_length << SECTOR_SHIFT;
+			blk_length = 1;
+			break;
+		}
+	default:
 		sector = SECTOR_SIZE;
 	}
 
@@ -1508,7 +1501,7 @@ request:
 			callback = public_bh ?
 				   _end_io_multi_part : _end_io_multi_full;
 		} else {
-			callback = locking? _end_io_locked : _end_io_nolock;
+			callback = locking ? _end_io_locked : _end_io_nolock;
 		}
 
 		/* Indicate that there is another page in progress */
