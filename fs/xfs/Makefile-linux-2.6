@@ -148,6 +148,8 @@ obj-y				+= linux/linux_xfs.o
 
 include $(TOPDIR)/Rules.make
 
+CFLAGS_xfsidbg.o += -I $(TOPDIR)/arch/$(ARCH)/kdb
+
 # This is really nasty, but Rules.make was never designed for multi directory
 # modules.  Keith Owens.
 
