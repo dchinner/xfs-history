@@ -68,6 +68,7 @@
 #endif
 
 STATIC int	xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
+STATIC int	xlog_clear_stale_blocks(xlog_t	*log);
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
 #ifndef SIM
@@ -138,6 +139,37 @@ xlog_bread(xlog_t	*log,
 	return 0;
 }	/* xlog_bread */
 
+
+/*
+ * Write out the buffer at the given block for the given number of blocks.
+ * The buffer is kept locked across the write and is returned locked.
+ * This can only be used for synchronous log writes.
+ */
+int
+xlog_bwrite(
+	xlog_t	*log,
+	daddr_t	blk_no,
+	int	nbblks,
+	buf_t	*bp)
+{
+	ASSERT(nbblks > 0);
+	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
+
+	bp->b_blkno	= log->l_logBBstart + blk_no;
+	bp->b_flags	= B_BUSY | B_HOLD;
+	bp->b_bcount	= BBTOB(nbblks);
+	bp->b_edev	= log->l_dev;
+
+	(void) bwrite(bp);
+
+	if (bp->b_flags & B_ERROR) {
+		cmn_err(CE_WARN, "XFS: error writing log block #%d",
+			bp->b_blkno);
+		ASSERT(0);
+		return bp->b_error;
+	}
+	return 0;
+}	/* xlog_bwrite */
 
 /*
  * This routine finds (to an approximation) the first block in the physical
@@ -594,10 +626,12 @@ xlog_find_tail(xlog_t  *log,
 	       daddr_t *head_blk,
 	       daddr_t *tail_blk)
 {
-	xlog_rec_header_t *rhead;
-	xlog_op_header_t  *op_head;
-	buf_t		  *bp;
-	int		  error, i, found;
+	xlog_rec_header_t	*rhead;
+	xlog_op_header_t	*op_head;
+	buf_t			*bp;
+	int			error, i, found;
+	daddr_t			umount_data_blk;
+	daddr_t			after_umount_blk;
 	
 	found = error = 0;
 	/*
@@ -679,18 +713,33 @@ xlog_find_tail(xlog_t  *log,
 
 	/*
 	 * Look for unmount record.  If we find it, then we know there
-	 * was a clean unmount.
+	 * was a clean unmount.  Since 'i' could be the last block in
+	 * the physical log, we convert to a log block before comparing
+	 * to the head_blk.
 	 */
-	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
-		if (error = xlog_bread(log, i+1, 1, bp))
+	after_umount_blk = (i + 2) % log->l_logBBsize;
+	if (*head_blk == after_umount_blk && rhead->h_num_logops == 1) {
+		umount_data_blk = (i + 1) % log->l_logBBsize;
+		if (error = xlog_bread(log, umount_data_blk, 1, bp)) {
 			goto bread_err;
+		}
 		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
 		if (op_head->oh_flags & XLOG_UNMOUNT_TRANS) {
 			log->l_tail_lsn =
-			     ((long long)log->l_curr_cycle<< 32)|((uint)(i+2));
-			*tail_blk = i+2;
+			     ((long long)log->l_curr_cycle << 32) |
+			     ((uint)(after_umount_blk));
+			*tail_blk = after_umount_blk;
 		}
 	}
+
+	/*
+	 * Make sure that there are no blocks in front of the head
+	 * with the same cycle number as the head.  This can happen
+	 * because we allow multiple outstanding log writes concurrently,
+	 * and the later writes might make it out before earlier ones.
+	 */
+	error = xlog_clear_stale_blocks(log);
+
 bread_err:
 exit:
 	xlog_put_bp(bp);
@@ -803,6 +852,180 @@ bp_err:
 	return -1;
 }	/* xlog_find_zeroed */
 
+
+/*
+ * This is simply a subroutine used by xlog_clear_stale_blocks() below
+ * to initialize a buffer full of empty log record headers and write
+ * them into the log.
+ */
+STATIC int
+xlog_write_log_records(
+	xlog_t	*log,
+	int	cycle,
+	int	start_block,
+	int	blocks,
+	int	tail_cycle,
+	int	tail_block,		       
+	buf_t	*bp)
+{
+	xlog_rec_header_t	*recp;
+	int			i;
+	int			curr_block;
+	int			error;
+
+	recp = (xlog_rec_header_t*)(bp->b_un.b_addr);
+	curr_block = start_block;
+	for (i = 0; i < blocks; i++) {
+		recp->h_magicno = XLOG_HEADER_MAGIC_NUM;
+		recp->h_cycle = cycle;
+		recp->h_version = 1;
+		recp->h_len = 0;
+		ASSIGN_ANY_LSN(recp->h_lsn, cycle, curr_block);
+		ASSIGN_ANY_LSN(recp->h_tail_lsn, tail_cycle, tail_block);
+		recp->h_chksum = 0;
+		recp->h_prev_block = 0;	/* unused */
+		recp->h_num_logops = 0;
+		
+		curr_block++;
+		recp = (xlog_rec_header_t*)(((char *)recp) + BBSIZE);
+	}
+
+	error = xlog_bwrite(log, start_block, blocks, bp);
+
+	return error;
+}
+
+/*
+ * This routine is called to blow away any incomplete log writes out
+ * in front of the log head.  We do this so that we won't become confused
+ * if we come up, write only a little bit more, and then crash again.
+ * If we leave the partial log records out there, this situation could
+ * cause us to think those partial writes are valid blocks since they
+ * have the current cycle number.  We get rid of them by overwriting them
+ * with empty log records with the old cycle number rather than the
+ * current one.
+ */
+STATIC int
+xlog_clear_stale_blocks(
+	xlog_t	*log)
+{
+	int			tail_cycle;
+	int			head_cycle;
+	int			tail_block;
+	int			head_block;
+	int			tail_distance;
+	int			max_distance;
+	int			distance;
+	buf_t			*bp;
+	int			error;
+
+	tail_cycle = CYCLE_LSN(log->l_tail_lsn);
+	tail_block = BLOCK_LSN(log->l_tail_lsn);
+	head_cycle = log->l_curr_cycle;
+	head_block = log->l_curr_block;
+
+	/*
+	 * Figure out the distance between the new head of the log
+	 * and the tail.  We want to write over any blocks beyond the
+	 * head that we may have written just before the crash, but
+	 * we don't want to overwrite the tail of the log.
+	 */
+	if (head_cycle == tail_cycle) {
+		/*
+		 * The tail is behind the head in the physical log,
+		 * so the distance from the head to the tail is the
+		 * distance from the head to the end of the log plus
+		 * the distance from the beginning of the log to the
+		 * tail.
+		 */
+		ASSERT(head_block >= tail_block);
+		ASSERT(head_block < log->l_logBBsize);
+		tail_distance = tail_block +
+				(log->l_logBBsize - head_block);
+	} else {
+		/*
+		 * The head is behind the tail in the physical log,
+		 * so the distance from the head to the tail is just
+		 * the tail block minus the head block.
+		 */
+		ASSERT(head_block < tail_block);
+		ASSERT(head_cycle == (tail_cycle + 1));
+		tail_distance = tail_block - head_block;
+	}
+
+	/*
+	 * If the head is right up against the tail, we can't clear
+	 * anything.
+	 */
+	if (tail_distance <= 0) {
+		ASSERT(tail_distance == 0);
+		return 0;
+	}
+
+	max_distance = BTOBB(XLOG_MAX_ICLOGS << XLOG_MAX_RECORD_BSHIFT);
+	/*
+	 * Take the smaller of the maximum amount of outstanding I/O
+	 * we could have and the distance to the tail to clear out.
+	 * We take the smaller so that we don't overwrite the tail and
+	 * we don't waste all day writing from the head to the tail
+	 * for no reason.
+	 */
+	max_distance = MIN(max_distance, tail_distance);
+	bp = xlog_get_bp(max_distance);
+	
+	if ((head_block + max_distance) <= log->l_logBBsize) {
+		/*
+		 * We can stomp all the blocks we need to without
+		 * wrapping around the end of the log.  Just do it
+		 * in a single write.  Use the cycle number of the
+		 * current cycle minus one so that the log will look like:
+		 *     n ... | n - 1 ...
+		 */
+		error = xlog_write_log_records(log, (head_cycle - 1),
+				head_block, max_distance, tail_cycle,
+				tail_block, bp);
+		if (error) {
+			xlog_put_bp(bp);
+			return error;
+		}
+	} else {
+		/*
+		 * We need to wrap around the end of the physical log in
+		 * order to clear all the blocks.  Do it in two separate
+		 * I/Os.  The first write should be from the head to the
+		 * end of the physical log, and it should use the current
+		 * cycle number minus one just like above.
+		 */
+		distance = log->l_logBBsize - head_block;
+		error = xlog_write_log_records(log, (head_cycle - 1),
+				head_block, distance, tail_cycle,
+				tail_block, bp);
+		if (error) {
+			xlog_put_bp(bp);
+			return error;
+		}
+
+		/*
+		 * Now write the blocks at the start of the physical log.
+		 * This writes the remainder of the blocks we want to clear.
+		 * It uses the current cycle number since we're now on the
+		 * same cycle as the head so that we get:
+		 *    n ... n ... | n - 1 ...
+		 *    ^^^^^ blocks we're writing
+		 */
+		distance = max_distance - (log->l_logBBsize - head_block);
+		error = xlog_write_log_records(log, head_cycle, 0, distance,
+				tail_cycle, tail_block, bp);
+		if (error) {
+			xlog_put_bp(bp);
+			return error;
+		}
+	}
+
+	xlog_put_bp(bp);
+
+	return 0;
+}
 
 /******************************************************************************
  *
