@@ -4516,34 +4516,6 @@ xfs_rwunlock(
 	return;
 }
 
-/*
- * xfs_seek
- *
- * Return an error if the new offset has overflowed and gone below
- * 0 or is greater than our maximum defined file offset.  Just checking
- * for overflow is not enough since off_t may be an __int64_t but the
- * file size may be limited to some number of bits between 32 and 64.
- */
-/*ARGSUSED*/
-STATIC int
-xfs_seek(
-	bhv_desc_t	*bdp,
-	xfs_off_t	old_offset,
-	xfs_off_t	*new_offsetp)
-{
-	vnode_t		*vp;
-
-	vp = BHV_TO_VNODE(bdp);
-	if (vp->v_type == VDIR)
-		return(0);
-	if ((*new_offsetp > XFS_MAX_FILE_OFFSET) ||
-	    (*new_offsetp < 0)) {
-		return XFS_ERROR(EINVAL);
-	} else {
-		return 0;
-	}
-}
-
 STATIC int
 xfs_inode_flush(bhv_desc_t	*bdp)
 {
@@ -5563,7 +5535,6 @@ vnodeops_t xfs_vnodeops = {
 	.vop_fid2		= xfs_fid2,
 	.vop_rwlock		= xfs_rwlock,
 	.vop_rwunlock		= xfs_rwunlock,
-	.vop_seek		= xfs_seek,
 	.vop_bmap		= xfs_bmap,
 	.vop_strategy		= xfs_strategy,
 	.vop_reclaim		= xfs_reclaim,
