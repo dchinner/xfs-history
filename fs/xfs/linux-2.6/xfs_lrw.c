@@ -1948,7 +1948,7 @@ xfs_pb_nfreer(page_buf_t *bp){
 void
 XFS_bflush(buftarg_t target)
 {
-    int pincount=0;  /* unused */
+	int pincount = 0;  /* unused */
 	pagebuf_delwri_flush(target.inode, PBDF_WAIT, &pincount);
 }
 
@@ -1967,41 +1967,35 @@ XFS_bflush(buftarg_t target)
 void
 XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 {
-  xfs_mount_t	*mp;
-  int pincount = 0;
-  int count=0;
+	xfs_mount_t	*mp;
+	int pincount = 0;
+	int count=0;
  
-  mp = XFS_BHVTOM(bdp);
+	mp = XFS_BHVTOM(bdp);
   
-  do {
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	pagebuf_delwri_flush(mp->m_ddev_targ.inode, PBDF_WAIT|PBDF_PINCOUNT, &pincount);
-/*	printk("0 Got pincount %d \n",pincount); */
-	if (pincount == 0) {delay(500); count++;}
-  }  while (count < 2);
+	do {
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+		pagebuf_delwri_flush(mp->m_ddev_targ.inode,
+				PBDF_WAIT|PBDF_PINCOUNT, &pincount);
+		if (pincount == 0) {delay(50); count++;}
+	}  while (count < 2);
   
-  /* ok this is a best guest at this point
-   * hopefully everybody has stopped writing to filesystem
-   * and the loop above has pushed everything out.
-   * write out the superblock which should be the last of 
-   * transactions */
-  xfs_unmountfs_writesb(mp);
+	/* ok this is a best guest at this point
+	 * hopefully everybody has stopped writing to filesystem
+	 * and the loop above has pushed everything out.
+	 * write out the superblock which should be the last of 
+	 * transactions
+	*/
+	xfs_unmountfs_writesb(mp);
 
-  do {
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	pagebuf_delwri_flush(mp->m_ddev_targ.inode, PBDF_WAIT|PBDF_PINCOUNT, &pincount);
-/*	printk("1 Got pincount %d \n",pincount); */
-  }  while (pincount);
+	do {
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+		pagebuf_delwri_flush(mp->m_ddev_targ.inode,
+			PBDF_WAIT|PBDF_PINCOUNT, &pincount);
+	}  while (pincount);
  
-  /* Ok now write out an unmount record */
-  xfs_log_unmount_write(mp);            
-
-  /* force the log one more time */
-  do {
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	pagebuf_delwri_flush(mp->m_ddev_targ.inode, PBDF_WAIT|PBDF_PINCOUNT, &pincount);
-/*	printk("2 Got pincount %d \n",pincount); */
-  }  while (pincount);
+	/* Ok now write out an unmount record */
+	xfs_log_unmount_write(mp);            
 }
 
 dev_t

@@ -4153,17 +4153,18 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("transp 0x%p &itemp 0x%p\n",
 		ip->i_transp,
 		ip->i_itemp);
-	kdb_printf("&lock 0x%p lock_ra 0x%p &iolock 0x%p\n",
+	kdb_printf("&lock 0x%p &iolock 0x%p ni_lock_ra",
 		&ip->i_lock,
-		ip->i_ilock_ra,
 		&ip->i_iolock);
-	kdb_printf("udquotp 0x%p pdquotp 0x%p\n",
-		ip->i_udquot, ip->i_pdquot);
+	kdb_symbol_print((unsigned int) ip->i_ilock_ra, NULL,
+		KDB_SP_SPACEB|KDB_SP_PAREN|KDB_SP_NEWLINE);
 	kdb_printf("&flock 0x%p (%d) &pinlock 0x%p pincount 0x%x &pinsema 0x%p\n",
 		&ip->i_flock, valusema(&ip->i_flock),
 		&ip->i_ipinlock,
 		ip->i_pincount,
 		&ip->i_pinsema);
+	kdb_printf("udquotp 0x%p pdquotp 0x%p\n",
+		ip->i_udquot, ip->i_pdquot);
 	kdb_printf("&rlock 0x%p\n", &ip->i_iocore.io_rlock);
 	kdb_printf("next_offset %Lx ", ip->i_iocore.io_next_offset);
 	kdb_printf("io_offset %Lx reada_blkno %s io_size 0x%x\n",

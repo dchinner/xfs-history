@@ -680,9 +680,10 @@ linvfs_write_super(
  	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
  	int		error; 
 
-	if	(sb->s_flags & MS_RDONLY){
-	  return;
+	if (sb->s_flags & MS_RDONLY) {
+		return;
 	}
+
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
 		sys_cred, error);
 
@@ -752,13 +753,12 @@ linvfs_remount(
 	if (*flags & MS_RDONLY || args.flags & MS_RDONLY) {
 		int error;
 		int save = sb->s_flags;
+		xfs_mount_t *mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+
 		sb->s_flags |= MS_RDONLY;
-		
-		PVFS_SYNC(vfsp->vfs_fbhv,
-				  SYNC_ATTR|SYNC_WAIT|SYNC_CLOSE,
-				  sys_cred, error);
-		PVFS_SYNC(vfsp->vfs_fbhv,
-				  SYNC_ATTR|SYNC_WAIT|SYNC_CLOSE,
+
+		XFS_bflush(mp->m_ddev_targ);
+		VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT|SYNC_CLOSE,
 				  sys_cred, error);
 		if (error) {
 			sb->s_flags=save;
@@ -766,12 +766,8 @@ linvfs_remount(
 		}
 		
 		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
-	
-		printk("XFS: Marking FS read-only\n");
-		
 		vfsp->vfs_flag |= VFS_RDONLY;
 	} else {
-		printk("XFS: Remounting read-write\n");
 		vfsp->vfs_flag &= ~VFS_RDONLY;
 		sb->s_flags &= ~MS_RDONLY;
 	}
