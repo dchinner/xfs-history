@@ -1787,8 +1787,7 @@ xlog_state_done_syncing(
 	 * in the ACTIVE state.  We kick off one thread to force the
 	 * iclog buffer out.
 	 */
-	if (iclog->ic_next->ic_state == XLOG_STATE_ACTIVE ||
-	    iclog->ic_next->ic_state == XLOG_STATE_IOERROR)
+	if (iclog->ic_next->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_IOERROR))
 		sv_signal(&iclog->ic_next->ic_forcesema);
 	LOG_UNLOCK(log, spl);
 	xlog_state_do_callback(log);	/* also cleans log */
