@@ -84,7 +84,7 @@ linvfs_write(
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	loff_t		pos;
 	vnode_t		*vp;
-	int		err;
+	int		err;	/* Use negative errors in this f'n */
 	uio_t		uio;
 	iovec_t		iov;
 
@@ -107,7 +107,7 @@ linvfs_write(
 		goto out;
 	}
 
-	if (file->f_flags & O_APPEND)
+	if (!S_ISBLK(inode->i_mode) && file->f_flags & O_APPEND)
 		pos = inode->i_size;
 
 	/*
@@ -197,18 +197,19 @@ linvfs_write(
 	uio.uio_iov->iov_len = uio.uio_resid = count;
         
 	VOP_WRITE(vp, &uio, file->f_flags, NULL, NULL, err);
+	/* xfs_write returns positive errors */
+	err = -err;	/* if it's 0 this is harmless */
 	*ppos = pos = uio.uio_offset;
 	count -= uio.uio_resid;
 out:
 	up(&inode->i_sem);
 
 	/*
-	 * If we got a return value, it was an error
-	 * Flip to negative & return that
+	 * If we got an error return that.
 	 * Otherwise, return bytes actually written
 	 */
 
-	return(err ? -err : count);
+	return(err ? err : count);
 }
 
 
