@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.139 $"
+#ident	"$Revision: 1.141 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -249,6 +249,35 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
+
+	/*
+	 * Check is sb_agblocks is aligned at stripe boundary
+	 * If sb_agblocks is NOT aligned turn off m_dalign since
+	 * allocator alignment is within an ag, therefore ag has
+	 * to be aligned at stripe boundary.
+	 */
+	if (mp->m_dalign) {
+		/*
+		 * If stripe unit and stripe with are not multiples
+		 * of the fs blocksize turn off alignment.
+		 */
+		if ((BBTOB(mp->m_dalign) % sbp->sb_blocksize) ||
+		    (BBTOB(mp->m_swidth) % sbp->sb_blocksize)) {
+			mp->m_dalign = mp->m_swidth = 0;
+		} else {
+			/*
+			 * Convert the stripe unit and with to FSBs.
+			 */
+			mp->m_dalign = XFS_BB_TO_FSBT(mp, mp->m_dalign);
+			if (mp->m_dalign && (sbp->sb_agblocks % mp->m_dalign)) {
+				mp->m_dalign = 0;
+				mp->m_swidth = 0;
+			} else if (mp->m_dalign) {
+				mp->m_swidth = XFS_BB_TO_FSBT(mp, mp->m_swidth);
+			} else
+				mp->m_swidth = 0;
+		}
+	}
 
 	/*
 	 * Setup for attributes, in case they get created.
