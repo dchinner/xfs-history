@@ -26,14 +26,32 @@ typedef __int32_t	xfs_dqid_t;
 typedef __uint64_t	xfs_qcnt_t;
 typedef __uint16_t      xfs_qwarncnt_t;
 
+/* 
+ * Disk quotas status in m_qflags, and also sb_qflags. 16 bits.
+ */
+#define XFS_UQUOTA_ACCT	0x0001  /* user quota accounting ON */
+#define XFS_UQUOTA_ENFD	0x0002  /* user quota limits enforced */
+#define XFS_UQUOTA_CHKD	0x0004  /* quotacheck run on usr quotas */
+#define XFS_PQUOTA_ACCT	0x0008  /* project quota accounting ON */
+#define XFS_PQUOTA_ENFD	0x0010  /* proj quota limits enforced */
+#define XFS_PQUOTA_CHKD	0x0020  /* quotacheck run on prj quotas */
+
+/* 
+ * Incore only flags for quotaoff - these bits get cleared when quota(s)
+ * are in the process of getting turned off. These flags are in m_qflags but
+ * never in sb_qflags.
+ */
+#define XFS_UQUOTA_ACTIVE	0x0040  /* uquotas are being turned off */
+#define XFS_PQUOTA_ACTIVE	0x0080  /* pquotas are being turned off */
+
 /*
  * Checking XFS_IS_*QUOTA_ON() while holding any inode lock guarantees
  * quota will be not be switched off as long as that inode lock is held.
  */
-#define XFS_IS_QUOTA_ON(mp)  	((mp)->m_flags & (XFS_MOUNT_UDQ_ACTIVE | \
-						  XFS_MOUNT_PDQ_ACTIVE))
-#define XFS_IS_UQUOTA_ON(mp)	((mp)->m_flags & XFS_MOUNT_UDQ_ACTIVE)
-#define XFS_IS_PQUOTA_ON(mp) 	((mp)->m_flags & XFS_MOUNT_PDQ_ACTIVE)
+#define XFS_IS_QUOTA_ON(mp)  	((mp)->m_qflags & (XFS_UQUOTA_ACTIVE | \
+						   XFS_PQUOTA_ACTIVE))
+#define XFS_IS_UQUOTA_ON(mp)	((mp)->m_qflags & XFS_UQUOTA_ACTIVE)
+#define XFS_IS_PQUOTA_ON(mp) 	((mp)->m_qflags & XFS_PQUOTA_ACTIVE)
 
 /*
  * Flags to tell various functions what to do. Not all of these are meaningful
@@ -104,16 +122,16 @@ typedef __uint16_t      xfs_qwarncnt_t;
 
 #define XFS_QM_NEED_QUOTACHECK(mp) ((XFS_IS_UQUOTA_ON(mp) && \
 				     (mp->m_sb.sb_qflags & \
-				      XFS_MOUNT_UDQ_CHKD) == 0) || \
+				      XFS_UQUOTA_CHKD) == 0) || \
 				    (XFS_IS_PQUOTA_ON(mp) && \
 				     (mp->m_sb.sb_qflags & \
-				      XFS_MOUNT_PDQ_CHKD) == 0))
+				      XFS_PQUOTA_CHKD) == 0))
 
-#define XFS_MOUNT_QUOTA_ALL	(XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_UDQ_ENFD|\
-				 XFS_MOUNT_UDQ_CHKD|XFS_MOUNT_PDQ_ACCT|\
-				 XFS_MOUNT_PDQ_ENFD|XFS_MOUNT_PDQ_CHKD)
-#define XFS_MOUNT_QUOTA_MASK	(XFS_MOUNT_QUOTA_ALL | XFS_MOUNT_UDQ_ACTIVE | \
-				 XFS_MOUNT_PDQ_ACTIVE)
+#define XFS_MOUNT_QUOTA_ALL	(XFS_UQUOTA_ACCT|XFS_UQUOTA_ENFD|\
+				 XFS_UQUOTA_CHKD|XFS_PQUOTA_ACCT|\
+				 XFS_PQUOTA_ENFD|XFS_PQUOTA_CHKD)
+#define XFS_MOUNT_QUOTA_MASK	(XFS_MOUNT_QUOTA_ALL | XFS_UQUOTA_ACTIVE | \
+				 XFS_PQUOTA_ACTIVE)
 
 #define XFS_PROC_PROJID(c)	  ((c)->p_arsess->as_prid)
 #define XFS_IS_REALTIME_INODE(ip) ((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME)
