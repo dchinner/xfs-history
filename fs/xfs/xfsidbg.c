@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -2421,11 +2421,12 @@ static int	kdbm_vn(
 
 static char	*pb_flag_vals[] = {
 /*  0 */ "READ", "WRITE", "MAPPED", "PARTIAL", "ASYNC",
-/*  5 */ "NONE", "DELWRI", "FREED", "SYNC", "MAPPABLE",
+/*  5 */ "NONE", "DELWRI", "INVALID0x07", "INVALID0x08", "INVALID0x09",
 /* 10 */ "STALE", "FS_MANAGED", "FS_DATAIOD", "LOCK", "TRYLOCK",
-/* 15 */ "DONT_BLOCK", "LOCKABLE", "PRIVATE_BH", "ALL_PAGES_MAPPED", 
+/* 15 */ "DONT_BLOCK", "PAGECACHE", "PRIVATE_BH", "ALL_PAGES_MAPPED", 
 	 "ADDR_ALLOCATED",
-/* 20 */ "MEM_ALLOCATED", "FORCEIO", "FLUSH", "READ_AHEAD",
+/* 20 */ "MEM_ALLOCATED", "MEM_SLAB", "FORCEIO", "FLUSH", "READ_AHEAD",
+/* 25 */ "RUN_QUEUES", "DIRECTIO",
 	 NULL };
 
 static char	*iomap_flag_vals[] = {
