@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1745,13 +1745,14 @@ idbg_xbtcur(xfs_btree_cur_t *c)
 	}
 	qprintf("bufs");
 	for (l = 0; l < c->bc_nlevels; l++)
-		qprintf(" 0x%x",
-			c->bc_bufs[l]);
+		qprintf(" 0x%x", c->bc_bufs[l]);
 	qprintf("\n");
 	qprintf("ptrs");
 	for (l = 0; l < c->bc_nlevels; l++)
-		qprintf(" 0x%x",
-			c->bc_ptrs[l]);
+		qprintf(" 0x%x", c->bc_ptrs[l]);
+	qprintf("  ra");
+	for (l = 0; l < c->bc_nlevels; l++)
+		qprintf(" %d", c->bc_ra[l]);
 	qprintf("\n");
 	qprintf("nlevels %d btnum %s blocklog %d\n",
 		c->bc_nlevels,
