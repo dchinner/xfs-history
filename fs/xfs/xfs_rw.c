@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.322 $"
+#ident "$Revision: 1.323 $"
 
 #include <xfs_os_defs.h>
 
@@ -108,8 +108,8 @@ int uiodbg_switch = 0;
  * The xfsd_lock variable is initialized in xfs_init()
  */
 static xfs_buf_t	*xfsd_list;
-static int	xfsd_bufcount;
-lock_t		xfsd_lock;
+static int	        xfsd_bufcount;
+lock_t		        xfsd_lock;
 
 /*
  * Zone allocator for xfs_gap_t structures.
@@ -120,13 +120,13 @@ xfs_zone_t		*xfs_gap_zone;
 /*
  * Global trace buffer for xfs_strat_write() tracing.
  */
-ktrace_t	*xfs_strat_trace_buf;
+ktrace_t	        *xfs_strat_trace_buf;
 #endif
 
 STATIC int
 xfs_retrieved(
 	uint		available,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		count,
 	uint		*total_retrieved,
 	xfs_fsize_t	isize);
@@ -146,7 +146,7 @@ xfs_check_gap_list(
 int
 xfs_build_gap_list(
 	xfs_iocore_t	*ip,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		count);
 
 void
@@ -161,7 +161,7 @@ xfsd(void);
 
 void
 xfs_strat_write_iodone(
-	xfs_buf_t		*bp);
+	xfs_buf_t	*bp);
 
 STATIC int
 xfs_dio_write_zero_rtarea(
@@ -240,7 +240,7 @@ static void
 xfs_iomap_enter_trace(
 	int		tag,
 	xfs_iocore_t	*io,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		count)
 {
 	xfs_inode_t	*ip = XFS_IO_INODE(io);
@@ -272,7 +272,7 @@ void
 xfs_iomap_map_trace(
 	int		tag,	     
 	xfs_iocore_t	*io,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		count,
 	struct bmapval	*bmapp,
 	xfs_bmbt_irec_t	*imapp)    
@@ -305,10 +305,10 @@ xfs_iomap_map_trace(
 static void
 xfs_inval_cached_trace(
 	xfs_iocore_t	*io,
-	xfs_off_t		offset,
-	xfs_off_t		len,
-	xfs_off_t		first,
-	xfs_off_t		last)
+	xfs_off_t	offset,
+	xfs_off_t	len,
+	xfs_off_t	first,
+	xfs_off_t	last)
 {
 	xfs_inode_t	*ip = XFS_IO_INODE(io);
 
@@ -497,7 +497,7 @@ xfs_next_bmap(
 STATIC int
 xfs_retrieved(
 	uint		available,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		count,
 	uint		*total_retrieved,
 	xfs_fsize_t	isize)
@@ -615,7 +615,7 @@ xfs_check_gap_list(
 int				/* error */
 xfs_build_gap_list(
 	xfs_iocore_t	*io,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		count)
 {
 	xfs_fileoff_t	offset_fsb;
@@ -734,9 +734,9 @@ xfs_force_shutdown(
 	xfs_mount_t	*mp,
 	int		flags)
 {
-	int ntries;
-	int logerror;
-	extern dev_t rootdev;		/* from sys/systm.h */
+	int             ntries;
+	int             logerror;
+	extern dev_t    rootdev;		/* from sys/systm.h */
         
 #if defined(XFSDEBUG) && 0
         printk("xfs_force_shutdown entered [0x%p, %d]\n",
@@ -934,9 +934,9 @@ xfs_read_buf(
 	xfs_daddr_t 	 blkno,
 	int              len,
 	uint             flags,
-	xfs_buf_t		 **bpp)
+	xfs_buf_t	 **bpp)
 {
-	xfs_buf_t		 *bp;
+	xfs_buf_t	 *bp;
 	int 		 error;
 	
 	bp = xfs_buf_read(target, blkno, len, flags);
@@ -1327,8 +1327,8 @@ void
 xfs_inval_cached_pages(
 	vnode_t		*vp,
 	xfs_iocore_t	*io,
-	xfs_off_t		offset,
-	xfs_off_t		len,
+	xfs_off_t	offset,
+	xfs_off_t	len,
 	void		*dio)		    
 {
 	xfs_dio_t	*diop = (xfs_dio_t *)dio;

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -152,7 +152,7 @@ fs_vnode_change(
 void
 fs_tosspages(
         bhv_desc_t	*bdp,
-	xfs_off_t		first,
+	xfs_off_t	first,
 	int		fiopt)
 {
 	if (BHV_TO_VNODE(bdp)->v_inode)
@@ -167,7 +167,7 @@ fs_tosspages(
 void
 fs_flushinval_pages(
         bhv_desc_t	*bdp,
-	xfs_off_t		first,
+	xfs_off_t	first,
 	int		fiopt)
 {
 	if (BHV_TO_VNODE(bdp)->v_inode)
@@ -183,7 +183,7 @@ fs_flushinval_pages(
 int
 fs_flush_pages(
         bhv_desc_t	*bdp,
-	xfs_off_t		first,
+	xfs_off_t	first,
 	uint64_t	flags,
 	int		fiopt)
 {
@@ -203,7 +203,7 @@ fs_pages_sethole(
 	void		*pfd,
 	int		cnt,
 	int		doremap,
-	xfs_off_t		remap_offset)
+	xfs_off_t	remap_offset)
 {
 	printk("XFS: fs_pages_sethole() NOT IMPLEMENTED\n");
 }
