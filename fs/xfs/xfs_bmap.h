@@ -71,6 +71,17 @@ typedef struct xfs_bmbt_key
 
 typedef xfs_fsblock_t xfs_bmbt_ptr_t;	/* btree pointer type */
 
+/*
+ * List of extents to be free "later".
+ * The list is kept sorted on xbf_startblock.
+ */
+typedef	struct xfs_bmap_free
+{
+	xfs_fsblock_t	xbf_startblock;		/* starting fs block number */
+	xfs_extlen_t	xbf_blockcount;		/* number of blocks in extent */
+	struct xfs_bmap_free	*xbf_next;	/* link to next entry */
+} xfs_bmap_free_t;
+
 #ifndef XFSDEBUG
 
 #define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) \
@@ -291,23 +302,40 @@ xfs_bmbt_get_block(
 /*
  * Flags for xfs_bmapi
  */
-#define	XFS_BMAPI_WRITE		0x1
+#define	XFS_BMAPI_WRITE		0x1	/* write operation: allocate space */
+#define	XFS_BMAPI_DELAY		0x2	/* delayed write operation */
 
-xfs_fsblock_t
-xfs_bmapi(
-	xfs_trans_t		*tp,
-	struct xfs_inode	*ip,
-	xfs_fsblock_t		bno,
-	xfs_extlen_t		len,
-	int			flags,
-	xfs_fsblock_t		firstblock,
-	xfs_extlen_t		total,
-	xfs_bmbt_irec_t		*mval,
-	int			*nmap);
+void
+xfs_bmap_finish(
+	xfs_trans_t		**tp,		/* transaction pointer addr */
+	xfs_bmap_free_t		**flist,	/* i/o: list extents to free */
+	xfs_fsblock_t		firstblock);	/* controlled a.g. for allocs */
 
 void
 xfs_bmap_read_extents(
-	xfs_trans_t		*tp,
-	struct xfs_inode	*ip);
+	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_inode	*ip);		/* incore inode */
+
+xfs_fsblock_t					/* first allocated block */
+xfs_bmapi(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_inode	*ip,		/* incore inode */
+	xfs_fsblock_t		bno,		/* starting file offs. mapped */
+	xfs_extlen_t		len,		/* length to map in file */
+	int			flags,		/* XFS_BMAPI_... */
+	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
+	xfs_extlen_t		total,		/* total blocks needed */
+	xfs_bmbt_irec_t		*mval,		/* output: map values */
+	int			*nmap,		/* i/o: mval size/count */
+	xfs_bmap_free_t		**flist);	/* i/o: list extents to free */
+
+xfs_fsblock_t					/* first allocated block */
+xfs_bunmapi(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_inode	*ip,		/* incore inode */
+	xfs_fsblock_t		bno,		/* starting offset to unmap */
+	xfs_extlen_t		len,		/* length to unmap in file */
+	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
+	xfs_bmap_free_t		**flist);	/* i/o: list extents to free */
 
 #endif	/* _FS_XFS_BMAP_H */
