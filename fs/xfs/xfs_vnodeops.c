@@ -1,4 +1,4 @@
-#ident "$Revision: 1.281 $"
+#ident "$Revision: 1.282 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1953,6 +1953,12 @@ xfs_dir_lookup_int(
 		}
 		return 0;
         }
+	if (flags & DLF_LOCK_SHARED) {
+		lock_mode = XFS_ILOCK_SHARED;
+	} else {
+		lock_mode = XFS_ILOCK_EXCL;
+	}
+	dp = XFS_BHVTOI(dir_bdp);
 
         /*
          * Try the directory name lookup cache.  We can't wait on
@@ -1960,8 +1966,18 @@ xfs_dir_lookup_int(
 	 * we're holding the directory lock.
          */
         if (!(flags & DLF_NODNLC)) {
-		if (bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd,
-					   NOCRED, VN_GET_NOWAIT)) {
+		dir_gen = dp->i_gen;
+		bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED,
+			VN_GET_NOWAIT);
+		if (!bdp && fd->vnowait) {
+			if (dir_unlocked != NULL)
+				*dir_unlocked = 1;
+			xfs_iunlock(dp, lock_mode);
+			bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd,
+				NOCRED, 0);
+			xfs_ilock(dp, lock_mode);
+		}
+		if (bdp && dir_gen == dp->i_gen) {
 			*inum = XFS_BHVTOI(bdp)->i_ino;
 			if (do_iget) {
 				*ipp = XFS_BHVTOI(bdp);
@@ -1994,16 +2010,10 @@ xfs_dir_lookup_int(
 	else
 		name_len = strlen(name);
 
-	dp = XFS_BHVTOI(dir_bdp);
 	error = xfs_dir_lookup(tp, dp, name, name_len, inum);
 	if (!error && do_iget) {
-		if (flags & DLF_LOCK_SHARED) {
-			lock_mode = XFS_ILOCK_SHARED;
-		} else {
-			lock_mode = XFS_ILOCK_EXCL;
-		}
 		*dir_unlocked = 1;
-		while (1) {
+		for (;;) {
 			/*
 			 * Unlock the directory and save the directory's
 			 * generation count.  We do this because we can't
@@ -2011,7 +2021,7 @@ xfs_dir_lookup_int(
 			 * in xfs_iget().  Doing so could cause us to hold
 			 * a lock while waiting for the inode to finish
 			 * being inactive while it's waiting for a log
-			 * reservationin the inactive routine.
+			 * reservation in the inactive routine.
 			 */
 			dir_gen = dp->i_gen;
 			xfs_iunlock(dp, lock_mode);
