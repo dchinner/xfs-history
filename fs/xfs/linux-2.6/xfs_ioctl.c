@@ -45,6 +45,7 @@ extern int xfs_set_uiosize(xfs_mount_t *, xfs_inode_t *,
 			uint, int, int, cred_t *);
 extern int xfs_change_file_space(bhv_desc_t *, int,
 			xfs_flock64_t *, xfs_off_t, cred_t *, int);
+extern int xfs_set_dmattrs(bhv_desc_t *, u_int, u_int16_t, cred_t *);
 
 
 /*
@@ -428,7 +429,6 @@ xfs_fssetdm_by_handle(
 	struct fsdmidata	fsd;
 	xfs_fsop_setdm_handlereq_t dmhreq;
 	struct inode		*inode;
-	dm_fcntl_t		dmfcntl;
 	bhv_desc_t		*bdp;
 	vnode_t			*vp;
 
@@ -444,12 +444,9 @@ xfs_fssetdm_by_handle(
 		return -XFS_ERROR(EFAULT);
 	}
 
-	dmfcntl.dmfc_subfunc = DM_FCNTL_FSSETDM;
-	dmfcntl.u_fcntl.setdmrq.fsd_dmevmask = fsd.fsd_dmevmask;
-	dmfcntl.u_fcntl.setdmrq.fsd_dmstate = fsd.fsd_dmstate;
-
 	bdp = bhv_base_unlocked(VN_BHV_HEAD(vp));
-	error = xfs_dm_fcntl(bdp, &dmfcntl, 0, 0, get_current_cred(), NULL);
+	error = xfs_set_dmattrs(bdp, fsd.fsd_dmevmask, fsd.fsd_dmstate,
+				get_current_cred());
 
 	VN_RELE(vp);
 	if (error)

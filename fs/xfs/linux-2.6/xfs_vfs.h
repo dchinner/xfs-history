@@ -42,7 +42,7 @@ struct vnode;
 struct cred;
 struct super_block;
 struct fid;
-struct dm_fcntl;
+struct dm_fcntl_vector;
 
 enum whymountroot { ROOT_INIT, ROOT_REMOUNT, ROOT_UNMOUNT };
 typedef enum whymountroot whymountroot_t;
@@ -153,8 +153,8 @@ typedef struct vfsops {
 	int	(*vfs_dmapi_mount)(struct vfs *, struct vnode *,
 				   char *, char *);
 					/* send dmapi mount event */
-	int	(*vfs_dmapi_fsys_vector)(bhv_desc_t *, struct dm_fcntl *);
-					/* get fsys-specific dmapi hooks */
+	int	(*vfs_dmapi_fsys_vector)(bhv_desc_t *,
+					 struct dm_fcntl_vector *);
 #ifdef CELL_CAPABLE
         int     vfs_ops_magic;          /* magic number for intfc extensions */
         __uint64_t   vfs_ops_version;   /* interface version number */
