@@ -223,7 +223,10 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define FSC_NOTIFY_NAME_CHANGED(vp)
 #endif
 
+#ifndef ENOTSUP
 #define ENOTSUP		ENOTSUPP	/* Not supported (POSIX 1003.1b) */
+#endif
+
 #define	EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
 
 /*
@@ -232,7 +235,10 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
  * XXX also note these need to be < 1000 and fairly unique on linux
  */
 #define EFSCORRUPTED    990		/* Filesystem is corrupted */
+
+#ifndef ENOATTR
 #define ENOATTR         ENODATA 	/* Attribute not found */
+#endif
 
 #define SYNCHRONIZE()	((void)0)
 #define lbolt		jiffies
