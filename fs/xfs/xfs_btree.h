@@ -78,8 +78,6 @@ typedef struct xfs_btree_cur
 {
 	xfs_trans_t	*bc_tp;	/* links cursors on freelist */
 	xfs_mount_t	*bc_mp;		/* mount struct */
-	buf_t		*bc_agbuf;	/* agf buffer */
-	xfs_agnumber_t	bc_agno;	/* ag number */
 	union {
 		xfs_alloc_rec_t		a;
 		xfs_bmbt_irec_t		b;
@@ -90,9 +88,14 @@ typedef struct xfs_btree_cur
 	xfs_btnum_t	bc_btnum;
 	int		bc_blocklog;
 	union {
-		struct {
-			int		inodesize;	/* needed for BMAP */
-			struct xfs_inode *ip;		/* needed for BMAP */
+		struct {			/* needed for BNO, CNT */
+			buf_t		*agbuf;
+			xfs_agnumber_t	agno;
+		} a;
+		struct {			/* needed for BMAP */
+			int		inodesize;
+			struct xfs_inode *ip;
+			xfs_fsblock_t	firstblock;
 		} b;
 	}		bc_private;
 } xfs_btree_cur_t;

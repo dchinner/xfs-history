@@ -193,7 +193,7 @@ xfs_btree_check_sblock(xfs_btree_cur_t *cur, xfs_btree_sblock_t *block, int leve
 	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
 	ASSERT(block->bb_level == level);
 	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
-	agbuf = cur->bc_agbuf;
+	agbuf = cur->bc_private.a.agbuf;
 	agf = xfs_buf_to_agf(agbuf);
 	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
 	       block->bb_leftsib < agf->agf_length);
@@ -211,7 +211,7 @@ xfs_btree_check_sptr(xfs_btree_cur_t *cur, xfs_agblock_t ptr, int level)
 	xfs_agf_t *agf;
 
 	ASSERT(level > 0);
-	agbuf = cur->bc_agbuf;
+	agbuf = cur->bc_private.a.agbuf;
 	agf = xfs_buf_to_agf(agbuf);
 	ASSERT(ptr != NULLAGBLOCK && ptr < agf->agf_length);
 }
@@ -251,8 +251,9 @@ xfs_btree_dup_cursor(xfs_btree_cur_t *cur)
 
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	newcur = xfs_btree_init_cursor(mp, tp, cur->bc_agbuf, cur->bc_agno,
-				       cur->bc_btnum, cur->bc_private.b.ip);
+	newcur = xfs_btree_init_cursor(mp, tp, cur->bc_private.a.agbuf,
+				       cur->bc_private.a.agno, cur->bc_btnum,
+				       cur->bc_private.b.ip);
 	newcur->bc_rec = cur->bc_rec;
 	for (i = 0; i < newcur->bc_nlevels; i++) {
 		newcur->bc_ptrs[i] = cur->bc_ptrs[i];
@@ -332,12 +333,10 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 		cur = (xfs_btree_cur_t *)kmem_zalloc(sizeof(*cur), 0);
 	cur->bc_tp = tp;
 	cur->bc_mp = mp;
-	cur->bc_agbuf = agbuf;
-	cur->bc_agno = agno;
-	agf = xfs_buf_to_agf(agbuf);
 	switch (btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
+		agf = xfs_buf_to_agf(agbuf);
 		nlevels = agf->agf_levels[btnum];
 		break;
 	case XFS_BTNUM_BMAP:
@@ -349,12 +348,17 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 	sbp = &mp->m_sb;
 	cur->bc_blocklog = sbp->sb_blocklog;
 	switch (btnum) {
+	case XFS_BTNUM_BNO:
+	case XFS_BTNUM_CNT:
+		cur->bc_private.a.agbuf = agbuf;
+		cur->bc_private.a.agno = agno;
+		break;
 	case XFS_BTNUM_BMAP:
 		cur->bc_private.b.inodesize = sbp->sb_inodesize;
 		cur->bc_private.b.ip = ip;
 		break;
 	default:
-		break;
+		ASSERT(0);
 	}
 	return cur;
 }
