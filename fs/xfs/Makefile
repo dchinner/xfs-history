@@ -5,7 +5,7 @@
 WORKAREA ?= `pwd`
 
 KERN_SPEC = kernel-2.4.spec
-KERNEL_VERSION = 2.4.0-test11
+KERNEL_VERSION = 2.4.0-test12
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
@@ -60,10 +60,9 @@ clean:
 realclean: clean
 	rm -rf linux-${KERNEL_VERSION}
 	rm -f kern
-	rm -f SOURCES/linux-${KERNEL_VERSION}.tar.bz2 SOURCES/xfs-cmds-*.tar.gz
+	rm -f SOURCES/xfs-cmds-*.tar.gz
 	if [ -e SPECS/${KERN_SPEC}.old ] ; then \
 		rm SPECS/${KERN_SPEC}; \
 		mv SPECS/${KERN_SPEC}.old SPECS/${KERN_SPEC}; \
 	fi
 	cd $(WORKAREA)/cmd/xfs && make realclean
-
