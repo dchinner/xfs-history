@@ -51,27 +51,30 @@ vpath %.c =  . linux pagebuf support
 
 obj-$(CONFIG_XFS_FS) 		+= xfs.o
 
-
-ifeq ($(CONFIG_XFS_RT),)
-  xfs-objs			+= xfsrtstubs.o
-else
-  xfs-objs			+= xfs_rtalloc.o xfs_rtbit.o
-endif
-
 ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
   xfs-objs			+= xfsdmapistubs.o
 else
   xfs-objs			+= xfs_dmapi.o
 endif
 
-ifeq ($(CONFIG_XFS_QUOTA),)
-  xfs-objs			+= xfsquotasstubs.o
-else
-  xfs-objs			+= xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
+ifeq ($(CONFIG_XFS_RT),y)
+  xfs-objs			+= xfs_rtalloc.o
+endif
+
+ifeq ($(CONFIG_XFS_QUOTA),y)
+  xfs-objs			+= xfs_dquot.o \
+				   xfs_dquot_item.o \
+				   xfs_trans_dquot.o \
+				   xfs_qm_syscalls.o \
+				   xfs_qm.o
 endif
 
 ifneq ($(CONFIG_FS_POSIX_ACL),)
   xfs-objs			+= xfs_acl.o
+endif
+
+ifneq ($(CONFIG_FS_POSIX_CAP),)
+  xfs-objs			+= xfs_cap.o
 endif
 
 ifneq ($(CONFIG_FS_POSIX_MAC),)
@@ -145,7 +148,7 @@ xfs-objs			+= page_buf.o \
 
 # Objects in linux/
 
-xfs-objs			+= xfs_fs_subr.o
+export-objs			+= xfs_globals.o
 
 ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
   xfs-objs			+= xfs_dmistubs.o

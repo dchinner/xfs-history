@@ -48,3 +48,14 @@ int		xpg4_sticky_dir = 1;	/* see xfs_stickytest */
  * restricted_chown = 0  sysV style chown(2), non super-user can give away files
  */
 int             restricted_chown = 1;
+
+/* 
+ * The global quota manager. There is only one of these for the entire
+ * system, _not_ one per file system. XQM keeps track of the overall
+ * quota functionality, including maintaining the freelist and hash
+ * tables of dquots.
+ */
+struct xfs_qm   *xfs_Gqm;
+mutex_t         xfs_Gqm_lock;
+
+EXPORT_SYMBOL(xfs_Gqm);	/* for KDB */

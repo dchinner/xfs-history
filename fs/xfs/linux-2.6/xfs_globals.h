@@ -45,4 +45,7 @@ extern int	restricted_chown;
 extern int	scache_linemask;       /* second level cache line size mask */
 extern unsigned long	xfs_physmem;
 
+extern struct xfs_qm	*xfs_Gqm;		
+extern mutex_t		xfs_Gqm_lock;
+
 #endif	/* __XFS_GLOBALS_H__ */
