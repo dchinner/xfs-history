@@ -156,24 +156,14 @@ linvfs_lookup(
 {
 	int		error;
 	vnode_t		*vp, *cvp;
-	pathname_t	pn;
-	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
 
 	if (dentry->d_name.len >= MAXNAMELEN)
 		return ERR_PTR(-ENAMETOOLONG);
 
-	/*
-	 * Initialize a pathname_t to pass down.
-	 */
-	bzero(pnp, sizeof(pathname_t));
-	pnp->pn_complen = dentry->d_name.len;
-	pnp->pn_hash = dentry->d_name.hash;
-	pnp->pn_path = (char *)dentry->d_name.name;
-
 	cvp = NULL;
 	vp = LINVFS_GET_VP(dir);
-	VOP_LOOKUP(vp, (char *)dentry->d_name.name, &cvp, pnp, 0, NULL,
+	VOP_LOOKUP(vp, (char *)dentry->d_name.name, &cvp, NULL, 0, NULL,
 						NULL, error);
 	if (!error) {
 		ASSERT(cvp);
@@ -367,14 +357,7 @@ linvfs_rename(
 	int		error;
 	vnode_t		*fvp;	/* from directory */
 	vnode_t		*tvp;	/* target directory */
-	pathname_t	pn;
-	pathname_t      *pnp = &pn;
 	struct inode	*new_inode = NULL;
-
-	bzero(pnp, sizeof(pathname_t));
-	pnp->pn_complen = ndentry->d_name.len;
-	pnp->pn_hash = ndentry->d_name.hash;
-	pnp->pn_path = (char *)ndentry->d_name.name;
 
 	fvp = LINVFS_GET_VP(odir);
 	tvp = LINVFS_GET_VP(ndir);
@@ -382,7 +365,7 @@ linvfs_rename(
 	new_inode = ndentry->d_inode;
 
 	VOP_RENAME(fvp, (char *)odentry->d_name.name, tvp,
-			   (char *)ndentry->d_name.name, pnp, NULL, error);
+			   (char *)ndentry->d_name.name, NULL, NULL, error);
 	if (error)
 		return -error;
 
