@@ -102,6 +102,7 @@ xfs_inobt_decrement(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	int			level);	/* level in btree, 0 is leaf */
 
+#ifdef _NOTYET_
 /*
  * Delete the record pointed to by cur.
  * The cursor refers to the place where the record was (could be inserted)
@@ -110,6 +111,7 @@ xfs_inobt_decrement(
 int					/* success/failure */
 xfs_inobt_delete(
 	struct xfs_btree_cur	*cur);	/* btree cursor */
+#endif	/* _NOTYET_ */
 
 /*
  * Get the data from the pointed-to record.

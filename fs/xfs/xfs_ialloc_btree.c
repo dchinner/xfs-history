@@ -46,6 +46,7 @@
  * Prototypes for internal functions.
  */
 
+#ifdef _NOTYET_
 /*
  * Single level of the xfs_inobt_delete record deletion routine.
  * Delete record pointed to by cur/level.
@@ -56,6 +57,7 @@ STATIC int				/* fail/done/go-on */
 xfs_inobt_delrec(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	int		level);		/* level removing record from */
+#endif	/* _NOTYET_ */
 
 /*
  * Insert one record/level.  Return information to the caller
@@ -208,6 +210,7 @@ xfs_inobt_updkey(
  * Internal functions.
  */
 
+#ifdef _NOTYET_
 /*
  * Single level of the xfs_inobt_delete record deletion routine.
  * Delete record pointed to by cur/level.
@@ -641,6 +644,7 @@ xfs_inobt_delrec(
 	 */
 	return 2;
 }
+#endif	/* _NOTYET_ */
 
 /*
  * Insert one record/level.  Return information to the caller
@@ -1928,6 +1932,7 @@ xfs_inobt_decrement(
 	return 1;
 }
 
+#ifdef _NOTYET_
 /*
  * Delete the record pointed to by cur.
  * The cursor refers to the place where the record was (could be inserted)
@@ -1958,6 +1963,7 @@ xfs_inobt_delete(
 	xfs_inobt_kcheck(cur);
 	return i;
 }
+#endif	/* _NOTYET_ */
 
 /* 
  * Get the data from the pointed-to record.
