@@ -331,7 +331,7 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 	/*
 	 * Unlock each item in each chunk, free non-dirty descriptors,
 	 * and free empty chunks.
-p	 */
+	 */
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
 		freed += xfs_trans_unlock_chunk(licp, 0);
