@@ -665,10 +665,10 @@ xfs_rename(
 	}
 	src_namelen = strlen(src_name);
 	if (src_namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 	target_namelen = strlen(target_name);
 	if (target_namelen >= MAXNAMELEN)
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(ENAMETOOLONG);
 	src_dp = XFS_BHVTOI(src_dir_bdp);
         target_dp = XFS_BHVTOI(target_dir_bdp);
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, src_dp, DM_EVENT_RENAME) ||
