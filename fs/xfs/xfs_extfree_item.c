@@ -175,6 +175,8 @@ xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
 STATIC void
 xfs_efi_item_unlock(xfs_efi_log_item_t *efip)
 {
+	if (efip->efi_item.li_flags & XFS_LI_ABORTED)
+		xfs_efi_item_abort(efip);
 	return;
 }
 
@@ -443,6 +445,8 @@ xfs_efd_item_trylock(xfs_efd_log_item_t *efdp)
 STATIC void
 xfs_efd_item_unlock(xfs_efd_log_item_t *efdp)
 {
+	if (efdp->efd_item.li_flags & XFS_LI_ABORTED)
+		xfs_efd_item_abort(efdp);
 	return;
 }
 
@@ -459,8 +463,13 @@ xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
 {
 	uint	size;
 	int	nexts;
-
-	xfs_efi_release(efdp->efd_efip, efdp->efd_format.efd_nextents);
+	
+	/*
+	 * If we got a log I/O error, it's always the case that the LR with the
+	 * EFI got unpinned and freed before the EFD got aborted.
+	 */
+	if ((efdp->efd_item.li_flags & XFS_LI_ABORTED) == 0)
+		xfs_efi_release(efdp->efd_efip, efdp->efd_format.efd_nextents);
 
 	nexts = efdp->efd_format.efd_nextents;
 	if (nexts > XFS_EFD_MAX_FAST_EXTENTS) {
@@ -485,7 +494,13 @@ xfs_efd_item_abort(xfs_efd_log_item_t *efdp)
 	int	nexts;
 	int	size;
 
-	xfs_efi_cancel(efdp->efd_efip);
+	/*
+	 * If we got a log I/O error, it's always the case that the LR with the
+	 * EFI got unpinned and freed before the EFD got aborted. So don't
+	 * reference the EFI at all in that case.
+	 */
+	if ((efdp->efd_item.li_flags & XFS_LI_ABORTED) == 0)
+		xfs_efi_cancel(efdp->efd_efip);
 
 	nexts = efdp->efd_format.efd_nextents;
 	if (nexts > XFS_EFD_MAX_FAST_EXTENTS) {
