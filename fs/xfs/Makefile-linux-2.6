@@ -79,10 +79,14 @@ ifeq ($(CONFIG_KDB),y)
   obj-m				+= xfsidbg.o
 endif
 
-ifeq ($(CONFIG_XFS_GRIO),)
+ifeq ($(CONFIG_XFS_RT),)
   xfs-objs			+= xfsrtstubs.o
 else
-  xfs-objs			+= xfs_rtalloc.o xfs_rtbit.o xfs_grio.o
+  xfs-objs			+= xfs_rtalloc.o xfs_rtbit.o
+endif
+
+ifneq ($(CONFIG_XFS_GRIO),)
+  xfs-objs			+= xfs_grio.o
 endif
 
 ifeq ($(CONFIG_XFS_DMAPI),)

@@ -83,3 +83,12 @@ xfs_rtmount_inodes(xfs_mount_t *mp)
 		return 0;
 	return nopkg();
 }
+
+int
+xfs_growfs_rt(
+	xfs_mount_t *mp,
+	xfs_growfs_rt_t	*in)
+{
+	return nopkg();
+}
+

@@ -204,7 +204,6 @@ xfs_rtcheck_free_range(
 	int		*stat);		/* out: 1 for free, 0 for not */
 #endif
 
-#if defined(DEBUG)
 /*
  * Check that the given range is either all allocated (val = 0) or 
  * all free (val = 1).
@@ -218,7 +217,6 @@ xfs_rtcheck_range(
 	int		val,		/* 1 for free, 0 for allocated */
 	xfs_rtblock_t	*new,		/* out: first block not matching */
 	int		*stat);		/* out: 1 for matches, 0 for not */
-#endif	/* */
 
 /*
  * Copy and transform the summary file, given the old and new
@@ -264,10 +262,9 @@ xfs_rtfree_range(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_rtblock_t	start,		/* starting block to free */
 	xfs_extlen_t	len,		/* length to free */
-	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t	**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb);		/* in/out: summary block number */
 
-#if defined(DEBUG)
 /*
  * Read and return the summary information for a given extent size,
  * bitmap block combination.
@@ -280,10 +277,9 @@ xfs_rtget_summary(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	int		log,		/* log2 of extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
-	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t	**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_suminfo_t	*sum);		/* out: summary info for this block */
-#endif	/* DEBUG */
 
 /*
  * Set the given range of bitmap bits to the given value.
@@ -544,7 +540,7 @@ xfs_rtallocate_extent_block(
 		/*
 		 * If size should be a multiple of prod, make that so.
 		 */
-		if (prod > 1 && (p = bestlen % prod))
+		if (prod > 1 && (p = do_mod(bestlen, prod)))
 			bestlen -= p;
 		/*
 		 * Allocate besti for bestlen & return that.
@@ -1216,7 +1212,6 @@ xfs_rtcheck_free_range(
 }
 #endif
 
-#if defined(DEBUG)
 /*
  * Check that the given range is either all allocated (val = 0) or 
  * all free (val = 1).
@@ -1392,7 +1387,6 @@ xfs_rtcheck_range(
 	*stat = 1;
 	return 0;
 }
-#endif	/* DEBUG */
 
 /*
  * Copy and transform the summary file, given the old and new
@@ -1855,7 +1849,6 @@ xfs_rtfree_range(
 	return error;
 }
 
-#if defined(DEBUG)
 /*
  * Read and return the summary information for a given extent size,
  * bitmap block combination.
@@ -1868,11 +1861,11 @@ xfs_rtget_summary(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	int		log,		/* log2 of extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
-	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t	**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_suminfo_t	*sum)		/* out: summary info for this block */
 {
-	xfs_buf_t		*bp;		/* buffer for summary block */
+	xfs_buf_t	*bp;		/* buffer for summary block */
 	int		error;		/* error value */
 	xfs_fsblock_t	sb;		/* summary fsblock */
 	int		so;		/* index into the summary file */
@@ -1924,7 +1917,6 @@ xfs_rtget_summary(
 		xfs_trans_brelse(tp, bp);
 	return 0;
 }
-#endif	/* DEBUG */
 
 /*
  * Set the given range of bitmap bits to the given value.
@@ -1941,7 +1933,7 @@ xfs_rtmodify_range(
 	xfs_rtword_t	*b;		/* current word in buffer */
 	int		bit;		/* bit number in the word */
 	xfs_rtblock_t	block;		/* bitmap block number */
-	xfs_buf_t		*bp;		/* buf for the block */
+	xfs_buf_t	*bp;		/* buf for the block */
 	xfs_rtword_t	*bufp;		/* starting word in buffer */
 	int		error;		/* error value */
 	xfs_rtword_t	*first;		/* first used word in the buffer */
@@ -2201,8 +2193,8 @@ xfs_growfs_rt(
 	/*
 	 * Calculate new parameters.  These are the final values to be reached.
 	 */
-	nrextents = nrblocks / in->extsize;
-	nrbmblocks = howmany(nrextents, NBBY * sbp->sb_blocksize);
+	nrextents = do_div(nrblocks, in->extsize);
+	nrbmblocks = roundup_64(nrextents, NBBY * sbp->sb_blocksize);
 	nrextslog = xfs_highbit32(nrextents);
 	nrsumlevels = nrextslog + 1;
 	nrsumsize = (uint)sizeof(xfs_suminfo_t) * nrsumlevels * nrbmblocks;
@@ -2213,7 +2205,7 @@ xfs_growfs_rt(
 	 * the log.  This prevents us from getting a log overflow,
 	 * since we'll log basically the whole summary file at once.
 	 */
-	if (nrsumblocks > mp->m_sb.sb_logblocks / 2)
+	if (nrsumblocks > (mp->m_sb.sb_logblocks >> 1))
 		return XFS_ERROR(EINVAL);
 	/*
 	 * Get the old block counts for bitmap and summary inodes.
@@ -2256,7 +2248,7 @@ xfs_growfs_rt(
 			XFS_RTMIN(nrblocks,
 				  nsbp->sb_rbmblocks * NBBY *
 				  nsbp->sb_blocksize * nsbp->sb_rextsize);
-		nsbp->sb_rextents = nsbp->sb_rblocks / nsbp->sb_rextsize;
+		nsbp->sb_rextents = do_div(nsbp->sb_rblocks, nsbp->sb_rextsize);
 		nsbp->sb_rextslog = xfs_highbit32(nsbp->sb_rextents);
 		nrsumlevels = nmp->m_rsumlevels = nsbp->sb_rextslog + 1;
 		nrsumsize =
@@ -2640,7 +2632,7 @@ xfs_rtpick_extent(
 		b = (mp->m_sb.sb_rextents * ((resid << 1) + 1ULL)) >>
 		    (log2 + 1);
 		if (b >= mp->m_sb.sb_rextents)
-			b %= mp->m_sb.sb_rextents;
+			b = do_mod(b, mp->m_sb.sb_rextents);
 		if (b + len > mp->m_sb.sb_rextents) 
 			b = mp->m_sb.sb_rextents - len;
 	}

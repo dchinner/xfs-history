@@ -388,15 +388,6 @@ xfs_growfs_log_private(
 	return XFS_ERROR(ENOSYS);
 }
 
-static int
-xfs_growfs_rt_private(
-	xfs_mount_t		*mp,		/* mount point for filesystem */
-	xfs_growfs_rt_t		*in)		/* growfs data input struct */
-{
-	return XFS_ERROR(ENOSYS);
-}
-
-
 /*
  * protected versions of growfs function acquire and release locks on the mount
  * point - exported through ioctls: XFS_IOC_FSGROWFSDATA, XFS_IOC_FSGROWFSLOG,
@@ -426,19 +417,6 @@ xfs_growfs_log(
 	if (!cpsema(&mp->m_growlock))
 		return XFS_ERROR(EWOULDBLOCK);
 	error = xfs_growfs_log_private(mp, in);
-	vsema(&mp->m_growlock);
-	return error;
-}
-
-int
-xfs_growfs_rt(
-	xfs_mount_t		*mp,
-	xfs_growfs_rt_t		*in)
-{
-	int error;
-	if (!cpsema(&mp->m_growlock))
-		return XFS_ERROR(EWOULDBLOCK);
-	error = xfs_growfs_rt_private(mp, in);
 	vsema(&mp->m_growlock);
 	return error;
 }
