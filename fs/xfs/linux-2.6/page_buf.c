@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: page_buf.c,v 1.1 2002/01/13 13:14:04 lord Exp $"
 
 /*
  *	page_buf.c
@@ -66,6 +65,7 @@
 #include <linux/proc_fs.h>
 #include <linux/xfs_support/support.h>
 
+#include "avl.h"
 #include "page_buf.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,6)

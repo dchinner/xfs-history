@@ -40,6 +40,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <pagebuf/avl.h>
 #include <pagebuf/page_buf.h>
 #include <linux/file.h>
 #include <linux/swap.h>
