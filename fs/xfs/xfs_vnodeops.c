@@ -77,16 +77,9 @@
 #include <sys/capability.h>
 #include <sys/flock.h>
 #include <sys/kfcntl.h>
-#ifndef __linux__
-/* don't want userland mem* */
-#include <string.h>
-#endif
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <sys/major.h>
-#ifndef __linux__
-#include <sys/ddi.h>
-#endif
 #include <ksys/fdt.h>
 #include <ksys/fsc_notify.h>
 #include <ksys/cell_config.h>
@@ -126,11 +119,9 @@
 #include "xfs_dmapi.h"
 #ifdef SIM
 #include "sim.h"
-#else
-#include <fs/fs_bhv_id.h>
 #endif
-/* this seems to be needed even in sim mode? RMC  8/17/99 */
 #include <fs/fs_bhv_id.h>
+#include <fs/specfs/spec_lsnode.h>
 
 /*
  * Here so that we do not need to include vproc.h -> vpgrp.h ->

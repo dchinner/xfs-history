@@ -1,4 +1,3 @@
-
 /*
  * Copyright (C) 1999 Silicon Graphics, Inc.  All Rights Reserved.
  * 
@@ -17,14 +16,16 @@
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
 #ident	"$Revision$"
-#if defined(__linux__)
+
 #include <xfs_linux.h>
-#endif
 
+#ifdef SIM
+#include <stdio.h>
 #define _KERNEL 1
-
+#else
 #define FSID_T
 #include <limits.h>
+#endif
 #include <sys/types.h>
 #include <sys/cred.h>
 #include <sys/debug.h>
@@ -33,7 +34,6 @@
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <ksys/kern_heap.h>
-/* #include <sys/mount.h> */
 #include <sys/param.h>
 #include <sys/pathname.h>
 #include <sys/sema.h>
@@ -41,6 +41,9 @@
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
+#ifdef SIM
+#undef _KERNEL
+#endif
 #include <sys/vfs.h>
 #include <sys/vnode_private.h>
 #include <sys/sysinfo.h>
@@ -52,9 +55,7 @@
 #include <sys/imon.h>
 #include <sys/cmn_err.h>
 #include <sys/atomic_ops.h>
-/*#include <sys/buf.h>*/
-
-#ifndef _KERNEL
+#ifdef SIM
 #include "sim.h"
 #endif
 
@@ -172,6 +173,7 @@ vn_init(void)
 	vn_minvn = ncsize;
 }
 
+#ifndef SIM
 void
 vn_cleanup(void)
 {
@@ -196,6 +198,7 @@ vn_cleanup(void)
 	kmem_free(vhash, (VHASHMASK+1) * sizeof(vhash_t));
 	kmem_free(vfreelist, (vfreelistmask + 1) * sizeof(vfreelist_t));
 }
+#endif
 
 vnode_t *
 vn_find(vnumber_t number)
@@ -308,7 +311,6 @@ vn_reclaim(struct vnode *vp, int flag)
 
 	vp->v_flag &= (VRECLM|VWAIT|VSHARE|VLOCK);
 	VN_UNLOCK(vp, s);
-	vp->v_stream = NULL;
 #ifdef PGCACHEDEBUG
 	{
 	extern void panyvp(vnode_t *);
@@ -321,7 +323,6 @@ vn_reclaim(struct vnode *vp, int flag)
 	vp->v_fbhv = NULL;
 
 	ASSERT(vp->v_mreg == (struct pregion *)vp);
-	ASSERT(vp->v_intpcount == 0);
 	return 0;
 }
 
@@ -531,7 +532,6 @@ alloc:
 
 	/* We never free the vnodes in the simulator, so these don't
 	   get destroyed either */
-	init_mutex(&vp->v_filocksem, MUTEX_DEFAULT, "vfl", (long)vp);
 	spinlock_init(&vp->v_lock, "v_lock");
 	vp->v_mreg = vp->v_mregb = (struct pregion *)vp;
 
@@ -544,8 +544,6 @@ gotit:
 	ASSERT(vp->v_count == 0);
 	ASSERT(vp->v_dpages == NULL && vp->v_dbuf == 0 && vp->v_pgcnt == 0);
 	ASSERT(vp->v_flag & VSHARE);
-	ASSERT(vp->v_filocks == NULL);
-	ASSERT(vp->v_intpcount == 0);
 
 	/* Initialize the first behavior and the behavior chain head. */
 	if (!alloced) {
@@ -576,9 +574,6 @@ vn_free(struct vnode *vp)
 	register int s;
 
 	ASSERT(vp->v_count == 1);
-	if (vp->v_intpcount)
-		printk("vn_free: v_intpcount = %d\n", vp->v_intpcount);
-	ASSERT(vp->v_intpcount == 0);
 
 	if (vfreelistmask) {
 		ASSERT(vfreelistmask == 0);
@@ -672,12 +667,7 @@ again:
 			}
 			NESTED_UNLOCK_VFP(vfp);
 			vp->v_flag |= VWAIT;
-#ifndef __linux__
-			sv_bitlock_wait(vptosync(vp), PINOD, &vp->v_flag, VLOCK, s);
-#else /* __linux__ */
-	/* No bit locks */
 			sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
-#endif /* __linux__ */
 			VOPINFO.vn_gchg++;
 			goto again;
 		}
@@ -716,7 +706,6 @@ again:
 
 		ASSERT(vp->v_next != vp && vp->v_prev != vp);
 		ASSERT(vp->v_flag & VSHARE);
-		ASSERT(vp->v_filocks == NULL);
 
 		vn_unlink(vp);
 		ASSERT(vfp->vf_lsize > 0);
@@ -797,12 +786,7 @@ again:
 		ASSERT(vp->v_count == 0);
 		NESTED_UNLOCK_VFP(vfp);
 		vp->v_flag |= VWAIT;
-#ifndef __linux__
-		sv_bitlock_wait(vptosync(vp), PINOD, &vp->v_flag, VLOCK, s);
-#else /* __linux__ */
-	/* No bit locks */
 		sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
-#endif /* __linux__ */
 		goto again;
 	}
 
@@ -1023,16 +1007,4 @@ vn_relink(
 	vlist->vl_next = next;
 	vlist->vl_prev = prev;
 	prev->v_next = (struct vnode *)vlist;
-}
-
-int
-lookupname(char *fnamep,                /* user pathname */
-        enum uio_seg seg,               /* addr space that name is in */
-        enum symfollow followlink,      /* follow sym links */
-        vnode_t **dirvpp,               /* ret for ptr to parent dir vnode */
-        vnode_t **compvpp,              /* ret for ptr to component vnode */
-        ckpt_handle_t *ckpt)            /* ret for ckpt lookup info */
-{
-	printk("XFS: lookupname NOT IMPLEMENTED\n");
-	return(ENOSYS);
 }
