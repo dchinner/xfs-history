@@ -174,6 +174,12 @@ xfs_sync(
 	cred_t		*credp);
 
 STATIC int
+xfs_vget(
+	bhv_desc_t	*bdp,
+	vnode_t		**vpp,
+	fid_t		*fidp);
+
+STATIC int
 xfs_cmountfs(
 	vfs_t		*vfsp,
 	dev_t		ddev,
@@ -2161,6 +2167,73 @@ xfs_syncsub(
 	return XFS_ERROR(last_error);
 }
 
+
+/*
+ * xfs_vget - called by DMAPI to get vnode from file handle
+ */
+STATIC int
+xfs_vget(
+	bhv_desc_t	*bdp,
+	vnode_t		**vpp,
+	fid_t		*fidp)
+{
+        xfs_fid_t	*xfid;
+	xfs_fid2_t	*xfid2;
+        xfs_inode_t	*ip;
+	int		error;
+	xfs_ino_t	ino;
+	unsigned int	igen;
+	xfs_mount_t	*mp;
+
+	xfid  = (struct xfs_fid *)fidp;
+	xfid2 = (struct xfs_fid2 *)fidp;
+#if 0
+	if (xfid->fid_len == sizeof *xfid - sizeof xfid->fid_len) {
+	  /*
+	   * The 10 byte fid used by NFS, using 48 bits of inode number
+	   */
+		ino  = (xfs_ino_t)xfid->fid_ino | ((xfs_ino_t)xfid->fid_pad << 32);
+		igen = xfid->fid_gen;
+	} else 
+#endif
+	if (xfid2->fid_len == sizeof *xfid2 - sizeof xfid2->fid_len) {
+		ino  = xfid2->fid_ino;
+		igen = xfid2->fid_gen;
+	} else {
+#pragma mips_frequency_hint NEVER
+		/*
+		 * Invalid.  Since handles can be created in user space
+		 * and passed in via gethandle(), this is not cause for
+		 * a panic.
+		 */
+		return XFS_ERROR(EINVAL);
+	}
+	mp = XFS_BHVTOM(bdp);
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+	if (error) {
+#pragma mips_frequency_hint NEVER
+		*vpp = NULL;
+		return error;
+	}
+        if (ip == NULL) {
+#pragma mips_frequency_hint NEVER
+                *vpp = NULL;
+                return XFS_ERROR(EIO);
+        }
+
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+#pragma mips_frequency_hint NEVER
+		xfs_iput(ip, XFS_ILOCK_SHARED);
+		*vpp = NULL;
+		return 0;
+        }
+
+        xfs_iunlock(ip, XFS_ILOCK_SHARED);
+        *vpp = XFS_ITOV(ip);
+        return 0;
+}
+
+
 STATIC int
 xfs_get_vnode(bhv_desc_t *bdp,
 	vnode_t		**vpp,
@@ -2205,7 +2278,7 @@ vfsops_t xfs_vfsops = {
 	xfs_root,
 	xfs_statvfs,
 	xfs_sync,
-	(void*)fs_nosys,
+	xfs_vget,
 	xfs_vfsmountroot,
 	xfs_get_vnode,
 };
