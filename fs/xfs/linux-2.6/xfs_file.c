@@ -36,7 +36,8 @@
 #include <linux/slab.h>
 
 
-STATIC ssize_t linvfs_read(
+STATIC ssize_t
+linvfs_read(
 	struct file	*filp,
 	char		*buf,
 	size_t		size,
@@ -72,27 +73,26 @@ STATIC ssize_t linvfs_read(
 }
 
 
-STATIC ssize_t linvfs_write(
-	struct file *file,
-	const char *buf,
-	size_t count,
-	loff_t *ppos)
+STATIC ssize_t
+linvfs_write(
+	struct file	*file,
+	const char	*buf,
+	size_t		count,
+	loff_t		*ppos)
 {
-	struct inode *inode;
+	struct inode	*inode = file->f_dentry->d_inode;
 	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
-	loff_t	pos;
-	vnode_t *vp;
-	int	err;
-        uio_t	uio;
-        iovec_t iov;
-	
-	if (!file || !file->f_dentry ||
-			!(inode = file->f_dentry->d_inode)) {
-		printk("EXIT linvfs_write -EBADF\n");
-		return -EBADF;
-	}
+	loff_t		pos;
+	vnode_t		*vp;
+	int		err;
+	uio_t		uio;
+	iovec_t		iov;
 
-	inode = file->f_dentry->d_inode;
+	if ((ssize_t) count < 0)
+		return -EINVAL;
+
+	if (!access_ok(VERIFY_READ, buf, count))
+		return -EFAULT;
 
 	down(&inode->i_sem);
 
@@ -187,19 +187,18 @@ STATIC ssize_t linvfs_write(
 	XFS_STATS_ADD(xfsstats.xs_write_bytes, count);
 
 	vp = LINVFS_GET_VP(inode);
-
 	ASSERT(vp);
         
-        uio.uio_iov = &iov;
-        uio.uio_offset = pos;
-        uio.uio_fp = file;
-        uio.uio_iovcnt = 1;
-        uio.uio_iov->iov_base = (void *)buf;
-        uio.uio_iov->iov_len = uio.uio_resid = count;
+	uio.uio_iov = &iov;
+	uio.uio_offset = pos;
+	uio.uio_fp = file;
+	uio.uio_iovcnt = 1;
+	uio.uio_iov->iov_base = (void *)buf;
+	uio.uio_iov->iov_len = uio.uio_resid = count;
         
 	VOP_WRITE(vp, &uio, file->f_flags, NULL, NULL, err);
-        *ppos = pos = uio.uio_offset;
-        count -= uio.uio_resid;
+	*ppos = pos = uio.uio_offset;
+	count -= uio.uio_resid;
 out:
 	up(&inode->i_sem);
 
@@ -213,46 +212,45 @@ out:
 }
 
 
-STATIC int linvfs_open(
-	struct inode *inode,
-	struct file *filp)
+STATIC int
+linvfs_open(
+	struct inode	*inode,
+	struct file	*filp)
 {
-	vnode_t *vp = LINVFS_GET_VP(inode);
-	vnode_t *newvp;
-	int	error;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	vnode_t		*newvp;
+	int		error;
 
 	ASSERT(vp);
-
 	VOP_OPEN(vp, &newvp, 0, get_current_cred(), error);
-
 	return -error;
 }
 
 
-STATIC int linvfs_release(
-	struct inode *inode,
-	struct file *filp)
+STATIC int
+linvfs_release(
+	struct inode	*inode,
+	struct file	*filp)
 {
-	vnode_t *vp = LINVFS_GET_VP(inode);
-	int	error = 0;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	int		error = 0;
 
-	if (vp) {
+	if (vp)
 		VOP_RELEASE(vp, error);
-	}
-
 	return -error;
 }
 
 
-STATIC int linvfs_fsync(
-	struct file *filp,
-	struct dentry *dentry,
-	int datasync)
+STATIC int
+linvfs_fsync(
+	struct file	*filp,
+	struct dentry	*dentry,
+	int		datasync)
 {
-	struct inode *inode = dentry->d_inode;
-	vnode_t *vp = LINVFS_GET_VP(inode);
-	int	error;
-	int	flags = FSYNC_WAIT;
+	struct inode	*inode = dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	int		error;
+	int		flags = FSYNC_WAIT;
 
 	if (datasync)
 		flags |= FSYNC_DATA;
@@ -262,10 +260,7 @@ STATIC int linvfs_fsync(
 	VOP_FSYNC(vp, flags, get_current_cred(),
 		(off_t)0, (off_t)-1, error);
 
-	if (error)
-		return -error;
-
-	return 0;
+	return -error;
 }
 
 /*
@@ -275,26 +270,27 @@ STATIC int linvfs_fsync(
 
 #define nextdp(dp)      ((struct xfs_dirent *)((char *)(dp) + (dp)->d_reclen))
 
-STATIC int linvfs_readdir(
-	struct file *filp,
-	void *dirent,
-	filldir_t filldir)
+STATIC int
+linvfs_readdir(
+	struct file	*filp,
+	void		*dirent,
+	filldir_t	filldir)
 {
-	int			error = 0;
-	vnode_t			*vp;
-	uio_t			uio;
-	iovec_t			iov;
-	int			eof = 0;
-	cred_t			cred;		/* Temporary cred workaround */
-	caddr_t			read_buf;
-	int			namelen, size = 0;
-	size_t			rlen = PAGE_CACHE_SIZE << 2;
-	off_t			start_offset;
-	xfs_dirent_t		*dbp = NULL;
+	int		error = 0;
+	vnode_t		*vp;
+	uio_t		uio;
+	iovec_t		iov;
+	int		eof = 0;
+	cred_t		cred;		/* Temporary cred workaround */
+	caddr_t		read_buf;
+	int		namelen, size = 0;
+	size_t		rlen = PAGE_CACHE_SIZE << 2;
+	off_t		start_offset;
+	xfs_dirent_t	*dbp = NULL;
 
         vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
-
 	ASSERT(vp);
+
 	/* Try fairly hard to get memory */
 	do {
 		if ((read_buf = (caddr_t)kmalloc(rlen, GFP_KERNEL)))
@@ -353,14 +349,17 @@ done:
 
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
-int linvfs_dmapi_map_event(struct file *filp, struct vm_area_struct *vma,
-			   unsigned int wantflag)
+STATIC int
+linvfs_dmapi_map_event(
+	struct file	*filp,
+	struct vm_area_struct *vma,
+	unsigned int	wantflag)
 {
 	vnode_t		*vp;
 	xfs_inode_t	*ip;
 	bhv_desc_t	*bdp;
 	int		ret = 0;
-	dm_fcntl_mapevent_t	maprq;
+	dm_fcntl_mapevent_t maprq;
 	dm_eventtype_t	max_event = DM_EVENT_READ;
 
 	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
@@ -402,11 +401,13 @@ int linvfs_dmapi_map_event(struct file *filp, struct vm_area_struct *vma,
 #endif
 
 
-
-int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
+STATIC int
+linvfs_generic_file_mmap(
+	struct file	*filp,
+	struct vm_area_struct *vma)
 {
-	vnode_t	*vp;
-	int	ret;
+	vnode_t		*vp;
+	int		ret;
 
 	/* this will return a (-) error so flip */
 	ret = -generic_file_mmap(filp, vma);
@@ -417,7 +418,6 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 		vap->va_mask = AT_UPDATIME;
 
 		vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
-
 		ASSERT(vp);
 
 		VOP_SETATTR(vp, vap, AT_UPDATIME, NULL, ret);
@@ -434,18 +434,17 @@ out:
 }
 
 
-STATIC int linvfs_ioctl(
+STATIC int
+linvfs_ioctl(
 	struct inode	*inode,
 	struct file	*filp,
 	unsigned int	cmd,
 	unsigned long	arg)
 {
-	int	error;
-	vnode_t	*vp = LINVFS_GET_VP(inode);
-
+	int		error;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	ASSERT(vp);
-
 	VOP_IOCTL(vp, inode, filp, cmd, arg, error);
 	VMODIFY(vp);
 
@@ -480,5 +479,3 @@ struct file_operations linvfs_dir_operations = {
 	ioctl:		linvfs_ioctl,
 	fsync:		linvfs_fsync,
 };
-
-
