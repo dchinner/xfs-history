@@ -143,7 +143,7 @@ typedef enum page_buf_flags_e {
 	PBF_SYNC = (1 << 8),    /* force updates to disk                   */
 	PBF_MAPPABLE = (1 << 9),/* use directly-addressable pages          */
 	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */	
-	PBF_FS_RESERVED_2 = (1 << 11), /* reserved for client use (UNUSED) */
+	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
 	PBF_RELEASE = (1 << 12),/* buffer to be released after I/O is done */
 
 	/* flags used only as arguments to access routines */
