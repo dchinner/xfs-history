@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -156,8 +156,11 @@ xlog_find_cycle_start(xlog_t	*log,
  * region must be updated since a later routine will need to perform another
  * test.  If the region is completely good, we end up returning the same
  * last block number.
+ *
+ * Return -1 if we encounter no errors.  This is an invalid block number
+ * since we don't ever expect logs to get this large.
  */
-STATIC daddr_t
+STATIC int
 xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 		       daddr_t	start_blk,
 		       int	nbblks,
@@ -165,18 +168,16 @@ xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 {
 	int	i;
 	uint	cycle;
-	daddr_t last_blk = start_blk + nbblks - 1;
 
 	for (i=0; i<nbblks; i++) {
 		cycle = GET_CYCLE(*bap);
 		if (cycle == verify_cycle_no) {
 			(*bap) += BBSIZE;
 		} else {
-			last_blk = start_blk+i;
-			break;
+			return (start_blk+i);
 		}
 	}
-	return last_blk;
+	return -1;
 }	/* xlog_find_verify_cycle */
 
 
@@ -225,8 +226,8 @@ xlog_find_head(xlog_t  *log,
 	       daddr_t *head_blk)
 {
 	buf_t	*bp, *big_bp;
-	daddr_t	first_blk, mid_blk, last_blk, num_scan_bblks;
-	daddr_t	start_blk, saved_last_blk;
+	daddr_t	new_blk, first_blk, start_blk, mid_blk, last_blk;
+	daddr_t num_scan_bblks;
 	uint	first_half_cycle, mid_cycle, last_half_cycle, cycle;
 	caddr_t	ba;
 	int	error, i, log_bbnum = log->l_logBBsize;
@@ -265,9 +266,11 @@ xlog_find_head(xlog_t  *log,
 		if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
 			goto big_bp_err;
 		ba = big_bp->b_dmaaddr;
-		last_blk = xlog_find_verify_cycle(&ba, start_blk,
-						  num_scan_bblks,
-						  first_half_cycle);
+		new_blk = xlog_find_verify_cycle(&ba, start_blk,
+						 num_scan_bblks,
+						 first_half_cycle);
+		if (new_blk != -1)
+			last_blk = new_blk;
 	} else {	/* need to read 2 parts of log */
 		/* scan end of physical log */
 		start_blk = log_bbnum - num_scan_bblks + last_blk;
@@ -275,20 +278,23 @@ xlog_find_head(xlog_t  *log,
 				       num_scan_bblks - last_blk, big_bp))
 			goto big_bp_err;
 		ba = big_bp->b_dmaaddr;
-		saved_last_blk = last_blk;
-		if ((last_blk =
-		     xlog_find_verify_cycle(&ba, start_blk,
-					    num_scan_bblks - last_blk,
-					    last_half_cycle)) != saved_last_blk)
+		new_blk = xlog_find_verify_cycle(&ba, start_blk,
+						 num_scan_bblks - last_blk,
+						 last_half_cycle);
+		if (new_blk != -1) {
+			last_blk = new_blk;
 			goto bad_blk;
+		}
 
 		/* scan beginning of physical log */
 		start_blk = 0;
 		if (error = xlog_bread(log, start_blk, last_blk, big_bp))
 			goto big_bp_err;
 		ba = big_bp->b_dmaaddr;
-		last_blk = xlog_find_verify_cycle(&ba, start_blk, last_blk,
-						  first_half_cycle);
+		new_blk = xlog_find_verify_cycle(&ba, start_blk, last_blk,
+						 first_half_cycle);
+		if (new_blk != -1)
+			last_blk = new_blk;
 	}
 
 bad_blk:
@@ -467,7 +473,8 @@ xlog_find_zeroed(xlog_t	 *log,
 {
 	buf_t	*bp, *big_bp;
 	uint	first_cycle, mid_cycle, last_cycle, cycle;
-	daddr_t	first_blk, mid_blk, last_blk, start_blk, num_scan_bblks;
+	daddr_t	new_blk, first_blk, mid_blk, last_blk, start_blk;
+	daddr_t num_scan_bblks;
 	caddr_t	ba;
 	int	error, i, log_bbnum = log->l_logBBsize;
 
@@ -510,7 +517,9 @@ xlog_find_zeroed(xlog_t	 *log,
 	if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
 		goto big_bp_err;
 	ba = big_bp->b_dmaaddr;
-	last_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks, 1);
+	new_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks, 1);
+	if (new_blk != -1)
+		last_blk = new_blk;
 
 	/* Potentially backup over partial log record write */
 	last_blk = xlog_find_verify_log_record(ba, start_blk, last_blk);
