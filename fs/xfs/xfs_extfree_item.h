@@ -37,8 +37,8 @@ typedef struct xfs_efi_log_item {
  * size is given by efd_nextents;
  */
 typedef struct xfs_efd_log_format {
-	unsigned int		efd_type;	/* efd log item type */
-	unsigned int		efd_size;	/* size of this item */
+	unsigned short		efd_type;	/* efd log item type */
+	unsigned short		efd_size;	/* size of this item */
 	uint			efd_nextents;	/* # of extents freed */
 	xfs_extent_t		efd_extents[1];	/* array of extents freed */
 } xfs_efd_log_format_t;
