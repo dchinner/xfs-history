@@ -2,7 +2,7 @@
 #
 # Makefile for SGI XFS File System
 #
-# $Revision: 1.48 $
+# $Revision: 1.49 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -172,4 +172,9 @@ headers!
 xfsidbg.o: xfsidbg.c
 	$(CCF) -c $(JALR) -G 0 $(KPATH)/xfsidbg.c && \
 	$(LDF) $(PRODOBJECT) -G 0 -r $(.TARGET:T) -o $$$$.o && \
+	mv $$$$.o $(.TARGET:T)
+
+xfs_icrash.o: xfs_icrash.c
+	$(CCF) -g3 -c $(JALR) $(KPATH)/xfs_icrash.c && \
+	$(LDF) $(PRODOBJECT) -r $(.TARGET:T) -o $$$$.o && \
 	mv $$$$.o $(.TARGET:T)
