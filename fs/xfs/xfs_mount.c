@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.150 $"
+#ident	"$Revision: 1.151 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -498,6 +498,15 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		mp->m_inoalign = mp->m_sb.sb_inoalignmt;
 	else
 		mp->m_inoalign = 0;
+
+	/*
+	 * If we are using stripe alignment, check whether
+	 * the stripe unit is a multiple of the inode alignment
+	 */
+	if (mp->m_dalign && mp->m_inoalign && !(mp->m_dalign % mp->m_inoalign)) 
+		mp->m_sinoalign = mp->m_dalign;
+	else
+		mp->m_sinoalign = 0;
 
 	/*
 	 * Check that the data (and log if separate) are an ok size.

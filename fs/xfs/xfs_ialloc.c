@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.101 $"
+#ident	"$Revision: 1.102 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -206,7 +206,7 @@ xfs_ialloc_ag_alloc(
 	 * so don't need alignment anyway.
 	 */
 	isaligned = 0;
-	if (XFS_SB_VERSION_HASDALIGN(&args.mp->m_sb) && args.mp->m_dalign) {
+	if (args.mp->m_sinoalign) {
 		ASSERT(!(args.mp->m_flags & XFS_MOUNT_NOALIGN));
 		args.alignment = args.mp->m_dalign;
 		isaligned = 1;
