@@ -699,7 +699,8 @@ try_again:
 
 		mp = XFS_VFSTOM(dir_vp->v_vfsp);
 		tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
-		if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
+		if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS,
+						10, 0, 0))
 			goto error_return;
 
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
@@ -1682,7 +1683,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
-	if (code = xfs_trans_reserve (tp, 10, 10, 0, 0))
+	if (code = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS, 10, 0, 0))
 		goto error_return;
 
 	/*
@@ -1946,7 +1947,7 @@ xfs_symlink(vnode_t	*dir_vp,
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
-	if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
+	if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS, 10, 0, 0))
 		goto error_return;
 
 	/*
