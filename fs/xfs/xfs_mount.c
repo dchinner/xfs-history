@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.92 $"
+#ident	"$Revision: 1.93 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -136,6 +136,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	int		readio_log;
 	int		writeio_log;
 	vmap_t		vmap;
+	__uint64_t	ret64;
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount xFS filesystems */
 		return 0;
@@ -234,6 +235,15 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_ialloc_compute_maxlevels(mp);
 	mp->m_bsize = XFS_FSB_TO_BB(mp, 1);
 	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
+
+	/*
+	 * XFS uses the uuid from the superblock as the unique
+	 * identifier for fsid.  We can not use the uuid from the volume
+	 * since a single partition filesystem is identical to a single
+	 * partition volume/filesystem.
+	 */
+	ret64 = uuid_hash64(&sbp->sb_uuid, (uint *)&i);
+	bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
 
 	/*
 	 * Set the default minimum read and write sizes.

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.92 $"
+#ident  "$Revision: 1.93 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -60,6 +60,7 @@
 #include <sys/uio.h>
 #include <sys/dirent.h>
 #include <sys/ktrace.h>
+#include <sys/uuid.h>
 #ifndef SIM
 #include <sys/xlv_base.h>
 #include <sys/xlv_tab.h>
@@ -503,14 +504,13 @@ xfs_get_vfsmount(
 		mp->m_rtdevp = NULL;
 
 		vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
-		/* vfsp->vfs_bsize filled in later from the superblock. */
+		/* vfsp->vfs_bsize filled in later from superblock */
 		vfsp->vfs_fstype = xfs_fstype;
-		vfsp->vfs_fsid.val[0] = ddev;
-		vfsp->vfs_fsid.val[1] = xfs_fstype;
 		vfsp->vfs_data = mp;
 		vfsp->vfs_dev = ddev;
 		vfsp->vfs_nsubmounts = 0;
 		vfsp->vfs_bcount = 0;
+		/* vfsp->vfs_fsid is filled in later from superblock */
 	}
 
 	return mp;
@@ -839,7 +839,6 @@ xfs_mountroot(
 			XLV_IO_LOCK(minor(rootdev), MR_ACCESS);
 			xlv_p = &xlv_tab->subvolume[minor(rootdev)];
 			if (! XLV_SUBVOL_EXISTS(xlv_p)) {
-
 				XLV_IO_UNLOCK(minor(rootdev));
 				return XFS_ERROR(ENXIO);
 			}
