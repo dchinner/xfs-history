@@ -817,9 +817,9 @@ xfs_mountroot(
 			 */
 			xfs_log_force(mp, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-			bflush(mp->m_dev);
+			binval(mp->m_dev);
 			if (mp->m_rtdev) {
-				bflush(mp->m_dev);
+				binval(mp->m_dev);
 			}
 
 			/*
@@ -831,7 +831,7 @@ xfs_mountroot(
 			 */
 			xfs_log_force(mp, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-			bflush(mp->m_dev);
+			binval(mp->m_dev);
 
 			/*
 			 * Finally, try to flush out the superblock.  If
@@ -975,7 +975,6 @@ xfs_ibusy(
 /*
  * xfs_unmount
  *
- * XXX xfs_unmount() needs return code work and more error checking.
  */
 /*ARGSUSED*/
 STATIC int
@@ -1019,8 +1018,9 @@ xfs_unmount(
 	/*
 	 * Make sure there are no active users.
 	 */
-	if (xfs_ibusy(mp))
+	if (xfs_ibusy(mp)) {
 		return XFS_ERROR(EBUSY);
+	}
 	
 	xfs_ilock(rip, XFS_ILOCK_EXCL);
 	xfs_iflock(rip);
@@ -1566,6 +1566,13 @@ xfs_sync(
 					if (mp->m_ireclaims != ireclaims) {
 						restarts++;
 						XFS_MOUNT_IUNLOCK(mp);
+						/*
+						 * This is the bdflush case,
+						 * so we never should have
+						 * acquired a ref to the
+						 * vnode above.
+						 */
+						ASSERT(!vnode_refed);
 						goto loop;
 					}
 					mount_locked = B_TRUE;
@@ -1798,13 +1805,29 @@ xfs_vget(
 	fid_t		*fidp)
 {
         xfs_fid_t	*xfid;
+	xfs_fid2_t	*xfid2;
         xfs_inode_t	*ip;
 	int		error;
 	xfs_ino_t	ino;
+	unsigned int	igen;
 	xfs_mount_t	*mp;
 
-        xfid = (struct xfs_fid *)fidp;
-	ino = (xfs_ino_t)xfid->fid_ino;
+	xfid  = (struct xfs_fid *)fidp;
+	xfid2 = (struct xfs_fid2 *)fidp;
+	if (xfid->fid_len == sizeof *xfid - sizeof xfid->fid_len) {
+		ino  = (xfs_ino_t)xfid->fid_ino;
+		igen = xfid->fid_gen;
+	} else if (xfid2->fid_len == sizeof *xfid2 - sizeof xfid2->fid_len) {
+		ino  = xfid2->fid_ino;
+		igen = xfid2->fid_gen;
+	} else {
+		/*
+		 * Invalid.  Since handles can be created in user space
+		 * and passed in via gethandle(), this is not cause for
+		 * a panic.
+		 */
+		return XFS_ERROR(EINVAL);
+	}
 	mp = XFS_VFSTOM(vfsp);
 	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_EXCL, &ip, 0);
 	if (error) {
@@ -1815,7 +1838,7 @@ xfs_vget(
                 *vpp = NULL;
                 return XFS_ERROR(EIO);
         }
-        if (ip->i_d.di_gen != xfid->fid_gen) {
+	if (ip->i_d.di_gen != igen) {
                 xfs_iput(ip, XFS_ILOCK_EXCL);
                 *vpp = NULL;
                 return 0;
@@ -1823,8 +1846,6 @@ xfs_vget(
         xfs_iunlock(ip, XFS_ILOCK_EXCL);
         *vpp = XFS_ITOV(ip);
         return 0;
-
-
 }
 
 
@@ -1842,20 +1863,3 @@ struct vfsops xfs_vfsops = {
 #else	/* SIM */
 struct vfsops xfs_vfsops;
 #endif	/* !SIM */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
