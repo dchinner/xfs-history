@@ -3026,6 +3026,7 @@ static void xfs_prdinode_core(xfs_dinode_core_t *dip, int convert);
 static void xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
 #ifdef XFS_RW_TRACE
 static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
+static void xfs_page_trace_entry(ktrace_entry_t *ktep);
 static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_xexlist_fork(xfs_inode_t *ip, int whichfork);
@@ -4106,16 +4107,9 @@ xfs_iomap_enter_trace_entry(ktrace_entry_t *ktep)
 		(unsigned int)(long)ktep->val[4],
 		(unsigned int)(long)ktep->val[5],
 		(unsigned int)(long)ktep->val[6]);
-	qprintf("next offset 0x%x%x io offset 0x%x%x\n",
+	qprintf("io new size 0x%x%x\n",
 		(unsigned int)(long)ktep->val[7],
-		(unsigned int)(long)ktep->val[8],
-		(unsigned int)(long)ktep->val[9],
-		(unsigned int)(long)ktep->val[10]);
-	qprintf("io size 0x%x last req sz 0x%x new size 0x%x%x\n",
-		(unsigned int)(long)ktep->val[11],
-		(unsigned int)(long)ktep->val[12],
-		(unsigned int)(long)ktep->val[13],
-		(unsigned int)(long)ktep->val[14]);
+		(unsigned int)(long)ktep->val[8]);
 }
 
 /*
@@ -4124,6 +4118,20 @@ xfs_iomap_enter_trace_entry(ktrace_entry_t *ktep)
 static void
 xfs_iomap_map_trace_entry(ktrace_entry_t *ktep)
 {
+	static char *bmapi_flags[] = {
+		"read",		/* BMAPI_READ */
+		"write",	/* BMAPI_WRITE */
+		"allocate",	/* BMAPI_ALLOCATE */
+		"unwritten",	/* BMAPI_UNWRITTEN */
+		"ignstate",	/* BMAPI_IGNSTATE */
+		"direct",	/* BMAPI_DIRECT */
+		"mmap",		/* BMAPI_MMAP */
+		"sync",		/* BMAPI_SYNC */
+		"trylock",	/* BMAPI_TRYLOCK */
+		"device",	/* BMAPI_DEVICE */
+		0
+	};
+
 	qprintf("ip 0x%p size 0x%x%x offset 0x%x%x count 0x%x\n",
 		ktep->val[1],
 		(unsigned int)(long)ktep->val[2],
@@ -4131,8 +4139,8 @@ xfs_iomap_map_trace_entry(ktrace_entry_t *ktep)
 		(unsigned int)(long)ktep->val[4],
 		(unsigned int)(long)ktep->val[5],
 		(unsigned int)(long)ktep->val[6]);
-	qprintf("bmap off 0x%x%x len 0x%x pboff 0x%x pbsize 0x%x bno 0x%x\n",
-		(unsigned int)(long)ktep->val[7],
+	printflags((__psint_t)ktep->val[7], bmapi_flags, "bmapi flags");
+	qprintf("iomap off 0x%x%x delta 0x%x bsize 0x%x bno 0x%x\n",
 		(unsigned int)(long)ktep->val[8],
 		(unsigned int)(long)ktep->val[9],
 		(unsigned int)(long)ktep->val[10],
@@ -4292,24 +4300,40 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 static void
 xfs_rw_enter_trace_entry(ktrace_entry_t *ktep)
 {
-	qprintf("ip 0x%p size 0x%x%x uio offset 0x%x%x uio count 0x%x\n",
+	qprintf("ip 0x%p size 0x%x%x ptr 0x%p size %lu\n",
 		ktep->val[1],
 		(unsigned int)(long)ktep->val[2],
 		(unsigned int)(long)ktep->val[3],
 		(unsigned int)(long)ktep->val[4],
+		(unsigned long)ktep->val[5]);
+	qprintf("io offset 0x%x%x ioflags 0x%x new size 0x%x%x\n",
+		(unsigned int)(long)ktep->val[6],
+		(unsigned int)(long)ktep->val[7],
+		(unsigned int)(long)ktep->val[8],
+		(unsigned int)(long)ktep->val[9],
+		(unsigned int)(long)ktep->val[10]);
+}
+
+/*
+ * Print page write/release trace.
+ */
+static void
+xfs_page_trace_entry(ktrace_entry_t *ktep)
+{
+	qprintf("ip 0x%p inode 0x%p 0x%p page 0x%p\n",
+		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4]);
+	qprintf("mask 0x%x di_size 0x%x%x isize 0x%x%x offset 0x%x%x\n",
 		(unsigned int)(long)ktep->val[5],
-		(unsigned int)(long)ktep->val[6]);
-	qprintf("ioflags 0x%x next offset 0x%x%x io offset 0x%x%x\n",
+		(unsigned int)(long)ktep->val[6],
 		(unsigned int)(long)ktep->val[7],
 		(unsigned int)(long)ktep->val[8],
 		(unsigned int)(long)ktep->val[9],
 		(unsigned int)(long)ktep->val[10],
 		(unsigned int)(long)ktep->val[11]);
-	qprintf("io size 0x%x last req sz 0x%x new size 0x%x%x\n",
+	qprintf("delalloc %d unmapped %d unwritten %d\n",
 		(unsigned int)(long)ktep->val[12],
 		(unsigned int)(long)ktep->val[13],
-		(unsigned int)(long)ktep->val[14],
-		(unsigned int)(long)ktep->val[15]);
+		(unsigned int)(long)ktep->val[14]);
 }
 
 /*
@@ -4325,6 +4349,10 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		break;
 	case XFS_WRITE_ENTER:
 		qprintf("WRITE ENTER:\n");
+		xfs_rw_enter_trace_entry(ktep);
+		break;
+	case XFS_SENDFILE_ENTER:
+		qprintf("SENDFILE ENTER:\n");
 		xfs_rw_enter_trace_entry(ktep);
 		break;
 	case XFS_IOMAP_READ_ENTER:
@@ -4399,8 +4427,29 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		qprintf("DIOWR ENTER:\n");
 		xfs_rw_enter_trace_entry(ktep);
 		break;
+	case XFS_WRITEPAGE_ENTER:
+		qprintf("PAGE WRITE:\n");
+		xfs_page_trace_entry(ktep);
+		break;
+	case XFS_RELEASEPAGE_ENTER:
+		qprintf("PAGE RELEASE:\n");
+		xfs_page_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_ALLOC_ENTER:
+		qprintf("ALLOC ENTER:\n");
+		xfs_iomap_enter_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_ALLOC_MAP:
+		qprintf("ALLOC MAP:\n");
+		xfs_iomap_map_trace_entry(ktep);
+		break;
+	case XFS_IOMAP_UNWRITTEN:
+		qprintf("UNWRITTEN:\n");
+		xfs_iomap_enter_trace_entry(ktep);
+		break;
 
 	default:
+		qprintf("UNKNOWN RW TRACE\n");
 		return 0;
 	}
 
