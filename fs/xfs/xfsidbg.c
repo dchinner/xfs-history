@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -675,22 +675,45 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 static void
 xfs_buf_item_print(xfs_buf_log_item_t *blip)
 {
+#if XFS_BIG_FILESYSTEMS
+	xfs_buf_log_format64_t	*blfp;
+#endif
 	static char *bli_flags[] = {
 		"hold",		/* 0x1 */
 		"dirty",	/* 0x2 */
 		"stale",	/* 0x4 */
 		"logged",	/* 0x8 */
+		"ialloc",	/* 0x10 */
+		0
+		};
+	static char *blf_flags[] = {
+		"inode",	/* 0x1 */
+		"cancel",	/* 0x2 */
 		0
 		};
 
-	qprintf("buf 0x%x recur %d refcount %d flags",
+	qprintf("buf 0x%x recur %d refcount %d flags:",
 		blip->bli_buf, blip->bli_recur, blip->bli_refcount);
-	printflags(blip->bli_flags, bli_flags,"bufitem");
+	printflags(blip->bli_flags, bli_flags, NULL);
 	qprintf("\n");
 	qprintf("size %d blkno 0x%x len 0x%x map size %d map 0x%x\n",
 		blip->bli_format.blf_size, blip->bli_format.blf_blkno,
 		blip->bli_format.blf_len, blip->bli_format.blf_map_size,
 		&(blip->bli_format.blf_data_map));
+	qprintf("blf flags:");
+	printflags((uint)blip->bli_format.blf_flags, blf_flags, NULL);
+#if XFS_BIG_FILESYSTEMS
+	if (blip->bli_format64 != NULL) {
+		blfp = blip->bli_format64;
+		qprintf("BLI has an attached format64\n");
+		qprintf("type 0x%x size %d flags:",
+			blfp->blf_type, blfp->blf_size);
+		printflags((uint)blfp->blf_flags, blf_flags, NULL);
+		qprintf("blkno 0x%llx len 0x%x map size %d map 0x%x\n",
+			blfp->blf_blkno, blfp->blf_len, blfp->blf_map_size,
+			blfp->blf_data_map);
+	}
+#endif
 }
 
 /*
@@ -727,6 +750,7 @@ xfs_efd_item_print(xfs_efd_log_item_t *efdp)
 	qprintf("size %d nextents %d next extent %d efip 0x%x\n",
 		efdp->efd_format.efd_size, efdp->efd_format.efd_nextents,
 		efdp->efd_next_extent, efdp->efd_efip);
+	qprintf("efi_id 0x%llx\n", efdp->efd_format.efd_efi_id);
 	qprintf("efd extents:\n");
 	ep = &(efdp->efd_format.efd_extents[0]);
 	for (i = 0; i < efdp->efd_next_extent; i++, ep++) {
@@ -743,11 +767,19 @@ xfs_efi_item_print(xfs_efi_log_item_t *efip)
 {
 	int		i;
 	xfs_extent_t	*ep;
+	static char *efi_flags[] = {
+		"recovered",	/* 0x1 */
+		"committed",	/* 0x2 */
+		"cancelled",	/* 0x4 */
+		0,
+		};
 
 	qprintf("size %d nextents %d next extent %d\n",
 		efip->efi_format.efi_size, efip->efi_format.efi_nextents,
 		efip->efi_next_extent);
-	qprintf("id %llx\n", efip->efi_format.efi_id);
+	qprintf("id %llx flags: ", efip->efi_format.efi_id);
+	printflags(efip->efi_flags, efi_flags, NULL);
+	qprintf("\n");
 	qprintf("efi extents:\n");
 	ep = &(efip->efi_format.efi_extents[0]);
 	for (i = 0; i < efip->efi_next_extent; i++, ep++) {
@@ -877,29 +909,39 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip)
 		0
 		};
 	static char *ilf_fields[] = {
-		"core",		/* 0x01 */
-		"data",		/* 0x02 */
-		"exts",		/* 0x04 */
-		"broot",	/* 0x08 */
-		"dev",		/* 0x10 */
+		"core",		/* 0x001 */
+		"ddata",	/* 0x002 */
+		"dexts",	/* 0x004 */
+		"dbroot",	/* 0x008 */
+		"dev",		/* 0x010 */
+		"uuid",		/* 0x020 */
+		"adata",	/* 0x040 */
+		"aext",		/* 0x080 */
+		"abroot",	/* 0x100 */
 		0
 		};
 
-	qprintf("inode 0x%x logged %d flags ",
-		ilip->ili_inode, ilip->ili_logged);
-	printflags(ilip->ili_flags, ili_flags,"inodeitem");
+	qprintf("inode 0x%x ino 0x%llx logged %d flags: ",
+		ilip->ili_inode, ilip->ili_format.ilf_ino, ilip->ili_logged);
+	printflags(ilip->ili_flags, ili_flags, NULL);
 	qprintf("\n");
 	qprintf("ilock recur %d iolock recur %d ext buf 0x%x\n",
 		ilip->ili_ilock_recur, ilip->ili_iolock_recur,
 		ilip->ili_extents_buf);
 	qprintf("inode buf 0x%x\n", ilip->ili_bp);
-	qprintf("size %d fields ", ilip->ili_format.ilf_size);
-	printflags(ilip->ili_format.ilf_fields, ilf_fields,"formatfield");
-	qprintf(" last fields ");
-	printflags(ilip->ili_last_fields, ilf_fields,"lastfield");
+	qprintf("size %d fields: ", ilip->ili_format.ilf_size);
+	printflags(ilip->ili_format.ilf_fields, ilf_fields, "formatfield");
+	qprintf(" last fields: ");
+	printflags(ilip->ili_last_fields, ilf_fields, "lastfield");
 	qprintf("\n");
-	qprintf("dsize %d, rdev 0x%x\n", ilip->ili_format.ilf_dsize,
+	qprintf("dsize %d, asize %d, rdev 0x%x\n",
+		ilip->ili_format.ilf_dsize,
+		ilip->ili_format.ilf_asize,
 		ilip->ili_format.ilf_u.ilfu_rdev);
+	qprintf("blkno 0x%llx len 0x%x boffset 0x%x\n",
+		ilip->ili_format.ilf_blkno,
+		ilip->ili_format.ilf_len,
+		ilip->ili_format.ilf_boffset);
 }
 
 /*
@@ -2572,11 +2614,14 @@ idbg_xlogitem(xfs_log_item_t *lip)
 	xfs_log_item_t	*bio_lip;
 	static char *lid_type[] = {
 		"???",		/* 0 */
-		"buf",		/* 1 */
-		"inode",	/* 2 */
+		"obuf",		/* 1 */
+		"oinode",	/* 2 */
 		"efi",		/* 3 */
 		"efd",		/* 4 */
 		"iunlink",	/* 5 */
+		"inode",	/* 6 */
+		"buf",		/* 7 */
+		"buf64",	/* 8 */
 		0
 		};
 	static char *li_flags[] = {
@@ -2698,6 +2743,9 @@ idbg_xtrans_res(
 		xtrp->tr_ichange, xtrp->tr_growdata, xtrp->tr_swrite);
 	qprintf("addafork: %d\twriteid: %d\tainval: %d\n",
 		xtrp->tr_addafork, xtrp->tr_writeid, xtrp->tr_ainval);
+	qprintf("setattr: %d\trmattr: %d\tattrflag: %d\n",
+		xtrp->tr_setattr, xtrp->tr_rmattr, xtrp->tr_attrflag);
+	qprintf("clearagi: %d\n", xtrp->tr_clearagi);
 }
 		
 
@@ -3085,6 +3133,7 @@ idbg_xtp(xfs_trans_t *tp)
 	case XFS_TRANS_ATTR_SET:	qprintf("ATTR_SET");		break;
 	case XFS_TRANS_ATTR_RM:		qprintf("ATTR_RM");		break;
 	case XFS_TRANS_ATTR_FLAG:	qprintf("ATTR_FLAG");		break;
+	case XFS_TRANS_CLEAR_AGI_BUCKET:  qprintf("CLEAR_AGI_BUCKET");	break;
 	default:			qprintf("0x%x", tp->t_type);	break;
 	}
 	qprintf(" mount 0x%x\n", tp->t_mountp);
