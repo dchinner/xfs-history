@@ -1797,12 +1797,11 @@ xfsbdstrat(
 {
 	ASSERT(mp);
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
-		if (XFS_BUF_IS_GRIO(bp)) {
-			printk("xfsbdstrat needs grio_strategy\n");
-		} else {
-			pagebuf_iorequest(bp);
-		}
+		/* Grio redirection would go here
+		 * if (XFS_BUF_IS_GRIO(bp)) {
+		 */
 
+		pagebuf_iorequest(bp);
 		return 0;
 	}
 

@@ -43,14 +43,6 @@ extern void vfsinit(void);
 extern int  xfs_init(int fstype);
 extern void xfs_cleanup(void);
 
-#ifdef CONFIG_XFS_GRIO
-extern void xfs_grio_init(void);
-extern void xfs_grio_uninit(void);
-#else
-# define xfs_grio_init()	do { } while (0)
-# define xfs_grio_uninit()	do { } while (0)
-#endif
-
 #ifdef CELL_CAPABLE
 extern int cxfs_parseargs(char *, int, struct xfs_args *);
 #else
@@ -923,7 +915,6 @@ static int __init init_xfs_fs(void)
 	cred_init();
 	vfsinit();
 	xfs_init(0);
-	xfs_grio_init();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
@@ -938,7 +929,6 @@ out:
 
 static void __exit exit_xfs_fs(void)
 {
-        xfs_grio_uninit();
 	xfs_cleanup();
         unregister_filesystem(&xfs_fs_type);
 	pagebuf_terminate();

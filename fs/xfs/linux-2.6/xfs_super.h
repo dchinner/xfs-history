@@ -50,12 +50,6 @@
 # define XFS_QUOTA_STRING
 #endif
 
-#ifdef CONFIG_XFS_GRIO
-# define XFS_GRIO_STRING	"GRIO, "
-#else
-# define XFS_GRIO_STRING
-#endif
-
 #ifdef CONFIG_XFS_RT
 # define XFS_RT_STRING		"realtime, "
 #else
@@ -75,7 +69,7 @@
 #endif
 
 #define XFS_BUILD_OPTIONS	XFS_ACL_STRING XFS_DMAPI_STRING \
-				XFS_GRIO_STRING XFS_RT_STRING \
+				XFS_RT_STRING \
 				XFS_QUOTA_STRING XFS_VNTRACE_STRING \
 				XFS_DBG_STRING /* DBG must be last */
 

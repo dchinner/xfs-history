@@ -36,7 +36,7 @@
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
 # but I am not going to change every file at the moment.
 
-EXTRA_CFLAGS +=  -I. -funsigned-char
+EXTRA_CFLAGS +=  -I. -funsigned-char 
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
@@ -56,10 +56,6 @@ ifeq ($(CONFIG_XFS_RT),)
   xfs-objs			+= xfsrtstubs.o
 else
   xfs-objs			+= xfs_rtalloc.o xfs_rtbit.o
-endif
-
-ifneq ($(CONFIG_XFS_GRIO),)
-  xfs-objs			+= xfs_grio.o
 endif
 
 ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
@@ -150,10 +146,6 @@ xfs-objs			+= page_buf.o \
 # Objects in linux/
 
 xfs-objs			+= xfs_fs_subr.o
-
-ifeq ($(CONFIG_XFS_GRIO),)
-  xfs-objs			+= xfs_griostubs.o
-endif
 
 ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
   xfs-objs			+= xfs_dmistubs.o

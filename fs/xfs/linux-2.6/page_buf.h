@@ -127,7 +127,6 @@ typedef enum page_buf_flags_e { 	/* pb_flags values */
 	_PBF_MEM_ALLOCATED = (1 << 25),
 				/* pb_mem and underlying pages allocated   */
 
-	PBF_GRIO = (1 << 26),
 	PBF_FORCEIO = (1 << 27),
 	PBF_FLUSH = (1 << 28),	/* flush disk write cache */ 
 	PBF_FS_RESERVED_3 = (1 << 31)	/* reserved (XFS use: XFS_B_STALE) */
