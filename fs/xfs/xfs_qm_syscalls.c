@@ -1,4 +1,4 @@
-#ident "$Revision: 1.9 $"
+#ident "$Revision: 1.10 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -61,8 +61,8 @@ STATIC int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
 STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint, caddr_t);
 STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, caddr_t);
 STATIC int	xfs_qm_scall_setqlim(xfs_mount_t *, xfs_dqid_t, uint, caddr_t);
-STATIC int	xfs_qm_scall_quotaoff(xfs_mount_t *, uint);
 STATIC int	xfs_qm_scall_quotaon(xfs_mount_t *, uint);
+STATIC int	xfs_qm_scall_qwarn(xfs_mount_t *, xfs_dqid_t, caddr_t);
 STATIC int	xfs_qm_log_quotaoff(xfs_mount_t *, xfs_qoff_logitem_t **, uint);
 STATIC int	xfs_qm_log_quotaoff_end(xfs_mount_t *, xfs_qoff_logitem_t *,
 					uint);
@@ -145,7 +145,8 @@ xfs_qm_sysent(
 	switch (cmd) {
 	      case Q_QUOTAOFF:
 		error = xfs_qm_scall_quotaoff(mp,
-					      xfs_qm_import_flags((uint *)addr));
+					      xfs_qm_import_flags((uint *)addr),
+					      B_FALSE);
 		break;
 
 		/* 
@@ -173,15 +174,19 @@ xfs_qm_sysent(
 		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_PROJ, 
 					addr);
 		break;
-		/*
-		 * Set limits, both hard and soft. Defaults to Q_SETUQLIM.
-		 */
 #else	
 	      case Q_XSETPQLIM:
 	      case Q_XGETPQUOTA:
 		error = ENOTSUP;
 		break;
 #endif
+		/*
+		 * Add a warning to the User/Project.
+		 */
+	      case Q_WARN:
+		error = xfs_qm_scall_qwarn(mp, (xfs_dqid_t)id, addr);
+		break;
+
 		/*
 		 * Quotas are entirely undefined after quotaoff in XFS quotas.
 		 * For instance, there's no way to set limits when quotaoff.
@@ -205,6 +210,216 @@ xfs_qm_sysent(
 }
 
 
+
+/*
+ * Turn off quota accounting and/or enforcement for all udquots and/or
+ * pdquots. Called only at mount time.
+ *
+ * This assumes that there are no dquots of this file system cached 
+ * incore, and modifies the ondisk dquot directly. Therefore, for example,
+ * it is an error to call this twice, without purging the cache.
+ */
+int
+xfs_qm_scall_quotaoff(
+	xfs_mount_t	*mp,
+	uint		flags,
+	boolean_t	force)
+{
+	uint			dqtype;
+	int			s;
+	int			error;
+	uint			inactivate_flags;
+	xfs_qoff_logitem_t 	*qoffstart;
+	extern dev_t		rootdev;
+
+	if (!force && !_CAP_ABLE(CAP_QUOTA_MGT))
+		return (EPERM);
+	/*
+	 * Only root file system can have quotas enabled on disk but not
+	 * in core. Note that quota utilities (like quotaoff) _expect_ 
+	 * errno == EEXIST here.
+	 */
+	if (mp->m_dev != rootdev && (mp->m_qflags & flags) == 0)
+		return (EEXIST);
+	ASSERT(mp->m_quotainfo);
+	error = 0;
+
+#ifdef _NOPROJQUOTAS
+	flags &= (XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD);
+#else
+	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
+#endif	
+	/* 
+	 * We don't want to deal with two quotaoffs messing up each other,
+	 * so we're going to serialize it. quotaoff isn't exactly a performance
+	 * critical thing. XXXcurrently, we also take the vfslock.
+	 */
+	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
+
+	/*
+	 * Root file system may or may not have quotas on in core.
+	 * We have to perform the quotaoff accordingly.
+	 */
+	if (mp->m_dev == rootdev) {
+		uint sbflags, newflags;
+		s = XFS_SB_LOCK(mp);
+		sbflags = mp->m_sb.sb_qflags;
+		if ((mp->m_qflags & flags) == 0) {
+			mp->m_sb.sb_qflags &= flags;
+			newflags = mp->m_sb.sb_qflags;
+			XFS_SB_UNLOCK(mp, s);
+			mutex_unlock(&mp->QI_QOFFLOCK);
+			if (sbflags != newflags)
+			      error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
+			return (error);
+		}			
+		XFS_SB_UNLOCK(mp, s);
+			
+		if ((sbflags & flags) != (mp->m_qflags & flags)) {
+			/*
+			 * Something must have been turned on, with
+			 * delayed effect. ie. Something's in the SB,
+			 * but not in the incore mount struct.
+			 */
+			ASSERT((sbflags & XFS_ALL_QUOTA_ACCT) != 
+			       (mp->m_qflags & XFS_ALL_QUOTA_ACCT));
+			
+			/* XXX TBD */
+			/* We need to update the SB and mp separately */
+			return (EINVAL);
+		}
+	}
+	/*
+	 * if we're just turning off quota enforcement, change mp and go.
+	 */
+	if ((flags & XFS_ALL_QUOTA_ACCT) == 0) {
+		mp->m_qflags &= ~(flags);
+		
+		s = XFS_SB_LOCK(mp);
+		mp->m_sb.sb_qflags = mp->m_qflags;
+		XFS_SB_UNLOCK(mp, s);
+		mutex_unlock(&mp->QI_QOFFLOCK);
+		
+		/* XXX what to do if error ? Revert back to old vals incore ? */
+		error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
+		return (error);
+	}
+
+	dqtype = 0;
+	inactivate_flags = 0;
+	/* 
+	 * If accounting is off, we must turn enforcement off, clear the
+	 * quota 'CHKD' certificate to make it known that we have to
+	 * do a quotacheck the next time this quota is turned on.
+	 */
+	if (flags & XFS_UQUOTA_ACCT) {
+		dqtype |= XFS_QMOPT_UQUOTA;
+		flags |= (XFS_UQUOTA_CHKD | XFS_UQUOTA_ENFD);
+		inactivate_flags |= XFS_UQUOTA_ACTIVE;
+	}
+	if (flags & XFS_PQUOTA_ACCT) {
+		dqtype |= XFS_QMOPT_PQUOTA;
+		flags |= (XFS_PQUOTA_CHKD | XFS_PQUOTA_ENFD);
+		inactivate_flags |= XFS_PQUOTA_ACTIVE;
+	}
+	
+	/*
+	 * Nothing to do? Don't complain.
+	 * This happens when we're just turning off quota enforcement.
+	 */
+	if ((mp->m_qflags & flags) == 0) {
+		mutex_unlock(&mp->QI_QOFFLOCK);
+		return (0);
+	}
+	
+	/*
+	 * Write the LI_QUOTAOFF log record, and do SB changes atomically,
+	 * and synchronously.
+	 */
+	xfs_qm_log_quotaoff(mp, &qoffstart, flags);
+
+	/*
+	 * Next we clear the XFS_MOUNT_*DQ_ACTIVE bit(s) in the mount struct
+	 * to take care of the race between dqget and quotaoff. We don't take
+	 * any special locks to reset these bits. All processes need to check
+	 * these bits *after* taking inode lock(s) to see if the particular
+	 * quota type is in the process of being turned off. If *ACTIVE, it is
+	 * guaranteed that all dquot structures and all quotainode ptrs will all
+	 * stay valid as long as that inode is kept locked. 
+	 *
+	 * There is no turning back after this.
+	 */
+	mp->m_qflags &= ~inactivate_flags;
+
+	/*
+	 * Give back all the dquot reference(s) held by inodes.
+	 * Here we go thru every single incore inode in this file system, and
+	 * do a dqrele on the i_udquot/i_pdquot that it may have.
+	 * Essentially, as long as somebody has an inode locked, this guarantees
+	 * that quotas will not be turned off. This is handy because in a
+	 * transaction once we lock the inode(s) and check for quotaon, we can
+	 * depend on the quota inodes (and other things) being valid as long as
+	 * we keep the lock(s).
+	 */
+	xfs_qm_dqrele_all_inodes(mp, flags);
+	
+	/*
+	 * Next we make the changes in the quota flag in the mount struct. 
+	 * This isn't protected by a particular lock directly, because we
+	 * don't want to take a mrlock everytime we depend on quotas being on.
+	 */
+	mp->m_qflags &= ~(flags);	
+
+	/*
+	 * Go through all the dquots of this file system and purge them,
+	 * according to what was turned off.
+	 * At this point if everybody played according to the rules and didnt
+	 * slip thru the cracks, we should be able to free every single dquot
+	 * that is affected by this quotaoff all the time.
+	 */
+	(void) xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF);
+
+	/*
+	 * Transactions that had started before ACTIVE state bit was cleared 
+	 * could have logged many dquots, so they'd have higher LSNs than 
+	 * the first QUOTAOFF log record does. If we happen to crash when
+	 * the tail of the log has gone past the QUOTAOFF record, but 
+	 * before the last dquot modification, those dquots __will__
+	 * recover, and that's not good.
+	 *
+	 * So, we have QUOTAOFF start and end logitems; the start
+	 * logitem won't get overwritten until the end logitem appears...
+	 */
+	xfs_qm_log_quotaoff_end(mp, qoffstart, flags);
+
+	/*	
+	 * If quotas is completely disabled, close shop.
+	 */
+	if ((flags & XFS_MOUNT_QUOTA_ALL) == XFS_MOUNT_QUOTA_ALL) {
+		mutex_unlock(&mp->QI_QOFFLOCK);
+		xfs_qm_destroy_quotainfo(mp);	
+		return (0);
+	}
+
+	/*
+	 * Release our quotainode references, and vn_purge them,
+	 * if we don't need them anymore.
+	 */
+	if ((dqtype & XFS_QMOPT_UQUOTA) &&
+	    mp->QI_UQIP) {
+		XFS_PURGE_INODE(XFS_ITOV(mp->QI_UQIP));
+		mp->QI_UQIP = NULL;
+	}
+	if ((dqtype & XFS_QMOPT_PQUOTA) && 
+	    mp->QI_PQIP) {
+		XFS_PURGE_INODE(XFS_ITOV(mp->QI_PQIP));
+		mp->QI_PQIP = NULL;
+	}
+	mutex_unlock(&mp->QI_QOFFLOCK);
+
+	return (error);
+}
+	
 STATIC int
 xfs_qm_scall_trunc_qfiles(
 	xfs_mount_t	*mp,
@@ -276,7 +491,7 @@ xfs_qm_scall_quotaon(
 	rootfs = (boolean_t) (mp->m_dev == rootdev);
 	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
 #ifdef _NOPROJQUOTAS
-	flags &= (XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_UDQ_ENFD);
+	flags &= (XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD);
 #else
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
 #endif	
@@ -295,13 +510,13 @@ xfs_qm_scall_quotaon(
 #endif
 		return (EINVAL);
 	}
-	if (((flags & XFS_MOUNT_UDQ_ACCT) == 0 &&
-	    (mp->m_flags & XFS_MOUNT_UDQ_ACCT) == 0 &&
-	    (flags & XFS_MOUNT_UDQ_ENFD))
+	if (((flags & XFS_UQUOTA_ACCT) == 0 &&
+	    (mp->m_qflags & XFS_UQUOTA_ACCT) == 0 &&
+	    (flags & XFS_UQUOTA_ENFD))
 	    ||
-	    ((flags & XFS_MOUNT_PDQ_ACCT) == 0 &&
-	    (mp->m_flags & XFS_MOUNT_PDQ_ACCT) == 0 &&
-	    (flags & XFS_MOUNT_PDQ_ENFD))) {
+	    ((flags & XFS_PQUOTA_ACCT) == 0 &&
+	    (mp->m_qflags & XFS_PQUOTA_ACCT) == 0 &&
+	    (flags & XFS_PQUOTA_ENFD))) {
 		/*
 		 * Can't enforce without accounting.
 		 */
@@ -313,7 +528,7 @@ xfs_qm_scall_quotaon(
 	/*
 	 * If everything's upto-date incore, then don't waste time.
 	 */
-	if ((mp->m_flags & flags) == flags)
+	if ((mp->m_qflags & flags) == flags)
 		return (EEXIST);
 
 	/*
@@ -371,7 +586,7 @@ xfs_qm_scall_quotaon(
 	 * and non-root file systems.
 	 */
 	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
-	mp->m_flags |= (flags & XFS_ALL_QUOTA_ENFD);
+	mp->m_qflags |= (flags & XFS_ALL_QUOTA_ENFD);
 	mutex_unlock(&mp->QI_QOFFLOCK);
 	
 	return (0);
@@ -401,7 +616,7 @@ xfs_qm_scall_getqstat(
 		out.qs_pquota.qfs_ino = NULLFSINO;
 		goto done;
 	}
-	out.qs_flags = (__uint16_t) xfs_qm_export_flags(mp->m_flags & 
+	out.qs_flags = (__uint16_t) xfs_qm_export_flags(mp->m_qflags & 
 							(XFS_ALL_QUOTA_ACCT|
 							 XFS_ALL_QUOTA_ENFD));
 	out.qs_pad = 0;
@@ -601,7 +816,20 @@ xfs_qm_scall_setqlim(
 	return (0);
 }
 
-
+/* ARGSUSED */
+STATIC int
+xfs_qm_scall_qwarn(
+	xfs_mount_t 	*mp,
+	xfs_dqid_t 	id,
+	caddr_t 	addr)
+{
+#ifdef _IRIX62_XFS_ONLY
+	return (ENOTSUP);
+#else
+	
+#endif
+}
+	   
 STATIC int
 xfs_qm_scall_getquota(
 	xfs_mount_t 	*mp,
@@ -649,215 +877,6 @@ xfs_qm_scall_getquota(
 	xfs_qm_dqput(dqp);
 	return (error ? EFAULT : 0);
 }
-
-/*
- * Turn off quota accounting and/or enforcement for all udquots and/or
- * pdquots. Called only at mount time.
- *
- * This assumes that there are no dquots of this file system cached 
- * incore, and modifies the ondisk dquot directly. Therefore, for example,
- * it is an error to call this twice, without purging the cache.
- */
-STATIC int
-xfs_qm_scall_quotaoff(
-	xfs_mount_t	*mp,
-	uint		flags)
-{
-	uint			dqtype;
-	int			s;
-	int			error;
-	uint			inactivate_flags;
-	xfs_qoff_logitem_t 	*qoffstart;
-	extern dev_t		rootdev;
-
-	if (!_CAP_ABLE(CAP_QUOTA_MGT))
-		return (EPERM);
-	/*
-	 * Only root file system can have quotas enabled on disk but not
-	 * in core. Note that quota utilities (like quotaoff) _expect_ 
-	 * errno == EEXIST here.
-	 */
-	if (mp->m_dev != rootdev && (mp->m_flags & flags) == 0)
-		return (EEXIST);
-	ASSERT(mp->m_quotainfo);
-	error = 0;
-
-#ifdef _NOPROJQUOTAS
-	flags &= (XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_UDQ_ENFD);
-#else
-	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
-#endif	
-	/* 
-	 * We don't want to deal with two quotaoffs messing up each other,
-	 * so we're going to serialize it. quotaoff isn't exactly a performance
-	 * critical thing. XXXcurrently, we also take the vfslock.
-	 */
-	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
-
-	/*
-	 * Root file system may or may not have quotas on in core.
-	 * We have to perform the quotaoff accordingly.
-	 */
-	if (mp->m_dev == rootdev) {
-		uint sbflags, newflags;
-		s = XFS_SB_LOCK(mp);
-		sbflags = mp->m_sb.sb_qflags;
-		if ((mp->m_flags & flags) == 0) {
-			mp->m_sb.sb_qflags &= flags;
-			newflags = mp->m_sb.sb_qflags;
-			XFS_SB_UNLOCK(mp, s);
-			mutex_unlock(&mp->QI_QOFFLOCK);
-			if (sbflags != newflags)
-			      error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
-			return (error);
-		}			
-		XFS_SB_UNLOCK(mp, s);
-			
-		if ((sbflags & flags) != (mp->m_flags & flags)) {
-			/*
-			 * Something must have been turned on, with
-			 * delayed effect. ie. Something's in the SB,
-			 * but not in the incore mount struct.
-			 */
-			ASSERT((sbflags & XFS_ALL_QUOTA_ACCT) != 
-			       (mp->m_flags & XFS_ALL_QUOTA_ACCT));
-			
-			/* XXX TBD */
-			/* We need to update the SB and mp separately */
-			return (EINVAL);
-		}
-	}
-	/*
-	 * if we're just turning off quota enforcement, change mp and go.
-	 */
-	if ((flags & XFS_ALL_QUOTA_ACCT) == 0) {
-		mp->m_flags &= ~(flags);
-		
-		s = XFS_SB_LOCK(mp);
-		mp->m_sb.sb_qflags = mp->m_flags;
-		XFS_SB_UNLOCK(mp, s);
-		mutex_unlock(&mp->QI_QOFFLOCK);
-		
-		/* XXX what to do if error ? Revert back to old vals incore ? */
-		error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
-		return (error);
-	}
-
-	dqtype = 0;
-	inactivate_flags = 0;
-	/* 
-	 * If accounting is off, we must turn enforcement off, clear the
-	 * quota 'CHKD' certificate to make it known that we have to
-	 * do a quotacheck the next time this quota is turned on.
-	 */
-	if (flags & XFS_MOUNT_UDQ_ACCT) {
-		dqtype |= XFS_QMOPT_UQUOTA;
-		flags |= (XFS_MOUNT_UDQ_CHKD | XFS_MOUNT_UDQ_ENFD);
-		inactivate_flags |= XFS_MOUNT_UDQ_ACTIVE;
-	}
-	if (flags & XFS_MOUNT_PDQ_ACCT) {
-		dqtype |= XFS_QMOPT_PQUOTA;
-		flags |= (XFS_MOUNT_PDQ_CHKD | XFS_MOUNT_PDQ_ENFD);
-		inactivate_flags |= XFS_MOUNT_PDQ_ACTIVE;
-	}
-	
-	/*
-	 * Nothing to do? Don't complain.
-	 * This happens when we're just turning off quota enforcement.
-	 */
-	if ((mp->m_flags & flags) == 0) {
-		mutex_unlock(&mp->QI_QOFFLOCK);
-		return (0);
-	}
-	
-	/*
-	 * Write the LI_QUOTAOFF log record, and do SB changes atomically,
-	 * and synchronously.
-	 */
-	xfs_qm_log_quotaoff(mp, &qoffstart, flags);
-
-	/*
-	 * Next we clear the XFS_MOUNT_*DQ_ACTIVE bit(s) in the mount struct
-	 * to take care of the race between dqget and quotaoff. We don't take
-	 * any special locks to reset these bits. All processes need to check
-	 * these bits *after* taking inode lock(s) to see if the particular
-	 * quota type is in the process of being turned off. If *ACTIVE, it is
-	 * guaranteed that all dquot structures and all quotainode ptrs will all
-	 * stay valid as long as that inode is kept locked. 
-	 *
-	 * There is no turning back after this.
-	 */
-	mp->m_flags &= ~inactivate_flags;
-
-	/*
-	 * Give back all the dquot reference(s) held by inodes.
-	 * Here we go thru every single incore inode in this file system, and
-	 * do a dqrele on the i_udquot/i_pdquot that it may have.
-	 * Essentially, as long as somebody has an inode locked, this guarantees
-	 * that quotas will not be turned off. This is handy because in a
-	 * transaction once we lock the inode(s) and check for quotaon, we can
-	 * depend on the quota inodes (and other things) being valid as long as
-	 * we keep the lock(s).
-	 */
-	xfs_qm_dqrele_all_inodes(mp, flags);
-	
-	/*
-	 * Next we make the changes in the quota flag in the mount struct. 
-	 * This isn't protected by a particular lock directly, because we
-	 * don't want to take a mrlock everytime we depend on quotas being on.
-	 */
-	mp->m_flags &= ~(flags);	
-
-	/*
-	 * Go through all the dquots of this file system and purge them,
-	 * according to what was turned off.
-	 * At this point if everybody played according to the rules and didnt
-	 * slip thru the cracks, we should be able to free every single dquot
-	 * that is affected by this quotaoff all the time.
-	 */
-	(void) xfs_qm_dqpurge_all(mp, dqtype|XFS_QMOPT_QUOTAOFF);
-
-	/*
-	 * Transactions that had started before ACTIVE state bit was cleared 
-	 * could have logged many dquots, so they'd have higher LSNs than 
-	 * the first QUOTAOFF log record does. If we happen to crash when
-	 * the tail of the log has gone past the QUOTAOFF record, but 
-	 * before the last dquot modification, those dquots __will__
-	 * recover, and that's not good.
-	 *
-	 * So, we have QUOTAOFF start and end logitems; the start
-	 * logitem won't get overwritten until the end logitem appears...
-	 */
-	xfs_qm_log_quotaoff_end(mp, qoffstart, flags);
-
-	/*	
-	 * If quotas is completely disabled, close shop.
-	 */
-	if ((flags & XFS_MOUNT_QUOTA_ALL) == XFS_MOUNT_QUOTA_ALL) {
-		mutex_unlock(&mp->QI_QOFFLOCK);
-		xfs_qm_destroy_quotainfo(mp);	
-		return (0);
-	}
-
-	/*
-	 * Release our quotainode references, and vn_purge them,
-	 * if we don't need them anymore.
-	 */
-	if ((dqtype & XFS_QMOPT_UQUOTA) &&
-	    mp->QI_UQIP) {
-		XFS_PURGE_INODE(XFS_ITOV(mp->QI_UQIP));
-		mp->QI_UQIP = NULL;
-	}
-	if ((dqtype & XFS_QMOPT_PQUOTA) && 
-	    mp->QI_PQIP) {
-		XFS_PURGE_INODE(XFS_ITOV(mp->QI_PQIP));
-		mp->QI_PQIP = NULL;
-	}
-	mutex_unlock(&mp->QI_QOFFLOCK);
-
-	return (error);
-}
-	
 
 
 STATIC int
@@ -921,7 +940,7 @@ xfs_qm_log_quotaoff(
 
 	s = XFS_SB_LOCK(mp);
 	oldsbqflag = mp->m_sb.sb_qflags;
-	mp->m_sb.sb_qflags = (mp->m_flags & ~(flags)) & XFS_MOUNT_QUOTA_ALL;
+	mp->m_sb.sb_qflags = (mp->m_qflags & ~(flags)) & XFS_MOUNT_QUOTA_ALL;
 	XFS_SB_UNLOCK(mp, s);
 
 	xfs_mod_sb(tp, XFS_SB_QFLAGS);
@@ -1063,13 +1082,13 @@ xfs_qm_import_flags(
 
 	flags = 0;
 	if (uflags & XFS_QUOTA_UDQ_ACCT)
-		flags |= XFS_MOUNT_UDQ_ACCT;
+		flags |= XFS_UQUOTA_ACCT;
 	if (uflags & XFS_QUOTA_PDQ_ACCT)
-		flags |= XFS_MOUNT_PDQ_ACCT;
+		flags |= XFS_PQUOTA_ACCT;
 	if (uflags & XFS_QUOTA_UDQ_ENFD)
-		flags |= XFS_MOUNT_UDQ_ENFD;
+		flags |= XFS_UQUOTA_ENFD;
 	if (uflags & XFS_QUOTA_PDQ_ENFD)
-		flags |= XFS_MOUNT_PDQ_ENFD;
+		flags |= XFS_PQUOTA_ENFD;
 	return (flags);
 }
 
@@ -1081,13 +1100,13 @@ xfs_qm_export_flags(
 	uint uflags;
 	
 	uflags = 0;
-	if (flags & XFS_MOUNT_UDQ_ACCT)
+	if (flags & XFS_UQUOTA_ACCT)
 		uflags |= XFS_QUOTA_UDQ_ACCT;
-	if (flags & XFS_MOUNT_PDQ_ACCT)
+	if (flags & XFS_PQUOTA_ACCT)
 		uflags |= XFS_QUOTA_PDQ_ACCT;
-	if (flags & XFS_MOUNT_UDQ_ENFD)
+	if (flags & XFS_UQUOTA_ENFD)
 		uflags |= XFS_QUOTA_UDQ_ENFD;
-	if (flags & XFS_MOUNT_PDQ_ENFD)
+	if (flags & XFS_PQUOTA_ENFD)
 		uflags |= XFS_QUOTA_PDQ_ENFD;
 	return (uflags);
 }
@@ -1156,11 +1175,11 @@ again:
 		 * We don't keep the mountlock across the dqrele() call,
 		 * since it can take a while..
 		 */
-		if ((flags & XFS_MOUNT_UDQ_ACCT) && ip->i_udquot) {
+		if ((flags & XFS_UQUOTA_ACCT) && ip->i_udquot) {
 			xfs_qm_dqrele(ip->i_udquot);
 			ip->i_udquot = NULL;
 		}
-		if ((flags & XFS_MOUNT_PDQ_ACCT) && ip->i_pdquot) {
+		if ((flags & XFS_PQUOTA_ACCT) && ip->i_pdquot) {
 			xfs_qm_dqrele(ip->i_pdquot);
 			ip->i_pdquot = NULL;
 		}
@@ -1360,12 +1379,6 @@ xfs_qm_internalqcheck_dqget(
 	d->dq_flags = type;
 	d->d_id = id;
 	d->q_mount = mp;
-	/*
-	   printf("allocing 0x%x, %d hash %d, [%s]\n", 
-	       d, d->d_id,
-	       (int) DQTEST_HASHVAL(mp, id),
-	       XFS_QM_ISUDQ(d) ? "USR" : "PRJ");
-	       */
 	d->q_hash = h;
 	xfs_qm_hashinsert(h, d);
 	*O_dq = d;
@@ -1447,14 +1460,6 @@ xfs_qm_internalqcheck_adjust(
 					     &ud, &pd)) {
 		xfs_iput(ip, lock_flags);
 		return (0);
-	}
-	if (mp->m_dev != rootdev) {
-		if (ip->i_d.di_uid == 0)
-			printf("uid 0 ino %d, bcount 0x%x\n",
-			       (int) ip->i_ino, (int) ip->i_d.di_nblocks);
-		if (ip->i_d.di_projid == 0)
-			printf("projid 0 ino %d, bcount 0x%x\n",
-			       (int) ip->i_ino, (int) ip->i_d.di_nblocks);
 	}
 	if (XFS_IS_UQUOTA_ON(mp)) {
 		ASSERT(ud);
