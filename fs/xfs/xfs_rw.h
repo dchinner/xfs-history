@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.37 $"
+#ident "$Revision$"
 
 struct bhv_desc;
 struct bdevsw;
@@ -46,6 +46,14 @@ typedef	struct xfs_dio {
 	xfs_mount_t	*xd_mp;
 	int		xd_blkalgn;
 } xfs_dio_t;
+
+/*
+ * used for mmap i/o page lockdown code
+ */
+typedef struct xfs_uaccmap {
+	uvaddr_t		xfs_uacstart;
+	__psunsigned_t		xfs_uaclen;
+} xfs_uaccmap_t;
 
 /*
  * Maximum count of bmaps used by read and write paths.
@@ -232,9 +240,21 @@ xfs_rwlock(
 	vrwlock_t	write_lock);
 
 void
+xfs_rwlockf(
+	bhv_desc_t	*bdp,
+	vrwlock_t	write_lock,
+	int		flags);
+
+void
 xfs_rwunlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	write_lock);
+
+void
+xfs_rwunlockf(
+	bhv_desc_t	*bdp,
+	vrwlock_t	write_lock,
+	int		flags);
 
 int
 xfs_read_buf(

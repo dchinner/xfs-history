@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.119 $"
+#ident "$Revision$"
 
 struct bhv_desc;
 struct buf;
@@ -274,6 +274,7 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define	XFS_ILOCK_EXCL		0x04
 #define	XFS_ILOCK_SHARED	0x08
 #define	XFS_IUNLOCK_NONOTIFY	0x10
+#define XFS_IOLOCK_NESTED	0x20
 
 /*
  * Flags for xfs_iflush()
@@ -399,6 +400,7 @@ void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);
 int		xfs_ilock_nowait(xfs_inode_t *, uint);
 void		xfs_iunlock(xfs_inode_t *, uint);
+void		xfs_ilock_demote(xfs_inode_t *, uint);
 void		xfs_iflock(xfs_inode_t *);
 int		xfs_iflock_nowait(xfs_inode_t *);
 uint		xfs_ilock_map_shared(xfs_inode_t *);

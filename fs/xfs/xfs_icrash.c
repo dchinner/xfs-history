@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
 
 #include <sys/types.h>
 #include <ksys/vpag.h>
@@ -108,6 +108,7 @@ typedef struct xfs_icrash_s {
 	xfs_dquot_acct_t			*xfs_icrash54;
 	xfs_ail_ticket_t			*xfs_icrash55;
 	xfs_item_ops_t				*xfs_icrash56;
+	xfs_uaccmap_t				*xfs_icrash57;
 } xfs_icrash_t;
 
 xfs_icrash_t *xfs_icrash_struct;

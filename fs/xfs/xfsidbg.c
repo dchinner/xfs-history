@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.94 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3820,7 +3820,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		(unsigned int) ip->i_max_io_log);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
-	qprintf("update_core 0x%x\n", (int)(ip->i_update_core));
+	qprintf("update_core 0x%x update size 0x%x\n",
+		(int)(ip->i_update_core), (int) ip->i_update_size);
 	qprintf("gen 0x%x qbufs %d delayed blks %d",
 		ip->i_gen,
 		ip->i_queued_bufs,

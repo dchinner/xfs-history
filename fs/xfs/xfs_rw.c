@@ -1,8 +1,5 @@
-#ident "$Revision: 1.254 $"
+#ident "$Revision$"
 
-#ifdef SIM
-#define _KERNEL 1
-#endif
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/uio.h>
@@ -16,21 +13,15 @@
 #include <sys/grio.h>
 #include <sys/pda.h>
 #include <sys/dmi_kern.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/errno.h> 
 #include <sys/fcntl.h>
 #include <sys/var.h>
-#ifdef SIM
-#include <bstring.h>
-#include <stdio.h>
-#else
 #include <sys/conf.h>
 #include <sys/systm.h>
-#endif
+#include <sys/uthread.h>
+#include <ksys/as.h>
 #include <sys/kmem.h>
 #include <sys/sema.h>
 #include <ksys/vfile.h>
@@ -72,10 +63,6 @@
 #include "xfs_trans_space.h"
 #include "xfs_dmapi.h"
 #include <limits.h>
-
-#ifdef SIM
-#include "sim.h"
-#endif
 
 /*
  * turning on UIOSZ_DEBUG in a DEBUG kernel causes each xfs_write/xfs_read
@@ -418,7 +405,27 @@ xfs_inval_cached_trace(
 		(void *)0);
 }
 #endif	/* XFS_RW_TRACE */
-	     
+
+#ifdef DEBUG
+/* ARGSUSED */
+void
+debug_print_vnmaps(vnmap_t *vnmap, int numvnmaps, int vnmap_flags)
+{
+	int i;
+
+	for (i = 0; i < numvnmaps; i++, vnmap++) {
+		cmn_err(CE_DEBUG,
+"vaddr = 0x%llx, len = 0x%llx, flags = 0x%x\n  ovvaddr = 0x%llx len = 0x%llx offset = %lld\n",
+			(uint64_t)vnmap->vnmap_vaddr,
+			(uint64_t)vnmap->vnmap_len,
+			vnmap->vnmap_flags,
+			(uint64_t)vnmap->vnmap_ovvaddr,
+			(uint64_t)vnmap->vnmap_ovlen,
+			vnmap->vnmap_ovoffset);
+	}
+}
+#endif
+
 /*
  * Fill in the bmap structure to indicate how the next bp
  * should fit over the given extent.
@@ -1133,14 +1140,13 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	*pboff = *pbsize = -1;
 	error = 0;
 
-	xfs_rwlock(bdp, VRWLOCK_READ);
+	xfs_rwlockf(bdp, VRWLOCK_READ, 0);
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
-		error = EIO;
+		error = XFS_ERROR(EIO);
 		goto out;
 	}
 
-#ifndef SIM
 	/*
 	 * blow this off if mandatory locking or DMI are involved
 	 */
@@ -1149,7 +1155,6 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !(ioflags & IO_INVIS))
 		goto out;
-#endif
 
 	unlocked = 0;
 	lockmode = xfs_ilock_map_shared(ip);
@@ -1214,8 +1219,512 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 
 	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 out:
-	xfs_rwunlock(bdp, VRWLOCK_READ);
+	xfs_rwunlockf(bdp, VRWLOCK_READ, 0);
 	return XFS_ERROR(error);
+}
+
+/*
+ * set of routines (xfs_lockdown_iopages, xfs_unlock_iopages,
+ * xfs_mapped_biomove) to deal with i/o to or from mmapped files where
+ * some or all of the user buffer is mmapped to the file passed in
+ * as the target of the read/write system call.
+ * 
+ * there are 6 sets of deadlocks and possible problems.
+ *
+ * 1)	the i/o is a read, the user buffer lies in a region
+ *	that is mapped to the file and not paged in.  the fault
+ *	code calls VOP_READ.  But we deadlock if another thread
+ *	has tried to write the file in the meantime because he's
+ *	now waiting on the lock and the i/o lock has to be a barrier
+ *	lock to prevent writer starvation.  this is addressed by calling
+ *	the new VASOP, verifyvnmap that returns a set of maps indicating
+ *	which ranges of the biomove'd virtual addresses are mmapped to
+ *	the file.  the i/o path then breaks up the biomove (using
+ *	xfs_mapped_biomove) into pieces and enables nested locking
+ *	on the i/o lock during the biomove calls that could result
+ *	in page faults that need to read data from the file.
+ *
+ * 2)   like above only the i/o is a write.  the page fault deadlocks
+ *	instantly since we already hold the i/o lock in write mode and
+ *	the xfs_read called by the page fault needs it in read mode.
+ *	this one is handled as above by enabling nested locking around
+ *	the appropriate biomove calls.
+ *
+ * 3)	the i/o is a read, the user buffer lies in a region
+ *	that is mapped autogrow,shared, and the biomove filling
+ *	the user buffer causes the file to grow.  the page fault
+ *	triggered by the biomove needs to run xfs_write() and take
+ *	the i/o lock in write mode.  this is addressed by making the
+ *	read path smart enough to detect this condition using the
+ *	information returned by the verifyvnmap VASOP and take the
+ *	i/o lock in update mode at the beginning.  we then enable
+ *	recursive locking (see xfs_ilock) to allow the fault to obtain
+ *	the i/o lock regardless of whose waiting on it.
+ *
+ * 4)	deadlock in pagewait().  if the biomove faults and needs a
+ *	page that exists but that page was created by the chunkread
+ *	issued by xfs_read/xfs_write, the page won't be marked P_DONE
+ *	(and usable by the fault code) until the i/o finishes and releases
+ *	the buffer.  so the fault code will find the page and wait forever
+ *	waiting for it to be marked P_DONE.  this case is handled by
+ *	useracc'ing the dangerous pages before the chunkread so that
+ *	the pages exist prior to the chunkread.  this case only happens
+ *	if the range of file offsets touched by the i/o overlap with
+ *	the range of file offsets associated with the mmapped virtual
+ *	addresses touched by the biomove.
+ *
+ * 5)	buffer deadlock.  in the autogrow case, it's possible that
+ *	that there can be no page overlap but that the file blocks
+ *	that need to be initialized for the autogrow by xfs_zeroeof_blocks()
+ *	and the file blocks in the i/o will both wind up living in the same
+ *	buffer set up by the i/o path.  this will deadlock because the
+ *	the buffer will be held by the i/o path when the biomove faults
+ *	causing the autogrow process to deadlock on the buffer semaphore.
+ *	this case is handled like case #2.  we create the pages and cause
+ *	the autogrow to happen before the chunkread so that the fault/autogrow
+ *	code and the io path code don't have to use the same buffer at the
+ *	same time.
+ *
+ * 6)	a write i/o that passes in a data buffer that is mmapped beyond
+ *	the current EOF.  Even if nested locking is enabled, the write path
+ *	assumes that because buffered writes are single-threaded only one
+ *	buffered writer can use the gap list and other inode fields at once.
+ *	this is addressed by faulting in the user virtual address associated
+ *	mapped to the largest file offset mapped by the buffer.  the fault
+ *	occurs after the i/o lock is taken in write mode but before any real
+ *	work is done.  this allows the VM system to issue a VOP_WRITE to
+ *	grow the file to the appropriate point.  then the real write call
+ *	executes after the file has been grown.  the fault is issued with
+ *	nested locking enabled so the write-path inode fields are used
+ *	serially while still holding onto the i/o lock to prevent a race
+ *	with truncate().
+ *
+ * Situations this code does NOT attempt to deal with:
+ *
+ *	- the above situations only we're doing direct I/O instead of
+ *	  buffered I/O.
+ *
+ *	- situations arising from the mappings changing while our i/o
+ *	  is in progress.  it's possible that someone could remap part
+ *	  of the buffer to make it dangerous after we've called to
+ *	  verifyvnmap but before we've done all our biomoves.  fixing
+ *	  this would require serializing i/o's and mmaps/munmaps
+ *	  and I'd rather not do that.
+ */
+
+/*
+ * routines to enable/disable/query nested iolock locking and isolate
+ * the curuthread references to make the Cellular Irix merge easier
+ */
+void
+xfs_enable_nested_locking(void)
+{
+	ASSERT_ALWAYS(curuthread->ut_vnlock == 0);
+	curuthread->ut_vnlock = UT_FSNESTED;
+}
+
+void
+xfs_disable_nested_locking(void)
+{
+	ASSERT_ALWAYS(curuthread->ut_vnlock == UT_FSNESTED);
+	curuthread->ut_vnlock = 0;
+}
+
+int
+xfs_is_nested_locking_enabled(void)
+{
+	return curuthread->ut_vnlock & UT_FSNESTED;
+}
+
+/*
+ * xfs_lockdown_iopages() - lock down any mmapped user pages required for
+ *	this i/o.  this is either
+ *
+ *	1) pages which will be referenced by the biomove and whose backing
+ *		file blocks will be directly read/written by the i/o
+ *	2) pages which will be referenced by the biomove, whose backing
+ *		file blocks will reside in the same buffer used by the i/o,
+ *		and whose file blocks are beyond the current EOF causing
+ *		the file to be grown as part of the biomove
+ *
+ *	if any pages are locked down, *useracced is set to 1 and a set
+ *	of xfs_uaccmap_t's are returned indicating the set of address ranges
+ *	were locked down.  these pages should be unlocked as soon as
+ *	possible after they are biomoved.
+ *
+ * returns ENOMEM if the number of pages being locked down exceeds
+ * maxdmasz.  the pages should be unlocked ASAP after the biomove
+ * using xfs_unlock_iopages().
+ */
+int
+xfs_lockdown_iopages(
+	struct bmapval	*bmapp,
+	xfs_fsize_t	isize,		/* in - current inode size/eof */
+	int		vnmapflags,	/* in - map flags */
+	vnmap_t		**vnmapp,	/* in/out - vmaps array */
+	int		*nvnmapp,	/* in/out - number of valid maps left */
+	xfs_uaccmap_t	*uaccmap,	/* in - caller supplied useracc maps */
+	int		*nuaccmapp,	/* out - number of filled in uaccmaps */
+	int		*useracced)	/* out - did we useracc anything */
+{
+	int		nuaccmaps;
+	vnmap_t		*vnmap = *vnmapp;
+	uvaddr_t	useracc_startvaddr;
+	uvaddr_t	useracc_endvaddr;
+	size_t		useracc_len;	
+	__psunsigned_t	uacc_startshift;	
+	__psunsigned_t	uacc_endshift;	
+	uvaddr_t	agac_vaddr_start;
+	uvaddr_t	agac_vaddr_end;
+	__psunsigned_t	start_trim;	
+	off_t		bmap_end;
+	off_t		bmap_start;
+	off_t		vnmap_end;
+	off_t		overlap_off_start;
+	off_t		overlap_off_end;
+	off_t		iomove_off_start;
+	off_t		iomove_off_end;
+	off_t		curr_offset;
+	int		error;
+	int		numpages;
+
+	/*
+	 * do we have overlapping pages we need to
+	 * useracc?  don't have to worry about readahead
+	 * buffers since those pages will be marked
+	 * P_DONE by the buffer release function out of
+	 * biodone when the i/o to the buffer finishes.
+	 */
+	ASSERT(*nuaccmapp >= *nvnmapp);
+	ASSERT((vnmapflags & (AS_VNMAP_OVERLAP|AS_VNMAP_AUTOGROW)));
+
+	error = numpages = *useracced = *nuaccmapp = nuaccmaps = 0;
+	curr_offset = 0;
+	bmap_start = BBTOOFF(bmapp[0].offset);
+	bmap_end = bmap_start + BBTOOFF(bmapp[0].length);
+
+	/*
+	 * process all vnmaps up through the end of the current
+	 * buffer
+	 */
+	while (vnmap && curr_offset < bmap_end &&
+	       vnmap->vnmap_ovoffset < bmap_end) {
+		/*
+		 * skip over maps that aren't marked as overlap or
+		 * autogrow
+		 */
+		if (!(vnmap->vnmap_flags &
+		      (AS_VNMAP_OVERLAP|AS_VNMAP_AUTOGROW))) {
+			(*nvnmapp)--;
+			if (*nvnmapp >= 0)
+				vnmap++;
+			else
+				vnmap = NULL;
+			continue;
+		}
+
+		/*
+		 * if we haven an autogrow region, if the iomove
+		 * grows the file, we need to calculate if any part
+		 * of the iomove that is beyond the EOF will land
+		 * in this buffer.  if so, we need to lock those
+		 * pages down now otherwise the xfs_write called by
+		 * the fault code will need to zero the area of the
+		 * file between the current and new EOF but it has to
+		 * to get the buffer to do that.  the problem is
+		 * the buffer will be held (already locked) by the
+		 * i/o so we'll deadlock.
+		 */
+		if (isize >= 0 && vnmap->vnmap_flags & AS_VNMAP_AUTOGROW) {
+			/*
+			 * calculate file offsets touched by the iomove
+			 * indicated in this vnmap
+			 */
+			start_trim = vnmap->vnmap_ovvaddr - vnmap->vnmap_vaddr;
+			iomove_off_start = vnmap->vnmap_ovoffset - start_trim;
+			iomove_off_end = iomove_off_start + vnmap->vnmap_len;
+
+			/*
+			 * determine if any of the uimoved pages are in
+			 * the buffer that will be set up by this bmap.
+			 * we have to lock down any pages in the buffer
+			 * between eof and the end of the uiomove to
+			 * grow the file out to the end of the uiomove.
+			 */
+			if (isize < bmap_start) {
+				overlap_off_start = MAX(bmap_start,
+							iomove_off_start);
+			} else {
+				overlap_off_start = MIN(isize,
+							iomove_off_start);
+			}
+
+			overlap_off_end = MIN(iomove_off_end, bmap_end);
+
+			/*
+			 * if so, set up the useracc range to span those
+			 * pages.  the useracc range can only grow larger
+			 * than that range.  it can't get smaller.
+			 */
+			if (overlap_off_end - overlap_off_start > 0) {
+				agac_vaddr_start = vnmap->vnmap_vaddr +
+					(iomove_off_start > overlap_off_start ?
+					 iomove_off_start - overlap_off_start :
+					 0);
+				agac_vaddr_end = vnmap->vnmap_vaddr +
+					vnmap->vnmap_len -
+					 (iomove_off_end > overlap_off_end ?
+					  iomove_off_end - overlap_off_end :
+					  0);
+			} else {
+				agac_vaddr_start = (uvaddr_t) -1LL;
+				agac_vaddr_end = (uvaddr_t) 0LL;
+			}
+		} else {
+			agac_vaddr_start = (uvaddr_t) -1LL;
+			agac_vaddr_end = (uvaddr_t) 0LL;
+		}
+
+		/*
+		 * useracc the smallest possible range.  don't bother
+		 * unless the overlap specified in the vnmap overlaps
+		 * the file offsets specified for the buffer by the bmap.
+		 */
+		vnmap_end = vnmap->vnmap_ovoffset + vnmap->vnmap_ovlen;
+		overlap_off_start = MAX(vnmap->vnmap_ovoffset, bmap_start);
+		overlap_off_end = MIN(vnmap_end, bmap_end);
+
+		if (vnmap->vnmap_flags & AS_VNMAP_OVERLAP &&
+		    overlap_off_end - overlap_off_start > 0) {
+			uacc_startshift = overlap_off_start -
+						vnmap->vnmap_ovoffset;
+			uacc_endshift = vnmap_end - overlap_off_end;
+			ASSERT(overlap_off_start - vnmap->vnmap_ovoffset >= 0);
+			ASSERT(vnmap_end - overlap_off_end >= 0);
+			useracc_startvaddr = vnmap->vnmap_ovvaddr +
+						uacc_startshift;
+			useracc_endvaddr = vnmap->vnmap_ovvaddr +
+						 vnmap->vnmap_ovlen -
+						 uacc_endshift;
+		} else {
+			useracc_startvaddr = (uvaddr_t) -1LL;
+			useracc_endvaddr = (uvaddr_t) 0LL;
+		}
+
+		/*
+		 * enlarge range if necessary to include
+		 * pages that have to be pinned because they
+		 * would cause a zero-eof autogrow scenario
+		 */
+		useracc_startvaddr = MIN(useracc_startvaddr, agac_vaddr_start);
+		useracc_endvaddr = MAX(useracc_endvaddr, agac_vaddr_end);
+
+		if (useracc_startvaddr != (uvaddr_t) -1LL &&
+		    useracc_endvaddr != (uvaddr_t) 0LL) {
+			/*
+			 * enable recursive locking so the fault handler won't
+			 * block on the i/o lock when setting up the pages.
+			 * round the lockdown range to page boundaries.
+			 * make sure we don't pin more than maxdmasz pages
+			 * per i/o.  that's not allowed.
+			 */
+			ASSERT(useracc_endvaddr > useracc_startvaddr);
+			useracc_startvaddr = (uvaddr_t)
+						ctob(btoct(useracc_startvaddr));
+			useracc_endvaddr = (uvaddr_t)
+						ctob(btoc(useracc_endvaddr));
+			useracc_len = useracc_endvaddr - useracc_startvaddr;
+			numpages += btoc(useracc_len);
+
+			if (numpages > maxdmasz) {
+				cmn_err(CE_WARN,
+"xfs_lockdown_iopages needed to pin %d pages, maxdmasz = %d\nPlease increase maxdmasz and try again.\n",
+					numpages, maxdmasz);
+				error = XFS_ERROR(ENOMEM);
+				break;
+			}
+
+			xfs_enable_nested_locking();
+			error = useracc((void *)useracc_startvaddr, useracc_len,
+					B_READ|B_PHYS, NULL);
+			xfs_disable_nested_locking();
+			if (!error) {
+				*useracced = 1;
+				uaccmap->xfs_uacstart = useracc_startvaddr;
+				uaccmap->xfs_uaclen = useracc_len;
+				uaccmap++;
+				nuaccmaps++;
+			}
+		}
+
+		/*
+		 * have to check next vmap if this vmap ends
+		 * before the buffer does
+		 */
+		if (bmap_end >= vnmap_end) {
+			(*nvnmapp)--;
+			if (*nvnmapp >= 0)
+				vnmap++;
+			else
+				vnmap = NULL;
+			curr_offset = vnmap_end;
+		} else
+			curr_offset = bmap_end;
+	}
+
+	*nuaccmapp = nuaccmaps;
+	*vnmapp = vnmap;
+
+	return error;
+}
+
+/*
+ * xfs_unlock_iopages() - unlock the set of pages specified in the
+ *	xfs_uaccmap_t's set up by xfs_lockdown_iopages().
+ */
+void
+xfs_unlock_iopages(
+	xfs_uaccmap_t	*uaccmap,	/* useracc maps */
+	int		nuaccmaps)	/* number of filled in uaccmaps */
+
+{
+	int	i;
+
+	for (i = 0; i < nuaccmaps; i++, uaccmap++) {
+		ASSERT(uaccmap->xfs_uaclen <= ((size_t)-1));
+		unuseracc((void *)uaccmap->xfs_uacstart,
+			  (size_t)uaccmap->xfs_uaclen,
+			  B_PHYS|B_READ);
+	}
+
+	return;
+}
+
+/*
+ * handles biomoves of data where some of the user addresses are mapped to
+ * the file being read/written.  each vnmap_t represents a range of addresses
+ * mapped to a file.  that range needs to be biomoved with recursive locking
+ * enabled so we don't deadlock on the i/o lock when faulting in the biomove.
+ * however, we don't want recursive locking enabled on any other page since
+ * we could screw up the locking on other inodes if we try and take the
+ * i/o lock on a different inode where we don't hold the lock and we have
+ * recursive locking enabled.
+ *
+ * note -- we could do one biomove if we were willing to add an
+ * inode pointer in the uthread along with the vnlocks field.  this
+ * code trades off increased complexity and slower execution speed
+ * (the extra biomoves plus the cycles required in pas_verifyvnmap
+ * to set up the additional vnmap's that we might not need if we
+ * weren't breaking up our biomoves) suffered only in the danger cases
+ * against memory bloat in the uthread structure that would be suffered by
+ * all uthreads.
+ *
+ * vnmapp and nvnmapp are set to the first map that hasn't completely been
+ * moved and the count of remaining valid maps respectively.
+ */
+int
+xfs_mapped_biomove(
+	struct buf	*bp,
+	u_int		pboff,
+	size_t		io_len,
+	enum uio_rw	rw,
+	struct uio	*uiop,
+	vnmap_t		**vnmapp,
+	int		*nvnmapp)
+{
+	uvaddr_t	io_end;
+	uvaddr_t	current_vaddr;
+	int		numvnmaps = *nvnmapp;
+	vnmap_t		*vnmap = *vnmapp;
+	size_t		partial_io_len;
+	size_t		vmap_io_len;
+	int		error = 0;
+
+	ASSERT(uiop->uio_iovcnt == 1);
+
+	/*
+	 * do nothing if the requested biomove is entirely before
+	 * the first vnmap address range
+	 */
+	current_vaddr = uiop->uio_iov->iov_base;
+	io_end = current_vaddr + io_len;
+
+	if (io_end < vnmap->vnmap_vaddr)
+		return XFS_ERROR(biomove(bp, pboff, io_len, rw, uiop));
+
+	/*
+	 * move as much as we can (up to the first vnmap)
+	 */
+	if (current_vaddr < vnmap->vnmap_vaddr) {
+		partial_io_len = MIN(io_len,
+				 (__psunsigned_t) vnmap->vnmap_vaddr -
+				 (__psunsigned_t) uiop->uio_iov->iov_base);
+		if (error = biomove(bp, pboff, partial_io_len, rw, uiop))
+			return XFS_ERROR(error);
+		pboff += partial_io_len;
+		io_len -= partial_io_len;
+		current_vaddr += partial_io_len;
+	}
+
+	while (vnmap && current_vaddr < io_end) {
+		/*
+		 * move what we can of the first vnmap.  allow recursive
+		 * io-lock locking in the biomove.
+		 */
+		ASSERT(uiop->uio_iov->iov_base >= vnmap->vnmap_vaddr);
+
+		ASSERT(current_vaddr >= vnmap->vnmap_vaddr);
+		vmap_io_len = vnmap->vnmap_len -
+				((__psunsigned_t) uiop->uio_iov->iov_base -
+				 (__psunsigned_t) vnmap->vnmap_vaddr);
+		partial_io_len = MIN(vmap_io_len, io_len);
+
+		xfs_enable_nested_locking();
+		if (error = biomove(bp, pboff, partial_io_len, rw, uiop)) {
+			xfs_disable_nested_locking();
+			error = XFS_ERROR(error);
+			break;
+		}
+		xfs_disable_nested_locking();
+		pboff += partial_io_len;
+		io_len -= partial_io_len;
+		current_vaddr += partial_io_len;
+
+		/*
+		 * did we move the entire vnmap?  if so, look at the next map
+		 * and move the data up to the next vnmap if there is one
+		 * (or finish up the I/O if we're out of maps)
+		 */
+		ASSERT(current_vaddr <= vnmap->vnmap_vaddr + vnmap->vnmap_len);
+		if (current_vaddr == vnmap->vnmap_vaddr + vnmap->vnmap_len) {
+			numvnmaps--;
+			if (numvnmaps > 0) {
+				vnmap++;
+				partial_io_len = MIN(
+					(__psunsigned_t)vnmap->vnmap_vaddr -
+					(__psunsigned_t)uiop->uio_iov->iov_base,
+						     io_len);
+			} else {
+				vnmap = NULL;
+				partial_io_len = io_len;
+			}
+			if (partial_io_len > 0) {
+				if (error = biomove(bp, pboff, partial_io_len,
+							rw, uiop)) {
+					error = XFS_ERROR(error);
+					break;
+				}
+				pboff += partial_io_len;
+				io_len -= partial_io_len;
+				current_vaddr += partial_io_len;
+			}
+		}
+	}
+
+	*nvnmapp = numvnmaps;
+	*vnmapp = vnmap;
+
+	return error;
 }
 
 /* ARGSUSED */		
@@ -1224,7 +1733,12 @@ xfs_read_file(
 	bhv_desc_t	*bdp,	      
 	uio_t		*uiop,
 	int		ioflag,
-	cred_t		*credp)
+	cred_t		*credp,
+	vnmap_t		*vnmaps,
+	int		numvnmaps,
+	const uint	vnmapflags,
+	xfs_uaccmap_t	*uaccmaps,
+	xfs_fsize_t	isize)
 {
 	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
@@ -1237,6 +1751,14 @@ xfs_read_file(
 	int		error;
 	int		unlocked;
 	unsigned int	lockmode;
+	int		useracced = 0;
+	vnmap_t		*cur_ldvnmap = vnmaps;
+	int		num_ldvnmaps = numvnmaps;
+	int		num_biovnmaps = numvnmaps;
+	int		nuaccmaps;
+	int		do_lockdown = vnmapflags & (AS_VNMAP_OVERLAP |
+						    AS_VNMAP_AUTOGROW);
+	vnmap_t		*cur_biovnmap = vnmaps;
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -1274,6 +1796,12 @@ xfs_read_file(
 		unlocked = 0;
 		nbmaps = ip->i_mount->m_nreadaheads ;
 		ASSERT(nbmaps <= sizeof(bmaps) / sizeof(bmaps[0]));
+
+		/*
+		 * XXX - rcc - we could make sure that if an overlap
+		 * exists, that we don't set up bmaps that are > maxdmasz
+		 * pages
+		 */
 		error = xfs_iomap_read(ip, uiop->uio_offset, uiop->uio_resid,
 			bmaps, &nbmaps, uiop->uio_pmp, &unlocked, lockmode);
 
@@ -1302,6 +1830,30 @@ xfs_read_file(
 		 * first call to it.
 		 */
 		while ((uiop->uio_resid != 0) && (nbmaps > 0)) {
+			/*
+			 * do we have overlapping pages we need to
+			 * useracc?  don't have to worry about readahead
+			 * buffers since those pages will be marked
+			 * P_DONE by the buffer release function out of
+			 * biodone when the i/o to the buffer finishes.
+			 */
+			if (cur_ldvnmap && do_lockdown) {
+				nuaccmaps = numvnmaps;
+				if (xfs_lockdown_iopages(bmapp, isize,
+							vnmapflags,
+							&cur_ldvnmap,
+							&num_ldvnmaps,
+							uaccmaps, &nuaccmaps,
+							&useracced)) {
+					if (useracced)
+						xfs_unlock_iopages(uaccmaps,
+								    nuaccmaps);
+					error = XFS_ERROR(ENOMEM);
+					useracced = 0;
+					break;
+				}
+			}
+
 			bp = chunkread(vp, bmapp, read_bmaps, credp);
 
 			if (bp->b_flags & B_ERROR) {
@@ -1323,9 +1875,25 @@ xfs_read_file(
 				buffer_bytes_ok = 1;
 				ASSERT((BBTOOFF(bmapp->offset) + bmapp->pboff)
 				       == uiop->uio_offset);
-				error = biomove(bp, bmapp->pboff,
-						bmapp->pbsize, UIO_READ,
-						uiop);
+				if (!cur_biovnmap) {
+					error = biomove(bp, bmapp->pboff,
+							bmapp->pbsize, UIO_READ,
+							uiop);
+				} else {
+#pragma mips_frequency_hint NEVER
+					/*
+					 * break up the biomoves so that
+					 * we never biomove across a region
+					 * that might fault on more than
+					 * one inode
+					 */
+					error = xfs_mapped_biomove(bp,
+							bmapp->pboff,
+							bmapp->pbsize,
+							UIO_READ, uiop,
+							&cur_biovnmap,
+							&num_biovnmaps);
+				}
 				if (error) {
 					bp->b_flags |= B_DONE|B_STALE;
 					brelse(bp);
@@ -1335,20 +1903,25 @@ xfs_read_file(
 
 			brelse(bp);
 
+			if (useracced) {
+				xfs_unlock_iopages(uaccmaps, nuaccmaps);
+				useracced = 0;
+			}
+
 			XFSSTATS.xs_read_bufs++;
 			read_bmaps = 1;
 			nbmaps--;
 			bmapp++;
 		}
 
+		if (useracced) {
+			xfs_unlock_iopages(uaccmaps, nuaccmaps);
+			useracced = 0;
+		}
 	} while (!error && (uiop->uio_resid != 0) && buffer_bytes_ok);
 
 	return error;
 }
-
-
-
-
 
 /*
  * xfs_read
@@ -1370,11 +1943,25 @@ xfs_read(
 	off_t		n;
 	size_t		count;
 	int		error;
+	int		lflag;
+	vrwlock_t	lmode;
 	xfs_mount_t	*mp;
 	size_t		resid;
 	vnode_t 	*vp;
+	vasid_t			vasid;
+	as_verifyvnmap_t	vnmap_args;
+	as_verifyvnmapres_t	vnmap_res;
+	const int		numvnmaps = 10;
+	vnmap_t			vnmaps[numvnmaps];
+	vnmap_t			*rvnmaps;
+	int			num_rvnmaps;
+	int			rvnmap_flags;
+	int			rvnmap_size = 0;
+	xfs_uaccmap_t		uaccmap_array[numvnmaps];
+	xfs_uaccmap_t		*uaccmaps;
+	xfs_fsize_t		isize;
 
-#if defined(DEBUG) && !defined(SIM) && defined(UIOSZ_DEBUG)
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
 	/*
 	 * Randomly set io size
 	 */
@@ -1394,23 +1981,130 @@ xfs_read(
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
+	lmode = VRWLOCK_READ;
+	lflag = 0;
 
+	/*
+	 * need to protect against deadlocks that can occur if the
+	 * biomove touches a virtual address in user space that is
+	 * mapped to the file being read.  This only works for
+	 * read/write and pread/pwrite.  readv/writev lose.
+	 * direct i/o loses too for now.
+	 *
+	 * note that if someone remaps the user buffer to this file
+	 * while the I/O in progess, we lose, too.  instant deadlock.
+	 */
+	rvnmaps = NULL;
+	num_rvnmaps = 0;
+	rvnmap_flags = 0;
+	uaccmaps = NULL;
+
+	if (uiop->uio_segflg == UIO_USERSPACE && uiop->uio_iovcnt == 1 &&
+	    !(ioflag & IO_DIRECT) && VN_MAPPED(vp)) {
+#pragma mips_frequency_hint NEVER
+		as_lookup_current(&vasid);
+		VAS_LOCK(vasid, AS_SHARED);
+
+		vnmap_args.as_vp = vp;
+		vnmap_args.as_vaddr = (uvaddr_t)
+					ctob(btoct(uiop->uio_iov->iov_base));
+		vnmap_args.as_len = uiop->uio_iov->iov_len +
+				((__psunsigned_t) uiop->uio_iov->iov_base -
+				 (__psunsigned_t) vnmap_args.as_vaddr);
+		vnmap_args.as_offstart = uiop->uio_offset;
+		vnmap_args.as_offend = uiop->uio_offset + uiop->uio_resid;
+		vnmap_args.as_vnmap = vnmaps;
+		vnmap_args.as_nmaps = numvnmaps;
+
+		if (error = VAS_VERIFYVNMAP(vasid, &vnmap_args, &vnmap_res)) {
+			VAS_UNLOCK(vasid);
+			return error;
+		}
+
+		VAS_UNLOCK(vasid);
+
+		if (vnmap_res.as_rescodes) {
+			rvnmaps = (vnmap_res.as_multimaps == NULL)
+					? vnmaps 
+					: vnmap_res.as_multimaps;
+			rvnmap_flags = vnmap_res.as_rescodes;
+			num_rvnmaps = vnmap_res.as_nmaps;
+			rvnmap_size = vnmap_res.as_mapsize;
+			if (num_rvnmaps <= numvnmaps)
+				uaccmaps = uaccmap_array;
+			else if ((uaccmaps = kmem_alloc(num_rvnmaps *
+						sizeof(xfs_uaccmap_t),
+						KM_SLEEP)) == NULL) {
+				error = XFS_ERROR(ENOMEM);
+				goto out;
+			}
+		}
+	}
+
+	/*
+	 * check if we're in recursive lock mode (a read inside a biomove
+	 * to a page that is mapped to ip that faulted)
+	 */
+	lflag = xfs_is_nested_locking_enabled()
+		 ? XFS_IOLOCK_NESTED
+		 : 0;
 	if (!(ioflag & IO_ISLOCKED)) {
 		/* For calls from the paging system where the faulting
 		 * process is multithreaded, try to grab the I/O lock,
 		 * if it is already held, then we ask the paging system
-		 * to try again by returning EAGAIN.
+		 * to try again by returning EAGAIN.  It's safe to return
+		 * directly since the UIO_NOSPACE i/o never takes the
+		 * aspacelock (VAS_LOCK) above.
 		 */
 		if ((uiop->uio_segflg == UIO_NOSPACE) &&
 		    (ioflag & IO_MTTHREAD) && VN_MAPPED(vp)) {
-			if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED)) {
-				return (EAGAIN);
+			if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED|lflag)) {
+				return XFS_ERROR(EAGAIN);
 			}
 		} else {
-			xfs_rwlock(bdp, VRWLOCK_READ);
+			xfs_rwlockf(bdp, VRWLOCK_READ, lflag);
 		}
 	}
-	
+
+	/*
+	 * if we're in a possible mmap autogrow case, check to
+	 * see if a biomove is going to have to grow the file.
+	 * if so, drop the iolock and re-obtain it in write mode.
+	 * it's possible that someone might have grown the file
+	 * while we were re-acquiring the lock.  if so, then we
+	 * demote the iolock from exclusive back to shared and
+	 * proceed onwards.
+	 */
+	isize = -1;
+
+	if (rvnmap_flags & AS_VNMAP_AUTOGROW) {
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+
+		if (vnmap_res.as_maxoffset <= ip->i_d.di_size)
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		else {
+			/*
+			 * note, we don't have to worry about the
+			 * multi-threaded ilock_nowait case above
+			 * because the fault path will never biomove
+			 * a page and cause an autogrow fault
+			 */
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+			xfs_rwunlockf(bdp, VRWLOCK_READ, lflag);
+			xfs_rwlockf(bdp, VRWLOCK_WRITE, lflag);
+			xfs_ilock(ip, XFS_ILOCK_SHARED);
+			if (vnmap_res.as_maxoffset > ip->i_d.di_size) {
+				isize = ip->i_d.di_size;
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
+				lmode = VRWLOCK_WRITE;
+			} else {
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
+				xfs_ilock_demote(ip, XFS_IOLOCK_EXCL);
+			}
+		}
+	}
+
+
 	type = ip->i_d.di_mode & IFMT;
 	ASSERT(type == IFDIR ||
 	       ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
@@ -1421,7 +2115,6 @@ xfs_read(
 	offset = uiop->uio_offset;
 	count = uiop->uio_resid;
 
-#ifndef SIM
 	/* check for locks if some exist and mandatory locking is enabled */
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
@@ -1430,7 +2123,6 @@ xfs_read(
 		if (error)
 			goto out;
 	}
-#endif
 
 	if (offset < 0) {
 		error = XFS_ERROR(EINVAL);
@@ -1487,7 +2179,6 @@ xfs_read(
 		ASSERT((ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS) ||
 		       (ip->i_d.di_format == XFS_DINODE_FMT_BTREE));
 
-#ifndef SIM
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
 		    !(ioflag & IO_INVIS)) {
 			vrwlock_t	locktype = VRWLOCK_READ;
@@ -1498,9 +2189,7 @@ xfs_read(
 			if (error)
 				goto out;
 		}
-#endif /* SIM */
 
-#ifndef SIM
 		/*
 		 * Respect preferred read size if indicated in uio structure.
 		 * But if the read size has already been set, go with the
@@ -1546,12 +2235,13 @@ xfs_read(
 #endif /* ! (DEBUG && UIOSZ_DEBUG) */
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
-#endif /* !SIM */
 
 		if (ioflag & IO_DIRECT) {
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_READ);
 		} else {
-			error = xfs_read_file(bdp, uiop, ioflag, credp);
+			error = xfs_read_file(bdp, uiop, ioflag, credp,
+						rvnmaps, num_rvnmaps,
+						rvnmap_flags, uaccmaps, isize);
 		}
 
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
@@ -1587,9 +2277,15 @@ xfs_read(
 	}
 
 out:
+	if (rvnmap_size > 0)
+		kmem_free(rvnmaps, rvnmap_size);
+
+	if (num_rvnmaps > numvnmaps)
+		kmem_free(uaccmaps, num_rvnmaps * sizeof(xfs_uaccmap_t));
+
 	if (!(ioflag & IO_ISLOCKED))
-		xfs_rwunlock(bdp, VRWLOCK_READ);
-	
+		xfs_rwunlockf(bdp, lmode, lflag);
+
 	return error;
 }
 
@@ -2435,7 +3131,11 @@ xfs_write_file(
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp,
-	xfs_lsn_t	*commit_lsn_p)
+	xfs_lsn_t	*commit_lsn_p,
+	vnmap_t		*vnmaps,
+	int		numvnmaps,
+	const uint	vnmapflags,
+	xfs_uaccmap_t	*uaccmaps)
 {
 	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
@@ -2455,6 +3155,12 @@ xfs_write_file(
 	xfs_mount_t	*mp;
 	int		fsynced;
 	extern void	chunkrelse(buf_t*);
+	int		useracced = 0;
+	vnmap_t		*cur_ldvnmap = vnmaps;
+	int		num_ldvnmaps = numvnmaps;
+	int		num_biovnmaps = numvnmaps;
+	int		nuaccmaps;
+	vnmap_t		*cur_biovnmap = vnmaps;
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -2647,6 +3353,33 @@ xfs_write_file(
 		while (((uiop->uio_resid != 0) || (error != 0)) &&
 		       (nbmaps > 0)) {
 			/*
+			 * do we have overlapping pages we need to
+			 * useracc?  don't have to worry about autogrow
+			 * case here as those have been failed earlier
+			 */
+			if (cur_ldvnmap && vnmapflags & AS_VNMAP_OVERLAP) {
+				nuaccmaps = numvnmaps;
+				/*
+				 * tell xfs_lockdown_iopages to skip
+				 * the autogrow checking since any
+				 * necessary file growing was handled
+				 * at the beginning of xfs_write()
+				 */
+				if (error = xfs_lockdown_iopages(bmapp, -1,
+							vnmapflags,
+							&cur_ldvnmap,
+							&num_ldvnmaps,
+							uaccmaps, &nuaccmaps,
+							&useracced)) {
+					if (useracced)
+						xfs_unlock_iopages(uaccmaps,
+								    nuaccmaps);
+					error = XFS_ERROR(ENOMEM);
+					useracced = 0;
+				}
+			}
+
+			/*
 			 * If the write doesn't completely overwrite
 			 * the buffer and we're not writing from
 			 * the beginning of the buffer to the end
@@ -2738,10 +3471,28 @@ xfs_write_file(
 			 * anything until we hit the first buffer with
 			 * data that we have to write.
 			 */
-			if (!fillhole)
-				error = biomove(bp, bmapp->pboff, bmapp->pbsize,
-						UIO_WRITE, uiop);
-			else if (BBTOOFF(bmapp->offset) + bmapp->pboff +
+			if (!fillhole) {
+				if (!cur_biovnmap) {
+					error = biomove(bp, bmapp->pboff,
+							bmapp->pbsize,
+							UIO_WRITE,
+							uiop);
+				} else {
+#pragma mips_frequency_hint NEVER
+					/*
+					 * break up the biomoves so that
+					 * we never biomove across a region
+					 * that might fault on more than
+					 * one inode
+					 */
+					error = xfs_mapped_biomove(bp,
+							bmapp->pboff,
+							bmapp->pbsize,
+							UIO_WRITE, uiop,
+							&cur_biovnmap,
+							&num_biovnmaps);
+				}
+			} else if (BBTOOFF(bmapp->offset) + bmapp->pboff +
 					bmapp->pbsize >= uiop->uio_offset)  {
 				/*
 				 * NFS - first buffer to be written.  biomove
@@ -2750,15 +3501,37 @@ xfs_write_file(
 				 */
 				ASSERT(BBTOOFF(bmapp->offset) + bmapp->pboff
 							<= uiop->uio_offset);
-				error = biomove(bp,
-						uiop->uio_offset -
-						 BBTOOFF(bmapp->offset),
-						bmapp->pbsize -
-						  (int)(uiop->uio_offset -
-						    (BBTOOFF(bmapp->offset) +
-						     bmapp->pboff)),
-						UIO_WRITE,
-						uiop);
+				if (!cur_biovnmap) {
+					error = biomove(bp,
+						  uiop->uio_offset -
+						   BBTOOFF(bmapp->offset),
+						  bmapp->pbsize -
+						    (int)(uiop->uio_offset -
+						      (BBTOOFF(bmapp->offset) +
+						       bmapp->pboff)),
+						  UIO_WRITE,
+						  uiop);
+				} else {
+#pragma mips_frequency_hint NEVER
+					/*
+					 * break up the biomoves so that
+					 * we never biomove across a region
+					 * that might fault on more than
+					 * one inode
+					 */
+					error = xfs_mapped_biomove(bp,
+						  uiop->uio_offset -
+						   BBTOOFF(bmapp->offset),
+						  bmapp->pbsize -
+						    (int)(uiop->uio_offset -
+						      (BBTOOFF(bmapp->offset) +
+						       bmapp->pboff)),
+						  UIO_WRITE,
+						  uiop,
+						  &cur_biovnmap,
+						  &num_biovnmaps);
+				}
+
 				/*
 				 * turn off hole-filling code.  The rest
 				 * of the buffers can be handled as per
@@ -2785,13 +3558,17 @@ xfs_write_file(
 				 * that the buffer will be decommissioned
 				 * after it is synced out.
 				 */
+				if (useracced) {
+					xfs_unlock_iopages(uaccmaps,
+							nuaccmaps);
+					useracced = 0;
+				}
 				if (!(bp->b_flags & B_DONE)) {
 					chunkreread(bp);
 				}
 
 				bp->b_flags |= B_STALE;
 				(void) bwrite(bp);
-
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -2856,6 +3633,11 @@ xfs_write_file(
 				bdwrite(bp);
 			}
 
+			if (useracced) {
+				xfs_unlock_iopages(uaccmaps, nuaccmaps);
+				useracced = 0;
+			}
+
 			/*
 			 * If we've grown the file, get back the
 			 * inode lock and move di_size up to the
@@ -2897,7 +3679,6 @@ xfs_write_file(
 			XFSSTATS.xs_write_bufs++;
 			bmapp++;
 			nbmaps--;
-
 		}
 	} while ((uiop->uio_resid > 0) && !error);
 
@@ -2979,6 +3760,7 @@ xfs_write(
 	off_t		offset;
 	size_t		count;
 	int		error, transerror;
+	int		lflag;
 	off_t		n;
 	int		resid;
 	off_t		savedsize;
@@ -2986,8 +3768,21 @@ xfs_write(
 	int		eventsent;
 	vnode_t 	*vp;
 	xfs_lsn_t	commit_lsn;
+	vasid_t		vasid;
+	const int	numvnmaps = 10;
+	vnmap_t		vnmaps[numvnmaps];
+	vnmap_t		*rvnmaps;
+	vnmap_t		*map;
+	int		num_rvnmaps;
+	int		rvnmap_flags;
+	int		rvnmap_size = 0;
+	int		i;
+	xfs_uaccmap_t		uaccmap_array[numvnmaps];
+	xfs_uaccmap_t		*uaccmaps;
+	as_verifyvnmap_t	vnmap_args;
+	as_verifyvnmapres_t	vnmap_res;
 
-#if defined(DEBUG) && !defined(SIM) && defined(UIOSZ_DEBUG)
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
 	/*
 	 * Randomly set io size
 	 */
@@ -3014,9 +3809,107 @@ xfs_write(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return (EIO);
 
+	/*
+	 * need to protect against deadlocks that can occur if the
+	 * biomove touches a virtual address in user space that is
+	 * mapped to the file being read.  This only works for
+	 * read/write and pread/pwrite.  readv/writev lose.
+	 * direct i/o loses too for now.
+	 *
+	 * note that if someone remaps the user buffer to this file
+	 * while the I/O in progess, we lose too.  instant deadlock.
+	 */
+	rvnmaps = NULL;
+	num_rvnmaps = 0;
+	rvnmap_flags = 0;
+	uaccmaps = NULL;
+
+	if (uiop->uio_segflg == UIO_USERSPACE && uiop->uio_iovcnt == 1 &&
+	    !(ioflag & IO_DIRECT) && VN_MAPPED(vp)) {
+#pragma mips_frequency_hint NEVER
+		as_lookup_current(&vasid);
+		VAS_LOCK(vasid, AS_SHARED);
+
+		vnmap_args.as_vp = vp;
+		vnmap_args.as_vaddr = (uvaddr_t)
+					ctob(btoct(uiop->uio_iov->iov_base));
+		vnmap_args.as_len = uiop->uio_iov->iov_len +
+				((__psunsigned_t) uiop->uio_iov->iov_base -
+				 (__psunsigned_t) vnmap_args.as_vaddr);
+		vnmap_args.as_offstart = uiop->uio_offset;
+		vnmap_args.as_offend = uiop->uio_offset + uiop->uio_resid;
+		vnmap_args.as_vnmap = vnmaps;
+		vnmap_args.as_nmaps = numvnmaps;
+
+		if (error = VAS_VERIFYVNMAP(vasid, &vnmap_args, &vnmap_res)) {
+			VAS_UNLOCK(vasid);
+			return error;
+		}
+
+		VAS_UNLOCK(vasid);
+
+		if (vnmap_res.as_rescodes) {
+			rvnmaps = (vnmap_res.as_multimaps == NULL)
+					? vnmaps 
+					: vnmap_res.as_multimaps;
+			rvnmap_flags = vnmap_res.as_rescodes;
+			num_rvnmaps = vnmap_res.as_nmaps;
+			rvnmap_size = vnmap_res.as_mapsize;
+
+			if (num_rvnmaps <= numvnmaps)
+				uaccmaps = uaccmap_array;
+			else if ((uaccmaps = kmem_alloc(num_rvnmaps *
+						sizeof(xfs_uaccmap_t),
+						KM_SLEEP)) == NULL) {
+				error = XFS_ERROR(ENOMEM);
+				goto out;
+			}
+		}
+	}
+
+	/*
+	 * check if we're in recursive lock mode (a read inside a biomove
+	 * to a page that is mapped to ip that faulted)
+	 */
+	lflag = xfs_is_nested_locking_enabled()
+		 ? XFS_IOLOCK_NESTED
+		 : 0;
+
 	if (!(ioflag & IO_ISLOCKED))
-		xfs_rwlock(bdp, (ioflag & IO_DIRECT) ?
-			   VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE);
+		xfs_rwlockf(bdp, (ioflag & IO_DIRECT) ?
+			   VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE,
+			   lflag);
+
+	/*
+	 * if the write will grow the file beyond the current
+	 * eof, grow the file now by faulting in the page with
+	 * the largest file offset.  That will zero-fill all
+	 * pages in the buffer containing eof and will enable
+	 * faults between the current eof and the new eof to
+	 * read in zero'ed pages.
+	 */
+	if (rvnmap_flags & AS_VNMAP_AUTOGROW) {
+#pragma mips_frequency_hint NEVER
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+		if (vnmap_res.as_maxoffset <= ip->i_d.di_size) {
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		} else {
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+			map = rvnmaps;
+			for (i = 0; i < num_rvnmaps; i++) {
+				if (!(map->vnmap_flags & AS_VNMAP_AUTOGROW))
+					continue;
+				xfs_enable_nested_locking();
+				error = fubyte((char *) map->vnmap_ovvaddr +
+						map->vnmap_ovlen - 1);
+				xfs_disable_nested_locking();
+				if (error == -1) {
+					error = XFS_ERROR(EFAULT);
+					goto out;
+				}
+			}
+		}
+	}
 
 	type = ip->i_d.di_mode & IFMT;
 	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
@@ -3041,7 +3934,6 @@ start:
 	offset = uiop->uio_offset;
 	count = uiop->uio_resid;
 
-#ifndef SIM
 	/* check for locks if some exist and mandatory locking is enabled */
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
@@ -3051,7 +3943,6 @@ start:
 		if (error)
 			goto out;
 	}
-#endif
 
 	if (offset < 0) {
 		error = XFS_ERROR(EINVAL);
@@ -3078,7 +3969,6 @@ start:
 			resid = 0;
 		}
 
-#ifndef SIM
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_WRITE) &&
 		    !(ioflag & IO_INVIS) && !eventsent) {
 			vrwlock_t	locktype;
@@ -3110,7 +4000,6 @@ start:
 			ioflag &= ~IO_SYNC;
 			ioflag |= IO_DSYNC;
 		}
-#endif
 
 		/*
 		 * If we're writing the file then make sure to clear the
@@ -3130,7 +4019,6 @@ start:
 			}
 		}
 
-#ifndef SIM
 		/*
 		 * Respect preferred write size if indicated in uio structure.
 		 * But if the write size has already been set, go with the
@@ -3173,17 +4061,17 @@ start:
 #endif /* ! (DEBUG && UIOSZ_DEBUG) */
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
-#endif /* !SIM */
 
 retry:
 		if (ioflag & IO_DIRECT) {
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
 		} else {
 			error = xfs_write_file(bdp, uiop, ioflag, credp,
-						&commit_lsn);
+						&commit_lsn,
+						rvnmaps, num_rvnmaps,
+						rvnmap_flags, uaccmaps);
 		}
 
-#ifndef SIM
 		if (error == ENOSPC &&
 		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_NOSPACE) &&
 		    !(ioflag & IO_INVIS)) {
@@ -3202,9 +4090,7 @@ retry:
 
 			offset = uiop->uio_offset;
 			goto retry;
-		} else
-#endif
-		if (error == ENOSPC) {
+		} else if (error == ENOSPC) {
 			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)  {
 				xfs_error(mp, 2);
 			} else {
@@ -3314,10 +4200,17 @@ retry:
 		break;
 	}
 
- out:
+out:
+	if (rvnmap_size > 0)
+		kmem_free(rvnmaps, rvnmap_size);
+
+	if (num_rvnmaps > numvnmaps)
+		kmem_free(uaccmaps, num_rvnmaps * sizeof(xfs_uaccmap_t));
+
 	if (!(ioflag & IO_ISLOCKED))
-		xfs_rwunlock(bdp, (ioflag & IO_DIRECT) ?
-			     VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE);
+		xfs_rwunlockf(bdp, (ioflag & IO_DIRECT) ?
+			     VRWLOCK_WRITE_DIRECT : VRWLOCK_WRITE,
+			     lflag);
 
 	return error;
 }
@@ -3446,11 +4339,10 @@ xfs_overlap_bp(
 		rbp->b_bufsize = ctob(dtop(pgbboff + BTOBB(rbp_len)));
 
 		rbp->b_flags |= B_PAGEIO;
-#ifndef SIM
+
 		if (pgbboff != 0) {
 			bp_mapin(rbp);
 		}
-#endif
 	}
 	rbp->b_blkno = bp->b_blkno + BTOBB(rbp_offset);
 	rbp->b_remain = 0;
@@ -4535,11 +5427,11 @@ xfs_strat_write_relse(
 	rbp->b_fsprivate = NULL;
 	rbp->b_fsprivate2 = NULL;
 	rbp->b_relse = NULL;
-#ifndef SIM
+
 	if (BP_ISMAPPED(rbp)) {
 		bp_mapout(rbp);
 	}
-#endif
+
 	freerbuf(rbp);
 }
 
@@ -5265,9 +6157,7 @@ xfs_force_shutdown(
 {
 	int ntries;
 	int logerror;
-#ifndef SIM
 	extern dev_t rootdev;		/* from sys/systm.h */
-#endif /* !SIM */
 
 #define XFS_MAX_DRELSE_RETRIES	10
 	logerror = flags & XFS_LOG_IO_ERROR;
@@ -5278,10 +6168,8 @@ xfs_force_shutdown(
 	if (XFS_FORCED_SHUTDOWN(mp) && !logerror)
 		return;
 
-#ifndef SIM
 	if (XFS_MTOVFS(mp)->vfs_dev == rootdev)
 		cmn_err(CE_PANIC, "Fatal error on root filesystem");
-#endif /* !SIM */
 
 	/*
 	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
@@ -5701,8 +6589,6 @@ xfs_strategy(
 	}
 }
 
-#ifndef SIM
-
 /*
  * This is called from xfs_init() to start the xfs daemons.
  * We'll start with a minimum of 4 of them, and add 1
@@ -5808,7 +6694,6 @@ xfsd(void)
 		s = mp_mutex_spinlock(&xfsd_lock);
 	}
 }
-#endif	/* !SIM */
 
 struct dio_s {
 	bhv_desc_t	*bdp;
@@ -6326,7 +7211,7 @@ retry:
 			if (using_quotas) {
 				if (xfs_trans_reserve_blkquota(tp, ip,
 							nres)) {
-					error = EDQUOT;
+					error = XFS_ERROR(EDQUOT);
 					xfs_trans_cancel(tp, 
 					     XFS_TRANS_RELEASE_LOG_RES);
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -6725,9 +7610,7 @@ xfs_diordwr(
 		    (uiop->uio_offset == ip->i_d.di_size)) {
 			return (0);
 		}
-#ifndef SIM
 		return XFS_ERROR(EINVAL);
-#endif
 	}
 	/*
 	 * This ASSERT should catch bad addresses being passed in by
@@ -6739,9 +7622,7 @@ xfs_diordwr(
  	 * Do maxio check.
  	 */
 	if (uiop->uio_resid > ctooff(v.v_maxdmasz - 1)) {
-#ifndef SIM
 		return XFS_ERROR(EINVAL);
-#endif
 	}
 
 	/*
@@ -6842,9 +7723,7 @@ xfs_diordwr(
 
 	ASSERT((bp->b_flags & B_MAPPED) == 0);
 	bp->b_flags = 0;
-#ifdef SIM
 	bp->b_un.b_addr = 0;
-#endif
 	putphysbuf(bp);
 
 	return (error);

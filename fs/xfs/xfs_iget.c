@@ -1,4 +1,4 @@
-#ident "$Revision: 1.96 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -17,12 +17,14 @@
 #include <sys/debug.h>
 #include <sys/imon.h>
 #include <sys/cred.h>
+#include <sys/cmn_err.h>
 
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/kmem.h>
 #ifndef SIM
+#include <sys/uthread.h>
 #include <sys/systm.h>
 #endif
 #include "xfs_macros.h"
@@ -513,6 +515,19 @@ xfs_iunlock_map_shared(
 	xfs_iunlock(ip, lock_mode);
 }
 
+#ifndef SIM
+/*
+ * private #define's to isolate the curuthread references and
+ * make the Cellular Irix merge easier
+ */
+#define XFST_ISNESTED_ENABLED()	(curuthread->ut_vnlock & UT_FSNESTED)
+#define XFST_ISNESTED_MAX()	(curuthread->ut_vnlock == UT_FSNESTED_MAX)
+#define XFST_NESTED_INCR()	(curuthread->ut_vnlock++)
+#define XFST_NESTED_DECR()	(curuthread->ut_vnlock--)
+#define XFST_ISNESTED_USED()	(curuthread->ut_vnlock & ~UT_FSNESTED)
+#else
+#define XFST_NESTED_DECR()
+#endif /* !SIM */
 
 /*
  * The xfs inode contains 2 locks: a multi-reader lock called the
@@ -523,17 +538,22 @@ xfs_iunlock_map_shared(
  * obtained first in order to prevent deadlock.
  *
  * ip -- the inode being locked
- * lock_flags -- this parameter indicates the inode's locks to be
+ * lock_flags -- this parameter indicates the inode's locks
  *       to be locked.  It can be:
  *		XFS_IOLOCK_SHARED,
+ *		XFS_IOLOCK_SHARED | XFS_IOLOCK_NESTED,
  *		XFS_IOLOCK_EXCL,
+ *		XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED,
  *	 	XFS_ILOCK_SHARED,
  *		XFS_ILOCK_EXCL,
  *		XFS_IOLOCK_SHARED | XFS_ILOCK_SHARED,
  *		XFS_IOLOCK_SHARED | XFS_ILOCK_EXCL,
+ *		XFS_IOLOCK_SHARED | XFS_IOLOCK_NESTED | XFS_ILOCK_SHARED,
+ *		XFS_IOLOCK_SHARED | XFS_IOLOCK_NESTED | XFS_ILOCK_EXCL,
  *		XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED,
  *		XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL
- *
+ *		XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED | XFS_ILOCK_SHARED,
+ *		XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED | XFS_ILOCK_EXCL
  */
 void
 xfs_ilock_ra(xfs_inode_t	*ip,
@@ -550,18 +570,35 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
-		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
-	ASSERT(lock_flags != 0);
-
+				XFS_IOLOCK_NESTED | XFS_ILOCK_SHARED |
+				XFS_ILOCK_EXCL)) == 0);
+	ASSERT(lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
+		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
+#ifdef SIM
+	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
+#endif
 	if (return_address == NULL)
 		return_address = (inst_t *)__return_address;
 
-	if (lock_flags & XFS_IOLOCK_EXCL) {
-		mrupdatef(&ip->i_iolock, PLTWAIT);
-	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		mraccessf(&ip->i_iolock, PLTWAIT);
+	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
+		if (lock_flags & XFS_IOLOCK_EXCL) {
+			mrupdatef(&ip->i_iolock, PLTWAIT);
+		} else if (lock_flags & XFS_IOLOCK_SHARED) {
+			mraccessf(&ip->i_iolock, PLTWAIT);
+		}
 	}
-
+#ifndef SIM
+	else {
+#pragma mips_frequency_hint NEVER
+		ASSERT(XFST_ISNESTED_ENABLED());
+		if (!XFST_ISNESTED_MAX())
+			XFST_NESTED_INCR();
+		else
+			cmn_err(CE_PANIC,
+				"i/o lock recursion loop, inode 0x%llx",
+				(uint64_t) ip);
+	}
+#endif /* !SIM */
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		mrupdatef(&ip->i_lock, PLTWAIT);
 		ip->i_ilock_ra = return_address;
@@ -599,6 +636,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 {
 	int	iolocked;
 	int	ilocked;
+	int	iolock_recursive;
 
 	/*
 	 * You can't set both SHARED and EXCL for the same lock,
@@ -610,28 +648,48 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
-		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
-	ASSERT(lock_flags != 0);
+				XFS_IOLOCK_NESTED |
+				XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
+	ASSERT(lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
+		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
+#ifdef SIM
+	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
+#endif
 
-	iolocked = 0;
-	if (lock_flags & XFS_IOLOCK_EXCL) {
-		iolocked = mrtryupdate(&ip->i_iolock);
-		if (!iolocked) {
-			return 0;
-		}
-	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		iolocked = mrtryaccess(&ip->i_iolock);
-		if (!iolocked) {
-			return 0;
+	iolocked = iolock_recursive = 0;
+	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
+		if (lock_flags & XFS_IOLOCK_EXCL) {
+			iolocked = mrtryupdate(&ip->i_iolock);
+			if (!iolocked) {
+				return 0;
+			}
+		} else if (lock_flags & XFS_IOLOCK_SHARED) {
+			iolocked = mrtryaccess(&ip->i_iolock);
+			if (!iolocked) {
+				return 0;
+			}
 		}
 	}
-
+#ifndef SIM
+	else {
+#pragma mips_frequency_hint NEVER
+		ASSERT(XFST_ISNESTED_ENABLED());
+		if (!XFST_ISNESTED_MAX()) {
+			XFST_NESTED_INCR();
+			iolock_recursive = 1;
+		} else
+			cmn_err(CE_PANIC,
+				"i/o lock recursion loop, inode 0x%llx",
+				(uint64_t) ip);
+	}
+#endif /* !SIM */
 	if (lock_flags & XFS_ILOCK_EXCL) {
 		ilocked = mrtryupdate(&ip->i_lock);
 		if (!ilocked) {
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
-			}
+			} else if (iolock_recursive)
+				XFST_NESTED_DECR();
 			return 0;
 		}
 		ip->i_ilock_ra = (inst_t *) __return_address;
@@ -640,7 +698,8 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 		if (!ilocked) {
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
-			}
+			} else if (iolock_recursive)
+				XFST_NESTED_DECR();
 			return 0;
 		}
 	}
@@ -676,18 +735,31 @@ xfs_iunlock(xfs_inode_t	*ip,
 	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
 	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 	ASSERT((lock_flags &
-		~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
+		~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL | XFS_IOLOCK_NESTED |
 		  XFS_ILOCK_SHARED | XFS_ILOCK_EXCL |
 		  XFS_IUNLOCK_NONOTIFY)) == 0);
 	ASSERT(lock_flags != 0);
+#ifdef SIM
+	ASSERT(!(lock_flags & XFS_IOLOCK_NESTED));
+#endif
 
-	if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
-		ASSERT(!(lock_flags & XFS_IOLOCK_SHARED) ||
-		       (ismrlocked(&ip->i_iolock, MR_ACCESS)));
-		ASSERT(!(lock_flags & XFS_IOLOCK_EXCL) ||
-		       (ismrlocked(&ip->i_iolock, MR_UPDATE)));
-		mrunlock(&ip->i_iolock);
+	if (!(lock_flags & XFS_IOLOCK_NESTED)) {
+		if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
+			ASSERT(!(lock_flags & XFS_IOLOCK_SHARED) ||
+			       (ismrlocked(&ip->i_iolock, MR_ACCESS)));
+			ASSERT(!(lock_flags & XFS_IOLOCK_EXCL) ||
+			       (ismrlocked(&ip->i_iolock, MR_UPDATE)));
+			mrunlock(&ip->i_iolock);
+		}
 	}
+#ifndef SIM
+	else {
+#pragma mips_frequency_hint NEVER
+		ASSERT_ALWAYS(XFST_ISNESTED_ENABLED());
+		ASSERT_ALWAYS(XFST_ISNESTED_USED());
+		XFST_NESTED_DECR();
+	}
+#endif /* !SIM */
 
 	if (lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) {
 		ASSERT(!(lock_flags & XFS_ILOCK_SHARED) ||
@@ -712,6 +784,30 @@ xfs_iunlock(xfs_inode_t	*ip,
 	xfs_ilock_trace(ip, 3, lock_flags, (inst_t *)__return_address);
 #endif
 }
+
+#ifndef SIM
+/*
+ * give up write locks.  the i/o lock cannot be held nested
+ * if it is being demoted.
+ */
+void
+xfs_ilock_demote(xfs_inode_t	*ip,
+		 uint		lock_flags)
+{
+	ASSERT(lock_flags & (XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL));
+	ASSERT((lock_flags & ~(XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL)) == 0);
+
+	if (lock_flags & XFS_ILOCK_EXCL) {
+		ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
+		mrdemote(&ip->i_lock);
+	}
+	if (lock_flags & XFS_IOLOCK_EXCL) {
+		ASSERT(!XFST_ISNESTED_USED());
+		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE));
+		mrdemote(&ip->i_iolock);
+	}
+}
+#endif /* !SIM */
 
 /*
  * The following three routines simply manage the i_flock

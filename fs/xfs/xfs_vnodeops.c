@@ -1,4 +1,4 @@
-#ident "$Revision: 1.384 $"
+#ident "$Revision$"
 
 
 #ifdef SIM
@@ -5096,12 +5096,23 @@ xfs_fid2(
 
 /*
  * xfs_rwlock
- *
  */
 void
 xfs_rwlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	locktype)
+{
+	xfs_rwlockf(bdp, locktype, 0);
+}
+
+/*
+ * currently the only supported flag is XFS_IOLOCK_RECURSIVE
+ */
+void
+xfs_rwlockf(
+	bhv_desc_t	*bdp,
+	vrwlock_t	locktype,
+	int		flags)
 {
 	xfs_inode_t	*ip;
 	vnode_t 	*vp;
@@ -5111,23 +5122,34 @@ xfs_rwlock(
 		return;
 	ip = XFS_BHVTOI(bdp);
 	if (locktype == VRWLOCK_WRITE) {
-		xfs_ilock(ip, XFS_IOLOCK_EXCL);
+		xfs_ilock(ip, XFS_IOLOCK_EXCL|flags);
 	} else {
 		ASSERT((locktype == VRWLOCK_READ) ||
 		       (locktype == VRWLOCK_WRITE_DIRECT));
-		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+		xfs_ilock(ip, XFS_IOLOCK_SHARED|flags);
 	}
 }
 
 
 /*
  * xfs_rwunlock
- *
  */
 void
 xfs_rwunlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	locktype)
+{
+	xfs_rwunlockf(bdp, locktype, 0);
+}
+
+/*
+ * xfs_rwunlockf
+ */
+void
+xfs_rwunlockf(
+	bhv_desc_t	*bdp,
+	vrwlock_t	locktype,
+	int		flags)
 {
         xfs_inode_t     *ip;
 	xfs_inode_t	*release_ip;
@@ -5147,7 +5169,7 @@ xfs_rwunlock(
 		 */
 		release_ip = ip->i_release;
 		ip->i_release = NULL;
-        	xfs_iunlock (ip, XFS_IOLOCK_EXCL);
+        	xfs_iunlock (ip, XFS_IOLOCK_EXCL|flags);
 		
 		if (release_ip != NULL) {
 			VN_RELE(XFS_ITOV(release_ip));
@@ -5155,7 +5177,7 @@ xfs_rwunlock(
 	} else {
 		ASSERT((locktype == VRWLOCK_READ) ||
 		       (locktype == VRWLOCK_WRITE_DIRECT));
-        	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+        	xfs_iunlock(ip, XFS_IOLOCK_SHARED|flags);
 	}
         return;
 }
