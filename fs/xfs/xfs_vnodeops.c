@@ -877,9 +877,11 @@ xfs_readlink(vnode_t	*vp,
 		goto error_return;
 	}
 
-	nanotime(&tv);
-	ip->i_d.di_atime.t_sec = tv.tv_sec;
-	ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+	if (!(uiop->uio_fmode & FINVIS)) {
+		nanotime(&tv);
+		ip->i_d.di_atime.t_sec  = tv.tv_sec;
+		ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+	}
 
 	/*
 	 * See if the symlink is stored inline.

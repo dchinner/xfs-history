@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -165,6 +165,7 @@ readlink_by_handle (
 	auio.uio_iovcnt	= 1;
 	auio.uio_pio	= 0;
 	auio.uio_pbuf	= 0;
+	auio.uio_fmode	= FINVIS;		/* not used otherwise */
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= bufsiz;
