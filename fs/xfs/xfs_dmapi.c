@@ -481,7 +481,7 @@ xfs_get_dirents(
 	xfs_inode_t	*dirp,
 	void		*bufp,
 	size_t		bufsz,
-	off_t		*locp,
+	xfs_off_t	*locp,
 	size_t		*nreadp)
 {
 	int		sink;
@@ -501,7 +501,7 @@ xfs_get_dirents(
 
 	rval = XFS_DIR_GETDENTS(dirp->i_mount, NULL, dirp, &auio, &sink);
 	if (! rval) {
-		*locp = (off_t) auio.uio_offset;
+		*locp = auio.uio_offset;
 
 		/*
 		 * number of bytes read into the dirent buffer
@@ -520,14 +520,14 @@ xfs_dirents_to_stats(
 	size_t		direntbufsz,	/* sz of filled part of dirent buf */
 	size_t		*spaceleftp,	/* IO - space left in user buffer */
 	size_t		*nwrittenp,	/* number of bytes written to 'bufp' */
-	off_t		*locp)
+	xfs_off_t	*locp)
 {
 	xfs_dirent_t	*p;
 	dm_stat_t	*statp;
 	size_t		reclen;
 	size_t		namelen;
 	size_t		spaceleft;
-	off_t		prevoff;
+	xfs_off_t	prevoff;
 	int		res;
 
 	spaceleft = *spaceleftp;
@@ -1563,8 +1563,8 @@ xfs_dm_get_dirattrs_rvp(
 			xfs_iunlock_map_shared(dp, lock_mode);
 			break;
 		}
-		error = xfs_get_dirents(dp, direntp, direntbufsz, (off_t *)&loc,
-					&nread);
+		error = xfs_get_dirents(dp, direntp, direntbufsz,
+						(xfs_off_t *)&loc, &nread);
 		xfs_iunlock_map_shared(dp, lock_mode);
 
 		if (error) {
@@ -1582,7 +1582,7 @@ xfs_dm_get_dirattrs_rvp(
 					  nread,
 					  &spaceleft,
 					  &nwritten,
-					  (off_t *)&loc);
+					  (xfs_off_t *)&loc);
 		if (error) {
 			break;
 		}
@@ -2514,7 +2514,7 @@ xfs_dm_sync_by_handle (
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
 
-	VOP_FSYNC(vp, FSYNC_WAIT, NULL, (off_t)0, (off_t)-1, error);
+	VOP_FSYNC(vp, FSYNC_WAIT, NULL, (xfs_off_t)0, (xfs_off_t)-1, error);
 	return(error);
 }
 
@@ -2691,7 +2691,7 @@ xfs_dm_mapevent(
 {
 	xfs_fsize_t	filesize;		/* event read/write "size" */
 	xfs_inode_t	*ip;
-	off_t		end_of_area, evsize;
+	xfs_off_t	end_of_area, evsize;
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	struct vfs	*vfsp = vp->v_vfsp;
 
