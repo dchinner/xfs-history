@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -654,6 +654,7 @@ xfs_rename(
 	int		src_dp_dropped = 0;	/* dropped src_dp link? */
 	vnode_t 	*src_dir_vp;
 	bhv_desc_t	*target_dir_bdp;
+	int		spaceres;
 
 	src_dir_vp = BHV_TO_VNODE(src_dir_bdp);
 	vn_trace_entry(src_dir_vp, "xfs_rename", (inst_t *)__return_address);
@@ -760,9 +761,15 @@ xfs_rename(
 	mp = src_dp->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve(tp, XFS_RENAME_SPACE_RES(mp, target_name),
-			XFS_RENAME_LOG_RES(mp), 0, XFS_TRANS_PERM_LOG_RES,
-			XFS_RENAME_LOG_COUNT)) {
+	spaceres = XFS_RENAME_SPACE_RES(mp, target_name);
+	error = xfs_trans_reserve(tp, spaceres, XFS_RENAME_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_RENAME_LOG_COUNT);
+	if (error == ENOSPC) {
+		spaceres = 0;
+		error = xfs_trans_reserve(tp, 0, XFS_RENAME_LOG_RES(mp), 0,
+				XFS_TRANS_PERM_LOG_RES, XFS_RENAME_LOG_COUNT);
+	}
+	if (error) {
 		rename_which_error_return = __LINE__;
 		xfs_trans_cancel(tp, 0);
 		if (ancestor_checked) {
@@ -855,7 +862,11 @@ xfs_rename(
 		 */
 		error = xfs_dir_createname(tp, target_dp, target_name,
 					   src_ip->i_ino, &first_block,
-					   &free_list, MAX_EXT_NEEDED);
+					   &free_list, spaceres);
+		if (error == ENOSPC) {
+			rename_which_error_return = __LINE__;
+			goto error_return;
+		}
 		if (error) {
 			rename_which_error_return = __LINE__;
 			goto abort_return;
@@ -978,7 +989,7 @@ xfs_rename(
 	}
 
 	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
-				   &free_list, MAX_EXT_NEEDED);
+				   &free_list, spaceres);
 	if (error) {
 		rename_which_error_return = __LINE__;
 		goto abort_return;
