@@ -58,8 +58,8 @@
 
 
 /* Log Clients */
-#define XFS_TRANSACTION		1
-#define XFS_VOLUME		2
+#define XFS_TRANSACTION		0x69
+#define XFS_VOLUME		0x2
 
 
 typedef struct xfs_log_iovec {
