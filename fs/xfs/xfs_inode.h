@@ -313,6 +313,12 @@ void		xfs_inobp_check(xfs_mount_t *, buf_t *);
 #define	xfs_inobp_check(mp, bp)
 #endif	/* DEBUG */
 
+/*
+ * xfs_vnodeops.c prototypes.
+ */
+int		xfs_fast_fid(vnode_t *, xfs_fid_t *);
+
+extern int		xfs_do_fast_fid;
 extern struct zone	*xfs_inode_zone;
 
 #endif	/* _XFS_INODE_H */
