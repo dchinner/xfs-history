@@ -63,6 +63,7 @@
 #include "xfs_inode.h"
 #include "xfs_dir.h"
 #include "xfs_rw.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -307,7 +308,7 @@ xfs_ioctl(vnode_t	*vp,
 	  cred_t	*credp,
 	  int		*rvalp)
 {
-	return ENOTTY;
+	return XFS_ERROR(ENOTTY);
 }
 
 
@@ -436,7 +437,7 @@ xfs_setattr(vnode_t	*vp,
          */
         mask = vap->va_mask;
         if (mask & AT_NOSET)
-                return EINVAL;
+                return XFS_ERROR(EINVAL);
 
         ip = XFS_VTOI(vp);
 
@@ -495,7 +496,7 @@ xfs_setattr(vnode_t	*vp,
          */
         if (mask & (AT_MODE|AT_XFLAGS|AT_EXTSIZE)) {
                 if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
-                        code = EPERM;
+                        code = XFS_ERROR(EPERM);
                         goto error_return;
                 }
         }
@@ -516,7 +517,7 @@ xfs_setattr(vnode_t	*vp,
                                 (restricted_chown &&
                                 (ip->i_d.di_uid != uid ||
                                  !groupmember(gid, credp)))) {
-                                code = EPERM;
+                                code = XFS_ERROR(EPERM);
                                 goto error_return;
                         }
                 }
@@ -527,7 +528,7 @@ xfs_setattr(vnode_t	*vp,
          */
         if (mask & AT_SIZE) {
                 if (vp->v_type == VDIR) {
-                        code = EISDIR;
+                        code = XFS_ERROR(EISDIR);
                         goto error_return;
                 }
 
@@ -543,7 +544,7 @@ xfs_setattr(vnode_t	*vp,
         if (mask & (AT_ATIME|AT_MTIME)) {
                 if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
                         if (flags & ATTR_UTIME) {
-                                code = EPERM;
+                                code = XFS_ERROR(EPERM);
                                 goto error_return;
                         }
 
@@ -560,7 +561,7 @@ xfs_setattr(vnode_t	*vp,
 		 */
 		if (ip->i_d.di_nextents && (mask & AT_EXTSIZE) &&
 		    ip->i_d.di_extsize != vap->va_extsize) {
-			code = EINVAL;	/* EFBIG? */
+			code = XFS_ERROR(EINVAL);	/* EFBIG? */
 			goto error_return;
 		}
 		/*
@@ -569,7 +570,7 @@ xfs_setattr(vnode_t	*vp,
 		if (ip->i_d.di_nextents && (mask & AT_XFLAGS) &&
 		    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) !=
 		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
-			code = EINVAL;	/* EFBIG? */
+			code = XFS_ERROR(EINVAL);	/* EFBIG? */
 			goto error_return;
 		}
 		/*
@@ -589,7 +590,7 @@ xfs_setattr(vnode_t	*vp,
 			else
 				size = mp->m_sb.sb_blocksize;
 			if (vap->va_extsize % size) {
-				code = EINVAL;
+				code = XFS_ERROR(EINVAL);
 				goto error_return;
 			}
 		}
@@ -604,7 +605,7 @@ xfs_setattr(vnode_t	*vp,
 			if ((mp->m_sb.sb_rextsize == 0)  ||
 			    (ip->i_d.di_extsize % mp->m_sb.sb_rextsize)) {
 
-				code = EINVAL;	/* ??? */
+				code = XFS_ERROR(EINVAL);	/* ??? */
 				goto error_return;
 			}
 		}
@@ -799,7 +800,7 @@ xfs_readlink(vnode_t	*vp,
         int             error = 0;
 
 	if (vp->v_type != VLNK)
-                return EINVAL;
+                return XFS_ERROR(EINVAL);
 
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
@@ -814,7 +815,7 @@ xfs_readlink(vnode_t	*vp,
                 goto error_return;
         }
 	if (offset < 0) {
-                error = EINVAL;
+                error = XFS_ERROR(EINVAL);
 		goto error_return;
 	}
         if (count <= 0) {
@@ -1162,7 +1163,7 @@ xfs_lookup(vnode_t	*dir_vp,
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
                 VN_RELE(vp);
                 if (newvp == NULL)
-                        return ENOSYS;
+                        return XFS_ERROR(ENOSYS);
                 vp = newvp;
         }
 
@@ -1469,9 +1470,9 @@ try_again:
 
 		vp = XFS_ITOV(ip);
 		if (excl == EXCL)
-                        error = EEXIST;
+                        error = XFS_ERROR(EEXIST);
 		else if (vp->v_type == VDIR && (I_mode & IWRITE))
-                        error = EISDIR;
+                        error = XFS_ERROR(EISDIR);
 		else if (I_mode)
 			error = xfs_iaccess(ip, I_mode, credp);
 
@@ -1593,7 +1594,7 @@ try_again:
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
                 VN_RELE(vp);
                 if (newvp == NULL)
-                        return ENOSYS;
+                        return XFS_ERROR(ENOSYS);
                 vp = newvp;
         }
 
@@ -1939,11 +1940,11 @@ xfs_remove(vnode_t	*dir_vp,
 
 
 	if (XFS_ITOV(ip)->v_vfsmountedhere) {
-                        error = EBUSY;
+                        error = XFS_ERROR(EBUSY);
 			goto error_return;
 	}
 	if ((ip->i_d.di_mode & IFMT) == IFDIR && !crsuser(credp)) {
-                        error = EPERM;
+                        error = XFS_ERROR(EPERM);
 			goto error_return;
 	}
 
@@ -1952,11 +1953,11 @@ xfs_remove(vnode_t	*dir_vp,
 	 */
 	if (name[0] == '.') {
 		if (name[1] == '\0') {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			goto error_return;
 		}
 		else if (name[1] == '.' && name[2] == '\0') {
-			error = EEXIST;
+			error = XFS_ERROR(EEXIST);
 			goto error_return;
 		}
 	} 
@@ -2041,7 +2042,7 @@ xfs_link(vnode_t	*target_dir_vp,
 	if (VOP_REALVP(src_vp, &realvp) == 0)
                 src_vp = realvp;
         if (src_vp->v_type == VDIR && !crsuser(credp))
-                return EPERM;
+                return XFS_ERROR(EPERM);
 
 	mp = XFS_VFSTOM(target_dir_vp->v_vfsp);
         tp = xfs_trans_alloc (mp, 0);
@@ -2071,7 +2072,7 @@ xfs_link(vnode_t	*target_dir_vp,
 				   NULL, &e_inum, NULL);
 	if (error != ENOENT) {
 		if (error == 0) 
-			error = EEXIST;
+			error = XFS_ERROR(EEXIST);
 		goto error_return;
 	}
 
@@ -2215,7 +2216,7 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 		xfs_ino_t	parent_ino;
 
 		if (ip == src_ip) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			break;
 		}
 		if (error = xfs_dir_lookup_int (NULL, XFS_ITOV(ip), 0, "..",
@@ -2224,7 +2225,7 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 		if (parent_ino == ip->i_ino) {
 			prdev("Directory inode %lld has bad parent link",
                               ip->i_dev, ip->i_ino);
-                        error = ENOENT;
+                        error = XFS_ERROR(ENOENT);
                         break;
 		}
 
@@ -2243,7 +2244,7 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 		    (ip->i_d.di_nlink <= 0)) {
                         prdev("Ancestor inode %d is not a directory",
                                 ip->i_dev, ip->i_ino);
-                        error = ENOTDIR;
+                        error = XFS_ERROR(ENOTDIR);
                         break;
                 }
 	}
@@ -2397,7 +2398,7 @@ start_over:
 	}
 
 	if ((src_ip == src_dp) || (target_ip == target_dp)) {
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 		goto error_return;
 	}
 
@@ -2423,12 +2424,12 @@ start_over:
 		 */
 		if ((src_name[0] == '.') && (src_name[1] == '.') &&
 		    (src_name[2] == '\0')) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			goto error_return;
 		}
                 if ((target_name[0] == '.') && (target_name[1] == '.') &&
                     (target_name[2] == '\0')) {
-                        error = EINVAL;
+                        error = XFS_ERROR(EINVAL);
                         goto error_return;
                 }
 
@@ -2501,7 +2502,7 @@ start_over:
 			 */
 			if (! (xfs_dir_isempty(target_dp)) || 
 			    (target_ip->i_d.di_nlink > 2)) {
-				error = EEXIST;
+				error = XFS_ERROR(EEXIST);
                                 goto error_return;
                         }
 
@@ -2509,13 +2510,13 @@ start_over:
 			 * Make sure src is a directory.
 			 */
 			if (! src_is_directory) {
-				error = EISDIR;
+				error = XFS_ERROR(EISDIR);
 				goto error_return;
 			}
 
 			if (ABI_IS_SVR4(u.u_procp->p_abi) &&
                             XFS_ITOV(target_ip)->v_vfsmountedhere) {
-                                error = EBUSY;
+                                error = XFS_ERROR(EBUSY);
                                 goto error_return;
                         }
 
@@ -2523,7 +2524,7 @@ start_over:
 		}
 		else {
 			if (src_is_directory) {
-				error = ENOTDIR;
+				error = XFS_ERROR(ENOTDIR);
 				goto error_return;
 			}
 		}
@@ -2705,7 +2706,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 	 * the directory could have been removed.
 	 */
         if (dp->i_d.di_nlink <= 0) {
-		code = ENOENT;
+		code = XFS_ERROR(ENOENT);
                 goto error_return;
 	}
 
@@ -2713,7 +2714,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 				  &e_inum, NULL);
         if (code != ENOENT) {
 		if (code == 0)
-			code = EEXIST;
+			code = XFS_ERROR(EEXIST);
                 goto error_return;
 	}
 
@@ -2837,24 +2838,24 @@ xfs_rmdir(vnode_t	*dir_vp,
 
 
 	if ((cdp == dp) || (cdp == XFS_VTOI(current_dir_vp))) {
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 		goto error_return;
 	}
 	if ((cdp->i_d.di_mode & IFMT) != IFDIR) {
-	        error = ENOTDIR;
+	        error = XFS_ERROR(ENOTDIR);
 		goto error_return;
 	}
 	if (XFS_ITOV(cdp)->v_vfsmountedhere) {
-		error = EBUSY;
+		error = XFS_ERROR(EBUSY);
 		goto error_return;
 	}
 	ASSERT (cdp->i_d.di_nlink >= 2);
 	if (cdp->i_d.di_nlink != 2) {
-		error = EEXIST;
+		error = XFS_ERROR(EEXIST);
 		goto error_return;
         }
 	if (! xfs_dir_isempty(cdp)) {
-		error = EEXIST;
+		error = XFS_ERROR(EEXIST);
 		goto error_return;
 	}
 
@@ -2941,7 +2942,7 @@ xfs_readdir(vnode_t	*dir_vp,
 
         if ((dp->i_d.di_mode & IFMT) != IFDIR) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
-                return ENOTDIR;
+                return XFS_ERROR(ENOTDIR);
         }
 
 	if (status = xfs_iaccess (dp, IEXEC, credp)) {
@@ -2997,7 +2998,7 @@ xfs_symlink(vnode_t	*dir_vp,
          */
         pathlen = strlen(target_path);
         if (pathlen >= MAXPATHLEN)      /* total string too long */
-                return ENAMETOOLONG;
+                return XFS_ERROR(ENAMETOOLONG);
         if (pathlen >= MAXNAMELEN) {    /* is any component too long? */
                 pn_alloc(&cpn);
                 pn_alloc(&ccpn);
@@ -3033,7 +3034,7 @@ xfs_symlink(vnode_t	*dir_vp,
         error = xfs_dir_lookup_int(NULL, dir_vp, 0, link_name, NULL,
                                        &e_inum, NULL);
 	if (error != ENOENT) {
-		error = EEXIST;
+		error = XFS_ERROR(EEXIST);
                 goto error_return;
 	}
 
@@ -3214,7 +3215,7 @@ xfs_seek(vnode_t	*vp,
 {
 	if ((*new_offsetp > XFS_MAX_FILE_OFFSET) ||
 	    (*new_offsetp < 0)) {
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	} else {
 		return 0;
 	}
@@ -3386,7 +3387,7 @@ xfs_allocstore(vnode_t	*vp,
 	isize = ip->i_d.di_size;
 	if (offset >= isize) {
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 	if ((offset + count) > isize) {
 		count = isize - offset;
@@ -3470,7 +3471,7 @@ xfs_allocstore(vnode_t	*vp,
 		imapp++;
 	}
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	return ENOSPC;
+	return XFS_ERROR(ENOSPC);
 }
 
 
@@ -3546,14 +3547,14 @@ xfs_fcntl(vnode_t	*vp,
 
 		/* only works on files opened for direct I/O */
 		if (!(flags & FDIRECT)) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			break;
 		}
 		da.d_mem = BBSIZE;
 		da.d_miniosz = BBSIZE;
 		da.d_maxiosz = ctob(v.v_maxdmasz);
 		if (copyout(&da, arg, sizeof(da)))
-			error = EFAULT;
+			error = XFS_ERROR(EFAULT);
 		break;
 	    }
 
@@ -3569,7 +3570,7 @@ xfs_fcntl(vnode_t	*vp,
 		fa.fsx_nextents = va.va_nextents;
 		fa.fsx_uuid = va.va_uuid;
 		if (copyout(&fa, arg, sizeof(fa)))
-			error = EFAULT;
+			error = XFS_ERROR(EFAULT);
 		break;
 	    }
 
@@ -3578,7 +3579,7 @@ xfs_fcntl(vnode_t	*vp,
 		vattr_t va;
 
 		if (copyin(arg, &fa, sizeof(fa))) {
-			error = EFAULT;
+			error = XFS_ERROR(EFAULT);
 			break;
 		}
 		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
@@ -3589,7 +3590,7 @@ xfs_fcntl(vnode_t	*vp,
 	    }
 
 	default:
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 		break;
 	}
 	return error;

@@ -43,6 +43,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
 #include "xfs_rw.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -1492,11 +1493,11 @@ xfs_iaccess(
 	 * For TIRIX: Verify that the label allows access.
 	 */
 	if (_MAC_XFS_IACCESS(ip, cr, mode))
-		return EACCESS;
+		return XFS_ERROR(EACCESS);
 #endif
 	
 	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip), cr))
-		return EROFS;
+		return XFS_ERROR(EROFS);
 	if (cr->cr_uid == 0)
 		return 0;
 	if (cr->cr_uid != ip->i_d.di_uid) {
@@ -1505,7 +1506,7 @@ xfs_iaccess(
 			mode >>= 3;
 	}
 	if ((ip->i_d.di_mode & mode) != mode)
-		return EACCES;
+		return XFS_ERROR(EACCES);
 	return 0;
 }
 

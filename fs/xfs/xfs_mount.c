@@ -44,6 +44,7 @@
 #include "xfs_alloc.h"
 #include "xfs_rtalloc.h"
 #include "xfs_bmap.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -135,7 +136,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	sbp = XFS_BUF_TO_SBP(bp);
 	if ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
 	    (sbp->sb_versionnum != XFS_SB_VERSION)) {
-		error = EINVAL;		/* or EIO ? */
+		error = XFS_ERROR(EINVAL);		/* or EIO ? */
 		goto bad;
 	}
 	mp->m_sb_bp = bp;
@@ -227,7 +228,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			prdev("Root inode %d is not a directory",
 			      rip->i_dev, rip->i_ino);
 
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 			goto bad;
 		}
 		s = VN_LOCK(rvp);
@@ -452,7 +453,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_icount;
 		lcounter += delta;
 		if (lcounter < 0) {
-			return (EINVAL);
+			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_icount = lcounter;
 		return (0);
@@ -460,7 +461,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_ifree;
 		lcounter += delta;
 		if (lcounter < 0) {
-			return (EINVAL);
+			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_ifree = lcounter;
 		return (0);
@@ -468,7 +469,7 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_fdblocks;
 		lcounter += delta;
 		if (lcounter < 0) {
-			return (EINVAL);
+			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_fdblocks = lcounter;
 		return (0);
@@ -476,13 +477,13 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		lcounter = mp->m_sb.sb_frextents;
 		lcounter += delta;
 		if (lcounter < 0) {
-			return (EINVAL);
+			return (XFS_ERROR(EINVAL));
 		}
 		mp->m_sb.sb_frextents = lcounter;
 		return (0);
 	default:
 		ASSERT(0);
-		return (EINVAL);
+		return (XFS_ERROR(EINVAL));
 	}
 }
 

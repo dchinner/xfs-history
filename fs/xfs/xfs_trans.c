@@ -29,6 +29,7 @@
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
+#include "xfs_error.h"
 #include "xfs_trans_priv.h"
 
 #ifdef SIM
@@ -171,7 +172,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
 					  -blocks);
 		if (error != 0) {
-			return (ENOSPC);
+			return (XFS_ERROR(ENOSPC));
 		}
 		tp->t_blk_res = blocks;
 	}
@@ -212,7 +213,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FREXTENTS,
 					  -rtextents);
 		if (error) {
-			error = ENOSPC;
+			error = XFS_ERROR(ENOSPC);
 			goto undo_log;
 		}
 		tp->t_rtx_res = rtextents;

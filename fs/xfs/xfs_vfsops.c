@@ -88,6 +88,7 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_ag.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -203,7 +204,7 @@ _spectodev(char	 *spec,
 		return error;
 	if (bvp->v_type != VBLK) {
 		VN_RELE(bvp);
-		return ENOTBLK;
+		return XFS_ERROR(ENOTBLK);
 	}
 	*devp = bvp->v_rdev;
 	VN_RELE(bvp);
@@ -323,7 +324,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		 * XXX	log recovery failure - What action should be taken?
 		 * 	Translate log error to something user understandable
 		 */
-		error = EBUSY;		/* XXX log recovery fail - errno? */
+		error = XFS_ERROR(EBUSY); /* XXX log recovery fail - errno? */
 	}
 
 	return error;
@@ -403,19 +404,19 @@ xfs_vfsmount(vfs_t		*vfsp,
 	int		lflags;
 
 	if (!suser())
-		return EPERM;
+		return XFS_ERROR(EPERM);
 	if (mvp->v_type != VDIR)
-		return ENOTDIR;
+		return XFS_ERROR(ENOTDIR);
 	if ((uap->flags & MS_REMOUNT) == 0
 	    && (mvp->v_count != 1 || (mvp->v_flag & VROOT)))
-		return EBUSY;
+		return XFS_ERROR(EBUSY);
 
 	/*
 	 * Copy in XFS-specific arguments.
 	 */
 	bzero(&args, sizeof args);
 	if (copyin(uap->dataptr, &args, MIN(uap->datalen, sizeof args)))
-		return EFAULT;
+		return XFS_ERROR(EFAULT);
 
 	lflags = 0;
 	if (args.flags & XFSMNT_CHKLOG)
@@ -444,7 +445,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 		xlv_p = &xlv_tab->subvolume[minor(device)];
 		if (! XLV_SUBVOL_EXISTS(xlv_p)) {
 			XLV_IO_UNLOCK(minor(device));
-			return ENXIO;
+			return XFS_ERROR(ENXIO);
 		}
 		ddev   = (sv_p = xlv_p->vol_p->data_subvol) ? sv_p->dev : 0;
 		logdev = (sv_p = xlv_p->vol_p->log_subvol) ? sv_p->dev : 0;
@@ -466,7 +467,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 		ASSERT((uap->flags & MS_REMOUNT) == 0);
 	} else {
 		if ((uap->flags & MS_REMOUNT) == 0)
-			return EBUSY;
+			return XFS_ERROR(EBUSY);
 	}
 
 	error = xfs_cmountfs(vfsp, ddev, rtdev, NONROOT_MOUNT,
@@ -553,14 +554,14 @@ xfs_mountroot(vfs_t		*vfsp,
 	 * Check that the root device holds a XFS file system.
 	 */
 	if ((why == ROOT_INIT) && _xfs_isdev(rootdev))
-		return ENOSYS;
+		return XFS_ERROR(ENOSYS);
 	
 	switch (why) {
 	  case ROOT_INIT:
 		if (xfsrootdone++)
-			return EBUSY;
+			return XFS_ERROR(EBUSY);
 		if (rootdev == NODEV)
-			return ENODEV;
+			return XFS_ERROR(ENODEV);
 		vfsp->vfs_dev = rootdev;
 		break;
 	  case ROOT_REMOUNT:
@@ -647,7 +648,7 @@ xfs_unmount(vfs_t	*vfsp,
 	int		vfs_flags;
 
 	if (!suser())
-		return EPERM;
+		return XFS_ERROR(EPERM);
 
 	mp = XFS_VFSTOM(vfsp);
 
@@ -655,7 +656,7 @@ xfs_unmount(vfs_t	*vfsp,
 	 * Make sure there are no active users.
 	 */
 	if (_xfs_ibusy(mp))
-		return EBUSY;
+		return XFS_ERROR(EBUSY);
 	
 	/*
 	 * Get rid of root inode (vnode) first, if we can.
@@ -689,7 +690,7 @@ xfs_unmount(vfs_t	*vfsp,
 	rvp = XFS_ITOV(rip);
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
-		return EBUSY;
+		return XFS_ERROR(EBUSY);
 	}
 
 	if (rbmip) {
@@ -1054,7 +1055,7 @@ xfs_vget(vfs_t		*vfsp,
 	ip = xfs_iget(XFS_VFSTOM(vfsp), NULL, xfid->fid_ino, XFS_ILOCK_EXCL);
         if (NULL == ip) {
                 *vpp = NULL;
-                return EIO;
+                return XFS_ERROR(EIO);
         }
         if (ip->i_gen != xfid->fid_gen) {
                 xfs_iput(ip, XFS_ILOCK_EXCL);
