@@ -1,4 +1,4 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -39,6 +39,7 @@
 #include "xfs_error.h"
 #include "xfs_quota.h"
 #include "xfs_dqblk.h"
+#include "xfs_dquot_item.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
@@ -256,7 +257,7 @@ xfs_qm_dquot_logitem_pushbuf(
 	}
 	mp = dqp->q_mount;
 	bp = incore(mp->m_dev, qip->qli_format.qlf_blkno, 
-		    mp->QI_DQCHUNKLEN,
+		    XFS_QI_DQCHUNKLEN(mp),
 		    INCORE_TRYLOCK);
 	if (bp != NULL) {
 		if (bp->b_flags & B_DELWRI) {
@@ -421,7 +422,7 @@ struct xfs_item_ops xfs_dquot_item_ops = {
  */
 void
 xfs_qm_dquot_logitem_init(
-	xfs_dquot_t	*dqp)
+	struct xfs_dquot *dqp)
 {
 	xfs_dq_logitem_t  *lp;
 	lp = &dqp->q_logitem;
@@ -556,7 +557,9 @@ xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *qf)
 
 /*ARGSUSED*/
 STATIC xfs_lsn_t
-xfs_qm_qoffend_logitem_committed(xfs_qoff_logitem_t *qfe, xfs_lsn_t lsn)
+xfs_qm_qoffend_logitem_committed(
+	xfs_qoff_logitem_t *qfe, 
+	xfs_lsn_t lsn)
 {
 	xfs_qoff_logitem_t 	*qfs;
 	SPLDECL(s);
@@ -604,7 +607,10 @@ struct xfs_item_ops xfs_qm_qoff_logitem_ops = {
  * Allocate and initialize an quotaoff item of the correct quota type(s).
  */
 xfs_qoff_logitem_t *
-xfs_qm_qoff_logitem_init(xfs_mount_t *mp, xfs_qoff_logitem_t *start, uint flags)
+xfs_qm_qoff_logitem_init(
+	struct xfs_mount *mp, 
+	xfs_qoff_logitem_t *start,
+	uint flags)
 {
 	xfs_qoff_logitem_t	*qf;
 

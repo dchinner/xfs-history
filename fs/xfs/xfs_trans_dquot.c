@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -37,6 +37,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_quota.h"
 #include "xfs_dqblk.h"
+#include "xfs_dquot_item.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
@@ -710,7 +711,7 @@ xfs_trans_dqresv(
 				if ((btimer != 0 && time > btimer) ||
 				    (dqp->q_core.d_bwarns != 0 && 
 				     dqp->q_core.d_bwarns >= 
-				     dqp->q_mount->QI_BWARNLIMIT)) {
+				     XFS_QI_BWARNLIMIT(dqp->q_mount))) {
 					/* XXX XFSSTATS */
 					error = EDQUOT;
 					goto error_return;
@@ -735,7 +736,7 @@ xfs_trans_dqresv(
 				     time > dqp->q_core.d_itimer) || 
 				    (dqp->q_core.d_iwarns != 0 &&
 				     dqp->q_core.d_iwarns >= 
-				     dqp->q_mount->QI_IWARNLIMIT)) {
+				     XFS_QI_IWARNLIMIT(dqp->q_mount))) {
 					/* XXX XFSSTATS */
 					error = EDQUOT;
 					goto error_return;

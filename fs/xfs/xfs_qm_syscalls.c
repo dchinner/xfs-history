@@ -1,4 +1,4 @@
-#ident "$Revision: 1.20 $"
+#ident "$Revision: 1.21 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -49,6 +49,7 @@
 #include "xfs_clnt.h"
 #include "xfs_quota.h"
 #include "xfs_dqblk.h"
+#include "xfs_dquot_item.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
@@ -84,17 +85,11 @@ xfs_qm_sysent(
 {
 	xfs_mount_t	*mp;
 	int 		error;
-#ifndef _BANYAN_XFS
 	bhv_desc_t 	*bdp;
 
 	ASSERT(vfsp);
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
         mp = XFS_BHVTOM(bdp);
-#else
-	ASSERT(vfsp);
-	mp = (xfs_mount_t *) vfsp->vfs_data;
-	ASSERT(mp->m_vfsp->vfs_fstype == xfs_fstype);
-#endif
 
 #ifdef DEBUG		
 	/*
@@ -266,7 +261,7 @@ xfs_qm_scall_quotaoff(
 	 */
 	ASSERT(mp->m_quotainfo || mp->m_dev == rootdev);
 	if (mp->m_quotainfo)
-		mutex_lock(&mp->QI_QOFFLOCK, PINOD);
+		mutex_lock(&(XFS_QI_QOFFLOCK(mp)), PINOD);
 
 	/*
 	 * Root file system may or may not have quotas on in core.
@@ -280,7 +275,7 @@ xfs_qm_scall_quotaoff(
 			newflags = mp->m_sb.sb_qflags;
 			XFS_SB_UNLOCK(mp, s);
 			if (mp->m_quotainfo)
-				mutex_unlock(&mp->QI_QOFFLOCK);
+				mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 			if (sbflags != newflags)
 			      error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
 			return (error);
@@ -317,7 +312,7 @@ xfs_qm_scall_quotaoff(
 		s = XFS_SB_LOCK(mp);
 		mp->m_sb.sb_qflags = mp->m_qflags;
 		XFS_SB_UNLOCK(mp, s);
-		mutex_unlock(&mp->QI_QOFFLOCK);
+		mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 		
 		/* XXX what to do if error ? Revert back to old vals incore ? */
 		error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
@@ -347,7 +342,7 @@ xfs_qm_scall_quotaoff(
 	 * This happens when we're just turning off quota enforcement.
 	 */
 	if ((mp->m_qflags & flags) == 0) {
-		mutex_unlock(&mp->QI_QOFFLOCK);
+		mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 		return (0);
 	}
 	
@@ -418,7 +413,7 @@ xfs_qm_scall_quotaoff(
 	 * If quotas is completely disabled, close shop.
 	 */
 	if ((flags & XFS_MOUNT_QUOTA_ALL) == XFS_MOUNT_QUOTA_ALL) {
-		mutex_unlock(&mp->QI_QOFFLOCK);
+		mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 		xfs_qm_destroy_quotainfo(mp);	
 		return (0);
 	}
@@ -428,16 +423,16 @@ xfs_qm_scall_quotaoff(
 	 * if we don't need them anymore.
 	 */
 	if ((dqtype & XFS_QMOPT_UQUOTA) &&
-	    mp->QI_UQIP) {
-		XFS_PURGE_INODE(XFS_ITOV(mp->QI_UQIP));
-		mp->QI_UQIP = NULL;
+	    XFS_QI_UQIP(mp)) {
+		XFS_PURGE_INODE(XFS_ITOV(XFS_QI_UQIP(mp)));
+		XFS_QI_UQIP(mp) = NULL;
 	}
 	if ((dqtype & XFS_QMOPT_PQUOTA) && 
-	    mp->QI_PQIP) {
-		XFS_PURGE_INODE(XFS_ITOV(mp->QI_PQIP));
-		mp->QI_PQIP = NULL;
+	    XFS_QI_PQIP(mp)) {
+		XFS_PURGE_INODE(XFS_ITOV(XFS_QI_PQIP(mp)));
+		XFS_QI_PQIP(mp) = NULL;
 	}
-	mutex_unlock(&mp->QI_QOFFLOCK);
+	mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 
 	return (error);
 }
@@ -619,9 +614,9 @@ xfs_qm_scall_quotaon(
 	 * Switch on quota enforcement in core. This applies to both root
 	 * and non-root file systems.
 	 */
-	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
+	mutex_lock(&(XFS_QI_QOFFLOCK(mp)), PINOD);
 	mp->m_qflags |= (flags & XFS_ALL_QUOTA_ENFD);
-	mutex_unlock(&mp->QI_QOFFLOCK);
+	mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 	
 	return (0);
 }
@@ -698,12 +693,12 @@ xfs_qm_scall_getqstat(
 			VN_RELE(XFS_ITOV(pip));
 	}
 	if (mp->m_quotainfo) {
-		out.qs_incoredqs = mp->QI_MPLNDQUOTS;
-		out.qs_btimelimit = mp->QI_BTIMELIMIT;
-		out.qs_itimelimit = mp->QI_ITIMELIMIT;
-		out.qs_rtbtimelimit = mp->QI_RTBTIMELIMIT;
-		out.qs_bwarnlimit = mp->QI_BWARNLIMIT;
-		out.qs_iwarnlimit = mp->QI_IWARNLIMIT;
+		out.qs_incoredqs = XFS_QI_MPLNDQUOTS(mp);
+		out.qs_btimelimit = XFS_QI_BTIMELIMIT(mp);
+		out.qs_itimelimit = XFS_QI_ITIMELIMIT(mp);
+		out.qs_rtbtimelimit = XFS_QI_RTBTIMELIMIT(mp);
+		out.qs_bwarnlimit = XFS_QI_BWARNLIMIT(mp);
+		out.qs_iwarnlimit = XFS_QI_IWARNLIMIT(mp);
 	}
  done:
 	if (copyout(&out, addr, sizeof(fs_quota_stat_t)))	
@@ -740,7 +735,6 @@ xfs_qm_scall_setqlim(
 	if (error = xfs_trans_reserve(tp, 0, sizeof(xfs_disk_dquot_t) + 128,
 				      0, 0, XFS_DEFAULT_LOG_COUNT)) {
 		xfs_trans_cancel(tp, 0);
-		mutex_unlock(&mp->QI_QOFFLOCK);
 		return (error);
 	}
 
@@ -750,7 +744,7 @@ xfs_qm_scall_setqlim(
 	 * a quotaoff from happening). (XXXThis doesn't currently doesn't happen
 	 * because we take the vfslock before calling xfs_qm_sysent).
 	 */
-	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
+	mutex_lock(&(XFS_QI_QOFFLOCK(mp)), PINOD);
 
 	/*
 	 * Get the dquot (locked), and join it to the transaction.
@@ -758,7 +752,7 @@ xfs_qm_scall_setqlim(
 	 */
 	if (error = xfs_qm_dqget(mp, NULL, id, type, XFS_QMOPT_DQALLOC, &dqp)) {
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
-		mutex_unlock(&mp->QI_QOFFLOCK);
+		mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 		ASSERT(error != ENOENT);
 		return (error);	    
 	}
@@ -863,7 +857,7 @@ xfs_qm_scall_setqlim(
 	xfs_trans_commit(tp, 0);
 	/* xfs_qm_dqprint(dqp); */
 	xfs_qm_dqrele(dqp);
-	mutex_unlock(&mp->QI_QOFFLOCK);
+	mutex_unlock(&(XFS_QI_QOFFLOCK(mp)));
 
 	return (0);
 }
@@ -1187,7 +1181,7 @@ again:
 		/*
 		 * Rootinode, rbmip and rsumip have blocks associated with it.
 		 */
-		if (ip == mp->QI_UQIP || ip == mp->QI_PQIP) {
+		if (ip == XFS_QI_UQIP(mp) || ip == XFS_QI_PQIP(mp)) {
 			ASSERT(ip->i_udquot == NULL);
 			ASSERT(ip->i_pdquot == NULL);
 			ip = ip->i_mnext;

@@ -20,37 +20,33 @@ struct xfs_dquotblk;
 
 #define XFS_DQ_IS_ADDEDTO_TRX(t, d)	((d)->q_transp == (t))
 
-#define QM_FLLOCK	qm_dqfreelist.qh_lock
-#define QM_FLNEXT	qm_dqfreelist.qh_next
+#define XFS_QI_MPLRECLAIMS(mp)	((mp)->m_quotainfo->qi_dqreclaims)
+#define XFS_QI_UQIP(mp)		((mp)->m_quotainfo->qi_uquotaip)
+#define XFS_QI_PQIP(mp)		((mp)->m_quotainfo->qi_pquotaip)
+#define XFS_QI_DQCHUNKLEN(mp)	((mp)->m_quotainfo->qi_dqchunklen)
+#define XFS_QI_BTIMELIMIT(mp)	((mp)->m_quotainfo->qi_btimelimit)
+#define XFS_QI_RTBTIMELIMIT(mp)	((mp)->m_quotainfo->qi_rtbtimelimit)
+#define XFS_QI_ITIMELIMIT(mp)	((mp)->m_quotainfo->qi_itimelimit)
+#define XFS_QI_BWARNLIMIT(mp)	((mp)->m_quotainfo->qi_bwarnlimit)
+#define XFS_QI_IWARNLIMIT(mp)	((mp)->m_quotainfo->qi_iwarnlimit)
+#define XFS_QI_QOFFLOCK(mp)	((mp)->m_quotainfo->qi_quotaofflock)
 
-#define QI_MPL_LIST	m_quotainfo->qi_dqlist
-#define QI_MPLLOCK	m_quotainfo->qi_dqlist.qh_lock
-#define QI_MPLNEXT	m_quotainfo->qi_dqlist.qh_next
-#define QI_MPLNDQUOTS	m_quotainfo->qi_dqlist.qh_nelems
+#define XFS_QI_MPL_LIST(mp)	((mp)->m_quotainfo->qi_dqlist)
+#define XFS_QI_MPLLOCK(mp)	((mp)->m_quotainfo->qi_dqlist.qh_lock)
+#define XFS_QI_MPLNEXT(mp)	((mp)->m_quotainfo->qi_dqlist.qh_next)
+#define XFS_QI_MPLNDQUOTS(mp)	((mp)->m_quotainfo->qi_dqlist.qh_nelems)
 
-#define QI_UQIP		m_quotainfo->qi_uquotaip
-#define QI_PQIP		m_quotainfo->qi_pquotaip
-#define QI_DQCHUNKLEN	m_quotainfo->qi_dqchunklen
-#define QI_BTIMELIMIT	m_quotainfo->qi_btimelimit
-#define QI_RTBTIMELIMIT	m_quotainfo->qi_rtbtimelimit
-#define QI_ITIMELIMIT	m_quotainfo->qi_itimelimit
-#define QI_BWARNLIMIT	m_quotainfo->qi_bwarnlimit
-#define QI_IWARNLIMIT	m_quotainfo->qi_iwarnlimit
-#define QI_QOFFLOCK	m_quotainfo->qi_quotaofflock
-#define QI_MPLRECLAIMS	m_quotainfo->qi_dqreclaims
-
-
-#define XQMLCK(h)			mutex_lock(&((h)->qh_lock), PINOD)
-#define XQMUNLCK(h)			mutex_unlock(&((h)->qh_lock))
+#define XQMLCK(h)			(mutex_lock(&((h)->qh_lock), PINOD))
+#define XQMUNLCK(h)			(mutex_unlock(&((h)->qh_lock)))
 #define XQMISLCKD(h)			(mutex_mine(&((h)->qh_lock)))
 
 #define XFS_DQ_HASH_LOCK(h)		XQMLCK(h)
 #define XFS_DQ_HASH_UNLOCK(h)		XQMUNLCK(h)
 #define XFS_DQ_IS_HASH_LOCKED(h)	XQMISLCKD(h)
 
-#define xfs_qm_mplist_lock(mp)		XQMLCK(&((mp)->QI_MPL_LIST))
-#define xfs_qm_mplist_unlock(mp)	XQMUNLCK(&((mp)->QI_MPL_LIST))
-#define XFS_QM_IS_MPLIST_LOCKED(mp)	XQMISLCKD(&((mp)->QI_MPL_LIST))
+#define xfs_qm_mplist_lock(mp)		XQMLCK(&(XFS_QI_MPL_LIST(mp)))
+#define xfs_qm_mplist_unlock(mp)	XQMUNLCK(&(XFS_QI_MPL_LIST(mp)))
+#define XFS_QM_IS_MPLIST_LOCKED(mp)	XQMISLCKD(&(XFS_QI_MPL_LIST(mp)))
 
 #define xfs_qm_freelist_lock(qm) 	XQMLCK(&((qm)->qm_dqfreelist))
 #define xfs_qm_freelist_unlock(qm) 	XQMUNLCK(&((qm)->qm_dqfreelist))
@@ -111,7 +107,7 @@ struct xfs_dquotblk;
 	 }
 
 #define FOREACH_DQUOT_IN_MP(dqp, mp) \
-	for ((dqp) = (mp)->QI_MPLNEXT; (dqp) != NULL; (dqp) = (dqp)->MPL_NEXT) 
+	for ((dqp) = XFS_QI_MPLNEXT(mp); (dqp) != NULL; (dqp) = (dqp)->MPL_NEXT) 
 
 #define FOREACH_DQUOT_IN_FREELIST(dqp, qlist) 	\
 for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
@@ -132,7 +128,7 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
          xfs_qm_freelist_unlink(dqp)
 #define XQM_MPLIST_REMOVE(h, dqp)	\
         { _LIST_REMOVE(h, dqp, MPL_PREVP, MPL_NEXT); \
-	  (dqp)->q_mount->QI_MPLRECLAIMS++; }
+	  XFS_QI_MPLRECLAIMS((dqp)->q_mount)++; }
 
 #define XFS_DQ_IS_LOGITEM_INITD(dqp)	((dqp)->q_logitem.qli_dquot == (dqp))
 

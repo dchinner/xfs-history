@@ -1,4 +1,4 @@
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -44,6 +44,7 @@
 #include "xfs_bit.h"
 #include "xfs_quota.h"
 #include "xfs_dqblk.h"
+#include "xfs_dquot_item.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
@@ -273,7 +274,7 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_bcount >= d->d_blk_softlimit)) ||
 		    (d->d_blk_hardlimit &&
 		    (d->d_bcount >= d->d_blk_hardlimit))) {
-			d->d_btimer = time + mp->QI_BTIMELIMIT;
+			d->d_btimer = time + XFS_QI_BTIMELIMIT(mp);
 		}
 	} else {
 		if ((d->d_blk_softlimit == 0 ||	
@@ -289,7 +290,7 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_icount >= d->d_ino_softlimit)) ||
 		    (d->d_ino_hardlimit &&
 		    (d->d_icount >= d->d_ino_hardlimit))) {
-			d->d_itimer = time + mp->QI_ITIMELIMIT;
+			d->d_itimer = time + XFS_QI_ITIMELIMIT(mp);
 		}
 	} else {
 		if ((d->d_ino_softlimit == 0 ||
@@ -380,14 +381,14 @@ xfs_qm_init_dquot_blk(
 	 */
 	curid = id - (id % XFS_QM_DQPERBLK(mp));
 	ASSERT(curid >= 0);
-	bzero(d, BBTOB(mp->QI_DQCHUNKLEN));
+	bzero(d, BBTOB(XFS_QI_DQCHUNKLEN(mp)));
 	for (i = 0; i < XFS_QM_DQPERBLK(mp); i++, d++, curid++)
 		xfs_qm_dqinit_core(curid, type, d);
 	xfs_trans_dquot_buf(tp, bp, 
 			    type & XFS_DQ_USER ?
 			    XFS_BLI_UDQUOT_BUF :
 			    XFS_BLI_PDQUOT_BUF);
-	xfs_trans_log_buf(tp, bp, 0, BBTOB(mp->QI_DQCHUNKLEN) - 1);
+	xfs_trans_log_buf(tp, bp, 0, BBTOB(XFS_QI_DQCHUNKLEN(mp)) - 1);
 
 }
 
@@ -459,7 +460,7 @@ xfs_qm_dqalloc(
 	/* now we can just get the buffer (there's nothing to read yet) */
 	bp = xfs_trans_get_buf(tp, mp->m_dev,
 			       dqp->q_blkno,
-			       mp->QI_DQCHUNKLEN,
+			       XFS_QI_DQCHUNKLEN(mp),
 			       0);
 	if (!bp || (error = geterror(bp)))
 		goto error1;
@@ -585,7 +586,7 @@ xfs_qm_dqtobp(
 		xfs_dqtrace_entry(dqp, "DQTOBP READBUF");
 		if (error = xfs_trans_read_buf(tp, mp->m_dev,
 					       dqp->q_blkno,
-					       mp->QI_DQCHUNKLEN,
+					       XFS_QI_DQCHUNKLEN(mp),
 					       0, &bp)) {
 			return (error);
 		}
@@ -711,7 +712,7 @@ xfs_qm_idtodq(
 				       mp->m_bm_maxlevels[XFS_DATA_FORK] + 
 					      XFS_DQUOT_CLUSTER_SIZE_FSB,
 				       XFS_WRITE_LOG_RES(mp) + 
-					      BBTOB(mp->QI_DQCHUNKLEN) - 1 +
+					      BBTOB(XFS_QI_DQCHUNKLEN(mp)) - 1 +
 					      128,
 				       0,
 				       XFS_TRANS_PERM_LOG_RES,
@@ -1074,7 +1075,7 @@ xfs_qm_dqget(
 	xfs_dqlock(dqp);
 	dqp->q_nrefs = 1;
 	
-	XQM_MPLIST_INSERT(&(mp->QI_MPL_LIST), dqp);
+	XQM_MPLIST_INSERT(&(XFS_QI_MPL_LIST(mp)), dqp);
 
 	xfs_qm_mplist_unlock(mp);
 	XFS_DQ_HASH_UNLOCK(h);
@@ -1203,11 +1204,7 @@ xfs_qm_dqflush(
 	buf_t			*bp;
 	xfs_disk_dquot_t 	*ddqp;
 	int			error;
-#ifdef _BANYAN_XFS
-	int			s;
-#else
 	SPLDECL(s);
-#endif
 
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	ASSERT(XFS_DQ_IS_FLUSH_LOCKED(dqp));
@@ -1257,11 +1254,7 @@ xfs_qm_dqflush(
 	mp = dqp->q_mount;
 
 	/* lsn is 64 bits */
-#ifdef _BANYAN_XFS
-	s = AIL_LOCK(mp);
-#else
 	AIL_LOCK(mp, s);
-#endif
 	dqp->q_logitem.qli_flush_lsn = dqp->q_logitem.qli_item.li_lsn;
 	AIL_UNLOCK(mp, s);
 
@@ -1309,11 +1302,8 @@ xfs_qm_dqflush_done(
         xfs_dq_logitem_t	*qip)
 {
         xfs_dquot_t     	*dqp;
-#ifdef _BANYAN_XFS
-        int             	s;
-#else
 	SPLDECL(s);
-#endif
+
         dqp = qip->qli_dquot;
 
         /*
@@ -1326,11 +1316,8 @@ xfs_qm_dqflush_done(
          */
         if ((qip->qli_item.li_flags & XFS_LI_IN_AIL) &&
 	    qip->qli_item.li_lsn == qip->qli_flush_lsn) {
-#ifdef _BANYAN_XFS
-                s = AIL_LOCK(dqp->q_mount);
-#else
+
 		AIL_LOCK(dqp->q_mount, s);
-#endif
 		/*
 		 * xfs_trans_delete_ail() drops the AIL lock.
 		 */
@@ -1506,7 +1493,7 @@ xfs_qm_dqpurge(
 
 	thishash = dqp->q_hash;
 	XQM_HASHLIST_REMOVE(thishash, dqp);
-	XQM_MPLIST_REMOVE(&(mp->QI_MPL_LIST), dqp);
+	XQM_MPLIST_REMOVE(&(XFS_QI_MPL_LIST(mp)), dqp);
 	/*
 	 * XXX Move this to the front of the freelist, if we can get the
 	 * freelist lock.
@@ -1685,7 +1672,7 @@ xfs_qm_dqflock_pushbuf_wait(
 	 * the flush lock when the I/O completes.
 	 */
 	bp = incore(dqp->q_dev, dqp->q_blkno, 
-		    dqp->q_mount->QI_DQCHUNKLEN,
+		    XFS_QI_DQCHUNKLEN(dqp->q_mount),
 		    INCORE_TRYLOCK);
 	if (bp != NULL) {
 		if (bp->b_flags & B_DELWRI) {
