@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision: 1.30 $"
 
 /*
  * Super block
@@ -25,12 +25,14 @@ struct xfs_mount;
 #define	XFS_SB_VERSION_NLINKBIT		0x0020
 #define	XFS_SB_VERSION_QUOTABIT		0x0040
 #define	XFS_SB_VERSION_ALIGNBIT		0x0080
+#define XFS_SB_VERSION_DALIGNBIT	0x0100
 #define	XFS_SB_VERSION_OKSASHFBITS	0
 #define	XFS_SB_VERSION_OKREALFBITS	\
 	(XFS_SB_VERSION_ATTRBIT | \
 	 XFS_SB_VERSION_NLINKBIT | \
 	 XFS_SB_VERSION_QUOTABIT | \
-	 XFS_SB_VERSION_ALIGNBIT)
+	 XFS_SB_VERSION_ALIGNBIT | \
+	 XFS_SB_VERSION_DALIGNBIT)
 #define	XFS_SB_VERSION_OKSASHBITS	\
 	(XFS_SB_VERSION_NUMBITS | \
 	 XFS_SB_VERSION_REALFBITS | \
@@ -40,7 +42,8 @@ struct xfs_mount;
 	 XFS_SB_VERSION_OKREALFBITS | \
 	 XFS_SB_VERSION_OKSASHFBITS)
 #define	XFS_SB_VERSION_MKFS(ia)	\
-	((ia) ? (XFS_SB_VERSION_4 | XFS_SB_VERSION_ALIGNBIT) : XFS_SB_VERSION_1)
+	((ia) ? (XFS_SB_VERSION_4 | XFS_SB_VERSION_ALIGNBIT \
+			| XFS_SB_VERSION_DALIGNBIT) : XFS_SB_VERSION_1)
 
 typedef struct xfs_sb
 {
@@ -90,6 +93,8 @@ typedef struct xfs_sb
 	xfs_ino_t	sb_pquotino;	/* project quota inode */
 	__uint16_t	sb_qflags;	/* quota flags */
 	xfs_extlen_t	sb_inoalignmt;	/* inode chunk alignment, fsblocks */
+	__uint32_t	sb_unit;	/* stripe or raid unit */
+	__uint32_t	sb_width;	/* stripe or raid width */	
 } xfs_sb_t;
 
 /*
@@ -105,8 +110,8 @@ typedef enum {
 	XFS_SBS_SECTLOG, XFS_SBS_INODELOG, XFS_SBS_INOPBLOG, XFS_SBS_AGBLKLOG,
 	XFS_SBS_REXTSLOG, XFS_SBS_INPROGRESS, XFS_SBS_IMAX_PCT, XFS_SBS_ICOUNT,
 	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS, XFS_SBS_UQUOTINO,
-	XFS_SBS_PQUOTINO, XFS_SBS_QFLAGS, XFS_SBS_INOALIGNMT,
-	XFS_SBS_FIELDCOUNT
+	XFS_SBS_PQUOTINO, XFS_SBS_QFLAGS, XFS_SBS_INOALIGNMT, XFS_SBS_UNIT,
+	XFS_SBS_WIDTH, XFS_SBS_FIELDCOUNT
 } xfs_sb_field_t;
 
 /*
@@ -121,11 +126,14 @@ typedef enum {
 #define XFS_SB_UQUOTINO		XFS_SB_MVAL(UQUOTINO)
 #define XFS_SB_PQUOTINO		XFS_SB_MVAL(PQUOTINO)
 #define XFS_SB_QFLAGS		XFS_SB_MVAL(QFLAGS)
+#define XFS_SB_UNIT		XFS_SB_MVAL(UNIT)
+#define XFS_SB_WIDTH		XFS_SB_MVAL(WIDTH)
 #define	XFS_SB_NUM_BITS		((int)XFS_SBS_FIELDCOUNT)
 #define	XFS_SB_ALL_BITS		((1LL << XFS_SB_NUM_BITS) - 1)
 #define	XFS_SB_MOD_BITS		\
 	(XFS_SB_ROOTINO | XFS_SB_RBMINO | XFS_SB_RSUMINO | XFS_SB_VERSIONNUM | \
-	 XFS_SB_UQUOTINO | XFS_SB_PQUOTINO | XFS_SB_QFLAGS)
+	 XFS_SB_UQUOTINO | XFS_SB_PQUOTINO | XFS_SB_QFLAGS | XFS_SB_UNIT | \
+	 XFS_SB_WIDTH)
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_VERSION_NUM)
 int xfs_sb_version_num(xfs_sb_t *sbp);
@@ -260,6 +268,15 @@ void xfs_sb_version_subalign(xfs_sb_t *sbp);
 #define	XFS_SB_VERSION_SUBALIGN(sbp)	\
 	((sbp)->sb_versionnum = \
 	 XFS_SB_VERSION_TOOLD((sbp)->sb_versionnum & ~XFS_SB_VERSION_ALIGNBIT))
+#endif
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_VERSION_HASDALIGN)
+int xfs_sb_version_hasdalign(xfs_sb_t *sbp);
+#define XFS_SB_VERSION_HASDALIGN(sbp)	xfs_sb_version_hasdalign(sbp)
+#else
+#define XFS_SB_VERSION_HASDALIGN(sbp)	\
+	((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
+	 ((sbp)->sb_versionnum & XFS_SB_VERSION_DALIGNBIT))
 #endif
 
 #define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
