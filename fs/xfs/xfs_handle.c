@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.37 $"
+#ident "$Revision: 1.38 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -174,6 +174,8 @@ readlink_by_handle (
 	auio.uio_pmp	= NULL;
 	auio.uio_pio	= 0;
 	auio.uio_pbuf	= 0;
+	auio.uio_readiolog	= 0;
+	auio.uio_writeiolog	= 0;
 
 	auio.uio_fmode	= FINVIS;		/* not used otherwise */
 	auio.uio_offset	= 0;
