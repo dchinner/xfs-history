@@ -1,4 +1,4 @@
-#ident "$Revision: 1.14 $"
+#ident "$Revision: 1.15 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -1164,6 +1164,8 @@ xfs_qm_dqrele_all_inodes(
 	xfs_inode_t	*ip, *topino;
 	uint		ireclaims;
 	vnode_t		*vp;
+	boolean_t	vnode_refd;
+
 	ASSERT(mp->m_quotainfo);
 
 again:
@@ -1182,7 +1184,7 @@ again:
 			continue;
 		}
 		vp = XFS_ITOV(ip);
-
+		vnode_refd = B_FALSE;
 		if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0) {
 			/*
 			 * Sample vp mapping while holding the mplock, lest
@@ -1192,6 +1194,8 @@ again:
 			ireclaims = mp->m_ireclaims;
 			topino = mp->m_inodes;
 			XFS_MOUNT_IUNLOCK(mp);
+			
+			/* XXX restart limit ? */
 #ifndef _IRIX62_XFS_ONLY
 			if (!(vp = vn_get(vp, &vmap, 0)))
 				goto again;
@@ -1201,7 +1205,7 @@ again:
 			ASSERT(ip == XFS_VTOI(vp));
 #endif
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
-			VN_RELE(vp);
+			vnode_refd = B_TRUE;
 		} else {
 			ireclaims = mp->m_ireclaims;
 			topino = mp->m_inodes;
@@ -1220,9 +1224,14 @@ again:
 			xfs_qm_dqrele(ip->i_pdquot);
 			ip->i_pdquot = NULL;
 		}
-
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-
+		/*
+		 * Wait until we've dropped the ilock and mountlock to
+		 * do the vn_rele. Or be condemned to an eternity in the
+		 * inactive code in hell.
+		 */
+		if (vnode_refd)
+			VN_RELE(vp);
 		XFS_MOUNT_ILOCK(mp);
 		/*
 		 * If an inode was inserted or removed, we gotta
