@@ -3896,6 +3896,15 @@ xfs_strat_write(
 	error = 0;
 	bp->b_flags |= B_STALE;
 
+	/*
+	 * Drop the count of queued buffers. We need to do
+	 * this before the bdstrat(s) because callers of
+	 * pflushinvalvp(), for example, may expect the queued_buf
+	 * count to be down when it returns. See xfs_itruncate_start.
+	 */
+	atomicAddInt(&(ip->i_queued_bufs), -1);
+	ASSERT(ip->i_queued_bufs >= 0);
+
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0)) {
@@ -4035,12 +4044,12 @@ xfs_strat_write(
 			xfs_check_bp(ip, bp);
 			my_bdevsw = get_bdevsw(bp->b_edev);
 			ASSERT(my_bdevsw != NULL);
+#ifdef XFSRACEDEBUG
+			delay_for_intr();
+			delay(100);
+#endif
 			bdstrat(my_bdevsw, bp);
-			/*
-			 * Drop the count of queued buffers.
-			 */
-			atomicAddInt(&(ip->i_queued_bufs), -1);
-			ASSERT(ip->i_queued_bufs >= 0);
+
 			XFSSTATS.xs_xstrat_quick++;
 			return 0;
 		}
@@ -4141,8 +4150,11 @@ xfs_strat_write(
 
 			my_bdevsw = get_bdevsw(rbp->b_edev);
 			ASSERT(my_bdevsw != NULL);
+#ifdef XFSRACEDEBUG
+			delay_for_intr();
+			delay(100);
+#endif
 			bdstrat(my_bdevsw, rbp);
-
 			map_start_fsb +=
 				imapp->br_blockcount;
 			count_fsb -= imapp->br_blockcount;
@@ -4165,8 +4177,6 @@ xfs_strat_write(
 	 * or whether we jumped here after an error before issuing any.
 	 */
  error0:
-	atomicAddInt(&(ip->i_queued_bufs), -1);
-	ASSERT(ip->i_queued_bufs >= 0);
 	if (error) {
 		ASSERT(count_fsb != 0);
 		/*
@@ -5426,25 +5436,3 @@ xfs_refcache_purge_some(void)
 		VN_RELE(XFS_ITOV(iplist[i]));
 	}
 }
-
-#ifdef DEBUG
-void
-xfs_print_xfsd_buflist()
-{
-	int 	s, k = 0;
-	buf_t	*bp;
-
-	s = mp_mutex_spinlock(&xfsd_lock);
-	bp = xfsd_list;
-	while (bp) {
-		printf("%d. bp 0x%x, flags 0x%x\n", 
-		       k++, bp,
-		       bp->b_flags);
-		bp = bp->av_forw;
-		if (bp == xfsd_list)
-			break;
-	}
-	printf("xfsd_bufcount 0x%x\n", xfsd_bufcount);
-	mp_mutex_spinunlock(&xfsd_lock, s);
-}
-#endif
