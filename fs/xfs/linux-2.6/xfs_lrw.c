@@ -749,7 +749,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 	ASSERT((flags & PBF_READ) || (flags & PBF_WRITE));
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_iocore.io_mount))
-		return (EIO);
+		return XFS_ERROR(EIO);
 
 	if (flags & PBF_READ) {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
@@ -773,7 +773,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 			if (XFS_NOT_DQATTACHED(ip->i_mount, ip)) {
 				if (error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED)) {
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					return error;
+					return XFS_ERROR(error);
 				}
 			}
 		}
@@ -815,7 +815,7 @@ retry:
 			}
 		}
 	}
-	return error;
+	return XFS_ERROR(error);
 }	
 
 
@@ -911,7 +911,7 @@ xfs_iomap_read(
 				flags, &firstblock, 0, imap,
 				&nimaps, NULL);
 	if (error) {
-		return error;
+		return XFS_ERROR(error);
 	}
 
 	if(nimaps) {
@@ -919,7 +919,7 @@ xfs_iomap_read(
 			*npbmaps);
 	} else
 		*npbmaps = 0;
-	return error;
+	return XFS_ERROR(error);
 }
 
 /*
@@ -947,7 +947,7 @@ xfs_iomap_write(
 	xfs_inode_t	*ip = XFS_IO_INODE(io);
 	xfs_mount_t	*mp;
 	int		maps;
-	int		error;
+	int		error = 0;
 
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_WRITE_IMAPS], *imapp;
@@ -1043,7 +1043,7 @@ out_no_unlock:
 	if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
 		printk("xfsiomapw: bmap too small pbmap 0x%p\n", pbmapp);
 	}
-	return error;
+	return XFS_ERROR(error);
 }
 
 #ifdef DEBUG
@@ -1916,7 +1916,7 @@ finish_maps:	/* copy any maps to caller's array and return any error. */
 
 error_out:
 out:	/* Just return error and any tracing at end of routine */
-	return error;
+	return XFS_ERROR(error);
 }
 int
 _xfs_incore_relse(buftarg_t *targ,
