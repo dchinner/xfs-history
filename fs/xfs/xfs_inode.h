@@ -237,7 +237,7 @@ typedef struct xfs_inode {
 /*
  * Value for inode buffers' b_ref field.
  */
-#define XFS_INOREF	1
+#define XFS_INO_REF	1
 
 /*
  * XFS file identifier.
