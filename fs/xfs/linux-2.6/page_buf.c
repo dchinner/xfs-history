@@ -1167,7 +1167,7 @@ int pagebuf_iostart(		/* start I/O on a buffer          */
 
 /* Helper routines for pagebuf_iorequest */
 
-int bio_end_io_pagebuf(struct bio *bio)
+static void bio_end_io_pagebuf(struct bio *bio)
 {
 	int	i;
 	page_buf_t *pb = (page_buf_t *)bio->bi_private;
@@ -1198,7 +1198,6 @@ int bio_end_io_pagebuf(struct bio *bio)
 	}
 
 	bio_put(bio);
-	return 0;
 }
 
 /*
