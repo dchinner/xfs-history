@@ -1,7 +1,7 @@
 #ifndef	_XFS_EXTFREE_ITEM_H
 #define	_XFS_EXTFREE_ITEM_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 
 typedef struct xfs_extent {
 	xfs_dfsbno_t	ext_start;
@@ -17,6 +17,7 @@ typedef struct xfs_efi_log_format {
 	unsigned short		efi_type;	/* efi log item type */
 	unsigned short		efi_size;	/* size of this item */
 	uint			efi_nextents;	/* # extents to free */
+	__uint64_t		efi_id;		/* efi identifier */
 	xfs_extent_t		efi_extents[1];	/* array of extents to free */
 } xfs_efi_log_format_t;
 
@@ -41,6 +42,7 @@ typedef struct xfs_efd_log_format {
 	unsigned short		efd_type;	/* efd log item type */
 	unsigned short		efd_size;	/* size of this item */
 	uint			efd_nextents;	/* # of extents freed */
+	__uint64_t		efd_efi_id;	/* id of corresponding efi */
 	xfs_extent_t		efd_extents[1];	/* array of extents freed */
 } xfs_efd_log_format_t;
 
