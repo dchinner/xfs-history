@@ -445,8 +445,6 @@ xfs_getattr(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	ASSERT(!((flags & ATTR_LAZY) && (vap->va_mask != AT_SIZE)));
-
 	if (!(flags & ATTR_LAZY))
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
 
@@ -568,8 +566,8 @@ xfs_getattr(
 	vap->va_gencount = ip->i_d.di_gen;
 	vap->va_vcode = 0L;
 
-	ASSERT(!(flags & ATTR_LAZY));
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	if (!(flags & ATTR_LAZY))
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return 0;
 }
 
