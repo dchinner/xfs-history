@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision: 1.12 $"
 
 /*
  * xFS types
@@ -99,6 +99,12 @@ typedef	__uint32_t	xfs_fileoff_t;	/* block number in a file */
 #define	NULLAGBLOCK	((xfs_agblock_t)-1)
 #define	NULLAGNUMBER	((xfs_agnumber_t)-1)
 #define	NULLEXTNUM	((xfs_extnum_t)-1)
+
+/*
+ * Max values for extnum, extlen.
+ */
+#define	MAXEXTLEN	((xfs_extlen_t)0xffffffff)
+#define	MAXEXTNUM	((xfs_extnum_t)0x7fffffff)
 
 typedef enum {
 	XFS_LOOKUP_EQi, XFS_LOOKUP_LEi, XFS_LOOKUP_GEi
