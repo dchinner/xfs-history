@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.25 $"
 
 struct buf;
 struct proc;
@@ -15,10 +15,24 @@ struct xfs_mount;
  * (if any) is indicated in the ilf_dsize field.  Changes to this structure
  * must be added on to the end.
  *
- * -Version 1 of this structure (XFS_LI_OINODE) included up to the first
+ * Convention for naming inode log item versions :  The current version
+ * is always named XFS_LI_INODE.  When an inode log item gets superseded,
+ * add the latest version of IRIX that will generate logs with that item
+ * to the version name.
+ *
+ * -Version 1 of this structure (XFS_LI_5_3_INODE) included up to the first
  *	union (ilf_u) field.  This was released with IRIX 5.3-XFS.
- * -Version 2 of this structure (XFS_LI_INODE) is currently the entire
+ * -Version 2 of this structure (XFS_LI_6_1_INODE) is currently the entire
  *	structure.  This was released with IRIX 6.0.1-XFS and IRIX 6.1.
+ * -Version 3 of this structure (XFS_LI_INODE) is the same as version 2
+ *	so a new structure definition wasn't necessary.  However, we had
+ *	to add a new type because the inode cluster size changed from 4K
+ *	to 8K and the version number had to be rev'ved to keep older kernels
+ *	from trying to recover logs with the 8K buffers in them.  The logging
+ *	code can handle recovery on different-sized clusters now so hopefully
+ *	this'll be the last time we need to change the inode log item just
+ *	for a change in the inode cluster size.  This new version was
+ *	released with IRIX 6.2.
  */
 typedef struct xfs_inode_log_format {
 	unsigned short		ilf_type;	/* inode log item type */
