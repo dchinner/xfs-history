@@ -317,13 +317,17 @@ xfs_buf_item_format(
 			first_bit = next_bit;
 			last_bit = next_bit;
 			nbits = 1;
-		} else if (xfs_buf_offset(bp, next_bit * XFS_BLI_CHUNK) !=
-			   (xfs_buf_offset(bp, last_bit * XFS_BLI_CHUNK) +
+		} else if (xfs_buf_offset(bp, next_bit << XFS_BLI_SHIFT) !=
+			   (xfs_buf_offset(bp, last_bit << XFS_BLI_SHIFT) +
 			    XFS_BLI_CHUNK)) {
 			buffer_offset = first_bit * XFS_BLI_CHUNK;
 			vecp->i_addr = xfs_buf_offset(bp, buffer_offset);
 			vecp->i_len = nbits * XFS_BLI_CHUNK;
-			nvecs++;
+/* You would think we need to bump the nvecs here too, but we do not
+ * this number is used by recovery, and it gets confused by the boundary
+ * split here
+ *			nvecs++;
+ */
 			vecp++;
 			first_bit = next_bit;
 			last_bit = next_bit;
