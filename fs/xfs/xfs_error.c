@@ -1,4 +1,4 @@
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 #include "sys/types.h"
 #include "sys/pda.h"
@@ -29,7 +29,7 @@ xfs_error_trap(int e)
 #ifdef SIM
 		abort();
 #else
-		debug_stop_all_cpus();
+		debug_stop_all_cpus((void *)-1LL);
 		debug("xfs");
 #endif
 		break;
