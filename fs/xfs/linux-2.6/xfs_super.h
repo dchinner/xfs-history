@@ -70,7 +70,7 @@
 # define XFS_TRACE_STRING
 #endif
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 # define XFS_DBG_STRING		"debug"
 #else
 # define XFS_DBG_STRING		"no debug"
