@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.138 $"
+#ident  "$Revision: 1.139 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -128,6 +128,7 @@ xfs_vfsmount(
 	vfs_t		*vfsp,
 	vnode_t		*mvp,
 	struct mounta	*uap,
+	char		*attrs,
 	cred_t		*credp);
 
 STATIC int
@@ -728,11 +729,13 @@ xfs_mount(
 
 
 /* VFS_MOUNT */
+/*ARGSUSED*/
 STATIC int
 xfs_vfsmount(
 	vfs_t           *vfsp,
         vnode_t         *mvp,
         struct mounta   *uap,
+	char 		*attrs,
         cred_t          *credp)
 {
 	return(xfs_mount(vfsp, mvp, uap, credp));
@@ -1980,6 +1983,7 @@ vfsops_t xfs_vfsops = {
 	xfs_sync,
 	xfs_vget,
 	xfs_vfsmountroot,
+	fs_realvfsops,	
 	fs_nosys,	/* swapvp */
 };
 #else	/* SIM */
