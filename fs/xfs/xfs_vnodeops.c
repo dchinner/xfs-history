@@ -4179,11 +4179,11 @@ xfs_rmdir(
 	}
 	ASSERT(cdp->i_d.di_nlink >= 2);
 	if (cdp->i_d.di_nlink != 2) {
-		error = XFS_ERROR(EEXIST);
+		error = XFS_ERROR(ENOTEMPTY);
 		goto error_return;
         }
 	if (!XFS_DIR_ISEMPTY(mp, cdp)) {
-		error = XFS_ERROR(EEXIST);
+		error = XFS_ERROR(ENOTEMPTY);
 		goto error_return;
 	}
 
