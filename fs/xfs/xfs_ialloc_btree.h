@@ -28,7 +28,9 @@ typedef	__uint64_t	xfs_inofree_t;
 #define	XFS_INOBT_SET_FREE(rp, i)	((rp)->ir_free |= XFS_INOBT_MASK(i))
 #define	XFS_INOBT_CLR_FREE(rp, i)	((rp)->ir_free &= ~XFS_INOBT_MASK(i))
 
-#define	XFS_INOBT_MASKN(i,n)		((xfs_inofree_t)((1 << (n)) - 1) << (i))
+#define	XFS_INOBT_MASKN(i,n)	\
+	((((n) >= XFS_INODES_PER_CHUNK ? \
+		(xfs_inofree_t)0 : ((xfs_inofree_t)1 << (n))) - 1) << (i))
 
 /*
  * Data record structure
