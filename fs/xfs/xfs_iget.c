@@ -31,6 +31,7 @@
  */
 
 #include <xfs.h>
+#include <linux/xfs_iops.h>
 
 
 /*
@@ -490,7 +491,7 @@ retry:
 							lock_flags, ipp, bno);
 			if (error) {
 				make_bad_inode(inode);
-				if (inode->i_state == (I_NEW | I_LOCKED))
+				if (inode->i_state == (I_NEW | I_LOCK))
 					unlock_new_inode(inode);
 				iput(inode);
 			}
