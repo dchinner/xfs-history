@@ -108,9 +108,6 @@ typedef struct vfs {
 
 
 typedef struct vfsops {
-#ifdef CELL_CAPABLE
-	bhv_position_t	vf_position;	/* position within behavior chain */
-#endif
 	int	(*vfs_mount)(struct vfs *, struct xfs_mount_args *,
 					struct cred *);
 					/* mount file system */
@@ -133,11 +130,6 @@ typedef struct vfsops {
 					 struct dm_fcntl_vector *);
 	void	(*vfs_force_shutdown)(bhv_desc_t *,
 					int, char *, int);
-#ifdef CELL_CAPABLE
-	int	vfs_ops_magic;		/* magic number for intfc extensions */
-	__uint64_t   vfs_ops_version;	/* interface version number */
-	__uint64_t   vfs_ops_flags;	/* interface flags */
-#endif
 } vfsops_t;
 
 #define VFS_DOUNMOUNT(vfsp,f,vp,cr, rv) \
