@@ -95,6 +95,7 @@ xfs_efi_item_format(xfs_efi_log_item_t	*efip,
 
 	log_vector->i_addr = (caddr_t)&(efip->efi_format);
 	log_vector->i_len = size;
+	ASSERT(size >= sizeof(xfs_efi_log_format_t));
 }
 	
 
@@ -279,6 +280,7 @@ xfs_efd_item_format(xfs_efd_log_item_t	*efdp,
 
 	log_vector->i_addr = (caddr_t)&(efdp->efd_format);
 	log_vector->i_len = size;
+	ASSERT(size >= sizeof(xfs_efd_log_format_t));
 }
 	
 
