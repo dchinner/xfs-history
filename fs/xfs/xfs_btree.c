@@ -56,7 +56,7 @@ const __uint32_t xfs_magics[XFS_BTNUM_MAX] =
 /*
  * Checking routine: return maxrecs for the block.
  */
-static int				/* number of records fitting in block */
+STATIC int				/* number of records fitting in block */
 xfs_btree_maxrecs(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block);/* generic btree block pointer */
@@ -68,7 +68,7 @@ xfs_btree_maxrecs(
 /*
  * Checking routine: return maxrecs for the block.
  */
-static int				/* number of records fitting in block */
+STATIC int				/* number of records fitting in block */
 xfs_btree_maxrecs(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block) /* generic btree block pointer */

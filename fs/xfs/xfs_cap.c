@@ -32,7 +32,7 @@
 
 #include <xfs.h>
 
-static int xfs_cap_allow_set(vnode_t *);
+STATIC int xfs_cap_allow_set(vnode_t *);
 
 
 /*
@@ -53,7 +53,7 @@ xfs_cap_vhascap(
 /*
  * Convert from extended attribute representation to in-memory for XFS.
  */
-static int
+STATIC int
 posix_cap_xattr_to_xfs(
 	posix_cap_xattr		*src,
 	size_t			size,
@@ -82,7 +82,7 @@ posix_cap_xattr_to_xfs(
 /*
  * Convert from in-memory XFS to extended attribute representation.
  */
-static int
+STATIC int
 posix_cap_xfs_to_xattr(
 	xfs_cap_set_t		*src,
 	posix_cap_xattr		*xattr_cap,
@@ -181,7 +181,7 @@ out:
 	return -error;
 }
 
-static int
+STATIC int
 xfs_cap_allow_set(
 	vnode_t		*vp)
 {

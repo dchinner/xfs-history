@@ -33,15 +33,15 @@
 #include <xfs.h>
 #include <xfs_log_recover.h>
 
-static int	xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
+STATIC int	xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
 
-static int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
-static void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
+STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
+STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
 
 #if defined(DEBUG)
-static void	xlog_recover_check_summary(xlog_t *log);
-static void	xlog_recover_check_ail(xfs_mount_t *mp, xfs_log_item_t *lip,
+STATIC void	xlog_recover_check_summary(xlog_t *log);
+STATIC void	xlog_recover_check_ail(xfs_mount_t *mp, xfs_log_item_t *lip,
 				       int gen);
 #else
 #define xlog_recover_check_summary(log)
@@ -155,7 +155,7 @@ xlog_header_check_dump(xfs_mount_t *mp, xlog_rec_header_t *head)
  * check log record header for recovery
  */
 
-static int
+STATIC int
 xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
 {
     ASSERT(INT_GET(head->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
@@ -187,7 +187,7 @@ xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
  * read the head block of the log and check the header
  */
 
-static int
+STATIC int
 xlog_header_check_mount(xfs_mount_t *mp, xlog_rec_header_t *head)
 {
     ASSERT(INT_GET(head->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
@@ -213,7 +213,7 @@ xlog_header_check_mount(xfs_mount_t *mp, xlog_rec_header_t *head)
     return 0;
 }
 
-static void
+STATIC void
 xlog_recover_iodone(
 	struct xfs_buf	*bp)
 {
@@ -284,7 +284,7 @@ xlog_find_cycle_start(xlog_t	*log,
  * since we don't ever expect logs to get this large.
  */
 
-static int
+STATIC int
 xlog_find_verify_cycle( xlog_t		*log,
 			xfs_daddr_t	start_blk,
 			int		nbblks,
@@ -348,7 +348,7 @@ out:
  * call to this routine.
  */
 
-static int
+STATIC int
 xlog_find_verify_log_record(xlog_t	*log,
 			    xfs_daddr_t start_blk,
 			    xfs_daddr_t *last_blk,
@@ -1010,7 +1010,7 @@ bp_err:
  * to initialize a buffer full of empty log record headers and write
  * them into the log.
  */
-static int
+STATIC int
 xlog_write_log_records(
 	xlog_t	*log,
 	int	cycle,
@@ -1083,7 +1083,7 @@ xlog_write_log_records(
  * any valid log records in it until a new one was written.  If we crashed
  * during that time we would not be able to recover.
  */
-static int
+STATIC int
 xlog_clear_stale_blocks(
 	xlog_t		*log,
 	xfs_lsn_t	tail_lsn)
@@ -1204,7 +1204,7 @@ xlog_clear_stale_blocks(
  ******************************************************************************
  */
 
-static xlog_recover_t *
+STATIC xlog_recover_t *
 xlog_recover_find_tid(xlog_recover_t *q,
 		      xlog_tid_t     tid)
 {
@@ -1219,7 +1219,7 @@ xlog_recover_find_tid(xlog_recover_t *q,
 }	/* xlog_recover_find_tid */
 
 
-static void
+STATIC void
 xlog_recover_put_hashq(xlog_recover_t **q,
 		       xlog_recover_t *trans)
 {
@@ -1228,7 +1228,7 @@ xlog_recover_put_hashq(xlog_recover_t **q,
 }	/* xlog_recover_put_hashq */
 
 
-static void
+STATIC void
 xlog_recover_add_item(xlog_recover_item_t **itemq)
 {
 	xlog_recover_item_t *item;
@@ -1238,7 +1238,7 @@ xlog_recover_add_item(xlog_recover_item_t **itemq)
 }	/* xlog_recover_add_item */
 
 
-static int
+STATIC int
 xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
 			       xfs_caddr_t		dp,
 			       int		len)
@@ -1280,7 +1280,7 @@ xlog_recover_add_to_cont_trans(xlog_recover_t	*trans,
  * later.  If we have at least 4 bytes, then we can determine how many regions
  * will appear in the current log item.
  */
-static int
+STATIC int
 xlog_recover_add_to_trans(xlog_recover_t	*trans,
 			  xfs_caddr_t		dp,
 			  int			len)
@@ -1325,7 +1325,7 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 }	/* xlog_recover_add_to_trans */
 
 
-static void
+STATIC void
 xlog_recover_new_tid(xlog_recover_t	**q,
 		     xlog_tid_t		tid,
 		     xfs_lsn_t		lsn)
@@ -1339,7 +1339,7 @@ xlog_recover_new_tid(xlog_recover_t	**q,
 }	/* xlog_recover_new_tid */
 
 
-static int
+STATIC int
 xlog_recover_unlink_tid(xlog_recover_t	**q,
 			xlog_recover_t	*trans)
 {
@@ -1369,7 +1369,7 @@ xlog_recover_unlink_tid(xlog_recover_t	**q,
 	return 0;
 }	/* xlog_recover_unlink_tid */
 
-static void
+STATIC void
 xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 			       xlog_recover_item_t *item)
 {
@@ -1384,7 +1384,7 @@ xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 	}
 }	/* xlog_recover_insert_item_backq */
 
-static void
+STATIC void
 xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 				xlog_recover_item_t *item)
 {
@@ -1392,7 +1392,7 @@ xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
 	*q = item;
 }	/* xlog_recover_insert_item_frontq */
 
-static int
+STATIC int
 xlog_recover_reorder_trans(xlog_t	  *log,
 			   xlog_recover_t *trans)
 {
@@ -1444,7 +1444,7 @@ xlog_recover_reorder_trans(xlog_t	  *log,
  * record in the table to tell us how many times we expect to see this
  * record during the second pass.
  */
-static void
+STATIC void
 xlog_recover_do_buffer_pass1(xlog_t			*log,
 			     xfs_buf_log_format_t	*buf_f)
 {
@@ -1539,7 +1539,7 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
  * again after its last cancellation we actually replay the changes
  * made at that point.
  */
-static int
+STATIC int
 xlog_recover_do_buffer_pass2(xlog_t			*log,
 			     xfs_buf_log_format_t	*buf_f)
 {
@@ -1641,7 +1641,7 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
  * the buffer will not be marked as an inode buffer and so will be
  * sent to xlog_recover_do_reg_buffer() below during recovery.
  */
-static int
+STATIC int
 xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			     xlog_recover_item_t	*item,
 			     xfs_buf_t			*bp,
@@ -1757,7 +1757,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
  * where to place the logged data.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 			   xlog_recover_item_t	*item,
 			   xfs_buf_t		*bp,
@@ -1828,7 +1828,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
  * (ie. USR or GRP), then just toss this buffer away; don't recover it.
  * Else, treat it as a regular buffer and do recovery.
  */
-static void
+STATIC void
 xlog_recover_do_dquot_buffer(
 	xfs_mount_t		*mp,
 	xlog_t			*log,
@@ -1883,7 +1883,7 @@ xlog_recover_do_dquot_buffer(
  * records in the table.  See xlog_recover_do_buffer_pass[1,2] above
  * for more details on the implementation of the table of cancel records.
  */
-static int
+STATIC int
 xlog_recover_do_buffer_trans(xlog_t		 *log,
 			     xlog_recover_item_t *item,
 			     int		 pass)
@@ -1999,7 +1999,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	return (error);
 }	/* xlog_recover_do_buffer_trans */
 
-static int
+STATIC int
 xlog_recover_do_inode_trans(xlog_t		*log,
 			    xlog_recover_item_t *item,
 			    int			pass)
@@ -2241,7 +2241,7 @@ write_inode_buffer:
  * structure, so that we know not to do any dquot item or dquot buffer recovery,
  * of that type.
  */
-static int
+STATIC int
 xlog_recover_do_quotaoff_trans(xlog_t			*log,
 			       xlog_recover_item_t	*item,
 			       int			pass)
@@ -2271,7 +2271,7 @@ xlog_recover_do_quotaoff_trans(xlog_t			*log,
 /*
  * Recover a dquot record
  */
-static int
+STATIC int
 xlog_recover_do_dquot_trans(xlog_t		*log,
 			    xlog_recover_item_t *item,
 			    int			pass)
@@ -2371,7 +2371,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
  * structure into it, and adds the efi to the AIL with the given
  * LSN.
  */
-static void
+STATIC void
 xlog_recover_do_efi_trans(xlog_t		*log,
 			  xlog_recover_item_t	*item,
 			  xfs_lsn_t		lsn,
@@ -2415,7 +2415,7 @@ xlog_recover_do_efi_trans(xlog_t		*log,
  * efd format structure.  If we find it, we remove the efi from the
  * AIL and free it.
  */
-static void
+STATIC void
 xlog_recover_do_efd_trans(xlog_t		*log,
 			  xlog_recover_item_t	*item,
 			  int			pass)
@@ -2485,7 +2485,7 @@ xlog_recover_do_efd_trans(xlog_t		*log,
  * If the transaction modifies a buffer or inode, do it now.  Otherwise,
  * EFIs and EFDs get queued up by adding entries into the AIL for them.
  */
-static int
+STATIC int
 xlog_recover_do_trans(xlog_t	     *log,
 		      xlog_recover_t *trans,
 		      int	     pass)
@@ -2549,7 +2549,7 @@ xlog_recover_do_trans(xlog_t	     *log,
  *
  * Remember that EFIs, EFDs, and IUNLINKs are handled later.
  */
-static void
+STATIC void
 xlog_recover_free_trans(xlog_recover_t	    *trans)
 {
 	xlog_recover_item_t *first_item, *item, *free_item;
@@ -2574,7 +2574,7 @@ xlog_recover_free_trans(xlog_recover_t	    *trans)
 }	/* xlog_recover_free_trans */
 
 
-static int
+STATIC int
 xlog_recover_commit_trans(xlog_t	 *log,
 			  xlog_recover_t **q,
 			  xlog_recover_t *trans,
@@ -2592,7 +2592,7 @@ xlog_recover_commit_trans(xlog_t	 *log,
 
 
 /*ARGSUSED*/
-static int
+STATIC int
 xlog_recover_unmount_trans(xlog_recover_t *trans)
 {
 	/* Do nothing now */
@@ -2610,7 +2610,7 @@ xlog_recover_unmount_trans(xlog_recover_t *trans)
  *
  * NOTE: skip LRs with 0 data length.
  */
-static int
+STATIC int
 xlog_recover_process_data(xlog_t	    *log,
 			  xlog_recover_t    *rhash[],
 			  xlog_rec_header_t *rhead,
@@ -2699,7 +2699,7 @@ xlog_recover_process_data(xlog_t	    *log,
  * Process an extent free intent item that was recovered from
  * the log.  We need to free the extents that it describes.
  */
-static void
+STATIC void
 xlog_recover_process_efi(xfs_mount_t		*mp,
 			 xfs_efi_log_item_t	*efip)
 {
@@ -2754,7 +2754,7 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
  * in the AIL that there are no more EFIs in the AIL.
  */
 #if defined(DEBUG)
-static void
+STATIC void
 xlog_recover_check_ail(xfs_mount_t	*mp,
 		       xfs_log_item_t	*lip,
 		       int		gen)
@@ -2795,7 +2795,7 @@ xlog_recover_check_ail(xfs_mount_t	*mp,
  * everything already in the AIL, we stop processing as soon as
  * we see something other than an EFI in the AIL.
  */
-static void
+STATIC void
 xlog_recover_process_efis(xlog_t	*log)
 {
 	xfs_log_item_t		*lip;
@@ -2839,7 +2839,7 @@ xlog_recover_process_efis(xlog_t	*log)
  * This routine performs a transaction to null out a bad inode pointer
  * in an agi unlinked inode hash bucket.
  */
-static void
+STATIC void
 xlog_recover_clear_agi_bucket(
 	xfs_mount_t	*mp,
 	xfs_agnumber_t	agno,
@@ -3093,7 +3093,7 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 
 
 /*ARGSUSED*/
-static void
+STATIC void
 xlog_unpack_data(xlog_rec_header_t *rhead,
 		 xfs_caddr_t	   dp,
 		 xlog_t		   *log)
@@ -3159,7 +3159,7 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
  * to the routines called to process the data and is not looked at
  * here.
  */
-static int
+STATIC int
 xlog_do_recovery_pass(xlog_t	*log,
 		      xfs_daddr_t	head_blk,
 		      xfs_daddr_t	tail_blk,
@@ -3388,7 +3388,7 @@ bread_err1:
  * and freed at this level, since only here do we know when all of
  * the log recovery has been completed.
  */
-static int
+STATIC int
 xlog_do_log_recovery(xlog_t	*log,
 		     xfs_daddr_t	head_blk,
 		     xfs_daddr_t	tail_blk)
@@ -3435,7 +3435,7 @@ xlog_do_log_recovery(xlog_t	*log,
 /*
  * Do the actual recovery
  */
-static int
+STATIC int
 xlog_do_recover(xlog_t	*log,
 		xfs_daddr_t head_blk,
 		xfs_daddr_t tail_blk)

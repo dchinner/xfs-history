@@ -33,9 +33,9 @@
 #include <xfs.h>
 
 
-static xfs_buf_t *xfs_trans_buf_item_match(xfs_trans_t *, xfs_buftarg_t *,
+STATIC xfs_buf_t *xfs_trans_buf_item_match(xfs_trans_t *, xfs_buftarg_t *,
 		xfs_daddr_t, int);
-static xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, xfs_buftarg_t *,
+STATIC xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, xfs_buftarg_t *,
 		xfs_daddr_t, int);
 
 
@@ -981,7 +981,7 @@ xfs_trans_dquot_buf(
  * a part of the given transaction.  Only check the first, embedded
  * chunk, since we don't want to spend all day scanning large transactions.
  */
-static xfs_buf_t *
+STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
 	xfs_buftarg_t	*target,
@@ -1034,7 +1034,7 @@ xfs_trans_buf_item_match(
  * a part of the given transaction.  Check all the chunks, we
  * want to be thorough.
  */
-static xfs_buf_t *
+STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	xfs_buftarg_t	*target,

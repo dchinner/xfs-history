@@ -54,7 +54,7 @@ kmem_zone_t	*xfs_buf_item_zone;
  * We also double check the bits set in xfs_buf_item_log using a
  * simple algorithm to check that every byte is accounted for.
  */
-static void
+STATIC void
 xfs_buf_item_log_debug(
 	xfs_buf_log_item_t	*bip,
 	uint			first,
@@ -117,7 +117,7 @@ xfs_buf_item_flush_log_debug(
  * and ensuring that all bytes which miscompare are set in the bli_logged
  * array of the buf log item.
  */
-static void
+STATIC void
 xfs_buf_item_log_check(
 	xfs_buf_log_item_t	*bip)
 {
@@ -146,7 +146,7 @@ xfs_buf_item_log_check(
 #define		xfs_buf_item_log_check(x)
 #endif
 
-static void	xfs_buf_error_relse(xfs_buf_t *bp);
+STATIC void	xfs_buf_error_relse(xfs_buf_t *bp);
 
 /*
  * This returns the number of log iovecs needed to log the
@@ -955,7 +955,7 @@ xfs_buf_attach_iodone(
 	XFS_BUF_SET_IODONE_FUNC(bp, xfs_buf_iodone_callbacks);
 }
 
-static void
+STATIC void
 xfs_buf_do_callbacks(
 	xfs_buf_t	*bp,
 	xfs_log_item_t	*lip)
@@ -1092,7 +1092,7 @@ xfs_buf_iodone_callbacks(
  * This is a callback routine attached to a buffer which gets an error
  * when being written out synchronously.
  */
-static void
+STATIC void
 xfs_buf_error_relse(
 	xfs_buf_t	*bp)
 {

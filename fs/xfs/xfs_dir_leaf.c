@@ -52,15 +52,15 @@
 /*
  * Routines used for growing the Btree.
  */
-static void xfs_dir_leaf_add_work(xfs_dabuf_t *leaf_buffer, xfs_da_args_t *args,
+STATIC void xfs_dir_leaf_add_work(xfs_dabuf_t *leaf_buffer, xfs_da_args_t *args,
 					      int insertion_index,
 					      int freemap_index);
-static int xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *leaf_buffer,
+STATIC int xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *leaf_buffer,
 					    int musthave, int justcheck);
-static void xfs_dir_leaf_rebalance(xfs_da_state_t *state,
+STATIC void xfs_dir_leaf_rebalance(xfs_da_state_t *state,
 						  xfs_da_state_blk_t *blk1,
 						  xfs_da_state_blk_t *blk2);
-static int xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
+STATIC int xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
 					  xfs_da_state_blk_t *leaf_blk_1,
 					  xfs_da_state_blk_t *leaf_blk_2,
 					  int *number_entries_in_blk1,
@@ -69,7 +69,7 @@ static int xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
 /*
  * Utility routines.
  */
-static void xfs_dir_leaf_moveents(xfs_dir_leafblock_t *src_leaf,
+STATIC void xfs_dir_leaf_moveents(xfs_dir_leafblock_t *src_leaf,
 					      int src_start,
 					      xfs_dir_leafblock_t *dst_leaf,
 					      int dst_start, int move_count,
@@ -385,7 +385,7 @@ out:
 	return(retval);
 }
 
-static int
+STATIC int
 xfs_dir_shortform_compare(const void *a, const void *b)
 {
 	xfs_dir_sf_sort_t *sa, *sb;
@@ -934,7 +934,7 @@ xfs_dir_leaf_add(xfs_dabuf_t *bp, xfs_da_args_t *args, int index)
 /*
  * Add a name to a leaf directory structure.
  */
-static void
+STATIC void
 xfs_dir_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int index,
 		      int mapindex)
 {
@@ -1013,7 +1013,7 @@ xfs_dir_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int index,
 /*
  * Garbage collect a leaf directory block by copying it to a new buffer.
  */
-static int
+STATIC int
 xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 		     int justcheck)
 {
@@ -1089,7 +1089,7 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
  *
  * NOTE: if new block is empty, then it will get the upper half of old block.
  */
-static void
+STATIC void
 xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 				      xfs_da_state_blk_t *blk2)
 {
@@ -1219,7 +1219,7 @@ xfs_dir_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
  * GROT: there will always be enough room in either block for a new entry.
  * GROT: Do a double-split for this case?
  */
-static int
+STATIC int
 xfs_dir_leaf_figure_balance(xfs_da_state_t *state,
 					   xfs_da_state_blk_t *blk1,
 					   xfs_da_state_blk_t *blk2,
@@ -1772,7 +1772,7 @@ xfs_dir_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args, int *index)
  * NOTE: this routine modifies both source and destination leaves.
  */
 /* ARGSUSED */
-static void
+STATIC void
 xfs_dir_leaf_moveents(xfs_dir_leafblock_t *leaf_s, int start_s,
 		      xfs_dir_leafblock_t *leaf_d, int start_d,
 		      int count, xfs_mount_t *mp)

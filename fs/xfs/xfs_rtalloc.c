@@ -42,21 +42,21 @@
  */
 
 
-static int xfs_rtallocate_range(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
+STATIC int xfs_rtallocate_range(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
 		xfs_extlen_t, xfs_buf_t **, xfs_fsblock_t *);
-static int xfs_rtany_summary(xfs_mount_t *, xfs_trans_t *, int, int,
+STATIC int xfs_rtany_summary(xfs_mount_t *, xfs_trans_t *, int, int,
 		xfs_rtblock_t, xfs_buf_t **, xfs_fsblock_t *, int *);
-static int xfs_rtcheck_range(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
+STATIC int xfs_rtcheck_range(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
 		xfs_extlen_t, int, xfs_rtblock_t *, int *);
-static int xfs_rtfind_back(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
+STATIC int xfs_rtfind_back(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
 		xfs_rtblock_t, xfs_rtblock_t *);
-static int xfs_rtfind_forw(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
+STATIC int xfs_rtfind_forw(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
 		xfs_rtblock_t, xfs_rtblock_t *);
-static int xfs_rtget_summary( xfs_mount_t *, xfs_trans_t *, int,
+STATIC int xfs_rtget_summary( xfs_mount_t *, xfs_trans_t *, int,
 		xfs_rtblock_t, xfs_buf_t **, xfs_fsblock_t *, xfs_suminfo_t *);
-static int xfs_rtmodify_range(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
+STATIC int xfs_rtmodify_range(xfs_mount_t *, xfs_trans_t *, xfs_rtblock_t,
 		xfs_extlen_t, int);
-static int xfs_rtmodify_summary(xfs_mount_t *, xfs_trans_t *, int,
+STATIC int xfs_rtmodify_summary(xfs_mount_t *, xfs_trans_t *, int,
 		xfs_rtblock_t, int, xfs_buf_t **, xfs_fsblock_t *);
 
 /*
@@ -66,7 +66,7 @@ static int xfs_rtmodify_summary(xfs_mount_t *, xfs_trans_t *, int,
 /*
  * xfs_lowbit32: get low bit set out of 32-bit argument, -1 if none set.
  */
-static int
+STATIC int
 xfs_lowbit32(
 	__uint32_t	v)
 {
@@ -76,7 +76,7 @@ xfs_lowbit32(
 /*
  * Allocate space to the bitmap or summary file, and zero it, for growfs.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_growfs_rt_alloc(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_extlen_t	oblocks,	/* old count of blocks */
@@ -194,7 +194,7 @@ error_exit:
  * the length, if given.  Returns error; returns starting block in *rtblock.
  * The lengths are all in rtextents.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtallocate_extent_block(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -307,7 +307,7 @@ xfs_rtallocate_extent_block(
  * Returns error; returns starting block in *rtblock.
  * The lengths are all in rtextents.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtallocate_extent_exact(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -386,7 +386,7 @@ xfs_rtallocate_extent_exact(
  * to bno as possible.	If we don't get maxlen then use prod to trim
  * the length, if given.  The lengths are all in rtextents.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtallocate_extent_near(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -580,7 +580,7 @@ xfs_rtallocate_extent_near(
  * specified.  If we don't get maxlen then use prod to trim
  * the length, if given.  The lengths are all in rtextents.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtallocate_extent_size(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -720,7 +720,7 @@ xfs_rtallocate_extent_size(
  * Mark an extent specified by start and len allocated.
  * Updates all the summary information as well as the bitmap.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtallocate_range(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -797,7 +797,7 @@ xfs_rtallocate_range(
  * Return whether there are any free extents in the size range given
  * by low and high, for the bitmap block bbno.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtany_summary(
 	xfs_mount_t	*mp,		/* file system mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -842,7 +842,7 @@ xfs_rtany_summary(
  * Get a buffer for the bitmap or summary file block specified.
  * The buffer is returned read and locked.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtbuf_get(
 	xfs_mount_t	*mp,		/* file system mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -887,7 +887,7 @@ xfs_rtbuf_get(
 /*
  * Check that the given extent (block range) is allocated already.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtcheck_alloc_range(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -905,7 +905,7 @@ xfs_rtcheck_alloc_range(
 /*
  * Check whether the given block in the bitmap has the given value.
  */
-static int				/* 1 for matches, 0 for not */
+STATIC int				/* 1 for matches, 0 for not */
 xfs_rtcheck_bit(
 	xfs_mount_t	*mp,		/* file system mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -938,7 +938,7 @@ xfs_rtcheck_bit(
 /*
  * Check that the given extent (block range) is free already.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtcheck_free_range(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -956,7 +956,7 @@ xfs_rtcheck_free_range(
  * Check that the given range is either all allocated (val = 0) or
  * all free (val = 1).
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtcheck_range(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -1132,7 +1132,7 @@ xfs_rtcheck_range(
  * Copy and transform the summary file, given the old and new
  * parameters in the mount structures.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtcopy_summary(
 	xfs_mount_t	*omp,		/* old file system mount point */
 	xfs_mount_t	*nmp,		/* new file system mount point */
@@ -1174,7 +1174,7 @@ xfs_rtcopy_summary(
  * Searching backward from start to limit, find the first block whose
  * allocated/free state is different from start's.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtfind_back(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -1349,7 +1349,7 @@ xfs_rtfind_back(
  * Searching forward from start to limit, find the first block whose
  * allocated/free state is different from start's.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtfind_forw(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -1519,7 +1519,7 @@ xfs_rtfind_forw(
  * Mark an extent specified by start and len freed.
  * Updates all the summary information as well as the bitmap.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtfree_range(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -1595,7 +1595,7 @@ xfs_rtfree_range(
  * Keeps track of a current summary block, so we don't keep reading
  * it from the buffer cache.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtget_summary(
 	xfs_mount_t	*mp,		/* file system mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -1662,7 +1662,7 @@ xfs_rtget_summary(
  * Set the given range of bitmap bits to the given value.
  * Do whatever I/O and logging is required.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtmodify_range(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -1821,7 +1821,7 @@ xfs_rtmodify_range(
  * Keeps track of a current summary block, so we don't keep reading
  * it from the buffer cache.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_rtmodify_summary(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */

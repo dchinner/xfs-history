@@ -41,9 +41,9 @@
 kmem_zone_t	*xfs_efi_zone;
 kmem_zone_t	*xfs_efd_zone;
 
-static void	xfs_efi_item_unlock(xfs_efi_log_item_t *);
-static void	xfs_efi_item_abort(xfs_efi_log_item_t *);
-static void	xfs_efd_item_abort(xfs_efd_log_item_t *);
+STATIC void	xfs_efi_item_unlock(xfs_efi_log_item_t *);
+STATIC void	xfs_efi_item_abort(xfs_efi_log_item_t *);
+STATIC void	xfs_efd_item_abort(xfs_efd_log_item_t *);
 
 
 
@@ -53,7 +53,7 @@ static void	xfs_efd_item_abort(xfs_efd_log_item_t *);
  * structure.
  */
 /*ARGSUSED*/
-static uint
+STATIC uint
 xfs_efi_item_size(xfs_efi_log_item_t *efip)
 {
 	return 1;
@@ -66,7 +66,7 @@ xfs_efi_item_size(xfs_efi_log_item_t *efip)
  * It is at this point that we assert that all of the extent
  * slots in the efi item have been filled.
  */
-static void
+STATIC void
 xfs_efi_item_format(xfs_efi_log_item_t	*efip,
 		    xfs_log_iovec_t	*log_vector)
 {
@@ -90,7 +90,7 @@ xfs_efi_item_format(xfs_efi_log_item_t	*efip,
  * Pinning has no meaning for an efi item, so just return.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efi_item_pin(xfs_efi_log_item_t *efip)
 {
 	return;
@@ -104,7 +104,7 @@ xfs_efi_item_pin(xfs_efi_log_item_t *efip)
  * free the EFI.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
 {
 	int		nexts;
@@ -143,7 +143,7 @@ xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
  * the descriptor and then calling unpin would force us to drop the AIL
  * lock which would open up a race condition.
  */
-static void
+STATIC void
 xfs_efi_item_unpin_remove(xfs_efi_log_item_t *efip, xfs_trans_t *tp)
 {
 	int		nexts;
@@ -192,7 +192,7 @@ xfs_efi_item_unpin_remove(xfs_efi_log_item_t *efip, xfs_trans_t *tp)
  * This should help in getting the EFI out of the AIL.
  */
 /*ARGSUSED*/
-static uint
+STATIC uint
 xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
 {
 	return XFS_ITEM_PINNED;
@@ -202,7 +202,7 @@ xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
  * Efi items have no locking, so just return.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efi_item_unlock(xfs_efi_log_item_t *efip)
 {
 	if (efip->efi_item.li_flags & XFS_LI_ABORTED)
@@ -217,7 +217,7 @@ xfs_efi_item_unlock(xfs_efi_log_item_t *efip)
  * until the EFI is unpinned.
  */
 /*ARGSUSED*/
-static xfs_lsn_t
+STATIC xfs_lsn_t
 xfs_efi_item_committed(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
 {
 	return lsn;
@@ -229,7 +229,7 @@ xfs_efi_item_committed(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
  * the item in the transaction.	 That was done by the unpin code
  * which is called prior to this routine in the abort/fs-shutdown path.
  */
-static void
+STATIC void
 xfs_efi_item_abort(xfs_efi_log_item_t *efip)
 {
 	int	nexts;
@@ -252,7 +252,7 @@ xfs_efi_item_abort(xfs_efi_log_item_t *efip)
  * committed to disk.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efi_item_push(xfs_efi_log_item_t *efip)
 {
 	return;
@@ -266,7 +266,7 @@ xfs_efi_item_push(xfs_efi_log_item_t *efip)
  * so the dependency should be recorded there.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efi_item_committing(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
 {
 	return;
@@ -381,7 +381,7 @@ xfs_efi_release(xfs_efi_log_item_t	*efip,
  * canceled flags are used to coordinate the freeing of the EFI and
  * the references by the transaction that committed it.
  */
-static void
+STATIC void
 xfs_efi_cancel(
 	xfs_efi_log_item_t	*efip)
 {
@@ -424,7 +424,7 @@ xfs_efi_cancel(
  * structure.
  */
 /*ARGSUSED*/
-static uint
+STATIC uint
 xfs_efd_item_size(xfs_efd_log_item_t *efdp)
 {
 	return 1;
@@ -437,7 +437,7 @@ xfs_efd_item_size(xfs_efd_log_item_t *efdp)
  * It is at this point that we assert that all of the extent
  * slots in the efd item have been filled.
  */
-static void
+STATIC void
 xfs_efd_item_format(xfs_efd_log_item_t	*efdp,
 		    xfs_log_iovec_t	*log_vector)
 {
@@ -461,7 +461,7 @@ xfs_efd_item_format(xfs_efd_log_item_t	*efdp,
  * Pinning has no meaning for an efd item, so just return.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efd_item_pin(xfs_efd_log_item_t *efdp)
 {
 	return;
@@ -473,14 +473,14 @@ xfs_efd_item_pin(xfs_efd_log_item_t *efdp)
  * not either.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efd_item_unpin(xfs_efd_log_item_t *efdp)
 {
 	return;
 }
 
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efd_item_unpin_remove(xfs_efd_log_item_t *efdp, xfs_trans_t *tp)
 {
 	return;
@@ -490,7 +490,7 @@ xfs_efd_item_unpin_remove(xfs_efd_log_item_t *efdp, xfs_trans_t *tp)
  * Efd items have no locking, so just return success.
  */
 /*ARGSUSED*/
-static uint
+STATIC uint
 xfs_efd_item_trylock(xfs_efd_log_item_t *efdp)
 {
 	return XFS_ITEM_LOCKED;
@@ -501,7 +501,7 @@ xfs_efd_item_trylock(xfs_efd_log_item_t *efdp)
  * so that the caller doesn't bother with us.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efd_item_unlock(xfs_efd_log_item_t *efdp)
 {
 	if (efdp->efd_item.li_flags & XFS_LI_ABORTED)
@@ -517,7 +517,7 @@ xfs_efd_item_unlock(xfs_efd_log_item_t *efdp)
  * this item.
  */
 /*ARGSUSED*/
-static xfs_lsn_t
+STATIC xfs_lsn_t
 xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
 {
 	uint	size;
@@ -549,7 +549,7 @@ xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
  * transaction.	 That was done by the unpin code which is called
  * prior to this routine in the abort/fs-shutdown path.
  */
-static void
+STATIC void
 xfs_efd_item_abort(xfs_efd_log_item_t *efdp)
 {
 	int	nexts;
@@ -579,7 +579,7 @@ xfs_efd_item_abort(xfs_efd_log_item_t *efdp)
  * stuck waiting for the log to be flushed to disk.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efd_item_push(xfs_efd_log_item_t *efdp)
 {
 	return;
@@ -593,7 +593,7 @@ xfs_efd_item_push(xfs_efd_log_item_t *efdp)
  * so the dependency should be recorded there.
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_efd_item_committing(xfs_efd_log_item_t *efip, xfs_lsn_t lsn)
 {
 	return;

@@ -32,13 +32,13 @@
 
 #include <xfs.h>
 
-static void xfs_ail_insert(xfs_ail_entry_t *, xfs_log_item_t *);
-static xfs_log_item_t * xfs_ail_delete(xfs_ail_entry_t *, xfs_log_item_t *);
-static xfs_log_item_t * xfs_ail_min(xfs_ail_entry_t *);
-static xfs_log_item_t * xfs_ail_next(xfs_ail_entry_t *, xfs_log_item_t *);
+STATIC void xfs_ail_insert(xfs_ail_entry_t *, xfs_log_item_t *);
+STATIC xfs_log_item_t * xfs_ail_delete(xfs_ail_entry_t *, xfs_log_item_t *);
+STATIC xfs_log_item_t * xfs_ail_min(xfs_ail_entry_t *);
+STATIC xfs_log_item_t * xfs_ail_next(xfs_ail_entry_t *, xfs_log_item_t *);
 
 #ifdef XFSDEBUG
-static void xfs_ail_check(xfs_ail_entry_t *);
+STATIC void xfs_ail_check(xfs_ail_entry_t *);
 #else
 #define xfs_ail_check(a)
 #endif /* XFSDEBUG */
@@ -454,7 +454,7 @@ xfs_trans_ail_init(
  * we search from the end of the list to find where the
  * new item belongs.
  */
-static void
+STATIC void
 xfs_ail_insert(
 	xfs_ail_entry_t *base,
 	xfs_log_item_t	*lip)
@@ -493,7 +493,7 @@ xfs_ail_insert(
  * Delete the given item from the AIL.	Return a pointer to the item.
  */
 /*ARGSUSED*/
-static xfs_log_item_t *
+STATIC xfs_log_item_t *
 xfs_ail_delete(
 	xfs_ail_entry_t *base,
 	xfs_log_item_t	*lip)
@@ -512,7 +512,7 @@ xfs_ail_delete(
  * Return a pointer to the first item in the AIL.
  * If the AIL is empty, then return NULL.
  */
-static xfs_log_item_t *
+STATIC xfs_log_item_t *
 xfs_ail_min(
 	xfs_ail_entry_t *base)
 /* ARGSUSED */
@@ -529,7 +529,7 @@ xfs_ail_min(
  * the given item in the AIL.  If the given item
  * is the last item in the list, then return NULL.
  */
-static xfs_log_item_t *
+STATIC xfs_log_item_t *
 xfs_ail_next(
 	xfs_ail_entry_t *base,
 	xfs_log_item_t	*lip)
@@ -546,7 +546,7 @@ xfs_ail_next(
 /*
  * Check that the list is sorted as it should be.
  */
-static void
+STATIC void
 xfs_ail_check(
 	xfs_ail_entry_t *base)
 {

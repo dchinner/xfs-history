@@ -37,7 +37,7 @@ ktrace_t	*xfs_bmap_trace_buf;
 #endif
 
 #ifdef XFSDEBUG
-static void
+STATIC void
 xfs_bmap_check_leaf_extents(xfs_btree_cur_t *cur, xfs_inode_t *ip, int whichfork);
 #endif
 
@@ -51,7 +51,7 @@ kmem_zone_t		*xfs_bmap_free_item_zone;
 /*
  * Called from xfs_bmap_add_attrfork to handle extents format files.
  */
-static int					/* error */
+STATIC int					/* error */
 xfs_bmap_add_attrfork_extents(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	xfs_inode_t		*ip,		/* incore inode pointer */
@@ -62,7 +62,7 @@ xfs_bmap_add_attrfork_extents(
 /*
  * Called from xfs_bmap_add_attrfork to handle local format files.
  */
-static int					/* error */
+STATIC int					/* error */
 xfs_bmap_add_attrfork_local(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	xfs_inode_t		*ip,		/* incore inode pointer */
@@ -74,7 +74,7 @@ xfs_bmap_add_attrfork_local(
  * Called by xfs_bmapi to update extent list structure and the btree
  * after allocating space (or doing a delayed allocation).
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -90,7 +90,7 @@ xfs_bmap_add_extent(
  * Called by xfs_bmap_add_extent to handle cases converting a delayed
  * allocation to a real allocation.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_delay_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -106,7 +106,7 @@ xfs_bmap_add_extent_delay_real(
  * Called by xfs_bmap_add_extent to handle cases converting a hole
  * to a delayed allocation.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_hole_delay(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -119,7 +119,7 @@ xfs_bmap_add_extent_hole_delay(
  * Called by xfs_bmap_add_extent to handle cases converting a hole
  * to a real allocation.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_hole_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -132,7 +132,7 @@ xfs_bmap_add_extent_hole_real(
  * Called by xfs_bmap_add_extent to handle cases converting an unwritten
  * allocation to a real allocation or vice versa.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_unwritten_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -144,7 +144,7 @@ xfs_bmap_add_extent_unwritten_real(
  * xfs_bmap_alloc is called by xfs_bmapi to allocate an extent for a file.
  * It figures out where to ask the underlying allocator to put the new extent.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_alloc(
 	xfs_bmalloca_t		*ap);	/* bmap alloc argument struct */
 
@@ -154,7 +154,7 @@ xfs_bmap_alloc(
  * Since the extent list is already in-core, all we have to do is
  * give up the space for the btree root and pitch the leaf block.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_btree_to_extents(
 	xfs_trans_t		*tp,	/* transaction pointer */
 	xfs_inode_t		*ip,	/* incore inode pointer */
@@ -167,7 +167,7 @@ xfs_bmap_btree_to_extents(
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
-static void
+STATIC void
 xfs_bmap_check_extents(
 	xfs_inode_t		*ip,		/* incore inode pointer */
 	int			whichfork);	/* data or attr fork */
@@ -179,7 +179,7 @@ xfs_bmap_check_extents(
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_del_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_trans_t		*tp,	/* current trans pointer */
@@ -196,7 +196,7 @@ xfs_bmap_del_extent(
  * Remove the entry "free" from the free item list.  Prev points to the
  * previous entry, unless "free" is the head of the list.
  */
-static void
+STATIC void
 xfs_bmap_del_free(
 	xfs_bmap_free_t		*flist, /* free item list header */
 	xfs_bmap_free_item_t	*prev,	/* previous item on list, if any */
@@ -207,7 +207,7 @@ xfs_bmap_del_free(
  * at index "idx".  Copies the remaining items down over the deleted ones,
  * and gives back the excess memory.
  */
-static void
+STATIC void
 xfs_bmap_delete_exlist(
 	xfs_inode_t	*ip,		/* incode inode pointer */
 	xfs_extnum_t	idx,		/* starting delete index */
@@ -218,7 +218,7 @@ xfs_bmap_delete_exlist(
  * Convert an extents-format file into a btree-format file.
  * The new file will have a root block (in the inode) and a single child block.
  */
-static int					/* error */
+STATIC int					/* error */
 xfs_bmap_extents_to_btree(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	xfs_inode_t		*ip,		/* incore inode pointer */
@@ -233,7 +233,7 @@ xfs_bmap_extents_to_btree(
  * Insert new item(s) in the extent list for inode "ip".
  * Count new items are inserted at offset idx.
  */
-static void
+STATIC void
 xfs_bmap_insert_exlist(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx,		/* starting index of new items */
@@ -246,7 +246,7 @@ xfs_bmap_insert_exlist(
  * This code is sort of bogus, since the file data needs to get
  * logged so it won't be lost.	The bmap-level manipulations are ok, though.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_local_to_extents(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_inode_t	*ip,		/* incore inode pointer */
@@ -262,7 +262,7 @@ xfs_bmap_local_to_extents(
  * Else, *lastxp will be set to the index of the found
  * entry; *gotp will contain the entry.
  */
-static xfs_bmbt_rec_t *			/* pointer to found extent entry */
+STATIC xfs_bmbt_rec_t *			/* pointer to found extent entry */
 xfs_bmap_search_extents(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_fileoff_t	bno,		/* block number searched for */
@@ -276,7 +276,7 @@ xfs_bmap_search_extents(
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
-static void
+STATIC void
 xfs_bmap_trace_addentry(
 	int		opcode,		/* operation */
 	char		*fname,		/* function name */
@@ -291,7 +291,7 @@ xfs_bmap_trace_addentry(
 /*
  * Add bmap trace entry prior to a call to xfs_bmap_delete_exlist.
  */
-static void
+STATIC void
 xfs_bmap_trace_delete(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -304,7 +304,7 @@ xfs_bmap_trace_delete(
  * Add bmap trace entry prior to a call to xfs_bmap_insert_exlist, or
  * reading in the extents list from the disk (in the btree).
  */
-static void
+STATIC void
 xfs_bmap_trace_insert(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -318,7 +318,7 @@ xfs_bmap_trace_insert(
 /*
  * Add bmap trace entry after updating an extent list entry in place.
  */
-static void
+STATIC void
 xfs_bmap_trace_post_update(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -329,7 +329,7 @@ xfs_bmap_trace_post_update(
 /*
  * Add bmap trace entry prior to updating an extent list entry in place.
  */
-static void
+STATIC void
 xfs_bmap_trace_pre_update(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -348,7 +348,7 @@ xfs_bmap_trace_pre_update(
  * Compute the worst-case number of indirect blocks that will be used
  * for ip's delayed extent of length "len".
  */
-static xfs_filblks_t
+STATIC xfs_filblks_t
 xfs_bmap_worst_indlen(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_filblks_t		len);	/* delayed extent length */
@@ -358,7 +358,7 @@ xfs_bmap_worst_indlen(
  * Perform various validation checks on the values being returned
  * from xfs_bmapi().
  */
-static void
+STATIC void
 xfs_bmap_validate_ret(
 	xfs_fileoff_t		bno,
 	xfs_filblks_t		len,
@@ -371,7 +371,7 @@ xfs_bmap_validate_ret(
 #endif /* DEBUG */
 
 #if defined(DEBUG) && defined(XFS_RW_TRACE)
-static void
+STATIC void
 xfs_bunmap_trace(
 	xfs_inode_t		*ip,
 	xfs_fileoff_t		bno,
@@ -382,7 +382,7 @@ xfs_bunmap_trace(
 #define xfs_bunmap_trace(ip, bno, len, flags, ra)
 #endif	/* DEBUG && XFS_RW_TRACE */
 
-static int
+STATIC int
 xfs_bmap_count_tree(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
@@ -390,7 +390,7 @@ xfs_bmap_count_tree(
 	int		levelin,
 	int		*count);
 
-static int
+STATIC int
 xfs_bmap_count_leaves(
 	xfs_bmbt_rec_t		*frp,
 	int			numrecs,
@@ -403,7 +403,7 @@ xfs_bmap_count_leaves(
 /*
  * Called from xfs_bmap_add_attrfork to handle btree format files.
  */
-static int					/* error */
+STATIC int					/* error */
 xfs_bmap_add_attrfork_btree(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	xfs_inode_t		*ip,		/* incore inode pointer */
@@ -446,7 +446,7 @@ error0:
 /*
  * Called from xfs_bmap_add_attrfork to handle extents format files.
  */
-static int					/* error */
+STATIC int					/* error */
 xfs_bmap_add_attrfork_extents(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	xfs_inode_t		*ip,		/* incore inode pointer */
@@ -473,7 +473,7 @@ xfs_bmap_add_attrfork_extents(
 /*
  * Called from xfs_bmap_add_attrfork to handle local format files.
  */
-static int					/* error */
+STATIC int					/* error */
 xfs_bmap_add_attrfork_local(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	xfs_inode_t		*ip,		/* incore inode pointer */
@@ -507,7 +507,7 @@ xfs_bmap_add_attrfork_local(
  * Called by xfs_bmapi to update extent list structure and the btree
  * after allocating space (or doing a delayed allocation).
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -676,7 +676,7 @@ done:
  * Called by xfs_bmap_add_extent to handle cases converting a delayed
  * allocation to a real allocation.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_delay_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -1216,7 +1216,7 @@ done:
  * Called by xfs_bmap_add_extent to handle cases converting an unwritten
  * allocation to a real allocation or vice versa.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_unwritten_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -1732,7 +1732,7 @@ done:
  * to a delayed allocation.
  */
 /*ARGSUSED*/
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_hole_delay(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -1902,7 +1902,7 @@ xfs_bmap_add_extent_hole_delay(
  * Called by xfs_bmap_add_extent to handle cases converting a hole
  * to a real allocation.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_add_extent_hole_real(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
@@ -2119,7 +2119,7 @@ xfs_bmap_add_extent_hole_real(
  * xfs_bmap_alloc is called by xfs_bmapi to allocate an extent for a file.
  * It figures out where to ask the underlying allocator to put the new extent.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_alloc(
 	xfs_bmalloca_t	*ap)		/* bmap alloc argument struct */
 {
@@ -2716,7 +2716,7 @@ xfs_bmap_alloc(
  * Since the extent list is already in-core, all we have to do is
  * give up the space for the btree root and pitch the leaf block.
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_btree_to_extents(
 	xfs_trans_t		*tp,	/* transaction pointer */
 	xfs_inode_t		*ip,	/* incore inode pointer */
@@ -2779,7 +2779,7 @@ xfs_bmap_btree_to_extents(
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_del_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_trans_t		*tp,	/* current transaction pointer */
@@ -3112,7 +3112,7 @@ done:
  * Remove the entry "free" from the free item list.  Prev points to the
  * previous entry, unless "free" is the head of the list.
  */
-static void
+STATIC void
 xfs_bmap_del_free(
 	xfs_bmap_free_t		*flist, /* free item list header */
 	xfs_bmap_free_item_t	*prev,	/* previous item on list, if any */
@@ -3131,7 +3131,7 @@ xfs_bmap_del_free(
  * at index "idx".  Copies the remaining items down over the deleted ones,
  * and gives back the excess memory.
  */
-static void
+STATIC void
 xfs_bmap_delete_exlist(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx,		/* starting delete index */
@@ -3155,7 +3155,7 @@ xfs_bmap_delete_exlist(
  * Convert an extents-format file into a btree-format file.
  * The new file will have a root block (in the inode) and a single child block.
  */
-static int					/* error */
+STATIC int					/* error */
 xfs_bmap_extents_to_btree(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	xfs_inode_t		*ip,		/* incore inode pointer */
@@ -3293,7 +3293,7 @@ xfs_bmap_extents_to_btree(
  * Insert new item(s) in the extent list for inode "ip".
  * Count new items are inserted at offset idx.
  */
-static void
+STATIC void
 xfs_bmap_insert_exlist(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_extnum_t	idx,		/* starting index of new items */
@@ -3323,7 +3323,7 @@ xfs_bmap_insert_exlist(
  * since the file data needs to get logged so things will stay consistent.
  * (The bmap-level manipulations are ok, though).
  */
-static int				/* error */
+STATIC int				/* error */
 xfs_bmap_local_to_extents(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_inode_t	*ip,		/* incore inode pointer */
@@ -3508,7 +3508,7 @@ xfs_bmap_do_search_extents(
  * Else, *lastxp will be set to the index of the found
  * entry; *gotp will contain the entry.
  */
-static xfs_bmbt_rec_t *			/* pointer to found extent entry */
+STATIC xfs_bmbt_rec_t *			/* pointer to found extent entry */
 xfs_bmap_search_extents(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_fileoff_t	bno,		/* block number searched for */
@@ -3538,7 +3538,7 @@ xfs_bmap_search_extents(
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
-static void
+STATIC void
 xfs_bmap_trace_addentry(
 	int		opcode,		/* operation */
 	char		*fname,		/* function name */
@@ -3598,7 +3598,7 @@ xfs_bmap_trace_addentry(
 /*
  * Add bmap trace entry prior to a call to xfs_bmap_delete_exlist.
  */
-static void
+STATIC void
 xfs_bmap_trace_delete(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -3620,7 +3620,7 @@ xfs_bmap_trace_delete(
  * Add bmap trace entry prior to a call to xfs_bmap_insert_exlist, or
  * reading in the extents list from the disk (in the btree).
  */
-static void
+STATIC void
 xfs_bmap_trace_insert(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -3649,7 +3649,7 @@ xfs_bmap_trace_insert(
 /*
  * Add bmap trace entry after updating an extent list entry in place.
  */
-static void
+STATIC void
 xfs_bmap_trace_post_update(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -3667,7 +3667,7 @@ xfs_bmap_trace_post_update(
 /*
  * Add bmap trace entry prior to updating an extent list entry in place.
  */
-static void
+STATIC void
 xfs_bmap_trace_pre_update(
 	char		*fname,		/* function name */
 	char		*desc,		/* operation description */
@@ -3687,7 +3687,7 @@ xfs_bmap_trace_pre_update(
  * Compute the worst-case number of indirect blocks that will be used
  * for ip's delayed extent of length "len".
  */
-static xfs_filblks_t
+STATIC xfs_filblks_t
 xfs_bmap_worst_indlen(
 	xfs_inode_t	*ip,		/* incore inode pointer */
 	xfs_filblks_t	len)		/* delayed extent length */
@@ -3715,7 +3715,7 @@ xfs_bmap_worst_indlen(
 }
 
 #if defined(DEBUG) && defined(XFS_RW_TRACE)
-static void
+STATIC void
 xfs_bunmap_trace(
 	xfs_inode_t		*ip,
 	xfs_fileoff_t		bno,
@@ -4490,7 +4490,7 @@ xfs_bmap_trace_exlist(
  * ranges of the returned irecs to ensure that they only extent beyond
  * the given parameters if the XFS_BMAPI_ENTIRE flag was set.
  */
-static void
+STATIC void
 xfs_bmap_validate_ret(
 	xfs_fileoff_t		bno,
 	xfs_filblks_t		len,
@@ -5815,7 +5815,7 @@ xfs_bmap_eof(
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
-static void
+STATIC void
 xfs_bmap_check_extents(
 	xfs_inode_t		*ip,		/* incore inode pointer */
 	int			whichfork)	/* data or attr fork */
@@ -5835,7 +5835,7 @@ xfs_bmap_check_extents(
 	}
 }
 
-static
+STATIC
 xfs_buf_t *
 xfs_bmap_get_bp(
 	xfs_btree_cur_t		*cur,
@@ -5957,7 +5957,7 @@ xfs_check_block(
  * btree leaves.
  */
 
-static void
+STATIC void
 xfs_bmap_check_leaf_extents(
 	xfs_btree_cur_t		*cur,	/* btree cursor or null */
 	xfs_inode_t		*ip,		/* incore inode pointer */

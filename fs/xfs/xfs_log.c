@@ -43,80 +43,80 @@
 	  (off) += (bytes);}
 
 /* Local miscellaneous function prototypes */
-static int	 xlog_bdstrat_cb(struct xfs_buf *);
-static int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
+STATIC int	 xlog_bdstrat_cb(struct xfs_buf *);
+STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
 				    xfs_lsn_t *);
-static xlog_t *	 xlog_alloc_log(xfs_mount_t	*mp,
+STATIC xlog_t *	 xlog_alloc_log(xfs_mount_t	*mp,
 				dev_t		log_dev,
 				xfs_daddr_t	blk_offset,
 				int		num_bblks);
-static int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
-static int	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
-static void	 xlog_unalloc_log(xlog_t *log);
-static int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
+STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
+STATIC int	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
+STATIC void	 xlog_unalloc_log(xlog_t *log);
+STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
 			    xfs_lsn_t *start_lsn, uint flags);
 
 /* local state machine functions */
-static void xlog_state_done_syncing(xlog_in_core_t *iclog, int);
-static void xlog_state_do_callback(xlog_t *log,int aborted, xlog_in_core_t *iclog);
+STATIC void xlog_state_done_syncing(xlog_in_core_t *iclog, int);
+STATIC void xlog_state_do_callback(xlog_t *log,int aborted, xlog_in_core_t *iclog);
 static inline void xlog_state_finish_copy(xlog_t	*log,
 					xlog_in_core_t	*iclog,
 					int		first_write,
 					int		bytes);
-static int  xlog_state_get_iclog_space(xlog_t		*log,
+STATIC int  xlog_state_get_iclog_space(xlog_t		*log,
 				       int		len,
 				       xlog_in_core_t	**iclog,
 				       xlog_ticket_t	*ticket,
 				       int		*continued_write,
 				       int		*logoffsetp);
-static int  xlog_state_lsn_is_synced(xlog_t		*log,
+STATIC int  xlog_state_lsn_is_synced(xlog_t		*log,
 				     xfs_lsn_t		lsn,
 				     xfs_log_callback_t *cb,
 				     int		*abortflg);
-static void xlog_state_put_ticket(xlog_t	*log,
+STATIC void xlog_state_put_ticket(xlog_t	*log,
 				  xlog_ticket_t *tic);
-static int  xlog_state_release_iclog(xlog_t		*log,
+STATIC int  xlog_state_release_iclog(xlog_t		*log,
 				     xlog_in_core_t	*iclog);
-static void xlog_state_switch_iclogs(xlog_t		*log,
+STATIC void xlog_state_switch_iclogs(xlog_t		*log,
 				     xlog_in_core_t *iclog,
 				     int		eventual_size);
-static int  xlog_state_sync(xlog_t *log, xfs_lsn_t lsn, uint flags);
-static int  xlog_state_sync_all(xlog_t *log, uint flags);
-static void xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog);
+STATIC int  xlog_state_sync(xlog_t *log, xfs_lsn_t lsn, uint flags);
+STATIC int  xlog_state_sync_all(xlog_t *log, uint flags);
+STATIC void xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog);
 
 /* local functions to manipulate grant head */
-static int  xlog_grant_log_space(xlog_t		*log,
+STATIC int  xlog_grant_log_space(xlog_t		*log,
 				 xlog_ticket_t	*xtic);
-static void xlog_grant_push_ail(xfs_mount_t	*mp,
+STATIC void xlog_grant_push_ail(xfs_mount_t	*mp,
 				int		need_bytes);
-static void xlog_regrant_reserve_log_space(xlog_t	 *log,
+STATIC void xlog_regrant_reserve_log_space(xlog_t	 *log,
 					   xlog_ticket_t *ticket);
-static int xlog_regrant_write_log_space(xlog_t		*log,
+STATIC int xlog_regrant_write_log_space(xlog_t		*log,
 					 xlog_ticket_t	*ticket);
-static void xlog_ungrant_log_space(xlog_t	 *log,
+STATIC void xlog_ungrant_log_space(xlog_t	 *log,
 				   xlog_ticket_t *ticket);
 
 
 /* local ticket functions */
-static void		xlog_state_ticket_alloc(xlog_t *log);
-static xlog_ticket_t	*xlog_ticket_get(xlog_t *log,
+STATIC void		xlog_state_ticket_alloc(xlog_t *log);
+STATIC xlog_ticket_t	*xlog_ticket_get(xlog_t *log,
 					 int	unit_bytes,
 					 int	count,
 					 char	clientid,
 					 uint	flags);
-static void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
+STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
-static void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
+STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
 #ifdef XFSDEBUG
-static void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
+STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
 #endif
-static void	xlog_verify_grant_head(xlog_t *log, int equals);
-static void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
+STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
+STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
-static void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
+STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
 				     xfs_lsn_t tail_lsn);
 #else
 #define xlog_verify_dest_ptr(a,b)
@@ -974,7 +974,7 @@ xlog_iodone(xfs_buf_t *bp)
  * iclogs to disk. This is because we don't want anymore new transactions to be
  * started or completed afterwards.
  */
-static int
+STATIC int
 xlog_bdstrat_cb(struct xfs_buf *bp)
 {
 	xlog_in_core_t *iclog;
@@ -1011,7 +1011,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
  * XXXmiken XXXcurtis
  */
 
-static void
+STATIC void
 xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			   xlog_t	*log)
 {
@@ -1130,7 +1130,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
  * Its primary purpose is to fill in enough, so recovery can occur.  However,
  * some other stuff may be filled in too.
  */
-static xlog_t *
+STATIC xlog_t *
 xlog_alloc_log(xfs_mount_t	*mp,
 	       dev_t		log_dev,
 	       xfs_daddr_t	blk_offset,
@@ -1247,7 +1247,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
  * Write out the commit record of a transaction associated with the given
  * ticket.  Return the lsn of the commit record.
  */
-static int
+STATIC int
 xlog_commit_record(xfs_mount_t	*mp,
 		   xlog_ticket_t *ticket,
 		   xfs_lsn_t	*commitlsnp)
@@ -1882,7 +1882,7 @@ xlog_state_clean_log(xlog_t *log)
 	}
 }	/* xlog_state_clean_log */
 
-static xfs_lsn_t
+STATIC xfs_lsn_t
 xlog_get_lowest_lsn(
 	xlog_t		*log)
 {
@@ -1905,7 +1905,7 @@ xlog_get_lowest_lsn(
 }
 
 
-static void
+STATIC void
 xlog_state_do_callback(
 	xlog_t		*log,
 	int		aborted,
@@ -2312,7 +2312,7 @@ restart:
  * Once a ticket gets put onto the reserveq, it will only return after
  * the needed reservation is satisfied.
  */
-static int
+STATIC int
 xlog_grant_log_space(xlog_t	   *log,
 		     xlog_ticket_t *tic)
 {
@@ -2429,7 +2429,7 @@ redo:
  *
  *
  */
-static int
+STATIC int
 xlog_regrant_write_log_space(xlog_t	   *log,
 			     xlog_ticket_t *tic)
 {
@@ -2566,7 +2566,7 @@ redo:
  * reset current reservation to be one units worth.  Also
  * move grant reservation head forward.
  */
-static void
+STATIC void
 xlog_regrant_reserve_log_space(xlog_t	     *log,
 			       xlog_ticket_t *ticket)
 {
@@ -2614,7 +2614,7 @@ xlog_regrant_reserve_log_space(xlog_t	     *log,
  * space, the count will stay at zero and the only space remaining will be
  * in the current reservation field.
  */
-static void
+STATIC void
 xlog_ungrant_log_space(xlog_t	     *log,
 		       xlog_ticket_t *ticket)
 {
@@ -2787,7 +2787,7 @@ xlog_state_release_iclog(xlog_t		*log,
  * exact size of the iclog has not yet been determined.	 All we know is
  * that every data block.  We have run out of space in this log record.
  */
-static void
+STATIC void
 xlog_state_switch_iclogs(xlog_t		*log,
 			 xlog_in_core_t *iclog,
 			 int		eventual_size)
@@ -2856,7 +2856,7 @@ xlog_state_switch_iclogs(xlog_t		*log,
  *	   b) when we return from flushing out this iclog, it is still
  *		not in the active nor dirty state.
  */
-static int
+STATIC int
 xlog_state_sync_all(xlog_t *log, uint flags)
 {
 	xlog_in_core_t	*iclog;
@@ -3074,7 +3074,7 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
 /*
  *	Algorithm doesn't take into account page size. ;-(
  */
-static void
+STATIC void
 xlog_state_ticket_alloc(xlog_t *log)
 {
 	xlog_ticket_t	*t_list;
@@ -3127,7 +3127,7 @@ xlog_state_ticket_alloc(xlog_t *log)
  *
  * Assumption: log lock is held around this call.
  */
-static void
+STATIC void
 xlog_ticket_put(xlog_t		*log,
 		xlog_ticket_t	*ticket)
 {
@@ -3253,7 +3253,7 @@ xlog_verify_dest_ptr(xlog_t	*log,
 
 #ifdef XFSDEBUG
 /* check split LR write */
-static void
+STATIC void
 xlog_verify_disk_cycle_no(xlog_t	 *log,
 			  xlog_in_core_t *iclog)
 {
@@ -3275,7 +3275,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 }	/* xlog_verify_disk_cycle_no */
 #endif
 
-static void
+STATIC void
 xlog_verify_grant_head(xlog_t *log, int equals)
 {
     if (log->l_grant_reserve_cycle == log->l_grant_write_cycle) {
@@ -3290,7 +3290,7 @@ xlog_verify_grant_head(xlog_t *log, int equals)
 }	/* xlog_verify_grant_head */
 
 /* check if it will fit */
-static void
+STATIC void
 xlog_verify_tail_lsn(xlog_t	    *log,
 		     xlog_in_core_t *iclog,
 		     xfs_lsn_t	    tail_lsn)
@@ -3329,7 +3329,7 @@ xlog_verify_tail_lsn(xlog_t	    *log,
  *	log, check the preceding blocks of the physical log to make sure all
  *	the cycle numbers agree with the current cycle number.
  */
-static void
+STATIC void
 xlog_verify_iclog(xlog_t	 *log,
 		  xlog_in_core_t *iclog,
 		  int		 count,
@@ -3424,7 +3424,7 @@ xlog_verify_iclog(xlog_t	 *log,
 /*
  * Mark all iclogs IOERROR. LOG_LOCK is held by the caller.
  */
-static int
+STATIC int
 xlog_state_ioerror(
 	xlog_t	*log)
 {

@@ -43,10 +43,10 @@ kmem_zone_t *xfs_chashlist_zone;
  */
 #define XFS_ITRUNC_MAX_EXTENTS	2
 
-static int xfs_iflush_int(xfs_inode_t *, xfs_buf_t *);
-static int xfs_iformat_local(xfs_inode_t *, xfs_dinode_t *, int, int);
-static int xfs_iformat_extents(xfs_inode_t *, xfs_dinode_t *, int);
-static int xfs_iformat_btree(xfs_inode_t *, xfs_dinode_t *, int);
+STATIC int xfs_iflush_int(xfs_inode_t *, xfs_buf_t *);
+STATIC int xfs_iformat_local(xfs_inode_t *, xfs_dinode_t *, int, int);
+STATIC int xfs_iformat_extents(xfs_inode_t *, xfs_dinode_t *, int);
+STATIC int xfs_iformat_btree(xfs_inode_t *, xfs_dinode_t *, int);
 
 
 #ifdef DEBUG
@@ -54,7 +54,7 @@ static int xfs_iformat_btree(xfs_inode_t *, xfs_dinode_t *, int);
  * Make sure that the extents in the given memory buffer
  * are valid.
  */
-static void
+STATIC void
 xfs_validate_extents(
 	xfs_bmbt_rec_t		*ep,
 	int			nrecs,
@@ -406,7 +406,7 @@ xfs_itobp(
  * brought in-core.  The rest will be in-lined in if_extents when it
  * is first referenced (see xfs_iread_extents()).
  */
-static int
+STATIC int
 xfs_iformat(
 	xfs_inode_t		*ip,
 	xfs_dinode_t		*dip)
@@ -542,7 +542,7 @@ xfs_iformat(
  * sure that its size is a multiple of 4 and
  * record the real size in i_real_bytes.
  */
-static int
+STATIC int
 xfs_iformat_local(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip,
@@ -595,7 +595,7 @@ xfs_iformat_local(
  * them into it.  Either way, set if_extents
  * to point at the extents.
  */
-static int
+STATIC int
 xfs_iformat_extents(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip,
@@ -673,7 +673,7 @@ xfs_iformat_extents(
  * field will remain NULL until all of the
  * extents are read in (when they are needed).
  */
-static int
+STATIC int
 xfs_iformat_btree(
 	xfs_inode_t		*ip,
 	xfs_dinode_t		*dip,
@@ -1288,7 +1288,7 @@ xfs_file_last_byte(
 }
 
 #if defined(XFS_RW_TRACE)
-static void
+STATIC void
 xfs_itrunc_trace(
 	int		tag,
 	xfs_inode_t	*ip,
@@ -1870,7 +1870,7 @@ xfs_iunlink(
 /*
  * Pull the on-disk inode from the AGI unlinked list.
  */
-static int
+STATIC int
 xfs_iunlink_remove(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip)
@@ -2702,7 +2702,7 @@ xfs_iextents_copy(
  * format indicates the current state of the fork.
  */
 /*ARGSUSED*/
-static int
+STATIC int
 xfs_iflush_fork(
 	xfs_inode_t		*ip,
 	xfs_dinode_t		*dip,
@@ -3076,7 +3076,7 @@ cluster_corrupt_out:
 }
 
 
-static int
+STATIC int
 xfs_iflush_int(
 	xfs_inode_t		*ip,
 	xfs_buf_t		*bp)

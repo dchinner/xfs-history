@@ -48,7 +48,7 @@ kmem_zone_t	*xfs_ili_zone;		/* inode log item zone */
  * inode core, and possibly one for the inode data/extents/b-tree root
  * and one for the inode attribute data/extents/b-tree root.
  */
-static uint
+STATIC uint
 xfs_inode_item_size(
 	xfs_inode_log_item_t	*iip)
 {
@@ -205,7 +205,7 @@ xfs_inode_item_size(
  * and a possible third and/or fourth with the inode data/extents/b-tree
  * root and inode attributes data/extents/b-tree root.
  */
-static void
+STATIC void
 xfs_inode_item_format(
 	xfs_inode_log_item_t	*iip,
 	xfs_log_iovec_t		*log_vector)
@@ -521,7 +521,7 @@ xfs_inode_item_format(
  * xfs_ipin() to bump the pin count in the inode while holding the
  * inode pin lock.
  */
-static void
+STATIC void
 xfs_inode_item_pin(
 	xfs_inode_log_item_t	*iip)
 {
@@ -535,7 +535,7 @@ xfs_inode_item_pin(
  * item which was previously pinned with a call to xfs_inode_item_pin().
  * Just call xfs_iunpin() on the inode to do this.
  */
-static void
+STATIC void
 xfs_inode_item_unpin(
 	xfs_inode_log_item_t	*iip)
 {
@@ -543,7 +543,7 @@ xfs_inode_item_unpin(
 }
 
 /* ARGSUSED */
-static void
+STATIC void
 xfs_inode_item_unpin_remove(
 	xfs_inode_log_item_t	*iip,
 	xfs_trans_t		*tp)
@@ -564,7 +564,7 @@ xfs_inode_item_unpin_remove(
  * Also we don't want to sleep in any device strategy routines, which can happen
  * if we do the subsequent bawrite in here.
  */
-static uint
+STATIC uint
 xfs_inode_item_trylock(
 	xfs_inode_log_item_t	*iip)
 {
@@ -621,7 +621,7 @@ xfs_inode_item_trylock(
  * are specific to the current transaction.  If the
  * hold flags is set, do not unlock the inode.
  */
-static void
+STATIC void
 xfs_inode_item_unlock(
 	xfs_inode_log_item_t	*iip)
 {
@@ -708,7 +708,7 @@ xfs_inode_item_unlock(
  * given lsn.
  */
 /*ARGSUSED*/
-static xfs_lsn_t
+STATIC xfs_lsn_t
 xfs_inode_item_committed(
 	xfs_inode_log_item_t	*iip,
 	xfs_lsn_t		lsn)
@@ -722,7 +722,7 @@ xfs_inode_item_committed(
  * shutting down).  We simply unlock just as if the transaction
  * had been cancelled.
  */
-static void
+STATIC void
 xfs_inode_item_abort(
 	xfs_inode_log_item_t	*iip)
 {
@@ -741,7 +741,7 @@ xfs_inode_item_abort(
  * We aren't holding the AIL_LOCK (or the flush lock) when this gets called,
  * so it is inherently race-y.
  */
-static void
+STATIC void
 xfs_inode_item_pushbuf(
 	xfs_inode_log_item_t	*iip)
 {
@@ -827,7 +827,7 @@ xfs_inode_item_pushbuf(
  * inode log item out to disk. The inode will already have been locked by
  * a successful call to xfs_inode_item_trylock().
  */
-static void
+STATIC void
 xfs_inode_item_push(
 	xfs_inode_log_item_t	*iip)
 {
@@ -864,7 +864,7 @@ xfs_inode_item_push(
  * to stamp in a new field in the incore inode.
  */
 /* ARGSUSED */
-static void
+STATIC void
 xfs_inode_item_committing(
 	xfs_inode_log_item_t	*iip,
 	xfs_lsn_t		lsn)

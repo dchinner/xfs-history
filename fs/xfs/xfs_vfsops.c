@@ -34,9 +34,9 @@
 
 #include <xfs.h>
 
-static int xfs_ibusy(xfs_mount_t *);
-static int xfs_sync(bhv_desc_t *, int, cred_t *);
-static int xfs_unmount(bhv_desc_t *, int, cred_t *);
+STATIC int xfs_ibusy(xfs_mount_t *);
+STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
+STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
 
 int
 xfs_init(void)
@@ -203,7 +203,7 @@ xfs_cleanup(void)
  * This function fills in xfs_mount_t fields based on mount args.
  * Note: the superblock has _not_ yet been read in.
  */
-static int
+STATIC int
 xfs_start_flags(
 	struct xfs_mount_args	*ap,
 	struct xfs_mount	*mp,
@@ -315,7 +315,7 @@ xfs_start_flags(
  * This function fills in xfs_mount_t fields based on mount args.
  * Note: the superblock _has_ now been read in.
  */
-static int
+STATIC int
 xfs_finish_flags(
 	struct xfs_mount_args	*ap,
 	struct xfs_mount	*mp,
@@ -398,7 +398,7 @@ xfs_finish_flags(
  * The Linux VFS took care of finding and opening the data volume for
  * us.  We have to handle the other two (if present) here.
  */
-static int
+STATIC int
 xfs_mount(
 	vfs_t			*vfsp,
 	struct xfs_mount_args	*args,
@@ -501,7 +501,7 @@ xfs_mount(
  *
  * Return 0 if there are no active inodes otherwise return 1.
  */
-static int
+STATIC int
 xfs_ibusy(
 	xfs_mount_t	*mp)
 {
@@ -548,7 +548,7 @@ xfs_ibusy(
 }
 
 
-static int
+STATIC int
 xfs_unmount(
 	bhv_desc_t	*bdp,
 	int		flags,
@@ -742,7 +742,7 @@ fscorrupt_out2:
  * vpp	-- address of the caller's vnode pointer which should be
  *	   set to the desired fs root vnode
  */
-static int
+STATIC int
 xfs_root(
 	bhv_desc_t	*bdp,
 	vnode_t		**vpp)
@@ -763,7 +763,7 @@ xfs_root(
  * the superblock lock in the mount structure to ensure a consistent
  * snapshot of the counters returned.
  */
-static int
+STATIC int
 xfs_statvfs(
 	bhv_desc_t	*bdp,
 	struct statfs	*statp,
@@ -847,7 +847,7 @@ xfs_statvfs(
  *
  */
 /*ARGSUSED*/
-static int
+STATIC int
 xfs_sync(
 	bhv_desc_t	*bdp,
 	int		flags,
@@ -1570,7 +1570,7 @@ xfs_syncsub(
 /*
  * xfs_vget - called by DMAPI to get vnode from file handle
  */
-static int
+STATIC int
 xfs_vget(
 	bhv_desc_t	*bdp,
 	vnode_t		**vpp,

@@ -48,7 +48,7 @@
    flush lock - ditto.
 */
 
-static void		xfs_qm_dqflush_done(xfs_buf_t *, xfs_dq_logitem_t *);
+STATIC void		xfs_qm_dqflush_done(xfs_buf_t *, xfs_dq_logitem_t *);
 
 #ifdef DEBUG
 dev_t xfs_dqerror_dev = 0;
@@ -149,7 +149,7 @@ xfs_qm_dqdestroy(
 /*
  * This is what a 'fresh' dquot inside a dquot chunk looks like on disk.
  */
-static void
+STATIC void
 xfs_qm_dqinit_core(
 	xfs_dqid_t	 id,
 	uint		 type,
@@ -329,7 +329,7 @@ xfs_qm_dqwarn(
 /*
  * initialize a buffer full of dquots and log the whole thing
  */
-static void
+STATIC void
 xfs_qm_init_dquot_blk(
 	xfs_trans_t	*tp,
 	xfs_mount_t	*mp,
@@ -367,7 +367,7 @@ xfs_qm_init_dquot_blk(
  * Allocate a block and fill it with dquots.
  * This is called when the bmapi finds a hole.
  */
-static int
+STATIC int
 xfs_qm_dqalloc(
 	xfs_trans_t	*tp,
 	xfs_mount_t	*mp,
@@ -461,7 +461,7 @@ xfs_qm_dqalloc(
  * This returns a ptr to the buffer containing the on-disk dquot
  * in the bpp param, and a ptr to the on-disk dquot within that buffer
  */
-static int
+STATIC int
 xfs_qm_dqtobp(
 	xfs_trans_t		*tp,
 	xfs_dquot_t		*dqp,
@@ -593,7 +593,7 @@ xfs_qm_dqtobp(
  *
  */
 /* ARGSUSED */
-static int
+STATIC int
 xfs_qm_dqread(
 	xfs_trans_t	*tp,
 	xfs_dqid_t	id,
@@ -655,7 +655,7 @@ xfs_qm_dqread(
  * If XFS_QMOPT_DQALLOC is set, it'll allocate a dquot on disk
  * if it wasn't already allocated.
  */
-static int
+STATIC int
 xfs_qm_idtodq(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	id,	 /* gid or uid, depending on type */
@@ -727,7 +727,7 @@ xfs_qm_idtodq(
  * The hash chain must be locked by caller, and it is left locked
  * on return. Returning dquot is locked.
  */
-static int
+STATIC int
 xfs_qm_dqlookup(
 	xfs_mount_t		*mp,
 	xfs_dqid_t		id,
@@ -1260,7 +1260,7 @@ xfs_qm_dqflush(
  * flush lock. This behavior is very similar to that of inodes..
  */
 /*ARGSUSED*/
-static void
+STATIC void
 xfs_qm_dqflush_done(
 	xfs_buf_t		*bp,
 	xfs_dq_logitem_t	*qip)

@@ -38,7 +38,7 @@
  * If there are fewer than 4 entries in the array, the empty entries will
  * be at the end and will have NULL pointers in them.
  */
-static void
+STATIC void
 xfs_rename_unlock4(
 	xfs_inode_t	**i_tab,
 	uint		lock_mode)
@@ -74,7 +74,7 @@ int xfs_rename_skip, xfs_rename_nskip;
  * Return ENOENT if dp1 does not exist, other lookup errors, or 0 for success.
  * Return EAGAIN if the caller needs to try again.
  */
-static int
+STATIC int
 xfs_lock_for_rename(
 	xfs_inode_t	*dp1,	/* old (source) directory inode */
 	xfs_inode_t	*dp2,	/* new (target) directory inode */

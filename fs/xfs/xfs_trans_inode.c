@@ -34,7 +34,7 @@
 
 
 #ifdef XFS_TRANS_DEBUG
-static void
+STATIC void
 xfs_trans_inode_broot_debug(
 	xfs_inode_t	*ip);
 #else
@@ -394,7 +394,7 @@ xfs_trans_log_inode(
  * Keep track of the state of the inode btree root to make sure we
  * log it properly.
  */
-static void
+STATIC void
 xfs_trans_inode_broot_debug(
 	xfs_inode_t	*ip)
 {

@@ -168,7 +168,7 @@ xfs_trans_mod_dquot_byino(
 	}
 }
 
-static xfs_dqtrx_t *
+STATIC xfs_dqtrx_t *
 xfs_trans_get_dqtrx(
 	xfs_trans_t	*tp,
 	xfs_dquot_t	*dqp)
@@ -295,7 +295,7 @@ xfs_trans_mod_dquot(
  * involved in a transaction is 2 and that both usr and grp combined - 3.
  * So, we don't attempt to make this very generic.
  */
-static void
+STATIC void
 xfs_trans_dqlockedjoin(
 	xfs_trans_t	*tp,
 	xfs_dqtrx_t	*q)
@@ -568,7 +568,7 @@ xfs_trans_unreserve_and_mod_dquots(
  * Sending in XFS_QMOPT_FORCE_RES flag skips the quota check.
  * Returns EDQUOT if quota is exceeded.
  */
-static int
+STATIC int
 xfs_trans_dqresv(
 	xfs_trans_t	*tp,
 	xfs_dquot_t	*dqp,

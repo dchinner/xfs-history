@@ -32,15 +32,15 @@
 
 #include <xfs.h>
 
-static void	xfs_mount_reset_sbqflags(xfs_mount_t *);
-static void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
-static int	xfs_uuid_mount(xfs_mount_t *);
+STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
+STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
+STATIC int	xfs_uuid_mount(xfs_mount_t *);
 
 mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
-static int	xfs_uuidtab_size;
-static uuid_t	*xfs_uuidtab;
+STATIC int	xfs_uuidtab_size;
+STATIC uuid_t	*xfs_uuidtab;
 
-static void	xfs_uuid_unmount(xfs_mount_t *);
+STATIC void	xfs_uuid_unmount(xfs_mount_t *);
 
 void xfs_xlatesb(void *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
 
@@ -181,7 +181,7 @@ xfs_mount_free(
 /*
  * Check the validity of the SB found.
  */
-static int
+STATIC int
 xfs_mount_validate_sb(
 	xfs_mount_t	*mp,
 	xfs_sb_t	*sbp)
@@ -1258,7 +1258,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
  *
  * The SB_LOCK must be held when this routine is called.
  */
-static int
+STATIC int
 xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, xfs_sb_field_t field,
 			  int delta, int rsvd)
 {
@@ -1546,7 +1546,7 @@ xfs_freesb(
  * Mount fails if UUID is nil or a FS with the same UUID is already
  * mounted
  */
-static int
+STATIC int
 xfs_uuid_mount(xfs_mount_t *mp)
 {
 	int	hole;
@@ -1587,7 +1587,7 @@ xfs_uuid_mount(xfs_mount_t *mp)
 /*
  * Remove filesystem from the uuid table.
  */
-static void
+STATIC void
 xfs_uuid_unmount(xfs_mount_t *mp)
 {
 	int	i;
@@ -1609,7 +1609,7 @@ xfs_uuid_unmount(xfs_mount_t *mp)
  * When xfsquotas isn't installed and the superblock had quotas, we need to
  * clear the quotaflags from superblock.
  */
-static void
+STATIC void
 xfs_mount_reset_sbqflags(
 	xfs_mount_t	*mp)
 {
@@ -1650,7 +1650,7 @@ xfs_mount_reset_sbqflags(
  * Used to log changes to the superblock unit and width fields which could
  * be altered by the mount options. Only the first superblock is updated.
  */
-static void
+STATIC void
 xfs_mount_log_sbunit(
 	xfs_mount_t *mp,
 	__int64_t fields)

@@ -167,10 +167,10 @@ pb_tracking_free(
  *	File wide globals
  */
 
-static kmem_cache_t *pagebuf_cache;
-static pagebuf_daemon_t *pb_daemon;
-static struct list_head pagebuf_iodone_tq[NR_CPUS];
-static wait_queue_head_t pagebuf_iodone_wait[NR_CPUS];
+STATIC kmem_cache_t *pagebuf_cache;
+STATIC pagebuf_daemon_t *pb_daemon;
+STATIC struct list_head pagebuf_iodone_tq[NR_CPUS];
+STATIC wait_queue_head_t pagebuf_iodone_wait[NR_CPUS];
 
 /*
  *	For pre-allocated buffer head pool
@@ -182,8 +182,8 @@ static spinlock_t		pb_resv_bh_lock = SPIN_LOCK_UNLOCKED;
 struct buffer_head		*pb_resv_bh = NULL;	/* list of bh */
 int				pb_resv_bh_cnt = 0;	/* # of bh available */
 
-static void pagebuf_daemon_wakeup(int);
-static int _pagebuf_segment_apply(page_buf_t *);
+STATIC void pagebuf_daemon_wakeup(int);
+STATIC int _pagebuf_segment_apply(page_buf_t *);
 
 /*
  * Pagebuf module configuration parameters, exported via
@@ -227,10 +227,10 @@ typedef struct {
 	spinlock_t		pb_hash_lock;
 } pb_hash_t;
 
-static pb_hash_t	pbhash[NHASH];
+STATIC pb_hash_t	pbhash[NHASH];
 #define pb_hash(pb)	&pbhash[pb->pb_hash_index]
 
-static int
+STATIC int
 _bhash(
 	dev_t		dev,
 	loff_t		base)
@@ -253,17 +253,17 @@ _bhash(
  * Mapping of multi-page buffers into contingous virtual space
  */
 
-static void *pagebuf_mapout_locked(page_buf_t *);
+STATIC void *pagebuf_mapout_locked(page_buf_t *);
 
-static	spinlock_t		as_lock = SPIN_LOCK_UNLOCKED;
+STATIC	spinlock_t		as_lock = SPIN_LOCK_UNLOCKED;
 typedef struct a_list {
 	void	*vm_addr;
 	struct a_list	*next;
 } a_list_t;
-static	a_list_t	*as_free_head;
-static	int		as_list_len;
+STATIC	a_list_t	*as_free_head;
+STATIC	int		as_list_len;
 
-static void
+STATIC void
 free_address(
 	void		*addr)
 {
@@ -278,7 +278,7 @@ free_address(
 	spin_unlock(&as_lock);
 }
 
-static void
+STATIC void
 purge_addresses(void)
 {
 	a_list_t	*aentry, *old;
@@ -312,7 +312,7 @@ purge_addresses(void)
  *	Internal pagebuf object manipulation
  */
 
-static void
+STATIC void
 _pagebuf_initialize(
 	page_buf_t		*pb,
 	pb_target_t		*target,
@@ -355,7 +355,7 @@ _pagebuf_initialize(
  * Allocate a page array capable of holding a specified number
  * of pages, and point the page buf at it.
  */
-static int
+STATIC int
 _pagebuf_get_pages(
 	page_buf_t		*pb,
 	int			page_count,
@@ -383,7 +383,7 @@ _pagebuf_get_pages(
 /*
  * Walk a pagebuf releasing all the pages contained within it.
  */
-static inline void
+STATIC inline void
 _pagebuf_freepages(
 	page_buf_t		*pb)
 {
@@ -469,7 +469,7 @@ _pagebuf_free_object(
  *	already in the list. Invalid pages (pages which have not yet been
  *	read in from disk) are assigned for any pages which are not found.
  */
-static int
+STATIC int
 _pagebuf_lookup_pages(
 	page_buf_t		*pb,
 	struct address_space	*aspace,
@@ -617,7 +617,7 @@ mapit:
  *	Puts them on a list at "pb_resv_bh"
  *	Returns number of bh actually allocated to pool.
  */
-static int
+STATIC int
 _pagebuf_prealloc_bh(
 	int			count)
 {
@@ -643,7 +643,7 @@ _pagebuf_prealloc_bh(
  *	If pool is empty, sleep 'til one comes back in.
  *	Returns aforementioned buffer head.
  */
-static struct buffer_head *
+STATIC struct buffer_head *
 _pagebuf_get_prealloc_bh(void)
 {
 	unsigned long		flags;
@@ -694,7 +694,7 @@ _pagebuf_get_prealloc_bh(void)
  *	Otherwise, put it back in the pool, and wake up anybody
  *	waiting for one.
  */
-static inline void
+STATIC inline void
 _pagebuf_free_bh(
 	struct buffer_head	*bh)
 {
@@ -736,7 +736,7 @@ _pagebuf_free_bh(
  *	which may imply that this call will block until those buffers
  *	are unlocked.  No I/O is implied by this call.
  */
-static page_buf_t *
+STATIC page_buf_t *
 _pagebuf_find(				/* find buffer for block	*/
 	pb_target_t		*target,/* target for block		*/
 	loff_t			ioff,	/* starting offset of range	*/
@@ -1399,7 +1399,7 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
  * (different routines for locked/unlocked, and single/multi-bh pagebufs)
  */
 
-static inline void
+STATIC inline void
 _pb_io_done(
 	page_buf_t		*pb)
 {
@@ -1409,7 +1409,7 @@ _pb_io_done(
 	}
 }
 
-static void
+STATIC void
 _end_pagebuf_page_io(
 	struct buffer_head	*bh,
 	int			uptodate,
@@ -1436,7 +1436,7 @@ _end_pagebuf_page_io(
 	_pb_io_done(pb);
 }
 
-static void
+STATIC void
 _end_io_locked(
 	struct buffer_head	*bh,
 	int			uptodate)
@@ -1444,7 +1444,7 @@ _end_io_locked(
 	_end_pagebuf_page_io(bh, uptodate, 1);
 }
 
-static void
+STATIC void
 _end_io_nolock(
 	struct buffer_head	*bh,
 	int			uptodate)
@@ -1458,7 +1458,7 @@ typedef struct {
 	atomic_t	remain;		/* count of remaining I/O requests */
 } pagesync_t;
 
-static void
+STATIC void
 _end_pagebuf_page_io_multi(
 	struct buffer_head	*bh,
 	int			uptodate,
@@ -1491,7 +1491,7 @@ _end_pagebuf_page_io_multi(
 	}
 }
 
-static void
+STATIC void
 _end_io_multi_full(
 	struct buffer_head	*bh,
 	int			uptodate)
@@ -1499,7 +1499,7 @@ _end_io_multi_full(
 	_end_pagebuf_page_io_multi(bh, uptodate, 1);
 }
 
-static void
+STATIC void
 _end_io_multi_part(
 	struct buffer_head	*bh,
 	int			uptodate)
@@ -1511,7 +1511,7 @@ _end_io_multi_part(
 /*
  * Initiate I/O on part of a page we are interested in
  */
-static int
+STATIC int
 _pagebuf_page_io(
 	struct page		*page,	/* Page structure we are dealing with */
 	page_buf_t		*pb,	/* pagebuf holding it, can be NULL */
@@ -1704,7 +1704,7 @@ error:
 	return err;
 }
 
-static int
+STATIC int
 _page_buf_page_apply(
 	page_buf_t		*pb,
 	loff_t			offset,
@@ -1821,7 +1821,7 @@ pagebuf_iowait(
 	return pb->pb_error;
 }
 
-static void *
+STATIC void *
 pagebuf_mapout_locked(
 	page_buf_t		*pb)
 {
@@ -1862,7 +1862,7 @@ pagebuf_offset(
  *	calls will update to point to the segment following the one
  *	returned.
  */
-static void
+STATIC void
 pagebuf_segment(
 	page_buf_t		*pb,	/* buffer to examine		*/
 	loff_t			*boff_p,/* offset in buffer of next	*/
@@ -1936,7 +1936,7 @@ pagebuf_iomove(
  *
  *	Applies _page_buf_page_apply to each segment of the page_buf_t.
  */
-static int
+STATIC int
 _pagebuf_segment_apply(			/* apply function to segments	*/
 	page_buf_t		*pb)	/* buffer to examine		*/
 {
@@ -2037,9 +2037,9 @@ pagebuf_delwri_dequeue(
  * The pagebuf iodone daemon
  */
 
-static int pb_daemons[NR_CPUS];
+STATIC int pb_daemons[NR_CPUS];
 
-static int
+STATIC int
 pagebuf_iodone_daemon(
 	void			*__bind_cpu)
 {
@@ -2097,9 +2097,9 @@ pagebuf_iodone_daemon(
 
 /* Defines for pagebuf daemon */
 DECLARE_WAIT_QUEUE_HEAD(pbd_waitq);
-static int force_flush;
+STATIC int force_flush;
 
-static void
+STATIC void
 pagebuf_daemon_wakeup(
 	int			flag)
 {
@@ -2111,7 +2111,7 @@ pagebuf_daemon_wakeup(
 
 typedef void (*timeout_fn)(unsigned long);
 
-static int
+STATIC int
 pagebuf_daemon(
 	void			*data)
 {
@@ -2278,7 +2278,7 @@ pagebuf_delwri_flush(
 	}
 }
 
-static int
+STATIC int
 pagebuf_daemon_start(void)
 {
 	if (!pb_daemon) {
@@ -2324,7 +2324,7 @@ pagebuf_daemon_start(void)
  * 
  * Note: do not mark as __exit, it is called from pagebuf_terminate.
  */
-static void
+STATIC void
 pagebuf_daemon_stop(void)
 {
 	if (pb_daemon) {
@@ -2356,7 +2356,7 @@ pagebuf_daemon_stop(void)
  * Pagebuf sysctl interface
  */
 
-static int
+STATIC int
 pb_stats_clear_handler(
 	ctl_table		*ctl,
 	int			write,
@@ -2378,9 +2378,9 @@ pb_stats_clear_handler(
 	return ret;
 }
 
-static struct ctl_table_header *pagebuf_table_header;
+STATIC struct ctl_table_header *pagebuf_table_header;
 
-static ctl_table pagebuf_table[] = {
+STATIC ctl_table pagebuf_table[] = {
 	{PB_FLUSH_INT, "flush_int", &pb_params.data[0],
 	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[0], &pagebuf_max[0]},
@@ -2401,18 +2401,18 @@ static ctl_table pagebuf_table[] = {
 	{0}
 };
 
-static ctl_table pagebuf_dir_table[] = {
+STATIC ctl_table pagebuf_dir_table[] = {
 	{VM_PAGEBUF, "pagebuf", NULL, 0, 0555, pagebuf_table},
 	{0}
 };
 
-static ctl_table pagebuf_root_table[] = {
+STATIC ctl_table pagebuf_root_table[] = {
 	{CTL_VM, "vm",	NULL, 0, 0555, pagebuf_dir_table},
 	{0}
 };
 
 #ifdef CONFIG_PROC_FS
-static int
+STATIC int
 pagebuf_readstats(
 	char			*buffer,
 	char			**start,
@@ -2445,7 +2445,7 @@ pagebuf_readstats(
 }
 #endif	/* CONFIG_PROC_FS */
 
-static void
+STATIC void
 pagebuf_shaker(void)
 {
 	pagebuf_daemon_wakeup(1);

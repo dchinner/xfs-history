@@ -117,26 +117,26 @@ xfs_dirops_t xfsv1_dirops = {
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
-static int xfs_dir_leaf_lookup(xfs_da_args_t *args);
-static int xfs_dir_leaf_removename(xfs_da_args_t *args, int *number_entries,
+STATIC int xfs_dir_leaf_lookup(xfs_da_args_t *args);
+STATIC int xfs_dir_leaf_removename(xfs_da_args_t *args, int *number_entries,
 						 int *total_namebytes);
-static int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
+STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     xfs_dirent_t *dbp,
 					     xfs_dir_put_t put);
-static int xfs_dir_leaf_replace(xfs_da_args_t *args);
+STATIC int xfs_dir_leaf_replace(xfs_da_args_t *args);
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
-static int xfs_dir_node_addname(xfs_da_args_t *args);
-static int xfs_dir_node_lookup(xfs_da_args_t *args);
-static int xfs_dir_node_removename(xfs_da_args_t *args);
-static int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
+STATIC int xfs_dir_node_addname(xfs_da_args_t *args);
+STATIC int xfs_dir_node_lookup(xfs_da_args_t *args);
+STATIC int xfs_dir_node_removename(xfs_da_args_t *args);
+STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     xfs_dirent_t *dbp,
 					     xfs_dir_put_t put);
-static int xfs_dir_node_replace(xfs_da_args_t *args);
+STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
 
 #if defined(DEBUG)
 ktrace_t *xfs_dir_trace_buf;
@@ -607,7 +607,7 @@ xfs_dir_leaf_addname(xfs_da_args_t *args)
  * Remove a name from the leaf directory structure
  * This is the external routine.
  */
-static int
+STATIC int
 xfs_dir_leaf_removename(xfs_da_args_t *args, int *count, int *totallen)
 {
 	xfs_dir_leafblock_t *leaf;
@@ -636,7 +636,7 @@ xfs_dir_leaf_removename(xfs_da_args_t *args, int *count, int *totallen)
  * Look up a name in a leaf directory structure.
  * This is the external routine.
  */
-static int
+STATIC int
 xfs_dir_leaf_lookup(xfs_da_args_t *args)
 {
 	int index, retval;
@@ -655,7 +655,7 @@ xfs_dir_leaf_lookup(xfs_da_args_t *args)
 /*
  * Copy out directory entries for getdents(), for leaf directories.
  */
-static int
+STATIC int
 xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				  int *eofp, xfs_dirent_t *dbp, xfs_dir_put_t put)
 {
@@ -676,7 +676,7 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
  * Look up a name in a leaf directory structure, replace the inode number.
  * This is the external routine.
  */
-static int
+STATIC int
 xfs_dir_leaf_replace(xfs_da_args_t *args)
 {
 	int index, retval;
@@ -720,7 +720,7 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
  * leaf nodes and even splitting intermediate nodes up to and including
  * the root node (a special case of an intermediate node).
  */
-static int
+STATIC int
 xfs_dir_node_addname(xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
@@ -777,7 +777,7 @@ error:
  * leaf nodes and even joining intermediate nodes up to and including
  * the root node (a special case of an intermediate node).
  */
-static int
+STATIC int
 xfs_dir_node_removename(xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
@@ -827,7 +827,7 @@ xfs_dir_node_removename(xfs_da_args_t *args)
  * Look up a filename in a int directory.
  * Use an internal routine to actually do all the work.
  */
-static int
+STATIC int
 xfs_dir_node_lookup(xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
@@ -860,7 +860,7 @@ xfs_dir_node_lookup(xfs_da_args_t *args)
 	return(retval);
 }
 
-static int
+STATIC int
 xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				  int *eofp, xfs_dirent_t *dbp, xfs_dir_put_t put)
 {
@@ -1006,7 +1006,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
  * Look up a filename in an int directory, replace the inode number.
  * Use an internal routine to actually do the lookup.
  */
-static int
+STATIC int
 xfs_dir_node_replace(xfs_da_args_t *args)
 {
 	xfs_da_state_t *state;
