@@ -2153,6 +2153,40 @@ xfs_iaccess(
 }
 
 /*
+ * Return whether or not it is OK to swap to the given file in the
+ * given range.  Return 1 for OK and 0 for error.
+ *
+ * It is only OK to swap to a file if it has no holes.
+ */
+int
+xfs_swappable(
+	vnode_t		*vp)
+{
+	xfs_fileoff_t	end_fsb;
+	xfs_fileoff_t	first_hole_offset_fsb;
+	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
+	int		error;
+
+	ip = XFS_VTOI(vp);
+	mp = ip->i_mount;
+	/*
+	 * Verify that the file does not have any
+	 * holes.
+	 */
+	error = 0;
+	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+	end_fsb = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+	first_hole_offset_fsb = xfs_bmap_first_unused(NULL, ip);
+	if (first_hole_offset_fsb < end_fsb) {
+		error = EINVAL;
+	}
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+
+	return error;
+}
+
+/*
  * xfs_iroundup: round up argument to next power of two
  */
 uint
