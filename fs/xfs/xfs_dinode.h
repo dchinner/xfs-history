@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.7 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e4f44	/* 'INOD' */
@@ -12,6 +12,11 @@
  * with the last field expanding.  It is split into the core and "other"
  * because we only need the core part in the in-core inode.
  */
+typedef struct xfs_timestamp {
+	__int32_t	t_sec;		/* timestamp seconds */
+	__int32_t	t_nsec;		/* timestamp nanoseconds */
+} xfs_timestamp_t;
+
 typedef struct xfs_dinode_core
 {
 	__uint32_t	di_magic;	/* inode magic # = XFS_DINODE_MAGIC */
@@ -25,12 +30,14 @@ typedef struct xfs_dinode_core
 	uuid_t		di_uuid;	/* file unique id */
 	__int64_t	di_nextents;	/* number of extents in file */
 	/*
-	 * Should these be timestruc_t's??
-	 * efs makes them __int32_t's.
+	 * While these fields hold 64 bit values, we will only
+	 * be using the upper 32 bits for now.  The t_nsec
+	 * portion of the fields should always be zero.  This
+	 * leaves room for expansion in the future if necessary.
 	 */
-	time_t		di_atime;	/* time last accessed */
-	time_t		di_mtime;	/* time last modified */
-	time_t		di_ctime;	/* time created/inode modified */
+	xfs_timestamp_t	di_atime;	/* time last accessed */
+	xfs_timestamp_t	di_mtime;	/* time last modified */
+	xfs_timestamp_t	di_ctime;	/* time created/inode modified */
 	/*
 	 * Should this be 64 bits? What does nfs3.0 want?
 	 */
