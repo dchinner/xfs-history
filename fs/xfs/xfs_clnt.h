@@ -1,0 +1,32 @@
+#ifndef __SYS_XFS_CLNT_H__
+#define __SYS_XFS_CLNT_H__
+
+/**************************************************************************
+ *									  *
+ * 		 Copyright (C) 1993, Silicon Graphics, Inc.		  *
+ *									  *
+ *  These coded instructions, statements, and computer programs  contain  *
+ *  unpublished  proprietary  information of Silicon Graphics, Inc., and  *
+ *  are protected by Federal copyright law.  They  may  not be disclosed  *
+ *  to  third  parties  or copied or duplicated in any form, in whole or  *
+ *  in part, without the prior written consent of Silicon Graphics, Inc.  *
+ *									  *
+ **************************************************************************/
+#ident "$Revision$"
+
+/*
+ * XFS arguments to the mount system call.
+ */
+struct xfs_args {
+	/*
+	 * XXXjleong	What are the XFS mount args?
+	 */
+	int	flags;		/* flags */
+};
+
+/*
+ * XFS mount option flags
+ */
+#define	XFSMNT_CHKLOG	0x0001	/* check log */
+
+#endif /* !__SYS_XFS_CLNT_H__ */
