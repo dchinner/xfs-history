@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.81 $"
+#ident	"$Revision: 1.82 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -1004,9 +1004,7 @@ xfs_dilocate(
 	 * Split up the inode number into its parts.
 	 */
 	agno = XFS_INO_TO_AGNO(mp, ino);
-	ASSERT(agno < mp->m_sb.sb_agcount);
 	agbno = XFS_INO_TO_AGBNO(mp, ino);
-	ASSERT(agbno < mp->m_sb.sb_agblocks);
 	if ((agno >= mp->m_sb.sb_agcount) ||
 	    (agbno >= mp->m_sb.sb_agblocks)) {
 		return EINVAL;
