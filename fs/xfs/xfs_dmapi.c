@@ -2826,7 +2826,8 @@ xfs_dm_mount(
 	vfs_t		*vfsp,
 	vnode_t		*mvp,
 	char		*dir_name,
-	char		*fsname)
+	char		*fsname,
+	struct vfsmount *mnt)
 {
 	vnode_t		*rootvp;
 	bhv_desc_t	*mbdp, *rootbdp;
@@ -2842,5 +2843,9 @@ xfs_dm_mount(
 	error = dm_send_mount_event(vfsp, DM_RIGHT_NULL, mbdp, DM_RIGHT_NULL,
 				    rootbdp, DM_RIGHT_NULL, dir_name,
 				    fsname);
+
+	if (error == 0)
+		dm_hookup_vfsmount(vfsp, mnt);
+
 	return error;
 }

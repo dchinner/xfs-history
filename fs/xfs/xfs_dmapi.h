@@ -72,7 +72,8 @@ xfs_dm_mount(
 	vfs_t		*vfsp,
 	vnode_t		*mvp,
 	char		*dir_name,
-	char		*fsname);
+	char		*fsname,
+	struct vfsmount *mnt);
 
 int
 xfs_dm_get_fsys_vector(
