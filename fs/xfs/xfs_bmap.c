@@ -1594,6 +1594,13 @@ xfs_bmap_alloc(
 	xfs_extlen_t	rotor;		/* rt rotor value */
 	int		rt;		/* true if inode is realtime */
 
+#define	ISLEGAL(x,y)	\
+	(rt ? \
+		(x) < mp->m_sb.sb_rextents : \
+		XFS_FSB_TO_AGNO(mp, x) == XFS_FSB_TO_AGNO(mp, y) && \
+		XFS_FSB_TO_AGNO(mp, x) < mp->m_sb.sb_agcount && \
+		XFS_FSB_TO_AGBNO(mp, x) < mp->m_sb.sb_agblocks)
+
 	/*
 	 * Set up variables.
 	 */
@@ -1622,26 +1629,18 @@ xfs_bmap_alloc(
 	 * try to use it's last block as our starting point.
 	 */
 	if (ap->eof && ap->prevp->br_startoff != NULLFILEOFF &&
-	    !ISNULLSTARTBLOCK(ap->prevp->br_startblock)) {
+	    !ISNULLSTARTBLOCK(ap->prevp->br_startblock) &&
+	    ISLEGAL(ap->prevp->br_startblock + ap->prevp->br_blockcount,
+		    ap->prevp->br_startblock)) {
 		ap->rval = ap->prevp->br_startblock + ap->prevp->br_blockcount;
 		/*
 		 * Adjust for the gap between prevp and us.
 		 */
 		adjust = ap->off -
 			(ap->prevp->br_startoff + ap->prevp->br_blockcount);
-		ap->rval += adjust;
-		if (!adjust)
-			adjust = 1;
-		/*
-		 * Reject adjustment if the resulting block is illegal.
-		 */
-		if ((!rt &&
-		     (XFS_FSB_TO_AGNO(mp, ap->rval) !=
-		       XFS_FSB_TO_AGNO(mp, ap->prevp->br_startblock) ||
-		      XFS_FSB_TO_AGBNO(mp, ap->rval) >=
-		       mp->m_sb.sb_agblocks)) ||
-		    (rt && ap->rval >= mp->m_sb.sb_rextents))
-			ap->rval -= adjust;
+		if (adjust &&
+		    ISLEGAL(ap->rval + adjust, ap->prevp->br_startblock))
+			ap->rval += adjust;
 	}
 	/*
 	 * If not at eof, then compare the two neighbor blocks.
@@ -1659,36 +1658,30 @@ xfs_bmap_alloc(
 		 * start block based on it.
 		 */
 		if (ap->prevp->br_startoff != NULLFILEOFF &&
-		    !ISNULLSTARTBLOCK(ap->prevp->br_startblock)) {
+		    !ISNULLSTARTBLOCK(ap->prevp->br_startblock) &&
+		    (prevbno = ap->prevp->br_startblock +
+			       ap->prevp->br_blockcount) &&
+		    ISLEGAL(prevbno, ap->prevp->br_startblock)) {
 			/*
 			 * Calculate gap to end of previous block.
 			 */
-			prevdiff = ap->off -
+			adjust = prevdiff = ap->off -
 				(ap->prevp->br_startoff +
 				 ap->prevp->br_blockcount);
 			/*
 			 * Figure the startblock based on the previous block's
 			 * end and the gap size.
-			 */
-			prevbno = ap->prevp->br_startblock +
-				ap->prevp->br_blockcount + prevdiff;
-			adjust = prevdiff ? prevdiff : 1;
-			/*
 			 * Heuristic!
 			 * If the gap is large relative to the piece we're
 			 * allocating, or using it gives us an illegal block
 			 * number, then just use the end of the previous block.
 			 */
-			if (prevdiff > 2 * ap->alen ||
-			    (!rt &&
-			     (XFS_FSB_TO_AGNO(mp, prevbno) !=
-			      XFS_FSB_TO_AGNO(mp, ap->prevp->br_startblock) ||
-			      XFS_FSB_TO_AGBNO(mp, prevbno) >=
-			      mp->m_sb.sb_agblocks)) ||
-			    (rt && prevbno >= mp->m_sb.sb_rextents)) {
-				prevbno -= adjust;
+			if (prevdiff <= 2 * ap->alen &&
+			    ISLEGAL(prevbno + prevdiff,
+				    ap->prevp->br_startblock))
+				prevbno += adjust;
+			else
 				prevdiff += adjust;
-			}
 			/*
 			 * If the firstblock forbids it, can't use it, 
 			 * must use default.
@@ -1698,7 +1691,7 @@ xfs_bmap_alloc(
 				prevbno = NULLFSBLOCK;
 		}
 		/*
-		 * No previous block, just default.
+		 * No previous block or can't follow it, just default.
 		 */
 		else
 			prevbno = NULLFSBLOCK;
@@ -1710,12 +1703,12 @@ xfs_bmap_alloc(
 			/*
 			 * Calculate gap to start of next block.
 			 */
-			gotdiff = ap->gotp->br_startoff - ap->off;
+			adjust = gotdiff = ap->gotp->br_startoff - ap->off;
 			/*
 			 * Figure the startblock based on the next block's
 			 * start and the gap size.
 			 */
-			gotbno = ap->gotp->br_startblock - gotdiff;
+			gotbno = ap->gotp->br_startblock;
 			/*
 			 * Heuristic!
 			 * If the gap is large relative to the piece we're
@@ -1723,25 +1716,14 @@ xfs_bmap_alloc(
 			 * number, then just use the start of the next block
 			 * offset by our length.
 			 */
-			if (gotdiff > 2 * ap->alen ||
-			    (!rt &&
-			     (XFS_FSB_TO_AGNO(mp, gotbno) !=
-			      XFS_FSB_TO_AGNO(mp, ap->gotp->br_startblock))) ||
-			    (rt && gotbno >= mp->m_sb.sb_rextents)) {
-				gotbno = ap->gotp->br_startblock - ap->alen;
-				gotdiff = ap->alen;
-				if ((!rt &&
-				     (XFS_FSB_TO_AGNO(mp, gotbno) !=
-				      XFS_FSB_TO_AGNO(mp,
-					      ap->gotp->br_startblock))) ||
-				    (rt && gotbno >= mp->m_sb.sb_rextents)) {
-					gotbno = XFS_AGB_TO_FSB(mp,
-						XFS_FSB_TO_AGNO(mp,
-						ap->gotp->br_startblock), 0);
-					gotdiff = ap->gotp->br_startblock -
-						gotbno;
-				}
-			}
+			if (gotdiff <= 2 * ap->alen &&
+			    ISLEGAL(gotbno - gotdiff, gotbno))
+				gotbno -= adjust;
+			else if (ISLEGAL(gotbno - ap->alen, gotbno)) {
+				gotbno -= ap->alen;
+				gotdiff += adjust - ap->alen;
+			} else
+				gotdiff += adjust;
 			/*
 			 * If the firstblock forbids it, can't use it, 
 			 * must use default.
@@ -1840,7 +1822,14 @@ xfs_bmap_alloc(
 		if (nullfb) {
 			args.type = XFS_ALLOCTYPE_START_BNO;
 			args.total = ap->total;
-			args.minlen = ap->alen;
+			/*
+			 * If the alen is clearly impossible to fit in 
+			 * a single ag, don't set minlen that high.
+			 */
+			if (ap->alen > mp->m_sb.sb_agblocks)
+				args.minlen = ap->minlen;
+			else
+				args.minlen = ap->alen;
 		} else if (ap->low) {
 			args.type = XFS_ALLOCTYPE_FIRST_AG;
 			args.total = 1;
@@ -1872,7 +1861,7 @@ xfs_bmap_alloc(
 			return error;
 		}
 		if (args.fsbno == NULLFSBLOCK && nullfb &&
-		    ap->alen > ap->minlen) {
+		    args.minlen > ap->minlen) {
 			args.minlen = ap->minlen;
 			args.type = XFS_ALLOCTYPE_START_BNO;
 			args.fsbno = ap->rval;
@@ -1921,6 +1910,7 @@ xfs_bmap_alloc(
 		}
 	}
 	return 0;
+#undef	ISLEGAL
 }
 
 /*
