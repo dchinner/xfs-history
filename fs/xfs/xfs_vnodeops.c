@@ -1973,14 +1973,6 @@ xfs_lookup(
 
 	lock_mode = xfs_ilock_map_shared(dp);
 
-	/*
-	 * If the directory has been removed, then fail all lookups.
-	 */
-	if (dp->i_d.di_nlink == 0) {
-		xfs_iunlock_map_shared(dp, lock_mode);
-		return XFS_ERROR(ENOENT);
-	}
-
 	lookup_flags = DLF_IGET;
 	if (lock_mode == XFS_ILOCK_SHARED) {
 		lookup_flags |= DLF_LOCK_SHARED;
@@ -2169,15 +2161,6 @@ xfs_create(
 	}
 
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
-
-	/*
-	 * If the directory has been removed, then fail all creates.
-	 */
-	if (dp->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		goto error_return;
-	}
-
 
 	/*
 	 * At this point we cannot do an xfs_iget() of the entry named
@@ -2664,14 +2647,6 @@ again:
 
 	if (dp->i_gen != dir_generation) {
 		/*
-		 * If the link count on the directory is 0, there are no
-		 * entries to lock.
-		 */
-		if (dp->i_d.di_nlink == 0) {
-			xfs_iunlock(dp, XFS_ILOCK_EXCL);
-			return XFS_ERROR(ENOENT);
-		}
-		/*
 		 * The directory has changed somehow, so do the lookup
 		 * for the entry again.	 If it is changed we'll have to
 		 * give up and return to our caller.
@@ -2753,15 +2728,6 @@ again:
 		 * Do a new lookup if directory was changed.
 		 */
 		if (dp->i_gen != new_dir_gen) {
-			/*
-			 * If the directory has been unlinked, we're
-			 * not going to find our entry there anymore.
-			 */
-			if (dp->i_d.di_nlink == 0) {
-				xfs_iunlock(dp, XFS_ILOCK_EXCL);
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				return XFS_ERROR(ENOENT);
-			}
 			/*
 			 * The directory has changed somehow, so do the
 			 * lookup for the entry again.	If it is changed
@@ -3342,27 +3308,6 @@ xfs_link(
 	}
 
 	/*
-	 * If the source has been unlinked and put on the unlinked
-	 * list, we can't link to it.  Doing so would cause the inode
-	 * to be placed on the list a second time when the link
-	 * created here is removed.
-	 */
-	if (sip->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		goto error_return;
-	}
-
-	/*
-	 * If the target directory has been removed, we can't link
-	 * any more files in it.
-	 */
-	if (tdp->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		goto error_return;
-	}
-
-
-	/*
 	 * Make sure that nothing with the given name exists in the
 	 * target directory.
 	 */
@@ -3538,15 +3483,6 @@ xfs_mkdir(
 	}
 
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
-
-	/*
-	 * Since dp was not locked between VOP_LOOKUP and VOP_MKDIR,
-	 * the directory could have been removed.
-	 */
-	if (dp->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		goto error_return;
-	}
 
 	/*
 	 * Check for directory link count overflow.
@@ -4017,12 +3953,6 @@ xfs_readdir(
 		return XFS_ERROR(ENOTDIR);
 	}
 
-	/* If the directory has been removed after it was opened. */
-	if (dp->i_d.di_nlink == 0) {
-		xfs_iunlock_map_shared(dp, lock_mode);
-		return 0;
-	}
-
 	start_offset = uiop->uio_offset;
 	error = XFS_DIR_GETDENTS(dp->i_mount, tp, dp, uiop, eofp);
 	if (start_offset != uiop->uio_offset) {
@@ -4180,16 +4110,6 @@ xfs_symlink(
 	}
 
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
-
-	/*
-	 * If the directory has been removed, then we can't create
-	 * anything in it.
-	 */
-	if (dp->i_d.di_nlink == 0) {
-		error = XFS_ERROR(ENOENT);
-		goto error_return;
-	}
-
 
 	/*
 	 * Since we've already started a transaction, we cannot allow
