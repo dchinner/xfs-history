@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.95 $"
+#ident  "$Revision: 1.96 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -83,14 +83,15 @@
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
 #include "xfs_alloc.h"
-#include "xfs_dir.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_ag.h"
 #include "xfs_error.h"
 #include "xfs_bmap.h"
-#include "xfs_dir_btree.h"
+#include "xfs_da_btree.h"
 #include "xfs_rw.h"
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
@@ -211,7 +212,7 @@ xfs_init(
 	extern int	xfs_refcache_size;
 	extern int	ncsize;
 	extern xfs_inode_t	**xfs_refcache;
-	extern zone_t	*xfs_dir_state_zone;
+	extern zone_t	*xfs_da_state_zone;
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
 	extern zone_t	*xfs_inode_zone;
@@ -273,8 +274,8 @@ xfs_init(
 					      "xfs_strat_write");
 	xfs_gap_zone = kmem_zone_init(sizeof(xfs_gap_t), "xfs_gap");
 #endif
-	xfs_dir_state_zone =
-		kmem_zone_init(sizeof(xfs_dir_state_t), "xfs_dir_state");
+	xfs_da_state_zone =
+		kmem_zone_init(sizeof(xfs_da_state_t), "xfs_da_state");
 
 	/*
 	 * The size of the zone allocated buf log item is the maximum
