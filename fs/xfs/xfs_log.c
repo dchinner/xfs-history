@@ -973,7 +973,10 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
-		pagebuf_iorequest(bp);
+	  /* note for irix bstrat will need  struct bdevsw passed
+	   * Fix the following macro if the code ever is merged
+	   */
+	    XFS_bdstrat(bp);
 		return 0;
 	}
 
@@ -1141,7 +1144,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_quotaoffs_flag = 0;      /* XFS_LI_QUOTAOFF logitems */
 
 	xlog_get_iclog_buffer_size(mp, log);
-	bp = log->l_xbuf   = XFS_getrbuf(0,mp);	/* get my locked buffer */ /* mp need for pagebuf/linux only */
+	bp = log->l_xbuf   = XFS_getrbuf(0,mp);	/* get my locked buffer */ /* mp needed for pagebuf/linux only */
 	
 	XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
 	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
