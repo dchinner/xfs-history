@@ -53,6 +53,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -806,7 +807,7 @@ xfs_read(
 #endif
 
 	if (offset < 0)
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	if (count <= 0)
 		return 0;
 
@@ -834,16 +835,16 @@ xfs_read(
 
 	case IFDIR:
 	case IFLNK:
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 		break;
 	      
 	case IFSOCK:
-		error = ENODEV;
+		error = XFS_ERROR(ENODEV);
 		break;
 
 	default:
 		ASSERT(0);
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 	}
 	return error;
 }
@@ -1422,7 +1423,7 @@ xfs_write(
 #endif
 
 	if ((offset < 0) || ((offset + count) > XFS_MAX_FILE_OFFSET)) {
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 	if (count <= 0) {
 		return 0;
@@ -1432,7 +1433,7 @@ xfs_write(
 	case IFREG:
 		n = uiop->uio_limit - uiop->uio_offset;
 		if (n <= 0) {
-			return EFBIG;
+			return XFS_ERROR(EFBIG);
 		}
 		if (n < uiop->uio_resid) {
 			resid = uiop->uio_resid - n;
@@ -1479,14 +1480,14 @@ xfs_write(
 
 	case IFDIR:
 	case IFLNK:
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 
 	case IFSOCK:
-		return ENODEV;
+		return XFS_ERROR(ENODEV);
 
 	default:
 		ASSERT(0);
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 	
 	return error;
@@ -1740,7 +1741,7 @@ xfs_strat_read(
 
 				if (rbp->b_flags & B_ERROR) {
 					bp->b_flags |= B_ERROR;
-					bp->b_error = rbp->b_error;
+					bp->b_error = XFS_ERROR(rbp->b_error);
 				}
 #ifndef SIM
 				if (BP_ISMAPPED(rbp)) {
@@ -1849,7 +1850,7 @@ xfs_strat_write_relse(
 		leader = back;
 		if (rbp->b_flags & B_ERROR) {
 			leader->b_flags |= B_ERROR;
-			leader->b_error = rbp->b_error;
+			leader->b_error = XFS_ERROR(rbp->b_error);
 		}
 		leader->b_flags &= ~B_LEADER;
 		spunlockspl(xfs_strat_lock, s);
@@ -1869,7 +1870,7 @@ xfs_strat_write_relse(
 		leader = back;
 		if (rbp->b_flags & B_ERROR) {
 			leader->b_flags |= B_ERROR;
-			leader->b_error = rbp->b_error;
+			leader->b_error = XFS_ERROR(rbp->b_error);
 		}
 		spunlockspl(xfs_strat_lock, s);
 	}
@@ -2431,7 +2432,7 @@ xfs_diostrat( buf_t *bp)
                  * xfs_bmapi() was unable to allocate space
                  */
                 if (reccount == 0) {
-                        error = ENOSPC;
+                        error = XFS_ERROR(ENOSPC);
                         break;
                 }
 
@@ -2641,7 +2642,7 @@ xfs_diordwr(vnode_t	*vp,
 	     (uiop->uio_offset & BBMASK) ||
 	     (uiop->uio_resid & BBMASK)) {
 #ifndef SIM
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 #endif
 	}
 
@@ -2650,7 +2651,7 @@ xfs_diordwr(vnode_t	*vp,
  	 */
 	if (uiop->uio_resid > ctob(v.v_maxdmasz)) {
 #ifndef SIM
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 #endif
 	}
 
