@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.199 $"
+#ident	"$Revision: 1.204 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -4107,6 +4107,7 @@ xfs_bunmapi(
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	int			*done)		/* set if not done yet */
 {
+	int			async;		/* xactions can be async */
 	xfs_btree_cur_t		*cur;		/* bmap btree cursor */
 	xfs_bmbt_irec_t		del;		/* extent being deleted */
 	int			eof;		/* is deleting at eof */
@@ -4123,8 +4124,8 @@ xfs_bunmapi(
 	xfs_bmbt_irec_t		prev;		/* previous extent list entry */
 	xfs_fileoff_t		start;		/* first file offset deleted */
 	int			tmp_logflags;	/* partial logging flags */
+	int			wasdel;		/* was a delayed alloc extent */
 	int			whichfork;	/* data or attribute fork */
-	int			async;		/* xactions can be async */
 
 	whichfork = (flags & XFS_BMAPI_ATTRFORK) ?
 		XFS_ATTR_FORK : XFS_DATA_FORK;
@@ -4224,7 +4225,7 @@ xfs_bunmapi(
 		}
 		if (del.br_startoff + del.br_blockcount > start + len)
 			del.br_blockcount = start + len - del.br_startoff;
-		if (ISNULLSTARTBLOCK(del.br_startblock)) {
+		if (wasdel = ISNULLSTARTBLOCK(del.br_startblock)) {
 			ASSERT(STARTBLOCKVAL(del.br_startblock) > 0);
 			xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS,
 				del.br_blockcount);
@@ -4244,6 +4245,26 @@ xfs_bunmapi(
 					XFS_BTCUR_BPRV_WASDEL;
 		} else if (cur)
 			cur->bc_private.b.flags &= ~XFS_BTCUR_BPRV_WASDEL;
+		/*
+		 * If it's the case where the directory code is running
+		 * with no block reservation, and the deleted block is in 
+		 * the middle of its extent, and the resulting insert
+		 * of an extent would cause transformation to btree format,
+		 * then reject it.  The calling code will then swap
+		 * blocks around instead.
+		 * We have to do this now, rather than waiting for the
+		 * conversion to btree format, since the transaction
+		 * will be dirty.
+		 */
+		if (!wasdel && xfs_trans_get_block_res(tp) == 0 &&
+		    XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS &&
+		    XFS_IFORK_NEXTENTS(ip, whichfork) >= ifp->if_ext_max &&
+		    del.br_startoff > got.br_startoff &&
+		    del.br_startoff + del.br_blockcount < 
+		    got.br_startoff + got.br_blockcount) {
+			error = XFS_ERROR(ENOSPC);
+			goto error0;
+		}
 		if (error = xfs_bmap_del_extent(ip, tp, lastx, flist, cur, &del,
 				flags, &tmp_logflags, whichfork))
 			goto error0;
