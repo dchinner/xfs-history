@@ -79,6 +79,16 @@ typedef struct xfs_gap {
 #define	XFS_MAX_BMAP_LEN_BYTES	524288
 
 /*
+ * Convert the given file system block to a disk block.
+ * We have to treat it differently based on whether the
+ * file is a real time file or not, because the bmap code
+ * does.
+ */
+#define	XFS_FSB_TO_DB(mp, ip, fsb) \
+		(((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME) ? \
+		 XFS_FSB_TO_BB((mp), (fsb)) : XFS_FSB_TO_DADDR((mp), (fsb)))
+     
+/*
  * Defines for the trace mechanisms in xfs_rw.c.
  */
 #define	XFS_RW_KTRACE_SIZE	64
