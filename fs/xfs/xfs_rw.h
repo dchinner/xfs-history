@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.39 $"
 
 struct bhv_desc;
 struct bdevsw;
@@ -230,6 +230,9 @@ xfs_refcache_purge_some(void);
 
 int
 xfs_bioerror(struct buf *b);
+
+void
+xfs_xfsd_list_evict(bhv_desc_t *bdp);
 
 /*
  * Needed by xfs_rw.c

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.257 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -6639,6 +6639,327 @@ xfs_start_daemons(void)
 	return;
 }
 
+
+#define MAX_BUF_EXAMINED 10
+
+/*
+ * This function purges the xfsd list of all bufs belonging to the
+ * specified vnode.  This will allow a file about to be deleted to 
+ * remove its buffers from the xfsd_list so it doesn't have to wait
+ * for them to be pushed out to disk
+ */
+void xfs_xfsd_list_evict(bhv_desc_t * bdp)
+{
+	vnode_t		*vp;
+	xfs_inode_t	*ip;
+	
+	int	s;
+	int	cur_count;	/* 
+				 * Count of buffers that have been processed
+				 * since aquiring the spin lock 
+				 */
+	int countdown;		/* 
+				 * Count of buffers that have been processed
+				 * since we started.  This will prevent non-
+				 * termination if buffers are being added to
+				 * the head of the list 
+				 */
+	buf_t	*bp;
+	buf_t	*forw;
+	buf_t	*back;
+	buf_t	*next_bp;
+	
+	/* List and count of the saved buffers */
+	buf_t	*bufs;
+	unsigned int bufcount;
+
+	/* Marker Buffers */
+	buf_t	*cur_marker;
+	buf_t	*end_marker;
+	
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
+	
+	/* Initialize bufcount and bufs */
+	bufs = NULL;
+	bufcount = 0;
+
+	/* Allocate both markers at once... it's a little nicer. */
+	cur_marker = (buf_t *)kmem_alloc(sizeof(buf_t)*2, KM_SLEEP);
+	
+	/* A little sketchy pointer-math, but should be ok. */
+	end_marker = cur_marker + 1;
+
+	s = mp_mutex_spinlock(&xfsd_lock);
+	
+	/* Make sure there are buffers to check */
+	if (xfsd_list == NULL) {
+		mp_mutex_spinunlock(&xfsd_lock, s);
+		
+		kmem_free(cur_marker, sizeof(buf_t)*2);
+		return;
+	}
+
+	/* 
+	 * Ok.  We know we're going to use the markers now, so let's 
+	 * actually initialize them.  At Ray's suggestion, we'll make
+	 * the b_vp == -1 as the signifier that this is a marker.  We 
+	 * know a marker is unlinked if it's av_forw and av_back pointers
+	 * point to itself.
+	 */
+
+	cur_marker->b_vp = (vnode_t *)-1L;
+	end_marker->b_vp = (vnode_t *)-1L;
+
+	/* Now link end_marker onto the end of the list */
+
+	end_marker->av_back = xfsd_list->av_back;
+	xfsd_list->av_back->av_forw = end_marker;
+	end_marker->av_forw = xfsd_list;
+	xfsd_list->av_back = end_marker;
+
+	xfsd_bufcount++;
+
+	/* 
+	 * Set the countdown to it's initial value.  This will be a snapshot
+	 * of the size of the list.  If we process this many buffers without
+	 * finding the end_marker, then someone is putting buffers onto the 
+	 * head of the list
+	 */
+	countdown = xfsd_bufcount;
+	
+	/* Zero the initial count */
+	cur_count = 0;
+
+	bp = xfsd_list;
+ 
+	/* 
+	 * Loop: Assumptions: the end_marker has been set, bp is set to the 
+	 * current buf being examined, the xfsd_lock is held, cur_marker is
+	 * <not> linked into the list.
+	 */
+	while (1) {
+		/* We are processing a buffer.  Take note of that fact. */
+		cur_count++;
+		countdown--;
+		
+		if (bp == end_marker) {
+			/* Unlink it from the list */
+			
+			/* 
+			 * If it's the only thing on the list, NULL the 
+			 * xfsd_list. Otherwise, unlink normally 
+			 */
+			if (bp->av_forw == bp) {
+				xfsd_list = NULL;
+			} else {
+				forw = bp->av_forw;
+				back = bp->av_back;
+				forw->av_back = back;
+				back->av_forw = forw;
+			}
+			
+			xfsd_bufcount--;
+
+			/* Move the head of the list forward if necessary */
+			if (bp == xfsd_list)
+				xfsd_list = bp->av_forw;
+			
+			break;
+		}
+
+		/* Check to see if this buffer should be removed */
+		if (bp->b_vp == vp) {
+			next_bp = bp->av_forw;
+	    
+			/* Remove the buffer from the xfsd_list */
+			forw = bp->av_forw;
+			back = bp->av_back;
+			forw->av_back = back;
+			back->av_forw = forw;
+
+			/* 
+			 * If we removed the head of the xfsd_list, move 
+			 * it forward. 
+			 */
+			if (xfsd_list == bp) xfsd_list = next_bp;
+
+			xfsd_bufcount--;
+			
+			/* 
+			 * We can't remove all of the list, since we know 
+			 * we have yet to see the end_marker.. that's the
+			 * only buffer we'll see that MIGHT be the sole
+			 * occupant of the list.
+			 */
+			   
+			/* Now add the buffer to the list of buffers to free */
+			if (bufcount > 0) {			
+				bufs->av_back->av_forw = bp;
+				bp->av_back = bufs->av_back;
+				bufs->av_back = bp;
+				bp->av_forw = bufs;
+				
+				bufcount++;
+			} else {
+				bufs = bp;
+				bp->av_forw = bp;
+				bp->av_back = bp;
+				
+				bufcount = 1;
+			}
+			
+			bp = next_bp;
+		} else {
+			bp = bp->av_forw;
+		}
+		
+		/* Now, bp has been advanced. */
+		
+		/* Now before we iterate, make sure we haven't run too long */
+		if (cur_count > MAX_BUF_EXAMINED) {
+			/* 
+			 * Stick the cur_marker into the current pos in the 
+			 * list.  The only special case is if the current bp
+			 * is the head of the list, in which case we have to
+			 * point the head of the list.
+			 */
+			
+			/* First, link the cur_marker before the new bp */
+			cur_marker->av_forw = bp;
+			cur_marker->av_back = bp->av_back;
+			bp->av_back->av_forw = cur_marker;
+			bp->av_back = cur_marker;
+			
+			xfsd_bufcount++;
+			
+			if (bp == xfsd_list)
+				xfsd_list = cur_marker;
+			
+			/* Now, it's safe to release the lock... */
+			mp_mutex_spinunlock(&xfsd_lock, s);
+			
+			/*
+			 * Kill me! I'm here! KILL ME!!! (If an interrupt
+			 * needs too happen, it can. Now we won't blow
+			 * realtime ;-).
+			 */
+			
+			s = mp_mutex_spinlock(&xfsd_lock);
+			
+			/* Zero the current count */
+			cur_count = 0;
+			
+			/* 
+			 * Figure out if we SHOULD continue (if the end_marker
+			 * has been removed, give up, unless it's the head of
+			 * the otherwise empty list, since it's about to be 
+			 * dequed and then we'll stop.
+			 */
+			if ((end_marker->av_forw == end_marker->av_back) && 
+				(xfsd_list != end_marker)) {
+				break;
+			}
+			
+			/*
+			 * Now determine if we should start at the marker or
+			 * from the beginning of the list.  It can't be the
+			 * only thing on the list, since the end_marker should
+			 * be there too.
+			 */
+			if (cur_marker->av_forw == cur_marker->av_back) {
+				bp = xfsd_list;
+			} else {
+				bp = cur_marker->av_forw;
+				
+				/* 
+				 * Now dequeue the marker.  It might be the 
+				 * head of the list, so we might have to move
+				 * the list head... 
+				 */
+				
+				forw = cur_marker->av_forw;
+				back = cur_marker->av_back;
+				forw->av_back = back;
+				back->av_forw = forw;
+				
+				if (cur_marker == xfsd_list)
+					xfsd_list = bp;
+				
+				xfsd_bufcount--;
+				
+				/* 
+				 * We know we can't be the only buffer on the 
+				 * list, as previously stated... so we 
+				 * continue. 
+				 */
+			}
+		}
+
+		/*
+		 * If countdown reaches zero without breaking by dequeuing the
+		 * end_marker, someone is putting things on the front of the 
+		 * list, so we'll quit to thwart their cunning attempt to keep
+		 * us tied up in the list.  So dequeue the end_marker now and
+		 * break.
+		 */
+		   
+		/*
+		 * Invarients at this point:  The end_marker is on the list.
+		 * It may or may not be the head of the list.  cur_marker is
+		 * NOT on the list.
+		 */
+		if (countdown == 0) {
+			/* Unlink the end_marker from the list */
+			
+			if (end_marker->av_forw == end_marker) {
+				xfsd_list = NULL;
+			} else {
+				forw = end_marker->av_forw;
+				back = end_marker->av_back;
+				forw->av_back = back;
+				back->av_forw = forw;
+			}
+			
+			xfsd_bufcount--;
+
+			/* Move the head of the list forward if necessary */
+			if (end_marker == xfsd_list) xfsd_list = end_marker->av_forw;
+			
+			break;
+		}
+	}
+	
+	mp_mutex_spinunlock(&xfsd_lock, s);
+	kmem_free(cur_marker, sizeof(buf_t)*2);	
+	
+	/*
+	 * At this point, bufs contains the list of buffers that would have
+	 * been written to disk, if we hadn't swiped them (which we did
+	 * because they are part of a file being deleted, so they obviously
+	 * shouldn't go to the disk.  At this point, we need to make them as
+	 * done.
+	 */
+	
+	bp = bufs;
+	
+	/* We use s as a counter.  It's handy, so there. */
+	for (s = 0; s < bufcount; s++) {
+		next_bp = bp->av_forw;
+		
+		bp->av_forw = bp;
+		bp->av_back = bp;
+		
+		bp->b_flags |= B_STALE;
+		atomicAddInt(&(ip->i_queued_bufs), -1);
+		
+		/* Now call biodone. */
+		biodone(bp);
+		
+		bp = next_bp;
+	}
+}
+
 /*
  * This is the main loop for the xfs daemons.
  * From here they wait in a loop for buffers which will
@@ -6654,6 +6975,7 @@ xfsd(void)
 	buf_t		*forw;
 	buf_t		*back;
 	bhv_desc_t	*bdp;
+	xfs_inode_t	*ip;
 
 	s = mp_mutex_spinlock(&xfsd_lock);
 	xfsd_count++;
@@ -6684,12 +7006,27 @@ xfsd(void)
 		bp->av_forw = bp;
 		bp->av_back = bp;
 
+		/* Now make sure we didn't just process a marker */
+		if (bp->b_vp == (vnode_t *)-1L) {
+			s = mp_mutex_spinlock(&xfsd_lock);
+			continue;
+		}
+
 		ASSERT((bp->b_flags & (B_BUSY | B_ASYNC | B_READ)) ==
 		       (B_BUSY | B_ASYNC));
 		XFSSTATS.xs_xfsd_bufs++;
 		bdp = bp->b_private;
 		bp->b_private = NULL;
-		xfs_strat_write(bdp, bp);
+
+		/* Now make sure we still want to write out this buffer */
+		ip = XFS_BHVTOI(bdp);
+		if (!((ip->i_d.di_nlink == 0) && (bp->b_vp->v_flag & VINACT))) {
+			xfs_strat_write(bdp, bp);
+		} else {
+			bp->b_flags |= B_STALE;
+			atomicAddInt(&(ip->i_queued_bufs), -1);
+			biodone(bp);
+		}
 
 		s = mp_mutex_spinlock(&xfsd_lock);
 	}

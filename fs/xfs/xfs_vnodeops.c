@@ -1,4 +1,4 @@
-#ident "$Revision: 1.388 $"
+#ident "$Revision: 1.389 $"
 
 
 #ifdef SIM
@@ -2074,6 +2074,10 @@ xfs_inactive(
 		 * do that within a transaction.
 		 */
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
+
+		/* Evict buffers on the xfsd's list. */		 
+		xfs_xfsd_list_evict(bdp);
+
 		xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, 0);
 
 		error = xfs_trans_reserve(tp, 0,
