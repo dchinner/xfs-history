@@ -65,6 +65,15 @@ int xfs_bmapi_aflag(int w);
 #define	XFS_BMAP_TRACE_SIZE	4096	/* size of global trace buffer */
 #define	XFS_BMAP_KTRACE_SIZE	32	/* size of per-inode trace buffer */
 
+#if defined(XFS_ALL_TRACE)
+#define	XFS_BMAP_TRACE
+#endif
+
+#if !defined(DEBUG) || defined(SIM)
+#undef	XFS_BMAP_TRACE
+#endif
+
+
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_INIT)
 void xfs_bmap_init(xfs_bmap_free_t *flp, xfs_fsblock_t *fbp);
 #define	XFS_BMAP_INIT(flp,fbp)	xfs_bmap_init(flp,fbp)
@@ -192,7 +201,7 @@ xfs_bmap_read_extents(
 	struct xfs_inode	*ip,		/* incore inode */
 	int			whichfork);	/* data or attr fork */
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 /*
  * Add bmap trace insert entries for all the contents of the extent list.
  */
