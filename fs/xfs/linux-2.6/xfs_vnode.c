@@ -43,8 +43,6 @@
 #define NESTED_VN_LOCK(vp)      spin_lock(&(vp)->v_lock)
 #define NESTED_VN_UNLOCK(vp)    spin_unlock(&(vp)->v_lock)
 
-
-static struct xfs_zone *vn_zone;	/* vnode heap zone */
 uint64_t vn_generation;		/* vnode generation number */
 atomic_t vn_vnumber;		/* # of vnodes ever allocated */
 
@@ -621,9 +619,7 @@ vn_put(struct vnode *vp)
 void
 vn_remove(struct vnode *vp)
 {
-	int	s;
 	/* REFERENCED */
-	int cache;
 	vmap_t  vmap;
 
 	XFS_STATS_INC(vn_remove);

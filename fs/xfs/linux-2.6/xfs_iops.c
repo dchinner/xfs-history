@@ -237,9 +237,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 	int		error;
 	vnode_t		*dvp;	/* directory containing name to remove */
 	vnode_t		*cvp;	/* used to lookup symlink to put in dentry */
-        vattr_t va;
-	pathname_t	pn;
-	pathname_t      *pnp = &pn;
+        vattr_t		va;
 	struct inode	*ip = NULL;
 
 	dvp = LINVFS_GET_VP(dir);
@@ -556,8 +554,6 @@ int linvfs_permission(struct inode *ip, int mode)
 int linvfs_revalidate_core(struct inode *inode)
 {
         vnode_t *vp;
-        vattr_t va;
-        int     error;
 
         vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
@@ -648,10 +644,7 @@ linvfs_pb_bmap(struct inode *inode,
 			   int flags/* page_buf_flags_t */)
 {
 	vnode_t		*vp;
-	pb_bmap_t	pbmap;
-	int		npbmaps = 1;
 	int		error;
-	long		blockno;
 
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
@@ -705,8 +698,6 @@ linvfs_write_full_page(
 	vnode_t		*vp;
 	struct inode	*inode = (struct inode*)page->mapping->host;
 	int		error;
-	bhv_desc_t	*bdp;
-	xfs_inode_t	*ip;
 
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
@@ -749,7 +740,6 @@ void linvfs_file_read(
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	vnode_t		*vp;
-	int error;
 
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);

@@ -113,7 +113,7 @@ xfs_read(
 	loff_t		*offsetp)
 {
 	ssize_t ret;
-	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
+	xfs_fsize_t	n;
 	vnode_t		*vp;
 	xfs_inode_t	*ip;
 
@@ -423,8 +423,6 @@ xfs_zero_eof(
 	int		nimaps;
 	int		error = 0;
 	xfs_bmbt_irec_t	imap;
-	int		i;
-	int		length;
 	loff_t		loff;
 	size_t		lsize;
 
@@ -820,8 +818,6 @@ retry:
 		/* xfs_iomap_write unlocks/locks/unlocks */
 
 		if (error == ENOSPC) {
-			xfs_fsize_t	last_byte;
-
 			switch (fsynced) {
 			case 0:
 				VOP_FLUSH_PAGES(vp, 0, 0, FI_NONE, error);
@@ -986,13 +982,10 @@ xfs_iomap_write(
 	struct pm	*pmp)
 {
 	xfs_inode_t	*ip = XFS_IO_INODE(io);
-	xfs_mount_t	*mp;
 	int		maps;
 	int		error = 0;
 
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
-	xfs_bmbt_irec_t	imap[XFS_WRITE_IMAPS], *imapp;
-	xfs_bmap_free_t free_list;
 	int		convert; 
 	int		found; 
 	int		flags = 0;
@@ -1079,7 +1072,6 @@ out:
 	if (iunlock)
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
-out_no_unlock:
 	XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
 	if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
 		printk("xfsiomapw: bmap too small pbmap 0x%p\n", pbmapp);
@@ -1237,20 +1229,14 @@ xfs_iomap_write_delay(
 	int		error;
 	int		n;
 	unsigned int	iosize;
-	unsigned int	writing_bytes;
-	short		filled_bmaps;
-	short		x;
 	short		small_write;
-	size_t		count_remaining;
 	xfs_mount_t	*mp;
-	pb_bmap_t	*curr_bmapp;
-	pb_bmap_t	*next_bmapp;
-	pb_bmap_t	*last_bmapp;
-	xfs_bmbt_irec_t	*curr_imapp;
-	xfs_bmbt_irec_t	*last_imapp;
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_WRITE_IMAPS];
 	int		aeof;
+#ifdef DELALLOC_BUG
+	unsigned int	writing_bytes;
+#endif
 
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE) != 0);
 
@@ -1528,17 +1514,14 @@ xfs_iomap_write_convert(
 	xfs_fileoff_t	offset_fsb;
 	xfs_off_t	offset_fsb_bb;
 	xfs_fileoff_t   map_start_fsb;
-	xfs_fileoff_t	imap_offset;
 	xfs_fsblock_t	first_block;
 	xfs_filblks_t	count_fsb;
-	xfs_extlen_t	imap_blocks;
 	/* REFERENCED */
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
 	int		error;
 	xfs_bmap_free_t	free_list;
-	xfs_bmbt_irec_t	*imapp;
 	int		i;
 	int		is_xfs = 1; /* This needs work for CXFS */
 	/* REFERENCED */
@@ -1754,7 +1737,6 @@ xfs_iomap_write_direct(
 	xfs_filblks_t	count_fsb;
 	xfs_fsize_t	isize;
 	xfs_fsblock_t	firstfsb;
-	__uint64_t	last_page_offset;
 	int		nimaps, maps;
 	int		error;
 	xfs_trans_t	*tp;
@@ -1927,7 +1909,7 @@ xfs_iomap_write_direct(
 		goto error_out;
 	}
 
-finish_maps:	/* copy any maps to caller's array and return any error. */
+	/* copy any maps to caller's array and return any error. */
 	if (nimaps == 0) {
 		error = (ENOSPC);
 		goto error_out;
@@ -2084,8 +2066,6 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
   int pincount = 0;
   int count=0;
  
-  int error;
-
   mp = XFS_BHVTOM(bdp);
   
   do {
@@ -2121,7 +2101,6 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 
 dev_t
 XFS_pb_target(page_buf_t *bp) {
-	dev_t	dev;
 
 	return bp->pb_target->i_dev;
 }

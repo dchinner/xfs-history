@@ -126,7 +126,6 @@ linvfs_read_super(
 	struct xfs_args	arg, *args = &arg;
 	int		error;
 	statvfs_t	statvfs;
-	u_int		disk, partition;
 	struct		inode *ip, *cip;
 
 	/* first mount pagebuf delayed write daemon not running yet */
@@ -517,7 +516,6 @@ linvfs_remount(
 	char		*options)
 {
 	struct xfs_args args;
-	extern vfsops_t xfs_vfsops;
 	vfs_t *vfsp;
 	vnode_t *cvp;
 

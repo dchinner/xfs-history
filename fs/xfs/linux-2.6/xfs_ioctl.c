@@ -193,7 +193,6 @@ xfs_find_handle(
         
         if (!only_fsid) {
             xfs_inode_t             *ip;
-            int                     error;
 	    bhv_desc_t	            *bhv;
             int                     lock_mode;
             
@@ -350,7 +349,10 @@ xfs_open_by_handle(
 	/*
 	 * Fix the mode flags that linvfs_set_inode_ops bashes.
 	 */
-	linvfs_revalidate_core(inode);
+	error = linvfs_revalidate_core(inode);
+	if (error) {
+		return -XFS_ERROR(error);
+	}
 
 	/*
 	 * Restrict handle operations to directories & regular files.
@@ -454,7 +456,6 @@ xfs_readlink_by_handle(
 	vfs_t		*vfsp,
 	xfs_mount_t	*mp)
 {
-	int			i;
 	int			error;
 	int			rlsize;
 	__u32			igen;
