@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.166 $"
+#ident  "$Revision: 1.167 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1722,7 +1722,8 @@ xfs_sync(
 				 */
 				last_byte = xfs_file_last_byte(ip);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				error = pflushvp(vp, last_byte, fflag);
+				error = pflushvp(vp, (off_t)0, last_byte,
+						 fflag);
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
 
