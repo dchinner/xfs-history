@@ -108,6 +108,7 @@ typedef struct xfs_btree_cur
 			struct xfs_inode *ip;
 			xfs_fsblock_t	firstblock;
 			struct xfs_bmap_free *flist;
+			int		allocated;
 		} b;
 	}		bc_private;
 } xfs_btree_cur_t;

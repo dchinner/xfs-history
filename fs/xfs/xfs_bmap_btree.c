@@ -776,6 +776,7 @@ xfs_bmbt_insrec(
 			cbno = xfs_alloc_extent(tp, askbno, 1, XFS_ALLOCTYPE_START_BNO, 0, 0);
 			if (cbno == NULLFSBLOCK)
 				return 0;
+			cur->bc_private.b.allocated++;
 			ip->i_d.di_nblocks++;
 			buf = xfs_btree_get_bufl(mp, tp, cbno, 0);
 			cblock = xfs_buf_to_lblock(buf);
@@ -1479,6 +1480,7 @@ xfs_bmbt_split(
 				XFS_ALLOCTYPE_START_BNO, 0, 0);
 	if (rbno == NULLFSBLOCK)
 		return 0;
+	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	rbuf = xfs_btree_get_bufl(mp, tp, rbno, 0);

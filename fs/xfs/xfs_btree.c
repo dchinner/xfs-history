@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.22 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -239,6 +239,8 @@ xfs_btree_del_cursor(xfs_btree_cur_t *cur)
 		else
 			break;
 	}
+	ASSERT(cur->bc_btnum != XFS_BTNUM_BMAP ||
+	       cur->bc_private.b.allocated == 0);
 	cur->bc_tp = (xfs_trans_t *)xfs_btree_curfreelist;
 	xfs_btree_curfreelist = cur;
 }
@@ -363,6 +365,9 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 	case XFS_BTNUM_BMAP:
 		cur->bc_private.b.inodesize = sbp->sb_inodesize;
 		cur->bc_private.b.ip = ip;
+		cur->bc_private.b.firstblock = NULLFSBLOCK;
+		cur->bc_private.b.flist = NULL;
+		cur->bc_private.b.allocated = 0;
 		break;
 	default:
 		ASSERT(0);
