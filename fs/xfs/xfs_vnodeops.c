@@ -1,4 +1,4 @@
-#ident "$Revision: 1.224 $"
+#ident "$Revision: 1.226 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -24,12 +24,12 @@
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/pda.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/cmn_err.h>
 #include <sys/cred.h>
-#include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
@@ -6172,18 +6172,18 @@ struct vnodeops xfs_vnodeops = {
 	xfs_inactive,
 	fs_nosys,	/* fid */
 	fs_nosys,	/* fid2 */
-	(void (*)(vnode_t *, vrwlock_t))fs_nosys,	/* rwlock */
-	(void (*)(vnode_t *, vrwlock_t))fs_nosys,	/* rwunlock */
+	(void (*)(pvnode_t *, vrwlock_t))fs_nosys,	/* rwlock */
+	(void (*)(pvnode_t *, vrwlock_t))fs_nosys,	/* rwunlock */
 	fs_nosys,	/* seek */
 	fs_nosys,
 	fs_nosys,	/* frlock */
 	fs_nosys,	/* realvp */
 	fs_nosys,	/* bmap */
-	(void (*)(vnode_t *, buf_t *))fs_nosys,		/* strategy */
+	(void (*)(pvnode_t *, buf_t *))fs_nosys,	/* strategy */
 	fs_nosys,	/* map */
 	fs_nosys,	/* addmap */
 	fs_nosys,	/* delmap */
-	(int (*)(vnode_t *, short, int, short *, struct pollhead **))fs_nosys,
+	(int (*)(pvnode_t *, short, int, short *, struct pollhead **))fs_nosys,
 	fs_nosys,	/* dump */
 	fs_nosys,	/* pathconf */
 	fs_nosys,	/* allocstore */
