@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -36,6 +36,7 @@
 #include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
