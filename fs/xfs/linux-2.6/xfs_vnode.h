@@ -214,7 +214,7 @@ typedef int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
 typedef int	(*vop_strategy_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
-typedef int	(*vop_reclaim_t)(bhv_desc_t *, int);
+typedef int	(*vop_reclaim_t)(bhv_desc_t *);
 typedef int	(*vop_attr_get_t)(bhv_desc_t *, char *, char *, int *, int,
 				struct cred *);
 typedef int	(*vop_attr_set_t)(bhv_desc_t *, char *, char *, int, int,
@@ -424,9 +424,9 @@ typedef struct vnodeops {
 	(void)_VOP_(vop_rwunlock, vp)((vp)->v_fbhv, i);			\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_RECLAIM(vp, flag, rv)					\
+#define VOP_RECLAIM(vp, rv)						\
 {	/* vnode not reference-able, so no need to lock chain */	\
-	rv = _VOP_(vop_reclaim, vp)((vp)->v_fbhv, flag);		\
+	rv = _VOP_(vop_reclaim, vp)((vp)->v_fbhv);			\
 }
 #define VOP_ATTR_GET(vp, name, val, vallenp, fl, cred, rv)		\
 {									\

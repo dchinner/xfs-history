@@ -77,8 +77,8 @@ vn_init(void)
 /*
  * Clean a vnode of filesystem-specific data and prepare it for reuse.
  */
-int
-vn_reclaim(struct vnode *vp, int flag)
+STATIC int
+vn_reclaim(struct vnode *vp)
 {
 	int error;
 
@@ -91,7 +91,7 @@ vn_reclaim(struct vnode *vp, int flag)
 	 * to call.
 	 */
 	if (vp->v_fbhv != NULL) {
-		VOP_RECLAIM(vp, flag, error);
+		VOP_RECLAIM(vp, error);
 		if (error)
 			return -error;
 	}
@@ -105,11 +105,10 @@ vn_reclaim(struct vnode *vp, int flag)
 	vp->v_type = VNON;
 	vp->v_fbhv = NULL;
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
+#ifdef CONFIG_XFS_VNODE_TRACING
 	ktrace_free(vp->v_trace);
-
 	vp->v_trace = NULL;
-#endif	/* CONFIG_XFS_VNODE_TRACING */
+#endif
 
 	return 0;
 }
@@ -305,7 +304,7 @@ again:
 	 * When vn_reclaim returns, vp should have no private data,
 	 * either in a system cache or attached to v_data.
 	 */
-	if (vn_reclaim(vp, FSYNC_INVAL) != 0)
+	if (vn_reclaim(vp) != 0)
 		panic("vn_purge: cannot reclaim");
 
 	/*
