@@ -101,6 +101,8 @@
 #include <xfs_qm.h>
 #include <xfs_rw.h>
 
+extern int xfs_is_read_only(xlog_t *);
+
 #ifdef SIM
 #include "sim.h"		/* must be last include file */
 #endif
