@@ -1,4 +1,4 @@
-#ident "$Revision: 1.63 $"
+#ident "$Revision: 1.65 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -360,6 +360,11 @@ xfs_buf_item_unpin_remove(
 		 */
 		lidp = xfs_trans_find_item(tp, (xfs_log_item_t *) bip);
 		xfs_trans_free_item(tp, lidp);
+		/*
+		 * Since the transaction no longer refers to the buffer,
+		 * the buffer should no longer refer to the transaction.
+		 */
+		bp->b_fsprivate2 = NULL;
 	}
 
 	xfs_buf_item_unpin(bip);
