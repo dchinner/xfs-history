@@ -32,6 +32,7 @@
 #define _KERNEL
 #endif
 #include <sys/grio.h>
+#include <sys/fcntl.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -1766,12 +1767,7 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 	int		reclen;
 	iovec_t		*iovp;
 
-	/*
-	 * If it's a kernel request, then the target abi is
-	 * IRIX5_64.
-	 */
-	target_abi = uio->uio_segflg == UIO_USERSPACE ?
-		u.u_procp->p_abi : ABI_IRIX5_64;
+	target_abi = GETDENTS_ABI(u.u_procp->p_abi, uio);
 	switch(target_abi) {
 	case ABI_IRIX5_64:
 	   {

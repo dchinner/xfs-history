@@ -1,4 +1,4 @@
-#ident "$Revision: 1.71 $"
+#ident "$Revision: 1.72 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -22,6 +22,7 @@
 #include <sys/grio.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
+#include <sys/fcntl.h>
 #ifdef SIM
 #undef _KERNEL
 #include <bstring.h>
@@ -367,9 +368,8 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 * just work directly within that buffer.  If it's in user memory,
 	 * lock it down first.
 	 */
-	abi = uio->uio_segflg == UIO_USERSPACE ?
-		u.u_procp->p_abi : ABI_IRIX5_64;
-	alignment = (((abi == ABI_IRIX5_64) || (abi == ABI_IRIX5_N32)) ?
+	abi = GETDENTS_ABI(u.u_procp->p_abi, uio);
+	alignment = ((ABI_IS_IRIX5_64(abi) || ABI_IS_IRIX5_N32(abi)) ?
 		sizeof(off_t) : sizeof(irix5_off_t)) - 1;
 	if (uio->uio_iovcnt == 1 &&
 	    ((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0 &&
