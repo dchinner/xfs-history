@@ -3895,6 +3895,14 @@ xfs_diostrat( buf_t *bp)
 			offset_this_req = XFS_FSB_TO_B(mp,
 				imapp->br_startoff) + BBTOB(blk_algn); 
 
+	     		/*
+ 	      		 * Reduce request size, if it 
+			 * is longer than user buffer.
+	      		 */
+	     		if ( bytes_this_req > count ) {
+	 			 bytes_this_req = count;
+			}
+
 			/*
 			 * Check if this is the end of the file.
 			 */
@@ -3925,13 +3933,6 @@ xfs_diostrat( buf_t *bp)
 				}
 			}
 
-	     		/*
- 	      		 * Reduce request size, if it 
-			 * is longer than user buffer.
-	      		 */
-	     		if ( bytes_this_req > count ) {
-	 			 bytes_this_req = count;
-			}
 
 			/*
  			 * Do not do I/O if there is a hole in the file.
