@@ -481,6 +481,13 @@ xfs_bmbt_set_all(
 	xfs_bmbt_irec_t	*s);
 
 void
+xfs_bmbt_set_allf(
+	xfs_bmbt_rec_t	*r,
+	xfs_fileoff_t	o,
+	xfs_fsblock_t	b,
+	xfs_filblks_t	c);
+
+void
 xfs_bmbt_set_blockcount(
 	xfs_bmbt_rec_t	*r,
 	xfs_filblks_t	v);
