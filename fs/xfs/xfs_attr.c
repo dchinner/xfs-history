@@ -95,11 +95,12 @@ ktrace_t *xfs_attr_trace_buf;
 
 /*ARGSUSED*/
 int								/* error */
-xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
+xfs_attr_get(pvnode_t *pvp, char *name, char *value, int *valuelenp, int flags,
 		     struct cred *cred)
 {
 	xfs_da_args_t args;
 	int error;
+	vnode_t *vp = PVN_TO_VN(pvp);
 
 	XFSSTATS.xs_attr_get++;
 
@@ -152,7 +153,7 @@ xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
 
 /*ARGSUSED*/
 int								/* error */
-xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
+xfs_attr_set(pvnode_t *pvp, char *name, char *value, int valuelen, int flags,
 		     struct cred *cred)
 {
 	xfs_da_args_t args;
@@ -160,6 +161,7 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	xfs_fsblock_t firstblock;
 	xfs_bmap_free_t flist;
 	int error, committed;
+	vnode_t *vp = PVN_TO_VN(pvp);
 
 	XFSSTATS.xs_attr_set++;
 
@@ -345,13 +347,14 @@ out:
  */
 /*ARGSUSED*/
 int								/* error */
-xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
+xfs_attr_remove(pvnode_t *pvp, char *name, int flags, struct cred *cred)
 {
 	xfs_da_args_t args;
 	xfs_inode_t *dp;
 	xfs_fsblock_t firstblock;
 	xfs_bmap_free_t flist;
 	int error;
+	vnode_t *vp = PVN_TO_VN(pvp);
 
 	XFSSTATS.xs_attr_remove++;
 
@@ -459,12 +462,13 @@ out:
 
 /*ARGSUSED*/
 int								/* error */
-xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
+xfs_attr_list(pvnode_t *pvp, char *buffer, int bufsize, int flags,
 		      attrlist_cursor_kern_t *cursor, struct cred *cred)
 {
 	xfs_attr_list_context_t context;
 	xfs_inode_t *dp;
 	int error;
+	vnode_t *vp = PVN_TO_VN(pvp);
 
 	XFSSTATS.xs_attr_list++;
 
