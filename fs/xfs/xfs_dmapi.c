@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -871,9 +871,9 @@ found:
 	file.f_flags = oflags;
 
 	if (fmode & FMODE_READ) {
-		VOP_READ(vp, &file, bufp, len, &off, NULL, xfer);
+		VOP_READ(vp, &file, bufp, len, &off, 0, NULL, xfer);
 	} else {
-		VOP_WRITE(vp, &file, bufp, len, &off, NULL, xfer);
+		VOP_WRITE(vp, &file, bufp, len, &off, 0, NULL, xfer);
 	}
 	if (xfer >= 0) {
 		*rvp = xfer;
@@ -2504,12 +2504,14 @@ STATIC fsys_function_vector_t	xfs_fsys_vector[DM_FSYS_MAX];
 int
 xfs_dm_get_fsys_vector(
 	bhv_desc_t	*bdp,
-	dm_fcntl_vector_t	*vecrq)
+	caddr_t		addr)
 {
 	static	int		initialized = 0;
-	fsys_function_vector_t *vecp;
-	int		i = 0;
+	dm_fcntl_vector_t	*vecrq;
+	fsys_function_vector_t	*vecp;
+	int			i = 0;
 
+	vecrq = (dm_fcntl_vector_t *)addr;
 	vecrq->count =
 		sizeof(xfs_fsys_vector) / sizeof(xfs_fsys_vector[0]);
 	vecrq->vecp = xfs_fsys_vector;
@@ -2724,30 +2726,4 @@ xfs_dm_send_mmap_event(
 	}
 
 	return -ret;
-}
-
-
-int
-xfs_dm_mount(
-	vfs_t		*vfsp,
-	char		*dir_name,
-	char		*fsname)
-{
-	vnode_t		*rootvp;
-	bhv_desc_t	*rootbdp;
-	int		error;
-
-	if (*dir_name == '\0')
-		return EINVAL;
-	VFS_ROOT(vfsp, &rootvp, error);
-	if (error)
-		return error;
-
-	rootbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rootvp), &xfs_vnodeops);
-	VN_RELE(rootvp);
-	error = dm_send_mount_event(vfsp, DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
-				    rootbdp, DM_RIGHT_NULL, dir_name,
-				    fsname);
-
-	return error;
 }
