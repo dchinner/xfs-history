@@ -775,6 +775,13 @@ xfs_iread(
 
 	ip->i_delayed_blks = 0;
 
+	ASSERT(mp->m_readio_log <= 0xff);
+	ASSERT(mp->m_writeio_log <= 0xff);
+	ip->i_readio_log = (uchar_t) mp->m_readio_log;
+	ip->i_writeio_log = (uchar_t) mp->m_writeio_log;
+	ip->i_readio_blocks = mp->m_readio_blocks;
+	ip->i_writeio_blocks = mp->m_writeio_blocks;
+
 	/*
 	 * Mark the buffer containing the inode as something to keep
 	 * around for a while.  This helps to keep recently accessed
