@@ -33,7 +33,6 @@
 #define __XFS_OS_DEFS_H__
 
 #include <linux/xfs_linux.h>
-#include <xfs_arch.h>
 #include <asm/div64.h>
 
 typedef __u64    xfs_off_t;

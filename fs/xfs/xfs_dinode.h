@@ -32,8 +32,6 @@
 #ifndef __XFS_DINODE_H__
 #define	__XFS_DINODE_H__
 
-#include <xfs_arch.h>
-
 struct xfs_buf;
 struct xfs_mount;
 

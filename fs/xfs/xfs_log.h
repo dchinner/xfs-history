@@ -32,8 +32,6 @@
 #ifndef	__XFS_LOG_H__
 #define __XFS_LOG_H__
 
-#include <xfs_arch.h>
-
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?1:0)
 #define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?0:1)
