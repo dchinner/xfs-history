@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.94 $"
+#ident	"$Revision: 1.95 $"
 
 #include <sys/buf.h>	/* for buftarg_t */
 struct cred;
@@ -138,7 +138,7 @@ typedef struct xfs_mount {
 	int			m_da_magicpct;	/* 37% of the blocksize */
 	__uint8_t		m_mk_sharedro;	/* mark shared ro on unmount */
 #if CELL_IRIX
-	char			m_export[VFS_EILIMIT];
+	int			m_export[VFS_EILIMIT/sizeof(int)];
 						/* Info to export to other
 						 * cells. */
 #endif
