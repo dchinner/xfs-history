@@ -47,7 +47,7 @@ extern dev_t	rootdev;
 extern int	restricted_chown;
 extern int	scache_linemask;       /* second level cache line size mask */
 extern prid_t	dfltprid;
-extern long	physmem;
+extern unsigned long	physmem;
 extern int	ndquot;
 
 #endif	/* __XFS_GLOBALS_H__ */
