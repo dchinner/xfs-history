@@ -1,7 +1,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision$"
+#ident "$Revision: 6.0 $"
 
 struct buf;
 struct ktrace;
@@ -50,6 +50,12 @@ typedef struct xfs_buf_log_format_t {
  * during recovery because its blocks are being freed.
  */
 #define	XFS_BLI_CANCEL		0x2
+/*
+ * This flag indicates that the buffer contains on disk 
+ * user or projectdquots and may require special recovery handling.   
+ */
+#define	XFS_BLI_UDQUOT_BUF	0x4
+#define	XFS_BLI_PDQUOT_BUF	0x8
 
 #define	XFS_BLI_CHUNK		128
 #define	XFS_BLI_SHIFT		7
