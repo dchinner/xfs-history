@@ -3536,9 +3536,8 @@ xfs_reclaim(vnode_t	*vp,
 	/*
 	 * Flush and invalidate any data left around that is
 	 * a part of this file.
-	 * XXXajs - Is this enough of a test?
 	 */
-	if (ip->i_d.di_size > 0) {
+	if (((ip->i_d.di_mode & IFMT) == IFREG) && (ip->i_d.di_size > 0)) {
 		/*
 		 * Get the inode's i/o lock so that buffers are pushed
 		 * out while holding the proper lock.  We can't hold
@@ -3555,10 +3554,12 @@ xfs_reclaim(vnode_t	*vp,
 	ASSERT(ip->i_iui == NULL);
 	/*
 	 * If the inode is still dirty, then flush it out synchronously.
+	 * We get the flush lock regardless, though, just to make sure
+	 * we don't free it while it is being flushed.
 	 */
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_iflock(ip);
 	if (ip->i_update_core || (ip->i_item.ili_format.ilf_fields != 0)) {
-		xfs_iflock(ip);
 		xfs_iflush(ip, 0);
 	}
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
