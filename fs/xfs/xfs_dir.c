@@ -1,17 +1,37 @@
-#include <sys/errno.h>
-#include <sys/types.h>
 #include <sys/param.h>
+#include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#include <sys/kmem.h>
+#include <sys/debug.h>
+#ifdef SIM
+#include <string.h>
+#include <bstring.h>
+#else
+/* ick... need a kernel prototype for this. */
+extern size_t strlen(const char *);
+#pragma int_to_unsigned strlen
+#include <sys/systm.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_btree.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_bmap.h"
 #include "xfs_dir.h"
 #include "xfs_dir_btree.h"
+#ifdef SIM
+#include "sim.h"
+#endif
 
 /*
  * xfs_dir.c
@@ -20,21 +40,38 @@
  * and implement the in-inode shortform of a directory.
  */
 
-
 /*========================================================================
  * Overall external interface routines.
  *========================================================================*/
 
 /*
+ * Return 1 if directory contains only "." and "..".
+ */
+xfs_dir_isempty(xfs_inode_t *dp)
+{
+	return(dp->i_d.di_size == 0);
+}
+
+/*
+ * Initialize a directory with its "." and ".." entries.
+ */
+xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
+{
+	return(xfs_dir_shortform_create(trans, dir, parent_dir->i_ino));
+}
+
+/*
  * Generic handler routine to add a name to a directory.
  * Transitions directory from shortform to Btree as necessary.
  */
-xfs_dir_createname(char *name, int namelen, xfs_ino_t *inum)
+xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
+				       xfs_ino_t inum)
 {
 	struct xfs_dir_name args;
-	int retval, newsize;
-	xfs_trans_t *trans;
+	int retval, newsize, namelen;
+	xfs_sb_t *sbp;
 
+	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
 		return(EINVAL);
 
@@ -44,26 +81,27 @@ xfs_dir_createname(char *name, int namelen, xfs_ino_t *inum)
 	args.name = name;
 	args.namelen = namelen;
 	args.hashval = xfs_dir_hashname(name, namelen);
-	args.inumber = *inum = ++global_inum;
+	args.inumber = inum;
+	args.dp = dp;
 
+	sbp = &dp->i_mount->m_sb;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	trans = xfs_trans_alloc(mp, 0);
-	if (inodesize <= XFS_LITINO(fs)) {
+	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
 		newsize = XFS_DIR_SF_ENTSIZE_BYNAME(args.namelen);
-		if ((inodesize + newsize) <= XFS_LITINO(fs)) {
+		if ((dp->i_d.di_size + newsize) <= XFS_LITINO(sbp)) {
 			retval = xfs_dir_shortform_addname(trans, &args);
 		} else {
-			retval = xfs_dir_shortform_to_leaf(trans);
+			retval = xfs_dir_shortform_to_leaf(trans, dp);
 			if (retval == 0) {
 				retval = xfs_dir_leaf_addname(trans, &args);
 			}
 		}
-	} else if (inodesize == XFS_LBSIZE(fs)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
 		retval = xfs_dir_leaf_addname(trans, &args);
 		if (retval == ENOSPC) {
-			retval = xfs_dir_leaf_to_node(trans);
+			retval = xfs_dir_leaf_to_node(trans, dp);
 			if (retval == 0) {
 				retval = xfs_dir_node_addname(trans, &args);
 			}
@@ -71,7 +109,6 @@ xfs_dir_createname(char *name, int namelen, xfs_ino_t *inum)
 	} else {
 		retval = xfs_dir_node_addname(trans, &args);
 	}
-	xfs_trans_commit(trans);
 	return(retval);
 }
 
@@ -80,12 +117,13 @@ xfs_dir_createname(char *name, int namelen, xfs_ino_t *inum)
  * Transitions directory from Btree to shortform as necessary.
  */
 int
-xfs_dir_removename(char *name, int namelen)
+xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name)
 {
 	struct xfs_dir_name args;
-	int count, totallen, newsize, retval;
-	xfs_trans_t *trans;
+	int count, totallen, newsize, retval, namelen;
+	xfs_sb_t *sbp;
 
+	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
 		return(EINVAL);
 
@@ -96,35 +134,36 @@ xfs_dir_removename(char *name, int namelen)
 	args.namelen = namelen;
 	args.hashval = xfs_dir_hashname(name, namelen);
 	args.inumber = 0;
+	args.dp = dp;
 
+	sbp = &dp->i_mount->m_sb;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	trans = xfs_trans_alloc();
-	if (inodesize <= XFS_LITINO(fs)) {
+	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
 		retval = xfs_dir_shortform_removename(trans, &args);
-	} else if (inodesize == XFS_LBSIZE(fs)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
 		retval = xfs_dir_leaf_removename(trans, &args,
 							&count, &totallen);
 		if (retval == 0) {
 			newsize = XFS_DIR_SF_ALLFIT(count, totallen);
-			if (newsize <= XFS_LITINO(fs)) {
-				retval = xfs_dir_leaf_to_shortform(trans);
+			if (newsize <= XFS_LITINO(sbp)) {
+				retval = xfs_dir_leaf_to_shortform(trans, dp);
 			}
 		}
 	} else {
 		retval = xfs_dir_node_removename(trans, &args);
 	}
-	xfs_trans_commit(trans);
 	return(retval);
 }
 
 int
-xfs_dir_lookup(char *name, int namelen, xfs_ino_t *inum)
+xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
+				   xfs_ino_t *inum)
 {
 	struct xfs_dir_name args;
-	xfs_trans_t *trans;
 	int retval;
+	xfs_sb_t *sbp;
 
 	if (namelen >= MAXNAMELEN)
 		return(EINVAL);
@@ -136,18 +175,18 @@ xfs_dir_lookup(char *name, int namelen, xfs_ino_t *inum)
 	args.namelen = namelen;
 	args.hashval = xfs_dir_hashname(name, namelen);
 	args.inumber = 0;
+	args.dp = dp;
 
+	sbp = &dp->i_mount->m_sb;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (inodesize <= XFS_LITINO(fs)) {
-		retval = xfs_dir_shortform_lookup(&args);
-	} else if (inodesize == XFS_LBSIZE(fs)) {
-		retval = xfs_dir_leaf_lookup(&args);
+	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+		retval = xfs_dir_shortform_lookup(trans, &args);
+	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+		retval = xfs_dir_leaf_lookup(trans, &args);
 	} else {
-		trans = xfs_trans_alloc();
 		retval = xfs_dir_node_lookup(trans, &args);
-		xfs_trans_commit(trans);
 	}
 	if (retval == EEXIST)
 		retval = 0;
@@ -164,30 +203,37 @@ xfs_dir_getdents()	/* GROT: finish this */
 }
 
 /*========================================================================
- * External routines when dirsize < XFS_LITINO(fs).
+ * External routines when dirsize < XFS_LITINO(sbp).
  *========================================================================*/
 
 /*
  * Create the initial contents of a shortform directory.
  */
 int
-xfs_dir_shortform_create(xfs_trans_t *trans, xfs_ino_t parent)
+xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_ino_t parent)
 {
 	struct xfs_dir_sf_hdr *hdr;
 	xfs_fsblock_t blkno;
 	int retval;
-	buf_t *bp;
 
-	xfs_trans_iget(trans, 0, &bp);
-	bzero(bp->buffer, XFS_LITINO(fs));
-	hdr = (struct xfs_dir_sf_hdr *)bp->buffer;
+	ASSERT(dp->i_d.di_size == 0);
+	if (dp->i_d.di_format == XFS_DINODE_FMT_EXTENTS) {
+		dp->i_flags &= ~XFS_IEXTENTS;	/* just in case */
+		dp->i_d.di_format = XFS_DINODE_FMT_LOCAL;
+		xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
+		dp->i_flags |= XFS_IINLINE;
+	}
+	ASSERT(dp->i_flags & XFS_IINLINE);
+	ASSERT(dp->i_bytes == 0);
+	xfs_idata_realloc(dp, sizeof(*hdr));
+	hdr = (struct xfs_dir_sf_hdr *)dp->i_u1.iu_data;
 	bcopy((char *)&parent, hdr->parent, sizeof(xfs_ino_t));
 	hdr->count = 0;
-	retval = xfs_dir_grow_inode(trans, sizeof(struct xfs_dir_sf_hdr),
+	retval = xfs_dir_grow_inode(trans, dp, sizeof(struct xfs_dir_sf_hdr),
 					   &blkno);
 
 	if (!retval)
-		xfs_trans_log_inode(trans, bp);
+		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
 	return(retval);
 }
 
@@ -199,12 +245,13 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
 	struct xfs_dir_shortform *sf;
 	struct xfs_dir_sf_entry *sfe;
-	int retval, i;
+	int retval, i, offset, size;
 	xfs_fsblock_t blkno;
-	buf_t *bp;
+	xfs_inode_t *dp;
 
-	xfs_trans_iget(trans, 0, &bp);
-	sf = (struct xfs_dir_shortform *)bp->buffer;
+	dp = args->dp;
+	ASSERT(dp->i_flags & XFS_IINLINE);
+	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
 		if (sfe->namelen == args->namelen) {
@@ -215,17 +262,21 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 
+	offset = (char *)sfe - (char *)sf;
+	size = XFS_DIR_SF_ENTSIZE_BYNAME(args->namelen);
+	xfs_idata_realloc(dp, size);
+	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
+	sfe = &sf->list[sf->hdr.count];
+
 	bcopy((char *)&args->inumber, sfe->inumber, sizeof(xfs_ino_t));
 	sfe->namelen = args->namelen;
 	bcopy(args->name, sfe->name, sfe->namelen);
 	sf->hdr.count++;
 
-	retval = xfs_dir_grow_inode(trans,
-				    XFS_DIR_SF_ENTSIZE_BYNAME(args->namelen),
-				    &blkno);
+	retval = xfs_dir_grow_inode(trans, dp, size, &blkno);
 
 	if (!retval)
-		xfs_trans_log_inode(trans, bp);
+		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
 	return(retval);
 }
 
@@ -239,10 +290,12 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 	int base, size, retval, i;
 	xfs_fsblock_t blkno;
 	buf_t *bp;
+	xfs_inode_t *dp;
 
-	xfs_trans_iget(trans, 0, &bp);
+	dp = args->dp;
+	ASSERT(dp->i_flags & XFS_IINLINE);
 	base = sizeof(struct xfs_dir_sf_hdr);
-	sf = (struct xfs_dir_shortform *)bp->buffer;
+	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
 		size = XFS_DIR_SF_ENTSIZE_BYENTRY(sfe);
@@ -257,32 +310,42 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 	if (i < 0)
 		return(ENOENT);
 
-	if ((base + size) != inodesize) {
-		bcopy(&bp->buffer[base+size], &bp->buffer[base],
-					      inodesize - (base+size));
+	if ((base + size) != dp->i_d.di_size) {
+		bcopy(&((char *)sf)[base+size], &((char *)sf)[base],
+					      dp->i_d.di_size - (base+size));
 	}
-	bzero(&bp->buffer[inodesize - size], size);
+	bzero(&((char *)sf)[dp->i_d.di_size - size], size);
 	sf->hdr.count--;
 
-	retval = xfs_dir_shrink_inode(trans, size, &blkno);
+	retval = xfs_dir_shrink_inode(trans, dp, size, &blkno);
 
 	if (!retval)
-		xfs_trans_log_inode(trans, bp);
+		xfs_trans_log_inode(trans, dp, XFS_ILOG_DATA);
 	return(retval);
 }
 
 /*
  * Look up a name in a shortform directory structure.
  */
-xfs_dir_shortform_lookup(struct xfs_dir_name *args)
+xfs_dir_shortform_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
 	struct xfs_dir_shortform *sf;
 	struct xfs_dir_sf_entry *sfe;
-	buf_t *bp;
 	int i;
+	xfs_inode_t *dp;
 
-	xfs_trans_iget(NULL, 0, &bp);
-	sf = (struct xfs_dir_shortform *)bp->buffer;
+	dp = args->dp;
+	ASSERT(dp->i_flags & XFS_IINLINE);
+	sf = (struct xfs_dir_shortform *)dp->i_u1.iu_data;
+	if (args->namelen == 2 &&
+	    args->name[0] == '.' && args->name[1] == '.') {
+		bcopy(sf->hdr.parent, (char *)&args->inumber, sizeof(xfs_ino_t));
+		return(0);
+	}
+	if (args->namelen == 1 && args->name[0] == '.') {
+		args->inumber = dp->i_ino;
+		return(0);
+	}
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
 		if (sfe->namelen == args->namelen) {
@@ -301,40 +364,40 @@ xfs_dir_shortform_lookup(struct xfs_dir_name *args)
  * Convert from using the shortform to the leaf.
  */
 int
-xfs_dir_shortform_to_leaf(xfs_trans_t *trans)
+xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_inode_t *dp)
 {
 	struct xfs_dir_shortform *sf;
 	struct xfs_dir_sf_entry *sfe;
 	struct xfs_dir_name args;
 	xfs_ino_t inumber;
 	char *tmpbuffer;
-	int retval, i;
+	int retval, i, size;
 	xfs_fsblock_t blkno;
 	buf_t *bp;
+	xfs_sb_t *sbp;
 
-	tmpbuffer = malloc(XFS_LITINO(fs));
-	if (tmpbuffer == NULL) {
-		perror("malloc failed");
-		return(ENOMEM);
-	}
+	sbp = &dp->i_mount->m_sb;
+	size = dp->i_bytes;
+	tmpbuffer = kmem_alloc(size, KM_SLEEP);
+	ASSERT(tmpbuffer != NULL);
 
-	xfs_trans_iget(trans, 0, &bp);
-	bcopy(bp->buffer, tmpbuffer, XFS_LITINO(fs));
+	bcopy(dp->i_u1.iu_data, tmpbuffer, size);
 
 	sf = (struct xfs_dir_shortform *)tmpbuffer;
 	bcopy(sf->hdr.parent, (char *)&inumber, sizeof(xfs_ino_t));
 
-	/* GROT: change all XFS_LBSIZE into state->blocksize */
-	retval = xfs_dir_grow_inode(trans, XFS_LBSIZE(fs) - inodesize, &blkno);
+	xfs_idata_realloc(dp, -size);
+	retval = xfs_dir_grow_inode(trans, dp, XFS_LBSIZE(sbp) - size, &blkno);
 	if (retval)
 		goto out;
 
-	bp = xfs_dir_leaf_create(trans, blkno);
+	bp = xfs_dir_leaf_create(trans, dp, blkno);
 
 	args.name = ".";
 	args.namelen = 1;
 	args.hashval = xfs_dir_hashname(".", 1);
-	args.inumber = inumber;
+	args.inumber = dp->i_ino;
+	args.dp = dp;
 	retval = xfs_dir_leaf_addname(trans, &args);
 	if (retval)
 		goto out;
@@ -361,34 +424,37 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans)
 	retval = 0;
 
 out:
-	free(tmpbuffer);
+	kmem_free(tmpbuffer, size);
 	return(retval);
 }
 
 /*========================================================================
- * External routines when dirsize == XFS_LBSIZE(fs).
+ * External routines when dirsize == XFS_LBSIZE(sbp).
  *========================================================================*/
 
 /*
- * Create the initial contents of a leaf directory.
+ * Create the initial contents of a leaf directory
+ * or a leaf in a node directory.
  */
 buf_t *
-xfs_dir_leaf_create(xfs_trans_t *trans, xfs_fsblock_t blkno)
+xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno)
 {
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_leaf_hdr *hdr;
 	buf_t *bp;
+	xfs_sb_t *sbp;
 
-	bp = xfs_trans_getblk(trans, blkno, XFS_LBSIZE(fs));
-	bzero(bp->buffer, XFS_LBSIZE(fs));
-	leaf = (struct xfs_dir_leafblock *)bp->buffer;
+	bp = xfs_dir_get_buf(trans, dp, blkno);
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
+	sbp = &dp->i_mount->m_sb;
+	bzero((char *)leaf, XFS_LBSIZE(sbp));
 	hdr = &leaf->hdr;
 	hdr->info.magic = XFS_DIR_LEAF_MAGIC;
-	hdr->firstused = XFS_LBSIZE(fs);
+	hdr->firstused = XFS_LBSIZE(sbp);
 	hdr->freemap[0].base = sizeof(struct xfs_dir_leaf_hdr);
-	hdr->freemap[0].size = XFS_LBSIZE(fs) - hdr->freemap[0].base;
+	hdr->freemap[0].size = XFS_LBSIZE(sbp) - hdr->freemap[0].base;
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(fs));
+	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(sbp) - 1);
 	return(bp);
 }
 
@@ -402,7 +468,7 @@ xfs_dir_leaf_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	int index, retval;
 	buf_t *bp;
 
-	bp = xfs_trans_bread(trans, 0, XFS_LBSIZE(fs));
+	bp = xfs_dir_read_buf(trans, args->dp, 0);
 
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
 	if (retval != ENOENT)
@@ -417,14 +483,14 @@ xfs_dir_leaf_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
  * This is the external routine.
  */
 xfs_dir_leaf_removename(xfs_trans_t *trans, struct xfs_dir_name *args,
-				    int *count, int *totallen)
+			    int *count, int *totallen)
 {
 	struct xfs_dir_leafblock *leaf;
 	int index, retval;
 	buf_t *bp;
 
-	bp = xfs_trans_bread(trans, 0, XFS_LBSIZE(fs));
-	leaf = (struct xfs_dir_leafblock *)bp->buffer;
+	bp = xfs_dir_read_buf(trans, args->dp, 0);
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
 	if (retval != EEXIST)
@@ -440,21 +506,21 @@ xfs_dir_leaf_removename(xfs_trans_t *trans, struct xfs_dir_name *args,
  * Look up a name in a leaf directory structure.
  * This is the external routine.
  */
-xfs_dir_leaf_lookup(struct xfs_dir_name *args)
+xfs_dir_leaf_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
 	int index, retval;
 	buf_t *bp;
 
-	bp = xfs_trans_bread(NULL, 0, XFS_LBSIZE(fs));
+	bp = xfs_dir_read_buf(trans, args->dp, 0);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
-	xfs_trans_brelse(NULL, bp);
+	xfs_trans_brelse(trans, bp);
 	return(retval);
 }
 
 /*
  * Convert a leaf directory to shortform structure
  */
-xfs_dir_leaf_to_shortform(xfs_trans_t *trans)
+xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_inode_t *dp)
 {
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_leaf_hdr *hdr;
@@ -466,18 +532,17 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans)
 	char *tmpbuffer;
 	int retval, i;
 	buf_t *bp;
+	xfs_sb_t *sbp;
 
-	tmpbuffer = malloc(XFS_LBSIZE(fs));
-	if (tmpbuffer == NULL) {
-		perror("malloc failed");
-		exit(1);
-	}
+	sbp = &dp->i_mount->m_sb;
+	tmpbuffer = kmem_alloc(XFS_LBSIZE(sbp), KM_SLEEP);
+	ASSERT(tmpbuffer != NULL);
 
-	bp = xfs_trans_bread(trans, 0, XFS_LBSIZE(fs));
-	bcopy(bp->buffer, tmpbuffer, XFS_LBSIZE(fs));
+	bp = xfs_dir_read_buf(trans, dp, 0);
+	bcopy(bp->b_un.b_addr, tmpbuffer, XFS_LBSIZE(sbp));
 	leaf = (struct xfs_dir_leafblock *)tmpbuffer;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
-	bzero(bp->buffer, XFS_LBSIZE(fs));
+	bzero(bp->b_un.b_addr, XFS_LBSIZE(sbp));
 
 	/*
 	 * Find and special case the parent inode number
@@ -497,10 +562,10 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans)
 			entry->nameidx = 0;
 		}
 	}
-	retval = xfs_dir_shrink_inode(trans, inodesize, &blkno);
+	retval = xfs_dir_shrink_inode(trans, dp, dp->i_d.di_size, &blkno);
 	if (retval)
 		goto out;
-	retval = xfs_dir_shortform_create(trans, parent);
+	retval = xfs_dir_shortform_create(trans, dp, parent);
 	if (retval)
 		goto out;
 
@@ -508,6 +573,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans)
 	 * Copy the rest of the filenames
 	 */
 	entry = &leaf->leaves[0];
+	args.dp = dp;
 	for (i = hdr->count-1; i >= 0; entry++, i--) {
 		if (entry->nameidx == 0)
 			continue;
@@ -520,64 +586,70 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans)
 	}
 
 out:
-	free(tmpbuffer);
+	kmem_free(tmpbuffer, XFS_LBSIZE(sbp));
 	return(retval);
 }
 
 /*
  * Convert from using a single leaf to a root node and a leaf.
  */
-xfs_dir_leaf_to_node(xfs_trans_t *trans)
+xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_inode_t *dp)
 {
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_intnode *node;
 	buf_t *bp1, *bp2;
 	xfs_fsblock_t blkno;
 	int retval;
+	xfs_sb_t *sbp;
 
-	retval = xfs_dir_grow_inode(trans, XFS_LBSIZE(fs), &blkno);
+	sbp = &dp->i_mount->m_sb;
+	retval = xfs_dir_grow_inode(trans, dp, XFS_LBSIZE(sbp), &blkno);
+	ASSERT(blkno == 1);
 	if (retval)
 		return(retval);
-	bp1 = xfs_trans_bread(trans, 0, XFS_LBSIZE(fs));
-	bp2 = xfs_trans_getblk(trans, blkno, XFS_LBSIZE(fs));
-	bcopy(bp1->buffer, bp2->buffer, XFS_LBSIZE(fs));
-	xfs_trans_log_buf(trans, bp2, 0, XFS_LBSIZE(fs));
+	bp1 = xfs_dir_read_buf(trans, dp, 0);
+	bp2 = xfs_dir_get_buf(trans, dp, 1);
+	bcopy(bp1->b_un.b_addr, bp2->b_un.b_addr, XFS_LBSIZE(sbp));
+	xfs_trans_log_buf(trans, bp2, 0, XFS_LBSIZE(sbp) - 1);
 
 	/*
 	 * Set up the new root node.
 	 */
-	bp1 = xfs_dir_node_create(trans, 0, 1);
-	node = (struct xfs_dir_intnode *)bp1->buffer;
-	leaf = (struct xfs_dir_leafblock *)bp2->buffer;
+	bp1 = xfs_dir_node_create(trans, dp, 0, 1);
+	node = (struct xfs_dir_intnode *)bp1->b_un.b_addr;
+	leaf = (struct xfs_dir_leafblock *)bp2->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	node->btree[0].hashval = leaf->leaves[ leaf->hdr.count-1 ].hashval;
 	node->btree[0].before = blkno;
 	node->hdr.count = 1;
-	xfs_trans_log_buf(trans, bp1, 0, XFS_LBSIZE(FS));
+	xfs_trans_log_buf(trans, bp1, 0, XFS_LBSIZE(sbp) - 1);
 
 	return(retval);
 }
 
 /*========================================================================
- * External routines when dirsize > XFS_LBSIZE(fs).
+ * External routines when dirsize > XFS_LBSIZE(sbp).
  *========================================================================*/
 
 /*
  * Create the initial contents of an intermediate node.
  */
 buf_t *
-xfs_dir_node_create(xfs_trans_t *trans, xfs_fsblock_t blkno, int level)
+xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno,
+			int level)
 {
 	struct xfs_dir_intnode *node;
 	buf_t *bp;
+	xfs_sb_t *sbp;
 
-	bp = xfs_trans_bread(trans, blkno, XFS_LBSIZE(fs));
-	bzero((char *)bp->buffer, XFS_LBSIZE(fs));
-	node = (struct xfs_dir_intnode *)bp->buffer;
+	bp = xfs_dir_get_buf(trans, dp, blkno);
+	sbp = &dp->i_mount->m_sb;
+	bzero((char *)bp->b_un.b_addr, XFS_LBSIZE(sbp));
+	node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 	node->hdr.info.magic = XFS_DIR_NODE_MAGIC;
 	node->hdr.level = level;
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(fs));
+	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(sbp) - 1);
 
 	return(bp);
 }
@@ -600,8 +672,9 @@ xfs_dir_node_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	 */
 	bzero((char *)&state, sizeof(struct xfs_dir_state));
 	state.args = args;
+	state.mp = args->dp->i_mount;
 	state.trans = trans;
-	state.blocksize = blocksize;
+	state.blocksize = state.mp->m_sb.sb_blocksize;
 
 	/*
 	 * Search to see if name already exists, and get back a pointer
@@ -645,8 +718,9 @@ xfs_dir_node_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 
 	bzero((char *)&state, sizeof(struct xfs_dir_state));
 	state.args = args;
+	state.mp = args->dp->i_mount;
 	state.trans = trans;
-	state.blocksize = blocksize;
+	state.blocksize = state.mp->m_sb.sb_blocksize;
 
 	/*
 	 * Search to see if name exists, and get back a pointer to it.
@@ -673,8 +747,9 @@ xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 
 	bzero((char *)&state, sizeof(struct xfs_dir_state));
 	state.args = args;
+	state.mp = args->dp->i_mount;
 	state.trans = trans;
-	state.blocksize = blocksize;
+	state.blocksize = state.mp->m_sb.sb_blocksize;
 
 	/*
 	 * Search to see if name exists,
@@ -705,34 +780,65 @@ xfs_dir_hashname(register char *name, register int namelen)
 }
 
 int
-xfs_dir_grow_inode(xfs_trans_t *trans, int delta, xfs_fsblock_t *new_blkno)
+xfs_dir_grow_inode(xfs_trans_t *trans, xfs_inode_t *dp, int delta,
+			xfs_fsblock_t *new_blkno)
 {
 	xfs_fsblock_t newsize;
 	int remain;
+	xfs_sb_t *sbp;
 
-	newsize = (inodesize + delta) / XFS_LBSIZE(fs);
+	sbp = &dp->i_mount->m_sb;
+	newsize = (dp->i_d.di_size + delta) >> XFS_LBLOG(sbp);
 	if (newsize >= XFS_DIR_MAXBLK) {
 		return(ENOSPC);
 	}
 
-	/* GROT: fill this in */
-
-	inodesize += delta;
+	dp->i_d.di_size += delta;
 	*new_blkno = (newsize > 0) ? newsize-1 : 0;
+
+	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
 
 	return(0);
 }
 
 int
-xfs_dir_shrink_inode(xfs_trans_t *trans, int delta, xfs_fsblock_t *new_blkno)
+xfs_dir_shrink_inode(xfs_trans_t *trans, xfs_inode_t *dp, int delta,
+			xfs_fsblock_t *new_blkno)
 {
 	xfs_fsblock_t newsize;
+	xfs_sb_t *sbp;
 
-	inodesize -= delta;
+	dp->i_d.di_size -= delta;
 
-	/* GROT: fill this in */
-
-	newsize = inodesize / XFS_LBSIZE(fs);
+	sbp = &dp->i_mount->m_sb;
+	newsize = dp->i_d.di_size >> XFS_LBLOG(sbp);
 	*new_blkno = (newsize > 0) ? newsize-1 : 0;
+
+	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
+
 	return(0);
+}
+
+buf_t *
+xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
+{
+	xfs_bmbt_irec_t map;
+	int nmap;
+
+	nmap = 1;
+	(void)xfs_bmapi(trans, dp, bno, 1, 0, NULLFSBLOCK, 0, &map, &nmap, 0);
+	ASSERT(nmap == 1);
+	return(xfs_btree_get_bufl(dp->i_mount, trans, map.br_startblock, 0));
+}
+
+buf_t *
+xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
+{
+	xfs_bmbt_irec_t map;
+	int nmap;
+
+	nmap = 1;
+	(void)xfs_bmapi(trans, dp, bno, 1, 0, NULLFSBLOCK, 0, &map, &nmap, 0);
+	ASSERT(nmap == 1);
+	return(xfs_btree_read_bufl(dp->i_mount, trans, map.br_startblock, 0));
 }

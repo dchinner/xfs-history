@@ -1,17 +1,32 @@
-#include <sys/errno.h>
-#include <sys/types.h>
 #include <sys/param.h>
+#include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#include <sys/kmem.h>
+#include <sys/debug.h>
+#ifdef SIM
+#include <bstring.h>
+#else
+#include <sys/systm.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_btree.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
 #include "xfs_dir.h"
 #include "xfs_dir_btree.h"
+#ifdef SIM
+#include "sim.h"
+#endif
 
 /*
  * xfs_dir_btree.c
@@ -80,7 +95,7 @@ xfs_dir_split(struct xfs_dir_state *state)
 	 * Split the root node.
 	 */
 	oldblk = &state->path.blk[0];
-	ASSERT(oldblk->bp->addr == 0);		/* root must be at block 0 */
+	ASSERT(oldblk->bp->b_un.b_addr == 0);	/* root must be at block 0 */
 	ASSERT(oldblk->blkno == 0);
 	retval = xfs_dir_root_split(state, oldblk, addblk);
 	if (retval)	
@@ -90,9 +105,10 @@ xfs_dir_split(struct xfs_dir_state *state)
 	 * Update the backward pointer in the second child node.  It was
 	 * set to zero in node_link() because it WAS block 0.
 	 */
-	node = (struct xfs_dir_intnode *)addblk->bp->buffer;
+	node = (struct xfs_dir_intnode *)addblk->bp->b_un.b_addr;
 	node->hdr.info.back = oldblk->blkno;
-	xfs_trans_log_buf(state->trans, addblk->bp, 0, sizeof(node->hdr.info));
+	xfs_trans_log_buf(state->trans, addblk->bp, 0,
+					sizeof(node->hdr.info) - 1);
 
 	return(0);
 }
@@ -112,21 +128,23 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 	buf_t *bp;
 	int retval;
 
-	retval = xfs_dir_grow_inode(state->trans, state->blocksize, &blkno);
+	retval = xfs_dir_grow_inode(state->trans, state->args->dp,
+				    state->blocksize, &blkno);
 	if (retval)
 		return(retval);
-	bp = xfs_trans_getblk(state->trans, blkno, state->blocksize);
-	bcopy(blk1->bp->buffer, bp->buffer, state->blocksize);
+	bp = xfs_dir_get_buf(state->trans, state->args->dp, blkno);
+	bcopy(blk1->bp->b_un.b_addr, bp->b_un.b_addr, state->blocksize);
 	blk1->bp = bp;
 	blk1->blkno = blkno;
-	xfs_trans_log_buf(state->trans, bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, bp, 0, state->blocksize - 1);
 
 	/*
 	 * Set up the new root node.
 	 */
-	oldroot = (struct xfs_dir_intnode *)blk1->bp->buffer;
-	bp = xfs_dir_node_create(state->trans, 0, oldroot->hdr.level + 1);
-	node = (struct xfs_dir_intnode *)bp->buffer;
+	oldroot = (struct xfs_dir_intnode *)blk1->bp->b_un.b_addr;
+	bp = xfs_dir_node_create(state->trans, state->args->dp, 0,
+					       oldroot->hdr.level + 1);
+	node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 	node->btree[0].hashval = blk1->hashval;
 	node->btree[0].before = blk1->blkno;
 	node->btree[1].hashval = blk2->hashval;
@@ -138,7 +156,7 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 	oldroot->hdr.freecount = 0;
 	oldroot->hdr.freechain = 0;
 #endif
-	xfs_trans_log_buf(state->trans, bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, bp, 0, state->blocksize - 1);
 
 	return(0);
 }
@@ -159,10 +177,11 @@ xfs_dir_leaf_split(struct xfs_dir_state *state,
 	 * GROT: use a block off the freelist if possible.
 	 */
 	ASSERT(oldblk->leafblk == 1);
-	retval = xfs_dir_grow_inode(state->trans, state->blocksize, &blkno);
+	retval = xfs_dir_grow_inode(state->trans, state->args->dp,
+						  state->blocksize, &blkno);
 	if (retval)
 		return(retval);
-	newblk->bp = xfs_dir_leaf_create(state->trans, blkno);
+	newblk->bp = xfs_dir_leaf_create(state->trans, state->args->dp, blkno);
 	newblk->blkno = blkno;
 	newblk->leafblk = 1;
 
@@ -188,9 +207,9 @@ xfs_dir_leaf_split(struct xfs_dir_state *state,
 	/*
 	 * Update last hashval in each block since we added the name.
 	 */
-	leaf = (struct xfs_dir_leafblock *)oldblk->bp->buffer;
+	leaf = (struct xfs_dir_leafblock *)oldblk->bp->b_un.b_addr;
 	oldblk->hashval = leaf->leaves[leaf->hdr.count-1].hashval;
-	leaf = (struct xfs_dir_leafblock *)newblk->bp->buffer;
+	leaf = (struct xfs_dir_leafblock *)newblk->bp->b_un.b_addr;
 	newblk->hashval = leaf->leaves[leaf->hdr.count-1].hashval;
 
 	return(-1);
@@ -207,8 +226,9 @@ xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, struct xfs_dir_name *args,
 	struct xfs_dir_leaf_hdr *hdr;
 	struct xfs_dir_leaf_map *map;
 	int tablesize, i, tmp, retval;
+	xfs_sb_t *sbp;
 
-	leaf = (struct xfs_dir_leafblock *)bp->buffer;
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	ASSERT((index >= 0) && (index <= leaf->hdr.count));
 	hdr = &leaf->hdr;
@@ -216,7 +236,8 @@ xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *bp, struct xfs_dir_name *args,
 	/*
 	 * Ensure that we have the right insertion index.
 	 */
-	index = xfs_dir_leaf_refind(leaf, index, args->hashval);
+	sbp = &trans->t_mountp->m_sb;
+	index = xfs_dir_leaf_refind(leaf, index, args->hashval, sbp);
 
 	/*
 	 * Search through freemap for first-fit on new name length.
@@ -284,8 +305,9 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 	struct xfs_dir_leaf_name *namest;
 	struct xfs_dir_leaf_map *map;
 	int tmp, i;
+	xfs_sb_t *sbp;
 
-	leaf = (struct xfs_dir_leafblock *)bp->buffer;
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	hdr = &leaf->hdr;
 	ASSERT((mapindex >= 0) && (mapindex < XFS_DIR_LEAF_MAPSIZE));
@@ -307,9 +329,10 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 	 */
 	/* GROT: change all XFS_LBSIZE into state->blocksize */
 	map = &hdr->freemap[mapindex];
-	ASSERT(map->base < XFS_LBSIZE(fs));
+	sbp = &trans->t_mountp->m_sb;
+	ASSERT(map->base < XFS_LBSIZE(sbp));
 	ASSERT(map->size >= XFS_DIR_LEAF_ENTSIZE_BYNAME(args->namelen));
-	ASSERT(map->size < XFS_LBSIZE(fs));
+	ASSERT(map->size < XFS_LBSIZE(sbp));
 	map->size -= XFS_DIR_LEAF_ENTSIZE_BYNAME(args->namelen);
 	entry->nameidx = map->base + map->size;
 	entry->hashval = args->hashval;
@@ -339,7 +362,7 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 	}
 	hdr->namebytes += args->namelen;
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(fs));
+	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(sbp) - 1);
 }
 
 /*
@@ -351,24 +374,23 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp)
 	struct xfs_dir_leafblock *leaf_s, *leaf_d;
 	struct xfs_dir_leaf_hdr *hdr_s, *hdr_d;
 	char *tmpbuffer;
+	xfs_sb_t *sbp;
 
-	tmpbuffer = malloc(XFS_LBSIZE(fs));
-	if (tmpbuffer == NULL) {
-		perror("malloc failed");
-		exit(1);
-	}
-	bcopy(bp->buffer, tmpbuffer, XFS_LBSIZE(fs));
-	bzero(bp->buffer, XFS_LBSIZE(fs));
+	sbp = &trans->t_mountp->m_sb;
+	tmpbuffer = kmem_alloc(XFS_LBSIZE(sbp), KM_SLEEP);
+	ASSERT(tmpbuffer != NULL);
+	bcopy(bp->b_un.b_addr, tmpbuffer, XFS_LBSIZE(sbp));
+	bzero(bp->b_un.b_addr, XFS_LBSIZE(sbp));
 
 	/*
 	 * Copy basic information
 	 */
 	leaf_s = (struct xfs_dir_leafblock *)tmpbuffer;
-	leaf_d = (struct xfs_dir_leafblock *)bp->buffer;
+	leaf_d = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	hdr_s = &leaf_s->hdr;
 	hdr_d = &leaf_d->hdr;
 	hdr_d->info = hdr_s->info;	/* struct copy */
-	hdr_d->firstused = XFS_LBSIZE(fs);
+	hdr_d->firstused = XFS_LBSIZE(sbp);
 	hdr_d->namebytes = 0;
 	hdr_d->count = 0;
 	hdr_d->holes = 0;
@@ -379,11 +401,11 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *bp)
 	 * Copy all entry's in the same (sorted) order,
 	 * but allocate filenames packed and in sequence.
 	 */
-	xfs_dir_leaf_moveents(leaf_s, 0, leaf_d, 0, (int)hdr_s->count);
+	xfs_dir_leaf_moveents(leaf_s, 0, leaf_d, 0, (int)hdr_s->count, sbp);
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(fs));
+	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(sbp) - 1);
 
-	free(tmpbuffer);
+	kmem_free(tmpbuffer, XFS_LBSIZE(sbp));
 }
 
 /*
@@ -402,14 +424,15 @@ xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
 	struct xfs_dir_leaf_hdr *hdr1, *hdr2;
 	int hightolow, count, totallen;
 	int retval, max, swap, tmp;
+	xfs_sb_t *sbp;
 
 	/*
 	 * Set up environment.
 	 */
 	ASSERT(blk1->leafblk == 1);
 	ASSERT(blk2->leafblk == 1);
-	leaf1 = (struct xfs_dir_leafblock *)blk1->bp->buffer;
-	leaf2 = (struct xfs_dir_leafblock *)blk2->bp->buffer;
+	leaf1 = (struct xfs_dir_leafblock *)blk1->bp->b_un.b_addr;
+	leaf2 = (struct xfs_dir_leafblock *)blk2->bp->b_un.b_addr;
 	ASSERT(leaf1->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	ASSERT(leaf2->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 
@@ -422,8 +445,8 @@ xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
 		tmp_blk = blk1;
 		blk1 = blk2;
 		blk2 = tmp_blk;
-		leaf1 = (struct xfs_dir_leafblock *)blk1->bp->buffer;
-		leaf2 = (struct xfs_dir_leafblock *)blk2->bp->buffer;
+		leaf1 = (struct xfs_dir_leafblock *)blk1->bp->b_un.b_addr;
+		leaf2 = (struct xfs_dir_leafblock *)blk2->bp->b_un.b_addr;
 		swap = 1;
 	}
 	hdr1 = &leaf1->hdr;
@@ -454,6 +477,7 @@ xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
 	tmp += count * (sizeof(struct xfs_dir_leaf_name)-1);
 	tmp += count * sizeof(struct xfs_dir_leaf_entry);
 
+	sbp = &state->mp->m_sb;
 	/*
 	 * Move any entries required from leaf to leaf:
 	 */
@@ -471,7 +495,7 @@ xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
 		 * Move high entries from leaf1 to low end of leaf2.
 		 */
 		xfs_dir_leaf_moveents(leaf1, hdr1->count - count,
-					     leaf2, 0, count);
+					     leaf2, 0, count, sbp);
 	} else {
 		/*
 		 * leaf1 is the destination, compact it if req'd.
@@ -485,11 +509,11 @@ xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
 		/*
 		 * Move low entries from leaf2 to high end of leaf1.
 		 */
-		xfs_dir_leaf_moveents(leaf2, 0, leaf1, hdr1->count, count);
+		xfs_dir_leaf_moveents(leaf2, 0, leaf1, hdr1->count, count, sbp);
 	}
 
-	xfs_trans_log_buf(state->trans, blk1->bp, 0, state->blocksize);
-	xfs_trans_log_buf(state->trans, blk2->bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, blk1->bp, 0, state->blocksize - 1);
+	xfs_trans_log_buf(state->trans, blk2->bp, 0, state->blocksize - 1);
 
 outahere:
 	/*
@@ -505,11 +529,13 @@ outahere:
 	 */
 	if (state->inleaf) {
 		blk1->index = xfs_dir_leaf_refind(leaf1, blk1->index,
-							 state->args->hashval);
+							 state->args->hashval,
+							 sbp);
 	} else {
 		blk2->index = blk1->index - leaf1->hdr.count;
 		blk2->index = xfs_dir_leaf_refind(leaf2, blk2->index,
-							 state->args->hashval);
+							 state->args->hashval,
+							 sbp);
 	}
 }
 
@@ -536,8 +562,8 @@ xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 	/*
 	 * Set up environment.
 	 */
-	leaf1 = (struct xfs_dir_leafblock *)blk1->bp->buffer;
-	leaf2 = (struct xfs_dir_leafblock *)blk2->bp->buffer;
+	leaf1 = (struct xfs_dir_leafblock *)blk1->bp->b_un.b_addr;
+	leaf2 = (struct xfs_dir_leafblock *)blk2->bp->b_un.b_addr;
 	hdr1 = &leaf1->hdr;
 	hdr2 = &leaf2->hdr;
 	foundit = 0;
@@ -616,8 +642,9 @@ xfs_dir_node_split(struct xfs_dir_state *state,
 	struct xfs_dir_intnode *node;
 	xfs_fsblock_t blkno;
 	int retval;
+	xfs_sb_t *sbp;
 
-	node = (struct xfs_dir_intnode *)oldblk->bp->buffer;
+	node = (struct xfs_dir_intnode *)oldblk->bp->b_un.b_addr;
 	ASSERT(node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	oldblk->index = xfs_dir_node_refind(node, oldblk->index,
 						  addblk->hashval);
@@ -626,18 +653,21 @@ xfs_dir_node_split(struct xfs_dir_state *state,
 	 * Do we have to split the node?
 	 */
 	retval = 0;
-	if (node->hdr.count >= XFS_DIR_NODE_ENTRIES(fs)) {
+	sbp = &state->mp->m_sb;
+	if (node->hdr.count >= XFS_DIR_NODE_ENTRIES(sbp)) {
 		/*
 		 * Allocate a new node, add to the doubly linked chain of
 		 * nodes, then move some of our excess entries into it.
 		 * GROT: use a freelist block.
 		 */
-		retval = xfs_dir_grow_inode(state->trans, state->blocksize,
+		retval = xfs_dir_grow_inode(state->trans, state->args->dp,
+							  state->blocksize,
 							  &blkno);
 		if (retval)
 			return(retval);	/* GROT: dir is inconsistent */
 		
-		newblk->bp = xfs_dir_node_create(state->trans, blkno,
+		newblk->bp = xfs_dir_node_create(state->trans, state->args->dp,
+							       blkno,
 							       treelevel);
 		newblk->blkno = blkno;
 		xfs_dir_node_rebalance(state, oldblk, newblk,
@@ -650,7 +680,7 @@ xfs_dir_node_split(struct xfs_dir_state *state,
 	 * Insert the new entry into the correct block
 	 * (updating last hashval in the process).
 	 */
-	node = (struct xfs_dir_intnode *)oldblk->bp->buffer;
+	node = (struct xfs_dir_intnode *)oldblk->bp->b_un.b_addr;
 	if (oldblk->index <= node->hdr.count)
 		xfs_dir_node_add(state, oldblk, addblk);
 	else
@@ -678,8 +708,8 @@ xfs_dir_node_rebalance(struct xfs_dir_state *state,
 	/*
 	 * Figure out how many entries need to move, and in which direction.
 	 */
-	node1 = (struct xfs_dir_intnode *)blk1->bp->buffer;
-	node2 = (struct xfs_dir_intnode *)blk2->bp->buffer;
+	node1 = (struct xfs_dir_intnode *)blk1->bp->b_un.b_addr;
+	node2 = (struct xfs_dir_intnode *)blk2->bp->b_un.b_addr;
 	ASSERT(node1->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	ASSERT(node2->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	count = (node1->hdr.count - node2->hdr.count) / 2;
@@ -691,8 +721,8 @@ xfs_dir_node_rebalance(struct xfs_dir_state *state,
 	 */
 	if ((node1->hdr.count > 0) && (node2->hdr.count > 0) &&
 	    (node2->btree[0].hashval < node1->btree[0].hashval)) {
-		node1 = (struct xfs_dir_intnode *)blk2->bp->buffer;
-		node2 = (struct xfs_dir_intnode *)blk1->bp->buffer;
+		node1 = (struct xfs_dir_intnode *)blk2->bp->b_un.b_addr;
+		node2 = (struct xfs_dir_intnode *)blk1->bp->b_un.b_addr;
 	}
 
 	/*
@@ -749,14 +779,14 @@ xfs_dir_node_rebalance(struct xfs_dir_state *state,
 	}
 
 
-	xfs_trans_log_buf(state->trans, blk1->bp, 0, state->blocksize);
-	xfs_trans_log_buf(state->trans, blk2->bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, blk1->bp, 0, state->blocksize - 1);
+	xfs_trans_log_buf(state->trans, blk2->bp, 0, state->blocksize - 1);
 
 	/*
 	 * Record the last hashval from each block for upward propagation.
 	 */
-	node1 = (struct xfs_dir_intnode *)blk1->bp->buffer;
-	node2 = (struct xfs_dir_intnode *)blk2->bp->buffer;
+	node1 = (struct xfs_dir_intnode *)blk1->bp->b_un.b_addr;
+	node2 = (struct xfs_dir_intnode *)blk2->bp->b_un.b_addr;
 	blk1->hashval = node1->btree[node1->hdr.count-1].hashval;
 	blk2->hashval = node2->btree[node2->hdr.count-1].hashval;
 
@@ -783,7 +813,7 @@ xfs_dir_node_add(struct xfs_dir_state *state,
 	struct xfs_dir_node_entry *btree;
 	int tmp;
 
-	node = (struct xfs_dir_intnode *)oldblk->bp->buffer;
+	node = (struct xfs_dir_intnode *)oldblk->bp->b_un.b_addr;
 	ASSERT(node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	ASSERT((oldblk->index >= 0) && (oldblk->index <= node->hdr.count));
 	ASSERT(newblk->blkno != 0);
@@ -806,7 +836,7 @@ xfs_dir_node_add(struct xfs_dir_state *state,
 	 * Copy the last hash value from the oldblk to propagate upwards.
 	 */
 	oldblk->hashval = node->btree[node->hdr.count-1].hashval;
-	xfs_trans_log_buf(state->trans, oldblk->bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, oldblk->bp, 0, state->blocksize - 1);
 }
 
 /*========================================================================
@@ -871,7 +901,7 @@ out:
 		 * entry in the root, make the child block the new root.
 		 */
 		drop_blk = &state->path.blk[0];
-		ASSERT(drop_blk->bp->addr == 0);
+		ASSERT(drop_blk->bp->b_un.b_addr == 0);
 		ASSERT(drop_blk->blkno == 0);
 		ASSERT(drop_blk->leafblk == 0);
 		xfs_dir_root_join(state, drop_blk);
@@ -892,41 +922,44 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 	xfs_fsblock_t blkno;
 	int retval;
 	buf_t *bp;
+	xfs_sb_t *sbp;
 
 	retval = 0;
-	oldroot = (struct xfs_dir_intnode *)drop_blk->bp->buffer;
+	oldroot = (struct xfs_dir_intnode *)drop_blk->bp->b_un.b_addr;
 	ASSERT(oldroot->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	if (oldroot->hdr.count > 1)
 		return(0);
 
 	blkno = oldroot->btree[ oldroot->hdr.count-1 ].before;
-	bp = xfs_trans_bread(state->trans, blkno, state->blocksize);
+	bp = xfs_dir_read_buf(state->trans, state->args->dp, blkno);
 	if (oldroot->hdr.level == 1) {
-		leaf = (struct xfs_dir_leafblock *)bp->buffer;
+		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 		ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 		ASSERT(leaf->hdr.info.forw == 0);
 		ASSERT(leaf->hdr.info.back == 0);
-		bcopy(bp->buffer, drop_blk->bp->buffer, state->blocksize);
+		bcopy(bp->b_un.b_addr, drop_blk->bp->b_un.b_addr, state->blocksize);
 		xfs_trans_log_buf(state->trans, drop_blk->bp, 0,
-						state->blocksize);
+						state->blocksize - 1);
+		sbp = &state->mp->m_sb;
 		retval = xfs_dir_shrink_inode(state->trans,
-					      inodesize - state->blocksize,
+					      state->args->dp,
+					      sbp->sb_inodesize - state->blocksize,
 					      &blkno);
 	} else {
 		ASSERT(oldroot->hdr.info.forw == 0);
 		ASSERT(oldroot->hdr.info.back == 0);
-		newroot = (struct xfs_dir_intnode *)bp->buffer;
+		newroot = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 		ASSERT(newroot->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 #ifdef GROT
 		newroot->hdr.freecount = oldroot->hdr.freecount;
 		newroot->hdr.freechain = oldroot->hdr.freechain;
 #endif
-		bcopy(bp->buffer, drop_blk->bp->buffer, state->blocksize);
+		bcopy(bp->b_un.b_addr, drop_blk->bp->b_un.b_addr, state->blocksize);
 #ifdef GROT
 		xfs_dir_node_addfreelist(state, drop_blk);
 #endif
 		xfs_trans_log_buf(state->trans, drop_blk->bp, 0,
-						state->blocksize);
+						state->blocksize - 1);
 	}
 	return(retval);
 }
@@ -949,9 +982,10 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 	xfs_fsblock_t blkno[2];
 	uint lasthash;
 	buf_t *bp;
+	xfs_sb_t *sbp;
 
 	blk = &state->path.blk[ level ];
-	info = (struct xfs_dir_blkinfo *)blk->bp->buffer;
+	info = (struct xfs_dir_blkinfo *)blk->bp->b_un.b_addr;
 	ASSERT((info->magic == XFS_DIR_NODE_MAGIC) ||
 	       (info->magic == XFS_DIR_LEAF_MAGIC));
 
@@ -973,11 +1007,11 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 	 * coalesce it with a sibling block.
 	 */
 	if (blk->leafblk) {
-		leaf = (struct xfs_dir_leafblock *)blk->bp->buffer;
+		leaf = (struct xfs_dir_leafblock *)blk->bp->b_un.b_addr;
 		ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 		count = leaf->hdr.count;
 	} else {
-		node = (struct xfs_dir_intnode *)blk->bp->buffer;
+		node = (struct xfs_dir_intnode *)blk->bp->b_un.b_addr;
 		ASSERT(node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 		count = node->hdr.count;
 	}
@@ -992,13 +1026,13 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 		/*
 		 * Fill the alternate path with this block's sibling info.
 		 */
-		bp = xfs_trans_bread(state->trans, blkno[i], state->blocksize);
+		bp = xfs_dir_read_buf(state->trans, state->args->dp, blkno[i]);
 		if (blk->leafblk) {
-			tmp_leaf = (struct xfs_dir_leafblock *)bp->buffer;
+			tmp_leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 			ASSERT(tmp_leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 			lasthash = tmp_leaf->leaves[ tmp_leaf->hdr.count-1 ].hashval;
 		} else {
-			tmp_node = (struct xfs_dir_intnode *)bp->buffer;
+			tmp_node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 			ASSERT(tmp_node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 			lasthash = tmp_node->btree[ tmp_node->hdr.count-1 ].hashval;
 		}
@@ -1012,10 +1046,10 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 	for (i = 0; i < 2; i++) {
 		if (blkno[i] == 0)
 			continue;
-		bp = xfs_trans_bread(state->trans, blkno[i], state->blocksize);
+		bp = xfs_dir_read_buf(state->trans, state->args->dp, blkno[i]);
 
 		if (blk->leafblk) {
-			tmp_leaf = (struct xfs_dir_leafblock *)bp->buffer;
+			tmp_leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 			ASSERT(tmp_leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 			count = leaf->hdr.count + tmp_leaf->hdr.count;
 			bytes  = state->blocksize - (state->blocksize>>2);
@@ -1029,10 +1063,11 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 				break;	/* fits with at least 25% to spare */
 			}
 		} else {
-			tmp_node = (struct xfs_dir_intnode *)bp->buffer;
+			tmp_node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 			ASSERT(tmp_node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
-			count  = XFS_DIR_NODE_ENTRIES(fs);
-			count -= XFS_DIR_NODE_ENTRIES(fs) >> 2;
+			sbp = &state->mp->m_sb;
+			count  = XFS_DIR_NODE_ENTRIES(sbp);
+			count -= XFS_DIR_NODE_ENTRIES(sbp) >> 2;
 			count -= node->hdr.count + tmp_node->hdr.count;
 			if (count >= 0) {
 				lasthash = tmp_node->btree[ tmp_node->hdr.count-1 ].hashval;
@@ -1076,20 +1111,20 @@ xfs_dir_fixhashpath(struct xfs_dir_state *state,
 
 	blk = &path->blk[level];
 	if (blk->leafblk) {
-		leaf = (struct xfs_dir_leafblock *)blk->bp->buffer;
+		leaf = (struct xfs_dir_leafblock *)blk->bp->b_un.b_addr;
 		ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 		if (leaf->hdr.count == 0)
 			return;
 		lasthash = leaf->leaves[ leaf->hdr.count-1 ].hashval;
 	} else {
-		node = (struct xfs_dir_intnode *)blk->bp->buffer;
+		node = (struct xfs_dir_intnode *)blk->bp->b_un.b_addr;
 		ASSERT(node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 		if (node->hdr.count == 0)
 			return;
 		lasthash = node->btree[ node->hdr.count-1 ].hashval;
 	}
 	for (blk--, level--; level >= 0; blk--, level--) {
-		node = (struct xfs_dir_intnode *)blk->bp->buffer;
+		node = (struct xfs_dir_intnode *)blk->bp->b_un.b_addr;
 		ASSERT(node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 		btree = &node->btree[blk->index];
 		if (btree->hashval == lasthash)
@@ -1097,7 +1132,8 @@ xfs_dir_fixhashpath(struct xfs_dir_state *state,
 		blk->hashval = btree->hashval = lasthash;
 		xfs_trans_log_buf(state->trans, blk->bp,
 					 XFS_DIR_LOGSTART(node, btree),
-					 XFS_DIR_LOGSIZE(btree->hashval));
+					 XFS_DIR_LOGSTART(node, btree) +
+					 XFS_DIR_LOGSIZE(btree->hashval) - 1);
 
 		lasthash = node->btree[ node->hdr.count-1 ].hashval;
 	}
@@ -1116,16 +1152,18 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	struct xfs_dir_leaf_name *namest;
 	int before, after, smallest, entsize;
 	int tablesize, tmp, i;
+	xfs_sb_t *sbp;
 
-	leaf = (struct xfs_dir_leafblock *)bp->buffer;
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	hdr = &leaf->hdr;
-	ASSERT((hdr->count > 0) && (hdr->count < (XFS_LBSIZE(fs)/8)));
+	sbp = &trans->t_mountp->m_sb;
+	ASSERT((hdr->count > 0) && (hdr->count < (XFS_LBSIZE(sbp)/8)));
 	ASSERT((index >= 0) && (index < hdr->count));
 	ASSERT(hdr->firstused >= ((hdr->count*sizeof(*entry))+sizeof(*hdr)));
 	entry = &leaf->leaves[index];
 	ASSERT(entry->nameidx >= hdr->firstused);
-	ASSERT(entry->nameidx < XFS_LBSIZE(fs));
+	ASSERT(entry->nameidx < XFS_LBSIZE(sbp));
 
 	/*
 	 * Scan through free region table:
@@ -1142,8 +1180,8 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 	entsize = XFS_DIR_LEAF_ENTSIZE_BYENTRY(namest);
 	for (i = 0; i < XFS_DIR_LEAF_MAPSIZE; map++, i++) {
-		ASSERT(map->base < XFS_LBSIZE(fs));
-		ASSERT(map->size < XFS_LBSIZE(fs));
+		ASSERT(map->base < XFS_LBSIZE(sbp));
+		ASSERT(map->size < XFS_LBSIZE(sbp));
 		if (map->base == tablesize) {
 			map->base -= sizeof(struct xfs_dir_leaf_entry);
 			map->size += sizeof(struct xfs_dir_leaf_entry);
@@ -1215,11 +1253,11 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	 * removing the name.
 	 */
 	if (smallest) {
-		tmp = XFS_LBSIZE(fs);
+		tmp = XFS_LBSIZE(sbp);
 		entry = &leaf->leaves[0];
 		for (i = hdr->count-1; i >= 0; entry++, i--) {
 			ASSERT(entry->nameidx >= hdr->firstused);
-			ASSERT(entry->nameidx < XFS_LBSIZE(fs));
+			ASSERT(entry->nameidx < XFS_LBSIZE(sbp));
 			if (entry->nameidx < tmp)
 				tmp = entry->nameidx;
 		}
@@ -1228,7 +1266,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 		hdr->holes = 1;		/* mark as needing compaction */
 	}
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(fs));
+	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(sbp) - 1);
 }
 
 /*
@@ -1242,14 +1280,15 @@ xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 	struct xfs_dir_leafblock *drop_leaf, *save_leaf, *tmp_leaf;
 	struct xfs_dir_leaf_hdr *drop_hdr, *save_hdr, *tmp_hdr;
 	char *tmpbuffer;
+	xfs_sb_t *sbp;
 
 	/*
 	 * Set up environment.
 	 */
 	ASSERT(drop_blk->leafblk == 1);
 	ASSERT(save_blk->leafblk == 1);
-	drop_leaf = (struct xfs_dir_leafblock *)drop_blk->bp->buffer;
-	save_leaf = (struct xfs_dir_leafblock *)save_blk->bp->buffer;
+	drop_leaf = (struct xfs_dir_leafblock *)drop_blk->bp->b_un.b_addr;
+	save_leaf = (struct xfs_dir_leafblock *)save_blk->bp->b_un.b_addr;
 	ASSERT(drop_leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	ASSERT(save_leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	drop_hdr = &drop_leaf->hdr;
@@ -1260,6 +1299,7 @@ xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 	 */
 	drop_blk->hashval = drop_leaf->leaves[drop_leaf->hdr.count-1].hashval;
 
+	sbp = &state->mp->m_sb;
 	/*
 	 * Check if we need a temp buffer, or can we do it in place.
 	 * Note that we don't check leaf for holes because we will
@@ -1272,22 +1312,19 @@ xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 		 */
 		if (drop_leaf->leaves[0].hashval < save_leaf->leaves[0].hashval) {
 			xfs_dir_leaf_moveents(drop_leaf, 0, save_leaf, 0,
-							 (int)drop_hdr->count);
+						 (int)drop_hdr->count, sbp);
 		} else {
 			xfs_dir_leaf_moveents(drop_leaf, 0,
 					      save_leaf, save_hdr->count,
-					      (int)drop_hdr->count);
+					      (int)drop_hdr->count, sbp);
 		}
 	} else {
 		/*
 		 * Destination has holes, so we make a temporary copy
 		 * of the leaf and add them both to that.
 		 */
-		tmpbuffer = malloc(state->blocksize);
-		if (tmpbuffer == NULL) {
-			perror("malloc failed");
-			exit(1);
-		}
+		tmpbuffer = kmem_alloc(state->blocksize, KM_SLEEP);
+		ASSERT(tmpbuffer != NULL);
 		bzero(tmpbuffer, state->blocksize);
 		tmp_leaf = (struct xfs_dir_leafblock *)tmpbuffer;
 		tmp_hdr = &tmp_leaf->hdr;
@@ -1297,22 +1334,22 @@ xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 		tmp_hdr->namebytes = 0;
 		if (drop_leaf->leaves[0].hashval < save_leaf->leaves[0].hashval) {
 			xfs_dir_leaf_moveents(drop_leaf, 0, tmp_leaf, 0,
-							 (int)drop_hdr->count);
+						 (int)drop_hdr->count, sbp);
 			xfs_dir_leaf_moveents(save_leaf, 0,
 					      tmp_leaf, tmp_leaf->hdr.count,
-					      (int)save_hdr->count);
+					      (int)save_hdr->count, sbp);
 		} else {
 			xfs_dir_leaf_moveents(save_leaf, 0, tmp_leaf, 0,	
-							 (int)save_hdr->count);
+						 (int)save_hdr->count, sbp);
 			xfs_dir_leaf_moveents(drop_leaf, 0,
 					      tmp_leaf, tmp_leaf->hdr.count,
-					      (int)drop_hdr->count);
+					      (int)drop_hdr->count, sbp);
 		}
 		bcopy((char *)tmp_leaf, (char *)save_leaf, state->blocksize);
-		free(tmpbuffer);
+		kmem_free(tmpbuffer, state->blocksize);
 	}
 
-	xfs_trans_log_buf(state->trans, save_blk->bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, save_blk->bp, 0, state->blocksize - 1);
 
 	/*
 	 * Copy out last hashval in each block for B-tree code.
@@ -1331,7 +1368,7 @@ xfs_dir_node_remove(struct xfs_dir_state *state,
 	struct xfs_dir_node_entry *btree;
 	int tmp;
 
-	node = (struct xfs_dir_intnode *)drop_blk->bp->buffer;
+	node = (struct xfs_dir_intnode *)drop_blk->bp->b_un.b_addr;
 	ASSERT(drop_blk->index <= node->hdr.count);
 	ASSERT(drop_blk->index >= 0);
 
@@ -1357,7 +1394,7 @@ xfs_dir_node_remove(struct xfs_dir_state *state,
 	btree--;
 	drop_blk->hashval = btree->hashval;
 
-	xfs_trans_log_buf(state->trans, drop_blk->bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, drop_blk->bp, 0, state->blocksize - 1);
 }
 
 /*
@@ -1373,8 +1410,8 @@ xfs_dir_node_unbalance(struct xfs_dir_state *state,
 	struct xfs_dir_node_entry *btree;
 	int tmp;
 
-	drop_node = (struct xfs_dir_intnode *)drop_blk->bp->buffer;
-	save_node = (struct xfs_dir_intnode *)save_blk->bp->buffer;
+	drop_node = (struct xfs_dir_intnode *)drop_blk->bp->b_un.b_addr;
+	save_node = (struct xfs_dir_intnode *)save_blk->bp->b_un.b_addr;
 	ASSERT(drop_node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	ASSERT(save_node->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 
@@ -1398,7 +1435,7 @@ xfs_dir_node_unbalance(struct xfs_dir_state *state,
 	bcopy((char *)&drop_node->btree[0], (char *)btree, tmp);
 	save_node->hdr.count += drop_node->hdr.count;
 
-	xfs_trans_log_buf(state->trans, save_blk->bp, 0, state->blocksize);
+	xfs_trans_log_buf(state->trans, save_blk->bp, 0, state->blocksize - 1);
 
 	/*
 	 * Save the last hashval in the remaining block for upward propagation.
@@ -1431,10 +1468,12 @@ xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
 	struct xfs_dir_leaf_entry *entry;
 	struct xfs_dir_leaf_name *namest;
 	int probe, span, i;
+	xfs_sb_t *sbp;
 
-	leaf = (struct xfs_dir_leafblock *)bp->buffer;
+	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
-	ASSERT((leaf->hdr.count >= 0) && (leaf->hdr.count < (XFS_LBSIZE(fs)/8)));
+	sbp = &args->dp->i_mount->m_sb;
+	ASSERT((leaf->hdr.count >= 0) && (leaf->hdr.count < (XFS_LBSIZE(sbp)/8)));
 
 	/*
 	 * Only bother with a binary search if more than a few entries.
@@ -1586,23 +1625,23 @@ xfs_dir_findpath(struct xfs_dir_state *state,
 		/*
 		 * Read the next node down in the tree.
 		 */
-		blk->bp = xfs_trans_bread(state->trans, cur_blkno,
-							state->blocksize);
+		blk->bp = xfs_dir_read_buf(state->trans, state->args->dp,
+							 cur_blkno);
 		blk->blkno = cur_blkno;
 
 		/*
 		 * Do the right thing depending on block type.
 		 */
-		info = (struct xfs_dir_blkinfo *)blk->bp->buffer;
+		info = (struct xfs_dir_blkinfo *)blk->bp->b_un.b_addr;
 		switch (info->magic) {
 		case XFS_DIR_LEAF_MAGIC:
-			leaf = (struct xfs_dir_leafblock *)blk->bp->buffer;
+			leaf = (struct xfs_dir_leafblock *)blk->bp->b_un.b_addr;
 			blk->hashval = leaf->leaves[leaf->hdr.count-1].hashval;
 			blk->leafblk = 1;
 			goto out;
 
 		case XFS_DIR_NODE_MAGIC:
-			node = (struct xfs_dir_intnode *)blk->bp->buffer;
+			node = (struct xfs_dir_intnode *)blk->bp->b_un.b_addr;
 			blk->hashval = node->btree[node->hdr.count-1].hashval;
 			blk->leafblk = 0;
 			if (cur_blkno == find_blkno)
@@ -1647,7 +1686,7 @@ out:
 void
 xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 		      struct xfs_dir_leafblock *leaf_d, int start_d,
-		      int count)
+		      int count, xfs_sb_t *sbp)
 {
 	struct xfs_dir_leaf_hdr *hdr_s, *hdr_d;
 	struct xfs_dir_leaf_entry *entry_s, *entry_d;
@@ -1667,9 +1706,9 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 	ASSERT(leaf_d->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	hdr_s = &leaf_s->hdr;
 	hdr_d = &leaf_d->hdr;
-	ASSERT((hdr_s->count > 0) && (hdr_s->count < (XFS_LBSIZE(fs)/8)));
+	ASSERT((hdr_s->count > 0) && (hdr_s->count < (XFS_LBSIZE(sbp)/8)));
 	ASSERT(hdr_s->firstused >= ((hdr_s->count*sizeof(*entry_s))+sizeof(*hdr_s)));
-	ASSERT((hdr_d->count >= 0) && (hdr_d->count < (XFS_LBSIZE(fs)/8)));
+	ASSERT((hdr_d->count >= 0) && (hdr_d->count < (XFS_LBSIZE(sbp)/8)));
 	ASSERT(hdr_d->firstused >= ((hdr_d->count*sizeof(*entry_d))+sizeof(*hdr_d)));
 
 	ASSERT(start_s < hdr_s->count);
@@ -1695,7 +1734,7 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 	entry_d = &leaf_d->leaves[start_d];
 	for (i = 0; i < count; entry_s++, entry_d++, i++) {
 		ASSERT(entry_s->nameidx >= hdr_s->firstused);
-		ASSERT(entry_s->nameidx < XFS_LBSIZE(fs));
+		ASSERT(entry_s->nameidx < XFS_LBSIZE(sbp));
 		namest_s = XFS_DIR_LEAF_NAMESTRUCT(leaf_s, entry_s->nameidx);
 		ASSERT(namest_s->namelen < MAXNAMELEN);
 		tmp = XFS_DIR_LEAF_ENTSIZE_BYENTRY(namest_s);
@@ -1748,7 +1787,8 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
  * GROT: allow multiple duplicate hashvals.
  */
 int
-xfs_dir_leaf_refind(struct xfs_dir_leafblock *leaf, int start, uint hashval)
+xfs_dir_leaf_refind(struct xfs_dir_leafblock *leaf, int start, uint hashval,
+			xfs_sb_t *sbp)
 {
 	struct xfs_dir_leaf_entry *entry;
 	int max, i;
@@ -1768,13 +1808,13 @@ xfs_dir_leaf_refind(struct xfs_dir_leafblock *leaf, int start, uint hashval)
 		return(start);
 	for (i = start; i > 0; entry--, i--) {
 		ASSERT(entry->nameidx >= leaf->hdr.firstused);
-		ASSERT(entry->nameidx < XFS_LBSIZE(fs));
+		ASSERT(entry->nameidx < XFS_LBSIZE(sbp));
 		if (hashval >= entry->hashval)
 			break;
 	}
 	for (  ; i <= max; entry++, i++) {
 		ASSERT(entry->nameidx >= leaf->hdr.firstused);
-		ASSERT(entry->nameidx < XFS_LBSIZE(fs));
+		ASSERT(entry->nameidx < XFS_LBSIZE(sbp));
 		if (hashval < entry->hashval)
 			break;
 	}
@@ -1833,8 +1873,8 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 	 * Set up environment.
 	 */
 	ASSERT(old_blk->leafblk == new_blk->leafblk);
-	old_info = (struct xfs_dir_blkinfo *)old_blk->bp->buffer;
-	new_info = (struct xfs_dir_blkinfo *)new_blk->bp->buffer;
+	old_info = (struct xfs_dir_blkinfo *)old_blk->bp->b_un.b_addr;
+	new_info = (struct xfs_dir_blkinfo *)new_blk->bp->b_un.b_addr;
 	if (old_blk->leafblk) {
 		ASSERT(old_info->magic == XFS_DIR_LEAF_MAGIC);
 	} else {
@@ -1843,8 +1883,8 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 	ASSERT(old_info->magic == new_info->magic);
 
 	if (old_blk->leafblk) {
-		old_leaf = (struct xfs_dir_leafblock *)old_blk->bp->buffer;
-		new_leaf = (struct xfs_dir_leafblock *)new_blk->bp->buffer;
+		old_leaf = (struct xfs_dir_leafblock *)old_blk->bp->b_un.b_addr;
+		new_leaf = (struct xfs_dir_leafblock *)new_blk->bp->b_un.b_addr;
 		if ((old_leaf->hdr.count > 0) && (new_leaf->hdr.count > 0) && 
 		    (new_leaf->leaves[0].hashval < old_leaf->leaves[0].hashval)) {
 			before = 1;
@@ -1852,8 +1892,8 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 			before = 0;
 		}
 	} else {
-		old_node = (struct xfs_dir_intnode *)old_blk->bp->buffer;
-		new_node = (struct xfs_dir_intnode *)new_blk->bp->buffer;
+		old_node = (struct xfs_dir_intnode *)old_blk->bp->b_un.b_addr;
+		new_node = (struct xfs_dir_intnode *)new_blk->bp->b_un.b_addr;
 		if ((old_node->hdr.count > 0) && (new_node->hdr.count > 0) && 
 		    (new_node->btree[0].hashval < old_node->btree[0].hashval)) {
 			before = 1;
@@ -1872,9 +1912,9 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 		new_info->forw = old_blk->blkno;
 		new_info->back = old_info->back;
 		if (old_info->back) {
-			bp = xfs_trans_bread(state->trans, old_info->back,
-							   state->blocksize);
-			tmp_info = (struct xfs_dir_blkinfo *)bp->buffer;
+			bp = xfs_dir_read_buf(state->trans, state->args->dp,
+							    old_info->back);
+			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (old_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
 			} else {
@@ -1883,7 +1923,7 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 			ASSERT(tmp_info->forw == old_blk->blkno);
 			tmp_info->forw = new_blk->blkno;
 			xfs_trans_log_buf(state->trans, bp, 0,
-							sizeof(*tmp_info));
+							sizeof(*tmp_info) - 1);
 		}
 		old_info->back = new_blk->blkno;
 	} else {
@@ -1893,9 +1933,9 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 		new_info->forw = old_info->forw;
 		new_info->back = old_blk->blkno;
 		if (old_info->forw) {
-			bp = xfs_trans_bread(state->trans, old_info->forw,
-							   state->blocksize);
-			tmp_info = (struct xfs_dir_blkinfo *)bp->buffer;
+			bp = xfs_dir_read_buf(state->trans, state->args->dp,
+							    old_info->forw);
+			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (old_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
 			} else {
@@ -1904,13 +1944,13 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 			ASSERT(tmp_info->back == old_blk->blkno);
 			tmp_info->back = new_blk->blkno;
 			xfs_trans_log_buf(state->trans, bp, 0,
-							sizeof(*tmp_info));
+							sizeof(*tmp_info) - 1);
 		}
 		old_info->forw = new_blk->blkno;
 	}
 
-	xfs_trans_log_buf(state->trans, old_blk->bp, 0, sizeof(*tmp_info));
-	xfs_trans_log_buf(state->trans, new_blk->bp, 0, sizeof(*tmp_info));
+	xfs_trans_log_buf(state->trans, old_blk->bp, 0, sizeof(*tmp_info) - 1);
+	xfs_trans_log_buf(state->trans, new_blk->bp, 0, sizeof(*tmp_info) - 1);
 }
 
 /*
@@ -1928,8 +1968,8 @@ xfs_dir_blk_unlink(struct xfs_dir_state *state,
 	 * Set up environment.
 	 */
 	ASSERT(save_blk->leafblk == drop_blk->leafblk);
-	save_info = (struct xfs_dir_blkinfo *)save_blk->bp->buffer;
-	drop_info = (struct xfs_dir_blkinfo *)drop_blk->bp->buffer;
+	save_info = (struct xfs_dir_blkinfo *)save_blk->bp->b_un.b_addr;
+	drop_info = (struct xfs_dir_blkinfo *)drop_blk->bp->b_un.b_addr;
 	if (save_blk->leafblk) {
 		ASSERT(save_info->magic == XFS_DIR_LEAF_MAGIC);
 	} else {
@@ -1948,9 +1988,9 @@ xfs_dir_blk_unlink(struct xfs_dir_state *state,
 	if (save_info->back == drop_blk->blkno) {
 		save_info->back = drop_info->back;
 		if (drop_info->back) {
-			bp = xfs_trans_bread(state->trans, drop_info->back,
-							   state->blocksize);
-			tmp_info = (struct xfs_dir_blkinfo *)bp->buffer;
+			bp = xfs_dir_read_buf(state->trans, state->args->dp,
+							    drop_info->back);
+			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (save_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
 			} else {
@@ -1959,14 +1999,14 @@ xfs_dir_blk_unlink(struct xfs_dir_state *state,
 			ASSERT(tmp_info->forw == drop_blk->blkno);
 			tmp_info->forw = save_blk->blkno;
 			xfs_trans_log_buf(state->trans, bp, 0,
-							sizeof(*tmp_info));
+							sizeof(*tmp_info) - 1);
 		}
 	} else {
 		save_info->forw = drop_info->forw;
 		if (drop_info->forw) {
-			bp = xfs_trans_bread(state->trans, drop_info->forw,
-							   state->blocksize);
-			tmp_info = (struct xfs_dir_blkinfo *)bp->buffer;
+			bp = xfs_dir_read_buf(state->trans, state->args->dp,
+							    drop_info->forw);
+			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (save_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
 			} else {
@@ -1975,9 +2015,10 @@ xfs_dir_blk_unlink(struct xfs_dir_state *state,
 			ASSERT(tmp_info->back == drop_blk->blkno);
 			tmp_info->back = save_blk->blkno;
 			xfs_trans_log_buf(state->trans, bp, 0,
-							sizeof(*tmp_info));
+							sizeof(*tmp_info) - 1);
 		}
 	}
 
-	xfs_trans_log_buf(state->trans, save_blk->bp, 0, sizeof(*save_info));
+	xfs_trans_log_buf(state->trans, save_blk->bp, 0,
+					sizeof(*save_info) - 1);
 }

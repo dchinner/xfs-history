@@ -1,3 +1,8 @@
+#ifndef _FS_XFS_DIR_BTREE_H
+#define	_FS_XFS_DIR_BTREE_H
+
+#ident	"$Revision$"
+
 /*
  * xfs_dir_btree.h
  */
@@ -14,6 +19,7 @@ struct xfs_dir_name {
 	int namelen;			/* length of string (maybe no NULL) */
 	uint hashval;			/* hash value of name */
 	xfs_ino_t inumber;		/* input/output inode number */
+	xfs_inode_t *dp;		/* directory inode to manipulate */
 };
 
 /*
@@ -58,63 +64,6 @@ struct xfs_dir_state {
  *========================================================================*/
 
 /*
- * Overall external interface routines.
- */
-int	xfs_dir_isempty(xfs_inode_t *dp);
-
-int	xfs_dir_init (xfs_trans_t *tp,
-		      xfs_inode_t *dir,
-		      xfs_inode_t *parent_dir);
-
-int	xfs_dir_createname(xfs_trans_t *tp,
-			   xfs_inode_t *dp,
-			   char *name_string,
-			   xfs_ino_t inode_number);
-
-int	xfs_dir_removename(xfs_trans_t *tp,
-			   xfs_inode_t *dp,
-			   char *name_string);
-
-int	xfs_dir_lookup(xfs_trans_t *tp,
-		       xfs_inode_t *dp,
-		       char *name_string,
-		       int name_length,
-		       xfs_ino_t *inode_number);
-
-int	xfs_dir_getdents();
-
-/*
- * Interface routines when dirsize < XFS_LITINO(fs).
- */
-int	xfs_dir_shortform_create(xfs_trans_t *, xfs_ino_t parent_inumber);
-int	xfs_dir_shortform_addname(xfs_trans_t *, struct xfs_dir_name *add);
-int	xfs_dir_shortform_removename(xfs_trans_t *, struct xfs_dir_name *remove);
-int	xfs_dir_shortform_lookup(struct xfs_dir_name *lookup);
-int	xfs_dir_shortform_to_leaf(xfs_trans_t *);
-
-/*
- * Interface routines when dirsize == XFS_LBSIZE(fs).
- */
-buf_t	*xfs_dir_leaf_create(xfs_trans_t *, xfs_fsblock_t which_block);
-int	xfs_dir_leaf_addname(xfs_trans_t *, struct xfs_dir_name *args);
-int	xfs_dir_leaf_removename(xfs_trans_t *, struct xfs_dir_name *args,
-					    int *number_entries,
-					    int *total_namebytes);
-int	xfs_dir_leaf_lookup(struct xfs_dir_name *args);
-int	xfs_dir_leaf_to_shortform(xfs_trans_t *);
-int	xfs_dir_leaf_to_node(xfs_trans_t *);
-
-/*
- * Interface routines when dirsize > XFS_LBSIZE(fs).
- */
-buf_t	*xfs_dir_node_create(xfs_trans_t *, xfs_fsblock_t which_block,
-					 int leaf_block_next);
-int	xfs_dir_node_addname(xfs_trans_t *, struct xfs_dir_name *args);
-int	xfs_dir_node_removename(xfs_trans_t *, struct xfs_dir_name *args);
-int	xfs_dir_node_lookup(xfs_trans_t *, struct xfs_dir_name *args);
-int	xfs_dir_node_to_leaf(xfs_trans_t *);
-
-/*
  * Routines used for growing the Btree.
  */
 int	xfs_dir_split(struct xfs_dir_state *state);
@@ -124,14 +73,14 @@ int	xfs_dir_root_split(struct xfs_dir_state *state,
 int	xfs_dir_leaf_split(struct xfs_dir_state *state,
 				  struct xfs_dir_state_blk *oldblk,
 				  struct xfs_dir_state_blk *newblk);
-int	xfs_dir_leaf_add(xfs_trans_t *, buf_t *leaf_buffer,
+int	xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *leaf_buffer,
 				     struct xfs_dir_name *args,
 				     int insertion_index);
-void	xfs_dir_leaf_add_work(xfs_trans_t *, buf_t *leaf_buffer,
+void	xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *leaf_buffer,
 					  struct xfs_dir_name *args,
 					  int insertion_index,
 					  int freemap_index);
-void	xfs_dir_leaf_compact(xfs_trans_t *, buf_t *leaf_buffer);
+void	xfs_dir_leaf_compact(xfs_trans_t *trans, buf_t *leaf_buffer);
 void	xfs_dir_leaf_rebalance(struct xfs_dir_state *state,
 				      struct xfs_dir_state_blk *blk1,
 				      struct xfs_dir_state_blk *blk2);
@@ -163,7 +112,7 @@ int	xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level);
 void	xfs_dir_fixhashpath(struct xfs_dir_state *state,
 				   struct xfs_dir_state_path *path_to_to_fix,
 				   int level_in_path);
-void	xfs_dir_leaf_remove(xfs_trans_t *, buf_t *leaf_buffer,
+void	xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *leaf_buffer,
 					int index_to_remove);
 void	xfs_dir_leaf_unbalance(struct xfs_dir_state *state,
 				      struct xfs_dir_state_blk *drop_blk,
@@ -191,9 +140,11 @@ void	xfs_dir_findpath(struct xfs_dir_state *state,
 void	xfs_dir_leaf_moveents(struct xfs_dir_leafblock *src_leaf,
 				     int src_start,
 				     struct xfs_dir_leafblock *dst_leaf,
-				     int dst_start, int move_count);
+				     int dst_start, int move_count,
+				     xfs_sb_t *sbp);
 int	xfs_dir_leaf_refind(struct xfs_dir_leafblock *leaf,
-				   int likely_index, uint hashval);
+				   int likely_index, uint hashval,
+				   xfs_sb_t *sbp);
 int	xfs_dir_node_refind(struct xfs_dir_intnode *node,
 				   int likely_index, uint hashval);
 void	xfs_dir_blk_unlink(struct xfs_dir_state *state,
@@ -203,8 +154,4 @@ void	xfs_dir_blk_link(struct xfs_dir_state *state,
 				struct xfs_dir_state_blk *old_blk,
 				struct xfs_dir_state_blk *new_blk);
 
-uint	xfs_dir_hashname(char *name_string, int name_length);
-int	xfs_dir_grow_inode(xfs_trans_t *, int delta_in_bytes,
-				       xfs_fsblock_t *last_logblk_in_inode);
-int	xfs_dir_shrink_inode(xfs_trans_t *, int delta_in_bytes,
-					 xfs_fsblock_t *last_logblk_in_inode);
+#endif	/* !FS_XFS_DIR_BTREE_H */
