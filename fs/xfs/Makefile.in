@@ -87,3 +87,8 @@ ifsel(CONFIG_XFS_FS)
 endif
 
 select(CONFIG_XFS_FS xfs.o)
+
+# kdb uses bfd.h from user space.  This is deliberate, to avoid multiple copies
+# of bfd.h in the kdb patch.  It will probably change, with bfd.h being copied
+# to arch/$(ARCH)/kdb.
+extra_cflags(xfsidbg.o -I /usr/include)
