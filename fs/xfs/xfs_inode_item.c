@@ -77,9 +77,9 @@ xfs_inode_item_size(
 			~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
+		    (ip->i_d.di_nextents > 0) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_extents != NULL);
-			ASSERT(ip->i_d.di_nextents > 0);
 			nvecs++;
 		} else {
 			iip->ili_format.ilf_fields &= ~XFS_ILOG_EXT;
