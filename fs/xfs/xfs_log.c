@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.148 $"
+#ident	"$Revision: 1.150 $"
 
 /*
  * High level interface routines for log manager
@@ -1567,18 +1567,22 @@ xlog_write(xfs_mount_t *	mp,
 	    /* are we copying a commit or unmount record? */
 	    logop_head->oh_flags = flags;
 
-#ifndef NO_XFS_PARANOIA
+	    /*
+	     * We've seen logs corrupted with bad transaction client
+	     * ids.  This makes sure that XFS doesn't generate them on.
+	     * Turn this into an EIO and shut down the filesystem.
+	     */
 	    switch (logop_head->oh_clientid)  {
 	    case XFS_TRANSACTION:
 	    case XFS_VOLUME:
 	    case XFS_LOG:
 		break;
 	    default:
-		cmn_err(CE_PANIC,
+		cmn_err(CE_WARN,
 		    "Bad XFS transaction clientid 0x%x in ticket 0x%x\n",
 		    logop_head->oh_clientid, tic);
+		return XFS_ERROR(EIO);
 	    }
-#endif
 
 	    /* Partial write last time? => (partial_copy != 0)
 	     * need_copy is the amount we'd like to copy if everything could
