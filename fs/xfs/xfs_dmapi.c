@@ -524,8 +524,10 @@ xfs_bulkstat_one(
 
 	buf = (dm_stat_t *)buffer;
 
-	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino)
-		return(0); /* KCM - why no *res = BULKSTAT_RV_NOTHING here? */
+	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino) {
+		*res = BULKSTAT_RV_NOTHING;
+		return EINVAL;	/* KCM - Correct errno ? */
+	}
 	error = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED, &ip, bno);
 	if (error) {
 		*res = BULKSTAT_RV_NOTHING;
