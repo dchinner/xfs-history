@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.41 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1300,8 +1300,8 @@ xfs_bmap_search_extents(
 
 	lastx = ip->i_lastex;
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+	base = &ip->i_u1.iu_extents[0];
 	if (lastx != NULLEXTNUM && lastx < nextents) {
-		base = &ip->i_u1.iu_extents[0];
 		ep = base + lastx;
 	} else
 		ep = NULL;
@@ -1595,6 +1595,7 @@ xfs_bmapi(
 	xfs_alloctype_t		type;
 	int			wasdelay;
 	int			wr;
+	int			inhole_last_loop;
 
 	ASSERT(*nmap >= 1 && *nmap <= XFS_BMAP_MAX_NMAP);
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
@@ -1603,6 +1604,7 @@ xfs_bmapi(
 	wr = (flags & XFS_BMAPI_WRITE) != 0;
 	delay = (flags & XFS_BMAPI_DELAY) != 0;
 	trim = (flags & XFS_BMAPI_ENTIRE) == 0;
+	inhole_last_loop = 0;
 	ASSERT(wr || !delay);
 	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		if (!wr) {
@@ -1698,6 +1700,7 @@ xfs_bmapi(
 			len -= mval->br_blockcount;
 			mval++;
 			n++;
+			inhole_last_loop = 1;
 			continue;
 		}
 		/*
@@ -1725,7 +1728,8 @@ xfs_bmapi(
 			ASSERT(mval->br_startoff ==
 			       mval[-1].br_startoff + mval[-1].br_blockcount);
 			mval[-1].br_blockcount += mval->br_blockcount;
-		} else if (n > 0 && mval->br_startblock == NULLSTARTBLOCK &&
+		} else if (n > 0 && inhole_last_loop == 0 &&
+			   mval->br_startblock == NULLSTARTBLOCK &&
 			   mval[-1].br_startblock == NULLSTARTBLOCK &&
 			   mval->br_startoff ==
 			   mval[-1].br_startoff + mval[-1].br_blockcount) {
@@ -1734,6 +1738,7 @@ xfs_bmapi(
 			mval++;
 			n++;
 		}
+		inhole_last_loop = 0;
 		/*
 		 * If we're done, stop now.
 		 */
