@@ -18,6 +18,7 @@
 #include <sys/debug.h>
 #include <sys/ktrace.h>
 #include <sys/kmem.h>
+#include <sys/errno.h>
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
@@ -2372,8 +2373,17 @@ xfs_alloc_read_agf(
 		*bpp = NULL;
 		return 0;
 	}
-	pag = &mp->m_perag[agno];
+	/*
+	 * Validate the magic number of the agf block.
+	 */
 	agf = XFS_BUF_TO_AGF(bp);
+	if ((agf->agf_magicnum != XFS_AGF_MAGIC) ||
+	    (agf->agf_versionnum != XFS_AGF_VERSION)) {
+		bp->b_flags |= B_ERROR;
+		xfs_trans_brelse(tp, bp);
+		return EIO;
+	}
+	pag = &mp->m_perag[agno];
 	if (!pag->pagf_init) {
 		pag->pagf_freeblks = agf->agf_freeblks;
 		pag->pagf_flcount = agf->agf_flcount;

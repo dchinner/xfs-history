@@ -1630,6 +1630,7 @@ xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 	xfs_bmbt_irec_t map;
 	int nmap, error;
 	xfs_fsblock_t firstblock;
+	xfs_dir_blkinfo_t *dirblkp;
 
 	nmap = 1;
 	firstblock = NULLFSBLOCK;
@@ -1647,8 +1648,23 @@ xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 		*bpp = NULL;
 		return(0);
 	}
-	return(xfs_btree_read_bufl(dp->i_mount, trans, map.br_startblock,
-				   0, bpp));
+	error = xfs_btree_read_bufl(dp->i_mount, trans, map.br_startblock,
+				    0, bpp);
+	if (error) {
+		return(error);
+	}
+	
+	/*
+	 * Watch out for corrupted on disk blocks.
+	 */
+	dirblkp = (xfs_dir_blkinfo_t *)((*bpp)->b_un.b_addr);
+	if ((dirblkp->magic != XFS_DIR_NODE_MAGIC) &&
+	    (dirblkp->magic != XFS_DIR_LEAF_MAGIC)) {
+		(*bpp)->b_flags |= B_ERROR;
+		xfs_trans_brelse(trans, *bpp);
+		return(EIO);
+	}
+	return(0);
 }
 
 /*

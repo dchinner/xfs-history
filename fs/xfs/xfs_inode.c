@@ -1,4 +1,4 @@
-#ident "$Revision: 1.141 $"
+#ident "$Revision: 1.139 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -135,6 +135,7 @@ xfs_inotobp(
 	buf_t		*bp;
 	dev_t		dev;
 	int		error;
+	xfs_dinode_t	*dip;
 
 	/*
 	 * Call the space managment code to find the location of the
@@ -163,8 +164,15 @@ xfs_inotobp(
 	error = xfs_trans_read_buf(tp, dev, imap.im_blkno,
 				   (int)imap.im_len, 0, &bp);
 
-	if (error != 0) {
+	if (error) {
 		return error;
+	}
+	dip = (xfs_dinode_t *)(bp->b_un.b_addr);
+	if ((dip->di_core.di_magic != XFS_DINODE_MAGIC) ||
+	    (dip->di_core.di_version != XFS_DINODE_VERSION)) {
+		bp->b_flags |= B_ERROR;
+		xfs_trans_brelse(tp, bp);
+		return EIO;
 	}
 
 	xfs_inobp_check(mp, bp);
@@ -210,6 +218,7 @@ xfs_itobp(
 	buf_t		*bp;
 	dev_t		dev;
 	int		error;
+	xfs_dinode_t	*dip;
 
 	if (ip->i_blkno == (daddr_t)0) {
 		/*
@@ -257,8 +266,15 @@ xfs_itobp(
 	error = xfs_trans_read_buf(tp, dev, imap.im_blkno, (int)imap.im_len,
 				   0, &bp);
 
-	if (error != 0) {
+	if (error) {
 		return error;
+	}
+	dip = (xfs_dinode_t *)(bp->b_un.b_addr);
+	if ((dip->di_core.di_magic != XFS_DINODE_MAGIC) ||
+	    (dip->di_core.di_version != XFS_DINODE_VERSION)) {
+		bp->b_flags |= B_ERROR;
+		xfs_trans_brelse(tp, bp);
+		return EIO;
 	}
 
 	xfs_inobp_check(mp, bp);
@@ -1226,10 +1242,19 @@ xfs_iunlink(
 	 * on the list.
 	 */
 	error = xfs_trans_read_buf(tp, mp->m_dev, agdaddr, 1, 0, &agibp);
-	if (error != 0) {
+	if (error) {
 		return error;
 	}
+	/*
+	 * Validate the magic number of the agi block.
+	 */
 	agi = XFS_BUF_TO_AGI(agibp);
+	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
+	    (agi->agi_versionnum != XFS_AGI_VERSION)) {
+		agibp->b_flags |= B_ERROR;
+		xfs_trans_brelse(tp, agibp);
+		return EIO;
+	}
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 
 	/*
@@ -1249,7 +1274,7 @@ xfs_iunlink(
 		 * and then we fall through to point the head at us.
 		 */
 		error = xfs_itobp(mp, tp, ip, &dip, &ibp);
-		if (error != 0) {
+		if (error) {
 			return error;
 		}
 		ASSERT(dip->di_next_unlinked == NULLAGINO);
@@ -1314,7 +1339,16 @@ xfs_iunlink_remove(
 	if (error != 0) {
 		return error;
 	}
+	/*
+	 * Validate the magic number of the agi block.
+	 */
 	agi = XFS_BUF_TO_AGI(agibp);
+	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
+	    (agi->agi_versionnum != XFS_AGI_VERSION)) {
+		agibp->b_flags |= B_ERROR;
+		xfs_trans_brelse(tp, agibp);
+		return EIO;
+	}
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 
 	/*
@@ -1337,7 +1371,7 @@ xfs_iunlink_remove(
 		 * change it.
 		 */
 		error = xfs_itobp(mp, tp, ip, &dip, &ibp);
-		if (error != 0) {
+		if (error) {
 			return error;
 		}
 		next_agino = dip->di_next_unlinked;
@@ -1380,7 +1414,7 @@ xfs_iunlink_remove(
 			next_ino = XFS_AGINO_TO_INO(mp, agno, next_agino);
 			error = xfs_inotobp(mp, tp, next_ino, &last_dip,
 					    &last_ibp);
-			if (error != 0) {
+			if (error) {
 				return error;
 			}
 			next_agino = last_dip->di_next_unlinked;
@@ -1392,7 +1426,7 @@ xfs_iunlink_remove(
 		 * the unlinked list.  Pull us from the list.
 		 */
 		error = xfs_itobp(mp, tp, ip, &dip, &ibp);
-		if (error != 0) {
+		if (error) {
 			return error;
 		}
 		next_agino = dip->di_next_unlinked;

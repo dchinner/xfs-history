@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.28 $"
 
 /*
  * Free space allocation for xFS.
@@ -16,6 +16,7 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include <sys/errno.h>
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
@@ -1199,6 +1200,16 @@ xfs_alloc_lookup(
 				return error;
 			}
 			ASSERT(bp && !geterror(bp));
+			/*
+			 * Validate the magic number in the block.
+			 */
+			block = XFS_BUF_TO_ALLOC_BLOCK(bp);
+			if (block->bb_magic != xfs_magics[cur->bc_btnum]) {
+				bp->b_flags |= B_ERROR;
+				xfs_trans_brelse(cur->bc_tp, bp);
+				return EIO;
+			}
+
 			xfs_btree_setbuf(cur, level, bp);
 			bp->b_ref = XFS_ALLOC_BTREE_REF;
 		}

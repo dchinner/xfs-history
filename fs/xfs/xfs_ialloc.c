@@ -1150,8 +1150,17 @@ xfs_ialloc_read_agi(
 		return error;
 	}
 	ASSERT(bp && !geterror(bp));
-	pag = &mp->m_perag[agno];
+	/*
+	 * Validate the magic number of the agi block.
+	 */
 	agi = XFS_BUF_TO_AGI(bp);
+	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
+	    (agi->agi_versionnum != XFS_AGI_VERSION)) {
+		bp->b_flags |= B_ERROR;
+		xfs_trans_brelse(tp, bp);
+		return EIO;
+	}
+	pag = &mp->m_perag[agno];
 	if (!pag->pagi_init) {
 		pag->pagi_freecount = agi->agi_freecount;
 		pag->pagi_init = 1;

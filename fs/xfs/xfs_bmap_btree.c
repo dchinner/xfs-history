@@ -10,6 +10,7 @@
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
+#include <sys/errno.h>
 #include <stddef.h>
 #ifdef SIM
 #include <bstring.h>
@@ -1156,6 +1157,16 @@ xfs_bmbt_lookup(
 				}
 				ASSERT(bp);
 				ASSERT(!geterror(bp));
+				/*
+				 * Validate the magic number in the block.
+				 */
+				block = XFS_BUF_TO_BMBT_BLOCK(bp);
+				if (block->bb_magic !=
+				    xfs_magics[cur->bc_btnum]) {
+					bp->b_flags |= B_ERROR;
+					xfs_trans_brelse(tp, bp);
+					return EIO;
+				}
 				xfs_btree_setbuf(cur, level, bp);
 				bp->b_ref = XFS_BMAP_BTREE_REF;
 			}
@@ -1443,6 +1454,7 @@ xfs_bmbt_read_agf(
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	int		error;
+	xfs_agf_t	*agf;
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
@@ -1452,6 +1464,16 @@ xfs_bmbt_read_agf(
 	}
 	ASSERT(bp);
 	ASSERT(!geterror(bp));
+	/*
+	 * Validate the magic number of the agf block.
+	 */
+	agf = XFS_BUF_TO_AGF(bp);
+	if ((agf->agf_magicnum != XFS_AGF_MAGIC) ||
+	    (agf->agf_versionnum != XFS_AGF_VERSION)) {
+		bp->b_flags |= B_ERROR;
+		xfs_trans_brelse(tp, bp);
+		return EIO;
+	}
 	bp->b_ref = XFS_AGF_REF;
 	*bpp = bp;
 	return 0;
