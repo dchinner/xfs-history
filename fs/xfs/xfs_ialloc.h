@@ -3,19 +3,11 @@
 
 #ident	"$Revision$"
 
-#include <sys/types.h>
+#include "xfs_types.h"
 #include <sys/pfdat.h>
 #include <sys/buf.h>
-#include "xfs_types.h"
 #include "xfs.h"
 #include "xfs_trans.h"
-
-#define	XFS_INODE_LOWBITS	32
-#define	XFS_INODE_HIGHBITS	32
-
-#define xfs_ino_to_agno(i)	((xfs_agnumber_t)((i) >> XFS_INODE_LOWBITS))
-#define	xfs_ino_to_agino(i)	((xfs_agino_t)((i) & ((1LL << XFS_INODE_LOWBITS) - 1LL)))
-#define	xfs_agino_to_ino(a,i)	((((xfs_ino_t)(a)) << XFS_INODE_LOWBITS) | (i))
 
 /*
  * block numbers in the AG; SB is block 0, AGH is block 1, free btree roots
@@ -38,9 +30,9 @@
 #define	XFS_IBT_MAGIC	0x58494254	/* 'XIBT' */
 typedef struct xfs_ialloc_block
 {
-	u_int32_t	magic;		/* XFS_IBT_MAGIC */
-	u_int16_t	level;		/* 0 is a leaf */
-	u_int16_t	numrecs;	/* current # of data records */
+	__uint32_t	magic;		/* XFS_IBT_MAGIC */
+	__uint16_t	level;		/* 0 is a leaf */
+	__uint16_t	numrecs;	/* current # of data records */
 	xfs_agblock_t	leftsib;	/* left sibling block */
 	xfs_agblock_t	rightsib;	/* right sibling block */
 } xfs_ialloc_block_t;
@@ -83,19 +75,10 @@ typedef struct xfs_ialloc_cur
 #endif
 } xfs_ialloc_cur_t;
 
-/* 
- * Dummy freelist inode structure.
- */
-typedef struct xfs_inode_free
-{
-	xfs_agino_t	i_next;		/* next free inode, or NULLAGINO */
-	int		i_mode;
-} xfs_inode_free_t;
-
 #define	xfs_buf_to_iblock(buf)	((xfs_ialloc_block_t *)(buf->b_un.b_addr))
 
 #define	xfs_make_iptr(s,b,o) \
-	((xfs_inode_free_t *)((caddr_t)xfs_buf_to_iblock(b) + (o) * (s)->xfsb_inodesize))
+	((xfs_dinode_t *)((caddr_t)xfs_buf_to_iblock(b) + (o) * (s)->xfsb_inodesize))
 
 /*
  * Prototypes for per-ag routines.
