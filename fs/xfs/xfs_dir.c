@@ -1,4 +1,4 @@
-#ident "$Revision: 1.101 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -196,17 +196,13 @@ xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
  */
 int							/* error */
 xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
-		   xfs_ino_t inum, xfs_fsblock_t *firstblock,
+		   int namelen, xfs_ino_t inum, xfs_fsblock_t *firstblock,
 		   xfs_bmap_free_t *flist, xfs_extlen_t total)
 {
 	xfs_da_args_t args;
-	int retval, newsize, namelen;
+	int retval, newsize;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	namelen = strlen(name);
-	if (namelen >= MAXNAMELEN) {
-		return(XFS_ERROR(EINVAL));
-	}
 
 	if (retval = xfs_dir_ino_validate(trans->t_mountp, inum))
 		return (retval);
@@ -263,16 +259,12 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
  * without adding any blocks to the directory.
  */
 int							/* error */
-xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name)
+xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen)
 {
 	xfs_da_args_t args;
-	int retval, newsize, namelen;
+	int retval, newsize;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	namelen = strlen(name);
-	if (namelen >= MAXNAMELEN) {
-		return(XFS_ERROR(EINVAL));
-	}
 
 	/*
 	 * Fill in the arg structure for this request.
@@ -312,17 +304,13 @@ xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name)
  */
 int							/* error */
 xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
-		   xfs_fsblock_t *firstblock, xfs_bmap_free_t *flist,
-		   xfs_extlen_t total)
+		   int namelen, xfs_fsblock_t *firstblock,
+		   xfs_bmap_free_t *flist, xfs_extlen_t total)
 {
 	xfs_da_args_t args;
-	int count, totallen, newsize, retval, namelen;
+	int count, totallen, newsize, retval;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	namelen = strlen(name);
-	if (namelen >= MAXNAMELEN) {
-		return(XFS_ERROR(EINVAL));
-	}
 
 	XFSSTATS.xs_dir_remove++;
 	/*

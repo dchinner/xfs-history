@@ -2466,11 +2466,15 @@ xfs_create_new(
 	int			dm_di_mode;
 	int			xfs_create_retries = 0;
 	xfs_ino_t		e_inum_saved;	/* for retry trap code */
+	int			namelen;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_create_new", (inst_t *)__return_address);
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
+	namelen = strlen(name);
+	if (namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
 
 #ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
@@ -2511,7 +2515,7 @@ xfs_create_new(
 	
 	tp = xfs_trans_alloc(mp, XFS_TRANS_CREATE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-	resblks = XFS_CREATE_SPACE_RES(mp, name);
+	resblks = XFS_CREATE_SPACE_RES(mp, namelen);
 	/*
 	 * Initially assume that the file does not exist and
 	 * reserve the resources for that case.  If that is not
@@ -2589,7 +2593,8 @@ xfs_create_new(
 				goto error_return;
 			}
 		}
-		if (resblks == 0 && (error = xfs_dir_canenter(tp, dp, name)))
+		if (resblks == 0 &&
+		    (error = xfs_dir_canenter(tp, dp, name, namelen)))
 			goto error_return;
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 		error = xfs_dir_ialloc(&tp, dp, 
@@ -2621,11 +2626,7 @@ xfs_create_new(
 		xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
 		dp_joined_to_trans = B_TRUE;
 
-		/*
-		 * XXX Need to sanity check namelen.
-		 */
-
-		error = xfs_dir_createname(tp, dp, name, ip->i_ino,
+		error = xfs_dir_createname(tp, dp, name, namelen, ip->i_ino,
 			&first_block, &free_list,
 			resblks ? resblks - XFS_IALLOC_SPACE_RES(mp) : 0);
 		if (error) {
@@ -3590,6 +3591,7 @@ xfs_remove(
 	int			entry_changed;
 	int			dm_di_mode = 0;
 	uint			resblks;
+	int			namelen;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_remove", (inst_t *)__return_address);
@@ -3599,6 +3601,9 @@ xfs_remove(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
+	namelen = strlen(name);
+	if (namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
 #ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = dm_send_namesp_event(DM_EVENT_REMOVE, dir_bdp, DM_RIGHT_NULL,
@@ -3753,7 +3758,8 @@ xfs_remove(
 	 * Entry must exist since we did a lookup in xfs_lock_dir_and_entry.
 	 */
 	XFS_BMAP_INIT(&free_list, &first_block);
-	error = xfs_dir_removename(tp, dp, name, &first_block, &free_list, 0);
+	error = xfs_dir_removename(tp, dp, name, namelen,
+		&first_block, &free_list, 0);
 	if (error) {
 		ASSERT(error != ENOENT);
 		remove_which_error_return = __LINE__;
@@ -3889,9 +3895,13 @@ xfs_link(
 	vnode_t 		*target_dir_vp;
 	bhv_desc_t		*src_bdp;
 	int			resblks;
+	int			target_namelen;
 
 	target_dir_vp = BHV_TO_VNODE(target_dir_bdp);
 	vn_trace_entry(target_dir_vp, "xfs_link", (inst_t *)__return_address);
+	target_namelen = strlen(target_name);
+	if (target_namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
 	/*
 	 * Get the real vnode.
 	 */
@@ -3946,7 +3956,7 @@ xfs_link(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_LINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-	resblks = XFS_LINK_SPACE_RES(mp, target_name);
+	resblks = XFS_LINK_SPACE_RES(mp, target_namelen);
         error = xfs_trans_reserve(tp, resblks, XFS_LINK_LOG_RES(mp), 0,
 			XFS_TRANS_PERM_LOG_RES, XFS_LINK_LOG_COUNT);
 	if (error == ENOSPC) {
@@ -4029,8 +4039,8 @@ xfs_link(
 
 	XFS_BMAP_INIT(&free_list, &first_block);
 
-	error = xfs_dir_createname(tp, tdp, target_name, sip->i_ino,
-				   &first_block, &free_list,
+	error = xfs_dir_createname(tp, tdp, target_name, target_namelen,
+				   sip->i_ino, &first_block, &free_list,
 				   resblks > 0 ? resblks : 0);
 	if (error) {
 		if (error == ENOSPC)
@@ -4130,6 +4140,7 @@ xfs_mkdir(
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
 	int			dm_di_mode;
+	int			dir_namelen;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -4137,6 +4148,10 @@ xfs_mkdir(
 
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
+
+	dir_namelen = strlen(dir_name);
+	if (dir_namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
 
 	tp = NULL;
 	dp_joined_to_trans = B_FALSE;
@@ -4173,7 +4188,7 @@ xfs_mkdir(
 	
 	tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        resblks = XFS_MKDIR_SPACE_RES(mp, dir_name);
+	resblks = XFS_MKDIR_SPACE_RES(mp, dir_namelen);
 	error = xfs_trans_reserve(tp, resblks, XFS_MKDIR_LOG_RES(mp), 0,
 				  XFS_TRANS_PERM_LOG_RES, XFS_MKDIR_LOG_COUNT);
 	if (error == ENOSPC) {
@@ -4239,7 +4254,8 @@ xfs_mkdir(
 		}
 	} 
 
-	if (resblks == 0 && (error = xfs_dir_canenter(tp, dp, dir_name)))
+	if (resblks == 0 &&
+	    (error = xfs_dir_canenter(tp, dp, dir_name, dir_namelen)))
 		goto error_return;
 	/*
 	 * create the directory inode.
@@ -4267,8 +4283,9 @@ xfs_mkdir(
 
 	XFS_BMAP_INIT(&free_list, &first_block);
 
-	error = xfs_dir_createname(tp, dp, dir_name, cdp->i_ino, &first_block,
-		&free_list, resblks ? resblks - XFS_IALLOC_SPACE_RES(mp) : 0);
+	error = xfs_dir_createname(tp, dp, dir_name, dir_namelen,
+			cdp->i_ino, &first_block, &free_list,
+			resblks ? resblks - XFS_IALLOC_SPACE_RES(mp) : 0);
 	if (error) {
 		ASSERT(error != ENOSPC);
 		goto error1;
@@ -4404,6 +4421,7 @@ xfs_rmdir(
 	int			entry_changed;
 	vnode_t 		*dir_vp;
 	int			dm_di_mode = 0;
+	int			namelen;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -4411,6 +4429,9 @@ xfs_rmdir(
 
 	if (XFS_FORCED_SHUTDOWN(XFS_BHVTOI(dir_bdp)->i_mount))
 		return XFS_ERROR(EIO);
+	namelen = strlen(name);
+	if (namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
 
 #ifndef SIM
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
@@ -4556,7 +4577,8 @@ xfs_rmdir(
 		goto error_return;
 	}
 
-        error = xfs_dir_removename(tp, dp, name, &first_block, &free_list, 0);
+	error = xfs_dir_removename(tp, dp, name, namelen,
+		&first_block, &free_list, 0);
 	if (error) {
 		goto error1;
 	}
@@ -4751,6 +4773,7 @@ xfs_symlink(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
+	int			link_namelen;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -4765,6 +4788,9 @@ xfs_symlink(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
+	link_namelen = strlen(link_name);
+	if (link_namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
 	/*
 	 * Check component lengths of the target path name.
          */
@@ -4829,7 +4855,7 @@ xfs_symlink(
 		fs_blocks = 0;
 	else
 		fs_blocks = XFS_B_TO_FSB(mp, pathlen);
-	resblks = XFS_SYMLINK_SPACE_RES(mp, link_name, fs_blocks);
+	resblks = XFS_SYMLINK_SPACE_RES(mp, link_namelen, fs_blocks);
         error = xfs_trans_reserve(tp, resblks, XFS_SYMLINK_LOG_RES(mp), 0,
 			XFS_TRANS_PERM_LOG_RES, XFS_SYMLINK_LOG_COUNT);
 	if (error == ENOSPC && fs_blocks == 0) {
@@ -4886,7 +4912,8 @@ xfs_symlink(
 	/*
 	 * Check for ability to enter directory entry, if no space reserved.
 	 */
-	if (resblks == 0 && (error = xfs_dir_canenter(tp, dp, link_name)))
+	if (resblks == 0 &&
+	    (error = xfs_dir_canenter(tp, dp, link_name, link_namelen)))
 		goto error_return;
 	/*
 	 * Initialize the bmap freelist prior to calling either
@@ -4974,8 +5001,8 @@ xfs_symlink(
 	/*
 	 * Create the directory entry for the symlink.
 	 */
-	error = xfs_dir_createname(tp, dp, link_name, ip->i_ino, &first_block,
-			&free_list,
+	error = xfs_dir_createname(tp, dp, link_name, link_namelen,
+			ip->i_ino, &first_block, &free_list,
 			resblks ? resblks - fs_blocks -
 				XFS_IALLOC_SPACE_RES(mp) : 0);
 	if (error) {

@@ -774,6 +774,8 @@ xfs_rename(
 	bhv_desc_t	*target_dir_bdp;
 	int		spaceres;
 	int		num_inodes;
+	int		src_namelen;
+	int		target_namelen;
 #ifdef DEBUG
 	int		retries;
 
@@ -792,6 +794,12 @@ xfs_rename(
 	if (target_dir_bdp == NULL) {
 		return XFS_ERROR(EXDEV);
 	}
+	src_namelen = strlen(src_name);
+	if (src_namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
+	target_namelen = strlen(target_name);
+	if (target_namelen >= MAXNAMELEN)
+		return XFS_ERROR(EINVAL);
 	src_dp = XFS_BHVTOI(src_dir_bdp);
         target_dp = XFS_BHVTOI(target_dir_bdp);
 #ifndef SIM
@@ -896,7 +904,7 @@ xfs_rename(
 	mp = src_dp->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-	spaceres = XFS_RENAME_SPACE_RES(mp, target_name);
+	spaceres = XFS_RENAME_SPACE_RES(mp, target_namelen);
 	error = xfs_trans_reserve(tp, spaceres, XFS_RENAME_LOG_RES(mp), 0,
 			XFS_TRANS_PERM_LOG_RES, XFS_RENAME_LOG_COUNT);
 	if (error == ENOSPC) {
@@ -1026,8 +1034,8 @@ xfs_rename(
 		 * to account for the ".." reference from the new entry.
 		 */
 		error = xfs_dir_createname(tp, target_dp, target_name,
-					   src_ip->i_ino, &first_block,
-					   &free_list, spaceres);
+					   target_namelen, src_ip->i_ino,
+					   &first_block, &free_list, spaceres);
 		if (error == ENOSPC) {
 			rename_which_error_return = __LINE__;
 			goto error_return;
@@ -1069,7 +1077,7 @@ xfs_rename(
 		 */
 		error = xfs_dir_replace(tp, target_dp, target_name,
 			((target_pnp != NULL) ? target_pnp->pn_complen :
-			 strlen(target_name)), src_ip->i_ino);
+			 target_namelen), src_ip->i_ino);
 		if (error) {
 			rename_which_error_return = __LINE__;
 			goto abort_return;
@@ -1153,8 +1161,8 @@ xfs_rename(
 		src_dp_dropped = 1;
 	}
 
-	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
-				   &free_list, spaceres);
+	error = xfs_dir_removename(tp, src_dp, src_name, src_namelen,
+			&first_block, &free_list, spaceres);
 	if (error) {
 		rename_which_error_return = __LINE__;
 		goto abort_return;

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision$"
 
 /*
  * xfs_dir.h
@@ -48,6 +48,7 @@ int	xfs_dir_init(struct xfs_trans *trans, struct xfs_inode *dir,
 
 int	xfs_dir_createname(struct xfs_trans *trans, struct xfs_inode *dp,
 				  char *name_string,
+				  int name_length,
 				  xfs_ino_t inode_number,
 				  xfs_fsblock_t *firstblock,
 				  struct xfs_bmap_free *flist,
@@ -59,6 +60,7 @@ int	xfs_dir_lookup(struct xfs_trans *tp, struct xfs_inode *dp,
 
 int	xfs_dir_removename(struct xfs_trans *trans, struct xfs_inode *dp,
 				  char *name_string,
+				  int name_length,
 				  xfs_fsblock_t *firstblock,
 				  struct xfs_bmap_free *flist,
 				  xfs_extlen_t total);
@@ -81,6 +83,6 @@ int	xfs_dir_replace(struct xfs_trans *tp, struct xfs_inode *dp,
 			       xfs_ino_t inode_number);
 
 int	xfs_dir_canenter(struct xfs_trans *tp, struct xfs_inode *dp,
-				char *name_string);
+				char *name_string, int name_length);
 
 #endif	/* !_FS_XFS_DIR_H */
