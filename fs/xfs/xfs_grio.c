@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.4 1994/03/16 16:17:42 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.5 1994/03/16 17:38:28 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,7 +40,6 @@
 #ifdef SIM
 #include "sim.h"
 #include "stdio.h"
-extern xfs_mount_t *mountp;
 #endif
 
 
@@ -110,7 +109,7 @@ xfs_get_inode(  dev_t fs_dev, int ino)
 		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) {
                 	ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, 0);
 #else
-                	ip = xfs_iget( mountp, NULL, ino, 0);
+                	ip = xfs_iget( NULL, NULL, ino, 0);
 #endif
 
 #ifdef DEBUG
