@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.319 $"
+#ident "$Revision: 1.320 $"
 
 #include <xfs_os_defs.h>
 
@@ -948,9 +948,9 @@ xfs_read_buf(
 		if (!error)
 			error = XFS_ERROR(EIO);
 		if (bp) {
-		    XFS_BUF_UNDONE(bp);
-		    XFS_BUF_UNDELAYWRITE(bp);
-		    XFS_BUF_STALE(bp);
+			XFS_BUF_UNDONE(bp);
+			XFS_BUF_UNDELAYWRITE(bp);
+			XFS_BUF_STALE(bp);
 			/* 
 			 * brelse clears B_ERROR and b_error
 			 */

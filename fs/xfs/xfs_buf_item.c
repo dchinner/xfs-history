@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.103 $"
+#ident "$Revision: 1.104 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -598,7 +598,6 @@ xfs_buf_item_push(
 	bp = bip->bli_buf;
 
 	if (XFS_BUF_ISDELAYWRITE(bp)) {
-		XFS_BUF_UNDELAYWRITE(bp);
 		xfs_bawrite(bip->bli_item.li_mountp, bp);
 	} else {
 		xfs_buf_relse(bp);

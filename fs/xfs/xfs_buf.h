@@ -494,7 +494,11 @@ extern dev_t	XFS_pb_target(page_buf_t *);
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
 				flags)
 
-#define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
+static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
+{
+	xfs_buf_undelay(bp);
+	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC);
+}
 
 static inline void	xfs_buf_relse(page_buf_t *bp)
 {
