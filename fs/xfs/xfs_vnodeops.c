@@ -2047,7 +2047,7 @@ xfs_lookup(
 	 * of this thread shouldn't really matter.  If we see problems
 	 * because of this window, this code can be re-enabled.
 	 */
-#if 1
+#if 0
 	if (dir_unlocked) {
 		/*
 		 * If the directory had to be unlocked in the call,
