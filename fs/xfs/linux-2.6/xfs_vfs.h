@@ -90,7 +90,7 @@ typedef enum {
 #define SYNC_BDFLUSH		0x0010	/* BDFLUSH is calling -- don't block */
 #define SYNC_FSDATA		0x0020	/* flush fs data (e.g. superblocks) */
 #define SYNC_REFCACHE		0x0040  /* prune some of the nfs ref cache */
-
+#define SYNC_REMOUNT		0x0080  /* remount readonly, no dummy LRs */
 
 #define IGET_NOALLOC		0x0001	/* vfs_get_inode may return NULL */
 
