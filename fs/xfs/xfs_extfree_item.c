@@ -18,6 +18,7 @@
 #include <sys/uuid.h>
 #ifndef SIM
 #include <sys/systm.h>
+#include <sys/kmem.h>
 #else
 #include <bstring.h>
 #endif
