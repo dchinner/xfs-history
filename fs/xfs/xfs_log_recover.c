@@ -567,8 +567,12 @@ xlog_find_head(xlog_t  *log,
 	start_blk = head_blk - num_scan_bblks;
 	new_blk = xlog_find_verify_cycle(log, start_blk, num_scan_bblks,
 					 stop_on_cycle);
-	if (new_blk != -1)
+	if (new_blk >= 0)
 	    head_blk = new_blk;
+	else if (new_blk != -1) {
+	    error = new_blk;
+	    goto bp_err;
+	}
     } else {			/* need to read 2 parts of log */
         /*
 	 * We are going to scan backwards in the log in two parts.  First
@@ -599,9 +603,12 @@ xlog_find_head(xlog_t  *log,
 	ASSERT(head_blk <= INT_MAX && (xfs_daddr_t) num_scan_bblks-head_blk >= 0);
 	new_blk= xlog_find_verify_cycle(log, start_blk,
 		     num_scan_bblks-(int)head_blk, (stop_on_cycle - 1));
-	if (new_blk != -1) {
+	if (new_blk >= 0) {
 	    head_blk = new_blk;
 	    goto bad_blk;
+	} else if (new_blk != -1) {
+		error = new_blk;
+		goto bp_err;
 	}
 
 	/*
@@ -613,8 +620,12 @@ xlog_find_head(xlog_t  *log,
 	ASSERT(head_blk <= INT_MAX);
 	new_blk = xlog_find_verify_cycle(log, start_blk, (int) head_blk,
 					 stop_on_cycle);
-	if (new_blk != -1)
+	if (new_blk >= 0)
 	    head_blk = new_blk;
+	else if (new_blk != -1) {
+		error = new_blk;
+		goto bp_err;
+	}
     }
 
 bad_blk:
@@ -937,8 +948,12 @@ xlog_find_zeroed(struct log	*log,
 	 */
 	new_blk = xlog_find_verify_cycle(log, start_blk,
 					 (int)num_scan_bblks, 0);
-	if (new_blk != -1)
+	if (new_blk >= 0)
 		last_blk = new_blk;
+	else if (new_blk != -1) {
+		error = last_blk;
+		goto bp_err;
+	}
 
 	/*
 	 * Potentially backup over partial log record write.  We don't need
@@ -1116,6 +1131,8 @@ xlog_clear_stale_blocks(
 		error = xlog_write_log_records(log, (head_cycle - 1),
 				head_block, max_distance, tail_cycle,
 				tail_block);
+		if (error)
+			return error;
 	} else {
 		/*
 		 * We need to wrap around the end of the physical log in
@@ -1143,6 +1160,8 @@ xlog_clear_stale_blocks(
 		distance = max_distance - (log->l_logBBsize - head_block);
 		error = xlog_write_log_records(log, head_cycle, 0, distance,
 				tail_cycle, tail_block);
+		if (error)
+			return error;
 	}
 
 	return 0;
