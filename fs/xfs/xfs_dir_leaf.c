@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.49 $"
 
 /*
  * xfs_dir_leaf.c
@@ -1957,7 +1957,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
-	int entno, i;
+	int entno, want_entno, i, nextentno;
 	xfs_mount_t *mp;
 	xfs_dahash_t cookhash, lasthash;
 	xfs_dir_put_args_t p;
@@ -1968,14 +1968,14 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		*eobp = 1;
 		return(XFS_ERROR(ENOENT));
 	}
-	entno = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
+	want_entno = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
 	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
 	xfs_dir_trace_g_dul("leaf: start", dp, uio, leaf);
 
 	/*
 	 * Re-find our place.
 	 */
-	for (i = 0, entry = &leaf->entries[0];
+	for (i = entno = 0, entry = &leaf->entries[0];
 	     i < leaf->hdr.count;
 	     entry++, i++) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
@@ -1986,25 +1986,27 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		if (entry->hashval >= cookhash) {
-			if ((entno > 0) && (entry->hashval == cookhash)) {
+			if (entno < want_entno && entry->hashval == cookhash) {
 				/*
 				 * Trying to get to a particular offset in a
-				 * run of equal-hashval entries.  Change the
-				 * UIO so that if we roll out of this block
-				 * the next block will know how many are left.
+				 * run of equal-hashval entries.
 				 */
-				entno--;
-				uio->uio_offset = XFS_DA_MAKE_COOKIE(mp,
-							     bno, entno,
-							     entry->hashval);
+				entno++;
 			} else {
+				entno = 0;
 				break;
 			}
 		}
 	}
 	if (i == leaf->hdr.count) {
 		xfs_dir_trace_g_du("leaf: hash not found", dp, uio);
-		uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+		if (!leaf->hdr.info.forw)
+			uio->uio_offset =
+				XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+		/*
+		 * Don't set uio_offset if there's another block:
+		 * the node code will be setting uio_offset anyway.
+		 */
 		*eobp = 0;
 		return(0);
 	}
@@ -2017,10 +2019,12 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 	/*
 	 * We're synchronized, start copying entries out to the user.
 	 */
-	lasthash = XFS_DA_MAXHASH;
-	for ( ; i < leaf->hdr.count; entry++, i++) {
+	for (lasthash = XFS_DA_MAXHASH;
+	     entno >= 0 && i < leaf->hdr.count;
+	     entry++, i++, (entno = nextentno)) {
 		int lastresid, retval;
 		xfs_dircook_t lastoffset;
+		xfs_dahash_t nexthash;
 
 		/*
 		 * Check for a damaged directory leaf block and pick up
@@ -2039,7 +2043,12 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		 * and calculate its magic cookie (ie: directory offset).
 		 */
 		if (i < leaf->hdr.count-1) {
-			XFS_PUT_COOKIE(p.cook, mp, bno, 0, (entry+1)->hashval);
+			nexthash = entry[1].hashval;
+			if (nexthash == entry->hashval)
+				nextentno = entno + 1;
+			else
+				nextentno = 0;
+			XFS_PUT_COOKIE(p.cook, mp, bno, nextentno, nexthash);
 			xfs_dir_trace_g_duc("leaf: middle cookie  ",
 						   dp, uio, p.cook.o);
 		} else if (leaf->hdr.info.forw) {
@@ -2058,12 +2067,15 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 			    (leaf2->hdr.info.back != bno)) {	/* GROT */
 				return(XFS_ERROR(EFSCORRUPTED));
 			}
+			nexthash = leaf2->entries[0].hashval;
+			nextentno = -1;
 			XFS_PUT_COOKIE(p.cook, mp, leaf->hdr.info.forw, 0,
-				       leaf2->entries[0].hashval);
+				       nexthash);
 			xfs_trans_brelse(dp->i_transp, bp2);
 			xfs_dir_trace_g_duc("leaf: next blk cookie",
 						   dp, uio, p.cook.o);
 		} else {
+			nextentno = -1;
 			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
 			xfs_dir_trace_g_duc("leaf: EOF cookie",
 						   dp, uio, p.cook.o);
@@ -2074,7 +2086,8 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		 * so that we can back them out if they don't all fit.
 		 */
 		if (entry->hashval != lasthash) {
-			XFS_PUT_COOKIE(lastoffset, mp, bno, 0, entry->hashval);
+			XFS_PUT_COOKIE(lastoffset, mp, bno, entno,
+				entry->hashval);
 			lastresid = uio->uio_resid;
 			lasthash = entry->hashval;
 		} else {
