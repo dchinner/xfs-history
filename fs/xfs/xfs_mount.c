@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.225 $"
+#ident	"$Revision: 1.226 $"
 
 #include <xfs_os_defs.h>
 
@@ -944,7 +944,7 @@ xfs_mountfs_int(
 		/*
 		 * Free up the root inode.
 		 */
-  		cmn_err(CE_WARN, "XFS: failed ro read RT inodes\n");
+  		cmn_err(CE_WARN, "XFS: failed to read RT inodes\n");
 		VMAP(rvp, rip, vmap);
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
