@@ -1,4 +1,4 @@
-#ident "$Revision: 1.223 $"
+#ident "$Revision: 1.224 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4839,7 +4839,8 @@ xfs_read_buf(
 		*bpp = bp;
 	} else {
 		*bpp = NULL;
-		error = XFS_ERROR(EIO);
+		if (!error)
+			error = XFS_ERROR(EIO);
 		if (bp) {	
 			bp->b_flags &= ~(B_DONE|B_DELWRI);
 			bp->b_flags |= B_STALE;
