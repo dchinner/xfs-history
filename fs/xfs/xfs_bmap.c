@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.72 $"
+#ident	"$Revision: 1.74 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -404,7 +404,15 @@ xfs_bmap_add_extent_delay_real(
 	ASSERT(PREV.br_startoff <= new->br_startoff);
 	ASSERT(PREV.br_startoff + PREV.br_blockcount >= new_endoff);
 	/*
-	 * Check and set flags if this segment has a left neighbor
+	 * Set flags determining what part of the previous delayed allocation
+	 * extent is being replaced by a real allocation.
+	 */
+	STATE_SET(LEFT_FILLING, PREV.br_startoff == new->br_startoff);
+	STATE_SET(RIGHT_FILLING,
+		PREV.br_startoff + PREV.br_blockcount == new_endoff);
+	/*
+	 * Check and set flags if this segment has a left neighbor.
+	 * Don't set contiguous if the combined extent would be too large.
 	 */
 	if (STATE_SET_TEST(LEFT_VALID, idx > 0)) {
 		xfs_bmbt_get_all(ep - 1, &LEFT);
@@ -413,9 +421,12 @@ xfs_bmap_add_extent_delay_real(
 	STATE_SET(LEFT_CONTIG, 
 		STATE_TEST(LEFT_VALID) && !STATE_TEST(LEFT_DELAY) &&
 		LEFT.br_startoff + LEFT.br_blockcount == new->br_startoff &&
-		LEFT.br_startblock + LEFT.br_blockcount == new->br_startblock);
+		LEFT.br_startblock + LEFT.br_blockcount == new->br_startblock &&
+		LEFT.br_blockcount + new->br_blockcount <= MAXEXTLEN);
 	/*
-	 * Check and set flags if this segment has a right neighbor
+	 * Check and set flags if this segment has a right neighbor.
+	 * Don't set contiguous if the combined extent would be too large.
+	 * Also check for all-three-contiguous being too large.
 	 */
 	if (STATE_SET_TEST(RIGHT_VALID,
 		idx < ip->i_bytes / sizeof(xfs_bmbt_rec_t) - 1)) {
@@ -425,14 +436,13 @@ xfs_bmap_add_extent_delay_real(
 	STATE_SET(RIGHT_CONTIG, 
 		STATE_TEST(RIGHT_VALID) && !STATE_TEST(RIGHT_DELAY) &&
 		new_endoff == RIGHT.br_startoff &&
-		new->br_startblock + new->br_blockcount == RIGHT.br_startblock);
-	/*
-	 * Set flags determining what part of the previous delayed allocation
-	 * extent is being replaced by a real allocation.
-	 */
-	STATE_SET(LEFT_FILLING, PREV.br_startoff == new->br_startoff);
-	STATE_SET(RIGHT_FILLING,
-		PREV.br_startoff + PREV.br_blockcount == new_endoff);
+		new->br_startblock + new->br_blockcount ==
+		    RIGHT.br_startblock &&
+		new->br_blockcount + RIGHT.br_blockcount <= MAXEXTLEN &&
+		((state & MASK3(LEFT_CONTIG, LEFT_FILLING, RIGHT_FILLING)) !=
+		  MASK3(LEFT_CONTIG, LEFT_FILLING, RIGHT_FILLING) ||
+		 LEFT.br_blockcount + new->br_blockcount + RIGHT.br_blockcount
+		     <= MAXEXTLEN));
 	/*
 	 * Switch out based on the FILLING and CONTIG state bits.
 	 */
@@ -792,14 +802,19 @@ xfs_bmap_add_extent_hole_delay(
 	}
 	/*
 	 * Set contiguity flags on the left and right neighbors.
+	 * Don't let extents get too large, even if the pieces are contiguous.
 	 */
 	STATE_SET(LEFT_CONTIG, 
 		STATE_TEST(LEFT_VALID) && STATE_TEST(LEFT_DELAY) &&
-		left.br_startoff + left.br_blockcount == new->br_startoff);
+		left.br_startoff + left.br_blockcount == new->br_startoff &&
+		left.br_blockcount + new->br_blockcount <= MAXEXTLEN);
 	STATE_SET(RIGHT_CONTIG,
 		STATE_TEST(RIGHT_VALID) && STATE_TEST(RIGHT_DELAY) &&
-		new->br_startoff + new->br_blockcount == right.br_startoff);
-
+		new->br_startoff + new->br_blockcount == right.br_startoff &&
+		new->br_blockcount + right.br_blockcount <= MAXEXTLEN &&
+		(!STATE_TEST(LEFT_CONTIG) ||
+		 (left.br_blockcount + new->br_blockcount +
+		     right.br_blockcount <= MAXEXTLEN)));
 	/*
 	 * Switch out based on the contiguity flags.
 	 */
@@ -929,16 +944,22 @@ xfs_bmap_add_extent_hole_real(
 	}
 	/*
 	 * We're inserting a real allocation between "left" and "right".
-	 * Set the contiguity flags.
+	 * Set the contiguity flags.  Don't let extents get too large.
 	 */
 	STATE_SET(LEFT_CONTIG, 
 		STATE_TEST(LEFT_VALID) && !STATE_TEST(LEFT_DELAY) &&
 		left.br_startoff + left.br_blockcount == new->br_startoff &&
-		left.br_startblock + left.br_blockcount == new->br_startblock);
+		left.br_startblock + left.br_blockcount == new->br_startblock &&
+		left.br_blockcount + new->br_blockcount <= MAXEXTLEN);
 	STATE_SET(RIGHT_CONTIG,
 		STATE_TEST(RIGHT_VALID) && !STATE_TEST(RIGHT_DELAY) &&
 		new->br_startoff + new->br_blockcount == right.br_startoff &&
-		new->br_startblock + new->br_blockcount == right.br_startblock);
+		new->br_startblock + new->br_blockcount ==
+		    right.br_startblock &&
+		new->br_blockcount + right.br_blockcount <= MAXEXTLEN &&
+		(!STATE_TEST(LEFT_CONTIG) ||
+		 left.br_blockcount + new->br_blockcount +
+		     right.br_blockcount <= MAXEXTLEN));
 
 	/*
 	 * Select which case we're in here, and implement it.
@@ -2377,9 +2398,10 @@ xfs_bmapi(
 				aoff = got.br_startoff;
 				minlen = (bno - aoff) + 1;
 			} else {
-				alen = eof ? len :
-					XFS_EXTLEN_MIN(got.br_startoff - bno,
-						       len);
+				alen = XFS_EXTLEN_MIN(len, MAXEXTLEN);
+				if (!eof)
+					alen = XFS_EXTLEN_MIN(alen,
+						got.br_startoff - bno);
 				aoff = bno;
 				minlen = 1;
 			}
