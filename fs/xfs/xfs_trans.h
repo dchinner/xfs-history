@@ -222,14 +222,14 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_FIRST		0x08	/* original xact in a dup chain */
 #define	XFS_TRANS_SECOND	0x10	/* second xact in a dup chain */
 #define	XFS_TRANS_CONTINUED	0x20	/* third+ xact in a dup chain */
+#define	XFS_TRANS_SYNC		0x40	/* make commit synchronous */
 
 /*
  * Values for call flags parameter.
  */
 #define	XFS_TRANS_NOSLEEP		0x1
 #define	XFS_TRANS_WAIT			0x2
-#define	XFS_TRANS_SYNC			0x4
-#define	XFS_TRANS_RELEASE_LOG_RES	0x8
+#define	XFS_TRANS_RELEASE_LOG_RES	0x4
 
 /*
  * Field values for xfs_trans_mod_sb.
