@@ -127,6 +127,12 @@ typedef struct xfs_inode {
 #define	XFS_FLUSH_ALL		0x1
 
 /*
+ * Flags for xfs_itruncate_start().
+ */
+#define	XFS_ITRUNC_DEFINITE	0x1
+#define	XFS_ITRUNC_MAYBE	0x2
+
+/*
  * Maximum number of extent pointers in i_u1.iu_extents.
  */
 #define	XFS_MAX_INCORE_EXTENTS	32768
@@ -187,7 +193,9 @@ void		xfs_iread_extents(xfs_trans_t *, xfs_inode_t *);
 xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
 			    dev_t, struct cred *, buf_t **, boolean_t *);
 void		xfs_ifree(xfs_trans_t *, xfs_inode_t *);
-void		xfs_itruncate(xfs_trans_t **, xfs_inode_t *, xfs_fsize_t);
+void		xfs_itruncate_start(xfs_inode_t *, uint, xfs_fsize_t);
+void		xfs_itruncate_finish(xfs_trans_t **, xfs_inode_t *,
+				     xfs_fsize_t);
 void		xfs_igrow(xfs_trans_t *, xfs_inode_t *,
 			  xfs_fsize_t, struct cred *);
 
