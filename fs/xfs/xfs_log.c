@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.83 $"
+#ident	"$Revision: 1.84 $"
 
 /*
  * High level interface routines for log manager
@@ -219,7 +219,7 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 }
 
 #else
-#define	xlog_trace_loggrant(log,tic)
+#define	xlog_trace_loggrant(log,tic,string)
 #define	xlog_trace_iclog(iclog,state)
 #endif /* DEBUG && !SIM */
 
@@ -1468,11 +1468,7 @@ xlog_grant_log_space(xlog_t	   *log,
 
 	/* something is already sleeping; insert new transaction at end */
 	if (head = log->l_reserve_headq) {
-		tic->t_next = head;
-		tic->t_prev = head->t_prev;
-		head->t_prev->t_next = tic;
-		head->t_prev  = tic;
-		tic->t_flags |= XLOG_TIC_IN_Q;
+		XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: wake 1");
@@ -1484,50 +1480,24 @@ xlog_grant_log_space(xlog_t	   *log,
 		need_bytes = tic->t_unit_res;
 
 redo:
-	/* figure out if there is enough room */
 	free_bytes = xlog_space_left(log, log->l_grant_reserve_cycle,
 				     log->l_grant_reserve_bytes);
 	if (free_bytes < need_bytes) {
-		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0) {
-			if (head = log->l_reserve_headq) {
-				tic->t_next = head;
-				tic->t_prev = head->t_prev;
-				head->t_prev->t_next = tic;
-				head->t_prev  = tic;
-			} else {
-				tic->t_prev = tic->t_next = tic;
-				log->l_reserve_headq = tic;
-			}
-			tic->t_flags |= XLOG_TIC_IN_Q;
-		}
+		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
+			XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: wake 2");
 		xlog_grant_push_ail(log->l_mp);
 		spl = GRANT_LOCK(log);
 		goto redo;
-	} else if (tic->t_flags & XLOG_TIC_IN_Q) {
-		if (tic == tic->t_next) {
-			log->l_reserve_headq = 0;
-		} else {
-			log->l_reserve_headq = tic->t_next;
-			tic->t_next->t_prev = tic->t_prev;
-			tic->t_prev->t_next = tic->t_next;
-		}
-		tic->t_next = tic->t_prev = NULL;
-	}
+	} else if (tic->t_flags & XLOG_TIC_IN_Q)
+		XLOG_DEL_TICKETQ(log->l_reserve_headq, tic);
 
-	/* we've got enough space; use it. */
-	log->l_grant_write_bytes += need_bytes;
-	if (log->l_grant_write_bytes > log->l_logsize) {
-		log->l_grant_write_bytes -= log->l_logsize;
-		log->l_grant_write_cycle++;
-	}
-	log->l_grant_reserve_bytes += need_bytes;
-	if (log->l_grant_reserve_bytes > log->l_logsize) {
-		log->l_grant_reserve_bytes -= log->l_logsize;
-		log->l_grant_reserve_cycle++;
-	}
+	/* we've got enough space */
+	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'w');
+	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'r');
+
 	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: exit");
 	xlog_verify_grant_head(log, 1);
 	GRANT_UNLOCK(log, spl);
@@ -1561,41 +1531,18 @@ redo:
 	free_bytes = xlog_space_left(log, log->l_grant_write_cycle,
 				     log->l_grant_write_bytes);
 	if (free_bytes < need_bytes) {
-		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0) {
-			if (head = log->l_write_headq) {
-				tic->t_next = head;
-				tic->t_prev = head->t_prev;
-				head->t_prev->t_next = tic;
-				head->t_prev  = tic;
-			} else {
-				tic->t_prev = tic->t_next = tic;
-				log->l_write_headq = tic;
-			}
-			tic->t_flags |= XLOG_TIC_IN_Q;
-		}
+		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
+			XLOG_INS_TICKETQ(log->l_write_headq, tic);
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: wake 1");
 		xlog_grant_push_ail(log->l_mp);
 		spl = GRANT_LOCK(log);
 		goto redo;
-	} else if (tic->t_flags & XLOG_TIC_IN_Q) {
-		if (tic == tic->t_next) {
-			log->l_reserve_headq = 0;
-		} else {
-			log->l_reserve_headq = tic->t_next;
-			tic->t_next->t_prev = tic->t_prev;
-			tic->t_prev->t_next = tic->t_next;
-		}
-		tic->t_next = tic->t_prev = NULL;
-	}
+	} else if (tic->t_flags & XLOG_TIC_IN_Q)
+		XLOG_DEL_TICKETQ(log->l_write_headq, tic);
 
-	/* we've got enough space */
-	log->l_grant_write_bytes += need_bytes;
-	if (log->l_grant_write_bytes > log->l_logsize) {
-		log->l_grant_write_bytes -= log->l_logsize;
-		log->l_grant_write_cycle++;
-	}
+	XLOG_GRANT_ADD_SPACE(log, need_bytes, 'w'); /* we've got enough space */
 
 	xlog_trace_loggrant(log, tic, "xlog_regrant_write_log_space: exit");
 	xlog_verify_grant_head(log, 1);
@@ -1622,16 +1569,8 @@ xlog_regrant_reserve_log_space(xlog_t	     *log,
 		ticket->t_cnt--;
 
 	spl = GRANT_LOCK(log);
-	log->l_grant_write_bytes -= ticket->t_curr_res;
-	if (log->l_grant_write_bytes < 0) {
-		log->l_grant_write_bytes += log->l_logsize;
-		log->l_grant_write_cycle--;
-	}
-	log->l_grant_reserve_bytes -= ticket->t_curr_res;
-	if (log->l_grant_reserve_bytes < 0) {
-		log->l_grant_reserve_bytes += log->l_logsize;
-		log->l_grant_reserve_cycle--;
-	}
+	XLOG_GRANT_SUB_SPACE(log, ticket->t_curr_res, 'w');
+	XLOG_GRANT_SUB_SPACE(log, ticket->t_curr_res, 'r');
 	ticket->t_curr_res = ticket->t_unit_res;
 	xlog_trace_loggrant(log, ticket,
 			    "xlog_regrant_reserve_log_space: sub current res");
@@ -1643,11 +1582,7 @@ xlog_regrant_reserve_log_space(xlog_t	     *log,
 		return;
 	}
 
-	log->l_grant_reserve_bytes += ticket->t_unit_res;
-	if (log->l_grant_reserve_bytes > log->l_logsize) {
-		log->l_grant_reserve_bytes -= log->l_logsize;
-		log->l_grant_reserve_cycle++;
-	}
+	XLOG_GRANT_ADD_SPACE(log, ticket->t_unit_res, 'r');
 	xlog_trace_loggrant(log, ticket,
 			    "xlog_regrant_reserve_log_space: exit");
 	xlog_verify_grant_head(log, 0);
@@ -1671,16 +1606,8 @@ xlog_ungrant_log_space(xlog_t	     *log,
 	spl = GRANT_LOCK(log);
 	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: enter");
 
-	log->l_grant_write_bytes -= ticket->t_curr_res;
-	if (log->l_grant_write_bytes < 0) {
-		log->l_grant_write_bytes += log->l_logsize;
-		log->l_grant_write_cycle--;
-	}
-	log->l_grant_reserve_bytes -= ticket->t_curr_res;
-	if (log->l_grant_reserve_bytes < 0) {
-		log->l_grant_reserve_bytes += log->l_logsize;
-		log->l_grant_reserve_cycle--;
-	}
+	XLOG_GRANT_SUB_SPACE(log, ticket->t_curr_res, 'w');
+	XLOG_GRANT_SUB_SPACE(log, ticket->t_curr_res, 'r');
 
 	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: sub current");
 
@@ -1688,16 +1615,8 @@ xlog_ungrant_log_space(xlog_t	     *log,
 	 * unit worth of space.
 	 */
 	if (perm_res) {
-		log->l_grant_write_bytes -= ticket->t_unit_res*ticket->t_cnt;
-		if (log->l_grant_write_bytes < 0) {
-			log->l_grant_write_bytes += log->l_logsize;
-			log->l_grant_write_cycle--;
-		}
-		log->l_grant_reserve_bytes -= ticket->t_unit_res*ticket->t_cnt;
-		if (log->l_grant_reserve_bytes < 0) {
-			log->l_grant_reserve_bytes += log->l_logsize;
-			log->l_grant_reserve_cycle--;
-		}
+		XLOG_GRANT_SUB_SPACE(log, ticket->t_unit_res*ticket->t_cnt,'w');
+		XLOG_GRANT_SUB_SPACE(log, ticket->t_unit_res*ticket->t_cnt,'r');
 	}
 	xlog_trace_loggrant(log, ticket, "xlog_ungrant_log_space: exit");
 	xlog_verify_grant_head(log, 1);
