@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.209 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -28,6 +28,7 @@
 #undef _KERNEL
 #endif
 #include <sys/cmn_err.h>
+#include <sys/cred.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/fs_subr.h>
@@ -38,6 +39,7 @@
 #else
 #include <sys/conf.h>
 #endif
+#include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/mount.h>
 #include <sys/param.h>
@@ -3710,7 +3712,7 @@ xfs_rename_target_checks(
 			goto error_return;
 		}
 
-		if (ABI_IS_SVR4(curprocp->p_abi) &&
+		if (ABI_IS_SVR4(get_current_abi()) &&
 		    XFS_ITOV(target_ip)->v_vfsmountedhere) {
 			error = XFS_ERROR(EBUSY);
 			rename_which_error_return = __LINE__;
@@ -5455,7 +5457,7 @@ xfs_fcntl(
 		} else if (vp->v_type != VREG) {
 			error = XFS_ERROR(EINVAL);
 #ifdef _K64U64
-		} else if (ABI_IS_IRIX5_64(curprocp->p_abi)) {
+		} else if (ABI_IS_IRIX5_64(get_current_abi())) {
 			if (copyin((caddr_t)arg, &bf, sizeof bf)) {
 				error = XFS_ERROR(EFAULT);
 				break;
@@ -5463,7 +5465,7 @@ xfs_fcntl(
 #endif
 		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64   ||
 			   cmd == F_RESVSP64  || cmd == F_UNRESVSP64 || 
-			   ABI_IS_IRIX5_N32(curprocp->p_abi)) {
+			   ABI_IS_IRIX5_N32(get_current_abi())) {
 			/* 
 			 * The n32 flock structure is the same size as the
 			 * o32 flock64 structure. So the copyin_xlate
@@ -5471,7 +5473,7 @@ xfs_fcntl(
 			 */
 			if (COPYIN_XLATE((caddr_t)arg, &bf, sizeof bf,
 					 irix5_n32_to_flock,
-					 curprocp->p_abi, 1)) {
+					 get_current_abi(), 1)) {
 				error = XFS_ERROR(EFAULT);
 				break;
 			}
@@ -5491,7 +5493,7 @@ xfs_fcntl(
 
 		if (!error) {
 			error = xfs_change_file_space(vp, cmd, &bf, offset,
-						      curprocp->p_cred );
+						      credp);
 		}
 		break;
 
