@@ -125,13 +125,34 @@ __pb_map_buffer_at_offset(
  * Convert delalloc space to real space, do not flush the
  * data out to disk, that will be done by the caller.
  */
-void
+int
 pagebuf_release_page(
 	struct page		*page)
 {
 	struct inode		*inode = (struct inode*)page->mapping->host;
+	unsigned long		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	int			ret;
 
-	pagebuf_delalloc_convert(inode, page, 0, 0);
+	/* Are we off the end of the file ? */
+	if (page->index >= end_index) {
+		unsigned offset = inode->i_size & (PAGE_CACHE_SIZE-1);
+		if ((page->index >= end_index+1) || !offset) {
+			ret =  -EIO;
+			goto out;
+		}
+	}
+
+	ret = pagebuf_delalloc_convert(inode, page, 0, 0);
+
+out:
+	if (ret < 0) {
+		block_flushpage(page, 0);
+		ClearPageUptodate(page);
+
+		return 0;
+	}
+
+	return 1;
 }
 
 /*
