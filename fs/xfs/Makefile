@@ -2,7 +2,7 @@
 # Top-level Makefile for slinx
 #
 
-KERN_SPECS = kernel-2.4.0.spec
+KERN_SPECS = kernel-2.4.spec
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
@@ -60,9 +60,9 @@ realclean: clean
 	rm -f kern
 	rm -f SPECS/_sgi_kvers_
 	rm -f SOURCES/linux-2.4.0.tar.bz2 SOURCES/pcmcia-cs-3.1.8.tar.gz SOURCES/ibcs-2.1-981105.tar.gz SOURCES/xfs-cmds-*.tar.gz
-	if [ -e SPECS/kernel-2.4.0.spec.old ] ; then \
-		rm SPECS/kernel-2.4.0.spec; \
-		mv SPECS/kernel-2.4.0.spec.old SPECS/kernel-2.4.0.spec; \
+	if [ -e SPECS/kernel-2.4.spec.old ] ; then \
+		rm SPECS/kernel-2.4.spec; \
+		mv SPECS/kernel-2.4.spec.old SPECS/kernel-2.4.spec; \
 	fi
 	rm -f $(WORKAREA)/linux/include/asm
 	cd $(WORKAREA)/cmd/xfs && make clean
