@@ -1,4 +1,4 @@
-#ident "$Revision: 1.179 $"
+#ident "$Revision: 1.180 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1507,10 +1507,10 @@ xfs_zero_eof(
 	 * to a block boundary.  We subtract 1 in case the size is
 	 * exactly on a block boundary.
 	 */
-	last_fsb = XFS_B_TO_FSBT(mp, isize - 1);
-	start_zero_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)isize));
+	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize - 1) : (xfs_fileoff_t)-1;
+	start_zero_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
 	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
-	ASSERT(last_fsb < start_zero_fsb);
+	ASSERT((xfs_sfiloff_t)last_fsb < (xfs_sfiloff_t)start_zero_fsb);
 	if (last_fsb == end_zero_fsb) {
 		/*
 		 * The size was only incremented on its last block.
@@ -2266,10 +2266,10 @@ error0:
 }
 
 /*
- * This is a subroutine for xfs_write() which clears the setuid and
- * setgid bits when a file is written.
+ * This is a subroutine for xfs_write() and other writers
+ * (xfs_fcntl) which clears the setuid and setgid bits when a file is written.
  */
-STATIC int
+int
 xfs_write_clear_setuid(
 	xfs_inode_t	*ip)
 {
@@ -4271,7 +4271,7 @@ struct dio_s {
 };
 
 /*
- * xfs_dio_cache_inval()
+ * xfs_inval_cached_pages()
  * This routine is responsible for keeping direct I/O and buffered I/O
  * somewhat coherent.  From here we make sure that we're at least
  * temporarily holding the inode I/O lock exclusively and then call
@@ -4279,10 +4279,10 @@ struct dio_s {
  * are no cached pages this routine will be very quick.
  */
 void
-xfs_dio_cache_inval(
+xfs_inval_cached_pages(
 	xfs_inode_t	*ip,
 	off_t		offset,
-	size_t		len)		    
+	off_t		len)		    
 {
 	vnode_t		*vp;
 	int		relock;
@@ -4442,7 +4442,7 @@ xfs_diostrat(
 	 * it should be good enough.
 	 */
 	if (!(dp->ioflag & IO_IGNCACHE) && VN_CACHED(vp)) {
-		xfs_dio_cache_inval(ip, offset, totresid);
+		xfs_inval_cached_pages(ip, offset, totresid);
 	}
 
 	/*
