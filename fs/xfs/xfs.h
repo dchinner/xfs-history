@@ -32,30 +32,10 @@
 #ifndef __XFS_H__
 #define __XFS_H__
 
-#include <linux/types.h>
-#include <linux/config.h>
 #include <linux/version.h>
-#include <xfs_types.h>
-
-#include <xfs_arch.h>
-
-#include <support/mrlock.h>
-#include <support/qsort.h>
-#include <support/spin.h>
-#include <support/sv.h>
-#include <support/ktrace.h>
-#include <support/mutex.h>
-#include <support/sema.h>
-#include <support/debug.h>
-#include <support/move.h>
-#include <support/uuid.h>
-#include <support/time.h>
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#include <linux-2.6/kmem.h>
 #include <linux-2.6/xfs_linux.h>
 #else
-#include <linux-2.4/kmem.h>
 #include <linux-2.4/xfs_linux.h>
 #endif
 

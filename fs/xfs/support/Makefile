@@ -43,7 +43,6 @@ endif
 
 obj-y				:= debug.o \
 				   move.o \
-				   mrlock.o \
 				   qsort.o \
 				   uuid.o
 
