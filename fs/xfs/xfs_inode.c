@@ -1,4 +1,4 @@
-#ident "$Revision: 1.147 $"
+#ident "$Revision: 1.149 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2725,7 +2725,7 @@ xfs_swappable(
 	error = 0;
 	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	end_fsb = XFS_B_TO_FSB(mp, ip->i_d.di_size);
-	error = xfs_bmap_first_unused(NULL, ip, &first_hole_offset_fsb,
+	error = xfs_bmap_first_unused(NULL, ip, 1, &first_hole_offset_fsb,
 		XFS_DATA_FORK);
 	if ((error == 0) && (first_hole_offset_fsb < end_fsb)) {
 		error = EINVAL;
