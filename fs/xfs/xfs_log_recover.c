@@ -2082,11 +2082,21 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		      item->ri_buf[1].i_len  - sizeof(xfs_dinode_core_t));
 	}
 
+	fields = in_f->ilf_fields;
+	switch (fields & (XFS_ILOG_DEV | XFS_ILOG_UUID)) {
+	case XFS_ILOG_DEV:
+		INT_SET(dip->di_u.di_dev, ARCH_CONVERT, in_f->ilf_u.ilfu_rdev);
+
+		break;
+	case XFS_ILOG_UUID:
+		dip->di_u.di_muuid = in_f->ilf_u.ilfu_uuid;
+		break;
+	}
+
 	if (in_f->ilf_size == 2)
 		goto write_inode_buffer;
 	len = item->ri_buf[2].i_len;
 	src = item->ri_buf[2].i_addr;
-	fields = in_f->ilf_fields;
 	ASSERT(in_f->ilf_size <= 4);
 	ASSERT((in_f->ilf_size == 3) || (fields & XFS_ILOG_AFORK));
 	ASSERT(!(fields & XFS_ILOG_DFORK) ||
@@ -2102,14 +2112,6 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		xfs_bmbt_to_bmdr((xfs_bmbt_block_t *)src, len,
 				 &(dip->di_u.di_bmbt),
 				 XFS_DFORK_DSIZE(dip, mp));
-		break;
-
-	case XFS_ILOG_DEV:
-		INT_SET(dip->di_u.di_dev, ARCH_CONVERT, in_f->ilf_u.ilfu_rdev);
-		break;
-
-	case XFS_ILOG_UUID:
-		dip->di_u.di_muuid = in_f->ilf_u.ilfu_uuid;
 		break;
 
 	default:
