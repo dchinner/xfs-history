@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 26
+SUBLEVEL = 27
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -166,6 +166,10 @@ ifeq ($(CONFIG_PCMCIA_NETCARD),y)
 DRIVERS := $(DRIVERS) drivers/net/pcmcia/pcmcia_net.o
 endif
 
+ifeq ($(CONFIG_PCMCIA_CHRDEV),y)
+DRIVERS := $(DRIVERS) drivers/char/pcmcia/pcmcia_char.o
+endif
+
 ifdef CONFIG_DIO
 DRIVERS := $(DRIVERS) drivers/dio/dio.a
 endif
@@ -329,7 +333,7 @@ endif
 modules: $(patsubst %, _mod_%, $(SUBDIRS))
 
 modules/MARKER:
-	mkdir modules
+	mkdir -p modules
 	touch modules/MARKER
 
 $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER modules/MARKER
@@ -362,6 +366,8 @@ modules_install:
 	if [ -f IRDA_MODULES  ]; then inst_mod IRDA_MODULES  net;   fi; \
 	if [ -f USB_MODULES   ]; then inst_mod USB_MODULES   usb;   fi; \
 	if [ -f PCMCIA_MODULES ]; then inst_mod PCMCIA_MODULES pcmcia; fi; \
+	if [ -f PCMCIA_NET_MODULES ]; then inst_mod PCMCIA_NET_MODULES pcmcia; fi; \
+	if [ -f PCMCIA_CHAR_MODULES ]; then inst_mod PCMCIA_CHAR_MODULES pcmcia; fi; \
 	\
 	ls *.o > $$MODLIB/.allmods; \
 	echo $$MODULES | tr ' ' '\n' | sort | comm -23 $$MODLIB/.allmods - > $$MODLIB/.misc; \
@@ -390,6 +396,7 @@ clean:	archclean
 	rm -f .tmp*
 	rm -f drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c
 	rm -f drivers/char/conmakehash
+	rm -f drivers/pci/devlist.h drivers/pci/gen-devlist
 	rm -f drivers/sound/bin2hex drivers/sound/hex2hex
 	rm -f net/khttpd/make_times_h
 	rm -f net/khttpd/times.h
