@@ -640,7 +640,7 @@ xfs_qm_scall_setqlim(
 	/*
 	 * We don't want to race with a quotaoff so take the quotaoff lock.
 	 * (We don't hold an inode lock, so there's nothing else to stop
-	 * a quotaoff from happening). (XXXThis doesn't currently doesn't happen
+	 * a quotaoff from happening). (XXXThis doesn't currently happen
 	 * because we take the vfslock before calling xfs_qm_sysent).
 	 */
 	mutex_lock(&(XFS_QI_QOFFLOCK(mp)), PINOD);

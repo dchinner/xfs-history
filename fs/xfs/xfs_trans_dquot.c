@@ -344,12 +344,8 @@ xfs_trans_apply_dquot_deltas(
 	xfs_disk_dquot_t	*d;
 	long			totalbdelta;
 	long			totalrtbdelta;
-#ifdef _SHAREII
-	xfs_qcnt_t		oldresbcnt;
-	xfs_qcnt_t		oldresicnt;
-#endif /* _SHAREII */
-	ASSERT(tp->t_dqinfo);
 
+	ASSERT(tp->t_dqinfo);
 	qa = tp->t_dqinfo->dqa_usrdquots;
 	for (j = 0; j < 2; j++) {
 		if (qa[0].qt_dquot == NULL) {
@@ -428,16 +424,6 @@ xfs_trans_apply_dquot_deltas(
 			 * add this to the list of items to get logged 
 			 */
 			xfs_trans_log_dquot(tp, dqp);
-#ifdef _SHAREII
-			/*
-			 * SHAREII doesn't distinguish between RT and reg blks.
-			 */
-			if (SHR_ACTIVE) {
-				oldresbcnt = dqp->q_res_bcount + 
-					dqp->q_res_rtbcount;
-				oldresicnt = dqp->q_res_icount;
-			}
-#endif /* _SHAREII */
 			/* 
 			 * Take off what's left of the original reservation.
 			 * In case of delayed allocations, there's no 
@@ -515,29 +501,6 @@ xfs_trans_apply_dquot_deltas(
 			ASSERT(dqp->q_res_bcount >= dqp->q_core.d_bcount);
 			ASSERT(dqp->q_res_icount >= dqp->q_core.d_icount);
 			ASSERT(dqp->q_res_rtbcount >= dqp->q_core.d_rtbcount);
-#ifdef _SHAREII
-			if (SHR_ACTIVE) {
-				long x = dqp->q_res_bcount + dqp->q_res_rtbcount -
-				    oldresbcnt;
-				if (x)
-				{
-				      (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
-						   dqp->q_core.d_id,
-						   (u_long)(x > 0 ? x : -x),
-						   XFS_FSB_TO_B(dqp->q_mount, 1),
-						   (x > 0 ? LI_ALLOC : LI_FREE)|LI_UPDATE, NULL, NULL);
-			        }
-				x = dqp->q_res_icount - oldresicnt;
-				if (x)
-				{
-				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
-							dqp->q_core.d_id,
-							(u_long)(x > 0 ? x : -x),
-							0, 
-							(x > 0 ? LI_ALLOC : LI_FREE)|LI_UPDATE, NULL, NULL);
-				}
-			}	
-#endif /* _SHAREII */
 		}
 		/*
 		 * Do the project quotas next
@@ -561,10 +524,6 @@ xfs_trans_unreserve_and_mod_dquots(
 	xfs_dquot_t 		*dqp;
 	xfs_dqtrx_t 		*qtrx, *qa;
 	boolean_t		locked;
-#ifdef _SHAREII
-	int			blkunres = 0;
-	int			inounres = 0;
-#endif /* _SHAREII */
 
 	ASSERT(tp->t_dqinfo);
 	qa = tp->t_dqinfo->dqa_usrdquots;
@@ -589,10 +548,6 @@ xfs_trans_unreserve_and_mod_dquots(
 				locked = B_TRUE;
 				dqp->q_res_bcount -= 
 					(xfs_qcnt_t)qtrx->qt_blk_res; 
-#ifdef _SHAREII
-				if (SHR_ACTIVE)
-					blkunres = (int)qtrx->qt_blk_res;
-#endif /* _SHAREII */
 			}
 			if (qtrx->qt_ino_res) {
 				if (!locked) {
@@ -601,10 +556,6 @@ xfs_trans_unreserve_and_mod_dquots(
 				}
 				dqp->q_res_icount -= 
 					(xfs_qcnt_t)qtrx->qt_ino_res; 
-#ifdef _SHAREII
-				if (SHR_ACTIVE) 
-					inounres = (int)qtrx->qt_ino_res;
-#endif /* _SHAREII */
 			}
 			
 			if (qtrx->qt_rtblk_res) {
@@ -614,29 +565,7 @@ xfs_trans_unreserve_and_mod_dquots(
 				}
 				dqp->q_res_rtbcount -= 
 					(xfs_qcnt_t)qtrx->qt_rtblk_res; 
-#ifdef _SHAREII
-				if (SHR_ACTIVE)
-					blkunres += (int)qtrx->qt_rtblk_res;
-#endif /* _SHAREII */
 			}
-#ifdef _SHAREII
-			/* Undo the SHAREII reservation. */
-			if (SHR_ACTIVE) {
-				if (blkunres)
-				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
-						   dqp->q_core.d_id,
-						   (u_long) blkunres,
-						   XFS_FSB_TO_B(dqp->q_mount, 1),
-						   LI_UPDATE|LI_FREE,
-						   NULL,
-						   NULL);
-				if (inounres)
-				     (void) SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
-							dqp->q_core.d_id,
-							(u_long) inounres,
-							0, LI_UPDATE|LI_FREE, NULL, NULL);
-			}
-#endif /* _SHAREII */
 			if (locked)
 				xfs_dqunlock(dqp);
 
@@ -666,10 +595,6 @@ xfs_trans_dqresv(
 	time_t		btimer;
 	xfs_qcnt_t	*resbcountp;
 
-#ifdef _SHAREII
-	uint		enforceflag;
-#endif /* _SHAREII */
-
 	if (! (flags & XFS_QMOPT_DQLOCK)) {
 		xfs_dqlock(dqp);
 	} 
@@ -691,6 +616,10 @@ xfs_trans_dqresv(
 	if ((flags & XFS_QMOPT_FORCE_RES) == 0 &&
 	    dqp->q_core.d_id != 0 && 
 	    XFS_IS_QUOTA_ENFORCED(dqp->q_mount)) {
+#ifdef QUOTADEBUG
+		printk("BLK Res: nblks=%ld + resbcount=%Ld > hardlimit=%Ld?\n",
+			nblks, *resbcountp, hardlimit);
+#endif
 		if (nblks > 0) {
 			/*
 			 * dquot is locked already. See if we'd go over the 
@@ -699,7 +628,6 @@ xfs_trans_dqresv(
 			 */
 			if (hardlimit > 0ULL &&
 			     (hardlimit <= nblks + *resbcountp)) {
-				/* XXX XFS_STATS */
 				error = EDQUOT;
 				goto error_return;
 			}
@@ -714,7 +642,6 @@ xfs_trans_dqresv(
 				    (dqp->q_core.d_bwarns != 0 && 
 				     dqp->q_core.d_bwarns >= 
 				     XFS_QI_BWARNLIMIT(dqp->q_mount))) {
-					/* XXX XFS_STATS */
 					error = EDQUOT;
 					goto error_return;
 				}
@@ -724,7 +651,6 @@ xfs_trans_dqresv(
 			if (dqp->q_core.d_ino_hardlimit > 0ULL &&
 			    dqp->q_core.d_icount >=
 			    dqp->q_core.d_ino_hardlimit) {
-				/* XXX XFS_STATS */
 				error = EDQUOT;
 				goto error_return;
 			} else if (dqp->q_core.d_ino_softlimit > 0ULL &&
@@ -739,7 +665,6 @@ xfs_trans_dqresv(
 				    (dqp->q_core.d_iwarns != 0 &&
 				     dqp->q_core.d_iwarns >= 
 				     XFS_QI_IWARNLIMIT(dqp->q_mount))) {
-					/* XXX XFS_STATS */
 					error = EDQUOT;
 					goto error_return;
 				}
@@ -747,40 +672,7 @@ xfs_trans_dqresv(
 		}
 	}
 
-#ifdef _SHAREII
-	if (SHR_ACTIVE) {
-		if ((flags & XFS_QMOPT_FORCE_RES) == 0  &&
-		    dqp->q_core.d_id != 0) 
-			enforceflag = LI_ENFORCE;
-		else
-			enforceflag = 0;
-		/* disk blk reservation */
-		if (SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
-				dqp->q_core.d_id,
-				(u_long) nblks,
-				XFS_FSB_TO_B(dqp->q_mount, 1),
-				LI_ALLOC|LI_UPDATE | enforceflag,
-				NULL,
-				NULL)) {
-			error = EDQUOT;
-			goto error_return;
-		}
-		/* inode reservation */
-		if (ninos != 0) {
-			if (SHR_LIMITDISK(XFS_MTOVFS(dqp->q_mount),
-					dqp->q_core.d_id, 
-					(u_long) ninos, 
-					0,
-					LI_ALLOC|LI_UPDATE | enforceflag,
-					NULL,
-					NULL)) {
-				error = EDQUOT;
-				goto error_return;
-			}
-		}
-	}
-#endif /* _SHAREII */
-        /*
+	/*
 	 * Change the reservation, but not the actual usage. 
 	 * Note that q_res_bcount = q_core.d_bcount + resv
 	 */

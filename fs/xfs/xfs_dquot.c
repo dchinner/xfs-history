@@ -349,7 +349,7 @@ xfs_qm_init_dquot_blk(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	id,
 	uint		type,
-	xfs_buf_t		*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_dqblk_t	*d;
 	int		curid, i;
@@ -389,13 +389,13 @@ xfs_qm_dqalloc(
 	xfs_dquot_t	*dqp,
 	xfs_inode_t 	*quotip,
 	xfs_fileoff_t   offset_fsb,
-	xfs_buf_t		**O_bpp)
+	xfs_buf_t	**O_bpp)
 {
 	xfs_fsblock_t   firstblock;
 	xfs_bmap_free_t flist;
 	xfs_bmbt_irec_t map;
 	int		nmaps, error, committed;
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 
 	ASSERT(tp != NULL);
 	xfs_dqtrace_entry(dqp, "DQALLOC");
@@ -481,13 +481,13 @@ xfs_qm_dqtobp(
 	xfs_trans_t		*tp,
 	xfs_dquot_t    		*dqp,
 	xfs_disk_dquot_t	**O_ddpp,
-	xfs_buf_t          		**O_bpp,
+	xfs_buf_t		**O_bpp,
 	uint			flags)
 {
 	xfs_fsblock_t   firstblock;
 	xfs_bmbt_irec_t map;
 	int             nmaps, error;
-	xfs_buf_t           *bp;
+	xfs_buf_t       *bp;
 	xfs_inode_t     *quotip;
 	xfs_mount_t	*mp;
 	xfs_disk_dquot_t *ddq;
@@ -603,7 +603,7 @@ xfs_qm_dqtobp(
 	*O_ddpp = ddq;
 
 	return (0);
-}	   
+}
 
 
 /*
@@ -620,7 +620,7 @@ xfs_qm_dqread(
 	uint        	flags)
 {
 	xfs_disk_dquot_t *ddqp;
-	xfs_buf_t		 *bp;
+	xfs_buf_t	 *bp;
 	int		 error;
 
 	/* 
@@ -1178,7 +1178,7 @@ xfs_qm_dqflush(
 	uint			flags)
 {
 	xfs_mount_t		*mp;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	xfs_disk_dquot_t 	*ddqp;
 	int			error;
 	SPLDECL(s);
@@ -1250,7 +1250,7 @@ xfs_qm_dqflush(
 	 * Attach an iodone routine so that we can remove this dquot from the
 	 * AIL and release the flush lock once the dquot is synced to disk.
 	 */
-	xfs_buf_attach_iodone(bp, (void(*)(xfs_buf_t*,xfs_log_item_t*))
+	xfs_buf_attach_iodone(bp, (void(*)(xfs_buf_t *, xfs_log_item_t *))
 			      xfs_qm_dqflush_done, &(dqp->q_logitem.qli_item));
 	/*
 	 * If the buffer is pinned then push on the log so we won't
@@ -1286,7 +1286,7 @@ xfs_qm_dqflush(
 /*ARGSUSED*/
 STATIC void
 xfs_qm_dqflush_done(
-        xfs_buf_t         		*bp,
+        xfs_buf_t      		*bp,
         xfs_dq_logitem_t	*qip)
 {
         xfs_dquot_t     	*dqp;
@@ -1657,9 +1657,9 @@ xfs_qm_dqprint(xfs_dquot_t *dqp)
  */
 void
 xfs_qm_dqflock_pushbuf_wait(
-	xfs_dquot_t *dqp)
+	xfs_dquot_t	*dqp)
 {
-	xfs_buf_t *bp;
+	xfs_buf_t	*bp;
 	
 	/*
 	 * Check to see if the dquot has been flushed delayed

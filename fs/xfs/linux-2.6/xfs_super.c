@@ -601,10 +601,6 @@ linvfs_quotactl(
 	vfs_t		*vfsp;
 	int		sts = -EINVAL;
 
-#ifdef DEBUG
-	printk("linvfs_quotactl cmd=0x%x, type=%d, id=%d\n", cmd, type, id);
-#endif
-
 	if (!IS_XQM_CMD(cmd))
 		return sts;
 
