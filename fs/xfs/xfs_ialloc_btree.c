@@ -2,7 +2,7 @@
 #ident	"$Revision: 1.20 $"
 
 /*
- * Inode allocation management for xFS.
+ * Inode allocation management for XFS.
  */
 
 #ifdef SIM

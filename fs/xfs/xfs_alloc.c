@@ -1,7 +1,7 @@
-#ident	"$Revision: 1.79 $"
+#ident	"$Revision: 1.80 $"
 
 /*
- * Free space allocation for xFS.
+ * Free space allocation for XFS.
  */
 
 #ifdef SIM

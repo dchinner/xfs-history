@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.97 $"
+#ident  "$Revision: 1.98 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -339,7 +339,7 @@ spectodev(
 /*
  * xfs_cmountfs
  *
- * This function is the common mount file system function for xFS.
+ * This function is the common mount file system function for XFS.
  */
 STATIC int
 xfs_cmountfs(

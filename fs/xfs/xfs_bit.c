@@ -1,7 +1,7 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
- * xFS bit manipulation routines.
+ * XFS bit manipulation routines.
  */
 
 #include <sys/types.h>

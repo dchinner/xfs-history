@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1359,7 +1359,7 @@ idbg_xalgtrace(xfs_agnumber_t agno)
 #endif	/* DEBUG */
 
 /*
- * Print an allocation argument structure for xFS.
+ * Print an allocation argument structure for XFS.
  */
 void
 idbg_xalloc(xfs_alloc_arg_t *args)
@@ -1513,7 +1513,7 @@ idbg_xblitrace(xfs_buf_log_item_t *bip)
 #endif	/* DEBUG */
 
 /*
- * Print a bmap alloc argument structure for xFS.
+ * Print a bmap alloc argument structure for XFS.
  */
 void
 idbg_xbmalla(xfs_bmalloca_t *a)
@@ -2192,7 +2192,7 @@ idbg_xhelp(int dummy)
 }
 
 /*
- * Print out an xFS in-core log structure.
+ * Print out an XFS in-core log structure.
  */
 void
 idbg_xiclog(xlog_in_core_t *iclog)
@@ -2315,7 +2315,7 @@ idbg_xinodes(xfs_mount_t *mp)
 }
 
 /*
- * Print out an xFS log structure.
+ * Print out an XFS log structure.
  */
 void
 idbg_xlog(xlog_t *log)
@@ -2398,7 +2398,7 @@ idbg_xlog_granttrace(xlog_t *log)
 #endif	/* DEBUG */
 
 /*
- * Print out an xFS recovery transaction
+ * Print out an XFS recovery transaction
  */
 void
 idbg_xlog_ritem(xlog_recover_item_t *item)
@@ -2420,7 +2420,7 @@ idbg_xlog_ritem(xlog_recover_item_t *item)
 }	/* idbg_xlog_ritem */
 
 /*
- * Print out an xFS recovery transaction
+ * Print out an XFS recovery transaction
  */
 void
 idbg_xlog_rtrans(xlog_recover_t *trans)
@@ -2444,7 +2444,7 @@ idbg_xlog_rtrans(xlog_recover_t *trans)
 }	/* idbg_xlog_rtrans */
 
 /*
- * Print out an xFS ticket structure.
+ * Print out an XFS ticket structure.
  */
 void
 idbg_xlog_tic(xlog_ticket_t *tic)

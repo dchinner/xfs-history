@@ -1127,7 +1127,7 @@ xfs_read_file(
 /*
  * xfs_read
  *
- * This is the xFS VOP_READ entry point.  It does some minimal
+ * This is the XFS VOP_READ entry point.  It does some minimal
  * error checking and then switches out based on the file type.
  */
 int
@@ -2221,7 +2221,7 @@ error0:
 /*
  * xfs_write
  *
- * This is the xFS VOP_WRITE entry point.  It does some minimal error
+ * This is the XFS VOP_WRITE entry point.  It does some minimal error
  * checking and then switches out based on the file type.
  */
 int
@@ -2413,7 +2413,7 @@ retry:
 
 
 /*
- * This is the xFS entry point for VOP_BMAP().
+ * This is the XFS entry point for VOP_BMAP().
  * It simply switches based on the given flags
  * to either xfs_iomap_read() or xfs_iomap_write().
  * This cannot be used to grow a file or to read

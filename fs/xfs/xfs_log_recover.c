@@ -118,7 +118,7 @@ xlog_bread(xlog_t	*log,
 	iowait(bp);
 
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_WARN, "xFS: error reading log block #%d",
+		cmn_err(CE_WARN, "XFS: error reading log block #%d",
 			bp->b_blkno);
 		ASSERT(0);
 		return bp->b_error;
@@ -238,7 +238,7 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 	} else {
 	    if (i < start_blk) {
 		/* legal log record not found */
-		xlog_warn("xFS: xlog_find_verify_log_record: need to backup");
+		xlog_warn("XFS: xlog_find_verify_log_record: need to backup");
 		ASSERT(0);
 		return XFS_ERROR(EIO);
 	    }
@@ -579,7 +579,7 @@ xlog_find_tail(xlog_t  *log,
 		}
 	}
 	if (!found) {
-		xlog_warn("xFS: xlog_find_tail: couldn't find sync record");
+		xlog_warn("XFS: xlog_find_tail: couldn't find sync record");
 		ASSERT(0);
 		return XFS_ERROR(EIO);
 	}
@@ -683,7 +683,7 @@ xlog_find_zeroed(xlog_t	 *log,
 		 * Hopefully, this will catch the case where someone mkfs's
 		 * over a log partition.
 		 */
-	xlog_warn("xFS: (xlog_find_zeroed): last cycle = 0; first cycle != 1");
+	xlog_warn("XFS: (xlog_find_zeroed): last cycle = 0; first cycle != 1");
 		ASSERT(first_cycle == 1);
 		return EINVAL;
 	}
@@ -889,7 +889,7 @@ xlog_recover_unlink_tid(xlog_recover_t	**q,
 		}
 		if (!found) {
 			xlog_warn(
-			     "xFS: xlog_recover_unlink_tid: trans not found");
+			     "XFS: xlog_recover_unlink_tid: trans not found");
 			ASSERT(0);
 			return XFS_ERROR(EIO);
 		}
@@ -1357,7 +1357,7 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 	    }
 	    default: {
 		xlog_warn(
-	"xFS: xlog_recover_reorder_trans: unrecognized type of log operation");
+	"XFS: xlog_recover_reorder_trans: unrecognized type of log operation");
 		ASSERT(0);
 		return XFS_ERROR(EIO);
 	    }
@@ -1742,7 +1742,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	bp = bread(mp->m_dev, buf_f->blf_blkno, buf_f->blf_len);
 	if (bp->b_flags & B_ERROR) {
 		cmn_err(CE_WARN,
-			"xFS: xlog_recover_do_buffer_trans: bread error (%d)",
+			"XFS: xlog_recover_do_buffer_trans: bread error (%d)",
 			buf_f->blf_blkno);
 		ASSERT(0);
 		error = bp->b_error;
@@ -2090,7 +2090,7 @@ xlog_recover_do_trans(xlog_t	     *log,
 		} else if (ITEM_TYPE(item) == XFS_LI_EFD) {
 			xlog_recover_do_efd_trans(log, item, pass);
 		} else {
-			xlog_warn("xFS: xlog_recover_do_trans");
+			xlog_warn("XFS: xlog_recover_do_trans");
 			ASSERT(0);
 			error = XFS_ERROR(EIO);
 			break;
@@ -2153,7 +2153,7 @@ STATIC int
 xlog_recover_unmount_trans(xlog_recover_t *trans)
 {
 	/* Do nothing now */
-	xlog_warn("xFS: xlog_recover_unmount_trans: Unmount LR");
+	xlog_warn("XFS: xlog_recover_unmount_trans: Unmount LR");
 	return( 0 );
 }	/* xlog_recover_unmount_trans */
 
@@ -2189,7 +2189,7 @@ xlog_recover_process_data(xlog_t	    *log,
 	dp += sizeof(xlog_op_header_t);
 	if (ohead->oh_clientid != XFS_TRANSACTION &&
 	    ohead->oh_clientid != XFS_LOG) {
-	    xlog_warn("xFS: xlog_recover_process_data: bad clientid ");
+	    xlog_warn("XFS: xlog_recover_process_data: bad clientid ");
 	    ASSERT(0);
 	    return (XFS_ERROR(EIO));
         }
@@ -2220,7 +2220,7 @@ xlog_recover_process_data(xlog_t	    *log,
 		    break;
 		}
 		case XLOG_START_TRANS : {
-		    xlog_warn("xFS: xlog_recover_process_data: bad transaction");
+		    xlog_warn("XFS: xlog_recover_process_data: bad transaction");
 		    ASSERT(0);
 		    error = XFS_ERROR(EIO);
 		    break;
@@ -2232,7 +2232,7 @@ xlog_recover_process_data(xlog_t	    *log,
 		    break;
 		}
 		default: {
-		    xlog_warn("xFS: xlog_recover_process_data: bad flag");
+		    xlog_warn("XFS: xlog_recover_process_data: bad flag");
 		    ASSERT(0);
 		    error = XFS_ERROR(EIO);
 		    break;
@@ -2530,10 +2530,10 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 	    if (rhead->h_chksum != 0 ||
 		((log->l_flags & XLOG_CHKSUM_MISMATCH) == 0)) {
 		    cmn_err(CE_DEBUG,
-		        "xFS: LogR chksum mismatch: was (0x%x) is (0x%x)\n",
+		        "XFS: LogR chksum mismatch: was (0x%x) is (0x%x)\n",
 			    rhead->h_chksum, chksum);
 		    cmn_err(CE_DEBUG,
-"xFS: Disregard message if filesystem was created with non-DEBUG kernel\n");
+"XFS: Disregard message if filesystem was created with non-DEBUG kernel\n");
 		    log->l_flags |= XLOG_CHKSUM_MISMATCH;
 	    }
         }
@@ -2807,7 +2807,7 @@ xlog_recover(xlog_t *log)
 #endif
 #if defined(DEBUG) && defined(_KERNEL)
 		cmn_err(CE_NOTE,
-			"Starting xFS recovery on filesystem: %s (dev: %d/%d)",
+			"Starting XFS recovery on filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, emajor(log->l_dev),
 			eminor(log->l_dev));
 #endif
@@ -2845,13 +2845,13 @@ xlog_recover_finish(xlog_t *log)
 		xlog_recover_check_summary(log);
 #endif /* _KERNEL */
 		cmn_err(CE_NOTE,
-			"Ending xFS recovery for filesystem: %s (dev: %d/%d)",
+			"Ending XFS recovery for filesystem: %s (dev: %d/%d)",
 			log->l_mp->m_fsname, emajor(log->l_dev),
 			eminor(log->l_dev));
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
 		cmn_err(CE_NOTE,
-			"Ending clean xFS mount for filesystem: %s",
+			"Ending clean XFS mount for filesystem: %s",
 			log->l_mp->m_fsname);
 	}
 	return 0;

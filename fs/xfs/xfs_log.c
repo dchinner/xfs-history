@@ -824,7 +824,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 				log->l_iclog_bufs = 8;
 				break;
 			    default:
-				xlog_panic("xFS: Illegal blocksize");
+				xlog_panic("XFS: Illegal blocksize");
 				break;
 			}
 		}
@@ -2447,7 +2447,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
 	    xlog_bread(log, i, 1, bp);
 	    if (GET_CYCLE(bp->b_dmaaddr) != cycle_no)
-		xlog_warn("xFS: xlog_verify_disk_cycle_no: bad cycle no");
+		xlog_warn("XFS: xlog_verify_disk_cycle_no: bad cycle no");
 	}
 	xlog_put_bp(bp);
     }

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.96 $"
+#ident	"$Revision: 1.97 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -140,7 +140,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	vmap_t		vmap;
 	__uint64_t	ret64;
 
-	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount xFS filesystems */
+	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
 
 	mp = XFS_VFSTOM(vfsp);

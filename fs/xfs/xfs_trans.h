@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.62 $"
+#ident "$Revision: 1.63 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -563,7 +563,7 @@ typedef struct xfs_trans {
 #define	XFS_INO_REF		1     
      
 /*
- * xFS transaction mechanism exported interfaces that are
+ * XFS transaction mechanism exported interfaces that are
  * actually macros.
  */
 #define	xfs_trans_get_log_res(tp)	((tp)->t_log_res)
@@ -582,7 +582,7 @@ typedef struct xfs_trans {
 #endif
 
 /*
- * xFS transaction mechanism exported interfaces.
+ * XFS transaction mechanism exported interfaces.
  */
 void		xfs_trans_init(struct xfs_mount *);
 xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint);

@@ -1,10 +1,10 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.24 $"
 
 /*
- * xFS types
+ * XFS types
  */
 
 /*

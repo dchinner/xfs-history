@@ -1,10 +1,10 @@
 #ifndef _FS_XFS_BIT_H
 #define	_FS_XFS_BIT_H
 
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
- * xFS bit manipulation routines.
+ * XFS bit manipulation routines.
  */
 
 /*
