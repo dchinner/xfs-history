@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1984,8 +1984,18 @@ idbg_xattrleaf(struct xfs_attr_leafblock *leaf)
 			j, m->base, m->size);
 	}
 	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
-		qprintf("[%2d] hash 0x%x nameidx %d flags 0x%x\n     name \"",
+		qprintf("[%2d] hash 0x%x nameidx %d flags <",
 			j, e->hashval, e->nameidx, e->flags);
+		if (e->flags & XFS_ATTR_LOCAL)
+			qprintf("LOCAL ");
+		if (e->flags & XFS_ATTR_ROOT)
+			qprintf("ROOT ");
+		if (e->flags & XFS_ATTR_INCOMPLETE)
+			qprintf("INCOMPLETE ");
+		k = ~(XFS_ATTR_LOCAL | XFS_ATTR_ROOT | XFS_ATTR_INCOMPLETE);
+		if ((e->flags & k) != 0)
+			qprintf("0x%x", e->flags & k);
+		qprintf(">\n     name \"");
 		if (e->flags & XFS_ATTR_LOCAL) {
 			l = XFS_ATTR_LEAF_NAME_LOCAL(leaf, j);
 			for (k = 0; k < l->namelen; k++)
@@ -2123,26 +2133,49 @@ idbg_xdanode(struct xfs_da_intnode *node)
 void
 idbg_xdaargs(xfs_da_args_t *n)
 {
+	char *ch;
 	int i;
 
 	qprintf(" name \"", n->namelen);
-	for (i = 0; i < n->namelen; i++)
+	for (i = 0; i < n->namelen; i++) {
 		qprintf("%c", n->name[i]);
+	}
 	qprintf("\"(%d) value ", n->namelen);
 	if (n->value) {
 		qprintf("\"");
-		for (i = 0; (i < n->valuelen) && (i < 32); i++)
-			qprintf("%c", n->value[i]);
+		ch = n->value;
+		for (i = 0; (i < n->valuelen) && (i < 32); ch++, i++) {
+			switch(*ch) {
+			case '\n':	qprintf("\n");		break;
+			case '\b':	qprintf("\b");		break;
+			case '\t':	qprintf("\t");		break;
+			default:	qprintf("%c", *ch);	break;
+			}
+		}
 		if (i == 32)
 			qprintf("...");
 		qprintf("\"(%d)\n", n->valuelen);
 	} else {
 		qprintf("(NULL)(%d)\n", n->valuelen);
 	}
-	qprintf(" flags 0x%x hashval 0x%x whichfork %d\n",
-		  n->flags, n->hashval, n->whichfork);
-	qprintf(" aleaf: blkno %d index %d rmtblkno %d\n",
-		  n->aleaf_blkno, n->aleaf_index, n->aleaf_rmtblkno);
+	qprintf(" hashval 0x%x whichfork %d flags <",
+		  n->hashval, n->whichfork);
+	if (n->flags & ATTR_ROOT)
+		qprintf("ROOT ");
+	if (n->flags & ATTR_CREATE)
+		qprintf("CREATE ");
+	if (n->flags & ATTR_REPLACE)
+		qprintf("REPLACE ");
+	if (n->flags & XFS_ATTR_INCOMPLETE)
+		qprintf("INCOMPLETE ");
+	i = ~(ATTR_ROOT | ATTR_CREATE | ATTR_REPLACE | XFS_ATTR_INCOMPLETE);
+	if ((n->flags & i) != 0)
+		qprintf("0x%x", n->flags & i);
+	qprintf(">\n");
+	qprintf(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
+		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
+	qprintf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
+		  n->blkno2, n->index2, n->rmtblkno2, n->rmtblkcnt2);
 	qprintf(" inumber %lld dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
 		n->inumber, n->dp, n->firstblock, n->flist, n->total);
 }
