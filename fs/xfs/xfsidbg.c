@@ -1987,8 +1987,7 @@ idbg_xattrleaf(struct xfs_attr_leafblock *leaf)
 			l = XFS_ATTR_LEAF_NAME_LOCAL(leaf, j);
 			for (k = 0; k < l->namelen; k++)
 				qprintf("%c", l->nameval[k]);
-			qprintf("\"(%d) value \"",
-				  l->namelen, l->valuelen);
+			qprintf("\"(%d) value \"", l->namelen);
 			for (k = 0; (k < l->valuelen) && (k < 32); k++)
 				qprintf("%c", l->nameval[l->namelen + k]);
 			if (k == 32)
@@ -2123,23 +2122,26 @@ idbg_xdaargs(xfs_da_args_t *n)
 {
 	int i;
 
-	qprintf(" hashval 0x%x inumber %lld", n->hashval, n->inumber);
-	qprintf(" namelen %d name \"", n->namelen);
+	qprintf(" name \"", n->namelen);
 	for (i = 0; i < n->namelen; i++)
 		qprintf("%c", n->name[i]);
-	qprintf("\" valuelen %d value ", n->valuelen);
+	qprintf("\"(%d) value ", n->namelen);
 	if (n->value) {
 		qprintf("\"");
 		for (i = 0; (i < n->valuelen) && (i < 32); i++)
 			qprintf("%c", n->value[i]);
-		qprintf("\"\n");
+		if (i == 32)
+			qprintf("...");
+		qprintf("\"(%d)\n", n->valuelen);
 	} else {
-		qprintf("(NULL)\n");
+		qprintf("(NULL)(%d)\n", n->valuelen);
 	}
-	if (i == 32)
-		qprintf("...");
-	qprintf(" dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
-		n->dp, n->firstblock, n->flist, n->total);
+	qprintf(" flags 0x%x hashval 0x%x whichfork %d\n",
+		  n->flags, n->hashval, n->whichfork);
+	qprintf(" aleaf: blkno %d index %d rmtblkno %d\n",
+		  n->aleaf_blkno, n->aleaf_index, n->aleaf_rmtblkno);
+	qprintf(" inumber %lld dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
+		n->inumber, n->dp, n->firstblock, n->flist, n->total);
 }
 
 /*
