@@ -1022,12 +1022,15 @@ xfs_inactive(vnode_t	*vp,
 
 		/*
 		 * Free the inode and clean up the iunlink item that
-		 * was logged when the link count went to 0.
+		 * was logged when the link count went to 0.  Keep
+		 * the iui_done call before the ifree call since it
+		 * needs to use the current inode generation number which
+		 * is incremented in xfs_ifree().
 		 */
 		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 		xfs_trans_ihold(tp, ip);
-		xfs_ifree(tp, ip);
 		xfs_trans_log_iui_done(tp, ip);
+		xfs_ifree(tp, ip);
 
 		xfs_trans_commit(tp , 0);
 	}
@@ -3521,6 +3524,7 @@ xfs_reclaim(vnode_t	*vp,
 
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_VTOI(vp);
+	mp = ip->i_mount;
 
 	/*
 	 * Flush and invalidate any data left around that is
@@ -3535,13 +3539,13 @@ xfs_reclaim(vnode_t	*vp,
 		 * cause us to try to get the lock in xfs_strategy().
 		 */
 	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		mp = ip->i_mount;
 		pflushinvalvp(vp, 0,
 			      (ip->i_d.di_size + (1 << mp->m_writeio_log)));
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	}
 
 	dnlc_purge_vp(vp);
+	ASSERT(ip->i_iui == NULL);
 	/*
 	 * If the inode is still dirty, then flush it out synchronously.
 	 */
