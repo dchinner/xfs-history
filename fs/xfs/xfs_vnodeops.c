@@ -1,4 +1,4 @@
-#ident "$Revision: 1.241 $"
+#ident "$Revision: 1.243 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3464,6 +3464,12 @@ xfs_remove(
 #ifndef SIM
 	xfs_refcache_purge_ip(ip);
 #endif
+
+	/*
+	 * Let interposed file systems know about removed links.
+	 */
+	VOP_LINK_REMOVED(XFS_ITOV(ip), dir_vp, (ip)->i_d.di_nlink==0);
+
 	IRELE(ip);
 
 	return 0;
@@ -5187,6 +5193,13 @@ xfs_rmdir(
 		(void) dm_namesp_event(DM_POSTREMOVE, dir_vp, NULL,
 				       name, NULL, cdp->i_d.di_mode, 0);
 	}
+
+	/*
+	 * Let interposed file systems know about removed links.
+	 */
+	VOP_LINK_REMOVED(dir_vp, XFS_ITOV(cdp), (dp)->i_d.di_nlink==0);
+	VOP_LINK_REMOVED(XFS_ITOV(cdp), dir_vp, (cdp)->i_d.di_nlink==0);
+
 	IRELE(cdp);
 
 	return 0;
@@ -6846,6 +6859,7 @@ vnodeops_t xfs_vnodeops = {
 	fs_nosys,	/* attr_set */
 	fs_nosys,	/* attr_remove */
 	fs_nosys,	/* attr_list */
+	fs_noval,	/* link_removed */
 };
 
 #else
@@ -6897,6 +6911,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_attr_remove,/* attr_remove */
 	xfs_attr_list,	/* attr_list */
 	fs_mount,
+	fs_noval,	/* link_removed */
 };
 
 #endif	/* SIM */
