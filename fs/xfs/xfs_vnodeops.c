@@ -1,4 +1,4 @@
-#ident "$Revision: 1.359 $"
+#ident "$Revision: 1.360 $"
 
 
 #ifdef SIM
@@ -2851,7 +2851,7 @@ std_return:
 							DM_EVENT_POSTCREATE)) {
 		(void) dm_send_namesp_event(DM_EVENT_POSTCREATE,
 			dir_bdp, DM_RIGHT_NULL,
-			created ? VNODE_TO_FIRST_BHV(vp):NULL,
+			created ? vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops):NULL,
 			DM_RIGHT_NULL, name, NULL,
 			dm_di_mode, error, 0);
 	}
