@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.69 $"
+#ident	"$Revision: 1.70 $"
 
 /*
  * High level interface routines for log manager
@@ -447,7 +447,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	xlog_t		 *log = mp->m_log;
 	xlog_in_core_t	 *iclog, *first_iclog;
 	xfs_log_iovec_t  reg[1];
-	xfs_log_ticket_t tic;
+	xfs_log_ticket_t tic = 0;
 	xfs_lsn_t	 lsn;
 	int		 error;
 	int		 spl;
