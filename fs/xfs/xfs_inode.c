@@ -96,8 +96,6 @@ xfs_itobp(xfs_mount_t	*mp,
 	 */
 	if (ip->i_dev == 0) {
 		ip->i_dev = dev;
-		ip->i_bno = imap.im_agblkno;
-		ip->i_index = imap.im_ioffset;
 	}
 
 	/*
@@ -415,9 +413,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 	case IFREG:
 	case IFDIR:
 	case IFLNK:
-/*		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL; */
-		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
-		ip->i_flags |= XFS_IEXTENTS;
+		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL;
 		break;
 	case IFMNT:
 		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
@@ -1018,8 +1014,6 @@ xfs_iprint(xfs_inode_t *ip)
 	printf("Inode %x\n", ip);
 	printf("    i_dev %x\n", (uint)ip->i_dev);
 	printf("    i_ino %llx\n", ip->i_ino);
-	printf("    i_bno %x\n", (uint)ip->i_bno);
-	printf("    i_index %d\n", ip->i_index);
 
 	printf("    i_flags %x ", ip->i_flags);
 	if (ip->i_flags & XFS_IEXTENTS) {

@@ -338,8 +338,6 @@ xfs_inode_item_init(xfs_inode_t	*ip,
 	iip->ili_item.li_mountp = mp;
 	iip->ili_inode = ip;
 	iip->ili_format.ilf_type = XFS_LI_INODE;
-	iip->ili_format.ilf_blkno = ip->i_bno;
-	iip->ili_format.ilf_index = ip->i_index;
 }
 
 

@@ -12,8 +12,6 @@ struct xfs_inode;
 typedef struct xfs_inode_log_format {
 	unsigned int		ilf_type;	/* inode log item type */
 	unsigned int		ilf_size;	/* size of this item */
-	xfs_agblock_t		ilf_blkno;	/* block on dev inode is in */
-	int			ilf_index;	/* index into block of inode */
 	uint			ilf_fields;	/* flags for fields logged */
 	uint			ilf_dsize;	/* size of data/ext/root */
 	union {

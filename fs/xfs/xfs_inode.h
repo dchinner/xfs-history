@@ -44,8 +44,6 @@ typedef struct xfs_inode {
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
 	dev_t			i_dev;		/* dev containing this inode */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino) */
-	xfs_agblock_t		i_bno;		/* ag block # of inode */
-	int			i_index;	/* which inode in block */
 
 	/* Transaction and locking information. */
 	xfs_trans_t		*i_transp;	/* ptr to owning transaction */
