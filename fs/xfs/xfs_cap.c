@@ -117,7 +117,7 @@ xfs_cap_vget(
 	posix_cap_xattr *xattr_cap = cap;
 
 	VN_HOLD(vp);
-	if ((error = _MAC_VACCESS(vp, get_current_cred(), VREAD)))
+	if ((error = _MAC_VACCESS(vp, NULL, VREAD)))
 		goto out;
 
 	if (!size)

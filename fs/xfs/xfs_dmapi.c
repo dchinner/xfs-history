@@ -1651,7 +1651,7 @@ xfs_dm_get_dmattr(
 	value_len = alloc_size;		/* in/out parameter */
 
 	VOP_ATTR_GET(vp, name.dan_chars, value, &value_len,
-			ATTR_ROOT, get_current_cred(), error);
+			ATTR_ROOT, NULL, error);
 	DM_EA_XLATE_ERR(error);
 
 	/* DMAPI requires an errno of ENOENT if an attribute does not exist,
@@ -1836,7 +1836,7 @@ xfs_dm_getall_dmattr(
 		*/
 
 		VOP_ATTR_LIST(vp, (char *)attrlist, list_size,
-			ATTR_ROOT, &cursor, get_current_cred(), error);
+			ATTR_ROOT, &cursor, NULL, error);
 		DM_EA_XLATE_ERR(error);
 
 		if (error || attrlist->al_count == 0)
@@ -1896,7 +1896,7 @@ xfs_dm_getall_dmattr(
 
 			VOP_ATTR_GET(vp, entry->a_name,
 				(void *)(ulist + 1), &value_len,
-				ATTR_ROOT, get_current_cred(), error);
+				ATTR_ROOT, NULL, error);
 			DM_EA_XLATE_ERR(error);
 
 			if (error || value_len != entry->a_valuelen) {
@@ -2109,7 +2109,7 @@ xfs_dm_punch_hole(
 
 	/* --- start of grow --- */
 	/* ip left locked after previous commit */
-	xfs_igrow_start(ip, realsize, get_current_cred());
+	xfs_igrow_start(ip, realsize, NULL);
 	xfs_trans_ijoin(tp2, ip, lock_flags);
 	xfs_igrow_finish(tp2, ip, realsize, 0);
 
@@ -2184,7 +2184,7 @@ xfs_dm_remove_dmattr(
 
 	VOP_ATTR_REMOVE(vp, name.dan_chars,
 			(setdtime ? ATTR_ROOT : ATTR_ROOT|ATTR_KERNOTIME),
-			get_current_cred(), error);
+			NULL, error);
 	DM_EA_XLATE_ERR(error);
 
 	if (error == ENOATTR)
@@ -2253,7 +2253,7 @@ xfs_dm_set_dmattr(
 	} else {
 		VOP_ATTR_SET(vp, name.dan_chars, value, buflen,
 			(setdtime ? ATTR_ROOT : ATTR_ROOT|ATTR_KERNOTIME),
-			get_current_cred(), error);
+			NULL, error);
 		DM_EA_XLATE_ERR(error);
 	}
 	kmem_free(value, alloc_size);
@@ -2345,7 +2345,7 @@ xfs_dm_set_fileattr(
 		vat.va_size = stat.fa_size;
 	}
 
-	VOP_SETATTR(vp, &vat, ATTR_DMI, get_current_cred(), error);
+	VOP_SETATTR(vp, &vat, ATTR_DMI, NULL, error);
 	return(error);
 }
 
@@ -2477,7 +2477,7 @@ xfs_dm_sync_by_handle (
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
 
-	VOP_FSYNC(vp, FSYNC_WAIT, get_current_cred(), (off_t)0, (off_t)-1, error);
+	VOP_FSYNC(vp, FSYNC_WAIT, NULL, (off_t)0, (off_t)-1, error);
 	return(error);
 }
 

@@ -213,7 +213,7 @@ xfs_acl_vget(
 	posix_acl_xattr_header	*ext_acl = acl;
 
 	VN_HOLD(vp);
-	if ((error = _MAC_VACCESS(vp, get_current_cred(), VREAD)))
+	if ((error = _MAC_VACCESS(vp, NULL, VREAD)))
 		goto out;
 	if (!(_ACL_ALLOC(xfs_acl))) {
 		error = ENOMEM;
