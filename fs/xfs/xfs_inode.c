@@ -25,6 +25,7 @@
 #include <sys/ktrace.h>
 #include <sys/cmn_err.h>
 #include <sys/pda.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
@@ -73,6 +74,7 @@
 
 zone_t *xfs_ifork_zone;
 zone_t *xfs_inode_zone;
+zone_t *xfs_chashlist_zone;
 
 /*
  * Used in xfs_itruncate().  This is the maximum number of extents
@@ -86,6 +88,11 @@ xfs_iflush_fork(
 	xfs_dinode_t		*dip,
 	xfs_inode_log_item_t	*iip,
 	int			whichfork,
+	buf_t			*bp);
+
+STATIC int
+xfs_iflush_int(
+	xfs_inode_t		*ip,
 	buf_t			*bp);
 
 STATIC int
@@ -2874,10 +2881,13 @@ xfs_iflush(
 	xfs_dinode_t		*dip;
 	xfs_mount_t		*mp;
 	int			error;
-#ifdef XFS_TRANS_DEBUG
-	int			first;
-#endif
+	xfs_chash_t		*ch;
+	xfs_inode_t		*iq;
+	int			clcount;	/* count of inodes clustered */
+	vnode_t			*vp;
 	SPLDECL(s);
+
+	XFSSTATS.xs_iflush_count++;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
@@ -2926,6 +2936,210 @@ xfs_iflush(
 		xfs_ifunlock(ip);
 		return error;
 	}
+
+	/*
+	 * First flush out the inode that xfs_iflush was called with.
+	 */
+	error = xfs_iflush_int(ip, bp);
+	if (error) {
+		xfs_ifunlock(ip);
+		goto corrupt_out;
+	}
+
+	/*
+	 * inode clustering:
+	 * see if other inodes can be gathered into this write
+	 */
+
+#ifdef DEBUG
+	ip->i_chash->chl_buf = bp;		/* inode clustering debug */
+#endif
+
+	ch = XFS_CHASH(mp, ip->i_blkno);
+	s = mutex_spinlock(&ch->ch_lock);
+
+	clcount=0;
+	for (iq=ip->i_cnext; iq != ip; iq=iq->i_cnext) {
+		/*
+		 * Do an un-protected check to see if the inode is dirty and
+		 * is a candidate for flushing.  These checks will be repeated
+		 * later after the appropriate locks are acquired.
+		 */
+		iip = iq->i_itemp;
+		if ((iq->i_update_core == 0) &&
+		    ((iip == NULL) ||
+		     !(iip->ili_format.ilf_fields & XFS_ILOG_ALL)) &&
+		    iq->i_pincount == 0) {
+			continue;
+		}
+
+		/*
+		 * We don't mess with swap files from here since it is
+		 * too easy to deadlock on memory.
+		 */
+		vp = XFS_ITOV(ip);
+		if (vp->v_flag & VISSWAP) {
+			continue;
+		}
+
+		/*
+		 * Try to get locks.  If any are unavailable,
+		 * then this inode cannot be flushed and is skipped.
+		 */
+
+		/* get inode locks (just i_lock) */
+		if (xfs_ilock_nowait(iq, XFS_ILOCK_SHARED)) {
+			/* get inode flush lock */
+			if (xfs_iflock_nowait(iq)) {
+				/* check if ipined */
+				if (xfs_ipincount(iq) == 0) {
+					/* arriving here means that
+					 * this inode can be flushed.
+					 * first re-check that it's
+					 * dirty
+					 */
+					iip = iq->i_itemp;
+					if ((iq->i_update_core != 0)||
+					    ((iip != NULL) &&
+					     (iip->ili_format.ilf_fields & XFS_ILOG_ALL))) {
+						clcount++;
+						error = xfs_iflush_int(iq, bp);
+						if (error) {
+							xfs_ifunlock(iq);
+							xfs_iunlock(iq,
+								    XFS_ILOCK_SHARED);
+							goto corrupt_out;
+						}
+					} else {
+						xfs_ifunlock(iq);
+					}
+				} else {
+					xfs_ifunlock(iq);
+				}
+			}
+			xfs_iunlock(iq, XFS_ILOCK_SHARED);
+		}
+	}
+	mutex_spinunlock(&ch->ch_lock, s);
+
+	if (!clcount) {
+	    XFSSTATS.xs_icluster_flushzero++;
+	}
+
+	iip = ip->i_itemp;   /* go back to passed-in inode, not last checked */
+	if (iip != NULL && iip->ili_format.ilf_fields != 0) {
+		/*
+		 * Flush out the inode buffer according to the directions
+		 * of the caller.  In the cases where the caller has given
+		 * us a choice choose the non-delwri case.  This is because
+		 * the inode is in the AIL and we need to get it out soon.
+		 */
+		switch (flags) {
+		case XFS_IFLUSH_SYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
+			flags = 0;
+			break;
+		case XFS_IFLUSH_ASYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
+			flags = B_ASYNC;
+			break;
+		case XFS_IFLUSH_DELWRI:
+			flags = B_DELWRI;
+			break;
+		default:
+			ASSERT(0);
+			flags = 0;
+			break;
+		}
+
+		ASSERT(bp->b_fsprivate != NULL);
+		ASSERT(bp->b_iodone != NULL);
+	} else {
+		switch (flags) {
+		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
+		case XFS_IFLUSH_DELWRI:
+			flags = B_DELWRI;
+			break;
+		case XFS_IFLUSH_ASYNC:
+			flags = B_ASYNC;
+			break;
+		case XFS_IFLUSH_SYNC:
+			flags = 0;
+			break;
+		default:
+			ASSERT(0);
+			flags = 0;
+			break;
+		}
+	}
+
+	/*
+	 * If the buffer is pinned then push on the log so we won't
+	 * get stuck waiting in the write for too long.
+	 */
+	if (bp->b_pincount > 0) {
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+	}
+
+#ifdef SIM
+	error = xfs_bwrite(mp, bp);
+#else
+	if (flags & B_DELWRI) {
+		xfs_bdwrite(mp, bp);
+	} else if (flags & B_ASYNC) {
+		xfs_bawrite(mp, bp);
+	} else {
+		error = xfs_bwrite(mp, bp);
+	}
+#endif /* SIM */
+
+	return error;
+
+corrupt_out:
+	brelse(bp);
+	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
+	xfs_iflush_abort(ip);
+	/*
+	 * Unlocks the flush lock
+	 */
+	return XFS_ERROR(EFSCORRUPTED);
+}
+
+
+STATIC int
+xfs_iflush_int(
+	xfs_inode_t		*ip,
+	buf_t			*bp)
+{
+	xfs_inode_log_item_t	*iip;
+	xfs_dinode_t		*dip;
+	xfs_mount_t		*mp;
+#ifdef XFS_TRANS_DEBUG
+	int			first;
+#endif
+	SPLDECL(s);
+
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
+	ASSERT(valusema(&ip->i_flock) <= 0);
+	ASSERT(ip->i_d.di_format != XFS_DINODE_FMT_BTREE ||
+	       ip->i_d.di_nextents > ip->i_df.if_ext_max);
+
+	iip = ip->i_itemp;
+	mp = ip->i_mount;
+
+	/*
+	 * If the inode isn't dirty, then just release the inode
+	 * flush lock and do nothing.
+	 */
+	if ((ip->i_update_core == 0) &&
+	    ((iip == NULL) || !(iip->ili_format.ilf_fields & XFS_ILOG_ALL))) {
+		xfs_ifunlock(ip);
+		return 0;
+	}
+
+	/* set *dip = inode's place in the buffer */
+	dip = (xfs_dinode_t *)(bp->b_un.b_addr + ip->i_boffset);
 
 	/*
 	 * Clear i_update_core before copying out the data.
@@ -3100,29 +3314,6 @@ xfs_iflush(
 		xfs_buf_attach_iodone(bp, (void(*)(buf_t*,xfs_log_item_t*))
 				      xfs_iflush_done, (xfs_log_item_t *)iip);
 
-		/*
-		 * Flush out the inode buffer according to the directions
-		 * of the caller.  In the cases where the caller has given
-		 * us a choice choose the non-delwri case.  This is because
-		 * the inode is in the AIL and we need to get it out soon.
-		 */
-		switch (flags) {
-		case XFS_IFLUSH_SYNC:
-		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
-			flags = 0;
-			break;
-		case XFS_IFLUSH_ASYNC:
-		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
-			flags = B_ASYNC;
-			break;
-		case XFS_IFLUSH_DELWRI:
-			flags = B_DELWRI;
-			break;
-		default:
-			ASSERT(0);
-			flags = 0;
-			break;
-		}
 		ASSERT(bp->b_fsprivate != NULL);
 		ASSERT(bp->b_iodone != NULL);
 	} else {
@@ -3141,54 +3332,11 @@ xfs_iflush(
 			ASSERT((iip->ili_item.li_flags & XFS_LI_IN_AIL) == 0);
 		}
 		xfs_ifunlock(ip);
-		switch (flags) {
-		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
-		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
-		case XFS_IFLUSH_DELWRI:
-			flags = B_DELWRI;
-			break;
-		case XFS_IFLUSH_ASYNC:
-			flags = B_ASYNC;
-			break;
-		case XFS_IFLUSH_SYNC:
-			flags = 0;
-			break;
-		default:
-			ASSERT(0);
-			flags = 0;
-			break;
-		}
 	}
 
-	/*
-	 * If the buffer is pinned then push on the log so we won't
-	 * get stuck waiting in the write for too long.
-	 */
-	if (bp->b_pincount > 0) {
-		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
-	}
-
-#ifdef SIM
-	error = xfs_bwrite(mp, bp);
-#else
-	if (flags & B_DELWRI) {
-		xfs_bdwrite(mp, bp);
-	} else if (flags & B_ASYNC) {
-		xfs_bawrite(mp, bp);
-	} else {
-		error = xfs_bwrite(mp, bp);
-	}
-#endif /* SIM */
-
-	return error;
+	return 0;
 
 corrupt_out:
-	brelse(bp);
-	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
-	xfs_iflush_abort(ip);
-	/*
-	 * Unlocks the flush lock
-	 */
 	return XFS_ERROR(EFSCORRUPTED);
 }
 

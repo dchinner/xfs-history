@@ -55,6 +55,7 @@
 #endif /* SIM */
 
 extern vnodeops_t xfs_vnodeops;
+extern zone_t *xfs_chashlist_zone;
 
 void
 xfs_ilock_ra(xfs_inode_t	*ip,
@@ -99,6 +100,52 @@ xfs_ihash_free(xfs_mount_t *mp)
 		mrfree(&mp->m_ihash[i].ih_lock);
 	kmem_free(mp->m_ihash, mp->m_ihsize*sizeof(xfs_ihash_t));
 	mp->m_ihash = NULL;
+}
+
+/*
+ * Initialize the inode cluster hash table for the newly mounted file system.
+ *
+ * mp -- this is the mount point structure for the file system being
+ *       initialized
+ */
+void
+xfs_chash_init(xfs_mount_t *mp)
+{
+	int	i;
+
+	/*
+	 * m_chash size is based on m_ishash
+	 * with a minimum of 32 entries
+	 */
+	mp->m_chsize = (37*(mp)->m_sb.sb_agcount-1) /
+		         (XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog);
+	if (mp->m_chsize < 37) {
+		mp->m_chsize = 37;
+	}
+	mp->m_chash = (xfs_chash_t *)kmem_zalloc(mp->m_chsize
+						 * sizeof(xfs_chash_t), 
+						 KM_SLEEP);
+	ASSERT(mp->m_chash != NULL);
+
+	for (i = 0; i < mp->m_chsize; i++) {
+		spinlock_init(&mp->m_chash[i].ch_lock,"xfshash");
+	}
+}
+
+/*
+ * Free up structures allocated by xfs_chash_init, at unmount time.
+ */
+void
+xfs_chash_free(xfs_mount_t *mp)
+{
+	int	i;
+
+	for (i = 0; i < mp->m_chsize; i++) {
+		spinlock_destroy(&mp->m_chash[i].ch_lock);
+	}
+
+	kmem_free(mp->m_chash, mp->m_chsize*sizeof(xfs_chash_t));
+	mp->m_chash = NULL;
 }
 
 /*
@@ -150,6 +197,9 @@ xfs_iget(
 	/* REFERENCED */
 	int		newnode;
 	vmap_t		vmap;
+	xfs_chash_t	*ch;
+	xfs_chashlist_t	*chl, *chlnew;
+	SPLDECL(s);
 
 	SYSINFO.iget++;
 	XFSSTATS.xs_ig_attempts++;
@@ -283,6 +333,62 @@ again:
 	ih->ih_next = ip;
 	ip->i_udquot = ip->i_pdquot = NULL;
 	ih->ih_version++;
+
+	/*
+	 * put ip on its cluster's hash chain
+	 */
+	ASSERT(ip->i_chash == NULL && ip->i_cprev == NULL && 
+	       ip->i_cnext == NULL);
+
+	chlnew = NULL;
+	ch = XFS_CHASH(mp, ip->i_blkno);
+ chlredo:
+	s = mutex_spinlock(&ch->ch_lock);
+	for (chl = ch->ch_list; chl != NULL; chl = chl->chl_next) {
+		if (chl->chl_blkno == ip->i_blkno) {
+
+			/* insert this inode into the doubly-linked list 
+			 * where chl points */
+			if (iq = chl->chl_ip) {
+				ip->i_cprev = iq->i_cprev;
+				iq->i_cprev->i_cnext = ip;
+				iq->i_cprev = ip;
+				ip->i_cnext = iq;
+			} else {
+				ip->i_cnext = ip;
+				ip->i_cprev = ip;
+			}
+			chl->chl_ip = ip;
+			ip->i_chash = chl;
+			break;
+		}
+	}
+
+	/* no hash list found for this block; add a new hash list */
+	if (chl == NULL)  {
+		if (chlnew == NULL) {
+			mutex_spinunlock(&ch->ch_lock, s);
+			ASSERT(xfs_chashlist_zone != NULL);
+			chlnew = (xfs_chashlist_t *)kmem_zone_zalloc(xfs_chashlist_zone,
+								  KM_SLEEP);
+			ASSERT(chlnew != NULL);
+			goto chlredo;
+		} else {
+			ip->i_cnext = ip;
+			ip->i_cprev = ip;
+			ip->i_chash = chlnew;
+			chlnew->chl_ip = ip;
+			chlnew->chl_blkno = ip->i_blkno;
+			chlnew->chl_next = ch->ch_list;
+			ch->ch_list = chlnew;
+			chlnew = NULL;
+		}
+	} else {
+		if (chlnew != NULL) {
+			kmem_zone_free(xfs_chashlist_zone, chlnew);
+		}
+	}
+	mutex_spinunlock(&ch->ch_lock, s);
 	mrunlock(&ih->ih_lock);
 
 	/*
@@ -398,6 +504,9 @@ xfs_ireclaim(xfs_inode_t *ip)
 	xfs_inode_t	*iq;
 	xfs_mount_t	*mp;
 	vnode_t		*vp;
+	xfs_chash_t	*ch;
+	xfs_chashlist_t	*chl, *chm;
+	SPLDECL(s);
 
 	/*
 	 * Remove from old hash list.
@@ -409,12 +518,56 @@ xfs_ireclaim(xfs_inode_t *ip)
 		iq->i_prevp = ip->i_prevp;
 	}
 	*ip->i_prevp = iq;
+
+	/*
+	 * Remove from cluster hash list
+	 *   1) delete the chashlist if this is the last inode on the chashlist
+	 *   2) unchain from list of inodes
+	 *   3) point chashlist->chl_ip to 'chl_next' if to this inode.
+	 */
+	mp = ip->i_mount;
+	ch = XFS_CHASH(mp, ip->i_blkno);
+	s = mutex_spinlock(&ch->ch_lock);
+
+	if (ip->i_cnext == ip) {
+		/* Last inode on chashlist */
+		ASSERT(ip->i_cnext == ip && ip->i_cprev == ip);
+		ASSERT(ip->i_chash != NULL);
+		chm=NULL;
+		for (chl = ch->ch_list; chl != NULL; chl = chl->chl_next) {
+			if (chl->chl_blkno == ip->i_blkno) {
+				if (chm == NULL) {
+					/* first item on the list */
+					ch->ch_list = chl->chl_next;
+				} else {
+					chm->chl_next = chl->chl_next;
+				}
+				kmem_zone_free(xfs_chashlist_zone, chl);
+				break;
+			} else {
+				ASSERT(chl->chl_ip != ip);
+				chm = chl;
+			}
+		}
+		ASSERT_ALWAYS(chl != NULL);
+       } else {
+		/* delete one inode from a non-empty list */
+		iq = ip->i_cnext;
+		iq->i_cprev = ip->i_cprev;
+		ip->i_cprev->i_cnext = iq;
+		if (ip->i_chash->chl_ip == ip) {
+			ip->i_chash->chl_ip = iq;
+		}
+		ip->i_chash = __return_address;
+		ip->i_cprev = __return_address;
+		ip->i_cnext = __return_address;
+	}
+	mutex_spinunlock(&ch->ch_lock, s);
 	mrunlock(&ih->ih_lock);
 
 	/*
 	 * Remove from mount's inode list.
 	 */
-	mp = ip->i_mount;
 	XFS_MOUNT_ILOCK(mp);
 	ASSERT((ip->i_mnext != NULL) && (ip->i_mprev != NULL));
 	iq = ip->i_mnext;

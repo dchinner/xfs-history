@@ -7,6 +7,7 @@ struct cred;
 struct vfs;
 struct vnode;
 struct xfs_ihash;
+struct xfs_chash;
 struct xfs_inode;
 struct xfs_perag;
 struct xfs_qm;
@@ -146,6 +147,9 @@ typedef struct xfs_mount {
 	xfs_dablk_t		m_dirdatablk;	/* blockno of dir data v2 */
 	xfs_dablk_t		m_dirleafblk;	/* blockno of dir non-data v2 */
 	xfs_dablk_t		m_dirfreeblk;	/* blockno of dirfreeindex v2 */
+	int			m_chsize;	/* size of next field */
+	struct xfs_chash	*m_chash;	/* fs private inode per-cluster
+						 * hash table */
 #if CELL_IRIX
 	int			m_export[VFS_EILIMIT/sizeof(int)];
 						/* Info to export to other

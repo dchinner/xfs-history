@@ -112,6 +112,8 @@ xfs_mount_free(xfs_mount_t *mp)
 {
 	if (mp->m_ihash)
 		xfs_ihash_free(mp);
+	if (mp->m_chash)
+		xfs_chash_free(mp);
 
 	if (mp->m_perag) {
 		mrfree(&mp->m_peraglock);
@@ -662,6 +664,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	 * file system.
 	 */
 	xfs_ihash_init(mp);
+	xfs_chash_init(mp);
 
 	/*
 	 * Allocate and initialize the per-ag data.
@@ -832,6 +835,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 
  error2:
 	xfs_ihash_free(mp);
+	xfs_chash_free(mp);
 	mrfree(&mp->m_peraglock);
 	kmem_free(mp->m_perag, sbp->sb_agcount * sizeof(xfs_perag_t));
 	mp->m_perag = NULL;

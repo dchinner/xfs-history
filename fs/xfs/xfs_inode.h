@@ -33,6 +33,28 @@ typedef struct xfs_ihash {
 #pragma set type attribute xfs_ihash align=128
 #endif
 
+/*
+ * This is the xfs inode cluster hash.  This hash is used by xfs_iflush to
+ * find inodes that share a cluster and can be flushed to disk at the same
+ * time.
+ */
+
+typedef struct xfs_chashlist {
+	struct xfs_chashlist	*chl_next;
+	struct xfs_inode	*chl_ip;
+	daddr_t			chl_blkno;	/* starting block number of 
+						 * the cluster */
+#ifdef DEBUG
+	struct buf		*chl_buf;	/* debug: the inode buffer */
+#endif
+} xfs_chashlist_t;
+
+typedef struct xfs_chash {
+	xfs_chashlist_t		*ch_list;
+	lock_t			ch_lock;
+} xfs_chash_t;
+
+
 #ifdef NOTYET
 /*
  * The range structure is used to describe a locked range
@@ -184,6 +206,9 @@ typedef struct xfs_inode {
 	void			*i_ilock_ra;	/* current ilock ret addr */
 
 	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
+	xfs_chashlist_t		*i_chash;	/* cluster hash list header */
+	struct xfs_inode	*i_cnext;	/* cluster hash link forward */
+	struct xfs_inode	*i_cprev;	/* cluster hash link backward */
 
 #ifdef DEBUG
 	/* Trace buffers per inode. */
@@ -389,10 +414,19 @@ typedef struct xfs_fid2 {
 } xfs_fid2_t;
 
 /*
+ * Pick the inode cluster hash bucket
+ * (m_chash is the same size as m_ihash)
+ */
+#define XFS_CHASH(mp,blk) ((mp)->m_chash + (blk % (mp)->m_chsize))
+
+
+/*
  * xfs_iget.c prototypes.
  */
 void		xfs_ihash_init(struct xfs_mount *);
 void		xfs_ihash_free(struct xfs_mount *);
+void		xfs_chash_init(struct xfs_mount *);
+void		xfs_chash_free(struct xfs_mount *);
 xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 				  struct xfs_trans *);
 int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,

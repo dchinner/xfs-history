@@ -265,6 +265,7 @@ xfs_init(
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
 	extern zone_t	*xfs_inode_zone;
+	extern zone_t	*xfs_chashlist_zone;
 	extern zone_t	*xfs_trans_zone;
 	extern zone_t	*xfs_buf_item_zone;
 #if XFS_BIG_FILESYSTEMS
@@ -358,6 +359,8 @@ xfs_init(
 				      "xfs_efi_item");
 	xfs_ifork_zone = kmem_zone_init(sizeof(xfs_ifork_t), "xfs_ifork");
 	xfs_ili_zone = kmem_zone_init(sizeof(xfs_inode_log_item_t), "xfs_ili");
+	xfs_chashlist_zone = kmem_zone_init(sizeof(xfs_chashlist_t),
+					    "xfs_chashlist");
 
 	/*
 	 * Allocate global trace buffers.

@@ -136,6 +136,8 @@ static void	xfsidbg_xbxatrace(int);
 static void	xfsidbg_xbxitrace(xfs_inode_t *);
 static void	xfsidbg_xbxstrace(xfs_inode_t *);
 #endif
+static void	xfsidbg_xchash(xfs_mount_t *mp);
+static void	xfsidbg_xchashlist(xfs_chashlist_t *chl);
 static void 	xfsidbg_xchksum(uint *);
 static void	xfsidbg_xdaargs(xfs_da_args_t *);
 static void	xfsidbg_xdabuf(xfs_dabuf_t *);
@@ -259,6 +261,8 @@ static struct xif {
     "xbxitrc",	VD xfsidbg_xbxitrace,	"Dump XFS bmap extent per-inode trace",
     "xbxstrc",	VD xfsidbg_xbxstrace,	"Dump XFS bmap extent inode trace",
 #endif
+    "xchash",	VD xfsidbg_xchash,	"Dump XFS cluster hash",
+    "xchlist",	VD xfsidbg_xchashlist,	"Dump XFS cluster hash list",
     "xchksum",	VD xfsidbg_xchksum,	"Dump chksum",
 #ifdef DEBUG
     "xd2atrc",	VD xfsidbg_xdir2atrace,	"Dump XFS directory v2 count trace",
@@ -4063,6 +4067,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		(xfs_dfiloff_t)mp->m_dirdatablk,
 		(xfs_dfiloff_t)mp->m_dirleafblk,
 		(xfs_dfiloff_t)mp->m_dirfreeblk);
+	qprintf("chsize %d chash 0x%x\n",
+		mp->m_chsize, mp->m_chash);
 	if (mp->m_fsname != NULL)
 		qprintf("mountpoint \"%s\"\n", mp->m_fsname);
 	else
@@ -4198,10 +4204,62 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	qprintf(" &traces = 0x%x", &(ip->i_xtrace));
 #endif
 	qprintf("\n");
+	qprintf("chash 0x%x cnext 0x%x cprev 0x%x\n",
+		ip->i_chash,
+		ip->i_cnext,
+		ip->i_cprev);
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
 	qprintf("\n");
 	xfs_prdinode_core(&ip->i_d);
+}
+
+/*
+ * Command to print xfs inode cluster hash table: kp xchash <addr>
+ */
+static void
+xfsidbg_xchash(xfs_mount_t *mp)
+{
+	int		i;
+	xfs_chash_t	*ch;
+
+	qprintf("m_chash 0x%x size %d\n",
+		mp->m_chash, mp->m_chsize);
+	for (i = 0; i < mp->m_chsize; i++) {
+		ch = mp->m_chash + i;
+		qprintf("[%3d] ch 0x%x chashlist 0x%x\n", i, ch, ch->ch_list);
+		xfsidbg_xchashlist(ch->ch_list);
+	}
+}
+
+/*
+ * Command to print xfs inode cluster hash list: kp xchashlist <addr>
+ */
+static void
+xfsidbg_xchashlist(xfs_chashlist_t *chl)
+{
+	xfs_inode_t	*ip;
+
+	while (chl != NULL) {
+		qprintf("hashlist inode 0x%x blkno %d ",
+		       chl->chl_ip, chl->chl_blkno);
+
+#ifdef DEBUG
+		qprintf(" buf 0x%x",
+			chl->chl_buf);
+#endif
+		qprintf("\n");
+
+		/* print inodes on chashlist */
+		ip = chl->chl_ip;
+		do {
+			qprintf("0x%x ", ip);
+			ip = ip->i_cnext;
+		} while (ip != chl->chl_ip);
+		qprintf("\n");
+
+		chl=chl->chl_next;
+	}
 }
 
 /*
