@@ -1,4 +1,4 @@
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 #include "sys/types.h"
 #include "sys/pda.h"
@@ -18,10 +18,6 @@ int
 xfs_error_trap(int e)
 {
 	int i;
-#ifndef SIM
-	int cpu;
-	int id;
-#endif
 
 	if (!e)
 		return 0;
