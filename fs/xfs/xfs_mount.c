@@ -110,7 +110,7 @@ xfs_mount_init(void)
 {
 	xfs_mount_t *mp;
 
-	mp = kmem_zalloc(sizeof(*mp), KM_SLEEP_IO);
+	mp = kmem_zalloc(sizeof(*mp), KM_SLEEP);
 
 	AIL_LOCKINIT(&mp->m_ail_lock, "xfs_ail");
 	spinlock_init(&mp->m_sb_lock, "xfs_sb");
@@ -882,7 +882,7 @@ xfs_mountfs(
 	 */
 	mrinit(&mp->m_peraglock, "xperag");
 	mp->m_perag =
-		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP_IO);
+		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
 
 	xfs_initialize_perag(mp, sbp->sb_agcount);
 
@@ -1569,7 +1569,7 @@ xfs_uuid_mount(xfs_mount_t *mp)
 		xfs_uuidtab = kmem_realloc(xfs_uuidtab,
 	                (xfs_uuidtab_size + 1) * sizeof(*xfs_uuidtab),
 	                xfs_uuidtab_size  * sizeof(*xfs_uuidtab),
-	                KM_SLEEP_IO);
+	                KM_SLEEP);
 		hole = xfs_uuidtab_size++;
 	}
 	xfs_uuidtab[hole] = mp->m_sb.sb_uuid;

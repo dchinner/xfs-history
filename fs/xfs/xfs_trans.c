@@ -115,7 +115,7 @@ _xfs_trans_alloc(
 {
 	xfs_trans_t	*tp;
 	ASSERT(xfs_trans_zone != NULL);
-	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP_IO);
+	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP);
 	tp->t_dqinfo = NULL;
 
 	/*

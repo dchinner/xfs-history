@@ -1041,7 +1041,7 @@ xfs_syncsub(
 	preempt = 0;
 
 	/* Allocate a reference marker */
-	ipointer = (xfs_iptr_t *)kmem_zalloc(sizeof(xfs_iptr_t), KM_SLEEP_IO);
+	ipointer = (xfs_iptr_t *)kmem_zalloc(sizeof(xfs_iptr_t), KM_SLEEP);
 
 	fflag = XFS_B_ASYNC;		/* default is don't wait */
 	if (flags & SYNC_BDFLUSH)
