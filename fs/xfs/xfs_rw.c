@@ -1,4 +1,4 @@
-#ident "$Revision: 1.192 $"
+#ident "$Revision: 1.194 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -199,6 +199,11 @@ xfs_diordwr(
 extern int
 xfs_io_is_guaranteed(
 	xfs_inode_t	*,
+	stream_id_t	*);
+
+extern int
+xfs_fp_to_stream(
+	vfile_t		*,
 	stream_id_t	*);
 
 extern int
@@ -1235,14 +1240,7 @@ xfs_read(
 				goto out;
 		}
 		if (ioflag & IO_DIRECT) {
-#ifdef PRIO_DEBUG
-			printf("xfs_read: IO_DIRECT ioflag %d IO_PRIORITY %x\n", ioflag, IO_PRIORITY);
-#endif
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_READ);
-#ifdef PRIO_DEBUG
-			printf("xfs_read: xfs_diordwr returns %d\n", error);
-#endif
-
 		} else {
 			error = xfs_read_file(bdp, uiop, ioflag, credp);
 		}
@@ -2546,13 +2544,7 @@ start:
 		}
 retry:
 		if (ioflag & IO_DIRECT) {
-#ifdef PRIO_DEBUG
-			printf("xfs_write: IO_DIRECT ioflag %d IO_PRIORITY %x\n", ioflag, IO_PRIORITY);
-#endif /* PRIO_DEBUG */
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
-#ifdef PRIO_DEBUG
-			printf("xfs_write: xfs_diordwr returns %d\n", error);
-#endif
 		} else {
 			error = xfs_write_file(bdp, uiop, ioflag, credp);
 		}
@@ -5091,11 +5083,6 @@ retry:
 	     			bps[bufsissued++]= nbp = getphysbuf();
 				CHECK_GRIO_TIMESTAMP(bp, 40);
 
-#ifdef PRIO_DEBUG
-				if (BP_IS_PRIORITY(nbp))
-					printf("xfs_diostrat: BP_IS_PRIORITY %llx\n", nbp);
-#endif
-
 	     			nbp->b_flags     = bp->b_flags;
 	     			nbp->b_flags2    = bp->b_flags2;
 
@@ -5167,7 +5154,9 @@ retry:
 	  		nbp = bps[j];
 	    		biowait(nbp);
 			nbp->b_flags2 &= ~B_GR_BUF;
+#if 0
 			nbp->b_flags2 &= ~B_PRIO_BUF;
+#endif
 
 	     		if (!error)
 				error = geterror(nbp);
@@ -5325,13 +5314,16 @@ xfs_diordwr(
 	 */
 	bp = getphysbuf();
 	bp->b_private = &dp;
-	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		bp->b_edev = mp->m_rtdev;
+	if (ioflag & IO_PRIORITY) {
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+			bp->b_edev = mp->m_rtdev;
+		else
+			bp->b_edev = mp->m_dev;
 
 		/*
  	 	 * Check if this is a guaranteed rate I/O
 	 	 */
-		if (xfs_io_is_guaranteed(ip, &stream_id)) {
+		if (xfs_fp_to_stream((vfile_t *)uiop->uio_fp, &stream_id)) {
 			bp->b_flags2 |= B_GR_BUF;
 
 			ASSERT(bp->b_grio_private == NULL);
@@ -5352,16 +5344,15 @@ xfs_diordwr(
 		bp->b_flags2 &= ~B_GR_BUF;
 	}
 
+#if 0
 	/*
 	 * If this is a "priority" I/O, set the Priority I/O flag in the buf_t
 	 */
 	if (ioflag & IO_PRIORITY) {
-#ifdef PRIO_DEBUG
-	  printf("xfs_diordwr: IO_PRIORITY flag set in ioflag\n");
-#endif /* PRIO_DEBUG */
 	  bp->b_flags2 |= B_PRIO_BUF;
 	} else
 	  bp->b_flags2 &= ~B_PRIO_BUF;
+#endif
 
 	/*
  	 * Perform I/O operation.
@@ -5386,8 +5377,10 @@ xfs_diordwr(
 		bp->b_flags2 &= ~B_GR_BUF;
 	}
 
+#if 0
 	/* Reset the Priority I/O flag */
 	bp->b_flags2 &= ~B_PRIO_BUF;
+#endif
 
 #ifdef SIM
 	bp->b_un.b_addr = 0;
