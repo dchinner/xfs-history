@@ -240,11 +240,12 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 			nblks <<= 1;
 		}
 	} else {
+		uint	dblocks = XFS_B_TO_FSB(mp, valuelen);
 		/* Out of line attribute, cannot double split, but make
 		 * room for the attribute value itself.
 		 */
-		nblks += XFS_B_TO_FSB(mp, size);
-		nblks += XFS_NEXTENTADD_SPACE_RES(mp, size, XFS_ATTR_FORK);
+		nblks += dblocks;
+		nblks += XFS_NEXTENTADD_SPACE_RES(mp, dblocks, XFS_ATTR_FORK);
 	}
 
 	/* Size is now blocks for attribute data */
