@@ -66,7 +66,7 @@
 #endif
 
 #ifdef XFSDADEBUG
-int xfsda_debug = 200;		/* interval for fsck at split/join ops */
+int xfsda_debug = 1;		/* interval for fsck at split/join ops */
 int xfsda_debug_cnt = 1;	/* counter for fsck at split/join ops */
 int xfsda_check(xfs_inode_t *dp, int whichfork);
 int xfsda_loaddir(xfs_inode_t *dp);

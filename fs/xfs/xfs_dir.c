@@ -78,7 +78,7 @@ STATIC int xfs_dir_leaf_removename(xfs_da_args_t *args, int *number_entries,
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp,
-					     xfs_dir_put_t *putp);
+					     xfs_dir_put_t put);
 STATIC int xfs_dir_leaf_replace(xfs_da_args_t *args);
 #endif	/* !SIM */
 
@@ -92,7 +92,7 @@ STATIC int xfs_dir_node_removename(xfs_da_args_t *args);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp,
-					     xfs_dir_put_t *putp);
+					     xfs_dir_put_t put);
 STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
 #endif	/* !SIM */
 
@@ -346,7 +346,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	dirent_t *dbp;
 	caddr_t lockaddr;
 	int locklen = 0, alignment, retval, is32;
-	xfs_dir_put_t put, oput;
+	xfs_dir_put_t put;
 
 	XFSSTATS.xs_dir_getdents++;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
@@ -362,15 +362,26 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
 	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
 		dbp = NULL;
-		lockaddr = uio->uio_iov[0].iov_base;
-		locklen = uio->uio_iov[0].iov_len;
 		if (uio->uio_segflg == UIO_SYSSPACE) {
 			ASSERT(!is32);
-			oput = put = xfs_dir_put_dirent64_rest;
-		} else
-			oput = put = is32 ?
-					xfs_dir_put_dirent32_first :
-					xfs_dir_put_dirent64_first;
+			lockaddr = NULL;
+			locklen = 0;
+			put = xfs_dir_put_dirent64_direct;
+		} else {
+			if (useracc(uio->uio_iov[0].iov_base,
+				    uio->uio_iov[0].iov_len,
+				    (B_READ|B_PHYS)) == 0) {
+				*eofp = 0;
+				return (curthreadp->k_error ?
+					curthreadp->k_error :
+					XFS_ERROR(EFAULT));
+			}
+			lockaddr = uio->uio_iov[0].iov_base;
+			locklen = uio->uio_iov[0].iov_len;
+			put = is32 ?
+				xfs_dir_put_dirent32_direct :
+				xfs_dir_put_dirent64_direct;
+		}
 	} else {
 		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
 		put = is32 ?
@@ -384,17 +395,17 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	*eofp = 0;
 	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp,
-						    &put);
+						    put);
 	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
-		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp, &put);
+		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp, put);
 	} else {
-		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp, &put);
+		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp, put);
 	}
 
 	if (dbp != NULL)
 		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
-	else if (locklen && oput != put)
-		unuseracc(lockaddr, locklen, B_READ);
+	else if (locklen)
+		unuseracc(lockaddr, locklen, (B_READ|B_PHYS));
 	return(retval);
 }
 
@@ -524,7 +535,7 @@ xfs_dir_leaf_lookup(xfs_da_args_t *args)
  */
 STATIC int
 xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				  int *eofp, dirent_t *dbp, xfs_dir_put_t *putp)
+				  int *eofp, dirent_t *dbp, xfs_dir_put_t put)
 {
 	buf_t *bp;
 	int retval, eob;
@@ -533,7 +544,7 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
-	retval = xfs_dir_leaf_getdents_int(bp, dp, 0, uio, &eob, dbp, putp, -1);
+	retval = xfs_dir_leaf_getdents_int(bp, dp, 0, uio, &eob, dbp, put, -1);
 	xfs_trans_brelse(trans, bp);
 	*eofp = (eob == 0);
 	return(retval);
@@ -725,7 +736,7 @@ xfs_dir_node_lookup(xfs_da_args_t *args)
 #ifndef SIM
 STATIC int
 xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				  int *eofp, dirent_t *dbp, xfs_dir_put_t *putp)
+				  int *eofp, dirent_t *dbp, xfs_dir_put_t put)
 {
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
@@ -757,7 +768,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 */
 	if (bno > 0) {
 		error = xfs_da_read_buf(trans, dp, bno, -1, &bp, XFS_DATA_FORK);
-		if (error)
+		if ((error != 0) && (error != EDIRCORRUPTED))
 			return(error);
 		if (bp) {
 			leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
@@ -789,7 +800,8 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 						       XFS_DATA_FORK);
 			if (error)
 				return(error);
-			ASSERT(bp != NULL);
+			if (bp == NULL)
+				return(XFS_ERROR(EDIRCORRUPTED));
 			node = (xfs_da_intnode_t *)bp->b_un.b_addr;
 			if (node->hdr.info.magic != XFS_DA_NODE_MAGIC)
 				break;
@@ -841,7 +853,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		} else
 			nextda = -1;
 		error = xfs_dir_leaf_getdents_int(bp, dp, bno, uio, &eob, dbp,
-						  putp, nextda);
+						  put, nextda);
 		xfs_trans_brelse(trans, bp);
 		bno = nextbno;
 		if (eob) {
@@ -855,7 +867,8 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 					XFS_DATA_FORK);
 		if (error)
 			return(error);
-		ASSERT(bp != NULL);
+		if (bp == NULL)
+			return(XFS_ERROR(EDIRCORRUPTED));
 	}
 	*eofp = 1;
 	xfs_dir_trace_g_du("node: E-O-F", dp, uio);
