@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.57 $"
+#ident	"$Revision: 1.58 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -82,8 +82,8 @@ extern struct vnodeops	xfs_vnodeops;
  */
 static void	xfsidbg_xagf(xfs_agf_t *);
 static void	xfsidbg_xagi(xfs_agi_t *);
-#ifdef DEBUG
 static void	xfsidbg_xaildump(xfs_mount_t *);
+#ifdef DEBUG
 static void	xfsidbg_xalatrace(int);
 static void	xfsidbg_xalbtrace(xfs_agblock_t);
 static void	xfsidbg_xalgtrace(xfs_agnumber_t );
@@ -148,6 +148,7 @@ static void	xfsidbg_xlog_granttrace(xlog_t *);
 #endif
 static void	xfsidbg_xlog_ritem(xlog_recover_item_t *);
 static void	xfsidbg_xlog_rtrans(xlog_recover_t *);
+static void	xfsidbg_xlog_rtrans_entire(xlog_recover_t *);
 static void	xfsidbg_xlog_tic(xlog_ticket_t *);
 static void	xfsidbg_xlogitem(xfs_log_item_t *);
 static void	xfsidbg_xmount(xfs_mount_t *);
@@ -194,8 +195,8 @@ static struct xif {
 } xfsidbg_funcs[] = {
     "xagf",	VD xfsidbg_xagf,	"Dump XFS allocation group freespace",
     "xagi",	VD xfsidbg_xagi,	"Dump XFS allocation group inode",
-#ifdef DEBUG
     "xail",	VD xfsidbg_xaildump,	"Dump XFS AIL for a mountpoint",
+#ifdef DEBUG
     "xalatrc",	VD xfsidbg_xalatrace,	"Dump XFS alloc count trace",
     "xalbtrc",	VD xfsidbg_xalbtrace,	"Dump XFS alloc block trace",
     "xalgtrc",	VD xfsidbg_xalgtrace,	"Dump XFS alloc alloc-group trace",
@@ -257,6 +258,7 @@ static struct xif {
 #endif
     "xl_rcit",	VD xfsidbg_xlog_ritem,	"Dump XFS recovery item",
     "xl_rctr",	VD xfsidbg_xlog_rtrans,	"Dump XFS recovery transaction",
+    "xl_rctr2",	VD xfsidbg_xlog_rtrans_entire,	"Dump entire recovery transaction",
     "xl_tic",	VD xfsidbg_xlog_tic,	"Dump XFS log ticket",
     "xlog",	VD xfsidbg_xlog,	"Dump XFS log",
     "xlogcb",	VD xfsidbg_xiclogcb,	"Dump XFS in-core log callbacks",
@@ -1253,7 +1255,6 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 	qprintf("root bytes %d root orig 0x%x\n",
 		ilip->ili_root_size, ilip->ili_orig_root);
 #endif
-	qprintf("inode buf 0x%x\n", ilip->ili_bp);
 	qprintf("size %d fields: ", ilip->ili_format.ilf_size);
 	printflags(ilip->ili_format.ilf_fields, ilf_fields, "formatfield");
 	qprintf(" last fields: ");
@@ -3149,6 +3150,97 @@ xfsidbg_xlog_rtrans(xlog_recover_t *trans)
 		} while (rip != first_rip);
 	}
 }	/* xfsidbg_xlog_rtrans */
+ 
+static void
+xfsidbg_xlog_buf_logitem(xlog_recover_item_t *item)
+{
+	xfs_buf_log_format_t	*buf_f;
+	int			i, j;
+	int			bit;
+	int			nbits;
+	unsigned int		*data_map;
+	unsigned int		map_size;
+	int			size;
+
+	buf_f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
+	if (buf_f->blf_flags & XFS_BLI_INODE_BUF) {
+		qprintf("\tINODE BUF <blkno=0x%x, len=0x%x>\n",
+			buf_f->blf_blkno, buf_f->blf_len);
+	} else if (buf_f->blf_flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_PDQUOT_BUF)) {
+		qprintf("\tDQUOT BUF <blkno=0x%x, len=0x%x>\n",
+			buf_f->blf_blkno, buf_f->blf_len);
+	} else {
+		qprintf("\tREG BUF <blkno=0x%x, len=0x%x>\n",
+			buf_f->blf_blkno, buf_f->blf_len);
+		data_map = buf_f->blf_data_map;
+		map_size = buf_f->blf_map_size;
+		bit = 0;
+		i = 1;  /* 0 is the buf format structure */
+		while (1) {
+			bit = xfs_buf_item_next_bit(data_map, map_size, bit);
+			if (bit == -1)
+				break;
+			nbits = xfs_buf_item_contig_bits(data_map, map_size, bit);
+			size = ((uint)bit << XFS_BLI_SHIFT)+(nbits<<XFS_BLI_SHIFT);
+			qprintf("\t\tlogbuf.i_addr 0x%x, size 0x%xB\n",
+				item->ri_buf[i].i_addr, size);
+			qprintf("\t\t\t\"");
+			for (j=0; j<8 && j<size; j++) {
+				qprintf("%c", ((char *)item->ri_buf[i].i_addr)[j]);
+			}
+			qprintf("...\"\n");
+			i++;
+			bit += nbits;
+		}
+			
+	}
+}
+
+/*
+ * Print out an ENTIRE XFS recovery transaction
+ */
+static void
+xfsidbg_xlog_rtrans_entire(xlog_recover_t *trans)
+{
+	xlog_recover_item_t *item, *first_rip;
+
+	qprintf("(Recovering Xact 0x%x) ", trans);
+	qprintf("tid: %x type: %d nitems: %d ttid: 0x%x  ",
+		trans->r_log_tid, trans->r_theader.th_type,
+		trans->r_theader.th_num_items, trans->r_theader.th_tid);
+	qprintf("itemq: 0x%x\n", trans->r_itemq);
+	if (trans->r_itemq) {
+		item = first_rip = trans->r_itemq;
+		do {
+			/* 
+			   qprintf("(recovery item: 0x%x) ", item);
+			   qprintf("type: %d cnt: %d total: %d\n",
+				   item->ri_type, item->ri_cnt, item->ri_total); 
+				   */
+			if ((ITEM_TYPE(item) == XFS_LI_BUF) ||
+			    (ITEM_TYPE(item) == XFS_LI_6_1_BUF) ||
+			    (ITEM_TYPE(item) == XFS_LI_5_3_BUF)) {
+				qprintf("BUF:");
+				xfsidbg_xlog_buf_logitem(item);
+			} else if ((ITEM_TYPE(item) == XFS_LI_INODE) ||
+				   (ITEM_TYPE(item) == XFS_LI_6_1_INODE) ||
+				   (ITEM_TYPE(item) == XFS_LI_5_3_INODE)) {
+				qprintf("INODE:\n");
+			} else if (ITEM_TYPE(item) == XFS_LI_EFI) {
+				qprintf("EFI:\n");
+			} else if (ITEM_TYPE(item) == XFS_LI_EFD) {
+				qprintf("EFD:\n");
+			} else if (ITEM_TYPE(item) == XFS_LI_DQUOT) {
+				qprintf("DQUOT:\n");
+			} else if ((ITEM_TYPE(item) == XFS_LI_QUOTAOFF)) {
+				qprintf("QUOTAOFF:\n");
+			} else {
+				qprintf("UNKNOWN LOGITEM 0x%x\n", ITEM_TYPE(item));
+			}
+			item = item->ri_next;
+		} while (item != first_rip);
+	}
+}	/* xfsidbg_xlog_rtrans */
 
 /*
  * Print out an XFS ticket structure.
@@ -3246,7 +3338,6 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 	}
 }
 
-#ifdef DEBUG
 /*
  * Print out a summary of the AIL hanging off of a mount struct.
  */
@@ -3317,7 +3408,6 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		}
 	}
 }
-#endif	/* DEBUG */
 
 /*
  * Print xfs mount structure.
