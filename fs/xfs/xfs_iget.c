@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -413,18 +413,17 @@ xfs_iget(
 retry:
 	XFS_STATS_INC(xfsstats.xs_ig_attempts);
 
-	if ((inode = iget_locked(XFS_MTOVFS(mp)->vfs_super, ino))) {
+	if ((inode = VFS_GET_INODE(XFS_MTOVFS(mp), ino, 0))) {
 		bhv_desc_t	*bdp;
 		xfs_inode_t	*ip;
 		int		newnode;
-
 
 		vp = LINVFS_GET_VP(inode);
 		if (inode->i_state & I_NEW) {
 inode_allocate:
 			vn_initialize(inode);
 			error = xfs_iget_core(vp, mp, tp, ino,
-							lock_flags, ipp, bno);
+						lock_flags, ipp, bno);
 			if (error) {
 				remove_inode_hash(inode);
 				make_bad_inode(inode);
