@@ -125,7 +125,8 @@ typedef union {
 
 #if XFS_BIG_FILESYSTEMS
 #define	XFS_GET_DIR_INO(mp,di) \
-	(XFS_DI_LO(di) | ((xfs_intino_t)XFS_DI_HI(di) << 32))
+	(((xfs_intino_t)XFS_DI_LO(di) & 0xffffffffULL) | \
+	 ((xfs_intino_t)XFS_DI_HI(di) << 32))
 #else
 #define	XFS_GET_DIR_INO(mp,di) XFS_DI_LO(di)
 #endif
