@@ -288,7 +288,7 @@ purge_addresses(void)
 	spin_unlock(&as_lock);
 
 	while ((old = aentry) != NULL) {
-		vfree(aentry->vm_addr);
+		vunmap(aentry->vm_addr);
 		aentry = aentry->next;
 		kfree(old);
 	}
@@ -578,8 +578,7 @@ mapit:
 		} else if (flags & PBF_MAPPED) {
 			if (as_list_len > 64)
 				purge_addresses();
-			pb->pb_addr = remap_page_array(pb->pb_pages,
-							page_count, gfp_mask);
+			pb->pb_addr = vmap(pb->pb_pages, page_count);
 			if (!pb->pb_addr)
 				BUG();
 			pb->pb_addr += pb->pb_offset;
