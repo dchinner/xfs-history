@@ -1,4 +1,4 @@
-#ident "$Revision: 1.215 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4057,7 +4057,15 @@ xfs_rename(
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 		dnlc_remove(XFS_ITOV(src_ip), "..");
-		
+	}
+
+	/*
+	 * Adjust the link count on src_dp.  This is necessary when
+	 * renaming a directory, either within one parent when
+	 * the target existed, or across two parent directories.
+	 */
+	if (src_is_directory && (new_parent || target_ip != NULL)) {
+
 		/*
 		 * Decrement link count on src_directory since the
 		 * entry that's moved no longer points to it.
@@ -4068,7 +4076,6 @@ xfs_rename(
 			goto abort_return;
 		}
 	}
-
 
 	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
 				   &free_list, MAX_EXT_NEEDED);
