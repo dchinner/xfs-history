@@ -1,4 +1,3 @@
-
 #ident	"$Revision: 1.70 $"
 
 /*
@@ -62,6 +61,7 @@
 
 /* Local miscellaneous function prototypes */
 STATIC void	 xlog_alloc(xlog_t *log);
+STATIC xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
 STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
 STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t* blk_no);
 STATIC xlog_t *  xlog_init_log(xfs_mount_t *mp, dev_t log_dev,
@@ -72,9 +72,6 @@ STATIC void	 xlog_unalloc(void);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
 			    xfs_lsn_t *start_lsn, uint flags);
-STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
-STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
-				     xfs_lsn_t tail_lsn);
 
 /* local state machine functions */
 STATIC void		xlog_state_done_syncing(xlog_in_core_t *iclog);
@@ -99,14 +96,17 @@ STATIC void		xlog_state_want_sync(xlog_t *log,
 					     xlog_in_core_t *iclog);
 
 /* local ticket functions */
-STATIC xfs_log_ticket_t *xlog_maketicket(xlog_t *log, int len, char clientid);
-STATIC void		xlog_alloc_tickets(xlog_t *log);
-STATIC void		xlog_putticket(xlog_t *log, xlog_ticket_t *ticket);
-STATIC void		xlog_relticket(xlog_ticket_t *ticket);
+STATIC void		xlog_ticket_alloc(xlog_t *log);
+STATIC xfs_log_ticket_t *xlog_ticket_get(xlog_t *log, int len, char clientid);
+STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 
-STATIC void		xlog_verify_dest_ptr(xlog_t *log, psint ptr);
-STATIC void		xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
-					  int count, boolean_t syncing);
+/* local debug functions */
+STATIC void	xlog_verify_dest_ptr(xlog_t *log, psint ptr);
+STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
+STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
+				  int count, boolean_t syncing);
+STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
+				     xfs_lsn_t tail_lsn);
 
 
 /*
@@ -323,7 +323,6 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		uint		 flags)
 {
 	xlog_t	  *log = mp->m_log;
-	xfs_lsn_t tail_lsn;
 	
 	if (! xlog_debug)
 		return 0;
@@ -349,19 +348,9 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 			((len + XLOG_RECORD_BSIZE - 1) >> XLOG_RECORD_BSHIFT);
 	}
 
-	/* xfs_trans_tail_ail returns 0 when there is nothing in the list.
-	 * The log manager must keep track of the last LR which was committed
-	 * to disk.  The lsn of this LR will become the new tail_lsn whenever
-	 * xfs_trans_tail_ail returns 0.  If we don't do this, we run into
-	 * the situation where stuff could be written into the log but nothing
-	 * was ever in the AIL when asked.  Eventually, we panic since the
-	 * tail hits the head.
-	 */
-	if ((tail_lsn = xfs_trans_tail_ail(mp)) != 0)
-		log->l_tail_lsn = tail_lsn;
-	else
-		log->l_tail_lsn = log->l_last_sync_lsn;
+	xlog_assign_tail_lsn(mp, 0);
 	xlog_push_buffers_to_disk(mp);
+	xlog_assign_tail_lsn(mp, 0);
 
 	/*
 	 * XXX temporary hack until this code is revised for the
@@ -419,8 +408,7 @@ int
 xfs_log_mount(xfs_mount_t	*mp,
 	      dev_t		log_dev,
 	      daddr_t		blk_offset,
-	      int		num_bblks,
-	      uint		flags)
+	      int		num_bblks)
 {
 	xlog_t *log;
 	
@@ -516,6 +504,44 @@ xfs_log_write(xfs_mount_t *	mp,
  ******************************************************************************
  */
 
+/* xfs_trans_tail_ail returns 0 when there is nothing in the list.
+ * The log manager must keep track of the last LR which was committed
+ * to disk.  The lsn of this LR will become the new tail_lsn whenever
+ * xfs_trans_tail_ail returns 0.  If we don't do this, we run into
+ * the situation where stuff could be written into the log but nothing
+ * was ever in the AIL when asked.  Eventually, we panic since the
+ * tail hits the head.
+ */
+STATIC xfs_lsn_t
+xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog)
+{
+	xfs_lsn_t tail_lsn;
+	xlog_t	  *log = mp->m_log;
+
+	if ((tail_lsn = xfs_trans_tail_ail(mp)) != 0)
+		log->l_tail_lsn = tail_lsn;
+	else
+		tail_lsn = log->l_tail_lsn = log->l_last_sync_lsn;
+	if (iclog)
+		iclog->ic_header.h_tail_lsn = tail_lsn;
+
+	return tail_lsn;
+}	/* xlog_assign_tail_lsn */
+
+
+int
+xlog_space_left(xlog_t *log)
+{
+	if (BLOCK_LSN(log->l_tail_lsn) <= BLOCK_LSN(log->l_reshead_lsn))
+		return (BBTOB(BLOCK_LSN(log->l_reshead_lsn) -
+			      BLOCK_LSN(log->l_tail_lsn)));
+	else
+		return BBTOB(log->l_logBBsize -
+			     (BLOCK_LSN(log->l_tail_lsn) -
+			      BLOCK_LSN(log->l_reshead_lsn)));
+}	/* xlog_space_left */
+
+
 /*
  * Log function which is called when an io completes.
  *
@@ -554,7 +580,7 @@ xlog_init_log(xfs_mount_t	*mp,
 
 	log->l_prev_block  = -1;
 	log->l_tail_lsn    = 0x100000000LL;  /* cycle = 1; current block = 0 */
-	log->l_last_sync_lsn= log->l_tail_lsn;
+	log->l_reshead_lsn = log->l_last_sync_lsn = log->l_tail_lsn;
 	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
 	log->l_logreserved = 0;
 	log->l_curr_block  = 0;		/* filled in by xlog_recover */
@@ -582,7 +608,7 @@ xlog_alloc(xlog_t *log)
 	/* XLOG_RECORD_BSIZE must be mult of BBSIZE; see xlog_rec_header_t */
 	ASSERT((XLOG_RECORD_BSIZE & BBMASK) == 0);
 
-	xlog_alloc_tickets(log);
+	xlog_ticket_alloc(log);
 	
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
 	bp->b_edev	   = log_dev;
@@ -758,10 +784,7 @@ xlog_sync(xlog_t		*log,
 
 	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
-
-#ifdef DEBUG
 	xlog_verify_iclog(log, iclog, count, B_TRUE);
-#endif
 
 	/* account for log which don't start at block #0 */
 	bp->b_blkno += log->l_logBBstart;
@@ -963,12 +986,10 @@ xlog_write(xfs_mount_t *	mp,
 		partial_copy++;
 		len += sizeof(xlog_op_header_t); /* from splitting of region */
 	    }
-
-#ifdef DEBUG
-	    ASSERT(copy_len >= 0);
 	    xlog_verify_dest_ptr(log, ptr);
-#endif
+
 	    /* copy region */
+	    ASSERT(copy_len >= 0);
 	    bcopy(reg[index].i_addr + copy_off, (caddr_t)ptr, copy_len);
 	    xlog_write_adv_cnt(ptr, len, log_offset, copy_len);
 
@@ -1277,7 +1298,7 @@ xlog_state_get_ticket(xlog_t	*log,
 		}
 	}
 	log->l_logreserved += len;
-	tic = xlog_maketicket(log, len, log_client);
+	tic = xlog_ticket_get(log, len, log_client);
 	spunlockspl(log->l_icloglock, spl);
 
 	return tic;
@@ -1342,7 +1363,7 @@ xlog_state_put_ticket(xlog_t	    *log,
 #endif
 
 	log->l_logreserved -= tic->t_orig_reserv;
-	xlog_putticket(log, tic);
+	xlog_ticket_put(log, tic);
 
 	spunlockspl(log->l_icloglock, spl);
 }	/* xlog_state_reserve_space */
@@ -1374,16 +1395,8 @@ xlog_state_release_iclog(xlog_t		*log,
 	sync++;
 	iclog->ic_state = XLOG_STATE_SYNCING;
 	
-	if ((tail_lsn = xfs_trans_tail_ail(log->l_mp)) == 0)
-	    tail_lsn = iclog->ic_header.h_tail_lsn =
-		    log->l_tail_lsn = log->l_last_sync_lsn;
-	else
-	    iclog->ic_header.h_tail_lsn = log->l_tail_lsn = tail_lsn;
-
-#ifdef DEBUG
+	tail_lsn = xlog_assign_tail_lsn((xfs_mount_t *)log->l_mp, iclog);
 	xlog_verify_tail_lsn(log, iclog, tail_lsn);
-#endif /* DEBUG */
-
 	/* cycle incremented when incrementing curr_block */
     }
     
@@ -1542,7 +1555,7 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
  *	Algorithm doesn't take into account page size. ;-(
  */
 STATIC void
-xlog_alloc_tickets(xlog_t *log)
+xlog_ticket_alloc(xlog_t *log)
 {
 	caddr_t buf;
 	xlog_ticket_t *t_list;
@@ -1562,15 +1575,15 @@ xlog_alloc_tickets(xlog_t *log)
 	t_list->t_next = 0;
 	log->l_tail = t_list;
 
-}	/* xlog_alloc_tickets */
+}	/* xlog_ticket_alloc */
 
 
 /*
  * Put ticket into free list
  */
 STATIC void
-xlog_putticket(xlog_t		*log,
-	       xlog_ticket_t	*ticket)
+xlog_ticket_put(xlog_t		*log,
+		xlog_ticket_t	*ticket)
 {
 	xlog_ticket_t *t_list;
 
@@ -1585,21 +1598,21 @@ xlog_putticket(xlog_t		*log,
 	log->l_tail->t_next = ticket;
 	log->l_tail = ticket;
 #endif
-}	/* xlog_putticket */
+}	/* xlog_ticket_put */
 
 
 /*
  * Grab ticket off freelist or allocation some more
  */
 xfs_log_ticket_t *
-xlog_maketicket(xlog_t		*log,
+xlog_ticket_get(xlog_t		*log,
 		int		len,
 		char		log_clientid)
 {
 	xlog_ticket_t *tic;
 
 	if (log->l_freelist == NULL)
-		xlog_alloc_tickets(log);
+		xlog_ticket_alloc(log);
 
 	tic			= log->l_freelist;
 	log->l_freelist		= tic->t_next;
@@ -1609,7 +1622,7 @@ xlog_maketicket(xlog_t		*log,
 	tic->t_flags		= XLOG_TIC_INITED;
 
 	return (xfs_log_ticket_t)tic;
-}	/* xlog_maketicket */
+}	/* xlog_ticket_get */
 
 
 /******************************************************************************
@@ -1628,6 +1641,7 @@ void
 xlog_verify_dest_ptr(xlog_t *log,
 		     psint  ptr)
 {
+#ifdef DEBUG
 	int i;
 	int good_ptr = 0;
 
@@ -1638,6 +1652,7 @@ xlog_verify_dest_ptr(xlog_t *log,
 	}
 	if (! good_ptr)
 		xlog_panic("xlog_verify_dest_ptr: invalid ptr");
+#endif /* DEBUG */
 }	/* xlog_verify_dest_ptr */
 
 
@@ -1669,6 +1684,7 @@ xlog_verify_tail_lsn(xlog_t	    *log,
 		     xlog_in_core_t *iclog,
 		     xfs_lsn_t	    tail_lsn)
 {
+#ifdef DEBUG
     int blocks;
 
     if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
@@ -1686,6 +1702,7 @@ xlog_verify_tail_lsn(xlog_t	    *log,
 	if (blocks < BTOBB(iclog->ic_offset) + 1)
 	    xlog_panic("xlog_verify_tail_lsn: ran out of log space");
     }
+#endif /* DEBUG */
 }	/* xlog_verify_tail_lsn */
 
 
@@ -1704,12 +1721,13 @@ xlog_verify_tail_lsn(xlog_t	    *log,
  *	log, check the preceding blocks of the physical log to make sure all
  *	the cycle numbers agree with the current cycle number.
  */
-void
+STATIC void
 xlog_verify_iclog(xlog_t	 *log,
 		  xlog_in_core_t *iclog,
 		  int		 count,
 		  boolean_t	 syncing)
 {
+#ifdef DEBUG
 	xlog_op_header_t  *ophead;
 	xlog_rec_header_t *rec;
 	xlog_in_core_t	 *icptr;
@@ -1783,4 +1801,5 @@ xlog_verify_iclog(xlog_t	 *log,
 		xlog_panic("xlog_verify_iclog: illegal iclog");
 
 	xlog_verify_disk_cycle_no(log, iclog);
+#endif /* DEBUG */
 }	/* xlog_verify_iclog */
