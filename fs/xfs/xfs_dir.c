@@ -139,7 +139,7 @@ xfs_dir_mount(xfs_mount_t *mp)
 		    (sizeof(xfs_dir_leaf_entry_t) +
 		     sizeof(xfs_dir_leaf_name_t));
 	count = shortcount > leafcount ? shortcount : leafcount;
-	mp->m_dircook_elog = xfs_da_log2_roundup(count);
+	mp->m_dircook_elog = xfs_da_log2_roundup(count + 1);
 	ASSERT(mp->m_dircook_elog <= mp->m_sb.sb_blocklog);
 	mp->m_da_node_ents =
 		(XFS_LBSIZE(mp) - sizeof(xfs_da_node_hdr_t)) /
