@@ -642,6 +642,7 @@ linvfs_delete_inode(
 	vnode_t	*vp = LINVFS_GET_VP(inode);
 
 	if (vp) {
+		vn_rele(vp);
 		vn_trace_entry(vp, "linvfs_delete_inode",
 					(inst_t *)__return_address);
 		/*
@@ -662,6 +663,7 @@ linvfs_clear_inode(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	if (vp) {
+		vn_rele(vp);
 		vn_trace_entry(vp, "linvfs_clear_inode",
 					(inst_t *)__return_address);
 		/*
@@ -674,11 +676,13 @@ linvfs_clear_inode(
 
 void 
 linvfs_put_inode(
-	struct inode	*inode)
+	struct inode	*ip)
 {
-	vnode_t		*vp = LINVFS_GET_VP(inode);
+	vnode_t		*vp = LINVFS_GET_VP(ip);
+	int		error;
 
-    	if (vp) vn_put(vp);
+    	if (vp && (atomic_read(&ip->i_count) == 1))
+		VOP_RELEASE(vp, error);
 }
 
 void

@@ -761,7 +761,6 @@ typedef struct vattr {
  * incremented to define a new vnode epoch.
  */
 extern void	vn_init(void);
-extern void	vn_free(struct vnode *);
 extern int	vn_wait(struct vnode *);
 extern vnode_t  *vn_initialize(struct vfs *, struct inode *, int);
 
@@ -791,11 +790,17 @@ typedef struct vnode_map {
 #define	VMAP(vp, ip, vmap)	{(vmap).v_vfsp   = (vp)->v_vfsp,	\
 				 (vmap).v_number = (vp)->v_number,	\
 				 (vmap).v_ino    = (ip)->i_ino; }
-extern int	vn_count(struct vnode *);
 extern void	vn_purge(struct vnode *, vmap_t *);
 extern vnode_t  *vn_get(struct vnode *, vmap_t *, uint);
 extern int	vn_revalidate(struct vnode *, int);
 extern void	vn_remove(struct vnode *);
+
+static inline int vn_count(struct vnode *vp)
+{
+	struct inode *ip = LINVFS_GET_IP(vp);
+
+	return atomic_read(&ip->i_count);
+}
 
 /*
  * Flags for vn_get().
@@ -807,7 +812,6 @@ extern void	vn_remove(struct vnode *);
  */
 extern vnode_t	*vn_hold(struct vnode *);
 extern void	vn_rele(struct vnode *);
-extern void	vn_put(struct vnode *);
 
 #if defined(CONFIG_XFS_VNODE_TRACING)
 
@@ -816,12 +820,12 @@ extern void	vn_put(struct vnode *);
 	  vn_trace_hold(vp, __FILE__, __LINE__, (inst_t *)__return_address))
 #define VN_RELE(vp)		\
 	  (vn_trace_rele(vp, __FILE__, __LINE__, (inst_t *)__return_address), \
-	   vn_rele(vp))
+	   iput(LINVFS_GET_IP(vp)))
 
 #else	/* ! (defined(CONFIG_XFS_VNODE_TRACING)) */
 
 #define VN_HOLD(vp)		((void)vn_hold(vp))
-#define VN_RELE(vp)		(vn_rele(vp))
+#define VN_RELE(vp)		(iput(LINVFS_GET_IP(vp)))
 
 #endif	/* ! (defined(CONFIG_XFS_VNODE_TRACING) */
 

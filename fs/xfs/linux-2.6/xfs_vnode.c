@@ -203,29 +203,6 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 }
 
 /*
- * Free an isolated vnode.
- * The vnode must not have any other references.
- */
-void
-vn_free(struct vnode *vp)
-{
-	struct inode *inode;
-
-	XFS_STATS_INC(xfsstats.vn_free);
-
-	vn_trace_entry(vp, "vn_free", (inst_t *)__return_address);
-
-	ASSERT(vn_count(vp) == 1);
-
-	ASSERT((vp->v_flag & VPURGE) == 0);
-	vp->v_fbhv = NULL;
-	inode = LINVFS_GET_IP(vp);
-	inode->i_sb = NULL;
-	iput(inode);
-}
-
-
-/*
  * Get a reference on a vnode.
  */
 vnode_t *
@@ -253,25 +230,6 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 	ASSERT((vp->v_flag & VPURGE) == 0);
 
 	return vp;
-}
-
-
-/*
- * "Temporary" routine to return the linux inode
- * hold count, after everybody else can directly
- * reference the inode (header magic!), this
- * routine is dead meat..
- */
-int
-vn_count(struct vnode *vp)
-{
-	struct inode *inode;
-
-	inode = LINVFS_GET_IP(vp);
-
-	ASSERT(inode);
-
-	return atomic_read(&inode->i_count);
 }
 
 /*
@@ -419,19 +377,10 @@ vn_hold(struct vnode *vp)
 }
 
 /*
- * Release a vnode. 
- */
-void
-vn_rele(struct vnode *vp)
-{
-	iput(LINVFS_GET_IP(vp));
-}
-
-/*
  *  Call VOP_INACTIVE on last reference.
  */
 void
-vn_put(struct vnode *vp)
+vn_rele(struct vnode *vp)
 {
 	int	s;
 	int	vcnt;
@@ -453,7 +402,7 @@ vn_put(struct vnode *vp)
 	 * that i_count won't be decremented after we
 	 * return. 
 	 */
-	if (vcnt == 1) {
+	if (vcnt == 0) {
 		/*
 		 * It is absolutely, positively the case that
 		 * the lock manager will not be releasing vnodes
@@ -505,8 +454,6 @@ vn_remove(struct vnode *vp)
 	/* Make sure we don't do this to the same vnode twice */
 	if (!(vp->v_fbhv))
 		return;
-
-	XFS_STATS_INC(xfsstats.vn_remove);
 
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
 
