@@ -1,4 +1,4 @@
-#ident "$Revision: 1.246 $"
+#ident "$Revision: 1.247 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1144,7 +1144,7 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	/*
 	 * blow this off if mandatory locking or DMI are involved
 	 */
-	if (MANDLOCK(vp, ip->i_d.di_mode))
+	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == (VENF_LOCKING|VFRLOCKS))
 		goto out;
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !(ioflags & IO_INVIS))
