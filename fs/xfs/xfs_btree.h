@@ -27,7 +27,7 @@ typedef struct xfs_btree_cur
 	xfs_agnumber_t	bc_agno;	/* ag number */
 	union {
 		xfs_alloc_rec_t		a;
-		xfs_bmbt_rec_t		b;
+		xfs_bmbt_irec_t		b;
 		xfs_ialloc_rec_t	i;
 	}		bc_rec;
 	buf_t		*bc_bufs[XFS_BTREE_MAXLEVELS];
@@ -68,7 +68,7 @@ extern __uint32_t xfs_magics[];
 #define	xfs_btree_get_block(cur, level) \
 	((cur)->bc_btnum == XFS_BTNUM_BMAP && \
 	 (level) == (cur)->bc_nlevels - 1 ? \
-	&(cur)->bc_private.b.ip->i_d.di_u.di_bmbt : \
+	(cur)->bc_private.b.ip->i_broot : \
 	xfs_buf_to_block((cur)->bc_bufs[level]))
 
 #endif	/* !_FS_XFS_BTREE_H */

@@ -113,7 +113,7 @@ xfs_btree_check_rec(xfs_btnum_t btnum, void *ar1, void *ar2)
 	    }
 	case XFS_BTNUM_BMAP: {
 		xfs_bmbt_rec_t *r1 = ar1, *r2 = ar2;
-		ASSERT(r1->br_startoff + r1->br_blockcount <= r2->br_startoff);
+		ASSERT(xfs_offset_ptox(r1->br_startoff) + xfs_extlen_ptox(r1->br_blockcount) <= xfs_offset_ptox(r2->br_startoff));
 		break;
 	    }
 	}
@@ -206,7 +206,7 @@ xfs_btree_init_cursor(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_bt
 		nlevels = agp->ag_ilevels;
 		break;
 	case XFS_BTNUM_BMAP:
-		nlevels = ip->i_d.di_u.di_bmbt.bb_level + 1;
+		nlevels = ip->i_broot->bb_level + 1;
 		break;
 	}
 	cur->bc_nlevels = nlevels;
