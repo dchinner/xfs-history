@@ -1389,7 +1389,7 @@ _pagebuf_iodone(
 				unlock_page(page);
 		}
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb, 0, schedule);
+		pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), schedule);
 	}
 }
 
