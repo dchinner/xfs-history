@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.29 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -70,34 +70,27 @@ xfs_mount_init(void)
 	return mp;
 }
 	
-xfs_mount_t *
-xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
+/*
+ * xfs_mountfs		XXXjleong Needs more error checking
+ */
+int
+xfs_mountfs(vfs_t *vfsp, dev_t dev)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error;
 	xfs_mount_t	*mp;
-	vfs_t		*vfsp;
-	extern vfsops_t	xfs_vfsops;
 
-	mp = xfs_mount_init();
-	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
-	VFS_INIT(vfsp, &xfs_vfsops, NULL);
-	mp->m_vfsp = vfsp;
-	vfsp->vfs_data = mp;
-	mp->m_dev = dev;
-	mp->m_rtdev = rtdev;
-	vfsp->vfs_dev = dev;
+	mp = XFS_VFSTOM(vfsp);
 
 	/*
-	 * Allocate a buffer to hold the superblock.
+	 * Allocate a (locked) buffer to hold the superblock.
 	 * This will be kept around at all time to optimize
 	 * access to the superblock.
 	 */
 	bp = ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))));
 	ASSERT(buf != NULL);
-	ASSERT(valusema(&bp->b_lock) == 1);
-	psema(&bp->b_lock, PRIBIO);
+	ASSERT((bp->b_flags & B_BUSY) && valusema(&bp->b_lock) <= 0);
 
 	/*
 	 * Initialize and read in the superblock buffer.
@@ -127,7 +120,6 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 		mp->m_readio_log = sbp->sb_blocklog;
 	} else {
 		mp->m_readio_log = XFS_READIO_LOG;
-
 	}
 	mp->m_readio_blocks = 1 << (mp->m_readio_log - sbp->sb_blocklog);
 	if (sbp->sb_blocklog > XFS_WRITEIO_LOG) {
@@ -173,14 +165,42 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	 */
 	xfs_dir_mount(mp);
 
+	return error;
+}
+
+#ifdef SIM
+xfs_mount_t *
+xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
+{
+	int		error;
+	xfs_mount_t	*mp;
+	vfs_t		*vfsp;
+	extern vfsops_t	xfs_vfsops;
+
+	mp = xfs_mount_init();
+	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
+	VFS_INIT(vfsp, &xfs_vfsops, NULL);
+	mp->m_vfsp = vfsp;
+	vfsp->vfs_data = mp;
+	mp->m_dev = dev;
+	mp->m_rtdev = rtdev;
+	vfsp->vfs_dev = dev;
+
+        error = xfs_mountfs(vfsp, dev);
+
 	/*
 	 * Call the log's mount-time initialization.
 	 */
-	if (logdev)
-		xfs_log_mount(mp, logdev, xfs_btod(sbp, sbp->sb_logstart), xfs_btod(sbp, sbp->sb_logblocks), 0);
+	if (logdev) {
+		xfs_sb_t *sbp;
+		sbp = xfs_buf_to_sbp(mp->m_sb_bp);
+		xfs_log_mount(mp, logdev, xfs_btod(sbp, sbp->sb_logstart),
+			      xfs_btod(sbp, sbp->sb_logblocks), 0);
+	}
 
 	return mp;
 }
+#endif
 
 void
 xfs_umount(xfs_mount_t *mp)
@@ -199,6 +219,7 @@ xfs_umount(xfs_mount_t *mp)
 	bdstrat(bmajor(mp->m_dev), bp);
 	error = iowait(bp);
 	ASSERT(error == 0);	
+	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 	brelse(bp);
 	freerbuf(bp);
 	kmem_free(mp, sizeof(*mp));
