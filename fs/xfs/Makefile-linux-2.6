@@ -40,7 +40,14 @@ EXTRA_CFLAGS +=  -I. -funsigned-char
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
+	KTRACE_DEBUG = y
+else
+  ifeq ($(CONFIG_XFS_VNODE_TRACING),y)
+	KTRACE_DEBUG = y
+  endif
 endif
+
+vpath %.c =  . linux pagebuf support
 
 obj-$(CONFIG_XFS_FS) 		+= xfs.o
 
@@ -134,52 +141,56 @@ ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
 			-DPAGEBUF_DEBUG -DPAGEBUF_TRACKING -DPAGEBUF_TRACE
 endif
 
-export-objs			+= pagebuf/page_buf.o
+export-objs			+= page_buf.o
 
-xfs-objs			+= pagebuf/page_buf.o \
-				   pagebuf/page_buf_io.o \
-				   pagebuf/page_buf_locking.o
+xfs-objs			+= page_buf.o \
+				   page_buf_io.o \
+				   page_buf_locking.o
 
 # Objects in linux/
 
-export-objs			+= linux/xfs_fs_subr.o
+xfs-objs			+= xfs_fs_subr.o
 
 ifeq ($(CONFIG_XFS_GRIO),)
-  xfs-objs			+= linux/xfs_griostubs.o
+  xfs-objs			+= xfs_griostubs.o
 endif
 
 ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
-  xfs-objs			+= linux/xfs_dmistubs.o
+  xfs-objs			+= xfs_dmistubs.o
 endif
 
-xfs-objs			+= linux/xfs_behavior.o \
-				   linux/xfs_cred.o \
-				   linux/xfs_file.o \
-				   linux/xfs_fs_subr.o \
-				   linux/xfs_globals.o \
-				   linux/xfs_ioctl.o \
-				   linux/xfs_iops.o \
-				   linux/xfs_lrw.o \
-				   linux/xfs_stats.o \
-				   linux/xfs_sysctl.o \
-				   linux/xfs_super.o \
-				   linux/xfs_vfs.o \
-				   linux/xfs_vnode.o \
-				   linux/xfs_xattr.o
+xfs-objs			+= xfs_behavior.o \
+				   xfs_cred.o \
+				   xfs_file.o \
+				   xfs_fs_subr.o \
+				   xfs_globals.o \
+				   xfs_ioctl.o \
+				   xfs_iops.o \
+				   xfs_lrw.o \
+				   xfs_stats.o \
+				   xfs_sysctl.o \
+				   xfs_super.o \
+				   xfs_vfs.o \
+				   xfs_vnode.o \
+				   xfs_xattr.o
 
 # Objects in support/
 
-export-objs			+= support/ktrace.o
+ifneq ($(KTRACE_DEBUG),)
+  export-objs			+= ktrace.o
+else
+  xfs-objs			+= ktrace.o
+endif
 
-xfs-objs			+= support/debug.o \
-				   support/kmem.o \
-				   support/ktrace.o \
-				   support/move.o \
-				   support/mrlock.o \
-				   support/mutex.o \
-				   support/qsort.o \
-				   support/sv.o \
-				   support/uuid.o
+xfs-objs			+= debug.o \
+				   kmem.o \
+				   ktrace.o \
+				   move.o \
+				   mrlock.o \
+				   mutex.o \
+				   qsort.o \
+				   sv.o \
+				   uuid.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to
@@ -198,9 +209,3 @@ CFLAGS_xfsidbg.o += -I $(TOPDIR)/arch/$(ARCH)/kdb
 
 include $(TOPDIR)/Rules.make
 
-# Well, that's what you get for distributing your objects throughout
-# multiple subdirs. It'll go away when we switch to the new dependencies,
-# though
-
-fastdep: FORCE
-	$(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS] pagebuf/*.[chS] linux/*.[chS] support/*.[chS]) > .depend
