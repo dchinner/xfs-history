@@ -9,10 +9,9 @@
 
 #define	XFS_FS_GEOMETRY		0	/* get filesystem geometry */
 #define	XFS_GROWFS_DATA		1	/* grow data area */
-#define	XFS_GROWFS_LOG_INT	2	/* grow log, new log is internal */
-#define	XFS_GROWFS_LOG_EXT	3	/* grow log, new log is external */
-#define	XFS_GROWFS_RT		4	/* grow realtime area */
-#define	XFS_FSOPS_COUNT		5	/* count of operations */
+#define	XFS_GROWFS_LOG		2	/* grow log, new log is internal */
+#define	XFS_GROWFS_RT		3	/* grow realtime area */
+#define	XFS_FSOPS_COUNT		4	/* count of operations */
 
 /*
  * Minimum sizes need for growth checks
@@ -42,11 +41,25 @@ typedef struct xfs_fsop_geom
 	uuid_t		uuid;
 } xfs_fsop_geom_t;
 
-/* Input for all growfs ops */
-typedef struct xfs_growfs_input
+/* Input for growfs data op */
+typedef struct xfs_growfs_data
 {
 	__uint64_t	newblocks;
-} xfs_growfs_input_t;
+} xfs_growfs_data_t;
+
+/* Input for growfs log op */
+typedef struct xfs_growfs_log
+{
+	__uint32_t	newblocks;
+	int		isint;
+} xfs_growfs_log_t;
+
+/* Input for growfs rt op */
+typedef struct xfs_growfs_rt
+{
+	__uint64_t	newblocks;
+	__uint32_t	extsize;
+} xfs_growfs_rt_t;
 
 #ifdef _KERNEL
 int					/* error status */

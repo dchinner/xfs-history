@@ -54,7 +54,7 @@ xfs_fs_geometry(
 STATIC int
 xfs_growfs_data(
 	xfs_mount_t		*mp,		/* mount point for filesystem */
-	xfs_fsblock_t		nb)		/* new size of data in blocks */
+	xfs_growfs_data_t	*in)		/* growfs data input struct */
 {
 	xfs_agf_t		*agf;
 	xfs_agi_t		*agi;
@@ -67,6 +67,7 @@ xfs_growfs_data(
 	int			bucket;
 	int			error;
 	xfs_agnumber_t		nagcount;
+	xfs_rfsblock_t		nb;
 	xfs_rfsblock_t		new;
 	xfs_rfsblock_t		nfree;
 	xfs_agnumber_t		oagcount;
@@ -74,6 +75,7 @@ xfs_growfs_data(
 	int			sectbb;
 	xfs_trans_t		*tp;
 
+	nb = in->newblocks;
 	if (nb <= mp->m_sb.sb_dblocks)
 		return XFS_ERROR(EINVAL);
 	bp = read_buf(mp->m_dev, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0);
@@ -244,14 +246,16 @@ xfs_growfs_data(
 
 STATIC int
 xfs_growfs_log(
-	xfs_mount_t	*mp,		/* mount point for filesystem */
-	int		new_int,	/* new log is internal */
-	xfs_fsblock_t	nb)		/* new size of log in blocks */
+	xfs_mount_t		*mp,	/* mount point for filesystem */
+	xfs_growfs_log_t	*in)	/* growfs log input struct */
 {
+	xfs_extlen_t		nb;
+
+	nb = in->newblocks;
 	if (nb < XFS_MIN_LOG_BLOCKS || nb < XFS_B_TO_FSB(mp, XFS_MIN_LOG_BYTES))
 		return XFS_ERROR(EINVAL);
 	if (nb == mp->m_sb.sb_logblocks &&
-	    new_int == (mp->m_sb.sb_logstart != 0))
+	    in->isint == (mp->m_sb.sb_logstart != 0))
 		return XFS_ERROR(EINVAL);
 	/*
 	 * Moving the log is hard, need new interfaces to sync
@@ -265,9 +269,14 @@ xfs_growfs_log(
 STATIC int
 xfs_growfs_rt(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_fsblock_t	nb)		/* new size of rt in blocks */
+	xfs_growfs_rt_t	*in)		/* growfs rt input struct */
 {
+	xfs_rfsblock_t	nb;
+
+	nb = in->newblocks;
 	if (nb <= mp->m_sb.sb_rblocks)
+		return XFS_ERROR(EINVAL);
+	if (mp->m_sb.sb_rblocks && (in->extsize != mp->m_sb.sb_rextsize))
 		return XFS_ERROR(EINVAL);
 	/*
 	 * If a realtime area is being added to the fs for the first time
@@ -291,17 +300,15 @@ xfs_fsoperations(
 	static int	cisize[] =
 	{
 		0,				/* XFS_FS_GEOMETRY */
-		sizeof(xfs_growfs_input_t),	/* XFS_GROWFS_DATA */
-		sizeof(xfs_growfs_input_t),	/* XFS_GROWFS_LOG_INT */
-		sizeof(xfs_growfs_input_t),	/* XFS_GROWFS_LOG_EXT */
-		sizeof(xfs_growfs_input_t),	/* XFS_GROWFS_RT */
+		sizeof(xfs_growfs_data_t),	/* XFS_GROWFS_DATA */
+		sizeof(xfs_growfs_log_t),	/* XFS_GROWFS_LOG */
+		sizeof(xfs_growfs_rt_t),	/* XFS_GROWFS_RT */
 	};
 	static int	cosize[] =
 	{
 		sizeof(xfs_fsop_geom_t),	/* XFS_FS_GEOMETRY */
 		0,				/* XFS_GROWFS_DATA */
-		0,				/* XFS_GROWFS_LOG_INT */
-		0,				/* XFS_GROWFS_LOG_EXT */
+		0,				/* XFS_GROWFS_LOG */
 		0,				/* XFS_GROWFS_RT */
 	};
 
@@ -329,20 +336,19 @@ xfs_fsoperations(
 	case XFS_GROWFS_DATA:
 		if (!cpsema(&mp->m_growlock))
 			return XFS_ERROR(EWOULDBLOCK);
-		error = xfs_growfs_data(mp, ((xfs_growfs_input_t *)inb)->newblocks);
+		error = xfs_growfs_data(mp, (xfs_growfs_data_t *)inb);
 		vsema(&mp->m_growlock);
 		break;
-	case XFS_GROWFS_LOG_INT:
-	case XFS_GROWFS_LOG_EXT:
+	case XFS_GROWFS_LOG:
 		if (!cpsema(&mp->m_growlock))
 			return XFS_ERROR(EWOULDBLOCK);
-		error = xfs_growfs_log(mp, opcode == XFS_GROWFS_LOG_INT, ((xfs_growfs_input_t *)inb)->newblocks);
+		error = xfs_growfs_log(mp, (xfs_growfs_log_t *)inb);
 		vsema(&mp->m_growlock);
 		break;
 	case XFS_GROWFS_RT:
 		if (!cpsema(&mp->m_growlock))
 			return XFS_ERROR(EWOULDBLOCK);
-		error = xfs_growfs_rt(mp, ((xfs_growfs_input_t *)inb)->newblocks);
+		error = xfs_growfs_rt(mp, (xfs_growfs_rt_t *)inb);
 		vsema(&mp->m_growlock);
 		break;
 	default:
