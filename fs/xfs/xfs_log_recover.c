@@ -26,7 +26,6 @@
 #include <sys/debug.h>
 #include <sys/ktrace.h>
 #include <sys/sema.h>
-#include <sys/uuid.h>
 #include <sys/vfs.h>
 
 #include "xfs_inum.h"
