@@ -31,48 +31,30 @@
 #
 # Makefile for XFS on Linux.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
 
 #CFLAGS := $(filter-out -Wall,$(CFLAGS))
 
 # This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
-# but I am not going to change every file at the moment.  Keith Owens.
+# but I am not going to change every file at the moment.  It also needs
+# -I $TOPDIR/fs to pick up #include <xfs_support/xxx>, the support files should
+# really be in linux/include/xfs_support, not hidden under fs.  Keith Owens.
 EXTRA_CFLAGS += -Wno-unused  -Wno-parentheses \
-                -Wno-uninitialized -I. \
+                -Wno-uninitialized -I. -I$(TOPDIR)/fs \
 		-funsigned-char 
 
 EXTRA_CFLAGS += $(shell if $(CC) -Wno-unknown-pragmas -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-Wno-unknown-pragmas"; fi)
-
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
 endif
 
 subdir-$(CONFIG_XFS_FS)		+= linux
-# Uncomment when grio directory created
-# subdir-$(CONFIG_XFS_GRIO)	+= grio		
-# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
-ifneq ($(CONFIG_XFS_DMAPI),)
-  subdir-$(CONFIG_XFS_FS)	+= dmapi
-endif
-subdir-$(CONFIG_XFS_SUPPORT)	+= support
+subdir-$(CONFIG_XFS_GRIO)	+= grio		
+subdir-$(CONFIG_XFS_DMAPI)	+= dmapi
 
-obj-y :=
-obj-m :=
-obj-n :=
-obj-  :=
-
-# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
-ifeq ($(CONFIG_XFS_FS),y)
-  O_TARGET			:= xfs.o
-else
-  list-multi			:= xfs.o
-  obj-$(CONFIG_XFS_FS)		:= xfs.o
-endif
+O_TARGET			:= xfs.o
+obj-m				:= $(O_TARGET)
 
 # xfsidbg is always a module, but only if kdb is available.
 ifeq ($(CONFIG_KDB),y)
@@ -80,32 +62,32 @@ ifeq ($(CONFIG_KDB),y)
 endif
 
 ifeq ($(CONFIG_XFS_RT),)
-  xfs-objs			+= xfsrtstubs.o
+  obj-y				+= xfsrtstubs.o
 else
-  xfs-objs			+= xfs_rtalloc.o xfs_rtbit.o
+  obj-y				+= xfs_rtalloc.o xfs_rtbit.o
 endif
 
 ifneq ($(CONFIG_XFS_GRIO),)
-  xfs-objs			+= xfs_grio.o
+  obj-y				+= xfs_grio.o
 endif
 
 ifeq ($(CONFIG_XFS_DMAPI),)
-  xfs-objs			+= xfsdmapistubs.o
+  obj-y				+= xfsdmapistubs.o
 else
-  xfs-objs			+= dmapi/dmapi.o xfs_dmapi.o
+  obj-y				+= dmapi/dmapi.o xfs_dmapi.o
 endif
 
 ifeq ($(CONFIG_XFS_QUOTA),)
-  xfs-objs			+= xfsquotasstubs.o
+  obj-y				+= xfsquotasstubs.o
 else
-  xfs-objs			+= xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
+  obj-y				+= xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
 endif
 
 ifneq ($(CONFIG_FS_POSIX_ACL),)
-  xfs-objs			+= xfs_acl.o
+  obj-y				+= xfs_acl.o
 endif
 
-xfs-objs			+= xfs_alloc.o \
+obj-y				+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
 				   xfs_attr_fetch.o \
@@ -154,26 +136,11 @@ xfs-objs			+= xfs_alloc.o \
 				   macstubs.o
 
 # Objects not built in this directory
-xfs-objs			+= linux/linux_xfs.o
-ifeq ($(CONFIG_XFS_SUPPORT),y)
-  xfs-objs			+= support/xfs_support.o
-endif
-
-# Kludge, 2.4.0-test13-pre3 Makefiles are still not quite right.  Keith Owens.
-ifeq ($(CONFIG_XFS_FS),y)
-  obj-y				:= $(xfs-objs)
-else
-  ifeq ($(CONFIG_XFS_FS)$(MAKING_MODULES),m1)
-  obj-m				+= $(xfs-objs)
-# This is really nasty, but Rules.make was never designed for multi directory
-# modules.  Keith Owens.
-xfs.o: $(xfs-objs) $(patsubst %,_modsubdir_%,$(subdir-m))
-	$(LD) -r -o $@ $(xfs-objs)
-  endif
-endif
+obj-y				+= linux/linux_xfs.o
 
 include $(TOPDIR)/Rules.make
 
-ifneq ($(wildcard .hdepend),)
-include .hdepend
-endif
+# This is really nasty, but Rules.make was never designed for multi directory
+# modules.  Keith Owens.
+
+xfs.o: $(patsubst %,_modsubdir_%,$(subdir-m))
