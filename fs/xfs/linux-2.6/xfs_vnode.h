@@ -101,21 +101,11 @@ extern ushort		vttoif_tab[];
  *    Flags that must be maintained coherent across all cells
  */
  /* Local only flags */
-#define VINACT		       0x2	/* vnode is being inactivated	*/
-#define VRECLM		       0x4	/* vnode is being reclaimed	*/
-#define VLOCK		       0x0	/* no bit on Linux		*/
-#define VWAIT		      0x20	/* waiting for VINACT
+#define VINACT		       0x1	/* vnode is being inactivated	*/
+#define VRECLM		       0x2	/* vnode is being reclaimed	*/
+#define VWAIT		       0x4	/* waiting for VINACT
 					   or VRECLM to finish */
-#define VGONE		      0x80	/* vnode isn't really here	*/
-#define VREMAPPING	     0x100	/* file data flush/inval in progress */
-#define VMOUNTING	     0x200	/* mount in progress on vnode	*/
-#define VLOCKHOLD	     0x400	/* VN_HOLD for remote locks	*/
-#define VINACTIVE_TEARDOWN  0x2000	/* vnode torn down at inactive time */
-#define VSEMAPHORE	    0x4000	/* vnode ::= a Posix named semaphore */
-#define VUSYNC		    0x8000	/* vnode aspace ::= usync objects */
-#define VHASLABEL	   0x10000	/* vnode has a label and acl from VOP */
-#define VEXTATTR	   0x20000 /* atomic creation of vnode and setting MAC label */
-#define VMODIFIED	   0x40000	/* xfs inode state possibly different
+#define VMODIFIED	       0x8	/* xfs inode state possibly different
 					 * from linux inode state.
 					 */
 
