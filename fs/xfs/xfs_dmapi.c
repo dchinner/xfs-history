@@ -3227,9 +3227,13 @@ xfs_dm_fh_to_inode(
 
 	*ip = NULL;
 	memcpy(&fid, dmfsfid, sizeof(*dmfsfid));
-	ASSERT(fid.fid_len);
-	VFS_VGET(vfsp, &vp, &fid, error);
-	if (vp && (error == 0))
+	if (fid.fid_len) {	/* file object handle */
+		VFS_VGET(vfsp, &vp, &fid, error);
+	}
+	else {			/* filesystem handle */
+		VFS_ROOT(vfsp, &vp, error);
+	}
+	if(vp && (error == 0))
 		*ip = LINVFS_GET_IP(vp);
 	return -error; /* Return negative error to DMAPI */
 }
