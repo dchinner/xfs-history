@@ -37,33 +37,6 @@ struct xfsstats xfsstats;
 #endif
 
 /*
- * Test the sticky attribute of a directory.  We can unlink from a sticky
- * directory that's writable by us if: we are superuser, we own the file,
- * we own the directory, or the file is writable.
- */
-int
-xfs_stickytest(
-	xfs_inode_t	*dp,
-	xfs_inode_t	*ip,
-	cred_t		*cr)
-{
-        if (!(dp->i_d.di_mode & ISVTX))
-		return 0;
-	if (current->fsuid == ip->i_d.di_uid)
-		return 0;
-	if (current->fsuid == dp->i_d.di_uid)
-		return 0;
-	if (!capable_cred(cr, CAP_FOWNER)) {
-		if (xpg4_sticky_dir) {
-			return XFS_ERROR(EACCES);
-		} else {
-			return xfs_iaccess(ip, IWRITE, cr);
-		}
-        }
-        return 0;
-}
-
-/*
  * Wrapper around xfs_dir_lookup.
  *
  * If DLF_IGET is set, then this routine will also return the inode.

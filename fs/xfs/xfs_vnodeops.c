@@ -3139,12 +3139,6 @@ xfs_remove(
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
 	}
-#if 0
-	if ((error = xfs_stickytest(dp, ip, credp))) {
-		REMOVE_DEBUG_TRACE(__LINE__);
-		goto error_return;
-	}
-#endif
 
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
 		error = XFS_ERROR(EPERM);

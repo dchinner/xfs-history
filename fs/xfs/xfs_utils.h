@@ -109,12 +109,6 @@ xfs_dir_ialloc(
 	int 			*committed);
 
 extern int
-xfs_stickytest(
-	struct xfs_inode	*dp,
-	struct xfs_inode	*ip,
-	struct cred		*cr);
-
-extern int
 xfs_droplink(
 	struct xfs_trans	*tp,
 	struct xfs_inode	*ip);
