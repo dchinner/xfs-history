@@ -887,14 +887,14 @@ xfs_ilock(xfs_inode_t	*ip,
 	ASSERT((lock_flags & ~XFS_LOCK_MASK) == 0);
 
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		mrupdatef(&ip->i_iolock, PLTWAIT);
+		mrupdate(&ip->i_iolock);
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		mraccessf(&ip->i_iolock, PLTWAIT);
+		mraccess(&ip->i_iolock);
 	}
 	if (lock_flags & XFS_ILOCK_EXCL) {
-		mrupdatef(&ip->i_lock, PLTWAIT);
+		mrupdate(&ip->i_lock);
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
-		mraccessf(&ip->i_lock, PLTWAIT);
+		mraccess(&ip->i_lock);
 	}
 #ifdef XFS_ILOCK_TRACE
 	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)return_address);
