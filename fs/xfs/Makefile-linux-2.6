@@ -88,19 +88,19 @@ endif
 endif
 
 ifeq ($(CONFIG_XFS_RT),y)
-	XFS_RT_OBJS=xfs_rtalloc.o xfs_rtbit.o
+XFS_RT_OBJS=xfs_rtalloc.o xfs_rtbit.o
 else
-	XFS_RT_OBJS=xfsrtstubs.o
+XFS_RT_OBJS=xfsrtstubs.o
 endif
 ifeq ($(CONFIG_XFS_GRIO),y)
-	XFS_GRIO_OBJS=xfs_grio.o 
+XFS_GRIO_OBJS=xfs_grio.o 
 else
-	XFS_GRIO_OBJS=
+XFS_GRIO_OBJS=
 endif
 ifeq ($(CONFIG_XFS_DMAPI),y)
-	XFS_DMAPI_OBJS=dmapi/dmapi.o
+XFS_DMAPI_OBJS=dmapi/dmapi.o
 else
-	XFS_DMAPI_OBJS=xfsdmapistubs.o
+XFS_DMAPI_OBJS=xfsdmapistubs.o
 endif
 
 XFS_OBJS  :=    $(XFS_RT_OBJS) \
