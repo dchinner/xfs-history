@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.184 $"
+#ident	"$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -74,11 +74,12 @@ STATIC void	xfs_sb_relse(buf_t *);
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC void	xfs_uuid_mount(xfs_mount_t *);
-STATIC void	xfs_uuid_unmount(xfs_mount_t *);
 
 mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
 STATIC int	xfs_uuidtab_size;
 STATIC uuid_t	*xfs_uuidtab;
+
+void	xfs_uuid_unmount(xfs_mount_t *);
 #endif	/* !SIM */
 
 /*
@@ -1534,7 +1535,7 @@ xfs_uuid_mount(xfs_mount_t *mp)
 /*
  * Remove filesystem from the uuid table.
  */
-STATIC void
+void
 xfs_uuid_unmount(xfs_mount_t *mp)
 {
 	int	i;
