@@ -360,8 +360,11 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		ASSERT(flags & XFS_LOG_PERM_RESERV);
 		xlog_state_put_ticket(log, *ticket);
 	}
-	if ((int)(*ticket = xlog_state_get_ticket(log,len,client,flags)) == -1)
+
+	*ticket = xlog_state_get_ticket(log, len, client, flags);
+	if ((int)(*ticket) == -1)
 		return XFS_ENOLOGSPACE;
+
 
 	if (flags & XFS_LOG_PERM_RESERV)
 		((xlog_ticket_t *)(*ticket))->t_flags |= XLOG_TIC_PERM_RESERV;
@@ -529,6 +532,7 @@ xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog)
 }	/* xlog_assign_tail_lsn */
 
 
+#if 0
 int
 xlog_space_left(xlog_t *log)
 {
@@ -540,6 +544,7 @@ xlog_space_left(xlog_t *log)
 			     (BLOCK_LSN(log->l_tail_lsn) -
 			      BLOCK_LSN(log->l_reshead_lsn)));
 }	/* xlog_space_left */
+#endif
 
 
 /*
@@ -580,7 +585,7 @@ xlog_init_log(xfs_mount_t	*mp,
 
 	log->l_prev_block  = -1;
 	log->l_tail_lsn    = 0x100000000LL;  /* cycle = 1; current block = 0 */
-	log->l_reshead_lsn = log->l_last_sync_lsn = log->l_tail_lsn;
+	log->l_last_sync_lsn = log->l_tail_lsn;
 	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
 	log->l_logreserved = 0;
 	log->l_curr_block  = 0;		/* filled in by xlog_recover */
@@ -807,6 +812,8 @@ xlog_sync(xlog_t		*log,
 		dptr = bp->b_dmaaddr;
 		for (i=0; i<split; i += BBSIZE) {
 			*(uint *)dptr += 1;
+			if (*(uint *)dptr == XLOG_HEADER_MAGIC_NUM)
+				*(uint *)dptr += 1;
 			dptr += BBSIZE;
 		}
 
@@ -1431,6 +1438,8 @@ xlog_state_switch_iclogs(xlog_t		*log,
 	log->l_curr_block += BTOBB(eventual_size)+1;
 	if (log->l_curr_block >= log->l_logBBsize) {
 		log->l_curr_cycle++;
+		if (log->l_curr_cycle == XLOG_HEADER_MAGIC_NUM)
+			log->l_curr_cycle++;
 		log->l_curr_block -= log->l_logBBsize;
 		ASSERT(log->l_curr_block >= 0);
 	}
