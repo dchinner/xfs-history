@@ -645,6 +645,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 		if (!(iclog->ic_state == XLOG_STATE_ACTIVE ||
 		      iclog->ic_state == XLOG_STATE_DIRTY)) {
 			if (!XLOG_FORCED_SHUTDOWN(log)) {
+				xfs_trigger_io();
 				sv_wait(&iclog->ic_forcesema, PMEM, 
 					&log->l_icloglock, spl);
 			} else {
@@ -683,6 +684,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 		        || iclog->ic_state == XLOG_STATE_DIRTY
 			|| iclog->ic_state == XLOG_STATE_IOERROR) ) {
 
+				xfs_trigger_io();
 				sv_wait(&iclog->ic_forcesema, PMEM, 
 					&log->l_icloglock, spl);
 		} else {
@@ -2841,6 +2843,7 @@ maybe_sleep:
 			return XFS_ERROR(EIO);
 		}
 		XFSSTATS.xs_log_force_sleep++;
+		xfs_trigger_io();
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
@@ -2923,6 +2926,7 @@ try_again:
 						 XLOG_STATE_SYNCING))) {
 			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
 			XFSSTATS.xs_log_force_sleep++;
+			xfs_trigger_io();
 			sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock,
 				spl);
 			already_slept = 1;
@@ -2949,6 +2953,7 @@ try_again:
 			return XFS_ERROR(EIO);
 		}
 		XFSSTATS.xs_log_force_sleep++;
+		xfs_trigger_io();
 		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
