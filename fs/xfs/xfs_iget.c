@@ -40,9 +40,7 @@
 #include "sim.h"
 #endif /* SIM */
 
-#ifdef SIM
 struct igetstats	XFS_IGETINFO;
-#endif
 
 extern struct vnodeops xfs_vnodeops;
 
