@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 struct xfs_ihash;
 
@@ -24,7 +24,8 @@ typedef struct xfs_mount {
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
 	ulong			m_ihashmask;	/* fs inode hash size - 1 */
 	struct xfs_inode	*m_inodes;	/* active inode list */
-	lock_t			m_ilock;	/* inode list mutex */
+	sema_t			m_ilock;	/* inode list mutex */
+	uint			m_ireclaims;	/* count of calls to reclaim*/
 	uint			m_readio_log;	/* min read size log bytes */
 	uint			m_readio_blocks; /* min read size blocks */
 	uint			m_writeio_log;	/* min write size log bytes */
@@ -62,8 +63,8 @@ typedef struct xfs_mod_sb {
 	int	msb_delta;	/* change to make to the specified field */
 } xfs_mod_sb_t;
 
-#define	XFS_MOUNT_ILOCK(mp)	splockspl((mp)->m_ilock, splhi)
-#define	XFS_MOUNT_IUNLOCK(mp,s)	spunlockspl((mp)->m_ilock,(s))
+#define	XFS_MOUNT_ILOCK(mp)	psema(&((mp)->m_ilock), PINOD)
+#define	XFS_MOUNT_IUNLOCK(mp)	vsema(&((mp)->m_ilock))
 #define	XFS_SB_LOCK(mp)		splockspl((mp)->m_sb_lock, splhi)
 #define	XFS_SB_UNLOCK(mp,s)	spunlockspl((mp)->m_sb_lock,(s))
 
