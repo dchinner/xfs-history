@@ -84,9 +84,3 @@ xfs_iocore_inode_init(
 	xfs_iocore_inode_reinit(ip);
 }
 
-void
-xfs_iocore_destroy(
-	xfs_iocore_t	*io)
-{
-}
-
