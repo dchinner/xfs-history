@@ -611,8 +611,14 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 	xfs_log_ticket_t tic = 0;
 	xfs_lsn_t	 lsn;
 	int		 error;
-	int		 spl;        
-        __uint16_t       magic = XLOG_UNMOUNT_TYPE;
+	int		 spl;
+        
+        /* the data section must be 32 bit size aligned */
+        struct {
+            __uint16_t magic;
+            __uint16_t pad1;
+            __uint32_t pad2; /* may as well make it 64 bits */
+        } magic = { XLOG_UNMOUNT_TYPE, 0, 0 };
         
 #if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	if (! xlog_debug && xlog_devt == log->l_dev)
@@ -640,7 +646,7 @@ xfs_log_unmount_write(xfs_mount_t *mp)
 #endif
 	if (! (XLOG_FORCED_SHUTDOWN(log))) {
 		reg[0].i_addr = (void*)&magic;
-		reg[0].i_len  = sizeof(__uint16_t);
+		reg[0].i_len  = sizeof(magic);  
                 
 		error = xfs_log_reserve(mp, 600, 1, &tic, XFS_LOG, 0);
 		if (!error) {
