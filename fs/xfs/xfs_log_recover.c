@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.111 $"
+#ident	"$Revision: 1.112 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -601,17 +601,18 @@ bp_err:
 int
 xlog_find_tail(xlog_t  *log,
 	       daddr_t *head_blk,
-	       daddr_t *tail_blk)
+	       daddr_t *tail_blk,
+	       int readonly)
 {
 	xlog_rec_header_t	*rhead;
 	xlog_op_header_t	*op_head;
 	buf_t			*bp;
-	int			error, i, found;
+	int			error, i, found, clean;
 	daddr_t			umount_data_blk;
 	daddr_t			after_umount_blk;
 	xfs_lsn_t		tail_lsn;
 	
-	found = error = 0;
+	clean = found = error = 0;
 	/*
 	 * Find previous log record 
 	 */
@@ -721,6 +722,7 @@ xlog_find_tail(xlog_t  *log,
 			     ((long long)log->l_curr_cycle << 32) |
 			     ((uint)(after_umount_blk));
 			*tail_blk = after_umount_blk;
+			clean = 1;
 		}
 	}
 
@@ -732,8 +734,11 @@ xlog_find_tail(xlog_t  *log,
 	 *
 	 * We use the lsn from before modifying it so that we'll never
 	 * overwrite the unmount record after a clean unmount.
+	 *
+	 * Do this only if we actually recovered the filesystem
 	 */
-	error = xlog_clear_stale_blocks(log, tail_lsn);
+	if (!clean || !readonly)
+		error = xlog_clear_stale_blocks(log, tail_lsn);
 
 bread_err:
 exit:
@@ -3153,13 +3158,14 @@ xlog_do_recover(xlog_t	*log,
  * Return error or zero.
  */
 int
-xlog_recover(xlog_t *log)
+xlog_recover(xlog_t *log, int readonly, int *clean)
 {
 	daddr_t head_blk, tail_blk;
 	int	error;
 
-	if (error = xlog_find_tail(log, &head_blk, &tail_blk))
+	if (error = xlog_find_tail(log, &head_blk, &tail_blk, readonly))
 		return error;
+	*clean = 1;
 	if (tail_blk != head_blk) {
 #ifdef SIM
 		extern daddr_t HEAD_BLK, TAIL_BLK;
@@ -3181,6 +3187,7 @@ xlog_recover(xlog_t *log)
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
+		*clean = 0;
 	}
 	return error;
 }	/* xlog_recover */
@@ -3196,7 +3203,7 @@ xlog_recover(xlog_t *log)
  * in the real-time portion of the file system.
  */
 int
-xlog_recover_finish(xlog_t *log)
+xlog_recover_finish(xlog_t *log, int *clean)
 {
 	/*
 	 * Now we're ready to do the transactions needed for the
@@ -3234,6 +3241,7 @@ xlog_recover_finish(xlog_t *log)
 		cmn_err(CE_NOTE,
 			"!Ending clean XFS mount for filesystem: %s",
 			log->l_mp->m_fsname);
+		*clean = 1;
 	}
 	return 0;
 }	/* xlog_recover_finish */

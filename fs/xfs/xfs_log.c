@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.138 $"
+#ident	"$Revision: 1.139 $"
 
 /*
  * High level interface routines for log manager
@@ -452,7 +452,8 @@ int
 xfs_log_mount(xfs_mount_t	*mp,
 	      dev_t		log_dev,
 	      daddr_t		blk_offset,
-	      int		num_bblks)
+	      int		num_bblks,
+	      int		*clean)
 {
 	xlog_t *log;
 	int    error;
@@ -466,7 +467,8 @@ xfs_log_mount(xfs_mount_t	*mp,
 		return 0;
 	}
 
-	if ((error = xlog_recover(log)) != NULL) {
+	if ((error = xlog_recover(log, XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY,
+				clean)) != NULL) {
 		xlog_unalloc_log(log);
 	}
 
@@ -489,8 +491,17 @@ int
 xfs_log_mount_finish(xfs_mount_t *mp)
 {
 	int	error;
+	int	clean;
 
-	error = xlog_recover_finish(mp->m_log);
+	error = xlog_recover_finish(mp->m_log, &clean);
+
+	/*
+	 * if the fs didn't need recovery and is marked read-only,
+	 * keep it clean.
+	 */
+	if (clean && (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY))
+		mp->m_flags |= XFS_MOUNT_FS_IS_CLEAN;
+
 	return error;
 }
 
@@ -517,6 +528,15 @@ xfs_log_unmount(xfs_mount_t *mp)
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 #endif
+
+	/*
+	 * don't write out unmount record if the fs was clean when
+	 * mounted (no recovery required) and the fs is readonly
+	 */
+	if (mp->m_flags & XFS_MOUNT_FS_IS_CLEAN) {
+		xlog_unalloc_log(log);
+		return 0;
+	}
 
 	if (xfs_log_force(mp, 0, XFS_LOG_FORCE|XFS_LOG_SYNC))
 		xlog_panic("xfs_log_unmount: log force failed");

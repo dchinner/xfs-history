@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.143 $"
+#ident	"$Revision: 1.144 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -64,7 +64,7 @@
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int);
 STATIC void	xfs_sb_relse(buf_t *);
 #ifndef SIM
-STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
+STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *, int);
 STATIC void	xfs_uuid_mount(xfs_mount_t *);
 STATIC void	xfs_uuid_unmount(xfs_mount_t *);
 
@@ -168,6 +168,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	vmap_t		vmap;
 	daddr_t		d;
 	struct bdevsw	*my_bdevsw;
+	int		clean;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 #ifndef SIM
 	__uint64_t	ret64;
@@ -524,7 +525,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	if (sbp->sb_logblocks > 0) {		/* check for volume case */
 		error = xfs_log_mount(mp, mp->m_logdev,
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
-				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
+				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks),
+				      &clean);
 		if (error) {
 			goto error2;
 		}
@@ -633,8 +635,10 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			 * mounting, and get on with the boring life 
 			 * without disk quotas.
 			 */
-			if (xfs_qm_mount_quotas(mp) == ENOPKG)
-				xfs_mount_reset_sbqflags(mp);
+			if (xfs_qm_mount_quotas(mp, clean &&
+					(vfsp->vfs_flag & VFS_RDONLY))
+					== ENOPKG)
+				xfs_mount_reset_sbqflags(mp, clean);
 		} else {
 			/*
 			 * Clear the quota flags, but remember them. This 
@@ -666,8 +670,9 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	if (needquotamount) {
 		ASSERT(mp->m_qflags == 0);
 		mp->m_qflags = quotaflags; 
-		if (xfs_qm_mount_quotas(mp) == ENOPKG)
-			xfs_mount_reset_sbqflags(mp);
+		if (xfs_qm_mount_quotas(mp,
+				mp->m_flags & XFS_MOUNT_FS_IS_CLEAN) == ENOPKG)
+			xfs_mount_reset_sbqflags(mp, clean);
 	}
 
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
@@ -727,6 +732,7 @@ STATIC xfs_mount_t *
 xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 {
 	int		error;
+	int		clean;
 	xfs_mount_t	*mp;
 	vfs_t		*vfsp;
 
@@ -756,7 +762,7 @@ xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 		sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
 		logstart = sbp->sb_logstart;
 		xfs_log_mount(mp, logdev, XFS_FSB_TO_DADDR(mp, logstart),
-			      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
+			      XFS_FSB_TO_BB(mp, sbp->sb_logblocks), &clean);
 	}
 
 	return mp;
@@ -834,15 +840,20 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	if (mp->m_rtdev) {
 		binval(mp->m_rtdev);
 	}
-	bp = xfs_getsb(mp, 0);
-	bp->b_flags &= ~(B_DONE | B_READ);
-	bp->b_flags |= B_WRITE;
-	bwait_unpin(bp);
-	my_bdevsw = get_bdevsw(mp->m_dev);
-	ASSERT(my_bdevsw != NULL);
-	bdstrat(my_bdevsw, bp);
-	error = iowait(bp);
-	ASSERT(error == 0);
+	/*
+	 * skip superblock write if fs is truly read-only
+	 */
+	if (!(mp->m_flags & XFS_MOUNT_FS_IS_CLEAN))  {
+		bp = xfs_getsb(mp, 0);
+		bp->b_flags &= ~(B_DONE | B_READ);
+		bp->b_flags |= B_WRITE;
+		bwait_unpin(bp);
+		my_bdevsw = get_bdevsw(mp->m_dev);
+		ASSERT(my_bdevsw != NULL);
+		bdstrat(my_bdevsw, bp);
+		error = iowait(bp);
+		ASSERT(error == 0);
+	}
 	
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
@@ -859,7 +870,8 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		VN_RELE(mp->m_logdevp);
 	}
 
-	nfreerbuf(bp);
+	if (!(mp->m_flags & XFS_MOUNT_FS_IS_CLEAN))
+		nfreerbuf(bp);
 
 	/*
 	 * All inodes from this mount point should be freed.
@@ -1253,7 +1265,8 @@ xfs_uuid_unmount(xfs_mount_t *mp)
  */
 STATIC void
 xfs_mount_reset_sbqflags(
-	xfs_mount_t	*mp)
+	xfs_mount_t	*mp,
+	int		clean)
 {
 	xfs_trans_t	*tp;
 	int		s;
@@ -1268,7 +1281,13 @@ xfs_mount_reset_sbqflags(
 	s = XFS_SB_LOCK(mp);
 	mp->m_sb.sb_qflags = 0;
 	XFS_SB_UNLOCK(mp, s);
-		
+
+	/*
+	 * if the fs is truly readonly, let the incore superblock run
+	 * with quotas off but don't flush the update out to disk
+	 */
+	if (clean)
+		return;
 #ifdef QUOTADEBUG	
 	cmn_err(CE_NOTE, 	
 		"Writing superblock quota changes :%s\n",

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.75 $"
+#ident	"$Revision: 1.76 $"
 
 struct buf;
 struct cred;
@@ -139,6 +139,7 @@ typedef struct xfs_mount {
 #define	XFS_MOUNT_INO64		0x00000002
 #endif
 #define XFS_MOUNT_ROOTQCHECK	0x00000004
+#define XFS_MOUNT_FS_IS_CLEAN	0x00000008	/* fs is truly read-only */
 
 /*
  * Default minimum read and write sizes.
