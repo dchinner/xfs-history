@@ -258,4 +258,14 @@ bhv_insert_initial(
         (bhp)->bh_first = bdp;
 }
 
+void
+bhv_head_destroy(
+	bhv_head_t *bhp)
+{
+	ASSERT(bhp->bh_first == NULL);
+#if defined(CELL_CAPABLE)
+	ASSERT(bhp->bh_lockp == BHVMAGIC);
+	bhp->bh_lockp = NULL;
+#endif
+}
 

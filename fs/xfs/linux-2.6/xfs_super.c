@@ -23,6 +23,7 @@
 #include <sys/vnode.h>
 #include <ksys/behavior.h>
 #include <sys/statvfs.h>
+#include <asm/uaccess.h>
 
 #undef MS_RDONLY
 #undef MS_REMOUNT

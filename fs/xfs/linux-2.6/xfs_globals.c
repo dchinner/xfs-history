@@ -16,6 +16,8 @@
  * somewhere else in IRIX.
  */
 
+#include <sys/types.h>
+#include <sys/cred.h>
 int    		xfs_refcache_percent = 100;
 int		mac_enabled = 0;
 int		acl_enabled = 0;
@@ -24,20 +26,8 @@ int		nclrus = 0;
 
 
 int imon_enabled;
+int	scache_linemask;	/* second level cache line size mask */
 
 
-int
-cap_able(long long int cid)
-{
-	/*
-	 * This function requires user context. If you hit this
-	 * ASSERT, there's a call to CAP_ABLE() which needs to be
-	 * changed to use CAP_CRABLE() (or cap_able_cred())
-	 */
-  printf("cap_able not implemented\n");
-#if 0
-	ASSERT(get_current_cred() != NULL);
-
-	return cap_able_cred(get_current_cred(), cid);
-#endif
-}
+prid_t dfltprid;
+struct cred		*credp;

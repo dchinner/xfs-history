@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Id: xfs_behavior.c,v 1.1 1999/08/30 20:33:27 cattelan Exp $"
+#ident "$Id: xfs_behavior.c,v 1.2 1999/09/02 22:24:14 cattelan Exp $"
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized 
@@ -258,4 +258,14 @@ bhv_insert_initial(
         (bhp)->bh_first = bdp;
 }
 
+void
+bhv_head_destroy(
+	bhv_head_t *bhp)
+{
+	ASSERT(bhp->bh_first == NULL);
+#if defined(CELL_CAPABLE)
+	ASSERT(bhp->bh_lockp == BHVMAGIC);
+	bhp->bh_lockp = NULL;
+#endif
+}
 

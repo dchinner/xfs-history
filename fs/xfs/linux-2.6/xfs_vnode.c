@@ -68,7 +68,9 @@
 #include <sys/atomic_ops.h>
 /*#include <sys/buf.h>*/
 
+#ifndef _KERNEL
 #include "sim.h"
+#endif
 
 #define	VFREELIST(count)	&vfreelist[count].vf_freelist
 
