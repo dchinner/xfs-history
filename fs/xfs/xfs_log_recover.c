@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.106 $"
+#ident	"$Revision: 1.107 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2131,6 +2131,11 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 		logged_nextp = (xfs_agino_t *)
 			       ((char *)(item->ri_buf[item_index].i_addr) +
 				(next_unlinked_offset - reg_buf_offset));
+#ifndef NO_XFS_PARANOIA
+		if (*logged_nextp == 0)
+			cmn_err(CE_PANIC,
+		"XFS trying to replay bad (0) inode di_next_unlinked field\n");
+#endif
 		buffer_nextp = (xfs_agino_t *)((char *)(bp->b_un.b_addr) +
 					      next_unlinked_offset);
 		*buffer_nextp = *logged_nextp;
