@@ -12,23 +12,17 @@
 
 #include "xfs_coda_oops.h"
 
+
+#include <linux/xfs_to_linux.h>
+
 #undef  NODEV
-#undef off_t
-#undef ino_t
-#undef daddr_t
-#undef caddr_t
-#define off_t __kernel_off_t
-#define ino_t __kernel_ino_t
-#define daddr_t __kernel_daddr_t
-#define caddr_t __kernel_caddr_t
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/slab.h>
-#undef off_t
-#undef ino_t
-#undef daddr_t
-#undef caddr_t
+#include <linux/xfs_inode.h>
+
+#include <linux/linux_to_xfs.h>
 
 #include <sys/capability.h>
 #include <sys/cred.h>
@@ -43,9 +37,6 @@
 #undef MS_RDONLY
 #undef MS_REMOUNT
 #include <sys/mount.h>
-
-
-#include <linux/xfs_inode.h>
 
 #include <xfs_clnt.h>
 #include <xfs_inum.h>
@@ -484,8 +475,10 @@ linvfs_write_super(
 
 
 	ENTER("linvfs_write_super");
+#ifdef notyet
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
 		sys_cred, error);
+#endif
 
 
 	sb->s_dirt = 1;  /*  Keep the syncs coming.  */

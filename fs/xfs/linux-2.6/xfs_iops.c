@@ -8,23 +8,16 @@
 #include <sys/types.h>
 #include <linux/errno.h>
 #include "xfs_coda_oops.h"
+
+#include <linux/xfs_to_linux.h>
+
 #undef  NODEV
-#undef off_t
-#undef ino_t
-#undef daddr_t
-#undef caddr_t
-#define off_t __kernel_off_t
-#define ino_t __kernel_ino_t
-#define daddr_t __kernel_daddr_t
-#define caddr_t __kernel_caddr_t
 #include <linux/fs.h>
 #include <linux/sched.h>	/* To get current */
 #include <linux/locks.h>
 #include <linux/slab.h>
-#undef off_t
-#undef ino_t
-#undef daddr_t
-#undef caddr_t
+
+#include <linux/linux_to_xfs.h>
 
 #include <sys/capability.h>
 #include <sys/cred.h>
@@ -91,7 +84,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		VOP_GETATTR(vp, &va, 0, sys_cred, error);
 		if (error) {
 			VN_RELE(vp);
-			return error;
+			return -error;
 		}
 		ino = va.va_nodeid;
 		ASSERT(ino);
@@ -102,7 +95,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		}
 		d_instantiate(dentry, ip);
 	}
-	return error;
+	return 0;
 }
 
 
@@ -157,7 +150,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 		}
 	}
 	d_add(dentry, ip);	/* Negative entry goes in if ip is NULL */
-	return NULL;
+	return dentry;
 }
 
 
@@ -179,7 +172,7 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 	if (!error) {
 		d_instantiate(dentry, ip);
 	}
-	return error;
+	return -error;
 }
 
 
@@ -201,7 +194,7 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	if (!error) {
 		d_delete(dentry);       /* del and free inode */
 	}
-	return error;
+	return -error;
 }
 
 
@@ -262,7 +255,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 			VN_RELE(cvp);
 		}
 	}
-	return error;
+	return -error;
 }
 
 
@@ -303,7 +296,7 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 		mark_inode_dirty(dir);
 		d_delete(dentry);       /* del and free inode */
 	}
-	return error;
+	return -error;
 }
 
 
