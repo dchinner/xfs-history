@@ -196,7 +196,7 @@ xfs_get_inode(dev_t , xfs_ino_t);
 void
 xfs_inobp_check(
 	xfs_mount_t	*mp,
-	xfs_buf_t		*bp)
+	xfs_buf_t	*bp)
 {
 	int		i;
 	int		j;
@@ -2102,7 +2102,7 @@ xfs_iunlink_remove(
 		xfs_trans_inode_buf(tp, last_ibp);
 		xfs_trans_log_buf(tp, last_ibp, offset,
 				  (offset + sizeof(xfs_agino_t) - 1));
-		xfs_inobp_check(mp, ibp);
+		xfs_inobp_check(mp, last_ibp);
 	}
 	return 0;
 }
