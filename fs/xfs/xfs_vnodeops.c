@@ -1,4 +1,4 @@
-#ident "$Revision: 1.185 $"
+#ident "$Revision: 1.190 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1495,7 +1495,8 @@ xfs_inactive(
 				xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 			}
 			ASSERT(error || (ip->i_d.di_anextents == 0));
-		}
+		} else if (ip->i_afp)
+			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 				
  free_inode:
 		/*
@@ -1698,7 +1699,7 @@ xfs_dir_lookup_int(
 	code = xfs_dir_lookup(tp, XFS_VTOI(dir_vp), name, name_len, inum);
 	if (!code && do_iget) {
 		code = xfs_iget(XFS_VFSTOM(dir_vp->v_vfsp), NULL, *inum,
-				0, ipp);
+				0, ipp, 0);
 		if (code) {
 			*ipp = NULL;
 			return code;
@@ -3304,7 +3305,7 @@ xfs_ancestor_check(
 		if (ip != target_dp)
 			IRELE(ip);
 
-		error = xfs_iget(mp, NULL, parent_ino, XFS_ILOCK_EXCL, &ip);
+		error = xfs_iget(mp, NULL, parent_ino, XFS_ILOCK_EXCL, &ip, 0);
 		if (error) {
 			goto relock_and_return;
 		}
