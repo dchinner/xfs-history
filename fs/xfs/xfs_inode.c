@@ -1,4 +1,4 @@
-#ident "$Revision: 1.183 $"
+#ident "$Revision: 1.184 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -809,8 +809,8 @@ xfs_ialloc(
 	 * the inode version number now.  This way we only do the conversion
 	 * here rather than here and in the flush/logging code.
 	 */
-	if ((tp->t_mountp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASNLINK) &&
-	    (ip->i_d.di_version == XFS_DINODE_VERSION_1)) {
+	if (XFS_SB_VERSION_HASNLINK(&tp->t_mountp->m_sb) &&
+	    ip->i_d.di_version == XFS_DINODE_VERSION_1) {
 		ip->i_d.di_version = XFS_DINODE_VERSION_2;
 		/*
 		 * We've alredy zeroed the old link count, the projid field,
@@ -2792,10 +2792,10 @@ xfs_iflush(
 	 * convert back to the old inode format.  If the superblock version
 	 * has been updated, then make the conversion permanent.
 	 */
-	ASSERT((ip->i_d.di_version == XFS_DINODE_VERSION_1) ||
-	       (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASNLINK));
+	ASSERT(ip->i_d.di_version == XFS_DINODE_VERSION_1 ||
+	       XFS_SB_VERSION_HASNLINK(&mp->m_sb));
 	if (ip->i_d.di_version == XFS_DINODE_VERSION_1) {
-		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
+		if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
 			/*
 			 * Convert it back.
 			 */
