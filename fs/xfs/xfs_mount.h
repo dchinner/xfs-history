@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.83 $"
+#ident	"$Revision: 1.84 $"
 
 struct buf;
 struct cred;
@@ -169,6 +169,7 @@ typedef struct xfs_mount {
 #define	XFS_UIO_MIN_WRITEIO_LOG	13
 #define	XFS_UIO_MAX_READIO_LOG	16
 #define	XFS_UIO_MIN_READIO_LOG	13
+
 /*
  * Synchronous read and write sizes.  This should be
  * better for NFS.
