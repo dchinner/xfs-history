@@ -228,7 +228,7 @@ xfs_dir2_leafn_add(
 #pragma mips_frequency_hint NEVER
 		if (leaf->hdr.stale == 0)
 			return XFS_ERROR(ENOSPC);
-		compact = 1;
+		compact = leaf->hdr.stale > 1;
 	} else
 		compact = 0;
 	ASSERT(index == 0 || leaf->ents[index - 1].hashval <= args->hashval);
