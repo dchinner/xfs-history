@@ -472,7 +472,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		 * so that we can maybe start it on the next request.
 		 */
 		if (first_read_ahead_bmapp != NULL) {
-			read_aheads = curr_bmapp - first_read_ahead_bmapp;
+			read_aheads = curr_bmapp - first_read_ahead_bmapp +1;
 			next_read_ahead_bmapp = first_read_ahead_bmapp +
 						(read_aheads / 2);
 			ip->i_reada_blkno = next_read_ahead_bmapp->offset;
@@ -1008,11 +1008,18 @@ xfs_iomap_write(xfs_inode_t	*ip,
 					 * boundaries, round next_offset
 					 * down to a writeio_blocks boundary
 					 * before calling xfs_write_bmap().
+					 *
+					 * XXXajs
+					 * Adding a macro to writeio align
+					 * fsblocks would be good to reduce
+					 * the bit shifting here.
 					 */
 					ioalign = xfs_fsb_to_b(sbp,
 					                    next_offset_fsb);
 					ioalign = XFS_WRITEIO_ALIGN(mp,
 								    ioalign);
+					ioalign = xfs_b_to_fsbt(sbp,
+								ioalign);
 					xfs_write_bmap(mp, curr_imapp,
 						       next_bmapp, iosize,
 						       ioalign, isize);
@@ -1173,6 +1180,7 @@ xfs_write_file(vnode_t	*vp,
 			if ((bmapp->pbsize != bmapp->bsize) &&
 			    !((bmapp->pboff == 0) &&
 			      (uiop->uio_offset == isize))) {
+
 				bp = read_chunk(vp, bmapp, 1, delalloc,
 						credp);
 
@@ -1201,6 +1209,7 @@ xfs_write_file(vnode_t	*vp,
 					 */
 					valid = pbcount;
 				}
+
 			} else {
 				bp = alloc_chunk(vp, bmapp, delalloc, credp);
 				/*
@@ -1405,6 +1414,9 @@ xfs_strat_read(vnode_t	*vp,
 	xfs_fsblock_t	imap_offset;
 	xfs_extlen_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
+	__int64_t	isize;
+	off_t		offset;
+	off_t		end_offset;
 	int		x;
 	caddr_t		datap;
 	buf_t		*rbp;
@@ -1423,7 +1435,18 @@ xfs_strat_read(vnode_t	*vp,
 	mp = XFS_VFSTOM(vp->v_vfsp);
 	sbp = &mp->m_sb;
 	offset_fsb = xfs_bb_to_fsbt(sbp, bp->b_offset);
-	count_fsb = xfs_b_to_fsb(sbp, bp->b_bcount);
+	/*
+	 * Only read up to the EOF.
+	 */
+	isize = ip->i_d.di_size;
+	offset = BBTOB(bp->b_offset);
+	ASSERT(offset < isize);
+	end_offset = offset + bp->b_bcount;
+	if (end_offset > isize) {
+		count_fsb = xfs_b_to_fsb(sbp, isize - offset);
+	} else {
+		count_fsb = xfs_b_to_fsb(sbp, bp->b_bcount);
+	}
 	map_start_fsb = offset_fsb;
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	while (count_fsb != 0) {
@@ -1622,6 +1645,7 @@ xfs_strat_write(vnode_t	*vp,
 	 * the old EOF-overlapping buffers as well.
 	 */
 	ASSERT(bp->b_valid > 0);
+	ASSERT((BBTOB(bp->b_offset) + bp->b_valid) <= ip->i_d.di_size);
 	count_fsb = xfs_b_to_fsb(sbp, bp->b_valid);
 	map_start_fsb = offset_fsb;
 	bp->b_flags |= B_STALE;
