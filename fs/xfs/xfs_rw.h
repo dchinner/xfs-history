@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.28 $"
+#ident "$Revision: 1.29 $"
 
 struct bhv_desc;
 struct bdevsw;
@@ -76,23 +76,14 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 		 XFS_FSB_TO_DADDR((ip)->i_mount, (fsb)))
 #endif
 
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BDWRITE)
-void	xfs_bdelwri(struct xfs_mount *, struct buf *);
-#define xfs_bdwrite(mp, bp)	xfs_bdelwri(mp, bp)
-#else
 #define	xfs_bdwrite(mp, bp) \
-          ((!XFS_FORCED_SHUTDOWN(mp)) ? \
-	  ((bp)->b_bdstrat = xfs_bdstrat, bdwrite(bp)) : (void) xfs_bioerror(bp))
-#endif
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BAWRITE)
-void	xfs_basyncwri(struct xfs_mount *, struct buf *);
-#define xfs_bawrite(mp, bp)	xfs_basyncwri(mp, bp)
-#else
+          (!XFS_FORCED_SHUTDOWN(mp) ? \
+	   ((bp)->b_bdstrat = xfs_bdstrat, bdwrite(bp)) : \
+	   (void)xfs_bioerror(bp))
 #define	xfs_bawrite(mp, bp) \
-	  ((!XFS_FORCED_SHUTDOWN(mp)) ? \
-	  ((bp)->b_bdstrat = xfs_bdstrat, bawrite(bp)) : (void) xfs_bioerror(bp))
-
-#endif
+	  (!XFS_FORCED_SHUTDOWN(mp) ? \
+	   ((bp)->b_bdstrat = xfs_bdstrat, bawrite(bp)) : \
+	   (void)xfs_bioerror(bp))
 
 /*
  * Defines for the trace mechanisms in xfs_rw.c.
