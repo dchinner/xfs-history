@@ -1,7 +1,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #include "xfs_quota.h"
 
@@ -196,7 +196,6 @@ extern void 		xfs_qm_destroy_quotainfo(xfs_mount_t *);
 extern void		xfs_qm_dqunlink(xfs_dquot_t *);
 extern boolean_t	xfs_qm_dqalloc_incore(xfs_dquot_t **);
 extern int 		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
-extern void		xfs_qm_force_quotaoff(xfs_mount_t *);
 extern int		xfs_qm_scall_quotaoff(xfs_mount_t *, uint, boolean_t);
 
 /* logitem stuff */
