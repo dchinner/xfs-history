@@ -109,6 +109,8 @@
 #else
 #include <fs/fs_bhv_id.h>
 #endif
+/* this seems to be needed even in sim mode? RMC  8/17/99 */
+#include <fs/fs_bhv_id.h>
 
 /*
  * Here so that we do not need to include vproc.h -> vpgrp.h ->
@@ -6901,8 +6903,8 @@ xfs_error(
 #ifdef SIM
 
 vnodeops_t xfs_vnodeops = {
-  /*	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE), */ 0,
-  /* (vop_open_t)fs_noerr, */ 0,
+  	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
+    (vop_open_t)fs_noerr,
 	(vop_close_t)fs_nosys,
 	(vop_read_t)fs_nosys,
 	(vop_write_t)fs_nosys,

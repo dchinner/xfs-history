@@ -2713,7 +2713,7 @@ vfsops_t xfs_vfsops = {
 };
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
-  /*	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE), */ 0,
+ 	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
 	0,
 	0,
 	0,
