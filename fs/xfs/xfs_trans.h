@@ -139,25 +139,32 @@ typedef void(*xfs_trans_callback_t)(struct xfs_trans*, void*);
  * This is the structure maintained for every active transaction.
  */
 typedef struct xfs_trans {
-	xfs_trans_id_t		t_tid;
-	unsigned int		t_reserve;
-	unsigned int		t_type;
-	struct xfs_trans	*t_forw;
-	struct xfs_trans	*t_back;
-	sema_t			t_sema;
-	xfs_lsn_t		t_lsn;
-	struct xfs_mount	*t_mountp;
-	xfs_trans_callback_t	t_callback;
-	void			*t_callarg;
-	unsigned int		t_flags;
-	unsigned int		t_items_free;	
-	xfs_log_item_chunk_t	t_items;
+	xfs_trans_id_t		t_tid;		/* transaction id */
+	struct xfs_trans	*t_forw;	/* forw link ptr */
+	struct xfs_trans	*t_back;	/* back link ptr */
+	unsigned int		t_type;		/* transaction type */
+	unsigned int		t_log_res;	/* amt of log space resvd */	
+	unsigned int		t_blk_res;	/* # of blocks resvd */
+	unsigned int		t_blk_res_used;	/* # of resvd blocks used */
+	sema_t			t_sema;		/* sema for commit completion */
+	xfs_lsn_t		t_lsn;		/* log seq num of trans commit*/
+	struct xfs_mount	*t_mountp;	/* ptr to fs mount struct */
+	xfs_trans_callback_t	t_callback;	/* transaction callback */
+	void			*t_callarg;	/* callback arg */
+	unsigned int		t_flags;	/* misc flags */
+	int			t_icount_delta;	/* superblock icount change */
+	int			t_ifree_delta;	/* superblock ifree change */
+	int			t_fdblocks_delta; /* superblock fdblocks chg */
+	int			t_frextents_delta;/* superblock freextents chg*/
+	unsigned int		t_items_free;	/* log item descs free */
+	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
 } xfs_trans_t;
 
 /*
  * Values for t_flags.
  */
 #define	XFS_TRANS_DIRTY		0x1
+#define	XFS_TRANS_SB_DIRTY	0x2
 
 /*
  * Values for call flags parameter.
@@ -190,11 +197,14 @@ struct xfs_mount;
 /*
  * xFS transaction mechanism exported interfaces.
  */
-extern xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint, uint, uint);
+extern xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint);
+extern int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint);
 extern void		xfs_trans_callback(xfs_trans_t *,
 					   void(*)(xfs_trans_t*, void*),
 					   void *);
+extern void		xfs_trans_mod_sb(xfs_trans_t *, uint, int);
 extern buf_t		*xfs_trans_getblk(xfs_trans_t *, dev_t, daddr_t, int);
+extern buf_t		*xfs_trans_getsb(xfs_trans_t *);
 extern buf_t		*xfs_trans_bread(xfs_trans_t *, dev_t, daddr_t, int);
 extern buf_t		*xfs_trans_getchunk(xfs_trans_t *, vnode_t *,
 					    struct bmapval *, struct cred *);
