@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.93 $"
+#ident  "$Revision: 1.94 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -208,6 +208,10 @@ xfs_init(
 	int	fstype)
 {
 	extern lock_t	xfs_bli_reflock;
+	extern mutex_t	xfs_refcache_lock;
+	extern int	xfs_refcache_size;
+	extern int	ncsize;
+	extern xfs_inode_t	**xfs_refcache;
 	extern zone_t	*xfs_dir_state_zone;
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
@@ -238,12 +242,22 @@ xfs_init(
 
 	initnlock(&xfs_bli_reflock, "xfsbli");
 #ifndef SIM
+	mutex_init(&xfs_refcache_lock, MUTEX_SPIN, "xfsref");
 	initnlock(&xfs_strat_lock, "xfsstrat");
 	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
 	mutex_init(&xfsd_lock, MUTEX_SPIN, "xfsd");
 	sv_init(&xfsd_wait, SV_DEFAULT, "xfsd");
+
+	/*
+	 * Initialize the inode reference cache.
+	 */
+	if (ncsize == 0) {
+		xfs_refcache_size = 100;
+	} else {
+		xfs_refcache_size = ncsize;
+	}
 #endif	/* !SIM */
-	
+
 	/*
 	 * Initialize all of the zone allocators we use.
 	 */
@@ -970,6 +984,12 @@ xfs_unmount(
 		if (mp->m_dmevmask & DM_ETOM(DM_UNMOUNT))
 			sendunmountevent = 1;
 	}
+
+	/*
+	 * First blow any referenced inode from this file system
+	 * out of the reference cache.
+	 */
+	xfs_refcache_purge_mp(mp);
 
 	/*
 	 * Make sure there are no active users.
@@ -1709,6 +1729,15 @@ xfs_sync(
 		if (error) {
 			last_error = error;
 		}
+	}
+
+	/*
+	 * If this is the 30 second sync, then kick some entries out of
+	 * the reference cache.  This ensures that idle entries are
+	 * eventually kicked out of the cache.
+	 */
+	if (flags & SYNC_BDFLUSH) {
+		xfs_refcache_purge_some();
 	}
 
 	return last_error;
