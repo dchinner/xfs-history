@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.93 $"
+#ident "$Revision: 1.94 $"
 
 struct buf;
 struct buftarg;
@@ -119,6 +119,7 @@ typedef struct xfs_item_ops {
 	void (*iop_format)(xfs_log_item_t *, struct xfs_log_iovec *);
 	void (*iop_pin)(xfs_log_item_t *);
 	void (*iop_unpin)(xfs_log_item_t *);
+	void (*iop_unpin_remove)(xfs_log_item_t *, struct xfs_trans *);
 	uint (*iop_trylock)(xfs_log_item_t *);
 	void (*iop_unlock)(xfs_log_item_t *);
 	xfs_lsn_t (*iop_committed)(xfs_log_item_t *, xfs_lsn_t);	
@@ -131,6 +132,7 @@ typedef struct xfs_item_ops {
 #define	IOP_FORMAT(ip,vp)	(*(ip)->li_ops->iop_format)(ip, vp)
 #define	IOP_PIN(ip)		(*(ip)->li_ops->iop_pin)(ip)
 #define	IOP_UNPIN(ip)		(*(ip)->li_ops->iop_unpin)(ip)
+#define	IOP_UNPIN_REMOVE(ip,tp)	(*(ip)->li_ops->iop_unpin_remove)(ip, tp)
 #define	IOP_TRYLOCK(ip)		(*(ip)->li_ops->iop_trylock)(ip)
 #define	IOP_UNLOCK(ip)		(*(ip)->li_ops->iop_unlock)(ip)
 #define	IOP_COMMITTED(ip, lsn)	(*(ip)->li_ops->iop_committed)(ip, lsn)
