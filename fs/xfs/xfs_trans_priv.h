@@ -1,7 +1,7 @@
 #ifndef _XFS_TRANS_PRIV_H
 #define	_XFS_TRANS_PRIV_H
 
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 struct xfs_log_item;
 struct xfs_log_item_desc;
@@ -27,21 +27,21 @@ void				xfs_trans_unlock_items(struct xfs_trans *);
 /*
  * From xfs_trans_ail.c
  */
-#if defined(INTR_KTHREADS) && defined(INTERRUPT_LATENCY_TESTING)
+#if defined(INTERRUPT_LATENCY_TESTING)
 #define	xfs_trans_update_ail(a,b,c,d)	_xfs_trans_update_ail(a,b,c)
 #define	xfs_trans_delete_ail(a,b,c)	_xfs_trans_delete_ail(a,b)
 void			_xfs_trans_update_ail(struct xfs_mount *,
 				     struct xfs_log_item *, xfs_lsn_t);
 void			_xfs_trans_delete_ail(struct xfs_mount *,
 				     struct xfs_log_item *);
-#else	/* INTR_KTHREADS */
+#else	/* INTERRUPT_LATENCY_TESTING */
 #define	xfs_trans_update_ail(a,b,c,d)	_xfs_trans_update_ail(a,b,c,d)
 #define	xfs_trans_delete_ail(a,b,c)	_xfs_trans_delete_ail(a,b,c)
 void			xfs_trans_update_ail(struct xfs_mount *,
 				     struct xfs_log_item *, xfs_lsn_t, int);
 void			xfs_trans_delete_ail(struct xfs_mount *,
 				     struct xfs_log_item *, int);
-#endif	/* INTR_KTHREADS */
+#endif	/* INTERRUPT_LATENCY_TESTING */
 struct xfs_log_item	*xfs_trans_first_ail(struct xfs_mount *, int *);
 struct xfs_log_item	*xfs_trans_next_ail(struct xfs_mount *,
 				     struct xfs_log_item *, int *, int *);

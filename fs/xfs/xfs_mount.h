@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.95 $"
+#ident	"$Revision: 1.96 $"
 
 #include <sys/buf.h>	/* for buftarg_t */
 struct cred;
@@ -13,21 +13,21 @@ struct xfs_perag;
 struct xfs_qm;
 struct xfs_quotainfo;
 
-#if defined(INTR_KTHREADS) && defined(INTERRUPT_LATENCY_TESTING)
+#if defined(INTERRUPT_LATENCY_TESTING)
 #define	SPLDECL(s)	       
 #define	AIL_LOCK_T		mutex_t
 #define	AIL_LOCKINIT(x,y)	mutex_init(x,MUTEX_DEFAULT, y)
 #define	AIL_LOCK_DESTROY(x)	mutex_destroy(x)
 #define	AIL_LOCK(mp,s)		mutex_lock(&(mp)->m_ail_lock, PZERO)
 #define	AIL_UNLOCK(mp,s)	mutex_unlock(&(mp)->m_ail_lock)
-#else	/* !INTR_KTHREADS */
+#else	/* !INTERRUPT_LATENCY_TESTING */
 #define	SPLDECL(s)		int s
 #define	AIL_LOCK_T		lock_t
 #define	AIL_LOCKINIT(x,y)	spinlock_init(x,y)
 #define	AIL_LOCK_DESTROY(x)	spinlock_destroy(x)
 #define	AIL_LOCK(mp,s)		s=mutex_spinlock(&(mp)->m_ail_lock)
 #define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
-#endif /* !INTR_KTHREADS */
+#endif /* !INTERRUPT_LATENCY_TESTING */
 
 typedef struct xfs_trans_reservations {
 	uint	tr_write;	/* extent alloc trans */
