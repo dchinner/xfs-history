@@ -562,7 +562,6 @@ xfs_setattr(
 	mp = ip->i_mount;
 	tp = NULL;
 	lock_flags = XFS_ILOCK_EXCL;
-	ASSERT(!(mask & AT_SIZE) || (mask == AT_SIZE));
 	if (!(mask & AT_SIZE)) {
 		tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_NOT_SIZE);
 		if (code = xfs_trans_reserve(tp, 0,
