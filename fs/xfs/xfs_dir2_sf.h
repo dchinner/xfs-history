@@ -51,14 +51,10 @@ struct xfs_trans;
  */
 typedef	struct { __uint8_t i[8]; } xfs_dir2_ino8_t;
 
-/* XXX - no architecture mods here YET */
-#if XFS_BIG_FILESYSTEMS
-#define	XFS_DIR2_SF_GET_INO8(di)	\
-	(xfs_intino_t)(INT_GET_UNALIGNED_64(&di))
-#else
-#define	XFS_DIR2_SF_GET_INO8(di)	\
-	(xfs_intino_t)(INT_GET_UNALIGNED_64(&di))
-#endif
+#define	XFS_DIR2_SF_GET_INO8_ARCH(di,arch)	\
+	(xfs_ino_t)(DIRINO_GET(&di,arch))
+#define	XFS_DIR2_SF_GET_INO8(di)	        \
+        XFS_DIR2_SF_GET_INO8_ARCH(di,XFS_ARCH_NATIVE)
 
 /*
  * Inode number stored as 4 8-bit values.
@@ -66,15 +62,10 @@ typedef	struct { __uint8_t i[8]; } xfs_dir2_ino8_t;
  * fit in 32 bits.
  */
 typedef struct { __uint8_t i[4]; } xfs_dir2_ino4_t;
-#ifdef __LITTLE_ENDIAN
-#define	XFS_DIR2_SF_GET_INO4(di)	\
-	((uint)((di).i4.i[3] << 24) | (uint)((di).i4.i[2] << 16) | \
-	 (uint)((di).i4.i[1] << 8) | (uint)((di).i4.i[0]))
-#else
-#define	XFS_DIR2_SF_GET_INO4(di)	\
-	((uint)((di).i4.i[0] << 24) | (uint)((di).i4.i[1] << 16) | \
-	 (uint)((di).i4.i[2] << 8) | (uint)((di).i4.i[3]))
-#endif
+#define	XFS_DIR2_SF_GET_INO4_ARCH(di,arch)	\
+	(xfs_ino_t)(DIRINO4_GET(&di,arch))
+#define	XFS_DIR2_SF_GET_INO4(di)	        \
+	XFS_DIR2_SF_GET_INO4_ARCH(di,XFS_ARCH_NATIVE)
 
 typedef union {
 	xfs_dir2_ino8_t	i8;
@@ -133,63 +124,56 @@ xfs_dir2_inou_t *xfs_dir2_sf_inumberp(xfs_dir2_sf_entry_t *sfep);
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_GET_INUMBER)
-xfs_intino_t xfs_dir2_sf_get_inumber(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from);
-#define	XFS_DIR2_SF_GET_INUMBER(sfp, from)	\
-	xfs_dir2_sf_get_inumber(sfp, from)
+xfs_intino_t xfs_dir2_sf_get_inumber_arch(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from, 
+                                            xfs_arch_t arch);
+#define	XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch)	\
+	xfs_dir2_sf_get_inumber_arch(sfp, from, arch)
 #else
-#define	XFS_DIR2_SF_GET_INUMBER(sfp, from)	\
+#define	XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch)	\
 	((sfp)->hdr.i8count == 0 ? \
-		(xfs_intino_t)XFS_DIR2_SF_GET_INO4(*(from)) : \
-		(xfs_intino_t)XFS_DIR2_SF_GET_INO8(*(from)))
+		(xfs_intino_t)XFS_DIR2_SF_GET_INO4_ARCH(*(from), arch) : \
+		(xfs_intino_t)XFS_DIR2_SF_GET_INO8_ARCH(*(from), arch))
 #endif
+#define	XFS_DIR2_SF_GET_INUMBER(sfp, from)	\
+        XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, XFS_ARCH_NATIVE)
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_PUT_INUMBER)
-void xfs_dir2_sf_put_inumber(xfs_dir2_sf_t *sfp, xfs_ino_t *from,
-			     xfs_dir2_inou_t *to);
-#define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	\
-	xfs_dir2_sf_put_inumber(sfp,from,to)
+void xfs_dir2_sf_put_inumber_arch(xfs_dir2_sf_t *sfp, xfs_ino_t *from,
+			             xfs_dir2_inou_t *to, xfs_arch_t arch);
+#define	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,arch)	\
+	xfs_dir2_sf_put_inumber_arch(sfp,from,to,arch)
 #else
-#ifdef __LITTLE_ENDIAN
-#define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	\
-	((sfp)->hdr.i8count == 0 ? \
-		(void)((to)->i4 = *(xfs_dir2_ino4_t *)((char *)(from))) : \
-		(void)((to)->i8 = *(xfs_dir2_ino8_t *)(from)))
-#else
-#define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	\
-	((sfp)->hdr.i8count == 0 ? \
-		(void)((to)->i4 = *(xfs_dir2_ino4_t *)(((char *)(from))+4)) : \
-		(void)((to)->i8 = *(xfs_dir2_ino8_t *)(from)))
+#define	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,arch)	\
+	if ((sfp)->hdr.i8count == 0) { \
+            DIRINO4_COPY(from,to,arch); \
+        } else { \
+            DIRINO_COPY(from,to,arch); \
+        }
 #endif
-#endif
+#define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	        \
+        XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,XFS_ARCH_NATIVE)	 
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_GET_OFFSET)
-xfs_dir2_data_aoff_t xfs_dir2_sf_get_offset(xfs_dir2_sf_entry_t *sfep);
-#define	XFS_DIR2_SF_GET_OFFSET(sfep)	xfs_dir2_sf_get_offset(sfep)
+xfs_dir2_data_aoff_t xfs_dir2_sf_get_offset_arch(xfs_dir2_sf_entry_t *sfep, 
+                                                    xfs_arch_t arch);
+#define	XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,arch)	xfs_dir2_sf_get_offset_arch(sfep,arch)
 #else
-#ifdef __LITTLE_ENDIAN
-#define	XFS_DIR2_SF_GET_OFFSET(sfep)	\
-	(((sfep)->offset.i[1] << 8) | ((sfep)->offset.i[0]))
-#else
-#define	XFS_DIR2_SF_GET_OFFSET(sfep)	\
-	(((sfep)->offset.i[0] << 8) | ((sfep)->offset.i[1]))
+#define	XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,arch)	\
+        INT_GET_UNALIGNED_16(&(sfep)->offset.i,arch)
 #endif
-#endif
+#define	XFS_DIR2_SF_GET_OFFSET(sfep)	\
+        XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,XFS_ARCH_NATIVE)
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_PUT_OFFSET)
-void xfs_dir2_sf_put_offset(xfs_dir2_sf_entry_t *sfep,
-			    xfs_dir2_data_aoff_t off);
-#define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	xfs_dir2_sf_put_offset(sfep,off)
+void xfs_dir2_sf_put_offset_arch(xfs_dir2_sf_entry_t *sfep,
+			            xfs_dir2_data_aoff_t off, xfs_arch_t arch);
+#define	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,arch)	xfs_dir2_sf_put_offset_arch(sfep,off,arch)
 #else
-#ifdef __LITTLE_ENDIAN
-#define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	\
-	((sfep)->offset.i[0] = ((off) >> 0) & 0xff, \
-	 (sfep)->offset.i[1] = ((off) >> 8) & 0xff)
-#else
-#define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	\
-	((sfep)->offset.i[0] = ((off) >> 8) & 0xff, \
-	 (sfep)->offset.i[1] = ((off) >> 0) & 0xff)
+#define	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,arch)	\
+        INT_SET_UNALIGNED_16(&(sfep)->offset.i,off,arch)
 #endif
-#endif
+#define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	\
+        XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,XFS_ARCH_NATIVE)
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_ENTSIZE_BYNAME)
 int xfs_dir2_sf_entsize_byname(xfs_dir2_sf_t *sfp, int len);

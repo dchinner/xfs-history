@@ -1269,17 +1269,17 @@ xfs_dir2_sf_entsize_byname(xfs_dir2_sf_t *sfp, int len)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_GET_INUMBER)
 xfs_intino_t
-xfs_dir2_sf_get_inumber(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from)
+xfs_dir2_sf_get_inumber_arch(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from, xfs_arch_t arch)
 {
-	return XFS_DIR2_SF_GET_INUMBER(sfp, from);
+	return XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch);
 }
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_GET_OFFSET)
 xfs_dir2_data_aoff_t
-xfs_dir2_sf_get_offset(xfs_dir2_sf_entry_t *sfep)
+xfs_dir2_sf_get_offset_arch(xfs_dir2_sf_entry_t *sfep, xfs_arch_t arch)
 {
-	return XFS_DIR2_SF_GET_OFFSET(sfep);
+	return XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch);
 }
 #endif
 
@@ -1309,17 +1309,17 @@ xfs_dir2_sf_nextentry(xfs_dir2_sf_t *sfp, xfs_dir2_sf_entry_t *sfep)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_PUT_INUMBER)
 void
-xfs_dir2_sf_put_inumber(xfs_dir2_sf_t *sfp, xfs_ino_t *from, xfs_dir2_inou_t *to)
+xfs_dir2_sf_put_inumber_arch(xfs_dir2_sf_t *sfp, xfs_ino_t *from, xfs_dir2_inou_t *to, xfs_arch_t arch)
 {
-	XFS_DIR2_SF_PUT_INUMBER(sfp, from, to);
+	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, from, to, arch);
 }
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_PUT_OFFSET)
 void
-xfs_dir2_sf_put_offset(xfs_dir2_sf_entry_t *sfep, xfs_dir2_data_aoff_t off)
+xfs_dir2_sf_put_offset_arch(xfs_dir2_sf_entry_t *sfep, xfs_dir2_data_aoff_t off, xfs_arch_t arch)
 {
-	XFS_DIR2_SF_PUT_OFFSET(sfep, off);
+	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep, off, arch);
 }
 #endif
 

@@ -119,11 +119,14 @@ xfs_dir2_block_sfsize(
 	int			namelen;	/* total name bytes */
 	xfs_ino_t		parent;		/* parent inode number */
 	int			size;		/* total computed size */
+        xfs_arch_t              arch;
 
 	mp = dp->i_mount;
+        arch = mp->m_arch;
 	count = i8count = namelen = 0;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
 	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
+        
 	/*
 	 * Iterate over the block's data entries by using the leaf pointers.
 	 */
@@ -171,7 +174,7 @@ xfs_dir2_block_sfsize(
 	 */
 	sfhp->count = count;
 	sfhp->i8count = i8count;
-	XFS_DIR2_SF_PUT_INUMBER((xfs_dir2_sf_t *)sfhp, &parent, &sfhp->parent);
+	XFS_DIR2_SF_PUT_INUMBER_ARCH((xfs_dir2_sf_t *)sfhp, &parent, &sfhp->parent, arch);
 	return size;
 }
 
@@ -198,10 +201,12 @@ xfs_dir2_block_to_sf(
 	char			*ptr;		/* current data pointer */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
+        xfs_arch_t              arch;
 
 	xfs_dir2_trace_args_sb("block_to_sf", args, size, bp);
 	dp = args->dp;
 	mp = dp->i_mount;
+        arch = mp->m_arch;
 	/*
 	 * Make a copy of the block data, so we can shrink the inode
 	 * and add local data.
@@ -264,18 +269,18 @@ xfs_dir2_block_to_sf(
 		else if (dep->namelen == 2 &&
 			 dep->name[0] == '.' && dep->name[1] == '.')
 			ASSERT(dep->inumber ==
-			       XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent));
+			       XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch));
 		/*
 		 * Normal entry, copy it into shortform.
 		 */
 		else {
 			sfep->namelen = dep->namelen;
-			XFS_DIR2_SF_PUT_OFFSET(sfep,
+			XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,
 				(xfs_dir2_data_aoff_t)
-				((char *)dep - (char *)block));
+				((char *)dep - (char *)block), arch);
 			bcopy(dep->name, sfep->name, dep->namelen);
-			XFS_DIR2_SF_PUT_INUMBER(sfp, &dep->inumber,
-				XFS_DIR2_SF_INUMBERP(sfep));
+			XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &dep->inumber,
+				XFS_DIR2_SF_INUMBERP(sfep), arch);
 			sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep);
 		}
 		ptr += XFS_DIR2_DATA_ENTSIZE(dep->namelen);
@@ -420,8 +425,10 @@ xfs_dir2_sf_addname_easy(
 	int			byteoff;	/* byte offset in sf dir */
 	xfs_inode_t		*dp;		/* incore directory inode */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
+        xfs_arch_t              arch;
 
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	byteoff = (int)((char *)sfep - (char *)sfp);
 	/*
@@ -438,10 +445,10 @@ xfs_dir2_sf_addname_easy(
 	 * Fill in the new entry.
 	 */
 	sfep->namelen = args->namelen;
-	XFS_DIR2_SF_PUT_OFFSET(sfep, offset);
+	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep, offset, arch);
 	bcopy(args->name, sfep->name, sfep->namelen);
-	XFS_DIR2_SF_PUT_INUMBER(sfp, &args->inumber,
-		XFS_DIR2_SF_INUMBERP(sfep));
+	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &args->inumber,
+		XFS_DIR2_SF_INUMBERP(sfep), arch);
 	/*
 	 * Update the header and inode.
 	 */
@@ -481,11 +488,13 @@ xfs_dir2_sf_addname_hard(
 	xfs_dir2_sf_t		*oldsfp;	/* original shortform dir */
 	xfs_dir2_sf_entry_t	*sfep;		/* entry in new dir */
 	xfs_dir2_sf_t		*sfp;		/* new shortform dir */
+        xfs_arch_t              arch;
 
 	/*
 	 * Copy the old directory to the stack buffer.
 	 */
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	old_isize = (int)dp->i_d.di_size;
 	oldsfp = (xfs_dir2_sf_t *)buf;
@@ -503,7 +512,7 @@ xfs_dir2_sf_addname_hard(
 	     offset = new_offset + XFS_DIR2_DATA_ENTSIZE(oldsfep->namelen),
 	      oldsfep = XFS_DIR2_SF_NEXTENTRY(oldsfp, oldsfep),
 	      eof = (char *)oldsfep == &buf[old_isize]) {
-		new_offset = XFS_DIR2_SF_GET_OFFSET(oldsfep);
+		new_offset = XFS_DIR2_SF_GET_OFFSET_ARCH(oldsfep, arch);
 		if (offset + add_datasize <= new_offset)
 			break;
 	}
@@ -528,10 +537,10 @@ xfs_dir2_sf_addname_hard(
 	 * Fill in the new entry, and update the header counts.
 	 */
 	sfep->namelen = args->namelen;
-	XFS_DIR2_SF_PUT_OFFSET(sfep, offset);
+	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep, offset, arch);
 	bcopy(args->name, sfep->name, sfep->namelen);
-	XFS_DIR2_SF_PUT_INUMBER(sfp, &args->inumber,
-		XFS_DIR2_SF_INUMBERP(sfep));
+	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &args->inumber,
+		XFS_DIR2_SF_INUMBERP(sfep), arch);
 	sfp->hdr.count++;
 #if XFS_BIG_FILESYSTEMS
 	if (args->inumber > XFS_DIR2_MAX_SHORT_INUM && !objchange)
@@ -571,9 +580,11 @@ xfs_dir2_sf_addname_pick(
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
 	int			size;		/* entry's data size */
 	int			used;		/* data bytes used */
+        xfs_arch_t              arch;
 
 	dp = args->dp;
 	mp = dp->i_mount;
+        arch = mp->m_arch;
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	size = XFS_DIR2_DATA_ENTSIZE(args->namelen);
 	offset = XFS_DIR2_DATA_FIRST_OFFSET;
@@ -586,8 +597,8 @@ xfs_dir2_sf_addname_pick(
 	 */
 	for (i = 0; i < sfp->hdr.count; i++) {
 		if (!holefit)
-			holefit = offset + size <= XFS_DIR2_SF_GET_OFFSET(sfep);
-		offset = XFS_DIR2_SF_GET_OFFSET(sfep) +
+			holefit = offset + size <= XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch);
+		offset = XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch) +
 			 XFS_DIR2_DATA_ENTSIZE(sfep->namelen);
 		sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep);
 	}
@@ -644,20 +655,23 @@ xfs_dir2_sf_check(
 	int			offset;		/* data offset */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform dir entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
+        xfs_arch_t              arch;
 
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	offset = XFS_DIR2_DATA_FIRST_OFFSET;
-	ino = XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent);
+	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch);
 	i8count = ino > XFS_DIR2_MAX_SHORT_INUM;
+        
 	for (i = 0, sfep = XFS_DIR2_SF_FIRSTENTRY(sfp);
 	     i < sfp->hdr.count;
 	     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
-		ASSERT(XFS_DIR2_SF_GET_OFFSET(sfep) >= offset);
-		ino = XFS_DIR2_SF_GET_INUMBER(sfp, XFS_DIR2_SF_INUMBERP(sfep));
+		ASSERT(XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch) >= offset);
+		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, XFS_DIR2_SF_INUMBERP(sfep), arch);
 		i8count += ino > XFS_DIR2_MAX_SHORT_INUM;
 		offset =
-			XFS_DIR2_SF_GET_OFFSET(sfep) +
+			XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch) +
 			XFS_DIR2_DATA_ENTSIZE(sfep->namelen);
 	}
 	ASSERT(i8count == sfp->hdr.i8count);
@@ -684,9 +698,11 @@ xfs_dir2_sf_create(
 	int		i8count;	/* parent inode is an 8-byte number */
 	xfs_dir2_sf_t	*sfp;		/* shortform structure */
 	int		size;		/* directory size */
+        xfs_arch_t      arch;
 
 	xfs_dir2_trace_args_i("sf_create", args, pino);
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	ASSERT(dp != NULL);
 	ASSERT(dp->i_d.di_size == 0);
 	/*
@@ -715,7 +731,7 @@ xfs_dir2_sf_create(
 	/*
 	 * Now can put in the inode number, since i8count is set.
 	 */
-	XFS_DIR2_SF_PUT_INUMBER(sfp, &pino, &sfp->hdr.parent);
+	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &pino, &sfp->hdr.parent, arch);
 	sfp->hdr.count = 0;
 	dp->i_d.di_size = size;
 	xfs_dir2_sf_check(args);
@@ -740,8 +756,10 @@ xfs_dir2_sf_getdents(
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform directory entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
 	off_t			dir_offset;
+        xfs_arch_t              arch;
 
 	mp = dp->i_mount;
+        arch = mp->m_arch;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	/*
 	 * Give up if the directory is way too short.
@@ -805,10 +823,10 @@ xfs_dir2_sf_getdents(
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
 				XFS_DIR2_DATA_FIRST_OFFSET);
 #if XFS_BIG_FILESYSTEMS
-		p.ino = XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent) +
+		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch) +
 			mp->m_inoadd;
 #else
-		p.ino = XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent);
+		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch);
 #endif
 		p.name = "..";
 		p.namelen = 2;
@@ -828,20 +846,20 @@ xfs_dir2_sf_getdents(
 	     i < sfp->hdr.count;
 	     i++, sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep)) {
 		off = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-			XFS_DIR2_SF_GET_OFFSET(sfep));
+			XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch));
 		if (dir_offset > off)
 			continue;
 		p.namelen = sfep->namelen;
 		p.cook = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, mp->m_dirdatablk,
-			XFS_DIR2_SF_GET_OFFSET(sfep) +
+			XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch) +
 			XFS_DIR2_DATA_ENTSIZE(p.namelen));
 #if XFS_BIG_FILESYSTEMS
-		p.ino = XFS_DIR2_SF_GET_INUMBER(sfp,
-				XFS_DIR2_SF_INUMBERP(sfep)) +
+		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
+				XFS_DIR2_SF_INUMBERP(sfep), arch) +
 			mp->m_inoadd;
 #else
-		p.ino = XFS_DIR2_SF_GET_INUMBER(sfp,
-				XFS_DIR2_SF_INUMBERP(sfep));
+		p.ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
+				XFS_DIR2_SF_INUMBERP(sfep), arch);
 #endif
 		p.name = (char *)sfep->name;
 		error = p.put(&p);
@@ -873,10 +891,12 @@ xfs_dir2_sf_lookup(
 	int			i;		/* entry index */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform directory entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
+        xfs_arch_t              arch;
 
 	xfs_dir2_trace_args("sf_lookup", args);
 	xfs_dir2_sf_check(args);
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	/*
 	 * Bail out if the directory is way too short.
@@ -902,7 +922,7 @@ xfs_dir2_sf_lookup(
 	 */
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
-		args->inumber = XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent);
+		args->inumber = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch);
 		return XFS_ERROR(EEXIST);
 	}
 	/*
@@ -915,8 +935,8 @@ xfs_dir2_sf_lookup(
 		    sfep->name[0] == args->name[0] &&
 		    bcmp(args->name, sfep->name, args->namelen) == 0) {
 			args->inumber =
-				XFS_DIR2_SF_GET_INUMBER(sfp,
-					XFS_DIR2_SF_INUMBERP(sfep));
+				XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
+					XFS_DIR2_SF_INUMBERP(sfep), arch);
 			return XFS_ERROR(EEXIST);
 		}
 	}
@@ -943,9 +963,11 @@ xfs_dir2_sf_removename(
 	int			oldsize;	/* old inode size */
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform directory entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
+        xfs_arch_t              arch;
 
 	xfs_dir2_trace_args("sf_removename", args);
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	oldsize = (int)dp->i_d.di_size;
 	/*
@@ -970,8 +992,8 @@ xfs_dir2_sf_removename(
 		if (sfep->namelen == args->namelen &&
 		    sfep->name[0] == args->name[0] &&
 		    bcmp(sfep->name, args->name, args->namelen) == 0) {
-			ASSERT(XFS_DIR2_SF_GET_INUMBER(sfp,
-					XFS_DIR2_SF_INUMBERP(sfep)) ==
+			ASSERT(XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
+					XFS_DIR2_SF_INUMBERP(sfep), arch) ==
 				args->inumber);
 			break;
 		}
@@ -1036,9 +1058,11 @@ xfs_dir2_sf_replace(
 #endif
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform directory entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
+        xfs_arch_t              arch;
 
 	xfs_dir2_trace_args("sf_replace", args);
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	/*
 	 * Bail out if the shortform directory is way too small.
@@ -1090,10 +1114,10 @@ xfs_dir2_sf_replace(
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
 #if XFS_BIG_FILESYSTEMS || defined(DEBUG)
-		ino = XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent);
+		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch);
 		ASSERT(args->inumber != ino);
 #endif
-		XFS_DIR2_SF_PUT_INUMBER(sfp, &args->inumber, &sfp->hdr.parent);
+		XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &args->inumber, &sfp->hdr.parent, arch);
 	}
 	/*
 	 * Normal entry, look for the name.
@@ -1106,12 +1130,12 @@ xfs_dir2_sf_replace(
 			    sfep->name[0] == args->name[0] &&
 			    bcmp(args->name, sfep->name, args->namelen) == 0) {
 #if XFS_BIG_FILESYSTEMS || defined(DEBUG)
-				ino = XFS_DIR2_SF_GET_INUMBER(sfp,
-					XFS_DIR2_SF_INUMBERP(sfep));
+				ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
+					XFS_DIR2_SF_INUMBERP(sfep), arch);
 				ASSERT(args->inumber != ino);
 #endif
-				XFS_DIR2_SF_PUT_INUMBER(sfp, &args->inumber,
-					XFS_DIR2_SF_INUMBERP(sfep));
+				XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &args->inumber,
+					XFS_DIR2_SF_INUMBERP(sfep), arch);
 				break;
 			}
 		}
@@ -1166,9 +1190,11 @@ xfs_dir2_sf_toino4(
 	int			oldsize;	/* old inode size */
 	xfs_dir2_sf_entry_t	*sfep;		/* new sf entry */
 	xfs_dir2_sf_t		*sfp;		/* new sf directory */
+        xfs_arch_t              arch;
 
 	xfs_dir2_trace_args("sf_toino4", args);
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	/*
 	 * Copy the old directory to the buffer.
 	 * Then nuke it from the inode, and add the new buffer to the inode.
@@ -1198,8 +1224,8 @@ xfs_dir2_sf_toino4(
 	 */
 	sfp->hdr.count = oldsfp->hdr.count;
 	sfp->hdr.i8count = 0;
-	ino = XFS_DIR2_SF_GET_INUMBER(oldsfp, &oldsfp->hdr.parent);
-	XFS_DIR2_SF_PUT_INUMBER(sfp, &ino, &sfp->hdr.parent);
+	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(oldsfp, &oldsfp->hdr.parent, arch);
+	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &ino, &sfp->hdr.parent, arch);
 	/*
 	 * Copy the entries field by field.
 	 */
@@ -1211,9 +1237,9 @@ xfs_dir2_sf_toino4(
 		sfep->namelen = oldsfep->namelen;
 		sfep->offset = oldsfep->offset;
 		bcopy(oldsfep->name, sfep->name, sfep->namelen);
-		ino = XFS_DIR2_SF_GET_INUMBER(oldsfp,
-			XFS_DIR2_SF_INUMBERP(oldsfep));
-		XFS_DIR2_SF_PUT_INUMBER(sfp, &ino, XFS_DIR2_SF_INUMBERP(sfep));
+		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(oldsfp,
+			XFS_DIR2_SF_INUMBERP(oldsfep), arch);
+		XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &ino, XFS_DIR2_SF_INUMBERP(sfep), arch);
 	}
 	/*
 	 * Clean up the inode.
@@ -1243,9 +1269,11 @@ xfs_dir2_sf_toino8(
 	int			oldsize;	/* old inode size */
 	xfs_dir2_sf_entry_t	*sfep;		/* new sf entry */
 	xfs_dir2_sf_t		*sfp;		/* new sf directory */
+        xfs_arch_t              arch;
 
 	xfs_dir2_trace_args("sf_toino8", args);
 	dp = args->dp;
+        arch = dp->i_mount->m_arch;
 	/*
 	 * Copy the old directory to the buffer.
 	 * Then nuke it from the inode, and add the new buffer to the inode.
@@ -1275,8 +1303,8 @@ xfs_dir2_sf_toino8(
 	 */
 	sfp->hdr.count = oldsfp->hdr.count;
 	sfp->hdr.i8count = 1;
-	ino = XFS_DIR2_SF_GET_INUMBER(oldsfp, &oldsfp->hdr.parent);
-	XFS_DIR2_SF_PUT_INUMBER(sfp, &ino, &sfp->hdr.parent);
+	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(oldsfp, &oldsfp->hdr.parent, arch);
+	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &ino, &sfp->hdr.parent, arch);
 	/*
 	 * Copy the entries field by field.
 	 */
@@ -1288,9 +1316,9 @@ xfs_dir2_sf_toino8(
 		sfep->namelen = oldsfep->namelen;
 		sfep->offset = oldsfep->offset;
 		bcopy(oldsfep->name, sfep->name, sfep->namelen);
-		ino = XFS_DIR2_SF_GET_INUMBER(oldsfp,
-			XFS_DIR2_SF_INUMBERP(oldsfep));
-		XFS_DIR2_SF_PUT_INUMBER(sfp, &ino, XFS_DIR2_SF_INUMBERP(sfep));
+		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(oldsfp,
+			XFS_DIR2_SF_INUMBERP(oldsfep), arch);
+		XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &ino, XFS_DIR2_SF_INUMBERP(sfep), arch);
 	}
 	/*
 	 * Clean up the inode.

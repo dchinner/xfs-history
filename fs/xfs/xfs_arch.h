@@ -106,10 +106,12 @@
     }
 
 /* 
- * get a 32/64 bit unsigned number from a potentially unaligned address 
+ * get a 16/32/64 bit unsigned number from a potentially unaligned address 
  * both little and big endian versions
  */
         
+#define INT_GET_UNALIGNED_16_LE(pointer) \
+   ((__u16)((((__u8*)(pointer))[0]      ) | (((__u8*)(pointer))[1] << 8 )))
 #define INT_GET_UNALIGNED_32_LE(pointer) \
    ((__u32)((((__u8*)(pointer))[0]      ) | (((__u8*)(pointer))[1] << 8 ) \
            |(((__u8*)(pointer))[2] << 16) | (((__u8*)(pointer))[3] << 24)))
@@ -117,6 +119,8 @@
    (((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))+4)) << 32 ) \
    |((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))  ))       ))
    
+#define INT_GET_UNALIGNED_16_BE(pointer) \
+   ((__u16)((((__u8*)(pointer))[0] << 8) | (((__u8*)(pointer))[1])))
 #define INT_GET_UNALIGNED_32_BE(pointer) \
    ((__u32)((((__u8*)(pointer))[0] << 24) | (((__u8*)(pointer))[1] << 16) \
            |(((__u8*)(pointer))[2] << 8)  | (((__u8*)(pointer))[3]      )))
@@ -129,11 +133,39 @@
  */
    
 #ifdef __LITTLE_ENDIAN 
-#define INT_GET_UNALIGNED_32(pointer) INT_GET_UNALIGNED_32_LE(pointer)
-#define INT_GET_UNALIGNED_64(pointer) INT_GET_UNALIGNED_64_LE(pointer)
+#define INT_GET_UNALIGNED_16_NATIVE(pointer) INT_GET_UNALIGNED_16_LE(pointer)
+#define INT_GET_UNALIGNED_32_NATIVE(pointer) INT_GET_UNALIGNED_32_LE(pointer)
+#define INT_GET_UNALIGNED_64_NATIVE(pointer) INT_GET_UNALIGNED_64_LE(pointer)
 #else
-#define INT_GET_UNALIGNED_32(pointer) INT_GET_UNALIGNED_32_BE(pointer)
-#define INT_GET_UNALIGNED_64(pointer) INT_GET_UNALIGNED_64_BE(pointer)
+#define INT_GET_UNALIGNED_16_NATIVE(pointer) INT_GET_UNALIGNED_16_BE(pointer)
+#define INT_GET_UNALIGNED_32_NATIVE(pointer) INT_GET_UNALIGNED_32_BE(pointer)
+#define INT_GET_UNALIGNED_64_NATIVE(pointer) INT_GET_UNALIGNED_64_BE(pointer)
+#endif
+
+/*
+ * put a 16 bit unsigned number to a potentially unaligned address
+ * both little and big versions
+ */
+ 
+#define INT_SET_UNALIGNED_16_BE(pointer,value) \
+    { \
+        ((__u8*)(pointer))[0] = (((value) >> 8) & 0xff); \
+        ((__u8*)(pointer))[1] = (((value)     ) & 0xff); \
+    }
+#define INT_SET_UNALIGNED_16_LE(pointer,value) \
+    { \
+        ((__u8*)(pointer))[0] = (((value)     ) & 0xff); \
+        ((__u8*)(pointer))[1] = (((value) >> 8) & 0xff); \
+    }
+ 
+/*
+ * now pick the right ones for our MACHINE ARCHITECTURE
+ */
+   
+#ifdef __LITTLE_ENDIAN 
+#define INT_SET_UNALIGNED_16_NATIVE(pointer,value) INT_SET_UNALIGNED_16_LE(pointer,value)
+#else
+#define INT_SET_UNALIGNED_16_NATIVE(pointer,value) INT_SET_UNALIGNED_16_BE(pointer,value)
 #endif
 
 /*
@@ -165,17 +197,27 @@
     ((reference) == 0)
 #define INT_ZERO(reference,arch) \
     ((reference) = 0)
-        
+   
+#define DIRINO4_GET(pointer,arch) \
+    INT_GET_UNALIGNED_32_NATIVE(pointer);
+    
 #ifdef XFS_BIG_FILESYSTEMS
 #define DIRINO_GET(pointer,arch) \
-    INT_GET_UNALIGNED_64(pointer);
+    INT_GET_UNALIGNED_64_NATIVE(pointer);
 #else
 #define DIRINO_GET(pointer,arch) \
-    INT_GET_UNALIGNED_32(pointer);
+    DIRINO4_GET(pointer,arch)
 #endif    
 
 #define DIRINO_COPY(from,to,arch) \
     bcopy(from,to,sizeof(xfs_dir_ino_t))
+#define DIRINO4_COPY(from,to,arch) \
+    bcopy(from,to,sizeof(xfs_dir2_ino4_t))
+    
+#define INT_GET_UNALIGNED_16(pointer,arch) \
+    INT_GET_UNALIGNED_16_NATIVE(pointer)
+#define INT_SET_UNALIGNED_16(pointer,value,arch) \
+    INT_SET_UNALIGNED_16_NATIVE(pointer,value)
 
 #else
 
@@ -225,16 +267,26 @@
 #define INT_ZERO(reference,arch) \
     ((reference) = 0)
         
+#define DIRINO4_GET(pointer,arch) \
+    INT_GET_UNALIGNED_32_BE(pointer);
+    
 #ifdef XFS_BIG_FILESYSTEMS
 #define DIRINO_GET(pointer,arch) \
     INT_GET_UNALIGNED_64_BE(pointer);
 #else
 #define DIRINO_GET(pointer,arch) \
-    INT_GET_UNALIGNED_32_BE(pointer);
+    DIRINO4_GET(pointer,arch)
 #endif    
 
 #define DIRINO_COPY(from,to,arch) \
     INT_SWAP_UNALIGNED_64(from,to)
+#define DIRINO4_COPY(from,to,arch) \
+    INT_SWAP_UNALIGNED_32(from,to)
+    
+#define INT_GET_UNALIGNED_16(pointer,arch) \
+    INT_GET_UNALIGNED_16_BE(pointer)
+#define INT_SET_UNALIGNED_16(pointer,value,arch) \
+    INT_SET_UNALIGNED_16_BE(pointer,value)
  
 #endif       
 
@@ -291,6 +343,14 @@
 #define INT_ZERO(reference,arch) \
     ((reference) = 0)
     
+#define DIRINO4_GET(pointer,arch) \
+    ( ((arch) == ARCH_MIPS) \
+        ? \
+            (INT_GET_UNALIGNED_32_BE(pointer)) \
+        : \
+            (INT_GET_UNALIGNED_32_LE(pointer)) \
+    )
+    
 #ifdef XFS_BIG_FILESYSTEMS
 #define DIRINO_GET(pointer,arch) \
     ( ((arch) == ARCH_MIPS) \
@@ -301,12 +361,7 @@
     )
 #else
 #define DIRINO_GET(pointer,arch) \
-    ( ((arch) == ARCH_MIPS) \
-        ? \
-            (INT_GET_UNALIGNED_32_BE(pointer)) \
-        : \
-            (INT_GET_UNALIGNED_32_LE(pointer)) \
-    )
+    DIRINO4_GET(pointer,arch)
 #endif    
 
 #define DIRINO_COPY(from,to,arch) \
@@ -314,6 +369,26 @@
         bcopy(from,to,sizeof(xfs_ino_t)); \
     } else { \
         INT_SWAP_UNALIGNED_64(from,to); \
+    }
+#define DIRINO4_COPY(from,to,arch) \
+    if ((arch) == XFS_ARCH_NATIVE) { \
+        bcopy(from,to,sizeof(xfs_dir2_ino4_t)); \
+    } else { \
+        INT_SWAP_UNALIGNED_32(from,to); \
+    }
+    
+#define INT_GET_UNALIGNED_16(pointer,arch) \
+    ( ((arch) == ARCH_MIPS) \
+        ? \
+            (INT_GET_UNALIGNED_16_BE(pointer)) \
+        : \
+            (INT_GET_UNALIGNED_16_LE(pointer)) \
+    )
+#define INT_SET_UNALIGNED_16(pointer,value,arch) \
+    if ((arch) == ARCH_MIPS) { \
+        INT_SET_UNALIGNED_16_BE(pointer,value); \
+    } else { \
+        INT_SET_UNALIGNED_16_LE(pointer,value); \
     }
 
 #endif
