@@ -1848,9 +1848,7 @@ xfs_alloc_fix_freelist(
 		/*
 		 * Put each allocated block on the list.
 		 */
-		for (bno = args->agbno + args->len - 1;
-		     bno >= args->agbno;
-		     bno--)
+		for (bno = args->agbno; bno < args->agbno + args->len; bno++)
 			xfs_alloc_put_freelist(tp, agbp, agflbp, bno);
 	}
 	xfs_alloc_arg_free(args);

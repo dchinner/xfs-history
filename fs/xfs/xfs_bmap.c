@@ -1462,7 +1462,8 @@ xfs_bmap_alloc(
 		}
 		if (ap->ip->i_d.di_extsize) {
 			args->prod = ap->ip->i_d.di_extsize;
-			args->mod = 0;
+			if (args->mod = ap->off % args->prod)
+				args->mod = args->prod - args->mod;
 		} else if (mp->m_sb.sb_blocksize >= NBPP) {
 			args->prod = 1;
 			args->mod = 0;
