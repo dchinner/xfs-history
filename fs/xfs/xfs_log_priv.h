@@ -18,14 +18,6 @@
 #define XLOGBB_TO_BB(x)		(((x) << LOG_BBSHIFT) >> BBSHIFT)
 
 #define NBLOCKS(size)		((size)+LOG_BBSIZE-1 >> LOG_BBSHIFT)
-#if XXX
-#define LOG_LOCK(x)		{while ((x) > 0) sleep(1); x++;}
-#define LOG_UNLOCK(x)		(x--)
-#else
-#define LOG_LOCK(x)		{}
-#define LOG_UNLOCK(x)		{}
-#endif
-#define ICLOG_LEFT(x)		((x)->ic_size - (x)->ic_offset)
 
 #define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_cycle; \
 				  ((uint *)&(lsn))[1] = (log)->l_currblock; }
@@ -42,27 +34,41 @@
 #define LOG_DIRTY	5	/* Need to clean this IC log */
 #define LOG_NOTUSED	6	/* This IC log not being used */
 
-#define LOG_CH_SYNC	7
-
-
 /*
  * Flags to log operation header
+ *
+ * The first write of a new transaction will be preceded with a start
+ * record, LOG_START_TRANS.  Once a transaction is committed, a commit
+ * record is written, LOG_COMMIT_TRANS.  If a single region can not fit into
+ * the remainder of the current active in-core log, it is split up into
+ * multiple regions.  Each partial region will be marked with a
+ * LOG_CONTINUE_TRANS until the last one, which gets marked with LOG_END_TRANS.
+ *
  */
-#define LOG_COMMIT		0x1	/* Commit this transaction id */
-#define LOG_CONTINUE		0x2	/* Continue this transaction id */
-#define LOG_END			0x4	/* End of this transaction id */
+#define LOG_START_TRANS		0x1	/* Start a new transaction */
+#define LOG_COMMIT_TRANS	0x2	/* Commit this transaction */
+#define LOG_CONTINUE_TRANS	0x4	/* Cont this trans into new region */
+#define LOG_END_TRANS		0x8	/* End a continued transaction */
 
+/*
+ * Flags to log ticket
+ */
+#define LOG_TIC_INITED		0x1	/* has been initialized */
+#define LOG_TIC_PERM_RESERV	0x2	/* permanent reservation */
+
+typedef void * log_tid_t;
 
 typedef struct log_ticket {
 	struct log_ticket *t_next;	/*			      4/8 b */
-	xfs_tid_t	  t_tid;	/* Transaction identifier	8 b */
+	log_tid_t	  t_tid;	/* Transaction identifier	8 b */
 	uint		  t_reservation;/* Reservation in bytes;	4 b */
 	char		  t_clientid;	/* Who does this belong to;	1 b */
-	char		  reserved;	/* 32bit align;			1 b */
-} log_ticket_t ;
+	char		  t_flags;	/* 				1 b */
+} log_ticket_t;
+
 
 typedef struct log_op_header {
-	xfs_tid_t  oh_tid;	/* transaction id of operation	:  4 b */
+	log_tid_t  oh_tid;	/* transaction id of operation	:  4 b */
 	int	   oh_len;	/* bytes in data region		:  4 b */
 	char	   oh_clientid;	/* who sent me this		:  1 b */
 	char	   oh_flags;	/* 				:  1 b */
@@ -71,8 +77,8 @@ typedef struct log_op_header {
 
 
 typedef struct log_rec_header {
-	uint	  h_cycle;	/* write cycle of log			:  4 */
 	uint	  h_magicno;	/* log record (LR) identifier		:  4 */
+	uint	  h_cycle;	/* write cycle of log			:  4 */
 	int	  h_version;	/* LR version				:  4 */
 	xfs_lsn_t h_lsn;	/* lsn of this LR			:  8 */
 	xfs_lsn_t h_sync_lsn;	/* lsn of last LR with buffers committed:  8 */
@@ -81,22 +87,7 @@ typedef struct log_rec_header {
 	int	  h_prev_offset;/* offset in bytes to previous LR	:  4 */
 	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
 	uint	  h_cycle_data[LOG_RECORD_BSIZE / BBSIZE];
-	uint	  h_blocks_col[1];/* blocks which collide with LR magic #:4/8 */
 } log_rec_header_t;
-
-
-
-typedef struct log_callback {
-	void (*cb_func)(void *);
-	void  *cb_arg;
-} log_callback_t;
-
-
-typedef struct log_callback_list {
-	struct log_callback_list *cb_next;
-	log_callback_t		 cb_chunk[LOG_CALLBACK_SIZE];
-} log_callback_list_t;
-
 
 
 typedef struct log_in_core {
@@ -107,6 +98,7 @@ typedef struct log_in_core {
 	char			ic_data[LOG_RECORD_BSIZE-LOG_HEADER_SIZE];
 	struct log_in_core	*ic_next;
 	buf_t	  		*ic_bp;
+	struct log		*ic_log;	/* back ptr to log */
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
@@ -137,10 +129,5 @@ typedef struct log {
 } log_t;
 
 
-log_ticket_t *log_maketicket(log_t *log, xfs_tid_t tid, int len, char clientid);
-void	     log_alloc_tickets(log_t *log);
-void	     log_putticket(log_t *log, log_ticket_t *ticket);
-void	     log_relticket(log_ticket_t *ticket);
-int	     log_recover(struct xfs_mount *mp, dev_t log_dev);
 
 #endif	/* _XFS_LOG_PRIV_H */

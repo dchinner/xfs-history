@@ -54,17 +54,26 @@ typedef struct xfs_log_iovec {
 
 typedef void* xfs_log_ticket_t;
 
+/*
+ * Structure used to pass callback function and the function's argument
+ * to the log manager.
+ */
+typedef struct xfs_log_callback {
+	struct xfs_log_callback	*cb_next;
+	void			(*cb_func)(void *);
+	void 			*cb_arg;
+} xfs_log_callback_t;
+
+
 /* Log manager interfaces */
 struct xfs_mount;
-void xfs_log_done(struct xfs_mount *mp, xfs_log_ticket_t ticket);
-int  xfs_log_force(struct xfs_mount *mp, xfs_log_ticket_t ticket, uint flags);
+void xfs_log_done(struct xfs_mount *mp, xfs_log_ticket_t ticket, uint flags);
+int  xfs_log_force(struct xfs_mount *mp, xfs_lsn_t lsn, uint flags);
 int  xfs_log_init();
 int  xfs_log_mount(struct xfs_mount *mp, dev_t log_dev, uint flags);
-int  xfs_log_new_transaction(struct xfs_mount *mp, xfs_log_ticket_t ticket,
-			     xfs_tid_t old_tid, xfs_tid_t new_tid);
 void xfs_log_notify(struct xfs_mount *mp, xfs_lsn_t lsn,
-		    void (*callback_func)(void*), void* callback_arg);
-int  xfs_log_reserve(struct xfs_mount *mp, xfs_tid_t tid, uint length,
+		    xfs_log_callback_t *callback_entry);
+int  xfs_log_reserve(struct xfs_mount *mp, uint length,
 		     xfs_log_ticket_t *ticket, char clientid, uint flags);
 int  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[], int nentries,
 		   xfs_log_ticket_t ticket);
