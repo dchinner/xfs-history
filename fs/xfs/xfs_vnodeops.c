@@ -1,4 +1,4 @@
-#ident "$Revision: 1.373 $"
+#ident "$Revision: 1.374 $"
 
 
 #ifdef SIM
@@ -2167,9 +2167,12 @@ xfs_inactive(
 	error = xfs_ifree(tp, ip);
 	if (error) {
 		/*
-		 * If we fail to free the inode, just do our best
-		 * to keep going.
+		 * If we fail to free the inode, shut down.  The cancel
+		 * might do that, we need to make sure.  Otherwise the
+		 * inode might be lost for a long time or forever.
 		 */
+		if (!XFS_FORCED_SHUTDOWN(tp->t_mountp))
+			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR);
 		xfs_trans_cancel(tp, commit_flags | XFS_TRANS_ABORT);
 	} else {
 		/*
