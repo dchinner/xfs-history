@@ -215,8 +215,8 @@ extern void		xfs_trans_bjoin(xfs_trans_t *, buf_t *);
 extern void		xfs_trans_bhold(xfs_trans_t *, buf_t *);
 extern struct xfs_inode	*xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 					xfs_ino_t , uint);
-extern void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *);
-extern void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *);
+extern void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);
+extern void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *,uint);
 extern void		xfs_trans_ihold(xfs_trans_t *, struct xfs_inode *);
 extern void		xfs_trans_log_buf(xfs_trans_t *, buf_t *, uint, uint);
 extern void		xfs_trans_log_inode(xfs_trans_t *, struct xfs_inode *,
