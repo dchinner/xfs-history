@@ -19,6 +19,11 @@ typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
 typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
 typedef __int32_t	xfs_extnum_t;	/* # of extents in a file */
 
+typedef	xfs_fsblock_t	xfs_rtblock_t;	/* block/extent in realtime area */
+typedef	xfs_fsblock_t	xfs_rtbit_t;	/* bit number in rt bitmap */
+typedef	__int32_t	xfs_suminfo_t;	/* type of bitmap summary info */
+typedef	__int32_t	xfs_rtword_t;	/* word type for bitmap manipulations */
+
 typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
 typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
 
