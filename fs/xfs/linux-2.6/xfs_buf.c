@@ -483,7 +483,7 @@ _pagebuf_lookup_pages(
 					}
 				}
 				page = cached_page;
-				if (add_to_page_cache_unique(page,
+				if (add_to_page_cache(page,
 					aspace, index))
 					goto retry;
 				cached_page = NULL;
@@ -1535,7 +1535,7 @@ int	pb_daemons[NR_CPUS];
 STATIC int
 pagebuf_iodone_daemon(void *__bind_cpu)
 {
-	int cpu = (int) (long) __bind_cpu;
+	int cpu = (long) __bind_cpu;
 	DECLARE_WAITQUEUE(wait, current);
 
 	/*  Set up the thread  */
