@@ -268,7 +268,7 @@ xfs_zero_last_block(
 						  &firstblock, 0, &imap,
 						  &nimaps, NULL);
 				if (error) {
-					clear_bit(PG_locked, &page->flags);
+					UnlockPage(page);
 					page_cache_release(page);
 					return error;
 				}
@@ -299,7 +299,7 @@ xfs_zero_last_block(
 				}
 #endif
 			}
-			clear_bit(PG_locked, &page->flags);
+			UnlockPage(page);
 			page_cache_release(page);
 		} 
 	}
