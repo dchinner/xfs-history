@@ -378,6 +378,14 @@ int linvfs_readpage(struct file *filp, struct page *page)
 	return(rval);
 }
 
+int linvfs_writepage(struct file *filp, struct page *page)
+{
+	int rval;
+	rval = -ENOSYS;
+	printk("linvfs_writepage: NOT IMPLEMENTED\n", rval);
+	return(rval);
+}
+
 int linvfs_bmap(struct inode *inode, int block)
 {
 	vnode_t		*vp;
@@ -409,7 +417,18 @@ int linvfs_bmap(struct inode *inode, int block)
 
 	blockno = (int)bmap.bn;
 	if (blockno < 0) return 0;
-	else return(blockno);
+
+	if(bmap.pboff) {
+		if (bmap.pboff % count) {
+			printk("this shouldn't happen %d %d %d!\n",
+				bmap.pboff % count, bmap.pboff, count);
+		}
+		printk("blockno %d moving to %d\n",
+				blockno, blockno+bmap.pboff/count);
+		blockno += bmap.pboff/count;
+	}
+
+	return(blockno);
 }
 
 
@@ -459,7 +478,7 @@ struct inode_operations linvfs_file_inode_operations =
   NULL,	 /*  readlink  */
   NULL,	 /*  follow_link  */
   linvfs_readpage,
-  NULL,	 /*  writepage  */
+  linvfs_writepage,
   linvfs_bmap,
   NULL,	 /*  truncate  */
   NULL,  /*  permission  */
