@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.179 $"
+#ident	"$Revision: 1.180 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1807,7 +1807,10 @@ xfs_bmap_alloc(
 	 */
 	else {
 		xfs_alloc_arg_t	args;
+		xfs_alloctype_t atype;
+		int tryagain, isaligned;
 
+		tryagain = isaligned = 0;
 		args.tp = ap->tp;
 		args.mp = mp;
 		args.fsbno = ap->rval;
@@ -1845,14 +1848,73 @@ xfs_bmap_alloc(
 			if (args.mod = ap->off % args.prod)
 				args.mod = args.prod - args.mod;
 		}
+
+		/*
+		 * If we are not low on available data blocks, and the 
+		 * underlying logical volume manager is a stripe, and
+		 * the file offset is zero then try to allocate data 
+		 * blocks on stripe unit boundary. 
+		 * NOTE: ap->aeof is only set if the allocation length
+		 * is >= the stripe unit and the allocation offset is
+		 * at the end of file. 
+		 */ 
+		if (!ap->low && ap->aeof) {
+			if (!ap->off) {
+				args.alignment = mp->m_dalign;
+				atype = args.type;
+				isaligned = 1;
+			} else {
+				/*
+			 	 * First try an exact bno allocation. If it fails
+			 	 * then do a near or start bno allocation with 
+			 	 * alignment turned on.
+			 	 */
+				atype = args.type;
+				tryagain = 1;
+				args.type = XFS_ALLOCTYPE_THIS_BNO;
+				args.alignment = 0;
+			}
+		} else 
+			args.alignment = 0;
+
 		args.minleft = ap->minleft;
 		args.wasdel = ap->wasdel;
-		args.alignment = args.isfl = 0;
+		args.isfl = 0;
 		args.userdata = ap->userdata;
 		error = xfs_alloc_vextent(&args);
 		if (error) {
 			return error;
 		}
+
+		if (tryagain && args.fsbno == NULLFSBLOCK) {
+			/*
+			 * Exact allocation failed. Now try with alignment
+			 * turned on.
+			 */
+                        args.type = atype;
+                        args.fsbno = ap->rval;
+                        args.alignment = mp->m_dalign;
+			isaligned = 1;
+                        error = xfs_alloc_vextent(&args);
+                        if (error) {
+                                return error;
+                        }
+                }
+
+		if (isaligned && args.fsbno == NULLFSBLOCK) {
+			/* 
+			 * allocation failed, so turn off alignment and
+			 * try again.
+			 */
+			args.type = atype;
+			args.fsbno = ap->rval;
+			args.alignment = 0;
+			error = xfs_alloc_vextent(&args);
+			if (error) {
+				return error;
+			}
+		}
+
 		if (args.fsbno == NULLFSBLOCK && nullfb &&
 		    args.minlen > ap->minlen) {
 			args.minlen = ap->minlen;
@@ -3555,6 +3617,7 @@ xfs_bmapi(
 	int		logflags;	/* flags for transaction logging */
 	xfs_extlen_t	minleft;	/* min blocks left after allocation */
 	xfs_extlen_t	minlen;		/* min allocation size */
+	xfs_mount_t	*mp;		/* xfs mount structure */
 	int		n;		/* current extent index */
 	int		nallocs;	/* number of extents alloc\'d */
 	xfs_extnum_t	nextents;	/* number of extents in file */
@@ -3631,6 +3694,7 @@ xfs_bmapi(
 	cur = NULL;
 	obno = bno;
 	bma.ip = NULL;
+	mp = ip->i_mount;
 
 	while (bno < end && n < *nmap) {
 
@@ -3726,6 +3790,26 @@ xfs_bmapi(
 				bma.minlen = minlen;
 				bma.low = flist->xbf_low;
 				bma.minleft = minleft;
+
+				/*
+				 * Only want to do the alignment at the
+				 * eof if it is userdata and allocation length 
+				 * is larger than a stripe unit.
+				 */
+				if (mp->m_dalign && alen >= mp->m_dalign &&
+				    userdata && (whichfork == XFS_DATA_FORK)) { 
+					error = xfs_bmap_isaeof(ip, aoff, 
+						    whichfork, &bma.aeof);
+					if (error) {
+						if (cur) {
+							xfs_btree_del_cursor(cur,
+								XFS_BTREE_ERROR);
+						}
+						return error;
+					}
+				} else
+					bma.aeof = 0;
+
 				/*
 				 * Call allocator.
 				 */
@@ -4392,3 +4476,110 @@ xfs_getbmap(
 	return error;
 }
 #endif	/* !SIM */
+
+/*
+ * Check the last inode extent to determine whether this allocation will result 
+ * in blocks being allocated at the end of the file. When we allocate new data 
+ * blocks at the end of the file which do not start at the previous data block,
+ * we will try to align the new blocks at stripe unit boundaries.
+ */
+int
+xfs_bmap_isaeof(
+	struct xfs_inode	*ip,
+	xfs_fileoff_t   	off,
+	int             	whichfork,
+	int			*aeof)
+{
+
+	int error;
+	xfs_ifork_t *ifp;
+	xfs_extnum_t nextents;
+	xfs_bmbt_rec_t *lastrec;
+	xfs_fileoff_t startoff;
+	xfs_fsblock_t blockcount;
+	xfs_fsblock_t startblock;
+
+	ASSERT(whichfork == XFS_DATA_FORK);
+
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	if (!(ifp->if_flags & XFS_IFEXTENTS)) {
+		error = xfs_iread_extents(NULL, ip, whichfork);
+		if (error) {
+			return error;
+		}
+	}
+
+	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
+
+	if (nextents == 0) {
+		*aeof = 1;
+		return 0;
+	}
+
+	/* Go to the last extent */
+	lastrec = &ifp->if_u1.if_extents[nextents - 1];
+	startoff = xfs_bmbt_get_startoff(lastrec);
+	blockcount = xfs_bmbt_get_blockcount(lastrec);
+	startblock = xfs_bmbt_get_startblock(lastrec);
+
+	/*
+	 * Check we are allocating in the last extent (for delayed allocations)
+	 * or past the last extent for non-delayed allocations.
+	 */ 
+	if ((off >= startoff) && (off < (startoff + blockcount)) && 
+	     ISNULLSTARTBLOCK(startblock))
+		*aeof = 1;
+	else if (off >= (startoff + blockcount))
+		*aeof = 1;
+	else
+		*aeof = 0;
+	return 0;
+}
+
+/*
+ * Check if the endoff is outside the last extent. If so the caller will grow 
+ * the allocation to a stripe unit boundary
+ */ 
+int
+xfs_bmap_eof(
+	struct xfs_inode	*ip,
+	xfs_fileoff_t   	endoff,
+	int             	whichfork,
+	int			*eof)
+{
+
+	int error;
+	xfs_ifork_t *ifp;
+	xfs_extnum_t nextents;
+	xfs_bmbt_rec_t *lastrec;
+	xfs_fileoff_t startoff;
+	xfs_fsblock_t blockcount;
+
+	ASSERT(whichfork == XFS_DATA_FORK);
+
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	if (!(ifp->if_flags & XFS_IFEXTENTS)) {
+		error = xfs_iread_extents(NULL, ip, whichfork);
+		if (error) {
+			return error;
+		}
+	}
+
+	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
+
+	if (nextents == 0) {
+		*eof = 1;
+		return 0;
+	}
+
+	/* Go to the last extent */
+	lastrec = &ifp->if_u1.if_extents[nextents - 1];
+	startoff = xfs_bmbt_get_startoff(lastrec);
+	blockcount = xfs_bmbt_get_blockcount(lastrec);
+
+	if (endoff >= (startoff + blockcount))
+		*eof = 1;
+	else
+		*eof = 0;
+	return 0;
+}
