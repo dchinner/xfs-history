@@ -44,7 +44,7 @@
 static __inline unsigned int flag_convert(int flags)
 {
 #if DEBUG
-	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP))) {
+	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS))) {
 		printk(KERN_WARNING
 		    "XFS: memory allocation with wrong flags (%x)\n", flags);
 		BUG();
