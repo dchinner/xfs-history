@@ -168,7 +168,7 @@ linvfs_read_super(
 	struct mounta	*uap = &ap;
 	char		spec[256];
 	struct xfs_args	arg, *args = &arg;
-	int		error, locked = 1;
+	int		error;
 	statvfs_t	statvfs;
 	vattr_t		attr;
 	u_int		disk, partition;
@@ -212,7 +212,6 @@ linvfs_read_super(
 	uap->dataptr = (char *)args;
 	uap->datalen = sizeof(*args);
 
-	// lock_super(sb);
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 
 	vfsops = &xfs_vfsops;
@@ -268,8 +267,6 @@ linvfs_read_super(
 
 	ino = (unsigned long) attr.va_nodeid;
 	sb->s_op = &linvfs_sops;
-	unlock_super(sb);
-	locked = 0;
 	sb->s_root = d_alloc_root(iget(sb, ino));
 	if (!sb->s_root)
 		goto fail_vnrele;
@@ -289,9 +286,6 @@ fail_unmount:
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
-	sb->s_dev = 0;
-	if (locked)
-		unlock_super(sb);
 	MOD_DEC_USE_COUNT;
 
 	return(NULL);
