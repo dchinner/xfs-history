@@ -969,7 +969,7 @@ pagebuf_lock(
 {
 	PB_TRACE(pb, "lock", 0);
 	if (atomic_read(&pb->pb_io_remaining))
-		blk_run_queues(pb->pb_target->pbr_mapping);
+		blk_run_address_space(pb->pb_target->pbr_mapping);
 	down(&pb->pb_sema);
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, "locked", 0);
@@ -1065,7 +1065,7 @@ _pagebuf_wait_unpin(
 		if (atomic_read(&pb->pb_pin_count) == 0)
 			break;
 		if (atomic_read(&pb->pb_io_remaining))
-			blk_run_queues(pb->pb_target->pbr_mapping);
+			blk_run_address_space(pb->pb_target->pbr_mapping);
 		schedule();
 	}
 	remove_wait_queue(&pb->pb_waiters, &wait);
@@ -1359,7 +1359,7 @@ submit_io:
 	if (pb->pb_flags & _PBF_RUN_QUEUES) {
 		pb->pb_flags &= ~_PBF_RUN_QUEUES;
 		if (atomic_read(&pb->pb_io_remaining) > 1)
-			blk_run_queues(pb->pb_target->pbr_mapping);
+			blk_run_address_space(pb->pb_target->pbr_mapping);
 	}
 }
 
@@ -1408,7 +1408,7 @@ pagebuf_iowait(
 {
 	PB_TRACE(pb, "iowait", 0);
 	if (atomic_read(&pb->pb_io_remaining))
-		blk_run_queues(pb->pb_target->pbr_mapping);
+		blk_run_address_space(pb->pb_target->pbr_mapping);
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, "iowaited", (long)pb->pb_error);
 	return pb->pb_error;
@@ -1609,8 +1609,8 @@ pagebuf_daemon(
 	INIT_LIST_HEAD(&tmp);
 	do {
 		/* swsusp */
-		if (current->flags & PF_IOTHREAD)
-			refrigerator(PF_IOTHREAD);
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_FREEZE);
 
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(xfs_flush_interval);
