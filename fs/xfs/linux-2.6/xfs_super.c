@@ -875,24 +875,24 @@ STATIC int linvfs_dentry_to_fh(
 		return 255 ;
 
 	VOP_FID2(vp, (struct fid *)&fid, error);
-	memcpy(&data[0], &fid.fid_ino, sizeof(__u64));
-	data[2] = fid.fid_gen;
+	data[0] = (__u32)fid.fid_ino;	/* 32 bits of inode is OK */
+	data[1] = fid.fid_gen;
 
-	*lenp = 3 ;
-	if (maxlen < 5 || ! need_parent)
-		return 3 ;
+	*lenp = 2 ;
+	if (maxlen < 4 || ! need_parent)
+		return 2 ;
 
 	inode = dentry->d_parent->d_inode ;
 	vp = LINVFS_GET_VP(inode);
 
 	VOP_FID2(vp, (struct fid *)&fid, error);
-	memcpy(&data[3], &fid.fid_ino, sizeof(__u64));
-	*lenp = 5 ;
-	if (maxlen < 6)
-		return 5 ;
-	data[5] = fid.fid_gen;
-	*lenp = 6 ;
-	return 6 ;
+	data[2] = (__u32)fid.fid_ino;	/* 32 bits of inode is OK */
+	*lenp = 3 ;
+	if (maxlen < 4)
+		return 3 ;
+	data[3] = fid.fid_gen;
+	*lenp = 4 ;
+	return 4 ;
 }
 
 STATIC struct dentry *linvfs_fh_to_dentry(
@@ -914,14 +914,14 @@ STATIC struct dentry *linvfs_fh_to_dentry(
 	xfid.fid_pad = 0;
 
 	if (!parent) {
-		xfid.fid_gen = data[2];
-		memcpy(&xfid.fid_ino, &data[0], sizeof(__u64));
+		xfid.fid_gen = data[1];
+		xfid.fid_ino = (__u64)data[0];
 	} else {
-		if (fhtype == 6)	
-			xfid.fid_gen = data[5];
+		if (fhtype == 4)	
+			xfid.fid_gen = data[3];
 		else
 			xfid.fid_gen = 0;
-		memcpy(&xfid.fid_ino, &data[3], sizeof(__u64));
+		xfid.fid_ino = (__u64)data[2];
 	}
 
 	VFS_VGET(vfsp, &vp, (fid_t *)&xfid, error);
