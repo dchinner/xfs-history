@@ -1,4 +1,4 @@
-#ident "$Revision: 1.40 $"
+#ident "$Revision: 1.41 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -8,6 +8,7 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
+#include <sys/ksa.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -118,6 +119,8 @@ xfs_trans_push_ail(
 		return (xfs_lsn_t)0;
 	}
 
+	XFSSTATS.xs_push_ail++;
+
 	/*
 	 * While the item we are looking at is below the given threshold
 	 * try to flush it out.  Make sure to limit the number of times
@@ -150,12 +153,14 @@ xfs_trans_push_ail(
 		switch (lock_result) {
 		      case XFS_ITEM_SUCCESS:
 			AIL_UNLOCK(mp, s);
+			XFSSTATS.xs_push_ail_success++;
 			IOP_PUSH(lip);
 			AIL_LOCK(mp,s);
 			break;
 
 		      case XFS_ITEM_PUSHBUF:
 			AIL_UNLOCK(mp, s);
+			XFSSTATS.xs_push_ail_pushbuf++;
 #ifdef XFSRACEDEBUG
 			delay_for_intr();
 			delay(300);
@@ -167,11 +172,16 @@ xfs_trans_push_ail(
 			break;
 
 		      case XFS_ITEM_PINNED:
+			XFSSTATS.xs_push_ail_pinned++;
 			flush_log = 1;
 			break;
 
 		      case XFS_ITEM_LOCKED:
+			XFSSTATS.xs_push_ail_locked++;
+			break;
+
 		      case XFS_ITEM_FLUSHING:
+			XFSSTATS.xs_push_ail_flushing++;
 			break;
 
 		      default:
@@ -200,6 +210,7 @@ xfs_trans_push_ail(
 		 * move forward in the AIL.
 		 */
 		AIL_UNLOCK(mp, s);
+		XFSSTATS.xs_push_ail_flush++;
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 		AIL_LOCK(mp, s);
 	}
@@ -421,6 +432,7 @@ xfs_trans_next_ail(
 			*gen = (int)mp->m_ail_gen;
 		}
 		if (restarts != NULL) {
+			XFSSTATS.xs_push_ail_restarts++;
 			(*restarts)++;
 		}
 	}
