@@ -1,4 +1,4 @@
-#ident "$Revision: 1.203 $"
+#ident "$Revision: 1.204 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -45,7 +45,6 @@
 #include <sys/proc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>
-#include <sys/region.h>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <sys/mode.h>
@@ -215,7 +214,7 @@ STATIC int	xfs_frlock(vnode_t	*vp,
 
 STATIC int	xfs_map(vnode_t	*vp,
 			off_t	offset,
-			preg_t	*pregp,
+			void	*pregp,
 			addr_t	*addrp,
 			size_t	len,
 			uint	prot,
@@ -225,7 +224,7 @@ STATIC int	xfs_map(vnode_t	*vp,
 
 STATIC int	xfs_addmap(vnode_t	*vp,
 			   off_t	offset,
-			   preg_t	*pregp,
+			   void		*pregp,
 			   addr_t	addr,
 			   size_t	len,
 			   uint		prot,
@@ -235,7 +234,7 @@ STATIC int	xfs_addmap(vnode_t	*vp,
 
 STATIC int	xfs_delmap(vnode_t	*vp,
 			   off_t	offset,
-			   preg_t	*pregp,
+			   void		*pregp,
 			   addr_t	addr,
 			   size_t	len,
 			   uint		prot,
@@ -4659,7 +4658,7 @@ STATIC int
 xfs_map(
 	vnode_t		*vp,
 	off_t		offset,
-	preg_t		*pregp,
+	void		*pregp,
 	addr_t		*addrp,
 	size_t		len,
 	uint		prot,
@@ -4690,7 +4689,7 @@ STATIC int
 xfs_addmap(
 	vnode_t		*vp,
 	off_t		offset,
-	preg_t		*pregp,
+	void		*pregp,
 	addr_t		addr,
 	size_t		len,
 	uint		prot,
@@ -4724,7 +4723,7 @@ STATIC int
 xfs_delmap(
 	vnode_t		*vp,
 	off_t		offset,
-	preg_t		*pregp,
+	void		*pregp,
 	addr_t		addr,
 	size_t		len,
 	uint		prot,
