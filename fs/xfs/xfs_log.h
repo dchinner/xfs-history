@@ -46,6 +46,14 @@
 #define XFS_LOG_URGE		0x4
 
 
+/*
+ * Flags to xfs_log_print()
+ *
+ *	XFS_LOG_PRINT_FORCE:
+ */
+#define XFS_LOG_PRINT_FORCE	0x1
+
+
 /* Log Clients */
 #define XFS_TRANSACTION_MANAGER	1
 #define XFS_VOLUME_MANAGER	2
@@ -84,7 +92,7 @@ int	  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[],
 			xfs_lsn_t *start_lsn);
 
 /* Log manager utility interfaces */
-void xfs_log_print(struct xfs_mount *mp, dev_t log_dev);
+void xfs_log_print(struct xfs_mount *mp, dev_t log_dev, uint flags);
 
 #define XFS_ERECOVER	4	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
