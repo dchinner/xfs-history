@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.140 $"
+#ident  "$Revision: 1.141 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1993,5 +1993,18 @@ vfsops_t xfs_vfsops = {
 	fs_nosys,	/* swapvp */
 };
 #else	/* SIM */
-vfsops_t xfs_vfsops;
+vfsops_t xfs_vfsops = {
+	VFS_POSITION_BASE,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+};
 #endif	/* !SIM */

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.16 $"
+#ident "$Revision: 1.17 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -686,7 +686,7 @@ xfs_qm_scall_getqstat(
 			VN_RELE(XFS_ITOV(uip));
 	}
 	if (pip) {
-		out.qs_pquota.qfs_nblks = XFS_FSB_TO_BB(mp, pip->i_d.di_nblocks);
+		out.qs_pquota.qfs_nblks = pip->i_d.di_nblocks;
 		out.qs_pquota.qfs_nextents = pip->i_d.di_nextents;
 		if (temppqip)
 			VN_RELE(XFS_ITOV(pip));
@@ -727,6 +727,9 @@ xfs_qm_scall_setqlim(
 	if (copyin(addr, &newlim, sizeof newlim))
 		return XFS_ERROR(EFAULT);
 
+	if ((newlim.d_fieldmask & (FS_DQ_LIMIT_MASK|FS_DQ_TIMER_MASK)) == 0)
+		return (0);
+
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SETQLIM); 
 	if (error = xfs_trans_reserve(tp, 0, sizeof(xfs_disk_dquot_t) + 128,
 				      0, 0, XFS_DEFAULT_LOG_COUNT)) {
@@ -759,15 +762,14 @@ xfs_qm_scall_setqlim(
 
 	/*
 	 * Make sure that hardlimits are >= soft limits before changing.
-	 * XXX Should we expand the interface to set individual limits ?
 	 */
-	hard = (newlim.d_blk_hardlimit != (xfs_qcnt_t) -1) ?
+	hard = (newlim.d_fieldmask & FS_DQ_BHARD) ?
 		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_hardlimit) :
 			ddq->d_blk_hardlimit;
-	soft = (newlim.d_blk_softlimit != (xfs_qcnt_t) -1) ?
+	soft = (newlim.d_fieldmask & FS_DQ_BSOFT) ?
 		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_softlimit) :
 			ddq->d_blk_softlimit;
-	if (!hard || hard >= soft) {
+	if (hard == 0 || hard >= soft) {
 		ddq->d_blk_hardlimit = hard;
 		ddq->d_blk_softlimit = soft;
 	}
@@ -775,13 +777,13 @@ xfs_qm_scall_setqlim(
 	else 
 		printf("blkhard 0x%x < blksoft 0x%x\n", hard, soft);
 #endif			
-	hard = (newlim.d_rtb_hardlimit != (xfs_qcnt_t) -1) ?
+	hard = (newlim.d_fieldmask & FS_DQ_RTBHARD) ?
 		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit) :
 			ddq->d_rtb_hardlimit;
-	soft = (newlim.d_rtb_softlimit != (xfs_qcnt_t) -1) ?
+	soft = (newlim.d_fieldmask & FS_DQ_RTBSOFT) ?
 		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_softlimit) :
 			ddq->d_rtb_softlimit;
-	if (!hard || hard >= soft) {
+	if (hard == 0 || hard >= soft) {
 		ddq->d_rtb_hardlimit = hard;
 		ddq->d_rtb_softlimit = soft;
 	}
@@ -790,11 +792,11 @@ xfs_qm_scall_setqlim(
 		printf("rtbhard 0x%x < rtbsoft 0x%x\n", hard, soft);
 #endif	
 	
-	hard = (newlim.d_ino_hardlimit != (xfs_qcnt_t) -1) ?
+	hard = (newlim.d_fieldmask & FS_DQ_IHARD) ?
 		(xfs_qcnt_t) newlim.d_ino_hardlimit : ddq->d_ino_hardlimit;
-	soft = (newlim.d_ino_softlimit != (xfs_qcnt_t) -1) ?
+	soft = (newlim.d_fieldmask & FS_DQ_ISOFT) ?
 		(xfs_qcnt_t) newlim.d_ino_softlimit : ddq->d_ino_softlimit;
-	if (!hard || hard >= soft) {
+	if (hard == 0 || hard >= soft) {
 		ddq->d_ino_hardlimit = hard;
 		ddq->d_ino_softlimit = soft;
 	}
@@ -808,22 +810,22 @@ xfs_qm_scall_setqlim(
 		 * the other users can be over quota for this file system.
 		 * If it is zero a default is used.
 		 */
-		if (newlim.d_btimer > 0) {
+		if (newlim.d_fieldmask & FS_DQ_BTIMER) {
 			mp->m_quotainfo->qi_btimelimit = newlim.d_btimer;
 			dqp->q_core.d_btimer = newlim.d_btimer;
 		}
-		if (newlim.d_itimer > 0) {
+		if (newlim.d_fieldmask & FS_DQ_ITIMER) {
 			mp->m_quotainfo->qi_itimelimit = newlim.d_itimer;
 			dqp->q_core.d_itimer = newlim.d_itimer;
 		}
-		if (newlim.d_rtbtimer > 0) {
+		if (newlim.d_fieldmask & FS_DQ_RTBTIMER) {
 			mp->m_quotainfo->qi_rtbtimelimit = newlim.d_rtbtimer;
 			dqp->q_core.d_rtbtimer = newlim.d_rtbtimer;
 		}
-
+#ifdef NOTYET
 		/*
 		 * Ditto, for warning limits.
-		 * (XXXare we actually doing these here?)
+		 * XXXthese aren't quite in use yet.
 		 */
 		if (newlim.d_bwarns > 0) {
 			mp->m_quotainfo->qi_bwarnlimit = newlim.d_bwarns;
@@ -836,12 +838,15 @@ xfs_qm_scall_setqlim(
 		if (newlim.d_rtbwarns > 0) {
 			dqp->q_core.d_rtbwarns = newlim.d_rtbwarns;
 		}
-
+#endif
 	} else /* if (XFS_IS_QUOTA_ENFORCED(mp)) */ {
 		/*
 		 * If the user is now over quota, start the timelimit.
 		 * The user will not be 'warned'. Warnings increase only
 		 * by request via Q_WARN.
+		 * Note that we keep the timers ticking, whether enforcement
+		 * is on or off. We don't really want to bother with iterating
+		 * over all ondisk dquots are turning the timers on/off.
 		 */
 		xfs_qm_adjust_dqtimers(mp, ddq);
 	}
