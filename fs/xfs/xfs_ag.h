@@ -71,19 +71,20 @@ typedef struct xfs_aghdr
 
 #define	XFS_MIN_FREELIST(a)	(2 * (((a)->ag_levels[XFS_BTNUM_BNO]) + ((a)->ag_levels[XFS_BTNUM_CNT]) + 1))
 
+#define	xfs_agb_mask(k)	((1 << (k)) - 1)
 #define	xfs_agb_to_fsb(s,agno,agbno) \
-	((xfs_fsblock_t)((agno) * (s)->sb_agblocks + (agbno)))
+	((xfs_fsblock_t)(((agno) << (s)->sb_agblklog) | (agbno)))
 #define	xfs_fsb_to_agno(s,fsbno) \
-	((xfs_agnumber_t)((fsbno) / (s)->sb_agblocks))
+	((xfs_agnumber_t)((fsbno) >> (s)->sb_agblklog))
 #define	xfs_fsb_to_agbno(s,fsbno) \
-	((xfs_agblock_t)((fsbno) % (s)->sb_agblocks))
+	((xfs_agblock_t)((fsbno) & xfs_agb_mask((s)->sb_agblklog)))
 
-#define	xfs_daddr_to_agno(s,d) \
-	xfs_fsb_to_agno(s,xfs_daddr_to_fsb(s,d))
-#define	xfs_daddr_to_agbno(s,d) \
-	xfs_fsb_to_agbno(s,xfs_daddr_to_fsb(s,d))
 #define	xfs_agb_to_daddr(s,agno,agbno) \
-	xfs_fsb_to_daddr(s,xfs_agb_to_fsb(s,agno,agbno))
+	((daddr_t)((agno) * (s)->sb_agblocks + (agbno)))
+#define	xfs_daddr_to_agno(s,d) \
+	((xfs_agnumber_t)((d) / (s)->sb_agblocks))
+#define	xfs_daddr_to_agbno(s,d) \
+	((xfs_agblock_t)((d) % (s)->sb_agblocks))
 
 #define	xfs_buf_to_agp(buf)	((xfs_aghdr_t *)(buf)->b_un.b_addr)
 
