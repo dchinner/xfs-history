@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.182 $"
+#ident	"$Revision: 1.183 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3270,8 +3270,9 @@ xfs_bmap_finish(
 		return error;
 	}
 	*committed = 1;
-	xfs_trans_reserve(ntp, 0, logres, 0,
-			  XFS_TRANS_PERM_LOG_RES, logcount);
+	if (error = xfs_trans_reserve(ntp, 0, logres, 0,
+				      XFS_TRANS_PERM_LOG_RES, logcount))
+		return (error);
 	efd = xfs_trans_get_efd(ntp, efi, flist->xbf_count);
 	for (free = flist->xbf_first; free != NULL; free = next) {
 		next = free->xbfi_next;
@@ -3704,6 +3705,10 @@ xfs_bmapi(
 		XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 		XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
 			return XFS_ERROR(EIO);
+	mp = ip->i_mount;
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return (EIO);
+
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	ASSERT(ifp->if_ext_max ==
 	       XFS_IFORK_SIZE(ip, whichfork) / sizeof(xfs_bmbt_rec_t));
@@ -3748,7 +3753,6 @@ xfs_bmapi(
 	cur = NULL;
 	obno = bno;
 	bma.ip = NULL;
-	mp = ip->i_mount;
 
 	while (bno < end && n < *nmap) {
 
@@ -4100,6 +4104,7 @@ xfs_bmapi(
 	}
 	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
 		orig_nmap, *nmap);
+
 	return 0;
 }
 
@@ -4129,6 +4134,9 @@ xfs_bmapi_single(
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
 	       XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS)
 	       return XFS_ERROR(EIO);
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
+		return (EIO);
+
 	XFSSTATS.xs_blk_mapr++;
 	if (!(ifp->if_flags & XFS_IFEXTENTS)) {
 		error = xfs_iread_extents(tp, ip, whichfork);
@@ -4195,6 +4203,10 @@ xfs_bunmapi(
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EIO);
+	
+	mp = ip->i_mount;
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return (EIO);
 	ASSERT(len > 0);
 	ASSERT(nexts > 0);
 	ASSERT(ifp->if_ext_max ==
@@ -4211,7 +4223,6 @@ xfs_bunmapi(
 		return error;
 	}
 	XFSSTATS.xs_blk_unmap++;
-	mp = ip->i_mount;
 	/*
 	 * Adjust the arguments silently if this is a realtime file,
 	 * so the bno and length are on the right boundary.
