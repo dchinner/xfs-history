@@ -176,6 +176,10 @@ vn_get(struct vnode *vp, vmap_t *vmap)
 	struct inode	*inode;
 
 	XFS_STATS_INC(xfsstats.vn_get);
+	inode = LINVFS_GET_IP(vp);
+	if (inode->i_state & I_FREEING)
+		return NULL;
+
 	inode = iget_locked(vmap->v_vfsp->vfs_super, vmap->v_ino);
 	if (inode == NULL)		/* Inode not present */
 		return NULL;
