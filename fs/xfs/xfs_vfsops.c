@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.94 $"
+#ident  "$Revision: 1.95 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -207,7 +207,6 @@ xfs_init(
 	vfssw_t	*vswp,
 	int	fstype)
 {
-	extern lock_t	xfs_bli_reflock;
 	extern mutex_t	xfs_refcache_lock;
 	extern int	xfs_refcache_size;
 	extern int	ncsize;
@@ -222,10 +221,10 @@ xfs_init(
 	extern zone_t	*xfs_efi_zone;
 
 #ifndef SIM
-	extern lock_t	xfs_strat_lock;
+	extern mutex_t	xfs_strat_lock;
 	extern mutex_t	xfsd_lock;
 	extern sv_t	xfsd_wait;
-	extern sema_t	xfs_ancestormon;
+	extern mutex_t	xfs_ancestormon;
 	extern zone_t	*xfs_bmap_zone;
 	extern zone_t	*xfs_irec_zone;
 	extern zone_t	*xfs_strat_write_zone;
@@ -240,11 +239,9 @@ xfs_init(
 
 	xfs_fstype = fstype;
 
-	initnlock(&xfs_bli_reflock, "xfsbli");
 #ifndef SIM
-	mutex_init(&xfs_refcache_lock, MUTEX_SPIN, "xfsref");
-	initnlock(&xfs_strat_lock, "xfsstrat");
-	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
+	mutex_init(&xfs_strat_lock, MUTEX_SPIN, "xfsstrat");
+	mutex_init(&xfs_ancestormon, MUTEX_DEFAULT, "xfs_ancestor");
 	mutex_init(&xfsd_lock, MUTEX_SPIN, "xfsd");
 	sv_init(&xfsd_wait, SV_DEFAULT, "xfsd");
 

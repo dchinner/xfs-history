@@ -1,4 +1,4 @@
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -49,8 +49,8 @@ extern struct vnodeops xfs_vnodeops;
  */
 #define XFS_IHASH(mp,ino)	((mp)->m_ihash + \
 				 (ino & (__uint64_t)((mp)->m_ihashmask)))
-#define	XFS_IHLOCK(ih)		appsema(&(ih)->ih_lock, PINOD)
-#define	XFS_IHUNLOCK(ih)	apvsema(&(ih)->ih_lock)
+#define	XFS_IHLOCK(ih)		mp_mutex_lock(&(ih)->ih_lock, PINOD)
+#define	XFS_IHUNLOCK(ih)	mp_mutex_unlock(&(ih)->ih_lock)
 
 
 /*
@@ -82,7 +82,7 @@ xfs_ihash_init(xfs_mount_t *mp)
 						 KM_SLEEP);
 	ASSERT(mp->m_ihash != NULL);
 	for (i = 0; i < hsize; i++) {
-		initnsema(&(mp->m_ihash[i].ih_lock), 1,
+		mutex_init(&(mp->m_ihash[i].ih_lock), MUTEX_DEFAULT,
 			  makesname(name, "xih", i));
 	}
 }
@@ -97,7 +97,7 @@ xfs_ihash_free(xfs_mount_t *mp)
 
 	hsize = mp->m_ihashmask + 1;
 	for (i = 0; i < hsize; i++)
-		freesema(&mp->m_ihash[i].ih_lock);
+		mutex_destroy(&mp->m_ihash[i].ih_lock);
 	kmem_free(mp->m_ihash, hsize * sizeof(xfs_ihash_t));
 }
 
@@ -224,7 +224,7 @@ again:
 	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
 	mrinit(&ip->i_iolock, makesname(name, "xio", (int)vp->v_number));
 #ifdef NOTYET
-	initnlock(&ip->i_range_lock.r_splock, "xrange");
+	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
 #endif /* NOTYET */
 	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
 	sv_init(&ip->i_pinsema, SV_DEFAULT,

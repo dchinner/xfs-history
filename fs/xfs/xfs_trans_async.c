@@ -1,4 +1,4 @@
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -48,15 +48,13 @@ void
 xfs_trans_add_async(xfs_trans_t *tp)
 {
 	int			s;
-	lock_t			async_lock;
 	struct xfs_mount	*mp;
 
 	mp = tp->t_mountp;
-	async_lock = mp->m_async_lock;
-	s = splockspl(async_lock, splhi);
+	s = mutex_spinlock(&mp->m_async_lock);
 	tp->t_forw = mp->m_async_trans;
 	mp->m_async_trans = tp;
-	spunlockspl(async_lock, s);
+	mutex_spinunlock(&mp->m_async_lock, s);
 }
 
 /*
@@ -68,7 +66,6 @@ xfs_trans_t *
 xfs_trans_get_async(struct xfs_mount *mp)
 {
 	int			s;
-	lock_t			async_lock;
 	xfs_trans_t		*async_list;
 
 	/*
@@ -83,15 +80,12 @@ xfs_trans_get_async(struct xfs_mount *mp)
 	 * Pull off the entire list and return it.
 	 * If it's NULL, we return NULL which is fine.
 	 */
-	async_lock = mp->m_async_lock;
-	s = splockspl(async_lock, splhi);
+	s = mutex_spinlock(&mp->m_async_lock);
 	async_list = mp->m_async_trans;
 	mp->m_async_trans = NULL;
-	spunlockspl(async_lock, s);
+	mutex_spinunlock(&mp->m_async_lock, s);
 
 	return (async_list);
 }
-
-
 
 

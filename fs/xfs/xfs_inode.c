@@ -1,4 +1,4 @@
-#ident "$Revision: 1.143 $"
+#ident "$Revision: 1.144 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1895,7 +1895,7 @@ xfs_idestroy(
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
 #ifdef NOTYET
-	freesplock(ip->i_range_lock.r_splock);
+	mutex_destroy(&ip->i_range_lock.r_spinlock);
 #endif /* NOTYET */
 	freesema(&ip->i_flock);
 	sv_destroy(&ip->i_pinsema);

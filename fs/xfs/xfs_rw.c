@@ -1,4 +1,4 @@
-#ident "$Revision: 1.129 $"
+#ident "$Revision: 1.130 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -73,7 +73,7 @@
  * This lock is used by xfs_strat_write().
  * The xfs_strat_lock is initialized in xfs_init().
  */
-lock_t	xfs_strat_lock;
+mutex_t	xfs_strat_lock;
 
 /*
  * Variables for coordination with the xfsd daemons.
@@ -3311,7 +3311,7 @@ xfs_strat_write_relse(
 	buf_t	*back;
 	
 
-	s = splockspl(xfs_strat_lock, splhi);
+	s = mutex_spinlock(&xfs_strat_lock);
 	ASSERT(rbp->b_flags & B_DONE);
 
 	forw = (buf_t*)rbp->b_fsprivate2;
@@ -3344,7 +3344,7 @@ xfs_strat_write_relse(
 			ASSERT(leader->b_error != EINVAL);
 		}
 		leader->b_flags &= ~B_LEADER;
-		spunlockspl(xfs_strat_lock, s);
+		mutex_spinunlock(&xfs_strat_lock, s);
 
 		iodone(leader);
 	} else {
@@ -3364,7 +3364,7 @@ xfs_strat_write_relse(
 			leader->b_error = XFS_ERROR(rbp->b_error);
 			ASSERT(leader->b_error != EINVAL);
 		}
-		spunlockspl(xfs_strat_lock, s);
+		mutex_spinunlock(&xfs_strat_lock, s);
 	}
 
 	rbp->b_fsprivate = NULL;
@@ -3818,7 +3818,7 @@ xfs_strat_write(
 			 * fields until it finds the buffer marked with
 			 * B_LEADER.
 			 */
-			s = splockspl(xfs_strat_lock, splhi);
+			s = mutex_spinlock(&xfs_strat_lock);
 			rbp->b_fsprivate = bp;
 			rbp->b_fsprivate2 = bp->b_fsprivate2;
 			if (bp->b_fsprivate2 != NULL) {
@@ -3826,7 +3826,7 @@ xfs_strat_write(
 								rbp;
 			}
 			bp->b_fsprivate2 = rbp;
-			spunlockspl(xfs_strat_lock, s);
+			mutex_spinunlock(&xfs_strat_lock, s);
 
 			rbp->b_relse = xfs_strat_write_relse;
 			rbp->b_flags |= B_ASYNC;
@@ -3867,7 +3867,7 @@ xfs_strat_write(
 		xfs_delalloc_cleanup(ip, map_start_fsb, count_fsb);
 	}
 	if (set_lead) {
-		s = splockspl(xfs_strat_lock, splhi);
+		s = mutex_spinlock(&xfs_strat_lock);
 		ASSERT((bp->b_flags & (B_DONE | B_PARTIAL)) == B_PARTIAL);
 		ASSERT(bp->b_flags & B_LEADER);
 		
@@ -3877,14 +3877,14 @@ xfs_strat_write(
 			 * Call iodone() to note that the I/O has completed.
 			 */
 			bp->b_flags &= ~(B_PARTIAL | B_LEADER);
-			spunlockspl(xfs_strat_lock, s);
+			mutex_spinunlock(&xfs_strat_lock, s);
 
 			iodone(bp);
 			return error;
 		}
 
 		bp->b_flags &= ~B_PARTIAL;
-		spunlockspl(xfs_strat_lock, s);
+		mutex_spinunlock(&xfs_strat_lock, s);
 	} else {
 		biodone(bp);
 	}

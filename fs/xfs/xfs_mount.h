@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.47 $"
+#ident	"$Revision: 1.48 $"
 
 struct buf;
 struct cred;
@@ -34,9 +34,9 @@ typedef struct xfs_mount {
 	uint			m_ail_gen;	/* fs AIL generation count */
 	xfs_ail_ticket_t	*m_ail_wait;	/* list of AIL push waiters*/
 	xfs_trans_t		*m_async_trans;	/* list of async transactions */
-	lock_t			m_async_lock;	/* async trans list mutex */
+	mutex_t			m_async_lock;	/* async trans list mutex */
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
-	lock_t			m_sb_lock;	/* sb counter mutex */
+	mutex_t			m_sb_lock;	/* sb counter mutex */
 	struct buf		*m_sb_bp;	/* buffer for superblock */
 	char			*m_fsname; /* filesystem name */
 	dev_t			m_dev;		/* dev of fs meta-data */
@@ -49,7 +49,7 @@ typedef struct xfs_mount {
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
 	uint			m_ihashmask;	/* fs inode hash size - 1 */
 	struct xfs_inode	*m_inodes;	/* active inode list */
-	sema_t			m_ilock;	/* inode list mutex */
+	mutex_t			m_ilock;	/* inode list mutex */
 	uint			m_ireclaims;	/* count of calls to reclaim*/
 	uint			m_readio_log;	/* min read size log bytes */
 	uint			m_readio_blocks; /* min read size blocks */
@@ -126,10 +126,10 @@ typedef struct xfs_mod_sb {
 	int	msb_delta;	/* change to make to the specified field */
 } xfs_mod_sb_t;
 
-#define	XFS_MOUNT_ILOCK(mp)	psema(&((mp)->m_ilock), PINOD)
-#define	XFS_MOUNT_IUNLOCK(mp)	vsema(&((mp)->m_ilock))
-#define	XFS_SB_LOCK(mp)		splockspl((mp)->m_sb_lock, splhi)
-#define	XFS_SB_UNLOCK(mp,s)	spunlockspl((mp)->m_sb_lock,(s))
+#define	XFS_MOUNT_ILOCK(mp)	mutex_lock(&((mp)->m_ilock), PINOD)
+#define	XFS_MOUNT_IUNLOCK(mp)	mutex_unlock(&((mp)->m_ilock))
+#define	XFS_SB_LOCK(mp)		mutex_spinlock(&(mp)->m_sb_lock)
+#define	XFS_SB_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_sb_lock,(s))
 
 #define	AIL_LOCK(mp)		mutex_spinlock(&(mp)->m_ail_lock)
 #define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)

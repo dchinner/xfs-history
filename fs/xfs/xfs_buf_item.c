@@ -1,4 +1,4 @@
-#ident "$Revision: 1.39 $"
+#ident "$Revision: 1.41 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -13,6 +13,7 @@
 #endif
 #include <sys/param.h>
 #include <sys/buf.h>
+#include <sys/atomic_ops.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -40,11 +41,6 @@
 #endif
 
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
-
-/*
- * This lock guards the buf log item bli_refcount fields.
- */
-lock_t	xfs_bli_reflock;
 
 zone_t	*xfs_buf_item_zone;
 
@@ -271,9 +267,7 @@ xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
 	ASSERT(bip->bli_refcount > 0);
 	xfs_buf_item_trace("UNPIN", bip);
 
-	s = splockspl(xfs_bli_reflock, splhi);
-	refcount = --(bip->bli_refcount);
-	spunlockspl(xfs_bli_reflock, s);
+	refcount = atomicAddInt(&bip->bli_refcount, -1);
 
 	bunpin(bp);
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
@@ -349,7 +343,6 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 {
 	buf_t	*bp;
 	uint	hold;
-	int	s;
 
 	bp = bip->bli_buf;
 
@@ -377,9 +370,7 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 	 * the transaction is really through with the buffer.
 	 */
 	if (!(bip->bli_flags & XFS_BLI_LOGGED)) {
-		s = splockspl(xfs_bli_reflock, splhi);
-		bip->bli_refcount--;
-		spunlockspl(xfs_bli_reflock, s);
+		(void) atomicAddInt(&bip->bli_refcount, -1);
 	} else {
 		/*
 		 * Clear the logged flag since this is per

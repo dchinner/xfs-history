@@ -1,4 +1,4 @@
-#ident "$Revision: 1.171 $"
+#ident "$Revision: 1.172 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -280,7 +280,7 @@ xfs_ctrunc_trace(
 
 #ifndef SIM
 
-sema_t	xfs_ancestormon;		/* initialized in xfs_init */
+mutex_t	xfs_ancestormon;		/* initialized in xfs_init */
 int	xfs_do_fast_fid = 1;
 
 #define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
@@ -3093,7 +3093,7 @@ xfs_ancestor_check(
 	if (target_ip && target_ip != src_dp)
 		xfs_iunlock(target_ip, XFS_ILOCK_EXCL);
 
-	psema(&xfs_ancestormon, PINOD);
+	mutex_lock(&xfs_ancestormon, PINOD);
 
 	/*
 	 * Ascend the target_dp's ancestor line, stopping if we
@@ -3175,7 +3175,7 @@ xfs_ancestor_check(
 	/*
 	 * Unserialize efs_notancestor calls.
          */
-        vsema(&xfs_ancestormon);
+        mutex_unlock(&xfs_ancestormon);
 
 	/*
 	 * See if anything has changed when they were unlocked.

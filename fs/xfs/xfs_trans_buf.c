@@ -1,4 +1,4 @@
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.31 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -6,6 +6,7 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
+#include <sys/atomic_ops.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -70,7 +71,6 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
-	int			s;
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
@@ -137,9 +137,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	s = splockspl(xfs_bli_reflock, splhi);
-	bip->bli_refcount++;
-	spunlockspl(xfs_bli_reflock, s);
+	(void) atomicAddInt(&bip->bli_refcount, 1);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -170,7 +168,6 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
-	int			s;
 
 	/*
 	 * Default to just trying to lock the superblock buffer
@@ -221,9 +218,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	s = splockspl(xfs_bli_reflock, splhi);
-	bip->bli_refcount++;
-	spunlockspl(xfs_bli_reflock, s);
+	(void) atomicAddInt(&bip->bli_refcount, 1);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -275,7 +270,6 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
-	int			s;
 	int			error;
 
 	/*
@@ -402,9 +396,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	s = splockspl(xfs_bli_reflock, splhi);
-	bip->bli_refcount++;
-	spunlockspl(xfs_bli_reflock, s);
+	(void) atomicAddInt(&bip->bli_refcount, 1);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -445,7 +437,6 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	xfs_buf_log_item_t	*bip;
 	xfs_log_item_t		*lip;
 	xfs_log_item_desc_t	*lidp;
-	int			s;
 
 	/*
 	 * Default to a normal brelse() call if the tp is NULL.
@@ -534,9 +525,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	/*
 	 * Drop our reference to the buf log item.
 	 */
-	s = splockspl(xfs_bli_reflock, splhi);
-	bip->bli_refcount--;
-	spunlockspl(xfs_bli_reflock, s);
+	(void) atomicAddInt(&bip->bli_refcount, -1);
 
 	/*
 	 * If the buf item is not tracking data in the log, then
@@ -579,7 +568,6 @@ void
 xfs_trans_bjoin(xfs_trans_t	*tp,
 		buf_t		*bp)
 {
-	int			s;
 	xfs_buf_log_item_t	*bip;
 
 	ASSERT(bp->b_flags & B_BUSY);
@@ -599,9 +587,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	/*
 	 * Take a reference for this transaction on the buf item.
 	 */
-	s = splockspl(xfs_bli_reflock, splhi);
-	bip->bli_refcount++;
-	spunlockspl(xfs_bli_reflock, s);
+	(void) atomicAddInt(&bip->bli_refcount, 1);
 
 	/*
 	 * Get a log_item_desc to point at the new item.

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.93 $"
+#ident	"$Revision: 1.94 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -70,11 +70,11 @@ xfs_mount_init(void)
 	mp->m_fsname = kmem_alloc(PATH_MAX, 0);
 
 	mutex_init(&mp->m_ail_lock, MUTEX_SPIN, "xfs_ail");
-	initnlock(&mp->m_async_lock, "xfs_async");
-	initnsema(&mp->m_ilock, 1, "xfs_ilock");
-	initnsema(&mp->m_growlock, 1, "xfs_grow");
+	mutex_init(&mp->m_async_lock, MUTEX_SPIN, "xfs_async");
 	mutex_init(&mp->m_ipinlock, MUTEX_SPIN, "xfs_ipin");
-	initnlock(&mp->m_sb_lock, "xfs_sb");
+	mutex_init(&mp->m_sb_lock, MUTEX_SPIN, "xfs_sb");
+	mutex_init(&mp->m_ilock, MUTEX_DEFAULT, "xfs_ilock");
+	initnsema(&mp->m_growlock, 1, "xfs_grow");
 	/*
 	 * Initialize the AIL.
 	 */
@@ -101,11 +101,11 @@ xfs_mount_free(xfs_mount_t *mp)
 	}
 	
 	mutex_destroy(&mp->m_ail_lock);
-	freesplock(mp->m_async_lock);
-	freesema(&mp->m_ilock);
-	freesema(&mp->m_growlock);
+	mutex_destroy(&mp->m_async_lock);
 	mutex_destroy(&mp->m_ipinlock);
-	freesplock(mp->m_sb_lock);
+	mutex_destroy(&mp->m_sb_lock);
+	mutex_destroy(&mp->m_ilock);
+	freesema(&mp->m_growlock);
 
 	kmem_free(mp->m_fsname, PATH_MAX);
 	kmem_free(mp, sizeof(xfs_mount_t));

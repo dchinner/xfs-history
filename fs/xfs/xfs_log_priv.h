@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 #include <sys/cmn_err.h>
 
@@ -274,7 +274,7 @@ typedef struct log {
     xlog_in_core_t	*l_iclog_bak[XLOG_MAX_ICLOGS];
 
     /* The following block of fields are changed while holding grant_lock */
-    lock_t		l_grant_lock;		/* protects below fields */
+    mutex_t		l_grant_lock;		/* protects below fields */
     xlog_ticket_t	*l_reserve_headq;	/* */
     xlog_ticket_t	*l_write_headq;		/* */
     int			l_grant_reserve_cycle;	/* */

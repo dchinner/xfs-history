@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2479,7 +2479,7 @@ idbg_xnode(xfs_inode_t *ip)
 		&ip->i_pinsema);
 #ifdef NOTYET
 	qprintf("range lock splock 0x%x sleep 0x%x list head 0x%x\n",
-		&ip->i_range_lock.r_splock, &ip->i_range_lock.r_sleep,
+		&ip->i_range_lock.r_spinlock, &ip->i_range_lock.r_sleep,
 		ip->i_range_lock.r_range_list);
 #endif
 	qprintf("next_offset %llx ", ip->i_next_offset);
@@ -2576,7 +2576,7 @@ idbg_xrangelocks(xfs_inode_t *ip)
 	xfs_range_t		*firstp;
 
 	qprintf("range lock splock 0x%x sleep 0x%x list head 0x%x\n\n",
-		&ip->i_range_lock.r_splock, &ip->i_range_lock.r_sleep,
+		&ip->i_range_lock.r_spinlock, &ip->i_range_lock.r_sleep,
 		ip->i_range_lock.r_range_list);
 
 	firstp = ip->i_range_lock.r_range_list;

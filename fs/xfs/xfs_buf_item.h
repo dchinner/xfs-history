@@ -1,7 +1,7 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.15 $"
 
 struct buf;
 struct ktrace;
@@ -49,7 +49,7 @@ typedef struct xfs_buf_log_item {
 	struct buf		*bli_buf;	/* real buffer pointer */
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
-	unsigned int		bli_refcount;	/* cnt of tp refs */
+	int			bli_refcount;	/* cnt of tp refs */
 	struct ktrace		*bli_trace;	/* event trace buf */
 #ifdef DEBUG
 	char			*bli_orig;	/* original buffer copy */
@@ -77,11 +77,6 @@ typedef struct xfs_buf_cancel {
 	int			bc_refcount;
 	struct xfs_buf_cancel	*bc_next;
 } xfs_buf_cancel_t;
-
-/*
- * This lock guards the bli_refcount fields of the buf items.
- */
-extern lock_t	xfs_bli_reflock;
 
 #define	XFS_BLI_TRACE_SIZE	32
 #if	(defined(DEBUG) && !defined(SIM))

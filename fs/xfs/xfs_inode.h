@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.81 $"
+#ident "$Revision: 1.82 $"
 
 struct buf;
 struct cred;
@@ -22,7 +22,7 @@ struct zone;
  */
 typedef struct xfs_ihash {
 	struct xfs_inode	*ih_next;	
-	sema_t			ih_lock;
+	mutex_t			ih_lock;
 	uint			ih_version;
 } xfs_ihash_t;
 
@@ -44,9 +44,10 @@ typedef struct xfs_range {
  * This is a structure embedded in the incore inode for
  * tracking range locks over the file.  The semaphore is
  * dynamically allocated to reduce our memory consumption.
+ * XXX Semaphores are now only 32-bits -- should allocate in-line. --yohn
  */
 typedef struct xfs_range_lock {
-	lock_t		r_splock;	/* lock to make sleeps atomic */
+	mutex_t		r_spinlock;	/* lock to make sleeps atomic */
 	sema_t		*r_sleep;	/* semaphore for sleeping on */
 	xfs_range_t	*r_range_list;	/* list of locked ranges */
 } xfs_range_lock_t;
