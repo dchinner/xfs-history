@@ -59,6 +59,7 @@
 /* #include <sys/syslog.h> */
 
 #include <asm/page.h>
+#include <asm/byteorder.h>
 #define _PAGESZ PAGE_SIZE
 // #include <asm/semaphore.h> */
 //#include <asm/spinlock.h>
