@@ -3787,7 +3787,6 @@ STATIC int
 xfs_rmdir(
 	bhv_desc_t	*dir_bdp,
 	struct dentry	*dentry,
-	vnode_t		*current_dir_vp,
 	cred_t		*credp)
 {
 	char			*name = (char *)dentry->d_name.name;
@@ -3939,14 +3938,6 @@ xfs_rmdir(
 		goto error_return;
 	}
 
-	if ((cdp == dp) || (XFS_ITOV(cdp) == current_dir_vp)) {
-		error = XFS_ERROR(EINVAL);
-		goto error_return;
-	}
-	if ((cdp->i_d.di_mode & IFMT) != IFDIR) {
-	        error = XFS_ERROR(ENOTDIR);
-		goto error_return;
-	}
 	ASSERT(cdp->i_d.di_nlink >= 2);
 	if (cdp->i_d.di_nlink != 2) {
 		error = XFS_ERROR(ENOTEMPTY);
