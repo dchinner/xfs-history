@@ -3191,9 +3191,10 @@ xfs_fcntl(vnode_t	*vp,
 			error = EFAULT;
 			break;
 		}
+		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
 		va.va_xflags = fa.fsx_xflags;
 		va.va_extsize = fa.fsx_extsize;
-		error = xfs_setattr(vp, &va, AT_XFLAGS|AT_EXTSIZE, credp);
+		error = xfs_setattr(vp, &va, 0, credp);
 		break;
 	    }
 
