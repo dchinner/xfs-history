@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.73 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -24,6 +24,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/buf.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/ktrace.h>
 #include <sys/sysinfo.h>
@@ -58,7 +59,7 @@
 #define	kmem_check()	/* dummy for memory-allocation checking */
 #endif
 
-#if defined(DEBUG) && !defined(SIM)
+#ifdef DEBUG
 ktrace_t	*xfs_bmbt_trace_buf;
 #endif
 
@@ -200,7 +201,7 @@ xfs_bmbt_split(
 	xfs_btree_cur_t		**curp,
 	int			*stat);
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMBT_TRACE)
 /*
  * Add a trace buffer entry for arguments, for a buffer & 1 integer arg.
  */
@@ -312,7 +313,7 @@ xfs_bmbt_trace_enter(
 #define	xfs_bmbt_trace_argifr(n,c,i,f,r)
 #define	xfs_bmbt_trace_argik(n,c,i,k)
 #define	xfs_bmbt_trace_cursor(n,c)
-#endif	/* DEBUG && !SIM */
+#endif	/* XFS_BMBT_TRACE */
 
 /*
  * Update keys for the record.
@@ -1662,7 +1663,7 @@ xfs_bmbt_split(
 	return 0;
 }
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMBT_TRACE)
 /*
  * Add a trace buffer entry for arguments, for a buffer & 1 integer arg.
  */
@@ -1863,7 +1864,7 @@ xfs_bmbt_trace_enter(
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
 		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
 }
-#endif	/* DEBUG && !SIM */
+#endif	/* XFS_BMBT_TRACE */
 
 /*
  * Update keys for the record.
