@@ -23,7 +23,12 @@
 				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
 #define CYCLE_LSN(lsn)		(((uint *)&(lsn))[0])
 #define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1])
+
+#ifdef _KERNEL
+#define log_panic(s)		{panic(s); }
+#else
 #define log_panic(s)		{printf("%s\n", s); abort();}
+#endif
 
 
 /*

@@ -10,6 +10,7 @@
 #endif
 
 #include <sys/sysmacros.h>
+#include <sys/systm.h>
 #include <sys/buf.h>
 
 #ifdef SIM
@@ -1231,6 +1232,22 @@ log_end(struct xfs_mount *mp, dev_t log_dev)
 #endif
 
 
+#ifdef _KERNEL
+void
+log_verify_dest_ptr(log_t *log,
+		    psint ptr)
+{
+}
+
+
+void
+log_verify_iclog(log_t		*log,
+		 log_in_core_t	*iclog,
+		 int		count)
+{
+}
+
+#else
 /******************************************************************************
  *
  *		Log debug routines
@@ -1353,7 +1370,6 @@ log_verify_iclog(log_t		*log,
  ******************************************************************************
  */
 
-#ifndef _KERNEL
 void
 print_lsn(caddr_t string, xfs_lsn_t *lsn)
 {
