@@ -755,6 +755,16 @@ linvfs_read_full_page(
 }
 
 STATIC int
+linvfs_readpages(
+	struct address_space	*mapping,
+	struct list_head	*pages,
+	unsigned		nr_pages)
+{
+	return mpage_readpages(mapping, pages, nr_pages, linvfs_get_block);
+}
+
+
+STATIC int
 count_page_state(
 	struct page	*page,
 	int		*nr_delalloc,
@@ -959,6 +969,7 @@ linvfs_release_page(
 
 struct address_space_operations linvfs_aops = {
 	readpage:		linvfs_read_full_page,
+	readpages:		linvfs_readpages,
 	writepage:		linvfs_write_full_page,
 	sync_page:		block_sync_page,
 	releasepage:		linvfs_release_page,
