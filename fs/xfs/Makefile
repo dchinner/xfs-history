@@ -5,12 +5,12 @@
 KERN_SPECS = kernel-2.4.0.spec
 LIB_SPECS  = 
 #libdba.spec
-CMD_SPECS = 
+CMD_SPECS = xfs-cmds.spec
 #kernprof.spec ktrace.spec lockstat.spec sard.spec
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-default all: tarballs headers exports i686kernel i386cmd
+default all: tarballs headers i686kernel i386cmd
 
 tarballs:
 	@echo "=== Making $@ `date`"; \
