@@ -1,4 +1,4 @@
-#ident "$Revision: 1.260 $"
+#ident "$Revision: 1.262 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -25,6 +25,7 @@
 #include <sys/dmi_kern.h>
 #include <sys/pda.h>
 #include <sys/debug.h>
+#include <sys/uthread.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -46,7 +47,6 @@
 #include <sys/param.h>
 #include <sys/pathname.h>
 #include <ksys/vproc.h>
-#include <sys/proc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>
 #include <sys/stat.h>
@@ -89,7 +89,6 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
-#include "os/proc/pproc_private.h"	/* XXX bogus */
 
 #ifdef SIM
 #include "sim.h"
@@ -2492,12 +2491,15 @@ xfs_create(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
+	arsess_t		*arsess;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
 
         dp = XFS_BHVTOI(dir_bdp);
-	prid = (xfs_prid_t) XFS_PROC_PROJID(curprocp);
+
+	VPROC_GETARSESS(curvprocp, &arsess);
+	prid = (xfs_prid_t)arsess->as_prid;
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_CREATE)) {
 		error = dm_namesp_event(DM_CREATE, dir_vp, NULL, name, NULL,
@@ -4779,6 +4781,7 @@ xfs_mkdir(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
+	arsess_t		*arsess;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -4793,7 +4796,10 @@ xfs_mkdir(
 	}
 	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
 	mp = dp->i_mount;
-        prid = (xfs_prid_t)XFS_PROC_PROJID(curprocp);
+
+	VPROC_GETARSESS(curvprocp, &arsess);
+	prid = (xfs_prid_t)arsess->as_prid;
+
 	udqp = pdqp = NULL;
 
 	/*
@@ -5337,6 +5343,7 @@ xfs_symlink(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
+	arsess_t		*arsess;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
@@ -5369,7 +5376,9 @@ xfs_symlink(
                 pn_free(&ccpn);
         }
         dp = XFS_BHVTOI(dir_bdp);
-	prid = (xfs_prid_t) XFS_PROC_PROJID(curprocp);
+
+	VPROC_GETARSESS(curvprocp, &arsess);
+	prid = (xfs_prid_t)arsess->as_prid;
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_SYMLINK)) {
 		error = dm_namesp_event(DM_SYMLINK, dir_vp, NULL,
