@@ -1258,7 +1258,9 @@ xlog_recover_print_trans_head(xlog_recover_t *tr)
 		"QM_QUOTAOFF",
 		"QM_DQALLOC",
 		"QM_SETQLIM",
-		"QM_DQCLUSTER"
+		"QM_DQCLUSTER",
+		"QM_QINOCREATE",
+		"QM_QUOTAOFF_END"
 	};
 
 	printf("TRANS: tid:0x%x  type:%s  #items:%d  trans:0x%x  q:0x%x\n",
@@ -2146,9 +2148,9 @@ xlog_recover_do_dquot_buffer(
 	/*
 	 * This type of quotas was turned off, so ignore this buffer
 	 */
-	if (log->l_quotaoffs_flag & type)
+	if (log->l_quotaoffs_flag & type) 
 		return;
-	
+
 	xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
 }
 
@@ -2571,7 +2573,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	if (xfs_qm_dqcheck(recddq, 
 			   dq_f->qlf_id,
 			   "xlog_recover_do_dquot_trans (log copy)")) {
-		return (EIO);
+		return XFS_ERROR(EIO);
 	}
 	ASSERT(dq_f->qlf_len == 1);
 	
@@ -2592,7 +2594,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 				   dq_f->qlf_boffset);
 	
 	/* 
-	 * at least the magic num portion should be on disk because this
+	 * At least the magic num portion should be on disk because this
 	 * was among a chunk of dquots created earlier, and we did some
 	 * minimal initialization then.
 	 */
@@ -2604,10 +2606,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	       bp->b_dmaaddr + bp->b_bcount);
 
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
-#ifdef QUOTADEBUG
-	cmn_err(CE_NOTE, "recovering  dquot (id = %d), ddq 0x%x\n", 
-		recddq->d_id, ddq);
-#endif
+
 	ASSERT(dq_f->qlf_size == 2);
 	bdwrite(bp);
 
