@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.145 $"
+#ident  "$Revision: 1.146 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -433,6 +433,21 @@ xfs_cmountfs(
 			goto error0;
 		}
 		mp->m_ddevp = ddevvp;
+
+                /* Values are in BBs */
+                if ((ap != NULL) && (ap->version == 2)) {
+                        /*
+                         * At this point the superblock has not been read
+                         * in, therefore we do not know the block size.
+                         * Before, the mount call ends we will convert
+                         * these to FSBs.
+                         */
+                        mp->m_dalign = ap->sunit;
+                        mp->m_swidth = ap->swidth;
+                } else {
+                        mp->m_dalign = 0;
+                        mp->m_swidth = 0;
+                }
 	} else {
 		ddevvp = NULL;
 	}
@@ -466,7 +481,7 @@ xfs_cmountfs(
 		}
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
-			if (ap->version != 1) {
+			if ((ap->version < 1) || (ap->version > 2)) {
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -612,26 +627,53 @@ xfs_get_vfsmount(
 
 #if _MIPS_SIM == _ABI64
 /*
- * irix5_to_xfs_args
+ * xfs_args_ver_1
  * 
- * This is used with copyin_xlate() to copy a xfs_args structure
+ * This is used with copyin_xlate() to copy a xfs_args version 1 structure
  * in from user space from a 32 bit application into a 64 bit kernel.
  */
 /*ARGSUSED*/
 int
-irix5_to_xfs_args(
+xfs_args_to_ver_1(
 	enum xlate_mode	mode,
 	void		*to,
 	int		count,
 	xlate_info_t	*info)
 {
-	COPYIN_XLATE_PROLOGUE(irix5_xfs_args, xfs_args);
+	COPYIN_XLATE_PROLOGUE(xfs_args_ver_1, xfs_args);
 
 	target->version = source->version;
 	target->flags = source->flags;
 	target->logbufs = source->logbufs;
 	target->logbufsize = source->logbufsize;
 	target->fsname = (char*)(__psint_t)source->fsname;
+
+	return 0;
+}
+
+/*
+ * xfs_args_to_ver_2 
+ * 
+ * This is used with copyin_xlate() to copy a xfs_args version 2 structure
+ * in from user space from a 32 bit application into a 64 bit kernel.
+ */
+/*ARGSUSED*/
+int
+xfs_args_to_ver_2(
+	enum xlate_mode	mode,
+	void		*to,
+	int		count,
+	xlate_info_t	*info)
+{
+	COPYIN_XLATE_PROLOGUE(xfs_args_ver_2, xfs_args);
+
+	target->version = source->version;
+	target->flags = source->flags;
+	target->logbufs = source->logbufs;
+	target->logbufsize = source->logbufsize;
+	target->fsname = (char*)(__psint_t)source->fsname;
+	target->sunit = source->sunit;
+	target->swidth = source->swidth;
 
 	return 0;
 }
@@ -673,10 +715,23 @@ xfs_mount(
 	 * Copy in XFS-specific arguments.
 	 */
 	bzero(&args, sizeof args);
-	if (uap->datalen && uap->dataptr &&
-	    COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
-			 irix5_to_xfs_args, get_current_abi(), 1))
-		return XFS_ERROR(EFAULT);
+	if (uap->datalen && uap->dataptr) { 
+
+		/* Copy in the xfs_args version number */
+		if (copyin(uap->dataptr, &args, sizeof(args.version)))
+			return XFS_ERROR(EFAULT);
+
+		if (args.version == 1) {
+			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
+				     xfs_args_to_ver_1, get_current_abi(), 1))
+				return XFS_ERROR(EFAULT);
+		} else if (args.version == 2) {
+			if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
+				     xfs_args_to_ver_2, get_current_abi(),1))
+				return XFS_ERROR(EFAULT);
+		} else
+			return XFS_ERROR(EINVAL);
+	}
 
 	/*
 	 * Resolve path name of special file being mounted.
