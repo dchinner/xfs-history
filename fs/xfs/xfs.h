@@ -1,0 +1,147 @@
+/*
+ * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * 
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it would be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * 
+ * Further, this software is distributed without any warranty that it is
+ * free of the rightful claim of any third person regarding infringement
+ * or the like.  Any license provided herein, whether implied or
+ * otherwise, applies only to this software file.  Patent licenses, if
+ * any, provided herein do not apply to combinations of this program with
+ * other software, or any other product whatsoever.
+ * 
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write the Free Software Foundation, Inc., 59
+ * Temple Place - Suite 330, Boston MA 02111-1307, USA.
+ * 
+ * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
+ * Mountain View, CA  94043, or:
+ * 
+ * http://www.sgi.com 
+ * 
+ * For further information regarding this notice, see: 
+ * 
+ * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
+ */
+#ifndef __XFS_H__
+#define __XFS_H__
+
+#include <xfs_os_defs.h>
+
+#define FSID_T
+#include <pseudo-inc/sys/types.h>
+#include <pseudo-inc/sys/param.h>
+
+#include <linux/fs.h>
+#include <linux/xfs_fs.h>
+#include <linux/xfs_sema.h>
+#include <linux/xfs_debug.h>
+#include <linux/kernel.h>
+#include <linux/stddef.h>
+#include <linux/stat.h>
+#include <linux/xfs_cred.h>
+#include <linux/page_buf.h>
+#include <linux/file.h>
+#include <asm/uaccess.h>
+
+#include <pseudo-inc/sys/kmem.h>
+#include <xfs_buf.h>
+#include <pseudo-inc/ksys/cell_config.h>
+#include <pseudo-inc/ksys/behavior.h>
+#include <pseudo-inc/sys/vfs.h>
+#include <pseudo-inc/sys/vnode.h>
+#include <pseudo-inc/sys/pvfs.h>
+#include <pseudo-inc/sys/fs_subr.h>
+#include <pseudo-inc/sys/ktrace.h>
+#include <pseudo-inc/sys/cmn_err.h>
+#include <pseudo-inc/sys/pathname.h>
+#include <pseudo-inc/sys/sysmacros.h>
+#include <pseudo-inc/sys/uio.h>
+#include <pseudo-inc/sys/quota.h>
+#include <pseudo-inc/sys/systm.h>
+#include <pseudo-inc/sys/dirent.h>
+#include <pseudo-inc/sys/statvfs.h>
+#include <pseudo-inc/sys/attributes.h>
+#include <pseudo-inc/sys/acl.h>
+#include <pseudo-inc/sys/uuid.h>
+#include <pseudo-inc/sys/kabi.h>
+#include <pseudo-inc/sys/mode.h>
+#include <pseudo-inc/sys/file.h>
+#include <pseudo-inc/ksys/vfile.h>
+#include <pseudo-inc/ksys/fsc_notify.h>
+
+#include <linux/slab.h>
+#include <linux/errno.h>
+#include <linux/config.h>
+#include <linux/module.h>
+#include <linux/dmapi_kern.h>
+
+#include <xfs_macros.h>
+#include <xfs_types.h>
+#include <xfs_inum.h>
+#include <xfs_log.h>
+#include <xfs_cxfs.h>
+#include <xfs_clnt.h>
+
+#include <xfs_trans.h>
+#include <xfs_sb.h>
+#include <xfs_ag.h>
+#include <xfs_dir.h>
+#include <xfs_dir2.h>
+#include <xfs_imap.h>
+#include <xfs_mount.h>
+#include <xfs_alloc_btree.h>
+#include <xfs_bmap_btree.h>
+#include <xfs_ialloc_btree.h>
+#include <xfs_btree.h>
+#include <xfs_ialloc.h>
+#include <xfs_attr_sf.h>
+#include <xfs_dir_sf.h>
+#include <xfs_dir2_sf.h>
+#include <xfs_dinode.h>
+#include <xfs_inode.h>
+#include <xfs_alloc.h>
+#include <xfs_bmap.h>
+#include <xfs_bit.h>
+#include <xfs_rtalloc.h>
+#include <xfs_error.h>
+#include <xfs_quota.h>
+#include <xfs_itable.h>
+#include <xfs_dqblk.h>
+#include <xfs_dquot_item.h>
+#include <xfs_dquot.h>
+#include <xfs_qm.h>
+#include <xfs_rw.h>
+#include <xfs_da_btree.h>
+#include <xfs_dir_leaf.h>
+#include <xfs_dir2_data.h>
+#include <xfs_dir2_leaf.h>
+#include <xfs_dir2_block.h>
+#include <xfs_dir2_node.h>
+#include <xfs_dir2_trace.h>
+#include <xfs_attr.h>
+#include <xfs_attr_leaf.h>
+#include <xfs_inode_item.h>
+#include <xfs_buf_item.h>
+#include <xfs_extfree_item.h>
+#include <xfs_log_priv.h>
+#include <xfs_trans_priv.h>
+#include <xfs_trans_space.h>
+#include <xfs_utils.h>
+#include <xfs_dmapi.h>
+#include <xfs_grio.h>
+
+#if defined(XFSDEBUG) && defined(CONFIG_KDB)
+#include <asm/kdb.h>
+#endif
+
+#include <linux/xfs_lrw.h>
+#include <linux/xfs_globals.h>
+
+#endif	/* __XFS_H__ */
