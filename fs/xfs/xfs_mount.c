@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.52 $"
+#ident	"$Revision: 1.53 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -125,8 +125,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	bp->b_blkno = XFS_SB_DADDR;		
 	bp->b_flags |= B_READ;
 	bdstrat(bmajor(dev), bp);
-	error = iowait(bp);
-	if (error) {
+	if (error = iowait(bp)) {
 		ASSERT(error == 0);
 		goto bad;
 	}
@@ -141,7 +140,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		goto bad;
 	}
 	mp->m_sb_bp = bp;
-	mp->m_sb = *sbp;
+	mp->m_sb = *sbp;				/* bcopy structure */
 	mp->m_agrotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
@@ -211,6 +210,41 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * file system.
 	 */
 	xfs_ihash_init(mp);
+
+	/*
+	 * Call the log's mount-time initialization.
+	 * xfs_log_mount() always does XFS_LOG_RECOVER.
+	 */
+	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
+	error = xfs_log_mount(mp, mp->m_logdev,
+			      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
+			      XFS_BTOD(mp, sbp->sb_logblocks), 0);
+	if (error > 0) {
+		/*
+		 * XXX	log recovery failure - What action should be taken?
+		 * 	Translate log error to something user understandable
+		 */
+		error = XFS_ERROR(EBUSY); /* XXX log recovery fail - errno? */
+	}
+
+	/* re-read the superblock.  Some fields have possibly changed */
+	bp->b_flags = (B_READ | B_BUSY);
+	bdstrat(bmajor(dev), bp);
+	if (error = iowait(bp)) {
+		ASSERT(error == 0);
+		goto bad;
+	}
+
+	/*
+	 * Re-initialize the mount structure from the superblock.
+	 */
+	sbp = XFS_BUF_TO_SBP(bp);
+	if ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
+	    (sbp->sb_versionnum != XFS_SB_VERSION)) {
+		error = XFS_ERROR(EINVAL);		/* or EIO ? */
+		goto bad;
+	}
+	mp->m_sb = *sbp;				/* bcopy structure */
 
 #ifdef SIM
 	/*
