@@ -1,4 +1,4 @@
-#ident "$Revision: 1.307 $"
+#ident "$Revision: 1.308 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -405,7 +405,6 @@ xfs_close(
 	cred_t		*credp)
 {
 
-	extern 	int	grio_remove_reservation(pid_t, dev_t, gr_ino_t);
         xfs_inode_t	*ip;
 	vnode_t 	*vp;
 
@@ -413,6 +412,7 @@ xfs_close(
 	vn_trace_entry(vp, "xfs_close", (inst_t *)__return_address);
 	ip = XFS_BHVTOI(bdp);
 
+#if 0
 	/*
 	 * If this is the last close of a file, and this process
 	 * no longer has the file open via another file descriptor, 
@@ -421,6 +421,7 @@ xfs_close(
 	if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && lastclose &&
 	    !fdt_vnode_isopen(vp))
 		grio_remove_reservation(current_pid(), ip->i_dev, ip->i_ino);
+#endif
 
 	return 0;
 }
