@@ -99,16 +99,16 @@ xfs_growfs_rt_alloc(
 		/*
 		 * Reserve space & log for one extent added to the file.
 		 */
-		if (error = xfs_trans_reserve(tp, resblks,
+		if ((error = xfs_trans_reserve(tp, resblks,
 				XFS_GROWRTALLOC_LOG_RES(mp), 0,
 				XFS_TRANS_PERM_LOG_RES,
-				XFS_DEFAULT_PERM_LOG_COUNT))
+				XFS_DEFAULT_PERM_LOG_COUNT)))
 			goto error_exit;
 		cancelflags = XFS_TRANS_RELEASE_LOG_RES;
 		/*
 		 * Lock the inode.
 		 */
-		if (error = xfs_trans_iget(mp, tp, ino, XFS_ILOCK_EXCL, &ip))
+		if ((error = xfs_trans_iget(mp, tp, ino, XFS_ILOCK_EXCL, &ip)))
 			goto error_exit;
 		XFS_BMAP_INIT(&flist, &firstblock);
 		/*
@@ -142,14 +142,14 @@ xfs_growfs_rt_alloc(
 			/*
 			 * Reserve log for one block zeroing.
 			 */
-			if (error = xfs_trans_reserve(tp, 0,
-					XFS_GROWRTZERO_LOG_RES(mp), 0, 0, 0))
+			if ((error = xfs_trans_reserve(tp, 0,
+					XFS_GROWRTZERO_LOG_RES(mp), 0, 0, 0)))
 				goto error_exit;
 			/*
 			 * Lock the bitmap inode.
 			 */
-			if (error = xfs_trans_iget(mp, tp, ino, XFS_ILOCK_EXCL,
-					&ip))
+			if ((error = xfs_trans_iget(mp, tp, ino, XFS_ILOCK_EXCL,
+					&ip)))
 				goto error_exit;
 			/*
 			 * Get a buffer for the block.
@@ -1007,7 +1007,7 @@ xfs_rtcheck_range(
 		/*
 		 * Compute difference between actual and desired value.
 		 */
-		if (wdiff = (*b ^ val) & mask) {
+		if ((wdiff = (*b ^ val) & mask)) {
 			/*
 			 * Different, compute first wrong bit and return.
 			 */
@@ -1053,7 +1053,7 @@ xfs_rtcheck_range(
 		/*
 		 * Compute difference between actual and desired value.
 		 */
-		if (wdiff = *b ^ val) {
+		if ((wdiff = *b ^ val)) {
 			/*
 			 * Different, compute first wrong bit and return.
 			 */
@@ -1090,7 +1090,7 @@ xfs_rtcheck_range(
 	 * If not ending on a word boundary, deal with the last
 	 * (partial) word.
 	 */
-	if (lastbit = len - i) {
+	if ((lastbit = len - i)) {
 		/*
 		 * Mask of relevant bits.
 		 */
@@ -1098,7 +1098,7 @@ xfs_rtcheck_range(
 		/*
 		 * Compute difference between actual and desired value.
 		 */
-		if (wdiff = (*b ^ val) & mask) {
+		if ((wdiff = (*b ^ val) & mask)) {
 			/*
 			 * Different, compute first wrong bit and return.
 			 */
@@ -1947,11 +1947,11 @@ xfs_growfs_rt(
 	/*
 	 * Allocate space to the bitmap and summary files, as necessary.
 	 */
-	if (error = xfs_growfs_rt_alloc(mp, rbmblocks, nrbmblocks,
-			mp->m_sb.sb_rbmino))
+	if ((error = xfs_growfs_rt_alloc(mp, rbmblocks, nrbmblocks,
+			mp->m_sb.sb_rbmino)))
 		return error;
-	if (error = xfs_growfs_rt_alloc(mp, rsumblocks, nrsumblocks,
-			mp->m_sb.sb_rsumino))
+	if ((error = xfs_growfs_rt_alloc(mp, rsumblocks, nrsumblocks,
+			mp->m_sb.sb_rsumino)))
 		return error;
 	nmp = NULL;
 	/*
@@ -1992,14 +1992,14 @@ xfs_growfs_rt(
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFSRT_FREE);
 		cancelflags = 0;
-		if (error = xfs_trans_reserve(tp, 0,
-				XFS_GROWRTFREE_LOG_RES(nmp), 0, 0, 0))
+		if ((error = xfs_trans_reserve(tp, 0,
+				XFS_GROWRTFREE_LOG_RES(nmp), 0, 0, 0)))
 			goto error_exit;
 		/*
 		 * Lock out other callers by grabbing the bitmap inode lock.
 		 */
-		if (error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino,
-				XFS_ILOCK_EXCL, &ip))
+		if ((error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rbmino,
+				XFS_ILOCK_EXCL, &ip)))
 			goto error_exit;
 		ASSERT(ip == mp->m_rbmip);
 		/*
@@ -2012,8 +2012,8 @@ xfs_growfs_rt(
 		/*
 		 * Get the summary inode into the transaction.
 		 */
-		if (error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rsumino,
-				XFS_ILOCK_EXCL, &ip))
+		if ((error = xfs_trans_iget(mp, tp, mp->m_sb.sb_rsumino,
+				XFS_ILOCK_EXCL, &ip)))
 			goto error_exit;
 		ASSERT(ip == mp->m_rsumip);
 		/*
@@ -2121,9 +2121,9 @@ xfs_rtallocate_extent(
 	if (prod > 1) {
 		xfs_extlen_t	i;
 
-		if (i = maxlen % prod)
+		if ((i = maxlen % prod))
 			maxlen -= i;
-		if (i = minlen % prod)
+		if ((i = minlen % prod))
 			minlen += prod - i;
 		if (maxlen < minlen) {
 			*rtblock = NULLRTBLOCK;
