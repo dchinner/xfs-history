@@ -8,13 +8,13 @@
  * Macros, structures, prototypes for internal log manager use.
  */
 
-#define XLOG_NUM_ICLOGS		8
+#define XLOG_NUM_ICLOGS		4
 #define XLOG_MAX_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
-#define XLOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
+#define XLOG_RECORD_BSIZE	(8*1024)	/* eventually 32k */
 #define XLOG_MAX_RECORD_BSIZE	(32*1024)
-#define XLOG_RECORD_BSHIFT	12		/* 4096 == 1 << 12 */
+#define XLOG_RECORD_BSHIFT	13		/* 8192 == 1 << 13 */
 #define XLOG_MAX_RECORD_BSHIFT	15		/* 32k == 1 << 15 */
 #define XLOG_BTOLRBB(b)		((b)+XLOG_RECORD_BSIZE-1 >> XLOG_RECORD_BSHIFT)
 
@@ -148,6 +148,7 @@
  * Flags for log structure
  */
 #define XLOG_CHKSUM_MISMATCH	0x1	/* used only during recovery */
+#define XLOG_ACTIVE_RECOVERY	0x2	/* in the middle of recovery */
 
 
 typedef void * xlog_tid_t;
@@ -185,7 +186,7 @@ typedef struct xlog_rec_header {
 	uint	  h_chksum;	/* may not be used; non-zero if used	:  4 */
 	int	  h_prev_block; /* block number to previous LR		:  4 */
 	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
-	uint	  h_cycle_data[XLOG_RECORD_BSIZE / BBSIZE];
+	uint	  h_cycle_data[XLOG_MAX_RECORD_BSIZE / BBSIZE];
 } xlog_rec_header_t;
 
 
@@ -210,7 +211,7 @@ typedef struct xlog_in_core {
 		xlog_rec_header_t hic_header;
 		char		  hic_sector[XLOG_HEADER_SIZE];
 	} ic_h;
-	char			ic_data[XLOG_RECORD_BSIZE-XLOG_HEADER_SIZE];
+	char		       ic_data[XLOG_MAX_RECORD_BSIZE-XLOG_HEADER_SIZE];
 	sema_t			ic_forcesema;
 	struct xlog_in_core	*ic_next;
 	struct xlog_in_core	*ic_prev;
@@ -259,10 +260,12 @@ typedef struct log {
     int			l_prev_cycle;   /* Cycle # b4 last block increment */
     int			l_curr_block;   /* current logical block of log */
     int			l_prev_block;   /* previous logical block of log */
+    int			l_iclog_size;	 /* size of log in bytes */
+    int			l_iclog_size_log;/* log power size of log */
+    int			l_iclog_bufs;	 /* number of iclog buffers */
 
-    /* The following 2 fields are used for debugging; need to hold icloglock */
-    xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];
-    int			l_iclog_size;		 /* size of log in bytes */
+    /* The following field are used for debugging; need to hold icloglock */
+    xlog_in_core_t	*l_iclog_bak[XLOG_MAX_ICLOGS];
 
     /* The following block of fields are changed while holding grant_lock */
     lock_t		l_grant_lock;		/* protects below fields */

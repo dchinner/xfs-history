@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1723,7 +1723,7 @@ xlog_do_recover(xlog_t	*log,
      * the delayed write calls.  The write calls get their own buffers.
      */
     hbp = xlog_get_bp(1);
-    dbp = xlog_get_bp(BTOBB(XLOG_RECORD_BSIZE));
+    dbp = xlog_get_bp(BTOBB(XLOG_MAX_RECORD_BSIZE));
     bzero(rhash, sizeof(rhash));
     if (tail_blk <= head_blk) {
 	for (blk_no = tail_blk; blk_no < head_blk; ) {
@@ -1852,6 +1852,10 @@ bread_err:
 
     xlog_recover_check_summary(log);
 
+
+    /* Normal transactions can now occur */
+    log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+
     /*
      * Now we're ready to do the transactions needed for the
      * rest of recovery.  Start with completing all the extent
@@ -1881,7 +1885,13 @@ xlog_recover(xlog_t *log)
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk))
 		return error;
 	if (tail_blk != head_blk) {
+		cmn_err(CE_NOTE,
+			"Starting xFS recovery on (major: %d) (minor: %d)",
+			major(log->l_dev), minor(log->l_dev));
 		error = xlog_do_recover(log, head_blk, tail_blk);
+		cmn_err(CE_NOTE, 
+			"Ending xFS recovery on (major: %d) (minor: %d)",
+			major(log->l_dev), minor(log->l_dev));
 	}
 	return error;
 }	/* xlog_recover */
