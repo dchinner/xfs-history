@@ -813,11 +813,11 @@ static struct super_block *linvfs_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type xfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"xfs",
-	get_sb:		linvfs_get_sb,
-	kill_sb:	kill_block_super,
-	fs_flags:	FS_REQUIRES_DEV,
+	.owner		= THIS_MODULE,
+	.name		= "xfs",
+	.get_sb		= linvfs_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
 };
 
 static int __init init_xfs_fs(void)
