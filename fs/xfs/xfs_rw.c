@@ -879,6 +879,7 @@ xfs_refcache_purge_ip(
 	xfs_inode_t	*ip)
 {
 	vnode_t	*vp;
+	int	error;
 
 	/*
 	 * If we're not pointing to our entry in the cache, then
@@ -907,6 +908,7 @@ xfs_refcache_purge_ip(
 
 	vp = XFS_ITOV(ip);
 	ASSERT(vp->v_count > 1);
+	VOP_RELEASE(vp, error);
 	VN_RELE(vp);
 
 	return;
@@ -923,7 +925,7 @@ xfs_refcache_purge_mp(
 	xfs_mount_t	*mp)
 {
 	vnode_t		*vp;
-	int		i;
+	int		error, i;
 	xfs_inode_t	*ip;
 
 	if (xfs_refcache == NULL) {
@@ -947,6 +949,7 @@ xfs_refcache_purge_mp(
 			ASSERT(xfs_refcache_count >= 0);
 			spin_unlock(&xfs_refcache_lock);
 			vp = XFS_ITOV(ip);
+			VOP_RELEASE(vp, error);
 			VN_RELE(vp);
 			spin_lock(&xfs_refcache_lock);
 		}
@@ -966,7 +969,7 @@ xfs_refcache_purge_mp(
 void
 xfs_refcache_purge_some(void)
 {
-	int		i;
+	int		error, i;
 	xfs_inode_t	*ip;
 	int		iplist_index;
 #define	XFS_REFCACHE_PURGE_COUNT	10
@@ -1009,6 +1012,7 @@ xfs_refcache_purge_some(void)
 	 * Now drop the inodes we collected.
 	 */
 	for (i = 0; i < iplist_index; i++) {
+		VOP_RELEASE(XFS_ITOV(iplist[i]), error);
 		VN_RELE(XFS_ITOV(iplist[i]));
 	}
 }

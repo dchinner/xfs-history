@@ -1864,6 +1864,10 @@ xfs_release(
 		return 0;
 	}
 
+	/* If we are in the NFS reference cache then don't do this now */
+	if (ip->i_refcache)
+		return 0;
+
 	mp = ip->i_mount;
 
 	if (ip->i_d.di_nlink != 0) {
