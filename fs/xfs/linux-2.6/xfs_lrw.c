@@ -68,55 +68,60 @@ STATIC int _xfs_imap_to_bmap(xfs_iocore_t *, xfs_off_t, xfs_bmbt_irec_t *,
  */
 STATIC int
 xfs_iozero(
-	struct inode		*ip,	/* inode owning buffer		*/
-	page_buf_t		*pb,	/* buffer to zero		*/
-	off_t			boff,	/* offset in buffer		*/
-	size_t			bsize,	/* size of data to zero		*/
+	struct inode		*ip,	/* inode 			*/
+	loff_t			pos,	/* offset in file		*/
+	size_t			count,	/* size of data to zero		*/
 	loff_t			end_size)	/* max file size to set */
 {
-	loff_t			cboff, pos;
-	size_t			cpoff, csize;
+	unsigned		bytes;
 	struct page		*page;
 	struct address_space	*mapping;
 	char			*kaddr;
+	int			status;
 
-	cboff = boff;
-	boff += bsize; /* last */
+	mapping = ip->i_mapping;
+	do {
+		unsigned long index, offset;
 
-	/* check range */
-	if (boff > pb->pb_buffer_length)
-		return (ENOENT);
+		offset = (pos & (PAGE_CACHE_SIZE -1)); /* Within page */
+		index = pos >> PAGE_CACHE_SHIFT;
+		bytes = PAGE_CACHE_SIZE - offset;
+		if (bytes > count)
+			bytes = count;
 
-	while (cboff < boff) {
-		if (pagebuf_segment(pb, &cboff, &page, &cpoff, &csize, 0)) {
-			return (ENOMEM);
-		}
-		ASSERT(((csize + cpoff) <= PAGE_CACHE_SIZE));
-		lock_page(page);
-
-		mapping = page->mapping;
+		status = -ENOMEM;
+		page = grab_cache_page(mapping, index);
+		if (!page)
+			break;
 
 		kaddr = kmap(page);
-		mapping->a_ops->prepare_write(NULL, page, cpoff, cpoff+csize);
+		status = mapping->a_ops->prepare_write(NULL, page, offset,
+							offset + bytes);
+		if (status) {
+			goto unlock;
+		}
 
-		memset((void *) (kaddr + cpoff), 0, csize);
+		memset((void *) (kaddr + offset), 0, bytes);
 		flush_dcache_page(page);
-		mapping->a_ops->commit_write(NULL, page, cpoff, cpoff+csize);
-		pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) +
-			cpoff + csize;
-		if (pos > ip->i_size)
-			ip->i_size = pos < end_size ? pos : end_size;
+		status = mapping->a_ops->commit_write(NULL, page, offset,
+							offset + bytes);
+		if (!status) {
+			pos += bytes;
+			count -= bytes;
+			if (pos > ip->i_size)
+				ip->i_size = pos < end_size ? pos : end_size;
+		}
 
+unlock:
 		kunmap(page);
 		unlock_page(page);
-	}
+		page_cache_release(page);
+		if (status)
+			break;
+	} while (count);
 
-	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
-	pb->pb_flags &= ~(PBF_PARTIAL | PBF_NONE);
-
-	return (0);
+	return (-status);
 }
-
 
 ssize_t				/* error (positive) */
 xfs_read(
@@ -205,7 +210,6 @@ xfs_zero_last_block(
 {
 	xfs_fileoff_t	last_fsb;
 	xfs_mount_t	*mp;
-	page_buf_t	*pb;
 	int		nimaps;
 	int		zero_offset;
 	int		zero_len;
@@ -252,40 +256,13 @@ xfs_zero_last_block(
 	 */
 	XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL| XFS_EXTSIZE_RD);
 	loff = XFS_FSB_TO_B(mp, last_fsb);
-	lsize = BBTOB(XFS_FSB_TO_BB(mp, 1));
+	lsize = XFS_FSB_TO_B(mp, 1);
 
 	zero_offset = isize_fsb_offset;
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 
-	pb = pagebuf_lookup(
-		(io->io_flags & XFS_IOCORE_RT)?
-		mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-		ip, loff, lsize, PBF_ENTER_PAGES);
-	if (!pb) {
-		error = ENOMEM;
-		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
-		return error;
-	}
+	error = xfs_iozero(ip, loff + zero_offset, zero_len, end_size);
 
-	if ((imap.br_startblock > 0) &&
-	    (imap.br_startblock != DELAYSTARTBLOCK)) {
-		pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
-		if (imap.br_state == XFS_EXT_UNWRITTEN) {
-			printk("xfs_zero_last_block: unwritten?\n");
-		}
-		if (PBF_NOT_DONE(pb)) {
-			/* pagebuf functions return negative errors */
-			if ((error = -pagebuf_iostart(pb, PBF_READ))) {
-				pagebuf_rele(pb);
-				goto out_lock;
-			}
-		}
-	}
-
-	error = xfs_iozero(ip, pb, zero_offset, zero_len, end_size);
-	pagebuf_rele(pb);
-
-out_lock:
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	ASSERT(error >= 0);
 	return error;
@@ -320,7 +297,6 @@ xfs_zero_eof(
 	xfs_extlen_t	buf_len_fsb;
 	xfs_extlen_t	prev_zero_count;
 	xfs_mount_t	*mp;
-	page_buf_t	*pb;
 	int		nimaps;
 	int		error = 0;
 	xfs_bmbt_irec_t imap;
@@ -418,24 +394,7 @@ xfs_zero_eof(
 		loff = XFS_FSB_TO_B(mp, start_zero_fsb);
 		lsize = XFS_FSB_TO_B(mp, buf_len_fsb);
 
-		pb = pagebuf_lookup(
-			(io->io_flags & XFS_IOCORE_RT)?
-			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			ip, loff, lsize, PBF_ENTER_PAGES);
-		if (!pb) {
-			error = ENOMEM;
-			goto out_lock;
-		}
-
-		if (imap.br_startblock != DELAYSTARTBLOCK) {
-			pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
-			if (imap.br_state == XFS_EXT_UNWRITTEN) {
-				printk("xfs_zero_eof: unwritten? what do we do here?\n");
-			}
-		}
-
-		error = xfs_iozero(ip, pb, 0, lsize, end_size);
-		pagebuf_rele(pb);
+		error = xfs_iozero(ip, loff, lsize, end_size);
 
 		if (error) {
 			goto out_lock;
