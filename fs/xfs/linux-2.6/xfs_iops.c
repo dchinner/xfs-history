@@ -524,8 +524,8 @@ int linvfs_revalidate(struct dentry *dentry)
 		inode->i_gid = va.va_gid;
 		inode->i_rdev = va.va_rdev;
 		inode->i_size = va.va_size;
-		inode->i_blocks = va.va_nblocks >> (PAGE_SHIFT - 9);
-		inode->i_blksize = PAGE_SIZE;
+		inode->i_blocks = va.va_nblocks;
+		inode->i_blksize = va.va_blksize;
 		inode->i_atime = va.va_atime.tv_sec;
 		inode->i_mtime = va.va_mtime.tv_sec;
 		inode->i_ctime = va.va_ctime.tv_sec;
