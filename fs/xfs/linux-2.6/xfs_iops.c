@@ -692,7 +692,6 @@ linvfs_read_full_page(
 
 STATIC int
 linvfs_write_full_page(
-	struct file *filp,
 	struct page *page,
 	int wait)
 {
@@ -714,25 +713,23 @@ linvfs_write_full_page(
 		VOP_RWLOCK(vp, VRWLOCK_WRITE);
 		lock_page(page); /* Wait for the page with inode I/O lock */
 	}
-	error = pagebuf_write_full_page(filp, page);
+	error = pagebuf_write_full_page(page);
 	VOP_RWUNLOCK(vp, VRWLOCK_WRITE);
 	return error;
 }
 
 int
 linvfs_write_full_page_sync(
-	struct file *filp,
 	struct page *page)
 {
-	return(linvfs_write_full_page(filp, page, 1));
+	return(linvfs_write_full_page(page, 1));
 }
 
 int
 linvfs_write_full_page_async(
-	struct file *filp,
 	struct page *page)
 {
-	return(linvfs_write_full_page(filp, page, 0));
+	return(linvfs_write_full_page(page, 0));
 }
 
 void linvfs_file_read(
