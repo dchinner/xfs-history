@@ -130,7 +130,7 @@ typedef struct log_in_core {
 #define ic_header	ic_h.hic_header
 
 /*
- * 
+ *
  */
 typedef struct log {
 	log_ticket_t	*l_freelist;  /* free list of tickets		  :  4*/
@@ -150,6 +150,8 @@ typedef struct log {
 	int		l_curr_block; /* current logical block of log	   : 4*/
 	int		l_prev_block; /* previous logical block of log	   : 4*/
 	int		l_logreserved;/* log space reserved		   : 4*/
+	log_in_core_t	*l_iclog_bak[8];
+	int		l_iclog_size;
 } log_t;
 
 
