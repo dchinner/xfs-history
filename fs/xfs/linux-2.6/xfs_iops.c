@@ -604,9 +604,11 @@ linvfs_get_block_core(
 	 * we are now coming back to use it then we will need to
 	 * flag it as new even if it has a disk address.
 	 */
-	if (create && (!buffer_mapped(bh_result) ||
-				(offset >= inode->i_size)))
+	if (create &&
+	    ((!buffer_mapped(bh_result) && !buffer_uptodate(bh_result)) ||
+	     (offset >= inode->i_size))) {
 		set_buffer_new(bh_result);
+	}
 
 	if (pbmap.pbm_flags & PBMF_DELAY) {
 		if (unlikely(direct))
@@ -944,8 +946,8 @@ linvfs_release_page(
 	}
 
 	if (gfp_mask & __GFP_FS) {
-		pagebuf_release_page(page);
-		return try_to_free_buffers(page);
+		if (pagebuf_release_page(page) == 0)
+			return try_to_free_buffers(page);
 	}
 	return 0;
 }
