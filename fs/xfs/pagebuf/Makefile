@@ -22,6 +22,10 @@ endif
 
 O_TARGET			:= pagebuf.o
 
+ifneq ($(MAKECMDGOALS),modules_install)
+  obj-m                         := $(O_TARGET)
+endif
+
 export-objs			+= page_buf.o page_buf_io.o page_buf_locking.o
 obj-y				+= avl.o \
 				   page_buf.o \
