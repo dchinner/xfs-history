@@ -35,8 +35,6 @@
 #include <linux/xfs_linux.h>
 #include <xfs_arch.h>
 
-#define FSID_T
-
 #include <linux/fs.h>
 #include <linux/xfs_fs.h>
 #include <linux/xfs_sema.h>
@@ -48,7 +46,6 @@
 #include <linux/xfs_uuid.h>
 #include <linux/page_buf.h>
 #include <linux/file.h>
-#include <asm/uaccess.h>
 
 #include <xfs_buf.h>
 #include <linux/xfs_random.h>

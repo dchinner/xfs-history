@@ -41,6 +41,7 @@
 #include <linux/kdev_t.h>
 #include <asm/page.h>
 #include <asm/param.h>
+#include <asm/uaccess.h>
 #include <asm/byteorder.h>
 
 #ifndef STATIC
