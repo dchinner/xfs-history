@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.38 $"
 
 /*
  * xfs_da_btree.h
@@ -350,7 +350,6 @@ void xfs_da_brelse(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 void xfs_da_binval(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 xfs_daddr_t xfs_da_blkno(xfs_dabuf_t *dabuf);
 #ifdef XFS_REPAIR_SIM
-void xfs_da_bwrite(xfs_dabuf_t *dabuf);
 void xfs_da_bhold(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 void xfs_da_bjoin(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 #endif	/* XFS_REPAIR_SIM */

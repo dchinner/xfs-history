@@ -1695,7 +1695,7 @@ xfs_da_hashname(char *name, int namelen)
 }
 
 /*
- * Add a block to the btree aread of the file.
+ * Add a block to the btree ahead of the file.
  * Return the new block number to the caller.
  */
 int
@@ -2641,34 +2641,6 @@ xfs_da_brelse(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 }
 
 #ifdef XFS_REPAIR_SIM
-/*
- * Write dabuf from simulation, no transaction.
- * Have to free up the dabuf before the buffers are released,
- * since the synchronization on the dabuf is really the lock on the buffer.
- */
-void
-xfs_da_bwrite(xfs_dabuf_t *dabuf)
-{
-	xfs_buf_t	*bp;
-	xfs_buf_t	**bplist;
-	int	i;
-	int	nbuf;
-
-	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
-	if ((nbuf = dabuf->nbuf) == 1) {
-		bplist = &bp;
-		bp = dabuf->bps[0];
-	} else {
-		bplist = kmem_alloc(nbuf * sizeof(*bplist), KM_SLEEP);
-		bcopy(dabuf->bps, bplist, nbuf * sizeof(*bplist));
-	}
-	xfs_da_buf_done(dabuf);
-	for (i = 0; i < nbuf; i++)
-		bwrite(bplist[i]);
-	if (bplist != &bp)
-		kmem_free(bplist, nbuf * sizeof(*bplist));
-}
-
 /*
  * Hold dabuf at transaction commit.
  */

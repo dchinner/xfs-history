@@ -31,7 +31,7 @@
  */
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision$"
+#ident	"$Revision: 1.72 $"
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_LOG_TRACE
@@ -194,14 +194,14 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define LOG_LOCK(log)		mutex_spinlock(&(log)->l_icloglock)
 #define LOG_UNLOCK(log, s)	mutex_spinunlock(&(log)->l_icloglock, s)
 
-#ifdef _KERNEL
-#define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
-#define xlog_exit(s)		{cmn_err(CE_PANIC, s); }
-#define xlog_warn(s)		{cmn_err(CE_WARN, s); }
-#else
+#ifdef SIM
 #define xlog_panic(s)		{printf("%s\n", s); abort();}
 #define xlog_exit(s)		{printf("%s\n", s); exit(1);}
 #define xlog_warn(s)		{printf("%s\n", s); }
+#else
+#define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
+#define xlog_exit(s)		{cmn_err(CE_PANIC, s); }
+#define xlog_warn(s)		{cmn_err(CE_WARN, s); }
 #endif
 
 
