@@ -466,7 +466,7 @@ xfs_dm_bulkstat_one(
 	void		*dip,		/* on-disk inode pointer */
 	int		*res)		/* bulkstat result code */
 {
-	xfs_inode_t	*ip;
+	xfs_inode_t	*xip = NULL;
 	dm_stat_t	*sbuf;
 	dm_xstat_t	*xbuf = NULL;
 	dm_handle_t	handle;
@@ -478,7 +478,7 @@ xfs_dm_bulkstat_one(
 	caddr_t		attr_user_buf = NULL;
 	int		value_len;
 	dm_bulkstat_one_t *dmb = (dm_bulkstat_one_t*)private_data;
-	vnode_t		*vp;
+	vnode_t		*vp = NULL;
 
 	/* Returns positive errors to XFS */
 
@@ -510,26 +510,26 @@ xfs_dm_bulkstat_one(
 		error = ENOMEM;
 		goto out_free_buffer;
 	}
-	vp = XFS_ITOV(ip);
 
 	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino) {
 		error = EINVAL;
 		goto out_free_buffer;
 	}
 
-	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, bno);
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &xip, bno);
 	if (error)
 		goto out_free_buffer;
-	if (ip->i_d.di_mode == 0) {
-		xfs_iput_new(ip, XFS_ILOCK_SHARED);
+	if (xip->i_d.di_mode == 0) {
+		xfs_iput_new(xip, XFS_ILOCK_SHARED);
 		error = ENOENT;
 		goto out_free_buffer;
 	}
+	vp = XFS_ITOV(xip);
 
 	/*
 	 * copy everything to the dm_stat buffer
 	 */
-	xfs_ip_to_stat(mp, sbuf, ip);
+	xfs_ip_to_stat(mp, sbuf, xip);
 
 	/*
 	 * Make the handle and put it at the end of the stat buffer.
@@ -554,7 +554,7 @@ xfs_dm_bulkstat_one(
   	/*
 	 * Do not hold ILOCK_SHARED during VOP_ATTR_GET.
   	 */
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	xfs_iunlock(xip, XFS_ILOCK_SHARED);
 
   	/*
 	 * For dm_xstat, get attr.
@@ -581,7 +581,7 @@ xfs_dm_bulkstat_one(
 		}
 
 		memset((void *) &xbuf->dx_attrdata, 0, sizeof(dm_vardata_t));
-		VOP_ATTR_GET(XFS_ITOV(ip), dmb->attrname.dan_chars, attr_buf,
+		VOP_ATTR_GET(vp, dmb->attrname.dan_chars, attr_buf,
 			     &value_len, ATTR_ROOT, sys_cred, error);
 
 		DM_EA_XLATE_ERR(error);
@@ -604,7 +604,7 @@ xfs_dm_bulkstat_one(
 	/*
 	 * Finished with the vnode
   	 */
-	VN_RELE(XFS_ITOV(ip));
+	VN_RELE(vp);
 
 	/*
 	 *  Update link in dm_stat_t to point to next struct.
@@ -645,7 +645,7 @@ xfs_dm_bulkstat_one(
 	return(0);
 
  out_iput:
-	VN_RELE(XFS_ITOV(ip));
+	VN_RELE(vp);
  out_free_attr_buffer:
 	if (attr_buf_sz)
 		kmem_free(attr_buf, attr_buf_sz);
