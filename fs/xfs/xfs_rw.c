@@ -1,4 +1,4 @@
-#ident "$Revision: 1.173 $"
+#ident "$Revision: 1.174 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4374,7 +4374,6 @@ xfs_diostrat(
 	uint		lock_mode;
 	xfs_fsize_t	new_size;
 	struct bdevsw	*my_bdevsw;
-	boolean_t	quotainprogress;
 
 	CHECK_GRIO_TIMESTAMP(bp, 40);
 
@@ -4389,7 +4388,6 @@ xfs_diostrat(
 	blk_algn = rt = 0;
 	numrtextents = iprtextsize = sbrtextsize = 0;
 	totresid = count = bp->b_bcount;
-	quotainprogress = B_FALSE;
 
 	/*
  	 * Determine if this file is using the realtime volume.
@@ -4413,10 +4411,10 @@ xfs_diostrat(
 		writeflag = 0;
 	} else {
 		writeflag = XFS_BMAPI_WRITE;
-		if (quotainprogress = (boolean_t) XFS_IS_QUOTA_ON(mp)) {
+		if (XFS_IS_QUOTA_ON(mp)) {
 			if (XFS_NOT_DQATTACHED(mp, ip)) {
-				if (xfs_qm_dqattach(ip, 0)) 
-					quotainprogress = B_FALSE;
+				if (error = xfs_qm_dqattach(ip, 0)) 
+					goto quota_error;
 			}
 		}
 	}
@@ -4543,8 +4541,7 @@ retry:
 				/* 
 				 * quota reservations
 				 */
-				if (quotainprogress &&
-				    XFS_IS_QUOTA_ON(mp)) {
+				if (XFS_IS_QUOTA_ON(mp)) {
 					if (xfs_trans_reserve_blkquota(tp, ip, 
 					  XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) +
 					  datablocks)) {
@@ -4833,7 +4830,7 @@ retry:
 		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
-
+ quota_error:
 	/*
 	 * Issue completion on the original buffer.
 	 */
