@@ -147,7 +147,8 @@ xfs_bulkstat(
 			i = agino - gino + 1;
 		xfs_trans_brelse(tp, agbp);
 		xfs_btree_del_cursor(cur);
-	}
+	} else
+		i = XFS_INODES_PER_CHUNK;
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
 		if (i >= XFS_INODES_PER_CHUNK) {
 			agbp = xfs_ialloc_read_agi(mp, tp, agno);

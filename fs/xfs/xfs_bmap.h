@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.37 $"
+#ident "$Revision: 1.38 $"
 
 struct getbmap;
 struct xfs_bmbt_rec;
@@ -87,6 +87,7 @@ typedef struct xfs_bmalloca {
  * This would be hidden, but we want idbg to be able to see it.
  */
 typedef struct xfs_bmapi_locals {
+	int			orig_nmap; /* original value of *nmap */
 	char			delay;	/* this request is for delayed alloc */
 	char			inhole;	/* current location is hole in file */
 	char			lowspace; /* using the low-space algorithm */
@@ -98,7 +99,6 @@ typedef struct xfs_bmapi_locals {
 	int			logflags; /* flags for transaction logging */
 	int			n;	/* current extent index */
 	int			orig_flags; /* original flags arg value */
-	int			orig_nmap; /* original value of *nmap */
 	struct xfs_bmbt_irec	*orig_mval; /* original value of mval */
 	struct xfs_bmbt_rec	*ep;	/* extent list entry pointer */
 	struct xfs_btree_cur	*cur;	/* bmap btree cursor */
