@@ -1,14 +1,15 @@
-#ident	"$Revision: 1.48 $"
+#ident	"$Revision: 1.53 $"
+
+#ifdef SIM
+#define _KERNEL 1
+#endif
 
 #include <sys/types.h>
 #include <sys/param.h>
 
-#ifdef SIM
-#define _KERNEL
-#endif
-
 #include <sys/sysmacros.h>
 #include <sys/buf.h>
+#include <sys/sema.h>
 #include <sys/vnode.h>
 
 #ifdef SIM
@@ -26,7 +27,6 @@
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/ktrace.h>
-#include <sys/sema.h>
 #include <sys/vfs.h>
 #include <stddef.h>
 
@@ -171,7 +171,7 @@ xlog_find_cycle_start(xlog_t	*log,
  * Return -1 if we encounter no errors.  This is an invalid block number
  * since we don't ever expect logs to get this large.
  */
-STATIC int
+STATIC daddr_t
 xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 		       daddr_t	start_blk,
 		       int	nbblks,
@@ -1391,7 +1391,6 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
 	daddr_t			blkno;
-	uint			len;
 
 	if (log->l_buf_cancel_table == NULL) {
 		/*
@@ -1419,7 +1418,6 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	 * matches our buffer.
 	 */
 	blkno = buf_f->blf_blkno;
-	len = buf_f->blf_len;
 	prevp = NULL;
 	while (bcp != NULL) {
 		if (bcp->bc_blkno == blkno) {
@@ -1431,7 +1429,7 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 			 * one in the table and remove it if this is the
 			 * last reference.
 			 */
-			ASSERT(bcp->bc_len == len);
+			ASSERT(bcp->bc_len == buf_f->blf_len);
 			if (buf_f->blf_flags & XFS_BLI_CANCEL) {
 				bcp->bc_refcount--;
 				if (bcp->bc_refcount == 0) {
