@@ -4,7 +4,13 @@
  * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
+#ifdef SIM
+#define _KERNEL 1
+#endif
 #include <sys/param.h>
+#ifdef SIM
+#undef _KERNEL
+#endif
 #include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>

@@ -1,7 +1,7 @@
-#include <sys/param.h>
 #ifdef SIM
 #define	_KERNEL 1
 #endif
+#include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/pfdat.h>

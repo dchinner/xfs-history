@@ -16,14 +16,14 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.78 $"
+#ident  "$Revision: 1.79 $"
 
 #include <strings.h>
 #include <limits.h>
-#include <sys/types.h>
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL	1
 #endif
+#include <sys/types.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
 #ifdef SIM

@@ -1,4 +1,10 @@
+#ifdef SIM
+#define _KERNEL 1
+#endif /* SIM */
 #include <sys/param.h>
+#ifdef SIM
+#undef _KERNEL
+#endif /* SIM */
 #include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>

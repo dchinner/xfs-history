@@ -1,7 +1,7 @@
-#include <sys/types.h>
 #ifdef SIM
 #define _KERNEL 1
 #endif
+#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/timers.h>
 #include <sys/buf.h>
