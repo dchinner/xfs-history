@@ -2965,9 +2965,9 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		kdb_printf("\n");
 		return;
 	}
-	kdb_printf("inode 0x%p ino 0x%llu logged %d flags: ",
+	kdb_printf("inode 0x%p ino 0x%llu pushbuf %d logged %d flags: ",
 		ilip->ili_inode, (unsigned long long) ilip->ili_format.ilf_ino,
-		ilip->ili_logged);
+		ilip->ili_pushbuf_flag, ilip->ili_logged);
 	printflags(ilip->ili_flags, ili_flags, NULL);
 	kdb_printf("\n");
 	kdb_printf("ilock recur %d iolock recur %d ext buf 0x%p\n",
@@ -2977,10 +2977,9 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 	kdb_printf("root bytes %d root orig 0x%x\n",
 		ilip->ili_root_size, ilip->ili_orig_root);
 #endif
-	kdb_printf("size %d fields: ", ilip->ili_format.ilf_size);
-	printflags(ilip->ili_format.ilf_fields, ilf_fields, "formatfield");
-	kdb_printf(" last fields: ");
-	printflags(ilip->ili_last_fields, ilf_fields, "lastfield");
+	kdb_printf("size %d ", ilip->ili_format.ilf_size);
+	printflags(ilip->ili_format.ilf_fields, ilf_fields, "fields:");
+	printflags(ilip->ili_last_fields, ilf_fields, " last fields: ");
 	kdb_printf("\n");
 	kdb_printf(" flush lsn %s last lsn %s\n",
 		xfs_fmtlsn(&(ilip->ili_flush_lsn)),
@@ -3070,19 +3069,19 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 		INT_GET(dip->di_format, convert),
 		xfs_fmtformat(
 		    (xfs_dinode_fmt_t)INT_GET(dip->di_format, convert)));
-	kdb_printf("nlink 0x%x uid 0x%x gid 0x%x projid 0x%x\n",
+	kdb_printf("nlink %d uid %d gid %d projid %d\n",
 		INT_GET(dip->di_nlink, convert),
 		INT_GET(dip->di_uid, convert),
 		INT_GET(dip->di_gid, convert),
 		(uint)INT_GET(dip->di_projid, convert));
-	kdb_printf("atime 0x%x:%x mtime 0x%x:%x ctime 0x%x:%x\n",
+	kdb_printf("atime %u:%u mtime %ud:%u ctime %u:%u\n",
 		INT_GET(dip->di_atime.t_sec, convert),
 		INT_GET(dip->di_atime.t_nsec, convert),
 		INT_GET(dip->di_mtime.t_sec, convert),
 		INT_GET(dip->di_mtime.t_nsec, convert),
 		INT_GET(dip->di_ctime.t_sec, convert),
 		INT_GET(dip->di_ctime.t_nsec, convert));
-	kdb_printf("size 0x%Lx ", INT_GET(dip->di_size, convert));
+	kdb_printf("size 0x%Ld ", INT_GET(dip->di_size, convert));
 	kdb_printf("nblocks %Ld extsize 0x%x nextents 0x%x anextents 0x%x\n",
 		INT_GET(dip->di_nblocks, convert),
 		INT_GET(dip->di_extsize, convert),
@@ -4513,10 +4512,10 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 		lip->li_mountp);
 	printflags((uint)(lip->li_flags), li_flags,"log");
 	kdb_printf("\n");
-	kdb_printf("ail forw 0x%p ail back 0x%p lsn %s desc %p ops 0x%p\n",
+	kdb_printf("ail forw 0x%p ail back 0x%p lsn %s\ndesc %p ops 0x%p",
 		lip->li_ail.ail_forw, lip->li_ail.ail_back,
 		xfs_fmtlsn(&(lip->li_lsn)), lip->li_desc, lip->li_ops);
-	kdb_printf("iodonefunc &0x%p\n", lip->li_cb);
+	kdb_printf(" iodonefunc &0x%p\n", lip->li_cb);
 	if (lip->li_type == XFS_LI_BUF) {
 		bio_lip = lip->li_bio_list;
 		if (bio_lip != NULL) {
@@ -4857,7 +4856,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("transp 0x%p &itemp 0x%p\n",
 		ip->i_transp,
 		ip->i_itemp);
-	kdb_printf("&lock 0x%p &iolock 0x%p",
+	kdb_printf("&lock 0x%p &iolock 0x%p ",
 		&ip->i_lock,
 		&ip->i_iolock);
 	kdb_printf("&flock 0x%p (%d) pincount 0x%x\n",
@@ -4865,10 +4864,10 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		xfs_ipincount(ip));
 	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
 		ip->i_udquot, ip->i_gdquot);
-	kdb_printf("new_size %Lx\n", ip->i_iocore.io_new_size);
+	kdb_printf("new_size %Ld\n", ip->i_iocore.io_new_size);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	kdb_printf("\n");
-	kdb_printf("update_core 0x%x update size 0x%x\n",
+	kdb_printf("update_core %d update size %d\n",
 		(int)(ip->i_update_core), (int) ip->i_update_size);
 	kdb_printf("gen 0x%x delayed blks %d",
 		ip->i_gen,
