@@ -1,17 +1,5 @@
-/*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
+#ident	"$Revision: 1.6 $"
 
-/*	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF     	*/
-/*	UNIX System Laboratories, Inc.                     	*/
-/*	The copyright notice above does not evidence any   	*/
-/*	actual or intended publication of such source code.	*/
-
-#ident	"$Revision: 1.4 $"
-
-/*
- * Generic vnode operations.
- */
 #include <xfs_linux.h>
 #include <sys/types.h>
 #undef sysinfo
@@ -151,7 +139,7 @@ fs_noerr()
 }
 
 /*
- * The associated operation is not supported by the file system.
+ * Operation unsupported under this file system.
  */
 int
 fs_nosys()
@@ -178,7 +166,7 @@ fs_noval()
 }
 
 /*
- * Compare two vnodes.
+ * Compare given vnodes.
  */
 int
 fs_cmp(bhv_desc_t * bdp, vnode_t * vp2)
@@ -316,8 +304,7 @@ fs_pages_sethole(
 
 
 /*
- * Return the answer requested to poll() for non-device files.
- * Only POLLIN, POLLRDNORM, and POLLOUT are recognized.
+ * Return requested answer when non-device files poll()'ed.
  */
 /* ARGSUSED */
 int
