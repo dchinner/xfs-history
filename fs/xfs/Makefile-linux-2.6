@@ -45,7 +45,7 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
 
-subdir-$(CONFIG_XFS_FS)		+= linux
+subdir-$(CONFIG_XFS_FS)		+= pagebuf linux
 
 # fs/Makefile enters fs/xfs twice if CONFIG_XFS_FS is y, once for kernel and
 # once for modules.  This is necessary because xfsidbg can be built as a module
@@ -138,7 +138,7 @@ obj-y				+= xfs_alloc.o \
 				   macstubs.o
 
 # Objects not built in this directory
-obj-y				+= linux/linux_xfs.o
+obj-y				+= pagebuf/pagebuf.o linux/linux_xfs.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to

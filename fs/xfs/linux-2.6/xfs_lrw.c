@@ -35,8 +35,6 @@
  */
 
 #include <xfs.h>
-#include <linux/kernel.h>
-#include <linux/page_buf.h>
 #include <linux/pagemap.h>
 #include <linux/capability.h>
 #include <linux/xfs_iops.h>

@@ -37,7 +37,6 @@
 #include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
-#include <linux/page_buf.h>
 
 /* xfs_vfs[ops].c */
 extern void vfsinit(void);
@@ -919,10 +918,14 @@ DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);
 
 static int __init init_xfs_fs(void)
 {
+	int error;
 	struct sysinfo	si;
 	static char message[] __initdata =
 		KERN_INFO "SGI XFS with " XFS_BUILD_OPTIONS " enabled\n";
 
+	error = pagebuf_init();
+	if (error < 0)
+		return error;
 	si_meminfo(&si);
 	xfs_physmem = si.totalram;
 
@@ -942,6 +945,7 @@ static void __exit exit_xfs_fs(void)
         xfs_grio_uninit();
 	xfs_cleanup();
         unregister_filesystem(&xfs_fs_type);
+	pagebuf_terminate();
 }
 
 EXPORT_NO_SYMBOLS;
