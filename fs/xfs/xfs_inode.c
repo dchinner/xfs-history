@@ -83,14 +83,14 @@ xfs_iformat(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip);
 
-STATIC void
+STATIC int
 xfs_iformat_local(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip,
 	int		whichfork,
 	int		size);
 
-STATIC void
+STATIC int
 xfs_iformat_extents(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip,
@@ -349,9 +349,11 @@ xfs_iformat(
 {
 	xfs_attr_shortform_t	*atp;
 	int			size;
+	int			error;
 
 	ip->i_df.if_ext_max =
 		XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
+	error = 0;
 	switch (ip->i_d.di_mode & IFMT) {
 	case IFIFO:
 	case IFCHR:
@@ -369,10 +371,11 @@ xfs_iformat(
 		switch (dip->di_core.di_format) {
 		case XFS_DINODE_FMT_LOCAL:
 			size = (int)ip->i_d.di_size;
-			xfs_iformat_local(ip, dip, XFS_DATA_FORK, size);
+			error = xfs_iformat_local(ip, dip, XFS_DATA_FORK,
+						  size);
 			break;
 		case XFS_DINODE_FMT_EXTENTS:
-			xfs_iformat_extents(ip, dip, XFS_DATA_FORK);
+			error = xfs_iformat_extents(ip, dip, XFS_DATA_FORK);
 			break;
 		case XFS_DINODE_FMT_BTREE:
 			xfs_iformat_btree(ip, dip, XFS_DATA_FORK);
@@ -385,6 +388,9 @@ xfs_iformat(
 	default:
 		return XFS_ERROR(EINVAL);
 	}
+	if (error) {
+		return error;
+	}
 	if (!XFS_DFORK_Q(dip))
 		return 0;
 	ASSERT(ip->i_afp == NULL);
@@ -395,21 +401,23 @@ xfs_iformat(
 	case XFS_DINODE_FMT_LOCAL:
 		atp = (xfs_attr_shortform_t *)XFS_DFORK_APTR(dip);
 		size = (int)atp->hdr.totsize;
-		xfs_iformat_local(ip, dip, XFS_ATTR_FORK, size);
+		error = xfs_iformat_local(ip, dip, XFS_ATTR_FORK, size);
 		break;
 	case XFS_DINODE_FMT_EXTENTS:
-		xfs_iformat_extents(ip, dip, XFS_ATTR_FORK);
+		error = xfs_iformat_extents(ip, dip, XFS_ATTR_FORK);
 		break;
 	case XFS_DINODE_FMT_BTREE:
 		xfs_iformat_btree(ip, dip, XFS_ATTR_FORK);
 		break;
 	default:
+		error = XFS_ERROR(EINVAL);
+	}
+	if (error) {
 		kmem_zone_free(xfs_ifork_zone, ip->i_afp);
 		ip->i_afp = NULL;
-		return XFS_ERROR(EINVAL);
+		xfs_idestroy_fork(ip, XFS_DATA_FORK);
 	}
-
-	return 0;
+	return error;
 }
 
 /*
@@ -422,7 +430,7 @@ xfs_iformat(
  * sure that its size is a multiple of 4 and
  * record the real size in i_real_bytes.
  */
-STATIC void
+STATIC int
 xfs_iformat_local(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip,
@@ -432,6 +440,14 @@ xfs_iformat_local(
 	xfs_ifork_t	*ifp;
 	int		real_size;
 
+	/*
+	 * If the size is unreasonable, then something
+	 * is wrong and we just bail out rather than crash in
+	 * kmem_alloc() or bcopy() below.
+	 */
+	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
+		return XFS_ERROR(EIO);
+	}
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	real_size = 0;
 	if (size == 0)
@@ -448,6 +464,7 @@ xfs_iformat_local(
 		bcopy(XFS_DFORK_PTR(dip, whichfork), ifp->if_u1.if_data, size);
 	ifp->if_flags &= ~XFS_IFEXTENTS;
 	ifp->if_flags |= XFS_IFINLINE;
+	return 0;
 }
 
 /*
@@ -459,7 +476,7 @@ xfs_iformat_local(
  * them into it.  Either way, set if_extents
  * to point at the extents.
  */
-STATIC void
+STATIC int
 xfs_iformat_extents(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip,
@@ -473,6 +490,14 @@ xfs_iformat_extents(
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nex = XFS_DFORK_NEXTENTS(dip, whichfork);
 	size = nex * (int)sizeof(xfs_bmbt_rec_t);
+	/*
+	 * If the number of extents is unreasonable, then something
+	 * is wrong and we just bail out rather than crash in
+	 * kmem_alloc() or bcopy() below.
+	 */
+	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
+		return XFS_ERROR(EIO);
+	}
 	real_size = 0;
 	if (nex == 0)
 		ifp->if_u1.if_extents = NULL;
@@ -494,6 +519,7 @@ xfs_iformat_extents(
 			whichfork);
 	}
 	ifp->if_flags |= XFS_IFEXTENTS;
+	return 0;
 }
 
 /*
