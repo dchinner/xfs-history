@@ -71,9 +71,9 @@ xfs_mount_init(void)
 
 	mp = kmem_zalloc(sizeof(*mp), 0);
 
-	mutex_init(&mp->m_ail_lock, MUTEX_SPIN, "xfs_ail");
-	mutex_init(&mp->m_ipinlock, MUTEX_SPIN, "xfs_ipin");
-	mutex_init(&mp->m_sb_lock, MUTEX_SPIN, "xfs_sb");
+	spinlock_init(&mp->m_ail_lock, "xfs_ail");
+	spinlock_init(&mp->m_ipinlock, "xfs_ipin");
+	spinlock_init(&mp->m_sb_lock, "xfs_sb");
 	mutex_init(&mp->m_ilock, MUTEX_DEFAULT, "xfs_ilock");
 	initnsema(&mp->m_growlock, 1, "xfs_grow");
 	/*
@@ -101,9 +101,9 @@ xfs_mount_free(xfs_mount_t *mp)
 			  sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
 	}
 	
-	mutex_destroy(&mp->m_ail_lock);
-	mutex_destroy(&mp->m_ipinlock);
-	mutex_destroy(&mp->m_sb_lock);
+	spinlock_destroy(&mp->m_ail_lock);
+	spinlock_destroy(&mp->m_ipinlock);
+	spinlock_destroy(&mp->m_sb_lock);
 	mutex_destroy(&mp->m_ilock);
 	freesema(&mp->m_growlock);
 
@@ -532,6 +532,7 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	xfs_ihash_free(mp);
 	mrfree(&mp->m_peraglock);
 	kmem_free(mp->m_perag, sbp->sb_agcount * sizeof(xfs_perag_t));
+	mp->m_perag = NULL;
 	/* FALLTHROUGH */
  error1:
 	/*
@@ -706,7 +707,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 	int		last;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
-	static const int offsets[] = {
+	static const short offsets[] = {
 		offsetof(xfs_sb_t, sb_magicnum),
 		offsetof(xfs_sb_t, sb_blocksize),
 		offsetof(xfs_sb_t, sb_dblocks),

@@ -2630,7 +2630,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_ino_t	ino;
 	int		bucket;
 	int		error;
-	ino_t		last_ino;
+	xfs_ino_t	last_ino;
 
 	mp = log->l_mp;
 	last_ino = 0;
@@ -2687,6 +2687,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 				 * the inode.
 				 */
 				VN_RELE(ip->i_vnode);
+				last_ino = ino;
 			} else {
 				/*
 				 * Skip this bucket if we can't read in
