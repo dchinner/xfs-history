@@ -355,7 +355,8 @@ xfs_getattr(vnode_t	*vp,
 		break;
 	case XFS_DINODE_FMT_EXTENTS:
 	case XFS_DINODE_FMT_BTREE:
-		vap->va_nblocks = xfs_fsb_to_bb(&mp->m_sb, ip->i_d.di_nblocks);
+		vap->va_nblocks = xfs_fsb_to_bb(&mp->m_sb,
+			ip->i_d.di_nblocks + ip->i_delayed_blks);
 		break;
 	default:
 		ASSERT(0);

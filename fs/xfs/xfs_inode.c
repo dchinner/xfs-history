@@ -315,6 +315,8 @@ xfs_iread(xfs_mount_t	*mp,
 		ip->i_d.di_nexti = dip->di_core.di_nexti;
 	}	
 
+	ip->i_delayed_blks = 0;
+
 /*
 	ASSERT(!((ip->i_d.di_nlink == 0) && (ip->i_d.di_mode == 0)));
 */

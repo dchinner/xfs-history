@@ -73,6 +73,7 @@ typedef struct xfs_inode {
 	unsigned long		i_mapcnt;	/* count of mapped pages */
 	unsigned long		i_update_core;	/* timestamps are dirty */
 	unsigned long		i_gen;		/* generation count */
+	unsigned long		i_delayed_blks;	/* count of delay alloc blks */
 
 	/* File incore extent information. */
 	size_t			i_bytes; 	/* bytes in i_u1 */
