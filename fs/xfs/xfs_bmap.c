@@ -131,7 +131,7 @@ xfs_bmap_btree_to_extents(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_btree_cur_t		*cur);	/* btree cursor */
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
@@ -1083,7 +1083,7 @@ xfs_bmap_alloc(
 	 * If allocating at eof, and there's a previous real block,
 	 * try to use it's last block as our starting point.
 	 */
-	if (eof && prevp->br_startoff != NULLFSBLOCK &&
+	if (eof && prevp->br_startoff != NULLFILEOFF &&
 	    !ISNULLSTARTBLOCK(prevp->br_startblock)) {
 		bno = prevp->br_startblock + prevp->br_blockcount;
 		/*
@@ -1118,7 +1118,7 @@ xfs_bmap_alloc(
 		 * If there's a previous (left) block, select a requested
 		 * start block based on it.
 		 */
-		if (prevp->br_startoff != NULLFSBLOCK &&
+		if (prevp->br_startoff != NULLFILEOFF &&
 		    !ISNULLSTARTBLOCK(prevp->br_startblock)) {
 			/*
 			 * Calculate gap to end of previous block.
@@ -1316,8 +1316,9 @@ xfs_bmap_btree_to_extents(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_btree_cur_t		*cur)	/* btree cursor */
 {
-	xfs_bmbt_ptr_t		cbno;	/* child block number */
+	xfs_fsblock_t		cbno;	/* child block number */
 	xfs_mount_t		*mp;	/* mount point structure */
+	xfs_bmbt_ptr_t		*pp;	/* ptr to block address */
 	xfs_bmbt_block_t	*rblock;/* root btree block */
 	xfs_sb_t		*sbp;	/* superblock structure pointer */
 
@@ -1328,7 +1329,9 @@ xfs_bmap_btree_to_extents(
 	ASSERT(rblock->bb_numrecs == 1);
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
-	cbno = *XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, sbp->sb_inodesize);
+	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, sbp->sb_inodesize);
+	xfs_btree_check_lptr(cur, *pp, 1);
+	cbno = *pp;
 #ifdef XFSDEBUG
 	{
 		xfs_bmbt_block_t	*cblock;
@@ -1345,7 +1348,7 @@ xfs_bmap_btree_to_extents(
 	return XFS_ILOG_CORE;
 }
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
@@ -1652,7 +1655,7 @@ xfs_bmap_extents_to_btree(
 	block->bb_magic = XFS_BMAP_MAGIC;
 	block->bb_level = 1;
 	block->bb_numrecs = 1;
-	block->bb_leftsib = block->bb_rightsib = NULLFSBLOCK;
+	block->bb_leftsib = block->bb_rightsib = NULLDFSBNO;
 	/*
 	 * Need a cursor.  Can't allocate until bb_level is filled in.
 	 */
@@ -1688,7 +1691,7 @@ xfs_bmap_extents_to_btree(
 	ablock->bb_magic = XFS_BMAP_MAGIC;
 	ablock->bb_level = 0;
 	ablock->bb_numrecs = 0;
-	ablock->bb_leftsib = ablock->bb_rightsib = NULLFSBLOCK;
+	ablock->bb_leftsib = ablock->bb_rightsib = NULLDFSBNO;
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
 	for (ep = ip->i_u1.iu_extents, i = 0; i < nextents; i++, ep++) {
@@ -1844,7 +1847,7 @@ xfs_bmap_search_extents(
 		ep = base + lastx;
 	} else
 		ep = NULL;
-	prevp->br_startoff = NULLFSBLOCK;
+	prevp->br_startoff = NULLFILEOFF;
 	if (ep && bno >= (got.br_startoff = xfs_bmbt_get_startoff(ep)) &&
 	    bno < got.br_startoff +
 		  (got.br_blockcount = xfs_bmbt_get_blockcount(ep))) {
@@ -2124,10 +2127,11 @@ xfs_bmap_read_extents(
 	xfs_inode_t		*ip)	/* incore inode */
 {
 	xfs_bmbt_block_t	*block;	/* current btree block */
-	xfs_bmbt_ptr_t		bno;	/* block # of "block" */
+	xfs_fsblock_t		bno;	/* block # of "block" */
 	buf_t			*buf;	/* buffer for "block" */
 	xfs_extnum_t		i;	/* index into the extents list */
 	xfs_mount_t		*mp;	/* file system mount structure */
+	xfs_bmbt_ptr_t		*pp;	/* pointer to block address */
 	xfs_extnum_t		room;	/* number of entries there's room for */
 	xfs_sb_t		*sbp;	/* super block structure */
 	xfs_bmbt_rec_t		*trp;	/* target record pointer */
@@ -2139,8 +2143,10 @@ xfs_bmap_read_extents(
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
-	if (block->bb_level)
-		bno = *XFS_BMAP_BROOT_PTR_ADDR(block, 1, sbp->sb_inodesize);
+	if (block->bb_level) {
+		pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, sbp->sb_inodesize);
+		bno = *pp;
+	}
 	/*
 	 * Go down the tree until leaf level is reached, following the first
 	 * pointer (leftmost) at each level.
@@ -2150,8 +2156,8 @@ xfs_bmap_read_extents(
 		block = xfs_buf_to_bmbt_block(buf);
 		if (block->bb_level == 0)
 			break;
-		bno = *XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt,
-					  block, 1);
+		pp = XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
+		bno = *pp;
 		xfs_trans_brelse(tp, buf);
 	}
 	/*
@@ -2165,7 +2171,7 @@ xfs_bmap_read_extents(
 	 */
 	for (;;) {
 		xfs_bmbt_rec_t	*frp;
-		xfs_bmbt_ptr_t	nextbno;
+		xfs_fsblock_t	nextbno;
 
 		ASSERT(i + block->bb_numrecs <= room);
 		/*
