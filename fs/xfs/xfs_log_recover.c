@@ -374,6 +374,7 @@ xlog_find_tail(xlog_t  *log,
 	log->l_prev_block = i;
 	log->l_curr_block = *head_blk;
 	log->l_curr_cycle = rhead->h_cycle;
+	ASSIGN_LSN(log->l_reshead_lsn, log);
 	log->l_tail_lsn = rhead->h_tail_lsn;
 	log->l_last_sync_lsn = log->l_tail_lsn;
 	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
@@ -385,10 +386,10 @@ xlog_find_tail(xlog_t  *log,
 		}
 	}
 	if (BLOCK_LSN(log->l_tail_lsn) <= *head_blk) {
-		log->l_logreserved = BBTOB(*head_blk-BLOCK_LSN(log->l_tail_lsn));
+		log->l_logreserved =BBTOB(*head_blk-BLOCK_LSN(log->l_tail_lsn));
 	} else {
 		log->l_logreserved =
-		    log->l_logsize - BBTOB(BLOCK_LSN(log->l_tail_lsn)-*head_blk);
+		   log->l_logsize - BBTOB(BLOCK_LSN(log->l_tail_lsn)-*head_blk);
 	}
 exit:
 	xlog_put_bp(bp);

@@ -183,6 +183,7 @@ typedef struct log {
     lock_t		l_icloglock;    /* grab to change iclog state */
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
+    xfs_lsn_t		l_reshead_lsn;	/* lsn of reservation head */
     xfs_mount_t		*l_mp;	        /* mount point */
     buf_t		*l_xbuf;        /* extra buffer for log wrapping */
     dev_t		l_dev;	        /* dev_t of log */
