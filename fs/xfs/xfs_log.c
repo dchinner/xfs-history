@@ -57,12 +57,12 @@ xfs_log_write(xfs_mount_t *	mp,
 	return 0;
 }	/* xfs_log_write */
 
-void
+xfs_lsn_t
 xfs_log_done(xfs_mount_t	*mp,
 	     xfs_log_ticket_t	tic,
 	     uint		flags)
 {
-	return;
+	return 0;
 }	/* xfs_log_done */
 #else
 
