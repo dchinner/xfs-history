@@ -155,10 +155,12 @@ xfs_parseargs(
 				"XFS: this FS is trash after writing to it\n");
 			} else {
 				logbufs = simple_strtoul(value, &eov, 10);
-				if (logbufs < 2 || logbufs > 8) {
+				if (logbufs < XLOG_NUM_ICLOGS ||
+				    logbufs > XLOG_MAX_ICLOGS) {
 					printk(
-					"XFS: Illegal logbufs: %d [not 2-8]\n",
-						logbufs);
+					"XFS: Illegal logbufs: %d [not %d-%d]\n",
+						logbufs, XLOG_NUM_ICLOGS,
+						XLOG_MAX_ICLOGS);
 					return rval;
 				}
 			}
