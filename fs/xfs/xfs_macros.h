@@ -28,7 +28,7 @@
  */
 #define	XFS_WANT_SPACE_C	\
 	(!defined(_STANDALONE) && \
-	 (defined(_KERNEL) ))
+	 (defined(DEBUG) || (defined(_KERNEL))))
 
 /*
  * Set for debug simulation and kernel builds, but not for standalone.
@@ -36,7 +36,7 @@
  * Used in xfs_macros.c.
  */
 #define	XFS_WANT_FUNCS_C	\
-	(!defined(_STANDALONE))
+	(!defined(_STANDALONE) && defined(DEBUG))
 
 /*
  * Corresponding names used in .h files.
