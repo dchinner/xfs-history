@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.95 $"
+#ident	"$Revision: 1.96 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -57,7 +57,7 @@
 #endif /* SIM */
 
 
-STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, uint, int);
+STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, __int64_t, int);
 STATIC void	xfs_sb_relse(buf_t *);
 
 /*
@@ -130,7 +130,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error = 0;
-	int		i, brsize;
+	int		i;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
@@ -178,7 +178,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
 	if ((sbp->sb_magicnum != XFS_SB_MAGIC)		||
-	    (sbp->sb_versionnum != XFS_SB_VERSION)	||
+	    !XFS_SB_GOOD_VERSION(sbp->sb_versionnum)	||
 	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev)) {
 		error = XFS_ERROR(EINVAL);
 		goto error0;
@@ -205,6 +205,27 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
+
+	/*
+	 * Setup for attributes, in case they get created.
+	 * This value is for inodes getting attributes for the first time,
+	 * the per-inode value is for old attribute values.
+	 */
+	ASSERT(mp->m_sb.sb_inodesize >= 256 && mp->m_sb.sb_inodesize <= 2048);
+	switch (mp->m_sb.sb_inodesize) {
+	case 256:
+		mp->m_attroffset = XFS_LITINO(mp) - XFS_BMDR_SPACE_CALC(2);
+		break;
+	case 512:
+	case 1024:
+	case 2048:
+		mp->m_attroffset = XFS_BMDR_SPACE_CALC(12);
+		break;
+	default:
+		ASSERT(0);
+	}
+	ASSERT(mp->m_attroffset < XFS_LITINO(mp));
+
 	for (i = 0; i < 2; i++) {
 		mp->m_alloc_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
 			xfs_alloc, i == 0);
@@ -217,15 +238,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_bmap_dmnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
 			xfs_bmbt, i == 0);
 	}
-	brsize = XFS_BMAP_BROOT_SIZE(sbp->sb_inodesize);
-	for (i = 0; i < 2; i++) {
-		mp->m_bmap_dmxr[i + 2] = XFS_BTREE_BLOCK_MAXRECS(brsize,
-			xfs_bmdr, i == 0);
-		ASSERT(mp->m_bmap_dmxr[i + 2] >= 2);
-		mp->m_bmap_dmnr[i + 2] = XFS_BTREE_BLOCK_MINRECS(brsize,
-			xfs_bmdr, i == 0);
-	}
-	mp->m_bmap_ext_mxr = brsize / sizeof(xfs_bmbt_rec_t);
 	for (i = 0; i < 2; i++) {
 		mp->m_inobt_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
 			xfs_inobt, i == 0);
@@ -233,7 +245,8 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			xfs_inobt, i == 0);
 	}
 	xfs_alloc_compute_maxlevels(mp);
-	xfs_bmap_compute_maxlevels(mp);
+	xfs_bmap_compute_maxlevels(mp, XFS_DATA_FORK);
+	xfs_bmap_compute_maxlevels(mp, XFS_ATTR_FORK);
 	xfs_ialloc_compute_maxlevels(mp);
 	mp->m_bsize = XFS_FSB_TO_BB(mp, 1);
 	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
@@ -271,7 +284,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_writeio_log = writeio_log;
 	}
 	mp->m_writeio_blocks = 1 << (mp->m_writeio_log - sbp->sb_blocklog);
-
+	
 	/*
 	 * Check that the data (and log if separate) are an ok size.
 	 */
@@ -594,7 +607,7 @@ xfs_umount(xfs_mount_t *mp)
  * access.
  */
 void
-xfs_mod_sb(xfs_trans_t *tp, int fields)
+xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 {
 	buf_t		*bp;
 	int		first;
@@ -630,6 +643,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 		offsetof(xfs_sb_t, sb_agblklog),
 		offsetof(xfs_sb_t, sb_rextslog),
 		offsetof(xfs_sb_t, sb_inprogress),
+		offsetof(xfs_sb_t, sb_pad1),
 		offsetof(xfs_sb_t, sb_icount),
 		offsetof(xfs_sb_t, sb_ifree),
 		offsetof(xfs_sb_t, sb_fdblocks),
@@ -656,7 +670,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
  * The SB_LOCK must be held when this routine is called.
  */
 STATIC int
-xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, uint field, int delta)
+xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, __int64_t field, int delta)
 {
 	register int		scounter; /* short counter for 32 bit fields */
 	register long long	lcounter; /* long counter for 64 bit fields */
@@ -733,7 +747,7 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, uint field, int delta)
  * routine to do the work.
  */
 int
-xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
+xfs_mod_incore_sb(xfs_mount_t *mp, __int64_t field, int delta)
 {
 	int	s;
 	int	status;

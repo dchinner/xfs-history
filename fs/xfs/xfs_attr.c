@@ -101,6 +101,7 @@ xfs_attr_get(vnode_t *vp, char *name, char *value, int *valuelenp, int flags,
 	args.flags = flags;
 	args.hashval = xfs_da_hashname(args.name, args.namelen);
 	args.dp = XFS_VTOI(vp);
+	args.whichfork = XFS_ATTR_FORK;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -158,6 +159,7 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	args.firstblock = &firstblock;
 	args.flist = &flist;
 	args.total = MAX_EXT_NEEDED;
+	args.whichfork = XFS_ATTR_FORK;
 
 	/*
 	 * Set up the transaction envelope.
@@ -265,6 +267,7 @@ xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
 	args.firstblock = &firstblock;
 	args.flist = &flist;
 	args.total = 0;
+	args.whichfork = XFS_ATTR_FORK;
 
 	/*
 	 * Set up the transaction envelope.
@@ -387,12 +390,14 @@ xfs_attr_isempty(xfs_inode_t *dp)
 {
 	xfs_attr_sf_hdr_t *hdr;
 
+	/* FIXME */
 	ASSERT((dp->i_d.di_mode & IFMT) == IFREG);
 	if (dp->i_d.di_size == 0)
 		return(1);
-	if (dp->i_d.di_size > XFS_LITINO(dp->i_mount))
+	/* FIXME */
+	if (dp->i_d.di_size > XFS_IFORK_ASIZE(dp))
 		return(0);
-	hdr = (xfs_attr_sf_hdr_t *)dp->i_u1.iu_data;
+	hdr = (xfs_attr_sf_hdr_t *)dp->i_af.if_u1.if_data;
 	return(hdr->count == 0);
 }
 
@@ -406,8 +411,10 @@ xfs_attr_print(xfs_trans_t *trans, xfs_inode_t *dp)
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
+	/* FIXME */
 	ASSERT((dp->i_d.di_mode & IFMT) == IFREG);
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	/* FIXME */
+	if (dp->i_d.di_size <= XFS_IFORK_ASIZE(dp)) {
 		xfs_attr_shortform_print(trans, dp);
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		xfs_attr_leaf_print(trans, dp);

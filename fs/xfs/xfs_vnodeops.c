@@ -1,4 +1,4 @@
-#ident "$Revision: 1.174 $"
+#ident "$Revision: 1.175 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -399,7 +399,7 @@ xfs_getattr(
         } else if ((vp->v_type == VCHR) ||
 		   (vp->v_type == VBLK) ||
 		   (vp->v_type == VXNAM)) {
-                vap->va_rdev = ip->i_u2.iu_rdev;
+                vap->va_rdev = ip->i_df.if_u2.if_rdev;
         } else {
                 vap->va_rdev = 0;       /* not a b/c spec. */
 	}
@@ -452,8 +452,8 @@ xfs_getattr(
 			vap->va_xflags |= XFS_XFLAG_REALTIME ;
 		}
 		vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
-		vap->va_nextents = (ip->i_flags & XFS_IEXTENTS) ?
-			ip->i_bytes / sizeof(xfs_bmbt_rec_t) :
+		vap->va_nextents = (ip->i_df.if_flags & XFS_IFEXTENTS) ?
+			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
 		vap->va_uuid = ip->i_d.di_uuid;
 	}
@@ -968,8 +968,8 @@ xfs_readlink(
 	 */
 	pathlen = (int) ip->i_d.di_size;
 
-	if (ip->i_flags & XFS_IINLINE) {
-		error = uiomove (ip->i_u1.iu_data, pathlen, UIO_READ, uiop);
+	if (ip->i_df.if_flags & XFS_IFINLINE) {
+		error = uiomove (ip->i_df.if_u1.if_data, pathlen, UIO_READ, uiop);
 	}
 	else {
 		/*
@@ -1048,7 +1048,7 @@ xfs_fsync(
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	last_byte = xfs_file_last_byte(ip);
 	if (flag & FSYNC_INVAL) {
-		if (ip->i_flags & XFS_IEXTENTS && ip->i_bytes > 0) {
+		if (ip->i_df.if_flags & XFS_IFEXTENTS && ip->i_df.if_bytes > 0) {
 			if (VN_MAPPED(vp)) {
 				remapf(vp, 0, 1);
 			}
@@ -1114,10 +1114,10 @@ xfs_itruncate_cleanup(
 	xfs_trans_ijoin(*tpp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	xfs_trans_ihold(*tpp, ip);
 
-	if (ip->i_broot != NULL) {
-		kmem_free(ip->i_broot, ip->i_broot_bytes);
-		ip->i_broot = NULL;
-		ip->i_broot_bytes = 0;
+	if (ip->i_df.if_broot != NULL) {
+		kmem_free(ip->i_df.if_broot, ip->i_df.if_broot_bytes);
+		ip->i_df.if_broot = NULL;
+		ip->i_df.if_broot_bytes = 0;
 	}
 
 	/*
@@ -1127,24 +1127,24 @@ xfs_itruncate_cleanup(
 	 * so check and free it up if we do.
 	 */
 	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
-		if ((ip->i_u1.iu_data != ip->i_u2.iu_inline_data) && 
-		    (ip->i_u1.iu_data != NULL)) {
-			ASSERT(ip->i_real_bytes != 0);
-			kmem_free(ip->i_u1.iu_data, ip->i_real_bytes);
-			ip->i_u1.iu_data = NULL;
-			ip->i_real_bytes = 0;
+		if ((ip->i_df.if_u1.if_data != ip->i_df.if_u2.if_inline_data) &&
+		    (ip->i_df.if_u1.if_data != NULL)) {
+			ASSERT(ip->i_df.if_real_bytes != 0);
+			kmem_free(ip->i_df.if_u1.if_data, ip->i_df.if_real_bytes);
+			ip->i_df.if_u1.if_data = NULL;
+			ip->i_df.if_real_bytes = 0;
 		}
-	} else if ((ip->i_flags & XFS_IEXTENTS) &&
-		   (ip->i_u1.iu_extents != NULL) &&
-		   (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext)) {
-		ASSERT(ip->i_real_bytes != 0);
-		kmem_free(ip->i_u1.iu_extents, ip->i_real_bytes);
-		ip->i_u1.iu_extents = NULL;
-		ip->i_real_bytes = 0;
+	} else if ((ip->i_df.if_flags & XFS_IFEXTENTS) &&
+		   (ip->i_df.if_u1.if_extents != NULL) &&
+		   (ip->i_df.if_u1.if_extents != ip->i_df.if_u2.if_inline_ext)) {
+		ASSERT(ip->i_df.if_real_bytes != 0);
+		kmem_free(ip->i_df.if_u1.if_extents, ip->i_df.if_real_bytes);
+		ip->i_df.if_u1.if_extents = NULL;
+		ip->i_df.if_real_bytes = 0;
 	}
-	ASSERT(ip->i_u1.iu_extents == NULL ||
-	       ip->i_u1.iu_extents == ip->i_u2.iu_inline_ext);
-	ASSERT(ip->i_real_bytes == 0);
+	ASSERT(ip->i_df.if_u1.if_extents == NULL ||
+	       ip->i_df.if_u1.if_extents == ip->i_df.if_u2.if_inline_ext);
+	ASSERT(ip->i_df.if_real_bytes == 0);
 	
 	ip->i_d.di_nblocks = 0;
 	ip->i_d.di_nextents = 0;
@@ -1191,8 +1191,8 @@ xfs_inactive(
 	 * to clean up here.
 	 */
 	if (ip->i_d.di_mode == 0) {
-		ASSERT(ip->i_real_bytes == 0);
-		ASSERT(ip->i_broot_bytes == 0);
+		ASSERT(ip->i_df.if_real_bytes == 0);
+		ASSERT(ip->i_df.if_broot_bytes == 0);
 		return;
 	}
 
@@ -1256,7 +1256,7 @@ xfs_inactive(
 			}
 		} else if ((ip->i_d.di_mode & IFMT) == IFLNK) {
 
-			if (ip->i_d.di_size > XFS_LITINO(mp)) {
+			if (ip->i_d.di_size > XFS_IFORK_DSIZE(ip)) {
 				/*
 				 * We're freeing a symlink that has some
 				 * blocks allocated to it.  Free the
@@ -1325,10 +1325,12 @@ xfs_inactive(
 				 */
 				(void) xfs_trans_commit(tp, 0);
 				tp = ntp;
-				if (ip->i_bytes) {
-					xfs_idata_realloc(ip, -(ip->i_bytes));
+				if (ip->i_df.if_bytes) {
+					xfs_idata_realloc(ip,
+						-(ip->i_df.if_bytes),
+						XFS_DATA_FORK);
 				}
-				ASSERT(ip->i_bytes == 0);
+				ASSERT(ip->i_df.if_bytes == 0);
 				error = xfs_trans_reserve(tp, 0,
 					       XFS_ITRUNCATE_LOG_RES(mp),
 					       0, XFS_TRANS_PERM_LOG_RES,
@@ -1349,9 +1351,10 @@ xfs_inactive(
 
 				xfs_ilock(ip, XFS_ILOCK_EXCL |
 					  XFS_IOLOCK_EXCL);
-				ASSERT(ip->i_bytes > 0);
-				xfs_idata_realloc(ip, -(ip->i_bytes));
-				ASSERT(ip->i_bytes == 0);
+				ASSERT(ip->i_df.if_bytes > 0);
+				xfs_idata_realloc(ip, -(ip->i_df.if_bytes),
+					XFS_DATA_FORK);
+				ASSERT(ip->i_df.if_bytes == 0);
 			}
 
 			xfs_trans_ijoin(tp, ip,
@@ -1395,7 +1398,7 @@ free_inode:
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	} else if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		   (ip->i_d.di_size > 0) &&
-		   (ip->i_flags & XFS_IEXTENTS))  &&
+		   (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		   (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC)) ) { 
 		/*
 		 * Figure out if there are any blocks beyond the end
@@ -1957,7 +1960,7 @@ xfs_create(
 	if (error = xfs_trans_reserve(tp,
 				      XFS_IALLOC_BLOCKS(mp) +
 				      XFS_IN_MAXLEVELS(mp) +
-				      XFS_BM_MAXLEVELS(mp) + 10,
+				      XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + 10,
 				      XFS_CREATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_CREATE_LOG_COUNT)) {
@@ -4213,19 +4216,19 @@ xfs_symlink(
 	/*
 	 * If the symlink will fit into the inode, write it inline.
 	 */
-	if (pathlen <= XFS_LITINO(mp)) {
-		xfs_idata_realloc(ip, pathlen);
-		bcopy(target_path, ip->i_u1.iu_data, pathlen);
+	if (pathlen <= XFS_IFORK_DSIZE(ip)) {
+		xfs_idata_realloc(ip, pathlen, XFS_DATA_FORK);
+		bcopy(target_path, ip->i_df.if_u1.if_data, pathlen);
 		ip->i_d.di_size = pathlen;
 
 		/*
 		 * The inode was initially created in extent format.
 		 */
-		ip->i_flags &= ~(XFS_IEXTENTS | XFS_IBROOT);
-		ip->i_flags |= XFS_IINLINE;
+		ip->i_df.if_flags &= ~(XFS_IFEXTENTS | XFS_IFBROOT);
+		ip->i_df.if_flags |= XFS_IFINLINE;
 
 		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL;
-		xfs_trans_log_inode(tp, ip, XFS_ILOG_DATA | XFS_ILOG_CORE);
+		xfs_trans_log_inode(tp, ip, XFS_ILOG_DDATA | XFS_ILOG_CORE);
 
 	} else {
                 xfs_fileoff_t   first_fsb;
@@ -5257,7 +5260,7 @@ xfs_alloc_file_space(
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
 		error = xfs_trans_reserve(tp,
-					  XFS_BM_MAXLEVELS(mp) + datablocks,
+					  XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + datablocks,
 					  XFS_WRITE_LOG_RES(mp),
 					  numrtextents,
 					  XFS_TRANS_PERM_LOG_RES,

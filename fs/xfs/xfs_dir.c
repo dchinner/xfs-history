@@ -1,4 +1,4 @@
-#ident "$Revision: 1.57 $"
+#ident "$Revision: 1.60 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -116,7 +116,7 @@ xfs_dir_mount(xfs_mount_t *mp)
 {
 	uint shortcount, leafcount, count;
 
-	shortcount = (XFS_LITINO(mp) - sizeof(xfs_dir_sf_hdr_t)) /
+	shortcount = (mp->m_attroffset - sizeof(xfs_dir_sf_hdr_t)) /
 		     sizeof(xfs_dir_sf_entry_t);
 	leafcount = (XFS_LBSIZE(mp) - sizeof(xfs_dir_leaf_hdr_t)) /
 		    (sizeof(xfs_dir_leaf_entry_t) +
@@ -137,9 +137,9 @@ xfs_dir_isempty(xfs_inode_t *dp)
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (dp->i_d.di_size == 0)
 		return(1);
-	if (dp->i_d.di_size > XFS_LITINO(dp->i_mount))
+	if (dp->i_d.di_size > XFS_IFORK_DSIZE(dp))
 		return(0);
-	hdr = (xfs_dir_sf_hdr_t *)dp->i_u1.iu_data;
+	hdr = (xfs_dir_sf_hdr_t *)dp->i_df.if_u1.if_data;
 	return(hdr->count == 0);
 }
 
@@ -190,13 +190,14 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.firstblock = firstblock;
 	args.flist = flist;
 	args.total = total;
+	args.whichfork = XFS_DATA_FORK;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
 		newsize = XFS_DIR_SF_ENTSIZE_BYNAME(args.namelen);
-		if ((dp->i_d.di_size + newsize) <= XFS_LITINO(dp->i_mount)) {
+		if ((dp->i_d.di_size + newsize) <= XFS_IFORK_DSIZE(dp)) {
 			retval = xfs_dir_shortform_addname(trans, &args);
 		} else {
 			retval = xfs_dir_shortform_to_leaf(trans, &args);
@@ -259,18 +260,19 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.firstblock = firstblock;
 	args.flist = flist;
 	args.total = total;
+	args.whichfork = XFS_DATA_FORK;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
 		retval = xfs_dir_shortform_removename(trans, &args);
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		retval = xfs_dir_leaf_removename(trans, &args,
 							&count, &totallen);
 		if (retval == 0) {
 			newsize = XFS_DIR_SF_ALLFIT(count, totallen);
-			if (newsize <= XFS_LITINO(dp->i_mount)) {
+			if (newsize <= XFS_IFORK_DSIZE(dp)) {
 				retval = xfs_dir_leaf_to_shortform(trans,
 								   &args);
 			}
@@ -316,11 +318,12 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.firstblock = NULL;
 	args.flist = NULL;
 	args.total = 0;
+	args.whichfork = XFS_DATA_FORK;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
 		retval = xfs_dir_shortform_lookup(trans, &args);
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		retval = xfs_dir_leaf_lookup(trans, &args);
@@ -350,7 +353,7 @@ xfs_dir_print(xfs_trans_t *trans, xfs_inode_t *dp)
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
 		xfs_dir_shortform_print(trans, dp);
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		xfs_dir_leaf_print(trans, dp);
@@ -389,7 +392,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
 		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp);
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp);
@@ -436,11 +439,12 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.firstblock = NULL;
 	args.flist = NULL;
 	args.total = 0;
+	args.whichfork = XFS_DATA_FORK;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
+	if (dp->i_d.di_size <= XFS_IFORK_DSIZE(dp)) {
 		retval = xfs_dir_shortform_replace(trans, &args);
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		retval = xfs_dir_leaf_replace(trans, &args);

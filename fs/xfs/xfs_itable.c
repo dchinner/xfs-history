@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -90,7 +90,7 @@ xfs_bulkstat_one(
 	buf->bs_padding = 0;
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_DEV:
-		buf->bs_rdev = ip->i_u2.iu_rdev;
+		buf->bs_rdev = ip->i_df.if_u2.if_rdev;
 		buf->bs_blksize = BLKDEV_IOSIZE;
 		buf->bs_blocks = 0;
 		break;
@@ -175,7 +175,7 @@ xfs_bulkstat(
 			goto next;
 		}
 		cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
-			XFS_BTNUM_INO, (xfs_inode_t *)0);
+			XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 		error = xfs_inobt_lookup_le(cur, agino, 0, 0, &tmp);
 		if (error) {
 			/*
@@ -217,7 +217,7 @@ xfs_bulkstat(
 				continue;
 			}
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
-				XFS_BTNUM_INO, (xfs_inode_t *)0);
+				XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 			error = xfs_inobt_lookup_ge(cur, agino, 0, 0, &tmp);
 			if (error) {
 				/*
@@ -345,7 +345,7 @@ xfs_inumbers(
 				continue;
 			}
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
-				XFS_BTNUM_INO, (xfs_inode_t *)0);
+				XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 			error = xfs_inobt_lookup_ge(cur, agino, 0, 0, &tmp);
 			if (error) {
 				xfs_btree_del_cursor(cur);

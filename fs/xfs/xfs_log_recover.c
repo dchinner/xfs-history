@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.58 $"
+#ident	"$Revision: 1.59 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1033,9 +1033,9 @@ xlog_recover_print_inode_core(xfs_dinode_core_t *di)
 	   di->di_uid, di->di_gid, di->di_uuid);
     printf("		atime:%d  mtime:%d  ctime:%d\n",
 	   di->di_atime.t_sec, di->di_mtime.t_sec, di->di_ctime.t_sec);
-    printf("		size:0x%llx  nblks:0x%llx  exsize:%d  nextents:%d  nattrext:%d\n",
+    printf("		size:0x%llx  nblks:0x%llx  exsize:%d  nextents:%d  anextents:%d\n",
 	   di->di_size, di->di_nblocks, di->di_extsize, di->di_nextents,
-	   (int)di->di_nattrextents);
+	   (int)di->di_anextents);
     printf("		forkoff:%d  dmevmask:0x%x  dmstate:%d  flags:0x%x  gen:%d\n",
 	   (int)di->di_forkoff, di->di_dmevmask, (int)di->di_dmstate, (int)di->di_flags,
 	   di->di_gen);
@@ -1062,7 +1062,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
 
     /* does anything come next */
     switch (f->ilf_fields & XFS_ILOG_NONCORE) {
-	case XFS_ILOG_EXT: {
+	case XFS_ILOG_DEXT: {
 	    ASSERT(f->ilf_size == 3);
 	    printf("		EXTENTS inode data:\n");
 	    if (print_inode && print_data) {
@@ -1071,7 +1071,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
 	    }
 	    break;
 	}
-	case XFS_ILOG_BROOT: {
+	case XFS_ILOG_DBROOT: {
 	    ASSERT(f->ilf_size == 3);
 	    printf("		BTREE inode data:\n");
 	    if (print_inode && print_data) {
@@ -1080,7 +1080,7 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
 	    }
 	    break;
 	}
-	case XFS_ILOG_DATA: {
+	case XFS_ILOG_DDATA: {
 	    ASSERT(f->ilf_size == 3);
 	    printf("		LOCAL inode data:\n");
 	    if (print_inode && print_data) {
@@ -1797,17 +1797,18 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	len = item->ri_buf[2].i_len;
 	src = item->ri_buf[2].i_addr;
 	ASSERT(in_f->ilf_size == 3);
+	/* FIX ME: ATTR FORK */
 	switch (in_f->ilf_fields & XFS_ILOG_NONCORE) {
-	    case XFS_ILOG_DATA:
-	    case XFS_ILOG_EXT: {
+	    case XFS_ILOG_DDATA:
+	    case XFS_ILOG_DEXT: {
 		    ASSERT((caddr_t)&dip->di_u+len <= bp->b_dmaaddr+bp->b_bcount);
 		    bcopy(src, &dip->di_u, len);
 		    break;
 	    }
-	    case XFS_ILOG_BROOT: {
+	    case XFS_ILOG_DBROOT: {
 		xfs_bmbt_to_bmdr((xfs_bmbt_block_t *)src, len,
 				 &(dip->di_u.di_bmbt),
-				 XFS_BMAP_BROOT_SIZE(mp->m_sb.sb_inodesize));
+				 XFS_DFORK_DSIZE(dip, mp));
 		break;
 	    }
 	    case XFS_ILOG_DEV: {
@@ -2684,7 +2685,7 @@ xlog_do_recover(xlog_t	*log,
 	}
 	sbp = XFS_BUF_TO_SBP(bp);
 	ASSERT(sbp->sb_magicnum == XFS_SB_MAGIC);
-	ASSERT(sbp->sb_versionnum == XFS_SB_VERSION);
+	ASSERT(XFS_SB_GOOD_VERSION(sbp->sb_versionnum));
 	log->l_mp->m_sb = *sbp;
 	brelse(bp);
 

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.25 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -96,11 +96,10 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 
 #define	XFS_BUF_TO_BMBT_BLOCK(bp) ((xfs_bmbt_block_t *)((bp)->b_un.b_addr))
 
-#define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) \
-	((cur)->bc_private.b.inodesize - \
-	 (int)(sizeof(xfs_dinode_core_t) + sizeof(xfs_agino_t)))
+#define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) ((cur)->bc_private.b.forksize)
 #define	XFS_BMAP_RBLOCK_ISIZE(lev,cur) \
-	((int)(cur)->bc_private.b.ip->i_broot_bytes)
+	((int)XFS_IFORK_PTR((cur)->bc_private.b.ip, \
+			    (cur)->bc_private.b.whichfork)->if_broot_bytes)
 #define	XFS_BMAP_IBLOCK_SIZE(lev,cur) (1 << (cur)->bc_blocklog)
 
 #define	XFS_BMAP_BLOCK_DSIZE(lev,cur) \
@@ -113,8 +112,10 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 		XFS_BMAP_IBLOCK_SIZE(lev,cur))
 
 #define	XFS_BMAP_BLOCK_DMAXRECS(lev,cur) \
-	((cur)->bc_mp->m_bmap_dmxr[((lev) != 0) + \
-				   (((lev) == (cur)->bc_nlevels - 1) << 1)])
+	((lev) == (cur)->bc_nlevels - 1 ? \
+		XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_RBLOCK_DSIZE(lev,cur), \
+			xfs_bmdr, (lev) == 0) : \
+		((cur)->bc_mp->m_bmap_dmxr[(lev) != 0]))
 #define	XFS_BMAP_BLOCK_IMAXRECS(lev,cur) \
 	((lev) == (cur)->bc_nlevels - 1 ? \
 		XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_RBLOCK_ISIZE(lev,cur), \
@@ -122,8 +123,10 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 		((cur)->bc_mp->m_bmap_dmxr[(lev) != 0]))
 
 #define	XFS_BMAP_BLOCK_DMINRECS(lev,cur) \
-	((cur)->bc_mp->m_bmap_dmnr[((lev) != 0) + \
-				   (((lev) == (cur)->bc_nlevels - 1) << 1)])
+	((lev) == (cur)->bc_nlevels - 1 ? \
+		XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_RBLOCK_DSIZE(lev,cur), \
+			xfs_bmdr, (lev) == 0) : \
+		((cur)->bc_mp->m_bmap_dmnr[(lev) != 0]))
 #define	XFS_BMAP_BLOCK_IMINRECS(lev,cur) \
 	((lev) == (cur)->bc_nlevels - 1 ? \
 		XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_RBLOCK_ISIZE(lev,cur), \
@@ -155,8 +158,6 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
  * These are to be used when we know the size of the block and
  * we don't have a cursor.
  */
-#define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - \
-     (sizeof(xfs_dinode_core_t) + sizeof(xfs_agino_t))) 
 #define	XFS_BMAP_BROOT_REC_ADDR(bb,i,sz) \
 	XFS_BTREE_REC_ADDR(sz,xfs_bmbt,bb,i,XFS_BMAP_BROOT_MAXRECS(sz))
 #define	XFS_BMAP_BROOT_KEY_ADDR(bb,i,sz) \
@@ -170,15 +171,14 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 	((int)(sizeof(xfs_bmbt_block_t) + \
 	       ((nrecs) * (sizeof(xfs_bmbt_key_t) + sizeof(xfs_bmbt_ptr_t)))))
 #define	XFS_BMAP_BROOT_SPACE(bb) XFS_BMAP_BROOT_SPACE_CALC((bb)->bb_numrecs)
+#define	XFS_BMDR_SPACE_CALC(nrecs)	\
+	((int)(sizeof(xfs_bmdr_block_t) + \
+	       ((nrecs) * (sizeof(xfs_bmbt_key_t) + sizeof(xfs_bmbt_ptr_t)))))
 
-/*
- * Number of extent records that fit in the inode.
- */
-#define	XFS_BMAP_EXT_MAXRECS(mp)	((mp)->m_bmap_ext_mxr)
 /*
  * Maximum number of bmap btree levels.
  */
-#define	XFS_BM_MAXLEVELS(mp)		((mp)->m_bm_maxlevels)
+#define	XFS_BM_MAXLEVELS(mp,w)		((mp)->m_bm_maxlevels[w])
 
 /*
  * Trace buffer entry types.

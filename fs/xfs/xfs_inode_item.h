@@ -73,19 +73,32 @@ typedef struct xfs_inode_log_item {
  * Flags for xfs_trans_log_inode flags field.
  */
 #define	XFS_ILOG_CORE	0x001	/* log standard inode fields */
-#define	XFS_ILOG_DATA	0x002	/* log iu_data */
-#define	XFS_ILOG_EXT	0x004	/* log iu_extents */
-#define	XFS_ILOG_BROOT	0x008	/* log i_broot */
+#define	XFS_ILOG_DDATA	0x002	/* log i_df.if_data */
+#define	XFS_ILOG_DEXT	0x004	/* log i_df.if_extents */
+#define	XFS_ILOG_DBROOT	0x008	/* log i_df.i_broot */
 #define	XFS_ILOG_DEV	0x010	/* log the dev field */
 #define	XFS_ILOG_UUID	0x020	/* log the uuid field */
+#define	XFS_ILOG_ADATA	0x040	/* log i_af.if_data */
+#define	XFS_ILOG_AEXT	0x080	/* log i_af.if_extents */
+#define	XFS_ILOG_ABROOT	0x100	/* log i_af.i_broot */
 
-#define	XFS_ILOG_NONCORE	(XFS_ILOG_DATA | XFS_ILOG_EXT | \
-				 XFS_ILOG_BROOT | XFS_ILOG_DEV | \
-				 XFS_ILOG_UUID)
+#define	XFS_ILOG_FDATA(w)	\
+	((w) == XFS_DATA_FORK ? XFS_ILOG_DDATA : XFS_ILOG_ADATA)
+#define	XFS_ILOG_FBROOT(w)	\
+	((w) == XFS_DATA_FORK ? XFS_ILOG_DBROOT : XFS_ILOG_ABROOT)
+#define	XFS_ILOG_FEXT(w)	\
+	((w) == XFS_DATA_FORK ? XFS_ILOG_DEXT : XFS_ILOG_AEXT)
 
-#define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DATA | \
-				 XFS_ILOG_EXT | XFS_ILOG_BROOT | \
-				 XFS_ILOG_DEV | XFS_ILOG_UUID)
+#define	XFS_ILOG_NONCORE	(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
+				 XFS_ILOG_DBROOT | XFS_ILOG_DEV | \
+				 XFS_ILOG_UUID | XFS_ILOG_ADATA | \
+				 XFS_ILOG_AEXT | XFS_ILOG_ABROOT)
+
+#define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DDATA | \
+				 XFS_ILOG_DEXT | XFS_ILOG_DBROOT | \
+				 XFS_ILOG_DEV | XFS_ILOG_UUID | \
+				 XFS_ILOG_ADATA | XFS_ILOG_AEXT | \
+				 XFS_ILOG_ABROOT)
 
      
 void	xfs_inode_item_init(struct xfs_inode *, struct xfs_mount *);

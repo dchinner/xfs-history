@@ -1,4 +1,4 @@
-#ident "$Revision: 1.53 $"
+#ident "$Revision: 1.54 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -214,14 +214,14 @@ again:
 	 * Read the disk inode attributes into a new inode structure and get
 	 * a new vnode for it.  Initialize the inode lock so we can idestroy
 	 * it soon if it's a dup.  This should also initialize i_dev, i_ino,
-	 * i_bno, and i_index;
+	 * i_bno, i_mount, and i_index.
 	 */
 	error = xfs_iread(mp, tp, ino, &ip);
 	if (error) {
 		return error;
 	}
 	vp = vn_alloc(&xfs_vnodeops, mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
-		      ip->i_u2.iu_rdev, ip);
+		      ip->i_df.if_u2.if_rdev, ip);
 
 	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
 	mrinit(&ip->i_iolock, makesname(name, "xio", (int)vp->v_number));
@@ -257,7 +257,6 @@ again:
 	 * These values _must_ be set before releasing ihlock!
 	 */
 	ip->i_vnode = vp;
-	ip->i_mount = mp;
 	ip->i_hash = ih;
 	if (iq = ih->ih_next) {
 		iq->i_prevp = &ip->i_next;
@@ -457,7 +456,7 @@ xfs_ilock_map_shared(
 	uint	lock_mode;
 
 	if ((ip->i_d.di_format == XFS_DINODE_FMT_BTREE) &&
-	    ((ip->i_flags & XFS_IEXTENTS) == 0)) {
+	    ((ip->i_df.if_flags & XFS_IFEXTENTS) == 0)) {
 		lock_mode = XFS_ILOCK_EXCL;
 	} else {
 		lock_mode = XFS_ILOCK_SHARED;

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.46 $"
+#ident "$Revision: 1.47 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -39,6 +39,7 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_ENTIRE	0x04	/* return entire extent, not trimmed */
 #define	XFS_BMAPI_METADATA	0x08	/* mapping metadata not user data */
 #define	XFS_BMAPI_EXACT		0x10	/* allocate only to spec'd bounds */
+#define	XFS_BMAPI_ATTRFORK	0x20	/* use attribute fork not data */
 
 /*
  * Special values for xfs_bmbt_irec_t br_startblock field.
@@ -99,7 +100,8 @@ xfs_bmap_add_free(
  */
 void
 xfs_bmap_compute_maxlevels(
-	struct xfs_mount	*mp);	/* file system mount structure */
+	struct xfs_mount	*mp,	/* file system mount structure */
+	int			whichfork);	/* data or attr fork */
 
 /*
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
@@ -123,9 +125,10 @@ xfs_bmap_finish(
  */
 int						/* error */
 xfs_bmap_first_unused(
-	struct xfs_trans		*tp,		/* transaction pointer */
+	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
-	xfs_fileoff_t		*unused);	/* unused block num */
+	xfs_fileoff_t		*unused,	/* unused block num */
+	int			whichfork);	/* data or attr fork */
 
 /*
  * Returns the file-relative block number of the first block past eof in
@@ -136,7 +139,8 @@ int						/* error */
 xfs_bmap_last_offset(
 	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
-	xfs_fileoff_t		*unused);	/* last block num */
+	xfs_fileoff_t		*unused,	/* last block num */
+	int			whichfork);	/* data or attr fork */
 
 /*
  * Read in the extents to iu_extents.
@@ -146,7 +150,8 @@ xfs_bmap_last_offset(
 int						/* error */
 xfs_bmap_read_extents(
 	struct xfs_trans	*tp,		/* transaction pointer */
-	struct xfs_inode	*ip);		/* incore inode */
+	struct xfs_inode	*ip,		/* incore inode */
+	int			whichfork);	/* data or attr fork */
 
 #if defined(DEBUG) && !defined(SIM)
 /*

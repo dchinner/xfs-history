@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 
 /*
  * Super block
@@ -9,8 +9,15 @@
  * Only the first of these is ever updated except during growfs.
  */
 
-#define	XFS_SB_MAGIC	0x58465342	/* 'XFSB' */
-#define	XFS_SB_VERSION	1
+#define	XFS_SB_MAGIC		0x58465342	/* 'XFSB' */
+#define	XFS_SB_VERSION_1	1		/* 5.3, 6.0.1, 6.1 */
+#define	XFS_SB_VERSION_2	2		/* 6.2 - attributes */
+#define	XFS_SB_VERSION_LOW	XFS_SB_VERSION_1
+#define	XFS_SB_VERSION_HIGH	XFS_SB_VERSION_2
+#define	XFS_SB_VERSION_HASATTR	XFS_SB_VERSION_2
+#define	XFS_SB_VERSION		XFS_SB_VERSION_2
+#define	XFS_SB_GOOD_VERSION(v)	\
+	((v) >= XFS_SB_VERSION_LOW && (v) <= XFS_SB_VERSION_HIGH)
 
 typedef struct xfs_sb
 {
@@ -42,7 +49,7 @@ typedef struct xfs_sb
 	__uint8_t	sb_agblklog;	/* log2 of sb_agblocks (rounded up) */
 	__uint8_t	sb_rextslog;	/* log2 of sb_rextents */
 	__uint8_t	sb_inprogress;	/* mkfs is in progress, don't mount */
-					/* 1 byte of padding */
+	__uint8_t	sb_pad1;	/* free byte */
 					/* statistics */
 	/*
 	 * These fields must remain contiguous.  If you really
@@ -56,40 +63,41 @@ typedef struct xfs_sb
 } xfs_sb_t;
 
 
-#define	XFS_SB_MAGICNUM		0x00000001
-#define	XFS_SB_BLOCKSIZE	0x00000002
-#define	XFS_SB_DBLOCKS		0x00000004
-#define	XFS_SB_RBLOCKS		0x00000008
-#define	XFS_SB_REXTENTS		0x00000010
-#define	XFS_SB_UUID		0x00000020
-#define	XFS_SB_LOGSTART		0x00000040
-#define	XFS_SB_ROOTINO		0x00000080
-#define	XFS_SB_RBMINO		0x00000100
-#define	XFS_SB_RSUMINO		0x00000200
-#define	XFS_SB_REXTSIZE		0x00000400
-#define	XFS_SB_AGBLOCKS		0x00000800
-#define	XFS_SB_AGCOUNT		0x00001000
-#define	XFS_SB_RBMBLOCKS	0x00002000
-#define	XFS_SB_LOGBLOCKS	0x00004000
-#define	XFS_SB_VERSIONNUM	0x00008000
-#define	XFS_SB_SECTSIZE		0x00010000
-#define	XFS_SB_INODESIZE	0x00020000
-#define	XFS_SB_INOPBLOCK	0x00040000
-#define	XFS_SB_FNAME		0x00080000
-#define	XFS_SB_FPACK		0x00100000
-#define	XFS_SB_BLOCKLOG		0x00200000
-#define	XFS_SB_SECTLOG		0x00400000
-#define	XFS_SB_INODELOG		0x00800000
-#define	XFS_SB_INOPBLOG		0x01000000
-#define	XFS_SB_AGBLKLOG		0x02000000
-#define	XFS_SB_REXTSLOG		0x04000000
-#define	XFS_SB_INPROGRESS	0x08000000
-#define	XFS_SB_ICOUNT		0x10000000
-#define	XFS_SB_IFREE		0x20000000
-#define	XFS_SB_FDBLOCKS		0x40000000
-#define	XFS_SB_FREXTENTS	0x80000000
-#define	XFS_SB_NUM_BITS		32
-#define	XFS_SB_ALL_BITS		((1 << XFS_SB_NUM_BITS) - 1)
+#define	XFS_SB_MAGICNUM		0x000000001LL
+#define	XFS_SB_BLOCKSIZE	0x000000002LL
+#define	XFS_SB_DBLOCKS		0x000000004LL
+#define	XFS_SB_RBLOCKS		0x000000008LL
+#define	XFS_SB_REXTENTS		0x000000010LL
+#define	XFS_SB_UUID		0x000000020LL
+#define	XFS_SB_LOGSTART		0x000000040LL
+#define	XFS_SB_ROOTINO		0x000000080LL
+#define	XFS_SB_RBMINO		0x000000100LL
+#define	XFS_SB_RSUMINO		0x000000200LL
+#define	XFS_SB_REXTSIZE		0x000000400LL
+#define	XFS_SB_AGBLOCKS		0x000000800LL
+#define	XFS_SB_AGCOUNT		0x000001000LL
+#define	XFS_SB_RBMBLOCKS	0x000002000LL
+#define	XFS_SB_LOGBLOCKS	0x000004000LL
+#define	XFS_SB_VERSIONNUM	0x000008000LL
+#define	XFS_SB_SECTSIZE		0x000010000LL
+#define	XFS_SB_INODESIZE	0x000020000LL
+#define	XFS_SB_INOPBLOCK	0x000040000LL
+#define	XFS_SB_FNAME		0x000080000LL
+#define	XFS_SB_FPACK		0x000100000LL
+#define	XFS_SB_BLOCKLOG		0x000200000LL
+#define	XFS_SB_SECTLOG		0x000400000LL
+#define	XFS_SB_INODELOG		0x000800000LL
+#define	XFS_SB_INOPBLOG		0x001000000LL
+#define	XFS_SB_AGBLKLOG		0x002000000LL
+#define	XFS_SB_REXTSLOG		0x004000000LL
+#define	XFS_SB_INPROGRESS	0x008000000LL
+#define	XFS_SB_PAD1		0x010000000LL
+#define	XFS_SB_ICOUNT		0x020000000LL
+#define	XFS_SB_IFREE		0x040000000LL
+#define	XFS_SB_FDBLOCKS		0x080000000LL
+#define	XFS_SB_FREXTENTS	0x100000000LL
+#define	XFS_SB_NUM_BITS		33
+#define	XFS_SB_ALL_BITS		((1LL << XFS_SB_NUM_BITS) - 1)
 
 #define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
 #define	XFS_SB_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_SB_DADDR)

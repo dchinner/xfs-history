@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.61 $"
+#ident "$Revision: 1.62 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -306,11 +306,11 @@ typedef struct xfs_trans {
 #define XFS_CALC_WRITE_LOG_RES(mp) \
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
-	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)) + \
 	  (2 * (mp)->m_sb.sb_sectsize) + \
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
-	  (128 * (4 + XFS_BM_MAXLEVELS(mp) + (4 * XFS_AG_MAXLEVELS(mp))))),\
+	  (128 * (4 + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + (4 * XFS_AG_MAXLEVELS(mp))))),\
 	 ((2 * (mp)->m_sb.sb_sectsize) + \
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
@@ -332,8 +332,8 @@ typedef struct xfs_trans {
 #define	XFS_CALC_ITRUNCATE_LOG_RES(mp) \
 	(MAX( \
 	 ((mp)->m_sb.sb_inodesize + \
-	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
-	  (128 * (1 + XFS_BM_MAXLEVELS(mp)))), \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)) + \
+	  (128 * (1 + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)))), \
 	 ((4 * (mp)->m_sb.sb_sectsize) + \
 	  (4 * (mp)->m_sb.sb_sectsize) + \
 	  (mp)->m_sb.sb_sectsize + \
@@ -356,9 +356,9 @@ typedef struct xfs_trans {
 	(MAX( \
 	 ((4 * (mp)->m_sb.sb_inodesize) + \
 	  (2 * XFS_FSB_TO_B((mp), XFS_DA_NODE_MAXDEPTH)) + \
-	  (2 * XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp))) + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK))) + \
 	  (128 * (4 + (2 * XFS_DA_NODE_MAXDEPTH) + \
-	   (2 * XFS_BM_MAXLEVELS(mp))))), \
+	   (2 * XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK))))), \
 	 ((2 * (mp)->m_sb.sb_sectsize) + \
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
@@ -382,8 +382,8 @@ typedef struct xfs_trans {
 	 ((mp)->m_sb.sb_inodesize + \
  	  (mp)->m_sb.sb_inodesize + \
 	  XFS_FSB_TO_B((mp), XFS_DA_NODE_MAXDEPTH) + \
-	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
-	  (128 * (2 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)) + \
+	  (128 * (2 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)))), \
 	 ((mp)->m_sb.sb_sectsize + \
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
@@ -407,8 +407,8 @@ typedef struct xfs_trans {
 	 ((mp)->m_sb.sb_inodesize + \
  	  (mp)->m_sb.sb_inodesize + \
 	  XFS_FSB_TO_B((mp), XFS_DA_NODE_MAXDEPTH) + \
-	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
-	  (128 * (2 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)) + \
+	  (128 * (2 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)))), \
 	 ((mp)->m_sb.sb_sectsize + \
 	  (mp)->m_sb.sb_sectsize + \
 	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
@@ -435,9 +435,9 @@ typedef struct xfs_trans {
 	  (mp)->m_sb.sb_inodesize + \
 	  XFS_FSB_TO_B(mp, 1) + \
 	  XFS_FSB_TO_B((mp), XFS_DA_NODE_MAXDEPTH) + \
-	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)) + \
 	  1024 + \
-	  (128 * (5 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	  (128 * (5 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)))), \
 	 (2 * (mp)->m_sb.sb_sectsize + \
 	  XFS_FSB_TO_B((mp), XFS_IALLOC_BLOCKS((mp))) + \
 	  XFS_FSB_TO_B((mp), XFS_IN_MAXLEVELS(mp)) + \
@@ -466,8 +466,8 @@ typedef struct xfs_trans {
 	  (mp)->m_sb.sb_inodesize + \
 	  XFS_FSB_TO_B(mp, 1) + \
 	  XFS_FSB_TO_B((mp), XFS_DA_NODE_MAXDEPTH) + \
-	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
-	  (128 * (3 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)) + \
+	  (128 * (3 + XFS_DA_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK)))), \
 	 (2 * (mp)->m_sb.sb_sectsize + \
 	  XFS_FSB_TO_B((mp), XFS_IALLOC_BLOCKS((mp))) + \
 	  XFS_FSB_TO_B((mp), XFS_IN_MAXLEVELS(mp)) + \

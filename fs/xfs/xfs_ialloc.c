@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.77 $"
+#ident	"$Revision: 1.78 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -114,9 +114,9 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_core_t, di_nblocks),
 		offsetof(xfs_dinode_core_t, di_extsize),
 		offsetof(xfs_dinode_core_t, di_nextents),
-		offsetof(xfs_dinode_core_t, di_nattrextents),
+		offsetof(xfs_dinode_core_t, di_anextents),
 		offsetof(xfs_dinode_core_t, di_forkoff),
-		offsetof(xfs_dinode_core_t, di_pad1),
+		offsetof(xfs_dinode_core_t, di_aformat),
 		offsetof(xfs_dinode_core_t, di_dmevmask),
 		offsetof(xfs_dinode_core_t, di_dmstate),
 		offsetof(xfs_dinode_core_t, di_flags),
@@ -259,9 +259,9 @@ xfs_ialloc_ag_alloc(
 			free->di_core.di_nblocks = 0;
 			free->di_core.di_extsize = 0;
 			free->di_core.di_nextents = 0;
-			free->di_core.di_nattrextents = 0;
+			free->di_core.di_anextents = 0;
 			free->di_core.di_forkoff = 0;
-			free->di_core.di_pad1 = 0;
+			free->di_core.di_aformat = 0;
 			free->di_core.di_dmevmask = 0;
 			free->di_core.di_dmstate = 0;
 			free->di_core.di_flags = 0;
@@ -282,7 +282,7 @@ xfs_ialloc_ag_alloc(
 	 * Insert records describing the new inode chunk into the btree.
 	 */
 	cur = xfs_btree_init_cursor(args.mp, tp, agbp, agi->agi_seqno,
-		XFS_BTNUM_INO, (xfs_inode_t *)0);
+		XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 	for (thisino = newino;
 	     thisino < newino + newlen;
 	     thisino += XFS_INODES_PER_CHUNK) {
@@ -573,7 +573,7 @@ nextag:
 	agno = tagno;
 	*IO_agbp = NULL;
 	cur = xfs_btree_init_cursor(mp, tp, agbp, agi->agi_seqno,
-				    XFS_BTNUM_INO, (xfs_inode_t *)0);
+				    XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 	/*
 	 * If pagino is 0 (this is the root inode allocation) use newino.
 	 * This must work because we've just allocated some.
@@ -887,7 +887,7 @@ xfs_difree(
 	 * Initialize the cursor.
 	 */
 	cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_INO,
-		(xfs_inode_t *)0);
+		(xfs_inode_t *)0, 0);
 #ifdef DEBUG
 	if (cur->bc_nlevels == 1) {
 		int freecount = 0;
@@ -1027,7 +1027,7 @@ xfs_dilocate(
 			return error;
 		}
 		cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
-			XFS_BTNUM_INO, (xfs_inode_t *)0);
+			XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 		error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i);
 		if (error) {
 			xfs_trans_brelse(tp, agbp);

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 /*
  * xFS types
@@ -44,7 +44,7 @@ typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
 typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
 typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
 typedef __int32_t	xfs_extnum_t;	/* # of extents in a file */
-typedef __int16_t	xfs_attrextnm_t;/* # extents in an attribute fork */
+typedef __int16_t	xfs_aextnum_t;	/* # extents in an attribute fork */
 typedef	__int64_t	xfs_fsize_t;	/* bytes in a file */
 typedef __uint64_t	xfs_ufsize_t;	/* unsigned bytes in a file */
 
@@ -105,10 +105,11 @@ typedef	__uint32_t	xfs_filblks_t;	/* number of blocks in a file */
 #define	NULLEXTNUM	((xfs_extnum_t)-1)
 
 /*
- * Max values for extnum, extlen.
+ * Max values for extlen, extnum, aextnum.
  */
 #define	MAXEXTLEN	((xfs_extlen_t)0x001fffff)	/* 21 bits */
 #define	MAXEXTNUM	((xfs_extnum_t)0x7fffffff)	/* signed int */
+#define	MAXAEXTNUM	((xfs_aextnum_t)0x7fff)		/* signed short */
 
 typedef enum {
 	XFS_LOOKUP_EQi, XFS_LOOKUP_LEi, XFS_LOOKUP_GEi

@@ -1439,7 +1439,7 @@ xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_name_t *args,
 	int nmap, error;
 
 	dp = args->dp;
-	error = xfs_bmap_first_unused(trans, dp, &bno);
+	error = xfs_bmap_first_unused(trans, dp, &bno, args->whichfork);
 	if (error) {
 		return(error);
 	}
@@ -1456,7 +1456,7 @@ xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_name_t *args,
 		return(XFS_ERROR(ENOSPC));
 	}
 	*new_blkno = bno;
-	error = xfs_bmap_last_offset(trans, dp, &bno);
+	error = xfs_bmap_last_offset(trans, dp, &bno, args->whichfork);
 	if (error) {
 		return(error);
 	}
@@ -1484,7 +1484,7 @@ xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_name_t *args,
 	}
 	ASSERT(done);
 	xfs_trans_binval(trans, dead_buf);
-	error = xfs_bmap_last_offset(trans, dp, &bno);
+	error = xfs_bmap_last_offset(trans, dp, &bno, args->whichfork);
 	if (error)
 		return(error);
 	dp->i_d.di_size = XFS_FSB_TO_B(dp->i_mount, bno);

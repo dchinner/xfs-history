@@ -1,4 +1,4 @@
-#ident "$Revision: 1.46 $"
+#ident "$Revision: 1.47 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -75,55 +75,55 @@ xfs_inode_item_size(
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
+			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID);
-		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_DEXT) &&
 		    (ip->i_d.di_nextents > 0) &&
-		    (ip->i_bytes > 0)) {
-			ASSERT(ip->i_u1.iu_extents != NULL);
+		    (ip->i_df.if_bytes > 0)) {
+			ASSERT(ip->i_df.if_u1.if_extents != NULL);
 			nvecs++;
 		} else {
-			iip->ili_format.ilf_fields &= ~XFS_ILOG_EXT;
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_DEXT;
 		}
 		break;
 
 	case XFS_DINODE_FMT_BTREE:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DATA | XFS_ILOG_EXT |
+			~(XFS_ILOG_DDATA | XFS_ILOG_DEXT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID);
-		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
-		    (ip->i_broot_bytes > 0)) {
-			ASSERT(ip->i_broot != NULL);
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_DBROOT) &&
+		    (ip->i_df.if_broot_bytes > 0)) {
+			ASSERT(ip->i_df.if_broot != NULL);
 			nvecs++;
 		} else {
-			iip->ili_format.ilf_fields &= ~XFS_ILOG_BROOT;
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_DBROOT;
 		}
 		break;
 
 	case XFS_DINODE_FMT_LOCAL:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_EXT | XFS_ILOG_BROOT |
+			~(XFS_ILOG_DEXT | XFS_ILOG_DBROOT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID);
-		if ((iip->ili_format.ilf_fields & XFS_ILOG_DATA) &&
-		    (ip->i_bytes > 0)) {
-			ASSERT(ip->i_u1.iu_data != NULL);
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_DDATA) &&
+		    (ip->i_df.if_bytes > 0)) {
+			ASSERT(ip->i_df.if_u1.if_data != NULL);
 			ASSERT(ip->i_d.di_size > 0);
 			nvecs++;
 		} else {
-			iip->ili_format.ilf_fields &= ~XFS_ILOG_DATA;
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_DDATA;
 		}
 		break;
 
 	case XFS_DINODE_FMT_DEV:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
-			  XFS_ILOG_EXT | XFS_ILOG_UUID);
+			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
+			  XFS_ILOG_DEXT | XFS_ILOG_UUID);
 		break;
 
 	case XFS_DINODE_FMT_UUID:
 		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
-			  XFS_ILOG_EXT | XFS_ILOG_DEV);
+			~(XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
+			  XFS_ILOG_DEXT | XFS_ILOG_DEV);
 		break;
 
 	default:
@@ -169,14 +169,14 @@ xfs_inode_item_format(
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_DATA | XFS_ILOG_BROOT |
+			 (XFS_ILOG_DDATA | XFS_ILOG_DBROOT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID)));
-		if (iip->ili_format.ilf_fields & XFS_ILOG_EXT) {
-			ASSERT(ip->i_bytes > 0);
-			ASSERT(ip->i_u1.iu_extents != NULL);
+		if (iip->ili_format.ilf_fields & XFS_ILOG_DEXT) {
+			ASSERT(ip->i_df.if_bytes > 0);
+			ASSERT(ip->i_df.if_u1.if_extents != NULL);
 			ASSERT(ip->i_d.di_nextents > 0);
 			ASSERT(iip->ili_extents_buf == NULL);
-			nrecs = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+			nrecs = ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t);
 			ASSERT(nrecs > 0);
 			if (nrecs == ip->i_d.di_nextents) {
 				/*
@@ -184,8 +184,9 @@ xfs_inode_item_format(
 				 * extents, so just point to the
 				 * real extents array.
 				 */
-				vecp->i_addr = (char *)(ip->i_u1.iu_extents);
-				vecp->i_len = ip->i_bytes;
+				vecp->i_addr =
+					(char *)(ip->i_df.if_u1.if_extents);
+				vecp->i_len = ip->i_df.if_bytes;
 			} else {
 				/*
 				 * There are delayed allocation extents
@@ -194,12 +195,14 @@ xfs_inode_item_format(
 				 * a separate buffer.  We'll free the
 				 * buffer in the unlock routine.
 				 */
-				ext_buffer = kmem_alloc(ip->i_bytes, KM_SLEEP);
+				ext_buffer = kmem_alloc(ip->i_df.if_bytes,
+					KM_SLEEP);
 				iip->ili_extents_buf = ext_buffer;
 				vecp->i_addr = (caddr_t)ext_buffer;
-				vecp->i_len = xfs_iextents_copy(ip, ext_buffer);
+				vecp->i_len = xfs_iextents_copy(ip, ext_buffer,
+					XFS_DATA_FORK);
 			}
-			ASSERT(vecp->i_len <= ip->i_bytes);
+			ASSERT(vecp->i_len <= ip->i_df.if_bytes);
 			iip->ili_format.ilf_dsize = vecp->i_len;
 			vecp++;
 			nvecs++;
@@ -208,37 +211,37 @@ xfs_inode_item_format(
 
 	case XFS_DINODE_FMT_BTREE:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_DATA | XFS_ILOG_EXT |
+			 (XFS_ILOG_DDATA | XFS_ILOG_DEXT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID)));
-		if (iip->ili_format.ilf_fields & XFS_ILOG_BROOT) {
-			ASSERT(ip->i_broot_bytes > 0);
-			ASSERT(ip->i_broot != NULL);
-			vecp->i_addr = (caddr_t)ip->i_broot;
-			vecp->i_len = ip->i_broot_bytes;
+		if (iip->ili_format.ilf_fields & XFS_ILOG_DBROOT) {
+			ASSERT(ip->i_df.if_broot_bytes > 0);
+			ASSERT(ip->i_df.if_broot != NULL);
+			vecp->i_addr = (caddr_t)ip->i_df.if_broot;
+			vecp->i_len = ip->i_df.if_broot_bytes;
 			vecp++;
 			nvecs++;
-			iip->ili_format.ilf_dsize = ip->i_broot_bytes;
+			iip->ili_format.ilf_dsize = ip->i_df.if_broot_bytes;
 		}
 		break;
 
 	case XFS_DINODE_FMT_LOCAL:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_BROOT | XFS_ILOG_EXT |
+			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT |
 			  XFS_ILOG_DEV | XFS_ILOG_UUID)));
-		if (iip->ili_format.ilf_fields & XFS_ILOG_DATA) {
-			ASSERT(ip->i_bytes > 0);
-			ASSERT(ip->i_u1.iu_data != NULL);
+		if (iip->ili_format.ilf_fields & XFS_ILOG_DDATA) {
+			ASSERT(ip->i_df.if_bytes > 0);
+			ASSERT(ip->i_df.if_u1.if_data != NULL);
 			ASSERT(ip->i_d.di_size > 0);
 
-			vecp->i_addr = (caddr_t)ip->i_u1.iu_data;
+			vecp->i_addr = (caddr_t)ip->i_df.if_u1.if_data;
 			/*
 			 * Round i_bytes up to a word boundary.
 			 * The underlying memory is guaranteed to
 			 * to be there by xfs_idata_realloc().
 			 */
-			data_bytes = (((ip->i_bytes + 3) >> 2) << 2);
-			ASSERT((ip->i_real_bytes == 0) ||
-			       (ip->i_real_bytes == data_bytes));
+			data_bytes = roundup(ip->i_df.if_bytes, 4);
+			ASSERT((ip->i_df.if_real_bytes == 0) ||
+			       (ip->i_df.if_real_bytes == data_bytes));
 			vecp->i_len = data_bytes;
 			vecp++;
 			nvecs++;
@@ -248,19 +251,21 @@ xfs_inode_item_format(
 
 	case XFS_DINODE_FMT_DEV:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_BROOT | XFS_ILOG_EXT |
-			  XFS_ILOG_DATA | XFS_ILOG_UUID)));
+			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT |
+			  XFS_ILOG_DDATA | XFS_ILOG_UUID)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
-			iip->ili_format.ilf_u.ilfu_rdev = ip->i_u2.iu_rdev;
+			iip->ili_format.ilf_u.ilfu_rdev =
+				ip->i_df.if_u2.if_rdev;
 		}
 		break;
 
 	case XFS_DINODE_FMT_UUID:
 		ASSERT(!(iip->ili_format.ilf_fields &
-			 (XFS_ILOG_BROOT | XFS_ILOG_EXT |
-			  XFS_ILOG_DATA | XFS_ILOG_DEV)));
+			 (XFS_ILOG_DBROOT | XFS_ILOG_DEXT |
+			  XFS_ILOG_DDATA | XFS_ILOG_DEV)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
-			iip->ili_format.ilf_u.ilfu_uuid = ip->i_u2.iu_uuid;
+			iip->ili_format.ilf_u.ilfu_uuid =
+				ip->i_df.if_u2.if_uuid;
 		}
 		break;
 
@@ -407,12 +412,13 @@ xfs_inode_item_unlock(
 	 * If the inode needed a separate buffer with which to log
 	 * its extents, then free it now.
 	 */
+	/* FIXME */
 	if (iip->ili_extents_buf != NULL) {
 		ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS);
 		ASSERT(ip->i_d.di_nextents > 0);
-		ASSERT(iip->ili_format.ilf_fields & XFS_ILOG_EXT);
-		ASSERT(ip->i_bytes > 0);
-		kmem_free(iip->ili_extents_buf, ip->i_bytes);
+		ASSERT(iip->ili_format.ilf_fields & XFS_ILOG_DEXT);
+		ASSERT(ip->i_df.if_bytes > 0);
+		kmem_free(iip->ili_extents_buf, ip->i_df.if_bytes);
 		iip->ili_extents_buf = NULL;
 	}
 

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 struct buf;
 struct xfs_bmap_free;
@@ -143,12 +143,13 @@ typedef struct xfs_btree_cur
 			xfs_agnumber_t	agno;	/* ag number */
 		} a;
 		struct {			/* needed for BMAP */
-			int		inodesize;	/* size of inodes */
 			struct xfs_inode *ip;	/* pointer to our inode */
-			xfs_fsblock_t	firstblock;	/* 1st blk allocated */
 			struct xfs_bmap_free *flist;	/* list to free after */
+			xfs_fsblock_t	firstblock;	/* 1st blk allocated */
 			int		allocated;	/* count of alloced */
-			int		flags;		/* flags */
+			short		forksize;	/* fork's inode space */
+			char		whichfork;	/* data or attr fork */
+			char		flags;		/* flags */
 #define	XFS_BTCUR_BPRV_WASDEL	1			/* was delayed */
 #define	XFS_BTCUR_BPRV_LOWSPC	2			/* in low-space mode */
 		} b;
@@ -306,7 +307,8 @@ xfs_btree_init_cursor(
 	struct buf		*agbp,	/* (A only) buffer for agf structure */
 	xfs_agnumber_t		agno,	/* (A only) allocation group number */
 	xfs_btnum_t		btnum,	/* btree identifier */
-	struct xfs_inode	*ip);	/* (B only) inode owning the btree */
+	struct xfs_inode	*ip,	/* (B only) inode owning the btree */
+	int			whichfork); /* (B only) data/attr fork */
 
 /*
  * Check for the cursor referring to the last block at the given level.
@@ -331,7 +333,7 @@ xfs_btree_lastrec(
  */
 void
 xfs_btree_offsets(
-	int			fields,	/* bitmask of fields */
+	__int64_t		fields,	/* bitmask of fields */
 	const int		*offsets,/* table of field offsets */
 	int			nbits,	/* number of bits to inspect */
 	int			*first,	/* output: first byte offset */

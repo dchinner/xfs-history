@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -97,6 +97,7 @@ void	idbg_xbmstrace(xfs_inode_t *);
 #endif
 void	idbg_xbrec(xfs_bmbt_rec_32_t *);
 void	idbg_xbroot(xfs_inode_t *);
+void	idbg_xbroota(xfs_inode_t *);
 void	idbg_xbtcur(xfs_btree_cur_t *);
 void	idbg_xbuf(buf_t *);
 #ifdef DEBUG
@@ -180,7 +181,8 @@ static struct xif {
     "xbmstrc",	VD idbg_xbmstrace, 	"Dump XFS bmap btree inode trace",
 #endif
     "xbrec",	VD idbg_xbrec, 		"Dump XFS bmap record",
-    "xbroot",	VD idbg_xbroot, 	"Dump XFS bmap btree root",
+    "xbroot",	VD idbg_xbroot, 	"Dump XFS bmap btree root (data)",
+    "xbroota",	VD idbg_xbroota, 	"Dump XFS bmap btree root (attr)",
     "xbtcur",	VD idbg_xbtcur,		"Dump XFS btree cursor",
     "xbuf",	VD idbg_xbuf,		"Dump XFS data from a buffer",
 #ifdef DEBUG
@@ -265,6 +267,7 @@ static int xfs_alloc_trace_entry(ktrace_entry_t *ktep);
 static int xfs_bmap_trace_entry(ktrace_entry_t *ktep);
 static int xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
 #endif
+static void xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f);
 static void xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
 static void xfs_btbmap(xfs_bmbt_block_t *bt, int bsz);
 static void xfs_btino(xfs_inobt_block_t *bt, int bsz);
@@ -295,6 +298,7 @@ static void xfs_strat_enter_trace_entry(ktrace_entry_t *ktep);
 static void xfs_strat_sub_trace_entry(ktrace_entry_t *ktep);
 static int xfs_strat_trace_entry(ktrace_entry_t *ktep);
 #endif
+static void xfs_xnode_fork(char *name, xfs_ifork_t *f);
 
 /*
  * Static functions.
@@ -508,6 +512,34 @@ xfs_bmbt_trace_entry(ktrace_entry_t *ktep)
 	return 1;
 }
 #endif	/* DEBUG */
+
+/*
+ * Print an xfs in-inode bmap btree root.
+ */
+void
+xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
+{
+	xfs_bmbt_block_t	*broot;
+	int			format;
+	int			i;
+	xfs_bmbt_key_t		*kp;
+	xfs_bmbt_ptr_t		*pp;
+
+	format = f == &ip->i_df ? ip->i_d.di_format : ip->i_d.di_aformat;
+	if ((f->if_flags & XFS_IFBROOT) == 0 ||
+	    format != XFS_DINODE_FMT_BTREE) {
+		qprintf("inode 0x%x not btree format\n", ip); 
+		return;
+	}
+	broot = f->if_broot;
+	qprintf("block @0x%x magic %x level %d numrecs %d\n",
+		broot, broot->bb_magic, broot->bb_level, broot->bb_numrecs);
+	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, f->if_broot_bytes);
+	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
+	for (i = 1; i <= broot->bb_numrecs; i++)
+		qprintf("\t%d: startoff %lld ptr %llx\n",
+			i, kp[i - 1].br_startoff, pp[i - 1]);
+}
 
 /*
  * Print allocation btree block.
@@ -935,6 +967,7 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 {
 	static char *diflags[] = {
 		"realtime",		/* XFS_DIFLAG_REALTIME */
+		"prealloc",		/* XFS_DIFLAG_PREALLOC */
 		NULL
 	};
 
@@ -949,9 +982,9 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
 		dip->di_ctime.t_sec, dip->di_ctime.t_nsec);
 	qprintf("size %llx ", dip->di_size);
-	qprintf("nblocks %lld extsize 0x%x nextents 0x%x nattrextents 0x%x\n",
+	qprintf("nblocks %lld extsize 0x%x nextents 0x%x anextents 0x%x\n",
 		dip->di_nblocks, dip->di_extsize,
-		dip->di_nextents, dip->di_nattrextents);
+		dip->di_nextents, dip->di_anextents);
 	qprintf("forkoff %d dmevmask 0x%x dmstate 0x%x ", dip->di_forkoff,
 		dip->di_dmevmask, dip->di_dmstate);
 	printflags(dip->di_flags, diflags, "flags");
@@ -1142,6 +1175,29 @@ xfs_strat_trace_entry(ktrace_entry_t *ktep)
 	return 1;
 }
 #endif	/* DEBUG */
+
+static void
+xfs_xnode_fork(char *name, xfs_ifork_t *f)
+{
+	int *p;
+
+	qprintf("%s fork\n", name);
+	qprintf(" bytes %s ", xfs_fmtsize(f->if_bytes));
+	qprintf("real_bytes %s lastex 0x%x u1:%s 0x%x\n",
+		xfs_fmtsize(f->if_real_bytes), f->if_lastex,
+		f->if_flags & XFS_IFINLINE ? "data" : "extents",
+		f->if_flags & XFS_IFINLINE ?
+			f->if_u1.if_data :
+			(char *)f->if_u1.if_extents);
+	qprintf(" broot 0x%x broot_bytes %s\n",
+		f->if_broot, xfs_fmtsize(f->if_broot_bytes));
+	qprintf(" u2");
+	for (p = (int *)&f->if_u2;
+	     p < (int *)((char *)&f->if_u2 + XFS_INLINE_DATA);
+	     p++)
+		qprintf(" 0x%w32x", *p);
+	qprintf("\n");
+}
 
 /*
  * Command-level xfs-idbg functions.
@@ -1587,31 +1643,21 @@ idbg_xbrec(xfs_bmbt_rec_32_t *r)
 }
 
 /*
- * Print an xfs in-inode bmap btree root.
+ * Print an xfs in-inode bmap btree root (data fork).
  */
 void
 idbg_xbroot(xfs_inode_t *ip)
 {
-	xfs_bmbt_block_t	*broot;
-	int			i;
-	xfs_bmbt_key_t		*kp;
-	xfs_bmbt_ptr_t		*pp;
+	xfs_broot(ip, &ip->i_df);
+}
 
-	if ((ip->i_flags & XFS_IBROOT) == 0 ||
-	    ip->i_d.di_format != XFS_DINODE_FMT_BTREE) {
-		qprintf("inode 0x%x not btree format\n", ip); 
-		return;
-	}
-	broot = ip->i_broot;
-	qprintf("block @0x%x magic %x level %d numrecs %d\n",
-		broot, broot->bb_magic, broot->bb_level, broot->bb_numrecs);
-	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, ip->i_broot_bytes);
-	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, ip->i_broot_bytes);
-	for (i = 1; i <= broot->bb_numrecs; i++) {
-		qprintf("\t%d: startoff %lld ",
-			i, kp[i - 1].br_startoff);
-		qprintf("ptr %llx\n", pp[i - 1]);
-	}
+/*
+ * Print an xfs in-inode bmap btree root (attribute fork).
+ */
+void
+idbg_xbroota(xfs_inode_t *ip)
+{
+	xfs_broot(ip, &ip->i_af);
 }
 
 /* 
@@ -1654,8 +1700,9 @@ idbg_xbtcur(xfs_btree_cur_t *c)
 		 (c->bc_btnum == XFS_BTNUM_BMAP ? "bmap" : "ino")),
 		c->bc_blocklog);
 	if (c->bc_btnum == XFS_BTNUM_BMAP) {
-		qprintf("private inodesize 0x%x ip 0x%x flags %d\n",
-			c->bc_private.b.inodesize,
+		qprintf("private forksize 0x%x whichfork %d ip 0x%x flags %d\n",
+			c->bc_private.b.forksize,
+			c->bc_private.b.whichfork,
 			c->bc_private.b.ip,
 			c->bc_private.b.flags);
 		qprintf("private firstblock %s flist 0x%x allocated 0x%x\n",
@@ -2079,17 +2126,16 @@ idbg_xexlist(xfs_inode_t *ip)
 	xfs_dfsbno_t s;
 	xfs_dfilblks_t c;
 
-	if (!(ip->i_flags & XFS_IEXTENTS))
+	if (!(ip->i_df.if_flags & XFS_IFEXTENTS))
 		return;
-	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_32_t);
+	nextents = ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_32_t);
 	qprintf("inode 0x%x extents 0x%x nextents 0x%x\n",
-		ip, ip->i_u1.iu_extents, nextents);
+		ip, ip->i_df.if_u1.if_extents, nextents);
 	for (i = 0; i < nextents; i++) {
-		xfs_convert_extent((xfs_bmbt_rec_32_t *)&ip->i_u1.iu_extents[i],
+		xfs_convert_extent((xfs_bmbt_rec_32_t *)&ip->i_df.if_u1.if_extents[i],
 			&o, &s, &c);
-		qprintf("%d: startoff %lld ", i, o);
-		qprintf("startblock %s ", xfs_fmtfsblock(s, ip->i_mount));
-		qprintf("blockcount %lld\n", c);
+		qprintf("%d: startoff %lld startblock %s blockcount %lld\n",
+			i, o, xfs_fmtfsblock(s, ip->i_mount), c);
 	}
 }
 
@@ -2522,21 +2568,19 @@ idbg_xmount(xfs_mount_t *mp)
 	qprintf("alloc_mxr[lf,nd] %d %d alloc_mnr[lf,nd] %d %d\n",
 		mp->m_alloc_mxr[0], mp->m_alloc_mxr[1],
 		mp->m_alloc_mnr[0], mp->m_alloc_mnr[1]);
-	qprintf("bmap_dmxr[lfnr,ndnr,lfr,ndr] %d %d %d %d\n",
+	qprintf("bmap_dmxr[lfnr,ndnr] %d %d bmap_dmnr[lfnr,ndnr] %d %d\n",
 		mp->m_bmap_dmxr[0], mp->m_bmap_dmxr[1],
-		mp->m_bmap_dmxr[2], mp->m_bmap_dmxr[3]);
-	qprintf("bmap_dmnr[lfnr,ndnr,lfr,ndr] %d %d %d %d bmap_ext_mxr %d\n",
-		mp->m_bmap_dmnr[0], mp->m_bmap_dmnr[1],
-		mp->m_bmap_dmnr[2], mp->m_bmap_dmnr[3],
-		mp->m_bmap_ext_mxr);
+		mp->m_bmap_dmnr[0], mp->m_bmap_dmnr[1]);
 	qprintf("inobt_mxr[lf,nd] %d %d inobt_mnr[lf,nd] %d %d\n",
 		mp->m_inobt_mxr[0], mp->m_inobt_mxr[1],
 		mp->m_inobt_mnr[0], mp->m_inobt_mnr[1]);
-	qprintf("ag_maxlevels %d bm_maxlevels %d in_maxlevels %d\n",
-		mp->m_ag_maxlevels, mp->m_bm_maxlevels, mp->m_in_maxlevels);
+	qprintf("ag_maxlevels %d bm_maxlevels[d,a] %d %d in_maxlevels %d\n",
+		mp->m_ag_maxlevels, mp->m_bm_maxlevels[0],
+		mp->m_bm_maxlevels[1], mp->m_in_maxlevels);
 	qprintf("perag 0x%x &peraglock 0x%x &growlock 0x%x rbmrotor %d\n",
 		mp->m_perag, &mp->m_peraglock, &mp->m_growlock, mp->m_rbmrotor);
-	qprintf("flags ");
+	qprintf("attroffset %d flags ",
+		mp->m_attroffset);
 	printflags(mp->m_flags, xmount_flags,"mount");
 	qprintf("\n");
 }
@@ -2547,7 +2591,6 @@ idbg_xmount(xfs_mount_t *mp)
 void
 idbg_xnode(xfs_inode_t *ip)
 {
-	int *p;
 	static char *tab_flags[] = {
 		"inline",	/* XFS_IINLINE */
 		"extents",	/* XFS_IEXTENTS */
@@ -2599,35 +2642,17 @@ idbg_xnode(xfs_inode_t *ip)
 		ip->i_write_offset, ip->i_gap_list);
 	printflags(ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
-	qprintf("vcode 0x%x mapcnt 0x%x update_core 0x%x gen 0x%x qbufs %d\n",
+	qprintf("vcode 0x%x mapcnt 0x%x update_core 0x%x\n",
 		ip->i_vcode,
 		ip->i_mapcnt,
-		ip->i_update_core,
+		ip->i_update_core);
+	qprintf("gen 0x%x qbufs %d delayed blks %d\n",
 		ip->i_gen,
-		ip->i_queued_bufs);
-	qprintf("delayed_blks %d bytes %s ",
-		ip->i_delayed_blks,
-		xfs_fmtsize(ip->i_bytes));
-	qprintf("real_bytes %s lastex 0x%x u1:%s 0x%x\n",
-		xfs_fmtsize(ip->i_real_bytes),
-		ip->i_lastex,
-		ip->i_flags & XFS_IINLINE ? "data" : "extents",
-		ip->i_flags & XFS_IINLINE ?
-			ip->i_u1.iu_data : (char *)ip->i_u1.iu_extents);
-	qprintf("broot 0x%x broot_bytes %s\n",
-		ip->i_broot,
-		xfs_fmtsize(ip->i_broot_bytes));
-	qprintf("u2");
-	for (p = (int *)&ip->i_u2;
-	     p < (int *)((char *)&ip->i_u2 + XFS_INLINE_DATA);
-	     p++)
-		qprintf(" 0x%w32x", *p);
-	qprintf("\n");
-	qprintf("abytes %s alastex 0x%x u3 0x%x dmevents 0x%x\n",
-		xfs_fmtsize(ip->i_abytes),
-		ip->i_alastex,
-		ip->i_u3.iu_adata,
-		ip->i_dmevents);
+		ip->i_queued_bufs,
+		ip->i_delayed_blks);
+	xfs_xnode_fork("data", &ip->i_df);
+	xfs_xnode_fork("attr", &ip->i_af);
+	qprintf("dmevents 0x%x\n", ip->i_dmevents);
 	xfs_prdinode_core(&ip->i_d);
 }
 
@@ -2754,11 +2779,9 @@ idbg_xrwtrace(xfs_inode_t *ip)
 void
 idbg_xsb(xfs_sb_t *sbp)
 {
-	qprintf("magicnum 0x%x blocksize 0x%x dblocks %lld ",
+	qprintf("magicnum 0x%x blocksize 0x%x dblocks %lld rblocks %lld\n",
 		sbp->sb_magicnum, sbp->sb_blocksize,
-		sbp->sb_dblocks);
-	qprintf("rblocks %lld\n",
-		sbp->sb_rblocks);
+		sbp->sb_dblocks, sbp->sb_rblocks);
 	qprintf("rextents %lld uuid %s logstart %s\n",
 		sbp->sb_rextents,
 		fmtuuid(&sbp->sb_uuid),
@@ -2789,10 +2812,11 @@ idbg_xsb(xfs_sb_t *sbp)
 		sbp->sb_agblklog,
 		sbp->sb_rextslog,
 		sbp->sb_inprogress);
-	qprintf("icount %llx ", sbp->sb_icount);
-	qprintf("ifree %llx ", sbp->sb_ifree);
-	qprintf("fdblocks %llx ", sbp->sb_fdblocks);
-	qprintf("frextents %llx\n", sbp->sb_frextents);
+	qprintf("icount %llx ifree %llx fdblocks %llx frextents %llx\n",
+		sbp->sb_icount,
+		sbp->sb_ifree,
+		sbp->sb_fdblocks,
+		sbp->sb_frextents);
 }
 
 #ifdef DEBUG

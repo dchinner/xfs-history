@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.48 $"
+#ident	"$Revision: 1.49 $"
 
 struct buf;
 struct cred;
@@ -75,13 +75,12 @@ typedef struct xfs_mount {
 	uint			m_blockwmask;	/* blockwsize-1 */
 	uint			m_alloc_mxr[2];	/* XFS_ALLOC_BLOCK_MAXRECS */
 	uint			m_alloc_mnr[2];	/* XFS_ALLOC_BLOCK_MINRECS */
-	uint			m_bmap_dmxr[4];	/* XFS_BMAP_BLOCK_DMAXRECS */
-	uint			m_bmap_dmnr[4];	/* XFS_BMAP_BLOCK_DMINRECS */
-	uint			m_bmap_ext_mxr;	/* XFS_BMAP_EXT_MAXRECS */
+	uint			m_bmap_dmxr[2];	/* XFS_BMAP_BLOCK_DMAXRECS */
+	uint			m_bmap_dmnr[2];	/* XFS_BMAP_BLOCK_DMINRECS */
 	uint			m_inobt_mxr[2];	/* XFS_INOBT_BLOCK_MAXRECS */
 	uint			m_inobt_mnr[2];	/* XFS_INOBT_BLOCK_MINRECS */
 	uint			m_ag_maxlevels;	/* XFS_AG_MAXLEVELS */
-	uint			m_bm_maxlevels;	/* XFS_BM_MAXLEVELS */
+	uint			m_bm_maxlevels[2]; /* XFS_BM_MAXLEVELS */
 	uint			m_in_maxlevels;	/* XFS_IN_MAXLEVELS */
 	struct xfs_perag	*m_perag;	/* per-ag accounting info */
 	mrlock_t		m_peraglock;	/* lock for m_perag (pointer) */
@@ -90,6 +89,7 @@ typedef struct xfs_mount {
 	int			m_fixedfsid[2];	/* unchanged for life of FS */
 	uint			m_dmevmask;	/* DMI events for this FS */
 	uint			m_flags;	/* global mount flags */
+	uint			m_attroffset;	/* inode attribute offset */
 	xfs_trans_reservations_t m_reservations; /* precomputed res values */
 } xfs_mount_t;
 
@@ -122,8 +122,8 @@ typedef struct xfs_mount {
  * This structure is for use by the xfs_mod_incore_sb_batch() routine.
  */
 typedef struct xfs_mod_sb {
-	uint	msb_field;	/* Field to modify, see below */
-	int	msb_delta;	/* change to make to the specified field */
+	__int64_t	msb_field;	/* Field to modify, see below */
+	int		msb_delta;	/* change to make to the specified field */
 } xfs_mod_sb_t;
 
 #define	XFS_MOUNT_ILOCK(mp)	mutex_lock(&((mp)->m_ilock), PINOD)
@@ -134,18 +134,20 @@ typedef struct xfs_mod_sb {
 #define	AIL_LOCK(mp)		mutex_spinlock(&(mp)->m_ail_lock)
 #define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
 
+#define	XFS_HAS_ATTRIBUTES(mp)	\
+	((mp)->m_sb.sb_versionnum >= XFS_SB_VERSION_HASATTR)
 
 #ifdef SIM
 xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
 void		xfs_umount(xfs_mount_t *);
 #endif
 
-void		xfs_mod_sb(xfs_trans_t *, int);
+void		xfs_mod_sb(xfs_trans_t *, __int64_t);
 xfs_mount_t	*xfs_mount_init(void);
 void		xfs_mount_free(xfs_mount_t *mp);
 int		xfs_mountfs(struct vfs *, dev_t);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
-int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
+int		xfs_mod_incore_sb(xfs_mount_t *, __int64_t, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
 struct buf	*xfs_getsb(xfs_mount_t *, int);
 

@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.82 $"
+#ident "$Revision: 1.83 $"
 
 struct buf;
 struct cred;
@@ -54,12 +54,39 @@ typedef struct xfs_range_lock {
 #endif /* NOTYET */
 
 /*
+ * File incore extent information, present for each of data & attr forks.
+ */
+#define	XFS_INLINE_EXTS	2
+#define	XFS_INLINE_DATA	32
+typedef struct xfs_ifork {
+	size_t			if_bytes; 	/* bytes in if_u1 */
+	size_t			if_real_bytes;	/* bytes allocated in if_u1 */
+	size_t			if_broot_bytes;	/* bytes allocated for root */
+	xfs_bmbt_block_t	*if_broot;	/* file's incore btree root */
+	__uint16_t		if_flags;	/* per-fork flags */
+	__uint16_t		if_ext_max;	/* max # of extent records */
+	xfs_extnum_t		if_lastex;	/* last if_extents used */
+	union {
+		xfs_bmbt_rec_t	*if_extents;	/* linear map file exts */
+		char		*if_data;	/* inline file data */
+	} if_u1;
+	union {
+		xfs_bmbt_rec_t	if_inline_ext[XFS_INLINE_EXTS];
+						/* very small file extents */
+		char		if_inline_data[XFS_INLINE_DATA];
+						/* very small file data */
+		dev_t		if_rdev;	/* dev number if special */
+		uuid_t		if_uuid;	/* mount point value */
+	} if_u2;
+} xfs_ifork_t;
+
+/*
  * This is the xfs in-core inode structure.
  * Most of the on-disk inode is embedded in the i_d field.
  *
  * The extent pointers/inline file space, however, are managed
  * separately.  The memory for this information is pointed to by
- * the i_u1 and i_u3 unions depending on the type of the data.
+ * the if_u1 unions depending on the type of the data.
  * This is used to linearize the array of extents for fast in-core
  * access.  This is used until the file's number of extents
  * surpasses XFS_MAX_INCORE_EXTENTS, at which point all extent pointers
@@ -68,8 +95,6 @@ typedef struct xfs_range_lock {
  * Other state kept in the in-core inode is used for identification,
  * locking, transactional updating, etc of the inode.
  */
-#define	XFS_INLINE_EXTS	2
-#define	XFS_INLINE_DATA	32
 typedef struct xfs_inode {
 	/* Inode linking and identification information. */
 	struct xfs_ihash	*i_hash;	/* pointer to hash header */
@@ -113,7 +138,7 @@ typedef struct xfs_inode {
 	struct xfs_gap		*i_gap_list;	/* hole list in write range */
 
 	/* Miscellaneous state. */
-	unsigned short		i_flags;	/* see defined flags below */
+	unsigned int		i_flags;	/* see defined flags below */
 	unsigned long		i_vcode;	/* version code token (RFS) */
 	unsigned long		i_mapcnt;	/* count of mapped pages */
 	unsigned int		i_update_core;	/* timestamps are dirty */
@@ -121,32 +146,9 @@ typedef struct xfs_inode {
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
 	int			i_queued_bufs;	/* count of xfsd queued bufs*/
 
-	/* File incore extent information. */
-	size_t			i_bytes; 	/* bytes in i_u1 */
-	size_t			i_real_bytes;	/* bytes allocated in i_u1 */
-	xfs_extnum_t		i_lastex;	/* last iu_extents used */
-	union {
-		xfs_bmbt_rec_t	*iu_extents;	/* linear map of file exts */
-		char		*iu_data;	/* inline file data */
-	} i_u1;
-	xfs_bmbt_block_t	*i_broot;	/* file's incore btree root */
-	size_t			i_broot_bytes;	/* bytes allocated for root */
-	union {
-		xfs_bmbt_rec_t	iu_inline_ext[XFS_INLINE_EXTS];
-						/* very small file extents */
-		char		iu_inline_data[XFS_INLINE_DATA];
-						/* very small file data */
-		dev_t		iu_rdev;	/* dev number if special*/
-		uuid_t		iu_uuid;	/* mount point value */
-	} i_u2;
-
-	/* File incore attribute extent information. */
-	size_t			i_abytes;	/* bytes in i_u3 */
-	xfs_extnum_t		i_alastex;	/* last iu_aextents used */
-	union {
-		xfs_bmbt_rec_t	*iu_aextents;	/* map of attr extents */
-		char		*iu_adata;	/* inline attribute data */
-	} i_u3;
+	/* Extent information. */
+	xfs_ifork_t		i_df;		/* data fork */
+	xfs_ifork_t		i_af;		/* attribute fork */
 
 	/* Trace buffers per inode. */
 	struct ktrace		*i_xtrace;	/* inode extent list trace */
@@ -161,12 +163,32 @@ typedef struct xfs_inode {
 } xfs_inode_t;
 
 /*
+ * Fork handling.
+ */
+#define	XFS_DATA_FORK	0
+#define	XFS_ATTR_FORK	1
+/* This knows that the data fork is first... */
+#define	XFS_IFORK_PTR(ip,w)		(&(ip)->i_df + (w))
+#define	XFS_IFORK_Q(ip)			XFS_CFORK_Q(&(ip)->i_d)
+#define	XFS_IFORK_DSIZE(ip)		XFS_CFORK_DSIZE(&ip->i_d, ip->i_mount)
+#define	XFS_IFORK_ASIZE(ip)		XFS_CFORK_ASIZE(&ip->i_d, ip->i_mount)
+#define	XFS_IFORK_SIZE(ip,w)		XFS_CFORK_SIZE(&ip->i_d, ip->i_mount, w)
+#define	XFS_IFORK_FORMAT(ip,w)		XFS_CFORK_FORMAT(&ip->i_d, w)
+#define	XFS_IFORK_FMT_SET(ip,w,n)	XFS_CFORK_FMT_SET(&ip->i_d, w, n)
+#define	XFS_IFORK_NEXTENTS(ip,w)	XFS_CFORK_NEXTENTS(&ip->i_d, w)
+#define	XFS_IFORK_NEXT_SET(ip,w,n)	XFS_CFORK_NEXT_SET(&ip->i_d, w, n)
+
+/*
  * In-core inode flags.
  */
-#define	XFS_IINLINE	0x0001	/* Inline data is read in */
-#define	XFS_IEXTENTS	0x0002	/* All extent pointers are read in */
-#define	XFS_IBROOT	0x0004	/* i_broot points to the bmap b-tree root */
-#define XFS_IGRIO	0x0008  /* inode will be used for guaranteed rate i/o */
+#define XFS_IGRIO	0x0001  /* inode will be used for guaranteed rate i/o */
+
+/*
+ * Per-fork incore inode flags.
+ */
+#define	XFS_IFINLINE	0x0001	/* Inline data is read in */
+#define	XFS_IFEXTENTS	0x0002	/* All extent pointers are read in */
+#define	XFS_IFBROOT	0x0004	/* i_broot points to the bmap b-tree root */
 
 /*
  * Flags for inode locking.
@@ -286,7 +308,7 @@ int		xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			    xfs_dinode_t **, struct buf **);
 int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			  xfs_inode_t **);
-int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *);
+int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, ushort,
 		           dev_t, struct cred *, struct buf **, boolean_t *,
 			   xfs_inode_t **);
@@ -302,12 +324,12 @@ void		xfs_igrow_finish(struct xfs_trans *, xfs_inode_t *,
 				 xfs_fsize_t);
 
 void		xfs_idestroy(xfs_inode_t *);
-void		xfs_idata_realloc(xfs_inode_t *, int);
-void		xfs_iext_realloc(xfs_inode_t *, int);
-void		xfs_iroot_realloc(xfs_inode_t *, int);
+void		xfs_idata_realloc(xfs_inode_t *, int, int);
+void		xfs_iext_realloc(xfs_inode_t *, int, int);
+void		xfs_iroot_realloc(xfs_inode_t *, int, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
-int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *);
+int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *, int);
 int		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(struct xfs_mount *, int);
 #ifdef SIM

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * xfs_da_btree.h
@@ -11,6 +11,7 @@ struct buf;
 struct xfs_bmap_free;
 struct xfs_inode;
 struct xfs_mount;
+struct xfs_trans;
 struct zone;
 
 /*========================================================================
@@ -101,6 +102,7 @@ typedef struct xfs_da_name {
 	xfs_fsblock_t	*firstblock;	/* ptr to firstblock for bmap calls */
 	struct xfs_bmap_free *flist;	/* ptr to freelist for bmap_finish */
 	xfs_extlen_t	total;		/* total blocks needed, for 1st bmap */
+	int		whichfork;	/* data or attribute fork */
 } xfs_da_name_t;
 
 /*

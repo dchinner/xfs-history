@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -369,7 +369,8 @@ xfs_btree_dup_cursor(
 	 */
 	ncur = xfs_btree_init_cursor(mp, tp, cur->bc_private.a.agbp,
 				     cur->bc_private.a.agno, cur->bc_btnum,
-				     cur->bc_private.b.ip);
+				     cur->bc_private.b.ip,
+				     cur->bc_private.b.whichfork);
 	/*
 	 * Copy the record currently in the cursor.
 	 */
@@ -440,7 +441,7 @@ xfs_btree_get_block(
 	xfs_btree_block_t	*block;	/* return value */
 
 	if (cur->bc_btnum == XFS_BTNUM_BMAP && level == cur->bc_nlevels - 1)
-		block = (xfs_btree_block_t *)cur->bc_private.b.ip->i_broot;
+		block = (xfs_btree_block_t *)cur->bc_private.b.ip->i_df.if_broot;
 	else
 		block = XFS_BUF_TO_BLOCK(cur->bc_bufs[level]);
 	ASSERT(block != NULL);
@@ -505,11 +506,13 @@ xfs_btree_init_cursor(
 					/* (I only) buffer for agi structure */
 	xfs_agnumber_t	agno,		/* (AI only) allocation group number */
 	xfs_btnum_t	btnum,		/* btree identifier */
-	xfs_inode_t	*ip)		/* (B only) inode owning the btree */
+	xfs_inode_t	*ip,		/* (B only) inode owning the btree */
+	int		whichfork)	/* (B only) data or attr fork */
 {
 	xfs_agf_t	*agf;		/* (A) allocation group freespace */
 	xfs_agi_t	*agi;		/* (I) allocation group inodespace */
 	xfs_btree_cur_t	*cur;		/* return value */
+	xfs_ifork_t	*ifp;		/* (I) inode fork pointer */
 	int		nlevels;	/* number of levels in the btree */
 
 	ASSERT(xfs_btree_cur_zone != NULL);
@@ -527,7 +530,8 @@ xfs_btree_init_cursor(
 		nlevels = agf->agf_levels[btnum];
 		break;
 	case XFS_BTNUM_BMAP:
-		nlevels = ip->i_broot->bb_level + 1;
+		ifp = XFS_IFORK_PTR(ip, whichfork);
+		nlevels = ifp->if_broot->bb_level + 1;
 		break;
 	case XFS_BTNUM_INO:
 		agi = XFS_BUF_TO_AGI(agbp);
@@ -558,12 +562,13 @@ xfs_btree_init_cursor(
 		/*
 		 * Bmap btree fields.
 		 */
-		cur->bc_private.b.inodesize = mp->m_sb.sb_inodesize;
+		cur->bc_private.b.forksize = XFS_IFORK_SIZE(ip, whichfork);
 		cur->bc_private.b.ip = ip;
 		cur->bc_private.b.firstblock = NULLFSBLOCK;
 		cur->bc_private.b.flist = NULL;
 		cur->bc_private.b.allocated = 0;
 		cur->bc_private.b.flags = 0;
+		cur->bc_private.b.whichfork = whichfork;
 		break;
 	case XFS_BTNUM_INO:
 		/*
@@ -630,20 +635,20 @@ xfs_btree_lastrec(
  */
 void
 xfs_btree_offsets(
-	int		fields,		/* bitmask of fields */
+	__int64_t	fields,		/* bitmask of fields */
 	const int	*offsets,	/* table of field offsets */
 	int		nbits,		/* number of bits to inspect */
 	int		*first,		/* output: first byte offset */
 	int		*last)		/* output: last byte offset */
 {
 	int		i;		/* current bit number */
-	int		imask;		/* mask for current bit number */
+	__int64_t	imask;		/* mask for current bit number */
 
 	ASSERT(fields != 0);
 	/*
 	 * Find the lowest bit, so the first byte offset.
 	 */
-	for (i = 0, imask = 1; ; i++, imask <<= 1) {
+	for (i = 0, imask = 1LL; ; i++, imask <<= 1) {
 		if (imask & fields) {
 			*first = offsets[i];
 			break;
@@ -652,7 +657,7 @@ xfs_btree_offsets(
 	/*
 	 * Find the highest bit, so the last byte offset.
 	 */
-	for (i = nbits - 1, imask = 1 << i; ; i--, imask >>= 1) {
+	for (i = nbits - 1, imask = 1LL << i; ; i--, imask >>= 1) {
 		if (imask & fields) {
 			*last = offsets[i + 1] - 1;
 			break;

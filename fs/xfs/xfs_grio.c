@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.53 1995/05/08 19:57:12 curtis Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.54 1995/05/09 21:21:37 doucette Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -198,8 +198,8 @@ xfs_get_file_extents(
 		/*
 		 * Read in the file extents from disk if necessary.
 		 */
-		if (!(ip->i_flags & XFS_IEXTENTS)) {
-			ret = xfs_iread_extents(NULL, ip);
+		if (!(ip->i_df.if_flags & XFS_IFEXTENTS)) {
+			ret = xfs_iread_extents(NULL, ip, XFS_DATA_FORK);
 			if (ret) {
 				goto out;
 			}
@@ -208,7 +208,7 @@ xfs_get_file_extents(
 		recsize = sizeof(grio_bmbt_irec_t) * num_extents;
 		grec = kmem_alloc(recsize, KM_SLEEP );
 
-		ep = ip->i_u1.iu_extents;
+		ep = ip->i_df.if_u1.if_extents;
 
 		ASSERT( ep );
 

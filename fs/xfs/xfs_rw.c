@@ -1,4 +1,4 @@
-#ident "$Revision: 1.132 $"
+#ident "$Revision: 1.133 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3678,7 +3678,7 @@ xfs_strat_write(
 			nimaps = XFS_STRAT_WRITE_IMAPS;
 			error = xfs_bmapi(tp, ip, map_start_fsb, count_fsb,
 					  XFS_BMAPI_WRITE, &first_block, 1,
-					  imap, &(nimaps), &(free_list));
+					  imap, &nimaps, &free_list);
 			if (error) {
 				xfs_bmap_cancel(&free_list);
 				xfs_trans_cancel(tp,
@@ -4247,7 +4247,7 @@ xfs_diostrat( buf_t *bp)
 
 				xfs_iunlock( ip, XFS_ILOCK_EXCL );
 				error = xfs_trans_reserve( tp, 
-					   XFS_BM_MAXLEVELS(mp) + datablocks, 
+					   XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + datablocks, 
 					   XFS_WRITE_LOG_RES(mp),
 					   numrtextents,
 					   XFS_TRANS_PERM_LOG_RES,

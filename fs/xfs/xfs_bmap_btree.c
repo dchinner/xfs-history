@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.62 $"
+#ident	"$Revision: 1.63 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -416,7 +416,8 @@ xfs_bmbt_delrec(
 	 * If we can't then there's nothing left to do.
 	 */
 	if (level == cur->bc_nlevels - 1) {
-		xfs_iroot_realloc(cur->bc_private.b.ip, -1);
+		xfs_iroot_realloc(cur->bc_private.b.ip, -1,
+			cur->bc_private.b.whichfork);
 		i = xfs_bmbt_killroot(cur);
 		if (level > 0) {
 			error = xfs_bmbt_decrement(cur, level, &j);
@@ -739,7 +740,8 @@ xfs_bmbt_insrec(
 			/*
 			 * A root block, that can be made bigger.
 			 */
-			xfs_iroot_realloc(cur->bc_private.b.ip, 1);
+			xfs_iroot_realloc(cur->bc_private.b.ip, 1,
+				cur->bc_private.b.whichfork);
 			block = xfs_bmbt_get_block(cur, level, &bp);
 		} else if (level == cur->bc_nlevels - 1) {
 			/*
@@ -795,7 +797,9 @@ xfs_bmbt_insrec(
 			xfs_btree_check_lptr(cur, (xfs_bmbt_ptr_t)args.fsbno,
 				level);
 			*pp = args.fsbno;
-			xfs_iroot_realloc(cur->bc_private.b.ip, 1 - cblock->bb_numrecs);
+			xfs_iroot_realloc(cur->bc_private.b.ip,
+				1 - cblock->bb_numrecs,
+				cur->bc_private.b.whichfork);
 			xfs_btree_setbuf(cur, level, bp);
 			/*
 			 * Do all this logging at the end so that 
@@ -805,7 +809,8 @@ xfs_bmbt_insrec(
 			xfs_bmbt_log_keys(cur, bp, 1, cblock->bb_numrecs);
 			xfs_bmbt_log_ptrs(cur, bp, 1, cblock->bb_numrecs);
 			xfs_trans_log_inode(cur->bc_tp, cur->bc_private.b.ip,
-				XFS_ILOG_CORE | XFS_ILOG_BROOT);
+				XFS_ILOG_CORE |
+				XFS_ILOG_FBROOT(cur->bc_private.b.whichfork));
 			block = cblock;
 		} else {
 			error = xfs_bmbt_rshift(cur, level, &i);
@@ -1004,11 +1009,11 @@ xfs_bmbt_killroot(
 	ASSERT(cblock->bb_rightsib == NULLDFSBNO);
 	ip = cur->bc_private.b.ip;
 	ASSERT(XFS_BMAP_BLOCK_IMAXRECS(level, cur) ==
-	       XFS_BMAP_BROOT_MAXRECS(ip->i_broot_bytes));
+	       XFS_BMAP_BROOT_MAXRECS(ip->i_df.if_broot_bytes));
 	i = (int)(cblock->bb_numrecs - XFS_BMAP_BLOCK_IMAXRECS(level, cur));
 	if (i) {
-		xfs_iroot_realloc(ip, i);
-		block = ip->i_broot;
+		xfs_iroot_realloc(ip, i, cur->bc_private.b.whichfork);
+		block = ip->i_df.if_broot;
 	}
 	block->bb_numrecs += i;
 	ASSERT(block->bb_numrecs == cblock->bb_numrecs);
@@ -1029,7 +1034,8 @@ xfs_bmbt_killroot(
 	xfs_trans_binval(cur->bc_tp, cbp);
 	cur->bc_bufs[level - 1] = NULL;
 	block->bb_level--;
-	xfs_trans_log_inode(cur->bc_tp, ip, XFS_ILOG_CORE | XFS_ILOG_BROOT);
+	xfs_trans_log_inode(cur->bc_tp, ip,
+		XFS_ILOG_CORE | XFS_ILOG_FBROOT(cur->bc_private.b.whichfork));
 	cur->bc_nlevels--;
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_killroot exit3", cur);
@@ -1066,7 +1072,8 @@ xfs_bmbt_log_keys(
 		xfs_inode_t *ip;
 
 		ip = cur->bc_private.b.ip;
-		xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
+		xfs_trans_log_inode(tp, ip,
+			XFS_ILOG_FBROOT(cur->bc_private.b.whichfork));
 	}
 	xfs_bmbt_trace_cursor("xfs_bmbt_log_keys exit", cur);
 }
@@ -1101,7 +1108,8 @@ xfs_bmbt_log_ptrs(
 		xfs_inode_t *ip;
 
 		ip = cur->bc_private.b.ip;
-		xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
+		xfs_trans_log_inode(tp, ip,
+			XFS_ILOG_FBROOT(cur->bc_private.b.whichfork));
 	}
 	xfs_bmbt_trace_cursor("xfs_bmbt_log_ptrs exit", cur);
 }
@@ -2176,7 +2184,7 @@ xfs_bmbt_get_block(
 		rval = XFS_BUF_TO_BMBT_BLOCK(*bpp);
 	} else {
 		*bpp = 0;
-		rval = cur->bc_private.b.ip->i_broot;
+		rval = cur->bc_private.b.ip->i_df.if_broot;
 	}
 	return rval;
 }
@@ -2412,7 +2420,7 @@ xfs_bmbt_kcheck(
 	ip = cur->bc_private.b.ip;
 	dip = &ip->i_d;
 	ASSERT(dip->di_format == XFS_DINODE_FMT_BTREE);
-	block = ip->i_broot;
+	block = ip->i_df.if_broot;
 	level = block->bb_level;
 	levels = level + 1;
 	ASSERT(levels == cur->bc_nlevels);
@@ -2449,7 +2457,8 @@ xfs_bmbt_log_block(
 				  &last);
 		xfs_trans_log_buf(tp, bp, first, last);
 	} else
-		xfs_trans_log_inode(tp, cur->bc_private.b.ip, XFS_ILOG_BROOT);
+		xfs_trans_log_inode(tp, cur->bc_private.b.ip,
+			XFS_ILOG_FBROOT(cur->bc_private.b.whichfork));
 	xfs_bmbt_trace_cursor("xfs_bmbt_log_block exit", cur);
 }
 
@@ -2543,7 +2552,7 @@ xfs_bmbt_rcheck(
 	ip = cur->bc_private.b.ip;
 	dip = &ip->i_d;
 	ASSERT(dip->di_format == XFS_DINODE_FMT_BTREE);
-	block = ip->i_broot;
+	block = ip->i_df.if_broot;
 	level = cur->bc_nlevels - 1;
 	rp = level ? (void *)&key : (void *)&rec;
 	xfs_bmbt_rcheck_body(cur, block, &bno, rp, level);
