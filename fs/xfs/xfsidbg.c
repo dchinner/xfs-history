@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.12 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -385,18 +385,22 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	xfs_dfilblks_t		c;
 	xfs_inode_t		*ip;
 	xfs_ino_t		ino;
-	static char		*ops[] = { "del", "ins", "pre", "post" };
 	xfs_dfiloff_t		o;
+	int			opcode;
+	static char		*ops[] = { "del", "ins", "pre", "post" };
 	xfs_bmbt_rec_32_t	r;
+	int			whichfork;
 
-	if ((__psint_t)ktep->val[0] == 0)
+	opcode = ((__psint_t)ktep->val[0]) & 0xffff;
+	if (opcode == 0)
 		return 0;
+	whichfork = ((__psint_t)ktep->val[0]) >> 16;
 	ip = (xfs_inode_t *)ktep->val[3];
 	ino = ((xfs_ino_t)ktep->val[6] << 32) | ((xfs_ino_t)ktep->val[7]);
-	qprintf("%s %s:%s ip %x ino %s idx %d\n",
-		ops[(__psint_t)ktep->val[0] - 1], (char *)ktep->val[1],
+	qprintf("%s %s:%s ip %x ino %s %cf idx %d\n",
+		ops[opcode - 1], (char *)ktep->val[1],
 		(char *)ktep->val[2], ip, xfs_fmtino(ino, ip->i_mount),
-		(__psint_t)ktep->val[4]);
+		"da"[whichfork], (__psint_t)ktep->val[4]);
 	r.l0 = (xfs_bmbt_rec_base_t)ktep->val[8];
 	r.l1 = (xfs_bmbt_rec_base_t)ktep->val[9];
 	r.l2 = (xfs_bmbt_rec_base_t)ktep->val[10];
@@ -422,18 +426,24 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
  * Print xfs bmap btree trace buffer entry.
  */
 static int
-xfs_bmbt_trace_entry(ktrace_entry_t *ktep)
+xfs_bmbt_trace_entry(
+	ktrace_entry_t		*ktep)
 {		  
-	xfs_bmbt_rec_32_t r;
-	xfs_bmbt_irec_t s;
+	xfs_bmbt_rec_32_t	r;
+	xfs_bmbt_irec_t		s;
+	int			type;
+	int			whichfork;
 
-	if ((__psint_t)ktep->val[0] == 0)
+	type = (__psint_t)ktep->val[0] & 0xffff;
+	whichfork = (__psint_t)ktep->val[0] >> 16;
+	if (type == 0)
 		return 0;
-	qprintf("%s ip 0x%x cur 0x%x",
+	qprintf("%s ip 0x%x %cf cur 0x%x",
 		(char *)ktep->val[1],
 		(xfs_inode_t *)ktep->val[2],
+		"da"[whichfork],
 		(xfs_btree_cur_t *)ktep->val[3]);
-	switch ((__psint_t)ktep->val[0]) {
+	switch (type) {
 	case XFS_BMBT_KTRACE_ARGBI:
 		qprintf(" buf 0x%x i %d\n",
 			(buf_t *)ktep->val[4],
@@ -1181,6 +1191,12 @@ xfs_strat_trace_entry(ktrace_entry_t *ktep)
 static void
 xfs_xnode_fork(char *name, xfs_ifork_t *f)
 {
+	static char *tab_flags[] = {
+		"inline",	/* XFS_IFINLINE */
+		"extents",	/* XFS_IFEXTENTS */
+		"broot",	/* XFS_IFBROOT */
+		NULL
+	};
 	int *p;
 
 	qprintf("%s fork\n", name);
@@ -1191,8 +1207,10 @@ xfs_xnode_fork(char *name, xfs_ifork_t *f)
 		f->if_flags & XFS_IFINLINE ?
 			f->if_u1.if_data :
 			(char *)f->if_u1.if_extents);
-	qprintf(" broot 0x%x broot_bytes %s\n",
-		f->if_broot, xfs_fmtsize(f->if_broot_bytes));
+	qprintf(" broot 0x%x broot_bytes %s ext_max %d",
+		f->if_broot, xfs_fmtsize(f->if_broot_bytes), f->if_ext_max);
+	printflags(f->if_flags, tab_flags, "flags");
+	qprintf("\n");
 	qprintf(" u2");
 	for (p = (int *)&f->if_u2;
 	     p < (int *)((char *)&f->if_u2 + XFS_INLINE_DATA);
@@ -2594,9 +2612,6 @@ void
 idbg_xnode(xfs_inode_t *ip)
 {
 	static char *tab_flags[] = {
-		"inline",	/* XFS_IINLINE */
-		"extents",	/* XFS_IEXTENTS */
-		"broot",	/* XFS_IBROOT */
 		"grio",		/* XFS_IGRIO */
 		NULL
 	};
