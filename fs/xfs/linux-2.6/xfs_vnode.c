@@ -205,6 +205,8 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 
 	XFS_STATS_INC(xfsstats.vn_get);
 	inode = iget_locked(vmap->v_vfsp->vfs_super, vmap->v_ino);
+	if (inode == NULL)		/* Inode not present */
+		return NULL;
 
 	/* We do not want to create new inodes via vn_get,
 	 * returning NULL here is OK.
@@ -215,9 +217,6 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 		iput(inode);
 		return NULL;
 	}
-
-	if (inode == NULL)		/* Inode not present */
-		return NULL;
 
 	vn_trace_exit(vp, "vn_get", (inst_t *)__return_address);
 	ASSERT((vp->v_flag & VPURGE) == 0);
