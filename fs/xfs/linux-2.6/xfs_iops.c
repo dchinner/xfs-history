@@ -823,12 +823,7 @@ linvfs_write_full_page(
 		ASSERT(atomic_read(&page->count));
 		UnlockPage(page);
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		lock_page(page); /* We can wait for the page with inode I/O lock */
-		if (Page_Uptodate(page)) {
-			xfs_hit_nowait_done++;
-			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-			return 0;
-		}
+		lock_page(page); /* Wait for the page with inode I/O lock */
 	}
 	error = pagebuf_write_full_page(filp, page);
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
