@@ -1,4 +1,4 @@
-#ident "$Revision: 1.216 $"
+#ident "$Revision: 1.217 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1063,7 +1063,7 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	extern void	chunkrelse(buf_t *bp);
 
 	vp = BHV_TO_VNODE(bdp);
-	ip = XFS_BHVTOI(vp->v_fbhv);
+	ip = XFS_BHVTOI(bdp);
 	*rbuf = NULL;
 	*pboff = *pbsize = -1;
 	error = 0;
