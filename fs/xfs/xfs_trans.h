@@ -84,7 +84,7 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_WRITE_SYNC		17
 #define	XFS_TRANS_WRITEID		18
 #define	XFS_TRANS_ADDAFORK		19
-#define	XFS_TRANS_AINVAL		20
+#define	XFS_TRANS_ATTRINVAL		20
 #define	XFS_ATRUNCATE			21
 #define	XFS_TRANS_ATTR_SET		22
 #define	XFS_TRANS_ATTR_RM		23
@@ -621,34 +621,25 @@ typedef struct xfs_trans {
 
 /*
  * Logging an invalidated buffer when truncating the attribute fork.
- *	"max bufs" buffer log items
  */
-#define	XFS_ATRUNC_MAX_BUFS	8     
-#define	XFS_CALC_AINVAL_LOG_RES(mp) \
-     	((XFS_ATRUNC_MAX_BUFS * 128) + 128)
+#define	XFS_ATTRINVAL_MAX_BUFS	128     
+#define	XFS_CALC_ATTRINVAL_LOG_RES(mp)	128000	/* GROT */
 
-#define	XFS_AINVAL_LOG_RES(mp)	((mp)->m_reservations.tr_ainval)     
+#define	XFS_ATTRINVAL_LOG_RES(mp)	((mp)->m_reservations.tr_attrinval)     
 
 /*
  * Setting an attribute is the same as creating a new file.
  */
-#define	XFS_CALC_SETATTR_LOG_RES(mp)	4*XFS_CREATE_LOG_RES(mp) /* GROT? */
+#define	XFS_CALC_ATTRSET_LOG_RES(mp)	128000 /* GROT? */
 
-#define	XFS_SETATTR_LOG_RES(mp)	((mp)->m_reservations.tr_setattr)
+#define	XFS_ATTRSET_LOG_RES(mp)	((mp)->m_reservations.tr_attrset)
 
 /*
  * Removing an attribute is the same as creating a new file.
  */
-#define	XFS_CALC_RMATTR_LOG_RES(mp)	4*XFS_REMOVE_LOG_RES(mp) /* GROT? */
+#define	XFS_CALC_ATTRRM_LOG_RES(mp)	128000 /* GROT? */
 
-#define	XFS_RMATTR_LOG_RES(mp)	((mp)->m_reservations.tr_rmattr)
-
-/*
- * Setting/clearing the INCOMPLETE flag on an attribute.
- */
-#define	XFS_CALC_ATTRFLAG_LOG_RES(mp)	2*XFS_FSB_TO_B((mp), 1)	/* GROT? */
-
-#define	XFS_ATTRFLAG_LOG_RES(mp)	((mp)->m_reservations.tr_rmattr)
+#define	XFS_ATTRRM_LOG_RES(mp)	((mp)->m_reservations.tr_attrrm)
 
 /*
  * Clearing a bad agino number in an agi hash bucket.
@@ -671,10 +662,9 @@ typedef struct xfs_trans {
 #define	XFS_RENAME_LOG_COUNT		2
 #define	XFS_WRITE_LOG_COUNT		2     
 #define	XFS_ADDAFORK_LOG_COUNT		2
-#define	XFS_AINVAL_LOG_COUNT		1     
-#define	XFS_SETATTR_LOG_COUNT		3     
-#define	XFS_RMATTR_LOG_COUNT		3     
-#define	XFS_ATTRFLAG_LOG_COUNT		1     
+#define	XFS_ATTRINVAL_LOG_COUNT		1     
+#define	XFS_ATTRSET_LOG_COUNT		3     
+#define	XFS_ATTRRM_LOG_COUNT		3     
 
 
 /*
