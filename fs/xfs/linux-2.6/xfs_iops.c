@@ -779,10 +779,11 @@ int linvfs_bmap(struct address_space *mapping, long block)
 
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
-	if (inode->i_data.nrpages)
+	if (inode->i_data.nrpages) {
 		VOP_RWLOCK(vp, VRWLOCK_READ);
 		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, 0, FI_REMAPF, error);
 		VOP_RWUNLOCK(vp, VRWLOCK_READ);
+	}
 	if (error)
 	return -1;
 
