@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.28 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -184,8 +184,8 @@ xfs_bulkstat(
 	/* 
 	 * Lock down the user's buffer.
 	 */
-	if (!useracc(ubuffer, ubcount * statstruct_size, B_READ))
-		return curthreadp->k_error ? curthreadp->k_error : EFAULT;
+	if (error = useracc(ubuffer, ubcount * statstruct_size, B_READ, NULL))
+		return error;
 	/*
 	 * Allocate a page-sized buffer for inode btree records.
 	 * We could try allocating something smaller, but for normal
