@@ -493,7 +493,7 @@ xfs_alloc_ag_vextent(
 	 */
 	if (args->agbno != NULLAGBLOCK) {
 		xfs_agf_t	*agf;	/* allocation group freelist header */
-		int 		slen = (int)args->len;
+		long 		slen = (long)args->len;
 
 		ASSERT(args->len >= args->minlen && args->len <= args->maxlen);
 		ASSERT(!(args->wasfromfl) || !args->isfl);
@@ -1979,7 +1979,7 @@ xfs_free_ag_extent(
 		xfs_alloc_trace_modagf(fname, NULL, mp, agf, XFS_AGF_FREEBLKS);
 		xfs_alloc_log_agf(tp, agbp, XFS_AGF_FREEBLKS);
 		if (!isfl)
-			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, (int)len);
+			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, (long)len);
 		XFSSTATS.xs_freex++;
 		XFSSTATS.xs_freeb += len;
 	}
