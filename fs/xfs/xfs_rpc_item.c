@@ -1,4 +1,7 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 /*
  * Implementation of CXFS RPC log items -- needed to implement

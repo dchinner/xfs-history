@@ -5830,7 +5830,7 @@ xfs_fcntl(
 		da.d_maxiosz = XFS_FSB_TO_B(mp,
 				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
 #endif
-		printf("xfs_vnodeops.c Fix Me Fix Me\n");
+		printk("xfs_vnodeops.c Fix Me Fix Me\n");
 
 		if (copyout(&da, arg, sizeof(da))) {
 			error = XFS_ERROR(EFAULT);

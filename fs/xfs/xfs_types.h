@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision: 1.36 $"
 
 /*
  * XFS types
@@ -34,7 +34,7 @@
 #endif
 #endif
 
-#if !defined(__linux__)
+#if !defined(SIM) & 0
 typedef int8_t		__int8_t;
 typedef	u_int8_t	__uint8_t;
 
