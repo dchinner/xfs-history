@@ -1,4 +1,4 @@
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -1170,7 +1170,6 @@ xfs_qm_dqrele(
 	xfs_dquot_t   	*dqp)
 {
 	ASSERT(dqp);
-	ASSERT(! XFS_DQ_IS_LOCKED(dqp));
 	xfs_dqtrace_entry(dqp, "DQRELE");
 
 	xfs_dqlock(dqp);
@@ -1363,13 +1362,7 @@ int
 xfs_qm_dqlock_nowait(
 	xfs_dquot_t *dqp)
 {
-	int locked;
-	
-	locked = mutex_trylock(&((dqp)->q_qlock)); 
-	if (locked) 
-		(dqp)->dq_flags |= XFS_DQ_LOCKED;
-
-	return (locked);
+	return (mutex_trylock(&((dqp)->q_qlock)));
 }
 
 void
@@ -1377,7 +1370,6 @@ xfs_dqlock(
 	xfs_dquot_t *dqp)
 {
 	mutex_lock(&(dqp->q_qlock), PINOD); 
-	(dqp)->dq_flags |= XFS_DQ_LOCKED;
 }
 
 void
@@ -1385,7 +1377,6 @@ xfs_dqunlock(
 	xfs_dquot_t *dqp)
 {
 	mutex_unlock(&(dqp->q_qlock)); 
-	dqp->dq_flags &= ~(XFS_DQ_LOCKED);
 	if (dqp->q_logitem.qli_dquot == dqp) { 
 		xfs_trans_unlocked_item(dqp->q_mount,
 					(xfs_log_item_t*)&(dqp->q_logitem));	
@@ -1398,7 +1389,6 @@ xfs_dqunlock_nonotify(
 	xfs_dquot_t *dqp)
 {
 	mutex_unlock(&(dqp->q_qlock)); 
-	dqp->dq_flags &= ~(XFS_DQ_LOCKED);
 }
 
 void

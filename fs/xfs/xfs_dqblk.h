@@ -1,7 +1,7 @@
 #ifndef _XFS_DQBLK_H_
 #define _XFS_DQBLK_H_
 
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
  * The ondisk form of a dquot structure.
@@ -54,7 +54,7 @@ typedef struct xfs_dqblk {
  */
 #define XFS_DQ_USER	 	0x0001		/* a user quota */
 #define XFS_DQ_PROJ	 	0x0002		/* a project quota */
-#define XFS_DQ_LOCKED		0x0004		/* dquot is locked */
+
 #define XFS_DQ_FLOCKED		0x0008		/* flush lock taken */
 #define XFS_DQ_DIRTY		0x0010		/* dquot is dirty */
 #define XFS_DQ_WANT		0x0020		/* for lookup/reclaim race */
