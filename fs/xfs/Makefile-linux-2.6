@@ -2,7 +2,7 @@
 #
 # Makefile for SGI XFS File System
 #
-# $Revision: 1.45 $
+# $Revision: 1.46 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -47,6 +47,8 @@ XFS_CSRCS=	xfs_alloc.c \
 		xfs_log_recover.c \
 		xfs_macros.c \
 		xfs_mount.c \
+		xfs_prio.c \
+		xfs_rename.c \
 		xfs_rw.c \
 		xfs_trans.c \
 		xfs_trans_ail.c \
@@ -54,9 +56,9 @@ XFS_CSRCS=	xfs_alloc.c \
 		xfs_trans_extfree.c \
 		xfs_trans_inode.c \
 		xfs_trans_item.c \
+		xfs_utils.c \
 		xfs_vfsops.c \
-		xfs_vnodeops.c \
-		xfs_prio.c
+		xfs_vnodeops.c
 
 
 XFS_OBJS=$(XFS_CSRCS:.c=.o)
@@ -116,6 +118,9 @@ HFILES=	xfs_ag.h \
 	xfs_dir.h \
 	xfs_dir_leaf.h \
 	xfs_dir_sf.h \
+	xfs_dquot.h \
+	xfs_dquot_item.h \
+	xfs_dqblk.h \
 	xfs_error.h \
 	xfs_extfree_item.h \
 	xfs_fsops.h \
@@ -132,17 +137,17 @@ HFILES=	xfs_ag.h \
 	xfs_log_recover.h \
 	xfs_macros.h \
 	xfs_mount.h \
+	xfs_qm.h \
+	xfs_quota.h \
+	xfs_quota_priv.h \
 	xfs_rtalloc.h \
 	xfs_rw.h \
 	xfs_sb.h \
 	xfs_trans.h \
 	xfs_trans_priv.h \
 	xfs_types.h \
-	xfs_dquot.h \
-	xfs_dqblk.h \
-	xfs_qm.h \
-	xfs_quota.h \
-	xfs_quota_priv.h
+	xfs_utils.h
+
 
 #
 # Rules
