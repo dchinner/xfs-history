@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 struct xfs_ihash;
 
@@ -35,6 +35,7 @@ typedef struct xfs_mount {
 	struct xfs_inode	*m_rbmip;	/* pointer to bitmap inode */
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
 	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
+	struct xfs_inode	*m_rootip;	/* pointer to root directory */
 } xfs_mount_t;
 
 /*
@@ -47,7 +48,7 @@ typedef struct xfs_mount {
  * Macros for getting from mount to vfs and back.
  */
 #define	XFS_MTOVFS(mp)		((mp)->m_vfsp)
-#define	XFS_VFSTOM(vfsp)	((vfsp)->vfs_data)
+#define	XFS_VFSTOM(vfsp)	((xfs_mount_t *) (vfsp)->vfs_data)
 
  
 /*
