@@ -2165,6 +2165,7 @@ xfs_bmap_read_extents(
 	xfs_fsblock_t		bno;	/* block # of "block" */
 	buf_t			*buf;	/* buffer for "block" */
 	xfs_extnum_t		i;	/* index into the extents list */
+	int			level;	/* btree level, for checking */
 	xfs_mount_t		*mp;	/* file system mount structure */
 	xfs_bmbt_ptr_t		*pp;	/* pointer to block address */
 	xfs_extnum_t		room;	/* number of entries there's room for */
@@ -2178,20 +2179,27 @@ xfs_bmap_read_extents(
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
-	if (block->bb_level) {
+	if (level = block->bb_level) {
 		pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, sbp->sb_inodesize);
+		ASSERT(*pp != NULLFSBLOCK &&
+		       xfs_fsb_to_agno(mp, *pp) < mp->m_sb.sb_agcount &&
+		       xfs_fsb_to_agbno(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
 	}
 	/*
 	 * Go down the tree until leaf level is reached, following the first
 	 * pointer (leftmost) at each level.
 	 */
-	while (block->bb_level) {
+	while (level-- > 0) {
 		buf = xfs_btree_read_bufl(mp, tp, bno, 0);
 		block = xfs_buf_to_bmbt_block(buf);
-		if (block->bb_level == 0)
+		ASSERT(block->bb_level == level);
+		if (level == 0)
 			break;
 		pp = XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
+		ASSERT(*pp != NULLFSBLOCK &&
+		       xfs_fsb_to_agno(mp, *pp) < mp->m_sb.sb_agcount &&
+		       xfs_fsb_to_agbno(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
 		xfs_trans_brelse(tp, buf);
 	}
