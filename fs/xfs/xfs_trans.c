@@ -56,7 +56,7 @@
 STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
 STATIC uint	xfs_trans_count_vecs(xfs_trans_t *);
 STATIC void	xfs_trans_fill_vecs(xfs_trans_t *, xfs_log_iovec_t *);
-STATIC void	xfs_trans_unpin_items(xfs_trans_t *);
+STATIC void	xfs_trans_uncommit(xfs_trans_t *, uint);
 STATIC void	xfs_trans_committed(xfs_trans_t *);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t);
 STATIC void	xfs_trans_free(xfs_trans_t *);
@@ -564,16 +564,13 @@ xfs_trans_unreserve_and_mod_sb(
  * XFS disk error handling mechanism is not based on a typical
  * transaction abort mechanism. Logically after the filesystem
  * gets marked 'SHUTDOWN', we can't let any new transactions
- * be durable - ie. committed to disk. But the external interface
- * to the transaction mechanism is different, since we can't
- * implement a 'rollback' once we do a 'logical abort' of a trx.
- * So, we may let the commit succeed knowing full well
- * that the changes will never reach the disk. 
- *
- * Hence, this routine always returns 0 - SUCCESS.
+ * be durable - ie. committed to disk - because some metadata might
+ * be inconsistent. In such cases, this returns an error, and the
+ * caller may assume that all locked objects joined to the transaction
+ * have already been unlocked as if the commit had succeeded. 
+ * It's illegal to reference the transaction structure after this call.
  */
-
-/*ARGSUSED*/
+ /*ARGSUSED*/
 int
 xfs_trans_commit(
 	xfs_trans_t	*tp,
@@ -612,8 +609,7 @@ xfs_trans_commit(
 	 * Also make sure to return any reserved blocks to
 	 * the free pool.
 	 */
-	if (!(tp->t_flags & XFS_TRANS_DIRTY) ||
-	    XFS_FORCED_SHUTDOWN(mp)) {
+	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
 		/*
 		 * It is indeed possible for the transaction to be
@@ -697,14 +693,11 @@ xfs_trans_commit(
 
 	/*
 	 * If we got a log write error. Unpin the logitems that we
-	 * had pinned, clean up, but return success. Transaction
-	 * commit failures are opaque to outsiders.(!)
+	 * had pinned, clean up, free trans structure, and return error.
 	 */
 	if (error || commit_lsn == -1) { 
-		xfs_trans_unpin_items(tp);
-		xfs_trans_free_items(tp, flags);
-		xfs_trans_free(tp);
-		return (0);
+		xfs_trans_uncommit(tp, flags);
+		return XFS_ERROR(EIO);
 	}
 	
 	/*
@@ -791,9 +784,14 @@ xfs_trans_count_vecs(
 	return nvecs;
 }
 
+/*
+ * Called from the trans_commit code when we notice that
+ * the filesystem is in the middle of a forced shutdown.
+ */
 STATIC void
-xfs_trans_unpin_items(
-	xfs_trans_t		*tp)
+xfs_trans_uncommit(
+	xfs_trans_t	*tp,
+	uint		flags)
 {
 	xfs_log_item_desc_t	*lidp;
 
@@ -806,6 +804,16 @@ xfs_trans_unpin_items(
 		if (lidp->lid_flags & XFS_LID_DIRTY)
 			IOP_UNPIN(lidp->lid_item);
 	}
+
+	xfs_trans_unreserve_and_mod_sb(tp);
+	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY)) {
+#ifndef SIM
+		xfs_trans_unreserve_and_mod_dquots(tp);
+#endif
+	}
+	
+	xfs_trans_free_items(tp, flags);
+	xfs_trans_free(tp);
 }
 
 /*
@@ -889,16 +897,7 @@ xfs_trans_cancel(
 	xfs_log_item_t		*lip;
 	int			i;
 #endif
-#if 0
-	if (tp->t_flags & XFS_TRANS_DIRTY) {
-		/* cmn_err(CE_PANIC, "XFS aborting dirty transaction 0x%x\n",
-			tp); */
-		ASSERT(XFS_FORCED_SHUTDOWN(tp->t_mountp));
-		xfs_trans_free_items(tp, flags);
-		xfs_trans_free(tp);
-		return;
-	}
-#endif
+
 #ifdef DEBUG
 	if (!(flags & XFS_TRANS_ABORT)) {
 		licp = &(tp->t_items);
@@ -920,6 +919,7 @@ xfs_trans_cancel(
 	 * Don't bother about unreserving block reservations,
 	 * if we're shutting down. Just take care of the log reservations
 	 * because the log may be functional still.
+	 * XXXsup why bother? bloat, bloat.
 	 */
 	if (!XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
