@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision: 1.36 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -205,17 +205,20 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
     xlog_rec_header_t *rhead;
     int		      i;
     int		      extra_bblks = 0;
+    int		      extra = 0;
 
     ASSERT(start_blk != 0 || *last_blk != start_blk);
 
     /* We may be verifying a partial log record */
     if (*last_blk - start_blk < BTOBB(XLOG_MAX_RECORD_BSIZE)) {
 	extra_bblks = BTOBB(XLOG_MAX_RECORD_BSIZE) - (*last_blk - start_blk);
+	extra = 1;
     }
 
     ba -= BBSIZE;
     for (i=(*last_blk)-1; i>=0; i--) {
 	if (*(uint *)ba == XLOG_HEADER_MAGIC_NUM) {
+	    extra = 0;
 	    break;
 	} else {
 	    if (i < start_blk) {
@@ -239,6 +242,8 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
      * record do we update last_blk.
      */
     rhead = (xlog_rec_header_t *)ba;
+    if (extra == 0)
+	extra_bblks = 0;
     if (*last_blk - i + extra_bblks != BTOBB(rhead->h_len)+1)
 	*last_blk = i;
     return 0;
