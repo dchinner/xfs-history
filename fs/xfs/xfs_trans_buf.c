@@ -604,7 +604,7 @@ xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
 	 * to disk.  See xfs_buf_attach_iodone() for more details
 	 * on li_cb and xfs_buf_iodone_callbacks().
 	 */
-	bp->b_flags |= B_DELWRI;
+	bp->b_flags |= B_DELWRI | B_DONE;
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	if (bp->b_iodone == NULL) {
 		bp->b_iodone = xfs_buf_iodone_callbacks;
