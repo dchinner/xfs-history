@@ -3162,7 +3162,7 @@ xfs_dm_send_namesp_event(
 
 	error = dm_send_namesp_event(event, vfsp ? vfsp->vfs_super: NULL,
 				    LINVFS_GET_IP(vp1), vp1_right,
-				    LINVFS_GET_IP(vp2), vp2_right,
+				    vp2 ? LINVFS_GET_IP(vp2) : NULL, vp2_right,
 				    name1, name2,
 				    mode, retcode, flags);
 	error = -error; /* DMAPI returns negative errors */
