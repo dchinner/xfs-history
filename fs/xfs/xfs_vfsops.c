@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.132 $"
+#ident  "$Revision: 1.134 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1499,7 +1499,7 @@ xfs_sync(
 			VMAP(vp, vmap);
 			XFS_MOUNT_IUNLOCK(mp);
 			mount_locked = B_FALSE;
-			vp = vn_get(vp, &vmap);
+			vp = vn_get(vp, &vmap, 0);
 			if (vp == NULL) {
 				/*
 				 * The vnode was reclaimed once we let go

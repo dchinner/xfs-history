@@ -1,4 +1,4 @@
-#ident "$Revision: 1.69 $"
+#ident "$Revision: 1.71 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -176,7 +176,7 @@ again:
 			 * looking for the same inode so we have to at
 			 * least look.
 			 */
-			if (!(vp = vn_get(vp, &vmap))) {
+			if (!(vp = vn_get(vp, &vmap, 0))) {
 				XFSSTATS.xs_ig_frecycle++;
 				goto again;
 			}
