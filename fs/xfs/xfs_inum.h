@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_INUM_H
 #define	_FS_XFS_INUM_H
 
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision$"
 
 /*
  * Inode number format:
@@ -12,6 +12,17 @@
  */
 typedef	__uint64_t	xfs_ino_t;	/* inode number */
 typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
+
+/*
+ * Useful inode bits for this kernel.
+ * Used in some places where having 64-bits in the 32-bit kernels
+ * costs too much.
+ */
+#if XFS_BIG_FILESYSTEMS
+typedef	xfs_ino_t	xfs_intino_t;
+#else
+typedef	__uint32_t	xfs_intino_t;
+#endif
 
 #define	NULLFSINO	((xfs_ino_t)-1)
 #define	NULLAGINO	((xfs_agino_t)-1)
@@ -123,10 +134,11 @@ xfs_agino_t xfs_offbno_to_agino(struct xfs_mount *mp, xfs_agblock_t b, int o);
 #endif
 
 #if XFS_BIG_FILESYSTEMS
-#define	XFS_MAXINUMBER	((xfs_ino_t)((1ULL << 56) - 1ULL))
+#define	XFS_MAXINUMBER		((xfs_ino_t)((1ULL << 56) - 1ULL))
 #define	XFS_INO64_OFFSET	((xfs_ino_t)(1ULL << 32))
 #else
-#define	XFS_MAXINUMBER	((xfs_ino_t)((1ULL << 32) - 1ULL))
+#define	XFS_MAXINUMBER		((xfs_ino_t)((1ULL << 32) - 1ULL))
 #endif
+#define	XFS_MAXINUMBER_32	((xfs_ino_t)((1ULL << 32) - 1ULL))
 
 #endif	/* !_FS_XFS_INUM_H */

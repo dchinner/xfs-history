@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_SF_H
 #define	_FS_XFS_DIR_SF_H
 
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision$"
 
 /*
  * xfs_dir_sf.h
@@ -12,7 +12,7 @@
  * fit into the literal area of the inode.
  */
 
-typedef	__uint8_t xfs_dir_ino_t[sizeof(xfs_ino_t)];
+typedef struct { __uint8_t i[sizeof(xfs_ino_t)]; } xfs_dir_ino_t;
 
 /*
  * The parent directory has a dedicated field, and the self-pointer must
@@ -93,7 +93,7 @@ struct xfs_dir_leaf_entry;
 
 void xfs_dir_trace_g_du(char *where, struct xfs_inode *dp, struct uio *uio);
 void xfs_dir_trace_g_dub(char *where, struct xfs_inode *dp, struct uio *uio,
-			      unsigned int bno);
+			      xfs_dablk_t bno);
 void xfs_dir_trace_g_dun(char *where, struct xfs_inode *dp, struct uio *uio,
 			      struct xfs_da_intnode *node);
 void xfs_dir_trace_g_dul(char *where, struct xfs_inode *dp, struct uio *uio,
