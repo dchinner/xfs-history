@@ -469,6 +469,19 @@ int		xfs_refcache_busy;
 int		xfs_refcache_count;
 
 /*
+ * Timer callback to mark SB dirty, make sure we keep purging refcache
+ */
+void
+xfs_refcache_sbdirty(struct super_block *sb)
+{
+	sb->s_dirt = 1;
+}
+
+typedef void (*timeout_fn)(unsigned long);
+struct timer_list xfs_refcache_sbdirty_timer = 
+	{ {NULL, NULL}, 0, 0, (timeout_fn)xfs_refcache_sbdirty };
+
+/*
  * Insert the given inode into the reference cache.
  */
 void
@@ -677,7 +690,7 @@ xfs_refcache_purge_mp(
  * each call.
  */
 void
-xfs_refcache_purge_some(void)
+xfs_refcache_purge_some(xfs_mount_t *mp)
 {
 	int		error, i;
 	xfs_inode_t	*ip;
@@ -717,6 +730,20 @@ xfs_refcache_purge_some(void)
 	}
 
 	spin_unlock(&xfs_refcache_lock);
+
+	/*
+	 * If there are still entries in the refcache,
+	 * set timer to mark the SB dirty to make sure that
+	 * we hit sync even if filesystem is idle, so that we'll
+	 * purge some more later.
+	 */
+	if (xfs_refcache_count) {
+		del_timer(&xfs_refcache_sbdirty_timer);
+		xfs_refcache_sbdirty_timer.data = 
+			(int)XFS_ITOV(mp->m_rootip)->v_inode->i_sb;
+		xfs_refcache_sbdirty_timer.expires = jiffies + 2*HZ;
+		add_timer(&xfs_refcache_sbdirty_timer);
+	}
 
 	/*
 	 * Now drop the inodes we collected.

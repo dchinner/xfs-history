@@ -1586,7 +1586,7 @@ xfs_syncsub(
 	 * eventually kicked out of the cache.
 	 */
 	if (flags & SYNC_BDFLUSH) {
-		xfs_refcache_purge_some();
+		xfs_refcache_purge_some(mp);
 	}
 
 	/*

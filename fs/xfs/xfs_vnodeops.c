@@ -1733,6 +1733,9 @@ xfs_release(
 		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
 			if ((error = xfs_inactive_free_eofblocks(mp, ip)))
 				return (error);
+			/* Update linux inode block count after free above */
+			vp->v_inode->i_blocks = XFS_FSB_TO_BB(mp, 
+				ip->i_d.di_nblocks + ip->i_delayed_blks);
 		}
 	}
 
@@ -1816,6 +1819,9 @@ xfs_inactive(
 		     (ip->i_delayed_blks != 0))) {
 			if ((error = xfs_inactive_free_eofblocks(mp, ip)))
 				return (VN_INACTIVE_CACHE);
+			/* Update linux inode block count after free above */
+			vp->v_inode->i_blocks = XFS_FSB_TO_BB(mp, 
+				ip->i_d.di_nblocks + ip->i_delayed_blks);
 		}
 		goto out;
 	}
@@ -4588,6 +4594,7 @@ xfs_rwunlock(
         xfs_inode_t     *ip;
 	xfs_inode_t	*release_ip;
 	vnode_t 	*vp;
+	int		error;
 
 	vp = BHV_TO_VNODE(bdp);
 	if (vp->v_type == VDIR)
@@ -4606,6 +4613,7 @@ xfs_rwunlock(
         	xfs_iunlock (ip, XFS_IOLOCK_EXCL);
 		
 		if (release_ip != NULL) {
+			VOP_RELEASE(XFS_ITOV(release_ip), error);
 			VN_RELE(XFS_ITOV(release_ip));
 		}
 	} else {

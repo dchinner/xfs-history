@@ -165,7 +165,8 @@ xfs_refcache_purge_mp(
 	struct xfs_mount        *mp);
 
 void
-xfs_refcache_purge_some(void);
+xfs_refcache_purge_some(
+	struct xfs_mount	*mp);
 
 
 int
