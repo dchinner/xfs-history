@@ -33,7 +33,6 @@
  */
 
 #include <xfs.h>
-#include <linux/xfs_iops.h>
 
 STATIC int xfs_ibusy(xfs_mount_t *);
 STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
