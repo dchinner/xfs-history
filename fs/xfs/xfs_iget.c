@@ -483,7 +483,6 @@ xfs_iget(
 		xfs_inode_t	*ip;
 		int		newnode;
 
-		XFS_STATS_INC(xfsstats.xs_ig_found);
 
 		vp = LINVFS_GET_VN_ADDRESS(inode);
 		if (!(inode->i_state & I_NEW)) {
@@ -498,6 +497,7 @@ xfs_iget(
 				xfs_iocore_inode_reinit(ip);
 			}
 			vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
+			XFS_STATS_INC(xfsstats.xs_ig_found);
 			*ipp = ip;
 			return 0;
 		}
