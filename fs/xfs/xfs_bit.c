@@ -36,44 +36,7 @@
 
 #include <xfs.h>
 
-/*
- * Index of low bit number in byte, -1 for none set, 0..7 otherwise.
- */
-const char xfs_lowbit[256] = {
-       -1, 0, 1, 0, 2, 0, 1, 0,			/* 00 .. 07 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 08 .. 0f */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* 10 .. 17 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 18 .. 1f */
-	5, 0, 1, 0, 2, 0, 1, 0,			/* 20 .. 27 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 28 .. 2f */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* 30 .. 37 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 38 .. 3f */
-	6, 0, 1, 0, 2, 0, 1, 0,			/* 40 .. 47 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 48 .. 4f */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* 50 .. 57 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 58 .. 5f */
-	5, 0, 1, 0, 2, 0, 1, 0,			/* 60 .. 67 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 68 .. 6f */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* 70 .. 77 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 78 .. 7f */
-	7, 0, 1, 0, 2, 0, 1, 0,			/* 80 .. 87 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 88 .. 8f */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* 90 .. 97 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* 98 .. 9f */
-	5, 0, 1, 0, 2, 0, 1, 0,			/* a0 .. a7 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* a8 .. af */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* b0 .. b7 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* b8 .. bf */
-	6, 0, 1, 0, 2, 0, 1, 0,			/* c0 .. c7 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* c8 .. cf */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* d0 .. d7 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* d8 .. df */
-	5, 0, 1, 0, 2, 0, 1, 0,			/* e0 .. e7 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* e8 .. ef */
-	4, 0, 1, 0, 2, 0, 1, 0,			/* f0 .. f7 */
-	3, 0, 1, 0, 2, 0, 1, 0,			/* f8 .. ff */
-};
-
+#ifndef HAVE_ARCH_HIGHBIT
 /*
  * Index of high bit number in byte, -1 for none set, 0..7 otherwise.
  */
@@ -111,11 +74,12 @@ const char xfs_highbit[256] = {
 	7, 7, 7, 7, 7, 7, 7, 7,			/* f0 .. f7 */
 	7, 7, 7, 7, 7, 7, 7, 7,			/* f8 .. ff */
 };
+#endif
 
 /*
  * Count of bits set in byte, 0..8.
  */
-const char xfs_countbit[256] = {
+static const char xfs_countbit[256] = {
 	0, 1, 1, 2, 1, 2, 2, 3,			/* 00 .. 07 */
 	1, 2, 2, 3, 2, 3, 3, 4,			/* 08 .. 0f */
 	1, 2, 2, 3, 2, 3, 3, 4,			/* 10 .. 17 */
@@ -153,10 +117,13 @@ const char xfs_countbit[256] = {
 /*
  * xfs_highbit32: get high bit set out of 32-bit argument, -1 if none set.
  */
-int
+int inline
 xfs_highbit32(
 	__uint32_t	v)
 {
+#ifdef HAVE_ARCH_HIGHBIT
+	return highbit32(v);
+#else
 	int		i;
 
 	if (v & 0xffff0000)
@@ -172,6 +139,7 @@ xfs_highbit32(
 	else
 		return -1;
 	return i + xfs_highbit[(v >> i) & 0xff];
+#endif
 }
 
 /*
@@ -181,63 +149,14 @@ int
 xfs_lowbit64(
 	__uint64_t	v)
 {
-	int		i;
-#if XFS_64
-	if (v & 0x00000000ffffffff)
-		if (v & 0x000000000000ffff)
-			if (v & 0x00000000000000ff)
-				i = 0;
-			else
-				i = 8;
-		else
-			if (v & 0x0000000000ff0000)
-				i = 16;
-			else
-				i = 24;
-	else if (v & 0xffffffff00000000)
-		if (v & 0x0000ffff00000000)
-			if (v & 0x000000ff00000000)
-				i = 32;
-			else
-				i = 40;
-		else
-			if (v & 0x00ff000000000000)
-				i = 48;
-			else
-				i = 56;
-	else
-		return -1;
-	return i + xfs_lowbit[(v >> i) & 0xff];
-#else
-	__uint32_t	vw;
-
-	if ((vw = v)) {
-		if (vw & 0x0000ffff)
-			if (vw & 0x000000ff)
-				i = 0;
-			else
-				i = 8;
-		else
-			if (vw & 0x00ff0000)
-				i = 16;
-			else
-				i = 24;
-		return i + xfs_lowbit[(vw >> i) & 0xff];
-	} else if ((vw = v >> 32)) {
-		if (vw & 0x0000ffff)
-			if (vw & 0x000000ff)
-				i = 32;
-			else
-				i = 40;
-		else
-			if (vw & 0x00ff0000)
-				i = 48;
-			else
-				i = 56;
-		return i + xfs_lowbit[(vw >> (i - 32)) & 0xff];
-	} else
-		return -1;
-#endif
+	int n;
+	n = ffs((unsigned)v);
+	if (n == 0) { 
+		n = ffs(v >> 32);
+		if (n >= 0) 
+			n+=32;
+	}
+	return n-1;
 }
 
 /*
@@ -247,61 +166,117 @@ int
 xfs_highbit64(
 	__uint64_t	v)
 {
-	int		i;
-#if  XFS_64
-	if (v & 0xffffffff00000000)
-		if (v & 0xffff000000000000)
-			if (v & 0xff00000000000000)
-				i = 56;
-			else
-				i = 48;
-		else
-			if (v & 0x0000ff0000000000)
-				i = 40;
-			else
-				i = 32;
-	else if (v & 0x00000000ffffffff)
-		if (v & 0x00000000ffff0000)
-			if (v & 0x00000000ff000000)
-				i = 24;
-			else
-				i = 16;
-		else
-			if (v & 0x000000000000ff00)
-				i = 8;
-			else
-				i = 0;
-	else
-		return -1;
-	return i + xfs_highbit[(v >> i) & 0xff];
-#else
-	__uint32_t	vw;
+	__uint32_t h = v >> 32; 
+	if (h) 
+		return xfs_highbit32(h) + 32;
+	return xfs_highbit32((__u32)v); 
+}
 
-	if ((vw = v >> 32)) {
-		if (vw & 0xffff0000)
-			if (vw & 0xff000000)
-				i = 56;
-			else
-				i = 48;
-		else
-			if (vw & 0x0000ff00)
-				i = 40;
-			else
-				i = 32;
-		return i + xfs_highbit[(vw >> (i - 32)) & 0xff];
-	} else if ((vw = v)) {
-		if (vw & 0xffff0000)
-			if (vw & 0xff000000)
-				i = 24;
-			else
-				i = 16;
-		else
-			if (vw & 0x0000ff00)
-				i = 8;
-			else
-				i = 0;
-		return i + xfs_highbit[(vw >> i) & 0xff];
-	} else
+
+/*
+ * Count the number of bits set in the bitmap starting with bit
+ * start_bit.  Size is the size of the bitmap in words.
+ *
+ * Do the counting by mapping a byte value to the number of set
+ * bits for that value using the xfs_countbit array, i.e.
+ * xfs_countbit[0] == 0, xfs_countbit[1] == 1, xfs_countbit[2] == 1,
+ * xfs_countbit[3] == 2, etc.
+ */
+int
+xfs_count_bits(uint *map, uint size, uint start_bit)
+{
+	register int	bits;
+	register unsigned char	*bytep;
+	register unsigned char	*end_map;
+	int		byte_bit;
+
+	bits = 0;
+	end_map = (char*)(map + size);
+	bytep = (char*)(map + (start_bit & ~0x7));
+	byte_bit = start_bit & 0x7;
+
+	/*
+	 * If the caller fell off the end of the map, return 0.
+	 */
+	if (bytep >= end_map) {
+		return (0);
+	}
+
+	/*
+	 * If start_bit is not byte aligned, then process the
+	 * first byte separately.
+	 */
+	if (byte_bit != 0) {
+		/*
+		 * Shift off the bits we don't want to look at,
+		 * before indexing into xfs_countbit.
+		 */
+		bits += xfs_countbit[(*bytep >> byte_bit)];
+		bytep++;
+	}
+
+	/*
+	 * Count the bits in each byte until the end of the bitmap.
+	 */
+	while (bytep < end_map) {
+		bits += xfs_countbit[*bytep];
+		bytep++;
+	}
+
+	return (bits);
+}
+	
+/*
+ * Count the number of contiguous bits set in the bitmap starting with bit
+ * start_bit.  Size is the size of the bitmap in words.
+ */
+int
+xfs_contig_bits(uint *map, uint	size, uint start_bit)
+{
+	return find_next_zero_bit(map,size*sizeof(uint)*8,start_bit) - 1; 
+} 
+	
+/*
+ * This takes the bit number to start looking from and
+ * returns the next set bit from there.  It returns -1
+ * if there are no more bits set or the start bit is
+ * beyond the end of the bitmap.
+ *
+ * Size is the number of words, not bytes, in the bitmap.
+ */
+int xfs_next_bit(uint *map, uint size, uint start_bit)
+{
+        uint * p = ((unsigned int *) map) + (start_bit >> BIT_TO_WORD_SHIFT);
+        uint result = start_bit & ~(NBWORD - 1);
+        uint tmp;
+
+	size <<= BIT_TO_WORD_SHIFT;
+
+        if (start_bit >= size) 
 		return -1;
-#endif
+        size -= result;
+        start_bit &= (NBWORD - 1);
+        if (start_bit) {
+                tmp = *p++;
+                /* set to zero first offset bits */
+                tmp &= (~0U << start_bit);
+                if (size < NBWORD)
+                        goto found_first;
+                if (tmp != 0U)
+                        goto found_middle;
+                size -= NBWORD;
+                result += NBWORD;
+        }
+        while (size >= NBWORD) {
+                if ((tmp = *p++) != 0U)
+                        goto found_middle;
+                result += NBWORD;
+                size -= NBWORD;
+        }
+        if (!size) 
+                return -1;
+        tmp = *p;
+found_first:
+found_middle:
+        return result + ffs(tmp) - 1;
 }
