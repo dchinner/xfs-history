@@ -40,6 +40,8 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_dir.h"
+#include "xfs_alloc.h"
+#include "xfs_rtalloc.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -136,9 +138,14 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	}
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;
-	mp->m_bsize = xfs_btod(sbp, 1);
 	mp->m_agrotor = 0;
-	vfsp->vfs_bsize = xfs_fsb_to_b(sbp, 1);
+	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
+	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
+	mp->m_blockmask = sbp->sb_blocksize - 1;
+	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
+	mp->m_blockwmask = mp->m_blockwsize - 1;
+	mp->m_bsize = xfs_btod(mp, 1);
+	vfsp->vfs_bsize = xfs_fsb_to_b(mp, 1);
 
 	/*
 	 * Set the default minimum read and write sizes.
@@ -265,9 +272,12 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	 */
 	if (logdev) {
 		xfs_sb_t *sbp;
+		xfs_fsblock_t logstart;
+
 		sbp = xfs_buf_to_sbp(mp->m_sb_bp);
-		xfs_log_mount(mp, logdev, xfs_btod(sbp, sbp->sb_logstart),
-			      xfs_btod(sbp, sbp->sb_logblocks), 0);
+		logstart = sbp->sb_logstart;
+		xfs_log_mount(mp, logdev, xfs_fsb_to_daddr(mp, logstart),
+			      xfs_btod(mp, sbp->sb_logblocks), 0);
 	}
 
 	return mp;

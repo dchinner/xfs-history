@@ -57,7 +57,7 @@
  *========================================================================*/
 
 /*
- * Internal routines when dirsize < XFS_LITINO(sbp).
+ * Internal routines when dirsize < XFS_LITINO(mp).
  */
 STATIC int xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp,
 					xfs_ino_t parent_inumber);
@@ -76,7 +76,7 @@ STATIC int xfs_dir_shortform_replace(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
 
 /*
- * Internal routines when dirsize == XFS_LBSIZE(sbp).
+ * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_leaf_addname(xfs_trans_t *trans, struct xfs_dir_name *args);
 STATIC int xfs_dir_leaf_removename(xfs_trans_t *trans,
@@ -93,7 +93,7 @@ STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 STATIC int xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
 
 /*
- * Internal routines when dirsize > XFS_LBSIZE(sbp).
+ * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_node_addname(xfs_trans_t *trans, struct xfs_dir_name *args);
 STATIC int xfs_dir_node_removename(xfs_trans_t *trans,
@@ -124,13 +124,11 @@ STATIC uint xfs_dir_log2_roundup(uint i);
 void
 xfs_dir_mount(xfs_mount_t *mp)
 {
-	xfs_sb_t *sbp;
 	uint shortcount, leafcount, count;
 
-	sbp = &mp->m_sb;
-	shortcount = (XFS_LITINO(sbp) - sizeof(struct xfs_dir_sf_hdr)) /
+	shortcount = (XFS_LITINO(mp) - sizeof(struct xfs_dir_sf_hdr)) /
 		     sizeof(struct xfs_dir_sf_entry);
-	leafcount = (XFS_LBSIZE(sbp) - sizeof(struct xfs_dir_leaf_hdr)) /
+	leafcount = (XFS_LBSIZE(mp) - sizeof(struct xfs_dir_leaf_hdr)) /
 		    (sizeof(struct xfs_dir_leaf_entry) +
 		     sizeof(struct xfs_dir_leaf_name));
 	count = shortcount > leafcount ? shortcount : leafcount;
@@ -142,14 +140,14 @@ xfs_dir_mount(xfs_mount_t *mp)
  */
 xfs_dir_isempty(xfs_inode_t *dp)
 {
-	xfs_sb_t *sbp;
 	struct xfs_dir_sf_hdr *hdr;
+	xfs_mount_t *mp;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (dp->i_d.di_size == 0)
 		return(1);
-	sbp = &dp->i_mount->m_sb;
-	if (dp->i_d.di_size > XFS_LITINO(sbp))
+	mp = dp->i_mount;
+	if (dp->i_d.di_size > XFS_LITINO(mp))
 		return(0);
 	hdr = (struct xfs_dir_sf_hdr *)dp->i_u1.iu_data;
 	return(hdr->count == 0);
@@ -174,7 +172,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 {
 	struct xfs_dir_name args;
 	int retval, newsize, namelen;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	namelen = strlen(name);
@@ -193,13 +191,13 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.flist = flist;
 	args.total = total;
 
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+	if (dp->i_d.di_size <= XFS_LITINO(mp)) {
 		newsize = XFS_DIR_SF_ENTSIZE_BYNAME(args.namelen);
-		if ((dp->i_d.di_size + newsize) <= XFS_LITINO(sbp)) {
+		if ((dp->i_d.di_size + newsize) <= XFS_LITINO(mp)) {
 			retval = xfs_dir_shortform_addname(trans, &args);
 		} else {
 			retval = xfs_dir_shortform_to_leaf(trans, &args);
@@ -207,7 +205,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 				retval = xfs_dir_leaf_addname(trans, &args);
 			}
 		}
-	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(mp)) {
 		retval = xfs_dir_leaf_addname(trans, &args);
 		if (retval == ENOSPC) {
 			retval = xfs_dir_leaf_to_node(trans, &args);
@@ -232,7 +230,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 {
 	struct xfs_dir_name args;
 	int count, totallen, newsize, retval, namelen;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	namelen = strlen(name);
@@ -251,18 +249,18 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.flist = flist;
 	args.total = total;
 
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+	if (dp->i_d.di_size <= XFS_LITINO(mp)) {
 		retval = xfs_dir_shortform_removename(trans, &args);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(mp)) {
 		retval = xfs_dir_leaf_removename(trans, &args,
 							&count, &totallen);
 		if (retval == 0) {
 			newsize = XFS_DIR_SF_ALLFIT(count, totallen);
-			if (newsize <= XFS_LITINO(sbp)) {
+			if (newsize <= XFS_LITINO(mp)) {
 				retval = xfs_dir_leaf_to_shortform(trans,
 								   &args);
 			}
@@ -279,7 +277,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 {
 	struct xfs_dir_name args;
 	int retval;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (namelen >= MAXNAMELEN)
@@ -297,13 +295,13 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.flist = NULL;
 	args.total = 0;
 
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+	if (dp->i_d.di_size <= XFS_LITINO(mp)) {
 		retval = xfs_dir_shortform_lookup(trans, &args);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(mp)) {
 		retval = xfs_dir_leaf_lookup(trans, &args);
 	} else {
 		retval = xfs_dir_node_lookup(trans, &args);
@@ -323,16 +321,16 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 void
 xfs_dir_print(xfs_trans_t *trans, xfs_inode_t *dp)
 {
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+	if (dp->i_d.di_size <= XFS_LITINO(mp)) {
 		xfs_dir_shortform_print(trans, dp);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(mp)) {
 		xfs_dir_leaf_print(trans, dp);
 	} else {
 		xfs_dir_node_print(trans, dp);
@@ -345,20 +343,20 @@ xfs_dir_print(xfs_trans_t *trans, xfs_inode_t *dp)
 int
 xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 	int retval;
 	dirent_t *buf;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	buf = kmem_alloc(sizeof(*buf) + MAXNAMELEN, KM_SLEEP);
 	*eofp = 0;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+	if (dp->i_d.di_size <= XFS_LITINO(mp)) {
 		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, buf);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(mp)) {
 		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, buf);
 	} else {
 		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, buf);
@@ -373,7 +371,7 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 {
 	struct xfs_dir_name args;
 	int retval;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (namelen >= MAXNAMELEN)
@@ -391,13 +389,13 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.flist = NULL;
 	args.total = 0;
 
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_size <= XFS_LITINO(sbp)) {
+	if (dp->i_d.di_size <= XFS_LITINO(mp)) {
 		retval = xfs_dir_shortform_replace(trans, &args);
-	} else if (dp->i_d.di_size == XFS_LBSIZE(sbp)) {
+	} else if (dp->i_d.di_size == XFS_LBSIZE(mp)) {
 		retval = xfs_dir_leaf_replace(trans, &args);
 	} else {
 		retval = xfs_dir_node_replace(trans, &args);
@@ -408,7 +406,7 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 
 
 /*========================================================================
- * External routines when dirsize < XFS_LITINO(sbp).
+ * External routines when dirsize < XFS_LITINO(mp).
  *========================================================================*/
 
 /*
@@ -574,10 +572,8 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	int retval, i, size;
 	xfs_fsblock_t blkno;
 	buf_t *bp;
-	xfs_sb_t *sbp;
 
 	dp = iargs->dp;
-	sbp = &dp->i_mount->m_sb;
 	size = dp->i_bytes;
 	tmpbuffer = kmem_alloc(size, KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
@@ -767,7 +763,7 @@ xfs_dir_shortform_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 
 
 /*========================================================================
- * External routines when dirsize == XFS_LBSIZE(sbp).
+ * External routines when dirsize == XFS_LBSIZE(mp).
  *========================================================================*/
 
 /*
@@ -780,19 +776,19 @@ xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno)
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_leaf_hdr *hdr;
 	buf_t *bp;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	bp = xfs_dir_get_buf(trans, dp, blkno);
 	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
-	sbp = &dp->i_mount->m_sb;
-	bzero((char *)leaf, XFS_LBSIZE(sbp));
+	mp = dp->i_mount;
+	bzero((char *)leaf, XFS_LBSIZE(mp));
 	hdr = &leaf->hdr;
 	hdr->info.magic = XFS_DIR_LEAF_MAGIC;
-	hdr->firstused = XFS_LBSIZE(sbp);
+	hdr->firstused = XFS_LBSIZE(mp);
 	hdr->freemap[0].base = sizeof(struct xfs_dir_leaf_hdr);
-	hdr->freemap[0].size = XFS_LBSIZE(sbp) - hdr->freemap[0].base;
+	hdr->freemap[0].size = XFS_LBSIZE(mp) - hdr->freemap[0].base;
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(sbp) - 1);
+	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
 	return(bp);
 }
 
@@ -874,18 +870,18 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	char *tmpbuffer;
 	int retval, i;
 	buf_t *bp;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	dp = iargs->dp;
-	sbp = &dp->i_mount->m_sb;
-	tmpbuffer = kmem_alloc(XFS_LBSIZE(sbp), KM_SLEEP);
+	mp = dp->i_mount;
+	tmpbuffer = kmem_alloc(XFS_LBSIZE(mp), KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
 
 	bp = xfs_dir_read_buf(trans, dp, 0);
-	bcopy(bp->b_un.b_addr, tmpbuffer, XFS_LBSIZE(sbp));
+	bcopy(bp->b_un.b_addr, tmpbuffer, XFS_LBSIZE(mp));
 	leaf = (struct xfs_dir_leafblock *)tmpbuffer;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
-	bzero(bp->b_un.b_addr, XFS_LBSIZE(sbp));
+	bzero(bp->b_un.b_addr, XFS_LBSIZE(mp));
 
 	/*
 	 * Find and special case the parent inode number
@@ -932,7 +928,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	}
 
 out:
-	kmem_free(tmpbuffer, XFS_LBSIZE(sbp));
+	kmem_free(tmpbuffer, XFS_LBSIZE(mp));
 	return(retval);
 }
 
@@ -948,18 +944,18 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args)
 	buf_t *bp1, *bp2;
 	xfs_fsblock_t blkno;
 	int retval;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	dp = args->dp;
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	retval = xfs_dir_grow_inode(trans, args, &blkno);
 	ASSERT(blkno == 1);
 	if (retval)
 		return(retval);
 	bp1 = xfs_dir_read_buf(trans, dp, 0);
 	bp2 = xfs_dir_get_buf(trans, dp, 1);
-	bcopy(bp1->b_un.b_addr, bp2->b_un.b_addr, XFS_LBSIZE(sbp));
-	xfs_trans_log_buf(trans, bp2, 0, XFS_LBSIZE(sbp) - 1);
+	bcopy(bp1->b_un.b_addr, bp2->b_un.b_addr, XFS_LBSIZE(mp));
+	xfs_trans_log_buf(trans, bp2, 0, XFS_LBSIZE(mp) - 1);
 
 	/*
 	 * Set up the new root node.
@@ -971,7 +967,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args)
 	node->btree[0].hashval = leaf->leaves[ leaf->hdr.count-1 ].hashval;
 	node->btree[0].before = blkno;
 	node->hdr.count = 1;
-	xfs_trans_log_buf(trans, bp1, 0, XFS_LBSIZE(sbp) - 1);
+	xfs_trans_log_buf(trans, bp1, 0, XFS_LBSIZE(mp) - 1);
 
 	return(retval);
 }
@@ -1041,7 +1037,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 
 
 /*========================================================================
- * External routines when dirsize > XFS_LBSIZE(sbp).
+ * External routines when dirsize > XFS_LBSIZE(mp).
  *========================================================================*/
 
 /*
@@ -1053,16 +1049,16 @@ xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno,
 {
 	struct xfs_dir_intnode *node;
 	buf_t *bp;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	bp = xfs_dir_get_buf(trans, dp, blkno);
-	sbp = &dp->i_mount->m_sb;
-	bzero((char *)bp->b_un.b_addr, XFS_LBSIZE(sbp));
+	mp = dp->i_mount;
+	bzero((char *)bp->b_un.b_addr, XFS_LBSIZE(mp));
 	node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 	node->hdr.info.magic = XFS_DIR_NODE_MAGIC;
 	node->hdr.level = level;
 
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(sbp) - 1);
+	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
 
 	return(bp);
 }
@@ -1353,13 +1349,13 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 {
 	xfs_inode_t *dp;
 	xfs_fsblock_t oldsize, newsize;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 	xfs_bmbt_irec_t map;
 	int nmap;
 	xfs_fsblock_t bno;
 
 	dp = args->dp;
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	bno = xfs_bmap_first_unused(trans, dp);
 	nmap = 1;
 	ASSERT(args->firstblock != NULL);
@@ -1369,7 +1365,7 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 	if (nmap < 1)
 		return ENOSPC;
 	*new_blkno = bno;
-	dp->i_d.di_size = xfs_fsb_to_b(sbp, xfs_bmap_last_offset(trans, dp));
+	dp->i_d.di_size = xfs_fsb_to_b(mp, xfs_bmap_last_offset(trans, dp));
 
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
 
@@ -1381,16 +1377,16 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 			xfs_fsblock_t dead_blkno)
 {
 	xfs_inode_t *dp;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 	int done;
 
 	dp = args->dp;
-	sbp = &dp->i_mount->m_sb;
+	mp = dp->i_mount;
 	*(args->firstblock) = xfs_bunmapi(trans, dp, dead_blkno, 1, 1,
 					  *(args->firstblock), args->flist,
 					  &done);
 	ASSERT(done);
-	dp->i_d.di_size = xfs_fsb_to_b(sbp, xfs_bmap_last_offset(trans, dp));
+	dp->i_d.di_size = xfs_fsb_to_b(mp, xfs_bmap_last_offset(trans, dp));
 
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
 

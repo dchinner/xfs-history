@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.24 $"
 
 struct xfs_ihash;
 
@@ -13,7 +13,7 @@ typedef struct xfs_mount {
 	uint			m_ail_gen;	/* fs AIL generation count */
 	xfs_trans_t		*m_async_trans;	/* list of async transactions */
 	lock_t			m_async_lock;	/* async trans list mutex */
-	xfs_sb_t		m_sb;		/* ptr to fs superblock */
+	xfs_sb_t		m_sb;		/* copy of fs superblock */
 	lock_t			m_sb_lock;	/* sb counter mutex */
 	buf_t			*m_sb_bp;	/* buffer for superblock */
 	dev_t			m_dev;		/* dev of fs meta-data */
@@ -35,10 +35,15 @@ typedef struct xfs_mount {
 	uint			m_rsumsize;	/* size of rt summary, bytes */
 	struct xfs_inode	*m_rbmip;	/* pointer to bitmap inode */
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
-	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
 	struct xfs_inode	*m_rootip;	/* pointer to root directory */
 	struct vnode 		*m_ddevp;	/* ptr to data dev vnode */
 	struct vnode 		*m_rtdevp;	/* prt to rt dev vnode   */
+	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
+	__uint8_t		m_blkbit_log;	/* blocklog + NBBY */
+	__uint8_t		m_blkbb_log;	/* blocklog - BBSHIFT */
+	uint			m_blockmask;	/* sb_blocksize-1 */
+	uint			m_blockwsize;	/* sb_blocksize in words */
+	uint			m_blockwmask;	/* blockwsize-1 */
 } xfs_mount_t;
 
 /*

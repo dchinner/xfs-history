@@ -21,7 +21,7 @@
 typedef	__uint8_t xfs_dir_ino_t[sizeof(xfs_ino_t)];
 
 /*========================================================================
- * Directory Structure when smaller than XFS_LITINO(sbp) bytes.
+ * Directory Structure when smaller than XFS_LITINO(mp) bytes.
  *========================================================================*/
 
 /*
@@ -56,7 +56,7 @@ struct xfs_dir_shortform {
 	       (sizeof(struct xfs_dir_sf_entry)-1)*(COUNT) + (TOTALLEN))
 
 /*========================================================================
- * Directory Structure when equal to XFS_LBSIZE(sbp) bytes.
+ * Directory Structure when equal to XFS_LBSIZE(mp) bytes.
  *========================================================================*/
 
 /*
@@ -131,7 +131,7 @@ struct xfs_dir_leafblock {
 	((struct xfs_dir_leaf_name *)&((char *)(LEAFP))[OFFSET])
 
 /*========================================================================
- * Directory Structure when greater than XFS_LBSIZE(sbp) bytes.
+ * Directory Structure when greater than XFS_LBSIZE(mp) bytes.
  *========================================================================*/
 
 /*
@@ -159,17 +159,17 @@ struct xfs_dir_intnode {
 
 #define XFS_DIR_NODE_ENTSIZE_BYNAME()	/* space a name uses */ \
 	(sizeof(struct xfs_dir_node_entry))
-#define XFS_DIR_NODE_ENTRIES(sbp)	/* how many entries in this block? */ \
-	((XFS_LBSIZE(sbp) - sizeof(struct xfs_dir_node_hdr)) \
+#define XFS_DIR_NODE_ENTRIES(mp)	/* how many entries in this block? */ \
+	((XFS_LBSIZE(mp) - sizeof(struct xfs_dir_node_hdr)) \
 		   / sizeof(struct xfs_dir_node_entry))
 #define XFS_DIR_MAXBLK		0x10000000	/* max hash value */
 
 /*
  * Macros used by directory code to interface to the filesystem.
  */
-#define	XFS_LBSIZE(sbp)	((sbp)->sb_blocksize)
-#define	XFS_LBLOG(sbp)	((sbp)->sb_blocklog)
-#define	XFS_LITINO(sbp)	((sbp)->sb_inodesize - sizeof(xfs_dinode_core_t))
+#define	XFS_LBSIZE(mp)	((mp)->m_sb.sb_blocksize)
+#define	XFS_LBLOG(mp)	((mp)->m_sb.sb_blocklog)
+#define	XFS_LITINO(mp)	((mp)->m_sb.sb_inodesize - sizeof(xfs_dinode_core_t))
 
 /*
  * Macros used to manipulate directory off_t's
@@ -192,13 +192,13 @@ struct dirent;
 struct xfs_bmap_free;
 
 /*
- * Internal routines when dirsize == XFS_LBSIZE(sbp).
+ * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
 buf_t	*xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t which_block);
 
 /*
- * Internal routines when dirsize > XFS_LBSIZE(sbp).
+ * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
 buf_t	*xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t which_block, int leaf_block_next);

@@ -120,14 +120,13 @@ xfs_next_bmap(xfs_mount_t	*mp,
 	      xfs_bmbt_irec_t	*imapp,
 	      struct bmapval	*bmapp,
 	      int		iosize,
-	      xfs_fsblock_t	ioalign,
-	      xfs_fsblock_t	last_offset,
-	      xfs_fsblock_t	req_offset)
+	      xfs_fileoff_t	ioalign,
+	      xfs_fileoff_t	last_offset,
+	      xfs_fileoff_t	req_offset)
 {
 	int		extra_blocks;
-	xfs_sb_t	*sbp = &mp->m_sb;
-	xfs_fsblock_t	size_diff;
-	xfs_fsblock_t	ext_offset;
+	xfs_fileoff_t	size_diff;
+	xfs_fileoff_t	ext_offset;
 
 	/*
 	 * Make sure that the request offset lies in the extent given.
@@ -226,7 +225,7 @@ xfs_next_bmap(xfs_mount_t	*mp,
 	    	bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
 	}
-	bmapp->bsize = xfs_fsb_to_b(sbp, bmapp->length);
+	bmapp->bsize = xfs_fsb_to_b(mp, bmapp->length);
 }
 
 /*
@@ -297,27 +296,25 @@ xfs_iomap_extra(xfs_inode_t	*ip,
 		struct bmapval	*bmapp,
 		int		*nbmaps)
 {
-	xfs_fsblock_t	offset_fsb;
-	xfs_fsblock_t	count_fsb;
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t	count_fsb;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 
 	ASSERT(((dpoff(offset) == 0) && (count == NBPP)) ||
 	       ((offset == ip->i_d.di_size) && (count < NBPP)));
 	ASSERT(offset >= ip->i_d.di_size);
 
 	mp = ip->i_mount;
-	sbp = &(mp->m_sb);
-	offset_fsb = xfs_b_to_fsbt(sbp, offset);
-	count_fsb = xfs_b_to_fsb(sbp, count);
+	offset_fsb = xfs_b_to_fsbt(mp, offset);
+	count_fsb = xfs_b_to_fsb(mp, count);
 
 	*nbmaps = 1;
 	bmapp->eof = BMAP_HOLE | BMAP_EOF;
 	bmapp->bn = -1;
-	bmapp->offset = xfs_fsb_to_bb(sbp, offset_fsb);
-	bmapp->length = xfs_fsb_to_bb(sbp, count_fsb);
-	bmapp->bsize = xfs_fsb_to_b(sbp, count_fsb);
-	bmapp->pboff = offset - xfs_fsb_to_b(sbp, offset_fsb);
+	bmapp->offset = xfs_fsb_to_bb(mp, offset_fsb);
+	bmapp->length = xfs_fsb_to_bb(mp, count_fsb);
+	bmapp->bsize = xfs_fsb_to_b(mp, count_fsb);
+	bmapp->pboff = offset - xfs_fsb_to_b(mp, offset_fsb);
 	bmapp->pbsize = count;
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		bmapp->pbdev = mp->m_rtdev;
@@ -333,12 +330,12 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	       struct bmapval	*bmapp,
 	       int		*nbmaps)
 {
-	xfs_fsblock_t	offset_fsb;
-	xfs_fsblock_t	ioalign;
-	xfs_fsblock_t	last_offset;
-	xfs_fsblock_t	last_required_offset;
-	xfs_fsblock_t	last_fsb;
-	xfs_fsblock_t	next_offset;
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t	ioalign;
+	xfs_fileoff_t	last_offset;
+	xfs_fileoff_t	last_required_offset;
+	xfs_fileoff_t	last_fsb;
+	xfs_fileoff_t	next_offset;
 	__int64_t	nisize;
 	off_t		offset_page;
 	int		nimaps;
@@ -349,7 +346,6 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	short		read_aheads;
 	int		x;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	struct bmapval	*curr_bmapp;
 	struct bmapval	*next_bmapp;
 	struct bmapval	*last_bmapp;
@@ -361,14 +357,13 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	xfs_bmbt_irec_t	imap[XFS_READ_IMAPS];
 
 	mp = ip->i_mount;
-	sbp = &(mp->m_sb);
 	nisize = ip->i_new_size;
 	if (nisize < ip->i_d.di_size) {
 		nisize = ip->i_d.di_size;
 	}
-	offset_fsb = xfs_b_to_fsbt(sbp, offset);
+	offset_fsb = xfs_b_to_fsbt(mp, offset);
 	nimaps = XFS_READ_IMAPS;
-	last_fsb = xfs_b_to_fsb(sbp, nisize);
+	last_fsb = xfs_b_to_fsb(mp, nisize);
 	if (last_fsb <= offset_fsb) {
 		/*
 		 * One of the pages beyond the EOF created by the
@@ -401,7 +396,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		 * The I/O size for the file has not yet been
 		 * determined, so figure it out.
 		 */
-		if (xfs_b_to_fsb(sbp, count) <= mp->m_readio_blocks) {
+		if (xfs_b_to_fsb(mp, count) <= mp->m_readio_blocks) {
 			/*
 			 * The request is smaller than our
 			 * minimum I/O size, so default to
@@ -411,7 +406,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 			 */
 			iosize = mp->m_readio_blocks;
 			ioalign = XFS_READIO_ALIGN(mp, offset);
-			ioalign = xfs_b_to_fsbt(sbp, ioalign);
+			ioalign = xfs_b_to_fsbt(mp, ioalign);
 		} else {
 			/*
 			 * The request is bigger than our
@@ -433,12 +428,11 @@ xfs_iomap_read(xfs_inode_t	*ip,
 			 * then round that up to a file system block
 			 * boundary.
 			 */
-			offset_page = ctob(btoct(xfs_fsb_to_b(sbp,
-							      offset_fsb)));
-			last_fsb = xfs_b_to_fsb(sbp,
+			offset_page = ctob(btoct(xfs_fsb_to_b(mp, offset_fsb)));
+			last_fsb = xfs_b_to_fsb(mp,
 						ctob(btoc(offset + count)));
-			iosize = last_fsb - xfs_b_to_fsbt(sbp, offset_page);
-			ioalign = xfs_b_to_fsb(sbp, offset_page);
+			iosize = last_fsb - xfs_b_to_fsbt(mp, offset_page);
+			ioalign = xfs_b_to_fsb(mp, offset_page);
 		}
 		last_offset = -1;
 	}
@@ -451,14 +445,14 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	xfs_next_bmap(mp, imap, bmapp, iosize, ioalign,
 		      last_offset, offset_fsb);
 	ASSERT((bmapp->length > 0) &&
-	       (offset >= xfs_fsb_to_b(sbp, bmapp->offset)));
+	       (offset >= xfs_fsb_to_b(mp, bmapp->offset)));
 	
 	if ((nimaps == 1) &&
-	    (xfs_fsb_to_b(sbp, bmapp->offset + bmapp->length) >= nisize)) {
+	    (xfs_fsb_to_b(mp, bmapp->offset + bmapp->length) >= nisize)) {
 		bmapp->eof |= BMAP_EOF;
 	}
 
-	bmapp->pboff = offset - xfs_fsb_to_b(sbp, bmapp->offset);
+	bmapp->pboff = offset - xfs_fsb_to_b(mp, bmapp->offset);
 	retrieved_bytes = bmapp->bsize - bmapp->pboff;
 	total_retrieved_bytes = 0;
 	bmapp->pbsize = xfs_retrieved(retrieved_bytes, offset, count,
@@ -539,7 +533,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 			}
 			
 			if ((curr_imapp == last_imapp) &&
-			    (xfs_fsb_to_b(sbp, curr_bmapp->offset +
+			    (xfs_fsb_to_b(mp, curr_bmapp->offset +
 					  curr_bmapp->length) >= nisize)) {
 				curr_bmapp->eof |= BMAP_EOF;
 			}
@@ -550,7 +544,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 			 * be used for i_io_offset later.  Also record
 			 * the first bmapp used to track a read ahead.
 			 */
-			if (xfs_fsb_to_b(sbp, curr_bmapp->offset) <
+			if (xfs_fsb_to_b(mp, curr_bmapp->offset) <
 			    (offset + count)) {
 				last_required_offset = curr_bmapp->offset;
 			} else if (first_read_ahead_bmapp == NULL) {
@@ -626,11 +620,11 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		} else {
 			curr_bmapp->pbdev = mp->m_dev;
 		}
-		curr_bmapp->offset = xfs_fsb_to_bb(sbp, curr_bmapp->offset);
-		curr_bmapp->length = xfs_fsb_to_bb(sbp, curr_bmapp->length);
+		curr_bmapp->offset = xfs_fsb_to_bb(mp, curr_bmapp->offset);
+		curr_bmapp->length = xfs_fsb_to_bb(mp, curr_bmapp->length);
 		if (curr_bmapp->bn != -1) {
 			curr_bmapp->bn =
-				xfs_fsb_to_daddr(sbp, curr_bmapp->bn);
+				xfs_fsb_to_daddr(mp, curr_bmapp->bn);
 		}
 	}
 	return;
@@ -828,13 +822,12 @@ xfs_write_bmap(xfs_mount_t	*mp,
 	       xfs_bmbt_irec_t	*imapp,
 	       struct bmapval	*bmapp,
 	       int		iosize,
-	       xfs_fsblock_t	ioalign,
+	       xfs_fileoff_t	ioalign,
 	       __int64_t	isize)
 {
 	int		extra_blocks;
-	xfs_sb_t	*sbp = &mp->m_sb;
-	xfs_fsblock_t	size_diff;
-	xfs_fsblock_t	ext_offset;
+	xfs_fileoff_t	size_diff;
+	xfs_fileoff_t	ext_offset;
 	off_t		last_imap_byte;
 	
 	if (ioalign < imapp->br_startoff) {
@@ -875,7 +868,7 @@ xfs_write_bmap(xfs_mount_t	*mp,
 	 */
 	extra_blocks = (int)((bmapp->offset + bmapp->length) -
 		       (imapp->br_startoff + imapp->br_blockcount));
-	last_imap_byte = xfs_fsb_to_b(sbp, imapp->br_startoff +
+	last_imap_byte = xfs_fsb_to_b(mp, imapp->br_startoff +
 				      imapp->br_blockcount);
 	if ((extra_blocks > 0) &&
 	    ((last_imap_byte < isize) ||
@@ -883,7 +876,7 @@ xfs_write_bmap(xfs_mount_t	*mp,
 		bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
 	}
-	bmapp->bsize = xfs_fsb_to_b(sbp, bmapp->length);
+	bmapp->bsize = xfs_fsb_to_b(mp, bmapp->length);
 }
 
 
@@ -903,12 +896,11 @@ xfs_zero_eof(xfs_inode_t	*ip,
 	     __int64_t		isize,
 	     cred_t		*credp)
 {
-	xfs_fsblock_t	last_fsb;
+	xfs_fileoff_t	last_fsb;
 	__int64_t	last_byte;
 	off_t		page_start;
 	off_t		ioalign;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	buf_t		*bp;
 	int		iosize;
 	int		page_off;
@@ -924,7 +916,6 @@ xfs_zero_eof(xfs_inode_t	*ip,
 	ASSERT(offset > isize);
 
 	mp = ip->i_mount;
-	sbp = &(mp->m_sb);
 	vp = XFS_ITOV(ip);
 	ioalign = XFS_WRITEIO_ALIGN(mp, isize);
 
@@ -958,12 +949,12 @@ xfs_zero_eof(xfs_inode_t	*ip,
 		page_start += NBPP;
 	}
 
-	last_fsb = xfs_b_to_fsbt(sbp, isize);
+	last_fsb = xfs_b_to_fsbt(mp, isize);
 	/*
 	 * If isize is fs block aligned, then there is no block
 	 * to zero.
 	 */
-	if (last_fsb == xfs_b_to_fsb(sbp, isize)) {
+	if (last_fsb == xfs_b_to_fsb(mp, isize)) {
 		return;
 	}
 	nimaps = 1;
@@ -984,8 +975,8 @@ xfs_zero_eof(xfs_inode_t	*ip,
 	 * calls back to us.
 	 */
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	bmap.offset = xfs_fsb_to_bb(sbp, last_fsb);
-	bmap.length = xfs_fsb_to_bb(sbp, 1);
+	bmap.offset = xfs_fsb_to_bb(mp, last_fsb);
+	bmap.length = xfs_fsb_to_bb(mp, 1);
 	bmap.bsize = BBTOB(bmap.length);
 	bmap.pboff = 0;
 	bmap.pbsize = bmap.bsize;
@@ -996,14 +987,14 @@ xfs_zero_eof(xfs_inode_t	*ip,
 	}
 	bmap.eof = BMAP_EOF;
 	if (imap.br_startblock != DELAYSTARTBLOCK) {
-		bmap.bn = xfs_fsb_to_daddr(sbp, imap.br_startblock);
+		bmap.bn = xfs_fsb_to_daddr(mp, imap.br_startblock);
 	} else {
 		bmap.bn = -1;
 		bmap.eof |= BMAP_HOLE;
 	}
 	bp = chunkread(XFS_ITOV(ip), &bmap, 1, credp);
-	zero_offset = isize - xfs_fsb_to_b(sbp, last_fsb);
-	zero_len = xfs_fsb_to_b(sbp, 1) - isize;
+	zero_offset = isize - xfs_fsb_to_b(mp, last_fsb);
+	zero_len = xfs_fsb_to_b(mp, 1) - isize;
 	xfs_zero_bp(bp, zero_offset, zero_len);
 	bawrite(bp);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1017,11 +1008,11 @@ xfs_iomap_write(xfs_inode_t	*ip,
 		struct bmapval	*bmapp,
 		int		*nbmaps)
 {
-	xfs_fsblock_t	offset_fsb;
-	xfs_fsblock_t	ioalign;
-	xfs_fsblock_t	next_offset_fsb;
-	xfs_fsblock_t	last_fsb;
-	xfs_fsblock_t	bmap_end_fsb;
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t	ioalign;
+	xfs_fileoff_t	next_offset_fsb;
+	xfs_fileoff_t	last_fsb;
+	xfs_fileoff_t	bmap_end_fsb;
 	off_t		next_offset;
 	__int64_t	isize;
 	int		nimaps;
@@ -1031,7 +1022,6 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	short		x;
 	size_t		count_remaining;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	struct bmapval	*curr_bmapp;
 	struct bmapval	*next_bmapp;
 	struct bmapval	*last_bmapp;
@@ -1043,11 +1033,10 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 
 	mp = ip->i_mount;
-	sbp = &(mp->m_sb);
 	isize = ip->i_d.di_size;
-	offset_fsb = xfs_b_to_fsbt(sbp, offset);
+	offset_fsb = xfs_b_to_fsbt(mp, offset);
 	nimaps = XFS_WRITE_IMAPS;
-	last_fsb = xfs_b_to_fsb(sbp, offset + count);
+	last_fsb = xfs_b_to_fsb(mp, offset + count);
 	(void) xfs_bmapi(NULL, ip, offset_fsb,
 			 (xfs_extlen_t)(last_fsb - offset_fsb),
 			 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
@@ -1056,7 +1045,7 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	
 	iosize = mp->m_writeio_blocks;
 	ioalign = XFS_WRITEIO_ALIGN(mp, offset);
-	ioalign = xfs_b_to_fsbt(sbp, ioalign);
+	ioalign = xfs_b_to_fsbt(mp, ioalign);
 
 	/*
 	 * Now map our desired I/O size and alignment over the
@@ -1064,7 +1053,7 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	 */
 	xfs_write_bmap(mp, imap, bmapp, iosize, ioalign, isize);
 	ASSERT((bmapp->length > 0) &&
-	       (offset >= xfs_fsb_to_b(sbp, bmapp->offset)));
+	       (offset >= xfs_fsb_to_b(mp, bmapp->offset)));
 
 	/*
 	 * A bmap is the EOF bmap when it reaches to or beyond the current
@@ -1076,10 +1065,10 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	bmap_end_fsb = bmapp->offset + bmapp->length;
 	if ((nimaps == 1) &&
 	    (bmap_end_fsb >= imap[0].br_startoff + imap[0].br_blockcount) &&
-	    (xfs_fsb_to_b(sbp, bmap_end_fsb) >= isize)) {
+	    (xfs_fsb_to_b(mp, bmap_end_fsb) >= isize)) {
 		bmapp->eof |= BMAP_EOF;
 	}
-	bmapp->pboff = offset - xfs_fsb_to_b(sbp, bmapp->offset);
+	bmapp->pboff = offset - xfs_fsb_to_b(mp, bmapp->offset);
 	writing_bytes = bmapp->bsize - bmapp->pboff;
 	if (writing_bytes > count) {
 		/*
@@ -1126,7 +1115,7 @@ xfs_iomap_write(xfs_inode_t	*ip,
 				 * we just start where the last one
 				 * left off.
 				 */
-				ASSERT((xfs_fsb_to_b(sbp, next_offset_fsb) &
+				ASSERT((xfs_fsb_to_b(mp, next_offset_fsb) &
 					((1 << mp->m_writeio_log) - 1))==0);
 				xfs_write_bmap(mp, curr_imapp, next_bmapp,
 					       iosize, next_offset_fsb,
@@ -1147,12 +1136,11 @@ xfs_iomap_write(xfs_inode_t	*ip,
 					 * fsblocks would be good to reduce
 					 * the bit shifting here.
 					 */
-					ioalign = xfs_fsb_to_b(sbp,
+					ioalign = xfs_fsb_to_b(mp,
 					                    next_offset_fsb);
 					ioalign = XFS_WRITEIO_ALIGN(mp,
 								    ioalign);
-					ioalign = xfs_b_to_fsbt(sbp,
-								ioalign);
+					ioalign = xfs_b_to_fsbt(mp, ioalign);
 					xfs_write_bmap(mp, curr_imapp,
 						       next_bmapp, iosize,
 						       ioalign, isize);
@@ -1178,7 +1166,7 @@ xfs_iomap_write(xfs_inode_t	*ip,
 			 * entire buffer unless the count of bytes to
 			 * write runs out.
 			 */
-			next_offset = xfs_fsb_to_b(sbp, next_offset_fsb);
+			next_offset = xfs_fsb_to_b(mp, next_offset_fsb);
 			writing_bytes = next_bmapp->bsize;
 			if (writing_bytes > count_remaining) {
 				writing_bytes = count_remaining;
@@ -1204,7 +1192,7 @@ xfs_iomap_write(xfs_inode_t	*ip,
 			if ((curr_imapp == last_imapp) &&
 			    (bmap_end_fsb >= curr_imapp->br_startoff +
 			     curr_imapp->br_blockcount) &&
-			    (xfs_fsb_to_b(sbp, bmap_end_fsb) >= isize)) {
+			    (xfs_fsb_to_b(mp, bmap_end_fsb) >= isize)) {
 				curr_bmapp->eof |= BMAP_EOF;
 			}					
 		}
@@ -1217,11 +1205,11 @@ xfs_iomap_write(xfs_inode_t	*ip,
 		} else {
 			curr_bmapp->pbdev = mp->m_dev;
 		}
-		curr_bmapp->offset = xfs_fsb_to_bb(sbp, curr_bmapp->offset);
-		curr_bmapp->length = xfs_fsb_to_bb(sbp, curr_bmapp->length);
+		curr_bmapp->offset = xfs_fsb_to_bb(mp, curr_bmapp->offset);
+		curr_bmapp->length = xfs_fsb_to_bb(mp, curr_bmapp->length);
 		if (curr_bmapp->bn != -1) {
 			curr_bmapp->bn =
-				xfs_fsb_to_daddr(sbp, curr_bmapp->bn);
+				xfs_fsb_to_daddr(mp, curr_bmapp->bn);
 		}
 	}
 }
@@ -1653,9 +1641,9 @@ STATIC void
 xfs_strat_read(vnode_t	*vp,
 	       buf_t	*bp)
 {
-	xfs_fsblock_t	offset_fsb;
-	xfs_fsblock_t   map_start_fsb;
-	xfs_fsblock_t	imap_offset;
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t   map_start_fsb;
+	xfs_fileoff_t	imap_offset;
 	xfs_extlen_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
 	__int64_t	isize;
@@ -1665,7 +1653,6 @@ xfs_strat_read(vnode_t	*vp,
 	caddr_t		datap;
 	buf_t		*rbp;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	xfs_inode_t	*ip;
 	int		data_bytes;
 	int		data_offset;
@@ -1677,8 +1664,7 @@ xfs_strat_read(vnode_t	*vp,
 	ASSERT(bp->b_blkno == -1);
 	ip = XFS_VTOI(vp);
 	mp = XFS_VFSTOM(vp->v_vfsp);
-	sbp = &(mp->m_sb);
-	offset_fsb = xfs_bb_to_fsbt(sbp, bp->b_offset);
+	offset_fsb = xfs_bb_to_fsbt(mp, bp->b_offset);
 	/*
 	 * Only read up to the EOF.
 	 */
@@ -1686,9 +1672,9 @@ xfs_strat_read(vnode_t	*vp,
 	offset = BBTOB(bp->b_offset);
 	end_offset = offset + bp->b_bcount;
 	if ((offset < isize) && (end_offset > isize)) {
-		count_fsb = xfs_b_to_fsb(sbp, isize - offset);
+		count_fsb = xfs_b_to_fsb(mp, isize - offset);
 	} else {
-		count_fsb = xfs_b_to_fsb(sbp, bp->b_bcount);
+		count_fsb = xfs_b_to_fsb(mp, bp->b_bcount);
 	}
 	map_start_fsb = offset_fsb;
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -1712,16 +1698,16 @@ xfs_strat_read(vnode_t	*vp,
 				 */
 #ifndef SIM
 				datap = bp_mapin(bp);
-				datap += xfs_fsb_to_b(sbp, imap_offset -
+				datap += xfs_fsb_to_b(mp, imap_offset -
 						      offset_fsb);
-				data_bytes = xfs_fsb_to_b(sbp, imap_blocks);
+				data_bytes = xfs_fsb_to_b(mp, imap_blocks);
 
 				bzero(datap, data_bytes);
 #else /* SIM */
 				ASSERT(bp->b_flags & B_PAGEIO);
-				data_offset = xfs_fsb_to_b(sbp, imap_offset -
+				data_offset = xfs_fsb_to_b(mp, imap_offset -
 							   offset_fsb);
-				data_len = xfs_fsb_to_b(sbp, imap_blocks);
+				data_len = xfs_fsb_to_b(mp, imap_blocks);
 				xfs_zero_bp(bp, data_offset, data_len);
 #endif /* SIM */
 			} else {
@@ -1730,9 +1716,9 @@ xfs_strat_read(vnode_t	*vp,
 				 * read it in.
 				 */
 				rbp = getrbuf(KM_SLEEP);
-				data_offset = xfs_fsb_to_b(sbp, imap_offset -
+				data_offset = xfs_fsb_to_b(mp, imap_offset -
 							  offset_fsb);
-				data_len = xfs_fsb_to_b(sbp, imap_blocks);
+				data_len = xfs_fsb_to_b(mp, imap_blocks);
 				xfs_overlap_bp(bp, rbp, data_offset,
 					       data_len);
 				
@@ -1776,12 +1762,12 @@ xfs_strat_read(vnode_t	*vp,
  */
 STATIC xfs_extlen_t
 xfs_strat_write_count(xfs_inode_t	*ip,
-		      xfs_fsblock_t	offset_fsb,
+		      xfs_fileoff_t	offset_fsb,
 		      xfs_extlen_t	buf_fsb,
 		      xfs_bmbt_irec_t	*imap,
 		      int		imap_count)
 {
-	xfs_fsblock_t	off_fsb;
+	xfs_fileoff_t	off_fsb;
 	xfs_extlen_t	count_fsb;
 	boolean_t	done;
 	int		nimaps;
@@ -1907,9 +1893,9 @@ STATIC void
 xfs_strat_write(vnode_t	*vp,
 		buf_t	*bp)
 {
-	xfs_fsblock_t	offset_fsb;
-	xfs_fsblock_t   map_start_fsb;
-	xfs_fsblock_t	imap_offset;
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t   map_start_fsb;
+	xfs_fileoff_t	imap_offset;
 	xfs_fsblock_t	first_block;
 	xfs_extlen_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
@@ -1917,7 +1903,6 @@ xfs_strat_write(vnode_t	*vp,
 	caddr_t		datap;
 	buf_t		*rbp;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
 	int		error;
@@ -1934,7 +1919,6 @@ xfs_strat_write(vnode_t	*vp,
 	
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
-	sbp = &(mp->m_sb);
 	bp->b_flags |= B_STALE;
 
 	/*
@@ -1945,8 +1929,8 @@ xfs_strat_write(vnode_t	*vp,
 	 * and not to write that part.
 	 */
 	ASSERT(bp->b_blkno == -1);
-	offset_fsb = xfs_bb_to_fsbt(sbp, bp->b_offset);
-	count_fsb = xfs_b_to_fsb(sbp, bp->b_bcount);
+	offset_fsb = xfs_bb_to_fsbt(mp, bp->b_offset);
+	count_fsb = xfs_b_to_fsb(mp, bp->b_bcount);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	count_fsb = xfs_strat_write_count(ip, offset_fsb, count_fsb, imap,
@@ -1969,7 +1953,7 @@ xfs_strat_write(vnode_t	*vp,
 		 * backing store for the file.
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_FILE_WRITE);
-		error = xfs_trans_reserve(tp, 0, XFS_DEFAULT_LOG_RES(sbp),
+		error = xfs_trans_reserve(tp, 0, XFS_DEFAULT_LOG_RES(mp),
 					  0, 0);
 		ASSERT(error == 0);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1979,11 +1963,10 @@ xfs_strat_write(vnode_t	*vp,
 		/*
 		 * Allocate the backing store for the file.
 		 */
-		free_list.xbf_first = NULL;
-		free_list.xbf_count = 0;
+		XFS_BMAP_INIT(&free_list, &first_block);
 		nimaps = XFS_STRAT_WRITE_IMAPS;
 		first_block = xfs_bmapi(tp, ip, map_start_fsb, count_fsb,
-					XFS_BMAPI_WRITE, NULLFSBLOCK, 1,
+					XFS_BMAPI_WRITE, first_block, 1,
 					imap, &nimaps, &free_list);
 		ASSERT(nimaps > 0);
 		(void) xfs_bmap_finish(&tp, &free_list, first_block, 0);
@@ -1999,9 +1982,9 @@ xfs_strat_write(vnode_t	*vp,
 		if ((map_start_fsb == offset_fsb) &&
 		    (imap[0].br_blockcount == count_fsb)) {
 			ASSERT(nimaps == 1);
-			bp->b_blkno = xfs_fsb_to_daddr(sbp,
+			bp->b_blkno = xfs_fsb_to_daddr(mp,
 						     imap[0].br_startblock);
-			bp->b_bcount = xfs_fsb_to_b(sbp, count_fsb);
+			bp->b_bcount = xfs_fsb_to_b(mp, count_fsb);
 			bdstrat(bmajor(bp->b_edev), bp);
 			return;
 		}
@@ -2028,12 +2011,11 @@ xfs_strat_write(vnode_t	*vp,
 			ASSERT((imapp->br_startblock != DELAYSTARTBLOCK) &&
 			       (imapp->br_startblock != HOLESTARTBLOCK));
 			imap_offset = imapp->br_startoff;
-			rbp_offset = xfs_fsb_to_b(sbp, imap_offset -
-						 offset_fsb);
+			rbp_offset = xfs_fsb_to_b(mp, imap_offset - offset_fsb);
 			imap_blocks = imapp->br_blockcount;
-			rbp_len = xfs_fsb_to_b(sbp, imap_blocks);
+			rbp_len = xfs_fsb_to_b(mp, imap_blocks);
 			xfs_overlap_bp(bp, rbp, rbp_offset, rbp_len);
-			rbp->b_blkno = xfs_fsb_to_daddr(sbp,
+			rbp->b_blkno = xfs_fsb_to_daddr(mp,
 							imapp->br_startblock);
 			
 			/*
@@ -2113,11 +2095,9 @@ xfs_strategy(vnode_t	*vp,
 	     buf_t	*bp)
 {
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	int		s;
 
 	mp = XFS_VFSTOM(vp->v_vfsp);
-	sbp = &(mp->m_sb);
 
 	/*
 	 * If this is just a buffer whose underlying disk space
@@ -2268,11 +2248,11 @@ xfs_diostrat( buf_t *bp)
 	xfs_inode_t 	*ip;
 	xfs_trans_t	*tp;
 	vnode_t		*vp;
-	xfs_sb_t	*sbp;
 	xfs_mount_t	*mp;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp, *timapp;
 	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
-	xfs_fsblock_t	offset_fsb, last_fsb, firstfsb;
+	xfs_fileoff_t	offset_fsb, last_fsb;
+	xfs_fsblock_t	firstfsb;
 	xfs_extlen_t	blocks, count_fsb, total;
 	xfs_bmap_free_t free_list;
 	caddr_t		base;
@@ -2286,9 +2266,8 @@ xfs_diostrat( buf_t *bp)
 	vp        = dp->vp;
 	ip        = XFS_VTOI(vp); 
 	mp 	  = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
-	sbp 	  = &mp->m_sb;
 	base	  = bp->b_un.b_addr;
-	error     = resid = totxfer = end_of_file = firstfsb = 0;
+	error     = resid = totxfer = end_of_file = 0;
 	ioflag	  = dp->ioflag;
 	offset    = BBTOB(bp->b_blkno);
 	blk_algn  = 0;
@@ -2322,11 +2301,11 @@ xfs_diostrat( buf_t *bp)
 	/*
  	 * Check if the request is on a file system block boundary.
 	 */
-	if ( (offset % sbp->sb_blocksize) != 0 ) {
+	if ( (offset % mp->m_sb.sb_blocksize) != 0 ) {
 		/*
  		 * The request is NOT on a file system block boundary.
 		 */
-		blk_algn =  BTOBB(offset % sbp->sb_blocksize);
+		blk_algn =  BTOBB(offset % mp->m_sb.sb_blocksize);
 	}
 
 	/*
@@ -2337,9 +2316,9 @@ xfs_diostrat( buf_t *bp)
 	 * 4) request is completed.
 	 */
 	while ( !error && !end_of_file && !resid && count ) {
-		offset_fsb = xfs_b_to_fsbt( sbp, offset );
-		last_fsb   = xfs_b_to_fsb( sbp, offset + count);
-		count_fsb  = xfs_b_to_fsb( sbp, count);
+		offset_fsb = xfs_b_to_fsbt( mp, offset );
+		last_fsb   = xfs_b_to_fsb( mp, offset + count);
+		count_fsb  = xfs_b_to_fsb( mp, count);
 		blocks     = (xfs_extlen_t)(last_fsb - offset_fsb);
 
 		exist = 1;
@@ -2389,7 +2368,7 @@ xfs_diostrat( buf_t *bp)
  				 */
 				tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
 				error = xfs_trans_reserve( tp, count_fsb, 
-					   XFS_DEFAULT_LOG_RES(sbp),
+					   XFS_DEFAULT_LOG_RES(mp),
 					   numrtextents, 0 );
 
 				if (error) {
@@ -2455,11 +2434,11 @@ xfs_diostrat( buf_t *bp)
 		for (i = 0; (i < reccount) && (!end_of_file) && (count); i++){
 			imapp = &imaps[i];
 
-			bytes_this_req  = xfs_fsb_to_b(sbp,
+			bytes_this_req  = xfs_fsb_to_b(mp,
 				imapp->br_blockcount) - BBTOB(blk_algn);
 
 
-			offset_this_req = xfs_fsb_to_b(sbp,
+			offset_this_req = xfs_fsb_to_b(mp,
 				imapp->br_startoff) + BBTOB(blk_algn); 
 
 			/*
@@ -2514,10 +2493,10 @@ xfs_diostrat( buf_t *bp)
 	     			nbp->b_proc      = bp->b_proc;
 	     			nbp->b_edev      = bp->b_edev;
 				if (rt) {
-	     				nbp->b_blkno = xfs_btod(sbp,
+	     				nbp->b_blkno = xfs_btod(mp,
 						imapp->br_startblock);
 				} else {
-	     				nbp->b_blkno = xfs_fsb_to_daddr(sbp,
+	     				nbp->b_blkno = xfs_fsb_to_daddr(mp,
 						imapp->br_startblock) + 
 						blk_algn;
 				}

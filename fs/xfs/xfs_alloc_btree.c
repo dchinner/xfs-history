@@ -751,7 +751,6 @@ xfs_alloc_lookup(
 	int			low;
 	xfs_mount_t		*mp;
 	xfs_alloc_rec_t		*rp;
-	xfs_sb_t		*sbp;
 	xfs_agblock_t		startblock;
 	xfs_trans_t		*tp;
 
@@ -763,10 +762,9 @@ xfs_alloc_lookup(
 	agf = xfs_buf_to_agf(agbuf);
 	agno = agf->agf_seqno;
 	agbno = agf->agf_roots[cur->bc_btnum];
-	sbp = &mp->m_sb;
 	rp = &cur->bc_rec.a;
 	for (level = cur->bc_nlevels - 1, diff = 1; level >= 0; level--) {
-		d = xfs_agb_to_daddr(sbp, agno, agbno);
+		d = xfs_agb_to_daddr(mp, agno, agbno);
 		buf = cur->bc_bufs[level];
 		if (buf && buf->b_blkno != d)
 			buf = (buf_t *)0;
@@ -970,14 +968,12 @@ xfs_alloc_newroot(
 	buf_t			*rbuf;
 	xfs_btree_sblock_t	*right;
 	xfs_alloc_rec_t		*rp;
-	xfs_sb_t		*sbp;
 	xfs_trans_t		*tp;
 
 	xfs_alloc_rcheck(cur);
 	ASSERT(cur->bc_nlevels < XFS_BTREE_MAXLEVELS);
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	sbp = &mp->m_sb;
 	agbuf = cur->bc_private.a.agbuf;
 	agf = xfs_buf_to_agf(agbuf);
 	nbno = xfs_alloc_get_freelist(tp, agbuf, &nbuf);
@@ -992,7 +988,7 @@ xfs_alloc_newroot(
 	xfs_btree_check_sblock(cur, block, cur->bc_nlevels - 1);
 	if (block->bb_rightsib != NULLAGBLOCK) {
 		lbuf = buf;
-		lbno = xfs_daddr_to_agbno(sbp, lbuf->b_blkno);
+		lbno = xfs_daddr_to_agbno(mp, lbuf->b_blkno);
 		left = block;
 		rbno = left->bb_rightsib;
 		rbuf = xfs_btree_read_bufs(mp, tp, cur->bc_private.a.agno,
@@ -1003,7 +999,7 @@ xfs_alloc_newroot(
 		nptr = 1;
 	} else {
 		rbuf = buf;
-		rbno = xfs_daddr_to_agbno(sbp, rbuf->b_blkno);
+		rbno = xfs_daddr_to_agbno(mp, rbuf->b_blkno);
 		right = block;
 		lbno = right->bb_leftsib;
 		lbuf = xfs_btree_read_bufs(mp, tp, cur->bc_private.a.agno,
@@ -1269,13 +1265,11 @@ xfs_alloc_split(
 	xfs_btree_sblock_t	*rrblock;
 	buf_t			*rrbuf;
 	xfs_alloc_rec_t		*rrp;
-	xfs_sb_t		*sbp;
 	xfs_trans_t		*tp;
 
 	xfs_alloc_rcheck(cur);
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	sbp = &mp->m_sb;
 	agbuf = cur->bc_private.a.agbuf;
 	agf = xfs_buf_to_agf(agbuf);
 	rbno = xfs_alloc_get_freelist(tp, agbuf, &rbuf);
@@ -1317,7 +1311,7 @@ xfs_alloc_split(
 		keyp->ar_blockcount = rrp->ar_blockcount;
 	}
 	d = lbuf->b_blkno;
-	lbno = xfs_daddr_to_agbno(sbp, d);
+	lbno = xfs_daddr_to_agbno(mp, d);
 	left->bb_numrecs -= right->bb_numrecs;
 	right->bb_rightsib = left->bb_rightsib;
 	left->bb_rightsib = rbno;

@@ -32,8 +32,8 @@ typedef struct xfs_btree_lblock
 	__uint32_t	bb_magic;	/* magic number for block type */
 	__uint16_t	bb_level;	/* 0 is a leaf */
 	__uint16_t	bb_numrecs;	/* current # of data records */
-	xfs_fsblock_t	bb_leftsib;	/* left sibling block or NULLFSBLOCK */
-	xfs_fsblock_t	bb_rightsib;	/* right sibling block or NULLFSBLOCK */
+	xfs_dfsbno_t	bb_leftsib;	/* left sibling block or NULLFSBLOCK */
+	xfs_dfsbno_t	bb_rightsib;	/* right sibling block or NULLFSBLOCK */
 } xfs_btree_lblock_t;
 
 /*
@@ -55,8 +55,8 @@ typedef struct xfs_btree_block
 			xfs_agblock_t	bb_rightsib;
 		}	s;		/* short form pointers */
 		struct	{
-			xfs_fsblock_t	bb_leftsib;
-			xfs_fsblock_t	bb_rightsib;
+			xfs_dfsbno_t	bb_leftsib;
+			xfs_dfsbno_t	bb_rightsib;
 		}	l;		/* long form pointers */
 	}		bb_u;		/* rest */
 } xfs_btree_block_t;
@@ -267,5 +267,8 @@ extern __uint32_t xfs_magics[];
 
 #define	xfs_fsbno_min(a,b)	((xfs_fsblock_t)(a) < (xfs_fsblock_t)(b) ? (xfs_fsblock_t)(a) : (xfs_fsblock_t)(b))
 #define	xfs_fsbno_max(a,b)	((xfs_fsblock_t)(a) > (xfs_fsblock_t)(b) ? (xfs_fsblock_t)(a) : (xfs_fsblock_t)(b))
+
+#define	xfs_filbno_min(a,b)	((xfs_filbno_t)(a) < (xfs_filbno_t)(b) ? (xfs_filbno_t)(a) : (xfs_filbno_t)(b))
+#define	xfs_filbno_max(a,b)	((xfs_filbno_t)(a) > (xfs_filbno_t)(b) ? (xfs_filbno_t)(a) : (xfs_filbno_t)(b))
 
 #endif	/* !_FS_XFS_BTREE_H */

@@ -49,7 +49,7 @@ typedef struct xfs_agf
 
 /* disk block (daddr_t) in the AG */
 #define	XFS_AGF_DADDR		((daddr_t)1)
-#define	XFS_AGF_BLOCK(s)	xfs_hdr_block(s, XFS_AGF_DADDR)
+#define	XFS_AGF_BLOCK(mp)	xfs_hdr_block(mp, XFS_AGF_DADDR)
 
 typedef struct xfs_agi
 {
@@ -86,7 +86,7 @@ typedef struct xfs_agi
 
 /* disk block (daddr_t) in the AG */
 #define	XFS_AGI_DADDR		((daddr_t)2)
-#define	XFS_AGI_BLOCK(s)	xfs_hdr_block(s, XFS_AGI_DADDR)
+#define	XFS_AGI_BLOCK(mp)	xfs_hdr_block(mp, XFS_AGI_DADDR)
 
 #define	XFS_AG_MIN_BYTES	(1LL << 24)	/* 16 MB */
 #define	XFS_AG_MAX_BYTES	(1LL << 32)	/*  4 GB */
@@ -97,24 +97,21 @@ typedef struct xfs_agi
 #define	XFS_MIN_FREELIST(a)	(2 * (((a)->agf_levels[XFS_BTNUM_BNOi]) + ((a)->agf_levels[XFS_BTNUM_CNTi]) + 1))
 
 #define	xfs_agb_mask(k)	((1 << (k)) - 1)
-#define	xfs_agb_to_fsb(s,agno,agbno) \
-	(((xfs_fsblock_t)(agno) << (xfs_fsblock_t)(s)->sb_agblklog) | \
-	 (xfs_fsblock_t)(agbno))
-#define	xfs_fsb_to_agno(s,fsbno) \
-	((xfs_agnumber_t)((fsbno) >> (xfs_fsblock_t)(s)->sb_agblklog))
-#define	xfs_fsb_to_agbno(s,fsbno) \
-	((xfs_agblock_t)((fsbno) & \
-			 (xfs_fsblock_t)xfs_agb_mask((s)->sb_agblklog)))
+#define	xfs_agb_to_fsb(mp,agno,agbno) \
+	(((xfs_fsblock_t)(agno) << (mp)->m_sb.sb_agblklog) | (agbno))
+#define	xfs_fsb_to_agno(mp,fsbno) \
+	((xfs_agnumber_t)((fsbno) >> (mp)->m_sb.sb_agblklog))
+#define	xfs_fsb_to_agbno(mp,fsbno) \
+	((xfs_agblock_t)((fsbno) & xfs_agb_mask((mp)->m_sb.sb_agblklog)))
 
-#define	xfs_agb_to_daddr(s,agno,agbno) \
-	(xfs_btod(s, (xfs_fsblock_t)(agno) * (xfs_fsblock_t)(s)->sb_agblocks + \
-	 (xfs_fsblock_t)(agbno)))
-#define	xfs_daddr_to_agno(s,d) \
-	((xfs_agnumber_t)(xfs_dtobt(s, d) / (xfs_fsblock_t)(s)->sb_agblocks))
-#define	xfs_daddr_to_agbno(s,d) \
-	((xfs_agblock_t)(xfs_dtobt(s, d) % (xfs_fsblock_t)(s)->sb_agblocks))
+#define	xfs_agb_to_daddr(mp,agno,agbno) \
+	(xfs_btod(mp, (xfs_fsblock_t)(agno) * (mp)->m_sb.sb_agblocks + (agbno)))
+#define	xfs_daddr_to_agno(mp,d) \
+	((xfs_agnumber_t)(xfs_dtobt(mp, d) / (mp)->m_sb.sb_agblocks))
+#define	xfs_daddr_to_agbno(mp,d) \
+	((xfs_agblock_t)(xfs_dtobt(mp, d) % (mp)->m_sb.sb_agblocks))
 
-#define	xfs_ag_daddr(s,agno,d)	(xfs_agb_to_daddr(s, agno, 0) + (d))
+#define	xfs_ag_daddr(mp,agno,d)	(xfs_agb_to_daddr(mp, agno, 0) + (d))
 
 #define	xfs_buf_to_agf(buf)	((xfs_agf_t *)(buf)->b_un.b_addr)
 #define	xfs_buf_to_agi(buf)	((xfs_agi_t *)(buf)->b_un.b_addr)

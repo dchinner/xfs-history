@@ -502,7 +502,6 @@ xfs_itruncate(xfs_trans_t	**tp,
 	off_t		toss_start;
 	xfs_extlen_t	unmap_len;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	xfs_trans_t	*ntp;
 	int		done;
 	xfs_bmap_free_t	free_list;
@@ -517,7 +516,6 @@ xfs_itruncate(xfs_trans_t	**tp,
 	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
 
 	mp = (*tp)->t_mountp;
-	sbp = &(mp->m_sb);
 	/*
 	 * Call ptossvp() to get rid of pages and buffers
 	 * overlapping the region being removed.  Make sure
@@ -527,20 +525,20 @@ xfs_itruncate(xfs_trans_t	**tp,
 	 * so that we don't toss things on the same block as
 	 * new_size but before it.
 	 */
-	toss_start = xfs_b_to_fsb(sbp, new_size);
-	toss_start = xfs_fsb_to_b(sbp, toss_start);
+	toss_start = xfs_b_to_fsb(mp, new_size);
+	toss_start = xfs_fsb_to_b(mp, toss_start);
 	last_byte = ip->i_d.di_size + (1 << mp->m_writeio_log);
 	if (last_byte > toss_start) {
 		ptossvp(XFS_ITOV(ip), toss_start, last_byte);
 	}
 
-	first_unmap_block = xfs_b_to_fsb(sbp, new_size);
+	first_unmap_block = xfs_b_to_fsb(mp, new_size);
 	/*
 	 * Subtract 1 from the size so that we get the correct
 	 * last block when the size is a multiple of the block
 	 * size.
 	 */
-	last_block = xfs_b_to_fsbt(sbp, ip->i_d.di_size - 1);
+	last_block = xfs_b_to_fsbt(mp, ip->i_d.di_size - 1);
 	if (first_unmap_block > last_block) {
 		/*
 		 * The old size and new size both fall on the same
@@ -949,15 +947,13 @@ xfs_imap(xfs_mount_t	*mp,
 {
 	xfs_fsblock_t fsbno;
 	int off;
-	xfs_sb_t *sbp;
 
 	xfs_dilocate(mp, tp, ino, &fsbno, &off);
-	sbp = &mp->m_sb;
-	imap->im_blkno = xfs_fsb_to_daddr(sbp, fsbno);
-	imap->im_len = xfs_btod(sbp, 1);
-	imap->im_agblkno = xfs_fsb_to_agbno(sbp, fsbno);
+	imap->im_blkno = xfs_fsb_to_daddr(mp, fsbno);
+	imap->im_len = xfs_btod(mp, 1);
+	imap->im_agblkno = xfs_fsb_to_agbno(mp, fsbno);
 	imap->im_ioffset = (ushort)off;
-	imap->im_boffset = (ushort)(off << sbp->sb_inodelog);
+	imap->im_boffset = (ushort)(off << mp->m_sb.sb_inodelog);
 	return 1;
 }
 
@@ -1315,7 +1311,7 @@ xfs_iprint(xfs_inode_t *ip)
 	xfs_bmbt_rec_t *ep;
 	xfs_extnum_t i;
 	xfs_extnum_t nextents;
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	printf("Inode %x\n", ip);
 	printf("    i_dev %x\n", (uint)ip->i_dev);
@@ -1333,14 +1329,14 @@ xfs_iprint(xfs_inode_t *ip)
 	printf("    i_u1.iu_extents/iu_data %x\n", ip->i_u1.iu_extents);
 	if (ip->i_flags & XFS_IEXTENTS) {
 		nextents = ip->i_bytes / sizeof(*ep);
-		sbp = &ip->i_mount->m_sb;
+		mp = ip->i_mount;
 		for (ep = ip->i_u1.iu_extents, i = 0; i < nextents; i++, ep++) {
 			xfs_bmbt_irec_t rec;
 
-			xfs_bmbt_get_all(ep, rec);
+			xfs_bmbt_get_all(ep, &rec);
 			printf("\t%d: startoff %lld, startblock %s, blockcount %d\n",
 				i, rec.br_startoff,
-				xfs_print_startblock(sbp, rec.br_startblock),
+				xfs_print_startblock(mp, rec.br_startblock),
 				rec.br_blockcount);
 		}
 	}

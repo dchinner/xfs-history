@@ -16,23 +16,24 @@
 #define	XFS_NBWORD	(1 << XFS_NBWORDLOG)
 #define	XFS_WORDMASK	((1 << XFS_WORDLOG) - 1)
 
-#define	XFS_BLOCKSIZE(sbp)	(1 << (sbp)->sb_blocklog)
-#define	XFS_BLOCKMASK(sbp)	(XFS_BLOCKSIZE(sbp) - 1)
-#define	XFS_BLOCKWSIZE(sbp)	(1 << ((sbp)->sb_blocklog - XFS_WORDLOG))
-#define	XFS_BLOCKWMASK(sbp)	(XFS_BLOCKWSIZE(sbp) - 1)
+#define	XFS_BLOCKSIZE(mp)	((mp)->m_sb.sb_blocksize)
+#define	XFS_BLOCKMASK(mp)	((mp)->m_blockmask)
+#define	XFS_BLOCKWSIZE(mp)	((mp)->m_blockwsize)
+#define	XFS_BLOCKWMASK(mp)	((mp)->m_blockwmask)
 
 /*
  * Summary and bit manipulation macros.
  */
-#define	XFS_SUMOFFS(sbp,ls,bb)	((ls) * (sbp)->sb_rbmblocks + (bb))
-#define	XFS_SUMOFFSTOBLOCK(sbp,s)	\
-	(((s) * sizeof(xfs_suminfo_t)) >> (sbp)->sb_blocklog)
-#define	XFS_SUMPTR(sbp,bp,so)	\
-	((xfs_suminfo_t *)((char *)bp->b_un.b_addr + (((so) * sizeof(xfs_suminfo_t)) & XFS_BLOCKMASK(sbp))))
+#define	XFS_SUMOFFS(mp,ls,bb)	((ls) * (mp)->m_sb.sb_rbmblocks + (bb))
+#define	XFS_SUMOFFSTOBLOCK(mp,s)	\
+	(((s) * sizeof(xfs_suminfo_t)) >> (mp)->m_sb.sb_blocklog)
+#define	XFS_SUMPTR(mp,bp,so)	\
+	((xfs_suminfo_t *)((char *)bp->b_un.b_addr + \
+		(((so) * sizeof(xfs_suminfo_t)) & XFS_BLOCKMASK(mp))))
 
-#define	XFS_BITTOBLOCK(sbp,bi)	((bi) >> (sbp->sb_blocklog + XFS_NBBYLOG))
-#define	XFS_BLOCKTOBIT(sbp,bb)	((bb) << (sbp->sb_blocklog + XFS_NBBYLOG))
-#define	XFS_BITTOWORD(sbp,bi)	(((bi) >> XFS_NBWORDLOG) & XFS_BLOCKWMASK(sbp))
+#define	XFS_BITTOBLOCK(mp,bi)	((bi) >> (mp)->m_blkbit_log)
+#define	XFS_BLOCKTOBIT(mp,bb)	((bb) << (mp)->m_blkbit_log)
+#define	XFS_BITTOWORD(mp,bi)	(((bi) >> XFS_NBWORDLOG) & XFS_BLOCKWMASK(mp))
 
 #define	XFS_RTMIN(a,b)	((a) < (b) ? (a) : (b))
 #define	XFS_RTMAX(a,b)	((a) > (b) ? (a) : (b))
@@ -68,7 +69,7 @@ void
 xfs_rtprint_range(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
-	xfs_rtbit_t	start,
+	xfs_rtblock_t	start,
 	xfs_extlen_t	len);
 
 void

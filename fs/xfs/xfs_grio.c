@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.11 1994/04/11 19:53:19 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.12 1994/04/12 01:16:43 doucette Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -658,7 +658,7 @@ xfs_get_file_extents(dev_t fsdev,
 			/*
  			 * copy extent numbers;
  			 */
-			xfs_bmbt_get_all( ep, rec[i]);
+			xfs_bmbt_get_all(ep, &rec[i]);
 		}
 
 		if (copyout(rec, extents, recsize )) {

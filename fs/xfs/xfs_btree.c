@@ -62,11 +62,9 @@ xfs_btree_read_bufl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno,
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
-	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(fsbno != NULLFSBLOCK);
-	sbp = &mp->m_sb;
-	d = xfs_fsb_to_daddr(sbp, fsbno);
+	d = xfs_fsb_to_daddr(mp, fsbno);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 	ASSERT(!bp || !geterror(bp));
 	return bp;
@@ -81,12 +79,10 @@ xfs_btree_read_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
-	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
-	sbp = &mp->m_sb;
-	d = xfs_agb_to_daddr(sbp, agno, agbno);
+	d = xfs_agb_to_daddr(mp, agno, agbno);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 	ASSERT(!bp || !geterror(bp));
 	return bp;
@@ -138,18 +134,18 @@ xfs_btree_check_key(xfs_btnum_t btnum, void *ak1, void *ak2)
 void
 xfs_btree_check_lblock(xfs_btree_cur_t *cur, xfs_btree_lblock_t *block, int level)
 {
-	xfs_sb_t *sbp;
+	xfs_mount_t	*mp;
 
+	mp = cur->bc_mp;
 	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
 	ASSERT(block->bb_level == level);
 	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
-	sbp = &cur->bc_mp->m_sb;
 	ASSERT(block->bb_leftsib == NULLFSBLOCK || 
-	       (xfs_fsb_to_agno(sbp, block->bb_leftsib) < sbp->sb_agcount &&
-		xfs_fsb_to_agbno(sbp, block->bb_leftsib) < sbp->sb_agblocks));
+	       (xfs_fsb_to_agno(mp, block->bb_leftsib) < mp->m_sb.sb_agcount &&
+		xfs_fsb_to_agbno(mp, block->bb_leftsib) < mp->m_sb.sb_agblocks));
 	ASSERT(block->bb_rightsib == NULLFSBLOCK || 
-	       (xfs_fsb_to_agno(sbp, block->bb_rightsib) < sbp->sb_agcount &&
-		xfs_fsb_to_agbno(sbp, block->bb_rightsib) < sbp->sb_agblocks));
+	       (xfs_fsb_to_agno(mp, block->bb_rightsib) < mp->m_sb.sb_agcount &&
+		xfs_fsb_to_agbno(mp, block->bb_rightsib) < mp->m_sb.sb_agblocks));
 }
 
 /*
@@ -158,13 +154,13 @@ xfs_btree_check_lblock(xfs_btree_cur_t *cur, xfs_btree_lblock_t *block, int leve
 void
 xfs_btree_check_lptr(xfs_btree_cur_t *cur, xfs_fsblock_t ptr, int level)
 {
-	xfs_sb_t *sbp;
+	xfs_mount_t *mp;
 
 	ASSERT(level > 0);
-	sbp = &cur->bc_mp->m_sb;
+	mp = cur->bc_mp;
 	ASSERT(ptr != NULLFSBLOCK &&
-	       xfs_fsb_to_agno(sbp, ptr) < sbp->sb_agcount &&
-	       xfs_fsb_to_agbno(sbp, ptr) < sbp->sb_agblocks);
+	       xfs_fsb_to_agno(mp, ptr) < mp->m_sb.sb_agcount &&
+	       xfs_fsb_to_agbno(mp, ptr) < mp->m_sb.sb_agblocks);
 }
 
 /*
@@ -311,11 +307,9 @@ xfs_btree_get_bufl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno,
 {
 	buf_t		*bp;
 	daddr_t		d;
-	xfs_sb_t	*sbp;
 
 	ASSERT(fsbno != NULLFSBLOCK);
-	sbp = &mp->m_sb;
-	d = xfs_fsb_to_daddr(sbp, fsbno);
+	d = xfs_fsb_to_daddr(mp, fsbno);
 	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 	ASSERT(bp && !geterror(bp));
 	return bp;
@@ -330,12 +324,10 @@ xfs_btree_get_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 {
 	buf_t		*bp;
 	daddr_t		d;
-	xfs_sb_t	*sbp;
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
-	sbp = &mp->m_sb;
-	d = xfs_agb_to_daddr(sbp, agno, agbno);
+	d = xfs_agb_to_daddr(mp, agno, agbno);
 	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 	ASSERT(bp && !geterror(bp));
 	return bp;
@@ -350,7 +342,6 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 	xfs_agf_t *agf;
 	xfs_btree_cur_t *cur;
 	int nlevels;
-	xfs_sb_t *sbp;
 
 	if (xfs_btree_curfreelist) {
 		cur = xfs_btree_curfreelist;
@@ -371,8 +362,7 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 	}
 	cur->bc_nlevels = nlevels;
 	cur->bc_btnum = btnum;
-	sbp = &mp->m_sb;
-	cur->bc_blocklog = sbp->sb_blocklog;
+	cur->bc_blocklog = mp->m_sb.sb_blocklog;
 	switch (btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
@@ -380,7 +370,7 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 		cur->bc_private.a.agno = agno;
 		break;
 	case XFS_BTNUM_BMAP:
-		cur->bc_private.b.inodesize = sbp->sb_inodesize;
+		cur->bc_private.b.inodesize = mp->m_sb.sb_inodesize;
 		cur->bc_private.b.ip = ip;
 		cur->bc_private.b.firstblock = NULLFSBLOCK;
 		cur->bc_private.b.flist = NULL;

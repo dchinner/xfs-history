@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.17 $"
+#ident  "$Revision: 1.18 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -86,12 +86,11 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_ag.h"
 
 #ifdef SIM
 #include "sim.h"
 #endif
-
-#define	xfs_vfstosb(vfsp)	(&((xfs_mount_t *)XFS_VFSTOM(vfsp))->m_sb)
 
 #define	whymount_t	whymountroot_t
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
@@ -316,8 +315,8 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * xfs_log_mount() always does XFS_LOG_RECOVER.
 	 */
 	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
-	error = xfs_log_mount(mp, ddev, xfs_btod(sbp, sbp->sb_logstart),
-			      xfs_btod(sbp, sbp->sb_logblocks), lflags);
+	error = xfs_log_mount(mp, ddev, xfs_fsb_to_daddr(mp, sbp->sb_logstart),
+			      xfs_btod(mp, sbp->sb_logblocks), lflags);
 	if (error > 0) {
 		/*
 		 * XXX	log recovery failure - What action should be taken?
@@ -482,7 +481,7 @@ xfs_vfsmount(vfs_t		*vfsp,
  * This function should be called when unmounting.
  */
 STATIC int
-xfs_cleanfs(xfs_sb_t *sbp)
+xfs_cleanfs(xfs_mount_t *mp)
 {
 	/* XXX xfs_cleanfs() is a stub */
 	return 0;
@@ -570,7 +569,7 @@ xfs_mountroot(vfs_t		*vfsp,
 		/*
 		 * XXX copied from efs_mountroot() - Is this right?
 		 */
-		error = xfs_cleanfs(xfs_vfstosb(vfsp));
+		error = xfs_cleanfs(XFS_VFSTOM(vfsp));
 		binval(rootdev);
 		pflushinvalvfsp(vfsp);
 		return error;

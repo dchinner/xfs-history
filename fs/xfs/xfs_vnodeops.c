@@ -288,7 +288,6 @@ xfs_getattr(vnode_t	*vp,
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
@@ -335,7 +334,6 @@ xfs_getattr(vnode_t	*vp,
         vap->va_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
 
 	mp = XFS_VFSTOM(vp->v_vfsp);
-	sbp = &(mp->m_sb);
 
         switch (ip->i_d.di_mode & IFMT) {
           case IFBLK:
@@ -358,7 +356,7 @@ xfs_getattr(vnode_t	*vp,
 		break;
 	case XFS_DINODE_FMT_EXTENTS:
 	case XFS_DINODE_FMT_BTREE:
-		vap->va_nblocks = xfs_fsb_to_bb(&mp->m_sb,
+		vap->va_nblocks = xfs_fsb_to_bb(mp,
 			ip->i_d.di_nblocks + ip->i_delayed_blks);
 		break;
 	default:
@@ -370,7 +368,7 @@ xfs_getattr(vnode_t	*vp,
 	 */
 	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID)) {
 		vap->va_xflags = ip->i_d.di_flags;
-		vap->va_extsize = ip->i_d.di_extsize << sbp->sb_blocklog;
+		vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 		vap->va_nextents = ip->i_d.di_nextents;
 		vap->va_uuid = ip->i_d.di_uuid;
 	}
@@ -393,7 +391,6 @@ xfs_setattr(vnode_t	*vp,
         xfs_inode_t     *ip;
 	xfs_trans_t	*tp = NULL;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	int		mask;
 	int		code;
 	uint		lock_flags;
@@ -444,9 +441,8 @@ xfs_setattr(vnode_t	*vp,
 	 * first do an error checking pass.
 	 */
 	mp = ip->i_mount;
-	sbp = &(mp->m_sb);
         tp = xfs_trans_alloc (mp, 0);
-        if (code = xfs_trans_reserve (tp, 0, XFS_ITRUNCATE_LOG_RES(sbp), 0,
+        if (code = xfs_trans_reserve (tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES)) {
                 xfs_trans_cancel (tp, 0);
                 return code;
@@ -549,16 +545,17 @@ xfs_setattr(vnode_t	*vp,
 		 * size, if set at all.
 		 */
 		if ((mask & AT_EXTSIZE) && vap->va_extsize != 0) {
-			xfs_sb_t	*sbp;
+			xfs_mount_t	*mp;
 			xfs_extlen_t	size;
 
-			sbp = &ip->i_mount->m_sb;
+			mp = ip->i_mount;
 			if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ||
 			    ((mask & AT_XFLAGS) && 
 			    (vap->va_xflags & XFS_DIFLAG_REALTIME)))
-				size = sbp->sb_rextsize << sbp->sb_blocklog;
+				size = mp->m_sb.sb_rextsize <<
+					mp->m_sb.sb_blocklog;
 			else
-				size = sbp->sb_blocksize;
+				size = mp->m_sb.sb_blocksize;
 			if (vap->va_extsize % size) {
 				code = EINVAL;
 				goto error_return;
@@ -569,11 +566,11 @@ xfs_setattr(vnode_t	*vp,
 		 */
 		if ((mask & AT_XFLAGS) &&
 		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
-			xfs_sb_t	*sbp;
+			xfs_mount_t	*mp;
 
-			sbp = &ip->i_mount->m_sb;
-			if ((sbp->sb_rextsize == 0)  ||
-			    (ip->i_d.di_extsize % sbp->sb_rextsize)) {
+			mp = ip->i_mount;
+			if ((mp->m_sb.sb_rextsize == 0)  ||
+			    (ip->i_d.di_extsize % mp->m_sb.sb_rextsize)) {
 
 				code = EINVAL;	/* ??? */
 				goto error_return;
@@ -675,7 +672,8 @@ xfs_setattr(vnode_t	*vp,
 			/*
  			 * Converting bytes to fs blocks.
 			 */
-			ip->i_d.di_extsize = vap->va_extsize>>sbp->sb_blocklog;
+			ip->i_d.di_extsize = vap->va_extsize >>
+				mp->m_sb.sb_blocklog;
 		}
 		if (mask & AT_XFLAGS)
 			ip->i_d.di_flags = vap->va_xflags & XFS_DIFLAG_ALL;
@@ -803,21 +801,19 @@ xfs_readlink(vnode_t	*vp,
                 char            *cur_chunk;
                 int             byte_cnt, n;
                 struct          buf *bp;
-		xfs_sb_t        *sbp;
 		xfs_bmap_free_t free_list;
 
 		mp = XFS_VFSTOM(vp->v_vfsp);
-		sbp = &mp->m_sb;
                 first_fsb = 0;
-                fs_blocks = xfs_b_to_fsb(sbp, pathlen);
+                fs_blocks = xfs_b_to_fsb(mp, pathlen);
                 nmaps = SYMLINK_MAPS;
 
                 (void) xfs_bmapi (tp, ip, first_fsb, fs_blocks,
                          0, NULLFSBLOCK, 0, mval, &nmaps, &free_list);
 
                 for (n = 0; n < nmaps; n++) {
-                        d = xfs_fsb_to_daddr(sbp, mval[n].br_startblock);
-                        byte_cnt = xfs_fsb_to_b(sbp, mval[n].br_blockcount);
+                        d = xfs_fsb_to_daddr(mp, mval[n].br_startblock);
+                        byte_cnt = xfs_fsb_to_b(mp, mval[n].br_blockcount);
                         bp = xfs_read_buf (mp->m_dev, d, BTOBB(byte_cnt), 0);
                         if (pathlen < byte_cnt)
                                 byte_cnt = pathlen;
@@ -890,7 +886,6 @@ xfs_inactive(vnode_t	*vp,
 	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	int		truncate;
 	int		status;
 
@@ -900,7 +895,6 @@ xfs_inactive(vnode_t	*vp,
 	ASSERT(ip->i_d.di_nlink >= 0);
 	if (ip->i_d.di_nlink == 0) {
 		mp = ip->i_mount;
-		sbp = &(mp->m_sb);
 		tp = xfs_trans_alloc(mp, 0);
 
 		/*
@@ -911,7 +905,7 @@ xfs_inactive(vnode_t	*vp,
 			    ((ip->i_d.di_mode & IFMT) == IFREG));
 		if (truncate) {
 			status = xfs_trans_reserve(tp, 0,
-						  XFS_ITRUNCATE_LOG_RES(sbp),
+						  XFS_ITRUNCATE_LOG_RES(mp),
 						  0, XFS_TRANS_PERM_LOG_RES);
 			if (status != 0) {
 				ASSERT(0);
@@ -931,7 +925,7 @@ xfs_inactive(vnode_t	*vp,
 			tp = xfs_trans_alloc(ip->i_mount, 0);
 		}
 
-		status = xfs_trans_reserve(tp, 0, XFS_IFREE_LOG_RES(sbp),
+		status = xfs_trans_reserve(tp, 0, XFS_IFREE_LOG_RES(mp),
 					   0, 0);
 		if (status != 0) {
 			ASSERT(0);
@@ -1296,7 +1290,6 @@ xfs_create(vnode_t	*dir_vp,
 	xfs_trans_t      	*tp = NULL;
         xfs_ino_t               e_inum;
         xfs_mount_t	        *mp;
-	xfs_sb_t		*sbp;
 	dev_t			rdev;
 	unsigned long   	dir_generation;
         int                     error;
@@ -1312,11 +1305,10 @@ xfs_create(vnode_t	*dir_vp,
 try_again:
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	sbp = &(mp->m_sb);
 	tp = xfs_trans_alloc (mp, 0);
 	commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 	if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS + 12,
-				       XFS_CREATE_LOG_RES(sbp), 0,
+				       XFS_CREATE_LOG_RES(mp), 0,
 				       XFS_TRANS_PERM_LOG_RES)) {
 		commit_flags = 0;
 		goto error_return;
@@ -1782,7 +1774,6 @@ xfs_remove(vnode_t	*dir_vp,
         xfs_trans_t             *tp = NULL;
         xfs_ino_t               e_inum;
 	xfs_mount_t		*mp;
-	xfs_sb_t			*sbp;
         int                     error = 0;
 	boolean_t		release_res;
 	int			commit_flag;
@@ -1793,9 +1784,8 @@ xfs_remove(vnode_t	*dir_vp,
 
 	release_res = B_TRUE;
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	sbp = &(mp->m_sb);
 	tp = xfs_trans_alloc (mp, 0);
-        if (error = xfs_trans_reserve (tp, 0, XFS_REMOVE_LOG_RES(sbp), 0,
+        if (error = xfs_trans_reserve (tp, 0, XFS_REMOVE_LOG_RES(mp), 0,
 				       XFS_TRANS_PERM_LOG_RES)) 
                 goto error_return;
 
@@ -1922,7 +1912,6 @@ xfs_link(vnode_t	*target_dir_vp,
 	xfs_ino_t		e_inum;
 	xfs_trans_t		*tp;
 	xfs_mount_t		*mp;
-	xfs_sb_t		*sbp;
 	int			error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
@@ -1936,9 +1925,8 @@ xfs_link(vnode_t	*target_dir_vp,
                 return EPERM;
 
 	mp = XFS_VFSTOM(target_dir_vp->v_vfsp);
-	sbp = &(mp->m_sb);
         tp = xfs_trans_alloc (mp, 0);
-        if (error = xfs_trans_reserve (tp, 10, XFS_LINK_LOG_RES(sbp), 0, 0))
+        if (error = xfs_trans_reserve (tp, 10, XFS_LINK_LOG_RES(mp), 0, 0))
                 goto error_return;
 
 
@@ -2197,7 +2185,6 @@ xfs_rename(vnode_t	*src_dir_vp,
 	xfs_trans_t	*tp;
 	xfs_inode_t	*src_dp, *target_dp, *src_ip, *target_ip;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	boolean_t	new_parent;		/* moving to a new dir */
 	boolean_t	src_is_directory;	/* src_name is a directory */
 	boolean_t	state_has_changed;
@@ -2213,9 +2200,8 @@ start_over:
 
 	release_res = B_TRUE;
 	mp = XFS_VFSTOM(src_dir_vp->v_vfsp);
-	sbp = &(mp->m_sb);
 	tp = xfs_trans_alloc (mp, 0);
-        if (error = xfs_trans_reserve (tp, 10, XFS_RENAME_LOG_RES(sbp), 0,
+        if (error = xfs_trans_reserve (tp, 10, XFS_RENAME_LOG_RES(mp), 0,
 				       XFS_TRANS_PERM_LOG_RES))
                 goto error_return;
 
@@ -2571,7 +2557,6 @@ xfs_mkdir(vnode_t	*dir_vp,
 	dev_t			rdev;
 	mode_t			mode;
         xfs_mount_t		*mp;
-	xfs_sb_t		*sbp;
         int                     code;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
@@ -2579,10 +2564,9 @@ xfs_mkdir(vnode_t	*dir_vp,
 
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	sbp = &(mp->m_sb);
         tp = xfs_trans_alloc (mp, 0);
         if (code = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS + 10,
-				      XFS_MKDIR_LOG_RES(sbp), 0, 0))
+				      XFS_MKDIR_LOG_RES(mp), 0, 0))
 		goto error_return;
 
         dp = XFS_VTOI(dir_vp);
@@ -2687,7 +2671,6 @@ xfs_rmdir(vnode_t	*dir_vp,
         xfs_trans_t             *tp;
         xfs_ino_t               e_inum;
 	xfs_mount_t		*mp;
-	xfs_sb_t		*sbp;
         dev_t                   rdev;
         mode_t                  mode;
         int                     error;
@@ -2700,9 +2683,8 @@ xfs_rmdir(vnode_t	*dir_vp,
 
 	release_res = B_TRUE;
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	sbp = &(mp->m_sb);
 	tp = xfs_trans_alloc (mp, 0);
-        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(sbp), 0,
+        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(mp), 0,
 				       XFS_TRANS_PERM_LOG_RES))
                 goto error_return;
 	XFS_BMAP_INIT(&free_list, &first_block);
@@ -2875,7 +2857,6 @@ xfs_symlink(vnode_t	*dir_vp,
 {
 	xfs_trans_t	*tp = NULL;
 	xfs_mount_t	*mp;
-	xfs_sb_t	*sbp;
 	xfs_inode_t	*dp, *ip;
         int 		error = 0, pathlen;
         struct pathname cpn, ccpn;
@@ -2911,10 +2892,9 @@ xfs_symlink(vnode_t	*dir_vp,
         }
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	sbp = &(mp->m_sb);
         tp = xfs_trans_alloc (mp, 0);
         if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS + 12,
-				       XFS_SYMLINK_LOG_RES(sbp), 0, 0))
+				       XFS_SYMLINK_LOG_RES(mp), 0, 0))
                 goto error_return;
 
 
@@ -2952,13 +2932,10 @@ xfs_symlink(vnode_t	*dir_vp,
         xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
         dp_joined_to_trans = B_TRUE;
 
-
-	sbp = &mp->m_sb;
-
 	/*
 	 * If the symlink will fit into the inode, write it inline.
 	 */
-	if (pathlen <= XFS_LITINO(sbp)) {
+	if (pathlen <= XFS_LITINO(mp)) {
 		xfs_idata_realloc (ip, pathlen);
 		bcopy(target_path, ip->i_u1.iu_data, pathlen);
 		ip->i_d.di_size = pathlen;
@@ -2987,7 +2964,7 @@ xfs_symlink(vnode_t	*dir_vp,
 		struct 		buf *bp;
 
 		first_fsb = 0;
-		fs_blocks = xfs_b_to_fsb(sbp, pathlen);
+		fs_blocks = xfs_b_to_fsb(mp, pathlen);
 		nmaps = SYMLINK_MAPS;
 
 		first_block = xfs_bmapi (tp, ip, first_fsb, fs_blocks,
@@ -2999,8 +2976,8 @@ xfs_symlink(vnode_t	*dir_vp,
 
 		cur_chunk = target_path;
 		for (n = 0; n < nmaps; n++) {
-			d = xfs_fsb_to_daddr(sbp, mval[n].br_startblock);
-			byte_cnt = xfs_fsb_to_b(sbp, mval[n].br_blockcount);
+			d = xfs_fsb_to_daddr(mp, mval[n].br_startblock);
+			byte_cnt = xfs_fsb_to_b(mp, mval[n].br_blockcount);
 			bp = xfs_trans_get_buf (tp, mp->m_dev, d, 
 				BTOBB(byte_cnt), 0);
 			ASSERT(bp && !geterror(bp));
@@ -3324,20 +3301,16 @@ xfs_fcntl(vnode_t	*vp,
 	  rval_t	*rvalp)
 {
 	int		error = 0;
-	xfs_inode_t	*ip;
 
 	switch (cmd) {
 	case F_DIOINFO: {
 		struct dioattr	da;
-		xfs_sb_t	*sbp;
 
 		/* only works on files opened for direct I/O */
 		if (!(flags & FDIRECT)) {
 			error = EINVAL;
 			break;
 		}
-		ip = XFS_VTOI(vp);
-		sbp = &ip->i_mount->m_sb;
 		da.d_mem = BBSIZE;
 		da.d_miniosz = BBSIZE;
 		da.d_maxiosz = ctob(v.v_maxdmasz);

@@ -71,7 +71,7 @@ xfs_bmap_finish(
  * This is the lowest-address hole if the file has holes, else the first block
  * past the end of file.
  */
-xfs_fsblock_t
+xfs_fileoff_t
 xfs_bmap_first_unused(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	struct xfs_inode	*ip);		/* incore inode */
@@ -81,7 +81,7 @@ xfs_bmap_first_unused(
  * the file.  This is not based on i_size, it is based on the extent list.
  * Returns 0 for local files, as they do not have an extent list.
  */
-xfs_fsblock_t
+xfs_fileoff_t
 xfs_bmap_last_offset(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	struct xfs_inode	*ip);		/* incore inode */
@@ -113,7 +113,7 @@ xfs_fsblock_t					/* first allocated block */
 xfs_bmapi(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
-	xfs_fsblock_t		bno,		/* starting file offs. mapped */
+	xfs_fileoff_t		bno,		/* starting file offs. mapped */
 	xfs_extlen_t		len,		/* length to map in file */
 	int			flags,		/* XFS_BMAPI_... */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
@@ -132,7 +132,7 @@ xfs_fsblock_t					/* first allocated block */
 xfs_bunmapi(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
-	xfs_fsblock_t		bno,		/* starting offset to unmap */
+	xfs_fileoff_t		bno,		/* starting offset to unmap */
 	xfs_extlen_t		len,		/* length to unmap in file */
 	xfs_extnum_t		nexts,		/* number of extents max */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */

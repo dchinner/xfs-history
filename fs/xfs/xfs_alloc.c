@@ -251,11 +251,9 @@ xfs_alloc_read_agf(
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
-	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(agno != NULLAGNUMBER);
-	sbp = &mp->m_sb;
-	d = xfs_ag_daddr(sbp, agno, XFS_AGF_DADDR);
+	d = xfs_ag_daddr(mp, agno, XFS_AGF_DADDR);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1,
 		(flags & XFS_ALLOC_FLAG_TRYLOCK) ? BUF_TRYLOCK : 0U);
 	ASSERT(!bp || !geterror(bp));
@@ -1563,10 +1561,8 @@ xfs_alloc_put_freelist(
 	xfs_btree_sblock_t	*block;	/* data of "buf" */
 	xfs_agblock_t		bno;	/* block number of buf */
 	xfs_mount_t		*mp;	/* mount point of filesystem */
-	xfs_sb_t		*sbp;	/* superblock of filesystem */
 
 	mp = tp->t_mountp;
-	sbp = &mp->m_sb;
 	agf = xfs_buf_to_agf(agbuf);
 	block = xfs_buf_to_sblock(buf);
 	/*
@@ -1574,7 +1570,7 @@ xfs_alloc_put_freelist(
 	 */
 	*(xfs_agblock_t *)block = agf->agf_freelist;
 	xfs_trans_log_buf(tp, buf, 0, (int)sizeof(xfs_agblock_t) - 1);
-	bno = xfs_daddr_to_agbno(sbp, buf->b_blkno);
+	bno = xfs_daddr_to_agbno(mp, buf->b_blkno);
 	agf->agf_freelist = bno;
 	agf->agf_freecount++;
 	xfs_alloc_log_agf(tp, agbuf, XFS_AGF_FREELIST | XFS_AGF_FREECOUNT);
@@ -1617,8 +1613,8 @@ xfs_alloc_vextent(
 	 * These should really be asserts, left this way for now just
 	 * for the benefit of xfs_test.
 	 */
-	if (xfs_fsb_to_agno(sbp, bno) >= sbp->sb_agcount ||
-	    xfs_fsb_to_agbno(sbp, bno) >= sbp->sb_agblocks || minlen > maxlen ||
+	if (xfs_fsb_to_agno(mp, bno) >= sbp->sb_agcount ||
+	    xfs_fsb_to_agbno(mp, bno) >= sbp->sb_agblocks || minlen > maxlen ||
 	    minlen > agsize || len == 0 || mod >= prod)
 		return NULLFSBLOCK;
 	/*
@@ -1637,11 +1633,11 @@ xfs_alloc_vextent(
 		/*
 		 * These three force us into a single a.g.
 		 */
-		agno = xfs_fsb_to_agno(sbp, bno);
+		agno = xfs_fsb_to_agno(mp, bno);
 		agbuf = xfs_alloc_fix_freelist(tp, agno, minlen, total, 1);
 		if (!agbuf)
 			break;
-		agbno = xfs_fsb_to_agbno(sbp, bno);
+		agbno = xfs_fsb_to_agbno(mp, bno);
 		agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, agbno, minlen,
 			maxlen, len, type, wasdel, mod, prod); 
 		break;
@@ -1650,7 +1646,7 @@ xfs_alloc_vextent(
 		 * Try near allocation first, then anywhere-in-ag after
 		 * the first a.g. fails.
 		 */
-		agbno = xfs_fsb_to_agbno(sbp, bno);
+		agbno = xfs_fsb_to_agbno(mp, bno);
 		ntype = XFS_ALLOCTYPE_NEAR_BNO;
 		/* FALLTHROUGH */
 	case XFS_ALLOCTYPE_ANY_AG:
@@ -1669,14 +1665,14 @@ xfs_alloc_vextent(
 			/*
 			 * Start with allocation group given by bno.
 			 */
-			tagno = xfs_fsb_to_agno(sbp, bno);
+			tagno = xfs_fsb_to_agno(mp, bno);
 			agno = 0;
 			flags = 0;
 		} else {
 			/*
 			 * Start with the given allocation group.
 			 */
-			tagno = agno = xfs_fsb_to_agno(sbp, bno);
+			tagno = agno = xfs_fsb_to_agno(mp, bno);
 			flags = XFS_ALLOC_FLAG_TRYLOCK;
 		}
 		/*
@@ -1724,7 +1720,7 @@ xfs_alloc_vextent(
 	if (agbno == NULLAGBLOCK)
 		return NULLFSBLOCK;
 	else
-		return xfs_agb_to_fsb(sbp, agno, agbno);
+		return xfs_agb_to_fsb(mp, agno, agbno);
 }
 
 /*
@@ -1747,9 +1743,9 @@ xfs_free_extent(
 	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	ASSERT(len != 0);
-	agno = xfs_fsb_to_agno(sbp, bno);
+	agno = xfs_fsb_to_agno(mp, bno);
 	ASSERT(agno < sbp->sb_agcount);
-	agbno = xfs_fsb_to_agbno(sbp, bno);
+	agbno = xfs_fsb_to_agbno(mp, bno);
 	ASSERT(agbno < sbp->sb_agblocks);
 	agbuf = xfs_alloc_fix_freelist(tp, agno, 0, 0, 1);
 	ASSERT(agbuf != NULL);

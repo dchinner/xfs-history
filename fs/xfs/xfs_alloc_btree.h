@@ -54,9 +54,9 @@ typedef	struct xfs_btree_sblock xfs_alloc_block_t;
 /*
  * block numbers in the AG; SB is BB 0, AGF is BB 1, AGI is BB 2
  */
-#define	XFS_BNO_BLOCK(s)	((xfs_agblock_t)(XFS_AGI_BLOCK(s) + 1))
-#define	XFS_CNT_BLOCK(s)	((xfs_agblock_t)(XFS_BNO_BLOCK(s) + 1))
-#define	XFS_PREALLOC_BLOCKS(s)	((xfs_agblock_t)(XFS_CNT_BLOCK(s) + 1))
+#define	XFS_BNO_BLOCK(mp)	((xfs_agblock_t)(XFS_AGI_BLOCK(mp) + 1))
+#define	XFS_CNT_BLOCK(mp)	((xfs_agblock_t)(XFS_BNO_BLOCK(mp) + 1))
+#define	XFS_PREALLOC_BLOCKS(mp)	((xfs_agblock_t)(XFS_CNT_BLOCK(mp) + 1))
 
 /*
  * Record, key, and pointer address macros for btree blocks.

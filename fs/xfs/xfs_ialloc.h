@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * Allocation parameters.
@@ -9,20 +9,22 @@
  */
 #define	XFS_IALLOC_MAX_EVER_BLOCKS	16
 #define	XFS_IALLOC_MAX_EVER_INODES	256
-#define	XFS_IALLOC_MAX_EVER(s,a)	xfs_extlen_min(XFS_IALLOC_MAX_EVER_BLOCKS, XFS_IALLOC_MAX_EVER_INODES >> (s)->sb_inopblog)
+#define	XFS_IALLOC_MAX_EVER(mp,a)	xfs_extlen_min(XFS_IALLOC_MAX_EVER_BLOCKS, XFS_IALLOC_MAX_EVER_INODES >> (mp)->m_sb.sb_inopblog)
 
-#define	XFS_IALLOC_MIN_ALLOC(s,a)	1
-#define XFS_IALLOC_MAX_ALLOC(s,a)	\
-	(((a)->agi_count >> (s)->sb_inopblog) >= XFS_IALLOC_MAX_EVER(s,a) ? \
-		XFS_IALLOC_MAX_EVER(s,a) : \
-		((a)->agi_count ? ((a)->agi_count >> (s)->sb_inopblog) : 1))
+#define	XFS_IALLOC_MIN_ALLOC(mp,a)	1
+#define XFS_IALLOC_MAX_ALLOC(mp,a)	\
+	(((a)->agi_count >> (mp)->m_sb.sb_inopblog) >= \
+	 XFS_IALLOC_MAX_EVER(mp,a) ? \
+		XFS_IALLOC_MAX_EVER(mp,a) : \
+		((a)->agi_count ? \
+			((a)->agi_count >> (mp)->m_sb.sb_inopblog) : 1))
 
 /*
  * Make an inode pointer out of the buffer/offset.
  */
-#define	xfs_make_iptr(s,b,o) \
+#define	xfs_make_iptr(mp,b,o) \
 	((xfs_dinode_t *)((caddr_t)xfs_buf_to_block(b) + \
-			  ((o) << (s)->sb_inodelog)))
+			  ((o) << (mp)->m_sb.sb_inodelog)))
 
 /*
  * Prototypes for visible xfs_ialloc.c routines.

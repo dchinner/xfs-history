@@ -31,39 +31,59 @@ typedef struct xfs_bmbt_rec
  * l3:0-20 are blockcount.
  */
 #define	xfs_bmbt_get_startoff(r)	\
-	((((xfs_fsblock_t)((r)->l0)) << 23) | \
-	 (((xfs_fsblock_t)((r)->l1)) >> 9))
+	((((xfs_fileoff_t)((r)->l0)) << 23) | \
+	 (((xfs_fileoff_t)((r)->l1)) >> 9))
+#if XFS_BIG_FILESYSTEMS
 #define	xfs_bmbt_get_startblock(r)	\
 	((((xfs_fsblock_t)((r)->l1 & 0x000001ff)) << 43) | \
 	 (((xfs_fsblock_t)((r)->l2)) << 11) | \
 	 (((xfs_fsblock_t)((r)->l3)) >> 21))
+#else
+#define	xfs_bmbt_get_startblock(r)	\
+	((((xfs_fsblock_t)((r)->l2)) << 11) | \
+	 (((xfs_fsblock_t)((r)->l3)) >> 21))
+#endif /* XFS_BIG_FILESYSTEMS */
 #define	xfs_bmbt_get_blockcount(r)	\
 	((xfs_extlen_t)((r)->l3 & 0x001fffff))
 #define	xfs_bmbt_get_all(r,s)	\
-	(((s).br_startoff = xfs_bmbt_get_startoff(r)), \
-	 ((s).br_startblock = xfs_bmbt_get_startblock(r)), \
-	 ((s).br_blockcount = xfs_bmbt_get_blockcount(r)))
+	(((s)->br_startoff = xfs_bmbt_get_startoff(r)), \
+	 ((s)->br_startblock = xfs_bmbt_get_startblock(r)), \
+	 ((s)->br_blockcount = xfs_bmbt_get_blockcount(r)))
 #define	xfs_bmbt_set_startoff(r,v)	\
-	(((r)->l0 = (__uint32_t)((v) >> 23)), \
+	(((r)->l0 = (__uint32_t)((xfs_fileoff_t)(v) >> 23)), \
 	 ((r)->l1 = ((r)->l1 & 0x000001ff) | (((__uint32_t)(v)) << 9)))
+#if XFS_BIG_FILESYSTEMS
 #define	xfs_bmbt_set_startblock(r,v)	\
 	(((r)->l1 = ((r)->l1 & 0xfffffe00) | (__uint32_t)((v) >> 43)), \
 	 ((r)->l2 = (__uint32_t)((v) >> 11)), \
 	 ((r)->l3 = ((r)->l3 & 0x001fffff) | (((__uint32_t)(v)) << 21)))
+#else
+#define	xfs_bmbt_set_startblock(r,v)	\
+	(((r)->l2 = (__uint32_t)((v) >> 11)), \
+	 ((r)->l3 = ((r)->l3 & 0x001fffff) | (((__uint32_t)(v)) << 21)))
+#endif /* XFS_BIG_FILESYSTEMS */
 #define	xfs_bmbt_set_blockcount(r,v)	\
 	((r)->l3 = ((r)->l3 & 0xffe00000) | ((__uint32_t)(v) & 0x001fffff))
+#if XFS_BIG_FILESYSTEMS
 #define	xfs_bmbt_set_all(r,s)	\
-	(((r)->l0 = (__uint32_t)((s).br_startoff >> 23)), \
-	 ((r)->l1 = ((((__uint32_t)(s).br_startoff) << 9) | \
-		    ((__uint32_t)((s).br_startblock >> 43)))), \
-	 ((r)->l2 = (__uint32_t)((s).br_startblock >> 11)), \
-	 ((r)->l3 = ((((__uint32_t)(s).br_startblock) << 21) | \
-		    ((__uint32_t)((s).br_blockcount & 0x001fffff)))))
+	(((r)->l0 = (__uint32_t)((s)->br_startoff >> 23)), \
+	 ((r)->l1 = ((((__uint32_t)(s)->br_startoff) << 9) | \
+		    ((__uint32_t)((s)->br_startblock >> 43)))), \
+	 ((r)->l2 = (__uint32_t)((s)->br_startblock >> 11)), \
+	 ((r)->l3 = ((((__uint32_t)(s)->br_startblock) << 21) | \
+		    ((__uint32_t)((s)->br_blockcount & 0x001fffff)))))
+#else
+#define	xfs_bmbt_set_all(r,s)	\
+	(((r)->l0 = (__uint32_t)((s)->br_startoff >> 23)), \
+	 ((r)->l1 = (__uint32_t)((s)->br_startoff << 9)), \
+	 ((r)->l2 = (__uint32_t)((s)->br_startblock >> 11)), \
+	 ((r)->l3 = ((((__uint32_t)(s)->br_startblock) << 21) | \
+		    ((__uint32_t)((s)->br_blockcount & 0x001fffff)))))
+#endif
 
 #define	STARTBLOCKMASK	((xfs_fsblock_t)(((1LL << 36) - 1) << 16))
 #define	ISNULLSTARTBLOCK(x)	(((x) & STARTBLOCKMASK) == STARTBLOCKMASK)
-#define	NULLSTARTBLOCK(k)	\
-	((xfs_fsblock_t)(STARTBLOCKMASK | (long long)(k)))
+#define	NULLSTARTBLOCK(k)	(STARTBLOCKMASK | (k))
 #define	STARTBLOCKVAL(x)	((xfs_extlen_t)((x) & ~STARTBLOCKMASK))
 
 /*
@@ -71,7 +91,7 @@ typedef struct xfs_bmbt_rec
  */
 typedef struct xfs_bmbt_irec
 {
-	xfs_fsblock_t	br_startoff;	/* starting file offset */
+	xfs_fileoff_t	br_startoff;	/* starting file offset */
 	xfs_fsblock_t	br_startblock;	/* starting block number */
 	xfs_extlen_t	br_blockcount;	/* number of block */
 } xfs_bmbt_irec_t;
@@ -81,10 +101,10 @@ typedef struct xfs_bmbt_irec
  */
 typedef struct xfs_bmbt_key
 {
-	xfs_fsblock_t	br_startoff;	/* starting file offset */
+	xfs_dfiloff_t	br_startoff;	/* starting file offset */
 } xfs_bmbt_key_t, xfs_bmdr_key_t;
 
-typedef xfs_fsblock_t xfs_bmbt_ptr_t, xfs_bmdr_ptr_t;	/* btree pointer type */
+typedef xfs_dfsbno_t xfs_bmbt_ptr_t, xfs_bmdr_ptr_t;	/* btree pointer type */
 					/* btree block header type */
 typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 
@@ -362,21 +382,21 @@ xfs_bmbt_log_recs(
 int
 xfs_bmbt_lookup_eq(
 	struct xfs_btree_cur *,
-	xfs_fsblock_t,
+	xfs_fileoff_t,
 	xfs_fsblock_t,
 	xfs_extlen_t);
 
 int
 xfs_bmbt_lookup_ge(
 	struct xfs_btree_cur *,
-	xfs_fsblock_t,
+	xfs_fileoff_t,
 	xfs_fsblock_t,
 	xfs_extlen_t);
 
 int
 xfs_bmbt_lookup_le(
 	struct xfs_btree_cur *,
-	xfs_fsblock_t,
+	xfs_fileoff_t,
 	xfs_fsblock_t,
 	xfs_extlen_t);
 
@@ -398,7 +418,7 @@ xfs_bmbt_to_bmdr(
 int
 xfs_bmbt_update(
 	struct xfs_btree_cur *,
-	xfs_fsblock_t,
+	xfs_fileoff_t,
 	xfs_fsblock_t,
 	xfs_extlen_t);
 

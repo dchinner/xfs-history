@@ -219,23 +219,23 @@ typedef struct xfs_trans {
  * These are based on the size of the file system block
  * because that is what most transactions manipulate.
  */
-#define XFS_DEFAULT_LOG_RES(sbp)	xfs_fsb_to_b((sbp), 64)
-#define	XFS_ITRUNCATE_LOG_RES(sbp)	xfs_fsb_to_b((sbp), 64)
-#define	XFS_IALLOC_LOG_RES(sbp)		xfs_fsb_to_b((sbp), \
+#define XFS_DEFAULT_LOG_RES(mp)		xfs_fsb_to_b(mp, 64)
+#define	XFS_ITRUNCATE_LOG_RES(mp)	xfs_fsb_to_b(mp, 64)
+#define	XFS_IALLOC_LOG_RES(mp)		xfs_fsb_to_b(mp, \
 						   XFS_IALLOC_MAX_EVER_BLOCKS)
-#define	XFS_REMOVE_LOG_RES(sbp)		xfs_fsb_to_b((sbp), 10)
-#define	XFS_LINK_LOG_RES(sbp)		xfs_fsb_to_b((sbp), 10)
-#define	XFS_RENAME_LOG_RES(sbp)		xfs_fsb_to_b((sbp), 10)
-#define	XFS_SYMLINK_LOG_RES(sbp)	xfs_fsb_to_b((sbp), \
+#define	XFS_REMOVE_LOG_RES(mp)		xfs_fsb_to_b(mp, 10)
+#define	XFS_LINK_LOG_RES(mp)		xfs_fsb_to_b(mp, 10)
+#define	XFS_RENAME_LOG_RES(mp)		xfs_fsb_to_b(mp, 10)
+#define	XFS_SYMLINK_LOG_RES(mp)		xfs_fsb_to_b(mp, \
 					      XFS_IALLOC_MAX_EVER_BLOCKS + 12)
      
-#define	XFS_CREATE_LOG_RES(sbp)		(MAX(xfs_fsb_to_b((sbp), \
+#define	XFS_CREATE_LOG_RES(mp)		(MAX(xfs_fsb_to_b(mp, \
      					    XFS_IALLOC_MAX_EVER_BLOCKS + 10),\
-				             XFS_ITRUNCATE_LOG_RES((sbp))))
+				            XFS_ITRUNCATE_LOG_RES(mp)))
      
-#define	XFS_MKDIR_LOG_RES(sbp)		xfs_fsb_to_b((sbp), \
+#define	XFS_MKDIR_LOG_RES(mp)		xfs_fsb_to_b(mp, \
      					      XFS_IALLOC_MAX_EVER_BLOCKS + 10)
-#define	XFS_IFREE_LOG_RES(sbp)		xfs_fsb_to_b((sbp), 5)
+#define	XFS_IFREE_LOG_RES(mp)		xfs_fsb_to_b(mp, 5)
 
 
 /*

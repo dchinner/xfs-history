@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision: 1.38 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -144,7 +144,6 @@ xfs_ialloc_log_di(
 	int			ioffset;	/* off in bytes */
 	int			last;		/* last byte number */
 	xfs_mount_t		*mp;		/* mount point structure */
-	xfs_sb_t		*sbp;		/* superblock structure */
 	static const int	offsets[] = {	/* field offsets */
 						/* keep in sync with bits */
 		offsetof(xfs_dinode_core_t, di_magic),
@@ -171,7 +170,6 @@ xfs_ialloc_log_di(
 
 	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
 	mp = tp->t_mountp;
-	sbp = &mp->m_sb;
 	/*
 	 * Get the inode-relative first and last bytes for these fields
 	 */
@@ -179,7 +177,7 @@ xfs_ialloc_log_di(
 	/*
 	 * Convert to buffer offsets and log it.
 	 */
-	dip = xfs_make_iptr(sbp, buf, off);
+	dip = xfs_make_iptr(mp, buf, off);
 	ioffset = (caddr_t)dip - (caddr_t)xfs_buf_to_dinode(buf);
 	first += ioffset;
 	last += ioffset;
@@ -197,11 +195,9 @@ xfs_ialloc_read_agi(
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
-	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(agno != NULLAGNUMBER);
-	sbp = &mp->m_sb;
-	d = xfs_ag_daddr(sbp, agno, XFS_AGI_DADDR);
+	d = xfs_ag_daddr(mp, agno, XFS_AGI_DADDR);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
 	ASSERT(bp && !geterror(bp));
 	return bp;
@@ -235,14 +231,12 @@ xfs_ialloc_ag_alloc(
 	xfs_agino_t	newino;		/* new first inode's number */
 	xfs_agino_t	newlen;		/* new number of inodes */
 	xfs_agino_t	nextino;	/* next inode number, for loop */
-	xfs_sb_t	*sbp;		/* filesystem superblock */
 	xfs_agino_t	thisino;	/* current inode number, for loop */
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
 	static uuid_t	zuuid;		/* zero uuid */
 
 	mp = tp->t_mountp;
 	agi = xfs_buf_to_agi(agbuf);
-	sbp = &mp->m_sb;
 	/*
 	 * Locking will ensure that we don't have two callers in here
 	 * at one time.
@@ -252,17 +246,17 @@ xfs_ialloc_ag_alloc(
 	/*
 	 * Calculate the range of number of blocks to be allocated
 	 */
-	minnewblocks = XFS_IALLOC_MIN_ALLOC(sbp, agi);
-	maxnewblocks = XFS_IALLOC_MAX_ALLOC(sbp, agi);
-	newlen = minnewblocks << sbp->sb_inopblog;
+	minnewblocks = XFS_IALLOC_MIN_ALLOC(mp, agi);
+	maxnewblocks = XFS_IALLOC_MAX_ALLOC(mp, agi);
+	newlen = minnewblocks << mp->m_sb.sb_inopblog;
 	/*
 	 * Figure out a good first block number to ask for.  These inodes 
 	 * should follow the previous inodes, to get some locality.
 	 */
 	newbno = (agi->agi_last == NULLAGINO) ?
-		XFS_AGI_BLOCK(sbp) :
-		(xfs_agino_to_agbno(sbp, agi->agi_last) + 1);
-	newfsbno = xfs_agb_to_fsb(sbp, agi->agi_seqno, newbno);
+		XFS_AGI_BLOCK(mp) :
+		(xfs_agino_to_agbno(mp, agi->agi_last) + 1);
+	newfsbno = xfs_agb_to_fsb(mp, agi->agi_seqno, newbno);
 	/*
 	 * Allocate a variable-sized extent.
 	 */
@@ -284,9 +278,9 @@ xfs_ialloc_ag_alloc(
 	/*
 	 * Convert the results.
 	 */
-	newlen = newblocks << sbp->sb_inopblog;
-	newbno = xfs_fsb_to_agbno(sbp, newfsbno);
-	newino = xfs_offbno_to_agino(sbp, newbno, 0);
+	newlen = newblocks << mp->m_sb.sb_inopblog;
+	newbno = xfs_fsb_to_agbno(mp, newfsbno);
+	newino = xfs_offbno_to_agino(mp, newbno, 0);
 	/*
 	 * Loop over the new blocks, filling in the inodes.
 	 * Run both loops backwards, so that the inodes are linked together
@@ -302,9 +296,9 @@ xfs_ialloc_ag_alloc(
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
-		for (i = sbp->sb_inopblock - 1; i >= 0; i--) {
-			thisino = xfs_offbno_to_agino(sbp, newbno + j, i);
-			free = xfs_make_iptr(sbp, fbuf, i);
+		for (i = mp->m_sb.sb_inopblock - 1; i >= 0; i--) {
+			thisino = xfs_offbno_to_agino(mp, newbno + j, i);
+			free = xfs_make_iptr(mp, fbuf, i);
 			free->di_core.di_magic = XFS_DINODE_MAGIC;
 			free->di_core.di_mode = 0;
 			free->di_core.di_version = XFS_DINODE_VERSION;
@@ -382,16 +376,14 @@ xfs_ialloc_ag_select(
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		needspace;	/* file mode implies space allocated */
 	xfs_agnumber_t	pagno;		/* parent ag number */
-	xfs_sb_t	*sbp;		/* super block structure */
 
 	/*
 	 * Files of these types need at least one block if length > 0.
 	 */
 	needspace = S_ISDIR(mode) || S_ISREG(mode) || S_ISLNK(mode);
 	mp = tp->t_mountp;
-	sbp = &mp->m_sb;
-	pagno = xfs_ino_to_agno(sbp, parent);
-	agcount = sbp->sb_agcount;
+	pagno = xfs_ino_to_agno(mp, parent);
+	agcount = mp->m_sb.sb_agcount;
 	ASSERT(pagno < agcount);
 	/*
 	 * Loop through allocation groups, looking for one with a little
@@ -511,9 +503,7 @@ xfs_dialloc_ino(
 
 	xfs_ino_t	ino;		/* fs-relative inode to be returned */
 	xfs_mount_t	*mp;		/* mount point structure */
-	xfs_sb_t	*sbp;		/* superblock structure */
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
-
 
 	if (*IO_agbuf == NULL) {
 
@@ -542,8 +532,7 @@ xfs_dialloc_ino(
 		ASSERT(agi->agi_freelist != NULLAGINO);
 	}
 	mp = tp->t_mountp;
-	sbp = &mp->m_sb;
-	agcount = sbp->sb_agcount;
+	agcount = mp->m_sb.sb_agcount;
 	agno = agi->agi_seqno;
 	tagno = agno;
 	/*
@@ -595,7 +584,7 @@ xfs_dialloc_ino(
 	 */
 	*IO_agbuf = agbuf;
 	agino = agi->agi_freelist;
-	ino = xfs_agino_to_ino(sbp, tagno, agino);
+	ino = xfs_agino_to_ino(mp, tagno, agino);
 	return ino;
 }
 
@@ -619,29 +608,25 @@ xfs_dialloc_finish(
 	xfs_ino_t	ino,		/* ino chosen by xfs_dialloc_ino() */
 	buf_t		*agbuf)		/* agi buf from xfs_dialloc_ino() */
 {	 
-	xfs_mount_t	*mp;		/* mount point structure */
-	xfs_sb_t	*sbp;		/* superblock structure */
+	xfs_agblock_t	agbno;		/* starting block number of inode */
+	xfs_agi_t	*agi;		/* allocation group header */
+	xfs_agnumber_t	agno;		/* allocation group number */
 	buf_t		*fbuf;		/* buffer containing inode */
 	xfs_dinode_t	*free;		/* pointer into fbuf for dinode */
+	xfs_mount_t	*mp;		/* mount point structure */
        	int		off;		/* index of free in fbuf */
-	xfs_agi_t	*agi;		/* allocation group header */
-	xfs_agblock_t	agbno;		/* starting block number of inode */
-	xfs_agnumber_t	agno;		/* allocation group number */
-
-
 
 	mp = tp->t_mountp;
-	sbp = &(mp->m_sb);
-	agno = xfs_ino_to_agno(sbp, ino);
-	agbno = xfs_ino_to_agbno(sbp, ino);
-	off = xfs_ino_to_offset(sbp, ino);
+	agno = xfs_ino_to_agno(mp, ino);
+	agbno = xfs_ino_to_agbno(mp, ino);
+	off = xfs_ino_to_offset(mp, ino);
 	agi = xfs_buf_to_agi(agbuf);
 	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	/*
 	 * Get a buffer containing the free inode.
 	 */
 	fbuf = xfs_btree_read_bufs(mp, tp, agno, agbno, 0);
-	free = xfs_make_iptr(sbp, fbuf, off);
+	free = xfs_make_iptr(mp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
 	ASSERT(free->di_core.di_mode == 0);
 	ASSERT(free->di_core.di_format == XFS_DINODE_FMT_AGINO);
@@ -681,15 +666,13 @@ xfs_dialloc_next_free(
 	buf_t		*fbuf;	/* buffer containing the free inode */
 	xfs_dinode_t	*free;	/* pointer to the free inode */
 	int		off;	/* index of inode in the buffer */
-	xfs_sb_t	*sbp;	/* super block structure */
 
-	sbp = &mp->m_sb;
 	agi = xfs_buf_to_agi(agbuf);
 	agno = agi->agi_seqno;
-	agbno = xfs_agino_to_agbno(sbp, agino);
-	off = xfs_agino_to_offset(sbp, agino);
+	agbno = xfs_agino_to_agbno(mp, agino);
+	off = xfs_agino_to_offset(mp, agino);
 	fbuf = xfs_btree_read_bufs(mp, tp, agno, agbno, 0);
-	free = xfs_make_iptr(sbp, fbuf, off);
+	free = xfs_make_iptr(mp, fbuf, off);
 	agino = free->di_u.di_next;
 	xfs_trans_brelse(tp, fbuf);
 	return agino;
@@ -724,18 +707,16 @@ xfs_difree(
 	xfs_dinode_t	*ip;	/* pointer to inodes in the buffer */
 	xfs_mount_t	*mp;	/* mount structure for filesystem */
 	int		off;	/* index of free in fbuf */
-	xfs_sb_t	*sbp;	/* superblock structure for filesystem */
 
 	mp = tp->t_mountp;
-	sbp = &mp->m_sb;
 	/*
 	 * Break up inode number into its components.
 	 */
-	agno = xfs_ino_to_agno(sbp, inode);
-	ASSERT(agno < sbp->sb_agcount);
-	agbno = xfs_ino_to_agbno(sbp, inode);
-	off = xfs_ino_to_offset(sbp, inode);
-	agino = xfs_offbno_to_agino(sbp, agbno, off);
+	agno = xfs_ino_to_agno(mp, inode);
+	ASSERT(agno < mp->m_sb.sb_agcount);
+	agbno = xfs_ino_to_agbno(mp, inode);
+	off = xfs_ino_to_offset(mp, inode);
+	agino = xfs_offbno_to_agino(mp, agbno, off);
 	ASSERT(agino != NULLAGINO);
 	/*
 	 * Get the allocation group header.
@@ -748,16 +729,16 @@ xfs_difree(
 	 * Get the inode into a buffer
 	 */
 	fbuf = xfs_btree_read_bufs(mp, tp, agno, agbno, 0);
-	free = xfs_make_iptr(sbp, fbuf, off);
+	free = xfs_make_iptr(mp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
 	/*
 	 * Look at other inodes in the same block; if there are any free
 	 * then insert this one after.  This increases the locality
 	 * in the inode free list.
 	 */
-	for (flags = 0, found = 0, i = 0, ip = xfs_make_iptr(sbp, fbuf, i);
-	     i < sbp->sb_inopblock;
-	     i++, ip = xfs_make_iptr(sbp, fbuf, i)) {
+	for (flags = 0, found = 0, i = 0, ip = xfs_make_iptr(mp, fbuf, i);
+	     i < mp->m_sb.sb_inopblock;
+	     i++, ip = xfs_make_iptr(mp, fbuf, i)) {
 		if (ip == free)
 			continue;
 		if (ip->di_u.di_next == NULLAGINO_ALLOC ||
@@ -812,22 +793,20 @@ xfs_dilocate(
 	xfs_agblock_t	agbno;	/* block number of inode in the alloc group */
 	xfs_agnumber_t	agno;	/* allocation group number */
 	int		offset;	/* index of inode in its buffer */
-	xfs_sb_t	*sbp;	/* super block structure for the filesystem */
 
 	ASSERT(ino != NULLFSINO);
-	sbp = &mp->m_sb;
 	/*
 	 * Split up the inode number into its parts.
 	 */
-	agno = xfs_ino_to_agno(sbp, ino);
-	ASSERT(agno < sbp->sb_agcount);
-	agbno = xfs_ino_to_agbno(sbp, ino);
-	ASSERT(agbno < sbp->sb_agblocks);
-	offset = xfs_ino_to_offset(sbp, ino);
-	ASSERT(offset < sbp->sb_inopblock);
+	agno = xfs_ino_to_agno(mp, ino);
+	ASSERT(agno < mp->m_sb.sb_agcount);
+	agbno = xfs_ino_to_agbno(mp, ino);
+	ASSERT(agbno < mp->m_sb.sb_agblocks);
+	offset = xfs_ino_to_offset(mp, ino);
+	ASSERT(offset < mp->m_sb.sb_inopblock);
 	/*
 	 * Store the results in the output parameters.
 	 */
-	*bno = xfs_agb_to_fsb(sbp, agno, agbno);
+	*bno = xfs_agb_to_fsb(mp, agno, agbno);
 	*off = offset;
 }
