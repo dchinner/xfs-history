@@ -377,9 +377,9 @@ xfs_bmbt_get_rec(xfs_btree_cur_t *cur, xfs_fsblock_t *off, xfs_fsblock_t *bno, x
 	sbp = mp->m_sb;
 	bl = sbp->sb_blocklog;
 	rp = XFS_BMAP_REC_ADDR(block, ptr, bl, cur);
-	*off = rp->br_startoff;
-	*bno = rp->br_startblock;
-	*len = rp->br_blockcount;
+	*off = xfs_offset_ptox(rp->br_startoff);
+	*bno = xfs_blkno_ptox(rp->br_startblock);
+	*len = xfs_extlen_ptox(rp->br_blockcount);
 	return 1;
 }
 
@@ -444,7 +444,7 @@ xfs_bmbt_insert(xfs_btree_cur_t *cur)
 
 	level = 0;
 	nbno = NULLAGBLOCK;
-	nrec = cur->bc_rec.b;
+	xfs_xtoprec(&cur->bc_rec.b, &nrec);
 	ncur = (xfs_btree_cur_t *)0;
 	pcur = cur;
 	do {
@@ -655,8 +655,7 @@ xfs_bmbt_kcheck_body(xfs_btree_cur_t *cur, xfs_aghdr_t *agp, xfs_btree_block_t *
 	xfs_btree_check_block(cur, block, level);
 	rp = XFS_BMAP_REC_ADDR(block, 1, bl, cur);
 	if (kp)
-		ASSERT(rp->br_startblock == kp->br_startblock &&
-		       rp->br_blockcount == kp->br_blockcount);
+		ASSERT(bcmp(rp, kp, sizeof(*kp)) == 1);
 	if (level > 0) {
 		pp = XFS_BMAP_PTR_ADDR(block, 1, bl, cur);
 		if (*pp != NULLAGBLOCK) {
@@ -702,7 +701,7 @@ xfs_bmbt_lookup(xfs_btree_cur_t *cur, xfs_lookup_t dir)
 	int level;
 	int low;
 	xfs_mount_t *mp;
-	xfs_bmbt_rec_t *rp;
+	xfs_bmbt_irec_t *rp;
 	xfs_sb_t *sbp;
 	xfs_trans_t *tp;
 
@@ -740,7 +739,8 @@ xfs_bmbt_lookup(xfs_btree_cur_t *cur, xfs_lookup_t dir)
 			while (low <= high) {
 				keyno = (low + high) >> 1;
 				kp = kbase + keyno - 1;
-				diff = kp->br_startoff - rp->br_startoff;
+				diff = xfs_offset_ptox(kp->br_startoff) -
+					rp->br_startoff;
 				if (diff < 0)
 					low = keyno + 1;
 				else if (diff > 0)
@@ -1212,9 +1212,9 @@ xfs_bmbt_update(xfs_btree_cur_t *cur, xfs_fsblock_t off, xfs_fsblock_t bno, xfs_
 	sbp = mp->m_sb;
 	bl = sbp->sb_blocklog;
 	rp = XFS_BMAP_REC_ADDR(block, ptr, bl, cur);
-	rp->br_startoff = off;
-	rp->br_startblock = bno;
-	rp->br_blockcount = len;
+	xfs_offset_xtop(rp->br_startoff, off);
+	xfs_blkno_xtop(rp->br_startblock, bno);
+	xfs_extlen_xtop(rp->br_blockcount, len);
 	if (cur->bc_nlevels > 1) {
 		first = (caddr_t)rp - (caddr_t)block;
 		last = first + sizeof(*rp) - 1;
@@ -1270,3 +1270,39 @@ xfs_bmbt_updkey(xfs_btree_cur_t *cur, xfs_bmbt_rec_t *kp, int level)
 	}
 	xfs_bmbt_rcheck(cur);
 }
+
+/*
+ * Higher-level routines go here.
+ */
+/*
+ * read-bmaps have following algorithm.
+ *
+ * If format is btree then
+ *	lookup(le) the offset in the inode's root block
+ *	if nothing then return 0's
+ *	if found entry does not overlap then return 0's
+ *	else compute block & return it
+ * else if format is ep's then
+ *	binary search the ep's for correct entry
+ *	as above
+ *
+ * write-bmaps have following algorithm
+ *
+ * If format is btree then
+ *	lookup(le) the offset in the inode's root block
+ *	if nothing or entry does not overlap then
+ *		allocate some disk space to cover needed blocks
+ *		insert/update old entry to map the new disk space
+ *	else compute block and return it
+ *	note this can be partly one, partly the other.
+ */
+ /*
+  * Mapping structure (bmapval):
+  * (for each mapping found in the range asked; for writes the
+  * mappings are created)
+  * file starting block
+  * fs starting block
+  * length in fs blocks
+  * If a read and a hole is read then the file starting block is filled
+  * in, and the fs starting block is NULLFSBLOCK.
+  */
