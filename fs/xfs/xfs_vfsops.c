@@ -49,7 +49,6 @@ xfs_init(void)
 	extern kmem_zone_t	*xfs_efd_zone;
 	extern kmem_zone_t	*xfs_efi_zone;
 	extern kmem_zone_t	*xfs_dabuf_zone;
-	extern mutex_t	        xfs_uuidtabmon;
 #ifdef DEBUG_NOT
 	extern ktrace_t	        *xfs_alloc_trace_buf;
 	extern ktrace_t	        *xfs_bmap_trace_buf;
@@ -66,7 +65,6 @@ xfs_init(void)
 #ifdef XFS_DABUF_DEBUG
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
 #endif
-	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 
 	/*
 	 * Initialize all of the zone allocators we use.
