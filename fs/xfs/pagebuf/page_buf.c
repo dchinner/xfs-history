@@ -1047,14 +1047,13 @@ void pagebuf_free(	/* deallocate a buffer          */
 
 void pagebuf_rele(page_buf_t * pb)
 {
-	int	do_free;
 	unsigned long flags;
 
 	PB_TRACE(pb, PB_TRACE_REC(rele), pb->pb_relse);
 	spin_lock_irqsave(&PBP(pb)->pb_lock, flags);
 
 	if (pb->pb_hold == 1) {
-		do_free = 1;
+		int	do_free = 1;
 		if (pb->pb_relse) {
 			spin_unlock_irqrestore(&PBP(pb)->pb_lock, flags);
 			(*(pb->pb_relse)) (pb);
@@ -1065,6 +1064,10 @@ void pagebuf_rele(page_buf_t * pb)
 			if (do_free)
 				spin_unlock_irqrestore(&PBP(pb)->pb_lock,flags);
 			pagebuf_delwri_queue(pb, 0);
+			do_free = 0;
+		} else if (pb->pb_flags & PBF_FS_MANAGED) {
+			pb->pb_hold--;
+			spin_unlock_irqrestore(&PBP(pb)->pb_lock, flags);
 			do_free = 0;
 		}
 

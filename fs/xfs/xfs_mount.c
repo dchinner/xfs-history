@@ -38,7 +38,6 @@ void cxfs_unmount(xfs_mount_t *);
 # define cxfs_unmount(mp)	do { } while (0)
 #endif
 
-STATIC void	xfs_sb_relse(xfs_buf_t *);
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC int	xfs_uuid_mount(xfs_mount_t *);
@@ -427,24 +426,10 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 * This will be kept around at all time to optimize
 	 * access to the superblock.
 	 */
-	bp = XFS_ngetrbuf(BBTOB(BTOBB(sizeof(xfs_sb_t))),mp);
+	bp = xfs_buf_read_flags(mp->m_ddev_targp, XFS_SB_DADDR, 1,
+		PBF_LOCK|PBF_READ|PBF_MAPPED|PBF_MAPPABLE|PBF_FS_MANAGED);
 	ASSERT(bp != NULL);
 	ASSERT(XFS_BUF_ISBUSY(bp) && XFS_BUF_VALUSEMA(bp) <= 0);
-
-	/*
-	 * Initialize and read in the superblock buffer.
-	 */
-	XFS_BUF_SET_BRELSE_FUNC(bp,xfs_sb_relse);
-	XFS_BUF_SET_ADDR(bp, XFS_SB_DADDR);
-	XFS_BUF_READ(bp);
-	XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
-	xfsbdstrat(mp, bp);
-	if ((error = xfs_iowait(bp))) {
-		cmn_err(CE_WARN, "XFS: SB read failed");
-		xfs_ioerror_alert("xfs_readsb",
-				  mp, bp, XFS_BUF_ADDR(bp));
-		goto err;
-	}
 
 	/*
 	 * Initialize the mount structure from the superblock.
@@ -463,7 +448,8 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	return 0;
 
  err:
-	XFS_nfreerbuf(bp);
+	bp->pb_flags &= ~PBF_FS_MANAGED;
+	xfs_buf_relse(bp);
 	return error;
 }
 
@@ -1503,9 +1489,9 @@ xfs_getsb(xfs_mount_t	*mp,
 	  int		flags)
 {
 	xfs_buf_t	*bp;
-
 	ASSERT(mp->m_sb_bp != NULL);
 	bp = mp->m_sb_bp;
+	XFS_BUF_HOLD(bp);
 	if (flags & XFS_BUF_TRYLOCK) {
 		if (!XFS_BUF_CPSEMA(bp)) {
 			return NULL;
@@ -1531,23 +1517,9 @@ xfs_freesb(
 	 * when we call nfreerbuf().
 	 */
 	bp = xfs_getsb(mp, 0);
-	XFS_nfreerbuf(bp);
+	bp->pb_flags &= ~PBF_FS_MANAGED;
+	xfs_buf_relse(bp);
 	mp->m_sb_bp = NULL;
-}
-
-/*
- * This is the brelse function for the private superblock buffer.
- * All it needs to do is unlock the buffer and clear any spurious
- * flags.
- */
-STATIC void
-xfs_sb_relse(xfs_buf_t *bp)
-{
-	ASSERT(XFS_BUF_ISBUSY(bp));
-	ASSERT(XFS_BUF_VALUSEMA(bp) <= 0);
-	XFS_BUF_UNASYNC(bp);
-	XFS_BUF_UNREAD(bp);
-	XFS_BUF_VSEMA(bp);
 }
 
 /*

@@ -108,7 +108,7 @@ xlog_bread(xlog_t	*log,
 int
 xlog_bwrite(
 	xlog_t	*log,
-	xfs_daddr_t	blk_no,
+	int	blk_no,
 	int	nbblks,
 	xfs_buf_t	*bp)
 {

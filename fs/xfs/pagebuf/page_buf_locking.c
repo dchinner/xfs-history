@@ -225,13 +225,6 @@ _pagebuf_lockable_increment_key(avl_key_t *next_key,avl_key_t key)
  *	disabled.
  */
 
-void
-_pagebuf_grab_lock(page_buf_t *pb)
-{
-	down(&PBP(pb)->pb_sema);
-}
-
-
 int
 _pagebuf_find_lockable_buffer(pb_target_t *target,
 			     loff_t range_base,
@@ -284,13 +277,7 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 			if (!(flags & PBF_TRYLOCK)) {
 				/* wait for buffer ownership */
 				PB_TRACE(pb, PB_TRACE_REC(get_lk), 0);
-
-				/* If this buffer has I/O outstanding, push */
-				if (atomic_read(&PBP(pb)->pb_io_remaining))
-					run_task_queue(&tq_disk);
-				_pagebuf_grab_lock(pb);
-				/** down(&PBP(pb)->pb_sema); **/
-				PB_SET_OWNER(pb);
+				pagebuf_lock(pb);
 				PB_STATS_INC(pbstats.pb_get_locked_waited);
 			} else {
 				/* We asked for a trylock and failed, no need
@@ -300,10 +287,13 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 				 * either does not exist, or is this buffer
 				 */
 
-				pagebuf_rele(pb);
+				if (down_trylock(&PBP(pb)->pb_sema)) {
+					pagebuf_rele(pb);
 
-				PB_STATS_INC(pbstats.pb_busy_locked);
-				return -EBUSY;
+					PB_STATS_INC(pbstats.pb_busy_locked);
+					return -EBUSY;
+				}
+				PB_SET_OWNER(pb);
 			}
 		} else {
 			/* trylock worked */
