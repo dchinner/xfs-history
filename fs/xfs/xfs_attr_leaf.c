@@ -1817,7 +1817,7 @@ xfs_attr_leaf_print_int(buf_t *bp, xfs_inode_t *dp)
  * Copy out attribute list entries for attr_list(), for leaf attribute lists.
  */
 int
-xfs_attr_leaf_list_int(buf_t *bp, xfs_inode_t *dp, attrlist_t *alist,
+xfs_attr_leaf_list_int(buf_t *bp, attrlist_t *alist,
 			     attrlist_cursor_kern_t *cursor)
 {
 	xfs_attr_leafblock_t *leaf;

@@ -147,7 +147,7 @@ int	xfs_attr_leaf_add(xfs_trans_t *trans, buf_t *leaf_buffer,
 int	xfs_attr_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args);
 int	xfs_attr_leaf_remove(xfs_trans_t *trans, buf_t *leaf_buffer,
 					int index_to_remove, int *result);
-int	xfs_attr_leaf_list_int(buf_t *bp, xfs_inode_t *dp, attrlist_t *alist,
+int	xfs_attr_leaf_list_int(buf_t *bp, attrlist_t *alist,
 				     attrlist_cursor_kern_t *cursor);
 void	xfs_attr_leaf_print_int(buf_t *leaf_buffer, xfs_inode_t *attr_inode);
 /*
