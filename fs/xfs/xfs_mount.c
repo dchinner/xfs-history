@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.134 $"
+#ident	"$Revision: 1.135 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -598,7 +598,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			 * or via xfs_log_mount_finish.
 			 */
 			quotaflags = mp->m_qflags;
-			mp->m_flags = 0;
+			mp->m_qflags = 0;
 		}
 	}
 #endif		
