@@ -97,6 +97,7 @@ STATIC void xfs_dir_node_add(struct xfs_dir_state *state,
 				    struct xfs_dir_state_blk *old_node_blk,
 				    struct xfs_dir_state_blk *new_node_blk);
 
+#ifndef SIM
 /*
  * Routines used for shrinking the Btree.
  */
@@ -111,6 +112,7 @@ STATIC void xfs_dir_node_remove(struct xfs_dir_state *state,
 STATIC void xfs_dir_node_unbalance(struct xfs_dir_state *state,
 					struct xfs_dir_state_blk *src_node_blk,
 					struct xfs_dir_state_blk *dst_node_blk);
+#endif	/* !SIM */
 
 /*
  * Routines used for finding things in the Btree.
@@ -949,6 +951,7 @@ xfs_dir_node_add(struct xfs_dir_state *state,
  * Routines used for shrinking the Btree.
  *========================================================================*/
 
+#ifndef SIM
 /*
  * Deallocate an empty leaf node, remove it from its parent,
  * possibly deallocating that block, etc...
@@ -1195,6 +1198,7 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state)
 	}
 	return(1);
 }
+#endif	/* !SIM */
 
 /*
  * Walk back up the tree adjusting hash values as necessary,
@@ -1240,6 +1244,7 @@ xfs_dir_fixhashpath(struct xfs_dir_state *state,
 	}
 }
 
+#ifndef SIM
 /*
  * Remove a name from the leaf directory structure.
  *
@@ -1576,6 +1581,7 @@ xfs_dir_node_unbalance(struct xfs_dir_state *state,
 	 */
 	save_blk->hashval = save_node->btree[ save_node->hdr.count-1 ].hashval;
 }
+#endif	/* !SIM */
 
 /*========================================================================
  * Routines used for finding things in the Btree.
@@ -2153,6 +2159,7 @@ xfs_dir_path_shift(struct xfs_dir_state *state, struct xfs_dir_state_path *path,
 	return(0);
 }
 
+#ifndef SIM
 /*
  * Print the contents of a leaf block.
  */
@@ -2225,6 +2232,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 	*eobp = 1;
 	return(0);
 }
+#endif	/* !SIM */
 
 #ifdef XFSDIRDEBUG
 

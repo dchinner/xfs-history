@@ -1064,6 +1064,9 @@ xfs_inactive(vnode_t	*vp,
 		    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
 		    ((ip->i_d.di_mode & IFMT) == IFREG));
 
+#ifdef SIM
+	ASSERT(ip->i_d.di_nlink > 0);
+#else
 	ASSERT(ip->i_d.di_nlink >= 0);
 	if (ip->i_d.di_nlink == 0) {
 		mp = ip->i_mount;
@@ -1199,6 +1202,7 @@ xfs_inactive(vnode_t	*vp,
 		xfs_trans_commit(tp , commit_flags);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	}
+#endif	/* !SIM */
 
 	/*
 	 * Clear all the inode's read-ahead state.  We don't need the

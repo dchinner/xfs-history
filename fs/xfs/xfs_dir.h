@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * xfs_dir.h
@@ -207,15 +207,19 @@ buf_t	*xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp,
  */
 int	xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 				xfs_fsblock_t *new_logblock);
+#ifndef SIM
 int	xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 				xfs_fsblock_t dead_logblock, buf_t *dead_buf);
+#endif	/* !SIM */
 buf_t	*xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
 buf_t	*xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
+#ifndef SIM
 int	xfs_dir_put_dirent(xfs_mount_t *mp, struct dirent *dbp, xfs_ino_t ino,
 				char *name, int namelen, off_t nextcook,
 				uio_t *uio, int *done);
+#endif	/* !SIM */
 
 /*
  * Overall external interface routines.
@@ -236,12 +240,14 @@ int	xfs_dir_createname(xfs_trans_t *trans,
 			   struct xfs_bmap_free *flist,
 			   xfs_extlen_t total);
 
+#ifndef SIM
 int	xfs_dir_removename(xfs_trans_t *trans,
 			   xfs_inode_t *dp,
 			   char *name_string,
 			   xfs_fsblock_t *firstblock,
 			   struct xfs_bmap_free *flist,
 			   xfs_extlen_t total);
+#endif	 /* !SIM */
 
 int	xfs_dir_lookup(xfs_trans_t *tp,
 		       xfs_inode_t *dp,
@@ -249,6 +255,7 @@ int	xfs_dir_lookup(xfs_trans_t *tp,
 		       int name_length,
 		       xfs_ino_t *inode_number);
 
+#ifndef SIM
 void	xfs_dir_print(xfs_trans_t *tp,
 		      xfs_inode_t *dp);
 
@@ -262,5 +269,6 @@ int	xfs_dir_replace(xfs_trans_t *tp,
 			char *name_string,
 			int name_length,
 			xfs_ino_t inode_number);
+#endif	/* !SIM */
 
 #endif	/* !_FS_XFS_DIR_H */

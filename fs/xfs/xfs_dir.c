@@ -63,49 +63,63 @@ STATIC int xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp,
 					xfs_ino_t parent_inumber);
 STATIC int xfs_dir_shortform_addname(xfs_trans_t *trans,
 					struct xfs_dir_name *add);
+#ifndef SIM
 STATIC int xfs_dir_shortform_removename(xfs_trans_t *trans,
 					struct xfs_dir_name *remove);
+#endif	/* !SIM */
 STATIC int xfs_dir_shortform_lookup(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
 STATIC int xfs_dir_shortform_to_leaf(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
+#ifndef SIM
 STATIC void xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					uio_t *uio, int *eofp, dirent_t *dbp);
 STATIC int xfs_dir_shortform_replace(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
+#endif	/* !SIM */
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_leaf_addname(xfs_trans_t *trans, struct xfs_dir_name *args);
+#ifndef SIM
 STATIC int xfs_dir_leaf_removename(xfs_trans_t *trans,
 					struct xfs_dir_name *args,
 					int *number_entries,
 					int *total_namebytes);
+#endif	/* !SIM */
 STATIC int xfs_dir_leaf_lookup(xfs_trans_t *trans, struct xfs_dir_name *args);
+#ifndef SIM
 STATIC int xfs_dir_leaf_to_shortform(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
+#endif	/* !SIM */
 STATIC int xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args);
+#ifndef SIM
 STATIC void xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					uio_t *uio, int *eofp, dirent_t *dbp);
 STATIC int xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
+#endif	/* !SIM */
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_node_addname(xfs_trans_t *trans, struct xfs_dir_name *args);
+#ifndef SIM
 STATIC int xfs_dir_node_removename(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
+#endif	/* !SIM */
 STATIC int xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args);
 #if 0
 STATIC int xfs_dir_node_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *args);
 #endif
+#ifndef SIM
 STATIC void xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					uio_t *uio, int *eofp, dirent_t *dbp);
 STATIC int xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
+#endif	/* !SIM */
 
 /*
  * Utility routines.
@@ -229,6 +243,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Generic handler routine to remove a name from a directory.
  * Transitions directory from Btree to shortform as necessary.
@@ -283,6 +298,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	}
 	return(retval);
 }
+#endif	/* !SIM */
 
 int
 xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
@@ -330,6 +346,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Print a directory's contents.
  * For debugging.
@@ -422,6 +439,7 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 
 	return(retval);
 }
+#endif	/* !SIM */
 
 
 /*========================================================================
@@ -496,6 +514,7 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	return(0);
 }
 
+#ifndef SIM
 /*
  * Remove a name from the shortform directory structure.
  */
@@ -537,6 +556,7 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 
 	return(0);
 }
+#endif	/* !SIM */
 
 /*
  * Look up a name in a shortform directory structure.
@@ -652,6 +672,7 @@ out:
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Print the shortform directory.
  */
@@ -790,6 +811,7 @@ xfs_dir_shortform_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 	}
 	return(XFS_ERROR(ENOENT));
 }
+#endif	/* !SIM */
 
 
 /*========================================================================
@@ -844,6 +866,7 @@ xfs_dir_leaf_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Remove a name from the leaf directory structure
  * This is the external routine.
@@ -869,6 +892,7 @@ xfs_dir_leaf_removename(xfs_trans_t *trans, struct xfs_dir_name *args,
 	*totallen = leaf->hdr.namebytes;
 	return(0);
 }
+#endif	/* !SIM */
 
 /*
  * Look up a name in a leaf directory structure.
@@ -887,6 +911,7 @@ xfs_dir_leaf_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Convert a leaf directory to shortform structure
  */
@@ -964,6 +989,7 @@ out:
 	kmem_free(tmpbuffer, XFS_LBSIZE(dp->i_mount));
 	return(retval);
 }
+#endif	/* !SIM */
 
 /*
  * Convert from using a single leaf to a root node and a leaf.
@@ -1005,6 +1031,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args)
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Print the leaf directory.
  */
@@ -1075,6 +1102,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 		xfs_trans_brelse(trans, bp);
 	return(retval);
 }
+#endif	/* !SIM */
 
 
 /*========================================================================
@@ -1156,6 +1184,7 @@ xfs_dir_node_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Remove a name from a B-tree directory.
  *
@@ -1203,6 +1232,7 @@ xfs_dir_node_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 	xfs_dir_state_free(state);
 	return(retval);
 }
+#endif	/* !SIM */
 
 /*
  * Look up a filename in a int directory.
@@ -1237,6 +1267,7 @@ xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 	return(retval);
 }
 
+#ifndef SIM
 /*
  * Print the B-tree directory.
  */
@@ -1395,6 +1426,7 @@ xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 	xfs_dir_state_free(state);
 	return(retval);
 }
+#endif	/* !SIM */
 
 
 /*========================================================================
@@ -1445,6 +1477,7 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 	return(0);
 }
 
+#ifndef SIM
 int
 xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 				 xfs_fsblock_t dead_blkno, buf_t *dead_buf)
@@ -1466,6 +1499,7 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 
 	return(0);
 }
+#endif	/* !SIM */
 
 buf_t *
 xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
@@ -1516,6 +1550,7 @@ xfs_dir_log2_roundup(uint i)
 	return(rval);
 }
 
+#ifndef SIM
 /*
  * Format a dirent structure and copy it out the the user's buffer.
  * A 32-bit process has a differently sized dirent structure than
@@ -1578,6 +1613,7 @@ xfs_dir_put_dirent(
 	}
 	return(retval);
 }
+#endif	/* !SIM */
 
 /*
  * Allocate a dir-state structure.

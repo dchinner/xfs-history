@@ -203,6 +203,7 @@ STATIC int
 xfs_alloc_ag_vextent_size(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
+#ifndef SIM
 /*
  * Free the extent starting at agno/bno for length.
  */
@@ -214,6 +215,7 @@ xfs_free_ag_extent(
 	xfs_agblock_t	bno,	/* starting block number */
 	xfs_extlen_t	len,	/* length of extent */
 	int		isfl);	/* set if is freelist blocks - no sb acctg */
+#endif	/* !SIM */
 
 /*
  * Internal functions.
@@ -1405,6 +1407,7 @@ xfs_alloc_ag_vextent_size(
 	return 0;
 }
 
+#ifndef SIM
 /*
  * Free the extent starting at agno/bno for length.
  */
@@ -1618,6 +1621,7 @@ xfs_free_ag_extent(
 	xfs_alloc_trace_free(fname, NULL, mp, agno, bno, len, isfl);
 	return 1;
 }
+#endif	/* !SIM */
 
 /* 
  * Visible (exported) allocation/free functions.
@@ -1744,6 +1748,9 @@ xfs_alloc_fix_freelist(
 		xfs_trans_brelse(tp, agbp);
 		return NULL;
 	}
+#ifdef SIM
+	ASSERT(agf->agf_flcount <= need);
+#else
 	/*
 	 * Make the freelist shorter if it's too long.
 	 */
@@ -1767,6 +1774,7 @@ xfs_alloc_fix_freelist(
 		 */
 		xfs_trans_set_sync(tp);
 	}
+#endif	/* SIM */
 	/*
 	 * Allocate and initialize the args structure.
 	 */
@@ -2148,6 +2156,7 @@ xfs_alloc_vextent(
 	}
 }
 
+#ifndef SIM
 /*
  * Free an extent.
  * Just break up the extent address and hand off to xfs_free_ag_extent
@@ -2186,3 +2195,4 @@ xfs_free_extent(
 	mrunlock(&mp->m_peraglock);
 	return rval;
 }
+#endif	/* !SIM */

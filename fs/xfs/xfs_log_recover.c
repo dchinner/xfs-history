@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.32 $"
+#ident	"$Revision: 1.33 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1719,6 +1719,9 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 	int			i;
 	xfs_extent_t		*extp;
 
+#ifdef SIM
+	ASSERT(0);
+#else
 	ASSERT(!(efip->efi_flags & XFS_EFI_RECOVERED));
 
 	tp = xfs_trans_alloc(mp, 0);
@@ -1734,6 +1737,7 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 
 	efip->efi_flags |= XFS_EFI_RECOVERED;
 	xfs_trans_commit(tp, 0);
+#endif	/* SIM */
 }	/* xlog_recover_process_efi */
 
 

@@ -57,6 +57,7 @@ xfs_dialloc(
 	buf_t		**agbp,		/* buf for a.g. inode header */
 	boolean_t	*alloc_done);	/* an allocation was done to replenish
 					   the free inodes */
+#ifndef SIM
 /*
  * Free disk inode.  Carefully avoids touching the incore inode, all
  * manipulations incore are the caller's responsibility.
@@ -67,6 +68,7 @@ void
 xfs_difree(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	inode);		/* inode to be freed */
+#endif	/* !SIM */
 
 /*
  * Return the location of the inode in bno/off, for mapping it into a buffer.

@@ -167,6 +167,7 @@ void
 xfs_alloc_vextent(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
+#ifndef SIM
 /*
  * Free an extent.
  */
@@ -175,5 +176,6 @@ xfs_free_extent(
 	xfs_trans_t	*tp,	/* transaction pointer */
 	xfs_fsblock_t	bno,	/* starting block number of extent */
 	xfs_extlen_t	len);	/* length of extent */
+#endif	/* !SIM */
 
 #endif	/* !_FS_XFS_ALLOC_H */

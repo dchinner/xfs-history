@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.64 $"
+#ident	"$Revision: 1.66 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -686,6 +686,7 @@ xfs_dialloc(
 	return ino;
 }
 
+#ifndef SIM
 /*
  * Free disk inode.  Carefully avoids touching the incore inode, all
  * manipulations incore are the caller's responsibility.
@@ -788,6 +789,7 @@ xfs_difree(
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 }
+#endif	/* !SIM */
 
 /*
  * Return the location of the inode in bno/off, for mapping it into a buffer.

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.120 $"
+#ident	"$Revision: 1.121 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -146,6 +146,7 @@ xfs_bmap_check_extents(
 #define	xfs_bmap_check_extents(ip)
 #endif
 
+#ifndef SIM
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -159,6 +160,7 @@ xfs_bmap_del_extent(
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
 	int			iflags);/* input flags (meta-data or not) */
+#endif	/* !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -1430,6 +1432,9 @@ xfs_bmap_alloc(
 	 * Realtime allocation, done through xfs_rtallocate_extent.
 	 */
 	if (rt) {
+#ifdef SIM
+		ASSERT(0);
+#else
 		xfs_extlen_t	ralen;
 		xfs_alloctype_t	type;		/* allocation type flag */
 
@@ -1455,6 +1460,7 @@ xfs_bmap_alloc(
 				ap->ip->i_delayed_blks -= ralen;
 		} else
 			ap->alen = 0;
+#endif	/* SIM */
 	}
 	/*
 	 * Normal allocation, done through xfs_alloc_vextent.
@@ -1598,6 +1604,7 @@ xfs_bmap_check_extents(
 }
 #endif
 
+#ifndef SIM
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -1835,6 +1842,7 @@ xfs_bmap_del_extent(
 	kmem_check();
 	return flags;
 }
+#endif	/* !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -2460,6 +2468,9 @@ xfs_bmap_finish(
 
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 
+#ifdef SIM
+	ASSERT(flist->xbf_count == 0);
+#else
 	if (flist->xbf_count == 0)
 		return 0;
 	ntp = *tp;
@@ -2486,6 +2497,7 @@ xfs_bmap_finish(
 	*tp = ntp;
 	kmem_check();
 	return 1;
+#endif
 }
 
 /*
@@ -3085,6 +3097,7 @@ xfs_bmapi(
 	return firstblock;
 }
 
+#ifndef SIM
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -3342,3 +3355,4 @@ xfs_getbmap(
 	kmem_free(map, nex * sizeof(*map));
 	return error;
 }
+#endif	/* !SIM */

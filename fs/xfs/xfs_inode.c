@@ -563,6 +563,7 @@ xfs_isize_check(
 }
 #endif	/* DEBUG */
 
+#ifndef SIM
 /*
  * Start the truncation of the file to new_size.  The new size
  * must be smaller than the current size.  This routine will
@@ -790,6 +791,7 @@ xfs_itruncate_finish(
 		(ip->i_queued_bufs == 0) &&
 		(ip->i_vnode->v_buf == NULL)));
 }
+#endif	/* !SIM */
 
 
 /*
@@ -856,6 +858,7 @@ xfs_igrow_finish(
 }
 
 
+#ifndef SIM
 /*
  * This is called when the inode's link count goes to 0.
  * We place the on-disk inode on a list in the AGI.  It
@@ -1102,6 +1105,7 @@ xfs_ifree(
 	ip->i_d.di_gen++;
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 }
+#endif	/* !SIM */
 
 /*
  * Reallocate the space for i_broot based on the number of records

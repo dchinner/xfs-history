@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.40 $"
+#ident "$Revision: 1.42 $"
 
 struct getbmap;
 struct xfs_bmbt_rec;
@@ -223,6 +223,7 @@ xfs_bmapi(
 	int			*nmap,		/* i/o: mval size/count */
 	xfs_bmap_free_t		*flist);	/* i/o: list extents to free */
 
+#ifndef SIM
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -249,5 +250,6 @@ xfs_getbmap(
 	vnode_t			*vp,		/* vnode pointer */
 	struct getbmap		*bmv,		/* user bmap structure */
 	void			*ap);		/* pointer to user's array */
+#endif	/* !SIM */
 
 #endif	/* _FS_XFS_BMAP_H */
