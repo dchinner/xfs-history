@@ -34,8 +34,8 @@
 #include <xfs_fsops.h>
 #include <xfs_dfrag.h>
 #include <linux/dcache.h>
+#include <linux/pagemap.h>
 #include <linux/namei.h>
-#include <linux/iobuf.h>
 
 
 extern int xfs_change_file_space(bhv_desc_t *, int,
@@ -591,16 +591,16 @@ xfs_ioctl(
 	case XFS_IOC_DIOINFO: {
 		struct dioattr	da;
 
-		da.d_miniosz = mp->m_sb.sb_blocksize;
-		da.d_mem = mp->m_sb.sb_blocksize;
 
 		/*
 		 * this only really needs to be BBSIZE.
 		 * it is set to the file system block size to
 		 * avoid having to do block zeroing on short writes.
 		 */
-		da.d_maxiosz = XFS_FSB_TO_B(mp,
-				XFS_B_TO_FSBT(mp, KIO_MAX_ATOMIC_IO << 10));
+		da.d_miniosz = mp->m_sb.sb_blocksize;
+		da.d_mem = mp->m_sb.sb_blocksize;
+		/* The size dio will do in one go */
+		da.d_maxiosz = 64 * PAGE_CACHE_SIZE;
 
 		if (copy_to_user((struct dioattr *)arg, &da, sizeof(da)))
 			return -XFS_ERROR(EFAULT);
