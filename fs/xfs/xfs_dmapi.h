@@ -34,8 +34,8 @@
 
 #ifdef CONFIG_XFS_DMAPI
 
-#include <linux/dmapi.h>
-#include <linux/dmapi_kern.h>
+#include <dmapi/dmapi.h>
+#include <dmapi/dmapi_kern.h>
 
 /*	Values used to define the on-disk version of dm_attrname_t. All
  *	on-disk attribute names start with the 8-byte string "SGI_DMI_".
