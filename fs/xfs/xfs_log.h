@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -64,7 +64,6 @@
 #define XFS_VOLUME		0x2
 #define XFS_LOG			0xaa
 
-
 typedef struct xfs_log_iovec {
 	caddr_t		i_addr;		/* beginning address of region */
 	int		i_len;		/* length in bytes of region */
@@ -78,7 +77,7 @@ typedef void* xfs_log_ticket_t;
  */
 typedef struct xfs_log_callback {
 	struct xfs_log_callback	*cb_next;
-	void			(*cb_func)(void *);
+	void			(*cb_func)(void *, int);
 	void 			*cb_arg;
 } xfs_log_callback_t;
 
@@ -115,7 +114,7 @@ int	  xfs_log_write(struct xfs_mount *mp,
 			xfs_log_ticket_t ticket,
 			xfs_lsn_t	 *start_lsn);
 int	  xfs_log_unmount(struct xfs_mount *mp);
-void	  xfs_log_force_umount(struct xfs_mount *mp);
+int	  xfs_log_force_umount(struct xfs_mount *mp, int logerror);
 
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp,
