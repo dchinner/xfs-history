@@ -1224,11 +1224,10 @@ _xfs_imap_to_bmap(
 				pbmapp->pbm_flags |= PBMF_UNWRITTEN;
 		}
 
-		if (XFS_FSB_TO_B(mp, pbmapp->pbm_offset + pbmapp->pbm_bsize)
-								>= nisize) {
+		if ((pbmapp->pbm_offset + pbmapp->pbm_bsize) >= nisize) {
 			pbmapp->pbm_flags |= PBMF_EOF;
 		}
-		
+
 		offset += pbmapp->pbm_bsize - pbmapp->pbm_delta;
 	}
 	return(pbm);	/* Return the number filled */
