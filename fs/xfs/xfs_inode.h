@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.103 $"
+#ident "$Revision: 1.104 $"
 
 struct bhv_desc;
 struct buf;
@@ -318,6 +318,9 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
 
 /*
  * Clear out the read-ahead state in the in-core inode.
+ * We actually only need to clear i_next_offset and
+ * i_last_req_sz to get the effect of making all the
+ * read ahead state unusable.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INODE_CLEAR_READ_AHEAD)
 void xfs_inode_clear_read_ahead(xfs_inode_t *ip);
@@ -325,9 +328,6 @@ void xfs_inode_clear_read_ahead(xfs_inode_t *ip);
 #else
 #define	XFS_INODE_CLEAR_READ_AHEAD(ip)	{	\
 		ip->i_next_offset = 0;		\
-		ip->i_io_offset = 0;		\
-		ip->i_reada_blkno = 0;		\
-		ip->i_io_size = 0;		\
 		ip->i_last_req_sz = 0; }
 #endif
 
