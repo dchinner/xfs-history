@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision: 1.34 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1538,7 +1538,7 @@ xlog_recover_do_trans(xlog_t	     *log,
 	int		    error = 0;
 
 	xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug);
-#ifdef KERNEL
+#ifdef _KERNEL
 	if (error = xlog_recover_reorder_trans(log, trans))
 		return error;
 	xlog_recover_print_trans(trans, trans->r_itemq, xlog_debug+1);
@@ -1563,7 +1563,7 @@ xlog_recover_do_trans(xlog_t	     *log,
 		}
 		item = item->ri_next;
 	} while (first_item != item);
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 	return error;
 }	/* xlog_recover_do_trans */
