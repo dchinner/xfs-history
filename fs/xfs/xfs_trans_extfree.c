@@ -7,6 +7,7 @@
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
+#include <sys/uuid.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
