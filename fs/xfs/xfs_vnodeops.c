@@ -13,6 +13,7 @@
 #include <sys/sysmacros.h>
 #include <sys/cred.h>
 #include <sys/grio.h>
+#include <sys/pfdat.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -30,7 +31,6 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <sys/pfdat.h>
 #include <sys/proc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>
