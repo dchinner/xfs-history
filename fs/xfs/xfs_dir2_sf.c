@@ -436,7 +436,7 @@ xfs_dir2_sf_addname_hard(
 	int			new_isize)	/* new directory size */
 {
 	int			add_datasize;	/* data size need for new ent */
-	char			buf[XFS_DIR2_SF_MAX_SIZE]; /* buffer for old */
+	char			*buf;		/* buffer for old */
 	xfs_inode_t		*dp;		/* incore directory inode */
 	int			eof;		/* reached end of old dir */
 	int			nbytes;		/* temp for byte copies */
@@ -455,6 +455,7 @@ xfs_dir2_sf_addname_hard(
 
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	old_isize = (int)dp->i_d.di_size;
+	buf = kmem_alloc(old_isize, GFP_KERNEL);
 	oldsfp = (xfs_dir2_sf_t *)buf;
 	bcopy(sfp, oldsfp, old_isize);
 	/*
@@ -511,6 +512,7 @@ xfs_dir2_sf_addname_hard(
 		sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep);
 		bcopy(oldsfep, sfep, old_isize - nbytes);
 	}
+	kmem_free(buf, old_isize);
 	dp->i_d.di_size = new_isize;
 	xfs_dir2_sf_check(args);
 }
