@@ -1611,7 +1611,7 @@ xfs_inactive(
 	 * If the inode is already free, then there can be nothing
 	 * to clean up here.
 	 */
-	if (ip->i_d.di_mode == 0) {
+	if (ip->i_d.di_mode == 0 || VN_BAD(vp)) {
 		ASSERT(ip->i_df.if_real_bytes == 0);
 		ASSERT(ip->i_df.if_broot_bytes == 0);
 		return VN_INACTIVE_CACHE;
@@ -3812,6 +3812,13 @@ xfs_reclaim(
 	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
 	ASSERT(!VN_MAPPED(vp));
+
+	/* bad inode, get out here ASAP */
+	if (VN_BAD(vp)) {
+		xfs_ireclaim(ip);
+		return 0;
+	}
+
 	ip = XFS_BHVTOI(bdp);
 
 	if ((ip->i_d.di_mode & S_IFMT) == S_IFREG) {
@@ -3890,7 +3897,11 @@ xfs_finish_reclaim(
 	int		sync_mode)
 {
 	xfs_ihash_t	*ih = ip->i_hash;
+	vnode_t		*vp = XFS_ITOV_NULL(ip);
 	int		error;
+
+	if (vp && VN_BAD(vp))
+		return 0;
 
 	/* The hash lock here protects a thread in xfs_iget_core from
 	 * racing with us on linking the inode back with a vnode.
@@ -3899,8 +3910,7 @@ xfs_finish_reclaim(
 	 */
 	write_lock(&ih->ih_lock);
 	if ((ip->i_flags & XFS_IRECLAIM) ||
-	    (!(ip->i_flags & XFS_IRECLAIMABLE) &&
-	      (XFS_ITOV_NULL(ip) == NULL))) {
+	    (!(ip->i_flags & XFS_IRECLAIMABLE) && vp == NULL)) {
 		write_unlock(&ih->ih_lock);
 		if (locked) {
 			xfs_ifunlock(ip);
