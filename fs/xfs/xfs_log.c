@@ -61,7 +61,6 @@
 /* Local miscellaneous function prototypes */
 STATIC void	 xlog_alloc(xlog_t *log);
 STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
-STATIC daddr_t	 xlog_find_head(xlog_t *log);
 STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t* blk_no);
 STATIC xlog_t *  xlog_init_log(xfs_mount_t *mp, dev_t log_dev,
 			       daddr_t blk_offset, int num_bblks);
@@ -88,7 +87,8 @@ STATIC void		xlog_state_put_ticket(xlog_t *log, xlog_ticket_t *tic);
 STATIC void		xlog_state_release_iclog(xlog_t *log,
 						 xlog_in_core_t *iclog);
 static void		xlog_state_switch_iclogs(xlog_t *log,
-						 xlog_in_core_t *iclog);
+						 xlog_in_core_t *iclog,
+						 int eventual_size);
 STATIC int		xlog_state_sync(xlog_t *log, xfs_lsn_t lsn, uint flags);
 STATIC void		xlog_state_want_sync(xlog_t *log,
 					     xlog_in_core_t *iclog);
@@ -681,7 +681,7 @@ xlog_find_verify_log_record(caddr_t	ba,	/* update ptr as we go */
  * write would go.  This means that incomplete writes at the end are eliminated
  * when calculating the head.
  */
-static daddr_t
+daddr_t
 xlog_find_head(xlog_t	*log)
 {
 	buf_t	*bp, *big_bp;
@@ -1561,7 +1561,7 @@ restart:
 	 */
 	if (iclog->ic_size - iclog->ic_offset < 2*sizeof(xlog_op_header_t)) {
 		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog);
+			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
 
 		if (iclog->ic_refcnt == 1) {		/* I'm the only one */
 			spunlockspl(log->l_icloglock, spl);
@@ -1578,7 +1578,7 @@ restart:
 	} else {	/* take as much as possible and write rest in next LR */
 		*continued_write = 1;
 		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog);
+			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
 		/* this iclog releases in xlog_write() */
 	}
 	*iclogp = iclog;
@@ -1746,17 +1746,27 @@ xlog_state_release_iclog(xlog_t		*log,
 }	/* xlog_state_release_iclog */
 
 
+/*
+ * This routine will mark the current iclog in the ring as WANT_SYNC
+ * and move the current iclog pointer to the next iclog in the ring.
+ * When this routine is called from xlog_state_get_iclog_space(), the
+ * exact size of the iclog has not yet been determined.  All we know is
+ * that every data block.  We have run out of space in this log record.
+ */
 static void
 xlog_state_switch_iclogs(xlog_t		*log,
-			 xlog_in_core_t *iclog)
+			 xlog_in_core_t *iclog,
+			 int		eventual_size)
 {
+	if (!eventual_size)
+		eventual_size = iclog->ic_offset;
 	iclog->ic_state = XLOG_STATE_WANT_SYNC;
 	iclog->ic_header.h_prev_block = log->l_prev_block;
 	log->l_prev_block = log->l_curr_block;
 	log->l_prev_cycle = log->l_curr_cycle;
 	
 	/* roll log?: ic_offset changed later */
-	log->l_curr_block += BTOBB(iclog->ic_offset)+1;
+	log->l_curr_block += BTOBB(eventual_size)+1;
 	if (log->l_curr_block >= log->l_logBBsize) {
 		log->l_curr_cycle++;
 		log->l_curr_block -= log->l_logBBsize;
@@ -1777,19 +1787,19 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 
 	iclog = log->l_iclog;
 	do {
-			iclog = iclog->ic_next;
-		    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-			    xlog_state_switch_iclogs(log, iclog);
-		    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
-			    spunlockspl(log->l_icloglock, spl);
-			    return 0;
-		    }
-		    if (flags & XFS_LOG_SYNC)		/* sleep */
-			    spunlockspl_psema(log->l_icloglock, spl,
-					      &iclog->ic_forcesema, 0);
-		    else				/* just return */
-			    spunlockspl(log->l_icloglock, spl);
-		    return 0;
+		iclog = iclog->ic_next;
+		if (iclog->ic_state == XLOG_STATE_ACTIVE) {
+			xlog_state_switch_iclogs(log, iclog, 0);
+		} else if (iclog->ic_state == XLOG_STATE_DIRTY) {
+			spunlockspl(log->l_icloglock, spl);
+			return 0;
+		}
+		if (flags & XFS_LOG_SYNC)		/* sleep */
+			spunlockspl_psema(log->l_icloglock, spl,
+					  &iclog->ic_forcesema, 0);
+		else				/* just return */
+			spunlockspl(log->l_icloglock, spl);
+		return 0;
 	} while (iclog != log->l_iclog);
 
 	spunlockspl(log->l_icloglock, spl);
@@ -1828,7 +1838,7 @@ xlog_state_sync(xlog_t	  *log,
 			iclog = iclog->ic_next;
 		} else {
 		    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-			    xlog_state_switch_iclogs(log, iclog);
+			    xlog_state_switch_iclogs(log, iclog, 0);
 		    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			    spunlockspl(log->l_icloglock, spl);
 			    return 0;
@@ -1859,7 +1869,7 @@ xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
 	spl = splockspl(log->l_icloglock, splhi);
 	
 	if (iclog->ic_state == XLOG_STATE_ACTIVE)
-		xlog_state_switch_iclogs(log, iclog);
+		xlog_state_switch_iclogs(log, iclog, 0);
 	else if (iclog->ic_state != XLOG_STATE_WANT_SYNC)
 		xlog_panic("xlog_state_want_sync: bad state");
 	
