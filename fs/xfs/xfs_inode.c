@@ -1,4 +1,4 @@
-#ident "$Revision: 1.189 $"
+#ident "$Revision: 1.190 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -135,7 +135,7 @@ xfs_itrunc_trace(
  * Check that none of the inode's in the buffer have a next
  * unlinked field of 0.
  */
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(XFS_REPAIR_SIM)
 void
 xfs_inobp_check(
 	xfs_mount_t	*mp,
@@ -150,7 +150,7 @@ xfs_inobp_check(
 		ASSERT(dip->di_next_unlinked != 0);
 	}
 }
-#endif
+#endif /* DEBUG && !XFS_REPAIR_SIM */
 
 /*
  * This routine is called to map an inode number within a file

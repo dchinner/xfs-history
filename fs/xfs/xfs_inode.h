@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.104 $"
+#ident "$Revision: 1.105 $"
 
 struct bhv_desc;
 struct buf;
@@ -417,11 +417,15 @@ xfs_fsize_t	xfs_file_last_byte(xfs_inode_t *);
 
 #ifdef DEBUG
 void		xfs_isize_check(struct xfs_mount *, xfs_inode_t *, xfs_fsize_t);
-void		xfs_inobp_check(struct xfs_mount *, struct buf *);
 #else	/* DEBUG */
 #define xfs_isize_check(mp, ip, isize)
-#define	xfs_inobp_check(mp, bp)
 #endif	/* DEBUG */
+
+#if defined(DEBUG) && !defined(XFS_REPAIR_SIM)
+void		xfs_inobp_check(struct xfs_mount *, struct buf *);
+#else
+#define	xfs_inobp_check(mp, bp)
+#endif /* DEBUG && !XFS_REPAIR_SIM */
 
 /*
  * xfs_vnodeops.c prototypes.
