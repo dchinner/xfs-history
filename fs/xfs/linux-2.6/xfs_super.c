@@ -62,6 +62,14 @@ static struct quotactl_ops linvfs_qops = {
 # define set_quota_ops(sb)	do { } while (0)
 #endif
 
+#ifdef CONFIG_XFS_DMAPI
+int dmapi_init(void);
+void dmapi_uninit(void);
+#else
+#define dmapi_init()
+#define dmapi_uninit()
+#endif
+
 static struct super_operations linvfs_sops;
 static struct export_operations linvfs_export_ops;
 
@@ -809,6 +817,7 @@ static int __init init_xfs_fs(void)
 	cred_init();
 	vn_init();
 	xfs_init(0);
+	dmapi_init();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
@@ -823,6 +832,7 @@ out:
 
 static void __exit exit_xfs_fs(void)
 {
+	dmapi_uninit();
 	xfs_cleanup();
 	unregister_filesystem(&xfs_fs_type);
 	pagebuf_terminate();

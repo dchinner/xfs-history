@@ -34,7 +34,7 @@
 
 
 # we also have source in the subdirectories..
-vpath %.c =  . linux pagebuf support
+vpath %.c =  . dmapi linux pagebuf support
 
 
 # This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
@@ -54,7 +54,22 @@ export-objs			:= page_buf.o ktrace.o xfs_globals.o
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
 
-xfs-obj-$(CONFIG_XFS_DMAPI)	+= xfs_dmapi.o
+xfs-obj-$(CONFIG_XFS_DMAPI)	+= xfs_dmapi.o \
+				   dmapi_sysent.o \
+				   dmapi_attr.o \
+				   dmapi_config.o \
+				   dmapi_bulkattr.o \
+				   dmapi_dmattr.o \
+				   dmapi_event.o \
+				   dmapi_handle.o \
+				   dmapi_hole.o \
+				   dmapi_io.o \
+				   dmapi_mountinfo.o \
+				   dmapi_region.o \
+				   dmapi_register.o \
+				   dmapi_right.o \
+				   dmapi_session.o
+
 
 xfs-obj-$(CONFIG_XFS_RT)	+= xfs_rtalloc.o
 
