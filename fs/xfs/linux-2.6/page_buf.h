@@ -179,29 +179,15 @@ typedef enum page_buf_flags_e {
 #define PBF_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) == 0)
 
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,13)
-
 typedef struct pb_target {
 	kdev_t			pbr_device;
-	unsigned int		pbr_blocksize;
-	unsigned int 		pbr_blocksize_bits;
-	struct address_space 	*pbr_addrspace;
-} pb_target_t;
-
-#define PB_ADDR_SPACE(pb)  (&(pb)->pb_target->pbr_addrspace)
-
-#else
-
-typedef struct pb_target {
-	kdev_t			pbr_device;
+	struct block_device	*pbr_bdev;
 	unsigned int		pbr_blocksize;
 	unsigned int 		pbr_blocksize_bits;
 	struct inode	 	*pbr_inode;
 } pb_target_t;
 
 #define PB_ADDR_SPACE(pb)  ((pb)->pb_target->pbr_inode->i_mapping)
-
-#endif
 
 struct page_buf_s;
 
@@ -222,7 +208,6 @@ typedef struct page_buf_s {
 	struct pb_target	*pb_target;	/* logical object */
 	atomic_t		pb_hold;	/* reference count */
 	page_buf_daddr_t	pb_bn;		/* block number for I/O */
-	kdev_t			pb_dev;
 	loff_t			pb_file_offset;	/* offset in file */
 	size_t			pb_buffer_length; /* size of buffer in bytes */
 	size_t			pb_count_desired; /* desired transfer size */

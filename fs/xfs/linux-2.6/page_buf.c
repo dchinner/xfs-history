@@ -268,7 +268,6 @@ _pagebuf_initialize(
 	init_MUTEX_LOCKED(&PBP(pb)->pb_sema); /* held, no waiters */
 	PB_SET_OWNER(pb);
 	pb->pb_target = target;
-	pb->pb_dev = target->pbr_device;
 	pb->pb_file_offset = range_base;
 	pb->pb_buffer_length = pb->pb_count_desired = range_length; 
 	/* set buffer_length and count_desired to the same value initially 
@@ -1208,7 +1207,7 @@ int pagebuf_iorequest(		/* start real I/O               */
 	    (pb->pb_flags & PBF_READ) && pb->pb_locked)) {
 		bio = bio_alloc(GFP_NOIO, 1);
 
-		bio->bi_dev = pb->pb_dev;
+		bio->bi_bdev = pb->pb_target->pbr_bdev;
 		bio->bi_sector = sector - (offset >> 9);
 		bio->bi_end_io = bio_end_io_pagebuf;
 		bio->bi_private = pb;
@@ -1268,7 +1267,7 @@ next_chunk:
 
 	BUG_ON(bio == NULL);
 
-	bio->bi_dev = pb->pb_dev;
+	bio->bi_bdev = pb->pb_target->pbr_bdev;
 	bio->bi_sector = sector;
 	bio->bi_end_io = bio_end_io_pagebuf;
 	bio->bi_private = pb;

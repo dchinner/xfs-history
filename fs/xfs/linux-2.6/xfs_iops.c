@@ -187,7 +187,7 @@ linvfs_lookup(
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 	}
 	if (error && (error != ENOENT))
-		return (ERR_PTR(-error));
+		return ERR_PTR(-error);
 	d_add(dentry, ip);	/* Negative entry goes in if ip is NULL */
 	return NULL;
 }
