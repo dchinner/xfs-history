@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.50 $"
+#ident	"$Revision: 1.51 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.

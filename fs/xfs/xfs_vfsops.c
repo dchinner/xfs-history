@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.128 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1101,6 +1101,9 @@ devvptoxfs(
 	int		error;
 	xfs_sb_t	*fs;
 	vnode_t		*openvp;
+	bhv_desc_t	*bdp;
+	bhv_head_t	*bhp;
+	struct snode	*sp;
 
 	if (devvp->v_type != VBLK)
 		return XFS_ERROR(ENOTBLK);
@@ -1110,7 +1113,20 @@ devvptoxfs(
 		return error;
 	dev = devvp->v_rdev;
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
-	if (VTOS(devvp)->s_flag & SMOUNTED) {
+
+	/*
+	 * Find the spec behavior for this vnode so that we can look
+	 * at the snode.
+	 */
+	bhp = VN_BHV_HEAD(devvp);
+	bdp = bhv_lookup_unlocked(bhp, &spec_vnodeops);
+	if (bdp == NULL) {
+		VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
+		return XFS_ERROR(ENODEV);
+	}
+
+	sp = (struct snode *)BHV_PDATA(bdp);
+	if (sp->s_flag & SMOUNTED) {
 		/*
 		 * Device is mounted.  Get an empty buffer to hold a
 		 * copy of its superblock, so we don't have to worry

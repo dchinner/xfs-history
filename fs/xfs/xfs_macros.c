@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 #define	XFS_MACRO_C
 
@@ -14,6 +14,7 @@
 #endif
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/pvnode.h>
 #include <sys/uuid.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -1655,14 +1656,6 @@ xfs_mount_t *
 xfs_vfstom(vfs_t *vfsp)
 {
 	return XFS_VFSTOM(vfsp);
-}
-#endif
-
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_VTOI)
-xfs_inode_t *
-xfs_vtoi(vnode_t *vp)
-{
-	return XFS_VTOI(vp);
 }
 #endif
 

@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.99 $"
 
 struct buf;
 struct cred;
@@ -106,6 +106,7 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_mnext;	/* next inode in mount list */
 	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
+	struct bhv_desc		i_bhv_desc;	/* inode behavior descriptor*/
 
 	/* Extent information. */
 	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
@@ -293,18 +294,13 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define	XFS_MAX_FILE_OFFSET	((1LL<<40)-1LL)
 #endif
 
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ITOV)
-struct vnode *xfs_itov(xfs_inode_t *ip);
-#define	XFS_ITOV(ip)	((struct vnode *)((ip)->i_vnode))
-#else
-#define	XFS_ITOV(ip)	((struct vnode *)((ip)->i_vnode))
+#if 0
+#define	XFS_VTOI(vp)		((xfs_inode_t *)((vp)->v_data))
 #endif
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_VTOI)
-xfs_inode_t *xfs_vtoi(struct vnode *vp);
-#define	XFS_VTOI(vp)	((xfs_inode_t *)((vp)->v_data))
-#else
-#define	XFS_VTOI(vp)	((xfs_inode_t *)((vp)->v_data))
-#endif
+#define	XFS_ITOV(ip)		((struct vnode *)((ip)->i_vnode))
+#define	XFS_ITOBHV(ip)		((struct bhv_desc *)(&((ip)->i_bhv_desc)))
+#define	XFS_BHVTOI(bhvp)	((xfs_inode_t *)(BHV_PDATA(bhvp)))
+
 
 /*
  * Clear out the read-ahead state in the in-core inode.
@@ -416,11 +412,12 @@ void		xfs_inobp_check(struct xfs_mount *, struct buf *);
 /*
  * xfs_vnodeops.c prototypes.
  */
-int		xfs_fast_fid(struct vnode *, xfs_fid_t *);
+int		xfs_fast_fid(struct bhv_desc *, xfs_fid_t *);
 
 extern int		xfs_do_fast_fid;
 extern struct zone	*xfs_ifork_zone;
 extern struct zone	*xfs_inode_zone;
 extern struct zone	*xfs_ili_zone;
+extern struct vnodeops	xfs_vnodeops;
 
 #endif	/* _XFS_INODE_H */

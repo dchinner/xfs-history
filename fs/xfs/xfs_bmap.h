@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.59 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -282,7 +282,7 @@ xfs_bunmapi(
  */
 int						/* error code */
 xfs_getbmap(
-	vnode_t			*vp,		/* vnode pointer */
+	bhv_desc_t		*bdp,		/* XFS behavior descriptor*/
 	struct getbmap		*bmv,		/* user bmap structure */
 	void			*ap,		/* pointer to user's array */
 	int			whichfork);	/* data or attr fork */

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.169 $"
+#ident	"$Revision: 1.171 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -4193,7 +4193,7 @@ xfs_bunmapi(
  */
 int						/* error code */
 xfs_getbmap(
-	vnode_t			*vp,		/* vnode pointer */
+	bhv_desc_t		*bdp,		/* XFS behavior descriptor*/
 	struct getbmap		*bmv,		/* user bmap structure */
 	void			*ap,		/* pointer to user's array */
 	int			whichfork)	/* data or attr fork */
@@ -4203,6 +4203,7 @@ xfs_getbmap(
 	xfs_fsblock_t		firstblock;	/* start block for bmapi */
 	int			i;		/* extent number */
 	xfs_inode_t		*ip;		/* xfs incore inode pointer */
+	vnode_t			*vp;		/* corresponding vnode */
 	xfs_fsize_t		last_byte;	/* last cached byte */
 	int			lock;		/* lock state */
 	xfs_bmbt_irec_t		*map;		/* buffer for user's data */
@@ -4213,7 +4214,8 @@ xfs_getbmap(
 	int			prealloced;	/* this is a file with
 						 * preallocated data space */
 
-	ip = XFS_VTOI(vp);
+	ip = XFS_BHVTOI(bdp);
+	vp = BHV_TO_VNODE(bdp);
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
 	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EINVAL);

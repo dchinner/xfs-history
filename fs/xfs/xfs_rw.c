@@ -1,4 +1,4 @@
-#ident "$Revision: 1.164 $"
+#ident "$Revision: 1.165 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -187,7 +187,7 @@ xfsd(void);
 
 int
 xfs_diordwr(
-	vnode_t		*vp,
+	bhv_desc_t	*bdp,
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp,
@@ -1003,21 +1003,23 @@ xfs_iomap_read(
 /* ARGSUSED */		
 int
 xfs_read_file(
-	vnode_t	*vp,
-	uio_t	*uiop,
-	int	ioflag,
-	cred_t	*credp)
+	bhv_desc_t	*bdp,	      
+	uio_t		*uiop,
+	int		ioflag,
+	cred_t		*credp)
 {
 	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
 	int		nbmaps;
+	vnode_t		*vp;
 	buf_t		*bp;
 	int		read_bmaps;
 	int		buffer_bytes_ok;
 	xfs_inode_t	*ip;
 	int		error;
 
-	ip = XFS_VTOI(vp);
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
 	error = 0;
 	buffer_bytes_ok = 0;
 	XFSSTATS.xs_read_calls++;
@@ -1135,9 +1137,10 @@ xfs_read(
 	int		error;
 	xfs_mount_t	*mp;
 	size_t		resid;
-	vnode_t 	*vp = BHV_TO_VNODE(bdp);
+	vnode_t 	*vp;
 
-	ip = XFS_VTOI(vp);
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
 	type = ip->i_d.di_mode & IFMT;
 	ASSERT(type == IFDIR ||
 	       ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
@@ -1162,25 +1165,22 @@ xfs_read(
 		return 0;
 	if (ioflag & IO_RSYNC) {
 		/* First we sync the data */
-	    if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
-		chunkpush(vp, offset, offset + count , 0);
-	    }
-		/* Now we sync the timestamps */
-	    if (ioflag & IO_SYNC) {
-		xfs_inode_t	*ip;
-
-		ip = XFS_VTOI(vp);
-		xfs_ilock(ip, XFS_ILOCK_SHARED);
-		xfs_iflock(ip);
-		xfs_iflush(ip, XFS_IFLUSH_SYNC);
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
-	    } else {
-		if (ioflag & IO_DSYNC) {
-		    mp = ip->i_mount;
-		    xfs_log_force(mp, (xfs_lsn_t)0,
-				  XFS_LOG_FORCE | XFS_LOG_SYNC );
+		if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
+			chunkpush(vp, offset, offset + count , 0);
 		}
-	    }
+		/* Now we sync the timestamps */
+		if (ioflag & IO_SYNC) {
+			xfs_ilock(ip, XFS_ILOCK_SHARED);
+			xfs_iflock(ip);
+			xfs_iflush(ip, XFS_IFLUSH_SYNC);
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
+		} else {
+			if (ioflag & IO_DSYNC) {
+				mp = ip->i_mount;
+				xfs_log_force(mp, (xfs_lsn_t)0,
+					      XFS_LOG_FORCE | XFS_LOG_SYNC );
+			}
+		}
 	}
 	switch (type) {
 	case IFREG:
@@ -1212,10 +1212,11 @@ xfs_read(
 			if (error = dm_data_event(vp, DM_READ, offset, count))
 				return error;
 		}
-		if (ioflag & IO_DIRECT)
-			error = xfs_diordwr( vp, uiop, ioflag, credp, B_READ);
-		else
-			error = xfs_read_file( vp, uiop, ioflag, credp);
+		if (ioflag & IO_DIRECT) {
+			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_READ);
+		} else {
+			error = xfs_read_file(bdp, uiop, ioflag, credp);
+		}
 
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		/* don't update timestamps if doing invisible I/O */
@@ -1932,14 +1933,15 @@ xfs_iomap_write(
 
 int
 xfs_write_file(
-	vnode_t	*vp,
-	uio_t	*uiop,
-	int	ioflag,
-	cred_t	*credp)
+	bhv_desc_t	*bdp,
+	uio_t		*uiop,
+	int		ioflag,
+	cred_t		*credp)
 {
 	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
 	int		nbmaps;
+	vnode_t		*vp;
 	buf_t		*bp;
 	xfs_inode_t	*ip;
 	int		error;
@@ -1950,7 +1952,8 @@ xfs_write_file(
 	xfs_mount_t	*mp;
 	extern void	chunkrelse(buf_t*);
 
-	ip = XFS_VTOI(vp);
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
 	/*
@@ -1960,7 +1963,7 @@ xfs_write_file(
 	 */
 	if ((ip->i_d.di_extsize) || 
 	    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME))  {
-		return( XFS_ERROR(EINVAL) );
+		return (XFS_ERROR(EINVAL));
 	}
 
 	error = 0;
@@ -2276,11 +2279,11 @@ xfs_write_clear_setuid(
  */
 int
 xfs_write(
-	bhv_desc_t *bdp,
-	uio_t	*uiop,
-	int	ioflag,
-	cred_t	*credp,
-	flid_t	*fl)
+	bhv_desc_t	*bdp,
+	uio_t		*uiop,
+	int		ioflag,
+	cred_t		*credp,
+	flid_t		*fl)
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
@@ -2293,14 +2296,14 @@ xfs_write(
 	int		resid;
 	off_t		savedsize;
 	xfs_fsize_t	limit;
-	vnode_t 	*vp = BHV_TO_VNODE(bdp);
-	int		eventsent = 0;
+	int		eventsent;
+	vnode_t 	*vp;
 
-
+	vp = BHV_TO_VNODE(bdp);
 	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
-
-	ip = XFS_VTOI(vp);
+	ip = XFS_BHVTOI(bdp);
 	type = ip->i_d.di_mode & IFMT;
+	eventsent = 0;
 	ASSERT(type == IFDIR ||
 	       ismrlocked(&ip->i_iolock, MR_UPDATE) ||
 	       (ismrlocked(&ip->i_iolock, MR_ACCESS) &&
@@ -2325,7 +2328,7 @@ start:
 #ifndef SIM
 	if (MANDLOCK(vp, ip->i_d.di_mode) &&
 	    (error = chklock(vp, FWRITE, offset, count, uiop->uio_fmode,
-					credp, fl))) {
+			     credp, fl))) {
 		return error;
 	}
 #endif
@@ -2353,8 +2356,8 @@ start:
 		}
 
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_WRITE) &&
-				!(ioflag & IO_INVIS) &&
-				!eventsent) {
+		    !(ioflag & IO_INVIS) &&
+		    !eventsent) {
 			if (error = dm_data_event(vp, DM_WRITE, offset, count))
 				return error;
 			eventsent = 1;
@@ -2385,10 +2388,11 @@ start:
 			}
 		}
 retry:
-		if (ioflag & IO_DIRECT)
-			error = xfs_diordwr( vp, uiop, ioflag, credp, B_WRITE);
-		else
-			error = xfs_write_file( vp, uiop, ioflag, credp );
+		if (ioflag & IO_DIRECT) {
+			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
+		} else {
+			error = xfs_write_file(bdp, uiop, ioflag, credp);
+		}
 
 		if (error == ENOSPC &&
 		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_NOSPACE) &&
@@ -2460,9 +2464,9 @@ retry:
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 		if ((ioflag & IO_DSYNC) && !(vp->v_flag & VISSWAP)) {
-		    mp = ip->i_mount;
-		    xfs_log_force(mp, (xfs_lsn_t)0,
-				  XFS_LOG_FORCE | XFS_LOG_SYNC );
+			mp = ip->i_mount;
+			xfs_log_force(mp, (xfs_lsn_t)0,
+				      XFS_LOG_FORCE | XFS_LOG_SYNC );
 		}
 		if (ioflag & IO_NFS) {
 			xfs_refcache_insert(ip);
@@ -2509,11 +2513,10 @@ xfs_bmap(
 	struct bmapval	*bmapp,
 	int		*nbmaps)
 {
-	vnode_t 	*vp = BHV_TO_VNODE(bdp);
 	xfs_inode_t	*ip;
 	int		error;
 
-	ip = XFS_VTOI(vp);
+	ip = XFS_BHVTOI(bdp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT((flags == B_READ) || (flags == B_WRITE));
 
@@ -2980,8 +2983,8 @@ xfs_cmp_gap_list_and_zero(
  */
 STATIC int
 xfs_strat_read(
-	vnode_t	*vp,
-	buf_t	*bp)
+	bhv_desc_t	*bdp,
+	buf_t		*bp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t   map_start_fsb;
@@ -3011,8 +3014,8 @@ xfs_strat_read(
 	struct bdevsw	*my_bdevsw;
 	
 	ASSERT(bp->b_blkno == -1);
-	ip = XFS_VTOI(vp);
-	mp = XFS_VFSTOM(vp->v_vfsp);
+	ip = XFS_BHVTOI(bdp);
+	mp = ip->i_mount;
 	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 	/*
 	 * Only read up to the EOF or the current write offset.
@@ -3680,8 +3683,8 @@ xfs_delalloc_cleanup(
 
 STATIC int
 xfs_strat_write(
-	vnode_t	*vp,
-	buf_t	*bp)
+	bhv_desc_t	*bdp,
+	buf_t		*bp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t   map_start_fsb;
@@ -3724,7 +3727,7 @@ xfs_strat_write(
 	 
 	XFSSTATS.xs_xstrat_bytes += bp->b_bcount;
 
-	ip = XFS_VTOI(vp);
+	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 	set_lead = 0;
 	rbp_count = 0;
@@ -4018,19 +4021,19 @@ xfs_strat_write(
  */
 void
 xfs_strategy(
-	bhv_desc_t *bdp,
-	buf_t	*bp)
+	bhv_desc_t	*bdp,
+	buf_t		*bp)
 {
 	int		s;
+	xfs_inode_t	*ip;
 	struct bdevsw	*my_bdevsw;
-	vnode_t 	*vp = BHV_TO_VNODE(bdp);
 
 	/*
 	 * If this is just a buffer whose underlying disk space
 	 * is already allocated, then just do the requested I/O.
 	 */
 	if (bp->b_blkno >= 0) {
-		xfs_check_bp(XFS_VTOI(vp), bp);
+		xfs_check_bp(XFS_BHVTOI(bdp), bp);
 		my_bdevsw = get_bdevsw(bp->b_edev);
 		ASSERT(my_bdevsw != NULL);
 		bdstrat(my_bdevsw, bp);
@@ -4043,7 +4046,7 @@ xfs_strategy(
 	 * out and zero/read in the appropriate data.
 	 */
 	if (bp->b_flags & B_READ) {
-		xfs_strat_read(vp, bp);
+		xfs_strat_read(bdp, bp);
 		return;
 	}
 
@@ -4053,6 +4056,7 @@ xfs_strategy(
 	 * asynchronously by bdflush() then we queue if for the xfsds
 	 * so that we won't put bdflush() to sleep.
 	 */
+	ip = XFS_BHVTOI(bdp);
 	if ((bp->b_flags & (B_ASYNC | B_BDFLUSH)) == (B_ASYNC | B_BDFLUSH) &&
 	    (xfsd_count > 0)) {
 		s = mp_mutex_spinlock(&xfsd_lock);
@@ -4070,9 +4074,15 @@ xfs_strategy(
 			xfsd_list->av_back = bp;
 			bp->av_forw = xfsd_list;
 		}
+		/*
+		 * Store the behavior pointer where the xfsds can find
+		 * it so that we don't have to lookup the XFS behavior
+		 * from the vnode in the buffer again.
+		 */
+		bp->b_private = bdp;
 		xfsd_bufcount++;
-		ASSERT(XFS_VTOI(vp)->i_queued_bufs >= 0);
-		atomicAddInt(&(XFS_VTOI(vp)->i_queued_bufs), 1);
+		ASSERT(ip->i_queued_bufs >= 0);
+		atomicAddInt(&(ip->i_queued_bufs), 1);
 		(void)sv_signal(&xfsd_wait);
 		mp_mutex_spinunlock(&xfsd_lock, s);
 	} else {
@@ -4081,9 +4091,9 @@ xfs_strategy(
 		 * inode's count anyway so that we can tell that this
 		 * buffer is still on its way out.
 		 */
-		ASSERT(XFS_VTOI(vp)->i_queued_bufs >= 0);
-		atomicAddInt(&(XFS_VTOI(vp)->i_queued_bufs), 1);
-		xfs_strat_write(vp, bp);
+		ASSERT(ip->i_queued_bufs >= 0);
+		atomicAddInt(&(ip->i_queued_bufs), 1);
+		xfs_strat_write(bdp, bp);
 	}
 }
 
@@ -4140,10 +4150,11 @@ xfs_start_daemons(void)
 STATIC int
 xfsd(void)
 {
-	int	s;
-	buf_t	*bp;
-	buf_t	*forw;
-	buf_t	*back;
+	int		s;
+	buf_t		*bp;
+	buf_t		*forw;
+	buf_t		*back;
+	bhv_desc_t	*bdp;
 
 	s = mp_mutex_spinlock(&xfsd_lock);
 	xfsd_count++;
@@ -4177,7 +4188,9 @@ xfsd(void)
 		ASSERT((bp->b_flags & (B_BUSY | B_ASYNC | B_READ)) ==
 		       (B_BUSY | B_ASYNC));
 		XFSSTATS.xs_xfsd_bufs++;
-		xfs_strat_write(bp->b_vp, bp);
+		bdp = bp->b_private;
+		bp->b_private = NULL;
+		xfs_strat_write(bdp, bp);
 
 		s = mp_mutex_spinlock(&xfsd_lock);
 	}
@@ -4185,9 +4198,9 @@ xfsd(void)
 #endif	/* !SIM */
 
 struct dio_s {
-	struct vnode *vp;
-	struct cred *cr;
-	int 	ioflag;
+	bhv_desc_t	*bdp;
+	cred_t		*cr;
+	int		ioflag;
 };
 
 /*
@@ -4268,12 +4281,14 @@ xfs_dio_cache_inval(
  *	none
  */
 int
-xfs_diostrat( buf_t *bp)
+xfs_diostrat(
+	buf_t	*bp)
 {
 	struct dio_s	*dp;
 	xfs_inode_t 	*ip;
 	xfs_trans_t	*tp;
 	vnode_t		*vp;
+	bhv_desc_t	*bdp;
 	xfs_mount_t	*mp;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;
 	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
@@ -4292,12 +4307,13 @@ xfs_diostrat( buf_t *bp)
 	xfs_fsize_t	new_size;
 	struct bdevsw	*my_bdevsw;
 
-	CHECK_GRIO_TIMESTAMP( bp, 40 );
+	CHECK_GRIO_TIMESTAMP(bp, 40);
 
 	dp        = (struct dio_s *)bp->b_private;
-	vp        = dp->vp;
-	ip        = XFS_VTOI(vp); 
-	mp 	  = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
+	bdp	  = dp->bdp;
+	vp        = BHV_TO_VNODE(bdp);
+	ip        = XFS_BHVTOI(bdp); 
+	mp 	  = ip->i_mount;
 	base	  = bp->b_un.b_addr;
 	error     = resid = totxfer = end_of_file = 0;
 	offset    = BBTOOFF((off_t)bp->b_blkno);
@@ -4308,10 +4324,10 @@ xfs_diostrat( buf_t *bp)
 	/*
  	 * Determine if this file is using the realtime volume.
 	 */
-	if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		rt = 1;
 		iprtextsize = sbrtextsize = mp->m_sb.sb_rextsize;
-		if ( ip->i_d.di_extsize ) {
+		if (ip->i_d.di_extsize) {
 			iprtextsize = ip->i_d.di_extsize;
 		}
 	}
@@ -4332,7 +4348,7 @@ xfs_diostrat( buf_t *bp)
 	/*
  	 * Check if the request is on a file system block boundary.
 	 */
-	if ( (offset & mp->m_blockmask) != 0 ) {
+	if ((offset & mp->m_blockmask) != 0) {
 		/*
  		 * The request is NOT on a file system block boundary.
 		 */
@@ -4356,16 +4372,16 @@ xfs_diostrat( buf_t *bp)
 	 * 3) end of device (driver error) occurs
 	 * 4) request is completed.
 	 */
-	while ( !error && !end_of_file && !resid && count ) {
-		offset_fsb = XFS_B_TO_FSBT( mp, offset );
-		count_fsb  = XFS_B_TO_FSB( mp, count);
+	while (!error && !end_of_file && !resid && count) {
+		offset_fsb = XFS_B_TO_FSBT(mp, offset);
+		count_fsb  = XFS_B_TO_FSB(mp, count);
 
 		tp = NULL;
 		exist = 1;
 retry:
 		XFS_BMAP_INIT(&free_list, &firstfsb);
 
-		if ( writeflag ) {
+		if (writeflag) {
 			/*
  			 * In the write case, need to call bmapi() with
 			 * the read flag set first to determine the existing 
@@ -4375,14 +4391,14 @@ retry:
 			 */
 			reccount = XFS_BMAP_MAX_NMAP;
 
-			xfs_ilock( ip, XFS_ILOCK_EXCL );
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
 
-			error = xfs_bmapi( NULL, ip, offset_fsb, 
-				count_fsb, 0, &firstfsb, 0, imaps, 
-				&reccount, 0);
+			error = xfs_bmapi(NULL, ip, offset_fsb, 
+					  count_fsb, 0, &firstfsb, 0, imaps, 
+					  &reccount, 0);
 
 			if (error) {
-				xfs_iunlock( ip, XFS_ILOCK_EXCL );
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				break;
 			}
 
@@ -4427,29 +4443,29 @@ retry:
 				/*
  				 * Setup transactions.
  				 */
-				tp = xfs_trans_alloc( mp, XFS_TRANS_DIOSTRAT);
+				tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
 
-				xfs_iunlock( ip, XFS_ILOCK_EXCL );
-				error = xfs_trans_reserve( tp, 
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
+				error = xfs_trans_reserve(tp, 
 					   XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + datablocks, 
 					   XFS_WRITE_LOG_RES(mp),
 					   numrtextents,
 					   XFS_TRANS_PERM_LOG_RES,
 					   XFS_WRITE_LOG_COUNT );
-				xfs_ilock( ip, XFS_ILOCK_EXCL );
+				xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 				if (error) {
 					/*
 					 * Ran out of file system space.
 					 * Free the transaction structure.
 					 */
-					ASSERT( error == ENOSPC );
+					ASSERT(error == ENOSPC);
 					xfs_trans_cancel(tp, 0);
-					xfs_iunlock( ip, XFS_ILOCK_EXCL);
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 					break;
 				} else {
 					xfs_trans_ijoin(tp,ip,XFS_ILOCK_EXCL);
-					xfs_trans_ihold( tp, ip);
+					xfs_trans_ihold(tp, ip);
 				}
 			}
 		} else {
@@ -4460,11 +4476,11 @@ retry:
 			 */
 			reccount = XFS_BMAP_MAX_NMAP;
 			imapp = &imaps[0];
-			CHECK_GRIO_TIMESTAMP( bp, 40);
+			CHECK_GRIO_TIMESTAMP(bp, 40);
 
-			lock_mode = xfs_ilock_map_shared( ip);
+			lock_mode = xfs_ilock_map_shared(ip);
 
-			CHECK_GRIO_TIMESTAMP( bp, 40);
+			CHECK_GRIO_TIMESTAMP(bp, 40);
 		}
 
 		/*
@@ -4472,39 +4488,40 @@ retry:
  		 * In the case of write requests this call does the
 		 * actual file space allocation.
 		 */
-		CHECK_GRIO_TIMESTAMP( bp, 40);
-		error = xfs_bmapi( tp, ip, offset_fsb, count_fsb, 
-			writeflag, &firstfsb, 0, imapp, &reccount, &free_list);
-		CHECK_GRIO_TIMESTAMP( bp, 40);
+		CHECK_GRIO_TIMESTAMP(bp, 40);
+		error = xfs_bmapi(tp, ip, offset_fsb, count_fsb, 
+				  writeflag, &firstfsb, 0, imapp,
+				  &reccount, &free_list);
+		CHECK_GRIO_TIMESTAMP(bp, 40);
 
-		if ( writeflag ) {
+		if (writeflag) {
 			if (error) {
 				xfs_bmap_cancel(&free_list);
 				xfs_trans_cancel(tp,
 						 (XFS_TRANS_RELEASE_LOG_RES |
 						  XFS_TRANS_ABORT));
-				xfs_iunlock( ip, XFS_ILOCK_EXCL );
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				break;
 			}
 			/*
  			 * Complete the bmapi() transactions.
 			 */
 			if (!exist) {
-			    error = xfs_bmap_finish( &tp, &free_list,
-						     firstfsb, &committed );
+			    error = xfs_bmap_finish(&tp, &free_list,
+						    firstfsb, &committed);
 			    if (error) {
 				    xfs_bmap_cancel(&free_list);
 				    xfs_trans_cancel(tp,
 						 (XFS_TRANS_RELEASE_LOG_RES |
 						  XFS_TRANS_ABORT));
-				    xfs_iunlock( ip, XFS_ILOCK_EXCL );
+				    xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				    break;
 			    }
-			    xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES );
+			    xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
 			} 
-			xfs_iunlock( ip, XFS_ILOCK_EXCL);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		} else {
-			xfs_iunlock_map_shared( ip, lock_mode);
+			xfs_iunlock_map_shared(ip, lock_mode);
 			if (error) {
 				break;
 			}
@@ -4516,7 +4533,7 @@ retry:
 		 * in progress and it is necessary to call xfs_bmapi() again
 		 * to map the correct portion of the file.
                  */
-                if( (!error) && (reccount == 0) ) {
+                if ((!error) && (reccount == 0)) {
 			goto retry;
                 }
 
@@ -4524,22 +4541,25 @@ retry:
    		 * Run through each extent.
 		 */
 		bufsissued = 0;
-		for (i = 0; (i < reccount) && (!end_of_file) && (count); i++){
+		for (i = 0; (i < reccount) && (!end_of_file) && (count);
+		     i++) {
 			imapp = &imaps[i];
 
-			bytes_this_req  = XFS_FSB_TO_B(mp,
-				imapp->br_blockcount) - BBTOB(blk_algn);
+			bytes_this_req =
+				XFS_FSB_TO_B(mp, imapp->br_blockcount) -
+				BBTOB(blk_algn);
 
 			ASSERT(bytes_this_req);
 
-			offset_this_req = XFS_FSB_TO_B(mp,
-				imapp->br_startoff) + BBTOB(blk_algn); 
+			offset_this_req =
+				XFS_FSB_TO_B(mp, imapp->br_startoff) +
+				BBTOB(blk_algn); 
 
 			/*
 			 * Reduce request size, if it
 			 * is longer than user buffer.
 			 */
-			if ( bytes_this_req > count ) {
+			if (bytes_this_req > count) {
 				 bytes_this_req = count;
 			}
 
@@ -4547,8 +4567,8 @@ retry:
 			 * Check if this is the end of the file.
 			 */
 			new_size = offset_this_req + bytes_this_req;
-			if (new_size >ip->i_d.di_size){
-				if ( writeflag ) {
+			if (new_size >ip->i_d.di_size) {
+				if (writeflag) {
 					/*
 					 * File is being extended on a
 					 * write, update the file size if
@@ -4579,9 +4599,6 @@ retry:
 						bytes_this_req =  0;
 					}
 
-
-
-
 					end_of_file = 1;
 
 					if (!bytes_this_req) {
@@ -4598,9 +4615,9 @@ retry:
 				/*
  				 * Setup I/O request for this extent.
 				 */
-				CHECK_GRIO_TIMESTAMP( bp, 40 );
+				CHECK_GRIO_TIMESTAMP(bp, 40);
 	     			bps[bufsissued++]= nbp = getphysbuf();
-				CHECK_GRIO_TIMESTAMP( bp, 40 );
+				CHECK_GRIO_TIMESTAMP(bp, 40);
 
 	     			nbp->b_flags     = bp->b_flags;
 	     			nbp->b_flags2    = bp->b_flags2;
@@ -4624,13 +4641,13 @@ retry:
 				/*
  				 * Issue I/O request.
 				 */
-				CHECK_GRIO_TIMESTAMP( nbp, 40 );
+				CHECK_GRIO_TIMESTAMP(nbp, 40);
 				my_bdevsw = get_bdevsw(nbp->b_edev);
 				ASSERT(my_bdevsw != NULL);
 				bdstrat(my_bdevsw, nbp);
 	
 		    		if (error = geterror(nbp)) {
-					iowait( nbp );
+					biowait(nbp);
 					nbp->b_flags = 0;
 		     			nbp->b_un.b_addr = 0;
 					nbp->b_grio_private = 0;
@@ -4672,13 +4689,13 @@ retry:
 		/*
 		 * Wait for I/O completion and recover buffers.
 		 */
-		for ( j = 0; j < bufsissued ; j++) {
+		for (j = 0; j < bufsissued ; j++) {
 	  		nbp = bps[j];
-	    		iowait( nbp );
+	    		biowait(nbp);
 			nbp->b_flags2 &= ~B_GR_BUF;
 
 	     		if (!error)
-				error = geterror( nbp );
+				error = geterror(nbp);
 
 	     		if (!error && !resid) {
 				resid = nbp->b_resid;
@@ -4686,7 +4703,7 @@ retry:
 				/*
 				 * prevent adding up partial xfers
 				 */
-				if (trail && (j == (bufsissued -1 )) ) {
+				if (trail && (j == (bufsissued -1 ))) {
 					if (resid <= (nbp->b_bcount - trail) )
 						totxfer += trail;
 				} else {
@@ -4705,7 +4722,7 @@ retry:
  	 * Fill in resid count for original buffer.
 	 * if any of the io's fail, the whole thing fails
 	 */
-	if ( error ) {
+	if (error) {
 		totxfer = 0;
 	}
 
@@ -4714,7 +4731,7 @@ retry:
 	/*
  	 *  Update the inode timestamp if file was written.
  	 */
-	if ( writeflag) {
+	if (writeflag) {
 
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0){
@@ -4729,12 +4746,12 @@ retry:
 	/*
 	 * Issue completion on the original buffer.
 	 */
-	bioerror( bp, error);
-	iodone( bp );
+	bioerror(bp, error);
+	biodone(bp);
 
         ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS| MR_UPDATE) != 0);
 
-	return(0);
+	return (0);
 }
 
 /*
@@ -4749,15 +4766,17 @@ retry:
  * 	errno on error
  */
 int
-xfs_diordwr(vnode_t	*vp,
-	 uio_t		*uiop,
-	 int		ioflag,
-	 cred_t		*credp,
-	 int		rw)
+xfs_diordwr(
+	bhv_desc_t	*bdp,
+	uio_t		*uiop,
+	int		ioflag,
+	cred_t		*credp,
+	int		rw)
 {
 	extern 		zone_t	*grio_buf_data_zone;
 
 	xfs_inode_t	*ip;
+	vnode_t		*vp;
 	struct dio_s	dp;
 	xfs_mount_t	*mp;
 	uuid_t		stream_id;
@@ -4766,8 +4785,9 @@ xfs_diordwr(vnode_t	*vp,
 	__int64_t	iosize;
 	extern int	scache_linemask;
 
-	ip = XFS_VTOI(vp);
-	mp = XFS_VFSTOM(vp->v_vfsp);
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
+	mp = ip->i_mount;
 
 	/*
  	 * Check that the user buffer address is on a secondary cache
@@ -4794,9 +4814,9 @@ xfs_diordwr(vnode_t	*vp,
 		 * if the user tries to start reading at the
 		 * end of the file, just return 0.
 		 */
-		if ( (rw & B_READ) &&
-	  	     (uiop->uio_offset == ip->i_d.di_size) ) {
-			return( 0 );
+		if ((rw & B_READ) &&
+		    (uiop->uio_offset == ip->i_d.di_size)) {
+			return (0);
 		}
 #ifndef SIM
 		return XFS_ERROR(EINVAL);
@@ -4821,7 +4841,7 @@ xfs_diordwr(vnode_t	*vp,
  	 * Use dio_s structure to pass file/credential
 	 * information to file system strategy routine.
 	 */
-	dp.vp = vp;
+	dp.bdp = bdp;
 	dp.cr = credp;
 	dp.ioflag = ioflag;
 
@@ -4830,24 +4850,23 @@ xfs_diordwr(vnode_t	*vp,
 	 */
 	bp = getphysbuf();
 	bp->b_private = &dp;
-	mp = XFS_VFSTOM(vp->v_vfsp);
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 		bp->b_edev = mp->m_rtdev;
 
 		/*
  	 	 * Check if this is a guaranteed rate I/O
 	 	 */
-		if ( xfs_io_is_guaranteed( ip, &stream_id ) ) {
+		if (xfs_io_is_guaranteed(ip, &stream_id)) {
 			bp->b_flags2 |= B_GR_BUF;
 
-			ASSERT( bp->b_grio_private == NULL );
+			ASSERT(bp->b_grio_private == NULL);
 			bp->b_grio_private = 
-				kmem_zone_alloc( grio_buf_data_zone, KM_SLEEP );
-			ASSERT( BUF_GRIO_PRIVATE( bp ) );
+				kmem_zone_alloc(grio_buf_data_zone, KM_SLEEP);
+			ASSERT(BUF_GRIO_PRIVATE(bp));
 			COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
 			iosize =  uiop->uio_iov[0].iov_len;
-			index = grio_monitor_io_start( &stream_id, iosize );
-			INIT_GRIO_TIMESTAMP( bp );
+			index = grio_monitor_io_start(&stream_id, iosize);
+			INIT_GRIO_TIMESTAMP(bp);
 		} else {
 			bp->b_grio_private = NULL;
 			bp->b_flags2 &= ~B_GR_BUF;
@@ -4870,14 +4889,14 @@ xfs_diordwr(vnode_t	*vp,
  	 */
 	bp->b_flags = 0;
 
-	if ( BUF_IS_GRIO(bp) ) {
+	if (BUF_IS_GRIO(bp)) {
 
-		grio_monitor_io_end( &stream_id, index );
+		grio_monitor_io_end(&stream_id, index);
 #ifdef GRIO_DEBUG
-		CHECK_GRIO_TIMESTAMP( bp, 400 );
+		CHECK_GRIO_TIMESTAMP(bp, 400);
 #endif
-		ASSERT( BUF_GRIO_PRIVATE(bp) );
-		kmem_zone_free( grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
+		ASSERT(BUF_GRIO_PRIVATE(bp));
+		kmem_zone_free(grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
 		bp->b_grio_private = NULL;
 		bp->b_flags2 &= ~B_GR_BUF;
 	}
@@ -4887,7 +4906,7 @@ xfs_diordwr(vnode_t	*vp,
 #endif
 	putphysbuf(bp);
 
-	return( error );
+	return (error);
 }
 
 

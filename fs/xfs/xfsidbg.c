@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision$"
+#ident	"$Revision: 1.44 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -23,6 +23,7 @@
 #include <sys/systm.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/pvnode.h>
 #include <sys/kmem.h>
 #include <sys/attributes.h>
 #include <sys/uuid.h>
@@ -2722,7 +2723,7 @@ xfsidbg_xfindi(__psunsigned_t ino)
 
 	for (vfsp = rootvfs; (vfsp != NULL); vfsp = vfsp->vfs_next) {
 		if (vfsp->vfs_op == &xfs_vfsops) {
-			mp = XFS_VFSTOM(vfsp);
+			mp = (xfs_mount_t*)vfsp->vfs_data;
 			ip = mp->m_inodes;
 			do {
 				if (ip->i_ino == xino) {
@@ -3766,7 +3767,7 @@ xfsidbg_vfs_vnodes_print(vfs_t *vfsp, int all)
 	xfs_mount_t *mp;
 	xfs_inode_t *xp;
 
-	mp = XFS_VFSTOM(vfsp);
+	mp = (xfs_mount_t*)vfsp->vfs_data;
 	xp = mp->m_inodes;
 	if (xp != NULL) {
 		do {
@@ -3796,7 +3797,7 @@ xfsidbg_vnode_find(vfs_t *vfsp, long vnum)
 	xfs_mount_t	*mp;
 	xfs_inode_t	*xp;
 
-	mp = XFS_VFSTOM(vfsp);
+	mp = (xfs_mount_t *)vfsp->vfs_data;
 	xp = mp->m_inodes;
 	if (xp != NULL) {
 		do {

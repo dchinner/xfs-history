@@ -100,7 +100,6 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 {
 	xfs_da_args_t args;
 	int error;
-	vnode_t *vp = BHV_TO_VNODE(bdp);
 
 	XFSSTATS.xs_attr_get++;
 
@@ -114,7 +113,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	args.valuelen = *valuelenp;
 	args.flags = flags;
 	args.hashval = xfs_da_hashname(args.name, args.namelen);
-	args.dp = XFS_VTOI(vp);
+	args.dp = XFS_BHVTOI(bdp);
 	args.whichfork = XFS_ATTR_FORK;
 	args.trans = NULL;
 
@@ -122,7 +121,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	 * Do we answer them, or ignore them?
 	 */
 	xfs_ilock(args.dp, XFS_ILOCK_SHARED);
-	if (error = xfs_iaccess(XFS_VTOI(vp), IREAD, cred)) {
+	if (error = xfs_iaccess(XFS_BHVTOI(bdp), IREAD, cred)) {
 		xfs_iunlock(args.dp, XFS_ILOCK_SHARED);
                 return(XFS_ERROR(error));
 	}
@@ -161,14 +160,13 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	xfs_fsblock_t firstblock;
 	xfs_bmap_free_t flist;
 	int error, committed;
-	vnode_t *vp = BHV_TO_VNODE(bdp);
 
 	XFSSTATS.xs_attr_set++;
 
 	/*
 	 * Do we answer them, or ignore them?
 	 */
-	dp = XFS_VTOI(vp);
+	dp = XFS_BHVTOI(bdp);
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if (error = xfs_iaccess(dp, IWRITE, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
@@ -354,14 +352,13 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	xfs_fsblock_t firstblock;
 	xfs_bmap_free_t flist;
 	int error;
-	vnode_t *vp = BHV_TO_VNODE(bdp);
 
 	XFSSTATS.xs_attr_remove++;
 
 	/*
 	 * Do we answer them, or ignore them?
 	 */
-	dp = XFS_VTOI(vp);
+	dp = XFS_BHVTOI(bdp);
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
 	if (error = xfs_iaccess(dp, IWRITE, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);	
@@ -468,7 +465,6 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	xfs_attr_list_context_t context;
 	xfs_inode_t *dp;
 	int error;
-	vnode_t *vp = BHV_TO_VNODE(bdp);
 
 	XFSSTATS.xs_attr_list++;
 
@@ -493,7 +489,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	/*
 	 * Initialize the output buffer.
 	 */
-	context.dp = dp = XFS_VTOI(vp);
+	context.dp = dp = XFS_BHVTOI(bdp);
 	context.cursor = cursor;
 	context.count = 0;
 	context.dupcnt = 0;

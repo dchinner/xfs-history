@@ -1,4 +1,4 @@
-#ident "$Revision: 1.177 $"
+#ident "$Revision: 1.178 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3136,10 +3136,15 @@ xfs_iaccess(
  * given range.  Return 0 for OK and otherwise return the error.
  *
  * It is only OK to swap to a file if it has no holes.
+ *
+ * We use the vnode behavior chain prevent and allow primitives
+ * to ensure that the vnode chain stays coherent while we do this.
+ * This allows us to walk the chain down to the bottom where XFS
+ * lives without worrying about it changing out from under us.
  */
 int
 xfs_swappable(
-	vnode_t		*vp)
+	bhv_desc_t	*bdp)
 {
 	xfs_fileoff_t	end_fsb;
 	xfs_fileoff_t	first_hole_offset_fsb;
@@ -3147,7 +3152,7 @@ xfs_swappable(
 	xfs_mount_t	*mp;
 	int		error;
 
-	ip = XFS_VTOI(vp);
+	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 	/*
 	 * Verify that the file does not have any

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.65 $"
+#ident "$Revision: 1.66 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -224,8 +224,10 @@ again:
 	if (error) {
 		return error;
 	}
-	vp = vn_alloc(&xfs_vnodeops, mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
-		      ip->i_df.if_u2.if_rdev, ip);
+	vp = vn_alloc(mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
+		      ip->i_df.if_u2.if_rdev);
+	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops, 0);
+	bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
 
 	init_mrlock(&ip->i_lock, "xfsino", vp->v_number);
 	init_mrlock(&ip->i_iolock, "xfsio", vp->v_number);
@@ -247,6 +249,7 @@ again:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				XFS_IHUNLOCK(ih);
+				bhv_remove(&(vp->v_bh), &(ip->i_bhv_desc));
 				vn_free(vp);
 				xfs_idestroy(ip);
 				XFSSTATS.xs_ig_dup++;
@@ -379,6 +382,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*iq;
 	xfs_mount_t	*mp;
+	vnode_t		*vp;
 
 	/*
 	 * Remove from old hash list.
@@ -427,6 +431,12 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 */
 	xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
+	/*
+	 * Pull our behavior descriptor from the vnode chain.
+	 */
+	vp = XFS_ITOV(ip);
+	bhv_remove(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+ 
 	/*
 	 * Free all memory associated with the inode.
 	 */

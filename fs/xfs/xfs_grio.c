@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.64 1996/02/13 17:03:40 sp Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.65 1996/04/01 22:49:28 ajs Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -386,14 +386,26 @@ xfs_grio_get_inumber( int fdes )
 	file_t	*fp;
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
+	bhv_desc_t	*bdp;
+	bhv_head_t	*bhp;
+	xfs_ino_t	ino;
 
 	if ( getf( fdes, &fp ) != 0 ) {
 		return( (xfs_ino_t)0 );
 	}
 
 	vp = fp->f_vnode;
-	ip = XFS_VTOI( vp );
-	return( ip->i_ino );
+	bhp = VN_BHV_HEAD(vp);
+	BHV_INSERT_PREVENT(bhp);
+	bdp = bhv_lookup(bhp, &xfs_vnodeops);
+	if (bdp == NULL) {
+		ino = (xfs_ino_t)0;
+	} else {
+		ip = XFS_BHVTOI(bdp);
+		ino = ip->i_ino;
+	}
+	BHV_INSERT_ALLOW(bhp);
+	return( ino );
 }
 
 
@@ -413,12 +425,24 @@ xfs_grio_get_fs_dev( int fdes )
 	file_t	*fp;
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
+	bhv_desc_t	*bdp;
+	bhv_head_t	*bhp;
+	dev_t		dev;
 
 	if ( getf( fdes, &fp ) != 0 ) {
 		return( 0 );
 	}
 
 	vp = fp->f_vnode;
-	ip = XFS_VTOI( vp );
-	return( ip->i_dev );
+	bhp = VN_BHV_HEAD(vp);
+	BHV_INSERT_PREVENT(bhp);
+	bdp = bhv_lookup(bhp, &xfs_vnodeops);
+	if (bdp == NULL) {
+		dev = 0;
+	} else {
+		ip = XFS_BHVTOI(bdp);
+		dev = ip->i_dev;
+	}
+	BHV_INSERT_ALLOW(bhp);
+	return( dev );
 }

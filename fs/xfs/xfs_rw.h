@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 
 struct bmapval;
 struct buf;
