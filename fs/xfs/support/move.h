@@ -50,8 +50,6 @@ typedef struct uio {
 	xfs_off_t	uio_offset;	/* file offset */
 	short		uio_segflg;	/* address space (kernel or user) */
 	ssize_t		uio_resid;	/* residual count */
-
-	struct file *	uio_fp;		/* file associated with io */
 } uio_t;
 
 /*
@@ -63,32 +61,11 @@ typedef enum uio_rw { UIO_READ, UIO_WRITE } uio_rw_t;
  * Segment flag values.
  */
 typedef enum uio_seg {
-	UIO_NOSPACE = -1,	/* no data movement (used for pagein) */
 	UIO_USERSPACE,		/* uio_iov describes user space */
 	UIO_SYSSPACE,		/* uio_iov describes system space */
-	UIO_USERISPACE		/* uio_iov describes instruction space */
 } uio_seg_t;
 
 
 extern int	uiomove (void *, size_t, uio_rw_t, uio_t *);
-
-/*
- * map these directly... trying to use a #define causes
- * many strange side affects
- */
-/*
- * copyin/copyout on irix return 0 on success, -1 on failure
- */
-static __inline__ int
-copyout( void* from, void* to, int size )
-{
-	return copy_to_user(to, from, size ) ? -1 : 0;
-}
-
-static __inline__ int
-copyin( void* from, void* to, int size )
-{
-	return copy_from_user(to, from, size ) ? -1 : 0;
-}
 
 #endif	/* __XFS_SUPPORT_MOVE_H__ */

@@ -632,7 +632,7 @@ xfs_bulkstat_single(
 			return 0;
 	}
 	*done = 0;
-	if (copyout(&bstat, buffer, sizeof(bstat)))
+	if (copy_to_user(buffer, &bstat, sizeof(bstat)))
 		return XFS_ERROR(EFAULT);
 	return 0;
 }
@@ -725,7 +725,7 @@ xfs_inumbers(
 		bufidx++;
 		left--;
 		if (bufidx == bcount) {
-			if (copyout((xfs_caddr_t)buffer, ubuffer,
+			if (copy_to_user(ubuffer, buffer,
 					bufidx * sizeof(*buffer))) {
 				error = XFS_ERROR(EFAULT);
 				break;
@@ -752,7 +752,7 @@ xfs_inumbers(
 	}
 	if (!error) {
 		if (bufidx) {
-			if (copyout((xfs_caddr_t)buffer, ubuffer,
+			if (copy_to_user(ubuffer, buffer,
 					bufidx * sizeof(*buffer)))
 				error = XFS_ERROR(EFAULT);
 			else

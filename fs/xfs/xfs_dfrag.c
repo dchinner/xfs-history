@@ -58,7 +58,7 @@ xfs_swapext(
 	int		taforkblks = 0;
 	int		locked = 0;
 
-	if (copyin(sxp, &sx, sizeof sx))
+	if (copy_from_user(&sx, sxp, sizeof(sx)))
 		return XFS_ERROR(EFAULT);
 
 	/* Pull information for the target fd */

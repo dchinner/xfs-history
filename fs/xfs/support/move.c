@@ -60,25 +60,25 @@ uiomove(void *cp, size_t n, enum uio_rw rw, struct uio *uio)
 		if (cnt > n)
 			cnt = (u_int)n;
 		switch (uio->uio_segflg) {
-
 		case UIO_USERSPACE:
 			if (rw == UIO_READ)
-				error = copyout(cp, iov->iov_base, cnt);
+				error = copy_to_user(iov->iov_base, cp, cnt);
 			else
-				error = copyin(iov->iov_base, cp, cnt);
+				error = copy_from_user(cp, iov->iov_base, cnt);
 			if (error)
 				return EFAULT;
 			break;
 
-		case UIO_USERISPACE:
-			ASSERT(0);
-			break;
 
 		case UIO_SYSSPACE:
 			if (rw == UIO_READ)
 				bcopy(cp, iov->iov_base, cnt);
 			else
 				bcopy(iov->iov_base, cp, cnt);
+			break;
+
+		default:
+			ASSERT(0);
 			break;
 		}
 		iov->iov_base = (void *)((char *)iov->iov_base + cnt);

@@ -5750,12 +5750,12 @@ xfs_getbmap(
 				outx.bmv_oflags = oflags;
 				outx.bmv_unused1 = outx.bmv_unused2 = 0;
 
-				if (copyout(&outx, ap, sizeof(outx))) {
+				if (copy_to_user(ap, &outx, sizeof(outx))) {
 					error = XFS_ERROR(EFAULT);
 					goto unlock_and_return;
 				}
 			} else {
-				if (copyout(&out, ap, sizeof(out))) {
+				if (copy_to_user(ap, &out, sizeof(out))) {
 					error = XFS_ERROR(EFAULT);
 					goto unlock_and_return;
 				}
