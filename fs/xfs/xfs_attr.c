@@ -1,4 +1,4 @@
-#ident "$Revision: 1.45 $"
+#ident "$Revision: 1.46 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -283,13 +283,14 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 			if (dp->i_mount->m_flags & XFS_MOUNT_WSYNC) {
 				xfs_trans_set_sync(args.trans);
 			}
-			xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+			error = xfs_trans_commit(args.trans, 
+						 XFS_TRANS_RELEASE_LOG_RES);
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 			/*
 			 * Hit the inode change time.
 			 */
-			if ((flags & ATTR_KERNOTIME) == 0) {
+			if (!error && (flags & ATTR_KERNOTIME) == 0) {
 				xfs_ichgtime(dp, XFS_ICHGTIME_CHG);
 			}
 			return(error);
@@ -323,7 +324,9 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		 * Commit the leaf transformation.  We'll need another (linked)
 		 * transaction to add the new attribute to the leaf.
 		 */
-		xfs_attr_rolltrans(&args.trans, dp);
+		if (error = xfs_attr_rolltrans(&args.trans, dp))
+			goto out;
+			
 	}
 
 	if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
@@ -347,17 +350,17 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * Commit the last in the sequence of transactions.
 	 */
 	xfs_trans_log_inode(args.trans, dp, XFS_ILOG_CORE);
-	xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 	/*
 	 * Hit the inode change time.
 	 */
-	if ((flags & ATTR_KERNOTIME) == 0) {
+	if (!error && (flags & ATTR_KERNOTIME) == 0) {
 		xfs_ichgtime(dp, XFS_ICHGTIME_CHG);
 	}
 
-	return(0);
+	return(error);
 
 out:
 	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
@@ -483,17 +486,17 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 * Commit the last in the sequence of transactions.
 	 */
 	xfs_trans_log_inode(args.trans, dp, XFS_ILOG_CORE);
-	xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 	/*
 	 * Hit the inode change time.
 	 */
-	if ((flags & ATTR_KERNOTIME) == 0) {
+	if (!error && (flags & ATTR_KERNOTIME) == 0) {
 		xfs_ichgtime(dp, XFS_ICHGTIME_CHG);
 	}
 
-	return(0);
+	return(error);
 
 out:
 	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
@@ -640,18 +643,19 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * and the unlink transaction has already hit the disk so
 	 * async inactive transactions are safe.
 	 */
-	error = xfs_itruncate_finish(&trans, dp, 0LL, XFS_ATTR_FORK,
+	if (error = xfs_itruncate_finish(&trans, dp, 0LL, XFS_ATTR_FORK,
 				(!(dp->i_mount->m_flags & XFS_MOUNT_WSYNC)
-				 ? 1 : 0));
+				 ? 1 : 0)))
+		goto out;
 
 	/*
 	 * Commit the last in the sequence of transactions.
 	 */
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
-	xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
-	return(0);
+	return(error);
 
 out:
 	xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
@@ -779,7 +783,8 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 		 * Commit the current trans (including the inode) and start
 		 * a new one.
 		 */
-		xfs_attr_rolltrans(&args->trans, dp);
+		if (error = xfs_attr_rolltrans(&args->trans, dp))
+			return (error);
 
 		/*
 		 * Fob the whole rest of the problem off on the Btree code.
@@ -792,7 +797,8 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 	 * Commit the transaction that added the attr name so that
 	 * later routines can manage their own transactions.
 	 */
-	xfs_attr_rolltrans(&args->trans, dp);
+	if (error = xfs_attr_rolltrans(&args->trans, dp))
+		return (error);
 
 	/*
 	 * If there was an out-of-line value, allocate the blocks we
@@ -877,7 +883,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 		/*
 		 * Commit the remove and start the next trans in series.
 		 */
-		xfs_attr_rolltrans(&args->trans, dp);
+		error = xfs_attr_rolltrans(&args->trans, dp);
 		
 	} else if (args->rmtblkno > 0) {
 		/*
@@ -1099,7 +1105,8 @@ restart:
 			 * Commit the node conversion and start the next
 			 * trans in the chain.
 			 */
-			xfs_attr_rolltrans(&args->trans, dp);
+			if (error = xfs_attr_rolltrans(&args->trans, dp))
+				goto out;
 
 			goto restart;
 		}
@@ -1140,7 +1147,8 @@ restart:
 	 * Commit the leaf addition or btree split and start the next
 	 * trans in the chain.
 	 */
-	xfs_attr_rolltrans(&args->trans, dp);
+	if (error = xfs_attr_rolltrans(&args->trans, dp))
+		goto out;
 
 	/*
 	 * If there was an out-of-line value, allocate the blocks we
@@ -1233,7 +1241,8 @@ restart:
 		/*
 		 * Commit and start the next trans in the chain.
 		 */
-		xfs_attr_rolltrans(&args->trans, dp);
+		if (error = xfs_attr_rolltrans(&args->trans, dp))
+			goto out;
 
 	} else if (args->rmtblkno > 0) {
 		/*
@@ -1360,7 +1369,8 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 		/*
 		 * Commit the Btree join operation and start a new trans.
 		 */
-		xfs_attr_rolltrans(&args->trans, dp);
+		if (error = xfs_attr_rolltrans(&args->trans, dp))
+			goto out;
 	}
 
 	/*
@@ -1813,7 +1823,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		/*
 		 * Start the next trans in the chain.
 		 */
-		xfs_attr_rolltrans(&args->trans, dp);
+		if (error = xfs_attr_rolltrans(&args->trans, dp))
+			return (error);
 	}
 
 	/*
@@ -1955,7 +1966,8 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		/*
 		 * Close out trans and start the next one in the chain.
 		 */
-		xfs_attr_rolltrans(&args->trans, args->dp);
+		if (error = xfs_attr_rolltrans(&args->trans, args->dp))
+			return (error);
 	}
 	return(0);
 }
