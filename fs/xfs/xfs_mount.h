@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.55 $"
-#ident	"$Revision: 1.55 $"
+#ident	"$Revision: 1.56 $"
+#ident	"$Revision: 1.56 $"
 
 struct buf;
 struct cred;
@@ -109,8 +109,10 @@ typedef struct xfs_mount {
 /*
  * Default minimum read and write sizes.
  */
-#define	XFS_READIO_LOG	16
-#define	XFS_WRITEIO_LOG	16
+#define	XFS_READIO_LOG_SMALL	15	/* <= 32MB memory */
+#define	XFS_WRITEIO_LOG_SMALL	15
+#define	XFS_READIO_LOG_LARGE	16	/* > 32MB memory */
+#define	XFS_WRITEIO_LOG_LARGE	16
 
 /*
  * Synchronous read and write sizes.  This should be
