@@ -403,12 +403,10 @@ int linvfs_dmapi_map_event(struct file *filp, struct vm_area_struct *vma,
 	bdp = bhv_base_unlocked(VN_BHV_HEAD(vp));
 	ip = XFS_BHVTOI(bdp);
 
-#ifdef	CONFIG_XFS_DMAPI	/* Temporary until dmapi is in main kernel */
 	if(DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
 		xfs_dm_mapevent(bdp, 0, 0, &dmfcntl);
 		ret = dmfcntl.u_fcntl.maprq.error;
 	}
-#endif
 
 	return -ret;
 }
