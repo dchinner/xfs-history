@@ -68,7 +68,8 @@ XFS_OBJS  :=   xfs_alloc.o \
                 xfs_vfsops.o \
                 xfs_vnodeops.o \
                 xfs_rw.o \
-		xfsquotasstubs.o
+		xfsquotasstubs.o \
+		oplockstubs.o
 #                xfs_rpc_item.o
  
 O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS) libgcc.a

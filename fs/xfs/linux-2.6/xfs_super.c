@@ -19,6 +19,7 @@
 #include <sys/capability.h>
 #include <sys/cred.h>
 #include <sys/vfs.h>
+#include <sys/pvfs.h>
 #include <sys/vnode.h>
 #include <sys/behavior.h>
 #include <sys/statvfs.h>
@@ -52,69 +53,6 @@ cred_init(void)
         sys_cred->cr_cap.cap_inheritable = CAP_ALL_ON;
         sys_cred->cr_cap.cap_permitted = CAP_ALL_ON;
         /*_MAC_INIT_CRED();*/
-}
-
-
-int
-fs_dounmount(
-        bhv_desc_t      *bdp,
-        int             flags,
-        vnode_t         *rootvp,
-        cred_t          *cr)
-{
-        struct vfs      *vfsp = bhvtovfs(bdp);
-        bhv_desc_t      *fbdp = vfsp->vfs_fbhv;
-        vnode_t         *coveredvp;
-        int             error;
-
-        /*
-         * Wait for sync to finish and lock vfsp.  This also sets the
-         * VFS_OFFLINE flag.  Once we do this we can give up reference
-         * the root vnode which we hold to avoid the another unmount
-         * ripping the vfs out from under us before we get to lock it.
-         * The VFS_DOUNMOUNT calling convention is that the reference
-         * on the rot vnode is released whether the call succeeds or
-         * fails.
-         */
-        error = vfs_lock_offline(vfsp);
-        if (rootvp)
-                VN_RELE(rootvp);
-        if (error)
-                return error;
-
-        /*
-         * Get covered vnode after vfs_lock.
-         */
-        coveredvp = vfsp->vfs_vnodecovered;
-
-        /*
-         * Purge all dnlc entries for this vfs.
-         */
-        (void) dnlc_purge_vfsp(vfsp, 0);
-
-        /*
-         * Now invoke SYNC and UNMOUNT ops, using the PVFS versions is
-         * OK since we already have a behavior lock as a result of
-         * being in VFS_DOUNMOUNT.  It is necessary to do things this
-         * way since using the VFS versions would cause us to get the
-         * behavior lock twice which can cause deadlock as well as
-         * making the coding of vfs relocation unnecessarilty difficult
-         * by making relocations invoked by unmount occur in a different
-         * environment than those invoked by mount-update.
-         */
-        PVFS_SYNC(fbdp, SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT, cr, error);
-        if (error == 0)
-                PVFS_UNMOUNT(fbdp, flags, cr, error);
-
-        if (error) {
-                vfs_unlock(vfsp);       /* clears VFS_OFFLINE flag, too */
-        } else {
-                --coveredvp->v_vfsp->vfs_nsubmounts;
-                ASSERT(vfsp->vfs_nsubmounts == 0);
-                vfs_remove(vfsp);
-                VN_RELE(coveredvp);
-        }
-        return error;
 }
 
 
