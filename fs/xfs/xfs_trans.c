@@ -1,4 +1,4 @@
-#ident "$Revision: 1.63 $"
+#ident "$Revision: 1.64 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -87,6 +87,7 @@ xfs_trans_init(
 	resp->tr_swrite = XFS_CALC_SWRITE_LOG_RES(mp);
 	resp->tr_writeid = XFS_CALC_WRITEID_LOG_RES(mp);
 	resp->tr_addafork = XFS_CALC_ADDAFORK_LOG_RES(mp);
+	resp->tr_ainval = XFS_CALC_AINVAL_LOG_RES(mp);
 }
 
 /*
@@ -581,6 +582,7 @@ xfs_trans_commit(
 		XFSSTATS.xs_trans_empty++;
 		return 0;
 	}
+	ASSERT(tp->t_ticket != NULL);
 
 	/*
 	 * If we need to update the superblock, then do it now.
