@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.64 $"
+#ident	"$Revision: 1.66 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -95,7 +95,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
-	int		error;
+	int		error = 0;
 	int		s, i, brsize;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
@@ -227,16 +227,32 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * Call the log's mount-time initialization.
 	 * xfs_log_mount() always does XFS_LOG_RECOVER.
 	 */
-	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
-	error = xfs_log_mount(mp, mp->m_logdev,
+	if (sbp->sb_logblocks > 0) {		/* check for volume case */
+		error = xfs_log_mount(mp, mp->m_logdev,
 			      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 			      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
-	if (error > 0) {
+		if (error > 0) {
+			/*
+			 * XXX	log recovery failure - What action should be 
+			 * taken?  Translate log error to something user 
+			 * understandable
+			 */
+			error = XFS_ERROR(EBUSY); 
+		}
+	} else {
 		/*
-		 * XXX	log recovery failure - What action should be taken?
-		 * 	Translate log error to something user understandable
+		 * No log has be defined.
 		 */
-		error = XFS_ERROR(EBUSY); /* XXX log recovery fail - errno? */
+		error = XFS_ERROR(EIO);
+
+	}
+
+	if (error)  {
+		/*
+		 * XXX memory that has been allocated for the 
+		 * mount structure needs to be freed.
+		 */
+		return(error);
 	}
 
 #ifdef SIM
@@ -264,7 +280,8 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			      rip->i_dev, rip->i_ino);
 
 			error = XFS_ERROR(EINVAL);
-			goto bad;
+			xfs_iunlock(rip, XFS_ILOCK_EXCL);
+			return (error);
 		}
 		s = VN_LOCK(rvp);
 		rvp->v_flag |= VROOT;
