@@ -1,4 +1,4 @@
-#ident "$Revision: 1.46 $"
+#ident "$Revision: 1.47 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -133,7 +133,9 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (XFS_IFORK_Q(args.dp) == 0) {
+	if (XFS_IFORK_Q(args.dp) == 0 ||
+	    (args.dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
+	     args.dp->i_d.di_anextents == 0)) {
 		error = XFS_ERROR(ENOATTR);
 	} else if (args.dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
 		error = xfs_attr_shortform_getvalue(&args);
@@ -395,7 +397,9 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	if (error = xfs_iaccess(dp, IWRITE, cred)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);	
                 return(XFS_ERROR(error));
-	} else if (XFS_IFORK_Q(dp) == 0) {
+	} else if (XFS_IFORK_Q(dp) == 0 ||
+		   (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
+		    dp->i_d.di_anextents == 0)) {
 		xfs_iunlock(dp, XFS_ILOCK_SHARED);
 		return(XFS_ERROR(ENOATTR));
 	}
@@ -455,7 +459,9 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (XFS_IFORK_Q(dp) == 0) {
+	if (XFS_IFORK_Q(dp) == 0 ||
+	    (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
+	     dp->i_d.di_anextents == 0)) {
 		error = XFS_ERROR(ENOATTR);
 		goto out;
 	}
@@ -565,7 +571,9 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	xfs_attr_trace_l_c("syscall start", &context);
-	if (XFS_IFORK_Q(dp) == 0) {
+	if (XFS_IFORK_Q(dp) == 0 ||
+	    (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
+	     dp->i_d.di_anextents == 0)) {
 		error = 0;
 	} else if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
 		error = xfs_attr_shortform_list(&context);
@@ -591,7 +599,9 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	/* XXXsup - why on earth are we taking ILOCK_EXCL here??? */
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 	if ((XFS_IFORK_Q(dp) == 0) ||
-	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)) {
+	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) ||
+	    (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
+	     dp->i_d.di_anextents == 0)) {
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 		return(0);
 	}
@@ -628,7 +638,9 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	if ((XFS_IFORK_Q(dp) == 0) ||
-	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)) {
+	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) ||
+	    (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS &&
+	     dp->i_d.di_anextents == 0)) {
 		error = 0;
 		goto out;
 	}
