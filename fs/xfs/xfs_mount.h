@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.90 $"
+#ident	"$Revision: 1.91 $"
 
 struct buf;
 struct cred;
@@ -153,6 +153,9 @@ typedef struct xfs_mount {
                                                    user */
 #define XFS_MOUNT_NOALIGN	0x00000080	/* turn off stripe alignment 
 						   allocations */
+#define XFS_MOUNT_UNSHARED      0x00000100      /* unshared mount */
+#define XFS_MOUNT_REGISTERED    0x00000200      /* registered with cxfs master
+                                                   cell logic */
 #define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 
 /*
@@ -225,11 +228,13 @@ void		xfs_umount(xfs_mount_t *);
 void		xfs_mod_sb(xfs_trans_t *, __int64_t);
 xfs_mount_t	*xfs_mount_init(void);
 void		xfs_mount_free(xfs_mount_t *mp);
-int		xfs_mountfs(struct vfs *, xfs_mount_t *mp, dev_t);
+int		xfs_mountfs(struct vfs *, xfs_mount_t *mp);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
+int		xfs_readsb(xfs_mount_t *mp, dev_t);
 struct buf	*xfs_getsb(xfs_mount_t *, int);
+void            xfs_freesb(xfs_mount_t *);
 void		xfs_force_shutdown(struct xfs_mount *, int);
 extern	struct vfsops xfs_vfsops;
 #endif	/* !_FS_XFS_MOUNT_H */
