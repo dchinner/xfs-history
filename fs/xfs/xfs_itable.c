@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.5 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -73,6 +73,9 @@ xfs_bulkstat_one(
 	buf->bs_extents = ip->i_d.di_nextents;
 	buf->bs_gen = ip->i_d.di_gen;
 	buf->bs_uuid = ip->i_d.di_uuid;
+	buf->bs_dmevmask = ip->i_d.di_dmevmask;
+	buf->bs_dmstate = ip->i_d.di_dmstate;
+	buf->bs_padding = 0;
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_DEV:
 		buf->bs_rdev = ip->i_u2.iu_rdev;
