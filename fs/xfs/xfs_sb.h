@@ -35,6 +35,8 @@ typedef struct xfs_sb
 	char		sb_fpack[6];	/* file system pack name */
 	__uint8_t	sb_blocklog;	/* log2 of xfs_blocksize */
 	__uint8_t	sb_sectlog;	/* log2 of xfs_sectsize */
+	__uint8_t	sb_inodelog;	/* log2 of xfs_inodesize */
+	__uint8_t	sb_inopblog;	/* log2 of xfs_inopblock */
 	__uint8_t	sb_smallfiles;	/* set if small files in inodes */
 					/* other inode config information? */
 					/* statistics */
