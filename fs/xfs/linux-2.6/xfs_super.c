@@ -432,6 +432,11 @@ linvfs_read_super(
 	sb->s_magic = XFS_SB_MAGIC;
 	sb->s_dirt = 1;  /*  Make sure we get regular syncs  */
 
+	/* For kernels which have the s_maxbytes field - set it */
+#ifdef MAX_NON_LFS
+	sb->s_maxbytes = XFS_MAX_FILE_OFFSET;
+#endif
+
         VFS_ROOT(vfsp, &rootvp, error);
         if (error)
                 goto fail_unmount;
