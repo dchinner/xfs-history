@@ -2425,7 +2425,7 @@ pagebuf_terminate(void)
 
 	kmem_cache_destroy(pagebuf_cache);
 	kmem_shake_deregister(pagebuf_shaker);
-	free_pages(pbhash, pb_order);
+	free_pages((unsigned long)pbhash, pb_order);
 
 	unregister_sysctl_table(pagebuf_table_header);
 #ifdef	CONFIG_PROC_FS
