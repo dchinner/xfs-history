@@ -67,6 +67,7 @@ typedef struct xfs_inode {
 	unsigned long		i_vcode;	/* version code token (RFS) */
 	unsigned long		i_mapcnt;	/* count of mapped pages */
 	unsigned long		i_update_core;	/* timestamps are dirty */
+	unsigned long		i_gen;		/* generation count */
 
 	/* File incore extent information. */
 	size_t			i_bytes; 	/* bytes in i_u1 */	
@@ -118,7 +119,7 @@ typedef struct xfs_inode {
 #define	XFS_MAX_INCORE_EXTENTS	32768
 
 #define	XFS_ITOV(ip)	((vnode_t*)((ip)->i_vnode))
-#define	XFS_VTOI(ip)	((xfs_inode_t*)((vp)->v_data))
+#define	XFS_VTOI(vp)	((xfs_inode_t*)((vp)->v_data))
 
 /*
  * Value for inode buffers' b_ref field.
@@ -147,7 +148,8 @@ void		xfs_ireclaim(xfs_inode_t *);
 xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
 void		xfs_iread_extents(xfs_trans_t *, xfs_inode_t *);
 xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
-			    dev_t, struct cred *);
+			    dev_t, struct cred *, buf_t **, boolean_t *);
+
 void		xfs_idestroy(xfs_inode_t *);
 void		xfs_idata_realloc(xfs_inode_t *, int);
 void		xfs_iext_realloc(xfs_inode_t *, int);
