@@ -41,7 +41,6 @@
 #include <linux/mm.h>
 #include <linux/locks.h>
 #include <linux/xfs_iops.h>
-#include <linux/xfs_file.h>
 #include <linux/attributes.h>
 
 
@@ -588,7 +587,7 @@ int linvfs_revalidate_core(struct inode *inode, int flags)
 	return vn_revalidate(vp, flags);
 }
 
-int linvfs_revalidate(struct dentry *dentry)
+STATIC int linvfs_revalidate(struct dentry *dentry)
 {
 	return linvfs_revalidate_core(dentry->d_inode, 0);
 }
