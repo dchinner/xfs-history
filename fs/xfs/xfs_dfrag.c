@@ -29,10 +29,11 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: xfs_dfrag.c,v 1.18 2000/07/21 17:30:17 jtk Exp $"
+#ident "$Id: xfs_dfrag.c,v 1.19 2000/07/22 04:20:01 nathans Exp $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
+#include <linux/file.h>
 
 #include <sys/param.h>
 #include "xfs_buf.h"
@@ -43,7 +44,6 @@
 #include <sys/vnode.h>
 
 #include <sys/kabi.h>
-#include <ksys/vfile.h>
 #include <ksys/cell_config.h>
 #include <sys/vfs.h>
 #include <sys/uuid.h>
@@ -78,7 +78,6 @@
 #include "xfs_rw.h"
 
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
-extern int getf(int, struct vfile **);
 extern int xfs_bmap_count_blocks( xfs_trans_t *, xfs_inode_t *, int, int *); 
 
 /*
@@ -93,7 +92,7 @@ xfs_swapext(
 	xfs_trans_t     *tp;
 	xfs_mount_t     *mp;
 	xfs_bstat_t	*sbp;
-	struct vfile	*fp, *tfp;
+	struct file	*fp = NULL, *tfp = NULL;
 	vnode_t 	*vp, *tvp;
         bhv_desc_t      *bdp, *tbdp;
         vn_bhv_head_t   *bhp, *tbhp;
@@ -104,66 +103,74 @@ xfs_swapext(
 	__uint64_t	tmp;
 	__uint64_t	cxfs_val;
 	int		aforkblks = 0;
+	int		locked = 0;
 
 	if (copyin(sxp, &sx, sizeof sx))
 		return XFS_ERROR(EFAULT);
 
 	/* Pull information for the target fd */
-	if (error = getf(sx.sx_fdtarget, &fp))
-		return XFS_ERROR(error);
+	if (((fp = fget((int)sx.sx_fdtarget)) == NULL) ||
+            ((vp = LINVFS_GET_VP(fp->f_dentry->d_inode)) == NULL))  {
+                error = XFS_ERROR(EINVAL);
+                goto error0;
+        }
 
-	if (!VF_IS_VNODE(fp) || VF_TO_VNODE(fp)->v_type != VREG)
-		return XFS_ERROR(EINVAL);
-
-	vp = VF_TO_VNODE(fp);
 	bhp = VN_BHV_HEAD(vp);
 	VN_BHV_READ_LOCK(bhp);
 	bdp = vn_bhv_lookup(bhp, &xfs_vnodeops);
 	if (bdp == NULL) {
 		VN_BHV_READ_UNLOCK(bhp);
-		return XFS_ERROR(EBADF);
+		error = XFS_ERROR(EBADF);
+                goto error0;
 	} else {
 		ip = XFS_BHVTOI(bdp);
 		VN_BHV_READ_UNLOCK(bhp);
 	}
 
-	/* Pull information for the tmp fd */
-	if (error = getf(sx.sx_fdtmp, &tfp))
-		return XFS_ERROR(error);
+        if (((tfp = fget((int)sx.sx_fdtmp)) == NULL) ||
+            ((tvp = LINVFS_GET_VP(tfp->f_dentry->d_inode)) == NULL)) {
+                error = XFS_ERROR(EINVAL);
+                goto error0;
+        }
 
-	if (!VF_IS_VNODE(tfp) || VF_TO_VNODE(tfp)->v_type != VREG)
-		return XFS_ERROR(EINVAL);
-
-	tvp = VF_TO_VNODE(tfp);
 	tbhp = VN_BHV_HEAD(tvp);
 	VN_BHV_READ_LOCK(tbhp);
 	tbdp = vn_bhv_lookup(tbhp, &xfs_vnodeops);
 	if (tbdp == NULL) {
 		VN_BHV_READ_UNLOCK(tbhp);
-		return XFS_ERROR(EBADF);
+		error = XFS_ERROR(EBADF);
+                goto error0;
 	} else {
 		tip = XFS_BHVTOI(tbdp);
 		VN_BHV_READ_UNLOCK(tbhp);
 	}
 
 	if (ip->i_ino == tip->i_ino) {
-		return XFS_ERROR(EINVAL);
+		error =  XFS_ERROR(EINVAL);
+                goto error0;
 	}
 
 	mp = ip->i_mount;
 
 	sbp = &sx.sx_stat;
 
-	if (XFS_FORCED_SHUTDOWN(mp))
-		return XFS_ERROR(EIO);
-
-	CELL_ONLY(cxfs_val = cfs_start_defrag(vp));
+	if (XFS_FORCED_SHUTDOWN(mp)) {
+		error =  XFS_ERROR(EIO);
+                goto error0;
+ 	}
 
 	/* quit if either is the swap file */
-	if (vp->v_flag & VISSWAP && vp->v_type == VREG)
-		return XFS_ERROR(EACCES);
-	if (tvp->v_flag & VISSWAP && tvp->v_type == VREG)
-		return XFS_ERROR(EACCES);
+	if (vp->v_flag & VISSWAP && vp->v_type == VREG) {
+		error = XFS_ERROR(EACCES);
+                goto error0;
+	}
+	if (tvp->v_flag & VISSWAP && tvp->v_type == VREG) {
+		error = XFS_ERROR(EACCES);
+                goto error0;
+	}
+
+	locked = 1;
+	CELL_ONLY(cxfs_val = cfs_start_defrag(vp));
 
 	/* Lock in i_ino order */
 	if (ip->i_ino < tip->i_ino) {
@@ -389,11 +396,21 @@ xfs_swapext(
         error = xfs_trans_commit(tp, XFS_TRANS_SWAPEXT, NULL);
 
 	CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
+
+        fput(fp);
+        fput(tfp);
+
 	return error;
 
  error0:
-	CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
-	xfs_iunlock(ip,  lock_flags);
-	xfs_iunlock(tip, lock_flags);
+	if (locked) {
+		CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
+		xfs_iunlock(ip,  lock_flags);
+		xfs_iunlock(tip, lock_flags);
+	}
+
+        if (fp != NULL) fput(fp);
+        if (tfp != NULL) fput(tfp);
+
 	return error;
 }
