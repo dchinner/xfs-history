@@ -68,12 +68,17 @@ linvfs_read(
 	struct iovec		iov = {buf, count};
 	struct file		*file = iocb->ki_filp;
 	vnode_t			*vp;
-	int			ioflags;
+	int			ioflags = 0;
 	int			error;
 
 	BUG_ON(iocb->ki_pos != pos);
+
+	if (unlikely(file->f_mode & FINVIS))
+		ioflags |= IO_INVIS;
+
+	if (unlikely(file->f_flags & O_DIRECT))
+		ioflags |= IO_ISDIRECT;
 	vp = LINVFS_GET_VP(file->f_dentry->d_inode);
-	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
 	VOP_READ(vp, iocb, &iov, 1, &iocb->ki_pos, ioflags, NULL, error);
 	return error;
 }
@@ -90,12 +95,15 @@ linvfs_write(
 	struct file	*file = iocb->ki_filp;
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-	int		ioflags;
+	int		ioflags = 0;
 	int		error;
 
+	if (unlikely(file->f_mode & FINVIS))
+		ioflags |= IO_INVIS;
+
 	BUG_ON(iocb->ki_pos != pos);
-	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
-	if (ioflags & IO_ISDIRECT) {
+	if (unlikely(file->f_flags & O_DIRECT)) {
+		ioflags |= IO_ISDIRECT;
 		VOP_WRITE(vp, iocb, &iov, 1, &iocb->ki_pos,
 				ioflags, NULL, error);
 	} else {
@@ -118,12 +126,16 @@ linvfs_readv(
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
-	int		ioflags;
+	int		ioflags = 0;
 	int		error;
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
-	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
+	if (unlikely(file->f_mode & FINVIS))
+		ioflags |= IO_INVIS;
+
+	if (unlikely(file->f_flags & O_DIRECT))
+		ioflags |= IO_ISDIRECT;
 	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, error);
 	if (-EIOCBQUEUED == error)
 		error = wait_on_sync_kiocb(&kiocb);
@@ -143,13 +155,16 @@ linvfs_writev(
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
-	int		ioflags;
+	int		ioflags = 0;
 	int		error;
+
+	if (unlikely(file->f_mode & FINVIS))
+		ioflags |= IO_INVIS;
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
-	ioflags = (file->f_flags & O_DIRECT) ? IO_ISDIRECT : 0;
-	if (ioflags & IO_ISDIRECT) {
+	if (unlikely(file->f_flags & O_DIRECT)) {
+		ioflags |= IO_ISDIRECT;
 		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
 				ioflags, NULL, error);
 	} else {
@@ -270,7 +285,6 @@ linvfs_readdir(
 		return -ENOMEM;
 
 	uio.uio_iov = &iov;
-	uio.uio_fmode = filp->f_mode;
 	uio.uio_segflg = UIO_SYSSPACE;
 	curr_offset = filp->f_pos;
 	if (filp->f_pos != 0x7fffffff)

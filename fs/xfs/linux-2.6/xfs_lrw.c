@@ -160,7 +160,6 @@ xfs_read(
 	xfs_mount_t		*mp;
 	vnode_t			*vp;
 	unsigned long		seg;
-	int			invisible = (file->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -215,7 +214,8 @@ xfs_read(
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !invisible) {
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+	    !(ioflags & IO_INVIS)) {
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
@@ -235,7 +235,7 @@ xfs_read(
 	if (ret > 0)
 		XFS_STATS_ADD(xs_read_bytes, ret);
 
-	if (!invisible)
+	if (likely(!(ioflags & IO_INVIS)))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
 	return ret;
@@ -296,8 +296,7 @@ xfs_sendfile(
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xs_read_bytes, ret);
-	if (!invisible)
-		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 	return ret;
 }
 
@@ -619,7 +618,7 @@ start:
 	}
 
 	if ((DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_WRITE) &&
-	    !invisible && !eventsent)) {
+	    !(ioflags & IO_INVIS) && !eventsent)) {
 		loff_t		savedsize = *offset;
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
@@ -701,7 +700,8 @@ retry:
 	ret = generic_file_aio_write_nolock(iocb, iovp, segs, offset);
 
 	if ((ret == -ENOSPC) &&
-	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) && !invisible) {
+	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
+	    !(ioflags & IO_INVIS)) {
 
 		xfs_rwunlock(bdp, locktype);
 		error = XFS_SEND_NAMESP(xip->i_mount, DM_EVENT_NOSPACE, vp,

@@ -220,7 +220,8 @@ typedef int	(*vop_readdir_t)(bhv_desc_t *, struct uio *, struct cred *,
 				int *);
 typedef int	(*vop_symlink_t)(bhv_desc_t *, vname_t *, struct vattr *,
 				char *, vnode_t **, struct cred *);
-typedef int	(*vop_readlink_t)(bhv_desc_t *, struct uio *, struct cred *);
+typedef int	(*vop_readlink_t)(bhv_desc_t *, struct uio *, int,
+				struct cred *);
 typedef int	(*vop_fsync_t)(bhv_desc_t *, int, struct cred *,
 				xfs_off_t, xfs_off_t);
 typedef int	(*vop_inactive_t)(bhv_desc_t *, struct cred *);
@@ -329,8 +330,8 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_readdir, vp)((vp)->v_fbhv,uiop,cr,eofp)
 #define	VOP_SYMLINK(dvp,d,vap,tnm,vpp,cr,rv)				\
 	rv = _VOP_(vop_symlink, dvp) ((dvp)->v_fbhv,d,vap,tnm,vpp,cr)
-#define	VOP_READLINK(vp,uiop,cr,rv)					\
-	rv = _VOP_(vop_readlink, vp)((vp)->v_fbhv,uiop,cr)
+#define	VOP_READLINK(vp,uiop,fl,cr,rv)					\
+	rv = _VOP_(vop_readlink, vp)((vp)->v_fbhv,uiop,fl,cr)
 #define	VOP_FSYNC(vp,f,cr,b,e,rv)					\
 	rv = _VOP_(vop_fsync, vp)((vp)->v_fbhv,f,cr,b,e)
 #define VOP_INACTIVE(vp, cr, rv)					\
@@ -385,16 +386,13 @@ typedef struct vnodeops {
 /*
  * Flags for read/write calls - same values as IRIX
  */
-
-#define IO_ISDIRECT	0x00004
-#define IO_NFS		0x00100
-#define IO_ISLOCKED	0x00800
-#define IO_NFS3		0x02000
+#define IO_ISDIRECT	0x00004		/* bypass page cache */
+#define IO_INVIS	0x00020		/* don't update inode timestamps */
+#define IO_ISLOCKED	0x00800		/* don't do inode locking */
 
 /*
  * Flags for VOP_IFLUSH call
  */
-
 #define FLUSH_SYNC		1	/* wait for flush to complete	*/
 #define FLUSH_INODE		2	/* flush the inode itself	*/
 #define FLUSH_LOG		4	/* force the last log entry for

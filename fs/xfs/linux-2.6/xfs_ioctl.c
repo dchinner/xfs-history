@@ -415,12 +415,11 @@ xfs_readlink_by_handle(
 
 	auio.uio_iov	= &aiov;
 	auio.uio_iovcnt	= 1;
-	auio.uio_fmode	= FINVIS;
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
-	VOP_READLINK(vp, &auio, NULL, error);
+	VOP_READLINK(vp, &auio, IO_INVIS, NULL, error);
 
 	VN_RELE(vp);
 	return (olen - auio.uio_resid);
