@@ -299,8 +299,10 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
  */
 #ifndef SIM
 buf_t *
-xfs_trans_getchunk(xfs_trans_t *tp, vnode_t *vp,
-		   struct bmapval *bmap, struct cred *cred)
+xfs_trans_getchunk(xfs_trans_t		*tp,
+		   vnode_t		*vp,
+		   struct bmapval	*bmap,
+		   struct cred		*cred)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
@@ -376,8 +378,10 @@ xfs_trans_getchunk(xfs_trans_t *tp, vnode_t *vp,
  */
 #ifndef SIM
 buf_t *
-xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
-		    struct bmapval *bmap, struct cred *cred)
+xfs_trans_chunkread(xfs_trans_t		*tp,
+		    vnode_t		*vp,
+		    struct bmapval	*bmap,
+		    struct cred		*cred)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
@@ -468,7 +472,8 @@ xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
  * brelse() call.
  */
 void
-xfs_trans_brelse(xfs_trans_t *tp, buf_t *bp)
+xfs_trans_brelse(xfs_trans_t	*tp,
+		 buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
 	xfs_log_item_desc_t	*lidp;
@@ -546,7 +551,8 @@ xfs_trans_brelse(xfs_trans_t *tp, buf_t *bp)
  * then allocate one for it.  Then add the buf item to the transaction.
  */
 void
-xfs_trans_bjoin(xfs_trans_t *tp, buf_t *bp)
+xfs_trans_bjoin(xfs_trans_t	*tp,
+		buf_t		*bp)
 {
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT(bp->b_fsprivate2 == NULL);
@@ -576,7 +582,8 @@ xfs_trans_bjoin(xfs_trans_t *tp, buf_t *bp)
  * and associated with the given transaction.
  */
 void
-xfs_trans_bhold(xfs_trans_t *tp, buf_t *bp)
+xfs_trans_bhold(xfs_trans_t	*tp,
+		buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -586,6 +593,32 @@ xfs_trans_bhold(xfs_trans_t *tp, buf_t *bp)
 
 	bip = (xfs_buf_log_item_t*)(bp->b_fsprivate);
 	bip->bli_flags |= XFS_BLI_HOLD;
+}
+
+/*
+ * This function is used to indicate that the buffer should not be
+ * unlocked until the transaction is committed to disk.
+ *
+ * It uses the log item descriptor flag XFS_LID_SYNC_UNLOCK to
+ * delay the buf items's unlock call until the transaction is
+ * committed to disk or aborted.
+ */
+void
+xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
+				buf_t		*bp)
+{
+	xfs_log_item_desc_t	*lidp;
+	xfs_buf_log_item_t	*bip;
+
+	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT((xfs_trans_t*)(bp->b_fsprivate2) == tp);
+	ASSERT(bp->b_fsprivate != NULL);
+
+	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
+	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
+	ASSERT(lidp != NULL);
+
+	lidp->lid_flags |= XFS_LID_SYNC_UNLOCK;
 }
 
 
@@ -599,7 +632,10 @@ xfs_trans_bhold(xfs_trans_t *tp, buf_t *bp)
  * value of b_blkno.
  */
 void
-xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
+xfs_trans_log_buf(xfs_trans_t	*tp,
+		  buf_t		*bp,
+		  uint		first,
+		  uint		last)
 {
 	xfs_buf_log_item_t	*bip;
 	xfs_log_item_desc_t	*lidp;
