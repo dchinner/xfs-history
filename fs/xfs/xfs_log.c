@@ -207,7 +207,10 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 
 
 /*
- * Initialize log manager data.
+ * Initialize log manager data.  This routine is intended to be called when
+ * a system boots up.  It is not a per filesystem initialization.
+ *
+ * As you can see, we currently do nothing.
  */
 int
 xfs_log_init()
@@ -221,9 +224,9 @@ xfs_log_init()
  *  2. Potentially, push buffers at tail of log to disk.
  *
  * Each reservation is going to reserve extra space for a log record header.
- * When writes happen to the on-disk log, we don't subtract from any
- * reservation.  Log space is wasted in order to insure that deadlock
- * never happens.
+ * When writes happen to the on-disk log, we don't subtract the length of the
+ * log record header from any reservation.  By wasting space in each
+ * reservation, we prevent over allocation problems.
  */
 int
 xfs_log_reserve(xfs_mount_t	 *mp,
@@ -274,9 +277,11 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 /*
  * Mount a log filesystem.
  *
- * mp	   -
- * log_dev - device number of on-disk log device
- * flags   -
+ * mp		- ubiquitous xfs mount point structure
+ * log_dev	- device number of on-disk log device
+ * start_block	- Start block # where block size is 512 bytes (BBSIZE)
+ * num_bblocks	- Number of BBSIZE blocks in on-disk log
+ * flags	-
  *
  */
 int
@@ -291,7 +296,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	if (! log_debug)
 		return 0;
 
-	if ((flags & XFS_LOG_RECOVER) && log_recover(mp, log_dev) != 0) {
+	if (log_recover(mp, log_dev) != 0) {
 		return XFS_ERECOVER;
 	}
 	log_alloc(mp, log_dev, start_block, num_bblocks);
@@ -299,6 +304,11 @@ xfs_log_mount(xfs_mount_t	*mp,
 }	/* xfs_log_mount */
 
 
+/*
+ * Unmount a log filesystem.
+ *
+ * Mark the filesystem clean as unmount happens.
+ */
 int
 xfs_log_unmount(xfs_mount_t *mp)
 {
@@ -307,6 +317,12 @@ xfs_log_unmount(xfs_mount_t *mp)
 	return 0;
 }
 
+
+/*
+ * Write region vectors to log.  The write happens using the space reservation
+ * of the ticket (tic).  It is not a requirement that all writes for a given
+ * transaction occur with one call to xfs_log_write().
+ */
 int
 xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_iovec_t	reg[],
@@ -332,7 +348,9 @@ xfs_log_write(xfs_mount_t *	mp,
 
 
 /*
+ * Allocate a log
  *
+ * Perform all the specific initialization required during a log mount.
  */
 void
 log_alloc(xfs_mount_t	*mp,
@@ -392,8 +410,9 @@ log_alloc(xfs_mount_t	*mp,
 /*		iclog->ic_refcnt = 0;	*/
 /*		iclog->ic_callback = 0;	*/
 		iclog->ic_bp = getrbuf(0);
-		initnsema(&iclog->ic_forcesema, 0, "iclog-force");
 		psema(&iclog->ic_bp->b_lock, PINOD);	/* it's mine */
+
+		initnsema(&iclog->ic_forcesema, 0, "iclog-force");
 
 		iclogp = &iclog->ic_next;
 	}
@@ -403,6 +422,10 @@ log_alloc(xfs_mount_t	*mp,
 }	/* log_alloc */
 
 
+/*
+ * Write out the commit record of a transaction associated with the given
+ * ticket.  Return the lsn of the commit record.
+ */
 xfs_lsn_t
 log_commit_record(xfs_mount_t  *mp,
 		  log_ticket_t *ticket)
@@ -423,9 +446,10 @@ log_commit_record(xfs_mount_t  *mp,
 
 
 /*
- * Function which is called when an io completes.  The log manager
- * needs its own routine, in order to control what happens with the buffer
- * after the write completes.
+ * Log function which is called when an io completes.
+ *
+ * The log manager needs its own routine, in order to control what
+ * happens with the buffer after the write completes.
  */
 void
 log_iodone(buf_t *bp)
@@ -512,6 +536,8 @@ log_sync(log_t		*log,
 	uint		count;		/* byte count of bwrite */
 	int		split = 0;	/* split write into two regions */
 	
+	ASSERT(iclog->ic_refcnt == 0);
+
 	if (flags != 0 && ((flags & XFS_LOG_SYNC) != XFS_LOG_SYNC))
 		log_panic("log_sync: illegal flag");
 	
@@ -529,7 +555,6 @@ log_sync(log_t		*log,
 	bp->b_blkno = BLOCK_LSN(iclog->ic_header.h_lsn);
 
 	/* Round byte count up to a LOG_BBSIZE chunk */
-	ASSERT(iclog->ic_refcnt == 0);
 	count = BBTOB(BTOBB(iclog->ic_offset)) + LOG_HEADER_SIZE;
 	if (bp->b_blkno + BTOBB(count) > log->l_logBBsize) {
 		split = count - (BBTOB(log->l_logBBsize - bp->b_blkno));
@@ -590,6 +615,11 @@ log_sync(log_t		*log,
 }	/* log_sync */
 
 
+/*
+ * Unallocate a log
+ *
+ * What to do... sigh.
+ */
 void
 log_unalloc(void)
 {
@@ -597,17 +627,44 @@ log_unalloc(void)
 
 
 /*
- * 1.  Tickets are single threaded structures.
+ * Write some region out to in-core log
  *
+ * This will be called when writing externally provided regions or when
+ * writing out a commit record for a given transaction.
+ *
+ * General algorithm:
+ *	1. Find total length of this write.  This may include adding to the
+ *		lengths passed in.
+ *	2. Check whether we violate the tickets reservation.
+ *	3. While writing to this iclog
+ *	    A. Reserve as much space in this iclog as can get
+ *	    B. If this is first write, save away start lsn
+ *	    C. While writing this region:
+ *		1. If first write of transaction, write start record
+ *		2. Write log operation header (header per region)
+ *		3. Find out if we can fit entire region into this iclog
+ *		4. Potentially, verify destination bcopy ptr
+ *		5. Bcopy (partial) region
+ *		6. If partial copy, release iclog; otherwise, continue
+ *			copying more regions into current iclog
+ *	4. Mark want sync bit (in simulation mode)
+ *	5. Release iclog for potential flush to on-disk log.
+ *		
  * ERRORS:
- *	Return error at any time if reservation is overrun.
+ * 1.	Panic if reservation is overrun.  This should never happen since
+ *	reservation amounts are generated internal to the filesystem.
  * NOTES:
- * 1.  The LOG_END_TRANS & LOG_CONTINUE_TRANS flags are passed down to the
+ * 1. Tickets are single threaded data structures.
+ * 2. The LOG_END_TRANS & LOG_CONTINUE_TRANS flags are passed down to the
  *	syncing routine.  When a single log_write region needs to span
  *	multiple in-core logs, the LOG_CONTINUE_TRANS bit should be set
  *	on all log operation writes which don't contain the end of the
  *	region.  The LOG_END_TRANS bit is used for the in-core log
  *	operation which contains the end of the continued log_write region.
+ * 3. When log_state_get_iclog_space() grabs the rest of the current iclog,
+ *	we don't really know exactly how much space will be used.  As a result,
+ *	we don't update ic_offset until the end when we know exactly how many
+ *	bytes have been written out.
  */
 int
 log_write(xfs_mount_t *		mp,
@@ -763,7 +820,9 @@ log_write(xfs_mount_t *		mp,
 
 /* Clean iclogs starting from the head.  This ordering must be
  * maintained, so an iclog doesn't become ACTIVE beyond one that
- * is SYNCING.
+ * is SYNCING.  This is also required to maintain the notion that we use
+ * a counting semaphore to hold off would be writers to the log when every
+ * iclog is trying to sync to disk.
  */
 void
 log_state_clean_log(log_t *log)
@@ -791,7 +850,18 @@ log_state_clean_log(log_t *log)
 
 
 /*
- * 
+ * Finish transitioning this iclog to the dirty state.
+ *
+ * Make sure that we completely execute this routine only when this is
+ * the last call to the iclog.  There is a good chance that iclog flushes,
+ * when we reach the end of the physical log, get turned into 2 separate
+ * calls to bwrite.  Hence, one iclog flush could generate two calls to this
+ * routine.  By using the reference count bwritecnt, we guarantee that only
+ * the second completion goes through.
+ *
+ * Callbacks could take time, so they are done outside the scope of the
+ * global state machine log lock.  Assume that the calls to cvsema won't
+ * take a long time.  At least we know it won't sleep.
  */
 void
 log_state_done_syncing(log_in_core_t	*iclog)
@@ -837,6 +907,9 @@ log_state_done_syncing(log_in_core_t	*iclog)
 }	/* log_state_done_syncing */
 
 
+/*
+ * Update counters atomically now that bcopy is done.
+ */
 void
 log_state_finish_copy(log_t		*log,
 		      log_in_core_t	*iclog,
@@ -861,7 +934,7 @@ log_state_finish_copy(log_t		*log,
  * If the head of the in-core log ring is not (ACTIVE or DIRTY), then we must
  * sleep.  The flush semaphore is set to the number of in-core buffers and
  * decremented around disk syncing.  Therefore, if all buffers are syncing,
- * this semaphore will cause new writes to sleep until a write completes.
+ * this semaphore will cause new writes to sleep until a sync completes.
  * Otherwise, this code just does p() followed by v().  This approximates
  * a sleep/wakeup except we can't race.
  *
@@ -961,6 +1034,9 @@ restart:
 }	/* log_state_get_iclog_space */
 
 
+/*
+ * Atomically get ticket.  Usually, don't return until one is available.
+ */
 xfs_log_ticket_t
 log_state_get_ticket(log_t	*log,
 		     int	len,
@@ -1028,6 +1104,9 @@ log_state_lsn_is_synced(log_t		   *log,
 }	/* log_state_lsn_is_synced */
 
 
+/*
+ * Atomically put back used ticket.
+ */
 void
 log_state_put_ticket(log_t	  *log,
 		     log_ticket_t *tic)
@@ -1048,8 +1127,13 @@ log_state_put_ticket(log_t	  *log,
 
 
 /*
+ * Flush iclog to disk if this is the last reference to the given iclog and
+ * the WANT_SYNC bit is set.
+ *
  * When this function is entered, the iclog is not necessarily in the
  * WANT_SYNC state.  It may be sitting around waiting to get filled.
+ *
+ * 
  */
 void
 log_state_release_iclog(log_t		*log,
@@ -1104,6 +1188,8 @@ log_state_release_iclog(log_t		*log,
 
 
 /*
+ * Used by code which implements synchronous log forces.
+ *
  * Find in-core log with lsn.
  *	If it is in the DIRTY state, just return.
  *	If it is in the ACTIVE state, move the in-core log into the WANT_SYNC
@@ -1156,6 +1242,10 @@ log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags)
 }	/* log_state_sync */
 
 
+/*
+ * Called when we want to mark the current iclog as being ready to sync to
+ * disk.
+ */
 void
 log_state_want_sync(log_t *log, log_in_core_t *iclog)
 {
@@ -1222,7 +1312,7 @@ log_alloc_tickets(log_t *log)
 
 
 /*
- *
+ * Put ticket into free list
  */
 void log_putticket(log_t	*log,
 		   log_ticket_t *ticket)
@@ -1243,6 +1333,9 @@ void log_putticket(log_t	*log,
 }	/* log_putticket */
 
 
+/*
+ * Grab ticket off freelist or allocation some more
+ */
 xfs_log_ticket_t *
 log_maketicket(log_t		*log,
 	       int		len,
@@ -1252,6 +1345,7 @@ log_maketicket(log_t		*log,
 
 	if (log->l_freelist == NULL) {
 		log_panic("xfs_log_ticket: ran out of tickets"); /* XXXmiken */
+		/* just call log_alloc_tickets */
 	}
 
 	tic			= log->l_freelist;
@@ -1307,6 +1401,12 @@ log_end(struct xfs_mount *mp, dev_t log_dev)
  *
  ******************************************************************************
  */
+
+/*
+ * Make sure that the destination ptr is within the valid data region of
+ * one of the iclogs.  This uses backup pointers stored in a different
+ * part of the log in case we trash the log structure.
+ */
 void
 log_verify_dest_ptr(log_t *log,
 		    psint ptr)
@@ -1324,6 +1424,21 @@ log_verify_dest_ptr(log_t *log,
 }	/* log_verify_dest_ptr */
 
 
+/*
+ * Perform a number of checks on the iclog before writing to disk.
+ *
+ * 1. Make sure the iclogs are still circular
+ * 2. Make sure we have a good magic number
+ * 3. Make sure we don't have magic numbers in the data
+ * 4. Check fields of each log operation header for:
+ *	A. Valid client identifier
+ *	B. tid ptr value falls in valid ptr space (user space code)
+ *	C. Length in log record header is correct according to the
+ *		individual operation headers within record.
+ * 5. When a bwrite will occur within 5 blocks of the front of the physical
+ *	log, check the preceding blocks of the physical log to make sure all
+ *	the cycle numbers agree with the current cycle number.
+ */
 void
 log_verify_iclog(log_t		*log,
 		 log_in_core_t	*iclog,
@@ -1383,9 +1498,11 @@ log_verify_iclog(log_t		*log,
 		else
 			tid = (log_tid_t)iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_tid - (psint)iclog->ic_data)];
 
+#ifndef _KERNEL
 		/* This is a user space check */
 		if ((psint)tid < 0x10000000 || (psint)tid > 0x20000000)
 			log_panic("log_verify_iclog: illegal tid");
+#endif
 
 		/* check length */
 		if (((psint)&ophead->oh_len & 0x1ff) != 0)
