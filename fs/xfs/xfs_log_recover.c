@@ -2048,7 +2048,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		xfs_buf_relse(bp);
 		return error;
 	}
-	xfs_inobp_check(mp, bp);
+	error = 0;
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
 	dip = (xfs_dinode_t *)xfs_buf_offset(bp, imap.im_boffset);
 
