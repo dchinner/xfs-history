@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision$"
 
 /*
  * Allocation group header
@@ -42,6 +42,24 @@ typedef struct xfs_aghdr
 	xfs_agino_t	ag_iflist;	/* first free inode */
 	xfs_agino_t	ag_ifcount;	/* number of free inodes */
 } xfs_aghdr_t;
+
+#define	XFS_AG_MAGIC		0x0001
+#define	XFS_AG_VERSION		0x0002
+#define	XFS_AG_SEQNO		0x0004
+#define	XFS_AG_LENGTH		0x0008
+#define	XFS_AG_ROOTS		0x0010
+#define	XFS_AG_FREELIST		0x0020
+#define	XFS_AG_LEVELS		0x0040
+#define	XFS_AG_FLIST_COUNT	0x0080
+#define	XFS_AG_FREEBLKS		0x0100
+#define	XFS_AG_LONGEST		0x0200
+#define	XFS_AG_IROOT		0x0400
+#define	XFS_AG_ICOUNT		0x0800
+#define	XFS_AG_ILEVELS		0x1000
+#define	XFS_AG_IFLIST		0x2000
+#define	XFS_AG_IFCOUNT		0x4000
+#define	XFS_AG_NUM_BITS		15
+#define	XFS_AG_ALL_BITS		((1 << XFS_AG_NUM_BITS) - 1)
 
 /* block number in the AG; SB is block 0 */
 #define	XFS_AGH_BLOCK	((xfs_agblock_t)(XFS_SB_BLOCK + 1))
