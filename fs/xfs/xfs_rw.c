@@ -1784,6 +1784,7 @@ xfs_strat_read(
 				data_bytes = XFS_FSB_TO_B(mp, imap_blocks);
 
 				bzero(datap, data_bytes);
+				bp_mapout(bp);
 #else /* SIM */
 				ASSERT(bp->b_flags & B_PAGEIO);
 				data_offset = XFS_FSB_TO_B(mp, imap_offset -
