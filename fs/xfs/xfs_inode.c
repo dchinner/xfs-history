@@ -22,6 +22,7 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
@@ -912,7 +913,8 @@ xfs_iflush(xfs_inode_t	*ip,
 	 */
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_LOCAL:
-		if ((iip->ili_fields & XFS_ILOG_DATA) && (ip->i_bytes > 0)) {
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_DATA) &&
+		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_data != NULL);
 			bcopy(ip->i_u1.iu_data, dip->di_u.di_c, ip->i_bytes);
 		}
@@ -921,13 +923,14 @@ xfs_iflush(xfs_inode_t	*ip,
 		ASSERT(ip->i_flags & XFS_IEXTENTS);
 		ASSERT((ip->i_u1.iu_extents != NULL) || (ip->i_bytes == 0));
 		ASSERT((ip->i_u1.iu_extents == NULL) || (ip->i_bytes > 0));
-		if ((iip->ili_fields & XFS_ILOG_EXT) && (ip->i_bytes > 0)) {
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
+		    (ip->i_bytes > 0)) {
 			bcopy(ip->i_u1.iu_extents, dip->di_u.di_bmx,
 			      ip->i_bytes);
 		}
 		break;
 	case XFS_DINODE_FMT_BTREE:
-		if ((iip->ili_fields & XFS_ILOG_BROOT) &&
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
 			/*
@@ -956,7 +959,7 @@ xfs_iflush(xfs_inode_t	*ip,
 		}
 		break;
 	case XFS_DINODE_FMT_DEV:
-		if (iip->ili_fields & XFS_ILOG_DEV) {
+		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
 			dip->di_u.di_dev = ip->i_u2.iu_rdev;
 		}
 		break;
@@ -977,9 +980,9 @@ xfs_iflush(xfs_inode_t	*ip,
 	 * In order to read the lsn we need the AIL lock, because
 	 * it is a 64 bit value that cannot be read atomically.
 	 */
-	if (iip->ili_fields != 0) {
+	if (iip->ili_format.ilf_fields != 0) {
 		iip->ili_ref = 1;
-		iip->ili_fields = 0;
+		iip->ili_format.ilf_fields = 0;
 	}
 	ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't need lock if it shrinks */
 	s = AIL_LOCK(ip->i_mount);

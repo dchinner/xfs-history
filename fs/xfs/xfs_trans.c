@@ -22,31 +22,22 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_bio.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
-#include "xfs_log.h"
 #include "xfs_trans_priv.h"
 
 #ifdef SIM
 #include "sim.h"
 #endif
 
-#define	XFS_TRANS_LOG_CHUNK	8192
-
-#ifndef SIM
-#define ROUNDUP32(x)		(((x) + 31) & ~31)
-#endif
-
 STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
 STATIC void	xfs_trans_do_commit(xfs_trans_t *, uint);
-STATIC void	xfs_trans_large_item(xfs_trans_t *, xfs_log_item_desc_t *);
-STATIC xfs_log_item_desc_t *xfs_trans_log_items(xfs_trans_t *,
-						xfs_log_item_desc_t *, uint);
-STATIC void	xfs_trans_write_header(xfs_trans_t *, caddr_t);
-STATIC void	xfs_trans_write_commit(xfs_trans_t *, caddr_t);
+STATIC uint	xfs_trans_count_vecs(xfs_trans_t *);
+STATIC void	xfs_trans_fill_vecs(xfs_trans_t *, xfs_log_iovec_t *);
 STATIC void	xfs_trans_committed(xfs_trans_t *);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t);
 STATIC void	xfs_trans_free(xfs_trans_t *);
@@ -54,7 +45,7 @@ STATIC void	xfs_trans_free(xfs_trans_t *);
 struct zone	*xfs_trans_zone;
 
 xfs_tid_t	
-xfs_trans_id_alloc(struct xfs_mount *mp)
+xfs_trans_id_alloc(xfs_mount_t *mp)
 {
 #ifndef SIM
 	ASSERT(0);
@@ -66,7 +57,8 @@ xfs_trans_id_alloc(struct xfs_mount *mp)
 
 
 int
-xfs_trans_lsn_danger(struct xfs_mount *mp, xfs_lsn_t lsn)
+xfs_trans_lsn_danger(xfs_mount_t	*mp,
+		     xfs_lsn_t		lsn)
 /* ARGSUSED */
 {
 #ifndef SIM
@@ -86,7 +78,8 @@ xfs_trans_lsn_danger(struct xfs_mount *mp, xfs_lsn_t lsn)
  * zone, initialize it, and return it to the caller.
  */
 xfs_trans_t *
-xfs_trans_alloc(struct xfs_mount *mp, uint type)
+xfs_trans_alloc(xfs_mount_t	*mp,
+		uint		type)
 {
 	xfs_trans_t	*tp;
 
@@ -120,7 +113,10 @@ xfs_trans_alloc(struct xfs_mount *mp, uint type)
  * is used by long running transactions.
  */
 int
-xfs_trans_reserve(xfs_trans_t *tp, uint blocks, uint logspace, uint flags)
+xfs_trans_reserve(xfs_trans_t	*tp,
+		  uint		blocks,
+		  uint		logspace,
+		  uint		flags)
 {
 	int		status;
 
@@ -133,49 +129,24 @@ xfs_trans_reserve(xfs_trans_t *tp, uint blocks, uint logspace, uint flags)
 		status = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
 					   -blocks);
 		if (status != 0) {
-#if 0
-			printf("trans_reserve: reserve %u failed\n", blocks);
-#endif
 			return (status);
 		}
 		tp->t_blk_res = blocks;
-#if 0
-		printf("trans_reserve: reserved %u\n", blocks);
-#endif
 	}
 
 	/*
 	 * Reserve the log space needed for this transaction.
 	 */
 	if (logspace > 0) {
-		(void) xfs_log_reserve(tp->t_mountp, logspace, flags);
+		(void) xfs_log_reserve(tp->t_mountp, tp->t_tid, logspace,
+				       &tp->t_ticket, XFS_TRANSACTION_MANAGER,
+				       flags);
 		tp->t_log_res = logspace;
 	}
 
 	return (0);
 }
 
-#if 0
-/*
- * xfs_trans_use_reserve() is called to indicate to the transaction
- * mechanism that that some of the blocks reserved through a call
- * to xfs_trans_reserve() have been used.  This should be called
- * each time blocks are allocated.
- */
-void
-xfs_trans_use_reserve(xfs_trans_t *tp, uint blocks)
-{
-	/*
-	 * Make sure that the number of blocks used is not greater
-	 * than the number reserved, and then simply decrement
-	 * the number used from the number reserved.
-	 */
-	ASSERT(tp->t_blk_res >= blocks);
-	tp->t_blk_res -= blocks;
-	printf("trans_use: used %u\n", blocks);
-}
-#endif
-	
 
 /*
  * This is called to set the a callback to be called when the given
@@ -185,30 +156,15 @@ xfs_trans_use_reserve(xfs_trans_t *tp, uint blocks)
  * Only one callback can be associated with any single transaction.
  */
 void
-xfs_trans_callback(xfs_trans_t *tp, xfs_trans_callback_t callback, void *arg)
+xfs_trans_callback(xfs_trans_t		*tp,
+		   xfs_trans_callback_t	callback,
+		   void			*arg)
 {
 	ASSERT(tp->t_callback == NULL);
 	tp->t_callback = callback;
 	tp->t_callarg = arg;
 }
 
-/*
- * Add the xfs_log_item structure to the list of items associated
- * with the transaction.  It should be logged when the transaction
- * is committed.
- *
- * Mark the log item descriptor for the operation as DIRTY so it
- * will be logged during commit.
- */
-void
-xfs_trans_log_op(xfs_trans_t *tp, xfs_log_item_t *op)
-{
-	xfs_log_item_desc_t	*lidp;
-
-	tp->t_flags |= XFS_TRANS_DIRTY;
-	lidp = xfs_trans_add_item(tp, op);
-	lidp->lid_flags |= XFS_LID_DIRTY;
-}
 
 /*
  * Record the indicated change to the given field for application
@@ -219,7 +175,9 @@ xfs_trans_log_op(xfs_trans_t *tp, xfs_log_item_t *op)
  * needs to be updated before committing.
  */
 void
-xfs_trans_mod_sb(xfs_trans_t *tp, uint field, int delta)
+xfs_trans_mod_sb(xfs_trans_t	*tp,
+		 uint		field,
+		 int		delta)
 {
 	switch (field) {
 	case XFS_SB_ICOUNT:
@@ -230,9 +188,6 @@ xfs_trans_mod_sb(xfs_trans_t *tp, uint field, int delta)
 		tp->t_ifree_delta += delta;
 		break;
 	case XFS_SB_FDBLOCKS:
-#if 0
-		printf("trans_mod_sb: delta %d\n", delta);
-#endif
 		/*
 		 * Track the number of blocks allocated in the
 		 * transaction.  Make sure it does not exceed the
@@ -388,11 +343,12 @@ xfs_trans_id(xfs_trans_t *tp)
  * XFS_TRANS_NOSLEEP and XFS_TRANS_WAIT cannot be set simultaneously.
  */
 void
-xfs_trans_commit(xfs_trans_t *tp, uint flags)
+xfs_trans_commit(xfs_trans_t	*tp,
+		 uint		flags)
 {
-	int		async;
+	uint		async;
 
-	async = (int)flags & XFS_TRANS_NOSLEEP;
+	async = flags & XFS_TRANS_NOSLEEP;
 
 	/*
 	 * If the transaction is not asynchronous and there are
@@ -431,12 +387,10 @@ xfs_trans_commit(xfs_trans_t *tp, uint flags)
  * This is called to commit all of the transactions which are
  * currently hung on the list in the given mount structure.
  * Each transaction should be committed in turn.  This is called
- * by both xfs_trans_commit() and the utility thread which manages
- * the tail of the log.  That thread is also responsible for making
- * sure that async transactions get committed in a timely manner.
+ * by both xfs_trans_commit() and the xfs_sync routine.
  */
 void
-xfs_trans_commit_async(struct xfs_mount *mp)
+xfs_trans_commit_async(xfs_mount_t *mp)
 {
 	xfs_trans_t	*async_list;
 	xfs_trans_t	*atp;
@@ -459,9 +413,10 @@ xfs_trans_commit_async(struct xfs_mount *mp)
  * If there is nothing to log, then all log items will be unlocked
  * and the transaction will freed.
  */
-#ifndef SIM
+#if 0
 STATIC void
-xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
+xfs_trans_do_commit(xfs_trans_t	*tp,
+		    uint	flags)
 {
 	char			*trans_headerp;
 	char			*trans_commitp;
@@ -578,14 +533,6 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	xfs_log_free(trans_commitp, sizeof(xfs_trans_commit_t));
 
 	/*
- 	 * Tell the LM to call the transaction completion routine
-	 * when the log write with LSN commit_lsn completes.
-	 * After this call we cannot reference tp, because the call
-	 * can happen at any time and tp can be freed.
-	 */
-	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
-
-	/*
 	 * Once all the items of the transaction have been copied
 	 * to the in core log we can release them.  Do that here.
 	 * This will free descriptors pointing to items which were
@@ -594,6 +541,14 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	 * so they can be unpinned after the transaction commits.
 	 */
 	xfs_trans_unlock_items(tp);
+
+	/*
+ 	 * Tell the LM to call the transaction completion routine
+	 * when the log write with LSN commit_lsn completes.
+	 * After this call we cannot reference tp, because the call
+	 * can happen at any time and tp can be freed.
+	 */
+	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
 
 	/*
 	 * If the caller wants the log written immediately,
@@ -612,6 +567,92 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 		xfs_log_wait(commit_lsn);
 	}
 }	
+#endif
+#ifndef SIM
+STATIC void
+xfs_trans_do_commit(xfs_trans_t	*tp,
+		    uint	flags)
+/* ARGSUSED */
+{
+	char			*trans_headerp;
+	char			*trans_commitp;
+	xfs_log_iovec_t		*log_vector;
+	int			nvec;
+	xfs_log_item_desc_t	*start_desc;
+	xfs_log_item_desc_t	*desc;
+	xfs_lsn_t		commit_lsn;
+	int			error;
+
+	/*
+	 * If there is nothing to be logged by the transaction,
+	 * then unlock all of the items associated with the
+	 * transaction and free the transaction structure.
+	 * Also make sure to return any reserved blocks to
+	 * the free pool.
+	 */
+	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
+		xfs_trans_unreserve_and_mod_sb(tp);
+		xfs_log_done(tp->t_mountp, tp->t_ticket); 
+		xfs_trans_free_items(tp);
+		xfs_trans_free(tp);
+		return;
+	}
+
+	/*
+	 * If we need to update the superblock, then do it now.
+	 */
+	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
+		xfs_trans_apply_sb_deltas(tp);
+	}
+
+	/*
+	 * Ask each log item how many log_vector entries it will
+	 * need so we can figure out how many to allocate.
+	 */
+	nvec = xfs_trans_count_vecs(tp);
+
+	log_vector = (xfs_log_iovec_t *)kmem_alloc(nvec *
+						   sizeof(xfs_log_iovec_t),
+						   KM_SLEEP);
+
+	/*
+	 * Fill in the log_vector and pin the logged items, and
+	 * then write the transaction to the log.
+	 */
+	xfs_trans_fill_vecs(tp, log_vector);
+	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket);
+	ASSERT(error == 0);
+	commit_lsn = log_vector[0].i_lsn;
+	xfs_log_done(tp->t_mountp, tp->t_ticket);
+
+	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
+
+	/*
+	 * Once all the items of the transaction have been copied
+	 * to the in core log we can release them.  Do that here.
+	 * This will free descriptors pointing to items which were
+	 * not logged since there is nothing more to do with them.
+	 * For items which were logged, we will keep pointers to them
+	 * so they can be unpinned after the transaction commits.
+	 */
+	xfs_trans_unlock_items(tp);
+
+	/*
+	 * Once the transaction has been committed, unused
+	 * reservations need to be released and changes to
+	 * the superblock need to be reflected in the in-core
+	 * version.  Do that now.
+	 */
+	xfs_trans_unreserve_and_mod_sb(tp);
+
+	/*
+ 	 * Tell the LM to call the transaction completion routine
+	 * when the log write with LSN commit_lsn completes.
+	 * After this call we cannot reference tp, because the call
+	 * can happen at any time and tp can be freed.
+	 */
+	xfs_log_notify((void(*)(void*))xfs_trans_committed, tp, commit_lsn);
+}
 #else
 STATIC void
 xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
@@ -650,16 +691,7 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	 * the superblock need to be reflected in the in-core
 	 * version.  Do that now.
 	 */
-#if 0
-	printf("trans_commit: blkres %u delta %d fdblocks %lld\n",
-	       tp->t_blk_res, tp->t_fdblocks_delta,
-	       tp->t_mountp->m_sb.sb_fdblocks);
-#endif
 	xfs_trans_unreserve_and_mod_sb(tp);
-#if 0
-	printf("trans committed: fdblocks == %lld\n",
-	       tp->t_mountp->m_sb.sb_fdblocks);
-#endif
 
 	/*
 	 * Free the transaction structure now that it has been committed.
@@ -669,105 +701,88 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 #endif
 
 /*
- * This is called by xfs_trans_commit() to write a large item into
- * the incore log.  Just do it in a loop, logging up to XFS_TRANS_LOG_CHUNK
- * bytes at a time.
+ * Total up the number of log iovecs needed to commit this
+ * transaction.  The transaction itself needs one for the
+ * transaction header.  Ask each dirty item in turn how many
+ * it needs to get the total.
  */
-#ifndef SIM
-STATIC void
-xfs_trans_large_item(xfs_trans_t *tp, xfs_log_item_desc_t *desc)
+STATIC uint
+xfs_trans_count_vecs(xfs_trans_t *tp)
 {
-	int	key;
-	uint	space;
-	char	*log_ptr;
- 
-	key = -1;
-	while (desc->lid_size != 0) {
-		space = MIN(XFS_TRANS_LOG_CHUNK,
-			    desc->lid_size);
-		log_ptr = xfs_log_alloc(space, 0, NULL);
-		desc->lid_size = IOP_FORMAT(desc->lid_item, log_ptr,
-					    space, &key);
-		desc->lid_size = ROUNDUP32(desc->lid_size);
-		xfs_log_free(log_ptr, space);
+	int			nvecs;
+	xfs_log_item_desc_t	*lidp;
+
+	nvecs = 1;
+	lidp = xfs_trans_first_item(tp);
+	ASSERT(lidp != NULL);
+	while (lidp != NULL) {
+		/*
+		 * Skip items which aren't dirty in this transaction.
+		 */
+		if (!(lidp->lid_flags & XFS_LID_DIRTY)) {
+			lidp = xfs_trans_next_item(tp, lidp);
+			continue;
+		}
+		lidp->lid_size = IOP_SIZE(lidp->lid_item);
+		nvecs += lidp->lid_size;
+		lidp = xfs_trans_next_item(tp, lidp);
+	}
+
+}
+
+/*
+ * Fill in the vector with pointers to data to be logged
+ * by this transaction.  The transaction header takes
+ * the first vector, and then each dirty item takes the
+ * number of vectors it indicated it needed in xfs_trans_count_vecs().
+ *
+ * As each item fills in the entries it needs, also pin the item
+ * so that it cannot be flushed out until the log write completes.
+ */
+STATIC void
+xfs_trans_fill_vecs(xfs_trans_t		*tp,
+		    xfs_log_iovec_t	*log_vector)
+{
+	xfs_log_item_desc_t	*lidp;
+	xfs_log_iovec_t		*vecp;
+	uint			nitems;			
+
+	/*
+	 * Skip over the entry for the transaction header, we'll
+	 * fill that in at the end.
+	 */
+	vecp = log_vector + 1;		/* pointer arithmetic */
+
+	nitems = 0;
+	lidp = xfs_trans_first_item(tp);
+	ASSERT(lidp != NULL);
+	while (lidp != NULL) {
+		/*
+		 * Skip items which aren't dirty in this transaction.
+		 */
+		if (!(lidp->lid_flags & XFS_LID_DIRTY)) {
+			lidp = xfs_trans_next_item(tp, lidp);
+			continue;
+		}
+		nitems++;
+		IOP_FORMAT(lidp->lid_item, vecp);
+		vecp += lidp->lid_size;		/* pointer arithmetic */
+		IOP_PIN(lidp->lid_item);
+		lidp = xfs_trans_next_item(tp, lidp);
 	}
 
 	/*
-	 * Once we've copied the item into the in core log, pin it
-	 * so it can't be written out once we unlock it.
+	 * Now that we've counted the number of items in this
+	 * transaction, fill in the transaction header.
 	 */
-	IOP_PIN(desc->lid_item);
-}
-#endif /* SIM */
-
-/*
- * This is called from xfs_trans_commit() to write a group of
- * log items to the in core log.
- *
- * Allocate a chunk of space for them and write each one
- * into that space.  They must fit, because they said they
- * would earlier.  Because the sizes and items are correlated,
- * at the end desc will point to the next item to be written
- * into the log (but not yet having space allocated for it).
- *
- * We return the pointer to the log item descriptor that follows
- * the last one we write into the in core log.  This is for use
- * in the loop in xfs_trans_commit().
- */
-#ifndef SIM
-STATIC xfs_log_item_desc_t *
-xfs_trans_log_items(xfs_trans_t		*tp,
-		    xfs_log_item_desc_t	*start_desc,
-		    uint		space)
-{
-	char			*log_ptr;
-	char			*save_ptr;
-	xfs_log_item_desc_t	*desc;
-	uint			tmp_space;
-	int			key;
-
-	log_ptr = xfs_log_alloc(space, 0, NULL);
-	save_ptr = log_ptr;
-	desc = start_desc;
-	tmp_space = space;
-	while (tmp_space != 0) {
-		/*
-		 * If the item is not dirty then skip it.
-		 */
-		if (!(desc->lid_flags & XFS_LID_DIRTY)) {
-			desc = xfs_trans_next_item(tp, desc);
-			continue;
-		}	
-		key = -1;
-		(void) IOP_FORMAT(desc->lid_item, log_ptr,
-				  desc->lid_size, &key);
-		/*
-		 * Once we've copied the item into the in core log, pin it
-		 * so it can't be written out once we unlock it.
-		 */
-		IOP_PIN(desc->lid_item);
-		log_ptr += desc->lid_size;
-		tmp_space -= desc->lid_size;
-		desc = xfs_trans_next_item(tp, desc);
-	}
-	xfs_log_free(save_ptr, space);
-	return (desc);
-}
-#endif /* SIM */
-
-STATIC void
-xfs_trans_write_header(xfs_trans_t *tp, caddr_t buffer)
-/* ARGSUSED */
-{
-
+	tp->t_header.th_magic = XFS_TRANS_HEADER_MAGIC;
+	tp->t_header.th_type = tp->t_type;
+	tp->t_header.th_tid = tp->t_tid;
+	tp->t_header.th_num_items = nitems;
+	log_vector->i_addr = (caddr_t)&tp->t_header;
+	log_vector->i_len = sizeof(xfs_trans_header_t);
 }
 
-STATIC void
-xfs_trans_write_commit(xfs_trans_t *tp, caddr_t buffer)
-/* ARGSUSED */
-{
-
-}
 
 /*
  * Unlock all of the transaction's items and free the transaction.
@@ -874,7 +889,8 @@ xfs_trans_committed(xfs_trans_t *tp)
  * with the flusher trying to pull the item from the AIL as we add it.
  */
 STATIC void
-xfs_trans_chunk_committed(xfs_log_item_chunk_t *licp, xfs_lsn_t lsn)
+xfs_trans_chunk_committed(xfs_log_item_chunk_t	*licp,
+			  xfs_lsn_t		lsn)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_log_item_t		*lip;

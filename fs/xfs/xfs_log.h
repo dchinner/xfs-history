@@ -5,19 +5,6 @@
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
 
-#ifndef _LOG_DEBUG
-caddr_t         xfs_log_alloc(size_t, uint, xfs_lsn_t*);
-void            xfs_log_free(caddr_t, size_t);
-void            xfs_log_notify(void(*)(void*), void*, xfs_lsn_t);
-int             xfs_log_reserve(struct xfs_mount *, int, int);
-
-#ifndef SIM
-xfs_lsn_t       xfs_log_lsn(struct xfs_mount *);
-void            xfs_log_sync(xfs_lsn_t);
-void            xfs_log_unreserve(struct xfs_mount *, uint);
-void            xfs_log_wait(xfs_lsn_t);
-#endif
-#else
 /*
  * Macros, structures, prototypes for interface to the log manager.
  */
@@ -68,26 +55,26 @@ typedef struct xfs_log_iovec {
 typedef void* xfs_log_ticket_t;
 
 /* Log manager interfaces */
-void xfs_log_done(xfs_mount_t *mp, xfs_log_ticket_t ticket);
-int  xfs_log_force(xfs_mount_t *mp, xfs_log_ticket_t ticket, uint flags);
+struct xfs_mount;
+void xfs_log_done(struct xfs_mount *mp, xfs_log_ticket_t ticket);
+int  xfs_log_force(struct xfs_mount *mp, xfs_log_ticket_t ticket, uint flags);
 int  xfs_log_init();
-int  xfs_log_mount(xfs_mount_t *mp, dev_t log_dev, uint flags);
-int  xfs_log_new_transaction(xfs_mount_t *mp, xfs_log_ticket_t ticket,
+int  xfs_log_mount(struct xfs_mount *mp, dev_t log_dev, uint flags);
+int  xfs_log_new_transaction(struct xfs_mount *mp, xfs_log_ticket_t ticket,
 			     xfs_tid_t old_tid, xfs_tid_t new_tid);
-void xfs_log_notify(xfs_mount_t *mp, xfs_lsn_t lsn,
+void xfs_log_notify(struct xfs_mount *mp, xfs_lsn_t lsn,
 		    void (*callback_func)(void*), void* callback_arg);
-int  xfs_log_reserve(xfs_mount_t *mp, xfs_tid_t tid, uint length,
+int  xfs_log_reserve(struct xfs_mount *mp, xfs_tid_t tid, uint length,
 		     xfs_log_ticket_t *ticket, char clientid, uint flags);
-int  xfs_log_write(xfs_mount_t *mp, xfs_log_iovec_t region[], int nentries,
+int  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[], int nentries,
 		   xfs_log_ticket_t ticket);
 
 /* Log manager utility interfaces */
-void xfs_log_print(xfs_mount_t *mp, dev_t log_dev);
+void xfs_log_print(struct xfs_mount *mp, dev_t log_dev);
 
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
 #define XFS_ENOLOGSPACE	3	/* Reservation too large */
 #define XFS_ENOTSUP	4
 
-#endif /* _LOG_DEBUG */
 #endif	/* _XFS_LOG_H */

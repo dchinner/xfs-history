@@ -25,6 +25,7 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
@@ -45,55 +46,100 @@
 
 
 /*
- * This returns the amount of space needed to log the given inode
- * log item.
+ * This returns the number of iovecs needed to log the given inode item.
+ *
+ * We need one iovec for the inode log format structure, one for the
+ * inode core, and possibly one for the inode data/extents/b-tree root.
  */
 uint
 xfs_inode_item_size(xfs_inode_log_item_t *iip)
 {
-	uint	base_size;
-	uint	core_size;
-	uint	other_size;
+	uint	nvecs;
 
-	/*
-	 * Always log an inode log format structure.
-	 */
-	base_size = sizeof(xfs_inode_log_format_t);
-
-	/*
-	 * If we're logging the xfs_dinode_core structure
-	 * count it here.
-	 */
-	core_size = 0;
-	if (iip->ili_fields & XFS_ILOG_CORE) {
-		core_size = sizeof(xfs_dinode_core_t);
+	nvecs = 2;
+	if (iip->ili_format.ilf_fields &
+	    (XFS_ILOG_DATA | XFS_ILOG_EXT | XFS_ILOG_BROOT)) {
+		nvecs++;
 	}
 
-	/*
-	 * If we need to log inline data/extents/b-tree root,
-	 * figure out the size here.  We always log all
-	 * of it.
-	 */
-	other_size = 0;
-	if (iip->ili_fields & (XFS_ILOG_DATA | XFS_ILOG_EXT)) {
-		other_size = iip->ili_inode->i_bytes;
-	} else if (iip->ili_fields & XFS_ILOG_BROOT) {
-		other_size = iip->ili_inode->i_broot_bytes;
-	}
-		
-	return (base_size + core_size + other_size);
+	return nvecs; 
 }
 
 /*
- * This will remain unimplemented until the logging interfaces
- * are reworked.
+ * This is called to fill in the vector of log iovecs for the
+ * given inode log item.  It fills the first item with an inode
+ * log format structure, the second with the on-disk inode structure,
+ * and possible a third with the inode data/extents/b-tree root.
  */
-uint
-xfs_inode_item_format(xfs_inode_log_item_t *bip, caddr_t buffer,
-		    uint buffer_size, int *keyp)
+void
+xfs_inode_item_format(xfs_inode_log_item_t	*iip,
+		      xfs_log_iovec_t		*log_vector)
 {
-	*keyp = 0;
-	return (0);
+	uint		total_size;
+	xfs_log_iovec_t	*vecp;
+	xfs_inode_t	*ip;
+
+	ip = iip->ili_inode;
+	vecp = log_vector;
+
+	vecp->i_addr = (caddr_t)&iip->ili_format;
+	vecp->i_len = sizeof(xfs_inode_log_format_t);
+	vecp++;
+	total_size= sizeof(xfs_inode_log_format_t);
+
+	vecp->i_addr = (caddr_t)&ip->i_d;
+	vecp->i_len = sizeof(xfs_dinode_core_t);	
+	vecp++;
+	total_size += sizeof(xfs_dinode_core_t);
+
+	switch (ip->i_d.di_format) {
+	case XFS_DINODE_FMT_EXTENTS:
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
+		    (ip->i_bytes > 0)) {
+			ASSERT(ip->i_u1.iu_extents != NULL);
+			ASSERT(ip->i_d.di_nextents > 0);
+			vecp->i_addr = (caddr_t)ip->i_u1.iu_extents;
+			vecp->i_len = ip->i_bytes;
+			vecp++;
+			total_size += ip->i_bytes;
+		}
+		break;
+
+	case XFS_DINODE_FMT_BTREE:
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
+		    (ip->i_broot_bytes > 0)) {
+			ASSERT(ip->i_broot != NULL);
+			vecp->i_addr = (caddr_t)ip->i_broot;
+			vecp->i_len = ip->i_broot_bytes;
+			vecp++;
+			total_size += ip->i_broot_bytes;
+		}
+		break;
+
+	case XFS_DINODE_FMT_LOCAL:
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_DATA) &&
+		    (ip->i_bytes > 0)) {
+			ASSERT(ip->i_u1.iu_data != NULL);
+			ASSERT(ip->i_d.di_size > 0);
+			vecp->i_addr = (caddr_t)ip->i_u1.iu_data;
+			vecp->i_len = ip->i_bytes;
+			vecp++;
+			total_size += ip->i_bytes;
+		}
+		break;
+
+	case XFS_DINODE_FMT_DEV:
+		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
+			iip->ili_format.ilf_u.ilfu_rdev = ip->i_u2.iu_rdev;
+		}
+		break;
+
+	default:
+		ASSERT(0);
+		break;
+	}
+
+	iip->ili_format.ilf_size = total_size;
 }
 	
 
@@ -251,7 +297,7 @@ xfs_inode_item_push(xfs_inode_log_item_t *iip)
 	 * anyone in the process of flushing the inode.
 	 */
 	ip = iip->ili_inode;
-	ASSERT(iip->ili_fields != 0);
+	ASSERT(iip->ili_format.ilf_fields != 0);
 
 	/*
 	 * Write out the inode.  The completion routine will
@@ -266,7 +312,7 @@ xfs_inode_item_push(xfs_inode_log_item_t *iip)
  */
 struct xfs_item_ops xfs_inode_item_ops = {
 	(uint(*)(xfs_log_item_t*))xfs_inode_item_size,
-	(uint(*)(xfs_log_item_t*, caddr_t, uint, int*))xfs_inode_item_format,
+	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_inode_item_format,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_pin,
 	(void(*)(xfs_log_item_t*))xfs_inode_item_unpin,
 	(uint(*)(xfs_log_item_t*))xfs_inode_item_trylock,
@@ -280,7 +326,8 @@ struct xfs_item_ops xfs_inode_item_ops = {
  * Initialize the inode log item for a newly allocated (in-core) inode.
  */
 void
-xfs_inode_item_init(xfs_inode_t *ip, xfs_mount_t *mp)
+xfs_inode_item_init(xfs_inode_t	*ip,
+		    xfs_mount_t	*mp)
 {
 	xfs_inode_log_item_t	*iip;
 
@@ -290,6 +337,9 @@ xfs_inode_item_init(xfs_inode_t *ip, xfs_mount_t *mp)
 	iip->ili_item.li_ops = &xfs_inode_item_ops;
 	iip->ili_item.li_mountp = mp;
 	iip->ili_inode = ip;
+	iip->ili_format.ilf_type = XFS_LI_INODE;
+	iip->ili_format.ilf_blkno = ip->i_bno;
+	iip->ili_format.ilf_index = ip->i_index;
 }
 
 

@@ -29,13 +29,18 @@
 #include "xfs_inum.h"
 #include "xfs_types.h"
 #include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
+#include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
-#include "xfs_log.h"		/* depends on xfs_mount.h */
 
 #ifndef _LOG_DEBUG
 int
-xfs_log_reserve(struct xfs_mount *mp, int reserve, int flags)
+xfs_log_reserve(xfs_mount_t	 *mp,
+		xfs_tid_t	 tid,
+		uint		 len,
+		xfs_log_ticket_t *x_ticket,
+		char		 log_client,
+		uint		 flags)
 {
         return (1);
 }

@@ -20,8 +20,8 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include "xfs_trans.h"
 #include "xfs_log.h"
+#include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
@@ -48,7 +48,7 @@
  * opposed to the io lock, must be taken exclusively.  This ensures
  * that the inode can be involved in only 1 transaction at a time.
  * Lock recursion is handled on the io lock, but only for lock modes
- * of equal or lesser strength.  That is, you can recur on a the io lock
+ * of equal or lesser strength.  That is, you can recur on the io lock
  * held EXCL with a SHARED request but not vice versa.  Also, if
  * the inode is already a part of the transaction then you cannot
  * go from not holding the io lock to having it EXCL or SHARED.
@@ -179,6 +179,7 @@ xfs_trans_iput(xfs_trans_t	*tp,
 	 */
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)iip);
 	ASSERT(lidp != NULL);
+	ASSERT(lidp->lid_item == (xfs_log_item_t*)iip);
 
 	/*
 	 * Be consistent about the bookkeeping for the inode's
@@ -208,6 +209,7 @@ xfs_trans_iput(xfs_trans_t	*tp,
 		iip->ili_ilock_recur--;
 		return;
 	}
+	ASSERT(iip->ili_iolock_recur == 0);
 
 	/*
 	 * If the inode was dirtied within this transaction, it cannot
@@ -228,7 +230,7 @@ xfs_trans_iput(xfs_trans_t	*tp,
 	 */
 	ASSERT((!(iip->ili_flags & XFS_ILI_IOLOCKED_ANY)) ||
 	       (lock_flags & (XFS_IOLOCK_EXCL | XFS_IOLOCK_SHARED)));
-	if (iip->ili_flags & (XFS_ILI_HOLD & XFS_ILI_IOLOCKED_ANY)) {
+	if (iip->ili_flags & (XFS_ILI_HOLD | XFS_ILI_IOLOCKED_ANY)) {
 		iip->ili_flags &= ~(XFS_ILI_HOLD | XFS_ILI_IOLOCKED_ANY);
 	}
 
@@ -333,10 +335,10 @@ xfs_trans_log_inode(xfs_trans_t	*tp,
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
 
-	if (ip->i_item.ili_fields == 0) {
+	if (ip->i_item.ili_format.ilf_fields == 0) {
 		ASSERT(ip->i_item.ili_ref == 0);
 		vn_hold(XFS_ITOV(ip));
 	}
-	ip->i_item.ili_fields |= flags;
+	ip->i_item.ili_format.ilf_fields |= flags;
 }
 

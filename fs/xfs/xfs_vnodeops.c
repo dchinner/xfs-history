@@ -38,6 +38,7 @@
 #include <sys/region.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
@@ -791,7 +792,7 @@ xfs_reclaim(vnode_t	*vp,
 */
 	dnlc_purge_vp(vp);
 	ASSERT(ip->i_update_core == 0);
-	ASSERT(ip->i_item.ili_fields == 0);
+	ASSERT(ip->i_item.ili_format.ilf_fields == 0);
 	xfs_ireclaim(ip);
 	return 0;
 }

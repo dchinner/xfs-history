@@ -26,6 +26,7 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"
@@ -36,190 +37,147 @@
 #include "sim.h"
 #endif
 
-#define	ROUNDUP32(x)		(((x) + 31) & ~31)
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~NBWORD)
 
 
-STATIC int	xfs_buf_item_bits(uint *, int, int);
-STATIC void	xfs_buf_item_set_bit(uint *, int, int);
-STATIC int	xfs_buf_item_next_bit(uint *, int, int);
+STATIC int	xfs_buf_item_bits(uint *, uint, uint);
+STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
+STATIC int	xfs_buf_item_next_bit(uint *, uint, uint);
 
 /*
- * This returns the amount of space needed to log the given buf
- * log item.
+ * This returns the number of log iovecs needed to log the
+ * given buf log item.
  *
- * It calculates this by adding the amount of space need to log
- * the dirty XFS_BLI_CHUNK byte chunks of the buffer to the amount of space
- * needed for an xfs_buf_log_format structure.
+ * It calculates this as 1 iovec for the buf log format structure
+ * and 1 or each stretch of non-contiguous chunks to be logged.
+ * Contiguous chunks are logged in a single iovec.
  */
 uint
 xfs_buf_item_size(xfs_buf_log_item_t *bip)
 {
-	uint	base_size;
-	uint	dirty_chunks;
-	uint	align_size;
-	uint	total_size;
+	uint	nvecs;
+	int	next_bit;
+	int	last_bit;
 
-	/*
-	 * The size of the base structure is the size of the
-	 * declared structure plus the space for the extra words
-	 * of the bitmap.  We subtract one from the map size, because
-	 * the first element of the bitmap is accounted for in the
-	 * size of the base structure.
-	 */
-	base_size = sizeof(xfs_buf_log_format_t) +
-		    ((bip->bli_map_size - 1) * sizeof(uint));
-
-	/*
-	 * Count the number of bits in the dirty chunk map.
-	 * Each bit corresponds to XFS_BLI_CHUNK bytes of data which
-	 * need to be logged.
-	 */
-	dirty_chunks = xfs_buf_item_bits((uint *)&bip->bli_dirty_map,
-					 (int)bip->bli_map_size, 0);
-
-	/*
-	 * Calculate the number of bytes needed to align the chunks on
-	 * a 32 byte boundary.  This is the base size of the structure
-	 * rounded up to a 32 byte boundary minus the size of the structure.
-	 */
-	align_size = ROUNDUP32(base_size) - base_size;
-
-	/*
-	 * The total size is simply the sum of all three of these pieces.
-	 */
-	total_size = base_size + (dirty_chunks * XFS_BLI_CHUNK) + align_size;
-	return (total_size);
-}
-
-/*
- * This is called to write the image of the buf log item into the in
- * core log.  If the entire image does not fit, then it should write
- * part of it and return a key which will allow it to write the rest
- * next time.  The routine should return how much space is needed to
- * log the rest of the image if it does not fit in the given space.
- *
- * The contents of *keyp must be -1 the first time this is called.
- */
-uint
-xfs_buf_item_format(xfs_buf_log_item_t *bip, caddr_t buffer,
-		    uint buffer_size, int *keyp)
-{
-	uint			base_size;
-	uint			align_size;
-	uint			total_size;
-	uint			bits_left;
-	uint			buffer_offset;
-	int			set_bit;
-	xfs_buf_log_format_t	*blfp;
-	buf_t			*bp;
-	caddr_t			chunkp;
-
-	/*
-	 * The size of the base structure is the size of the
-	 * declared structure plus the space for the extra words
-	 * of the bitmap.  We subtract one from the map size, because
-	 * the first element of the bitmap is accounted for in the
-	 * size of the base structure.
-	 */
-	base_size = sizeof(xfs_buf_log_format_t) +
-		    ((bip->bli_map_size - 1) * sizeof(uint));
-
-	/*
-	 * Calculate the number of bytes needed to align the chunks on
-	 * a 32 byte boundary.  This is the base size of the structure
-	 * rounded up to a 32 byte boundary minus the size of the structure.
-	 */
-	align_size = ROUNDUP32(base_size) - base_size;
-
-	bp = bip->bli_buf;
-
-	/*
-	 * Initialize the buf log format header.  Zero the bitmap so we
-	 * can just set the bits as we add them and not worry about
-	 * extraneous bits.
-	 */
-	blfp = (xfs_buf_log_format_t*)buffer;
-	blfp->blf_type = XFS_LI_BUF;
-	blfp->blf_size = buffer_size;
-	blfp->blf_blkno = bp->b_blkno;
-	blfp->blf_dev = bp->b_edev;
-	blfp->blf_map_size = bip->bli_map_size;
-	bzero(&blfp->blf_data_map, (int)(blfp->blf_map_size * sizeof(uint)));
-
-	/*
-	 * Make sure the buffer is mapped to virtual memory so we can
-	 * copy it into the log.  Do I need to call bp_mapout() later?
-	 */
-#ifndef SIM
-	if (!BP_ISMAPPED(bp)) {
-		bp_mapin(bp);
-	}
-#endif
-
-	/*
-	 * Copy as many chunks as will fit into given buffer.
-	 * The key should contain either -1 on the first call
-	 * or the bit to start searching from minus 1 in the case
-	 * that the first call could not get all the data into the
-	 * log in one write.
-	 */
-	chunkp = buffer + (base_size + align_size);
-	set_bit = *keyp;
-	while ((chunkp + XFS_BLI_CHUNK) <= (buffer + buffer_size)) {
+	nvecs = 1;
+	last_bit = xfs_buf_item_next_bit(bip->bli_format.blf_data_map,
+					 bip->bli_format.blf_map_size, 0);
+	ASSERT(last_bit != -1);
+	nvecs++;
+	while (last_bit != -1) {	
 		/*
 		 * This takes the bit number to start looking from and
 		 * returns the next set bit from there.  It returns -1
 		 * if there are no more bits set or the start bit is
 		 * beyond the end of the bitmap.
 		 */
-		set_bit = xfs_buf_item_next_bit(bip->bli_dirty_map,
-						(int)bip->bli_map_size,
-						set_bit + 1);
-		if (set_bit == -1) {
-			break;
-		}
-
+		next_bit = xfs_buf_item_next_bit(bip->bli_format.blf_data_map,
+						 bip->bli_format.blf_map_size,
+						 last_bit + 1);
 		/*
-		 * Set the same bit in the log format bit map and copy
-		 * that chunk into the log.
+		 * If we run out of bits, leave the loop,
+		 * else if we find a new set of bits bump the number of vecs,
+		 * else keep scanning the current set of bits.
 		 */
-		xfs_buf_item_set_bit(blfp->blf_data_map,
-				     (int)blfp->blf_map_size,
-				     set_bit);
-		buffer_offset = set_bit * XFS_BLI_CHUNK;
-		bcopy(bp->b_un.b_addr + buffer_offset, chunkp, XFS_BLI_CHUNK);
-		chunkp += XFS_BLI_CHUNK;
-	}
-	ASSERT(chunkp <= (buffer + buffer_size));
-
-	/*
-	 * When set_bit is -1 we know we got all the dirty chunks in the
-	 * buffer into the log, so return indicating there is nothing more
-	 * to do.
-	 */
-	if (set_bit == -1) {
-		return (0);
+		if (next_bit == -1) {
+			last_bit = -1;
+		} else if (next_bit != last_bit + 1) {
+			last_bit = next_bit;	
+			nvecs++;
+		} else {
+			last_bit++;
+		}
 	}
 
+	return nvecs;
+}
+
+/*
+ * This is called to fill in the vector of log iovecs for the
+ * given log buf item.  It fills the first entry with a buf log
+ * format structure, and the rest point to contiguous chunks
+ * within the buffer.
+ */
+void
+xfs_buf_item_format(xfs_buf_log_item_t	*bip,
+		    xfs_log_iovec_t	*log_vector)
+{
+	uint		base_size;
+	uint		total_size;
+	xfs_log_iovec_t	*vecp;
+	buf_t		*bp;
+	int		first_bit;
+	int		last_bit;
+	int		next_bit;
+	uint		nbits;
+	uint		buffer_offset;
+
+	bp = bip->bli_buf;
+	ASSERT(BP_ISMAPPED(bp));
+	vecp = log_vector;
+
 	/*
-	 * We ran out of space but we don't know if we got all the chunks.
-	 * There may or may not be more chunks to record in the log.
-	 * Count the number of bits left.  If there are none, then
-	 * we're done.  If there are more, return the amount of space
-	 * we still need and set the key to the value of set_bit. This
-	 * will make the next call start looking from the bit after the
-	 * last set bit we found and logged.
+	 * The size of the base structure is the size of the
+	 * declared structure plus the space for the extra words
+	 * of the bitmap.  We subtract one from the map size, because
+	 * the first element of the bitmap is accounted for in the
+	 * size of the base structure.
 	 */
-	bits_left = xfs_buf_item_bits(bip->bli_dirty_map,
-				      (int)bip->bli_map_size,
-				      set_bit + 1);
-	if (bits_left == 0) {
-		return (0);
+	base_size = sizeof(xfs_buf_log_format_t) +
+		    ((bip->bli_format.blf_map_size - 1) * sizeof(uint));
+	vecp->i_addr = (caddr_t)&bip->bli_format;
+	vecp->i_len = base_size;
+	vecp++;
+	total_size = base_size;
+
+	/*
+	 * Fill in an iovec for each set of contiguous chunks.
+	 */
+	first_bit = xfs_buf_item_next_bit(bip->bli_format.blf_data_map,
+					 bip->bli_format.blf_map_size, 0);
+	ASSERT(first_bit != -1);
+	last_bit = first_bit;
+	nbits = 1;
+	while (1) {
+		/*
+		 * This takes the bit number to start looking from and
+		 * returns the next set bit from there.  It returns -1
+		 * if there are no more bits set or the start bit is
+		 * beyond the end of the bitmap.
+		 */
+		next_bit = xfs_buf_item_next_bit(bip->bli_format.blf_data_map,
+						 bip->bli_format.blf_map_size,
+						 (uint)last_bit + 1);
+		/*
+		 * If we run out of bits fill in the last iovec and get
+		 * out of the loop.
+		 * Else if we start a new set of bits then fill in the
+		 * iovec for the series we were looking at and start
+		 * counting the bits in the new one.
+		 * Else we're still in the same set of bits so just
+		 * keep counting and scanning.
+		 */
+		if (next_bit == -1) {
+			buffer_offset = first_bit * XFS_BLI_CHUNK;
+			vecp->i_addr = bp->b_un.b_addr + buffer_offset;
+			vecp->i_len = nbits * XFS_BLI_CHUNK;
+			total_size += vecp->i_len;
+			break;
+		} else if (next_bit != last_bit + 1) {
+			buffer_offset = first_bit * XFS_BLI_CHUNK;
+			vecp->i_addr = bp->b_un.b_addr + buffer_offset;
+			vecp->i_len = nbits * XFS_BLI_CHUNK;
+			total_size += vecp->i_len;
+			vecp++;
+			first_bit = next_bit;
+			last_bit = next_bit;	
+			nbits = 1;
+		} else {
+			last_bit++;
+			nbits++;
+		}
 	}
-	*keyp = set_bit;
-	total_size = base_size + align_size + (bits_left * XFS_BLI_CHUNK);
-	return (total_size);
+	bip->bli_format.blf_size = total_size;
 }
 
 /*
@@ -272,7 +230,6 @@ xfs_buf_item_trylock(xfs_buf_log_item_t *bip)
 
 	/*
 	 * Remove the buffer from the free list.
-	 * This needs to be added and exported from the buffer cache.
 	 */
 	notavail(bp);
 
@@ -318,7 +275,8 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 	 * If the buf item isn't tracking any data, free it.
 	 * Otherwise, if XFS_BLI_HOLD is set clear it.
 	 */
-	if (xfs_buf_item_bits(bip->bli_dirty_map, (int)bip->bli_map_size, 0) == 0) {
+	if (xfs_buf_item_bits(bip->bli_format.blf_data_map,
+			      bip->bli_format.blf_map_size, 0) == 0) {
 		xfs_buf_item_relse(bp);
 	} else if (hold) {
 		bip->bli_flags &= ~XFS_BLI_HOLD;
@@ -341,7 +299,8 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
  * given lsn.
  */
 xfs_lsn_t
-xfs_buf_item_committed(xfs_buf_log_item_t *bip, xfs_lsn_t lsn)
+xfs_buf_item_committed(xfs_buf_log_item_t	*bip,
+		       xfs_lsn_t		lsn)
 /* ARGSUSED */
 {
 	return (lsn);
@@ -373,7 +332,7 @@ xfs_buf_item_push(xfs_buf_log_item_t *bip)
  */
 struct xfs_item_ops xfs_buf_item_ops = {
 	(uint(*)(xfs_log_item_t*))xfs_buf_item_size,
-	(uint(*)(xfs_log_item_t*, caddr_t, uint, int*))xfs_buf_item_format,
+	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_buf_item_format,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_pin,
 	(void(*)(xfs_log_item_t*))xfs_buf_item_unpin,
 	(uint(*)(xfs_log_item_t*))xfs_buf_item_trylock,
@@ -391,7 +350,8 @@ struct xfs_item_ops xfs_buf_item_ops = {
  * buf log item at the front.
  */
 void
-xfs_buf_item_init(buf_t *bp, struct xfs_mount *mp)
+xfs_buf_item_init(buf_t		*bp,
+		  xfs_mount_t	*mp)
 {
 	xfs_log_item_t		*lip;
 	xfs_buf_log_item_t	*bip;
@@ -433,7 +393,10 @@ xfs_buf_item_init(buf_t *bp, struct xfs_mount *mp)
 	bip->bli_item.li_ops = &xfs_buf_item_ops;
 	bip->bli_item.li_mountp = mp;
 	bip->bli_buf = bp;
-	bip->bli_map_size = map_size;
+	bip->bli_format.blf_type = XFS_LI_BUF;
+	bip->bli_format.blf_blkno = bp->b_blkno;
+	bip->bli_format.blf_len = BTOBB(bp->b_bcount);
+	bip->bli_format.blf_map_size = map_size;
 
 	/*
 	 * Put the buf item into the list of items attached to the
@@ -451,7 +414,9 @@ xfs_buf_item_init(buf_t *bp, struct xfs_mount *mp)
  * item's bitmap.
  */
 void
-xfs_buf_item_log(xfs_buf_log_item_t *bip, uint first, uint last)
+xfs_buf_item_log(xfs_buf_log_item_t	*bip,
+		 uint			first,
+		 uint			last)
 {
 	uint		first_bit;
 	uint		last_bit;
@@ -485,7 +450,7 @@ xfs_buf_item_log(xfs_buf_log_item_t *bip, uint first, uint last)
 	 * to set a bit in.
 	 */
 	word_num = first_bit >> BIT_TO_WORD_SHIFT;
-	wordp = &(bip->bli_dirty_map[word_num]);
+	wordp = &(bip->bli_format.blf_data_map[word_num]);
 
 	/*
 	 * Calculate the starting bit in the first word.
@@ -540,7 +505,9 @@ xfs_buf_item_log(xfs_buf_log_item_t *bip, uint first, uint last)
  * byte_to_bits[3] == 2, etc.
  */
 STATIC int
-xfs_buf_item_bits(uint *map, int size, int start_bit)
+xfs_buf_item_bits(uint	*map,
+		  uint	size,
+		  uint	start_bit)
 {
 	register int	bits;
 	register char	*bytep;
@@ -593,7 +560,9 @@ xfs_buf_item_bits(uint *map, int size, int start_bit)
  * Size is the number of words, not bytes, in the bitmap.
  */
 STATIC int
-xfs_buf_item_next_bit(uint *map, int size, int start_bit)
+xfs_buf_item_next_bit(uint	*map,
+		      uint	size,
+		      uint	start_bit)
 {
 	int	next_bit;
 	uint	*wordp;
@@ -673,7 +642,9 @@ xfs_buf_item_next_bit(uint *map, int size, int start_bit)
  * Set the specified bit in the given bitmap.
  */
 STATIC void
-xfs_buf_item_set_bit(uint *map, int size, int bit)
+xfs_buf_item_set_bit(uint	*map,
+		     uint	size,
+		     uint	bit)
 /* ARGSUSED */
 {
 	uint	*wordp;
@@ -713,7 +684,7 @@ xfs_buf_item_relse(buf_t *bp)
 		bp->b_iodone = NULL;
 	}
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
-		  ((bip->bli_map_size - 1) * sizeof(int)));
+		  ((bip->bli_format.blf_map_size - 1) * sizeof(int)));
 }
 
 
@@ -795,7 +766,8 @@ xfs_buf_iodone_callbacks(buf_t *bp)
  * care of cleaning up the buffer itself.
  */ 
 void
-xfs_buf_iodone(buf_t *bp, xfs_buf_log_item_t *bip)
+xfs_buf_iodone(buf_t			*bp,
+	       xfs_buf_log_item_t	*bip)
 {
 	struct xfs_mount	*mp;
 	int			s;
@@ -808,7 +780,7 @@ xfs_buf_iodone(buf_t *bp, xfs_buf_log_item_t *bip)
 	AIL_UNLOCK(mp, s);
 
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
-		  ((bip->bli_map_size - 1) * sizeof(int)));
+		  ((bip->bli_format.blf_map_size - 1) * sizeof(int)));
 }
 
 

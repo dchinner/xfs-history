@@ -35,7 +35,7 @@ typedef struct xfs_log_item {
 
 typedef struct xfs_item_ops {
 	uint(*iop_size)(xfs_log_item_t*);
-	uint(*iop_format)(xfs_log_item_t*, caddr_t, uint, int*);
+	void(*iop_format)(xfs_log_item_t*, xfs_log_iovec_t*);
 	void(*iop_pin)(xfs_log_item_t*);	
 	void(*iop_unpin)(xfs_log_item_t*);	
 	uint(*iop_trylock)(xfs_log_item_t*);	
@@ -45,7 +45,7 @@ typedef struct xfs_item_ops {
 } xfs_item_ops_t;
 
 #define	IOP_SIZE(ip)		(*(ip)->li_ops->iop_size)(ip)
-#define	IOP_FORMAT(ip,bp,sz,kp)	(*(ip)->li_ops->iop_format)(ip, bp, sz, kp)
+#define	IOP_FORMAT(ip,vp)	(*(ip)->li_ops->iop_format)(ip, vp)
 #define	IOP_PIN(ip)		(*(ip)->li_ops->iop_pin)(ip)
 #define	IOP_UNPIN(ip)		(*(ip)->li_ops->iop_unpin)(ip)
 #define	IOP_TRYLOCK(ip)		(*(ip)->li_ops->iop_trylock)(ip)
@@ -136,6 +136,21 @@ struct xfs_trans;
 typedef void(*xfs_trans_callback_t)(struct xfs_trans*, void*);
 
 /*
+ * This is the structure written in the log at the head of
+ * every transaction. It identifies the type and id of the
+ * transaction, and contains the number of items logged by
+ * the transaction so we know how many to expect during recovery.
+ */
+typedef struct xfs_trans_header {
+	uint		th_magic;		/* magic number */
+	uint		th_type;		/* transaction type */
+	xfs_trans_id_t	th_tid;			/* transaction id */
+	uint		th_num_items;		/* num items logged by trans */
+} xfs_trans_header_t;
+
+#define	XFS_TRANS_HEADER_MAGIC	0x5452414e	/* TRAN */
+
+/*
  * This is the structure maintained for every active transaction.
  */
 typedef struct xfs_trans {
@@ -146,6 +161,7 @@ typedef struct xfs_trans {
 	unsigned int		t_log_res;	/* amt of log space resvd */	
 	unsigned int		t_blk_res;	/* # of blocks resvd */
 	unsigned int		t_blk_res_used;	/* # of resvd blocks used */
+	xfs_log_ticket_t	t_ticket;	/* log mgr ticket */
 	sema_t			t_sema;		/* sema for commit completion */
 	xfs_lsn_t		t_lsn;		/* log seq num of trans commit*/
 	struct xfs_mount	*t_mountp;	/* ptr to fs mount struct */
@@ -158,6 +174,7 @@ typedef struct xfs_trans {
 	int			t_frextents_delta;/* superblock freextents chg*/
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
+	xfs_trans_header_t	t_header;	/* header for in-log trans */
 } xfs_trans_t;
 
 /*
@@ -173,23 +190,6 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_WAIT		0x2
 #define	XFS_TRANS_SYNC		0x4
 
-/*
- * This has not been thought through.
- * It is just to get the code to compile.
- */
-typedef struct xfs_trans_header {
-	xfs_lsn_t	th_lsn;
-	uint		th_type;
-	xfs_trans_id_t	th_tid;
-} xfs_trans_header_t;
-/*
- * This has not been thought through.
- * It is just to get the code to compile.
- */
-typedef struct xfs_trans_commit {
-	uint		tc_type;
-	xfs_trans_id_t	tc_tid;
-} xfs_trans_commit_t;
 
 struct xfs_inode;
 struct xfs_mount;
