@@ -34,13 +34,8 @@
 
 
 #if defined(XFSDEBUG) && defined(CONFIG_KDB)
-#include <asm/kdb.h>
-
 #undef xfs_buftrace
-#define xfs_buftrace(A,B) \
-    printk("    xfs_buftrace : %s (0x%p)\n", A, B); \
-    KDB_ENTER();
-       
+#define xfs_buftrace(A,B)	panic("    xfs_buftrace : %s (0x%p)\n", A, B);
 #endif
 
 /*

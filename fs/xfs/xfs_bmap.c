@@ -37,7 +37,6 @@ ktrace_t	*xfs_bmap_trace_buf;
 #endif
 
 #ifdef XFSDEBUG
-#include "xfs_buf_item.h"
 STATIC void
 xfs_bmap_check_leaf_extents(xfs_btree_cur_t *cur, xfs_inode_t *ip, int whichfork);
 #endif

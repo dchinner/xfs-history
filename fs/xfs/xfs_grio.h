@@ -33,9 +33,7 @@
 #ifndef __XFS_GRIO_H__
 #define __XFS_GRIO_H__
 
-#include <xfs_buf.h>
 #include <linux/grio.h>
-#include <linux/fs.h>
 
 void xfs_grio_init(void);
 void xfs_grio_uninit(void);
