@@ -670,7 +670,7 @@ xfs_ioctl(
 		attr_flags = (filp->f_flags & (O_NDELAY|O_NONBLOCK))
 						? ATTR_NONBLOCK : 0;
 
-		/* if (filp->f_flags & FINVIS)	XXXjtk - need O_INVISIBLE? */
+		if (filp->f_flags & O_INVISIBLE)
 			attr_flags |= ATTR_DMI;
 
 		error = xfs_change_file_space(bdp, cmd, &bf, filp->f_pos,
@@ -862,7 +862,7 @@ xfs_ioctl(
 
 		iflags = (cmd == XFS_IOC_GETBMAPA ? BMV_IF_ATTRFORK : 0);
 
-		/* if (filp->f_flags & FINVIS)	XXXjtk - need O_INVISIBLE? */
+		if (filp->f_flags & O_INVISIBLE)
 			iflags |= BMV_IF_NO_DMAPI_READ;
 
 		error = xfs_getbmap(bdp, &bm,
