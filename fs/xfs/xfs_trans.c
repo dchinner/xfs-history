@@ -1,4 +1,4 @@
-#ident "$Revision: 1.93 $"
+#ident "$Revision: 1.94 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -431,7 +431,8 @@ xfs_trans_apply_sb_deltas(
 	buf_t		*bp;
 	xfs_mount_t *mp = tp->t_mountp;
 	int		whole = 0;
-	long 	res_used, rem, delta_sum;
+	long 		delta_sum;
+	__int64_t	res_used, rem;
 
 	bp = xfs_trans_getsb(tp, tp->t_mountp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
@@ -995,8 +996,8 @@ xfs_trans_fill_vecs(
  */
 void
 xfs_trans_cancel(
-	xfs_trans_t	*tp,
-	int		flags)
+	xfs_trans_t		*tp,
+	int			flags)
 {
 	int			log_flags;
 #ifdef DEBUG
@@ -1006,15 +1007,14 @@ xfs_trans_cancel(
 	int			i;
 #endif
 	
-	/*
-	 * This really shouldn't be happening.
+	/* 
+	 * See if the caller is relying on us to shut down the
+	 * filesystem.  This happens in paths where we detect
+	 * corruption and decide to give up.
 	 */
 	if ((tp->t_flags & XFS_TRANS_DIRTY) &&
-	    !(XFS_FORCED_SHUTDOWN(tp->t_mountp))) {
-		ASSERT(XFS_FORCED_SHUTDOWN(tp->t_mountp));
-		/* debug(""); */
+	    !XFS_FORCED_SHUTDOWN(tp->t_mountp))
 		xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
-	}
 #ifdef DEBUG
 	if (!(flags & XFS_TRANS_ABORT)) {
 		licp = &(tp->t_items);
