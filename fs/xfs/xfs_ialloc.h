@@ -3,12 +3,6 @@
 
 #ident	"$Revision$"
 
-#include "xfs_types.h"
-#include <sys/pfdat.h>
-#include <sys/buf.h>
-#include "xfs.h"
-#include "xfs_trans.h"
-
 /*
  * block numbers in the AG; SB is block 0, AGH is block 1, free btree roots
  * are 2 and 3.
@@ -28,14 +22,6 @@
  * Structures for inode mapping
  */
 #define	XFS_IBT_MAGIC	0x58494254	/* 'XIBT' */
-typedef struct xfs_ialloc_block
-{
-	__uint32_t	magic;		/* XFS_IBT_MAGIC */
-	__uint16_t	level;		/* 0 is a leaf */
-	__uint16_t	numrecs;	/* current # of data records */
-	xfs_agblock_t	leftsib;	/* left sibling block */
-	xfs_agblock_t	rightsib;	/* right sibling block */
-} xfs_ialloc_block_t;
 
 /*
  * Data record/key structure
@@ -51,12 +37,22 @@ typedef struct xfs_ialloc_rec
  * Real block structures have a size equal to the file system block size.
  */
 
-#define	XFS_IALLOC_BLOCK_MAXRECS(n,l)	\
-	(((1 << (n)) - sizeof(xfs_ialloc_block_t)) / (sizeof(xfs_ialloc_rec_t) + sizeof(xfs_agblock_t) * ((l) > 0)))
-#define	XFS_IALLOC_BLOCK_MINRECS(n,l)	(XFS_IALLOC_BLOCK_MAXRECS(n,l) / 2)
+#define	XFS_IALLOC_BLOCK_SIZE(bl,lev,cur)	(1 << (bl))
 
-#define	XFS_IALLOC_REC_ADDR(b,i,n)	((xfs_ialloc_rec_t *)((char *)(b) + sizeof(xfs_ialloc_block_t) + ((i) - 1) * sizeof(xfs_ialloc_rec_t)))
-#define	XFS_IALLOC_PTR_ADDR(b,i,n)	((xfs_agblock_t *)((char *)(b) + sizeof(xfs_ialloc_block_t) + XFS_IALLOC_BLOCK_MAXRECS(n,1) * sizeof(xfs_ialloc_rec_t) + ((i) - 1) * sizeof(xfs_agblock_t)))
+#define	XFS_IALLOC_BLOCK_MAXRECS(bl,lev,cur)	\
+	XFS_BTREE_BLOCK_MAXRECS(XFS_IALLOC_BLOCK_SIZE(bl,lev,cur), \
+				xfs_ialloc_rec_t, lev)
+#define	XFS_IALLOC_BLOCK_MINRECS(bl,lev,cur)	\
+	XFS_BTREE_BLOCK_MINRECS(XFS_IALLOC_BLOCK_SIZE(bl,lev,cur), \
+				xfs_ialloc_rec_t, lev)
+
+#define	XFS_IALLOC_REC_ADDR(bb,i,bl,cur)	\
+	XFS_BTREE_REC_ADDR(XFS_IALLOC_BLOCK_SIZE(bl,(bb)->level,cur), \
+			   xfs_ialloc_rec_t, bb, i)
+
+#define	XFS_IALLOC_PTR_ADDR(bb,i,bl,cur)	\
+	XFS_BTREE_PTR_ADDR(XFS_IALLOC_BLOCK_SIZE(bl,(bb)->level,cur), \
+			   xfs_ialloc_rec_t, bb, i)
 
 #define	XFS_IALLOC_MAXLEVELS	5 /* ??? */
 
@@ -69,16 +65,15 @@ typedef struct xfs_ialloc_cur
 	buf_t			*bufs[XFS_IALLOC_MAXLEVELS];
 	int			ptrs[XFS_IALLOC_MAXLEVELS];
 	int			nlevels;
+	xfs_btnum_t		btnum;	/* == XFS_BTNUM_IBT */
 #ifdef XFSIDEBUG
 	int			lineno;
 	struct xfs_ialloc_cur	*next;	/* on all cursors list */
 #endif
 } xfs_ialloc_cur_t;
 
-#define	xfs_buf_to_iblock(buf)	((xfs_ialloc_block_t *)(buf->b_un.b_addr))
-
 #define	xfs_make_iptr(s,b,o) \
-	((xfs_dinode_t *)((caddr_t)xfs_buf_to_iblock(b) + (o) * (s)->xfsb_inodesize))
+	((xfs_dinode_t *)((caddr_t)xfs_buf_to_block(b) + (o) * (s)->xfsb_inodesize))
 
 /*
  * Prototypes for per-ag routines.
