@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.1 $"
 
 /*
  * Inode allocation management for xFS.
@@ -830,7 +830,7 @@ xfs_inobt_kcheck_btree(
 	else {
 		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
 		if (keyp)
-			key.ir_startino = rp->ar_startino;
+			key.ir_startino = rp->ir_startino;
 	}
 	/*
 	 * If the caller passed in a matching key, check it.
