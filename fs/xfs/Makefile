@@ -6,7 +6,12 @@ KERN_SPECS = kernel-2.4.spec
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-default all: tarballs headers i686kernel i386cmd
+default all: checkproc tarballs headers i686kernel i386cmd
+
+checkproc:
+	if [ ! -e /proc/stat ]; then \
+		mount /proc; \
+	fi
 
 tarballs: xfs-cmds
 	@echo "=== Making $@ `date`"; \
