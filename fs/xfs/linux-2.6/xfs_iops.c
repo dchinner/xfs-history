@@ -348,7 +348,7 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 		validate_fields(inode);
 		validate_fields(dir);
 		inode->i_version = ++event;
-		dir->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
+		inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	}
 	return -error;
 }
