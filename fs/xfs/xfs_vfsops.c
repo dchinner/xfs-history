@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.106 $"
+#ident  "$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -222,7 +222,6 @@ xfs_init(
 #endif
 	extern zone_t	*xfs_efd_zone;
 	extern zone_t	*xfs_efi_zone;
-
 #ifndef SIM
 	extern mutex_t	xfs_strat_lock;
 	extern mutex_t	xfsd_lock;
@@ -289,13 +288,6 @@ xfs_init(
 				(((XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK) /
                                   NBWORD) * sizeof(int))),
 			       "xfs_buf_item");
-#if XFS_BIG_FILESYSTEMS
-	xfs_buf_item64_zone =
-		kmem_zone_init((sizeof(xfs_buf_log_format64_t) +
-				(((XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK) /
-                                  NBWORD) * sizeof(int))),
-			       "xfs_buf_item64");
-#endif
 	xfs_efd_zone = kmem_zone_init((sizeof(xfs_efd_log_item_t) +
 				       (15 * sizeof(xfs_extent_t))),
 				      "xfs_efd_item");
@@ -303,6 +295,7 @@ xfs_init(
 				       (15 * sizeof(xfs_extent_t))),
 				      "xfs_efi_item");
 	xfs_ifork_zone = kmem_zone_init(sizeof(xfs_ifork_t), "xfs_ifork");
+	xfs_ili_zone = kmem_zone_init(sizeof(xfs_inode_log_item_t), "xfs_ili");
 
 	/*
 	 * Allocate global trace buffers.
@@ -366,6 +359,7 @@ xfs_cmountfs(
 	int		error = 0;
 	int		vfs_flags;
 	size_t		n;
+	char		*tmp_fsname_buffer;
 	struct vnode 	*makespecvp(dev_t, vtype_t);
 
 	/*
@@ -424,19 +418,29 @@ xfs_cmountfs(
 			}
 			mp->m_logbufs = ap->logbufs;
 			mp->m_logbsize = ap->logbufsize;
-			if (error = copyinstr(ap->fsname, mp->m_fsname,
-					      PATH_MAX, &n)) {
+			tmp_fsname_buffer = kmem_alloc(PATH_MAX, KM_SLEEP);
+			if (error = copyinstr(ap->fsname, tmp_fsname_buffer,
+					      PATH_MAX - 1, &n)) {
 				if (error == ENAMETOOLONG)
 					error = EINVAL;
+				kmem_free(tmp_fsname_buffer, PATH_MAX);
 				goto error3;
 			}
+			tmp_fsname_buffer[PATH_MAX - 1] = '\0';
+			mp->m_fsname_len = strlen(tmp_fsname_buffer) + 1;
+			mp->m_fsname = (char*)kmem_alloc(mp->m_fsname_len, 0);
+			strcpy(mp->m_fsname, tmp_fsname_buffer);
+			kmem_free(tmp_fsname_buffer, PATH_MAX);
 		} else {
 			/*
 			 * Called through vfs_mountroot/xfs_mountroot.
 			 */
 			mp->m_logbufs = -1;
 			mp->m_logbsize = -1;
-			strcpy(mp->m_fsname, "/");
+			mp->m_fsname_len = 2;
+			mp->m_fsname = (char*)kmem_alloc(mp->m_fsname_len, 0);
+			mp->m_fsname[0] = '/';
+			mp->m_fsname[1] = '\0';
 		}
 	} else {
 		ldevvp = NULL;
@@ -1370,8 +1374,9 @@ xfs_sync(
 		 * to know for sure, so we at least try to lock them.
 		 */
 		if (flags & SYNC_BDFLUSH) {
-			if (!(ip->i_item.ili_format.ilf_fields &
-			      XFS_ILOG_ALL) &&
+			if (((ip->i_itemp == NULL) ||
+			     !(ip->i_itemp->ili_format.ilf_fields &
+			       XFS_ILOG_ALL)) &&
 			    (ip->i_update_core == 0)) {
 				ip = ip->i_mnext;
 				continue;
@@ -1501,7 +1506,8 @@ xfs_sync(
 		} else if (flags & SYNC_BDFLUSH) {
 			if ((flags & SYNC_ATTR) &&
 			    ((ip->i_update_core) ||
-			     (ip->i_item.ili_format.ilf_fields != 0))) {
+			     ((ip->i_itemp != NULL) &&
+			      (ip->i_itemp->ili_format.ilf_fields != 0)))) {
 				if (mount_locked) {
 					ireclaims = mp->m_ireclaims;
 					XFS_MOUNT_IUNLOCK(mp);
@@ -1530,9 +1536,8 @@ xfs_sync(
 				    xfs_iflock_nowait(ip)) {
 					xfs_ifunlock(ip);
 					xfs_iunlock(ip, XFS_ILOCK_SHARED);
-					error = xfs_inotobp(mp, NULL,
-							    ip->i_ino,
-							    &dip, &bp);
+					error = xfs_itobp(mp, NULL, ip,
+							  &dip, &bp, 0);
 					if (!error) {
 						brelse(bp);
 					}
@@ -1591,7 +1596,8 @@ xfs_sync(
 		} else {
 			if ((flags & SYNC_ATTR) &&
 			    ((ip->i_update_core) ||
-			     (ip->i_item.ili_format.ilf_fields != 0))) {
+			     ((ip->i_itemp != NULL) &&
+			      (ip->i_itemp->ili_format.ilf_fields != 0)))) {
 				if (mount_locked) {
 					ireclaims = mp->m_ireclaims;
 					XFS_MOUNT_IUNLOCK(mp);
