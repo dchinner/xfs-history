@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.40 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1634,8 +1634,12 @@ xfs_bmapi(
 	end = bno + len;
 	cur = NULL;
 	while (bno < end && n < *nmap) {
+		/*
+		 * Reading past eof, act as though there's a hole
+		 * up to end.
+		 */
 		if (eof && !wr)
-			break;
+			got.br_startoff = end;
 		inhole = eof || got.br_startoff > bno;
 		wasdelay = !inhole && !delay &&
 			got.br_startblock == NULLSTARTBLOCK;
