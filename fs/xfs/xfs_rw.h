@@ -23,6 +23,15 @@ void
 xfs_strategy(vnode_t	*vp,
 	     buf_t	*bp);
 
+int
+xfs_bmap(vnode_t	*vp,
+	 off_t		offset,
+	 ssize_t	count,
+	 int		flags,
+	 cred_t		*credp,
+	 struct bmapval	*bmapp,
+	 int		*nbmaps);
+
 
 
 
