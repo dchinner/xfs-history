@@ -1632,6 +1632,9 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 		error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
 					 XFS_BMAPI_AFLAG(whichfork),
 					 &firstblock, 0, &map, &nmap, 0);
+		if (error)
+			return (error);
+
 		if (!error) {
 			ASSERT(nmap == 0 || nmap == 1);
 			if (nmap == 1) {
