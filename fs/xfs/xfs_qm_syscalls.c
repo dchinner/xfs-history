@@ -1,4 +1,4 @@
-#ident "$Revision: 1.11 $"
+#ident "$Revision: 1.12 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -605,6 +605,7 @@ xfs_qm_scall_getqstat(
 	fs_quota_stat_t	out;
 	xfs_inode_t	*uip, *pip;
 	boolean_t	tempuqip, temppqip;
+	__uint16_t	sbflags;
 
 	uip = pip = NULL;
 	tempuqip = temppqip = B_FALSE;
@@ -619,6 +620,20 @@ xfs_qm_scall_getqstat(
 	out.qs_flags = (__uint16_t) xfs_qm_export_flags(mp->m_qflags & 
 							(XFS_ALL_QUOTA_ACCT|
 							 XFS_ALL_QUOTA_ENFD));
+	/*
+	 * If the qflags are different on disk, as can be the case when 
+	 * root filesystem's quotas are being turned on, return them in the
+	 * HI 8 bits.
+	 */
+	if (mp->m_dev == rootdev) {
+		sbflags = (__uint16_t) xfs_qm_export_flags(mp->m_sb.sb_qflags & 
+							   (XFS_ALL_QUOTA_ACCT|
+							    XFS_ALL_QUOTA_ENFD));
+		ASSERT((out.qs_flags & 0xff00) == 0);
+		if (sbflags != out.qs_flags) 
+			out.qs_flags |= ((sbflags & 0x00ff) << 8);
+	}
+
 	out.qs_pad = 0;
 	out.qs_uquota.qfs_ino = mp->m_sb.sb_uquotino;
 	out.qs_pquota.qfs_ino = mp->m_sb.sb_pquotino;
@@ -1346,7 +1361,7 @@ xfs_dqtest_cmp(
 	xfs_dquot_t	*dqp;
 	int		error;
 
-	xfs_qm_dqtest_print(d);
+	/* xfs_qm_dqtest_print(d); */
 	if (error = xfs_qm_dqget(d->q_mount, NULL, d->d_id, d->dq_flags, 0,
 				 &dqp)) {
 		xfs_qm_dqtest_failed(d, NULL, "dqget failed", 0, 0, error);
