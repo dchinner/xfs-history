@@ -1,4 +1,4 @@
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -13,6 +13,7 @@
 #include <sys/errno.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
+#include <sys/cmn_err.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -651,4 +652,41 @@ xfs_truncate_file(
 	return error;
 }
 
+extern int xfs_fd_to_mp(int, int, xfs_mount_t **);
+
+int
+xfs_mk_sharedro(int fd)
+{
+	int error;
+	xfs_mount_t *mp;
+
+	if (error = xfs_fd_to_mp(fd, 1, &mp))
+		return XFS_ERROR(error);
+
+	mp->m_mk_sharedro = 1;
+
+	cmn_err(CE_NOTE,
+		"Filesystem \"%s\" will be marked shared read-only on unmount",
+		mp->m_fsname);
+
+	return 0;
+}
+
+int
+xfs_clear_sharedro(int fd)
+{
+	int error;
+	xfs_mount_t *mp;
+
+	if (error = xfs_fd_to_mp(fd, 1, &mp))
+		return XFS_ERROR(error);
+
+	mp->m_mk_sharedro = 0;
+
+	cmn_err(CE_NOTE,
+	"Filesystem \"%s\" will not be marked shared read-only on unmount",
+		mp->m_fsname);
+
+	return 0;
+}
 #endif /* !SIM */
