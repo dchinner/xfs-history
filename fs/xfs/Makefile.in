@@ -40,7 +40,7 @@
 # linux/include/xfs_support, not hidden under fs.  Keith Owens.
 
 XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs) $(src_includelist /fs) -funsigned-char
-ifeq ($(CONFIG_XFS_DEBUG),y)
+ifsel(CONFIG_XFS_DEBUG)
   XFS_EXTRA_CFLAGS	+= -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
 extra_cflags_all($(XFS_EXTRA_CFLAGS))
@@ -51,7 +51,7 @@ else
   objlink(xfs.o xfsrtstubs.o)
 endif
 
-objlink_cond(CONFIG_XFS_GRIO xfs.o xfs_grio.o)
+objlink(CONFIG_XFS_GRIO xfs.o xfs_grio.o)
 
 ifsel(CONFIG_XFS_DMAPI)
   objlink(xfs.o dmapi/dmapi.o xfs_dmapi.o)
@@ -65,7 +65,7 @@ else
   objlink(xfs.o xfsquotasstubs.o)
 endif
 
-objlink_cond(CONFIG_FS_POSIX_ACL xfs.o xfs_acl.o)
+objlink(CONFIG_FS_POSIX_ACL xfs.o xfs_acl.o)
 
 objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
         xfs_attr_leaf.o xfs_bit.o xfs_bmap.o xfs_bmap_btree.o xfs_btree.o
@@ -79,10 +79,16 @@ objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
         xfs_trans_item.o xfs_utils.o xfs_vfsops.o xfs_vnodeops.o xfs_rw.o
         macstubs.o linux/linux_xfs.o)
 
-# xfsidbg is always a module, but only if kdb is available.
-ifsel(CONFIG_XFS_FS)
-  ifsel(CONFIG_KDB)
-    always_mod(xfsidbg.o)
+# If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
+# a module and kdb modules are being compiled then xfsidbg must be a module, to
+# follow xfs.  If xfs is built in then xfsidbg tracks the kdb module state.
+# This must come after the main xfs code so xfs initialises before xfsidbg.
+# KAO
+ifsel(CONFIG_KDB_MODULES)
+  ifselnmod(CONFIG_XFS_FS)
+    select(CONFIG_KDB_MODULES xfsidbg.o)
+  else
+    select(CONFIG_XFS_FS xfsidbg.o)
   endif
 endif
 
