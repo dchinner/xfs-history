@@ -15,7 +15,7 @@ COMMANDS = cmd/attr cmd/xfsprogs cmd/xfsdump cmd/acl
 COMMANDRPMS = attr attr-devel xfsprogs xfsprogs-devel xfsdump acl acl-devel
 # COMMANDRPMS += dmapi dmapi-devel
 
-default all: checkproc tarballs i386kernel i586kernel i686kernel ia64kernel cmds
+default all: checkproc tarballs kernel cmds
 
 checkproc:
 	if [ ! -e /proc/stat ]; then \
@@ -30,37 +30,14 @@ tarballs: xfs-cmds
 		cp $(WORKAREA)/$$d/build/*.src.tar.gz $(WORKAREA)/SOURCES; \
 	done
 
-i386kernel:
-	if [[ "i386" == $(ARCH) ]]; then \
-		@echo "=== Making $@ `date`"; \
-		cd $(WORKAREA)/SPECS; \
-		rpm -ba --target=i386 ${KERN_SPEC}; \
-		echo "=== Done Making $@ `date`"; \
-	fi
-
-i586kernel:
-	if [[ "i386" == $(ARCH) ]]; then \
-		@echo "=== Making $@ `date`"; \
-		cd $(WORKAREA)/SPECS; \
-		rpm -ba --target=i586 ${KERN_SPEC}; \
-		echo "=== Done Making $@ `date`"; \
-	fi
-
-i686kernel:
-	if [[ "i386" == $(ARCH) ]]; then \
-		@echo "=== Making $@ `date`"; \
-		cd $(WORKAREA)/SPECS; \
-		rpm -ba --target=i686 ${KERN_SPEC}; \
-		echo "=== Done Making $@ `date`"; \
-	fi
-
-ia64kernel:
-	if [[ "ia64" == $(ARCH) ]]; then \
-		@echo "=== Making $@ `date`"; \
-		cd $(WORKAREA)/SPECS; \
-		rpm -ba --target=ia64 ${KERN_SPEC}; \
-		echo "=== Done Making $@ `date`"; \
-	fi
+kernel:
+	@echo "=== Making $@ `date`";
+	rpm -ba --target=$(ARCH) $(WORKAREA)/SPECS/${KERN_SPEC};
+ifeq ($(ARCH),i386)
+	rpm -ba --target=i586 $(WORKAREA)/SPECS/${KERN_SPEC};
+	rpm -ba --target=i686 $(WORKAREA)/SPECS/${KERN_SPEC};
+endif
+	echo "=== Done Making $@ `date`";
 
 cmds: xfs-cmds
 	[ ! -d $(WORKAREA)/SRPMS ] \
