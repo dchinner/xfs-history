@@ -74,6 +74,8 @@ xfs_write_clear_setuid(
 	xfs_mount_t	*mp;
 	xfs_trans_t	*tp;
 	int		error;
+	vnode_t		*vp = XFS_ITOV(ip);
+	struct inode	*inode = LINVFS_GET_IP(vp);
 
 	mp = ip->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_WRITEID);
@@ -87,6 +89,7 @@ xfs_write_clear_setuid(
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 	ip->i_d.di_mode &= ~ISUID;
+	inode->i_mode &= ~ISUID;
 
 	/*
 	 * Note that we don't have to worry about mandatory
@@ -97,6 +100,7 @@ xfs_write_clear_setuid(
 	 */
 	if (ip->i_d.di_mode & (IEXEC >> 3)) {
 		ip->i_d.di_mode &= ~ISGID;
+		inode->i_mode &= ~ISGID;
 	}
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	xfs_trans_set_sync(tp);

@@ -171,6 +171,7 @@ int				pb_resv_bh_cnt = 0;	/* # of bh available */
 STATIC void pagebuf_daemon_wakeup(int);
 STATIC void _pagebuf_ioapply(page_buf_t *);
 STATIC void pagebuf_delwri_queue(page_buf_t *, int);
+STATIC void pagebuf_runall_queues(struct list_head[]);
 
 /*
  * Pagebuf module configuration parameters, exported via
@@ -1743,6 +1744,8 @@ pagebuf_iowait(
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
 	if (atomic_read(&pb->pb_io_remaining))
 		blk_run_queues();
+	if ((pb->pb_flags & PBF_FS_DATAIOD))
+		pagebuf_runall_queues(pagebuf_dataiodone_tq);
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, PB_TRACE_REC(iowaited), (int)pb->pb_error);
 	return pb->pb_error;
