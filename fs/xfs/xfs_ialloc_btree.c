@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.23 $"
 
 /*
  * Inode allocation management for XFS.
@@ -706,8 +706,9 @@ xfs_inobt_delrec(
 	 * cursor to the left block, and fix up the index.
 	 */
 	if (bp != lbp) {
-		cur->bc_bufs[level] = NULL;
+		cur->bc_bufs[level] = lbp;
 		cur->bc_ptrs[level] += left->bb_numrecs;
+		cur->bc_ra[level] = 0;
 	}
 	/*
 	 * If we joined with the right neighbor and there's a level above
@@ -2064,6 +2065,10 @@ xfs_inobt_decrement(
 	int			lev;	/* btree level */
 
 	/*
+	 * Read-ahead to the left at this level.
+	 */
+	xfs_btree_readahead(cur, level, XFS_BTCUR_LEFTRA);
+	/*
 	 * Decrement the ptr at this level.  If we're still in the block
 	 * then we're done.
 	 */
@@ -2091,6 +2096,11 @@ xfs_inobt_decrement(
 	for (lev = level + 1; lev < cur->bc_nlevels; lev++) {
 		if (--cur->bc_ptrs[lev] > 0)
 			break;
+		/*
+		 * Read-ahead the left block, we're going to read it
+		 * in the next loop.
+		 */
+		xfs_btree_readahead(cur, lev, XFS_BTCUR_LEFTRA);
 	}
 	/*
 	 * If we went off the root then we are seriously confused.
@@ -2166,6 +2176,41 @@ xfs_inobt_delete(
 #endif	/* _NOTYET_ */
 
 /* 
+ * Get the data from the next record after the pointed-to one.
+ */
+int					/* success/failure */
+xfs_inobt_get_nextrec(
+	xfs_btree_cur_t		*cur,	/* btree cursor */
+	xfs_agino_t		*ino,	/* output: starting inode of chunk */
+	__int32_t		*fcnt,	/* output: number of free inodes */
+	xfs_inofree_t		*free)	/* output: free inode mask */
+{
+	xfs_inobt_block_t	*block;	/* btree block */
+	buf_t			*bp;	/* buffer containing btree block */
+	int			ptr;	/* record number */
+	xfs_inobt_rec_t		*rec;	/* record data */
+
+	bp = cur->bc_bufs[0];
+	ptr = cur->bc_ptrs[0] + 1;
+	block = XFS_BUF_TO_INOBT_BLOCK(bp);
+	xfs_btree_check_sblock(cur, block, 0);
+	/*
+	 * Off the right end or left end, return failure.
+	 */
+	if (ptr > block->bb_numrecs || ptr <= 0)
+		return 0;
+	/*
+	 * Point to the record and extract its data.
+	 */
+	rec = XFS_INOBT_REC_ADDR(block, ptr, cur);
+	*ino = rec->ir_startino;
+	*fcnt = rec->ir_freecount;
+	*free = rec->ir_free;
+	kmem_check();
+	return 1;
+}
+
+/* 
  * Get the data from the pointed-to record.
  */
 int					/* success/failure */
@@ -2216,6 +2261,10 @@ xfs_inobt_increment(
 	int			lev;	/* btree level */
 
 	/*
+	 * Read-ahead to the right at this level.
+	 */
+	xfs_btree_readahead(cur, level, XFS_BTCUR_RIGHTRA);
+	/*
 	 * Get a pointer to the btree block.
 	 */
 	bp = cur->bc_bufs[level];
@@ -2246,6 +2295,11 @@ xfs_inobt_increment(
 		xfs_btree_check_sblock(cur, block, lev);
 		if (++cur->bc_ptrs[lev] <= block->bb_numrecs)
 			break;
+		/*
+		 * Read-ahead the right block, we're going to read it
+		 * in the next loop.
+		 */
+		xfs_btree_readahead(cur, lev, XFS_BTCUR_RIGHTRA);
 	}
 	/*
 	 * If we went off the root then we are seriously confused.

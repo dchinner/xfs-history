@@ -1,4 +1,4 @@
-#ident "$Revision: 1.156 $"
+#ident "$Revision: 1.157 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -178,6 +178,7 @@ xfs_inotobp(
 	 * Call the space managment code to find the location of the
 	 * inode on disk.
 	 */
+	imap.im_blkno = 0;
 	error = xfs_imap(mp, tp, ino, &imap, XFS_IMAP_LOOKUP);
 	if (error != 0) {
 		return error;
@@ -249,7 +250,8 @@ xfs_itobp(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,	
 	xfs_dinode_t	**dipp,
-	buf_t		**bpp)
+	buf_t		**bpp,
+	daddr_t		bno)
 {
 	xfs_imap_t	imap;
 	buf_t		*bp;
@@ -262,6 +264,7 @@ xfs_itobp(
 		 * Call the space managment code to find the location of the
 		 * inode on disk.
 		 */
+		imap.im_blkno = bno;
 		error = xfs_imap(mp, tp, ip->i_ino, &imap, XFS_IMAP_LOOKUP);
 		if (error != 0) {
 			return error;
@@ -294,6 +297,7 @@ xfs_itobp(
 		imap.im_len = ip->i_len;
 		imap.im_boffset = ip->i_boffset;
 	}
+	ASSERT(bno == 0 || bno == imap.im_blkno);
 
 	/*
 	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
@@ -533,7 +537,8 @@ xfs_iread(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
-	xfs_inode_t	**ipp)
+	xfs_inode_t	**ipp,
+	daddr_t		bno)
 {
 	buf_t		*bp;
 	xfs_dinode_t	*dip;
@@ -554,8 +559,7 @@ xfs_iread(
 	 * return NULL as well.  Set i_blkno to 0 so that xfs_itobp() will
 	 * know that this is a new incore inode.
 	 */
-	ip->i_blkno = 0;
-	error = xfs_itobp(mp, tp, ip, &dip, &bp);
+	error = xfs_itobp(mp, tp, ip, &dip, &bp, bno);
 
 	if (error != 0) {
 		kmem_zone_free(xfs_inode_zone, ip);
@@ -582,7 +586,7 @@ xfs_iread(
 	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
 		kmem_zone_free(xfs_inode_zone, ip);
 		xfs_trans_brelse(tp, bp);
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 
 	/*
@@ -1611,7 +1615,7 @@ xfs_iunlink(
 		 * Here we put the head pointer into our next pointer,
 		 * and then we fall through to point the head at us.
 		 */
-		error = xfs_itobp(mp, tp, ip, &dip, &ibp);
+		error = xfs_itobp(mp, tp, ip, &dip, &ibp, 0);
 		if (error) {
 			return error;
 		}
@@ -1708,7 +1712,7 @@ xfs_iunlink_remove(
 		 * of dealing with the buffer when there is no need to
 		 * change it.
 		 */
-		error = xfs_itobp(mp, tp, ip, &dip, &ibp);
+		error = xfs_itobp(mp, tp, ip, &dip, &ibp, 0);
 		if (error) {
 			return error;
 		}
@@ -1763,7 +1767,7 @@ xfs_iunlink_remove(
 		 * Now last_ibp points to the buffer previous to us on
 		 * the unlinked list.  Pull us from the list.
 		 */
-		error = xfs_itobp(mp, tp, ip, &dip, &ibp);
+		error = xfs_itobp(mp, tp, ip, &dip, &ibp, 0);
 		if (error) {
 			return error;
 		}
@@ -2181,6 +2185,8 @@ xfs_imap(
 	int		off;
 	int		error;
 
+	fsbno = imap->im_blkno ?
+		XFS_DADDR_TO_FSB(mp, imap->im_blkno) : NULLFSBLOCK;
 	error = xfs_dilocate(mp, tp, ino, &fsbno, &len, &off, flags);
 	if (error != 0) {
 		return error;
@@ -2231,6 +2237,10 @@ xfs_idestroy_fork(
 	ASSERT(ifp->if_u1.if_extents == NULL ||
 	       ifp->if_u1.if_extents == ifp->if_u2.if_inline_ext);
 	ASSERT(ifp->if_real_bytes == 0);
+	if (whichfork == XFS_ATTR_FORK) {
+		kmem_zone_free(xfs_ifork_zone, ip->i_afp);
+		ip->i_afp = NULL;
+	}
 }
 
 /*
@@ -2251,10 +2261,8 @@ xfs_idestroy(
 		xfs_idestroy_fork(ip, XFS_DATA_FORK);
 		break;
 	}
-	if (ip->i_afp) {
+	if (ip->i_afp)
 		xfs_idestroy_fork(ip, XFS_ATTR_FORK);
-		kmem_zone_free(xfs_ifork_zone, ip->i_afp);
-	}
 #ifdef NOTYET
 	if (ip->i_range_lock.r_sleep != NULL) {
 		freesema(ip->i_range_lock.r_sleep);
@@ -2598,7 +2606,7 @@ xfs_iflush(
 	/*
 	 * Get the buffer containing the on-disk inode.
 	 */
-	error = xfs_itobp(mp, NULL, ip, &dip, &bp);
+	error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
 	if (error != 0) {
 		xfs_ifunlock(ip);
 		return error;

@@ -288,7 +288,7 @@ void		xfs_ihash_free(struct xfs_mount *);
 xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 				  struct xfs_trans *);
 int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			 uint, xfs_inode_t **);
+			 uint, xfs_inode_t **, daddr_t);
 void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);
 int		xfs_ilock_nowait(xfs_inode_t *, uint);
@@ -306,7 +306,7 @@ void		xfs_ireclaim(xfs_inode_t *);
 int		xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			    xfs_dinode_t **, struct buf **);
 int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			  xfs_inode_t **);
+			  xfs_inode_t **, daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, ushort,
 		           dev_t, struct cred *, struct buf **, boolean_t *,

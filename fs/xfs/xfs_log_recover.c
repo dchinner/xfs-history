@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.63 $"
+#ident	"$Revision: 1.67 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1886,6 +1886,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		 * rather than its cluster, so we must make sure to
 		 * invalidate the buffer when we write it out below.
 		 */
+		imap.im_blkno = 0;
 		xfs_imap(log->l_mp, 0, in_f->ilf_ino, &imap, 0);
 	}
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
@@ -2528,7 +2529,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			brelse(agibp);
 
 			ino = XFS_AGINO_TO_INO(mp, agno, agino);
-			error = xfs_iget(mp, NULL, ino, 0, &ip);
+			error = xfs_iget(mp, NULL, ino, 0, &ip, 0);
 			if (!error) {
 				ASSERT(ip != NULL);
 				ASSERT(ip->i_d.di_nlink == 0);

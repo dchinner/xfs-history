@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.101 $"
+#ident	"$Revision: 1.102 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -414,7 +414,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		 * Save the pointer to it in the mount structure.
 		 */
 		error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL,
-				 &rip);
+				 &rip, 0);
 		if (error) {
 			goto error2;
 		}
@@ -440,7 +440,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 */
 	if (sbp->sb_rbmino != NULLFSINO) {
 		error = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL,
-				 &(mp->m_rbmip));
+				 &mp->m_rbmip, 0);
 		if (error) {
 			/*
 			 * Free up the root inode.
@@ -453,7 +453,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		ASSERT(mp->m_rbmip != NULL);
 		ASSERT(sbp->sb_rsumino != NULLFSINO);
 		error = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL,
-				 &(mp->m_rsumip));
+				 &mp->m_rsumip, 0);
 		if (error) {
 			/*
 			 * Free up the root and first rt inodes.

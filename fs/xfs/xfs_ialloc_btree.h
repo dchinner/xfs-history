@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_BTREE_H
 #define	_FS_XFS_IALLOC_BTREE_H
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 /*
  * Inode map on-disk structures
@@ -27,6 +27,8 @@ typedef	__uint64_t	xfs_inofree_t;
 #define	XFS_INOBT_IS_FREE(rp, i)	((rp)->ir_free & XFS_INOBT_MASK(i))
 #define	XFS_INOBT_SET_FREE(rp, i)	((rp)->ir_free |= XFS_INOBT_MASK(i))
 #define	XFS_INOBT_CLR_FREE(rp, i)	((rp)->ir_free &= ~XFS_INOBT_MASK(i))
+
+#define	XFS_INOBT_MASKN(i,n)		((xfs_inofree_t)((1 << (n)) - 1) << (i))
 
 /*
  * Data record structure
@@ -62,6 +64,10 @@ typedef	struct xfs_btree_sblock xfs_inobt_block_t;
 	((cur)->bc_mp->m_inobt_mxr[lev != 0])
 #define	XFS_INOBT_BLOCK_MINRECS(lev,cur)	\
 	((cur)->bc_mp->m_inobt_mnr[lev != 0])
+
+#define	XFS_INOBT_IS_LAST_REC(cur)	\
+	((cur)->bc_ptrs[0] == \
+	 XFS_BUF_TO_INOBT_BLOCK((cur)->bc_bufs[0])->bb_numrecs)
 
 /*
  * Maximum number of inode btree levels.
@@ -114,6 +120,16 @@ xfs_inobt_delete(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	int			*stat);	/* success/failure */
 #endif	/* _NOTYET_ */
+
+/*
+ * Get the data from the next record after the pointed-to one.
+ */
+int					/* success/failure */
+xfs_inobt_get_nextrec(
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	xfs_agino_t		*ino,	/* output: starting inode of chunk */
+	__int32_t		*fcnt,	/* output: number of free inodes */
+	xfs_inofree_t		*free);	/* output: free inode mask */
 
 /*
  * Get the data from the pointed-to record.

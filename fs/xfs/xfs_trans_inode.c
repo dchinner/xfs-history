@@ -1,4 +1,4 @@
-#ident "$Revision: 1.20 $"
+#ident "$Revision: 1.21 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -84,7 +84,7 @@ xfs_trans_iget(
 	 * xfs_iget().
 	 */
 	if (tp == NULL) {
-		return (xfs_iget(mp, NULL, ino, lock_flags, ipp));
+		return (xfs_iget(mp, NULL, ino, lock_flags, ipp, 0));
 	}
 
 	/*
@@ -124,7 +124,7 @@ xfs_trans_iget(
 	}
 
 	ASSERT(lock_flags & XFS_ILOCK_EXCL);
-	error = xfs_iget(tp->t_mountp, tp, ino, lock_flags, &ip);
+	error = xfs_iget(tp->t_mountp, tp, ino, lock_flags, &ip, 0);
 	if (error) {
 		return error;
 	}

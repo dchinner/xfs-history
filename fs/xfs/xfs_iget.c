@@ -1,4 +1,4 @@
-#ident "$Revision: 1.55 $"
+#ident "$Revision: 1.56 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -127,16 +127,20 @@ xfs_ihash_free(xfs_mount_t *mp)
  * tp -- a pointer to the current transaction if there is one.  This is
  *       simply passed through to the xfs_iread() call.
  * ino -- the number of the inode desired.  This is the unique identifier
- *       within the file system for the inode being requested.
+ *        within the file system for the inode being requested.
  * lock_flags -- flags indicating how to lock the inode.  See the comment
- *	 for xfs_ilock() for a list of valid values.
+ *		 for xfs_ilock() for a list of valid values.
+ * bno -- the block number starting the buffer containing the inode,
+ *	  if known (as by bulkstat), else 0.
  */
 int
-xfs_iget(xfs_mount_t	*mp,
-	 xfs_trans_t	*tp,
-	 xfs_ino_t	ino,
-	 uint		lock_flags,
-	xfs_inode_t	**ipp)
+xfs_iget(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_ino_t	ino,
+	uint		lock_flags,
+	xfs_inode_t	**ipp,
+	daddr_t		bno)
 {
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
@@ -216,7 +220,7 @@ again:
 	 * it soon if it's a dup.  This should also initialize i_dev, i_ino,
 	 * i_bno, i_mount, and i_index.
 	 */
-	error = xfs_iread(mp, tp, ino, &ip);
+	error = xfs_iread(mp, tp, ino, &ip, bno);
 	if (error) {
 		return error;
 	}
