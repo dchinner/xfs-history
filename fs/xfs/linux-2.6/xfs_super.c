@@ -143,10 +143,9 @@ xfs_parseargs(
 		return 0;
 	}
 	
-	for (this_char = strtok (options, ",");
-	     this_char != NULL;
-	     this_char = strtok (NULL, ",")) {
-
+	while ((this_char = strsep (&options, ",")) != NULL) {
+		if (!*this_char)
+			continue;
 		if ((value = strchr (this_char, '=')) != NULL)
 			*value++ = 0;
 
@@ -681,7 +680,7 @@ linvfs_put_inode(
 	vnode_t		*vp = LINVFS_GET_VP(ip);
 	int		error;
 
-    	if (vp && (atomic_read(&ip->i_count) == 1))
+    	if (vp && vp->v_fbhv && (atomic_read(&ip->i_count) == 1))
 		VOP_RELEASE(vp, error);
 }
 

@@ -421,7 +421,7 @@ _pagebuf_lookup_pages(
 	unsigned long pi;
 	unsigned long index;
 	int all_mapped, good_pages;
-	struct page *cp, **hash, *cached_page;
+	struct page *cp, *cached_page;
 	int gfp_mask;
 	int	retry_count = 0;
 
@@ -470,9 +470,8 @@ _pagebuf_lookup_pages(
 	index = (pb->pb_file_offset - pb->pb_offset) >> PAGE_CACHE_SHIFT;
 	for (all_mapped = 1; pi < page_count; pi++, index++) {
 		if (pb->pb_pages[pi] == 0) {
-			hash = page_hash(aspace, index);
 		      retry:
-			cp = __find_lock_page(aspace, index, hash);
+			cp = find_lock_page(aspace, index);
 			if (!cp) {
 				PB_STATS_INC(pbstats.pb_page_alloc);
 				if (!cached_page) {
@@ -494,7 +493,7 @@ _pagebuf_lookup_pages(
 				}
 				cp = cached_page;
 				if (add_to_page_cache_unique(cp,
-					aspace, index, hash))
+					aspace, index))
 					goto retry;
 				cached_page = NULL;
 			} else {

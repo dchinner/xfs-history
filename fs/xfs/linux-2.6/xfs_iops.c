@@ -760,10 +760,10 @@ linvfs_write_full_page(
 		goto out_fail;
 
 	if ((current->flags & (PF_FSTRANS|PF_NOIO)) &&
-	    (!page->buffers || buffer_delay(page->buffers)))
+	    (!page_has_buffers(page) || buffer_delay(page_buffers(page))))
 		goto out_fail;
 
-	if (!page->buffers || buffer_delay(page->buffers)) {
+	if (!page_has_buffers(page) || buffer_delay(page_buffers(page))) {
 		current->flags |= PF_NOIO;
 		flagset = 1;
 	}
@@ -821,8 +821,8 @@ linvfs_release_page(
 	struct page	*page,
 	int		gfp_mask)
 {
-	if (page->buffers && !buffer_delay(page->buffers)) {
-		return 1;
+	if (page_has_buffers(page) && !buffer_delay(page_buffers(page))) {
+		return try_to_free_buffers(page, gfp_mask);
 	}
 
 	if (gfp_mask & __GFP_FS) {
@@ -831,7 +831,7 @@ linvfs_release_page(
 		struct vnode	*vp = LINVFS_GET_VP(inode);
 
 		VOP_RELEASE_PAGE(vp, page, error);
-		return error;
+		return try_to_free_buffers(page, gfp_mask);
 	}
 	return 0;
 }
