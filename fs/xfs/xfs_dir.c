@@ -134,7 +134,7 @@ xfs_dir_isempty(xfs_inode_t *dp)
 	xfs_sb_t *sbp;
 	struct xfs_dir_sf_hdr *hdr;
 
-	ASSERT(dp->i_d.di_mode & IFMT == IFDIR);
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (dp->i_d.di_size == 0)
 		return(1);
 	sbp = &dp->i_mount->m_sb;
@@ -149,7 +149,7 @@ xfs_dir_isempty(xfs_inode_t *dp)
  */
 xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
 {
-	ASSERT(dir->i_d.di_mode & IFMT == IFDIR);
+	ASSERT((dir->i_d.di_mode & IFMT) == IFDIR);
 	return(xfs_dir_shortform_create(trans, dir, parent_dir->i_ino));
 }
 
@@ -165,7 +165,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	int retval, newsize, namelen;
 	xfs_sb_t *sbp;
 
-	ASSERT(dp->i_d.di_mode & IFMT == IFDIR);
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
 		return(EINVAL);
@@ -223,7 +223,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	int count, totallen, newsize, retval, namelen;
 	xfs_sb_t *sbp;
 
-	ASSERT(dp->i_d.di_mode & IFMT == IFDIR);
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN)
 		return(EINVAL);
@@ -270,7 +270,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	int retval;
 	xfs_sb_t *sbp;
 
-	ASSERT(dp->i_d.di_mode & IFMT == IFDIR);
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (namelen >= MAXNAMELEN)
 		return(EINVAL);
 
@@ -314,7 +314,7 @@ xfs_dir_print(xfs_trans_t *trans, xfs_inode_t *dp)
 {
 	xfs_sb_t *sbp;
 
-	ASSERT(dp->i_d.di_mode & IFMT == IFDIR);
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	sbp = &dp->i_mount->m_sb;
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -338,7 +338,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	int retval;
 	dirent_t *buf;
 
-	ASSERT(dp->i_d.di_mode & IFMT == IFDIR);
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	sbp = &dp->i_mount->m_sb;
 	buf = kmem_alloc(sizeof(*buf) + MAXNAMELEN, KM_SLEEP);
 	*eofp = 0;
