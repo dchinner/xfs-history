@@ -1,12 +1,19 @@
-
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
+#ident "$Revision$"
 
-struct xfs_inode;
+struct buf;
+struct cred;
+struct grio_ticket;
 struct ktrace;
-struct xfs_gap;
 struct vnode;
+struct xfs_bmbt_block;
+struct xfs_gap;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
+struct zone;
 
 /*
  * This is the type used in the xfs inode hash table.
@@ -82,7 +89,7 @@ typedef struct xfs_inode {
 	short			i_boffset;	/* off of inode in buffer */
 
 	/* Transaction and locking information. */
-	xfs_trans_t		*i_transp;	/* ptr to owning transaction*/
+	struct xfs_trans	*i_transp;	/* ptr to owning transaction*/
 	xfs_inode_log_item_t	i_item;		/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
 	mrlock_t		i_iolock;	/* inode IO lock */
@@ -221,8 +228,8 @@ typedef struct xfs_inode {
 #endif
 
 
-#define	XFS_ITOV(ip)	((vnode_t*)((ip)->i_vnode))
-#define	XFS_VTOI(vp)	((xfs_inode_t*)((vp)->v_data))
+#define	XFS_ITOV(ip)	((struct vnode *)((ip)->i_vnode))
+#define	XFS_VTOI(vp)	((xfs_inode_t *)((vp)->v_data))
 
 /*
  * Clear out the read-ahead state in the in-core inode.
@@ -247,17 +254,19 @@ typedef __uint32_t	xfs_fid_ino_t;
 typedef struct xfs_fid {
 	u_short		fid_len;       /* length of remainder */
         u_short		fid_pad;       /* padding, must be zero */
-	__uint32_t		fid_gen;       /* generation number */
+	__uint32_t	fid_gen;       /* generation number */
         xfs_fid_ino_t	fid_ino;       /* inode number */
 } xfs_fid_t;
 
 /*
  * xfs_iget.c prototypes.
  */
-void		xfs_ihash_init(xfs_mount_t *);
-void		xfs_ihash_free(xfs_mount_t *);
-xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t, xfs_trans_t *);
-xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, uint);
+void		xfs_ihash_init(struct xfs_mount *);
+void		xfs_ihash_free(struct xfs_mount *);
+xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
+				  struct xfs_trans *);
+xfs_inode_t	*xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
+			  uint);
 void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);
 int		xfs_ilock_nowait(xfs_inode_t *, uint);
@@ -272,21 +281,21 @@ void		xfs_ireclaim(xfs_inode_t *);
 /*
  * xfs_inode.c prototypes.
  */
-buf_t		*xfs_inotobp(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,
+struct buf	*xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			     xfs_dinode_t **);
-xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
-void		xfs_iread_extents(xfs_trans_t *, xfs_inode_t *);
-xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
-			    dev_t, struct cred *, buf_t **, boolean_t *);
+xfs_inode_t	*xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t);
+void		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *);
+xfs_inode_t	*xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, ushort,
+			    dev_t, struct cred *, struct buf **, boolean_t *);
 #ifndef SIM
-void		xfs_ifree(xfs_trans_t *, xfs_inode_t *);
+void		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
 void		xfs_itruncate_start(xfs_inode_t *, uint, xfs_fsize_t);
-void		xfs_itruncate_finish(xfs_trans_t **, xfs_inode_t *,
+void		xfs_itruncate_finish(struct xfs_trans **, xfs_inode_t *,
 				     xfs_fsize_t);
-void		xfs_iunlink(xfs_trans_t *, xfs_inode_t *);
+void		xfs_iunlink(struct xfs_trans *, xfs_inode_t *);
 #endif	/* !SIM */
 void		xfs_igrow_start(xfs_inode_t *, xfs_fsize_t, struct cred *);
-void		xfs_igrow_finish(xfs_trans_t *, xfs_inode_t *,
+void		xfs_igrow_finish(struct xfs_trans *, xfs_inode_t *,
 				 xfs_fsize_t);
 
 void		xfs_idestroy(xfs_inode_t *);
@@ -297,7 +306,7 @@ void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
 int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *);
 void		xfs_iflush(xfs_inode_t *, uint);
-int		xfs_iflush_all(xfs_mount_t *, int);
+int		xfs_iflush_all(struct xfs_mount *, int);
 #ifdef SIM
 void		xfs_iprint(xfs_inode_t *);
 #endif
@@ -307,8 +316,8 @@ void		xfs_ichgtime(xfs_inode_t *, int);
 xfs_fsize_t	xfs_file_last_byte(xfs_inode_t *);
 
 #ifdef DEBUG
-void		xfs_isize_check(xfs_mount_t *, xfs_inode_t *, xfs_fsize_t);
-void		xfs_inobp_check(xfs_mount_t *, buf_t *);
+void		xfs_isize_check(struct xfs_mount *, xfs_inode_t *, xfs_fsize_t);
+void		xfs_inobp_check(struct xfs_mount *, struct buf *);
 #else	/* DEBUG */
 #define xfs_isize_check(mp, ip, isize)
 #define	xfs_inobp_check(mp, bp)

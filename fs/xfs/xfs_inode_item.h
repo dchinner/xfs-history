@@ -1,9 +1,13 @@
-
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-struct xfs_inode;
+#ident "$Revision$"
+
+struct buf;
+struct proc;
 struct xfs_bmbt_rec_32;
+struct xfs_inode;
+struct xfs_mount;
 
 /*
  * This is the structure used to lay out an inode log item in the
@@ -44,7 +48,6 @@ typedef struct xfs_inode_log_format_v1 {
 	} ilf_u;
 } xfs_inode_log_format_t_v1;
 
-struct proc;
 typedef struct xfs_inode_log_item {
 	xfs_log_item_t		ili_item;	   /* common portion */
 	struct xfs_inode	*ili_inode;	   /* inode ptr */
@@ -55,7 +58,7 @@ typedef struct xfs_inode_log_item {
 	unsigned short		ili_logged;	   /* flushed logged data */
 	unsigned int		ili_last_fields;   /* fields when flushed */
 	struct xfs_bmbt_rec_32	*ili_extents_buf;  /* array of logged exts */
-	buf_t			*ili_bp;	   /* locked inode buffer */
+	struct buf		*ili_bp;	   /* locked inode buffer */
 	struct proc		*ili_bp_owner;	   /* bp owner proc */
 	xfs_inode_log_format_t	ili_format;	   /* logged structure */
 } xfs_inode_log_item_t;
@@ -85,7 +88,7 @@ typedef struct xfs_inode_log_item {
 				 XFS_ILOG_DEV | XFS_ILOG_UUID)
 
      
-void	xfs_inode_item_init(struct xfs_inode *, xfs_mount_t *);
-void	xfs_iflush_done(buf_t *, xfs_inode_log_item_t *);
+void	xfs_inode_item_init(struct xfs_inode *, struct xfs_mount *);
+void	xfs_iflush_done(struct buf *, xfs_inode_log_item_t *);
 
 #endif	/* _XFS_INODE_ITEM_H */

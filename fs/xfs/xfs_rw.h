@@ -1,8 +1,16 @@
-
-
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
+#ident "$Revision$"
+
+struct bmapval;
+struct buf;
+struct cred;
+struct uio;
+struct vnode;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
 
 /*
  * This is a structure used to hold the local variables used
@@ -12,34 +20,34 @@
  * initialize the zone allocator.
  */
 typedef struct xfs_strat_write_locals {
-	xfs_fileoff_t	offset_fsb;
-	xfs_fileoff_t   map_start_fsb;
-	xfs_fileoff_t	imap_offset;
-	xfs_fsblock_t	first_block;
-	xfs_fsize_t	real_size;
-	xfs_filblks_t	count_fsb;
-	xfs_extlen_t	imap_blocks;
-	off_t		last_rbp_offset;
-	xfs_extlen_t	last_rbp_bcount;
-	daddr_t		last_rbp_blkno;
-	int		rbp_count;
-	int		x;
-	caddr_t		datap;
-	buf_t		*rbp;
-	xfs_mount_t	*mp;
-	xfs_inode_t	*ip;
-	xfs_trans_t	*tp;
-	int		error;
-	xfs_bmap_free_t	free_list;
-	xfs_bmbt_irec_t	*imapp;
-	int		rbp_offset;
-	int		rbp_len;
-	int		set_lead;
-	int		s;
-	int		loops;
-	int		imap_index;
-	int		nimaps;
-	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];
+	xfs_fileoff_t		offset_fsb;
+	xfs_fileoff_t  		map_start_fsb;
+	xfs_fileoff_t		imap_offset;
+	xfs_fsblock_t		first_block;
+	xfs_fsize_t		real_size;
+	xfs_filblks_t		count_fsb;
+	xfs_extlen_t		imap_blocks;
+	off_t			last_rbp_offset;
+	xfs_extlen_t		last_rbp_bcount;
+	daddr_t			last_rbp_blkno;
+	int			rbp_count;
+	int			x;
+	caddr_t			datap;
+	struct buf		*rbp;
+	struct xfs_mount	*mp;
+	struct xfs_inode	*ip;
+	struct xfs_trans	*tp;
+	int			error;
+	xfs_bmap_free_t		free_list;
+	xfs_bmbt_irec_t		*imapp;
+	int			rbp_offset;
+	int			rbp_len;
+	int			set_lead;
+	int			s;
+	int			loops;
+	int			imap_index;
+	int			nimaps;
+	xfs_bmbt_irec_t		imap[XFS_BMAP_MAX_NMAP];
 } xfs_strat_write_locals_t;
 
 /*
@@ -111,35 +119,35 @@ typedef struct xfs_gap {
  * Prototypes for functions in xfs_rw.c.
  */
 int
-xfs_read(vnode_t	*vp,
-	 uio_t		*uiop,
+xfs_read(struct vnode	*vp,
+	 struct uio	*uiop,
 	 int		ioflag,
-	 cred_t		*credp);
+	 struct cred	*credp);
 
 int
-xfs_write(vnode_t	*vp,
-	  uio_t		*uiop,
+xfs_write(struct vnode	*vp,
+	  struct uio	*uiop,
 	  int		ioflag,
-	  cred_t	*credp);
+	  struct cred	*credp);
 
 void
-xfs_strategy(vnode_t	*vp,
-	     buf_t	*bp);
+xfs_strategy(struct vnode	*vp,
+	     struct buf		*bp);
 
 int
-xfs_bmap(vnode_t	*vp,
+xfs_bmap(struct vnode	*vp,
 	 off_t		offset,
 	 ssize_t	count,
 	 int		flags,
-	 cred_t		*credp,
+	 struct cred	*credp,
 	 struct bmapval	*bmapp,
 	 int		*nbmaps);
 
 void
-xfs_zero_eof(xfs_inode_t	*ip,
+xfs_zero_eof(struct xfs_inode	*ip,
 	     off_t		offset,
 	     xfs_fsize_t	isize,
-	     cred_t		*credp);
+	     struct cred	*credp);
 
 
 

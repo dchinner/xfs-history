@@ -1,6 +1,11 @@
 #ifndef _FS_XFS_IMAP_H
 #define	_FS_XFS_IMAP_H
 
+#ident "$Revision$"
+
+struct xfs_mount;
+struct xfs_trans;
+
 /*
  * This is the structure passed to xfs_imap() to map
  * an inode number to its on disk location.
@@ -13,6 +18,7 @@ typedef struct xfs_imap {
 	ushort		im_boffset;	/* inode offset in block in bytes */
 } xfs_imap_t;
 	
-int	xfs_imap(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_imap_t *, uint);
+int	xfs_imap(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
+		 xfs_imap_t *, uint);
 
 #endif	/* !_FS_XFS_IMAP_H */

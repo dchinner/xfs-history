@@ -1,11 +1,18 @@
-
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
+#ident "$Revision$"
+
+struct buf;
+struct xfs_efd_log_item;
+struct xfs_efi_log_item;
+struct xfs_inode;
 struct xfs_item_ops;
+struct xfs_log_iovec;
+struct xfs_log_item;
 struct xfs_log_item_desc;
 struct xfs_mount;
-struct xfs_log_item;
+struct xfs_trans;
 
 typedef struct xfs_ail_entry {
 	struct xfs_log_item	*ail_forw;	/* AIL forw pointer */
@@ -33,7 +40,8 @@ typedef struct xfs_log_item {
 	uint				li_type;	/* item type */
 	uint				li_flags;	/* misc flags */
 	struct xfs_log_item		*li_bio_list;	/* buffer item list */
-	void				(*li_cb)(buf_t*, struct xfs_log_item*); 
+	void				(*li_cb)(struct buf *,
+						 struct xfs_log_item *); 
 							/* buffer item iodone */
 							/* callback func */
 	struct xfs_item_ops		*li_ops;	/* function list */
@@ -75,14 +83,14 @@ typedef struct xfs_log_item {
 
 
 typedef struct xfs_item_ops {
-	uint(*iop_size)(xfs_log_item_t*);
-	void(*iop_format)(xfs_log_item_t*, xfs_log_iovec_t*);
-	void(*iop_pin)(xfs_log_item_t*);	
-	void(*iop_unpin)(xfs_log_item_t*);	
-	uint(*iop_trylock)(xfs_log_item_t*);	
-	void(*iop_unlock)(xfs_log_item_t*);	
-	xfs_lsn_t(*iop_committed)(xfs_log_item_t*, xfs_lsn_t);	
-	void(*iop_push)(xfs_log_item_t*);	
+	uint (*iop_size)(xfs_log_item_t *);
+	void (*iop_format)(xfs_log_item_t *, struct xfs_log_iovec *);
+	void (*iop_pin)(xfs_log_item_t *);
+	void (*iop_unpin)(xfs_log_item_t *);
+	uint (*iop_trylock)(xfs_log_item_t *);
+	void (*iop_unlock)(xfs_log_item_t *);
+	xfs_lsn_t (*iop_committed)(xfs_log_item_t *, xfs_lsn_t);	
+	void (*iop_push)(xfs_log_item_t *);	
 } xfs_item_ops_t;
 
 #define	IOP_SIZE(ip)		(*(ip)->li_ops->iop_size)(ip)
@@ -182,8 +190,7 @@ typedef uint	xfs_trans_id_t;
  * This is the type of function which can be given to xfs_trans_callback()
  * to be called upon the transaction's commit to disk.
  */
-struct xfs_trans;
-typedef void(*xfs_trans_callback_t)(struct xfs_trans*, void*);
+typedef void (*xfs_trans_callback_t)(struct xfs_trans *, void *);
 
 /*
  * This is the structure written in the log at the head of
@@ -559,11 +566,6 @@ typedef struct xfs_trans {
 #define	XFS_INO_BTREE_REF	2
 #define	XFS_INO_REF		1     
      
-struct xfs_inode;
-struct xfs_mount;
-struct xfs_efi_log_item;
-struct xfs_efd_log_item;
-
 /*
  * xFS transaction mechanism exported interfaces that are
  * actually macros.
@@ -592,24 +594,24 @@ xfs_trans_t	*xfs_trans_dup(xfs_trans_t *);
 int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint,
 				  uint, uint);
 void		xfs_trans_callback(xfs_trans_t *,
-				   void(*)(xfs_trans_t*, void*), void *);
+				   void (*)(xfs_trans_t *, void *), void *);
 void		xfs_trans_mod_sb(xfs_trans_t *, uint, long);
-buf_t		*xfs_trans_get_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
-buf_t		*xfs_trans_getsb(xfs_trans_t *, int);
-buf_t		*xfs_trans_read_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
-void		xfs_trans_brelse(xfs_trans_t *, buf_t *);
-void		xfs_trans_bjoin(xfs_trans_t *, buf_t *);
-void		xfs_trans_bhold(xfs_trans_t *, buf_t *);
-void		xfs_trans_bhold_until_committed(xfs_trans_t *, buf_t *);
-void		xfs_trans_binval(xfs_trans_t *, buf_t *);
-void		xfs_trans_inode_buf(xfs_trans_t *, buf_t *);
-void		xfs_trans_inode_alloc_buf(xfs_trans_t *, buf_t *);
+struct buf	*xfs_trans_get_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
+struct buf	*xfs_trans_getsb(xfs_trans_t *, int);
+struct buf	*xfs_trans_read_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
+void		xfs_trans_brelse(xfs_trans_t *, struct buf *);
+void		xfs_trans_bjoin(xfs_trans_t *, struct buf *);
+void		xfs_trans_bhold(xfs_trans_t *, struct buf *);
+void		xfs_trans_bhold_until_committed(xfs_trans_t *, struct buf *);
+void		xfs_trans_binval(xfs_trans_t *, struct buf *);
+void		xfs_trans_inode_buf(xfs_trans_t *, struct buf *);
+void		xfs_trans_inode_alloc_buf(xfs_trans_t *, struct buf *);
 struct xfs_inode	*xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 					xfs_ino_t , uint);
 void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);
-void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *,uint);
+void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *, uint);
 void		xfs_trans_ihold(xfs_trans_t *, struct xfs_inode *);
-void		xfs_trans_log_buf(xfs_trans_t *, buf_t *, uint, uint);
+void		xfs_trans_log_buf(xfs_trans_t *, struct buf *, uint, uint);
 void		xfs_trans_log_inode(xfs_trans_t *, struct xfs_inode *, uint);
 struct xfs_efi_log_item	*xfs_trans_get_efi(xfs_trans_t *, uint);
 void		xfs_trans_log_efi_extent(xfs_trans_t *,
