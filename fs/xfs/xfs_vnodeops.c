@@ -331,13 +331,13 @@ xfs_getattr(vnode_t	*vp,
         vap->va_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
         vap->va_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
 
+	mp = XFS_VFSTOM(vp->v_vfsp);
         switch (ip->i_d.di_mode & IFMT) {
           case IFBLK:
           case IFCHR:
                 vap->va_blksize = BLKDEV_IOSIZE;
                 break;
           default:
-		mp = XFS_VFSTOM(vp->v_vfsp);
 		vap->va_blksize = mp->m_sb.sb_blocksize;	/* in bytes */
 		break;
         }
@@ -345,10 +345,19 @@ xfs_getattr(vnode_t	*vp,
 	/*
 	 * XXX : truncate to 32 bits for now.
 	 */
-	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL)
+	switch (ip->i_d.di_format) {
+	case XFS_DINODE_FMT_LOCAL:
+	case XFS_DINODE_FMT_DEV:
+	case XFS_DINODE_FMT_UUID:
 		vap->va_nblocks = 0;
-	else
+		break;
+	case XFS_DINODE_FMT_EXTENTS:
+	case XFS_DINODE_FMT_BTREE:
 		vap->va_nblocks = xfs_fsb_to_bb(&mp->m_sb, ip->i_d.di_nblocks);
+		break;
+	default:
+		ASSERT(0);
+	}
 
 	/*
 	 * XFS-added attributes
