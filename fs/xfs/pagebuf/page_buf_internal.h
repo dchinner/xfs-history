@@ -124,7 +124,7 @@ extern pb_hash_t	pbhash[];
  * Tunable pagebuf parameters
  */
 
-#define P_PARAM	5
+#define P_PARAM	4
 
 typedef union pagebuf_param {
 	struct {
@@ -132,7 +132,6 @@ typedef union pagebuf_param {
 					 * delwri flush daemon.  */
 		ulong	age_buffer;	/* time for buffer to age before
 					 * we flush it.  */
-		ulong	max_dio;	/* maximum pages locked in a dio call */
 		ulong	debug;		/* debug tracing on or off */
 		ulong	stats_clear;	/* clear the pagebuf stats */
 	} p_un;
@@ -142,9 +141,8 @@ typedef union pagebuf_param {
 enum {
 	PB_FLUSH_INT = 1,
 	PB_FLUSH_AGE = 2,
-	PB_DIO_MAX = 3,
-	PB_STATS_CLEAR = 4,
-	PB_DEBUG = 5
+	PB_STATS_CLEAR = 3,
+	PB_DEBUG = 4
 };
 
 extern pagebuf_param_t	pb_params;

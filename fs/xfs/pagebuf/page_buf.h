@@ -392,23 +392,6 @@ extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 
 /* Reading and writing pages */
 
-extern ssize_t pagebuf_generic_file_write(
-		struct pb_target *,
-		struct file *,		/* file to write		*/
-		const char *,		/* buffer address		*/
-		size_t,			/* size of buffer		*/
-		loff_t *,		/* file offset to use and update */
-		pagebuf_bmap_fn_t);	/* bmap function		*/
-
-	/*
-	 * pagebuf_generic_file_write writes data from the specified file
-	 * at the loff_t referenced, updating the loff_t to point after the
-	 * data written and returning the count of bytes written.
-	 * The data is written from the supplied buffer, up to a maximum of the
-	 * specified size.  Normally all of the data is written, unless there
-	 * is an error.
-	 */
-
 extern int pagebuf_write_full_page(	/* write a page via pagebuf	*/
 		struct page *,		/* page to write		*/
 		int delalloc,		/* delalloc bh present		*/
@@ -437,7 +420,5 @@ static __inline__ int __pagebuf_iorequest(page_buf_t *pb)
 		return pb->pb_strat(pb);
 	return pagebuf_iorequest(pb);
 }
-
-extern size_t pagebuf_max_direct(void);
 
 #endif /* __PAGE_BUF_H__ */
