@@ -52,6 +52,13 @@ extern int xfs_acl_vset(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vget(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vremove(struct vnode *vp, int);
 
+extern struct xfs_zone *xfs_acl_zone;
+
+#define _ACL_DECL(a)		xfs_acl_t *(a) = NULL
+#define _ACL_ALLOC(a)		((a) = kmem_zone_alloc(xfs_acl_zone, KM_SLEEP))
+#define _ACL_FREE(a)		((a)? kmem_zone_free(xfs_acl_zone, (a)) : 0)
+#define _ACL_ZONE_INIT(z,name)	((z) = kmem_zone_init(sizeof(xfs_acl_t), name))
+#define _ACL_ZONE_DESTROY(z)	(kmem_cache_destroy(z))
 #define _ACL_INHERIT(c,v,d)	(xfs_acl_inherit(c,v,d))
 #define _ACL_GET_ACCESS(pv,pa)  (xfs_acl_vtoacl(pv,pa,NULL)==0)
 #define _ACL_GET_DEFAULT(pv,pd) (xfs_acl_vtoacl(pv,NULL,pd)==0)
@@ -63,18 +70,23 @@ extern int posix_acl_default_exists(vnode_t *);
 
 #else
 
-#define ACL_TYPE_ACCESS		/* unused */
-#define ACL_TYPE_DEFAULT	/* unused */
-
 #define xfs_acl_vset(v,p,sz,t)	(-ENOTSUP)
 #define xfs_acl_vget(v,p,sz,t)	(-ENOTSUP)
 #define xfs_acl_vremove(v,t)	(-ENOTSUP)
-#define _ACL_INHERIT(c,v,d)	((void)d,0)
+
+#define _ACL_DECL(a)		((void)0)
+#define _ACL_ALLOC(a)		(1)	/* successfully allocate nothing */
+#define _ACL_FREE(a)		((void)0)
+#define _ACL_ZONE_INIT(z,name)	((void)0)
+#define _ACL_ZONE_DESTROY(z)	((void)0)
+#define _ACL_INHERIT(c,v,d)	(0)
 #define _ACL_GET_ACCESS(pv,pa)	(0)
 #define _ACL_GET_DEFAULT(pv,pd)	(0)
 #define _ACL_XFS_IACCESS(i,m,c)	(-1)
-#define posix_acl_access_exists  (NULL)
-#define posix_acl_default_exists (NULL)
+
+/* need to be able to take the address of these functions */
+extern __inline__ int posix_acl_access_exists(vnode_t *vp)	{ return 0; }
+extern __inline__ int posix_acl_default_exists(vnode_t *vp)	{ return 0; }
 
 #endif
 

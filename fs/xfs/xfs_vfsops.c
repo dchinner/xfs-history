@@ -129,7 +129,8 @@ xfs_init(int	fstype)
 	xfs_ili_zone = kmem_zone_init(sizeof(xfs_inode_log_item_t), "xfs_ili");
 	xfs_chashlist_zone = kmem_zone_init(sizeof(xfs_chashlist_t),
 					    "xfs_chashlist");
-        
+	_ACL_ZONE_INIT(xfs_acl_zone, "xfs_acl");
+
 #ifdef CONFIG_XFS_VNODE_TRACING
         ktrace_init(VNODE_TRACE_SIZE);
 #else
@@ -224,6 +225,7 @@ xfs_cleanup(void)
 		kmem_cache_destroy(qm_dqzone);
 	if (qm_dqtrxzone)
 		kmem_cache_destroy(qm_dqtrxzone);
+	_ACL_ZONE_DESTROY(xfs_acl_zone);
 #if  (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
         ktrace_uninit();
 #endif
