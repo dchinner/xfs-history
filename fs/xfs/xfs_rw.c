@@ -2086,6 +2086,7 @@ xfs_write(
 	struct reservation_id id;
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
+	xfs_trans_t	*tp;
 	int		type;
 	off_t		offset;
 	size_t		count;
@@ -2176,19 +2177,20 @@ retry:
 				     UIO_WRITE);
 
 		if (error == ENOSPC &&
-				DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_NOSPACE) &&
-				!(ioflag & IO_INVIS)) {
+		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_NOSPACE) &&
+		    !(ioflag & IO_INVIS)) {
 			error = dm_data_event(vp, DM_NOSPACE, 0, 0);
-			if (error)
+			if (error) {
 				return error;
+			}
 			offset = uiop->uio_offset;
 			goto retry;
-		} else if ( error == ENOSPC ) {
+		} else if (error == ENOSPC) {
 			mp = ip->i_mount;
-			if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
-				xfs_error( mp, 2);
+			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)  {
+				xfs_error(mp, 2);
 			} else {
-				xfs_error( mp, 1);
+				xfs_error(mp, 1);
 			}
 		}
 
@@ -2219,17 +2221,29 @@ retry:
 		}
 
 		/*
-		 * If the write was synchronous then flush the log
-		 * to make sure that everything is permanent.
-		 * As you can tell the modification time will not
-		 * be permanent, but it's not clear that it needs
-		 * to be.  We could also probably be smarter about
-		 * whether or not this is necessary, but it should
-		 * work for a first cut.
+		 * If the write was synchronous then we need to make
+		 * sure that the inode modification time is permanent.
+		 * We'll have update the timestamp above, so here
+		 * we use a synchronous transaction to log the inode.
+		 * It's not fast, but it's necessary.
 		 */
 		if (ioflag & IO_SYNC) {
-			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
-				      XFS_LOG_FORCE | XFS_LOG_SYNC);
+			mp = ip->i_mount;
+			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
+			if (error = xfs_trans_reserve(tp, 0,
+						      XFS_SWRITE_LOG_RES(mp),
+						      0, 0, 0)) {
+				ASSERT(0);
+				xfs_trans_cancel(tp, 0);
+				break;
+			}
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+			xfs_trans_set_sync(tp);
+			xfs_trans_commit(tp, 0);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 		break;
 

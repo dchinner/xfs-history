@@ -69,6 +69,7 @@ typedef struct xfs_log_item {
 #define XFS_TRANS_GROWFS		14
 #define XFS_TRANS_STRAT_WRITE		15
 #define XFS_TRANS_DIOSTRAT		16
+#define	XFS_TRANS_WRITE_SYNC		17
 
 
 typedef struct xfs_item_ops {
@@ -496,6 +497,12 @@ typedef struct xfs_trans {
 	 (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
 	 (128 * (3 + (2 * XFS_AG_MAXLEVELS(mp)))))
 
+/*
+ * Logging the inode modification timestamp on a synchronous write.
+ *	inode
+ */
+#define	XFS_SWRITE_LOG_RES(mp) \
+     	((mp)->m_sb.sb_inodesize + 128)
 
 /*
  * Various log count values.

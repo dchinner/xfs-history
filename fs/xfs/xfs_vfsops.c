@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.72 $"
+#ident  "$Revision: 1.73 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -330,8 +330,9 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			return(error);
 		}
 		mp->m_ddevp = ddevvp;
-	} else
+	} else {
 		ddevvp = NULL;
+	}
 	if (rtdev != 0) {
 		rdevvp = makespecvp( rtdev, VBLK );
 		error = VOP_OPEN(&rdevvp, vfs_flags, cr);
@@ -345,8 +346,9 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			return(error);
 		}
 		mp->m_rtdevp = rdevvp;
-	} else
+	} else {
 		rdevvp = NULL;
+	}
 	if (logdev != 0) {
 		if (logdev == ddev) {
 			ldevvp = NULL;
@@ -381,8 +383,18 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			mp->m_logbufs = -1;
 			mp->m_logbsize = -1;
 		}
-	} else
+	} else {
 		ldevvp = NULL;
+	}
+
+	/*
+	 * Pull in the 'wsync' mount option before we do the real
+	 * work of mounting and recovery.  The arg pointer will
+	 * be NULL when we are being called from the root mount code.
+	 */
+	if ((ap != NULL) && (ap->flags & XFSMNT_WSYNC)) {
+		mp->m_flags |= XFS_MOUNT_WSYNC;
+	}
 
 	if (error = xfs_mountfs(vfsp, ddev)) {
 		xfs_mount_free(mp);
@@ -412,8 +424,8 @@ error:
 	sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
 
 	/*
-	 * XXX Anything special for root mounts?
-	 * if (why == ROOT_INIT) {}
+	 * For root mounts, make sure the clock is set.  This
+	 * is just a traditional root file system thing to do.
 	 */
         if (why == ROOT_INIT) {
                 extern int rtodc( void );
