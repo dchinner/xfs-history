@@ -48,5 +48,4 @@ int             restricted_chown = 0;
 int     	scache_linemask = 0x1f;       /* second level cache line size mask */
 prid_t		dfltprid;
 long            physmem;
-int		ncsize = 792;
 int		ndquot;

@@ -544,7 +544,7 @@ xfs_qm_scall_getqstat(
 	out.qs_version = FS_QSTAT_VERSION;
 	if (! XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
 		out.qs_uquota.qfs_ino = NULLFSINO;
-		out.qs_pquota.qfs_ino = NULLFSINO;
+		out.qs_aquota.qfs_ino = NULLFSINO;
 		goto done;
 	}
 	out.qs_flags = (__uint16_t) xfs_qm_export_flags(mp->m_qflags & 
@@ -566,7 +566,7 @@ xfs_qm_scall_getqstat(
 
 	out.qs_pad = 0;
 	out.qs_uquota.qfs_ino = mp->m_sb.sb_uquotino;
-	out.qs_pquota.qfs_ino = mp->m_sb.sb_pquotino;
+	out.qs_aquota.qfs_ino = mp->m_sb.sb_pquotino;
 	if (mp->m_quotainfo) {
 		uip = mp->m_quotainfo->qi_uquotaip;
 		pip = mp->m_quotainfo->qi_pquotaip;
@@ -586,8 +586,8 @@ xfs_qm_scall_getqstat(
 			VN_RELE(XFS_ITOV(uip));
 	}
 	if (pip) {
-		out.qs_pquota.qfs_nblks = pip->i_d.di_nblocks;
-		out.qs_pquota.qfs_nextents = pip->i_d.di_nextents;
+		out.qs_aquota.qfs_nblks = pip->i_d.di_nblocks;
+		out.qs_aquota.qfs_nextents = pip->i_d.di_nextents;
 		if (temppqip)
 			VN_RELE(XFS_ITOV(pip));
 	}
