@@ -60,7 +60,7 @@ typedef struct xfs_mod_sb {
 #define	AIL_UNLOCK(mp,s)	(spunlockspl((mp)->m_ail_lock, s))
 
 void		xfs_mod_sb(xfs_trans_t *, int);
-xfs_mount_t	*xfs_mount(dev_t, dev_t);
+xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
 void		xfs_umount(xfs_mount_t *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
