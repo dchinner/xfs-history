@@ -4179,7 +4179,14 @@ xfs_fcntl(vnode_t	*vp,
 			error = XFS_ERROR(EINVAL);
 			break;
 		}
-		da.d_mem = BBSIZE;
+                /*
+                 * This value was changed from BBSIZE (512 bytes) to
+                 * NBPP so that a full maxdmasz sized request can be issued.
+                 * If the buffer was not aligned on a NBPP byte boundary,
+                 * all the pages in a maxdmmasz sized request could not be
+                 * mapped (see bug #248912).
+                 */
+		da.d_mem = NBPP;
 
 		/* this only really needs to be BBSIZE.
 		 * it is set to the file system block size to
