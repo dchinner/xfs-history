@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -29,12 +29,40 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#include <xfs.h>
+#ifndef __XFS_QM_STATS_H__
+#define __XFS_QM_STATS_H__
 
-xfs_dmops_t	xfs_dmcore_xfs = {
-	.xfs_send_data		= (xfs_send_data_t)fs_nosys,
-	.xfs_send_mmap		= (xfs_send_mmap_t)fs_noerr,
-	.xfs_send_destroy	= (xfs_send_destroy_t)fs_nosys,
-	.xfs_send_namesp	= (xfs_send_namesp_t)fs_nosys,
-	.xfs_send_unmount	= (xfs_send_unmount_t)fs_noval,
+
+#if defined(CONFIG_PROC_FS) && !defined(XFS_STATS_OFF)
+
+/*
+ * XQM global statistics
+ */
+struct xqmstats {
+	__uint32_t		xs_qm_dqreclaims;
+	__uint32_t		xs_qm_dqreclaim_misses;
+	__uint32_t		xs_qm_dquot_dups;
+	__uint32_t		xs_qm_dqcachemisses;
+	__uint32_t		xs_qm_dqcachehits;
+	__uint32_t		xs_qm_dqwants;
+	__uint32_t		xs_qm_dqshake_reclaims;
+	__uint32_t		xs_qm_dqinact_reclaims;
 };
+
+extern struct xqmstats xqmstats;
+
+# define XQM_STATS_INC(count)	( (count)++ )
+
+extern void xfs_qm_init_procfs(void);
+extern void xfs_qm_cleanup_procfs(void);
+
+#else
+
+# define XQM_STATS_INC(count)	do { } while (0)
+
+static __inline void xfs_qm_init_procfs(void) { };
+static __inline void xfs_qm_cleanup_procfs(void) { };
+
+#endif
+
+#endif	/* __XFS_QM_STATS_H__ */
