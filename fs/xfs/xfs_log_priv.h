@@ -134,12 +134,13 @@ typedef struct log_in_core {
  */
 typedef struct log {
 	log_ticket_t	*l_freelist;  /* free list of tickets		  :  4*/
+	log_ticket_t	*l_tail;      /* free list of tickets		  :  4*/
 	log_in_core_t	*l_iclog;     /* head log queue			  :  4*/
 	sema_t		l_flushsema;  /* iclog flushing semaphore	  : 20*/
 	lock_t		l_icloglock;  /* grab to change iclog state	  :  4*/
 	xfs_lsn_t	l_sync_lsn;   /* lsn of 1st LR w/ unflushed buffers: 8*/
 	xfs_mount_t	*l_mp;	      /* mount point			   : 4*/
-    buf_t		*l_xbuf;      /* extra buffer for log wrapping	   : 4*/
+	buf_t		*l_xbuf;      /* extra buffer for log wrapping	   : 4*/
 	dev_t		l_dev;	      /* dev_t of log			   : 4*/
 	int		l_logstart;   /* start block of log		   : 4*/
 	int		l_logsize;    /* size of log in bytes 		   : 4*/
