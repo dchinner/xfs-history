@@ -144,7 +144,6 @@ STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 
 #define DM_STAT_SIZE(dmtype,namelen)	\
 	(sizeof(dmtype) + sizeof(dm_handle_t) + namelen)
-#define MAX_DIRENT_SIZE		(sizeof(dirent_t) + MAXNAMELEN)
 
 #define DM_STAT_ALIGN		(sizeof(__uint64_t))
 
@@ -478,7 +477,7 @@ STATIC int
 xfs_dm_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_ino_t	ino,		/* inode number to get data for */
-	void __user	*buffer,	/* buffer to place output in */
+	void		__user *buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
 	void		*private_data,	/* my private data */
 	xfs_daddr_t	bno,		/* starting block of inode cluster */
