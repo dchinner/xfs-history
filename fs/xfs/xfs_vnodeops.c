@@ -1,4 +1,4 @@
-#ident "$Revision: 1.246 $"
+#ident "$Revision: 1.247 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2489,16 +2489,12 @@ xfs_create(
 	udqp = pdqp = NULL;
 
 	/*
-	 * Make sure that we have allocated dquot(s) on disk, and that we won't
-	 * exceed inode quotas by creating this file. If not, bail out.
+	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (quotainprogress = (boolean_t)XFS_IS_QUOTA_ON(mp)) {
 		if (error = xfs_qm_vop_dqalloc(mp, dp, credp->cr_uid, prid,
-					       XFS_QMOPT_QUOTALL | 
-					       XFS_QMOPT_INOQCHK,
+					       XFS_QMOPT_QUOTALL,
 					       &udqp, &pdqp)) {
-			if (error == EDQUOT)
-				return (EDQUOT);
 			quotainprogress = B_FALSE;
 		}
 	}
@@ -2571,13 +2567,12 @@ xfs_create(
 		}
 		
 		/*
-		 * Reserve disk quota. We only make disk block reservations;
-		 * the new inode isn't reserved.
+		 * Reserve disk quota and the inode.
 		 */
 		if (quotainprogress && XFS_IS_QUOTA_ON(mp)) {
-			if (xfs_trans_reserve_blkquota_bydquots(tp, 
-								udqp, pdqp,
-								resblks, 0)) {
+			if (xfs_trans_reserve_quota(tp, 
+						    udqp, pdqp,
+						    resblks, 1, 0)) {
 				error = EDQUOT;
 				goto error_return;
 			}
@@ -4761,13 +4756,11 @@ xfs_mkdir(
 	udqp = pdqp = NULL;
 
 	/*
-	 * Make sure that we have allocated dquot(s) on disk, and that we won't
-	 * exceed inode quotas by creating this directory. If not, bail out.
+	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (quotainprogress = (boolean_t)XFS_IS_QUOTA_ON(mp)) {
 		if (error = xfs_qm_vop_dqalloc(mp, dp, credp->cr_uid, prid,
-					       XFS_QMOPT_QUOTALL | 
-					       XFS_QMOPT_INOQCHK,
+					       XFS_QMOPT_QUOTALL,
 					       &udqp, &pdqp)) {
 			if (error == EDQUOT) 
 				return (EDQUOT);
@@ -4831,12 +4824,10 @@ xfs_mkdir(
 
 	
 	/*
-	 * Reserve disk quota. We only make disk block reservations;
-	 * the new inode isn't 'reserved'.
+	 * Reserve disk quota and the inode.
 	 */
 	if (quotainprogress && XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_blkquota_bydquots(tp, 
-					       	udqp, pdqp, resblks, 0)) {
+		if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks, 1, 0)) {
 			error = EDQUOT;
 			goto error_return;
 		}
@@ -5305,7 +5296,7 @@ xfs_symlink(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	boolean_t		quotainprogress;
-	uint			nblks;
+	uint			resblks;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
@@ -5351,26 +5342,21 @@ xfs_symlink(
         udqp = pdqp = NULL;
 
 	/*
-	 * Make sure that we have allocated dquot(s) on disk, and that we won't
-	 * exceed inode quotas by creating this. If not, bail out.
+	 * Make sure that we have allocated dquot(s) on disk.
 	 */
 	if (quotainprogress = (boolean_t)XFS_IS_QUOTA_ON(mp)) {
 		if (error = xfs_qm_vop_dqalloc(mp, dp, credp->cr_uid, prid,
-					       XFS_QMOPT_QUOTALL | 
-					       XFS_QMOPT_INOQCHK,
+					       XFS_QMOPT_QUOTALL,
 					       &udqp, &pdqp)) {
-			
-			if (error == EDQUOT) 
-				return (EDQUOT);
 			quotainprogress = B_FALSE;
 		} 
 	}
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SYMLINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-	nblks = XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + 12;
+	resblks = XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + 12;
         if (error = xfs_trans_reserve(tp,
-				      nblks,
+				      resblks,
 				      XFS_SYMLINK_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_SYMLINK_LOG_COUNT)) {
@@ -5410,12 +5396,10 @@ xfs_symlink(
                 goto error_return;
 	}
 	/*
-	 * Reserve disk quota. We only make disk block reservations;
-	 * the new inode isn't reserved.
+	 * Reserve disk quota.
 	 */
 	if (quotainprogress && XFS_IS_QUOTA_ON(mp)) {
-		if (xfs_trans_reserve_blkquota_bydquots(tp, udqp, pdqp, 
-							nblks, 0)) {
+		if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks, 1, 0)) {
 			error = EDQUOT;
 			goto error_return;
 		}
@@ -6042,7 +6026,16 @@ xfs_fcntl(
 		 * maximum size plus 1 pages.
                  */
 		ASSERT(scache_linemask != 0);
+#ifdef R10000_SPECULATION_WAR	/* makes tlb invalidate during dma more
+	effective, by decreasing the likelihood of a valid reference in the
+	same page as dma user address space; leaving the tlb invalid avoids
+	the speculative reference. We return the more stringent
+	"requirements" on the fcntl(), but do *NOT* enforced them
+	in the read/write code, to be sure we don't break apps... */
+		da.d_mem = _PAGESZ;
+#else
 		da.d_mem = scache_linemask + 1;
+#endif
 
 		/*
 		 * this only really needs to be BBSIZE.
@@ -6461,7 +6454,7 @@ xfs_alloc_file_space(
 	xfs_bmbt_irec_t		imaps[1];
 	xfs_bmbt_irec_t		*imapp;
 	xfs_bmap_free_t		free_list;
-	uint			blkres;
+	uint			resblks;
 	boolean_t		quotainprogress;
 
 	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_alloc_file_space",
@@ -6539,10 +6532,10 @@ xfs_alloc_file_space(
 		} else {
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			if (quotainprogress && XFS_IS_QUOTA_ON(mp)) {
-				if (xfs_trans_reserve_blkquota_bydquots(tp, 
-								ip->i_udquot, 
-								ip->i_pdquot,
-								blkres,	0)) {
+				if (xfs_trans_reserve_quota(tp, 
+							    ip->i_udquot, 
+							    ip->i_pdquot,
+							    resblks, 0, 0)) {
 					error = EDQUOT;
 					goto error0;
 				}
