@@ -83,6 +83,7 @@
 #define ENTER(x) printk("Entering %s\n",x);
 #define EXIT(x)  printk("Exiting  %s\n",x);
 
+#ifdef KERNEL
 #ifndef KDB_REASON_ENTER
 struct pt_regs;
 extern int   kdb(int reason, int error_code, struct pt_regs *);
@@ -90,6 +91,7 @@ extern int   kdb(int reason, int error_code, struct pt_regs *);
 #endif
 #define debug(str)	printk("%s\n", str); kdb(1, 0, NULL)
 extern int get_thread_id(void);
+#endif
 
 #if 0
 /* This is major wrong.... fix me FIX ME  RMC */
