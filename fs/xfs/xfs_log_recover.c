@@ -299,7 +299,6 @@ xlog_find_verify_cycle( xlog_t 		*log,
     	xfs_buf_t		*bp;
     	char                    *buf        = NULL;
 	int			error       = 0;
-	int			smallmem    = 0;
 	int			bufblks	    = nbblks;
 
 	while (!(bp = xlog_get_bp(bufblks, log->l_mp))) {
@@ -307,7 +306,6 @@ xlog_find_verify_cycle( xlog_t 		*log,
 		bufblks >>= 1;
 	        if (!bufblks)
 	                return -ENOMEM;
-                smallmem = 1;
         }
         
 
