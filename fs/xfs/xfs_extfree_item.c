@@ -39,7 +39,6 @@
 zone_t	*xfs_efi_zone;
 zone_t	*xfs_efd_zone;
 
-STATIC void	xfs_efi_release(xfs_efi_log_item_t *, uint);
 STATIC uint	xfs_efi_item_size(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_format(xfs_efi_log_item_t *, xfs_log_iovec_t *);
 STATIC void	xfs_efi_item_pin(xfs_efi_log_item_t *);
@@ -50,7 +49,6 @@ STATIC xfs_lsn_t	xfs_efi_item_committed(xfs_efi_log_item_t *,
 					       xfs_lsn_t lsn);
 STATIC void	xfs_efi_item_abort(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_push(xfs_efi_log_item_t *);
-STATIC void	xfs_efi_release(xfs_efi_log_item_t *, uint);
 STATIC void	xfs_efi_cancel(xfs_efi_log_item_t *);
 
 STATIC uint	xfs_efd_item_size(xfs_efd_log_item_t *);
@@ -279,7 +277,7 @@ xfs_efi_init(xfs_mount_t	*mp,
  * We'll use the AIL lock to protect our counters as well as
  * the removal from the AIL.
  */
-STATIC void
+void
 xfs_efi_release(xfs_efi_log_item_t	*efip,
 		uint			nextents)
 {
