@@ -81,7 +81,7 @@ xfs_dm_mount(
 int
 xfs_dm_get_fsys_vector(
 	bhv_desc_t	*bdp,
-	dm_fcntl_t	*dmfcntlp);
+	dm_fcntl_vector_t *vecrq);
 
 extern int
 xfs_dm_send_data_event(
@@ -99,31 +99,12 @@ xfs_dm_send_create_event(
 	mode_t		new_mode,
 	int		*good_event_sent);
 
-extern int
-xfs_dm_fcntl(
-	bhv_desc_t	*bdp,
-	void		*arg,
-	int		flags,
-	xfs_off_t	offset,
-	cred_t		*credp,
-	int		*rvalp);
-
 int
 xfs_dm_mapevent(
 	bhv_desc_t	*bdp,
 	int		flags,
 	xfs_off_t	offset,
-	dm_fcntl_t	*dmfcntlp);
-
-/*
- *	Function defined in xfs_vnodeops.c used by DMAPI as well as by xfs_vnodeops.c
- */
-extern int
-xfs_set_dmattrs(
-        bhv_desc_t      *bdp,
-        u_int           evmask,
-        u_int16_t       state,
-        cred_t          *credp);
+	dm_fcntl_mapevent_t *maprq);
 
 #endif	/* __KERNEL__ */
 

@@ -2598,18 +2598,18 @@ STATIC fsys_function_vector_t	xfs_fsys_vector[DM_FSYS_MAX];
 int
 xfs_dm_get_fsys_vector(
 	bhv_desc_t	*bdp,
-	dm_fcntl_t	*dmfcntlp)
+	dm_fcntl_vector_t *vecrq)
 {
 	static	int		initialized = 0;
 	fsys_function_vector_t *vecp;
 	int		i = 0;
 
-	dmfcntlp->u_fcntl.vecrq.count =
+	vecrq->count =
 		sizeof(xfs_fsys_vector) / sizeof(xfs_fsys_vector[0]);
-	dmfcntlp->u_fcntl.vecrq.vecp = xfs_fsys_vector;
+	vecrq->vecp = xfs_fsys_vector;
 	if (initialized)
 		return(0);
-	dmfcntlp->u_fcntl.vecrq.code_level = DM_CLVL_XOPEN;
+	vecrq->code_level = DM_CLVL_XOPEN;
 	vecp = xfs_fsys_vector;
 
 	vecp[i].func_no = DM_FSYS_CLEAR_INHERIT;
@@ -2704,9 +2704,8 @@ xfs_dm_mapevent(
 	bhv_desc_t	*bdp,
 	int		flags,
 	xfs_off_t	offset,
-	dm_fcntl_t	*dmfcntlp)
+	dm_fcntl_mapevent_t *mapevp)
 {
-	dm_fcntl_mapevent_t  *mapevp;
 	xfs_fsize_t	filesize;		/* event read/write "size" */
 	xfs_inode_t	*ip;
 	off_t		end_of_area, evsize;
@@ -2715,7 +2714,6 @@ xfs_dm_mapevent(
 
 	/* exit immediately if not regular file in a DMAPI file system */
 
-	mapevp = &dmfcntlp->u_fcntl.maprq;
 	mapevp->error = 0;			/* assume success */
 
 	if ((vp->v_type != VREG) || !(vfsp->vfs_flag & VFS_DMI))
@@ -2830,35 +2828,6 @@ xfs_dm_testevent(
 	return 0;
 }
 #endif
-
-
-/* ARGSUSED */
-int
-xfs_dm_fcntl(
-	bhv_desc_t	*bdp,
-	void		*arg,
-	int		flags,
-	xfs_off_t	offset,
-	cred_t		*credp,
-	int		*rvalp)
-{
-	dm_fcntl_t	*dmfcntlp;
-
-	if (!capable(CAP_MKNOD))
-		return(EPERM);
-
-	dmfcntlp = (dm_fcntl_t *)arg;
-
-	switch (dmfcntlp->dmfc_subfunc) {
-	case DM_FCNTL_FSSETDM:
-		return xfs_set_dmattrs(bdp, dmfcntlp->u_fcntl.setdmrq.fsd_dmevmask,
-					dmfcntlp->u_fcntl.setdmrq.fsd_dmstate,
-					credp);
-	default:
-		break;
-	}
-	return(ENOSYS);
-}
 
 
 int

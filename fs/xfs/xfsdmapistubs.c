@@ -37,10 +37,7 @@
 #include <xfs.h>
 
 
-int	xfs_dm_fcntl(bhv_desc_t *bdp, void *arg, int flags, xfs_off_t offset,
-		cred_t *credp, int *rvalp)	{ return nopkg(); }
-
-int	xfs_dm_get_fsys_vector(bhv_desc_t *bdp, dm_fcntl_t *dmfcntlp)
+int	xfs_dm_get_fsys_vector(bhv_desc_t *bdp, dm_fcntl_vector_t *vecrq)
 		{ return nopkg(); }
 
 int	xfs_dm_send_create_event(bhv_desc_t *dir_bdp, char *name,
