@@ -93,8 +93,17 @@ acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
         dest_entry = &dest->acl_entry[0];
 
 	for (n = 0; n < count; n++, src_entry++, dest_entry++) {
-		dest_entry->ae_tag  = le16_to_cpu(src_entry->e_tag);
 		dest_entry->ae_perm = le16_to_cpu(src_entry->e_perm);
+		switch(dest_entry->ae_perm) {
+			case ACL_READ:
+			case ACL_WRITE:
+			case ACL_EXECUTE:
+				break;
+
+			default:
+				return EINVAL;
+		}
+		dest_entry->ae_tag  = le16_to_cpu(src_entry->e_tag);
 		switch(dest_entry->ae_tag) {
 			case ACL_USER:
 			case ACL_GROUP:
@@ -153,9 +162,17 @@ acl_xfs_to_ext_attr(xfs_acl_t *src, acl_ea_header *ext_acl, size_t size)
 	dest_entry = &ext_acl->a_entries[0];
 	src_entry = &src->acl_entry[0];
 	for (n=0; n < src->acl_cnt; n++, dest_entry++, src_entry++) {
-		dest_entry->e_tag  = cpu_to_le16(src_entry->ae_tag);
 		dest_entry->e_perm = cpu_to_le16(src_entry->ae_perm);
+		switch(dest_entry->ae_perm) {
+			case ACL_READ:
+			case ACL_WRITE:
+			case ACL_EXECUTE:
+				break;
 
+			default:
+				return -EINVAL;
+		}
+		dest_entry->e_tag  = cpu_to_le16(src_entry->ae_tag);
 		switch(src_entry->ae_tag) {
 			case ACL_USER:
 			case ACL_GROUP:
