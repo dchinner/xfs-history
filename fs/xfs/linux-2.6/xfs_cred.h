@@ -37,8 +37,6 @@
 #ifdef __KERNEL__
 #include <linux/capability.h>
 #include <linux/sched.h>
-#else
-#define capable(cap)	1
 #endif
 
 /*
