@@ -292,15 +292,11 @@ xfs_retrieved(
 /*
  * xfs_iomap_extra()
  *
- * This is called to fill in the bmapval for a page which is beyond
- * the end of the file.  We map the entire fs block that the page
- * resides on here.  That is because all XFS buffers should be a
- * multiple of the fs block size.  If the fs block size is less than
- * the size of a page, then map all of the fs blocks in the given
- * range.  We may get partial pages here if the fs block size is less
- * than the page size and this page overlaps the EOF.  The first part
- * of the page would have been handled in the normal path, and the
- * rest of the page is passed off to here.
+ * This is called to fill in the bmapval for a page which overlaps
+ * the end of the file and the fs block size is less than the page
+ * size.  We map the rest of the blocks up to the end of the page
+ * here.  The first part of the page would have been handled in the
+ * normal path, and the rest of the page is passed off to here.
  */
 STATIC void
 xfs_iomap_extra(
@@ -314,18 +310,16 @@ xfs_iomap_extra(
 	xfs_fileoff_t	count_fsb;
 	xfs_mount_t	*mp;
 
-	ASSERT(((dpoff(offset) == 0) && (count == NBPP)) ||
-	       ((offset == ip->i_d.di_size) && (count < NBPP)));
-	ASSERT(offset >= ip->i_d.di_size);
+	ASSERT((offset == BTOBB(BBTOB(ip->i_d.di_size))) && (count < NBPP));
+	ASSERT(ip->i_mount->m_sb.sb_blocksize < NBPP);
 
 	mp = ip->i_mount;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	count_fsb = XFS_B_TO_FSB(mp, count);
 
 	/*
-	 * We set BMAP_DELAY rather than BMAP_HOLE in the bmap
-	 * to be consistent with what the write code is doing for
-	 * these extra pages.
+	 * Don't set BMAP_HOLE here because we don't want to trap
+	 * on writes to this page beyond the EOF.
 	 */
 	*nbmaps = 1;
 	bmapp->eof = BMAP_DELAY | BMAP_EOF;
@@ -387,12 +381,14 @@ xfs_iomap_read(
 	last_fsb = XFS_B_TO_FSB(mp, nisize);
 	if (last_fsb <= offset_fsb) {
 		/*
-		 * One of the pages beyond the EOF created by the
-		 * write code is being pushed out by the VM system.
-		 * Handle it here so it does not interfere with the
-		 * normal path code.  If the fs block size is less
-		 * than the page size then this may even be only a
-		 * part of a page.
+		 * The VM/chunk code is trying to map a page to be
+		 * pushed out which contains the last file block
+		 * and byte.  Since the file ended, we did not map
+		 * the entire page, and now it is calling back to
+		 * map the rest of it.  Handle it here so that it
+		 * does not interfere with the normal path code.
+		 * This can only happen if the fs block size is
+		 * less than the page size.
 		 */
 		xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
 		return;
@@ -889,17 +885,13 @@ xfs_write_bmap(
 
 	/*
 	 * If the iosize from our offset extends beyond the end of
-	 * the extent and we're not at the end of the file or the
-	 * underlying extent is real rather than delayed, then trim
-	 * down length to match that of the extent.
+	 * the extent, then trim down length to match that of the extent.
 	 */
 	extra_blocks = (int)((bmapp->offset + bmapp->length) -
 		       (imapp->br_startoff + imapp->br_blockcount));
 	last_imap_byte = XFS_FSB_TO_B(mp, imapp->br_startoff +
 				      imapp->br_blockcount);
-	if ((extra_blocks > 0) &&
-	    ((last_imap_byte < isize) ||
-	     (imapp->br_startblock != DELAYSTARTBLOCK))) {
+	if (extra_blocks > 0) {
 		bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
 	}
@@ -908,14 +900,10 @@ xfs_write_bmap(
 
 
 /*
- * This routine is called to handle zeroing the pages which overlap
- * the end of the file if the user seeks and writes beyond the EOF.
- * This is necessary because those pages in the buffer which used
- * to be beyond EOF and therefore invalid become valid when isize
- * is extended beyond them.
- *
- * We also zero any space left in the last block of the file so that
- * we don't re-read garbage from it later.
+ * This routine is called to handle zeroing any space in the last
+ * block of the file that is beyond the EOF.  We do this since the
+ * size is being increased without writing anything to that block
+ * and we don't want anyone to read the garbage on the disk.
  */
 void
 xfs_zero_eof(
@@ -925,18 +913,14 @@ xfs_zero_eof(
 	cred_t		*credp)
 {
 	xfs_fileoff_t	last_fsb;
-	xfs_fsize_t	last_byte;
-	off_t		page_start;
-	off_t		ioalign;
 	xfs_mount_t	*mp;
 	buf_t		*bp;
 	int		iosize;
-	int		page_off;
-	pfd_t		*pfdp;
 	vnode_t		*vp;
 	int		nimaps;
 	int		zero_offset;
 	int		zero_len;
+	int		isize_fsb_offset;
 	xfs_bmbt_irec_t	imap;
 	struct bmapval	bmap;
 
@@ -945,47 +929,17 @@ xfs_zero_eof(
 
 	mp = ip->i_mount;
 	vp = XFS_ITOV(ip);
-	ioalign = XFS_WRITEIO_ALIGN(mp, isize);
+	isize_fsb_offset = XFS_B_FSB_OFFSET(mp, isize);
 
-	if (ioalign == isize) {
+	if (isize_fsb_offset == 0) {
 		/*
-		 * The buffer containing the last byte of the file
-		 * would end at that last byte, so there is nothing
-		 * to zero.
+		 * There are not extra bytes in the last block to
+		 * zero, so return.
 		 */
 		return;
 	}
 
-	/*
-	 * Zero any pages beyond the current EOF.  These pages
-	 * may exist up to writeio size beyond the EOF.
-	 */
-	iosize = (1 << mp->m_writeio_log);
-	last_byte = isize + iosize;
-	if (last_byte > offset) {
-		last_byte = offset;
-	}
-	page_off = poff(isize);
-	page_start = btoct(isize);
-	while (page_start < last_byte) {
-		pfdp = pfind(vp, page_start, VM_ATTACH);
-		if (pfdp != NULL) {
-			page_zero(pfdp, 0, page_off, NBPP - page_off);
-			pageflags(pfdp, P_HOLE, 1);
-			pagefree(pfdp);
-		}
-		page_off = 0;
-		page_start += NBPP;
-	}
-
 	last_fsb = XFS_B_TO_FSBT(mp, isize);
-	/*
-	 * If isize is fs block aligned, then there is no block
-	 * to zero.
-	 */
-	if (last_fsb == XFS_B_TO_FSB(mp, isize)) {
-		return;
-	}
 	nimaps = 1;
 	(void) xfs_bmapi(NULL, ip, last_fsb, 1, 0, NULLFSBLOCK, 0, &imap,
 			 &nimaps, NULL);
@@ -1022,10 +976,9 @@ xfs_zero_eof(
 		bmap.eof |= BMAP_DELAY;
 	}
 	bp = chunkread(XFS_ITOV(ip), &bmap, 1, credp);
-	/*
-	 * We did the zeroing in the page loop above.
-	 * Just write it out.
-	 */
+	zero_offset = isize_fsb_offset;
+	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
+	xfs_zero_bp(bp, zero_offset, zero_len);
 	bawrite(bp);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	return;
@@ -1831,6 +1784,7 @@ xfs_strat_write_count(
 				 * that the hole we've found extends
 				 * all the way to the end of the buffer.
 				 */
+				ASSERT(0);
 				ASSERT((imap[n].br_startoff +
 					imap[n].br_blockcount) ==
 				       (offset_fsb + buf_fsb));
