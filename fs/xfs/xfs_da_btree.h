@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 
 /*
  * xfs_da_btree.h
@@ -67,7 +67,8 @@ int xfs_da_node_entries(struct xfs_mount *mp);
 #else
 #define	XFS_DA_NODE_ENTRIES(mp)		((mp)->m_da_node_ents)
 #endif
-#define XFS_DA_MAXBLK		0x10000000	/* max hash value */
+
+#define	XFS_DA_MAXHASH	((__uint32_t)-1)/* largest valid hash value */
 
 /*
  * Macros used by directory code to interface to the filesystem.
@@ -89,25 +90,36 @@ int xfs_lblog(struct xfs_mount *mp);
  * Macros used to manipulate directory off_t's
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_MAKE_COOKIE)
-off_t xfs_da_make_cookie(struct xfs_mount *mp, __uint32_t bno, int entry);
-#define	XFS_DA_MAKE_COOKIE(mp,bno,entry)	xfs_da_make_cookie(mp,bno,entry)
+off_t xfs_da_make_cookie(struct xfs_mount *mp, __uint32_t bno, int entry,
+				__uint32_t hash);
+#define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash)	\
+	xfs_da_make_cookie(mp,bno,entry,hash)
 #else
-#define	XFS_DA_MAKE_COOKIE(mp,bno,entry) \
-	(((bno) << (mp)->m_dircook_elog) | (entry))
+#define	XFS_DA_MAKE_COOKIE(mp,bno,entry,hash) \
+	((((((off_t)(bno)) << (mp)->m_dircook_elog) | (entry)) \
+	  << (sizeof(__uint32_t)*NBBY)) | (hash))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_HASH)
+__uint32_t xfs_da_cookie_hash(struct xfs_mount *mp, off_t cookie);
+#define	XFS_DA_COOKIE_HASH(mp,cookie)		xfs_da_cookie_hash(mp,cookie)
+#else
+#define	XFS_DA_COOKIE_HASH(mp,cookie) \
+	((__uint32_t)(((off_t)(cookie)) & 0xFFFFFFFF))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_BNO)
 __uint32_t xfs_da_cookie_bno(struct xfs_mount *mp, off_t cookie);
 #define	XFS_DA_COOKIE_BNO(mp,cookie)		xfs_da_cookie_bno(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_BNO(mp,cookie) \
-	((cookie) >> (mp)->m_dircook_elog)
+	(((off_t)(cookie)) >> ((mp)->m_dircook_elog + NBBY*sizeof(__uint32_t)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DA_COOKIE_ENTRY)
 int xfs_da_cookie_entry(struct xfs_mount *mp, off_t cookie);
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie)		xfs_da_cookie_entry(mp,cookie)
 #else
 #define	XFS_DA_COOKIE_ENTRY(mp,cookie) \
-	((cookie) & ((1 << (mp)->m_dircook_elog) - 1))
+	((((off_t)(cookie)) >> (NBBY*sizeof(__uint32_t))) & \
+	 ((1 << (mp)->m_dircook_elog) - 1))
 #endif
 
 
@@ -244,35 +256,5 @@ void xfs_da_state_free(struct xfs_da_state *state);
 #ifdef _KERNEL
 extern struct zone *xfs_da_state_zone;
 #endif /* _KERNEL */
-
-
-#ifdef XFSDADEBUG
-#ifdef XFSDABDEBUG
-#define xfs_trans_binval(T,B)	xfsda_t_binval(T,B,__FILE__,__LINE__)
-#define xfs_trans_brelse(T,B)	xfsda_t_brelse(T,B,__FILE__,__LINE__)
-#define xfs_trans_log_buf(T,B,F,L) xfsda_t_log_buf(T,B,F L,__FILE__,__LINE__)
-#define xfs_trans_log_inode(T,I,F) xfsda_t_log_inode(T,I,F,__FILE__,__LINE__)
-#define xfs_da_read_buf(T,I,B,W) xfsda_t_da_read_buf(T,I,B,W,__FILE__,__LINE__)
-#endif /* !XFSDABDEBUG */
-void xfsda_t_reinit(char *description, char *file, int line);
-void xfsda_t_binval(struct xfs_trans *tp, struct buf *bp, char *file, int line);
-void xfsda_t_brelse(struct xfs_trans *tp, struct buf *bp, char *file, int line);
-void xfsda_t_log_buf(struct xfs_trans *tp, struct buf *bp, uint first,
-			    uint last, char *file, int line);
-void xfsda_t_log_inode(struct xfs_trans *tp, struct xfs_inode *ip, uint flags,
-			      char *file, int line);
-struct buf *xfsda_t_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-				       xfs_fileoff_t bno, int whichfork,
-				       char *file, int line);
-#define BUFTRACEMAX	128
-typedef struct xfsda_buftrace {
-	short		which;
-	short		line;
-	char		*file;
-	struct buf	*bp;
-} xfsda_buftrace_t;
-#else /* !XFSDADEBUG */
-#define	xfsda_t_reinit(D,F,L)
-#endif /* !XFSDADEBUG */
 
 #endif	/* !FS_XFS_DA_BTREE_H */
