@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -122,6 +122,7 @@ xfs_bulkstat(
 	int		i;
 	xfs_ino_t	ino;
 	int		left;
+	int		res;
 
 	ino = (xfs_ino_t)*lastino;
 	agno = XFS_INO_TO_AGNO(mp, ino);
@@ -139,34 +140,29 @@ xfs_bulkstat(
 		agbp = xfs_ialloc_read_agi(mp, tp, agno);
 		cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 			XFS_BTNUM_INO, (xfs_inode_t *)0);
-		if (!xfs_inobt_lookup_le(cur, agino, 0, 0)) {
+		(void)xfs_inobt_lookup_le(cur, agino, 0, 0);
+		if (!xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree))
 			i = XFS_INODES_PER_CHUNK;
-		} else {
-			xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree);
+		else
 			i = agino - gino + 1;
-		}
-		xfs_inobt_increment(cur, 0);
+		xfs_trans_brelse(tp, agbp);
+		xfs_btree_del_cursor(cur);
 	}
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
-		if (agbp == NULL) {
-			ASSERT(agino == 0);
+		if (i >= XFS_INODES_PER_CHUNK) {
 			agbp = xfs_ialloc_read_agi(mp, tp, agno);
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 				XFS_BTNUM_INO, (xfs_inode_t *)0);
-			(void)xfs_inobt_lookup_ge(cur, 0, 0, 0);
-			i = XFS_INODES_PER_CHUNK;
-		}
-		if (i >= XFS_INODES_PER_CHUNK) {
-			if (!xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree)) {
-				xfs_trans_brelse(tp, agbp);
-				agbp = NULL;
-				xfs_btree_del_cursor(cur);
-				cur = NULL;
+			(void)xfs_inobt_lookup_ge(cur, agino, 0, 0);
+			res = xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree);
+			xfs_trans_brelse(tp, agbp);
+			xfs_btree_del_cursor(cur);
+			if (!res) {
 				agno++;
 				agino = 0;
+				i = XFS_INODES_PER_CHUNK;
 				continue;
 			}
-			xfs_inobt_increment(cur, 0);
 			i = 0;
 		}
 		agino = gino + i;
@@ -203,10 +199,6 @@ xfs_bulkstat(
 		*lastino = XFS_AGINO_TO_INO(mp, agno, agino);
 	}
 	kmem_free(buffer, bcount * sizeof(*buffer));
-	if (cur)
-		xfs_btree_del_cursor(cur);
-	if (agbp)
-		xfs_trans_brelse(tp, agbp);
 	return error;
 }
 
