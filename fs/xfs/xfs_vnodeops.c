@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.223 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -387,8 +387,8 @@ xfs_close(
 			ufp = sa->s_flist;
 			nofiles  = sa->s_nofiles;
 		} else {
-			ufp = u.u_flist;
-			nofiles = u.u_nofiles;
+			ufp = p->p_user->u_flist;
+			nofiles = p->p_user->u_nofiles;
 		}
 
 		for (i = 0 ; i < nofiles; i++ ) {

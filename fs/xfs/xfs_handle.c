@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.18 $"
+#ident "$Revision: 1.19 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -20,6 +20,7 @@
 #include <sys/file.h>
 #include <sys/kabi.h>
 #include <sys/kmem.h>
+#include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -237,7 +238,7 @@ open_by_handle (
 	 * the 'fp' for it opening file - we use u_openfp to mark
 	 * this.
 	 */
-	u.u_openfp = fp;
+	curprocp->p_user->u_openfp = fp;
 
 	if ((filemode & FWRITE) == 0)
 		_SAT_PNALLOC(SAT_OPEN_RO);
@@ -246,7 +247,7 @@ open_by_handle (
 
 	error = vp_open (vp, filemode, get_current_cred());
 
-	u.u_openfp = NULL;
+	curprocp->p_user->u_openfp = NULL;
 	if (error) {
 		setf (fd, NULLFP);
 		unfalloc (fp);
