@@ -97,15 +97,15 @@ xfs_stats_clear_proc_handler(ctl_table *ctl, int write, struct file * filp,
 
 static ctl_table xfs_table[] = {
 	{XFS_REFCACHE_SIZE, "refcache_size", &xfs_params.data[0],
-	sizeof(int), 0644, NULL, &xfs_refcache_resize_proc_handler,
+	sizeof(ulong), 0644, NULL, &xfs_refcache_resize_proc_handler,
 	&sysctl_intvec, NULL, &xfs_min[0], &xfs_max[0]},
 
 	{XFS_REFCACHE_PURGE, "refcache_purge", &xfs_params.data[1],
-	sizeof(int), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
 	&sysctl_intvec, NULL, &xfs_min[1], &xfs_params.xfs_un.refcache_size},
 
 	{XFS_STATS_CLEAR, "stats_clear", &xfs_params.data[2],
-	sizeof(int), 0644, NULL, &xfs_stats_clear_proc_handler,
+	sizeof(ulong), 0644, NULL, &xfs_stats_clear_proc_handler,
 	&sysctl_intvec, NULL, &xfs_min[2], &xfs_max[2]},
 
 	{0}
