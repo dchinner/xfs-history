@@ -60,27 +60,14 @@ void            xfs_log_wait(xfs_lsn_t);
 
 
 typedef struct xfs_log_iovec {
-    caddr_t	i_addr;		/* beginning address of region */
-    uint	i_len;		/* length in bytes of region */
-    xfs_lsn_t	i_lsn;		/* log sequence number of region */
+	caddr_t		i_addr;		/* beginning address of region */
+	uint		i_len;		/* length in bytes of region */
+	xfs_lsn_t	i_lsn;		/* log sequence number of region */
 } xfs_log_iovec_t;
 
 typedef void* xfs_log_ticket_t;
 
 /* Log manager interfaces */
-#ifdef TICKET_INT
-void xfs_log_done(xfs_mount_t *mp, int ticket);
-int  xfs_log_force(xfs_mount_t *mp, int ticket, uint flags);
-int  xfs_log_init();
-int  xfs_log_mount(xfs_mount_t *mp, dev_t log_dev, uint flags);
-int  xfs_log_new_transaction(xfs_mount_t *mp, int ticket, xfs_tid_t old_tid,
-			     xfs_tid_t new_tid);
-void xfs_log_notify(xfs_mount_t *mp, xfs_lsn_t lsn,
-		    void (*callback_func)(void*), void* callback_arg);
-int  xfs_log_reserve(xfs_mount_t *mp, xfs_tid_t tid, uint len, int *ticket,
-		     char clientid, uint flags);
-int  xfs_log_write(xfs_mount_t *mp, xfs_log_iovec_t reg[], int num, int ticket);
-#else
 void xfs_log_done(xfs_mount_t *mp, xfs_log_ticket_t ticket);
 int  xfs_log_force(xfs_mount_t *mp, xfs_log_ticket_t ticket, uint flags);
 int  xfs_log_init();
@@ -89,11 +76,10 @@ int  xfs_log_new_transaction(xfs_mount_t *mp, xfs_log_ticket_t ticket,
 			     xfs_tid_t old_tid, xfs_tid_t new_tid);
 void xfs_log_notify(xfs_mount_t *mp, xfs_lsn_t lsn,
 		    void (*callback_func)(void*), void* callback_arg);
-int  xfs_log_reserve(xfs_mount_t *mp, xfs_tid_t tid, uint len,
+int  xfs_log_reserve(xfs_mount_t *mp, xfs_tid_t tid, uint length,
 		     xfs_log_ticket_t *ticket, char clientid, uint flags);
-int  xfs_log_write(xfs_mount_t *mp, xfs_log_iovec_t reg[], int num,
+int  xfs_log_write(xfs_mount_t *mp, xfs_log_iovec_t region[], int nentries,
 		   xfs_log_ticket_t ticket);
-#endif /* TICKET_INT */
 
 /* Log manager utility interfaces */
 void xfs_log_print(xfs_mount_t *mp, dev_t log_dev);
