@@ -30,6 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
+
 #include <xfs.h>
 #include <xfs_log_recover.h>
 
@@ -207,24 +208,40 @@ xlog_find_cycle_start(xlog_t	*log,
  * Return -1 if we encounter no errors.  This is an invalid block number
  * since we don't ever expect logs to get this large.
  */
-STATIC xfs_daddr_t
-xlog_find_verify_cycle(xfs_caddr_t	*bap,	/* update ptr as we go */
-		       xfs_daddr_t	start_blk,
-		       int	nbblks,
-		       uint	stop_on_cycle_no)
-{
-	int	i;
-	uint	cycle;
 
-	for (i=0; i<nbblks; i++) {
-		cycle = GET_CYCLE(*bap, ARCH_CONVERT);
-		if (cycle != stop_on_cycle_no) {
-			(*bap) += BBSIZE;
-		} else {
-			return (start_blk+i);
+STATIC xfs_daddr_t
+xlog_find_verify_cycle( xlog_t 		*log,
+		       	xfs_daddr_t	start_blk,
+		       	int		nbblks,
+		       	uint		stop_on_cycle_no)
+{
+	int			i;
+	uint			cycle;
+    	xfs_buf_t		*bp;
+	int			error = 0;
+
+	bp = xlog_get_bp(1, log->l_mp);
+	if (!bp)
+	    return -ENOMEM;
+
+	for (i=start_blk; i< start_blk + nbblks; i++) {
+		error = xlog_bread(log, i, 1, bp);
+		if (error)
+			goto out;
+
+		cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
+		if (cycle == stop_on_cycle_no) {
+			error = i;
+			goto out;
 		}
 	}
-	return -1;
+
+	error = -1;
+
+out:
+	xlog_put_bp(bp);
+
+	return error;
 }	/* xlog_find_verify_cycle */
 
 
@@ -240,29 +257,40 @@ xlog_find_verify_cycle(xfs_caddr_t	*bap,	/* update ptr as we go */
  * extra_bblks is the number of blocks potentially verified on a previous
  * call to this routine.
  */
+
 STATIC int
-xlog_find_verify_log_record(xfs_caddr_t	ba,	     /* update ptr as we go */
+xlog_find_verify_log_record(xlog_t	*log,
 			    xfs_daddr_t	start_blk,
 			    xfs_daddr_t	*last_blk,
 			    int		extra_bblks)
 {
-    xlog_rec_header_t *rhead;
-    xfs_daddr_t           i;
+    xfs_daddr_t         i;
+    xfs_buf_t		*bp;
+    xlog_rec_header_t	*head;
+    int			error = 0;
 
     ASSERT(start_blk != 0 || *last_blk != start_blk);
 
-    ba -= BBSIZE;
+    bp = xlog_get_bp(1, log->l_mp);
+    if (!bp)
+    	return -ENOMEM;
+
     for (i=(*last_blk)-1; i>=0; i--) {
 	if (i < start_blk) {
 	    /* legal log record not found */
 	    xlog_warn("XFS: xlog_find_verify_log_record: need to back-up");
 	    ASSERT(0);
-	    return XFS_ERROR(EIO);
+	    error = XFS_ERROR(EIO);
+	    goto out;
 	}
-	if (INT_GET(*(uint *)ba, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM) {
+
+	error = xlog_bread(log, i, 1, bp);
+	if (error)
+		goto out;
+    	head = (xlog_rec_header_t*)XFS_BUF_PTR(bp);
+	
+	if (INT_GET(head->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM)
 	    break;
-	}
-	ba -= BBSIZE;
     }
 
     /*
@@ -270,8 +298,10 @@ xlog_find_verify_log_record(xfs_caddr_t	ba,	     /* update ptr as we go */
      * to caller.  If caller can handle a return of -1, then this routine
      * will be called again for the end of the physical log.
      */
-    if (i == -1)
-	    return -1;
+    if (i == -1) {
+    	error = -1;
+	goto out;
+    }
 
     /*
      * We may have found a log record header before we expected one.
@@ -280,10 +310,14 @@ xlog_find_verify_log_record(xfs_caddr_t	ba,	     /* update ptr as we go */
      * reset last_blk.  Only when last_blk points in the middle of a log
      * record do we update last_blk.
      */
-    rhead = (xlog_rec_header_t *)ba;
-    if (*last_blk - i + extra_bblks != BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT))+1)
+    if (*last_blk - i + extra_bblks 
+    		!= BTOBB(INT_GET(head->h_len, ARCH_CONVERT))+1)
 	    *last_blk = i;
-    return 0;
+
+out:
+    xlog_put_bp(bp);
+
+    return error;
 }	/* xlog_find_verify_log_record */
 
 
@@ -306,12 +340,11 @@ int
 xlog_find_head(xlog_t  *log,
 	       xfs_daddr_t *return_head_blk)
 {
-    xfs_buf_t   *bp, *big_bp;
+    xfs_buf_t   *bp;
     xfs_daddr_t new_blk, first_blk, start_blk, last_blk, head_blk;
     int     num_scan_bblks;
     uint    first_half_cycle, last_half_cycle;
     uint    stop_on_cycle;
-    xfs_caddr_t ba;
     int     error, log_bbnum = log->l_logBBsize;
 
     /* special case freshly mkfs'ed filesystem; return immediately */
@@ -408,22 +441,13 @@ xlog_find_head(xlog_t  *log,
      * we actually look at the block size of the filesystem.
      */
     num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
-    big_bp = xlog_get_bp(num_scan_bblks,log->l_mp);
-    if (!big_bp) {
-	error = -ENOMEM;
-	goto bp_err;
-    }
-
     if (head_blk >= num_scan_bblks) {
 	/*
 	 * We are guaranteed that the entire check can be performed
 	 * in one buffer.
 	 */
 	start_blk = head_blk - num_scan_bblks;
-	if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
-	    goto big_bp_err;
-	ba = XFS_BUF_PTR(big_bp);
-	new_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks,
+	new_blk = xlog_find_verify_cycle(log, start_blk, num_scan_bblks,
 					 stop_on_cycle);
 	if (new_blk != -1)
 	    head_blk = new_blk;
@@ -455,11 +479,7 @@ xlog_find_head(xlog_t  *log,
 	 */
 	start_blk = log_bbnum - num_scan_bblks + head_blk;
 	ASSERT(head_blk <= INT_MAX && (xfs_daddr_t) num_scan_bblks-head_blk >= 0);
-	if (error = xlog_bread(log, start_blk,
-			num_scan_bblks-(int)head_blk, big_bp))
-	    goto big_bp_err;
-	ba = XFS_BUF_PTR(big_bp);
-	new_blk= xlog_find_verify_cycle(&ba, start_blk,
+	new_blk= xlog_find_verify_cycle(log, start_blk,
 		     num_scan_bblks-(int)head_blk, (stop_on_cycle - 1));
 	if (new_blk != -1) {
 	    head_blk = new_blk;
@@ -473,10 +493,7 @@ xlog_find_head(xlog_t  *log,
 	 */
 	start_blk = 0;
 	ASSERT(head_blk <= INT_MAX);
-	if (error = xlog_bread(log, start_blk, (int) head_blk, big_bp))
-	    goto big_bp_err;
-	ba = XFS_BUF_PTR(big_bp);
-	new_blk = xlog_find_verify_cycle(&ba, start_blk, (int) head_blk,
+	new_blk = xlog_find_verify_cycle(log, start_blk, (int) head_blk,
 					 stop_on_cycle);
 	if (new_blk != -1)
 	    head_blk = new_blk;
@@ -490,26 +507,20 @@ bad_blk:
     num_scan_bblks = BTOBB(XLOG_MAX_RECORD_BSIZE);
     if (head_blk >= num_scan_bblks) {
 	start_blk = head_blk - num_scan_bblks;  /* don't read head_blk */
-	if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
-	    goto big_bp_err;
 
 	/* start ptr at last block ptr before head_blk */
-	ba = XFS_BUF_PTR(big_bp) + XLOG_MAX_RECORD_BSIZE;
-	if ((error = xlog_find_verify_log_record(ba,
+	if ((error = xlog_find_verify_log_record(log,
 						 start_blk,
 						 &head_blk,
 						 0)) == -1) {
 	    error = XFS_ERROR(EIO);
-	    goto big_bp_err;
+	    goto bp_err;
 	} else if (error)
-	    goto big_bp_err;
+	    goto bp_err;
     } else {
 	start_blk = 0;
 	ASSERT(head_blk <= INT_MAX);
-	if (error = xlog_bread(log, start_blk, (int)head_blk, big_bp))
-	    goto big_bp_err;
-	ba = XFS_BUF_PTR(big_bp) + BBTOB(head_blk);
-	if ((error = xlog_find_verify_log_record(ba,
+	if ((error = xlog_find_verify_log_record(log,
 						 start_blk,
 						 &head_blk,
 						 0)) == -1) {
@@ -517,26 +528,21 @@ bad_blk:
 	    start_blk = log_bbnum - num_scan_bblks + head_blk;
 	    new_blk = log_bbnum;
 	    ASSERT(start_blk <= INT_MAX && (xfs_daddr_t) log_bbnum-start_blk >= 0);
-	    if (error = xlog_bread(log, start_blk, log_bbnum - (int)start_blk,
-				   big_bp))
-		goto big_bp_err;
-	    ba = XFS_BUF_PTR(big_bp) + BBTOB(log_bbnum - start_blk);
 	    ASSERT(head_blk <= INT_MAX);
-	    if ((error = xlog_find_verify_log_record(ba,
+	    if ((error = xlog_find_verify_log_record(log,
 						     start_blk,
 						     &new_blk,
 						     (int)head_blk)) == -1) {
 		error = XFS_ERROR(EIO);
-		goto big_bp_err;
+		goto bp_err;
 	    } else if (error)
-		goto big_bp_err;
+		goto bp_err;
 	    if (new_blk != log_bbnum)
 		head_blk = new_blk;
 	} else if (error)
-	    goto big_bp_err;
+	    goto bp_err;
     }
 
-    xlog_put_bp(big_bp);
     xlog_put_bp(bp);
     if (head_blk == log_bbnum)
 	    *return_head_blk = 0;
@@ -550,8 +556,6 @@ bad_blk:
      */
     return 0;
 
-big_bp_err:
-	xlog_put_bp(big_bp);
 bp_err:
 	xlog_put_bp(bp);
 
@@ -813,12 +817,11 @@ int
 xlog_find_zeroed(struct log	*log,
 		 xfs_daddr_t 	*blk_no)
 {
-	xfs_buf_t	*bp, *big_bp;
-	uint	first_cycle, last_cycle;
+	xfs_buf_t	*bp;
+	uint	        first_cycle, last_cycle;
 	xfs_daddr_t	new_blk, last_blk, start_blk;
-	xfs_daddr_t num_scan_bblks;
-	xfs_caddr_t	ba;
-	int	error, log_bbnum = log->l_logBBsize;
+	xfs_daddr_t     num_scan_bblks;
+	int	        error, log_bbnum = log->l_logBBsize;
 
 	error = 0;
 	/* check totally zeroed log */
@@ -864,28 +867,18 @@ xlog_find_zeroed(struct log	*log,
 	 */
 	num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
 	ASSERT(num_scan_bblks <= INT_MAX);
-	big_bp = xlog_get_bp((int)num_scan_bblks,log->l_mp);
-	if (!big_bp) {
-		error = -ENOMEM;
-		goto bp_err;
-	}
-        ASSERT(big_bp);
         
 	if (last_blk < num_scan_bblks)
 		num_scan_bblks = last_blk;
 	start_blk = last_blk - num_scan_bblks;
-        
-	if (error = xlog_bread(log, start_blk, (int)num_scan_bblks, big_bp))
-		goto big_bp_err;
-	ba = XFS_BUF_PTR(big_bp);
-        
+     
 	/*
 	 * We search for any instances of cycle number 0 that occur before
 	 * our current estimate of the head.  What we're trying to detect is
 	 *        1 ... | 0 | 1 | 0...
 	 *                       ^ binary search ends here
 	 */
-	new_blk = xlog_find_verify_cycle(&ba, start_blk,
+	new_blk = xlog_find_verify_cycle(log, start_blk,
 					 (int)num_scan_bblks, 0);
 	if (new_blk != -1)
 		last_blk = new_blk;
@@ -894,12 +887,11 @@ xlog_find_zeroed(struct log	*log,
 	 * Potentially backup over partial log record write.  We don't need
 	 * to search the end of the log because we know it is zero.
 	 */
-	if (error = xlog_find_verify_log_record(ba, start_blk, &last_blk, 0))
-	    goto big_bp_err;
+	if (error = xlog_find_verify_log_record(log, start_blk, 
+				&last_blk, 0))
+	    goto bp_err;
 
 	*blk_no = last_blk;
-big_bp_err:
-	xlog_put_bp(big_bp);
 bp_err:
 	xlog_put_bp(bp);
 	if (error)
@@ -919,32 +911,34 @@ xlog_write_log_records(
 	int	start_block,
 	int	blocks,
 	int	tail_cycle,
-	int	tail_block,		       
-	xfs_buf_t	*bp)
+	int	tail_block)
 {
 	xlog_rec_header_t	*recp;
 	int			i;
-	int			curr_block;
-	int			error;
+	int			error = 0;
+	xfs_buf_t		*bp;
 
+        bp = xlog_get_bp(1, log->l_mp);
+	if (!bp)
+		return -ENOMEM;
 	recp = (xlog_rec_header_t*)(XFS_BUF_PTR(bp));
-	curr_block = start_block;
-	for (i = 0; i < blocks; i++) {
-		INT_SET(recp->h_magicno, ARCH_CONVERT, XLOG_HEADER_MAGIC_NUM);
-		INT_SET(recp->h_cycle, ARCH_CONVERT, cycle);
-		INT_SET(recp->h_version, ARCH_CONVERT, 1);
-		INT_ZERO(recp->h_len, ARCH_CONVERT);
-		ASSIGN_ANY_LSN(recp->h_lsn, cycle, curr_block, ARCH_CONVERT);
-		ASSIGN_ANY_LSN(recp->h_tail_lsn, tail_cycle, tail_block, ARCH_CONVERT);
-		INT_ZERO(recp->h_chksum, ARCH_CONVERT);
-		INT_ZERO(recp->h_prev_block, ARCH_CONVERT);	/* unused */
-		INT_ZERO(recp->h_num_logops, ARCH_CONVERT);
-		
-		curr_block++;
-		recp = (xlog_rec_header_t*)(((char *)recp) + BBSIZE);
-	}
 
-	error = xlog_bwrite(log, start_block, blocks, bp);
+        INT_SET(recp->h_magicno, ARCH_CONVERT, XLOG_HEADER_MAGIC_NUM);
+        INT_SET(recp->h_cycle, ARCH_CONVERT, cycle);
+        INT_SET(recp->h_version, ARCH_CONVERT, 1);
+        INT_ZERO(recp->h_len, ARCH_CONVERT);
+        ASSIGN_ANY_LSN(recp->h_tail_lsn, tail_cycle, tail_block, ARCH_CONVERT);
+        INT_ZERO(recp->h_chksum, ARCH_CONVERT);
+        INT_ZERO(recp->h_prev_block, ARCH_CONVERT);	/* unused */
+        INT_ZERO(recp->h_num_logops, ARCH_CONVERT);
+
+	for (i = start_block; i < start_block + blocks; i++) {
+		ASSIGN_ANY_LSN(recp->h_lsn, cycle, i, ARCH_CONVERT);
+		error = xlog_bwrite(log, i, 1, bp);
+		if (error)
+			break;
+	}
+	xlog_put_bp(bp);
 
 	return error;
 }
@@ -977,7 +971,6 @@ xlog_clear_stale_blocks(
 	int			tail_distance;
 	int			max_distance;
 	int			distance;
-	xfs_buf_t		*bp;
 	int			error;
 
 	tail_cycle = CYCLE_LSN(tail_lsn, ARCH_NOCONVERT);
@@ -1032,9 +1025,6 @@ xlog_clear_stale_blocks(
 	 * for no reason.
 	 */
 	max_distance = MIN(max_distance, tail_distance);
-	bp = xlog_get_bp(max_distance,log->l_mp);
-        if (!bp)
-            return -ENOMEM;
 	
 	if ((head_block + max_distance) <= log->l_logBBsize) {
 		/*
@@ -1046,11 +1036,7 @@ xlog_clear_stale_blocks(
 		 */
 		error = xlog_write_log_records(log, (head_cycle - 1),
 				head_block, max_distance, tail_cycle,
-				tail_block, bp);
-		if (error) {
-			xlog_put_bp(bp);
-			return error;
-		}
+				tail_block);
 	} else {
 		/*
 		 * We need to wrap around the end of the physical log in
@@ -1062,11 +1048,10 @@ xlog_clear_stale_blocks(
 		distance = log->l_logBBsize - head_block;
 		error = xlog_write_log_records(log, (head_cycle - 1),
 				head_block, distance, tail_cycle,
-				tail_block, bp);
-		if (error) {
-			xlog_put_bp(bp);
+				tail_block);
+
+		if (error)
 			return error;
-		}
 
 		/*
 		 * Now write the blocks at the start of the physical log.
@@ -1078,14 +1063,8 @@ xlog_clear_stale_blocks(
 		 */
 		distance = max_distance - (log->l_logBBsize - head_block);
 		error = xlog_write_log_records(log, head_cycle, 0, distance,
-				tail_cycle, tail_block, bp);
-		if (error) {
-			xlog_put_bp(bp);
-			return error;
-		}
+				tail_cycle, tail_block);
 	}
-
-	xlog_put_bp(bp);
 
 	return 0;
 }

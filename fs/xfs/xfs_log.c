@@ -3160,6 +3160,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
     if (BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT) < 10) {
 	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT);
 	bp = xlog_get_bp(1, log->l_mp);
+        ASSERT(bp);
 	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT); i++) {
 	    xlog_bread(log, i, 1, bp);
 	    if (GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT) != cycle_no)
