@@ -535,9 +535,9 @@ struct xfs_efd_log_item;
 #define	xfs_trans_set_sync(tp)		((tp)->t_flags |= XFS_TRANS_SYNC)
 
 #ifdef DEBUG
-#define	xfs_trans_agblocks_delta(tp, d)	((tp)->t_ag_freeblks_delta += d)
-#define	xfs_trans_agflist_delta(tp, d)	((tp)->t_ag_flist_delta += d)
-#define	xfs_trans_agbtree_delta(tp, d)	((tp)->t_ag_btree_delta += d)
+#define	xfs_trans_agblocks_delta(tp, d)	((tp)->t_ag_freeblks_delta += (long)d)
+#define	xfs_trans_agflist_delta(tp, d)	((tp)->t_ag_flist_delta += (long)d)
+#define	xfs_trans_agbtree_delta(tp, d)	((tp)->t_ag_btree_delta += (long)d)
 #else
 #define	xfs_trans_agblocks_delta(tp, d)
 #define	xfs_trans_agflist_delta(tp, d)
