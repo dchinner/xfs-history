@@ -399,6 +399,9 @@ xfs_ialloc(xfs_trans_t	*tp,
 	ip->i_d.di_mtime.t_sec = curr_time;
 	ip->i_d.di_ctime.t_sec = curr_time;
 	uuid_create(&ip->i_d.di_uuid, &status);
+	/* di_gen??? */
+	ip->i_d.di_extsize = 0;
+	ip->i_d.di_flags = 0;
 	flags = XFS_ILOG_CORE;
 	switch (mode & IFMT) {
 	case IFIFO:
@@ -1052,6 +1055,8 @@ xfs_iprint(xfs_inode_t *ip)
 	printf("   di_size %d\n", (int)dip->di_size);
 	printf("   di_nextents %d\n", (int)dip->di_nextents);
 	printf("   di_gen %x\n", dip->di_gen);
+	printf("   di_extsize %d\n", dip->di_extsize);
+	printf("   di_flags %x\n", dip->di_flags);
 }
 	
 
