@@ -104,8 +104,11 @@ xfs_trans_alloc(xfs_mount_t	*mp,
 
 /*
  * This is called to create a new transaction which will share the
- * permanent log reservation of the given transaction.  Other
- * reservations, locks, etc are not inherited.
+ * permanent log reservation of the given transaction.  The remaining
+ * unused block and rt extent reservations are also inherited.  This
+ * implies that the original transaction is no longer allowed to allocate
+ * blocks.  Locks and log items, however, are no inherited.  They must
+ * be added to the new transaction explicitly.
  */
 xfs_trans_t *
 xfs_trans_dup(xfs_trans_t *tp)
@@ -130,7 +133,9 @@ xfs_trans_dup(xfs_trans_t *tp)
 	ntp->t_ticket = tp->t_ticket;
 	ntp->t_log_res = tp->t_log_res;
 	ntp->t_blk_res = tp->t_blk_res - tp->t_blk_res_used;
+	tp->t_blk_res = tp->t_blk_res_used;
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
+	tp->t_rtx_res = tp->t_rtx_res_used;
 
 	return ntp;
 }
