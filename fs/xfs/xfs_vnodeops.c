@@ -959,9 +959,6 @@ xfs_readlink(
 
 	vn_trace_entry(vp, "xfs_readlink", (inst_t *)__return_address);
 
-	if (vp->v_type != VLNK)
-		return XFS_ERROR(EINVAL);
-
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
@@ -1958,13 +1955,6 @@ xfs_lookup(
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 
 	vn_trace_entry(dir_vp, "xfs_lookup", (inst_t *)__return_address);
-
-	/*
-	 * If it's not a directory, fail the request.
-	 */
-	if (dir_vp->v_type != VDIR) {
-		return XFS_ERROR(ENOTDIR);
-	}
 
 	dp = XFS_BHVTOI(dir_bdp);
 

@@ -40,18 +40,8 @@ STATIC int xfs_ibusy(xfs_mount_t *);
 STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
 
-/*
- * xfs_init
- *
- * This is called through the vfs switch at system initialization
- * to initialize any global state associated with XFS.	All we
- * need to do currently is save the type given to XFS in xfs_fstype.
- *
- * vswp -- pointer to the XFS entry in the vfs switch table
- * fstype -- index of XFS in the vfs switch table used as the XFS fs type.
- */
 int
-xfs_init(int	fstype)
+xfs_init(void)
 {
 	extern kmem_zone_t	*xfs_da_state_zone;
 	extern kmem_zone_t	*xfs_bmap_free_item_zone;
@@ -76,8 +66,6 @@ xfs_init(int	fstype)
 	extern lock_t		xfs_dabuf_global_lock;
 #endif
 	extern int		xfs_refcache_size;
-
-	xfs_fstype = fstype;
 
 #ifdef XFS_DABUF_DEBUG
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
@@ -527,7 +515,6 @@ xfs_get_vfsmount(
 	mp = xfs_mount_init();
 
 	/* vfsp->vfs_bsize filled in later from superblock */
-	vfsp->vfs_fstype = xfs_fstype;
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 	vfsp->vfs_dev = ddev;
 	/* vfsp->vfs_fsid is filled in later from superblock */
