@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.35 $"
 
 /*
  * XFS types
@@ -34,11 +34,13 @@
 #endif
 #endif
 
+#if !defined(__linux__)
 typedef int8_t		__int8_t;
 typedef	u_int8_t	__uint8_t;
 
 typedef	int16_t		__int16_t;
 typedef	u_int16_t	__uint16_t;
+#endif
 
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
 typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */

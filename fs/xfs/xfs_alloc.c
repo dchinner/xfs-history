@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.111 $"
 
 /*
  * Free space allocation for XFS.
@@ -12,6 +12,9 @@
 #include <sys/buf.h>
 #include <sys/ksa.h>
 #include <sys/debug.h>
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -20,6 +23,7 @@
 #include <sys/kmem.h>
 #include <sys/errno.h>
 #include <sys/uuid.h>
+
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
