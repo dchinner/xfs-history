@@ -350,7 +350,6 @@ EXPORT_SYMBOL(xfs_mountfs);
 EXPORT_SYMBOL(xfs_qm_dqcheck);
 EXPORT_SYMBOL(xfs_readsb);
 EXPORT_SYMBOL(xfs_read_buf);
-EXPORT_SYMBOL(xfs_refcache_purge_mp);
 EXPORT_SYMBOL(xfs_rwlock);
 EXPORT_SYMBOL(xfs_rwunlock);
 EXPORT_SYMBOL(xfs_setsize_buftarg);
