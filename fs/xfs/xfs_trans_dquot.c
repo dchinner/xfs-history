@@ -34,17 +34,6 @@
 #include <xfs_quota_priv.h>
 
 
-STATIC
-int		xfs_trans_dqresv( xfs_trans_t	*tp,
-				 xfs_dquot_t 	*dqp,
-				 long  		nblks,
-				 long		ninos,
-				 uint		flags);
-
-STATIC 
-void		xfs_trans_dqlockedjoin(xfs_trans_t *tp, 
-				       xfs_dqtrx_t *q);
-      		      
 /*
  * Add the locked dquot to the transaction.
  * The dquot must be locked, and it cannot be associated with any

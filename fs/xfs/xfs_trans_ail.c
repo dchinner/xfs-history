@@ -32,29 +32,13 @@
 
 #include <xfs.h>
 
-STATIC void
-xfs_ail_insert(
-	xfs_ail_entry_t	*base,
-	xfs_log_item_t	*lip);
-
-STATIC xfs_log_item_t *
-xfs_ail_delete(
-	xfs_ail_entry_t	*base,
-	xfs_log_item_t	*lip);
-
-STATIC xfs_log_item_t *
-xfs_ail_min(
-	xfs_ail_entry_t	*base);
-
-STATIC xfs_log_item_t *
-xfs_ail_next(
-	xfs_ail_entry_t	*base,
-	xfs_log_item_t	*lip);
+STATIC void xfs_ail_insert(xfs_ail_entry_t *, xfs_log_item_t *);
+STATIC xfs_log_item_t * xfs_ail_delete(xfs_ail_entry_t *, xfs_log_item_t *);
+STATIC xfs_log_item_t * xfs_ail_min(xfs_ail_entry_t *);
+STATIC xfs_log_item_t * xfs_ail_next(xfs_ail_entry_t *, xfs_log_item_t *);
 
 #ifdef XFSDEBUG
-STATIC void
-xfs_ail_check(
-	xfs_ail_entry_t *base);
+STATIC void xfs_ail_check(xfs_ail_entry_t *);
 #else
 #define	xfs_ail_check(a)
 #endif /* XFSDEBUG */

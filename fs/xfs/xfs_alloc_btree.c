@@ -40,130 +40,16 @@
  * Prototypes for internal functions.
  */
 
-/*
- * Single level of the xfs_alloc_delete record deletion routine.
- * Delete record pointed to by cur/level.
- * Remove the record from its block then rebalance the tree.
- * Return 0 for error, 1 for done, 2 to go on to the next level.
- */
-STATIC int				/* error */
-xfs_alloc_delrec(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level,		/* level removing record from */
-	int		*stat);		/* fail/done/go-on */
-
-/*
- * Insert one record/level.  Return information to the caller
- * allowing the next level up to proceed if necessary.
- */
-STATIC int				/* error */
-xfs_alloc_insrec(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level,		/* level to insert record at */
-	xfs_agblock_t	*bnop,		/* i/o: block number inserted */
-	xfs_alloc_rec_t	*recp,		/* i/o: record data inserted */
-	xfs_btree_cur_t	**curp,		/* output: new cursor replacing cur */
-	int		*stat);		/* output: success/failure */
-
-/*
- * Log header fields from a btree block.
- */
-STATIC void
-xfs_alloc_log_block(
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_buf_t	*bp,		/* buffer containing btree block */
-	int		fields);	/* mask of fields: XFS_BB_... */
-
-/*
- * Log keys from a btree block (nonleaf).
- */
-STATIC void
-xfs_alloc_log_keys(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t	*bp,		/* buffer containing btree block */
-	int		kfirst,		/* index of first key to log */
-	int		klast);		/* index of last key to log */
-
-/*
- * Log block pointer fields from a btree block (nonleaf).
- */
-STATIC void
-xfs_alloc_log_ptrs(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t	*bp,		/* buffer containing btree block */
-	int		pfirst,		/* index of first pointer to log */
-	int		plast);		/* index of last pointer to log */
-
-/*
- * Log records from a btree block (leaf).
- */
-STATIC void
-xfs_alloc_log_recs(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t	*bp,		/* buffer containing btree block */
-	int		rfirst,		/* index of first record to log */
-	int		rlast);		/* index of last record to log */
-
-/*
- * Lookup the record.  The cursor is made to point to it, based on dir.
- * Return 0 if can't find any such record, 1 for success.
- */
-STATIC int				/* error */
-xfs_alloc_lookup(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_lookup_t	dir,		/* <=, ==, or >= */
-	int		*stat);		/* success/failure */
-
-/*
- * Move 1 record left from cur/level if possible.
- * Update cur to reflect the new path.
- */
-STATIC int				/* error */
-xfs_alloc_lshift(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level,		/* level to shift record on */
-	int		*stat);		/* success/failure */
-
-/*
- * Allocate a new root block, fill it in.
- */
-STATIC int				/* error */
-xfs_alloc_newroot(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		*stat);		/* success/failure */
-
-/*
- * Move 1 record right from cur/level if possible.
- * Update cur to reflect the new path.
- */
-STATIC int				/* error */
-xfs_alloc_rshift(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level,		/* level to shift record on */
-	int		*stat);		/* success/failure */
-
-/*
- * Split cur/level block in half.
- * Return new block number and its first record (to be inserted into parent).
- * Also returns a new cursor in this case, for next level of insert to use.
- */
-STATIC int				/* error */
-xfs_alloc_split(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level,		/* level to split */
-	xfs_agblock_t	*bnop,		/* output: block number allocated */
-	xfs_alloc_key_t	*keyp,		/* output: first key of new block */
-	xfs_btree_cur_t	**curp,		/* output: new cursor */
-	int		*stat);		/* output: success/failure */
-
-/*
- * Update keys at all levels from here to the root along the cursor's path.
- */
-STATIC int				/* error */
-xfs_alloc_updkey(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_alloc_key_t	*keyp,		/* new key value to update to */
-	int		level);		/* starting level for update */
+STATIC void xfs_alloc_log_block(xfs_trans_t *, xfs_buf_t *, int);
+STATIC void xfs_alloc_log_keys(xfs_btree_cur_t *, xfs_buf_t *, int, int);
+STATIC void xfs_alloc_log_ptrs(xfs_btree_cur_t *, xfs_buf_t *, int, int);
+STATIC void xfs_alloc_log_recs(xfs_btree_cur_t *, xfs_buf_t *, int, int);
+STATIC int xfs_alloc_lshift(xfs_btree_cur_t *, int, int *);
+STATIC int xfs_alloc_newroot(xfs_btree_cur_t *, int *);
+STATIC int xfs_alloc_rshift(xfs_btree_cur_t *, int, int *);
+STATIC int xfs_alloc_split(xfs_btree_cur_t *, int, xfs_agblock_t *,
+		xfs_alloc_key_t *, xfs_btree_cur_t **, int *);
+STATIC int xfs_alloc_updkey(xfs_btree_cur_t *, xfs_alloc_key_t *, int);
 
 /*
  * Internal functions.

@@ -39,78 +39,10 @@
 #define	whymount_t	whymountroot_t
 static char *whymount[] = { "initial mount", "remount", "unmount" };
 
-/*
- * Static function prototypes.
- */
-STATIC int
-xfs_vfsmount(
-	vfs_t		*vfsp,
-	vnode_t		*mvp,
-	struct mounta	*uap,
-	char		*attrs,
-	cred_t		*credp);
-
-STATIC int
-xfs_rootinit(
-	vfs_t		*vfsp);
-
-
-STATIC int
-xfs_vfsmountroot(
-	bhv_desc_t		*bdp,
-	enum whymountroot	why);
-
-STATIC int
-xfs_unmount(
-	bhv_desc_t	*bdp,
-	int	flags,
-	cred_t	*credp);
-
-STATIC int
-xfs_root(
-	bhv_desc_t	*bdp,
-	vnode_t	**vpp);
-
-STATIC int
-xfs_statvfs(
-	bhv_desc_t	*bdp,
-	statvfs_t	*statp,
-	vnode_t		*vp);
-
-STATIC int
-xfs_sync(
-	bhv_desc_t	*bdp,
-	int		flags,
-	cred_t		*credp);
-
-STATIC int
-xfs_vget(
-	bhv_desc_t	*bdp,
-	vnode_t		**vpp,
-	fid_t		*fidp);
-
-STATIC int
-xfs_cmountfs(
-	vfs_t		*vfsp,
-	dev_t		ddev,
-	dev_t		logdev,
-	dev_t		rtdev,
-	whymount_t	why,
-	struct xfs_args	*ap,
-	struct mounta	*args,
-	struct cred	*cr);
-
-STATIC xfs_mount_t *
-xfs_get_vfsmount(
-	vfs_t	*vfsp,
-	dev_t	ddev,
-	dev_t	logdev,
-	dev_t	rtdev);
-
-STATIC int
-xfs_ibusy(
-	xfs_mount_t	*mp);
-
+STATIC xfs_mount_t *xfs_get_vfsmount(vfs_t *, dev_t, dev_t, dev_t);
+STATIC int xfs_ibusy(xfs_mount_t *);
+STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
+STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
 
 /*
  * xfs_init

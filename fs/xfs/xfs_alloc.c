@@ -44,120 +44,10 @@ ktrace_t	*xfs_alloc_trace_buf;
 
 #define XFS_ABSDIFF(a,b)	(((a) <= (b)) ? ((b) - (a)) : ((a) - (b)))
 
-/*
- * Prototypes for internal functions.
- */
-
-/*
- * Compute aligned version of the found extent.
- * Takes alignment and min length into account.
- */
-STATIC int				/* success (>= minlen) */
-xfs_alloc_compute_aligned(
-	xfs_agblock_t	foundbno,	/* starting block in found extent */
-	xfs_extlen_t	foundlen,	/* length in found extent */
-	xfs_extlen_t	alignment,	/* alignment for allocation */
-	xfs_extlen_t	minlen,		/* minimum length for allocation */
-	xfs_agblock_t	*resbno,	/* result block number */
-	xfs_extlen_t	*reslen);	/* result length */
-
-/*
- * Compute best start block and diff for "near" allocations.
- * freelen >= wantlen already checked by caller.
- */
-STATIC xfs_extlen_t			/* difference value (absolute) */
-xfs_alloc_compute_diff(
-	xfs_agblock_t	wantbno,	/* target starting block */
-	xfs_extlen_t	wantlen,	/* target length */
-	xfs_extlen_t	alignment,	/* target alignment */
-	xfs_agblock_t	freebno,	/* freespace's starting block */
-	xfs_extlen_t	freelen,	/* freespace's length */
-	xfs_agblock_t	*newbnop);	/* result: best start block from free */
-
-/*
- * Fix up the length, based on mod and prod.
- * len should be k * prod + mod for some k.
- * If len is too small it is returned unchanged.
- * If len hits maxlen it is left alone.
- */
-STATIC void
-xfs_alloc_fix_len(
-	xfs_alloc_arg_t	*args);		/* allocation argument structure */
-
-/*
- * Fix up length if there is too little space left in the a.g.
- * Return 1 if ok, 0 if too little, should give up.
- */
-STATIC int
-xfs_alloc_fix_minleft(
-	xfs_alloc_arg_t	*args);		/* allocation argument structure */
-
-/*
- * Update the two btrees, logically removing from freespace the extent
- * starting at rbno, rlen blocks.  The extent is contained within the
- * actual (current) free extent fbno for flen blocks.
- * Flags are passed in indicating whether the cursors are set to the
- * relevant records.
- */
-STATIC int				/* error code */
-xfs_alloc_fixup_trees(
-	xfs_btree_cur_t	*cnt_cur,	/* cursor for by-size btree */
-	xfs_btree_cur_t	*bno_cur,	/* cursor for by-block btree */
-	xfs_agblock_t	fbno,		/* starting block of free extent */
-	xfs_extlen_t	flen,		/* length of free extent */
-	xfs_agblock_t	rbno,		/* starting block of returned extent */
-	xfs_extlen_t	rlen,		/* length of returned extent */
-	int		flags);		/* flags, XFSA_FIXUP_... */
 #define	XFSA_FIXUP_BNO_OK	1
 #define	XFSA_FIXUP_CNT_OK	2
 
-/*
- * Read in the allocation group free block array.
- */
-STATIC int				/* error */
-xfs_alloc_read_agfl(
-	xfs_mount_t	*mp,		/* mount point structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_agnumber_t	agno,		/* allocation group number */
-	xfs_buf_t	**bpp);		/* buffer for the ag free block array */
-
 #if defined(XFS_ALLOC_TRACE)
-/*
- * Add an allocation trace entry for an alloc call.
- */
-STATIC void
-xfs_alloc_trace_alloc(
-	char		*name,		/* function tag string */
-	char		*str,		/* additional string */
-	xfs_alloc_arg_t	*args,		/* allocation argument structure */
-	int		line);		/* source line number */
-
-/*
- * Add an allocation trace entry for a free call.
- */
-STATIC void
-xfs_alloc_trace_free(
-	char		*name,		/* function tag string */
-	char		*str,		/* additional string */
-	xfs_mount_t	*mp,		/* file system mount point */
-	xfs_agnumber_t	agno,		/* allocation group number */
-	xfs_agblock_t	agbno,		/* a.g. relative block number */
-	xfs_extlen_t	len,		/* length of extent */
-	int		isfl,		/* set if is freelist allocation/free */
-	int		line);		/* source line number */
-
-/*
- * Add an allocation trace entry for modifying an agf.
- */
-STATIC void
-xfs_alloc_trace_modagf(
-	char		*name,		/* function tag string */
-	char		*str,		/* additional string */
-	xfs_mount_t	*mp,		/* file system mount point */
-	xfs_agf_t	*agf,		/* new agf value */
-	int		flags,		/* logging flags for agf */
-	int		line);		/* source line number */
-
 #define	TRACE_ALLOC(s,a)	\
 	xfs_alloc_trace_alloc(fname, s, a, __LINE__)
 #define	TRACE_FREE(s,a,b,x,f)	\
@@ -174,72 +64,11 @@ xfs_alloc_trace_modagf(
  * Prototypes for per-ag allocation routines
  */
 
-/*
- * Allocate a variable extent in the allocation group agno.
- * Type and bno are used to determine where in the allocation group the
- * extent will start.
- * Extent's length (returned in len) will be between minlen and maxlen,
- * and of the form k * prod + mod unless there's nothing that large.
- * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
- */
-STATIC int			/* error */
-xfs_alloc_ag_vextent(
-	xfs_alloc_arg_t	*args);	/* allocation argument structure */
-
-/*
- * Allocate a variable extent at exactly agno/bno.
- * Extent's length (returned in *len) will be between minlen and maxlen,
- * and of the form k * prod + mod unless there's nothing that large.
- * Return the starting a.g. block (bno), or NULLAGBLOCK if we can't do it.
- */
-STATIC int			/* error */
-xfs_alloc_ag_vextent_exact(
-	xfs_alloc_arg_t	*args);	/* allocation argument structure */
-
-/*
- * Allocate a variable extent near bno in the allocation group agno.
- * Extent's length (returned in *len) will be between minlen and maxlen,
- * and of the form k * prod + mod unless there's nothing that large.
- * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
- */
-STATIC int			/* error */
-xfs_alloc_ag_vextent_near(
-	xfs_alloc_arg_t	*args);	/* allocation argument structure */
-
-/*
- * Allocate a variable extent anywhere in the allocation group agno.
- * Extent's length (returned in *len) will be between minlen and maxlen,
- * and of the form k * prod + mod unless there's nothing that large.
- * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
- */
-STATIC int			/* error */
-xfs_alloc_ag_vextent_size(
-	xfs_alloc_arg_t	*args);	/* allocation argument structure */
-
-/*
- * Deal with the case where only small freespaces remain.
- * Either return the contents of the last freespace record,
- * or allocate space from the freelist if there is nothing in the tree.
- */
-STATIC int			/* error */
-xfs_alloc_ag_vextent_small(
-	xfs_alloc_arg_t	*args,	/* allocation argument structure */
-	xfs_btree_cur_t	*ccur,	/* by-size cursor */
-	xfs_agblock_t	*fbnop,	/* result block number */
-	xfs_extlen_t	*flenp,	/* result length */
-	int		*stat);	/* status: 0-freelist, 1-normal/none */
-
-/*
- * Free the extent starting at agno/bno for length.
- */
-STATIC int			/* error */
-xfs_free_ag_extent(
-	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_buf_t		*agbp,	/* buffer for a.g. freelist header */
-	xfs_agnumber_t	agno,	/* allocation group number */
-	xfs_agblock_t	bno,	/* starting block number */
-	xfs_extlen_t	len,	/* length of extent */
-	int		isfl);	/* set if is freelist blocks - no sb acctg */
+STATIC int xfs_alloc_ag_vextent_exact(xfs_alloc_arg_t *);
+STATIC int xfs_alloc_ag_vextent_near(xfs_alloc_arg_t *);
+STATIC int xfs_alloc_ag_vextent_size(xfs_alloc_arg_t *);
+STATIC int xfs_alloc_ag_vextent_small(xfs_alloc_arg_t *,
+	xfs_btree_cur_t *, xfs_agblock_t *, xfs_extlen_t *, int *);
 
 /*
  * Internal functions.

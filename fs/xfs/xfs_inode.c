@@ -43,74 +43,38 @@ xfs_zone_t *xfs_chashlist_zone;
  */
 #define	XFS_ITRUNC_MAX_EXTENTS	2
 
-STATIC int
-xfs_iflush_fork(
-	xfs_inode_t		*ip,
-	xfs_dinode_t		*dip,
-	xfs_inode_log_item_t	*iip,
-	int			whichfork,
-	xfs_buf_t			*bp);
+STATIC int xfs_iflush_int(xfs_inode_t *, xfs_buf_t *);
+STATIC int xfs_iformat_local(xfs_inode_t *, xfs_dinode_t *, int, int);
+STATIC int xfs_iformat_extents(xfs_inode_t *, xfs_dinode_t *, int);
+STATIC int xfs_iformat_btree(xfs_inode_t *, xfs_dinode_t *, int);
 
-STATIC int
-xfs_iflush_int(
-	xfs_inode_t		*ip,
-	xfs_buf_t			*bp);
-
-STATIC int
-xfs_iformat(
-	xfs_inode_t	*ip,
-	xfs_dinode_t	*dip);
-
-STATIC int
-xfs_iformat_local(
-	xfs_inode_t	*ip,
-	xfs_dinode_t	*dip,
-	int		whichfork,
-	int		size);
-
-STATIC int
-xfs_iformat_extents(
-	xfs_inode_t	*ip,
-	xfs_dinode_t	*dip,
-	int		whichfork);
-
-STATIC int
-xfs_iformat_btree(
-	xfs_inode_t	*ip,
-	xfs_dinode_t	*dip,
-	int		whichfork);
-
-STATIC int
-xfs_iunlink_remove(
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip);
 
 #ifdef DEBUG
+/*
+ * Make sure that the extents in the given memory buffer
+ * are valid.
+ */
 STATIC void
 xfs_validate_extents(
 	xfs_bmbt_rec_32_t	*ep,
 	int			nrecs,
-	xfs_exntfmt_t		fmt);
+	xfs_exntfmt_t		fmt)
+{
+	xfs_bmbt_irec_t		irec;
+	int			i;
+	xfs_bmbt_rec_t		rec;
 
-#ifdef XFS_RW_TRACE
-STATIC void
-xfs_itrunc_trace(
-	int		tag,
-	xfs_inode_t	*ip,
-	int		flag,		 
-	xfs_fsize_t	new_size,
-	xfs_off_t		toss_start,
-	xfs_off_t		toss_finish);
-#else
-#define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
-#endif /* XFS_RW_TRACE */
+	for (i = 0; i < nrecs; i++) {
+		bcopy(ep, &rec, sizeof(rec));
+		xfs_bmbt_get_all(&rec, &irec);
+		if (fmt == XFS_EXTFMT_NOSTATE)
+			ASSERT(irec.br_state == XFS_EXT_NORM);
+		ep++;
+	}
+}
 #else /* DEBUG */
 #define xfs_validate_extents(ep, nrecs, fmt)
-#define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
-#endif /* DEBUG */		     
-
-xfs_inode_t *
-xfs_get_inode(dev_t , xfs_ino_t);
+#endif /* DEBUG */
 
 /*
  * Check that none of the inode's in the buffer have a next
@@ -1306,6 +1270,8 @@ xfs_itrunc_trace(
 		     (void*)0,
 		     (void*)0);
 }
+#else
+#define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
 #endif
 
 /*
@@ -2632,31 +2598,6 @@ xfs_iunpin_wait(
 	return;
 }
 
-
-#ifdef DEBUG
-/*
- * Make sure that the extents in the given memory buffer
- * are valid.
- */
-STATIC void
-xfs_validate_extents(
-	xfs_bmbt_rec_32_t	*ep,
-	int			nrecs,
-	xfs_exntfmt_t		fmt)
-{
-	xfs_bmbt_irec_t		irec;
-	int			i;
-	xfs_bmbt_rec_t		rec;
-
-	for (i = 0; i < nrecs; i++) {
-		bcopy(ep, &rec, sizeof(rec));
-		xfs_bmbt_get_all(&rec, &irec);
-		if (fmt == XFS_EXTFMT_NOSTATE)
-			ASSERT(irec.br_state == XFS_EXT_NORM);
-		ep++;
-	}
-}
-#endif /* DEBUG */
 
 /*
  * xfs_iextents_copy()

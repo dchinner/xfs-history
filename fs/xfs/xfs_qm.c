@@ -39,30 +39,12 @@ mutex_t		xfs_Gqm_lock;
 
 STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
 STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
-STATIC int 	xfs_qm_dqget_noattach(xfs_inode_t *, xfs_dquot_t **, 
-				      xfs_dquot_t **);
-STATIC int	xfs_qm_qino_alloc(xfs_mount_t *, xfs_inode_t **, __int64_t,
-				  uint);
-STATIC int	xfs_qm_reset_dqcounts(xfs_mount_t *, xfs_buf_t *, xfs_dqid_t, uint);
-STATIC int	xfs_qm_dqiter_bufs(xfs_mount_t *, xfs_dqid_t, xfs_fsblock_t,
-				   xfs_filblks_t, uint);
-STATIC int	xfs_qm_dqiterate(xfs_mount_t *, xfs_inode_t *, uint);
-STATIC void 	xfs_qm_quotacheck_dqadjust(xfs_dquot_t *, xfs_qcnt_t, xfs_qcnt_t);
-STATIC int	xfs_qm_dqusage_adjust(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, 
-				      void *, xfs_daddr_t, void *, int *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
-STATIC int	xfs_qm_shake_freelist(int);
+#ifndef __linux__
 STATIC int	xfs_qm_shake(int);
-STATIC xfs_dquot_t *xfs_qm_dqreclaim_one(void);
-STATIC int	xfs_qm_dqattach_one(xfs_inode_t	*, xfs_dqid_t, uint, uint, uint,
-				    xfs_dquot_t	*, xfs_dquot_t	**);
-STATIC void	xfs_qm_dqattach_grouphint(xfs_dquot_t *, xfs_dquot_t *, uint);
-STATIC int 	xfs_qm_hold_quotafs_ref(struct xfs_mount *);
-STATIC void 	xfs_qm_rele_quotafs_ref(struct xfs_mount *);
-STATIC void	xfs_qm_detach_gdquots(xfs_mount_t *);
-STATIC int	xfs_qm_get_rtblks(xfs_inode_t *, xfs_qcnt_t *);
+#endif
 
 #ifdef DEBUG
 extern mutex_t	qcheck_lock;
@@ -138,7 +120,7 @@ xfs_qm_init(void)
 	} else
 		xqm->qm_dqzone = qm_dqzone;
 
-#if 0	/* TODO */
+#ifndef __linux__
 	shake_register(SHAKEMGR_MEMORY, xfs_qm_shake);
 #endif
 
@@ -2106,6 +2088,8 @@ xfs_qm_init_quotainos(
 	return (0);
 }
 
+
+#ifndef __linux__
 /*
  * Traverse the freelist of dquots and attempt to reclaim a maximum of
  * 'howmany' dquots. This operation races with dqlookup(), and attempts to
@@ -2295,6 +2279,7 @@ xfs_qm_shake(int level)
 	
 	return xfs_qm_shake_freelist(MAX(nfree, n));
 }
+#endif /* !__linux__ */
 
 
 /*

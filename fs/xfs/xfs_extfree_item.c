@@ -41,31 +41,9 @@
 xfs_zone_t	*xfs_efi_zone;
 xfs_zone_t	*xfs_efd_zone;
 
-STATIC uint	xfs_efi_item_size(xfs_efi_log_item_t *);
-STATIC void	xfs_efi_item_format(xfs_efi_log_item_t *, xfs_log_iovec_t *);
-STATIC void	xfs_efi_item_pin(xfs_efi_log_item_t *);
-STATIC void	xfs_efi_item_unpin(xfs_efi_log_item_t *);
-STATIC void	xfs_efi_item_unpin_remove(xfs_efi_log_item_t *,
-					  xfs_trans_t *tp);
-STATIC uint	xfs_efi_item_trylock(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_unlock(xfs_efi_log_item_t *);
-STATIC xfs_lsn_t	xfs_efi_item_committed(xfs_efi_log_item_t *,
-					       xfs_lsn_t lsn);
 STATIC void	xfs_efi_item_abort(xfs_efi_log_item_t *);
-STATIC void	xfs_efi_item_push(xfs_efi_log_item_t *);
-STATIC void	xfs_efi_cancel(xfs_efi_log_item_t *);
-
-STATIC uint	xfs_efd_item_size(xfs_efd_log_item_t *);
-STATIC void	xfs_efd_item_format(xfs_efd_log_item_t *, xfs_log_iovec_t *);
-STATIC void	xfs_efd_item_pin(xfs_efd_log_item_t *);
-STATIC void	xfs_efd_item_unpin(xfs_efd_log_item_t *);
-STATIC void	xfs_efd_item_unpin_remove(xfs_efd_log_item_t *, xfs_trans_t *);
-STATIC uint	xfs_efd_item_trylock(xfs_efd_log_item_t *);
-STATIC void	xfs_efd_item_unlock(xfs_efd_log_item_t *);
 STATIC void	xfs_efd_item_abort(xfs_efd_log_item_t *);
-STATIC xfs_lsn_t	xfs_efd_item_committed(xfs_efd_log_item_t *,
-					       xfs_lsn_t lsn);
-STATIC void	xfs_efd_item_push(xfs_efd_log_item_t *);
 
 
 

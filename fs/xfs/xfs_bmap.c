@@ -47,16 +47,6 @@ xfs_zone_t		*xfs_bmap_free_item_zone;
  * Prototypes for internal bmap routines.
  */
 
-/*
- * Called from xfs_bmap_add_attrfork to handle btree format files.
- */
-STATIC int					/* error */
-xfs_bmap_add_attrfork_btree(
-	xfs_trans_t		*tp,		/* transaction pointer */
-	xfs_inode_t		*ip,		/* incore inode pointer */
-	xfs_fsblock_t		*firstblock,	/* first block allocated */
-	xfs_bmap_free_t		*flist,		/* blocks to free at commit */
-	int			*flags);	/* inode logging flags */
 
 /*
  * Called from xfs_bmap_add_attrfork to handle extents format files.

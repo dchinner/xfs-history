@@ -34,17 +34,10 @@
 #include <xfs_log_recover.h>
 
 STATIC int	xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
-STATIC int	xlog_find_cycle_start(struct log *log,
-				      xfs_buf_t	*bp,	
-				      xfs_daddr_t	first_blk,
-				      xfs_daddr_t	*last_blk,
-				      uint	cycle);
 
 STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
-STATIC void	xlog_recover_insert_item_frontq(xlog_recover_item_t **q,
-						xlog_recover_item_t *item);
 
 #if defined(DEBUG)
 STATIC void	xlog_recover_check_summary(xlog_t *log);

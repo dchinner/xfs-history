@@ -33,19 +33,10 @@
 #include <xfs.h>
 
 
-STATIC xfs_buf_t *
-xfs_trans_buf_item_match(
-	xfs_trans_t	*tp,
-	buftarg_t	*target,
-	xfs_daddr_t	blkno,
-	int		len);
-
-STATIC xfs_buf_t *
-xfs_trans_buf_item_match_all(
-	xfs_trans_t	*tp,
-	buftarg_t	*target,
-	xfs_daddr_t	blkno,
-	int		len);
+STATIC xfs_buf_t *xfs_trans_buf_item_match(xfs_trans_t *, buftarg_t *,
+		xfs_daddr_t, int);
+STATIC xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, buftarg_t *,
+		xfs_daddr_t, int);
 
 
 /*
@@ -1052,7 +1043,7 @@ STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	xfs_daddr_t		blkno,
+	xfs_daddr_t	blkno,
 	int		len)
 {
 	xfs_log_item_chunk_t	*licp;

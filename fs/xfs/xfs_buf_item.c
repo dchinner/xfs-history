@@ -44,16 +44,103 @@
 
 xfs_zone_t	*xfs_buf_item_zone;
 
-#ifdef	XFS_TRANS_DEBUG
+#ifdef XFS_TRANS_DEBUG
+/*
+ * This function uses an alternate strategy for tracking the bytes
+ * that the user requests to be logged.  This can then be used
+ * in conjunction with the bli_orig array in the buf log item to
+ * catch bugs in our callers' code.
+ *
+ * We also double check the bits set in xfs_buf_item_log using a
+ * simple algorithm to check that every byte is accounted for.
+ */
 STATIC void
 xfs_buf_item_log_debug(
 	xfs_buf_log_item_t	*bip,
 	uint			first,
-	uint			last);
+	uint			last)
+{
+	uint	x;
+	uint	byte;
+	uint	nbytes;
+	uint	chunk_num;
+	uint	word_num;
+	uint	bit_num;
+	uint	bit_set;
+	uint	*wordp;
 
+	ASSERT(bip->bli_logged != NULL);
+	byte = first;
+	nbytes = last - first + 1;
+	bfset(bip->bli_logged, first, nbytes);
+	for (x = 0; x < nbytes; x++) { 
+		chunk_num = byte >> XFS_BLI_SHIFT;
+		word_num = chunk_num >> BIT_TO_WORD_SHIFT;
+		bit_num = chunk_num & (NBWORD - 1);
+		wordp = &(bip->bli_format.blf_data_map[word_num]);
+		bit_set = *wordp & (1 << bit_num);
+		ASSERT(bit_set);
+		byte++;
+	}
+}
+
+/*
+ * This function is called when we flush something into a buffer without
+ * logging it.  This happens for things like inodes which are logged
+ * separately from the buffer.
+ */
+void
+xfs_buf_item_flush_log_debug(
+	xfs_buf_t	*bp,
+	uint		first,
+	uint		last)
+{
+	xfs_buf_log_item_t	*bip;
+	uint			nbytes;
+
+	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
+	if ((bip == NULL) || (bip->bli_item.li_type != XFS_LI_BUF)) {
+		return;
+	}
+
+	ASSERT(bip->bli_logged != NULL);
+	nbytes = last - first + 1;
+	bfset(bip->bli_logged, first, nbytes);
+}
+
+/*
+ * This function is called to verify that our caller's have logged
+ * all the bytes that they changed.
+ *
+ * It does this by comparing the original copy of the buffer stored in
+ * the buf log item's bli_orig array to the current copy of the buffer
+ * and ensuring that all bytes which miscompare are set in the bli_logged
+ * array of the buf log item.
+ */
 STATIC void
 xfs_buf_item_log_check(
-	xfs_buf_log_item_t	*bip);
+	xfs_buf_log_item_t	*bip)
+{
+	char		*orig;
+	char		*buffer;
+	int		x;
+	xfs_buf_t	*bp;
+
+	ASSERT(bip->bli_orig != NULL);
+	ASSERT(bip->bli_logged != NULL);
+
+	bp = bip->bli_buf;
+	ASSERT(XFS_BUF_COUNT(bp) > 0);
+	ASSERT(XFS_BUF_PTR(bp) != NULL);
+	orig = bip->bli_orig;
+	buffer = XFS_BUF_PTR(bp);
+	for (x = 0; x < XFS_BUF_COUNT(bp); x++) {
+		if (orig[x] != buffer[x] && !btst(bip->bli_logged, x))
+			cmn_err(CE_PANIC,
+	"xfs_buf_item_log_check bip %x buffer %x orig %x index %d",
+				bip, bp, orig, x);
+	}
+}
 #else
 #define		xfs_buf_item_log_debug(x,y,z)
 #define 	xfs_buf_item_log_check(x)
@@ -781,104 +868,6 @@ xfs_buf_item_log(
 	xfs_buf_item_log_debug(bip, first, last);
 }
 
-#ifdef XFS_TRANS_DEBUG
-/*
- * This function uses an alternate strategy for tracking the bytes
- * that the user requests to be logged.  This can then be used
- * in conjunction with the bli_orig array in the buf log item to
- * catch bugs in our callers' code.
- *
- * We also double check the bits set in xfs_buf_item_log using a
- * simple algorithm to check that every byte is accounted for.
- */
-STATIC void
-xfs_buf_item_log_debug(
-	xfs_buf_log_item_t	*bip,
-	uint			first,
-	uint			last)
-{
-	uint	x;
-	uint	byte;
-	uint	nbytes;
-	uint	chunk_num;
-	uint	word_num;
-	uint	bit_num;
-	uint	bit_set;
-	uint	*wordp;
-
-	ASSERT(bip->bli_logged != NULL);
-	byte = first;
-	nbytes = last - first + 1;
-	bfset(bip->bli_logged, first, nbytes);
-	for (x = 0; x < nbytes; x++) { 
-		chunk_num = byte >> XFS_BLI_SHIFT;
-		word_num = chunk_num >> BIT_TO_WORD_SHIFT;
-		bit_num = chunk_num & (NBWORD - 1);
-		wordp = &(bip->bli_format.blf_data_map[word_num]);
-		bit_set = *wordp & (1 << bit_num);
-		ASSERT(bit_set);
-		byte++;
-	}
-}
-
-/*
- * This function is called when we flush something into a buffer without
- * logging it.  This happens for things like inodes which are logged
- * separately from the buffer.
- */
-void
-xfs_buf_item_flush_log_debug(
-	xfs_buf_t	*bp,
-	uint		first,
-	uint		last)
-{
-	xfs_buf_log_item_t	*bip;
-	uint			nbytes;
-
-	bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t*);
-	if ((bip == NULL) || (bip->bli_item.li_type != XFS_LI_BUF)) {
-		return;
-	}
-
-	ASSERT(bip->bli_logged != NULL);
-	nbytes = last - first + 1;
-	bfset(bip->bli_logged, first, nbytes);
-}
-
-/*
- * This function is called to verify that our caller's have logged
- * all the bytes that they changed.
- *
- * It does this by comparing the original copy of the buffer stored in
- * the buf log item's bli_orig array to the current copy of the buffer
- * and ensuring that all bytes which miscompare are set in the bli_logged
- * array of the buf log item.
- */
-STATIC void
-xfs_buf_item_log_check(
-	xfs_buf_log_item_t	*bip)
-{
-	char		*orig;
-	char		*buffer;
-	int		x;
-	xfs_buf_t	*bp;
-
-	ASSERT(bip->bli_orig != NULL);
-	ASSERT(bip->bli_logged != NULL);
-
-	bp = bip->bli_buf;
-	ASSERT(XFS_BUF_COUNT(bp) > 0);
-	ASSERT(XFS_BUF_PTR(bp) != NULL);
-	orig = bip->bli_orig;
-	buffer = XFS_BUF_PTR(bp);
-	for (x = 0; x < XFS_BUF_COUNT(bp); x++) {
-		if (orig[x] != buffer[x] && !btst(bip->bli_logged, x))
-			cmn_err(CE_PANIC,
-	"xfs_buf_item_log_check bip %x buffer %x orig %x index %d",
-				bip, bp, orig, x);
-	}
-}
-#endif /* XFS_TRANS_DEBUG */
 
 /*
  * Count the number of bits set in the bitmap starting with bit

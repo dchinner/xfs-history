@@ -48,21 +48,8 @@
    flush lock - ditto. 
 */
 
-STATIC int		xfs_qm_dqlookup(xfs_mount_t *, xfs_dqid_t,
-					xfs_dqhash_t *,	xfs_dquot_t **);
-STATIC int		xfs_qm_idtodq(xfs_mount_t *, xfs_dqid_t,
-				      uint, uint, xfs_dquot_t **);
 STATIC void 		xfs_qm_dqflush_done(xfs_buf_t *, xfs_dq_logitem_t *);
-STATIC int		xfs_qm_dqtobp(xfs_trans_t *, xfs_dquot_t *,
-				      xfs_disk_dquot_t **, xfs_buf_t **, uint);
-STATIC void		xfs_qm_init_dquot_blk(xfs_trans_t *, xfs_mount_t *,
-					      xfs_dqid_t, uint, xfs_buf_t *);
-STATIC void		xfs_qm_dqinit_core(xfs_dqid_t, uint, xfs_dqblk_t *);
-STATIC int		xfs_qm_dqalloc(xfs_trans_t*, xfs_mount_t *,
-				       xfs_dquot_t*, xfs_inode_t *,
-				       xfs_fileoff_t, xfs_buf_t **);
-STATIC int		xfs_qm_dqread(xfs_trans_t*, xfs_dqid_t, xfs_dquot_t *,
-				      uint);
+
 #ifdef DEBUG
 int xfs_do_dqerror = 0;
 int xfs_dqreq_num = 0;

@@ -34,49 +34,6 @@
 
 
 /*
- * Prototypes for internal routines.
- */
-
-/*
- * Log specified fields for the inode given by bp and off.
- */
-STATIC void
-xfs_ialloc_log_di(
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_buf_t	*bp,		/* inode buffer */
-	int		off,		/* index of inode in buffer */
-	int		fields);	/* bitmask of fields to log */
-
-/*
- * Prototypes for per-allocation group routines.
- */
-
-/*
- * Allocate new inodes in the allocation group specified by agbp.
- * Return 0 for success, else error code.
- */
-STATIC int				/* error code or 0 */
-xfs_ialloc_ag_alloc(
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_buf_t	*agbp,		/* alloc group buffer */
-	int		*stat);		/* success/failure */		    
-
-/*
- * Select an allocation group to look for a free inode in, based on the parent
- * inode and then mode.  Return the allocation group buffer.
- */
-STATIC xfs_buf_t *			/* allocation group buffer */
-xfs_ialloc_ag_select(
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_ino_t	parent,		/* parent directory inode number */
-	mode_t		mode,		/* bits set to indicate file type */
-	int		okalloc);	/* ok to allocate more space */
-
-/*
- * Internal functions.
- */
-
-/*
  * Log specified fields for the inode given by bp and off.
  */
 STATIC void

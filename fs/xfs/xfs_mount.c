@@ -33,7 +33,6 @@
 #include <xfs.h>
 
 
-STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int, int);
 STATIC void	xfs_sb_relse(xfs_buf_t *);
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);

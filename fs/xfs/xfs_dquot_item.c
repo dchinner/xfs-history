@@ -34,44 +34,6 @@
 #include <xfs_quota_priv.h>
 
 
-STATIC uint		xfs_qm_dquot_logitem_size(xfs_dq_logitem_t *logitem);
-STATIC void		xfs_qm_dquot_logitem_format(xfs_dq_logitem_t *logitem,
-					      xfs_log_iovec_t *logvec);
-STATIC void		xfs_qm_dquot_logitem_unpin(xfs_dq_logitem_t *logitem);
-STATIC void		xfs_qm_dquot_logitem_unpin_remove(
-						xfs_dq_logitem_t *logitem,
-						xfs_trans_t *tp);
-STATIC xfs_lsn_t 	xfs_qm_dquot_logitem_committed(
-						xfs_dq_logitem_t *logitem, 
-						xfs_lsn_t lsn);
-STATIC void		xfs_qm_dquot_logitem_push(xfs_dq_logitem_t *logitem);
-STATIC void 		xfs_qm_dquot_logitem_committing(
-						xfs_dq_logitem_t *logitem, 
-						xfs_lsn_t lsn);
-
-
-STATIC uint		xfs_qm_qoff_logitem_size(xfs_qoff_logitem_t *logitem);
-STATIC void		xfs_qm_qoff_logitem_format(xfs_qoff_logitem_t *logitem,
-					      xfs_log_iovec_t *logvec);
-STATIC void		xfs_qm_qoff_logitem_unpin(xfs_qoff_logitem_t *logitem);
-STATIC void		xfs_qm_qoff_logitem_unpin_remove(
-						xfs_qoff_logitem_t *logitem,
-						xfs_trans_t *tp);
-STATIC xfs_lsn_t 	xfs_qm_qoff_logitem_committed(
-						xfs_qoff_logitem_t *logitem, 
-						xfs_lsn_t lsn);
-STATIC void		xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *logitem);
-STATIC void	 	xfs_qm_qoff_logitem_committing(
-						xfs_qoff_logitem_t *logitem, 
-						xfs_lsn_t lsn);
-
-STATIC xfs_lsn_t	xfs_qm_qoffend_logitem_committed(
-							xfs_qoff_logitem_t *qfe,
-							xfs_lsn_t lsn);
-STATIC void		xfs_qm_qoffend_logitem_committing(
-							xfs_qoff_logitem_t *qfe,
-							xfs_lsn_t lsn);
-
 /*
  * returns the number of iovecs needed to log the given dquot item.
  */
