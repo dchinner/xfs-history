@@ -65,7 +65,7 @@ xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
 xfs-$(CONFIG_PROC_FS)		+= $(XFS_LINUX)/xfs_stats.o
 xfs-$(CONFIG_SYSCTL)		+= $(XFS_LINUX)/xfs_sysctl.o
 xfs-$(CONFIG_COMPAT)		+= $(XFS_LINUX)/xfs_ioctl32.o
-xfs-$(CONFIG_EXPORTFS)		+= $(XFS_LINUX)/xfs_export.o
+xfs-$(CONFIG_XFS_EXPORT)	+= $(XFS_LINUX)/xfs_export.o
 
 
 xfs-y				+= xfs_alloc.o \
