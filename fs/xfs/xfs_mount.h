@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.80 $"
+#ident	"$Revision: 1.82 $"
 
 struct buf;
 struct cred;
@@ -129,6 +129,7 @@ typedef struct xfs_mount {
 #endif
 	int			m_dalign;	/* stripe unit */
 	int			m_swidth;	/* stripe width */
+	int			m_sinoalign;	/* stripe unit inode alignmnt */
 } xfs_mount_t;
 
 /*
