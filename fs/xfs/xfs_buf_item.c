@@ -43,7 +43,6 @@
 
 STATIC int	xfs_buf_item_bits(uint *, uint, uint);
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
-STATIC int	xfs_buf_item_next_bit(uint *, uint, uint);
 
 #ifdef XFSDEBUG
 STATIC void	xfs_buf_item_log_debug(xfs_buf_log_item_t *, uint, uint);
@@ -670,7 +669,7 @@ xfs_buf_item_bits(uint	*map,
  *
  * Size is the number of words, not bytes, in the bitmap.
  */
-STATIC int
+int
 xfs_buf_item_next_bit(uint	*map,
 		      uint	size,
 		      uint	start_bit)
