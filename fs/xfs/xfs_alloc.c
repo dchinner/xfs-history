@@ -1708,7 +1708,7 @@ xfs_alloc_fix_freelist(xfs_trans_t *tp, xfs_agnumber_t agno)
 		if (agbno == NULLAGBLOCK)
 			break;
 		for (bno = agbno + i - 1; bno >= agbno; bno--) {
-			buf = xfs_btree_bread(mp, tp, agno, bno);
+			buf = xfs_btree_getblk(mp, tp, agno, bno);
 			xfs_alloc_put_freelist(tp, agbuf, buf);
 		}
 	}

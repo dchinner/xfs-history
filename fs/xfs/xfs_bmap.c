@@ -720,7 +720,7 @@ xfs_bmbt_insrec(xfs_btree_cur_t *cur, int level, xfs_agblock_t *bnop, xfs_bmbt_r
 			if (cfsbno == NULLFSBLOCK)
 				return 0;
 			cbno = xfs_fsb_to_agbno(sbp, cfsbno);
-			cbuf = xfs_btree_bread(mp, tp, cur->bc_agno, cbno);
+			cbuf = xfs_btree_getblk(mp, tp, cur->bc_agno, cbno);
 			cblock = xfs_buf_to_block(cbuf);
 			*cblock = *block;
 			block->bb_level++;
@@ -1325,7 +1325,7 @@ xfs_bmbt_split(xfs_btree_cur_t *cur, int level, xfs_agblock_t *bnop, xfs_bmbt_re
 	if (rfsbno == NULLFSBLOCK)
 		return 0;
 	rbno = xfs_fsb_to_agbno(sbp, rfsbno);
-	rbuf = xfs_btree_bread(mp, tp, cur->bc_agno, rbno);
+	rbuf = xfs_btree_getblk(mp, tp, cur->bc_agno, rbno);
 	right = xfs_buf_to_block(rbuf);
 	xfs_btree_check_block(cur, left, level);
 	right->bb_magic = XFS_BMAP_MAGIC;
@@ -1667,7 +1667,7 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 		 */
 		ASSERT(abno != NULLFSBLOCK);
 		agbno = xfs_fsb_to_agbno(sbp, abno);
-		abuf = xfs_btree_bread(mp, tp, agno, agbno);
+		abuf = xfs_btree_getblk(mp, tp, agno, agbno);
 		/*
 		 * Fill in the child block.
 		 */
