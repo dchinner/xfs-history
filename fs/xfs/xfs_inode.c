@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.289 $"
+#ident "$Revision: 1.290 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -93,6 +93,7 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_dir2_trace.h"
+#include "xfs_utils.h"
 #ifdef DEBUG
 #include "xfs_quota.h"
 #endif
