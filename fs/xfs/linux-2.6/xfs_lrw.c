@@ -753,7 +753,7 @@ retry:
 
 		/* Flush all inode data buffers */
 
-		error = -fsync_inode_buffers(ip);
+		error = -fsync_inode_data_buffers(ip);
 		if (error)
 			goto out;
 		
@@ -912,7 +912,7 @@ retry:
 			switch (fsynced) {
 			case 0:
 				if (ip->i_delayed_blks) {
-					fsync_inode_buffers(LINVFS_GET_IP(vp));
+					fsync_inode_data_buffers(LINVFS_GET_IP(vp));
 					fsynced = 1;
 				} else {
 					fsynced = 2;
