@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2002 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -39,7 +39,7 @@ STATIC void	xfs_acl_get_endian(xfs_acl_t *);
 STATIC int	xfs_acl_access(uid_t, gid_t, xfs_acl_t *, mode_t, cred_t *);
 STATIC int	xfs_acl_invalid(xfs_acl_t *);
 STATIC void	xfs_acl_sync_mode(mode_t, xfs_acl_t *);
-STATIC void	xfs_acl_get_attr(vnode_t *, xfs_acl_t *, int, int *);
+STATIC void	xfs_acl_get_attr(vnode_t *, xfs_acl_t *, int, int, int *);
 STATIC void	xfs_acl_set_attr(vnode_t *, xfs_acl_t *, int, int *);
 STATIC int	xfs_acl_allow_set(vnode_t *, int);
 
@@ -186,18 +186,7 @@ xfs_acl_vget(vnode_t *vp, void *acl, size_t size, int kind)
 {
 	acl_ea_header *ext_acl = acl;
 	xfs_acl_t xfs_acl;
-	vattr_t	va;
 	int error;
-
-	if (!size) {
-		/*
-		 * This is an overrestimate of the max size - used
-		 * to size a buffer for a subsequent "get" call.
-		 */	
-		size = sizeof(acl_ea_header);
-		size += sizeof(acl_ea_entry) * XFS_ACL_MAX_ENTRIES;
-		return size;
-	}
 
 	VN_HOLD(vp);
 
@@ -206,34 +195,29 @@ xfs_acl_vget(vnode_t *vp, void *acl, size_t size, int kind)
 		goto out;
 
 	memset(&xfs_acl, 0, sizeof(xfs_acl));
-	xfs_acl_get_attr(vp, &xfs_acl, kind, &error);
-
-	if (!error && xfs_acl_invalid(&xfs_acl)) {
-		error = EINVAL;
-		goto out;
-	}
-
-	if (!error && (kind == ACL_TYPE_ACCESS)) {
-		/* For Access ACLs, get the mode for synchronization. */
-		va.va_mask = AT_MODE;
-		VOP_GETATTR(vp, &va, 0, sys_cred, error);
-	}
-
-	/* XXX: tes TODO - audit use of XFS_ACL_NOT_PRESENT */
-
-	/*
-	 * If there was an error retrieving or validating the ACL or 
-	 * an Access ACL and we had trouble synchronizing the mode with the
-	 * ACL, then the ACL is deemed NOT PRESENT.
-	 */
+	xfs_acl_get_attr(vp, &xfs_acl, kind, size? 0 : ATTR_KERNOVAL, &error);
 	if (error)
-		xfs_acl.acl_cnt = XFS_ACL_NOT_PRESENT;
-	else if (kind == ACL_TYPE_ACCESS)
-		xfs_acl_sync_mode(va.va_mode, &xfs_acl);
+		goto out;
 
-	if (!error)
+	if (!size) {
+		error = -acl_ea_size(XFS_ACL_MAX_ENTRIES);
+	} else {
+		if (xfs_acl_invalid(&xfs_acl)) {
+			error = EINVAL;
+			goto out;
+		}
+
+		if (kind == ACL_TYPE_ACCESS) {
+			vattr_t	va;
+
+			va.va_mask = AT_MODE;
+			VOP_GETATTR(vp, &va, 0, sys_cred, error);
+			if (error)
+				goto out;
+			xfs_acl_sync_mode(va.va_mode, &xfs_acl);
+		}
 		error = -acl_xfs_to_ext_attr(&xfs_acl, ext_acl, size);
-
+	}
 out:
 	VN_RELE(vp);
 	return -error;
@@ -534,12 +518,13 @@ xfs_acl_get_endian(xfs_acl_t *aclp)
  * Get the ACL from the EA and do endian conversion.
  */
 STATIC void
-xfs_acl_get_attr(vnode_t *vp, xfs_acl_t *aclp, int kind, int *error)
+xfs_acl_get_attr(vnode_t *vp, xfs_acl_t *aclp, int kind, int flags, int *error)
 {
 	int len = sizeof(xfs_acl_t);
 
-	VOP_ATTR_GET(vp, kind==ACL_TYPE_ACCESS ? SGI_ACL_FILE: SGI_ACL_DEFAULT, 
-		     (char *)aclp, &len, ATTR_ROOT, sys_cred, *error);
+	flags |= ATTR_ROOT;
+	VOP_ATTR_GET(vp, kind==ACL_TYPE_ACCESS ? SGI_ACL_FILE : SGI_ACL_DEFAULT,
+		     (char *)aclp, &len, flags, sys_cred, *error);
 	if (*error)
 		return;
 	xfs_acl_get_endian(aclp);
@@ -580,7 +565,7 @@ xfs_acl_vtoacl(vnode_t *vp, xfs_acl_t *access_acl, xfs_acl_t *default_acl)
 		 * Get the Access ACL and the mode.  If either cannot
 		 * be obtained for some reason, invalidate the access ACL.
 		 */
-		xfs_acl_get_attr(vp, access_acl, ACL_TYPE_ACCESS, &error);
+		xfs_acl_get_attr(vp, access_acl, ACL_TYPE_ACCESS, 0, &error);
 		if (!error) {
 			/* Got the ACL, need the mode... */
 			va.va_mask = AT_MODE;
@@ -594,7 +579,7 @@ xfs_acl_vtoacl(vnode_t *vp, xfs_acl_t *access_acl, xfs_acl_t *default_acl)
 	}
 
 	if (default_acl != NULL) {
-		xfs_acl_get_attr(vp, default_acl, ACL_TYPE_DEFAULT, &error);
+		xfs_acl_get_attr(vp, default_acl, ACL_TYPE_DEFAULT, 0, &error);
 		if (error)
 			default_acl->acl_cnt = XFS_ACL_NOT_PRESENT;
 	}
