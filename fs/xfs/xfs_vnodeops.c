@@ -343,9 +343,12 @@ xfs_getattr(vnode_t	*vp,
         }
 
 	/*
-	 * XXX : truncate to 32 bites for now.
+	 * XXX : truncate to 32 bits for now.
 	 */
-        vap->va_nblocks = BTOBB((u_long) (ip->i_d.di_size));
+	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL)
+		vap->va_nblocks = 0;
+	else
+		vap->va_nblocks = xfs_fsb_to_bb(&mp->m_sb, ip->i_d.di_nblocks);
 
 	/*
 	 * XFS-added attributes
