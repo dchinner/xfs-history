@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision: 1.45 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -18,6 +18,7 @@
 #include <sys/capability.h>
 #include <sys/kthread.h>
 #include <sys/uuid.h>
+#include <sys/hwgraph.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -619,6 +620,7 @@ xfs_fd_to_mp(
 	int		wperm,			/* need write perm on device */
 	xfs_mount_t	**mpp)			/* return mount pointer */
 {
+	dev_t		dev;
 	int		error;
 	vfile_t		*fp;
 	vfs_t		*vfsp;
@@ -631,9 +633,13 @@ xfs_fd_to_mp(
 	if (vp->v_type == VBLK || vp->v_type == VCHR) {
 		if (wperm && !(fp->vf_flag & FWRITE))
 			return XFS_ERROR(EPERM);
-		vfsp = vfs_devsearch(vp->v_rdev);
+		if (vp->v_type == VCHR && dev_is_vertex(vp->v_rdev))
+			dev = chartoblock(vp->v_rdev);
+		else
+			dev = vp->v_rdev;
+		vfsp = vfs_devsearch(dev);
 		if (vfsp == NULL)
-			return XFS_ERROR(ENOTBLK);
+			vfsp = vp->v_vfsp;
 	} else {
 		if (!_CAP_ABLE(CAP_DEVICE_MGT))
 			return XFS_ERROR(EPERM);
