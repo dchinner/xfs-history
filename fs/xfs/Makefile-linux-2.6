@@ -72,10 +72,10 @@ endif
 # a module and kdb modules are being compiled then xfsidbg must be a module, to
 # follow xfs.  If xfs is built in then xfsidbg tracks the kdb module state.  KAO
 ifneq ($(CONFIG_KDB_MODULES),)
-  ifeq ($(CONFIG_XFS),y)
+  ifeq ($(CONFIG_XFS_FS),y)
     obj-$(CONFIG_KDB_MODULES)	+= xfsidbg.o
   else
-    obj-$(CONFIG_XFS)		+= xfsidbg.o
+    obj-$(CONFIG_XFS_FS)	+= xfsidbg.o
   endif
 endif
 
