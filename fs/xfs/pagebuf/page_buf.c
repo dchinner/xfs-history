@@ -2296,8 +2296,20 @@ pagebuf_daemon_start(void)
 				printk("pagebuf_daemon_start failed\n");
 			} else {
 				while (!pb_daemons[cpu_logical_map(cpu)]) {
+					/*
+					 * Must be that ugly because yield()
+					 * is broken in 2.4.19 (my fault, btw)
+					 *
+					 * XXX: Rip this out once we've merged
+					 * up to 2.4.20.
+					 *			--hch
+					 */
+#ifdef SCHED_YIELD
 					current->policy |= SCHED_YIELD;
 					schedule();
+#else
+					yield();
+#endif
 				}
 			}
 		}
