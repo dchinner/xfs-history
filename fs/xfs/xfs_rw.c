@@ -4545,7 +4545,8 @@ retry:
 					  XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) +
 					  datablocks)) {
 						error = EDQUOT;
-						xfs_trans_cancel(tp, 0);
+						xfs_trans_cancel(tp, 
+						     XFS_TRANS_RELEASE_LOG_RES);
 						xfs_iunlock(ip,
 							    XFS_ILOCK_EXCL);
 						break;
