@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.55 1995/05/21 16:44:16 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.56 1995/06/08 18:35:43 doucette Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -101,7 +101,7 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 #endif
 		{
                 	error = xfs_iget( XFS_VFSTOM( vfsp ), 
-					NULL, ino, XFS_ILOCK_EXCL, &ip);
+					NULL, ino, XFS_ILOCK_EXCL, &ip, 0);
 
 
 			if ( error ) {

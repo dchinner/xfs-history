@@ -1020,6 +1020,13 @@ xfs_dilocate(
 		*bno = XFS_AGB_TO_FSB(mp, agno, agbno);
 		*off = offset;
 		*len = 1;
+	} else if (*bno != NULLFSBLOCK) {
+		offset = XFS_INO_TO_OFFSET(mp, ino);
+		ASSERT(offset < mp->m_sb.sb_inopblock);
+		cluster_agbno = XFS_FSB_TO_AGBNO(mp, *bno);
+		*off = ((agbno - cluster_agbno) * mp->m_sb.sb_inopblock) +
+			offset;
+		*len = XFS_INODE_CLUSTER_SIZE >> mp->m_sb.sb_blocklog;
 	} else {
 		agino = XFS_INO_TO_AGINO(mp, ino);
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
@@ -1043,8 +1050,8 @@ xfs_dilocate(
 			chunk_agbno = XFS_AGINO_TO_AGBNO(mp, chunk_agino);
 			ASSERT(agbno >= chunk_agbno);
 			offset_agbno = agbno - chunk_agbno;
-			blks_per_cluster = XFS_INODE_CLUSTER_SIZE /
-				           mp->m_sb.sb_blocksize;
+			blks_per_cluster = XFS_INODE_CLUSTER_SIZE >>
+				           mp->m_sb.sb_blocklog;
 			cluster_agbno = chunk_agbno +
 				        ((offset_agbno / blks_per_cluster) *
 					 blks_per_cluster);
