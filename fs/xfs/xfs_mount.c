@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision: 1.32 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -276,6 +276,8 @@ xfs_unmountfs(xfs_mount_t *mp)
 	/* XXX someone needs to free the inodes' memory */
 
 	bflush(mp->m_dev);
+	if (mp->m_rtdev)
+		bflush(mp->m_rtdev);
 	bp = xfs_getsb(mp);
 	bp->b_flags &= ~(B_DONE | B_READ);
 	bp->b_flags |= B_WRITE;
