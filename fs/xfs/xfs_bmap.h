@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.62 $"
+#ident "$Revision: 1.63 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -41,6 +41,7 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_METADATA	0x08	/* mapping metadata not user data */
 #define	XFS_BMAPI_EXACT		0x10	/* allocate only to spec'd bounds */
 #define	XFS_BMAPI_ATTRFORK	0x20	/* use attribute fork not data */
+#define	XFS_BMAPI_ASYNC		0x40	/* bunmapi xactions can be async */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAPI_AFLAG)
 int xfs_bmapi_aflag(int w);
