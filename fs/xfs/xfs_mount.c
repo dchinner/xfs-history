@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.103 $"
+#ident	"$Revision: 1.105 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -589,7 +589,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 xfs_mount_t *
 xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 {
-	return(do_xfs_mount(dev, logdev, rtdev, 1));
+	return(do_xfs_mount(dev, logdev, rtdev, 0));
 }
 #endif /* SIM */
 
