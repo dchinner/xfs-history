@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.71 1996/10/02 22:31:44 pjr Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.72 1997/03/08 02:32:20 singal Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -53,8 +53,11 @@
 #define IRELE(ip)		VN_RELE(XFS_ITOV(ip))
 
 extern xfs_inode_t 			*xfs_get_inode ( dev_t, xfs_ino_t);
+#if 0
 extern grio_stream_info_t 	* grio_find_stream_with_proc_dev_inum( 
 					pid_t, dev_t, xfs_ino_t);
+#endif
+extern grio_stream_info_t	* grio_find_stream_with_fp(vfile_t *);
 
 
 /*
@@ -267,6 +270,7 @@ xfs_get_block_size(
 
 
 
+#if 0
 /*
  * xfs_io_is_guaranteed()
  *
@@ -294,6 +298,7 @@ xfs_io_is_guaranteed( xfs_inode_t *ip, stream_id_t *stream_id)
 		return( 0 );
 	}
 }
+#endif
 
 /*
  * xfs_grio_get_inumber
@@ -376,4 +381,26 @@ xfs_grio_get_fs_dev( int fdes )
 	}
 	BHV_READ_UNLOCK(bhp);
 	return( dev );
+}
+
+/*
+ * xfs_fp_to_stream()
+ *
+ * RETURNS
+ *	0 if there is no guarantee
+ *	non-zero if there is a guarantee
+ *
+ */
+int
+xfs_fp_to_stream(vfile_t *fp, stream_id_t *stream_id)
+{
+	grio_stream_info_t	*griosp;
+
+	griosp = grio_find_stream_with_fp(fp);
+	if (griosp) {
+		COPY_STREAM_ID( griosp->stream_id, (*stream_id) );
+		return (1);
+	} else {
+		return (0);
+	}
 }
