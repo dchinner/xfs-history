@@ -199,8 +199,14 @@ xfs_cleanup(void)
 	extern xfs_zone_t	*xfs_chashlist_zone;
 	extern xfs_zone_t	*qm_dqzone;
 	extern xfs_zone_t	*qm_dqtrxzone;
+	extern xfs_inode_t	**xfs_refcache;
 
 	xfs_cleanup_procfs();
+	if (xfs_refcache) {
+		kmem_free(xfs_refcache, 
+			512 * sizeof(xfs_inode_t *));
+	}
+
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
 	kmem_cache_destroy(xfs_inode_zone);
