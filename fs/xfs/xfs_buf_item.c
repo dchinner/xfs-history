@@ -246,9 +246,13 @@ xfs_buf_item_trylock(xfs_buf_log_item_t *bip)
 	}
 
 	/*
-	 * Remove the buffer from the free list.
+	 * Remove the buffer from the free list.  Only do this
+	 * if it's on the free list.  Private buffers like the
+	 * superblock buffer are not.
 	 */
-	notavail(bp);
+	if (bp->av_forw != NULL) {
+		notavail(bp);
+	}
 
 	return XFS_ITEM_SUCCESS;
 }
