@@ -274,8 +274,8 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define FINVIS		0x0100	/* don't update timestamps - XFS */
 #define FSOCKET		0x0200	/* open file refers to a vsocket */
 
-#define MIN(a,b)	(((a)<(b))?(a):(b))
-#define MAX(a,b)	(((a)>(b))?(a):(b))
+#define MIN(a,b)	(min(a,b))
+#define MAX(a,b)	(max(a,b))
 #define howmany(x, y)   (((x)+((y)-1))/(y))
 #define roundup(x, y)   ((((x)+((y)-1))/(y))*(y))
 

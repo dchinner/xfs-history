@@ -1015,7 +1015,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 	ASSERT(flags & PBF_WRITE);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	nimaps = min(int, XFS_MAX_RW_NBMAPS, *npbmaps);
+	nimaps = min(XFS_MAX_RW_NBMAPS, *npbmaps);
 	end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	first_block = NULLFSBLOCK;
 
@@ -1169,7 +1169,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 			if (offset_fsb >= imap[i].br_startoff && 
 				(offset_fsb < (imap[i].br_startoff + imap[i].br_blockcount))) {
 				XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_WR);
-				maps = min(int, nimaps, *npbmaps);
+				maps = min(nimaps, *npbmaps);
 				*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[i],
 					pbmapp, maps, *npbmaps);
 				XFS_STATS_INC(xfsstats.xs_xstrat_quick);
@@ -1285,7 +1285,7 @@ xfs_iomap_read(
 	mp = io->io_mount;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = sizeof(imap) / sizeof(imap[0]);
-	nimaps = min(int, nimaps, *npbmaps); /* Don't ask for more than caller has */
+	nimaps = min(nimaps, *npbmaps); /* Don't ask for more than caller has */
 	end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 	firstblock = NULLFSBLOCK;
 	error = XFS_BMAPI(mp, NULL, io, offset_fsb,
@@ -1745,7 +1745,7 @@ xfs_iomap_write_direct(
 	uint		resblks;
 	int		rtextsize;
 
-	maps = min(int, XFS_WRITE_IMAPS, *npbmaps);
+	maps = min(XFS_WRITE_IMAPS, *npbmaps);
 	nimaps = maps;
 
 	mp = io->io_mount;
@@ -1901,7 +1901,7 @@ xfs_iomap_write_direct(
 		goto error_out;
 	}
 
-	maps = min(int, nimaps, maps);
+	maps = min(nimaps, maps);
 	*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[0], pbmapp, maps, *npbmaps);
 	if(*npbmaps) {
 		/*
