@@ -1000,6 +1000,7 @@ xfs_bmbt_lookup(
 				ASSERT(!geterror(bp));
 				xfs_btree_setbuf(cur, level, bp);
 			}
+			ASSERT(cur->bc_bufs[level]);
 		}
 		block = xfs_bmbt_get_block(cur, level, &bp);
 		xfs_btree_check_lblock(cur, block, level);
@@ -1670,11 +1671,19 @@ xfs_bmbt_trace_enter(
 	int		a10,
 	int		a11)
 {
+	xfs_inode_t	*ip;
+
 	if (xfs_bmbt_trace_buf == NULL)
 		xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE);
+	ip = cur->bc_private.b.ip;
 	ktrace_enter(xfs_bmbt_trace_buf,
-		(void *)type, (void *)name,
-		(void *)cur->bc_private.b.ip, (void *)cur,
+		(void *)type, (void *)name, (void *)ip, (void *)cur,
+		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
+		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
+		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
+	ASSERT(ip->i_btrace);
+	ktrace_enter(ip->i_btrace,
+		(void *)type, (void *)name, (void *)ip, (void *)cur,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
 		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
