@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_BTREE_H
 #define	_FS_XFS_IALLOC_BTREE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.9 $"
 
 /*
  * Inode map on-disk structures
@@ -246,17 +246,6 @@ xfs_inobt_insert(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	int			*stat);	/* success/failure */
 
-#ifdef XFSDEBUG
-/*
- * Check key consistency in the btree given by cur.
- */
-void
-xfs_inobt_kcheck(
-	struct xfs_btree_cur	*cur);	/* btree cursor */
-#else
-#define	xfs_inobt_kcheck(a)
-#endif
-
 /*
  * Lookup the record equal to ino in the btree given by cur.
  */
@@ -292,18 +281,6 @@ xfs_inobt_lookup_le(
 	xfs_inofree_t		free,	/* free inode mask */
 	int			*stat);	/* success/failure */
  
-#ifdef XFSDEBUG
-/*
- * Check consistency in the given btree.
- * Checks header consistency and that keys/records are in the right order.
- */
-void
-xfs_inobt_rcheck(
-	struct xfs_btree_cur	*cur);	/* btree cursor */
-#else
-#define	xfs_inobt_rcheck(a)
-#endif	/* XFSDEBUG */
-
 /*
  * Update the record referred to by cur, to the value given
  * by [ino, fcnt, free].
