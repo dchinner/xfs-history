@@ -1338,6 +1338,7 @@ xlog_state_switch_iclogs(xlog_t		*log,
 		ASSERT(log->l_curr_block >= 0);
 	}
 	log->l_iclog = iclog->ic_next;
+	ASSERT(valusema(&log->l_flushsema) > 0);
 	psema(&log->l_flushsema, PINOD);
 }	/* xlog_state_switch_iclogs */
 
