@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.72 $"
+#ident "$Revision: 1.73 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -52,14 +52,15 @@ typedef struct xfs_log_item {
 /*
  * Log item types.
  */
-#define	XFS_LI_OBUF	0x1234
-#define	XFS_LI_OINODE	0x1235
-#define	XFS_LI_EFI	0x1236
-#define	XFS_LI_EFD	0x1237
-#define	XFS_LI_IUNLINK	0x1238
-#define	XFS_LI_INODE	0x1239
-#define	XFS_LI_BUF	0x123a
-#define	XFS_LI_BUF64	0x123b
+#define	XFS_LI_OBUF		0x1234
+#define	XFS_LI_5_3_INODE	0x1235
+#define	XFS_LI_EFI		0x1236
+#define	XFS_LI_EFD		0x1237
+#define	XFS_LI_IUNLINK		0x1238
+#define	XFS_LI_6_1_INODE	0x1239
+#define	XFS_LI_6_1_BUF		0x123a
+#define	XFS_LI_INODE		0x123b
+#define	XFS_LI_BUF		0x123c
 
 /*
  * Transaction types.  Used to distinguish types of buffers.
