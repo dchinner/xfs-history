@@ -72,7 +72,7 @@ STATIC int xfs_dir_shortform_to_leaf(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
 STATIC void xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
-					uio_t *uio, int *eofp, dirent_t *buf);
+					uio_t *uio, int *eofp, dirent_t *dbp);
 STATIC int xfs_dir_shortform_replace(xfs_trans_t *trans,
 					struct xfs_dir_name *args);
 
@@ -90,7 +90,7 @@ STATIC int xfs_dir_leaf_to_shortform(xfs_trans_t *trans,
 STATIC int xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args);
 STATIC void xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
-					uio_t *uio, int *eofp, dirent_t *buf);
+					uio_t *uio, int *eofp, dirent_t *dbp);
 STATIC int xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
 
 /*
@@ -105,7 +105,7 @@ STATIC int xfs_dir_node_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *args);
 #endif
 STATIC void xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
-					uio_t *uio, int *eofp, dirent_t *buf);
+					uio_t *uio, int *eofp, dirent_t *dbp);
 STATIC int xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
 
 /*
@@ -346,23 +346,23 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
 	xfs_mount_t *mp;
 	int retval;
-	dirent_t *buf;
+	dirent_t *dbp;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	mp = dp->i_mount;
-	buf = kmem_alloc(sizeof(*buf) + MAXNAMELEN, KM_SLEEP);
+	dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
 	*eofp = 0;
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	if (dp->i_d.di_size <= XFS_LITINO(mp)) {
-		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, buf);
+		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp);
 	} else if (dp->i_d.di_size == XFS_LBSIZE(mp)) {
-		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, buf);
+		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp);
 	} else {
-		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, buf);
+		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp);
 	}
-	kmem_free(buf, sizeof(*buf) + MAXNAMELEN);
+	kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
 	return(retval);
 }
 
@@ -487,7 +487,6 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 	struct xfs_dir_shortform *sf;
 	struct xfs_dir_sf_entry *sfe;
 	int base, size, i;
-	buf_t *bp;
 	xfs_inode_t *dp;
 
 	dp = args->dp;
@@ -664,7 +663,7 @@ xfs_dir_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp)
  */
 STATIC int
 xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				int *eofp, dirent_t *buf)
+				int *eofp, dirent_t *dbp)
 {
 	xfs_mount_t *mp;
 	struct xfs_dir_shortform *sf;
@@ -686,7 +685,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		return(ENOENT);
 
 	if (entry == 0) {
-		retval = xfs_dir_put_dirent(mp, buf, dp->i_ino, ".", 1, bno,
+		retval = xfs_dir_put_dirent(mp, dbp, dp->i_ino, ".", 1, bno,
 						entry, uio, &done);
 		if (!done)
 			return(retval);
@@ -694,7 +693,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	}
 	if (entry == 1) {
 		bcopy(sf->hdr.parent, (char *)&ino, sizeof(ino));
-		retval = xfs_dir_put_dirent(mp, buf, ino, "..", 2, bno, entry,
+		retval = xfs_dir_put_dirent(mp, dbp, ino, "..", 2, bno, entry,
 						uio, &done);
 		if (!done) {
 			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
@@ -707,7 +706,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	for (; i < sf->hdr.count; i++, entry++) {
 		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
-		retval = xfs_dir_put_dirent(mp, buf, ino, sfe->name,
+		retval = xfs_dir_put_dirent(mp, dbp, ino, sfe->name,
 						sfe->namelen, bno, entry, uio,
 						&done);
 		if (!done) {
@@ -780,6 +779,7 @@ xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno)
 	xfs_mount_t *mp;
 
 	bp = xfs_dir_get_buf(trans, dp, blkno);
+	ASSERT(bp != NULL);
 	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	mp = dp->i_mount;
 	bzero((char *)leaf, XFS_LBSIZE(mp));
@@ -804,6 +804,7 @@ xfs_dir_leaf_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 	buf_t *bp;
 
 	bp = xfs_dir_read_buf(trans, args->dp, 0);
+	ASSERT(bp != NULL);
 
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
 	if (retval != ENOENT)
@@ -826,6 +827,7 @@ xfs_dir_leaf_removename(xfs_trans_t *trans, struct xfs_dir_name *args,
 	buf_t *bp;
 
 	bp = xfs_dir_read_buf(trans, args->dp, 0);
+	ASSERT(bp != NULL);
 	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
@@ -849,6 +851,7 @@ xfs_dir_leaf_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 	buf_t *bp;
 
 	bp = xfs_dir_read_buf(trans, args->dp, 0);
+	ASSERT(bp != NULL);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
 	xfs_trans_brelse(trans, bp);
 	return(retval);
@@ -879,6 +882,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	ASSERT(tmpbuffer != NULL);
 
 	bp = xfs_dir_read_buf(trans, dp, 0);
+	ASSERT(bp != NULL);
 	bcopy(bp->b_un.b_addr, tmpbuffer, XFS_LBSIZE(mp));
 	leaf = (struct xfs_dir_leafblock *)tmpbuffer;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -954,7 +958,9 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args)
 	if (retval)
 		return(retval);
 	bp1 = xfs_dir_read_buf(trans, dp, 0);
+	ASSERT(bp1 != NULL);
 	bp2 = xfs_dir_get_buf(trans, dp, 1);
+	ASSERT(bp2 != NULL);
 	bcopy(bp1->b_un.b_addr, bp2->b_un.b_addr, XFS_LBSIZE(mp));
 	xfs_trans_log_buf(trans, bp2, 0, XFS_LBSIZE(mp) - 1);
 
@@ -982,6 +988,7 @@ xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp)
 	buf_t *bp;
 
 	bp = xfs_dir_read_buf(trans, dp, 0);
+	ASSERT(bp != NULL);
 	xfs_dir_leaf_print_int(bp, dp);
 	xfs_trans_brelse(trans, bp);
 }
@@ -991,13 +998,14 @@ xfs_dir_leaf_print(xfs_trans_t *trans, xfs_inode_t *dp)
  */
 STATIC int
 xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-			int *eofp, dirent_t *buf)
+			int *eofp, dirent_t *dbp)
 {
 	buf_t *bp;
 	int retval, eob;
 
 	bp = xfs_dir_read_buf(trans, dp, 0);
-	retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, buf);
+	ASSERT(bp != NULL);
+	retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, dbp);
 	xfs_trans_brelse(trans, bp);
 	*eofp = eob;
 	return(retval);
@@ -1019,6 +1027,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 
 	inum = args->inumber;
 	bp = xfs_dir_read_buf(trans, args->dp, 0);
+	ASSERT(bp != NULL);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
 	if (retval == EEXIST) {
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
@@ -1053,6 +1062,7 @@ xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno,
 	xfs_mount_t *mp;
 
 	bp = xfs_dir_get_buf(trans, dp, blkno);
+	ASSERT(bp != NULL);
 	mp = dp->i_mount;
 	bzero((char *)bp->b_un.b_addr, XFS_LBSIZE(mp));
 	node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
@@ -1195,6 +1205,7 @@ xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp)
 		struct xfs_dir_node_entry *btree;
 
 		bp = xfs_dir_read_buf(trans, dp, bno);
+		ASSERT(bp != NULL);
 		node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 		if (node->hdr.info.magic != XFS_DIR_NODE_MAGIC)
 			break;
@@ -1212,12 +1223,13 @@ xfs_dir_node_print(xfs_trans_t *trans, xfs_inode_t *dp)
 		if (bno == 0)
 			break;
 		bp = xfs_dir_read_buf(trans, dp, bno);
+		ASSERT(bp != NULL);
 	}
 }
 
 STATIC int
 xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-			int *eofp, dirent_t *buf)
+			int *eofp, dirent_t *dbp)
 {
 	__uint32_t bno;
 	buf_t *bp;
@@ -1233,6 +1245,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			struct xfs_dir_node_entry *btree;
 
 			bp = xfs_dir_read_buf(trans, dp, bno);
+			ASSERT(bp != NULL);
 			node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 			if (node->hdr.info.magic != XFS_DIR_NODE_MAGIC)
 				break;
@@ -1243,7 +1256,8 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	} else {
 		bno = XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
 		bp = xfs_dir_read_buf(trans, dp, bno);
-		/* GROT: deal with bp == NULL means past eof now */
+		if (bp == NULL)
+			return(ENOENT);
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 		if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
 			xfs_trans_brelse(trans, bp);
@@ -1251,7 +1265,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		}
 	}
 	for (;;) {
-		retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, buf);
+		retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, dbp);
 		if (!eob) {
 			*eofp = 0;
 			xfs_trans_brelse(trans, bp);
@@ -1264,6 +1278,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			break;
 		uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, 0);
 		bp = xfs_dir_read_buf(trans, dp, bno);
+		ASSERT(bp != NULL);
 	}
 	*eofp = 1;
 	return(0);
@@ -1416,9 +1431,12 @@ xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
 
 	nmap = 1;
 	(void)xfs_bmapi(trans, dp, bno, 1, 0, NULLFSBLOCK, 0, &map, &nmap, 0);
+	if (nmap == 0)
+		return NULL;
 	ASSERT(nmap == 1);
-	ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
-	       (map.br_startblock != HOLESTARTBLOCK));
+	ASSERT(map.br_startblock != DELAYSTARTBLOCK);
+	if (map.br_startblock == HOLESTARTBLOCK)
+		return NULL;
 	return(xfs_btree_read_bufl(dp->i_mount, trans, map.br_startblock, 0));
 }
 
@@ -1438,21 +1456,21 @@ xfs_dir_log2_roundup(uint i)
 }
 
 int
-xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *buf, xfs_ino_t ino, char *name,
+xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino, char *name,
 			int namelen, __uint32_t bno, int entry, uio_t *uio,
 			int *done)
 {
 	int retval;
 
-	if ((buf->d_reclen = DIRENTSIZE(namelen)) > uio->uio_resid) {
+	if ((dbp->d_reclen = DIRENTSIZE(namelen)) > uio->uio_resid) {
 		*done = 0;
 		retval = 0;
 	} else {
-		buf->d_ino = ino;
-		bcopy(name, buf->d_name, namelen);
-		buf->d_name[namelen] = '\0';
-		buf->d_off = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
-		retval = uiomove((caddr_t)buf, buf->d_reclen, UIO_READ, uio);
+		dbp->d_ino = ino;
+		bcopy(name, dbp->d_name, namelen);
+		dbp->d_name[namelen] = '\0';
+		dbp->d_off = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
+		retval = uiomove((caddr_t)dbp, dbp->d_reclen, UIO_READ, uio);
 		*done = retval == 0;
 	}
 	return(retval);

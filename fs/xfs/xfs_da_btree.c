@@ -246,6 +246,7 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 	if (retval)
 		return(retval);
 	bp = xfs_dir_get_buf(state->trans, state->args->dp, blkno);
+	ASSERT(bp != NULL);
 	bcopy(blk1->bp->b_un.b_addr, bp->b_un.b_addr, state->blocksize);
 	blk1->bp = bp;
 	blk1->blkno = blkno;
@@ -1040,6 +1041,7 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 	blkno = oldroot->btree[ oldroot->hdr.count-1 ].before;
 	ASSERT(blkno != 0);
 	bp = xfs_dir_read_buf(state->trans, state->args->dp, blkno);
+	ASSERT(bp != NULL);
 	if (oldroot->hdr.level == 1) {
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 		ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -1120,6 +1122,7 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 		 * Fill the alternate path with this block's sibling info.
 		 */
 		bp = xfs_dir_read_buf(state->trans, state->args->dp, blkno[i]);
+		ASSERT(bp != NULL);
 		if (blk->leafblk) {
 			tmp_leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 			ASSERT(tmp_leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -1140,6 +1143,7 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state, int level)
 		if (blkno[i] == 0)
 			continue;
 		bp = xfs_dir_read_buf(state->trans, state->args->dp, blkno[i]);
+		ASSERT(bp != NULL);
 
 		if (blk->leafblk) {
 			tmp_leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
@@ -1719,6 +1723,7 @@ xfs_dir_findpath(struct xfs_dir_state *state,
 		 */
 		blk->bp = xfs_dir_read_buf(state->trans, state->args->dp,
 							 cur_blkno);
+		ASSERT(blk->bp != NULL);
 		blk->blkno = cur_blkno;
 
 		/*
@@ -2006,6 +2011,7 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 		if (old_info->back) {
 			bp = xfs_dir_read_buf(state->trans, state->args->dp,
 							    old_info->back);
+			ASSERT(bp != NULL);
 			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (old_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
@@ -2027,6 +2033,7 @@ xfs_dir_blk_link(struct xfs_dir_state *state,
 		if (old_info->forw) {
 			bp = xfs_dir_read_buf(state->trans, state->args->dp,
 							    old_info->forw);
+			ASSERT(bp != NULL);
 			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (old_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
@@ -2082,6 +2089,7 @@ xfs_dir_blk_unlink(struct xfs_dir_state *state,
 		if (drop_info->back) {
 			bp = xfs_dir_read_buf(state->trans, state->args->dp,
 							    drop_info->back);
+			ASSERT(bp != NULL);
 			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (save_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
@@ -2098,6 +2106,7 @@ xfs_dir_blk_unlink(struct xfs_dir_state *state,
 		if (drop_info->forw) {
 			bp = xfs_dir_read_buf(state->trans, state->args->dp,
 							    drop_info->forw);
+			ASSERT(bp != NULL);
 			tmp_info = (struct xfs_dir_blkinfo *)bp->b_un.b_addr;
 			if (save_blk->leafblk) {
 				ASSERT(tmp_info->magic == XFS_DIR_LEAF_MAGIC);
@@ -2142,7 +2151,7 @@ xfs_dir_leaf_print_int(buf_t *bp, xfs_inode_t *dp)
  */
 int
 xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
-				dirent_t *buf)
+				dirent_t *dbp)
 {
 	int retval, done, entno, i;
 	xfs_mount_t *mp;
@@ -2165,7 +2174,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 	for (i = entno; i < leaf->hdr.count; entry++, i++) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
-		retval = xfs_dir_put_dirent(mp, buf, ino, namest->name,
+		retval = xfs_dir_put_dirent(mp, dbp, ino, namest->name,
 						namest->namelen, bno, i, uio,
 						&done);
 		if (!done) {
