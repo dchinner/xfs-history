@@ -45,25 +45,16 @@ ifsel(CONFIG_XFS_DEBUG)
 endif
 extra_cflags_all($(XFS_EXTRA_CFLAGS))
 
-ifsel(CONFIG_XFS_RT)
-  objlink(xfs.o xfs_rtalloc.o xfs_rtbit.o)
-else
-  objlink(xfs.o xfsrtstubs.o)
-endif
+objlink(CONFIG_XFS_RT  xfs.o xfs_rtalloc.o xfs_rtbit.o)
+objlink(!CONFIG_XFS_RT xfs.o xfsrtstubs.o)
 
 objlink(CONFIG_XFS_GRIO xfs.o xfs_grio.o)
 
-ifsel(CONFIG_XFS_DMAPI)
-  objlink(xfs.o dmapi/dmapi.o xfs_dmapi.o)
-else
-  objlink(xfs.o xfsdmapistubs.o)
-endif
+objlink(CONFIG_XFS_DMAPI  xfs.o dmapi/dmapi.o xfs_dmapi.o)
+objlink(!CONFIG_XFS_DMAPI xfs.o xfsdmapistubs.o)
 
-ifsel(CONFIG_XFS_QUOTA)
-  objlink(xfs.o xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o)
-else
-  objlink(xfs.o xfsquotasstubs.o)
-endif
+objlink(CONFIG_XFS_QUOTA  xfs.o xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o)
+objlink(!CONFIG_XFS_QUOTA xfs.o xfsquotasstubs.o)
 
 objlink(CONFIG_FS_POSIX_ACL xfs.o xfs_acl.o)
 
