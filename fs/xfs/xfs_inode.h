@@ -4,6 +4,7 @@
 
 
 struct xfs_inode;
+struct ktrace;
 	
 /*
  * This is the type used in the xfs inode hash table.
@@ -101,6 +102,10 @@ typedef struct xfs_inode {
 		xfs_bmbt_rec_t	*iu_aextents;	/* map of attr extents */
 		char		*iu_adata;	/* inline attribute data */
 	} i_u3;
+
+	/* Trace buffers per inode. */
+	struct ktrace		*i_xtrace;	/* inode extent list trace */
+	struct ktrace		*i_btrace;	/* inode bmap btree trace */
 	
 	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
 } xfs_inode_t;
