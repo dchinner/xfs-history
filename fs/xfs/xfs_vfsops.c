@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.147 $"
+#ident  "$Revision: 1.148 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -351,7 +351,9 @@ xfs_init(
 #ifndef SIM
 	xfs_start_daemons();
 
+#ifdef TO_FIX_LATER
 	fspeinit();
+#endif /* TO_FIX_LATER */
 #endif
 	/*
 	 * The inode hash table is created on a per mounted
