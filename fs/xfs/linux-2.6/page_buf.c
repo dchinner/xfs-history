@@ -1166,7 +1166,7 @@ int pagebuf_iostart(		/* start I/O on a buffer          */
 
 /* Helper routines for pagebuf_iorequest */
 
-int bio_end_io_pagebuf(struct bio *bio, int nr_sectors)
+int bio_end_io_pagebuf(struct bio *bio)
 {
 	int	i;
 	page_buf_t *pb = (page_buf_t *)bio->bi_private;
@@ -1585,7 +1585,7 @@ pagebuf_daemon(void *data)
 	spin_lock_irq(&current->sigmask_lock);	
 	flush_signals(current);
 	sigfillset(&current->blocked);
-	recalc_sigpending(current);
+	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
 
 	current->session = 1;
