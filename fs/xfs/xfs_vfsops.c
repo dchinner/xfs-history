@@ -239,6 +239,7 @@ xfs_init(
 	extern ktrace_t	*xfs_bmbt_trace_buf;
 	extern ktrace_t	*xfs_strat_trace_buf;
 	extern ktrace_t	*xfs_dir_trace_buf;
+	extern ktrace_t	*xfs_attr_trace_buf;
 #endif	/* DEBUG */
 #endif	/* !SIM */
 
@@ -309,6 +310,7 @@ xfs_init(
 	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, 0);
 	xfs_strat_trace_buf = ktrace_alloc(XFS_STRAT_GTRACE_SIZE, 0);
 	xfs_dir_trace_buf = ktrace_alloc(XFS_DIR_TRACE_SIZE, 0);
+	xfs_attr_trace_buf = ktrace_alloc(XFS_ATTR_TRACE_SIZE, 0);
 #endif
 
 	xfs_dir_startup();
