@@ -1,4 +1,4 @@
-#ident "$Revision: 1.179 $"
+#ident "$Revision: 1.180 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -472,20 +472,8 @@ xfs_getattr(
 	/*
 	 * XXX : truncate to 32 bits for now.
 	 */
-	switch (ip->i_d.di_format) {
-	case XFS_DINODE_FMT_EXTENTS:
-	case XFS_DINODE_FMT_BTREE:
-		vap->va_nblocks = XFS_FSB_TO_BB(mp, (ip->i_d.di_nblocks +
-						ip->i_delayed_blks));
-		break;
-	case XFS_DINODE_FMT_LOCAL:
-	case XFS_DINODE_FMT_DEV:
-	case XFS_DINODE_FMT_UUID:
-		vap->va_nblocks = 0;
-		break;
-	default:
-		ASSERT(0);
-	}
+	vap->va_nblocks =
+		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
 
 	/*
 	 * XFS-added attributes
