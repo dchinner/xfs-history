@@ -183,9 +183,11 @@ linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 void
 linvfs_release_inode(struct inode *inode)
 {
-	pagebuf_lock_disable(inode);
-	truncate_inode_pages(inode, 0L);
-	iput(inode);
+	if (inode) {
+		pagebuf_lock_disable(inode);
+		truncate_inode_pages(inode, 0L);
+		iput(inode);
+	}
 }
 
 
