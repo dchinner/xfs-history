@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.156 $"
+#ident	"$Revision: 1.157 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -280,7 +280,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	ASSERT(valusema(&bp->b_lock) > 0);
 
 	sbp = &(mp->m_sb);
-	mp->m_agfrotor = mp->m_agirotor = mp->m_rbmrotor = 0;
+	mp->m_agfrotor = mp->m_agirotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
 	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
