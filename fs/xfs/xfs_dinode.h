@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e4f44	/* 'INOD' */
@@ -23,6 +23,7 @@ typedef struct xfs_dinode_core
 	__uint16_t	di_gid;		/* owner's group id */
 	__int64_t	di_size;	/* number of bytes in file */
 	xfs_uuid_t	di_uuid;	/* file unique id */
+	__int64_t	di_nextents;	/* number of extents in file */
 	/*
 	 * Should these be timestruc_t's??
 	 * efs makes them __int32_t's.
