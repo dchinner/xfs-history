@@ -1,4 +1,4 @@
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 
 #include <sys/param.h>
@@ -1570,7 +1570,6 @@ xfs_qm_dqiter_bufs(
 					  0, 0,	
 					  XFS_DEFAULT_LOG_COUNT);
 		}
-
 		error = xfs_trans_read_buf(tp, mp->m_dev,
 					   XFS_FSB_TO_DADDR(mp, bno),
 					   (int)mp->QI_DQCHUNKLEN,
@@ -1609,6 +1608,17 @@ xfs_qm_dqiter_bufs(
 
 			if (++notcommitted == incr) {
 				notcommitted = 0;
+				/*
+				 * When quotachecking the root filesystem,
+				 * we don't have bdflush, and we may fill
+				 * up all available freebufs. Because we use
+				 * the trans_buf interface which sends the
+				 * BUF_BUSY flag, we won't flush out delayed
+				 * write buffers, and can hang.
+				 * The workaround here is to push on the
+				 * log and, do a bflush on the rootdev
+				 * periodically.
+				 */
 				if (rootfs)
 					xfs_trans_set_sync(tp);
 				xfs_trans_commit(tp, 0);
@@ -1629,6 +1639,9 @@ xfs_qm_dqiter_bufs(
 			 * updates and write them together.
 			 */
 			bdwrite(bp);
+			/*
+			 * See comments in the if (tp) case above.
+			 */
 			if (rootfs) {
 				if (++notcommitted == incr) {
 					bflush(mp->m_dev);
@@ -1974,6 +1987,10 @@ xfs_qm_quotacheck(
 					     xfs_qm_reset_dqcounts))
 			return (error);
 	}
+	/*
+	 * Hack. XXX temporary.
+	 */
+	bflush(mp->m_dev);
 		
 	do {
 		/*
@@ -2004,7 +2021,7 @@ xfs_qm_quotacheck(
 	 * down to disk buffers.
 	 */
 	xfs_qm_dqflush_all(mp, XFS_QMOPT_DELWRI);
-	
+
 	/*
 	 * We didn't log anything, because if we crashed, we'll have to
 	 * start the quotacheck from scratch anyway. However, we must make
@@ -2141,6 +2158,9 @@ xfs_qm_shake_freelist(
 	nreclaimed = 0; 
 	restarts = 0;
 
+#ifdef QUOTADEBUG
+	printf("Shake free 0x%x\n", howmany);
+#endif
 	/* lock order is : hashchainlock, freelistlock, mplistlock */
  tryagain:
 	xfs_qm_freelist_lock(G_xqm);
@@ -2241,6 +2261,9 @@ xfs_qm_shake_freelist(
 			goto tryagain;
 		}
 		xfs_dqtrace_entry(dqp, "DQSHAKE: UNLINKING");
+#ifdef QUOTADEBUG
+		printf("Shake 0x%x, ID 0x%x\n", dqp, dqp->q_core.d_id);
+#endif
 		ASSERT(dqp->q_nrefs == 0);
 		nextdqp = dqp->dq_flnext;
 		XQM_MPLIST_REMOVE(&(dqp->q_mount->QI_MPL_LIST), dqp);
