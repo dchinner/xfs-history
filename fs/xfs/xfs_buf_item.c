@@ -236,8 +236,13 @@ xfs_buf_item_trylock(xfs_buf_log_item_t *bip)
 	buf_t	*bp;
 
 	bp = bip->bli_buf;
+
+	if (bp->b_pincount > 0) {
+		return XFS_ITEM_PINNED;
+	}
+
 	if (!cpsema(&bp->b_lock)) {
-		return (0);
+		return XFS_ITEM_LOCKED;
 	}
 
 	/*
@@ -245,7 +250,7 @@ xfs_buf_item_trylock(xfs_buf_log_item_t *bip)
 	 */
 	notavail(bp);
 
-	return (1);
+	return XFS_ITEM_SUCCESS;
 }
 
 /*

@@ -322,16 +322,20 @@ xfs_inode_item_trylock(xfs_inode_log_item_t *iip)
 
 	ip = iip->ili_inode;
 
+	if (ip->i_pincount > 0) {
+		return XFS_ITEM_PINNED;
+	}
+
 	if (!xfs_ilock_nowait(ip, XFS_ILOCK_SHARED)) {
-		return (0);
+		return XFS_ITEM_LOCKED;
 	}
 
 	if (!xfs_iflock_nowait(ip)) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-		return (0);
+		return XFS_ITEM_FLUSHING;
 	}
 
-	return (1);
+	return XFS_ITEM_SUCCESS;
 }
 
 /*

@@ -126,7 +126,7 @@ xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
 STATIC uint
 xfs_efi_item_trylock(xfs_efi_log_item_t *efip)
 {
-	return 0;
+	return XFS_ITEM_LOCKED;
 }
 
 /*
@@ -310,7 +310,7 @@ xfs_efd_item_unpin(xfs_efd_log_item_t *efdp)
 STATIC uint
 xfs_efd_item_trylock(xfs_efd_log_item_t *efdp)
 {
-	return 0;
+	return XFS_ITEM_LOCKED;
 }
 
 /*

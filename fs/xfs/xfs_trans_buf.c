@@ -306,181 +306,6 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 
 
 /*
- * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it is already locked
- * within the transaction, just increment its lock recursion count
- * and return a pointer to it.
- *
- * Use the buffer cache routine findchunk_match() to find the buffer
- * if it is already owned by this transaction.
- *
- * If we don't already own the buffer, use xfs_getchunk() to get it.
- * If it doesn't yet have an associated xfs_buf_log_item structure,
- * then allocate one and add the item to this transaction.
- *
- * If the transaction pointer is NULL, make this just a normal
- * getchunk() call.
- */
-#if 0
-buf_t *
-xfs_trans_getchunk(xfs_trans_t		*tp,
-		   vnode_t		*vp,
-		   struct bmapval	*bmap,
-		   struct cred		*cred)
-{
-	buf_t			*bp;
-	xfs_buf_log_item_t	*bip;
-
-	/*
-	 * Default to a normal getchunk() call if the tp is NULL.
-	 */
-	if (tp == NULL) {
-		return (getchunk(vp, bmap, cred));
-	}
-
-	/*
-	 * If we find the buffer in the cache with this transaction
-	 * pointer in its b_fsprivate2 field, then we know we already
-	 * have it locked.  In this case we just increment the lock
-	 * recursion count and return the buffer to the caller.
-	 */
-	if ((bp = findchunk_match(vp, bmap, BUF_FSPRIV2, tp)) != NULL) {
-		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-		ASSERT(bip != NULL);
-		bip->bli_recur++;
-		return (bp);
-	}
-
-	bp = xfs_getchunk(vp, bmap, cred);
-
-	/*
-	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
-	 * it doesn't have one yet, then allocate one and initialize it.
-	 * The checks to see if one is there are in xfs_buf_item_init().
-	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
-
-	/*
-	 * Set the recursion count for the buffer within this transaction
-	 * to 0.
-	 */
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	bip->bli_recur = 0;
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
-
-	/*
-	 * Initialize b_fsprivate2 so we can find it with findchunk_match()
-	 * above.
-	 */
-	bp->b_fsprivate2 = tp;
-
-	return (bp);
-}
-#endif /* 0 */
-
-
-/*
- * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it has not yet been
- * read in, read it from disk. If it is already locked
- * within the transaction and already read in, just increment its
- * lock recursion count and return a pointer to it.
- *
- * Use the buffer cache routine findchunk_match() to find the buffer
- * if it is already owned by this transaction.
- *
- * If we don't already own the buffer, use xfs_chunkread() to get it.
- * If it doesn't yet have an associated xfs_buf_log_item structure,
- * then allocate one and add the item to this transaction.
- *
- * If the transaction pointer is NULL, make this just a normal
- * chunkread() call.
- */
-#if 0
-buf_t *
-xfs_trans_chunkread(xfs_trans_t		*tp,
-		    vnode_t		*vp,
-		    struct bmapval	*bmap,
-		    struct cred		*cred)
-{
-	buf_t			*bp;
-	xfs_buf_log_item_t	*bip;
-
-	/*
-	 * Default to a normal chunkread() call if the tp is NULL.
-	 */
-	if (tp == NULL) {
-		return (chunkread(vp, bmap, 1, cred));
-	}
-	/*
-	 * If we find the buffer in the cache with this transaction
-	 * pointer in its b_fsprivate2 field, then we know we already
-	 * have it locked.  If it is already read in we just increment
-	 * the lock recursion count and return the buffer to the caller.
-	 * If the buffer is not yet read in, then we read it in, increment
-	 * the lock recursion count, and return it to the caller.
-	 */
-	if ((bp = findchunk_match(vp, bmap, BUF_FSPRIV2, tp)) != NULL) {
-		if (!bp->b_flags & B_DONE) {
-#ifndef SIM
-			SYSINFO.lread += BTOBB(bmap->pbsize);
-#endif
-
-			ASSERT(!(bp->b_flags & B_ASYNC));
-			bp->b_flags |= B_READ;
-			VOP_STRATEGY(vp, bp);
-
-#ifndef SIM
-			u.u_ior++;
-			SYSINFO.bread += BTOBBT(bp->b_bcount);
-#endif
-
-			iowait(bp);
-		}
-
-		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-		bip->bli_recur++;
-
-		return (bp);
-	}
-
-	bp = xfs_chunkread(vp, bmap, 1, cred);
-
-	/*
-	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
-	 * it doesn't have one yet, then allocate one and initialize it.
-	 * The checks to see if one is there are in xfs_buf_item_init().
-	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
-
-	/*
-	 * Set the recursion count for the buffer within this transaction
-	 * to 0.
-	 */
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	bip->bli_recur = 0;
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
-
-	/*
-	 * Initialize b_fsprivate2 so we can find it with incore_match()
-	 * above.
-	 */
-	bp->b_fsprivate2 = tp;
-
-	return (bp);
-}
-#endif /* 0 */
-
-
-/*
  * Release the buffer bp which was previously acquired with one of the
  * xfs_trans_... buffer allocation routines if the buffer has not
  * been modified within this transaction.  If the buffer is modified
@@ -506,6 +331,17 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	 * Default to a normal brelse() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
+		/*
+		 * If there's a buf log item attached to the buffer,
+		 * then let the AIL know that the buffer is being
+		 * unlocked.
+		 */
+		if (bp->b_fsprivate != NULL) {
+			bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
+			ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
+			xfs_trans_unlocked_item(bip->bli_item.li_mountp,
+						(xfs_log_item_t*)bip);
+		}
 		brelse(bp);
 		return;
 	}
@@ -562,7 +398,16 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		xfs_buf_item_relse(bp);
 	}
 	bp->b_fsprivate2 = NULL;
-	xfs_brelse(bp);
+
+	/*
+	 * If we've still got a buf log item on the buffer, then
+	 * tell the AIL that the buffer is being unlocked.
+	 */
+	if (bp->b_fsprivate != NULL) {
+		xfs_trans_unlocked_item(bip->bli_item.li_mountp,
+					(xfs_log_item_t*)bip);
+	}
+	brelse(bp);
 	return;
 }
 
