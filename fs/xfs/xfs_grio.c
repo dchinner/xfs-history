@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.19 1994/05/04 00:20:57 doucette Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.20 1994/05/09 15:53:44 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -24,6 +24,7 @@
 #include <sys/cred.h>
 #include <sys/proc.h>
 #include <sys/user.h>
+#include <sys/ktime.h>
 #include <sys/fs/xfs_types.h>
 #include <sys/fs/xfs_log.h>
 #include <sys/fs/xfs_inum.h>
@@ -83,6 +84,9 @@ extern int xfs_write_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_diordwr(vnode_t *,uio_t *, int, cred_t *,int);
 extern struct vfs *vfs_devsearch( dev_t );
 extern int strncmp(char *, char *, int);
+extern void fasthz_delay( struct timeval *);
+extern void timestruc_sub( timestruc_t *, timestruc_t *);
+extern void timestruc_fix( timestruc_t *);
 
 
 /*
@@ -151,7 +155,8 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 			ticket->sz = sz;
 			ticket->id.ino = id->ino;
 			ticket->id.pid = id->pid;
-			ticket->lastreq = 0;
+			ticket->lastreq.tv_sec = 0;
+			ticket->lastreq.tv_nsec = 0;
 			if (ip->i_ticket) 
 				ticket->nextticket = ip->i_ticket;
 			/*
@@ -326,6 +331,79 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 	return(0);
 }
 
+int xfs_fast_test = 0;
+
+/*
+ * xfs_grio_time_check()
+ *
+ *
+ *  
+ * RETURNS: 
+ * 	none
+ */
+void
+xfs_grio_time_check(timestruc_t *lastreq)
+{
+	timestruc_t	tv, nexttv;
+	struct timeval	tvl;
+
+#ifdef SIM
+	/*
+	 * Check if the request is within the time limits
+	 * of the rate guarantee.
+	 */
+	if (lbolt < (lastreq->tv_sec + HZ)) {
+		/*
+		 * This request is being issued too soon
+		 * after the last request for this guarantee.
+		 * It cannot be issued until the next second.
+		 */
+		GRIO_DBPRNT(2,"request issued too soon \n");
+		delay(lastreq->tv_sec + HZ - lbolt);
+	}
+	lastreq->tv_sec  = lbolt;
+#else
+
+	/*
+	 * Check if the request is within the time limits
+	 * of the rate guarantee.
+	 */
+	nanotime(&tv);
+	
+	/*
+	 * Determine the time that the next request can be issued.
+	 */
+	nexttv.tv_sec  = lastreq->tv_sec + 1;
+	nexttv.tv_nsec = lastreq->tv_nsec;
+
+	if (( tv.tv_sec < nexttv.tv_sec) ||
+	    ((tv.tv_sec == nexttv.tv_sec) && (tv.tv_nsec < nexttv.tv_nsec))) {
+
+
+		/*
+		 * The user issued the next request too soon. The
+		 * process will be put to sleep until the next time slice.
+		 * The granularity of this delay is 1/fasthz (1 millisecond).
+		 */
+		GRIO_DBPRNT(2,"request issued too soon \n");
+
+		timestruc_sub( &nexttv, &tv );
+		timestruc_fix( &nexttv );
+
+		TIMESTRUC_TO_TIMEVAL(&nexttv, &tvl);
+
+		fasthz_delay( &tvl );
+		nanotime(&tv);
+
+	}
+
+	lastreq->tv_sec  =  tv.tv_sec;
+	lastreq->tv_nsec =  tv.tv_nsec;
+#endif
+	return;
+}
+
+
 /*
  * xfs_io_is_guaranteed()
  *
@@ -375,9 +453,9 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip,
 		cred_t *credp, 
 		int rw)
 {
-        int     remainingio, ret = 0;
-        grio_ticket_t *ticket;
-	vnode_t *vp;
+        int     	remainingio, ret = 0;
+	vnode_t 	*vp;
+        grio_ticket_t 	*ticket;
 
         /*
          * Check that rate guarantee ticket still exists.
@@ -405,20 +483,8 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip,
 			uiop->uio_iov[0].iov_len = ticket->sz;
                         remainingio    -= ticket->sz;
 
-                        /*
-                         * Check if the request is within the time limits
-                         * of the rate guarantee.
-                         */
-                        if (lbolt < (ticket->lastreq + HZ)) {
-                                /*
-                                 * This request is being issued too soon
-                                 * after the last request for this guarantee.
-                                 * It cannot be issued until the next second.
-                                 */
-                                GRIO_DBPRNT(2,"request issued too soon \n");
-                                delay(ticket->lastreq + HZ - lbolt);
-                        }
-                        ticket->lastreq = lbolt;
+
+			xfs_grio_time_check(&(ticket->lastreq));
 
                         /*
                          * Drop ticket lock before calling read/write.
@@ -469,8 +535,6 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip,
         ticket_unlock(ip);
         return(ret);
 }
-
-
 
 /*
  * xfs_grio_req()
@@ -527,24 +591,7 @@ xfs_grio_req( xfs_inode_t *ip,
                  * request for this guarantee.
                  */
                 if ((!ret) && ticket) {
-                        if (lbolt < (ticket->lastreq  + HZ)) {
-                                /*
-                                 * This request cannot be
-                                 * issued until the next second.
-                                 */
-                                GRIO_DBPRNT(2, "request issued too soon \n");
-                                delay(ticket->lastreq + HZ - lbolt);
-				/*
- 				 * Should lastreq be set to 0 here so that a 
-				 * requestor will not be out of step forever?
-				 * The max we delay is every other time.
- 				 */
-			/*     	ticket->lastreq = 0; */
-                       		ticket->lastreq = lbolt;
-			} else {
-				ticket->lastreq = lbolt;
-			}
-
+			xfs_grio_time_check(&(ticket->lastreq));
                 }
         }
         /*
