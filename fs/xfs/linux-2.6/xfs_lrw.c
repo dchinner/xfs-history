@@ -34,6 +34,7 @@
 #include <asm/uaccess.h>
 #include <linux/page_buf.h>
 #include <linux/pagemap.h>
+#include <linux/capability.h>
 
 #include <linux/linux_to_xfs.h>
 
@@ -75,6 +76,8 @@
 #define min(a, b) ((a) < (b) ? (a) :  (b))
 #define XFS_WRITEIO_ALIGN(io,off)       (((off) >> io->io_writeio_log) \
                                                 << io->io_writeio_log)
+
+extern int xfs_write_clear_setuid(struct xfs_inode *);
 
 ssize_t
 xfs_rdwr(
@@ -299,6 +302,7 @@ xfs_zero_last_block(
 
 	if (PBF_NOT_DONE(pb)) {
 		if (error = pagebuf_iostart(pb, PBF_READ)) {
+			pagebuf_rele(pb);
 			goto out_lock;
 		}
 	}
@@ -306,9 +310,11 @@ xfs_zero_last_block(
 	zero_offset = isize_fsb_offset;
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 	if (error = pagebuf_iozero(pb, zero_offset, zero_len)) {
+		pagebuf_rele(pb);
 		goto out_lock;
 	}
 	if (error = pagebuf_iostart(pb, PBF_WRITE)) {
+		pagebuf_rele(pb);
 		goto out_lock;
 	}
 
@@ -329,13 +335,9 @@ xfs_zero_last_block(
 	    imap.br_state == XFS_EXT_UNWRITTEN) {
 		printk("xfs_zero_last_block: We want DELWRI? not waiting?\n");
 		/* XFS_bdwrite(bp);*/
-		error = pagebuf_iowait(pb); /* REMOVE ME WHEN DELWRI EXISTS */
-	} else {
-		error = pagebuf_iowait(pb);
 	}
 
 out_lock:
-	pagebuf_rele(pb);
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	return error;
 }
@@ -510,14 +512,10 @@ xfs_zero_eof(
 		if (imap.br_startblock == DELAYSTARTBLOCK ||
 		    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
 			printk("xfs_zero_eof: need to allocate? delwri\n");
-			error = pagebuf_iowait(pb);
-		} else { /* Sync */
-			error = pagebuf_iowait(pb);
 		}
 		if (error) {
 			goto out_lock;
 		}
-		pagebuf_rele(pb);
 
 		prev_zero_fsb = start_zero_fsb;
 		prev_zero_count = buf_len_fsb;
@@ -580,8 +578,21 @@ xfs_write(
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 0);
 
 	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
-	if (ret > 0 && *offsetp > xip->i_d.di_size) {
-		XFS_SETSIZE(mp, io, *offsetp);
+	if (ret > 0) {
+		unsigned int mode;
+		/* set S_IGID if S_IXGRP is set, and always set S_ISUID */
+		mode = (ip->i_mode & S_IXGRP)*(S_ISGID/S_IXGRP) | S_ISUID;
+
+		/* was any of the uid bits set? */
+		mode &= ip->i_mode;
+		if (mode && !capable(CAP_FSETID)) {
+			ip->i_mode &= ~mode;
+			mark_inode_dirty(ip);
+			xfs_write_clear_setuid(xip);
+		}
+		if (*offsetp > xip->i_d.di_size) {
+			XFS_SETSIZE(mp, io, *offsetp);
+		}
 	}
 	xfs_rwunlock(bdp, VRWLOCK_WRITE);
 	return(ret);
@@ -733,21 +744,6 @@ xfs_iomap_read(
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = sizeof(imap) / sizeof(imap[0]);
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)nisize));
-/*	printk("offset %Ld nisize %dL\n", offset, nisize); */
-	if (offset >= nisize) {
-		// printk("xfs_iomap_read about to call EXTRA!! %Ld %Ld\n",
-		//	offset, nisize);
-
-		/*
-		 * The VM/chunk code is trying to map a page or part
-		 * of a page to be pushed out that is beyond the end
-		 * of the file.  We handle these cases separately so
-		 * that they do not interfere with the normal path
-		 * code.
-		 */
-		error = xfs_iomap_extra(io, offset, count, pbmapp, npbmaps, pmp);
-		return error;
-	}
 	/*
 	 * Map out to the maximum possible file size.  This will return
 	 * an extra hole we don't really care about at the end, but we
@@ -1110,7 +1106,9 @@ xfs_iomap_extra(
 		 * The page is beyond the EOF, but we need to return
 		 * something to keep the chunk cache happy.
 		 */
+/***
 		ASSERT(count <= NBPP);
+****/
 		end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
 		nimaps = 1;
 		firstblock = NULLFSBLOCK;

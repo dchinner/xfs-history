@@ -22,7 +22,6 @@
  */
 
 
-/* Don't want anything from linux/capability.h. We need the stuff from IRIX */
 #define FSID_T /* wrapper hack... border files have type problems */
 #include <sys/types.h> 
 
@@ -87,66 +86,6 @@ int xfs_init(int fstype);
 extern struct super_operations linvfs_sops;
 
 
-void
-linvfs_inode_attr_in(
-	struct inode	*inode)
-{
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-	vattr_t		attr;
-	int		error;
-
-	memset(&attr, 0, sizeof(vattr_t));
-	attr.va_mask = AT_STAT;
-
-	VOP_GETATTR(vp, &attr, 0, sys_cred, error);
-
-	if (error) {
-		printk("linvfs:  Whoah!  Bad VOP_GETATTR()\n");
-		return;
-	}
-
-	inode->i_mode = attr.va_mode & S_IALLUGO;
-
-	switch (attr.va_type) {
-	case VREG:
-		inode->i_mode |= S_IFREG;
-		break;
-	case VDIR:
-		inode->i_mode |= S_IFDIR;
-		break;
-	case VLNK:
-		inode->i_mode |= S_IFLNK;
-		break;
-	case VBLK:
-		inode->i_mode |= S_IFBLK;
-		inode->i_rdev = MKDEV(emajor(attr.va_rdev),
-				      eminor(attr.va_rdev));
-		break;
-	case VCHR:
-		inode->i_mode |= S_IFCHR;
-		inode->i_rdev = MKDEV(emajor(attr.va_rdev),
-				      eminor(attr.va_rdev));
-		break;
-	case VFIFO:
-		inode->i_mode |= S_IFIFO;
-		break;
-	default:
-		printk(KERN_ERR "XFS:  D'oh!  dinode %lu has bad type %d\n",
-			inode->i_ino, attr.va_type);
-		break;
-	};
-
-	inode->i_nlink = attr.va_nlink;
-	inode->i_uid = attr.va_uid;
-	inode->i_gid = attr.va_gid;
-	inode->i_size = attr.va_size;
-	inode->i_atime = attr.va_atime.tv_sec;
-	inode->i_mtime = attr.va_mtime.tv_sec;
-	inode->i_ctime = attr.va_ctime.tv_sec;
-	inode->i_blksize = attr.va_blksize;
-	inode->i_blocks = attr.va_nblocks;
-	inode->i_version = ++event;
-}
 
 int spectodevs(
 	struct super_block *sb,
@@ -273,7 +212,9 @@ linvfs_read_super(
 	vfsp->vfs_super = sb;
 
 
+#if !CONFIG_PAGE_BUF_META
 #define XFS_DATA_BLOCKSIZE_4K
+#endif
 #ifdef XFS_DATA_BLOCKSIZE_4K
 	sb->s_blocksize = 4096;
 	sb->s_blocksize_bits = 12;
@@ -344,6 +285,7 @@ linvfs_read_inode(
 	vfs_t		*vfsp = LINVFS_GET_VFS(inode->i_sb);
 	vnode_t		*vp;
 	int		error = ENOENT;
+	struct dentry	dentry;
 
 	if (vfsp) {
 		VFS_GET_VNODE(vfsp, &vp, inode->i_ino, error);
@@ -356,7 +298,9 @@ linvfs_read_inode(
 	LINVFS_GET_VP(inode) = vp;
 	vp->v_inode = inode;
 
-	linvfs_inode_attr_in(inode);
+	dentry.d_inode = inode;
+	linvfs_revalidate(&dentry);
+	inode->i_version = ++event;
 
 	if (S_ISREG(inode->i_mode))
 		inode->i_op = &linvfs_file_inode_operations;
@@ -439,7 +383,9 @@ linvfs_notify_change(
 
 	VOP_SETATTR(vp, &vattr, 0, sys_cred, error);
 
-	linvfs_inode_attr_in(inode);
+	if (!error) {
+		inode_setattr(inode, attr);
+	}
 
 	return(-error);
 }
@@ -575,6 +521,7 @@ static struct file_system_type xfs_fs_type = {
 
 int __init init_xfs_fs(void)
 {
+  extern void uuid_init(void);
   struct sysinfo	si;
 
   ENTER("init_xfs_fs"); 
