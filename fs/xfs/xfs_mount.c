@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision: 1.45 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -43,6 +43,7 @@
 #include "xfs_dir.h"
 #include "xfs_alloc.h"
 #include "xfs_rtalloc.h"
+#include "xfs_bmap.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -165,6 +166,8 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_bmap_dmnr[i + 2] = XFS_BTREE_BLOCK_MINRECS(brsize,
 			xfs_bmdr, i);
 	}
+	xfs_alloc_compute_maxlevels(mp);
+	xfs_bmap_compute_maxlevels(mp);
 	mp->m_bsize = xfs_btod(mp, 1);
 	vfsp->vfs_bsize = xfs_fsb_to_b(mp, 1);
 
