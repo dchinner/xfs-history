@@ -241,11 +241,6 @@ xfs_init(int	fstype)
 	 * file system bases.
 	 */
 
-	/*
-	 * turn ACLs on
-	 */
-	xfs_acl_init ();
-
 	return 0;
 }
 

@@ -3486,12 +3486,14 @@ xfs_iaccess(
 	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip)))
 		return XFS_ERROR(EROFS);
 
+#ifdef CONFIG_FS_POSIX_ACL
 	/*
 	 * If there's an Access Control List it's used instead of
 	 * the mode bits.
 	 */
-	if ((error = _ACL_XFS_IACCESS(ip, mode, cr)) != -1)
+	if ((error = xfs_acl_iaccess(ip, mode, cr)) != -1)
 		return error ? XFS_ERROR(error) : 0;
+#endif
 
 	if (current->fsuid != ip->i_d.di_uid) {
 		mode >>= 3;

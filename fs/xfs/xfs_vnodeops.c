@@ -6121,8 +6121,10 @@ vnodeops_t xfs_vnodeops = {
 	(vop_attr_set_t)xfs_attr_set,
 	(vop_attr_remove_t)xfs_attr_remove,
 	(vop_attr_list_t)xfs_attr_list,
+#ifdef CONFIG_FS_POSIX_ACL
 	(vop_acl_get_t)xfs_acl_get,
 	(vop_acl_set_t)xfs_acl_set,
+#endif
 	(vop_link_removed_t)fs_noval,
 	fs_vnode_change,
 	fs_tosspages,

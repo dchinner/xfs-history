@@ -123,9 +123,11 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		d_instantiate(dentry, ip);
 	}
 
+#ifdef CONFIG_FS_POSIX_ACL
         if (!error) {
-	    error = _ACL_INHERIT(dvp, vp, &va);
+	    error = xfs_acl_inherit(dvp, vp, &va);
         }
+#endif
 
 	return -error;
 }
@@ -532,6 +534,8 @@ int linvfs_attrctl(
 	return -error;
 }
 
+#ifdef CONFIG_FS_POSIX_ACL
+
 int linvfs_acl_get(
 		struct dentry	*dentry,
 		struct acl	*acl,
@@ -567,6 +571,7 @@ int linvfs_acl_set(
 	return -error;
 }
 
+#endif
 
 int linvfs_permission(struct inode *ip, int mode)
 {
@@ -833,8 +838,10 @@ struct inode_operations linvfs_file_inode_operations =
   pagebuf_bmap:		linvfs_pb_bmap,
   pagebuf_fileread:	linvfs_file_read,
   attrctl:		linvfs_attrctl,
+#ifdef CONFIG_FS_POSIX_ACL
   acl_get:		linvfs_acl_get,
   acl_set:		linvfs_acl_set,
+#endif
 };
 
 struct inode_operations linvfs_dir_inode_operations =
@@ -852,8 +859,10 @@ struct inode_operations linvfs_dir_inode_operations =
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
   attrctl:		linvfs_attrctl,
+#ifdef CONFIG_FS_POSIX_ACL
   acl_get:		linvfs_acl_get,
   acl_set:		linvfs_acl_set,
+#endif
 };
 
 struct inode_operations linvfs_symlink_inode_operations =
@@ -864,7 +873,9 @@ struct inode_operations linvfs_symlink_inode_operations =
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
   attrctl:		linvfs_attrctl,
+#ifdef CONFIG_FS_POSIX_ACL
   acl_get:		linvfs_acl_get,
   acl_set:		linvfs_acl_set,
+#endif
 };
 

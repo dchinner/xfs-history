@@ -38,19 +38,9 @@ struct xfs_inode;
 struct vattr;
 struct vnode;
 
-extern void xfs_acl_init(void);
 extern int  xfs_acl_inherit(struct vnode *, struct vnode *, struct vattr *);
 extern int  xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
 extern int  xfs_acl_get(struct vnode *, struct acl *, struct acl *);
 extern int  xfs_acl_set(struct vnode *, struct acl *, struct acl *);
-
-/* Define macros choosing stub functions or real functions here */
-extern int xfs_acl_enabled;
-
-#define _ACL_INHERIT(p,c,v)	((xfs_acl_enabled)? xfs_acl_inherit(p,c,v) : 0)
-#define _ACL_XFS_IACCESS(a,b,c)	((xfs_acl_enabled)? xfs_acl_iaccess(a,b,c) : -1)
-
-#define _ACL_GET(a,b,c,d)	((xfs_acl_enabled)? xfs_acl_get(a,b,c,d) : ENOSYS)
-#define _ACL_SET(a,b,c,d)	((xfs_acl_enabled)? xfs_acl_set(a,b,c,d) : ENOSYS)
 
 #endif /* __XFS_ACL_H__ */

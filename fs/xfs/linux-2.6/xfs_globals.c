@@ -38,7 +38,6 @@
 #include <xfs.h>
 
 int		mac_enabled = 0;
-int		xfs_acl_enabled = 0;
 int		xpg4_sticky_dir = 1;	/* see xfs_stickytest */
 int		xfs_fstype;
 uint64_t	xfs_panic_mask;		/* set to cause more panics */

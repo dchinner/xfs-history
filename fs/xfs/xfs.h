@@ -47,8 +47,9 @@
 #include <linux/page_buf.h>
 #include <linux/file.h>
 #include <linux/attributes.h>
+#ifdef CONFIG_FS_POSIX_ACL
 #include <linux/acl.h>
-
+#endif
 #include <xfs_buf.h>
 #include <linux/xqm.h>
 #include <linux/xfs_stats.h>
@@ -107,7 +108,9 @@
 #include <xfs_dir2_block.h>
 #include <xfs_dir2_node.h>
 #include <xfs_dir2_trace.h>
+#ifdef CONFIG_FS_POSIX_ACL
 #include <xfs_acl.h>
+#endif
 #include <xfs_attr.h>
 #include <xfs_attr_leaf.h>
 #include <xfs_inode_item.h>

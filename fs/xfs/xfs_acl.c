@@ -271,11 +271,6 @@ acl_invalid:
 	return EINVAL;
 }
 
-void
-xfs_acl_init(void)
-{
-	xfs_acl_enabled = 1;
-}
 
 /*
  * Do ACL endian conversion.
