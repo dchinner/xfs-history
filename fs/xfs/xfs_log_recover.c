@@ -749,11 +749,6 @@ xlog_find_tail(xlog_t  *log,
 	
 	found = error = 0;
 
-	/* Look for an external log signature, and adjust the log's length if
-	 * found. */
-	if ((error = xlog_test_footer(log)))
-		return error;
-
 	/*
 	 * Find previous log record 
 	 */
@@ -3385,6 +3380,13 @@ xlog_recover(xlog_t *log, int readonly)
 	xfs_daddr_t head_blk, tail_blk;
 	int	error;
 
+	/* Look for an external log signature, and adjust the log's length if
+	 * found. */
+	if ((error = xlog_test_footer(log)))
+		return error;
+        
+        /* now find the tail of the log */
+        
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk, readonly))
 		return error;
 	if (tail_blk != head_blk) {
