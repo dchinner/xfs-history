@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.67 $"
+#ident	"$Revision: 1.68 $"
 
 struct buf;
 struct cred;
@@ -144,7 +144,7 @@ struct vfs *xfs_mtovfs(xfs_mount_t *mp);
 xfs_mount_t *xfs_bhvtom(bhv_desc_t *bdp);
 #define	XFS_BHVTOM(bdp)	xfs_bhvtom(bdp)
 #else
-#define	XFS_BHVTOM(vfsp)	((xfs_mount_t *)BHV_PDATA(bdp))
+#define	XFS_BHVTOM(bdp)		((xfs_mount_t *)BHV_PDATA(bdp))
 #endif
  
 /*
