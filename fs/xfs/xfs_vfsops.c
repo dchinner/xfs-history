@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.121 $"
+#ident  "$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -241,9 +241,6 @@ xfs_init(
 	extern lock_t	xfsd_lock;
 	extern sv_t	xfsd_wait;
 	extern mutex_t	xfs_ancestormon;
-	extern zone_t	*xfs_bmap_zone;
-	extern zone_t	*xfs_irec_zone;
-	extern zone_t	*xfs_strat_write_zone;
 	extern zone_t	*xfs_gap_zone;
 #ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
@@ -283,12 +280,6 @@ xfs_init(
 	xfs_inode_zone = kmem_zone_init(sizeof(xfs_inode_t), "xfs_inode");
 	xfs_trans_zone = kmem_zone_init(sizeof(xfs_trans_t), "xfs_trans");
 #ifndef SIM
-	xfs_irec_zone = kmem_zone_init((XFS_BMAP_MAX_NMAP *
-					sizeof(xfs_bmbt_irec_t)), "xfs_irec");
-	xfs_bmap_zone = kmem_zone_init((XFS_ZONE_NBMAPS *
-					sizeof(struct bmapval)), "xfs_bmap");
-	xfs_strat_write_zone = kmem_zone_init(sizeof(xfs_strat_write_locals_t),
-					      "xfs_strat_write");
 	xfs_gap_zone = kmem_zone_init(sizeof(xfs_gap_t), "xfs_gap");
 #endif
 	xfs_da_state_zone =
@@ -696,7 +687,7 @@ xfs_vfsmount(
 	if (uap->flags & MS_DMI) {
 		vfsp->vfs_flag |= VFS_DMI;
 		/* Always send mount event (when mounted with dmi option) */
-		error = dm_namesp_event(DM_MOUNT, mvp, mvp,
+		error = dm_namesp_event(DM_MOUNT, (vnode_t *) vfsp, mvp,
 					uap->dir, uap->spec, 0, 0);
 		if (error) {
 			int	errcode;
