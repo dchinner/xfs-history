@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.470 $"
+#ident "$Revision: 1.471 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -6217,34 +6217,6 @@ xfs_change_file_space(
 	return error;
 }
 
-/*
- * print out error describing the problem with the fs
- *
- *
- * type 1 indicates the file system ran out of data space
- * type 2 indicates the file system ran out of realtime space
- *
- */
-void
-xfs_error(
-	xfs_mount_t	*mp,
-	int		type)
-{
-	dev_t	dev;
-	
-	switch (type) {
-	case 1:
-		dev = mp->m_dev;
-		prdev("Process [%s] ran out of disk space",
-		      dev, get_current_name());
-		break;
-	case 2:
-		dev = mp->m_rtdev;
-		prdev("Process [%s] ran out of rt disk space",
-		      dev, get_current_name());
-		break;
-	}
-}
 #endif	/* !SIM */
 
 #ifdef SIM

@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.284 $"
+#ident  "$Revision: 1.285 $"
 
 #include <xfs_os_defs.h>
 
@@ -244,14 +244,12 @@ xfs_init(int	fstype)
 	extern xfs_zone_t	*xfs_ktrace_ent_zone;
 #endif	/* (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)) */
 #ifndef SIM
-	extern lock_t	xfsd_lock;
 	extern mutex_t	xfs_uuidtabmon;
 	extern xfs_zone_t	*xfs_gap_zone;
 #ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
 	extern ktrace_t	*xfs_bmap_trace_buf;
 	extern ktrace_t	*xfs_bmbt_trace_buf;
-	extern ktrace_t	*xfs_strat_trace_buf;
 	extern ktrace_t	*xfs_dir_trace_buf;
 	extern ktrace_t	*xfs_attr_trace_buf;
 	extern ktrace_t	*xfs_dir2_trace_buf;
@@ -333,9 +331,6 @@ xfs_init(int	fstype)
 #endif
 #ifdef XFS_BMBT_TRACE
 	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, KM_SLEEP);
-#endif
-#ifdef XFS_STRAT_TRACE
-	xfs_strat_trace_buf = ktrace_alloc(XFS_STRAT_GTRACE_SIZE, KM_SLEEP);
 #endif
 #ifdef XFS_DIR_TRACE
 	xfs_dir_trace_buf = ktrace_alloc(XFS_DIR_TRACE_SIZE, KM_SLEEP);
