@@ -304,8 +304,9 @@ extern void pdflush(struct vnode *, uint64_t);
 #define XFS_BUF_STALE(x)	     ((x)->pb_flags |= XFS_B_STALE)
 #define XFS_BUF_UNSTALE(x)	     ((x)->pb_flags &= ~XFS_B_STALE)
 #define XFS_BUF_ISSTALE(x)	     ((x)->pb_flags & XFS_B_STALE)
-#define XFS_BUF_SUPER_STALE(x)   (x)->pb_flags & XFS_B_STALE;\
-                                 (x)->pb_flags &= ~(PBF_DELWRI|PBF_PARTIAL|PBF_NONE)
+#define XFS_BUF_SUPER_STALE(x)   (x)->pb_flags |= XFS_B_STALE;\
+				 xfs_buf_undelay(x);\
+                                 (x)->pb_flags &= ~(PBF_PARTIAL|PBF_NONE)
 
 static inline void xfs_buf_undelay(page_buf_t *pb)
 {
