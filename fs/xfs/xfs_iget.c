@@ -489,6 +489,7 @@ xfs_iget(
 	vnode_t		*vp = NULL;
 	int		error;
 
+retry:
 	XFS_STATS_INC(xfsstats.xs_ig_attempts);
 
 	if ((inode = icreate(XFS_MTOVFS(mp)->vfs_super, ino))) {
@@ -509,6 +510,12 @@ xfs_iget(
 			if (error)
 				iput(inode);
 		} else {
+			if (vp->v_flag & (VINACT | VRECLM)) {
+				vn_wait(vp);
+				iput(inode);
+				goto retry;
+			}
+
 			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
 			ip = XFS_BHVTOI(bdp);
 			if (lock_flags != 0) {

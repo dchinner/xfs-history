@@ -129,6 +129,19 @@ vn_wakeup(struct vnode *vp)
 	VN_UNLOCK(vp, s);
 }
 
+int 
+vn_wait(struct vnode *vp)
+{
+	NESTED_VN_LOCK(vp);
+
+	if (vp->v_flag & (VINACT | VRECLM)) {
+		vp->v_flag |= VWAIT;
+		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
+		return 1;
+	}
+	NESTED_VN_UNLOCK(vp);
+	return 0;
+}
 
 struct vnode *
 vn_address(struct inode *inode)
@@ -441,10 +454,10 @@ vn_put(struct vnode *vp)
 
 	XFS_STATS_INC(xfsstats.vn_rele);
 
-	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
 
 	s = VN_LOCK(vp);
 
+	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
 	vcnt = vn_count(vp);
 
 	ASSERT(vcnt > 0);
@@ -478,6 +491,11 @@ vn_put(struct vnode *vp)
 		}
 
 		s = VN_LOCK(vp);
+		if (vp->v_flag & VWAIT) {
+			if (vp->v_flag & VWAIT) {
+				sv_broadcast(vptosync(vp));
+			}
+		}
 
 		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE|VMODIFIED);
 
