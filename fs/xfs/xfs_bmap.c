@@ -1330,7 +1330,7 @@ xfs_bmap_btree_to_extents(
 	ASSERT(rblock->bb_numrecs == 1);
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
-	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, sbp->sb_inodesize);
+	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, ip->i_broot_bytes);
 	xfs_btree_check_lptr(cur, *pp, 1);
 	cbno = *pp;
 #ifdef XFSDEBUG
@@ -2180,8 +2180,8 @@ xfs_bmap_read_extents(
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
 	if (level = block->bb_level) {
-		pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, sbp->sb_inodesize);
-		ASSERT(*pp != NULLFSBLOCK &&
+		pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ip->i_broot_bytes);
+		ASSERT(*pp != NULLDFSBNO &&
 		       xfs_fsb_to_agno(mp, *pp) < mp->m_sb.sb_agcount &&
 		       xfs_fsb_to_agbno(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
@@ -2197,7 +2197,7 @@ xfs_bmap_read_extents(
 		if (level == 0)
 			break;
 		pp = XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
-		ASSERT(*pp != NULLFSBLOCK &&
+		ASSERT(*pp != NULLDFSBNO &&
 		       xfs_fsb_to_agno(mp, *pp) < mp->m_sb.sb_agcount &&
 		       xfs_fsb_to_agbno(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
