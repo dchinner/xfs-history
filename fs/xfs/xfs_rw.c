@@ -1990,7 +1990,8 @@ xfs_write_file(
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			(void) xfs_qm_dqattach(ip, 0);
+			if (error = xfs_qm_dqattach(ip, 0))
+				return (error);
 		}
 	}
 
@@ -2563,18 +2564,17 @@ xfs_bmap(
 		 * the ilock across a disk read.
 		 */
 		if (XFS_IS_QUOTA_ON(ip->i_mount)) {
-			/*
-			 * We don't really care if an error happens here.
-			 * Quotas would have gotten disabled, and life will
-			 * go on as usual, minus disk quotas.
-			 */
-			(void) xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED);
+			if (XFS_NOT_DQATTACHED(ip->i_mount, ip)) {
+				if (error = xfs_qm_dqattach(ip,
+							    XFS_QMOPT_ILOCKED))
+					goto error0;
+			}
 		}
 
 		error = xfs_iomap_write(ip, offset, count, bmapp,
 					nbmaps, 0, NULL);
 	}
-
+ error0:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	return error;
@@ -3772,12 +3772,11 @@ xfs_strat_write(
 
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			/*
-			 * We don't really care if an error happens here.
-			 * Quotas would have gotten disabled, and life will
-			 * go on as usual, minus disk quotas.
-			 */
-			(void) xfs_qm_dqattach(ip, 0);
+			if (error = xfs_qm_dqattach(ip, 0)) {
+				bp->b_flags |= B_ERROR;
+				bp->b_error = error;
+				goto error0;
+			}
 		}
 	}
 
@@ -4414,7 +4413,7 @@ xfs_diostrat(
 		if (XFS_IS_QUOTA_ON(mp)) {
 			if (XFS_NOT_DQATTACHED(mp, ip)) {
 				if (error = xfs_qm_dqattach(ip, 0)) 
-					goto quota_error;
+					goto error0;
 			}
 		}
 	}
@@ -4830,7 +4829,7 @@ retry:
 		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
- quota_error:
+ error0:
 	/*
 	 * Issue completion on the original buffer.
 	 */

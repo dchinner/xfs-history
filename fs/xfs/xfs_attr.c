@@ -408,7 +408,8 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 */
 	if (XFS_IS_QUOTA_ON(dp->i_mount)) {
 		if (XFS_NOT_DQATTACHED(dp->i_mount, dp)) {
-			(void) xfs_qm_dqattach(dp, 0);
+			if (error = xfs_qm_dqattach(dp, 0))
+				return (error);
 		}
 	}
 	/*
