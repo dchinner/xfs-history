@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.86 $"
+#ident  "$Revision: 1.88 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -1485,6 +1485,21 @@ xfs_sync(vfs_t		*vfsp,
 							 &dip);
 					brelse(bp);
 
+					/*
+					 * Since we dropped the inode lock,
+					 * the inode may have been reclaimed.
+					 * Therefore, we reacquire the mount
+					 * lock and start from the beginning
+					 * again if any inodes were
+					 * reclaimed.
+					 */
+					XFS_MOUNT_ILOCK(mp);
+					if (mp->m_ireclaims != ireclaims) {
+						restarts++;
+						XFS_MOUNT_IUNLOCK(mp);
+						goto loop;
+					}
+					mount_locked = B_TRUE;
 					if (xfs_ilock_nowait(ip,
 						    XFS_ILOCK_SHARED) == 0) {
 						/*
@@ -1495,7 +1510,8 @@ xfs_sync(vfs_t		*vfsp,
 						 * clear the ILOCK bit from
 						 * the lock_flags so that we
 						 * won't try to drop a lock
-						 * we don't hold below.
+						 * we don't hold below.  Drop
+						 * the mount lock so that we
 						 */
 						lock_flags &= ~XFS_ILOCK_SHARED;
 					} else if ((ip->i_pincount == 0) &&
@@ -1505,8 +1521,14 @@ xfs_sync(vfs_t		*vfsp,
 						 * calling we only flush the
 						 * inode out if we can lock
 						 * it without sleeping and
-						 * it is not pinned.
+						 * it is not pinned.  Drop
+						 * the mount lock here so
+						 * that we don't hold it for
+						 * too long.
 						 */
+						ireclaims = mp->m_ireclaims;
+						XFS_MOUNT_IUNLOCK(mp);
+						mount_locked = B_FALSE;
 						xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 					}
 				}
@@ -1554,7 +1576,17 @@ xfs_sync(vfs_t		*vfsp,
 			 * the inode to release the reference.  This is
 			 * because we can be already holding the inode
 			 * lock when VN_RELE() calls xfs_inactive().
+			 *
+			 * Make sure to drop the mount lock before calling
+			 * VN_RELE() so that we don't trip over ourselves if
+			 * we have to go for the mount lock again in the
+			 * inactive code.
 			 */
+			if (mount_locked) {
+				ireclaims = mp->m_ireclaims;
+				XFS_MOUNT_IUNLOCK(mp);
+				mount_locked = B_FALSE;
+			}
 			VN_RELE(vp);
 			vnode_refed = B_FALSE;
 		}
