@@ -27,8 +27,8 @@ typedef struct xfs_dinode_core
 	__uint16_t	di_uid;		/* owner's user id */
 	__uint16_t	di_gid;		/* owner's group id */
 	xfs_extnum_t	di_nextents;	/* number of extents in file */
-	__int64_t	di_size;	/* number of bytes in file */
 	uuid_t		di_uuid;	/* file unique id */
+	__int64_t	di_size;	/* number of bytes in file */
 	/*
 	 * While these fields hold 64 bit values, we will only
 	 * be using the upper 32 bits for now.  The t_nsec
@@ -42,6 +42,8 @@ typedef struct xfs_dinode_core
 	 * Should this be 64 bits? What does nfs3.0 want?
 	 */
 	__uint32_t	di_gen;		/* generation number */
+	xfs_extlen_t	di_extsize;	/* basic/minimum extent size for file */
+	__uint32_t	di_flags;	/* random flags, XFS_DIFLAG_... */
 	xfs_agino_t	di_nexti;	/* next allocated inode in ag */
 } xfs_dinode_core_t;
 
@@ -61,23 +63,25 @@ typedef struct xfs_dinode
 /*
  * Bit names for logging disk inodes only
  */
-#define	XFS_DI_MAGIC	0x0001
-#define	XFS_DI_MODE	0x0002
-#define	XFS_DI_VERSION	0x0004
-#define	XFS_DI_FORMAT	0x0008
-#define	XFS_DI_NLINK	0x0010
-#define	XFS_DI_UID	0x0020
-#define	XFS_DI_GID	0x0040
-#define	XFS_DI_NEXTENTS	0x0080
-#define	XFS_DI_SIZE	0x0100
-#define	XFS_DI_UUID	0x0200
-#define	XFS_DI_ATIME	0x0400
-#define	XFS_DI_MTIME	0x0800
-#define	XFS_DI_CTIME	0x1000
-#define	XFS_DI_GEN	0x2000
-#define	XFS_DI_NEXTI	0x4000
-#define	XFS_DI_U	0x8000
-#define	XFS_DI_NUM_BITS	16
+#define	XFS_DI_MAGIC	0x00001
+#define	XFS_DI_MODE	0x00002
+#define	XFS_DI_VERSION	0x00004
+#define	XFS_DI_FORMAT	0x00008
+#define	XFS_DI_NLINK	0x00010
+#define	XFS_DI_UID	0x00020
+#define	XFS_DI_GID	0x00040
+#define	XFS_DI_NEXTENTS	0x00080
+#define	XFS_DI_UUID	0x00100
+#define	XFS_DI_SIZE	0x00200
+#define	XFS_DI_ATIME	0x00400
+#define	XFS_DI_MTIME	0x00800
+#define	XFS_DI_CTIME	0x01000
+#define	XFS_DI_GEN	0x02000
+#define	XFS_DI_EXTSIZE	0x04000
+#define	XFS_DI_FLAGS	0x08000
+#define	XFS_DI_NEXTI	0x10000
+#define	XFS_DI_U	0x20000
+#define	XFS_DI_NUM_BITS	18
 #define	XFS_DI_ALL_BITS	((1 << XFS_DI_NUM_BITS) - 1)
 
 /*
@@ -92,6 +96,14 @@ typedef enum xfs_dinode_fmt
 	XFS_DINODE_FMT_BTREE,		/* DIR, REG, LNK: di_bmbt */
 	XFS_DINODE_FMT_UUID 		/* MNT: di_uuid */
 } xfs_dinode_fmt_t;
+
+/*
+ * Inode minimum and maximum sizes.
+ */
+#define	XFS_DINODE_MIN_LOG	8
+#define	XFS_DINODE_MAX_LOG	11
+#define	XFS_DINODE_MIN_SIZE	(1 << XFS_DINODE_MIN_LOG)
+#define	XFS_DINODE_MAX_SIZE	(1 << XFS_DINODE_MAX_LOG)
 
 /*
  * File types (mode field)
@@ -115,6 +127,11 @@ typedef enum xfs_dinode_fmt
 #define	IREAD		0400		/* read, write, execute permissions */
 #define	IWRITE		0200
 #define	IEXEC		0100
+
+/*
+ * Values for di_flags
+ */
+#define	XFS_DIFLAG_REALTIME	0x1	/* file's blocks come from rt area */
 
 #define	xfs_buf_to_dinode(buf)	((xfs_dinode_t *)(buf->b_un.b_addr))
 
