@@ -139,7 +139,7 @@
 	(1 << DM_EVENT_ATTRIBUTE)	| \
 	(1 << DM_EVENT_DESTROY)		)
 
-
+#ifdef CONFIG_XFS_DMAPI
 extern int
 xfs_dm_mount(
 	vfs_t		*vfsp,
@@ -168,10 +168,44 @@ xfs_dm_send_create_event(
 	int		*good_event_sent);
 
 extern int
-xfs_dmapi_mmap_event(
+xfs_dm_send_mmap_event(
 	struct vm_area_struct *vma,
 	unsigned int	wantflag);
+#else
 
+/*
+ *	XFS DMAPI utilitie routine stubs.
+ */
+static __inline int
+xfs_dm_send_create_event(
+	bhv_desc_t	*dir_bdp,
+	char		*name,
+	mode_t		new_mode,
+	int		*good_event_sent)
+{
+	return 0;
+}
+
+static __inline int
+xfs_dm_send_data_event(
+	dm_eventtype_t	event,
+	bhv_desc_t	*bdp,
+	xfs_off_t	offset,
+	size_t		length,
+	int		flags,
+	vrwlock_t	*locktype)
+{
+	return nopkg();
+}
+
+static __inline int
+xfs_dm_send_mmap_event(
+	struct vm_area_struct *vma,
+	unsigned int	wantflag)
+{
+	return 0;
+}
+
+#endif	/* CONFIG_XFS_DMAPI */
 #endif	/* __KERNEL__ */
-
 #endif	/* __XFS_DMAPI_H__ */

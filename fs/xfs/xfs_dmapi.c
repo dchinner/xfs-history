@@ -2754,7 +2754,7 @@ xfs_dm_mapevent(
 
 
 int
-xfs_dmapi_mmap_event(
+xfs_dm_send_mmap_event(
 	struct vm_area_struct *vma,
 	unsigned int	wantflag)
 {

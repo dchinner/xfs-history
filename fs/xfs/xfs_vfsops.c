@@ -1712,6 +1712,8 @@ vfsops_t xfs_vfsops = {
 	.vfs_statvfs		= xfs_statvfs,
 	.vfs_sync		= xfs_sync,
 	.vfs_vget		= xfs_vget,
+#ifdef CONFIG_XFS_DMAPI
 	.vfs_dmapi_mount	= xfs_dm_mount,
 	.vfs_dmapi_fsys_vector	= xfs_dm_get_fsys_vector,
+#endif
 };
