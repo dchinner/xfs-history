@@ -81,11 +81,11 @@ xfs_ialloc_log_di(xfs_trans_t *tp, buf_t *buf, int off, int fields)
 		offsetof(xfs_dinode_t, di_core) +
 			offsetof(xfs_dinode_core_t, di_gid),
 		offsetof(xfs_dinode_t, di_core) +
+			offsetof(xfs_dinode_core_t, di_nextents),
+		offsetof(xfs_dinode_t, di_core) +
 			offsetof(xfs_dinode_core_t, di_size),
 		offsetof(xfs_dinode_t, di_core) +
 			offsetof(xfs_dinode_core_t, di_uuid),
-		offsetof(xfs_dinode_t, di_core) +
-			offsetof(xfs_dinode_core_t, di_nextents),
 		offsetof(xfs_dinode_t, di_core) +
 			offsetof(xfs_dinode_core_t, di_atime),
 		offsetof(xfs_dinode_t, di_core) +

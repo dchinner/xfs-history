@@ -4,7 +4,7 @@
 #ident "$Revision: 1.8 $"
 
 #define	XFS_DINODE_VERSION	1
-#define	XFS_DINODE_MAGIC	0x494e4f44	/* 'INOD' */
+#define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
 
 /*
  * Disk inode structure.
@@ -19,16 +19,16 @@ typedef struct xfs_timestamp {
 
 typedef struct xfs_dinode_core
 {
-	__uint32_t	di_magic;	/* inode magic # = XFS_DINODE_MAGIC */
+	__uint16_t	di_magic;	/* inode magic # = XFS_DINODE_MAGIC */
 	__uint16_t	di_mode;	/* mode and type of file */
 	__int8_t	di_version;	/* inode version */
 	__int8_t	di_format;	/* format of di_c data */
 	__int16_t	di_nlink;	/* number of links to file */
 	__uint16_t	di_uid;		/* owner's user id */
 	__uint16_t	di_gid;		/* owner's group id */
+	xfs_extnum_t	di_nextents;	/* number of extents in file */
 	__int64_t	di_size;	/* number of bytes in file */
 	uuid_t		di_uuid;	/* file unique id */
-	xfs_extnum_t	di_nextents;	/* number of extents in file */
 	/*
 	 * While these fields hold 64 bit values, we will only
 	 * be using the upper 32 bits for now.  The t_nsec
@@ -68,9 +68,9 @@ typedef struct xfs_dinode
 #define	XFS_DI_NLINK	0x0010
 #define	XFS_DI_UID	0x0020
 #define	XFS_DI_GID	0x0040
-#define	XFS_DI_SIZE	0x0080
-#define	XFS_DI_UUID	0x0100
-#define	XFS_DI_NEXTENTS	0x0200
+#define	XFS_DI_NEXTENTS	0x0080
+#define	XFS_DI_SIZE	0x0100
+#define	XFS_DI_UUID	0x0200
 #define	XFS_DI_ATIME	0x0400
 #define	XFS_DI_MTIME	0x0800
 #define	XFS_DI_CTIME	0x1000
