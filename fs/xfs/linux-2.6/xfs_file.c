@@ -36,49 +36,6 @@
 #include <linux/slab.h>
 
 
-STATIC long long linvfs_file_lseek(
-	struct file *file,
-	loff_t offset,
-	int origin)
-{
-	struct inode *inode = file->f_dentry->d_inode;
-	vnode_t *vp;
-	struct vattr vattr;
-	loff_t old_off = offset;
-	int error;
-
-	vp = LINVFS_GET_VP(inode);
-
-	ASSERT(vp);
-
-	switch (origin) {
-		case 2:
-			vattr.va_mask = AT_SIZE;
-			VOP_GETATTR(vp, &vattr, 0, get_current_cred(), error);
-			if (error)
-				return -error;
-
-			offset += vattr.va_size;
-			break;
-		case 1:
-			offset += file->f_pos;
-	}
-
-	/* All for the sake of seeing if we are too big */
-	VOP_SEEK(vp, old_off, &offset, error);
-
-	if (error)
-		return -error;
-
-	if (offset != file->f_pos) {
-		file->f_pos = offset;
-		file->f_version = ++event;
-		file->f_reada = 0;
-	}
-
-	return offset;
-}
-
 STATIC ssize_t linvfs_read(
 	struct file *filp,
 	char *buf,
@@ -126,56 +83,118 @@ STATIC ssize_t linvfs_read(
 
 
 STATIC ssize_t linvfs_write(
-	struct file *filp,
+	struct file *file,
 	const char *buf,
-	size_t size,
-	loff_t *offset)
+	size_t count,
+	loff_t *ppos)
 {
 	struct inode *inode;
+	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	loff_t	pos;
 	vnode_t *vp;
 	int	err;
-	int	pb_flags = 0; /* Flags to pass bmap calls */
-
-        uio_t uio;
+        uio_t	uio;
         iovec_t iov;
 	
-	if (!filp || !filp->f_dentry ||
-			!(inode = filp->f_dentry->d_inode)) {
+	if (!file || !file->f_dentry ||
+			!(inode = file->f_dentry->d_inode)) {
 		printk("EXIT linvfs_write -EBADF\n");
 		return -EBADF;
 	}
 
-	inode = filp->f_dentry->d_inode;
+	inode = file->f_dentry->d_inode;
 
 	down(&inode->i_sem);
 
+	pos = *ppos;
 	err = -EINVAL;
-
-	pos = *offset;
 	if (pos < 0)
 		goto out;
 
-	err = filp->f_error;
+	err = file->f_error;
 	if (err) {
-		filp->f_error = 0;
+		file->f_error = 0;
 		goto out;
 	}
 
-	if (filp->f_flags & O_APPEND)
+	if (file->f_flags & O_APPEND)
 		pos = inode->i_size;
 
 	/*
-	 * Handle O_SYNC writes
-	 * The real work gets done in xfs_write()
+	 * Check whether we've reached the file size limit.
 	 */
-	 
-	if (filp->f_flags & O_SYNC) {
-		pb_flags |= PBF_SYNC;
+	err = -EFBIG;
+	
+	if (limit != RLIM_INFINITY) {
+		if (pos >= limit) {
+			send_sig(SIGXFSZ, current, 0);
+			goto out;
+		}
+		if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
+			/* send_sig(SIGXFSZ, current, 0); */
+			count = limit - (u32)pos;
+		}
 	}
 
+	/*
+	 *	LFS rule 
+	 */
+	if ( pos + count > MAX_NON_LFS && !(file->f_flags&O_LARGEFILE)) {
+		if (pos >= MAX_NON_LFS) {
+			send_sig(SIGXFSZ, current, 0);
+			goto out;
+		}
+		if (count > MAX_NON_LFS - (u32)pos) {
+			/* send_sig(SIGXFSZ, current, 0); */
+			count = MAX_NON_LFS - (u32)pos;
+		}
+	}
+
+	/*
+	 *	Are we about to exceed the fs block limit ?
+	 *
+	 *	If we have written data it becomes a short write
+	 *	If we have exceeded without writing data we send
+	 *	a signal and give them an EFBIG.
+	 *
+	 *	Linus frestrict idea will clean these up nicely..
+	 */
+	 
+	if (!S_ISBLK(inode->i_mode)) {
+		if (pos >= inode->i_sb->s_maxbytes)
+		{
+			if (count || pos > inode->i_sb->s_maxbytes) {
+				send_sig(SIGXFSZ, current, 0);
+				err = -EFBIG;
+				goto out;
+			}
+			/* zero-length writes at ->s_maxbytes are OK */
+		}
+
+		if (pos + count > inode->i_sb->s_maxbytes)
+			count = inode->i_sb->s_maxbytes - pos;
+	} else {
+		if (is_read_only(inode->i_rdev)) {
+			err = -EPERM;
+			goto out;
+		}
+		if (pos >= inode->i_size) {
+			if (count || pos > inode->i_size) {
+				err = -ENOSPC;
+				goto out;
+			}
+		}
+
+		if (pos + count > inode->i_size)
+			count = inode->i_size - pos;
+	}
+
+	err = 0;
+	if (count == 0)
+		goto out;
+
 	XFS_STATS_INC(xfsstats.xs_write_calls);
-	XFS_STATS_ADD(xfsstats.xs_write_bytes, size);
+	XFS_STATS_ADD(xfsstats.xs_write_bytes, count);
 
 	vp = LINVFS_GET_VP(inode);
 
@@ -183,14 +202,14 @@ STATIC ssize_t linvfs_write(
         
         uio.uio_iov = &iov;
         uio.uio_offset = pos;
-        uio.uio_fp = filp;
+        uio.uio_fp = file;
         uio.uio_iovcnt = 1;
         uio.uio_iov->iov_base = (void *)buf;
-        uio.uio_iov->iov_len = uio.uio_resid = size;
+        uio.uio_iov->iov_len = uio.uio_resid = count;
         
-	VOP_WRITE(vp, &uio, pb_flags, NULL, NULL, err);
-        *offset = pos = uio.uio_offset;
-        
+	VOP_WRITE(vp, &uio, file->f_flags, NULL, NULL, err);
+        *ppos = pos = uio.uio_offset;
+        count -= uio.uio_resid;
 out:
 	up(&inode->i_sem);
 
@@ -200,7 +219,7 @@ out:
 	 * Otherwise, return bytes actually written
 	 */
 
-	return(err ? -err : size-uio.uio_resid);
+	return(err ? -err : count);
 }
 
 
@@ -392,7 +411,6 @@ STATIC int linvfs_ioctl(
 
 struct file_operations linvfs_file_operations =
 {
-	llseek:		linvfs_file_lseek,
 	read:		linvfs_read,  
 	write:		linvfs_write,
 	ioctl:		linvfs_ioctl,

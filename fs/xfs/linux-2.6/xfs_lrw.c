@@ -578,7 +578,7 @@ ssize_t				/* error (positive) */
 xfs_write(
         bhv_desc_t      *bdp,
         uio_t           *uiop,
-        int             ioflag,
+        int             ioflags,
         cred_t          *credp,
         flid_t          *fl)
 {
@@ -595,7 +595,7 @@ xfs_write(
 	xfs_iocore_t    *io;
 	vnode_t		*vp;
 	int		iolock;
-	int		direct = filp->f_flags & O_DIRECT;
+	int		direct = ioflags & O_DIRECT;
 #ifdef CONFIG_XFS_DMAPI
 	int		eventsent = 0;
 	loff_t		savedsize = *offsetp;
@@ -622,7 +622,7 @@ xfs_write(
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 
-	xfs_check_frozen(mp, bdp, ioflag, XFS_FREEZE_WRITE);
+	xfs_check_frozen(mp, bdp, ioflags, XFS_FREEZE_WRITE);
 
 	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
 		return EIO;
@@ -657,7 +657,7 @@ start:
 
 #ifdef CONFIG_XFS_DMAPI
 	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
-	    !(filp->f_flags & O_INVISIBLE) && !eventsent)) {
+	    !(ioflags & O_INVISIBLE) && !eventsent)) {
 
 		error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 				*offsetp, size,
@@ -676,7 +676,7 @@ start:
 	 *  to xfs_dm_send_data_event, which is what
 	 *  allows the size to change in the first place.
 	 */
-	if ((filp->f_flags & O_APPEND) && savedsize != xip->i_d.di_size) {
+	if ((ioflags & O_APPEND) && savedsize != xip->i_d.di_size) {
 		*offsetp = isize = xip->i_d.di_size;
 		goto start;
 	}
@@ -689,7 +689,7 @@ start:
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
 	if (size) {
-		if (!(filp->f_flags & O_INVISIBLE))
+		if (!(ioflags & O_INVISIBLE))
 			xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	}
 
@@ -733,7 +733,7 @@ retry:
 #ifdef CONFIG_XFS_DMAPI
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
-	    !(filp->f_flags & O_INVISIBLE)) {
+	    !(ioflags & O_INVISIBLE)) {
 
 		xfs_rwunlock(bdp, locktype);
 		error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
@@ -781,7 +781,7 @@ retry:
 	}
 	
 	/* Handle various SYNC-type writes */
-	if (ioflag & PBF_SYNC) {
+	if (ioflags & O_SYNC) {
 
 		/* Flush all inode data buffers */
 
@@ -863,7 +863,7 @@ retry:
 				xfs_iunlock(xip, XFS_ILOCK_EXCL);
 			}
 		}
-	} /* (ioflag & PBF_SYNC) */
+	} /* (ioflags & O_SYNC) */
 
 out:
 
