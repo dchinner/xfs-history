@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -116,6 +116,24 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 	mp->m_sb = *sbp;
 	mp->m_bsize = xfs_btod(sbp, 1);
 	mp->m_agrotor = 0;
+
+	/*
+	 * Set the default minimum read and write sizes.
+	 */
+	if (sbp->sb_blocklog > XFS_READIO_LOG) {
+		mp->m_readio_log = sbp->sb_blocklog;
+	} else {
+		mp->m_readio_log = XFS_READIO_LOG;
+
+	}
+	mp->m_readio_blocks = 1 << (mp->m_readio_log - sbp->sb_blocklog);
+	if (sbp->sb_blocklog > XFS_WRITEIO_LOG) {
+		mp->m_writeio_log = sbp->sb_blocklog;
+	} else {
+		mp->m_writeio_log = XFS_WRITEIO_LOG;
+	}
+	mp->m_writeio_blocks = 1 << (mp->m_writeio_log - sbp->sb_blocklog);
+
 
 	/*
 	 * Initialize realtime fields in the mount structure
