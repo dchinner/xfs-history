@@ -2286,10 +2286,19 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 		ASSERT ((target_ip->i_d.di_mode & IFMT) == IFDIR);
 
 	/*
+	 * Assert that all the relationships that were checked by our
+	 * caller are true!
+	 */
+	ASSERT(src_ip != src_dp);
+	ASSERT(target_ip != target_dp);
+	ASSERT(src_ip != target_ip);
+	ASSERT(src_dp != target_dp);
+
+	/*
 	 * Record all the inodes and their current generations.
 	 *
 	 * There are at least 2 entries in table.  May have duplicate 
-	 * entries if src_ip == src_dp, for example.
+	 * entries if src_ip == target_dp, for example.
 	 */
 	i_tab[0].ip = src_dp;
 	i_tab[0].gen = src_dp->i_gen;
@@ -2325,11 +2334,19 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
          * our directories via "..". 
          */
 	xfs_iunlock (src_dp, XFS_ILOCK_EXCL);
-	if (src_dp != src_ip)
-		xfs_iunlock (src_ip, XFS_ILOCK_EXCL);
-	if (src_dp != target_dp)
+	/*
+	 * src_ip can't be same as src_dp
+	 */
+	xfs_iunlock (src_ip, XFS_ILOCK_EXCL);
+	/*
+	 * target_dp can't be same as src_dp
+	 */
+	if (target_dp != src_ip)
 		xfs_iunlock (target_dp, XFS_ILOCK_EXCL);
-	if (target_ip)
+	/*
+	 * target_ip can't be same as src_ip or target_dp
+	 */
+	if (target_ip && target_ip != src_dp)
 		xfs_iunlock (target_ip, XFS_ILOCK_EXCL);
 
 	psema (&xfs_ancestormon, PINOD);
