@@ -655,7 +655,8 @@ xfs_ifree(xfs_trans_t	*tp,
 	ASSERT(ip->i_transp == tp);
 	ASSERT(ip->i_d.di_nlink == 0);
 	ASSERT(ip->i_d.di_nextents == 0);
-	ASSERT(ip->i_d.di_size == 0);
+	ASSERT((ip->i_d.di_size == 0) ||
+	       ((ip->i_d.di_mode & IFMT) != IFREG));
 
 	xfs_difree(tp, ip->i_ino);
 	ip->i_d.di_format = XFS_DINODE_FMT_AGINO;
