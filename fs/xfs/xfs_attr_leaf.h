@@ -270,4 +270,4 @@ int	xfs_attr_put_listent(struct xfs_attr_list_context *context,
 				    char *name, int namelen, int valuelen);
 void	xfs_attr_rolltrans(struct xfs_trans **transp, struct xfs_inode *dp);
 
-#endif	/* !FS_XFS_ATTR_LEAE_H */
+#endif	/* !FS_XFS_ATTR_LEAF_H */
