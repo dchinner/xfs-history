@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.73 $"
+#ident	"$Revision: 1.74 $"
 
 struct buf;
 struct cred;
@@ -13,7 +13,7 @@ struct xfs_perag;
 struct xfs_qm;
 struct xfs_quotainfo;
 
-#ifdef INTR_KTHREADS
+#if defined(INTR_KTHREADS) && defined(INTERRUPT_LATENCY_TESTING)
 #define	SPLDECL(s)	       
 #define	AIL_LOCK_T		mutex_t
 #define	AIL_LOCKINIT(x,y)	mutex_init(x,MUTEX_DEFAULT, y)

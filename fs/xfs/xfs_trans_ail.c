@@ -1,4 +1,4 @@
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.31 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -250,7 +250,7 @@ _xfs_trans_update_ail(
 	xfs_mount_t	*mp,
 	xfs_log_item_t	*lip,
 	xfs_lsn_t	lsn
-#ifndef INTR_KTHREADS
+#if !defined(INTR_KTHREADS) || !defined(INTERRUPT_LATENCY_TESTING)
 	,	int	s
 #endif
 	)
@@ -305,7 +305,7 @@ void
 _xfs_trans_delete_ail(
 	xfs_mount_t	*mp,
 	xfs_log_item_t	*lip
-#ifndef INTR_KTHREADS
+#if !defined(INTR_KTHREADS) || !defined(INTERRUPT_LATENCY_TESTING)
 	, int		s
 #endif
 	)
