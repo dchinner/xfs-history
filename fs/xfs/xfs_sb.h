@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * Super block
@@ -14,16 +14,12 @@
 
 typedef struct xfs_sb
 {
-	uuid_t		sb_uuid;	/* file system unique id */
-	xfs_drfsbno_t	sb_dblocks;	/* number of data blocks */
-	__uint32_t	sb_blocksize;	/* logical block size, bytes */
-	/*
-	 * sb_magicnum is at offset 28 to be at the same location as fs_magic
-	 * in an EFS filesystem, thus ensuring there is no confusion.
-	 */
 	__uint32_t	sb_magicnum;	/* magic number == XFS_SB_MAGIC */
+	__uint32_t	sb_blocksize;	/* logical block size, bytes */
+	xfs_drfsbno_t	sb_dblocks;	/* number of data blocks */
 	xfs_drfsbno_t	sb_rblocks;	/* number of realtime blocks */
 	xfs_drtbno_t	sb_rextents;	/* number of realtime extents */
+	uuid_t		sb_uuid;	/* file system unique id */
 	xfs_dfsbno_t	sb_logstart;	/* starting block of log if internal */
 	xfs_ino_t	sb_rootino;	/* root inode number */
 	xfs_ino_t	sb_rbmino;	/* bitmap inode for realtime extents */
@@ -59,12 +55,12 @@ typedef struct xfs_sb
 } xfs_sb_t;
 
 
-#define	XFS_SB_UUID		0x00000001
-#define	XFS_SB_DBLOCKS		0x00000002
-#define	XFS_SB_BLOCKSIZE	0x00000004
-#define	XFS_SB_MAGICNUM		0x00000008
-#define	XFS_SB_RBLOCKS		0x00000010
-#define	XFS_SB_REXTENTS		0x00000020
+#define	XFS_SB_MAGICNUM		0x00000001
+#define	XFS_SB_BLOCKSIZE	0x00000002
+#define	XFS_SB_DBLOCKS		0x00000004
+#define	XFS_SB_RBLOCKS		0x00000008
+#define	XFS_SB_REXTENTS		0x00000010
+#define	XFS_SB_UUID		0x00000020
 #define	XFS_SB_LOGSTART		0x00000040
 #define	XFS_SB_ROOTINO		0x00000080
 #define	XFS_SB_RBMINO		0x00000100

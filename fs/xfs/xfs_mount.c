@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.66 $"
+#ident	"$Revision: 1.67 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -136,7 +136,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	sbp = XFS_BUF_TO_SBP(bp);
 	if ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
 	    (sbp->sb_versionnum != XFS_SB_VERSION)) {
-		error = XFS_ERROR(EINVAL);		/* or EIO ? */
+		error = XFS_ERROR(EINVAL);
 		goto bad;
 	}
 	mp->m_sb_bp = bp;
@@ -241,10 +241,9 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		}
 	} else {
 		/*
-		 * No log has be defined.
+		 * No log has been defined.
 		 */
-		error = XFS_ERROR(EIO);
-
+		error = XFS_ERROR(EINVAL);
 	}
 
 	if (error)  {
@@ -268,7 +267,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		 */
 		rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
 		rvp = XFS_ITOV(rip);
-		ASSERT(IFDIR == (rip->i_d.di_mode & IFMT));
 		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
 			vmap_t vmap;
 
@@ -438,12 +436,12 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	static const int offsets[] = {
-		offsetof(xfs_sb_t, sb_uuid),
-		offsetof(xfs_sb_t, sb_dblocks),
-		offsetof(xfs_sb_t, sb_blocksize),
 		offsetof(xfs_sb_t, sb_magicnum),
+		offsetof(xfs_sb_t, sb_blocksize),
+		offsetof(xfs_sb_t, sb_dblocks),
 		offsetof(xfs_sb_t, sb_rblocks),
 		offsetof(xfs_sb_t, sb_rextents),
+		offsetof(xfs_sb_t, sb_uuid),
 		offsetof(xfs_sb_t, sb_logstart),
 		offsetof(xfs_sb_t, sb_rootino),
 		offsetof(xfs_sb_t, sb_rbmino),
