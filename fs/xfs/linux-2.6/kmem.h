@@ -41,6 +41,13 @@
 #define KM_SLEEP        0x0001
 #define KM_NOSLEEP      0x0002	/* must match VM_NOSLEEP */
 #define KM_CACHEALIGN	0x0004	/* guarantee that memory is cache aligned */
+#define KM_PHYSCONTIG	0x0008
+
+#define VM_NOSLEEP	0x0002
+#define VM_PHYSCONTIG	0x0004
+#define VM_CACHEALIGN	0x0008
+#define VM_DIRECT	0x0000
+#define VM_UNCACHED	0x0000
 
 typedef struct kmem_cache_s kmem_zone_t;
 

@@ -87,7 +87,15 @@ cmn_err(register int level, char *fmt, ...)
 	va_start(ap, fmt);
 	if (*fmt == '!') fp++;
 	vsprintf(message, fp, ap);
-	printk("%s\n", message);
+	switch (level) {
+	case CE_CONT:
+	case CE_DEBUG:
+		printk("%s", message);
+		break;
+	default:
+		printk("%s\n", message);
+		break;
+	}
 	va_end(ap);
 }
 
@@ -97,9 +105,17 @@ icmn_err(register int level, char *fmt, va_list ap)
 { 
 	char	message[256];
 
-	printk("cmn_err level %d ",level);
 	vsprintf(message, fmt, ap);
-	printk("%s\n", message);
+	switch (level) {
+	case CE_CONT:
+	case CE_DEBUG:
+		printk("%s", message);
+		break;
+	default:
+		printk("cmn_err level %d ", level);
+		printk("%s\n", message);
+		break;
+	}
 }
 
 EXPORT_SYMBOL(icmn_err);
