@@ -8,7 +8,7 @@ struct xfs_dquotblk;
  * Number of bmaps that we ask from bmapi when doing a quotacheck.
  * We make this restriction to keep the memory usage to a minimum.
  */
-#define XFS_DQITER_MAP_SIZE	3
+#define XFS_DQITER_MAP_SIZE	10
 	
 /* Number of dquots that fit in to a dquot block */
 #define XFS_QM_DQPERBLK(mp)	((mp)->m_quotainfo->qi_dqperchunk)
