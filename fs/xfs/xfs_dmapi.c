@@ -516,7 +516,7 @@ xfs_dm_bulkstat_one(
 		goto out_free_buffer;
 	}
 
-	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &xip, bno);
+	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &xip, bno);
 	if (error)
 		goto out_free_buffer;
 	if (xip->i_d.di_mode == 0) {
