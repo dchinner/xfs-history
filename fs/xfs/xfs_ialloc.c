@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.109 $"
+#ident	"$Revision: 1.110 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -534,6 +534,7 @@ xfs_dialloc(
 	int		error;		/* error return value */
 	int		i;		/* result code */
 	int		ialloced;	/* inode allocation status */
+	int		noroom = 0;	/* no space for inode blk allocation */
 	xfs_ino_t	ino;		/* fs-relative inode to be returned */
 	/* REFERENCED */
 	int		j;		/* result code */
@@ -578,6 +579,19 @@ xfs_dialloc(
 	tagno = agno;
 	pagno = XFS_INO_TO_AGNO(mp, parent);
 	pagino = XFS_INO_TO_AGINO(mp, parent);
+
+	/*
+	 * If we have already hit the ceiling of inode blocks then clear
+	 * okalloc so we scan all available agi structures for a free
+	 * inode.
+	 */
+
+	if (mp->m_maxicount &&
+	    mp->m_sb.sb_icount + XFS_IALLOC_INODES(mp) > mp->m_maxicount) {
+		noroom = 1;
+		okalloc = 0;
+	}
+
 	/*
 	 * Loop until we find an allocation group that either has free inodes
 	 * or in which we can allocate some inodes.  Iterate through the
@@ -628,7 +642,7 @@ nextag:
 			tagno = 0;
 		if (tagno == agno) {
 			*inop = NULLFSINO;
-			return 0;
+			return noroom ? ENOSPC : 0;
 		}
 		mraccess(&mp->m_peraglock);
 		error = xfs_ialloc_read_agi(mp, tp, tagno, &agbp);

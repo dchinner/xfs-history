@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.166 $"
+#ident	"$Revision: 1.167 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -437,11 +437,15 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
 	mp->m_ialloc_inos = MAX(XFS_INODES_PER_CHUNK, sbp->sb_inopblock);
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
-	if (sbp->sb_imax_pct)
-		mp->m_maxicount =
-			((sbp->sb_dblocks * sbp->sb_imax_pct) / 100) <<
-			sbp->sb_inopblog;
-	else
+	if (sbp->sb_imax_pct) {
+		/* Make sure the maximum inode count is a multiple of the
+		 * units we allocate inodes in.
+		 */
+		mp->m_maxicount = (sbp->sb_dblocks * sbp->sb_imax_pct) / 100;
+		mp->m_maxicount = ((mp->m_maxicount / mp->m_ialloc_blks) *
+				   mp->m_ialloc_blks)  <<
+				   sbp->sb_inopblog;
+	} else
 		mp->m_maxicount = 0;
 
 	/*
