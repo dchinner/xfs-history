@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.3 1994/03/10 18:51:29 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.4 1994/03/16 16:17:42 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,7 +40,9 @@
 #ifdef SIM
 #include "sim.h"
 #include "stdio.h"
+extern xfs_mount_t *mountp;
 #endif
+
 
 /*
  * These routines determine if a griven file read or write request 
@@ -77,6 +79,7 @@ extern int xfs_read_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_write_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_diordwr(vnode_t *,uio_t *, int, cred_t *,int);
 extern struct vfs *vfs_devsearch( dev_t );
+extern int strncmp(char *, char *, int);
 
 
 /*
@@ -98,18 +101,31 @@ xfs_get_inode(  dev_t fs_dev, int ino)
         xfs_inode_t *ip = NULL ;
 	extern struct vfs *vfs_devsearch( dev_t );
 
+#ifndef SIM
         vfsp = vfs_devsearch( fs_dev );
         if (vfsp) {
-                ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, 0);
-#ifdef DEBUG
-		if (!ip) 
-			printf("xfs_get failed on %d \n",ino);
+		/*
+		 * Verify that this is an xfs file system.
+		 */
+		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) {
+                	ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, 0);
+#else
+                	ip = xfs_iget( mountp, NULL, ino, 0);
 #endif
+
+#ifdef DEBUG
+			if (!ip) 
+				printf("xfs_get failed on %d \n",ino);
+#endif
+
+#ifndef SIM
+		}
         } 
 #ifdef DEBUG
 	else {
 		printf("vfs_devsearch failed \n");
 	}
+#endif
 #endif
         return( ip );
 }
@@ -185,8 +201,8 @@ xfs_grio_add_ticket( int ino, dev_t fs_dev, int sz, char *idptr)
 		t1 = id.ino;
 		t2 = id.pid;
 
-        	sprintf(str,"grio add tkt: dev %x, ino %x, sz %x, id (%x,%x)\n",
-                     fs_dev, ino, sz, t1, t2);
+        	sprintf(str,"grio add tkt: dev %x, ino %x, sz %x, id (%llx,%x)\n",
+                     fs_dev, ino, sz, id.ino, id.pid);
         	GRIO_DBPRNT(0, str);
 	}
 #endif
@@ -277,8 +293,8 @@ xfs_grio_remove_ticket( int ino, dev_t fs_dev, char *idptr)
 		t1  = id.ino;
 		t2  = id.pid;
 
-       		sprintf(str,"grio rm tkt: dev %x, ino %x, id (%x,%x)\n",
-                        fs_dev, ino, t1, t2);
+       		sprintf(str,"grio rm tkt: dev %x, ino %x, id (%llx,%x)\n",
+                        fs_dev, ino, id.ino, id.pid);
         	GRIO_DBPRNT(0, str);
 	}
 #endif
@@ -316,7 +332,7 @@ xfs_io_is_guaranteed( xfs_inode_t *ip, struct reservation_id *id)
 
 	while (ticket && (!MATCH_ID((&(ticket->id)), id))) {
 		ticket = ticket->nextticket;
-	}
+	} 
 	return(ticket);
 }
 /*
@@ -460,6 +476,11 @@ xfs_grio_req( xfs_inode_t *ip,
          * Determine if this request has a guaranteed rate of I/O.
          */
         if (ticket = xfs_io_is_guaranteed( ip, id)) {
+		/*
+ 		 * Mark this request as being rate guaranteed. 
+		 */
+		ioflag |= IO_GRIO;
+
                 /*
                  * Determine if the size of the request is
                  * within the limits of the guaranteed rate.
@@ -516,10 +537,21 @@ xfs_grio_issue_io( vnode_t *vp,
 {
 	int ret;
 
+	/*
+  	 * Currently rate guaranteed I/O can only be issued IO_DIRECT.
+	 */
+	if ((ioflag & IO_GRIO) && (!(ioflag & IO_DIRECT))) {
+		ret = -1;
+#ifdef DEBUG
+		printf("file is rate guaranteed - cannot user buffer cache.\n");
+#endif
+		return( ret );
+	}
+
 	if (rw == UIO_READ) {
 		if (ioflag & IO_DIRECT)
 			ret = xfs_diordwr( vp, uiop, ioflag, credp, B_READ);
-		else
+		else 
 			ret = xfs_read_file(vp, uiop, ioflag, credp);
 	} else {
 		if (ioflag & IO_DIRECT)
