@@ -58,6 +58,11 @@
 #include <sys/pda.h>
 #include <sys/imon.h>
 #include <sys/cmn_err.h>
+
+#ifdef	CONFIG_XFS_VNODE_TRACING
+#include <sys/ktrace.h>
+#endif	/* CONFIG_XFS_VNODE_TRACING */
+
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -192,6 +197,9 @@ vn_cleanup(void)
 	while (vp != (struct vnode *)vlist) {
 		nvp = vp->v_next;
 		vn_unlink(vp);
+#ifdef	CONFIG_XFS_VNODE_TRACING
+		ktrace_free(vp->v_trace);
+#endif	/* CONFIG_XFS_VNODE_TRACING */
 		kmem_zone_free(vn_zone, vp);
 		vp = nvp;
 	}
@@ -529,8 +537,13 @@ alloc:
 	vp = kmem_zone_zalloc(vn_zone, KM_SLEEP);
 	alloced = 1;
 
+#ifdef	CONFIG_XFS_VNODE_TRACING
+	vp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, 0);
+#endif	/* CONFIG_XFS_VNODE_TRACING */
+
 	vp->v_flag = VSHARE;
 	(void) atomicAddLong((long *)&vn_vnumber, 1);
+
 
 	/* We never free the vnodes in the simulator, so these don't
 	   get destroyed either */
@@ -1010,3 +1023,52 @@ vn_relink(
 	vlist->vl_prev = prev;
 	prev->v_next = (struct vnode *)vlist;
 }
+
+
+#ifdef	CONFIG_XFS_VNODE_TRACING
+
+#define	cpuid smp_processor_id
+#define	current_pid() (current->pid)
+
+/*
+ * Vnode tracing code.
+ */
+void
+vn_trace_entry(vnode_t *vp, char *func, inst_t *ra)
+{
+	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_ENTRY,
+		(void *)func, 0, (void *)(__psint_t)vp->v_count, (void *)ra,
+		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
+		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+void
+vn_trace_hold(vnode_t *vp, char *file, int line, inst_t *ra)
+{
+	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_HOLD,
+		(void *)file, (void *)(__psint_t)line,
+		(void *)(__psint_t)vp->v_count, (void *)ra,
+		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
+		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+void
+vn_trace_ref(vnode_t *vp, char *file, int line, inst_t *ra)
+{
+	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_REF,
+		(void *)file, (void *)(__psint_t)line,
+		(void *)(__psint_t)vp->v_count, (void *)ra,
+		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
+		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+}
+
+void
+vn_trace_rele(vnode_t *vp, char *file, int line, inst_t *ra)
+{
+	ktrace_enter(vp->v_trace, (void *)(__psint_t)VNODE_KTRACE_RELE,
+		(void *)file, (void *)(__psint_t)line,
+		(void *)(__psint_t)vp->v_count, (void *)ra,
+		(void *)(__psunsigned_t)vp->v_flag, (void *)(__psint_t)cpuid(),
+		(void *)(__psint_t)current_pid(), 0, 0, 0, 0, 0, 0, 0, 0);
+}
+#endif	/* CONFIG_XFS_VNODE_TRACING */

@@ -48,6 +48,7 @@
 #include <sys/vnode.h>
 #include <sys/attributes.h>
 #include <sys/uuid.h>
+#include "sys/ktrace.h"
 #include "xfs_buf.h"
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -1286,9 +1287,74 @@ static int	kdbm_xfs_xtrans_res(
 	return 0;
 }
 
+/*
+ * Vnode descriptor dump.
+ * This table is a string version of all the flags defined in sys/vnode.h.
+ */
+char *tab_vflags[] = {
+	/* local only flags */
+	"INVALID0x01",		/*       0x01 */
+	"VINACT",		/*       0x02 */
+	"VRECLM",		/*       0x04 */
+	"INVALID0x08",		/*       0x08 */
+	"INVALID0x10",		/*       0x10 */
+	"VWAIT",		/*       0x20 */
+	"INVALID0x40",		/*       0x40 */
+	"VGONE",		/*       0x80 */
+	"VREMAPPING",		/*      0x100 */
+	"VMOUNTING",		/*      0x200 */
+	"VLOCKHOLD",		/*      0x400 */
+	"INVALID0x800",		/*      0x800 */
+	"INVALID0x1000",	/*     0x1000 */
+	"VINACTIVE_TEARDOWN",	/*     0x2000 */
+	"VSEMAPHORE",		/*     0x4000 */
+	"VUSYNC",		/*     0x8000 */
+	"INVALID0x10000",	/*    0x10000 */
+	"INVALID0x20000",	/*    0x20000 */
+	"INVALID0x40000",	/*    0x40000 */
+	"INVALID0x80000",	/*    0x80000 */
+	"VROOT",		/*   0x100000 */
+	"VNOSWAP", 		/*   0x200000 */
+	"VISSWAP", 		/*   0x400000 */
+	"VREPLICABLE",		/*   0x800000 */
+	"VNOTREPLICABLE",	/*  0x1000000 */
+	"VDOCMP",		/*  0x2000000 */
+	"VSHARE",		/*  0x4000000 */
+	"VFRLOCKS",		/*  0x8000000 */
+	"VENF_LOCKING",		/* 0x10000000 */
+	"VOPLOCK",		/* 0x20000000 */
+	"INVALID0x40000000",	/* 0x40000000 */
+	"INVALID0x80000000",	/* 0x80000000 */
+	0
+};
+
+
 static char *vnode_type[] = {
 	"VNON", "VREG", "VDIR", "VBLK", "VLNK", "VFIFO", "VBAD", "VSOCK"
 };
+
+void
+printflags(register uint64_t flags,
+        register char **strings,
+        register char *name)
+{
+        register uint64_t mask = 1;
+
+        if (name)
+                printk("%s 0x%Lx <", name, flags);
+        while (flags != 0 && *strings) {
+                if (mask & flags) {
+                        printk("%s ", *strings);
+                        flags &= ~mask;
+                }
+                mask <<= 1;
+                strings++;
+        }
+        if (name)
+                printk("> ");
+        return;
+}
+
 
 static int	kdbm_vnode(
 	int	argc,
@@ -1306,20 +1372,162 @@ static int	kdbm_vnode(
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
+
 	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+
 	if (diag)
 		return diag;
 
 	vp = (vnode_t *)addr;
+
 	printk("vnode: 0x%p v_count %d type %s\n", vp, vp->v_count,
-		vnode_type[vp->v_type]);
-	bh = vp->v_bh.bh_first;
-	symname = kdbnearsym((unsigned int)bh->bd_ops);
-	printk("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p ops %s\n",
-		vp->v_inode, bh, bh->bd_pdata, symname ? symname : "???");
+						   vnode_type[vp->v_type]);
+
+	if (bh = vp->v_bh.bh_first) {
+		symname = kdbnearsym((unsigned int)bh->bd_ops);
+
+		printk("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
+						vp->v_inode, bh, bh->bd_pdata);
+		printk("   ops %s\n", symname ? symname : "???");
+	} else {
+		printk("   v_inode 0x%p v_bh->bh_first = NULLBHV\n",
+						vp->v_inode);
+	}
+
+#ifdef	CONFIG_XFS_VNODE_TRACING
+	printk("   v_trace 0x%p\n", vp->v_trace);
+#endif	/* CONFIG_XFS_VNODE_TRACING */
+
 	return 0;
 }
 
+#ifdef	CONFIG_XFS_VNODE_TRACING
+/*
+ * Print a vnode trace entry.
+ */
+static int
+vn_trace_pr_entry(ktrace_entry_t *ktep)
+{
+	char		*symname;
+
+
+	if ((__psint_t)ktep->val[0] == 0)
+		return 0;
+
+	switch ((__psint_t)ktep->val[0]) {
+	case VNODE_KTRACE_ENTRY:
+		printk("entry to %s v_count = %d",
+				(char *)ktep->val[1], (__psint_t)ktep->val[3]);
+		break;
+
+	case VNODE_KTRACE_HOLD:
+		if ((__psint_t)ktep->val[3] != 1)
+			printk("hold @%s:%d v_count %d => %d",
+						(char *)ktep->val[1],
+						(__psint_t)ktep->val[2],
+						(__psint_t)ktep->val[3] - 1,
+						(__psint_t)ktep->val[3]);
+		else
+			printk("get @%s:%d",	(char *)ktep->val[1],
+						(__psint_t)ktep->val[2]);
+		break;
+
+	case VNODE_KTRACE_REF:
+		printk("ref @%s:%d v_count = %d",
+						(char *)ktep->val[1],
+						(__psint_t)ktep->val[2],
+						(__psint_t)ktep->val[3]);
+		break;
+
+	case VNODE_KTRACE_RELE:
+		if ((__psint_t)ktep->val[3] != 1)
+			printk("rele @%s:%d v_count %d => %d",
+						(char *)ktep->val[1],
+						(__psint_t)ktep->val[2],
+						(__psint_t)ktep->val[3],
+						(__psint_t)ktep->val[3] - 1);
+		else
+			printk("free @%s:%d",
+				(char *)ktep->val[1], (__psint_t)ktep->val[2]);
+		break;
+
+	default:
+		printk("unknown vntrace record\n");
+		return 1;
+	}
+
+	if (symname = kdbnearsym((unsigned int)ktep->val[4])) {
+		unsigned long val, offval;
+
+		val = kdbgetsymval(symname);
+
+		offval  = (unsigned int)ktep->val[4];
+		offval -= val;
+
+		if (offval)
+			printk("  ra = %s+0x%lx\n", symname, offval);
+		else
+			printk("  ra = %s\n", symname);
+	} else
+		printk("  ra = ?? 0x%p\n", (void *)ktep->val[4]);
+
+	printk("  cpu = %d pid = %d ",
+			(__psint_t)ktep->val[6], (pid_t)ktep->val[7]);
+
+	printflags((__psunsigned_t)ktep->val[5], tab_vflags, "flag =");
+
+	return 1;
+}
+
+
+/*
+ * Print out the trace buffer attached to the given vnode.
+ */
+static int	kdbm_vntrace(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	int		diag;
+	int		nextarg = 1;
+	long		offset = 0;
+	unsigned long	addr;
+	vnode_t		*vp;
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+
+	if (diag)
+		return diag;
+
+	vp = (vnode_t *)addr;
+
+	if (vp->v_trace == NULL) {
+		printk("The vnode trace buffer is not initialized\n");
+
+		return 0;
+	}
+
+	printk("vntrace vp 0x%p\n", vp);
+
+	ktep = ktrace_first(vp->v_trace, &kts);
+
+	while (ktep != NULL) {
+		if (vn_trace_pr_entry(ktep))
+			printk("\n");
+
+		ktep = ktrace_next(vp->v_trace, &kts);
+	}
+
+	return 0;
+}
+#endif	/* CONFIG_XFS_VNODE_TRACING */
 
 
 
@@ -1330,6 +1538,10 @@ static struct xif {
 	char	*args;
 	char	*help;
 } xfsidbg_funcs[] = {
+  {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
+#ifdef	CONFIG_XFS_VNODE_TRACING
+  {  "vntrace",	kdbm_vntrace,	"<vntrace>", "Dump vnode Trace"},
+#endif	/* CONFIG_XFS_VNODE_TRACING */
   {  "xagf",	kdbm_xfs_xagf,	"<agf>",
 				"Dump XFS allocation group freespace" },
   {  "xagi",	kdbm_xfs_xagi,	"<agi>",
@@ -1440,32 +1652,8 @@ static struct xif {
 				"Dump XFS transaction structure"},
   {  "xtrres",	kdbm_xfs_xtrans_res,	"<xfs_mount_t>",
 				"Dump XFS reservation values"},
-  {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
   {  0,		0,	0 }
 };
-
-void
-printflags(register uint64_t flags,
-        register char **strings,
-        register char *name)
-{
-        register uint64_t mask = 1;
-
-        if (name)
-                printk("%s 0x%Lx <", name, flags);
-        while (flags != 0 && *strings) {
-                if (mask & flags) {
-                        printk("%s ", *strings);
-                        flags &= ~mask;
-                }
-                mask <<= 1;
-                strings++;
-        }
-        if (name)
-                printk("> ");
-        return;
-}
-
 
 int
 init_module(void)

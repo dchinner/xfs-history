@@ -130,4 +130,9 @@ O_OBJS += linux/linux_xfs.o
 
 include $(TOPDIR)/Rules.make
 
+ifneq ($(wildcard .hdepend),)
+include .hdepend
+endif
+
 links:
+
