@@ -708,7 +708,6 @@ linvfs_bmap(
 {
 	struct inode		*inode = (struct inode *)mapping->host;
 	vnode_t			*vp = LINVFS_GET_VP(inode);
-	xfs_inode_t		*ip = XFS_BHVTOI(vp->v_fbhv);
 	int			error;
 
 	/* block	     - Linux disk blocks    512b */
@@ -719,10 +718,7 @@ linvfs_bmap(
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
 	VOP_RWLOCK(vp, VRWLOCK_READ);
-	if (ip->i_delayed_blks) {
-		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
-	}
-
+	VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	return generic_block_bmap(mapping, block, linvfs_get_block);
 }
