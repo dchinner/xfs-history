@@ -5827,7 +5827,7 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	}
 	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, INT_GET(e->nameidx, ARCH_CONVERT));
-		XFS_DIR_SF_GET_DIRINO_ARCH(&n->inumber, &ino, ARCH_CONVERT);
+		XFS_DIR_SF_GET_DIRINO(&n->inumber, &ino);
 		kdb_printf("leaf %d hashval 0x%x nameidx %d inumber %llu ",
 			j, (uint_t)INT_GET(e->hashval, ARCH_CONVERT),
 			INT_GET(e->nameidx, ARCH_CONVERT),
@@ -5873,7 +5873,7 @@ xfs_dir2data(void *addr, int size)
 		/* XFS_DIR2_BLOCK_TAIL_P */
 		tail = (xfs_dir2_block_tail_t *)
 		       ((char *)bb + size - sizeof(xfs_dir2_block_tail_t));
-		l = XFS_DIR2_BLOCK_LEAF_P_ARCH(tail, ARCH_CONVERT);
+		l = XFS_DIR2_BLOCK_LEAF_P(tail);
 		t = (char *)l;
 	}
 	for (p = (char *)(h + 1); p < t; ) {
@@ -5883,7 +5883,7 @@ xfs_dir2data(void *addr, int size)
 				(unsigned long) (p - (char *)addr),
 				INT_GET(u->freetag, ARCH_CONVERT),
 				INT_GET(u->length, ARCH_CONVERT),
-				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_CONVERT), ARCH_CONVERT));
+				INT_GET(*XFS_DIR2_DATA_UNUSED_TAG_P(u), ARCH_CONVERT));
 			p += INT_GET(u->length, ARCH_CONVERT);
 			continue;
 		}
@@ -5940,7 +5940,7 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 		return;
 	/* XFS_DIR2_LEAF_TAIL_P */
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
-	b = XFS_DIR2_LEAF_BESTS_P_ARCH(t, ARCH_CONVERT);
+	b = XFS_DIR2_LEAF_BESTS_P(t);
 	for (j = 0; j < INT_GET(t->bestcount, ARCH_CONVERT); j++, b++) {
 		kdb_printf("0x%lx best %d 0x%x\n",
 			(unsigned long) ((char *)b - (char *)leaf), j,
@@ -5961,11 +5961,11 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	XFS_DIR_SF_GET_DIRINO_ARCH(&sfh->parent, &ino, ARCH_CONVERT);
+	XFS_DIR_SF_GET_DIRINO(&sfh->parent, &ino);
 	kdb_printf("hdr parent %llu", (unsigned long long)ino);
 	kdb_printf(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		XFS_DIR_SF_GET_DIRINO_ARCH(&sfe->inumber, &ino, ARCH_CONVERT);
+		XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &ino);
 		kdb_printf("entry %d inumber %llu", i, (unsigned long long)ino);
 		kdb_printf(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
@@ -5987,14 +5987,14 @@ xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, &sfh->parent, ARCH_CONVERT);
+	ino = XFS_DIR2_SF_GET_INUMBER(s, &sfh->parent);
 	kdb_printf("hdr count %d i8count %d parent %llu\n",
 		sfh->count, sfh->i8count, (unsigned long long) ino);
 	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
-		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, XFS_DIR2_SF_INUMBERP(sfe), ARCH_CONVERT);
+		ino = XFS_DIR2_SF_GET_INUMBER(s, XFS_DIR2_SF_INUMBERP(sfe));
 		kdb_printf("entry %d inumber %llu offset 0x%x namelen %d name \"",
 			i, (unsigned long long) ino,
-			XFS_DIR2_SF_GET_OFFSET_ARCH(sfe, ARCH_CONVERT),
+			XFS_DIR2_SF_GET_OFFSET(sfe),
 			sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			kdb_printf("%c", sfe->name[j]);
