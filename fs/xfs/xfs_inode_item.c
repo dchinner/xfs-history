@@ -1,4 +1,4 @@
-#ident "$Revision: 1.81 $"
+#ident "$Revision: 1.84 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -766,7 +766,7 @@ xfs_inode_item_pushbuf(
 	
 	mp = ip->i_mount;
 	bp = xfs_incore(mp->m_ddev_targ, iip->ili_format.ilf_blkno,
-		    iip->ili_format.ilf_len, INCORE_TRYLOCK);
+		    iip->ili_format.ilf_len, XFS_INCORE_TRYLOCK);
 
 	if (bp != NULL) {
 		if (XFS_BUF_ISDELAYWRITE(bp)) {

@@ -48,6 +48,7 @@ typedef struct buf xfs_buf_t;
 #define XFS_B_DELWRI B_DELWRI
 #define XFS_B_READ   B_READ
 #define XFS_BUF_TRYLOCK	BUF_TRYLOCK
+#define XFS_INCORE_TRYLOCK	INCORE_TRYLOCK
 
 #define XFS_BUF_BFLAGS(x)            ((x)->b_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)            ((x)->b_flags = 0) 
@@ -258,7 +259,8 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_B_DELWRI PBF_DELWRI
 #define XFS_B_READ   PBF_READ
 #define XFS_B_STALE (1 << 31)
-#define XFS_BUF_TRYLOCK	PBF_TRYLOCK
+#define XFS_BUF_TRYLOCK		PBF_TRYLOCK
+#define XFS_INCORE_TRYLOCK	PBF_TRYLOCK
 
 #define XFS_BUF_BFLAGS(x)        ((x)->pb_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)     ((x)->pb_flags = 0) 
@@ -267,7 +269,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_UNSTALE(x)	     ((x)->pb_flags &= ~XFS_B_STALE)
 #define XFS_BUF_ISSTALE(x)	     ((x)->pb_flags & XFS_B_STALE)
 #define XFS_BUF_SUPER_STALE(x)   (x)->pb_flags & XFS_B_STALE;\
-                                 (x)->pb_flags &= ~(PBF_DELWRI|PBF_COMPLETED)
+                                 (x)->pb_flags &= ~(PBF_DELWRI|PBF_PARTIAL|PBF_NONE)
 
 #define XFS_BUF_DELAYWRITE(x)	 ((x)->pb_flags |= PBF_DELWRI)
 #define XFS_BUF_UNDELAYWRITE(x)	 ((x)->pb_flags &= ~PBF_DELWRI)
@@ -278,9 +280,9 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_GETERROR(x)      pagebuf_geterror(x)
 #define XFS_BUF_ISERROR(x)       (pagebuf_geterror(x)?1:0)
 
-#define XFS_BUF_DONE(x)          ((x)->pb_flags |= PBF_COMPLETED)
-#define XFS_BUF_UNDONE(x)    	 ((x)->pb_flags &= ~PBF_COMPLETED)
-#define XFS_BUF_ISDONE(x)	     ((x)->pb_flags & PBF_COMPLETED)
+#define XFS_BUF_DONE(x)          ((x)->pb_flags &= ~(PBF_PARTIAL|PBF_NONE))
+#define XFS_BUF_UNDONE(x)    	 ((x)->pb_flags |= PBF_PARTIAL|PBF_NONE)
+#define XFS_BUF_ISDONE(x)	 (!(PBF_NOT_DONE(x)))
 
 #define XFS_BUF_BUSY(x)          
 #define XFS_BUF_UNBUSY(x)    	 
@@ -290,12 +292,12 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_UNASYNC(x)     	 ((x)->pb_flags &= ~PBF_ASYNC)
 #define XFS_BUF_ISASYNC(x)       ((x)->pb_flags & PBF_ASYNC)
 
-#define XFS_BUF_SHUT(x)          /* error! not implemeneted yet */
-#define XFS_BUF_UNSHUT(x)     	 /* error! not implemeneted yet */
+#define XFS_BUF_SHUT(x)          /* error! not implemented yet */
+#define XFS_BUF_UNSHUT(x)     	 /* error! not implemented yet */
 #define XFS_BUF_ISSHUT(x)        (0)
 
-#define XFS_BUF_HOLD(x)        /* error! not implemeneted yet */  
-#define XFS_BUF_UNHOLD(x)       /* error! not implemeneted yet */
+#define XFS_BUF_HOLD(x)        /* error! not implemented yet */  
+#define XFS_BUF_UNHOLD(x)       /* error! not implemented yet */
 #define XFS_BUF_ISHOLD(x)       (1)
 /* this may go away... calling iostart will define read or write */
 /* used for irix at the moment not needed for linux? */
@@ -363,7 +365,7 @@ typedef struct buftarg {
 #define XFS_BUF_SET_BRELSE_FUNC(buf, value) 
 
 
-#define XFS_BUF_PTR(bp)		((bp)->pb_addr)
+#define XFS_BUF_PTR(bp)		(caddr_t)((bp)->pb_addr)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_file_offset >> 9)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
 			((bp)->pb_file_offset = (blk) << 9)
@@ -379,10 +381,10 @@ typedef struct buftarg {
 
 #define XFS_BUF_ISPINNED(bp) 0 /* ERROR implement me */ 
 
-#define XFS_BUF_VALUSEMA(bp) 0 /* ERROR implement me */ 
-#define XFS_BUF_CPSEMA(bp)   0/* ERROR implement me */ 
-#define XFS_BUF_VSEMA(bp)   0/* ERROR implement me */ 
-#define XFS_BUF_PSEMA(bp,x)   0/* ERROR implement me */ 
+#define XFS_BUF_VALUSEMA(bp) 	pagebuf_is_locked(bp)
+#define XFS_BUF_CPSEMA(bp)   	pagebuf_cond_lock(bp)
+#define XFS_BUF_VSEMA(bp)   	pagebuf_unlock(bp)
+#define XFS_BUF_PSEMA(bp,x)	pagebuf_lock(bp)
 #define XFS_BUF_V_IODONESEMA(bp) 
 
 /* setup the buffer target from a buftarg structure */
@@ -426,18 +428,20 @@ typedef struct buftarg {
             pagebuf_iodone(pb)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
-            pagebuf_find(buftarg,blkno,len,lockit)
+            pagebuf_find(buftarg.inode,blkno,len,lockit)
 
 #define XFS_bwrite(pb)              \
             pagebuf_iostart(pb,PBF_WRITE)
 
 #define XFS_bdwrite(pb)              \
-            pagebuf_iostart(pb,PBF_WRITE|PBF_DELWRI)
+	    pb->pb_flags |= PBF_DELWRI; \
+            pagebuf_release(pb)
 
 #define xfs_iowait(pb)              \
     pagebuf_iowait(pb)
-#define xfs_binval(buftarg)  /* hmm this is going to be tricky binval wants to flush all 
-						  * delay write buffers on device...  how do we do this with pagebuf? */
+#define xfs_binval(buftarg)  /* hmm this is going to be tricky binval
+			      * wants to flush all delay write buffers
+			      * on device...  how do we do this with pagebuf? */
 
 #define xfs_bflushed(buftarg) /* assert the buffers for dev are really flushed */
 
@@ -451,6 +455,8 @@ typedef struct buftarg {
 #define xfs_incore_match(buftarg,blkno,len,field,value) 
 
 #define xfs_baread(target, rablkno, ralen) 
+
+#define buftrace(id, bp)
 
 #endif /* _USING_PAGEBUF_T */
 

@@ -245,8 +245,10 @@ extern void xfs_disable_nested_locking(void);
 #endif
 
 
+#ifndef _USING_PAGEBUF_T
 void
 xfs_xfsd_list_evict(bhv_desc_t *bdp);
+#endif
 
 /*
  * Needed by xfs_rw.c

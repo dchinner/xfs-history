@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.186 $"
+#ident	"$Revision: 1.187 $"
 
 /*
  * High level interface routines for log manager
@@ -1037,7 +1037,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	xfs_buftrace("XLOG__BDSTRAT IOERROR", bp);
 	XFS_BUF_ERROR(bp, EIO);
 	XFS_BUF_STALE(bp);
-    xfs_biodone(bp);
+	xfs_biodone(bp);
 	return (XFS_ERROR(EIO));
 	
 

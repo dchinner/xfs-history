@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.87 $"
+#ident "$Revision: 1.88 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -421,9 +421,11 @@ xfs_buf_item_trylock(
 	 * if it's on the free list.  Private buffers like the
 	 * superblock buffer are not.
 	 */
+#ifndef _USING_PAGEBUF_T
 	if (bp->av_forw != NULL) {
 		notavail(bp);
 	}
+#endif
 
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("TRYLOCK SUCCESS", bip);

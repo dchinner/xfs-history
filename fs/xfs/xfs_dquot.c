@@ -1,4 +1,4 @@
-#ident "$Revision: 1.38 $"
+#ident "$Revision: 1.39 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include "xfs_buf.h"
@@ -1700,7 +1700,7 @@ xfs_qm_dqflock_pushbuf_wait(
 	*/
 	bp = xfs_incore(dqp->q_mount->m_ddev_targ, dqp->q_blkno, 
 		    XFS_QI_DQCHUNKLEN(dqp->q_mount),
-		    INCORE_TRYLOCK);
+		    XFS_INCORE_TRYLOCK);
 	if (bp != NULL) {
 		if (XFS_BUF_ISDELAYWRITE(bp)) {
 			if (bp->b_pincount > 0) {
