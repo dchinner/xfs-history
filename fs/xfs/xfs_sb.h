@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 /*
  * Super block
@@ -277,6 +277,15 @@ int xfs_sb_version_hasdalign(xfs_sb_t *sbp);
 #define XFS_SB_VERSION_HASDALIGN(sbp)	\
 	((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
 	 ((sbp)->sb_versionnum & XFS_SB_VERSION_DALIGNBIT))
+#endif
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_VERSION_ADDDALIGN)
+int xfs_sb_version_adddalign(xfs_sb_t *sbp);
+#define XFS_SB_VERSION_ADDDALIGN(sbp)	xfs_sb_version_adddalign(sbp)
+#else
+#define XFS_SB_VERSION_ADDDALIGN(sbp)	\
+        ((sbp)->sb_versionnum = \
+                ((sbp)->sb_versionnum | XFS_SB_VERSION_DALIGNBIT))
 #endif
 
 #define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
