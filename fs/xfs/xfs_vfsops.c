@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.81 $"
+#ident  "$Revision: 1.82 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -64,6 +64,7 @@
 #include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
+#include <io/dmi/dmi_kern.h>
 #include <fs/specfs/snode.h>
 #ifdef SIM
 #undef _KERNEL
@@ -618,16 +619,30 @@ xfs_vfsmount(vfs_t		*vfsp,
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
 			     &args, credp);
+	if (error)
+		return error;
 	/*
 	 *  Don't set the VFS_DMI flag until here because we don't want
 	 *  to send events while replaying the log.
 	 */
-	if (uap->flags & MS_DMI)
+	if (uap->flags & MS_DMI) {
 		vfsp->vfs_flag |= VFS_DMI;
+		/* Always send mount event (when mounted with dmi option) */
+		error = dm_namesp_event(DM_MOUNT, mvp, mvp,
+				uap->dir, uap->spec, 0, 0);
+		if (error) {
+			int	errcode;
+
+			vfsp->vfs_flag &= ~VFS_DMI;
+			errcode = xfs_unmount(vfsp, 0, credp);
+			ASSERT (errcode == 0);
+		}
+	}
 
 	return error;
 
 }	/* end of xfs_vfsmount() */
+
 
 
 /*
@@ -917,11 +932,26 @@ xfs_unmount(vfs_t	*vfsp,
 	vnode_t		*rvp = 0;
 	vmap_t		vmap;
 	int		vfs_flags;
+	int		sendunmountevent = 0;
+	int		error;
 
 	if (!suser())
 		return XFS_ERROR(EPERM);
 
 	mp = XFS_VFSTOM(vfsp);
+	rip = mp->m_rootip;
+	rvp = XFS_ITOV(rip);
+
+	if (vfsp->vfs_flag & VFS_DMI) {
+		if (mp->m_dmevmask & DM_ETOM(DM_PREUNMOUNT)) {
+			error = dm_namesp_event(DM_PREUNMOUNT,
+				rvp, rvp, 0, 0, 0, 0);
+			if (error)
+				return XFS_ERROR(error);
+		}
+		if (mp->m_dmevmask & DM_ETOM(DM_UNMOUNT))
+			sendunmountevent = 1;
+	}
 
 	/*
 	 * Make sure there are no active users.
@@ -929,7 +959,6 @@ xfs_unmount(vfs_t	*vfsp,
 	if (xfs_ibusy(mp))
 		return XFS_ERROR(EBUSY);
 	
-	rip = mp->m_rootip;
 	xfs_ilock(rip, XFS_ILOCK_EXCL);
 	xfs_iflock(rip);
 
@@ -952,10 +981,10 @@ xfs_unmount(vfs_t	*vfsp,
 	}
 
 	xfs_iflush(rip, XFS_IFLUSH_SYNC);   /* synchronously flush to disk */
-	rvp = XFS_ITOV(rip);
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
-		return XFS_ERROR(EBUSY);
+		error = EBUSY;
+		goto out;
 	}
 
 	if (rbmip) {
@@ -968,14 +997,19 @@ xfs_unmount(vfs_t	*vfsp,
 	VN_RELE(rvp);
 	vn_purge(rvp, &vmap);
 
+	error = 0;
 	/*
 	 * Call common unmount function to flush to disk
 	 * and free the super block buffer & mount structures.
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	xfs_unmountfs(mp, vfs_flags, credp);	
-
-	return 0;
+out:
+	if (sendunmountevent) {
+		(void) dm_namesp_event(DM_UNMOUNT, (vnode_t *) vfsp,
+			0, 0, 0, 0, error);
+	}
+	return XFS_ERROR(error);
 }
 
 
