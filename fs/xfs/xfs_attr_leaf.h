@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_LEAF_H
 #define	_FS_XFS_ATTR_LEAF_H
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 /*
  * xfs_attr_leaf.h
@@ -165,6 +165,7 @@ int	xfs_attr_leaf_to_node(struct xfs_trans *trans,
 int	xfs_attr_leaf_to_shortform(struct xfs_trans *trans, buf_t *bp,
 					  struct xfs_da_args *args);
 int	xfs_attr_leaf_clearflag(struct xfs_da_args *args);
+int	xfs_attr_leaf_setflag(struct xfs_da_args *args);
 
 /*
  * Routines used for growing the Btree.
