@@ -1,4 +1,4 @@
-#ident "$Revision: 1.130 $"
+#ident "$Revision: 1.131 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -210,6 +210,16 @@ extern int
 xfs_io_is_guaranteed(
 	xfs_inode_t	*,
 	stream_id_t	*);
+
+extern int
+grio_monitor_io_start( 
+	stream_id_t *, 
+	__int64_t);
+
+extern int
+grio_monitor_io_end(
+	int);
+	
 
 extern void xfs_error(
 	xfs_mount_t *,
@@ -4546,7 +4556,8 @@ xfs_diordwr(vnode_t	*vp,
 	xfs_mount_t	*mp;
 	uuid_t		stream_id;
 	buf_t		*bp;
-	int		error;
+	int		error, index;
+	__int64_t	iosize;
 
 	ip = XFS_VTOI(vp);
 	mp = XFS_VFSTOM(vp->v_vfsp);
@@ -4618,6 +4629,8 @@ xfs_diordwr(vnode_t	*vp,
 				kmem_zone_alloc( grio_buf_data_zone, KM_SLEEP );
 			ASSERT( BUF_GRIO_PRIVATE( bp ) );
 			COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
+			iosize =  uiop->uio_iov[0].iov_len;
+			index = grio_monitor_io_start( &stream_id, iosize );
 		} else {
 			bp->b_grio_private = NULL;
 			bp->b_flags2 &= ~B_GR_BUF;
@@ -4641,6 +4654,8 @@ xfs_diordwr(vnode_t	*vp,
 	bp->b_flags = 0;
 
 	if ( bp->b_flags2 & B_GR_BUF ) {
+		grio_monitor_io_end( index );
+
 		ASSERT( BUF_GRIO_PRIVATE(bp) );
 		kmem_zone_free( grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
 		bp->b_grio_private = NULL;
