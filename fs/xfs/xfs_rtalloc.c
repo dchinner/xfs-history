@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.5 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -25,6 +25,7 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#include <sys/grio.h>
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
