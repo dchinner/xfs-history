@@ -662,7 +662,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	sfe = &sf->list[0];
 	for (i = 0; i < entry - 2; i++)
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
-	for (; i < sf->hdr.count + 2; i++, entry++) {
+	for (; i < sf->hdr.count; i++, entry++) {
 		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
 		retval = xfs_dir_put_dirent(mp, buf, ino, sfe->name,
 						sfe->namelen, bno, entry, uio,
