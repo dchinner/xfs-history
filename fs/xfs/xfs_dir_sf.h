@@ -36,6 +36,19 @@ typedef struct xfs_dir_shortform {
 typedef struct xfs_dir_sf_hdr xfs_dir_sf_hdr_t;
 typedef struct xfs_dir_sf_entry xfs_dir_sf_entry_t;
 
+/*
+ * We generate this then sort it, so that readdirs are returned in
+ * hash-order.  Else seekdir won't work.
+ */
+typedef struct xfs_dir_sf_sort {
+	__uint8_t	entno;		/* .=0, ..=1, else entry# + 2 */
+	__uint8_t	seqno;		/* sequence # with same hash value */
+	__uint8_t	namelen;	/* length of name value (no null) */
+	xfs_dahash_t	hash;		/* this entry's hash value */
+	xfs_intino_t	ino;		/* this entry's inode number */
+	char		*name;		/* name value, pointer into buffer */
+} xfs_dir_sf_sort_t;
+
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_ENTSIZE_BYNAME)
 int xfs_dir_sf_entsize_byname(int len);
 #define XFS_DIR_SF_ENTSIZE_BYNAME(len)		xfs_dir_sf_entsize_byname(len)

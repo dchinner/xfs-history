@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -391,9 +391,9 @@ xfs_fsoperations(
 		return error;
 	if (cisize[opcode]) {
 		inb = kmem_alloc(cisize[opcode], KM_SLEEP);
-		if (error = copyin(in, inb, cisize[opcode])) {
+		if (copyin(in, inb, cisize[opcode])) {
 			kmem_free(inb, cisize[opcode]);
-			return XFS_ERROR(error);
+			return XFS_ERROR(EFAULT);
 		}
 	} else
 		inb = NULL;
@@ -434,7 +434,8 @@ xfs_fsoperations(
 	if (inb)
 		kmem_free(inb, cisize[opcode]);
 	if (!error && outb) {
-		error = copyout(outb, out, cosize[opcode]);
+		if (copyout(outb, out, cosize[opcode]))
+			error = XFS_ERROR(EFAULT);
 		kmem_free(outb, cosize[opcode]);
 	}
 	return error;
