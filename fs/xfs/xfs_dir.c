@@ -1,4 +1,4 @@
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.67 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -368,21 +368,19 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 		u.u_procp->p_abi : ABI_IRIX5_64;
 	alignment = (((abi == ABI_IRIX5_64) || (abi == ABI_IRIX5_N32)) ?
 		sizeof(off_t) : sizeof(irix5_off_t)) - 1;
-	if (uio->uio_segflg == UIO_SYSSPACE) {
-		ASSERT(uio->uio_iovcnt == 1);
-		ASSERT(((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0);
-		ASSERT((uio->uio_iov[0].iov_len & alignment) == 0);
+	if (uio->uio_iovcnt == 1 &&
+	    ((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0 &&
+	    (uio->uio_iov[0].iov_len & alignment) == 0) {
 		dbp = NULL;
-	} else if (uio->uio_iovcnt == 1 &&
-		   ((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0 &&
-		   (uio->uio_iov[0].iov_len & alignment) == 0) {
-		dbp = NULL;
-		if (!useracc((lockaddr = uio->uio_iov[0].iov_base),
-			     (locklen = uio->uio_iov[0].iov_len), B_READ))
+		if ((uio->uio_segflg != UIO_SYSSPACE) &&
+		    !useracc((lockaddr = uio->uio_iov[0].iov_base),
+			     (locklen = uio->uio_iov[0].iov_len), B_READ)) {
 			return curthreadp->k_error ?
 				curthreadp->k_error : EFAULT;
-	} else
+		}
+	} else {
 		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
+	}
 	*eofp = 0;
 	/*
 	 * Decide on what work routines to call based on the inode size.
