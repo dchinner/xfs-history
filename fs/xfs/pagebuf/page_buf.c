@@ -2142,49 +2142,53 @@ pagebuf_delwri_flush(
 			}
 		}
 
-		list_del_init(&pb->pb_list);
-		if (flags & PBDF_WAIT) {
-			list_add(&pb->pb_list, &tmp);
+		list_move(&pb->pb_list, &tmp);
+
+	}
+	
+	/* ok found all the items that can be worked on 
+	 * drop the lock and process the private list */
+	spin_unlock(&pbd_delwrite_lock);
+	
+	list_for_each(curr,&tmp) {
+		pb = list_entry(curr, page_buf_t, pb_list);
+		
+		if (flags & PBDF_WAIT)
 			pb->pb_flags &= ~PBF_ASYNC;
-		}
 
-		spin_unlock(&pbd_delwrite_lock);
-
-		if ((flags & PBDF_TRYLOCK) == 0) {
+		if ((flags & PBDF_TRYLOCK) == 0) 
 			pagebuf_lock(pb);
-		}
-
+		
 		pb->pb_flags &= ~PBF_DELWRI;
 		pb->pb_flags |= PBF_WRITE;
-
 		__pagebuf_iorequest(pb);
+
 		if (++flush_cnt > 32) {
 			pagebuf_run_queues(NULL);
 			flush_cnt = 0;
 		}
-
-		spin_lock(&pbd_delwrite_lock);
 	}
-
-	spin_unlock(&pbd_delwrite_lock);
 
 	pagebuf_run_queues(NULL);
 
-	if (pinptr)
-		*pinptr = pincount;
-
-	if ((flags & PBDF_WAIT) == 0)
-		return;
-
+	/* must run list the second time even if PBDF_WAIT isn't
+	 * to reset all the pb_list pointers 
+	 */
 	while (!list_empty(&tmp)) {
 		pb = list_entry(tmp.next, page_buf_t, pb_list);
 
 		list_del_init(&pb->pb_list);
-		pagebuf_iowait(pb);
-		if (!pb->pb_relse)
-			pagebuf_unlock(pb);
-		pagebuf_rele(pb);
+		
+		if (flags & PBDF_WAIT) {
+			pagebuf_iowait(pb);
+			if (!pb->pb_relse)
+				pagebuf_unlock(pb);
+			pagebuf_rele(pb);
+		}
 	}
+
+	if (pinptr)
+		*pinptr = pincount;
 }
 
 STATIC int
