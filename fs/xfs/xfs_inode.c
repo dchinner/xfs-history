@@ -540,6 +540,8 @@ xfs_isize_check(
 	int		nimaps;
 	xfs_bmbt_irec_t	imaps[2];
 
+	if ((ip->i_d.di_mode & IFMT) != IFREG)
+		return;
 	nimaps = 2;
 	map_first = XFS_B_TO_FSB(mp, isize);
 	(void) xfs_bmapi(NULL, ip, map_first,
