@@ -111,6 +111,7 @@ typedef struct xfs_inode {
 #define	XFS_IINLINE	0x0001	/* Inline data is read in */
 #define	XFS_IEXTENTS	0x0002	/* All extent pointers are read in */
 #define	XFS_IBROOT	0x0004	/* i_broot points to the bmap b-tree root */
+#define XFS_IGRIO	0x0008  /* inode will be used for guaranteed rate i/o */
 
 /*
  * Flags for inode locking.
