@@ -1067,8 +1067,9 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 								 &blk->index);
 #ifndef SIM
 		} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
-			retval = xfs_attr_leaf_lookup_int(blk->bp, state->args,
-								   &blk->index);
+			retval = xfs_attr_leaf_lookup_int(blk->bp, state->args);
+			blk->index = state->args->aleaf_index;
+			state->args->aleaf_blkno = blk->blkno;
 #endif
 		}
 		if (((retval == ENOENT) || (retval == ENXIO)) &&
@@ -1106,8 +1107,7 @@ xfs_da_node_getvalue(xfs_da_state_t *state)
 	ASSERT(blk->bp != NULL);
 	ASSERT(blk->magic == XFS_ATTR_LEAF_MAGIC);
 
-	retval = xfs_attr_leaf_getvalue(state->trans, blk->bp, state->args,
-						      blk->index);
+	retval = xfs_attr_leaf_getvalue(blk->bp, state->args);
 
 	return(retval);	
 }
@@ -1440,7 +1440,7 @@ xfs_da_hashname(register char *name, register int namelen)
 }
 
 int
-xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_name_t *args, int length,
+xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_args_t *args, int length,
 			      xfs_fileoff_t *new_blkno)
 {
 	xfs_fileoff_t bno;
@@ -1483,7 +1483,7 @@ xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_name_t *args, int length,
 
 #ifndef SIM
 int
-xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_name_t *args,
+xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_args_t *args,
 				xfs_fileoff_t dead_blkno, int length,
 				buf_t *dead_buf)
 {
