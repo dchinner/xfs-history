@@ -1,4 +1,4 @@
-#ident "$Revision: 1.26 $"
+#ident "$Revision: 1.27 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -293,10 +293,10 @@ xfs_efi_release(xfs_efi_log_item_t	*efip,
 	SPLDECL(s);
 
 	ASSERT(efip->efi_next_extent > 0);
-	ASSERT(efip->efi_flags & XFS_EFI_COMMITTED);
 
 	mp = efip->efi_item.li_mountp;
 	AIL_LOCK(mp, s);
+	ASSERT(efip->efi_flags & XFS_EFI_COMMITTED);
 	ASSERT(efip->efi_next_extent >= nextents);
 	efip->efi_next_extent -= nextents;
 	extents_left = efip->efi_next_extent;
