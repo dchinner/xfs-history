@@ -5223,17 +5223,11 @@ void
 xfs_strat_write_iodone(
 	buf_t	*bp)
 {
-	bhv_desc_t 	*bdp;
-	/* REFERENCED */
-	xfs_inode_t	*ip;
 	int		s;
 
 	ASSERT(bp->b_flags & B_UNINITIAL);
 	ASSERT(bp->b_vp);
-	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(bp->b_vp), &xfs_vnodeops);
-	ASSERT(bdp);
 	ASSERT(xfsc_count > 0);
-	ip = XFS_BHVTOI(bdp);
 	/*
 	 * Delay I/O done work until the transaction is completed.
 	 */
@@ -5262,7 +5256,6 @@ xfs_strat_write_iodone(
 	}
 	buftrace("STRAT_WRITE_IODONE", bp);
 	xfsc_bufcount++;
-	xfs_strat_write_bp_trace(XFS_STRAT_ENTER, ip, bp);
 	(void)sv_signal(&xfsc_wait);
 	mp_mutex_spinunlock(&xfsc_lock, s);
 	return;
@@ -5727,9 +5720,6 @@ xfs_strat_write_unwritten(
 	ASSERT((offset_fsb_bb == bp->b_offset) || (count_fsb == 1));
 
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_WR);
-/***
-	xfs_strat_write_bp_trace(XFS_STRAT_ENTER, ip, bp);
-***/
 
 	/*
 	 * Modify the unwritten extent state of the buffer.
