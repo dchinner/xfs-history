@@ -108,6 +108,11 @@ STATIC ctl_table xfs_table[] = {
 	&sysctl_intvec, NULL,
 	&xfs_params.probe_dmapi.min, &xfs_params.probe_dmapi.max},
 
+	{XFS_PROBE_IOOPS, "probe_ioops", &xfs_params.probe_ioops.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.probe_ioops.min, &xfs_params.probe_ioops.max},
+
 	{XFS_PROBE_QUOTA, "probe_quota", &xfs_params.probe_quota.val,
 	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,

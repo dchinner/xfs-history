@@ -58,6 +58,7 @@ xfs_param_t xfs_params = {
 	.error_level	= {	0,	3,	11	},
 	.sync_interval	= {	HZ,	30*HZ,	60*HZ	},
 	.probe_dmapi	= {	0,	1,	1	},
+	.probe_ioops	= {	0,	0,	1	},
 	.probe_quota	= {	0,	1,	1	},
 	.stats_clear	= {	0,	0,	1	},
 	.inherit_sync	= {	0,	1,	1	},

@@ -56,6 +56,7 @@ typedef struct xfs_param {
 	xfs_sysctl_val_t sync_interval;	/* time between sync calls           */
 	xfs_sysctl_val_t stats_clear;	/* Reset all XFS statistics to zero. */
 	xfs_sysctl_val_t probe_dmapi;	/* probe for DMAPI module on mount. */
+	xfs_sysctl_val_t probe_ioops;	/* probe for an IO module on mount. */
 	xfs_sysctl_val_t probe_quota;	/* probe for quota module on mount. */
 	xfs_sysctl_val_t inherit_sync;	/* Inherit the "sync" inode flag. */
 	xfs_sysctl_val_t inherit_nodump;/* Inherit the "nodump" inode flag. */
@@ -85,6 +86,7 @@ enum {
 	XFS_ERRLEVEL = 7,
 	XFS_SYNC_INTERVAL = 8,
 	XFS_PROBE_DMAPI = 9,
+	XFS_PROBE_IOOPS = 10,
 	XFS_PROBE_QUOTA = 11,
 	XFS_STATS_CLEAR = 12,
 	XFS_INHERIT_SYNC = 13,
