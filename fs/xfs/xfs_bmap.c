@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.138 $"
+#ident	"$Revision: 1.140 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1599,12 +1599,15 @@ xfs_bmap_alloc(
 		ASSERT(ap->userdata == 1);
 		type = ap->rval == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
-		if (ap->ip->i_d.di_extsize)
+		if (ap->ip->i_d.di_extsize) {
 			prod = ap->ip->i_d.di_extsize / mp->m_sb.sb_rextsize;
-		else
+			ap->alen = (ap->alen + ap->ip->i_d.di_extsize - 1) /
+				mp->m_sb.sb_rextsize;
+		} else {
 			prod = 1;
-		ap->alen = (ap->alen + mp->m_sb.sb_rextsize - 1) /
-			mp->m_sb.sb_rextsize;
+			ap->alen = (ap->alen + mp->m_sb.sb_rextsize - 1) /
+				mp->m_sb.sb_rextsize;
+		}
 		ap->rval /= mp->m_sb.sb_rextsize;
 		error = xfs_rtallocate_extent(ap->tp, ap->rval, 1, ap->alen,
 				&ralen, type, ap->wasdel, prod, &(ap->rval));
@@ -3132,6 +3135,7 @@ xfs_bmapi(
 	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		if (!wr) {
 			/* change to assert later */
+ASSERT( 0 );
 			*nmap = 0;
 			kmem_check();
 			return 0;
@@ -3163,8 +3167,10 @@ xfs_bmapi(
 	cur = NULL;
 	obno = bno;
 	bma.ip = NULL;
+
 	while (bno < end && n < *nmap) {
-		/*
+
+		/* 
 		 * Reading past eof, act as though there's a hole
 		 * up to end.
 		 */
@@ -3267,8 +3273,9 @@ xfs_bmapi(
 				if (cur)
 					cur->bc_private.b.firstblock =
 						*firstblock;
-				if (abno == NULLFSBLOCK)
+				if (abno == NULLFSBLOCK) {
 					break;
+				}
 				if ((ip->i_flags & XFS_IBROOT) && !cur) {
 					cur = xfs_btree_init_cursor(ip->i_mount,
 						tp, NULL, 0,
