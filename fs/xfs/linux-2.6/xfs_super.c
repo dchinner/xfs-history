@@ -619,22 +619,6 @@ linvfs_set_inode_ops(
 	unlock_new_inode(inode);
 }
 
-void
-linvfs_read_inode(
-	struct inode	*inode)
-{
-	vfs_t		*vfsp = LINVFS_GET_VFS(inode->i_sb);
-
-	if (vfsp) {
-		vn_initialize(vfsp, inode, 1);
-	} else {
-		make_bad_inode(inode);
-		return;
-	}
-
-	inode->i_version = ++event;
-}
-
 /*
  * We do not actually write the inode here, just mark the
  * super block dirty so that sync_supers calls us and
@@ -898,7 +882,6 @@ static struct export_operations linvfs_export_ops = {
 static struct super_operations linvfs_sops = {
 	alloc_inode:		linvfs_alloc_inode,
 	destroy_inode:		linvfs_destroy_inode,
-	read_inode:		linvfs_read_inode,
 	write_inode:		linvfs_write_inode,
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	dmapi_mount_event:	linvfs_dmapi_mount,

@@ -688,32 +688,10 @@ typedef struct vattr {
 #define	WRITEALLOWED(vp) \
  	(((vp)->v_vfsp && ((vp)->v_vfsp->vfs_flag & VFS_RDONLY) == 0) || \
 	 (((vp)->v_type != VREG ) && ((vp)->v_type != VDIR) && ((vp)->v_type != VLNK)))
-/*
- * Global vnode allocation:
- *
- *	vp = vn_alloc(vfsp, type, rdev);
- *	vn_free(vp);
- *
- * Inactive vnodes are kept on an LRU freelist managed by vn_alloc, vn_free,
- * vn_get, vn_purge, and vn_rele.  When vn_rele inactivates a vnode,
- * it puts the vnode at the end of the list unless there are no behaviors
- * attached to it, which tells vn_rele to insert at the beginning of the
- * freelist.  When vn_get acquires an inactive vnode, it unlinks the vnode
- * from the list;
- * vn_purge puts inactive dead vnodes at the front of the list for rapid reuse.
- *
- * If the freelist is empty, vn_alloc dynamically allocates another vnode.
- * Call vn_free to destroy a vn_alloc'd vnode that has no other references
- * and no valid private data.  Do not call vn_free from within VOP_INACTIVE;
- * just remove the behaviors and vn_rele will do the right thing.
- *
- * A vnode might be deallocated after it is put on the freelist (after
- * a VOP_RECLAIM, of course).  In this case, the vn_epoch value is
- * incremented to define a new vnode epoch.
- */
+
 extern void	vn_init(void);
 extern int	vn_wait(struct vnode *);
-extern vnode_t  *vn_initialize(struct vfs *, struct inode *, int);
+extern vnode_t  *vn_initialize(struct vfs *, struct inode *);
 
 /*
  * Acquiring and invalidating vnodes:

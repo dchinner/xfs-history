@@ -145,19 +145,14 @@ vn_wait(struct vnode *vp)
 
 
 struct vnode *
-vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
+vn_initialize(vfs_t *vfsp, struct inode *inode)
 {
-	struct vnode	*vp;
+	struct vnode	*vp = LINVFS_GET_VPTR(inode);
 	
 	XFS_STATS_INC(xfsstats.vn_active);
 
-	vp = LINVFS_GET_VPTR(inode);
-
 	vp->v_flag = VMODIFIED;
-
 	spinlock_init(&vp->v_lock, "v_lock");
-	if (from_readinode)
-		VN_LOCK(vp);
 
 	spin_lock(&vnumber_lock);
 	vn_generation += 1;
@@ -175,23 +170,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	vp->v_trace = ktrace_alloc(VNODE_TRACE_SIZE, KM_SLEEP);
 #endif	/* CONFIG_XFS_VNODE_TRACING */
 
-	/*
-	 * Check to see if we've been called from
-	 * read_inode, and we need to "stitch" it all
-	 * together right now.
-	 */
-	if (from_readinode) {
-
-		if (xfs_vn_iget(vfsp, vp, (xfs_ino_t)inode->i_ino)) {
-			make_bad_inode(inode);
-		} else {
-			vn_revalidate(vp, ATTR_LAZY|ATTR_COMM);
-		}
-		VN_UNLOCK(vp, 0);
-	}
-
 	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
-
 	return vp;
 }
 
