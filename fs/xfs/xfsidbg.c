@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.65 $"
+#ident	"$Revision: 1.67 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3524,8 +3524,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		qprintf("quotainfo NULL\n");
 	printflags(mp->m_qflags, quota_flags,"quotaflags");
 	qprintf("\n");
-	qprintf("data alignment %d stripe width %d\n", mp->m_dalign,
-		mp->m_swidth);
+	qprintf("data alignment %d stripe width %d sinoalign %d\n", 
+		mp->m_dalign, mp->m_swidth, mp->m_sinoalign);
 	if (mp->m_fsname != NULL)
 		qprintf("mountpoint \"%s\"\n", mp->m_fsname);
 	else
