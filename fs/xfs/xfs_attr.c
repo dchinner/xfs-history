@@ -2055,8 +2055,8 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		 */
 		bp = incore(mp->m_dev, dblkno, blkcnt, 1);
 		if (bp) {
-		    XFS_BUF_STALE(bp);
-		    XFS_BUF_UNDELAYWRITE(bp);
+			XFS_BUF_STALE(bp);
+			XFS_BUF_UNDELAYWRITE(bp);
 			xfs_buf_relse(bp);
 			bp = NULL;
 		}

@@ -1,10 +1,13 @@
 /*
  *
- * $Header: /plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_globals.c,v 1.5 1999/09/03 00:40:44 mostek Exp $
- * $Author: mostek $
- * $Id: xfs_globals.c,v 1.5 1999/09/03 00:40:44 mostek Exp $
+ * $Header: /ptools/plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_globals.c,v 1.6 1999/09/29 17:55:19 lord Exp $
+ * $Author: lord $
+ * $Id: xfs_globals.c,v 1.6 1999/09/29 17:55:19 lord Exp $
  *
  * $Log: xfs_globals.c,v $
+ * Revision 1.6  1999/09/29 17:55:19  lord
+ * Fill in var structure for buffer cache sizes.
+ *
  * Revision 1.5  1999/09/03 00:40:44  mostek
  * A bunch more (physmem, maxdmasz, lbolt, ...
  *
@@ -53,7 +56,9 @@ int		imon_enabled;
 prid_t		dfltprid;
 long            physmem;
 int		maxdmasz = 0x401;	/* Obviously needs to be set dynamically */
-time_t          lbolt;                  /* time in HZ since last boot */
+#ifdef SIM
+time_t		jiffies;
+#endif
 struct ksa	ksa;
 struct ksa      *ksaptr = &ksa;        /* ptr to kernel system activities buf*/
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.82 $"
+#ident "$Revision: 1.83 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -1285,7 +1285,7 @@ xfs_buf_iodone_callbacks(
 			if (!(XFS_BUF_ISSTALE(bp))) {
 				XFS_BUF_DELAYWRITE(bp);
 				XFS_BUF_DONE(bp);
-				bp->b_start = lbolt;
+				XFS_BUF_SET_START(bp);
 			}
 			ASSERT(XFS_BUF_IODONE_FUNC(bp));
 			buftrace("BUF_IODONE ASYNC", bp);

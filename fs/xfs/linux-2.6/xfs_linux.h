@@ -102,7 +102,10 @@ typedef long            __kernel_clock_t;
 
 /* #define stat64 stat */
 
-extern time_t          lbolt;                  /* time in HZ since last boot */
+#ifndef _LINUX_SCHED_H
+extern unsigned long volatile jiffies;
+#endif
+#define lbolt		jiffies
 
 
 #define __return_address __builtin_return_address(0)

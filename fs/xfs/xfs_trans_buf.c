@@ -1,4 +1,4 @@
-#ident "$Revision: 1.67 $"
+#ident "$Revision: 1.68 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -137,10 +137,12 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		 * since last read.  This doesn't matter since the
 		 * caller isn't allowed to use the data anyway.
 		 */
+#ifndef _USING_PAGEBUF_T
 		else if (XFS_BUF_ISSTALE(bp)) {
 			buftrace("TRANS GET RECUR STALE", bp);
 			ASSERT(XFS_BUF_ISDELAYWRITE(bp));
 		}
+#endif
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
 		ASSERT(bip != NULL);

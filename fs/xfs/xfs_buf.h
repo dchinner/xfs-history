@@ -103,6 +103,8 @@ typedef struct buf xfs_buf_t;
 			((type)(buf)->b_fsprivate3)
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)	\
 			(buf)->b_fsprivate3 = (void *)(value)
+#define XFS_BUF_SET_START(buf)			\
+			(buf)->b_start = lbolt
 
 #define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
 #define XFS_BUF_ADDR(bp)	((bp)->b_blkno)
@@ -248,6 +250,7 @@ typedef struct buftarg {
 #define XFS_BUF_FSPRIVATE3(buf, type)		\
 
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
+#define XFS_BUF_SET_START(buf)
 
 #define XFS_BUF_PTR(bp)		((bp)->pb_addr)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_file_offset >> 9)
