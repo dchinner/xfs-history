@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_BTREE_H
 #define	_FS_XFS_DIR_BTREE_H
 
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 /*
  * xfs_dir_btree.h
@@ -34,7 +34,7 @@ struct xfs_dir_name {
  */
 struct xfs_dir_state_blk {
 	buf_t		*bp;		/* buffer containing block */
-	xfs_fsblock_t	blkno;		/* blkno of buffer */
+	xfs_fileoff_t	blkno;		/* blkno of buffer */
 	int		index;		/* relevant index into block */
 	uint		hashval;	/* last hash value in block */
 	int		leafblk;	/* 1->blk is a leaf, 0->blk is a node */
@@ -116,7 +116,7 @@ void xfsdir_t_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last,
 void xfsdir_t_log_inode(xfs_trans_t *tp, xfs_inode_t *ip, uint flags,
 				    char *file, int line);
 buf_t *xfsdir_t_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,
-					 xfs_fsblock_t bno,
+					 xfs_fileoff_t bno,
 					 char *file, int line);
 #define BUFTRACEMAX	128
 struct xfsdir_buftrace {

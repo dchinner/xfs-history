@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 /*
  * xFS types
@@ -19,7 +19,7 @@
  */
 
 #ifndef XFS_BIG_FILES
-#if defined(_K32U32) || defined(_K32U64) || defined(_K64U64)
+#if defined(_K32U32) || defined(_K32U64)
 #define	XFS_BIG_FILES		0
 #else
 #define	XFS_BIG_FILES		1
@@ -62,6 +62,8 @@ typedef __uint64_t	xfs_dfsbno_t;	/* blockno in filesystem (agno|agbno) */
 typedef __uint64_t	xfs_drfsbno_t;	/* blockno in filesystem (raw) */
 typedef	__uint64_t	xfs_drtbno_t;	/* extent (block) in realtime area */
 typedef	__uint64_t	xfs_dfiloff_t;	/* block number in a file */
+typedef	__uint64_t	xfs_dfilblks_t;	/* number of blocks in a file */
+
 /*
  * Memory based types are conditional.
  */
@@ -78,8 +80,10 @@ typedef	__int32_t	xfs_srtblock_t;	/* signed version of xfs_rtblock_t */
 #endif
 #if XFS_BIG_FILES
 typedef	__uint64_t	xfs_fileoff_t;	/* block number in a file */
+typedef	__uint64_t	xfs_filblks_t;	/* number of blocks in a file */
 #else
 typedef	__uint32_t	xfs_fileoff_t;	/* block number in a file */
+typedef	__uint32_t	xfs_filblks_t;	/* number of blocks in a file */
 #endif
 
 /*

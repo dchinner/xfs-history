@@ -148,7 +148,7 @@ STATIC void
 xfs_strat_write_check(
 	xfs_inode_t	*ip,
 	xfs_fileoff_t	offset_fsb,
-	xfs_extlen_t	buf_fsb,
+	xfs_filblks_t	buf_fsb,
 	xfs_bmbt_irec_t	*imap,
 	int		imap_count);
 
@@ -586,7 +586,7 @@ xfs_iomap_extra(
 		end_fsb = XFS_B_TO_FSB(mp, (offset + count));
 		nimaps = 1;
 		(void) xfs_bmapi(NULL, ip, offset_fsb,
-				 (xfs_extlen_t)(end_fsb - offset_fsb),
+				 (xfs_filblks_t)(end_fsb - offset_fsb),
 				 0, NULLFSBLOCK, 0, &imap,
 				 &nimaps, NULL);
 		ASSERT(nimaps == 1);
@@ -702,7 +702,7 @@ xfs_iomap_read(
 	 */
 	max_fsb = XFS_B_TO_FSBT(mp, XFS_MAX_FILE_OFFSET);
 	(void)xfs_bmapi(NULL, ip, offset_fsb,
-			(xfs_extlen_t)(max_fsb - offset_fsb),
+			(xfs_filblks_t)(max_fsb - offset_fsb),
 			XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imap,
 			&nimaps, NULL);
 
@@ -1460,7 +1460,7 @@ xfs_zero_eof(
 		 * That is not the most efficient thing to do, but it
 		 * is simple and this path should not be exercised often.
 		 */
-		buf_len_fsb = XFS_EXTLEN_MIN(imap.br_blockcount,
+		buf_len_fsb = XFS_FILBLKS_MIN(imap.br_blockcount,
 					      mp->m_writeio_blocks);
 		bmap.offset = XFS_FSB_TO_BB(mp, imap.br_startoff);
 		bmap.length = XFS_FSB_TO_BB(mp, buf_len_fsb);
@@ -1554,7 +1554,7 @@ xfs_iomap_write(
 		nimaps = 1;
 		(void) xfs_bmapi(NULL, ip,
 				 XFS_B_TO_FSBT(mp, (offset + count - 1)),
-				 (xfs_extlen_t)1, 0, NULLFSBLOCK, 0, imap,
+				 (xfs_filblks_t)1, 0, NULLFSBLOCK, 0, imap,
 				 &nimaps, NULL);
 		ASSERT(nimaps == 1);
 		if ((imap->br_startblock == HOLESTARTBLOCK) ||
@@ -1568,7 +1568,7 @@ xfs_iomap_write(
 	}
 	nimaps = XFS_WRITE_IMAPS;
 	(void) xfs_bmapi(NULL, ip, offset_fsb,
-			 (xfs_extlen_t)(last_fsb - offset_fsb),
+			 (xfs_filblks_t)(last_fsb - offset_fsb),
 			 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
 			 XFS_BMAPI_ENTIRE, NULLFSBLOCK, 1, imap,
 			 &nimaps, NULL);
@@ -2446,7 +2446,7 @@ xfs_build_gap_list(
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	last_fsb;
-	xfs_extlen_t	count_fsb;
+	xfs_filblks_t	count_fsb;
 	xfs_gap_t	*new_gap;
 	xfs_gap_t	*last_gap;
 	xfs_mount_t	*mp;
@@ -2462,7 +2462,7 @@ xfs_build_gap_list(
 	mp = ip->i_mount;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	last_fsb = XFS_B_TO_FSB(mp, (offset + count));
-	count_fsb = (xfs_extlen_t)(last_fsb - offset_fsb);
+	count_fsb = (xfs_filblks_t)(last_fsb - offset_fsb);
 	ASSERT(count_fsb > 0);
 
 	last_gap = NULL;
@@ -2741,7 +2741,7 @@ xfs_strat_read(
 	xfs_fileoff_t	imap_offset;
 	xfs_fsblock_t	last_bp_bb;
 	xfs_fsblock_t	last_map_bb;
-	xfs_extlen_t	count_fsb;
+	xfs_filblks_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
 	xfs_fsize_t	isize;
 	off_t		offset;
@@ -3001,7 +3001,7 @@ xfs_strat_write_bp_trace(
 		     (void*)(bp->b_blkno),
 		     (void*)((unsigned long)(bp->b_flags)),
 		     (void*)(bp->b_pages),
-		     (void*)((unsigned long)(bp->b_pages->pf_pageno)),
+		     (void*)(bp->b_pages->pf_pageno),
 		     (void*)0,
 		     (void*)0,
 		     (void*)0);
@@ -3019,7 +3019,7 @@ xfs_strat_write_bp_trace(
 		     (void*)(bp->b_blkno),
 		     (void*)((unsigned long)(bp->b_flags)),
 		     (void*)(bp->b_pages),
-		     (void*)((unsigned long)(bp->b_pages->pf_pageno)),
+		     (void*)(bp->b_pages->pf_pageno),
 		     (void*)0,
 		     (void*)0,
 		     (void*)0);
@@ -3089,11 +3089,11 @@ STATIC void
 xfs_strat_write_check(
 	xfs_inode_t	*ip,
 	xfs_fileoff_t	offset_fsb,
-	xfs_extlen_t	buf_fsb,
+	xfs_filblks_t	buf_fsb,
 	xfs_bmbt_irec_t	*imap,
 	int		imap_count)
 {
-	xfs_extlen_t	count_fsb;
+	xfs_filblks_t	count_fsb;
 	int		nimaps;
 	int		n;
 
@@ -3216,7 +3216,7 @@ xfs_check_rbp(
 	int		nimaps;
 	xfs_bmbt_irec_t	imap;
 	xfs_fileoff_t	rbp_offset_fsb;
-	xfs_extlen_t	rbp_len_fsb;
+	xfs_filblks_t	rbp_len_fsb;
 	pfd_t		*pfdp;
 
 	mp = ip->i_mount;
@@ -3270,7 +3270,7 @@ xfs_check_bp(
 	int		nimaps;
 	xfs_bmbt_irec_t	imap;
 	xfs_fileoff_t	bp_offset_fsb;
-	xfs_extlen_t	bp_len_fsb;
+	xfs_filblks_t	bp_len_fsb;
 	pfd_t		*pfdp;
 	int		locked;
 
@@ -3783,7 +3783,7 @@ xfs_diostrat( buf_t *bp)
 	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
 	xfs_fileoff_t	offset_fsb;
 	xfs_fsblock_t	firstfsb;
-	xfs_extlen_t	count_fsb;
+	xfs_filblks_t	count_fsb;
 	xfs_bmap_free_t free_list;
 	caddr_t		base;
 	ssize_t		resid, count, totxfer;

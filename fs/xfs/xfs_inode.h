@@ -95,7 +95,7 @@ typedef struct xfs_inode {
 	/* I/O state */
 	off_t			i_next_offset;	/* seq read detector */
 	off_t			i_io_offset;	/* last buf offset */
-	xfs_fsblock_t		i_reada_blkno;	/* next blk to start ra */
+	xfs_fileoff_t		i_reada_blkno;	/* next blk to start ra */
 	unsigned int		i_io_size;	/* file io buffer len */
 	unsigned int		i_last_req_sz;	/* last read size */
 	unsigned int		i_num_readaheads; /* # read ahead bufs */

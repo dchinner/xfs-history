@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.42 $"
+#ident "$Revision: 1.43 $"
 
 struct getbmap;
 struct xfs_bmbt_rec;
@@ -73,7 +73,7 @@ typedef struct xfs_bmalloca {
 	xfs_fsblock_t		firstblock; /* i/o first block allocated */
 	xfs_extlen_t		alen;	/* i/o length asked/allocated */
 	xfs_extlen_t		total;	/* total blocks needed for xaction */
-	xfs_fsblock_t		off;	/* offset in file filling in */
+	xfs_fileoff_t		off;	/* offset in file filling in */
 	int			wasdel;	/* replacing a delayed allocation */
 	int			userdata;/* set if is user data */
 	xfs_extlen_t		minlen;	/* mininum allocation size (blocks) */
@@ -87,7 +87,6 @@ typedef struct xfs_bmalloca {
  * This would be hidden, but we want idbg to be able to see it.
  */
 typedef struct xfs_bmapi_locals {
-	int			orig_nmap; /* original value of *nmap */
 	char			delay;	/* this request is for delayed alloc */
 	char			exact;	/* don't do all of wasdelayed extent */
 	char			inhole;	/* current location is hole in file */
@@ -96,24 +95,25 @@ typedef struct xfs_bmapi_locals {
 	char			userdata; /* allocating non-metadata */
 	char			wasdelay; /* old extent was delayed */
 	char			wr;	/* this is a write request */
+	int			orig_nmap; /* original value of *nmap */
 	int			eof;	/* we've hit the end of extent list */
 	int			logflags; /* flags for transaction logging */
 	int			n;	/* current extent index */
 	int			nallocs; /* number of extents alloc\'d */
 	int			orig_flags; /* original flags arg value */
+	xfs_alloctype_t		type;	/* allocation type chosen */
 	struct xfs_bmbt_irec	*orig_mval; /* original value of mval */
 	struct xfs_bmbt_rec	*ep;	/* extent list entry pointer */
 	struct xfs_btree_cur	*cur;	/* bmap btree cursor */
-	xfs_alloctype_t		type;	/* allocation type chosen */
 	xfs_bmbt_irec_t		got;	/* current extent list record */
 	xfs_bmbt_irec_t		prev;	/* previous extent list record */
 	xfs_extlen_t		alen;	/* allocated extent length */
 	xfs_extlen_t		indlen;	/* indirect blocks length */
 	xfs_extlen_t		minleft; /* min blocks left after allocation */
 	xfs_extlen_t		minlen;	/* min allocation size */
-	xfs_extlen_t		orig_len; /* original value of len arg */
 	xfs_extnum_t		lastx;	/* last useful extent number */
 	xfs_extnum_t		nextents; /* number of extents in file */
+	xfs_filblks_t		orig_len; /* original value of len arg */
 	xfs_fileoff_t		aoff;	/* allocated file offset */
 	xfs_fileoff_t		end;	/* end of mapped file region */
 	xfs_fileoff_t		obno;	/* old block number (offset) */
@@ -128,7 +128,7 @@ typedef struct xfs_bmapi_locals {
 void
 xfs_bmap_add_free(
 	xfs_fsblock_t		bno,		/* fs block number of extent */
-	xfs_extlen_t		len,		/* length of extent */
+	xfs_filblks_t		len,		/* length of extent */
 	xfs_bmap_free_t		*flist,		/* list of extents */
 	xfs_mount_t		*mp);		/* mount point structure */
 
@@ -215,7 +215,7 @@ xfs_bmapi(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		bno,		/* starting file offs. mapped */
-	xfs_extlen_t		len,		/* length to map in file */
+	xfs_filblks_t		len,		/* length to map in file */
 	int			flags,		/* XFS_BMAPI_... */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
 	xfs_extlen_t		total,		/* total blocks needed */
@@ -235,7 +235,7 @@ xfs_bunmapi(
 	xfs_trans_t		*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		bno,		/* starting offset to unmap */
-	xfs_extlen_t		len,		/* length to unmap in file */
+	xfs_filblks_t		len,		/* length to unmap in file */
 	int			flags,		/* XFS_BMAPI_... */
 	xfs_extnum_t		nexts,		/* number of extents max */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */

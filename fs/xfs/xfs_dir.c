@@ -618,7 +618,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	xfs_ino_t inumber;
 	char *tmpbuffer;
 	int retval, i, size;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 
 	dp = iargs->dp;
 	size = dp->i_bytes;
@@ -834,7 +834,7 @@ xfs_dir_shortform_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
  * or a leaf in a node directory.
  */
 buf_t *
-xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno)
+xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t blkno)
 {
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_leaf_hdr *hdr;
@@ -1011,7 +1011,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, struct xfs_dir_name *args)
 	struct xfs_dir_intnode *node;
 	xfs_inode_t *dp;
 	buf_t *bp1, *bp2;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 	int retval;
 
 	dp = args->dp;
@@ -1123,7 +1123,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
  * Create the initial contents of an intermediate node.
  */
 buf_t *
-xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno,
+xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t blkno,
 			int level)
 {
 	struct xfs_dir_intnode *node;
@@ -1461,9 +1461,9 @@ xfs_dir_hashname(register char *name, register int namelen)
 
 int
 xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
-			       xfs_fsblock_t *new_blkno)
+			       xfs_fileoff_t *new_blkno)
 {
-	xfs_fsblock_t bno;
+	xfs_fileoff_t bno;
 	xfs_bmbt_irec_t map;
 	xfs_inode_t *dp;
 	int nmap;
@@ -1492,7 +1492,7 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 #ifndef SIM
 int
 xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
-				 xfs_fsblock_t dead_blkno, buf_t *dead_buf)
+				 xfs_fileoff_t dead_blkno, buf_t *dead_buf)
 {
 	xfs_inode_t *dp;
 	int done;
@@ -1514,7 +1514,7 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 #endif	/* !SIM */
 
 buf_t *
-xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
+xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno)
 {
 	xfs_bmbt_irec_t map;
 	int nmap;
@@ -1531,7 +1531,7 @@ xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
 #undef xfs_dir_read_buf
 #endif /* XFSDIRDEBUG */
 buf_t *
-xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t bno)
+xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno)
 {
 	xfs_bmbt_irec_t map;
 	int nmap;

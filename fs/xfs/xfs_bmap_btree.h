@@ -51,7 +51,7 @@ typedef struct xfs_bmbt_rec
 #define	ISNULLDSTARTBLOCK(x)	(((x) & DSTARTBLOCKMASK) == DSTARTBLOCKMASK)
 #define	NULLSTARTBLOCK(k)	\
 	((ASSERT(k < (1 << STARTBLOCKVALBITS))), (STARTBLOCKMASK | (k)))
-#define	STARTBLOCKVAL(x)	((xfs_extlen_t)((x) & ~STARTBLOCKMASK))
+#define	STARTBLOCKVAL(x)	((xfs_filblks_t)((x) & ~STARTBLOCKMASK))
 
 /*
  * Incore version of above.
@@ -60,7 +60,7 @@ typedef struct xfs_bmbt_irec
 {
 	xfs_fileoff_t	br_startoff;	/* starting file offset */
 	xfs_fsblock_t	br_startblock;	/* starting block number */
-	xfs_extlen_t	br_blockcount;	/* number of block */
+	xfs_filblks_t	br_blockcount;	/* number of blocks */
 } xfs_bmbt_irec_t;
 
 /*
@@ -166,7 +166,7 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
  */
 #define	XFS_BMBT_KTRACE_ARGBI	1
 #define	XFS_BMBT_KTRACE_ARGBII	2
-#define	XFS_BMBT_KTRACE_ARGFFI	3
+#define	XFS_BMBT_KTRACE_ARGFFF	3
 #define	XFS_BMBT_KTRACE_ARGI	4
 #define	XFS_BMBT_KTRACE_ARGIFK	5
 #define	XFS_BMBT_KTRACE_ARGIFR	6
@@ -251,7 +251,7 @@ xfs_bmbt_get_block(
 	int			level,
 	buf_t			**bpp);
 
-xfs_extlen_t
+xfs_filblks_t
 xfs_bmbt_get_blockcount(
 	xfs_bmbt_rec_t	*r);
 
@@ -298,21 +298,21 @@ xfs_bmbt_lookup_eq(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_extlen_t);
+	xfs_filblks_t);
 
 int
 xfs_bmbt_lookup_ge(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_extlen_t);
+	xfs_filblks_t);
 
 int
 xfs_bmbt_lookup_le(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_extlen_t);
+	xfs_filblks_t);
 
 #ifdef XFSDEBUG
 void
@@ -330,7 +330,7 @@ xfs_bmbt_set_all(
 void
 xfs_bmbt_set_blockcount(
 	xfs_bmbt_rec_t	*r,
-	xfs_extlen_t	v);
+	xfs_filblks_t	v);
 
 void
 xfs_bmbt_set_startblock(
@@ -354,6 +354,6 @@ xfs_bmbt_update(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_extlen_t);
+	xfs_filblks_t);
 
 #endif	/* _FS_XFS_BMAP_BTREE_H */

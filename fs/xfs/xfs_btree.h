@@ -363,7 +363,7 @@ xfs_btree_setbuf(
 	buf_t			*bp);	/* new buffer to set */
 
 /*
- * Min and max functions for extlen, agblock, and fileoff types.
+ * Min and max functions for extlen, agblock, fileoff, and filblks types.
  */
 #define	XFS_EXTLEN_MIN(a,b)	\
 	((xfs_extlen_t)(a) < (xfs_extlen_t)(b) ? \
@@ -385,5 +385,12 @@ xfs_btree_setbuf(
 #define	XFS_FILEOFF_MAX(a,b)	\
 	((xfs_fileoff_t)(a) > (xfs_fileoff_t)(b) ? \
 	 (xfs_fileoff_t)(a) : (xfs_fileoff_t)(b))
+
+#define	XFS_FILBLKS_MIN(a,b)	\
+	((xfs_filblks_t)(a) < (xfs_filblks_t)(b) ? \
+	 (xfs_filblks_t)(a) : (xfs_filblks_t)(b))
+#define	XFS_FILBLKS_MAX(a,b)	\
+	((xfs_filblks_t)(a) > (xfs_filblks_t)(b) ? \
+	 (xfs_filblks_t)(a) : (xfs_filblks_t)(b))
 
 #endif	/* !_FS_XFS_BTREE_H */

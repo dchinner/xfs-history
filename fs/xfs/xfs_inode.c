@@ -691,7 +691,7 @@ xfs_isize_check(
 	xfs_inode_t	*ip,
 	xfs_fsize_t	isize)
 {
-	xfs_fsblock_t	map_first;
+	xfs_fileoff_t	map_first;
 	int		nimaps;
 	xfs_bmbt_irec_t	imaps[2];
 
@@ -704,8 +704,7 @@ xfs_isize_check(
 	nimaps = 2;
 	map_first = XFS_B_TO_FSB(mp, isize);
 	(void) xfs_bmapi(NULL, ip, map_first,
-			 (XFS_B_TO_FSB(mp, (off_t)XFS_MAX_FILE_OFFSET) -
-			  map_first),
+			 (XFS_B_TO_FSB(mp, XFS_MAX_FILE_OFFSET) - map_first),
 			 XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imaps, &nimaps,
 			 NULL);
 	ASSERT(nimaps == 1);
@@ -822,9 +821,9 @@ xfs_itruncate_finish(
 	xfs_fsize_t	new_size)
 {
 	xfs_fsblock_t	first_block;
-	xfs_fsblock_t	first_unmap_block;
-	xfs_fsblock_t	last_block;
-	xfs_extlen_t	unmap_len;
+	xfs_fileoff_t	first_unmap_block;
+	xfs_fileoff_t	last_block;
+	xfs_filblks_t	unmap_len;
 	xfs_mount_t	*mp;
 	xfs_trans_t	*ntp;
 	int		done;

@@ -125,7 +125,7 @@ xfs_bmbt_get_rec(
 	xfs_btree_cur_t		*cur,
 	xfs_fileoff_t		*off,
 	xfs_fsblock_t		*bno,
-	xfs_extlen_t		*len);
+	xfs_filblks_t		*len);
 #endif
 
 /*
@@ -225,15 +225,15 @@ xfs_bmbt_trace_argbii(
 	int			i1);
 
 /*
- * Add a trace buffer entry for arguments, for 2 blocks & 1 integer arg.
+ * Add a trace buffer entry for arguments, for 3 block-length args.
  */
 STATIC void
-xfs_bmbt_trace_argffi(
+xfs_bmbt_trace_argfff(
 	char			*name,
 	xfs_btree_cur_t		*cur,
 	xfs_dfiloff_t		o,
 	xfs_dfsbno_t		b,
-	int			i);
+	xfs_dfilblks_t		i);
 
 /*
  * Add a trace buffer entry for arguments, for one integer arg.
@@ -308,7 +308,7 @@ xfs_bmbt_trace_enter(
 #else
 #define	xfs_bmbt_trace_argbi(n,c,b,i)
 #define	xfs_bmbt_trace_argbii(n,c,b,i,j)
-#define	xfs_bmbt_trace_argffi(n,c,o,b,i)
+#define	xfs_bmbt_trace_argfff(n,c,o,b,i)
 #define	xfs_bmbt_trace_argi(n,c,i)
 #define	xfs_bmbt_trace_argifk(n,c,i,f,k)
 #define	xfs_bmbt_trace_argifr(n,c,i,f,r)
@@ -587,7 +587,7 @@ xfs_bmbt_get_rec(
 	xfs_btree_cur_t		*cur,
 	xfs_fileoff_t		*off,
 	xfs_fsblock_t		*bno,
-	xfs_extlen_t		*len)
+	xfs_filblks_t		*len)
 {
 	xfs_bmbt_block_t	*block;
 	buf_t			*bp;
@@ -1539,19 +1539,19 @@ xfs_bmbt_trace_argbii(
 }
 
 /*
- * Add a trace buffer entry for arguments, for 2 blocks & 1 integer arg.
+ * Add a trace buffer entry for arguments, for 3 block-length args.
  */
 STATIC void
-xfs_bmbt_trace_argffi(
+xfs_bmbt_trace_argfff(
 	char			*name,
 	xfs_btree_cur_t		*cur,
 	xfs_dfiloff_t		o,
 	xfs_dfsbno_t		b,
-	int			i)
+	xfs_dfilblks_t		i)
 {
-	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_ARGFFI,
+	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_ARGFFF,
 		o >> 32, (int)o, b >> 32, (int)b,
-		i, 0, 0, 0,
+		i >> 32, (int)i, 0, 0,
 		0, 0, 0, 0);
 }
 
@@ -1604,7 +1604,7 @@ xfs_bmbt_trace_argifr(
 	xfs_bmbt_rec_t		*r)
 {
 	xfs_dfsbno_t		b;
-	xfs_extlen_t		c;
+	xfs_dfilblks_t		c;
 	xfs_dfsbno_t		d;
 	xfs_dfiloff_t		o;
 	xfs_bmbt_irec_t		s;
@@ -1616,8 +1616,8 @@ xfs_bmbt_trace_argifr(
 	c = s.br_blockcount;
 	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_ARGIFR,
 		i, d >> 32, (int)d, o >> 32,
-		(int)o, b >> 32, (int)b, c,
-		0, 0, 0, 0);
+		(int)o, b >> 32, (int)b, c >> 32,
+		(int)c, 0, 0, 0);
 }
 
 /*
@@ -1889,7 +1889,7 @@ xfs_bmbt_get_all(
 			   (((xfs_fsblock_t)r->l3) >> 21);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILESYSTEMS */
-	s->br_blockcount = (xfs_extlen_t)(r->l3 & 0x001fffff);
+	s->br_blockcount = (xfs_filblks_t)(r->l3 & 0x001fffff);
 }
 
 /*
@@ -1917,11 +1917,11 @@ xfs_bmbt_get_block(
 /*
  * Extract the blockcount field from a bmap extent record.
  */
-xfs_extlen_t
+xfs_filblks_t
 xfs_bmbt_get_blockcount(
 	xfs_bmbt_rec_t	*r)
 {
-	return (xfs_extlen_t)(r->l3 & 0x001fffff);
+	return (xfs_filblks_t)(r->l3 & 0x001fffff);
 }
 
 /*
@@ -2165,7 +2165,7 @@ xfs_bmbt_lookup_eq(
 	xfs_btree_cur_t	*cur,
 	xfs_fileoff_t	off,
 	xfs_fsblock_t	bno,
-	xfs_extlen_t	len)
+	xfs_filblks_t	len)
 {
 	cur->bc_rec.b.br_startoff = off;
 	cur->bc_rec.b.br_startblock = bno;
@@ -2178,7 +2178,7 @@ xfs_bmbt_lookup_ge(
 	xfs_btree_cur_t	*cur,
 	xfs_fileoff_t	off,
 	xfs_fsblock_t	bno,
-	xfs_extlen_t	len)
+	xfs_filblks_t	len)
 {
 	cur->bc_rec.b.br_startoff = off;
 	cur->bc_rec.b.br_startblock = bno;
@@ -2191,7 +2191,7 @@ xfs_bmbt_lookup_le(
 	xfs_btree_cur_t	*cur,
 	xfs_fileoff_t	off,
 	xfs_fsblock_t	bno,
-	xfs_extlen_t	len)
+	xfs_filblks_t	len)
 {
 	cur->bc_rec.b.br_startoff = off;
 	cur->bc_rec.b.br_startblock = bno;
@@ -2274,7 +2274,7 @@ xfs_bmbt_set_all(
 void
 xfs_bmbt_set_blockcount(
 	xfs_bmbt_rec_t	*r,
-	xfs_extlen_t	v)
+	xfs_filblks_t	v)
 {
 	ASSERT((v & ~((1 << 21) - 1)) == 0);
 	r->l3 = (r->l3 & 0xffe00000) | ((__uint32_t)v & 0x001fffff);
@@ -2358,7 +2358,7 @@ xfs_bmbt_update(
 	xfs_btree_cur_t		*cur,
 	xfs_fileoff_t		off,
 	xfs_fsblock_t		bno,
-	xfs_extlen_t		len)
+	xfs_filblks_t		len)
 {
 	xfs_bmbt_block_t	*block;
 	buf_t			*bp;
@@ -2368,8 +2368,8 @@ xfs_bmbt_update(
 
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_update entry", cur);
-	xfs_bmbt_trace_argffi("xfs_bmbt_update args", cur,
-		(xfs_dfiloff_t)off, (xfs_dfsbno_t)bno, (int)len);
+	xfs_bmbt_trace_argfff("xfs_bmbt_update args", cur,
+		(xfs_dfiloff_t)off, (xfs_dfsbno_t)bno, (xfs_dfilblks_t)len);
 	block = xfs_bmbt_get_block(cur, 0, &bp);
 	xfs_btree_check_lblock(cur, block, 0);
 	ptr = cur->bc_ptrs[0];

@@ -17,7 +17,7 @@ typedef struct xfs_strat_write_locals {
 	xfs_fileoff_t	imap_offset;
 	xfs_fsblock_t	first_block;
 	xfs_fsize_t	real_size;
-	xfs_extlen_t	count_fsb;
+	xfs_filblks_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
 	off_t		last_rbp_offset;
 	xfs_extlen_t	last_rbp_bcount;

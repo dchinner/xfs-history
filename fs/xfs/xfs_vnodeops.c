@@ -1076,7 +1076,7 @@ xfs_inactive(vnode_t	*vp,
 	xfs_bmap_free_t	free_list;
 	xfs_fileoff_t	end_fsb;
 	xfs_fileoff_t	last_fsb;
-	xfs_extlen_t	map_len;
+	xfs_filblks_t	map_len;
 	int		nimaps;
 	xfs_bmbt_irec_t	imap;
 
@@ -3718,8 +3718,8 @@ xfs_symlink(vnode_t	*dir_vp,
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_DATA | XFS_ILOG_CORE);
 	}
 	else {
-                xfs_fsblock_t   first_fsb;
-                xfs_extlen_t    fs_blocks;
+                xfs_fileoff_t   first_fsb;
+                xfs_filblks_t   fs_blocks;
                 int             nmaps;
                 xfs_bmbt_irec_t mval [SYMLINK_MAPS];
                 daddr_t         d;
@@ -4042,8 +4042,8 @@ xfs_allocstore(vnode_t	*vp,
 	xfs_fileoff_t	last_fsb;
         xfs_fileoff_t	curr_off_fsb;
 	xfs_fileoff_t	unmap_offset_fsb;
-	xfs_extlen_t	count_fsb;
-	xfs_extlen_t	unmap_len_fsb;
+	xfs_filblks_t	count_fsb;
+	xfs_filblks_t	unmap_len_fsb;
 	xfs_bmbt_irec_t	*imapp;
 	xfs_bmbt_irec_t	*last_imapp;
 	int		i;
@@ -4071,7 +4071,7 @@ xfs_allocstore(vnode_t	*vp,
 		count = isize - offset;
 	}
 	last_fsb = XFS_B_TO_FSB(mp, offset + count);
-	count_fsb = (xfs_extlen_t)(last_fsb - offset_fsb);
+	count_fsb = (xfs_filblks_t)(last_fsb - offset_fsb);
 	orig_nimaps = NDPP;
 	(void) xfs_bmapi(NULL, ip, offset_fsb, count_fsb, 0, NULLFSBLOCK, 0,
 			 orig_imap, &orig_nimaps, NULL);
@@ -4081,7 +4081,7 @@ xfs_allocstore(vnode_t	*vp,
 	while (count_fsb > 0) {
 		nimaps = XFS_BMAP_MAX_NMAP;
 		(void) xfs_bmapi(NULL, ip, curr_off_fsb,
-				 (xfs_extlen_t)(last_fsb - curr_off_fsb),
+				 (xfs_filblks_t)(last_fsb - curr_off_fsb),
 				 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE,
 				 NULLFSBLOCK, 1, imap, &nimaps, NULL);
 		if (nimaps == 0) {
@@ -4125,8 +4125,7 @@ xfs_allocstore(vnode_t	*vp,
 	last_imapp = &orig_imap[orig_nimaps - 1];
 	while (imapp <= last_imapp) {
 		if (unmap_offset_fsb != imapp->br_startoff) {
-			unmap_len_fsb = imapp->br_startoff -
-				        unmap_offset_fsb;
+			unmap_len_fsb = imapp->br_startoff - unmap_offset_fsb;
 			(void) xfs_bunmapi(NULL, ip, unmap_offset_fsb,
 					   unmap_len_fsb, 0, 1, NULLFSBLOCK,
 					   NULL, NULL);

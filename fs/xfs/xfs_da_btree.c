@@ -246,7 +246,7 @@ xfs_dir_root_split(struct xfs_dir_state *state,
 			  struct xfs_dir_state_blk *blk2)
 {
 	struct xfs_dir_intnode *node, *oldroot;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 	buf_t *bp;
 	int retval;
 
@@ -290,7 +290,7 @@ xfs_dir_leaf_split(struct xfs_dir_state *state,
 			  struct xfs_dir_state_blk *newblk)
 {
 	struct xfs_dir_leafblock *leaf;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 	int retval;
 
 	/*
@@ -754,7 +754,7 @@ xfs_dir_node_split(struct xfs_dir_state *state,
 			  int treelevel)
 {
 	struct xfs_dir_intnode *node;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 	int retval;
 
 	node = (struct xfs_dir_intnode *)oldblk->bp->b_un.b_addr;
@@ -1037,7 +1037,7 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 {
 	struct xfs_dir_intnode *oldroot, *newroot;
 	struct xfs_dir_leafblock *leaf;
-	xfs_fsblock_t child;
+	xfs_fileoff_t child;
 	buf_t *bp;
 
 	ASSERT(root_blk->bp->b_offset == 0);
@@ -1095,7 +1095,7 @@ xfs_dir_blk_toosmall(struct xfs_dir_state *state)
 	struct xfs_dir_state_blk *blk;
 	struct xfs_dir_blkinfo *info;
 	int count, bytes, forward, i;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 	buf_t *bp;
 
 	/*
@@ -1691,7 +1691,7 @@ xfs_dir_node_lookup_int(struct xfs_dir_state *state)
 	struct xfs_dir_intnode *node;
 	struct xfs_dir_node_entry *btree;
 	struct xfs_dir_leafblock *leaf;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 	int probe, span, max;
 	uint hashval;
 
@@ -2102,7 +2102,7 @@ xfs_dir_path_shift(struct xfs_dir_state *state, struct xfs_dir_state_path *path,
 	struct xfs_dir_blkinfo *info;
 	struct xfs_dir_intnode *node;
 	struct xfs_dir_leafblock *leaf;
-	xfs_fsblock_t blkno;
+	xfs_fileoff_t blkno;
 	int level;
 
 	/*
@@ -2329,7 +2329,7 @@ xfsdir_t_log_inode(xfs_trans_t *tp, xfs_inode_t *ip, uint flags,
 	xfs_trans_log_inode(tp, ip, flags);
 }
 buf_t *
-xfsdir_t_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *ip, xfs_fsblock_t bno,
+xfsdir_t_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *ip, xfs_fileoff_t bno,
 				  char *file, int line)
 {
 	buf_t *bp;
@@ -2399,8 +2399,8 @@ xfsdir_dumptrace()
  * Load all of the block in a directory into memory so they can be seen.
  *========================================================================*/
 
-int xfsdir_load_leaf(xfs_inode_t *dp, xfs_fsblock_t blkno);
-int xfsdir_load_node(xfs_inode_t *dp, xfs_fsblock_t blkno);
+int xfsdir_load_leaf(xfs_inode_t *dp, xfs_fileoff_t blkno);
+int xfsdir_load_node(xfs_inode_t *dp, xfs_fileoff_t blkno);
 
 int
 xfsdir_loaddir(xfs_inode_t *dp)
@@ -2418,7 +2418,7 @@ xfsdir_loaddir(xfs_inode_t *dp)
 }
 
 int
-xfsdir_load_leaf(xfs_inode_t *dp, xfs_fsblock_t blkno)
+xfsdir_load_leaf(xfs_inode_t *dp, xfs_fileoff_t blkno)
 {
 	struct xfs_dir_leafblock *leaf;
 	buf_t *bp;
@@ -2433,7 +2433,7 @@ xfsdir_load_leaf(xfs_inode_t *dp, xfs_fsblock_t blkno)
 }
 
 int
-xfsdir_load_node(xfs_inode_t *dp, xfs_fsblock_t blkno)
+xfsdir_load_node(xfs_inode_t *dp, xfs_fileoff_t blkno)
 {
 	struct xfs_dir_intnode *node;
 	struct xfs_dir_node_entry *btree;
@@ -2479,8 +2479,8 @@ struct xfsdir_context {
 	int		maxblockmap;	/* size of block-use map */
 	char		*blockmap;	/* map of blocks and their uses */
 	int		maxlinkmap;	/* size of forw/back link map */
-	xfs_fsblock_t	*forw_links;	/* map of forward chain links */
-	xfs_fsblock_t	*back_links;	/* map of backward chain links */
+	xfs_fileoff_t	*forw_links;	/* map of forward chain links */
+	xfs_fileoff_t	*back_links;	/* map of backward chain links */
 	int		bytemapsize;	/* size of used/free bytemap */
 	char		*bytemap;	/* used/free bytes in leaf blk */
 	int		namebytes;	/* total bytes used in filenames */
@@ -2492,17 +2492,17 @@ struct xfsdir_context {
 };
 
 
-int xfsdir_leaf_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+int xfsdir_leaf_check(struct xfsdir_context *con, xfs_fileoff_t blkno,
 			     int firstlast);
-int xfsdir_node_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+int xfsdir_node_check(struct xfsdir_context *con, xfs_fileoff_t blkno,
 			     int depth, int firstlast);
 int xfsdir_check_blockuse(struct xfsdir_context *con);
 int xfsdir_checkchain(struct xfsdir_context *con, buf_t *bp,
-			     xfs_fsblock_t parentblk,
-			     xfs_fsblock_t blkno, int forward);
-int xfsdir_endchain(struct xfsdir_context *con, buf_t *bp, xfs_fsblock_t blkno);
+			     xfs_fileoff_t parentblk,
+			     xfs_fileoff_t blkno, int forward);
+int xfsdir_endchain(struct xfsdir_context *con, buf_t *bp, xfs_fileoff_t blkno);
 int xfsdir_checkblock(struct xfsdir_context *con, buf_t *bp,
-			     xfs_fsblock_t blkno, int level);
+			     xfs_fileoff_t blkno, int level);
 int xfsdir_checkname(buf_t *bp, char *name, int namelen, int index,
 			   uint hashval);
 int xfsdir_printbytes(int bytes);
@@ -2524,9 +2524,9 @@ xfsdir_check(xfs_inode_t *dp)
 	con->blockmap = (char *)
 		kmem_zalloc(numblks * sizeof(*con->blockmap), KM_SLEEP);
 	con->maxlinkmap = numblks;
-	con->forw_links = (xfs_fsblock_t *)
+	con->forw_links = (xfs_fileoff_t *)
 		kmem_zalloc(numblks * sizeof(*con->forw_links), KM_SLEEP);
-	con->back_links = (xfs_fsblock_t *)
+	con->back_links = (xfs_fileoff_t *)
 		kmem_zalloc(numblks * sizeof(*con->back_links), KM_SLEEP);
 	con->bytemapsize = XFS_LBSIZE(dp->i_mount);
 	con->bytemap = (char *)
@@ -2544,7 +2544,7 @@ xfsdir_check(xfs_inode_t *dp)
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		retval = xfsdir_leaf_check(con, 0, -2);
 	} else {
-		retval = xfsdir_node_check(con, (xfs_fsblock_t)0, -1, -2);
+		retval = xfsdir_node_check(con, (xfs_fileoff_t)0, -1, -2);
 		retval += xfsdir_check_blockuse(con);
 		printf("%d nodes, %d leaves, %d files, ",
 			   con->nodes, con->leaves, con->entries);
@@ -2612,7 +2612,7 @@ xfsdir_shortform_check(struct xfsdir_context *con)
  *========================================================================*/
 
 int
-xfsdir_leaf_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+xfsdir_leaf_check(struct xfsdir_context *con, xfs_fileoff_t blkno,
 			 int firstlast)
 {
 	struct xfs_dir_leafblock *leaf;
@@ -2788,7 +2788,7 @@ xfsdir_leaf_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
  *========================================================================*/
 
 int
-xfsdir_node_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+xfsdir_node_check(struct xfsdir_context *con, xfs_fileoff_t blkno,
 			 int depth, int firstlast)
 {
 	struct xfs_dir_intnode *node;
@@ -2929,7 +2929,7 @@ xfsdir_checkname(buf_t *bp, char *name, int namelen, int index, uint hashval)
 
 int
 xfsdir_checkblock(struct xfsdir_context *con, buf_t *bp,
-			 xfs_fsblock_t blkno, int level)
+			 xfs_fileoff_t blkno, int level)
 {
 	int retval;
 
@@ -2947,7 +2947,7 @@ xfsdir_checkblock(struct xfsdir_context *con, buf_t *bp,
 }
 
 int
-xfsdir_endchain(struct xfsdir_context *con, buf_t *bp, xfs_fsblock_t blkno)
+xfsdir_endchain(struct xfsdir_context *con, buf_t *bp, xfs_fileoff_t blkno)
 {
 	int retval;
 
@@ -2960,11 +2960,11 @@ xfsdir_endchain(struct xfsdir_context *con, buf_t *bp, xfs_fsblock_t blkno)
 
 int
 xfsdir_checkchain(struct xfsdir_context *con, buf_t *bp,
-			 xfs_fsblock_t parentblk, xfs_fsblock_t blkno,
+			 xfs_fileoff_t parentblk, xfs_fileoff_t blkno,
 			 int forward)
 {
 	int retval, tmp, i;
-	xfs_fsblock_t *links;
+	xfs_fileoff_t *links;
 
 	retval = 0;
 	if (blkno >= con->maxblockmap) {
