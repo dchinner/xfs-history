@@ -1,7 +1,8 @@
+#ident "$Revision: 1.10 $"
 
 #include <sys/param.h>
 #ifdef SIM
-#define _KERNEL
+#define _KERNEL	1
 #endif
 #include <sys/buf.h>
 #ifdef SIM
