@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -616,8 +616,15 @@ xfs_dialloc_next_free(
 /*
  * Free disk inode.  Carefully avoids touching the incore inode, all
  * manipulations incore are the caller's responsibility.
+ *
+ * The caller is responsible for making the same changes to the in-core
+ * inode that are made to the on-disk inode here.  This applies to the
+ * di_format, di_mode, and di_flags fields.  It does not apply to the
+ * di_u.di_next field.  This field is managed entirely by xfs_dialloc()
+ * and xfs_difree() since it can be changed out from under the in-core
+ * inodes that are free in order to preserve locality on the free list.
  */
-xfs_agino_t				/* next value to be stored in di_un */
+void
 xfs_difree(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	inode)		/* inode to be freed */
@@ -686,9 +693,16 @@ xfs_difree(
 		flags |= XFS_AGI_FREELIST;
 	}
 	/*
+	 * Make the on-disk version of the inode look free.
+	 */
+	free->di_core.di_format = XFS_DINODE_FMT_AGINO;
+	free->di_core.di_mode = 0;
+	free->di_core.di_flags = 0;
+	/*
 	 * Log the change to the newly freed inode.
 	 */
-	xfs_ialloc_log_di(tp, fbuf, off, XFS_DI_U);
+	xfs_ialloc_log_di(tp, fbuf, off, XFS_DI_U | XFS_DI_MODE |
+			  XFS_DI_FORMAT | XFS_DI_FLAGS);
 	/*
 	 * Change the inode free counts and log the ag/sb changes.
 	 */
@@ -696,11 +710,7 @@ xfs_difree(
 	flags |= XFS_AGI_FREECOUNT;
 	xfs_ialloc_log_agi(tp, agbuf, flags);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
-	/*
-	 * Return the value to be stored in the incore inode's union.
-	 * The caller must set the format field to XFS_DINODE_FMT_AGINO.
-	 */
-	return free->di_u.di_next;
+	return;
 }
 
 /*
