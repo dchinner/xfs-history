@@ -34,9 +34,6 @@
 
 #include <linux/vnode.h>
 
-#define ISVDEV(t) \
-	((t) == VCHR || (t) == VBLK || (t) == VFIFO || (t) == VSOCK)
-
 /*
  * Conversion between vnode types/modes and encoded type/mode as
  * seen by stat(2) and mknod(2).

@@ -73,15 +73,11 @@ has_fs_struct(struct task_struct *task)
 }
 #endif
 
-/*
- * Common code used to create/instantiate various things in a directory.
- */
 STATIC int
-linvfs_common_create(
+linvfs_mknod(
 	struct inode	*dir,
 	struct dentry	*dentry,
 	int		mode,
-	enum vtype	tp,
 	int		rdev)
 {
 	struct inode	*ip;
@@ -89,13 +85,14 @@ linvfs_common_create(
 	vnode_t		*vp = NULL, *dvp = LINVFS_GET_VPTR(dir);
 	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
 	int		have_default_acl = 0;
-	int		error = 0;
+	int		error = EINVAL;
 
 	if (test_default_acl)
 		have_default_acl = test_default_acl(dvp);
 
 #ifdef CONFIG_FS_POSIX_ACL
-	/* Conditionally compiled so that the ACL base kernel changes can be
+	/*
+	 * Conditionally compiled so that the ACL base kernel changes can be
 	 * split out into separate patches - remove this once the S_POSIXACL
 	 * flag is accepted, or some other way to implement this exists.
 	 */
@@ -105,26 +102,23 @@ linvfs_common_create(
 
 	bzero(&va, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
-	va.va_type = tp;
+	va.va_type = IFTOVT(mode);
 	va.va_mode = mode;
 
-	if (tp == VREG) {
-		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp, NULL, error);
-	} else if (ISVDEV(tp)) {
-		/*
-		 * Get the real type from the mode
-		 */
+	switch (mode) {
+	case S_IFCHR: case S_IFBLK: case S_IFIFO: case S_IFSOCK:
 		va.va_rdev = rdev;
 		va.va_mask |= AT_RDEV;
-		va.va_type = IFTOVT(mode);
-		if (va.va_type == VNON) {
-			return -EINVAL;
-		}
+		/*FALLTHROUGH*/
+	case S_IFREG:
 		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp, NULL, error);
-	} else if (tp == VDIR) {
+		break;
+	case S_IFDIR:
 		VOP_MKDIR(dvp, dentry, &va, &vp, NULL, error);
-	} else {
+		break;
+	default:
 		error = EINVAL;
+		break;
 	}
 
 	if (!error) {
@@ -134,7 +128,8 @@ linvfs_common_create(
 			VN_RELE(vp);
 			return -ENOMEM;
 		}
-		if (ISVDEV(tp))
+
+		if (S_ISCHR(mode) || S_ISBLK(mode))
 			ip->i_rdev = to_kdev_t(rdev);
 		/* linvfs_revalidate_core returns (-) errors */
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
@@ -160,17 +155,24 @@ linvfs_common_create(
 	return -error;
 }
 
-/*
- * Create a new file in dir using mode.
- */
 STATIC int
 linvfs_create(
 	struct inode	*dir,
 	struct dentry	*dentry,
 	int		mode)
 {
-	return linvfs_common_create(dir, dentry, mode, VREG, 0);
+	return linvfs_mknod(dir, dentry, mode, 0);
 }
+
+STATIC int
+linvfs_mkdir(
+	struct inode	*dir,
+	struct dentry	*dentry,
+	int		mode)
+{
+	return linvfs_mknod(dir, dentry, mode, 0);
+}
+
 
 STATIC struct dentry *
 linvfs_lookup(
@@ -299,15 +301,6 @@ linvfs_symlink(
 }
 
 STATIC int
-linvfs_mkdir(
-	struct inode	*dir,
-	struct dentry	*dentry,
-	int		mode)
-{
-	return linvfs_common_create(dir, dentry, mode, VDIR, 0);
-}
-
-STATIC int
 linvfs_rmdir(
 	struct inode	*dir,
 	struct dentry	*dentry)
@@ -324,31 +317,6 @@ linvfs_rmdir(
 		mark_inode_dirty_sync(dir);
 	}
 	return -error;
-}
-
-STATIC int
-linvfs_mknod(
-	struct inode	*dir,
-	struct dentry	*dentry,
-	int		mode,
-	int		rdev)
-{
-	enum vtype	tp;
-
-	if (S_ISCHR(mode)) {
-		tp = VCHR;
-	} else if (S_ISBLK(mode)) {
-		tp = VBLK;
-	} else if (S_ISFIFO(mode)) {
-		tp = VFIFO;
-	} else if (S_ISSOCK(mode)) {
-		tp = VSOCK;
-	} else {
-		return -EINVAL;
-	}
-
-	/* linvfs_common_create will return (-) errors */
-	return linvfs_common_create(dir, dentry, mode, tp, rdev);
 }
 
 STATIC int
