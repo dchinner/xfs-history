@@ -1,4 +1,4 @@
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 
 #include <sys/param.h>
@@ -2167,7 +2167,6 @@ xfs_qm_shake_freelist(
 			ASSERT(! XFS_DQ_IS_DIRTY(dqp));
 			ASSERT(dqp->HL_PREVP == NULL);
 			ASSERT(dqp->MPL_PREVP == NULL);
-			ASSERT(dqp->dq_flags == 0);
 #ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dqinact_reclaims++;
 #endif
