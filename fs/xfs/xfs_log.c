@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.156 $"
+#ident	"$Revision: 1.158 $"
 
 /*
  * High level interface routines for log manager
@@ -961,7 +961,9 @@ xlog_bdstrat_cb(struct buf *bp)
 		return 0;
 	} 
 
+#ifndef SIM
 	buftrace("XLOG__BDSTRAT IOERROR", bp);
+#endif
 	bioerror(bp, EIO);
 	bp->b_flags |= B_STALE;
 	biodone(bp);
@@ -2174,6 +2176,12 @@ redo:
 	if (tic->t_flags & XLOG_TIC_IN_Q)
 		XLOG_DEL_TICKETQ(log->l_reserve_headq, tic);
 	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: err_ret");
+	/*
+	 * If we are failing, make sure the ticket doesn't have any
+	 * current reservations. We don't want to add this back when
+	 * the ticket/transaction gets cancelled.
+	 */
+	tic->t_curr_res = 0;
 	GRANT_UNLOCK(log, spl);
 	return XFS_ERROR(EIO);
 }	/* xlog_grant_log_space */
