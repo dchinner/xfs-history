@@ -177,7 +177,7 @@ xfs_alloc_ag_vextent(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block (bno), or NULLAGBLOCK if we can't do it.
  */
-STATIC void
+STATIC int
 xfs_alloc_ag_vextent_exact(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
@@ -187,7 +187,7 @@ xfs_alloc_ag_vextent_exact(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
  */
-STATIC void
+STATIC int
 xfs_alloc_ag_vextent_near(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
@@ -197,7 +197,7 @@ xfs_alloc_ag_vextent_near(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
  */
-STATIC void
+STATIC int
 xfs_alloc_ag_vextent_size(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
@@ -430,6 +430,8 @@ STATIC void
 xfs_alloc_ag_vextent(
 	xfs_alloc_arg_t	*args)	/* argument structure for allocation */
 {
+	int		wasfromfl;	/* alloc made from freelist */
+
 	ASSERT(args->minlen > 0);
 	ASSERT(args->maxlen > 0);
 	ASSERT(args->minlen <= args->maxlen);
@@ -439,13 +441,13 @@ xfs_alloc_ag_vextent(
 	 */
 	switch (args->type) {
 	case XFS_ALLOCTYPE_THIS_AG:
-		xfs_alloc_ag_vextent_size(args);
+		wasfromfl = xfs_alloc_ag_vextent_size(args);
 		break;
 	case XFS_ALLOCTYPE_NEAR_BNO:
-		xfs_alloc_ag_vextent_near(args);
+		wasfromfl = xfs_alloc_ag_vextent_near(args);
 		break;
 	case XFS_ALLOCTYPE_THIS_BNO:
-		xfs_alloc_ag_vextent_exact(args);
+		wasfromfl = xfs_alloc_ag_vextent_exact(args);
 		break;
 	default:
 		ASSERT(0);
@@ -460,12 +462,16 @@ xfs_alloc_ag_vextent(
 		int 		slen = (int)args->len;
 
 		ASSERT(args->len >= args->minlen && args->len <= args->maxlen);
-		agf = XFS_BUF_TO_AGF(args->agbp);
-		agf->agf_freeblks -= args->len;
-		ASSERT(agf->agf_freeblks <= agf->agf_length);
-		xfs_alloc_trace_modagf("xfs_alloc_ag_vextent", NULL, args->mp,
-			agf, XFS_AGF_FREEBLKS);
-		xfs_alloc_log_agf(args->tp, args->agbp, XFS_AGF_FREEBLKS);
+		ASSERT(!wasfromfl || !args->isfl);
+		if (!wasfromfl) {
+			agf = XFS_BUF_TO_AGF(args->agbp);
+			agf->agf_freeblks -= args->len;
+			ASSERT(agf->agf_freeblks <= agf->agf_length);
+			xfs_alloc_trace_modagf("xfs_alloc_ag_vextent", NULL,
+				args->mp, agf, XFS_AGF_FREEBLKS);
+			xfs_alloc_log_agf(args->tp, args->agbp,
+				XFS_AGF_FREEBLKS);
+		}
 		if (!args->isfl)
 			xfs_trans_mod_sb(args->tp,
 				args->wasdel ? XFS_TRANS_SB_RES_FDBLOCKS :
@@ -479,7 +485,7 @@ xfs_alloc_ag_vextent(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block (bno), or NULLAGBLOCK if we can't do it.
  */
-STATIC void
+STATIC int
 xfs_alloc_ag_vextent_exact(
 	xfs_alloc_arg_t	*args)	/* allocation argument structure */
 {
@@ -512,7 +518,7 @@ xfs_alloc_ag_vextent_exact(
 		 */
 		xfs_btree_del_cursor(bno_cur);
 		args->agbno = NULLAGBLOCK;
-		return;
+		return 0;
 	}
 	/*
 	 * Grab the freespace record.
@@ -528,7 +534,7 @@ xfs_alloc_ag_vextent_exact(
 	if (fend < minend) {
 		xfs_btree_del_cursor(bno_cur);
 		args->agbno = NULLAGBLOCK;
-		return;
+		return 0;
 	}
 	/*
 	 * End of extent will be smaller of the freespace end and the
@@ -542,7 +548,7 @@ xfs_alloc_ag_vextent_exact(
 	xfs_alloc_fix_len(args);
 	if (!xfs_alloc_fix_minleft(args)) {
 		xfs_btree_del_cursor(bno_cur);
-		return;
+		return 0;
 	}
 	rlen = args->len;
 	ASSERT(args->agbno + rlen <= fend);
@@ -619,6 +625,7 @@ xfs_alloc_ag_vextent_exact(
 	ASSERT(args->agbno + args->len <=
 	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 	xfs_alloc_trace_alloc(fname, NULL, args);
+	return 0;
 }
 
 /*
@@ -627,7 +634,7 @@ xfs_alloc_ag_vextent_exact(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
  */
-STATIC void
+STATIC int
 xfs_alloc_ag_vextent_near(
 	xfs_alloc_arg_t	*args)		/* allocation argument structure */
 {
@@ -681,7 +688,7 @@ xfs_alloc_ag_vextent_near(
 			ASSERT(args->agbno + args->len <=
 			       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 			xfs_alloc_trace_alloc(fname, "freelist", args);
-			return;
+			return 1;
 		}
 		/*
 		 * If nothing, or what we got is too small, give up.
@@ -689,7 +696,7 @@ xfs_alloc_ag_vextent_near(
 		if (ltlen < args->minlen) {
 			xfs_btree_del_cursor(cnt_cur);
 			args->agbno = NULLAGBLOCK;
-			return;
+			return 0;
 		}
 	}
 	/* 
@@ -752,7 +759,7 @@ xfs_alloc_ag_vextent_near(
 		xfs_alloc_fix_len(args);
 		if (!xfs_alloc_fix_minleft(args)) {
 			xfs_btree_del_cursor(cnt_cur);
-			return;
+			return 0;
 		}
 		rlen = args->len;
 		/*
@@ -840,7 +847,7 @@ xfs_alloc_ag_vextent_near(
 		ASSERT(args->agbno + args->len <=
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 		xfs_alloc_trace_alloc(fname, "first", args);
-		return;
+		return 0;
 	}
 	/*
 	 * Second algorithm.
@@ -1099,7 +1106,7 @@ xfs_alloc_ag_vextent_near(
 		if (!xfs_alloc_fix_minleft(args)) {
 			xfs_btree_del_cursor(bno_cur_lt);
 			xfs_btree_del_cursor(cnt_cur);
-			return;
+			return 0;
 		}
 		rlen = args->len;
 		ltdiff = xfs_alloc_compute_diff(args->agbno, rlen, ltbno, ltlen,
@@ -1182,7 +1189,7 @@ xfs_alloc_ag_vextent_near(
 		if (!xfs_alloc_fix_minleft(args)) {
 			xfs_btree_del_cursor(bno_cur_gt);
 			xfs_btree_del_cursor(cnt_cur);
-			return;
+			return 0;
 		}
 		rlen = args->len;
 		gtdiff = xfs_alloc_compute_diff(args->agbno, rlen, gtbno, gtlen,
@@ -1228,6 +1235,7 @@ xfs_alloc_ag_vextent_near(
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 		xfs_alloc_trace_alloc(fname, "gt", args);
 	}
+	return 0;
 }
 
 /*
@@ -1236,7 +1244,7 @@ xfs_alloc_ag_vextent_near(
  * and of the form k * prod + mod unless there's nothing that large.
  * Return the starting a.g. block, or NULLAGBLOCK if we can't do it.
  */
-STATIC void
+STATIC int
 xfs_alloc_ag_vextent_size(
 	xfs_alloc_arg_t	*args)	/* allocation argument structure */
 {
@@ -1274,7 +1282,7 @@ xfs_alloc_ag_vextent_size(
 			ASSERT(args->agbno + args->len <=
 			       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 			xfs_alloc_trace_alloc(fname, "freelist", args);
-			return;
+			return 1;
 		} else
 			flen = 0;
 		/*
@@ -1283,7 +1291,7 @@ xfs_alloc_ag_vextent_size(
 		if (flen < args->minlen) {
 			xfs_btree_del_cursor(cnt_cur);
 			args->agbno = NULLAGBLOCK;
-			return;
+			return 0;
 		}
 		rlen = flen;
 	}
@@ -1301,7 +1309,7 @@ xfs_alloc_ag_vextent_size(
 	xfs_alloc_fix_len(args);
 	if (!xfs_alloc_fix_minleft(args)) {
 		xfs_btree_del_cursor(cnt_cur);
-		return;
+		return 0;
 	}
 	rlen = args->len;
 	ASSERT(rlen <= flen);
@@ -1346,6 +1354,7 @@ xfs_alloc_ag_vextent_size(
 	ASSERT(args->agbno + args->len <=
 	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
 	xfs_alloc_trace_alloc(fname, "normal", args);
+	return 0;
 }
 
 /*
