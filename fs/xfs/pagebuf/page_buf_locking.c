@@ -416,7 +416,7 @@ pagebuf_lock_enable(
 #endif
 	target->pbr_addrspace.a_ops = &pagebuf_aops;
 #endif
-	pagebuf_target_blocksize(target, 1 << PB_SECTOR_BITS);
+	pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
 
 	return target;
 }
