@@ -8,7 +8,8 @@
 # Note 2! The CFLAGS definitions are now in the main makefile...
 EXTRA_CFLAGS += -I.
 O_TARGET := xfs.o
-LINO_OBJS   := xfs_linux_ops_file.o xfs_linux_ops_inode.o xfs_linux_ops_super.o
+LINO_OBJS   := xfs_linux_ops_file.o xfs_linux_ops_inode.o\
+ vnode.o behavior.o fs_bio.c vfs.c vnode.c xfs_linux_ops_super.o sim.random.o  
 M_OBJS   := $(O_TARGET)
 XFS_OBJS  :=   xfs_alloc.o \
                 xfs_alloc_btree.o \
@@ -47,8 +48,6 @@ XFS_OBJS  :=   xfs_alloc.o \
                 xfs_misc.o \
                 xfs_mount.o \
                 xfs_rename.o \
-                xfs_rpc_item.o \
-                xfs_rw.o \
                 xfs_trans.o \
                 xfs_trans_ail.o \
                 xfs_trans_buf.o \
@@ -57,8 +56,10 @@ XFS_OBJS  :=   xfs_alloc.o \
                 xfs_trans_item.o \
                 xfs_utils.o \
                 xfs_vfsops.o \
-                xfs_vnodeops.o
-
+                xfs_vnodeops.o 
+#               xfs_rw.o 
+#                xfs_rpc_item.o
+ 
 O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS)
 
 include $(TOPDIR)/Rules.make

@@ -1,4 +1,7 @@
-#ident "$Revision: 1.278 $"
+#ident "$Revision: 1.271 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -229,7 +232,7 @@ xfs_dio_write_zero_rtarea(
 	struct buf	*bp,
 	xfs_fileoff_t	*off_fsb,
 	xfs_filblks_t	*cnt_fsb);
-
+#if defined(__sgi__)
 extern int
 grio_io_is_guaranteed(
 	vfile_t *,
@@ -248,7 +251,7 @@ extern int
 grio_monitor_io_end(
 	stream_id_t *,
 	int);
-	
+#endif	
 
 extern void xfs_error(
 	xfs_mount_t *,

@@ -5762,7 +5762,9 @@ xfs_fcntl(
 	int			error = 0;
 	xfs_mount_t		*mp;
 	struct flock		bf;
+#if !defined(__linux__)
 	struct irix5_flock	i5_bf;
+#endif
 	vnode_t 		*vp;
 	xfs_inode_t		*ip;
 	struct biosize		bs;
@@ -5820,9 +5822,12 @@ xfs_fcntl(
 		 * it is set to the file system block size to
 		 * avoid having to do block zeroing on short writes.
 		 */
+#if 0
 		da.d_miniosz = mp->m_sb.sb_blocksize;
 		da.d_maxiosz = XFS_FSB_TO_B(mp,
 				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
+#endif
+		printf("xfs_vnodeops.c Fix Me Fix Me\n");
 
 		if (copyout(&da, arg, sizeof(da))) {
 			error = XFS_ERROR(EFAULT);
@@ -5977,6 +5982,7 @@ xfs_fcntl(
 				break;
 			}
 		} else {
+#if !defined(__linux__)
 			if (copyin((caddr_t)arg, &i5_bf, sizeof i5_bf)) {
 				error = XFS_ERROR(EFAULT);
 				break;
@@ -5988,6 +5994,9 @@ xfs_fcntl(
 			bf.l_whence = i5_bf.l_whence;
 			bf.l_start = i5_bf.l_start;
 			bf.l_len = i5_bf.l_len;
+#else
+			error = XFS_ERROR(ENOSYS);
+#endif
 		}
 		attr_flags = ( flags&(FNDELAY|FNONBLOCK) ) ? ATTR_NONBLOCK : 0;
 		if (flags&FINVIS)

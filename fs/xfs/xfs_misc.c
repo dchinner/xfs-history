@@ -1,4 +1,7 @@
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/sema.h>
