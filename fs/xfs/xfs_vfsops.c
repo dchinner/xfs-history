@@ -1093,7 +1093,8 @@ xfs_syncsub(
 				    xfs_iflock_nowait(ip)) {
 					IPOINTER_INSERT(ip, mp);
 
-					xfs_finish_reclaim(ip, 1, 0);
+					xfs_finish_reclaim(ip, 1,
+						XFS_IFLUSH_DELWRI_ELSE_SYNC);
 
 					XFS_MOUNT_ILOCK(mp);
 					mount_locked = B_TRUE;

@@ -4401,7 +4401,6 @@ xfs_reclaim(
 {
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
-	xfs_ihash_t	*ih;
 
 	vp = BHV_TO_VNODE(bdp);
 
@@ -4456,15 +4455,23 @@ xfs_reclaim(
 		}
 	}
 
-	ih = ip->i_hash;
-	write_lock(&ih->ih_lock); /* synchronizes but may still race? */
-	vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
-	write_unlock(&ih->ih_lock);
-
+	/* If we have nothing to flush with this inode then complete the
+	 * teardown now, otherwise break the link between the xfs inode
+	 * and the linux inode and clean up the xfs inode later. This
+	 * avoids flushing the inode to disk during the delete operation
+	 * itself.
+	 */
 	if (!ip->i_update_core && (ip->i_itemp == NULL)) {
-		return xfs_finish_reclaim(ip, 0, 0);
-	}
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		return xfs_finish_reclaim(ip, 1, XFS_IFLUSH_DELWRI_ELSE_SYNC);
+	} else {
+		xfs_mount_t	*mp = ip->i_mount;
 
+		/* Protect sync from us */
+		XFS_MOUNT_ILOCK(mp);
+		vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
+		XFS_MOUNT_IUNLOCK(mp);
+	}
 	return 0;
 }
 
@@ -4472,23 +4479,22 @@ int
 xfs_finish_reclaim(
 	xfs_inode_t	*ip,
 	int		locked,
-	int		from_umount)
+	int		sync_mode)
 {
 	int	error;
 	xfs_ihash_t	*ih = ip->i_hash;
 	int	sync_mode;
 
-	if (!locked) {
+	if (!locked)
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-	}
+
+	/* The hash lock here protects a thread in xfs_iget_core from
+	 * racing with us on linking the inode back with a vnode.
+	 * Once we have the XFS_IRECLAIM flag set it will not touch
+	 * us.
+	 */
 	write_lock(&ih->ih_lock);
-	if (XFS_ITOV_NULL(ip)) {
-		write_unlock(&ih->ih_lock);
-		if (!locked)
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		return(0);
-	}
-	if (ip->i_flags & XFS_IRECLAIM) {
+	if (ip->i_flags & XFS_IRECLAIM || (!locked && XFS_ITOV_NULL(ip))) {
 		write_unlock(&ih->ih_lock);
 		if (!locked)
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -4496,9 +4502,6 @@ xfs_finish_reclaim(
 	}
 	ip->i_flags |= XFS_IRECLAIM;
 	write_unlock(&ih->ih_lock);
-
-	sync_mode = from_umount ? XFS_IFLUSH_ASYNC :
-				XFS_IFLUSH_DELWRI_ELSE_SYNC;
 
 	/*
 	 * If the inode is still dirty, then flush it out.  If the inode
@@ -4533,14 +4536,11 @@ xfs_finish_reclaim(
 			xfs_iflock(ip); /* synchronize with xfs_iflush_done */
 		}
 
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-
 		ASSERT(ip->i_update_core == 0);
 		ASSERT(ip->i_itemp == NULL ||
 		       ip->i_itemp->ili_format.ilf_fields == 0);
-	} else {
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	xfs_ireclaim(ip);
 	return 0;

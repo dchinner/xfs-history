@@ -3348,7 +3348,7 @@ xfs_iflush_all(
 
 			if (!vp) {
 				XFS_MOUNT_IUNLOCK(mp);
-				xfs_finish_reclaim(ip, 0, 1);
+				xfs_finish_reclaim(ip, 0, XFS_IFLUSH_ASYNC);
 				purged = 1;
 				break;
 			}

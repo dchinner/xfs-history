@@ -194,6 +194,10 @@ again:
 			inode_vp = XFS_ITOV_NULL(ip);
 
 			if (inode_vp == NULL) {
+				/* If IRECLAIM is set this inode is
+				 * on its way out of the system,
+				 * we need to pause and try again.
+				 */
 				if (ip->i_flags & XFS_IRECLAIM) {
 					read_unlock(&ih->ih_lock);
 					delay(1);
@@ -220,6 +224,9 @@ again:
 			} else if (vp != inode_vp) {
 				struct inode *inode = LINVFS_GET_IP(inode_vp);
 
+				/* The inode is being torn down, pause and
+				 * try again.
+				 */
 				if (inode->i_state & (I_FREEING | I_CLEAR)) {
 					read_unlock(&ih->ih_lock);
 					delay(1);
@@ -253,7 +260,6 @@ finish_inode:
 
 			newnode = (ip->i_d.di_mode == 0);
 			if (newnode) {
-				ip->i_flags &= ~XFS_IRECLAIM;
 				xfs_iocore_inode_reinit(ip);
 			}
 			vn_trace_exit(vp, "xfs_iget.found",
@@ -459,6 +465,7 @@ retry:
 
 		vp = LINVFS_GET_VP(inode);
 		if (inode->i_state & I_NEW) {
+inode_allocate:
 			XFS_STATS_INC(xfsstats.vn_alloc);
 			vn_initialize(inode);
 			error = xfs_iget_core(vp, mp, tp, ino,
@@ -470,6 +477,10 @@ retry:
 				iput(inode);
 			}
 		} else {
+			/* These are true if the inode is in inactive or
+			 * reclaim. The linux inode is about to go away,
+			 * wait for that path to finish, and try again.
+			 */
 			if (vp->v_flag & (VINACT | VRECLM)) {
 				vn_wait(vp);
 				iput(inode);
@@ -477,15 +488,14 @@ retry:
 			}
 
 			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
+			if (bdp == NULL)
+				goto inode_allocate;
 			ip = XFS_BHVTOI(bdp);
-			if (lock_flags != 0) {
+			if (lock_flags != 0)
 				xfs_ilock(ip, lock_flags);
-			}
 			newnode = (ip->i_d.di_mode == 0);
-			if (newnode) {
-				ip->i_flags &= ~XFS_IRECLAIM;
+			if (newnode)
 				xfs_iocore_inode_reinit(ip);
-			}
 			vn_revalidate(vp, ATTR_COMM|ATTR_LAZY);
 			XFS_STATS_INC(xfsstats.xs_ig_found);
 			*ipp = ip;
