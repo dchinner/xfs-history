@@ -1,4 +1,4 @@
-#ident "$Revision: 1.221 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2029,6 +2029,7 @@ xfs_bumplink(
 		return XFS_ERROR(EMLINK);
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 
+	ASSERT(ip->i_d.di_nlink > 0);
         ip->i_d.di_nlink++;
 	if ((ip->i_d.di_version == XFS_DINODE_VERSION_1) &&
 	    (ip->i_d.di_nlink > XFS_MAXLINK_1)) {
@@ -3122,6 +3123,17 @@ xfs_link(
 	 */
 	if (sip->i_d.di_nlink >= XFS_MAXLINK) {
 		error = XFS_ERROR(EMLINK);
+		goto error_return;
+	}
+
+	/*
+	 * If the source has been unlinked and put on the unlinked
+	 * list, we can't link to it.  Doing so would cause the inode
+	 * to be placed on the list a second time when the link
+	 * created here is removed.
+	 */
+	if (sip->i_d.di_nlink == 0) {
+		error = XFS_ERROR(ENOENT);
 		goto error_return;
 	}
 
