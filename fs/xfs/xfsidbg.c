@@ -2628,14 +2628,14 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p dir/attr node 0x%p\n", bp, node);
 			xfsidbg_xdanode(node);
 		}
-	} else if ((di = d)->di_core.di_magic == XFS_DINODE_MAGIC) {
+	} else if (INT_GET((di = d)->di_core.di_magic, ARCH_UNKNOWN) == XFS_DINODE_MAGIC) {
 		if (summary) {
 			printk("Disk Inode (at 0x%p)\n", di);
 		} else {
 			printk("buf 0x%p dinode 0x%p\n", bp, di);
 			xfs_inodebuf(bp);
 		}
-	} else if ((sb = d)->sb_magicnum == XFS_SB_MAGIC) {
+	} else if (INT_GET((sb = d)->sb_magicnum, ARCH_UNKNOWN) == XFS_SB_MAGIC) {
 		if (summary) {
 			printk("Superblock (at 0x%p)\n", sb);
 		} else {
@@ -2649,14 +2649,14 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 		printk("Quota blk starting ID [%d], type %s at 0x%p\n",
 			dqb->d_id, XFSIDBG_DQTYPESTR(dqb), dqb);
 		
-	} else if ((d2block = d)->hdr.magic == XFS_DIR2_BLOCK_MAGIC) {
+	} else if (INT_GET((d2block = d)->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_BLOCK_MAGIC) {
 		if (summary) {
 			printk("Dir2 block (at 0x%p)\n", d2block);
 		} else {
 			printk("buf 0x%p dir2 block 0x%p\n", bp, d2block);
 			xfs_dir2data((void *)d2block, XFS_BUF_COUNT(bp));
 		}
-	} else if ((d2data = d)->hdr.magic == XFS_DIR2_DATA_MAGIC) {
+	} else if (INT_GET((d2data = d)->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC) {
 		if (summary) {
 			printk("Dir2 data (at 0x%p)\n", d2data);
 		} else {
@@ -2677,7 +2677,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p dir2 leaf 0x%p\n", bp, d2leaf);
 			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
-	} else if ((d2free = d)->hdr.magic == XFS_DIR2_FREE_MAGIC) {
+	} else if (INT_GET((d2free = d)->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC) {
 		if (summary) {
 			printk("Dir2 free (at 0x%p)\n", d2free);
 		} else {
@@ -2876,19 +2876,19 @@ xfs_dir2data(void *addr, int size)
 	bb = (xfs_dir2_block_t *)addr;
 	h = &db->hdr;
 	printk("hdr magic 0x%x (%s)\nhdr bestfree", h->magic,
-		h->magic == XFS_DIR2_DATA_MAGIC ? "DATA" :
-			(h->magic == XFS_DIR2_BLOCK_MAGIC ? "BLOCK" : ""));
+		INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC ? "DATA" :
+			(INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_BLOCK_MAGIC ? "BLOCK" : ""));
 	for (j = 0, m = h->bestfree; j < XFS_DIR2_DATA_FD_COUNT; j++, m++) {
 		printk(" %d: 0x%x@0x%x", j, m->length, m->offset);
 	}
 	printk("\n");
-	if (h->magic == XFS_DIR2_DATA_MAGIC)
+	if (INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC)
 		t = (char *)db + size;
 	else {
 		/* XFS_DIR2_BLOCK_TAIL_P */
 		tail = (xfs_dir2_block_tail_t *)
 		       ((char *)bb + size - sizeof(xfs_dir2_block_tail_t));
-		l = XFS_DIR2_BLOCK_LEAF_P(tail);
+		l = XFS_DIR2_BLOCK_LEAF_P_ARCH(tail, ARCH_UNKNOWN);
 		t = (char *)l;
 	}
 	for (p = (char *)(h + 1); p < t; ) {
@@ -2896,7 +2896,7 @@ xfs_dir2data(void *addr, int size)
 		if (u->freetag == XFS_DIR2_DATA_FREE_TAG) {
 			printk("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
 				p - (char *)addr, u->freetag, u->length,
-				*XFS_DIR2_DATA_UNUSED_TAG_P(u));
+				*XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(u, ARCH_UNKNOWN));
 			p += u->length;
 			continue;
 		}
@@ -2908,7 +2908,7 @@ xfs_dir2data(void *addr, int size)
 		printk("\" tag 0x%x\n", *XFS_DIR2_DATA_ENTRY_TAG_P(e));
 		p += XFS_DIR2_DATA_ENTSIZE(e->namelen);
 	}
-	if (h->magic == XFS_DIR2_DATA_MAGIC)
+	if (INT_GET(h->magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC)
 		return;
 	for (j = 0; j < tail->count; j++, l++) {
 		printk("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
@@ -2948,7 +2948,7 @@ xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
 		return;
 	/* XFS_DIR2_LEAF_TAIL_P */
 	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
-	b = XFS_DIR2_LEAF_BESTS_P(t);
+	b = XFS_DIR2_LEAF_BESTS_P_ARCH(t, ARCH_UNKNOWN);
 	for (j = 0; j < t->bestcount; j++, b++) {
 		printk("0x%x best %d 0x%x\n",
 			(char *)b - (char *)leaf, j, *b);
@@ -2994,13 +2994,13 @@ xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	ino = XFS_DIR2_SF_GET_INUMBER(s, &sfh->parent);
+	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, &sfh->parent, ARCH_UNKNOWN);
 	printk("hdr count %d i8count %d parent %Ld\n",
 		sfh->count, sfh->i8count, ino);
 	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
-		ino = XFS_DIR2_SF_GET_INUMBER(s, XFS_DIR2_SF_INUMBERP(sfe));
+		ino = XFS_DIR2_SF_GET_INUMBER_ARCH(s, XFS_DIR2_SF_INUMBERP(sfe), ARCH_UNKNOWN);
 		printk("entry %d inumber %Ld offset 0x%x namelen %d name \"",
-			i, ino, XFS_DIR2_SF_GET_OFFSET(sfe), sfe->namelen);
+			i, ino, XFS_DIR2_SF_GET_OFFSET_ARCH(sfe, ARCH_UNKNOWN), sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			printk("%c", sfe->name[j]);
 		printk("\"\n");

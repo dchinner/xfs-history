@@ -1183,9 +1183,9 @@ xfs_dir_sf_put_dirino(xfs_ino_t *from, xfs_dir_ino_t *to)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_BLOCK_LEAF_P)
 xfs_dir2_leaf_entry_t *
-xfs_dir2_block_leaf_p(xfs_dir2_block_tail_t *btp)
+xfs_dir2_block_leaf_p_arch(xfs_dir2_block_tail_t *btp, xfs_arch_t arch)
 {
-	return XFS_DIR2_BLOCK_LEAF_P(btp);
+	return XFS_DIR2_BLOCK_LEAF_P_ARCH(btp,arch);
 }
 #endif
 
@@ -1264,9 +1264,9 @@ xfs_dir2_data_entsize(int n)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DATA_UNUSED_TAG_P)
 xfs_dir2_data_off_t *
-xfs_dir2_data_unused_tag_p(xfs_dir2_data_unused_t *dup)
+xfs_dir2_data_unused_tag_p_arch(xfs_dir2_data_unused_t *dup, xfs_arch_t arch)
 {
-	return XFS_DIR2_DATA_UNUSED_TAG_P(dup);
+	return XFS_DIR2_DATA_UNUSED_TAG_P_ARCH(dup,arch);
 }
 #endif
 
@@ -1339,9 +1339,9 @@ xfs_dir2_db_to_fdindex(xfs_mount_t *mp, xfs_dir2_db_t db)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_LEAF_BESTS_P)
 xfs_dir2_data_off_t *
-xfs_dir2_leaf_bests_p(xfs_dir2_leaf_tail_t *ltp)
+xfs_dir2_leaf_bests_p_arch(xfs_dir2_leaf_tail_t *ltp, xfs_arch_t arch)
 {
-	return XFS_DIR2_LEAF_BESTS_P(ltp);
+	return XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, arch);
 }
 #endif
 
@@ -1391,11 +1391,6 @@ xfs_dir2_sf_get_inumber_arch(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from, xfs_arch
 {
 	return XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, arch);
 }
-xfs_intino_t
-xfs_dir2_sf_get_inumber(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from)
-{
-	return XFS_DIR2_SF_GET_INUMBER(sfp, from);
-}
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_GET_OFFSET)
@@ -1403,11 +1398,6 @@ xfs_dir2_data_aoff_t
 xfs_dir2_sf_get_offset_arch(xfs_dir2_sf_entry_t *sfep, xfs_arch_t arch)
 {
 	return XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, arch);
-}
-xfs_dir2_data_aoff_t
-xfs_dir2_sf_get_offset(xfs_dir2_sf_entry_t *sfep)
-{
-	return XFS_DIR2_SF_GET_OFFSET(sfep);
 }
 #endif
 
@@ -1441,11 +1431,6 @@ xfs_dir2_sf_put_inumber_arch(xfs_dir2_sf_t *sfp, xfs_ino_t *from, xfs_dir2_inou_
 {
 	XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, from, to, arch);
 }
-void
-xfs_dir2_sf_put_inumber(xfs_dir2_sf_t *sfp, xfs_ino_t *from, xfs_dir2_inou_t *to)
-{
-	XFS_DIR2_SF_PUT_INUMBER(sfp, from, to);
-}
 #endif
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_PUT_OFFSET)
@@ -1453,11 +1438,6 @@ void
 xfs_dir2_sf_put_offset_arch(xfs_dir2_sf_entry_t *sfep, xfs_dir2_data_aoff_t off, xfs_arch_t arch)
 {
 	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep, off, arch);
-}
-void
-xfs_dir2_sf_put_offset(xfs_dir2_sf_entry_t *sfep, xfs_dir2_data_aoff_t off)
-{
-	XFS_DIR2_SF_PUT_OFFSET(sfep, off);
 }
 #endif
 

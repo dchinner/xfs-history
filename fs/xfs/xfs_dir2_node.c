@@ -85,6 +85,41 @@
 #include "sim.h"
 #endif
 
+#if defined(XFSDEBUG) && !defined(SIM) && 0
+#include "asm/kdb.h"
+
+#undef xfs_dir2_print_args
+#define xfs_dir2_print_args(ARGS) \
+    printk("    inumber=%Ld, name=\"%*.*s\", hashval=0x%x, dir inumber=%Ld\n", \
+       ARGS->inumber, (int)ARGS->namelen, (int)ARGS->namelen, ARGS->name, \
+       ARGS->hashval, ARGS->dp->i_ino);
+
+#undef xfs_dir2_trace_args
+#define xfs_dir2_trace_args(A,B) { \
+    printk("[%s] (0x%p)\n", A, B); \
+    xfs_dir2_print_args(B); \
+}
+    
+#undef xfs_dir2_trace_args_sb
+#define xfs_dir2_trace_args_sb(A,B,C,D) {\
+    printk("[%s] (0x%p, %d, 0x%p)\n", A, B, C, D); \
+    xfs_dir2_print_args(B); \
+}
+  
+#undef xfs_dir2_trace_args_b
+#define xfs_dir2_trace_args_b(A,B,C) {\
+    printk("[%s] (0x%p, 0x%p)\n", A, B, C); \
+    xfs_dir2_print_args(B); \
+}
+
+#undef xfs_dir2_trace_args_bibii
+#define xfs_dir2_trace_args_bibii(A,B,C,D,E,F,G) {\
+    printk("[%s] (0x%p, 0x%p, %d, 0x%p, %d, %d)\n", A, B, C, D, E, F, G); \
+    xfs_dir2_print_args(B); \
+}
+
+#endif
+
 /*
  * Function declarations.
  */
@@ -122,7 +157,7 @@ xfs_dir2_free_log_bests(
 	xfs_dir2_free_t		*free;		/* freespace structure */
 
 	free = bp->data;
-	ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+	ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 	xfs_da_log_buf(tp, bp,
 		(uint)((char *)&free->bests[first] - (char *)free),
 		(uint)((char *)&free->bests[last] - (char *)free +
@@ -140,7 +175,7 @@ xfs_dir2_free_log_header(
 	xfs_dir2_free_t		*free;		/* freespace structure */
 
 	free = bp->data;
-	ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+	ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 	xfs_da_log_buf(tp, bp, (uint)((char *)&free->hdr - (char *)free),
 		(uint)(sizeof(xfs_dir2_free_hdr_t) - 1));
 }
@@ -197,28 +232,28 @@ xfs_dir2_leaf_to_node(
 	/*
 	 * Initialize the freespace block header.
 	 */
-	free->hdr.magic = XFS_DIR2_FREE_MAGIC;
-	free->hdr.firstdb = 0;
-	ASSERT(ltp->bestcount <= dp->i_d.di_size / mp->m_dirblksize);
-	free->hdr.nvalid = ltp->bestcount;
+	INT_SET(free->hdr.magic, ARCH_UNKNOWN, XFS_DIR2_FREE_MAGIC);
+	INT_ZERO(free->hdr.firstdb, ARCH_UNKNOWN);
+	ASSERT(INT_GET(ltp->bestcount, ARCH_UNKNOWN) <= dp->i_d.di_size / mp->m_dirblksize);
+	INT_SET(free->hdr.nvalid, ARCH_UNKNOWN, INT_GET(ltp->bestcount, ARCH_UNKNOWN));
 	/*
 	 * Copy freespace entries from the leaf block to the new block.
 	 * Count active entries.
 	 */
-	for (i = n = 0, from = XFS_DIR2_LEAF_BESTS_P(ltp), to = free->bests;
-	     i < ltp->bestcount; i++, from++, to++) {
-		if ((off = *from) != NULLDATAOFF)
+	for (i = n = 0, from = XFS_DIR2_LEAF_BESTS_P_ARCH(ltp, ARCH_UNKNOWN), to = free->bests;
+	     i < INT_GET(ltp->bestcount, ARCH_UNKNOWN); i++, from++, to++) {
+		if ((off = INT_GET(*from, ARCH_UNKNOWN)) != NULLDATAOFF)
 			n++;
-		*to = off;
+		INT_SET(*to, ARCH_UNKNOWN, off);
 	}
-	free->hdr.nused = n;
+	INT_SET(free->hdr.nused, ARCH_UNKNOWN, n);
 	leaf->hdr.info.magic = XFS_DIR2_LEAFN_MAGIC;
 	/*
 	 * Log everything.
 	 */
 	xfs_dir2_leaf_log_header(tp, lbp);
 	xfs_dir2_free_log_header(tp, fbp);
-	xfs_dir2_free_log_bests(tp, fbp, 0, free->hdr.nvalid - 1);
+	xfs_dir2_free_log_bests(tp, fbp, 0, INT_GET(free->hdr.nvalid, ARCH_UNKNOWN) - 1);
 	xfs_da_buf_done(fbp);
 	xfs_dir2_leafn_check(dp, lbp);
 	return 0;
@@ -256,16 +291,16 @@ xfs_dir2_leafn_add(
 	 * Caller will do a split.  If there are stale entries we'll do
 	 * a compact.
 	 */
-	if (leaf->hdr.count == XFS_DIR2_MAX_LEAF_ENTS(mp)) {
+	if (INT_GET(leaf->hdr.count, ARCH_UNKNOWN) == XFS_DIR2_MAX_LEAF_ENTS(mp)) {
 #pragma mips_frequency_hint NEVER
-		if (leaf->hdr.stale == 0)
+		if (INT_ISZERO(leaf->hdr.stale, ARCH_UNKNOWN))
 			return XFS_ERROR(ENOSPC);
-		compact = leaf->hdr.stale > 1;
+		compact = INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) > 1;
 	} else
 		compact = 0;
-	ASSERT(index == 0 || leaf->ents[index - 1].hashval <= args->hashval);
-	ASSERT(index == leaf->hdr.count ||
-	       leaf->ents[index].hashval >= args->hashval);
+	ASSERT(index == 0 || INT_GET(leaf->ents[index - 1].hashval, ARCH_UNKNOWN) <= args->hashval);
+	ASSERT(index == INT_GET(leaf->hdr.count, ARCH_UNKNOWN) ||
+	       INT_GET(leaf->ents[index].hashval, ARCH_UNKNOWN) >= args->hashval);
 	
 	if (args->justcheck)
 		return 0;
@@ -282,21 +317,21 @@ xfs_dir2_leafn_add(
 	/*
 	 * Set impossible logging indices for this case.
 	 */
-	else if (leaf->hdr.stale) {
-		lfloglow = leaf->hdr.count;
+	else if (!INT_ISZERO(leaf->hdr.stale, ARCH_UNKNOWN)) {
+		lfloglow = INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
 		lfloghigh = -1;
 	}
 	/*
 	 * No stale entries, just insert a space for the new entry.
 	 */
-	if (leaf->hdr.stale == 0) {
+	if (INT_ISZERO(leaf->hdr.stale, ARCH_UNKNOWN)) {
 		lep = &leaf->ents[index];
-		if (index < leaf->hdr.count)
+		if (index < INT_GET(leaf->hdr.count, ARCH_UNKNOWN))
 			ovbcopy(lep, lep + 1,
-				(leaf->hdr.count - index) * sizeof(*lep));
+				(INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - index) * sizeof(*lep));
 		lfloglow = index;
-		lfloghigh = leaf->hdr.count;
-		leaf->hdr.count++;
+		lfloghigh = INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
+		INT_MOD(leaf->hdr.count, ARCH_UNKNOWN, +1);
 	}
 	/*
 	 * There are stale entries.  We'll use one for the new entry.
@@ -312,7 +347,7 @@ xfs_dir2_leafn_add(
 			 */
 			for (lowstale = index - 1;
 			     lowstale >= 0 &&
-				leaf->ents[lowstale].address !=
+				INT_GET(leaf->ents[lowstale].address, ARCH_UNKNOWN) !=
 				XFS_DIR2_NULL_DATAPTR;
 			     lowstale--)
 				continue;
@@ -322,8 +357,8 @@ xfs_dir2_leafn_add(
 			 * lowstale already found.
 			 */
 			for (highstale = index;
-			     highstale < leaf->hdr.count &&
-				leaf->ents[highstale].address !=
+			     highstale < INT_GET(leaf->hdr.count, ARCH_UNKNOWN) &&
+				INT_GET(leaf->ents[highstale].address, ARCH_UNKNOWN) !=
 				XFS_DIR2_NULL_DATAPTR &&
 				(lowstale < 0 ||
 				 index - lowstale - 1 >= highstale - index);
@@ -335,9 +370,9 @@ xfs_dir2_leafn_add(
 		 * Shift entries up toward the stale slot.
 		 */
 		if (lowstale >= 0 &&
-		    (highstale == leaf->hdr.count ||
+		    (highstale == INT_GET(leaf->hdr.count, ARCH_UNKNOWN) ||
 		     index - lowstale - 1 < highstale - index)) {
-			ASSERT(leaf->ents[lowstale].address ==
+			ASSERT(INT_GET(leaf->ents[lowstale].address, ARCH_UNKNOWN) ==
 			       XFS_DIR2_NULL_DATAPTR);
 			ASSERT(index - lowstale - 1 >= 0);
 			if (index - lowstale - 1 > 0)
@@ -353,7 +388,7 @@ xfs_dir2_leafn_add(
 		 * Shift entries down toward the stale slot.
 		 */
 		else {
-			ASSERT(leaf->ents[highstale].address ==
+			ASSERT(INT_GET(leaf->ents[highstale].address, ARCH_UNKNOWN) ==
 			       XFS_DIR2_NULL_DATAPTR);
 			ASSERT(highstale - index >= 0);
 			if (highstale - index > 0)
@@ -364,13 +399,13 @@ xfs_dir2_leafn_add(
 			lfloglow = MIN(index, lfloglow);
 			lfloghigh = MAX(highstale, lfloghigh);
 		}
-		leaf->hdr.stale--;
+		INT_MOD(leaf->hdr.stale, ARCH_UNKNOWN, -1);
 	}
 	/*
 	 * Insert the new entry, log everything.
 	 */
-	lep->hashval = args->hashval;
-	lep->address = XFS_DIR2_DB_OFF_TO_DATAPTR(mp, args->blkno, args->index);
+	INT_SET(lep->hashval, ARCH_UNKNOWN, args->hashval);
+	INT_SET(lep->address, ARCH_UNKNOWN, XFS_DIR2_DB_OFF_TO_DATAPTR(mp, args->blkno, args->index));
 	xfs_dir2_leaf_log_header(tp, bp);
 	xfs_dir2_leaf_log_ents(tp, bp, lfloglow, lfloghigh);
 	xfs_dir2_leafn_check(dp, bp);
@@ -394,15 +429,16 @@ xfs_dir2_leafn_check(
 	leaf = bp->data;
 	mp = dp->i_mount;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
-	ASSERT(leaf->hdr.count <= XFS_DIR2_MAX_LEAF_ENTS(mp));
-	for (i = stale = 0; i < leaf->hdr.count; i++) {
-		if (i + 1 < leaf->hdr.count)
-			ASSERT(leaf->ents[i].hashval <=
-			       leaf->ents[i + 1].hashval);
-		if (leaf->ents[i].address == XFS_DIR2_NULL_DATAPTR)
+	ASSERT(INT_GET(leaf->hdr.count, ARCH_UNKNOWN) <= XFS_DIR2_MAX_LEAF_ENTS(mp));
+	for (i = stale = 0; i < INT_GET(leaf->hdr.count, ARCH_UNKNOWN); i++) {
+		if (i + 1 < INT_GET(leaf->hdr.count, ARCH_UNKNOWN)) {
+			ASSERT(INT_GET(leaf->ents[i].hashval, ARCH_UNKNOWN) <=
+			       INT_GET(leaf->ents[i + 1].hashval, ARCH_UNKNOWN));
+                }
+		if (INT_GET(leaf->ents[i].address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR)
 			stale++;
 	}
-	ASSERT(leaf->hdr.stale == stale);
+	ASSERT(INT_GET(leaf->hdr.stale, ARCH_UNKNOWN) == stale);
 }
 #endif	/* DEBUG */
 
@@ -420,10 +456,10 @@ xfs_dir2_leafn_lasthash(
 	leaf = bp->data;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
 	if (count)
-		*count = leaf->hdr.count;
-	if (leaf->hdr.count == 0)
+		*count = INT_GET(leaf->hdr.count, ARCH_UNKNOWN);
+	if (INT_ISZERO(leaf->hdr.count, ARCH_UNKNOWN))
 		return 0;
-	return leaf->ents[leaf->hdr.count - 1].hashval;
+	return INT_GET(leaf->ents[INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN);
 }
 
 /*
@@ -461,7 +497,7 @@ xfs_dir2_leafn_lookup_int(
 	leaf = bp->data;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
 #ifndef XFS_REPAIR_SIM
-	ASSERT(leaf->hdr.count > 0);
+	ASSERT(INT_GET(leaf->hdr.count, ARCH_UNKNOWN) > 0);
 #endif /* !XFS_REPAIR_SIM */
 	xfs_dir2_leafn_check(dp, bp);
 	/*
@@ -483,7 +519,7 @@ xfs_dir2_leafn_lookup_int(
 		curdb = -1;
 		length = XFS_DIR2_DATA_ENTSIZE(args->namelen);
 		if (free = (curbp ? curbp->data : NULL))
-			ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+			ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 	}
 	/*
 	 * For others, it's a data block buffer, get the block number.
@@ -496,17 +532,17 @@ xfs_dir2_leafn_lookup_int(
 	 * Loop over leaf entries with the right hash value.
 	 */
 	for (lep = &leaf->ents[index];
-	     index < leaf->hdr.count && lep->hashval == args->hashval;
+	     index < INT_GET(leaf->hdr.count, ARCH_UNKNOWN) && INT_GET(lep->hashval, ARCH_UNKNOWN) == args->hashval;
 	     lep++, index++) {
 		/*
 		 * Skip stale leaf entries.
 		 */
-		if (lep->address == XFS_DIR2_NULL_DATAPTR)
+		if (INT_GET(lep->address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR)
 			continue;
 		/*
 		 * Pull the data block number from the entry.
 		 */
-		newdb = XFS_DIR2_DATAPTR_TO_DB(mp, lep->address);
+		newdb = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_UNKNOWN));
 		/*
 		 * For addname, we're looking for a place to put the new entry.
 		 * We want to use a data block with an entry of equal
@@ -547,15 +583,15 @@ xfs_dir2_leafn_lookup_int(
 					}
 					curfdb = newfdb;
 					free = curbp->data;
-					ASSERT(free->hdr.magic ==
+					ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) ==
 					       XFS_DIR2_FREE_MAGIC);
-					ASSERT((free->hdr.firstdb %
+					ASSERT((INT_GET(free->hdr.firstdb, ARCH_UNKNOWN) %
 						XFS_DIR2_MAX_FREE_BESTS(mp)) ==
 					       0);
-					ASSERT(free->hdr.firstdb <= curdb);
+					ASSERT(INT_GET(free->hdr.firstdb, ARCH_UNKNOWN) <= curdb);
 					ASSERT(curdb <
-					       free->hdr.firstdb +
-					       free->hdr.nvalid);
+					       INT_GET(free->hdr.firstdb, ARCH_UNKNOWN) +
+					       INT_GET(free->hdr.nvalid, ARCH_UNKNOWN));
 				}
 				/*
 				 * Get the index for our entry.
@@ -564,11 +600,11 @@ xfs_dir2_leafn_lookup_int(
 				/*
 				 * If it has room, return it.
 				 */
-				if (free->bests[fi] == NULLDATAOFF) {
+				if (INT_GET(free->bests[fi], ARCH_UNKNOWN) == NULLDATAOFF) {
 #pragma mips_frequency_hint NEVER
 					return XFS_ERROR(EFSCORRUPTED);
 				}
-				if (free->bests[fi] >= length) {
+				if (INT_GET(free->bests[fi], ARCH_UNKNOWN) >= length) {
 					*indexp = index;
 					state->extravalid = 1;
 					state->extrablk.bp = curbp;
@@ -613,14 +649,14 @@ xfs_dir2_leafn_lookup_int(
 			 */
 			dep = (xfs_dir2_data_entry_t *)
 			      ((char *)curbp->data +
-			       XFS_DIR2_DATAPTR_TO_OFF(mp, lep->address));
+			       XFS_DIR2_DATAPTR_TO_OFF(mp, INT_GET(lep->address, ARCH_UNKNOWN)));
 			/*
 			 * Compare the entry, return it if it matches.
 			 */
 			if (dep->namelen == args->namelen &&
 			    dep->name[0] == args->name[0] &&
 			    bcmp(dep->name, args->name, args->namelen) == 0) {
-				args->inumber = dep->inumber;
+				args->inumber = INT_GET(dep->inumber, ARCH_UNKNOWN);
 				*indexp = index;
 				state->extravalid = 1;
 				state->extrablk.bp = curbp;
@@ -660,7 +696,7 @@ xfs_dir2_leafn_lookup_int(
 	 * Return the final index, that will be the insertion point.
 	 */
 	*indexp = index;
-	ASSERT(index == leaf->hdr.count || args->oknoent);
+	ASSERT(index == INT_GET(leaf->hdr.count, ARCH_UNKNOWN) || args->oknoent);
 	return XFS_ERROR(ENOENT);
 }
 
@@ -699,22 +735,22 @@ xfs_dir2_leafn_moveents(
 	 * destination leaf entries, open up a hole in the destination
 	 * to hold the new entries.
 	 */
-	if (start_d < leaf_d->hdr.count) {
+	if (start_d < INT_GET(leaf_d->hdr.count, ARCH_UNKNOWN)) {
 		ovbcopy(&leaf_d->ents[start_d], &leaf_d->ents[start_d + count],
-			(leaf_d->hdr.count - start_d) *
+			(INT_GET(leaf_d->hdr.count, ARCH_UNKNOWN) - start_d) *
 			sizeof(xfs_dir2_leaf_entry_t));
 		xfs_dir2_leaf_log_ents(tp, bp_d, start_d + count,
-			count + leaf_d->hdr.count - 1);
+			count + INT_GET(leaf_d->hdr.count, ARCH_UNKNOWN) - 1);
 	}
 	/*
 	 * If the source has stale leaves, count the ones in the copy range
 	 * so we can update the header correctly.
 	 */
-	if (leaf_s->hdr.stale) {
+	if (!INT_ISZERO(leaf_s->hdr.stale, ARCH_UNKNOWN)) {
 		int	i;			/* temp leaf index */
 
 		for (i = start_s, stale = 0; i < start_s + count; i++) {
-			if (leaf_s->ents[i].address == XFS_DIR2_NULL_DATAPTR)
+			if (INT_GET(leaf_s->ents[i].address, ARCH_UNKNOWN) == XFS_DIR2_NULL_DATAPTR)
 				stale++;
 		}
 	} else
@@ -729,7 +765,7 @@ xfs_dir2_leafn_moveents(
 	 * If there are source entries after the ones we copied,
 	 * delete the ones we copied by sliding the next ones down.
 	 */
-	if (start_s + count < leaf_s->hdr.count) {
+	if (start_s + count < INT_GET(leaf_s->hdr.count, ARCH_UNKNOWN)) {
 		ovbcopy(&leaf_s->ents[start_s + count], &leaf_s->ents[start_s],
 			count * sizeof(xfs_dir2_leaf_entry_t));
 		xfs_dir2_leaf_log_ents(tp, bp_s, start_s, start_s + count - 1);
@@ -737,10 +773,10 @@ xfs_dir2_leafn_moveents(
 	/*
 	 * Update the headers and log them.
 	 */
-	leaf_s->hdr.count -= count;
-	leaf_s->hdr.stale -= stale;
-	leaf_d->hdr.count += count;
-	leaf_d->hdr.stale += stale;
+	INT_MOD(leaf_s->hdr.count, ARCH_UNKNOWN, -(count));
+	INT_MOD(leaf_s->hdr.stale, ARCH_UNKNOWN, -(stale));
+	INT_MOD(leaf_d->hdr.count, ARCH_UNKNOWN, count);
+	INT_MOD(leaf_d->hdr.stale, ARCH_UNKNOWN, stale);
 	xfs_dir2_leaf_log_header(tp, bp_s);
 	xfs_dir2_leaf_log_header(tp, bp_d);
 	xfs_dir2_leafn_check(args->dp, bp_s);
@@ -763,11 +799,11 @@ xfs_dir2_leafn_order(
 	leaf2 = leaf2_bp->data;
 	ASSERT(leaf1->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
 	ASSERT(leaf2->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
-	if (leaf1->hdr.count > 0 &&
-	    leaf2->hdr.count > 0 &&
-	    (leaf2->ents[0].hashval < leaf1->ents[0].hashval ||
-	     leaf2->ents[leaf2->hdr.count - 1].hashval <
-	     leaf1->ents[leaf1->hdr.count - 1].hashval))
+	if (INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) > 0 &&
+	    INT_GET(leaf2->hdr.count, ARCH_UNKNOWN) > 0 &&
+	    (INT_GET(leaf2->ents[0].hashval, ARCH_UNKNOWN) < INT_GET(leaf1->ents[0].hashval, ARCH_UNKNOWN) ||
+	     INT_GET(leaf2->ents[INT_GET(leaf2->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN) <
+	     INT_GET(leaf1->ents[INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN)))
 		return 1;
 	return 0;
 }
@@ -811,22 +847,22 @@ xfs_dir2_leafn_rebalance(
 	}
 	leaf1 = blk1->bp->data;
 	leaf2 = blk2->bp->data;
-	oldsum = leaf1->hdr.count + leaf2->hdr.count;
+	oldsum = INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) + INT_GET(leaf2->hdr.count, ARCH_UNKNOWN);
 #ifdef DEBUG
-	oldstale = leaf1->hdr.stale + leaf2->hdr.stale;
+	oldstale = INT_GET(leaf1->hdr.stale, ARCH_UNKNOWN) + INT_GET(leaf2->hdr.stale, ARCH_UNKNOWN);
 #endif
 	mid = oldsum >> 1;
 	/*
-	 * If the old leaf count was old then the new one will be even,
+	 * If the old leaf count was odd then the new one will be even,
 	 * so we need to divide the new count evenly.
 	 */
 	if (oldsum & 1) {
 		xfs_dahash_t	midhash;	/* middle entry hash value */
 
-		if (mid >= leaf1->hdr.count)
-			midhash = leaf2->ents[mid - leaf1->hdr.count].hashval;
+		if (mid >= INT_GET(leaf1->hdr.count, ARCH_UNKNOWN))
+			midhash = INT_GET(leaf2->ents[mid - INT_GET(leaf1->hdr.count, ARCH_UNKNOWN)].hashval, ARCH_UNKNOWN);
 		else
-			midhash = leaf1->ents[mid].hashval;
+			midhash = INT_GET(leaf1->ents[mid].hashval, ARCH_UNKNOWN);
 		isleft = args->hashval <= midhash;
 	}
 	/*
@@ -840,30 +876,30 @@ xfs_dir2_leafn_rebalance(
 	 * Calculate moved entry count.  Positive means left-to-right,
 	 * negative means right-to-left.  Then move the entries.
 	 */
-	count = leaf1->hdr.count - mid + (isleft == 0);
+	count = INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) - mid + (isleft == 0);
 	if (count > 0)
 		xfs_dir2_leafn_moveents(args, blk1->bp,
-			leaf1->hdr.count - count, blk2->bp, 0, count);
+			INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) - count, blk2->bp, 0, count);
 	else if (count < 0)
 		xfs_dir2_leafn_moveents(args, blk2->bp, 0, blk1->bp,
-			leaf1->hdr.count, count);
-	ASSERT(leaf1->hdr.count + leaf2->hdr.count == oldsum);
-	ASSERT(leaf1->hdr.stale + leaf2->hdr.stale == oldstale);
+			INT_GET(leaf1->hdr.count, ARCH_UNKNOWN), count);
+	ASSERT(INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) + INT_GET(leaf2->hdr.count, ARCH_UNKNOWN) == oldsum);
+	ASSERT(INT_GET(leaf1->hdr.stale, ARCH_UNKNOWN) + INT_GET(leaf2->hdr.stale, ARCH_UNKNOWN) == oldstale);
 	/*
 	 * Mark whether we're inserting into the old or new leaf.
 	 */
-	if (leaf1->hdr.count < leaf2->hdr.count)
+	if (INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) < INT_GET(leaf2->hdr.count, ARCH_UNKNOWN))
 		state->inleaf = swap;
-	else if (leaf1->hdr.count > leaf2->hdr.count)
+	else if (INT_GET(leaf1->hdr.count, ARCH_UNKNOWN) > INT_GET(leaf2->hdr.count, ARCH_UNKNOWN))
 		state->inleaf = !swap;
 	else
 		state->inleaf =
-			swap ^ (args->hashval < leaf2->ents[0].hashval);
+			swap ^ (args->hashval < INT_GET(leaf2->ents[0].hashval, ARCH_UNKNOWN));
 	/*
 	 * Adjust the expected index for insertion.
 	 */
 	if (!state->inleaf)
-		blk2->index = blk1->index - leaf1->hdr.count;
+		blk2->index = blk1->index - INT_GET(leaf1->hdr.count, ARCH_UNKNOWN);
 }
 
 #if defined(XFS_REPAIR_SIM) || !defined(SIM)
@@ -907,17 +943,17 @@ xfs_dir2_leafn_remove(
 	/*
 	 * Extract the data block and offset from the entry.
 	 */
-	db = XFS_DIR2_DATAPTR_TO_DB(mp, lep->address);
+	db = XFS_DIR2_DATAPTR_TO_DB(mp, INT_GET(lep->address, ARCH_UNKNOWN));
 	ASSERT(dblk->blkno == db);
-	off = XFS_DIR2_DATAPTR_TO_OFF(mp, lep->address);
+	off = XFS_DIR2_DATAPTR_TO_OFF(mp, INT_GET(lep->address, ARCH_UNKNOWN));
 	ASSERT(dblk->index == off);
 	/*
 	 * Kill the leaf entry by marking it stale.
 	 * Log the leaf block changes.
 	 */
-	leaf->hdr.stale++;
+	INT_MOD(leaf->hdr.stale, ARCH_UNKNOWN, +1);
 	xfs_dir2_leaf_log_header(tp, bp);
-	lep->address = XFS_DIR2_NULL_DATAPTR;
+	INT_SET(lep->address, ARCH_UNKNOWN, XFS_DIR2_NULL_DATAPTR);
 	xfs_dir2_leaf_log_ents(tp, bp, index, index);
 	/*
 	 * Make the data entry free.  Keep track of the longest freespace
@@ -926,7 +962,7 @@ xfs_dir2_leafn_remove(
 	dbp = dblk->bp;
 	data = dbp->data;
 	dep = (xfs_dir2_data_entry_t *)((char *)data + off);
-	longest = data->hdr.bestfree[0].length;
+	longest = INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN);
 	needlog = needscan = 0;
 	xfs_dir2_data_make_free(tp, dbp, off,
 		XFS_DIR2_DATA_ENTSIZE(dep->namelen), &needlog, &needscan);
@@ -943,7 +979,7 @@ xfs_dir2_leafn_remove(
 	 * If the longest data block freespace changes, need to update
 	 * the corresponding freeblock entry.
 	 */
-	if (longest < data->hdr.bestfree[0].length) {
+	if (longest < INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN)) {
 		int		error;		/* error return value */
 		xfs_dabuf_t	*fbp;		/* freeblock buffer */
 		xfs_dir2_db_t	fdb;		/* freeblock block number */
@@ -962,15 +998,15 @@ xfs_dir2_leafn_remove(
 			return error;
 		}
 		free = fbp->data;
-		ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
-		ASSERT(free->hdr.firstdb ==
+		ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
+		ASSERT(INT_GET(free->hdr.firstdb, ARCH_UNKNOWN) ==
 		       XFS_DIR2_MAX_FREE_BESTS(mp) *
 		       (fdb - XFS_DIR2_FREE_FIRSTDB(mp)));
 		/*
 		 * Calculate which entry we need to fix.
 		 */
 		findex = XFS_DIR2_DB_TO_FDINDEX(mp, db);
-		longest = data->hdr.bestfree[0].length;
+		longest = INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN);
 		/*
 		 * If the data block is now empty we can get rid of it
 		 * (usually).
@@ -1004,7 +1040,7 @@ xfs_dir2_leafn_remove(
 			/*
 			 * One less used entry in the free table.
 			 */
-			free->hdr.nused--;
+			INT_MOD(free->hdr.nused, ARCH_UNKNOWN, -1);
 			xfs_dir2_free_log_header(tp, fbp);
 			/*
 			 * If this was the last entry in the table, we can
@@ -1012,28 +1048,28 @@ xfs_dir2_leafn_remove(
 			 * entries at the end referring to non-existent
 			 * data blocks, get those too.
 			 */
-			if (findex == free->hdr.nvalid - 1) {
+			if (findex == INT_GET(free->hdr.nvalid, ARCH_UNKNOWN) - 1) {
 				int	i;		/* free entry index */
 
 				for (i = findex - 1;
-				     i >= 0 && free->bests[i] == NULLDATAOFF;
+				     i >= 0 && INT_GET(free->bests[i], ARCH_UNKNOWN) == NULLDATAOFF;
 				     i--)
 					continue;
-				free->hdr.nvalid = i + 1;
+				INT_SET(free->hdr.nvalid, ARCH_UNKNOWN, i + 1);
 				logfree = 0;
 			}
 			/*
 			 * Not the last entry, just punch it out.
 			 */
 			else {
-				free->bests[findex] = NULLDATAOFF;
+				INT_SET(free->bests[findex], ARCH_UNKNOWN, NULLDATAOFF);
 				logfree = 1;
 			}
 			/*
 			 * If there are no useful entries left in the block,
 			 * get rid of the block if we can.
 			 */
-			if (free->hdr.nused == 0) {
+			if (INT_GET(free->hdr.nused, ARCH_UNKNOWN) == 0) {
 				error = xfs_dir2_shrink_inode(args, fdb, fbp);
 				if (error == 0) {
 					fbp = NULL;
@@ -1052,7 +1088,7 @@ xfs_dir2_leafn_remove(
 		 * the new value.
 		 */
 		else {
-			free->bests[findex] = longest;
+			INT_SET(free->bests[findex], ARCH_UNKNOWN, longest);
 			logfree = 1;
 		}
 		/*
@@ -1074,7 +1110,7 @@ xfs_dir2_leafn_remove(
 	*rval =
 		((uint)sizeof(leaf->hdr) +
 		 (uint)sizeof(leaf->ents[0]) *
-		 (leaf->hdr.count - leaf->hdr.stale)) <
+		 (INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - INT_GET(leaf->hdr.stale, ARCH_UNKNOWN))) <
 		mp->m_dir_magicpct;
 	return 0;
 }
@@ -1180,7 +1216,7 @@ xfs_dir2_leafn_toosmall(
 	info = blk->bp->data;
 	ASSERT(info->magic == XFS_DIR2_LEAFN_MAGIC);
 	leaf = (xfs_dir2_leaf_t *)info;
-	count = leaf->hdr.count - leaf->hdr.stale;
+	count = INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - INT_GET(leaf->hdr.stale, ARCH_UNKNOWN);
 	bytes = (uint)sizeof(leaf->hdr) + count * (uint)sizeof(leaf->ents[0]);
 	if (bytes > (state->blocksize >> 1)) {
 		/*
@@ -1236,11 +1272,11 @@ xfs_dir2_leafn_toosmall(
 		 * Count bytes in the two blocks combined.
 		 */
 		leaf = (xfs_dir2_leaf_t *)info;
-		count = leaf->hdr.count - leaf->hdr.stale;
+		count = INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - INT_GET(leaf->hdr.stale, ARCH_UNKNOWN);
 		bytes = state->blocksize - (state->blocksize >> 2);
 		leaf = bp->data;
 		ASSERT(leaf->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
-		count += leaf->hdr.count - leaf->hdr.stale;
+		count += INT_GET(leaf->hdr.count, ARCH_UNKNOWN) - INT_GET(leaf->hdr.stale, ARCH_UNKNOWN);
 		bytes -= count * (uint)sizeof(leaf->ents[0]);
 		/*
 		 * Fits with at least 25% to spare.
@@ -1305,21 +1341,21 @@ xfs_dir2_leafn_unbalance(
 	 * If there are any stale leaf entries, take this opportunity
 	 * to purge them.
 	 */
-	if (drop_leaf->hdr.stale)
+	if (INT_GET(drop_leaf->hdr.stale, ARCH_UNKNOWN))
 		xfs_dir2_leaf_compact(args, drop_blk->bp);
-	if (save_leaf->hdr.stale)
+	if (INT_GET(save_leaf->hdr.stale, ARCH_UNKNOWN))
 		xfs_dir2_leaf_compact(args, save_blk->bp);
 	/*
 	 * Move the entries from drop to the appropriate end of save.
 	 */
-	drop_blk->hashval = drop_leaf->ents[drop_leaf->hdr.count - 1].hashval;
+	drop_blk->hashval = INT_GET(drop_leaf->ents[INT_GET(drop_leaf->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN);
 	if (xfs_dir2_leafn_order(save_blk->bp, drop_blk->bp))
 		xfs_dir2_leafn_moveents(args, drop_blk->bp, 0, save_blk->bp, 0,
-			drop_leaf->hdr.count);
+			INT_GET(drop_leaf->hdr.count, ARCH_UNKNOWN));
 	else
 		xfs_dir2_leafn_moveents(args, drop_blk->bp, 0, save_blk->bp,
-			save_leaf->hdr.count, drop_leaf->hdr.count);
-	save_blk->hashval = save_leaf->ents[save_leaf->hdr.count - 1].hashval;
+			INT_GET(save_leaf->hdr.count, ARCH_UNKNOWN), INT_GET(drop_leaf->hdr.count, ARCH_UNKNOWN));
+	save_blk->hashval = INT_GET(save_leaf->ents[INT_GET(save_leaf->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN);
 	xfs_dir2_leafn_check(args->dp, save_blk->bp);
 }
 #endif /* XFS_REPAIR_SIM || !SIM */
@@ -1445,7 +1481,7 @@ xfs_dir2_node_addname_int(
 		 */
 		ifbno = fblk->blkno;
 		free = fbp->data;
-		ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+		ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 		findex = fblk->index;
 		/*
 		 * This means the free entry showed that the data block had
@@ -1453,10 +1489,10 @@ xfs_dir2_node_addname_int(
 		 * Use that data block.
 		 */
 		if (findex >= 0) {
-			ASSERT(findex < free->hdr.nvalid);
-			ASSERT(free->bests[findex] != NULLDATAOFF);
-			ASSERT(free->bests[findex] >= length);
-			dbno = free->hdr.firstdb + findex;
+			ASSERT(findex < INT_GET(free->hdr.nvalid, ARCH_UNKNOWN));
+			ASSERT(INT_GET(free->bests[findex], ARCH_UNKNOWN) != NULLDATAOFF);
+			ASSERT(INT_GET(free->bests[findex], ARCH_UNKNOWN) >= length);
+			dbno = INT_GET(free->hdr.firstdb, ARCH_UNKNOWN) + findex;
 		}
 		/*
 		 * The data block looked at didn't have enough room.
@@ -1532,29 +1568,29 @@ xfs_dir2_node_addname_int(
 				continue;
 			}
 			free = fbp->data;
-			ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+			ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 			findex = 0;
 		}
 		/*
 		 * Look at the current free entry.  Is it good enough?
 		 */
-		if (free->bests[findex] != NULLDATAOFF &&
-		    free->bests[findex] >= length)
-			dbno = free->hdr.firstdb + findex;
+		if (INT_GET(free->bests[findex], ARCH_UNKNOWN) != NULLDATAOFF &&
+		    INT_GET(free->bests[findex], ARCH_UNKNOWN) >= length)
+			dbno = INT_GET(free->hdr.firstdb, ARCH_UNKNOWN) + findex;
 		else {
 			/*
 			 * If we haven't found an empty entry yet, and this
 			 * one is empty, remember this slot.
 			 */
 			if (foundindex == -1 &&
-			    free->bests[findex] == NULLDATAOFF) {
+			    INT_GET(free->bests[findex], ARCH_UNKNOWN) == NULLDATAOFF) {
 				foundindex = findex;
 				foundbno = fbno;
 			}
 			/*
 			 * Are we done with the freeblock?
 			 */
-			if (++findex == free->hdr.nvalid) {
+			if (++findex == INT_GET(free->hdr.nvalid, ARCH_UNKNOWN)) {
 				/*
 				 * If there is space left in this freeblock,
 				 * and we don't have an empty entry yet,
@@ -1607,11 +1643,11 @@ xfs_dir2_node_addname_int(
 		 * its first slot as our empty slot.
 		 */
 		free = fbp->data;
-		free->hdr.magic = XFS_DIR2_FREE_MAGIC;
-		free->hdr.firstdb =
-			(fbno - XFS_DIR2_FREE_FIRSTDB(mp)) *
-			XFS_DIR2_MAX_FREE_BESTS(mp);
-		free->hdr.nvalid = free->hdr.nused = 0;
+		INT_SET(free->hdr.magic, ARCH_UNKNOWN, XFS_DIR2_FREE_MAGIC);
+		INT_SET(free->hdr.firstdb, ARCH_UNKNOWN, (fbno - XFS_DIR2_FREE_FIRSTDB(mp)) *
+			XFS_DIR2_MAX_FREE_BESTS(mp));
+                INT_ZERO(free->hdr.nused, ARCH_UNKNOWN);
+		INT_ZERO(free->hdr.nvalid, ARCH_UNKNOWN);
 		foundindex = 0;
 		foundbno = fbno;
 	}
@@ -1633,7 +1669,7 @@ xfs_dir2_node_addname_int(
 		}
 		ASSERT(fbp != NULL);
 		free = fbp->data;
-		ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+		ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 	}
 	/*
 	 * If we don't have a data block, we need to allocate one and make
@@ -1685,7 +1721,7 @@ xfs_dir2_node_addname_int(
 			}
 			ASSERT(fbp != NULL);
 			free = fbp->data;
-			ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+			ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 		}
 		/*
 		 * Set the freespace block index from the data block number.
@@ -1695,20 +1731,20 @@ xfs_dir2_node_addname_int(
 		 * If it's after the end of the current entries in the
 		 * freespace block, extend that table.
 		 */
-		if (findex >= free->hdr.nvalid) {
+		if (findex >= INT_GET(free->hdr.nvalid, ARCH_UNKNOWN)) {
 			ASSERT(findex < XFS_DIR2_MAX_FREE_BESTS(mp));
-			free->hdr.nvalid = findex + 1;
+			INT_SET(free->hdr.nvalid, ARCH_UNKNOWN, findex + 1);
 			/*
 			 * Tag new entry so nused will go up.
 			 */
-			free->bests[findex] = NULLDATAOFF;
+			INT_SET(free->bests[findex], ARCH_UNKNOWN, NULLDATAOFF);
 		}
 		/*
 		 * If this entry was for an empty data block
 		 * (this should always be true) then update the header.
 		 */
-		if (free->bests[findex] == NULLDATAOFF) {
-			free->hdr.nused++;
+		if (INT_GET(free->bests[findex], ARCH_UNKNOWN) == NULLDATAOFF) {
+			INT_MOD(free->hdr.nused, ARCH_UNKNOWN, +1);
 			xfs_dir2_free_log_header(tp, fbp);
 		}
 		/*
@@ -1717,7 +1753,7 @@ xfs_dir2_node_addname_int(
 		 * change again.
 		 */
 		data = dbp->data;
-		free->bests[findex] = data->hdr.bestfree[0].length;
+		INT_SET(free->bests[findex], ARCH_UNKNOWN, INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN));
 		logfree = 1;
 	}
 	/*
@@ -1745,12 +1781,12 @@ xfs_dir2_node_addname_int(
 		data = dbp->data;
 		logfree = 0;
 	}
-	ASSERT(data->hdr.bestfree[0].length >= length);
+	ASSERT(INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN) >= length);
 	/*
 	 * Point to the existing unused space.
 	 */
 	dup = (xfs_dir2_data_unused_t *)
-	      ((char *)data + data->hdr.bestfree[0].offset);
+	      ((char *)data + INT_GET(data->hdr.bestfree[0].offset, ARCH_UNKNOWN));
 	needscan = needlog = 0;
 	/*
 	 * Mark the first part of the unused space, inuse for us.
@@ -1762,11 +1798,11 @@ xfs_dir2_node_addname_int(
 	 * Fill in the new entry and log it.
 	 */
 	dep = (xfs_dir2_data_entry_t *)dup;
-	dep->inumber = args->inumber;
+	INT_SET(dep->inumber, ARCH_UNKNOWN, args->inumber);
 	dep->namelen = args->namelen;
 	bcopy(args->name, dep->name, dep->namelen);
 	tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
-	*tagp = (xfs_dir2_data_off_t)((char *)dep - (char *)data);
+	INT_SET(*tagp, ARCH_UNKNOWN, (xfs_dir2_data_off_t)((char *)dep - (char *)data));
 	xfs_dir2_data_log_entry(tp, dbp, dep);
 	/*
 	 * Rescan the block for bestfree if needed.
@@ -1781,8 +1817,8 @@ xfs_dir2_node_addname_int(
 	/*
 	 * If the freespace entry is now wrong, update it.
 	 */
-	if (free->bests[findex] != data->hdr.bestfree[0].length) {
-		free->bests[findex] = data->hdr.bestfree[0].length;
+	if (INT_GET(free->bests[findex], ARCH_UNKNOWN) != INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN)) {
+		INT_SET(free->bests[findex], ARCH_UNKNOWN, INT_GET(data->hdr.bestfree[0].length, ARCH_UNKNOWN));
 		logfree = 1;
 	}
 	/*
@@ -1799,7 +1835,7 @@ xfs_dir2_node_addname_int(
 	 * Return the data block and offset in args, then drop the data block.
 	 */
 	args->blkno = (xfs_dablk_t)dbno;
-	args->index = *tagp;
+	args->index = INT_GET(*tagp, ARCH_UNKNOWN);
 	xfs_da_buf_done(dbp);
 	return 0;
 }
@@ -1970,15 +2006,15 @@ xfs_dir2_node_replace(
 		 * Point to the data entry.
 		 */
 		data = state->extrablk.bp->data;
-		ASSERT(data->hdr.magic == XFS_DIR2_DATA_MAGIC);
+		ASSERT(INT_GET(data->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_DATA_MAGIC);
 		dep = (xfs_dir2_data_entry_t *)
 		      ((char *)data +
-		       XFS_DIR2_DATAPTR_TO_OFF(state->mp, lep->address));
-		ASSERT(inum != dep->inumber);
+		       XFS_DIR2_DATAPTR_TO_OFF(state->mp, INT_GET(lep->address, ARCH_UNKNOWN)));
+		ASSERT(inum != INT_GET(dep->inumber, ARCH_UNKNOWN));
 		/*
 		 * Fill in the new inode number and log the entry.
 		 */
-		dep->inumber = inum;
+		INT_SET(dep->inumber, ARCH_UNKNOWN, inum);
 		xfs_dir2_data_log_entry(args->trans, state->extrablk.bp, dep);
 		rval = 0;
 	}
@@ -2030,11 +2066,11 @@ xfs_dir2_node_trim_free(
 		return error;
 	}
 	free = bp->data;
-	ASSERT(free->hdr.magic == XFS_DIR2_FREE_MAGIC);
+	ASSERT(INT_GET(free->hdr.magic, ARCH_UNKNOWN) == XFS_DIR2_FREE_MAGIC);
 	/*
 	 * If there are used entries, there's nothing to do.
 	 */
-	if (free->hdr.nused > 0) {
+	if (INT_GET(free->hdr.nused, ARCH_UNKNOWN) > 0) {
 		xfs_da_brelse(tp, bp);
 		*rvalp = 0;
 		return 0;

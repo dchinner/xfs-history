@@ -83,6 +83,27 @@
 #include "sim.h"
 #endif
 
+#if defined(XFSDEBUG) && !defined(SIM) && 0
+#include "asm/kdb.h"
+#undef xfs_dir2_print_args
+#define xfs_dir2_print_args(ARGS) \
+    printk("    inumber=%Ld, name=\"%*.*s\", hashval=0x%x, dir inumber=%Ld\n", \
+       ARGS->inumber, (int)ARGS->namelen, (int)ARGS->namelen, ARGS->name, \
+       ARGS->hashval, ARGS->dp->i_ino);
+
+#undef xfs_dir2_trace_args
+#define xfs_dir2_trace_args(A,B) { \
+    printk("[%s] (0x%p)\n", A, B); \
+    xfs_dir2_print_args(B); \
+}
+   
+#undef xfs_dir2_trace_args_sb
+#define xfs_dir2_trace_args_sb(A,B,C,D) {\
+    printk("[%s] (0x%p, %d, 0x%p)\n", A, B, C, D); \
+    xfs_dir2_print_args(B); \
+}
+#endif
+
 /*
  * Prototypes for internal functions.
  */
@@ -139,13 +160,13 @@ xfs_dir2_block_sfsize(
         arch = ARCH_GET(mp->m_arch);
 	count = i8count = namelen = 0;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
-	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
+	blp = XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, arch);
         
 	/*
 	 * Iterate over the block's data entries by using the leaf pointers.
 	 */
-	for (i = 0; i < btp->count; i++) {
-		if ((addr = blp[i].address) == XFS_DIR2_NULL_DATAPTR)
+	for (i = 0; i < INT_GET(btp->count, arch); i++) {
+		if ((addr = INT_GET(blp[i].address, arch)) == XFS_DIR2_NULL_DATAPTR)
 			continue;
 		/*
 		 * Calculate the pointer to the entry at hand.
@@ -163,13 +184,13 @@ xfs_dir2_block_sfsize(
 			dep->name[0] == '.' && dep->name[1] == '.';
 #if XFS_BIG_FILESYSTEMS
 		if (!isdot)
-			i8count += dep->inumber > XFS_DIR2_MAX_SHORT_INUM;
+			i8count += INT_GET(dep->inumber, arch) > XFS_DIR2_MAX_SHORT_INUM;
 #endif
 		if (!isdot && !isdotdot) {
 			count++;
 			namelen += dep->namelen;
 		} else if (isdotdot)
-			parent = dep->inumber;
+			parent = INT_GET(dep->inumber, arch);
 		/*
 		 * Calculate the new size, see if we should give up yet.
 		 */
@@ -216,7 +237,8 @@ xfs_dir2_block_to_sf(
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform entry */
 	xfs_dir2_sf_t		*sfp;		/* shortform structure */
         xfs_arch_t              arch;
-
+        xfs_ino_t               temp;
+                
 	xfs_dir2_trace_args_sb("block_to_sf", args, size, bp);
 	dp = args->dp;
 	mp = dp->i_mount;
@@ -256,7 +278,7 @@ xfs_dir2_block_to_sf(
 	 */
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
 	ptr = (char *)block->u;
-	endptr = (char *)XFS_DIR2_BLOCK_LEAF_P(btp);
+	endptr = (char *)XFS_DIR2_BLOCK_LEAF_P_ARCH(btp, arch);
 	sfep = XFS_DIR2_SF_FIRSTENTRY(sfp);
 	/*
 	 * Loop over the active and unused entries.
@@ -267,8 +289,8 @@ xfs_dir2_block_to_sf(
 		 * If it's unused, just skip over it.
 		 */
 		dup = (xfs_dir2_data_unused_t *)ptr;
-		if (dup->freetag == XFS_DIR2_DATA_FREE_TAG) {
-			ptr += dup->length;
+		if (INT_GET(dup->freetag, arch) == XFS_DIR2_DATA_FREE_TAG) {
+			ptr += INT_GET(dup->length, arch);
 			continue;
 		}
 		dep = (xfs_dir2_data_entry_t *)ptr;
@@ -276,13 +298,13 @@ xfs_dir2_block_to_sf(
 		 * Skip .
 		 */
 		if (dep->namelen == 1 && dep->name[0] == '.')
-			ASSERT(dep->inumber == dp->i_ino);
+			ASSERT(INT_GET(dep->inumber, arch) == dp->i_ino);
 		/*
 		 * Skip .., but make sure the inode number is right.
 		 */
 		else if (dep->namelen == 2 &&
 			 dep->name[0] == '.' && dep->name[1] == '.')
-			ASSERT(dep->inumber ==
+			ASSERT(INT_GET(dep->inumber, arch) ==
 			       XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch));
 		/*
 		 * Normal entry, copy it into shortform.
@@ -293,7 +315,8 @@ xfs_dir2_block_to_sf(
 				(xfs_dir2_data_aoff_t)
 				((char *)dep - (char *)block), arch);
 			bcopy(dep->name, sfep->name, dep->namelen);
-			XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &dep->inumber,
+                        temp=INT_GET(dep->inumber, arch);
+			XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp, &temp,
 				XFS_DIR2_SF_INUMBERP(sfep), arch);
 			sfep = XFS_DIR2_SF_NEXTENTRY(sfp, sfep);
 		}

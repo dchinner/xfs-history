@@ -90,7 +90,9 @@
 #include "xfs_trans_space.h"
 #include "xfs_dmapi.h"
 #include "xfs_cxfs.h"
-
+#ifdef XFSDEBUG
+#include "asm/kdb.h"
+#endif
 /*
  * turning on UIOSZ_DEBUG in a DEBUG kernel causes each xfs_write/xfs_read
  * to set the write/read i/o size to a random valid value and instruments
@@ -805,6 +807,12 @@ xfs_force_shutdown(
 	int ntries;
 	int logerror;
 	extern dev_t rootdev;		/* from sys/systm.h */
+        
+#ifdef XFSDEBUG && 0
+        printk("xfs_force_shutdown entered [0x%p, %d]\n",
+                mp, flags);
+        KDB_ENTER();
+#endif
 
 #define XFS_MAX_DRELSE_RETRIES	10
 	logerror = flags & XFS_LOG_IO_ERROR;

@@ -408,7 +408,7 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		ASSERT(XFS_DIR_IS_V2(mp));
 		ASSERT(oldroot->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
 		leaf = (xfs_dir2_leaf_t *)oldroot;
-		size = (int)((char *)&leaf->ents[leaf->hdr.count] -
+		size = (int)((char *)&leaf->ents[INT_GET(leaf->hdr.count, ARCH_UNKNOWN)] -
 			     (char *)leaf);
 	}
 	bcopy(oldroot, node, size);
@@ -1863,12 +1863,12 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		dead_leaf = (xfs_dir_leafblock_t *)dead_info;
 		dead_level = 0;
 		dead_hash =
-			dead_leaf->entries[dead_leaf->hdr.count - 1].hashval;
+			INT_GET(dead_leaf->entries[INT_GET(dead_leaf->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN);
 	} else if (dead_info->magic == XFS_DIR2_LEAFN_MAGIC) {
 		ASSERT(XFS_DIR_IS_V2(mp));
 		dead_leaf2 = (xfs_dir2_leaf_t *)dead_info;
 		dead_level = 0;
-		dead_hash = dead_leaf2->ents[dead_leaf2->hdr.count - 1].hashval;
+		dead_hash = INT_GET(dead_leaf2->ents[INT_GET(dead_leaf2->hdr.count, ARCH_UNKNOWN) - 1].hashval, ARCH_UNKNOWN);
 	} else {
 		ASSERT(dead_info->magic == XFS_DA_NODE_MAGIC);
 		dead_node = (xfs_da_intnode_t *)dead_info;
@@ -2258,9 +2258,9 @@ xfs_da_do_buf(
 				   (info->magic != XFS_ATTR_LEAF_MAGIC) &&
 				   (info->magic != XFS_DIR2_LEAF1_MAGIC) &&
 				   (info->magic != XFS_DIR2_LEAFN_MAGIC) &&
-				   (data->hdr.magic != XFS_DIR2_BLOCK_MAGIC) &&
-				   (data->hdr.magic != XFS_DIR2_DATA_MAGIC) &&
-				   (free->hdr.magic != XFS_DIR2_FREE_MAGIC),
+				   (INT_GET(data->hdr.magic, ARCH_UNKNOWN) != XFS_DIR2_BLOCK_MAGIC) &&
+				   (INT_GET(data->hdr.magic, ARCH_UNKNOWN) != XFS_DIR2_DATA_MAGIC) &&
+				   (INT_GET(free->hdr.magic, ARCH_UNKNOWN) != XFS_DIR2_FREE_MAGIC),
 				mp, XFS_ERRTAG_DA_READ_BUF,
 				XFS_RANDOM_DA_READ_BUF)) {
 #pragma mips_frequency_hint NEVER

@@ -94,6 +94,21 @@
 #include "sim.h"
 #endif
 
+#if defined(XFSDEBUG) && !defined(SIM) && 0
+#include "asm/kdb.h"
+#undef xfs_dir2_trace_args
+#define xfs_dir2_trace_args(A,B) \
+    printk("[%s] (0x%p)\n", A, B);
+    
+#undef xfs_dir2_trace_args_s
+#define xfs_dir2_trace_args_s(A,B,C) \
+    printk("[%s] (0x%p, %d)\n", A, B, C);
+    
+#undef xfs_dir2_trace_args_db
+#define xfs_dir2_trace_args_db(A,B,C,D) \
+    printk("[%s] (0x%p, %d, 0x%p)\n", A, B, C, D);
+#endif
+
 /*
  * Declarations for interface routines.
  */
@@ -216,7 +231,7 @@ xfs_dir2_isempty(
 	if (dp->i_d.di_size > XFS_IFORK_DSIZE(dp))
 		return 0;
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
-	return sfp->hdr.count == 0;
+	return INT_ISZERO(sfp->hdr.count, ARCH_UNKNOWN);
 }
 
 /*
