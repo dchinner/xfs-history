@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -128,7 +128,7 @@ fd_to_handle (
 	if (error)
 		return error;
 	if (!VF_IS_VNODE(fp))
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	vp = VF_TO_VNODE(fp);
 	error = vp_to_handle (vp, &handle);
 	if (error)
