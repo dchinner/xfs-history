@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.84 $"
+#ident "$Revision: 1.86 $"
 
 #include <xfs_os_defs.h>
 
@@ -162,7 +162,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		 */
 		else if (XFS_BUF_ISSTALE(bp)) {
 			xfs_buftrace("TRANS GET RECUR STALE", bp);
-			ASSERT(XFS_BUF_ISDELAYWRITE(bp));
+			ASSERT(!XFS_BUF_ISDELAYWRITE(bp));
 		}
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 		bip = XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *);
