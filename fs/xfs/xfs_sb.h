@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * Super block
@@ -110,6 +110,7 @@ typedef struct xfs_sb
 #define	XFS_BB_TO_FSB(mp,bb)	\
 	(((bb) + (XFS_FSB_TO_BB(mp,1) - 1)) >> (mp)->m_blkbb_log)
 #define	XFS_BB_TO_FSBT(mp,bb)	((bb) >> (mp)->m_blkbb_log)
+#define	XFS_BB_FSB_OFFSET(mp,bb) ((bb) & ((mp)->m_bsize - 1))
 
 /*
  * File system block to byte conversions.
@@ -117,7 +118,8 @@ typedef struct xfs_sb
 #define	XFS_FSB_TO_B(mp,fsbno)	((fsbno) << (mp)->m_sb.sb_blocklog)
 #define	XFS_B_TO_FSB(mp,b)	\
 	(((b) + (mp)->m_blockmask) >> (mp)->m_sb.sb_blocklog)
-#define	XFS_B_TO_FSBT(s,b)	((b) >> (mp)->m_sb.sb_blocklog)
+#define	XFS_B_TO_FSBT(mp,b)	((b) >> (mp)->m_sb.sb_blocklog)
+#define	XFS_B_FSB_OFFSET(mp,b)	((b) & (mp)->m_blockmask)     
      
 #define	XFS_BTOD(mp,l)	((daddr_t)((l) << (mp)->m_blkbb_log))
 #define	XFS_DTOBT(mp,l)	((l) >> (mp)->m_blkbb_log)
