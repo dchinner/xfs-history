@@ -78,7 +78,8 @@ STATIC int xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_args_t *args,
 					       int *total_namebytes);
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
-					     dirent_t *dbp);
+					     dirent_t *dbp,
+					     xfs_dir_put_t *putp);
 STATIC int xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_args_t *args);
 #endif	/* !SIM */
 
@@ -91,14 +92,15 @@ STATIC int xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_args_t *args);
 STATIC int xfs_dir_node_removename(xfs_trans_t *trans, xfs_da_args_t *args);
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
-					     dirent_t *dbp);
+					     dirent_t *dbp,
+					     xfs_dir_put_t *putp);
 STATIC int xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_args_t *args);
 #endif	/* !SIM */
 
 /*
  * Utility routines.
  */
-uint xfs_dir_hashname(char *name_string, int name_length);
+xfs_dahash_t xfs_dir_hashname(char *name_string, int name_length);
 uint xfs_dir_log2_roundup(uint i);
 xfs_da_state_t *xfs_da_state_alloc(void);
 void xfs_da_state_free(xfs_da_state_t *state);
@@ -111,6 +113,18 @@ ktrace_t *xfs_dir_trace_buf;
 /*========================================================================
  * Overall external interface routines.
  *========================================================================*/
+
+xfs_dahash_t	xfs_dir_hash_dot, xfs_dir_hash_dotdot;
+
+/*
+ * One-time startup routine called from xfs_init().
+ */
+void
+xfs_dir_startup(void)
+{
+	xfs_dir_hash_dot = xfs_da_hashname(".", 1);
+	xfs_dir_hash_dotdot = xfs_da_hashname("..", 2);
+}
 
 /*
  * Initialize directory-related fields in the mount structure.
@@ -324,50 +338,56 @@ int							/* error */
 xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
 	dirent_t *dbp;
-	int retval;
 	caddr_t lockaddr;
-	int locklen = 0;
-	int abi;
-	int alignment;
+	int locklen = 0, alignment, retval, is32;
+	xfs_dir_put_t put, oput;
 
 	XFSSTATS.xs_dir_getdents++;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+
 	/*
 	 * If our caller has given us a single contiguous memory buffer,
 	 * just work directly within that buffer.  If it's in user memory,
 	 * lock it down first.
 	 */
-	abi = GETDENTS_ABI(curprocp->p_abi, uio);
-	alignment = ((ABI_IS_IRIX5_64(abi) || ABI_IS_IRIX5_N32(abi)) ?
-		sizeof(off_t) : sizeof(irix5_off_t)) - 1;
-	if (uio->uio_iovcnt == 1 &&
-	    ((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0 &&
-	    (uio->uio_iov[0].iov_len & alignment) == 0) {
+	is32 = ABI_IS_IRIX5(GETDENTS_ABI(curprocp->p_abi, uio));
+	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
+	if ((uio->uio_iovcnt == 1) &&
+	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
+	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
 		dbp = NULL;
-		if ((uio->uio_segflg != UIO_SYSSPACE) &&
-		    !useracc((lockaddr = uio->uio_iov[0].iov_base),
-			     (locklen = uio->uio_iov[0].iov_len), B_READ)) {
-			return curthreadp->k_error ?
-				curthreadp->k_error : EFAULT;
-		}
+		lockaddr = uio->uio_iov[0].iov_base;
+		locklen = uio->uio_iov[0].iov_len;
+		if (uio->uio_segflg == UIO_SYSSPACE) {
+			ASSERT(!is32);
+			oput = put = xfs_dir_put_dirent64_rest;
+		} else
+			oput = put = is32 ?
+					xfs_dir_put_dirent32_first :
+					xfs_dir_put_dirent64_first;
 	} else {
 		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
+		put = is32 ?
+			xfs_dir_put_dirent32_uio :
+			xfs_dir_put_dirent64_uio;
 	}
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
 	*eofp = 0;
-	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL)
-		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp);
-	else if (xfs_bmap_one_block(dp, XFS_DATA_FORK))
-		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp);
-	else
-		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp);
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
+		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp,
+						    &put);
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
+		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp, &put);
+	} else {
+		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp, &put);
+	}
 
 	if (dbp != NULL)
 		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
-	else if (locklen)
+	else if (locklen && oput != put)
 		unuseracc(lockaddr, locklen, B_READ);
 	return(retval);
 }
@@ -495,7 +515,7 @@ xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
  */
 STATIC int
 xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				  int *eofp, dirent_t *dbp)
+				  int *eofp, dirent_t *dbp, xfs_dir_put_t *putp)
 {
 	buf_t *bp;
 	int retval, eob;
@@ -504,7 +524,7 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
-	retval = xfs_dir_leaf_getdents_int(bp, dp, 0, uio, &eob, dbp);
+	retval = xfs_dir_leaf_getdents_int(bp, dp, 0, uio, &eob, dbp, putp, -1);
 	xfs_trans_brelse(trans, bp);
 	*eofp = (eob == 0);
 	return(retval);
@@ -534,8 +554,9 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
 		entry = &leaf->entries[index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		ASSERT(bcmp((char *)&inum, namest->inumber, sizeof(inum)));
-		bcopy((char *)&inum, namest->inumber, sizeof(inum));
+		ASSERT(bcmp((char *)&inum, (char *)&namest->inumber,
+			sizeof(inum)));
+		namest->inumber = *(xfs_dir_ino_t *)&inum;
 		xfs_trans_log_buf(trans, bp, 
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		retval = 0;
@@ -698,22 +719,24 @@ xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 #ifndef SIM
 STATIC int
 xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				  int *eofp, dirent_t *dbp)
+				  int *eofp, dirent_t *dbp, xfs_dir_put_t *putp)
 {
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
 	xfs_dir_leafblock_t *leaf;
-	__uint32_t bno, cookhash;
+	xfs_dablk_t bno, nextbno;
+	xfs_dahash_t cookhash;
 	xfs_mount_t *mp;
 	int error, eob, i;
 	buf_t *bp;
+	daddr_t nextda;
 
 	/*
 	 * Pick up our context.
 	 */
 	mp = dp->i_mount;
 	bp = NULL;
-	bno = (__uint32_t)XFS_DA_COOKIE_BNO(mp, uio->uio_offset);
+	bno = XFS_DA_COOKIE_BNO(mp, uio->uio_offset);
 	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
 
 	xfs_dir_trace_g_du("node: start", dp, uio);
@@ -806,9 +829,15 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			return XFS_ERROR(EDIRCORRUPTED);
 		}
 		xfs_dir_trace_g_dul("node: leaf detail", dp, uio, leaf);
-		error = xfs_dir_leaf_getdents_int(bp, dp, bno, uio, &eob, dbp);
-		bno = leaf->hdr.info.forw;
+		if (nextbno = leaf->hdr.info.forw) {
+			nextda = xfs_da_reada_buf(trans, dp, nextbno,
+						  XFS_DATA_FORK);
+		} else
+			nextda = -1;
+		error = xfs_dir_leaf_getdents_int(bp, dp, bno, uio, &eob, dbp,
+						  putp, nextda);
 		xfs_trans_brelse(trans, bp);
+		bno = nextbno;
 		if (eob) {
 			xfs_dir_trace_g_dub("node: E-O-B", dp, uio, bno);
 			*eofp = 0;
@@ -816,7 +845,8 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		}
 		if (bno == 0)
 			break;
-		error = xfs_da_read_buf(trans, dp, bno, -1, &bp, XFS_DATA_FORK);
+		error = xfs_da_read_buf(trans, dp, bno, nextda, &bp,
+					XFS_DATA_FORK);
 		if (error)
 			return(error);
 		ASSERT(bp != NULL);
@@ -865,8 +895,9 @@ xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
 		entry = &leaf->entries[blk->index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		ASSERT(bcmp((char *)&inum, namest->inumber, sizeof(inum)));
-		bcopy((char *)&inum, namest->inumber, sizeof(inum));
+		ASSERT(bcmp((char *)&inum, (char *)&namest->inumber,
+			sizeof(inum)));
+		namest->inumber = *(xfs_dir_ino_t *)&inum;
 		xfs_trans_log_buf(trans, bp,
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		retval = 0;
@@ -900,7 +931,7 @@ xfs_dir_trace_g_du(char *where, xfs_inode_t *dp, uio_t *uio)
  * Add a trace buffer entry for an inode and a uio.
  */
 void
-xfs_dir_trace_g_dub(char *where, xfs_inode_t *dp, uio_t *uio, __uint32_t bno)
+xfs_dir_trace_g_dub(char *where, xfs_inode_t *dp, uio_t *uio, xfs_dablk_t bno)
 {
 	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUB, where,
 		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,

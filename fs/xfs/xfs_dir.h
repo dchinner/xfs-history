@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision$"
 
 /*
  * xfs_dir.h
@@ -29,6 +29,8 @@ struct xfs_trans;
 /*
  * Overall external interface routines.
  */
+void	xfs_dir_startup(void);
+
 void	xfs_dir_mount(struct xfs_mount *mp);
 
 int	xfs_dir_isempty(struct xfs_inode *dp);
