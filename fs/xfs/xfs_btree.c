@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -132,9 +132,11 @@ xfs_btree_check_lblock(xfs_btree_cur_t *cur, xfs_btree_lblock_t *block, int leve
 	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
 	sbp = &cur->bc_mp->m_sb;
 	ASSERT(block->bb_leftsib == NULLFSBLOCK || 
-	       block->bb_leftsib < sbp->sb_dblocks);
+	       (xfs_fsb_to_agno(sbp, block->bb_leftsib) < sbp->sb_agcount &&
+		xfs_fsb_to_agbno(sbp, block->bb_leftsib) < sbp->sb_agblocks));
 	ASSERT(block->bb_rightsib == NULLFSBLOCK || 
-	       block->bb_rightsib < sbp->sb_dblocks);
+	       (xfs_fsb_to_agno(sbp, block->bb_rightsib) < sbp->sb_agcount &&
+		xfs_fsb_to_agbno(sbp, block->bb_rightsib) < sbp->sb_agblocks));
 }
 
 /*
@@ -147,7 +149,9 @@ xfs_btree_check_lptr(xfs_btree_cur_t *cur, xfs_fsblock_t ptr, int level)
 
 	ASSERT(level > 0);
 	sbp = &cur->bc_mp->m_sb;
-	ASSERT(ptr != NULLFSBLOCK && ptr < sbp->sb_dblocks);
+	ASSERT(ptr != NULLFSBLOCK &&
+	       xfs_fsb_to_agno(sbp, ptr) < sbp->sb_agcount &&
+	       xfs_fsb_to_agbno(sbp, ptr) < sbp->sb_agblocks);
 }
 
 /*
