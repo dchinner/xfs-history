@@ -1229,7 +1229,9 @@ int
 xfsbdstrat( struct xfs_mount 	*mp,
 			struct xfs_buf		*bp)
 {
+#if !defined(_USING_PAGEBUF_T)
   	int		dev_major = emajor(bp->b_edev);
+#endif
 
 	ASSERT(mp);
 	ASSERT(bp->b_target);

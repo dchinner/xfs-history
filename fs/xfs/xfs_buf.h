@@ -431,18 +431,18 @@ typedef struct bfidev {
 
 #define xfs_buf_read(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
-				PBF_LOCK | PBF_READ |((len > PAGE_SIZE)?PBF_MAPPED:0))
+				PBF_LOCK | PBF_READ | PBF_MAPPED)
 #define xfs_buf_get(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
-				PBF_LOCK)
+				PBF_LOCK | PBF_MAPPED)
 #define xfs_bdwrite(mp, bp)			\
 			bp->pb_flags |= PBF_DELWRI; \
-			pagebuf_rele(bp)
+			pagebuf_unlock(bp)
 
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
 #define xfs_buf_relse(bp)	\
-			pagebuf_rele(bp)
+			pagebuf_unlock(bp)
 
 #define xfs_bpin(bp)                 \
      pagebuf_pin(bp)

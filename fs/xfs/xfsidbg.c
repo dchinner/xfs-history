@@ -3628,8 +3628,12 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		mp->m_logbsize, mp->m_log);
 	qprintf("rsumlevels 0x%x rsumsize 0x%x rbmip 0x%p rsumip 0x%p\n",
 		mp->m_rsumlevels, mp->m_rsumsize, mp->m_rbmip, mp->m_rsumip);
+#ifdef __linux__
+	qprintf("rootip 0x%p\n", mp->m_rootip);
+#else
 	qprintf("rootip 0x%p ddevp 0x%p logdevp 0x%p rtdevp 0x%p\n",
 		mp->m_rootip, mp->m_ddevp, mp->m_logdevp, mp->m_rtdevp);
+#endif
 	qprintf("dircook_elog %d blkbit_log %d blkbb_log %d agno_log %d\n",
 		mp->m_dircook_elog, mp->m_blkbit_log, mp->m_blkbb_log,
 		mp->m_agno_log);

@@ -910,8 +910,8 @@ xfs_buf_item_bits(
 	uint	start_bit)
 {
 	register int	bits;
-	register char	*bytep;
-	register char	*end_map;
+	register unsigned char	*bytep;
+	register unsigned char	*end_map;
 	int		byte_bit;
 
 	bits = 0;
