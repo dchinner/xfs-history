@@ -237,6 +237,7 @@ xfs_init(
 	extern ktrace_t	*xfs_bmap_trace_buf;
 	extern ktrace_t	*xfs_bmbt_trace_buf;
 	extern ktrace_t	*xfs_strat_trace_buf;
+	extern ktrace_t	*xfs_dir_trace_buf;
 #endif	/* DEBUG */
 #endif	/* !SIM */
 
@@ -306,6 +307,7 @@ xfs_init(
 	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE, 0);
 	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, 0);
 	xfs_strat_trace_buf = ktrace_alloc(XFS_STRAT_GTRACE_SIZE, 0);
+	xfs_dir_trace_buf = ktrace_alloc(XFS_DIR_TRACE_SIZE, 0);
 #endif
 	
 	/*
@@ -448,12 +450,17 @@ xfs_cmountfs(
 	}
 
 	/*
-	 * Pull in the 'wsync' mount option before we do the real
+	 * Pull in the 'wsync' and 'ino64' mount options before we do the real
 	 * work of mounting and recovery.  The arg pointer will
 	 * be NULL when we are being called from the root mount code.
 	 */
-	if ((ap != NULL) && (ap->flags & XFSMNT_WSYNC)) {
-		mp->m_flags |= XFS_MOUNT_WSYNC;
+	if (ap != NULL) {
+		if (ap->flags & XFSMNT_WSYNC)
+			mp->m_flags |= XFS_MOUNT_WSYNC;
+#if XFS_BIG_FILESYSTEMS
+		if (ap->flags & XFSMNT_INO64)
+			mp->m_flags |= XFS_MOUNT_INO64;
+#endif
 	}
 
 	if (error = xfs_mountfs(vfsp, ddev)) {
@@ -606,7 +613,7 @@ xfs_vfsmount(
 	 */
 	bzero(&args, sizeof args);
 	if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
-			 irix5_to_xfs_args, u.u_procp->p_abi, 1))
+			 irix5_to_xfs_args, curprocp->p_abi, 1))
 		return XFS_ERROR(EFAULT);
 
 	/*
@@ -745,7 +752,7 @@ xfs_mountroot(
 {
 	int		error = ENOSYS;
 	static int	xfsrootdone;
-	struct cred	*cr = u.u_cred;
+	struct cred	*cr = curprocp->p_cred;
 	dev_t		ddev, logdev, rtdev;
 	xfs_mount_t	*mp;
 	buf_t		*bp;
@@ -1167,7 +1174,7 @@ xfs_statdevvp(
 	xfs_extlen_t	lsize;
 	xfs_sb_t	*sbp;
 
-	if (error = devvptoxfs(devvp, &bp, &sbp, u.u_cred))
+	if (error = devvptoxfs(devvp, &bp, &sbp, curprocp->p_cred))
 		return error;
 	if (sbp->sb_magicnum == XFS_SB_MAGIC &&
 	    XFS_SB_GOOD_VERSION(sbp->sb_versionnum) &&
@@ -1190,7 +1197,7 @@ xfs_statdevvp(
 		error = EINVAL;
 	}
 	brelse(bp);
-	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, u.u_cred);
+	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, curprocp->p_cred);
 	return error;
 }
 
@@ -1224,6 +1231,10 @@ xfs_statvfs(
 	statp->f_blocks = sbp->sb_dblocks - lsize;
 	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks;
 	fakeinos = statp->f_bfree << sbp->sb_inopblog;
+#if XFS_BIG_FILESYSTEMS
+	if (mp->m_flags & XFS_MOUNT_INO64)
+		fakeinos += XFS_INO64_OFFSET;
+#endif
 	statp->f_files = MIN(sbp->sb_icount + fakeinos, XFS_MAXINUMBER);
 	statp->f_ffree = statp->f_favail =
 		statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
@@ -1789,10 +1800,13 @@ xfs_vget(
         xfs_fid_t	*xfid;
         xfs_inode_t	*ip;
 	int		error;
+	xfs_ino_t	ino;
+	xfs_mount_t	*mp;
 
         xfid = (struct xfs_fid *)fidp;
-	error = xfs_iget(XFS_VFSTOM(vfsp), NULL, (xfs_ino_t)(xfid->fid_ino),
-			 XFS_ILOCK_EXCL, &ip, 0);
+	ino = (xfs_ino_t)xfid->fid_ino;
+	mp = XFS_VFSTOM(vfsp);
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_EXCL, &ip, 0);
 	if (error) {
 		*vpp = NULL;
 		return error;
