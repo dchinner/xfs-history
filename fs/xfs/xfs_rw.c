@@ -75,6 +75,23 @@
 #endif
 
 /*
+ * turning on UIOSZ_DEBUG in a DEBUG kernel causes each xfs_write/xfs_read
+ * to set the write/read i/o size to a random valid value and instruments
+ * the distribution.
+ *
+#define UIOSZ_DEBUG
+ */
+
+#ifdef UIOSZ_DEBUG
+int uiodbg = 0;
+int uiodbg_readiolog[XFS_UIO_MAX_READIO_LOG - XFS_UIO_MIN_READIO_LOG + 1] =
+		{0, 0, 0, 0};
+int uiodbg_writeiolog[XFS_UIO_MAX_WRITEIO_LOG - XFS_UIO_MIN_WRITEIO_LOG + 1] =
+		{0, 0, 0, 0};
+int uiodbg_switch = 0;
+#endif
+
+/*
  * This lock is used by xfs_strat_write().
  * The xfs_strat_lock is initialized in xfs_init().
  */
@@ -231,10 +248,10 @@ xfs_delalloc_cleanup(
  * Round the given file offset down to the nearest read/write
  * size boundary.
  */
-#define	XFS_READIO_ALIGN(mp,off)	(((off) >> mp->m_readio_log) \
-					        << mp->m_readio_log)
-#define	XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \
-					        << mp->m_writeio_log)
+#define	XFS_READIO_ALIGN(ip,off)	(((off) >> ip->i_readio_log) \
+					        << ip->i_readio_log)
+#define	XFS_WRITEIO_ALIGN(ip,off)	(((off) >> ip->i_writeio_log) \
+					        << ip->i_writeio_log)
 
 #if !defined(XFS_RW_TRACE)
 #define	xfs_rw_enter_trace(tag, ip, uiop, ioflags)
@@ -758,10 +775,10 @@ xfs_iomap_read(
 			 * we always want to align the requests
 			 * to XFS_READ_SIZE boundaries as well.
 			 */
-			iosize = mp->m_readio_blocks;
+			iosize = ip->i_readio_blocks;
 			ASSERT(iosize <=
 			       XFS_BB_TO_FSBT(mp, XFS_MAX_BMAP_LEN_BB));
-			aligned_offset = XFS_READIO_ALIGN(mp, offset);
+			aligned_offset = XFS_READIO_ALIGN(ip, offset);
 			ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		} else {
 			/*
@@ -1154,6 +1171,24 @@ xfs_read(
 	size_t		resid;
 	vnode_t 	*vp;
 
+#if defined(DEBUG) && !defined(SIM) && defined(UIOSZ_DEBUG)
+	/*
+	 * Randomly set io size
+	 */
+	extern ulong_t	random(void);
+	extern int	srandom(int);
+	timespec_t	now;		/* current time */
+	static int	seed = 0;	/* randomizing seed value */
+
+	if (!seed) {
+		nanotime(&now);
+		seed = (int)now.tv_sec ^ (int)now.tv_nsec;
+		srandom(seed);
+	}
+	ioflag |= IO_UIOSZ;
+	uiop->uio_readiolog = (random() & 0x3) + XFS_UIO_MIN_READIO_LOG;
+#endif
+
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
 
@@ -1239,6 +1274,44 @@ xfs_read(
 			if (error = dm_data_event(vp, DM_READ, offset, count))
 				goto out;
 		}
+
+#ifndef SIM
+		/*
+		 * Respect preferred read size if indicated in uio structure.
+		 * But if the read size has already been set, go with the
+		 * smallest value.  Silently ignore requests that aren't
+		 * within valid I/O size limits.
+		 */
+		if ((ioflag & IO_UIOSZ) &&
+		    uiop->uio_readiolog != ip->i_readio_log &&
+		    uiop->uio_readiolog >= ip->i_mount->m_sb.sb_blocklog &&
+		    uiop->uio_readiolog >= XFS_UIO_MIN_READIO_LOG &&
+		    uiop->uio_readiolog <= XFS_UIO_MAX_READIO_LOG) {
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
+			if (!(ip->i_flags & XFS_IUIOSZ) ||
+			    uiop->uio_readiolog < ip->i_readio_log) {
+#endif
+				ip->i_readio_log =  uiop->uio_readiolog;
+				ip->i_readio_blocks = 
+					1 << (int) (ip->i_readio_log -
+						ip->i_mount->m_sb.sb_blocklog);
+				if (!(ip->i_flags & XFS_IUIOSZ))
+					ip->i_flags |= XFS_IUIOSZ;
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
+				atomicAddInt(&uiodbg_switch, 1);
+				atomicAddInt(
+					&(uiodbg_readiolog[ip->i_readio_log -
+						XFS_UIO_MIN_READIO_LOG]),
+					1);
+#endif
+#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
+			}
+#endif
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		}
+#endif /* !SIM */
+
 		if (ioflag & IO_DIRECT) {
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_READ);
 		} else {
@@ -1289,7 +1362,7 @@ xfs_read(
  * Map the given I/O size and I/O alignment over the given extent.
  * If we're at the end of the file and the underlying extent is
  * delayed alloc, make sure we extend out to the
- * next m_writeio_blocks boundary.  Otherwise make sure that we
+ * next i_writeio_blocks boundary.  Otherwise make sure that we
  * are confined to the given extent.
  */
 /*ARGSUSED*/
@@ -1621,12 +1694,6 @@ xfs_zero_eof(
 		}
 
 		/*
-		 * Drop the inode lock while we're doing the I/O.
-		 * We'll still have the iolock to protect us.
-		 */
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-
-		/*
 		 * There are blocks in the range requested.
 		 * Zero them a single write at a time.  We actually
 		 * don't zero the entire range returned if it is
@@ -1635,7 +1702,14 @@ xfs_zero_eof(
 		 * is simple and this path should not be exercised often.
 		 */
 		buf_len_fsb = XFS_FILBLKS_MIN(imap.br_blockcount,
-					      mp->m_writeio_blocks);
+					      ip->i_writeio_blocks);
+
+		/*
+		 * Drop the inode lock while we're doing the I/O.
+		 * We'll still have the iolock to protect us.
+		 */
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
 		bmap.offset = XFS_FSB_TO_BB(mp, imap.br_startoff);
 		bmap.length = XFS_FSB_TO_BB(mp, buf_len_fsb);
 		bmap.bsize = BBTOB(bmap.length);
@@ -1763,7 +1837,7 @@ xfs_iomap_write(
 	if (!(ioflag & IO_SYNC) && ((offset + count) > ip->i_d.di_size)) {
 		start_fsb = XFS_B_TO_FSBT(mp,
 				  ((xfs_ufsize_t)(offset + count - 1)));
-		count_fsb = mp->m_writeio_blocks;
+		count_fsb = ip->i_writeio_blocks;
 		while (count_fsb > 0) {
 			nimaps = XFS_WRITE_IMAPS;
 			firstblock = NULLFSBLOCK;
@@ -1783,8 +1857,8 @@ xfs_iomap_write(
 				ASSERT(count_fsb < 0xffff000);
 			}
 		}
-		iosize = mp->m_writeio_blocks;
-		aligned_offset = XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
+		iosize = ip->i_writeio_blocks;
+		aligned_offset = XFS_WRITEIO_ALIGN(ip, (offset + count - 1));
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		last_fsb = ioalign + iosize;
 		aeof = 1;
@@ -1831,13 +1905,13 @@ xfs_iomap_write(
 	}
 
 	if (!(ioflag & IO_SYNC) ||
-	    ((last_fsb - offset_fsb) >= mp->m_writeio_blocks)) {
+	    ((last_fsb - offset_fsb) >= ip->i_writeio_blocks)) {
 		/*
 		 * For normal or large sync writes, align everything
-		 * into m_writeio_blocks sized chunks.
+		 * into i_writeio_blocks sized chunks.
 		 */
-		iosize = mp->m_writeio_blocks;
-		aligned_offset = XFS_WRITEIO_ALIGN(mp, offset);
+		iosize = ip->i_writeio_blocks;
+		aligned_offset = XFS_WRITEIO_ALIGN(ip, offset);
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		small_write = 0;
 	} else {
@@ -1947,7 +2021,7 @@ xfs_iomap_write(
 				 * left off.
 				 */
 				ASSERT((XFS_FSB_TO_B(mp, next_offset_fsb) &
-					((1 << mp->m_writeio_log) - 1))==0);
+					((1 << ip->i_writeio_log) - 1))==0);
 				xfs_write_bmap(mp, curr_imapp, next_bmapp,
 					       iosize, next_offset_fsb,
 					       isize);
@@ -1977,7 +2051,7 @@ xfs_iomap_write(
 							XFS_FSB_TO_B(mp,
 							    next_offset_fsb);
 						aligned_offset =
-							XFS_WRITEIO_ALIGN(mp,
+							XFS_WRITEIO_ALIGN(ip,
 							    aligned_offset);
 						ioalign = XFS_B_TO_FSBT(mp,
 							    aligned_offset);
@@ -2441,6 +2515,24 @@ xfs_write(
 	int		eventsent;
 	vnode_t 	*vp;
 
+#if defined(DEBUG) && !defined(SIM) && defined(UIOSZ_DEBUG)
+	/*
+	 * Randomly set io size
+	 */
+	extern ulong_t	random(void);
+	extern int	srandom(int);
+	timespec_t	now;		/* current time */
+	static int	seed = 0;	/* randomizing seed value */
+
+	if (!seed) {
+		nanotime(&now);
+		seed = (int)now.tv_sec ^ (int)now.tv_nsec;
+		srandom(seed);
+	}
+	ioflag |= IO_UIOSZ;
+	uiop->uio_writeiolog = (random() & 0x3) + XFS_UIO_MIN_WRITEIO_LOG;
+#endif
+
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
 	eventsent = 0;
@@ -2543,6 +2635,44 @@ start:
 				goto out;
 			}
 		}
+
+#ifndef SIM
+		/*
+		 * Respect preferred write size if indicated in uio structure.
+		 * But if the write size has already been set, go with the
+		 * smallest value.  Silently ignore requests that aren't
+		 * within valid I/O size limits.
+		 */
+		if ((ioflag & IO_UIOSZ) &&
+		    uiop->uio_writeiolog != ip->i_writeio_log &&
+		    uiop->uio_writeiolog >= ip->i_mount->m_sb.sb_blocklog &&
+		    uiop->uio_writeiolog >= XFS_UIO_MIN_WRITEIO_LOG &&
+		    uiop->uio_writeiolog <= XFS_UIO_MAX_WRITEIO_LOG) {
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
+			if (!(ip->i_flags & XFS_IUIOSZ) ||
+			    uiop->uio_writeiolog < ip->i_writeio_log) {
+#endif
+				ip->i_writeio_log = (int) uiop->uio_writeiolog;
+				ip->i_writeio_blocks = 1 <<
+					(int) (ip->i_writeio_log -
+						ip->i_mount->m_sb.sb_blocklog);
+				if (!(ip->i_flags & XFS_IUIOSZ))
+					ip->i_flags |= XFS_IUIOSZ;
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
+				atomicAddInt(&uiodbg_switch, 1);
+				atomicAddInt(
+					&(uiodbg_writeiolog[ip->i_writeio_log -
+						XFS_UIO_MIN_WRITEIO_LOG]),
+					1);
+#endif
+#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
+			}
+#endif
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		}
+#endif /* !SIM */
+
 retry:
 		if (ioflag & IO_DIRECT) {
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
