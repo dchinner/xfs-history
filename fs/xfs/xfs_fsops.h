@@ -34,7 +34,7 @@
 
 #include <linux/xfs_fs.h>
 
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 
 /*
  * Minimum and maximum sizes need for growth checks
@@ -45,30 +45,6 @@
 #define	XFS_MAX_LOG_BLOCKS	(64 * 1024)
 #define	XFS_MAX_LOG_BYTES	(128 * 1024 * 1024)
 
-/*
- * Input and output structures
- */
-
-/* Input for growfs data op */
-typedef struct xfs_growfs_data
-{
-	__uint64_t	newblocks;	/* new data subvol size, fsblocks */
-	__uint32_t	imaxpct;	/* new inode space percentage limit */
-} xfs_growfs_data_t;
-
-/* Input for growfs log op */
-typedef struct xfs_growfs_log
-{
-	__uint32_t	newblocks;	/* new log size, fsblocks */
-	__int32_t	isint;		/* 1 if new log is internal */
-} xfs_growfs_log_t;
-
-/* Input for growfs rt op */
-typedef struct xfs_growfs_rt
-{
-	__uint64_t	newblocks;	/* new realtime size, fsblocks */
-	__uint32_t	extsize;	/* new realtime extent size, fsblocks */
-} xfs_growfs_rt_t;
 
 #ifdef _KERNEL
 
@@ -77,6 +53,22 @@ xfs_fs_geometry(
 	xfs_mount_t		*mp,
 	xfs_fsop_geom_t 	*geo,
 	int			new_version);
+
+int
+xfs_growfs_data(
+	xfs_mount_t		*mp,
+	xfs_growfs_data_t	*in);
+
+int
+xfs_growfs_log(
+	xfs_mount_t		*mp,
+	xfs_growfs_log_t	*in);
+
+int
+xfs_growfs_rt(
+	xfs_mount_t		*mp,
+	xfs_growfs_rt_t		*in);
+
 
 int
 xfs_fs_counts(
