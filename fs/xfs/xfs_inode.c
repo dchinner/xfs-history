@@ -1,4 +1,4 @@
-#ident "$Revision: 1.157 $"
+#ident "$Revision: 1.158 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -761,8 +761,8 @@ xfs_ialloc(
 	vp->v_rdev = rdev;
 	ip->i_d.di_mode = (__uint16_t)mode;
 	ip->i_d.di_nlink = (__int16_t)nlink;
-	ip->i_d.di_uid = (__uint16_t)cr->cr_uid;
-	ip->i_d.di_gid = (__uint16_t)cr->cr_gid;
+	ip->i_d.di_uid = cr->cr_uid;
+	ip->i_d.di_gid = cr->cr_gid;
 
 	/*
 	 * For multiple groups support: if ISGID bit is set in the parent
