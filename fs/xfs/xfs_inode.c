@@ -1,4 +1,4 @@
-#ident "$Revision: 1.235 $"
+#ident "$Revision: 1.236 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3188,6 +3188,12 @@ xfs_iflush_all(
 			break;
 		}
 		do {
+			/* Make sure we skip markers inserted by sync */
+			if (ip->i_mount == NULL) {
+				ip = ip->i_mnext;
+				continue;
+			}
+
 			/*
 			 * It's up to our caller to purge the root
 			 * and quota vnodes later.

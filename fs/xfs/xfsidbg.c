@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.87 $"
+#ident	"$Revision: 1.88 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2940,6 +2940,10 @@ xfsidbg_xfindi(__psunsigned_t ino)
 			mp = XFS_BHVTOM(bdp);
 			ip = mp->m_inodes;
 			do {
+				if (ip->i_mount == NULL) {
+					ip = ip->i_mnext;
+					continue;
+				}
 				if (ip->i_ino == xino) {
 					xfsidbg_xnode(ip);
 				}
@@ -3136,6 +3140,10 @@ xfsidbg_xinodes(xfs_mount_t *mp)
 	ip = mp->m_inodes;
 	if (ip != NULL) {
 		do {
+			if (ip->i_mount == NULL) {
+				ip = ip->i_mnext;
+				continue;
+			}
 			qprintf("\n");
 			xfsidbg_xnode(ip);
 			ip = ip->i_mnext;
@@ -3908,6 +3916,10 @@ xfsidbg_xqm_dqattached_inos(xfs_mount_t	*mp)
 
 	ip = mp->m_inodes;
 	do {
+		if (ip->i_mount == NULL) {
+			ip = ip->i_mnext;
+			continue;
+		}
 		if (ip->i_udquot || ip->i_pdquot) {
 			n++;
 			qprintf("inode = 0x%x, ino %d: udq 0x%x, pdq 0x%x\n", 
@@ -4552,6 +4564,10 @@ xfsidbg_vfs_vnodes_print(vfs_t *vfsp, int all)
 	xp = mp->m_inodes;
 	if (xp != NULL) {
 		do {
+			if (xp->i_mount == NULL) {
+				xp = xp->i_mnext;
+				continue;
+			}
 			_prvn(XFS_ITOV(xp), all);
 			xp = xp->i_mnext;
 		} while (xp != mp->m_inodes);
@@ -4584,6 +4600,10 @@ xfsidbg_vnode_find(vfs_t *vfsp, vnumber_t vnum)
 	xp = mp->m_inodes;
 	if (xp != NULL) {
 		do {
+			if (xp->i_mount == NULL) {
+				xp = xp->i_mnext;
+				continue;
+			}
 			if (XFS_ITOV(xp)->v_number == vnum)
 				return XFS_ITOV(xp);
 			xp = xp->i_mnext;

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.26 $"
+#ident "$Revision: 1.27 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -1198,6 +1198,15 @@ again:
 		return;
 	}
         do {		
+		/*
+		 * skip markers from xfs_sync
+		 */
+
+		if (ip->i_mount == NULL) {
+			ip = ip->i_mnext;
+			continue;
+		}
+
 		/*
 		 * Rootinode, rbmip and rsumip have blocks associated with it.
 		 */
