@@ -47,15 +47,6 @@ typedef enum vtype {
 	VSOCK	= 8
 } vtype_t;
 
-/*
- * The prefix of a vnode struct is its freelist linkage.  The freelist
- * header has two pointers so we can insert at either end.
- */
-typedef struct vnlist {
-	struct vnode	*vl_next;
-	struct vnode	*vl_prev;
-} vnlist_t;
-
 typedef __u64	vnumber_t;
 
 /*
@@ -765,16 +756,6 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 #define FSYNC_WAIT	0x1	/* synchronous fsync or forced reclaim */
 #define FSYNC_INVAL	0x2	/* flush and invalidate cached data */
 #define FSYNC_DATA	0x4	/* synchronous fsync of data only */
-
-/*
- * Vnode list ops.
- */
-#define vn_append(vp,vl)	vn_insert(vp, (struct vnlist *)(vl)->vl_prev)
-
-extern void vn_initlist(struct vnlist *);
-extern void vn_insert(struct vnode *, struct vnlist *);
-extern void vn_unlink(struct vnode *);
-
 
 #if (defined(CONFIG_XFS_VNODE_TRACING))
 

@@ -204,7 +204,6 @@ xfs_zero_last_block(
 	struct pm	*pmp)
 {
 	xfs_fileoff_t	last_fsb;
-	xfs_fsblock_t	firstblock;
 	xfs_mount_t	*mp;
 	page_buf_t	*pb;
 	int		nimaps;
@@ -232,8 +231,7 @@ xfs_zero_last_block(
 
 	last_fsb = XFS_B_TO_FSBT(mp, isize);
 	nimaps = 1;
-	firstblock = NULLFSBLOCK;
-	error = XFS_BMAPI(mp, NULL, io, last_fsb, 1, 0, &firstblock, 0, &imap,
+	error = XFS_BMAPI(mp, NULL, io, last_fsb, 1, 0, NULL, 0, &imap,
 			  &nimaps, NULL);
 	if (error) {
 		return error;
@@ -319,7 +317,6 @@ xfs_zero_eof(
 	xfs_fileoff_t	prev_zero_fsb;
 	xfs_fileoff_t	zero_count_fsb;
 	xfs_fileoff_t	last_fsb;
-	xfs_fsblock_t	firstblock;
 	xfs_extlen_t	buf_len_fsb;
 	xfs_extlen_t	prev_zero_count;
 	xfs_mount_t	*mp;
@@ -377,9 +374,8 @@ xfs_zero_eof(
 	while (start_zero_fsb <= end_zero_fsb) {
 		nimaps = 1;
 		zero_count_fsb = end_zero_fsb - start_zero_fsb + 1;
-		firstblock = NULLFSBLOCK;
 		error = XFS_BMAPI(mp, NULL, io, start_zero_fsb, zero_count_fsb,
-				  0, &firstblock, 0, &imap, &nimaps, NULL);
+				  0, NULL, 0, &imap, &nimaps, NULL);
 		if (error) {
 			ASSERT(ismrlocked(io->io_lock, MR_UPDATE));
 			ASSERT(ismrlocked(io->io_iolock, MR_UPDATE));
@@ -1142,7 +1138,6 @@ xfs_iomap_read(
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	end_fsb;
-	xfs_fsblock_t	firstblock;
 	int		nimaps;
 	int		error;
 	xfs_mount_t	*mp;
@@ -1157,10 +1152,9 @@ xfs_iomap_read(
 	nimaps = sizeof(imap) / sizeof(imap[0]);
 	nimaps = min(nimaps, *npbmaps); /* Don't ask for more than caller has */
 	end_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)(offset + count)));
-	firstblock = NULLFSBLOCK;
 	error = XFS_BMAPI(mp, NULL, io, offset_fsb,
 				(xfs_filblks_t)(end_fsb - offset_fsb),
-				flags, &firstblock, 0, imap,
+				flags, NULL, 0, imap,
 				&nimaps, NULL);
 	if (error) {
 		return XFS_ERROR(error);
@@ -1397,9 +1391,8 @@ xfs_iomap_write_delay(
 		count_fsb = mp->m_writeio_blocks;
 		while (count_fsb > 0) {
 			nimaps = XFS_WRITE_IMAPS;
-			firstblock = NULLFSBLOCK;
 			error = XFS_BMAPI(mp, NULL, io, start_fsb, count_fsb,
-					  0, &firstblock, 0, imap, &nimaps,
+					  0, NULL, 0, imap, &nimaps,
 					  NULL);
 			if (error) {
 				return error;
