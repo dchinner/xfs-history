@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.111 $"
+#ident "$Revision: 1.112 $"
 
 struct bhv_desc;
 struct buf;
@@ -111,16 +111,16 @@ typedef struct xfs_inode {
 	struct xfs_dquot	*i_udquot;	/* user dquot */
 	struct xfs_dquot	*i_pdquot;	/* project dquot */
 
-	/* Extent information. */
-	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
-	xfs_ifork_t		i_df;		/* data fork */
-
 	/* Inode location stuff */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
 	daddr_t			i_blkno;	/* blkno of inode buffer */
 	dev_t			i_dev;		/* dev for this inode */
 	short			i_len;		/* len of inode buffer */
 	short			i_boffset;	/* off of inode in buffer */
+
+	/* Extent information. */
+	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
+	xfs_ifork_t		i_df;		/* data fork */
 
 	/* Transaction and locking information. */
 	struct xfs_trans	*i_transp;	/* ptr to owning transaction*/
@@ -130,6 +130,7 @@ typedef struct xfs_inode {
 	sema_t			i_flock;	/* inode flush lock */
 	unsigned int		i_pincount;	/* inode pin count */
 	sv_t			i_pinsema;	/* inode pin sema */
+	lock_t			i_ipinlock;	/* inode pinning mutex */
 #ifdef NOTYET
 	xfs_range_lock_t	i_range_lock;	/* range lock base */
 #endif /* NOTYET */
