@@ -530,7 +530,7 @@ xfs_qm_scall_quotaon(
 STATIC int
 xfs_qm_scall_getqstat(
 	xfs_mount_t 	*mp,
-	xfs_caddr_t		addr)
+	xfs_caddr_t	addr)
 {
 	fs_quota_stat_t	out;
 	xfs_inode_t	*uip, *pip;
@@ -613,7 +613,7 @@ xfs_qm_scall_setqlim(
 	xfs_mount_t		*mp,
 	xfs_dqid_t		id,
 	uint			type,
-	xfs_caddr_t			addr)
+	xfs_caddr_t		addr)
 {
 	xfs_disk_dquot_t	*ddq;
 	fs_disk_quota_t		newlim;

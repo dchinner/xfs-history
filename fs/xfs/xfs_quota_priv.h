@@ -174,8 +174,6 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 	  dqvp = XFS_ITOV(ip);		\
 	  VMAP(dqvp, ip, dqvmap);	\
 	  VN_RELE(dqvp);		\
-	  dqvp->v_flag |= VPURGE;	\
-	  vn_purge(dqvp, &dqvmap);	\
 	}
 
 #define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
