@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.197 $"
+#ident	"$Revision: 1.198 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3240,13 +3240,14 @@ xfs_bmap_finish(
 	for (free = flist->xbf_first; free != NULL; free = next) {
 		next = free->xbfi_next;
 		if (error = xfs_free_extent(ntp, free->xbfi_startblock,
-				free->xbfi_blockcount))
+				free->xbfi_blockcount)) {
 			/*
 			 * The bmap free list will be cleaned up at a
 			 * higher level.  The EFI will be canceled when
 			 * this transaction is aborted.
 			 */
 			return error;
+		}
 		xfs_trans_log_efd_extent(ntp, efd, free->xbfi_startblock,
 			free->xbfi_blockcount);
 		xfs_bmap_del_free(flist, NULL, free);
@@ -3262,12 +3263,15 @@ xfs_bmap_cancel(
 	xfs_bmap_free_t		*flist)	/* list of bmap_free_items */
 {
 	xfs_bmap_free_item_t	*free;	/* free list item */
-
+	xfs_bmap_free_item_t	*next; 
+	
 	if (flist->xbf_count == 0)
 		return;
 	ASSERT(flist->xbf_first != NULL);
-	for (free = flist->xbf_first; free; free = free->xbfi_next)
+	for (free = flist->xbf_first; free; free = next) {
+		next = free->xbfi_next;
 		xfs_bmap_del_free(flist, NULL, free);
+	}
 	ASSERT(flist->xbf_count == 0);
 }
 
