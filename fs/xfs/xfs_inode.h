@@ -154,6 +154,7 @@ void		xfs_iread_extents(xfs_trans_t *, xfs_inode_t *);
 xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
 			    dev_t, struct cred *, buf_t **, boolean_t *);
 void		xfs_ifree(xfs_trans_t *, xfs_inode_t *);
+void		xfs_itruncate(xfs_trans_t **, xfs_inode_t *, __int64_t);
 
 void		xfs_idestroy(xfs_inode_t *);
 void		xfs_idata_realloc(xfs_inode_t *, int);
