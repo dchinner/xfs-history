@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 #ifndef __XFS_LINUX__
@@ -85,7 +85,7 @@ typedef struct xfs_dirent {		/* data from readdir() */
 	((DIRENTBASESIZE + (namelen) + \
 		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
 
-#define NBPP		PAGE_SIZE 
+#define NBPP		PAGE_SIZE
 #define DPPSHFT		(PAGE_SHIFT - 9)
 #define NDPP		(1 << (PAGE_SHIFT - 9))
 #define dtop(DD)	(((DD) + NDPP - 1) >> DPPSHFT)
@@ -93,47 +93,47 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define dpoff(DD)	((DD) & (NDPP-1))
 
 #define NBBY		8		/* number of bits per byte */
-#define	NBPC		PAGE_SIZE	/* Number of bytes per click */
-#define	BPCSHIFT	PAGE_SHIFT	/* LOG2(NBPC) if exact */
+#define NBPC		PAGE_SIZE	/* Number of bytes per click */
+#define BPCSHIFT	PAGE_SHIFT	/* LOG2(NBPC) if exact */
 
 /*
  * Size of block device i/o is parameterized here.
  * Currently the system supports page-sized i/o.
  */
-#define	BLKDEV_IOSHIFT		BPCSHIFT
-#define	BLKDEV_IOSIZE		(1<<BLKDEV_IOSHIFT)
+#define BLKDEV_IOSHIFT		BPCSHIFT
+#define BLKDEV_IOSIZE		(1<<BLKDEV_IOSHIFT)
 /* number of BB's per block device block */
-#define	BLKDEV_BB		BTOBB(BLKDEV_IOSIZE)
+#define BLKDEV_BB		BTOBB(BLKDEV_IOSIZE)
 
 /* bytes to clicks */
-#define	btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
-#define	btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
-#define	btoc64(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
-#define	btoct64(x)	((__uint64_t)(x)>>BPCSHIFT)
-#define	io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))>>IO_BPCSHIFT)
-#define	io_btoct(x)	((__psunsigned_t)(x)>>IO_BPCSHIFT)
+#define btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
+#define btoc64(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define btoct64(x)	((__uint64_t)(x)>>BPCSHIFT)
+#define io_btoc(x)	(((__psunsigned_t)(x)+(IO_NBPC-1))>>IO_BPCSHIFT)
+#define io_btoct(x)	((__psunsigned_t)(x)>>IO_BPCSHIFT)
 
 /* off_t bytes to clicks */
-#define offtoc(x)       (((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
-#define offtoct(x)      ((xfs_off_t)(x)>>BPCSHIFT)
+#define offtoc(x)	(((__uint64_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define offtoct(x)	((xfs_off_t)(x)>>BPCSHIFT)
 
 /* clicks to off_t bytes */
-#define	ctooff(x)	((xfs_off_t)(x)<<BPCSHIFT)
+#define ctooff(x)	((xfs_off_t)(x)<<BPCSHIFT)
 
 /* clicks to bytes */
-#define	ctob(x)		((__psunsigned_t)(x)<<BPCSHIFT)
-#define btoct(x)        ((__psunsigned_t)(x)>>BPCSHIFT)
-#define	ctob64(x)	((__uint64_t)(x)<<BPCSHIFT)
-#define	io_ctob(x)	((__psunsigned_t)(x)<<IO_BPCSHIFT)
+#define ctob(x)		((__psunsigned_t)(x)<<BPCSHIFT)
+#define btoct(x)	((__psunsigned_t)(x)>>BPCSHIFT)
+#define ctob64(x)	((__uint64_t)(x)<<BPCSHIFT)
+#define io_ctob(x)	((__psunsigned_t)(x)<<IO_BPCSHIFT)
 
 /* bytes to clicks */
-#define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
+#define btoc(x)		(((__psunsigned_t)(x)+(NBPC-1))>>BPCSHIFT)
 
 #ifndef CELL_CAPABLE
 #define CELL_ONLY(x)
 #define CELL_NOT(x)	(x)
 #define CELL_IF(a, b)	(b)
-#define CELL_MUST(a)   	ASSERT(0)
+#define CELL_MUST(a)	ASSERT(0)
 #define CELL_ASSERT(x)
 #define FSC_NOTIFY_NAME_CHANGED(vp)
 #endif
@@ -147,7 +147,7 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #endif
 
 /* Note: EWRONGFS never visible outside the kernel */
-#define	EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
+#define EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
 
 /*
  * XXX EFSCORRUPTED needs a real value in errno.h. asm-i386/errno.h won't
@@ -160,7 +160,7 @@ typedef struct xfs_dirent {		/* data from readdir() */
  *	3/ EUCLEAN ["Structure needs cleaning"]
  *	4/ Convert EFSCORRUPTED to EIO [just prior to return into userspace]
  */
-#define EFSCORRUPTED    990		/* Filesystem is corrupted */
+#define EFSCORRUPTED	990		/* Filesystem is corrupted */
 
 #define SYNCHRONIZE()	barrier()
 #define lbolt		jiffies
@@ -182,10 +182,10 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define DEFAULT_PROJID	0
 #define dfltprid	DEFAULT_PROJID
 
-#define MAXNAMELEN      256
-#define	MAXPATHLEN	1024
+#define MAXNAMELEN	256
+#define MAXPATHLEN	1024
 
-#define	PVFS	27
+#define PVFS	27
 
 #define FREAD		0x01
 #define FWRITE		0x02
@@ -194,8 +194,8 @@ typedef struct xfs_dirent {		/* data from readdir() */
 
 #define MIN(a,b)	(min(a,b))
 #define MAX(a,b)	(max(a,b))
-#define howmany(x, y)   (((x)+((y)-1))/(y))
-#define roundup(x, y)   ((((x)+((y)-1))/(y))*(y))
+#define howmany(x, y)	(((x)+((y)-1))/(y))
+#define roundup(x, y)	((((x)+((y)-1))/(y))*(y))
 
 /* Move the kernel do_div definition off to one side */
 

@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -45,7 +45,7 @@ extern void xfs_cleanup(void);
 #ifdef CELL_CAPABLE
 extern int cxfs_parseargs(char *, int, struct xfs_args *);
 #else
-# define cxfs_parseargs(opt,flag,xargs)	(0) /* success */
+# define cxfs_parseargs(opt,flag,xargs) (0) /* success */
 #endif
 
 /* For kernels which have the s_maxbytes field - set it */
@@ -70,31 +70,31 @@ static struct quotactl_ops linvfs_qops = {
 static struct super_operations linvfs_sops;
 static struct export_operations linvfs_export_ops;
 
-#define MNTOPT_LOGBUFS  "logbufs"       /* number of XFS log buffers */
-#define MNTOPT_LOGBSIZE "logbsize"      /* size of XFS log buffers */
+#define MNTOPT_LOGBUFS	"logbufs"	/* number of XFS log buffers */
+#define MNTOPT_LOGBSIZE "logbsize"	/* size of XFS log buffers */
 #define MNTOPT_LOGDEV	"logdev"	/* log device */
 #define MNTOPT_RTDEV	"rtdev"		/* realtime I/O device */
-#define MNTOPT_DMAPI    "dmapi"         /* DMI enabled (DMAPI / XDSM) */
-#define MNTOPT_XDSM     "xdsm"          /* DMI enabled (DMAPI / XDSM) */
-#define MNTOPT_BIOSIZE  "biosize"       /* log2 of preferred buffered io size */
-#define MNTOPT_WSYNC    "wsync"         /* safe-mode nfs compatible mount */
-#define MNTOPT_INO64    "ino64"         /* force inodes into 64-bit range */
-#define MNTOPT_NOALIGN  "noalign"       /* turn off stripe alignment */
-#define MNTOPT_SUNIT    "sunit"         /* data volume stripe unit */
-#define MNTOPT_SWIDTH   "swidth"        /* data volume stripe width */
-#define MNTOPT_NORECOVERY "norecovery"  /* don't run XFS recovery */
+#define MNTOPT_DMAPI	"dmapi"		/* DMI enabled (DMAPI / XDSM) */
+#define MNTOPT_XDSM	"xdsm"		/* DMI enabled (DMAPI / XDSM) */
+#define MNTOPT_BIOSIZE	"biosize"	/* log2 of preferred buffered io size */
+#define MNTOPT_WSYNC	"wsync"		/* safe-mode nfs compatible mount */
+#define MNTOPT_INO64	"ino64"		/* force inodes into 64-bit range */
+#define MNTOPT_NOALIGN	"noalign"	/* turn off stripe alignment */
+#define MNTOPT_SUNIT	"sunit"		/* data volume stripe unit */
+#define MNTOPT_SWIDTH	"swidth"	/* data volume stripe width */
+#define MNTOPT_NORECOVERY "norecovery"	/* don't run XFS recovery */
 #define MNTOPT_OSYNCISDSYNC "osyncisdsync" /* o_sync == o_dsync on this fs */
 					   /* (this is now the default!) */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
-#define MNTOPT_QUOTA    "quota"         /* disk quotas */
-#define MNTOPT_MRQUOTA  "mrquota"       /* don't turnoff if SB has quotas on */
-#define MNTOPT_NOQUOTA  "noquota"       /* no quotas */
-#define MNTOPT_UQUOTA   "usrquota"      /* user quota enabled */
-#define MNTOPT_GQUOTA   "grpquota"      /* group quota enabled */
+#define MNTOPT_QUOTA	"quota"		/* disk quotas */
+#define MNTOPT_MRQUOTA	"mrquota"	/* don't turnoff if SB has quotas on */
+#define MNTOPT_NOQUOTA	"noquota"	/* no quotas */
+#define MNTOPT_UQUOTA	"usrquota"	/* user quota enabled */
+#define MNTOPT_GQUOTA	"grpquota"	/* group quota enabled */
 #define MNTOPT_UQUOTANOENF "uqnoenforce"/* user quota limit enforcement */
 #define MNTOPT_GQUOTANOENF "gqnoenforce"/* group quota limit enforcement */
 #define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
-#define MNTOPT_NOUUID   "nouuid"	/* Ignore FS uuid */
+#define MNTOPT_NOUUID	"nouuid"	/* Ignore FS uuid */
 #define MNTOPT_IRIXSGID "irixsgid"	/* Irix-style sgid inheritance */
 #define MNTOPT_NOLOGFLUSH	"nologflush"	/* Don't use hard flushes in log writing */
 #define MNTOPT_MTPT	"mtpt"		/* filesystem mount point */
@@ -103,7 +103,7 @@ STATIC int
 xfs_parseargs(
 	char		*options,
 	int		flags,
-	struct xfs_args	*args)
+	struct xfs_args *args)
 {
 	char		*this_char, *value, *eov;
 	int		logbufs = -1;
@@ -126,7 +126,7 @@ xfs_parseargs(
 		args->logbufsize = logbufsize;
 		return 0;
 	}
-	
+
 	while ((this_char = strsep (&options, ",")) != NULL) {
 		if (!*this_char)
 			continue;
@@ -169,7 +169,7 @@ xfs_parseargs(
 			args->flags |= XFSMNT_DMAPI;
 		} else if (!strcmp(this_char, MNTOPT_XDSM)) {
 			args->flags |= XFSMNT_DMAPI;
-                } else if (!strcmp(this_char, MNTOPT_RTDEV)) {
+		} else if (!strcmp(this_char, MNTOPT_RTDEV)) {
 			strncpy(args->rtname, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
 			iosize = simple_strtoul(value, &eov, 10);
@@ -221,7 +221,7 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 		} else if (!strcmp(this_char, MNTOPT_SWIDTH)) {
 			dswidth = simple_strtoul(value, &eov, 10);
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
-			args->flags |= XFSMNT_NOUUID; 
+			args->flags |= XFSMNT_NOUUID;
 		} else if (!strcmp(this_char, MNTOPT_IRIXSGID)) {
 			args->flags |= XFSMNT_IRIXSGID;
 		} else if (!strcmp(this_char, MNTOPT_NOLOGFLUSH)) {
@@ -229,7 +229,7 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 		} else {
 			printk("XFS: unknown mount option [%s].\n", this_char);
 			return rval;
-                }
+		}
 	}
 
 	if (args->flags & XFSMNT_NORECOVERY) {
@@ -258,14 +258,14 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 	}
 
 	if ((args->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
-		if (dsunit) { 
+		if (dsunit) {
 			args->sunit = dsunit;
 			args->flags |= XFSMNT_RETERR;
 		} else
-			args->sunit = vol_dsunit;	
-		dswidth ? (args->swidth = dswidth) : 
+			args->sunit = vol_dsunit;
+		dswidth ? (args->swidth = dswidth) :
 			  (args->swidth = vol_dswidth);
-	} else 
+	} else
 		args->sunit = args->swidth = 0;
 
 	args->logbufs = logbufs;
@@ -301,7 +301,7 @@ spectodev(
 int
 spectodevs(
 	struct super_block *sb,
-	struct xfs_args	*args,
+	struct xfs_args *args,
 	kdev_t		*ddevp,
 	kdev_t		*logdevp,
 	kdev_t		*rtdevp)
@@ -388,15 +388,15 @@ static kmem_cache_t * linvfs_inode_cachep;
 
 static __inline__ unsigned int gfp_mask(void)
 {
-        /* If we're not in a transaction, FS activity is ok */
-        if (current->flags & PF_FSTRANS) return GFP_NOFS;
+	/* If we're not in a transaction, FS activity is ok */
+	if (current->flags & PF_FSTRANS) return GFP_NOFS;
 	return GFP_KERNEL;
 }
 
 
 static struct inode *linvfs_alloc_inode(struct super_block *sb)
 {
-	vnode_t	*vp;
+	vnode_t *vp;
 
 	vp = (vnode_t *)kmem_cache_alloc(linvfs_inode_cachep, gfp_mask());
 	if (!vp)
@@ -445,13 +445,13 @@ linvfs_fill_super(
 	vnode_t		*rootvp;
 	struct inode	*ip;
 	struct mounta	ap;
-	struct xfs_args	*args;
+	struct xfs_args *args;
 	struct statfs	statvfs;
 	int		error;
 
 	args = (struct xfs_args *)kmalloc(sizeof(struct xfs_args), GFP_KERNEL);
 	if (!args)
-		return  -EINVAL;
+		return	-EINVAL;
 	strncpy(args->fsname, sb->s_id, MAXNAMELEN);
 
 	if (xfs_parseargs((char *)data, sb->s_flags, args)) {
@@ -470,10 +470,10 @@ linvfs_fill_super(
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 	vfsops = &xfs_vfsops;
 
-	/*  Set up the vfs_t structure  */
+	/*  Set up the vfs_t structure	*/
 	vfsp = vfs_allocate();
-	if (!vfsp) 
-		goto out_null; 
+	if (!vfsp)
+		goto out_null;
 
 	if (sb->s_flags & MS_RDONLY)
 		vfsp->vfs_flag |= VFS_RDONLY;
@@ -500,9 +500,9 @@ linvfs_fill_super(
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(statvfs.f_bsize) - 1;
 
-        VFS_ROOT(vfsp, &rootvp, error);
-        if (error)
-                goto fail_unmount;
+	VFS_ROOT(vfsp, &rootvp, error);
+	if (error)
+		goto fail_unmount;
 
 	ip = LINVFS_GET_IP(rootvp);
 	linvfs_revalidate_core(ip, ATTR_COMM);
@@ -597,9 +597,9 @@ linvfs_set_inode_ops(
 void
 linvfs_write_inode(
 	struct inode	*inode,
-        int             sync)
+	int		sync)
 {
-	vnode_t	*vp = LINVFS_GET_VP(inode);
+	vnode_t *vp = LINVFS_GET_VP(inode);
 	int	error;
 
 	if (vp) {
@@ -630,14 +630,14 @@ linvfs_clear_inode(
 	}
 }
 
-void 
+void
 linvfs_put_inode(
 	struct inode	*ip)
 {
 	vnode_t		*vp = LINVFS_GET_VP(ip);
 	int		error;
 
-    	if (vp && vp->v_fbhv && (atomic_read(&ip->i_count) == 1))
+	if (vp && vp->v_fbhv && (atomic_read(&ip->i_count) == 1))
 		VOP_RELEASE(vp, error);
 }
 
@@ -647,9 +647,9 @@ linvfs_put_super(
 {
 	int		error;
 	int		sector_size;
-	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
+	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
 
-	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
+	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error);
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
 		printk("linvfs_put_super: vfsp/0x%p left dangling!\n", vfsp);
@@ -667,8 +667,8 @@ void
 linvfs_write_super(
 	struct super_block *sb)
 {
- 	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
- 	int		error; 
+	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
+	int		error;
 
 	sb->s_dirt = 0;
 	if (sb->s_flags & MS_RDONLY)
@@ -696,7 +696,7 @@ linvfs_remount(
 	int		*flags,
 	char		*options)
 {
-	struct xfs_args	*args;
+	struct xfs_args *args;
 	vfs_t		*vfsp;
 	xfs_mount_t	*mp;
 	int		error = 0;
@@ -745,8 +745,8 @@ linvfs_freeze_fs(
 	int		error;
 
 	vfsp = LINVFS_GET_VFS(sb);
-        if (sb->s_flags & MS_RDONLY)
-                return;
+	if (sb->s_flags & MS_RDONLY)
+		return;
 	VFS_ROOT(vfsp, &vp, error);
 	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_FREEZE, 0, error);
 	VN_RELE(vp);
@@ -872,7 +872,7 @@ out:
 static void __exit exit_xfs_fs(void)
 {
 	xfs_cleanup();
-        unregister_filesystem(&xfs_fs_type);
+	unregister_filesystem(&xfs_fs_type);
 	pagebuf_terminate();
 	destroy_inodecache();
 }

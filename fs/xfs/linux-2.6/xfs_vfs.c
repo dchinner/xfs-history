@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -36,8 +36,8 @@
 
 STATIC spinlock_t	vfslock = SPIN_LOCK_UNLOCKED; /* protecting vfs_flag */
 
-#define		vfsp_wait(V,P,S)        sv_wait(&(V)->vfs_wait,P,&vfslock,S)
-#define		vfsp_waitsig(V,P,S)     sv_wait_sig(&(V)->vfs_wait,P,&vfslock,S)
+#define		vfsp_wait(V,P,S)	sv_wait(&(V)->vfs_wait,P,&vfslock,S)
+#define		vfsp_waitsig(V,P,S)	sv_wait_sig(&(V)->vfs_wait,P,&vfslock,S)
 
 /*
  * Allocate and initialize a new vfs
@@ -58,8 +58,8 @@ vfs_allocate(void)
 void
 vfs_deallocate(vfs_t *vfsp)
 {
-        VFS_FREE(vfsp);
-        kfree(vfsp);
+	VFS_FREE(vfsp);
+	kfree(vfsp);
 }
 
 /*
@@ -70,7 +70,7 @@ vfs_deallocate(vfs_t *vfsp)
  * to acquire update rights, other update calls fail.
  *
  * Multiple accessors are allowed: vfs_busycnt tracks the number of
- * concurrent accesses.  Update permission sleeps until the last access
+ * concurrent accesses.	 Update permission sleeps until the last access
  * has finished, but leaves the VFS_MWANT flag to hold (if called via
  * vfs_busy) or reject (called via vfs_lock) subsequent accesses/updates.
  * Note that traverse understands the vfs locking model and waits for
@@ -192,19 +192,19 @@ vfs_busy(struct vfs *vfsp)
 STATIC void
 vfs_unbusy_wakeup(register struct vfs *vfsp)
 {
-        /*
-         * If there's an updater (mount/unmount) waiting for the vfs lock,
-         * wake up only it.  Updater should be the first on the sema queue.
-         *
-         * Otherwise, wake all accessors (traverse() or vfs_syncall())
-         * waiting for the lock to clear.
-         */
-        if (vfsp->vfs_flag & VFS_MWANT) {
-                sv_signal(&vfsp->vfs_wait);
-        } else if (vfsp->vfs_flag & VFS_MWAIT) {
-                vfsp->vfs_flag &= ~VFS_MWAIT;
-                sv_broadcast(&vfsp->vfs_wait);
-        }
+	/*
+	 * If there's an updater (mount/unmount) waiting for the vfs lock,
+	 * wake up only it.  Updater should be the first on the sema queue.
+	 *
+	 * Otherwise, wake all accessors (traverse() or vfs_syncall())
+	 * waiting for the lock to clear.
+	 */
+	if (vfsp->vfs_flag & VFS_MWANT) {
+		sv_signal(&vfsp->vfs_wait);
+	} else if (vfsp->vfs_flag & VFS_MWAIT) {
+		vfsp->vfs_flag &= ~VFS_MWAIT;
+		sv_broadcast(&vfsp->vfs_wait);
+	}
 }
 
 void
@@ -219,17 +219,17 @@ vfs_unbusy(struct vfs *vfsp)
 }
 
 /*
- * Called by fs dependent VFS_MOUNT code to link the VFS base file system 
+ * Called by fs dependent VFS_MOUNT code to link the VFS base file system
  * dependent behavior with the VFS virtual object.
  */
 void
 vfs_insertbhv(
-	vfs_t *vfsp, 
-	bhv_desc_t *bdp, 
-	vfsops_t *vfsops, 	
+	vfs_t *vfsp,
+	bhv_desc_t *bdp,
+	vfsops_t *vfsops,
 	void *mount)
 {
-	/* 
+	/*
 	 * Initialize behavior desc with ops and data and then
 	 * attach it to the vfs.
 	 */

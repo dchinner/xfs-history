@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -37,8 +37,8 @@
 #include <linux/xfs_iops.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
-#define page_buffers(page)      ((page)->buffers)
-#define page_has_buffers(page)  ((page)->buffers)
+#define page_buffers(page)	((page)->buffers)
+#define page_has_buffers(page)	((page)->buffers)
 #endif
 
 
@@ -105,7 +105,7 @@ linvfs_common_create(
 	bzero(&va, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = tp;
-	va.va_mode = mode;	
+	va.va_mode = mode;
 
 	if (tp == VREG) {
 		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp, NULL, error);
@@ -313,7 +313,7 @@ linvfs_rmdir(
 {
 	int		error;
 	vnode_t		*dvp,		/* directory with name to remove */
-			*pwd_vp = NULL;	/* current working directory, vnode */
+			*pwd_vp = NULL; /* current working directory, vnode */
 	struct inode	*inode = dentry->d_inode;
 
 	dvp = LINVFS_GET_VPTR(dir);
@@ -416,7 +416,7 @@ linvfs_readlink(
  * careful here - this function can get called recusively up
  * to 32 times, hence we need to be very careful about how much
  * stack we use. uio is kmalloced for this reason...
- * 
+ *
  * TODO - nathans: this may no longer be true nowadays (limit is
  * 5 currently, see if we can revert the unnecessary kmalloc now)
 */
@@ -531,7 +531,7 @@ linvfs_setattr(
 
 	memset(&vattr, 0, sizeof(vattr_t));
 	if (ia_valid & ATTR_UID) {
-		vattr.va_mask |= AT_UID; 
+		vattr.va_mask |= AT_UID;
 		vattr.va_uid = attr->ia_uid;
 	}
 	if (ia_valid & ATTR_GID) {
@@ -569,7 +569,7 @@ linvfs_setattr(
 
 	VOP_SETATTR(vp, &vattr, flags, NULL, error);
 	if (error)
-		return(-error);	/* Positive error up from XFS */
+		return(-error); /* Positive error up from XFS */
 	if (ia_valid & ATTR_SIZE) {
 		error = vmtruncate(inode, attr->ia_size);
 	}
@@ -584,7 +584,7 @@ linvfs_setattr(
 STATIC int
 linvfs_get_block_core(
 	struct inode		*inode,
-	sector_t		iblock, 
+	sector_t		iblock,
 	struct buffer_head	*bh_result,
 	int			create,
 	int			direct,
@@ -649,7 +649,7 @@ linvfs_get_block_core(
 int
 linvfs_get_block(
 	struct inode		*inode,
-	sector_t		iblock, 
+	sector_t		iblock,
 	struct buffer_head	*bh_result,
 	int			create)
 {
@@ -660,7 +660,7 @@ linvfs_get_block(
 int
 linvfs_get_block_sync(
 	struct inode		*inode,
-	sector_t		iblock, 
+	sector_t		iblock,
 	struct buffer_head	*bh_result,
 	int			create)
 {
@@ -673,7 +673,7 @@ linvfs_get_block_sync(
 int
 linvfs_get_block_direct(
 	struct inode		*inode,
-	sector_t		iblock, 
+	sector_t		iblock,
 	struct buffer_head	*bh_result,
 	int			create)
 {
@@ -683,12 +683,12 @@ linvfs_get_block_direct(
 
 int
 linvfs_pb_bmap(
-	struct inode	*inode, 
+	struct inode	*inode,
 	loff_t		offset,
 	ssize_t		count,
 	page_buf_bmap_t *pbmapp,
-	int		maxpbbm, 
-	int		*retpbbm, 
+	int		maxpbbm,
+	int		*retpbbm,
 	int		flags)
 {
 	vnode_t		*vp = LINVFS_GET_VPTR(inode);
@@ -725,10 +725,10 @@ linvfs_bmap(
 	xfs_inode_t		*ip = XFS_BHVTOI(vp->v_fbhv);
 	int			error;
 
-	/* block             - Linux disk blocks    512b */
-	/* bmap input offset - bytes                  1b */
-	/* bmap output bn    - XFS BBs              512b */
-	/* bmap output delta - bytes                  1b */
+	/* block	     - Linux disk blocks    512b */
+	/* bmap input offset - bytes		      1b */
+	/* bmap output bn    - XFS BBs		    512b */
+	/* bmap output delta - bytes		      1b */
 
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
@@ -740,7 +740,7 @@ linvfs_bmap(
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	return generic_block_bmap(mapping, block, linvfs_get_block_direct);
 }
- 
+
 STATIC int
 linvfs_read_full_page(
 	struct file	*unused,
@@ -854,7 +854,7 @@ linvfs_direct_IO(
 	struct page	**maplist;
 	size_t		page_offset;
 	page_buf_t	*pb;
-	page_buf_bmap_t	map;
+	page_buf_bmap_t map;
 	int		error = 0, nmap;
 	int		pb_flags, map_flags, pg_index = 0;
 	size_t		length, total;
@@ -939,7 +939,7 @@ linvfs_direct_IO(
 
 /*
  * This gets a page into cleanable state - page locked on entry
- * kept locked on exit. If the page is marked dirty we should 
+ * kept locked on exit. If the page is marked dirty we should
  * not come this way.
  */
 STATIC int
@@ -996,13 +996,13 @@ struct inode_operations linvfs_dir_inode_operations =
 {
 	create:			linvfs_create,
 	lookup:			linvfs_lookup,
-	link:			linvfs_link,	
-	unlink:			linvfs_unlink,	
-	symlink:		linvfs_symlink,	
-	mkdir:			linvfs_mkdir,	
-	rmdir:			linvfs_rmdir,	
-	mknod:			linvfs_mknod,	
-	rename:			linvfs_rename,	
+	link:			linvfs_link,
+	unlink:			linvfs_unlink,
+	symlink:		linvfs_symlink,
+	mkdir:			linvfs_mkdir,
+	rmdir:			linvfs_rmdir,
+	mknod:			linvfs_mknod,
+	rename:			linvfs_rename,
 	permission:		linvfs_permission,
 	getattr:		linvfs_getattr,
 	setattr:		linvfs_setattr,

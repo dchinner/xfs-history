@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -47,8 +47,8 @@ extern int xfs_set_dmattrs(bhv_desc_t *, u_int, u_int16_t, cred_t *);
 /*
  * xfs_find_handle maps from userspace xfs_fsop_handlereq structure to
  * a file or fs handle.
- * 
- * XFS_IOC_PATH_TO_FSHANDLE 
+ *
+ * XFS_IOC_PATH_TO_FSHANDLE
  *    returns fs handle for a mount point or path within that mount point
  * XFS_IOC_FD_TO_HANDLE
  *    returns full handle for a FD opened in user space
@@ -95,19 +95,19 @@ xfs_find_handle(
 		path_release(&nd);
 		break;
 	}
-		
+
 	case XFS_IOC_FD_TO_HANDLE: {
 		struct file	*file;
-		
+
 		file = fget(hreq.fd);
 		if (!file)
 		    return -EBADF;
-		
+
 		ASSERT(file->f_dentry);
 		ASSERT(file->f_dentry->d_inode);
 		inode = igrab(file->f_dentry->d_inode);
 		fput(file);
-		
+
 		break;
 	}
 
@@ -115,7 +115,7 @@ xfs_find_handle(
 		ASSERT(0);
 		return -XFS_ERROR(EINVAL);
 	}
-	
+
 	/* we need the vnode */
 	vp = LINVFS_GET_VP(inode);
 	if (!vp || !vp->v_vfsp->vfs_altfsid) {
@@ -144,9 +144,9 @@ xfs_find_handle(
 		ip = XFS_BHVTOI(bhv);
 		ASSERT(ip);
 		lock_mode = xfs_ilock_map_shared(ip);
-	    
+
 		/* fill in fid section of handle from inode */
-		handle.ha_fid.xfs_fid_len = sizeof(xfs_fid_t) - 
+		handle.ha_fid.xfs_fid_len = sizeof(xfs_fid_t) -
 					    sizeof(handle.ha_fid.xfs_fid_len);
 		handle.ha_fid.xfs_fid_pad = 0;
 		handle.ha_fid.xfs_fid_gen = ip->i_d.di_gen;
@@ -173,17 +173,17 @@ xfs_find_handle(
 /*
  * Convert userspace handle data into vnode (and inode).
  * We [ab]use the fact that all the fsop_handlereq ioctl calls
- * have a data structure argument whose first component is always 
+ * have a data structure argument whose first component is always
  * a xfs_fsop_handlereq_t, so we can cast to and from this type.
  * This allows us to optimise the copy_from_user calls and gives
  * a handy, shared routine.
- * 
+ *
  * If no error, caller must always VN_RELE the returned vp.
  */
 STATIC int
 xfs_vget_fsop_handlereq(
 	xfs_mount_t		*mp,
-	struct inode		*parinode,	/* parent inode pointer    */
+	struct inode		*parinode,	/* parent inode pointer	   */
 	int			cap,		/* capability level for op */
 	unsigned long		arg,		/* userspace data pointer  */
 	unsigned long		size,		/* size of expected struct */
@@ -314,19 +314,19 @@ xfs_open_by_handle(
 
 	/* Can't write directories. */
 	if ( S_ISDIR(inode->i_mode) && (permflag & FMODE_WRITE)) {
-	  	iput(inode);
+		iput(inode);
 		return -XFS_ERROR(EISDIR);
 	}
 
 	if ((new_fd = get_unused_fd()) < 0) {
-	  	iput(inode);
+		iput(inode);
 		return new_fd;
 	}
 
 	dentry = d_alloc_anon(inode);
 	if (dentry == NULL) {
 		iput(inode);
-	     	put_unused_fd(new_fd);
+		put_unused_fd(new_fd);
 		return -XFS_ERROR(ENOMEM);
 	}
 
@@ -342,7 +342,7 @@ xfs_open_by_handle(
 	filp->f_mode |= FINVIS;
 
 	fd_install(new_fd, filp);
-        return new_fd;
+	return new_fd;
 }
 
 STATIC int
@@ -380,10 +380,10 @@ xfs_readlink_by_handle(
 	aiov.iov_base	= hreq.ohandle;
 
 	auio.uio_iov	= &aiov;
-	auio.uio_iovcnt	= 1;
+	auio.uio_iovcnt = 1;
 	auio.uio_fmode	= FINVIS;
-	auio.uio_offset	= 0;
-	auio.uio_segflg	= UIO_USERSPACE;
+	auio.uio_offset = 0;
+	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
 	VOP_READLINK(vp, &auio, NULL, error);
@@ -603,7 +603,7 @@ xfs_ioctl(
 		xfs_fsop_bulkreq_t bulkreq;
 		int		count;		/* # of records returned */
 		xfs_ino_t	inlast;		/* last inode number */
-		int		done;	
+		int		done;
 		/* done = 1 if there are more stats to get and if bulkstat */
 		/* should be called again (unused here, but used in dmapi) */
 
@@ -637,8 +637,8 @@ xfs_ioctl(
 						bulkreq.ubuffer, &done);
 			} else {
 				error = xfs_bulkstat(mp, NULL, &inlast, &count,
-					(bulkstat_one_pf)xfs_bulkstat_one, 
-					sizeof(xfs_bstat_t), bulkreq.ubuffer, 
+					(bulkstat_one_pf)xfs_bulkstat_one,
+					sizeof(xfs_bstat_t), bulkreq.ubuffer,
 					BULKSTAT_FG_QUICK, &done);
 			}
 		}
@@ -672,7 +672,7 @@ xfs_ioctl(
 	}
 
 	case XFS_IOC_FSGEOMETRY: {
-		xfs_fsop_geom_t	fsgeo;
+		xfs_fsop_geom_t fsgeo;
 
 		error = xfs_fs_geometry(mp, &fsgeo, 4);
 		if (error)
@@ -691,8 +691,8 @@ xfs_ioctl(
 		if (error)
 			return -error;
 
-		fa.fsx_xflags   = va.va_xflags;
-		fa.fsx_extsize  = va.va_extsize;
+		fa.fsx_xflags	= va.va_xflags;
+		fa.fsx_extsize	= va.va_extsize;
 		fa.fsx_nextents = va.va_nextents;
 
 		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
@@ -728,8 +728,8 @@ xfs_ioctl(
 		if (error)
 			return -error;
 
-		fa.fsx_xflags   = va.va_xflags;
-		fa.fsx_extsize  = va.va_extsize;
+		fa.fsx_xflags	= va.va_xflags;
+		fa.fsx_extsize	= va.va_extsize;
 		fa.fsx_nextents = va.va_anextents;
 
 		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
@@ -775,7 +775,7 @@ xfs_ioctl(
 	}
 
 	case XFS_IOC_GETBMAPX: {
-		struct getbmapx	bmx;
+		struct getbmapx bmx;
 		struct getbmap	bm;
 		int		iflags;
 
@@ -805,8 +805,8 @@ xfs_ioctl(
 		GETBMAP_CONVERT(bm, bmx);
 
 		if (copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx)))
-		    	return -XFS_ERROR(EFAULT);
-		
+			return -XFS_ERROR(EFAULT);
+
 		return 0;
 	}
 
@@ -848,10 +848,10 @@ xfs_ioctl(
 			return -XFS_ERROR(EFAULT);
 		return 0;
 	}
- 
+
 	case XFS_IOC_SET_RESBLKS: {
 		xfs_fsop_resblks_t inout;
-		__uint64_t	   in; 
+		__uint64_t	   in;
 
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
@@ -865,7 +865,7 @@ xfs_ioctl(
 
 		if (copy_to_user((char *)arg, &inout, sizeof(inout)))
 			return -XFS_ERROR(EFAULT);
-		return 0;	  
+		return 0;
 	}
 
 	case XFS_IOC_GET_RESBLKS: {
@@ -877,11 +877,11 @@ xfs_ioctl(
 		error = xfs_reserve_blocks(mp, NULL, &out);
 		if (error)
 			return -error;
-	
+
 		if (copy_to_user((char *)arg, &out, sizeof(out)))
-		    	return -XFS_ERROR(EFAULT);
-			
-		return 0;	  
+			return -XFS_ERROR(EFAULT);
+
+		return 0;
 	}
 
 	case XFS_IOC_FSGROWFSDATA: {
@@ -892,7 +892,7 @@ xfs_ioctl(
 
 		if (copy_from_user(&in, (char *)arg, sizeof(in)))
 			return -XFS_ERROR(EFAULT);
-		
+
 		error = xfs_growfs_data(mp, &in);
 		if (error)
 			return -error;
@@ -907,7 +907,7 @@ xfs_ioctl(
 
 		if (copy_from_user(&in, (char *)arg, sizeof(in)))
 			return -XFS_ERROR(EFAULT);
-		
+
 		error = xfs_growfs_log(mp, &in);
 		if (error)
 			return -error;
@@ -957,7 +957,7 @@ xfs_ioctl(
 		error = xfs_errortag_clearall(mp);
 		return -error;
 
-	default: 
+	default:
 		return -ENOTTY;
 	}
 }

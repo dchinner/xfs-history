@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -36,13 +36,13 @@
  *	The page_buf module provides an abstract buffer cache model on top of
  *	the Linux page cache.  Cached blocks for a file are hashed to the
  *	inode for that file, and can be held dirty in delayed write mode in
- *	the page cache.  Cached metadata blocks for a file system are hashed
+ *	the page cache.	 Cached metadata blocks for a file system are hashed
  *	to the inode for the mounted device.  The page_buf module assembles
  *	buffer (page_buf_t) objects on demand to aggregate such cached pages
  *	for I/O.
  *
  *
- *      Written by Steve Lord, Jim Mostek, Russell Cattelan
+ *	Written by Steve Lord, Jim Mostek, Russell Cattelan
  *		    and Rajagopal Ananthanarayanan ("ananth") at SGI.
  *
  */
@@ -70,7 +70,7 @@
 #include "page_buf_internal.h"
 
 #define SECTOR_SHIFT	9
-#define SECTOR_SIZE     (1<<SECTOR_SHIFT)
+#define SECTOR_SIZE	(1<<SECTOR_SHIFT)
 #define SECTOR_MASK	(SECTOR_SIZE - 1)
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - SECTOR_SHIFT)) - 1)
 
@@ -84,7 +84,7 @@ static	spinlock_t		pb_trace_lock = SPIN_LOCK_UNLOCKED;
 struct pagebuf_trace_buf	pb_trace;
 EXPORT_SYMBOL(pb_trace);
 EXPORT_SYMBOL(pb_trace_func);
-#define CIRC_INC(i)     (((i) + 1) & (PB_TRACE_BUFSIZE - 1))
+#define CIRC_INC(i)	(((i) + 1) & (PB_TRACE_BUFSIZE - 1))
 
 void	pb_trace_func(page_buf_t *pb, int event, void *misc, void *ra)
 {
@@ -112,7 +112,7 @@ void	pb_trace_func(page_buf_t *pb, int event, void *misc, void *ra)
 	pb_trace.buf[j].size = pb->pb_buffer_length;
 }
 #define ENTER(x)	printk("Entering " #x "\n")
-#define EXIT(x)		printk("Exiting  " #x "\n")
+#define EXIT(x)		printk("Exiting	 " #x "\n")
 #else
 #define ENTER(x)	do { } while (0)
 #define EXIT(x)		do { } while (0)
@@ -168,7 +168,7 @@ STATIC void pagebuf_daemon_wakeup(int);
  * /proc/sys/vm/pagebuf
  */
 
-unsigned long pagebuf_min[P_PARAM] = {  HZ/2,   1*HZ, 0, 0 };
+unsigned long pagebuf_min[P_PARAM] = {	HZ/2,	1*HZ, 0, 0 };
 unsigned long pagebuf_max[P_PARAM] = { HZ*30, HZ*300, 1, 1 };
 
 pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 0, 0 }};
@@ -181,13 +181,13 @@ struct pbstats pbstats;
 
 STATIC void *pagebuf_mapout_locked(page_buf_t *);
 
-STATIC  spinlock_t              as_lock = SPIN_LOCK_UNLOCKED;
+STATIC	spinlock_t		as_lock = SPIN_LOCK_UNLOCKED;
 typedef struct a_list {
 	void	*vm_addr;
 	struct a_list	*next;
 } a_list_t;
-STATIC  a_list_t	*as_free_head;
-STATIC  int		as_list_len;
+STATIC	a_list_t	*as_free_head;
+STATIC	int		as_list_len;
 
 STATIC void
 free_address(void *addr)
@@ -210,7 +210,7 @@ purge_addresses(void)
 
 	if (as_free_head == NULL) return;
 
-	spin_lock(&as_lock); 
+	spin_lock(&as_lock);
 	aentry = as_free_head;
 	as_free_head = NULL;
 	as_list_len = 0;
@@ -228,7 +228,7 @@ purge_addresses(void)
  *
  *	Buffers associated with inodes for which buffer locking
  *	is not enabled are not protected by semaphores, and are
- *	assumed to be exclusively owned by the caller.  There is
+ *	assumed to be exclusively owned by the caller.	There is
  *	spinlock in the buffer, for use by the caller when concurrent
  *	access is possible.
  */
@@ -263,8 +263,8 @@ _pagebuf_initialize(
 	PB_SET_OWNER(pb);
 	pb->pb_target = target;
 	pb->pb_file_offset = range_base;
-	pb->pb_buffer_length = pb->pb_count_desired = range_length; 
-	/* set buffer_length and count_desired to the same value initially 
+	pb->pb_buffer_length = pb->pb_count_desired = range_length;
+	/* set buffer_length and count_desired to the same value initially
 	 * io routines should use count_desired, which will the same in
 	 * most cases but may be reset (e.g. XFS recovery)
 	 */
@@ -339,7 +339,7 @@ STATIC inline void _pagebuf_freepages(page_buf_t *pb)
 
 void _pagebuf_free_object(
 	pb_hash_t	*hash,	/* hash bucket for buffer	*/
-	page_buf_t	*pb)	/* buffer to deallocate         */
+	page_buf_t	*pb)	/* buffer to deallocate		*/
 {
 	int	pb_flags = pb->pb_flags;
 
@@ -353,7 +353,7 @@ void _pagebuf_free_object(
 		}
 		spin_unlock(&hash->pb_hash_lock);
 	}
-	
+
 	if (!(pb_flags & PBF_FREED)) {
 		/* release any virtual mapping */ ;
 		if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
@@ -366,7 +366,7 @@ void _pagebuf_free_object(
 		if (pb->pb_flags & _PBF_MEM_ALLOCATED) {
 			if (pb->pb_pages) {
 				/* release the pages in the address list */
-				if (pb->pb_pages[0] && 
+				if (pb->pb_pages[0] &&
 				    PageSlab(pb->pb_pages[0])) {
 					/*
 					 * This came from the slab
@@ -391,8 +391,8 @@ void _pagebuf_free_object(
 /*
  *	_pagebuf_lookup_pages
  *
- *	_pagebuf_lookup_pages finds all pages which match the buffer 
- *	in question and the range of file offsets supplied, 
+ *	_pagebuf_lookup_pages finds all pages which match the buffer
+ *	in question and the range of file offsets supplied,
  *	and builds the page list for the buffer, if the
  *	page list is not already formed or if not all of the pages are
  *	already in the list. Invalid pages (pages which have not yet been
@@ -557,7 +557,7 @@ mapit:
 		/* A single page buffer is always mappable */
 		if (page_count == 1) {
 			pb->pb_addr =
-			    (caddr_t) page_address(pb->pb_pages[0]) + 
+			    (caddr_t) page_address(pb->pb_pages[0]) +
 					pb->pb_offset;
 			pb->pb_flags |= PBF_MAPPED;
 		} else if (flags & PBF_MAPPED) {
@@ -588,7 +588,7 @@ mapit:
 
 
 /*
- *	Finding and Reading Buffers 
+ *	Finding and Reading Buffers
  */
 
 /*
@@ -596,21 +596,21 @@ mapit:
  *
  *	pagebuf_find returns a buffer matching the specified range of
  *	data for the specified target, if any of the relevant blocks
- *	are in memory.  The buffer may have unallocated holes, if
- *	some, but not all, of the blocks are in memory.  Even where
+ *	are in memory.	The buffer may have unallocated holes, if
+ *	some, but not all, of the blocks are in memory.	 Even where
  *	pages are present in the buffer, not all of every page may be
- *	valid.  The file system may use pagebuf_segment to visit the
- *	various segments of the buffer.  pagebuf_find will return an
+ *	valid.	The file system may use pagebuf_segment to visit the
+ *	various segments of the buffer.	 pagebuf_find will return an
  *	empty buffer (with no storage allocated) if the fifth argument
- *	is TRUE. 
+ *	is TRUE.
  */
 
-page_buf_t *pagebuf_find(	/* find buffer for block if     */
-				/* the block is in memory       */
-    pb_target_t *target,	/* target for block              */
-    loff_t ioff,		/* starting offset of range     */
-    size_t isize,		/* length of range              */
-    page_buf_flags_t flags)	/* PBF_LOCK, PBF_ALWAYS_ALLOC   */
+page_buf_t *pagebuf_find(	/* find buffer for block if	*/
+				/* the block is in memory	*/
+    pb_target_t *target,	/* target for block		 */
+    loff_t ioff,		/* starting offset of range	*/
+    size_t isize,		/* length of range		*/
+    page_buf_flags_t flags)	/* PBF_LOCK, PBF_ALWAYS_ALLOC	*/
 {
 	page_buf_t *pb = NULL;
 
@@ -628,16 +628,16 @@ page_buf_t *pagebuf_find(	/* find buffer for block if     */
  *	pagebuf_get assembles a buffer covering the specified range.
  *	Some or all of the blocks in the range may be valid.  The file
  *	system may use pagebuf_segment to visit the various segments
- *	of the buffer.  Storage in memory for all portions of the
- *	buffer will be allocated, although backing storage may not be. 
+ *	of the buffer.	Storage in memory for all portions of the
+ *	buffer will be allocated, although backing storage may not be.
  *	If PBF_READ is set in flags, pagebuf_read
  */
 
-page_buf_t *pagebuf_get(	/* allocate a buffer            */
-    pb_target_t *target,	/* target for buffer (or NULL)   */
-    loff_t ioff,		/* starting offset of range     */
-    size_t isize,		/* length of range              */
-    page_buf_flags_t flags) 	/* PBF_LOCK, PBF_TRYLOCK, PBF_READ, */
+page_buf_t *pagebuf_get(	/* allocate a buffer		*/
+    pb_target_t *target,	/* target for buffer (or NULL)	 */
+    loff_t ioff,		/* starting offset of range	*/
+    size_t isize,		/* length of range		*/
+    page_buf_flags_t flags)	/* PBF_LOCK, PBF_TRYLOCK, PBF_READ, */
 				/* PBF_LONG_TERM, PBF_SEQUENTIAL, */
 				/* PBF_MAPPED */
 {
@@ -730,9 +730,9 @@ pagebuf_lookup(
  */
 void
 pagebuf_readahead(
-    pb_target_t * target,	/* target for buffer (or NULL)   */
-    loff_t ioff,		/* starting offset of range     */
-    size_t isize,		/* length of range              */
+    pb_target_t * target,	/* target for buffer (or NULL)	 */
+    loff_t ioff,		/* starting offset of range	*/
+    size_t isize,		/* length of range		*/
     int	   flags)		/* extra flags for the read	*/
 {
 	if (start_aggressive_readahead(GFP_KERNEL)) {
@@ -761,7 +761,7 @@ pagebuf_associate_memory(
 {
 	int	rval;
 	int i = 0;
-	size_t ptr; 
+	size_t ptr;
 	size_t end, end_cur;
 	off_t	offset;
 	int page_count = PAGE_CACHE_ALIGN(len) >> PAGE_CACHE_SHIFT;
@@ -878,8 +878,8 @@ void pagebuf_hold(page_buf_t * pb)
  *	state of any associated pages is left unchanged.
  */
 
-void pagebuf_free(	/* deallocate a buffer          */
-    page_buf_t * pb)	/* buffer to deallocate           */
+void pagebuf_free(	/* deallocate a buffer		*/
+    page_buf_t * pb)	/* buffer to deallocate		  */
 {
 	if (pb->pb_flags & _PBF_LOCKABLE) {
 		pb_hash_t	*h = pb_hash(pb);
@@ -893,7 +893,7 @@ void pagebuf_free(	/* deallocate a buffer          */
 
 /*
  *	pagebuf_rele
- * 
+ *
  *	pagebuf_rele releases a hold on the specified buffer.  If the
  *	the hold count is 1, pagebuf_rele calls pagebuf_free.
  */
@@ -949,19 +949,19 @@ void pagebuf_rele(page_buf_t * pb)
  *	pagebuf_pin
  *
  *	pagebuf_pin locks all of the memory represented by a buffer in
- *	memory.  Multiple calls to pagebuf_pin and pagebuf_unpin, for
+ *	memory.	 Multiple calls to pagebuf_pin and pagebuf_unpin, for
  *	the same or different buffers affecting a given page, will
  *	properly count the number of outstanding "pin" requests.  The
  *	buffer may be released after the pagebuf_pin and a different
  *	buffer used when calling pagebuf_unpin, if desired.
  *	pagebuf_pin should be used by the file system when it wants be
  *	assured that no attempt will be made to force the affected
- *	memory to disk.  It does not assure that a given logical page
- *	will not be moved to a different physical page. 
+ *	memory to disk.	 It does not assure that a given logical page
+ *	will not be moved to a different physical page.
  */
 
-void pagebuf_pin(	/* pin buffer in memory         */
-     page_buf_t * pb)	/* buffer to pin          */
+void pagebuf_pin(	/* pin buffer in memory		*/
+     page_buf_t * pb)	/* buffer to pin	  */
 {
 	atomic_inc(&PBP(pb)->pb_pin_count);
 	PB_TRACE(pb, PB_TRACE_REC(pin), PBP(pb)->pb_pin_count.counter);
@@ -973,11 +973,11 @@ void pagebuf_pin(	/* pin buffer in memory         */
  *
  *	pagebuf_unpin reverses the locking of memory performed by
  *	pagebuf_pin.  Note that both functions affected the logical
- *	pages associated with the buffer, not the buffer itself. 
+ *	pages associated with the buffer, not the buffer itself.
  */
 
-void pagebuf_unpin(		/* unpin buffered data          */
-    page_buf_t * pb)		/* buffer to unpin                */
+void pagebuf_unpin(		/* unpin buffered data		*/
+    page_buf_t * pb)		/* buffer to unpin		  */
 {
 	if (atomic_dec_and_test(&PBP(pb)->pb_pin_count)) {
 		wake_up_all(&PBP(pb)->pb_waiters);
@@ -993,8 +993,8 @@ pagebuf_ispin(page_buf_t *pb) {
  *	pagebuf_wait_unpin
  *
  *	pagebuf_wait_unpin waits until all of the memory associated
- *	with the buffer is not longer locked in memory.  It returns
- *	immediately if none of the affected pages are locked. 
+ *	with the buffer is not longer locked in memory.	 It returns
+ *	immediately if none of the affected pages are locked.
  */
 
 static inline void	_pagebuf_wait_unpin(page_buf_t * pb)
@@ -1027,15 +1027,15 @@ void pagebuf_queue_task(
 }
 
 /*
- * 	Buffer Utility Routines 
+ *	Buffer Utility Routines
  */
 
 /*
  *	pagebuf_iodone
  *
  *	pagebuf_iodone marks a buffer for which I/O is in progress
- *	done with respect to that I/O.  The pb_done routine, if
- *	present, will be called as a side-effect. 
+ *	done with respect to that I/O.	The pb_done routine, if
+ *	present, will be called as a side-effect.
  */
 
 void pagebuf_iodone_sched(
@@ -1055,8 +1055,8 @@ void pagebuf_iodone_sched(
 	}
 }
 
-void pagebuf_iodone(		/* mark buffer I/O complete     */
-    page_buf_t * pb)		/* buffer to mark 	        */
+void pagebuf_iodone(		/* mark buffer I/O complete	*/
+    page_buf_t * pb)		/* buffer to mark		*/
 {
 	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
 	if (pb->pb_error == 0) {
@@ -1085,8 +1085,8 @@ void pagebuf_iodone(		/* mark buffer I/O complete     */
  */
 
 void pagebuf_ioerror(	/* mark buffer in error (or not) */
-    page_buf_t * pb,	/* buffer to mark               */
-    int serror)		/* error to store (0 if none)     */
+    page_buf_t * pb,	/* buffer to mark		*/
+    int serror)		/* error to store (0 if none)	  */
 {
 	pb->pb_error = serror;
 	PB_TRACE(pb, PB_TRACE_REC(ioerror), serror);
@@ -1102,15 +1102,15 @@ void pagebuf_ioerror(	/* mark buffer in error (or not) */
  *	when all of the subsidiary I/O requests, if any, have been completed.
  *	pagebuf_iostart calls the pagebuf_ioinitiate routine or
  *	pagebuf_iorequest, if the former routine is not defined, to start
- *	the I/O on a given low-level request. 
+ *	the I/O on a given low-level request.
  */
 
-int pagebuf_iostart(		/* start I/O on a buffer          */
-    page_buf_t * pb,		/* buffer to start                */
+int pagebuf_iostart(		/* start I/O on a buffer	  */
+    page_buf_t * pb,		/* buffer to start		  */
     page_buf_flags_t flags)	/* PBF_LOCK, PBF_ASYNC, PBF_READ, */
-				/* PBF_WRITE, PBF_ALLOCATE,       */
+				/* PBF_WRITE, PBF_ALLOCATE,	  */
 				/* PBF_DELWRI, PBF_SEQUENTIAL,	  */
-				/* PBF_SYNC, PBF_DONT_BLOCK       */
+				/* PBF_SYNC, PBF_DONT_BLOCK	  */
 				/* PBF_RELEASE			  */
 {
 	int status = 0;
@@ -1124,7 +1124,7 @@ int pagebuf_iostart(		/* start I/O on a buffer          */
 		pagebuf_delwri_queue(pb, 1);
 		return status;
 	}
- 
+
 	pb->pb_flags &= ~(PBF_READ | PBF_WRITE | PBF_ASYNC | PBF_DELWRI);
 	pb->pb_flags |= flags & (PBF_READ | PBF_WRITE | PBF_ASYNC | PBF_SYNC);
 
@@ -1197,15 +1197,15 @@ static void bio_end_io_pagebuf(struct bio *bio)
 /*
  *	pagebuf_iorequest
  *
- * 	pagebuf_iorequest is the core I/O request routine.
+ *	pagebuf_iorequest is the core I/O request routine.
  *	It assumes that the buffer is well-formed and
  *	mapped and ready for physical I/O, unlike
  *	pagebuf_iostart() and pagebuf_iophysio().  Those
  *	routines call the pagebuf_ioinitiate routine to start I/O,
  *	if it is present, or else call pagebuf_iorequest()
- *	directly if the pagebuf_ioinitiate routine is not present.  
+ *	directly if the pagebuf_ioinitiate routine is not present.
  *
- *	This function will be responsible for ensuring access to the 
+ *	This function will be responsible for ensuring access to the
  *	pages is restricted whilst I/O is in progress - for locking
  *	pagebufs the pagebuf lock is the mediator, for non-locking
  *	pagebufs the pages will be locked. In the locking case we
@@ -1213,8 +1213,8 @@ static void bio_end_io_pagebuf(struct bio *bio)
  *	will reference the same page.
  */
 
-int pagebuf_iorequest(		/* start real I/O               */
-	page_buf_t * pb)	/* buffer to convey to device   */
+int pagebuf_iorequest(		/* start real I/O		*/
+	page_buf_t * pb)	/* buffer to convey to device	*/
 {
 	int status = 0;
 	int i, map_i, total_nr_pages, nr_pages;
@@ -1361,7 +1361,7 @@ io_submitted:
  *	the error code, if any, or 0 if there is no error.
  */
 
-int pagebuf_iowait(page_buf_t * pb) /* buffer to wait on              */
+int pagebuf_iowait(page_buf_t * pb) /* buffer to wait on	      */
 {
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
 	blk_run_queues();
@@ -1371,11 +1371,11 @@ int pagebuf_iowait(page_buf_t * pb) /* buffer to wait on              */
 }
 
 
-/* reverse pagebuf_mapin()      */ 
+/* reverse pagebuf_mapin()	*/
 STATIC void *
 pagebuf_mapout_locked(
-    page_buf_t * pb)	/* buffer to unmap                */
-{				
+    page_buf_t * pb)	/* buffer to unmap		  */
+{
 	void *old_addr = NULL;
 
 	if (pb->pb_flags & PBF_MAPPED) {
@@ -1394,12 +1394,12 @@ pagebuf_mapout_locked(
 caddr_t
 pagebuf_offset(page_buf_t *pb, off_t offset)
 {
-        struct page *page;
+	struct page *page;
 
-        offset += pb->pb_offset;
+	offset += pb->pb_offset;
 
-        page = pb->pb_pages[offset >> PAGE_CACHE_SHIFT];
-        return (caddr_t) page_address(page) + (offset & (PAGE_CACHE_SIZE - 1));
+	page = pb->pb_pages[offset >> PAGE_CACHE_SHIFT];
+	return (caddr_t) page_address(page) + (offset & (PAGE_CACHE_SIZE - 1));
 }
 
 /*
@@ -1411,29 +1411,29 @@ pagebuf_offset(page_buf_t *pb, off_t offset)
  *	calls will update to point to the segment following the one
  *	returned.  pagebuf_segment returns 0 on a successful
  *	retrieval, and a negative error code on any error (including
- *	-ENOENT when the loff_t is out of range). 
+ *	-ENOENT when the loff_t is out of range).
  *
  *	The struct page * return value may be set to NULL if the
  *	page is outside of main memory (as in the case of memory on a controller
- *	card).  The page_buf_pgno_t may be set to PAGE_BUF_PGNO_NULL
+ *	card).	The page_buf_pgno_t may be set to PAGE_BUF_PGNO_NULL
  *	as well, if the page is not actually allocated, unless the
  *	PBF_ALWAYS_ALLOC flag is set in the page_buf_flags_t,
  *	in which allocation of storage will be forced.
  */
 
 int pagebuf_segment(		/* return next segment of buffer */
-    page_buf_t * pb,		/* buffer to examine            */
-    loff_t * boff_p,		/* offset in buffer of next     */
-				/* segment (updated)            */
-    struct page ** spage_p,	/* page (updated)               */
-				/* (NULL if not in mem_map[])   */
-    size_t * soff_p,		/* offset in page (updated)     */
-    size_t * ssize_p,		/* length of segment (updated)  */
-    page_buf_flags_t flags)	/* unused 			*/
+    page_buf_t * pb,		/* buffer to examine		*/
+    loff_t * boff_p,		/* offset in buffer of next	*/
+				/* segment (updated)		*/
+    struct page ** spage_p,	/* page (updated)		*/
+				/* (NULL if not in mem_map[])	*/
+    size_t * soff_p,		/* offset in page (updated)	*/
+    size_t * ssize_p,		/* length of segment (updated)	*/
+    page_buf_flags_t flags)	/* unused			*/
 {
 	loff_t kpboff;		/* offset in pagebuf		*/
 	int kpi;		/* page index in pagebuf	*/
-	size_t slen;		/* segment length               */
+	size_t slen;		/* segment length		*/
 
 	kpboff = *boff_p;
 
@@ -1543,7 +1543,7 @@ pagebuf_iodone_daemon(void *__bind_cpu)
 	daemonize();
 
 	/* Avoid signals */
-	spin_lock_irq(&current->sigmask_lock);	
+	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
@@ -1603,7 +1603,7 @@ pagebuf_daemon(void *data)
 	int		count;
 	page_buf_t	*pb;
 	struct list_head *curr, *next, tmp;
-	struct timer_list pb_daemon_timer = 
+	struct timer_list pb_daemon_timer =
 		{ {NULL, NULL}, 0, 0, (timeout_fn)pagebuf_daemon_wakeup };
 
 
@@ -1611,7 +1611,7 @@ pagebuf_daemon(void *data)
 	daemonize();
 
 	/* Avoid signals */
-	spin_lock_irq(&current->sigmask_lock);	
+	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sigmask_lock);
@@ -1699,7 +1699,7 @@ pagebuf_delwri_flush(pb_target_t *target, u_long flags, int *pinptr)
 		pb = list_entry(curr, page_buf_t, pb_list);
 
 		/*
-		 * Skip other targets, markers and in progress buffers 
+		 * Skip other targets, markers and in progress buffers
 		 */
 
 		if ((pb->pb_flags == 0) || (pb->pb_target != target) ||
@@ -1765,7 +1765,7 @@ pagebuf_delwri_flush(pb_target_t *target, u_long flags, int *pinptr)
 static int pagebuf_daemon_start(void)
 {
 	int	cpu;
-  
+
 	if (!pb_daemon){
 		pb_daemon = (pagebuf_daemon_t *)
 				kmalloc(sizeof(pagebuf_daemon_t), GFP_KERNEL);
@@ -1797,9 +1797,9 @@ static int pagebuf_daemon_start(void)
 		}
 	}
 	return 0;
-}	
+}
 
-/* Do not mark as __exit, it is called from pagebuf_terminate.  */
+/* Do not mark as __exit, it is called from pagebuf_terminate.	*/
 
 static int pagebuf_daemon_stop(void)
 {
@@ -1882,7 +1882,7 @@ static ctl_table pagebuf_dir_table[] = {
 };
 
 static ctl_table pagebuf_root_table[] = {
-	{CTL_VM, "vm",  NULL, 0, 0555, pagebuf_dir_table},
+	{CTL_VM, "vm",	NULL, 0, 0555, pagebuf_dir_table},
 	{0}
 };
 
@@ -1891,10 +1891,10 @@ static int
 pagebuf_readstats(char *buffer, char **start, off_t offset,
 			int count, int *eof, void *data)
 {
-	int     i, len;
+	int	i, len;
 
 	len = 0;
-	len += sprintf(buffer + len, "pagebuf"); 
+	len += sprintf(buffer + len, "pagebuf");
 	for (i = 0; i < sizeof(pbstats) / sizeof(u_int32_t); i++) {
 		len += sprintf(buffer + len, " %u",
 			*(((u_int32_t*)&pbstats) + i));
@@ -1913,7 +1913,7 @@ pagebuf_readstats(char *buffer, char **start, off_t offset,
 
 	return len;
 }
-#endif  /* CONFIG_PROC_FS */
+#endif	/* CONFIG_PROC_FS */
 
 static void	pagebuf_shaker(void)
 {
@@ -1932,7 +1932,7 @@ int __init pagebuf_init(void)
 {
 	pagebuf_table_header = register_sysctl_table(pagebuf_root_table, 1);
 
-#ifdef  CONFIG_PROC_FS
+#ifdef	CONFIG_PROC_FS
 	if (proc_mkdir("fs/pagebuf", 0))
 		create_proc_read_entry("fs/pagebuf/stat", 0, 0, pagebuf_readstats, NULL);
 #endif
@@ -1981,7 +1981,7 @@ void pagebuf_terminate(void)
 	kmem_shake_deregister(pagebuf_shaker);
 
 	unregister_sysctl_table(pagebuf_table_header);
-#ifdef  CONFIG_PROC_FS
+#ifdef	CONFIG_PROC_FS
 	remove_proc_entry("fs/pagebuf/stat", NULL);
 	remove_proc_entry("fs/pagebuf", NULL);
 #endif

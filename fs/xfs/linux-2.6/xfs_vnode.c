@@ -1,32 +1,32 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
  * published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it would be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
+ *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.  Any license provided herein, whether implied or
+ * or the like.	 Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
- * 
+ *
  * You should have received a copy of the GNU General Public License along
  * with this program; if not, write the Free Software Foundation, Inc., 59
  * Temple Place - Suite 330, Boston MA 02111-1307, USA.
- * 
+ *
  * Contact information: Silicon Graphics, Inc., 1600 Amphitheatre Pkwy,
  * Mountain View, CA  94043, or:
- * 
- * http://www.sgi.com 
- * 
- * For further information regarding this notice, see: 
- * 
+ *
+ * http://www.sgi.com
+ *
+ * For further information regarding this notice, see:
+ *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
@@ -42,8 +42,8 @@ spinlock_t	vnumber_lock = SPIN_LOCK_UNLOCKED;
  * Dedicated vnode inactive/reclaim sync semaphores.
  * Prime number of hash buckets since address is used as the key.
  */
-#define NVSYNC                  37
-#define vptosync(v)             (&vsync[((unsigned long)v) % NVSYNC])
+#define NVSYNC			37
+#define vptosync(v)		(&vsync[((unsigned long)v) % NVSYNC])
 sv_t vsync[NVSYNC];
 
 /*
@@ -59,15 +59,15 @@ u_short vttoif_tab[] = {
 	0, S_IFREG, S_IFDIR, S_IFBLK, S_IFCHR, S_IFLNK, S_IFIFO, 0, S_IFSOCK
 };
 
-#define VN_LOCK(vp)             spin_lock(&(vp)->v_lock)
-#define VN_UNLOCK(vp)           spin_unlock(&(vp)->v_lock)
+#define VN_LOCK(vp)		spin_lock(&(vp)->v_lock)
+#define VN_UNLOCK(vp)		spin_unlock(&(vp)->v_lock)
 
 
 void
 vn_init(void)
 {
-        register sv_t *svp;
-        register int i;
+	register sv_t *svp;
+	register int i;
 
 	for (svp = vsync, i = 0; i < NVSYNC; i++, svp++)
 		init_sv(svp, SV_DEFAULT, "vsy", i);
@@ -105,11 +105,11 @@ vn_reclaim(struct vnode *vp, int flag)
 	vp->v_type = VNON;
 	vp->v_fbhv = NULL;
 
-#ifdef  CONFIG_XFS_VNODE_TRACING
+#ifdef	CONFIG_XFS_VNODE_TRACING
 	ktrace_free(vp->v_trace);
 
 	vp->v_trace = NULL;
-#endif  /* CONFIG_XFS_VNODE_TRACING */
+#endif	/* CONFIG_XFS_VNODE_TRACING */
 
 	return 0;
 }
@@ -125,7 +125,7 @@ vn_wakeup(struct vnode *vp)
 	VN_UNLOCK(vp);
 }
 
-int 
+int
 vn_wait(struct vnode *vp)
 {
 	VN_LOCK(vp);
@@ -142,7 +142,7 @@ struct vnode *
 vn_initialize(vfs_t *vfsp, struct inode *inode)
 {
 	struct vnode	*vp = LINVFS_GET_VPTR(inode);
-	
+
 	XFS_STATS_INC(xfsstats.vn_active);
 
 	_ACL_SET_IFLAG(inode);
@@ -219,11 +219,11 @@ vn_revalidate(struct vnode *vp, int flags)
 		inode = LINVFS_GET_IP(vp);
 		ASSERT(inode);
 
-		inode->i_mode       = VTTOIF(va.va_type) | va.va_mode;
-		inode->i_nlink      = va.va_nlink;
-		inode->i_uid        = va.va_uid;
-		inode->i_gid        = va.va_gid;
-		inode->i_rdev       = mk_kdev(MAJOR(va.va_rdev),
+		inode->i_mode	    = VTTOIF(va.va_type) | va.va_mode;
+		inode->i_nlink	    = va.va_nlink;
+		inode->i_uid	    = va.va_uid;
+		inode->i_gid	    = va.va_gid;
+		inode->i_rdev	    = mk_kdev(MAJOR(va.va_rdev),
 						MINOR(va.va_rdev));
 		inode->i_blksize    = va.va_blksize;
 		inode->i_generation = va.va_gencount;
@@ -231,11 +231,11 @@ vn_revalidate(struct vnode *vp, int flags)
 		    S_ISREG(inode->i_mode) ||
 		    S_ISDIR(inode->i_mode) ||
 		    S_ISLNK(inode->i_mode)) {
-			inode->i_size       = va.va_size;
-			inode->i_blocks     = va.va_nblocks;
-			inode->i_atime      = va.va_atime.tv_sec;
-			inode->i_mtime      = va.va_mtime.tv_sec;
-			inode->i_ctime      = va.va_ctime.tv_sec;
+			inode->i_size	    = va.va_size;
+			inode->i_blocks	    = va.va_nblocks;
+			inode->i_atime	    = va.va_atime.tv_sec;
+			inode->i_mtime	    = va.va_mtime.tv_sec;
+			inode->i_ctime	    = va.va_ctime.tv_sec;
 		}
 		if (flags & ATTR_LAZY)
 			vp->v_flag &= ~VMODIFIED;
@@ -352,9 +352,9 @@ vn_rele(struct vnode *vp)
 	vcnt = vn_count(vp);
 
 	/*
-	 * Since we always get called from put_inode we know 
+	 * Since we always get called from put_inode we know
 	 * that i_count won't be decremented after we
-	 * return. 
+	 * return.
 	 */
 	if (vcnt == 0) {
 		/*
@@ -396,7 +396,7 @@ void
 vn_remove(struct vnode *vp)
 {
 	/* REFERENCED */
-	vmap_t  vmap;
+	vmap_t	vmap;
 
 	/* Make sure we don't do this to the same vnode twice */
 	if (!(vp->v_fbhv))
@@ -417,8 +417,8 @@ vn_remove(struct vnode *vp)
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 
-#define KTRACE_ENTER(vp, vk, s, line, ra) 			\
-	ktrace_enter(	(vp)->v_trace, 				\
+#define KTRACE_ENTER(vp, vk, s, line, ra)			\
+	ktrace_enter(	(vp)->v_trace,				\
 /*  0 */		(void *)(__psint_t)(vk),		\
 /*  1 */		(void *)(s),				\
 /*  2 */		(void *)(__psint_t) line,		\
