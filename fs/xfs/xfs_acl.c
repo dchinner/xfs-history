@@ -35,6 +35,9 @@
 #define ACL_ACCESS	0
 #define ACL_DEFAULT	1
 
+#define SGI_ACL_FILE	"SGI_ACL_FILE"
+#define SGI_ACL_DEFAULT	"SGI_ACL_DEFAULT"
+
 STATIC int	xfs_acl_setmode(vnode_t *, struct acl *);
 STATIC void     xfs_acl_filter_mode(mode_t, struct acl *);
 STATIC void	xfs_acl_get_endian(struct acl *);
