@@ -43,4 +43,12 @@ extern int  xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
 extern int  xfs_acl_get(struct vnode *, struct acl *, struct acl *);
 extern int  xfs_acl_set(struct vnode *, struct acl *, struct acl *);
 
+#ifdef CONFIG_FS_POSIX_ACL
+#define _ACL_INHERIT(p,c,v)	(xfs_acl_inherit(p,c,v))
+#define _ACL_XFS_IACCESS(a,b,c)	(xfs_acl_iaccess(a,b,c))
+#else
+#define _ACL_INHERIT(p,c,v)	(0)
+#define _ACL_XFS_IACCESS(a,b,c)	(-1)
+#endif
+
 #endif /* __XFS_ACL_H__ */

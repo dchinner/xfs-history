@@ -683,12 +683,6 @@ xfs_setattr(
 			code = XFS_ERROR(EACCES);
 			goto error_return;
 		}
-#if 0
-		if (!(mask & AT_SIZE_NOPERM)) {
-			if (code = xfs_iaccess(ip, IWRITE, credp))
-				goto error_return;
-		}
-#endif
 		/* 
 		 * Make sure that the dquots are attached to the inode.
 		 */
@@ -708,12 +702,6 @@ xfs_setattr(
 				code = XFS_ERROR(EPERM);
 				goto error_return;
 			}
-/***
-			if ((code = xfs_iaccess(ip, IWRITE, credp)) &&
-			    !capable(CAP_FOWNER)) {
-				goto error_return;
-			}
-***/
 		}
         }
 
@@ -2192,13 +2180,6 @@ xfs_lookup(
 		return XFS_ERROR(ENOENT);
 	}
 
-#if 0
-	if (error = xfs_iaccess(dp, IEXEC, credp)) {
-		xfs_iunlock_map_shared(dp, lock_mode);
-		return error;
-	}
-#endif
-
 	lookup_flags = DLF_IGET;
 	if (lock_mode == XFS_ILOCK_SHARED) {
 		lookup_flags |= DLF_LOCK_SHARED;
@@ -2386,10 +2367,6 @@ xfs_create(
 		goto error_return;
 	}
 
-#if 0
-	if (error = xfs_iaccess(dp, IEXEC, credp))
-                goto error_return;
-#endif
 
 	/*
 	 * At this point we cannot do an xfs_iget() of the entry named
@@ -2412,12 +2389,6 @@ xfs_create(
 	if (error == ENOENT) {
 
 		ASSERT(ip == NULL);
-
-#if 0
-		if (error = xfs_iaccess(dp, IWRITE, credp)) {
-			goto error_return;
-		}
-#endif
 
 		/*
 		 * XPG4 says create cannot allocate a file if the
@@ -2620,12 +2591,6 @@ xfs_create(
 		 * Now lock inode.
 		 */
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-			
-#if 0
-		if (I_mode) {
-			error = xfs_iaccess(ip, I_mode, credp);
-		}
-#endif
 			
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
@@ -3338,12 +3303,6 @@ xfs_remove(
 		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	}
  
-#if 0
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
-		REMOVE_DEBUG_TRACE(__LINE__);
-		goto error_return;
-	}
-#endif
 	if (error = _MAC_XFS_IACCESS(ip, MACWRITE, credp)) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto error_return;
@@ -3632,11 +3591,6 @@ xfs_link(
 		goto error_return;
 	}
 
-#if 0
-	if (error = xfs_iaccess(tdp, IEXEC | IWRITE, credp)) {
-                goto error_return;
-	}
-#endif
 
 	/*
 	 * Make sure that nothing with the given name exists in the
@@ -3841,14 +3795,6 @@ xfs_mkdir(
                 goto error_return;
 	}
 
-#if 0
-	/*
-	 * check access.
-	 */
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
-                goto error_return;
-	}
-#endif
 	
 	/*
 	 * Reserve disk quota and the inode.
@@ -4153,10 +4099,6 @@ xfs_rmdir(
 	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
 
 #if 0
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
-                goto error_return;
-	}
-
 	if (error = xfs_stickytest(dp, cdp, credp)) {
                 goto error_return;
 	}
@@ -4491,11 +4433,6 @@ xfs_symlink(
 		goto error_return;
 	}
 
-#if 0
-	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
-                goto error_return;
-	}
-#endif
 
 	/*
 	 * Since we've already started a transaction, we cannot allow

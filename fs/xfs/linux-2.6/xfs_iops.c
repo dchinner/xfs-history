@@ -123,11 +123,9 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		d_instantiate(dentry, ip);
 	}
 
-#ifdef CONFIG_FS_POSIX_ACL
         if (!error) {
-	    error = xfs_acl_inherit(dvp, vp, &va);
+	    error = _ACL_INHERIT(dvp, vp, &va);
         }
-#endif
 
 	return -error;
 }
