@@ -1211,11 +1211,18 @@ xfs_dm_get_allocinfo_rvp(
 	int		elem;
 	bhv_desc_t	*xbdp;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
+	xfs_bmbt_irec_t *bmp = NULL;
+	u_int		bmpcnt = 50;
+	u_int		bmpsz = sizeof(xfs_bmbt_irec_t) * bmpcnt;
+	int		error = 0;
 
 	/* Returns negative errors to DMAPI */
 
 	if (right < DM_RIGHT_SHARED)
 		return(-EACCES);
+
+	if ((inode->i_mode & S_IFMT) != S_IFREG)
+		return(-EINVAL);
 
 	if (copy_from_user( &startoff, offp, sizeof(startoff)))
 		return(-EFAULT);
@@ -1224,15 +1231,13 @@ xfs_dm_get_allocinfo_rvp(
 
 	ip = XFS_BHVTOI(xbdp);
 	mp = ip->i_mount;
+	ASSERT(mp);
 
 	if (startoff > XFS_MAXIOFFSET(mp))
 		return(-EINVAL);
 
-	if (nelem == 0) {
-		if (put_user(1, nelemp))
-			return(-EFAULT);
-		return(-E2BIG);
-	}
+	if (nelem == 0)
+		return(-EINVAL);
 
 	/* Convert the caller's starting offset into filesystem allocation
 	   units as required by xfs_bmapi().  Round the offset down so that
@@ -1243,12 +1248,13 @@ xfs_dm_get_allocinfo_rvp(
 	fsb_length = XFS_B_TO_FSB(mp, XFS_MAXIOFFSET(mp)) - fsb_offset;
 	elem = 0;
 
+	if (fsb_length)
+		bmp = kmem_alloc(bmpsz, KM_SLEEP);
+
 	while (fsb_length && elem < nelem) {
-		xfs_bmbt_irec_t bmp[50];
 		dm_extent_t	extent;
 		xfs_filblks_t	fsb_bias;
 		dm_size_t	bias;
-		int		error;
 		int		lock;
 		int		num;
 		int		i;
@@ -1257,7 +1263,7 @@ xfs_dm_get_allocinfo_rvp(
 		   call.
 		*/
 
-		num = MIN((u_int)(nelem - elem), (u_int)(sizeof(bmp) / sizeof(bmp[0])));
+		num = MIN((u_int)(nelem - elem), bmpcnt);
 
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 		lock = xfs_ilock_map_shared(ip);
@@ -1268,8 +1274,10 @@ xfs_dm_get_allocinfo_rvp(
 		xfs_iunlock_map_shared(ip, lock);
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
-		if (error)
-			return(-error); /* Return negative error to DMAPI */
+		if (error) {
+			error = -error; /* Return negative error to DMAPI */
+			goto finish_out;
+		}
 
 		/* Fill in the caller's extents, adjusting the bias in the
 		   first entry if necessary.
@@ -1287,8 +1295,10 @@ xfs_dm_get_allocinfo_rvp(
 			}
 			startoff = extent.ex_offset + extent.ex_length;
 
-			if (copy_to_user( extentp, &extent, sizeof(extent)))
-				return(-EFAULT);
+			if (copy_to_user( extentp, &extent, sizeof(extent))) {
+				error = -EFAULT;
+				goto finish_out;
+			}
 
 			fsb_bias = fsb_offset - bmp[i].br_startoff;
 			fsb_offset += bmp[i].br_blockcount - fsb_bias;
@@ -1300,15 +1310,22 @@ xfs_dm_get_allocinfo_rvp(
 	if (fsb_length == 0) {
 		startoff = 0;
 	}
-	if (copy_to_user( offp, &startoff, sizeof(startoff)))
-		return(-EFAULT);
+	if (copy_to_user( offp, &startoff, sizeof(startoff))) {
+		error = -EFAULT;
+		goto finish_out;
+	}
 
-	if (copy_to_user( nelemp, &elem, sizeof(elem)))
-		return(-EFAULT);
+	if (copy_to_user( nelemp, &elem, sizeof(elem))) {
+		error = -EFAULT;
+		goto finish_out;
+	}
 
 	*rvp = (fsb_length == 0 ? 0 : 1);
 
-	return(0);
+finish_out:
+	if (bmp)
+		kmem_free(bmp, bmpsz);
+	return(error);
 }
 
 
