@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.14 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -197,7 +197,7 @@ static struct xif {
     "xdirsf",	VD idbg_xdirsf,		"Dump XFS directory shortform",
     "xdanode",	VD idbg_xdanode,	"Dump XFS dir/attr node block",
     "xdaargs",	VD idbg_xdaargs,	"Dump XFS dir/attr args structure",
-    "xdastate",	VD idbg_xdastate,	"Dump XFS dir/attr state_blk struct",
+    "xdastat",	VD idbg_xdastate,	"Dump XFS dir/attr state_blk struct",
     "xexlist",	VD idbg_xexlist,	"Dump XFS bmap extents in inode",
     "xflist",	VD idbg_xflist,		"Dump XFS to-be-freed extent list",
     "xgaplst",	VD idbg_xgaplist,	"Dump inode gap list",
@@ -290,7 +290,7 @@ static void xfs_iomap_map_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_prdinode(xfs_dinode_t *di, int coreonly);
 static void xfs_prdinode_core(xfs_dinode_core_t *dip);
-static void xfs_dastate_path(char *f, xfs_da_state_path_t *p);
+static void xfs_dastate_path(xfs_da_state_path_t *p);
 #ifdef DEBUG
 static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
 static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
@@ -2114,12 +2114,18 @@ idbg_xdaargs(xfs_da_args_t *n)
 	qprintf(" namelen %d name \"", n->namelen);
 	for (i = 0; i < n->namelen; i++)
 		qprintf("%c", n->name[i]);
-	qprintf("\" valuelen %d value \"", n->valuelen);
-	for (i = 0; (i < n->valuelen) && (i < 32); i++)
-		qprintf("%c", n->value[i]);
+	qprintf("\" valuelen %d value ", n->valuelen);
+	if (n->value) {
+		qprintf("\"");
+		for (i = 0; (i < n->valuelen) && (i < 32); i++)
+			qprintf("%c", n->value[i]);
+		qprintf("\"\n");
+	} else {
+		qprintf("(NULL)\n");
+	}
 	if (i == 32)
 		qprintf("...");
-	qprintf("\"\n dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
+	qprintf(" dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
 		n->dp, n->firstblock, n->flist, n->total);
 }
 
@@ -2127,11 +2133,11 @@ idbg_xdaargs(xfs_da_args_t *n)
  * Print an xfs_da_state_path structure.
  */
 static void
-xfs_dastate_path(char *f, xfs_da_state_path_t *p)
+xfs_dastate_path(xfs_da_state_path_t *p)
 {
 	int i;
 
-	qprintf("%s active %d\n", f, p->active);
+	qprintf("active %d\n", p->active);
 	for (i = 0; i < XFS_DA_NODE_MAXDEPTH; i++) {
 #if XFS_BIG_FILES
 		qprintf("blk %d bp 0x%x blkno 0x%llx",
@@ -2160,8 +2166,11 @@ idbg_xdastate(xfs_da_state_t *s)
 		s->args, s->mp, s->trans, s->blocksize, s->inleaf);
 	if (s->args)
 		idbg_xdaargs(s->args);
-	xfs_dastate_path("path", &s->path);
-	xfs_dastate_path("altpath", &s->altpath);
+	
+	qprintf("path ");
+	xfs_dastate_path(&s->path);
+	qprintf("altpath ");
+	xfs_dastate_path(&s->altpath);
 }
 
 /*
