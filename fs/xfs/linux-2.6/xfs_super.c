@@ -726,19 +726,7 @@ linvfs_remount(
                 return -ENOSPC;
 
 	if (*flags & MS_RDONLY || args.flags & MS_RDONLY) {
-		int		error;
-		int		saved = sb->s_flags;
-		xfs_mount_t	*mp = XFS_BHVTOM(vfsp->vfs_fbhv);
-
 		sb->s_flags |= MS_RDONLY;
-
-		XFS_bflush(mp->m_ddev_targ);
-		VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT|SYNC_CLOSE, sys_cred, error);
-		if (error) {
-			sb->s_flags = saved;
-			return -error;
-		}
-		
 		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
 		vfsp->vfs_flag |= VFS_RDONLY;
 	} else {

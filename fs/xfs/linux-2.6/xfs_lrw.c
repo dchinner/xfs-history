@@ -1991,15 +1991,7 @@ XFS_bflush(buftarg_t target)
 }
 
 
-/* Try very hard to clean up a filesystem for READ ONLY status
- * This is a very non deterministic method and such does not
- * always work.
- * In the case of shutting down a system that has an XFS root
- * file system it works most of the time, since most processes
- * have been killed prior to this happening.
- * It appears the upper layer of linux will let stuff through
- * even after the super block has been marked READ ONLY.
- * More investigation is necessary in this area.
+/* Push all fs state out to disk
  */
 
 void
@@ -2007,33 +1999,24 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 {
 	xfs_mount_t	*mp;
 	int pincount = 0;
-	int count=0;
+	int count = 0;
+	int error;
  
 	mp = XFS_BHVTOM(bdp);
+	xfs_refcache_purge_mp(mp);
+	xfs_binval(mp->m_ddev_targ);
   
 	do {
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+		VFS_SYNC(XFS_MTOVFS(mp), SYNC_ATTR|SYNC_WAIT, sys_cred, error);
 		pagebuf_delwri_flush(mp->m_ddev_targ.pb_targ,
 				PBDF_WAIT, &pincount);
 		if (pincount == 0) {delay(50); count++;}
 	}  while (count < 2);
   
-	/* ok this is a best guest at this point
-	 * hopefully everybody has stopped writing to filesystem
-	 * and the loop above has pushed everything out.
-	 * write out the superblock which should be the last of 
-	 * transactions
-	 */
-	xfs_unmountfs_writesb(mp);
-
-	do {
-		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-		pagebuf_delwri_flush(mp->m_ddev_targ.pb_targ,
-			PBDF_WAIT, &pincount);
-	}  while (pincount);
- 
 	/* Ok now write out an unmount record */
 	xfs_log_unmount_write(mp);            
+	xfs_unmountfs_writesb(mp);
 }
 
 /*
