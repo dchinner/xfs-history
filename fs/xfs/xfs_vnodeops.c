@@ -1,4 +1,4 @@
-#ident "$Revision: 1.278 $"
+#ident "$Revision: 1.279 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -96,11 +96,10 @@
 #endif
 
 /* data pipe functions */
-extern	int fspe_store_cookie(void *);
-extern	int fspe_destroy_cookie(void *);
 extern	int fspe_get_ops(void *);
 extern	int xfs_prio_set_bw(void *);
 extern	int xfs_prio_get_bw(void *);
+int         xfs_fspe_dioinfo(struct vnode *, struct dioattr *);
 
 #if _MIPS_SIM == _ABI64
 int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
@@ -108,6 +107,13 @@ int flock_to_irix5(void *, int, xlate_info_t *);
 int irix5_n32_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
 int flock_to_irix5_n32(void *, int, xlate_info_t *);
 #endif
+
+/*
+ * The maximum pathlen is 1024 bytes. Since the minimum file system
+ * blocksize is 512 bytes, we can get a max of 2 extents back from
+ * bmapi.
+ */
+#define SYMLINK_MAPS 2
 
 
 #ifndef SIM
@@ -1111,13 +1117,6 @@ xfs_access(
 	return error;
 }
 
-/*
- * The maximum pathlen is 1024 bytes. Since the minimum file system
- * blocksize is 512 bytes, we can get a max of 2 extents back from
- * bmapi.
- */
-#define SYMLINK_MAPS 2
-
 
 /*
  * xfs_readlink
@@ -1499,7 +1498,12 @@ xfs_inactive(
 	int		commit_flags;
 	xfs_fsblock_t	first_block;
 	xfs_bmap_free_t	free_list;
+	xfs_bmbt_irec_t	mval[SYMLINK_MAPS];
+	int		nmaps;
+	int		i;
+	int		size;
 	vnode_t 	*vp;
+	buf_t		*bp;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_inactive", (inst_t *)__return_address);
@@ -1605,6 +1609,7 @@ xfs_inactive(
 
 				xfs_ilock(ip, XFS_IOLOCK_EXCL |
 					  XFS_ILOCK_EXCL);
+				size = (int)ip->i_d.di_size;
 				ip->i_d.di_size = 0;
 				xfs_trans_ijoin(tp, ip,
 						XFS_ILOCK_EXCL |
@@ -1614,8 +1619,29 @@ xfs_inactive(
 
 				done = 0;
 				XFS_BMAP_INIT(&free_list, &first_block);
-				error = xfs_bunmapi(tp, ip, 0, 2,
-						  XFS_BMAPI_METADATA, 2,
+				nmaps = sizeof(mval) / sizeof(mval[0]);
+				error = xfs_bmapi(tp, ip, 0,
+					XFS_B_TO_FSB(mp, size),
+					XFS_BMAPI_METADATA, &first_block, 0,
+					mval, &nmaps, &free_list);
+				if (error) {
+					xfs_itruncate_cleanup(&tp, ip,
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT),
+						 XFS_DATA_FORK);
+					goto free_attrs;
+				}
+				for (i = 0; i < nmaps; i++) {
+					bp = xfs_trans_get_buf(tp, mp->m_dev,
+						XFS_FSB_TO_DADDR(mp,
+							mval[i].br_startblock),
+						XFS_FSB_TO_BB(mp,
+							mval[i].br_blockcount),
+						0);
+					xfs_trans_binval(tp, bp);
+				}
+				error = xfs_bunmapi(tp, ip, 0, size,
+						  XFS_BMAPI_METADATA, nmaps,
 						  &first_block, &free_list,
 						  &done);
 				if (error) {
@@ -1764,8 +1790,9 @@ xfs_inactive(
 #if 0
 			ASSERT(error || ip->i_d.di_anextents == 0);
 #else
-			cmn_err(CE_WARN,
-				"File system lost track of some space\n");
+			if (ip->i_d.di_anextents != 0)
+				cmn_err(CE_WARN,
+					"File system lost track of some space\n");
 #endif
 		} else if (ip->i_afp)
 			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
@@ -5554,7 +5581,7 @@ xfs_symlink(
 			bcopy(cur_chunk, bp->b_un.b_addr, byte_cnt);
 			cur_chunk += byte_cnt;
 
-			xfs_trans_log_buf(tp, bp, 0, byte_cnt);
+			xfs_trans_log_buf(tp, bp, 0, byte_cnt - 1);
 		}
 	}
 
@@ -6039,6 +6066,38 @@ xfs_allocstore(
 	return error;
 }
 
+
+/*
+ * xfs_fspe_dioinfo: called by file system pipe end.
+ */
+int 
+xfs_fspe_dioinfo(
+        struct vnode *vp,
+	struct dioattr *da)
+{
+	bhv_desc_t    *bdp;
+	xfs_inode_t   *ip;
+	xfs_mount_t   *mp;
+
+	bdp = vp->v_fbhv;
+	ip = XFS_BHVTOI(bdp);
+	mp = ip->i_mount;
+
+	/* It's a copy of the code in xfs_fcntl - F_DIOINFO cmd */
+	
+	ASSERT(scache_linemask != 0);
+#ifdef R10000_SPECULATION_WAR
+	da->d_mem = _PAGESZ;
+#else
+	da->d_mem = scache_linemask + 1;
+#endif
+
+	da->d_miniosz = mp->m_sb.sb_blocksize;
+	da->d_maxiosz = XFS_FSB_TO_B(mp,
+				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
+
+	return 0;
+}
 
 /*
  * xfs_fcntl
