@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.123 $"
+#ident	"$Revision$"
 
 /*
  * High level interface routines for log manager
@@ -104,7 +104,8 @@ STATIC void xlog_state_want_sync(xlog_t	*log, xlog_in_core_t *iclog);
 /* local functions to manipulate grant head */
 STATIC void xlog_grant_log_space(xlog_t		*log,
 				 xlog_ticket_t	*xtic);
-STATIC void xlog_grant_push_ail(xfs_mount_t *mp);
+STATIC void xlog_grant_push_ail(xfs_mount_t	*mp,
+				int		need_bytes);
 STATIC void xlog_regrant_reserve_log_space(xlog_t	 *log,
 					   xlog_ticket_t *ticket);
 STATIC void xlog_regrant_write_log_space(xlog_t		*log,
@@ -115,7 +116,7 @@ STATIC void xlog_ungrant_log_space(xlog_t	 *log,
 
 /* local ticket functions */
 STATIC void		xlog_state_ticket_alloc(xlog_t *log);
-STATIC xfs_log_ticket_t *xlog_ticket_get(xlog_t *log,
+STATIC xlog_ticket_t	*xlog_ticket_get(xlog_t *log,
 					 int	unit_bytes,
 					 int	count,
 					 char	clientid,
@@ -376,7 +377,8 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 		char		 client,
 		uint		 flags)
 {
-	xlog_t	  *log = mp->m_log;
+	xlog_t		*log = mp->m_log;
+	xlog_ticket_t	*internal_ticket;
 	
 	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
@@ -391,13 +393,18 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	
 	if (*ticket != NULL) {
 		ASSERT(flags & XFS_LOG_PERM_RESERV);
-		xlog_grant_push_ail(mp);
-		xlog_regrant_write_log_space(log, (xlog_ticket_t *)*ticket);
+		internal_ticket = (xlog_ticket_t *)*ticket;
+		xlog_grant_push_ail(mp, internal_ticket->t_unit_res);
+		xlog_regrant_write_log_space(log, internal_ticket);
 	} else {
 		/* may sleep if need to allocate more tickets */
-		*ticket = xlog_ticket_get(log, unit_bytes, cnt, client, flags);
-		xlog_grant_push_ail(mp);
-		xlog_grant_log_space(log, (xlog_ticket_t *)*ticket);
+		internal_ticket = xlog_ticket_get(log, unit_bytes, cnt,
+						  client, flags);
+		*ticket = internal_ticket;
+		xlog_grant_push_ail(mp,
+				    (internal_ticket->t_unit_res *
+				     internal_ticket->t_cnt));
+		xlog_grant_log_space(log, internal_ticket);
 	}
 
 	return 0;
@@ -996,15 +1003,19 @@ xlog_commit_record(xfs_mount_t  *mp,
  * water mark.  In this manner, we would be creating a low water mark.
  */
 void
-xlog_grant_push_ail(xfs_mount_t *mp)
+xlog_grant_push_ail(xfs_mount_t	*mp,
+		    int		need_bytes)
 {
     xlog_t	*log = mp->m_log;	/* pointer to the log */
     xfs_lsn_t	tail_lsn;		/* lsn of the log tail */
-    xfs_lsn_t	threshhold_lsn = 0;	/* lsn we'd like to be at */
+    xfs_lsn_t	threshold_lsn = 0;	/* lsn we'd like to be at */
     int		free_blocks;		/* free blocks left to write to */
     int		free_bytes;		/* free bytes left to write to */
-    int		threshhold_block;	/* block in lsn we'd like to be at */
+    int		threshold_block;	/* block in lsn we'd like to be at */
     int		spl;
+    int		free_threshold;
+
+    ASSERT(BTOBB(need_bytes) < log->l_logBBsize);
 
     spl = GRANT_LOCK(log);
     free_bytes = xlog_space_left(log,
@@ -1013,25 +1024,33 @@ xlog_grant_push_ail(xfs_mount_t *mp)
     tail_lsn = log->l_tail_lsn;
     free_blocks = BTOBBT(free_bytes);
 
-    if (free_blocks < (log->l_logBBsize >> 2)) {
-	threshhold_block = BLOCK_LSN(tail_lsn) + (log->l_logBBsize >> 2);
-	if (threshhold_block >= log->l_logBBsize) {
-	    threshhold_block -= log->l_logBBsize;
-	    ((uint *)&threshhold_lsn)[0] = CYCLE_LSN(tail_lsn) +1;
+    /*
+     * Set the threshold for the minimum number of free blocks in the
+     * log to the maximum of what the caller needs, one quarter of the
+     * log, and 256 blocks.
+     */
+    free_threshold = BTOBB(need_bytes);
+    free_threshold = MAX(free_threshold, (log->l_logBBsize >> 2));
+    free_threshold = MAX(free_threshold, 256);
+    if (free_blocks < free_threshold) {
+	threshold_block = BLOCK_LSN(tail_lsn) + free_threshold;
+	if (threshold_block >= log->l_logBBsize) {
+	    threshold_block -= log->l_logBBsize;
+	    ((uint *)&threshold_lsn)[0] = CYCLE_LSN(tail_lsn) +1;
 	} else {
-	    ((uint *)&threshhold_lsn)[0] = CYCLE_LSN(tail_lsn);
+	    ((uint *)&threshold_lsn)[0] = CYCLE_LSN(tail_lsn);
 	}
-	((uint *)&threshhold_lsn)[1] = threshhold_block;
+	((uint *)&threshold_lsn)[1] = threshold_block;
 
 	/* Don't pass in an lsn greater than the lsn of the last
 	 * log record known to be on disk.
 	 */
-	if (threshhold_lsn > log->l_last_sync_lsn)
-	    threshhold_lsn = log->l_last_sync_lsn;
+	if (threshold_lsn > log->l_last_sync_lsn)
+	    threshold_lsn = log->l_last_sync_lsn;
     }
     GRANT_UNLOCK(log, spl);
-    if (threshhold_lsn)
-	    xfs_trans_push_ail(mp, threshhold_lsn);
+    if (threshold_lsn)
+	    xfs_trans_push_ail(mp, threshold_lsn);
 }	/* xlog_grant_push_ail */
 
 
@@ -1767,7 +1786,7 @@ redo:
 		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: wake 2");
-		xlog_grant_push_ail(log->l_mp);
+		xlog_grant_push_ail(log->l_mp, need_bytes);
 		spl = GRANT_LOCK(log);
 		goto redo;
 	} else if (tic->t_flags & XLOG_TIC_IN_Q)
@@ -1834,7 +1853,7 @@ redo:
 		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: wake 1");
-		xlog_grant_push_ail(log->l_mp);
+		xlog_grant_push_ail(log->l_mp, need_bytes);
 		spl = GRANT_LOCK(log);
 		goto redo;
 	} else if (tic->t_flags & XLOG_TIC_IN_Q)
@@ -2362,7 +2381,7 @@ xlog_ticket_put(xlog_t		*log,
 /*
  * Grab ticket off freelist or allocation some more
  */
-xfs_log_ticket_t *
+xlog_ticket_t *
 xlog_ticket_get(xlog_t		*log,
 		int		unit_bytes,
 		int		cnt,
@@ -2420,7 +2439,7 @@ xlog_ticket_get(xlog_t		*log,
 		tic->t_flags |= XLOG_TIC_PERM_RESERV;
 	sv_init(&(tic->t_sema), SV_DEFAULT, "logtick");
 
-	return (xfs_log_ticket_t)tic;
+	return tic;
 }	/* xlog_ticket_get */
 
 
