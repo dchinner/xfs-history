@@ -8,6 +8,7 @@
 
 int
 xfs_log_reserve(struct xfs_mount *mp, int reserve, int flags)
+/* ARGSUSED */
 {
 	return (1);
 }

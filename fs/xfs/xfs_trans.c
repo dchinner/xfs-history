@@ -54,9 +54,11 @@ xfs_trans_id_alloc(struct xfs_mount *mp)
 
 int
 xfs_trans_lsn_danger(struct xfs_mount *mp, xfs_lsn_t lsn)
+/* ARGSUSED */
 {
 #ifndef SIM
 	abort();
+	/* NOTREACHED */
 #else
 	return (0);
 #endif
@@ -80,7 +82,7 @@ xfs_trans_alloc(struct xfs_mount *mp, uint type, uint reserve, uint flags)
 	 * This call can only return NULL if the caller specified
 	 * the TRANS_NOSLEEP flag.
 	 */
-	if (xfs_log_reserve(mp, reserve, flags & XFS_TRANS_NOSLEEP) == 0) {
+	if (xfs_log_reserve(mp, (int)reserve, (int)flags & XFS_TRANS_NOSLEEP) == 0) {
 		return (NULL);
 	}
 
@@ -238,7 +240,7 @@ xfs_trans_bread(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
 	 */
 	if ((bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp)) != NULL) {
 		ASSERT(bp->b_fsprivate != NULL);
-		if (!bp->b_flags & B_DONE) {
+		if (!(bp->b_flags & B_DONE)) {
 #ifndef SIM
 			SYSINFO.lread += len;
 #endif
@@ -777,7 +779,7 @@ xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT((xfs_trans_t*)bp->b_fsprivate2 == tp);
 	ASSERT(bp->b_fsprivate != NULL);
-	ASSERT((first >= 0) && (first <= last) && (last <= bp->b_bcount));
+	ASSERT((first <= last) && (last <= bp->b_bcount));
 	ASSERT((bp->b_iodone == NULL) || (bp->b_iodone == xfs_buf_iodone));
 
 	/*
@@ -873,10 +875,8 @@ void
 xfs_trans_commit(xfs_trans_t *tp, uint flags)
 {
 	int		async;
-	xfs_trans_t	*async_list;
-	xfs_trans_t	*atp;
 
-	async = flags & XFS_TRANS_NOSLEEP;
+	async = (int)flags & XFS_TRANS_NOSLEEP;
 
 	/*
 	 * If the transaction is not asynchronous and there are
@@ -1099,15 +1099,8 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 #else
 STATIC void
 xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
+/* ARGSUSED */
 {
-	char			*trans_headerp;
-	char			*trans_commitp;
-	char			*log_ptr;
-	xfs_log_item_desc_t	*start_desc;
-	xfs_log_item_desc_t	*desc;
-	uint			space;
-	xfs_lsn_t		commit_lsn;
-
 	/*
 	 * If there is nothing to be logged by the transaction,
 	 * then unlock all of the items associated with the
@@ -1221,12 +1214,14 @@ xfs_trans_log_items(xfs_trans_t		*tp,
 
 STATIC void
 xfs_trans_write_header(xfs_trans_t *tp, caddr_t buffer)
+/* ARGSUSED */
 {
 
 }
 
 STATIC void
 xfs_trans_write_commit(xfs_trans_t *tp, caddr_t buffer)
+/* ARGSUSED */
 {
 
 }
@@ -1277,10 +1272,8 @@ xfs_trans_free(xfs_trans_t *tp)
 STATIC void
 xfs_trans_committed(xfs_trans_t *tp)
 {
-	xfs_log_item_desc_t	*lidp;
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_chunk_t	*next_licp;
-	xfs_log_item_t		*lip;
 
 	/*
 	 * Call the transaction's completion callback if there

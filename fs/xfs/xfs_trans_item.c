@@ -95,6 +95,7 @@ xfs_trans_add_item(xfs_trans_t *tp, xfs_log_item_t *lip)
 		licp = licp->lic_next;
 	}
 	ASSERT(0);
+	/* NOTREACHED */
 }
 
 /*
@@ -151,6 +152,7 @@ xfs_trans_free_item(xfs_trans_t	*tp, xfs_log_item_desc_t *lidp)
  */
 xfs_log_item_desc_t *
 xfs_trans_find_item(xfs_trans_t	*tp, xfs_log_item_t *lip)
+/* ARGSUSED */
 {
 	ASSERT(lip->li_desc != NULL);
 
@@ -173,7 +175,6 @@ xfs_trans_find_item(xfs_trans_t	*tp, xfs_log_item_t *lip)
 xfs_log_item_desc_t *
 xfs_trans_first_item(xfs_trans_t *tp)
 {
-	xfs_log_item_desc_t	*lidp;
 	xfs_log_item_chunk_t	*licp;
 	int			i;
 
@@ -198,7 +199,10 @@ xfs_trans_first_item(xfs_trans_t *tp)
 	}
 #ifndef SIM
 	cmn_err(CE_PANIC, "xfs_trans_first_item() -- no first item");
+#else
+	ASSERT(0);
 #endif
+	/* NOTREACHED */
 }
 
 
@@ -212,9 +216,9 @@ xfs_trans_first_item(xfs_trans_t *tp)
  */
 xfs_log_item_desc_t *
 xfs_trans_next_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
+/* ARGSUSED */
 {
 	xfs_log_item_chunk_t	*licp;
-	xfs_log_item_desc_t	*tmp_lidp;
 	int			i;
 
 	licp = XFS_LIC_DESC_TO_CHUNK(lidp);
@@ -223,7 +227,7 @@ xfs_trans_next_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
 	 * First search the rest of the chunk. The for loop keeps us
 	 * from referencing things beyond the end of the chunk.
 	 */
-	for (i = XFS_LIC_DESC_TO_SLOT(lidp) + 1; i <= XFS_LIC_MAX_SLOT; i++) {
+	for (i = (int)XFS_LIC_DESC_TO_SLOT(lidp) + 1; i <= XFS_LIC_MAX_SLOT; i++) {
 		if (XFS_LIC_ISFREE(licp, i)) {
 			continue;
 		}
@@ -250,6 +254,7 @@ xfs_trans_next_item(xfs_trans_t *tp, xfs_log_item_desc_t *lidp)
 		return (XFS_LIC_SLOT(licp, i));	
 	}
 	ASSERT(0);
+	/* NOTREACHED */
 }
 
 /*
@@ -303,9 +308,7 @@ xfs_trans_free_items(xfs_trans_t *tp)
 void
 xfs_trans_unlock_items(xfs_trans_t *tp)
 {
-	xfs_log_item_desc_t	*lidp;
 	xfs_log_item_chunk_t	*licp;
-	xfs_log_item_t		*lip;	
 	xfs_log_item_chunk_t	*next_licp;
 	int			freed;
 

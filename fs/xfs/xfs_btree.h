@@ -11,8 +11,8 @@ typedef struct xfs_btree_block
 } xfs_btree_block_t;
 
 #define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lev)	\
-	(((bsz) - sizeof(xfs_btree_block_t)) / \
-	 (sizeof(t) + sizeof(xfs_agblock_t) * ((lev) > 0)))
+	((((int)(bsz)) - (int)sizeof(xfs_btree_block_t)) / \
+	 ((int)sizeof(t) + (int)sizeof(xfs_agblock_t) * ((lev) > 0)))
 #define	XFS_BTREE_BLOCK_MINRECS(bsz,t,lev)	\
 	(XFS_BTREE_BLOCK_MAXRECS(bsz,t,lev) / 2)
 
@@ -74,5 +74,11 @@ extern __uint32_t xfs_magics[];
 	 (level) == (cur)->bc_nlevels - 1 ? \
 	(cur)->bc_private.b.ip->i_broot : \
 	xfs_buf_to_block((cur)->bc_bufs[level]))
+
+#define	xfs_extlen_min(a,b)	((xfs_extlen_t)(a) < (xfs_extlen_t)(b) ? (xfs_extlen_t)(a) : (xfs_extlen_t)(b))
+#define	xfs_extlen_max(a,b)	((xfs_extlen_t)(a) > (xfs_extlen_t)(b) ? (xfs_extlen_t)(a) : (xfs_extlen_t)(b))
+
+#define	xfs_fsbno_min(a,b)	((xfs_fsblock_t)(a) < (xfs_fsblock_t)(b) ? (xfs_fsblock_t)(a) : (xfs_fsblock_t)(b))
+#define	xfs_fsbno_max(a,b)	((xfs_fsblock_t)(a) > (xfs_fsblock_t)(b) ? (xfs_fsblock_t)(a) : (xfs_fsblock_t)(b))
 
 #endif	/* !_FS_XFS_BTREE_H */

@@ -68,7 +68,7 @@ xfs_buf_item_size(xfs_buf_log_item_t *bip)
 	 * need to be logged.
 	 */
 	dirty_chunks = xfs_buf_item_bits((uint *)&bip->bli_dirty_map,
-					 bip->bli_map_size, 0);
+					 (int)bip->bli_map_size, 0);
 
 	/*
 	 * Calculate the number of bytes needed to align the chunks on
@@ -137,7 +137,7 @@ xfs_buf_item_format(xfs_buf_log_item_t *bip, caddr_t buffer,
 	blfp->blf_blkno = bp->b_blkno;
 	blfp->blf_dev = bp->b_edev;
 	blfp->blf_map_size = bip->bli_map_size;
-	bzero(&blfp->blf_data_map, (blfp->blf_map_size * sizeof(uint)));
+	bzero(&blfp->blf_data_map, (int)(blfp->blf_map_size * sizeof(uint)));
 
 	/*
 	 * Make sure the buffer is mapped to virtual memory so we can
@@ -166,7 +166,8 @@ xfs_buf_item_format(xfs_buf_log_item_t *bip, caddr_t buffer,
 		 * beyond the end of the bitmap.
 		 */
 		set_bit = xfs_buf_item_next_bit(bip->bli_dirty_map,
-						bip->bli_map_size, set_bit + 1);
+						(int)bip->bli_map_size,
+						set_bit + 1);
 		if (set_bit == -1) {
 			break;
 		}
@@ -175,7 +176,8 @@ xfs_buf_item_format(xfs_buf_log_item_t *bip, caddr_t buffer,
 		 * Set the same bit in the log format bit map and copy
 		 * that chunk into the log.
 		 */
-		xfs_buf_item_set_bit(blfp->blf_data_map, blfp->blf_map_size,
+		xfs_buf_item_set_bit(blfp->blf_data_map,
+				     (int)blfp->blf_map_size,
 				     set_bit);
 		buffer_offset = set_bit * XFS_BLI_CHUNK;
 		bcopy(bp->b_un.b_addr + buffer_offset, chunkp, XFS_BLI_CHUNK);
@@ -201,8 +203,9 @@ xfs_buf_item_format(xfs_buf_log_item_t *bip, caddr_t buffer,
 	 * will make the next call start looking from the bit after the
 	 * last set bit we found and logged.
 	 */
-	bits_left = xfs_buf_item_bits(bip->bli_dirty_map, bip->bli_map_size,
-				      (set_bit + 1));
+	bits_left = xfs_buf_item_bits(bip->bli_dirty_map,
+				      (int)bip->bli_map_size,
+				      set_bit + 1);
 	if (bits_left == 0) {
 		return (0);
 	}
@@ -307,7 +310,7 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 	 * If the buf item isn't tracking any data, free it.
 	 * Otherwise, if XFS_BLI_HOLD is set clear it.
 	 */
-	if (xfs_buf_item_bits(bip->bli_dirty_map, bip->bli_map_size, 0) == 0) {
+	if (xfs_buf_item_bits(bip->bli_dirty_map, (int)bip->bli_map_size, 0) == 0) {
 		xfs_buf_item_relse(bp);
 	} else if (hold) {
 		bip->bli_flags &= ~XFS_BLI_HOLD;
@@ -331,6 +334,7 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
  */
 xfs_lsn_t
 xfs_buf_item_committed(xfs_buf_log_item_t *bip, xfs_lsn_t lsn)
+/* ARGSUSED */
 {
 	return (lsn);
 }
@@ -391,7 +395,7 @@ xfs_buf_item_init(buf_t *bp, struct xfs_mount *mp)
 	 * truncate any pieces.  map_size is the size of the
 	 * bitmap needed to describe the chunks of the buffer.
 	 */
-	chunks = (bp->b_bcount + (XFS_BLI_CHUNK - 1)) >> XFS_BLI_SHIFT;
+	chunks = (int)((bp->b_bcount + (XFS_BLI_CHUNK - 1)) >> XFS_BLI_SHIFT);
 	map_size = (chunks + NBWORD) >> BIT_TO_WORD_SHIFT;
 
 	/*
@@ -644,6 +648,7 @@ xfs_buf_item_next_bit(uint *map, int size, int start_bit)
  */
 STATIC void
 xfs_buf_item_set_bit(uint *map, int size, int bit)
+/* ARGSUSED */
 {
 	uint	*wordp;
 	int	word_bit;

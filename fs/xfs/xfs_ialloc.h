@@ -62,7 +62,7 @@ typedef struct xfs_ialloc_rec
 /*
  * Prototypes for per-fs routines.
  */
-xfs_ino_t xfs_dialloc(xfs_trans_t *, xfs_ino_t, int, int);
+xfs_ino_t xfs_dialloc(xfs_trans_t *, xfs_ino_t, int, mode_t);
 xfs_agino_t xfs_dialloc_next_free(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agino_t);
 int xfs_difree(xfs_trans_t *, xfs_ino_t);
 int xfs_dilocate(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_fsblock_t *, int *);

@@ -71,7 +71,7 @@ xfs_itobp(xfs_mount_t	*mp,
 	 * default to just a bread() call.
 	 */
 	dev = mp->m_dev;
-	bp = xfs_trans_bread(tp, dev, imap.im_blkno, imap.im_len);
+	bp = xfs_trans_bread(tp, dev, imap.im_blkno, (int)imap.im_len);
 
 	/*
 	 * We need to come up with a disk error handling policy.
@@ -162,13 +162,13 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			 * them into it.  Either way, set iu_extents
 			 * to point at the extents.
 			 */
-			nex = dip->di_core.di_nextents;
-			size = nex * sizeof(xfs_extdesc_t);
+			nex = (int)dip->di_core.di_nextents;
+			size = nex * (int)sizeof(xfs_bmbt_rec_t);
 			if (nex <= XFS_INLINE_EXTS) {
 				ip->i_bytes = sizeof(ip->i_u2.iu_inline_ext);
 				ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
 			} else {
-				ip->i_u1.iu_extents = (xfs_extdesc_t*)
+				ip->i_u1.iu_extents = (xfs_bmbt_rec_t*)
 						kmem_alloc(size, KM_SLEEP);
 				ip->i_bytes = size;
 			}
@@ -206,7 +206,7 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			recp = XFS_BMAP_BROOT_REC_ADDR(rootbp, 1, dinode_size);
 			cp = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1,
 							     size);
-			csize = nrecs * sizeof(xfs_bmbt_rec_t);
+			csize = nrecs * (int)sizeof(xfs_bmbt_rec_t);
 			bcopy(recp, cp, csize);
 
 			/*
@@ -216,7 +216,7 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			ptrp = XFS_BMAP_BROOT_PTR_ADDR(rootbp, 1, dinode_size);
 			cp = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 							     size);
-			csize = nrecs * sizeof(xfs_agblock_t);
+			csize = nrecs * (int)sizeof(xfs_agblock_t);
 			bcopy(ptrp, cp, csize);
 			ip->i_flags |= XFS_IBROOT;
 			return;
@@ -326,7 +326,9 @@ xfs_ialloc(xfs_trans_t	*tp,
 {
 	xfs_ino_t	ino;
 	xfs_inode_t	*ip;
+#ifdef NOTYET
 	vnode_t		*vp;
+#endif
 	uint		flags;
 
 	/*
@@ -350,10 +352,10 @@ xfs_ialloc(xfs_trans_t	*tp,
 	vp->v_type = IFTOVT(mode);
 	vp->v_rdev = rdev;
 #endif
-	ip->i_d.di_mode = mode;
-	ip->i_d.di_nlink = nlink;
-	ip->i_d.di_uid = cr->cr_uid;
-	ip->i_d.di_gid = cr->cr_gid;
+	ip->i_d.di_mode = (__uint16_t)mode;
+	ip->i_d.di_nlink = (__int16_t)nlink;
+	ip->i_d.di_uid = (__uint16_t)cr->cr_uid;
+	ip->i_d.di_gid = (__uint16_t)cr->cr_gid;
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
 #ifdef NOTYET
@@ -393,6 +395,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 #ifdef NOTYET
 	xfs_trans_log_inode(tp, ip, flags, 0, 0);
 #endif
+	return ip;
 }
 
 
@@ -459,7 +462,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		/*
 		 * This depends on bcopy() handling overlapping buffers.
 		 */
-		bcopy(op, np, cur_max * sizeof(xfs_agblock_t));
+		bcopy(op, np, cur_max * (int)sizeof(xfs_agblock_t));
 		return;
 	}
 
@@ -490,7 +493,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		op = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1,
 						     ip->i_broot_bytes);
 		np = (char *)XFS_BMAP_BROOT_REC_ADDR(new_broot, 1, new_size);
-		bcopy(op, np, new_max * sizeof(xfs_bmbt_rec_t));	
+		bcopy(op, np, new_max * (int)sizeof(xfs_bmbt_rec_t));	
 
 		/*
 		 * Then copy the pointers.
@@ -498,7 +501,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 						     ip->i_broot_bytes);
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(new_broot, 1, new_size);
-		bcopy(op, np, new_max * sizeof(xfs_bmbt_rec_t));	
+		bcopy(op, np, new_max * (int)sizeof(xfs_bmbt_rec_t));	
 	}
 	kmem_free(ip->i_broot, ip->i_broot_bytes);
 	ip->i_broot = new_broot;
@@ -528,8 +531,8 @@ xfs_iext_realloc(xfs_inode_t *ip, int ext_diff)
 		return;
 	}
 
-	byte_diff = ext_diff * sizeof(xfs_extdesc_t);
-	new_size = ip->i_bytes + byte_diff;
+	byte_diff = ext_diff * (int)sizeof(xfs_bmbt_rec_t);
+	new_size = (int)ip->i_bytes + byte_diff;
 	/*
 	 * If the valid extents can fit in iu_inline_ext,
 	 * copy them from the malloc'd vector and free it.
@@ -546,11 +549,11 @@ xfs_iext_realloc(xfs_inode_t *ip, int ext_diff)
 		 * Stuck with malloc/realloc.
 		 */
 		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
-			ip->i_u1.iu_extents = (xfs_extdesc_t *)
+			ip->i_u1.iu_extents = (xfs_bmbt_rec_t *)
 					      kmem_realloc(ip->i_u1.iu_extents,
 							   new_size, KM_SLEEP);
 		} else {
-			ip->i_u1.iu_extents = (xfs_extdesc_t *)
+			ip->i_u1.iu_extents = (xfs_bmbt_rec_t *)
 					      kmem_alloc(new_size, KM_SLEEP);
 			bcopy(ip->i_u2.iu_inline_ext, ip->i_u1.iu_extents,
 			      sizeof(ip->i_u2.iu_inline_ext));
@@ -580,7 +583,7 @@ xfs_idata_realloc(xfs_inode_t *ip, int byte_diff)
 		return;
 	}
 
-	new_size = ip->i_bytes + byte_diff;
+	new_size = (int)ip->i_bytes + byte_diff;
 	ASSERT(new_size >= 0);
 	/*
 	 * If the valid extents/data can fit in iu_inline_ext/data,
@@ -630,8 +633,8 @@ xfs_imap(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, xfs_imap_t *imap)
 	imap->im_blkno = xfs_fsb_to_daddr(sbp, fsbno);
 	imap->im_len = xfs_btod(sbp, 1);
 	imap->im_agblkno = xfs_fsb_to_agbno(sbp, fsbno);
-	imap->im_ioffset = off;
-	imap->im_boffset = off << sbp->sb_inodelog;
+	imap->im_ioffset = (ushort)off;
+	imap->im_boffset = (ushort)(off << sbp->sb_inodelog);
 	return 1;
 }
 

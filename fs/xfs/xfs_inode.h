@@ -84,16 +84,15 @@ typedef struct xfs_inode {
 	unsigned long		i_mapcnt;	/* count of mapped pages */
 
 	/* File incore extent information. */
-	unsigned int		i_num_extents;	/* number of extents */
 	size_t			i_bytes; 	/* bytes in i_u1 */	
 	union {
-		xfs_extdesc_t	*iu_extents;	/* linear map of file extents */
+		xfs_bmbt_rec_t	*iu_extents;	/* linear map of file extents */
 		char		*iu_data;	/* inline file data */
 	} i_u1;
 	xfs_btree_block_t	*i_broot;	/* file's incore btree root */
 	size_t			i_broot_bytes;	/* bytes allocated for root */
 	union {
-		xfs_extdesc_t	iu_inline_ext[XFS_INLINE_EXTS];
+		xfs_bmbt_rec_t	iu_inline_ext[XFS_INLINE_EXTS];
 						/* very small file extents */
 		char		iu_inline_data[XFS_INLINE_DATA];
 						/* very small file data */
@@ -105,7 +104,7 @@ typedef struct xfs_inode {
 	unsigned short		i_num_aextents;	/* number of attr extents */
 	size_t			i_abytes;	/* bytes in i_u3 */
 	union {
-		xfs_extdesc_t	*iu_aextents;	/* map of attr extents */
+		xfs_bmbt_rec_t	*iu_aextents;	/* map of attr extents */
 		char		*iu_adata;	/* inline attribute data */
 	} i_u3;
 	

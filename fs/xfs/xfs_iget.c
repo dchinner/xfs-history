@@ -90,7 +90,9 @@ xfs_iget(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, uint flags)
 	xfs_inode_t	*iq;
 	vnode_t		*vp;
 	ulong		version;
+#ifdef NOTYET
 	vmap_t		vmap;
+#endif
 	int		s;
 	char		name[8];
 
@@ -144,7 +146,7 @@ again:
 				ih->ih_next = ip;
 			}
 			XFS_IHUNLOCK(ih);
-			xfs_ilock(ip, flags);
+			xfs_ilock(ip, (int)flags);
 			goto out;
 		}
 	}
@@ -169,8 +171,8 @@ again:
 		      ip->i_u2.iu_rdev, ip);
 #endif
 
-	mrinit(&ip->i_lock, makesname(name, "xino", vp->v_number));
-	xfs_ilock(ip, flags);
+	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
+	xfs_ilock(ip, (int)flags);
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
@@ -249,6 +251,7 @@ xfs_iput(xfs_inode_t *ip)
  */
 void
 xfs_iinactive(xfs_inode_t *ip)
+/* ARGSUSED */
 {
 }
 

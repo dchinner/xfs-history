@@ -53,6 +53,7 @@ xfs_mount(xfs_mount_t *mp, dev_t dev)
 
 void
 xfs_umount(xfs_mount_t *mp)
+/* ARGSUSED */
 {
 }
 

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e4f44	/* 'INOD' */
@@ -44,7 +44,7 @@ typedef struct xfs_dinode
 		xfs_agino_t	di_next;/* next inode for freelist inodes */
 		dev_t		di_dev;	/* device for IFCHR/IFBLK */
 		char		di_c[1];/* local contents */
-		xfs_bmx_t	di_bmx; /* extent list */
+		xfs_bmbt_rec_t	di_bmx[1];/* extent list */
 		xfs_btree_block_t di_bmbt;/* btree root */
 		xfs_uuid_t	di_muuid;/* mount point value */
 	}		di_u;

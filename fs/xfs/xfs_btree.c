@@ -275,7 +275,7 @@ xfs_btree_maxrecs(xfs_btree_cur_t *cur, xfs_btree_block_t *block)
 		maxrecs = XFS_IALLOC_BLOCK_MAXRECS(block->bb_level, cur);
 		break;
 	case XFS_BTNUM_BMAP:
-		maxrecs = XFS_BMAP_BLOCK_MAXRECS(block->bb_level, cur);
+		maxrecs = XFS_BMAP_BLOCK_IMAXRECS(block->bb_level, cur);
 		break;
 	}
 	return maxrecs;

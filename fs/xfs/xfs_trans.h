@@ -92,7 +92,7 @@ typedef struct xfs_log_item_chunk {
 					dp = (cp)->lic_descs; \
 					for (x = 0; x <= XFS_LIC_MAX_SLOT; \
 					     x++) { \
-						dp->lid_index = x; \
+						dp->lid_index = (unsigned char)x; \
 						dp++; \
 					} \
 					(cp)->lic_free = XFS_LIC_FREEMASK; \

@@ -181,7 +181,7 @@ xfs_trans_first_ail(struct xfs_mount *mp, int *gen)
 	xfs_log_item_t	*lip;
 
 	lip = sbb_min(&(mp->m_ail));
-	*gen = mp->m_ail_gen;
+	*gen = (int)mp->m_ail_gen;
 
 	return (lip);
 }
@@ -213,6 +213,7 @@ xfs_trans_next_ail(struct xfs_mount *mp, xfs_log_item_t *lip, int *gen)
 
 STATIC void
 sbb_insert(xfs_log_item_t **root, xfs_log_item_t *lip)
+/* ARGSUSED */
 {
 	return;
 }
@@ -220,6 +221,7 @@ sbb_insert(xfs_log_item_t **root, xfs_log_item_t *lip)
 
 STATIC xfs_log_item_t *
 sbb_delete(xfs_log_item_t **root, xfs_log_item_t *lip)
+/* ARGSUSED */
 {
 	return (NULL);
 }
@@ -227,6 +229,7 @@ sbb_delete(xfs_log_item_t **root, xfs_log_item_t *lip)
 
 STATIC xfs_log_item_t *
 sbb_min(xfs_log_item_t **root)
+/* ARGSUSED */
 {
 	return (NULL);
 
@@ -235,6 +238,7 @@ sbb_min(xfs_log_item_t **root)
 
 STATIC xfs_log_item_t *
 sbb_next(xfs_log_item_t **root, xfs_log_item_t *lip)
+/* ARGSUSED */
 {
 	return (NULL);
 

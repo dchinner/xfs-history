@@ -20,7 +20,7 @@ typedef struct xfs_aghdr
 {
 	__uint32_t	ag_magic;	/* magic number == XFS_AGH_MAGIC */
 	__uint16_t	ag_version;	/* header version == XFS_AGH_VERSION */
-	__uint16_t	ag_seqno;	/* sequence # starting from 0 */
+	xfs_agnumber_t	ag_seqno;	/* sequence # starting from 0 */
 	xfs_agblock_t	ag_length;	/* size in blocks of a.g. */
 	/*
 	 * Freespace information
