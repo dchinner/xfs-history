@@ -632,7 +632,6 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
 			return(error);
 		}
-		XFS_BMAP_INIT(args->flist, args->firstblock);
 
 		/*
 		 * Read in the block containing the "old" attr, then
@@ -649,11 +648,21 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 		 * If the result is small enough, shrink it all into the inode.
 		 */
 		if (xfs_attr_shortform_allfit(bp, dp)) {
+			XFS_BMAP_INIT(args->flist, args->firstblock);
 			xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
 			xfs_trans_ihold(trans, dp);
 
 			error = xfs_attr_leaf_to_shortform(trans, bp, args);
-/* GROT: should we commit this trans, what choice do we have? */
+			if (!error) {
+				error = xfs_bmap_finish(&trans, args->flist,
+						*args->firstblock, &committed);
+			}
+			if (error) {
+				xfs_bmap_cancel(args->flist);
+				xfs_trans_cancel(trans,
+						XFS_TRANS_RELEASE_LOG_RES);
+				return(error);
+			}
 		}
 		xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 
@@ -682,6 +691,7 @@ xfs_attr_leaf_removename(xfs_da_args_t *args)
 	xfs_trans_t *trans;
 	xfs_inode_t *dp;
 	buf_t *bp;
+	int committed;
 	int error;
 
 	/*
@@ -725,7 +735,15 @@ xfs_attr_leaf_removename(xfs_da_args_t *args)
 		XFS_BMAP_INIT(args->flist, args->firstblock);
 
 		error = xfs_attr_leaf_to_shortform(trans, bp, args);
-/* GROT: should we commit this trans, what choice do we have? */
+		if (!error) {
+			error = xfs_bmap_finish(&trans, args->flist,
+						*args->firstblock, &committed);
+		}
+		if (error) {
+			xfs_bmap_cancel(args->flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
 	}
 
 	/*
@@ -807,6 +825,7 @@ xfs_attr_node_addname(xfs_da_args_t *args)
 	xfs_trans_t *trans;
 	xfs_inode_t *dp;
 	xfs_mount_t *mp;
+	int committed;
 	int retval, error;
 
 	/*
@@ -865,8 +884,14 @@ restart:
 			 * have been a b-tree.
 			 */
 			retval = xfs_attr_leaf_to_node(trans, args);
-			if (retval)
+			if (!retval) {
+				error = xfs_bmap_finish(&trans, args->flist,
+						*args->firstblock, &committed);
+			}
+			if (error || retval) {
+				xfs_bmap_cancel(args->flist);
 				goto out;
+			}
 			xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 			goto restart;
 		} else {
@@ -968,8 +993,14 @@ restart:
 		 */
 		if (retval && (state->path.active > 1)) {
 			error = xfs_da_join(state);
-			if (error)
+			if (!error) {
+				error = xfs_bmap_finish(&trans, args->flist,
+						*args->firstblock, &committed);
+			}
+			if (error) {
+				xfs_bmap_cancel(args->flist);
 				goto out;
+			}
 		}
 		xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 
