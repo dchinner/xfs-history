@@ -415,7 +415,7 @@ xfs_itobp(
 #endif
 			bp->b_flags |= B_ERROR;
 			xfs_trans_brelse(tp, bp);
-			return XFS_ERROR(EIO);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 	}
 
@@ -701,6 +701,7 @@ xfs_iread(
 	 * Initialize inode's trace buffers.
 	 * Do this before xfs_iformat in case it adds entries.
 	 */
+#ifndef SIM
 #ifdef XFS_BMAP_TRACE
 	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE, 0);
 #endif
@@ -716,6 +717,8 @@ xfs_iread(
 #ifdef XFS_ILOCK_TRACE
 	ip->i_lock_trace = ktrace_alloc(XFS_ILOCK_KTRACE_SIZE, 0);
 #endif
+#endif /* !SIM */
+
 	/*
 	 * If we got something that isn't an inode it means someone
 	 * (nfs or dmi) has a stale handle.
@@ -1740,21 +1743,14 @@ xfs_itruncate_finish(
 		error = xfs_trans_reserve(ntp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
 					  XFS_TRANS_PERM_LOG_RES,
 					  XFS_ITRUNCATE_LOG_COUNT);
-		if (error) {
-			ASSERT(XFS_FORCED_SHUTDOWN(mp));
-			/* xfs_trans_cancel(ntp, XFS_TRANS_RELEASE_LOG_RES);
-			   xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL); */
-			xfs_trans_ijoin(ntp, ip,
-					XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-			xfs_trans_ihold(ntp, ip);
-			return (error);
-		}
 		/*
 		 * Add the inode being truncated to the next chained
 		 * transaction.
 		 */
 		xfs_trans_ijoin(ntp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 		xfs_trans_ihold(ntp, ip);
+		if (error)
+			return (error);
 	}
 	/*
 	 * Only update the size in the case of the data fork, but
@@ -2578,11 +2574,21 @@ xfs_idestroy(
 	freesema(&ip->i_flock);
 	sv_destroy(&ip->i_pinsema);
 #ifndef SIM
-	ktrace_free(ip->i_btrace);
+#ifdef XFS_BMAP_TRACE
 	ktrace_free(ip->i_xtrace);
+#endif
+#ifdef XFS_BMBT_TRACE
+	ktrace_free(ip->i_btrace);
+#endif
+#ifdef XFS_RW_TRACE
 	ktrace_free(ip->i_rwtrace);
+#endif
+#ifdef XFS_STRAT_TRACE
 	ktrace_free(ip->i_strat_trace);
+#endif
+#ifdef XFS_ILOCK_TRACE
 	ktrace_free(ip->i_lock_trace);
+#endif
 #endif
 	if (ip->i_itemp) {
 		xfs_inode_item_destroy(ip);
@@ -3172,6 +3178,8 @@ xfs_iflush(
 			flags = 0;
 			break;
 		}
+		ASSERT(bp->b_fsprivate != NULL);
+		ASSERT(bp->b_iodone != NULL);
 	} else {
 		/*
 		 * We're flushing an inode which is not in the AIL and has
@@ -3234,6 +3242,7 @@ xfs_iflush(
 		bp->b_flags2 |= B_XFS_INO;
 	}
 #endif /* !NO_XFS_PARANOIA */
+
 	if (flags & B_DELWRI) {
 		xfs_bdwrite(mp, bp);
 	} else if (flags & B_ASYNC) {
