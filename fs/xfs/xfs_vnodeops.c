@@ -1,4 +1,4 @@
-#ident "$Revision: 1.235 $"
+#ident "$Revision: 1.236 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1725,7 +1725,6 @@ xfs_dir_lookup_int(
 	int		code = 0;
 	int		do_iget;
 	bhv_desc_t	*bdp;
-	bhv_head_t	*bhp;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_dir_lookup_int",
@@ -1749,16 +1748,14 @@ xfs_dir_lookup_int(
          * Try the directory name lookup cache.
          */
         if (!(flags & DLF_NODNLC) &&
-	    (vp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED))) {
-		bhp = VN_BHV_HEAD(vp);
-		bdp = bhv_lookup_unlocked(bhp, &xfs_vnodeops);
-		ASSERT(bdp != NULL);
+	    (bdp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED))) {
                 *inum = XFS_BHVTOI(bdp)->i_ino;
 		if (do_iget) {
 			*ipp = XFS_BHVTOI(bdp);
 			ASSERT((*ipp)->i_d.di_mode != 0);
-		} else
-			VN_RELE(vp);
+		} else {
+			VN_RELE(BHV_TO_VNODE(bdp));
+		}
 		return 0;
         }
 
@@ -1791,8 +1788,9 @@ xfs_dir_lookup_int(
 			return XFS_ERROR(EIO);
 		}
 		ASSERT(*ipp != NULL);
-		vp = XFS_ITOV(*ipp);
+
 		if ((*ipp)->i_d.di_mode == 0) {
+			vp = XFS_ITOV(*ipp);
 			/*
 			 * The inode has been freed.  This
 			 * had better be "..".
@@ -1804,8 +1802,9 @@ xfs_dir_lookup_int(
 			VN_RELE(vp);
 			code = XFS_ERROR(ENOENT);
 		} else {
+			bdp = XFS_ITOBHV(*ipp);
 			ASSERT(!(flags & DLF_NODNLC));
-			dnlc_enter_fast(dir_vp, fd, vp, NOCRED);
+			dnlc_enter_fast(dir_vp, fd, bdp, NOCRED);
 		}
 	}
 
@@ -2323,7 +2322,7 @@ xfs_create(
 		 * use the slower dnlc_enter() function here rather than
 		 * dnlc_enter_fast().
 		 */
-		dnlc_enter(dir_vp, name, XFS_ITOV(ip), NOCRED);
+		dnlc_enter(dir_vp, name, XFS_ITOBHV(ip), NOCRED);
 
 	} else {
 
@@ -3279,7 +3278,7 @@ xfs_link(
 	 * because we can't use the dnlc in the lookup call above.  Thus,
 	 * we have not initialized fastdata structure to use here.
 	 */
-	dnlc_enter(target_dir_vp, target_name, XFS_ITOV(sip), credp);
+	dnlc_enter(target_dir_vp, target_name, XFS_ITOBHV(sip), credp);
 
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_POSTLINK)) {
 		(void) dm_namesp_event(DM_POSTLINK, target_dir_vp, src_vp,
@@ -4132,7 +4131,7 @@ xfs_rename(
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
-		dnlc_enter(target_dir_vp, target_name, XFS_ITOV(src_ip),
+		dnlc_enter(target_dir_vp, target_name, XFS_ITOBHV(src_ip),
 			   credp);
 
 		/*
@@ -4426,7 +4425,7 @@ xfs_mkdir(
 	 * use for adding our entry to the dnlc.  Instead we have to
 	 * use the slightly slower plain dnlc_enter().
 	 */
-	dnlc_enter(dir_vp, dir_name, XFS_ITOV(cdp), NOCRED);
+	dnlc_enter(dir_vp, dir_name, XFS_ITOBHV(cdp), NOCRED);
 
 	/*
 	 * Bump the in memory version number of the parent directory
@@ -4981,7 +4980,7 @@ xfs_symlink(
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
-        dnlc_enter(dir_vp, link_name, XFS_ITOV(ip), NOCRED);
+        dnlc_enter(dir_vp, link_name, XFS_ITOBHV(ip), NOCRED);
 
 	/*
 	 * Bump the in memory version number of the parent directory
