@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 #include <sys/param.h>
 #define _KERNEL
@@ -40,6 +40,7 @@ xfs_mount_init(void)
 	initnlock(&mp->m_ail_lock, "xfs_ail");
 	initnlock(&mp->m_async_lock, "xfs_async");
 	initnlock(&mp->m_ilock, "xfs_ilock");
+	initnlock(&mp->m_ipinlock, "xfs_ipin");
 
 	return (mp);
 }
