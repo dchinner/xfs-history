@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.81 $"
+#ident	"$Revision: 1.82 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -171,6 +171,15 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		error = XFS_ERROR(EINVAL);
 		goto bad;
 	}
+#ifndef SIM
+	/*
+	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
+	 */
+	if (sbp->sb_inprogress) {
+		error = XFS_ERROR(EINVAL);
+		goto bad;
+	}
+#endif
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;				/* bcopy structure */
 	brelse(bp);
@@ -245,7 +254,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		return XFS_ERROR(E2BIG);
 	else if (error)
 		return XFS_ERROR(error);
-	if (mp->m_logdev != mp->m_dev) {
+	if (mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		bp = read_buf(mp->m_logdev,
 			XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks) - 1, 1, 0);
 		ASSERT(bp);
@@ -536,6 +545,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 		offsetof(xfs_sb_t, sb_inopblog),
 		offsetof(xfs_sb_t, sb_agblklog),
 		offsetof(xfs_sb_t, sb_rextslog),
+		offsetof(xfs_sb_t, sb_inprogress),
 		offsetof(xfs_sb_t, sb_icount),
 		offsetof(xfs_sb_t, sb_ifree),
 		offsetof(xfs_sb_t, sb_fdblocks),

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.71 $"
+#ident  "$Revision: 1.72 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -604,8 +604,9 @@ xfs_isdev(dev_t dev)
 
 	if (error == 0) {
 		sbp = XFS_BUF_TO_SBP(bp);
-		error = ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
-			 (sbp->sb_versionnum != XFS_SB_VERSION));
+		error = (sbp->sb_magicnum != XFS_SB_MAGIC) ||
+			(sbp->sb_versionnum != XFS_SB_VERSION) ||
+			(sbp->sb_inprogress != 0);
 	}
 
 	bp->b_flags |= B_AGE;
@@ -1025,7 +1026,9 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 
 	if (error = devvptoxfs(devvp, &bp, &sbp, u.u_cred))
 		return error;
-	if (sbp->sb_magicnum == XFS_SB_MAGIC) {
+	if (sbp->sb_magicnum == XFS_SB_MAGIC &&
+	    sbp->sb_versionnum == XFS_SB_VERSION &&
+	    sbp->sb_inprogress == 0) {
 		sp->f_bsize = sbp->sb_blocksize;
 		sp->f_frsize = sbp->sb_blocksize;
 		lsize = sbp->sb_logstart ? sbp->sb_logblocks : 0;

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 /*
  * Super block
@@ -41,7 +41,8 @@ typedef struct xfs_sb
 	__uint8_t	sb_inopblog;	/* log2 of sb_inopblock */
 	__uint8_t	sb_agblklog;	/* log2 of sb_agblocks (rounded up) */
 	__uint8_t	sb_rextslog;	/* log2 of sb_rextents */
-					/* other inode config information? */
+	__uint8_t	sb_inprogress;	/* mkfs is in progress, don't mount */
+					/* 1 byte of padding */
 					/* statistics */
 	/*
 	 * These fields must remain contiguous.  If you really
@@ -82,11 +83,12 @@ typedef struct xfs_sb
 #define	XFS_SB_INOPBLOG		0x01000000
 #define	XFS_SB_AGBLKLOG		0x02000000
 #define	XFS_SB_REXTSLOG		0x04000000
-#define	XFS_SB_ICOUNT		0x08000000
-#define	XFS_SB_IFREE		0x10000000
-#define	XFS_SB_FDBLOCKS		0x20000000
-#define	XFS_SB_FREXTENTS	0x40000000
-#define	XFS_SB_NUM_BITS		31
+#define	XFS_SB_INPROGRESS	0x08000000
+#define	XFS_SB_ICOUNT		0x10000000
+#define	XFS_SB_IFREE		0x20000000
+#define	XFS_SB_FDBLOCKS		0x40000000
+#define	XFS_SB_FREXTENTS	0x80000000
+#define	XFS_SB_NUM_BITS		32
 #define	XFS_SB_ALL_BITS		((1 << XFS_SB_NUM_BITS) - 1)
 
 #define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
