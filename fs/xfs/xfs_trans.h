@@ -31,8 +31,10 @@ typedef struct xfs_log_item {
 /*
  * Log item types.
  */
-#define	XFS_LI_BUF	0x1
-#define	XFS_LI_INODE	0x2
+#define	XFS_LI_BUF	0x01
+#define	XFS_LI_INODE	0x02
+#define	XFS_LI_EFI	0x04
+#define	XFS_LI_EFD	0x08
 
 
 
@@ -197,6 +199,8 @@ typedef struct xfs_trans {
 
 struct xfs_inode;
 struct xfs_mount;
+struct xfs_efi_log_item;
+struct xfs_efd_log_item;
 
 /*
  * xFS transaction mechanism exported interfaces.
@@ -224,7 +228,18 @@ void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *,uint);
 void		xfs_trans_ihold(xfs_trans_t *, struct xfs_inode *);
 void		xfs_trans_log_buf(xfs_trans_t *, buf_t *, uint, uint);
 void		xfs_trans_log_inode(xfs_trans_t *, struct xfs_inode *, uint);
-void		xfs_trans_log_op(xfs_trans_t *, xfs_log_item_t *);
+struct xfs_efi_log_item	*xfs_trans_get_efi(xfs_trans_t *, uint);
+void		xfs_trans_log_efi_extent(xfs_trans_t *,
+					 struct xfs_efi_log_item *,
+					 xfs_fsblock_t,
+					 xfs_extlen_t);
+struct xfs_efd_log_item	*xfs_trans_get_efd(xfs_trans_t *,
+				  struct xfs_efi_log_item *,
+				  uint);
+void		xfs_trans_log_efd_extent(xfs_trans_t *,
+					 struct xfs_efd_log_item *,
+					 xfs_fsblock_t,
+					 xfs_extlen_t);
 xfs_trans_id_t	xfs_trans_id(xfs_trans_t *);
 void		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
