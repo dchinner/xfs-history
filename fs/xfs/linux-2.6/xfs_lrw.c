@@ -1472,7 +1472,7 @@ xfs_iomap_write_convert(
 	int		found)
 { 
 	xfs_fileoff_t	offset_fsb;
-	xfs_off_t		offset_fsb_bb;
+	xfs_off_t	offset_fsb_bb;
 	xfs_fileoff_t   map_start_fsb;
 	xfs_fileoff_t	imap_offset;
 	xfs_fsblock_t	first_block;
@@ -1649,7 +1649,7 @@ xfs_iomap_write_convert(
 				XFSSTATS.xs_xstrat_quick++;
 				return 0;
 			}
-			count_fsb -= imap[i].br_blockcount; /* for the nxt another bmapi,
+			count_fsb -= imap[i].br_blockcount; /* for next bmapi,
 								if needed. */
 		}
 
@@ -1660,9 +1660,9 @@ xfs_iomap_write_convert(
 
 		nimaps--; /* Index of last entry  */
 		ASSERT(nimaps >= 0);
-		ASSERT(offset_fsb >= imap[nimaps].br_startoff + imap[i].br_blockcount);
+		ASSERT(offset_fsb >= imap[nimaps].br_startoff + imap[nimaps].br_blockcount);
 		ASSERT(count_fsb);
-		offset_fsb = imap[nimaps].br_startoff + imap[i].br_blockcount;
+		offset_fsb = imap[nimaps].br_startoff + imap[nimaps].br_blockcount;
 		offset_fsb_bb = XFS_FSB_TO_BB(mp, offset_fsb);
 		map_start_fsb = offset_fsb;
 		XFSSTATS.xs_xstrat_split++;
