@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.107 $"
+#ident	"$Revision$"
 
 /*
  * Free space allocation for XFS.
@@ -1025,6 +1025,7 @@ xfs_alloc_ag_vextent_near(
 		args->len = blen;
 		if (!xfs_alloc_fix_minleft(args)) {
 			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
+			TRACE_ALLOC("nominleft", args);
 			return 0;
 		}
 		blen = args->len;
@@ -1958,10 +1959,11 @@ xfs_alloc_fix_freelist(
 	xfs_agf_t	*agf;	/* a.g. freespace structure pointer */
 	buf_t		*agflbp;/* agfl buffer pointer */
 	xfs_agblock_t	bno;	/* freelist block */
+	xfs_extlen_t	delta;	/* new blocks needed in freelist */
 	int		error;	/* error result code */
 	xfs_extlen_t	longest;/* longest extent in allocation group */
 	xfs_mount_t	*mp;	/* file system mount point structure */
-	xfs_extlen_t	need;	/* total blocks needed */
+	xfs_extlen_t	need;	/* total blocks needed in freelist */
 	xfs_perag_t	*pag;	/* per-ag information structure */
 	xfs_alloc_arg_t	targs;	/* local allocation arguments */
 	xfs_trans_t	*tp;	/* transaction pointer */
@@ -1980,14 +1982,15 @@ xfs_alloc_fix_freelist(
 	} else
 		agbp = NULL;
 	need = XFS_MIN_FREELIST_PAG(pag, mp);
+	delta = need > pag->pagf_flcount ? need - pag->pagf_flcount : 0;
 	/*
 	 * If it looks like there isn't a long enough extent, or enough
 	 * total blocks, reject it.
 	 */
-	longest = (pag->pagf_longest > need) ?
-		(pag->pagf_longest - need) :
+	longest = (pag->pagf_longest > delta) ?
+		(pag->pagf_longest - delta) :
 		(pag->pagf_flcount > 0 || pag->pagf_longest > 0);
-	if (args->minlen + args->alignment - 1 > longest ||
+	if (args->minlen + args->alignment + args->minalignslop - 1 > longest ||
 	    (args->minleft &&
 	     (int)(pag->pagf_freeblks + pag->pagf_flcount -
 		   need - args->total) <
@@ -2015,13 +2018,14 @@ xfs_alloc_fix_freelist(
 	 */
 	agf = XFS_BUF_TO_AGF(agbp);
 	need = XFS_MIN_FREELIST(agf, mp);
+	delta = need > agf->agf_flcount ? need - agf->agf_flcount : 0;
 	/*
 	 * If there isn't enough total or single-extent, reject it.
 	 */
-	longest = (agf->agf_longest > need) ?
-		(agf->agf_longest - need) :
+	longest = (agf->agf_longest > delta) ?
+		(agf->agf_longest - delta) :
 		(agf->agf_flcount > 0 || agf->agf_longest > 0);
-	if (args->minlen + args->alignment - 1 > longest ||
+	if (args->minlen + args->alignment + args->minalignslop - 1 > longest ||
 	    (args->minleft &&
 	     (int)(agf->agf_freeblks + agf->agf_flcount - need - args->total) <
 	     (int)args->minleft)) {
@@ -2068,7 +2072,8 @@ xfs_alloc_fix_freelist(
 	targs.mp = mp;
 	targs.agbp = agbp;
 	targs.agno = args->agno;
-	targs.mod = targs.minleft = targs.wasdel = targs.userdata = 0;
+	targs.mod = targs.minleft = targs.wasdel = targs.userdata =
+		targs.minalignslop = 0;
 	targs.alignment = targs.minlen = targs.prod = targs.isfl = 1;
 	targs.type = XFS_ALLOCTYPE_THIS_AG;
 	targs.pag = pag;
@@ -2383,10 +2388,13 @@ xfs_alloc_vextent(
 		args->minleft = 0;
 		error = xfs_alloc_fix_freelist(args, 0);
 		args->minleft = minleft;
-		if (error)
+		if (error) {
+			TRACE_ALLOC("nofix", args);
 			goto error0;
+		}
 		if (!args->agbp) {
 			mrunlock(&mp->m_peraglock);
+			TRACE_ALLOC("noagbp", args);
 			break;
 		}
 		args->agbno = XFS_FSB_TO_AGBNO(mp, args->fsbno);
@@ -2439,8 +2447,10 @@ xfs_alloc_vextent(
 		for (;;) {
 			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 			args->pag = &mp->m_perag[args->agno];
-			if (error = xfs_alloc_fix_freelist(args, flags))
+			if (error = xfs_alloc_fix_freelist(args, flags)) {
+				TRACE_ALLOC("nofix", args);
 				goto error0;
+			}
 			/*
 			 * If we get a buffer back then the allocation will fly.
 			 */
@@ -2526,7 +2536,7 @@ xfs_free_extent(
 	ASSERT(args.agno < args.mp->m_sb.sb_agcount);
 	args.agbno = XFS_FSB_TO_AGBNO(args.mp, bno);
 	args.alignment = 1;
-	args.minlen = args.minleft = 0;
+	args.minlen = args.minleft = args.minalignslop = 0;
 	mrlock(&args.mp->m_peraglock, MR_ACCESS, PINOD);
 	args.pag = &args.mp->m_perag[args.agno];
 	if (error = xfs_alloc_fix_freelist(&args, 0))

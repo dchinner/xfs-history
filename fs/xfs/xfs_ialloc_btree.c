@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision$"
 
 /*
  * Inode allocation management for XFS.
@@ -1350,7 +1350,7 @@ xfs_inobt_newroot(
 	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.i.agno,
 		agi->agi_root);
 	args.mod = args.minleft = args.alignment = args.total = args.wasdel =
-		args.isfl = args.userdata = 0;
+		args.isfl = args.userdata = args.minalignslop = 0;
 	args.minlen = args.maxlen = args.prod = 1;
 	args.type = XFS_ALLOCTYPE_NEAR_BNO;
 	if (error = xfs_alloc_vextent(&args))
@@ -1630,7 +1630,7 @@ xfs_inobt_split(
 	 */
 	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.i.agno, lbno);
 	args.mod = args.minleft = args.alignment = args.total = args.wasdel =
-		args.isfl = args.userdata = 0;
+		args.isfl = args.userdata = args.minalignslop = 0;
 	args.minlen = args.maxlen = args.prod = 1;
 	args.type = XFS_ALLOCTYPE_NEAR_BNO;
 	if (error = xfs_alloc_vextent(&args))

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.220 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2368,9 +2368,12 @@ xfs_bmap_alloc(
 		xfs_agnumber_t	ag;
 		xfs_alloc_arg_t	args;
 		xfs_extlen_t	blen;
+		xfs_extlen_t	delta;
 		int		isaligned;
 		xfs_extlen_t	longest;
 		xfs_extlen_t	need;
+		xfs_extlen_t	nextminlen;
+		int		notinit;
 		xfs_perag_t	*pag;
 		xfs_agnumber_t	startag;
 		int		tryagain;
@@ -2379,15 +2382,17 @@ xfs_bmap_alloc(
 		args.tp = ap->tp;
 		args.mp = mp;
 		args.fsbno = ap->rval;
-		args.maxlen = ap->alen;
+		args.maxlen = MIN(ap->alen, mp->m_sb.sb_agblocks);
 		blen = 0;
 		if (nullfb) {
 			args.type = XFS_ALLOCTYPE_START_BNO;
 			args.total = ap->total;
 			/*
 			 * Find the longest available space.
+			 * We're going to try for the whole allocation at once.
 			 */
 			startag = ag = XFS_FSB_TO_AGNO(mp, args.fsbno);
+			notinit = 0;
 			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 			while (blen < ap->alen) {
 				pag = &mp->m_perag[ag];
@@ -2397,13 +2402,21 @@ xfs_bmap_alloc(
 					mrunlock(&mp->m_peraglock);
 					return error;
 				}
+				/*
+				 * See xfs_alloc_fix_freelist...
+				 */
 				if (pag->pagf_init) {
 					need = XFS_MIN_FREELIST_PAG(pag, mp);
-					longest = pag->pagf_longest;
-					if (longest > need && 
-					    blen < longest - need)
-						blen = longest - need; 
-				}
+					delta = need > pag->pagf_flcount ?
+						need - pag->pagf_flcount : 0;
+					longest = (pag->pagf_longest > delta) ?
+						(pag->pagf_longest - delta) :
+						(pag->pagf_flcount > 0 ||
+						 pag->pagf_longest > 0);
+					if (blen < longest)
+						blen = longest;
+				} else
+					notinit = 1;
 				if (++ag == mp->m_sb.sb_agcount) 
 					ag = 0;
 				if (ag == startag)
@@ -2414,26 +2427,23 @@ xfs_bmap_alloc(
 			 * Since the above loop did a BUF_TRYLOCK, it is
 			 * possible that there is space for this request.
 			 */ 
-			if (blen == 0)
+			if (notinit || blen < ap->minlen)
 				args.minlen = ap->minlen;	
-			else {
-				/*
-			 	 * If the alen is clearly impossible to fit 
-				 * in a single ag, don't set minlen and maxlen 
-				 * that high.
-			 	 */
-				if (ap->alen >= mp->m_sb.sb_agblocks)
-					args.minlen = args.maxlen = blen;
-				else if (blen < ap->alen)
-					args.minlen = blen;
-				else 
-					args.minlen = ap->alen;
-			}
+			/*
+			 * If the best seen length is less than the request
+			 * length, use the best as the minimum.
+			 */
+			else if (blen < ap->alen)
+				args.minlen = blen;
+			/*
+			 * Otherwise we've seen an extent as big as alen,
+			 * use that as the minimum.
+			 */
+			else 
+				args.minlen = ap->alen;
 		} else if (ap->low) {
 			args.type = XFS_ALLOCTYPE_FIRST_AG;
-			args.total = 1;
-			ASSERT(ap->minlen == 1);
-			args.minlen = 1;
+			args.total = args.minlen = ap->minlen;
 		} else {
 			args.type = XFS_ALLOCTYPE_NEAR_BNO;
 			args.total = ap->total;
@@ -2470,6 +2480,7 @@ xfs_bmap_alloc(
 				 */
 				if (blen > args.alignment && blen <= ap->alen) 
 					args.minlen = blen - args.alignment;
+				args.minalignslop = 0;
 			} else {
 				/*
 			 	 * First try an exact bno allocation.
@@ -2479,10 +2490,28 @@ xfs_bmap_alloc(
 				atype = args.type;
 				tryagain = 1;
 				args.type = XFS_ALLOCTYPE_THIS_BNO;
-				args.alignment = 0;
+				args.alignment = 1;
+				/*
+				 * Compute the minlen+alignment for the
+				 * next case.  Set slop so that the value
+				 * of minlen+alignment+slop doesn't go up
+				 * between the calls.
+				 */
+				if (blen > mp->m_dalign && blen <= ap->alen) 
+					nextminlen = blen - mp->m_dalign;
+				else
+					nextminlen = args.minlen;
+				if (nextminlen + mp->m_dalign > args.minlen + 1)
+					args.minalignslop =
+						nextminlen + mp->m_dalign -
+						args.minlen - 1;
+				else
+					args.minalignslop = 0;
 			}
-		} else 
-			args.alignment = 0;
+		} else {
+			args.alignment = 1;
+			args.minalignslop = 0;
+		}
 		args.minleft = ap->minleft;
 		args.wasdel = ap->wasdel;
 		args.isfl = 0;
@@ -2497,8 +2526,8 @@ xfs_bmap_alloc(
                         args.type = atype;
                         args.fsbno = ap->rval;
                         args.alignment = mp->m_dalign;
-			if (blen > args.alignment && blen <= ap->alen) 
-				args.minlen = blen - args.alignment;
+			args.minlen = nextminlen;
+			args.minalignslop = 0;
 			isaligned = 1;
                         if (error = xfs_alloc_vextent(&args))
                                 return error;
@@ -2524,9 +2553,8 @@ xfs_bmap_alloc(
 		}
 		if (args.fsbno == NULLFSBLOCK && nullfb) {
 			args.fsbno = 0;
-			args.minlen = 1;
 			args.type = XFS_ALLOCTYPE_FIRST_AG;
-			args.total = 1;
+			args.total = ap->minlen;
 			args.minleft = 0;
 			if (error = xfs_alloc_vextent(&args))
 				return error;
@@ -3081,7 +3109,8 @@ xfs_bmap_extents_to_btree(
 		args.fsbno = *firstblock;
 	}
 	args.minlen = args.maxlen = args.prod = 1;
-	args.total = args.minleft = args.alignment = args.mod = args.isfl = 0;
+	args.total = args.minleft = args.alignment = args.mod = args.isfl =
+		args.minalignslop = 0;
 	args.wasdel = wasdel;
 	*logflagsp = 0;
 	if (error = xfs_alloc_vextent(&args)) {
@@ -3223,7 +3252,7 @@ xfs_bmap_local_to_extents(
 		}
 		args.total = total;
 		args.mod = args.minleft = args.alignment = args.wasdel =
-			args.isfl = 0;
+			args.isfl = args.minalignslop = 0;
 		args.minlen = args.maxlen = args.prod = 1;
 		if (error = xfs_alloc_vextent(&args))
 			goto done;

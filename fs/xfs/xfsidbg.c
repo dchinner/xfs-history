@@ -1908,14 +1908,15 @@ xfsidbg_xalloc(xfs_alloc_arg_t *args)
 	qprintf("tp 0x%x mp 0x%x agbp 0x%x fsbno %s\n",
 		args->tp, args->mp, args->agbp,
 		xfs_fmtfsblock(args->fsbno, args->mp));
-	qprintf("agno 0x%x agbno 0x%x minlen 0x%x maxlen 0x%x\n",
-		args->agno, args->agbno, args->minlen, args->maxlen);
-	qprintf("mod 0x%x prod 0x%x minleft 0x%x total 0x%x alignment 0x%x\n",
-		args->mod, args->prod, args->minleft, args->total,
-		args->alignment);
-	qprintf("len 0x%x type %s wasdel %d isfl %d userdata %d\n",
-		args->len, xfs_alloctype[args->type], args->wasdel, args->isfl,
-		args->userdata);
+	qprintf("agno 0x%x agbno 0x%x minlen 0x%x maxlen 0x%x mod 0x%x\n",
+		args->agno, args->agbno, args->minlen, args->maxlen, args->mod);
+	qprintf("prod 0x%x minleft 0x%x total 0x%x alignment 0x%x\n",
+		args->prod, args->minleft, args->total, args->alignment);
+	qprintf("minalignslop 0x%x len 0x%x type %s otype %s wasdel %d\n",
+		args->minalignslop, args->len, xfs_alloctype[args->type],
+		xfs_alloctype[args->otype], args->wasdel);
+	qprintf("wasfromfl %d isfl %d userdata %d\n",
+		args->wasfromfl, args->isfl, args->userdata);
 }
 
 #ifdef DEBUG

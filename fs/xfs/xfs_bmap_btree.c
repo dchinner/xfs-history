@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.93 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1523,9 +1523,9 @@ error1:
 /*
  * Determine the extent state.
  */
+/* ARGSUSED */
 STATIC xfs_exntst_t
 xfs_extent_state(
-	/* REFERENCED */
 	xfs_filblks_t		blks,
 	int			extent_flag)
 {
@@ -1586,7 +1586,7 @@ xfs_bmbt_split(
 	else
 		args.type = XFS_ALLOCTYPE_NEAR_BNO;
 	args.mod = args.minleft = args.alignment = args.total = args.isfl =
-		args.userdata = 0;
+		args.userdata = args.minalignslop = 0;
 	args.minlen = args.maxlen = args.prod = 1;
 	args.wasdel = cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
 	if (!args.wasdel && xfs_trans_get_block_res(args.tp) == 0) {
@@ -2628,7 +2628,7 @@ xfs_bmbt_newroot(
 	args.tp = cur->bc_tp;
 	args.fsbno = cur->bc_private.b.firstblock;
 	args.mod = args.minleft = args.alignment = args.total = args.isfl =
-		args.userdata = 0;
+		args.userdata = args.minalignslop = 0;
 	args.minlen = args.maxlen = args.prod = 1;
 	args.wasdel = cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
 	if (args.fsbno == NULLFSBLOCK) {
