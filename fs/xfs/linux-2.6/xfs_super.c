@@ -436,8 +436,8 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "linvfs_inode_cache: not all structures were freed\n");
 }
 
-struct super_block *
-linvfs_read_super(
+static int
+linvfs_fill_super(
 	struct super_block *sb,
 	void		*data,
 	int		silent)
@@ -452,7 +452,7 @@ linvfs_read_super(
 	int		error;
 
 	if (xfs_parseargs((char *)data, sb->s_flags, &args))
-		return NULL;
+		return  -EINVAL;
 	strncpy(args.fsname, sb->s_id, MAXNAMELEN);
 	/* args.rtdev and args.logdev done in xfs_parseargs */
 
@@ -468,7 +468,7 @@ linvfs_read_super(
 	/*  Set up the vfs_t structure  */
 	vfsp = vfs_allocate();
 	if (!vfsp) 
-		return NULL; 
+		return  -EINVAL; 
 
 	if (sb->s_flags & MS_RDONLY)
 		vfsp->vfs_flag |= VFS_RDONLY;
@@ -478,7 +478,7 @@ linvfs_read_super(
 	cip = linvfs_alloc_inode(sb);
 	if (!cip) { 
 		vfs_deallocate(vfsp);
-		return NULL;
+		return  -EINVAL;
 	} 
 
 	atomic_set(&cip->i_count, 1);
@@ -540,7 +540,7 @@ linvfs_read_super(
 
 	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
 
-	return(sb);
+	return(0);
 
 fail_vnrele:
 	if (sb->s_root) {
@@ -563,7 +563,7 @@ fail_vfsop:
 #endif  /* CONFIG_XFS_VNODE_TRACING */
 
 	linvfs_destroy_inode(LINVFS_GET_IP(cvp));
-	return(NULL);
+	return(-EINVAL);
 }
 
 void
@@ -958,7 +958,18 @@ static struct super_operations linvfs_sops = {
 #endif
 };
 
-DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);
+static struct super_block *linvfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, linvfs_fill_super);
+}
+
+static struct file_system_type xfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"xfs",
+	get_sb:		linvfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_xfs_fs(void)
 {

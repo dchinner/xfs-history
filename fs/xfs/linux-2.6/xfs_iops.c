@@ -131,8 +131,8 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		/* linvfs_revalidate_core returns (-) errors */
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 		validate_fields(dir);
-		d_instantiate(dentry, ip);
 		mark_inode_dirty(ip);
+		d_instantiate(dentry, ip);
 	}
 
 	if (!error && have_default_acl) {
