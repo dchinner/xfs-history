@@ -727,25 +727,6 @@ pagebuf_read_full_page(
 		PAGE_BUG(page);
 
 	if (!page_has_buffers(page)) {
-		/* shortcut, may not need a buffer_head here */
-		if (target->pbr_blocksize == PAGE_CACHE_SIZE) {
-			mp = maps;
-			err = bmap(inode,
-				((loff_t)page->index << PAGE_CACHE_SHIFT),
-				PAGE_CACHE_SIZE, maps, PBF_MAX_MAPS, &nmaps,
-			 	PBF_READ);
-			if (err) {
-				UnlockPage(page);
-				return err;
-			}
-			assert(nmaps == 1);
-			if (maps[0].pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
-				memset(kmap(page), 0, PAGE_CACHE_SIZE);
-				flush_dcache_page(page);
-				kunmap(page);
-				goto page_done;
-			}
-		}
 		create_empty_buffers(page, target->pbr_device,
 					   target->pbr_blocksize);
 	}
@@ -795,7 +776,6 @@ remap:
 	} while (i++, (bh = bh->b_this_page) != head);
 
 	if (!nr) {
-page_done:
 		/*
 		 * all buffers are uptodate - we can set the page
 		 * uptodate as well.
@@ -1388,6 +1368,54 @@ out:
 }
 
 /*
+ * Look for a page at index which it unlocked and not mapped
+ * yet - clustering for mmap write case.
+ */
+
+STATIC int
+probe_unmapped_page(struct inode *inode, unsigned long index)
+{ 
+	struct page *page, **hash;
+	int ret = 1;
+
+	hash = page_hash(inode->i_mapping, index);
+	page = __find_get_page(inode->i_mapping, index, hash);
+	if (!page)
+		return 0;
+	if (TryLockPage(page)) {
+		page_cache_release(page);
+		return 0;
+	}
+	if (page->mapping) {
+		struct buffer_head *bh = page_buffers(page);
+
+		if (!bh || !buffer_mapped(bh))
+			ret = 1;
+	}
+
+	UnlockPage(page);
+	page_cache_release(page);
+	return ret;
+}
+
+STATIC void
+probe_unmapped_cluster(
+	struct inode		*inode,
+	struct page		*startpage,
+	unsigned long		*tend)
+{
+	unsigned long		tindex, tlast;
+
+	*tend = startpage->index;
+	tlast = inode->i_size >> PAGE_CACHE_SHIFT;
+	for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
+		if (!probe_unmapped_page(inode, tindex))
+			break;
+		*tend = tindex;
+	}
+}
+
+/*
  * Probe for a given page (index) in the inode & test if it is delayed.
  * Returns page locked and with an extra reference count.
  */
@@ -1414,36 +1442,37 @@ probe_page(struct inode *inode, unsigned long index)
 
 /* Actually push the data out to disk */
 static void
-submit_page_io(struct page *page)
+submit_page_io(struct page *page, struct inode *inode)
 {
-	struct buffer_head	*bh, *head, *arr[MAX_BUF_PER_PAGE];
-	int			i, nr = 0;
+	struct buffer_head	*bh, *head;
+	unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	unsigned end, offset;
 
-	bh = head = page_buffers(page);
-	do {
-		if (buffer_uptodate(bh) && !buffer_dirty(bh))
-			continue;
-		assert(buffer_mapped(bh));
-		assert(!buffer_delay(bh));
-		arr[nr++] = bh;
-	} while ((bh = bh->b_this_page) != head);
-
-	if (!nr) {
-		SetPageUptodate(page);
-		UnlockPage(page);
-		return;
+	if (page->index < end_index) {
+		end = PAGE_CACHE_SIZE;
+	} else {
+		end = inode->i_size & (PAGE_CACHE_SIZE-1);
 	}
 
-	for (i = 0; i < nr; i++) {
-		bh = arr[i];
+	offset = 0;
+	bh = head = page_buffers(page);
+	do {
+		if (offset > end)
+			break;
 		lock_buffer(bh);
 		set_buffer_async_io(bh);
 		set_bit(BH_Uptodate, &bh->b_state);
 		clear_bit(BH_Dirty, &bh->b_state);
-	}
+		offset += bh->b_size;
+		bh = bh->b_this_page;
+	} while (bh != head);
 
-	for (i = 0; i < nr; i++)
-		submit_bh(WRITE, arr[i]);
+	head = page_buffers(page);
+	do {
+		struct buffer_head *next = head->b_this_page;
+		submit_bh(WRITE, head);
+		head = next;
+	} while (head != bh);
 
 	SetPageUptodate(page);
 }
@@ -1470,6 +1499,8 @@ map_page(
 					   target->pbr_blocksize);
 	bh = head = page_buffers(page);
 	do {
+		if (buffer_mapped(bh) && !buffer_delay(bh))
+			continue;
 		offset = i << bbits;
 		if (!mp) {
 remap:
@@ -1541,7 +1572,7 @@ convert_page(
 		return rval;
 
 	if (async_write) {
-		submit_page_io(page);
+		submit_page_io(page, inode);
 	}
 
 	page_cache_release(page);
@@ -1618,22 +1649,37 @@ pagebuf_delalloc_convert(
 {
 	struct buffer_head 	*bh, *head;
 	page_buf_bmap_t		maps[PBF_MAX_MAPS];
-	int			nmaps, nr = 0;
+	int			err, nmaps, nr_delay = 0, nr_unalloc = 0;
+	int			len = PAGE_CACHE_SIZE;
 
 	/* Fast path for completely mapped page */
 	if (page_has_buffers(page)) {
 		bh = head = page_buffers(page);
 		do {
-			if (!buffer_delay(bh) && buffer_mapped(bh))
+			if (!buffer_mapped(bh)) {
+				nr_unalloc++;
 				continue;
-			nr++;
-		} while ((bh = bh->b_this_page) != head && !nr);
+			}
+			if (!buffer_delay(bh))
+				continue;
+			nr_delay++;
+		} while ((bh = bh->b_this_page) != head);
 
-		if (!nr) {
+		if (nr_unalloc) {
+			unsigned long	tlast;
+
+			probe_unmapped_cluster(inode, page, &tlast);
+			len = (tlast - page->index + 1) << PAGE_CACHE_SHIFT;
+		} else if (!nr_delay) {
 			if (async_write)
-				submit_page_io(page);
+				submit_page_io(page, inode);
 			return 0;
 		}
+	} else {
+		unsigned long	tlast;
+
+		probe_unmapped_cluster(inode, page, &tlast);
+		len = (tlast - page->index + 1) << PAGE_CACHE_SHIFT;
 	}
 
 	/* Get an initial mapping - the extent(s) returned are
@@ -1644,11 +1690,11 @@ pagebuf_delalloc_convert(
 	 * less than the page size).  In that situation, we'll
 	 * need to go back and get subsequent mappings later.
 	 */
-	nr = bmap(inode,
+	err = bmap(inode,
 		((loff_t)page->index << PAGE_CACHE_SHIFT),
-		PAGE_CACHE_SIZE, maps, PBF_MAX_MAPS, &nmaps, flags);
-	if (nr)
-		return nr;
+		len, maps, PBF_MAX_MAPS, &nmaps, flags);
+	if (err)
+		return err;
 
 	/*
 	 * page needs to be setup as though find_page(...) returned it,
