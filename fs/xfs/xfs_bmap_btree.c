@@ -19,6 +19,7 @@
 #include <sys/buf.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
+#include <sys/ktrace.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -45,11 +46,8 @@
 #define	kmem_check()	/* dummy for memory-allocation checking */
 #endif
 
-#ifdef DEBUG
-#include <sys/ktrace.h>
 ktrace_t	*xfs_bmbt_trace_buf;
 #define	XFS_BMBT_TRACE_SIZE	4096
-#endif
 
 /*
  * Prototypes for internal btree functions.
