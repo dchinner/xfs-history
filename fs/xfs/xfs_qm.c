@@ -1,4 +1,4 @@
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.31 $"
 
 
 #include <sys/param.h>
@@ -120,6 +120,8 @@ xfs_qm_init(void)
 {
 	xfs_qm_t 	*xqm;
 	int		hsize, i;
+	static zone_t *qm_dqzone = NULL;
+	static zone_t *qm_dqtrxzone = NULL;
 	
 	xqm = kmem_zalloc(sizeof(xfs_qm_t), KM_SLEEP);
 	ASSERT(xqm);
@@ -158,13 +160,22 @@ xfs_qm_init(void)
 	/*
 	 * dquot zone. we register our own shaked callback.
 	 */
-	xqm->qm_dqzone = kmem_zone_init(sizeof(xfs_dquot_t), "dquots");
+	if (!qm_dqzone) {
+		xqm->qm_dqzone = kmem_zone_init(sizeof(xfs_dquot_t), "dquots");
+		qm_dqzone = xqm->qm_dqzone;
+	} else
+		xqm->qm_dqzone = qm_dqzone;
+
 	shake_register(SHAKEMGR_MEMORY, xfs_qm_shake);
 
 	/*
 	 * The t_dqinfo portion of transactions.
 	 */
-	xqm->qm_dqtrxzone = kmem_zone_init(sizeof(xfs_dquot_acct_t), "dqtrx");
+	if (!qm_dqtrxzone) {
+		xqm->qm_dqtrxzone = kmem_zone_init(sizeof(xfs_dquot_acct_t), "dqtrx");
+		qm_dqtrxzone = xqm->qm_dqtrxzone;
+	} else
+		xqm->qm_dqtrxzone = qm_dqtrxzone;
 
 	xqm->qm_totaldquots = 0;
 	xqm->qm_dqfree_ratio = XFS_QM_DQFREE_RATIO;
@@ -1341,6 +1352,7 @@ xfs_qm_destroy_quotainfo(
 	xfs_qm_rele_quotafs_ref(mp);
 
 	spinlock_destroy(&qi->qi_pinlock);
+	xfs_qm_list_destroy(&qi->qi_dqlist);
 
 	if (qi->qi_uquotaip) {
 		XFS_PURGE_INODE(XFS_ITOV(qi->qi_uquotaip));
