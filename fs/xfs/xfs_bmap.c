@@ -2931,6 +2931,39 @@ xfs_bmap_last_offset(
 }
 
 /*
+ * Returns whether the selected fork of the inode has exactly one
+ * block or not.  For the data fork we check this matches di_size,
+ * implying the file's range is 0..bsize-1.
+ */
+int					/* 1=>1 block, 0=>otherwise */
+xfs_bmap_one_block(
+	xfs_inode_t	*ip,		/* incore inode */
+	int		whichfork)	/* data or attr fork */
+{
+	xfs_bmbt_rec_t	*ep;		/* ptr to fork's extent */
+	xfs_ifork_t	*ifp;		/* inode fork pointer */
+	int		rval;		/* return value */
+	xfs_bmbt_irec_t	s;		/* internal version of extent */
+
+#ifndef DEBUG
+	if (whichfork == XFS_DATA_FORK)
+		return ip->i_d.di_size == ip->i_mount->m_sb.sb_blocksize;
+#endif	/* !DEBUG */
+	if (XFS_IFORK_NEXTENTS(ip, whichfork) != 1)
+		return 0;
+	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS)
+		return 0;
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	ASSERT(ifp->if_flags & XFS_IFEXTENTS);
+	ep = ifp->if_u1.if_extents;
+	xfs_bmbt_get_all(ep, &s);
+	rval = s.br_startoff == 0 && s.br_blockcount == 1;
+	if (rval && whichfork == XFS_DATA_FORK)
+		ASSERT(ip->i_d.di_size == ip->i_mount->m_sb.sb_blocksize);
+	return rval;
+}
+
+/*
  * Read in the extents to if_extents.
  * All inode fields are set up by caller, we just traverse the btree
  * and copy the records in.

@@ -94,6 +94,14 @@ xfs_bmap_add_free(
 	xfs_bmap_free_t		*flist,		/* list of extents */
 	struct xfs_mount	*mp);		/* mount point structure */
 
+/*
+ * Routine to clean up the free list data structure when
+ * an error occurs during a transaction.
+ */
+void
+xfs_bmap_cancel(
+	xfs_bmap_free_t		*flist);	/* free list to clean up */
+
 /* 
  * Compute and fill in the value of the maximum depth of a bmap btree
  * in this filesystem.  Done once, during mount.
@@ -140,6 +148,16 @@ xfs_bmap_last_offset(
 	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		*unused,	/* last block num */
+	int			whichfork);	/* data or attr fork */
+
+/*
+ * Returns whether the selected fork of the inode has exactly one
+ * block or not.  For the data fork we check this matches di_size,
+ * implying the file's range is 0..bsize-1.
+ */
+int
+xfs_bmap_one_block(
+	struct xfs_inode	*ip,		/* incore inode */
 	int			whichfork);	/* data or attr fork */
 
 /*
@@ -223,11 +241,4 @@ xfs_getbmap(
 	void			*ap);		/* pointer to user's array */
 #endif	/* !SIM */
 
-/*
- * Routine to clean up the free list data structure when
- * an error occurs during a transaction.
- */
-void
-xfs_bmap_cancel(
-	xfs_bmap_free_t	*flist);		/* free list to clean up */
 #endif	/* _FS_XFS_BMAP_H */
