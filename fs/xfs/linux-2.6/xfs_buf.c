@@ -1651,6 +1651,7 @@ pagebuf_daemon(
 {
 	struct list_head	tmp;
 	unsigned long		age;
+	xfs_buftarg_t		*target;
 	xfs_buf_t		*pb, *n;
 
 	/*  Set up the thread  */
@@ -1693,9 +1694,12 @@ pagebuf_daemon(
 
 		while (!list_empty(&tmp)) {
 			pb = list_entry(tmp.next, xfs_buf_t, pb_list);
+			target = pb->pb_target;
+
 			list_del_init(&pb->pb_list);
 			pagebuf_iostrategy(pb);
-			blk_run_address_space(pb->pb_target->pbr_mapping);
+
+			blk_run_address_space(target->pbr_mapping);
 		}
 
 		if (as_list_len > 0)
