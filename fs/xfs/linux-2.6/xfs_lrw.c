@@ -440,12 +440,6 @@ xfs_zero_eof(
 	}
 
 	/*
-	 * zero'ed last block already, shift up isize to next block
-	 */
-	isize += mp->m_sb.sb_blocksize;
-	isize &= ~(mp->m_sb.sb_blocksize - 1);
-
-	/*
 	 * Calculate the range between the new size and the old
 	 * where blocks needing to be zeroed may exist.  To get the
 	 * block where the last byte in the file currently resides,
@@ -453,7 +447,7 @@ xfs_zero_eof(
 	 * to a block boundary.  We subtract 1 in case the size is
 	 * exactly on a block boundary.
 	 */
-	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize) : (xfs_fileoff_t)-1;
+	last_fsb = isize ? XFS_B_TO_FSBT(mp, isize - 1) : (xfs_fileoff_t)-1;
 	start_zero_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
 	end_zero_fsb = XFS_B_TO_FSBT(mp, offset - 1);
 
@@ -507,7 +501,8 @@ xfs_zero_eof(
 			     dtopt(XFS_FSB_TO_BB(mp, prev_zero_fsb + 
 						     prev_zero_count)) ==
 			     dtopt(XFS_FSB_TO_BB(mp, imap.br_startoff)))) {
-			     	printk("xfs_zero_eof: look for pages to zero? HOLE\n");
+				dprintk(xfs_zeof_debug,
+			     		("xfs_zero_eof: look for pages to zero? HOLE\n"));
 			}
 		   	prev_zero_fsb = NULLFILEOFF;
 			prev_zero_count = 0;
@@ -527,7 +522,8 @@ xfs_zero_eof(
 		 */
 		buf_len_fsb = XFS_FILBLKS_MIN(imap.br_blockcount,
 					      io->io_writeio_blocks);
-		printk("zero: buf len is %d block\n", buf_len_fsb);
+		dprintk(xfs_zeof_debug,
+			("zero: buf len is %d block\n", buf_len_fsb));
 		/*
 		 * Drop the inode lock while we're doing the I/O.
 		 * We'll still have the iolock to protect us.
@@ -539,8 +535,9 @@ xfs_zero_eof(
 		/*
 		 * JIMJIM what about the real-time device
 		 */
-		printk("xfs_zero_eof: NEW CODE doing %d starting at %Ld\n",
-			lsize, loff);
+		dprintk(xfs_zeof_debug,
+			("xfs_zero_eof: NEW CODE doing %d starting at %Ld\n",
+			lsize, loff));
 
 		pb = pagebuf_get(ip, loff, lsize, 0);
 		if (!pb) {
@@ -549,17 +546,20 @@ xfs_zero_eof(
 		}
 
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
-			printk("xfs_zero_eof: hmmm what do we do here?\n");
+			dprintk(xfs_zeof_debug,
+				("xfs_zero_eof: hmmm what do we do here?\n"));
 			error = -ENOSYS;
 			goto out_lock;
 		} else {
 			pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
 			if (imap.br_state == XFS_EXT_UNWRITTEN) {
-				printk("xfs_zero_eof: unwritten? what do we do here?\n");
+				dprintk(xfs_zeof_debug,
+					("xfs_zero_eof: unwritten? what do we do here?\n"));
 			}
 		}
 		if (io->io_flags & XFS_IOCORE_RT) {
-			printk("xfs_zero_eof: real time device? use diff inode\n");
+			dprintk(xfs_zeof_debug,
+				("xfs_zero_eof: real time device? use diff inode\n"));
 		}
 
 		if (error = pagebuf_iozero(pb, 0, lsize)) {
@@ -570,7 +570,8 @@ xfs_zero_eof(
 		}
 		if (imap.br_startblock == DELAYSTARTBLOCK ||
 		    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
-			printk("xfs_zero_eof: need to allocate? delwri\n");
+			dprintk(xfs_zeof_debug,
+				("xfs_zero_eof: need to allocate? delwri\n"));
 		}
 		if (error) {
 			goto out_lock;
@@ -579,7 +580,8 @@ xfs_zero_eof(
 		prev_zero_fsb = start_zero_fsb;
 		prev_zero_count = buf_len_fsb;
 		start_zero_fsb = imap.br_startoff + buf_len_fsb;
-		printk("moved start to %Ld\n", start_zero_fsb);
+		dprintk(xfs_zeof_debug,
+			("moved start to %Ld\n", start_zero_fsb));
 		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
 
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
@@ -723,7 +725,6 @@ xfs_bmap(bhv_desc_t	*bdp,
 					pbmapp, npbmaps, flags, NULL);
 		/* xfs_iomap_write unlocks/locks/unlocks */
 	}
-/*	printk("EXIT xfs_bmap %d\n",error); */
 	return error;
 }	
 
