@@ -50,14 +50,15 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
-#include "xfs_mount.h"
-#include "xfs_alloc_btree.h"
-#include "xfs_ialloc.h"
 #include "xfs_ag.h"
+#include "xfs_mount.h"
 #include "xfs_bio.h"
+#include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
-#include "xfs_bmap.h"
+#include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_ialloc.h"
+#include "xfs_bmap.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -1025,11 +1026,11 @@ xfs_inactive(vnode_t	*vp,
 		 * was logged when the link count went to 0. 
 		 * It may be that we were actually just looked at by
 		 * xfs_sync() and that we've already been through
-		 * here before.  If that's the case then ip->i_d.di_format
-		 * will be AGINO and we should just get out without
+		 * here before.  If that's the case then ip->i_d.di_mode
+		 * will be 0 and we should just get out without
 		 * doing any harm.
 		 */
-		if (ip->i_d.di_format != XFS_DINODE_FMT_AGINO) {
+		if (ip->i_d.di_mode != 0) {
 			xfs_trans_ijoin(tp, ip,
 					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
@@ -1407,7 +1408,7 @@ try_again:
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, 0);
 	commit_flags = XFS_TRANS_RELEASE_LOG_RES;
-	if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS + 12,
+	if (error = xfs_trans_reserve (tp, XFS_IALLOC_BLOCKS(mp) + 12,
 				       XFS_CREATE_LOG_RES(mp), 0,
 				       XFS_TRANS_PERM_LOG_RES)) {
 		commit_flags = 0;
@@ -2734,7 +2735,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc (mp, 0);
-        if (code = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS + 10,
+        if (code = xfs_trans_reserve (tp, XFS_IALLOC_BLOCKS(mp) + 10,
 				      XFS_MKDIR_LOG_RES(mp), 0, 0))
 		goto error_return;
 
@@ -3062,7 +3063,7 @@ xfs_symlink(vnode_t	*dir_vp,
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc (mp, 0);
-        if (error = xfs_trans_reserve (tp, XFS_IALLOC_MAX_EVER_BLOCKS + 12,
+        if (error = xfs_trans_reserve (tp, XFS_IALLOC_BLOCKS(mp) + 12,
 				       XFS_SYMLINK_LOG_RES(mp), 0, 0))
                 goto error_return;
 
