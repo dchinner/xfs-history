@@ -199,10 +199,8 @@ xfs_ialloc_ag_alloc(
 	newino = XFS_OFFBNO_TO_AGINO(args->mp, args->agbno, 0);
 	/*
 	 * Loop over the new block(s), filling in the inodes.
-	 * Run both loops backwards, so that the inodes are linked together
-	 * forwards, in the natural order.
 	 */
-	for (j = (int)args->len - 1; j >= 0; j--) {
+	for (j = 0; j < (int)args->len; j++) {
 		/*
 		 * Get the block.
 		 */
@@ -211,9 +209,9 @@ xfs_ialloc_ag_alloc(
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
-		for (i = args->mp->m_sb.sb_inopblock - 1; i >= 0; i--) {
-			thisino =
-				XFS_OFFBNO_TO_AGINO(args->mp, args->agbno + j, i);
+		for (i = 0; i < args->mp->m_sb.sb_inopblock; i++) {
+			thisino = XFS_OFFBNO_TO_AGINO(args->mp,
+				args->agbno + j, i);
 			free = XFS_MAKE_IPTR(args->mp, fbuf, i);
 			free->di_core.di_magic = XFS_DINODE_MAGIC;
 			free->di_core.di_mode = 0;
@@ -239,25 +237,28 @@ xfs_ialloc_ag_alloc(
 			free->di_core.di_gen = 0;
 			free->di_next_unlinked = NULLAGINO;
 			xfs_ialloc_log_di(tp, fbuf, i,
-					  (XFS_DI_CORE_BITS |
-					   XFS_DI_NEXT_UNLINKED));
-			agi->agi_count++;
-			agi->agi_freecount++;
+				XFS_DI_CORE_BITS | XFS_DI_NEXT_UNLINKED);
 		}
 	}
+	agi->agi_count += newlen;
+	agi->agi_freecount += newlen;
 	args->mp->m_perag[agi->agi_seqno].pagi_freecount += newlen;
-	ASSERT(thisino == newino);
 	agi->agi_newino = newino;
 	/*
-	 * Insert a record describing the new inode chunk into the btree.
+	 * Insert records describing the new inode chunk into the btree.
 	 */
 	cur = xfs_btree_init_cursor(args->mp, tp, agbp, agi->agi_seqno,
 		XFS_BTNUM_INO, (xfs_inode_t *)0);
 	xfs_alloc_arg_free(args);
-	i = xfs_inobt_lookup_eq(cur, newino, newlen, XFS_INOBT_ALL_FREE);
-	ASSERT(i == 0);
-	i = xfs_inobt_insert(cur);
-	ASSERT(i == 1);
+	for (thisino = newino;
+	     thisino < newino + newlen;
+	     thisino += XFS_INODES_PER_CHUNK) {
+		i = xfs_inobt_lookup_eq(cur, thisino, XFS_INODES_PER_CHUNK,
+			XFS_INOBT_ALL_FREE);
+		ASSERT(i == 0);
+		i = xfs_inobt_insert(cur);
+		ASSERT(i == 1);
+	}
 	xfs_btree_del_cursor(cur);
 	/*
 	 * Log allocation group header fields
