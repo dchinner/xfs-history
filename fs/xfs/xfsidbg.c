@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision: 1.26 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2667,8 +2667,8 @@ idbg_xmount(xfs_mount_t *mp)
 	qprintf("xfs_mount at 0x%x\n", mp);
 	qprintf("vfsp 0x%x tid 0x%x ail_lock 0x%x &ail 0x%x\n",
 		mp->m_vfsp, mp->m_tid, mp->m_ail_lock, &mp->m_ail);
-	qprintf("ail_gen 0x%x async_trans 0x%x async_lock 0x%x &sb 0x%x\n",
-		mp->m_ail_gen, mp->m_async_trans, mp->m_async_lock, &mp->m_sb);
+	qprintf("ail_gen 0x%x &sb 0x%x\n",
+		mp->m_ail_gen, &mp->m_sb);
 	qprintf("sb_lock 0x%x sb_bp 0x%x dev 0x%x logdev 0x%x rtdev 0x%x\n",
 		mp->m_sb_lock, mp->m_sb_bp, mp->m_dev, mp->m_logdev,
 		mp->m_rtdev);
