@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.40 $"
+#ident  "$Revision: 1.41 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -394,9 +394,9 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 */
 #ifndef SIM
         if (why == ROOT_INIT) {
-                extern void clkset( time_t );
+                extern int rtodc( void );
 
-                clkset(time);
+                clkset( rtodc() );
         }
 #endif
 
