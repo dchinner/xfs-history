@@ -657,8 +657,8 @@ xfs_log_write(xfs_mount_t *	mp,
 	      xfs_lsn_t		*start_lsn)
 {
 	int	error;
-#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	xlog_t *log = mp->m_log;
+#if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 
 	if (! xlog_debug && xlog_devt == log->l_dev) {
 		*start_lsn = 0;
