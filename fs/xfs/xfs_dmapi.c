@@ -998,10 +998,18 @@ found:
 
 	error = init_private_file( &file, dentry, fmode );
 	if(error){
-		if (fmode & FMODE_WRITE)
-			put_write_access(ip);
-		dput(dentry);
-		return(EINVAL);
+		if (error == -EFBIG) {
+			/* try again */
+			oflags |= O_LARGEFILE;
+			file.f_flags = oflags;
+			error = file.f_op->open( dentry->d_inode, &file );
+		}
+		if (error) {
+			if (fmode & FMODE_WRITE)
+				put_write_access(ip);
+			dput(dentry);
+			return(EINVAL);
+		}
 	}
 
 	file.f_flags = oflags;
