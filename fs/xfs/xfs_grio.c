@@ -209,42 +209,6 @@ xfs_get_file_rt(
 
 
 /*
- * xfs_get_block_size()
- *	This routine determines the block size of the given
- *	file system copies it to the user memory pointed at by fs_size.
- *
- * RETURNS:
- *	0 on success
- *	non zero on failure
- */
-int
-xfs_get_block_size(
-	sysarg_t sysarg_fs_dev, 
-	sysarg_t sysarg_fs_size)
-{
-	int 		error = 0;
-	dev_t		fs_dev;
-	xfs_caddr_t		fs_size;
-	struct vfs	*vfsp;
-
-	fs_dev 		= (dev_t)sysarg_fs_dev;
-	fs_size		= (xfs_caddr_t)SYSARG_TO_PTR(sysarg_fs_size);
-
-	if ( vfsp = vfs_devsearch( fs_dev, xfs_fstype ) ) {
-		if (copy_to_user((xfs_caddr_t)fs_size, &(vfsp->vfs_bsize), 
-				sizeof(u_int)) ) {
-
-			error = -XFS_ERROR(EFAULT);
-		}
-	} else {
-		error = -XFS_ERROR( EIO );
-	}
-	return( error );
-}
-
-
-
-/*
  * xfs_grio_get_inumber
  *	Convert a users file descriptor to an inode number.
  *

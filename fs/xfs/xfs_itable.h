@@ -32,18 +32,6 @@
 #ifndef __XFS_ITABLE_H__
 #define	__XFS_ITABLE_H__
 
-/*
- * Convert file descriptor of a file in the filesystem to
- * a mount structure pointer.
- */
-int					/* error status */
-xfs_fd_to_mp(
-	int			fd,	/* file descriptor */
-	int			wperm,	/* need write perm on device fd */
-	struct xfs_mount	**mpp,	/* output: mount structure pointer */
-	int			rperm,	/* need root perm on file fd */
-	int			cfunc);	/* cxfs function */
-
 /* 
  * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
  * structures (by the dmi library). This is a pointer to a formatter function

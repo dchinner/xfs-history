@@ -618,34 +618,3 @@ xfs_truncate_file(
 
 	return error;
 }
-
-#if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
-/*
- * for error injection
- */
-int
-xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
-{
-	xfs_mount_t *mp;
-	int error;
-
-	if ((error = xfs_fd_to_mp(fd, 0, &mp, 1, 0)))
-		return XFS_ERROR(error);
-
-	*fsname = mp->m_fsname;
-	bcopy(mp->m_fixedfsid, fsid, sizeof(fsid_t));
-
-	return 0;
-}
-#endif /* DEBUG || INDUCE_IO_ERROR */
-
-#ifdef DEBUG
-int
-xfs_isshutdown(bhv_desc_t *bhv)
-{
-	xfs_inode_t	*ip = XFS_BHVTOI(bhv);
-	xfs_mount_t	*mp = ip->i_mount;
-
-	return XFS_FORCED_SHUTDOWN(mp) != 0;
-}
-#endif	/* DEBUG */
