@@ -308,7 +308,7 @@ extern int pagebuf_lock_value(		/* return count on lock		*/
 extern int pagebuf_lock(		/* lock buffer			*/
 		page_buf_t *);		/* buffer to lock		*/
 
-extern int pagebuf_lock_disable(	/* disable buffer locking	*/
+extern void pagebuf_lock_disable(	/* disable buffer locking	*/
 		struct pb_target *);	/* inode for buffers		*/
 
 extern struct pb_target *pagebuf_lock_enable(

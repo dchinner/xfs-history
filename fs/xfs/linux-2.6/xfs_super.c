@@ -326,16 +326,8 @@ spectodevs(
 
 /*
  * Initialise a device forming part of a filessystem.
- * The "data" flag indicates if this is part of the data
- * volume - if so, we don't need to initialize a block
- * device reference as the VFS has already done this.
  *
- * In the other cases (external log, rt volume) we must
- * initialise the device because:
- *  - its device driver may not yet have been loaded
- *  - without opening the block device, the kernel has no
- *    knowledge that we are actually using the device, so
- *    the driver may choose to unload at any time, etc.
+ * This is likely to go away.  Keep the unused data argument for now..
  */
 int
 linvfs_fill_buftarg(
@@ -344,24 +336,11 @@ linvfs_fill_buftarg(
 	struct super_block	*sb,
 	int			data)
 {
-	int			rval;
-	struct block_device	*bdev = NULL;
-
-	if (!data) {
-		bdev = bdget(dev);
-		if (!bdev)
-			return -ENOMEM;
-		rval = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-		if (rval) {
-			printk("XFS: blkdev_get failed on device %d\n", dev);
-			bdput(bdev);
-			return rval;
-		}
-	}
-
 	btp->pb_targ = pagebuf_lock_enable(dev, sb);
-	btp->bd_targ = bdev;
 	btp->dev = dev;
+
+	if (unlikely(!btp->pb_targ))
+		return -ENOMEM;
 	return 0;
 }
 
@@ -378,14 +357,10 @@ linvfs_release_buftarg(
 	struct buftarg		*btp)
 {
 	struct pb_target	*target = btp->pb_targ;
-	struct block_device	*bdev = btp->bd_targ;
 
 	if (target) {
 		pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
 		pagebuf_lock_disable(target);
-	}
-	if (bdev) {
-		blkdev_put(bdev, BDEV_FS);
 	}
 }
 
