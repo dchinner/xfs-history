@@ -17,7 +17,7 @@ typedef __uint64_t	xfs_fsblock_t;	/* blockno in filesystem */
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
 typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
 typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
-typedef __int64_t	xfs_extnum_t;	/* # of extents in a file */
+typedef __int32_t	xfs_extnum_t;	/* # of extents in a file */
 
 typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
 typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
