@@ -1,4 +1,4 @@
-#ident "$Revision: 1.328 $"
+#ident "$Revision: 1.329 $"
 
 
 #ifdef SIM
@@ -2177,6 +2177,7 @@ xfs_inactive(
 
 		XFS_INODE_CLEAR_READ_AHEAD(ip);
 
+#ifndef SIM
 		ASSERT(mp->m_readio_log <= 0xff);
 		ASSERT(mp->m_writeio_log <= 0xff);
 		ip->i_readio_log = (uchar_t) mp->m_readio_log;
@@ -2184,6 +2185,7 @@ xfs_inactive(
 		ip->i_max_io_log = (uchar_t) mp->m_writeio_log;
 		ip->i_readio_blocks = mp->m_readio_blocks;
 		ip->i_writeio_blocks = mp->m_writeio_blocks;
+#endif /* !SIM */
 
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
