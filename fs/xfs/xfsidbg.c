@@ -1171,8 +1171,9 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		dip->di_magic, dip->di_mode, xfs_fmtmode(dip->di_mode),
 		dip->di_version, dip->di_format,
 		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_format));
-	qprintf("nlink 0x%x uid 0x%x gid 0x%x uuid %s\n", dip->di_nlink,
-		dip->di_uid, dip->di_gid, fmtuuid(&dip->di_uuid));
+	qprintf("nlink 0x%x uid 0x%x gid 0x%x projid 0x%x\n",
+		dip->di_nlink, dip->di_uid, dip->di_gid,
+		(uint)dip->di_projid);
 	qprintf("atime 0x%x:%x mtime 0x%x:%x ctime 0x%x:%x\n",
 		dip->di_atime.t_sec, dip->di_atime.t_nsec,
 		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
@@ -3034,8 +3035,8 @@ idbg_xmount(xfs_mount_t *mp)
 	printflags(mp->m_flags, xmount_flags,"flags");
 	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
-	qprintf("attroffset %d da_node_ents %d",
-		mp->m_attroffset, mp->m_da_node_ents);
+	qprintf("attroffset %d da_node_ents %d maxicount %lld",
+		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount);
 #if XFS_BIG_FILESYSTEMS
 	qprintf(" inoadd %llx\n", mp->m_inoadd);
 #else
@@ -3286,11 +3287,12 @@ idbg_xsb(xfs_sb_t *sbp)
 		sbp->sb_blocklog,
 		sbp->sb_sectlog,
 		sbp->sb_inodelog);
-	qprintf("inopblog 0x%x agblklog 0x%x rextslog 0x%x inprogress %d\n",
+	qprintf("inopblog %d agblklog %d rextslog %d inprogress %d imax_pct %d\n",
 		sbp->sb_inopblog,
 		sbp->sb_agblklog,
 		sbp->sb_rextslog,
-		sbp->sb_inprogress);
+		sbp->sb_inprogress,
+		sbp->sb_imax_pct);
 	qprintf("icount %llx ifree %llx fdblocks %llx frextents %llx\n",
 		sbp->sb_icount,
 		sbp->sb_ifree,
@@ -3474,8 +3476,8 @@ idbg_xtp(xfs_trans_t *tp)
 	qprintf("ag freeblks delta %d ag flist delta %d ag btree delta %d\n",
 		tp->t_ag_freeblks_delta, tp->t_ag_flist_delta,
 		tp->t_ag_btree_delta);
-	qprintf("dblocks delta %d agcount delta %d\n",
-		tp->t_dblocks_delta, tp->t_agcount_delta);
+	qprintf("dblocks delta %d agcount delta %d imaxpct delta %d\n",
+		tp->t_dblocks_delta, tp->t_agcount_delta, tp->t_imaxpct_delta);
 	qprintf("log items:\n");
 	licp = &tp->t_items;
 	chunk = 0;
