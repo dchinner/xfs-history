@@ -228,8 +228,12 @@ extern dev_t	XFS_pb_target(page_buf_t *);
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 {
+	int	ret;
+
 	xfs_buf_undelay(bp);
-	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC);
+	if ((ret = pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)) == 0)
+		run_task_queue(&tq_disk);
+	return ret;
 }
 
 static inline void	xfs_buf_relse(page_buf_t *bp)
