@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.66 $"
+#ident	"$Revision: 1.71 $"
 
 /*
  * Free space allocation for xFS.
@@ -353,10 +353,22 @@ xfs_alloc_trace_addentry(
 	int		isfl)		/* set if is freelist allocation/free */
 {
 	ktrace_enter(xfs_alloc_trace_buf,
-		(void *)tag, (void *)name, (void *)str, (void *)mp,
-		(void *)agno, (void *)agbno, (void *)minlen, (void *)maxlen,
-		(void *)mod, (void *)prod, (void *)minleft, (void *)total,
-		(void *)len, (void *)type, (void *)wasdel, (void *)isfl);
+		(void *)((unsigned long)tag), 
+		(void *)((unsigned long)name), 
+		(void *)((unsigned long)str), 
+		(void *)((unsigned long)mp),
+		(void *)((unsigned long)agno), 
+		(void *)((unsigned long)agbno), 
+		(void *)((unsigned long)minlen), 
+		(void *)((unsigned long)maxlen),
+		(void *)((unsigned long)mod), 
+		(void *)((unsigned long)prod), 
+		(void *)((unsigned long)minleft), 
+		(void *)((unsigned long)total),
+		(void *)((unsigned long)len), 
+		(void *)((unsigned long)type), 
+		(void *)((unsigned long)wasdel), 
+		(void *)((unsigned long)isfl));
 }
 
 /*
