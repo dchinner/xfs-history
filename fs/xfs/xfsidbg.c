@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.73 $"
+#ident	"$Revision: 1.76 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3515,9 +3515,9 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	qprintf("sb_lock 0x%x sb_bp 0x%x dev 0x%x logdev 0x%x rtdev 0x%x\n",
 		mp->m_sb_lock, mp->m_sb_bp, mp->m_dev, mp->m_logdev,
 		mp->m_rtdev);
-	qprintf("bsize %d agfrotor %d agirotor %d ipinlock 0x%x ihash 0x%x\n",
+	qprintf("bsize %d agfrotor %d agirotor %d ihash 0x%x\n",
 		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
-		mp->m_ipinlock, mp->m_ihash);
+		mp->m_ihash);
 	qprintf("ihashmask 0x%x inodes 0x%x ilock 0x%x ireclaims 0x%x\n",
 		mp->m_ihashmask, mp->m_inodes, mp->m_ilock, mp->m_ireclaims);
 	qprintf("readio_log 0x%x readio_blocks 0x%x ",
@@ -3617,8 +3617,9 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		&ip->i_iolock);
 	qprintf("udquotp 0x%x pdquotp 0x%x\n",
 		ip->i_udquot, ip->i_pdquot);
-	qprintf("&flock 0x%x (%d) pincount 0x%x &pinsema 0x%x\n",
+	qprintf("&flock 0x%x (%d) pinlock 0x%x pincount 0x%x &pinsema 0x%x\n",
 		&ip->i_flock, valusema(&ip->i_flock),
+		ip->i_ipinlock,
 		ip->i_pincount,
 		&ip->i_pinsema);
 #ifdef NOTYET
