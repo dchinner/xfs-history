@@ -1668,10 +1668,6 @@ idbg_xbmitrace(xfs_inode_t *ip)
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
 
-#ifndef DEBUG
-	qprintf("Tracing only supported in DEBUG kernels\n");
-	return;
-#else
 	if (ip->i_btrace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
 		return;
@@ -1683,7 +1679,6 @@ idbg_xbmitrace(xfs_inode_t *ip)
 			qprintf("\n");
 		ktep = ktrace_next(ip->i_btrace, &kts);
 	}
-#endif /* DEBUG */
 }
 
 /*
@@ -1922,10 +1917,6 @@ idbg_xbxitrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
-#ifndef DEBUG
-	qprintf("Tracing only supported in DEBUG kernels\n");
-	return;
-#else
 	if (ip->i_xtrace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
 		return;
@@ -1937,7 +1928,6 @@ idbg_xbxitrace(xfs_inode_t *ip)
 			qprintf("\n");
 		ktep = ktrace_next(ip->i_xtrace, &kts);
 	}
-#endif /* DEBUG */
 }
 
 /*
