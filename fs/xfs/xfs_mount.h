@@ -63,6 +63,7 @@ typedef struct xfs_mount {
 	struct xfs_perag	*m_perag;	/* per-ag accounting info */
 	mrlock_t		m_peraglock;	/* lock for m_perag (pointer) */
 	sema_t			m_growlock;	/* growfs mutex */
+	xfs_extlen_t		m_rbmrotor;	/* rt bitmap allocation rotor */
 } xfs_mount_t;
 
 /*
