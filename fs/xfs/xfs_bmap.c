@@ -79,7 +79,7 @@ xfs_bmap_alloc(
 	int			eof,
 	xfs_bmbt_irec_t		*prevp,
 	xfs_bmbt_irec_t		*gotp,
-	xfs_fsblock_t		firstblock,
+	xfs_fsblock_t		*firstblock,
 	xfs_extlen_t		*alen,
 	xfs_extlen_t		total,
 	xfs_fsblock_t		off,
@@ -787,7 +787,7 @@ xfs_bmap_alloc(
 	int		eof,
 	xfs_bmbt_irec_t	*prevp,
 	xfs_bmbt_irec_t	*gotp,
-	xfs_fsblock_t	firstblock,
+	xfs_fsblock_t	*firstblock,
 	xfs_extlen_t	*alen,
 	xfs_extlen_t	total,
 	xfs_fsblock_t	off,
@@ -798,6 +798,7 @@ xfs_bmap_alloc(
 	xfs_extlen_t	asklen;
 	xfs_fsblock_t	bno;
 	xfs_agnumber_t	fb_agno;
+	xfs_fsblock_t	firstb;
 	xfs_fsblock_t	gotbno;
 	xfs_fsblock_t	gotdiff;
 	xfs_mount_t	*mp;
@@ -809,12 +810,13 @@ xfs_bmap_alloc(
 	xfs_alloctype_t	type;
 
 	asklen = *alen;
+	firstb = *firstblock;
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
-	nullfb = firstblock == NULLFSBLOCK;
+	nullfb = firstb == NULLFSBLOCK;
 	rt = ip->i_d.di_flags & XFS_DIFLAG_REALTIME;
-	fb_agno = nullfb ? NULLAGNUMBER : xfs_fsb_to_agno(sbp, firstblock);
-	bno = rt ? 0 : (nullfb ? xfs_ino_to_fsb(sbp, ip->i_ino) : firstblock);
+	fb_agno = nullfb ? NULLAGNUMBER : xfs_fsb_to_agno(sbp, firstb);
+	bno = rt ? 0 : (nullfb ? xfs_ino_to_fsb(sbp, ip->i_ino) : firstb);
 	if (eof && prevp->br_startoff != NULLFSBLOCK &&
 	    prevp->br_startblock != NULLSTARTBLOCK) {
 		bno = prevp->br_startblock + prevp->br_blockcount;
@@ -867,13 +869,17 @@ xfs_bmap_alloc(
 	if (nullfb || rt || xfs_fsb_to_agno(sbp, bno) == fb_agno)
 		askbno = bno;
 	else
-		askbno = firstblock;
-	if (rt)
-		abno = xfs_rtallocate_extent(mp, tp, askbno, 1, asklen, alen, XFS_ALLOCTYPE_NEAR_BNO, wasdel);
-	else {
+		askbno = firstb;
+	if (rt) {
+		type = askbno == 0 ?
+			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
+		abno = xfs_rtallocate_extent(mp, tp, askbno, 1, asklen, alen, type, wasdel);
+	} else {
 		type = nullfb ?
 			XFS_ALLOCTYPE_START_BNO : XFS_ALLOCTYPE_NEAR_BNO;
 		abno = xfs_alloc_vextent(tp, askbno, 1, asklen, alen, type, total, wasdel);
+		if (nullfb)
+			*firstblock = abno;
 	}
 	/* for debugging */ ASSERT(abno != NULLFSBLOCK);
 	kmem_check();
@@ -1407,7 +1413,7 @@ xfs_bmap_finish(
 	}
 	xfs_trans_commit(ntp, 0);
 	ntp = xfs_trans_alloc(mp, 0);
-	xfs_trans_reserve(ntp, 128 /* blocks to allocate? */, 128/* log */, 0);
+	xfs_trans_reserve(ntp, 128, 128, 0, 0);
 	for (free = *flist; free != NULL; free = next) {
 		next = free->xbf_next;
 		xfs_free_extent(ntp, free->xbf_startblock, free->xbf_blockcount);
@@ -1613,11 +1619,9 @@ xfs_bmapi(
 					break;
 				abno = NULLSTARTBLOCK;
 			} else {
-				abno = xfs_bmap_alloc(tp, ip, eof, &prev, &got, firstblock, &alen, total, aoff, wasdelay);
+				abno = xfs_bmap_alloc(tp, ip, eof, &prev, &got, &firstblock, &alen, total, aoff, wasdelay);
 				if (abno == NULLFSBLOCK)
 					break;
-				if (firstblock == NULLFSBLOCK)
-					firstblock = abno;
 				if ((ip->i_flags & XFS_IBROOT) && !cur) {
 					cur = xfs_btree_init_cursor(mp, tp, NULL, 0, XFS_BTNUM_BMAP, ip);
 					cur->bc_private.b.firstblock = firstblock;
