@@ -156,14 +156,15 @@ xfs_iformat(xfs_mount_t		*mp,
 			 * iu_data to point at the data.
 			 */
 			size = (int) ip->i_d.di_size;
-			if (size <= sizeof(ip->i_u2.iu_inline_data)) {
-				ip->i_bytes = sizeof(ip->i_u2.iu_inline_data);
+			if (size == 0) {
+				ip->i_u1.iu_data = NULL;
+			} else if (size <= sizeof(ip->i_u2.iu_inline_data)) {
 				ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
 			} else {
 				ip->i_u1.iu_data = (char*)kmem_alloc(size,
 								     KM_SLEEP);
-				ip->i_bytes = size;
 			}
+			ip->i_bytes = size;
 			if (size)
 				bcopy(dip->di_u.di_c, ip->i_u1.iu_data, size);
 			ip->i_flags |= XFS_IINLINE;
@@ -715,9 +716,11 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 		 * If the valid extents/data can fit in iu_inline_ext/data,
 		 * copy them from the malloc'd vector and free it.
 		 */
-		if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+		if (ip->i_u1.iu_data == NULL) {
+			ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
+		} else if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
 			bcopy(ip->i_u1.iu_data, ip->i_u2.iu_inline_data,
-			      new_size);
+			      ip->i_bytes);
 			kmem_free(ip->i_u1.iu_data, ip->i_bytes);
 			ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
 		}
@@ -725,15 +728,15 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 		/*
 		 * Stuck with malloc/realloc.
 		 */
-		if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
-			ip->i_u1.iu_data = (char *)
-					   kmem_realloc(ip->i_u1.iu_data,
+		if (ip->i_u1.iu_data == NULL) {
+			ip->i_u1.iu_data = kmem_alloc(new_size, KM_SLEEP);
+		} else if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+			ip->i_u1.iu_data = kmem_realloc(ip->i_u1.iu_data,
 							new_size, KM_SLEEP);
 		} else {
-			ip->i_u1.iu_data = (char *)kmem_alloc(new_size,
-							      KM_SLEEP);
+			ip->i_u1.iu_data = kmem_alloc(new_size, KM_SLEEP);
 			bcopy(ip->i_u2.iu_inline_data, ip->i_u1.iu_data,
-			      sizeof(ip->i_u2.iu_inline_data));
+			      ip->i_bytes);
 		}
 	}
 	ip->i_bytes = new_size;
