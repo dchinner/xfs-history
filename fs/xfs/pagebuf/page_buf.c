@@ -1980,7 +1980,7 @@ pagebuf_iodone_daemon(
 		schedule();
 #endif
 
-	sprintf(current->comm, "pagebuf_io_CPU%d", bind_cpu);
+	sprintf(current->comm, "pagebuf/%d", bind_cpu);
 	INIT_LIST_HEAD(&pagebuf_iodone_tq[cpu]);
 	init_waitqueue_head(&pagebuf_iodone_wait[cpu]);
 	__set_current_state(TASK_INTERRUPTIBLE);
