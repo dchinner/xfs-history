@@ -231,7 +231,6 @@ xfs_ialloc_ag_alloc(
 	xfs_fsblock_t	newfsbno;	/* long form of newbno */
 	xfs_agino_t	newino;		/* new first inode's number */
 	xfs_agino_t	newlen;		/* new number of inodes */
-	xfs_agino_t	nextino;	/* next inode number, for loop */
 	xfs_agino_t	thisino;	/* current inode number, for loop */
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
 	static uuid_t	zuuid;		/* zero uuid */
@@ -283,11 +282,15 @@ xfs_ialloc_ag_alloc(
 	newbno = XFS_FSB_TO_AGBNO(mp, newfsbno);
 	newino = XFS_OFFBNO_TO_AGINO(mp, newbno, 0);
 	/*
+	 * Set logging flags for allocation group header.
+	 */
+	flag = XFS_AGI_COUNT | XFS_AGI_FREELIST |
+	       XFS_AGI_FREECOUNT | XFS_AGI_FIRST;
+	/*
 	 * Loop over the new blocks, filling in the inodes.
 	 * Run both loops backwards, so that the inodes are linked together
 	 * forwards, in the natural order.
 	 */
-	nextino = NULLAGINO;
 	for (j = (int)newblocks - 1; j >= 0; j--) {
 		/*
 		 * Get the block.
@@ -316,35 +319,24 @@ xfs_ialloc_ag_alloc(
 			free->di_core.di_gen = 0;
 			free->di_core.di_extsize = 0;
 			free->di_core.di_flags = 0;
-			free->di_core.di_nexti = nextino;
+			free->di_core.di_nexti = agi->agi_first;
 			free->di_core.di_nblocks = 0;
-			free->di_u.di_next = nextino;
+			free->di_u.di_next = agi->agi_freelist;
 			xfs_ialloc_log_di(tp, fbuf, i, XFS_DI_ALL_BITS);
-			/*
-			 * Since both loops run backwards, the first time
-			 * here, nextino is null, and we set the new last
-			 * inode in the allocation group.
-			 */
-			if (nextino == NULLAGINO)
+			if (agi->agi_last == NULLAGINO) {
 				agi->agi_last = thisino;
-			nextino = thisino;
+				flag |= XFS_AGI_LAST;
+			}
+			agi->agi_freelist = thisino;
+			agi->agi_first = thisino;
+			agi->agi_count++;
+			agi->agi_freecount++;
 		}
 	}
+	ASSERT(thisino == newino);
 	/*
-	 * Set logging flags for allocation group header.
+	 * Log allocation group header fields
 	 */
-	flag = XFS_AGI_COUNT | XFS_AGI_LAST | XFS_AGI_FREELIST |
-	       XFS_AGI_FREECOUNT;
-	if (agi->agi_first == NULLAGINO) {
-		agi->agi_first = newino;
-		flag |= XFS_AGI_FIRST;
-	}
-	/*
-	 * Modify and log allocation group header fields
-	 */
-	agi->agi_freelist = newino;	/* new freelist header */
-	agi->agi_count += newlen;	/* inode count */
-	agi->agi_freecount = newlen;	/* free inode count */
 	xfs_ialloc_log_agi(tp, agbuf, flag);
 	/*
 	 * Modify/log superblock values for inode count and inode free count.
@@ -585,6 +577,7 @@ xfs_dialloc_ino(
 	 */
 	*IO_agbuf = agbuf;
 	agino = agi->agi_freelist;
+	ASSERT(agino != NULLAGINO && agino != NULLAGINO_ALLOC);
 	ino = XFS_AGINO_TO_INO(mp, tagno, agino);
 	return ino;
 }
@@ -636,7 +629,7 @@ xfs_dialloc_finish(
 	 */
 	ASSERT((free->di_u.di_next == NULLAGINO) ==
 	       (agi->agi_freecount == 1));
-
+	ASSERT(free->di_u.di_next != NULLAGINO_ALLOC);
 	agi->agi_freelist = free->di_u.di_next;
 	/*
 	 * Mark the inode in-buffer as free by setting its di_next to
