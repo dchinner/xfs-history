@@ -64,58 +64,49 @@ validate_fields(
  * Common code used to create/instantiate various things in a directory.
  */
 STATIC int
-linvfs_common_cr(
+linvfs_common_create(
 	struct inode	*dir,
 	struct dentry	*dentry,
 	int		mode,
 	enum vtype	tp,
 	int		rdev)
 {
-	int		error = 0;
-	vnode_t		*dvp, *vp = NULL;
 	struct inode	*ip;
 	vattr_t		va;
-	xfs_acl_t	pdacl; /* parent default ACL */
-	int		have_default_acl;
+	vnode_t		*vp = NULL, *dvp = LINVFS_GET_VPTR(dir);
+	int		have_default_acl = (int)posix_acl_default_exists(dvp);
+	int		error = 0;
 
-	dvp = LINVFS_GET_VPTR(dir);
-	ASSERT(dvp);
+#ifdef CONFIG_FS_POSIX_ACL
+	/* FIXME: This is a temporary fix for the XFS/NFS ACL/umask problem.
+	 * Review once we discuss with Andreas how the mask is to be handled.
+	 * Its wrapped in CONFIG_FS_POSIX_ACL so this code can compile without
+	 * applying the ACL patch.
+	 */
+	if (IS_POSIX_ACL(dir) && !have_default_acl)
+		mode &= ~current->fs->umask;
+#endif
 
 	bzero(&va, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = tp;
-	have_default_acl = _ACL_GET_DEFAULT(dvp, &pdacl);
-/* FIXME: This is a temporary fix for the XFS/NFS ACL/umask problem.
- * Review it when we discuss with Andreas G. how ACLs are to be handled.
- * It is wrapped in CONFIG_FS_POSIX_ACL so this code can compile without
- * applying the acl patch.  KAO
- */
-#ifdef	CONFIG_FS_POSIX_ACL
-	if (IS_POSIX_ACL(dir) && !have_default_acl)
-		mode &= ~current->fs->umask;
-#endif
 	va.va_mode = mode;	
-	va.va_size = 0;
 
 	if (tp == VREG) {
-		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp,
-							NULL, error);
+		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp, NULL, error);
 	} else if (ISVDEV(tp)) {
 		/*
 		 * Get the real type from the mode
 		 */
 		va.va_rdev = rdev;
 		va.va_mask |= AT_RDEV;
-
 		va.va_type = IFTOVT(mode);
 		if (va.va_type == VNON) {
 			return -EINVAL;
 		}
-		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp,
-			NULL, error);
+		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp, NULL, error);
 	} else if (tp == VDIR) {
-		VOP_MKDIR(dvp, dentry, &va, &vp,
-			NULL, error);
+		VOP_MKDIR(dvp, dentry, &va, &vp, NULL, error);
 	} else {
 		error = EINVAL;
 	}
@@ -137,10 +128,17 @@ linvfs_common_cr(
 	}
 
 	if (!error && have_default_acl) {
-		error = _ACL_INHERIT(vp, &va, &pdacl);
-		VMODIFY(vp);
-	}
+		_ACL_DECL	(pdacl);
 
+		if (!_ACL_ALLOC(pdacl)) {
+			error = -ENOMEM;
+		} else {
+			if (_ACL_GET_DEFAULT(dvp, pdacl))
+				error = _ACL_INHERIT(vp, &va, pdacl);
+			VMODIFY(vp);
+			_ACL_FREE(pdacl);
+		}
+	}
 	return -error;
 }
 
@@ -153,7 +151,7 @@ linvfs_create(
 	struct dentry	*dentry,
 	int		mode)
 {
-	return linvfs_common_cr(dir, dentry, mode, VREG, 0);
+	return linvfs_common_create(dir, dentry, mode, VREG, 0);
 }
 
 STATIC struct dentry *
@@ -294,7 +292,7 @@ linvfs_mkdir(
 	struct dentry	*dentry,
 	int		mode)
 {
-	return linvfs_common_cr(dir, dentry, mode, VDIR, 0);
+	return linvfs_common_create(dir, dentry, mode, VDIR, 0);
 }
 
 STATIC int
@@ -348,8 +346,8 @@ linvfs_mknod(
 		return -EINVAL;
 	}
 
-	/* linvfs_common_cr will return (-) errors */
-	return linvfs_common_cr(dir, dentry, mode, tp, rdev);
+	/* linvfs_common_create will return (-) errors */
+	return linvfs_common_create(dir, dentry, mode, tp, rdev);
 }
 
 STATIC int
