@@ -221,6 +221,9 @@ linvfs_open(
 	vnode_t		*newvp;
 	int		error;
 
+	if (!(filp->f_flags & O_LARGEFILE) && inode->i_size > MAX_NON_LFS)
+		return -EFBIG;
+
 	ASSERT(vp);
 	VOP_OPEN(vp, &newvp, 0, get_current_cred(), error);
 	return -error;
