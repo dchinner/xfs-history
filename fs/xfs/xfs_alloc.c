@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.64 $"
+#ident	"$Revision: 1.65 $"
 
 /*
  * Free space allocation for xFS.
@@ -731,9 +731,13 @@ xfs_alloc_ag_vextent_near(
 		if (xfs_alloc_decrement(cnt_cur, 0))
 			xfs_alloc_get_rec(cnt_cur, &ltbno, &ltlen);
 		/*
-		 * Nothing in the tree, try the freelist.
+		 * Nothing in the tree, try the freelist.  Make sure
+		 * to respect minleft even when pulling from the
+		 * freelist.
 		 */
 		else if (args->minlen == 1 && !args->isfl &&
+			 (XFS_BUF_TO_AGF(args->agbp)->agf_flcount >
+			  args->minleft) &&
 			 (ltbno = xfs_alloc_get_freelist(args->tp,
 				 args->agbp)) != NULLAGBLOCK) {
 			if (args->userdata) {
@@ -1343,9 +1347,13 @@ xfs_alloc_ag_vextent_size(
 		if (xfs_alloc_decrement(cnt_cur, 0))
 			xfs_alloc_get_rec(cnt_cur, &fbno, &flen);
 		/*
-		 * Nothing in the btree, try the freelist.
+		 * Nothing in the btree, try the freelist.  Make sure
+		 * to respect minleft even when pulling from the
+		 * freelist.
 		 */
 		else if (args->minlen == 1 && !args->isfl &&
+			 (XFS_BUF_TO_AGF(args->agbp)->agf_flcount >
+			  args->minleft) &&
 			 (fbno = xfs_alloc_get_freelist(args->tp,
 				 args->agbp)) != NULLAGBLOCK) {
 			if (args->userdata) {
