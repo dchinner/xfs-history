@@ -42,11 +42,11 @@
  */
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-#define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?1:0)
-#define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?0:1)
+#define LSN_FIELD_CYCLE(arch) (0)
+#define LSN_FIELD_BLOCK(arch) (1)
 #else
-#define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?0:1)
-#define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?1:0)
+#define LSN_FIELD_CYCLE(arch) (1)
+#define LSN_FIELD_BLOCK(arch) (0)
 #endif
 
 /* get lsn fields */
