@@ -1,4 +1,4 @@
-#ident "$Revision: 1.382 $"
+#ident "$Revision: 1.383 $"
 
 
 #ifdef SIM
@@ -285,13 +285,6 @@ xfs_fcntl(
 	off_t		offset,
 	cred_t		*credp,
 	rval_t		*rvalp);
-
-STATIC int
-xfs_set_dmattrs(
-	bhv_desc_t	*bdp,
-	u_int		evmask,
-	u_int16_t	state,
-	cred_t		*credp);
 
 STATIC int
 xfs_change_file_space(

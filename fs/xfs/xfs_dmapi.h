@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DMAPI_H
 #define _FS_XFS_DMAPI_H
 
-#ident  "$Revision: 1.1 $"
+#ident  "$Revision: 1.2 $"
 
 /*	Values used to define the on-disk version of dm_attrname_t. All
  *	on-disk attribute names start with the 8-byte string "SGI_DMI_".
@@ -63,6 +63,16 @@ xfs_dm_map(
         off_t           offset,
         size_t          length,
         dm_eventtype_t  max_event);
+
+/*
+ *	Function defined in xfs_vnodeops.c used by DMAPI as well as by xfs_vnodeops.c
+ */
+extern int
+xfs_set_dmattrs(
+        bhv_desc_t      *bdp,
+        u_int           evmask,
+        u_int16_t       state,
+        cred_t          *credp);
 
 #endif	/* _KERNEL */
 

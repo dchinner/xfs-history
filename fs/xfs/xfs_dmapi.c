@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -2854,7 +2854,9 @@ xfs_dm_fcntl(
 	case DM_FCNTL_TESTEVENT:
 		return(xfs_dm_testevent(bdp, flags, offset, dmfcntlp));
 	case DM_FCNTL_FSSETDM:
-		return EINVAL;	/* F_FSSETDM by handle someday */
+		return xfs_set_dmattrs(bdp, dmfcntlp->u_fcntl.setdmrq.fsd_dmevmask,
+					dmfcntlp->u_fcntl.setdmrq.fsd_dmstate,
+					credp);
 	default:
 		break;
 	}
