@@ -1,4 +1,4 @@
-#ident "$Revision: 1.123 $"
+#ident "$Revision: 1.124 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1601,12 +1601,15 @@ xfs_iomap_write(
 	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	bmap_end_fsb;
 	xfs_fileoff_t	last_file_fsb;
+	xfs_fileoff_t	start_fsb;
+	xfs_filblks_t	count_fsb;
 	off_t		aligned_offset;
 	xfs_fsize_t	isize;
 	xfs_fsblock_t	firstblock;
 	__uint64_t	last_page_offset;
 	int		nimaps;
 	int		error;
+	int		n;
 	unsigned int	iosize;
 	unsigned int	writing_bytes;
 	short		filled_bmaps;
@@ -1638,36 +1641,49 @@ xfs_iomap_write(
 	 * then extend the allocation (and the buffer used for the write)
 	 * out to the file system's write iosize.  We clean up any extra
 	 * space left over when the file is closed in xfs_inactive().
-	 * We can only do this if the block underlying the last byte to
-	 * be written is not yet allocated.  This is because the caller
-	 * will not be writing the extra block allocated yet, so if the
-	 * bytes that are written are on a different extent then the extra
-	 * blocks we allocate there will be no buffer created over the
-	 * extra delayed allocation blocks.  That's not allowed.
+	 * We can only do this if we are sure that we will create buffers
+	 * over all of the space we allocate beyond the end of the file.
+	 * Not doing so would allow us to create delalloc blocks with
+	 * no pages in memory covering them.  So, we need to check that
+	 * there are not any real blocks in the area beyond the end of
+	 * the file which we are optimistically going to preallocate. If
+	 * there are then our buffers will stop when they encounter them
+	 * and we may accidentally create delalloc blocks beyond them
+	 * that we never cover with a buffer.  All of this is because
+	 * we are not actually going to write the extra blocks preallocated
+	 * at this point.
 	 *
 	 * We don't bother with this for sync writes, because we need
 	 * to minimize the amount we write for good performance.
 	 */
 	if (!(ioflag & IO_SYNC) && ((offset + count) > ip->i_d.di_size)) {
-		nimaps = 1;
-		firstblock = NULLFSBLOCK;
-		error = xfs_bmapi(NULL, ip,
-				  XFS_B_TO_FSBT(mp, (offset + count - 1)),
-				  (xfs_filblks_t)1, 0, &firstblock, 0, imap,
-				  &nimaps, NULL);
-		if (error) {
-			return error;
+		start_fsb = last_fsb;
+		count_fsb = mp->m_writeio_blocks;
+		while (count_fsb > 0) {
+			nimaps = XFS_WRITE_IMAPS;
+			firstblock = NULLFSBLOCK;
+			error = xfs_bmapi(NULL, ip, start_fsb, count_fsb,
+					  0, &firstblock, 0, imap, &nimaps,
+					  NULL);
+			if (error) {
+				return error;
+			}
+			for (n = 0; n < nimaps; n++) {
+				if ((imap[n].br_startblock != HOLESTARTBLOCK) &&
+				    (imap[n].br_startblock != DELAYSTARTBLOCK)) {
+					goto write_map;
+				}
+				start_fsb += imap[n].br_blockcount;
+				count_fsb -= imap[n].br_blockcount;
+				ASSERT(count_fsb < 0xffff000);
+			}
 		}
-		ASSERT(nimaps == 1);
-		if ((imap->br_startblock == HOLESTARTBLOCK) ||
-		    (imap->br_startblock == DELAYSTARTBLOCK)) {
-			iosize = mp->m_writeio_blocks;
-			aligned_offset =
-				XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
-			ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
-			last_fsb = ioalign + iosize;
-		}
+		iosize = mp->m_writeio_blocks;
+		aligned_offset = XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
+		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
+		last_fsb = ioalign + iosize;
 	}
+ write_map:
 	nimaps = XFS_WRITE_IMAPS;
 	firstblock = NULLFSBLOCK;
 	error = xfs_bmapi(NULL, ip, offset_fsb,
