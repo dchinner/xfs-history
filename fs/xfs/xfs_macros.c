@@ -748,17 +748,8 @@ xfs_cnt_block(xfs_mount_t *mp)
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_HASH)
-/*ARGSUSED1*/
-__uint32_t
-xfs_da_cookie_hash(xfs_mount_t *mp, off_t cookie)
-{
-	return XFS_DA_COOKIE_HASH(mp, cookie);
-}
-#endif
-
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_BNO)
-__uint32_t
+xfs_dablk_t
 xfs_da_cookie_bno(xfs_mount_t *mp, off_t cookie)
 {
 	return XFS_DA_COOKIE_BNO(mp, cookie);
@@ -773,9 +764,27 @@ xfs_da_cookie_entry(xfs_mount_t *mp, off_t cookie)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_HASH)
+/*ARGSUSED1*/
+xfs_dahash_t
+xfs_da_cookie_hash(xfs_mount_t *mp, off_t cookie)
+{
+	return XFS_DA_COOKIE_HASH(mp, cookie);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_MAKE_BNOENTRY)
+__uint32_t
+xfs_da_make_bnoentry(xfs_mount_t *mp, xfs_dablk_t bno, int entry)
+{
+	return XFS_DA_MAKE_BNOENTRY(mp, bno, entry);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_MAKE_COOKIE)
 off_t
-xfs_da_make_cookie(xfs_mount_t *mp, __uint32_t bno, int entry, __uint32_t hash)
+xfs_da_make_cookie(xfs_mount_t *mp, xfs_dablk_t bno, int entry,
+		   xfs_dahash_t hash)
 {
 	return XFS_DA_MAKE_COOKIE(mp, bno, entry, hash);
 }

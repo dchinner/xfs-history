@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MACROS_H
 #define	_FS_XFS_MACROS_H
 
-#ident 	"$Revision: 1.1 $"
+#ident 	"$Revision$"
 
 /*
  * Set for debug kernels and simulation, and 32-bit kernels,
@@ -41,8 +41,12 @@
 #define	XFSSO_XFS_BMAP_PTR_IADDR 1
 #define	XFSSO_XFS_BMAPI_AFLAG 1
 #define	XFSSO_XFS_CFORK_ASIZE 1
-#define	XFSSO_XFS_DA_COOKIE_BNO 1
-#define	XFSSO_XFS_DA_COOKIE_ENTRY 1
+#if 0
+/*
+ * This would save space but it slows things down too much.
+ */
+#define	XFSSO_XFS_DA_MAKE_COOKIE 1
+#endif
 #define	XFSSO_XFS_DADDR_TO_AGBNO 1
 #define	XFSSO_XFS_DADDR_TO_FSB 1
 #define	XFSSO_XFS_DFORK_NEXTENTS 1
