@@ -1069,6 +1069,7 @@ xfs_sync(vfs_t		*vfsp,
 	uint		log_flags;
 	boolean_t	mount_locked;
 	boolean_t	vnode_refed;
+	xfs_fsize_t	last_byte;
 	int		preempt;
 #define PREEMPT_MASK	0x7f
 
@@ -1189,8 +1190,10 @@ xfs_sync(vfs_t		*vfsp,
 			 * we can't hold it across calls to the buffer
 			 * cache.
 			 */
+			last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+			last_byte = XFS_FSB_TO_B(mp, last_byte);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-			pflushinvalvp(vp, 0, XFS_ISIZE_MAX(ip));
+			pflushinvalvp(vp, 0, last_byte);
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 		} else if (flags & SYNC_DELWRI) {
@@ -1205,8 +1208,11 @@ xfs_sync(vfs_t		*vfsp,
 				 * Drop the inode lock since we can't hold it
 				 * across calls to the buffer cache.
 				 */
+				last_byte = XFS_B_TO_FSB(mp,
+							 ip->i_d.di_size);
+				last_byte = XFS_FSB_TO_B(mp, last_byte);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				error = pflushvp(vp, ip->i_d.di_size, fflag);
+				error = pflushvp(vp, last_byte, fflag);
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
 

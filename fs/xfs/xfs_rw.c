@@ -1701,49 +1701,111 @@ xfs_write_file(
 		 * have given up multiple bmaps to use so we make fewer
 		 * calls to it on big requests than if it only gave
 		 * us one at a time.
+		 *
+		 * Error handling is a bit tricky because of delayed
+		 * allocation.  We need to make sure that we create
+		 * dirty buffers over all the delayed allocation
+		 * extents created in xfs_iomap_write().  Thus, when
+		 * we get an error we continue to process each of
+		 * the bmaps returned by xfs_iomap_write().  Each is
+		 * read in so that it is fully initialized and then
+		 * written out without actually copying in the user's
+		 * data.
 		 */
-		while ((uiop->uio_resid != 0) && (nbmaps > 0)) {
+		while (((uiop->uio_resid != 0) || (error != 0)) &&
+		       (nbmaps > 0)) {
 			/*
 			 * If the write doesn't completely overwrite
 			 * the buffer and we're not writing from
 			 * the beginning of the buffer to the end
 			 * of the file then we need to read the
-			 * buffer.
+			 * buffer.  We also always want to read the
+			 * buffer if we've encountered an error and
+			 * we're just cleaning up.
 			 *
 			 * Reading the buffer will send it to xfs_strategy
 			 * which will take care of zeroing the holey
 			 * parts of the buffer and coordinating with
 			 * other, simultaneous writers.
 			 */
-			if ((bmapp->pbsize != bmapp->bsize) &&
+			if ((error != 0) ||
+			    ((bmapp->pbsize != bmapp->bsize) &&
 			    !((bmapp->pboff == 0) &&
-			      (uiop->uio_offset >= isize))) {
+			      (uiop->uio_offset >= isize)))) {
 				bp = chunkread(vp, bmapp, 1, credp);
 			} else {
 				bp = getchunk(vp, bmapp, credp);
 			}
 
 			/*
-			 * XXXajs
-			 * The error handling below needs more work.
+			 * There is not much we can do with buffer errors.
+			 * The assumption here is that the space underlying
+			 * the buffer must now be allocated (even if it
+			 * wasn't when we mapped the buffer) and we got an
+			 * error reading from it.  In this case the blocks
+			 * will remain unreadable, so we just toss the buffer
+			 * and its associated pages.
 			 */
 			if (bp->b_flags & B_ERROR) {
 				error = geterror(bp);
 				ASSERT(error != EINVAL);
 				brelse(bp);
-				break;
+				bmapp++;
+				nbmaps--;
+				continue;
+			}
+
+			/*
+			 * If we've already encountered an error, then
+			 * write the buffers out without copying the user's
+			 * data into them.  This way we get dirty buffers
+			 * over our delayed allocation extents which
+			 * have been initialized by xfs_strategy() since
+			 * we forced the chunkread() above.
+			 * We write the data out synchronously here so that
+			 * we don't have to worry about having buffers
+			 * possibly out beyond the EOF when we later flush
+			 * or truncate the file.  We set the B_STALE bit so
+			 * that the buffer will be decommissioned after it
+			 * is synced out.
+			 */
+			if (error != 0) {
+				bp->b_flags |= B_STALE;
+				bwrite(bp);
+				bmapp++;
+				nbmaps--;
+				continue;
 			}
 
 			ASSERT((BBTOOFF(bmapp->offset) + bmapp->pboff) ==
 			       uiop->uio_offset);
 			if (error = biomove(bp, bmapp->pboff, bmapp->pbsize,
 					    UIO_WRITE, uiop)) {
+				/*
+				 * If the buffer is already done then just
+				 * mark it dirty without copying any more
+				 * data into it.  It is already fully
+				 * initialized.
+				 * Otherwise, we must have getchunk()'d
+				 * the buffer above.  Use chunkreread()
+				 * to get it initialized by xfs_strategy()
+				 * and then write it out.
+				 * We write the data out synchronously here
+				 * so that we don't have to worry about
+				 * having buffers possibly out beyond the
+				 * EOF when we later flush or truncate
+				 * the file.  We set the B_STALE bit so
+				 * that the buffer will be decommissioned
+				 * after it is synced out.
+				 */
 				if (!(bp->b_flags & B_DONE)) {
-					bp->b_flags |= B_STALE | B_DONE |
-						       B_ERROR;
+					chunkreread(bp);
 				}
-				brelse(bp);
-				break;
+				bp->b_flags |= B_STALE;
+				bwrite(bp);
+				bmapp++;
+				nbmaps--;
+				continue;
 			}
 
 			/*

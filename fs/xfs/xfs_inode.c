@@ -608,13 +608,14 @@ xfs_itruncate_start(
 	 * dropping the inode's I/O lock.  Make sure
 	 * to catch any pages brought in by buffers overlapping
 	 * the EOF by searching out beyond the isize by our
-	 * writeio size. We round new_size up to a block boundary
+	 * block size. We round new_size up to a block boundary
 	 * so that we don't toss things on the same block as
 	 * new_size but before it.
 	 */
 	toss_start = XFS_B_TO_FSB(mp, new_size);
 	toss_start = XFS_FSB_TO_B(mp, toss_start);
-	last_byte = ip->i_d.di_size + (1 << mp->m_writeio_log);
+	last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+	last_byte = XFS_FSB_TO_B(mp, last_byte);
 	if (last_byte > toss_start) {
 		if (flags & XFS_ITRUNC_DEFINITE) {
 			ptossvp(XFS_ITOV(ip), toss_start, last_byte);

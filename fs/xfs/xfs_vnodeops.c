@@ -948,18 +948,22 @@ xfs_fsync(vnode_t	*vp,
 	  int		flag,
 	  cred_t	*credp)
 {
-	xfs_inode_t *ip;
+	xfs_mount_t	*mp;
+	xfs_inode_t	*ip;
+	xfs_fsize_t	last_byte;
 
 	vn_trace_entry(vp, "xfs_fsync");
 	ip = XFS_VTOI(vp);
+	mp = ip->i_mount;
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+	last_byte = XFS_FSB_TO_B(mp, last_byte);
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_flags & XFS_IEXTENTS && ip->i_bytes > 0) {
-			pflushinvalvp(vp, 0, XFS_ISIZE_MAX(ip));
+			pflushinvalvp(vp, 0, last_byte);
 		}
 	} else {
-		pflushvp(vp, ip->i_d.di_size,
-			 (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
+		pflushvp(vp, last_byte, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
 	}
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	xfs_iflock(ip);
@@ -3938,6 +3942,7 @@ xfs_reclaim(vnode_t	*vp,
 {
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
+	xfs_fsize_t		last_byte;
 
 	vn_trace_entry(vp, "xfs_reclaim");
 	ASSERT(!VN_MAPPED(vp));
@@ -3981,9 +3986,10 @@ xfs_reclaim(vnode_t	*vp,
 		 * the inode lock here since flushing out buffers may
 		 * cause us to try to get the lock in xfs_strategy().
 		 */
+		last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+		last_byte = XFS_FSB_TO_B(mp, last_byte);
 	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-		pflushinvalvp(vp, 0,
-			      (ip->i_d.di_size + (1 << mp->m_writeio_log)));
+		pflushinvalvp(vp, 0, last_byte);			     
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	}
 

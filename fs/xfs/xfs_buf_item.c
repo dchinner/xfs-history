@@ -46,13 +46,8 @@ lock_t	xfs_bli_reflock;
 
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
 
-#ifdef DEBUG
-STATIC void	xfs_buf_item_log_debug(xfs_buf_log_item_t *, uint, uint);
-STATIC void	xfs_buf_item_log_check(xfs_buf_log_item_t *);
-#else
 #define		xfs_buf_item_log_debug(x,y,z)
 #define 	xfs_buf_item_log_check(x)
-#endif
 
 /*
  * This returns the number of log iovecs needed to log the
@@ -518,7 +513,7 @@ xfs_buf_item_init(buf_t		*bp,
 	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, 0);
 #endif
 
-#ifdef DEBUG
+#ifdef XFS_TRANS_DEBUG
 	/*
 	 * Allocate the arrays for tracking what needs to be logged
 	 * and what our callers request to be logged.  bli_orig
@@ -631,7 +626,7 @@ xfs_buf_item_log(xfs_buf_log_item_t	*bip,
 	xfs_buf_item_log_debug(bip, first, last);
 }
 
-#ifdef DEBUG
+#ifdef XFS_TRANS_DEBUG
 /*
  * This function uses an alternate strategy for tracking the bytes
  * that the user requests to be logged.  This can then be used
@@ -711,7 +706,7 @@ xfs_buf_item_log_check(xfs_buf_log_item_t *bip)
 		logged++;
 	}
 }
-#endif /* DEBUG */
+#endif /* XFS_TRANS_DEBUG */
 
 /*
  * Count the number of bits set in the bitmap starting with bit
@@ -968,12 +963,12 @@ xfs_buf_item_relse(buf_t *bp)
 		bp->b_iodone = NULL;
 	}
 
-#ifdef DEBUG
+#ifdef XFS_TRANS_DEBUG
 	kmem_free(bip->bli_orig, bp->b_bcount);
 	bip->bli_orig = NULL;
 	kmem_free(bip->bli_logged, bp->b_bcount);
 	bip->bli_logged = NULL;
-#endif /* DEBUG */
+#endif /* XFS_TRANS_DEBUG */
 
 #ifndef SIM
 	ktrace_free(bip->bli_trace);
@@ -1074,12 +1069,12 @@ xfs_buf_iodone(buf_t			*bp,
 	xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip);
 	AIL_UNLOCK(mp, s);
 
-#ifdef DEBUG
+#ifdef XFS_TRANS_DEBUG
 	kmem_free(bip->bli_orig, bp->b_bcount);
 	bip->bli_orig = NULL;
 	kmem_free(bip->bli_logged, bp->b_bcount);
 	bip->bli_logged = NULL;
-#endif /* DEBUG */
+#endif /* XFS_TRANS_DEBUG */
 
 #ifndef SIM
 	ktrace_free(bip->bli_trace);
