@@ -1,4 +1,4 @@
-#ident "$Revision: 1.90 $"
+#ident "$Revision: 1.91 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -874,7 +874,7 @@ xfs_trans_uncommit(
 		 * Unpin all but those that aren't dirty.
 		 */
 		if (lidp->lid_flags & XFS_LID_DIRTY)
-			IOP_UNPIN(lidp->lid_item);
+			IOP_UNPIN_REMOVE(lidp->lid_item, tp);
 	}
 
 	xfs_trans_unreserve_and_mod_sb(tp);
