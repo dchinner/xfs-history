@@ -6,7 +6,7 @@ WORKAREA ?= `pwd`
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/)
 KERN_SPEC = kernel-2.4.spec
-KERNEL_VERSION = 2.4.1
+KERNEL_VERSION = 2.4.2
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
