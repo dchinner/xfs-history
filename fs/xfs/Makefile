@@ -64,7 +64,7 @@ builddirs:
 clean:
 	rm -rf RPMS SRPMS BUILD SOURCES/linux-${KERNEL_VERSION}-xfs.patch
 	for d in $(COMMANDS); do \
-		( cd $(WORKAREA)/$$d && make clean ) \
+		( cd $(WORKAREA)/$$d && make -i clean ) \
 	done
 	for d in $(COMMANDRPMS); do \
 		( rpm -e --nodeps --noscripts $$d >/dev/null 2>&1 || exit 0 ) \
