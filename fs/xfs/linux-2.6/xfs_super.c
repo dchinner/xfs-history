@@ -81,27 +81,7 @@ void vfsinit(void);
 /* xfs_vfs.c */
 int xfs_init(int fstype);
 
-/*
- * Global system credential structure.
- */
-cred_t	sys_cred_val, *sys_cred = &sys_cred_val;
-
 extern struct super_operations linvfs_sops;
-
-/*
- * Initialize the global system credential structure.
- */
-static void
-cred_init(void)
-{
-        memset(sys_cred, 0, sizeof(cred_t));
-        sys_cred->cr_ref = 1;
-
-        sys_cred->cr_cap.cap_effective = CAP_ALL_ON;
-        sys_cred->cr_cap.cap_inheritable = CAP_ALL_ON;
-        sys_cred->cr_cap.cap_permitted = CAP_ALL_ON;
-        /*_MAC_INIT_CRED();*/
-}
 
 
 void

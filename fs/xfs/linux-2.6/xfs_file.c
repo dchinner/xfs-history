@@ -208,11 +208,17 @@ static int linvfs_readdir(
 	uio_t			uio;
 	iovec_t			iov;
 	int			eof;
+	cred_t			cred;		/* Temporary cred workaround */
 
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode) ||
 					!S_ISDIR(inode->i_mode))
 		return -EBADF;
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
         vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	iov.iov_base = dirent;
@@ -228,7 +234,7 @@ static int linvfs_readdir(
 	uio.uio_resid = 0;
 	uio.uio_limit = PAGE_SIZE;	/* JIMJIM OK for now? */
 
-	VOP_READDIR(vp, &uio, sys_cred, &eof, error);
+	VOP_READDIR(vp, &uio, &cred, &eof, error);
 	filp->f_pos = uio.uio_offset;
 	return -error;
 }

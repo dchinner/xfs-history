@@ -69,11 +69,17 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	struct inode	*ip;
 	vattr_t		va;
 	ino_t		ino;
+	cred_t		cred;		/* Temporary cred workaround */
 
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
 
 	vp = NULL;
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	bzero(&va, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
@@ -84,7 +90,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 
 	if (tp == VREG) {
 		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
-				sys_cred, error);
+							&cred, error);
 	} else if ((tp == VBLK) || (tp == VCHR)) {
 		/*
 		 * Get the real type from the mode
@@ -97,17 +103,17 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 			return -EINVAL;
 		}
 		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
-			sys_cred, error);
+			&cred, error);
 	} else if (tp == VDIR) {
 		VOP_MKDIR(dvp, (char *)dentry->d_name.name, &va, &vp,
-			sys_cred, error);
+			&cred, error);
 	}
 
 	if (!error) {
 		ASSERT(vp);
 		bzero(&va, sizeof(va));
 		va.va_mask = AT_NODEID;
-		VOP_GETATTR(vp, &va, 0, sys_cred, error);
+		VOP_GETATTR(vp, &va, 0, &cred, error);
 		if (error) {
 			VN_RELE(vp);
 			return -error;
@@ -142,9 +148,15 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	struct inode	*ip = NULL;
 	vattr_t		va;
 	ino_t		ino;
+	cred_t		cred;		/* Temporary cred workaround */
 
 	vp = LINVFS_GET_VP(dir);
 	ASSERT(vp);
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	/*
 	 * Initialize a pathname_t to pass down.
@@ -157,12 +169,12 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	cvp = NULL;
 
 	VOP_LOOKUP(vp, (char *)dentry->d_name.name, &cvp, pnp, 0, NULL,
-			sys_cred, error);
+						&cred, error);
 	if (!error) {
 		ASSERT(cvp);
 		bzero(&va, sizeof(va));
 		va.va_mask = AT_NODEID;
-		VOP_GETATTR(cvp, &va, 0, sys_cred, error);
+		VOP_GETATTR(cvp, &va, 0, &cred, error);
 		if (error) {
 			VN_RELE(cvp);
 			return ERR_PTR(-error);
@@ -186,15 +198,21 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 	vnode_t		*tdvp;	/* Target directory for new name/link */
 	vnode_t		*vp;	/* vp of name being linked */
 	struct inode	*ip;	/* inode of guy being linked to */
+	cred_t		cred;	/* Temporary cred workaround */
 
 	tdvp = LINVFS_GET_VP(dir);
 	ASSERT(tdvp);
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	ip = old_dentry->d_inode;	/* inode being linked to */
 	vp = LINVFS_GET_VP(ip);
 
 	error = 0;
-	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, sys_cred, error);
+	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, &cred, error);
 	if (!error) {
 		ip->i_nlink++;
 		ip->i_ctime = CURRENT_TIME;
@@ -212,10 +230,16 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	int		error;
 	struct inode	*inode;
 	vnode_t		*dvp;	/* directory containing name to remove */
+	cred_t		cred;	/* Temporary cred workaround */
 
 	dvp = LINVFS_GET_VP(dir);
 	inode = dentry->d_inode;
 	ASSERT(dvp);
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	/*
 	 * Someday we could pass the dentry->d_inode into VOP_REMOVE so
@@ -223,7 +247,7 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 	 */
 
 	error = 0;
-	VOP_REMOVE(dvp, (char *)dentry->d_name.name, sys_cred, error);
+	VOP_REMOVE(dvp, (char *)dentry->d_name.name, &cred, error);
 	if (!error) {
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		dir->i_version = ++event;
@@ -245,17 +269,24 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
 	ino_t		ino;
+	cred_t		cred;		/* Temporary cred workaround */
 
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	bzero(&va, sizeof(va));
 	va.va_type = VLNK;
 	va.va_mode = 0777 & ~current->fs->umask;
 	va.va_mask = AT_TYPE|AT_MODE; /* AT_PROJID? */
+
 	error = 0;
 	VOP_SYMLINK(dvp, (char *)dentry->d_name.name, &va, (char *)symname,
-		sys_cred, error);
+							&cred, error);
 	if (!error) {
 		/* Now need to lookup the name since we didn't get the vp back */
 		/* Maybe modify VOP_SYMLINK to return *vpp? */
@@ -271,12 +302,12 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 
 		cvp = NULL;
 		VOP_LOOKUP(dvp, (char *)dentry->d_name.name, &cvp, pnp, 0, NULL,
-					sys_cred, error);
+					&cred, error);
 		if (!error) {
 			ASSERT(cvp);
 			bzero(&va, sizeof(va));
 			va.va_mask = AT_NODEID;
-			VOP_GETATTR(cvp, &va, 0, sys_cred, error);
+			VOP_GETATTR(cvp, &va, 0, &cred, error);
 			if (error) {
 				VN_RELE(cvp);
 				return error;
@@ -307,10 +338,16 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	int		error;
 	vnode_t		*dvp,	/* directory containing name to remove */
 			*pwd_vp; /* current working directory, vnode */
+	cred_t		cred;		/* Temporary cred workaround */
 
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
 	ASSERT(current->fs->pwd->d_inode);
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	pwd_vp = LINVFS_GET_VP(current->fs->pwd->d_inode);
 
@@ -320,7 +357,7 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 	 */
 
 	error = 0;
-	VOP_RMDIR(dvp, (char *)dentry->d_name.name, pwd_vp, sys_cred, error);
+	VOP_RMDIR(dvp, (char *)dentry->d_name.name, pwd_vp, &cred, error);
 	if (!error) {
 		ASSERT(dir->i_nlink == 2);
 		dir->i_nlink = 0;
@@ -352,6 +389,12 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	pathname_t	pn;
 	pathname_t      *pnp = &pn;
 	struct inode	*new_inode = NULL;
+	cred_t		cred;		/* Temporary cred workaround */
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	bzero(pnp, sizeof(pathname_t));
 	pnp->pn_complen = ndentry->d_name.len;
@@ -364,7 +407,7 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	new_inode = ndentry->d_inode;
 
 	VOP_RENAME(fvp, (char *)odentry->d_name.name, tvp,
-		   (char *)ndentry->d_name.name, pnp, sys_cred, error);
+			   (char *)ndentry->d_name.name, pnp, &cred, error);
 	if (error)
 		return -error;
 
@@ -388,6 +431,12 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	uio_t	uio;
 	iovec_t	iov;
 	int	error = 0;
+	cred_t	cred;		/* Temporary cred workaround */
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	iov.iov_base = buf;
@@ -399,7 +448,7 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	uio.uio_resid = size;
 
 	UPDATE_ATIME(dentry->d_inode);
-	VOP_READLINK(vp, &uio, sys_cred, error);
+	VOP_READLINK(vp, &uio, &cred, error);
 	if (error)
 		return -error;
 
@@ -416,6 +465,12 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	iovec_t	iov;
 	int	error = 0;
 	char	*link = kmalloc(MAXNAMELEN+1, GFP_KERNEL); 
+	cred_t	cred;		/* Temporary cred workaround */
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	iov.iov_base = link;
@@ -426,7 +481,7 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_resid = MAXNAMELEN;
 
-	VOP_READLINK(vp, &uio, sys_cred, error);
+	VOP_READLINK(vp, &uio, &cred, error);
 	if (error) {
 		kfree_s(link, MAXNAMELEN);
 		return NULL;
@@ -500,10 +555,16 @@ int linvfs_revalidate(struct dentry *dentry)
         vnode_t *vp;
         vattr_t va;
         int     error;
+	cred_t	cred;		/* Temporary cred workaround */
+
+	/*
+	 * Temporary workaround for creds
+	 */
+	cred_fill_from_current(&cred);
 
         vp = LINVFS_GET_VP(inode);
         va.va_mask = AT_STAT;
-        VOP_GETATTR(vp, &va, 0, sys_cred, error);
+        VOP_GETATTR(vp, &va, 0, &cred, error);
 
         inode->i_mode = VTTOIF(va.va_type) | va.va_mode;
         inode->i_nlink = va.va_nlink;
