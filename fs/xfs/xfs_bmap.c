@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.172 $"
+#ident	"$Revision: 1.173 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -60,6 +60,8 @@
 #include "xfs_dir_leaf.h"
 #include "xfs_bit.h"
 #include "xfs_rw.h"
+#include "xfs_quota.h"
+
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -638,10 +640,11 @@ xfs_bmap_add_extent(
 	}
 	/*
 	 * Adjust for changes in reserved delayed indirect blocks.
+	 * Nothing to do for disk quotas here.
 	 */
 	if (da_old || da_new) {
 		xfs_filblks_t	nblks;
-
+		
 		nblks = da_new;
 		if (cur)
 			nblks += cur->bc_private.b.allocated;
@@ -1351,6 +1354,9 @@ xfs_bmap_add_extent_hole_delay(
 		ASSERT(oldlen > newlen);
 		xfs_mod_incore_sb(ip->i_mount, XFS_SBS_FDBLOCKS,
 			oldlen - newlen);
+		/*
+		 * Nothing to do for disk quota accounting here.
+		 */
 	}
 	kmem_check();
 	*logflagsp = 0;
@@ -1819,6 +1825,19 @@ xfs_bmap_alloc(
 			xfs_trans_log_inode(ap->tp, ap->ip, XFS_ILOG_CORE);
 			if (ap->wasdel)
 				ap->ip->i_delayed_blks -= ralen;
+			/*
+			 * Adjust the disk quota also. This was reserved 
+			 * earlier.
+			 */
+			if (XFS_IS_QUOTA_ON(mp) &&
+			    ap->ip->i_ino != mp->m_sb.sb_uquotino &&
+			    ap->ip->i_ino != mp->m_sb.sb_pquotino) {
+				xfs_trans_mod_dquot_byino(ap->tp, ap->ip, 
+						(ap->wasdel)? 
+						 XFS_TRANS_DQ_DELRTBCOUNT:
+						 XFS_TRANS_DQ_RTBCOUNT,
+						(long) ralen);
+			}
 		} else
 			ap->alen = 0;
 #endif	/* SIM */
@@ -1898,6 +1917,19 @@ xfs_bmap_alloc(
 			xfs_trans_log_inode(ap->tp, ap->ip, XFS_ILOG_CORE);
 			if (ap->wasdel)
 				ap->ip->i_delayed_blks -= args.len;
+			/*
+			 * Adjust the disk quota also. This was reserved 
+			 * earlier.
+			 */
+			if (XFS_IS_QUOTA_ON(mp) &&
+			    ap->ip->i_ino != mp->m_sb.sb_uquotino &&
+			    ap->ip->i_ino != mp->m_sb.sb_pquotino) {
+				xfs_trans_mod_dquot_byino(ap->tp, ap->ip, 
+							 (ap->wasdel)? 
+							 XFS_TRANS_DQ_DELBCOUNT:
+							 XFS_TRANS_DQ_BCOUNT,
+							 (long) args.len);
+			}
 		} else {
 			ap->rval = NULLFSBLOCK;
 			ap->alen = 0;
@@ -1951,6 +1983,14 @@ xfs_bmap_btree_to_extents(
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
 	xfs_trans_set_sync(tp);
 	ip->i_d.di_nblocks--;
+	
+	if (XFS_IS_QUOTA_ON(mp) &&
+	    ip->i_ino != mp->m_sb.sb_uquotino &&
+	    ip->i_ino != mp->m_sb.sb_pquotino) {
+		xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_BCOUNT,
+					  (long) -1);
+	}
+	
 	xfs_trans_binval(tp, cbp);
 	if (cur->bc_bufs[0] == cbp)
 		cur->bc_bufs[0] = NULL;
@@ -2022,8 +2062,10 @@ xfs_bmap_del_extent(
 	xfs_extnum_t		nextents;	/* number of extents in list */
 	xfs_filblks_t		temp;	/* for indirect length calculations */
 	xfs_filblks_t		temp2;	/* for indirect length calculations */
+	xfs_mount_t		*mp;
 
 	XFSSTATS.xs_del_exlist++;
+	mp = ip->i_mount;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
 	ASSERT(idx >= 0 && idx < nextents);
@@ -2046,9 +2088,8 @@ xfs_bmap_del_extent(
 		    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
 			xfs_fsblock_t	bno;
 			xfs_filblks_t	len;
-			xfs_mount_t	*mp;
-	
-			mp = ip->i_mount;
+			xfs_filblks_t	nblks;
+
 			ASSERT((del->br_blockcount % mp->m_sb.sb_rextsize) == 0);
 			ASSERT((del->br_startblock % mp->m_sb.sb_rextsize) == 0);
 			bno = del->br_startblock / mp->m_sb.sb_rextsize;
@@ -2057,8 +2098,16 @@ xfs_bmap_del_extent(
 			if (error) {
 				return error;
 			}
-			ip->i_d.di_nblocks -=
-				(len * mp->m_sb.sb_rextsize);
+			nblks = len * mp->m_sb.sb_rextsize;
+			ip->i_d.di_nblocks -= nblks;
+
+			if (XFS_IS_QUOTA_ON(mp) &&
+			    ip->i_ino != mp->m_sb.sb_uquotino &&
+			    ip->i_ino != mp->m_sb.sb_pquotino) {
+				xfs_trans_mod_dquot_byino(tp, ip,
+							XFS_TRANS_DQ_RTBCOUNT,
+							(long) -nblks);
+			}		
 		}
 		/*
 		 * Ordinary allocation.  Add it to list of extents to be
@@ -2066,8 +2115,17 @@ xfs_bmap_del_extent(
 		 */
 		else {
 			xfs_bmap_add_free(del->br_startblock,
-				del->br_blockcount, flist, ip->i_mount);
+				del->br_blockcount, flist, mp);
 			ip->i_d.di_nblocks -= del->br_blockcount;
+
+			if (XFS_IS_QUOTA_ON(mp) &&
+			    ip->i_ino != mp->m_sb.sb_uquotino &&
+			    ip->i_ino != mp->m_sb.sb_pquotino) {
+				xfs_trans_mod_dquot_byino(tp, ip,
+						    XFS_TRANS_DQ_BCOUNT,
+						    (long) -del->br_blockcount);
+			}
+
 			/*
 			 * If we're freeing meta-data, then the transaction
 			 * that frees the blocks must be synchronous.  This
@@ -2247,8 +2305,7 @@ xfs_bmap_del_extent(
 	 */
 	ASSERT(da_old >= da_new);
 	if (da_old > da_new)
-		xfs_mod_incore_sb(ip->i_mount, XFS_SBS_FDBLOCKS,
-			da_old - da_new);
+		xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS, da_old - da_new);
 	kmem_check();
 	*logflagsp = flags;
 	return 0;
@@ -2391,6 +2448,14 @@ xfs_bmap_extents_to_btree(
 	*firstblock = cur->bc_private.b.firstblock = args.fsbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
+	
+	if (XFS_IS_QUOTA_ON(mp) &&
+	    ip->i_ino != mp->m_sb.sb_uquotino &&
+	    ip->i_ino != mp->m_sb.sb_pquotino) {
+		xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_BCOUNT, 
+					  (long) 1);
+	}
+
 	abp = xfs_btree_get_bufl(mp, tp, args.fsbno, 0);
 	/*
 	 * Fill in the child block.
@@ -2529,6 +2594,14 @@ xfs_bmap_local_to_extents(
 		xfs_bmap_trace_post_update(fname, "new", ip, 0, whichfork);
 		XFS_IFORK_NEXT_SET(ip, whichfork, 1);
 		ip->i_d.di_nblocks = 1;
+
+		if (XFS_IS_QUOTA_ON(args.mp) &&
+		    ip->i_ino != args.mp->m_sb.sb_uquotino &&
+		    ip->i_ino != args.mp->m_sb.sb_pquotino) {
+			xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_BCOUNT,
+						  (long) 1);
+		}
+		
 		flags |= XFS_ILOG_FEXT(whichfork);
 	} else
 		ASSERT(XFS_IFORK_NEXTENTS(ip, whichfork) == 0);
@@ -2871,11 +2944,22 @@ xfs_bmap_add_attrfork(
 	if (XFS_IFORK_Q(ip))
 		return 0;
 	mp = ip->i_mount;
+	ASSERT(! XFS_NOT_DQATTACHED(mp, ip));
+	
 	tp = xfs_trans_alloc(mp, XFS_TRANS_ADDAFORK);
 	if (error = xfs_trans_reserve(tp, 1, XFS_ADDAFORK_LOG_RES(mp), 0,
 			XFS_TRANS_PERM_LOG_RES, XFS_ADDAFORK_LOG_COUNT))
 		goto error0;
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	
+	if (XFS_IS_QUOTA_ON(mp)) {
+		if (error = xfs_trans_reserve_blkquota(tp, ip, (long)1)) {
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+			return (error);
+		}
+	}
+
 	if (XFS_IFORK_Q(ip))
 		goto error1;
 	/*
@@ -3631,10 +3715,36 @@ xfs_bmapi(
 			if (delay) {
 				indlen = xfs_bmap_worst_indlen(ip, alen);
 				ASSERT(indlen > 0);
+				
+				/*
+				 * Make a transaction-less quota reservation for
+				 * delayed allocation blocks. This number gets
+				 * adjusted later.
+				 * We return EDQUOT if we haven't allocated
+				 * blks already inside this loop;
+				 */
+				if (XFS_IS_QUOTA_ON(ip->i_mount)) {
+					if (xfs_trans_reserve_blkquota(NULL, ip,
+							       alen)) {
+						if (n == 0) {
+							*nmap = 0;
+							return (EDQUOT);
+						}
+						break;
+					}
+				}
+
 				if (xfs_mod_incore_sb(ip->i_mount,
 						XFS_SBS_FDBLOCKS,
-						-(alen + indlen)))
+						-(alen + indlen))) {
+					
+					if (XFS_IS_QUOTA_ON(ip->i_mount)) {
+						xfs_trans_unreserve_blkquota(
+							      NULL, ip,
+							      (long) alen);
+					}
 					break;
+				}
 				ip->i_delayed_blks += alen;
 				abno = NULLSTARTBLOCK(indlen);
 			} else {
@@ -4090,6 +4200,19 @@ xfs_bunmapi(
 			ASSERT(STARTBLOCKVAL(del.br_startblock) > 0);
 			xfs_mod_incore_sb(mp, XFS_SBS_FDBLOCKS,
 				del.br_blockcount);
+			
+			if (XFS_IS_QUOTA_ON(ip->i_mount)) {
+				ASSERT(ip->i_ino != mp->m_sb.sb_uquotino);
+				ASSERT(ip->i_ino != mp->m_sb.sb_pquotino);
+
+				if (!(ip->i_d.di_flags & XFS_DIFLAG_REALTIME))
+					xfs_trans_unreserve_blkquota(NULL, ip, 
+					      (long) del.br_blockcount);
+				else
+					xfs_trans_unreserve_rtblkquota(NULL, ip,
+					      (long) del.br_blockcount);
+			}
+
 			ip->i_delayed_blks -= del.br_blockcount;
 			if (cur)
 				cur->bc_private.b.flags |=
