@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 #include <xfs_os_defs.h>
 
 #include <sys/types.h>
@@ -81,6 +81,8 @@
 #include "xfs_log_priv.h"
 #include "xfs_log_recover.h"
 
+#include <linux/xfs_fs.h>
+
 /* Structure that contains fields that are pointers to key kernel 
  * structures). This forces the type information to be sucked into 
  * kernel the symbol table.
@@ -124,7 +126,6 @@ typedef struct xfs_icrash_s {
 	xfs_imap_t				*xfs_icrash35;
 	xfs_ihash_t				*xfs_icrash36;
 	xfs_fid_t				*xfs_icrash37;
-	xfs_fid2_t				*xfs_icrash38;
 	xfs_bstime_t				*xfs_icrash39;
 	xfs_bstat_t				*xfs_icrash40;
 	xfs_inogrp_t				*xfs_icrash41;

@@ -265,6 +265,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define xfs_baread(target, rablkno, ralen) \
             baread(target, rablkno, ralen)
 
+extern void pdflush(struct vnode *, uint64_t);
 #define XFS_pdflush(vnode,flags) \
             pdflush(vnode,flags)
 

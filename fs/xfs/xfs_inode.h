@@ -558,26 +558,6 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
 #define BHV_IS_XFS(bdp)		(BHV_OPS(bdp) == &xfs_vnodeops)
 
 /*
- * XFS file identifiers.  The xfs_fid_ino_t type is because NFS 2 won't
- * take more than 10 bytes of stuff past fid_len.  xfs_fid2_t is solely
- * to get a full 64 bit inode number.
- */
-typedef __uint32_t	xfs_fid_ino_t;
-typedef struct xfs_fid {
-	u_short		fid_len;       /* length of remainder (ten!) */
-        u_short		fid_pad;       /* middle 16 bits inode number */
-	__uint32_t	fid_gen;       /* generation number */
-        xfs_fid_ino_t	fid_ino;       /* lo 32 bits inode number */
-} xfs_fid_t;
-
-typedef struct xfs_fid2 {
-	u_short		fid_len;	/* length of remainder */
-	u_short		fid_pad;	/* padding, must be zero */
-	__uint32_t	fid_gen;	/* generation number */
-	xfs_ino_t	fid_ino;	/* inode number */
-} xfs_fid2_t;
-
-/*
  * Pick the inode cluster hash bucket
  * (m_chash is the same size as m_ihash)
  */

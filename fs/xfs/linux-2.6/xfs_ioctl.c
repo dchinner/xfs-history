@@ -74,8 +74,29 @@
 #include <xfs_mount.h>
 #include <xfs_fsops.h>
 #include <xfs_error.h>
+#include <xfs_itable.h>
+
+#include <asm/smplock.h>
+
+#include <linux/dcache.h>
+#include <linux/file.h>
+#include <linux/stat.h>
+#include <linux/xfs_fs.h>
+
+#include <ksys/vfile.h>
 
 #include <asm/uaccess.h> /* For copy_from_user */
+
+#define BREAKPOINT() asm("   int $3");
+
+
+/*
+ * The "open_by_handle() & readlink_by_handle() ioctl's
+ * require 'root', or 'SysAdmin' capabilies.
+ * To change to a simple 'permission' test,
+ * uncomment the following #define.
+ */
+/* #define	PERMISSIONS_BY_USER	*/
 
 
 int
@@ -126,7 +147,590 @@ xfs_change_file_space(
 
 
 
-int linvfs_ioctl (
+
+
+int
+xfs_something_to_handle(
+	struct inode	*inode,
+	struct file	*filp,
+	int		cmd,
+	unsigned long	arg,
+	vfs_t		*vfsp,
+	xfs_mount_t	*mp,
+	bhv_desc_t	*bdp,
+	vnode_t		*vp,
+	xfs_inode_t	*ip,
+	int		clamp_to_fsid)
+{
+	int			hsize;
+	xfs_fid_t		xfid;
+	xfs_fid_t		*xfidp;
+	xfs_handle_t		handle;
+	xfs_handle_t		*handlep;
+	xfs_fsop_handlereq_t	hreq;
+
+
+	/*
+	 * XFS_IOC_PATH_TO_FSHANDLE comes in against a
+	 * "mount point" path, or any file within the
+	 * mount point.
+	 */
+	if (copy_from_user(&hreq, (struct xfs_fsop_handlereq *)arg,
+					sizeof(struct xfs_fsop_handlereq)))
+		return -XFS_ERROR(EFAULT);
+
+	handlep = &handle;
+
+	bzero((char *)handlep, sizeof(*handlep));
+
+	/*
+	 * vp_to_handle()
+	 */
+	if (vp->v_vfsp->vfs_altfsid == NULL)
+		return -XFS_ERROR(EINVAL);
+	
+	switch(vp->v_type) {
+		case VREG:
+		case VDIR:
+		case VLNK:
+			break;
+		default:
+			return -XFS_ERROR(EBADF);
+	}
+
+
+	/*
+	 * xfs_fid2()
+	 */
+	xfidp = &xfid;
+
+	xfidp->xfs_fid_len = sizeof(xfs_fid_t) - sizeof(xfidp->xfs_fid_len);
+	xfidp->xfs_fid_pad = 0;
+
+	/*
+	 * use bcopy because the inode is a long long and there's no
+	 * assurance that xfidp->xfs_fid_ino is properly aligned.
+	 */
+	bcopy(&ip->i_ino, &xfidp->xfs_fid_ino,
+					sizeof(xfidp->xfs_fid_ino));
+
+	xfidp->xfs_fid_gen = ip->i_d.di_gen;
+
+	/*
+	 * vp_to_handle() continued
+	 */
+	bcopy (vp->v_vfsp->vfs_altfsid,
+			&handlep->ha_fsid, sizeof (xfs_fsid_t));
+
+	bcopy(xfidp, &handlep->ha_fid, xfidp->xfs_fid_len
+					+ sizeof(xfidp->xfs_fid_len));
+
+	hsize = XFS_HSIZE(*handlep);
+
+	if (clamp_to_fsid)
+		hsize = sizeof(xfs_fsid_t);	/* Clamp downed size	*/
+
+	if (copy_to_user((xfs_handle_t *)hreq.ohandle, &handle, hsize))
+		return -XFS_ERROR(EFAULT);
+
+	if (copy_to_user((__s32 *)hreq.ohandlen, &hsize,
+						sizeof(__s32)))
+		return -XFS_ERROR(EFAULT);
+
+	return 0;
+}
+
+
+int
+xfs_open_by_handle(
+	unsigned int	cmd,
+	unsigned long	arg,
+	struct file	*parfilp,
+	struct inode	*parinode,
+	vfs_t		*vfsp,
+	xfs_mount_t	*mp)
+{
+	int			i;
+	int			error;
+	int			klocked = 0;
+	int			newfd = -1;
+	int			permflag;
+	char			sname[(2 * MAXFIDSZ) + 1];
+	char			*cpi;
+	char			*cpo;
+	__u32			igen;
+	struct dentry		*dentry = NULL;
+	struct dentry		*pardentry;
+	struct file		*filp;
+	struct inode		*inode = NULL;
+	struct qstr		sqstr;
+	void			*hanp;
+	size_t			hlen;
+	vnode_t			*vp = NULL;
+	xfs_fid_t		*xfid;
+	xfs_handle_t		*handlep;
+	xfs_handle_t		handle;
+	xfs_ino_t		ino;
+	xfs_inode_t		*ip = NULL;
+	xfs_fsop_handlereq_t	hreq;
+
+
+#ifndef	PERMISSIONS_BY_USER
+	/*
+	 * Only allow Sys Admin capable users.
+	 */
+	if (! capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+#endif	/* ! PERMISSIONS_BY_USER */
+
+	/*
+	 * Only allow handle opens under a directory.
+	 */
+	if ( !S_ISDIR(parinode->i_mode) )
+		return -ENOTDIR;
+
+	/*
+	 * Copy the handle down from the user and validate
+	 * that it looks to be in the correct format.
+	 */
+	if (copy_from_user(&hreq, (struct xfs_fsop_handlereq *)arg,
+					sizeof(struct xfs_fsop_handlereq)))
+		return -XFS_ERROR(EFAULT);
+
+	hanp = hreq.ihandle;
+	hlen = hreq.ihandlen;
+
+	handlep = &handle;
+
+	/*
+	 * gethandle(hanp, hlen, &handle)
+	 */
+	if (hlen < sizeof(handlep->ha_fsid) || hlen > sizeof(*handlep))
+		return -XFS_ERROR(EINVAL);
+
+	if (copy_from_user(handlep, hanp, hlen))
+		return -XFS_ERROR(EFAULT);
+
+	if (hlen < sizeof(*handlep))
+		bzero(((char *)handlep) + hlen,
+					sizeof(*handlep) - hlen);
+
+	if (hlen > sizeof(handlep->ha_fsid)) {
+
+		if (   handlep->ha_fid.xfs_fid_len !=
+				(hlen - sizeof(handlep->ha_fsid)
+					- sizeof(handlep->ha_fid.xfs_fid_len))
+		    || handlep->ha_fid.xfs_fid_pad) {
+
+			return -XFS_ERROR(EINVAL);
+		}
+	}
+
+
+	/*
+	 * Crack the handle, obtain the inode # & generation #
+	 */
+
+	/*
+	 * handle_to_vp(&handle)
+	 * VFS_VGET (vfsp, &vp, &handlep->ha_fid, error)
+	 *	     bdp, **vp, fidp;
+	 */
+	xfid = (struct xfs_fid *)&handlep->ha_fid;
+
+	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
+		ino  = xfid->xfs_fid_ino;
+		igen = xfid->xfs_fid_gen;
+	} else {
+		/*
+		 * Invalid.  Since handles can be created in user
+		 * space and passed in, this is not cause for a panic.
+		 */
+		return -XFS_ERROR(EINVAL);
+	}
+
+
+	/*
+	 * Make a unique name for dcache.
+	 */
+	cpi = (char *)hanp;
+	cpo = sname;
+
+	for (i = 0; i < hlen && i < MAXFIDSZ; i++) {
+		sprintf(cpo, "%02x", *cpi);
+
+		cpi++;
+		cpo += 2;
+	}
+
+	*cpo = '\0';
+
+	/*
+	 * Obtain/create a 'dentry'.
+	 */
+	sqstr.name = sname;
+	sqstr.len  = 2 * hlen;
+	sqstr.hash = full_name_hash(sname, hlen);
+
+	pardentry = parfilp->f_dentry;
+
+
+	down(&parinode->i_sem);
+
+	dentry = d_lookup(pardentry, &sqstr);	/* There already? */
+
+	if (! dentry) {
+		dentry = d_alloc(pardentry, &sqstr);
+
+		if (! dentry) {
+			up(&parinode->i_sem);
+
+			return -ENOMEM;
+		}
+	}
+
+	up(&parinode->i_sem);
+
+
+	/*
+	 * Handle 'negative' & 'new' dentries.
+	 */
+	inode = dentry->d_inode;
+
+	if (inode == NULL) {
+
+		/*
+		 * Get the XFS inode, building a vnode to go with it.
+		 */
+		error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+
+		if (error) {
+			error = -error;
+
+			goto cleanup_dentry;
+		}
+
+		if (ip == NULL) {
+			error = -XFS_ERROR(EIO);
+
+			goto cleanup_dentry;
+		}
+
+		if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+
+			xfs_iput(ip, XFS_ILOCK_SHARED);
+
+			error = -XFS_ERROR(ENOENT);
+
+			goto cleanup_dentry;
+		}
+
+		vp = XFS_ITOV(ip);
+
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+
+		/*
+		 * Get the linux inode, triggering a linvfs_read_inode
+		 * which will stitch the XFS inode/vnode into place.
+		 */
+		inode = iget(parinode->i_sb, vp->v_nodeid);
+
+		if (! inode) {
+			error = -EACCES;
+
+			VN_RELE(vp);
+
+			goto cleanup_dentry;
+		}
+
+		d_add(dentry, inode);
+	}
+
+	/*
+	 * Restrict handle operations to directories & regular files.
+	 */
+	if (! (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)) ) {
+
+		error = -XFS_ERROR(EINVAL);
+
+		goto cleanup_dentry;
+	}
+
+	/*
+	 * Get a file descriptor # to use.
+	 */
+	lock_kernel();
+
+	klocked = 1;
+
+	newfd = get_unused_fd();
+
+	if (newfd < 0) {
+		error = newfd;
+
+		goto cleanup_dentry;
+	}
+
+	/*
+	 * Get a file table entry.
+	 */
+	filp = get_empty_filp();
+
+	if (! filp) {
+		error = -ENFILE;
+
+		goto cleanup_fd;
+	}
+
+	filp->f_flags = hreq.oflags;
+
+	filp->f_mode = (hreq.oflags + 1) & O_ACCMODE;
+
+#ifdef	PERMISSIONS_BY_USER
+	/*
+	 * Do permission/write checks
+	 */
+	permflag = 0;
+
+	if (filp->f_mode & FMODE_READ)
+		permflag |= MAY_READ;
+
+	if (filp->f_mode & FMODE_WRITE)
+		permflag |= MAY_WRITE;
+
+	if (error = permission(inode, permflag))
+		goto cleanup_file;
+
+#endif	/* PERMISSIONS_BY_USER */
+
+	if (filp->f_mode & FMODE_WRITE) {
+
+		if (vp->v_type == VDIR) {	/* Can't write directories */
+			error = -EISDIR;
+
+			goto cleanup_file;
+		}
+
+		error = get_write_access(inode);
+
+		if (error)
+			goto cleanup_file;
+	}
+
+
+	/*
+	 * Stitch it all together.
+	 */
+	filp->f_dentry = dentry;
+	filp->f_pos    = 0;
+	filp->f_reada  = 0;
+	filp->f_op     = inode->i_fop;
+
+	if (inode->i_sb)
+		file_move(filp, &inode->i_sb->s_files);
+
+	if (filp->f_op && filp->f_op->open) {
+
+		error = filp->f_op->open(inode, filp);
+
+		if (error)
+			goto cleanup_all;
+	}
+
+	filp->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
+
+	fd_install(newfd, filp);
+
+
+	return newfd;
+
+
+cleanup_all:
+	if (filp->f_mode & FMODE_WRITE)
+		put_write_access(inode);
+
+cleanup_file:
+	filp->f_dentry = NULL;
+	put_filp(filp);
+
+cleanup_fd:
+	if (newfd >= 0)
+		put_unused_fd(newfd);
+
+cleanup_dentry:
+	dput(dentry);
+
+	if (klocked)
+		unlock_kernel();
+
+	return error;
+}
+
+
+int
+xfs_readlink_by_handle(
+	unsigned int	cmd,
+	unsigned long	arg,
+	struct file	*parfilp,
+	struct inode	*parinode,
+	vfs_t		*vfsp,
+	xfs_mount_t	*mp)
+{
+	int			i;
+	int			error;
+	int			rlsize;
+	__u32			igen;
+	struct iovec		aiov;
+	struct uio		auio;
+	void			*hanp;
+	size_t			hlen;
+	vnode_t			*vp = NULL;
+	xfs_fid_t		*xfid;
+	xfs_handle_t		*handlep;
+	xfs_handle_t		handle;
+	xfs_ino_t		ino;
+	xfs_inode_t		*ip = NULL;
+	xfs_fsop_handlereq_t	hreq;
+
+
+#ifndef	PERMISSIONS_BY_USER
+	/*
+	 * Only allow Sys Admin capable users.
+	 */
+	if (! capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+#endif	/* ! PERMISSIONS_BY_USER */
+
+	/*
+	 * Only allow handle opens under a directory.
+	 */
+	if ( !S_ISDIR(parinode->i_mode) )
+		return -ENOTDIR;
+
+	/*
+	 * Copy the handle down from the user and validate
+	 * that it looks to be in the correct format.
+	 */
+	if (copy_from_user(&hreq, (struct xfs_fsop_handlereq *)arg,
+					sizeof(struct xfs_fsop_handlereq)))
+		return -XFS_ERROR(EFAULT);
+
+	hanp = hreq.ihandle;
+	hlen = hreq.ihandlen;
+
+	handlep = &handle;
+
+	/*
+	 * gethandle(hanp, hlen, &handle)
+	 */
+	if (hlen < sizeof(handlep->ha_fsid) || hlen > sizeof(*handlep))
+		return -XFS_ERROR(EINVAL);
+
+	if (copy_from_user(handlep, hanp, hlen))
+		return -XFS_ERROR(EFAULT);
+
+	if (hlen < sizeof(*handlep))
+		bzero(((char *)handlep) + hlen,
+					sizeof(*handlep) - hlen);
+
+	if (hlen > sizeof(handlep->ha_fsid)) {
+
+		if (   handlep->ha_fid.xfs_fid_len !=
+				(hlen - sizeof(handlep->ha_fsid)
+					- sizeof(handlep->ha_fid.xfs_fid_len))
+		    || handlep->ha_fid.xfs_fid_pad) {
+
+			return -XFS_ERROR(EINVAL);
+		}
+	}
+
+
+	/*
+	 * Crack the handle, obtain the inode # & generation #
+	 */
+
+	/*
+	 * handle_to_vp(&handle)
+	 * VFS_VGET (vfsp, &vp, &handlep->ha_fid, error)
+	 *	     bdp, **vp, fidp;
+	 */
+	xfid = (struct xfs_fid *)&handlep->ha_fid;
+
+	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
+		ino  = xfid->xfs_fid_ino;
+		igen = xfid->xfs_fid_gen;
+	} else {
+		/*
+		 * Invalid.  Since handles can be created in user
+		 * space and passed in via gethandle(), this is not
+		 * cause for a panic.
+		 */
+		return -XFS_ERROR(EINVAL);
+	}
+
+
+	/*
+	 * Get the XFS inode, building a vnode to go with it.
+	 */
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+
+	if (error)
+		return -error;
+
+	if (ip == NULL)
+		return -XFS_ERROR(EIO);
+
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+
+		xfs_iput(ip, XFS_ILOCK_SHARED);
+
+		return -XFS_ERROR(ENOENT);
+	}
+
+	vp = XFS_ITOV(ip);
+
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+
+	/*
+	 * Restrict handle operations to symlinks.
+	 */
+	if (vp->v_type != VLNK) {
+			VN_RELE(vp);
+
+			return -XFS_ERROR(EINVAL);
+	}
+
+	aiov.iov_base	= hreq.ohandle;
+	aiov.iov_len	= *hreq.ohandlen;
+
+	auio.uio_iov	= &aiov;
+	auio.uio_iovcnt	= 1;
+	auio.uio_pmp	= NULL;
+
+	auio.uio_readiolog	= 0;
+	auio.uio_writeiolog	= 0;
+
+	auio.uio_fmode	= FINVIS;
+	auio.uio_offset	= 0;
+	auio.uio_segflg	= UIO_USERSPACE;
+	auio.uio_resid	= *hreq.ohandlen;
+
+	VOP_READLINK(vp, &auio, get_current_cred(), error);
+
+	VN_RELE(vp);
+
+	rlsize = *hreq.ohandlen - auio.uio_resid;
+
+	return rlsize;
+}
+
+
+int xfs_ioctl (
+	bhv_desc_t	*bdp,
 	struct inode	*inode,
 	struct file	*filp,
 	unsigned int	cmd,
@@ -135,14 +739,14 @@ int linvfs_ioctl (
 	int		error;
 	struct biosize	bs;
 	struct dioattr	da;
-	xfs_flock64_t	bf;
 	struct fsdmidata dmi;
 	struct fsxattr	fa;
-	bhv_desc_t	*bdp;
 	cred_t		cred;		/* Temporary cred workaround */
 	vattr_t		va;
 	vnode_t		*vp;
+	vfs_t		*vfsp;
 	xfs_fsop_geom_t	fsgeo;
+	xfs_flock64_t	bf;
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
 
@@ -150,17 +754,18 @@ int linvfs_ioctl (
 
 	ASSERT(vp);
 
-	vn_trace_entry(vp, "linvfs_ioctl", (inst_t *)__return_address);
-
-	bdp = VNODE_TO_FIRST_BHV(vp);
-
-	ASSERT(bdp);
+	vn_trace_entry(vp, "xfs_ioctl", (inst_t *)__return_address);
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 
+	vfsp = LINVFS_GET_VFS(inode->i_sb);
+
+	ASSERT(vfsp);
+
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return (EIO);
+
 
 	switch (cmd) {
 	case XFS_IOC_ALLOCSP:
@@ -214,6 +819,63 @@ int linvfs_ioctl (
 
 		return copy_to_user((struct dioattr *)arg, &da,
 						sizeof(struct dioattr));
+
+	case XFS_IOC_FSBULKSTAT_SINGLE:
+	case XFS_IOC_FSBULKSTAT: {
+		int		count;		/* # of records returned */
+		ino64_t		inlast;		/* last inode number */
+		int		done;		/* = 1 if there are more
+						 * stats to get and if
+						 * bulkstat should be called
+						 * again.
+						 * This is unused in syssgi
+						 * but used in dmi */
+		xfs_fsop_bulkreq_t	bulkreq;
+
+
+		if (copy_from_user(&bulkreq, (xfs_fsop_bulkreq_t *)arg,
+						sizeof(xfs_fsop_bulkreq_t)))
+			return -XFS_ERROR(EFAULT);
+
+		if (copy_from_user(&inlast, (__s64 *)bulkreq.lastip,
+							sizeof(__s64)))
+			return -XFS_ERROR(EFAULT);
+
+		if ((count = bulkreq.icount) <= 0)
+			return -XFS_ERROR(EINVAL);
+
+		if (cmd == XFS_IOC_FSBULKSTAT_SINGLE) {
+			error = xfs_bulkstat_single(mp, &inlast,
+						bulkreq.ubuffer, &done);
+		} else {
+			if (count == 1 && inlast != 0) {
+				inlast++;
+
+				error = xfs_bulkstat_single(mp, &inlast,
+						bulkreq.ubuffer, &done);
+			} else {
+				error = xfs_bulkstat(mp, NULL, &inlast, &count,
+					(bulkstat_one_pf)xfs_bulkstat_one, 
+					sizeof(xfs_bstat_t), bulkreq.ubuffer, 
+					BULKSTAT_FG_QUICK, &done);
+			}
+		}
+
+		if (error)
+			return -error;
+
+		if (bulkreq.ocount != NULL) {
+			if (copy_to_user((ino64_t *)bulkreq.lastip, &inlast,
+							sizeof(ino64_t)))
+				return -XFS_ERROR(EFAULT);
+
+			if (copy_to_user((__s32 *)bulkreq.ocount, &count,
+							sizeof(count)))
+				return -XFS_ERROR(EFAULT);
+		}
+
+		return 0;
+	}
 
 	case XFS_IOC_FSGEOMETRY:
 		error = xfs_fs_geometry(mp, &fsgeo, 3);
@@ -372,20 +1034,37 @@ int linvfs_ioctl (
 		return copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx));
 	}
 
-#if 0	/* XXXjtk do these?? */
-	case EXT2_IOC_GETVERSION:
-		return put_user(inode->i_generation, (int *) arg);
-	case EXT2_IOC_SETVERSION:
-		if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
-			return -EPERM;
-		if (IS_RDONLY(inode))
-			return -EROFS;
-		if (get_user(inode->i_generation, (int *) arg))
-			return -EFAULT;	
-		inode->i_ctime = CURRENT_TIME;
-		mark_inode_dirty(inode);
-		return 0;
-#endif
+	case XFS_IOC_PATH_TO_FSHANDLE: {
+		/*
+		 * XFS_IOC_PATH_TO_FSHANDLE comes in against a "mount point"
+		 * path, or any file within the mount point.
+		 */
+		return xfs_something_to_handle(inode, filp, cmd, arg,
+						vfsp, mp, bdp, vp, ip, 1);
+	}
+
+	case XFS_IOC_FD_TO_HANDLE:
+	case XFS_IOC_PATH_TO_HANDLE: {
+		/*
+		 * XFS_IOC_PATH_TO_HANDLE comes in against any file
+		 * within the mount point.
+		 * That file must've been opened by the user-land
+		 * library code.
+		 */
+		return xfs_something_to_handle(inode, filp, cmd, arg,
+						vfsp, mp, bdp, vp, ip, 0);
+	}
+
+	case XFS_IOC_OPEN_BY_HANDLE: {
+
+		return xfs_open_by_handle(cmd, arg, filp, inode, vfsp, mp);
+	}
+
+	case XFS_IOC_READLINK_BY_HANDLE: {
+
+		return xfs_readlink_by_handle(cmd, arg, filp, inode, vfsp, mp);
+	}
+
 	default:
 		return -EINVAL;
 	}

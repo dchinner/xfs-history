@@ -224,6 +224,7 @@ static int linvfs_readdir(
 	return -error;
 }
 
+
 int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	vnode_t	*vp;
@@ -241,11 +242,29 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 	return(ret);
 }
 
-extern int linvfs_ioctl(
-	struct inode *inode,
-	struct file *filp,
-	unsigned int cmd,
-	unsigned long arg);
+
+static int linvfs_ioctl(
+	struct inode	*inode,
+	struct file	*filp,
+	unsigned int	cmd,
+	unsigned long	arg)
+{
+	int	error;
+	vnode_t	*vp = LINVFS_GET_VP(inode);
+
+
+	VOP_IOCTL(vp, inode, filp, cmd, arg, error);
+
+	/* NOTE:  some of the ioctl's return positive #'s as a
+	 *	  byte count indicating success, such as
+	 *	  readlink_by_handle.  So we don't "sign flip"
+	 *	  like most other routines.  This means true
+	 *	  errors need to be returned as a negative value.
+	 */
+	return error;
+}
+
+
 
 
 struct file_operations linvfs_file_operations =

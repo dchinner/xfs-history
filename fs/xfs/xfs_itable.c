@@ -73,12 +73,14 @@
 #include "xfs_cxfs.h"
 #endif
 
+#include <linux/xfs_fs.h>
+
 
 /*
  * Return stat information for one inode.
  * Return 0 if ok, else errno.
  */
-STATIC int				/* error status */
+int					/* error status */
 xfs_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -98,6 +100,7 @@ xfs_bulkstat_one(
 
 	buf = (xfs_bstat_t *)buffer;
 	dip = (xfs_dinode_t *)dibuff;
+
 	if (! buf || ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
 	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino))) {
@@ -122,7 +125,7 @@ xfs_bulkstat_one(
 			return XFS_ERROR(ENOENT);
 		}
 		dic = &ip->i_d;
-                arch=ARCH_NOCONVERT; /* in-core! */
+                arch = ARCH_NOCONVERT;		/* in-core! */
 		ASSERT(dic != NULL);
 
 		/* xfs_iget returns the following without needing
@@ -657,7 +660,7 @@ xfs_bulkstat(
  * Return stat information in bulk (by-inode) for the filesystem.
  * Special case for non-sequential one inode bulkstat.
  */
-STATIC int				/* error status */
+int					/* error status */
 xfs_bulkstat_single(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
 	ino64_t			*lastinop, /* inode to return */

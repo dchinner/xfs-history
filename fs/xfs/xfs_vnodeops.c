@@ -254,6 +254,14 @@ xfs_change_file_space(
 	cred_t		*credp,
 	int		attr_flags);
 
+int
+xfs_ioctl(
+	bhv_desc_t	*bdp,
+	struct inode	*inode,
+	struct file	*filp,
+	unsigned int	cmd,
+	unsigned long	arg);
+
 #endif	/* !SIM */
 
 STATIC int
@@ -6336,6 +6344,7 @@ vnodeops_t xfs_vnodeops = {
 	(vop_pflushinvalvp_t)fs_nosys,
 	(vop_pflushvp_t)fs_nosys,
 	(vop_sethole_t)fs_nosys,
+	(vop_ioctl_t)fs_nosys,
 };
 
 #else
@@ -6377,5 +6386,6 @@ vnodeops_t xfs_vnodeops = {
 	fs_flushinval_pages,
 	fs_flush_pages,
 	fs_pages_sethole,
+	xfs_ioctl,
 };
 #endif /* SIM */

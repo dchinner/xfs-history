@@ -478,7 +478,16 @@ again:
 		IMON_CHECK(vp, ip->i_dev, (ino_t)ino);
 	}
 #endif
+	/*
+	 * Add in the v_nodeid field like xfs_lookup.
+	 */
+#if XFS_BIG_FILESYSTEMS
+	vp->v_nodeid = ip->i_ino + mp->m_inoadd;
+#else
+	vp->v_nodeid = ip->i_ino;
+#endif
 	*ipp = ip;
+
 	return 0;
 }
 

@@ -34,60 +34,11 @@
 
 #ident	"$Revision$"
 
+#ifdef _KERNEL
+
 struct xfs_mount;
 struct xfs_trans;
 
-/*
- * Structures returned from xfs_bulkstat syssgi routine.
- */
-
-/*
- * This is just like a timespec_t but the size is the same 
- * for 32 and 64 bit applications.
- */
-typedef struct xfs_bstime
-{
-	time_t		tv_sec;		/* seconds */
-	__int32_t	tv_nsec;	/* and nanoseconds */
-} xfs_bstime_t;
-
-typedef struct xfs_bstat
-{
-	ino64_t		bs_ino;		/* inode number */
-	mode_t		bs_mode;	/* type and mode */
-	nlink_t		bs_nlink;	/* number of links */
-	uid_t		bs_uid;		/* user id */
-	gid_t		bs_gid;		/* group id */
-	xfs_dev_t	bs_rdev;	/* device value */
-	__int32_t	bs_blksize;	/* block size */		
-	off64_t		bs_size;	/* file size */
-	xfs_bstime_t	bs_atime;	/* access time */
-	xfs_bstime_t	bs_mtime;	/* modify time */
-	xfs_bstime_t	bs_ctime;	/* inode change time */
-	__int64_t	bs_blocks;	/* number of blocks */
-	__uint32_t	bs_xflags;	/* extended flags */
-	__int32_t	bs_extsize;	/* extent size */
-	__int32_t	bs_extents;	/* number of extents */
-	__uint32_t	bs_gen;		/* generation count */
-	u_int16_t	bs_projid;	/* project id */
-	char		bs_pad[14];	/* pad space, unused */
-	__uint32_t	bs_dmevmask;	/* DMIG event mask */
-	ushort_t	bs_dmstate;	/* DMIG state info */
-	ushort_t	bs_aextents;	/* attribute number of extents */
-} xfs_bstat_t;
-
-
-/*
- * Structures returned from xfs_inumbers syssgi routine.
- */
-typedef struct xfs_inogrp
-{
-	ino64_t		xi_startino;	/* starting inode number */
-	int		xi_alloccount;	/* count of bits set in allocmask */
-	__uint64_t	xi_allocmask;	/* mask of allocated inodes */
-} xfs_inogrp_t;
-
-#ifdef _KERNEL
 /*
  * Prototypes for visible xfs_itable.c routines.
  */
@@ -156,6 +107,23 @@ xfs_bulkstat(
 	caddr_t		ubuffer,	/* buffer with inode stats */
 	int		flags,		/* flag to control access method */
 	int		*done);		/* 1 if there're more stats to get */
+
+int
+xfs_bulkstat_single(
+	struct xfs_mount	*mp,
+	ino64_t		*lastinop,
+	caddr_t		buffer,
+	int		*done);
+
+int
+xfs_bulkstat_one(
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp,
+	xfs_ino_t	ino,
+	void		*buffer,
+	daddr_t		bno,
+	void		*dibuff,
+	int		*stat);
 
 #endif	/* _KERNEL */
 
