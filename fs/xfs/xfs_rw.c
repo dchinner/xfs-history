@@ -12,6 +12,7 @@
 #include <sys/sysmacros.h>
 #include <sys/pfdat.h>
 #include <sys/uuid.h>
+#include <sys/major.h>
 #include <sys/grio.h>
 #include <sys/pda.h>
 #ifdef SIM
@@ -201,6 +202,9 @@ xfs_io_is_guaranteed(
 	xfs_inode_t	*,
 	stream_id_t	*);
 
+extern void
+griostrategy(
+	buf_t	*);
 extern int
 xfs_fp_to_stream(
 	vfile_t		*,
@@ -4429,12 +4433,21 @@ xfsbdstrat(
 	struct buf		*bp)
 {
 	struct bdevsw	*my_bdevsw;
+	int		dev_major = emajor(bp->b_edev);
 
 	ASSERT(mp);
 	my_bdevsw = get_bdevsw(bp->b_edev);
 	ASSERT(my_bdevsw != NULL);
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
-		bdstrat(my_bdevsw, bp);
+		/* We want priority I/Os to non-XLV disks to go thru'
+		 * griostrategy(). The rest of the I/Os follow the normal
+		 * path.
+		 */
+		if ( (BUF_IS_PRIO(bp)) &&
+				(dev_major != XLV_MAJOR) ) {
+			griostrategy(bp);
+		} else
+			bdstrat(my_bdevsw, bp);
 		return 0;
 	}
 
@@ -5154,9 +5167,7 @@ retry:
 	  		nbp = bps[j];
 	    		biowait(nbp);
 			nbp->b_flags2 &= ~B_GR_BUF;
-#if 0
 			nbp->b_flags2 &= ~B_PRIO_BUF;
-#endif
 
 	     		if (!error)
 				error = geterror(nbp);
@@ -5324,7 +5335,10 @@ xfs_diordwr(
  	 	 * Check if this is a guaranteed rate I/O
 	 	 */
 		if (xfs_fp_to_stream((vfile_t *)uiop->uio_fp, &stream_id)) {
-			bp->b_flags2 |= B_GR_BUF;
+			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+				bp->b_flags2 |= B_GR_BUF;
+			else
+				bp->b_flags2 |= B_PRIO_BUF;
 
 			ASSERT(bp->b_grio_private == NULL);
 			bp->b_grio_private = 
@@ -5337,22 +5351,14 @@ xfs_diordwr(
 		} else {
 			bp->b_grio_private = NULL;
 			bp->b_flags2 &= ~B_GR_BUF;
+			bp->b_flags2 &= ~B_PRIO_BUF;
 		}
 	} else {
 		bp->b_edev = mp->m_dev;
 		bp->b_grio_private = NULL;
 		bp->b_flags2 &= ~B_GR_BUF;
+		bp->b_flags2 &= ~B_PRIO_BUF;
 	}
-
-#if 0
-	/*
-	 * If this is a "priority" I/O, set the Priority I/O flag in the buf_t
-	 */
-	if (ioflag & IO_PRIORITY) {
-	  bp->b_flags2 |= B_PRIO_BUF;
-	} else
-	  bp->b_flags2 &= ~B_PRIO_BUF;
-#endif
 
 	/*
  	 * Perform I/O operation.
@@ -5365,7 +5371,7 @@ xfs_diordwr(
  	 */
 	bp->b_flags = 0;
 
-	if (BUF_IS_GRIO(bp)) {
+	if (BUF_IS_GRIO(bp) || BUF_IS_PRIO(bp)) {
 
 		grio_monitor_io_end(&stream_id, index);
 #ifdef GRIO_DEBUG
@@ -5375,12 +5381,8 @@ xfs_diordwr(
 		kmem_zone_free(grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
 		bp->b_grio_private = NULL;
 		bp->b_flags2 &= ~B_GR_BUF;
+		bp->b_flags2 &= ~B_PRIO_BUF;
 	}
-
-#if 0
-	/* Reset the Priority I/O flag */
-	bp->b_flags2 &= ~B_PRIO_BUF;
-#endif
 
 #ifdef SIM
 	bp->b_un.b_addr = 0;
