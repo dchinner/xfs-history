@@ -50,57 +50,51 @@ STATIC int
 acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
 {
 	char *src_acl = (char*)src;
-	const char *end = src_acl + size;
 	acl_ea_header *header;
 	int n, count;
+	xfs_acl_entry_t *dest_entry;
+	acl_ea_entry *src_entry;
 
-	if (!src_acl)
+	if (!src_acl || !dest)
 		return EINVAL;
+
 	if (size < sizeof(acl_ea_header))
 		return EINVAL;
+
 	header = (acl_ea_header *)src;
 	if (header->a_version != cpu_to_le32(ACL_EA_VERSION))
 		return EINVAL;
-	src_acl = src_acl + sizeof(acl_ea_header);
+
 	count = acl_ea_count(size);
 	if (count <= 0)
 		return EINVAL;
+
 	memset(dest, 0, sizeof(xfs_acl_t));
 	dest->acl_cnt = count;
+        src_entry = (acl_ea_entry*) (src_acl + sizeof(acl_ea_header));
+        dest_entry = &dest->acl_entry[0];
 
-	for (n=0; n < count; n++) {
-		acl_ea_entry *entry = (acl_ea_entry *)src_acl;
+	for (n = 0; n < count; n++, src_entry++, dest_entry++) {
+		dest_entry->ae_tag  = le16_to_cpu(src_entry->e_tag);
+		dest_entry->ae_perm = le16_to_cpu(src_entry->e_perm);
+		switch(dest_entry->ae_tag) {
+			case ACL_USER:
+			case ACL_GROUP:
+				dest_entry->ae_id =
+				       le32_to_cpu(src_entry->e_id);
+				break;
 
-		if (src_acl + sizeof(acl_ea_entry_short) > end)
-		       return EINVAL;
-		dest->acl_entry[n].ae_tag  = le16_to_cpu(entry->e_tag);
-		dest->acl_entry[n].ae_perm = le16_to_cpu(entry->e_perm);
-		switch(dest->acl_entry[n].ae_tag) {
 			case ACL_USER_OBJ:
 			case ACL_GROUP_OBJ:
 			case ACL_MASK:
 			case ACL_OTHER:
-				src_acl = src_acl +
-				       sizeof(acl_ea_entry_short);
-				dest->acl_entry[n].ae_id = ACL_UNDEFINED_ID;
-				break;
-
-			case ACL_USER:
-			case ACL_GROUP:
-				src_acl = src_acl +
-				       sizeof(acl_ea_entry);
-				if (src_acl > end)
-				       return EINVAL;
-				dest->acl_entry[n].ae_id =
-				       le32_to_cpu(entry->e_id);
+				dest_entry->ae_id = ACL_UNDEFINED_ID;
 				break;
 
 			default:
 				return EINVAL;
 		}
 	}
-	if (src_acl != end)
-	    return EINVAL;
 	return 0;
 }
 
@@ -126,7 +120,8 @@ STATIC int
 acl_xfs_to_ext_attr(xfs_acl_t *src, acl_ea_header *ext_acl, size_t size)
 {
 	size_t new_size = acl_ea_size(src->acl_cnt);
-	acl_ea_entry *entry;
+	acl_ea_entry *dest_entry;
+	xfs_acl_entry_t *src_entry;
 	int n;
 
 	if (size < new_size)
@@ -137,25 +132,25 @@ acl_xfs_to_ext_attr(xfs_acl_t *src, acl_ea_header *ext_acl, size_t size)
 		acl_entry_compare);
 
 	ext_acl->a_version = cpu_to_le32(ACL_EA_VERSION);
-	entry = &ext_acl->a_entries[0];
-	for (n=0; n < src->acl_cnt; n++) {
-		entry->e_tag  = cpu_to_le16(src->acl_entry[n].ae_tag);
-		entry->e_perm = cpu_to_le16(src->acl_entry[n].ae_perm);
+	dest_entry = &ext_acl->a_entries[0];
+	src_entry = &src->acl_entry[0];
+	for (n=0; n < src->acl_cnt; n++, dest_entry++, src_entry++) {
+		dest_entry->e_tag  = cpu_to_le16(src_entry->ae_tag);
+		dest_entry->e_perm = cpu_to_le16(src_entry->ae_perm);
 
-		switch(src->acl_entry[n].ae_tag) {
+		switch(src_entry->ae_tag) {
 			case ACL_USER:
 			case ACL_GROUP:
-				entry->e_id =
-					cpu_to_le32(src->acl_entry[n].ae_id);
-				entry++;
+				dest_entry->e_id =
+					cpu_to_le32(src_entry->ae_id);
 				break;
 
 			case ACL_USER_OBJ:
 			case ACL_GROUP_OBJ:
 			case ACL_MASK:
 			case ACL_OTHER:
-				entry = (acl_ea_entry *)((char *)entry +
-					sizeof(acl_ea_entry_short));
+				dest_entry->e_id =
+					cpu_to_le32(ACL_UNDEFINED_ID);
 				break;
 
 			default:
