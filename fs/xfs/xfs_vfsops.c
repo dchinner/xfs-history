@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.193 $"
+#ident  "$Revision: 1.194 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -2298,7 +2298,7 @@ xfs_sync(
 
 
 /*
- * xfs_vget
+ * xfs_vget - called by NFS server to get vnode from file handle
  */
 STATIC int
 xfs_vget(
@@ -2317,12 +2317,16 @@ xfs_vget(
 	xfid  = (struct xfs_fid *)fidp;
 	xfid2 = (struct xfs_fid2 *)fidp;
 	if (xfid->fid_len == sizeof *xfid - sizeof xfid->fid_len) {
-		ino  = (xfs_ino_t)xfid->fid_ino;
+	  /*
+	   * The 10 byte fid used by NFS, using 48 bits of inode number
+	   */
+		ino  = (xfs_ino_t)xfid->fid_ino | ((xfs_ino_t)xfid->fid_pad << 32);
 		igen = xfid->fid_gen;
 	} else if (xfid2->fid_len == sizeof *xfid2 - sizeof xfid2->fid_len) {
 		ino  = xfid2->fid_ino;
 		igen = xfid2->fid_gen;
 	} else {
+#pragma mips_frequency_hint NEVER
 		/*
 		 * Invalid.  Since handles can be created in user space
 		 * and passed in via gethandle(), this is not cause for
@@ -2333,15 +2337,18 @@ xfs_vget(
 	mp = XFS_BHVTOM(bdp);
 	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
 	if (error) {
+#pragma mips_frequency_hint NEVER
 		*vpp = NULL;
 		return error;
 	}
         if (ip == NULL) {
+#pragma mips_frequency_hint NEVER
                 *vpp = NULL;
                 return XFS_ERROR(EIO);
         }
 
 	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+#pragma mips_frequency_hint NEVER
 		xfs_iput(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
 		return 0;
