@@ -1,4 +1,4 @@
-#ident "$Revision: 1.40 $"
+#ident "$Revision: 1.39 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -591,7 +591,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * the log.
 	 */
 	trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTRINVAL);
-	if (error = xfs_trans_reserve(trans, 16,
+	if (error = xfs_trans_reserve(trans, 0,
 				      XFS_ATTRINVAL_LOG_RES(dp->i_mount),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRINVAL_LOG_COUNT)) {
@@ -602,7 +602,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 
 	/* 
 	 * No need to make quota reservations here. We expect to release some
-	 * blocks not allocate in the common case.
+	 * blocks, not allocate, in the common case.
 	 */
 	xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(trans, dp);
@@ -618,6 +618,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	error = xfs_attr_root_inactive(&trans, dp);
 	if (error)
 		goto out;
+	error = xfs_itruncate_finish(&trans, dp, 0LL, XFS_ATTR_FORK, 1);
 
 	/*
 	 * Commit the last in the sequence of transactions.
