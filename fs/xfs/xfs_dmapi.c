@@ -1449,19 +1449,22 @@ xfs_dm_get_destroy_dmattr(
 
 	VOP_ATTR_GET(vp, dkattrname.dan_chars, value, &value_len,
 			ATTR_ROOT, sys_cred, error);
-	DM_EA_XLATE_ERR(error);
 
-	if (error == E2BIG) {
+	if (error == ERANGE) {
 		alloc_size = value_len;
-		value = kmem_alloc(alloc_size, KM_SLEEP);
+		value = kmalloc(alloc_size, SLAB_KERNEL);
+		if (value == NULL) {
+			printk("%s/%d: kmalloc returned NULL\n", __FUNCTION__, __LINE__);
+			return(ENOMEM);
+		}
 
 		VOP_ATTR_GET(vp, dkattrname.dan_chars, value,
 			&value_len, ATTR_ROOT, sys_cred, error);
-		DM_EA_XLATE_ERR(error);
 	}
 	if (error) {
 		if (alloc_size)
-			kmem_free(value, alloc_size);
+			kfree(value);
+		DM_EA_XLATE_ERR(error);
 		return(error);
 	}
 
@@ -1475,15 +1478,24 @@ xfs_dm_get_destroy_dmattr(
 	}
 
 	if (!alloc_size) {
-		value = kmem_alloc(value_len, KM_SLEEP);
+		value = kmalloc(value_len, SLAB_KERNEL);
+		if (value == NULL) {
+			printk("%s/%d: kmalloc returned NULL\n", __FUNCTION__, __LINE__);
+			return(ENOMEM);
+		}
 		bcopy(buffer, value, value_len);
 	} else if (value_len > DM_MAX_ATTR_BYTES_ON_DESTROY) {
 		int	value_len2 = DM_MAX_ATTR_BYTES_ON_DESTROY;
 		char	*value2;
 
-		value2 = kmem_alloc(value_len2, KM_SLEEP);
+		value2 = kmalloc(value_len2, SLAB_KERNEL);
+		if (value2 == NULL) {
+			printk("%s/%d: kmalloc returned NULL\n", __FUNCTION__, __LINE__);
+			kfree(value);
+			return(ENOMEM);
+		}
 		bcopy(value, value2, value_len2);
-		kmem_free(value, value_len);
+		kfree(value);
 		value = value2;
 		value_len = value_len2;
 	}
@@ -1597,6 +1609,8 @@ xfs_dm_get_dirattrs_rvp(
 		/* See if the directory was removed after it was opened. */
 		if (dp->i_d.di_nlink <= 0) {
 			xfs_iunlock_map_shared(dp, lock_mode);
+			kmem_free(statbufp, statbufsz);
+			kmem_free(direntp, direntbufsz);
 			return(ENOENT);
 		}
 		if (dir_gen == 0)
