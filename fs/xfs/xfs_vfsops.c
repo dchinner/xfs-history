@@ -526,7 +526,6 @@ xfs_get_vfsmount(
 	 */
 	mp = xfs_mount_init();
 
-	vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
 	/* vfsp->vfs_bsize filled in later from superblock */
 	vfsp->vfs_fstype = xfs_fstype;
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);

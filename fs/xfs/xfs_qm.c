@@ -1081,7 +1081,7 @@ xfs_qm_unmount(
  * This is called by xfs_sync and flags arg determines the caller,
  * and its motives, as done in xfs_sync.
  *
- * vfs_sync: SYNC_FSDATA|SYNC_ATTR|SYNC_BDFLUSH|SYNC_NOWAIT 0x31
+ * vfs_sync: SYNC_FSDATA|SYNC_ATTR|SYNC_BDFLUSH 0x31
  * syscall sync: SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI 0x25
  * umountroot : SYNC_WAIT | SYNC_CLOSE | SYNC_ATTR | SYNC_FSDATA
  */
