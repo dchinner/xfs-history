@@ -124,7 +124,6 @@ typedef struct xfs_dir_put_args
 	int		namelen;	/* length of name */
 	int		done;		/* output: set if value was stored */
 	xfs_dir_put_t	put;		/* put function ptr (i/o) */
-	xfs_dir_put_t	*putp;		/* ptr to put (original copy) */
 	struct uio	*uio;		/* uio control structure */
 } xfs_dir_put_args_t;
 
@@ -168,7 +167,7 @@ int xfs_dir_shortform_to_leaf(struct xfs_da_args *args);
 int xfs_dir_shortform_removename(struct xfs_da_args *args);
 int xfs_dir_shortform_getdents(struct xfs_trans *trans, struct xfs_inode *dp,
 			       struct uio *uio, int *eofp, struct dirent *dbp,
-			       xfs_dir_put_t *put);
+			       xfs_dir_put_t put);
 int xfs_dir_shortform_replace(struct xfs_da_args *args);
 #endif	/* !SIM */
 
@@ -200,7 +199,7 @@ int	xfs_dir_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 int	xfs_dir_leaf_getdents_int(struct buf *bp, struct xfs_inode *dp,
 					 xfs_dablk_t bno, struct uio *uio,
 					 int *eobp, struct dirent *dbp,
-					 xfs_dir_put_t *put, daddr_t nextda);
+					 xfs_dir_put_t put, daddr_t nextda);
 
 /*
  * Routines used for shrinking the Btree.
@@ -216,11 +215,9 @@ void	xfs_dir_leaf_unbalance(struct xfs_da_state *state,
  */
 uint	xfs_dir_leaf_lasthash(struct buf *bp, int *count);
 int	xfs_dir_leaf_order(struct buf *leaf1_bp, struct buf *leaf2_bp);
-int	xfs_dir_put_dirent32_first(xfs_dir_put_args_t *pa);
-int	xfs_dir_put_dirent32_rest(xfs_dir_put_args_t *pa);
+int	xfs_dir_put_dirent32_direct(xfs_dir_put_args_t *pa);
 int	xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa);
-int	xfs_dir_put_dirent64_first(xfs_dir_put_args_t *pa);
-int	xfs_dir_put_dirent64_rest(xfs_dir_put_args_t *pa);
+int	xfs_dir_put_dirent64_direct(xfs_dir_put_args_t *pa);
 int	xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa);
 
 /*

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_BTREE_H
 #define	_FS_XFS_IALLOC_BTREE_H
 
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision$"
 
 /*
  * Inode map on-disk structures
@@ -73,7 +73,7 @@ xfs_inofree_t xfs_inobt_mask(int i);
 int xfs_inobt_is_free(xfs_inobt_rec_t *rp, int i);
 #define	XFS_INOBT_IS_FREE(rp,i)		xfs_inobt_is_free(rp,i)
 #else
-#define	XFS_INOBT_IS_FREE(rp,i)		((rp)->ir_free & XFS_INOBT_MASK(i))
+#define	XFS_INOBT_IS_FREE(rp,i)	(((rp)->ir_free & XFS_INOBT_MASK(i)) != 0)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INOBT_SET_FREE)
 void xfs_inobt_set_free(xfs_inobt_rec_t *rp, int i);
