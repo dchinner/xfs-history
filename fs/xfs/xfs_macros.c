@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 #define	XFS_MACRO_C
 
@@ -1719,6 +1719,14 @@ int
 xfs_sb_version_hasattr(xfs_sb_t *sbp)
 {
 	return XFS_SB_VERSION_HASATTR(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASDALIGN)
+int
+xfs_sb_version_hasdalign(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASDALIGN(sbp);
 }
 #endif
 
