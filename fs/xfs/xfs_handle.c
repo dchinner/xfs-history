@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.35 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -320,7 +320,7 @@ vp_open (
 		}
 	}
 	/* Check discretionary permissions. */
-	VOP_ACCESS (vp, mode, 0, crp, error);
+	VOP_ACCESS (vp, mode, crp, error);
 	if (error)
 		goto out;
 
