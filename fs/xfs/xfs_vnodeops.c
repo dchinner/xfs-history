@@ -3808,6 +3808,7 @@ xfs_reclaim(
 	vnode_t		*vp;
 
 	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(bdp);
 
 	vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 
@@ -3818,8 +3819,6 @@ xfs_reclaim(
 		xfs_ireclaim(ip);
 		return 0;
 	}
-
-	ip = XFS_BHVTOI(bdp);
 
 	if ((ip->i_d.di_mode & S_IFMT) == S_IFREG) {
 		if (ip->i_d.di_size > 0) {
