@@ -1117,8 +1117,8 @@ xfs_read(
 	off_t		n;
 	size_t		count;
 	int		error;
+	xfs_mount_t	*mp;
 	size_t		resid;
-
 
 	ip = XFS_VTOI(vp);
 	ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
@@ -1141,7 +1141,28 @@ xfs_read(
 		return XFS_ERROR(EINVAL);
 	if (count <= 0)
 		return 0;
+	if (ioflag & IO_RSYNC) {
+		/* First we sync the data */
+	    if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
+		chunkpush(vp, offset, offset + count , 0);
+	    }
+		/* Now we sync the timestamps */
+	    if (ioflag & IO_SYNC) {
+		xfs_inode_t	*ip;
 
+		ip = XFS_VTOI(vp);
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+		xfs_iflock(ip);
+		xfs_iflush(ip, XFS_IFLUSH_SYNC);
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
+	    } else {
+		if (ioflag & IO_DSYNC) {
+		    mp = ip->i_mount;
+		    xfs_log_force(mp, (xfs_lsn_t)0,
+				  XFS_LOG_FORCE | XFS_LOG_SYNC );
+		}
+	    }
+	}
 	switch (type) {
 	case IFREG:
 		/*
@@ -2054,7 +2075,7 @@ xfs_write_file(
 					    XFS_BB_TO_FSBT(mp, bp->b_offset),
 					    XFS_B_TO_FSBT(mp, bp->b_bcount));
 
-			if (ioflag & IO_SYNC) {
+			if ((ioflag & IO_SYNC)   || (ioflag & IO_DSYNC)) {
 				if ((bmapp->pboff + bmapp->pbsize) ==
 				    bmapp->bsize) {
 					bp->b_relse = chunkrelse;
@@ -2264,6 +2285,11 @@ retry:
 			xfs_trans_set_sync(tp);
 			xfs_trans_commit(tp, 0);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		}
+		if (ioflag & IO_DSYNC) {
+		    mp = ip->i_mount;
+		    xfs_log_force(mp, (xfs_lsn_t)0,
+				  XFS_LOG_FORCE | XFS_LOG_SYNC );
 		}
 		break;
 

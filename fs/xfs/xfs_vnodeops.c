@@ -1061,15 +1061,19 @@ xfs_fsync(vnode_t	*vp,
 		 */
 		pflushvp(vp, last_byte, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
 	}
-	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
-	       (!VN_DIRTY(vp) &&
-		(ip->i_delayed_blks == 0) &&
-		(ip->i_queued_bufs == 0)));
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	xfs_iflock(ip);
-	xfs_iflush(ip, (flag & FSYNC_WAIT) ? XFS_IFLUSH_SYNC :
-		   XFS_IFLUSH_ASYNC);
-	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
+	if (!(flag & FSYNC_DATA)) {
+	    ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
+		   (!VN_DIRTY(vp) &&
+		    (ip->i_delayed_blks == 0) &&
+		    (ip->i_queued_bufs == 0)));
+	    xfs_ilock(ip, XFS_ILOCK_SHARED);
+	    xfs_iflock(ip);
+	    xfs_iflush(ip, (flag & FSYNC_WAIT) ? XFS_IFLUSH_SYNC :
+		       XFS_IFLUSH_ASYNC);
+	    xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
+	} else {
+	    xfs_log_force(ip->i_mount, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC );
+	}
 	return 0;
 }
 
