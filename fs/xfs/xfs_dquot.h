@@ -136,7 +136,15 @@ typedef struct xfs_dquot {
 #define XFS_IS_GQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_GQUOTA_ENFD)
 
 #ifdef DEBUG
-#define XFS_DQ_IS_LOCKED(dqp)		((dqp)->q_qlock.state < 1)
+static inline int
+XFS_DQ_IS_LOCKED(xfs_dquot_t *dqp)
+{
+	if (mutex_trylock(&dqp->q_qlock)) {
+		mutex_unlock(&dqp->q_qlock);
+		return 0;
+	}
+	return 1;
+}
 #endif
 
 /*

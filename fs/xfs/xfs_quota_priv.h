@@ -67,7 +67,15 @@
 #define XQMLCK(h)			(mutex_lock(&((h)->qh_lock), PINOD))
 #define XQMUNLCK(h)			(mutex_unlock(&((h)->qh_lock)))
 #ifdef DEBUG
-#define XQMISLCKD(h)			((h)->qh_lock.state < 1)
+static inline int
+XQMISLCKD(xfs_dqhash_t *h)
+{
+	if (mutex_trylock(&h->qh_lock)) {
+		mutex_unlock(&h->qh_lock);
+		return 0;
+	}
+	return 1;
+}
 #endif
 
 #define XFS_DQ_HASH_LOCK(h)		XQMLCK(h)
