@@ -649,7 +649,9 @@ int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
 	buf_t		*bp;
-	int		error, unused;
+	int		error;
+	/* REFERENCED */
+	int		unused;
 	struct bdevsw	*my_bdevsw;
 
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
