@@ -86,8 +86,7 @@ xfs_trans_alloc(xfs_mount_t	*mp,
 {
 	xfs_trans_t	*tp;
 
-	if (!xfs_trans_zone)
-		xfs_trans_zone = kmem_zone_init(sizeof(*tp), "xfs_trans");
+	ASSERT(xfs_trans_zone != NULL);
 	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP);
 
 	/*
