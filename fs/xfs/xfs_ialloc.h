@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.24 $"
 
 /*
  * Allocation parameters for inode allocation.
@@ -11,6 +11,11 @@
 	XFS_IALLOC_MAX(XFS_INODES_PER_CHUNK, (mp)->m_sb.sb_inopblock)
 #define	XFS_IALLOC_BLOCKS(mp)	\
 	(XFS_IALLOC_INODES(mp) >> (mp)->m_sb.sb_inopblog)
+
+/*
+ * For small block file systems, move inodes in clusters of this size.
+ */
+#define	XFS_INODE_CLUSTER_SIZE	4096
 
 /*
  * Make an inode pointer out of the buffer/offset.
@@ -71,15 +76,18 @@ xfs_difree(
 #endif	/* !SIM */
 
 /*
- * Return the location of the inode in bno/off, for mapping it into a buffer.
+ * Return the location of the inode in bno/len/off,
+ * for mapping it into a buffer.
  */
-void
+int
 xfs_dilocate(
 	xfs_mount_t	*mp,		/* file system mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode to locate */
 	xfs_fsblock_t	*bno,		/* output: block containing inode */
-	int		*off);		/* output: index in block of inode */
+	int		*len,		/* output: num blocks in cluster*/
+	int		*off,		/* output: index in block of inode */
+	uint		flags);		/* flags for inode btree lookup */
 
 /*
  * Compute and fill in value of m_in_maxlevels.
