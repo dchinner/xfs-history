@@ -80,9 +80,9 @@ xfs_read_xfsstats(char *buffer, char **start, linux_off_t offset,
 	}
 	/* extra precision counters */
 	len += sprintf(buffer + len, "xpc %Lu %Lu %Lu\n",
-			xfsstats.xpc.xs_xstrat_bytes,
-			xfsstats.xpc.xs_write_bytes,
-			xfsstats.xpc.xs_read_bytes);
+			xfsstats.xs_xstrat_bytes,
+			xfsstats.xs_write_bytes,
+			xfsstats.xs_read_bytes);
 
 	if (offset >= len) {
 		*start = buffer;

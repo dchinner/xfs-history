@@ -87,7 +87,7 @@ vn_reclaim(struct vnode *vp, int flag)
 {
 	int error, s;
 
-	XFS_STATS_INC(vn_reclaim);
+	XFS_STATS_INC(xfsstats.vn_reclaim);
 
 	vn_trace_entry(vp, "vn_reclaim", (inst_t *)__return_address);
 
@@ -160,7 +160,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	int		s = 0;
 
 	
-	XFS_STATS_INC(vn_active);
+	XFS_STATS_INC(xfsstats.vn_active);
 
 	vp = LINVFS_GET_VN_ADDRESS(inode);
 
@@ -230,7 +230,7 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, int flags)
 	struct vnode	*vp;
 	xfs_ino_t	inum = (xfs_ino_t) ino;
 
-	XFS_STATS_INC(vn_alloc);
+	XFS_STATS_INC(xfsstats.vn_alloc);
 
 	inode = get_empty_inode();
 
@@ -269,7 +269,7 @@ vn_free(struct vnode *vp)
 {
 	struct inode *inode;
 
-	XFS_STATS_INC(vn_free);
+	XFS_STATS_INC(xfsstats.vn_free);
 
 	vn_trace_entry(vp, "vn_free", (inst_t *)__return_address);
 
@@ -292,7 +292,7 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 	struct inode	*inode;
 	xfs_ino_t	inum;
 
-	XFS_STATS_INC(vn_get);
+	XFS_STATS_INC(xfsstats.vn_get);
 
 	inode = ihold(vmap->v_vfsp->vfs_super, vmap->v_ino);
 
@@ -467,7 +467,7 @@ again:
 		return;
 	}
 
-	XFS_STATS_DEC(vn_active);
+	XFS_STATS_DEC(xfsstats.vn_active);
 	vp->v_flag |= VRECLM;
 	NESTED_VN_UNLOCK(vp);
 
@@ -495,7 +495,7 @@ vn_hold(struct vnode *vp)
 	register int s = VN_LOCK(vp);
 	struct inode *inode;
 
-	XFS_STATS_INC(vn_hold);
+	XFS_STATS_INC(xfsstats.vn_hold);
 
 	inode = LINVFS_GET_IP(vp);
 
@@ -528,7 +528,7 @@ vn_put(struct vnode *vp)
 	/* REFERENCED */
 	int cache;
 
-	XFS_STATS_INC(vn_rele);
+	XFS_STATS_INC(xfsstats.vn_rele);
 
 	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
 
@@ -587,7 +587,7 @@ vn_remove(struct vnode *vp)
 	/* REFERENCED */
 	vmap_t  vmap;
 
-	XFS_STATS_INC(vn_remove);
+	XFS_STATS_INC(xfsstats.vn_remove);
 
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
 

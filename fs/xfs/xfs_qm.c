@@ -2134,7 +2134,7 @@ xfs_qm_shake_freelist(
 			xfs_qm_freelist_unlock(xfs_Gqm);
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS) 
 				return (nreclaimed != howmany);
-			XFS_STATS_INC(xs_qm_dqwants);
+			XFS_STATS_INC(xfsstats.xs_qm_dqwants);
 			goto tryagain;
 		}
 		
@@ -2148,7 +2148,7 @@ xfs_qm_shake_freelist(
 			ASSERT(! XFS_DQ_IS_DIRTY(dqp));
 			ASSERT(dqp->HL_PREVP == NULL);
 			ASSERT(dqp->MPL_PREVP == NULL);
-			XFS_STATS_INC(xs_qm_dqinact_reclaims);
+			XFS_STATS_INC(xfsstats.xs_qm_dqinact_reclaims);
 			nextdqp = dqp->dq_flnext;
 			goto off_freelist;
 		}
@@ -2241,7 +2241,7 @@ xfs_qm_shake_freelist(
 		XQM_FREELIST_REMOVE(dqp);
 		xfs_dqunlock(dqp);
 		nreclaimed++;
-		XFS_STATS_INC(xs_qm_dqshake_reclaims);
+		XFS_STATS_INC(xfsstats.xs_qm_dqshake_reclaims);
 		xfs_qm_dqdestroy(dqp);
 		dqp = nextdqp;
 	}
@@ -2318,7 +2318,7 @@ xfs_qm_dqreclaim_one(void)
 			xfs_qm_freelist_unlock(xfs_Gqm);
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS) 
 				return (NULL);
-			XFS_STATS_INC(xs_qm_dqwants);
+			XFS_STATS_INC(xfsstats.xs_qm_dqwants);
 			goto startagain;
 		}
 
@@ -2335,7 +2335,7 @@ xfs_qm_dqreclaim_one(void)
 			XQM_FREELIST_REMOVE(dqp);
 			xfs_dqunlock(dqp);
 			dqpout = dqp;
-			XFS_STATS_INC(xs_qm_dqinact_reclaims);
+			XFS_STATS_INC(xfsstats.xs_qm_dqinact_reclaims);
 			break;
 		}
 
@@ -2436,7 +2436,7 @@ xfs_qm_dqalloc_incore(
 		 * Try to recycle a dquot from the freelist.
 		 */
 		if ((dqp = xfs_qm_dqreclaim_one())) {
-			XFS_STATS_INC(xs_qm_dqreclaims);
+			XFS_STATS_INC(xfsstats.xs_qm_dqreclaims);
 			/*
 			 * Just bzero the core here. The rest will get
 			 * reinitialized by caller. XXX we shouldn't even
@@ -2446,7 +2446,7 @@ xfs_qm_dqalloc_incore(
 			*O_dqpp = dqp;
 			return (B_FALSE);
 		}
-		XFS_STATS_INC(xs_qm_dqreclaim_misses);
+		XFS_STATS_INC(xfsstats.xs_qm_dqreclaim_misses);
 	}
 	/*
 	 * Allocate a brand new dquot on the kernel heap and return it

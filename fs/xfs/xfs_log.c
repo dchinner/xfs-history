@@ -48,7 +48,7 @@ STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
 				    xfs_lsn_t *);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
 				dev_t		log_dev,
-				xfs_daddr_t		blk_offset,
+				xfs_daddr_t	blk_offset,
 				int		num_bblks);
 STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
 STATIC int	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
@@ -331,7 +331,7 @@ xfs_log_force(xfs_mount_t *mp,
 
 	ASSERT(flags & XFS_LOG_FORCE);
 
-	XFS_STATS_INC(xs_log_force);
+	XFS_STATS_INC(xfsstats.xs_log_force);
 
 	if ((log->l_flags & XLOG_IO_ERROR) == 0) {
 		if (lsn == 0)
@@ -418,7 +418,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return XFS_ERROR(EIO);
 
-	XFS_STATS_INC(xs_try_logspace);
+	XFS_STATS_INC(xfsstats.xs_try_logspace);
 
 	if (*ticket != NULL) {
 		ASSERT(flags & XFS_LOG_PERM_RESERV);
@@ -453,7 +453,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 int
 xfs_log_mount(xfs_mount_t	*mp,
 	      dev_t		log_dev,
-	      xfs_daddr_t		blk_offset,
+	      xfs_daddr_t	blk_offset,
 	      int		num_bblks)
 {
 	xlog_t *log;
@@ -1108,14 +1108,14 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 STATIC xlog_t *
 xlog_alloc_log(xfs_mount_t	*mp,
 	       dev_t		log_dev,
-	       xfs_daddr_t		blk_offset,
+	       xfs_daddr_t	blk_offset,
 	       int		num_bblks)
 {
 	xlog_t			*log;
 	xlog_rec_header_t	*head;
 	xlog_in_core_t		**iclogp;
 	xlog_in_core_t		*iclog, *prev_iclog=NULL;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	int			i;
 	int			iclogsize;
 
@@ -1338,14 +1338,14 @@ xlog_sync(xlog_t		*log,
 	  xlog_in_core_t	*iclog,
 	  uint			flags)
 {
-	xfs_caddr_t		dptr;		/* pointer to byte sized element */
-	xfs_buf_t		*bp;
+	xfs_caddr_t	dptr;		/* pointer to byte sized element */
+	xfs_buf_t	*bp;
 	int		i;
 	uint		count;		/* byte count of bwrite */
 	int		split = 0;	/* split write into two regions */
 	int		error;
 
-	XFS_STATS_INC(xs_log_writes);
+	XFS_STATS_INC(xfsstats.xs_log_writes);
 	ASSERT(iclog->ic_refcnt == 0);
 
 #ifdef DEBUG
@@ -1376,7 +1376,7 @@ xlog_sync(xlog_t		*log,
 
 	/* Add for LR header */
 	count += XLOG_HEADER_SIZE;
-	XFS_STATS_ADD(xs_log_blocks, BTOBB(count));
+	XFS_STATS_ADD(xfsstats.xs_log_blocks, BTOBB(count));
 
 	/* Do we need to split this write into 2 parts? */
 	if (XFS_BUF_ADDR(bp) + BTOBB(count) > log->l_logBBsize) {
@@ -2184,7 +2184,7 @@ restart:
 		log->l_flushcnt++;
 		LOG_UNLOCK(log, spl);
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
-		XFS_STATS_INC(xs_log_noiclogs);
+		XFS_STATS_INC(xfsstats.xs_log_noiclogs);
 		/* Ensure that log writes happen */
 		psema(&log->l_flushsema, PINOD);
 		goto restart;
@@ -2297,7 +2297,7 @@ xlog_grant_log_space(xlog_t	   *log,
 		if (XLOG_FORCED_SHUTDOWN(log)) 
 			goto error_return;
 
-		XFS_STATS_INC(xs_sleep_logspace);
+		XFS_STATS_INC(xfsstats.xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 		/*
 		 * If we got an error, and the filesystem is shutting down,
@@ -2323,7 +2323,7 @@ redo:
 			XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 2");
-		XFS_STATS_INC(xs_sleep_logspace);
+		XFS_STATS_INC(xfsstats.xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 		
 		if (XLOG_FORCED_SHUTDOWN(log)) {
@@ -2434,7 +2434,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 
 			xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: sleep 1");
-			XFS_STATS_INC(xs_sleep_logspace);
+			XFS_STATS_INC(xfsstats.xs_sleep_logspace);
 			sv_wait(&tic->t_sema, PINOD|PLTWAIT,
 				&log->l_grant_lock, spl); 
 
@@ -2463,7 +2463,7 @@ redo:
 	if (free_bytes < need_bytes) {
 		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
 			XLOG_INS_TICKETQ(log->l_write_headq, tic);
-		XFS_STATS_INC(xs_sleep_logspace);
+		XFS_STATS_INC(xfsstats.xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 
 		/* If we're shutting down, this tic is already off the queue */
@@ -2861,7 +2861,7 @@ maybe_sleep:
 			LOG_UNLOCK(log, spl);
 			return XFS_ERROR(EIO);
 		}
-		XFS_STATS_INC(xs_log_force_sleep);
+		XFS_STATS_INC(xfsstats.xs_log_force_sleep);
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
@@ -2943,7 +2943,7 @@ try_again:
 		    (iclog->ic_prev->ic_state & (XLOG_STATE_WANT_SYNC |
 						 XLOG_STATE_SYNCING))) {
 			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
-			XFS_STATS_INC(xs_log_force_sleep);
+			XFS_STATS_INC(xfsstats.xs_log_force_sleep);
 			sv_wait(&iclog->ic_prev->ic_forcesema, PSWP,
 				&log->l_icloglock, spl);
 			already_slept = 1;
@@ -2969,7 +2969,7 @@ try_again:
 			LOG_UNLOCK(log, spl);
 			return XFS_ERROR(EIO);
 		}
-		XFS_STATS_INC(xs_log_force_sleep);
+		XFS_STATS_INC(xfsstats.xs_log_force_sleep);
 		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're

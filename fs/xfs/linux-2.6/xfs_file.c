@@ -110,8 +110,8 @@ STATIC ssize_t linvfs_read(
         uio.uio_iov->iov_base = buf;
         uio.uio_iov->iov_len = uio.uio_resid = size;
 
-	XFS_STATS_INC(xs_read_calls);
-	XFS_STATS64_ADD(xs_read_bytes, size);
+	XFS_STATS_INC(xfsstats.xs_read_calls);
+	XFS_STATS_ADD(xfsstats.xs_read_bytes, size);
         
 	VOP_READ(vp, &uio, 0, NULL, NULL, err);
         *offset = uio.uio_offset;
@@ -174,8 +174,8 @@ STATIC ssize_t linvfs_write(
 		pb_flags |= PBF_SYNC;
 	}
 
-	XFS_STATS_INC(xs_write_calls);
-	XFS_STATS64_ADD(xs_write_bytes, size);
+	XFS_STATS_INC(xfsstats.xs_write_calls);
+	XFS_STATS_ADD(xfsstats.xs_write_bytes, size);
 
 	vp = LINVFS_GET_VP(inode);
 

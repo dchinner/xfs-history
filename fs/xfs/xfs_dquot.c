@@ -899,7 +899,7 @@ xfs_qm_dqget(
 	 * The chain is kept locked during lookup.
 	 */
 	if (xfs_qm_dqlookup(mp, id, h, O_dqpp) == 0) {
-		XFS_STATS_INC(xs_qm_dqcachehits);
+		XFS_STATS_INC(xfsstats.xs_qm_dqcachehits);
 		/* 
 		 * The dquot was found, moved to the front of the chain, 
 		 * taken off the freelist if it was on it, and locked
@@ -911,7 +911,7 @@ xfs_qm_dqget(
 		xfs_dqtrace_entry(*O_dqpp, "DQGET DONE (FROM CACHE)"); 
 		return (0);	/* success */
 	}
-	XFS_STATS_INC(xs_qm_dqcachemisses);
+	XFS_STATS_INC(xfsstats.xs_qm_dqcachemisses);
 
 	/* 
 	 * Dquot cache miss. We don't want to keep the inode lock across 
@@ -1011,7 +1011,7 @@ xfs_qm_dqget(
 			xfs_qm_dqput(tmpdqp);
 			XFS_DQ_HASH_UNLOCK(h);
 			xfs_qm_dqdestroy(dqp);
-			XFS_STATS_INC(xs_qm_dquot_dups); 
+			XFS_STATS_INC(xfsstats.xs_qm_dquot_dups); 
 			goto again;
 		}
 	}

@@ -850,7 +850,7 @@ xfs_setattr(
 	if (timeflags && !(flags & ATTR_DMI))
 		xfs_ichgtime(ip, timeflags);
 
-	XFS_STATS_INC(xs_ig_attrchg);
+	XFS_STATS_INC(xfsstats.xs_ig_attrchg);
 
 	/*
 	 * If this is a synchronous mount, make sure that the
@@ -960,18 +960,18 @@ xfs_readlink(
 {
         xfs_inode_t     *ip;
 	int		count;
-	xfs_off_t		offset;
+	xfs_off_t	offset;
 	int		pathlen;
 	vnode_t 	*vp;
-        int             error = 0;
+        int		error = 0;
 	xfs_mount_t	*mp;
 	xfs_fsblock_t	firstblock;
 	int             nmaps;
 	xfs_bmbt_irec_t mval[SYMLINK_MAPS];
-	xfs_daddr_t         d;
-	int             byte_cnt;
+	xfs_daddr_t	d;
+	int		byte_cnt;
 	int		n;
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 
 	vp = BHV_TO_VNODE(bdp);
 
@@ -1072,8 +1072,8 @@ xfs_fsync(
 	bhv_desc_t	*bdp,
 	int		flag,
 	cred_t		*credp,
-	xfs_off_t		start,
-	xfs_off_t		stop)
+	xfs_off_t	start,
+	xfs_off_t	stop)
 {
 	xfs_inode_t	*ip;
 	int		error;
@@ -1467,7 +1467,7 @@ xfs_inactive_symlink_rmt(
 	xfs_inode_t	*ip,
 	xfs_trans_t	**tpp)
 {
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	int		committed;
 	int		done;
 	int		error;
@@ -4119,7 +4119,7 @@ xfs_readdir(
         xfs_trans_t             *tp = NULL;
 	int			error = 0;
 	uint			lock_mode;
-	xfs_off_t			start_offset;
+	xfs_off_t		start_offset;
 
 	vn_trace_entry(BHV_TO_VNODE(dir_bdp), "xfs_readdir",
 					       (inst_t *)__return_address);
@@ -4624,8 +4624,8 @@ xfs_rwunlock(
 STATIC int
 xfs_seek(
 	bhv_desc_t	*bdp,
-	xfs_off_t		old_offset,
-	xfs_off_t		*new_offsetp)
+	xfs_off_t	old_offset,
+	xfs_off_t	*new_offsetp)
 {
 	vnode_t 	*vp;
 
@@ -4655,13 +4655,13 @@ xfs_seek(
 STATIC int
 xfs_allocstore(
 	bhv_desc_t	*bdp,
-	xfs_off_t		offset,
+	xfs_off_t	offset,
 	size_t		count,
 	cred_t		*credp)
 {
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
-	xfs_off_t		isize;
+	xfs_off_t	isize;
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	last_fsb;
         xfs_fileoff_t	curr_off_fsb;
@@ -5738,8 +5738,8 @@ xfs_change_file_space(
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
 	int		setprealloc;
-	xfs_off_t		startoffset;
-	xfs_off_t		llen;
+	xfs_off_t	startoffset;
+	xfs_off_t	llen;
 	xfs_trans_t	*tp;
 	vattr_t		va;
 	vnode_t		*vp;

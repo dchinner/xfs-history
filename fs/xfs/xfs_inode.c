@@ -758,7 +758,7 @@ xfs_iread(
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
 	xfs_inode_t	**ipp,
-	xfs_daddr_t		bno)
+	xfs_daddr_t	bno)
 {
 	xfs_buf_t	*bp;
 	xfs_dinode_t	*dip;
@@ -1245,8 +1245,8 @@ xfs_itrunc_trace(
 	xfs_inode_t	*ip,
 	int		flag,		 
 	xfs_fsize_t	new_size,
-	xfs_off_t		toss_start,
-	xfs_off_t		toss_finish)		 
+	xfs_off_t	toss_start,
+	xfs_off_t	toss_finish)		 
 {
 	if (ip->i_rwtrace == NULL) {
 		return;
@@ -1302,7 +1302,7 @@ xfs_itruncate_start(
 	xfs_fsize_t	new_size)
 {
 	xfs_fsize_t	last_byte;
-	xfs_off_t		toss_start;
+	xfs_off_t	toss_start;
 	xfs_mount_t	*mp;
 	vnode_t		*vp;
 
@@ -1739,7 +1739,7 @@ xfs_iunlink(
 	xfs_buf_t	*agibp;
 	xfs_buf_t	*ibp;
 	xfs_agnumber_t	agno;
-	xfs_daddr_t		agdaddr;
+	xfs_daddr_t	agdaddr;
 	xfs_agino_t	agino;
 	short		bucket_index;
 	int		offset;
@@ -2820,7 +2820,7 @@ xfs_iflush(
 	enum { INT_DELWRI = (1 << 0), INT_ASYNC = (1 << 1) };
 	SPLDECL(s);
 
-	XFS_STATS_INC(xs_iflush_count);
+	XFS_STATS_INC(xfsstats.xs_iflush_count);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
@@ -2995,8 +2995,8 @@ xfs_iflush(
 	mutex_spinunlock(&ch->ch_lock, s);
 
 	if (clcount) {
-		XFS_STATS_INC(xs_icluster_flushcnt);
-		XFS_STATS_ADD(xs_icluster_flushinode, clcount);
+		XFS_STATS_INC(xfsstats.xs_icluster_flushcnt);
+		XFS_STATS_ADD(xfsstats.xs_icluster_flushinode, clcount);
 	}
 
 	/*

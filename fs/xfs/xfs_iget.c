@@ -186,7 +186,7 @@ xfs_iget_core(
 	xfs_chashlist_t	*chl, *chlnew;
 	SPLDECL(s);
 
-	XFS_STATS_INC(xs_ig_attempts);
+	XFS_STATS_INC(xfsstats.xs_ig_attempts);
 
 	ih = XFS_IHASH(mp, ino);
 
@@ -202,7 +202,7 @@ again:
 				if (ip->i_flags & XFS_IRECLAIM) {
 					mrunlock(&ih->ih_lock);
 					delay(1);
-					XFS_STATS_INC(xs_ig_frecycle);
+					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
 
 					goto again;
 				}
@@ -235,7 +235,7 @@ again:
 				vn_bhv_insert_initial(VN_BHV_HEAD(vp),
 							&(ip->i_bhv_desc));
 
-				XFS_STATS_INC(xs_ig_found);
+				XFS_STATS_INC(xfsstats.xs_ig_found);
 
 				mrunlock(&ih->ih_lock);
 
@@ -278,7 +278,7 @@ again:
 
 			mrunlock(&ih->ih_lock);
 
-			XFS_STATS_INC(xs_ig_found);
+			XFS_STATS_INC(xfsstats.xs_ig_found);
 
 			/*
 			 * Get a reference to the vnode/inode.
@@ -300,7 +300,7 @@ again:
 				xfs_iget_vnode_init(mp, vp, ip);
 			} else {
 				if ( ! (vp = vn_get(vp, &vmap, 0))) {
-					XFS_STATS_INC(xs_ig_frecycle);
+					XFS_STATS_INC(xfsstats.xs_ig_frecycle);
 
 					goto again;
 				}
@@ -329,7 +329,7 @@ finish_inode:
 	 * Inode cache miss: save the hash chain version stamp and unlock
 	 * the chain, so we don't deadlock in vn_alloc.
 	 */
-	XFS_STATS_INC(xs_ig_missed);
+	XFS_STATS_INC(xfsstats.xs_ig_missed);
 
 	version = ih->ih_version;
 
@@ -404,7 +404,7 @@ finish_inode:
 				}
 				xfs_idestroy(ip);
 
-				XFS_STATS_INC(xs_ig_dup);
+				XFS_STATS_INC(xfsstats.xs_ig_dup);
 				goto again;
 			}
 		}
@@ -673,7 +673,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	/*
 	 * Remove from old hash list and mount list.
 	 */
-	XFS_STATS_INC(xs_ig_reclaims);
+	XFS_STATS_INC(xfsstats.xs_ig_reclaims);
 
 	xfs_iextract(ip);
 

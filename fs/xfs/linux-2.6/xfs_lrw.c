@@ -1036,7 +1036,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 			}
 		}
 	}
-	XFS_STATS64_ADD(xs_xstrat_bytes,
+	XFS_STATS_ADD(xfsstats.xs_xstrat_bytes,
 		XFS_FSB_TO_B(mp, imap[0].br_blockcount));
 
 	offset_fsb = imap[0].br_startoff;
@@ -1160,7 +1160,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 				maps = min(nimaps, *npbmaps);
 				*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[i],
 					pbmapp, maps, *npbmaps);
-				XFS_STATS_INC(xs_xstrat_quick);
+				XFS_STATS_INC(xfsstats.xs_xstrat_quick);
 				return 0;
 			}
 			count_fsb -= imap[i].br_blockcount; /* for next bmapi,
@@ -1178,7 +1178,7 @@ xfs_strategy(bhv_desc_t	*bdp,
 		ASSERT(count_fsb);
 		offset_fsb = imap[nimaps].br_startoff + imap[nimaps].br_blockcount;
 		map_start_fsb = offset_fsb;
-		XFS_STATS_INC(xs_xstrat_split);
+		XFS_STATS_INC(xfsstats.xs_xstrat_split);
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_WR);
 	}
 

@@ -1010,10 +1010,10 @@ xfs_dm_rdwr(
 		return EACCES;
 
 	if (fflag & FMODE_READ) {
-	        XFS_STATS_INC(xs_read_calls);
+	        XFS_STATS_INC(xfsstats.xs_read_calls);
 		oflags = O_RDONLY;
 	} else {
-	        XFS_STATS_INC(xs_write_calls);
+	        XFS_STATS_INC(xfsstats.xs_write_calls);
 		oflags = O_WRONLY;
 	}
 
@@ -1077,9 +1077,9 @@ xfs_dm_rdwr(
 
 
 	if (fflag & FMODE_READ) {
-	        XFS_STATS64_ADD(xs_read_bytes, xfer);
+	        XFS_STATS_ADD(xfsstats.xs_read_bytes, xfer);
 	} else {
-	        XFS_STATS64_ADD(xs_write_bytes, xfer);
+	        XFS_STATS_ADD(xfsstats.xs_write_bytes, xfer);
 	}
 
 	return error;
