@@ -478,7 +478,7 @@ STATIC int
 xfs_dm_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_ino_t	ino,		/* inode number to get data for */
-	void		*buffer,	/* buffer to place output in */
+	void __user	*buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
 	void		*private_data,	/* my private data */
 	xfs_daddr_t	bno,		/* starting block of inode cluster */
