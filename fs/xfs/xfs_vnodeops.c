@@ -1,4 +1,4 @@
-#ident "$Revision: 1.377 $"
+#ident "$Revision: 1.378 $"
 
 
 #ifdef SIM
@@ -1391,7 +1391,7 @@ xfs_fsync(
 		}
 		ASSERT(syncall == 0 ||
 		       (vp->v_pgcnt == 0 && vp->v_buf == 0));
-	} else if (VN_DIRTY(vp) || ip->i_queued_bufs > 0) {
+	} else if (VN_DIRTY(vp)) {
 		/*
 		 * In the non-invalidating case, calls to fsync() do not
 		 * flush all the dirty mmap'd pages.  That requires a
