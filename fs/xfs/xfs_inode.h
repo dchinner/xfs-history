@@ -63,6 +63,7 @@ typedef struct xfs_inode {
 
 	/* File incore extent information. */
 	size_t			i_bytes; 	/* bytes in i_u1 */	
+	xfs_extnum_t		i_lastex;	/* last iu_extents used */
 	union {
 		xfs_bmbt_rec_t	*iu_extents;	/* linear map of file extents */
 		char		*iu_data;	/* inline file data */
@@ -80,6 +81,7 @@ typedef struct xfs_inode {
 
 	/* File incore attribute extent information. */
 	size_t			i_abytes;	/* bytes in i_u3 */
+	xfs_extnum_t		i_alastex;	/* last iu_aextents used */
 	union {
 		xfs_bmbt_rec_t	*iu_aextents;	/* map of attr extents */
 		char		*iu_adata;	/* inline attribute data */
@@ -133,6 +135,8 @@ extern void		xfs_ifunlock(xfs_inode_t *);
  * xfs_inode.c prototypes.
  */
 extern xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
+extern void		xfs_iread_extents(xfs_mount_t *, xfs_trans_t *,
+					  xfs_inode_t *);
 extern xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t,
 				    ushort, dev_t, struct cred *);
 extern void		xfs_idestroy(xfs_inode_t *);
