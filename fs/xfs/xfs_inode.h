@@ -139,12 +139,6 @@ typedef struct xfs_inode {
 #define XFS_INOREF	1
 
 /*
- * Log reservation value required by xfs_itruncate().
- */
-#define	XFS_ITRUNCATE_LOG_RES	BBTOB(128)
-
-
-/*
  * XFS file identifier.
  */
 typedef struct xfs_fid {
@@ -178,6 +172,7 @@ xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
 			    dev_t, struct cred *, buf_t **, boolean_t *);
 void		xfs_ifree(xfs_trans_t *, xfs_inode_t *);
 void		xfs_itruncate(xfs_trans_t **, xfs_inode_t *, __int64_t);
+void		xfs_igrow(xfs_trans_t *, xfs_inode_t *, __int64_t);
 
 void		xfs_idestroy(xfs_inode_t *);
 void		xfs_idata_realloc(xfs_inode_t *, int);
