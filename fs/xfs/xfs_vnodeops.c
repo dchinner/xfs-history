@@ -4037,16 +4037,17 @@ xfs_link(
 		goto error_return;
 	}
 
+	if (resblks == 0 &&
+	    (error = xfs_dir_canenter(tp, tdp, target_name, target_namelen)))
+		goto error_return;
+
 	XFS_BMAP_INIT(&free_list, &first_block);
 
 	error = xfs_dir_createname(tp, tdp, target_name, target_namelen,
 				   sip->i_ino, &first_block, &free_list,
-				   resblks > 0 ? resblks : 0);
-	if (error) {
-		if (error == ENOSPC)
-			goto error_return;
+				   resblks);
+	if (error)
 		goto abort_return;
-	}
 	xfs_ichgtime(tdp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	tdp->i_gen++;
 	xfs_trans_log_inode(tp, tdp, XFS_ILOG_CORE);
@@ -4422,6 +4423,7 @@ xfs_rmdir(
 	vnode_t 		*dir_vp;
 	int			dm_di_mode = 0;
 	int			namelen;
+	uint			resblks;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -4488,15 +4490,23 @@ xfs_rmdir(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_RMDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
 	/*
-	 * The space reservation should really be XFS_REMOVE_SPACE_RES,
-	 * which allows for directory btree deletion(s) implying
-	 * possible bmap insert(s).  We avoid this in the directory
-	 * code by, if the bmap insert tries to happen, instead trimming
-	 * the LAST block from the directory.
+	 * We try to get the real space reservation first,
+	 * allowing for directory btree deletion(s) implying
+	 * possible bmap insert(s).  If we can't get the space
+	 * reservation then we use 0 instead, and avoid the bmap
+	 * btree insert(s) in the directory code by, if the bmap
+	 * insert tries to happen, instead trimming the LAST
+	 * block from the directory.
 	 */
-        if (error = xfs_trans_reserve(tp, 0, XFS_REMOVE_LOG_RES(mp), 0,
-				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_DEFAULT_LOG_COUNT)) {
+	resblks = XFS_REMOVE_SPACE_RES(mp);
+	error = xfs_trans_reserve(tp, resblks, XFS_REMOVE_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_DEFAULT_LOG_COUNT);
+	if (error == ENOSPC) {
+		resblks = 0;
+		error = xfs_trans_reserve(tp, 0, XFS_REMOVE_LOG_RES(mp), 0,
+				XFS_TRANS_PERM_LOG_RES, XFS_DEFAULT_LOG_COUNT);
+	}
+	if (error) {
 		ASSERT(error != ENOSPC);
 		cancel_flags = 0;
 		IRELE(cdp);
@@ -4578,7 +4588,7 @@ xfs_rmdir(
 	}
 
 	error = xfs_dir_removename(tp, dp, name, namelen,
-		&first_block, &free_list, 0);
+		&first_block, &free_list, resblks);
 	if (error) {
 		goto error1;
 	}
@@ -4946,7 +4956,8 @@ xfs_symlink(
 		xfs_qm_vop_dqattach_and_dqmod_newinode(tp, ip, udqp, pdqp);
 	}
 
-	resblks -= XFS_IALLOC_SPACE_RES(mp);
+	if (resblks)
+		resblks -= XFS_IALLOC_SPACE_RES(mp);
 	/*
 	 * If the symlink will fit into the inode, write it inline.
 	 */
@@ -4976,6 +4987,8 @@ xfs_symlink(
 			goto error1;
 		}
 
+		if (resblks)
+			resblks -= fs_blocks;
 		ip->i_d.di_size = pathlen;
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
@@ -5002,9 +5015,7 @@ xfs_symlink(
 	 * Create the directory entry for the symlink.
 	 */
 	error = xfs_dir_createname(tp, dp, link_name, link_namelen,
-			ip->i_ino, &first_block, &free_list,
-			resblks ? resblks - fs_blocks -
-				XFS_IALLOC_SPACE_RES(mp) : 0);
+			ip->i_ino, &first_block, &free_list, resblks);
 	if (error) {
 		goto error1;
 	}

@@ -1027,7 +1027,16 @@ xfs_rename(
 	 * Set up the target.
 	 */
 	if (target_ip == NULL) {
-
+		/*
+		 * If there's no space reservation, check the entry will
+		 * fit before actually inserting it.
+		 */
+		if (spaceres == 0 &&
+		    (error = xfs_dir_canenter(tp, target_dp, target_name,
+				target_namelen))) {
+			rename_which_error_return = __LINE__;
+			goto error_return;
+		}
 		/*
 		 * If target does not exist and the rename crosses
 		 * directories, adjust the target directory link count
