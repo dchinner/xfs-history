@@ -623,6 +623,8 @@ xfs_itruncate_start(
 			pflushinvalvp(XFS_ITOV(ip), toss_start, last_byte);
 		}
 	}
+	ASSERT((new_size != 0) ||
+	       (!VN_DIRTY(ip->i_vnode) && (ip->i_queued_bufs == 0)));
 }		    
 
 /*
@@ -757,6 +759,10 @@ xfs_itruncate_finish(
 	ip->i_d.di_ctime.t_sec = tv.tv_sec;
 	ip->i_d.di_mtime.t_sec = tv.tv_sec;
 	xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
+	ASSERT((new_size != 0) ||
+	       (!VN_DIRTY(ip->i_vnode) &&
+		(ip->i_delayed_blks == 0) &&
+		(ip->i_queued_bufs == 0)));
 }
 
 

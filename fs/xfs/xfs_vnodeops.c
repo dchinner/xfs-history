@@ -965,6 +965,9 @@ xfs_fsync(vnode_t	*vp,
 	} else {
 		pflushvp(vp, last_byte, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
 	}
+	ASSERT(!VN_DIRTY(ip->i_vnode) &&
+	       (ip->i_delayed_blks == 0) &&
+	       (ip->i_queued_bufs == 0));
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	xfs_iflock(ip);
 	xfs_iflush(ip, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
@@ -3990,6 +3993,9 @@ xfs_reclaim(vnode_t	*vp,
 		last_byte = XFS_FSB_TO_B(mp, last_byte);
 	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 		pflushinvalvp(vp, 0, last_byte);			     
+		ASSERT(!VN_DIRTY(ip->i_vnode) &&
+		       (ip->i_delayed_blks == 0) &&
+		       (ip->i_queued_bufs == 0));
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	}
 
