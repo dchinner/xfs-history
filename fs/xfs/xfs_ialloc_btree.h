@@ -17,6 +17,7 @@ struct xfs_btree_cur;
 
 typedef	__uint64_t	xfs_inofree_t;
 #define	XFS_INODES_PER_CHUNK	(NBBY * sizeof(xfs_inofree_t))
+#define	XFS_INODES_PER_CHUNK_LOG	(XFS_NBBYLOG + 3)
 #define	XFS_INOBT_ALL_FREE	((xfs_inofree_t)-1)
 
 /*

@@ -31,6 +31,7 @@
 #include "xfs_inode.h"
 #include "xfs_alloc.h"
 #include "xfs_bit.h"
+#include "xfs_rtalloc.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -793,7 +794,8 @@ xfs_ialloc_compute_maxlevels(
 	int		minleafrecs;
 	int		minnoderecs;
 
-	maxleafents = (1LL << XFS_INO_AGINO_BITS(mp)) / XFS_INODES_PER_CHUNK;
+	maxleafents = (1LL << XFS_INO_AGINO_BITS(mp)) >>
+		XFS_INODES_PER_CHUNK_LOG;
 	minleafrecs = mp->m_alloc_mnr[0];
 	minnoderecs = mp->m_alloc_mnr[1];
 	maxblocks = (maxleafents + minleafrecs - 1) / minleafrecs;
