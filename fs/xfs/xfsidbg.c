@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2457,13 +2457,11 @@ idbg_xnode(xfs_inode_t *ip)
 		ip->i_next,
 		ip->i_prevp,
 		ip->i_mount);
-	qprintf("mnext 0x%x mprev 0x%x vnode 0x%x ticket 0x%x\n",
+	qprintf("mnext 0x%x mprev 0x%x vnode 0x%x \n",
 		ip->i_mnext,
 		ip->i_mprev,
-		ip->i_vnode,
-		ip->i_ticket);
-	qprintf("&ticketlock 0x%x dev %x ino %s\n",
-		&ip->i_ticketlock,
+		ip->i_vnode);
+	qprintf("dev %x ino %s\n",
 		ip->i_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
 	qprintf("blkno 0x%x len 0x%x boffset 0x%x\n",
