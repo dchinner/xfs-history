@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.33 $"
 
 struct cred;
 struct xfs_ihash;
@@ -105,6 +105,6 @@ int		xfs_mountfs(struct vfs *, dev_t);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
-buf_t		*xfs_getsb(xfs_mount_t *);
+buf_t		*xfs_getsb(xfs_mount_t *, int);
 
 #endif	/* !_FS_XFS_MOUNT_H */
