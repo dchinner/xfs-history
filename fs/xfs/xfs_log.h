@@ -32,40 +32,48 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#include <endian.h>
+#include <xfs_arch.h>
 
 #ident	"$Revision$"
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-/* Since the lsn comes out with the cycle number in the least significant
- * part of the lsn as a 64 bit quantity we need to do the comparison
- * of cycle and block numbers explicitly. On 32 bit machines this is
- * less code than a 64 bit compare anyway.
+/*
+ * define lsn field order based on machine architecture and 
+ * buffer architecture
  */
+
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?1:0)
+#define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?0:1)
+#else
+#define LSN_FIELD_CYCLE(arch) (((arch)==ARCH_NOCONVERT)?0:1)
+#define LSN_FIELD_BLOCK(arch) (((arch)==ARCH_NOCONVERT)?1:0)
+#endif
+
+/* get lsn fields */
+    
+#define CYCLE_LSN(lsn,arch) (INT_GET(((uint *)&(lsn))[LSN_FIELD_CYCLE(arch)], arch))
+#define BLOCK_LSN(lsn,arch) (INT_GET(((uint *)&(lsn))[LSN_FIELD_BLOCK(arch)], arch))
 
 /*
- * We need the signed in stuff here since we are trying to return
- * negative values.
+ * By comparing each compnent, we don't have to worry about extra
+ * endian issues in treating two 32 bit numbers as one 64 bit number
  */
 
-#define CMP_CYCLE_LSN(lsn)          (((__int32_t *)&(lsn))[0])
-#define CMP_BLOCK_LSN(lsn)          (((__int32_t *)&(lsn))[1])
-
-static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2)
+static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2, xfs_arch_t arch)
 {
-	if (CMP_CYCLE_LSN(lsn1) != CMP_CYCLE_LSN(lsn2)) {
-		return (CMP_CYCLE_LSN(lsn1) - CMP_CYCLE_LSN(lsn2));
+	if (CYCLE_LSN(lsn1, arch) != CYCLE_LSN(lsn2, arch)) {
+		return (((__int32_t)CYCLE_LSN(lsn1, arch)) - 
+                        ((__int32_t)CYCLE_LSN(lsn2, arch)));
 	}
 
-	return (CMP_BLOCK_LSN(lsn1) - CMP_BLOCK_LSN(lsn2));
+	return (((__int32_t)BLOCK_LSN(lsn1, arch)) - 
+                ((__int32_t)BLOCK_LSN(lsn2, arch)));
 }
 
-#define	XFS_LSN_CMP(x,y)	_lsn_cmp(x, y)
-#define	XFS_LSN_DIFF(x,y)	_lsn_cmp(x, y)
-#else
-#define	XFS_LSN_CMP(x,y)	((x) - (y))
-#define	XFS_LSN_DIFF(x,y)	((x) - (y))
-#endif
+#define	XFS_LSN_CMP_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
+#define	XFS_LSN_CMP(x,y) XFS_LSN_CMP_ARCH(x,y,ARCH_NOCONVERT)
+#define	XFS_LSN_DIFF_ARCH(x,y,arch)	_lsn_cmp(x, y, arch)
+#define	XFS_LSN_DIFF(x,y) XFS_LSN_DIFF_ARCH(x,y,ARCH_NOCONVERT)
 
 /*
  * Macros, structures, prototypes for interface to the log manager.

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -136,10 +136,10 @@ xlog_print_find_oldest(
 	first_blk = 0;		/* read first block */
 	bp = xlog_get_bp(1, log->l_mp);
 	xlog_bread(log, 0, 1, bp);
-	first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
+	first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
 	*last_blk = log->l_logBBsize-1;	/* read last block */
 	xlog_bread(log, *last_blk, 1, bp);
-	last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
+	last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_UNKNOWN);
 	ASSERT(last_half_cycle != 0);
 
 	if (first_half_cycle == last_half_cycle) { /* all cycle nos are same */
@@ -292,13 +292,14 @@ xlog_recover_print_buffer(
 			printf("	SUPER Block Buffer:\n");
 			if (!print_buffer) continue;
 			printf("		icount:%Ld  ifree:%Ld  ",
-			       *(long long *)(p), *(long long *)(p+8));
+			       INT_GET(*(long long *)(p), ARCH_UNKNOWN), 
+                               INT_GET(*(long long *)(p+8), ARCH_UNKNOWN));
 			printf("fdblks:%Ld  frext:%Ld\n",
-			       *(long long *)(p+16),
-			       *(long long *)(p+24));
+			       INT_GET(*(long long *)(p+16), ARCH_UNKNOWN),
+			       INT_GET(*(long long *)(p+24), ARCH_UNKNOWN));
 			printf("		sunit:%u  swidth:%u\n", 
-			       *(uint *)(p+56),
-			       *(uint *)(p+60));
+			       INT_GET(*(uint *)(p+56), ARCH_UNKNOWN),
+			       INT_GET(*(uint *)(p+60), ARCH_UNKNOWN));
 		} else if (INT_GET(*(uint *)p, ARCH_UNKNOWN) == XFS_AGI_MAGIC) {
 			agi = (xfs_agi_t *)p;
 			printf("	AGI Buffer: (XAGI)\n");

@@ -72,15 +72,30 @@ int xlog_btolrbb(int b);
 
 #define XLOG_HEADER_SIZE	512
 
-#define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_curr_cycle; \
-				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
-#define ASSIGN_ANY_LSN(lsn,cycle,block)  \
-	{ ((uint *)&(lsn))[0] = (cycle); \
-	  ((uint *)&(lsn))[1] = (block); }
-#define CYCLE_LSN(lsn)		(((uint *)&(lsn))[0])
-#define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1])
+/*
+ *  set lsns
+ */
+
+#define ASSIGN_LSN_CYCLE(lsn,cycle,arch) \
+    INT_SET(((uint *)&(lsn))[LSN_FIELD_CYCLE(arch)], arch, (cycle));
+#define ASSIGN_LSN_BLOCK(lsn,block,arch) \
+    INT_SET(((uint *)&(lsn))[LSN_FIELD_BLOCK(arch)], arch, (block));
+#define ASSIGN_ANY_LSN(lsn,cycle,block,arch)  \
+    { \
+        ASSIGN_LSN_CYCLE(lsn,cycle,arch); \
+        ASSIGN_LSN_BLOCK(lsn,block,arch); \
+    }
+#define ASSIGN_LSN(lsn,log,arch) \
+    ASSIGN_ANY_LSN(lsn,(log)->l_curr_cycle,(log)->l_curr_block,arch);
+    
 #define XLOG_SET(f,b)		(((f) & (b)) == (b))
-#define GET_CYCLE(ptr)	(*(uint *)(ptr) == XLOG_HEADER_MAGIC_NUM ? *((uint *)(ptr)+1) : *(uint *)(ptr))
+
+#define GET_CYCLE(ptr, arch) \
+    (INT_GET(*(uint *)(ptr), arch) == XLOG_HEADER_MAGIC_NUM ? \
+         INT_GET(*((uint *)(ptr)+1), arch) : \
+         INT_GET(*(uint *)(ptr), arch) \
+    )
+   
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XLOG_GRANT_SUB_SPACE)
 void xlog_grant_sub_space(struct log *log, int bytes, int type);
 #define XLOG_GRANT_SUB_SPACE(log,bytes,type)	\
