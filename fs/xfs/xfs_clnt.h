@@ -12,7 +12,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * XFS arguments to the mount system call.
@@ -21,7 +21,10 @@ struct xfs_args {
 	/*
 	 * XXXjleong	What are the XFS mount args?
 	 */
+	int	version;	/* version of this */
 	int	flags;		/* flags */
+	int	logbufs;	/* Number of log buffers */
+	int	logbufsize;	/* Size of log buffers */
 };
 
 /*
