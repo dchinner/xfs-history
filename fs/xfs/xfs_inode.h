@@ -314,15 +314,17 @@ int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, ushort,
 			   xfs_inode_t **);
 #ifndef SIM
 int		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
+int		xfs_atruncate_start(xfs_inode_t *);
 void		xfs_itruncate_start(xfs_inode_t *, uint, xfs_fsize_t);
 int		xfs_itruncate_finish(struct xfs_trans **, xfs_inode_t *,
-				     xfs_fsize_t);
+				     xfs_fsize_t, int, int);
 int		xfs_iunlink(struct xfs_trans *, xfs_inode_t *);
 #endif	/* !SIM */
 int		xfs_igrow_start(xfs_inode_t *, xfs_fsize_t, struct cred *);
 void		xfs_igrow_finish(struct xfs_trans *, xfs_inode_t *,
 				 xfs_fsize_t);
 
+void		xfs_idestroy_fork(xfs_inode_t *, int);
 void		xfs_idestroy(xfs_inode_t *);
 void		xfs_idata_realloc(xfs_inode_t *, int, int);
 void		xfs_iext_realloc(xfs_inode_t *, int, int);
