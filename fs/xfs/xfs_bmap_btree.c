@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.37 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -631,38 +631,40 @@ xfs_bmbt_insrec(
 			xfs_iroot_realloc(ip, 1);
 			block = xfs_bmbt_get_block(cur, level, &bp);
 		} else if (level == cur->bc_nlevels - 1) {
-			xfs_alloc_arg_t	args;
+			xfs_alloc_arg_t	*args;
 
+			args = xfs_alloc_arg_alloc();
 			/*
 			 * Copy the root into a real block.
 			 */
 			pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
-			args.tp = tp;
-			args.mp = cur->bc_mp;
-			args.fsbno = cur->bc_private.b.firstblock;
-			args.mod = args.minleft = args.total = args.isfl = 0;
-			args.minlen = args.maxlen = args.prod = 1;
-			args.wasdel =
+			args->tp = tp;
+			args->mp = cur->bc_mp;
+			args->fsbno = cur->bc_private.b.firstblock;
+			args->mod = args->minleft = args->total = args->isfl = 0;
+			args->minlen = args->maxlen = args->prod = 1;
+			args->wasdel =
 				cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
-			if (args.fsbno == NULLFSBLOCK) {
+			if (args->fsbno == NULLFSBLOCK) {
 				xfs_btree_check_lptr(cur, *pp, level);
-				args.fsbno = *pp;
-				args.type = XFS_ALLOCTYPE_START_BNO;
-			} else if (args.wasdel)
-				args.type = XFS_ALLOCTYPE_FIRST_AG;
+				args->fsbno = *pp;
+				args->type = XFS_ALLOCTYPE_START_BNO;
+			} else if (args->wasdel)
+				args->type = XFS_ALLOCTYPE_FIRST_AG;
 			else
-				args.type = XFS_ALLOCTYPE_NEAR_BNO;
-			xfs_alloc_vextent(&args);
-			if (args.fsbno == NULLFSBLOCK) {
+				args->type = XFS_ALLOCTYPE_NEAR_BNO;
+			xfs_alloc_vextent(args);
+			if (args->fsbno == NULLFSBLOCK) {
 				xfs_bmbt_trace_cursor("xfs_bmbt_insrec exit1",
 					cur);
+				xfs_alloc_arg_free(args);
 				return 0;
 			}
-			ASSERT(args.len == 1);
-			cur->bc_private.b.firstblock = args.fsbno;
+			ASSERT(args->len == 1);
+			cur->bc_private.b.firstblock = args->fsbno;
 			cur->bc_private.b.allocated++;
 			ip->i_d.di_nblocks++;
-			bp = xfs_btree_get_bufl(args.mp, tp, args.fsbno, 0);
+			bp = xfs_btree_get_bufl(args->mp, tp, args->fsbno, 0);
 			cblock = XFS_BUF_TO_BMBT_BLOCK(bp);
 			*cblock = *block;
 			block->bb_level++;
@@ -678,9 +680,10 @@ xfs_bmbt_insrec(
 				xfs_btree_check_lptr(cur, pp[i], level);
 #endif
 			bcopy(pp, cpp, cblock->bb_numrecs * (int)sizeof(*pp));
-			xfs_btree_check_lptr(cur, (xfs_bmbt_ptr_t)args.fsbno,
+			xfs_btree_check_lptr(cur, (xfs_bmbt_ptr_t)args->fsbno,
 				level);
-			*pp = args.fsbno;
+			*pp = args->fsbno;
+			xfs_alloc_arg_free(args);
 			xfs_iroot_realloc(ip, 1 - cblock->bb_numrecs);
 			xfs_btree_setbuf(cur, level, bp);
 			/*
@@ -1393,7 +1396,7 @@ xfs_bmbt_split(
 	xfs_bmbt_key_t		*keyp,
 	xfs_btree_cur_t		**curp)
 {
-	xfs_alloc_arg_t		args;
+	xfs_alloc_arg_t		*args;
 	daddr_t			d;
 	int			i;
 	xfs_inode_t		*ip;
@@ -1414,34 +1417,36 @@ xfs_bmbt_split(
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_split entry", cur);
 	xfs_bmbt_trace_argifk("xfs_bmbt_split args", cur, level, *bnop, keyp);
-	args.tp = cur->bc_tp;
-	args.mp = cur->bc_mp;
+	args = xfs_alloc_arg_alloc();
+	args->tp = cur->bc_tp;
+	args->mp = cur->bc_mp;
 	ip = cur->bc_private.b.ip;
 	lbp = cur->bc_bufs[level];
-	lbno = XFS_DADDR_TO_FSB(args.mp, lbp->b_blkno);
+	lbno = XFS_DADDR_TO_FSB(args->mp, lbp->b_blkno);
 	left = XFS_BUF_TO_BMBT_BLOCK(lbp);
-	args.fsbno = cur->bc_private.b.firstblock;
-	if (args.fsbno == NULLFSBLOCK) {
-		args.fsbno = lbno;
-		args.type = XFS_ALLOCTYPE_START_BNO;
+	args->fsbno = cur->bc_private.b.firstblock;
+	if (args->fsbno == NULLFSBLOCK) {
+		args->fsbno = lbno;
+		args->type = XFS_ALLOCTYPE_START_BNO;
 	} else if (cur->bc_private.b.flags & XFS_BTCUR_BPRV_LOWSPC)
-		args.type = XFS_ALLOCTYPE_FIRST_AG;
+		args->type = XFS_ALLOCTYPE_FIRST_AG;
 	else
-		args.type = XFS_ALLOCTYPE_NEAR_BNO;
-	args.mod = args.minleft = args.total = args.isfl = 0;
-	args.minlen = args.maxlen = args.prod = 1;
-	args.wasdel = cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
-	xfs_alloc_vextent(&args);
-	if (args.fsbno == NULLFSBLOCK) {
+		args->type = XFS_ALLOCTYPE_NEAR_BNO;
+	args->mod = args->minleft = args->total = args->isfl = 0;
+	args->minlen = args->maxlen = args->prod = 1;
+	args->wasdel = cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
+	xfs_alloc_vextent(args);
+	if (args->fsbno == NULLFSBLOCK) {
 		xfs_bmbt_trace_cursor("xfs_bmbt_split exit0", cur);
+		xfs_alloc_arg_free(args);
 		return 0;
 	}
-	ASSERT(args.len == 1);
-	cur->bc_private.b.firstblock = args.fsbno;
+	ASSERT(args->len == 1);
+	cur->bc_private.b.firstblock = args->fsbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
-	xfs_trans_log_inode(args.tp, ip, XFS_ILOG_CORE);
-	rbp = xfs_btree_get_bufl(args.mp, args.tp, args.fsbno, 0);
+	xfs_trans_log_inode(args->tp, ip, XFS_ILOG_CORE);
+	rbp = xfs_btree_get_bufl(args->mp, args->tp, args->fsbno, 0);
 	right = XFS_BUF_TO_BMBT_BLOCK(rbp);
 	xfs_btree_check_lblock(cur, left, level);
 	right->bb_magic = XFS_BMAP_MAGIC;
@@ -1474,7 +1479,7 @@ xfs_bmbt_split(
 	d = lbp->b_blkno;
 	left->bb_numrecs -= right->bb_numrecs;
 	right->bb_rightsib = left->bb_rightsib;
-	left->bb_rightsib = args.fsbno;
+	left->bb_rightsib = args->fsbno;
 	right->bb_leftsib = lbno;
 	xfs_bmbt_log_block(cur, rbp, XFS_BB_ALL_BITS);
 	xfs_bmbt_log_block(cur, lbp, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
@@ -1482,10 +1487,10 @@ xfs_bmbt_split(
 		xfs_bmbt_block_t	*rrblock;
 		buf_t			*rrbp;
 
-		rrbp = xfs_btree_read_bufl(args.mp, args.tp, right->bb_rightsib, 0);
+		rrbp = xfs_btree_read_bufl(args->mp, args->tp, right->bb_rightsib, 0);
 		rrblock = XFS_BUF_TO_BMBT_BLOCK(rrbp);
 		xfs_btree_check_lblock(cur, rrblock, level);
-		rrblock->bb_leftsib = args.fsbno;
+		rrblock->bb_leftsib = args->fsbno;
 		xfs_bmbt_log_block(cur, rrbp, XFS_BB_LEFTSIB);
 	}
 	if (cur->bc_ptrs[level] > left->bb_numrecs + 1) {
@@ -1496,7 +1501,8 @@ xfs_bmbt_split(
 		*curp = xfs_btree_dup_cursor(cur);
 		(*curp)->bc_ptrs[level + 1]++;
 	}
-	*bnop = args.fsbno;
+	*bnop = args->fsbno;
+	xfs_alloc_arg_free(args);
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_split exit1", cur);
 	return 1;

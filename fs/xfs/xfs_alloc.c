@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
 
 /*
  * Free space allocation for xFS.
@@ -16,6 +16,7 @@
 #include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/ktrace.h>
+#include <sys/kmem.h>
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
@@ -48,6 +49,8 @@
  * Allocation tracing.
  */
 ktrace_t	*xfs_alloc_trace_buf;
+
+zone_t		*xfs_alloc_arg_zone;
 
 /*
  * Prototypes for internal functions.
@@ -1594,6 +1597,25 @@ xfs_alloc_ag_freeblks(
 }
 
 /*
+ * Allocate an alloc_arg structure.
+ */
+xfs_alloc_arg_t *
+xfs_alloc_arg_alloc(void)
+{
+	return kmem_zone_alloc(xfs_alloc_arg_zone, KM_SLEEP);
+}
+
+/*
+ * Free an alloc_arg structure.
+ */
+void
+xfs_alloc_arg_free(
+	xfs_alloc_arg_t	*args)
+{
+	kmem_zone_free(xfs_alloc_arg_zone, args);
+}
+
+/*
  * Compute and fill in value of m_ag_maxlevels.
  */
 void
@@ -1631,6 +1653,7 @@ xfs_alloc_fix_freelist(
 {
 	buf_t		*agbp;
 	xfs_agf_t	*agf;
+	xfs_alloc_arg_t	*args;
 	xfs_agblock_t	bno;
 	xfs_mount_t	*mp;
 	xfs_extlen_t	need;
@@ -1668,39 +1691,37 @@ xfs_alloc_fix_freelist(
 		xfs_free_ag_extent(tp, agbp, agno, bno, 1, 1);
 	}
 	/*
+	 * Allocate and initialize the args structure.
+	 */
+	args = xfs_alloc_arg_alloc();
+	args->tp = tp;
+	args->mp = mp;
+	args->agbp = agbp;
+	args->agno = agno;
+	args->mod = args->minleft = args->wasdel = 0;
+	args->minlen = args->prod = args->isfl = 1;
+	args->type = XFS_ALLOCTYPE_THIS_AG;
+	/*
 	 * Make the freelist longer if it's too short.
 	 */
 	while (agf->agf_freecount < need) {
-		xfs_alloc_arg_t	args;
-
-		args.tp = tp;
-		args.mp = mp;
-		args.agbp = agbp;
-		args.agno = agno;
-		args.agbno = 0;
-		args.minlen = 1;
-		args.maxlen = need - agf->agf_freecount;
-		args.mod = 0;
-		args.prod = 1;
-		args.minleft = 0;
-		args.type = XFS_ALLOCTYPE_THIS_AG;
-		args.wasdel = 0;
-		args.isfl = 1;
+		args->agbno = 0;
+		args->maxlen = need - agf->agf_freecount;
 		/*
 		 * Allocate as many blocks as possible at once.
 		 */
-		xfs_alloc_ag_vextent(&args);
+		xfs_alloc_ag_vextent(args);
 		/*
 		 * Stop if we run out.  Won't happen if callers are obeying
 		 * the restrictions correctly.
 		 */
-		if (args.agbno == NULLAGBLOCK)
+		if (args->agbno == NULLAGBLOCK)
 			break;
 		/*
 		 * Put each allocated block on the list.
 		 */
-		for (bno = args.agbno + args.len - 1;
-		     bno >= args.agbno;
+		for (bno = args->agbno + args->len - 1;
+		     bno >= args->agbno;
 		     bno--) {
 			buf_t	*bp;
 
@@ -1708,6 +1729,7 @@ xfs_alloc_fix_freelist(
 			xfs_alloc_put_freelist(tp, agbp, bp);
 		}
 	}
+	xfs_alloc_arg_free(args);
 	return agbp;
 }
 

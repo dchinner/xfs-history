@@ -1277,7 +1277,7 @@ xfs_inobt_newroot(
 	xfs_btree_cur_t		*cur)	/* btree cursor */
 {
 	xfs_agi_t		*agi;	/* a.g. inode header */
-	xfs_alloc_arg_t		args;	/* allocation argument structure */
+	xfs_alloc_arg_t		*args;	/* allocation argument structure */
 	xfs_inobt_block_t	*block;	/* one half of the old root block */
 	buf_t			*bp;	/* buffer containing block */
 	xfs_inobt_key_t		*kp;	/* btree key pointer */
@@ -1299,28 +1299,31 @@ xfs_inobt_newroot(
 	 * Get a block & a buffer.
 	 */
 	agi = XFS_BUF_TO_AGI(cur->bc_private.i.agbp);
-	args.tp = cur->bc_tp;
-	args.mp = cur->bc_mp;
-	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.i.agno,
+	args = xfs_alloc_arg_alloc();
+	args->tp = cur->bc_tp;
+	args->mp = cur->bc_mp;
+	args->fsbno = XFS_AGB_TO_FSB(args->mp, cur->bc_private.i.agno,
 		agi->agi_root);
-	args.mod = args.minleft = args.total = args.wasdel = args.isfl = 0;
-	args.minlen = args.maxlen = args.prod = 1;
-	args.type = XFS_ALLOCTYPE_NEAR_BNO;
-	xfs_alloc_vextent(&args);
+	args->mod = args->minleft = args->total = args->wasdel = args->isfl = 0;
+	args->minlen = args->maxlen = args->prod = 1;
+	args->type = XFS_ALLOCTYPE_NEAR_BNO;
+	xfs_alloc_vextent(args);
 	/*
 	 * None available, we fail.
 	 */
-	if (args.fsbno == NULLFSBLOCK)
+	if (args->fsbno == NULLFSBLOCK) {
+		xfs_alloc_arg_free(args);
 		return 0;
-	ASSERT(args.len == 1);
-	nbp = xfs_btree_get_bufs(args.mp, args.tp, args.agno, args.agbno, 0);
+	}
+	ASSERT(args->len == 1);
+	nbp = xfs_btree_get_bufs(args->mp, args->tp, args->agno, args->agbno, 0);
 	new = XFS_BUF_TO_INOBT_BLOCK(nbp);
 	/*
 	 * Set the root data in the a.g. inode structure.
 	 */
-	agi->agi_root = args.agbno;
+	agi->agi_root = args->agbno;
 	agi->agi_level++;
-	xfs_ialloc_log_agi(args.tp, cur->bc_private.i.agbp,
+	xfs_ialloc_log_agi(args->tp, cur->bc_private.i.agbp,
 		XFS_AGI_ROOT | XFS_AGI_LEVEL);
 	/*
 	 * At the previous root level there are now two blocks: the old
@@ -1336,10 +1339,10 @@ xfs_inobt_newroot(
 		 * Our block is left, pick up the right block.
 		 */
 		lbp = bp;
-		lbno = XFS_DADDR_TO_AGBNO(args.mp, lbp->b_blkno);
+		lbno = XFS_DADDR_TO_AGBNO(args->mp, lbp->b_blkno);
 		left = block;
 		rbno = left->bb_rightsib;
-		rbp = xfs_btree_read_bufs(args.mp, args.tp, args.agno, rbno, 0);
+		rbp = xfs_btree_read_bufs(args->mp, args->tp, args->agno, rbno, 0);
 		bp = rbp;
 		right = XFS_BUF_TO_INOBT_BLOCK(rbp);
 		xfs_btree_check_sblock(cur, right, cur->bc_nlevels - 1);
@@ -1349,10 +1352,10 @@ xfs_inobt_newroot(
 		 * Our block is right, pick up the left block.
 		 */
 		rbp = bp;
-		rbno = XFS_DADDR_TO_AGBNO(args.mp, rbp->b_blkno);
+		rbno = XFS_DADDR_TO_AGBNO(args->mp, rbp->b_blkno);
 		right = block;
 		lbno = right->bb_leftsib;
-		lbp = xfs_btree_read_bufs(args.mp, args.tp, args.agno, lbno, 0);
+		lbp = xfs_btree_read_bufs(args->mp, args->tp, args->agno, lbno, 0);
 		bp = lbp;
 		left = XFS_BUF_TO_INOBT_BLOCK(lbp);
 		xfs_btree_check_sblock(cur, left, cur->bc_nlevels - 1);
@@ -1365,7 +1368,8 @@ xfs_inobt_newroot(
 	new->bb_level = (__uint16_t)cur->bc_nlevels;
 	new->bb_numrecs = 2;
 	new->bb_leftsib = new->bb_rightsib = NULLAGBLOCK;
-	xfs_inobt_log_block(args.tp, nbp, XFS_BB_ALL_BITS);
+	xfs_inobt_log_block(args->tp, nbp, XFS_BB_ALL_BITS);
+	xfs_alloc_arg_free(args);
 	ASSERT(lbno != NULLAGBLOCK && rbno != NULLAGBLOCK);
 	/*
 	 * Fill in the key data in the new root.
@@ -1642,7 +1646,7 @@ xfs_inobt_split(
 	xfs_inobt_key_t		*keyp,	/* output: first key of new block */
 	xfs_btree_cur_t		**curp)	/* output: new cursor */
 {
-	xfs_alloc_arg_t		args;	/* allocation argument structure */
+	xfs_alloc_arg_t		*args;	/* allocation argument structure */
 	int			i;	/* loop index/record number */
 	xfs_agblock_t		lbno;	/* left (current) block number */
 	buf_t			*lbp;	/* buffer for left block */
@@ -1661,24 +1665,26 @@ xfs_inobt_split(
 	 * Set up left block (current one).
 	 */
 	lbp = cur->bc_bufs[level];
-	args.tp = cur->bc_tp;
-	args.mp = cur->bc_mp;
-	lbno = XFS_DADDR_TO_AGBNO(args.mp, lbp->b_blkno);
+	args = xfs_alloc_arg_alloc();
+	args->tp = cur->bc_tp;
+	args->mp = cur->bc_mp;
+	lbno = XFS_DADDR_TO_AGBNO(args->mp, lbp->b_blkno);
 	/*
 	 * Allocate the new block.
 	 * If we can't do it, we're toast.  Give up.
 	 */
-	args.fsbno = XFS_AGB_TO_FSB(args.mp, cur->bc_private.i.agno, lbno);
-	args.mod = args.minleft = args.total = args.wasdel = args.isfl = 0;
-	args.minlen = args.maxlen = args.prod = 1;
-	args.type = XFS_ALLOCTYPE_NEAR_BNO;
-	xfs_alloc_vextent(&args);
-	if (args.fsbno == NULLFSBLOCK) {
+	args->fsbno = XFS_AGB_TO_FSB(args->mp, cur->bc_private.i.agno, lbno);
+	args->mod = args->minleft = args->total = args->wasdel = args->isfl = 0;
+	args->minlen = args->maxlen = args->prod = 1;
+	args->type = XFS_ALLOCTYPE_NEAR_BNO;
+	xfs_alloc_vextent(args);
+	if (args->fsbno == NULLFSBLOCK) {
+		xfs_alloc_arg_free(args);
 		kmem_check();
 		return 0;
 	}
-	ASSERT(args.len == 1);
-	rbp = xfs_btree_get_bufs(args.mp, args.tp, args.agno, args.agbno, 0);
+	ASSERT(args->len == 1);
+	rbp = xfs_btree_get_bufs(args->mp, args->tp, args->agno, args->agbno, 0);
 	/*
 	 * Set up the new block as "right".
 	 */
@@ -1736,10 +1742,10 @@ xfs_inobt_split(
 	 */
 	left->bb_numrecs -= right->bb_numrecs;
 	right->bb_rightsib = left->bb_rightsib;
-	left->bb_rightsib = args.agbno;
+	left->bb_rightsib = args->agbno;
 	right->bb_leftsib = lbno;
-	xfs_inobt_log_block(args.tp, rbp, XFS_BB_ALL_BITS);
-	xfs_inobt_log_block(args.tp, lbp, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
+	xfs_inobt_log_block(args->tp, rbp, XFS_BB_ALL_BITS);
+	xfs_inobt_log_block(args->tp, lbp, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
 	/*
 	 * If there's a block to the new block's right, make that block
 	 * point back to right instead of to left.
@@ -1748,12 +1754,12 @@ xfs_inobt_split(
 		xfs_inobt_block_t	*rrblock;	/* rr btree block */
 		buf_t			*rrbp;		/* buffer for rrblock */
 
-		rrbp = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
+		rrbp = xfs_btree_read_bufs(args->mp, args->tp, args->agno,
 			right->bb_rightsib, 0);
 		rrblock = XFS_BUF_TO_INOBT_BLOCK(rrbp);
 		xfs_btree_check_sblock(cur, rrblock, level);
-		rrblock->bb_leftsib = args.agbno;
-		xfs_inobt_log_block(args.tp, rrbp, XFS_BB_LEFTSIB);
+		rrblock->bb_leftsib = args->agbno;
+		xfs_inobt_log_block(args->tp, rrbp, XFS_BB_LEFTSIB);
 	}
 	/*
 	 * If the cursor is really in the right block, move it there.
@@ -1772,7 +1778,8 @@ xfs_inobt_split(
 		*curp = xfs_btree_dup_cursor(cur);
 		(*curp)->bc_ptrs[level + 1]++;
 	}
-	*bnop = args.agbno;
+	*bnop = args->agbno;
+	xfs_alloc_arg_free(args);
 	xfs_inobt_rcheck(cur);
 	kmem_check();
 	return 1;

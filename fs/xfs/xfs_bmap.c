@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.91 $"
+#ident	"$Revision: 1.92 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1443,59 +1443,61 @@ xfs_bmap_alloc(
 	 * Normal allocation, done through xfs_alloc_vextent.
 	 */
 	else {
-		xfs_alloc_arg_t	args;
+		xfs_alloc_arg_t	*args;
 
-		args.tp = tp;
-		args.mp = mp;
-		args.fsbno = askbno;
-		args.minlen = minlen;
-		args.maxlen = asklen;
+		args = xfs_alloc_arg_alloc();
+		args->tp = tp;
+		args->mp = mp;
+		args->fsbno = askbno;
+		args->minlen = minlen;
+		args->maxlen = asklen;
 		if (nullfb) {
-			args.type = XFS_ALLOCTYPE_START_BNO;
-			args.total = total;
+			args->type = XFS_ALLOCTYPE_START_BNO;
+			args->total = total;
 		}
 		else if (*low) {
-			args.type = XFS_ALLOCTYPE_FIRST_AG;
-			args.total = 1;
+			args->type = XFS_ALLOCTYPE_FIRST_AG;
+			args->total = 1;
 		} else {
-			args.type = XFS_ALLOCTYPE_NEAR_BNO;
-			args.total = total;
+			args->type = XFS_ALLOCTYPE_NEAR_BNO;
+			args->total = total;
 		}
 		if (ip->i_d.di_extsize) {
-			args.prod = ip->i_d.di_extsize;
-			args.mod = 0;
+			args->prod = ip->i_d.di_extsize;
+			args->mod = 0;
 		} else if (mp->m_sb.sb_blocksize >= NBPP) {
-			args.prod = 1;
-			args.mod = 0;
+			args->prod = 1;
+			args->mod = 0;
 		} else {
-			args.prod = NBPP >> mp->m_sb.sb_blocklog;
-			if (args.mod = off % args.prod)
-				args.mod = args.prod - args.mod;
+			args->prod = NBPP >> mp->m_sb.sb_blocklog;
+			if (args->mod = off % args->prod)
+				args->mod = args->prod - args->mod;
 		}
-		args.minleft = minleft;
-		args.wasdel = wasdel;
-		args.isfl = 0;
-		xfs_alloc_vextent(&args);
-		if (args.fsbno == NULLFSBLOCK && nullfb) {
-			args.fsbno = 0;
-			args.minlen = 1;
-			args.type = XFS_ALLOCTYPE_FIRST_AG;
-			args.total = 1;
-			args.minleft = 0;
-			xfs_alloc_vextent(&args);
-			abno = args.fsbno;
+		args->minleft = minleft;
+		args->wasdel = wasdel;
+		args->isfl = 0;
+		xfs_alloc_vextent(args);
+		if (args->fsbno == NULLFSBLOCK && nullfb) {
+			args->fsbno = 0;
+			args->minlen = 1;
+			args->type = XFS_ALLOCTYPE_FIRST_AG;
+			args->total = 1;
+			args->minleft = 0;
+			xfs_alloc_vextent(args);
+			abno = args->fsbno;
 			*low = 1;
 		} else
-			abno = args.fsbno;
+			abno = args->fsbno;
 		if (abno != NULLFSBLOCK) {
 			*firstblock = abno;
-			*alen = args.len;
-			ip->i_d.di_nblocks += args.len;
+			*alen = args->len;
+			ip->i_d.di_nblocks += args->len;
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			if (wasdel)
-				ip->i_delayed_blks -= args.len;
+				ip->i_delayed_blks -= args->len;
 		} else
 			*alen = 0;
+		xfs_alloc_arg_free(args);
 	}
 	kmem_check();
 	return abno;
@@ -1850,7 +1852,7 @@ xfs_bmap_extents_to_btree(
 {
 	xfs_bmbt_block_t	*ablock;
 	buf_t			*abp;
-	xfs_alloc_arg_t		args;
+	xfs_alloc_arg_t		*args;
 	xfs_bmbt_rec_t		*arp;
 	xfs_bmbt_block_t	*block;
 	xfs_btree_cur_t		*cur;
@@ -1889,30 +1891,31 @@ xfs_bmap_extents_to_btree(
 	 * Convert to a btree with two levels, one record in root.
 	 */
 	ip->i_d.di_format = XFS_DINODE_FMT_BTREE;
-	args.tp = tp;
-	args.mp = mp;
+	args = xfs_alloc_arg_alloc();
+	args->tp = tp;
+	args->mp = mp;
 	if (*firstblock == NULLFSBLOCK) {
-		args.type = XFS_ALLOCTYPE_START_BNO;
-		args.fsbno = XFS_INO_TO_FSB(mp, ip->i_ino);
+		args->type = XFS_ALLOCTYPE_START_BNO;
+		args->fsbno = XFS_INO_TO_FSB(mp, ip->i_ino);
 	} else if (lowspace) {
-		args.type = XFS_ALLOCTYPE_START_BNO;
-		args.fsbno = *firstblock;
+		args->type = XFS_ALLOCTYPE_START_BNO;
+		args->fsbno = *firstblock;
 	} else {
-		args.type = XFS_ALLOCTYPE_NEAR_BNO;
-		args.fsbno = *firstblock;
+		args->type = XFS_ALLOCTYPE_NEAR_BNO;
+		args->fsbno = *firstblock;
 	}
-	args.minlen = args.maxlen = args.prod = 1;
-	args.total = args.minleft = args.mod = args.isfl = 0;
-	args.wasdel = wasdel;
-	xfs_alloc_vextent(&args);
+	args->minlen = args->maxlen = args->prod = 1;
+	args->total = args->minleft = args->mod = args->isfl = 0;
+	args->wasdel = wasdel;
+	xfs_alloc_vextent(args);
 	/*
 	 * Allocation can't fail, the space was reserved.
 	 */
-	ASSERT(args.fsbno != NULLFSBLOCK);
-	*firstblock = args.fsbno;
+	ASSERT(args->fsbno != NULLFSBLOCK);
+	*firstblock = args->fsbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
-	abp = xfs_btree_get_bufl(mp, tp, args.fsbno, 0);
+	abp = xfs_btree_get_bufl(mp, tp, args->fsbno, 0);
 	/*
 	 * Fill in the child block.
 	 */
@@ -1937,7 +1940,8 @@ xfs_bmap_extents_to_btree(
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	kp->br_startoff = xfs_bmbt_get_startoff(arp);
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
-	*pp = args.fsbno;
+	*pp = args->fsbno;
+	xfs_alloc_arg_free(args);
 	/*
 	 * Do all this logging at the end so that 
 	 * the root is at the right level.
@@ -1997,46 +2001,48 @@ xfs_bmap_local_to_extents(
 
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
 	if (ip->i_bytes) {
-		xfs_alloc_arg_t	args;
+		xfs_alloc_arg_t	*args;
 		buf_t		*bp;
 		xfs_bmbt_rec_t	*ep;
 
-		args.tp = tp;
-		args.mp = ip->i_mount;
+		args = xfs_alloc_arg_alloc();
+		args->tp = tp;
+		args->mp = ip->i_mount;
 		ASSERT(ip->i_flags & XFS_IINLINE);
 		/*
 		 * Allocate a block.  We know we need only one, since the
 		 * file currently fits in an inode.
 		 */
 		if (*firstblock == NULLFSBLOCK) {
-			args.fsbno = XFS_INO_TO_FSB(args.mp, ip->i_ino);
-			args.type = XFS_ALLOCTYPE_START_BNO;
+			args->fsbno = XFS_INO_TO_FSB(args->mp, ip->i_ino);
+			args->type = XFS_ALLOCTYPE_START_BNO;
 		} else {
-			args.fsbno = *firstblock;
-			args.type = XFS_ALLOCTYPE_NEAR_BNO;
+			args->fsbno = *firstblock;
+			args->type = XFS_ALLOCTYPE_NEAR_BNO;
 		}
-		args.total = total;
-		args.mod = args.minleft = args.wasdel = args.isfl = 0;
-		args.minlen = args.maxlen = args.prod = 1;
-		xfs_alloc_vextent(&args);
+		args->total = total;
+		args->mod = args->minleft = args->wasdel = args->isfl = 0;
+		args->minlen = args->maxlen = args->prod = 1;
+		xfs_alloc_vextent(args);
 		/* 
 		 * Can't fail, the space was reserved.
 		 */
-		ASSERT(args.fsbno != NULLFSBLOCK);
-		ASSERT(args.len == 1);
-		*firstblock = args.fsbno;
-		bp = xfs_btree_get_bufl(args.mp, tp, args.fsbno, 0);
+		ASSERT(args->fsbno != NULLFSBLOCK);
+		ASSERT(args->len == 1);
+		*firstblock = args->fsbno;
+		bp = xfs_btree_get_bufl(args->mp, tp, args->fsbno, 0);
 		bcopy(ip->i_u1.iu_data, (char *)bp->b_un.b_addr, ip->i_bytes);
 		xfs_idata_realloc(ip, -ip->i_bytes);
 		xfs_iext_realloc(ip, 1);
 		ep = ip->i_u1.iu_extents;
 		xfs_bmbt_set_startoff(ep, 0);
-		xfs_bmbt_set_startblock(ep, args.fsbno);
+		xfs_bmbt_set_startblock(ep, args->fsbno);
 		xfs_bmbt_set_blockcount(ep, 1);
 		xfs_bmap_trace_post_update(fname, "new", ip, 0);
 		ip->i_d.di_nextents = 1;
 		ip->i_d.di_nblocks = 1;
 		flags |= XFS_ILOG_EXT;
+		xfs_alloc_arg_free(args);
 	} else
 		ASSERT(ip->i_d.di_nextents == 0);
 	ip->i_flags &= ~XFS_IINLINE;
