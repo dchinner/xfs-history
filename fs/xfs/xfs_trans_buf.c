@@ -596,7 +596,15 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
  * the buffer may still be pinned by other transaction.  If that
  * is the case, then we'll wait until the buffer is committed to
  * disk for the last time (we can tell by the ref count) and
- * free it in xfs_buf_item_unpin().
+ * free it in xfs_buf_item_unpin().  Until it is cleaned up we
+ * will keep the buffer locked so that the buffer and buf log item
+ * are not reused.
+ *
+ * It is NOT the responsibility of this routine to ensure that
+ * noone reuses the disk blocks represented by this buffer until
+ * the transaction is committed to disk.  That needs to be taken
+ * care of by another mechanism, for example not making the blocks
+ * free to be reallocated until this transaction is permanent.
  */
 void
 xfs_trans_binval(

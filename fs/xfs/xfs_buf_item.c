@@ -237,7 +237,7 @@ xfs_buf_item_pin(xfs_buf_log_item_t *bip)
  *
  * Also drop the reference to the buf item for the current transaction.
  * If the XFS_BLI_STALE flag is set and we are the last reference,
- * then free up the buf log item.
+ * then free up the buf log item and unlock the buffer.
  */
 void
 xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
@@ -256,6 +256,7 @@ xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
 	refcount = --(bip->bli_refcount);
 	spunlockspl(xfs_bli_reflock, s);
 
+	bunpin(bp);
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(!(bp->b_flags & B_DELWRI));
 		mp = bip->bli_item.li_mountp;
@@ -264,8 +265,9 @@ xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
 		AIL_UNLOCK(mp, s);
 		xfs_buf_item_relse(bp);
 		ASSERT(bp->b_fsprivate == NULL);
+		brelse(bp);
 	}
-	bunpin(bp);
+
 }
 /*
  * This is called to attempt to lock the buffer associated with this
@@ -328,6 +330,15 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 	 * Clear the buffer's association with this transaction.
 	 */
 	bp->b_fsprivate2 = NULL;
+
+	/*
+	 * If the buf item is marked stale, then don't do anything.
+	 * We'll unlock the buffer and free the buf item when the
+	 * buffer is unpinned for the last time.
+	 */
+	if (bip->bli_flags & XFS_BLI_STALE) {
+		return;
+	}
 
 	/*
 	 * Before possibly freeing the buf item, determine if we should
