@@ -81,6 +81,25 @@
 #endif
 
 /*
+ * cpumask_t is used for supporting NR_CPUS > BITS_PER_LONG.
+ * If support for this is present, migrate_to_cpu exists and provides
+ * a wrapper around the set_cpus_allowed routine.
+ */
+#ifdef copy_cpumask
+#define __HAVE_CPUMASK_T	1
+#endif
+
+#ifndef __HAVE_CPUMASK_T
+# ifndef __HAVE_NEW_SCHEDULER
+#  define migrate_to_cpu(cpu)	\
+	do { current->cpus_allowed = 1UL << (cpu); } while (0)
+# else
+#  define migrate_to_cpu(cpu)	\
+	set_cpus_allowed(current, 1UL << (cpu))
+# endif
+#endif
+
+/*
  * Debug code
  */
 
@@ -1911,12 +1930,11 @@ pagebuf_iodone_daemon(
 	spin_unlock_irq(&current->sigmask_lock);
 
 	/* Migrate to the right CPU */
+	migrate_to_cpu(cpu);
 #ifdef __HAVE_NEW_SCHEDULER
-	set_cpus_allowed(current, 1UL << cpu);
 	if (smp_processor_id() != cpu)
 		BUG();
 #else
-	current->cpus_allowed = 1UL << cpu;
 	while (smp_processor_id() != cpu)
 		schedule();
 #endif
