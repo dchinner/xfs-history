@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.72 1997/03/08 02:32:20 singal Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.73 1997/03/20 23:54:32 singal Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -270,7 +270,6 @@ xfs_get_block_size(
 
 
 
-#if 0
 /*
  * xfs_io_is_guaranteed()
  *
@@ -279,26 +278,19 @@ xfs_get_block_size(
  *	non-zero if there is a guarantee
  */
 int
-xfs_io_is_guaranteed( xfs_inode_t *ip, stream_id_t *stream_id)
+xfs_io_is_guaranteed( vfile_t *fp, stream_id_t *stream_id)
 {
-	pid_t			proc_id;
-	dev_t			fs_dev;
-	xfs_ino_t		inum;
+	extern grio_stream_info_t *grio_find_associated_stream_with_fp(vfile_t *);
 	grio_stream_info_t	*griosp;
 
-	proc_id = current_pid();
-	fs_dev 	= ip->i_dev;
-	inum 	= ip->i_ino;
-
-	griosp = grio_find_stream_with_proc_dev_inum( proc_id, fs_dev, inum);
-	if ( griosp ) {
+	griosp = grio_find_associated_stream_with_fp(fp);
+	if (griosp) {
 		COPY_STREAM_ID( griosp->stream_id, (*stream_id) );
-		return( 1 );
+		return (1);
 	} else {
-		return( 0 );
+		return (0);
 	}
 }
-#endif
 
 /*
  * xfs_grio_get_inumber
@@ -383,24 +375,32 @@ xfs_grio_get_fs_dev( int fdes )
 	return( dev );
 }
 
+#if 0
 /*
- * xfs_fp_to_stream()
+ * xfs_set_xfs_igrio_flag
+ *	Set the XFS_IGRIO incore inode flag.
  *
  * RETURNS
- *	0 if there is no guarantee
- *	non-zero if there is a guarantee
- *
+ *	void
  */
-int
-xfs_fp_to_stream(vfile_t *fp, stream_id_t *stream_id)
+void
+xfs_set_xfs_igrio_flag(dev_t fs_dev, xfs_ino_t ino)
 {
-	grio_stream_info_t	*griosp;
+	xfs_inode_t	*ip;
 
-	griosp = grio_find_stream_with_fp(fp);
-	if (griosp) {
-		COPY_STREAM_ID( griosp->stream_id, (*stream_id) );
-		return (1);
-	} else {
-		return (0);
+	/* get the inode */
+	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
+		return;
 	}
+
+	ip->i_flags |= XFS_IGRIO;
+
+#ifdef GRIO_DEBUG
+	printf("Set XFS_IGRIO flag\n");
+#endif /* GRIO_DEBUG */
+
+	xfs_iunlock( ip, XFS_ILOCK_SHARED );
+	IRELE (ip);
+	return;
 }
+#endif
