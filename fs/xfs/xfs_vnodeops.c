@@ -956,6 +956,11 @@ xfs_setattr(
 		timeflags |= XFS_ICHGTIME_CHG;
 
 		mandlock_after = MANDLOCK(vp, ip->i_d.di_mode);
+		if (mandlock_before != mandlock_after &&
+		    ip_held == B_FALSE) {
+			xfs_trans_ihold(tp, ip);
+			ip_held = B_TRUE;
+		}
         }
 
 	/*
@@ -1069,10 +1074,20 @@ xfs_setattr(
 	}
 
 	code = xfs_trans_commit(tp, commit_flags);
+
+	/*
+	 * If the (regular) file's mandatory locking mode changed, then
+	 * notify the vnode.  We do this under the inode lock to prevent
+	 * racing calls to vop_vnode_change.
+	 */
+	if ((mask & AT_MODE) && mandlock_before != mandlock_after) {
+		VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_ENF_LOCKING, 
+				 mandlock_after);
+	}
+
 	if (ip_held) {
 		xfs_iunlock(ip, lock_flags);
 	}
-
 	
 	/* 
 	 * release any dquot(s) inode had kept before chown
@@ -1085,15 +1100,6 @@ xfs_setattr(
 		xfs_qm_dqrele(udqp);
 	if (pdqp)
 		xfs_qm_dqrele(pdqp);
-
-	/*
-	 * If the (regular) file's mandatory locking mode changed, then
-	 * notify the vnode.
-	 */
-	if ((mask & AT_MODE) && mandlock_before != mandlock_after) {
-		VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_ENF_LOCKING, 
-				 mandlock_after);
-	}
 
 	if (code) {
 		return code;
