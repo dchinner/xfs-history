@@ -403,6 +403,7 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	uio.uio_segflg = UIO_USERSPACE;
 	uio.uio_resid = size;
 
+	UPDATE_ATIME(dentry->d_inode);
 	VOP_READLINK(vp, &uio, sys_cred, error);
 	if (error)
 		return -error;
@@ -419,7 +420,7 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	uio_t	uio;
 	iovec_t	iov;
 	int	error = 0;
-	char	*link = kmalloc(MAXNAMELEN, GFP_KERNEL); 
+	char	*link = kmalloc(MAXNAMELEN+1, GFP_KERNEL); 
 
 	vp = LINVFS_GET_VP(dentry->d_inode);
 	iov.iov_base = link;
@@ -436,6 +437,9 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 		return NULL;
 	}
 
+	link[MAXNAMELEN - uio.uio_resid] = '\0';
+
+	UPDATE_ATIME(dentry->d_inode);
 	base = lookup_dentry(link, base, follow);
 	kfree_s(link, MAXNAMELEN);
 	return base;
