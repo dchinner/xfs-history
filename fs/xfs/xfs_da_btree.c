@@ -48,9 +48,11 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_da_btree.h"
+#ifndef SIM
 #include <attributes.h>
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
+#endif
 #include "xfs_dir.h"
 #include "xfs_dir_leaf.h"
 #include "xfs_error.h"
@@ -179,7 +181,11 @@ xfs_da_split(xfs_da_state_t *state)
 		 */
 		switch (oldblk->magic) {
 		case XFS_ATTR_LEAF_MAGIC:
+#ifdef SIM
+			error = ENOTTY;
+#else
 			error = xfs_attr_leaf_split(state, oldblk, newblk);
+#endif
 			if (error)
 				return(error);	/* GROT: dir is inconsistent */
 			addblk = newblk;
@@ -545,12 +551,18 @@ xfs_da_join(xfs_da_state_t *state)
 		 */
 		switch (drop_blk->magic) {
 		case XFS_ATTR_LEAF_MAGIC:
+#ifdef SIM
+			error = ENOTTY;
+#else
 			error = xfs_attr_leaf_toosmall(state, &action);
+#endif
 			if (error)
 				return(error);
 			if (action == 0)
 				return(0);
+#ifndef SIM
 			xfs_attr_leaf_unbalance(state, drop_blk, save_blk);
+#endif
 			break;
 		case XFS_DIR_LEAF_MAGIC:
 			error = xfs_dir_leaf_toosmall(state, &action);
@@ -801,11 +813,13 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 	level = path->active-1;
 	blk = &path->blk[ level ];
 	switch (blk->magic) {
+#ifndef SIM
 	case XFS_ATTR_LEAF_MAGIC:
 		lasthash = xfs_attr_leaf_lasthash(blk->bp, &count);
 		if (count == 0)
 			return;
 		break;
+#endif
 	case XFS_DIR_LEAF_MAGIC:
 		lasthash = xfs_dir_leaf_lasthash(blk->bp, &count);
 		if (count == 0)
@@ -1022,8 +1036,10 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 				blk->index = probe;
 				blkno = btree->before;	
 			}
+#ifndef SIM
 		} else if (current->magic == XFS_ATTR_LEAF_MAGIC) {
 			blk->hashval = xfs_attr_leaf_lasthash(blk->bp, NULL);
+#endif
 			break;
 		} else if (current->magic == XFS_DIR_LEAF_MAGIC) {
 			blk->hashval = xfs_dir_leaf_lasthash(blk->bp, NULL);
@@ -1041,9 +1057,11 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 		if (blk->magic == XFS_DIR_LEAF_MAGIC) {
 			retval = xfs_dir_leaf_lookup_int(blk->bp, state->args,
 								 &blk->index);
+#ifndef SIM
 		} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
 			retval = xfs_attr_leaf_lookup_int(blk->bp, state->args,
 								   &blk->index);
+#endif
 		}
 		if (((retval == ENOENT) || (retval == ENXIO)) &&
 		    (blk->hashval == state->args->hashval)) {
@@ -1053,8 +1071,10 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 				return(error);
 			if (retval == 0) {
 				continue;
+#ifndef SIM
 			} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
 				retval = ENXIO;	/* path_shift() gives ENOENT */
+#endif
 			}
 		}
 		break;
@@ -1063,6 +1083,7 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 	return(0);	
 }
 
+#ifndef SIM
 /*
  * Drop to the bottom of the btree and pick out the indicated
  * attribute's value.  Actually use an attribute work routine.
@@ -1081,6 +1102,7 @@ xfs_da_node_getvalue(xfs_da_state_t *state)
 
 	return(retval);	
 }
+#endif /* SIM */
 
 /*========================================================================
  * Utility routines.
@@ -1110,9 +1132,11 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 	ASSERT(old_blk->magic == new_blk->magic);
 
 	switch (old_blk->magic) {
+#ifndef SIM
 	case XFS_ATTR_LEAF_MAGIC:
 		before = xfs_attr_leaf_order(old_blk->bp, new_blk->bp);
 		break;
+#endif
 	case XFS_DIR_LEAF_MAGIC:
 		before = xfs_dir_leaf_order(old_blk->bp, new_blk->bp);
 		break;
@@ -1363,10 +1387,12 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 			ASSERT(level == path->active-1);
 			blk->index = 0;
 			switch(blk->magic) {
+#ifndef SIM
 			case XFS_ATTR_LEAF_MAGIC:
 				blk->hashval = xfs_attr_leaf_lasthash(blk->bp,
 								      NULL);
 				break;
+#endif
 			case XFS_DIR_LEAF_MAGIC:
 				blk->hashval = xfs_dir_leaf_lasthash(blk->bp,
 								     NULL);
