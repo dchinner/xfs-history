@@ -1,4 +1,4 @@
-#ident "$Revision: 1.267 $"
+#ident "$Revision: 1.268 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2509,18 +2509,10 @@ xfs_create(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
-	arsess_t		*arsess;
-	vproc_t			*vpr;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
-	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
-
         dp = XFS_BHVTOI(dir_bdp);
-
-	vpr = VPROC_LOOKUP(current_pid());
-	VPROC_GETARSESS(vpr, &arsess);
-	VPROC_RELE(vpr);
-	prid = (xfs_prid_t)arsess->as_prid;
+	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_CREATE)) {
 		error = dm_namesp_event(DM_CREATE, dir_vp, NULL, name, NULL,
@@ -2531,6 +2523,10 @@ xfs_create(
 	
 	mp = dp->i_mount;
 	udqp = pdqp = NULL;
+	if (vap->va_mask == AT_PROJID)
+		prid = (xfs_prid_t)vap->va_projid;
+	else 	
+		prid = (xfs_prid_t)dfltprid;
 
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
@@ -4802,8 +4798,6 @@ xfs_mkdir(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
-	arsess_t		*arsess;
-	vproc_t			*vpr;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -4817,14 +4811,13 @@ xfs_mkdir(
 			return error;
 	}
 	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
+
 	mp = dp->i_mount;
-
-	vpr = VPROC_LOOKUP(current_pid());
-	VPROC_GETARSESS(vpr, &arsess);
-	VPROC_RELE(vpr);
-	prid = (xfs_prid_t)arsess->as_prid;
-
 	udqp = pdqp = NULL;
+	if (vap->va_mask == AT_PROJID)
+		prid = (xfs_prid_t)vap->va_projid;
+	else 	
+		prid = (xfs_prid_t)dfltprid;
 
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
@@ -5367,14 +5360,14 @@ xfs_symlink(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
-	arsess_t		*arsess;
-	vproc_t			*vpr;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
-	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
+        dp = XFS_BHVTOI(dir_bdp);
 	dp_joined_to_trans = B_FALSE;
 	error = 0;
 	tp = NULL;
+
+	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
 
 	/*
 	 * Check component lengths of the target path name.
@@ -5400,12 +5393,6 @@ xfs_symlink(
                 pn_free(&cpn);
                 pn_free(&ccpn);
         }
-        dp = XFS_BHVTOI(dir_bdp);
-
-	vpr = VPROC_LOOKUP(current_pid());
-	VPROC_GETARSESS(vpr, &arsess);
-	VPROC_RELE(vpr);
-	prid = (xfs_prid_t)arsess->as_prid;
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_SYMLINK)) {
 		error = dm_namesp_event(DM_SYMLINK, dir_vp, NULL,
@@ -5416,6 +5403,10 @@ xfs_symlink(
 
 	mp = dp->i_mount;
         udqp = pdqp = NULL;
+	if (vap->va_mask == AT_PROJID)
+		prid = (xfs_prid_t)vap->va_projid;
+	else 	
+		prid = (xfs_prid_t)dfltprid;
 
 	/*
 	 * Make sure that we have allocated dquot(s) on disk.
