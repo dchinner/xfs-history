@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.51 1995/04/29 17:25:30 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.52 1995/05/01 17:54:45 ajs Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -373,12 +373,11 @@ xfs_io_is_guaranteed( xfs_inode_t *ip, stream_id_t *stream_id)
 xfs_ino_t 
 xfs_grio_get_inumber( int fdes )
 {
-	int	error;
 	file_t	*fp;
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
 
-	if ( error = getf( fdes, &fp ) ) {
+	if ( getf( fdes, &fp ) != 0 ) {
 		ASSERT( 0 );
 		return( (xfs_ino_t)0 );
 	}
@@ -402,12 +401,11 @@ xfs_grio_get_inumber( int fdes )
 dev_t 
 xfs_grio_get_fs_dev( int fdes )
 {
-	int	error;
 	file_t	*fp;
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
 
-	if ( error = getf( fdes, &fp ) ) {
+	if ( getf( fdes, &fp ) != 0 ) {
 		ASSERT( 0 );
 		return( 0 );
 	}
