@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
 
 /*
  * High level interface routines for log manager
@@ -536,24 +536,17 @@ static buf_t *
 xlog_get_bp(int num_bblks)
 {
 	buf_t   *bp;
-	daddr_t unaligned;
 
 	ASSERT(num_bblks > 0);
-
-	bp = getrbuf(0);
-	unaligned = (daddr_t)kmem_alloc(BBTOB(num_bblks+1), 0);
-	bp->b_dmaaddr = (caddr_t)((unaligned+BBSIZE-1) & ~(BBSIZE-1));
-	bp->b_bufsize = bp->b_bcount = BBTOB(num_bblks);
-	bp->b_fsprivate = (caddr_t)unaligned;
+	bp = ngetrbuf(BBTOB(num_bblks));
 	return bp;
 }	/* xlog_get_bp */
 
 
 static void
-xlog_put_bp(buf_t *bp, int num_bblks)
+xlog_put_bp(buf_t *bp)
 {
-	kmem_free(bp->b_fsprivate, BBTOB(num_bblks+1));
-	freerbuf(bp);
+	nfreerbuf(bp);
 }	/* xlog_get_bp */
 
 
@@ -746,8 +739,8 @@ bad_blk:
 	/* Potentially backup over partial log record write */
 	last_blk = xlog_find_verify_log_record(ba, start_blk, last_blk);
 	
-	xlog_put_bp(big_bp, num_scan_bblks);
-	xlog_put_bp(bp, 1);
+	xlog_put_bp(big_bp);
+	xlog_put_bp(bp);
 	return last_blk;
 }	/* xlog_find_head */
 
@@ -782,7 +775,7 @@ xlog_print_find_oldest(xlog_t *log)
 						 last_blk, last_half_cycle);
 	}
 
-	xlog_put_bp(bp, 1);
+	xlog_put_bp(bp);
 	return last_blk;
 }	/* xlog_find_oldest */
 
@@ -860,7 +853,7 @@ xlog_find_tail(xlog_t  *log,
 	rhead = (xlog_rec_header_t *)bp->b_dmaaddr;
 	tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
 exit:
-	xlog_put_bp(bp, 1);
+	xlog_put_bp(bp);
 
 	return tail_blk;
 }	/* xlog_find_sync */
@@ -889,15 +882,15 @@ xlog_find_zeroed(xlog_t	 *log,
 	first_cycle = GET_CYCLE(bp->b_dmaaddr);
 	if (first_cycle == 0) {		/* completely zeroed log */
 		*blk_no = 0;
-		xlog_put_bp(bp, 1);
+		xlog_put_bp(bp);
 		return 1;
 	}
 
-	/* check not zeroed log */
+	/* check partially zeroed log */
 	xlog_bread(log, log_bbnum-1, 1, bp);
 	last_cycle = GET_CYCLE(bp->b_dmaaddr);
 	if (last_cycle != 0) {		/* log completely written to */
-		xlog_put_bp(bp, 1);
+		xlog_put_bp(bp);
 		return 0;
 	}
 	ASSERT(first_cycle == 1);
@@ -919,8 +912,8 @@ xlog_find_zeroed(xlog_t	 *log,
 	last_blk = xlog_find_verify_log_record(ba, start_blk, last_blk);
 
 	*blk_no = last_blk;
-	xlog_put_bp(big_bp, num_scan_bblks);
-	xlog_put_bp(bp, 1);
+	xlog_put_bp(big_bp);
+	xlog_put_bp(bp);
 	return 1;
 }	/* xlog_find_zeroed */
 
@@ -1547,9 +1540,10 @@ xlog_state_get_ticket(xlog_t	*log,
 
 	/* Eventually force out buffers */
 	if (log->l_logreserved + len > log->l_logsize) {
-		if (flags & XFS_LOG_NOSLEEP)
+		if (flags & XFS_LOG_NOSLEEP) {
+			spunlockspl(log->l_icloglock, spl);
 			return (xfs_log_ticket_t)-1;
-		else
+		} else
 			xlog_panic("xlog_state_get_ticket: over reserved");
 	}
 	log->l_logreserved += len;
@@ -1728,12 +1722,16 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	lsn = iclog->ic_header.h_lsn;
 	if (iclog->ic_state == XLOG_STATE_ACTIVE) {
 		iclog->ic_refcnt++;
+		if (iclog->ic_refcnt == 1 && iclog->ic_offset == 0) {
+			iclog->ic_header.h_cycle = log->l_curr_cycle;
+			ASSIGN_LSN(iclog->ic_header.h_lsn, log);
+			ASSERT(log->l_curr_block >= 0);
+		}
 		spunlockspl(log->l_icloglock, spl);
 		xlog_state_want_sync(log, iclog);
 		xlog_state_release_iclog(log, iclog);
-
+		spl = splockspl(log->l_icloglock, splhi);
 	}
-	spl = splockspl(log->l_icloglock, splhi);
 	if (iclog->ic_header.h_lsn == lsn		&&
 	    !(iclog->ic_state == XLOG_STATE_ACTIVE ||
 	      iclog->ic_state == XLOG_STATE_DIRTY)	&&
