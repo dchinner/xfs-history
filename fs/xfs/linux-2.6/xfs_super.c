@@ -381,6 +381,7 @@ linvfs_release_buftarg(
 	}
 }
 
+#ifdef CONFIG_XFS_QUOTA
 STATIC int
 linvfs_quotactl(
 	struct super_block *sb,
@@ -412,6 +413,7 @@ linvfs_quotactl(
 		return -error;
 	return 0;
 }
+#endif
 
 struct super_block *
 linvfs_read_super(
