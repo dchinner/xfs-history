@@ -2499,7 +2499,7 @@ write_inode_buffer:
 
 
 /*
- * recover QUOTAOFF records. We simply make a note of it in the xlog_t
+ * Recover QUOTAOFF records. We simply make a note of it in the xlog_t
  * structure, so that we know not to do any dquot item or dquot buffer recovery,
  * of that type.
  */
@@ -2532,7 +2532,7 @@ xlog_recover_do_quotaoff_trans(xlog_t			*log,
 
 
 /*
- * recover a dquot record
+ * Recover a dquot record
  */
 STATIC int
 xlog_recover_do_dquot_trans(xlog_t		*log,
@@ -2566,6 +2566,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	ASSERT(dq_f);
 	if (xfs_qm_dqcheck(recddq, 
 			   dq_f->qlf_id,
+			   0, NULL,
 			   "xlog_recover_do_dquot_trans (log copy)")) {
 		return XFS_ERROR(EIO);
 	}
@@ -2591,7 +2592,8 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	 * was among a chunk of dquots created earlier, and we did some
 	 * minimal initialization then.
 	 */
-	if (xfs_qm_dqcheck(ddq, dq_f->qlf_id, "xlog_recover_do_dquot_trans")) {
+	if (xfs_qm_dqcheck(ddq, dq_f->qlf_id, 0, NULL,
+			   "xlog_recover_do_dquot_trans")) {
 		brelse(bp);
 		return (EIO);
 	}
