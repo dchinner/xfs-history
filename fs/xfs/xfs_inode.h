@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.113 $"
+#ident "$Revision: 1.114 $"
 
 struct bhv_desc;
 struct buf;
@@ -328,6 +328,8 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
 	((xfs_inode_t *)((char *)(bhvp) - \
 			 (char *)&(((xfs_inode_t *)0)->i_bhv_desc)))
 #endif
+
+#define BHV_IS_XFS(bdp)		(BHV_OPS(bdp) == &xfs_vnodeops)
 
 /*
  * Clear out the read-ahead state in the in-core inode.
