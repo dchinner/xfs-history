@@ -94,11 +94,11 @@
 #ifdef _KERNEL
 #define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
 #define xlog_exit(s)		{cmn_err(CE_PANIC, s); }
-#define xlog_warning(s)		{cmn_err(CE_WARN, s); }
+#define xlog_warn(s)		{cmn_err(CE_WARN, s); }
 #else
 #define xlog_panic(s)		{printf("%s\n", s); abort();}
 #define xlog_exit(s)		{printf("%s\n", s); exit(1);}
-#define xlog_warning(s)		{printf("%s\n", s); }
+#define xlog_warn(s)		{printf("%s\n", s); }
 #endif
 
 
@@ -143,6 +143,12 @@
 #define XLOG_TIC_IN_Q		0x4
 
 #define XLOG_UNMOUNT_TYPE	0x556e	/* Un for Unmount */
+
+/*
+ * Flags for log structure
+ */
+#define XLOG_CHKSUM_MISMATCH	0x1	/* used only during recovery */
+
 
 typedef void * xlog_tid_t;
 
@@ -231,6 +237,7 @@ typedef struct xlog_in_core {
  * that round off problems won't occur when releasing partial reservations.
  */
 typedef struct log {
+    /* The following block of fields are changed while holding icloglock */
     sema_t		l_flushsema;    /* iclog flushing semaphore */
     int			l_ticket_cnt;	/* free ticket count */
     int			l_ticket_tcnt;	/* total ticket count */
@@ -252,9 +259,12 @@ typedef struct log {
     int			l_prev_cycle;   /* Cycle # b4 last block increment */
     int			l_curr_block;   /* current logical block of log */
     int			l_prev_block;   /* previous logical block of log */
-    xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];/* for debugging */
-    int			l_iclog_size;   /* size of log in bytes; repeat */
 
+    /* The following 2 fields are used for debugging; need to hold icloglock */
+    xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];
+    int			l_iclog_size;		 /* size of log in bytes */
+
+    /* The following block of fields are changed while holding grant_lock */
     lock_t		l_grant_lock;		/* protects below fields */
     xlog_ticket_t	*l_reserve_headq;	/* */
     xlog_ticket_t	*l_write_headq;		/* */
@@ -263,15 +273,17 @@ typedef struct log {
     int			l_grant_write_cycle;	/* */
     int			l_grant_write_bytes;	/* */
 
+    /* The following fields don't need locking */
     ktrace_t		*l_trace;
     ktrace_t		*l_grant_trace;
+    uint		l_flags;
 } xlog_t;
 
 
 /* common routines */
 extern xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
 extern int	 xlog_find_head(xlog_t *log, daddr_t *head_blk);
-extern daddr_t   xlog_print_find_oldest(xlog_t *log);
+extern int	 xlog_print_find_oldest(xlog_t *log, daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
 extern buf_t *	 xlog_get_bp(int);
