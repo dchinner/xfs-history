@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision: 1.72 $"
 
 #include <sys/param.h>
 #ifdef SIM

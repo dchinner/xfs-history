@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.26 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1567,6 +1567,7 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 }	/* xlog_unpack_data */
 
 
+#ifndef SIM
 /*
  * Do the actual recovery
  */
@@ -1756,6 +1757,7 @@ xlog_recover(xlog_t *log)
 	}
 	return error;
 }	/* xlog_recover */
+#endif	/* !SIM */
 
 
 #ifdef DEBUG

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.49 $"
+#ident  "$Revision: 1.50 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -102,6 +102,7 @@
 #include "sim.h"
 #endif
 
+#ifndef SIM
 #define	whymount_t	whymountroot_t
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
 
@@ -154,6 +155,7 @@ STATIC xfs_mount_t *_xfs_get_vfsmount(struct vfs	*vfsp,
 STATIC int	_spectodev(char *spec, dev_t *devp);
 STATIC int	_xfs_isdev(dev_t dev);
 STATIC int	_xfs_ibusy(xfs_mount_t *mp);
+#endif	/* !SIM */
 
 
 
@@ -179,33 +181,39 @@ int
 xfs_init(vfssw_t	*vswp,
 	 int		fstype)
 {
-	extern lock_t	xfs_strat_lock;
-	extern sema_t	xfs_ancestormon;
-	extern lock_t	xfsd_lock;
-	extern sema_t	xfsd_wait;
 	extern lock_t	xfs_bli_reflock;
 	extern zone_t	*xfs_dir_state_zone;
 	extern zone_t	*xfs_bmap_free_item_zone;
 	extern zone_t	*xfs_btree_cur_zone;
 	extern zone_t	*xfs_inode_zone;
 	extern zone_t	*xfs_trans_zone;
-	extern zone_t	*xfs_irec_zone;
-	extern zone_t	*xfs_bmap_zone;
-	extern zone_t	*xfs_strat_write_zone;
 	extern zone_t	*xfs_bmbt_locals_zone;
 	extern zone_t	*xfs_bmalloca_zone;
 	extern zone_t	*xfs_bmapi_locals_zone;
+#ifndef SIM
+	extern lock_t	xfs_strat_lock;
+	extern lock_t	xfsd_lock;
+	extern sema_t	xfsd_wait;
+	extern sema_t	xfs_ancestormon;
+	extern zone_t	*xfs_bmap_zone;
+	extern zone_t	*xfs_irec_zone;
+	extern zone_t	*xfs_strat_write_zone;
+#ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
 	extern ktrace_t	*xfs_bmap_trace_buf;
 	extern ktrace_t	*xfs_bmbt_trace_buf;
+#endif	/* DEBUG */
+#endif	/* !SIM */
 
 	xfs_fstype = fstype;
 
+	initnlock(&xfs_bli_reflock, "xfsbli");
+#ifndef SIM
 	initnlock(&xfs_strat_lock, "xfsstrat");
 	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
 	initnlock(&xfsd_lock, "xfsd");
 	initnsema(&xfsd_wait, 0, "xfsd");
-	initnlock(&xfs_bli_reflock, "xfsbli");
+#endif	/* !SIM */
 	
 	/*
 	 * Initialize all of the zone allocators we use.
@@ -216,12 +224,14 @@ xfs_init(vfssw_t	*vswp,
 					    "xfs_btree_cur");
 	xfs_inode_zone = kmem_zone_init(sizeof(xfs_inode_t), "xfs_inode");
 	xfs_trans_zone = kmem_zone_init(sizeof(xfs_trans_t), "xfs_trans");
+#ifndef SIM
 	xfs_irec_zone = kmem_zone_init((XFS_BMAP_MAX_NMAP *
 					sizeof(xfs_bmbt_irec_t)), "xfs_irec");
 	xfs_bmap_zone = kmem_zone_init((XFS_ZONE_NBMAPS *
 					sizeof(struct bmapval)), "xfs_bmap");
 	xfs_strat_write_zone = kmem_zone_init(sizeof(xfs_strat_write_locals_t),
 					      "xfs_strat_write");
+#endif
 	xfs_alloc_arg_zone =
 		kmem_zone_init(sizeof(xfs_alloc_arg_t), "xfs_alloc_arg");
 	xfs_dir_state_zone =
@@ -250,6 +260,7 @@ xfs_init(vfssw_t	*vswp,
 }
 
 
+#ifndef SIM
 /*
  * Resolve path name of special file to its device.
  */
@@ -291,9 +302,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	int		error = 0;
 	int		s, vfs_flags;
 	xfs_sb_t	*sbp;
-#ifndef SIM
 	struct vnode 	*makespecvp(dev_t, vtype_t);
-#endif
 
 	/*
 	 * Remounting a XFS file system is bad. The log manager
@@ -304,7 +313,6 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	
 	mp = _xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
-#ifndef SIM
 	/*
  	 * Open the data and real time devices now.
 	 */
@@ -359,11 +367,6 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		}
 	} else
 		ldevvp = NULL;
-#else
-	mp->m_rtdevp = NULL;
-	mp->m_logdevp = NULL;
-	mp->m_ddevp  = NULL;
-#endif
 
 	if (error = xfs_mountfs(vfsp, ddev)) {
 		xfs_mount_free(mp);
@@ -395,13 +398,11 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * XXX Anything special for root mounts?
 	 * if (why == ROOT_INIT) {}
 	 */
-#ifndef SIM
         if (why == ROOT_INIT) {
                 extern int rtodc( void );
 
                 clkset( rtodc() );
         }
-#endif
 
 	/*
 	 * XXX Anything special for read-only mounts?
@@ -505,13 +506,6 @@ xfs_vfsmount(vfs_t		*vfsp,
 	 */
 	if (error = _spectodev(uap->spec, &device))
 		return error;
-#ifdef SIM
-	/*
-	 * Simulation does not use logical volume.
-	 */
-	ddev = logdev = device;
-	rtdev = 0;
-#else
 	if (emajor(device) == XLV_MAJOR) {
 		/*
 		 * logical volume
@@ -547,7 +541,6 @@ xfs_vfsmount(vfs_t		*vfsp,
 		ddev = logdev = device;
 		rtdev = 0;			/* no realtime */
 	}
-#endif	/* SIM */
 
 	/*
 	 * Ensure that this device isn't already mounted,
@@ -631,9 +624,6 @@ _xfs_isdev(dev_t dev)
 STATIC int
 xfs_mountroot(vfs_t		*vfsp,
 	      enum whymountroot	why)
-#ifdef SIM
-{ return ENOSYS; }
-#else	/* !SIM */
 {
 	int		error = ENOSYS;
 	static int	xfsrootdone;
@@ -737,7 +727,6 @@ bad:
 	return error;
 
 } /* end of xfs_mountroot() */
-#endif
 
 
 /*
@@ -1368,3 +1357,6 @@ struct vfsops xfs_vfsops = {
 	xfs_mountroot,
 	fs_nosys,	/* swapvp */
 };
+#else	/* SIM */
+struct vfsops xfs_vfsops;
+#endif	/* !SIM */
