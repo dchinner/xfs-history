@@ -8,6 +8,7 @@
 #include <sys/vnode.h>
 #include <sys/pfdat.h>
 #include <sys/cred.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
@@ -17,7 +18,6 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/mode.h>
-#include <sys/uuid.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/cmn_err.h>
@@ -111,7 +111,7 @@ xfs_validate_extents(
 	xfs_bmbt_rec_32_t	*ep,
 	int			nrecs);
 
-#ifndef SIM
+#ifdef XFS_RW_TRACE
 STATIC void
 xfs_itrunc_trace(
 	int		tag,
@@ -122,7 +122,7 @@ xfs_itrunc_trace(
 	off_t		toss_finish);
 #else
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
-#endif /* !SIM */
+#endif /* XFS_RW_TRACE */
 #else /* DEBUG */
 #define xfs_validate_extents(ep, nrecs)
 #define	xfs_itrunc_trace(tag, ip, flag, new_size, toss_start, toss_finish)
@@ -569,17 +569,21 @@ xfs_iread(
 		return error;
 	}
 
-#ifndef SIM
-#ifdef DEBUG
 	/*
 	 * Initialize inode's trace buffers.
 	 * Do this before xfs_iformat in case it adds entries.
 	 */
+#ifdef XFS_BMAP_TRACE
 	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE, 0);
-	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE, 0);
-	ip->i_rwtrace = ktrace_alloc(XFS_RW_KTRACE_SIZE, 0);
-	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, 0);
 #endif
+#ifdef XFS_BMBT_TRACE
+	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE, 0);
+#endif
+#ifdef XFS_RW_TRACE
+	ip->i_rwtrace = ktrace_alloc(XFS_RW_KTRACE_SIZE, 0);
+#endif
+#ifdef XFS_STRAT_TRACE
+	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, 0);
 #endif
 
 	/*
@@ -976,7 +980,7 @@ xfs_file_last_byte(
 	return last_byte;
 }
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_RW_TRACE)
 STATIC void
 xfs_itrunc_trace(
 	int		tag,
