@@ -512,9 +512,9 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 		bcopy(&((char *)sf)[base+size], &((char *)sf)[base],
 					      dp->i_d.di_size - (base+size));
 	}
-	bzero(&((char *)sf)[dp->i_d.di_size - size], size);
-	sf->hdr.count--;
+	xfs_idata_realloc(dp, -size);
 
+	sf->hdr.count--;
 	dp->i_d.di_size -= size;
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE | XFS_ILOG_DATA);
 
