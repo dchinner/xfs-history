@@ -1469,14 +1469,13 @@ xfs_inactive(
 					    XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 				goto out;
 			}
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 			/*
 			 * The return value is ignored cause we don't know
 			 * what to do about it.
 			 */
 			(void)xfs_attr_inactive(ip);	
-
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 			tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 			error = xfs_trans_reserve(tp, 0,
