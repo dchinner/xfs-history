@@ -3444,8 +3444,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 	kdb_printf("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
 		INT_GET(bt->bb_magic, ARCH_CONVERT), INT_GET(bt->bb_level, ARCH_CONVERT), INT_GET(bt->bb_numrecs, ARCH_CONVERT),
 		INT_GET(bt->bb_leftsib, ARCH_CONVERT), INT_GET(bt->bb_rightsib, ARCH_CONVERT));
-	if (INT_ISZERO(bt->bb_level, ARCH_CONVERT)) {
-
+	if (!bt->bb_level) {
 		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_alloc_rec_t *r;
 
@@ -3483,7 +3482,7 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 		INT_GET(bt->bb_numrecs, ARCH_CONVERT),
 		INT_GET(bt->bb_leftsib, ARCH_CONVERT));
 	kdb_printf("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_CONVERT));
-	if (INT_ISZERO(bt->bb_level, ARCH_CONVERT)) {
+	if (!bt->bb_level) {
 		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_bmbt_rec_t *r;
 			xfs_bmbt_irec_t	irec;
@@ -3528,8 +3527,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 		INT_GET(bt->bb_numrecs, ARCH_CONVERT),
 		INT_GET(bt->bb_leftsib, ARCH_CONVERT),
 		INT_GET(bt->bb_rightsib, ARCH_CONVERT));
-	if (INT_ISZERO(bt->bb_level, ARCH_CONVERT)) {
-
+	if (!bt->bb_level) {
 		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_CONVERT); i++) {
 			xfs_inobt_rec_t *r;
 
