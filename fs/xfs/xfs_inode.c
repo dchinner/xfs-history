@@ -537,7 +537,12 @@ xfs_itruncate(xfs_trans_t	**tp,
 
 	sbp = &(mp->m_sb);
 	first_unmap_block = xfs_b_to_fsb(sbp, new_size);
-	last_block = xfs_b_to_fsbt(sbp, ip->i_d.di_size);
+	/*
+	 * Subtract 1 from the size so that we get the correct
+	 * last block when the size is a multiple of the block
+	 * size.
+	 */
+	last_block = xfs_b_to_fsbt(sbp, ip->i_d.di_size - 1);
 	if (first_unmap_block > last_block) {
 		/*
 		 * The old size and new size both fall on the same
@@ -560,9 +565,8 @@ xfs_itruncate(xfs_trans_t	**tp,
 		free_list.xbf_first = NULL;
 		free_list.xbf_count = 0;
 		first_block = xfs_bunmapi(*tp, ip, first_unmap_block,
-					  unmap_len, first_block,
-					  XFS_ITRUNC_MAX_EXTENTS, &free_list,
-					  &done);
+					  unmap_len, XFS_ITRUNC_MAX_EXTENTS,
+					  first_block, &free_list, &done);
 
 		/*
 		 * Duplicate the transaction that has the permanent
