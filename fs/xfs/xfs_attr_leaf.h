@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_LEAF_H
 #define	_FS_XFS_ATTR_LEAF_H
 
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.8 $"
 
 /*
  * xfs_attr_leaf.h
@@ -195,6 +195,10 @@ int	xfs_attr_leaf_toosmall(struct xfs_da_state *state, int *retval);
 void	xfs_attr_leaf_unbalance(struct xfs_da_state *state,
 				       struct xfs_da_state_blk *drop_blk,
 				       struct xfs_da_state_blk *save_blk);
+int	xfs_attr_root_inactive(xfs_inode_t *dp);
+int	xfs_attr_node_inactive(xfs_inode_t *dp, struct buf *bp, int level);
+int	xfs_attr_leaf_inactive(xfs_inode_t *dp, struct buf *bp);
+int	xfs_attr_leaf_freextent(xfs_inode_t *dp, int blkno, int blkcnt);
 
 /*
  * Utility routines.
