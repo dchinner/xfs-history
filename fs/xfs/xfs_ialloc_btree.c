@@ -2118,7 +2118,8 @@ xfs_inobt_decrement(
 		cur->bc_ptrs[lev - 1] = block->bb_numrecs;
 	}
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 #ifdef _NOTYET_
