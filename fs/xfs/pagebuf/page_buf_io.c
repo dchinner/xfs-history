@@ -603,7 +603,7 @@ probe_unmapped_page(
 		page_cache_release(page);
 		return 0;
 	}
-	if (page->mapping) {
+	if (page->mapping && PageDirty(page)) {
 		if (!page_has_buffers(page)) {
 			ret = PAGE_CACHE_SIZE;
 		} else {
