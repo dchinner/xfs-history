@@ -4,6 +4,14 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
+#include <stddef.h>
+#ifdef SIM
+#include <bstring.h>
+#else
+#include <sys/kmem.h>
+#include <sys/systm.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -18,16 +26,8 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
-
 #ifdef SIM
 #include "sim.h"
-#include <stddef.h>
-#include <bstring.h>
-#ifndef XFSDEBUG
-#define	NDEBUG
-#endif
-#include <assert.h>
-#define	ASSERT(x)	assert(x)
 #endif
 
 STATIC xfs_btree_cur_t *xfs_btree_curfreelist;

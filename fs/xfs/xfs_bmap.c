@@ -4,6 +4,13 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
+#include <stddef.h>
+#ifdef SIM
+#include <bstring.h>
+#else
+#include <sys/systm.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -18,22 +25,13 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
-
 #ifdef SIM
 #include "sim.h"
-#include <stddef.h>
-#include <bstring.h>
 #endif
 
 /*
  * Prototypes for internal functions.
  */
-
-#ifndef XFSDEBUG
-#define NDEBUG
-#endif
-#include <assert.h>
-#define	ASSERT(x)	assert(x)
 
 #ifdef XFSDEBUG
 STATIC void xfs_bmbt_kcheck(xfs_btree_cur_t *);

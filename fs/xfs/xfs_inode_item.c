@@ -8,12 +8,21 @@
 
 
 #include <sys/param.h>
+#ifdef SIM
 #define _KERNEL
+#endif
 #include <sys/buf.h>
+#ifdef SIM
 #undef _KERNEL
+#endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#ifndef SIM
+#include <sys/systm.h>
+#else
+#include <bstring.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -32,10 +41,7 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #ifdef SIM
-#include <bstring.h>
 #include "sim.h"
-#else
-#include <sys/systm.h>
 #endif
 
 

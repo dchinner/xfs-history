@@ -4,12 +4,16 @@
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#ifndef SIM
+#include <sys/systm.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
+#include "xfs_log.h"
 #include "xfs_trans_priv.h"
 
 #ifdef SIM

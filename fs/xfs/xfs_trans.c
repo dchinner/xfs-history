@@ -1,12 +1,23 @@
 
 #include <sys/param.h>
+#ifdef SIM
 #define _KERNEL
+#endif
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
+#ifdef SIM
 #undef _KERNEL
+#endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#ifndef SIM
+#include <sys/sysinfo.h>
+#include <sys/kmem.h>
+#include <sys/conf.h>
+#include <sys/user.h>
+#include <sys/systm.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -32,6 +43,10 @@
 
 #define	XFS_TRANS_LOG_CHUNK	8192
 
+#ifndef SIM
+#define	ROUNDUP32(x)		(((x) + 31) & ~31)
+#endif
+
 STATIC void	xfs_trans_do_commit(xfs_trans_t *, uint);
 STATIC void	xfs_trans_large_item(xfs_trans_t *, xfs_log_item_desc_t *);
 STATIC xfs_log_item_desc_t *xfs_trans_log_items(xfs_trans_t *,
@@ -41,6 +56,8 @@ STATIC void	xfs_trans_write_commit(xfs_trans_t *, caddr_t);
 STATIC void	xfs_trans_committed(xfs_trans_t *);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t);
 STATIC void	xfs_trans_free(xfs_trans_t *);
+
+struct zone *xfs_trans_zone;
 
 xfs_tid_t	
 xfs_trans_id_alloc(struct xfs_mount *mp)
@@ -59,7 +76,7 @@ xfs_trans_lsn_danger(struct xfs_mount *mp, xfs_lsn_t lsn)
 /* ARGSUSED */
 {
 #ifndef SIM
-	abort();
+	ASSERT(0);
 	/* NOTREACHED */
 #else
 	return (0);
@@ -413,7 +430,7 @@ xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
 	if ((bp = findchunk_match(vp, bmap, BUF_FSPRIV2, tp)) != NULL) {
 		if (!bp->b_flags & B_DONE) {
 #ifndef SIM
-			SYSINFO.lread += len;
+			SYSINFO.lread += BTOBB(bmap->pbsize);
 #endif
 
 			ASSERT(!(bp->b_flags & B_ASYNC));
@@ -422,7 +439,7 @@ xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
 
 #ifndef SIM
 			u.u_ior++;
-			SYSINFO.bread += len;
+			SYSINFO.bread += BTOBBT(bp->b_bcount);
 #endif
 
 			iowait(bp);

@@ -148,4 +148,6 @@ extern void		xfs_iunpin(xfs_inode_t *);
 extern void		xfs_iflush(xfs_inode_t *, uint);
 extern void		xfs_iprint(xfs_inode_t *);
 
+extern struct zone	*xfs_inode_zone;
+
 #endif	/* _XFS_INODE_H */

@@ -3,6 +3,10 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#ifndef SIM
+#include <sys/kmem.h>
+#include <sys/cmn_err.h>
+#endif
 #include "xfs_inum.h"
 #include "xfs.h"
 #include "xfs_trans.h"

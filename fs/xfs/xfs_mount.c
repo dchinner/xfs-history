@@ -1,11 +1,22 @@
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 #include <sys/param.h>
+#ifdef SIM
 #define _KERNEL
+#endif
 #include <sys/buf.h>
+#ifdef SIM
 #undef _KERNEL
+#endif
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#ifdef SIM
+#include <bstring.h>
+#else
+#include <sys/systm.h>
+#include <sys/kmem.h>
+#endif
+#include <stddef.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -23,8 +34,6 @@
 
 #ifdef SIM
 #include "sim.h"
-#include <bstring.h>
-#include <stddef.h>
 #endif
 
 /*

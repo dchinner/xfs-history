@@ -4,6 +4,11 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
+#include <stddef.h>
+#ifdef SIM
+#include <stdlib.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -17,20 +22,11 @@
 #include "xfs_btree.h"
 #ifdef SIM
 #include "sim.h"
-#include <stddef.h>
-#include <bstring.h>
-#include <stdlib.h>
 #endif
 
 /*
  * Prototypes for internal functions.
  */
-
-#ifndef XFSDEBUG
-#define NDEBUG
-#endif
-#include <assert.h>
-#define	ASSERT(x)	assert(x)
 
 #ifdef XFSDEBUG
 void xfs_alloc_kcheck(xfs_btree_cur_t *);
@@ -1666,7 +1662,7 @@ xfs_alloc_ag_vextent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agb
 		r = xfs_alloc_ag_vextent_exact(tp, agbuf, agno, bno, minlen, maxlen, len);
 		break;
 	default:
-		abort();
+		ASSERT(0);
 		/* NOTREACHED */
 	}
 	if (r != NULLAGBLOCK) {
@@ -1878,7 +1874,7 @@ xfs_alloc_vextent(xfs_trans_t *tp, xfs_fsblock_t bno, xfs_extlen_t minlen, xfs_e
 		}
 		break;
 	default:
-		abort();
+		ASSERT(0);
 		/* NOTREACHED */
 	}
 	if (agbno == NULLAGBLOCK)

@@ -5,6 +5,11 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
+#include <stddef.h>
+#ifdef SIM
+#include <bstring.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -21,19 +26,7 @@
 #include "xfs_inode.h"
 #ifdef SIM
 #include "sim.h"
-#include <stddef.h>
-#include <bstring.h>
 #endif
-
-/*
- * Prototypes for internal functions.
- */
-
-#ifndef XFSDEBUG
-#define NDEBUG
-#endif
-#include <assert.h>
-#define	ASSERT(x)	assert(x)
 
 /*
  * Prototypes for internal routines.

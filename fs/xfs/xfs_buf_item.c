@@ -8,12 +8,22 @@
 
 
 #include <sys/param.h>
+#ifdef SIM
 #define _KERNEL
+#endif
 #include <sys/buf.h>
+#ifdef SIM
 #undef _KERNEL
+#endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#ifdef SIM
+#include <bstring.h>
+#else
+#include <sys/systm.h>
+#include <sys/kmem.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -24,10 +34,7 @@
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
 #ifdef SIM
-#include <bstring.h>
 #include "sim.h"
-#else
-#include <sys/systm.h>
 #endif
 
 #define	ROUNDUP32(x)		(((x) + 31) & ~31)

@@ -1,16 +1,24 @@
 #include <sys/param.h>
+#ifdef SIM
 #define	_KERNEL
+#endif
 #include <sys/buf.h>
+#ifdef SIM
 #undef _KERNEL
+#endif
 #include <sys/debug.h>
 #include <sys/errno.h>
-#ifndef SIM
-#include <sys/kmem.h>
-#endif
 #include <sys/mode.h>
 #include <sys/vnode.h>
 #include <sys/cred.h>
 #include <sys/uuid.h>
+#ifdef SIM
+#include <bstring.h>
+#include <stdio.h>
+#else
+#include <sys/systm.h>
+#include <sys/kmem.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -31,11 +39,10 @@
 
 #ifdef SIM
 #include "sim.h"
-#include "bstring.h"
-#include <stdio.h>
 #endif
 
 
+struct zone *xfs_inode_zone;
 
 
 

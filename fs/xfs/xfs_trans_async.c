@@ -1,11 +1,20 @@
 
 #include <sys/param.h>
+#ifdef SIM
 #define _KERNEL
+#endif
 #include <sys/buf.h>
+#ifdef SIM
 #undef _KERNEL
+#endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#ifndef SIM
+#include <sys/kmem.h>
+#include <sys/systm.h>
+#include <sys/cmn_err.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"

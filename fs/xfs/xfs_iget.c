@@ -3,18 +3,24 @@
 #include <sys/param.h>
 #ifndef SIM
 #include <sys/kmem.h>
-#endif
+#else
 #define _KERNEL
+#endif
 #include <sys/mode.h>
 #include <sys/stat.h>
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
+#ifdef SIM
 #undef _KERNEL
+#endif
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#ifndef SIM
+#include <sys/systm.h>
+#endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -32,12 +38,9 @@
 
 #ifdef SIM
 #include "sim.h"
-#include <bstring.h>
 #endif /* SIM */
 
-#ifdef SIM
 struct igetstats	XFS_IGETINFO;
-#endif	/* SIM */
 
 extern struct vnodeops xfs_vnodeops;
 
