@@ -2703,7 +2703,8 @@ start_over:
 		 * name at the destination directory, remove it first.
 		 */
 		error = xfs_dir_replace (tp, target_dp, target_name,
-			target_pnp->pn_complen, src_ip->i_ino);
+			((target_pnp != NULL) ? target_pnp->pn_complen :
+			 strlen(target_name)), src_ip->i_ino);
 		ASSERT (!error);
 
 		dnlc_enter (target_dir_vp, target_name,
