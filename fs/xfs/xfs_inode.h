@@ -115,6 +115,7 @@ typedef struct xfs_inode {
 /*
  * xfs_iget.c prototypes.
  */
+extern void		xfs_ihash_init(xfs_mount_t *);
 extern xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t,
 					  xfs_trans_t *);
 extern xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,uint);
@@ -139,5 +140,6 @@ extern void		xfs_iroot_realloc(xfs_inode_t *, int);
 extern void		xfs_ipin(xfs_inode_t *);
 extern void		xfs_iunpin(xfs_inode_t *);
 extern void		xfs_iflush(xfs_inode_t *);
+extern void		xfs_iprint(xfs_inode_t *);
 
 #endif	/* _XFS_INODE_H */
