@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.58 $"
+#ident	"$Revision: 1.60 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -368,7 +368,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	bflush(mp->m_dev);
 	if (mp->m_rtdev)
 		bflush(mp->m_rtdev);
-	bp = xfs_getsb(mp);
+	bp = xfs_getsb(mp, 0);
 	bp->b_flags &= ~(B_DONE | B_READ);
 	bp->b_flags |= B_WRITE;
 	bwait_unpin(bp);
@@ -468,7 +468,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 	};
  
 	mp = tp->t_mountp;
-	bp = xfs_trans_getsb(tp);
+	bp = xfs_trans_getsb(tp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
 	xfs_btree_offsets(fields, offsets, XFS_SB_NUM_BITS, &first, &last);
 	bcopy((caddr_t)&mp->m_sb + first, (caddr_t)sbp + first, last - first + 1);
@@ -625,15 +625,26 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb)
  * xfs_getsb() is called to obtain the buffer for the superblock.
  * The buffer is returned locked and read in from disk.
  * The buffer should be released with a call to xfs_brelse().
+ *
+ * If the flags parameter is BUF_TRYLOCK, then we'll only return
+ * the superblock buffer if it can be locked without sleeping.
+ * If it can't then we'll return NULL.
  */
 buf_t *
-xfs_getsb(xfs_mount_t *mp)
+xfs_getsb(xfs_mount_t	*mp,
+	  int		flags)
 {
 	buf_t	*bp;
 
 	ASSERT(mp->m_sb_bp != NULL);
 	bp = mp->m_sb_bp;
-	psema(&bp->b_lock, PRIBIO);
+	if (flags & BUF_TRYLOCK) {
+		if (!cpsema(&bp->b_lock)) {
+			return NULL;
+		}
+	} else {
+		psema(&bp->b_lock, PRIBIO);
+	}
 	ASSERT(bp->b_flags & B_DONE);
 	return (bp);
 }
@@ -649,7 +660,7 @@ xfs_sb_relse(buf_t *bp)
 {
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT(valusema(&bp->b_lock) <= 0);
-	bp->b_flags &= ~(B_ASYNC);
+	bp->b_flags &= ~(B_ASYNC | B_READ);
 	vsema(&bp->b_lock);
 }
 
