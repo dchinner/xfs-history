@@ -27,7 +27,7 @@ typedef struct xfs_inode_log_item {
 	unsigned short		ili_ilock_recur;
 	unsigned short		ili_iolock_recur;
 	unsigned short		ili_flags;
-	unsigned short		ili_ref;
+	unsigned short		ili_logged;
 	xfs_inode_log_format_t	ili_format;
 } xfs_inode_log_item_t;
 
@@ -48,6 +48,9 @@ typedef struct xfs_inode_log_item {
 
 #define	XFS_ILOG_NONCORE	(XFS_ILOG_DATA | XFS_ILOG_EXT | \
 				 XFS_ILOG_BROOT | XFS_ILOG_DEV)
+#define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DATA | \
+				 XFS_ILOG_EXT | XFS_ILOG_BROOT | \
+				 XFS_ILOG_DEV)
 
 	
 void	xfs_inode_item_init(struct xfs_inode *, xfs_mount_t *);
