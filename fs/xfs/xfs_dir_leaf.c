@@ -136,9 +136,11 @@ xfs_dir_ino_validate(xfs_mount_t *mp, xfs_ino_t ino)
 /*
  * Validate a given shortform directory inode.
  */
+/*ARGSUSED*/
 void
 xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 {
+#if 0
 	xfs_ino_t		ino;
 	int			namelen_sum;
 	int			count;
@@ -157,7 +159,6 @@ xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 	}
 
 	return;
-#if 0
 	/*
 	 * rcc - We can never look at the fork because we don't
 	 * log the fork on rmdir's.  So it's possible that
