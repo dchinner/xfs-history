@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.82 $"
+#ident  "$Revision: 1.83 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -1233,6 +1233,7 @@ xfs_sync(vfs_t		*vfsp,
 	int		ireclaims;
 	int		restarts;
 	uint		lock_flags;
+	uint		base_lock_flags;
 	uint		log_flags;
 	boolean_t	mount_locked;
 	boolean_t	vnode_refed;
@@ -1257,13 +1258,13 @@ xfs_sync(vfs_t		*vfsp,
 	if (flags & SYNC_WAIT)
 		fflag = 0;		/* synchronous overrides all */
 
-	lock_flags = XFS_ILOCK_SHARED;
+	base_lock_flags = XFS_ILOCK_SHARED;
 	if (flags & (SYNC_DELWRI | SYNC_CLOSE | SYNC_PDFLUSH)) {
 		/*
 		 * We need the I/O lock if we're going to call any of
 		 * the flush/inval routines.
 		 */
-		lock_flags |= XFS_IOLOCK_SHARED;
+		base_lock_flags |= XFS_IOLOCK_SHARED;
 	}
 
 	/*
@@ -1278,6 +1279,8 @@ xfs_sync(vfs_t		*vfsp,
 	vnode_refed = B_FALSE;
 	ip = mp->m_inodes;
 	do {
+		lock_flags = base_lock_flags;
+
 		/*
 		 * There were no inodes in the list, just break out
 		 * of the loop.
@@ -1533,7 +1536,9 @@ xfs_sync(vfs_t		*vfsp,
 			}
 		}
 
-		xfs_iunlock(ip, lock_flags);
+		if (lock_flags != 0) {
+			xfs_iunlock(ip, lock_flags);
+		}
 		if (vnode_refed) {
 			/*
 			 * If we had to take a reference on the vnode
