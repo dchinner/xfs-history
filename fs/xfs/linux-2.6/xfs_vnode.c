@@ -402,13 +402,17 @@ vn_revalidate(struct vnode *vp, int flags)
 		inode->i_uid        = va.va_uid;
 		inode->i_gid        = va.va_gid;
 		inode->i_rdev       = va.va_rdev;
-		inode->i_size       = va.va_size;
-		inode->i_blocks     = va.va_nblocks;
 		inode->i_blksize    = va.va_blksize;
-		inode->i_atime      = va.va_atime.tv_sec;
-		inode->i_mtime      = va.va_mtime.tv_sec;
-		inode->i_ctime      = va.va_ctime.tv_sec;
 		inode->i_generation = va.va_gencount;
+		if (S_ISREG(inode->i_mode) ||
+		    S_ISDIR(inode->i_mode) ||
+		    S_ISLNK(inode->i_mode)) {
+			inode->i_size       = va.va_size;
+			inode->i_blocks     = va.va_nblocks;
+			inode->i_atime      = va.va_atime.tv_sec;
+			inode->i_mtime      = va.va_mtime.tv_sec;
+			inode->i_ctime      = va.va_ctime.tv_sec;
+		}
 	} else {
 		vn_trace_exit(vp, "vn_revalidate.error",
 					(inst_t *)__return_address);
