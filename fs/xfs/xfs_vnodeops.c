@@ -100,28 +100,6 @@ xfs_open(
 	return rval;
 }
 
-/*
- * xfs_close
- *
- */
-/*ARGSUSED*/
-STATIC int
-xfs_close(
-	bhv_desc_t	*bdp,
-	int		flag,
-	lastclose_t	lastclose,
-	cred_t		*credp)
-{
-	/* REFERENCED */
-	vnode_t		*vp;
-
-	vp = BHV_TO_VNODE(bdp);
-
-	vn_trace_exit(vp, "xfs_close", (inst_t *)__return_address);
-
-	return 0;
-}
-
 
 /*
  * xfs_getattr
@@ -5769,7 +5747,6 @@ vnodeops_t xfs_vnodeops = {
 	vop_open:	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
 #endif
 	vop_open:		xfs_open,
-	vop_close:		xfs_close,
 	vop_read:		xfs_read,
 	vop_write:		xfs_write,
 	vop_ioctl:		xfs_ioctl,
