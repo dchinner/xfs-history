@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.66 1996/04/12 21:14:23 huy Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.67 1996/05/16 16:52:31 pjr Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -399,7 +399,7 @@ xfs_grio_get_inumber( int fdes )
 
 	vp = fp->f_vnode;
 	bhp = VN_BHV_HEAD(vp);
-	BHV_INSERT_PREVENT(bhp);
+	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);
 	if (bdp == NULL) {
 		ino = (xfs_ino_t)0;
@@ -407,7 +407,7 @@ xfs_grio_get_inumber( int fdes )
 		ip = XFS_BHVTOI(bdp);
 		ino = ip->i_ino;
 	}
-	BHV_INSERT_ALLOW(bhp);
+	BHV_READ_UNLOCK(bhp);
 	return( ino );
 }
 
@@ -438,7 +438,7 @@ xfs_grio_get_fs_dev( int fdes )
 
 	vp = fp->f_vnode;
 	bhp = VN_BHV_HEAD(vp);
-	BHV_INSERT_PREVENT(bhp);
+	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);
 	if (bdp == NULL) {
 		dev = 0;
@@ -446,6 +446,6 @@ xfs_grio_get_fs_dev( int fdes )
 		ip = XFS_BHVTOI(bdp);
 		dev = ip->i_dev;
 	}
-	BHV_INSERT_ALLOW(bhp);
+	BHV_READ_UNLOCK(bhp);
 	return( dev );
 }
