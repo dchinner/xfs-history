@@ -1,4 +1,4 @@
-#ident "$Revision: 1.62 $"
+#ident "$Revision: 1.63 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -251,10 +251,10 @@ xfs_inode_item_format(
 	 * has a new version number, then we don't bother converting back.
 	 */
 	mp = ip->i_mount;
-	ASSERT((ip->i_d.di_version == XFS_DINODE_VERSION_1) ||
-	       (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASNLINK));
+	ASSERT(ip->i_d.di_version == XFS_DINODE_VERSION_1 ||
+	       XFS_SB_VERSION_HASNLINK(&mp->m_sb));
 	if (ip->i_d.di_version == XFS_DINODE_VERSION_1) {
-		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
+		if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
 			/*
 			 * Convert it back.
 			 */

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.41 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -56,7 +56,7 @@ xfs_bulkstat_one(
 
 	buf = (xfs_bstat_t *)buffer;
 	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
-	    (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASQUOTA && 
+	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino))) {
 		return 0;
 	}

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.91 $"
+#ident	"$Revision: 1.93 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3574,7 +3574,7 @@ xlog_do_recover(xlog_t	*log,
 	}
 	sbp = XFS_BUF_TO_SBP(bp);
 	ASSERT(sbp->sb_magicnum == XFS_SB_MAGIC);
-	ASSERT(XFS_SB_GOOD_VERSION(sbp->sb_versionnum));
+	ASSERT(XFS_SB_GOOD_VERSION(sbp));
 	log->l_mp->m_sb = *sbp;
 	brelse(bp);
 

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision: 1.12 $"
 
 #define	XFS_MACRO_C
 
@@ -354,6 +354,14 @@ xfs_inode_t *
 xfs_bhvtoi(bhv_desc_t *bhvp)
 {
 	return XFS_BHVTOI(bhvp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BHVTOM)
+xfs_mount_t *
+xfs_bhvtom(bhv_desc_t *bdp)
+{
+	return XFS_BHVTOM(bdp);
 }
 #endif
 
@@ -1088,14 +1096,6 @@ xfs_fsb_to_db(xfs_inode_t *ip, xfs_fsblock_t fsb)
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_HAS_ATTRIBUTES)
-int
-xfs_has_attributes(xfs_mount_t *mp)
-{
-	return XFS_HAS_ATTRIBUTES(mp);
-}
-#endif
-
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_HDR_BLOCK)
 xfs_agblock_t
 xfs_hdr_block(xfs_mount_t *mp, daddr_t d)
@@ -1661,17 +1661,97 @@ xfs_sb_block(xfs_mount_t *mp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_GOOD_VERSION)
 int
-xfs_sb_good_version(unsigned v)
+xfs_sb_good_version(xfs_sb_t *sbp)
 {
-	return XFS_SB_GOOD_VERSION(v);
+	return XFS_SB_GOOD_VERSION(sbp);
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BHVTOM)
-xfs_mount_t *
-xfs_bhvtom(bhv_desc_t *bdp)
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_ADDATTR)
+void
+xfs_sb_version_addattr(xfs_sb_t *sbp)
 {
-	return XFS_BHVTOM(bdp);
+	XFS_SB_VERSION_ADDATTR(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_ADDNLINK)
+void
+xfs_sb_version_addnlink(xfs_sb_t *sbp)
+{
+	XFS_SB_VERSION_ADDNLINK(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_ADDQUOTA)
+void
+xfs_sb_version_addquota(xfs_sb_t *sbp)
+{
+	XFS_SB_VERSION_ADDQUOTA(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASALIGN)
+int
+xfs_sb_version_hasalign(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASALIGN(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASATTR)
+int
+xfs_sb_version_hasattr(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASATTR(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASNLINK)
+int
+xfs_sb_version_hasnlink(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASNLINK(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASQUOTA)
+int
+xfs_sb_version_hasquota(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASQUOTA(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_NUM)
+int
+xfs_sb_version_num(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_NUM(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_SUBALIGN)
+void
+xfs_sb_version_subalign(xfs_sb_t *sbp)
+{
+	XFS_SB_VERSION_SUBALIGN(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_TONEW)
+unsigned
+xfs_sb_version_tonew(unsigned v)
+{
+	return XFS_SB_VERSION_TONEW(v);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_TOOLD)
+unsigned
+xfs_sb_version_toold(unsigned v)
+{
+	return XFS_SB_VERSION_TOOLD(v);
 }
 #endif
 

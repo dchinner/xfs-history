@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MACROS_H
 #define	_FS_XFS_MACROS_H
 
-#ident 	"$Revision: 1.5 $"
+#ident 	"$Revision: 1.6 $"
 
 /*
  * Set for debug kernels and simulation, and 32-bit kernels,
@@ -72,6 +72,8 @@
 #define	XFSSO_XFS_INODE_CLEAR_READ_AHEAD 1
 #define	XFSSO_XFS_LIC_CLAIM 1
 #define	XFSSO_XFS_LIC_ISFREE 1
+#define XFSSO_XFS_SB_GOOD_VERSION 1
+#define XFSSO_XFS_SB_VERSION_HASNLINK 1
 #define	XFSSO_XLOG_GRANT_ADD_SPACE 1
 #define	XFSSO_XLOG_GRANT_SUB_SPACE 1
 
