@@ -648,6 +648,14 @@ linvfs_get_block_direct(
 					create, 1, PBF_WRITE|PBF_DIRECT);
 }
 
+static int
+linvfs_direct_IO(int rw, struct inode *inode, char *buf,
+                        loff_t offset, size_t count)
+{
+        return generic_direct_IO(rw, inode, buf, offset, count, 
+					linvfs_get_block_direct);
+}
+
 int
 linvfs_pb_bmap(
 	struct inode	*inode,
@@ -808,6 +816,11 @@ linvfs_truncate(
 						linvfs_get_block);
 }
 
+#if 0
+/* Keeping this for now as an example of a better way of
+ * doing O_DIRECT for XFS - the generic path has more
+ * overhead than we want.
+ */
 
 /* Initiate I/O on a kiobuf of user memory */
 STATIC int
@@ -903,6 +916,7 @@ linvfs_direct_IO(
 
 	return error ? error : total - length;
 }
+#endif
 
 /*
  * This gets a page into cleanable state - page locked on entry
