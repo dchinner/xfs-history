@@ -90,53 +90,9 @@
  * 2b) removal of a behavior can occur at any time during the life of an
  *     active object
  *
- * For now, behavior synchornization, is controlled if CELL is
- * defined.
- *
- * In order to allow binary compatibility with 6.5, platforms that might
- * support Cellular or Cluster Irix have reserved space in 6.5 in several kernel
- * structures (ex., kthread_t) which can be used to implement behavior
- * synchronization functionality. Reservation of this space is controled
- * by the CELL_PREPARE define.
- *
- *     Note that currently, the CELL code, takes up more space than will be
- *     available in 6.5 systems. This needs to be addressed, at some point.
- *
- * The makefile (Makefile.kernio) that is used for compiling 3rd party
- * drivers also defines CELL_PREPARE for the platforms that might
- * support Cellular or Cluster Irix. In addition, this makefile also defines
- * BHV_PREPARE. This causes calls to be generated to the appropriate
- * BHV locking code. In 6.5, these function are stubs but they will be
- * replaced with real locking code in CELL systems.
- *
- * Note that modifying the behavior chain due to insertion of a new behavior
- * is done atomically w.r.t. ops-in-progress.  This implies that even if
- * CELL is off, a racing op-in-progress will always see a consistent
- * view of the chain.  However, correctness is not guaranteed if an
- * op-in-progress is dependent on whether or not a new behavior is
- * inserted while it is executing.  The same applies to removal
- * of an existing behavior.
- *
  */
 
-#if defined(CELL_CAPABLE) || defined(CELL_PREPARE)
-/*
- * Behavior head lock structure.
- * This structure contains the mrlock for the behavior head
- * as well as the deferred callout info. A pointer to
- * this structure is located in the behavior head.
- */
-struct bhv_head_lock;
-typedef struct {
-	mrlock_t	bhl_lock;	/* MUST BE FIRST - behavior head lock */
-	kcallouthead_t	bhl_ucallout;	/* deferred update callout queue */
-	lock_t		bhl_ucqlock;	/* update callout queue lock */
-} bhv_head_lock_t;
-
-#define MR_TO_BHVL(mrp)	     ((bhv_head_lock_t*) (mrp))
-
-#endif	/* defined(CELL_CAPABLE) || defined(CELL_PREPARE) */
-
+typedef void	bhv_head_lock_t;
 
 /*
  * Behavior head.  Head of the chain of behaviors.
@@ -144,9 +100,7 @@ typedef struct {
  */
 typedef struct bhv_head {
 	struct bhv_desc *bh_first;	/* first behavior in chain */
-#if defined(CELL_CAPABLE) || defined(CELL_PREPARE)
 	bhv_head_lock_t *bh_lockp;	/* pointer to lock info struct */
-#endif
 } bhv_head_t;
 
 /*
@@ -202,107 +156,12 @@ typedef bhv_identity_t bhv_position_t;
 #define BHV_IDENTITY(bdp)	((bhv_identity_t *)(bdp)->bd_ops)
 #define BHV_POSITION(bdp)	(BHV_IDENTITY(bdp)->bi_position)
 
-#ifdef CELL_CAPABLE
-
-/*
- * Macros for manipulation of behavior locks. The following
- * macros operate on the lock itself. Currently, BHV locks are
- * simply mrlocks but this implementation could change in the
- * future. These macros should insulate us from this change.
- *   These macros take a mrlock_t* as an argument.
- */
-
-#define BHV_MRACCESS(l)			mraccess(l)
-#define BHV_MRACCUNLOCK(l)		mraccunlock(l)
-#define BHV_MRTRYACCESS(l)		mrtryaccess(l)
-#define BHV_MRTRYPROMOTE(l)		mrtrypromote(l)
-
-#define BHV_MRUPDATE(l)			mrupdate(l)
-#define BHV_MRTRYUPDATE(l)		mrtryupdate(l)
-#define BHV_MRUNLOCK(l)			mrunlock(l)
-#define BHV_MRDEMOTE(l)			mrdemote(l)
-#define BHV_MRDIVEST(l)			mrdivest(l)
-
-#define BHV_MR_IS_READ_LOCKED(l)	mrislocked_access(l)
-#define BHV_MR_NOT_READ_LOCKED(l)	(!mrislocked_access(l))
-#define BHV_MR_IS_WRITE_LOCKED(l)	mrislocked_update(l)
-#define BHV_MR_NOT_WRITE_LOCKED(l)	(!mrislocked_update(l))
-#define BHV_MR_IS_EITHER_LOCKED(l)	mrislocked_any(l)
-#define BHV_MR_NOT_EITHER_LOCKED(l)	(!mrislocked_any(l))
-#define BHV_MR_LOCK_MINE(l)		mrlock_mine(l,curthreadp)
-
-/*
- * Behavior chain lock macros - typically used by ops-in-progress to
- * synchronize with behavior insertion and object migration.
- *   Theses macros take a behavior (bhv_head_t*) as an
- *   argument.
- */
-#define BH_LOCK(bhp)			(&(bhp)->bh_lockp->bhl_lock)
-
-#define BHV_READ_LOCK(bhp)		CELL_ONLY(BHV_MRACCESS(BH_LOCK(bhp)))
-#define BHV_READ_UNLOCK(bhp)		CELL_ONLY(BHV_MRACCUNLOCK(BH_LOCK(bhp)))
-#define BHV_TRYACCESS(bhp)		CELL_MUST(BHV_MRTRYACCESS(BH_LOCK(bhp)))
-#define BHV_TRYPROMOTE(bhp)		CELL_MUST(BHV_MRTRYPROMOTE(BH_LOCK(bhp)))
-
-#define BHV_WRITE_LOCK(bhp)		CELL_ONLY(BHV_MRUPDATE(BH_LOCK(bhp)))
-#define BHV_WRITE_UNLOCK(bhp)		CELL_ONLY(BHV_MRUNLOCK(BH_LOCK(bhp)))
-#define BHV_TRYUPDATE(bhp)		CELL_MUST(BHV_MRTRYUPDATE(BH_LOCK(bhp)))
-#define BHV_WRITE_TO_READ(bhp)		CELL_ONLY(BHV_MRDEMOTE(BH_LOCK(bhp)))
-#define BHV_DEMOTE(bhp)			CELL_MUST(BHV_MRDEMOTE(BH_LOCK(bhp)))
-
-#define BHV_IS_READ_LOCKED(bhp)		CELL_IF(BHV_MR_IS_READ_LOCKED(BH_LOCK(bhp)), 1)
-#define BHV_NOT_READ_LOCKED(bhp)	CELL_IF(BHV_MR_NOT_READ_LOCKED(BH_LOCK(bhp)), 1)
-#define BHV_IS_WRITE_LOCKED(bhp)	CELL_IF(BHV_MR_IS_WRITE_LOCKED(BH_LOCK(bhp)), 1)
-#define BHV_NOT_WRITE_LOCKED(bhp)	CELL_IF(BHV_MR_NOT_WRITE_LOCKED(BH_LOCK(bhp)), 1)
-#define BHV_IS_EITHER_LOCKED(bhp)	CELL_IF(BHV_MR_IS_EITHER_LOCKED(BH_LOCK(bhp)), 1)
-#define BHV_NOT_EITHER_LOCKED(bhp)	CELL_IF(BHV_MR_NOT_EITHER_LOCKED(BH_LOCK(bhp)), 1)
-#define BHV_LOCK_MINE(bhp)		CELL_IF(BHV_MR_LOCK_MINE(BH_LOCK(bhp)), 1)
-#define BHV_AM_WRITE_OWNER(bhp) \
-	CELL_IF(BHV_MR_IS_WRITE_LOCKED(BH_LOCK(bhp)) && \
-		 BHV_MR_LOCK_MINE(BH_LOCK(bhp)), 1)
-
-/*
- * Request a callout to be made ((*func)(bhp, arg1, arg2, arg3, argv, argvsz))
- * with the behavior chain update locked.
- *
- * Must have read lock before calling this routine.
- * Note that the callouts will occur in the context of the last
- * accessor unlocking the behavior.
- */
-typedef void bhv_ucallout_t(bhv_head_t *bhp, void *, void *, caddr_t, size_t);
-
-#define BHV_WRITE_LOCK_CALLOUT(bhp, flags, func, arg1, arg2, argv, argvsz) \
-	bhv_queue_ucallout(bhp, flags, func, arg1, arg2, argv, argvsz)
-
-#define bhv_lock_init(bhp,name)		CELL_ONLY(mrbhinit(BH_LOCK(bhp), (name)))
-#define bhv_lock_free(bhp)		CELL_ONLY(mrfree(BH_LOCK(bhp)))
-
-
-#else	/* not CELL_CAPABLE ie non-cell kernel */
 
 #define BHV_READ_LOCK(bhp)
 #define BHV_READ_UNLOCK(bhp)
 #define BHV_NOT_READ_LOCKED(bhp)	1
 #define BHV_IS_WRITE_LOCKED(bhp)	1
 #define BHV_NOT_WRITE_LOCKED(bhp)	1
-
-#endif /* CELL_CAPABLE */
-
-#ifdef CELL_CAPABLE
-extern int		     bhv_try_deferred_ucalloutp(bhv_head_lock_t *bhl);
-
-static __inline int
-bhv_try_deferred_ucallout(mrlock_t *mrp)
-{
-     bhv_head_lock_t *bhl;
-
-     bhl = (bhv_head_lock_t*) mrp;
-     if (kcallout_isempty(&bhl->bhl_ucallout))
-	     return 0;
-     return bhv_try_deferred_ucalloutp(bhl);
-}
-
-#endif
 
 extern void bhv_head_init(bhv_head_t *, char *);
 extern void bhv_head_destroy(bhv_head_t *);
@@ -348,26 +207,9 @@ extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
 /*
  * Behavior module prototypes.
  */
-#ifdef CELL_CAPABLE
-extern int		bhv_insert(bhv_head_t *bhp, bhv_desc_t *bdp);
-extern int		bhv_forced_insert(bhv_head_t *bhp, bhv_desc_t *bdp);
-extern int		bhv_append(bhv_head_t *bhp, bhv_desc_t *bdp);
-extern int		bhv_truncate(bhv_head_t *bhp, bhv_desc_t *bdp);
-#endif
 extern void		bhv_remove_not_first(bhv_head_t *bhp, bhv_desc_t *bdp);
 extern bhv_desc_t *	bhv_lookup(bhv_head_t *bhp, void *ops);
 extern bhv_desc_t *	bhv_lookup_unlocked(bhv_head_t *bhp, void *ops);
-#ifdef CELL_CAPABLE
-extern bhv_desc_t *	bhv_lookup_range(bhv_head_t *bhp, int lpos, int hpos);
-#endif
 extern bhv_desc_t *	bhv_base_unlocked(bhv_head_t *bhp);
 
-#ifdef CELL_CAPABLE
-extern void		bhv_queue_ucallout(bhv_head_t *bhp,
-			     int flags, bhv_ucallout_t *func,
-			     void *, void *, caddr_t, cell_size_t);
-extern void		bhv_queue_ucallout_unlocked(bhv_head_t *bhp,
-			     int flags, bhv_ucallout_t *func,
-			     void *, void *, caddr_t, cell_size_t);
-#endif /* CELL_CAPABLE */
 #endif /* __XFS_BEHAVIOR_H__ */

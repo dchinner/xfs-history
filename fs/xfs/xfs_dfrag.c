@@ -33,14 +33,6 @@
 #include <xfs.h>
 #include <xfs_dfrag.h>
 
-#ifdef CELL_CAPABLE
-extern __uint64_t cfs_start_defrag(
-		struct vnode		*vp);
-extern void	cfs_end_defrag(
-		struct vnode		*vp,
-		__uint64_t		handle);
-#endif
-
 /*
  * Syssgi interface for swapext
  */
@@ -62,7 +54,6 @@ xfs_swapext(
 	int		error = 0;
 	xfs_ifork_t	tempif, *ifp, *tifp;
 	__uint64_t	tmp;
-/*	__uint64_t	cxfs_val; */
 	int		aforkblks = 0;
 	int		taforkblks = 0;
 	int		locked = 0;
@@ -122,7 +113,6 @@ xfs_swapext(
 	}
 
 	locked = 1;
-	CELL_ONLY(cxfs_val = cfs_start_defrag(vp));
 
 	/* Lock in i_ino order */
 	if (ip->i_ino < tip->i_ino) {
@@ -356,8 +346,6 @@ xfs_swapext(
 
 	error = xfs_trans_commit(tp, XFS_TRANS_SWAPEXT, NULL);
 
-	CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
-
 	fput(fp);
 	fput(tfp);
 
@@ -365,7 +353,6 @@ xfs_swapext(
 
  error0:
 	if (locked) {
-		CELL_ONLY(cfs_end_defrag(vp, cxfs_val));
 		xfs_iunlock(ip,	 lock_flags);
 		xfs_iunlock(tip, lock_flags);
 	}
