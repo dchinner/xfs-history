@@ -1022,17 +1022,24 @@ xfs_inactive(vnode_t	*vp,
 
 		/*
 		 * Free the inode and clean up the iunlink item that
-		 * was logged when the link count went to 0.  Keep
-		 * the iui_done call before the ifree call since it
-		 * needs to use the current inode generation number which
-		 * is incremented in xfs_ifree().
+		 * was logged when the link count went to 0. 
+		 * It may be that we were actually just looked at by
+		 * xfs_sync() and that we've already been through
+		 * here before.  If that's the case then ip->i_d.di_format
+		 * will be AGINO and we should just get out without
+		 * doing any harm.
 		 */
-		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-		xfs_trans_ihold(tp, ip);
-		xfs_trans_log_iui_done(tp, ip);
-		xfs_ifree(tp, ip);
+		if (ip->i_d.di_format != XFS_DINODE_FMT_AGINO) {
+			xfs_trans_ijoin(tp, ip,
+					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+			xfs_trans_log_iui_done(tp, ip);
+			xfs_ifree(tp, ip);
 
-		xfs_trans_commit(tp , 0);
+			xfs_trans_commit(tp , 0);
+		} else {
+			xfs_trans_cancel(tp, 0);
+		}
 	}
 
 	/*
