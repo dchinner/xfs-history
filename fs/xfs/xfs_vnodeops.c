@@ -426,10 +426,18 @@ xfs_getattr(vnode_t	*vp,
         vap->va_gid = ip->i_d.di_gid;
         vap->va_nlink = ip->i_d.di_nlink;
         vap->va_vcode = ip->i_vcode;
-        if (vp->v_type == VCHR || vp->v_type == VBLK || vp->v_type == VXNAM)
+	/*
+	 * Minor optimization, check the common cases first.
+	 */
+	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
+		vap->va_rdev = 0;
+        } else if ((vp->v_type == VCHR) ||
+		   (vp->v_type == VBLK) ||
+		   (vp->v_type == VXNAM)) {
                 vap->va_rdev = ip->i_u2.iu_rdev;
-        else
+        } else {
                 vap->va_rdev = 0;       /* not a b/c spec. */
+	}
 
         vap->va_atime.tv_sec = ip->i_d.di_atime.t_sec;
         vap->va_atime.tv_nsec = ip->i_d.di_atime.t_nsec;
@@ -454,15 +462,15 @@ xfs_getattr(vnode_t	*vp,
 	 * XXX : truncate to 32 bits for now.
 	 */
 	switch (ip->i_d.di_format) {
-	case XFS_DINODE_FMT_LOCAL:
-	case XFS_DINODE_FMT_DEV:
-	case XFS_DINODE_FMT_UUID:
-		vap->va_nblocks = 0;
-		break;
 	case XFS_DINODE_FMT_EXTENTS:
 	case XFS_DINODE_FMT_BTREE:
 		vap->va_nblocks = XFS_FSB_TO_BB(mp, (ip->i_d.di_nblocks +
 						ip->i_delayed_blks));
+		break;
+	case XFS_DINODE_FMT_LOCAL:
+	case XFS_DINODE_FMT_DEV:
+	case XFS_DINODE_FMT_UUID:
+		vap->va_nblocks = 0;
 		break;
 	default:
 		ASSERT(0);
