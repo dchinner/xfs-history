@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -114,6 +114,9 @@ void	idbg_xdirsf(xfs_dir_shortform_t *);
 void	idbg_xdanode(xfs_da_intnode_t *);
 void	idbg_xdaargs(xfs_da_args_t *);
 void	idbg_xdastate(xfs_da_state_t *);
+#ifdef DEBUG
+void	idbg_xdirtrace(int);
+#endif /* DEBUG */
 void	idbg_xexlist(xfs_inode_t *);
 void	idbg_xflist(xfs_bmap_free_t *);
 void	idbg_xgaplist(xfs_inode_t *);
@@ -199,6 +202,9 @@ static struct xif {
     "xdanode",	VD idbg_xdanode,	"Dump XFS dir/attr node block",
     "xdaargs",	VD idbg_xdaargs,	"Dump XFS dir/attr args structure",
     "xdastat",	VD idbg_xdastate,	"Dump XFS dir/attr state_blk struct",
+#ifdef DEBUG
+    "xdirtrc",	VD idbg_xdirtrace,	"Dump XFS directory trace",
+#endif
     "xexlist",	VD idbg_xexlist,	"Dump XFS bmap extents in inode",
     "xflist",	VD idbg_xflist,		"Dump XFS to-be-freed extent list",
     "xgaplst",	VD idbg_xgaplist,	"Dump inode gap list",
@@ -267,6 +273,7 @@ static int xargument = 0;
 static int xfs_alloc_trace_entry(ktrace_entry_t *ktep);
 static int xfs_bmap_trace_entry(ktrace_entry_t *ktep);
 static int xfs_bmbt_trace_entry(ktrace_entry_t *ktep);
+static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f);
 static void xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
@@ -430,7 +437,7 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 static int
 xfs_bmbt_trace_entry(
 	ktrace_entry_t		*ktep)
-{		  
+{
 	xfs_bmbt_rec_32_t	r;
 	xfs_bmbt_irec_t		s;
 	int			type;
@@ -519,6 +526,71 @@ xfs_bmbt_trace_entry(
 		break;
 	default:
 		qprintf("unknown bmbt trace record\n");
+		break;
+	}
+	return 1;
+}
+
+/*
+ * Print xfs a directory trace buffer entry.
+ */
+static int
+xfs_dir_trace_entry(ktrace_entry_t *ktep)
+{
+	xfs_mount_t *mp;
+	__uint32_t hash;
+	off_t cookie;
+	char *pos;
+
+	if (!ktep->val[0] || !ktep->val[1])
+		return 0;
+
+	mp = (xfs_mount_t *)ktep->val[3];
+	cookie = (__psunsigned_t)ktep->val[4];
+	cookie <<= 32;
+	cookie |= (__psunsigned_t)ktep->val[5];
+	qprintf("%s -- dp=0x%x b/e/h=%d/%d/0x%08x resid=0x%x ",
+		    (char *)ktep->val[1], (xfs_inode_t *)ktep->val[2],
+		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		    (__psunsigned_t)XFS_DA_COOKIE_HASH(mp, cookie),
+		    (__psint_t)ktep->val[6]);
+
+	switch ((__psint_t)ktep->val[0]) {
+	case XFS_DIR_KTRACE_G_DU:
+		break;
+	case XFS_DIR_KTRACE_G_DUB:
+		qprintf("bno=%d", (__psint_t)ktep->val[7]);
+		break;
+	case XFS_DIR_KTRACE_G_DUN:
+		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
+			      (__psint_t)ktep->val[7],
+			      (__psint_t)ktep->val[8],
+			      (__psunsigned_t)ktep->val[9],
+			      (__psunsigned_t)ktep->val[10]);
+		break;
+	case XFS_DIR_KTRACE_G_DUL:
+		qprintf("forw=%d, cnt=%d, 0x%08x - 0x%08x",
+			      (__psint_t)ktep->val[7],
+			      (__psint_t)ktep->val[8],
+			      (__psunsigned_t)ktep->val[9],
+			      (__psunsigned_t)ktep->val[10]);
+		break;
+	case XFS_DIR_KTRACE_G_DUE:
+		qprintf("entry hashval 0x%08x", (__psunsigned_t)ktep->val[7]);
+		break;
+	case XFS_DIR_KTRACE_G_DUC:
+		cookie = (__psunsigned_t)ktep->val[7];
+		cookie <<= 32;
+		cookie |= (__psunsigned_t)ktep->val[8];
+		hash = XFS_DA_COOKIE_HASH(mp, cookie);
+		qprintf("b/e/h=%d/%d/0x%08x",
+		    (__psint_t)XFS_DA_COOKIE_BNO(mp, cookie),
+		    (__psint_t)XFS_DA_COOKIE_ENTRY(mp, cookie),
+		    hash);
+		break;
+	default:
+		qprintf("unknown dir trace record format");
 		break;
 	}
 	return 1;
@@ -2095,7 +2167,7 @@ idbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
 		bcopy(n->inumber, (char *)&ino, sizeof(ino));
-		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld",
+		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld ",
 			j, e->hashval, e->nameidx, ino);
 		qprintf("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
@@ -2249,6 +2321,53 @@ idbg_xdastate(xfs_da_state_t *s)
 	qprintf("altpath ");
 	xfs_dastate_path(&s->altpath);
 }
+
+#ifdef DEBUG
+/*
+ * Print out the last "count" entries in the directory trace buffer.
+ */
+void
+idbg_xdirtrace(int count)
+{
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+	int		nentries;
+	int		skip_entries;
+	extern ktrace_t	*xfs_dir_trace_buf;
+
+	if (xfs_dir_trace_buf == NULL) {
+		qprintf("The xfs directory trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_dir_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_dir_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_dir_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_dir_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(xfs_dir_trace_buf, &kts);
+	}
+}
+#endif /* DEBUG */
 
 /*
  * Print xfs extent list.
