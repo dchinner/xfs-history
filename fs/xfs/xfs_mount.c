@@ -68,6 +68,7 @@ xfs_mount_init(void)
 	initnlock(&mp->m_ail_lock, "xfs_ail");
 	initnlock(&mp->m_async_lock, "xfs_async");
 	initnsema(&mp->m_ilock, 1, "xfs_ilock");
+	initnsema(&mp->m_growlock, 1, "xfs_grow");
 	initnlock(&mp->m_ipinlock, "xfs_ipin");
 	initnlock(&mp->m_sb_lock, "xfs_sb");
 	/*
@@ -98,6 +99,7 @@ xfs_mount_free(xfs_mount_t *mp)
 	freesplock(mp->m_ail_lock);
 	freesplock(mp->m_async_lock);
 	freesema(&mp->m_ilock);
+	freesema(&mp->m_growlock);
 	freesplock(mp->m_ipinlock);
 	freesplock(mp->m_sb_lock);
 

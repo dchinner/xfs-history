@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.1 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -327,14 +327,23 @@ xfs_fsoperations(
 		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb);
 		break;
 	case XFS_GROWFS_DATA:
+		if (!cpsema(&mp->m_growlock))
+			return XFS_ERROR(EWOULDBLOCK);
 		error = xfs_growfs_data(mp, ((xfs_growfs_input_t *)inb)->newblocks);
+		vsema(&mp->m_growlock);
 		break;
 	case XFS_GROWFS_LOG_INT:
 	case XFS_GROWFS_LOG_EXT:
+		if (!cpsema(&mp->m_growlock))
+			return XFS_ERROR(EWOULDBLOCK);
 		error = xfs_growfs_log(mp, opcode == XFS_GROWFS_LOG_INT, ((xfs_growfs_input_t *)inb)->newblocks);
+		vsema(&mp->m_growlock);
 		break;
 	case XFS_GROWFS_RT:
+		if (!cpsema(&mp->m_growlock))
+			return XFS_ERROR(EWOULDBLOCK);
 		error = xfs_growfs_rt(mp, ((xfs_growfs_input_t *)inb)->newblocks);
+		vsema(&mp->m_growlock);
 		break;
 	default:
 		error = XFS_ERROR(EINVAL);
