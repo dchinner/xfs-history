@@ -73,7 +73,6 @@
 #include "sim.h"
 #endif
 
-#ifndef SIM
 /*
  * This lock is used by xfs_strat_write().
  * The xfs_strat_lock is initialized in xfs_init().
@@ -1166,6 +1165,7 @@ xfs_read(
 	offset = uiop->uio_offset;
 	count = uiop->uio_resid;
 
+#ifndef SIM
 	/* check for locks if some exist and mandatory locking is enabled */
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
@@ -1174,6 +1174,7 @@ xfs_read(
 		if (error)
 			goto out;
 	}
+#endif
 
 	if (offset < 0) {
 		error = XFS_ERROR(EINVAL);
@@ -2474,6 +2475,7 @@ start:
 	offset = uiop->uio_offset;
 	count = uiop->uio_resid;
 
+#ifndef SIM
 	/* check for locks if some exist and mandatory locking is enabled */
 	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
 	    (VENF_LOCKING|VFRLOCKS)) {
@@ -2482,6 +2484,7 @@ start:
 		if (error)
 			goto out;
 	}
+#endif
 
 	if (offset < 0) {
 		error = XFS_ERROR(EINVAL);
@@ -2774,9 +2777,11 @@ xfs_overlap_bp(
 		rbp->b_bufsize = ctob(dtop(pgbboff + BTOBB(rbp_len)));
 
 		rbp->b_flags |= B_PAGEIO;
+#ifndef SIM
 		if (pgbboff != 0) {
 			bp_mapin(rbp);
 		}
+#endif
 	}
 	rbp->b_blkno = bp->b_blkno + BTOBB(rbp_offset);
 	rbp->b_remain = 0;
@@ -3655,9 +3660,11 @@ xfs_strat_write_relse(
 	rbp->b_fsprivate = NULL;
 	rbp->b_fsprivate2 = NULL;
 	rbp->b_relse = NULL;
+#ifndef SIM
 	if (BP_ISMAPPED(rbp)) {
 		bp_mapout(rbp);
 	}
+#endif
 	freerbuf(rbp);
 }
 
@@ -4210,7 +4217,6 @@ xfs_strat_write(
 	}
 	return error;
 }
-#endif	/* !SIM */
 
 dev_t xfserrordev = 0;	/* temp */
 
@@ -4280,9 +4286,7 @@ xfs_bioerror(
 	 * No need to wait until the buffer is unpinned.
 	 * We aren't flushing it.
 	 */
-#ifndef SIM
 	buftrace("XFS IOERROR", bp);
-#endif
 	bioerror(bp, EIO);
 	/*
 	 * XXXXsup chunkhold expects B_DONE to be there, so
@@ -4370,22 +4374,18 @@ xfs_bwrite(
 	int	flag;
 
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
-		bp->b_bdstrat = xfs_bdstrat;
+		bp->b_bdstrat = xfs_bdstrat_cb;
 		if (error = bwrite(bp)) {
 #ifdef DEBUG
 			printf("------- xfs_bwrite HIT ------- 0x%x\n", bp);
 #endif	
 			ASSERT(mp);
-#ifndef SIM
 			buftrace("XFSBWRITE IOERROR", bp);
-#endif
 			xfs_force_shutdown(mp);
 		}
 	} else {
 		flag = bp->b_flags;
-#ifndef SIM
 		buftrace("XFSBWRITE (SHUTDOWN)", bp);
-#endif
 		(void) xfs_bioerror(bp);	
 		if (flag & B_ASYNC) {
 			if (!(flag & B_DELWRI)) {
@@ -4410,7 +4410,7 @@ xfs_bwrite(
  * after prematurely unpinning it to forcibly shutdown the filesystem.
  */
 int
-xfs_bdstrat(struct buf *bp)
+xfs_bdstrat_cb(struct buf *bp)
 {
 	extern dev_t xfserrordev;
 	struct bdevsw	*my_bdevsw;
@@ -4422,9 +4422,7 @@ xfs_bdstrat(struct buf *bp)
 		bdstrat(my_bdevsw, bp);
 		return 0;
 	} else { 
-#ifndef SIM
 		buftrace("XFS__BDSTRAT IOERROR", bp);
-#endif
 		return (xfs_bioerror(bp));
 	}
 }
@@ -4448,14 +4446,11 @@ xfsbdstrat(
 		return 0;
 	}
 
-#ifndef SIM
 	buftrace("XFSBDSTRAT IOERROR", bp);
-#endif
 	return (xfs_bioerror(bp));
 }
 
 
-#ifndef SIM
 /*
  * xfs_strategy
  *
@@ -4545,6 +4540,8 @@ xfs_strategy(
 		xfs_strat_write(bdp, bp);
 	}
 }
+
+#ifndef SIM
 
 /*
  * This is called from xfs_init() to start the xfs daemons.
@@ -4642,6 +4639,7 @@ xfsd(void)
 		s = mp_mutex_spinlock(&xfsd_lock);
 	}
 }
+#endif	/* !SIM */
 
 struct dio_s {
 	bhv_desc_t	*bdp;
@@ -5295,7 +5293,9 @@ xfs_diordwr(
 		    (uiop->uio_offset == ip->i_d.di_size)) {
 			return (0);
 		}
+#ifndef SIM
 		return XFS_ERROR(EINVAL);
+#endif
 	}
 	/*
 	 * This ASSERT should catch bad addresses being passed in by
@@ -5307,7 +5307,9 @@ xfs_diordwr(
  	 * Do maxio check.
  	 */
 	if (uiop->uio_resid > ctooff(v.v_maxdmasz - 1)) {
+#ifndef SIM
 		return XFS_ERROR(EINVAL);
+#endif
 	}
 
 	/*
@@ -5387,7 +5389,9 @@ xfs_diordwr(
 	/* Reset the Priority I/O flag */
 	bp->b_flags2 &= ~B_PRIO_BUF;
 
+#ifdef SIM
 	bp->b_un.b_addr = 0;
+#endif
 	putphysbuf(bp);
 
 	return (error);
@@ -5671,4 +5675,3 @@ xfs_refcache_purge_some(void)
 		VN_RELE(XFS_ITOV(iplist[i]));
 	}
 }
-#endif	/* !SIM */
