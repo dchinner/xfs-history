@@ -39,7 +39,9 @@
 #include "sim.h"
 #endif /* SIM */
 
+#ifdef SIM
 struct igetstats	XFS_IGETINFO;
+#endif
 
 extern struct vnodeops xfs_vnodeops;
 
@@ -54,6 +56,9 @@ extern struct vnodeops xfs_vnodeops;
 
 /*
  * Initialize the inode hash table for the newly mounted file system.
+ *
+ * mp -- this is the mount point structure for the file system being
+ *       initialized
  */
 void
 xfs_ihash_init(xfs_mount_t *mp)
@@ -79,15 +84,39 @@ xfs_ihash_init(xfs_mount_t *mp)
 }
 
 /*
- * Look up an inode by inumber in the given file system.
- * If it is in core, honor the locking protocol.
- * If it is not in core, read it in from the file system's device.
- * In all cases, a pointer to a locked inode is returned.
- * The mode of the lock depends on the flags parameter.  Flags can
- * be either XFS_ILOCK_EXCL or XFS_ILOCK_SHARED. 
+ * Look up an inode by number in the given file system.
+ * The inode is looked up in the hash table for the file system
+ * represented by the mount point parameter mp.  Each bucket of
+ * the hash table is guarded by an individual semaphore.
+ *
+ * If the inode is found in the hash table, its corresponding vnode
+ * is obtained with a call to vn_get().  This call takes care of
+ * coordination with the reclamation of the inode and vnode.  Note
+ * that the vmap structure is filled in while holding the hash lock.
+ * This gives us the state of the inode/vnode when we found it and
+ * is used for coordination in vn_get().
+ *
+ * If it is not in core, read it in from the file system's device and
+ * add the inode into the hash table.
+ *
+ * The inode is locked according to the value of the lock_flags parameter.
+ * This flag parameter indicates how and if the inode's IO lock and inode lock
+ * should be taken.
+ *
+ * mp -- the mount point structure for the current file system.  It points
+ *       to the inode hash table.
+ * tp -- a pointer to the current transaction if there is one.  This is
+ *       simply passed through to the xfs_iread() call.
+ * ino -- the number of the inode desired.  This is the unique identifier
+ *       within the file system for the inode being requested.
+ * lock_flags -- flags indicating how to lock the inode.  See the comment
+ *	 for xfs_ilock() for a list of valid values.
  */
 xfs_inode_t *
-xfs_iget(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, uint flags)
+xfs_iget(xfs_mount_t	*mp,
+	 xfs_trans_t	*tp,
+	 xfs_ino_t	ino,
+	 uint		lock_flags)
 {
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
@@ -101,7 +130,6 @@ xfs_iget(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, uint flags)
 	SYSINFO.iget++;
 	XFS_IGETINFO.ig_attempts++;
 
-	ASSERT((flags == XFS_ILOCK_EXCL) || (flags == XFS_ILOCK_SHARED));
 	ih = XFS_IHASH(mp, ino);
 again:
 	XFS_IHLOCK(ih);
@@ -144,7 +172,7 @@ again:
 				ih->ih_next = ip;
 			}
 			XFS_IHUNLOCK(ih);
-			xfs_ilock(ip, (int)flags);
+			xfs_ilock(ip, lock_flags);
 			goto out;
 		}
 	}
@@ -168,10 +196,11 @@ again:
 		      ip->i_u2.iu_rdev, ip);
 
 	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
+	mrinit(&ip->i_iolock, makesname(name, "xio", (int)vp->v_number));
 	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
 	initnsema(&ip->i_pinsema, 0, makesname(name, "pino", vp->v_number));
 	xfs_inode_item_init(ip, mp);
-	xfs_ilock(ip, (int)flags);
+	xfs_ilock(ip, lock_flags);
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
@@ -227,7 +256,9 @@ out:
  * Otherwise, return NULL.
  */
 xfs_inode_t *
-xfs_inode_incore(xfs_mount_t *mp, xfs_ino_t ino, xfs_trans_t *tp)
+xfs_inode_incore(xfs_mount_t	*mp,
+		 xfs_ino_t	ino,
+		 xfs_trans_t	*tp)
 {
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
@@ -272,11 +303,17 @@ xfs_inode_incore(xfs_mount_t *mp, xfs_ino_t ino, xfs_trans_t *tp)
 
 /*
  * Decrement reference count of an inode structure and unlock it.
+ *
+ * ip -- the inode being released
+ * lock_flags -- this parameter indicates the inode's locks to be
+ *       to be released.  See the comment on xfs_iunlock() for a list
+ *	 of valid values.
  */
 void
-xfs_iput(xfs_inode_t *ip)
+xfs_iput(xfs_inode_t	*ip,
+	 uint		lock_flags)
 {
-	xfs_iunlock(ip);
+	xfs_iunlock(ip, lock_flags);
 	vn_rele(XFS_ITOV(ip));
 }
 
@@ -344,43 +381,161 @@ xfs_ireclaim(xfs_inode_t *ip)
 
 
 /*
- * The xfs inode lock is a multi-reader lock.
- * For now we will not allow lock trips, because there
- * is no single pid we can store as the holder of a multi-reader
- * lock.
- * The flags to be passed to this routine are XFS_LOCK_SHARED
- * or XFS_LOCK_EXCL.  These corespond directly to MR_ACCESS
- * and MR_UPDATE.
+ * The xfs inode contains 2 locks: a multi-reader lock called the
+ * i_iolock and a multi-reader lock called the i_lock.  This routine
+ * allows either or both of the locks to be obtained.
+ *
+ * The 2 locks should always be ordered so that the IO lock is
+ * obtained first in order to prevent deadlock.
+ *
+ * ip -- the inode being locked
+ * lock_flags -- this parameter indicates the inode's locks to be
+ *       to be locked.  It can be:
+ *		XFS_IOLOCK_SHARED,
+ *		XFS_IOLOCK_EXCL,
+ *	 	XFS_ILOCK_SHARED,
+ *		XFS_ILOCK_EXCL,
+ *		XFS_IOLOCK_SHARED | XFS_ILOCK_SHARED,
+ *		XFS_IOLOCK_SHARED | XFS_ILOCK_EXCL,
+ *		XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED,
+ *		XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL
+ *
  */
 void
-xfs_ilock(xfs_inode_t *ip, int flags)
+xfs_ilock(xfs_inode_t	*ip,
+	  uint		lock_flags)
 {
-	mrlock(&ip->i_lock, flags, PINOD);
+	/*
+	 * You can't set both SHARED and EXCL for the same lock,
+	 * and only XFS_IOLOCK_SHARED, XFS_IOLOCK_EXCL, XFS_ILOCK_SHARED,
+	 * and XFS_ILOCK_EXCL are valid values to set in lock_flags.
+	 */
+	ASSERT((lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) !=
+	       (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL));
+	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
+	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
+	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
+		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
+	ASSERT(lock_flags != 0);
+
+	if (lock_flags & XFS_IOLOCK_EXCL) {
+		mrlock(&ip->i_iolock, MR_UPDATE, PINOD);
+	} else if (lock_flags & XFS_IOLOCK_SHARED) {
+		mrlock(&ip->i_iolock, MR_ACCESS, PINOD);
+	}
+
+	if (lock_flags & XFS_ILOCK_EXCL) {
+		mrlock(&ip->i_lock, MR_UPDATE, PINOD);
+	} else if (lock_flags & XFS_ILOCK_SHARED) {
+		mrlock(&ip->i_lock, MR_ACCESS, PINOD);
+	}
+
 }
 
 /*
  * This is just like xfs_ilock(), except that the caller
  * is guaranteed not to sleep.  It returns 1 if it gets
- * the lock and 0 otherwise.
+ * the requested locks and 0 otherwise.  If the IO lock is
+ * obtained but the inode lock cannot be, then the IO lock
+ * is dropped before returning.
+ *
+ * ip -- the inode being locked
+ * lock_flags -- this parameter indicates the inode's locks to be
+ *       to be locked.  See the comment for xfs_ilock() for a list
+ *	 of valid values.
+ *
  */
 int
-xfs_ilock_nowait(xfs_inode_t *ip, int flags)
+xfs_ilock_nowait(xfs_inode_t	*ip,
+		 uint		lock_flags)
 {
-	if (cmrlock(&ip->i_lock, flags)) {
-		return 1;
+	int	iolocked;
+	int	ilocked;
+
+	/*
+	 * You can't set both SHARED and EXCL for the same lock,
+	 * and only XFS_IOLOCK_SHARED, XFS_IOLOCK_EXCL, XFS_ILOCK_SHARED,
+	 * and XFS_ILOCK_EXCL are valid values to set in lock_flags.
+	 */
+	ASSERT((lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) !=
+	       (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL));
+	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
+	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
+	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
+		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
+	ASSERT(lock_flags != 0);
+
+	iolocked = 0;
+	if (lock_flags & XFS_IOLOCK_EXCL) {
+		iolocked = cmrlock(&ip->i_iolock, MR_UPDATE);
+		if (!iolocked) {
+			return 0;
+		}
+	} else if (lock_flags & XFS_IOLOCK_SHARED) {
+		iolocked = cmrlock(&ip->i_iolock, MR_ACCESS);
+		if (!iolocked) {
+			return 0;
+		}
 	}
-	return 0;
+
+	if (lock_flags & XFS_ILOCK_EXCL) {
+		ilocked = cmrlock(&ip->i_lock, MR_UPDATE);
+		if (!ilocked) {
+			if (iolocked) {
+				mrunlock(&ip->i_iolock);
+			}
+			return 0;
+		}
+	} else if (lock_flags & XFS_ILOCK_SHARED) {
+		ilocked = cmrlock(&ip->i_lock, MR_ACCESS);
+		if (!ilocked) {
+			if (iolocked) {
+				mrunlock(&ip->i_iolock);
+			}
+			return 0;
+		}
+	}
+	return 1;
 }
 
 /*
- * This is used to drop an inode lock acquired by xfs_ilock()
- * or xfs_ilock_nowait().  The mode in which the lock is held
- * does not matter.
+ * xfs_iunlock() is used to drop the inode locks acquired with
+ * xfs_ilock() and xfs_ilock_nowait().  The caller must pass
+ * in the flags given to xfs_ilock() or xfs_ilock_nowait() so
+ * that we know which locks to drop.
+ *
+ * ip -- the inode being unlocked
+ * lock_flags -- this parameter indicates the inode's locks to be
+ *       to be unlocked.  See the comment for xfs_ilock() for a list
+ *	 of valid values for this parameter.
+ *
  */
 void
-xfs_iunlock(xfs_inode_t *ip)
+xfs_iunlock(xfs_inode_t	*ip,
+	    uint	lock_flags)
 {
-	mrunlock(&ip->i_lock);
+	/*
+	 * You can't set both SHARED and EXCL for the same lock,
+	 * and only XFS_IOLOCK_SHARED, XFS_IOLOCK_EXCL, XFS_ILOCK_SHARED,
+	 * and XFS_ILOCK_EXCL are valid values to set in lock_flags.
+	 */
+	ASSERT((lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) !=
+	       (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL));
+	ASSERT((lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) !=
+	       (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
+	ASSERT((lock_flags & ~(XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL |
+		XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) == 0);
+	ASSERT(lock_flags != 0);
+
+	if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
+		ASSERT(ismrlocked(&ip->i_iolock, (MR_UPDATE | MR_ACCESS)));
+		mrunlock(&ip->i_iolock);
+	}
+
+	if (lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) {
+		ASSERT(ismrlocked(&ip->i_lock, (MR_UPDATE | MR_ACCESS)));
+		mrunlock(&ip->i_lock);
+	}
 }
 
 /*
