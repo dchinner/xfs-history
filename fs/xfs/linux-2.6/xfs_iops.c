@@ -98,7 +98,7 @@ linvfs_common_cr(
 	va.va_size = 0;
 
 	if (tp == VREG) {
-		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
+		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp,
 							NULL, error);
 	} else if (ISVDEV(tp)) {
 		/*
@@ -111,10 +111,10 @@ linvfs_common_cr(
 		if (va.va_type == VNON) {
 			return -EINVAL;
 		}
-		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
+		VOP_CREATE(dvp, dentry, &va, 0, 0, &vp,
 			NULL, error);
 	} else if (tp == VDIR) {
-		VOP_MKDIR(dvp, (char *)dentry->d_name.name, &va, &vp,
+		VOP_MKDIR(dvp, dentry, &va, &vp,
 			NULL, error);
 	} else {
 		error = EINVAL;
@@ -170,8 +170,7 @@ linvfs_lookup(
 
 	cvp = NULL;
 	vp = LINVFS_GET_VPTR(dir);
-	VOP_LOOKUP(vp, (char *)dentry->d_name.name, &cvp, NULL, 0, NULL,
-						NULL, error);
+	VOP_LOOKUP(vp, dentry, &cvp, 0, NULL, NULL, error);
 	if (!error) {
 		ASSERT(cvp);
 		ip = LINVFS_GET_IP(cvp);
@@ -207,7 +206,7 @@ linvfs_link(
 	vp = LINVFS_GET_VP(ip);
 
 	error = 0;
-	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, NULL, error);
+	VOP_LINK(tdvp, vp, dentry, NULL, error);
 	if (!error) {
 		VMODIFY(tdvp);
 		ip->i_ctime = CURRENT_TIME;
@@ -233,7 +232,7 @@ linvfs_unlink(
 
 	dvp = LINVFS_GET_VPTR(dir);
 
-	VOP_REMOVE(dvp, (char *)dentry->d_name.name, NULL, error);
+	VOP_REMOVE(dvp, dentry, NULL, error);
 
 	if (!error) {
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
@@ -269,7 +268,7 @@ linvfs_symlink(
 	va.va_mask = AT_TYPE|AT_MODE; /* AT_PROJID? */
 
 	error = 0;
-	VOP_SYMLINK(dvp, (char *)dentry->d_name.name, &va, (char *)symname,
+	VOP_SYMLINK(dvp, dentry, &va, (char *)symname,
 							&cvp, NULL, error);
 	if (!error) {
 		ASSERT(cvp);
@@ -317,7 +316,7 @@ linvfs_rmdir(
 	 * Someday we could pass the dentry->d_inode into VOP_REMOVE so
 	 * that it can skip the lookup.
 	 */
-	VOP_RMDIR(dvp, (char *)dentry->d_name.name, pwd_vp, NULL, error);
+	VOP_RMDIR(dvp, dentry, pwd_vp, NULL, error);
 	if (!error) {
 		validate_fields(inode);
 		validate_fields(dir);
@@ -371,8 +370,7 @@ linvfs_rename(
 
 	new_inode = ndentry->d_inode;
 
-	VOP_RENAME(fvp, (char *)odentry->d_name.name, tvp,
-			   (char *)ndentry->d_name.name, NULL, NULL, error);
+	VOP_RENAME(fvp, odentry, tvp, ndentry, NULL, NULL, error);
 	if (error)
 		return -error;
 

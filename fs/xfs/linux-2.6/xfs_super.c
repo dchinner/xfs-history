@@ -965,17 +965,16 @@ struct dentry *linvfs_get_parent(struct dentry *child)
 	int		error;
 	vnode_t		*vp, *cvp;
 	struct dentry	*parent;
-	pathname_t	pn;
-	pathname_t	*pnp = &pn;
 	struct inode	*ip = NULL;
+	struct dentry dotdot;
 
-	bzero(pnp, sizeof(pathname_t));
-	pnp->pn_complen = 2;
-	pnp->pn_path = "..";
+	dotdot.d_name.name = "..";
+	dotdot.d_name.len = 2;
+	dotdot.d_inode = 0;
 
 	cvp = NULL;
 	vp = LINVFS_GET_VP(child->d_inode);
-	VOP_LOOKUP(vp, "..", &cvp, pnp, 0, NULL, NULL, error);
+	VOP_LOOKUP(vp, &dotdot, &cvp, 0, NULL, NULL, error);
 
 	if (!error) {
 		ASSERT(cvp);

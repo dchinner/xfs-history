@@ -187,21 +187,24 @@ typedef	int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 typedef	int	(*vop_setattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
 typedef	int	(*vop_access_t)(bhv_desc_t *, int, struct cred *);
-typedef	int	(*vop_lookup_t)(bhv_desc_t *, char *, vnode_t **,
-				struct pathname *, int, vnode_t *,
+typedef	int	(*vop_lookup_t)(bhv_desc_t *, struct dentry *, vnode_t **,
+				int, vnode_t *, struct cred *);
+typedef	int	(*vop_create_t)(bhv_desc_t *, struct dentry *, struct vattr *,
+				int, int, vnode_t **, struct cred *);
+typedef	int	(*vop_remove_t)(bhv_desc_t *, struct dentry *, struct cred *);
+typedef	int	(*vop_link_t)(bhv_desc_t *, vnode_t *, struct dentry *,
 				struct cred *);
-typedef	int	(*vop_create_t)(bhv_desc_t *, char *, struct vattr *, int, int,
-				vnode_t **, struct cred *);
-typedef	int	(*vop_remove_t)(bhv_desc_t *, char *, struct cred *);
-typedef	int	(*vop_link_t)(bhv_desc_t *, vnode_t *, char *, struct cred *);
-typedef	int	(*vop_rename_t)(bhv_desc_t *, char *, vnode_t *, char *,
+typedef	int	(*vop_rename_t)(bhv_desc_t *, struct dentry *, vnode_t *,
+				struct dentry *,
 				struct pathname *npnp, struct cred *);
-typedef	int	(*vop_mkdir_t)(bhv_desc_t *, char *, struct vattr *, vnode_t **,
+typedef	int	(*vop_mkdir_t)(bhv_desc_t *, struct dentry *, struct vattr *,
+				vnode_t **, struct cred *);
+typedef	int	(*vop_rmdir_t)(bhv_desc_t *, struct dentry *, vnode_t *,
 				struct cred *);
-typedef	int	(*vop_rmdir_t)(bhv_desc_t *, char *, vnode_t *, struct cred *);
 typedef	int	(*vop_readdir_t)(bhv_desc_t *, struct uio *, struct cred *,
 				int *);
-typedef	int	(*vop_symlink_t)(bhv_desc_t *, char *, struct vattr *, char *,
+typedef	int	(*vop_symlink_t)(bhv_desc_t *, struct dentry *,
+				struct vattr *, char *,
 				vnode_t **, struct cred *);
 typedef	int	(*vop_readlink_t)(bhv_desc_t *, struct uio *, struct cred *);
 typedef	int	(*vop_fsync_t)(bhv_desc_t *, int, struct cred *, xfs_off_t, xfs_off_t);
@@ -347,28 +350,28 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_access, vp)((vp)->v_fbhv, mode, cr);		\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define	VOP_LOOKUP(vp,cp,vpp,pnp,f,rdir,cr,rv) 				\
+#define	VOP_LOOKUP(vp,d,vpp,f,rdir,cr,rv) 				\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_lookup, vp)((vp)->v_fbhv,cp,vpp,pnp,f,rdir,cr);	\
+	rv = _VOP_(vop_lookup, vp)((vp)->v_fbhv,d,vpp,f,rdir,cr);	\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define	VOP_CREATE(dvp,p,vap,ex,mode,vpp,cr,rv) 			\
+#define	VOP_CREATE(dvp,d,vap,ex,mode,vpp,cr,rv) 			\
 {									\
 	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
-	rv = _VOP_(vop_create, dvp)((dvp)->v_fbhv,p,vap,ex,mode,vpp,cr);\
+	rv = _VOP_(vop_create, dvp)((dvp)->v_fbhv,d,vap,ex,mode,vpp,cr);\
 	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
-#define	VOP_REMOVE(dvp,p,cr,rv) 					\
+#define	VOP_REMOVE(dvp,d,cr,rv) 					\
 {									\
 	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
-	rv = _VOP_(vop_remove, dvp)((dvp)->v_fbhv,p,cr);		\
+	rv = _VOP_(vop_remove, dvp)((dvp)->v_fbhv,d,cr);		\
 	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
-#define	VOP_LINK(tdvp,fvp,p,cr,rv) 					\
+#define	VOP_LINK(tdvp,fvp,d,cr,rv) 					\
 {									\
 	VN_BHV_READ_LOCK(&(tdvp)->v_bh);				\
-	rv = _VOP_(vop_link, tdvp)((tdvp)->v_fbhv,fvp,p,cr);		\
+	rv = _VOP_(vop_link, tdvp)((tdvp)->v_fbhv,fvp,d,cr);		\
 	VN_BHV_READ_UNLOCK(&(tdvp)->v_bh);				\
 }
 #define	VOP_RENAME(fvp,fnm,tdvp,tnm,tpnp,cr,rv) 			\
@@ -377,16 +380,16 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_rename, fvp)((fvp)->v_fbhv,fnm,tdvp,tnm,tpnp,cr);\
 	VN_BHV_READ_UNLOCK(&(fvp)->v_bh);				\
 }
-#define	VOP_MKDIR(dp,p,vap,vpp,cr,rv) 					\
+#define	VOP_MKDIR(dp,d,vap,vpp,cr,rv) 					\
 {									\
 	VN_BHV_READ_LOCK(&(dp)->v_bh);					\
-	rv = _VOP_(vop_mkdir, dp)((dp)->v_fbhv,p,vap,vpp,cr);		\
+	rv = _VOP_(vop_mkdir, dp)((dp)->v_fbhv,d,vap,vpp,cr);		\
 	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
-#define	VOP_RMDIR(dp,p,cdir,cr,rv) 					\
+#define	VOP_RMDIR(dp,d,cdir,cr,rv) 					\
 {									\
 	VN_BHV_READ_LOCK(&(dp)->v_bh);					\
-	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,p,cdir,cr);		\
+	rv = _VOP_(vop_rmdir, dp)((dp)->v_fbhv,d,cdir,cr);		\
 	VN_BHV_READ_UNLOCK(&(dp)->v_bh);				\
 }
 #define	VOP_READDIR(vp,uiop,cr,eofp,rv) 				\
@@ -395,10 +398,10 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_readdir, vp)((vp)->v_fbhv,uiop,cr,eofp);		\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define	VOP_SYMLINK(dvp,lnm,vap,tnm,vpp,cr,rv) 				\
+#define	VOP_SYMLINK(dvp,d,vap,tnm,vpp,cr,rv) 				\
 {									\
 	VN_BHV_READ_LOCK(&(dvp)->v_bh);					\
-	rv = _VOP_(vop_symlink, dvp) ((dvp)->v_fbhv,lnm,vap,tnm,vpp,cr); \
+	rv = _VOP_(vop_symlink, dvp) ((dvp)->v_fbhv,d,vap,tnm,vpp,cr); \
 	VN_BHV_READ_UNLOCK(&(dvp)->v_bh);				\
 }
 #define	VOP_READLINK(vp,uiop,cr,rv) 					\
