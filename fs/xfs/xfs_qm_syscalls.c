@@ -88,8 +88,10 @@ linvfs_setxstate(
 
 	switch (op) {
 	case Q_XQUOTARM:
-		if (XFS_IS_QUOTA_ON(mp))
+		if (XFS_IS_QUOTA_ON(mp)) {
+			qdprintk("cannot remove, quota on: flags=%x\n", flags);
 			return -EINVAL;
+		}
 		qflags = xfs_qm_import_qtype_flags(flags);
 		return -xfs_qm_scall_trunc_qfiles(mp, qflags);
 	case Q_XQUOTAON:
@@ -103,6 +105,7 @@ linvfs_setxstate(
 			return -ESRCH;
 		return -xfs_qm_scall_quotaoff(mp, qflags, B_FALSE);
 	}
+	qdprintk("cannot set state, invalid op: op=%x flags=%x\n", op, flags);
 	return -EINVAL;
 }
 
@@ -225,6 +228,8 @@ xfs_qm_scall_quotaoff(
 			ASSERT((sbflags & XFS_ALL_QUOTA_ACCT) != 
 			       (mp->m_qflags & XFS_ALL_QUOTA_ACCT));
 			
+			qdprintk("quotaoff, sbflags=%x flags=%x m_qflags=%x\n",
+				sbflags, flags, mp->m_qflags);
 			/* XXX TBD Finish this for group quota support */
 			/* We need to update the SB and mp separately */
 			return XFS_ERROR(EINVAL);
@@ -375,8 +380,10 @@ xfs_qm_scall_trunc_qfiles(
 	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 	error = 0;
-	if (!XFS_SB_VERSION_HASQUOTA(&mp->m_sb) || flags == 0)
+	if (!XFS_SB_VERSION_HASQUOTA(&mp->m_sb) || flags == 0) {
+		qdprintk("qtrunc flags=%x m_qflags=%x\n", flags, mp->m_qflags);
 		return XFS_ERROR(EINVAL);
+	}
 
 	if ((flags & XFS_DQ_USER) && mp->m_sb.sb_uquotino != NULLFSINO) {
 		error = xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 0, &qip, 0);
@@ -439,8 +446,10 @@ xfs_qm_scall_quotaon(
 	sbflags = 0;
 	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
 
-	if (flags == 0)
+	if (flags == 0) {
+		qdprintk("quotaon: zero flags, m_qflags=%x\n", mp->m_qflags);
 		return XFS_ERROR(EINVAL);
+	}
 
 	/* Only rootfs can turn on quotas with a delayed effect */
 	ASSERT(!delay || rootfs);
@@ -457,7 +466,8 @@ xfs_qm_scall_quotaon(
 	    ((flags & XFS_GQUOTA_ACCT) == 0 &&
 	    (mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT) == 0 &&
 	    (flags & XFS_GQUOTA_ENFD))) {
-		qdprintk("Can't enforce without accounting.\n");
+		qdprintk("Can't enforce without acct, flags=%x sbflags=%x\n",
+			flags, mp->m_sb.sb_qflags);
 		return XFS_ERROR(EINVAL);
 	}
 	/*
@@ -477,7 +487,7 @@ xfs_qm_scall_quotaon(
 		mp->m_sb.sb_gquotino = NULLFSINO;
 		mp->m_sb.sb_qflags = 0;
 		XFS_SB_UNLOCK(mp, s);
-		qdprintk("Converted sb to version %x\n", mp->m_sb.sb_versionnum);
+		qdprintk("Converted to version %x\n", mp->m_sb.sb_versionnum);
 		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
 			    XFS_SB_GQUOTINO | XFS_SB_QFLAGS);
 	}
@@ -1325,6 +1335,10 @@ xfs_qm_internalqcheck_adjust(
 
 	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_gquotino) {
 		*res = BULKSTAT_RV_NOTHING;
+		qdprintk("internalqcheck: ino=%llu, uqino=%llu, gqino=%llu\n",
+			(unsigned long long) ino,
+			(unsigned long long) mp->m_sb.sb_uquotino,
+			(unsigned long long) mp->m_sb.sb_gquotino);
                 return XFS_ERROR(EINVAL);
 	}
 	ipreleased = B_FALSE;
