@@ -262,6 +262,9 @@ xfs_buf_item_pin(
 	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
 	       (bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("PIN", bip);
+#ifndef SIM
+	buftrace("XFS_PIN", bp);
+#endif
 	bpin(bp);
 }
 
@@ -289,6 +292,9 @@ xfs_buf_item_unpin(
 	ASSERT((xfs_buf_log_item_t*)(bp->b_fsprivate) == bip);
 	ASSERT(bip->bli_refcount > 0);
 	xfs_buf_item_trace("UNPIN", bip);
+#ifndef SIM
+	buftrace("XFS_UNPIN", bp);
+#endif
 
 	refcount = atomicAddInt(&bip->bli_refcount, -1);
 	mp = bip->bli_item.li_mountp;
@@ -300,6 +306,9 @@ xfs_buf_item_unpin(
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
+#ifndef SIM
+		buftrace("XFS_UNPIN STALE", bp);
+#endif
 		AIL_LOCK(mp,s);
 		/*
 		 * If we get called here because of an IO error, we may
@@ -327,13 +336,20 @@ xfs_buf_item_unpin_remove(
 	xfs_buf_log_item_t	*bip,
 	xfs_trans_t		*tp)
 {
+	/* REFERENCED */
+	buf_t		*bp;
 	xfs_log_item_desc_t	*lidp;
 
+	bp = bip->bli_buf;
 	/*
 	 * will xfs_buf_item_unpin() call xfs_buf_item_relse()?
 	 */
 	if (bip->bli_refcount == 1 && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(valusema(&bip->bli_buf->b_lock) <= 0);
+		xfs_buf_item_trace("UNPIN REMOVE", bip);
+#ifndef SIM
+		buftrace("XFS_UNPIN_REMOVE", bp);
+#endif
 		/*
 		 * yes -- clear the xaction descriptor in-use flag
 		 * and free the chunk if required.  We can safely
@@ -411,6 +427,9 @@ xfs_buf_item_unlock(
 	uint	hold;
 
 	bp = bip->bli_buf;
+#ifndef SIM
+	buftrace("XFS_UNLOCK", bp);
+#endif
 
 	/*
 	 * Clear the buffer's association with this transaction.
@@ -515,6 +534,9 @@ xfs_buf_item_abort(
 	buf_t 	*bp;
 
 	bp = bip->bli_buf;
+#ifndef SIM
+	buftrace("XFS_ABORT", bp);
+#endif
 	bp->b_flags &= ~(B_DELWRI|B_DONE);
 	bp->b_flags |= B_STALE;
 	xfs_buf_item_unlock(bip);
@@ -1106,6 +1128,9 @@ xfs_buf_item_relse(
 {
 	xfs_buf_log_item_t	*bip;
 
+#ifndef SIM
+	buftrace("XFS_RELSE", bp);
+#endif
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	bp->b_fsprivate = bip->bli_item.li_bio_list;
 	if ((bp->b_fsprivate == NULL) && (bp->b_iodone != NULL)) {
