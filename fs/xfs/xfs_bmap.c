@@ -2365,15 +2365,14 @@ xfs_bmap_worst_indlen(
 	xfs_extlen_t	rval;
 
 	mp = ip->i_mount;
-	maxrecs = XFS_BTREE_BLOCK_MAXRECS(mp->m_sb.sb_blocksize, xfs_bmbt, 1);
+	maxrecs = mp->m_bmap_dmxr[0];
 	for (level = 0, rval = 0; level < XFS_BM_MAXLEVELS(mp); level++) {
 		len = (len + maxrecs - 1) / maxrecs;
 		rval += len;
 		if (len == 1)
 			return rval + (XFS_BM_MAXLEVELS(mp) - level - 1);
 		if (level == 0)
-			maxrecs = XFS_BTREE_BLOCK_MAXRECS(mp->m_sb.sb_blocksize,
-				xfs_bmbt, 0);
+			maxrecs = mp->m_bmap_dmxr[1];
 	}
 	return rval;
 }
