@@ -1,4 +1,4 @@
-#ident "$Revision: 1.54 $"
+#ident "$Revision: 1.55 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -519,15 +519,15 @@ xfs_ilock(xfs_inode_t	*ip,
 	ASSERT(lock_flags != 0);
 
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		mrlock(&ip->i_iolock, MR_UPDATE, PINOD);
+		mrlock(&ip->i_iolock, MR_UPDATE, PINOD | PRECALC);
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		mrlock(&ip->i_iolock, MR_ACCESS, PINOD);
+		mrlock(&ip->i_iolock, MR_ACCESS, PINOD | PRECALC);
 	}
 
 	if (lock_flags & XFS_ILOCK_EXCL) {
-		mrlock(&ip->i_lock, MR_UPDATE, PINOD);
+		mrlock(&ip->i_lock, MR_UPDATE, PINOD | PRECALC);
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
-		mrlock(&ip->i_lock, MR_ACCESS, PINOD);
+		mrlock(&ip->i_lock, MR_ACCESS, PINOD | PRECALC);
 	}
 
 }
@@ -664,7 +664,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 void
 xfs_iflock(xfs_inode_t *ip)
 {
-	psema(&(ip->i_flock), PINOD);
+	psema(&(ip->i_flock), PINOD | PRECALC);
 }
 
 int
