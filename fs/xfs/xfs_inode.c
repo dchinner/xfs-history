@@ -145,9 +145,6 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			 * iu_data to point at the data.
 			 */
 			size = (int) ip->i_d.di_size;
-			if (size == 0) {
-				return;
-			}
 			if (size <= sizeof(ip->i_u2.iu_inline_data)) {
 				ip->i_bytes = sizeof(ip->i_u2.iu_inline_data);
 				ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
@@ -156,14 +153,16 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 								     KM_SLEEP);
 				ip->i_bytes = size;
 			}
-			bcopy(dip->di_u.di_c, ip->i_u1.iu_data, size);
+			if (size)
+				bcopy(dip->di_u.di_c, ip->i_u1.iu_data, size);
+			ip->i_flags |= XFS_IINLINE;
 			return;
 
 		case XFS_DINODE_FMT_EXTENTS:
 			/*
 			 * The file consists of a set of extents all
 			 * of which fit into the on-disk inode.
-			 * If there are few enought extents to fit into
+			 * If there are few enough extents to fit into
 			 * the iu_inline_ext, then copy them there.
 			 * Otherwise allocate a buffer for them and copy
 			 * them into it.  Either way, set iu_extents
@@ -171,10 +170,6 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			 */
 			nex = (int)dip->di_core.di_nextents;
 			size = nex * (int)sizeof(xfs_bmbt_rec_t);
-			if (nex == 0) {
-				ip->i_flags & XFS_IEXTENTS;
-				return;
-			}
 			if (nex <= XFS_INLINE_EXTS) {
 				ip->i_bytes = sizeof(ip->i_u2.iu_inline_ext);
 				ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
@@ -183,8 +178,9 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 						kmem_alloc(size, KM_SLEEP);
 				ip->i_bytes = size;
 			}
-			bcopy(&(dip->di_u.di_bmx), ip->i_u1.iu_extents, size); 
-			ip->i_flags & XFS_IEXTENTS;
+			if (size)
+				bcopy(&dip->di_u.di_bmx, ip->i_u1.iu_extents, size); 
+			ip->i_flags |= XFS_IEXTENTS;
 			return;
 
 		case XFS_DINODE_FMT_BTREE:
@@ -317,6 +313,14 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
 	 */
 	xfs_trans_brelse(tp, bp);
 	return (ip);
+}
+
+/*
+ * Read in extents from a btree-format inode.
+ */
+void
+xfs_iread_extents(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip)
+{
 }
 
 /*
@@ -497,7 +501,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 	 */
 	if (new_max > 0) {
 		/*
-		 * First copy then records.
+		 * First copy the records.
 		 */
 		op = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1,
 						     ip->i_broot_bytes);
