@@ -223,8 +223,7 @@ xfs_retrieved(int	available,
 		/*
 		 * This buffer will return more bytes
 		 * than we asked for.  Trim retrieved
-		 * _bytes so we can set
-		 * bmapp->pbsize correctly.
+		 * so we can set bmapp->pbsize correctly.
 		 */
 		retrieved = count - *total_retrieved;
 	} else {
@@ -289,7 +288,6 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	}
 	offset_fsb = xfs_b_to_fsbt(sbp, offset);
 	nimaps = XFS_READ_IMAPS;
-	ASSERT(offset + count <= nisize);
 	last_fsb = xfs_b_to_fsb(sbp, nisize);
 	(void)xfs_bmapi(NULL, ip, offset_fsb,
 			(xfs_extlen_t)(last_fsb - offset_fsb),
@@ -794,11 +792,10 @@ xfs_write_bmap(xfs_mount_t	*mp,
  * to be beyond EOF and therefore invalid become valid when isize
  * is extended beyond them.
  */
-STATIC int
-xfs_zero_eof_bp(xfs_inode_t	*ip,
-		off_t		offset,
-		__int64_t	isize,
-		cred_t		*credp)
+void
+xfs_zero_eof(xfs_inode_t	*ip,
+	     off_t		offset,
+	     __int64_t		isize)
 {
 	__int64_t	last_byte;
 	off_t		page_start;
@@ -824,7 +821,7 @@ xfs_zero_eof_bp(xfs_inode_t	*ip,
 		 * would end at that last byte, so there is nothing
 		 * to zero.
 		 */
-		return 0;
+		return;
 	}
 
 	/*
@@ -847,6 +844,7 @@ xfs_zero_eof_bp(xfs_inode_t	*ip,
 		page_off = 0;
 		page_start += NBPP;
 	}
+	return;
 }
 
 STATIC void
@@ -1109,16 +1107,11 @@ xfs_write_file(vnode_t	*vp,
 		 * If we've seeked passed the EOF to do this write,
 		 * then we need to make sure that any buffer overlapping
 		 * the EOF is zeroed beyond the EOF.
-		 * xfs_zero_eof_bp() unlocks the inode lock, so make
-		 * sure to reacquire it after the call.
 		 */
 		if (!eof_zeroed &&
 		    (uiop->uio_offset > isize) &&
 		    (isize != 0)) {
-			if (xfs_zero_eof_bp(ip, uiop->uio_offset,
-					    isize, credp) != 0) {
-				xfs_ilock(ip, XFS_ILOCK_EXCL);
-			}
+			xfs_zero_eof(ip, uiop->uio_offset, isize);
 			eof_zeroed = 1;
 		}
 
@@ -1775,7 +1768,7 @@ xfs_strat_write(vnode_t	*vp,
 					XFS_BMAPI_WRITE, NULLFSBLOCK, 1,
 					imap, &nimaps, &free_list);
 		ASSERT(nimaps > 0);
-		xfs_bmap_finish(&tp, &free_list, first_block);
+		(void) xfs_bmap_finish(&tp, &free_list, first_block, 0);
 
 		xfs_trans_commit(tp, 0);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
