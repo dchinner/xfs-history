@@ -527,11 +527,12 @@ xfs_retrieved(
 /*
  * xfs_iomap_extra()
  *
- * This is called to fill in the bmapval for a page which overlaps
- * the end of the file and the fs block size is less than the page
- * size.  We fill in the bmapval with zero sizes and offsets to
- * indicate that there is nothing here to read since we're beyond
- * the end of the file.
+ * This is called when the VM/chunk cache is trying to create a buffer
+ * for a page which is beyond the end of the file.  If we're at the
+ * start of the page we give it as much of a mapping as we can, but
+ * if it comes back for the rest of the page we say there is nothing there.
+ * This behavior is tied to the code in the VM/chunk cache (do_pdflush())
+ * that will call here.
  */
 STATIC void
 xfs_iomap_extra(
@@ -557,11 +558,13 @@ xfs_iomap_extra(
 	mp = ip->i_mount;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 
-	if ((offset == BBTOOFF(OFFTOBB(nisize))) && (count < NBPP)) {
-		ASSERT((offset == BBTOOFF(OFFTOBB(nisize))) &&
-		       (count < NBPP));
-		ASSERT(ip->i_mount->m_sb.sb_blocksize < NBPP);
-
+	if (poff(offset) != 0) {
+		/*
+		 * This is the 'remainder' of a page being mapped out.
+		 * Since it is already beyond the EOF, there is no reason
+		 * to bother.
+		 */
+		ASSERT(count < NBPP);
 		*nbmaps = 1;
 		bmapp->eof = BMAP_EOF;
 		bmapp->bn = -1;
@@ -576,6 +579,11 @@ xfs_iomap_extra(
 			bmapp->pbdev = mp->m_dev;
 		}
 	} else {
+		/*
+		 * A page is being mapped out so that it can be flushed.
+		 * The page is beyond the EOF, but we need to return
+		 * something to keep the chunk cache happy.
+		 */
 		ASSERT(count <= NBPP);
 		end_fsb = XFS_B_TO_FSB(mp, (offset + count));
 		nimaps = 1;
@@ -587,7 +595,6 @@ xfs_iomap_extra(
 		*nbmaps = 1;
 		bmapp->eof = BMAP_EOF;
 		offset_bb = OFFTOBBT(offset);
-		block_off_bb = XFS_BB_FSB_OFFSET(mp, offset_bb);
 		if (imap.br_startblock == HOLESTARTBLOCK) {
 			bmapp->eof |= BMAP_HOLE;
 			bmapp->bn = -1;
@@ -595,13 +602,10 @@ xfs_iomap_extra(
 			bmapp->eof |= BMAP_DELAY;
 			bmapp->bn = -1;
 		} else {
-			bmapp->bn =
-				XFS_FSB_TO_DB(mp, ip, imap.br_startblock) +
-				block_off_bb;
+			bmapp->bn = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
 		}
-		bmapp->offset = XFS_FSB_TO_BB(mp, offset_fsb) + block_off_bb;
-		bmapp->length =	XFS_FSB_TO_BB(mp, imap.br_blockcount) -
-				block_off_bb;
+		bmapp->offset = XFS_FSB_TO_BB(mp, offset_fsb);
+		bmapp->length =	XFS_FSB_TO_BB(mp, imap.br_blockcount);
 		ASSERT(bmapp->length > 0);
 		bmapp->bsize = BBTOB(bmapp->length);
 		bmapp->pboff = offset - BBTOOFF(bmapp->offset);
@@ -680,16 +684,13 @@ xfs_iomap_read(
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = XFS_READ_IMAPS;
 	last_fsb = XFS_B_TO_FSB(mp, nisize);
-	if (last_fsb <= offset_fsb) {
+	if (offset >= nisize) {
 		/*
-		 * The VM/chunk code is trying to map a page to be
-		 * pushed out which contains the last file block
-		 * and byte.  Since the file ended, we did not map
-		 * the entire page, and now it is calling back to
-		 * map the rest of it.  Handle it here so that it
-		 * does not interfere with the normal path code.
-		 * This can only happen if the fs block size is
-		 * less than the page size.
+		 * The VM/chunk code is trying to map a page or part
+		 * of a page to be pushed out that is beyond the end
+		 * of the file.  We handle these cases separately so
+		 * that they do not interfere with the normal path
+		 * code.
 		 */
 		xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
 		return;
