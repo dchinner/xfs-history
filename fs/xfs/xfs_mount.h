@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.114 $"
+#ident	"$Revision: 1.115 $"
 
 struct cred;
 struct mounta;
@@ -301,6 +301,7 @@ typedef struct xfs_mount {
 						   log item pin masks */
 	uint			m_cxfstype;	/* mounted shared, etc. */
 	uuid_t			m_newuuid;	/* saved copy of new uuid */
+	uuid_t			m_origuuid;	/* saved copy of original uuid */
 } xfs_mount_t;
 
 /*

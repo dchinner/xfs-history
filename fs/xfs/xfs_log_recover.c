@@ -683,9 +683,11 @@ xlog_test_footer(xlog_t *log)
 	                /* This has the magic number--it is an external log.
 		         * Now make sure that it's associated with the
 		         * filesystem that we're trying to mount. */
-	                xfs_sb_t *super = &log->l_mp->m_sb;
-
-	                if (uuid_compare(&super->sb_uuid, &rfoot->f_uuid, 
+                        /* compare against _original_ uuid because the
+                         * footer should match that even if we've assigned
+                         * a new uuid to this FS
+                         */
+	                if (uuid_compare(&log->l_mp->m_origuuid, &rfoot->f_uuid, 
                             &status)) {
   		                xlog_warn("XFS: mismatched external log (incorrect uuid)");
                                 error = XFS_ERROR(EINVAL);

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.231 $"
+#ident	"$Revision: 1.232 $"
 
 #include <xfs_os_defs.h>
 
@@ -1097,6 +1097,7 @@ xfs_mountfs_int(
 	mp->m_perag = NULL;
 	/* FALLTHROUGH */
  error1:
+	xfs_uuid_unmount(mp);
 	xfs_freesb(mp);
 	return error;
 }	/* xfs_mountfs_int */
@@ -1717,6 +1718,8 @@ xfs_uuid_mount(xfs_mount_t *mp)
 	int	hole;
 	int	i;
 	uint_t	status;
+        
+        mp->m_origuuid = mp->m_sb.sb_uuid;
 
 	uuid_create_nil(&mp->m_newuuid, &status);
 	mutex_lock(&xfs_uuidtabmon, PVFS);
