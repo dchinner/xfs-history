@@ -9,10 +9,21 @@
 #include "xfs_coda_oops.h"
 
 #undef NODEV
-/* shut up warning about redefining */
+#undef off_t
+#undef ino_t
+#undef daddr_t
+#undef caddr_t
+#define off_t __kernel_off_t
+#define ino_t __kernel_ino_t
+#define daddr_t __kernel_daddr_t
+#define caddr_t __kernel_caddr_t
 #include <linux/fs.h>
 #include <linux/dcache.h>
 #include <linux/sched.h>	/* To get current */
+#undef off_t
+#undef ino_t
+#undef daddr_t
+#undef caddr_t
 
 #include "xfs_file.h"
 #include <sys/vnode.h>
