@@ -180,14 +180,15 @@ xfs_iformat(xfs_mount_t		*mp,
 			 */
 			nex = (int)dip->di_core.di_nextents;
 			size = nex * (int)sizeof(xfs_bmbt_rec_t);
-			if (nex <= XFS_INLINE_EXTS) {
-				ip->i_bytes = sizeof(ip->i_u2.iu_inline_ext);
+			if (nex == 0) {
+				ip->i_u1.iu_extents = NULL;
+			} else if (nex <= XFS_INLINE_EXTS) {
 				ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
 			} else {
 				ip->i_u1.iu_extents = (xfs_bmbt_rec_t*)
 						kmem_alloc(size, KM_SLEEP);
-				ip->i_bytes = size;
 			}
+			ip->i_bytes = size;
 			if (size)
 				bcopy(&dip->di_u.di_bmx, ip->i_u1.iu_extents, size); 
 			ip->i_flags |= XFS_IEXTENTS;
@@ -416,7 +417,10 @@ xfs_ialloc(xfs_trans_t	*tp,
 	case IFREG:
 	case IFDIR:
 	case IFLNK:
-		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL;
+		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
+		ip->i_flags |= XFS_IEXTENTS;
+		ip->i_bytes = 0;
+		ip->i_u1.iu_extents = NULL;
 		break;
 	case IFMNT:
 		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
@@ -925,7 +929,8 @@ xfs_iflush(xfs_inode_t	*ip,
 		}
 		break;
 	case XFS_DINODE_FMT_EXTENTS:
-		ASSERT(ip->i_flags & XFS_IEXTENTS);
+		ASSERT((ip->i_flags & XFS_IEXTENTS) ||
+		       !(iip->ili_format.ilf_fields & XFS_ILOG_EXT));
 		ASSERT((ip->i_u1.iu_extents != NULL) || (ip->i_bytes == 0));
 		ASSERT((ip->i_u1.iu_extents == NULL) || (ip->i_bytes > 0));
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
