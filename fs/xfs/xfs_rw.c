@@ -1556,9 +1556,6 @@ xfs_write_file(
 		nbmaps = XFS_WRITE_BMAPS;
 		error = xfs_iomap_write(ip, uiop->uio_offset,
 					uiop->uio_resid, bmaps, &nbmaps);
-		xfs_isize_check(ip->i_mount, ip,
-				(ip->i_new_size > ip->i_d.di_size) ?
-				ip->i_new_size : ip->i_d.di_size);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		if (error || (bmaps[0].pbsize == 0)) {
@@ -2282,8 +2279,6 @@ xfs_strat_write(
 
 		xfs_trans_commit(locals->tp, XFS_TRANS_RELEASE_LOG_RES);
 
-		xfs_isize_check(locals->mp, locals->ip,
-				locals->ip->i_d.di_size);
 		/*
 		 * Before dropping the lock, clear any read-ahead state
 		 * since in allocating space here we may have made it
