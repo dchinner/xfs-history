@@ -36,6 +36,7 @@
 #include <sys/runq.h>
 #include <sys/schedctl.h>
 #include <sys/atomic_ops.h>
+#include <sys/ktrace.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -95,6 +96,15 @@ zone_t		*xfs_bmap_zone;
  * This routine is a real problem so we take extreme measures.
  */
 zone_t		*xfs_strat_write_zone;
+
+/*
+ * Global trace buffer for xfs_strat_write() tracing.
+ */
+ktrace_t	*xfs_strat_trace_buf;
+#ifndef DEBUG 
+#define	xfs_strat_write_bp_trace(tag, ip, bp)
+#define	xfs_strat_write_subbp_trace(tag, ip, bp, rbp, loff, lcnt, lblk)
+#endif	/* !DEBUG */
 
 STATIC void
 xfs_zero_last_block(
@@ -164,6 +174,107 @@ xfs_grio_req(
 #define	XFS_WRITEIO_ALIGN(mp,off)	(((off) >> mp->m_writeio_log) \
 					        << mp->m_writeio_log)
 
+#ifndef DEBUG
+#define	xfs_rw_enter_trace(tag, ip, uiop, ioflags)
+#define	xfs_iomap_enter_trace(tag, ip, offset, count);
+#define	xfs_iomap_map_trace(tag, ip, offset, count, bmapp, imapp)
+#else
+/*
+ * Trace routine for the read/write path.  This is the routine entry trace.
+ */
+void
+xfs_rw_enter_trace(
+	int		tag,	     
+	xfs_inode_t	*ip,
+	uio_t		*uiop,
+	int		ioflags)
+{
+	if (ip->i_rwtrace == NULL) {
+		return;
+	}
+
+	ktrace_enter(ip->i_rwtrace,
+		     (void*)tag,
+		     (void*)ip, 
+		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)(((__uint64_t)uiop->uio_offset > 32) & 0xffffffff),
+		     (void*)(uiop->uio_offset & 0xffffffff),
+		     (void*)uiop->uio_resid,
+		     (void*)ioflags,
+		     (void*)((ip->i_next_offset > 32) & 0xffffffff),
+		     (void*)(ip->i_next_offset & 0xffffffff),
+		     (void*)((ip->i_io_offset > 32) & 0xffffffff),
+		     (void*)(ip->i_io_offset & 0xffffffff),
+		     (void*)(ip->i_io_size),
+		     (void*)(ip->i_last_req_sz),
+		     (void*)((ip->i_new_size > 32) & 0xffffffff),
+		     (void*)(ip->i_new_size & 0xffffffff));
+}
+
+void
+xfs_iomap_enter_trace(
+	int		tag,
+	xfs_inode_t	*ip,
+	off_t		offset,
+	int		count)
+{
+	if (ip->i_rwtrace == NULL) {
+		return;
+	}
+
+	ktrace_enter(ip->i_rwtrace,
+		     (void*)tag,
+		     (void*)ip, 
+		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)(((__uint64_t)offset > 32) & 0xffffffff),
+		     (void*)(offset & 0xffffffff),
+		     (void*)count,
+		     (void*)((ip->i_next_offset > 32) & 0xffffffff),
+		     (void*)(ip->i_next_offset & 0xffffffff),
+		     (void*)((ip->i_io_offset > 32) & 0xffffffff),
+		     (void*)(ip->i_io_offset & 0xffffffff),
+		     (void*)(ip->i_io_size),
+		     (void*)(ip->i_last_req_sz),
+		     (void*)((ip->i_new_size > 32) & 0xffffffff),
+		     (void*)(ip->i_new_size & 0xffffffff),
+		     (void*)0);
+}
+
+void
+xfs_iomap_map_trace(
+	int		tag,	     
+	xfs_inode_t	*ip,
+	off_t		offset,
+	int		count,
+	struct bmapval	*bmapp,
+	xfs_bmbt_irec_t	*imapp)    
+{
+	if (ip->i_rwtrace == NULL) {
+		return;
+	}
+
+	ktrace_enter(ip->i_rwtrace,
+		     (void*)tag,
+		     (void*)ip, 
+		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)(((__uint64_t)offset > 32) & 0xffffffff),
+		     (void*)(offset & 0xffffffff),
+		     (void*)count,
+		     (void*)((bmapp->offset > 32) & 0xffffffff),
+		     (void*)(bmapp->offset & 0xffffffff),
+		     (void*)(bmapp->length),
+		     (void*)(bmapp->pboff),
+		     (void*)(bmapp->pbsize),
+		     (void*)(bmapp->bn),
+		     (void*)(imapp->br_startoff),
+		     (void*)(imapp->br_blockcount),
+		     (void*)(imapp->br_startblock));
+}
+#endif	/* DEBUG */
+	     
 /*
  * Fill in the bmap structure to indicate how the next bp
  * should fit over the given extent.
@@ -452,6 +563,7 @@ xfs_iomap_read(
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE | MR_ACCESS) != 0);
+	xfs_iomap_enter_trace(XFS_IOMAP_READ_ENTER, ip, offset, count);
 
 	mp = ip->i_mount;
 	nisize = ip->i_new_size;
@@ -556,8 +668,7 @@ xfs_iomap_read(
 	ASSERT((bmapp->length > 0) &&
 	       (offset >= XFS_FSB_TO_B(mp, bmapp->offset)));
 	
-	if ((nimaps == 1) &&
-	    (XFS_FSB_TO_B(mp, bmapp->offset + bmapp->length) >= nisize)) {
+	if (XFS_FSB_TO_B(mp, bmapp->offset + bmapp->length) >= nisize) {
 		bmapp->eof |= BMAP_EOF;
 	}
 
@@ -566,6 +677,8 @@ xfs_iomap_read(
 	total_retrieved_bytes = 0;
 	bmapp->pbsize = xfs_retrieved(retrieved_bytes, offset, count,
 				      &total_retrieved_bytes, nisize);
+	xfs_iomap_map_trace(XFS_IOMAP_READ_MAP,
+			    ip, offset, count, bmapp, imap);
 
 	/*
 	 * Only map additional buffers if they've been asked for
@@ -654,11 +767,12 @@ xfs_iomap_read(
 						      nisize);
 			}
 			
-			if ((curr_imapp == last_imapp) &&
-			    (XFS_FSB_TO_B(mp, curr_bmapp->offset +
-					  curr_bmapp->length) >= nisize)) {
+			if (XFS_FSB_TO_B(mp, curr_bmapp->offset +
+					 curr_bmapp->length) >= nisize) {
 				curr_bmapp->eof |= BMAP_EOF;
 			}
+			xfs_iomap_map_trace(XFS_IOMAP_READ_MAP, ip, offset,
+					    count, curr_bmapp, curr_imapp);
 
  			/*
 			 * Keep track of the offset of the last buffer
@@ -790,6 +904,7 @@ xfs_read_file(
 	 */
 	do {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		xfs_rw_enter_trace(XFS_READ_ENTER, ip, uiop, ioflag);
 
 		/*
 		 * We've fallen off the end of the file, so
@@ -1291,6 +1406,7 @@ xfs_iomap_write(
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
+	xfs_iomap_enter_trace(XFS_IOMAP_WRITE_ENTER, ip, offset, count);
 
 	mp = ip->i_mount;
 	if (ip->i_new_size > ip->i_d.di_size) {
@@ -1311,6 +1427,8 @@ xfs_iomap_write(
 	 * If bmapi returned us nothing, then we must have run out of space.
 	 */
 	if (nimaps == 0) {
+		xfs_iomap_enter_trace(XFS_IOMAP_WRITE_NOSPACE,
+				      ip, offset, count);
 		kmem_zone_free(xfs_irec_zone, (void *)imap);
 		return ENOSPC;
 	}
@@ -1332,7 +1450,7 @@ xfs_iomap_write(
 	 * inode size.
 	 */
 	bmap_end_fsb = bmapp->offset + bmapp->length;
-	if ((nimaps == 1) && (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize)) {
+	if (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize) {
 		bmapp->eof |= BMAP_EOF;
 	}
 	bmapp->pboff = offset - XFS_FSB_TO_B(mp, bmapp->offset);
@@ -1346,6 +1464,8 @@ xfs_iomap_write(
 		writing_bytes = count;
 	}
 	bmapp->pbsize = writing_bytes;
+	xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP,
+			    ip, offset, count, bmapp, imap);
 
 	/*
 	 * Map more buffers if the first does not map the entire
@@ -1467,10 +1587,11 @@ xfs_iomap_write(
 			 */
 			bmap_end_fsb = curr_bmapp->offset +
 				       curr_bmapp->length;
-			if ((curr_imapp == last_imapp) &&
-			    (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize)) {
+			if (XFS_FSB_TO_B(mp, bmap_end_fsb) >= isize) {
 				curr_bmapp->eof |= BMAP_EOF;
-			}					
+			}
+			xfs_iomap_map_trace(XFS_IOMAP_WRITE_MAP, ip, offset,
+					    count, curr_bmapp, curr_imapp);
 		}
 	}
 	*nbmaps = filled_bmaps;
@@ -1549,6 +1670,8 @@ xfs_write_file(
 		if (new_size > isize) {
 			ip->i_new_size = new_size;
 		}
+
+		xfs_rw_enter_trace(XFS_WRITE_ENTER, ip, uiop, ioflag);
 
 		/*
 		 * If we've seeked passed the EOF to do this write,
@@ -2102,6 +2225,106 @@ xfs_strat_read(
 
 
 #ifdef DEBUG
+
+void
+xfs_strat_write_bp_trace(
+	int		tag,
+	xfs_inode_t	*ip,
+	buf_t		*bp)
+{
+	if (ip->i_strat_trace == NULL) {
+		return;
+	}
+
+	ktrace_enter(ip->i_strat_trace,
+		     (void*)tag,
+		     (void*)ip,
+		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)bp,
+		     (void*)((bp->b_offset > 32) & 0xffffffff),
+		     (void*)(bp->b_offset & 0xffffffff),
+		     (void*)(bp->b_bcount),
+		     (void*)(bp->b_bufsize),
+		     (void*)(bp->b_blkno),
+		     (void*)(bp->b_flags),
+		     (void*)(bp->b_pages),
+		     (void*)(bp->b_pages->pf_pageno),
+		     (void*)0,
+		     (void*)0,
+		     (void*)0);
+
+	ktrace_enter(xfs_strat_trace_buf,
+		     (void*)tag,
+		     (void*)ip,
+		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)bp,
+		     (void*)((bp->b_offset > 32) & 0xffffffff),
+		     (void*)(bp->b_offset & 0xffffffff),
+		     (void*)(bp->b_bcount),
+		     (void*)(bp->b_bufsize),
+		     (void*)(bp->b_blkno),
+		     (void*)(bp->b_flags),
+		     (void*)(bp->b_pages),
+		     (void*)(bp->b_pages->pf_pageno),
+		     (void*)0,
+		     (void*)0,
+		     (void*)0);
+}
+
+
+void
+xfs_strat_write_subbp_trace(
+	int		tag,
+	xfs_inode_t	*ip,
+	buf_t		*bp,
+	buf_t		*rbp,
+	off_t		last_off,
+	int		last_bcount,
+	daddr_t		last_blkno)			    
+{
+	if (ip->i_strat_trace == NULL) {
+		return;
+	}
+
+	ktrace_enter(ip->i_strat_trace,
+		     (void*)tag,
+		     (void*)ip,
+		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)bp,
+		     (void*)rbp,
+		     (void*)((rbp->b_offset > 32) & 0xffffffff),
+		     (void*)(rbp->b_offset & 0xffffffff),
+		     (void*)(rbp->b_bcount),
+		     (void*)(rbp->b_blkno),
+		     (void*)(rbp->b_flags),
+		     (void*)(rbp->b_un.b_addr),
+		     (void*)(bp->b_pages),
+		     (void*)(last_off),
+		     (void*)(last_bcount),
+		     (void*)(last_blkno));
+
+	ktrace_enter(xfs_strat_trace_buf,
+		     (void*)tag,
+		     (void*)ip,
+		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)bp,
+		     (void*)rbp,
+		     (void*)((rbp->b_offset > 32) & 0xffffffff),
+		     (void*)(rbp->b_offset & 0xffffffff),
+		     (void*)(rbp->b_bcount),
+		     (void*)(rbp->b_blkno),
+		     (void*)(rbp->b_flags),
+		     (void*)(rbp->b_un.b_addr),
+		     (void*)(bp->b_pages),
+		     (void*)(last_off),
+		     (void*)(last_bcount),
+		     (void*)(last_blkno));
+}
+
 /*
  * xfs_strat_write_check
  *
@@ -2230,6 +2453,50 @@ xfs_strat_write_relse(
 	freerbuf(rbp);
 }
 
+void
+xfs_check_rbp(
+	xfs_inode_t	*ip,
+	buf_t		*bp,
+	buf_t		*rbp)
+{
+	xfs_mount_t	*mp;
+	int		nimaps;
+	xfs_bmbt_irec_t	imap;
+	xfs_fileoff_t	rbp_offset_fsb;
+	xfs_extlen_t	rbp_len_fsb;
+	pfd_t		*pfdp;
+
+	mp = ip->i_mount;
+	rbp_offset_fsb = XFS_BB_TO_FSB(mp, rbp->b_offset);
+	ASSERT(XFS_FSB_TO_BB(mp, rbp_offset_fsb == rbp->b_offset));
+	rbp_len_fsb = XFS_B_TO_FSBT(mp, rbp->b_bcount);
+	ASSERT(XFS_FSB_TO_B(mp, rbp_len_fsb) == rbp->b_bcount);
+	nimaps = 1;
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	(void) xfs_bmapi(NULL, ip, rbp_offset_fsb, rbp_len_fsb, 0,
+			 NULLFSBLOCK, 0, &imap, &nimaps, NULL);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+	ASSERT(imap.br_startoff == rbp_offset_fsb);
+	ASSERT(imap.br_blockcount == rbp_len_fsb);
+	ASSERT(XFS_FSB_TO_DADDR(mp, imap.br_startblock) == rbp->b_blkno);
+
+	if (rbp->b_flags & B_PAGEIO) {
+		pfdp = NULL;
+		pfdp = getnextpg(rbp, pfdp);
+		ASSERT(pfdp != NULL);
+		ASSERT(dtopt(rbp->b_offset) == pfdp->pf_pageno);
+		if (dpoff(rbp->b_offset)) {
+			ASSERT(rbp->b_flags & B_MAPPED);
+		}
+	}
+
+	if (rbp->b_flags & B_MAPPED) {
+		ASSERT(BTOBB(poff(rbp->b_un.b_addr)) ==
+		       dpoff(rbp->b_offset));
+	}
+}
+
 STATIC void
 xfs_strat_write(
 	vnode_t	*vp,
@@ -2244,6 +2511,7 @@ xfs_strat_write(
 	locals->ip = XFS_VTOI(vp);
 	locals->mp = locals->ip->i_mount;
 	locals->set_lead = 0;
+	locals->rbp_count = 0;
 	bp->b_flags |= B_STALE;
 
 	ASSERT(bp->b_blkno == -1);
@@ -2268,7 +2536,8 @@ xfs_strat_write(
 		xfs_ilock(locals->ip, XFS_ILOCK_EXCL);
 		xfs_trans_ijoin(locals->tp, locals->ip, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(locals->tp, locals->ip);
-		
+		xfs_strat_write_bp_trace(XFS_STRAT_ENTER, locals->ip, bp);
+
 		/*
 		 * Allocate the backing store for the file.
 		 */
@@ -2308,6 +2577,8 @@ xfs_strat_write(
 					    locals->imap[0].br_startblock);
 			bp->b_bcount = XFS_FSB_TO_B(locals->mp,
 						    locals->count_fsb);
+			xfs_strat_write_bp_trace(XFS_STRAT_FAST,
+						 locals->ip, bp);
 			bdstrat(bmajor(bp->b_edev), bp);
 			/*
 			 * Drop the count of queued buffers.
@@ -2346,12 +2617,46 @@ xfs_strat_write(
 						  locals->imap_offset -
 						  locals->offset_fsb);
 			locals->imap_blocks = locals->imapp->br_blockcount;
+			ASSERT((locals->imap_offset + locals->imap_blocks) <=
+			       (locals->offset_fsb +
+				XFS_B_TO_FSB(locals->mp, bp->b_bcount)));
 			locals->rbp_len = XFS_FSB_TO_B(locals->mp,
 						       locals->imap_blocks);
 			xfs_overlap_bp(bp, locals->rbp, locals->rbp_offset,
 				       locals->rbp_len);
 			locals->rbp->b_blkno = XFS_FSB_TO_DADDR(locals->mp,
 					       locals->imapp->br_startblock);
+			locals->rbp->b_offset = XFS_FSB_TO_BB(locals->mp,
+							locals->imap_offset);
+			xfs_strat_write_subbp_trace(XFS_STRAT_SUB,
+						    locals->ip, bp,
+						    locals->rbp,
+						    locals->last_rbp_offset,
+						    locals->last_rbp_bcount,
+						    locals->last_rbp_blkno);
+#ifdef DEBUG
+			xfs_check_rbp(locals->ip, bp, locals->rbp);
+			if (locals->rbp_count > 0) {
+				ASSERT((locals->last_rbp_offset +
+					BTOBB(locals->last_rbp_bcount)) ==
+				       locals->rbp->b_offset);
+				ASSERT((locals->rbp->b_blkno <
+					locals->last_rbp_blkno) ||
+				       (locals->rbp->b_blkno >=
+					(locals->last_rbp_blkno +
+					 BTOBB(locals->last_rbp_bcount))));
+				if (locals->rbp->b_blkno <
+				    locals->last_rbp_blkno) {
+					ASSERT((locals->rbp->b_blkno +
+					      BTOBB(locals->rbp->b_bcount)) <
+					       locals->last_rbp_blkno);
+				}
+			}
+			locals->last_rbp_offset = locals->rbp->b_offset;
+			locals->last_rbp_bcount = locals->rbp->b_bcount;
+			locals->last_rbp_blkno = locals->rbp->b_blkno;
+#endif
+					       
 			
 			/*
 			 * Link the buffer into the list of subordinate

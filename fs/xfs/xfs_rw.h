@@ -19,6 +19,10 @@ typedef struct xfs_strat_write_locals {
 	xfs_fsize_t	real_size;
 	xfs_extlen_t	count_fsb;
 	xfs_extlen_t	imap_blocks;
+	off_t		last_rbp_offset;
+	xfs_extlen_t	last_rbp_bcount;
+	daddr_t		last_rbp_blkno;
+	int		rbp_count;
 	int		x;
 	caddr_t		datap;
 	buf_t		*rbp;
@@ -54,6 +58,25 @@ typedef struct xfs_strat_write_locals {
  */
 #define	XFS_MAX_BMAP_LEN_BB	1024
 #define	XFS_MAX_BMAP_LEN_BYTES	524288
+
+/*
+ * Defines for the trace mechanisms in xfs_rw.c.
+ */
+#define	XFS_RW_KTRACE_SIZE	64
+#define	XFS_STRAT_KTRACE_SIZE	64
+#define	XFS_STRAT_GTRACE_SIZE	512
+
+#define	XFS_READ_ENTER		1
+#define	XFS_WRITE_ENTER		2
+#define XFS_IOMAP_READ_ENTER	3
+#define	XFS_IOMAP_WRITE_ENTER	4
+#define	XFS_IOMAP_READ_MAP	5
+#define	XFS_IOMAP_WRITE_MAP	6
+#define	XFS_IOMAP_WRITE_NOSPACE	7
+
+#define	XFS_STRAT_ENTER		1
+#define	XFS_STRAT_FAST		2
+#define	XFS_STRAT_SUB		3
 
 /*
  * Prototypes for functions in xfs_rw.c.
