@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.453 $"
+#ident "$Revision: 1.454 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -3567,16 +3567,6 @@ xfs_remove(
 		goto std_return;
 	}
 
-	/*
-	 * Before we drop our extra reference to the inode, purge it
-	 * from the refcache if it is there.  By waiting until afterwards
-	 * to do the IRELE, we ensure that we won't go inactive in the
-	 * xfs_refcache_purge_ip routine (although that would be OK).
-	 */
-#ifndef SIM
-	xfs_refcache_purge_ip(ip);
-#endif
-
 	vn_trace_exit(XFS_ITOV(ip), "xfs_remove",
 						(inst_t *)__return_address);
 
@@ -3621,16 +3611,9 @@ std_return:
 	xfs_bmap_cancel(&free_list);
 	cancel_flags |= XFS_TRANS_ABORT;
 	xfs_trans_cancel(tp, cancel_flags);
-	/*
-	 * Before we drop our extra reference to the inode, purge it
-	 * from the refcache if it is there.  By waiting until afterwards
-	 * to do the IRELE, we ensure that we won't go inactive in the
-	 * xfs_refcache_purge_ip routine (although that would be OK).
-	 */
-#ifndef SIM
-	xfs_refcache_purge_ip(ip);
-#endif
+
 	IRELE(ip);
+
 	goto std_return;
 }
 

@@ -32,7 +32,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.135 $"
 
 struct bhv_desc;
 struct xfs_buf;
@@ -341,7 +341,6 @@ typedef struct xfs_inode {
 #ifdef NOTYET
 	xfs_range_lock_t	i_range_lock;	/* range lock base */
 #endif /* NOTYET */
-	struct xfs_inode	**i_refcache;	/* ptr to entry in ref cache */
 	struct xfs_inode	*i_release;	/* inode to unref */
 
 	/* I/O state */

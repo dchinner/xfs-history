@@ -32,7 +32,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.53 $"
 
 struct bhv_desc;
 struct bmapval;
@@ -194,21 +194,6 @@ xfs_inval_cached_pages(
 	xfs_off_t			offset,
 	xfs_off_t			len,
 	void			*dio);
-
-void
-xfs_refcache_insert(
-	struct xfs_inode	*ip);
-
-void
-xfs_refcache_purge_ip(
-	struct xfs_inode	*ip);
-
-void
-xfs_refcache_purge_mp(
-	struct xfs_mount	*mp);
-
-void
-xfs_refcache_purge_some(void);
 
 int
 xfs_bioerror(struct xfs_buf *b);

@@ -31,9 +31,9 @@
  */
 /*
  *
- * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/linux/fs/xfs/linux/RCS/xfs_globals.c,v 1.13 2000/06/09 06:40:03 ananth Exp $
- * $Author: ananth $
- * $Id: xfs_globals.c,v 1.13 2000/06/09 06:40:03 ananth Exp $
+ * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/.RCS/PL/linux/fs/xfs/linux/RCS/xfs_globals.c,v 1.14 2000/06/15 03:01:24 nathans Exp $
+ * $Author: nathans $
+ * $Id: xfs_globals.c,v 1.14 2000/06/15 03:01:24 nathans Exp $
  *
  * Revision 1.12  2000/06/09 02:50:02  kenmcd
  * Updated copyright and license notices, ready for open source release
@@ -52,7 +52,6 @@
 #include <sys/vfs.h>
 #include <linux/xfs_cred.h>
 
-int    		xfs_refcache_percent = 100;
 int		mac_enabled = 0;
 int		acl_enabled = 0;
 int		ncsize = 792;

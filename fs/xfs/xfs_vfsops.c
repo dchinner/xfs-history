@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.268 $"
 
 #include <xfs_os_defs.h>
 
@@ -227,11 +227,7 @@ int
 xfs_init(int	fstype)
 {
 	extern void	xfs_init_procfs(void);
-	extern mutex_t	xfs_refcache_lock;
-	extern int	xfs_refcache_size;
 	extern int	ncsize;
-	extern int	xfs_refcache_percent;
-	extern xfs_inode_t	**xfs_refcache;
 	extern xfs_zone_t	*xfs_da_state_zone;
 	extern xfs_zone_t	*xfs_bmap_free_item_zone;
 	extern xfs_zone_t	*xfs_btree_cur_zone;
@@ -274,19 +270,6 @@ xfs_init(int	fstype)
 	mutex_init(&xfs_ancestormon, MUTEX_DEFAULT, "xfs_ancestor");
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
 	spinlock_init(&xfsd_lock, "xfsd");
-
-	/*
-	 * Initialize the inode reference cache.
-	 * Enforce (completely arbitrary) miminum size of 100.
-	 */
-	if (ncsize == 0) {
-		xfs_refcache_size = 100;
-	} else {
-		xfs_refcache_size = (ncsize * xfs_refcache_percent) / 100;
-
-		if (xfs_refcache_size < 100)
-			xfs_refcache_size = 100;
-	}
 #endif	/* !SIM */
 
 	/*
@@ -1209,12 +1192,6 @@ xfs_unmount(
 					0 : DM_FLAGS_UNWANTED;
 	}
 #endif
-
-	/*
-	 * First blow any referenced inode from this file system
-	 * out of the reference cache.
-	 */
-	xfs_refcache_purge_mp(mp);
 
 	/*
 	 * Make sure there are no active users.
@@ -2168,15 +2145,6 @@ xfs_syncsub(
 		if (error) {
 			last_error = error;
 		}
-	}
-
-	/*
-	 * If this is the 30 second sync, then kick some entries out of
-	 * the reference cache.  This ensures that idle entries are
-	 * eventually kicked out of the cache.
-	 */
-	if (flags & SYNC_BDFLUSH) {
-		xfs_refcache_purge_some();
 	}
 
 	/*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.23 $"
 
 #include <xfs_os_defs.h>
 
@@ -1297,9 +1297,6 @@ xfs_rename(
 	 */
 	error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES, NULL);
 	if (target_ip != NULL) {
-#ifndef SIM
-		xfs_refcache_purge_ip(target_ip);
-#endif
 		IRELE(target_ip);
 	}
 	/*
