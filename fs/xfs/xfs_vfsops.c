@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.187 $"
+#ident  "$Revision: 1.188 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -901,8 +901,8 @@ xfs_mount(
 		if (error == 0) {
 			bhv_desc_t	*mbdp, *rootbdp;
 
-			mbdp = bhv_lookup_unlocked(VN_BHV_HEAD(mvp), &xfs_vnodeops);
-			rootbdp = bhv_lookup_unlocked(VN_BHV_HEAD(rootvp), &xfs_vnodeops);
+			mbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(mvp), &xfs_vnodeops);
+			rootbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rootvp), &xfs_vnodeops);
 			VN_RELE(rootvp);
 			error = dm_send_mount_event(vfsp, DM_RIGHT_NULL,
 						mbdp, DM_RIGHT_NULL,
