@@ -540,6 +540,11 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	*nbmaps = filled_bmaps;
 	for (x = 0; x < filled_bmaps; x++) {
 		curr_bmapp = &bmapp[x];
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			curr_bmapp->pbdev = mp->m_rtdev;
+		} else {
+			curr_bmapp->pbdev = mp->m_dev;
+		}
 		curr_bmapp->offset = xfs_fsb_to_bb(sbp, curr_bmapp->offset);
 		curr_bmapp->length = xfs_fsb_to_bb(sbp, curr_bmapp->length);
 		if (curr_bmapp->bn != -1) {
@@ -1121,6 +1126,11 @@ xfs_iomap_write(xfs_inode_t	*ip,
 	*nbmaps = filled_bmaps;
 	for (x = 0; x < filled_bmaps; x++) {
 		curr_bmapp = &bmapp[x];
+		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			curr_bmapp->pbdev = mp->m_rtdev;
+		} else {
+			curr_bmapp->pbdev = mp->m_dev;
+		}
 		curr_bmapp->offset = xfs_fsb_to_bb(sbp, curr_bmapp->offset);
 		curr_bmapp->length = xfs_fsb_to_bb(sbp, curr_bmapp->length);
 		if (curr_bmapp->bn != -1) {
