@@ -1,4 +1,4 @@
-#ident "$Revision: 1.331 $"
+#ident "$Revision: 1.332 $"
 
 
 #ifdef SIM
@@ -5872,7 +5872,7 @@ xfs_error(
 #ifdef SIM
 
 vnodeops_t xfs_vnodeops = {
-	VNODE_POSITION_BASE,
+	BHV_IDENTITY_INIT_POSITION(VNODE_POSITION_BASE),
 	(vop_open_t)fs_noerr,
 	(vop_close_t)fs_nosys,
 	(vop_read_t)fs_nosys,
@@ -5925,7 +5925,7 @@ vnodeops_t xfs_vnodeops = {
 #else
 
 vnodeops_t xfs_vnodeops = {
-	VNODE_POSITION_BASE,
+	BHV_IDENTITY_INIT_POSITION(VNODE_POSITION_BASE),
 	xfs_open,
 	xfs_close,
 	xfs_read,
