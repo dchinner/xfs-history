@@ -5133,6 +5133,10 @@ xfs_reclaim(
 	vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
 	mrunlock(&ih->ih_lock);
 
+	if (!ip->i_update_core && (ip->i_itemp == NULL)) {
+		return xfs_finish_reclaim(ip, locked);
+	}
+
 	if (locked) {
 		xfs_ifunlock(ip);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
