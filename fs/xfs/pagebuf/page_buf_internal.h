@@ -47,7 +47,7 @@
 #define page_buffers(page)	((page)->buffers)
 #define page_has_buffers(page)	((page)->buffers)
 #endif
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,2)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,19)
 #define kdev_val(dev)		(unsigned)(dev)
 #endif
 
