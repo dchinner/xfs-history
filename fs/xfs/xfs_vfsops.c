@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.192 $"
+#ident  "$Revision: 1.193 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1329,7 +1329,7 @@ xfs_unmount(
 
 #ifndef SIM
 	if (vfsp->vfs_flag & VFS_DMI) {
-		bhv_desc_t	*rbdp = VNODE_TO_FIRST_BHV(rvp);
+		bhv_desc_t	*rbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rvp), &xfs_vnodeops);
 
 		error = dm_send_namesp_event(DM_EVENT_PREUNMOUNT,
 				rbdp, DM_RIGHT_NULL, rbdp, DM_RIGHT_NULL,
