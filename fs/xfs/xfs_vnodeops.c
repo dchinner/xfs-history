@@ -290,7 +290,7 @@ xfs_close(vnode_t	*vp,
 		}
 
 		for (i = 0 ; i < nofiles; i++ ) {
-			if ((fp = ufgetfast( i,nofiles, ufp) ) == 0){
+			if ((fp = ufgetfast( i,nofiles, ufp))) {
 				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
 					vpcount++;
 				}
