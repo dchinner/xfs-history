@@ -78,9 +78,6 @@ static struct super_operations linvfs_sops;
 #define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
 #define MNTOPT_RO       "ro"            /* read only */
 #define MNTOPT_RW       "rw"            /* read/write */
-#define MNTOPT_NOKIO    "nokio"         /* no kiobuf io */
-#define MNTOPT_KIO      "kio"           /* use kiobuf io */
-#define MNTOPT_KIOCLUSTER "kiocluster"  /* use kiobuf io - with clustering */
 
 STATIC int
 mountargs_xfs(
@@ -224,10 +221,6 @@ mountargs_xfs(
 			args->flags |= MS_RDONLY;
 		} else if (!strcmp(this_char, MNTOPT_NOSUID)) {
 			args->flags |= MS_NOSUID;
-		} else if (!strcmp(this_char, MNTOPT_KIO)) {
-			args->flags |= MS_KIOBUFIO;
-		} else if (!strcmp(this_char, MNTOPT_KIOCLUSTER)) {
-			args->flags |= MS_KIOBUFIO;
 		} else {
 			printk(
 			"mount: unknown mount option \"%s\".\n", this_char);
@@ -372,12 +365,6 @@ linvfs_read_super(
 	memset(args, 0, sizeof(struct xfs_args));
 	if (mountargs_xfs((char *)data, args) != 0) {
 		return NULL;
-	}
-	/* check to see if kio is suppose to be on for this mount */
-	if (args->flags & MS_KIOBUFIO){
-		sb->s_flags |= MS_KIOBUFIO;
-		printk("XFS (dev: %d/%d) mounting with kiobuf I/O\n",
-				MAJOR(sb->s_dev),MINOR(sb->s_dev));
 	}
 
 	args->fsname = uap->spec;
