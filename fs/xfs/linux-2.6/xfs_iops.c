@@ -117,6 +117,8 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 			VN_RELE(vp);
 			return -ENOMEM;
 		}
+		if (ISVDEV(tp))
+			ip->i_rdev = to_kdev_t(rdev);
 		linvfs_set_inode_ops(ip);
 		/* linvfs_revalidate_core returns (-) errors */
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
