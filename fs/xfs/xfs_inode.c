@@ -1,4 +1,4 @@
-#ident "$Revision: 1.230 $"
+#ident "$Revision: 1.231 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1114,9 +1114,9 @@ xfs_ialloc(
 	 * other vnode flags are not set.
 	 */
 	if (MANDLOCK(vp, ip->i_d.di_mode))
-		vp->v_flag |= VENF_LOCKING;	
+		VN_FLAGSET(vp, VENF_LOCKING);
 	else
-		vp->v_flag &= ~VENF_LOCKING;	
+		VN_FLAGCLR(vp, VENF_LOCKING);
 
 	ASSERT(!(vp->v_flag & (VNOSWAP |
 			       VISSWAP |
