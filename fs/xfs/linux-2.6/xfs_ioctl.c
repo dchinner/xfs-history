@@ -711,7 +711,7 @@ xfs_attrctl_by_handle(
 
 	/* call through to the vfs: note we know this is an XFS inode */
 	if (inode->i_op && inode->i_op->attrctl)
-		error = inode->i_op->attrctl(inode, ops, attr_hreq.count);
+		error = inode->i_op->attrctl(inode,(void*)ops,attr_hreq.count);
 
 	VN_RELE(vp);
 

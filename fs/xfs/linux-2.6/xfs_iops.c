@@ -70,28 +70,21 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 				enum vtype tp, int rdev)
 {
 	int		error = 0;
-	vnode_t		*dvp, *vp;
+	vnode_t		*dvp, *vp = NULL;
 	struct inode	*ip;
 	vattr_t		va;
-#ifdef CONFIG_FS_POSIX_ACL
-	struct acl	pdacl; /* parent default ACL */
-#endif
+	xfs_acl_t	pdacl; /* parent default ACL */
 	int		have_default_acl;
 
 	dvp = LINVFS_GET_VN_ADDRESS(dir);
 	ASSERT(dvp);
 
-	vp = NULL;
-
-
 	bzero(&va, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = tp;
 	have_default_acl = _ACL_GET_DEFAULT(dvp, &pdacl);
-        if (!have_default_acl) {
-	    mode &= ~current->fs->umask;
-	}
-			
+	if (!have_default_acl)
+		mode &= ~current->fs->umask;
 	va.va_mode = mode;	
 	va.va_size = 0;
 
@@ -136,8 +129,8 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	}
 
         if (!error && have_default_acl) {
-	    error = _ACL_INHERIT(vp, &va, &pdacl);
-	    VMODIFY(vp);
+		error = _ACL_INHERIT(vp, &va, &pdacl);
+		VMODIFY(vp);
         }
 
 	return -error;
@@ -474,12 +467,13 @@ int linvfs_follow_link(struct dentry *dentry,
  */
 int linvfs_attrctl(
 		   struct inode	*inode,
-		   attr_op_t	*ops,
+		   void		*oparray,
 		   int		count)
 {
 	int	i;
 	int	error = 0;
 	vnode_t	*vp;
+	attr_op_t *ops = (attr_op_t *)oparray;
 
 	for (i = 0; i < count; i++) {
 		int flags = ops[i].flags;
@@ -553,33 +547,31 @@ int linvfs_attrctl(
 
 int linvfs_acl_get(
 		struct dentry	*dentry,
-		struct acl	*acl,
-		struct acl	*dacl)
+		void		*acl,
+		void		*dacl)
 {
 	int	error = 0;
 	vnode_t	*vp;
 
 	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
 
-	VOP_ACL_GET(vp, acl, dacl, error);
-
+	VOP_ACL_GET(vp, (xfs_acl_t *)acl, (xfs_acl_t *)dacl, error);
 	return -error;
 }
 
 
 int linvfs_acl_set(
 		struct dentry	*dentry,
-		struct acl	*acl,
-		struct acl	*dacl)
+		void		*acl,
+		void		*dacl)
 {
 	int	error = 0;
 	vnode_t	*vp;
 
 	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
 
-	VOP_ACL_SET(vp, acl, dacl, error);
+	VOP_ACL_SET(vp, (xfs_acl_t *)acl, (xfs_acl_t *)dacl, error);
 	VMODIFY(vp);
-
 	return -error;
 }
 

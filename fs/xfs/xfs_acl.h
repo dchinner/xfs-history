@@ -29,8 +29,6 @@
  *
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-
-
 #ifndef __XFS_ACL_H__
 #define __XFS_ACL_H__
 
@@ -38,18 +36,18 @@ struct xfs_inode;
 struct vattr;
 struct vnode;
 
-extern int  xfs_acl_inherit(struct vnode *, struct vattr *, struct acl *);
+extern int  xfs_acl_inherit(struct vnode *, struct vattr *, xfs_acl_t *);
 extern int  xfs_acl_iaccess(struct xfs_inode *, mode_t, cred_t *);
-extern int  xfs_acl_get(struct vnode *, struct acl *, struct acl *);
-extern int  xfs_acl_set(struct vnode *, struct acl *, struct acl *);
-extern int  xfs_acl_vtoacl(vnode_t *, struct acl *, struct acl *);
+extern int  xfs_acl_get(struct vnode *, xfs_acl_t *, xfs_acl_t *);
+extern int  xfs_acl_set(struct vnode *, xfs_acl_t *, xfs_acl_t *);
+extern int  xfs_acl_vtoacl(vnode_t *, xfs_acl_t *, xfs_acl_t *);
 
 #ifdef CONFIG_FS_POSIX_ACL
 #define _ACL_INHERIT(c,v,d)	(xfs_acl_inherit(c,v,d))
 #define _ACL_GET_DEFAULT(pv,pd) (xfs_acl_vtoacl(pv,NULL,pd)==0)
 #define _ACL_XFS_IACCESS(a,b,c)	(xfs_acl_iaccess(a,b,c))
 #else
-#define _ACL_INHERIT(c,v,d)	(0)
+#define _ACL_INHERIT(c,v,d)	((void)d,0)
 #define _ACL_GET_DEFAULT(pv,pd) (0)
 #define _ACL_XFS_IACCESS(a,b,c)	(-1)
 #endif

@@ -178,6 +178,7 @@ union rval;
 struct attrlist_cursor_kern;
 struct file;
 struct page_buf_bmap_s;
+struct xfs_acl;
 
 typedef	int	(*vop_open_t)(bhv_desc_t *, vnode_t **, mode_t, struct cred *);
 typedef	int	(*vop_close_t)(bhv_desc_t *, int, lastclose_t, struct cred *);
@@ -239,8 +240,8 @@ typedef	int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int)
 typedef	void	(*vop_sethole_t)(bhv_desc_t *, void *, int, int, xfs_off_t);
 
 #ifdef CONFIG_FS_POSIX_ACL
-typedef int	(*vop_acl_get_t)(vnode_t *, struct acl *, struct acl *);
-typedef int	(*vop_acl_set_t)(vnode_t *, struct acl *, struct acl *);
+typedef int	(*vop_acl_get_t)(vnode_t *, struct xfs_acl *, struct xfs_acl *);
+typedef int	(*vop_acl_set_t)(vnode_t *, struct xfs_acl *, struct xfs_acl *);
 #endif
 
 
