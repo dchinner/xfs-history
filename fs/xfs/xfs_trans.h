@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.70 $"
+#ident "$Revision: 1.72 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -88,6 +88,7 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_ATTR_SET		22
 #define	XFS_TRANS_ATTR_RM		23
 #define	XFS_TRANS_ATTR_FLAG		24
+#define	XFS_TRANS_CLEAR_AGI_BUCKET	25
 
 
 typedef struct xfs_item_ops {
@@ -596,6 +597,13 @@ typedef struct xfs_trans {
 
 #define	XFS_ATTRFLAG_LOG_RES(mp)	((mp)->m_reservations.tr_rmattr)
 
+/*
+ * Clearing a bad agino number in an agi hash bucket.
+ */
+#define	XFS_CALC_CLEAR_AGI_BUCKET_LOG_RES(mp) \
+	((mp)->m_sb.sb_sectsize + 128)
+#define	XFS_CLEAR_AGI_BUCKET_LOG_RES(mp)  ((mp)->m_reservations.tr_clearagi)
+     
 /*
  * Various log count values.
  */
