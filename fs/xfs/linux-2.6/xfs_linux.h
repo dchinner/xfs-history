@@ -48,46 +48,6 @@
 #define STATIC
 #endif
 
-
-/*
- * Additional type declarations for XFS
- */
-
-typedef signed char	__int8_t;
-typedef unsigned char	__uint8_t;
-typedef signed short int	__int16_t;
-typedef unsigned short int	__uint16_t;
-typedef signed int	__int32_t;
-typedef unsigned int	__uint32_t;
-typedef signed long long int	__int64_t;
-typedef unsigned long long int	__uint64_t;
-
-/* POSIX Extensions */
-typedef unsigned char	uchar_t;
-typedef unsigned short	ushort_t;
-typedef unsigned int	uint_t;
-typedef unsigned long	ulong_t;
-
-typedef enum { B_FALSE, B_TRUE } boolean_t;
-
-typedef __int64_t	prid_t;		/* project ID */
-typedef	__uint32_t	inst_t;		/* an instruction */
-
-typedef __uint32_t	app32_ulong_t;
-typedef __uint32_t	app32_ptr_t;
-
-#if (BITS_PER_LONG == 32)
-#define XFS_64	0
-typedef __int64_t	sysarg_t;
-#elif (BITS_PER_LONG == 64)
-#define XFS_64	1
-typedef int		sysarg_t;
-#else
-#error BITS_PER_LONG must be 32 or 64
-#endif
-
-typedef struct timespec	timespec_t;
-
 typedef struct pathname {
 	char	*pn_path;	/* remaining pathname */
 	u_long	pn_hash;	/* last component's hash */
@@ -108,16 +68,6 @@ typedef struct statvfs {
 	char	f_basetype[16];	/* target fs type name, null-terminated */
 	char	f_fstr[32];	/* filesystem-specific string */
 } statvfs_t;
-
-typedef __u64	xfs_off_t;
-typedef __s32	xfs32_off_t;
-typedef __u64	xfs_ino_t;	/* <inode> type */
-typedef __s64	xfs_daddr_t;	/* <disk address> type */
-typedef char *	xfs_caddr_t;	/* <core address> type */
-typedef off_t	linux_off_t;
-typedef __kernel_ino_t	linux_ino_t;
-typedef __uint32_t	xfs_dev_t;
-
 
 #define _PAGESZ		PAGE_SIZE
 #define NBPP		PAGE_SIZE 
@@ -209,13 +159,6 @@ typedef __uint32_t	xfs_dev_t;
 #define btoc(x)         (((__psunsigned_t)(x)+(NBPC-1))/NBPC)
 #endif
 
-
-#define bzero(p,s)	memset((p), 0, (s))
-#define bcopy(s,d,n)	memcpy((d),(s),(n))
-#define bcmp(s1,s2,l)	memcmp(s1,s2,l)    
-#define ovbcopy(from,to,count)	memmove(to,from,count)
-
-
 #ifndef CELL_CAPABLE
 #define CELL_ONLY(x)
 #define CELL_NOT(x)	(x)
@@ -276,21 +219,7 @@ typedef __uint32_t	xfs_dev_t;
 
 struct xfs_args;
 extern int  mountargs_xfs (char *, struct xfs_args *);
-extern void qsort(void *, size_t, size_t, int (*)(const void *, const void *));
 extern void xfs_cleanup(void);
-
-
-static inline void delay(long ticks)
-{
-        current->state = TASK_UNINTERRUPTIBLE;
-        schedule_timeout(ticks);
-}
-
-static inline void nanotime(timespec_t *tvp)
-{
-        tvp->tv_sec = xtime.tv_sec;
-        tvp->tv_nsec = xtime.tv_usec * 1000;
-}
 
 /* Move the kernel do_div definition off to one side */
 static inline __u32 xfs_do_div(void *a, __u32 b, int n)

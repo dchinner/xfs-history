@@ -32,31 +32,28 @@
 #ifndef __XFS_H__
 #define __XFS_H__
 
+#include <support/support.h>
+
 #include <linux/xfs_linux.h>
-#include <xfs_arch.h>
 
 #include <linux/fs.h>
 #include <linux/xfs_fs.h>
-#include <linux/xfs_sema.h>
-#include <linux/xfs_debug.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <linux/stat.h>
 #include <linux/xfs_cred.h>
-#include <linux/xfs_uuid.h>
 #include <linux/page_buf.h>
 #include <linux/file.h>
 #include <linux/attributes.h>
 
 #include <xfs_buf.h>
 #include <linux/xqm.h>
-#include <linux/xfs_random.h>
+#include <linux/xfs_stats.h>
 #include <linux/xfs_globals.h>
 #include <linux/xfs_behavior.h>
 #include <linux/xfs_vfs.h>
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_fs_subr.h>
-#include <linux/xfs_move.h>
 #include <pseudo-inc/sys/dirent.h>
 #include <pseudo-inc/sys/acl.h>
 #include <pseudo-inc/sys/kabi.h>

@@ -40,7 +40,7 @@
 
 # EXTRA_MKDEP_OPTIONS = -v
 
-EXTRA_FIND_DIRECTORIES = linux
+EXTRA_FIND_DIRECTORIES = linux support
 ifeq ($(CONFIG_XFS_GRIO),y)
 #	EXTRA_FIND_DIRECTORIES += grio
 endif
@@ -60,7 +60,7 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
 endif
 
-ALL_SUB_DIRS=linux
+ALL_SUB_DIRS=linux support
 SUB_DIRS=linux
 ifeq ($(CONFIG_XFS_GRIO),y)
 #	ALL_SUB_DIRS += grio
@@ -69,6 +69,14 @@ endif
 ifeq ($(CONFIG_XFS_DMAPI),y)
 	ALL_SUB_DIRS += dmapi
 	SUB_DIRS += dmapi
+endif
+
+ifeq ($(CONFIG_XFS_SUPPORT),y)
+	SUB_DIRS += support
+else
+	ifeq ($(CONFIG_XFS_SUPPORT),m)
+		MOD_SUB_DIRS += support
+	endif
 endif
 
 O_TARGET := xfs.o
@@ -156,6 +164,9 @@ XFS_OBJS  :=    $(XFS_GRIO_OBJS) \
 O_OBJS :=  $(XFS_OBJS) 
 
 O_OBJS += linux/linux_xfs.o
+ifeq ($(CONFIG_XFS_SUPPORT),y)
+	O_OBJS += support/xfs_support.o
+endif
 
 include $(TOPDIR)/Rules.make
 
