@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.95 $"
+#ident "$Revision: 1.96 $"
 
 struct buf;
 struct buftarg;
@@ -347,6 +347,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_PERM_LOG_RES	0x04	/* xact took a permanent log res */
 #define	XFS_TRANS_SYNC		0x08	/* make commit synchronous */
 #define XFS_TRANS_DQ_DIRTY	0x10	/* at least one dquot in trx dirty */
+#define XFS_TRANS_RESERVE   0x20    /* OK to use reserved data blocks */
 
 /*
  * Values for call flags parameter.
