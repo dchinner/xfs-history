@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.27 $"
 
 /*
  * Free space allocation for xFS.
@@ -1528,11 +1528,9 @@ xfs_alloc_newroot(
 		return 0;
 	}
 	xfs_trans_agbtree_delta(cur->bc_tp, 1);
-	error = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp, 
-			cur->bc_private.a.agno, nbno, 0, &nbp);
-	if (error) {
-		return error;
-	}
+	nbp = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp, 
+			cur->bc_private.a.agno, nbno, 0);
+
 	new = XFS_BUF_TO_ALLOC_BLOCK(nbp);
 	/*
 	 * Set the root data in the a.g. freespace structure.
@@ -1927,11 +1925,9 @@ xfs_alloc_split(
 		return 0;
 	}
 	xfs_trans_agbtree_delta(cur->bc_tp, 1);
-	error = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.a.agno, rbno, 0, &rbp);
-	if (error) {
-		return error;
-	}
+	rbp = xfs_btree_get_bufs(cur->bc_mp, cur->bc_tp,
+			cur->bc_private.a.agno, rbno, 0);
+
 	/*
 	 * Set up the new block as "right".
 	 */
