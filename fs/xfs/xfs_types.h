@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 /*
  * XFS types
@@ -11,8 +11,8 @@
  * Some types are conditional based on the selected configuration.
  * Set XFS_BIG_FILES=1 or 0 and XFS_BIG_FILESYSTEMS=1 or 0 depending
  * on the desired configuration.
- * XFS_BIG_FILES needs pgno_t to be 64 bits.
- * XFS_BIG_FILESYSTEMS needs daddr_t to be 64 bits.
+ * XFS_BIG_FILES needs pgno_t to be 64 bits (64-bit kernels).
+ * XFS_BIG_FILESYSTEMS needs daddr_t to be 64 bits (N32 and 64-bit kernels).
  *
  * Expect these to be set from klocaldefs, or from the machine-type
  * defs files for the normal case.
@@ -27,7 +27,7 @@
 #endif
 
 #ifndef XFS_BIG_FILESYSTEMS
-#if _MIPS_SIM == _ABI64
+#if _MIPS_SIM == _ABI64 || _MIPS_SIM == _ABIN32
 #define	XFS_BIG_FILESYSTEMS	1
 #else
 #define	XFS_BIG_FILESYSTEMS	0
