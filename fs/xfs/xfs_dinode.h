@@ -353,8 +353,11 @@ xfs_dinode_t *xfs_buf_to_dinode(struct buf *bp);
  */
 #define XFS_DIFLAG_REALTIME_BIT	0	/* file's blocks come from rt area */
 #define XFS_DIFLAG_PREALLOC_BIT	1	/* file space has been preallocated */
+#define	XFS_DIFLAG_NEWRTBM_BIT	2	/* for rtbitmap inode, new format */
 #define XFS_DIFLAG_REALTIME     (1 << XFS_DIFLAG_REALTIME_BIT)
 #define XFS_DIFLAG_PREALLOC	(1 << XFS_DIFLAG_PREALLOC_BIT)
-#define XFS_DIFLAG_ALL  (XFS_DIFLAG_REALTIME|XFS_DIFLAG_PREALLOC)
+#define	XFS_DIFLAG_NEWRTBM	(1 << XFS_DIFLAG_NEWRTBM_BIT)
+#define XFS_DIFLAG_ALL  \
+	(XFS_DIFLAG_REALTIME|XFS_DIFLAG_PREALLOC|XFS_DIFLAG_NEWRTBM)
 
 #endif	/* _FS_XFS_DINODE_H */

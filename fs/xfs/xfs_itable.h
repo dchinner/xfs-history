@@ -52,6 +52,7 @@ typedef struct xfs_bstat
  */
 #define XFS_XFLAG_REALTIME	0x1
 #define	XFS_XFLAG_PREALLOC	0x2
+				/* no XFLAG for NEWRTBM */
 #define	XFS_XFLAG_HASATTR	0x80000000	/* no DIFLAG for this */
 #define XFS_XFLAG_ALL		\
 	( XFS_XFLAG_REALTIME|XFS_XFLAG_PREALLOC|XFS_XFLAG_HASATTR )
