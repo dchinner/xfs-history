@@ -464,6 +464,29 @@ xfs_open_by_handle(
 
 
 int
+xfs_fssetdm_by_handle(
+	unsigned int	cmd,
+	unsigned long	arg,
+	struct file	*filp,
+	struct inode	*inode,
+	vfs_t		*vfsp,
+	xfs_mount_t	*mp)
+{
+#ifdef CONFIG_XFS_DMAPI
+
+	/*
+	 * Need some code in here - xfsrestore does this by handle.
+	 * I'm too busy =) + Dean knows much more about this anyway.
+	 */
+	return -EBUSY;
+
+#else	/* !CONFIG_XFS_DMAPI */
+	return -ENOSYS;
+#endif	/* CONFIG_XFS_DMAPI */
+}
+
+
+int
 xfs_readlink_by_handle(
 	unsigned int	cmd,
 	unsigned long	arg,
@@ -1083,7 +1106,6 @@ xfs_ioctl(
 		struct	getbmap		bm;
 		int			iflags;
 
-
 		if (copy_from_user(&bmx, (struct getbmapx *)arg,
 						sizeof(struct getbmapx)))
 			return -XFS_ERROR(EFAULT);
@@ -1119,7 +1141,7 @@ xfs_ioctl(
 
 	case XFS_IOC_PATH_TO_FSHANDLE:
 	case XFS_IOC_FD_TO_HANDLE:
-	case XFS_IOC_PATH_TO_HANDLE: {
+	case XFS_IOC_PATH_TO_HANDLE:
 		/*
 		 * XFS_IOC_PATH_TO_FSHANDLE 
                  *    returns fs handle for a mount point or path within
@@ -1130,41 +1152,31 @@ xfs_ioctl(
                  *    returns full handle for a path
 		 */
 		return xfs_find_handle(cmd, arg);
-	}
 
-	case XFS_IOC_OPEN_BY_HANDLE: {
-
+	case XFS_IOC_OPEN_BY_HANDLE:
 		return xfs_open_by_handle(cmd, arg, filp, inode, vfsp, mp);
-	}
 
-	case XFS_IOC_READLINK_BY_HANDLE: {
+	case XFS_IOC_FSSETDM_BY_HANDLE:
+		return xfs_fssetdm_by_handle(cmd, arg, filp, inode, vfsp, mp);
 
+	case XFS_IOC_READLINK_BY_HANDLE:
 		return xfs_readlink_by_handle(cmd, arg, filp, inode, vfsp, mp);
-	}
 
-	case XFS_IOC_ATTRCTL_BY_HANDLE: {
-
+	case XFS_IOC_ATTRCTL_BY_HANDLE:
 		return xfs_attrctl_by_handle(cmd, arg, filp, inode, vfsp, mp);
-	}
 
-	case XFS_IOC_SWAPEXT: {
-
+	case XFS_IOC_SWAPEXT:
                 error = xfs_swapext((struct xfs_swapext *)arg);
 
 		if (error)
 			return -error;
 		return 0;
 
-	}
-
-	case XFS_IOC_GETFSUUID: {
-
+	case XFS_IOC_GETFSUUID:
 		if (copy_to_user((char *)arg, (char *)&mp->m_sb.sb_uuid,
 						sizeof(uuid_t)))
                     	return -XFS_ERROR(EFAULT);
-                        
                 return 0;
-	}
         
         case XFS_IOC_FSCOUNTS: {
                 xfs_fsop_counts_t out;
@@ -1261,8 +1273,7 @@ xfs_ioctl(
 		return 0;
 	}
 
-	case XFS_IOC_FREEZE: {
-
+	case XFS_IOC_FREEZE:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
@@ -1291,21 +1302,19 @@ xfs_ioctl(
 		xfs_log_unmount_write(mp);
 		xfs_unmountfs_writesb(mp);
 		return 0;
-	}
 
-	case XFS_IOC_THAW: {
-
+	case XFS_IOC_THAW:
 		if (!capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
 		xfs_unmountfs_writesb(mp);
 		xfs_finish_freeze(mp);
 		return 0;
-	}
 
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 	case XFS_IOC_ERROR_INJECTION: {
 		xfs_error_injection_t in;
+
 		error = copy_from_user(&in, (char *)arg, sizeof(xfs_error_injection_t));
 		if (error) {
 			return -error;
@@ -1317,10 +1326,9 @@ xfs_ioctl(
 		return 0;
 	}
 
-	case XFS_IOC_ERROR_CLEARALL: {
-			error = xfs_errortag_clearall(mp);
-			return -error;
-	}
+	case XFS_IOC_ERROR_CLEARALL:
+		error = xfs_errortag_clearall(mp);
+		return -error;
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
 	default: 
