@@ -2,13 +2,13 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.14 $
+# $Revision: 1.15 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
 .PATH:$(KPATH)
 
-KCOPTS=-fullwarn
+KCOPTS=-fullwarn -g
 
 XFS_NAME=xfs.a
 XFS_CSRCS=	byte_to_bits.c \
