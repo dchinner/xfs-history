@@ -61,10 +61,10 @@ typedef struct xfs_range_lock {
 typedef struct xfs_ifork {
 	int			if_bytes; 	/* bytes in if_u1 */
 	int			if_real_bytes;	/* bytes allocated in if_u1 */
-	int			if_broot_bytes;	/* bytes allocated for root */
 	xfs_bmbt_block_t	*if_broot;	/* file's incore btree root */
-	__uint16_t		if_flags;	/* per-fork flags */
-	__uint16_t		if_ext_max;	/* max # of extent records */
+	short			if_broot_bytes;	/* bytes allocated for root */
+	unsigned char		if_flags;	/* per-fork flags */
+	unsigned char		if_ext_max;	/* max # of extent records */
 	xfs_extnum_t		if_lastex;	/* last if_extents used */
 	union {
 		xfs_bmbt_rec_t	*if_extents;	/* linear map file exts */
@@ -105,6 +105,10 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
 
+	/* Extent information. */
+	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
+	xfs_ifork_t		i_df;		/* data fork */
+
 	/* Inode location stuff */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
 	daddr_t			i_blkno;	/* blkno of inode buffer */
@@ -114,7 +118,7 @@ typedef struct xfs_inode {
 
 	/* Transaction and locking information. */
 	struct xfs_trans	*i_transp;	/* ptr to owning transaction*/
-	xfs_inode_log_item_t	i_item;		/* logging information */
+	xfs_inode_log_item_t	*i_itemp;	/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
 	mrlock_t		i_iolock;	/* inode IO lock */
 	sema_t			i_flock;	/* inode flush lock */
@@ -129,27 +133,19 @@ typedef struct xfs_inode {
 	/* I/O state */
 	off_t			i_next_offset;	/* seq read detector */
 	off_t			i_io_offset;	/* last buf offset */
-	xfs_fileoff_t		i_reada_blkno;	/* next blk to start ra */
-	unsigned int		i_io_size;	/* file io buffer len */
-	unsigned int		i_last_req_sz;	/* last read size */
-	unsigned int		i_num_readaheads; /* # read ahead bufs */
 	xfs_fsize_t		i_new_size;	/* sz when write completes */
 	off_t			i_write_offset;	/* start off of curr write */
+	xfs_fileoff_t		i_reada_blkno;	/* next blk to start ra */
 	struct xfs_gap		*i_gap_list;	/* hole list in write range */
+	unsigned int		i_io_size;	/* file io buffer len */
+	unsigned int		i_last_req_sz;	/* last read size */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
 	unsigned short		i_update_core;	/* timestamps are dirty */
+	int			i_queued_bufs;	/* count of xfsd queued bufs*/
 	unsigned int		i_gen;		/* generation count */
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
-	int			i_queued_bufs;	/* count of xfsd queued bufs*/
-
-	/* Extent information. */
-	xfs_ifork_t		i_df;		/* data fork */
-	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
-
-	/* DMI state */
-	unsigned int		i_dmevents;	/* events enabled on file */
 
 	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
 
@@ -231,7 +227,7 @@ typedef struct xfs_inode {
 #define	XFS_IMAP_LOOKUP		0x1
 
 /*
- * Maximum number of extent pointers in i_u1.iu_extents.
+ * Maximum number of extent pointers in if_u1.if_extents.
  */
 #define	XFS_MAX_INCORE_EXTENTS	32768
 
@@ -261,13 +257,7 @@ typedef struct xfs_inode {
 		ip->i_io_offset = 0;		\
 		ip->i_reada_blkno = 0;		\
 		ip->i_io_size = 0;		\
-		ip->i_last_req_sz = 0;		\
-		ip->i_num_readaheads = 0; }
-     
-/*
- * Value for inode buffers' b_ref field.
- */
-#define XFS_INO_REF	1
+		ip->i_last_req_sz = 0; }
 
 /*
  * XFS file identifier.
@@ -357,5 +347,6 @@ int		xfs_fast_fid(struct vnode *, xfs_fid_t *);
 extern int		xfs_do_fast_fid;
 extern struct zone	*xfs_ifork_zone;
 extern struct zone	*xfs_inode_zone;
+extern struct zone	*xfs_ili_zone;
 
 #endif	/* _XFS_INODE_H */
