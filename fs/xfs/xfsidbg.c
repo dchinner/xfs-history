@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.48 $"
+#ident	"$Revision: 1.49 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -366,6 +366,7 @@ static void xfs_dastate_path(xfs_da_state_path_t *p);
 #ifdef DEBUG
 static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
 #endif
+static void xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary);
 static void xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary);
 static void xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary);
 static char *xfs_fmtformat(xfs_dinode_fmt_t f);
@@ -383,6 +384,7 @@ static void xfs_iomap_map_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_prdinode(xfs_dinode_t *di, int coreonly);
 static void xfs_prdinode_core(xfs_dinode_core_t *dip);
+static void xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
 #ifdef DEBUG
 static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
 static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
@@ -1246,6 +1248,30 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		ilip->ili_format.ilf_blkno,
 		ilip->ili_format.ilf_len,
 		ilip->ili_format.ilf_boffset);
+}
+
+/*
+ * Print a dquot log item.
+ */
+/* ARGSUSED */
+static void
+xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary)
+{
+	qprintf("dquot 0x%x\n",
+		lip->qli_dquot);
+
+}
+
+/*
+ * Print a quotaoff log item.
+ */
+/* ARGSUSED */
+static void
+xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary)
+{
+	qprintf("start qoff item 0x%x flags 0x%x\n",
+		lip->qql_start_lip, lip->qql_format.qf_flags);
+
 }
 
 /*
@@ -3500,6 +3526,9 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		&dqp->q_flock, 
 		(valusema(&dqp->q_flock) <= 0) ? "LCK" : "UNLKD",
 		dqp->q_pincount);
+#ifdef DQUOT_TRACING
+	qprintf("dqtrace 0x%x\n", dqp->q_trace);
+#endif
 	qprintf("disk-dquot 0x%x\n", &dqp->q_core);
 	xfsidbg_xqm_diskdq(&dqp->q_core);
 	
@@ -3548,9 +3577,7 @@ xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title)
 	xfs_dquot_t *dq;
 	int i = 0;
 	qprintf("%s (#%d)\n", title, (int) qlist->qh_nelems);		
-	for (dq = qlist->qh_next;
-	     dq != (xfs_dquot_t *)qlist;
-	     dq = dq->dq_flnext) {
+	FOREACH_DQUOT_IN_FREELIST(dq, qlist) {
 		qprintf("\t%d.\t\"%d (%s:0x%x)\"\t bcnt = %d, icnt = %d "
 		       "refs = %d\n",  
 		       ++i, (int) dq->q_core.d_id,
@@ -3614,8 +3641,6 @@ xfsidbg_xqm_htab(void)
 static int
 xfsidbg_xqm_pr_dqentry(ktrace_entry_t *ktep)
 {
-	qprintf("Dquot Tracing disabled\n");
-
 	static char *xdq_flags[] = {
 		"USR",		/* 0x1 */
 		"PRJ",		/* 0x2 */
