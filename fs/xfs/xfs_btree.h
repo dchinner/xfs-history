@@ -85,10 +85,12 @@ extern __uint32_t	xfs_magics[];
 
 /*
  * Maximum and minimum records in a btree block.
- * Given block size, type prefix, and leaf flag.
+ * Given block size, type prefix, and leaf flag (0 or 1).
+ * The divisor below is equivalent to lf ? (e1) : (e2) but that produces
+ * compiler warnings.
  */
 #define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf)	\
-	((((int)(bsz)) - (int)(sizeof(t ## _block_t))) / ((lf) ? sizeof(t ## _rec_t) : (sizeof(t ## _key_t) + sizeof(t ## _ptr_t))))
+	((((int)(bsz)) - (int)(sizeof(t ## _block_t))) / (((lf) * sizeof(t ## _rec_t)) + ((1 - (lf)) * (sizeof(t ## _key_t) + sizeof(t ## _ptr_t)))))
 #define	XFS_BTREE_BLOCK_MINRECS(bsz,t,lf)	\
 	(XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf) / 2)
 
