@@ -267,7 +267,7 @@ xfs_attr_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 	xfs_da_args_t args;
 	char *tmpbuffer;
 	int error, i, size;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	buf_t *bp;
 	xfs_ifork_t *ifp;
 
@@ -498,7 +498,7 @@ xfs_attr_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_da_intnode_t *node;
 	xfs_inode_t *dp;
 	buf_t *bp1, *bp2;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	int error;
 
 	dp = args->dp;
@@ -543,7 +543,7 @@ xfs_attr_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
  * or a leaf in a node attribute list.
  */
 int
-xfs_attr_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t blkno,
+xfs_attr_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t blkno,
 				 buf_t **bpp)
 {
 	xfs_attr_leafblock_t *leaf;
@@ -578,7 +578,7 @@ int
 xfs_attr_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 				   xfs_da_state_blk_t *newblk)
 {
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	int error;
 
 	/*
@@ -1135,7 +1135,7 @@ xfs_attr_leaf_toosmall(xfs_da_state_t *state, int *action)
 	xfs_da_state_blk_t *blk;
 	xfs_da_blkinfo_t *info;
 	int count, bytes, forward, error, retval, i;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	buf_t *bp;
 
 	/*
@@ -1505,7 +1505,7 @@ xfs_attr_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args)
 	xfs_attr_leaf_name_local_t *name_loc;
 	xfs_attr_leaf_name_remote_t *name_rmt;
 	int probe, span;
-	uint hashval;
+	xfs_dahash_t hashval;
 
 	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
@@ -2468,13 +2468,14 @@ xfs_attr_leaf_inactive(xfs_inode_t *dp, buf_t *bp)
  * invalidate any buffers that happen to be incore.
  */
 int
-xfs_attr_leaf_freextent(xfs_inode_t *dp, int blkno, int blkcnt)
+xfs_attr_leaf_freextent(xfs_inode_t *dp, xfs_dablk_t blkno, int blkcnt)
 {
 	xfs_bmbt_irec_t map;
 	xfs_fsblock_t firstblock;
 	xfs_bmap_free_t flist;
 	xfs_trans_t *trans;
-	int tblkno, tblkcnt, dblkcnt, nmap, done, error, committed;
+	xfs_dablk_t tblkno;
+	int tblkcnt, dblkcnt, nmap, done, error, committed;
 	daddr_t dblkno;
 	buf_t *bp;
 
@@ -2490,7 +2491,7 @@ xfs_attr_leaf_freextent(xfs_inode_t *dp, int blkno, int blkcnt)
 		 */
 		XFS_BMAP_INIT(&flist, &firstblock);
 		nmap = 1;
-		error = xfs_bmapi(NULL, dp, tblkno, tblkcnt,
+		error = xfs_bmapi(NULL, dp, (xfs_fileoff_t)tblkno, tblkcnt,
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
 					&firstblock, 0, &map, &nmap, &flist);
 		if (error)
