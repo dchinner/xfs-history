@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.218 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3945,6 +3945,13 @@ xfs_bmap_check_swappable(
 	int		retval = 0;		/* return value */
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+
+	/*
+	 * Check for a zero length file.
+	 */
+	if (ip->i_d.di_size == 0)
+		goto check_done;
+
 	ASSERT(XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_BTREE ||
 	       XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_EXTENTS);
 
@@ -5290,7 +5297,7 @@ xfs_getbmap(
 	for (error = i = 0; i < nmap && bmv->bmv_length; i++) {
 		oflags = 0;
 		out.bmv_offset = XFS_FSB_TO_BB(mp, map[i].br_startoff);
-		if (!ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		if (!(ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
 			out.bmv_length = 
 				XFS_FSB_TO_BB(mp, map[i].br_blockcount);
 		} else {		/* realtime extent allocation */
