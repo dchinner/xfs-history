@@ -927,8 +927,14 @@ xfs_mountfs(
 	if (needquotamount) {
 		ASSERT(mp->m_qflags == 0);
 		mp->m_qflags = quotaflags; 
+		rootqcheck = ((XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) &&
+				mp->m_dev == rootdev && needquotacheck);
+		if (rootqcheck && (error = xfs_quotacheck_read_only(mp)))
+			goto error2;
 		if (xfs_qm_mount_quotas(mp))
 			xfs_mount_reset_sbqflags(mp);
+		if (rootqcheck)
+			XFS_MTOVFS(mp)->vfs_flag |= VFS_RDONLY;
 	}
 
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
