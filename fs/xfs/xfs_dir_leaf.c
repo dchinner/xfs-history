@@ -1,4 +1,4 @@
-#ident "$Revision: 1.64 $"
+#ident "$Revision: 1.65 $"
 
 /*
  * xfs_dir_leaf.c
@@ -2180,7 +2180,17 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 	idbp->d_off = pa->cook.o;
 	idbp->d_name[namelen] = '\0';
 	bcopy(pa->name, idbp->d_name, namelen);
+#ifndef __linux__
 	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+#else
+	/* Just call filldir to do all the work. */
+	if (!uio->uio_copy) {
+		panic("XFS: xfs_dir_put_dirent32_uio: no copy routine in %x uio\n",
+			uio);
+	}
+	retval = uio->uio_copy((void *)uio->uio_iov->iov_base, 
+		idbp->d_name, namelen, idbp->d_off, idbp->d_ino);
+#endif
 	pa->done = (retval == 0);
 	return retval;
 }
@@ -2240,7 +2250,17 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
 	idbp->d_off = pa->cook.o;
 	idbp->d_name[namelen] = '\0';
 	bcopy(pa->name, idbp->d_name, namelen);
+#ifndef __linux__
 	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+#else
+	/* Just call filldir to do all the work. */
+	if (!uio->uio_copy) {
+		panic("XFS: xfs_dir_put_dirent64_uio: no copy routine in %x uio\n",
+			uio);
+	}
+	retval = uio->uio_copy((void *)uio->uio_iov->iov_base, 
+		idbp->d_name, namelen, idbp->d_off, idbp->d_ino);
+#endif
 	pa->done = (retval == 0);
 	return retval;
 }

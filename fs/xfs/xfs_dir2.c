@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
  * XFS v2 directory implmentation.
@@ -936,6 +936,7 @@ xfs_dir2_put_dirent32_uio(
 	namelen = pa->namelen;
 	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
+#ifndef __linux__
 	/*
 	 * Won't fit in the remaining space.
 	 */
@@ -944,13 +945,25 @@ xfs_dir2_put_dirent32_uio(
 		pa->done = 0;
 		return 0;
 	}
+
+#endif
 	idbp = (irix5_dirent_t *)pa->dbp;
 	idbp->d_reclen = reclen;
 	idbp->d_ino = pa->ino;
 	idbp->d_off = pa->cook;
 	idbp->d_name[namelen] = '\0';
 	bcopy(pa->name, idbp->d_name, namelen);
+#ifndef __linux__
 	rval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+#else
+	/* Just call filldir to do all the work. */
+	if (!uio->uio_copy) {
+		panic("XFS: xfs_dir2_put_dirent32_uio: no copy routine in %x uio\n",
+			uio);
+	}
+	rval = uio->uio_copy((void *)uio->uio_iov->iov_base, 
+		idbp->d_name, namelen, idbp->d_off, idbp->d_ino);
+#endif
 	pa->done = (rval == 0);
 	return rval;
 }
@@ -1023,7 +1036,17 @@ xfs_dir2_put_dirent64_uio(
 	idbp->d_off = pa->cook;
 	idbp->d_name[namelen] = '\0';
 	bcopy(pa->name, idbp->d_name, namelen);
+#ifndef __linux__
 	rval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+#else
+	/* Just call filldir to do all the work. */
+	if (!uio->uio_copy) {
+		panic("XFS: xfs_dir2_put_dirent64_uio: no copy routine in %x uio\n",
+			uio);
+	}
+	rval = uio->uio_copy((void *)uio->uio_iov->iov_base, 
+		idbp->d_name, namelen, idbp->d_off, idbp->d_ino);
+#endif
 	pa->done = (rval == 0);
 	return rval;
 }
