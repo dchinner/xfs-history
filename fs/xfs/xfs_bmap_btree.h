@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.32 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -376,6 +376,7 @@ xfs_bmbt_decrement(
 int
 xfs_bmbt_delete(
 	struct xfs_btree_cur *,
+	int,
 	int *);	       
 
 void
