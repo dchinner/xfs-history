@@ -1,6 +1,6 @@
 #ifndef __XFS_QUOTA_H__
 #define __XFS_QUOTA_H__
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.4 $"
 /*
  * External Interface to the XFS disk quota subsystem.
  */
@@ -110,6 +110,11 @@ typedef __uint16_t      xfs_qwarncnt_t;
 #define XFS_PROC_PROJID(c)	  ((c)->p_arsess->as_prid)
 #define XFS_IS_REALTIME_INODE(ip) ((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME)
 
+#ifdef _KERNEL
+
+/*
+ * Quota Manager Interface.
+ */
 extern struct xfs_qm   *xfs_qm_init(void);
 extern void 		xfs_qm_destroy(struct xfs_qm *xqm);
 extern int		xfs_qm_dqflush_all(struct xfs_mount *, int);
@@ -247,4 +252,5 @@ xfs_trans_reserve_quota_bydquots(mp, tp, udq, pdq, nblks, f|XFS_QMOPT_RES_RTBLKS
 #define 	xfs_trans_unreserve_rtblkquota_bydquots(tp, udq, pdq, nblks) \
 xfs_trans_reserve_quota_bydquots(tp, udq, pdq, -nblks, XFS_QMOPT_RES_RTBLKS)
 
-#endif
+#endif	/* _KERNEL */
+#endif	/* !__XFS_QUOTA_H__ */

@@ -1,7 +1,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -55,6 +55,7 @@ typedef struct xfs_dqblk {
 	char              dd_fill[32];	/* filling for posterity */
 } xfs_dqblk_t;
 
+#ifdef _KERNEL
 /* 
  * The hash chain headers (hash buckets)
  */
@@ -145,6 +146,8 @@ typedef struct xfs_dquot {
 #endif
 } xfs_dquot_t;
 
+#endif	/* _KERNEL */
+
 /*
  * flags for q_flags field in the dquot.
  */
@@ -234,6 +237,7 @@ extern void 		xfs_qm_dqprint(xfs_dquot_t *);
 #endif
 
 
+#ifdef _KERNEL
 extern xfs_dquot_t 	*xfs_qm_dqinit(xfs_mount_t *, xfs_dqid_t, uint);
 extern void		xfs_qm_dqdestroy(xfs_dquot_t *);
 extern int		xfs_qm_dqflush(xfs_dquot_t *, uint);
@@ -247,6 +251,7 @@ extern void 		xfs_qm_dqflock_pushbuf_wait(xfs_dquot_t *dqp);
 extern void		xfs_qm_adjust_dqtimers(xfs_mount_t *,
 					       xfs_disk_dquot_t	*);
 extern int		xfs_qm_dqwarn(xfs_disk_dquot_t *, uint);
+#endif /* _KERNEL */
 
 
 #endif /* _XFS_DQUOT__H_ */
