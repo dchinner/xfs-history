@@ -81,13 +81,14 @@
 #define ENTER(x) printk("Entering %s\n",x);
 #define EXIT(x)  printk("Exiting  %s\n",x);
 
+#if 0
 /* This is major wrong.... fix me FIX ME  RMC */
 #ifndef __ARCH_I386_POSIX_TYPES_H
 typedef long            __kernel_clock_t; 
 #endif
+#endif
 
-
-#define stat64 stat
+/* #define stat64 stat */
 
 extern time_t          lbolt;                  /* time in HZ since last boot */
 
