@@ -1,4 +1,4 @@
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -650,6 +650,25 @@ xfs_truncate_file(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
 	return error;
+}
+
+/*
+ * for error injection
+ */
+int
+xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid)
+{
+	xfs_mount_t *mp;
+	int error;
+	extern int xfs_fd_to_mp(int fd, int reqperm, xfs_mount_t **mpp);
+
+	if (error = xfs_fd_to_mp(fd, 0, &mp))
+		return XFS_ERROR(error);
+
+	*fsname = mp->m_fsname;
+	bcopy(mp->m_fixedfsid, fsid, sizeof(fsid_t));
+
+	return 0;
 }
 
 extern int xfs_fd_to_mp(int, int, xfs_mount_t **);
