@@ -1744,7 +1744,6 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 			       char *name, int namelen, off_t doff,
 			       uio_t *uio, int *done)
 {
-	irix5_dirent_t	*i5_dbp;
 	int		retval;
 	int		target_abi;
 	int		reclen;
@@ -1754,63 +1753,73 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 	 * If it's a kernel request, then the target abi is
 	 * IRIX5_64.
 	 */
-	if (uio->uio_segflg == UIO_USERSPACE) {
-		target_abi = u.u_procp->p_abi;
-	} else {
-		target_abi = ABI_IRIX5_64;
-	}
-
+	target_abi = uio->uio_segflg == UIO_USERSPACE ?
+		u.u_procp->p_abi : ABI_IRIX5_64;
 	if (ABI_IS(ABI_IRIX5_64 | ABI_IRIX5_N32, target_abi)) {
+		dirent_t *idbp;
+
 		reclen = DIRENTSIZE(namelen);
 		if (reclen > uio->uio_resid) {
 			*done = 0;
-			retval = 0;
-		} else {
-			if (dbp != NULL) {
-				dbp->d_reclen = reclen;
-				dbp->d_ino = ino;
-				bcopy(name, dbp->d_name, namelen);
-				dbp->d_name[namelen] = '\0';
-				dbp->d_off = doff;
-				retval = uiomove((caddr_t)dbp, dbp->d_reclen,
-						 UIO_READ, uio);
-				*done = (retval == 0);
-			} else {
-				/*
-				 * Our caller is in the kernel, probably
-				 * NFS, so work directly in its buffer.
-				 */
-				ASSERT(uio->uio_segflg == UIO_SYSSPACE);
-				iovp = uio->uio_iov;
-				dbp = (dirent_t *)iovp->iov_base;
-				dbp->d_reclen = reclen;
-				dbp->d_ino = ino;
-				bcopy(name, dbp->d_name, namelen);
-				dbp->d_name[namelen] = '\0';
-				dbp->d_off = doff;
-				iovp->iov_base += reclen;
-				iovp->iov_len -= reclen;
-				uio->uio_resid -= reclen;
-				*done = 1;
-				retval = 0;
-			}
+			return 0;
 		}
+		iovp = uio->uio_iov;
+		if (dbp != NULL)
+			idbp = dbp;
+		else
+			idbp = (dirent_t *)iovp->iov_base;
+		idbp->d_reclen = reclen;
+		idbp->d_ino = ino;
+		bcopy(name, idbp->d_name, namelen);
+		idbp->d_name[namelen] = '\0';
+		idbp->d_off = doff;
+		if (dbp == NULL) {
+			/*
+			 * Our caller is either in the kernel
+			 * (probably NFS) or has locked the user
+			 * buffer down, so work directly in its buffer.
+			 */
+			iovp->iov_base += reclen;
+			iovp->iov_len -= reclen;
+			uio->uio_resid -= reclen;
+			*done = 1;
+			return 0;
+		}
+		/*
+		 * Unaligned or non-single-iovec buffer.
+		 */
+		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
 	} else {
-		i5_dbp = (irix5_dirent_t *)dbp;
-		if ((i5_dbp->d_reclen = IRIX5_DIRENTSIZE(namelen)) >
-		    uio->uio_resid) {
+		irix5_dirent_t *idbp;
+
+		reclen = IRIX5_DIRENTSIZE(namelen);
+		if (reclen > uio->uio_resid) {
 			*done = 0;
-			retval = 0;
-		} else {
-			i5_dbp->d_ino = ino;
-			bcopy(name, i5_dbp->d_name, namelen);
-			i5_dbp->d_name[namelen] = '\0';
-			i5_dbp->d_off = doff;
-			retval = uiomove((caddr_t)i5_dbp, i5_dbp->d_reclen,
-					 UIO_READ, uio);
-			*done = (retval == 0);
+			return 0;
 		}
+		iovp = uio->uio_iov;
+		if (dbp != NULL)
+			idbp = (irix5_dirent_t *)dbp;
+		else
+			idbp = (irix5_dirent_t *)iovp->iov_base;
+		idbp->d_reclen = reclen;
+		idbp->d_ino = ino;
+		bcopy(name, idbp->d_name, namelen);
+		idbp->d_name[namelen] = '\0';
+		idbp->d_off = doff;
+		if (dbp == NULL) {
+			iovp->iov_base += reclen;
+			iovp->iov_len -= reclen;
+			uio->uio_resid -= reclen;
+			*done = 1;
+			return 0;
+		}
+		/*
+		 * Unaligned or non-single-iovec buffer.
+		 */
+		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
 	}
-	return(retval);
+	*done = (retval == 0);
+	return retval;
 }
 #endif	/* !SIM */

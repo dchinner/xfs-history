@@ -348,6 +348,10 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
 	dirent_t *dbp;
 	int retval;
+	caddr_t lockaddr;
+	int locklen = 0;
+	int abi;
+	int alignment;
 
 #ifdef XFSDADEBUG
 	xfsda_t_reinit("getdents", __FILE__, __LINE__);
@@ -356,31 +360,44 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	XFSSTATS.xs_dir_getdents++;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	/*
-	 * If our caller is already in the kernel and they've given
-	 * us a single, contiguous memory buffer, then just work
-	 * directly within that buffer.
+	 * If our caller has given us a single contiguous memory buffer,
+	 * just work directly within that buffer.  If it's in user memory,
+	 * lock it down first.
 	 */
-	if ((uio->uio_segflg == UIO_SYSSPACE) && (uio->uio_iovcnt == 1)) {
+	abi = uio->uio_segflg == UIO_USERSPACE ?
+		u.u_procp->p_abi : ABI_IRIX5_64;
+	alignment = ((abi == ABI_IRIX5_64) ?
+		sizeof(off_t) : sizeof(irix5_off_t)) - 1;
+	if (uio->uio_segflg == UIO_SYSSPACE) {
+		ASSERT(uio->uio_iovcnt == 1);
+		ASSERT(((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0);
+		ASSERT((uio->uio_iov[0].iov_len & alignment) == 0);
 		dbp = NULL;
-	} else {
+	} else if (uio->uio_iovcnt == 1 &&
+		   ((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0 &&
+		   (uio->uio_iov[0].iov_len & alignment) == 0) {
+		dbp = NULL;
+		if (!useracc((lockaddr = uio->uio_iov[0].iov_base),
+			     (locklen = uio->uio_iov[0].iov_len),
+			     B_READ|B_PHYS))
+			return curthreadp->k_error ?
+				curthreadp->k_error : EFAULT;
+	} else
 		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
-	}
 	*eofp = 0;
-
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL)
 		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp);
-	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
+	else if (xfs_bmap_one_block(dp, XFS_DATA_FORK))
 		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp);
-	} else {
+	else
 		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp);
-	}
-	if (dbp != NULL) {
+	if (dbp != NULL)
 		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
-	}
-
+	else if (locklen)
+		unuseracc(lockaddr, locklen, B_READ|B_PHYS);
 #ifdef XFSDADEBUG
 	xfsda_t_reinit("getdents", "return value", retval);
 #endif /* XFSDADEBUG */
