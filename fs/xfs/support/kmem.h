@@ -98,9 +98,11 @@ extern void	    *kmem_realloc(void *, size_t, size_t, int);
 extern void	    *kmem_zalloc(size_t, int);
 extern void         kmem_free(void *, size_t);
 
-typedef void	    (*kmem_shake_func_t)(void);
+typedef void	    *kmem_shaker_t;
+typedef int	    (*kmem_shake_func_t)(int, unsigned int);
 
-extern void	    kmem_shake_register(kmem_shake_func_t);
-extern void	    kmem_shake_deregister(kmem_shake_func_t);
+extern kmem_shaker_t	kmem_shake_register(kmem_shake_func_t);
+extern void	    kmem_shake_deregister(kmem_shaker_t);
+static __inline int	kmem_shake_allow(unsigned int mask) { return 1; }
 
 #endif /* __XFS_SUPPORT_KMEM_H__ */

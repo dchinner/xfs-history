@@ -82,13 +82,14 @@ EXPORT_SYMBOL(xfs_Gqm);	/* used by xfsidbg */
 
 kmem_zone_t	*qm_dqzone;
 kmem_zone_t	*qm_dqtrxzone;
+kmem_shaker_t	xfs_qm_shaker;
 
 STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
 STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
-STATIC void	xfs_qm_shake(void);
+STATIC int	xfs_qm_shake(int, unsigned int);
 
 #ifdef DEBUG
 extern mutex_t	qcheck_lock;
@@ -161,7 +162,7 @@ xfs_Gqm_init(void)
 	} else
 		xqm->qm_dqzone = qm_dqzone;
 
-	kmem_shake_register(xfs_qm_shake);
+	xfs_qm_shaker = kmem_shake_register(xfs_qm_shake);
 
 	/*
 	 * The t_dqinfo portion of transactions.
@@ -193,7 +194,7 @@ xfs_qm_destroy(
 
 	ASSERT(xqm != NULL);
 	ASSERT(xqm->qm_nrefs == 0);
-	kmem_shake_deregister(xfs_qm_shake);
+	kmem_shake_deregister(xfs_qm_shaker);
 	hsize = xqm->qm_dqhashmask + 1;
 	for (i = 0; i < hsize; i++) {
 		xfs_qm_list_destroy(&(xqm->qm_usr_dqhtable[i]));
@@ -2075,7 +2076,7 @@ xfs_qm_shake_freelist(
 			xfs_dqunlock(dqp);
 			xfs_qm_freelist_unlock(xfs_Gqm);
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS)
-				return (nreclaimed != howmany);
+				return (nreclaimed);
 			XQM_STATS_INC(xqmstats.xs_qm_dqwants);
 			goto tryagain;
 		}
@@ -2150,7 +2151,7 @@ xfs_qm_shake_freelist(
 			XFS_DQ_HASH_UNLOCK(hash);
 			xfs_qm_freelist_unlock(xfs_Gqm);
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS)
-				return (nreclaimed != howmany);
+				return (nreclaimed);
 			goto tryagain;
 		}
 		xfs_dqtrace_entry(dqp, "DQSHAKE: UNLINKING");
@@ -2175,22 +2176,23 @@ xfs_qm_shake_freelist(
 		dqp = nextdqp;
 	}
 	xfs_qm_freelist_unlock(xfs_Gqm);
-	return (nreclaimed != howmany);
+	return (nreclaimed);
 }
 
 
 /*
- * The shake manager routine called by shaked() when memory is
- * running low.
+ * The kmem_shake interface is invoked when memory is running low.
  */
 /* ARGSUSED */
-STATIC void
-xfs_qm_shake(void)
+STATIC int
+xfs_qm_shake(int nr_to_scan, unsigned int gfp_mask)
 {
 	int	ndqused, nfree, n;
 
+	if (!kmem_shake_allow(gfp_mask))
+		return (0);
 	if (!xfs_Gqm)
-		return;
+		return (0);
 
 	nfree = xfs_Gqm->qm_dqfreelist.qh_nelems; /* free dquots */
 	/* incore dquots in all f/s's */
@@ -2199,12 +2201,12 @@ xfs_qm_shake(void)
 	ASSERT(ndqused >= 0);
 
 	if (nfree <= ndqused && nfree < ndquot)
-		return;
+		return (0);
 
 	ndqused *= xfs_Gqm->qm_dqfree_ratio;	/* target # of free dquots */
 	n = nfree - ndqused - ndquot;		/* # over target */
 
-	(void) xfs_qm_shake_freelist(MAX(nfree, n));
+	return xfs_qm_shake_freelist(MAX(nfree, n));
 }
 
 

@@ -40,13 +40,13 @@
 
 #define DEF_PRIORITY	(6)
 #define MAX_SLAB_SIZE	0x10000
-
-#define MAX_SHAKE 8
+#define MAX_SHAKE	8
 
 static kmem_shake_func_t	shake_list[MAX_SHAKE];
 static DECLARE_MUTEX(shake_sem);
 
-void	kmem_shake_register(kmem_shake_func_t sfunc)
+kmem_shaker_t
+kmem_shake_register(kmem_shake_func_t sfunc)
 {
 	int	i;
 
@@ -60,15 +60,18 @@ void	kmem_shake_register(kmem_shake_func_t sfunc)
 	if (i == MAX_SHAKE)
 		BUG();
 	up(&shake_sem);
+
+	return (kmem_shaker_t)sfunc;
 }
 
-void	kmem_shake_deregister(kmem_shake_func_t sfunc)
+void
+kmem_shake_deregister(kmem_shaker_t sfunc)
 {
 	int	i;
 
 	down(&shake_sem);
 	for (i = 0; i < MAX_SHAKE; i++) {
-		if (shake_list[i] == sfunc)
+		if (shake_list[i] == (kmem_shake_func_t)sfunc)
 			break;
 	}
 	if (i == MAX_SHAKE)
@@ -86,7 +89,7 @@ static __inline__ void kmem_shake(void)
 
 	down(&shake_sem);
 	for (i = 0; i < MAX_SHAKE && shake_list[i]; i++)
-		(*shake_list[i])();
+		(*shake_list[i])(0, 0);
 	up(&shake_sem);
 	delay(10);
 }
