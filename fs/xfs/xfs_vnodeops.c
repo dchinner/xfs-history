@@ -1448,6 +1448,11 @@ xfs_lookup(vnode_t	*dir_vp,
 	 * If vnode is a device return special vnode instead.
          */
         if (ISVDEV(vp->v_type)) {
+		if (vp->v_type == VXNAM) {
+			cmn_err(CE_PANIC,
+				"xfs_lookup: inode type VXNAM ip 0x%x",
+				ip);
+		}
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
                 VN_RELE(vp);
                 if (newvp == NULL)
