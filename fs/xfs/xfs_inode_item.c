@@ -501,6 +501,7 @@ xfs_inode_item_init(xfs_inode_t	*ip,
 	iip->ili_inode = ip;
 	iip->ili_extents_buf = NULL;
 	iip->ili_format.ilf_type = XFS_LI_INODE;
+	iip->ili_format.ilf_ino = ip->i_ino;
 }
 
 
