@@ -446,7 +446,7 @@ xfs_setattr(vnode_t	*vp,
 	mp = ip->i_mount;
 	sbp = &(mp->m_sb);
         tp = xfs_trans_alloc (mp, 0);
-        if (code = xfs_trans_reserve (tp, 10, XFS_ITRUNCATE_LOG_RES(sbp), 0,
+        if (code = xfs_trans_reserve (tp, 0, XFS_ITRUNCATE_LOG_RES(sbp), 0,
 				      XFS_TRANS_PERM_LOG_RES)) {
                 xfs_trans_cancel (tp, 0);
                 return code;
@@ -910,7 +910,7 @@ xfs_inactive(vnode_t	*vp,
 		truncate = ((ip->i_d.di_size > 0) &&
 			    ((ip->i_d.di_mode & IFMT) == IFREG));
 		if (truncate) {
-			status = xfs_trans_reserve(tp, 10,
+			status = xfs_trans_reserve(tp, 0,
 						  XFS_ITRUNCATE_LOG_RES(sbp),
 						  0, XFS_TRANS_PERM_LOG_RES);
 			if (status != 0) {
@@ -1795,7 +1795,7 @@ xfs_remove(vnode_t	*dir_vp,
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	sbp = &(mp->m_sb);
 	tp = xfs_trans_alloc (mp, 0);
-        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(sbp), 0,
+        if (error = xfs_trans_reserve (tp, 0, XFS_REMOVE_LOG_RES(sbp), 0,
 				       XFS_TRANS_PERM_LOG_RES)) 
                 goto error_return;
 
