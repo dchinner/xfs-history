@@ -170,6 +170,23 @@ int xfs_attr_leaf_entsize_local_max(int bsize);
 
 
 /*========================================================================
+ * Structure used to pass context around among the routines.
+ *========================================================================*/
+
+typedef struct xfs_attr_list_context {
+	struct xfs_inode		*dp;	/* inode */
+	struct attrlist_cursor_kern	*cursor;/* position in list */
+	struct attrlist			*alist;	/* output buffer */
+	int				count;	/* num used entries */
+	int				dupcnt;	/* count dup hashvals seen */
+	int				bufsize;/* total buffer size */
+	int				firstu;	/* first used byte in buffer */
+	int				flags;	/* from VOP call */
+	int				resynch;/* T/F: resynch with cursor */
+} xfs_attr_list_context_t;
+
+
+/*========================================================================
  * Function prototypes for the kernel.
  *========================================================================*/
 
@@ -187,9 +204,7 @@ int	xfs_attr_shortform_to_leaf(struct xfs_trans *trans,
 					  struct xfs_da_args *args);
 int	xfs_attr_shortform_remove(xfs_trans_t *trans,
 					      struct xfs_da_args *remove);
-int	xfs_attr_shortform_list(struct xfs_inode *dp, struct attrlist *alist,
-				       int flags,
-				       struct attrlist_cursor_kern *cursor);
+int	xfs_attr_shortform_list(struct xfs_attr_list_context *context);
 int	xfs_attr_shortform_replace(struct xfs_trans *trans,
 					  struct xfs_da_args *args);
 int	xfs_attr_shortform_allfit(struct buf *bp, struct xfs_inode *dp);
@@ -220,9 +235,8 @@ int	xfs_attr_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
 				 struct xfs_da_args *args);
 int	xfs_attr_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 				    struct xfs_da_args *args);
-int	xfs_attr_leaf_list_int(struct buf *bp, struct attrlist *alist,
-				      int flags,
-				      struct attrlist_cursor_kern *cursor);
+int	xfs_attr_leaf_list_int(struct buf *bp,
+				      struct xfs_attr_list_context *context);
 
 /*
  * Routines used for shrinking the Btree.
@@ -240,13 +254,12 @@ int	xfs_attr_leaf_freextent(struct xfs_inode *dp, xfs_dablk_t blkno,
 /*
  * Utility routines.
  */
-uint	xfs_attr_leaf_lasthash(struct buf *bp, int *count);
+xfs_dahash_t	xfs_attr_leaf_lasthash(struct buf *bp, int *count);
 int	xfs_attr_leaf_order(struct buf *leaf1_bp, struct buf *leaf2_bp);
 int	xfs_attr_leaf_newentsize(struct xfs_da_args *args, int blocksize,
 					int *local);
 int	xfs_attr_leaf_entsize(struct xfs_attr_leafblock *leaf, int index);
-int	xfs_attr_put_listent(struct attrlist *alist, char *name, int namelen,
-				    int valuelen,
-				    struct attrlist_cursor_kern *cursor);
+int	xfs_attr_put_listent(struct xfs_attr_list_context *context,
+				    char *name, int namelen, int valuelen);
 
 #endif	/* !FS_XFS_ATTR_LEAE_H */
