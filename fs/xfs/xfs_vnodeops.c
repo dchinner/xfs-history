@@ -481,6 +481,7 @@ xfs_setattr(vnode_t	*vp,
 	timestruc_t 	tv;
 	uid_t		uid;
 	gid_t		gid;
+	int		timeflags = 0;
 
 	vn_trace_entry(vp, "xfs_setattr");
 	/*
@@ -497,13 +498,11 @@ xfs_setattr(vnode_t	*vp,
          * need to be done within a transaction.
          */
         if (mask & AT_UPDTIMES) {
-		int f = 0;
-
                 ASSERT((mask & ~AT_UPDTIMES) == 0);
-		f = ((mask & AT_UPDATIME) ? XFS_ICHGTIME_ACC : 0) |
-		    ((mask & AT_UPDCTIME) ? XFS_ICHGTIME_CHG : 0) |
-		    ((mask & AT_UPDMTIME) ? XFS_ICHGTIME_MOD : 0);
-		xfs_ichgtime(ip, f);
+		timeflags = ((mask & AT_UPDATIME) ? XFS_ICHGTIME_ACC : 0) |
+			    ((mask & AT_UPDCTIME) ? XFS_ICHGTIME_CHG : 0) |
+			    ((mask & AT_UPDMTIME) ? XFS_ICHGTIME_MOD : 0);
+		xfs_ichgtime(ip, timeflags);
 		return 0;
         }
 
@@ -728,7 +727,7 @@ xfs_setattr(vnode_t	*vp,
 		/*
 		 * Have to do this even if the file's size doesn't change.
 		 */
-		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+		timeflags |= XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG;
         }
 
         /*
@@ -749,6 +748,7 @@ xfs_setattr(vnode_t	*vp,
                                 ip->i_d.di_mode &= ~ISGID;
                 }
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+		timeflags |= XFS_ICHGTIME_CHG;
         }
 
 	/*
@@ -775,6 +775,7 @@ xfs_setattr(vnode_t	*vp,
                         ip->i_d.di_gid = gid;
                 }
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+		timeflags |= XFS_ICHGTIME_CHG;
         }
 
 
@@ -785,10 +786,12 @@ xfs_setattr(vnode_t	*vp,
                 if (mask & AT_ATIME) {
                         ip->i_d.di_atime.t_sec = vap->va_atime.tv_sec;
 			ip->i_update_core = 1;
+			timeflags &= ~XFS_ICHGTIME_ACC;
 		}
                 if (mask & AT_MTIME) {
 			ip->i_d.di_mtime.t_sec = vap->va_mtime.tv_sec;
-			xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
+			timeflags &= ~XFS_ICHGTIME_MOD;
+			timeflags |= XFS_ICHGTIME_CHG;
                 }
         }
 
@@ -810,7 +813,15 @@ xfs_setattr(vnode_t	*vp,
 			}
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+		timeflags |= XFS_ICHGTIME_CHG;
 	}
+
+	/*
+	 * Send out timestamp changes that need to be set to the
+	 * current time.
+	 */
+	if (timeflags)
+		xfs_ichgtime(ip, timeflags);
 
 	XFSSTATS.xs_ig_attrchg++;
 
@@ -3518,6 +3529,7 @@ xfs_readdir(vnode_t	*dir_vp,
         xfs_trans_t             *tp = NULL;
 	int			status;
 	uint			lock_mode;
+	off_t			start_offset;
 
 	vn_trace_entry(dir_vp, "xfs_readdir");
         dp = XFS_VTOI(dir_vp);
@@ -3540,7 +3552,10 @@ xfs_readdir(vnode_t	*dir_vp,
                 return 0;
         }
 
+	start_offset = uiop->uio_offset;
 	status = xfs_dir_getdents (tp, dp, uiop, eofp);
+	if (start_offset != uiop->uio_offset)
+		xfs_ichgtime(dp, XFS_ICHGTIME_ACC);
 
 	xfs_iunlock_map_shared(dp, lock_mode);
 	
