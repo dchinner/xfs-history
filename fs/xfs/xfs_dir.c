@@ -1,4 +1,4 @@
-#ident "$Revision: 1.82 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -576,7 +576,7 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		ASSERT(bcmp((char *)&inum, (char *)&namest->inumber,
 			sizeof(inum)));
-		namest->inumber = *(xfs_dir_ino_t *)&inum;
+		XFS_DIR_SF_PUT_DIRINO(&inum, &namest->inumber);
 		xfs_trans_log_buf(args->trans, bp, 
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		retval = 0;
@@ -914,7 +914,7 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		ASSERT(bcmp((char *)&inum, (char *)&namest->inumber,
 			sizeof(inum)));
-		namest->inumber = *(xfs_dir_ino_t *)&inum;
+		XFS_DIR_SF_PUT_DIRINO(&inum, &namest->inumber);
 		xfs_trans_log_buf(args->trans, bp,
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		retval = 0;
