@@ -20,10 +20,11 @@
  * Function prototypes for the kernel.
  *========================================================================*/
 
-struct xfs_trans;
-struct xfs_mount;
-struct xfs_inode;
+struct uio;
 struct xfs_bmap_free;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
 
 /*
  * Overall external interface routines.
@@ -53,10 +54,8 @@ int	xfs_dir_removename(struct xfs_trans *trans, struct xfs_inode *dp,
 				  struct xfs_bmap_free *flist,
 				  xfs_extlen_t total);
 
-void	xfs_dir_print(struct xfs_trans *tp, struct xfs_inode *dp);
-
 int	xfs_dir_getdents(struct xfs_trans *tp, struct xfs_inode *dp,
-				uio_t *uiop, int *eofp);
+				struct uio *uiop, int *eofp);
 
 int	xfs_dir_replace(struct xfs_trans *tp, struct xfs_inode *dp,
 			       char *name_string, int name_length,
