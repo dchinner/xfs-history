@@ -1,0 +1,349 @@
+/**************************************************************************
+ *                                                                        *
+ *               Copyright (C) 1994, Silicon Graphics, Inc.               *
+ *                                                                        *
+ *  These coded instructions, statements, and computer programs  contain  *
+ *  unpublished  proprietary  information of Silicon Graphics, Inc., and  *
+ *  are protected by Federal copyright law.  They  may  not be disclosed  *
+ *  to  third  parties  or copied or duplicated in any form, in whole or  *
+ *  in part, without the prior written consent of Silicon Graphics, Inc.  *
+ *                                                                        *
+ **************************************************************************/
+
+#ident "$Revision: 1.1 $"
+
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/errno.h>
+#include <sys/cred.h>
+#include <sys/file.h>
+#include <sys/proc.h>
+#include <sys/user.h>
+#include <sys/vfs.h>
+#include <sys/vnode.h>
+#include <sys/sat.h>
+#include "xfs_handle.h"
+#include <sys/kmem.h>
+#include <sys/debug.h>
+
+
+/*
+ *  Ok.  This file contains stuff that defines a general handle
+ *  mechanism, except that it's only used by xfs at the moment.
+ *  Imagine that it's in some generic place.  The same goes for
+ *  xfs_handle.h; it's would-be generic but xfs-only right now.
+ */
+
+
+int	vp_open ( vnode_t *vp, int filemode );
+
+
+/*
+ *  Return the handle for the object named by path.
+ */
+
+int
+path_to_handle (
+	char	*path,		/* any path name */
+	void	*hbuf,		/* user's data buffer */
+	size_t	*hlen)		/* set to size of data copied to hbuf */
+{
+	int		error;
+	vnode_t		*vp;
+	handle_t	handle;
+	int		hsize;	/* actual size of data in handle */
+
+	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp);
+	if (error)
+		return error;
+	error = vp_to_handle (vp, &handle);
+	VN_RELE (vp);
+	if (error)
+		return error;
+	hsize = HSIZE (handle);
+	if (copyout (&handle, hbuf, hsize))
+		return EFAULT;
+	if (suword (hlen, hsize))
+		return EFAULT;
+	return 0;
+}
+
+
+/*
+ *  Return the handle for the file system containing the object named by path.
+ */
+
+int
+path_to_fshandle (
+	char	*path,		/* any path name */
+	void	*hbuf,		/* user's data buffer */
+	size_t	*hlen)		/* set to size of data copied to hbuf */
+{
+	int		error;
+	vnode_t		*vp;
+	handle_t	handle;
+	int		hsize;	/* actual size of data in handle */
+
+	error = lookupname (path, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp);
+	if (error)
+		return error;
+	error = vp_to_handle (vp, &handle);
+	VN_RELE (vp);
+	if (error)
+		return error;
+	hsize = sizeof (fsid_t);
+	if (copyout (&handle, hbuf, hsize))
+		return EFAULT;
+	if (suword (hlen, hsize))
+		return EFAULT;
+	return 0;
+}
+
+
+int
+fd_to_handle (
+	int	fd,		/* any file descriptor */
+	void	*hbuf,		/* user's data buffer */
+	size_t	*hlen)		/* set to size of data copied to hbuf */
+{
+	int		error;
+	vnode_t		*vp;
+	file_t		*fp;
+	handle_t	handle;
+	int		hsize;
+
+	error = getf (fd, &fp);
+	if (error)
+		return error;
+	vp = fp->f_vnode;
+	error = vp_to_handle (vp, &handle);
+	if (error)
+		return error;
+	hsize = HSIZE (handle);
+	if (copyout (&handle, hbuf, hsize))
+		return EFAULT;
+	if (suword (hlen, hsize))
+		return EFAULT;
+	return 0;
+}
+
+
+/*
+ *  Open a file specified by a file handle.  Follow the same basic
+ *  algorithm as copen, cutting out some things not needed bacause
+ *  of self-imposed restrictions.  The restrictions are that only
+ *  directories and regular files are allowed and none of the funky
+ *  open flags are used.
+ *
+ *  Always sets the FINVIS flag.
+ */
+
+int
+open_by_handle (
+	void		*hanp,			/* handle data */
+	size_t		hlen,			/* size of handle data */
+	int		filemode,		/* open mode */
+	rval_t		*rvp)
+{
+	vnode_t		*vp;
+	file_t		*fp;
+	int		fd;
+	int		error;
+	handle_t	handle;
+
+	filemode -= FOPEN;
+	filemode &= (FREAD|FWRITE);
+	if ((filemode & (FREAD|FWRITE)) == 0)
+		return EINVAL;
+	filemode |= FINVIS;
+
+	error = gethandle (hanp, hlen, &handle);
+	if (error)
+		return error;
+	vp = handle_to_vp (&handle);
+	if (vp == NULL)
+		return EINVAL;
+
+	switch (vp->v_type) {
+		case VDIR:
+		case VREG:
+			break;
+		default:
+			error = EINVAL;
+			goto out;
+	}
+
+	error = falloc ((vnode_t *) NULL, filemode, &fp, &fd);
+	if (error)
+		goto out;
+	/*
+	 * a kludge for the usema device - it really needs to know
+	 * the 'fp' for it opening file - we use u_openfp to mark
+	 * this.
+	 */
+	u.u_openfp = fp;
+
+	if ((u.u_satrec = _SAT_PNALLOC (SAT_OPEN)) == NULL)
+		u.u_satrec = _SAT_PNALLOC (SAT_OPEN_RO);
+
+	error = vp_open (vp, filemode);
+
+	u.u_openfp = NULL;
+	if (error) {
+		setf (fd, NULLFP);
+		unfalloc (fp);
+	} else {
+		fp->f_vnode = vp;
+		rvp->r_val1 = fd;
+		fready (fp);
+	}
+
+out:
+	if (error)
+		VN_RELE (vp);
+	_SAT_OPEN (rvp->r_val1, (filemode&FCREAT), filemode, u.u_satrec, error);
+	return error;
+}
+
+
+/*
+ *  vp_open - based on vn_open.  Differences are
+ *	+ gets a vp passed to it, instead of using lookupname
+ *	+ restricted to FREAD and FWRITE, always has FINVIS
+ *	+ restricted to directories and regular files.
+ */
+
+int
+vp_open (
+	vnode_t		*vp,
+	int		filemode)
+{
+	struct vnode *tvp;
+	register int mode;
+	register int error;
+
+	tvp = (struct vnode *) NULL;
+	mode = 0;
+	filemode &= (FREAD | FWRITE | FINVIS);
+	if (filemode & FREAD)
+		mode |= VREAD;
+	if (filemode & FWRITE)
+		mode |= VWRITE;
+ 
+	tvp = vp;
+	VN_HOLD (tvp);
+
+	if (error = VOP_SETFL (vp, 0, filemode, u.u_cred))
+		goto out;
+
+	/*
+	 * Can't write directories, active texts, swap files,
+	 * or read-only filesystems.  
+	 */
+	if (filemode & FWRITE) {
+		if (vp->v_type == VDIR) {
+			error = EISDIR;
+			goto out;
+		}
+		if (vp->v_vfsp->vfs_flag & VFS_RDONLY) {
+			error = EROFS;
+			goto out;
+		}
+		if ((vp->v_flag & VISSWAP) && vp->v_type == VREG) {
+			error = EBUSY;
+			goto out;
+		}
+	}
+	/* Check discretionary permissions. */
+	if (error = VOP_ACCESS (vp, mode, 0, u.u_cred))
+		goto out;
+
+	/*
+	 * Do opening protocol.
+	 */
+	if ((error = VOP_OPEN (&vp, filemode, u.u_cred)) == 0) {
+		if (tvp)
+			VN_RELE (tvp);
+	}
+out:
+	if (error) {
+		if (tvp)
+			VN_RELE (tvp);
+	}
+	return error;
+}
+
+
+/*
+ *  Make a handle from a vnode.
+ */
+
+int
+vp_to_handle (
+	vnode_t		*vp,
+	handle_t	*handlep)
+{
+	int		error;
+	struct	fid	*fidp = NULL;
+
+	switch (vp->v_type) {
+		case VREG:
+		case VDIR:
+		case VLNK:
+			break;
+		default:
+			return EBADF;
+	}
+	error = VOP_FID (vp, &fidp);
+	if (error)
+		return error;
+	if (fidp == NULL)
+		return EIO;		/* FIX: what real errno? */
+	bzero (handlep, sizeof *handlep);
+	bcopy (&vp->v_vfsp->vfs_fsid, &handlep->ha_fsid, sizeof (fsid_t));
+	bcopy (fidp, &handlep->ha_fid, sizeof *fidp);
+	freefid (fidp);
+	return 0;
+}
+
+
+/*
+ *  Get a vnode for the object referenced by handle.
+ */
+
+struct vnode *
+handle_to_vp (
+	handle_t	*handlep)
+{
+	struct	vfs	*vfsp;
+	struct	vnode	*vp;
+		int	error;
+
+	vfsp = getvfs (&handlep->ha_fsid);
+	if (vfsp == NULL)
+		return NULL;
+	error = VFS_VGET (vfsp, &vp, &handlep->ha_fid);
+	if (error)
+		return NULL;
+	return vp;
+}
+
+
+/*
+ *  Get a handle of the form (void *, size_t) from user space and
+ *  convert it to a handle_t handle.
+ */
+
+int
+gethandle (
+	void		*hanp,		/* input,  handle data */
+	size_t		hlen,		/* input,  size of handle data */
+	handle_t	*handlep)	/* output, copy of data */
+{
+	if (hlen < sizeof handlep->ha_fsid || hlen > sizeof *handlep)
+		return EINVAL;
+	if (copyin (hanp, handlep, hlen))
+		return EFAULT;
+	return 0;
+}
