@@ -248,35 +248,168 @@ typedef struct xfs_trans {
  * Various log reservation values.
  * These are based on the size of the file system block
  * because that is what most transactions manipulate.
+ * Each adds in an additional 128 bytes per item logged to
+ * try to account for the overhead of the transaction mechanism.
+ *
+ * Note:
+ * Most of the reservations underestimate the number of allocation
+ * groups into which they could free extents in the xfs_bmap_finish()
+ * call.  This is because the number in the worst case is quite high
+ * and quite unusual.  In order to fix this we need to change
+ * xfs_bmap_finish() to free extents in only a single AG at a time.
+ * This will require changes to the EFI code as well, however, so that
+ * the EFI for the extents not freed is logged again in each transaction.
  */
-#define XFS_DEFAULT_LOG_RES(mp)		XFS_FSB_TO_B(mp, 64)
-#define	XFS_ITRUNCATE_LOG_RES(mp)	XFS_FSB_TO_B(mp, 64)
-#define	XFS_IALLOC_LOG_RES(mp)		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp))
-#define	XFS_REMOVE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 20)
-#define	XFS_LINK_LOG_RES(mp)		XFS_FSB_TO_B(mp, 20)
-#define	XFS_RENAME_LOG_RES(mp)		XFS_FSB_TO_B(mp, 20)
+
+/*
+ * In a write transaction we can allocate a maximum of 2
+ * extents.  This gives:
+ *    the inode getting the new extents: inode size
+ *    the inode\'s bmap btree: max depth * block size
+ *    the agfs of the ags from which the extents are allocate: 2 * sector
+ *    the superblock free block counter: sector size
+ *    the allocation btrees: 2 * 2 * max depth * block size
+ * And the bmap_finish transaction can free bmap blocks in a join:
+ *    the agfs of the ags containing the blocks: 2 * sector size
+ *    the super block free block counter: sector size
+ *    the allocation btrees: 2 * 2 * max depth * block size
+ */
+#define XFS_WRITE_LOG_RES(mp) \
+	(MAX( \
+	 ((mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  (2 * (mp)->m_sb.sb_sectsize) + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	  (128 * (4 + XFS_BM_MAXLEVELS(mp) + (4 * XFS_AG_MAXLEVELS(mp))))),\
+	 ((2 * (mp)->m_sb.sb_sectsize) + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	  (128 * (3 + (4 * XFS_AG_MAXLEVELS(mp)))))))
+     
+/*
+ * In truncating a file we can modify:
+ *    the inode being truncated: inode size
+ *    the inode\'s bmap btree: max depth * block size
+ * And the bmap_finish transaction can free the blocks and bmap blocks:
+ *    the agf for each of the ags: 4 * sector size
+ *    the super block to reflect the freed blocks: sector size
+ *    worst case split in allocation btrees per extent: 4 * max depth * block
+ */
+#define	XFS_ITRUNCATE_LOG_RES(mp) \
+	(MAX( \
+	 ((mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  (128 * (1 + XFS_BM_MAXLEVELS(mp)))), \
+	 ((4 * (mp)->m_sb.sb_sectsize) + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (4 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	  (128 * (5 + (4 * XFS_AG_MAXLEVELS(mp)))))))
+     
+/*
+ * In renaming a files we can modify:
+ *    the four inodes involved: 4 * inode size
+ *    the two directory btrees: 2 * max depth * block size
+ *    the two directory bmap btrees: 2 * max depth * block size
+ * And the bmap_finish transaction can free dir and bmap blocks giving:
+ *    the agf for the ag in which the blocks live: 2 * sector size
+ *    the superblock for the free block count: sector size
+ *    the allocation btrees: 2 * 2 * max depth * block size
+ */
+#define	XFS_RENAME_LOG_RES(mp) \
+	(MAX( \
+	 ((4 * (mp)->m_sb.sb_inodesize) + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_DIR_NODE_MAXDEPTH)) + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp))) + \
+	  (128 * (4 + (2 * XFS_DIR_NODE_MAXDEPTH) + \
+	   (2 * XFS_BM_MAXLEVELS(mp))))), \
+	 ((2 * (mp)->m_sb.sb_sectsize) + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (2 * 2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))) + \
+	  (128 * (3 + (4 * XFS_AG_MAXLEVELS(mp)))))))
+
+/*
+ * For creating a link to an inode:
+ *    the parent directory inode: inode size
+ *    the linked inode: inode size
+ *    the directory btree could split: max depth * block size
+ *    the directory bmap btree could join or split: max depth * block size
+ * And the bmap_finish transaction can free some bmap blocks giving:
+ *    the agf for the ag in which the blocks live
+ *    the superblock for the free block count: sector size
+ *    the allocation btrees: 2 * max depth * block size
+ */
+#define	XFS_LINK_LOG_RES(mp) \
+	(MAX( \
+	 ((mp)->m_sb.sb_inodesize + \
+ 	  (mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B((mp), XFS_DIR_NODE_MAXDEPTH) + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  (128 * (2 + XFS_DIR_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	 ((mp)->m_sb.sb_sectsize + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
+	  (128 * (2 + (2 * XFS_AG_MAXLEVELS(mp))))))
+
+
+/*
+ * For removing a directory entry we can modify:
+ *    the parent directory inode: inode size
+ *    the removed inode: inode size
+ *    the directory btree could join: max depth * block size
+ *    the directory bmap btree could join or split : max depth * block size
+ * And the bmap_finish transaction can free the dir blocks freed giving:
+ *    the agf for the ag in which the blocks live
+ *    the superblock for the free block count: sector size
+ *    the allocation btrees: 2 * max depth * block size
+ */
+#define	XFS_REMOVE_LOG_RES(mp)	\
+	(MAX( \
+	 ((mp)->m_sb.sb_inodesize + \
+ 	  (mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B((mp), XFS_DIR_NODE_MAXDEPTH) + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  (128 * (2 + XFS_DIR_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	 ((mp)->m_sb.sb_sectsize + \
+	  (mp)->m_sb.sb_sectsize + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
+	  (128 * (2 + (2 * XFS_AG_MAXLEVELS(mp))))))
+		  
+/*
+ * For symlink we can modify:
+ *    the parent directory inode: inode size
+ *    the new inode: inode size
+ *    the inode btree entry: 1 block
+ *    the directory btree: max depth * block size
+ *    the directory inode\'s bmap btree: max depth * block size
+ *    the blocks for the symlink: 1 KB
+ * Or in the first xact we allocate some inodes giving:
+ *    the agi and agf of the ag getting the new inodes: 2 * sectorsize
+ *    the inode blocks allocated: XFS_IALLOC_BLOCKS * blocksize
+ *    the inode btree: max depth * blocksize
+ *    the allocation btrees: 2 * max depth * block size
+ */
 #define	XFS_SYMLINK_LOG_RES(mp)		\
-		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp) + 12)
+	(MAX( \
+	 ((mp)->m_sb.sb_inodesize + \
+	  (mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B(mp, 1) + \
+	  XFS_FSB_TO_B((mp), XFS_DIR_NODE_MAXDEPTH) + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  1024 + \
+	  (128 * (5 + XFS_DIR_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	 (2 * (mp)->m_sb.sb_sectsize + \
+	  XFS_FSB_TO_B((mp), XFS_IALLOC_BLOCKS((mp))) + \
+	  XFS_FSB_TO_B((mp), XFS_IN_MAXLEVELS(mp)) + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
+	  (128 * (2 + XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + \
+	   (2 * XFS_AG_MAXLEVELS(mp))))))
 
 /*
  * For create we can modify:
- *    the directory inode: inode size
- *    the new inode: inode size
- *    the directory btree: max depth * block size
- *    the directory inode\'s bmap btree: max depth * block size
- *    the allocation btrees: 2 * max depth * block size
- */
-#define	XFS_CREATE_LOG_RES(mp) \
-     			((mp)->m_sb.sb_inodesize + \
-     			 (mp)->m_sb.sb_inodesize + \
-			 XFS_FSB_TO_B((mp), 5) + \
-			 XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
-			 (2 * XFS_FSB_TO_B((mp), XFS_BTREE_MAXLEVELS)))
-
-/*
- * For mkdir we can modify:
  *    the parent directory inode: inode size
  *    the new inode: inode size
+ *    the inode btree entry: block size
  *    the directory btree: max depth * block size
  *    the directory inode\'s bmap btree: max depth * block size
  * Or in the first xact we allocate some inodes giving:
@@ -285,19 +418,46 @@ typedef struct xfs_trans {
  *    the inode btree: max depth * blocksize
  *    the allocation btrees: 2 * max depth * block size
  */
-#define	XFS_MKDIR_LOG_RES(mp)		\
-     		(MAX( \
-		 ((mp)->m_sb.sb_inodesize + \
-		  (mp)->m_sb.sb_inodesize + \
-		  XFS_FSB_TO_B((mp), 5) + \
-		  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp))), \
-		 (2 * (mp)->m_sb.sb_sectsize + \
-		  XFS_FSB_TO_B((mp), XFS_IALLOC_BLOCKS((mp))) + \
-		  XFS_FSB_TO_B((mp), 5) + \
-		  (2 * XFS_FSB_TO_B((mp), XFS_BTREE_MAXLEVELS)))))
-     
-#define	XFS_IFREE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 10)
-#define	XFS_IUI_LOG_RES(mp)		512
+#define	XFS_CREATE_LOG_RES(mp)		\
+	(MAX( \
+	 ((mp)->m_sb.sb_inodesize + \
+	  (mp)->m_sb.sb_inodesize + \
+	  XFS_FSB_TO_B(mp, 1) + \
+	  XFS_FSB_TO_B((mp), XFS_DIR_NODE_MAXDEPTH) + \
+	  XFS_FSB_TO_B((mp), XFS_BM_MAXLEVELS(mp)) + \
+	  (128 * (3 + XFS_DIR_NODE_MAXDEPTH + XFS_BM_MAXLEVELS(mp)))), \
+	 (2 * (mp)->m_sb.sb_sectsize + \
+	  XFS_FSB_TO_B((mp), XFS_IALLOC_BLOCKS((mp))) + \
+	  XFS_FSB_TO_B((mp), XFS_IN_MAXLEVELS(mp)) + \
+	  (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp)))) + \
+	  (128 * (2 + XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) + \
+	   (2 * XFS_AG_MAXLEVELS(mp))))))
+
+/*
+ * Making a new directory is the same as creating a new file.
+ */
+#define	XFS_MKDIR_LOG_RES(mp)		XFS_CREATE_LOG_RES(mp)
+
+/*
+ * In freeing an inode we can modify:
+ *    the inode being freed: inode size
+ *    the super block free inode counter: sector size
+ *    the agi hash list and counters: sector size
+ *    the inode btree entry: block size
+ *    the on disk inode before ours in the agi hash list: block size
+ */
+#define	XFS_IFREE_LOG_RES(mp) \
+	((mp)->m_sb.sb_inodesize + \
+	 (mp)->m_sb.sb_sectsize + \
+	 (mp)->m_sb.sb_sectsize + \
+	 XFS_FSB_TO_B((mp), 1) + \
+	 XFS_FSB_TO_B((mp), 1) + \
+	 (128 * 5))
+
+/*
+ * When only changeing the inode we log the inode and we add a
+ * bit of slop for the transaction stuff.
+ */
 #define	XFS_ICHANGE_LOG_RES(mp)		((mp)->m_sb.sb_inodesize + 512)     
 
 

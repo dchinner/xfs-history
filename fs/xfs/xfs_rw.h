@@ -36,6 +36,7 @@ typedef struct xfs_strat_write_locals {
 	int		rbp_len;
 	int		set_lead;
 	int		s;
+	int		loops;
 	int		imap_index;
 	int		nimaps;
 	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];

@@ -1058,23 +1058,23 @@ xfs_read(
 		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
 #endif
 		id.ino = ip->i_ino;
-		if (!(ioflag&IO_INVIS) && DM_EVENT_ENABLED (ip, DM_READ)) {
-			if (error = dm_data_event (vp, DM_READ, offset, count))
+		if (!(ioflag & IO_INVIS) && DM_EVENT_ENABLED(ip, DM_READ)) {
+			if (error = dm_data_event(vp, DM_READ, offset, count))
 				return error;
 		}
-		error = xfs_grio_req (ip, &id, uiop, ioflag, credp, offset,
-					UIO_READ);
+		error = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset,
+				     UIO_READ);
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		/* don't update timestamps if doing invisible I/O */
-		if (!(ioflag&IO_INVIS)) {
+		if (!(ioflag & IO_INVIS)) {
 			nanotime (&tv);
 			ip->i_d.di_atime.t_sec = tv.tv_sec;
 			ip->i_update_core = 1;
 		}
-		if (!(ioflag&IO_INVIS) && !error &&
-		    DM_EVENT_ENABLED (ip, DM_POSTREAD)) {
-			(void) dm_data_event (vp, DM_POSTREAD, offset,
-					count - uiop->uio_resid);
+		if (!(ioflag & IO_INVIS) && !error &&
+		    DM_EVENT_ENABLED(ip, DM_POSTREAD)) {
+			(void) dm_data_event(vp, DM_POSTREAD, offset,
+					     count - uiop->uio_resid);
 		}
 		break;
 
@@ -1971,12 +1971,12 @@ xfs_write(
 #endif
 		id.ino = ip->i_ino;
 
-		if (!(ioflag&IO_INVIS) && DM_EVENT_ENABLED (ip, DM_WRITE)) {
-			if (error = dm_data_event (vp, DM_WRITE, offset, count))
+		if (!(ioflag & IO_INVIS) && DM_EVENT_ENABLED(ip, DM_WRITE)) {
+			if (error = dm_data_event(vp, DM_WRITE, offset, count))
 				return error;
 		}
-		error = xfs_grio_req (ip, &id, uiop, ioflag, credp, offset,
-					UIO_WRITE);
+		error = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset,
+				     UIO_WRITE);
 		/*
 		 * Add back whatever we refused to do because of
 		 * uio_limit.
@@ -1994,7 +1994,7 @@ xfs_write(
 		if (count != uiop->uio_resid) {
 			error = 0;
 			/* don't update timestamps if doing invisible I/O */
-			if (!(ioflag&IO_INVIS)) {
+			if (!(ioflag & IO_INVIS)) {
 				nanotime(&tv);
 				ip->i_d.di_mtime.t_sec = tv.tv_sec;
 				ip->i_d.di_ctime.t_sec = tv.tv_sec;
@@ -2015,10 +2015,10 @@ xfs_write(
 			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
 		}
-		if (!(ioflag&IO_INVIS) && !error &&
-		    DM_EVENT_ENABLED (ip, DM_POSTWRITE)) {
-			(void) dm_data_event (vp, DM_POSTWRITE, offset,
-					count - uiop->uio_resid);
+		if (!(ioflag & IO_INVIS) && !error &&
+		    DM_EVENT_ENABLED(ip, DM_POSTWRITE)) {
+			(void) dm_data_event(vp, DM_POSTWRITE, offset,
+					     count - uiop->uio_resid);
 		}
 		break;
 
@@ -2742,7 +2742,14 @@ xfs_strat_write(
 	buf_t	*bp)
 {
 	xfs_strat_write_locals_t	*locals;
-#define	XFS_STRAT_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
+#define	XFS_STRAT_WRITE_IMAPS	2
+	/*
+	 * If XFS_STRAT_WRITE_IMAPS is changed then the definition
+	 * of XFS_STRATW_LOG_RES in xfs_trans.h must be changed to
+	 * reflect the new number of extents that can actually be
+	 * allocated in a single transaction.
+	 */
+	 
 	
 	locals = (xfs_strat_write_locals_t *)
 		kmem_zone_alloc(xfs_strat_write_zone, KM_SLEEP);
@@ -2763,26 +2770,37 @@ xfs_strat_write(
 	while (locals->count_fsb != 0) {
 		/*
 		 * Set up a transaction with which to allocate the
-		 * backing store for the file.
+		 * backing store for the file.  Do allocations in a
+		 * loop until we get some space in the range we are
+		 * interested in.  The other space that might be allocated
+		 * is in the delayed allocation extent on which we sit
+		 * but before our buffer starts.
 		 */
-		locals->tp = xfs_trans_alloc(locals->mp,
-					     XFS_TRANS_FILE_WRITE);
-		locals->error = xfs_trans_reserve(locals->tp, 0,
-					XFS_DEFAULT_LOG_RES(locals->mp),
+		locals->nimaps = 0;
+		locals->loops = 0;
+		while (locals->nimaps == 0) {
+			locals->tp = xfs_trans_alloc(locals->mp,
+						     XFS_TRANS_FILE_WRITE);
+			locals->error = xfs_trans_reserve(locals->tp, 0,
+					XFS_WRITE_LOG_RES(locals->mp),
 					0, XFS_TRANS_PERM_LOG_RES,
 					XFS_WRITE_LOG_COUNT);
-		ASSERT(locals->error == 0);
-		xfs_ilock(locals->ip, XFS_ILOCK_EXCL);
-		xfs_trans_ijoin(locals->tp, locals->ip, XFS_ILOCK_EXCL);
-		xfs_trans_ihold(locals->tp, locals->ip);
-		xfs_strat_write_bp_trace(XFS_STRAT_ENTER, locals->ip, bp);
+			ASSERT(locals->error == 0);
+			xfs_ilock(locals->ip, XFS_ILOCK_EXCL);
+			xfs_trans_ijoin(locals->tp, locals->ip,
+					XFS_ILOCK_EXCL);
+			xfs_trans_ihold(locals->tp, locals->ip);
+			xfs_strat_write_bp_trace(XFS_STRAT_ENTER,
+						 locals->ip, bp);
 
-		/*
-		 * Allocate the backing store for the file.
-		 */
-		XFS_BMAP_INIT(&(locals->free_list), &(locals->first_block));
-		locals->nimaps = XFS_STRAT_WRITE_IMAPS;
-		locals->first_block = xfs_bmapi(locals->tp, locals->ip,
+			/*
+			 * Allocate the backing store for the file.
+			 */
+			XFS_BMAP_INIT(&(locals->free_list),
+				      &(locals->first_block));
+			locals->nimaps = XFS_STRAT_WRITE_IMAPS;
+			locals->first_block = xfs_bmapi(locals->tp,
+						locals->ip,
 						locals->map_start_fsb,
 						locals->count_fsb,
 						XFS_BMAPI_WRITE,
@@ -2790,19 +2808,24 @@ xfs_strat_write(
 						locals->imap,
 						&(locals->nimaps),
 						&(locals->free_list));
-		ASSERT(locals->nimaps > 0);
-		(void) xfs_bmap_finish(&(locals->tp), &(locals->free_list),
-				       locals->first_block);
+			ASSERT(locals->loops++ <=
+			       (locals->offset_fsb +
+				XFS_B_TO_FSB(locals->mp, bp->b_bcount)));
+			(void) xfs_bmap_finish(&(locals->tp),
+					       &(locals->free_list),
+					       locals->first_block);
 
-		xfs_trans_commit(locals->tp, XFS_TRANS_RELEASE_LOG_RES);
+			xfs_trans_commit(locals->tp,
+					 XFS_TRANS_RELEASE_LOG_RES);
 
-		/*
-		 * Before dropping the lock, clear any read-ahead state
-		 * since in allocating space here we may have made it
-		 * invalid.
-		 */
-		XFS_INODE_CLEAR_READ_AHEAD(locals->ip);
-		xfs_iunlock(locals->ip, XFS_ILOCK_EXCL);
+			/*
+			 * Before dropping the lock, clear any read-ahead
+			 * state since in allocating space here we may have
+			 * made it invalid.
+			 */
+			XFS_INODE_CLEAR_READ_AHEAD(locals->ip);
+			xfs_iunlock(locals->ip, XFS_ILOCK_EXCL);
+		}
 
 		/*
 		 * This is a quick check to see if the first time through
@@ -3299,7 +3322,7 @@ xfs_diostrat( buf_t *bp)
 				tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
 				error = xfs_trans_reserve( tp, 
 					   XFS_BM_MAXLEVELS(mp) + count_fsb, 
-					   XFS_DEFAULT_LOG_RES(mp),
+					   XFS_WRITE_LOG_RES(mp),
 					   numrtextents,
 					   XFS_TRANS_PERM_LOG_RES,
 					   XFS_WRITE_LOG_COUNT );
