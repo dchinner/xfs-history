@@ -1,4 +1,4 @@
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 
 #include <sys/param.h>
@@ -76,7 +76,7 @@ STATIC int	xfs_qm_dqiter_bufs(xfs_mount_t *, xfs_dqid_t, xfs_fsblock_t,
 STATIC int	xfs_qm_dqiterate(xfs_mount_t *, xfs_inode_t *, uint);
 STATIC void 	xfs_qm_quotacheck_dqadjust(xfs_dquot_t *, xfs_qcnt_t, xfs_qcnt_t);
 STATIC int	xfs_qm_dqusage_adjust(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, 
-				      void *, daddr_t, int *);
+				      void *, daddr_t, void *, int *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
 STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
@@ -1837,6 +1837,7 @@ xfs_qm_dqusage_adjust(
         xfs_ino_t       ino,            /* inode number to get data for */
         void            *buffer,        /* not used */
         daddr_t         bno,            /* starting block of inode cluster */
+	void    	*dip,           /* on-disk inode pointer (not used) */
 	int		*res)		/* result code value */
 {
 	xfs_inode_t     *ip;
@@ -2012,7 +2013,7 @@ xfs_qm_quotacheck(
 		 */
 		if (error = xfs_bulkstat(mp, NULL, &lastino, &count, 
 				     xfs_qm_dqusage_adjust,
-				     structsz, NULL, &done))
+				     structsz, NULL, BULKSTAT_FG_IGET, &done))
 			break;
 	} while (! done);
 	
