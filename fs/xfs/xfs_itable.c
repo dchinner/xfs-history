@@ -60,7 +60,7 @@ xfs_bulkstat_one(
 
 	buf = (xfs_bstat_t *)buffer;
 	dip = (xfs_dinode_t *)dibuff;
-	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
+	if (! buf || ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
 	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino))) {
 		*stat = BULKSTAT_RV_NOTHING;
