@@ -4941,7 +4941,6 @@ vnodeops_t xfs_vnodeops = {
 	.vop_rwlock		= xfs_rwlock,
 	.vop_rwunlock		= xfs_rwunlock,
 	.vop_bmap		= xfs_bmap,
-	.vop_strategy		= xfs_strategy,
 	.vop_reclaim		= xfs_reclaim,
 	.vop_attr_get		= xfs_attr_get,
 	.vop_attr_set		= xfs_attr_set,
