@@ -1457,7 +1457,8 @@ xfs_da_grow_inode(xfs_trans_t *trans, xfs_da_args_t *args, int length,
 	nmap = 1;	/* GROT: max of 1 extent is not enough */
 	ASSERT(args->firstblock != NULL);
 	error = xfs_bmapi(trans, dp, bno, (xfs_filblks_t)length,
-			 args->whichfork|XFS_BMAPI_WRITE|XFS_BMAPI_METADATA,
+			 XFS_BMAPI_AFLAG(args->whichfork) |
+			 XFS_BMAPI_WRITE|XFS_BMAPI_METADATA,
 			 args->firstblock, args->total, &map, &nmap,
 			 args->flist);
 	if (error) {
@@ -1528,8 +1529,8 @@ xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 
 	nmap = 1;
 	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(trans, dp, bno, 1, whichfork, &firstblock, 0,
-				 &map, &nmap, 0);
+	error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
+				 &firstblock, 0, &map, &nmap, 0);
 	if (error) {
 		return(error);
 	}
@@ -1561,8 +1562,8 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 
 	nmap = 1;
 	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(trans, dp, bno, 1, whichfork, &firstblock, 0,
-				 &map, &nmap, 0);
+	error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
+				 &firstblock, 0, &map, &nmap, 0);
 	if (error) {
 		return(error);
 	}
