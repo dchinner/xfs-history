@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.94 $"
+#ident "$Revision$"
 
 struct buf;
 struct cred;
@@ -320,7 +320,9 @@ void xfs_inode_clear_read_ahead(xfs_inode_t *ip);
 #endif
 
 /*
- * XFS file identifier.
+ * XFS file identifiers.  The xfs_fid_ino_t type is because NFS 2 won't
+ * take more than 10 bytes of stuff past fid_len.  xfs_fid2_t is solely
+ * to get a full 64 bit inode number.
  */
 typedef __uint32_t	xfs_fid_ino_t;
 typedef struct xfs_fid {
@@ -329,6 +331,13 @@ typedef struct xfs_fid {
 	__uint32_t	fid_gen;       /* generation number */
         xfs_fid_ino_t	fid_ino;       /* inode number */
 } xfs_fid_t;
+
+typedef struct xfs_fid2 {
+	u_short		fid_len;	/* length of remainder */
+	u_short		fid_pad;	/* padding, must be zero */
+	__uint32_t	fid_gen;	/* generation number */
+	xfs_ino_t	fid_ino;	/* inode number */
+} xfs_fid2_t;
 
 /*
  * xfs_iget.c prototypes.
