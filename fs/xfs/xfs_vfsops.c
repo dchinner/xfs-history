@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.23 $"
+#ident  "$Revision: 1.24 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -871,6 +871,7 @@ xfs_sync(vfs_t		*vfsp,
 	int		fflag;
 	int		ireclaims;
 	uint		lock_flags;
+	uint		log_flags;
 	boolean_t	mount_locked;
 	boolean_t	vnode_refed;
 	int		preempt;
@@ -900,7 +901,7 @@ xfs_sync(vfs_t		*vfsp,
 	 * Sync out the log.  This ensures that the log is periodically
 	 * flushed even if there is not enough activity to fill it up.
 	 */
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_SYNC|XFS_LOG_FORCE);
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 
  loop:
 	XFS_MOUNT_ILOCK(mp);
@@ -1060,6 +1061,19 @@ xfs_sync(vfs_t		*vfsp,
 			
 	}
 	XFS_MOUNT_IUNLOCK(mp);
+
+	/*
+	 * Flushing out dirty data above probably generated more
+	 * log activity, so if this isn't bdflush() then flush
+	 * the log again.  If SYNC_WAIT is set then do it synchronously.
+	 */
+	if (!(flags & SYNC_BDFLUSH)) {
+		log_flags = XFS_LOG_FORCE;
+		if (flags & SYNC_WAIT) {
+			log_flags |= XFS_LOG_SYNC;
+		}
+		xfs_log_force(mp, (xfs_lsn_t)0, log_flags);
+	}
 
 	if ((flags & (SYNC_FSDATA | SYNC_BDFLUSH)) == SYNC_FSDATA) {
 		/*
