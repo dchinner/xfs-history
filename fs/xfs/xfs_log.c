@@ -82,7 +82,7 @@ STATIC void log_push_buffers_to_disk(log_t *log);
 STATIC void log_sync(log_t *log, log_in_core_t *iclog, uint flags);
 STATIC void log_unalloc(void);
 STATIC int  log_write(xfs_mount_t *mp, xfs_log_iovec_t	region[], int nentries,
-		      xfs_log_ticket_t	tic, int commit);
+		      xfs_log_ticket_t	tic, xfs_lsn_t *start_lsn, int commit);
 
 /* local state machine functions */
 STATIC void log_state_done_syncing(log_in_core_t *iclog);
@@ -295,9 +295,10 @@ int
 xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_iovec_t	reg[],
 	      int		nentries,
-	      xfs_log_ticket_t	tic)
+	      xfs_log_ticket_t	tic,
+	      xfs_lsn_t		*start_lsn)
 {
-	log_write(mp, reg, nentries, tic, 0);
+	log_write(mp, reg, nentries, tic, start_lsn, 0);
 }	/* xfs_log_write */
 
 
@@ -374,15 +375,16 @@ log_commit_record(xfs_mount_t  *mp,
 {
 	int		error;
 	xfs_log_iovec_t	reg[1];
+	xfs_lsn_t	commit_lsn;
 	
 	reg[0].i_addr = 0;
 	reg[0].i_len = 0;
 
-	error = log_write(mp, reg, 1, ticket, 1);
+	error = log_write(mp, reg, 1, ticket, &commit_lsn, 1);
 	if (error)
 		log_panic("log_commit_record: Can't commit transaction");
 
-	return reg[0].i_lsn;
+	return commit_lsn;
 }	/* log_commit_record */
 
 
@@ -481,6 +483,7 @@ log_write(xfs_mount_t *		mp,
 	  xfs_log_iovec_t	reg[],
 	  int			nentries,
 	  xfs_log_ticket_t	tic,
+	  xfs_lsn_t		*start_lsn,
 	  int			commit)
 {
 	log_t		*log	= mp->m_log;
@@ -501,8 +504,8 @@ log_write(xfs_mount_t *		mp,
 	for (len=0, index=0; index < nentries; index++) {
 		len += reg[index].i_len;
 		len += sizeof(log_op_header_t);
-		reg[index].i_lsn = 0;
 	}
+	*start_lsn = 0;
 
 	if (ticket->t_flags & LOG_TIC_INITED)
 		len += sizeof(log_op_header_t);	    /* acct for start record */
@@ -517,7 +520,8 @@ log_write(xfs_mount_t *		mp,
 	    log_offset = log_state_get_iclog_space(log, len, &iclog, &lastwr);
 
 	    ptr = &iclog->ic_data[log_offset];
-	    reg[index].i_lsn = iclog->ic_header.h_lsn;
+	    if (! *start_lsn)
+		    *start_lsn = iclog->ic_header.h_lsn;
 	    for ( ;index < nentries; ) {
 		ASSERT(reg[index].i_len % sizeof(long) == 0);
 
@@ -527,15 +531,15 @@ log_write(xfs_mount_t *		mp,
 		 * can't have any "remains_to_copy" if we are inited.
 		 */
 		if (ticket->t_flags & LOG_TIC_INITED) {
-			logop_head		= (log_op_header_t *)ptr;
-			logop_head->oh_tid	= ticket->t_tid;
-			logop_head->oh_clientid	= ticket->t_clientid;
-			logop_head->oh_len	= 0;
-			logop_head->oh_flags	= LOG_START_TRANS;
-			ticket->t_flags &= ~LOG_TIC_INITED;	/* clear bit */
+		    logop_head		    = (log_op_header_t *)ptr;
+		    logop_head->oh_tid	    = ticket->t_tid;
+		    logop_head->oh_clientid = ticket->t_clientid;
+		    logop_head->oh_len	    = 0;
+		    logop_head->oh_flags    = LOG_START_TRANS;
+		    ticket->t_flags	    &= ~LOG_TIC_INITED;	/* clear bit */
 
-			start_rec_copy = sizeof(log_op_header_t);
-			log_write_adv_cnt(ptr, len, log_offset, start_rec_copy);
+		    start_rec_copy = sizeof(log_op_header_t);
+		    log_write_adv_cnt(ptr, len, log_offset, start_rec_copy);
 		}
 
 		/* Copy log operation header directly into data section */
@@ -564,7 +568,7 @@ log_write(xfs_mount_t *		mp,
 		    log_state_want_sync(log, iclog);
 		    log_state_release_iclog(log, iclog);
 		    remains_to_copy = 0;
-		    continue;
+		    break;			      /* break to outer loop */
 	        } else {				/* partial write */
 		    remains_to_copy = copy_len = logop_head->oh_len =
 			  iclog->ic_size - log_offset - sizeof(log_op_header_t);

@@ -54,7 +54,6 @@
 typedef struct xfs_log_iovec {
 	caddr_t		i_addr;		/* beginning address of region */
 	uint		i_len;		/* length in bytes of region */
-	xfs_lsn_t	i_lsn;		/* log sequence number of region */
 } xfs_log_iovec_t;
 
 typedef void* xfs_log_ticket_t;
@@ -81,7 +80,8 @@ void	  xfs_log_notify(struct xfs_mount *mp, xfs_lsn_t lsn,
 int	  xfs_log_reserve(struct xfs_mount *mp, uint length,
 			  xfs_log_ticket_t *ticket, char clientid, uint flags);
 int	  xfs_log_write(struct xfs_mount *mp, xfs_log_iovec_t region[],
-			int nentries, xfs_log_ticket_t ticket);
+			int nentries, xfs_log_ticket_t ticket,
+			xfs_lsn_t *start_lsn);
 
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp, dev_t log_dev);
