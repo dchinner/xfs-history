@@ -622,7 +622,9 @@ xfs_setattr(vnode_t	*vp,
 	 * once it is a part of the transaction.
 	 */
 	if (mask & AT_SIZE) {
-		if (vap->va_size < ip->i_d.di_size) {
+		if (vap->va_size > ip->i_d.di_size) {
+			xfs_igrow_start (ip, vap->va_size, credp);
+		} else if (vap->va_size < ip->i_d.di_size) {
 			xfs_iunlock (ip, XFS_ILOCK_EXCL);
 			xfs_itruncate_start (ip, XFS_ITRUNC_DEFINITE,
 					     (xfs_fsize_t)vap->va_size);
@@ -638,7 +640,7 @@ xfs_setattr(vnode_t	*vp,
          */
         if (mask & AT_SIZE) {
 		if (vap->va_size > ip->i_d.di_size) {
-			xfs_igrow (tp, ip, vap->va_size, credp);
+			xfs_igrow_finish (tp, ip, vap->va_size);
 		} else if (vap->va_size < ip->i_d.di_size) {
 			xfs_trans_ihold(tp, ip);
 			xfs_itruncate_finish (&tp, ip,
