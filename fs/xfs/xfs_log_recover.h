@@ -34,8 +34,10 @@ typedef struct xlog_recover {
 	uint		    r_type;
 	int		    r_items;		/* number of items */
 	xfs_trans_id_t	    r_trans_tid;	/* internal transaction tid */
-	uint		    r_state;		/* not needed */
-	xlog_recover_item_t *r_transq;
+	int		    r_state;		/* not needed */
+	xlog_recover_item_t *r_itemq;		/* q for buffers & inodes */
+	xlog_recover_item_t *r_item_extq;	/* q for extents */
+	xlog_recover_item_t *r_item_iunlinkq;	/* q for inode unlinks */
 } xlog_recover_t;
 
 
