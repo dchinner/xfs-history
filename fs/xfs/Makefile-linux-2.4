@@ -82,11 +82,18 @@ endif
 
 CPPFLAGS := -D__KERNEL__ -I$(HPATH)
 
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
+CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2
 AFLAGS := -D__ASSEMBLY__ $(CPPFLAGS)
 
 # use '-fno-strict-aliasing', but only if the compiler can take it
 CFLAGS += $(shell if $(CC) -fno-strict-aliasing -S -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-fno-strict-aliasing"; fi)
+
+ifdef CONFIG_LOCKMETER
+USE_FRAMEPTR = 1
+endif
+ifndef USE_FRAMEPTR
+CFLAGS += -fomit-frame-pointer
+endif
 
 export	CPPFLAGS CFLAGS AFLAGS
 
