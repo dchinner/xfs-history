@@ -4507,8 +4507,7 @@ xfs_finish_reclaim(
 	if (!locked) {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 	}
-	write_lock(&ih->ih_lock); /* Haven't worked this out yet */
-				  /* really not convinced :) */
+	write_lock(&ih->ih_lock);
 	if (XFS_ITOV_NULL(ip)) {
 		write_unlock(&ih->ih_lock);
 		if (!locked)
@@ -4516,9 +4515,9 @@ xfs_finish_reclaim(
 		return(0);
 	}
 	if (ip->i_flags & XFS_IRECLAIM) {
-		if (!locked) /* why iunlock first here? */
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		write_unlock(&ih->ih_lock);
+		if (!locked)
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		return(1);
 	}
 	ip->i_flags |= XFS_IRECLAIM;
