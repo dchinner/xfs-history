@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.36 1994/11/11 17:28:16 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.37 1994/11/11 21:09:14 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -80,7 +80,7 @@ extern int strncmp(char *, char *, int);
 extern struct vfs *vfs_devsearch( dev_t );
 STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
 STATIC int xfs_crack_file_id(file_id_t *, dev_t *, xfs_ino_t *);
-xfs_inode_t *xfs_get_inode ( dev_t, int);
+xfs_inode_t *xfs_get_inode ( dev_t, xfs_ino_t);
 grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *, int *);
 
 #ifndef SIM
@@ -103,7 +103,7 @@ extern void timestruc_fix( timestruc_t *);
  *
  */
 xfs_inode_t *
-xfs_get_inode(  dev_t fs_dev, int ino)
+xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 {
 	int			ret;
         struct vfs		*vfsp;
@@ -136,6 +136,13 @@ xfs_get_inode(  dev_t fs_dev, int ino)
                 	ip = xfs_iget( XFS_VFSTOM( vfsp ), 
 					NULL, ino, XFS_ILOCK_EXCL);
 
+
+			if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
+				if (ip) {
+					xfs_iunlock( ip, XFS_ILOCK_EXCL );
+				}
+				ip = NULL;
+			}
 #ifdef DEBUG
 			if (!ip) 
 				printf("xfs_get failed on %d \n",ino);
@@ -748,7 +755,8 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 	/*
 	 * Get the number of extents in the file.
 	 */
-	num_extents = ip->i_bytes / sizeof(*ep);
+	num_extents = ip->i_d.di_nextents;
+
 	if (num_extents) {
 
 		/*
@@ -756,11 +764,18 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 		 */
 		ASSERT(num_extents <  XFS_MAX_INCORE_EXTENTS);
 
+		/*
+		 * Read in the file extents from disk if necessary.
+		 */
+		if (!(ip->i_flags & XFS_IEXTENTS))
+			xfs_iread_extents(NULL, ip);
+
 		recsize = sizeof(grio_bmbt_irec_t) * num_extents;
 		grec = kmem_alloc(recsize, KM_SLEEP );
-		ASSERT(grec);
 
 		ep = ip->i_u1.iu_extents;
+
+		ASSERT( ep );
 
 		for (i = 0; i < num_extents; i++, ep++) {
 			/*
@@ -775,7 +790,7 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 		if (copyout(grec, extents, recsize )) {
 			ret = EFAULT;
 		}
-		kmem_free(grec, 0 );
+		kmem_free(grec, recsize);
 	}
 
 	/* 
