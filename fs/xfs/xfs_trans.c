@@ -49,11 +49,11 @@ zone_t		*xfs_trans_zone;
 xfs_tid_t	
 xfs_trans_id_alloc(xfs_mount_t *mp)
 {
-#ifndef SIM
-	ASSERT(0);
-#else
+	/*
+	 * XXXajs
+	 * Do this.
+	 */
 	return (mp->m_tid++);
-#endif
 }
 
 
@@ -63,12 +63,11 @@ xfs_trans_lsn_danger(xfs_mount_t	*mp,
 		     xfs_lsn_t		lsn)
 /* ARGSUSED */
 {
-#ifndef SIM
-	ASSERT(0);
-	/* NOTREACHED */
-#else
+	/*
+	 * XXXajs
+	 * Do this.
+	 */
 	return (0);
-#endif
 }
 
 /*
@@ -125,7 +124,7 @@ xfs_trans_dup(xfs_trans_t *tp)
 	XFS_LIC_INIT(&(ntp->t_items));
 
 	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
-	ASSERT(tp->t_ticket != NULL);
+	ASSERT(!log_debug || (tp->t_ticket != NULL));
 	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
 	ntp->t_ticket = tp->t_ticket;
 	ntp->t_log_res = tp->t_log_res;
@@ -504,7 +503,6 @@ xfs_trans_commit_async(xfs_mount_t *mp)
 	}
 }
 
-#ifdef _LOG_DEBUG
 STATIC void
 xfs_trans_do_commit(xfs_trans_t	*tp,
 		    uint	flags)
@@ -519,6 +517,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	xfs_lsn_t		commit_lsn;
 	int			error;
 	int			log_flags;
+	static xfs_lsn_t	trans_lsn = 1;
 
 	/*
 	 * Determine whether this commit is releasing a permanent
@@ -573,7 +572,12 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket,
 			      &(tp->t_lsn));
 	ASSERT(error == 0);
-	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
+	if (log_debug) {
+		commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket,
+					  log_flags);
+	} else {
+		tp->t_lsn = trans_lsn++;
+	}
 
 	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
 
@@ -601,13 +605,16 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 * After this call we cannot reference tp, because the call
 	 * can happen at any time and tp can be freed.
 	 */
-	tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
-	tp->t_logcb.cb_arg = tp;
-	xfs_log_notify(tp->t_mountp, commit_lsn, &(tp->t_logcb));
+	if (log_debug) {
+		tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
+		tp->t_logcb.cb_arg = tp;
+		xfs_log_notify(tp->t_mountp, commit_lsn, &(tp->t_logcb));
+	} else {
+		xfs_trans_committed(tp);
+	}
 }
 
-#else /* _LOG_DEBUG */
-
+#if 0
 
 STATIC void
 xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
@@ -687,7 +694,7 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	 */
 	xfs_trans_committed(tp);
 }
-#endif /* _LOG_DEBUG */
+#endif /* 0 */
 
 /*
  * Total up the number of log iovecs needed to commit this
