@@ -21,6 +21,7 @@
 #include "xfs_bio.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"
+#include "xfs_trans_priv.h"
 #ifdef SIM
 #include <bstring.h>
 #include "sim.h"
@@ -407,9 +408,9 @@ xfs_buf_item_init(buf_t *bp, struct xfs_mount *mp)
 	bip = (xfs_buf_log_item_t*)kmem_zalloc(sizeof(xfs_buf_log_item_t) +
 					       ((map_size - 1) * sizeof(int)),
 					       0);
-	bip->bli_type = XFS_LI_BUF;
-	bip->bli_ops = &xfs_buf_item_ops;
-	bip->bli_mountp = mp;
+	bip->bli_item.li_type = XFS_LI_BUF;
+	bip->bli_item.li_ops = &xfs_buf_item_ops;
+	bip->bli_item.li_mountp = mp;
 	bip->bli_buf = bp;
 	bip->bli_map_size = map_size;
 
@@ -707,9 +708,9 @@ xfs_buf_iodone(buf_t *bp)
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	ASSERT(bip->bli_buf == bp);
 
-	mp = bip->bli_mountp;
+	mp = bip->bli_item.li_mountp;
 	s = AIL_LOCK(mp);
-	xfs_trans_delete_ail(bip->bli_mountp, (xfs_log_item_t *)bip);
+	xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip);
 	AIL_UNLOCK(mp, s);
 
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +

@@ -7,9 +7,9 @@
 /*
  * From xfs_trans_async.c
  */
-extern int		xfs_trans_any_async(struct xfs_mount *);
+extern int		xfs_trans_any_async(xfs_mount_t *);
 extern void		xfs_trans_add_async(xfs_trans_t *);
-extern xfs_trans_t	*xfs_trans_get_async(struct xfs_mount *);
+extern xfs_trans_t	*xfs_trans_get_async(xfs_mount_t *);
 
 /*
  * From xfs_trans_item.c
@@ -29,12 +29,13 @@ extern void			xfs_trans_unlock_items(xfs_trans_t *);
 /*
  * From xfs_trans_ail.c
  */
-extern void		xfs_trans_push_ail(struct xfs_mount *);
-extern void		xfs_trans_update_ail(struct xfs_mount *,
-					     xfs_log_item_t *, xfs_lsn_t);
-extern xfs_log_item_t	*xfs_trans_first_ail(struct xfs_mount *, int *);
-extern xfs_log_item_t	*xfs_trans_next_ail(struct xfs_mount *,
-					    xfs_log_item_t *, int *);
+extern void		xfs_trans_push_ail(xfs_mount_t *);
+extern void		xfs_trans_update_ail(xfs_mount_t *, xfs_log_item_t *,
+					     xfs_lsn_t);
+extern void		xfs_trans_delete_ail(xfs_mount_t *, xfs_log_item_t *);
+extern xfs_log_item_t	*xfs_trans_first_ail(xfs_mount_t *, int *);
+extern xfs_log_item_t	*xfs_trans_next_ail(xfs_mount_t *, xfs_log_item_t *,
+					    int *);
 
 /*
  * Other.

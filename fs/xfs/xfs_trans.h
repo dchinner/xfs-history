@@ -26,6 +26,7 @@ typedef struct xfs_log_item {
  * Log item types.
  */
 #define	XFS_LI_BUF	0x1
+#define	XFS_LI_INODE	0x1
 
 
 
@@ -181,52 +182,41 @@ typedef struct xfs_trans_commit {
 } xfs_trans_commit_t;
 
 struct xfs_inode;
+struct xfs_mount;
 
 /*
  * xFS transaction mechanism exported interfaces.
  */
-extern xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *mp, uint type,
-					 uint reserve, uint flags);
-extern void		xfs_trans_callback(xfs_trans_t *trans,
-					   void(*callback)(xfs_trans_t*, void*),
-					   void *arg);
-extern buf_t		*xfs_trans_getblk(xfs_trans_t *trans, dev_t dev,
-					  daddr_t blkno, int len);
-extern buf_t		*xfs_trans_bread(xfs_trans_t *trans, dev_t dev,
-					 daddr_t blkno, int len);
-extern buf_t		*xfs_trans_getchunk(xfs_trans_t *trans, vnode_t *vp,
-			    		    struct bmapval *bmap,
-					    struct cred *cred);
-extern buf_t		*xfs_trans_chunkread(xfs_trans_t *trans, vnode_t *vp,
-					     struct bmapval *bmap,
-					     struct cred *cred);
-extern void		xfs_trans_brelse(xfs_trans_t *trans, buf_t *bp);
-extern void		xfs_trans_bjoin(xfs_trans_t *trans, buf_t *bp);
-extern void		xfs_trans_bhold(xfs_trans_t *trans, buf_t *bp);
-extern void		xfs_trans_iget(xfs_trans_t *trans, xfs_ino_t ino,
-				       struct xfs_inode **ipp);
-extern void		xfs_trans_irelse(xfs_trans_t *trans,
-					 struct xfs_inode *ip);
-extern void		xfs_trans_ijoin(xfs_trans_t *trans,
-					struct xfs_inode *ip);
-extern void		xfs_trans_ihold(xfs_trans_t *trans,
-					struct xfs_inode *ip);
-extern void		xfs_trans_log_buf(xfs_trans_t *trans, buf_t *bp,
-					  uint first, uint last);
-extern void		xfs_trans_log_inode(xfs_trans_t *trans,
-					    struct xfs_inode *ip,
-					    uint flags, int first, int last);
-extern void		xfs_trans_log_op(xfs_trans_t *trans,
-					 xfs_log_item_t *op);
-extern xfs_trans_id_t	xfs_trans_id(xfs_trans_t *trans);
-extern void		xfs_trans_commit(xfs_trans_t *trans, uint flags);
-void			xfs_trans_commit_async(struct xfs_mount *mp);
-extern void		xfs_trans_cancel(xfs_trans_t *trans);
+extern xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint, uint, uint);
+extern void		xfs_trans_callback(xfs_trans_t *,
+					   void(*)(xfs_trans_t*, void*),
+					   void *);
+extern buf_t		*xfs_trans_getblk(xfs_trans_t *, dev_t, daddr_t, int);
+extern buf_t		*xfs_trans_bread(xfs_trans_t *, dev_t, daddr_t, int);
+extern buf_t		*xfs_trans_getchunk(xfs_trans_t *, vnode_t *,
+					    struct bmapval *, struct cred *);
+extern buf_t		*xfs_trans_chunkread(xfs_trans_t *, vnode_t *,
+					     struct bmapval *, struct cred *);
+extern void		xfs_trans_brelse(xfs_trans_t *, buf_t *);
+extern void		xfs_trans_bjoin(xfs_trans_t *, buf_t *);
+extern void		xfs_trans_bhold(xfs_trans_t *, buf_t *);
+extern struct xfs_inode	*xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
+					xfs_ino_t , uint);
+extern void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *);
+extern void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *);
+extern void		xfs_trans_ihold(xfs_trans_t *, struct xfs_inode *);
+extern void		xfs_trans_log_buf(xfs_trans_t *, buf_t *, uint, uint);
+extern void		xfs_trans_log_inode(xfs_trans_t *, struct xfs_inode *,
+					    uint);
+extern void		xfs_trans_log_op(xfs_trans_t *, xfs_log_item_t *);
+extern xfs_trans_id_t	xfs_trans_id(xfs_trans_t *);
+extern void		xfs_trans_commit(xfs_trans_t *, uint flags);
+void			xfs_trans_commit_async(struct xfs_mount *);
+extern void		xfs_trans_cancel(xfs_trans_t *);
 
 /*
  * Not necessarily exported, but used outside a single file.
  */
-void			xfs_trans_delete_ail(struct xfs_mount *, xfs_log_item_t *);
 int			xfs_trans_lsn_danger(struct xfs_mount *, xfs_lsn_t);
 
 #endif	/* _XFS_TRANS_H */
