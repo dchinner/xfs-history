@@ -72,6 +72,13 @@
 
 #define MAXNAMLEN MAXNAMELEN
 
+int
+xfs_setattr(
+	bhv_desc_t	*bdp,
+	vattr_t		*vap,
+	int		flags,
+	cred_t		*credp);
+
 #define XFS_BHV_LOOKUP(vp, xbdp)  \
 	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops); \
 	ASSERT(xbdp);
@@ -2375,111 +2382,66 @@ xfs_dm_punch_hole(
 	dm_off_t	off,
 	dm_size_t	len)
 {
-	xfs_inode_t	*ip;
-	xfs_trans_t	*tp;
-	xfs_trans_t	*tp2;
-	xfs_mount_t	*mp;
-	int		error;
-	uint		lock_flags;
-	uint		commit_flags;
-	xfs_fsize_t	realsize;
-	u_int		bsize;
+	xfs_flock64_t	bf;
+	int		error = 0;
 	bhv_desc_t	*xbdp;
+	xfs_inode_t	*xip;
+	xfs_mount_t	*mp;
+	u_int		bsize;
+	int		cmd = XFS_IOC_UNRESVSP; /* punch */
+	xfs_fsize_t	realsize;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	/* Returns negative errors to DMAPI */
 
 	if (right < DM_RIGHT_EXCL)
 		return(-EACCES);
-
-	if (vp->v_type != VREG)
-		return(-EINVAL);
-	if (len != 0)	/* Only support punches to EOF for now */
-		return(-EAGAIN);
 	if (VN_MAPPED(vp))
 		return(-EBUSY);
 
 	XFS_BHV_LOOKUP(vp, xbdp);
-
-	ip = XFS_BHVTOI(xbdp);
-	mp = ip->i_mount;
+	xip = XFS_BHVTOI(xbdp);
+	mp = xip->i_mount;
 	bsize = mp->m_sb.sb_blocksize;
-
 	if (off & (bsize-1))
 		return(-EAGAIN);
+	if (len & (bsize-1))
+		return(-EAGAIN);
 
-	lock_flags = XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL;
-	xfs_ilock(ip, lock_flags);
-
-	realsize = ip->i_d.di_size;	/* saved size to restore to */
-	if (off >= realsize) {	/* also check block boundary */
-		xfs_iunlock(ip, lock_flags);
-		return(-EINVAL);
+	xfs_ilock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+	if ((off >= xip->i_d.di_size) || ((off+len) > xip->i_d.di_size)) {
+		xfs_iunlock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+		return(-E2BIG);
 	}
+	realsize = xip->i_d.di_size;
+	xfs_iunlock(xip, XFS_ILOCK_EXCL);
 
-	/*
-	 * Before we join the inode to the transaction, take care of
-	 * the part of the truncation that must be done without the
-	 * inode lock.	This needs to be done before joining the inode
-	 * to the transaction, because the inode cannot be unlocked
-	 * once it is a part of the transaction.
-	 */
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_SIZE);
-	if ((error = xfs_trans_reserve(tp, 0,
-				     XFS_ITRUNCATE_LOG_RES(mp), 0,
-				     XFS_TRANS_PERM_LOG_RES,
-				     XFS_ITRUNCATE_LOG_COUNT))) {
-		xfs_trans_cancel(tp, 0);
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-		return(-error); /* Return negative error to DMAPI */
-	}
-	commit_flags = XFS_TRANS_RELEASE_LOG_RES;
-	/* --- start of truncate --- */
-	xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t) off);
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	xfs_trans_ijoin(tp, ip, lock_flags);
-	xfs_trans_ihold(tp, ip);
-	xfs_itruncate_finish(&tp, ip, (xfs_fsize_t) off, XFS_DATA_FORK, 0);
+	bf.l_type = 0;
+	bf.l_whence = 0;
+	bf.l_start = (xfs_off_t)off;
+	bf.l_len = (xfs_off_t)len;
 
-	/*
-	 * If this is a synchronous mount, make sure that the
-	 * transaction goes to disk before returning to the user.
-	 */
-	if (mp->m_flags & XFS_MOUNT_WSYNC) {
-		xfs_trans_set_sync(tp);
-	}
-	xfs_trans_commit(tp, commit_flags, NULL);
-	/* --- end of truncate --- */
+	if (len == 0)
+		cmd = XFS_IOC_FREESP; /* truncate */
+	error = xfs_change_file_space(xbdp, cmd, &bf, (xfs_off_t)off,
+				      sys_cred,
+				      ATTR_DMI);
 
-	/* --- start of grow --- */
-	tp2 = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_SIZE);
-	if ((error = xfs_trans_reserve(tp2, 0,
-				     XFS_ITRUNCATE_LOG_RES(mp), 0,
-				     XFS_TRANS_PERM_LOG_RES,
-				     XFS_ITRUNCATE_LOG_COUNT))) {
-		xfs_trans_cancel(tp, 0);
-		xfs_trans_cancel(tp2, 0);
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-		return(-error); /* Return negative error to DMAPI */
+	/* If truncate, grow it back to its original size. */
+	if ((error == 0) && (len == 0)) {
+		vattr_t va;
+
+		va.va_mask = XFS_AT_SIZE;
+		va.va_size = realsize;
+		error = xfs_setattr(xbdp, &va, ATTR_DMI,
+				    sys_cred);
 	}
-	/* ip left locked after previous commit */
-	xfs_igrow_start(ip, realsize, NULL);
-	xfs_trans_ijoin(tp2, ip, lock_flags);
-	xfs_igrow_finish(tp2, ip, realsize, 0);
 
 	/* Let threads in send_data_event know we punched the file. */
-	ip->i_iocore.io_dmstate++;
+	xip->i_iocore.io_dmstate++;
+	xfs_iunlock(xip, XFS_IOLOCK_EXCL);
 
-	VN_HOLD(vp);
-	if (mp->m_flags & XFS_MOUNT_WSYNC) {
-		xfs_trans_set_sync(tp2);
-	}
-	xfs_trans_commit(tp2, commit_flags, NULL);
-	/* --- end of grow --- */
-
-	/* ip unlocked during the commit */
-	return(0);
+	return(error);
 }
 
 
