@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.195 $"
+#ident	"$Revision: 1.196 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2077,6 +2077,7 @@ xfs_bmap_del_extent(
 	xfs_fsblock_t		del_endblock;	/* first block past del */
 	xfs_fileoff_t		del_endoff;	/* first offset past del */
 	int			delay;	/* current block is delayed allocated */
+	int			do_fx;	/* free extent at end of routine */
 	xfs_bmbt_rec_t		*ep;	/* current extent entry pointer */
 	int			error;	/* error return value */
 	int			flags;	/* inode logging flags */
@@ -2088,9 +2089,11 @@ xfs_bmap_del_extent(
 	int			i;	/* temp state */
 	xfs_ifork_t		*ifp;	/* inode fork pointer */
 	xfs_mount_t		*mp;	/* mount structure */
+	xfs_filblks_t		nblks;	/* quota/sb block count */
 	xfs_bmbt_irec_t		new;	/* new record to be inserted */
 	/* REFERENCED */
 	xfs_extnum_t		nextents;	/* number of extents in list */
+	uint			qfield;	/* quota field to update */
 	xfs_filblks_t		temp;	/* for indirect length calculations */
 	xfs_filblks_t		temp2;	/* for indirect length calculations */
 	
@@ -2109,18 +2112,18 @@ xfs_bmap_del_extent(
 	delay = ISNULLSTARTBLOCK(got.br_startblock);
 	ASSERT(ISNULLSTARTBLOCK(del->br_startblock) == delay);
 	flags = 0;
+	qfield = 0;
 	/*
 	 * If deleting a real allocation, must free up the disk space.
 	 */
 	if (!delay) {
 		/*
-		 * Realtime allocation.  Free it and update di_nblocks.
+		 * Realtime allocation.  Free it and record di_nblocks update.
 		 */
 		if (whichfork == XFS_DATA_FORK &&
 		    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
 			xfs_fsblock_t	bno;
 			xfs_filblks_t	len;
-			xfs_filblks_t	nblks;
 
 			ASSERT(del->br_blockcount % mp->m_sb.sb_rextsize == 0);
 			ASSERT(del->br_startblock % mp->m_sb.sb_rextsize == 0);
@@ -2128,28 +2131,23 @@ xfs_bmap_del_extent(
 			len = del->br_blockcount / mp->m_sb.sb_rextsize;
 			if (error = xfs_rtfree_extent(ip->i_transp, bno, len))
 				return error;
+			do_fx = 0;
 			nblks = len * mp->m_sb.sb_rextsize;
-			ip->i_d.di_nblocks -= nblks;
 			if (XFS_IS_QUOTA_ON(mp) &&
 			    ip->i_ino != mp->m_sb.sb_uquotino &&
 			    ip->i_ino != mp->m_sb.sb_pquotino)
-				xfs_trans_mod_dquot_byino(tp, ip,
-					XFS_TRANS_DQ_RTBCOUNT, (long)-nblks);
+				qfield = XFS_TRANS_DQ_RTBCOUNT;
 		}
 		/*
-		 * Ordinary allocation.  Add it to list of extents to be
-		 * freed at the end of the transaction, and update di_nblocks.
+		 * Ordinary allocation.
 		 */
 		else {
-			xfs_bmap_add_free(del->br_startblock,
-				del->br_blockcount, flist, mp);
-			ip->i_d.di_nblocks -= del->br_blockcount;
+			do_fx = 1;
+			nblks = del->br_blockcount;
 			if (XFS_IS_QUOTA_ON(mp) &&
 			    ip->i_ino != mp->m_sb.sb_uquotino &&
 			    ip->i_ino != mp->m_sb.sb_pquotino)
-				xfs_trans_mod_dquot_byino(tp, ip,
-					XFS_TRANS_DQ_BCOUNT,
-					(long)-del->br_blockcount);
+				qfield = XFS_TRANS_DQ_BCOUNT;
 			/*
 			 * If we're freeing meta-data, then the transaction
 			 * that frees the blocks must be synchronous.  This
@@ -2178,6 +2176,8 @@ xfs_bmap_del_extent(
 	} else {
 		da_old = STARTBLOCKVAL(got.br_startblock);
 		da_new = 0;
+		nblks = 0;
+		do_fx = 0;
 	}
 	/*
 	 * Set flag value to use in switch statement.
@@ -2274,13 +2274,45 @@ xfs_bmap_del_extent(
 			new.br_startblock = del_endblock;
 			if (cur) {
 				xfs_bmbt_update(cur, got.br_startoff,
-					got.br_startblock,
-					del->br_startoff - got.br_startoff);
+					got.br_startblock, temp);
 				if (error = xfs_bmbt_increment(cur, 0, &i))
 					return error;
 				cur->bc_rec.b = new;
-				if (error = xfs_bmbt_insert(cur, &i))
+				error = xfs_bmbt_insert(cur, &i);
+				if (error && error != ENOSPC)
 					return error;
+				/*
+				 * If get no-space back from btree insert,
+				 * it tried a split, and we have a zero
+				 * block reservation.
+				 * Fix up our state and return the error.
+				 */
+				if (error == ENOSPC) {
+					/* 
+					 * Reset the cursor, don't trust
+					 * it after any insert operation.
+					 */
+					if (error = xfs_bmbt_lookup_eq(cur,
+							got.br_startoff,
+							got.br_startblock,
+							temp, &i))
+						return error;
+					ASSERT(i == 1);
+					/*
+					 * Update the btree record back
+					 * to the original value.
+					 */
+					xfs_bmbt_update(cur, got.br_startoff,
+						got.br_startblock,
+						got.br_blockcount);
+					/*
+					 * Reset the extent record back
+					 * to the original value.
+					 */
+					xfs_bmbt_set_blockcount(ep,
+						got.br_blockcount);
+					return XFS_ERROR(ENOSPC);
+				}
 				ASSERT(i == 1);
 			} else
 				flags |= XFS_ILOG_FEXT(whichfork);
@@ -2318,6 +2350,22 @@ xfs_bmap_del_extent(
 		ifp->if_lastex = idx + 1;
 		break;
 	}
+	/*
+	 * If we need to, add to list of extents to delete.
+	 */
+	if (do_fx)
+		xfs_bmap_add_free(del->br_startblock, del->br_blockcount, flist,
+			mp);
+	/*
+	 * Adjust inode # blocks in the file.
+	 */
+	if (nblks)
+		ip->i_d.di_nblocks -= nblks;
+	/*
+	 * Adjust quota data.
+	 */
+	if (qfield)
+		xfs_trans_mod_dquot_byino(tp, ip, qfield, (long)-nblks);
 	/*
 	 * Account for change in delayed indirect blocks.
 	 * Nothing to do for disk quota accounting here.
