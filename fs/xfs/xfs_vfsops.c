@@ -116,7 +116,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 	     struct mounta	*map,
 	     cred_t	*credp)
 {
-	return 0;
+	return ENOSYS;
 }
 
 
@@ -129,7 +129,7 @@ STATIC int
 xfs_mountroot(vfs_t		*vfsp,
 	      enum whymountroot	why)
 {
-	return 0;
+	return ENOSYS;
 }
 
 
@@ -143,7 +143,7 @@ xfs_unmount(vfs_t	*vfsp,
 	    int		flags,
 	    cred_t	*credp)
 {
-	return 0;
+	return ENOSYS;
 }
 
 
@@ -156,7 +156,7 @@ STATIC int
 xfs_root(vfs_t		*vfsp,
 	 vnode_t	**vpp)
 {
-	return 0;
+	return ENOSYS;
 }
 
 
