@@ -439,7 +439,7 @@ linvfs_fill_super(
 	struct inode	*ip;
 	struct xfs_mount_args *args;
 	struct statfs	statvfs;
-	int		error;
+	int		error = EINVAL;
 
 	args = (struct xfs_mount_args *)kmalloc(sizeof(struct xfs_mount_args), GFP_KERNEL);
 	if (!args)
@@ -447,7 +447,6 @@ linvfs_fill_super(
 	strncpy(args->fsname, sb->s_id, MAXNAMELEN);
 
 	if (xfs_parseargs((char *)data, sb->s_flags, args)) {
-		error = EINVAL;
 		goto out_null;
 	}
 	strncpy(args->fsname, bdevname(sb->s_bdev), MAXNAMELEN);
