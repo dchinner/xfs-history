@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.103 $"
+#ident	"$Revision: 1.104 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1309,6 +1309,7 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
     int				len, num, i;
     daddr_t			blkno;
     extern int			print_buffer;
+    xfs_disk_dquot_t		*ddq;
 
     f = (xfs_buf_log_format_t *)item->ri_buf[0].i_addr;
     old_f = (xfs_buf_log_format_v1_t *)f;
@@ -1378,6 +1379,13 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
 	    printf("		1st:%d  last:%d  cnt:%d  freeblks:%d  longest:%d\n",
 		   agf->agf_flfirst, agf->agf_fllast, agf->agf_flcount,
 		   agf->agf_freeblks, agf->agf_longest);
+	} else if (*(uint *)p == XFS_DQUOT_MAGIC) {
+	    ddq = (xfs_disk_dquot_t *)p;
+	    printf("	DQUOT Buffer:\n");
+	    if (!print_buffer) continue;
+	    printf("		UIDs 0x%x-0x%x\n", 
+		   ddq->d_id,
+		   ddq->d_id + (BBTOB(f->blf_len) / sizeof(xfs_dqblk_t)) - 1);
 	} else {
 	    printf("	BUF DATA\n");
 	    if (!print_buffer) continue;
@@ -1386,6 +1394,49 @@ xlog_recover_print_buffer(xlog_recover_item_t *item)
     }
 }	/* xlog_recover_print_buffer */
 
+STATIC void
+xlog_recover_print_quotaoff(xlog_recover_item_t *item)
+{
+	xfs_qoff_logformat_t *qoff_f;
+	char str[20];
+
+	qoff_f = (xfs_qoff_logformat_t *)item->ri_buf[0].i_addr;
+	ASSERT(qoff_f);
+	if (qoff_f->qf_flags & XFS_UQUOTA_ACCT) 
+		strcpy(str, "USER QUOTA");
+	if (qoff_f->qf_flags & XFS_PQUOTA_ACCT)
+		strcat(str, "PROJ QUOTA");
+	printf("\tQUOTAOFF: #regs:%d   type:%s\n",
+	       qoff_f->qf_size, str);
+}
+
+STATIC void
+xlog_recover_print_dquot(xlog_recover_item_t *item)
+{
+	xfs_dq_logformat_t 	*f;
+	struct xfs_disk_dquot	*d;
+	extern int print_quota;
+
+	f = (xfs_dq_logformat_t *)item->ri_buf[0].i_addr;
+	ASSERT(f);
+	ASSERT(f->qlf_len == 1);
+	d = (xfs_disk_dquot_t *)item->ri_buf[1].i_addr;
+	printf("\tDQUOT: #regs:%d  blkno:%lld  boffset:%u id: %d\n",
+	       f->qlf_size, f->qlf_blkno, f->qlf_boffset, f->qlf_id);
+	if (!print_quota)
+		return;
+	printf("\t\tmagic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n",
+	       d->d_magic, d->d_version, d->d_id, d->d_id);
+	printf("\t\tblk_hard 0x%x\tblk_soft 0x%x\tino_hard 0x%x"
+	       "\tino_soft 0x%x\n",
+		(int)d->d_blk_hardlimit, (int)d->d_blk_softlimit,
+		(int)d->d_ino_hardlimit, (int)d->d_ino_softlimit);
+	printf("\t\tbcount 0x%x (%d) icount 0x%x (%d)\n",
+		(int)d->d_bcount, (int)d->d_bcount, 
+		(int)d->d_icount, (int)d->d_icount);
+	printf("\t\tbtimer 0x%x itimer 0x%x \n",
+		(int)d->d_btimer, (int)d->d_itimer);
+}
 
 STATIC void
 xlog_recover_print_inode_core(xfs_dinode_core_t *di)
@@ -1615,6 +1666,14 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 		printf("5.3 INO");
 		break;
 	    }
+	    case XFS_LI_DQUOT: {
+		printf("DQ ");
+		break;
+	    }
+	    case XFS_LI_QUOTAOFF: {
+		printf("QOFF");
+		break;
+	    } 
 	    default: {
 		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type\n");
 		break;
@@ -1651,6 +1710,14 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 	    }
 	    case XFS_LI_EFI: {
 		xlog_recover_print_efi(item);
+		break;
+	    }
+	    case XFS_LI_DQUOT: {
+		xlog_recover_print_dquot(item);
+		break;
+	    }
+	    case XFS_LI_QUOTAOFF: {
+		xlog_recover_print_quotaoff(item);
 		break;
 	    }
 	    default: {
