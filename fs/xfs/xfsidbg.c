@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.70 $"
+#ident	"$Revision: 1.71 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2581,7 +2581,7 @@ xfsidbg_xilock_trace(xfs_inode_t *ip)
 			 else if ((__psint_t)ktep->val[1] == 3)
 				 qprintf("UNLOCK\n");
 			 prsymoff((void *)ktep->val[3], NULL, NULL);
-			 qprintf("Pid 0xd, cpu %d\n",
+			 qprintf("  Pid %d, cpu %d\n",
 				 (__psint_t)ktep->val[5],
 				 (__psint_t)ktep->val[4]);
 			 qprintf("-----------------------\n");
