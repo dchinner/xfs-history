@@ -38,7 +38,7 @@
 #define	kmem_check()	/* dummy for memory-allocation checking */
 #endif
 
-zone_t *xfs_bmap_free_zone;
+zone_t *xfs_bmap_free_item_zone;
 
 /*
  * Prototypes for internal bmap routines.
@@ -103,15 +103,15 @@ STATIC int				/* inode logging flags */
 xfs_bmap_del_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
-	xfs_bmap_free_t		**flist,/* list of extents to be freed */
+	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*new);	/* new data to put in extent list */
 
 STATIC void
 xfs_bmap_del_free(
-	xfs_bmap_free_t		**flist,
-	xfs_bmap_free_t		*prev,
-	xfs_bmap_free_t		*free);
+	xfs_bmap_free_t		*flist,
+	xfs_bmap_free_item_t	*prev,
+	xfs_bmap_free_item_t	*free);
 
 STATIC void
 xfs_bmap_delete_exlist(
@@ -124,7 +124,7 @@ xfs_bmap_extents_to_btree(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,
 	xfs_fsblock_t	firstblock,
-	xfs_bmap_free_t	**flist);
+	xfs_bmap_free_t	*flist);
 
 STATIC void
 xfs_bmap_insert_exlist(
@@ -921,7 +921,7 @@ STATIC int				/* inode logging flags */
 xfs_bmap_del_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extnum_t		idx,	/* extent number to update/delete */
-	xfs_bmap_free_t		**flist,/* list of extents to be freed */
+	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
 	xfs_bmbt_irec_t		*del)	/* data to remove from extent list */
 {
@@ -1025,15 +1025,16 @@ xfs_bmap_del_extent(
 
 STATIC void
 xfs_bmap_del_free(
-	xfs_bmap_free_t		**flist,
-	xfs_bmap_free_t		*prev,
-	xfs_bmap_free_t		*free)
+	xfs_bmap_free_t		*flist,
+	xfs_bmap_free_item_t	*prev,
+	xfs_bmap_free_item_t	*free)
 {
 	if (prev)
-		prev->xbf_next = free->xbf_next;
+		prev->xbfi_next = free->xbfi_next;
 	else
-		*flist = free->xbf_next;
-	kmem_zone_free(xfs_bmap_free_zone, free);
+		flist->xbf_first = free->xbfi_next;
+	flist->xbf_count--;
+	kmem_zone_free(xfs_bmap_free_item_zone, free);
 	kmem_check();
 }
 
@@ -1062,7 +1063,7 @@ xfs_bmap_extents_to_btree(
 	xfs_trans_t		*tp,
 	xfs_inode_t		*ip,
 	xfs_fsblock_t		firstblock,
-	xfs_bmap_free_t		**flist)
+	xfs_bmap_free_t		*flist)
 {
 	xfs_btree_lblock_t	*ablock;
 	xfs_fsblock_t		abno;
@@ -1354,26 +1355,27 @@ void
 xfs_bmap_add_free(
 	xfs_fsblock_t		bno,		/* fs block number of extent */
 	xfs_extlen_t		len,		/* length of extent */
-	xfs_bmap_free_t		**flist)	/* list of extents */
+	xfs_bmap_free_t		*flist)		/* list of extents */
 {
-	xfs_bmap_free_t		*cur;		/* current (next) element */
-	xfs_bmap_free_t		*new;		/* new element */
-	xfs_bmap_free_t		*prev;		/* previous element */
+	xfs_bmap_free_item_t	*cur;		/* current (next) element */
+	xfs_bmap_free_item_t	*new;		/* new element */
+	xfs_bmap_free_item_t	*prev;		/* previous element */
 
-	if (!xfs_bmap_free_zone)
-		xfs_bmap_free_zone = kmem_zone_init(sizeof(*cur), "xfs_bmap_free");
-	new = kmem_zone_alloc(xfs_bmap_free_zone, KM_SLEEP);
-	new->xbf_startblock = bno;
-	new->xbf_blockcount = len;
-	for (prev = NULL, cur = *flist; cur != NULL; prev = cur, cur = cur->xbf_next) {
-		if (cur->xbf_startblock >= bno)
+	if (!xfs_bmap_free_item_zone)
+		xfs_bmap_free_item_zone = kmem_zone_init(sizeof(*cur), "xfs_bmap_free_item");
+	new = kmem_zone_alloc(xfs_bmap_free_item_zone, KM_SLEEP);
+	new->xbfi_startblock = bno;
+	new->xbfi_blockcount = len;
+	for (prev = NULL, cur = flist->xbf_first; cur != NULL; prev = cur, cur = cur->xbfi_next) {
+		if (cur->xbfi_startblock >= bno)
 			break;
 	}
 	if (prev)
-		prev->xbf_next = new;
+		prev->xbfi_next = new;
 	else
-		*flist = new;
-	new->xbf_next = cur;
+		flist->xbf_first = new;
+	new->xbfi_next = cur;
+	flist->xbf_count++;
 	kmem_check();
 }
 
@@ -1385,47 +1387,52 @@ xfs_bmap_add_free(
 void
 xfs_bmap_finish(
 	xfs_trans_t		**tp,		/* transaction pointer addr */
-	xfs_bmap_free_t		**flist,	/* i/o: list extents to free */
-	xfs_fsblock_t		firstblock)	/* controlled a.g. for allocs */
+	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
+	xfs_fsblock_t		firstblock)	/* controlled ag for allocs */
 {
+	unsigned int		blkres;
 	xfs_efd_log_item_t	*efd;
 	xfs_efi_log_item_t	*efi;
 	xfs_agnumber_t		firstag;
-	xfs_bmap_free_t		*free;
+	xfs_bmap_free_item_t	*free;
+	int			i;
+	unsigned int		logres;
 	xfs_mount_t		*mp;
-	xfs_bmap_free_t		*next;
+	xfs_bmap_free_item_t	*next;
 	xfs_trans_t		*ntp;
-	xfs_bmap_free_t		*prev;
+	xfs_bmap_free_item_t	*prev;
 	xfs_sb_t		*sbp;
 
-	if (*flist == NULL)
+	if (flist->xbf_count == 0)
 		return;
 	ntp = *tp;
 	mp = ntp->t_mountp;
 	sbp = &mp->m_sb;
 	firstag = xfs_fsb_to_agno(sbp, firstblock);
-	for (prev = NULL, free = *flist; free != NULL; free = next) {
-		next = free->xbf_next;
-		if (xfs_fsb_to_agno(sbp, free->xbf_startblock) < firstag) {
-			efi = xfs_trans_get_efi(ntp, 1);
-			xfs_trans_log_efi_extent(ntp, efi, free->xbf_startblock, free->xbf_blockcount);
-			free->xbf_efip = efi;
-			prev = free;
+	for (prev = NULL, free = flist->xbf_first; free != NULL; free = next) {
+		next = free->xbfi_next;
+		if (xfs_fsb_to_agno(sbp, free->xbfi_startblock) < firstag)
 			continue;
-		}
-		xfs_free_extent(ntp, free->xbf_startblock, free->xbf_blockcount);
+		xfs_free_extent(ntp, free->xbfi_startblock,
+			free->xbfi_blockcount);
 		xfs_bmap_del_free(flist, prev, free);
 	}
-	if (*flist == NULL)
+	if (flist->xbf_count == 0)
 		return;
+	efi = xfs_trans_get_efi(ntp, flist->xbf_count);
+	for (free = flist->xbf_first, i = 0; free; free = free->xbfi_next, i++)
+		xfs_trans_log_efi_extent(ntp, efi + i, free->xbfi_startblock,
+			free->xbfi_blockcount);
+	logres = ntp->t_log_res;
+	blkres = ntp->t_blk_res - ntp->t_blk_res_used;
 	xfs_trans_commit(ntp, 0);
 	ntp = xfs_trans_alloc(mp, 0);
-	xfs_trans_reserve(ntp, 128, 128, 0, 0);
-	for (free = *flist; free != NULL; free = next) {
-		next = free->xbf_next;
-		xfs_free_extent(ntp, free->xbf_startblock, free->xbf_blockcount);
-		efd = xfs_trans_get_efd(ntp, free->xbf_efip, 1);
-		xfs_trans_log_efd_extent(ntp, efd, free->xbf_startblock, free->xbf_blockcount);
+	xfs_trans_reserve(ntp, blkres, logres, 0, 0);
+	efd = xfs_trans_get_efd(ntp, efi, flist->xbf_count);
+	for (free = flist->xbf_first, i = 0; free != NULL; free = next, i++) {
+		next = free->xbfi_next;
+		xfs_free_extent(ntp, free->xbfi_startblock, free->xbfi_blockcount);
+		xfs_trans_log_efd_extent(ntp, efd + i, free->xbfi_startblock, free->xbfi_blockcount);
 		xfs_bmap_del_free(flist, NULL, free);
 	}
 	*tp = ntp;
@@ -1540,7 +1547,7 @@ xfs_bmapi(
 	xfs_extlen_t		total,		/* total blocks needed */
 	xfs_bmbt_irec_t		*mval,		/* output: map values */
 	int			*nmap,		/* i/o: mval size/count */
-	xfs_bmap_free_t		**flist)	/* i/o: list extents to free */
+	xfs_bmap_free_t		*flist)		/* i/o: list extents to free */
 {
 	xfs_fsblock_t		abno;
 	xfs_extlen_t		alen;
@@ -1737,7 +1744,7 @@ xfs_bunmapi(
 	xfs_fsblock_t		bno,		/* starting offset to unmap */
 	xfs_extlen_t		len,		/* length to unmap in file */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
-	xfs_bmap_free_t		**flist)	/* i/o: list extents to free */
+	xfs_bmap_free_t		*flist)		/* i/o: list extents to free */
 {
 	xfs_btree_cur_t		*cur;
 	xfs_bmbt_irec_t		del;
