@@ -1,4 +1,4 @@
-#ident "$Revision: 1.322 $"
+#ident "$Revision: 1.323 $"
 
 
 #ifdef SIM
@@ -11,7 +11,7 @@
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <fs/specfs/spec_lsnode.h>
+#include <sys/fs/spec_lsnode.h>
 #include <sys/systm.h>
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>

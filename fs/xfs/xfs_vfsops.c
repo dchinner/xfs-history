@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.169 $"
+#ident  "$Revision: 1.170 $"
 
 
 #include <limits.h>
@@ -33,7 +33,7 @@
 #include <sys/grio.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-#include <fs/specfs/spec_lsnode.h>
+#include <sys/fs/spec_lsnode.h>
 #include <sys/kmem.h>
 #ifdef SIM
 #undef _KERNEL
