@@ -61,7 +61,8 @@ xfs_log_busy_slot_t		*xfs_trans_add_busy(xfs_trans_t *tp,
  * From xfs_trans_ail.c
  */
 void			xfs_trans_update_ail(struct xfs_mount *,
-				     struct xfs_log_item *, xfs_lsn_t, int);
+				     struct xfs_log_item *, xfs_lsn_t,
+				     unsigned long);
 void			xfs_trans_delete_ail(struct xfs_mount *,
 				     struct xfs_log_item *, int);
 struct xfs_log_item	*xfs_trans_first_ail(struct xfs_mount *, int *);

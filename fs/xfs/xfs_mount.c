@@ -1711,7 +1711,7 @@ xfs_check_frozen(
 	int	ioflag,
 	int	level)
 {
-	int	s;
+	SPLDECL(s);
 	int	do_lock = 0;
 
 	if (!mp->m_frozen) {

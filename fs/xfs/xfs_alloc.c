@@ -2504,7 +2504,7 @@ xfs_alloc_mark_busy(xfs_trans_t *tp,
 	xfs_mount_t		*mp;
 	xfs_perag_busy_t	*bsy;
 	int			n;
-	int			s;
+	SPLDECL(s);
 
 	mp = tp->t_mountp;
 	s = mutex_spinlock(&mp->m_perag[agno].pagb_lock);
@@ -2547,7 +2547,7 @@ xfs_alloc_clear_busy(xfs_trans_t *tp,
 {
 	xfs_mount_t		*mp;
 	xfs_perag_busy_t	*list;
-	int			s;
+	SPLDECL(s);
 
 	mp = tp->t_mountp;
 
@@ -2581,7 +2581,8 @@ xfs_alloc_search_busy(xfs_trans_t *tp,
 	int			n;
 	xfs_agblock_t		uend, bend;
 	xfs_lsn_t		lsn;
-	int			cnt, s;
+	int			cnt;
+	SPLDECL(s);
 
 	mp = tp->t_mountp;
 

@@ -2335,7 +2335,7 @@ xlog_recover_do_efi_trans(xlog_t		*log,
 	xfs_mount_t		*mp;
 	xfs_efi_log_item_t	*efip;
 	xfs_efi_log_format_t	*efi_formatp;
-	SPLDECL(spl);
+	SPLDECL(s);
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return;
@@ -2354,11 +2354,11 @@ xlog_recover_do_efi_trans(xlog_t		*log,
 	efip->efi_next_extent = efi_formatp->efi_nextents;
 	efip->efi_flags |= XFS_EFI_COMMITTED;
 
-	AIL_LOCK(mp,spl);
+	AIL_LOCK(mp,s);
 	/*
 	 * xfs_trans_update_ail() drops the AIL lock.
 	 */
- 	xfs_trans_update_ail(mp, (xfs_log_item_t *)efip, lsn, spl);
+ 	xfs_trans_update_ail(mp, (xfs_log_item_t *)efip, lsn, s);
 }	/* xlog_recover_do_efi_trans */
 
 
@@ -2382,7 +2382,7 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 	int			gen;
 	int			nexts;
 	__uint64_t		efi_id;
-	SPLDECL(spl);
+	SPLDECL(s);
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return;
@@ -2399,7 +2399,7 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 	 * in the AIL.
 	 */
 	mp = log->l_mp;
-	AIL_LOCK(mp,spl);
+	AIL_LOCK(mp,s);
 	lip = xfs_trans_first_ail(mp, &gen);
 	while (lip != NULL) {
 		if (lip->li_type == XFS_LI_EFI) {
@@ -2409,14 +2409,14 @@ xlog_recover_do_efd_trans(xlog_t		*log,
 				 * xfs_trans_delete_ail() drops the
 				 * AIL lock.
 				 */
-				xfs_trans_delete_ail(mp, lip, spl);
+				xfs_trans_delete_ail(mp, lip, s);
 				break;
 			}
 		}
 		lip = xfs_trans_next_ail(mp, lip, &gen, NULL);
 	}
 	if (lip == NULL) {
-		AIL_UNLOCK(mp, spl);
+		AIL_UNLOCK(mp, s);
 	}
 
 	/*
@@ -2757,10 +2757,10 @@ xlog_recover_process_efis(xlog_t	*log)
 	xfs_efi_log_item_t	*efip;
 	int			gen;
 	xfs_mount_t		*mp;
-	SPLDECL(spl);
+	SPLDECL(s);
 
 	mp = log->l_mp;
-	AIL_LOCK(mp,spl);
+	AIL_LOCK(mp,s);
 
 	lip = xfs_trans_first_ail(mp, &gen);
 	while (lip != NULL) {
@@ -2781,12 +2781,12 @@ xlog_recover_process_efis(xlog_t	*log)
 			continue;
 		}
 
-		AIL_UNLOCK(mp, spl);
+		AIL_UNLOCK(mp, s);
 		xlog_recover_process_efi(mp, efip);
-		AIL_LOCK(mp,spl);
+		AIL_LOCK(mp,s);
 		lip = xfs_trans_next_ail(mp, lip, &gen, NULL);
 	}
-	AIL_UNLOCK(mp, spl);
+	AIL_UNLOCK(mp, s);
 }	/* xlog_recover_process_efis */
 
 

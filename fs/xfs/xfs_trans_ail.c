@@ -281,7 +281,7 @@ xfs_trans_update_ail(
 	xfs_mount_t	*mp,
 	xfs_log_item_t	*lip,
 	xfs_lsn_t	lsn,
-	int	s)
+	unsigned long	s)
 {
 	xfs_ail_entry_t		*ailp;
 	xfs_log_item_t		*dlip=NULL;

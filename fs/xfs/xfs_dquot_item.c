@@ -171,7 +171,7 @@ void
 xfs_qm_dqunpin_wait(
 	xfs_dquot_t	*dqp)
 {
-	int             s;
+	SPLDECL(s);
 	
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	if (dqp->q_pincount == 0) {
