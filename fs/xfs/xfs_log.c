@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.136 $"
+#ident	"$Revision: 1.137 $"
 
 /*
  * High level interface routines for log manager
@@ -457,11 +457,8 @@ xfs_log_mount(xfs_mount_t	*mp,
 	xlog_t *log;
 	int    error;
 	
-#ifdef DEBUG
-	cmn_err(CE_NOTE, "Start mounting filesystem: %s", mp->m_fsname);
-#else
 	cmn_err(CE_NOTE, "!Start mounting filesystem: %s", mp->m_fsname);
-#endif
+
 	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
 
 	if (! xlog_debug) {
