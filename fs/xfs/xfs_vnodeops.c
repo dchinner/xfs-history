@@ -83,6 +83,10 @@ STATIC void	xfs_droplink(xfs_trans_t *tp,
 STATIC void	xfs_bumplink(xfs_trans_t *tp,
 			     xfs_inode_t *ip);
 
+STATIC int	xfs_open(vnode_t	**vpp,
+			 mode_t		flag,
+			 cred_t		*credp);
+
 STATIC int	xfs_close(vnode_t	*vp,
 			  int		flag,
 			  lastclose_t	lastclose,
@@ -251,12 +255,30 @@ sema_t xfs_ancestormon;		/* initialized in xfs_init */
 
 
 /*
- * No open action is required for regular files.  Devices are handled
+ * For xfs, we check that the file isn't too big to be opened by this kernel.
+ * No other open action is required for regular files.  Devices are handled
  * through the specfs file system, pipes through fifofs.  Device and
  * fifo vnodes are "wrapped" by specfs and fifofs vnodes, respectively,
  * when a new vnode is first looked up or created.
  */
+/*ARGSUSED*/
+STATIC int
+xfs_open(vnode_t	**vpp,
+	 mode_t		flag,
+	 cred_t		*credp)
+{
+	int		rval = 0;
+#if XFS_BIG_FILES == 0
+	vnode_t		*vp = *vpp;
+	xfs_inode_t	*ip = XFS_VTOI(vp);
 
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	if (ip->i_d.di_size > XFS_MAX_FILE_OFFSET)
+		rval = EFBIG;
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+#endif
+	return rval;
+}
 
 /*
  * xfs_close
@@ -3886,7 +3908,7 @@ xfs_seek(vnode_t	*vp,
 	 off_t		old_offset,
 	 off_t		*new_offsetp)
 {
-	if ((*new_offsetp >= XFS_MAX_FILE_OFFSET) ||
+	if ((*new_offsetp > XFS_MAX_FILE_OFFSET) ||
 	    (*new_offsetp < 0)) {
 		return XFS_ERROR(EINVAL);
 	} else {
@@ -4511,7 +4533,7 @@ struct vnodeops xfs_vnodeops = {
 #else
 
 struct vnodeops xfs_vnodeops = {
-	fs_noerr,
+	xfs_open,
 	xfs_close,
 	xfs_read,
 	xfs_write,
