@@ -1549,7 +1549,8 @@ xfs_uuid_mount(xfs_mount_t *mp)
 	int	i;
         
         if (uuid_is_nil(&mp->m_sb.sb_uuid)) {
-  	        cmn_err(CE_WARN, "XFS: Filesystem has nil UUID - can't mount");
+  	        cmn_err(CE_WARN, "XFS: Filesystem %s has nil UUID - can't mount",
+			mp->m_fsname);
                 return -1;
         }
  
@@ -1560,7 +1561,8 @@ xfs_uuid_mount(xfs_mount_t *mp)
 			continue;
 		}
 		if (uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i])) {
-  	                cmn_err(CE_WARN, "XFS: Filesystem has duplicate UUID - can't mount");
+  	                cmn_err(CE_WARN, "XFS: Filesystem %s has duplicate UUID - can't mount",
+				mp->m_fsname);
                         mutex_unlock(&xfs_uuidtabmon);
                         return -1;
                 }
