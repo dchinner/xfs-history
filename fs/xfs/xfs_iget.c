@@ -204,6 +204,8 @@ again:
 	 * i_bno, and i_index;
 	 */
 	ip = xfs_iread(mp, tp, ino);
+	if (ip == NULL)
+		return NULL;
 	vp = vn_alloc(&xfs_vnodeops, mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
 		      ip->i_u2.iu_rdev, ip);
 
