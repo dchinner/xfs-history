@@ -84,7 +84,7 @@ void
 xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 		      xfs_log_iovec_t		*log_vector)
 {
-	uint		total_size;
+	uint		nvecs;
 	xfs_log_iovec_t	*vecp;
 	xfs_inode_t	*ip;
 	size_t		data_bytes;
@@ -93,17 +93,20 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 	vecp = log_vector;
 
 	vecp->i_addr = (caddr_t)&iip->ili_format;
-	vecp->i_len = sizeof(xfs_inode_log_format_t);
+	vecp->i_len  = sizeof(xfs_inode_log_format_t);
 	vecp++;
-	total_size= sizeof(xfs_inode_log_format_t);
+	nvecs	     = 1;
 
 	vecp->i_addr = (caddr_t)&ip->i_d;
-	vecp->i_len = sizeof(xfs_dinode_core_t);	
+	vecp->i_len  = sizeof(xfs_dinode_core_t);
 	vecp++;
-	total_size += sizeof(xfs_dinode_core_t);
+	nvecs++;
+	iip->ili_format.ilf_fields |= XFS_ILOG_CORE;
 
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_DATA | XFS_ILOG_BROOT | XFS_ILOG_DEV);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_extents != NULL);
@@ -111,26 +114,37 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 			vecp->i_addr = (caddr_t)ip->i_u1.iu_extents;
 			vecp->i_len = ip->i_bytes;
 			vecp++;
-			total_size += ip->i_bytes;
+			nvecs++;
+			iip->ili_format.ilf_dsize = ip->i_bytes;
+		} else {
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_EXT;
 		}
 		break;
 
 	case XFS_DINODE_FMT_BTREE:
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_DATA | XFS_ILOG_EXT | XFS_ILOG_DEV);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
 			vecp->i_addr = (caddr_t)ip->i_broot;
 			vecp->i_len = ip->i_broot_bytes;
 			vecp++;
-			total_size += ip->i_broot_bytes;
+			nvecs++;
+			iip->ili_format.ilf_dsize = ip->i_broot_bytes;
+		} else {
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_BROOT;
 		}
 		break;
 
 	case XFS_DINODE_FMT_LOCAL:
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_EXT | XFS_ILOG_BROOT | XFS_ILOG_DEV);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_DATA) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_data != NULL);
 			ASSERT(ip->i_d.di_size > 0);
+
 			vecp->i_addr = (caddr_t)ip->i_u1.iu_data;
 			/*
 			 * Round i_bytes up to a word boundary.
@@ -142,17 +156,23 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 			       (ip->i_real_bytes == data_bytes));
 			vecp->i_len = data_bytes;
 			vecp++;
-			total_size += data_bytes;
+			nvecs++;
+			iip->ili_format.ilf_dsize = data_bytes;
+		} else {
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_DATA;
 		}
 		break;
 
 	case XFS_DINODE_FMT_DEV:
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_DATA | XFS_ILOG_BROOT | XFS_ILOG_EXT);
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
 			iip->ili_format.ilf_u.ilfu_rdev = ip->i_u2.iu_rdev;
 		}
 		break;
 
 	case XFS_DINODE_FMT_AGINO:
+		iip->ili_format.ilf_fields &= ~XFS_ILOG_NONCORE;
 		/*
 		 * We don't mess with the next free pointer in freed
 		 * inodes, because this is managed at the disk buffer
@@ -166,7 +186,7 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 		break;
 	}
 
-	iip->ili_format.ilf_size = total_size;
+	iip->ili_format.ilf_size = nvecs;
 }
 	
 

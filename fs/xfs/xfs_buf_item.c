@@ -111,7 +111,7 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 		    xfs_log_iovec_t	*log_vector)
 {
 	uint		base_size;
-	uint		total_size;
+	uint		nvecs;
 	xfs_log_iovec_t	*vecp;
 	buf_t		*bp;
 	int		first_bit;
@@ -136,7 +136,7 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 	vecp->i_addr = (caddr_t)&bip->bli_format;
 	vecp->i_len = base_size;
 	vecp++;
-	total_size = base_size;
+	nvecs = 1;
 
 	/*
 	 * Fill in an iovec for each set of contiguous chunks.
@@ -169,13 +169,13 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 			buffer_offset = first_bit * XFS_BLI_CHUNK;
 			vecp->i_addr = bp->b_un.b_addr + buffer_offset;
 			vecp->i_len = nbits * XFS_BLI_CHUNK;
-			total_size += vecp->i_len;
+			nvecs++;
 			break;
 		} else if (next_bit != last_bit + 1) {
 			buffer_offset = first_bit * XFS_BLI_CHUNK;
 			vecp->i_addr = bp->b_un.b_addr + buffer_offset;
 			vecp->i_len = nbits * XFS_BLI_CHUNK;
-			total_size += vecp->i_len;
+			nvecs++;
 			vecp++;
 			first_bit = next_bit;
 			last_bit = next_bit;	
@@ -185,7 +185,7 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 			nbits++;
 		}
 	}
-	bip->bli_format.blf_size = total_size;
+	bip->bli_format.blf_size = nvecs;
 
 	/*
 	 * Check to make sure everything is consistent.

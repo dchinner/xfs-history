@@ -273,7 +273,7 @@ xfs_efd_item_format(xfs_efd_log_item_t	*efdp,
 
 	size = sizeof(xfs_efd_log_format_t);
 	size += (efdp->efd_format.efd_nextents - 1) * sizeof(xfs_extent_t);
-	efdp->efd_format.efd_size = size;
+	efdp->efd_format.efd_size = 1;
 
 	log_vector->i_addr = (caddr_t)&(efdp->efd_format);
 	log_vector->i_len = size;
