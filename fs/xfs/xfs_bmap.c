@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.205 $"
+#ident	"$Revision: 1.206 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -29,6 +29,9 @@
 #include <sys/pfdat.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
+#include <sys/cred.h>
+#include <sys/dmi.h>
+#include <sys/dmi_kern.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -48,6 +51,7 @@
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
+#include "xfs_dmapi.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_itable.h"
@@ -4364,7 +4368,7 @@ xfs_getbmap(
 	bhv_desc_t		*bdp,		/* XFS behavior descriptor*/
 	struct getbmap		*bmv,		/* user bmap structure */
 	void			*ap,		/* pointer to user's array */
-	int			whichfork)	/* data or attr fork */
+	int			interface)	/* interface flags */
 {
 	__int64_t		bmvend;		/* last block requested */
 	int			error;		/* return value */
@@ -4380,11 +4384,39 @@ xfs_getbmap(
 	int			nex;		/* # of extents can do */
 	int			nmap;		/* number of map entries */
 	struct getbmap		out;		/* output structure */
+	int			whichfork;	/* data or attr fork */
 	int			prealloced;	/* this is a file with
 						 * preallocated data space */
+	__int32_t		oflags;		/* getbmapx bmv_oflags field */
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
+	whichfork = interface&BMV_IF_ATTRFORK ?
+				XFS_ATTR_FORK : XFS_DATA_FORK;
+	
+
+	/*	If the BMV_IF_NO_DMAPI_READ interface bit specified, do not
+	 *	generate a DMAPI read event.  Otherwise, if the DM_EVENT_READ
+	 *	bit is set for the file, generate a read event in order
+	 *	that the DMAPI application may do its thing before we return
+	 *	the extents.  Usually this means restoring user file data to
+	 *	regions of the file that look like holes.
+	 *	
+	 *	The "old behavior" (from F_GETBMAP) is to not specify 
+	 *	BMV_IF_NO_DMAPI_READ so that read events are generated.  If this
+	 *	were not true, callers of fcntl( F_GETBMAP ) could misinterpret
+	 *	holes in a DMAPI file as true holes, when in fact they may
+	 *	represent offline user data.
+	 */
+	if ( (interface&BMV_IF_NO_DMAPI_READ) == 0 &&
+		DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+		whichfork == XFS_DATA_FORK) {
+		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, 
+				0, 0, 0, NULL);
+		if (error)
+			return XFS_ERROR(error);
+	}
+
 	if (whichfork == XFS_ATTR_FORK) {
 		if (XFS_IFORK_Q(ip)) {
 			if (ip->i_d.di_aformat != XFS_DINODE_FMT_EXTENTS &&
@@ -4463,6 +4495,7 @@ xfs_getbmap(
 	if (error)
 		goto error0;
 	for (error = i = 0; i < nmap && bmv->bmv_length; i++) {
+		oflags = 0;
 		out.bmv_offset = XFS_FSB_TO_BB(mp, map[i].br_startoff);
 		out.bmv_length =
 			XFS_FSB_TO_BB(mp, map[i].br_blockcount);
@@ -4480,14 +4513,32 @@ xfs_getbmap(
 			else
 				out.bmv_block =
 					XFS_FSB_TO_DB(ip, map[i].br_startblock);
-			if (copyout(&out, ap, sizeof(out))) {
-				error = XFS_ERROR(EFAULT);
-				break;
+
+			/* return either a getbmap or a getbmapx structure. */
+
+			if (interface&BMV_IF_EXTENDED) {
+				struct	getbmapx 	outx;
+
+				GETBMAP_CONVERT(out,outx);
+				outx.bmv_oflags = oflags;
+				outx.bmv_unused1 = outx.bmv_unused2 = 0;
+				if (copyout(&outx, ap, sizeof(outx))) {
+					error = XFS_ERROR(EFAULT);
+					break;
+				}
+			} else {
+				if (copyout(&out, ap, sizeof(out))) {
+					error = XFS_ERROR(EFAULT);
+					break;
+				}
 			}
 			bmv->bmv_offset = out.bmv_offset + out.bmv_length;
 			bmv->bmv_length = MAX(0, bmvend - bmv->bmv_offset);
 			bmv->bmv_entries++;
-			ap = (void *)((struct getbmap *)ap + 1);
+			if (interface&BMV_IF_EXTENDED)
+				ap = (void *)((struct getbmapx *)ap + 1);
+			else
+				ap = (void *)((struct getbmap *)ap + 1);
 		}
 	}
 error0:
