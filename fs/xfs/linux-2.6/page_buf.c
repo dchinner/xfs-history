@@ -58,7 +58,9 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 
+#include <support/debug.h>
 #include <support/kmem.h>
+
 #include "page_buf_internal.h"
 
 #define SECTOR_SHIFT	9
@@ -547,8 +549,8 @@ _pagebuf_lookup_pages(
 			} else if (!PagePrivate(page)) {
 				unsigned long i, range = (offset + nbytes) >> SECTOR_SHIFT;
 
-				assert(blocksize < PAGE_CACHE_SIZE);
-				assert(!(pb->pb_flags & _PBF_PRIVATE_BH));
+				ASSERT(blocksize < PAGE_CACHE_SIZE);
+				ASSERT(!(pb->pb_flags & _PBF_PRIVATE_BH));
 				/*
 				 * In this case page->private holds a bitmap
 				 * of uptodate sectors (512) within the page
@@ -1311,8 +1313,8 @@ bio_end_io_pagebuf(
 		} else if (!PagePrivate(page)) {
 			unsigned int	j, range;
 
-			assert(blocksize < PAGE_CACHE_SIZE);
-			assert(!(pb->pb_flags & _PBF_PRIVATE_BH));
+			ASSERT(blocksize < PAGE_CACHE_SIZE);
+			ASSERT(!(pb->pb_flags & _PBF_PRIVATE_BH));
 
 			range = (bvec->bv_offset + bvec->bv_len)>>SECTOR_SHIFT;
 			for (j = bvec->bv_offset>>SECTOR_SHIFT; j < range; j++)
@@ -1605,7 +1607,7 @@ pagebuf_iomove(
 
 	while (cboff < boff) {
 		pagebuf_segment(pb, &cboff, &page, &cpoff, &csize);
-		assert(((csize + cpoff) <= PAGE_CACHE_SIZE));
+		ASSERT(((csize + cpoff) <= PAGE_CACHE_SIZE));
 
 		switch (mode) {
 		case PBRW_ZERO:
