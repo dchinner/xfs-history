@@ -24,6 +24,7 @@
 
 #include <linux/linux_to_xfs.h>
 
+#include <sys/sysmacros.h>
 #include <sys/capability.h>
 #include <sys/cred.h>
 #include <sys/vfs.h>
@@ -113,11 +114,13 @@ linvfs_inode_attr_in(
 		break;
 	case VBLK:
 		inode->i_mode |= S_IFBLK;
-		inode->i_rdev = attr.va_rdev;
+		inode->i_rdev = MKDEV(emajor(attr.va_rdev),
+				      eminor(attr.va_rdev));
 		break;
 	case VCHR:
 		inode->i_mode |= S_IFCHR;
-		inode->i_rdev = attr.va_rdev;
+		inode->i_rdev = MKDEV(emajor(attr.va_rdev),
+				      eminor(attr.va_rdev));
 		break;
 	case VFIFO:
 		inode->i_mode |= S_IFIFO;
@@ -146,7 +149,7 @@ int spectodevs(
 	dev_t	*logdevp,
 	dev_t	*rtdevp)
 {
-	*ddevp = *logdevp = sb->s_dev;
+	*ddevp = *logdevp = makedev(MAJOR(sb->s_dev), MINOR(sb->s_dev));
 	*rtdevp = 0;
 
 	return 0;

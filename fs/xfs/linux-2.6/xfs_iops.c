@@ -19,8 +19,10 @@
 
 #include <linux/linux_to_xfs.h>
 
+#include <sys/sysmacros.h>
 #include <sys/capability.h>
 #include <sys/cred.h>
+#include <sys/buf.h>
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>
@@ -59,11 +61,11 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	if (tp == VREG) {
 		VOP_CREATE(dvp, (char *)dentry->d_name.name, &va, 0, 0, &vp,
 				sys_cred, error);
-	} else if (tp == VBLK) {
+	} else if ((tp == VBLK) || (tp == VCHR)) {
 		/*
 		 * Get the real type from the mode
 		 */
-		va.va_rdev = rdev;
+		va.va_rdev = makedev(MAJOR(rdev), MINOR(rdev));
 		va.va_mask |= AT_RDEV;
 
 		va.va_type = IFTOVT(mode);
@@ -370,7 +372,25 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 
 int linvfs_bmap(struct inode *inode, int block)
 {
-	return(-ENOSYS);
+	vnode_t		*vp;
+	int		block_shift = inode->i_sb->s_blocksize_bits;
+	off_t		offset = block << block_shift;
+	ssize_t		count = inode->i_sb->s_blocksize;
+	struct	bmapval	bmap;
+	int		nbmaps = 1;
+	int		error;
+
+	vp = LINVFS_GET_VP(inode);
+
+	VOP_RWLOCK(vp, VRWLOCK_READ);
+	VOP_BMAP(vp, offset, count, B_READ, sys_cred, &bmap, &nbmaps, error);
+	VOP_RWUNLOCK(vp, VRWLOCK_READ);
+
+	if (error)
+		return 0;
+	printk("Mapped offset %d to block 0x%x\n", offset,
+		(int) (bmap.bn & 0xffffffff));
+	return((int)bmap.bn);
 }
 
 
@@ -393,7 +413,7 @@ int linvfs_revalidate(struct dentry *dentry)
         inode->i_nlink = va.va_nlink;
         inode->i_uid = va.va_uid;
         inode->i_gid = va.va_gid;
-        inode->i_rdev = va.va_rdev;
+        inode->i_rdev = MKDEV(emajor(va.va_rdev), eminor(va.va_rdev));
         inode->i_size = va.va_size;
         inode->i_blocks = va.va_nblocks;
         inode->i_blksize = va.va_blksize;

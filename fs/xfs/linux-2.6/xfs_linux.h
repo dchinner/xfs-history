@@ -49,6 +49,8 @@
 #ifndef __XFS_LINUX_
 #define __XFS_LINUX_
 
+#define _MIPS_SIM _ABIN32
+
 #define STATIC static 
 #include <sys/types.h>
 
