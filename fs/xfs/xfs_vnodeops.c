@@ -46,6 +46,7 @@
 #include <sys/mode.h>
 #include <sys/var.h>
 #include <sys/capability.h>
+#include <sys/dmi.h>
 #include <string.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -520,6 +521,11 @@ xfs_setattr(vnode_t	*vp,
 		commit_flags = 0;
 
 	} else {
+		if (DM_EVENT_ENABLED (ip, DM_TRUNCATE)) {
+			code = dm_data_event (vp, DM_TRUNCATE, vap->va_size, 0);
+			if (code)
+				return code;
+		}
 		lock_flags |= XFS_IOLOCK_EXCL;
 	}
 
@@ -805,10 +811,11 @@ xfs_setattr(vnode_t	*vp,
 		xfs_iunlock (ip, lock_flags);
 	}
 
+	if (DM_EVENT_ENABLED(ip, DM_ATTRIBUTE)) {
+		(void) dm_namesp_event (DM_ATTRIBUTE, vp, NULL, NULL, NULL,
+			0, 0);
+	}
 	return 0;
-
-
-
 
 error_return:
 
@@ -818,7 +825,6 @@ error_return:
 	xfs_iunlock (ip, lock_flags);
 
 	return code;
-
 }
 
 
@@ -1044,6 +1050,10 @@ xfs_inactive(vnode_t	*vp,
 	truncate = ((ip->i_d.di_nlink == 0) &&
 		    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
 		    ((ip->i_d.di_mode & IFMT) == IFREG));
+
+	if (ip->i_d.di_nlink == 0 && DM_EVENT_ENABLED(ip, DM_DESTROY)) {
+		(void) dm_namesp_event(DM_DESTROY, vp, NULL, NULL, NULL, 0, 0);
+	}
 
 #ifdef SIM
 	ASSERT(ip->i_d.di_nlink > 0);
@@ -1833,6 +1843,10 @@ try_again:
 
         *vpp = vp;
 
+	if (DM_EVENT_ENABLED(dp, DM_POSTCREATE)) {
+		(void) dm_namesp_event(DM_POSTCREATE, dir_vp, vp, name, NULL,
+			ip->i_d.di_mode, 0);
+	}
 	return 0;
 
 error_return:
@@ -1843,9 +1857,11 @@ error_return:
 	if (!dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	ASSERT(!truncated);
-
+	if (DM_EVENT_ENABLED(dp, DM_POSTCREATE)) {
+		(void) dm_namesp_event(DM_POSTCREATE, dir_vp, vp, name, NULL,
+			ip->i_d.di_mode, error);
+	}
 	return error;
-
 }
 
 
@@ -2215,6 +2231,13 @@ xfs_remove(vnode_t	*dir_vp,
 	nospace = 0;
 	vn_trace_entry(dir_vp, "xfs_remove");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
+
+	if (DM_EVENT_ENABLED (XFS_VTOI (dir_vp), DM_REMOVE)) {
+		error = dm_namesp_event (DM_REMOVE, dir_vp, NULL,
+			name, NULL, 0, 0);
+		if (error)
+			return error;
+	}
  retry:
 	tp = xfs_trans_alloc(mp, XFS_TRANS_REMOVE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -2341,14 +2364,22 @@ xfs_remove(vnode_t	*dir_vp,
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
+
+	if (DM_EVENT_ENABLED (dp, DM_POSTREMOVE)) {
+		(void) dm_namesp_event (DM_POSTREMOVE, dir_vp, NULL,
+			name, NULL, ip->i_d.di_mode, 0);
+	}
 	IRELE(ip);
 
 	return 0;
 
 error_return:
 	xfs_trans_cancel(tp, cancel_flags);
+	if (DM_EVENT_ENABLED (dp, DM_POSTREMOVE)) {
+		(void) dm_namesp_event (DM_POSTREMOVE, dir_vp, NULL,
+			name, NULL, ip->i_d.di_mode, error);
+	}
 	return error;
-
 }
 
 
@@ -2692,6 +2723,14 @@ xfs_rename(vnode_t	*src_dir_vp,
 	vn_trace_entry(src_dir_vp, "xfs_rename");
 	vn_trace_entry(target_dir_vp, "xfs_rename");
 
+	if (DM_EVENT_ENABLED(XFS_VTOI(src_dir_vp), DM_RENAME) ||
+	    DM_EVENT_ENABLED(XFS_VTOI(target_dir_vp), DM_RENAME)) {
+		error = dm_namesp_event (DM_RENAME, src_dir_vp, target_dir_vp,
+			src_name, target_name, 0, 0);
+		if (error)
+			return error;
+	}
+
 start_over:
 
 	mp = XFS_VFSTOM(src_dir_vp->v_vfsp);
@@ -3029,13 +3068,23 @@ start_over:
 		IRELE(target_ip);
 	}
 
+	if (DM_EVENT_ENABLED(XFS_VTOI(src_dir_vp), DM_POSTRENAME) ||
+	    DM_EVENT_ENABLED(XFS_VTOI(target_dir_vp), DM_POSTRENAME)) {
+		(void) dm_namesp_event (DM_POSTRENAME, src_dir_vp,
+			target_dir_vp, src_name, target_name, 0, 0);
+	}
+
 	return 0;
 
 error_return:
 
 	xfs_trans_cancel(tp, cancel_flags);
+	if (DM_EVENT_ENABLED(XFS_VTOI(src_dir_vp), DM_POSTRENAME) ||
+	    DM_EVENT_ENABLED(XFS_VTOI(target_dir_vp), DM_POSTRENAME)) {
+		(void) dm_namesp_event (DM_POSTRENAME, src_dir_vp,
+			target_dir_vp, src_name, target_name, 0, error);
+	}
 	return error;
-
 }
 
 
