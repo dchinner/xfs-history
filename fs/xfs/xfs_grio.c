@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.31 1994/08/09 17:19:47 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.32 1994/09/15 21:55:27 ajs Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -841,14 +841,22 @@ xfs_remove_tickets_from_fs(vfs_t *vfsp)
 
 
 	mp = XFS_VFSTOM(vfsp);
+	XFS_MOUNT_ILOCK(mp);
+	if (mp->m_inodes == NULL) {
+		XFS_MOUNT_IUNLOCK(mp);
+		return;
+	}
 
-	for ( ip = mp->m_inodes; ip; ip = ip->i_mnext ) {
+	ip = mp->m_inodes;
+	do {
 		for (ticket = ip->i_ticket; ticket; ticket = nextticket) {
 			nextticket = ticket->nextticket;
 			kmem_free( ticket, sizeof(grio_ticket_t));
 		}
 		ip->i_ticket = NULL;
-	}
+		ip = ip->i_mnext;
+	} while (ip != mp->m_inodes);
+	XFS_MOUNT_IUNLOCK(mp);
 }
 	
 

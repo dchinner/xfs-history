@@ -255,10 +255,15 @@ again:
 	 */
 	XFS_MOUNT_ILOCK(mp);
 	if (iq = mp->m_inodes) {
-		iq->i_mprevp = &ip->i_mnext;
+		ASSERT(iq->i_mprev->i_mnext == iq);
+		ip->i_mprev = iq->i_mprev;
+		iq->i_mprev->i_mnext = ip;
+		iq->i_mprev = ip;
+		ip->i_mnext = iq;
+	} else {
+		ip->i_mnext = ip;
+		ip->i_mprev = ip;
 	}
-	ip->i_mnext = iq;
-	ip->i_mprevp = &mp->m_inodes;
 	mp->m_inodes = ip;
 	XFS_MOUNT_IUNLOCK(mp);
 
@@ -363,10 +368,21 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 */
 	mp = ip->i_mount;
 	XFS_MOUNT_ILOCK(mp);
-	if (iq = ip->i_mnext) {
-		iq->i_mprevp = ip->i_mprevp;
+	ASSERT((ip->i_mnext != NULL) && (ip->i_mprev != NULL));
+	iq = ip->i_mnext;
+	iq->i_mprev = ip->i_mprev;
+	ip->i_mprev->i_mnext = iq;
+
+	/*
+	 * Fix up the head pointer if it points to the inode being deleted.
+	 */
+	if (mp->m_inodes == ip) {
+		if (ip == iq) {
+			mp->m_inodes = NULL;
+		} else {
+			mp->m_inodes = iq;
+		}
 	}
-	*ip->i_mprevp = iq;
 	mp->m_ireclaims++;
 	XFS_MOUNT_IUNLOCK(mp);
 
