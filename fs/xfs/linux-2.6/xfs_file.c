@@ -546,9 +546,9 @@ struct file_operations linvfs_invis_file_operations = {
 	.aio_read	= linvfs_aio_read_invis,
 	.aio_write	= linvfs_aio_write_invis,
 	.sendfile	= linvfs_sendfile,
-	.unlocked_ioctl	= linvfs_ioctl,
+	.unlocked_ioctl	= linvfs_ioctl_invis,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl	= xfs_compat_ioctl,
+	.compat_ioctl	= xfs_compat_invis_ioctl,
 #endif
 	.mmap		= linvfs_file_mmap,
 	.open		= linvfs_open,
