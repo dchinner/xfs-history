@@ -149,7 +149,8 @@ kmem_zalloc(size_t size, int flags)
 void
 kmem_free(void *ptr, size_t size)
 {
-	if (likely((unsigned long)ptr < VMALLOC_START)) {
+	if (((unsigned long)ptr < VMALLOC_START) ||
+            ((unsigned long)ptr >= VMALLOC_END)) {
 		kfree(ptr);
 	} else {
 		vfree(ptr);

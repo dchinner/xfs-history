@@ -999,7 +999,8 @@ pagebuf_get_empty(pb_target_t *target)
 static inline struct page *
 mem_to_page(void * addr)
 {
-	if (likely((unsigned long)addr < VMALLOC_START)) {
+	if (((unsigned long)addr < VMALLOC_START) ||
+            ((unsigned long)addr >= VMALLOC_END)) {
 		return virt_to_page(addr);
 	} else {
 		return vmalloc_to_page(addr);
