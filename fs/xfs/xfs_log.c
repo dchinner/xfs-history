@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.137 $"
+#ident	"$Revision: 1.138 $"
 
 /*
  * High level interface routines for log manager
@@ -1398,7 +1398,20 @@ xlog_write(xfs_mount_t *	mp,
 	    
 	    /* are we copying a commit or unmount record? */
 	    logop_head->oh_flags = flags;
-	    
+
+#ifndef NO_XFS_PARANOIA
+	    switch (logop_head->oh_clientid)  {
+	    case XFS_TRANSACTION:
+	    case XFS_VOLUME:
+	    case XFS_LOG:
+		break;
+	    default:
+		cmn_err(CE_PANIC,
+		    "Bad XFS transaction clientid 0x%x in ticket 0x%x\n",
+		    logop_head->oh_clientid, tic);
+	    }
+#endif
+
 	    /* Partial write last time? => (partial_copy != 0)
 	     * need_copy is the amount we'd like to copy if everything could
 	     * fit in the current bcopy.
