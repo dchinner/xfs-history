@@ -133,6 +133,16 @@ xfs_inotobp(
 	xfs_imap(mp, tp, ino, &imap);
 
 	/*
+	 * If the inode number maps to a block outside the bounds of the
+	 * file system then return NULL rather than calling read_buf
+	 * and panicing when we get an error from the driver.
+	 */
+	if ((imap.im_blkno + imap.im_len) >
+	    XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks)) {
+		return NULL;
+	}
+
+	/*
 	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
 	 * default to just a read_buf() call.
 	 */
@@ -320,8 +330,16 @@ xfs_iread(
 
 	/*
 	 * Get pointer's to the on-disk inode and the buffer containing it.
+	 * If the inode number refers to a block outside the file system
+	 * then xfs_inotobp() will return NULL.  In this case we should
+	 * return NULL as well.
 	 */
 	bp = xfs_inotobp(mp, tp, ino, &dip);
+
+	if (bp == NULL) {
+		kmem_zone_free(xfs_inode_zone, ip);
+		return NULL;
+	}
 
 #ifndef SIM
 	/*
