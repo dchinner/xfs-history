@@ -98,6 +98,7 @@
 #include "xfs_clnt.h"
 #include "xfs_cxfs.h"
 #include "xfs_utils.h"
+#include "xfs_fs_bio.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -188,6 +189,7 @@ xfs_get_vfsmount(
 extern int
 spectodevs(
 	struct super_block *sb,
+	struct xfs_args *args,
 	dev_t	*ddevp,
 	dev_t   *logdevp,
         dev_t   *rtdevp);
@@ -482,10 +484,9 @@ xfs_cmountfs(
 
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
+	xfs_fill_buftarg(&mp->m_logdev_targ, logdev, vfsp->vfs_super);
+	xfs_fill_buftarg(&mp->m_rtdev_targ, rtdev, vfsp->vfs_super);
 	mp->m_ddev_targp = &mp->m_ddev_targ;
-	mp->m_rtdev = NODEV;
-	mp->m_rtdev_targ.inode = NULL;
-	mp->m_logdev_targ.inode = NULL;
 
 	/* Values are in BBs */
 	if ((ap != NULL) && (ap->version >= 2) && 
@@ -507,7 +508,14 @@ xfs_cmountfs(
 			ldevvp = NULL;
 			mp->m_logdev_targ = mp->m_ddev_targ;
 		} else {
-			ASSERT(logdev == ddev);
+			/* Ensure that logdev isn't already mounted */
+			if (vfs_devsearch(logdev, VFS_FSTYPE_ANY) != NULL) {
+				error = XFS_ERROR(EBUSY);
+				goto error3;
+			}
+
+			/* Set the log device's block size */
+			set_blocksize(logdev, 512);
 		}
 		if (ap != NULL && ap->version != 0) {
 			/* Called through the mount system call */
@@ -518,6 +526,8 @@ xfs_cmountfs(
 			if (ap->logbufs != 0 &&
 			    ap->logbufs != -1 &&
 			    (ap->logbufs < 2 || ap->logbufs > 8)) {
+				cmn_err(CE_WARN,
+					"xfs: invalid logbufs value");
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -525,6 +535,7 @@ xfs_cmountfs(
 			if (ap->logbufsize != -1 &&
 			    ap->logbufsize != 16 * 1024 &&
 			    ap->logbufsize != 32 * 1024) {
+				cmn_err(CE_WARN, "xfs: invalid logbufsize");
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -551,7 +562,22 @@ xfs_cmountfs(
 	} else {
 		ldevvp = NULL;
 	}
+	if (rtdev != 0) {
+		if (rtdev == ddev || rtdev == logdev) {
+			cmn_err(CE_WARN, "XFS: Cannot mount filesystem with identical rtdev and logdev.");
+			error = XFS_ERROR(EINVAL);
+			goto error3;
+		} else {
+			/* Ensure that rtdev isn't already mounted */
+			if (vfs_devsearch(rtdev, VFS_FSTYPE_ANY) != NULL) {
+				error = XFS_ERROR(EBUSY);
+				goto error3;
+			}
 
+			/* Set the realtime device's block size */
+			set_blocksize(rtdev, 512);
+		}
+	}
 	/*
 	 * Pull in the 'wsync' and 'ino64' mount options before we do the real
 	 * work of mounting and recovery.  The arg pointer will
@@ -589,6 +615,7 @@ xfs_cmountfs(
 			if (ap->version < 3 ||
 			    ap->iosizelog > XFS_MAX_IO_LOG ||
 			    ap->iosizelog < XFS_MIN_IO_LOG) {
+				cmn_err(CE_WARN, "xfs: invalid log iosize");
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -602,6 +629,7 @@ xfs_cmountfs(
 		 */
 		if (ap->flags & XFSMNT_NORECOVERY) {
 			if (!(vfsp->vfs_flag & VFS_RDONLY)) {
+				cmn_err(CE_WARN, "xfs: tried to mount a FS read-write without recovery!");
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -622,6 +650,7 @@ xfs_cmountfs(
 	 */
 	if (mp->m_sb.sb_flags & XFS_SBF_READONLY &&
 	    !(vfsp->vfs_flag & VFS_RDONLY)) {
+		cmn_err(CE_WARN, "xfs: cannot mount a read-only filesystem as read-write");
 		error = XFS_ERROR(EROFS);
 		xfs_freesb(mp);
 		goto error3;
@@ -675,6 +704,10 @@ xfs_cmountfs(
 
 	if (client == 0) {
 		if (error = xfs_mountfs(vfsp, mp, ddev)) {
+#ifdef DEBUG
+			cmn_err(CE_WARN, "xfs: xfs_mountfs failed: error %d.",
+				error);
+#endif
 			goto error3;
 		}
 	}
@@ -955,7 +988,7 @@ xfs_mount(
 	if (error)
 		return (error);
 
-	if (error = spectodevs(vfsp->vfs_super, &ddev, &logdev, &rtdev))
+	if (error = spectodevs(vfsp->vfs_super, &args, &ddev, &logdev, &rtdev))
 		return error;
 
 	/*

@@ -82,13 +82,26 @@ extern struct super_operations linvfs_sops;
 
 int spectodevs(
 	struct super_block *sb,
+	struct xfs_args *args,
 	dev_t	*ddevp,
 	dev_t	*logdevp,
 	dev_t	*rtdevp)
 {
+#if 1
+        *ddevp = sb->s_dev;
+        if (args->logdev)
+                *logdevp = args->logdev;
+        else
+                *logdevp = *ddevp;
+        if (args->rtdev)
+                *rtdevp = args->rtdev;
+        else
+                *rtdevp = 0;
+#else
 	*ddevp = *logdevp = makedev(MAJOR(sb->s_dev), MINOR(sb->s_dev));
 	*rtdevp = 0;
-
+	printk("xfs: ddev=%d, logdev=%d\n", *ddevp, *logdevp);
+#endif
 	return 0;
 }
 
@@ -206,7 +219,7 @@ linvfs_read_super(
 
 
 #if !CONFIG_PAGE_BUF_META
-#define XFS_DATA_BLOCKSIZE_4K
+#undef XFS_DATA_BLOCKSIZE_4K
 #endif
 #ifdef XFS_DATA_BLOCKSIZE_4K
 	sb->s_blocksize = 4096;

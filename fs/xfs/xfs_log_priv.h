@@ -18,7 +18,7 @@
  */
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.65 $"
+#ident	"$Revision$"
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_LOG_TRACE
@@ -324,6 +324,12 @@ typedef struct xlog_rec_header {
 	uint	  h_cycle_data[XLOG_MAX_RECORD_BSIZE / BBSIZE];
 } xlog_rec_header_t;
 
+typedef struct xlog_volume_footer {
+	uuid_t	  f_magic;	/* magic field */
+	uuid_t	  f_uuid;	/* uuid of this log's filesystem */
+	int	  f_version;	/* footer version */
+} xlog_volume_footer_t;
+
 
 /*
  * - A log record header is 512 bytes.  There is plenty of room to grow the
@@ -470,7 +476,5 @@ extern void	 xlog_recover_process_iunlinks(xlog_t *log);
 #define XLOG_TRACE_REL_FLUSH   2
 #define XLOG_TRACE_SLEEP_FLUSH 3
 #define XLOG_TRACE_WAKE_FLUSH  4
-
-
 
 #endif	/* _XFS_LOG_PRIV_H */

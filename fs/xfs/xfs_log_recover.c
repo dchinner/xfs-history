@@ -646,6 +646,7 @@ xlog_find_tail(xlog_t  *log,
 	       int readonly)
 {
 	xlog_rec_header_t	*rhead;
+	xlog_volume_footer_t	*rfoot;
 	xlog_op_header_t	*op_head;
 	xfs_buf_t			*bp;
 	int			error, i, found;
@@ -710,8 +711,43 @@ xlog_find_tail(xlog_t  *log,
 
 	/* find blk_no of tail of log */
 	rhead = (xlog_rec_header_t *)XFS_BUF_PTR(bp);
+	rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
 	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
 
+	if (log->l_mp->m_sb.sb_logstart == 0) { /* external log */
+		uuid_t magic;
+		uint_t status;
+
+		(unsigned int)(magic.__u_bits)[0] = 0x7068696c;
+		(unsigned int)(magic.__u_bits)[1] = 0x266d6b70;
+		(unsigned int)(magic.__u_bits)[2] = 0x77657265;
+		(unsigned int)(magic.__u_bits)[3] = 0x68657265;
+
+		if (uuid_compare(&(rfoot->f_magic), &magic, &status) == 0) {
+			/* This has the magic number--it is an external log.
+			 * Now make sure that it's associated with the
+			 * filesystem that we're trying to mount. */
+			xfs_sb_t *super;
+
+			super = &log->l_mp->m_sb;
+			if (uuid_compare(&(super->sb_uuid), &(rfoot->f_uuid),
+					 &status) != 0) {
+				xlog_warn("xfs_log_recover: This Is Not The Log You're Looking For.\nAre you sure that this is the right device?\n");
+				error = XFS_ERROR(EINVAL);
+				goto exit;
+			}
+			/* Since the last block of the log is this magic data,
+			 * decrease the effective size. */
+			/* FIXME: is this the right thing to do? */
+			log->l_logsize -= BBSIZE;
+			log->l_iclog_size -= BBSIZE;
+			log->l_logBBsize -= BBSIZE / 512;
+		} else {
+			xlog_warn("xfs_log_recover: invalid log magic number.  Did you use mkfs to create this\nlog?");
+			error = XFS_ERROR(EINVAL);
+			goto exit;
+		}
+	}
 	/*
 	 * Reset log values according to the state of the log when we
 	 * crashed.  In the case where head_blk == 0, we bump curr_cycle
