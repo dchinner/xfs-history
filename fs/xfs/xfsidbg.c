@@ -2921,19 +2921,19 @@ xfs_fmtmode(int m)
 	static char rval[16];
 
 	sprintf(rval, "%c%c%c%c%c%c%c%c%c%c%c%c%c",
-		"?fc?dxb?r?l?S?m?"[(m & IFMT) >> 12],
-		m & ISUID ? 'u' : '-',
-		m & ISGID ? 'g' : '-',
-		m & ISVTX ? 'v' : '-',
-		m & IREAD ? 'r' : '-',
-		m & IWRITE ? 'w' : '-',
-		m & IEXEC ? 'x' : '-',
-		m & (IREAD >> 3) ? 'r' : '-',
-		m & (IWRITE >> 3) ? 'w' : '-',
-		m & (IEXEC >> 3) ? 'x' : '-',
-		m & (IREAD >> 6) ? 'r' : '-',
-		m & (IWRITE >> 6) ? 'w' : '-',
-		m & (IEXEC >> 6) ? 'x' : '-');
+		"?fc?dxb?r?l?S?m?"[(m & S_IFMT) >> 12],
+		m & S_ISUID ? 'u' : '-',
+		m & S_ISGID ? 'g' : '-',
+		m & S_ISVTX ? 'v' : '-',
+		m & S_IRUSR ? 'r' : '-',
+		m & S_IWUSR ? 'w' : '-',
+		m & S_IXUSR ? 'x' : '-',
+		m & S_IRGRP ? 'r' : '-',
+		m & S_IWGRP ? 'w' : '-',
+		m & S_IXGRP ? 'x' : '-',
+		m & S_IROTH ? 'r' : '-',
+		m & S_IWOTH ? 'w' : '-',
+		m & S_IXOTH ? 'x' : '-');
 	return rval;
 }
 
