@@ -103,7 +103,8 @@ xfs_alloc_extent(
 	xfs_fsblock_t	bno,	/* requested starting block */
 	xfs_extlen_t	len,	/* requested length */
 	xfs_alloctype_t	type,	/* allocation type, see above definition */
-	xfs_extlen_t	total);	/* total blocks needed in transaction */
+	xfs_extlen_t	total,	/* total blocks needed in transaction */
+	int		wasdel);/* extent was previously delayed-allocated */
 
 /*
  * Decide whether to use this allocation group for this allocation.
@@ -139,7 +140,8 @@ xfs_alloc_vextent(
 	xfs_extlen_t	maxlen,	/* maximum requested length */
 	xfs_extlen_t	*len,	/* output: actual allocated length */
 	xfs_alloctype_t	type,	/* allocation type, see above definition */
-	xfs_extlen_t	total);	/* total blocks needed in transaction */
+	xfs_extlen_t	total,	/* total blocks needed in transaction */
+	int		wasdel);/* extent was previously delayed-allocated */
 
 /*
  * Free an extent.
@@ -151,4 +153,3 @@ xfs_free_extent(
 	xfs_extlen_t	len);	/* length of extent */
 
 #endif	/* !_FS_XFS_ALLOC_H */
-

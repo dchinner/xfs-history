@@ -274,7 +274,8 @@ xfs_alloc_ag_vextent(
 	xfs_extlen_t	minlen,
 	xfs_extlen_t	maxlen,
 	xfs_extlen_t	*len,
-	xfs_alloctype_t	type);
+	xfs_alloctype_t	type,
+	int		wasdel);
 
 STATIC xfs_agblock_t
 xfs_alloc_ag_vextent_exact(
@@ -2186,7 +2187,16 @@ xfs_alloc_ag_vextent_near(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xf
  * Generic extent allocation in an allocation group, variable-size.
  */
 STATIC xfs_agblock_t
-xfs_alloc_ag_vextent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblock_t bno, xfs_extlen_t minlen, xfs_extlen_t maxlen, xfs_extlen_t *len, xfs_alloctype_t type) 
+xfs_alloc_ag_vextent(
+	xfs_trans_t	*tp,
+	buf_t		*agbuf,
+	xfs_agnumber_t	agno,
+	xfs_agblock_t	bno,
+	xfs_extlen_t	minlen,
+	xfs_extlen_t	maxlen,
+	xfs_extlen_t	*len,
+	xfs_alloctype_t	type,
+	int		wasdel) 
 {
 	xfs_agf_t *agf;
 	xfs_mount_t *mp;
@@ -2214,7 +2224,10 @@ xfs_alloc_ag_vextent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agb
 		agf = xfs_buf_to_agf(agbuf);
 		agf->agf_freeblks -= *len;
 		xfs_alloc_log_agf(tp, agbuf, XFS_AGF_FREEBLKS);
-		xfs_trans_mod_sb(tp, XFS_SB_FDBLOCKS, -(*len));
+		if (wasdel)
+			xfs_trans_mod_sb(tp, XFS_TRANS_SB_RES_FDBLOCKS, -(*len));
+		else
+			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, -(*len));
 	}
 	return r;
 }
@@ -2304,7 +2317,7 @@ xfs_free_ag_extent(xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_agblo
 	agf->agf_freeblks += flen;
 	xfs_alloc_log_agf(tp, agbuf, XFS_AGF_FREEBLKS);
 	xfs_btree_del_cursor(cnt_cur);
-	xfs_trans_mod_sb(tp, XFS_SB_FDBLOCKS, flen);
+	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, flen);
 	return 1;
 }
 
@@ -2342,12 +2355,13 @@ xfs_alloc_extent(
 	xfs_fsblock_t	bno,	/* requested starting block */
 	xfs_extlen_t	len,	/* requested length */
 	xfs_alloctype_t	type,	/* allocation type, see above definition */
-	xfs_extlen_t	total)	/* total blocks needed in transaction */
+	xfs_extlen_t	total,	/* total blocks needed in transaction */
+	int		wasdel)	/* extent was previously delayed-allocated */
 {
 	xfs_extlen_t rlen;
 	xfs_fsblock_t rval;
 
-	rval = xfs_alloc_vextent(tp, bno, len, len, &rlen, type, total);
+	rval = xfs_alloc_vextent(tp, bno, len, len, &rlen, type, total, wasdel);
 	if (rval != NULLFSBLOCK)
 		ASSERT(rlen == len);
 	return rval;
@@ -2392,7 +2406,7 @@ xfs_alloc_fix_freelist(
 	}
 	while (agf->agf_freecount < need) {
 		i = need - agf->agf_freecount;
-		agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, 0, 1, i, &i, XFS_ALLOCTYPE_THIS_AG);
+		agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, 0, 1, i, &i, XFS_ALLOCTYPE_THIS_AG, 0);
 		if (agbno == NULLAGBLOCK)
 			break;
 		for (bno = agbno + i - 1; bno >= agbno; bno--) {
@@ -2434,7 +2448,8 @@ xfs_alloc_vextent(
 	xfs_extlen_t	maxlen,	/* maximum requested length */
 	xfs_extlen_t	*len,	/* output: actual allocated length */
 	xfs_alloctype_t	type,	/* allocation type, see above definition */
-	xfs_extlen_t	total)	/* total blocks needed in transaction */
+	xfs_extlen_t	total,	/* total blocks needed in transaction */
+	int		wasdel)	/* extent was previously delayed-allocated */
 {
 	xfs_agblock_t	agbno;
 	buf_t		*agbuf;
@@ -2472,7 +2487,7 @@ xfs_alloc_vextent(
 		if (agbuf) {
 			agf = xfs_buf_to_agf(agbuf);
 			agbno = xfs_fsb_to_agbno(sbp, bno);
-			agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, agbno, minlen, maxlen, len, ntype); 
+			agbno = xfs_alloc_ag_vextent(tp, agbuf, agno, agbno, minlen, maxlen, len, ntype, wasdel); 
 			ASSERT(agbno != NULLAGBLOCK);
 		}
 		break;
@@ -2491,7 +2506,7 @@ xfs_alloc_vextent(
 			agbuf = xfs_alloc_fix_freelist(tp, tagno, minlen, total, flags);
 			if (agbuf) {
 				agf = xfs_buf_to_agf(agbuf);
-				agbno = xfs_alloc_ag_vextent(tp, agbuf, tagno, agbno, minlen, maxlen, len, ntype); 
+				agbno = xfs_alloc_ag_vextent(tp, agbuf, tagno, agbno, minlen, maxlen, len, ntype, wasdel); 
 				ASSERT(agbno != NULLAGBLOCK);
 				break;
 			}
