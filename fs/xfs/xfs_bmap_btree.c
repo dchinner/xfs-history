@@ -696,6 +696,8 @@ xfs_bmbt_insrec(
 				xfs_btree_check_lblock(cur, block, level);
 				ptr = cur->bc_ptrs[level];
 				xfs_bmbt_set_startoff(&nrec, nkey.br_startoff);
+				xfs_bmbt_set_startblock(&nrec, 0);
+				xfs_bmbt_set_blockcount(&nrec, 0);
 			} else {
 				xfs_bmbt_trace_cursor("xfs_bmbt_insrec exit2",
 					cur);
