@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision: 1.36 $"
+#ident "$Revision$"
 
 struct buf;
 struct xfs_bmap_free;
@@ -268,7 +268,14 @@ xfs_btree_check_sptr(
  */
 void
 xfs_btree_del_cursor(
-	xfs_btree_cur_t		*cur);	/* btree cursor */
+	xfs_btree_cur_t		*cur,	/* btree cursor */
+	int			error);	/* del because of error */
+
+/*
+ * Values for the error parameter of xfs_btree_del_cursor().
+ */
+#define	XFS_BTREE_NOERROR	0
+#define	XFS_BTREE_ERROR		1
 
 /*
  * Duplicate the btree cursor.
