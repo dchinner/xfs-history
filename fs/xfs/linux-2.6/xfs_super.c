@@ -488,7 +488,7 @@ linvfs_write_super(
 	irix_dev_t	dev;
 
 
-	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_DELWRI|SYNC_NOWAIT|SYNC_ATTR,
+	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
 		sys_cred, error);
 
 	bflush_bufs(vfsp->vfs_dev);/* Pretend a bdflush is going off for XFS

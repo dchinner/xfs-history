@@ -1491,6 +1491,7 @@ xlog_sync(xlog_t		*log,
 
 		/* account for internal log which does't start at block #0 */
 		XFS_BUF_SET_ADDR(bp, XFS_BUF_ADDR(bp) + log->l_logBBstart);
+		XFS_BUF_WRITE(bp);
 		if (error = XFS_bwrite(bp)) {
 			xfs_ioerror_alert("xlog_sync (split)", log->l_mp, 
 					  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));

@@ -206,7 +206,7 @@ xlog_bwrite(
 	XFS_BUF_SET_ADDR(bp, log->l_logBBstart + blk_no);
 	XFS_BUF_ZEROFLAGS(bp);
 	XFS_BUF_BUSY(bp);
-    XFS_BUF_HOLD(bp);
+	XFS_BUF_HOLD(bp);
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
 	XFS_BUF_SET_TARGET(bp, &log->l_mp->m_logdev_targ);
 
