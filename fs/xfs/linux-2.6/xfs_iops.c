@@ -585,12 +585,18 @@ linvfs_pb_bmap(struct inode *inode,
 	return error;
 }
 
-struct inode_operations linvfs_file_inode_operations =
-{
-  default_file_ops:	&linvfs_file_operations,
-  get_block:		linvfs_get_block,
+struct address_space_operations linvfs_aops = {
   readpage:		pagebuf_read_full_page,
   writepage:		pagebuf_write_full_page,
+
+	/* prepare_write: ext2_prepare_write,   */
+	/* commit_write: generic_commit_write,  */
+	/* bmap: ext2_bmap			*/
+
+};
+
+struct inode_operations linvfs_file_inode_operations =
+{
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   pagebuf_bmap:		linvfs_pb_bmap,
@@ -599,7 +605,6 @@ struct inode_operations linvfs_file_inode_operations =
 
 struct inode_operations linvfs_dir_inode_operations =
 {
-  default_file_ops:	&linvfs_dir_operations,
   create:		linvfs_create,
   lookup:		linvfs_lookup,
   link:			linvfs_link,	

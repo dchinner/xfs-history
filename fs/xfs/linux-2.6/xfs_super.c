@@ -130,7 +130,7 @@ linvfs_release_inode(struct inode *inode)
 {
 	if (inode) {
 		pagebuf_lock_disable(inode);
-		truncate_inode_pages(inode, 0L);
+		truncate_inode_pages(&inode->i_data, 0L);
 		iput(inode);
 	}
 }
@@ -190,7 +190,7 @@ linvfs_read_super(
 	uap->dataptr = (char *)args;
 	uap->datalen = sizeof(*args);
 
-	lock_super(sb);
+	// lock_super(sb);
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 
 	vfsops = &xfs_vfsops;
@@ -300,13 +300,18 @@ linvfs_read_inode(
 	linvfs_revalidate(&dentry);
 	inode->i_version = ++event;
 
-	if (S_ISREG(inode->i_mode))
+	if (S_ISREG(inode->i_mode)) {
 		inode->i_op = &linvfs_file_inode_operations;
-	else if (S_ISDIR(inode->i_mode))
+		inode->i_fop = &linvfs_file_operations;
+		inode->i_mapping->a_ops = &linvfs_aops;
+	} else if (S_ISDIR(inode->i_mode)) {
 		inode->i_op = &linvfs_dir_inode_operations;
-	else if (S_ISLNK(inode->i_mode))
+		inode->i_fop = &linvfs_dir_operations;
+	} else if (S_ISLNK(inode->i_mode)) {
 		inode->i_op = &linvfs_symlink_inode_operations;
-	else if (S_ISBLK(inode->i_mode))
+		if (inode->i_blocks)
+			inode->i_mapping->a_ops = &linvfs_aops;
+	} else if (S_ISBLK(inode->i_mode))
 		init_special_inode(inode, inode->i_mode, inode->i_rdev);
 }
 
@@ -314,6 +319,7 @@ void
 linvfs_delete_inode(
 	struct inode	*inode)
 {
+	clear_inode(inode);
 }
 
 
@@ -510,7 +516,7 @@ static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 	put_inode:		linvfs_put_inode,
 	delete_inode:		linvfs_delete_inode,
-	notify_change:		linvfs_notify_change,
+	/* notify_change:		linvfs_notify_change, */
 	put_super:		linvfs_put_super,
 	write_super:		linvfs_write_super,
 	statfs:			linvfs_statfs,

@@ -1161,7 +1161,7 @@ _xfs_incore_relse(buftarg_t *targ,
 				  int	delwri_only,
 				  int	wait)
 {
-	truncate_inode_pages(targ->inode, 0LL);
+	truncate_inode_pages(&targ->inode->i_data, 0LL);
 	return 0;
 } 
 
