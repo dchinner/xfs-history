@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.130 $"
+#ident	"$Revision: 1.131 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -588,7 +588,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 
 #ifndef SIM 
 	if ((XFS_IS_QUOTA_ON(mp)) ||
-	    (mp->m_sb.sb_versionnum >= XFS_SB_VERSION_HASQUOTA &&
+	    (XFS_QM_SB_HAS_QUOTA(mp) &&
 	     mp->m_sb.sb_qflags & (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT))) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE, "Attempting to turn on disk quotas.");
