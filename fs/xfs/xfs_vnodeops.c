@@ -500,6 +500,7 @@ xfs_setattr(vnode_t	*vp,
                         ip->i_d.di_mtime.t_sec = tv.tv_sec;
                         ip->i_d.di_mtime.t_nsec = tv.tv_nsec;
                 }
+		ip->i_update_core = 1;
 		return 0;
         }
 
@@ -764,6 +765,7 @@ xfs_setattr(vnode_t	*vp,
 			ip->i_d.di_ctime.t_sec = tv.tv_sec;
 			ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
                 }
+		ip->i_update_core = 1;
         }
 
 	/*
@@ -882,6 +884,7 @@ xfs_readlink(vnode_t	*vp,
 		nanotime(&tv);
 		ip->i_d.di_atime.t_sec  = tv.tv_sec;
 		ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+		ip->i_update_core = 1;
 	}
 
 	/*
