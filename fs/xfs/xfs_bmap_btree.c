@@ -44,6 +44,7 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_alloc.h"
+#include "xfs_bit.h"
 #include "xfs_bmap.h"
 #ifdef SIM
 #include "sim.h"
@@ -278,18 +279,18 @@ xfs_bmbt_trace_enter(
 	char			*name,
 	xfs_btree_cur_t		*cur,
 	int			type,
-	unsigned long		a0,
-	unsigned long		a1,
-	unsigned long		a2,
-	unsigned long		a3,
-	unsigned long		a4,
-	unsigned long		a5,
-	unsigned long		a6,
-	unsigned long		a7,
-	unsigned long		a8,
-	unsigned long		a9,
-	unsigned long		a10,
-	unsigned long		a11);
+	__psunsigned_t		a0,
+	__psunsigned_t		a1,
+	__psunsigned_t		a2,
+	__psunsigned_t		a3,
+	__psunsigned_t		a4,
+	__psunsigned_t		a5,
+	__psunsigned_t		a6,
+	__psunsigned_t		a7,
+	__psunsigned_t		a8,
+	__psunsigned_t		a9,
+	__psunsigned_t		a10,
+	__psunsigned_t		a11);
 #else
 #define	xfs_bmbt_trace_argbi(n,c,b,i)
 #define	xfs_bmbt_trace_argbii(n,c,b,i,j)
@@ -1529,7 +1530,7 @@ xfs_bmbt_trace_argbi(
 	int		i)
 {
 	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_ARGBI,
-		(unsigned long)b, i, 0, 0,
+		(__psunsigned_t)b, i, 0, 0,
 		0, 0, 0, 0,
 		0, 0, 0, 0);
 }
@@ -1546,7 +1547,7 @@ xfs_bmbt_trace_argbii(
 	int		i1)
 {
 	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_ARGBII,
-		(unsigned long)b, i0, i1, 0,
+		(__psunsigned_t)b, i0, i1, 0,
 		0, 0, 0, 0,
 		0, 0, 0, 0);
 }
@@ -1666,7 +1667,11 @@ xfs_bmbt_trace_cursor(
 	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_CUR,
 		(cur->bc_nlevels << 16) | cur->bc_private.b.flags,
 		cur->bc_private.b.allocated,
+#if BMBT_USE_64
+		r.l0 >> 32, (int)r.l0, r.l1 >> 32, (int)r.l1,
+#else
 		r.l0, r.l1, r.l2, r.l3,
+#endif
 		(unsigned long)cur->bc_bufs[0], (unsigned long)cur->bc_bufs[1],
 		(unsigned long)cur->bc_bufs[2], (unsigned long)cur->bc_bufs[3],
 		(cur->bc_ptrs[0] << 16) | cur->bc_ptrs[1],
@@ -1682,31 +1687,31 @@ xfs_bmbt_trace_enter(
 	char		*name,
 	xfs_btree_cur_t	*cur,
 	int		type,
-	unsigned long		a0,
-	unsigned long		a1,
-	unsigned long		a2,
-	unsigned long		a3,
-	unsigned long		a4,
-	unsigned long		a5,
-	unsigned long		a6,
-	unsigned long		a7,
-	unsigned long		a8,
-	unsigned long		a9,
-	unsigned long		a10,
-	unsigned long		a11)
+	__psunsigned_t	a0,
+	__psunsigned_t	a1,
+	__psunsigned_t	a2,
+	__psunsigned_t	a3,
+	__psunsigned_t	a4,
+	__psunsigned_t	a5,
+	__psunsigned_t	a6,
+	__psunsigned_t	a7,
+	__psunsigned_t	a8,
+	__psunsigned_t	a9,
+	__psunsigned_t	a10,
+	__psunsigned_t	a11)
 {
 	xfs_inode_t	*ip;
 
 	ip = cur->bc_private.b.ip;
 	ktrace_enter(xfs_bmbt_trace_buf,
-		(void *)((unsigned long)type), 
+		(void *)((__psunsigned_t)type), 
 		(void *)name, (void *)ip, (void *)cur,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
 		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
 	ASSERT(ip->i_btrace);
 	ktrace_enter(ip->i_btrace,
-		(void *)((unsigned long)type), 
+		(void *)((__psunsigned_t)type), 
 		(void *)name, (void *)ip, (void *)cur,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
@@ -1857,13 +1862,45 @@ xfs_bmbt_delete(
 
 /*
  * Convert a compressed bmap extent record to an uncompressed form.
- * This code must be in sync with the next three routines.
+ * This code must be in sync with the three routines xfs_bmbt_get_startoff,
+ * xfs_bmbt_get_startblock, xfs_bmbt_get_blockcount.
  */
 void
 xfs_bmbt_get_all(
 	xfs_bmbt_rec_t	*r,
 	xfs_bmbt_irec_t	*s)
 {
+#if BMBT_USE_64
+#if XFS_BIG_FILES
+	s->br_startoff = ((xfs_fileoff_t)r->l0) >> 9;
+#else	/* !XFS_BIG_FILES */
+	{
+		xfs_dfiloff_t	o;
+
+		o = ((xfs_dfiloff_t)r->l0) >> 9;
+		ASSERT((o >> 32) == 0);
+		s->br_startoff = (xfs_fileoff_t)o;
+	}
+#endif	/* XFS_BIG_FILES */
+#if XFS_BIG_FILESYSTEMS
+	s->br_startblock = (((xfs_fsblock_t)r->l0 & XFS_MASK64LO(9)) << 43) | 
+			   (((xfs_fsblock_t)r->l1) >> 21);
+#else
+#ifdef DEBUG
+	{
+		xfs_dfsbno_t	b;
+
+		b = (((xfs_dfsbno_t)r->l0 & XFS_MASK64LO(9)) << 43) | 
+		    (((xfs_dfsbno_t)r->l1) >> 21);
+		ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
+		s->br_startblock = (xfs_fsblock_t)b;
+	}
+#else	/* !DEBUG */
+	s->br_startblock = (xfs_fsblock_t)(((xfs_dfsbno_t)r->l1) >> 21);
+#endif	/* DEBUG */
+#endif	/* XFS_BIG_FILESYSTEMS */
+	s->br_blockcount = (xfs_filblks_t)(r->l1 & XFS_MASK64LO(21));
+#else	/* !BMBT_USE_64 */
 #if XFS_BIG_FILES
 	s->br_startoff = (((xfs_fileoff_t)r->l0) << 23) |
 			 (((xfs_fileoff_t)r->l1) >> 9);
@@ -1883,15 +1920,16 @@ xfs_bmbt_get_all(
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILES */
 #if XFS_BIG_FILESYSTEMS
-	s->br_startblock = (((xfs_fsblock_t)(r->l1 & 0x000001ff)) << 43) | 
-			   (((xfs_fsblock_t)r->l2) << 11) |
-			   (((xfs_fsblock_t)r->l3) >> 21);
+	s->br_startblock =
+		(((xfs_fsblock_t)(r->l1 & XFS_MASK32LO(9))) << 43) | 
+		(((xfs_fsblock_t)r->l2) << 11) |
+		(((xfs_fsblock_t)r->l3) >> 21);
 #else
 #ifdef DEBUG
 	{
 		xfs_dfsbno_t	b;
 
-		b = (((xfs_dfsbno_t)(r->l1 & 0x000001ff)) << 43) | 
+		b = (((xfs_dfsbno_t)(r->l1 & XFS_MASK32LO(9))) << 43) | 
 		    (((xfs_dfsbno_t)r->l2) << 11) |
 		    (((xfs_dfsbno_t)r->l3) >> 21);
 		ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
@@ -1902,7 +1940,8 @@ xfs_bmbt_get_all(
 			   (((xfs_fsblock_t)r->l3) >> 21);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILESYSTEMS */
-	s->br_blockcount = (xfs_filblks_t)(r->l3 & 0x001fffff);
+	s->br_blockcount = (xfs_filblks_t)(r->l3 & XFS_MASK32LO(21));
+#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -1934,7 +1973,11 @@ xfs_filblks_t
 xfs_bmbt_get_blockcount(
 	xfs_bmbt_rec_t	*r)
 {
-	return (xfs_filblks_t)(r->l3 & 0x001fffff);
+#if BMBT_USE_64
+	return (xfs_filblks_t)(r->l1 & XFS_MASK64LO(21));
+#else	/* !BMBT_USE_64 */
+	return (xfs_filblks_t)(r->l3 & XFS_MASK32LO(21));
+#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -1944,23 +1987,42 @@ xfs_fsblock_t
 xfs_bmbt_get_startblock(
 	xfs_bmbt_rec_t	*r)
 {
+#if BMBT_USE_64
 #if XFS_BIG_FILESYSTEMS
-	return (((xfs_fsblock_t)(r->l1 & 0x000001ff)) << 43) | 
+	return (((xfs_fsblock_t)r->l0 & XFS_MASK64LO(9)) << 43) |
+	       (((xfs_fsblock_t)r->l1) >> 21);
+#else
+#ifdef DEBUG
+	xfs_dfsbno_t	b;
+
+	b = (((xfs_dfsbno_t)r->l0 & XFS_MASK64LO(9)) << 43) |
+	    (((xfs_dfsbno_t)r->l1) >> 21);
+	ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
+	return (xfs_fsblock_t)b;
+#else	/* !DEBUG */
+	return (xfs_fsblock_t)(((xfs_dfsbno_t)r->l1) >> 21);
+#endif	/* DEBUG */
+#endif	/* XFS_BIG_FILESYSTEMS */
+#else	/* !BMBT_USE_64 */
+#if XFS_BIG_FILESYSTEMS
+	return (((xfs_fsblock_t)(r->l1 & XFS_MASK32LO(9))) << 43) | 
 	       (((xfs_fsblock_t)r->l2) << 11) |
 	       (((xfs_fsblock_t)r->l3) >> 21);
 #else
 #ifdef DEBUG
 	xfs_dfsbno_t	b;
 
-	b = (((xfs_dfsbno_t)(r->l1 & 0x000001ff)) << 43) | 
+	b = (((xfs_dfsbno_t)(r->l1 & XFS_MASK32LO(9))) << 43) | 
 	    (((xfs_dfsbno_t)r->l2) << 11) |
 	    (((xfs_dfsbno_t)r->l3) >> 21);
 	ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
 	return (xfs_fsblock_t)b;
 #else	/* !DEBUG */
-	return (((xfs_fsblock_t)r->l2) << 11) | (((xfs_fsblock_t)r->l3) >> 21);
+	return (((xfs_fsblock_t)r->l2) << 11) |
+	       (((xfs_fsblock_t)r->l3) >> 21);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILESYSTEMS */
+#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -1970,6 +2032,17 @@ xfs_fileoff_t
 xfs_bmbt_get_startoff(
 	xfs_bmbt_rec_t	*r)
 {
+#if BMBT_USE_64
+#if XFS_BIG_FILES
+	return ((xfs_fileoff_t)r->l0) >> 9;
+#else	/* !XFS_BIG_FILES */
+	xfs_dfiloff_t	o;
+
+	o = ((xfs_dfiloff_t)r->l0) >> 9;
+	ASSERT((o >> 32) == 0);
+	return (xfs_fileoff_t)o;
+#endif	/* XFS_BIG_FILES */
+#else	/* !BMBT_USE_64 */
 #if XFS_BIG_FILES
 	return (((xfs_fileoff_t)r->l0) << 23) |
 	       (((xfs_fileoff_t)r->l1) >> 9);
@@ -1981,9 +2054,11 @@ xfs_bmbt_get_startoff(
 	ASSERT((o >> 32) == 0);
 	return (xfs_fileoff_t)o;
 #else	/* !DEBUG */
-	return (((xfs_fileoff_t)r->l0) << 23) | (((xfs_fileoff_t)r->l1) >> 9);
+	return (((xfs_fileoff_t)r->l0) << 23) |
+	       (((xfs_fileoff_t)r->l1) >> 9);
 #endif	/* DEBUG */
 #endif	/* XFS_BIG_FILES */
+#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2257,28 +2332,56 @@ xfs_bmbt_set_all(
 	xfs_bmbt_irec_t	*s)
 {
 #if XFS_BIG_FILES
-	ASSERT((s->br_startoff & ~((1LL << 55) - 1)) == 0);
-#endif
+	ASSERT((s->br_startoff & XFS_MASK64HI(9)) == 0);
+	ASSERT((s->br_blockcount & XFS_MASK64HI(43)) == 0);
+#else	/* !XFS_BIG_FILES */
+	ASSERT((s->br_blockcount & XFS_MASK32HI(11)) == 0);
+#endif	/* XFS_BIG_FILES */
 #if XFS_BIG_FILESYSTEMS
-	ASSERT((s->br_startblock & ~((1LL << 52) - 1)) == 0);
-#endif
-	ASSERT((s->br_blockcount & 0xffe00000) == 0);
-	r->l0 = (__uint32_t)(s->br_startoff >> 23);
-	r->l3 = (((__uint32_t)s->br_startblock) << 21) |
-		((__uint32_t)(s->br_blockcount & 0x001fffff));
+	ASSERT((s->br_startblock & XFS_MASK64HI(12)) == 0);
+#endif	/* XFS_BIG_FILESYSTEMS */
+#if BMBT_USE_64
 #if XFS_BIG_FILESYSTEMS
-	r->l1 = (((__uint32_t)s->br_startoff) << 9) |
-		((__uint32_t)(s->br_startblock >> 43));
-	r->l2 = (__uint32_t)(s->br_startblock >> 11);
-#else
+	r->l0 = ((xfs_bmbt_rec_base_t)s->br_startoff << 9) |
+		  ((xfs_bmbt_rec_base_t)s->br_startblock >> 43);
+	r->l1 = ((xfs_bmbt_rec_base_t)s->br_startblock << 21) | 
+		  ((xfs_bmbt_rec_base_t)s->br_blockcount &
+		   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
+#else	/* !XFS_BIG_FILESYSTEMS */
 	if (ISNULLSTARTBLOCK(s->br_startblock)) {
-		r->l1 = (__uint32_t)(s->br_startoff << 9) | 0x000001ff;
-		r->l2 = 0xffe00000 | (__uint32_t)(s->br_startblock >> 11);
+		r->l0 = ((xfs_bmbt_rec_base_t)s->br_startoff << 9) |
+			  (xfs_bmbt_rec_base_t)XFS_MASK64LO(9);
+		r->l1 = XFS_MASK64HI(11) |
+			  ((xfs_bmbt_rec_base_t)s->br_startblock << 21) |
+			  ((xfs_bmbt_rec_base_t)s->br_blockcount &
+			   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
 	} else {
-		r->l1 = (__uint32_t)(s->br_startoff << 9);
-		r->l2 = (__uint32_t)(s->br_startblock >> 11);
+		r->l0 = (xfs_bmbt_rec_base_t)s->br_startoff << 9;
+		r->l1 = ((xfs_bmbt_rec_base_t)s->br_startblock << 21) | 
+			  ((xfs_bmbt_rec_base_t)s->br_blockcount &
+			   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
 	}
-#endif
+#endif	/* XFS_BIG_FILESYSTEMS */
+#else	/* !BMBT_USE_64 */
+	r->l0 = (xfs_bmbt_rec_base_t)(s->br_startoff >> 23);
+	r->l3 = (((xfs_bmbt_rec_base_t)s->br_startblock) << 21) |
+		  ((xfs_bmbt_rec_base_t)(s->br_blockcount & XFS_MASK32LO(21)));
+#if XFS_BIG_FILESYSTEMS
+	r->l1 = (((xfs_bmbt_rec_base_t)s->br_startoff) << 9) |
+		  ((xfs_bmbt_rec_base_t)(s->br_startblock >> 43));
+	r->l2 = (xfs_bmbt_rec_base_t)(s->br_startblock >> 11);
+#else	/* !XFS_BIG_FILESYSTEMS */
+	if (ISNULLSTARTBLOCK(s->br_startblock)) {
+		r->l1 = (xfs_bmbt_rec_base_t)(s->br_startoff << 9) |
+			  (xfs_bmbt_rec_base_t)XFS_MASK32LO(9);
+		r->l2 = (xfs_bmbt_rec_base_t)XFS_MASK32HI(11) |
+			  (xfs_bmbt_rec_base_t)(s->br_startblock >> 11);
+	} else {
+		r->l1 = (xfs_bmbt_rec_base_t)(s->br_startoff << 9);
+		r->l2 = (xfs_bmbt_rec_base_t)(s->br_startblock >> 11);
+	}
+#endif	/* XFS_BIG_FILESYSTEMS */
+#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2289,8 +2392,18 @@ xfs_bmbt_set_blockcount(
 	xfs_bmbt_rec_t	*r,
 	xfs_filblks_t	v)
 {
-	ASSERT((v & ~((1 << 21) - 1)) == 0);
-	r->l3 = (r->l3 & 0xffe00000) | ((__uint32_t)v & 0x001fffff);
+#if XFS_BIG_FILES
+	ASSERT((v & XFS_MASK64HI(43)) == 0);
+#else	/* !XFS_BIG_FILES */
+	ASSERT((v & XFS_MASK32HI(11)) == 0);
+#endif
+#if BMBT_USE_64
+	r->l1 = (r->l1 & (xfs_bmbt_rec_base_t)XFS_MASK64HI(43)) |
+		  (xfs_bmbt_rec_base_t)(v & XFS_MASK64LO(21));
+#else	/* !BMBT_USE_64 */
+	r->l3 = (r->l3 & (xfs_bmbt_rec_base_t)XFS_MASK32HI(11)) |
+		  ((xfs_bmbt_rec_base_t)v & XFS_MASK32LO(21));
+#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2302,19 +2415,42 @@ xfs_bmbt_set_startblock(
 	xfs_fsblock_t	v)
 {
 #if XFS_BIG_FILESYSTEMS
-	ASSERT((v & ~((1LL << 52) - 1)) == 0);
-	r->l1 = (r->l1 & 0xfffffe00) | (__uint32_t)(v >> 43);
-	r->l2 = (__uint32_t)(v >> 11);
-#else
+	ASSERT((v & XFS_MASK64HI(12)) == 0);
+#endif	/* XFS_BIG_FILESYSTEMS */
+#if BMBT_USE_64
+#if XFS_BIG_FILESYSTEMS
+	r->l0 = (r->l0 & (xfs_bmbt_rec_base_t)XFS_MASK64HI(55)) |
+		  (xfs_bmbt_rec_base_t)(v >> 43);
+	r->l1 = (r->l1 & (xfs_bmbt_rec_base_t)XFS_MASK64LO(21)) |
+		  (xfs_bmbt_rec_base_t)(v << 21);
+#else	/* !XFS_BIG_FILESYSTEMS */
 	if (ISNULLSTARTBLOCK(v)) {
-		r->l1 |= 0x000001ff;
-		r->l2 = 0xffe00000 | (__uint32_t)(v >> 11);
+		r->l0 |= (xfs_bmbt_rec_base_t)XFS_MASK64LO(9);
+		r->l1 = (xfs_bmbt_rec_base_t)XFS_MASK64HI(11) |
+			  ((xfs_bmbt_rec_base_t)v << 21) |
+			  (r->l1 & (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
 	} else {
-		r->l1 &= ~0x000001ff;
-		r->l2 = (__uint32_t)(v >> 11);
+		r->l0 &= ~(xfs_bmbt_rec_base_t)XFS_MASK64LO(9);
+		r->l1 = ((xfs_bmbt_rec_base_t)v << 21) |
+			  (r->l1 & (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
 	}
 #endif	/* XFS_BIG_FILESYSTEMS */
-	r->l3 = (r->l3 & 0x001fffff) | (((__uint32_t)v) << 21);
+#else	/* !BMBT_USE_64 */
+#if XFS_BIG_FILESYSTEMS
+	r->l1 = (r->l1 & XFS_MASK32HI(23)) | (xfs_bmbt_rec_base_t)(v >> 43);
+	r->l2 = (xfs_bmbt_rec_base_t)(v >> 11);
+#else	/* !XFS_BIG_FILESYSTEMS */
+	if (ISNULLSTARTBLOCK(v)) {
+		r->l1 |= XFS_MASK32LO(9);
+		r->l2 = XFS_MASK32HI(11) | (xfs_bmbt_rec_base_t)(v >> 11);
+	} else {
+		r->l1 &= ~XFS_MASK32LO(9);
+		r->l2 = (xfs_bmbt_rec_base_t)(v >> 11);
+	}
+#endif	/* XFS_BIG_FILESYSTEMS */
+	r->l3 = (r->l3 & XFS_MASK32LO(21)) |
+		  (((xfs_bmbt_rec_base_t)v) << 21);
+#endif	/* BMBT_USE_64 */
 }
 
 /*
@@ -2326,10 +2462,16 @@ xfs_bmbt_set_startoff(
 	xfs_fileoff_t	v)
 {
 #if XFS_BIG_FILES
-	ASSERT((v & ~((1LL << 55) - 1)) == 0);
-#endif
-	r->l0 = (__uint32_t)(v >> 23);
-	r->l1 = (r->l1 & 0x000001ff) | (((__uint32_t)v) << 9);
+	ASSERT((v & XFS_MASK64HI(9)) == 0);
+#endif	/* XFS_BIG_FILES */
+#if BMBT_USE_64
+	r->l0 = ((xfs_bmbt_rec_base_t)v << 9) |
+		  (r->l0 & (xfs_bmbt_rec_base_t)XFS_MASK64LO(9));
+#else	/* !BMBT_USE_64 */
+	r->l0 = (xfs_bmbt_rec_base_t)(v >> 23);
+	r->l1 = ((xfs_bmbt_rec_base_t)v << 9) |
+		  (r->l1 & (xfs_bmbt_rec_base_t)XFS_MASK32LO(9));
+#endif	/* BMBT_USE_64 */
 }
 
 /*
