@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.77 $"
+#ident	"$Revision: 1.78 $"
 
 struct buf;
 struct cred;
@@ -134,7 +134,9 @@ typedef struct xfs_mount {
 /*
  * Flags for m_flags.
  */
-#define	XFS_MOUNT_WSYNC		0x00000001
+#define	XFS_MOUNT_WSYNC		0x00000001	/* for nfs - all metadata ops
+						   must be synchronous except
+						   for space allocations */
 #if XFS_BIG_FILESYSTEMS
 #define	XFS_MOUNT_INO64		0x00000002
 #endif
@@ -143,6 +145,8 @@ typedef struct xfs_mount {
 #define XFS_MOUNT_FS_SHUTDOWN	0x00000010	/* atomic stop of all filesystem
 						   operations, typically for
 						   disk errors in metadata */
+#define XFS_MOUNT_NOATIME	0x00000020	/* don't modify inode access
+						   times on reads */
 #define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 
 /*
