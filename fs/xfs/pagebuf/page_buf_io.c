@@ -65,39 +65,38 @@ STATIC int  pagebuf_delalloc_convert(
 
 /*
  *	pagebuf_flush: write back cached pages to disk.
- *
  */
-void pagebuf_flush(
-    struct inode *ip,		/* inode for range              */
-    loff_t ioff,		/* first location in range      */
-    page_buf_flags_t bflags)	/* buffer flags, usually        */
-				/* PBF_ASYNC                    */
-
+void
+pagebuf_flush(
+	struct inode		*ip,	/* inode for range              */
+	loff_t			ioff,	/* first location in range      */
+	page_buf_flags_t	bflags)	/* unused                       */
 {
 	filemap_fdatasync(ip->i_mapping);
 	fsync_inode_data_buffers(ip);
 	filemap_fdatawait(ip->i_mapping);
 }
 
-
 /*
  *	pagebuf_inval: invalidate from page-cache (no implied write back).
  */
-void pagebuf_inval( /* invalidate buffered data for */
-    struct inode *ip,		/* inode for range              */
-    loff_t ioff,		/* first location in range      */
-    page_buf_flags_t bflags)	/* buffer flags, usually PBF_ASYNC	*/
+void
+pagebuf_inval(
+	struct inode		*ip,	/* inode for range              */
+	loff_t			ioff,	/* first location in range      */
+	page_buf_flags_t	bflags)	/* unused                       */
 {
 	truncate_inode_pages(ip->i_mapping, ioff);
 }
 
 /*
- *	pagebuf_flushinval
+ *	pagebuf_flushinval: write & invalidate buffered storage
  */
-void pagebuf_flushinval(	/* write & invalidate buffered storage	*/
-    struct inode *ip,		/* inode for range              	*/
-    loff_t ioff,		/* first location in range      	*/
-    page_buf_flags_t bflags)	/* buffer flags, usually PBF_ASYNC	*/
+void
+pagebuf_flushinval(
+	struct inode		*ip,	/* inode for range             	*/
+	loff_t			ioff,	/* first location in range     	*/
+	page_buf_flags_t	bflags)	/* unused                       */
 {
 	pagebuf_flush(ip, ioff, bflags);
 	truncate_inode_pages(ip->i_mapping, ioff);
@@ -115,21 +114,17 @@ void pagebuf_flushinval(	/* write & invalidate buffered storage	*/
  */
 int
 pagebuf_iozero(
-	struct inode	*ip,		/* inode owning buffer		*/
-	page_buf_t	*pb,		/* buffer to zero               */
-	off_t		boff,		/* offset in buffer             */
-	size_t		bsize,		/* size of data to zero         */
-	loff_t		end_size)	/* maximum file size to set	*/
+	struct inode		*ip,	/* inode owning buffer		*/
+	page_buf_t		*pb,	/* buffer to zero               */
+	off_t			boff,	/* offset in buffer             */
+	size_t			bsize,	/* size of data to zero         */
+	loff_t			end_size)	/* max file size to set	*/
 {
-	loff_t cboff;
-	size_t cpoff;
-	size_t csize;
-	struct page *page;
-	loff_t pos;
-	struct address_space *mapping;
-	char *kaddr;
-
-	assert(pb->pb_target);
+	loff_t			cboff, pos;
+	size_t			cpoff, csize;
+	struct page		*page;
+	struct address_space	*mapping;
+	char			*kaddr;
 
 	cboff = boff;
 	boff += bsize; /* last */
@@ -237,12 +232,13 @@ _pb_direct_io(
 /*
  * Return size in bytes of maximum direct I/O done in one call
  */
-size_t pagebuf_max_direct()
+size_t
+pagebuf_max_direct(void)
 {
 	return pb_params.p_un.max_dio << PAGE_SHIFT;
 }
 
-int
+STATIC int
 _pagebuf_file_write(
 	struct pb_target	*target,
 	struct file		*filp,	/* file to write                */
@@ -344,13 +340,13 @@ pagebuf_generic_file_write(
 	loff_t			*lp,	/* file offset to use and update */
 	pagebuf_bmap_fn_t	bmap)	/* bmap function */
 {
-	struct inode *inode = filp->f_dentry->d_inode;
-	unsigned long index;
-	int status = 0, written = 0, page_fault;
-	loff_t foff;
-	struct page *page;
-	int pb_flags;
-	int direct = filp->f_flags & O_DIRECT;
+	struct inode		*inode = filp->f_dentry->d_inode;
+	unsigned long		index;
+	int			status = 0, written = 0, page_fault;
+	loff_t			foff;
+	struct page		*page;
+	int			pb_flags;
+	int			direct = filp->f_flags & O_DIRECT;
 
 	pb_flags = PBF_WRITE;
 	if (filp->f_flags & O_SYNC)
@@ -367,9 +363,9 @@ pagebuf_generic_file_write(
 	}
 
 	while (len) {
-		unsigned long bytes, offset;
-		struct address_space *mapping;
-		char *kaddr;
+		unsigned long		bytes, offset;
+		struct address_space	*mapping;
+		char			*kaddr;
 
 		/*
 		 * Try to find the page in the cache. If it isn't there,
@@ -466,10 +462,8 @@ out:
  * __pb_match_offset_to_mapping
  * Finds the corresponding mapping in block @map array of the
  * given @offset within a @page.
- * @index keeps track of where we were in @map after previous
- * calls with earlier @offsets.
  */
-page_buf_bmap_t *
+STATIC page_buf_bmap_t *
 __pb_match_offset_to_mapping(
 	struct page		*page,
 	page_buf_bmap_t		*map,
@@ -490,7 +484,7 @@ __pb_match_offset_to_mapping(
 	return NULL;
 }
 
-void
+STATIC void
 __pb_map_buffer_at_offset(
 	struct page		*page,
 	struct buffer_head	*bh,
@@ -534,7 +528,7 @@ pagebuf_release_page(
 	struct page		*page,
 	pagebuf_bmap_fn_t	bmap)
 {
-	struct inode *inode = (struct inode*)page->mapping->host;
+	struct inode		*inode = (struct inode*)page->mapping->host;
 
 	pagebuf_delalloc_convert(inode, page, bmap, 0, 0);
 }
@@ -548,16 +542,15 @@ pagebuf_release_page(
  * not already delalloc. In the other case we need to allocate space
  * for all the page before EOF.
  */
-
 int
 pagebuf_write_full_page(
 	struct page		*page,
 	int			delalloc,
 	pagebuf_bmap_fn_t	bmap)
 {
-	struct inode *inode = (struct inode*)page->mapping->host;
-	unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT;
-	int ret;
+	struct inode		*inode = (struct inode*)page->mapping->host;
+	unsigned long		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
+	int			ret;
 
 	/* Are we off the end of the file ? */
 	if (page->index >= end_index) {
@@ -591,20 +584,18 @@ out:
 	return ret;
 }
 
-
 /*
- * Look for a page at index which it unlocked and not mapped
+ * Look for a page at index which is unlocked and not mapped
  * yet - clustering for mmap write case.
  */
-
 STATIC unsigned int
 probe_unmapped_page(
 	struct address_space	*mapping,
 	unsigned long		index,
 	unsigned int		pg_offset)
 { 
-	struct page *page;
-	int ret = 0;
+	struct page		*page;
+	int			ret = 0;
 
 	page = find_get_page(mapping, index);
 	if (!page)
@@ -679,9 +670,11 @@ probe_unmapped_cluster(
  * Returns page locked and with an extra reference count.
  */
 STATIC struct page *
-probe_page(struct inode *inode, unsigned long index)
+probe_page(
+	struct inode		*inode,
+	unsigned long		index)
 {
-	struct page *page;
+	struct page		*page;
 
 	page = find_get_page(inode->i_mapping, index);
 	if (!page)
@@ -703,7 +696,8 @@ probe_page(struct inode *inode, unsigned long index)
 	return NULL;
 }
 
-void write_bh_array(
+STATIC void
+write_bh_array(
 	struct buffer_head	*bh_arr[],
 	int			cnt)
 {
@@ -825,7 +819,6 @@ cluster_write(
  * and therefore need to allocate space for unmapped portions of the
  * page.
  */
-
 STATIC int
 pagebuf_delalloc_convert(
 	struct inode		*inode,		/* inode containing page */
