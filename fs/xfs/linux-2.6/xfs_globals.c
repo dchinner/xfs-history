@@ -61,4 +61,7 @@ spinlock_t Atomic_spin = SPIN_LOCK_UNLOCKED;
 struct xfs_qm	*xfs_Gqm;
 mutex_t		xfs_Gqm_lock;
 
-EXPORT_SYMBOL(xfs_Gqm); /* for KDB */
+/* Export XFS symbols used by xfsidbg */
+EXPORT_SYMBOL(xfs_Gqm);
+EXPORT_SYMBOL(xfs_next_bit);
+EXPORT_SYMBOL(xfs_contig_bits);
