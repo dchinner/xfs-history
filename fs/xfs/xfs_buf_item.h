@@ -8,8 +8,8 @@
  * have been logged.
  */
 typedef struct xfs_buf_log_format {
-	unsigned int	blf_type;	/* buf log item type indicator */
-	unsigned int	blf_size;	/* size of this item */
+	unsigned short	blf_type;	/* buf log item type indicator */
+	unsigned short	blf_size;	/* size of this item */
 	daddr_t		blf_blkno;	/* starting blkno of this buf */
 	uint		blf_len;	/* number of blocks in this buf */
 	unsigned int	blf_map_size;	/* size of data bitmap in words */

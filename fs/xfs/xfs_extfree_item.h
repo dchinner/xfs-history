@@ -13,8 +13,8 @@ typedef struct xfs_extent {
  * size is given by efi_nextents.
  */
 typedef struct xfs_efi_log_format {
-	unsigned int		efi_type;	/* efi log item type */
-	unsigned int		efi_size;	/* size of this item */
+	unsigned short		efi_type;	/* efi log item type */
+	unsigned short		efi_size;	/* size of this item */
 	uint			efi_nextents;	/* # extents to free */
 	xfs_extent_t		efi_extents[1];	/* array of extents to free */
 } xfs_efi_log_format_t;

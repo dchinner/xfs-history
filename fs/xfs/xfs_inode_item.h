@@ -10,8 +10,8 @@ struct xfs_inode;
  * (if any) is indicated in the ilf_dsize field.
  */
 typedef struct xfs_inode_log_format {
-	unsigned int		ilf_type;	/* inode log item type */
-	unsigned int		ilf_size;	/* size of this item */
+	unsigned short		ilf_type;	/* inode log item type */
+	unsigned short		ilf_size;	/* size of this item */
 	uint			ilf_fields;	/* flags for fields logged */
 	uint			ilf_dsize;	/* size of data/ext/root */
 	union {
