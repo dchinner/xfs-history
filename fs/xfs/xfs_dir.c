@@ -117,6 +117,10 @@ STATIC int xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args);
  */
 STATIC uint xfs_dir_hashname(char *name_string, int name_length);
 STATIC uint xfs_dir_log2_roundup(uint i);
+STATIC struct xfs_dir_state *xfs_dir_state_alloc(void);
+STATIC void xfs_dir_state_free(struct xfs_dir_state *state);
+
+zone_t	*xfs_dir_state_zone;
 
 
 /*========================================================================
@@ -1088,42 +1092,45 @@ xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fsblock_t blkno,
 STATIC int
 xfs_dir_node_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
-	struct xfs_dir_state state;
+	struct xfs_dir_state *state;
 	struct xfs_dir_state_blk *blk;
 	int retval;
 
 	/*
 	 * Fill in bucket of arguments/results/context to carry around.
 	 */
-	bzero((char *)&state, sizeof(struct xfs_dir_state));
-	state.args = args;
-	state.mp = args->dp->i_mount;
-	state.trans = trans;
-	state.blocksize = state.mp->m_sb.sb_blocksize;
+	state = xfs_dir_state_alloc();
+	state->args = args;
+	state->mp = args->dp->i_mount;
+	state->trans = trans;
+	state->blocksize = state->mp->m_sb.sb_blocksize;
 
 	/*
 	 * Search to see if name already exists, and get back a pointer
 	 * to where it should go.
 	 */
-	retval = xfs_dir_node_lookup_int(&state);
-	if (retval != ENOENT)
+	retval = xfs_dir_node_lookup_int(state);
+	if (retval != ENOENT) {
+		xfs_dir_state_free(state);
 		return(retval);
+	}
 		
-	blk = &state.path.blk[ state.path.active-1 ];
+	blk = &state->path.blk[ state->path.active-1 ];
 	ASSERT(blk->leafblk == 1);
-	retval = xfs_dir_leaf_add(state.trans, blk->bp, state.args, blk->index);
+	retval = xfs_dir_leaf_add(state->trans, blk->bp, state->args, blk->index);
 	if (retval == 0) {
 		/*
 		 * Addition succeeded, update Btree hashvals.
 		 * GROT: clean this up
 		 */
-		xfs_dir_fixhashpath(&state, &state.path, state.path.active-1);
+		xfs_dir_fixhashpath(state, &state->path, state->path.active-1);
 	} else if (retval == ENOSPC) {
 		/*
 		 * Addition failed, split as many Btree elements as required.
 		 */
-		retval = xfs_dir_split(&state);
+		retval = xfs_dir_split(state);
 	}
+	xfs_dir_state_free(state);
 
 	return(retval);
 }
@@ -1138,27 +1145,30 @@ xfs_dir_node_addname(xfs_trans_t *trans, struct xfs_dir_name *args)
 STATIC int
 xfs_dir_node_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
-	struct xfs_dir_state state;
+	struct xfs_dir_state *state;
 	struct xfs_dir_state_blk *blk;
 	int retval;
 
-	bzero((char *)&state, sizeof(struct xfs_dir_state));
-	state.args = args;
-	state.mp = args->dp->i_mount;
-	state.trans = trans;
-	state.blocksize = state.mp->m_sb.sb_blocksize;
+	state = xfs_dir_state_alloc();
+	state->args = args;
+	state->mp = args->dp->i_mount;
+	state->trans = trans;
+	state->blocksize = state->mp->m_sb.sb_blocksize;
 
 	/*
 	 * Search to see if name exists, and get back a pointer to it.
 	 */
-	retval = xfs_dir_node_lookup_int(&state);
-	if (retval != EEXIST)
+	retval = xfs_dir_node_lookup_int(state);
+	if (retval != EEXIST) {
+		xfs_dir_state_free(state);
 		return(retval);
+	}
 
 	/*
 	 * Check to see if the tree needs to be collapsed.
 	 */
-	retval = xfs_dir_join(&state);
+	retval = xfs_dir_join(state);
+	xfs_dir_state_free(state);
 	return(retval);
 }
 
@@ -1169,28 +1179,29 @@ xfs_dir_node_removename(xfs_trans_t *trans, struct xfs_dir_name *args)
 STATIC int
 xfs_dir_node_lookup(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
-	struct xfs_dir_state state;
+	struct xfs_dir_state *state;
 	int retval;
 	int i;
 
-	bzero((char *)&state, sizeof(struct xfs_dir_state));
-	state.args = args;
-	state.mp = args->dp->i_mount;
-	state.trans = trans;
-	state.blocksize = state.mp->m_sb.sb_blocksize;
+	state = xfs_dir_state_alloc();
+	state->args = args;
+	state->mp = args->dp->i_mount;
+	state->trans = trans;
+	state->blocksize = state->mp->m_sb.sb_blocksize;
 
 	/*
 	 * Search to see if name exists,
 	 * and get back a pointer to it.
 	 */
-	retval = xfs_dir_node_lookup_int(&state);
+	retval = xfs_dir_node_lookup_int(state);
 
 	/* 
 	 * If not in a transaction, we have to release all the buffers.
 	 */
-	for (i = 0; i < state.path.active; i++)
-		xfs_trans_brelse(trans, state.path.blk[i].bp);
+	for (i = 0; i < state->path.active; i++)
+		xfs_trans_brelse(trans, state->path.blk[i].bp);
 
+	xfs_dir_state_free(state);
 	return(retval);
 }
 
@@ -1295,7 +1306,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 STATIC int
 xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 {
-	struct xfs_dir_state state;
+	struct xfs_dir_state *state;
 	int retval;
 	int i;
 	struct xfs_dir_state_blk *blk;
@@ -1305,21 +1316,21 @@ xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 	struct xfs_dir_leaf_entry *entry;
 	struct xfs_dir_leaf_name *namest;
 
-	bzero((char *)&state, sizeof(struct xfs_dir_state));
-	state.args = args;
-	state.mp = args->dp->i_mount;
-	state.trans = trans;
-	state.blocksize = state.mp->m_sb.sb_blocksize;
+	state = xfs_dir_state_alloc();
+	state->args = args;
+	state->mp = args->dp->i_mount;
+	state->trans = trans;
+	state->blocksize = state->mp->m_sb.sb_blocksize;
 	inum = args->inumber;
 
 	/*
 	 * Search to see if name exists,
 	 * and get back a pointer to it.
 	 */
-	retval = xfs_dir_node_lookup_int(&state);
+	retval = xfs_dir_node_lookup_int(state);
 
 	if (retval == EEXIST) {
-		blk = &state.path.blk[state.path.active - 1];
+		blk = &state->path.blk[state->path.active - 1];
 		ASSERT(blk->leafblk);
 		bp = blk->bp;
 		leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
@@ -1333,12 +1344,13 @@ xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 			sizeof(namest->inumber) - 1);
 		retval = 0;
 	} else {
-		i = state.path.active - 1;
-		xfs_trans_brelse(trans, state.path.blk[i].bp);
+		i = state->path.active - 1;
+		xfs_trans_brelse(trans, state->path.blk[i].bp);
 	}
-	for (i = 0; i < state.path.active - 1; i++)
-		xfs_trans_brelse(trans, state.path.blk[i].bp);
+	for (i = 0; i < state->path.active - 1; i++)
+		xfs_trans_brelse(trans, state->path.blk[i].bp);
 
+	xfs_dir_state_free(state);
 	return(retval);
 }
 
@@ -1521,4 +1533,23 @@ xfs_dir_put_dirent(
 		}
 	}
 	return(retval);
+}
+
+/*
+ * Allocate a dir-state structure.
+ * We don't put them on the stack since they're large.
+ */
+STATIC struct xfs_dir_state *
+xfs_dir_state_alloc()
+{
+	return kmem_zone_zalloc(xfs_dir_state_zone, KM_SLEEP);
+}
+
+/*
+ * Free a dir-state structure.
+ */
+STATIC void
+xfs_dir_state_free(struct xfs_dir_state *state)
+{
+	kmem_zone_free(xfs_dir_state_zone, state);
 }
