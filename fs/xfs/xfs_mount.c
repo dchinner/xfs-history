@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.61 $"
+#ident	"$Revision: 1.62 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -141,6 +141,10 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	}
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;				/* bcopy structure */
+	brelse(bp);
+	ASSERT(valusema(&bp->b_lock) > 0);
+
+	sbp = &(mp->m_sb);
 	mp->m_agfrotor = mp->m_agirotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
@@ -229,25 +233,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		error = XFS_ERROR(EBUSY); /* XXX log recovery fail - errno? */
 	}
 
-	/* re-read the superblock.  Some fields have possibly changed */
-	bp->b_flags = (B_READ | B_BUSY);
-	bdstrat(bmajor(dev), bp);
-	if (error = iowait(bp)) {
-		ASSERT(error == 0);
-		goto bad;
-	}
-
-	/*
-	 * Re-initialize the mount structure from the superblock.
-	 */
-	sbp = XFS_BUF_TO_SBP(bp);
-	if ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
-	    (sbp->sb_versionnum != XFS_SB_VERSION)) {
-		error = XFS_ERROR(EINVAL);		/* or EIO ? */
-		goto bad;
-	}
-	mp->m_sb = *sbp;				/* bcopy structure */
-
 #ifdef SIM
 	/*
 	 * Mkfs calls mount before the root inode is allocated.
@@ -295,9 +280,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * Initialize directory manager's entries.
 	 */
 	xfs_dir_mount(mp);
-
-	vsema(&bp->b_lock);
-	ASSERT(valusema(&bp->b_lock) > 0);
 
 	return 0;
 bad:
