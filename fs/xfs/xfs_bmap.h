@@ -27,6 +27,10 @@ typedef struct xfs_bmbt_rec
 	 (((xfs_fsblock_t)((r)->l3)) >> 21))
 #define	xfs_bmbt_get_blockcount(r)	\
 	((xfs_extlen_t)((r)->l3 & 0x001fffff))
+#define	xfs_bmbt_get_all(r,s)	\
+	(((s).br_startoff = xfs_bmbt_get_startoff(r)), \
+	 ((s).br_startblock = xfs_bmbt_get_startblock(r)), \
+	 ((s).br_blockcount = xfs_bmbt_get_blockcount(r)))
 #define	xfs_bmbt_set_startoff(r,v)	\
 	((r)->l0 = (__uint32_t)((v) >> 23), \
 	 (r)->l1 = ((r)->l1 & 0x000001ff) | ((__uint32_t)(v) & 0x007fffff))
@@ -36,6 +40,10 @@ typedef struct xfs_bmbt_rec
 	 (r)->l3 = ((r)->l3 & 0x001fffff) | ((__uint32_t)(v) & 0x000007ff))
 #define	xfs_bmbt_set_blockcount(r,v)	\
 	((r)->l3 = ((r)->l3 & 0xffe00000) | ((__uint32_t)(v) & 0x001fffff))
+#define	xfs_bmbt_set_all(r,s)	\
+	(xfs_bmbt_set_startoff(r, (s).br_startoff), \
+	 xfs_bmbt_set_startblock(r, (s).br_startblock), \
+	 xfs_bmbt_set_blockcount(r, (s).br_blockcount))
 
 /*
  * Incore version of above.
@@ -84,6 +92,6 @@ typedef struct xfs_bmbt_irec
 	 ((*bpp = (cur)->bc_bufs[level]), xfs_buf_to_block(*bpp)) : \
 	 ((*bpp = 0), (cur)->bc_private.b.ip->i_broot))
 
-void xfs_bmapi(xfs_trans_t *, struct xfs_inode *, xfs_fsblock_t, xfs_extlen_t, int, xfs_bmbt_irec_t *, int *);
+void xfs_bmapi(xfs_mount_t *, xfs_trans_t *, struct xfs_inode *, xfs_fsblock_t, xfs_extlen_t, int, xfs_bmbt_irec_t *, int *);
 
 #endif	/* _FS_XFS_BMAP_H */
