@@ -11,13 +11,13 @@
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* need to outlaw as cycle XXX*/
 #define XLOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
 #define XLOG_RECORD_BSHIFT	12		/* 4096 == 1 << 12 */
-#define XLOG_HEADER_SIZE		512
+#define XLOG_HEADER_SIZE	512
 #define XLOG_BBSHIFT		12
 #define XLOG_BBSIZE		(1<<XLOG_BBSHIFT)	/* 4096 */
 #define XLOG_BBMASK		(XLOG_BBSIZE-1)
 #define XLOGBB_TO_BB(x)		(((x) << XLOG_BBSHIFT) >> BBSHIFT)
 
-#define NBLOCKS(size)		((size)+XLOG_BBSIZE-1 >> XLOG_BBSHIFT)
+#define XLOG_NBLKS(size)	((size)+XLOG_BBSIZE-1 >> XLOG_BBSHIFT)
 
 #define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_curr_cycle; \
 				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
@@ -159,5 +159,9 @@ typedef struct log {
 	xlog_in_core_t	*l_iclog_bak[8];
 	int		l_iclog_size;
 } xlog_t;
+
+
+/* common routines */
+extern uint	 xlog_find_oldest(dev_t log_dev, uint log_bbnum);
 
 #endif	/* _XFS_LOG_PRIV_H */
