@@ -179,12 +179,7 @@ typedef struct xfs_dirent {		/* data from readdir() */
 #define MAXNAMELEN	256
 #define MAXPATHLEN	1024
 
-#define PVFS	27
-
-#define FREAD		0x01
-#define FWRITE		0x02
 #define FINVIS		0x0100	/* don't update timestamps - XFS */
-#define FSOCKET		0x0200	/* open file refers to a vsocket */
 
 #define MIN(a,b)	(min(a,b))
 #define MAX(a,b)	(max(a,b))
@@ -294,7 +289,7 @@ static inline __u32 xfs_do_mod(void *a, __u32 b, int n)
 #define do_div(a, b)	xfs_do_div(&(a), (b), sizeof(a))
 #define do_mod(a, b)	xfs_do_mod(&(a), (b), sizeof(a))
 
-extern inline __uint64_t roundup_64(__uint64_t x, __uint32_t y)
+static inline __uint64_t roundup_64(__uint64_t x, __uint32_t y)
 {
 	x += y - 1;
 	do_div(x, y);
