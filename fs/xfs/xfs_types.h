@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * xFS types
@@ -26,6 +26,11 @@ typedef	__int32_t	xfs_rtword_t;	/* word type for bitmap manipulations */
 
 typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
 typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
+
+typedef __psint_t	psint;
+typedef __psunsigned_t	psuint;
+typedef __scint_t	scint;
+typedef __scunsigned_t	scuint;
 
 #define	NULLFSBLOCK	((xfs_fsblock_t)-1)
 #define	NULLAGBLOCK	((xfs_agblock_t)-1)
