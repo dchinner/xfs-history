@@ -1,4 +1,4 @@
-#ident "$Revision: 1.73 $"
+#ident "$Revision: 1.74 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -967,6 +967,50 @@ xfs_iflush_done(
 	return;
 }
 
+/*
+ * This is the inode flushing abort routine.  It is called
+ * from xfs_iflush when the filesystem is shutting down to clean
+ * up the inode state.
+ * It is responsible for removing the inode item
+ * from the AIL if it has not been re-logged, and unlocking the inode's
+ * flush lock.
+ */
+void
+xfs_iflush_abort(
+	xfs_inode_t		*ip)
+{
+	xfs_inode_log_item_t	*iip;
+	xfs_mount_t		*mp;
+	SPLDECL(s);
 
-
-
+	iip = ip->i_itemp;
+	mp = ip->i_mount;
+	if (iip) {
+		if (iip->ili_item.li_flags & XFS_LI_IN_AIL) {
+			AIL_LOCK(mp, s);
+			if (iip->ili_item.li_flags & XFS_LI_IN_AIL) {
+				/*
+				 * xfs_trans_delete_ail() drops the AIL lock.
+				 */
+				xfs_trans_delete_ail(mp, (xfs_log_item_t *)iip,
+					s);
+			} else
+				AIL_UNLOCK(mp, s);
+		}
+		iip->ili_logged = 0;
+		/*
+		 * Clear the ili_last_fields bits now that we know that the
+		 * data corresponding to them is safely on disk.
+		 */
+		iip->ili_last_fields = 0;
+		/*
+		 * Clear the inode logging fields so no more flushes are
+		 * attempted.
+		 */
+		iip->ili_format.ilf_fields = 0;
+	}
+	/*
+	 * Release the inode's flush lock since we're done with it.
+	 */
+	xfs_ifunlock(ip);
+}
