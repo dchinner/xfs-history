@@ -690,21 +690,26 @@ probe_page(
 }
 
 STATIC void
-write_bh_array(
+submit_page(
+	struct page		*page,
 	struct buffer_head	*bh_arr[],
 	int			cnt)
 {
-	int			i;
-	struct buffer_head	*bh;
+	if (cnt) {
+		struct buffer_head	*bh;
+		int			i;
 
-	for (i = 0; i < cnt; i++) {
-		bh = bh_arr[i];
-		set_buffer_async_io(bh);
-		set_bit(BH_Uptodate, &bh->b_state);
-		clear_bit(BH_Dirty, &bh->b_state);
-	}
-	for (i = 0; i < cnt; i++)
-		submit_bh(WRITE, bh_arr[i]);
+		for (i = 0; i < cnt; i++) {
+			bh = bh_arr[i];
+			set_buffer_async_io(bh);
+			set_bit(BH_Uptodate, &bh->b_state);
+			clear_bit(BH_Dirty, &bh->b_state);
+		}
+
+		for (i = 0; i < cnt; i++)
+			submit_bh(WRITE, bh_arr[i]);
+	} else
+		unlock_page(page);
 }
 
 STATIC int
@@ -774,12 +779,7 @@ convert_page(
 	int			cnt;
 
 	cnt = map_page(inode, page, maps, bh_arr, startio, all_bh);
-	if (cnt) {
-		write_bh_array(bh_arr, cnt);
-	} else {
-		UnlockPage(page);
-	}
-
+	submit_page(page, bh_arr, cnt);
 	page_cache_release(page);
 }
 
@@ -908,11 +908,9 @@ next_bh:
 		bh = bh->b_this_page;
 	} while (offset < end_offset);
 
-	if (cnt) {
-		write_bh_array(bh_arr, cnt);
-	} else if (startio) {
-		UnlockPage(page);
-	}
+	if (startio)
+		submit_page(page, bh_arr, cnt);
+
 	if (mp)
 		cluster_write(inode, page->index + 1, mp,
 				startio, allocate_space);
