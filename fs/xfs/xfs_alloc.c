@@ -2201,7 +2201,7 @@ xfs_alloc_get_freelist(
 	/*
 	 * Get the block number and update the data structures.
 	 */
-	bno = agfl->agfl_bno[INT_GET(agf->agf_flfirst, arch)];
+	bno = INT_GET(agfl->agfl_bno[INT_GET(agf->agf_flfirst, arch)], ARCH_UNKNOWN);
 	INT_MOD(agf->agf_flfirst, arch, 1);
 	xfs_trans_brelse(tp, agflbp);
 	if (INT_GET(agf->agf_flfirst, arch) == XFS_AGFL_SIZE)
@@ -2302,7 +2302,7 @@ xfs_alloc_put_freelist(
 	pag->pagf_flcount++;
 	ASSERT(INT_GET(agf->agf_flcount, arch) <= XFS_AGFL_SIZE);
 	blockp = &agfl->agfl_bno[INT_GET(agf->agf_fllast, arch)];
-	*blockp = bno;
+	INT_SET(*blockp, ARCH_UNKNOWN, bno);
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
 	xfs_trans_log_buf(tp, agflbp,
