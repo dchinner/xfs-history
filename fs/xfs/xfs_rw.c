@@ -1,4 +1,4 @@
-#ident "$Revision: 1.241 $"
+#ident "$Revision: 1.242 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3205,9 +3205,11 @@ retry:
 			locktype = (ioflag & IO_DIRECT) ?
 				VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
 
-			error = xfs_dm_send_data_event(DM_EVENT_NOSPACE, bdp,
-					0, 0,
-					UIO_DELAY_FLAG(uiop), &locktype);
+			VOP_RWUNLOCK(vp, locktype);
+			error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
+					DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
+					0, 0, 0); /* Delay flag intentionally unused */
+			VOP_RWLOCK(vp, locktype);
 			if (error)
 				goto out;
 
