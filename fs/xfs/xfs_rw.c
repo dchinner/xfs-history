@@ -1809,6 +1809,7 @@ xfs_write_file(
 	xfs_fsize_t	isize;
 	xfs_fsize_t	new_size;
 	xfs_mount_t	*mp;
+	extern void	chunkrelse(buf_t*);
 
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
@@ -2054,6 +2055,10 @@ xfs_write_file(
 					    XFS_B_TO_FSBT(mp, bp->b_bcount));
 
 			if (ioflag & IO_SYNC) {
+				if ((bmapp->pboff + bmapp->pbsize) ==
+				    bmapp->bsize) {
+					bp->b_relse = chunkrelse;
+				}
 				bwrite(bp);
 			} else {
 				bdwrite(bp);
@@ -2160,17 +2165,6 @@ start:
 			resid = 0;
 		}
 
-#ifdef SIM
-		/*
-		 * Need pid of client not of simulator process.
-		 * This may not always be correct.
-		 */
-		id.pid = MAKE_REQ_PID(u.u_procp->p_pid - 1, 0);
-#else
-		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
-#endif
-		id.ino = ip->i_ino;
-
 		if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_WRITE) &&
 				!(ioflag & IO_INVIS) &&
 				!eventsent) {
@@ -2188,8 +2182,22 @@ start:
 		if ((ioflag & IO_APPEND) && savedsize != ip->i_d.di_size)
 			goto start;
 retry:
-		error = xfs_grio_req(ip, &id, uiop, ioflag, credp, offset,
-				     UIO_WRITE);
+		if ((ip->i_ticket == NULL) && !(ioflag & IO_DIRECT)) {
+			error = xfs_write_file(vp, uiop, ioflag, credp);
+		} else {
+#ifdef SIM
+			/*
+			 * Need pid of client not of simulator process.
+			 * This may not always be correct.
+			 */
+			id.pid = MAKE_REQ_PID(u.u_procp->p_pid - 1, 0);
+#else
+			id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
+#endif
+			id.ino = ip->i_ino;
+			error = xfs_grio_req(ip, &id, uiop, ioflag, credp,
+					     offset, UIO_WRITE);
+		}
 
 		if (error == ENOSPC &&
 		    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_NOSPACE) &&
@@ -3349,7 +3357,31 @@ xfs_strat_write(
 	vnode_t	*vp,
 	buf_t	*bp)
 {
-	xfs_strat_write_locals_t	*locals;
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t   map_start_fsb;
+	xfs_fileoff_t	imap_offset;
+	xfs_fsblock_t	first_block;
+	xfs_filblks_t	count_fsb;
+	xfs_extlen_t	imap_blocks;
+	off_t		last_rbp_offset;
+	xfs_extlen_t	last_rbp_bcount;
+	daddr_t		last_rbp_blkno;
+	int		rbp_count;
+	buf_t		*rbp;
+	xfs_mount_t	*mp;
+	xfs_inode_t	*ip;
+	xfs_trans_t	*tp;
+	int		error;
+	xfs_bmap_free_t	free_list;
+	xfs_bmbt_irec_t	*imapp;
+	int		rbp_offset;
+	int		rbp_len;
+	int		set_lead;
+	int		s;
+	int		loops;
+	int		imap_index;
+	int		nimaps;
+	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];
 #define	XFS_STRAT_WRITE_IMAPS	2
 	/*
 	 * If XFS_STRAT_WRITE_IMAPS is changed then the definition
@@ -3359,23 +3391,21 @@ xfs_strat_write(
 	 */
 	 
 	XFSSTATS.xs_xstrat_bytes += bp->b_bcount;
-	locals = (xfs_strat_write_locals_t *)
-		kmem_zone_alloc(xfs_strat_write_zone, KM_SLEEP);
 
-	locals->ip = XFS_VTOI(vp);
-	locals->mp = locals->ip->i_mount;
-	locals->set_lead = 0;
-	locals->rbp_count = 0;
+	ip = XFS_VTOI(vp);
+	mp = ip->i_mount;
+	set_lead = 0;
+	rbp_count = 0;
 	bp->b_flags |= B_STALE;
 
 	ASSERT(bp->b_blkno == -1);
-	locals->offset_fsb = XFS_BB_TO_FSBT(locals->mp, bp->b_offset);
-	locals->count_fsb = XFS_B_TO_FSB(locals->mp, bp->b_bcount);
-	xfs_strat_write_check(locals->ip, locals->offset_fsb,
-			      locals->count_fsb, locals->imap,
+	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
+	count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
+	xfs_strat_write_check(ip, offset_fsb,
+			      count_fsb, imap,
 			      XFS_STRAT_WRITE_IMAPS);
-	locals->map_start_fsb = locals->offset_fsb;
-	while (locals->count_fsb != 0) {
+	map_start_fsb = offset_fsb;
+	while (count_fsb != 0) {
 		/*
 		 * Set up a transaction with which to allocate the
 		 * backing store for the file.  Do allocations in a
@@ -3384,46 +3414,46 @@ xfs_strat_write(
 		 * is in the delayed allocation extent on which we sit
 		 * but before our buffer starts.
 		 */
-		locals->nimaps = 0;
-		locals->loops = 0;
-		while (locals->nimaps == 0) {
-			locals->tp = xfs_trans_alloc(locals->mp,
-						     XFS_TRANS_STRAT_WRITE);
-			locals->error = xfs_trans_reserve(locals->tp, 0,
-					XFS_WRITE_LOG_RES(locals->mp),
+		nimaps = 0;
+		loops = 0;
+		while (nimaps == 0) {
+			tp = xfs_trans_alloc(mp,
+					     XFS_TRANS_STRAT_WRITE);
+			error = xfs_trans_reserve(tp, 0,
+					XFS_WRITE_LOG_RES(mp),
 					0, XFS_TRANS_PERM_LOG_RES,
 					XFS_WRITE_LOG_COUNT);
-			ASSERT(locals->error == 0);
-			xfs_ilock(locals->ip, XFS_ILOCK_EXCL);
-			xfs_trans_ijoin(locals->tp, locals->ip,
+			ASSERT(error == 0);
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+			xfs_trans_ijoin(tp, ip,
 					XFS_ILOCK_EXCL);
-			xfs_trans_ihold(locals->tp, locals->ip);
+			xfs_trans_ihold(tp, ip);
 			xfs_strat_write_bp_trace(XFS_STRAT_ENTER,
-						 locals->ip, bp);
+						 ip, bp);
 
 			/*
 			 * Allocate the backing store for the file.
 			 */
-			XFS_BMAP_INIT(&(locals->free_list),
-				      &(locals->first_block));
-			locals->nimaps = XFS_STRAT_WRITE_IMAPS;
-			locals->first_block = xfs_bmapi(locals->tp,
-						locals->ip,
-						locals->map_start_fsb,
-						locals->count_fsb,
+			XFS_BMAP_INIT(&(free_list),
+				      &(first_block));
+			nimaps = XFS_STRAT_WRITE_IMAPS;
+			first_block = xfs_bmapi(tp,
+						ip,
+						map_start_fsb,
+						count_fsb,
 						XFS_BMAPI_WRITE,
-						locals->first_block, 1,
-						locals->imap,
-						&(locals->nimaps),
-						&(locals->free_list));
-			ASSERT(locals->loops++ <=
-			       (locals->offset_fsb +
-				XFS_B_TO_FSB(locals->mp, bp->b_bcount)));
-			(void) xfs_bmap_finish(&(locals->tp),
-					       &(locals->free_list),
-					       locals->first_block);
+						first_block, 1,
+						imap,
+						&(nimaps),
+						&(free_list));
+			ASSERT(loops++ <=
+			       (offset_fsb +
+				XFS_B_TO_FSB(mp, bp->b_bcount)));
+			(void) xfs_bmap_finish(&(tp),
+					       &(free_list),
+					       first_block);
 
-			xfs_trans_commit(locals->tp,
+			xfs_trans_commit(tp,
 					 XFS_TRANS_RELEASE_LOG_RES);
 
 			/*
@@ -3431,8 +3461,8 @@ xfs_strat_write(
 			 * state since in allocating space here we may have
 			 * made it invalid.
 			 */
-			XFS_INODE_CLEAR_READ_AHEAD(locals->ip);
-			xfs_iunlock(locals->ip, XFS_ILOCK_EXCL);
+			XFS_INODE_CLEAR_READ_AHEAD(ip);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 
 		/*
@@ -3440,23 +3470,22 @@ xfs_strat_write(
 		 * was able to allocate a single extent over which to
 		 * write.
 		 */
-		if ((locals->map_start_fsb == locals->offset_fsb) &&
-		    (locals->imap[0].br_blockcount == locals->count_fsb)) {
-			ASSERT(locals->nimaps == 1);
-			bp->b_blkno = XFS_FSB_TO_DB(locals->mp, locals->ip,
-					    locals->imap[0].br_startblock);
-			bp->b_bcount = XFS_FSB_TO_B(locals->mp,
-						    locals->count_fsb);
+		if ((map_start_fsb == offset_fsb) &&
+		    (imap[0].br_blockcount == count_fsb)) {
+			ASSERT(nimaps == 1);
+			bp->b_blkno = XFS_FSB_TO_DB(mp, ip,
+					    imap[0].br_startblock);
+			bp->b_bcount = XFS_FSB_TO_B(mp,
+						    count_fsb);
 			xfs_strat_write_bp_trace(XFS_STRAT_FAST,
-						 locals->ip, bp);
-			xfs_check_bp(locals->ip, bp);
+						 ip, bp);
+			xfs_check_bp(ip, bp);
 			bdstrat(bmajor(bp->b_edev), bp);
 			/*
 			 * Drop the count of queued buffers.
 			 */
-			atomicAddInt(&(locals->ip->i_queued_bufs), -1);
-			ASSERT(locals->ip->i_queued_bufs >= 0);
-			kmem_zone_free(xfs_strat_write_zone, (void *)locals);
+			atomicAddInt(&(ip->i_queued_bufs), -1);
+			ASSERT(ip->i_queued_bufs >= 0);
 			XFSSTATS.xs_xstrat_quick++;
 			return;
 		}
@@ -3472,63 +3501,63 @@ xfs_strat_write(
 		 * ALL completed.
 		 */
 		XFSSTATS.xs_xstrat_split++;
-		locals->imap_index = 0;
-		if (!locals->set_lead) {
+		imap_index = 0;
+		if (!set_lead) {
 			bp->b_flags |= B_LEADER | B_PARTIAL;
-			locals->set_lead = 1;
+			set_lead = 1;
 		}
-		while (locals->imap_index < locals->nimaps) {
-			locals->rbp = getrbuf(KM_SLEEP);
+		while (imap_index < nimaps) {
+			rbp = getrbuf(KM_SLEEP);
 
-			locals->imapp = &(locals->imap[locals->imap_index]);
-			ASSERT((locals->imapp->br_startblock !=
+			imapp = &(imap[imap_index]);
+			ASSERT((imapp->br_startblock !=
 				DELAYSTARTBLOCK) &&
-			       (locals->imapp->br_startblock !=
+			       (imapp->br_startblock !=
 				HOLESTARTBLOCK));
-			locals->imap_offset = locals->imapp->br_startoff;
-			locals->rbp_offset = XFS_FSB_TO_B(locals->mp,
-						  locals->imap_offset -
-						  locals->offset_fsb);
-			locals->imap_blocks = locals->imapp->br_blockcount;
-			ASSERT((locals->imap_offset + locals->imap_blocks) <=
-			       (locals->offset_fsb +
-				XFS_B_TO_FSB(locals->mp, bp->b_bcount)));
-			locals->rbp_len = XFS_FSB_TO_B(locals->mp,
-						       locals->imap_blocks);
-			xfs_overlap_bp(bp, locals->rbp, locals->rbp_offset,
-				       locals->rbp_len);
-			locals->rbp->b_blkno =
-				XFS_FSB_TO_DB(locals->mp, locals->ip,
-					      locals->imapp->br_startblock);
-			locals->rbp->b_offset = XFS_FSB_TO_BB(locals->mp,
-							locals->imap_offset);
+			imap_offset = imapp->br_startoff;
+			rbp_offset = XFS_FSB_TO_B(mp,
+						  imap_offset -
+						  offset_fsb);
+			imap_blocks = imapp->br_blockcount;
+			ASSERT((imap_offset + imap_blocks) <=
+			       (offset_fsb +
+				XFS_B_TO_FSB(mp, bp->b_bcount)));
+			rbp_len = XFS_FSB_TO_B(mp,
+					       imap_blocks);
+			xfs_overlap_bp(bp, rbp, rbp_offset,
+				       rbp_len);
+			rbp->b_blkno =
+				XFS_FSB_TO_DB(mp, ip,
+					      imapp->br_startblock);
+			rbp->b_offset = XFS_FSB_TO_BB(mp,
+						      imap_offset);
 			xfs_strat_write_subbp_trace(XFS_STRAT_SUB,
-						    locals->ip, bp,
-						    locals->rbp,
-						    locals->last_rbp_offset,
-						    locals->last_rbp_bcount,
-						    locals->last_rbp_blkno);
+						    ip, bp,
+						    rbp,
+						    last_rbp_offset,
+						    last_rbp_bcount,
+						    last_rbp_blkno);
 #ifdef DEBUG
-			xfs_check_rbp(locals->ip, bp, locals->rbp, 0);
-			if (locals->rbp_count > 0) {
-				ASSERT((locals->last_rbp_offset +
-					BTOBB(locals->last_rbp_bcount)) ==
-				       locals->rbp->b_offset);
-				ASSERT((locals->rbp->b_blkno <
-					locals->last_rbp_blkno) ||
-				       (locals->rbp->b_blkno >=
-					(locals->last_rbp_blkno +
-					 BTOBB(locals->last_rbp_bcount))));
-				if (locals->rbp->b_blkno <
-				    locals->last_rbp_blkno) {
-					ASSERT((locals->rbp->b_blkno +
-					      BTOBB(locals->rbp->b_bcount)) <
-					       locals->last_rbp_blkno);
+			xfs_check_rbp(ip, bp, rbp, 0);
+			if (rbp_count > 0) {
+				ASSERT((last_rbp_offset +
+					BTOBB(last_rbp_bcount)) ==
+				       rbp->b_offset);
+				ASSERT((rbp->b_blkno <
+					last_rbp_blkno) ||
+				       (rbp->b_blkno >=
+					(last_rbp_blkno +
+					 BTOBB(last_rbp_bcount))));
+				if (rbp->b_blkno <
+				    last_rbp_blkno) {
+					ASSERT((rbp->b_blkno +
+					      BTOBB(rbp->b_bcount)) <
+					       last_rbp_blkno);
 				}
 			}
-			locals->last_rbp_offset = locals->rbp->b_offset;
-			locals->last_rbp_bcount = locals->rbp->b_bcount;
-			locals->last_rbp_blkno = locals->rbp->b_blkno;
+			last_rbp_offset = rbp->b_offset;
+			last_rbp_bcount = rbp->b_bcount;
+			last_rbp_blkno = rbp->b_blkno;
 #endif
 					       
 			
@@ -3543,27 +3572,27 @@ xfs_strat_write(
 			 * fields until it finds the buffer marked with
 			 * B_LEADER.
 			 */
-			locals->s = splockspl(xfs_strat_lock, splhi);
-			locals->rbp->b_fsprivate = bp;
-			locals->rbp->b_fsprivate2 = bp->b_fsprivate2;
+			s = splockspl(xfs_strat_lock, splhi);
+			rbp->b_fsprivate = bp;
+			rbp->b_fsprivate2 = bp->b_fsprivate2;
 			if (bp->b_fsprivate2 != NULL) {
 				((buf_t*)(bp->b_fsprivate2))->b_fsprivate =
-								locals->rbp;
+								rbp;
 			}
-			bp->b_fsprivate2 = locals->rbp;
-			spunlockspl(xfs_strat_lock, locals->s);
+			bp->b_fsprivate2 = rbp;
+			spunlockspl(xfs_strat_lock, s);
 
-			locals->rbp->b_relse = xfs_strat_write_relse;
-			locals->rbp->b_flags |= B_ASYNC;
+			rbp->b_relse = xfs_strat_write_relse;
+			rbp->b_flags |= B_ASYNC;
 
-			bdstrat(bmajor(locals->rbp->b_edev), locals->rbp);
+			bdstrat(bmajor(rbp->b_edev), rbp);
 
-			locals->map_start_fsb +=
-				locals->imapp->br_blockcount;
-			locals->count_fsb -= locals->imapp->br_blockcount;
-			ASSERT(((long)locals->count_fsb) >= 0);
+			map_start_fsb +=
+				imapp->br_blockcount;
+			count_fsb -= imapp->br_blockcount;
+			ASSERT(count_fsb < 0xffff000);
 
-			locals->imap_index++;
+			imap_index++;
 		}
 	}
 
@@ -3576,9 +3605,9 @@ xfs_strat_write(
 	 * now that we know that all the space underlying the buffer has
 	 * been allocated and it has really been sent out to disk.
 	 */
-	atomicAddInt(&(locals->ip->i_queued_bufs), -1);
-	ASSERT(locals->ip->i_queued_bufs >= 0);
-	locals->s = splockspl(xfs_strat_lock, splhi);
+	atomicAddInt(&(ip->i_queued_bufs), -1);
+	ASSERT(ip->i_queued_bufs >= 0);
+	s = splockspl(xfs_strat_lock, splhi);
 	ASSERT((bp->b_flags & (B_DONE | B_PARTIAL)) == B_PARTIAL);
 	ASSERT(bp->b_flags & B_LEADER);
 
@@ -3588,16 +3617,14 @@ xfs_strat_write(
 		 * Call iodone() to note that the I/O has completed.
 		 */
 		bp->b_flags &= ~(B_PARTIAL | B_LEADER);
-		spunlockspl(xfs_strat_lock, locals->s);
+		spunlockspl(xfs_strat_lock, s);
 
 		iodone(bp);
-		kmem_zone_free(xfs_strat_write_zone, (void *)locals);
 		return;
 	}
 
 	bp->b_flags &= ~B_PARTIAL;
-	spunlockspl(xfs_strat_lock, locals->s);
-	kmem_zone_free(xfs_strat_write_zone, (void *)locals);
+	spunlockspl(xfs_strat_lock, s);
 	return;
 }
 
@@ -3665,8 +3692,8 @@ xfs_strategy(
 		xfsd_bufcount++;
 		ASSERT(XFS_VTOI(vp)->i_queued_bufs >= 0);
 		atomicAddInt(&(XFS_VTOI(vp)->i_queued_bufs), 1);
-		cvsema(&xfsd_wait);
 		spunlock(xfsd_lock, s);
+		cvsema(&xfsd_wait);
 	} else {
 		/*
 		 * We're not going to queue it for the xfsds, but bump the
@@ -3766,12 +3793,12 @@ xfsd(void)
 		} else {
 			xfsd_list = forw;
 		}
-		bp->av_forw = bp;
-		bp->av_back = bp;
 		xfsd_bufcount--;;
 		ASSERT(xfsd_bufcount >= 0);
 
 		spunlock(xfsd_lock, s);
+		bp->av_forw = bp;
+		bp->av_back = bp;
 
 		ASSERT((bp->b_flags & (B_BUSY | B_ASYNC | B_READ)) ==
 		       (B_BUSY | B_ASYNC));
