@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.60 1995/10/17 08:20:09 ack Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.61 1995/10/24 07:44:23 ack Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -52,7 +52,6 @@
 #define IRELE(ip)		VN_RELE(XFS_ITOV(ip))
 
 xfs_inode_t 			*xfs_get_inode ( dev_t, xfs_ino_t);
-extern struct vfs 		*vfs_devsearch( dev_t );
 extern grio_stream_info_t 	* grio_find_stream_with_proc_dev_inum( 
 					pid_t, dev_t, xfs_ino_t);
 
@@ -75,8 +74,6 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
         struct vfs		*vfsp;
         xfs_inode_t		*ip = NULL ;
 	int			error;
-	extern struct vfs	*vfs_devsearch( dev_t );
-
 
 	/*
 	 * Lookup the vfs structure and mark it busy.
