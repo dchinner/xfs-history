@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision: 1.34 $"
 
 /*
  * Super block
@@ -97,11 +97,11 @@ typedef struct xfs_sb
 	xfs_ino_t	sb_uquotino;	/* user quota inode */
 	xfs_ino_t	sb_pquotino;	/* project quota inode */
 	__uint16_t	sb_qflags;	/* quota flags */
+	__uint8_t	sb_flags;	/* misc. flags */
+	__uint8_t	sb_shared_vn;	/* shared version number */
 	xfs_extlen_t	sb_inoalignmt;	/* inode chunk alignment, fsblocks */
 	__uint32_t	sb_unit;	/* stripe or raid unit */
 	__uint32_t	sb_width;	/* stripe or raid width */	
-	__uint8_t	sb_flags;	/* misc. flags */
-	__uint8_t	sb_shared_vn;	/* shared version number */
 } xfs_sb_t;
 
 /*
@@ -144,7 +144,8 @@ typedef enum {
 	 XFS_SB_WIDTH | XFS_SB_SHARED)
 
 /*
- * Misc. Flags
+ * Misc. Flags - warning - these will be cleared by xfs_repair unless
+ * a feature bit is set when the flag is used.
  */
 #define XFS_SBF_NOFLAGS		0x00	/* no flags set */
 #define XFS_SBF_READONLY	0x01	/* only read-only mounts allowed */
