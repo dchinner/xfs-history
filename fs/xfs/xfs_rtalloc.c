@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.40 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -2210,7 +2210,7 @@ xfs_growfs_rt(
 	/*
 	 * Initial error checking.
 	 */
-	if (mp->m_rtdev == 0 || mp->m_rbmip == NULL ||
+	if (mp->m_rtdev == NODEV || mp->m_rbmip == NULL ||
 	    (nrblocks = in->newblocks) <= sbp->sb_rblocks ||
 	    (sbp->sb_rblocks && (in->extsize != sbp->sb_rextsize)))
 		return XFS_ERROR(EINVAL);
@@ -2556,6 +2556,8 @@ xfs_rtmount_init(
 	sbp = &mp->m_sb;
 	if (sbp->sb_rblocks == 0)
 		return 0;
+	if (mp->m_rtdev == NODEV)
+		return XFS_ERROR(E2BIG);
 	mp->m_rsumlevels = sbp->sb_rextslog + 1;
 	mp->m_rsumsize =
 		sizeof(xfs_suminfo_t) * mp->m_rsumlevels * sbp->sb_rbmblocks;
