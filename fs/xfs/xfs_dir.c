@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.78 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -10,15 +10,14 @@
 #endif /* SIM */
 #include <sys/errno.h>
 #include <sys/vnode.h>
+#include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
 #ifdef SIM
 #define _KERNEL 1
 #endif /* SIM */
 #include <sys/dirent.h>
-#include <sys/user.h>
 #include <sys/grio.h>
 #include <sys/ktrace.h>
 #include <sys/sysinfo.h>
@@ -350,7 +349,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 * just work directly within that buffer.  If it's in user memory,
 	 * lock it down first.
 	 */
-	is32 = ABI_IS_IRIX5(GETDENTS_ABI(curprocp->p_abi, uio));
+	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
 	if ((uio->uio_iovcnt == 1) &&
 	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
