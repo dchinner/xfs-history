@@ -42,7 +42,6 @@ int		xpg4_sticky_dir = 1;	/* see xfs_stickytest */
 int		xfs_fstype;
 uint64_t	xfs_panic_mask;		/* set to cause more panics */
 
-dev_t           rootdev = NODEV;
 int             restricted_chown = 0;
 int     	scache_linemask = 0x1f;       /* second level cache line size mask */
 prid_t		dfltprid;

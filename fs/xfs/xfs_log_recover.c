@@ -3332,12 +3332,10 @@ xlog_recover(xlog_t *log, int readonly)
 		 */
 		if (readonly) {
 #ifdef __KERNEL__
-		  int ret;
-		  if(ret = xfs_is_read_only(log)){
-			return ret;
-		  }
+			if (error = xfs_recover_read_only(log))
+				return error;
 #else
-		  return ENOSPC;
+			return ENOSPC;
 #endif
 		}
                 
@@ -3357,7 +3355,7 @@ xlog_recover(xlog_t *log, int readonly)
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
 		if (readonly)
-		  XFS_MTOVFS(log->l_mp)->vfs_flag |= VFS_RDONLY;
+			XFS_MTOVFS(log->l_mp)->vfs_flag |= VFS_RDONLY;
 	}
 	return error;
 }	/* xlog_recover */

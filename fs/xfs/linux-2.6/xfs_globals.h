@@ -43,7 +43,6 @@ extern int	xpg4_sticky_dir;	/* see xfs_stickytest */
 extern int	xfs_fstype;
 extern uint64_t	xfs_panic_mask;		/* set to cause more panics */
 
-extern dev_t	rootdev;
 extern int	restricted_chown;
 extern int	scache_linemask;       /* second level cache line size mask */
 extern prid_t	dfltprid;

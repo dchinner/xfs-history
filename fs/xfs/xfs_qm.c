@@ -61,6 +61,7 @@ STATIC int	xfs_qm_dqattach_one(xfs_inode_t	*, xfs_dqid_t, uint, uint, uint,
 STATIC void	xfs_qm_dqattach_projhint(xfs_dquot_t *, xfs_dquot_t *, uint);
 STATIC int 	xfs_qm_hold_quotafs_ref(struct xfs_mount *);
 STATIC void 	xfs_qm_rele_quotafs_ref(struct xfs_mount *);
+STATIC int	xfs_qm_mount_quotas_int(struct xfs_mount *);
 STATIC void	xfs_qm_dettach_pdquots(xfs_mount_t *);
 STATIC int	xfs_qm_get_rtblks(xfs_inode_t *, xfs_qcnt_t *);
 
@@ -332,13 +333,37 @@ xfs_qm_unmount_quotadestroy(
 }
 
 /*
- * This is called from xfs_mount_int to start quotas and initialize all
- * necessary data structures like quotainfo, and in the rootfs's case
- * xfs_Gqm. This is also responsible for running a quotacheck as necessary.
- * We are guaranteed that the superblock is consistently read in at this point.
+ * Wrapper around xfs_qm_mount_quotas_int to provide quotacheck
+ * dquot update with write access for a readonly mounted root.
  */
 int
 xfs_qm_mount_quotas(
+	xfs_mount_t	*mp)
+{
+	int	error;
+	int	readonly;
+
+	readonly = (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY
+			&& mp->m_dev == rootdev);
+	if (readonly) {
+		if (error = xfs_quotacheck_read_only(mp))
+			return error;
+	}
+	error = xfs_qm_mount_quotas_int(mp);
+	if (readonly)
+		XFS_MTOVFS(mp)->vfs_flag |= VFS_RDONLY;
+	return error;
+}
+
+/*
+ * This is called from xfs_mount_int to start quotas and initialize all
+ * necessary data structures like quotainfo, and in the rootfs's case
+ * xfs_Gqm. This is also responsible for running a quotacheck as necessary.
+ * We are guaranteed that the superblock is consistently read in at this
+ * point.
+ */
+STATIC int
+xfs_qm_mount_quotas_int(
 	xfs_mount_t	*mp)
 {
 	int		s;
@@ -348,7 +373,7 @@ xfs_qm_mount_quotas(
 	error = 0;
 	/*
 	 * If a non-root file system had quotas running earlier, but decided
-	 * to mount without -o quota/pquota options, we revoke the quotachecked
+	 * to mount without -o quota/pquota options, revoke the quotachecked
 	 * license, and bail out.
 	 * Unless, of course the XFS_QUOTA_MAYBE flag is specified.
 	 */

@@ -63,7 +63,9 @@ extern ssize_t xfs_write (
          struct cred            *credp,
          struct flid            *fl);
 
-extern int xfs_is_read_only (xlog_t *);
+extern int xfs_recover_read_only (xlog_t *);
+extern int xfs_quotacheck_read_only (xfs_mount_t *);
+
 extern void XFS_log_write_unmount_ro (bhv_desc_t *);
 
 #define XFS_FSB_TO_DB_IO(io,fsb) \

@@ -216,6 +216,7 @@ typedef struct irix5_dirent {	/* Irix5 view of dirent structure */
 
 #define SYNCHRONIZE()	((void)0)
 #define lbolt		jiffies
+#define rootdev		ROOT_DEV
 #define __return_address __builtin_return_address(0)
 #define LONGLONG_MAX	9223372036854775807LL	/* max "long long int" */
 #define nopkg()		( ENOSYS )

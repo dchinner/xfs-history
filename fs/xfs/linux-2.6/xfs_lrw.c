@@ -1955,13 +1955,13 @@ XFS_bflush(buftarg_t target)
 
 /* Try very hard to clean up a filesystem for READ ONLY status
  * This is a very non deterministic method and such does not
- * aways work.
- * I the case of shutting down a system that has an XFS root
+ * always work.
+ * In the case of shutting down a system that has an XFS root
  * file system it works most of the time, since most processes
  * have been killed prior to this happening.
  * It appears the upper layer of linux will let stuff through
  * even after the super block has been marked READ ONLY.
- * More invsigation is nessesary in this area.
+ * More investigation is necessary in this area.
  */
 
 void
@@ -1981,7 +1981,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
   }  while (count < 2);
   
   /* ok this is a best guest at this point
-   * hopefully everybody has stoped writting to filesystem
+   * hopefully everybody has stopped writing to filesystem
    * and the loop above has pushed everything out.
    * write out the superblock which should be the last of 
    * transactions */
@@ -1993,7 +1993,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 /*	printk("1 Got pincount %d \n",pincount); */
   }  while (pincount);
  
- /* Ok now write out a unmount recored */
+  /* Ok now write out an unmount record */
   xfs_log_unmount_write(mp);            
 
   /* force the log one more time */
@@ -2017,22 +2017,36 @@ xfs_trigger_io(void)
 }
 
 
-int
-xfs_is_read_only(xlog_t *log)
+/*
+ * In these two situations we disregard the readonly mount flag and
+ * temporarily enable writes (we must, to ensure metadata integrity).
+ */
+STATIC int
+xfs_is_read_only(xfs_mount_t *mp)
 {
-	xfs_mount_t *mp;
-
-	cmn_err(CE_NOTE,
-		"XFS: WARNING: recovery required on readonly filesystem.\n");
-	mp = log->l_mp;
 	if (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev)) {
 		cmn_err(CE_NOTE,
 			"XFS: write access unavailable, cannot proceed.\n");
 		return EROFS;
 	}
 	cmn_err(CE_NOTE,
-		"XFS: write access will be enabled during recovery.\n");
+		"XFS: write access will be enabled during mount.\n");
 	XFS_MTOVFS(mp)->vfs_flag &= ~VFS_RDONLY;
 	return 0;
 }
 
+int
+xfs_recover_read_only(xlog_t *log)
+{
+	cmn_err(CE_NOTE, "XFS: WARNING: "
+		"recovery required on readonly filesystem.\n");
+	return xfs_is_read_only(log->l_mp);
+}
+
+int
+xfs_quotacheck_read_only(xfs_mount_t *mp)
+{
+	cmn_err(CE_NOTE, "XFS: WARNING: "
+		"quotacheck required on readonly filesystem.\n");
+	return xfs_is_read_only(mp);
+}
