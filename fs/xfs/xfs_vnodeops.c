@@ -1,4 +1,4 @@
-#ident "$Revision: 1.252 $"
+#ident "$Revision: 1.253 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -639,7 +639,13 @@ xfs_setattr(
 		}  else {
 			projid = ip->i_d.di_projid;
 		}
-		
+		/*
+		 * We take a reference when we initialize udqp and pdqp,
+		 * so it is important that we never blindly double trip on
+		 * the same variable. See xfs_create() for an example.
+		 */
+		ASSERT(udqp == NULL);
+		ASSERT(pdqp == NULL);
 		if (code = xfs_qm_vop_dqalloc(mp, ip, uid, projid, qflags,
 						    &udqp, &pdqp)) 
 			return (code);
@@ -2382,8 +2388,6 @@ xfs_bumplink(
 		ip->i_d.di_version = XFS_DINODE_VERSION_2;
 		ip->i_d.di_onlink = 0;
 		bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
-		ASSERT(ip->i_d.di_projid == 0);
-
 		mp = tp->t_mountp;
 		if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
 			s = XFS_SB_LOCK(mp);
@@ -2480,11 +2484,7 @@ xfs_create(
 		if (error)
 			return error;
 	}
- try_again:
-
-	ip = NULL;
-	dp_joined_to_trans = B_FALSE;
-	truncated = B_FALSE;
+	
 	mp = dp->i_mount;
 	udqp = pdqp = NULL;
 
@@ -2498,6 +2498,12 @@ xfs_create(
 			return (error);
 		}
 	}
+
+ try_again:
+	ip = NULL;
+	dp_joined_to_trans = B_FALSE;
+	truncated = B_FALSE;
+	
 	tp = xfs_trans_alloc(mp, XFS_TRANS_CREATE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
 	resblks = XFS_IALLOC_BLOCKS(mp) + XFS_IN_MAXLEVELS(mp) +
@@ -4597,6 +4603,17 @@ xfs_rename(
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 		dnlc_remove(XFS_ITOV(src_ip), "..");
+	} else {
+		/*
+		 * We always want to hit the ctime on the source inode.
+		 * We do it in the if clause above for the 'new_parent &&
+		 * src_is_directory' case, and here we get all the other
+		 * cases.  This isn't strictly required by the standards
+		 * since the source inode isn't really being changed,
+		 * but old unix file systems did it and some incremental
+		 * backup programs won't work without it.
+		 */
+		xfs_ichgtime(src_ip, XFS_ICHGTIME_CHG);
 	}
 
 	/*
@@ -5917,8 +5934,9 @@ xfs_allocstore(
 		if (error || (nimaps == 0)) {
 			/*
 			 * If we didn't get anything back, we must be
-			 * out of space.  Break out of the loop and
+			 * out of space (or quota).  Break out of the loop and
 			 * back out whatever we've done so far.
+			 * bmapi with BMAPI_DELAY can return EDQUOT.
 			 */
 			break;
 		}
@@ -6534,9 +6552,9 @@ xfs_alloc_file_space(
 		 * allocate and setup the transaction
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
+		resblks = XFS_BM_MAXLEVELS(mp, XFS_DATA_FORK) + datablocks;
 		error = xfs_trans_reserve(tp,
-					  XFS_BM_MAXLEVELS(mp,
-						XFS_DATA_FORK) + datablocks,
+					  resblks,
 					  XFS_WRITE_LOG_RES(mp),
 					  numrtextents,
 					  XFS_TRANS_PERM_LOG_RES,
