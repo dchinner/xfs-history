@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.25 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -675,9 +675,6 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 static void
 xfs_buf_item_print(xfs_buf_log_item_t *blip)
 {
-#if XFS_BIG_FILESYSTEMS
-	xfs_buf_log_format64_t	*blfp;
-#endif
 	static char *bli_flags[] = {
 		"hold",		/* 0x1 */
 		"dirty",	/* 0x2 */
@@ -696,24 +693,12 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip)
 		blip->bli_buf, blip->bli_recur, blip->bli_refcount);
 	printflags(blip->bli_flags, bli_flags, NULL);
 	qprintf("\n");
-	qprintf("size %d blkno 0x%x len 0x%x map size %d map 0x%x\n",
+	qprintf("size %d blkno 0x%llx len 0x%x map size %d map 0x%x\n",
 		blip->bli_format.blf_size, blip->bli_format.blf_blkno,
 		blip->bli_format.blf_len, blip->bli_format.blf_map_size,
 		&(blip->bli_format.blf_data_map));
 	qprintf("blf flags:");
 	printflags((uint)blip->bli_format.blf_flags, blf_flags, NULL);
-#if XFS_BIG_FILESYSTEMS
-	if (blip->bli_format64 != NULL) {
-		blfp = blip->bli_format64;
-		qprintf("BLI has an attached format64\n");
-		qprintf("type 0x%x size %d flags:",
-			blfp->blf_type, blfp->blf_size);
-		printflags((uint)blfp->blf_flags, blf_flags, NULL);
-		qprintf("blkno 0x%llx len 0x%x map size %d map 0x%x\n",
-			blfp->blf_blkno, blfp->blf_len, blfp->blf_map_size,
-			blfp->blf_data_map);
-	}
-#endif
 }
 
 /*
@@ -2615,13 +2600,14 @@ idbg_xlogitem(xfs_log_item_t *lip)
 	static char *lid_type[] = {
 		"???",		/* 0 */
 		"obuf",		/* 1 */
-		"oinode",	/* 2 */
+		"5-3-inode",	/* 2 */
 		"efi",		/* 3 */
 		"efd",		/* 4 */
 		"iunlink",	/* 5 */
-		"inode",	/* 6 */
-		"buf",		/* 7 */
-		"buf64",	/* 8 */
+		"6-1-inode",	/* 6 */
+		"6-1-buf",	/* 7 */
+		"inode",	/* 8 */
+		"buf",		/* 9 */
 		0
 		};
 	static char *li_flags[] = {
