@@ -107,8 +107,8 @@ typedef struct	{
 typedef struct {
 	void		*laststruct;
 	dm_dkattrname_t	attrname;
-	int		bulkall : 1;
-	int		kernel_buffer : 1;
+	uint		bulkall : 1;
+	uint		kernel_buffer : 1;
 } dm_bulkstat_one_t;
 
 /* In the on-disk inode, DMAPI attribute names consist of the user-provided
@@ -478,7 +478,7 @@ xfs_dm_bulkstat_one(
 	int		kern_buf_sz = 0;
 	int		attr_buf_sz = 0;
 	caddr_t		attr_buf = NULL;
-	caddr_t		attr_user_buf = NULL;
+	void __user	*attr_user_buf = NULL;
 	int		value_len;
 	dm_bulkstat_one_t *dmb = (dm_bulkstat_one_t*)private_data;
 	vnode_t		*vp = NULL;
@@ -574,7 +574,7 @@ xfs_dm_bulkstat_one(
 		if (value_len > ATTR_MAX_VALUELEN)
 			value_len = ATTR_MAX_VALUELEN;
 
-		attr_user_buf = ((caddr_t)buffer) + stat_sz;
+		attr_user_buf = ((char __user *)buffer) + stat_sz;
 		if (dmb->kernel_buffer) {
 			attr_buf = attr_user_buf;
 		}
@@ -989,7 +989,7 @@ xfs_dm_direct_ok(
 	bhv_desc_t	*bdp,
 	dm_off_t	off,
 	dm_size_t	len,
-	void		*bufp)
+	void		__user *bufp)
 {
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
@@ -1044,7 +1044,7 @@ xfs_dm_rdwr(
 	mode_t		fmode,
 	dm_off_t	off,
 	dm_size_t	len,
-	void		*bufp,
+	void		__user *bufp,
 	int		*rvp)
 {
 	int		error;
@@ -1119,7 +1119,7 @@ STATIC int
 xfs_dm_clear_inherit(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_attrname_t	*attrnamep)
+	dm_attrname_t	__user *attrnamep)
 {
 	return(-ENOSYS); /* Return negative error to DMAPI */
 }
@@ -1130,9 +1130,9 @@ STATIC int
 xfs_dm_create_by_handle(
 	struct inode	*inode,
 	dm_right_t	right,
-	void		*hanp,
+	void		__user *hanp,
 	size_t		hlen,
-	char		*cname)
+	char		__user *cname)
 {
 	return(-ENOSYS); /* Return negative error to DMAPI */
 }
@@ -1178,10 +1178,10 @@ STATIC int
 xfs_dm_get_allocinfo_rvp(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_off_t	*offp,
+	dm_off_t	__user	*offp,
 	u_int		nelem,
-	dm_extent_t	*extentp,
-	u_int		*nelemp,
+	dm_extent_t	__user *extentp,
+	u_int		__user *nelemp,
 	int		*rvp)
 {
 	xfs_inode_t	*ip;		/* xfs incore inode pointer */
@@ -1316,11 +1316,11 @@ xfs_dm_get_bulkall_rvp(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		mask,
-	dm_attrname_t	*attrnamep,
-	dm_attrloc_t	*locp,
+	dm_attrname_t	__user *attrnamep,
+	dm_attrloc_t	__user *locp,
 	size_t		buflen,
-	void		*bufp,		/* address of buffer in user space */
-	size_t		*rlenp,		/* user space address */
+	void		__user *bufp,	/* address of buffer in user space */
+	size_t		__user *rlenp,	/* user space address */
 	int		*rvalp)
 {
 	int		error, done;
@@ -1410,7 +1410,7 @@ xfs_dm_get_bulkall_rvp(
 	if (nelems < 1)
 		return(0);
 	/* set _link in the last struct to zero */
-	dxs = (dm_xstat_t*)dmb.laststruct;
+	dxs = (dm_xstat_t __user *)dmb.laststruct;
 	if (dxs) {
 		dm_xstat_t ldxs;
 		if (copy_from_user(&ldxs, dxs, sizeof(*dxs)))
@@ -1429,10 +1429,10 @@ xfs_dm_get_bulkattr_rvp(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		mask,
-	dm_attrloc_t	*locp,
+	dm_attrloc_t	__user *locp,
 	size_t		buflen,
-	void		*bufp,
-	size_t		*rlenp,
+	void		__user *bufp,
+	size_t		__user *rlenp,
 	int		*rvalp)
 {
 	int		error, done;
@@ -1443,7 +1443,7 @@ xfs_dm_get_bulkattr_rvp(
 	xfs_mount_t	*mp;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	vfs_t		*vfsp = vp->v_vfsp;
-	dm_stat_t	*dxs;
+	dm_stat_t __user *dxs;
 	dm_bulkstat_one_t dmb;
 
 	/* Returns negative errors to DMAPI */
@@ -1512,7 +1512,7 @@ xfs_dm_get_bulkattr_rvp(
 	if (nelems < 1)
 		return(0);
 	/* set _link in the last struct to zero */
-	dxs = (dm_stat_t*)dmb.laststruct;
+	dxs = (dm_stat_t __user *)dmb.laststruct;
 	if (dxs) {
 		dm_stat_t ldxs;
 		if (copy_from_user(&ldxs, dxs, sizeof(*dxs)))
@@ -1531,7 +1531,7 @@ xfs_dm_get_config(
 	struct inode	*inode,
 	dm_right_t	right,
 	dm_config_t	flagname,
-	dm_size_t	*retvalp)
+	dm_size_t	__user *retvalp)
 {
 	dm_size_t	retval;
 
@@ -1594,8 +1594,8 @@ xfs_dm_get_config_events(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		nelem,
-	dm_eventset_t	*eventsetp,
-	u_int		*nelemp)
+	dm_eventset_t	__user *eventsetp,
+	u_int		__user *nelemp)
 {
 	dm_eventset_t	eventset;
 
@@ -1731,7 +1731,7 @@ STATIC int
 xfs_dm_get_dioinfo(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_dioinfo_t	*diop)
+	dm_dioinfo_t	__user *diop)
 {
 	dm_dioinfo_t	dio;
 	xfs_mount_t	*mp;
@@ -1776,10 +1776,10 @@ xfs_dm_get_dirattrs_rvp(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		mask,
-	dm_attrloc_t	*locp,
+	dm_attrloc_t	__user *locp,
 	size_t		buflen,
-	void		*bufp,		/* address of buffer in user space */
-	size_t		*rlenp,		/* user space address */
+	void		__user *bufp,	/* address of buffer in user space */
+	size_t		__user *rlenp,	/* user space address */
 	int		*rvp)
 {
 	xfs_inode_t	*dp;
@@ -1931,10 +1931,10 @@ STATIC int
 xfs_dm_get_dmattr(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_attrname_t	*attrnamep,
+	dm_attrname_t	__user *attrnamep,
 	size_t		buflen,
-	void		*bufp,
-	size_t		*rlenp)
+	void		__user *bufp,
+	size_t		__user  *rlenp)
 {
 	dm_dkattrname_t name;
 	char		*value;
@@ -2031,7 +2031,7 @@ xfs_dm_get_fileattr(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		mask,		/* not used; always return everything */
-	dm_stat_t	*statp)
+	dm_stat_t	__user *statp)
 {
 	dm_stat_t	stat;
 	xfs_inode_t	*ip;
@@ -2072,8 +2072,8 @@ xfs_dm_get_region(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		nelem,
-	dm_region_t	*regbufp,
-	u_int		*nelemp)
+	dm_region_t	__user *regbufp,
+	u_int		__user *nelemp)
 {
 	dm_eventset_t	evmask;
 	dm_region_t	region;
@@ -2123,12 +2123,12 @@ xfs_dm_getall_dmattr(
 	struct inode	*inode,
 	dm_right_t	right,
 	size_t		buflen,
-	void		*bufp,
-	size_t		*rlenp)
+	void		__user *bufp,
+	size_t		__user *rlenp)
 {
 	attrlist_cursor_kern_t cursor;
 	attrlist_t	*attrlist;
-	dm_attrlist_t	*ulist;
+	dm_attrlist_t	__user *ulist;
 	int		*last_link;
 	int		alignment;
 	int		total_size;
@@ -2272,8 +2272,8 @@ xfs_dm_getall_inherit(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		nelem,
-	dm_inherit_t	*inheritbufp,
-	u_int		*nelemp)
+	dm_inherit_t	__user *inheritbufp,
+	u_int		__user *nelemp)
 {
 	return(-ENOSYS); /* Return negative error to DMAPI */
 }
@@ -2291,7 +2291,7 @@ STATIC int
 xfs_dm_init_attrloc(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_attrloc_t	*locp)
+	dm_attrloc_t	__user *locp)
 {
 	dm_attrloc_t	loc = 0;
 
@@ -2311,9 +2311,9 @@ STATIC int
 xfs_dm_mkdir_by_handle(
 	struct inode	*inode,
 	dm_right_t	right,
-	void		*hanp,
+	void		__user *hanp,
 	size_t		hlen,
-	char		*cname)
+	char		__user *cname)
 {
 	return(-ENOSYS); /* Return negative error to DMAPI */
 }
@@ -2326,8 +2326,8 @@ xfs_dm_probe_hole(
 	dm_right_t	right,
 	dm_off_t	off,
 	dm_size_t	len,		/* we ignore this for now */
-	dm_off_t	*roffp,
-	dm_size_t	*rlenp)
+	dm_off_t	__user	*roffp,
+	dm_size_t	__user *rlenp)
 {
 	dm_off_t	roff;
 	dm_size_t	rlen;
@@ -2446,7 +2446,7 @@ xfs_dm_read_invis_rvp(
 	dm_right_t	right,
 	dm_off_t	off,
 	dm_size_t	len,
-	void		*bufp,
+	void		__user *bufp,
 	int		*rvp)
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
@@ -2491,7 +2491,7 @@ xfs_dm_remove_dmattr(
 	struct inode	*inode,
 	dm_right_t	right,
 	int		setdtime,
-	dm_attrname_t	*attrnamep)
+	dm_attrname_t	__user *attrnamep)
 {
 	dm_dkattrname_t name;
 	int		error;
@@ -2550,10 +2550,10 @@ STATIC int
 xfs_dm_set_dmattr(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_attrname_t	*attrnamep,
+	dm_attrname_t	__user *attrnamep,
 	int		setdtime,
 	size_t		buflen,
-	void		*bufp)
+	void		__user *bufp)
 {
 	dm_dkattrname_t name;
 	char		*value;
@@ -2625,7 +2625,7 @@ xfs_dm_set_fileattr(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		mask,
-	dm_fileattr_t	*statp)
+	dm_fileattr_t	__user *statp)
 {
 	dm_fileattr_t	stat;
 	vattr_t		vat;
@@ -2696,7 +2696,7 @@ STATIC int
 xfs_dm_set_inherit(
 	struct inode	*inode,
 	dm_right_t	right,
-	dm_attrname_t	*attrnamep,
+	dm_attrname_t	__user *attrnamep,
 	mode_t		mode)
 {
 	return(-ENOSYS); /* Return negative error to DMAPI */
@@ -2708,8 +2708,8 @@ xfs_dm_set_region(
 	struct inode	*inode,
 	dm_right_t	right,
 	u_int		nelem,
-	dm_region_t	*regbufp,
-	dm_boolean_t	*exactflagp)
+	dm_region_t	__user *regbufp,
+	dm_boolean_t	__user *exactflagp)
 {
 	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
@@ -2804,10 +2804,10 @@ STATIC int
 xfs_dm_symlink_by_handle(
 	struct inode	*inode,
 	dm_right_t	right,
-	void		*hanp,
+	void		__user *hanp,
 	size_t		hlen,
-	char		*cname,
-	char		*path)
+	char		__user *cname,
+	char		__user *path)
 {
 	return(-ENOSYS); /* Return negative errors to DMAPI */
 }
@@ -2864,7 +2864,7 @@ xfs_dm_write_invis_rvp(
 	int		flags,
 	dm_off_t	off,
 	dm_size_t	len,
-	void		*bufp,
+	void		__user *bufp,
 	int		*rvp)
 {
 	int		fflag = 0;
