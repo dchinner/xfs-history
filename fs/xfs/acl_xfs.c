@@ -1,20 +1,21 @@
 /*
- * Copyright 1992, Silicon Graphics, Inc. 
- * All Rights Reserved.
- *
- * This is UNPUBLISHED PROPRIETARY SOURCE CODE of Silicon Graphics, Inc.;
- * the contents of this file may not be disclosed to third parties, copied or 
- * duplicated in any form, in whole or in part, without the prior written 
- * permission of Silicon Graphics, Inc.
- *
- * RESTRICTED RIGHTS LEGEND:
- * Use, duplication or disclosure by the Government is subject to restrictions 
- * as set forth in subdivision (c)(1)(ii) of the Rights in Technical Data
- * and Computer Software clause at DFARS 252.227-7013, and/or in similar or 
- * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished - 
- * rights reserved under the Copyright Laws of the United States.
+ * Copyright (C) 2000 Silicon Graphics, Inc.  All Rights Reserved.
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or (at
+ * your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write the Free Software Foundation,
+ * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
