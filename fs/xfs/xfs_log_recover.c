@@ -2118,9 +2118,11 @@ xlog_recover_do_inode_trans(xlog_t		*log,
         /* The core is in in-core format */
         xfs_xlate_dinode_core(dip, item->ri_buf[1].i_addr, -1, ARCH_CONVERT);
         /* the rest is in on-disk format */
-	bcopy(item->ri_buf[1].i_addr + sizeof(xfs_dinode_core_t), 
-              dip                    + sizeof(xfs_dinode_core_t), 
-              item->ri_buf[1].i_len  - sizeof(xfs_dinode_core_t));
+	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
+		bcopy(item->ri_buf[1].i_addr + sizeof(xfs_dinode_core_t), 
+		      (caddr_t) dip          + sizeof(xfs_dinode_core_t), 
+		      item->ri_buf[1].i_len  - sizeof(xfs_dinode_core_t));
+	}
 
 	if (in_f->ilf_size == 2)
 		goto write_inode_buffer;
@@ -2147,7 +2149,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		break;
 
 	case XFS_ILOG_DEV:
-		dip->di_u.di_dev = in_f->ilf_u.ilfu_rdev;
+		INT_SET(dip->di_u.di_dev, ARCH_CONVERT, in_f->ilf_u.ilfu_rdev);
 		break;
 
 	case XFS_ILOG_UUID:
@@ -3293,7 +3295,7 @@ xlog_do_recover(xlog_t	*log,
 		daddr_t tail_blk)
 {
 #ifdef _KERNEL
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp;
 #endif
 	int		error;

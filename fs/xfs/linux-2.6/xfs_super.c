@@ -144,6 +144,7 @@ void
 linvfs_release_inode(struct inode *inode)
 {
 	if (inode) {
+		pagebuf_delwri_flush(inode);
 		pagebuf_lock_disable(inode);
 		truncate_inode_pages(&inode->i_data, 0L, TRUNC_NO_TOSS);
 		iput(inode);
@@ -358,6 +359,10 @@ linvfs_put_inode(
 		}
 		/* XXX ---------- DELALLOC --------------- XXX */
 #endif
+
+		VOP_RWLOCK(vp, VRWLOCK_READ);
+		pagebuf_flush(inode, 0, 0); 
+		VOP_RWUNLOCK(vp, VRWLOCK_READ);
 
 		VN_RELE(vp);
 		vp->v_inode = 0;

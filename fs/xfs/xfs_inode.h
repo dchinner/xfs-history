@@ -602,6 +602,8 @@ int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
 		           dev_t, struct cred *, xfs_prid_t, int,
 			   struct xfs_buf **, boolean_t *, xfs_inode_t **);
+void		xfs_xlate_dinode_core(caddr_t, struct xfs_dinode_core *, int,
+			   xfs_arch_t);
 #ifndef SIM
 int		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
 int		xfs_atruncate_start(xfs_inode_t *);

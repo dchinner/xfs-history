@@ -785,7 +785,7 @@ xfs_iformat_btree(
  * arch = on-disk architecture
  */
  
-static void 
+void 
 xfs_xlate_dinode_core(caddr_t buf, xfs_dinode_core_t *dip, 
     int dir, xfs_arch_t arch)
 {

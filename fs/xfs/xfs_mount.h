@@ -462,5 +462,6 @@ struct xfs_buf	*xfs_getsb(xfs_mount_t *, int);
 void            xfs_freesb(xfs_mount_t *);
 void		xfs_force_shutdown(struct xfs_mount *, int);
 int		xfs_syncsub(xfs_mount_t *, int, int, int *);
+void		xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t, __int64_t);
 extern	struct vfsops xfs_vfsops;
 #endif	/* !_FS_XFS_MOUNT_H */
