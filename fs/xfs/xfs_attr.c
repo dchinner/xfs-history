@@ -227,13 +227,14 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	 * If the attribute list is non-existant or a shortform list,
 	 * upgrade it to a single-leaf-block attribute list.
 	 */
-	if ((dp->i_afp->if_bytes == 0) ||
-	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)) {
+	if ((dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) ||
+	    ((dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS) &&
+	     (dp->i_d.di_anextents == 0))) {
 
 		/* 
 		 * Build initial attribute list (if required).
 		 */
-		if (dp->i_afp->if_bytes == 0)
+		if (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS)
 			(void)xfs_attr_shortform_create(&args);
 
 		/*
