@@ -1,4 +1,4 @@
-#ident "$Revision: 1.65 $"
+#ident "$Revision: 1.66 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -428,6 +428,7 @@ void
 xfs_buf_item_unlock(
 	xfs_buf_log_item_t	*bip)
 {
+	int	aborted;
 	buf_t	*bp;
 	uint	hold;
 
@@ -442,6 +443,15 @@ xfs_buf_item_unlock(
 	bp->b_fsprivate2 = NULL;
 
 	/*
+	 * If this is a transaction abort, don't return early.
+	 * Instead, allow the brelse to happen.
+	 * Normally it would be done for stale (cancelled) buffers
+	 * at unpin time, but we'll never go through the pin/unpin
+	 * cycle if we abort inside commit.
+	 */
+	aborted = (bip->bli_item.li_flags & XFS_LI_ABORTED) != 0;
+
+	/*
 	 * If the buf item is marked stale, then don't do anything.
 	 * We'll unlock the buffer and free the buf item when the
 	 * buffer is unpinned for the last time.
@@ -450,7 +460,8 @@ xfs_buf_item_unlock(
 		bip->bli_flags &= ~XFS_BLI_LOGGED;
 		xfs_buf_item_trace("UNLOCK STALE", bip);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
-		return;
+		if (!aborted)
+			return;
 	}
 
 	/*
