@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.155 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -34,6 +34,7 @@
 #include <sys/kmem.h>
 #include <sys/sema.h>
 #include <sys/file.h>
+#include <sys/flock.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/runq.h>
@@ -1143,7 +1144,8 @@ xfs_read(
 	vnode_t		*vp,
 	uio_t		*uiop,
 	int		ioflag,
-	cred_t		*credp)
+	cred_t		*credp,
+	flid_t		*fl)
 {
 	xfs_inode_t	*ip;
 	int		type;
@@ -1167,7 +1169,8 @@ xfs_read(
 
 #ifndef SIM
 	if (MANDLOCK(vp, ip->i_d.di_mode) &&
-	    (error = chklock(vp, FREAD, offset, count, uiop->uio_fmode))) {
+	    (error = chklock(vp, FREAD, offset, count, uiop->uio_fmode,
+					credp, fl))) {
 		return error;
 	}
 #endif
@@ -2296,7 +2299,8 @@ xfs_write(
 	vnode_t	*vp,
 	uio_t	*uiop,
 	int	ioflag,
-	cred_t	*credp)
+	cred_t	*credp,
+	flid_t	*fl)
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
@@ -2339,7 +2343,8 @@ start:
 
 #ifndef SIM
 	if (MANDLOCK(vp, ip->i_d.di_mode) &&
-	    (error = chklock(vp, FWRITE, offset, count, uiop->uio_fmode))) {
+	    (error = chklock(vp, FWRITE, offset, count, uiop->uio_fmode,
+					credp, fl))) {
 		return error;
 	}
 #endif

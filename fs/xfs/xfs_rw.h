@@ -1,11 +1,12 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.20 $"
 
 struct bmapval;
 struct buf;
 struct cred;
+struct flid;
 struct uio;
 struct vnode;
 struct xfs_inode;
@@ -147,13 +148,15 @@ int
 xfs_read(struct vnode	*vp,
 	 struct uio	*uiop,
 	 int		ioflag,
-	 struct cred	*credp);
+	 struct cred	*credp,
+	 struct flid	*fl);
 
 int
 xfs_write(struct vnode	*vp,
 	  struct uio	*uiop,
 	  int		ioflag,
-	  struct cred	*credp);
+	  struct cred	*credp,
+	  struct flid	*fl);
 
 void
 xfs_strategy(struct vnode	*vp,
