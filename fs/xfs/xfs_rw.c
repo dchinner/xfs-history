@@ -1,4 +1,4 @@
-#ident "$Revision: 1.160 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4185,7 +4185,7 @@ struct dio_s {
 /*
  * xfs_dio_cache_inval()
  * This routine is responsible for keeping direct I/O and buffered I/O
- * somewhat coherent.  For here we make sure that we're at least
+ * somewhat coherent.  From here we make sure that we're at least
  * temporarily holding the inode I/O lock exclusively and then call
  * the page cache to flush and invalidate any cached pages.  If there
  * are no cached pages this routine will be very quick.
@@ -4224,11 +4224,19 @@ xfs_dio_cache_inval(
 		remapf(vp, ctooff(offtoct(offset)), 1);
 	}
 	/*
-	 * Watch out for overflow.  We subtract 1 from offset+len,
-	 * because pflushinvalvp() takes start and end values not
-	 * start and length.
+	 * Round up to the next page boundary and then back
+	 * off by one byte.  We back off by one because this
+	 * is a first byte/last byte interface rather than
+	 * a start/len interface.  We round up to a page
+	 * boundary because the page/chunk cache code is
+	 * slightly broken and won't invalidate all the right
+	 * buffers otherwise.
+	 *
+	 * We also have to watch out for overflow, so if we
+	 * go over the maximum off_t value we just pull back
+	 * to that max.
 	 */
-	flush_end = (__uint64_t)(offset + len - 1);
+	flush_end = (__uint64_t)ctooff(offtoc(offset + len)) - 1;
 	if (flush_end > (__uint64_t)LONGLONG_MAX) {
 		flush_end = LONGLONG_MAX;
 	}
