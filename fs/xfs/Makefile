@@ -13,7 +13,6 @@ SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 COMMANDS =	cmd/attr cmd/xfsprogs cmd/xfsdump cmd/acl cmd/dmapi
 COMMANDRPMS =	attr attr-devel xfsprogs xfsprogs-devel xfsdump acl acl-devel \
 		dmapi dmapi-devel
-QUOTA_SPEC =	quota-xfs.spec
 
 default all: checkproc tarballs kernel cmds quota
 
@@ -55,7 +54,7 @@ cmds: builddirs
 
 quota: builddirs
 	@echo "=== Making $@ `date`";
-	rpm -ba --target=$(ARCH) $(WORKAREA)/SPECS/${QUOTA_SPEC};
+	rpm -ba --target=$(ARCH) $(WORKAREA)/SPECS/quota.spec;
 
 builddirs:
 	[ -d $(WORKAREA)/BUILD ] || mkdir $(WORKAREA)/BUILD
