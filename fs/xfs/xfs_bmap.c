@@ -1636,7 +1636,8 @@ xfs_bmapi(
 		if (eof && !wr)
 			break;
 		inhole = eof || got.br_startoff > bno;
-		wasdelay = !inhole && got.br_startblock == NULLSTARTBLOCK;
+		wasdelay = !inhole && !delay &&
+			got.br_startblock == NULLSTARTBLOCK;
 		/*
 		 * First, deal with the hole before the allocated space 
 		 * that we found, if any.
