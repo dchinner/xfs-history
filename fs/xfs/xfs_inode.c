@@ -1,4 +1,4 @@
-#ident "$Revision: 1.149 $"
+#ident "$Revision: 1.150 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -470,7 +470,8 @@ xfs_iformat_extents(
 			nex);
 		bcopy(XFS_DFORK_PTR(dip, whichfork), ifp->if_u1.if_extents,
 		      size);
-		xfs_bmap_trace_exlist("xfs_iformat_extents", ip, nex);
+		xfs_bmap_trace_exlist("xfs_iformat_extents", ip, nex,
+			whichfork);
 	}
 	ifp->if_flags |= XFS_IFEXTENTS;
 }
@@ -2176,7 +2177,7 @@ xfs_iextents_copy(
 	ASSERT(ifp->if_bytes > 0);
 
 	nrecs = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
-	xfs_bmap_trace_exlist("xfs_extents_copy", ip, nrecs);
+	xfs_bmap_trace_exlist("xfs_extents_copy", ip, nrecs, whichfork);
 	ASSERT(nrecs > 0);
 	if (nrecs == XFS_IFORK_NEXTENTS(ip, whichfork)) {
 		/*

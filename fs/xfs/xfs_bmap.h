@@ -190,9 +190,10 @@ void
 xfs_bmap_trace_exlist(
 	char			*fname,		/* function name */
 	struct xfs_inode	*ip,		/* incore inode pointer */
-	xfs_extnum_t		cnt);		/* count of entries in list */
+	xfs_extnum_t		cnt,		/* count of entries in list */
+	int			whichfork);	/* data or attr fork */
 #else
-#define	xfs_bmap_trace_exlist(f,ip,c)
+#define	xfs_bmap_trace_exlist(f,ip,c,w)
 #endif
 
 /*

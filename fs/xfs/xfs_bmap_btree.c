@@ -1841,17 +1841,19 @@ xfs_bmbt_trace_enter(
 	__psunsigned_t	a11)
 {
 	xfs_inode_t	*ip;
+	int		whichfork;
 
 	ip = cur->bc_private.b.ip;
+	whichfork = cur->bc_private.b.whichfork;
 	ktrace_enter(xfs_bmbt_trace_buf,
-		(void *)((__psunsigned_t)type), 
+		(void *)((__psunsigned_t)type | (whichfork << 16)), 
 		(void *)name, (void *)ip, (void *)cur,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
 		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
 	ASSERT(ip->i_btrace);
 	ktrace_enter(ip->i_btrace,
-		(void *)((__psunsigned_t)type), 
+		(void *)((__psunsigned_t)type | (whichfork << 16)), 
 		(void *)name, (void *)ip, (void *)cur,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
