@@ -404,7 +404,7 @@ linvfs_read_super(
 
 	if (xfs_parseargs((char *)data, sb->s_flags, &args))
 		return NULL;
-	strncpy(args.fsname, bdevname(sb->s_dev), MAXNAMELEN);
+	strncpy(args.fsname, sb->s_id, MAXNAMELEN);
 	/* args.rtdev and args.logdev done in xfs_parseargs */
 
 	/*  Setup the generic "mounta" structure  */
@@ -773,7 +773,6 @@ linvfs_dmapi_mount(
 	char		*dir_name)
 {
 	vfsops_t	*vfsops;
-	char		fsname[MAXNAMELEN];
 	vnode_t		*cvp;	/* covered vnode */
 	vfs_t		*vfsp; /* mounted vfs */
 	int		error;
@@ -782,12 +781,11 @@ linvfs_dmapi_mount(
 	if ( ! (vfsp->vfs_flag & VFS_DMI) )
 		return 0;
 	cvp = LINVFS_GET_CVP(sb);
-	strncpy(fsname, bdevname(sb->s_dev), MAXNAMELEN);
 
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 	vfsops = &xfs_vfsops;
 
-	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, cvp, dir_name, fsname, error);
+	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, cvp, dir_name, sb->s_id, error);
 	if (error) {
 		if (atomic_read(&sb->s_active) == 1)
 			vfsp->vfs_flag &= ~VFS_DMI;
