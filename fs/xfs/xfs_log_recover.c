@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.38 $"
+#ident	"$Revision: 1.40 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1002,25 +1002,28 @@ xlog_recover_print_inode(xlog_recover_item_t *item)
 	case XFS_ILOG_EXT: {
 	    ASSERT(f->ilf_size == 3);
 	    printf("		EXTENTS inode data:\n");
-	    if (print_inode && print_data)
+	    if (print_inode && print_data) {
 		xlog_recover_print_data(item->ri_buf[2].i_addr,
 					item->ri_buf[2].i_len);
+	    }
 	    break;
 	}
 	case XFS_ILOG_BROOT: {
 	    ASSERT(f->ilf_size == 3);
 	    printf("		BTREE inode data:\n");
-	    if (print_inode && print_data)
+	    if (print_inode && print_data) {
 		xlog_recover_print_data(item->ri_buf[2].i_addr,
 					item->ri_buf[2].i_len);
+	    }
 	    break;
 	}
 	case XFS_ILOG_DATA: {
 	    ASSERT(f->ilf_size == 3);
 	    printf("		LOCAL inode data:\n");
-	    if (print_inode && print_data)
+	    if (print_inode && print_data) {
 		xlog_recover_print_data(item->ri_buf[2].i_addr,
 					item->ri_buf[2].i_len);
+	    }
 	    break;
 	}
 	case XFS_ILOG_DEV: {
@@ -2555,13 +2558,11 @@ xlog_recover(xlog_t *log)
 			"Starting xFS recovery on (major: %d) (minor: %d)",
 			emajor(log->l_dev), eminor(log->l_dev));
 		error = xlog_do_recover(log, head_blk, tail_blk);
-		cmn_err(CE_NOTE, 
-			"Ending xFS recovery on (major: %d) (minor: %d)",
-			emajor(log->l_dev), eminor(log->l_dev));
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
 	}
 	return error;
 }	/* xlog_recover */
+
 
 /*
  * In the first part of recovery we replay inodes and buffers and build
@@ -2589,10 +2590,14 @@ xlog_recover_finish(xlog_t *log)
 		xlog_recover_process_iunlinks(log);
 		xlog_recover_check_summary(log);
 #endif /* _KERNEL */
+		cmn_err(CE_NOTE,
+			"Ending xFS recovery on (major: %d) (minor: %d)",
+			emajor(log->l_dev), eminor(log->l_dev));
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	}
 	return 0;
-}
+}	/* xlog_recover_finish */
+
 
 #ifdef DEBUG
 /*
