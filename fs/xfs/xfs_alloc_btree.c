@@ -389,8 +389,7 @@ xfs_alloc_delrec(
 			 */
 			xfs_btree_setbuf(cur, level, 0);
 			cur->bc_nlevels--;
-		}
-		if (level > 0) {
+		} else if (level > 0) {
 			error = xfs_alloc_decrement(cur, level, &i);
 			if (error) {
 				return error;
@@ -2110,6 +2109,7 @@ xfs_alloc_decrement(
 	int			error;
 	int			lev;	/* btree level */
 
+	ASSERT(level < cur->bc_nlevels);
 	/*
 	 * Read-ahead to the left at this level.
 	 */
@@ -2267,6 +2267,7 @@ xfs_alloc_increment(
 	int			error;
 	int			lev;	/* btree level */
 
+	ASSERT(level < cur->bc_nlevels);
 	/*
 	 * Read-ahead to the right at this level.
 	 */
