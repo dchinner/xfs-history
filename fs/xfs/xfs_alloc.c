@@ -1235,7 +1235,7 @@ xfs_free_ag_extent(
 		 * Move the by-block cursor back to the left neighbor.
 		 */
 		xfs_alloc_decrement(bno_cur, 0);
-#ifdef XFSDEBUG
+#ifdef DEBUG
 		/*
 		 * Check that this is the right record: delete didn't
 		 * mangle the cursor.
