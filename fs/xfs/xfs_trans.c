@@ -185,6 +185,8 @@ xfs_trans_mod_sb(xfs_trans_t	*tp,
 		 uint		field,
 		 int		delta)
 {
+	xfs_sb_t		*sbp;
+
 	switch (field) {
 	case XFS_TRANS_SB_ICOUNT:
 		ASSERT(delta > 0);
@@ -215,7 +217,26 @@ xfs_trans_mod_sb(xfs_trans_t	*tp,
 		tp->t_res_fdblocks_delta += delta;
 		break;
 	case XFS_TRANS_SB_FREXTENTS:
+		/*
+		 * Track the number of blocks allocated in the
+		 * transaction.  Make sure it does not exceed the
+		 * number reserved.
+		 */
+		if (delta < 0) {
+			sbp = &tp->t_mountp->m_sb;
+			tp->t_blk_res_used += (uint)(-delta * sbp->sb_rextsize);
+			ASSERT(tp->t_blk_res_used <= tp->t_blk_res);
+		}
 		tp->t_frextents_delta += delta;
+		break;
+	case XFS_TRANS_SB_RES_FREXTENTS:
+		/*
+		 * The allocation has already been applied to the
+		 * in-core superblocks's counter.  This should only
+		 * be applied to the on-disk superblock.
+		 */
+		ASSERT(delta < 0);
+		tp->t_res_frextents_delta += delta;
 		break;
 	default:
 		ASSERT(0);
@@ -263,7 +284,8 @@ xfs_trans_apply_sb_deltas(xfs_trans_t *tp)
 	 * can get away with this.
 	 */
 	xfs_trans_log_buf(tp, bp, offsetof(xfs_sb_t, sb_icount),
-			  (offsetof(xfs_sb_t, sb_frextents) + 3));
+			  offsetof(xfs_sb_t, sb_frextents) +
+			  sizeof(sbp->sb_frextents) - 1);
 }
 
 /*
@@ -297,9 +319,9 @@ xfs_trans_unreserve_and_mod_sb(xfs_trans_t *tp)
 
 	/*
 	 * Apply any superblock modifications to the in-core version.
-	 * The t_res_fdblocks_delta field is explicity NOT applied
-	 * to the in-core superblock.  The idea is that that has
-	 * already been done.
+	 * The t_res_fdblocks_delta and t_res_frextents_delta fields are
+	 * explicity NOT applied to the in-core superblock.
+	 * The idea is that that has already been done.
 	 */
 	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
 		if (tp->t_icount_delta != 0) {
