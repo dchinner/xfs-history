@@ -358,7 +358,7 @@ xlog_find_verify_log_record(xlog_t	*log,
     xfs_daddr_t         i;
     xfs_buf_t		*bp;
     char                *buf        = NULL;
-    xlog_rec_header_t	*head;
+    xlog_rec_header_t	*head       = NULL;
     int			error       = 0;
     int                 smallmem    = 0;
     int                 num_blks    = *last_blk - start_blk;
