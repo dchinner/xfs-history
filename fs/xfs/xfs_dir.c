@@ -1,4 +1,4 @@
-#ident "$Revision: 1.94 $"
+#ident "$Revision: 1.95 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -54,6 +54,9 @@
 #include "xfs_dir.h"
 #include "xfs_dir_leaf.h"
 #include "xfs_error.h"
+#if	CELL
+#include <sys/kthread.h>
+#endif	/* CELL */
 #ifdef SIM
 #include "sim.h"
 #endif
