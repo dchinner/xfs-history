@@ -16,9 +16,10 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.73 $"
+#ident  "$Revision: 1.74 $"
 
 #include <strings.h>
+#include <limits.h>
 #include <sys/types.h>
 #ifdef SIM
 #define _KERNEL
@@ -291,7 +292,7 @@ spectodev(char	 *spec,
 /*
  * xfs_cmountfs
  *
- * This function is the common mount file system function.
+ * This function is the common mount file system function for xFS.
  */
 STATIC int
 xfs_cmountfs(struct vfs 	*vfsp,
@@ -307,6 +308,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	int		error = 0;
 	int		s, vfs_flags;
 	xfs_sb_t	*sbp;
+	size_t		n;
 	struct vnode 	*makespecvp(dev_t, vtype_t);
 
 	/*
@@ -373,15 +375,26 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			mp->m_logdevp = ldevvp;
 		}
 		if (ap != NULL) {
+			/* Called through the mount system call */
 			if (ap->version != 1) {
 				error = XFS_ERROR(EINVAL);
 				goto error;
 			}
 			mp->m_logbufs = ap->logbufs;
 			mp->m_logbsize = ap->logbufsize;
+			if (error = copyinstr(ap->fsname, mp->m_fsname,
+					      PATH_MAX, &n)) {
+				if (error == ENAMETOOLONG)
+					error = EINVAL;
+				goto error;
+			}
 		} else {
+			/*
+			 * Called through vfs_mountroot/xfs_mountroot.
+			 */
 			mp->m_logbufs = -1;
 			mp->m_logbsize = -1;
+			strcpy(mp->m_fsname, "/");
 		}
 	} else {
 		ldevvp = NULL;
@@ -439,7 +452,7 @@ error:
 	 */
 
 	return error;
-} /* end of xfs_cmountfs() */
+}	/* end of xfs_cmountfs() */
 
 
 /*
@@ -488,7 +501,7 @@ xfs_get_vfsmount(struct vfs	*vfsp,
 	}
 
 	return mp;
-}
+}	/* end of xfs_get_vfsmount() */
 
 
 /*
@@ -594,7 +607,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 
 	return error;
 
-} /* xfs_vfsmount() */
+}	/* end of xfs_vfsmount() */
 
 
 /*
