@@ -60,7 +60,7 @@ static inline void _sv_wait(sv_t *sv, spinlock_t *lock, int state,
 	DECLARE_WAITQUEUE(wait, current);
 
 	add_wait_queue_exclusive(&sv->waiters, &wait);
-	set_current_state(state);
+	__set_current_state(state);
 	spin_unlock(lock);
 
 	schedule_timeout(timeout);

@@ -87,7 +87,7 @@ lock_wait(wait_queue_head_t *q, spinlock_t *lock, int rw)
 {
 	DECLARE_WAITQUEUE( wait, current );
 
-	current->state = TASK_UNINTERRUPTIBLE;
+	__set_current_state(TASK_UNINTERRUPTIBLE);
 
 	wq_write_lock(&q->lock);
 	if (rw) {
