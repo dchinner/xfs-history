@@ -153,72 +153,10 @@ int xlog_req_num  = 0;
 int xlog_error_mod = 33;
 #endif
 
-#ifndef DEBUG
+#ifndef XFSERRORDEBUG
 #define xlog_bwrite(bp)		bwrite(bp)
 #else
 STATIC int xlog_bwrite(buf_t *);
-#endif
-
-#ifdef DEBUG
-/*
- * Wrapper around bwrite for log writes. Useful for isolating log error
- * handling problems.
- */
-STATIC int
-xlog_bwrite(
-	buf_t *bp)
-{
-	int error;
-	int flag = 0;
-	xlog_t	*log;
-
-	log = ((xlog_in_core_t *)bp->b_fsprivate)->ic_log;
-	if (XFS_FORCED_SHUTDOWN(log->l_mp)) {
-		printf("iclog 0x%x, buf 0x%x, bwritecnt 0x%x\n",
-		       bp->b_fsprivate, bp, 
-		       ((xlog_in_core_t *)bp->b_fsprivate)->ic_bwritecnt);
-		buftrace("XLOGBWRITE SHUTDOWN", bp);
-	}
-	ASSERT(!(((xlog_in_core_t *)bp->b_fsprivate)->ic_state &
-		 XLOG_STATE_IOERROR));
-	if (xlog_do_error &&
-	    xlog_err_dev == bp->b_edev &&
-	    ((xlog_req_num++) % xlog_error_mod) == 0) {
-		error = EIO;
-		flag = bp->b_flags;
-		bioerror(bp, error);
-	} else
-	{
-		error = bwrite(bp);
-	}
-	if (error) {
-		/*
-		 * This is only for error recovery debugging.
-		 */
-		if (flag) {
-			buftrace("XLOGBWRITE IOERROR", bp);
-			bp->b_flags |= B_STALE;
-			bp->b_flags &= ~(B_DELWRI|B_DONE);
-			biodone(bp);
-			
-#if 0
-			if (flag & B_ASYNC) {
-				if (!(flag & B_DELWRI)) {
-					error = geterror(bp);
-				} else {
-					error = 0;
-				}
-			} else {
-				error = biowait(bp);
-				if (!(bp->b_flags & B_HOLD)) {
-					brelse(bp);
-				}
-			}
-#endif
-		}
-	}
-	return (error);
-}
 #endif
 
 /*
@@ -2355,6 +2293,13 @@ xlog_state_release_iclog(xlog_t		*log,
 	
 	LOG_UNLOCK(log, spl);
 	
+	/*
+	 * We let the log lock go, so it's possible that we hit a log I/O
+	 * error or someother SHUTDOWN condition that marks the iclog
+	 * as XLOG_STATE_IOERROR before the bwrite. However, we know that 
+	 * this iclog has consistent data, so we ignore IOERROR 
+	 * flags after this point.
+	 */
 	if (sync) {
 		return (xlog_sync(log, iclog, 0));
 	}
@@ -3040,7 +2985,7 @@ xfs_log_force_umount(
 	 * is set, and this action is protected by the GRANTLOCK.
 	 */
 	if (tic = log->l_reserve_headq) {
-#ifdef DEBUG
+#ifdef XFSERRORDEBUG
 		printf("Waking up waitors on reserve_headq\n");
 #endif
 		do {
@@ -3050,7 +2995,7 @@ xfs_log_force_umount(
 	}
 	
 	if (tic = log->l_write_headq) {
-#ifdef DEBUG
+#ifdef XFSERRORDEBUG
 		printf("Waking up waitors on write_headq\n");
 #endif
 		do {
@@ -3060,9 +3005,11 @@ xfs_log_force_umount(
 	}
 	GRANT_UNLOCK(log, spl);
 	
-	xlog_state_sync_all(log, XFS_LOG_FORCE);
-	/* tmp */
-	xlog_state_error(mp);
+	if (!(log->l_flags & XLOG_IO_ERROR)) {
+		xlog_state_sync_all(log, XFS_LOG_FORCE);
+		/* tmp */
+		xlog_state_error(mp);
+	}
 }
 
 /*
@@ -3122,3 +3069,51 @@ xlog_state_error(
 	 */
 	xlog_state_do_callback(log);
 }
+
+
+#ifdef XFSERRORDEBUG
+/*
+ * Wrapper around bwrite for log writes. Useful for isolating log error
+ * handling problems.
+ */
+STATIC int
+xlog_bwrite(
+	buf_t *bp)
+{
+	int error;
+	int flag = 0;
+	xlog_t	*log;
+
+	log = ((xlog_in_core_t *)bp->b_fsprivate)->ic_log;
+	if (XFS_FORCED_SHUTDOWN(log->l_mp) || 
+	    (log->l_flags & XLOG_IO_ERROR)) {
+		printf("iclog 0x%x, buf 0x%x, bwritecnt 0x%x\n",
+		       bp->b_fsprivate, bp, 
+		       ((xlog_in_core_t *)bp->b_fsprivate)->ic_bwritecnt);
+		buftrace("XLOGBWRITE SHUTDOWN", bp);
+	}
+	
+	if (xlog_do_error &&
+	    xlog_err_dev == bp->b_edev &&
+	    ((xlog_req_num++) % xlog_error_mod) == 0) {
+		error = EIO;
+		flag = bp->b_flags;
+		bioerror(bp, error);
+	} else
+	{
+		error = bwrite(bp);
+	}
+	if (error) {
+		/*
+		 * This is only for error recovery debugging.
+		 */
+		if (flag) {
+			buftrace("XLOGBWRITE IOERROR", bp);
+			bp->b_flags |= B_STALE;
+			bp->b_flags &= ~(B_DELWRI|B_DONE);
+			biodone(bp);
+		}
+	}
+	return (error);
+}
+#endif
