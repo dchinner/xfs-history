@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -255,8 +255,8 @@ xfs_read_buf(
 	struct xfs_mount *mp,
 	xfs_buftarg_t	 *target,
 	xfs_daddr_t	 blkno,
-	int		 len,
-	uint		 flags,
+	int              len,
+	uint             flags,
 	xfs_buf_t	 **bpp)
 {
 	xfs_buf_t	 *bp;
@@ -447,7 +447,7 @@ xfs_refcache_insert(
 
 	/*
 	 * If we allocated memory for the refcache above and it still
-	 * needs it, then use the memory we allocated.	Otherwise we'll
+	 * needs it, then use the memory we allocated.  Otherwise we'll
 	 * free the memory below.
 	 */
 	if (refcache != NULL) {
@@ -518,7 +518,7 @@ void
 xfs_refcache_purge_ip(
 	xfs_inode_t	*ip)
 {
-	vnode_t *vp;
+	vnode_t	*vp;
 	int	error;
 
 	/*
@@ -557,7 +557,7 @@ xfs_refcache_purge_ip(
 
 /*
  * This is called from the XFS unmount code to purge all entries for the
- * given mount from the cache.	It uses the refcache busy counter to
+ * given mount from the cache.  It uses the refcache busy counter to
  * make sure that new entries are not added to the cache as we purge them.
  */
 void

@@ -11,7 +11,7 @@
 #
 # Further, this software is distributed without any warranty that it is
 # free of the rightful claim of any third person regarding infringement
-# or the like.	Any license provided herein, whether implied or
+# or the like.  Any license provided herein, whether implied or
 # otherwise, applies only to this software file.  Patent licenses, if
 # any, provided herein do not apply to combinations of this program with
 # other software, or any other product whatsoever.
@@ -40,7 +40,7 @@ EXTRA_CFLAGS += -I..
 O_TARGET			:= pagebuf.o
 
 ifneq ($(MAKECMDGOALS),modules_install)
-  obj-m				:= $(O_TARGET)
+  obj-m                         := $(O_TARGET)
 endif
 
 export-objs			+= page_buf.o

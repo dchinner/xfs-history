@@ -11,7 +11,7 @@
  *
  * Further, this software is distributed without any warranty that it is
  * free of the rightful claim of any third person regarding infringement
- * or the like.	 Any license provided herein, whether implied or
+ * or the like.  Any license provided herein, whether implied or
  * otherwise, applies only to this software file.  Patent licenses, if
  * any, provided herein do not apply to combinations of this program with
  * other software, or any other product whatsoever.
@@ -52,10 +52,10 @@
 #endif
 
 /* NODE_SIZE is the number of bytes used for the node identifier portion. */
-#define NODE_SIZE	6
+#define	NODE_SIZE	6
 
 /*
- * Total size must be 128 bits.	 N.B. definition of uuid_t in uuid.h!
+ * Total size must be 128 bits.  N.B. definition of uuid_t in uuid.h!
  */
 typedef struct {
 	u_int32_t	uu_timelow;	/* time "low" */
@@ -70,7 +70,7 @@ typedef struct {
  * time value (i.e. seconds since 1 Jan. 1970) to convert it to the
  * time base for UUIDs (15 Oct. 1582).
  */
-#define UUID_TBC	0x01B21DD2138140LL
+#define	UUID_TBC	0x01B21DD2138140LL
 
 static	short		uuid_eaddr[NODE_SIZE / 2];	/* ethernet address */
 static	__int64_t	uuid_time;	/* last time basis used */
@@ -94,7 +94,7 @@ uuid_init(void)
 void
 uuid_getnodeuniq(uuid_t *uuid, int fsid [2])
 {
-	char	*uu=(char*)uuid;
+	char    *uu=(char*)uuid;
 
 	/* on IRIX, this function assumes big-endian fields within
 	 * the uuid, so we use INT_GET to get the same result on
@@ -134,9 +134,9 @@ uuid_equal(uuid_t *uuid1, uuid_t *uuid2)
 
 /*
  * Given a 128-bit uuid, return a 64-bit value by adding the top and bottom
- * 64-bit words.  NOTE: This function can not be changed EVER.	Although
+ * 64-bit words.  NOTE: This function can not be changed EVER.  Although
  * brain-dead, some applications depend on this 64-bit value remaining
- * persistent.	Specifically, DMI vendors store the value as a persistent
+ * persistent.  Specifically, DMI vendors store the value as a persistent
  * filehandle.
  */
 __uint64_t
@@ -220,7 +220,7 @@ uuid_compare(uuid_t *uuid1, uuid_t *uuid2)
 	if (uuid1 == NULL) {
 		if (uuid2 == NULL) {
 			return 0;	/* equal because both are nil */
-		} else	{
+		} else  {
 			return -1;	/* uuid1 nil, so precedes uuid2 */
 		}
 	} else if (uuid2 == NULL) {
