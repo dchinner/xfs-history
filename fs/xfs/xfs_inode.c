@@ -1,4 +1,4 @@
-#ident "$Revision: 1.204 $"
+#ident "$Revision: 1.206 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1012,6 +1012,28 @@ xfs_ialloc(
 	 */
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_anextents = 0;
+
+	/*
+	 * Make sure the vnode's VENF_LOCKING flag corresponds with
+	 * the inode's mode.  Also do some sanity checking that
+	 * other vnode flags are not set.
+	 */
+	if (MANDLOCK(vp, ip->i_d.di_mode))
+		vp->v_flag |= VENF_LOCKING;	
+	else
+		vp->v_flag &= ~VENF_LOCKING;	
+
+	ASSERT(!(vp->v_flag & (VNOMAP |
+			       VNOSWAP |
+			       VISSWAP |
+			       VREPLICABLE |
+			   /*  VNONREPLICABLE | XXX uncomment this */
+			       VDOCMP |
+			       VFRLOCKS |
+			       VSEMAPHORE |
+			       VUSYNC |
+			       VREMAPPING |
+			       VMOUNTING)));
 
 	/*
 	 * Log the new values stuffed into the inode.
