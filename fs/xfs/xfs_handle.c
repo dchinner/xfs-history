@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.25 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -21,7 +21,6 @@
 #include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/proc.h>
-#include <sys/user.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/sat.h>
@@ -237,10 +236,10 @@ open_by_handle (
 
 	/*
 	 * a kludge for the usema device - it really needs to know
-	 * the 'fp' for it opening file - we use u_openfp to mark
+	 * the 'fp' for it opening file - we use p_openfp to mark
 	 * this.
 	 */
-	curprocp->p_user->u_openfp = fp;
+	curprocp->p_openfp = fp;
 
 	if ((filemode & FWRITE) == 0)
 		_SAT_PNALLOC(SAT_OPEN_RO);
@@ -249,7 +248,7 @@ open_by_handle (
 
 	error = vp_open (vp, filemode, get_current_cred());
 
-	curprocp->p_user->u_openfp = NULL;
+	curprocp->p_openfp = NULL;
 	if (error)
 		falloc_undo(fd, fp);
 	else {
