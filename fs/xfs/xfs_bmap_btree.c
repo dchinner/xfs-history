@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision: 1.73 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -744,7 +744,7 @@ xfs_bmbt_insrec(
 				cur->bc_private.b.whichfork);
 			block = xfs_bmbt_get_block(cur, level, &bp);
 		} else if (level == cur->bc_nlevels - 1) {
-			if ((error = xfs_bmbt_newroot(cur, stat, &logflags)) ||
+			if ((error = xfs_bmbt_newroot(cur, &logflags, stat)) ||
 			    *stat == 0)
 				return error;
 			xfs_trans_log_inode(cur->bc_tp, cur->bc_private.b.ip,
