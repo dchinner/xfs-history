@@ -428,7 +428,9 @@ xfs_alloc_fix_minleft(
 	if (args->minleft == 0)
 		return 1;
 	agf = XFS_BUF_TO_AGF(args->agbp);
-	diff = agf->agf_freeblks + agf->agf_flcount - args->len - args->minleft;
+	diff = INT_GET(agf->agf_freeblks, args->mp->m_arch)
+		+ INT_GET(agf->agf_flcount, args->mp->m_arch)
+		- args->len - args->minleft;
 	if (diff >= 0)
 		return 1;
 	args->len += diff;		/* shrink the allocated space */
@@ -686,17 +688,21 @@ xfs_alloc_trace_modagf(
 		(void *)str,
 		(void *)mp,
 		(void *)(__psint_t)flags,
-		(void *)(__psunsigned_t)agf->agf_seqno,
-		(void *)(__psunsigned_t)agf->agf_length,
-		(void *)(__psunsigned_t)agf->agf_roots[XFS_BTNUM_BNO],
-		(void *)(__psunsigned_t)agf->agf_roots[XFS_BTNUM_CNT],
-		(void *)(__psunsigned_t)agf->agf_levels[XFS_BTNUM_BNO],
-		(void *)(__psunsigned_t)agf->agf_levels[XFS_BTNUM_CNT],
-		(void *)(__psunsigned_t)agf->agf_flfirst,
-		(void *)(__psunsigned_t)agf->agf_fllast,
-		(void *)(__psunsigned_t)agf->agf_flcount,
-		(void *)(__psunsigned_t)agf->agf_freeblks,
-		(void *)(__psunsigned_t)agf->agf_longest);
+		(void *)(__psunsigned_t)INT_GET(agf->agf_seqno, mp->m_arch),
+		(void *)(__psunsigned_t)INT_GET(agf->agf_length, mp->m_arch),
+		(void *)(__psunsigned_t)INT_GET(agf->agf_roots[XFS_BTNUM_BNO],
+						mp->m_arch);
+		(void *)(__psunsigned_t)INT_GET(agf->agf_roots[XFS_BTNUM_CNT],
+						mp->m_arch);
+		(void *)(__psunsigned_t)INT_GET(agf->agf_levels[XFS_BTNUM_BNO],
+						mp->m_arch);
+		(void *)(__psunsigned_t)INT_GET(agf->agf_levels[XFS_BTNUM_CNT],
+						mp->m_arch);
+		(void *)(__psunsigned_t)INT_GET(agf->agf_flfirst, mp->m_arch),
+		(void *)(__psunsigned_t)INT_GET(agf->agf_fllast, mp->m_arch),
+		(void *)(__psunsigned_t)INT_GET(agf->agf_flcount, mp->m_arch),
+		(void *)(__psunsigned_t)INT_GET(agf->agf_freeblks, mp->m_arch),
+		(void *)(__psunsigned_t)INT_GET(agf->agf_longest, mp->m_arch));
 }
 #endif	/* XFS_ALLOC_TRACE */
 
@@ -761,15 +767,18 @@ xfs_alloc_ag_vextent(
 		ASSERT(!(args->wasfromfl) || !args->isfl);
 		ASSERT(args->agbno % args->alignment == 0);
 		if (!(args->wasfromfl)) {
+			xfs_arch_t	arch = ARCH_GET(args->mp->m_arch);
+
 			agf = XFS_BUF_TO_AGF(args->agbp);
-			agf->agf_freeblks -= args->len;
+			INT_MOD(agf->agf_freeblks, arch, -(args->len));
 			xfs_trans_agblocks_delta(args->tp,
 						 -((long)(args->len)));
 			args->pag->pagf_freeblks -= args->len;
-			ASSERT(agf->agf_freeblks <= agf->agf_length);
+			ASSERT(INT_GET(agf->agf_freeblks, arch)
+				<= INT_GET(agf->agf_length, arch));
 			TRACE_MODAGF(NULL, agf, XFS_AGF_FREEBLKS);
 			xfs_alloc_log_agf(args->tp, args->agbp,
-				XFS_AGF_FREEBLKS);
+						XFS_AGF_FREEBLKS);
 		}
 		if (!args->isfl)
 			xfs_trans_mod_sb(args->tp,
@@ -864,13 +873,14 @@ xfs_alloc_ag_vextent_exact(
 	ASSERT(args->agbno + rlen <= fend);
 	end = args->agbno + rlen;
 	/*
-	 * We are allocating agbno for rlen [agbno .. end)
+	 * We are allocating agbno for rlen [agbno .. end]
 	 * Allocate/initialize a cursor for the by-size btree.
 	 */
 	cnt_cur = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
 		args->agno, XFS_BTNUM_CNT, 0, 0);
 	ASSERT(args->agbno + args->len <=
-	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+		INT_GET(XFS_BUF_TO_AGF(args->agbp)->agf_length,
+			args->mp->m_arch));
 	if (error = xfs_alloc_fixup_trees(cnt_cur, bno_cur, fbno, flen, 
 			args->agbno, args->len, XFSA_FIXUP_BNO_OK)) {
 		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
@@ -1051,7 +1061,8 @@ xfs_alloc_ag_vextent_near(
 			goto error0;
 		XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 		ltend = ltbno + ltlen;
-		ASSERT(ltend <= XFS_BUF_TO_AGF(args->agbp)->agf_length);
+		ASSERT(ltend <= INT_GET(XFS_BUF_TO_AGF(args->agbp)->agf_length,
+				args->mp->m_arch));
 		args->len = blen;
 		if (!xfs_alloc_fix_minleft(args)) {
 			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
@@ -1409,7 +1420,8 @@ xfs_alloc_ag_vextent_near(
 		ltlen, &ltnew);
 	ASSERT(ltnew >= ltbno);
 	ASSERT(ltnew + rlen <= ltend);
-	ASSERT(ltnew + rlen <= XFS_BUF_TO_AGF(args->agbp)->agf_length);
+	ASSERT(ltnew + rlen <= INT_GET(XFS_BUF_TO_AGF(args->agbp)->agf_length,
+		args->mp->m_arch));
 	args->agbno = ltnew;
 	if (error = xfs_alloc_fixup_trees(cnt_cur, bno_cur_lt, ltbno, ltlen,
 			ltnew, rlen, XFSA_FIXUP_BNO_OK))
@@ -1572,7 +1584,8 @@ xfs_alloc_ag_vextent_size(
 	args->agbno = rbno;
 	XFS_WANT_CORRUPTED_GOTO(
 		args->agbno + args->len <=
-			XFS_BUF_TO_AGF(args->agbp)->agf_length,
+			INT_GET(XFS_BUF_TO_AGF(args->agbp)->agf_length,
+			args->mp->m_arch),
 		error0);
 	TRACE_ALLOC("normal", args);
 	return 0;
@@ -1619,9 +1632,9 @@ xfs_alloc_ag_vextent_small(
 	 * to respect minleft even when pulling from the
 	 * freelist.
 	 */
-	else if (args->minlen == 1 && args->alignment == 1 &&
-		 !args->isfl &&
-		 (XFS_BUF_TO_AGF(args->agbp)->agf_flcount > args->minleft)) {
+	else if (args->minlen == 1 && args->alignment == 1 && !args->isfl &&
+		 (INT_GET(XFS_BUF_TO_AGF(args->agbp)->agf_flcount,
+			args->mp->m_arch) > args->minleft)) {
 		if (error = xfs_alloc_get_freelist(args->tp, args->agbp, &fbno))
 			goto error0;
 		if (fbno != NULLAGBLOCK) {
@@ -1647,7 +1660,8 @@ xfs_alloc_ag_vextent_small(
 			args->agbno = fbno;
 			XFS_WANT_CORRUPTED_GOTO(
 				args->agbno + args->len <=
-					XFS_BUF_TO_AGF(args->agbp)->agf_length,
+				INT_GET(XFS_BUF_TO_AGF(args->agbp)->agf_length,
+					args->mp->m_arch),
 				error0);
 			args->wasfromfl = 1;
 			TRACE_ALLOC("freelist", args);
@@ -1921,10 +1935,12 @@ xfs_free_ag_extent(
 
 		agf = XFS_BUF_TO_AGF(agbp);
 		pag = &mp->m_perag[agno];
-		agf->agf_freeblks += len;
+		INT_MOD(agf->agf_freeblks, mp->m_arch, len);
 		xfs_trans_agblocks_delta(tp, len);
 		pag->pagf_freeblks += len;
-		XFS_WANT_CORRUPTED_GOTO(agf->agf_freeblks <= agf->agf_length,
+		XFS_WANT_CORRUPTED_GOTO(
+			INT_GET(agf->agf_freeblks, mp->m_arch)
+				<= INT_GET(agf->agf_length, mp->m_arch),
 			error0);
 		TRACE_MODAGF(NULL, agf, XFS_AGF_FREEBLKS);
 		xfs_alloc_log_agf(tp, agbp, XFS_AGF_FREEBLKS);
@@ -1985,9 +2001,9 @@ xfs_alloc_fix_freelist(
 	xfs_alloc_arg_t	*args,	/* allocation argument structure */
 	int		flags)	/* XFS_ALLOC_FLAG_... */
 {
-	xfs_buf_t		*agbp;	/* agf buffer pointer */
+	xfs_buf_t	*agbp;	/* agf buffer pointer */
 	xfs_agf_t	*agf;	/* a.g. freespace structure pointer */
-	xfs_buf_t		*agflbp;/* agfl buffer pointer */
+	xfs_buf_t	*agflbp;/* agfl buffer pointer */
 	xfs_agblock_t	bno;	/* freelist block */
 	xfs_extlen_t	delta;	/* new blocks needed in freelist */
 	int		error;	/* error result code */
@@ -1997,8 +2013,10 @@ xfs_alloc_fix_freelist(
 	xfs_perag_t	*pag;	/* per-ag information structure */
 	xfs_alloc_arg_t	targs;	/* local allocation arguments */
 	xfs_trans_t	*tp;	/* transaction pointer */
+	xfs_arch_t	arch;	/* on-disk architecture type */
 
 	mp = args->mp;
+	arch = ARCH_GET(mp->m_arch);
 	pag = args->pag;
 	tp = args->tp;
 	if (!pag->pagf_init) {
@@ -2048,16 +2066,18 @@ xfs_alloc_fix_freelist(
 	 */
 	agf = XFS_BUF_TO_AGF(agbp);
 	need = XFS_MIN_FREELIST(agf, mp);
-	delta = need > agf->agf_flcount ? need - agf->agf_flcount : 0;
+	delta = need > INT_GET(agf->agf_flcount, arch) ?
+		(need - INT_GET(agf->agf_flcount, arch)) : 0;
 	/*
 	 * If there isn't enough total or single-extent, reject it.
 	 */
-	longest = (agf->agf_longest > delta) ?
-		(agf->agf_longest - delta) :
-		(agf->agf_flcount > 0 || agf->agf_longest > 0);
+	longest = INT_GET(agf->agf_longest, arch);
+	longest = (longest > delta) ? (longest - delta) :
+		(INT_GET(agf->agf_flcount, arch) > 0 || longest > 0);
 	if (args->minlen + args->alignment + args->minalignslop - 1 > longest ||
-	    (args->minleft &&
-	     (int)(agf->agf_freeblks + agf->agf_flcount - need - args->total) <
+	     (args->minleft &&
+		(int)(INT_GET(agf->agf_freeblks, arch) +
+		   INT_GET(agf->agf_flcount, arch) - need - args->total) <
 	     (int)args->minleft)) {
 		xfs_trans_brelse(tp, agbp);
 		args->agbp = NULL;
@@ -2066,7 +2086,7 @@ xfs_alloc_fix_freelist(
 	/*
 	 * Make the freelist shorter if it's too long.
 	 */
-	while (agf->agf_flcount > need) {
+	while (INT_GET(agf->agf_flcount, arch) > need) {
 		xfs_buf_t	*bp;
 
 		if (error = xfs_alloc_get_freelist(tp, agbp, &bno))
@@ -2112,9 +2132,9 @@ xfs_alloc_fix_freelist(
 	/*
 	 * Make the freelist longer if it's too short.
 	 */
-	while (agf->agf_flcount < need) {
+	while (INT_GET(agf->agf_flcount, arch) < need) {
 		targs.agbno = 0;
-		targs.maxlen = need - agf->agf_flcount;
+		targs.maxlen = need - INT_GET(agf->agf_flcount, arch);
 		/*
 		 * Allocate as many blocks as possible at once.
 		 */
@@ -2147,12 +2167,12 @@ xfs_alloc_fix_freelist(
 int				/* error */
 xfs_alloc_get_freelist(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_buf_t		*agbp,	/* buffer containing the agf structure */
+	xfs_buf_t	*agbp,	/* buffer containing the agf structure */
 	xfs_agblock_t	*bnop)	/* block address retrieved from freelist */
 {
 	xfs_agf_t	*agf;	/* a.g. freespace structure */
 	xfs_agfl_t	*agfl;	/* a.g. freelist structure */
-	xfs_buf_t		*agflbp;/* buffer for a.g. freelist structure */
+	xfs_buf_t	*agflbp;/* buffer for a.g. freelist structure */
 	xfs_agblock_t	bno;	/* block number returned */
 	int		error;
 #ifdef XFS_ALLOC_TRACE
@@ -2160,12 +2180,13 @@ xfs_alloc_get_freelist(
 #endif
 	xfs_mount_t	*mp;	/* mount structure */
 	xfs_perag_t	*pag;	/* per allocation group data */
+	xfs_arch_t	arch = ARCH_GET(tp->t_mountp->m_arch);
 
 	agf = XFS_BUF_TO_AGF(agbp);
 	/*
 	 * Freelist is empty, give up.
 	 */
-	if (agf->agf_flcount == 0) {
+	if (INT_GET(agf->agf_flcount, arch) == 0) {
 		*bnop = NULLAGBLOCK;
 		return 0;
 	}
@@ -2173,18 +2194,20 @@ xfs_alloc_get_freelist(
 	 * Read the array of free blocks.
 	 */
 	mp = tp->t_mountp;
-	if (error = xfs_alloc_read_agfl(mp, tp, agf->agf_seqno, &agflbp))
+	if (error = xfs_alloc_read_agfl(mp, tp,
+			INT_GET(agf->agf_seqno, arch), &agflbp))
 		return error;
 	agfl = XFS_BUF_TO_AGFL(agflbp);
 	/*
 	 * Get the block number and update the data structures.
 	 */
-	bno = agfl->agfl_bno[agf->agf_flfirst++];
+	bno = agfl->agfl_bno[INT_GET(agf->agf_flfirst, arch)];
+	INT_MOD(agf->agf_flfirst, arch, 1);
 	xfs_trans_brelse(tp, agflbp);
-	if (agf->agf_flfirst == XFS_AGFL_SIZE)
-		agf->agf_flfirst = 0;
-	pag = &mp->m_perag[agf->agf_seqno];
-	agf->agf_flcount--;
+	if (INT_GET(agf->agf_flfirst, arch) == XFS_AGFL_SIZE)
+		INT_ZERO(agf->agf_flfirst, arch);
+	pag = &mp->m_perag[INT_GET(agf->agf_seqno, arch)];
+	INT_MOD(agf->agf_flcount, arch, -1);
 	xfs_trans_agflist_delta(tp, -1);
 	pag->pagf_flcount--;
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLFIRST | XFS_AGF_FLCOUNT);
@@ -2199,7 +2222,7 @@ xfs_alloc_get_freelist(
 void
 xfs_alloc_log_agf(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	xfs_buf_t		*bp,	/* buffer for a.g. freelist header */
+	xfs_buf_t	*bp,	/* buffer for a.g. freelist header */
 	int		fields)	/* mask of fields to be logged (XFS_AGF_...) */
 {
 	int	first;		/* first byte offset */
@@ -2249,8 +2272,8 @@ xfs_alloc_pagf_init(
 int					/* error */
 xfs_alloc_put_freelist(
 	xfs_trans_t		*tp,	/* transaction pointer */
-	xfs_buf_t			*agbp,	/* buffer for a.g. freelist header */
-	xfs_buf_t			*agflbp,/* buffer for a.g. free block array */
+	xfs_buf_t		*agbp,	/* buffer for a.g. freelist header */
+	xfs_buf_t		*agflbp,/* buffer for a.g. free block array */
 	xfs_agblock_t		bno)	/* block being freed */
 {
 	xfs_agf_t		*agf;	/* a.g. freespace structure */
@@ -2262,21 +2285,23 @@ xfs_alloc_put_freelist(
 #endif
 	xfs_mount_t		*mp;	/* mount structure */
 	xfs_perag_t		*pag;	/* per allocation group data */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
 	agf = XFS_BUF_TO_AGF(agbp);
 	mp = tp->t_mountp;
-	if (!agflbp &&
-	    (error = xfs_alloc_read_agfl(mp, tp, agf->agf_seqno, &agflbp)))
+	arch = ARCH_GET(mp->m_arch);
+	if (!agflbp && (error = xfs_alloc_read_agfl(mp, tp,
+			INT_GET(agf->agf_seqno, arch), &agflbp)))
 		return error;
 	agfl = XFS_BUF_TO_AGFL(agflbp);
-	if (++agf->agf_fllast == XFS_AGFL_SIZE)
-		agf->agf_fllast = 0;
-	pag = &mp->m_perag[agf->agf_seqno];
-	agf->agf_flcount++;
+	if (INT_MOD(agf->agf_fllast, arch, 1) == XFS_AGFL_SIZE)
+		INT_ZERO(agf->agf_fllast, arch);
+	pag = &mp->m_perag[INT_GET(agf->agf_seqno, arch)];
+	INT_MOD(agf->agf_flcount, arch, 1);
 	xfs_trans_agflist_delta(tp, 1);
 	pag->pagf_flcount++;
-	ASSERT(agf->agf_flcount <= XFS_AGFL_SIZE);
-	blockp = &agfl->agfl_bno[agf->agf_fllast];
+	ASSERT(INT_GET(agf->agf_flcount, arch) <= XFS_AGFL_SIZE);
+	blockp = &agfl->agfl_bno[INT_GET(agf->agf_fllast, arch)];
 	*blockp = bno;
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
@@ -2294,14 +2319,15 @@ xfs_alloc_read_agf(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags,		/* XFS_ALLOC_FLAG_... */
-	xfs_buf_t		**bpp)		/* buffer for the ag freelist header */
+	xfs_buf_t	**bpp)		/* buffer for the ag freelist header */
 {
 	xfs_agf_t	*agf;		/* ag freelist header */
 	int		agf_ok;		/* set if agf is consistent */
-	xfs_buf_t		*bp;		/* return value */
+	xfs_buf_t	*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	int		error;
 	xfs_perag_t	*pag;		/* per allocation group data */
+	xfs_arch_t	arch = ARCH_GET(mp->m_arch);
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
@@ -2319,12 +2345,13 @@ xfs_alloc_read_agf(
 	 */
 	agf = XFS_BUF_TO_AGF(bp);
 	agf_ok =
-		agf->agf_magicnum == XFS_AGF_MAGIC &&
-		XFS_AGF_GOOD_VERSION(agf->agf_versionnum) &&
-		agf->agf_freeblks <= agf->agf_length &&
-		agf->agf_flfirst < XFS_AGFL_SIZE &&
-		agf->agf_fllast < XFS_AGFL_SIZE &&
-		agf->agf_flcount <= XFS_AGFL_SIZE;
+		INT_GET(agf->agf_magicnum, arch) == XFS_AGF_MAGIC &&
+		XFS_AGF_GOOD_VERSION(INT_GET(agf->agf_versionnum, mp->m_arch)) &&
+		INT_GET(agf->agf_freeblks, arch) <=
+				INT_GET(agf->agf_length, arch) &&
+		INT_GET(agf->agf_flfirst, arch) < XFS_AGFL_SIZE &&
+		INT_GET(agf->agf_fllast,  arch) < XFS_AGFL_SIZE &&
+		INT_GET(agf->agf_flcount, arch) <= XFS_AGFL_SIZE;
 	if (XFS_TEST_ERROR(!agf_ok, mp, XFS_ERRTAG_ALLOC_READ_AGF,
 			XFS_RANDOM_ALLOC_READ_AGF)) {
 		xfs_trans_brelse(tp, bp);
@@ -2332,24 +2359,24 @@ xfs_alloc_read_agf(
 	}
 	pag = &mp->m_perag[agno];
 	if (!pag->pagf_init) {
-		pag->pagf_freeblks = agf->agf_freeblks;
-		pag->pagf_flcount = agf->agf_flcount;
-		pag->pagf_longest = agf->agf_longest;
+		pag->pagf_freeblks = INT_GET(agf->agf_freeblks, arch);
+		pag->pagf_flcount = INT_GET(agf->agf_flcount, arch);
+		pag->pagf_longest = INT_GET(agf->agf_longest, arch);
 		pag->pagf_levels[XFS_BTNUM_BNOi] =
-			agf->agf_levels[XFS_BTNUM_BNOi];
+			INT_GET(agf->agf_levels[XFS_BTNUM_BNOi], arch);
 		pag->pagf_levels[XFS_BTNUM_CNTi] =
-			agf->agf_levels[XFS_BTNUM_CNTi];
+			INT_GET(agf->agf_levels[XFS_BTNUM_CNTi], arch);
 		pag->pagf_init = 1;
-	} 
+	}
 #ifdef DEBUG
 	else if (!XFS_FORCED_SHUTDOWN(mp)) {
-		ASSERT(pag->pagf_freeblks == agf->agf_freeblks);
-		ASSERT(pag->pagf_flcount == agf->agf_flcount);
-		ASSERT(pag->pagf_longest == agf->agf_longest);
+		ASSERT(pag->pagf_freeblks == INT_GET(agf->agf_freeblks, arch));
+		ASSERT(pag->pagf_flcount == INT_GET(agf->agf_flcount, arch));
+		ASSERT(pag->pagf_longest == INT_GET(agf->agf_longest, arch));
 		ASSERT(pag->pagf_levels[XFS_BTNUM_BNOi] ==
-		       agf->agf_levels[XFS_BTNUM_BNOi]);
+		       INT_GET(agf->agf_levels[XFS_BTNUM_BNOi], arch));
 		ASSERT(pag->pagf_levels[XFS_BTNUM_CNTi] ==
-		       agf->agf_levels[XFS_BTNUM_CNTi]);
+		       INT_GET(agf->agf_levels[XFS_BTNUM_CNTi], arch));
 	}
 #endif
 	XFS_BUF_SET_VTYPE_REF(bp, B_FS_AGF, XFS_AGF_REF);
@@ -2573,7 +2600,7 @@ xfs_free_extent(
 #ifdef DEBUG
 	ASSERT(args.agbp != NULL);
 	agf = XFS_BUF_TO_AGF(args.agbp);
-	ASSERT(args.agbno + len <= agf->agf_length);
+	ASSERT(args.agbno + len <= INT_GET(agf->agf_length, args.mp->m_arch));
 #endif
 	error = xfs_free_ag_extent(tp, args.agbp, args.agno, args.agbno,
 		len, 0);

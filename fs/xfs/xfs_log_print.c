@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -245,12 +245,12 @@ STATIC void
 xlog_recover_print_buffer(
 	xlog_recover_item_t *item)
 {
-	xfs_agi_t			*agi;
-	xfs_agf_t			*agf;
+	xfs_agi_t		*agi;
+	xfs_agf_t		*agf;
 	xfs_buf_log_format_v1_t	*old_f;
 	xfs_buf_log_format_t	*f;
 	caddr_t			p;
-	int				len, num, i;
+	int			len, num, i;
 	daddr_t			blkno;
 	extern int		print_buffer;
 	xfs_disk_dquot_t	*ddq;
@@ -310,25 +310,32 @@ xlog_recover_print_buffer(
 			printf("		level:%d  free#:0x%x  newino:0x%x\n",
 			       agi->agi_level, agi->agi_freecount,
 			       agi->agi_newino);
-		} else if (*(uint *)p == XFS_AGF_MAGIC) {
+		} else if (INT_GET(*(uint *)p, ARCH_UNKNOWN) == XFS_AGF_MAGIC) {
 			agf = (xfs_agf_t *)p;
 			printf("	AGF Buffer: (XAGF)\n");
 			if (!print_buffer) continue;
 			printf("		ver:%d  seq#:%d  len:%d  \n",
-			       agf->agf_versionnum, agf->agf_seqno,
-			       agf->agf_length);
+				INT_GET(agf->agf_versionnum, ARCH_UNKNOWN),
+				INT_GET(agf->agf_seqno, ARCH_UNKNOWN),
+				INT_GET(agf->agf_length, ARCH_UNKNOWN));
 			printf("		root BNO:%d  CNT:%d\n",
-			       agf->agf_roots[XFS_BTNUM_BNOi],
-			       agf->agf_roots[XFS_BTNUM_CNTi]);
+				INT_GET(agf->agf_roots[XFS_BTNUM_BNOi],
+					ARCH_UNKNOWN),
+				INT_GET(agf->agf_roots[XFS_BTNUM_CNTi],
+					ARCH_UNKNOWN));
 			printf("		level BNO:%d  CNT:%d\n",
-			       agf->agf_levels[XFS_BTNUM_BNOi],
-			       agf->agf_levels[XFS_BTNUM_CNTi]);
+				INT_GET(agf->agf_levels[XFS_BTNUM_BNOi],
+					ARCH_UNKNOWN),
+				INT_GET(agf->agf_levels[XFS_BTNUM_CNTi],
+					ARCH_UNKNOWN));
 			printf("		1st:%d  last:%d  cnt:%d  "
-			     "freeblks:%d  longest:%d\n",
-			       agf->agf_flfirst, agf->agf_fllast, agf->agf_flcount,
-			       agf->agf_freeblks, agf->agf_longest);
+				"freeblks:%d  longest:%d\n",
+				INT_GET(agf->agf_flfirst, ARCH_UNKNOWN),
+				INT_GET(agf->agf_fllast, ARCH_UNKNOWN),
+				INT_GET(agf->agf_flcount, ARCH_UNKNOWN),
+				INT_GET(agf->agf_freeblks, ARCH_UNKNOWN),
+				INT_GET(agf->agf_longest, ARCH_UNKNOWN));
 		} else if (*(uint *)p == XFS_DQUOT_MAGIC) {
-  
 			ddq = (xfs_disk_dquot_t *)p;
 			printf("	DQUOT Buffer:\n");
 			if (!print_buffer) continue;

@@ -322,24 +322,26 @@ xfs_btree_check_sblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_sblock_t	*block,	/* btree short form block pointer */
 	int			level,	/* level of the btree block */
-	xfs_buf_t			*bp)	/* buffer containing block */
+	xfs_buf_t		*bp)	/* buffer containing block */
 {
-	xfs_buf_t			*agbp;	/* buffer for ag. freespace struct */
+	xfs_buf_t		*agbp;	/* buffer for ag. freespace struct */
 	xfs_agf_t		*agf;	/* ag. freespace structure */
+	xfs_agblock_t		agflen;	/* native ag. freespace length */
 	int			sblock_ok; /* block passes checks */
 
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
+	agflen = INT_GET(agf->agf_length, cur->bc_mp->m_arch);
 	sblock_ok =
 		block->bb_magic == xfs_magics[cur->bc_btnum] &&
 		block->bb_level == level &&
 		block->bb_numrecs <=
 			xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block) &&
 		(block->bb_leftsib == NULLAGBLOCK ||
-		 block->bb_leftsib < agf->agf_length) &&
+		 block->bb_leftsib < agflen) &&
 		block->bb_leftsib != 0 &&
 		(block->bb_rightsib == NULLAGBLOCK ||
-		 block->bb_rightsib < agf->agf_length) &&
+		 block->bb_rightsib < agflen) &&
 		block->bb_rightsib != 0;
 	if (XFS_TEST_ERROR(!sblock_ok, cur->bc_mp,
 			XFS_ERRTAG_BTREE_CHECK_SBLOCK,
@@ -361,14 +363,15 @@ xfs_btree_check_sptr(
 	xfs_agblock_t	ptr,		/* btree block disk address */
 	int		level)		/* btree block level */
 {
-	xfs_buf_t		*agbp;		/* buffer for ag. freespace struct */
+	xfs_buf_t	*agbp;		/* buffer for ag. freespace struct */
 	xfs_agf_t	*agf;		/* ag. freespace structure */
 
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
 	XFS_WANT_CORRUPTED_RETURN(
 		level > 0 &&
-		ptr != NULLAGBLOCK && ptr != 0 && ptr < agf->agf_length);
+		ptr != NULLAGBLOCK && ptr != 0 &&
+		ptr < INT_GET(agf->agf_length, cur->bc_mp->m_arch));
 	return 0;
 }
 
@@ -583,7 +586,7 @@ xfs_btree_cur_t *			/* new btree cursor */
 xfs_btree_init_cursor(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_buf_t		*agbp,		/* (A only) buffer for agf structure */
+	xfs_buf_t	*agbp,		/* (A only) buffer for agf structure */
 					/* (I only) buffer for agi structure */
 	xfs_agnumber_t	agno,		/* (AI only) allocation group number */
 	xfs_btnum_t	btnum,		/* btree identifier */
@@ -608,7 +611,7 @@ xfs_btree_init_cursor(
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
 		agf = XFS_BUF_TO_AGF(agbp);
-		nlevels = agf->agf_levels[btnum];
+		nlevels = INT_GET(agf->agf_levels[btnum], mp->m_arch);
 		break;
 	case XFS_BTNUM_BMAP:
 		ifp = XFS_IFORK_PTR(ip, whichfork);

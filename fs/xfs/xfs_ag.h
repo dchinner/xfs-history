@@ -242,8 +242,9 @@ int xfs_min_freelist(xfs_agf_t *a, struct xfs_mount *mp);
 #define	XFS_MIN_FREELIST(a,mp)		xfs_min_freelist(a,mp)
 #else
 #define	XFS_MIN_FREELIST(a,mp)	\
-	XFS_MIN_FREELIST_RAW((a)->agf_levels[XFS_BTNUM_BNOi], \
-			     (a)->agf_levels[XFS_BTNUM_CNTi], mp)
+	XFS_MIN_FREELIST_RAW(	\
+		INT_GET((a)->agf_levels[XFS_BTNUM_BNOi], (mp)->m_arch), \
+		INT_GET((a)->agf_levels[XFS_BTNUM_CNTi], (mp)->m_arch), mp)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MIN_FREELIST_PAG)
 int xfs_min_freelist_pag(xfs_perag_t *pag, struct xfs_mount *mp);

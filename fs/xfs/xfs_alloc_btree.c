@@ -112,7 +112,7 @@ xfs_alloc_insrec(
 STATIC void
 xfs_alloc_log_block(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		fields);	/* mask of fields: XFS_BB_... */
 
 /*
@@ -121,7 +121,7 @@ xfs_alloc_log_block(
 STATIC void
 xfs_alloc_log_keys(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		kfirst,		/* index of first key to log */
 	int		klast);		/* index of last key to log */
 
@@ -131,7 +131,7 @@ xfs_alloc_log_keys(
 STATIC void
 xfs_alloc_log_ptrs(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		pfirst,		/* index of first pointer to log */
 	int		plast);		/* index of last pointer to log */
 
@@ -141,7 +141,7 @@ xfs_alloc_log_ptrs(
 STATIC void
 xfs_alloc_log_recs(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_buf_t		*bp,		/* buffer containing btree block */
+	xfs_buf_t	*bp,		/* buffer containing btree block */
 	int		rfirst,		/* index of first record to log */
 	int		rlast);		/* index of last record to log */
 
@@ -225,12 +225,12 @@ xfs_alloc_delrec(
 	xfs_agf_t		*agf;	/* allocation group freelist header */
 	xfs_alloc_block_t	*block;	/* btree block record/key lives in */
 	xfs_agblock_t		bno;	/* btree block number */
-	xfs_buf_t			*bp;	/* buffer for block */
+	xfs_buf_t		*bp;	/* buffer for block */
 	int			error;	/* error return value */
 	int			i;	/* loop index */
 	xfs_alloc_key_t		key;	/* kp points here if block is level 0 */
 	xfs_agblock_t		lbno;	/* left block's block number */
-	xfs_buf_t			*lbp;	/* left block's buffer pointer */
+	xfs_buf_t		*lbp;	/* left block's buffer pointer */
 	xfs_alloc_block_t	*left;	/* left btree block */
 	xfs_alloc_key_t		*lkp;	/* left block key pointer */
 	xfs_alloc_ptr_t		*lpp;	/* left block address pointer */
@@ -239,13 +239,14 @@ xfs_alloc_delrec(
 	xfs_mount_t		*mp;	/* mount structure */
 	int			ptr;	/* index in btree block for this rec */
 	xfs_agblock_t		rbno;	/* right block's block number */
-	xfs_buf_t			*rbp;	/* right block's buffer pointer */
+	xfs_buf_t		*rbp;	/* right block's buffer pointer */
 	xfs_alloc_block_t	*right;	/* right btree block */
 	xfs_alloc_key_t		*rkp;	/* right block key pointer */
 	xfs_alloc_ptr_t		*rpp;	/* right block address pointer */
 	int			rrecs;	/* number of records in right block */
 	xfs_alloc_rec_t		*rrp;	/* right block record pointer */
 	xfs_btree_cur_t		*tcur;	/* temporary btree cursor */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
 	/*
 	 * Get the index of the entry being deleted, check for nothing there.
@@ -329,6 +330,7 @@ xfs_alloc_delrec(
 	 */
 	agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
 	mp = cur->bc_mp;
+	arch = ARCH_GET(mp->m_arch);
 	if (level == 0 &&
 	    cur->bc_btnum == XFS_BTNUM_CNT &&
 	    block->bb_rightsib == NULLAGBLOCK &&
@@ -340,14 +342,15 @@ xfs_alloc_delrec(
 		 */
 		if (block->bb_numrecs) {
 			rrp = XFS_ALLOC_REC_ADDR(block, block->bb_numrecs, cur);
-			agf->agf_longest = rrp->ar_blockcount;
+			INT_SET(agf->agf_longest, arch, rrp->ar_blockcount);
 		}
 		/*
 		 * No free extents left.
 		 */
 		else
-			agf->agf_longest = 0;
-		mp->m_perag[agf->agf_seqno].pagf_longest = agf->agf_longest;
+			INT_ZERO(agf->agf_longest, arch);
+		mp->m_perag[INT_GET(agf->agf_seqno, arch)].pagf_longest =
+			INT_GET(agf->agf_longest, arch);
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_LONGEST);
 	}
@@ -366,10 +369,10 @@ xfs_alloc_delrec(
 			 * lpp is still set to the first pointer in the block.
 			 * Make it the new root of the btree.
 			 */
-			bno = agf->agf_roots[cur->bc_btnum];
-			agf->agf_roots[cur->bc_btnum] = *lpp;
-			agf->agf_levels[cur->bc_btnum]--;
-			mp->m_perag[agf->agf_seqno].pagf_levels[cur->bc_btnum]--;
+			bno = INT_GET(agf->agf_roots[cur->bc_btnum], arch);
+			INT_SET(agf->agf_roots[cur->bc_btnum], arch, *lpp);
+			INT_MOD(agf->agf_levels[cur->bc_btnum], arch, -1);
+			mp->m_perag[INT_GET(agf->agf_seqno, arch)].pagf_levels[cur->bc_btnum]--;
 			/*
 			 * Put this buffer/block on the ag's freelist.
 			 */
@@ -715,7 +718,7 @@ xfs_alloc_insrec(
 {
 	xfs_agf_t		*agf;	/* allocation group freelist header */
 	xfs_alloc_block_t	*block;	/* btree block record/key lives in */
-	xfs_buf_t			*bp;	/* buffer for block */
+	xfs_buf_t		*bp;	/* buffer for block */
 	int			error;	/* error return value */
 	int			i;	/* loop index */
 	xfs_alloc_key_t		key;	/* key value being inserted */
@@ -728,6 +731,7 @@ xfs_alloc_insrec(
 	xfs_alloc_ptr_t		*pp;	/* pointer to btree addresses */
 	int			ptr;	/* index in btree block for this rec */
 	xfs_alloc_rec_t		*rp;	/* pointer to btree records */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
 	ASSERT(recp->ar_blockcount > 0);
 	/*
@@ -904,18 +908,20 @@ xfs_alloc_insrec(
 	 * Look to see if the longest extent in the allocation group
 	 * needs to be updated.
 	 */
+	arch = ARCH_GET(cur->bc_mp->m_arch);
 	agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
 	if (level == 0 &&
 	    cur->bc_btnum == XFS_BTNUM_CNT &&
 	    block->bb_rightsib == NULLAGBLOCK &&
-	    recp->ar_blockcount > agf->agf_longest) {
+	    recp->ar_blockcount > INT_GET(agf->agf_longest, arch)) {
 		/*
 		 * If this is a leaf in the by-size btree and there
 		 * is no right sibling block and this block is bigger
 		 * than the previous longest block, update it.
 		 */
-		cur->bc_mp->m_perag[agf->agf_seqno].pagf_longest = 
-			agf->agf_longest = recp->ar_blockcount;
+		INT_SET(agf->agf_longest, arch, recp->ar_blockcount);
+		cur->bc_mp->m_perag[INT_GET(agf->agf_seqno, arch)].pagf_longest
+			= recp->ar_blockcount;
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_LONGEST);
 	}
@@ -1025,7 +1031,7 @@ xfs_alloc_log_recs(
 		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
 		for (p = &rp[rfirst - 1]; p <= &rp[rlast - 1]; p++)
 			ASSERT(p->ar_startblock + p->ar_blockcount <=
-			       agf->agf_length);
+			       INT_GET(agf->agf_length, cur->bc_mp->m_arch));
 	}
 #endif
 	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
@@ -1051,18 +1057,20 @@ xfs_alloc_lookup(
 	int			keyno;	/* current key number */
 	int			level;	/* level in the btree */
 	xfs_mount_t		*mp;	/* file system mount point */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
 	XFSSTATS.xs_abt_lookup++;
 	/*
 	 * Get the allocation group header, and the root block number.
 	 */
 	mp = cur->bc_mp;
+	arch = ARCH_GET(mp->m_arch);
 	{
 		xfs_agf_t	*agf;	/* a.g. freespace header */
 
 		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
-		agno = agf->agf_seqno;
-		agbno = agf->agf_roots[cur->bc_btnum];
+		agno = INT_GET(agf->agf_seqno, arch);
+		agbno = INT_GET(agf->agf_roots[cur->bc_btnum], arch);
 	}
 	/*
 	 * Iterate over each level in the btree, starting at the root.
@@ -1410,8 +1418,10 @@ xfs_alloc_newroot(
 	xfs_agblock_t		rbno;	/* right block number */
 	xfs_buf_t			*rbp;	/* right btree buffer */
 	xfs_alloc_block_t	*right;	/* right btree block */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
 	mp = cur->bc_mp;
+	arch = ARCH_GET(mp->m_arch);
 	ASSERT(cur->bc_nlevels < XFS_AG_MAXLEVELS(mp));
 	/*
 	 * Get a buffer from the freelist blocks, for the new root.
@@ -1434,12 +1444,14 @@ xfs_alloc_newroot(
 	 * Set the root data in the a.g. freespace structure.
 	 */
 	{
-		xfs_agf_t		*agf;	/* a.g. freespace header */
+		xfs_agf_t	*agf;	/* a.g. freespace header */
+		xfs_agnumber_t	seqno;
 
 		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
-		agf->agf_roots[cur->bc_btnum] = nbno;
-		agf->agf_levels[cur->bc_btnum]++;
-		mp->m_perag[agf->agf_seqno].pagf_levels[cur->bc_btnum]++;
+		INT_SET(agf->agf_roots[cur->bc_btnum], arch, nbno);
+		INT_MOD(agf->agf_levels[cur->bc_btnum], arch, 1);
+		seqno = INT_GET(agf->agf_seqno, arch);
+		mp->m_perag[seqno].pagf_levels[cur->bc_btnum]++;
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_ROOTS | XFS_AGF_LEVELS);
 	}
@@ -2275,10 +2287,12 @@ xfs_alloc_update(
 	    block->bb_rightsib == NULLAGBLOCK &&
 	    ptr == block->bb_numrecs) {
 		xfs_agf_t	*agf;	/* a.g. freespace header */
+		xfs_agnumber_t	seqno;
 
 		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
-		cur->bc_mp->m_perag[agf->agf_seqno].pagf_longest =
-			agf->agf_longest = len;
+		seqno = INT_GET(agf->agf_seqno, cur->bc_mp->m_arch);
+		cur->bc_mp->m_perag[seqno].pagf_longest = len;
+		INT_SET(agf->agf_longest, cur->bc_mp->m_arch, len);
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_LONGEST);
 	}

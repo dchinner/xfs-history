@@ -2223,18 +2223,21 @@ static void
 xfsidbg_xagf(xfs_agf_t *agf)
 {
 	qprintf("magicnum 0x%x versionnum 0x%x seqno 0x%x length 0x%x\n",
-		agf->agf_magicnum,
-		agf->agf_versionnum,
-		agf->agf_seqno,
-		agf->agf_length);
+		INT_GET(agf->agf_magicnum, ARCH_UNKNOWN),
+		INT_GET(agf->agf_versionnum, ARCH_UNKNOWN),
+		INT_GET(agf->agf_seqno, ARCH_UNKNOWN),
+		INT_GET(agf->agf_length, ARCH_UNKNOWN));
 	qprintf("roots b 0x%x c 0x%x levels b %d c %d\n",
-		agf->agf_roots[XFS_BTNUM_BNO],
-		agf->agf_roots[XFS_BTNUM_CNT],
-		agf->agf_levels[XFS_BTNUM_BNO],
-		agf->agf_levels[XFS_BTNUM_CNT]);
+		INT_GET(agf->agf_roots[XFS_BTNUM_BNO], ARCH_UNKNOWN),
+		INT_GET(agf->agf_roots[XFS_BTNUM_CNT], ARCH_UNKNOWN),
+		INT_GET(agf->agf_levels[XFS_BTNUM_BNO], ARCH_UNKNOWN),
+		INT_GET(agf->agf_levels[XFS_BTNUM_CNT], ARCH_UNKNOWN));
 	qprintf("flfirst %d fllast %d flcount %d freeblks %d longest %d\n",
-		agf->agf_flfirst, agf->agf_fllast, agf->agf_flcount,
-		agf->agf_freeblks, agf->agf_longest);
+		INT_GET(agf->agf_flfirst, ARCH_UNKNOWN),
+		INT_GET(agf->agf_fllast, ARCH_UNKNOWN),
+		INT_GET(agf->agf_flcount, ARCH_UNKNOWN),
+		INT_GET(agf->agf_freeblks, ARCH_UNKNOWN),
+		INT_GET(agf->agf_longest, ARCH_UNKNOWN));
 }
 
 /*
@@ -2571,10 +2574,10 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	xfs_dir2_free_t *d2free;
 
 	d = XFS_BUF_PTR(bp);
-	if ((agf = d)->agf_magicnum == XFS_AGF_MAGIC) {
+	if (INT_GET((agf = d)->agf_magicnum, ARCH_UNKNOWN) == XFS_AGF_MAGIC) {
 		if (summary) {
 			qprintf("freespace hdr for AG %d (at 0x%p)\n",
-					   agf->agf_seqno, agf);
+				INT_GET(agf->agf_seqno, ARCH_UNKNOWN), agf);
 		} else {
 			qprintf("buf 0x%p agf 0x%p\n", bp, agf);
 			xfsidbg_xagf(agf);

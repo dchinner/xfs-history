@@ -3412,20 +3412,22 @@ xlog_recover_check_summary(xlog_t	*log)
 	xfs_mount_t	*mp;
 	xfs_agf_t	*agfp;
 	xfs_agi_t	*agip;
-	xfs_buf_t		*agfbp;
-	xfs_buf_t		*agibp;
+	xfs_buf_t	*agfbp;
+	xfs_buf_t	*agibp;
 	daddr_t		agfdaddr;
 	daddr_t		agidaddr;
-	xfs_buf_t		*sbbp;
+	xfs_buf_t	*sbbp;
 #ifdef XFS_LOUD_RECOVERY
 	xfs_sb_t	*sbp;
 #endif
 	xfs_agnumber_t	agno;
+	xfs_arch_t	arch;
 	__uint64_t	freeblks;
 	__uint64_t	itotal;
 	__uint64_t	ifree;
 
 	mp = log->l_mp;
+	arch = ARCH_GET(mp->m_arch);
 	freeblks = 0LL;
 	itotal = 0LL;
 	ifree = 0LL;
@@ -3433,11 +3435,12 @@ xlog_recover_check_summary(xlog_t	*log)
 		agfdaddr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
 		agfbp = xfs_buf_read(mp->m_ddev_targp, agfdaddr, 1, 0);
 		agfp = XFS_BUF_TO_AGF(agfbp);
-		ASSERT(agfp->agf_magicnum == XFS_AGF_MAGIC);
-		ASSERT(XFS_AGF_GOOD_VERSION(agfp->agf_versionnum));
-		ASSERT(agfp->agf_seqno == agno);
+		ASSERT(INT_GET(agfp->agf_magicnum, arch) == XFS_AGF_MAGIC);
+		ASSERT(XFS_AGF_GOOD_VERSION(INT_GET(agfp->agf_versionnum, arch)));
+		ASSERT(INT_GET(agfp->agf_seqno, arch)) == agno);
 
-		freeblks += agfp->agf_freeblks + agfp->agf_flcount;
+		freeblks += INT_GET(agfp->agf_freeblks, arch) +
+			    INT_GET(agfp->agf_flcount, arch);
 		xfs_buf_relse(agfbp);
 
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
