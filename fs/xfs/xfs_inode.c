@@ -1,4 +1,4 @@
-#ident "$Revision: 1.226 $"
+#ident "$Revision: 1.227 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2443,6 +2443,7 @@ xfs_idestroy(
 	freesema(&ip->i_flock);
 	sv_destroy(&ip->i_pinsema);
 	spinlock_destroy(&ip->i_ipinlock);
+	mutex_destroy(&ip->i_rlock);
 #ifndef SIM
 #ifdef XFS_BMAP_TRACE
 	ktrace_free(ip->i_xtrace);
