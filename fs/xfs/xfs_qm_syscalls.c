@@ -1,4 +1,4 @@
-#ident "$Revision: 1.21 $"
+#ident "$Revision: 1.22 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -111,6 +111,8 @@ xfs_qm_sysent(
 	      case Q_QUOTARM:
 		if (XFS_IS_QUOTA_ON(mp) || addr == NULL)
 			return XFS_ERROR(EINVAL);
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
 		return (xfs_qm_scall_trunc_qfiles(mp, 
 				       xfs_qm_import_qtype_flags((uint *)addr)));
 		/*
@@ -128,9 +130,13 @@ xfs_qm_sysent(
 	      case Q_QUOTAON:
 		if (addr == NULL)
 			return XFS_ERROR(EINVAL);
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
 		return (xfs_qm_scall_quotaon(mp,
 					  xfs_qm_import_flags((uint *)addr)));
 	      case Q_QUOTAOFF:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
 		if (mp->m_dev == rootdev) {
 			return (xfs_qm_scall_quotaoff(mp,
 					    xfs_qm_import_flags((uint *)addr),
@@ -147,6 +153,8 @@ xfs_qm_sysent(
 
 	switch (cmd) {
 	      case Q_QUOTAOFF:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
 		error = xfs_qm_scall_quotaoff(mp,
 					    xfs_qm_import_flags((uint *)addr),
 					    B_FALSE);
@@ -163,11 +171,15 @@ xfs_qm_sysent(
 		 * Set limits, both hard and soft. Defaults to Q_SETUQLIM.
 		 */
 	      case Q_XSETQLIM:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
 		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_USER,
 					     addr);
 		break;
 #ifndef _NOPROJQUOTAS
 	       case Q_XSETPQLIM:
+		if (vfsp->vfs_flag & VFS_RDONLY)
+			return XFS_ERROR(EROFS);
 		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_PROJ,
 					     addr);
 		break;
@@ -187,6 +199,9 @@ xfs_qm_sysent(
 		 * Add a warning to the User/Project.
 		 */
 	      case Q_WARN:
+		/*
+		 * XXX when this is supported, is it a readonly op?
+		 */
 		error = xfs_qm_scall_qwarn(mp, (xfs_dqid_t)id, addr);
 		break;
 
@@ -869,6 +884,11 @@ xfs_qm_scall_qwarn(
 	xfs_dqid_t 	id,
 	caddr_t 	addr)
 {
+	/*
+	 * XXX when this is supported, if it's a write operation
+	 * (changes the filesystem), it shouldn't work in a read-only
+	 * filesystem.  That has to be enforced in xfs_qm_sysent().
+	 */
 #ifdef _IRIX62_XFS_ONLY
 	return (ENOTSUP);
 #else
