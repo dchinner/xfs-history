@@ -1,4 +1,4 @@
-#ident "$Revision: 1.306 $"
+#ident "$Revision: 1.307 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -586,6 +586,7 @@ xfs_setattr(
 	int 		mandlock_before, mandlock_after;
 	uint		qflags;
 	struct xfs_dquot *udqp, *pdqp, *olddquot1, *olddquot2;
+	int 		file_owner;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_setattr", (inst_t *)__return_address);
@@ -689,9 +690,10 @@ xfs_setattr(
          * Change file access modes.  Must be owner or privileged.
 	 * Also check here for xflags, extsize.
          */
+	file_owner = (credp->cr_uid == ip->i_d.di_uid);
+
         if (mask & (AT_MODE|AT_XFLAGS|AT_EXTSIZE)) {
-                if (credp->cr_uid != ip->i_d.di_uid &&
-		    !_CAP_CRABLE(credp, CAP_FOWNER)) {
+                if (!file_owner && !cap_able_cred(credp, CAP_FOWNER)) {
                         code = XFS_ERROR(EPERM);
                         goto error_return;
                 }
@@ -720,15 +722,17 @@ xfs_setattr(
 			 iprojid;
 		
                 /* XXXsup How does restricted chown affect projid ??? */
-		if (! (privileged = _CAP_CRABLE(credp, CAP_FOWNER))) {
-                        if (credp->cr_uid != ip->i_d.di_uid ||
-			    (restricted_chown &&
-			     (ip->i_d.di_uid != uid ||
-			      !groupmember(gid, credp)))) {
-                                code = XFS_ERROR(EPERM);
-                                goto error_return;
-                        }
-                }
+		if (!file_owner && !cap_able_cred(credp, CAP_FOWNER)) {
+			code = XFS_ERROR(EPERM);
+			goto error_return;
+		}
+
+		if (restricted_chown &&
+		    (ip->i_d.di_uid != uid || !groupmember(gid, credp)) &&
+		    !cap_able_cred(credp, CAP_FOWNER)) {
+			code = XFS_ERROR(EPERM);
+			goto error_return;
+		}
 		/*
 		 * Do a quota reservation only if uid or projid is actually
 		 * going to change.
@@ -736,6 +740,10 @@ xfs_setattr(
 		if ((XFS_IS_UQUOTA_ON(mp) && iuid != uid) ||
 		    (XFS_IS_PQUOTA_ON(mp) && iprojid != projid)) {
 			ASSERT(tp);
+			/*
+			 * XXX:casey - This may result in unnecessary auditing.
+			 */
+			privileged = cap_able_cred(credp, CAP_FOWNER);
 			if (code = xfs_qm_vop_chown_reserve(tp, ip, udqp, pdqp,
 							  privileged ?
 							  XFS_QMOPT_FORCE_RES :
@@ -780,15 +788,17 @@ xfs_setattr(
          * Change file access or modified times.
          */
         if (mask & (AT_ATIME|AT_MTIME)) {
-                if (credp->cr_uid != ip->i_d.di_uid &&
-		    !_CAP_CRABLE(credp, CAP_FOWNER)) {
-                        if (flags & ATTR_UTIME) {
-                                code = XFS_ERROR(EPERM);
-                                goto error_return;
-                        }
-			if (code = xfs_iaccess(ip, IWRITE, credp))
+		if (!file_owner) {
+			if ((flags & ATTR_UTIME) &&
+			    !cap_able_cred(credp, CAP_FOWNER)) {
+				code = XFS_ERROR(EPERM);
 				goto error_return;
-                }
+			}
+			if ((code = xfs_iaccess(ip, IWRITE, credp)) &&
+			    !cap_able_cred(credp, CAP_FOWNER)) {
+				goto error_return;
+			}
+		}
         }
 
 	/*
@@ -944,13 +954,18 @@ xfs_setattr(
                  * A non-privileged user can set the sticky and sgid
                  * bits on a directory.
                  */
-                if (!_CAP_CRABLE(credp, CAP_DAC_OVERRIDE)) {
-                        if (vp->v_type != VDIR && (ip->i_d.di_mode & ISVTX))
-                                ip->i_d.di_mode &= ~ISVTX;
-                        if (!groupmember(ip->i_d.di_gid, credp) && 
-			    (ip->i_d.di_mode & ISGID))
-                                ip->i_d.di_mode &= ~ISGID;
-                }
+
+		if (vp->v_type != VDIR &&
+		    (ip->i_d.di_mode & ISVTX) &&
+		    !cap_able_cred(credp, CAP_FOWNER))
+                	ip->i_d.di_mode &= ~ISVTX;
+
+		if (!groupmember(ip->i_d.di_gid, credp) && 
+		    (ip->i_d.di_mode & ISGID) &&
+		    !cap_able_cred(credp, CAP_FOWNER))
+			ip->i_d.di_mode &= ~ISGID;
+
+
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
 
@@ -970,7 +985,8 @@ xfs_setattr(
          * or she is a member.
          */
         if (mask & (AT_UID|AT_GID|AT_PROJID)) {
-                if (!_CAP_CRABLE(credp, CAP_FOWNER)) {
+                if ((ip->i_d.di_mode & ~(ISUID|ISGID)) && 
+		    !cap_able_cred(credp, CAP_FOWNER)) {
                         ip->i_d.di_mode &= ~(ISUID|ISGID);
                 }
                 
@@ -4912,7 +4928,7 @@ xfs_set_dmattrs (
 	xfs_mount_t	*mp;
 	int		error;
 
-	if (!_CAP_ABLE(CAP_DEVICE_MGT))
+	if (!cap_able(CAP_DEVICE_MGT))
 		return XFS_ERROR(EPERM);
 
         ip = XFS_BHVTOI(bdp);
