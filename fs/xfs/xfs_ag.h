@@ -94,7 +94,13 @@ typedef struct xfs_agi
 #define	XFS_AG_MIN_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MIN_BYTES >> bl))
 #define	XFS_AG_MAX_BLOCKS(bl)	((xfs_extlen_t)(XFS_AG_MAX_BYTES >> bl))
 
-#define	XFS_MIN_FREELIST(a)	(2 * (((a)->agf_levels[XFS_BTNUM_BNOi]) + ((a)->agf_levels[XFS_BTNUM_CNTi]) + 1))
+#define	XFS_AG_MIN(a,b)		((a) < (b) ? (a) : (b))
+#define	XFS_AG_MAXLEVELS(mp)	((mp)->m_ag_maxlevels)
+#define	XFS_MIN_FREELIST(a,mp)	\
+	(XFS_AG_MIN((a)->agf_levels[XFS_BTNUM_BNOi] + 1, \
+		    XFS_AG_MAXLEVELS(mp)) + \
+	 XFS_AG_MIN((a)->agf_levels[XFS_BTNUM_CNTi] + 1, \
+		    XFS_AG_MAXLEVELS(mp)))
 
 #define	xfs_agb_mask(k)	((1 << (k)) - 1)
 #define	xfs_agb_to_fsb(mp,agno,agbno) \
