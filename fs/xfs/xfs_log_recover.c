@@ -68,7 +68,7 @@
 #endif
 
 STATIC int	xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
-STATIC int	xlog_clear_stale_blocks(xlog_t	*log);
+STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
 #ifndef SIM
@@ -632,6 +632,7 @@ xlog_find_tail(xlog_t  *log,
 	int			error, i, found;
 	daddr_t			umount_data_blk;
 	daddr_t			after_umount_blk;
+	xfs_lsn_t		tail_lsn;
 	
 	found = error = 0;
 	/*
@@ -716,8 +717,14 @@ xlog_find_tail(xlog_t  *log,
 	 * was a clean unmount.  Since 'i' could be the last block in
 	 * the physical log, we convert to a log block before comparing
 	 * to the head_blk.
+	 *
+	 * Save the current tail lsn to use to pass to
+	 * xlog_clear_stale_blocks() below.  We won't want to clear the
+	 * unmount record if there is one, so we pass the lsn of the
+	 * unmount record rather than the block after it.
 	 */
 	after_umount_blk = (i + 2) % log->l_logBBsize;
+	tail_lsn = log->l_tail_lsn;
 	if (*head_blk == after_umount_blk && rhead->h_num_logops == 1) {
 		umount_data_blk = (i + 1) % log->l_logBBsize;
 		if (error = xlog_bread(log, umount_data_blk, 1, bp)) {
@@ -725,7 +732,15 @@ xlog_find_tail(xlog_t  *log,
 		}
 		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
 		if (op_head->oh_flags & XLOG_UNMOUNT_TRANS) {
+			/*
+			 * Set tail and last sync so that newly written
+			 * log records will point recovery to after the
+			 * current unmount record.
+			 */
 			log->l_tail_lsn =
+			     ((long long)log->l_curr_cycle << 32) |
+			     ((uint)(after_umount_blk));
+			log->l_last_sync_lsn =
 			     ((long long)log->l_curr_cycle << 32) |
 			     ((uint)(after_umount_blk));
 			*tail_blk = after_umount_blk;
@@ -737,8 +752,11 @@ xlog_find_tail(xlog_t  *log,
 	 * with the same cycle number as the head.  This can happen
 	 * because we allow multiple outstanding log writes concurrently,
 	 * and the later writes might make it out before earlier ones.
+	 *
+	 * We use the lsn from before modifying it so that we'll never
+	 * overwrite the unmount record after a clean unmount.
 	 */
-	error = xlog_clear_stale_blocks(log);
+	error = xlog_clear_stale_blocks(log, tail_lsn);
 
 bread_err:
 exit:
@@ -904,10 +922,17 @@ xlog_write_log_records(
  * have the current cycle number.  We get rid of them by overwriting them
  * with empty log records with the old cycle number rather than the
  * current one.
+ *
+ * The tail lsn is passed in rather than taken from
+ * the log so that we will not write over the unmount record after a
+ * clean unmount in a 512 block log.  Doing so would leave the log without
+ * any valid log records in it until a new one was written.  If we crashed
+ * during that time we would not be able to recover.
  */
 STATIC int
 xlog_clear_stale_blocks(
-	xlog_t	*log)
+	xlog_t		*log,
+	xfs_lsn_t	tail_lsn)
 {
 	int			tail_cycle;
 	int			head_cycle;
@@ -919,8 +944,8 @@ xlog_clear_stale_blocks(
 	buf_t			*bp;
 	int			error;
 
-	tail_cycle = CYCLE_LSN(log->l_tail_lsn);
-	tail_block = BLOCK_LSN(log->l_tail_lsn);
+	tail_cycle = CYCLE_LSN(tail_lsn);
+	tail_block = BLOCK_LSN(tail_lsn);
 	head_cycle = log->l_curr_cycle;
 	head_block = log->l_curr_block;
 
@@ -2326,7 +2351,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		case XFS_ILOG_AEXT:
 			dest = XFS_DFORK_APTR(dip);
 			ASSERT(dest+len <= bp->b_dmaaddr+bp->b_bcount);
-			ASSERT(len < XFS_DFORK_ASIZE(dip, mp));
+			ASSERT(len <= XFS_DFORK_ASIZE(dip, mp));
 			bcopy(src, dest, len);
 			break;
 
