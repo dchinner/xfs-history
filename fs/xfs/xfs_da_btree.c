@@ -2567,8 +2567,8 @@ xfs_da_log_buf(xfs_trans_t *tp, xfs_dabuf_t *dabuf, uint first, uint last)
 		 * be set, and at commit it it released into the cache,
 		 * and then a read will fail.
 		 */
-		else if (!(bp->b_flags & B_DONE))
-			bp->b_flags |= B_DONE;
+		else if (!(XFS_BUF_ISDONE(bp)))
+		  XFS_BUF_DONE(bp);
 	}
 	ASSERT(last < off);
 }

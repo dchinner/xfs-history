@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.174 $"
+#ident	"$Revision: 1.177 $"
 
 /*
  * High level interface routines for log manager
@@ -966,7 +966,7 @@ xlog_iodone(xfs_buf_t *bp)
 		xfs_fs_cmn_err(CE_ALERT, iclog->ic_log->l_mp,
 			"xlog_iodone: log write error buf 0x%p", bp);
 #endif
-		bp->b_flags |= B_STALE;
+		XFS_BUF_STALE(bp);
 		xfs_force_shutdown(iclog->ic_log->l_mp, XFS_LOG_IO_ERROR);
 		/*
 		 * This flag will be propagated to the trans-committed
@@ -978,7 +978,7 @@ xlog_iodone(xfs_buf_t *bp)
 		aborted = XFS_LI_ABORTED;
 	}
 	xlog_state_done_syncing(iclog, aborted);
-	if ( !(bp->b_flags & B_ASYNC) ) {
+	if ( !(XFS_BUF_ISASYNC(bp)) ) {
 		/* 
 		 * Corresponding psema() will be done in bwrite().  If we don't
 		 * vsema() here, panic.
@@ -1013,7 +1013,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 
 	buftrace("XLOG__BDSTRAT IOERROR", bp);
 	bioerror(bp, EIO);
-	bp->b_flags |= B_STALE;
+	XFS_BUF_STALE(bp);
 	biodone(bp);
 	return (XFS_ERROR(EIO));
 	
@@ -1182,7 +1182,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
-	ASSERT(log->l_xbuf->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(log->l_xbuf));
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	spinlock_init(&log->l_icloglock, "iclog");
 	spinlock_init(&log->l_grant_lock, "grhead_iclog");
@@ -1236,7 +1236,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		iclog->ic_callback = 0;
 		iclog->ic_callback_tail = &(iclog->ic_callback);
 
-		ASSERT(iclog->ic_bp->b_flags & B_BUSY);
+		ASSERT(XFS_BUF_ISBUSY(iclog->ic_bp));
 		ASSERT(valusema(&iclog->ic_bp->b_lock) <= 0);
 		sv_init(&iclog->ic_forcesema, SV_DEFAULT, "iclog-force");
 
@@ -1418,10 +1418,13 @@ xlog_sync(xlog_t		*log,
 	bp->b_dmaaddr	= (caddr_t) &(iclog->ic_header);
 	bp->b_bcount	= count;
 	XFS_BUF_SET_FSPRIVATE(bp, iclog);	/* save for later */
-	if (flags & XFS_LOG_SYNC)
-		bp->b_flags |= (B_BUSY | B_HOLD);
-	else
-		bp->b_flags |= (B_BUSY | B_ASYNC);
+	if (flags & XFS_LOG_SYNC){
+		XFS_BUF_BUSY(bp);
+		XFS_BUF_HOLD(bp);
+	} else {
+		XFS_BUF_BUSY(bp);
+		XFS_BUF_ASYNC(bp);
+	}
 
 	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
@@ -1449,7 +1452,8 @@ xlog_sync(xlog_t		*log,
 		bp->b_dmaaddr	= (caddr_t)((__psint_t)&(iclog->ic_header)+
 					    (__psint_t)count);
 		XFS_BUF_SET_FSPRIVATE(bp, iclog);
-		bp->b_flags |= (B_BUSY | B_ASYNC);
+		XFS_BUF_BUSY(bp);
+		XFS_BUF_ASYNC(bp);
 		dptr = bp->b_dmaaddr;
 		/*
 		 * Bump the cycle numbers at the start of each block

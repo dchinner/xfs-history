@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.255 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -3122,7 +3122,7 @@ cluster_corrupt_out:
 	 * brelse can handle it with no problems.  If not, shut down the 
 	 * filesystem before releasing the buffer.
 	 */
-	if ((bufwasdelwri=bp->b_flags & B_DELWRI)) {
+	if ((bufwasdelwri= XFS_BUF_ISDELAYWRITE(bp))) {
 		brelse(bp);
 	}
 
@@ -3137,12 +3137,13 @@ cluster_corrupt_out:
 		if (XFS_BUF_IODONE_FUNC(bp)) {
 			XFS_BUF_CLR_BDSTRAT_FUNC(bp);
 			bp->b_target = NULL;
-			bp->b_flags &= ~(B_DONE);
-			bp->b_flags |= B_STALE|B_ERROR|B_XFS_SHUT;
-			bp->b_error = EIO;
+			XFS_BUF_UNDONE(bp);
+			XFS_BUF_STALE(bp);
+			XFS_BUF_SHUT(bp);
+			XFS_BUF_ERROR(bp,EIO);
 			biodone(bp);
 		} else {
-			bp->b_flags |= B_STALE;
+			XFS_BUF_STALE(bp);
 			brelse(bp);
 		}
 	}

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.279 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1348,6 +1348,7 @@ out:
  * routines to enable/disable/query nested iolock locking and isolate
  * the curuthread references to make the Cellular Irix merge easier
  */
+#ifndef __linux__
 void
 xfs_enable_nested_locking(void)
 {
@@ -1367,7 +1368,23 @@ xfs_is_nested_locking_enabled(void)
 {
 	return curuthread && curuthread->ut_vnlock & UT_FSNESTED;
 }
+#else
+void
+xfs_enable_nested_locking(void)
+{
+}
 
+void
+xfs_disable_nested_locking(void)
+{
+}
+
+int
+xfs_is_nested_locking_enabled(void)
+{
+  return 0; 
+}
+#endif
 /*
  * xfs_lockdown_iopages() - lock down any mmapped user pages required for
  *	this i/o.  this is either

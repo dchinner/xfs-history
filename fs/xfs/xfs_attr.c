@@ -1,4 +1,4 @@
-#ident "$Revision: 1.59 $"
+#ident "$Revision: 1.60 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -2056,14 +2056,14 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		 */
 		bp = incore(mp->m_dev, dblkno, blkcnt, 1);
 		if (bp) {
-			bp->b_flags |= B_STALE;
-			bp->b_flags &= ~B_DELWRI;
+		    XFS_BUF_STALE(bp);
+		    XFS_BUF_UNDELAYWRITE(bp);
 			brelse(bp);
 			bp = NULL;
 		}
 
 		valuelen -= map.br_blockcount;
-
+		
 		lblkno += map.br_blockcount;
 	}
 

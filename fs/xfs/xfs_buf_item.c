@@ -1,4 +1,4 @@
-#ident "$Revision: 1.73 $"
+#ident "$Revision: 1.76 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -264,7 +264,7 @@ xfs_buf_item_pin(
 	xfs_buf_t	*bp;
 
 	bp = bip->bli_buf;
-	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(bip->bli_refcount > 0);
 	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
 	       (bip->bli_flags & XFS_BLI_STALE));
@@ -304,8 +304,8 @@ xfs_buf_item_unpin(
 	bunpin(bp);
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
-		ASSERT(!(bp->b_flags & B_DELWRI));
-		ASSERT(bp->b_flags & B_STALE);
+		ASSERT(!(XFS_BUF_ISDELAYWRITE(bp)));
+		ASSERT(XFS_BUF_ISTALE(bp));
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
@@ -548,8 +548,7 @@ xfs_buf_item_abort(
 
 	bp = bip->bli_buf;
 	buftrace("XFS_ABORT", bp);
-	bp->b_flags &= ~(B_DELWRI|B_DONE);
-	bp->b_flags |= B_STALE;
+	XFS_BUF_SUPER_STALE(bp);
 	xfs_buf_item_unlock(bip);
 	return;
 }
@@ -572,7 +571,7 @@ xfs_buf_item_push(
 
 	bp = bip->bli_buf;
 
-	if (bp->b_flags & B_DELWRI) {
+	if (XFS_BUF_ISDELAYWRITE(bp)) {
 		xfs_bawrite(bip->bli_item.li_mountp, bp);
 	} else {
 		brelse(bp);
@@ -1136,7 +1135,7 @@ xfs_buf_item_relse(
 	XFS_BUF_SET_FSPRIVATE(bp, bip->bli_item.li_bio_list);
 	if ((XFS_BUF_FSPRIVATE(bp, void *) == NULL) &&
 	    (XFS_BUF_IODONE_FUNC(bp) != NULL)) {
-		ASSERT((bp->b_flags & B_UNINITIAL) == 0);
+		ASSERT((XFS_BUF_ISUNINTIAL(bp)) == 0);
 		XFS_BUF_CLR_IODONE_FUNC(bp);
 	}
 
@@ -1171,7 +1170,7 @@ xfs_buf_attach_iodone(
 {
 	xfs_log_item_t	*head_lip;
 
-	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(bp)); 
 	ASSERT(valusema(&bp->b_lock) <= 0);
 
 	lip->li_cb = cb;
@@ -1238,8 +1237,7 @@ xfs_buf_iodone_callbacks(
 		mp = lip->li_mountp;
 		if (XFS_FORCED_SHUTDOWN(mp)) {
 			ASSERT(bp->b_edev == mp->m_dev);
-			bp->b_flags |= B_STALE;
-			bp->b_flags &= ~(B_DONE|B_DELWRI);
+			XFS_BUF_SUPER_STALE(bp);
 			buftrace("BUF_IODONE_CB", bp);
 			xfs_buf_do_callbacks(bp, lip);
 			XFS_BUF_SET_FSPRIVATE(bp, NULL);
@@ -1252,8 +1250,8 @@ xfs_buf_iodone_callbacks(
 			 * Since there's no biowait done on those,
 			 * we should just brelse them.
 			 */
-			if (bp->b_flags & B_XFS_SHUT) {
-				bp->b_flags &= ~B_XFS_SHUT;
+			if (XFS_BUF_ISSHUT(bp)) {
+			    XFS_BUF_UNSHUT(bp);
 				brelse(bp);
 			} else {
 				biodone(bp);
@@ -1271,7 +1269,7 @@ xfs_buf_iodone_callbacks(
 		}
 		lastdev = bp->b_edev;
 
-		if (bp->b_flags & B_ASYNC) {
+		if (XFS_BUF_ISASYNC(bp)) {
 			/*
 			 * If the write was asynchronous then noone will be
 			 * looking for the error.  Clear the error state
@@ -1281,10 +1279,11 @@ xfs_buf_iodone_callbacks(
 			 * before we start the umount; we don't want these
 			 * DELWRI metadata bufs to be hanging around.
 			 */
-			bp->b_error = 0;
-			bp->b_flags &= ~(B_ERROR);
-			if (!(bp->b_flags & B_STALE)) {
-				bp->b_flags |= B_DELWRI | B_DONE;
+			XFS_BUF_ERROR(bp,0); /* errno of 0 unsets the flag */
+
+			if (!(XFS_BUF_ISSTALE(bp))) {
+				XFS_BUF_DELAYWRITE(bp);
+				XFS_BUF_DONE(bp);
 				bp->b_start = lbolt;
 			}
 			ASSERT(XFS_BUF_IODONE_FUNC(bp));
@@ -1306,7 +1305,7 @@ xfs_buf_iodone_callbacks(
 			   function at times, but we're gonna be shutting down
 			   anyway. */
 			bp->b_relse = xfs_buf_error_relse;
-			bp->b_flags |= B_DONE;
+			XFS_BUF_DONE(bp);
 			vsema(&bp->b_iodonesema);
 		}
 		return;
@@ -1335,9 +1334,10 @@ xfs_buf_error_relse(
 	mp = (xfs_mount_t *)lip->li_mountp;
 	ASSERT(bp->b_edev == mp->m_dev);
 
-	bp->b_flags |= B_STALE|B_DONE;
-	bp->b_flags &= ~(B_DELWRI|B_ERROR);
-	bp->b_error = 0;
+	XFS_BUF_STALE(bp);
+	XFS_BUF_DONE(bp);
+	XFS_BUF_UNDELAYWRITE(bp);
+	XFS_BUF_ERROR(bp,0)
 	buftrace("BUF_ERROR_RELSE", bp);
 	if (! XFS_FORCED_SHUTDOWN(mp)) 		
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
@@ -1421,8 +1421,8 @@ xfs_buf_item_trace(
 		     (void *)((unsigned long)bip->bli_refcount),
 		     (void *)bp->b_blkno,
 		     (void *)((unsigned long)bp->b_bcount),
-		     (void *)((unsigned long)(0xFFFFFFFF & (bp->b_flags >> 32))),
-		     (void *)((unsigned long)(0xFFFFFFFF & bp->b_flags)),
+		     (void *)((unsigned long)(0xFFFFFFFF & (XFS_BFLAGS(bp) >> 32))),
+		     (void *)((unsigned long)(0xFFFFFFFF & XFS_BFLAGS(bp))),
 		     XFS_BUF_FSPRIVATE(bp, void *),
 		     XFS_BUF_FSPRIVATE2(bp, void *),
 		     (void *)((unsigned long)bp->b_pincount),

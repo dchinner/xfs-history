@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.137 $"
+#ident	"$Revision: 1.140 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -148,7 +148,8 @@ xlog_bread(xlog_t	*log,
 	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
 
 	bp->b_blkno	= log->l_logBBstart + blk_no;
-	bp->b_flags	= B_READ|B_BUSY;
+	XFS_BUF_READ(bp);
+	XFS_BUF_BUSY(bp);
 	bp->b_bcount	= BBTOB(nbblks);
 	bp->b_edev	= log->l_dev;
 	bp->b_target	= &log->l_mp->m_logdev_targ;
@@ -1857,9 +1858,9 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	error = 0;
 	if ((*((__uint16_t *)(bp->b_un.b_addr)) == XFS_DINODE_MAGIC) &&
 	    (bp->b_bcount != MAX(log->l_mp->m_sb.sb_blocksize,
-				 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
-		bp->b_flags |= B_STALE;
-	        error = xfs_bwrite(mp, bp);
+							 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
+	  XFS_BUF_STALE(bp);
+	  error = xfs_bwrite(mp, bp);
 	} else {
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL ||
 		       XFS_BUF_FSPRIVATE(bp, xfs_mount *) == mp);
@@ -1916,7 +1917,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		xfs_imap(log->l_mp, 0, ino, &imap, 0);
 	}
 	bp = read_buf_targ(mp->m_ddev_targp, imap.im_blkno, imap.im_len, 0);
-	if (bp->b_flags & B_ERROR) {
+	if (XFS_BUF_ISERROR(bp)) {
 		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
 				  mp->m_dev, imap.im_blkno);
 		error = bp->b_error;
@@ -2092,7 +2093,7 @@ write_inode_buffer:
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_recover_iodone);
 		xfs_bdwrite(mp, bp);
 	} else {
-		bp->b_flags |= B_STALE;
+		XFS_BUF_STALE(bp);
 		error = xfs_bwrite(mp, bp);
 	}
 
@@ -3202,8 +3203,8 @@ xlog_do_recover(xlog_t	*log,
 	 * updates, re-read in the superblock.
 	 */
 	bp = xfs_getsb(log->l_mp, 0);
-	bp->b_flags &= ~B_DONE;
-	bp->b_flags |= B_READ;
+	XFS_BUF_UNDONE(bp);
+	XFS_BUF_READ(bp);
 #ifndef SIM
 	bp_dcache_wbinval(bp);
 #endif

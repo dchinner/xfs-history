@@ -1,4 +1,4 @@
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include "xfs_buf.h"
@@ -375,7 +375,7 @@ xfs_qm_init_dquot_blk(
 	int		curid, i;
 
 	ASSERT(tp);
-	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(valusema(&bp->b_lock) <= 0);
 
 	d = (xfs_dqblk_t *)bp->b_un.b_addr;
@@ -597,7 +597,7 @@ xfs_qm_dqtobp(
 		if (error || !bp)
 			return XFS_ERROR(error);
 	}
-	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(valusema(&bp->b_lock) <= 0);
 
 	/* 
@@ -616,7 +616,7 @@ xfs_qm_dqtobp(
 			xfs_trans_brelse(tp, bp);
 			return XFS_ERROR(EIO);
 		}
-		bp->b_flags |= B_DONE; /* We dirtied this */
+		XFS_BUF_BUSY(bp); /* We dirtied this */
 	}
 
 	*O_bpp = bp;
@@ -681,7 +681,7 @@ xfs_qm_dqread(
 	 * this particular dquot was repaired. We still aren't afraid to 
 	 * brelse it because we have the changes incore.
 	 */
-	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(valusema(&bp->b_lock) <= 0);
 	xfs_trans_brelse(tp, bp);
 
@@ -1698,7 +1698,7 @@ xfs_qm_dqflock_pushbuf_wait(
 		    XFS_QI_DQCHUNKLEN(dqp->q_mount),
 		    INCORE_TRYLOCK);
 	if (bp != NULL) {
-		if (bp->b_flags & B_DELWRI) {
+		if (XFS_BUF_ISDELAYWRITE(bp)) {
 			if (bp->b_pincount > 0) {
 				xfs_log_force(dqp->q_mount,
 					      (xfs_lsn_t)0,

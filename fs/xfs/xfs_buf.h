@@ -13,6 +13,54 @@
 typedef struct buf xfs_buf_t;
 #define xfs_buf buf
 
+
+#define XFS_BFLAGS(x)            ((x)->b_flags)  /* debugging routines might need this */
+#define XFS_BUF_STALE(x)	     ((x)->b_flags |= B_STALE)
+#define XFS_BUF_UNSTALE(x)	     ((x)->b_flags &= ~B_STALE)
+#define XFS_BUF_ISSTALE(x)	     ((x)->b_flags & B_STALE)
+#define XFS_BUF_SUPER_STALE(x)   (x)->b_flags |= B_STALE;\
+                                 (x)->b_flags &= ~(B_DELWRI|B_DONE)
+
+#define XFS_BUF_DELAYWRITE(x)	     ((x)->b_flags |= B_DELWRI)
+#define XFS_BUF_UNDELAYWRITE(x)	 ((x)->b_flags &= ~B_DELWRI)
+#define XFS_BUF_ISDELAYWRITE(x)	 ((x)->b_flags & B_DELWRI)
+
+
+#define XFS_BUF_ERROR(x,no)      bioerror(x,no)
+#define XFS_BUF_GETERROR(x)      geterror(x);
+#define XFS_BUF_ISERROR(x)       ((x)->b_flags & B_ERROR)
+
+#define XFS_BUF_DONE(x)          ((x)->b_flags |= B_DONE)
+#define XFS_BUF_UNDONE(x)    	 ((x)->b_flags &= ~B_DONE)
+#define XFS_BUF_ISDONE(x)	     ((x)->b_flags & B_DONE)
+
+#define XFS_BUF_BUSY(x)          ((x)->b_flags |= B_BUSY)
+#define XFS_BUF_UNBUSY(x)    	 ((x)->b_flags &= ~B_BUSY)
+#define XFS_BUF_ISBUSY(x)	     ((x)->b_flags & B_BUSY)
+
+#define XFS_BUF_ASYNC(x)         ((x)->b_flags |= B_ASYNC)
+#define XFS_BUF_UNASYNC(x)     	 ((x)->b_flags &= ~B_ASYNC)
+#define XFS_BUF_ISASYNC(x)       ((x)->b_flags & B_ASYNC)
+
+#define XFS_BUF_SHUT(x)         ((x)->b_flags |= B_XFS_SHUT)
+#define XFS_BUF_UNSHUT(x)     	 ((x)->b_flags &= ~B_XFS_SHUT)
+#define XFS_BUF_ISSHUT(x)       ((x)->b_flags & B_XFS_SHUT)
+
+#define XFS_BUF_HOLD(x)         ((x)->b_flags |= B_HOLD)
+#define XFS_BUF_UNHOLD(x)       ((x)->b_flags &= ~B_HOLD)
+#define XFS_BUF_ISHOLD(x)       ((x)->b_flags & B_HOLD)
+/* this may go away... calling iostart will define read or write */
+/* used for irix at the moment not needed for linux? */
+#define XFS_BUF_READ(x)         ((x)->b_flags |= B_READ)
+#define XFS_BUF_UNREAD(x)       ((x)->b_flags &= ~B_READ)
+#define XFS_BUF_ISREAD(x)       ((x)->b_flags & B_READ)
+
+#define XFS_BUF_WRITE(x)         ((x)->b_flags |= B_WRITE)
+#define XFS_BUF_UNWRITE(x)       ((x)->b_flags &= ~B_WRITE)
+#define XFS_BUF_ISWRITE(x)       ((x)->b_flags & B_WRITE)
+
+#define XFS_BUF_ISUNINITIAL(x)  ((x)->b_flags & B_UNINITIAL)
+
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->b_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
 			if ((buf)->b_iodone == NULL) { \
