@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.28 $"
+#ident  "$Revision: 1.29 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -458,6 +458,13 @@ xfs_vfsmount(vfs_t		*vfsp,
 		 */
 		xlv_tab_subvol_t *xlv_p;
 		xlv_tab_subvol_t *sv_p;
+
+		/*
+		 * XXX This XLV section should be moved to a xlv function
+		 * that can be stub'ed when xlv does not exist.
+		 */
+		if (xlv_tab == NULL)
+			return XFS_ERROR(ENXIO);
 
 		XLV_IO_LOCK(minor(device), MR_ACCESS);
 		xlv_p = &xlv_tab->subvolume[minor(device)];
