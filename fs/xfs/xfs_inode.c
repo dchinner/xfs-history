@@ -910,7 +910,7 @@ xfs_iunlink(
 	daddr_t		agdaddr;
 	xfs_agino_t	agino;
 	short		bucket_index;
-	short		offset;
+	int		offset;
 	
 	ASSERT(ip->i_d.di_nlink == 0);
 	ASSERT(ip->i_transp == tp);
@@ -987,7 +987,7 @@ xfs_iunlink_remove(
 	buf_t		*last_ibp;
 	xfs_dinode_t	*last_dip;
 	short		bucket_index;
-	short		offset;
+	int		offset;
 
 	/*
 	 * First pull the on-disk inode from the AGI unlinked list.
