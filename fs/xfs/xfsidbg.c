@@ -7167,7 +7167,7 @@ xfsidbg_xperag(xfs_mount_t *mp)
 
 #ifdef CONFIG_XFS_QUOTA
 static void
-xfsidbg_xqm()
+xfsidbg_xqm(void)
 {
 	if (xfs_Gqm == NULL) {
 		kdb_printf("NULL XQM!!\n");
