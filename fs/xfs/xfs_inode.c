@@ -26,13 +26,14 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_buf_item.h"
+#include "xfs_bio.h"
 
 #ifdef SIM
 #include "sim.h"
 #include "bstring.h"
 #include <stdio.h>
 #endif
-
 
 
 
@@ -46,7 +47,8 @@
  * to the on-disk inode within that buffer.  The in-core inode
  * pointed to by the ip parameter contains the inode number to
  * retrieve, and we fill in the fields of the inode related to
- * xfs_imap() since we have that information here.
+ * xfs_imap() since we have that information here if they are
+ * not already filled in.
  *
  * Use xfs_imap() to determine the size and location of the
  * buffer to read from disk.
@@ -82,11 +84,13 @@ xfs_itobp(xfs_mount_t	*mp,
 	}
 
 	/*
-	 * Fill in some of the fields of ip.
+	 * Fill in some of the fields of ip if they're not already set.
 	 */
-	ip->i_dev = dev;
-	ip->i_bno = imap.im_agblkno;
-	ip->i_index = imap.im_ioffset;
+	if (ip->i_dev == 0) {
+		ip->i_dev = dev;
+		ip->i_bno = imap.im_agblkno;
+		ip->i_index = imap.im_ioffset;
+	}
 
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.
@@ -341,6 +345,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 #endif
 	uint		flags;
 	error_status_t	status;
+	__int32_t	curr_time;
 
 	/*
 	 * Call the space management code to allocate
@@ -368,11 +373,12 @@ xfs_ialloc(xfs_trans_t	*tp,
 	ip->i_d.di_gid = (__uint16_t)cr->cr_gid;
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
-	ip->i_d.di_atime = time;
-	ip->i_d.di_mtime = time;
-	ip->i_d.di_ctime = time;
+	curr_time = (__int32_t)time;
+	ip->i_d.di_atime.t_sec = curr_time;
+	ip->i_d.di_mtime.t_sec = curr_time;
+	ip->i_d.di_ctime.t_sec = curr_time;
 	uuid_create(&ip->i_d.di_uuid, &status);
-	flags = XFS_ILOG_META;
+	flags = XFS_ILOG_CORE;
 	switch (mode & IFMT) {
 	case IFIFO:
 	case IFCHR:
@@ -698,19 +704,223 @@ xfs_idestroy(xfs_inode_t *ip)
 }
 
 
+/*
+ * Increment the pin count of the given buffer.
+ * This value is protected by ipinlock spinlock in the mount structure.
+ */
 void
 xfs_ipin(xfs_inode_t *ip)
 {
+	int		s;
+	xfs_mount_t	*mp;
+
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
+
+	mp = ip->i_mount;
+	s = splockspl(mp->m_ipinlock, splhi);
+	ip->i_pincount++;
+	spunlockspl(mp->m_ipinlock, s);	
 	return;
 }
+
+/*
+ * Decrement the pin count of the given inode, and wake up
+ * anyone in xfs_iwait_unpin() if the count goes to 0.  The
+ * inode must have been previoulsy pinned with a call to xfs_ipin().
+ */
 void
 xfs_iunpin(xfs_inode_t *ip)
 {
+	int		s;
+	xfs_mount_t	*mp;
+
+	ASSERT(ip->i_pincount > 0);
+
+	mp = ip->i_mount;
+	s = splockspl(mp->m_ipinlock, splhi);
+	ip->i_pincount--;
+	if (ip->i_pincount == 0) {
+		while (cvsema(&(ip->i_pinsema)) != 0) {
+			;
+		}
+	}
+	spunlockspl(mp->m_ipinlock, s);
 	return;
 }
+
+/*
+ * This is called to wait for the given inode to be unpinned.
+ * It will sleep until this happens.  The caller must have the
+ * inode locked in at least shared mode so that the buffer cannot
+ * be subsequently pinned once someone is waiting for it to be
+ * unpinned.
+ *
+ * The ipinlock in the mount structure is used to guard the pincount
+ * values of all inodes in a file system.  The i_pinsema is used to
+ * sleep until the inode is unpinned.
+ */
 void
-xfs_iflush(xfs_inode_t *ip)
+xfs_iunpin_wait(xfs_inode_t *ip)
 {
+	int		s;
+	xfs_mount_t	*mp;
+
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE | MR_ACCESS));
+
+	if (ip->i_pincount == 0) {
+		return;
+	}
+
+	mp = ip->i_mount;
+	s = splockspl(mp->m_ipinlock, splhi);
+	if (ip->i_pincount == 0) {
+		spunlockspl(mp->m_ipinlock, s);
+		return;
+	}
+	spunlockspl_psema(mp->m_ipinlock, s, &(ip->i_pinsema), PINOD);
+	return;
+}
+
+
+/*
+ * xfs_iflush() will write a modified inode's changes out to the
+ * inode's on disk home.  The caller must have the inode lock held
+ * in at least shared mode and the inode flush semaphore must be
+ * held as well.  The inode lock will still be held upon return from
+ * the call and the caller is free to unlock it.
+ * The inode flush lock will be unlocked when the inode reaches the disk.
+ * The flags can be one of B_ASYNC, B_DELWRI, or 0.
+ * These indicate the way in which the inode's buffer should be
+ * written out (0 indicating a synchronous write).
+ */
+void
+xfs_iflush(xfs_inode_t *ip, uint flags)
+{
+	xfs_inode_log_item_t	*iip;
+	buf_t			*bp;
+	xfs_dinode_t		*dip;
+	int			s;
+
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
+	ASSERT(valusema(&ip->i_flock) <= 0);
+
+	iip = &ip->i_item;
+
+	/*
+	 * We can't flush the inode until it is unpinned, so
+	 * wait for it.  We know noone new can pin it, because
+	 * we are holding the inode lock shared and you need
+	 * to hold it exclusively to pin the inode.
+	 */
+	xfs_iunpin_wait(ip);
+
+	/*
+	 * Get the buffer containing the on-disk inode.
+	 */
+	bp = xfs_itobp(ip->i_mount, NULL, ip, &dip);
+
+	/*
+	 * Clear i_update_core before copying out the data.
+	 * This is for coordination with our timestamp updates
+	 * that don't hold the inode lock. They will always
+	 * update the timestamps BEFORE setting i_update_core,
+	 * so if we clear i_update_core after they set it we
+	 * are guaranteed to see their updates to the timestamps.
+	 * I believe that this depends on strongly ordered memory
+	 * semantics, but we have that.
+	 */
+	ip->i_update_core = 0;
+
+	/*
+	 * Copy the dirty parts of the inode into the on-disk
+	 * inode.  We always copy out the core of the inode,
+	 * because if the inode is dirty at all the core must
+	 * be.
+	 */
+	bcopy(&(ip->i_d), &(dip->di_core), sizeof(xfs_dinode_core_t));
+
+	/*
+	 * Each of the following cases stores data into the same region
+	 * of the on-disk inode, so only one of them can be valid at
+	 * any given time. While it is possible to have conflicting formats
+	 * and log flags, e.g. having XFS_ILOG_DATA set when the inode is
+	 * in EXTENTS format, this can only happen when the inode has
+	 * changed formats after being modified but before being flushed.
+	 * In these cases, the format always takes precedence, because the
+	 * format indicates the current state of the inode.
+	 */
+	switch (ip->i_d.di_format) {
+	case XFS_DINODE_FMT_LOCAL:
+		if ((iip->ili_fields & XFS_ILOG_DATA) && (ip->i_bytes > 0)) {
+			ASSERT(ip->i_u1.iu_data != NULL);
+			bcopy(ip->i_u1.iu_data, dip->di_u.di_c, ip->i_bytes);
+		}
+		break;
+	case XFS_DINODE_FMT_EXTENTS:
+		ASSERT(ip->i_flags & XFS_IEXTENTS);
+		ASSERT((ip->i_u1.iu_extents != NULL) || (ip->i_bytes == 0));
+		ASSERT((ip->i_u1.iu_extents == NULL) || (ip->i_bytes > 0));
+		if ((iip->ili_fields & XFS_ILOG_EXT) && (ip->i_bytes > 0)) {
+			bcopy(ip->i_u1.iu_extents, dip->di_u.di_bmx,
+			      ip->i_bytes);
+		}
+		break;
+	case XFS_DINODE_FMT_BTREE:
+		if ((iip->ili_fields & XFS_ILOG_BROOT) &&
+		    (ip->i_broot_bytes > 0)) {
+			ASSERT(ip->i_broot != NULL);
+			bcopy(ip->i_broot, &(dip->di_u.di_bmbt),
+			      ip->i_broot_bytes);
+		}
+		break;
+	case XFS_DINODE_FMT_DEV:
+		if (iip->ili_fields & XFS_ILOG_DEV) {
+			dip->di_u.di_dev = ip->i_u2.iu_rdev;
+		}
+		break;
+	default:
+		ASSERT(0);
+		break;
+	}
+
+	/*
+	 * If ili_fields is set, then set ili_ref so that xfs_iflush_done()
+	 * will know to drop the reference taken on the inode in
+	 * xfs_trans_log_inode().  The ili_ref field is guared by
+	 * the inode's i_flock.  Then we're done looking at
+	 * ili_fields, so clear it.  We can do this since the lock
+	 * must be held exclusively in order to set bits in this field.
+	 * Also, store the current LSN of the inode so that we can tell
+	 * whether the item has moved in the AIL from xfs_iflush_done().
+	 * In order to read the lsn we need the AIL lock, because
+	 * it is a 64 bit value that cannot be read atomically.
+	 */
+	if (iip->ili_fields != 0) {
+		iip->ili_ref = 1;
+		iip->ili_fields = 0;
+	}
+	ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't need lock if it shrinks */
+	s = AIL_LOCK(ip->i_mount);
+	iip->ili_flush_lsn = iip->ili_item.li_lsn;
+	AIL_UNLOCK(ip->i_mount, s);
+
+	/*
+	 * Attach the function xfs_iflush_done to the inode's
+	 * buffer.  This will remove the inode from the AIL
+	 * and unlock the inode's flush lock when the inode is
+	 * completely written to disk.
+	 */
+	xfs_buf_attach_iodone(bp, (void(*)(buf_t*,xfs_log_item_t*))
+			      xfs_iflush_done, (xfs_log_item_t *)iip);
+
+	if (flags & B_DELWRI) {
+		xfs_bdwrite(bp);
+	} else if (flags & B_ASYNC) {
+		xfs_bawrite(bp);
+	} else {
+		xfs_bwrite(bp);
+	}
+
 	return;
 }
 
