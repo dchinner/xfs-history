@@ -214,6 +214,21 @@ again:
 					vp = preallocated_vnode;
 
 					xfs_iget_vnode_init(mp, vp, ip);
+
+					vn_trace_exit(vp, "xfs_iget.alloc",
+						(inst_t *)__return_address);
+
+					bhv_desc_init(&(ip->i_bhv_desc), ip, vp,
+								&xfs_vnodeops);
+					vn_bhv_insert_initial(VN_BHV_HEAD(vp),
+								&(ip->i_bhv_desc));
+
+					XFS_STATS_INC(xfsstats.xs_ig_found);
+
+					mrunlock(&ih->ih_lock);
+
+					goto finish_inode;
+
 				} else {
 					mrunlock(&ih->ih_lock);
 					vp = vn_alloc(XFS_MTOVFS(mp), ino,
@@ -225,20 +240,6 @@ again:
 					vn_alloc_used = 1;
 					goto again;
 				}
-
-				vn_trace_exit(vp, "xfs_iget.alloc",
-					(inst_t *)__return_address);
-
-				bhv_desc_init(&(ip->i_bhv_desc), ip, vp,
-							&xfs_vnodeops);
-				vn_bhv_insert_initial(VN_BHV_HEAD(vp),
-							&(ip->i_bhv_desc));
-
-				XFS_STATS_INC(xfsstats.xs_ig_found);
-
-				mrunlock(&ih->ih_lock);
-
-				goto finish_inode;
 
 			} else if (preallocated_vnode) {
 				if (vn_alloc_used) {
