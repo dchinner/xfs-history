@@ -1,4 +1,4 @@
-#ident "$Revision: 1.50 $"
+#ident "$Revision: 1.51 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -49,6 +49,7 @@
 #include "sim.h"
 #endif
 
+zone_t	*xfs_ili_zone;		/* inode log item zone */
 
 /*
  * This returns the number of iovecs needed to log the given inode item.
@@ -528,11 +529,13 @@ xfs_inode_item_unlock(
 	uint		lock_flags;
 	xfs_inode_t	*ip;
 
+	ASSERT(iip != NULL);
+	ASSERT(iip->ili_inode->i_itemp != NULL);
 	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), MR_UPDATE));
-	ASSERT((!(iip->ili_inode->i_item.ili_flags &
+	ASSERT((!(iip->ili_inode->i_itemp->ili_flags &
 		  XFS_ILI_IOLOCKED_EXCL)) ||
 	       ismrlocked(&(iip->ili_inode->i_iolock), MR_UPDATE));
-	ASSERT((!(iip->ili_inode->i_item.ili_flags &
+	ASSERT((!(iip->ili_inode->i_itemp->ili_flags &
 		  XFS_ILI_IOLOCKED_SHARED)) ||
 	       ismrlocked(&(iip->ili_inode->i_iolock), MR_ACCESS));
 	/*
@@ -714,7 +717,8 @@ xfs_inode_item_init(
 {
 	xfs_inode_log_item_t	*iip;
 
-	iip = &ip->i_item;
+	ASSERT(ip->i_itemp == NULL);
+	iip = ip->i_itemp = kmem_zone_zalloc(xfs_ili_zone, KM_SLEEP);
 
 	iip->ili_item.li_type = XFS_LI_INODE;
 	iip->ili_item.li_ops = &xfs_inode_item_ops;

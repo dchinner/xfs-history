@@ -1,4 +1,4 @@
-#ident "$Revision: 1.199 $"
+#ident "$Revision: 1.200 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5173,8 +5173,9 @@ xfs_reclaim(
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			return XFS_ERROR(EAGAIN);
 		}
-		if ((ip->i_item.ili_format.ilf_fields != 0) ||
-		    (ip->i_item.ili_last_fields != 0)) {
+		if ((ip->i_itemp != NULL) &&
+		    ((ip->i_itemp->ili_format.ilf_fields != 0) ||
+		     (ip->i_itemp->ili_last_fields != 0))) {
 			(void) xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			return XFS_ERROR(EAGAIN);
@@ -5230,7 +5231,9 @@ xfs_reclaim(
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		xfs_iflock(ip);
 	}
-	if (ip->i_update_core || (ip->i_item.ili_format.ilf_fields != 0)) {
+	if (ip->i_update_core ||
+	    ((ip->i_itemp != NULL) &&
+	     (ip->i_itemp->ili_format.ilf_fields != 0))) {
 		error = xfs_iflush(ip, XFS_IFLUSH_DELWRI_ELSE_SYNC);
 		if (error) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -5239,7 +5242,7 @@ xfs_reclaim(
 	}
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	ASSERT(ip->i_update_core == 0);
-	ASSERT(ip->i_item.ili_format.ilf_fields == 0);
+	ASSERT(ip->i_itemp == NULL || ip->i_itemp->ili_format.ilf_fields == 0);
 	ASSERT(!VN_DIRTY(vp) && (ip->i_queued_bufs == 0));
 	xfs_ireclaim(ip);
 	return 0;

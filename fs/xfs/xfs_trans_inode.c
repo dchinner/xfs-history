@@ -102,22 +102,23 @@ xfs_trans_iget(
 		 * that the io lock is never upgraded when the inode
 		 * is already a part of the transaction.
 		 */
+		ASSERT(ip->i_itemp != NULL);
 		ASSERT(lock_flags & XFS_ILOCK_EXCL);
 		ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 		ASSERT((!(lock_flags & XFS_IOLOCK_EXCL)) ||
 		       ismrlocked(&ip->i_iolock, MR_UPDATE));
 		ASSERT((!(lock_flags & XFS_IOLOCK_EXCL)) ||
-		       (ip->i_item.ili_flags & XFS_ILI_IOLOCKED_EXCL));
+		       (ip->i_itemp->ili_flags & XFS_ILI_IOLOCKED_EXCL));
 		ASSERT((!(lock_flags & XFS_IOLOCK_SHARED)) ||
 		       ismrlocked(&ip->i_iolock, (MR_UPDATE | MR_ACCESS)));
 		ASSERT((!(lock_flags & XFS_IOLOCK_SHARED)) ||
-		       (ip->i_item.ili_flags & XFS_ILI_IOLOCKED_ANY));
+		       (ip->i_itemp->ili_flags & XFS_ILI_IOLOCKED_ANY));
 
 		if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
-			ip->i_item.ili_iolock_recur++;
+			ip->i_itemp->ili_iolock_recur++;
 		}
 		if (lock_flags & XFS_ILOCK_EXCL) {
-			ip->i_item.ili_ilock_recur++;
+			ip->i_itemp->ili_ilock_recur++;
 		}
 		*ipp = ip;
 		return 0;
@@ -133,18 +134,20 @@ xfs_trans_iget(
 	/*
 	 * Get a log_item_desc to point at the new item.
 	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)&(ip->i_item));
+	if (ip->i_itemp == NULL)
+		xfs_inode_item_init(ip, mp);
+	(void) xfs_trans_add_item(tp, (xfs_log_item_t *)(ip->i_itemp));
 
 	/*
 	 * If the IO lock has been acquired, mark that in
 	 * the inode log item so we'll know to unlock it
 	 * when the transaction commits.
 	 */
-	ASSERT(ip->i_item.ili_flags == 0);
+	ASSERT(ip->i_itemp->ili_flags == 0);
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		ip->i_item.ili_flags |= XFS_ILI_IOLOCKED_EXCL;
+		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_EXCL;
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		ip->i_item.ili_flags |= XFS_ILI_IOLOCKED_SHARED;
+		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_SHARED;
 	}
 
 	/*
@@ -184,7 +187,8 @@ xfs_trans_iput(
 	}
 
 	ASSERT(ip->i_transp == tp);
-	iip = &ip->i_item;	
+	iip = ip->i_itemp;	
+	ASSERT(iip != NULL);
 
 	/*
 	 * Find the item descriptor pointing to this inode's
@@ -272,22 +276,24 @@ xfs_trans_ijoin(
 	ASSERT(ip->i_transp == NULL);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 	ASSERT(lock_flags & XFS_ILOCK_EXCL);
-	ASSERT(ip->i_item.ili_flags == 0);
-	ASSERT(ip->i_item.ili_ilock_recur == 0);
-	ASSERT(ip->i_item.ili_iolock_recur == 0);
+	if (ip->i_itemp == NULL)
+		xfs_inode_item_init(ip, ip->i_mount);
+	ASSERT(ip->i_itemp->ili_flags == 0);
+	ASSERT(ip->i_itemp->ili_ilock_recur == 0);
+	ASSERT(ip->i_itemp->ili_iolock_recur == 0);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
 	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)&(ip->i_item));
+	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)(ip->i_itemp));
 
 	/*
 	 * If the IO lock is already held, mark that in the inode log item.
 	 */
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		ip->i_item.ili_flags |= XFS_ILI_IOLOCKED_EXCL;
+		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_EXCL;
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		ip->i_item.ili_flags |= XFS_ILI_IOLOCKED_SHARED;
+		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_SHARED;
 	}
 
 	/*
@@ -311,9 +317,10 @@ xfs_trans_ihold(
 	xfs_inode_t	*ip)
 {
 	ASSERT(ip->i_transp == tp);
+	ASSERT(ip->i_itemp != NULL);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 
-	ip->i_item.ili_flags |= XFS_ILI_HOLD;
+	ip->i_itemp->ili_flags |= XFS_ILI_HOLD;
 }
 
 /*
@@ -327,10 +334,11 @@ xfs_trans_ihold_release(
 	xfs_inode_t	*ip)
 {
 	ASSERT(ip->i_transp == tp);
+	ASSERT(ip->i_itemp != NULL);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
-	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
+	ASSERT(ip->i_itemp->ili_flags & XFS_ILI_HOLD);
 
-	ip->i_item.ili_flags &= ~XFS_ILI_HOLD;
+	ip->i_itemp->ili_flags &= ~XFS_ILI_HOLD;
 }
 
 
@@ -352,9 +360,10 @@ xfs_trans_log_inode(
 	xfs_log_item_desc_t	*lidp;
 
 	ASSERT(ip->i_transp == tp);
+	ASSERT(ip->i_itemp != NULL);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 
-	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)&(ip->i_item));
+	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)(ip->i_itemp));
 	ASSERT(lidp != NULL);
 
 	tp->t_flags |= XFS_TRANS_DIRTY;
@@ -367,7 +376,7 @@ xfs_trans_log_inode(
 	 * See the big comment in xfs_iflush() for an explanation of
 	 * this coorination mechanism.
 	 */
-	flags |= ip->i_item.ili_last_fields;
-	ip->i_item.ili_format.ilf_fields |= flags;
+	flags |= ip->i_itemp->ili_last_fields;
+	ip->i_itemp->ili_format.ilf_fields |= flags;
 }
 
