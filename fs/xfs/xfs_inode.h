@@ -124,6 +124,12 @@ typedef struct xfs_inode {
  */
 #define	XFS_MAX_INCORE_EXTENTS	32768
 
+/*
+ * Maximum file size.
+ * 2^32 -1 for now.
+ */
+#define XFS_MAX_FILE_OFFSET	0x7fffffff
+
 #define	XFS_ITOV(ip)	((vnode_t*)((ip)->i_vnode))
 #define	XFS_VTOI(vp)	((xfs_inode_t*)((vp)->v_data))
 
@@ -131,6 +137,11 @@ typedef struct xfs_inode {
  * Value for inode buffers' b_ref field.
  */
 #define XFS_INOREF	1
+
+/*
+ * Log reservation value required by xfs_itruncate().
+ */
+#define	XFS_ITRUNCATE_LOG_RES	BBTOB(128)
 
 
 /*
