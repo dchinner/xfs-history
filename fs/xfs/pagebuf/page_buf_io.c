@@ -357,7 +357,7 @@ _pb_direct_io(
 
 	pb_size = min(pb_size, max_io);
 
-	pb_flags = (rdwr ? PBF_WRITE : PBF_READ) | PBF_FORCEIO;
+	pb_flags = (rdwr ? PBF_WRITE : PBF_READ) | PBF_FORCEIO | _PBF_LOCKABLE;
 
 	pb = pagebuf_lookup(inode, rounded_offset, pb_size, pb_flags);
 	if (!pb) {
@@ -372,6 +372,7 @@ _pb_direct_io(
 	/* Do our own allocation to avoid the buffer_head overhead */
 	kp = kmalloc(sizeof(struct kiobuf), SLAB_KERNEL);
 	if (!kp) {
+		pb->pb_flags &= ~_PBF_LOCKABLE;
 		pagebuf_rele(pb);
 		rdp->io_error = -ENOMEM;
 		return 0;
@@ -386,6 +387,7 @@ _pb_direct_io(
 	rval = map_user_kiobuf(rdwr ? WRITE : READ,
 			kp, (unsigned long) user_addr, pb_size);
 	if (rval == 0) {
+		pagebuf_hold(pb);
 		pb->pb_pages = kp->maplist;
 		pb->pb_page_count = kp->nr_pages;
 		pb->pb_offset = kp->offset;
@@ -405,6 +407,7 @@ _pb_direct_io(
 		}
 	}
 
+	pb->pb_flags &= ~_PBF_LOCKABLE;
 	pagebuf_rele(pb);
 
 	return rval ? 0 : pb_size;
@@ -1231,18 +1234,18 @@ pagebuf_generic_file_write(
 		if (&inode->i_data != inode->i_mapping)
 			BUG();
 
-		/*
-		 * Bring in the user page that we will copy from _first_.
-		 * Otherwise there's a nasty deadlock on copying from the
-		 * same page as we're writing to, without it being marked
-		 * up-to-date.
-		 */
-		{ volatile unsigned char dummy;
-			__get_user(dummy, buf);
-			__get_user(dummy, buf+bytes-1);
-		}
-
 		if (!direct) {
+			/*
+			 * Bring in the user page that we will copy from
+			 * _first_. Otherwise there's a nasty deadlock on
+			 * copying from the same page as we're writing to,
+			 * without it being marked up-to-date.
+			 */
+			{ volatile unsigned char dummy;
+				__get_user(dummy, buf);
+				__get_user(dummy, buf+bytes-1);
+			}
+
 			page = find_lock_page(&inode->i_data, index);
 		} else {
 			page = NULL;
