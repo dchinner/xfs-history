@@ -862,6 +862,16 @@ xfs_iflush(xfs_inode_t	*ip,
 	iip = &ip->i_item;
 
 	/*
+	 * If the inode isn't dirty, then just release the inode
+	 * flush lock and do nothing.
+	 */
+	if ((ip->i_update_core == 0) &&
+	    !(iip->ili_format.ilf_fields & XFS_ILOG_ALL)) {
+		xfs_ifunlock(ip);
+		return;
+	}
+
+	/*
 	 * We can't flush the inode until it is unpinned, so
 	 * wait for it.  We know noone new can pin it, because
 	 * we are holding the inode lock shared and you need
@@ -962,9 +972,9 @@ xfs_iflush(xfs_inode_t	*ip,
 	}
 
 	/*
-	 * If ili_fields is set, then set ili_ref so that xfs_iflush_done()
+	 * If ili_fields is set, then set ili_logged so that xfs_iflush_done()
 	 * will know to drop the reference taken on the inode in
-	 * xfs_trans_log_inode().  The ili_ref field is guarded by
+	 * xfs_trans_log_inode().  The ili_logged field is guarded by
 	 * the inode's i_flock.  Then we're done looking at
 	 * ili_fields, so clear it.  We can do this since the lock
 	 * must be held exclusively in order to set bits in this field.
@@ -974,7 +984,7 @@ xfs_iflush(xfs_inode_t	*ip,
 	 * it is a 64 bit value that cannot be read atomically.
 	 */
 	if (iip->ili_format.ilf_fields != 0) {
-		iip->ili_ref = 1;
+		iip->ili_logged = 1;
 		iip->ili_format.ilf_fields = 0;
 	}
 	ASSERT(sizeof(xfs_lsn_t) == 8);	/* don't need lock if it shrinks */
