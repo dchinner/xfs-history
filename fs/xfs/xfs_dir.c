@@ -1069,9 +1069,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 		ASSERT(bcmp((char *)&inum, namest->inumber, sizeof(inum)));
 		bcopy((char *)&inum, namest->inumber, sizeof(inum));
 		xfs_trans_log_buf(trans, bp,
-			(char *)namest->inumber - (char *)leaf,
-			(char *)namest->inumber - (char *)leaf +
-			sizeof(namest->inumber) - 1);
+		     XFS_DIR_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		retval = 0;
 	} else
 		xfs_trans_brelse(trans, bp);
@@ -1301,6 +1299,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			btree = &node->btree[0];
 			bno = btree->before;
 			xfs_trans_brelse(trans, bp);
+			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, 0);
 		}
 	} else {
 		bno = XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
@@ -1384,9 +1383,7 @@ xfs_dir_node_replace(xfs_trans_t *trans, struct xfs_dir_name *args)
 		ASSERT(bcmp((char *)&inum, namest->inumber, sizeof(inum)));
 		bcopy((char *)&inum, namest->inumber, sizeof(inum));
 		xfs_trans_log_buf(trans, bp,
-			(char *)namest->inumber - (char *)leaf,
-			(char *)namest->inumber - (char *)leaf +
-			sizeof(namest->inumber) - 1);
+		    XFS_DIR_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
 		retval = 0;
 	} else {
 		i = state->path.active - 1;
