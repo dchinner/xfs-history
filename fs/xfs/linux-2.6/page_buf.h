@@ -49,6 +49,7 @@
 #include <linux/iobuf.h>
 #include <linux/smp_lock.h>
 #include <linux/uio.h>
+#include <linux/tqueue.h>
 
 enum xfs_buffer_state { BH_Delay = BH_PrivateStart };
 BUFFER_FNS(Delay, delay);

@@ -58,6 +58,7 @@
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
+#include <linux/bio.h>
 #include <linux/swap.h>
 #include <asm/softirq.h>
 #include <linux/sysctl.h>
@@ -1541,8 +1542,7 @@ int	pb_daemons[NR_CPUS];
 STATIC int
 pagebuf_iodone_daemon(void *__bind_cpu)
 {
-	int bind_cpu = (int) (long) __bind_cpu;
-	int cpu = cpu_logical_map(bind_cpu);
+	int cpu = (int) (long) __bind_cpu;
 	DECLARE_WAITQUEUE(wait, current);
 
 	/*  Set up the thread  */
@@ -1559,7 +1559,7 @@ pagebuf_iodone_daemon(void *__bind_cpu)
 	if (smp_processor_id() != cpu)
 		BUG();
 
-	sprintf(current->comm, "pagebuf_io_CPU%d", bind_cpu);
+	sprintf(current->comm, "pagebuf_io_CPU%d", cpu);
 	INIT_LIST_HEAD(&pagebuf_iodone_tq[cpu]);
 	init_waitqueue_head(&pagebuf_iodone_wait[cpu]);
 	__set_current_state(TASK_INTERRUPTIBLE);
@@ -1788,13 +1788,15 @@ static int pagebuf_daemon_start(void)
 
 		kernel_thread(pagebuf_daemon, (void *)pb_daemon,
 				CLONE_FS|CLONE_FILES|CLONE_VM);
-		for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			if (!cpu_online(cpu))
+				continue;
 			if (kernel_thread(pagebuf_iodone_daemon,
 					(void *)(long) cpu,
 					CLONE_FS|CLONE_FILES|CLONE_VM) < 0) {
 				printk("pagebuf_daemon_start failed\n");
 			} else {
-				while (!pb_daemons[cpu_logical_map(cpu)]) {
+				while (!pb_daemons[cpu]) {
 					yield();
 				}
 			}
@@ -1817,12 +1819,14 @@ static int pagebuf_daemon_stop(void)
 		while (pb_daemon->active == 0) {
 			interruptible_sleep_on(&pbd_waitq);
 		}
-		for (cpu = 0; cpu < smp_num_cpus; cpu++) {
-			pb_daemons[cpu_logical_map(cpu)] = 0;
-			wake_up(&pagebuf_iodone_wait[cpu_logical_map(cpu)]);
-			while (pb_daemons[cpu_logical_map(cpu)] != -1) {
+		for (cpu = 0; cpu < NR_CPUS; cpu++) {
+			if (!cpu_online(cpu))
+				continue;
+			pb_daemons[cpu] = 0;
+			wake_up(&pagebuf_iodone_wait[cpu]);
+			while (pb_daemons[cpu] != -1) {
 				interruptible_sleep_on(
-					&pagebuf_iodone_wait[cpu_logical_map(cpu)]);
+					&pagebuf_iodone_wait[cpu]);
 			}
 		}
 
