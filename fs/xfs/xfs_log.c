@@ -10,7 +10,6 @@
 #endif
 
 #include <sys/sysmacros.h>
-#include <sys/systm.h>
 #include <sys/buf.h>
 
 #ifdef SIM
@@ -19,6 +18,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#else
+#include <sys/systm.h>
 #endif
 
 #include <sys/kmem.h>
@@ -1232,22 +1233,6 @@ log_end(struct xfs_mount *mp, dev_t log_dev)
 #endif
 
 
-#ifdef _KERNEL
-void
-log_verify_dest_ptr(log_t *log,
-		    psint ptr)
-{
-}
-
-
-void
-log_verify_iclog(log_t		*log,
-		 log_in_core_t	*iclog,
-		 int		count)
-{
-}
-
-#else
 /******************************************************************************
  *
  *		Log debug routines
@@ -1345,6 +1330,7 @@ log_verify_iclog(log_t		*log,
 	if (len != 0)
 		log_panic("log_verify_iclog: illegal iclog");
 
+#ifndef _KERNEL
 	/* check wrapping log */
 	if (BLOCK_LSN(iclog->ic_header.h_lsn) < 5) {
 		cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn);
@@ -1360,9 +1346,11 @@ log_verify_iclog(log_t		*log,
 				log_panic("log_verify_iclog: bad cycle no");
 		}
 	}
+#endif
 }	/* log_verify_iclog */
 
 
+#ifndef _KERNEL
 /******************************************************************************
  *
  *		Log print routines
