@@ -1,4 +1,4 @@
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -236,10 +236,11 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 		/* Out of line attribute, cannot double split, but make
 		 * room for the attribute value itself.
 		 */
-		size =  XFS_B_TO_FSB(mp, size);
+		nblks += XFS_B_TO_FSB(mp, size);
 		nblks += XFS_NEXTENTADD_SPACE_RES(mp, size, XFS_ATTR_FORK);
 	}
 
+	/* Size is now blocks for attribute data */
 	args.total = nblks;
 
 	/*
