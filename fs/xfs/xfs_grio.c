@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.2 1994/03/09 23:54:02 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.3 1994/03/10 18:51:29 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -60,12 +60,12 @@ extern int	grio_debug;
 #define GRIO_DBPRNT(s1, s2 )
 #endif
 
-int xfs_grio_add_ticket( int, dev_t, int, int);
-int xfs_grio_remove_ticket( int, dev_t, int);
+int xfs_grio_add_ticket( int, dev_t, int, char *);
+int xfs_grio_remove_ticket( int, dev_t, char *);
 xfs_inode_t *xfs_get_inode ( dev_t, int);
-int xfs_add_ticket_to_inode( xfs_inode_t *, int, int);
-void xfs_remove_ticket_from_inode( xfs_inode_t *, int);
-grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, int);
+int xfs_add_ticket_to_inode( xfs_inode_t *, int, struct reservation_id *);
+void xfs_remove_ticket_from_inode( xfs_inode_t *, struct reservation_id *);
+grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *);
 STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
 
 void ticket_lock_shared( xfs_inode_t *);
@@ -122,7 +122,7 @@ xfs_get_inode(  dev_t fs_dev, int ino)
  *
  */
 int
-xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, int id )
+xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 {
 	grio_ticket_t *ticket;
 	int 	ret = 0;
@@ -135,7 +135,8 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, int id )
 	} else {
 		if (ticket = kmem_zalloc( sizeof( grio_ticket_t), KM_SLEEP)) {
 			ticket->sz = sz;
-			ticket->id = id;
+			ticket->id.ino = id->ino;
+			ticket->id.pid = id->pid;
 			ticket->lastreq = 0;
 			if (ip->i_ticket) 
 				ticket->nextticket = ip->i_ticket;
@@ -161,25 +162,40 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, int id )
  *	-1 on failure
  */
 int
-xfs_grio_add_ticket( int ino, dev_t fs_dev, int sz, int id)
+xfs_grio_add_ticket( int ino, dev_t fs_dev, int sz, char *idptr)
 {
 	int ret = -1;
 	xfs_inode_t *ip;
+	struct reservation_id id;
+
+
+	if (copyin(idptr, (caddr_t)&id, sizeof(id))) {
+#ifdef DEBUG
+		printf("COULD NOT GET ID \n");
+#endif
+		ret = EFAULT;
+		return( ret );
+	}
 
 #ifdef DEBUG
-        char    str[80];
+	{
+		int t1,t2;
+       		char    str[80];
 
-        sprintf(str,"grio add tkt: dev %x, ino %x, sz %x, id %x\n",
-                        fs_dev, ino, sz, id);
-        GRIO_DBPRNT(0, str);
+		t1 = id.ino;
+		t2 = id.pid;
+
+        	sprintf(str,"grio add tkt: dev %x, ino %x, sz %x, id (%x,%x)\n",
+                     fs_dev, ino, sz, t1, t2);
+        	GRIO_DBPRNT(0, str);
+	}
 #endif
-
         /*
          * Lock the inode IOLOCK_EXCL so that the i_ticket
          * list in the inode can be safely updated.
          */
         if (ip = xfs_get_inode( fs_dev, ino )) {
-		ret = xfs_add_ticket_to_inode( ip, sz, id );
+		ret = xfs_add_ticket_to_inode( ip, sz, &id );
 		xfs_iunlock( ip, XFS_ILOCK_EXCL );
         }
 #ifdef DEBUG
@@ -206,16 +222,16 @@ xfs_grio_add_ticket( int ino, dev_t fs_dev, int sz, int id)
  *      none
  */
 void
-xfs_remove_ticket_from_inode( xfs_inode_t *ip, int id)
+xfs_remove_ticket_from_inode( xfs_inode_t *ip, struct reservation_id *id)
 {
 	grio_ticket_t *ticket, *previousticket;
 
 	ticket_lock_exclusive( ip );
 	if (ticket = ip->i_ticket) {
-		if (ticket->id == id) {
+		if (MATCH_ID((&(ticket->id)), id)) {
 			ip->i_ticket = ticket->nextticket;
 		} else {
-			while ((ticket) && (ticket->id != id)) {
+			while (ticket && (!(MATCH_ID((&(ticket->id)), id)))) {
 				previousticket = ticket;
 				ticket = ticket->nextticket;
 			}
@@ -241,19 +257,34 @@ xfs_remove_ticket_from_inode( xfs_inode_t *ip, int id)
  *	-1 on failure
  */
 int
-xfs_grio_remove_ticket( int ino, dev_t fs_dev, int id)
+xfs_grio_remove_ticket( int ino, dev_t fs_dev, char *idptr)
 {
 	xfs_inode_t *ip;
-#ifdef DEBUG
-        char str[80];
+	struct reservation_id id;
 
-        sprintf(str,"grio rm tkt: dev %x, ino %x, id %x\n",
-                        fs_dev, ino, id);
-        GRIO_DBPRNT(0, str);
+	if (copyin(idptr, (caddr_t)&id, sizeof(id))) {
+#ifdef DEBUG
+		printf("COULD NOT GET ID \n");
+#endif
+		return( EFAULT );
+	}
+
+#ifdef DEBUG
+	{
+        	char str[80];
+		int t1, t2;
+	
+		t1  = id.ino;
+		t2  = id.pid;
+
+       		sprintf(str,"grio rm tkt: dev %x, ino %x, id (%x,%x)\n",
+                        fs_dev, ino, t1, t2);
+        	GRIO_DBPRNT(0, str);
+	}
 #endif
 
 	if (ip = xfs_get_inode( fs_dev, ino)) {
-		xfs_remove_ticket_from_inode (ip, id);
+		xfs_remove_ticket_from_inode (ip, &id);
 		xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	}
 	return(0);
@@ -276,14 +307,14 @@ xfs_grio_remove_ticket( int ino, dev_t fs_dev, int id)
  *	non-zero if there is a guarantee
  */
 grio_ticket_t *
-xfs_io_is_guaranteed( xfs_inode_t *ip, int id)
+xfs_io_is_guaranteed( xfs_inode_t *ip, struct reservation_id *id)
 {
 	grio_ticket_t *ticket;
 
 	ticket_lock_shared( ip );
 	ticket = ip->i_ticket;
 
-	while (ticket && (ticket->id != id))  {
+	while (ticket && (!MATCH_ID((&(ticket->id)), id))) {
 		ticket = ticket->nextticket;
 	}
 	return(ticket);
@@ -301,7 +332,12 @@ xfs_io_is_guaranteed( xfs_inode_t *ip, int id)
  *      non-zero on error
  */
 int
-xfs_request_larger_than_guarantee(xfs_inode_t *ip, int id, uio_t *uiop, int ioflag, cred_t *credp, int rw)
+xfs_request_larger_than_guarantee(xfs_inode_t *ip, 	
+		struct reservation_id *id, 
+		uio_t *uiop, 
+		int ioflag, 
+		cred_t *credp, 
+		int rw)
 {
         int     remainingio, ret = 0;
         grio_ticket_t *ticket;
@@ -410,11 +446,11 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip, int id, uio_t *uiop, int iofl
  */
 int
 xfs_grio_req( xfs_inode_t *ip, 
-			int id, 
-			uio_t *uiop, 
-			int ioflag,
-			cred_t *credp,
-			int rw)
+	struct reservation_id *id, 
+	uio_t *uiop, 
+	int ioflag,
+	cred_t *credp,
+	int rw)
 {
 	grio_ticket_t *ticket;
 	int sz, ret = 0, remainingio;
