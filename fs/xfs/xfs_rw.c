@@ -2468,7 +2468,7 @@ xfs_check_rbp(
 
 	mp = ip->i_mount;
 	rbp_offset_fsb = XFS_BB_TO_FSB(mp, rbp->b_offset);
-	ASSERT(XFS_FSB_TO_BB(mp, rbp_offset_fsb == rbp->b_offset));
+	ASSERT(XFS_FSB_TO_BB(mp, rbp_offset_fsb) == rbp->b_offset);
 	rbp_len_fsb = XFS_B_TO_FSBT(mp, rbp->b_bcount);
 	ASSERT(XFS_FSB_TO_B(mp, rbp_len_fsb) == rbp->b_bcount);
 	nimaps = 1;
