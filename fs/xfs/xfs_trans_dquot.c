@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 #ifdef SIM
 #define _KERNEL 1
 #endif
@@ -516,7 +516,7 @@ xfs_trans_apply_dquot_deltas(
 #ifdef QUOTADEBUG
 
 			if (qtrx->qt_rtblk_res != 0)
-				xqmprf("RT res %d for 0x%x\n",
+				printf("RT res %d for 0x%x\n",
 				      (int) qtrx->qt_rtblk_res,
 				      dqp);
 #endif
@@ -567,7 +567,7 @@ xfs_trans_unreserve_and_mod_dquots(
 			 */
 			if (qtrx->qt_blk_res) {
 #ifdef QUOTADEBUG
-				xqmprf("############# TRANS_CANCEL: unresv: "
+				printf("############# TRANS_CANCEL: unresv: "
 				     "dqp 0x%x (\'%d\'), nblks = %d ##########\n", 
 				       dqp, dqp->q_core.d_id, 
 				       qtrx->qt_blk_res);
@@ -581,7 +581,7 @@ xfs_trans_unreserve_and_mod_dquots(
 			}
 			if (qtrx->qt_rtblk_res) {
 #ifdef QUOTADEBUG
-				xqmprf("############# TRANS_CANCEL: unresv: "
+				printf("############# TRANS_CANCEL: unresv: "
 				  "dqp 0x%x (\'%d\'), RT nblks = %d ##########\n", 
 				       dqp, dqp->q_core.d_id, 
 				       qtrx->qt_rtblk_res);

@@ -154,12 +154,6 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 
 extern int xfs_quotadebug;
 
-#if DEBUG 
-#define xqmprf	if (xfs_quotadebug) printf
-#else
-#define xqmprf
-#endif
-
 #define DQFLAGTO_TYPESTR(d) 	(((d)->dq_flags & XFS_DQ_USER) ? "USR" : \
 				 (((d)->dq_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
 #define DQFLAGTO_DIRTYSTR(d)	(XFS_DQ_IS_DIRTY(d) ? "DIRTY" : "NOTDIRTY")
@@ -174,9 +168,9 @@ extern int xfs_quotadebug;
 #define XQM_LIST_PRINT(l, NXT, title) \
 { \
 	  xfs_dquot_t	*dqp; int i = 0;\
-	  xqmprf("%s (#%d)\n", title, (int) (l)->qh_nelems); \
+	  printf("%s (#%d)\n", title, (int) (l)->qh_nelems); \
 	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) { \
-	    xqmprf("\t%d.\t\"%d (%s)\"\t bcnt = %d, icnt = %d refs = %d\n", \
+	    printf("\t%d.\t\"%d (%s)\"\t bcnt = %d, icnt = %d refs = %d\n", \
 			 ++i, (int) dqp->q_core.d_id, \
 		         DQFLAGTO_TYPESTR(dqp),      \
 			 (int) dqp->q_core.d_bcount, \

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -604,10 +604,10 @@ xfs_qm_dqpurge_all(
 		nrecl = mp->QI_MPLRECLAIMS;
 		xfs_qm_mplist_unlock(mp);
 		xfs_qm_dettach_pdquot(dqp);
-		if (nrecl != mp->QI_MPLRECLAIMS) {
-			xfs_qm_mplist_lock(mp);
+		xfs_qm_mplist_lock(mp);
+		if (nrecl != mp->QI_MPLRECLAIMS) 
 			goto again;
-		}
+
 		dqp = dqp->MPL_NEXT;
 	}
 
@@ -2536,7 +2536,7 @@ xfs_qm_vop_chown(
 	ASSERT(prevdq != newdq);
 
 #ifdef QUOTADEBUG
-	xqmprf("chown: %d blks [%d => %d]\n", 
+	printf("chown: %d blks [%d => %d]\n", 
 	       (int) ip->i_d.di_nblocks,
 	       xfs_qm_dqid(prevdq),
 	       xfs_qm_dqid(newdq));
@@ -2789,9 +2789,9 @@ xfs_qm_freelist_print(xfs_frlist_t *qlist, char *title)
 {
 	xfs_dquot_t *dq;
 	int i = 0;
-	xqmprf("%s (#%d)\n", title, (int) qlist->qh_nelems);	
+	printf("%s (#%d)\n", title, (int) qlist->qh_nelems);	
 	FOREACH_DQUOT_IN_FREELIST(dq, qlist) {
-		xqmprf("\t%d.\t\"%d (%s:0x%x)\"\t bcnt = %d, icnt = %d "
+		printf("\t%d.\t\"%d (%s:0x%x)\"\t bcnt = %d, icnt = %d "
 		       "refs = %d\n",  
 		       ++i, (int) dq->q_core.d_id,
 		       DQFLAGTO_TYPESTR(dq), dq,     

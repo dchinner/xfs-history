@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.90 $"
+#ident	"$Revision: 1.91 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2227,7 +2227,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		break;
 	      default:
 		cmn_err(CE_ALERT,
-			"xfs_log_recover: unknown buf type 0x%x\n", 
+			"xfs_log_recover: unknown buffer type 0x%x\n", 
 			buf_f->blf_type);
 		ASSERT(0);
 		break;
@@ -2514,9 +2514,10 @@ xlog_recover_do_quotaoff_trans(xlog_t			*log,
 	
 	qoff_f = (xfs_qoff_logformat_t *)item->ri_buf[0].i_addr;
 	ASSERT(qoff_f);
+#ifdef QUOTADEBUG
 	cmn_err(CE_NOTE, "QUOTAOFF 0x%x record found in recovery\n", 
 		qoff_f->qf_flags);
-	
+#endif	
 	/*
 	 * The logitem format's flag tells us if this was user quotaoff, 
 	 * project quotaoff or both. 
@@ -2559,7 +2560,9 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	type = recddq->d_flags & (XFS_DQ_USER|XFS_DQ_PROJ);
 	ASSERT(type);
 	if (log->l_quotaoffs_flag & type) {
+#ifdef QUOTADEBUG
 		cmn_err(CE_NOTE, "skipping");
+#endif
 		return (0);
 	}
 
@@ -2570,11 +2573,6 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 			   "xlog_recover_do_dquot_trans (log copy)")) {
 		return (EIO);
 	}
-	/*
-	cmn_err(CE_NOTE, "blk = 0x%x, len = %d, bufoff 0x%x\n",
-		(int) dq_f->qlf_blkno, dq_f->qlf_len, 
-		dq_f->qlf_boffset);
-		*/
 	ASSERT(dq_f->qlf_len == 1);
 	
 	bp = read_buf(mp->m_dev, 
@@ -2606,9 +2604,10 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	       bp->b_dmaaddr + bp->b_bcount);
 
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
+#ifdef QUOTADEBUG
 	cmn_err(CE_NOTE, "recovering  dquot (id = %d), ddq 0x%x\n", 
 		recddq->d_id, ddq);
-
+#endif
 	ASSERT(dq_f->qlf_size == 2);
 	bdwrite(bp);
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -250,7 +250,7 @@ xfs_qm_scall_trunc_qfiles(
 				 &qip, 0);
 		if (! error) {
 #ifdef QUOTADEBUG		
-			xqmprf("UQINO %d, nrefs %d\n",
+			printf("UQINO %d, nrefs %d\n",
 			       (int) mp->m_sb.sb_uquotino,	
 			       (int) (XFS_ITOV(qip))->v_count);
 #endif
@@ -267,7 +267,7 @@ xfs_qm_scall_trunc_qfiles(
 				 &qip, 0);
 		if (! error) {
 #ifdef QUOTADEBUG		
-			xqmprf("PQINO %d, nrefs %d\n",
+			printf("PQINO %d, nrefs %d\n",
 			       (int) mp->m_sb.sb_pquotino,	
 			       (int) (XFS_ITOV(qip))->v_count);
 #endif
@@ -716,12 +716,12 @@ xfs_qm_scall_quotaoff(
 
 #ifdef QUOTADEBUG
 	if (mp->QI_UQIP)
-		xqmprf("QINF uqino %d SB-UQINO %d, nrefs %d\n", 
+		printf("QINF uqino %d SB-UQINO %d, nrefs %d\n", 
 		       (int) mp->QI_UQIP->i_ino, 
 		       (int) mp->m_sb.sb_uquotino,
 		       (XFS_ITOV(mp->QI_UQIP))->v_count);
 	if (mp->QI_PQIP)
-		xqmprf("QINF pqino %d SB-PQINO %d, nrefs %d\n", 
+		printf("QINF pqino %d SB-PQINO %d, nrefs %d\n", 
 		       (int) mp->QI_PQIP->i_ino, 
 		       (int) mp->m_sb.sb_pquotino,
 		       (XFS_ITOV(mp->QI_PQIP))->v_count);

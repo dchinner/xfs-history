@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -270,7 +270,7 @@ xfs_qm_adjust_dqtimers(
 		if (d->d_blk_softlimit &&
 		    (d->d_bcount >= d->d_blk_softlimit)) {
 #ifdef QUOTADEBUG
-		xqmprf("----@@ starting btimer: %llu >= %llu \n",
+		printf("----@@ starting btimer: %llu >= %llu \n",
 			       d->d_bcount, d->d_blk_softlimit);
 #endif
 			d->d_btimer = time + mp->QI_BTIMELIMIT;
@@ -279,7 +279,7 @@ xfs_qm_adjust_dqtimers(
 		if (d->d_blk_softlimit == 0 ||	
 		    (d->d_bcount < d->d_blk_softlimit)) {
 #ifdef QUOTADEBUG
-			xqmprf("----@@ stopping btimer: %llu < %llu\n",
+			printf("----@@ stopping btimer: %llu < %llu\n",
 			        d->d_bcount, d->d_blk_softlimit);
 #endif
 			d->d_btimer = 0;
@@ -290,7 +290,7 @@ xfs_qm_adjust_dqtimers(
 		if (d->d_ino_softlimit > 0 &&
 		    (d->d_icount >= d->d_ino_softlimit)) {
 #ifdef QUOTADEBUG
-			xqmprf("----@@ starting itimer: %llu >= %llu\n",
+			printf("----@@ starting itimer: %llu >= %llu\n",
 			       d->d_icount, d->d_ino_softlimit);
 #endif
 			d->d_itimer = time + mp->QI_ITIMELIMIT;
@@ -299,7 +299,7 @@ xfs_qm_adjust_dqtimers(
 		if ((d->d_ino_softlimit == 0) ||
 		    (d->d_icount < d->d_ino_softlimit)) {
 #ifdef QUOTADEBUG
-			xqmprf("----@@ stopping itimer: %llu < %llu\n",
+			printf("----@@ stopping itimer: %llu < %llu\n",
 			       d->d_icount, d->d_ino_softlimit);
 #endif
 			d->d_itimer = 0;
@@ -307,10 +307,10 @@ xfs_qm_adjust_dqtimers(
 	}
 #ifdef QUOTADEBUG
 	if (d->d_itimer)
-		xqmprf("--------@@Inode Timer running : %llu >= %llu\n", 
+		printf("--------@@Inode Timer running : %llu >= %llu\n", 
 		       d->d_icount, d->d_ino_softlimit);
 	if (d->d_btimer)
-		xqmprf("--------@@Blks Timer running : %llu >= %llu\n",
+		printf("--------@@Blks Timer running : %llu >= %llu\n",
 		       d->d_bcount, d->d_blk_softlimit);
 #endif
 	
@@ -362,10 +362,10 @@ xfs_qm_dqwarn(
 	}
 #ifdef QUOTADEBUG
 	if (d->d_iwarns)
-		xqmprf("--------@@Inode warnings running : %llu >= %llu\n", 
+		printf("--------@@Inode warnings running : %llu >= %llu\n", 
 		       d->d_icount, d->d_ino_softlimit);
 	if (d->d_bwarns)
-		xqmprf("--------@@Blks warnings running : %llu >= %llu\n",
+		printf("--------@@Blks warnings running : %llu >= %llu\n",
 		       d->d_bcount, d->d_blk_softlimit);
 #endif
 	return (warned);
@@ -1641,35 +1641,35 @@ xfs_qm_dqcheck(
 void
 xfs_qm_dqprint(xfs_dquot_t *dqp)
 {
-	xqmprf( "-----------KERNEL DQUOT----------------\n");
-	xqmprf( "---- dquot ID	=  %d\n", (int) dqp->q_core.d_id);
-	xqmprf( "---- type      =  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" :
+	printf( "-----------KERNEL DQUOT----------------\n");
+	printf( "---- dquot ID	=  %d\n", (int) dqp->q_core.d_id);
+	printf( "---- type      =  %s\n", XFS_QM_ISUDQ(dqp) ? "USR" :
 	       "PRJ");
-	xqmprf( "---- fs        =  0x%x\n", dqp->q_mount);
-	xqmprf( "---- blkno     =  0x%x\n", (int) dqp->q_blkno);
-	xqmprf( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);
-	xqmprf( "---- blkhlimit	=  %llu (%d)\n", 
+	printf( "---- fs        =  0x%x\n", dqp->q_mount);
+	printf( "---- blkno     =  0x%x\n", (int) dqp->q_blkno);
+	printf( "---- boffset	=  0x%x\n", (int) dqp->q_bufoffset);
+	printf( "---- blkhlimit	=  %llu (%d)\n", 
 	       dqp->q_core.d_blk_hardlimit,
 	       (int) dqp->q_core.d_blk_hardlimit);
-	xqmprf( "---- blkslimit	=  %llu (0x%x)\n", 
+	printf( "---- blkslimit	=  %llu (0x%x)\n", 
 	       dqp->q_core.d_blk_softlimit,
 	       (int)dqp->q_core.d_blk_softlimit);
-	xqmprf( "---- inohlimit	=  %llu (0x%x)\n", 
+	printf( "---- inohlimit	=  %llu (0x%x)\n", 
 	       dqp->q_core.d_ino_hardlimit,
 	       (int)dqp->q_core.d_ino_hardlimit);
-	xqmprf( "---- inoslimit	=  %llu (0x%x)\n", 
+	printf( "---- inoslimit	=  %llu (0x%x)\n", 
 	       dqp->q_core.d_ino_softlimit,
 	       (int)dqp->q_core.d_ino_softlimit);
-	xqmprf( "---- bcount	=  %llu (0x%x)\n", 
+	printf( "---- bcount	=  %llu (0x%x)\n", 
 	       dqp->q_core.d_bcount,
 	       (int)dqp->q_core.d_bcount);
-	xqmprf( "---- icount	=  %llu (0x%x)\n", 
+	printf( "---- icount	=  %llu (0x%x)\n", 
 	       dqp->q_core.d_icount,
 	       (int)dqp->q_core.d_icount);
-	xqmprf( "---- btimer	=  %d\n", (int)dqp->q_core.d_btimer);
-	xqmprf( "---- itimer	=  %d\n", (int)dqp->q_core.d_itimer);
+	printf( "---- btimer	=  %d\n", (int)dqp->q_core.d_btimer);
+	printf( "---- itimer	=  %d\n", (int)dqp->q_core.d_itimer);
 
-	xqmprf( "---------------------------\n");
+	printf( "---------------------------\n");
 }
 #endif
 
