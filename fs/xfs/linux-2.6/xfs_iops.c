@@ -60,6 +60,8 @@
 
 #include <linux/page_buf.h>
 
+#include <asm/uaccess.h> /* For copy_from_user */
+
 /*
  * Common code used to create/instantiate various things in a directory.
  */
@@ -416,11 +418,100 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 	return base;
 }
 
+/*
+ * The following is used to get a list of blocks of the given
+ * size from a pagebuf_bmap_t returned by VOP_BMAP.
+ */
+
+static void
+_linvfs_set_blocks(
+	int		*blocks,	/* Array of blocknos to fill in */
+	int		nblocks,	/* number of elms in blocks array */
+	pb_bmap_t	*pbmap,		/* mappings of blocks (big for XFS) */
+	int		npbmaps,	/* number of pbmap entries */
+	int		block_bits,	/* bits (max size) of blocks e.g. 9 for 512 */
+	ssize_t		blocksize)	/* size of block */
+{
+	int i, *p, bmaps, blockno;
+
+	i = nblocks;
+        p = blocks;
+
+	/* Zero out all the blocks, first */
+	while(i) {
+		*p++ = 0;
+		i--;
+	}
+
+        i = nblocks;
+	p = blocks;
+
+	/*
+	 * We need to walk the bmaps to cover the case where this page
+	 * spans extents.
+	 */
+
+	for(bmaps = 0; bmaps < npbmaps && i; bmaps++, pbmap++) {
+
+		/* While we have room in this bmap, bump the block number */
+		while(pbmap->pbm_bsize && i) {
+			blockno = (long)pbmap->pbm_bn;
+			if (blockno < 0) {
+				printk("_linvfs_set_blocks have negative block %d\n",
+						blockno);
+				return;
+			} else if (pbmap->pbm_offset) {
+				if ( pbmap->pbm_offset % blocksize) {
+					printk("this shouldn't happen %lld %lld!\n",
+					   pbmap->pbm_offset, blocksize);
+				}
+				blockno += pbmap->pbm_offset >> block_bits;
+				pbmap->pbm_offset = 0;
+				pbmap->pbm_bn = blockno;
+			}
+
+			*p = blockno;
+			p++;
+			i--;
+			pbmap->pbm_bn++;
+			pbmap->pbm_bsize -= blocksize;
+		}
+        }
+	return;
+}
+
+
 int linvfs_readpage(struct file *filp, struct page *page)
 {
 	int rval;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-	rval = generic_readpage(filp, page);
+	struct dentry	*dentry = filp->f_dentry;
+	struct inode	*inode = dentry->d_inode;
+	vnode_t		*vp;
+	int		nr[PAGE_SIZE/512];
+#define LINBMAP_MAX 4
+	pb_bmap_t	pbmap[LINBMAP_MAX];
+	int		npbmaps = LINBMAP_MAX;
+	int		error;
+
+	atomic_inc(&page->count);
+	set_bit(PG_locked, &page->flags);
+	set_bit(PG_free_after, &page->flags);
+	
+	vp = LINVFS_GET_VP(inode);
+
+	VOP_RWLOCK(vp, VRWLOCK_READ);
+	VOP_BMAP(vp, page->offset, PAGE_SIZE, B_READ,(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
+	VOP_RWUNLOCK(vp, VRWLOCK_READ);
+
+	if (error)
+		return -EIO;
+
+	_linvfs_set_blocks(nr, PAGE_SIZE/512, &pbmap[0], npbmaps,
+		inode->i_sb->s_blocksize_bits, inode->i_sb->s_blocksize);
+
+	/* IO start */
+	rval = brw_page(READ, page, inode->i_dev, nr, inode->i_sb->s_blocksize, 1);
 #else
 	rval = block_read_full_page(filp, page);
 #endif
@@ -445,8 +536,8 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	int		block_shift = inode->i_sb->s_blocksize_bits;
 	off_t		offset = block << block_shift;
 	ssize_t		count = inode->i_sb->s_blocksize;
-	pb_bmap_t pbmap;
-	int     npbmaps =1;
+	pb_bmap_t	pbmap;
+	int		npbmaps = 1;
 	int		error;
 	long		blockno;
 
@@ -460,7 +551,6 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	VOP_RWLOCK(vp, VRWLOCK_READ);
 	VOP_BMAP(vp, offset, count, B_READ,(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-
 	if (error)
 		return -EIO;
 	/*
@@ -471,11 +561,12 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	blockno = (long)pbmap.pbm_bn;
 	if (blockno < 0) return 0;
 	if (pbmap.pbm_offset) {
-	  if ( pbmap.pbm_offset % count) {
-		printk("this shouldn't happen %d %d %d!\n",
-			   pbmap.pbm_offset % count, pbmap.pbm_offset, count);
-	  }
-	  blockno += pbmap.pbm_offset >> 9;
+		if ( pbmap.pbm_offset % count) {
+			printk("this shouldn't happen %lld %d!\n",
+				pbmap.pbm_offset,
+				count);
+		}
+		blockno += pbmap.pbm_offset >> block_shift;
 	}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
@@ -493,6 +584,81 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 #endif
 }
 
+/*
+ * JIMJIM have linvfs_updatepage use a new VOP if we are going to keep it
+ * around. We might just want to use _pagebuf_file_write and the bmap, ...
+ * instead of having this interface.
+ */
+
+int
+linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
+	unsigned long offset, unsigned int bytes, int sync)
+{
+	vnode_t		*vp;
+	struct dentry	*dentry = filp->f_dentry;
+	struct inode	*inode = dentry->d_inode;
+	unsigned	long block;
+	int		*p, nr[PAGE_SIZE/512], error;
+	int		wrote = 0, status, i, bmaps, block_bits;
+	pb_bmap_t	pbmap[2];
+	int		npbmaps = 2;
+	long		blockno;
+
+	printk("linvfs_updatepage(%s/%s %d@%ld, sync=%d)\n",
+		dentry->d_parent->d_name.name, dentry->d_name.name,
+		bytes, page->offset+offset, sync);
+	
+	vp = LINVFS_GET_VP(inode);
+
+	VOP_RWLOCK(vp, VRWLOCK_READ);
+	VOP_BMAP(vp, offset, bytes, B_WRITE,(struct page_buf_bmap_s *) &pbmap,
+				&npbmaps, error);
+	VOP_RWUNLOCK(vp, VRWLOCK_READ);
+	if (error)
+		return -EIO;
+
+	atomic_inc(&page->count);
+
+        set_bit(PG_locked, &page->flags);
+        set_bit(PG_free_after, &page->flags);
+
+	_linvfs_set_blocks(nr, PAGE_SIZE/512, &pbmap[0], npbmaps,
+		inode->i_sb->s_blocksize_bits, inode->i_sb->s_blocksize);
+
+	/* bytes can't be more than one page. */
+	ASSERT(bytes <= PAGE_CACHE_SIZE);
+
+	printk("linvfs_updatepage: before copy %d\n", bytes);
+	/* Copy down the user's data */
+	bytes -= copy_from_user((unsigned long *)page_address(page) + offset,
+							buf, bytes);
+	printk("linvfs_updatepage: after copy %d\n", bytes);
+
+	if (!bytes) {
+		wrote = -EFAULT;
+		clear_bit(PG_locked, &page->flags);
+		clear_bit(PG_uptodate, &page->flags);
+		goto out;
+	}
+
+	/* set_bit(PG_uptodate, &page->flags); who set's this? */
+
+	/* Now, write out the page to the right spot */
+	printk("linvfs_updatepage: before brw_page bs=%ld nr=%x\n",
+		inode->i_sb->s_blocksize, nr);
+	status = brw_page(WRITE, page, inode->i_dev, nr, inode->i_sb->s_blocksize, 1);
+
+	if (status < 0) /* Return error below if this failed */
+		wrote = status;
+	else
+		wrote = bytes;
+
+out:
+	wake_up(&page->wait);
+	printk("linvfs_updatepage: done writing %d\n", wrote);
+
+	return(wrote); /* The amount written */
+}
 
 /* Brute force approach for now - copy data into linux inode
  * from the results of a getattr. This gets called out of things
@@ -525,14 +691,49 @@ int linvfs_revalidate(struct dentry *dentry)
 }
 
 int
-linvfs_pb_bmap(struct inode *lnode, 
-			   loff_t io_offset,
-			   size_t io_count,
+linvfs_pb_bmap(struct inode *inode, 
+			   loff_t offset,
+			   size_t count,
 			   pb_bmap_t *pbmapp,
 			   int maxpbbm, 
 			   int *retpbbm, 
-			   int flags/* page_buf_flags_t */){
-  return -EIO;
+			   int flags/* page_buf_flags_t */)
+{
+	vnode_t		*vp;
+	int		block_shift = inode->i_sb->s_blocksize_bits;
+	pb_bmap_t	pbmap;
+	int		npbmaps = 1;
+	int		error, vop_flags;
+	long		blockno;
+
+	/*
+	 * First map the flags into vop_flags.
+	 */
+
+	switch(flags) {
+	case PBF_READ:
+		vop_flags = B_READ;
+		break;
+
+	case PBF_WRITE:
+		vop_flags = B_WRITE;
+		break;
+	
+	default:
+		printk("linvfs_pb_bmap: flag %x not implemented\n", flags);
+		return -EINVAL;
+	}
+
+	vp = LINVFS_GET_VP(inode);
+
+	*retpbbm = maxpbbm;
+
+	VOP_RWLOCK(vp, VRWLOCK_READ);
+	VOP_BMAP(vp, offset, count, vop_flags,
+			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
+	VOP_RWUNLOCK(vp, VRWLOCK_READ);
+
+	return error;
 }
 
 struct inode_operations linvfs_file_inode_operations =
@@ -563,11 +764,11 @@ struct inode_operations linvfs_file_inode_operations =
   NULL,  /*  permission  */
   NULL,	 /*  smap  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
-  NULL,  /*  updatepage  */
+  linvfs_updatepage,  /*  updatepage  */
 #endif
   linvfs_revalidate
 #if defined(CONFIG_PAGE_BUF) || defined(CONFIG_PAGE_BUF_MODULE)
-  ,0 /*linvfs_pb_bmap */
+  , linvfs_pb_bmap
 #endif
 };
 
