@@ -74,7 +74,12 @@
 #define GFP_NOFS	GFP_PAGE_IO
 #endif
 
-#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / 512)
+#define SECTOR_SHIFT	9
+#define SECTOR_SIZE     (1<<SECTOR_SHIFT)
+#define SECTOR_MASK	(SECTOR_SIZE - 1)
+#define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - SECTOR_SHIFT)) - 1)
+
+#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / SECTOR_SIZE)
 
 /*
  * Debug code
@@ -536,7 +541,7 @@ _pagebuf_lookup_pages(
 				}
 				good_pages--;
 			} else if (!PagePrivate(cp)) {
-				unsigned long i, range = (offset + nbytes) >> 9;
+				unsigned long i, range = (offset + nbytes) >> SECTOR_SHIFT;
 
 				assert(blocksize < PAGE_CACHE_SIZE);
 				assert(!(pb->pb_flags & _PBF_PRIVATE_BH));
@@ -544,7 +549,7 @@ _pagebuf_lookup_pages(
 				 * In this case page->private holds a bitmap
 				 * of uptodate sectors (512) within the page
 				 */
-				for (i = offset >> 9; i < range; i++)
+				for (i = offset >> SECTOR_SHIFT; i < range; i++)
 					if (!test_bit(i, &cp->private))
 						break;
 				if (i != range)
@@ -633,8 +638,8 @@ page_buf_t *pagebuf_find(	/* find buffer for block if     */
 {
 	page_buf_t *pb = NULL;
 
-	ioff <<= 9;
-	isize <<= 9;
+	ioff <<= SECTOR_SHIFT;
+	isize <<= SECTOR_SHIFT;
 
 	_pagebuf_find_lockable_buffer(target, ioff, isize, flags, &pb, NULL);
 
@@ -665,9 +670,9 @@ page_buf_t *pagebuf_get(	/* allocate a buffer            */
 
 	assert(target);
 
-	isize <<= 9;
+	isize <<= SECTOR_SHIFT;
 
-	rval = _pagebuf_get_lockable_buffer(target, ioff << 9,
+	rval = _pagebuf_get_lockable_buffer(target, ioff << SECTOR_SHIFT,
 						isize, flags, &pb);
 
 	if (rval != 0)
@@ -1191,8 +1196,8 @@ static void bio_end_io_pagebuf(struct bio *bio)
 			assert(blocksize < PAGE_CACHE_SIZE);
 			assert(!(pb->pb_flags & _PBF_PRIVATE_BH));
 
-			range = (bvec->bv_offset + bvec->bv_len) >> 9;
-			for (j = bvec->bv_offset >> 9; j < range; j++)
+			range = (bvec->bv_offset + bvec->bv_len)>>SECTOR_SHIFT;
+			for (j = bvec->bv_offset >> SECTOR_SHIFT; j < range; j++)
 				set_bit(j, &page->private);
 			if (page->private == (unsigned long)(PAGE_CACHE_SIZE-1))
 				SetPageUptodate(page);
@@ -1272,7 +1277,7 @@ int pagebuf_iorequest(		/* start real I/O               */
 		bio = bio_alloc(GFP_NOIO, 1);
 
 		bio->bi_bdev = pb->pb_target->pbr_bdev;
-		bio->bi_sector = sector - (offset >> 9);
+		bio->bi_sector = sector - (offset >> SECTOR_SHIFT);
 		bio->bi_end_io = bio_end_io_pagebuf;
 		bio->bi_private = pb;
 		bio->bi_vcnt++;
@@ -1317,7 +1322,7 @@ int pagebuf_iorequest(		/* start real I/O               */
 
 next_chunk:
 	atomic_inc(&PBP(pb)->pb_io_remaining);
-	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - 9);
+	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - SECTOR_SHIFT);
 	if (nr_pages > total_nr_pages)
 		nr_pages = total_nr_pages;
 
@@ -1347,7 +1352,7 @@ next_chunk:
 
 		offset = 0;
 
-		sector += nbytes >> 9;
+		sector += nbytes >> SECTOR_SHIFT;
 		size -= nbytes;
 		total_nr_pages--;
 	}
