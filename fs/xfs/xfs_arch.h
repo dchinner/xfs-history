@@ -56,9 +56,15 @@
  *     - support other architectures
  */
  
-#ifndef SIM
 #include <linux/autoconf.h>
-#else
+
+#ifdef SIM
+/* 
+ * if we're in SIM, force the MULTI architecture version of the macros,
+ * overriding the mode specified in the config file.
+ * - this will propably cause problems later when we don't always have 
+ * the architecture number handy
+ */
 #undef CONFIG_XFS_ARCH_NATIVE
 #undef CONFIG_XFS_ARCH_MIPS
 #define CONFIG_XFS_ARCH_MULTI
