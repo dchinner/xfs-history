@@ -59,13 +59,6 @@ zone_t *xfs_inode_zone;
 #define	XFS_ITRUNC_MAX_EXTENTS	128
 
 STATIC buf_t *
-xfs_itobp(
-	xfs_mount_t	*mp,
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip,
-	xfs_dinode_t	**dipp);
-
-STATIC buf_t *
 xfs_inotobp(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
@@ -86,39 +79,6 @@ xfs_validate_extents(
 #define xfs_validate_extents(ep, nrecs)
 #endif /* DEBUG */		     
 
-/*
- * This routine is called to map an inode within a file
- * system to the buffer containing the on-disk version of the
- * inode.  It returns a pointer to the buffer containing the
- * on-disk inode, and in the dip parameter it returns a pointer
- * to the on-disk inode within that buffer.  The in-core inode
- * pointed to by the ip parameter contains the inode number to
- * retrieve, and we fill in the fields of the inode related to
- * xfs_imap() since we have that information here if they are
- * not already filled in.
- *
- * Use xfs_inotobp() to do most of the real work.
- */
-STATIC buf_t *
-xfs_itobp(
-	xfs_mount_t	*mp,
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip,
-	xfs_dinode_t	**dipp)
-{
-	buf_t		*bp;
-
-	bp = xfs_inotobp(mp, tp, ip->i_ino, dipp);
-
-	/*
-	 * Fill in some of the fields of ip if they're not already set.
-	 */
-	if (ip->i_dev == 0) {
-		ip->i_dev = mp->m_dev;
-	}
-
-	return (bp);
-}
 
 /*
  * This routine is called to map an inode number within a file
@@ -329,12 +289,12 @@ xfs_iread(
 
 	ip = kmem_zone_zalloc(xfs_inode_zone, KM_SLEEP);
 	ip->i_ino = ino;
+	ip->i_dev = mp->m_dev;
 
 	/*
 	 * Get pointer's to the on-disk inode and the buffer containing it.
-	 * Pass in ip so it can fill in i_dev.
 	 */
-	bp = xfs_itobp(mp, tp, ip, &dip);
+	bp = xfs_inotobp(mp, tp, ino, &dip);
 
 #ifndef SIM
 	/*
@@ -378,7 +338,7 @@ xfs_iread(
 	/*
 	 * Use xfs_trans_brelse() to release the buffer containing the
 	 * on-disk inode, because it was acquired with xfs_trans_read_buf()
-	 * in xfs_itobp() above.  If tp is NULL, this is just a normal
+	 * in xfs_inotobp() above.  If tp is NULL, this is just a normal
 	 * brelse().  If we're within a transaction, then xfs_trans_brelse()
 	 * will only release the buffer if it is not dirty within the
 	 * transaction.  It will be OK to release the buffer in this case,
@@ -833,7 +793,7 @@ xfs_iunlink(
 		 * Here we put the head pointer into our next pointer,
 		 * and then we fall through to point the head at us.
 		 */
-		ibp = xfs_itobp(mp, tp, ip, &dip);
+		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
 		ASSERT(dip->di_next_unlinked == NULLAGINO);
 		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
 		offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
@@ -906,7 +866,7 @@ xfs_iunlink_remove(
 		 * of dealing with the buffer when there is no need to
 		 * change it.
 		 */
-		ibp = xfs_itobp(mp, tp, ip, &dip);
+		ibp = xfs_inotobp(mp, tp, ip->i_ino, &dip);
 		next_agino = dip->di_next_unlinked;
 		if (next_agino != NULLAGINO) {
 			dip->di_next_unlinked = NULLAGINO;
@@ -1326,7 +1286,7 @@ xfs_imap(
 
 	xfs_dilocate(mp, tp, ino, &fsbno, &off);
 	imap->im_blkno = XFS_FSB_TO_DADDR(mp, fsbno);
-	imap->im_len = XFS_BTOD(mp, 1);
+	imap->im_len = XFS_FSB_TO_BB(mp, 1);
 	imap->im_agblkno = XFS_FSB_TO_AGBNO(mp, fsbno);
 	imap->im_ioffset = (ushort)off;
 	imap->im_boffset = (ushort)(off << mp->m_sb.sb_inodelog);
@@ -1624,7 +1584,7 @@ xfs_iflush(
 	/*
 	 * Get the buffer containing the on-disk inode.
 	 */
-	bp = xfs_itobp(mp, NULL, ip, &dip);
+	bp = xfs_inotobp(mp, NULL, ip->i_ino, &dip);
 
 	/*
 	 * Clear i_update_core before copying out the data.
