@@ -53,7 +53,7 @@ extern struct vnodeops xfs_vnodeops;
  * Initialize the inode hash table for the newly mounted file system.
  */
 void
-xfs_ihashinit(xfs_mount_t *mp)
+xfs_ihash_init(xfs_mount_t *mp)
 {
 	int	i;
 	ulong	hsize;	
