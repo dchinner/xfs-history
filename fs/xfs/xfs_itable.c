@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -32,6 +32,19 @@
 #include "xfs_itable.h"
 #include "xfs_error.h"
 
+
+/* 
+ * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
+ * structures (by the dmi library). This is a pointer to a formatter function
+ * that will iget the inode and fill in the appropriate structure.
+ * see xfs_bulkstat_one() and dm_bulkstat_one() in dmi_xfs.c
+ */
+typedef int (*bulkstat_one_pf)(xfs_mount_t	*mp, 
+			       xfs_trans_t	*tp,
+			       xfs_ino_t   	ino,
+			       void	     	*buffer);
+
+
 /*
  * Return stat information for one inode.
  * Return 1 for success, 0 for failure.
@@ -41,10 +54,12 @@ xfs_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
-	xfs_bstat_t	*buf)		/* buffer to place output in */
+	void		*buffer)	/* buffer to place output in */
 {
 	xfs_inode_t	*ip;
+	xfs_bstat_t	*buf;
 
+	buf = (xfs_bstat_t *)buffer;
 	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino)
 		return 0;
 	ip = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED);
@@ -64,7 +79,7 @@ xfs_bulkstat_one(
 	buf->bs_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec;
 	buf->bs_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
 	buf->bs_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
-
+	
 	/* convert di_flags to bs_xflags.
 	 */
 	buf->bs_xflags = 0;
@@ -104,21 +119,25 @@ xfs_bulkstat_one(
 /*
  * Return stat information in bulk (by-inode) for the filesystem.
  */
-STATIC int				/* error status */
+int				/* error status */
 xfs_bulkstat(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	ino64_t		*lastino,	/* last inode returned */
 	int		*count,		/* size of buffer/count returned */
-	caddr_t		ubuffer)	/* buffer with inode stats */
+	bulkstat_one_pf formatter,	/* func that'd fill a single buf */
+	size_t		statstruct_size,/* sizeof struct that we're filling */
+	caddr_t		ubuffer,	/* buffer with inode stats */
+	int		*done)		/* 1 if there're more stats to get */
 {
 	buf_t		*agbp;
 	xfs_agi_t	*agi;
 	xfs_agino_t	agino;
 	xfs_agnumber_t	agno;
 	int		bcount;
-	xfs_bstat_t	*buffer;
-	int		bufidx;
+	caddr_t		buffer;
+	caddr_t		bufp;	
+	int		nbufs;
 	xfs_btree_cur_t	*cur;
 	int		error;
 	__int32_t	gcnt;
@@ -134,13 +153,16 @@ xfs_bulkstat(
 	agino = XFS_INO_TO_AGINO(mp, ino);
 	left = *count;
 	*count = 0;
-	bcount = MIN(left, NBPP / sizeof(*buffer));
-	buffer = kmem_alloc(bcount * sizeof(*buffer), KM_SLEEP);
-	error = bufidx = 0;
+	*done = 0;
+	bcount = MIN(left, NBPP / statstruct_size);
+	bufp = buffer = kmem_alloc(bcount * statstruct_size, KM_SLEEP);
+	error = nbufs = 0;
 	cur = NULL;
 	agbp = NULL;
-	if (agno >= mp->m_sb.sb_agcount)
+	if (agno >= mp->m_sb.sb_agcount) {
+		*done = 1;
 		return 0;
+	}
 	if (agino != 0) {
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		agbp = xfs_ialloc_read_agi(mp, tp, agno);
@@ -181,34 +203,45 @@ xfs_bulkstat(
 			continue;
 		}
 		ino = XFS_AGINO_TO_INO(mp, agno, agino);
-		if (!xfs_bulkstat_one(mp, tp, ino, &buffer[bufidx])) {
+		
+		/*
+		 * iget the inode and fill in a single buffer.
+		 * See: xfs_bulkstat_one() & dm_bulkstat_one()
+		 */
+		if (! (*formatter)(mp, tp, ino, bufp)) {
 			i++;
 			continue;
 		}
+		bufp += statstruct_size; 
 		i++;
-		bufidx++;
+		nbufs++;
 		left--;
-		if (bufidx == bcount) {
-			if (copyout((caddr_t)buffer, ubuffer, bufidx * sizeof(*buffer))) {
+		if (nbufs == bcount) {
+			if (copyout(buffer, ubuffer, 
+				    nbufs * statstruct_size)){
 				error = EFAULT;
 				break;
 			}
-			ubuffer += bufidx * sizeof(*buffer);
-			*count += bufidx;
-			bufidx = 0;
+			ubuffer += nbufs * statstruct_size;
+			*count += nbufs;
+			nbufs = 0;
+			bufp = buffer;
 		}
 	}
+
 	if (!error) {
-		if (bufidx) {
-			if (copyout((caddr_t)buffer, ubuffer,
-					bufidx * sizeof(*buffer)))
+		if (nbufs) {
+			if (copyout(buffer, ubuffer,
+				    nbufs * statstruct_size))
 				error = EFAULT;
 			else
-				*count += bufidx;
+				*count += nbufs;
 		}
 		*lastino = XFS_AGINO_TO_INO(mp, agno, agino);
+		if (agno >= mp->m_sb.sb_agcount)
+			*done = 1;
 	}
-	kmem_free(buffer, bcount * sizeof(*buffer));
+	kmem_free(buffer, bcount * statstruct_size);
 	return error;
 }
 
@@ -342,6 +375,10 @@ xfs_itable(
 	int		error;		/* error return value */
 	ino64_t		inlast;		/* last inode number */
 	xfs_mount_t	*mp;		/* mount point for filesystem */
+	int		done;		/* = 1 if there are more stats to get 
+					   and if bulkstat should be called
+					   again. This is unused in syssgi
+					   but used in dmi */
 
 	if (error = xfs_fd_to_mp(fd, &mp))
 		return error;
@@ -354,7 +391,11 @@ xfs_itable(
 		error = xfs_inumbers(mp, NULL, &inlast, &count, ubuffer);
 		break;
 	case SGI_FS_BULKSTAT:
-		error = xfs_bulkstat(mp, NULL, &inlast, &count, ubuffer);
+		error = xfs_bulkstat(mp, NULL, &inlast, &count, 
+				     (bulkstat_one_pf) xfs_bulkstat_one,
+				     sizeof(xfs_bstat_t),
+				     ubuffer,
+				     &done);
 		break;
 	}
 	if (error)
