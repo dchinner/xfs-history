@@ -178,6 +178,7 @@ typedef struct xfs_trans {
 	int			t_icount_delta;	/* superblock icount change */
 	int			t_ifree_delta;	/* superblock ifree change */
 	int			t_fdblocks_delta; /* superblock fdblocks chg */
+	int			t_res_fdblocks_delta; /* on-disk only chg */
 	int			t_frextents_delta;/* superblock freextents chg*/
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
@@ -196,6 +197,16 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_NOSLEEP	0x1
 #define	XFS_TRANS_WAIT		0x2
 #define	XFS_TRANS_SYNC		0x4
+
+/*
+ * Field values for xfs_trans_mod_sb.
+ */
+#define	XFS_TRANS_SB_ICOUNT		0x1
+#define	XFS_TRANS_SB_IFREE		0x2
+#define	XFS_TRANS_SB_FDBLOCKS		0x4
+#define	XFS_TRANS_SB_RES_FDBLOCKS	0x8
+#define	XFS_TRANS_SB_FREXTENTS		0x10
+
 
 
 struct xfs_inode;
