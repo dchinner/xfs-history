@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.98 $"
+#ident	"$Revision: 1.99 $"
 
 #include <sys/buf.h>	/* for buftarg_t */
 struct cred;
@@ -186,14 +186,29 @@ typedef struct xfs_mount {
 
 /*
  * max and min values for UIO and mount-option defined I/O sizes
+ * min value can't be less than a page.  Lower limit for 4K machines
+ * is 8K because that's what was tested.
  */
-#define	XFS_UIO_MAX_WRITEIO_LOG	16
-#define	XFS_UIO_MIN_WRITEIO_LOG	13
-#define	XFS_UIO_MAX_READIO_LOG	16
-#define	XFS_UIO_MIN_READIO_LOG	13
-
 #define XFS_MAX_IO_LOG		16	/* 64K */
+#define	XFS_UIO_MAX_WRITEIO_LOG	16
+#define	XFS_UIO_MAX_READIO_LOG	16
+
+#if defined(SIM)
+#define XFS_MIN_IO_LOG		13	/* 8K for simulation */
+#define	XFS_UIO_MIN_WRITEIO_LOG	13
+#define	XFS_UIO_MIN_READIO_LOG	13
+#elif _PAGESZ == 16384
+#define XFS_MIN_IO_LOG		14	/* 16K */
+#define	XFS_UIO_MIN_WRITEIO_LOG	14
+#define	XFS_UIO_MIN_READIO_LOG	14
+#elif _PAGESZ == 4096
 #define XFS_MIN_IO_LOG		13	/* 8K */
+#define	XFS_UIO_MIN_WRITEIO_LOG	13
+#define	XFS_UIO_MIN_READIO_LOG	13
+#else
+#error	"Unknown page size"
+#endif
+
 
 /*
  * Synchronous read and write sizes.  This should be
