@@ -554,41 +554,20 @@ xfs_get_vfsmount(
 STATIC int
 xfs_mount(
 	vfs_t		*vfsp,
-	vnode_t		*mvp,
-	struct mounta	*uap,
+	struct xfs_args	*args,
 	cred_t		*credp)
 {
-	struct xfs_args *args;
 	kdev_t		ddev;
 	kdev_t		logdev;
 	kdev_t		rtdev;
 	int		error;
 
-	args = (struct xfs_args *)uap->dataptr;
-
-	error = spectodevs(vfsp->vfs_super, args, &ddev, &logdev, &rtdev);
-	if (error)
-		return error;
-
-	return xfs_cmountfs(vfsp, ddev, logdev, rtdev, args, credp);
-}
-
-
-/* VFS_MOUNT */
-/*ARGSUSED*/
-STATIC int
-xfs_vfsmount(
-	vfs_t		*vfsp,
-	vnode_t		*mvp,
-	struct mounta	*uap,
-	char		*attrs,
-	cred_t		*credp)
-{
-	int		error;
-
 	vfs_lock(vfsp);
-	error = xfs_mount(vfsp, mvp, uap, credp);
+	error = spectodevs(vfsp->vfs_super, args, &ddev, &logdev, &rtdev);
+	if (!error)
+		error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, args, credp);
 	vfs_unlock(vfsp);
+
 	return (error);
 }
 
@@ -1726,7 +1705,7 @@ xfs_vget(
 
 
 vfsops_t xfs_vfsops = {
-	vfs_mount:		xfs_vfsmount,
+	vfs_mount:		xfs_mount,
 	vfs_dounmount:		fs_dounmount,
 	vfs_unmount:		xfs_unmount,
 	vfs_root:		xfs_root,

@@ -52,9 +52,6 @@
  *
  * For the Linux port, we kept this structure pretty much intact
  * and use it internally (because the existing code groks it).
- * We also kept "struct mounta" too, whereas we don't really need
- * that - we keep it so that the vnode/vfs interface survives for
- * the CXFS layer though.
  */
 struct xfs_args {
 	int	flags;		/* flags -> see XFSMNT_... macros below */

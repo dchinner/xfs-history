@@ -68,7 +68,6 @@ typedef struct xfs_trans_reservations {
 	((xfs_agblock_t)(XFS_BB_TO_FSBT(mp, d) % (mp)->m_sb.sb_agblocks))
 #else
 struct cred;
-struct mounta;
 struct vfs;
 struct vnode;
 struct xfs_args;
