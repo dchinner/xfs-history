@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.65 $"
+#ident	"$Revision: 1.67 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #include <sys/sysmacros.h>
@@ -292,6 +292,7 @@ xfs_bulkstat(
 	 * Lock down the user's buffer. If a buffer was not sent, as in the case
 	 * disk quota code calls here, we skip this.
 	 */
+#if defined(HAVE_USERACC)
 	if (ubuffer &&
 	    (error = useracc(ubuffer, ubcount * statstruct_size,
 			(B_READ|B_PHYS), NULL))) {
@@ -300,6 +301,7 @@ xfs_bulkstat(
 		}
 		return error;
 	}
+#endif
 	/*
 	 * Allocate a page-sized buffer for inode btree records.
 	 * We could try allocating something smaller, but for normal
@@ -599,7 +601,9 @@ xfs_bulkstat(
 	 */
 	kmem_free(irbuf, NBPC);
 	if (ubuffer)
+#if defined(HAVE_USERACC)
 		unuseracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS));
+#endif
 	*ubcountp = ubcount - ubleft;
 	if (agno >= mp->m_sb.sb_agcount) {
 		/*

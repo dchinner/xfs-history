@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.14 $"
+#ident "$Revision: 1.15 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -1984,8 +1984,9 @@ xfs_dm_getall_dmattr(
 		if (xfs_cpoutsizet(rlenp, total_size))
 			error = EFAULT;
 	}
-
+#if defined(HAVE_USERACC)
 	unuseracc(bufp, buflen, B_READ);
+#endif
 	kmem_free(attrlist, list_size);
 	return(error);
 }

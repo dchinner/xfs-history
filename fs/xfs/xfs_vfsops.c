@@ -2180,9 +2180,9 @@ xfs_syncsub(
 	/* Allocate a reference marker */
 	ipointer = (xfs_iptr_t *)kmem_zalloc(sizeof(xfs_iptr_t), KM_SLEEP);
 
-	fflag = B_ASYNC;		/* default is don't wait */
+	fflag = XFS_B_ASYNC;		/* default is don't wait */
 	if (flags & SYNC_BDFLUSH)
-		fflag = B_DELWRI;
+		fflag = XFS_B_DELWRI;
 	if (flags & SYNC_WAIT)
 		fflag = 0;		/* synchronous overrides all */
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.287 $"
+#ident "$Revision: 1.288 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -1415,7 +1415,7 @@ xfs_is_nested_locking_enabled(void)
  * using xfs_unlock_iopages().
  */
 /* ARGSUSED */
-#if 1 /* !defined(__linux__) */
+#if  !defined(__linux__) 
 int
 xfs_lockdown_iopages(
 	struct bmapval	*bmapp,
@@ -1642,7 +1642,7 @@ xfs_lockdown_iopages(
  * xfs_unlock_iopages() - unlock the set of pages specified in the
  *	xfs_uaccmap_t's set up by xfs_lockdown_iopages().
  */
-#if 1 /* !defined(__linux__) */
+#if  !defined(__linux__) 
 void
 xfs_unlock_iopages(
 	xfs_uaccmap_t	*uaccmap,	/* useracc maps */
@@ -6477,7 +6477,7 @@ xfs_bioerror(
 	 * We aren't flushing it.
 	 */
 	buftrace("XFS IOERROR", bp);
-	bioerror(bp, EIO);
+	XFS_BUF_ERROR(bp, EIO);
 	/*
 	 * We're calling biodone, so delete B_DONE flag. Either way
 	 * we have to call the iodone callback, and calling biodone
@@ -6535,7 +6535,7 @@ xfs_bioerror_relse(
 		 * There's no reason to mark error for
 		 * ASYNC buffers.
 		 */
-		bioerror(bp, EIO);
+		XFS_BUF_ERROR(bp, EIO);
 		vsema(&bp->b_iodonesema);
 	} else {
 		xfs_buf_relse(bp);
@@ -8276,7 +8276,7 @@ xfs_diostrat(
 	/*
 	 * Issue completion on the original buffer.
 	 */
-	bioerror(bp, error);
+	XFS_BUF_ERROR(bp, error);
 	biodone(bp);
 
         ASSERT(ismrlocked(io->io_iolock, MR_ACCESS| MR_UPDATE) != 0);

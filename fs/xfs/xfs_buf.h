@@ -5,7 +5,7 @@
 #define _USING_BUF_T
 #else
 #define _USING_BUF_T 
-// #define _USING_PAGEBUF_T 
+//#define _USING_PAGEBUF_T 
 #endif
 
 #ifdef _USING_BUF_T
@@ -14,6 +14,12 @@
 typedef struct buf xfs_buf_t;
 #define xfs_buf buf
 
+
+/* These are just for xfs_syncsub... it sets an internal variable 
+ * then passes it to VOP_FLUSH_PAGES or adds the flags to a newly gotten buf_t
+ */
+#define XFS_B_ASYNC B_ASYNC
+#define XFS_B_DELWRI B_DELWRI
 
 #define XFS_BUF_BFLAGS(x)            ((x)->b_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)            ((x)->b_flags = 0) 
@@ -157,30 +163,37 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #ifdef _USING_PAGEBUF_T
 #include <linux/page_buf.h>
 
-#define XFS_BUF_BFLAGS(x)            ((x)->pb_flags)  /* debugging routines might need this */
-#define XFS_BUF_ZEROFLAGS(x)            ((x)->pb_flags = 0) 
-#define XFS_BUF_STALE(x)	     pagebuf_free_inval(x)
-#define XFS_BUF_UNSTALE(x)	     printf("errror XFS_BUF_UNSTALE not implemented\n");
-#define XFS_BUF_ISSTALE(x)	     ((x)->pb_flags & PBF_FREED)
-#define XFS_BUF_SUPER_STALE(x)    pagebuf_free_inval(x);\
+/* These are just for xfs_syncsub... it sets an internal variable 
+ * then passes it to VOP_FLUSH_PAGES or adds the flags to a newly gotten buf_t
+ */
+#define XFS_B_ASYNC B_ASYNC
+#define XFS_B_DELWRI B_DELWRI
+#define XFS_B_STALE (1 << 31)
+#define XFS_BUF_BFLAGS(x)        ((x)->pb_flags)  /* debugging routines might need this */
+#define XFS_BUF_ZEROFLAGS(x)     ((x)->pb_flags = 0) 
+
+#define XFS_BUF_STALE(x)	     ((x)->pb_flags |= XFS_B_STALE)
+#define XFS_BUF_UNSTALE(x)	     ((x)->pb_flags &= ~XFS_B_STALE)
+#define XFS_BUF_ISSTALE(x)	     ((x)->pb_flags & XFS_B_STALE)
+#define XFS_BUF_SUPER_STALE(x)   (x)->pb_flags & XFS_B_STALE;\
                                  (x)->pb_flags &= ~(PBF_DELWRI|PBF_COMPLETED)
 
-#define XFS_BUF_DELAYWRITE(x)	     ((x)->pb_flags |= PBF_DELWRI)
+#define XFS_BUF_DELAYWRITE(x)	 ((x)->pb_flags |= PBF_DELWRI)
 #define XFS_BUF_UNDELAYWRITE(x)	 ((x)->pb_flags &= ~PBF_DELWRI)
 #define XFS_BUF_ISDELAYWRITE(x)	 ((x)->pb_flags & PBF_DELWRI)
 
 
-#define XFS_BUF_ERROR(x,no)      pagebuf_seterror(x,no)
-#define XFS_BUF_GETERROR(x)      pagebuf_ioerror(x)
-#define XFS_BUF_ISERROR(x)       /* error! not implemeneted yet */
+#define XFS_BUF_ERROR(x,no)      pagebuf_ioerror(x,no)
+#define XFS_BUF_GETERROR(x)      pagebuf_geterror(x)
+#define XFS_BUF_ISERROR(x)       (pagebuf_geterror(x)?1:0)
 
 #define XFS_BUF_DONE(x)          ((x)->pb_flags |= PBF_COMPLETED)
 #define XFS_BUF_UNDONE(x)    	 ((x)->pb_flags &= ~PBF_COMPLETED)
 #define XFS_BUF_ISDONE(x)	     ((x)->pb_flags & PBF_COMPLETED)
 
-#define XFS_BUF_BUSY(x)          ((x)->pb_flags |= PBF_BUSY)
-#define XFS_BUF_UNBUSY(x)    	 ((x)->pb_flags &= ~PBF_BUSY)
-#define XFS_BUF_ISBUSY(x)	     ((x)->pb_flags & PBF_BUSY)
+#define XFS_BUF_BUSY(x)          
+#define XFS_BUF_UNBUSY(x)    	 
+#define XFS_BUF_ISBUSY(x)	     1 /* only checked in asserts... keep it from tripping any */
 
 #define XFS_BUF_ASYNC(x)         ((x)->pb_flags |= PBF_ASYNC)
 #define XFS_BUF_UNASYNC(x)     	 ((x)->pb_flags &= ~PBF_ASYNC)
@@ -212,9 +225,9 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 
 #define XFS_BUF_AGE(x)        /* error! not implemeneted yet */
 
-#define XFS_BUF_BP_ISMAPPED(bp)  /* error! not implemeneted yet */
-#define XFS_BUF_IS_IOSPL(bp)      /* error! not implemeneted yet */
-#define XFS_BUF_IS_GRIO( bp )   /* error! not implemeneted yet */
+#define XFS_BUF_BP_ISMAPPED(bp)  1 /* error! not implemeneted yet */
+#define XFS_BUF_IS_IOSPL(bp)     1 /* error! not implemeneted yet */
+#define XFS_BUF_IS_GRIO(bp)      1 /* error! not implemeneted yet */
 
 /* hmm what does the mean on linux? may go away */
 #define XFS_BUF_PAGEIO(x)        /* error! not implemeneted yet */
@@ -251,7 +264,7 @@ typedef struct buftarg {
 			((type)(buf)->pb_fspriv2)
 #define XFS_BUF_SET_FSPRIVATE2(buf, value)	\
 			(buf)->pb_fspriv2 = (void *)(value)
-#define XFS_BUF_FSPRIVATE3(buf, type)		\
+#define XFS_BUF_FSPRIVATE3(buf, type)		1
 
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
 #define XFS_BUF_SET_START(buf)
@@ -270,6 +283,14 @@ typedef struct buftarg {
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
+/* setup the buffer target from a buftarg structure */
+#define XFS_BUF_SET_TARGET(bp, target) 
+/* return the dev_t being used */
+#define XFS_BUF_TARGET(bp)  1
+#define XFS_BUF_SET_VTYPE_REF(bp, type, ref)	
+#define XFS_BUF_SET_VTYPE(bp, type)
+#define XFS_BUF_SET_REF(bp, ref)	
+
 #define xfs_buf_read(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
 				PBF_LOCK | PBF_READ)
@@ -277,7 +298,7 @@ typedef struct buftarg {
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
 				PBF_LOCK)
 #define xfs_bdwrite(mp, bp)			\
-			pb->pb_flags |= PBF_DELWRI; \
+			bp->pb_flags |= PBF_DELWRI; \
 			pagebuf_relse(bp)
 
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.68 $"
+#ident "$Revision: 1.69 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -348,7 +348,7 @@ xfs_trans_read_buf(
 		bp = xfs_buf_read(target, blkno, len,
 			      flags | BUF_BUSY);
 #endif
-		if ((bp != NULL) && (geterror(bp) != 0)) {
+		if ((bp != NULL) && (XFS_BUF_GETERROR(bp) != 0)) {
 			xfs_ioerror_alert("xfs_trans_read_buf", mp,
 					  target->dev, blkno);
 			error = geterror(bp);

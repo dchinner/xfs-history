@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.178 $"
+#ident	"$Revision: 1.182 $"
 
 /*
  * High level interface routines for log manager
@@ -1012,7 +1012,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	} 
 
 	buftrace("XLOG__BDSTRAT IOERROR", bp);
-	bioerror(bp, EIO);
+	XFS_BUF_ERROR(bp, EIO);
 	XFS_BUF_STALE(bp);
 	biodone(bp);
 	return (XFS_ERROR(EIO));
