@@ -279,7 +279,7 @@ xfs_inobt_delrec(
 		 * structure to pass up to the next level (updkey).
 		 */
 		if (ptr == 1) {
-			INT_SET(key.ir_startino, ARCH_CONVERT, INT_GET(rp->ir_startino, ARCH_CONVERT));
+			INT_COPY(key.ir_startino, rp->ir_startino, ARCH_CONVERT);
 			kp = &key;
 		}
 	}
@@ -306,7 +306,7 @@ xfs_inobt_delrec(
 			 * Make it the new root of the btree.
 			 */
 			bno = INT_GET(agi->agi_root, ARCH_CONVERT);
-			INT_SET(agi->agi_root, ARCH_CONVERT, INT_GET(*pp, ARCH_CONVERT));
+			INT_COPY(agi->agi_root, *pp, ARCH_CONVERT);
 			INT_MOD(agi->agi_level, ARCH_CONVERT, -1);
 			/*
 			 * Free the block.
@@ -589,7 +589,7 @@ xfs_inobt_delrec(
 	/*
 	 * Fix up the right block pointer in the surviving block, and log it.
 	 */
-	INT_SET(left->bb_rightsib, ARCH_CONVERT, INT_GET(right->bb_rightsib, ARCH_CONVERT));
+	INT_COPY(left->bb_rightsib, right->bb_rightsib, ARCH_CONVERT);
 	xfs_inobt_log_block(cur->bc_tp, lbp, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
 	/*
 	 * If there is a right sibling now, make it point to the 
@@ -1434,9 +1434,9 @@ xfs_inobt_newroot(
 		kp[1] = *XFS_INOBT_KEY_ADDR(right, 1, cur); /* INT_: struct copy */
 	} else {
 		rp = XFS_INOBT_REC_ADDR(left, 1, cur);
-		INT_SET(kp[0].ir_startino, ARCH_CONVERT, INT_GET(rp->ir_startino, ARCH_CONVERT));
+		INT_COPY(kp[0].ir_startino, rp->ir_startino, ARCH_CONVERT);
 		rp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		INT_SET(kp[1].ir_startino, ARCH_CONVERT, INT_GET(rp->ir_startino, ARCH_CONVERT));
+		INT_COPY(kp[1].ir_startino, rp->ir_startino, ARCH_CONVERT);
 	}
 	xfs_inobt_log_keys(cur, nbp, 1, 2);
 	/*
@@ -1948,9 +1948,16 @@ xfs_inobt_get_rec(
 	 * Point to the record and extract its data.
 	 */
 	rec = XFS_INOBT_REC_ADDR(block, ptr, cur);
-	INT_SET(*ino, arch, INT_GET(rec->ir_startino, ARCH_CONVERT));
-	INT_SET(*fcnt, arch, INT_GET(rec->ir_freecount, ARCH_CONVERT));
-	INT_SET(*free, arch, INT_GET(rec->ir_free, ARCH_CONVERT));
+        ASSERT(arch == ARCH_NOCONVERT || arch == ARCH_CONVERT);
+        if (arch == ARCH_NOCONVERT) {
+	    *ino = INT_GET(rec->ir_startino, ARCH_CONVERT);
+	    *fcnt = INT_GET(rec->ir_freecount, ARCH_CONVERT);
+	    *free = INT_GET(rec->ir_free, ARCH_CONVERT);
+        } else {
+	    INT_COPY(*ino, rec->ir_startino, ARCH_CONVERT);
+	    INT_COPY(*fcnt, rec->ir_freecount, ARCH_CONVERT);
+	    INT_COPY(*free, rec->ir_free, ARCH_CONVERT);
+        }
 	*stat = 1;
 	return 0;
 }

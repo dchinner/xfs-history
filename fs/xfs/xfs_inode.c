@@ -730,15 +730,15 @@ xfs_xlate_dinode_core(xfs_caddr_t buf, xfs_dinode_core_t *dip,
         return;
     }
     
-    INT_COPY(buf_core->di_magic,       mem_core->di_magic,        dir, arch);
-    INT_COPY(buf_core->di_mode,        mem_core->di_mode,         dir, arch);
-    INT_COPY(buf_core->di_version,     mem_core->di_version,      dir, arch);
-    INT_COPY(buf_core->di_format,      mem_core->di_format,       dir, arch);
-    INT_COPY(buf_core->di_onlink,      mem_core->di_onlink,       dir, arch);
-    INT_COPY(buf_core->di_uid,         mem_core->di_uid,          dir, arch);
-    INT_COPY(buf_core->di_gid,         mem_core->di_gid,          dir, arch);
-    INT_COPY(buf_core->di_nlink,       mem_core->di_nlink,        dir, arch);
-    INT_COPY(buf_core->di_projid,      mem_core->di_projid,       dir, arch);
+    INT_XLATE(buf_core->di_magic,       mem_core->di_magic,        dir, arch);
+    INT_XLATE(buf_core->di_mode,        mem_core->di_mode,         dir, arch);
+    INT_XLATE(buf_core->di_version,     mem_core->di_version,      dir, arch);
+    INT_XLATE(buf_core->di_format,      mem_core->di_format,       dir, arch);
+    INT_XLATE(buf_core->di_onlink,      mem_core->di_onlink,       dir, arch);
+    INT_XLATE(buf_core->di_uid,         mem_core->di_uid,          dir, arch);
+    INT_XLATE(buf_core->di_gid,         mem_core->di_gid,          dir, arch);
+    INT_XLATE(buf_core->di_nlink,       mem_core->di_nlink,        dir, arch);
+    INT_XLATE(buf_core->di_projid,      mem_core->di_projid,       dir, arch);
     
     if (dir>0) {
         bcopy(buf_core->di_pad, mem_core->di_pad, sizeof(buf_core->di_pad));
@@ -746,27 +746,27 @@ xfs_xlate_dinode_core(xfs_caddr_t buf, xfs_dinode_core_t *dip,
         bcopy(mem_core->di_pad, buf_core->di_pad, sizeof(buf_core->di_pad));
     }
     
-    INT_COPY(buf_core->di_atime.t_sec, mem_core->di_atime.t_sec,  dir, arch);
-    INT_COPY(buf_core->di_atime.t_nsec,mem_core->di_atime.t_nsec, dir, arch);
+    INT_XLATE(buf_core->di_atime.t_sec, mem_core->di_atime.t_sec,  dir, arch);
+    INT_XLATE(buf_core->di_atime.t_nsec,mem_core->di_atime.t_nsec, dir, arch);
     
-    INT_COPY(buf_core->di_mtime.t_sec, mem_core->di_mtime.t_sec,  dir, arch);
-    INT_COPY(buf_core->di_mtime.t_nsec,mem_core->di_mtime.t_nsec, dir, arch);
+    INT_XLATE(buf_core->di_mtime.t_sec, mem_core->di_mtime.t_sec,  dir, arch);
+    INT_XLATE(buf_core->di_mtime.t_nsec,mem_core->di_mtime.t_nsec, dir, arch);
     
-    INT_COPY(buf_core->di_ctime.t_sec, mem_core->di_ctime.t_sec,  dir, arch);
-    INT_COPY(buf_core->di_ctime.t_nsec,mem_core->di_ctime.t_nsec, dir, arch);
+    INT_XLATE(buf_core->di_ctime.t_sec, mem_core->di_ctime.t_sec,  dir, arch);
+    INT_XLATE(buf_core->di_ctime.t_nsec,mem_core->di_ctime.t_nsec, dir, arch);
     
-    INT_COPY(buf_core->di_size,        mem_core->di_size,         dir, arch);
-    INT_COPY(buf_core->di_nblocks,     mem_core->di_nblocks,      dir, arch);
-    INT_COPY(buf_core->di_extsize,     mem_core->di_extsize,      dir, arch);
+    INT_XLATE(buf_core->di_size,        mem_core->di_size,         dir, arch);
+    INT_XLATE(buf_core->di_nblocks,     mem_core->di_nblocks,      dir, arch);
+    INT_XLATE(buf_core->di_extsize,     mem_core->di_extsize,      dir, arch);
     
-    INT_COPY(buf_core->di_nextents,    mem_core->di_nextents,     dir, arch);
-    INT_COPY(buf_core->di_anextents,   mem_core->di_anextents,    dir, arch);
-    INT_COPY(buf_core->di_forkoff,     mem_core->di_forkoff,      dir, arch);
-    INT_COPY(buf_core->di_aformat,     mem_core->di_aformat,      dir, arch);
-    INT_COPY(buf_core->di_dmevmask,    mem_core->di_dmevmask,     dir, arch);
-    INT_COPY(buf_core->di_dmstate,     mem_core->di_dmstate,      dir, arch);
-    INT_COPY(buf_core->di_flags,       mem_core->di_flags,        dir, arch);
-    INT_COPY(buf_core->di_gen,         mem_core->di_gen,          dir, arch);
+    INT_XLATE(buf_core->di_nextents,    mem_core->di_nextents,     dir, arch);
+    INT_XLATE(buf_core->di_anextents,   mem_core->di_anextents,    dir, arch);
+    INT_XLATE(buf_core->di_forkoff,     mem_core->di_forkoff,      dir, arch);
+    INT_XLATE(buf_core->di_aformat,     mem_core->di_aformat,      dir, arch);
+    INT_XLATE(buf_core->di_dmevmask,    mem_core->di_dmevmask,     dir, arch);
+    INT_XLATE(buf_core->di_dmstate,     mem_core->di_dmstate,      dir, arch);
+    INT_XLATE(buf_core->di_flags,       mem_core->di_flags,        dir, arch);
+    INT_XLATE(buf_core->di_gen,         mem_core->di_gen,          dir, arch);
     
 }
 

@@ -973,7 +973,8 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 		btree = &node->btree[ blk->index ];
 		if (INT_GET(btree->hashval, ARCH_CONVERT) == lasthash)
 			break;
-		blk->hashval = INT_SET(btree->hashval, ARCH_CONVERT, lasthash);
+		blk->hashval = lasthash;
+                INT_SET(btree->hashval, ARCH_CONVERT, lasthash);
 		xfs_da_log_buf(state->args->trans, blk->bp,
 				  XFS_DA_LOGRANGE(node, btree, sizeof(*btree)));
 

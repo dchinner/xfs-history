@@ -2246,7 +2246,8 @@ xfs_alloc_put_freelist(
 			INT_GET(agf->agf_seqno, ARCH_CONVERT), &agflbp)))
 		return error;
 	agfl = XFS_BUF_TO_AGFL(agflbp);
-	if (INT_MOD(agf->agf_fllast, ARCH_CONVERT, 1) == XFS_AGFL_SIZE)
+        INT_MOD(agf->agf_fllast, ARCH_CONVERT, 1);
+        if (INT_GET(agf->agf_fllast, ARCH_CONVERT) == XFS_AGFL_SIZE)
 		INT_ZERO(agf->agf_fllast, ARCH_CONVERT);
 	pag = &mp->m_perag[INT_GET(agf->agf_seqno, ARCH_CONVERT)];
 	INT_MOD(agf->agf_flcount, ARCH_CONVERT, 1);

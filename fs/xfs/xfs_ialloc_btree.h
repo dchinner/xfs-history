@@ -109,13 +109,13 @@ int xfs_inobt_is_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch);
 void xfs_inobt_set_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch);
 #define	XFS_INOBT_SET_FREE(rp,i,arch)	xfs_inobt_set_free(rp,i,arch)
 #else
-#define	XFS_INOBT_SET_FREE(rp,i,arch)	(INT_MODX((rp)->ir_free, arch, |= XFS_INOBT_MASK(i)))
+#define	XFS_INOBT_SET_FREE(rp,i,arch)	(INT_MOD_EXPR((rp)->ir_free, arch, |= XFS_INOBT_MASK(i)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_INOBT_CLR_FREE)
 void xfs_inobt_clr_free(xfs_inobt_rec_t *rp, int i, xfs_arch_t arch);
 #define	XFS_INOBT_CLR_FREE(rp,i,arch)	xfs_inobt_clr_free(rp,i,arch)
 #else
-#define	XFS_INOBT_CLR_FREE(rp,i,arch)	(INT_MODX((rp)->ir_free, arch, &= ~XFS_INOBT_MASK(i)))
+#define	XFS_INOBT_CLR_FREE(rp,i,arch)	(INT_MOD_EXPR((rp)->ir_free, arch, &= ~XFS_INOBT_MASK(i)))
 #endif
 
 /*

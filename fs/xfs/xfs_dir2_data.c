@@ -253,7 +253,7 @@ xfs_dir2_data_freeinsert(
 	       INT_GET(d->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC);
 #endif
 	dfp = d->hdr.bestfree;
-	INT_SET(new.length, ARCH_CONVERT, INT_GET(dup->length, ARCH_CONVERT)); 
+	INT_COPY(new.length, dup->length, ARCH_CONVERT); 
 	INT_SET(new.offset, ARCH_CONVERT, (xfs_dir2_data_off_t)((char *)dup - (char *)d));
 	/*
 	 * Insert at position 0, 1, or 2; or not at all.

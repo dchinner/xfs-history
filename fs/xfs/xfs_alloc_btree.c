@@ -300,7 +300,7 @@ xfs_alloc_delrec(
 		 */
 		if (INT_GET(block->bb_numrecs, ARCH_CONVERT)) {
 			rrp = XFS_ALLOC_REC_ADDR(block, INT_GET(block->bb_numrecs, ARCH_CONVERT), cur);
-			INT_SET(agf->agf_longest, ARCH_CONVERT, INT_GET(rrp->ar_blockcount, ARCH_CONVERT));
+			INT_COPY(agf->agf_longest, rrp->ar_blockcount, ARCH_CONVERT);
 		}
 		/*
 		 * No free extents left.
@@ -328,7 +328,7 @@ xfs_alloc_delrec(
 			 * Make it the new root of the btree.
 			 */
 			bno = INT_GET(agf->agf_roots[cur->bc_btnum], ARCH_CONVERT);
-			INT_SET(agf->agf_roots[cur->bc_btnum], ARCH_CONVERT, INT_GET(*lpp, ARCH_CONVERT));
+			INT_COPY(agf->agf_roots[cur->bc_btnum], *lpp, ARCH_CONVERT);
 			INT_MOD(agf->agf_levels[cur->bc_btnum], ARCH_CONVERT, -1);
 			mp->m_perag[INT_GET(agf->agf_seqno, ARCH_CONVERT)].pagf_levels[cur->bc_btnum]--;
 			/*
@@ -876,7 +876,7 @@ xfs_alloc_insrec(
 		 * is no right sibling block and this block is bigger
 		 * than the previous longest block, update it.
 		 */
-		INT_SET(agf->agf_longest, ARCH_CONVERT, INT_GET(recp->ar_blockcount, ARCH_CONVERT));
+		INT_COPY(agf->agf_longest, recp->ar_blockcount, ARCH_CONVERT);
 		cur->bc_mp->m_perag[INT_GET(agf->agf_seqno, ARCH_CONVERT)].pagf_longest
 			= INT_GET(recp->ar_blockcount, ARCH_CONVERT);
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,

@@ -186,7 +186,7 @@ xfs_dir2_leaf_to_node(
 	INT_SET(free->hdr.magic, ARCH_CONVERT, XFS_DIR2_FREE_MAGIC);
 	INT_ZERO(free->hdr.firstdb, ARCH_CONVERT);
 	ASSERT(INT_GET(ltp->bestcount, ARCH_CONVERT) <= (uint)dp->i_d.di_size / mp->m_dirblksize);
-	INT_SET(free->hdr.nvalid, ARCH_CONVERT, INT_GET(ltp->bestcount, ARCH_CONVERT));
+	INT_COPY(free->hdr.nvalid, ltp->bestcount, ARCH_CONVERT);
 	/*
 	 * Copy freespace entries from the leaf block to the new block.
 	 * Count active entries.
@@ -1700,7 +1700,7 @@ xfs_dir2_node_addname_int(
 		 * change again.
 		 */
 		data = dbp->data;
-		INT_SET(free->bests[findex], ARCH_CONVERT, INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT)); 
+		INT_COPY(free->bests[findex], data->hdr.bestfree[0].length, ARCH_CONVERT); 
 		logfree = 1;
 	}
 	/*
@@ -1765,7 +1765,7 @@ xfs_dir2_node_addname_int(
 	 * If the freespace entry is now wrong, update it.
 	 */
 	if (INT_GET(free->bests[findex], ARCH_CONVERT) != INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT)) {
-		INT_SET(free->bests[findex], ARCH_CONVERT, INT_GET(data->hdr.bestfree[0].length, ARCH_CONVERT));
+		INT_COPY(free->bests[findex], data->hdr.bestfree[0].length, ARCH_CONVERT);
 		logfree = 1;
 	}
 	/*

@@ -308,15 +308,15 @@ xfs_xlatesb(void *data, xfs_sb_t *sb, int dir, xfs_arch_t arch,
         } else {
             switch (size) {
                 case 2:  
-                    INT_COPY(*(__uint16_t*)(buf_ptr+first),
+                    INT_XLATE(*(__uint16_t*)(buf_ptr+first),
                              *(__uint16_t*)(mem_ptr+first), dir, arch);
                     break;
                 case 4:  
-                    INT_COPY(*(__uint32_t*)(buf_ptr+first),
+                    INT_XLATE(*(__uint32_t*)(buf_ptr+first),
                              *(__uint32_t*)(mem_ptr+first), dir, arch);
                     break;
                 case 8:  
-                    INT_COPY(*(__uint64_t*)(buf_ptr+first),
+                    INT_XLATE(*(__uint64_t*)(buf_ptr+first),
                              *(__uint64_t*)(mem_ptr+first), dir, arch);
                     break;
                 default: 

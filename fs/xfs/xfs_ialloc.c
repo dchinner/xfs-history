@@ -676,10 +676,10 @@ nextag:
 		XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 		do {
 			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_CONVERT))
+					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT))
 				goto error0;
 			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
-			freecount += INT_GET(rec.ir_freecount, ARCH_CONVERT);
+			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);
@@ -696,9 +696,9 @@ nextag:
 			goto error0;
 		if (i != 0 &&
 		    (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-			    &rec.ir_freecount, &rec.ir_free, &j, ARCH_CONVERT)) == 0 &&
+			    &rec.ir_freecount, &rec.ir_free, &j, ARCH_NOCONVERT)) == 0 &&
 		    j == 1 &&
-		    INT_GET(rec.ir_freecount, ARCH_CONVERT) > 0) {
+		    rec.ir_freecount > 0) {
 			/*
 			 * Found a free inode in the same chunk
 			 * as parent, done.
@@ -731,7 +731,7 @@ nextag:
 				if (error = xfs_inobt_get_rec(tcur,
 						&trec.ir_startino,
 						&trec.ir_freecount,
-						&trec.ir_free, &i, ARCH_CONVERT))
+						&trec.ir_free, &i, ARCH_NOCONVERT))
 					goto error1;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
@@ -745,7 +745,7 @@ nextag:
 				if (error = xfs_inobt_get_rec(cur,
 						&rec.ir_startino,
 						&rec.ir_freecount,
-						&rec.ir_free, &i, ARCH_CONVERT))
+						&rec.ir_free, &i, ARCH_NOCONVERT))
 					goto error1;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
@@ -764,16 +764,16 @@ nextag:
 				if (!doneleft && !doneright)
 					useleft =
 						pagino -
-						(INT_GET(trec.ir_startino, ARCH_CONVERT) +
+						(trec.ir_startino +
 						 XFS_INODES_PER_CHUNK - 1) <
-						 INT_GET(rec.ir_startino, ARCH_CONVERT) - pagino;
+						 rec.ir_startino - pagino;
 				else
 					useleft = !doneleft;
 				/*
 				 * If checking the left, does it have
 				 * free inodes?
 				 */
-				if (useleft && INT_GET(trec.ir_freecount, ARCH_CONVERT)) {
+				if (useleft && trec.ir_freecount) {
 					/*
 					 * Yes, set it up as the chunk to use.
 					 */
@@ -787,7 +787,7 @@ nextag:
 				 * If checking the right, does it have
 				 * free inodes?
 				 */
-				if (!useleft && INT_GET(rec.ir_freecount, ARCH_CONVERT)) {
+				if (!useleft && rec.ir_freecount) {
 					/*
 					 * Yes, it's already set up.
 					 */
@@ -809,7 +809,7 @@ nextag:
 							    tcur,
 							    &trec.ir_startino,
 							    &trec.ir_freecount,
-							    &trec.ir_free, &i, ARCH_CONVERT))
+							    &trec.ir_free, &i, ARCH_NOCONVERT))
 							goto error1;
 						XFS_WANT_CORRUPTED_GOTO(i == 1,
 							error1);
@@ -829,7 +829,7 @@ nextag:
 							    cur,
 							    &rec.ir_startino,
 							    &rec.ir_freecount,
-							    &rec.ir_free, &i, ARCH_CONVERT))
+							    &rec.ir_free, &i, ARCH_NOCONVERT))
 							goto error1;
 						XFS_WANT_CORRUPTED_GOTO(i == 1,
 							error1);
@@ -849,9 +849,9 @@ nextag:
 			goto error0;
 		if (i == 1 &&
 		    (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-			    &rec.ir_freecount, &rec.ir_free, &j, ARCH_CONVERT)) == 0 &&
+			    &rec.ir_freecount, &rec.ir_free, &j, ARCH_NOCONVERT)) == 0 &&
 		    j == 1 &&
-		    INT_GET(rec.ir_freecount, ARCH_CONVERT) > 0) {
+		    rec.ir_freecount > 0) {
 			/*
 			 * The last chunk allocated in the group still has
 			 * a free inode.
@@ -870,10 +870,10 @@ nextag:
 				if (error = xfs_inobt_get_rec(cur,
 						&rec.ir_startino,
 						&rec.ir_freecount, &rec.ir_free,
-						&i, ARCH_CONVERT))
+						&i, ARCH_NOCONVERT))
 					goto error0;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
-				if (INT_GET(rec.ir_freecount, ARCH_CONVERT) > 0)
+				if (rec.ir_freecount > 0)
 					break;
 				if (error = xfs_inobt_increment(cur, 0, &i))
 					goto error0;
@@ -881,20 +881,16 @@ nextag:
 			}
 		}
 	}
-        {
-            xfs_inofree_t temp;
-            temp=INT_GET(rec.ir_free, ARCH_CONVERT);
-	    offset = XFS_IALLOC_FIND_FREE(&temp);
-        }
+	offset = XFS_IALLOC_FIND_FREE(&rec.ir_free);
 	ASSERT(offset >= 0);
 	ASSERT(offset < XFS_INODES_PER_CHUNK);
-	ASSERT((XFS_AGINO_TO_OFFSET(mp, INT_GET(rec.ir_startino, ARCH_CONVERT)) %
+	ASSERT((XFS_AGINO_TO_OFFSET(mp, rec.ir_startino) %
 				   XFS_INODES_PER_CHUNK) == 0);
-	ino = XFS_AGINO_TO_INO(mp, agno, INT_GET(rec.ir_startino, ARCH_CONVERT) + offset);
-	XFS_INOBT_CLR_FREE(&rec, offset, ARCH_CONVERT);
-	INT_MOD(rec.ir_freecount, ARCH_CONVERT, -1);
-	if (error = xfs_inobt_update(cur, INT_GET(rec.ir_startino, ARCH_CONVERT), INT_GET(rec.ir_freecount, ARCH_CONVERT),
-			INT_GET(rec.ir_free, ARCH_CONVERT)))
+	ino = XFS_AGINO_TO_INO(mp, agno, rec.ir_startino + offset);
+	XFS_INOBT_CLR_FREE(&rec, offset, ARCH_NOCONVERT);
+	rec.ir_freecount--;
+	if (error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount,
+			rec.ir_free))
 		goto error0;
 	INT_MOD(agi->agi_freecount, ARCH_CONVERT, -1);
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
@@ -909,10 +905,10 @@ nextag:
 			goto error0;
 		do {
 			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_CONVERT))
+					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT))
 				goto error0;
 			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
-			freecount += INT_GET(rec.ir_freecount, ARCH_CONVERT);
+			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);
@@ -999,10 +995,10 @@ xfs_difree(
 			goto error0;
 		do {
 			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_CONVERT))
+					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT))
 				goto error0;
 			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
-			freecount += INT_GET(rec.ir_freecount, ARCH_CONVERT);
+			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);
@@ -1017,21 +1013,21 @@ xfs_difree(
 		goto error0;
 	XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 	if (error = xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
-			&rec.ir_free, &i, ARCH_CONVERT))
+			&rec.ir_free, &i, ARCH_NOCONVERT))
 		goto error0;
 	XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 	/*
 	 * Get the offset in the inode chunk.
 	 */
-	off = agino - INT_GET(rec.ir_startino, ARCH_CONVERT);
+	off = agino - rec.ir_startino;
 	ASSERT(off >= 0 && off < XFS_INODES_PER_CHUNK);
-	ASSERT(!XFS_INOBT_IS_FREE(&rec, off, ARCH_CONVERT));
+	ASSERT(!XFS_INOBT_IS_FREE(&rec, off, ARCH_NOCONVERT));
 	/*
 	 * Mark the inode free & increment the count.
 	 */
-	XFS_INOBT_SET_FREE(&rec, off, ARCH_CONVERT);
-	INT_MOD(rec.ir_freecount, ARCH_CONVERT, +1);
-	if (error = xfs_inobt_update(cur, INT_GET(rec.ir_startino, ARCH_CONVERT), INT_GET(rec.ir_freecount, ARCH_CONVERT), INT_GET(rec.ir_free, ARCH_CONVERT)))
+	XFS_INOBT_SET_FREE(&rec, off, ARCH_NOCONVERT);
+	rec.ir_freecount++;
+	if (error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free))
 		goto error0;
 	/*
 	 * Change the inode free counts and log the ag/sb changes.
@@ -1049,10 +1045,10 @@ xfs_difree(
 			goto error0;
 		do {
 			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					&rec.ir_freecount, &rec.ir_free, &i, ARCH_CONVERT))
+					&rec.ir_freecount, &rec.ir_free, &i, ARCH_NOCONVERT))
 				goto error0;
 			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
-			freecount += INT_GET(rec.ir_freecount, ARCH_CONVERT);
+			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
 		} while (i == 1);

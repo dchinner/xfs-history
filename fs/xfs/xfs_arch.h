@@ -148,20 +148,21 @@
         : \
             INT_SWAP((reference),(reference)) \
     )
-    
+
+/* does not return a value */   
 #define INT_SET(reference,arch,valueref) \
-    ( \
+    (void)( \
         ((reference) = (valueref)), \
         ( \
            ((arch) != ARCH_NOCONVERT) ? \
                (reference) = INT_SWAP((reference),(reference)) \
            : 0 \
-        ), \
-        INT_GET(reference, arch) \
+        ) \
     )
 
-#define INT_MODX(reference,arch,code) \
-    (((arch) == ARCH_NOCONVERT) \
+/* does not return a value */   
+#define INT_MOD_EXPR(reference,arch,code) \
+    (void)(((arch) == ARCH_NOCONVERT) \
         ? \
             ((reference) code) \
         : \
@@ -171,10 +172,44 @@
                 INT_SET(reference, arch, reference) \
             ) \
     )
-#define INT_MOD(reference,arch,delta) \
-    INT_MODX(reference,arch,+=(delta))
     
-#define INT_COPY(buf,mem,dir,arch) {\
+/* does not return a value */   
+#define INT_MOD(reference,arch,delta) \
+    (void)( \
+        INT_MOD_EXPR(reference,arch,+=(delta)) \
+    )
+    
+/*
+ * INT_COPY - copy a value between two locations with the
+ *            _same architecture_ but _potentially different sizes_
+ *
+ *          if the types of the two parameters are equal or they are
+ *              in native architecture, a simple copy is done
+ *
+ *          otherwise, architecture conversions are done
+ *
+ */
+    
+/* does not return a value */   
+#define INT_COPY(dst,src,arch) \
+    (void)( \
+        ((sizeof(dst) == sizeof(src)) || ((arch) == ARCH_NOCONVERT)) \
+            ? \
+                ((dst) = (src)) \
+            : \
+                INT_SET(dst, arch, INT_GET(src, arch)) \
+    )
+    
+/*
+ * INT_XLATE - copy a value in either direction between two locations 
+ *             with different architectures 
+ *
+ *                  dir < 0     - copy from memory to buffer (native to arch)
+ *                  dir > 0     - copy from buffer to memory (arch to native)
+ */
+    
+/* does not return a value */   
+#define INT_XLATE(buf,mem,dir,arch) {\
     ASSERT(dir); \
     if (dir>0) { \
         (mem)=INT_GET(buf, arch); \
@@ -182,6 +217,7 @@
         INT_SET(buf, arch, mem); \
     } \
 }
+
 
 #define INT_ISZERO(reference,arch) \
     ((reference) == 0)
