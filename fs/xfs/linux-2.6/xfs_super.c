@@ -872,8 +872,6 @@ static void __exit exit_xfs_fs(void)
 	destroy_inodecache();
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_xfs_fs);
 module_exit(exit_xfs_fs);
 
