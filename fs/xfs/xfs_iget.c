@@ -1,4 +1,4 @@
-#ident "$Revision: 1.50 $"
+#ident "$Revision: 1.51 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -143,6 +143,7 @@ xfs_iget(xfs_mount_t	*mp,
 	vnode_t		*vp;
 	ulong		version;
 	int		error;
+	int		newnode;
 	vmap_t		vmap;
 	char		name[8];
 
@@ -194,9 +195,9 @@ again:
 			if (lock_flags != 0) {
 				xfs_ilock(ip, lock_flags);
 			}
-			
-			*ipp = ip;
-			return 0;
+
+			newnode = (ip->i_d.di_mode == 0);
+			goto return_ip;
 		}
 	}
 
@@ -284,6 +285,16 @@ again:
 	mp->m_inodes = ip;
 	XFS_MOUNT_IUNLOCK(mp);
 
+	newnode = 1;
+
+ return_ip:
+	/*
+	 * Call hook for imon to see whether ip is of interest and should
+	 * have its vnodeops monitored.
+	 */
+	if (newnode) {
+		IMON_CHECK(vp, ip->i_dev, (ino_t)ino);
+	}
 	*ipp = ip;
 	return 0;
 }
