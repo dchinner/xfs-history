@@ -1,4 +1,4 @@
-#ident "$Revision: 1.236 $"
+#ident "$Revision: 1.237 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2342,7 +2342,9 @@ xfs_write_file(
 	bhv_desc_t	*bdp,
 	uio_t		*uiop,
 	int		ioflag,
-	cred_t		*credp)
+	cred_t		*credp,
+	xfs_lsn_t	*commit_lsn_p,
+	int		*append)
 {
 	struct bmapval	bmaps[XFS_MAX_RW_NBMAPS];
 	struct bmapval	*bmapp;
@@ -2579,6 +2581,26 @@ xfs_write_file(
 			}
 
 			/*
+			 * save the commit lsn for dsync writes
+			 * so xfs_write can force the log up to
+			 * the appropriate point.  don't bother
+			 * doing this for sync writes since xfs_write
+			 * will have to kick off a sync xaction to
+			 * log the timestamp updates anyway.
+			 *
+			 * blindly reset b_fsprivate3 here since
+			 * the XFS routines don't clear that field
+			 * when they release a metadata buffer.
+			 *
+			 * b_fsprivate3 on this buffer *must* be
+			 * reset before going down to xfs_strat_write 
+			 * or xfs_strat_write will stamp an lsn
+			 * into a mount structure.
+			 */
+			if (ioflag & IO_DSYNC)
+				bp->b_fsprivate3 = commit_lsn_p;
+
+			/*
 			 * There is not much we can do with buffer errors.
 			 * The assumption here is that the space underlying
 			 * the buffer must now be allocated (even if it
@@ -2697,6 +2719,12 @@ xfs_write_file(
 				}
 				bp->b_flags |= B_STALE;
 				(void) bwrite(bp);
+				/*
+				 * clean up after ourselves to avoid
+				 * potential future confusion
+				 */
+				if (ioflag & IO_DSYNC)
+					bp->b_fsprivate3 = NULL;
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -2740,6 +2768,12 @@ xfs_write_file(
 					bp->b_relse = chunkrelse;
 				}
 				error = bwrite(bp);
+				/*
+				 * clean up after ourselves to avoid
+				 * potential future confusion
+				 */
+				if (ioflag & IO_DSYNC)
+					bp->b_fsprivate3 = NULL;
 			} else {
 				bdwrite(bp);
 			}
@@ -2778,6 +2812,7 @@ xfs_write_file(
 					ip->i_update_core = 1;
 					ip->i_update_size = 1;
 					isize = offset;
+					*append = 1;
 				}
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			}
@@ -2841,7 +2876,7 @@ xfs_write_clear_setuid(
 	}
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	xfs_trans_set_sync(tp);
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return 0;
 }
@@ -2872,7 +2907,9 @@ xfs_write(
 	off_t		savedsize;
 	xfs_fsize_t	limit;
 	int		eventsent;
+	int		appended;
 	vnode_t 	*vp;
+	xfs_lsn_t	commit_lsn;
 
 #if defined(DEBUG) && !defined(SIM) && defined(UIOSZ_DEBUG)
 	/*
@@ -2894,7 +2931,11 @@ xfs_write(
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
+	mp = ip->i_mount;
+
 	eventsent = 0;
+	appended = 0;
+	commit_lsn = -1;
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return (EIO);
 
@@ -2987,6 +3028,13 @@ start:
 		 */
 		if ((ioflag & IO_APPEND) && savedsize != ip->i_d.di_size)
 			goto start;
+		/*
+		 * implement osync == dsync option
+		 */
+		if (ioflag & IO_SYNC && mp->m_flags & XFS_MOUNT_OSYNCISDSYNC) {
+			ioflag &= ~IO_SYNC;
+			ioflag |= IO_DSYNC;
+		}
 #endif
 
 		/*
@@ -3012,8 +3060,6 @@ start:
 		 * smallest value.  Silently ignore requests that aren't
 		 * within valid I/O size limits.
 		 */
-		mp = ip->i_mount;
-
 		if ((ioflag & IO_UIOSZ) &&
 		    uiop->uio_writeiolog != ip->i_writeio_log &&
 		    uiop->uio_writeiolog >= mp->m_sb.sb_blocklog &&
@@ -3056,7 +3102,8 @@ retry:
 		if (ioflag & IO_DIRECT) {
 			error = xfs_diordwr(bdp, uiop, ioflag, credp, B_WRITE);
 		} else {
-			error = xfs_write_file(bdp, uiop, ioflag, credp);
+			error = xfs_write_file(bdp, uiop, ioflag, credp,
+						&commit_lsn, &appended);
 		}
 
 #ifndef SIM
@@ -3079,14 +3126,12 @@ retry:
 		} else
 #endif
 		if (error == ENOSPC) {
-			mp = ip->i_mount;
 			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)  {
 				xfs_error(mp, 2);
 			} else {
 				xfs_error(mp, 1);
 			}
 		}
-
 
 		/*
 		 * Add back whatever we refused to do because of
@@ -3114,10 +3159,19 @@ retry:
 		 * we use a synchronous transaction to log the inode.
 		 * It's not fast, but it's necessary.
 		 *
+		 * If this a dsync write and the size got changed
+		 * because we were appending to the file, then we
+		 * need to ensure that the size change gets logged
+		 * in a synchronous transaction.  If an allocation
+		 * transaction occurred without extending the size,
+		 * then we have to force the log up the proper point
+		 * to ensure that the allocation is permanent.
+		 *
 		 * If the vnode is a swap vnode, then don't do anything
 		 * which could require allocating memory.
 		 */
-		if ((ioflag & IO_SYNC) && !(vp->v_flag & VISSWAP)) {
+		if (((ioflag & IO_SYNC) || ((ioflag & IO_DSYNC) && appended)) &&
+		    !(vp->v_flag & VISSWAP)) {
 			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
 			if (transerror = xfs_trans_reserve(tp, 0,
 						      XFS_SWRITE_LOG_RES(mp),
@@ -3131,14 +3185,14 @@ retry:
 			xfs_trans_ihold(tp, ip);
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			xfs_trans_set_sync(tp);
-			transerror = xfs_trans_commit(tp, 0);
+			transerror = xfs_trans_commit(tp, 0, &commit_lsn);
 			if ( transerror )
 				error = transerror;
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		}
-		if ((ioflag & IO_DSYNC) && !(vp->v_flag & VISSWAP)) {
-			xfs_log_force(mp, (xfs_lsn_t)0,
-				      XFS_LOG_FORCE | XFS_LOG_SYNC );
+		} else if ((ioflag & IO_DSYNC) && !(vp->v_flag & VISSWAP)) {
+			if (commit_lsn != -1)
+				xfs_log_force(mp, (xfs_lsn_t)commit_lsn,
+					      XFS_LOG_FORCE | XFS_LOG_SYNC );
 		}
 		if (ioflag & (IO_NFS|IO_NFS3)) {
 			xfs_refcache_insert(ip);
@@ -4401,6 +4455,7 @@ xfs_strat_write(
 	int		imap_index;
 	int		nimaps;
 	int		committed;
+	xfs_lsn_t	commit_lsn;
 	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];
 #define	XFS_STRAT_WRITE_IMAPS	2
 
@@ -4533,13 +4588,25 @@ xfs_strat_write(
 			}
 
 			error = xfs_trans_commit(tp,
-						 XFS_TRANS_RELEASE_LOG_RES);
+						 XFS_TRANS_RELEASE_LOG_RES,
+						 &commit_lsn);
 			if (error) {
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
 				goto error0;
 			}
+
+			/*
+			 * write the commit lsn if requested into the
+			 * place pointed at by the buffer.  This is
+			 * used by IO_DSYNC writes and b_fsprivate3
+			 * should be a pointer to a stack (automatic)
+			 * variable.  So be *very* careful if you muck
+			 * with b_fsprivate3.
+			 */
+			if (bp->b_fsprivate3)
+				*(xfs_lsn_t *)bp->b_fsprivate3 = commit_lsn;
 
 			/*
 			 * Before dropping the lock, clear any read-ahead
@@ -5613,7 +5680,8 @@ retry:
 				    xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				    break;
 			    }
-			    xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+			    xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
+					     NULL);
 			} 
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		} else {
