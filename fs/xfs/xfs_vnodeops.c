@@ -1,4 +1,4 @@
-#ident "$Revision: 1.209 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -511,7 +511,7 @@ xfs_getattr(
 		vap->va_nextents = (ip->i_df.if_flags & XFS_IFEXTENTS) ?
 			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
-		vap->va_uuid = ip->i_d.di_uuid;
+		bzero(&(vap->va_uuid), sizeof(vap->va_uuid));
 		if (ip->i_afp != NULL) {
 			vap->va_anextents =
 				(ip->i_afp->if_flags & XFS_IFEXTENTS) ?
@@ -2006,11 +2006,44 @@ xfs_bumplink(
 	xfs_trans_t *tp,
 	xfs_inode_t *ip)
 {
+	xfs_mount_t	*mp;
+	int		s;
+
 	if (ip->i_d.di_nlink >= XFS_MAXLINK)
 		return XFS_ERROR(EMLINK);
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
 
         ip->i_d.di_nlink++;
+	if ((ip->i_d.di_version == XFS_DINODE_VERSION_1) &&
+	    (ip->i_d.di_nlink > XFS_MAXLINK_1)) {
+		/*
+		 * The inode has increased its number of links beyond
+		 * what can fit in an old format inode.  It now needs
+		 * to be converted to a version 2 inode with a 32 bit
+		 * link count.  If this is the first inode in the file
+		 * system to do this, then we need to bump the superblock
+		 * version number as well.
+		 */
+		ip->i_d.di_version = XFS_DINODE_VERSION_2;
+		ip->i_d.di_onlink = 0;
+		bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
+		ASSERT(ip->i_d.di_projid == 0);
+
+		mp = tp->t_mountp;
+		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
+			s = XFS_SB_LOCK(mp);
+			if (mp->m_sb.sb_versionnum <
+			    XFS_SB_VERSION_HASNLINK) {
+				mp->m_sb.sb_versionnum =
+					XFS_SB_VERSION_HASNLINK;
+				XFS_SB_UNLOCK(mp, s);
+				xfs_mod_sb(tp, XFS_SB_VERSIONNUM);
+			} else {
+				XFS_SB_UNLOCK(mp, s);
+			}
+		}
+	}
+
         xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	return 0;
 }
