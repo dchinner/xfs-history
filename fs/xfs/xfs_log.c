@@ -110,7 +110,7 @@ STATIC void		xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 int xlog_debug = 2;
 
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 int bytes_of_ticket_used;
 #endif
 
@@ -367,7 +367,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	if (! xlog_debug)
 		return 0;
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	first_iclog = iclog = log->l_iclog;
 	do {
 		ASSERT(iclog->ic_state == XLOG_STATE_ACTIVE);
@@ -672,7 +672,7 @@ xlog_sync(xlog_t		*log,
 	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	xlog_verify_iclog(log, iclog, count, B_TRUE);
 #endif
 
@@ -877,7 +877,7 @@ xlog_write(xfs_mount_t *	mp,
 		len += sizeof(xlog_op_header_t); /* from splitting of region */
 	    }
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	    ASSERT(copy_len >= 0);
 	    xlog_verify_dest_ptr(log, ptr);
 #endif
@@ -1250,7 +1250,7 @@ xlog_state_put_ticket(xlog_t	    *log,
 
 	spl = splockspl(log->l_icloglock, splhi);
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	bytes_of_ticket_used = tic->t_orig_reserv - tic->t_curr_reserv;
 #endif
 
@@ -1293,7 +1293,7 @@ xlog_state_release_iclog(xlog_t		*log,
 	else
 	    iclog->ic_header.h_tail_lsn = log->l_tail_lsn = tail_lsn;
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	/* check if it will fit */
 	if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
 		blocks =
