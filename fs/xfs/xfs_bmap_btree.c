@@ -40,6 +40,7 @@
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
