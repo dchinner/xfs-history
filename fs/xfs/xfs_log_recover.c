@@ -616,8 +616,15 @@ xlog_find_zeroed(xlog_t	 *log,
 	if (last_cycle != 0) {		/* log completely written to */
 		xlog_put_bp(bp);
 		return 0;
+	} else if (first_cycle != 1) {
+		/*
+		 * Hopefully, this will catch the case where someone mkfs's
+		 * over a log partition.
+		 */
+	xlog_warn("xFS: (xlog_find_zeroed): last cycle = 0; first cycle != 1");
+		ASSERT(first_cycle == 1);
+		return EINVAL;
 	}
-	ASSERT(first_cycle == 1);
 
 	/* we have a partially zeroed log */
 	last_blk = log_bbnum-1;
@@ -2554,9 +2561,12 @@ xlog_recover(xlog_t *log)
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk))
 		return error;
 	if (tail_blk != head_blk) {
+#ifdef DEBUG
 		cmn_err(CE_NOTE,
-			"Starting xFS recovery on (major: %d) (minor: %d)",
-			emajor(log->l_dev), eminor(log->l_dev));
+			"Starting xFS recovery on filesystem: %s (dev: %d/%d)",
+			log->l_mp->m_fsname, emajor(log->l_dev),
+			eminor(log->l_dev));
+#endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
 	}
@@ -2591,9 +2601,14 @@ xlog_recover_finish(xlog_t *log)
 		xlog_recover_check_summary(log);
 #endif /* _KERNEL */
 		cmn_err(CE_NOTE,
-			"Ending xFS recovery on (major: %d) (minor: %d)",
-			emajor(log->l_dev), eminor(log->l_dev));
+			"Ending xFS recovery for filesystem: %s (dev: %d/%d)",
+			log->l_mp->m_fsname, emajor(log->l_dev),
+			eminor(log->l_dev));
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
+	} else {
+		cmn_err(CE_NOTE,
+			"Ending clean xFS mount for filesystem: %s",
+			log->l_mp->m_fsname);
 	}
 	return 0;
 }	/* xlog_recover_finish */
