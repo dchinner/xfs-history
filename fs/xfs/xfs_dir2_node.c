@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.13 $"
 
 /*
  * xfs_dir2_node.c
@@ -85,7 +85,7 @@
 #include "sim.h"
 #endif
 
-#if defined(XFSDEBUG) && !defined(SIM) && 0
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM) && 0
 #include "asm/kdb.h"
 
 #undef xfs_dir2_print_args

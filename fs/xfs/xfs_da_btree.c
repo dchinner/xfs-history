@@ -90,7 +90,8 @@
 #include "sim.h"
 #endif
 
-#if defined(XFSDEBUG) && !defined(SIM)
+
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM)
 #include "asm/kdb.h"
 
 #undef xfs_buftrace

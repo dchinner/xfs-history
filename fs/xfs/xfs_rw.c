@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.318 $"
+#ident "$Revision: 1.319 $"
 
 #include <xfs_os_defs.h>
 
@@ -82,7 +82,7 @@
 #include "xfs_trans_space.h"
 #include "xfs_dmapi.h"
 #include "xfs_cxfs.h"
-#ifdef XFSDEBUG
+#if defined(XFSDEBUG) && defined(CONFIG_KDB)
 #include "asm/kdb.h"
 #endif
 /*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.19 $"
+#ident "$Revision: 1.20 $"
 
 /*
  * XFS v2 directory implmentation.
@@ -93,7 +93,7 @@
 #include "sim.h"
 #endif
 
-#if defined(XFSDEBUG) && !defined(SIM) && 0
+#if defined(XFSDEBUG) && defined(CONFIG_KDB) && !defined(SIM) && 0
 #include "asm/kdb.h"
 #undef xfs_dir2_trace_args
 #define xfs_dir2_trace_args(A,B) \
