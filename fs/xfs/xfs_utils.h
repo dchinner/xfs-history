@@ -70,6 +70,11 @@ xfs_bumplink(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip);
 
+extern void
+xfs_bump_ino_vers2(
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip);
+
 #endif /* !SIM */
 
 #endif /* XFS_UTILS_H */
