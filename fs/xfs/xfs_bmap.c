@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.101 $"
+#ident	"$Revision: 1.103 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -302,6 +302,22 @@ xfs_bmap_worst_indlen(
 	xfs_inode_t		*ip,	/* incore inode pointer */
 	xfs_extlen_t		len);	/* delayed extent length */
 
+#ifdef DEBUG
+/*
+ * Perform various validation checks on the values being returned
+ * from xfs_bmapi().
+ */
+STATIC void
+xfs_bmap_validate_ret(
+	xfs_fileoff_t		bno,
+	xfs_extlen_t		len,
+	int			flags,
+	xfs_bmbt_irec_t		*mval,
+	int			nmap,
+	int			ret_nmap);
+#else
+#define	xfs_bmap_validate_ret(bno,len,flags,mval,onmap,nmap)
+#endif /* DEBUG */
 
 /*
  * Bmap internal routines.
@@ -2600,6 +2616,54 @@ xfs_bmap_trace_exlist(
 }
 #endif
 
+#ifdef DEBUG
+
+/*
+ * Validate that the bmbt_irecs being returned from bmapi are valid
+ * given the callers original parameters.  Specifically check the
+ * ranges of the returned irecs to ensure that they only extent beyond
+ * the given parameters if the XFS_BMAPI_ENTIRE flag was set.
+ */
+STATIC void
+xfs_bmap_validate_ret(
+	xfs_fileoff_t		bno,
+	xfs_extlen_t		len,
+	int			flags,
+	xfs_bmbt_irec_t		*mval,
+	int			nmap,
+	int			ret_nmap)
+{
+	int		i;
+
+	ASSERT(ret_nmap <= nmap);
+
+	for (i = 0; i < ret_nmap; i++) {
+		if (!(flags & XFS_BMAPI_ENTIRE)) {
+			ASSERT(mval[i].br_startoff >= bno);
+			ASSERT(mval[i].br_blockcount <= len);
+			ASSERT((mval[i].br_startoff +
+				mval[i].br_blockcount) <=
+			       (bno + len));
+		} else {
+			ASSERT(mval[i].br_startoff < (bno + len));
+			ASSERT((mval[i].br_startoff +
+				mval[i].br_blockcount) >
+			       bno);
+		}
+		ASSERT((i == 0) ||
+		       ((mval[i-1].br_startoff + mval[i-1].br_blockcount) ==
+			(mval[i].br_startoff)));
+		if ((flags & XFS_BMAPI_WRITE) &&
+		    !(flags & XFS_BMAPI_DELAY)) {
+			ASSERT((mval[i].br_startblock != DELAYSTARTBLOCK) &&
+			       (mval[i].br_startblock != HOLESTARTBLOCK));
+		}
+	}
+}		      
+
+#endif /* DEBUG */
+
+
 /*
  * Map file blocks to filesystem blocks.
  * File range is given by the bno/len pair.
@@ -2655,6 +2719,19 @@ xfs_bmapi(
 	int			userdata;
 	int			wasdelay;
 	int			wr;
+#ifdef DEBUG
+	xfs_fileoff_t		orig_bno;
+	xfs_extlen_t		orig_len;
+	int			orig_flags;
+	xfs_bmbt_irec_t		*orig_mval;
+	int			orig_nmap;
+
+	orig_bno = bno;
+	orig_len = len;
+	orig_flags = flags;
+	orig_mval = mval;
+	orig_nmap = *nmap;
+#endif
 
 	ASSERT(*nmap >= 1);
 	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP || !(flags & XFS_BMAPI_WRITE));
@@ -2831,6 +2908,7 @@ xfs_bmapi(
 		if (trim && (got.br_startoff + got.br_blockcount > obno)) {
 			bno = XFS_FILEOFF_MAX(bno, obno);
 			ASSERT((bno >= obno) || (n == 0));
+			ASSERT(bno < end);
 			mval->br_startoff = bno;
 			if (ISNULLSTARTBLOCK(got.br_startblock)) {
 				ASSERT(!wr || delay);
@@ -2838,9 +2916,18 @@ xfs_bmapi(
 			} else
 				mval->br_startblock = got.br_startblock +
 					(bno - got.br_startoff);
+			/*
+			 * Return the minimum of what we got and what we
+			 * asked for for the length.  We can use the len
+			 * variable here because it is modified below
+			 * and we could have been there before coming
+			 * here if the first part of the allocation
+			 * didn't overlap what was asked for.
+			 */
 			mval->br_blockcount =
-				XFS_EXTLEN_MIN(len, got.br_blockcount -
+				XFS_EXTLEN_MIN(end - bno, got.br_blockcount -
 					(bno - got.br_startoff));
+			ASSERT(mval->br_blockcount <= len);
 		} else {
 			*mval = got;
 			if (ISNULLSTARTBLOCK(mval->br_startblock)) {
@@ -2848,6 +2935,10 @@ xfs_bmapi(
 				mval->br_startblock = DELAYSTARTBLOCK;
 			}
 		}
+		ASSERT(!trim ||
+		       ((mval->br_startoff + mval->br_blockcount) <= end));
+		ASSERT(!trim || (mval->br_blockcount <= len) ||
+		       (mval->br_startoff < obno));
 		bno = mval->br_startoff + mval->br_blockcount;
 		len = end - bno;
 		if (n > 0 && mval->br_startoff == mval[-1].br_startoff) {
@@ -2917,6 +3008,8 @@ xfs_bmapi(
 		xfs_btree_del_cursor(cur);
 	}
 	kmem_check();
+	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
+			      orig_nmap, *nmap);
 	return firstblock;
 }
 
