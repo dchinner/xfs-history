@@ -627,7 +627,7 @@ linvfs_pb_bmap(struct inode *inode,
 	if (flags & PBF_BMAP_TRY_ILOCK)
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 
-	return error;
+	return -error;
 }
 
 extern int xfs_ilock_nowait(xfs_inode_t *, uint lock_flags);
