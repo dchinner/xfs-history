@@ -4,7 +4,7 @@
 #ident	"$Revision$"
 
 /* Min and max rt extent sizes, specified in bytes */
-#define	XFS_MAX_RTEXTSIZE	(16 * 1024 * 1024)	/* 16MB */
+#define	XFS_MAX_RTEXTSIZE	(1024 * 1024 * 1024)	/* 1GB */
 #define	XFS_MIN_RTEXTSIZE	(64 * 1024)		/* 64KB */
 
 /*
