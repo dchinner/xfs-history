@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.213 $"
+#ident  "$Revision: 1.215 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -2690,6 +2690,37 @@ bhv_desc_t	*bdp;
 	return 0;
 }
 
+STATIC int
+xfs_get_vnode(bhv_desc_t *bdp,
+	vnode_t		**vpp,
+	ino_t		ino)
+{
+	xfs_mount_t	*mp;
+	xfs_ihash_t	*ih;
+	xfs_inode_t	*ip;
+
+	*vpp = NULL;
+
+	mp = XFS_BHVTOM(bdp);
+	ih = XFS_IHASH(mp, ino);
+
+	mraccess(&ih->ih_lock);
+
+	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
+		if (ip->i_ino == ino) {
+			*vpp = XFS_ITOV(ip);
+			break;
+		}
+	}
+
+	mrunlock(&ih->ih_lock);
+
+	if (!*vpp)
+		return XFS_ERROR(ENOENT);
+	
+	return(0);
+}
+
 
 vfsops_t xfs_vfsops = {
 	BHV_IDENTITY_INIT(VFS_BHV_XFS,VFS_POSITION_BASE),
@@ -2707,6 +2738,7 @@ vfsops_t xfs_vfsops = {
 	fs_import,	
 	xfs_quotactl,
 	xfs_force_pinned,
+	xfs_get_vnode,
 	VFSOPS_MAGIC,
 	VFS_OPSVER_GROVE,/* interface version */
         VFS_OPSFL_FRLOCK2/* interface flags */
