@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.37 $"
 
 struct buf;
 struct xfs_mount;
@@ -43,8 +43,9 @@ typedef enum xfs_alloctype
 typedef struct xfs_alloc_arg {
 	struct xfs_trans *tp;		/* transaction pointer */
 	struct xfs_mount *mp;		/* file system mount point */
-	xfs_fsblock_t	fsbno;		/* file system block number */
 	struct buf	*agbp;		/* buffer for a.g. freelist header */
+	struct xfs_perag *pag;		/* per-ag struct for this agno */
+	xfs_fsblock_t	fsbno;		/* file system block number */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agblock_t	agbno;		/* allocation group-relative block # */
 	xfs_extlen_t	minlen;		/* minimum size of extent */
@@ -60,7 +61,6 @@ typedef struct xfs_alloc_arg {
 	char		wasfromfl;	/* set if allocation is from freelist */
 	char		isfl;		/* set if is freelist blocks - !actg */
 	char		userdata;	/* set if this is user data */
-	struct xfs_perag *pag;		/* per-ag struct for this agno */
 } xfs_alloc_arg_t;
 
 /*
