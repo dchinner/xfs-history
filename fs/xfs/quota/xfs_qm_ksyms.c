@@ -59,6 +59,7 @@ EXPORT_SYMBOL(xfs_Gqm);
 EXPORT_SYMBOL(xfs_qm_dqattach);
 EXPORT_SYMBOL(xfs_qm_dqpurge_all);
 EXPORT_SYMBOL(xfs_qm_dqrele_all_inodes);
+EXPORT_SYMBOL(xfs_qm_quotacheck);
 EXPORT_SYMBOL(xfs_trans_reserve_quota_bydquots);
 
 MODULE_AUTHOR("Silicon Graphics, Inc.");
