@@ -213,7 +213,6 @@ typedef struct page_buf_s {
 	struct pb_target	*pb_target;	/* logical object */
 	atomic_t		pb_hold;	/* reference count */
 	page_buf_daddr_t	pb_bn;		/* block number for I/O */
-	kdev_t			pb_dev;
 	loff_t			pb_file_offset;	/* offset in file */
 	size_t			pb_buffer_length; /* size of buffer in bytes */
 	size_t			pb_count_desired; /* desired transfer size */
@@ -235,20 +234,6 @@ typedef struct page_buf_s {
 	struct page		*pb_page_array[PB_PAGES]; /* inline pages */
 } page_buf_t;
 
-
-/* 
- *	Page_buf_apply_t
- *
- *	Type of function pointer supplied to pagebuf_segment_apply.
- */
-
-typedef int (*page_buf_apply_t)(	/* function to apply to segment	*/
-		page_buf_t *,		/* buffer to examine		*/
-		loff_t,			/* offset in file of segment	*/
-		struct page *,		/* page (NULL if not in mem_map[]) */
-		size_t,			/* offset in page		*/
-		size_t,			/* length of segment		*/
-		int);			/* true if last page in pagebuf */ 
 
 /*
  * page_buf module entry points
@@ -422,10 +407,6 @@ extern int pagebuf_iomove(		/* move data in/out of pagebuf  */
 		size_t,			/* length in buffer		*/
 		caddr_t,		/* data pointer			*/
 		page_buf_rw_t);		/* direction			*/
-
-extern int pagebuf_segment_apply(	/* apply function to segments	*/
-		page_buf_apply_t,	/* function to call		*/
-		page_buf_t *);		/* buffer to examine		*/
 
 /* Pinning Buffer Storage in Memory */
 

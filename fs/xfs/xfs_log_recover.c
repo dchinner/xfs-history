@@ -1806,10 +1806,10 @@ xlog_recover_do_dquot_buffer(
 	 * if it already is. (so, we have to replay dquot log records
 	 * when MAYBE flag's set).
 	 */
-	if (mp->m_qflags == 0 && mp->m_dev != rootdev) {
+	if (mp->m_qflags == 0 && !kdev_same(mp->m_dev, rootdev)) {
 		return;
 	}
-	
+
 	type = 0;
 	if (buf_f->blf_flags & XFS_BLI_UDQUOT_BUF)
 		type |= XFS_DQ_USER;
@@ -2259,11 +2259,10 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	 * if it already is. (so, we have to replay dquot log records
 	 * when MAYBE flag's set).
 	 */
-	if (mp->m_qflags == 0 &&
-	    mp->m_dev != rootdev) {
+	if (mp->m_qflags == 0 && !kdev_same(mp->m_dev, rootdev)) {
 		return (0);
 	}
-	
+
 	recddq = (xfs_disk_dquot_t *)item->ri_buf[1].i_addr;
 	ASSERT(recddq);
 	/*

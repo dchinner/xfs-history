@@ -162,9 +162,9 @@ uint
 xfs_buf_item_size(
 	xfs_buf_log_item_t	*bip)
 {
-	uint	nvecs;
-	int	next_bit;
-	int	last_bit;
+	uint		nvecs;
+	int		next_bit;
+	int		last_bit;
 	xfs_buf_t	*bp;
 
 	ASSERT(atomic_read(&bip->bli_refcount) > 0);
@@ -428,7 +428,6 @@ xfs_buf_item_unpin_remove(
 	xfs_buf_log_item_t	*bip,
 	xfs_trans_t		*tp)
 {
-	/* REFERENCED */
 	xfs_buf_t		*bp;
 	xfs_log_item_desc_t	*lidp;
 
@@ -440,7 +439,7 @@ xfs_buf_item_unpin_remove(
 	    (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(XFS_BUF_VALUSEMA(bip->bli_buf) <= 0);
 		xfs_buf_item_trace("UNPIN REMOVE", bip);
-      	xfs_buftrace("XFS_UNPIN_REMOVE", bp);
+		xfs_buftrace("XFS_UNPIN_REMOVE", bp);
 		/*
 		 * yes -- clear the xaction descriptor in-use flag
 		 * and free the chunk if required.  We can safely
@@ -1127,7 +1126,7 @@ xfs_buf_attach_iodone(
 
 STATIC void
 xfs_buf_do_callbacks(
-	xfs_buf_t		*bp,
+	xfs_buf_t	*bp,
 	xfs_log_item_t	*lip)
 {
 	xfs_log_item_t	*nlip;
@@ -1160,7 +1159,7 @@ xfs_buf_iodone_callbacks(
 {
 	xfs_log_item_t	*lip;
 	static time_t	lasttime;
-	static dev_t	lastdev;
+	static kdev_t	lastdev;
 	xfs_mount_t	*mp;
 
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
@@ -1174,7 +1173,7 @@ xfs_buf_iodone_callbacks(
 		 */ 
 		mp = lip->li_mountp;
 		if (XFS_FORCED_SHUTDOWN(mp)) {
-			ASSERT(XFS_BUF_TARGET(bp) == mp->m_dev);
+			ASSERT(kdev_same(XFS_BUF_TARGET_DEV(bp), mp->m_dev));
 			XFS_BUF_SUPER_STALE(bp);
 			xfs_buftrace("BUF_IODONE_CB", bp);
 			xfs_buf_do_callbacks(bp, lip);
@@ -1198,15 +1197,15 @@ xfs_buf_iodone_callbacks(
 			return;
 		}
 
-		if ((XFS_BUF_TARGET(bp) != lastdev) ||
+		if ((!kdev_same(XFS_BUF_TARGET_DEV(bp), lastdev)) ||
 		    ((lbolt - lasttime) > 500)) {
 			prdev("XFS write error in file system meta-data "
 			      "block 0x%Lx in %s",
-			      XFS_BUF_TARGET(bp),
+			      XFS_BUF_TARGET_DEV(bp),
 			      XFS_BUF_ADDR(bp), mp->m_fsname);
 			lasttime = lbolt;
 		}
-		lastdev = XFS_BUF_TARGET(bp);
+		lastdev = XFS_BUF_TARGET_DEV(bp);
 
 		if (XFS_BUF_ISASYNC(bp)) {
 			/*
@@ -1271,7 +1270,7 @@ xfs_buf_error_relse(
 
 	lip = XFS_BUF_FSPRIVATE(bp, xfs_log_item_t *);
 	mp = (xfs_mount_t *)lip->li_mountp;
-	ASSERT(XFS_BUF_TARGET(bp) == mp->m_dev);
+	ASSERT(kdev_same(XFS_BUF_TARGET_DEV(bp), mp->m_dev));
 
 	XFS_BUF_STALE(bp);
 	XFS_BUF_DONE(bp);
@@ -1289,8 +1288,6 @@ xfs_buf_error_relse(
 	XFS_BUF_CLR_IODONE_FUNC(bp);
 	XFS_BUF_SET_BRELSE_FUNC(bp,NULL);
 	xfs_buf_relse(bp);
-	return;
-
 }
 
 
@@ -1304,7 +1301,7 @@ xfs_buf_error_relse(
 /* ARGSUSED */
 void
 xfs_buf_iodone(
-	xfs_buf_t			*bp,
+	xfs_buf_t		*bp,
 	xfs_buf_log_item_t	*bip)
 {
 	struct xfs_mount	*mp;
@@ -1348,7 +1345,7 @@ xfs_buf_item_trace(
 	char			*id,
 	xfs_buf_log_item_t	*bip)
 {
-	xfs_buf_t	*bp;
+	xfs_buf_t		*bp;
 	ASSERT(bip->bli_trace != NULL);
 
 	bp = bip->bli_buf;

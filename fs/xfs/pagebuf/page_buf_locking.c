@@ -119,7 +119,7 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 	list_for_each(p, &h->pb_hash) {
 		pb = list_entry(p, page_buf_t, pb_hash_list);
 
-		if ((target->pbr_device == pb->pb_dev) &&
+		if ((target == pb->pb_target) &&
 		    (pb->pb_file_offset == range_base) &&
 		    (pb->pb_buffer_length == range_length)) {
 			if (pb->pb_flags & PBF_FREED)

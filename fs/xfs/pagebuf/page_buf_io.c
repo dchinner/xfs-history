@@ -196,7 +196,6 @@ _pb_direct_io(
 	}
 
 	offset = mp->pbm_delta >> 9;
-	pb->pb_dev = mp->pbm_target->pbr_device;
 	pb->pb_bn = mp->pbm_bn + offset;
 
 	/* Do our own allocation to avoid the buffer_head overhead */

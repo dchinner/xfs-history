@@ -86,7 +86,6 @@ typedef struct xfs_dquot {
 	struct xfs_trans*q_transp;	/* trans this belongs to currently */
 	uint		 q_nrefs;       /* # active refs from inodes */
 	xfs_daddr_t	 q_blkno;	/* blkno of dquot buffer */
-	dev_t		 q_dev;		/* dev for this dquot */
 	int		 q_bufoffset;	/* off of dq in buffer (# dquots) */
 	xfs_fileoff_t    q_fileoffset;	/* offset in quotas file */
 

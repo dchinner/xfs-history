@@ -159,7 +159,7 @@ xfs_getattr(
 	}
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-        vap->va_fsid = mp->m_dev;
+	vap->va_fsid = kdev_t_to_nr(mp->m_dev);
 #if XFS_BIG_FILESYSTEMS
 	vap->va_nodeid = ip->i_ino + mp->m_inoadd;
 #else
@@ -241,8 +241,8 @@ xfs_getattr(
                                 (mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
 		}
 	} else {
-                vap->va_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
-                vap->va_blksize = BLKDEV_IOSIZE;
+		vap->va_rdev = IRIX_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
+		vap->va_blksize = BLKDEV_IOSIZE;
 	}
 
         vap->va_atime.tv_sec = ip->i_d.di_atime.t_sec;
@@ -2266,7 +2266,7 @@ xfs_create(
 		if (resblks == 0 &&
 		    (error = XFS_DIR_CANENTER(mp, tp, dp, name, namelen)))
 			goto error_return;
-		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
+		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
 		error = xfs_dir_ialloc(&tp, dp, 
 				MAKEIMODE(vap->va_type,vap->va_mode), 1,
 				rdev, credp, prid, resblks > 0,
@@ -3682,7 +3682,7 @@ xfs_mkdir(
 	/*
 	 * create the directory inode.
 	 */
-	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
+	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
         mode = IFDIR | (vap->va_mode & ~IFMT);
 	error = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, prid, resblks > 0,
 		&cdp, NULL);
@@ -4332,7 +4332,7 @@ xfs_symlink(
 	/*
 	 * Allocate an inode for the symlink.
 	 */
-	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
+	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
 
 	error = xfs_dir_ialloc(&tp, dp, IFLNK | (vap->va_mode&~IFMT),
 			       1, rdev, credp, prid, resblks > 0, &ip, NULL);

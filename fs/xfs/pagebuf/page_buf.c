@@ -175,6 +175,7 @@ struct buffer_head		*pb_resv_bh = NULL;	/* list of bh */
 int				pb_resv_bh_cnt = 0;	/* # of bh available */
 
 STATIC void pagebuf_daemon_wakeup(int);
+STATIC int _pagebuf_segment_apply(page_buf_t *);
 
 /*
  * Pagebuf module configuration parameters, exported via
@@ -279,7 +280,6 @@ _pagebuf_initialize(
 	init_MUTEX_LOCKED(&PBP(pb)->pb_sema); /* held, no waiters */
 	PB_SET_OWNER(pb);
 	pb->pb_target = target;
-	pb->pb_dev = target->pbr_device;
 	pb->pb_file_offset = range_base;
 	pb->pb_buffer_length = pb->pb_count_desired = range_length; 
 	/* set buffer_length and count_desired to the same value initially 
@@ -1581,7 +1581,6 @@ error:
 	return err;
 }
 
-/* Apply function for pagebuf_segment_apply */
 STATIC int
 _page_buf_page_apply(
 	page_buf_t		*pb,
@@ -1592,7 +1591,7 @@ _page_buf_page_apply(
 	int			last)
 {
 	page_buf_daddr_t	bn = pb->pb_bn;
-	kdev_t			dev = pb->pb_dev;
+	kdev_t			dev = pb->pb_target->pbr_device;
 	size_t			blocksize = pb->pb_target->pbr_blocksize;
 	size_t			sector = 1 << PB_SECTOR_BITS;
 	loff_t			pb_offset;
@@ -1672,7 +1671,7 @@ int pagebuf_iorequest(		/* start real I/O               */
 	 * all the I/O from calling iodone too early
 	 */
 	atomic_set(&PBP(pb)->pb_io_remaining, 1);
-	status = pagebuf_segment_apply(_page_buf_page_apply, pb);
+	status = _pagebuf_segment_apply(pb);
 
 	/* Drop our count and if everything worked we are done */
 	if (atomic_dec_and_test(&PBP(pb)->pb_io_remaining) == 1) {
@@ -1822,20 +1821,15 @@ int pagebuf_iomove(			/* move data in/out of buffer	*/
 }
 
 /*
- *	pagebuf_segment_apply
+ *	_pagebuf_segment_apply
  *
- *	pagebuf_segment_apply applies the page_buf_apply_t function
- *	to each segment of the page_buf_t.  It may be used to walk
- *	the segments of a buffer, as when building 
- *	a driver scatter-gather list.
+ *	Applies _page_buf_page_apply to each segment of the page_buf_t.
  */
-
-int
-pagebuf_segment_apply(			/* apply function to segments   */
-	page_buf_apply_t	func,	/* function to call             */
+STATIC int
+_pagebuf_segment_apply(			/* apply function to segments   */
 	page_buf_t		*pb)	/* buffer to examine            */
 {
-	int			buf_index, sval, blocksize, status = 0;
+	int			buf_index, sval, status = 0;
 	loff_t			buffer_offset = pb->pb_file_offset;
 	size_t			buffer_len = pb->pb_count_desired;
 	size_t			page_offset, len, total = 0;
@@ -1843,7 +1837,6 @@ pagebuf_segment_apply(			/* apply function to segments   */
 
 	pagebuf_hold(pb);
 
-	blocksize = pb->pb_target->pbr_blocksize;
 	cur_offset = pb->pb_offset;
 	cur_len = buffer_len;
 
@@ -1863,8 +1856,7 @@ pagebuf_segment_apply(			/* apply function to segments   */
 			len = cur_len;
 		cur_len -= len;
 
-		/* func probably = _page_buf_page_apply */
-		sval = func(pb, buffer_offset,
+		sval = _page_buf_page_apply(pb, buffer_offset,
 				pb->pb_pages[buf_index], page_offset, len,
 				buf_index+1 == pb->pb_page_count);
 		if (sval <= 0) {

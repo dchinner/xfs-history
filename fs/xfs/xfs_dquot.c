@@ -78,8 +78,7 @@ xfs_qm_dqinit(
 	dqp->dq_flags = type;
 	INT_SET(dqp->q_core.d_id, ARCH_CONVERT, id);
 	dqp->q_mount = mp;
-	dqp->q_dev = mp->m_dev;
-	
+
 	/*
 	 * No need to re-initialize these if this is a reclaimed dquot.
 	 */
@@ -1646,11 +1645,6 @@ xfs_qm_dqflock_pushbuf_wait(
 	 * out immediately.  We'll be able to acquire
 	 * the flush lock when the I/O completes.
 	 */
-	/*
-	bp = incore(dqp->q_dev, dqp->q_blkno, 
-		    XFS_QI_DQCHUNKLEN(dqp->q_mount),
-		    INCORE_TRYLOCK);
-	*/
 	bp = xfs_incore(dqp->q_mount->m_ddev_targ, dqp->q_blkno, 
 		    XFS_QI_DQCHUNKLEN(dqp->q_mount),
 		    XFS_INCORE_TRYLOCK);

@@ -1594,12 +1594,12 @@ static void	printinode(struct inode *ip)
 
 	kdb_printf(" i_ino = %lu i_count = %u i_dev = 0x%x i_size %Ld\n",
 					ip->i_ino, atomic_read(&ip->i_count),
-					ip->i_dev, ip->i_size);
+					kdev_t_to_nr(ip->i_dev), ip->i_size);
 
 	kdb_printf(
 		" i_mode = 0x%x  i_nlink = %d  i_rdev = 0x%x i_state = 0x%lx\n",
 					ip->i_mode, ip->i_nlink,
-					ip->i_rdev, ip->i_state);
+					kdev_t_to_nr(ip->i_rdev), ip->i_state);
 
 	kdb_printf(" i_hash.nxt = 0x%p i_hash.prv = 0x%p\n",
 					ip->i_hash.next, ip->i_hash.prev);
@@ -4387,8 +4387,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("ail_gen 0x%x &sb 0x%p\n",
 		mp->m_ail_gen, &mp->m_sb);
 	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev 0x%x logdev 0x%x rtdev 0x%x\n",
-		&mp->m_sb_lock, mp->m_sb_bp, mp->m_dev, mp->m_logdev,
-		mp->m_rtdev);
+		&mp->m_sb_lock, mp->m_sb_bp, kdev_t_to_nr(mp->m_dev),
+		kdev_t_to_nr(mp->m_logdev), kdev_t_to_nr(mp->m_rtdev));
 	kdb_printf("bsize %d agfrotor %d agirotor %d ihash 0x%p ihsize %d\n",
 		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
 		mp->m_ihash, mp->m_ihsize);
@@ -4558,7 +4558,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_mprev,
 		XFS_ITOV_NULL(ip));
 	kdb_printf("dev %x ino %s\n",
-		ip->i_mount->m_dev,
+		kdev_t_to_nr(ip->i_mount->m_dev),
 		xfs_fmtino(ip->i_ino, ip->i_mount));
 	kdb_printf("blkno 0x%llx len 0x%x boffset 0x%x\n",
 		(long long) ip->i_blkno,
@@ -4757,8 +4757,8 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 	kdb_printf("nrefs 0x%x, res_bcount %d, ", 
 		dqp->q_nrefs, (int) dqp->q_res_bcount);
 	printflags(dqp->dq_flags, qflags, "flags:");
-	kdb_printf("\nblkno 0x%x\tdev 0x%x\tboffset 0x%x\n", (int) dqp->q_blkno, 
-		(int) dqp->q_dev, (int) dqp->q_bufoffset);
+	kdb_printf("\nblkno 0x%llx\tboffset 0x%x\n",
+		(unsigned long long) dqp->q_blkno, (int) dqp->q_bufoffset);
 	kdb_printf("qlock 0x%p  flock 0x%p (%s) pincount 0x%x\n",
 		&dqp->q_qlock,
 		&dqp->q_flock, 

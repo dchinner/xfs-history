@@ -111,7 +111,7 @@ _xfs_force_shutdown(
 	if (XFS_FORCED_SHUTDOWN(mp) && !logerror)
 		return;
 
-	if (XFS_MTOVFS(mp)->vfs_dev == rootdev)
+	if (XFS_MTOVFS(mp)->vfs_dev == kdev_t_to_nr(rootdev))
 		cmn_err(CE_PANIC, "Fatal error on root filesystem");
 
 	/*
@@ -149,11 +149,6 @@ _xfs_force_shutdown(
 		cmn_err(CE_ALERT,
 		"Please umount the filesystem, and rectify the problem(s)");
 	}
-
-	/*
-	 * Any delwri buffers left over for this device will be caught
-	 * in the write path and destroyed. (pagebuf_write_full_page)
-	 */
 
 #if CELL_CAPABLE
 	if (cell_enabled && !(flags & XFS_SHUTDOWN_REMOTE_REQ) &&
@@ -264,15 +259,15 @@ xfs_ioerror_alert(
 	xfs_buf_t		*bp,
 	xfs_daddr_t		blkno)
 {
-        cmn_err(CE_ALERT,
+	cmn_err(CE_ALERT,
  "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%llx\n"
  "       (\"%s\") error %d buf count %u",
-                (mp == NULL || mp->m_fsname == NULL) ? "(fs name not set)" : mp->m_fsname,
-                XFS_BUF_TARGET(bp),
-                (__uint64_t)blkno,
-                func,
-                XFS_BUF_GETERROR(bp),
-                XFS_BUF_COUNT(bp));
+		(!mp || !mp->m_fsname) ? "(fs name not set)" : mp->m_fsname,
+		kdev_t_to_nr(XFS_BUF_TARGET_DEV(bp)),
+		(__uint64_t)blkno,
+		func,
+		XFS_BUF_GETERROR(bp),
+		XFS_BUF_COUNT(bp));
 }
 
 /*
