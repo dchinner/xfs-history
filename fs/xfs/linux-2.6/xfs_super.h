@@ -46,7 +46,7 @@ linvfs_make_inode(
 	struct super_block *sb);
 
 int
-xfs_fs_dounmount(
+fs_dounmount(
         bhv_desc_t      *bdp,
         int             flags,
         vnode_t         *rootvp,
