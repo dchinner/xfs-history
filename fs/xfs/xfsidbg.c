@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.49 $"
+#ident	"$Revision: 1.50 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3164,6 +3164,7 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 		"6-1-buf",	/* 7 */
 		"inode",	/* 8 */
 		"buf",		/* 9 */
+		"dquot",	/* 10 */
 		0
 		};
 	static char *li_flags[] = {
@@ -3204,6 +3205,13 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 	case XFS_LI_EFD:
 		xfs_efd_item_print((xfs_efd_log_item_t *)lip, 0);
 		break;
+	case XFS_LI_DQUOT:
+		xfs_dquot_item_print((xfs_dq_logitem_t *)lip, 0);
+		break;
+	case XFS_LI_QUOTAOFF:
+		xfs_qoff_item_print((xfs_qoff_logitem_t *)lip, 0);
+		break;
+		
 	default:
 		qprintf("Unknown item type %d\n", lip->li_type);
 		break;
@@ -3263,6 +3271,12 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		case XFS_LI_EFD:
 			xfs_efd_item_print((xfs_efd_log_item_t *)lip, 1);
 			break;
+		case XFS_LI_DQUOT:
+			xfs_dquot_item_print((xfs_dq_logitem_t *)lip, 1);
+			break;
+		case XFS_LI_QUOTAOFF:
+			xfs_qoff_item_print((xfs_qoff_logitem_t *)lip, 1);
+			break;	
 		default:
 			qprintf("Unknown item type %d\n", lip->li_type);
 			break;
