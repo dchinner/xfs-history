@@ -12,7 +12,9 @@
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
-#ifndef SIM
+#ifdef SIM
+#include <bstring.h>
+#else
 #include <sys/sysinfo.h>
 #include <sys/kmem.h>
 #include <sys/conf.h>
