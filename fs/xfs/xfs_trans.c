@@ -1,4 +1,4 @@
-#ident "$Revision: 1.64 $"
+#ident "$Revision: 1.65 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -582,7 +582,9 @@ xfs_trans_commit(
 		XFSSTATS.xs_trans_empty++;
 		return 0;
 	}
+#ifndef SIM
 	ASSERT(tp->t_ticket != NULL);
+#endif
 
 	/*
 	 * If we need to update the superblock, then do it now.
