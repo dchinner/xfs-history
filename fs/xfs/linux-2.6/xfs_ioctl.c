@@ -324,32 +324,13 @@ xfs_open_by_handle(
 		return new_fd;
 	}
 
-	/* Now to find a dentry.  If possible, get a well-connected one. */
-	spin_lock(&dcache_lock);
-	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
-		dentry = list_entry(lp, struct dentry, d_alias);
-		if (! (dentry->d_flags & DCACHE_DISCONNECTED)) {
-			dget_locked(dentry);
-			dentry->d_vfs_flags |= DCACHE_REFERENCED;
-			spin_unlock(&dcache_lock);
-			iput(inode);
-			goto found;
-		}
-	}
-	spin_unlock(&dcache_lock);
-
-	/* ELSE didn't find dentry.  Create anonymous dcache entry. */
-	dentry = d_alloc_root(inode);
+	dentry = d_alloc_anon(inode);
 	if (dentry == NULL) {
 		iput(inode);
 	     	put_unused_fd(new_fd);
 		return -XFS_ERROR(ENOMEM);
 	}
 
-	/* Keep nfsd happy. */
-	dentry->d_flags |= DCACHE_DISCONNECTED;
-
- found:
 	/* Ensure umount returns EBUSY on umounts while this file is open. */
 	mntget(parfilp->f_vfsmnt);
 

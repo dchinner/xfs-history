@@ -846,99 +846,6 @@ linvfs_dmapi_mount(
 	return 0;
 }
 
-#if 0
-STATIC int linvfs_dentry_to_fh(
-	struct dentry *dentry,
-	__u32 *data,
-	int *lenp,
-	int need_parent)
-{
-	struct inode *inode = dentry->d_inode ;
-	vnode_t *vp = LINVFS_GET_VPTR(inode);
-	int maxlen = *lenp;
-	xfs_fid2_t fid;
-	int error;
-
-	if (maxlen < 3)
-		return 255 ;
-
-	VOP_FID2(vp, (struct fid *)&fid, error);
-	data[0] = (__u32)fid.fid_ino;	/* 32 bits of inode is OK */
-	data[1] = fid.fid_gen;
-
-	*lenp = 2 ;
-	if (maxlen < 4 || ! need_parent)
-		return 2 ;
-
-	inode = dentry->d_parent->d_inode ;
-	vp = LINVFS_GET_VPTR(inode);
-
-	VOP_FID2(vp, (struct fid *)&fid, error);
-	data[2] = (__u32)fid.fid_ino;	/* 32 bits of inode is OK */
-	*lenp = 3 ;
-	if (maxlen < 4)
-		return 3 ;
-	data[3] = fid.fid_gen;
-	*lenp = 4 ;
-	return 4 ;
-}
-
-STATIC struct dentry *linvfs_fh_to_dentry(
-	struct super_block *sb,
-	__u32 *data,
-	int len,
-	int fhtype,
-	int parent)
-{
-	vnode_t *vp;
-	struct inode *inode = NULL;
-	struct list_head *lp;
-	struct dentry *result;
-	xfs_fid2_t xfid;
-	vfs_t *vfsp = LINVFS_GET_VFS(sb);
-	int error;
-
-	xfid.fid_len = sizeof(xfs_fid2_t) - sizeof(xfid.fid_len);
-	xfid.fid_pad = 0;
-
-	if (!parent) {
-		xfid.fid_gen = data[1];
-		xfid.fid_ino = (__u64)data[0];
-	} else {
-		if (fhtype == 4)	
-			xfid.fid_gen = data[3];
-		else
-			xfid.fid_gen = 0;
-		xfid.fid_ino = (__u64)data[2];
-	}
-
-	VFS_VGET(vfsp, &vp, (fid_t *)&xfid, error);
-	if (error || vp == NULL)
-		return ERR_PTR(-ESTALE) ;
-
-	inode = LINVFS_GET_IP(vp);
-	spin_lock(&dcache_lock);
-	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
-		result = list_entry(lp,struct dentry, d_alias);
-		if (! (result->d_flags & DCACHE_DISCONNECTED)) {
-			dget_locked(result);
-			result->d_vfs_flags |= DCACHE_REFERENCED;
-			spin_unlock(&dcache_lock);
-			iput(inode);
-			return result;
-		}
-	}
-	spin_unlock(&dcache_lock);
-	result = d_alloc_root(inode);
-	if (result == NULL) {
-		iput(inode);
-		return ERR_PTR(-ENOMEM);
-	}
-	result->d_flags |= DCACHE_DISCONNECTED;
-	return result;
-}
-#endif
-
 struct dentry *linvfs_get_parent(struct dentry *child)
 {
 	int		error;
@@ -1005,11 +912,6 @@ static struct super_operations linvfs_sops = {
 	unlockfs:		linvfs_unfreeze_fs,
 	statfs:			linvfs_statfs,
 	remount_fs:		linvfs_remount,
-
-#if 0
-	fh_to_dentry:		linvfs_fh_to_dentry,
-	dentry_to_fh:		linvfs_dentry_to_fh,
-#endif
 };
 
 static struct super_block *linvfs_get_sb(struct file_system_type *fs_type,
