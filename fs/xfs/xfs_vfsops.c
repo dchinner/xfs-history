@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.126 $"
+#ident  "$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -1559,8 +1559,29 @@ xfs_sync(
 					 */
 					XFS_MOUNT_ILOCK(mp);
 					if (mp->m_ireclaims != ireclaims) {
-						restarts++;
 						XFS_MOUNT_IUNLOCK(mp);
+
+						/*
+						 * A vnode was reclaimed
+						 * once we let go of the
+						 * inode list lock.  Start
+						 * again at the beginning
+						 * of the list. If the
+						 * caller didn't want to
+						 * wait anyway, then only
+						 * spend so much time
+						 * trying to get through
+						 * the entire list.  This
+						 * keeps us from spending
+						 * all day here on busy
+						 * file systems.
+						 */
+						if (!(flags & SYNC_WAIT) &&
+						    (restarts ==
+						     RESTART_LIMIT)) {
+							XFS_MOUNT_ILOCK(mp);
+							break;
+						}
 						/*
 						 * This is the bdflush case,
 						 * so we never should have
@@ -1568,6 +1589,7 @@ xfs_sync(
 						 * vnode above.
 						 */
 						ASSERT(!vnode_refed);
+						restarts++;
 						goto loop;
 					}
 					mount_locked = B_TRUE;
