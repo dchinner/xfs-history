@@ -1538,6 +1538,20 @@ xfs_write(
 			ip->i_d.di_ctime.t_sec = tv.tv_sec;
 			ip->i_update_core = 1;
 		}
+
+		/*
+		 * If the write was synchronous then flush the log
+		 * to make sure that everything is permanent.
+		 * As you can tell the modification time will not
+		 * be permanent, but it's not clear that it needs
+		 * to be.  We could also probably be smarter about
+		 * whether or not this is necessary, but it should
+		 * work for a first cut.
+		 */
+		if (ioflag & IO_SYNC) {
+			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
+				      XFS_LOG_FORCE | XFS_LOG_SYNC);
+		}
 		break;
 
 	case IFDIR:
