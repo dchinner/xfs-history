@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.47 $"
+#ident	"$Revision$"
 
 #include <sys/cmn_err.h>
 
@@ -33,6 +33,9 @@ int xlog_btolrbb(int b);
 
 #define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_curr_cycle; \
 				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
+#define ASSIGN_ANY_LSN(lsn,cycle,block)  \
+	{ ((uint *)&(lsn))[0] = (cycle); \
+	  ((uint *)&(lsn))[1] = (block); }
 #define CYCLE_LSN(lsn)		(((uint *)&(lsn))[0])
 #define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1])
 #define XLOG_SET(f,b)		(((f) & (b)) == (b))
