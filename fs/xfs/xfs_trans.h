@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.58 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -28,7 +28,7 @@ typedef struct xfs_ail_ticket {
 	xfs_lsn_t		at_lsn;		/* lsn waitin for */
 	struct xfs_ail_ticket	*at_forw;	/* wait list ptr */
 	struct xfs_ail_ticket	*at_back;	/* wait list ptr */
-	sema_t			at_sema;	/* wait sema */
+	sv_t			at_sema;	/* wait sema */
 } xfs_ail_ticket_t;
 	
 
