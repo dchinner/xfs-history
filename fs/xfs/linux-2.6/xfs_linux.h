@@ -239,7 +239,7 @@ typedef __uint32_t	xfs_dev_t;
 #define lbolt		jiffies
 #define __return_address __builtin_return_address(0)
 #define LONGLONG_MAX	9223372036854775807LL	/* max "long long int" */
-#define nopkg()		( ENOPKG )
+#define nopkg()		( ENOSYS )
 #define getf(fd,fpp)	( printk("getf not implemented\n"), ASSERT(0), 0 )
 
 #define MAXNAMELEN      256
