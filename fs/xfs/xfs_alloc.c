@@ -1747,7 +1747,7 @@ xfs_alloc_get_freelist(
 	 * The link to the next block is stored as the first word of the block.
 	 */
 	nbno = *(xfs_agblock_t *)block;
-	ASSERT(nbno < agf->agf_length);
+	ASSERT(nbno == NULLAGBLOCK || nbno < agf->agf_length);
 	agf->agf_freelist = nbno;
 	xfs_alloc_trace_modagf(fname, NULL, tp->t_mountp, agf,
 		XFS_AGF_FREELIST | XFS_AGF_FREECOUNT);
