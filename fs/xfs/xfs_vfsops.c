@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.181 $"
+#ident  "$Revision: 1.182 $"
 
 
 #include <limits.h>
@@ -471,6 +471,7 @@ xfs_cmountfs(
 		}
 		mp->m_rtdevp = rdevvp;
 	} else {
+		mp->m_rtdev = NODEV;
 		rdevvp = NULL;
 	}
 	if (logdev != 0) {
@@ -957,8 +958,8 @@ xfs_mountroot(
 			xfs_log_force(mp, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
 			binval(mp->m_dev);
-			if (mp->m_rtdev) {
-				binval(mp->m_dev);
+			if (mp->m_rtdev != NODEV) {
+				binval(mp->m_rtdev);
 			}
 
 			/*
