@@ -60,44 +60,49 @@ typedef struct xfs_dinode
 		xfs_bmdr_block_t di_bmbt;	/* btree root block */
 		xfs_bmbt_rec_32_t di_bmx[1];	/* extent list */
 		xfs_dir_shortform_t di_dirsf;	/* shortform directory */
-		xfs_attr_shortform_t di_attrsf;	/* shortform attribute list */
 		char		di_c[1];	/* local contents */
 		dev_t		di_dev;		/* device for IFCHR/IFBLK */
 		uuid_t		di_muuid;	/* mount point value */
 		char		di_symlink[1];	/* local symbolic link */
 	}		di_u;
+	union {
+		xfs_bmdr_block_t di_abmbt;	/* btree root block */
+		xfs_bmbt_rec_32_t di_abmx[1];	/* extent list */
+		xfs_attr_shortform_t di_attrsf;	/* shortform attribute list */
+	}		di_a;
 } xfs_dinode_t;
 
 /*
  * Bit names for logging disk inodes only
  */
-#define	XFS_DI_MAGIC		0x000001
-#define	XFS_DI_MODE		0x000002
-#define	XFS_DI_VERSION		0x000004
-#define	XFS_DI_FORMAT		0x000008
-#define	XFS_DI_NLINK		0x000010
-#define	XFS_DI_UID		0x000020
-#define	XFS_DI_GID		0x000040
-#define	XFS_DI_UUID		0x000080
-#define	XFS_DI_ATIME		0x000100
-#define	XFS_DI_MTIME		0x000200
-#define	XFS_DI_CTIME		0x000400
-#define	XFS_DI_SIZE		0x000800
-#define	XFS_DI_NBLOCKS		0x001000
-#define	XFS_DI_EXTSIZE		0x002000
-#define	XFS_DI_NEXTENTS		0x004000
-#define	XFS_DI_NAEXTENTS	0x008000
-#define	XFS_DI_FORKOFF		0x010000
-#define	XFS_DI_AFORMAT		0x020000
-#define	XFS_DI_DMEVMASK		0x040000
-#define	XFS_DI_DMSTATE		0x080000
-#define	XFS_DI_FLAGS		0x100000
-#define	XFS_DI_GEN		0x200000
-#define	XFS_DI_NEXT_UNLINKED	0x400000
-#define	XFS_DI_U		0x800000
-#define	XFS_DI_NUM_BITS		24
+#define	XFS_DI_MAGIC		0x0000001
+#define	XFS_DI_MODE		0x0000002
+#define	XFS_DI_VERSION		0x0000004
+#define	XFS_DI_FORMAT		0x0000008
+#define	XFS_DI_NLINK		0x0000010
+#define	XFS_DI_UID		0x0000020
+#define	XFS_DI_GID		0x0000040
+#define	XFS_DI_UUID		0x0000080
+#define	XFS_DI_ATIME		0x0000100
+#define	XFS_DI_MTIME		0x0000200
+#define	XFS_DI_CTIME		0x0000400
+#define	XFS_DI_SIZE		0x0000800
+#define	XFS_DI_NBLOCKS		0x0001000
+#define	XFS_DI_EXTSIZE		0x0002000
+#define	XFS_DI_NEXTENTS		0x0004000
+#define	XFS_DI_NAEXTENTS	0x0008000
+#define	XFS_DI_FORKOFF		0x0010000
+#define	XFS_DI_AFORMAT		0x0020000
+#define	XFS_DI_DMEVMASK		0x0040000
+#define	XFS_DI_DMSTATE		0x0080000
+#define	XFS_DI_FLAGS		0x0100000
+#define	XFS_DI_GEN		0x0200000
+#define	XFS_DI_NEXT_UNLINKED	0x0400000
+#define	XFS_DI_U		0x0800000
+#define	XFS_DI_A		0x1000000
+#define	XFS_DI_NUM_BITS		25
 #define	XFS_DI_ALL_BITS		((1 << XFS_DI_NUM_BITS) - 1)
-#define	XFS_DI_CORE_BITS	(XFS_DI_ALL_BITS & ~XFS_DI_U)
+#define	XFS_DI_CORE_BITS	(XFS_DI_ALL_BITS & ~(XFS_DI_U|XFS_DI_A))
 
 /*
  * Values for di_format

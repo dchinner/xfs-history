@@ -123,10 +123,12 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_core_t, di_gen),
 		offsetof(xfs_dinode_t, di_next_unlinked),
 		offsetof(xfs_dinode_t, di_u),
+		offsetof(xfs_dinode_t, di_a),
 		sizeof(xfs_dinode_t)
 	};
 
 	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
+	ASSERT((fields & (XFS_DI_U|XFS_DI_A)) == 0);
 	mp = tp->t_mountp;
 	/*
 	 * Get the inode-relative first and last bytes for these fields
