@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.16 $"
+#ident  "$Revision: 1.17 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -171,11 +171,16 @@ xfs_init(vfssw_t	*vswp,
 {
 	extern lock_t	xfs_strat_lock;
 	extern sema_t	xfs_ancestormon;
+	extern lock_t	xfsd_lock;
+	extern sema_t	xfsd_wait;
 
 	xfs_type = fstype;
 
 	initnlock(&xfs_strat_lock, "xfsstrat");
 	initnsema(&xfs_ancestormon, 1, "xfs_ancestor");
+	initnlock(&xfsd_lock, "xfsd");
+	initnsema(&xfsd_wait, 0, "xfsd");
+
 	/*
 	 * The inode hash table is created on a per mounted
 	 * file system bases.
