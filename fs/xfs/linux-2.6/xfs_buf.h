@@ -350,6 +350,7 @@ struct pbstats {
 	u_int32_t	pb_miss_locked;
 	u_int32_t	pb_page_alloc;
 	u_int32_t	pb_page_found;
+	u_int32_t	pb_get_read;
 };
 
 extern struct pbstats pbstats;

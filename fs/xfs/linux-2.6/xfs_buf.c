@@ -486,6 +486,10 @@ _pagebuf_lookup_pages(
 	    page_buf_btoct(pb->pb_file_offset));
 
 	if (pb->pb_flags & _PBF_ALL_PAGES_MAPPED) {
+		/* Bring pages forward in cache */
+		for (pi = 0; pi < page_count; pi++) {
+			mark_page_accessed(pb->pb_pages[pi]);
+		}
 		if ((flags & PBF_MAPPED) && !(pb->pb_flags & PBF_MAPPED)) {
 			all_mapped = 1;
 			goto mapit;
@@ -533,6 +537,7 @@ _pagebuf_lookup_pages(
 				cached_page = NULL;
 			} else {
 				PB_STATS_INC(pbstats.pb_page_found);
+				mark_page_accessed(cp);
 			}
 
 			pb->pb_pages[pi] = cp;
@@ -695,6 +700,7 @@ page_buf_t *pagebuf_get(	/* allocate a buffer            */
 	if (flags & PBF_READ) {
 		if (PBF_NOT_DONE(pb)) {
 			PB_TRACE(pb, PB_TRACE_REC(get_read), flags);
+			PB_STATS_INC(pbstats.pb_get_read);
 			pagebuf_iostart(pb, flags);
 		} else if (flags & PBF_ASYNC) {
 			/* Read ahead call which is already satisfied,
@@ -886,7 +892,7 @@ void pagebuf_hold(page_buf_t * pb)
 
 	if (pb != NULL) {
 		spin_lock_irqsave(&PBP(pb)->pb_lock, flags);
-		assert(pb->pb_hold > 0);
+		assert((pb->pb_hold > 0) || (pb->pb_flags & PBF_FS_MANAGED));
 		pb->pb_hold++;
 		spin_unlock_irqrestore(&PBP(pb)->pb_lock, flags);
 
