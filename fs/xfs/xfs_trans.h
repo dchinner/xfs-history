@@ -563,6 +563,7 @@ void		xfs_trans_bhold(xfs_trans_t *, buf_t *);
 void		xfs_trans_bhold_until_committed(xfs_trans_t *, buf_t *);
 void		xfs_trans_binval(xfs_trans_t *, buf_t *);
 void		xfs_trans_inode_buf(xfs_trans_t *, buf_t *);
+void		xfs_trans_inode_alloc_buf(xfs_trans_t *, buf_t *);
 struct xfs_inode	*xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 					xfs_ino_t , uint);
 void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);

@@ -20,6 +20,7 @@
 #include <sys/user.h>
 #include <sys/systm.h>
 #endif
+#include <sys/cmn_err.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -260,7 +261,11 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 * the buffer cache.
 	 */
 	if (tp == NULL) {
-		return (read_buf(dev, blkno, len, flags | BUF_BUSY));
+		bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
+		if ((bp != NULL) && (geterror(bp) != 0)) {
+			cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
+		}
+		return bp;
 	}
 
 	/*
@@ -288,6 +293,9 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 #endif
 
 			iowait(bp);
+			if (geterror(bp) != 0) {
+				cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
+			}
 		}
 
 		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
@@ -309,6 +317,9 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
 	if (bp == NULL) {
 		return NULL;
+	}
+	if (geterror(bp) != 0) {
+		cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
 	}
 
 	/*
@@ -477,6 +488,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_refcount == 0);
 		ASSERT(!(bip->bli_item.li_flags & XFS_LI_IN_AIL));
+		ASSERT(!(bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF));
 		xfs_buf_item_relse(bp);
 	}
 	bp->b_fsprivate2 = NULL;
@@ -769,4 +781,31 @@ xfs_trans_inode_buf(
 	ASSERT(bip->bli_refcount > 0);
 
 	bip->bli_format.blf_flags |= XFS_BLI_INODE_BUF;
+}
+
+
+/*
+ * Mark the buffer as being one which contains newly allocated
+ * inodes.  We need to make sure that even if this buffer is
+ * relogged as an 'inode buf' we still recover all of the inode
+ * images in the face of a crash.  This works in coordination with
+ * xfs_buf_item_committed() to ensure that the buffer remains in the
+ * AIL at its original location even after it has been relogged.
+ */
+void
+xfs_trans_inode_alloc_buf(
+	xfs_trans_t	*tp,
+	buf_t		*bp)
+{
+	xfs_buf_log_item_t	*bip;
+
+	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT((xfs_trans_t*)(bp->b_fsprivate2) == tp);
+	ASSERT(bp->b_fsprivate != NULL);
+
+	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
+	ASSERT(bip->bli_refcount > 0);
+	ASSERT(!(bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF));
+
+	bip->bli_flags |= XFS_BLI_INODE_ALLOC_BUF;
 }

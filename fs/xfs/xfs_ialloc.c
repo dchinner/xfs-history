@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.67 $"
+#ident	"$Revision: 1.68 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -243,6 +243,7 @@ xfs_ialloc_ag_alloc(
 			xfs_ialloc_log_di(tp, fbuf, i,
 				XFS_DI_CORE_BITS | XFS_DI_NEXT_UNLINKED);
 		}
+		xfs_trans_inode_alloc_buf(tp, fbuf);
 	}
 	agi->agi_count += newlen;
 	agi->agi_freecount += newlen;
