@@ -127,19 +127,22 @@ xfs_da_node_create(xfs_da_args_t *args, xfs_dablk_t blkno, int level,
 	xfs_da_intnode_t *node;
 	buf_t *bp;
 	int error;
+	xfs_trans_t *tp;
 
-	error = xfs_da_get_buf(args->trans, args->dp, blkno, -1, &bp,
-			       whichfork);
+	tp = args->trans;
+	error = xfs_da_get_buf(tp, args->dp, blkno, -1, &bp, whichfork);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
-	bzero((char *)bp->b_un.b_addr, XFS_LBSIZE(args->dp->i_mount));
 	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+	node->hdr.info.forw = node->hdr.info.back = 0;
 	node->hdr.info.magic = XFS_DA_NODE_MAGIC;
+	node->hdr.info.pad = 0;
+	node->hdr.count = 0;
 	node->hdr.level = level;
 
-	xfs_trans_log_buf(args->trans,
-			  bp, 0, XFS_LBSIZE(args->dp->i_mount) - 1);
+	xfs_trans_log_buf(tp, bp,
+		XFS_DA_LOGRANGE(node, &node->hdr, sizeof(node->hdr)));
 
 	*bpp = bp;
 	return(0);
@@ -351,7 +354,10 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	xfs_da_args_t *args;
 	xfs_dablk_t blkno;
 	buf_t *bp;
-	int error;
+	int error, size;
+	xfs_inode_t *dp;
+	xfs_trans_t *tp;
+	xfs_mount_t *mp;
 
 	/*
 	 * Copy the existing (incorrect) block from the root node position
@@ -362,21 +368,26 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	error = xfs_da_grow_inode(args, &blkno);
 	if (error)
 		return(error);
-	error = xfs_da_get_buf(args->trans, args->dp, blkno, -1, &bp,
-					    args->whichfork);
+	dp = args->dp;
+	tp = args->trans;
+	mp = state->mp;
+	error = xfs_da_get_buf(tp, dp, blkno, -1, &bp, args->whichfork);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
-	bcopy(blk1->bp->b_un.b_addr, bp->b_un.b_addr, state->blocksize);
+	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+	oldroot = (xfs_da_intnode_t *)blk1->bp->b_un.b_addr;
+	ASSERT(oldroot->hdr.info.magic == XFS_DA_NODE_MAGIC);
+	size = (char *)&oldroot->btree[oldroot->hdr.count] - (char *)oldroot;
+	bcopy(oldroot, node, size);
+	xfs_trans_log_buf(tp, bp, 0, size - 1);
 	blk1->bp = bp;
 	blk1->blkno = blkno;
-	xfs_trans_log_buf(args->trans, bp, 0, state->blocksize - 1);
 
 	/*
 	 * Set up the new root node.
 	 */
-	oldroot = (xfs_da_intnode_t *)blk1->bp->b_un.b_addr;
-	error = xfs_da_node_create(args, 0, oldroot->hdr.level + 1, &bp,
+	error = xfs_da_node_create(args, 0, node->hdr.level + 1, &bp,
 					 args->whichfork);
 	if (error)
 		return(error);
@@ -386,7 +397,10 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	node->btree[1].hashval = blk2->hashval;
 	node->btree[1].before = blk2->blkno;
 	node->hdr.count = 2;
-	xfs_trans_log_buf(args->trans, bp, 0, state->blocksize - 1);
+	/* Header is already logged by xfs_da_node_create */
+	xfs_trans_log_buf(tp, bp,
+		XFS_DA_LOGRANGE(node, node->btree,
+			sizeof(xfs_da_node_entry_t) * 2));
 
 	return(0);
 }
@@ -484,6 +498,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	xfs_da_intnode_t *node1, *node2, *tmpnode;
 	xfs_da_node_entry_t *btree_s, *btree_d;
 	int count, tmp;
+	xfs_trans_t *tp;
 
 	node1 = (xfs_da_intnode_t *)blk1->bp->b_un.b_addr;
 	node2 = (xfs_da_intnode_t *)blk2->bp->b_un.b_addr;
@@ -504,7 +519,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	count = (node1->hdr.count - node2->hdr.count) / 2;
 	if (count == 0)
 		return;
-
+	tp = state->args->trans;
 	/*
 	 * Two cases: high-to-low and low-to-high.
 	 */
@@ -512,12 +527,12 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		/*
 		 * Move elements in node2 up to make a hole.
 		 */
-		if (node2->hdr.count > 0) {
+		if ((tmp = node2->hdr.count) > 0) {
 			tmp  = node2->hdr.count;
 			tmp *= sizeof(xfs_da_node_entry_t);
 			btree_s = &node2->btree[0];
 			btree_d = &node2->btree[count];
-			bcopy((char *)btree_s, (char *)btree_d, tmp);
+			ovbcopy(btree_s, btree_d, tmp);
 		}
 
 		/*
@@ -528,8 +543,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		tmp = count * sizeof(xfs_da_node_entry_t);
 		btree_s = &node1->btree[node1->hdr.count - count];
 		btree_d = &node2->btree[0];
-		bcopy((char *)btree_s, (char *)btree_d, tmp);
-		bzero((char *)btree_s, tmp);
+		bcopy(btree_s, btree_d, tmp);
 		node1->hdr.count -= count;
 	} else {
 		/*
@@ -540,8 +554,10 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		tmp = count * sizeof(xfs_da_node_entry_t);
 		btree_s = &node2->btree[0];
 		btree_d = &node1->btree[node1->hdr.count];
-		bcopy((char *)btree_s, (char *)btree_d, tmp);
+		bcopy(btree_s, btree_d, tmp);
 		node1->hdr.count += count;
+		xfs_trans_log_buf(tp, blk1->bp,
+			XFS_DA_LOGRANGE(node1, btree_d, tmp));
 
 		/*
 		 * Move elements in node2 down to fill the hole.
@@ -550,17 +566,19 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		tmp *= sizeof(xfs_da_node_entry_t);
 		btree_s = &node2->btree[count];
 		btree_d = &node2->btree[0];
-		bcopy((char *)btree_s, (char *)btree_d, tmp);
+		ovbcopy(btree_s, btree_d, tmp);
 		node2->hdr.count -= count;
-
-		btree_s = &node2->btree[node2->hdr.count];
-		tmp = count * sizeof(xfs_da_node_entry_t);
-		bzero((char *)btree_s, tmp);
 	}
 
-
-	xfs_trans_log_buf(state->args->trans, blk1->bp, 0, state->blocksize-1);
-	xfs_trans_log_buf(state->args->trans, blk2->bp, 0, state->blocksize-1);
+	/*
+	 * Log header of node 1 and all current bits of node 2.
+	 */
+	xfs_trans_log_buf(tp, blk1->bp,
+		XFS_DA_LOGRANGE(node1, &node1->hdr, sizeof(node1->hdr)));
+	xfs_trans_log_buf(tp, blk2->bp,
+		XFS_DA_LOGRANGE(node2, &node2->hdr,
+			sizeof(node2->hdr) +
+			sizeof(node2->btree[0]) * node2->hdr.count));
 
 	/*
 	 * Record the last hashval from each block for upward propagation.
@@ -603,7 +621,7 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	btree = &node->btree[ oldblk->index ];
 	if (oldblk->index < node->hdr.count) {
 		tmp = (node->hdr.count - oldblk->index) * sizeof(*btree);
-		bcopy((char *)btree, (char *)(btree+1), tmp);
+		ovbcopy(btree, btree + 1, tmp);
 	}
 	btree->hashval = newblk->hashval;
 	btree->before = newblk->blkno;
@@ -973,7 +991,7 @@ xfs_da_node_remove(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk)
 	if (drop_blk->index < (node->hdr.count-1)) {
 		tmp  = node->hdr.count - drop_blk->index - 1;
 		tmp *= sizeof(xfs_da_node_entry_t);
-		bcopy((char *)(btree+1), (char *)btree, tmp);
+		ovbcopy(btree + 1, btree, tmp);
 		xfs_trans_log_buf(state->args->trans, drop_blk->bp,
 		    XFS_DA_LOGRANGE(node, btree, tmp));
 		btree = &node->btree[ node->hdr.count-1 ];
@@ -1003,11 +1021,13 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	xfs_da_intnode_t *drop_node, *save_node;
 	xfs_da_node_entry_t *btree;
 	int tmp;
+	xfs_trans_t *tp;
 
 	drop_node = (xfs_da_intnode_t *)drop_blk->bp->b_un.b_addr;
 	save_node = (xfs_da_intnode_t *)save_blk->bp->b_un.b_addr;
 	ASSERT(drop_node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 	ASSERT(save_node->hdr.info.magic == XFS_DA_NODE_MAGIC);
+	tp = state->args->trans;
 
 	/*
 	 * If the dying block has lower hashvals, then move all the
@@ -1019,21 +1039,30 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	{
 		btree = &save_node->btree[ drop_node->hdr.count ];
 		tmp = save_node->hdr.count * sizeof(xfs_da_node_entry_t);
-		bcopy((char *)&save_node->btree[0], (char *)btree, tmp);
+		ovbcopy(&save_node->btree[0], btree, tmp);
 		btree = &save_node->btree[0];
+		xfs_trans_log_buf(tp, save_blk->bp,
+			XFS_DA_LOGRANGE(save_node, btree,
+				(save_node->hdr.count + drop_node->hdr.count) *
+				sizeof(xfs_da_node_entry_t)));
 	} else {
 		btree = &save_node->btree[ save_node->hdr.count ];
+		xfs_trans_log_buf(tp, save_blk->bp,
+			XFS_DA_LOGRANGE(save_node, btree,
+				drop_node->hdr.count *
+				sizeof(xfs_da_node_entry_t)));
 	}
 
 	/*
 	 * Move all the B-tree elements from drop_blk to save_blk.
 	 */
 	tmp = drop_node->hdr.count * sizeof(xfs_da_node_entry_t);
-	bcopy((char *)&drop_node->btree[0], (char *)btree, tmp);
+	bcopy(&drop_node->btree[0], btree, tmp);
 	save_node->hdr.count += drop_node->hdr.count;
 
-	xfs_trans_log_buf(state->args->trans, save_blk->bp, 0,
-					      state->blocksize - 1);
+	xfs_trans_log_buf(tp, save_blk->bp,
+		XFS_DA_LOGRANGE(save_node, &save_node->hdr,
+			sizeof(save_node->hdr)));
 
 	/*
 	 * Save the last hashval in the remaining block for upward propagation.

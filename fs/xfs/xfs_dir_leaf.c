@@ -1,4 +1,4 @@
-#ident "$Revision: 1.60 $"
+#ident "$Revision$"
 
 /*
  * xfs_dir_leaf.c
@@ -820,7 +820,8 @@ xfs_dir_leaf_to_node(xfs_da_args_t *args)
 	node->btree[0].hashval = leaf->entries[ leaf->hdr.count-1 ].hashval;
 	node->btree[0].before = blkno;
 	node->hdr.count = 1;
-	xfs_trans_log_buf(args->trans, bp1, 0, XFS_LBSIZE(dp->i_mount) - 1);
+	xfs_trans_log_buf(args->trans, bp1,
+		XFS_DA_LOGRANGE(node, &node->btree[0], sizeof(node->btree[0])));
 
 	return(retval);
 }
