@@ -283,7 +283,7 @@ xfs_sendfile(
 		vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offset, count,
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, count,
 				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
 			if (!(ioflags & IO_ISLOCKED))
