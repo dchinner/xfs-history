@@ -106,7 +106,7 @@ STATIC uuid_t	*xfs_uuidtab;
 void	xfs_uuid_unmount(xfs_mount_t *);
 #endif	/* !SIM */
 
-STATIC void xfs_xlatesb(xfs_buf_t *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
+STATIC void xfs_xlatesb(void *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
 
 static struct {
     short offset;
@@ -318,15 +318,15 @@ xfs_mount_validate_sb(
 /*
  * xfs_xlatesb
  *
- *     buf    - a buffer
- *     sb     - a superblock
- *     dir    - conversion direction: <0 - convert sb to buf
- *                                    >0 - convert buf to sb
- *     arch   - architecture to read/write from/to buf
- *     fields - which fields to copy (bitmask)
+ *     data       - on disk version of sb
+ *     sb         - a superblock
+ *     dir        - conversion direction: <0 - convert sb to buf
+ *                                        >0 - convert buf to sb
+ *     arch       - architecture to read/write from/to buf
+ *     fields     - which fields to copy (bitmask)
  */
 STATIC void
-xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch, 
+xfs_xlatesb(void *data, xfs_sb_t *sb, int dir, xfs_arch_t arch, 
             __int64_t fields)
 {
     caddr_t     buf_ptr;
@@ -338,7 +338,7 @@ xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch,
     if (!fields)
         return;
     
-    buf_ptr=XFS_BUF_PTR(buf);
+    buf_ptr=(caddr_t)data;
     mem_ptr=(caddr_t)sb;
     
     while (fields) {
@@ -426,7 +426,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 * But first do some basic consistency checking.
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
-        xfs_xlatesb(bp, &(mp->m_sb), 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
+        xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), 1, ARCH_CONVERT, XFS_SB_ALL_BITS);
 	if (error = xfs_mount_validate_sb(mp, &(mp->m_sb))) {
 		cmn_err(CE_WARN, "XFS: SB validate failed\n");
 		goto err;
@@ -1319,7 +1319,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
         
         /* translate/copy */
         
-        xfs_xlatesb(bp, &(mp->m_sb), -1, ARCH_CONVERT, fields);
+        xfs_xlatesb(XFS_BUF_PTR(bp), &(mp->m_sb), -1, ARCH_CONVERT, fields);
 
         /* find modified range */
 
