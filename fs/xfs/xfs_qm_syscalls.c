@@ -1,4 +1,4 @@
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -7,9 +7,9 @@
 #include <sys/vnode.h>
 #include <sys/pfdat.h>
 #include <sys/uuid.h>
-#include <sys/cred.h>
 #include <sys/capability.h>
 #include <sys/param.h>
+#include <sys/cred.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
 #include <sys/kmem.h>
@@ -20,18 +20,13 @@
 #include <sys/vfs.h>
 #include <sys/uuid.h>
 #include <sys/atomic_ops.h>
-
-#ifdef SIM
-#include <bstring.h>
-#else
 #include <sys/systm.h>
 #include <sys/ktrace.h>
-#endif
 #include <limits.h>
+
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include <sys/quota.h>
-
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
@@ -92,42 +87,49 @@ xfs_qm_sysent(
 {
 	xfs_mount_t	*mp;
 	int 		error;
-	boolean_t	done;
-	uint		flags;
+#ifndef _BANYAN_XFS
+	/* 
+	 * TEMP: XXX to keep various trees from getting out of sync. 
+	 * In the 6.2 code, project quotas and vfs behaviors
+	 * are not supported.
+	 */
 	bhv_desc_t 	*bdp;
 
 	ASSERT(vfsp);
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
         mp = XFS_BHVTOM(bdp);
+#else
+	ASSERT(vfsp);
+	mp = (xfs_mount_t *) vfsp->vfs_data;
+	ASSERT(mp->m_vfsp->vfs_fstype == xfs_fstype);
+#endif
 
-	done = B_FALSE;
-
+#ifdef DEBUG		
+	/* Internal quota accounting check for debugging */
+	if (cmd == 50) 
+		return (xfs_qm_internalqcheck(mp));
+#endif
+	if (addr == NULL)
+		return XFS_ERROR(EINVAL);
+	
 	/*
-	 * The following commands are valid even when quotas is off.
+	 * The following commands are valid even when quotaoff.
 	 */
 	switch (cmd) {
 	      	/* 
 		 * truncate quota files. quota must be off.
 		 */
 	      case Q_QUOTARM:
-		if (XFS_IS_QUOTA_ON(mp))
+		if (XFS_IS_QUOTA_ON(mp) || addr == NULL)
 			return XFS_ERROR(EINVAL);
-		flags = xfs_qm_import_qtype_flags((uint *)addr);
-		if (! flags) {
-#ifdef QUOTADEBUG
-			flags = XFS_DQ_USER|XFS_DQ_PROJ;
-#else
-			return XFS_ERROR(EINVAL);
-#endif
-		}
-		error = xfs_qm_scall_trunc_qfiles(mp, flags);
-		done = B_TRUE;
-		break;
-		
+		return (xfs_qm_scall_trunc_qfiles(mp, 
+				       xfs_qm_import_qtype_flags((uint *)addr)));
+		/*
+		 * Get quota status information.
+		 */
 	      case Q_GETQSTAT:
-		error = xfs_qm_scall_getqstat(mp, (uint *)addr);
-		done = B_TRUE;
-		break;
+
+		return (xfs_qm_scall_getqstat(mp, (uint *)addr));
 
 		/*
 		 * QUOTAON for root f/s and quota enforcement on others..
@@ -135,29 +137,19 @@ xfs_qm_sysent(
 		 * at mount time.
 		 */
 	      case Q_QUOTAON:
-		flags = addr ? 
-			xfs_qm_import_flags((uint *)addr) :
-			XFS_ALL_QUOTA_ACCT_ENFD;
-		error = xfs_qm_scall_quotaon(mp, flags);
-		done = B_TRUE;
-		break;
+		if (addr == NULL)
+			return XFS_ERROR(EINVAL);
+		return (xfs_qm_scall_quotaon(mp,
+					     xfs_qm_import_flags((uint *)addr)));
 	}
-	if (done)
-		return (error);
 
 	if (! XFS_IS_QUOTA_ON(mp))
 		return (ESRCH);
 
 	switch (cmd) {
-		
-		/* uquota off | pquota off */
-		/* XXX These flags can be sent by user */
 	      case Q_QUOTAOFF:
-		/*  */
-		flags = addr? 
-			xfs_qm_import_flags((uint *)addr) : 
-			XFS_ALL_QUOTA_ACCT_ENFD;
-		error = xfs_qm_scall_quotaoff(mp, flags);
+		error = xfs_qm_scall_quotaoff(mp,
+					      xfs_qm_import_flags((uint *)addr));
 		break;
 
 		/* 
@@ -167,11 +159,6 @@ xfs_qm_sysent(
 		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_USER, 
 					addr);
 		break;
-		
-	      case Q_XGETPQUOTA:
-		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_PROJ, 
-					addr);
-		break;
 		/*
 		 * Set limits, both hard and soft. Defaults to Q_SETUQLIM.
 		 */
@@ -179,17 +166,26 @@ xfs_qm_sysent(
 		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_USER,
 					     addr);
 		break;
-
+#ifndef _BANYAN_XFS
 	       case Q_XSETPQLIM:
 		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_PROJ,
 					     addr);
 		break;
 
-	      case Q_SYNC:
-		/* should we NOTSUP this too ??? */
-		error = xfs_qm_dqflush_all(mp, XFS_QMOPT_DELWRI);
+	      		
+	      case Q_XGETPQUOTA:
+		error = xfs_qm_scall_getquota(mp, (xfs_dqid_t)id, XFS_DQ_PROJ, 
+					addr);
 		break;
-
+		/*
+		 * Set limits, both hard and soft. Defaults to Q_SETUQLIM.
+		 */
+#else	
+	      case Q_XSETPQLIM:
+	      case Q_XGETPQUOTA:
+		error = ENOTSUP;
+		break;
+#endif
 		/*
 		 * Quotas are entirely undefined after quotaoff in XFS quotas.
 		 * For instance, there's no way to set limits when quotaoff.
@@ -200,28 +196,17 @@ xfs_qm_sysent(
 	      case Q_GETPQUOTA:
 	      case Q_SETQLIM:
 	      case Q_SETPQLIM:
+	      case Q_SYNC:
 		error = ENOTSUP;
 		break;
-#ifdef DEBUG		
-	      case 50:
-		error = xfs_qm_internalqcheck(mp);
-		break;
-		
-	      case 51:
-		/* error = xfs_qm_shake(*(int *) addr); */
-		break;
-#endif
+
 	      default:
-#ifdef QUOTADEBUG
-		cmn_err(CE_WARN, "SYSENT: inval arg %d\n", cmd);
-#endif
-		error = EINVAL;
+		error = XFS_ERROR(EINVAL);
 		break;
 	}
 	return (error);
 
 }
-
 
 
 STATIC int
@@ -237,10 +222,12 @@ xfs_qm_scall_trunc_qfiles(
 	extern int  xfs_truncate_file(xfs_mount_t *mp, xfs_inode_t *ip);
 
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
-		return (EPERM);
+		return XFS_ERROR(EPERM);
 	error = 0;
-	if ( mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASQUOTA)
-		return (EINVAL);
+	if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASQUOTA)
+		return XFS_ERROR(EINVAL);
+	if (flags == 0)
+		return XFS_ERROR(EINVAL);
 
 	if ((flags & XFS_DQ_USER) &&
 	    mp->m_sb.sb_uquotino != NULLFSINO) {
@@ -396,6 +383,9 @@ xfs_qm_scall_getqstat(
 	return (0);
 }
 
+/*
+ * Adjust quota limits, and start/stop timers accordingly.
+ */
 STATIC int
 xfs_qm_scall_setqlim(
 	xfs_mount_t		*mp,
@@ -408,11 +398,12 @@ xfs_qm_scall_setqlim(
 	xfs_dquot_t		*dqp;
 	xfs_trans_t		*tp;
 	int			error;
+	xfs_qcnt_t		hard, soft;
 
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
-		return (EPERM);
+		return XFS_ERROR(EPERM);
 	if (copyin(addr, &newlim, sizeof newlim))
-		return (EFAULT);
+		return XFS_ERROR(EFAULT);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SETQLIM); 
 	if (error = xfs_trans_reserve(tp, 0, sizeof(xfs_disk_dquot_t) + 128,
@@ -425,12 +416,14 @@ xfs_qm_scall_setqlim(
 	/*
 	 * We don't want to race with a quotaoff so take the quotaoff lock.
 	 * (We don't hold an inode lock, so there's nothing else to stop
-	 * a quotaoff from happening).
+	 * a quotaoff from happening). (XXXThis doesn't currently doesn't happen
+	 * because we take the vfslock before calling xfs_qm_sysent).
 	 */
 	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
 
 	/*
 	 * Get the dquot (locked), and join it to the transaction.
+	 * Allocate the dquot if this doesn't exist.
 	 */
 	if (error = xfs_qm_dqget(mp, NULL, id, type, XFS_QMOPT_DQALLOC, &dqp)) {
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -443,31 +436,53 @@ xfs_qm_scall_setqlim(
 	xfs_dqtrace_entry(dqp, "Q_SETQLIM: AFT DQGET");
 	xfs_trans_dqjoin(tp, dqp);
 	ddq = &dqp->q_core;
+
 	/*
+	 * Make sure that hardlimits are >= soft limits before changing.
 	 * XXX Should we expand the interface to set individual limits ?
-	 *
-	 * This doesn't check if softlimit <= hardlimit, because as it is,
-	 * one can send -1 as a limit to leave it unchanged.
 	 */
+	hard = (newlim.d_blk_hardlimit != (xfs_qcnt_t) -1) ?
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_hardlimit) :
+			ddq->d_blk_hardlimit;
+	soft = (newlim.d_blk_softlimit != (xfs_qcnt_t) -1) ?
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_blk_softlimit) :
+			ddq->d_blk_softlimit;
+	if (!hard || hard >= soft) {
+		ddq->d_blk_hardlimit = hard;
+		ddq->d_blk_softlimit = soft;
+	}
+#ifdef QUOTADEBUG
+	else 
+		printf("blkhard 0x%x < blksoft 0x%x\n", hard, soft);
+#endif			
+	hard = (newlim.d_rtb_hardlimit != (xfs_qcnt_t) -1) ?
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit) :
+			ddq->d_rtb_hardlimit;
+	soft = (newlim.d_rtb_softlimit != (xfs_qcnt_t) -1) ?
+		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_softlimit) :
+			ddq->d_rtb_softlimit;
+	if (!hard || hard >= soft) {
+		ddq->d_rtb_hardlimit = hard;
+		ddq->d_rtb_softlimit = soft;
+	}
+#ifdef QUOTADEBUG
+	else 
+		printf("rtbhard 0x%x < rtbsoft 0x%x\n", hard, soft);
+#endif	
 	
-	if (newlim.d_blk_hardlimit != (xfs_qcnt_t) -1)
-	       ddq->d_blk_hardlimit = (xfs_qcnt_t) 
-		       XFS_BB_TO_FSB(mp, newlim.d_blk_hardlimit);
-	if (newlim.d_blk_softlimit != (xfs_qcnt_t) -1)
-	       ddq->d_blk_softlimit = (xfs_qcnt_t) 
-		       XFS_BB_TO_FSB(mp, newlim.d_blk_softlimit);
-	if (newlim.d_rtb_hardlimit != (xfs_qcnt_t) -1)
-	       ddq->d_rtb_hardlimit = (xfs_qcnt_t) 
-	       XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit);
-	if (newlim.d_rtb_softlimit != (xfs_qcnt_t) -1)
-	       ddq->d_rtb_softlimit = (xfs_qcnt_t) 
-		       XFS_BB_TO_FSB(mp, newlim.d_rtb_softlimit);
-
-	if (newlim.d_ino_hardlimit != (xfs_qcnt_t) -1)
-	       ddq->d_ino_hardlimit = (xfs_qcnt_t) newlim.d_ino_hardlimit;
-	if (newlim.d_ino_softlimit != (xfs_qcnt_t) -1)
-	       ddq->d_ino_softlimit = (xfs_qcnt_t) newlim.d_ino_softlimit;
-
+	hard = (newlim.d_ino_hardlimit != (xfs_qcnt_t) -1) ?
+		(xfs_qcnt_t) newlim.d_ino_hardlimit : ddq->d_ino_hardlimit;
+	soft = (newlim.d_ino_softlimit != (xfs_qcnt_t) -1) ?
+		(xfs_qcnt_t) newlim.d_ino_softlimit : ddq->d_ino_softlimit;
+	if (!hard || hard >= soft) {
+		ddq->d_ino_hardlimit = hard;
+		ddq->d_ino_softlimit = soft;
+	}
+#ifdef QUOTADEBUG
+	else 
+		printf("ihard 0x%x < isoft 0x%x\n", hard, soft);
+#endif		
+		
 #ifdef QUOTADEBUG	
 	printf("@@@ ID %d: bsoft sent %llu, now %llu : isoft %llu, now %llu\n",
 	       (int) id,
@@ -491,6 +506,7 @@ xfs_qm_scall_setqlim(
 		
 		/*
 		 * ditto, for warning limits.
+		 * (XXXare we actually doing these here?)
 		 */
 		mp->m_quotainfo->qi_bwarnlimit = newlim.d_bwarns ?
 			newlim.d_bwarns : XFS_QM_BWARNLIMIT;
@@ -508,7 +524,8 @@ xfs_qm_scall_setqlim(
 #endif
 		/*
 		 * If the user is now over quota, start the timelimit.
-		 * The user will not be warned.
+		 * The user will not be 'warned'. Warnings increase only
+		 * by request via Q_WARN.
 		 */
 		xfs_qm_adjust_dqtimers(mp, ddq);
 	}
@@ -534,21 +551,28 @@ xfs_qm_scall_getquota(
 	fs_disk_quota_t	out;
 	int 		error;
 
+#ifndef _BANYAN_XFS
 	if (id != get_current_cred()->cr_ruid && !_CAP_ABLE(CAP_QUOTA_MGT))
-		return (EPERM);
+		return XFS_ERROR(EPERM);
+#else
+	if (id != curprocp->p_cred->cr_ruid && !_CAP_ABLE(CAP_QUOTA_MGT))
+		return XFS_ERROR(EPERM);
+#endif
 	/*
 	 * Try to get the dquot. We don't want it allocated on disk, so
 	 * we aren't passing the XFS_QMOPT_DOALLOC flag. If it doesn't
 	 * exist, we'll get ENOENT back.
 	 */
+#ifdef QUOTADEBUG
 	printf("Checking ID %d, type 0x%x in mp = 0x%x\n",
 	       id, type, mp);
+#endif
 	if (error = xfs_qm_dqget(mp, NULL, id, type, 0, &dqp)) {
 		if (error != ESRCH && error != ENOENT)
 			xfs_qm_force_quotaoff(mp);
 #ifdef QUOTADEBUG
 		else
-			printf("ID %d, type 0x%x not in mp = 0x%x\n",
+			printf("!ID %d, type 0x%x not in mp = 0x%x\n",
 			       id, type, mp);
 #endif
 		return (error);
@@ -928,8 +952,12 @@ xfs_qm_import_qtype_flags(
 {
 	uint uflags;
 	
-	if (copyin(uflagsp, &uflags, sizeof(uint)) < 0)
+	if (copyin(uflagsp, &uflags, sizeof(uint)) < 0) {
+#ifdef QUOTADEBUG
+		printf("copyin failed\n");
+#endif
 		return (0);
+	}
 
 	/*
 	 * Can't be both at the same time.
@@ -964,7 +992,7 @@ xfs_qm_import_flags(
 {
 	uint flags, uflags;
 	
-	if (copyin(uflagsp, &uflags, sizeof(uint)) < 0)
+	if (copyin(uflagsp, &uflags, sizeof(uint)) < 0) 
 		return (0);
 
 	flags = 0;
@@ -1044,8 +1072,14 @@ again:
 			VMAP(vp, vmap);
 			ireclaims = mp->m_ireclaims;
 			XFS_MOUNT_IUNLOCK(mp);
+#ifndef _BANYAN_XFS
 			if (!(vp = vn_get(vp, &vmap, 0)))
 				goto again;
+#else
+			if (!(vp = vn_get(vp, &vmap)))
+				goto again;
+			ASSERT(ip == XFS_VTOI(vp));
+#endif
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			VN_RELE(vp);
 		} else {
@@ -1099,12 +1133,13 @@ again:
  * This contains all the test functions for XFS disk quotas.
  * Currently it does an quota accounting check. ie. it walks through
  * all inodes in the file system, calculating the dquot accounting fields,	
- * and prints out any inconsistencies.
+ * and prints out any inconsistencies. 
  */
 xfs_dqhash_t *qmtest_udqtab;
 xfs_dqhash_t *qmtest_pdqtab;
 int	      qmtest_hashmask;
 int	      qmtest_nfails;
+mutex_t	      qcheck_lock;
 
 #define DQTEST_HASHVAL(mp, id) (((__psunsigned_t)(mp) + \
 				 (__psunsigned_t)(id)) & \
@@ -1130,12 +1165,6 @@ int	      qmtest_nfails;
 }
 	
 typedef struct dqtest {
-#if 0
-	struct xfs_dquot*q_flnext;	/* link to the freelist - must be first */
-	struct xfs_dquot*q_flprev;
-	uint		 q_flags;
-	xfs_dqlink_t	 q_hashlist;	/* link to the hash chain */
-#endif
 	xfs_dqmarker_t	q_lists;
 	xfs_dqhash_t	*q_hash;        /* the hashchain header */
 	struct xfs_mount *q_mount;	/* filesystem this relates to */
@@ -1389,6 +1418,7 @@ xfs_qm_internalqcheck(
 	done = 0;
 	qmtest_nfails = 0;
 	
+	mutex_lock(&qcheck_lock, PINOD);
 	/* There should be absolutely no quota activity while this
 	   is going on. */
 	qmtest_udqtab = kmem_zalloc(qmtest_hashmask *
@@ -1411,7 +1441,6 @@ xfs_qm_internalqcheck(
 	printf("Checking results against system dquots\n");
 	for (i = 0; i < qmtest_hashmask; i++) {
 		h1 = &qmtest_udqtab[i];
-		/* DQTEST_LIST_PRINT(h1, HL_NEXT, "@@@@@ USR dqtestlist @@@@@"); */
 		for (d = (xfs_dqtest_t *) h1->qh_next; d != NULL; ) {
 			xfs_dqtest_cmp(d);
 			e = (xfs_dqtest_t *) d->HL_NEXT;
@@ -1419,7 +1448,6 @@ xfs_qm_internalqcheck(
 			d = e;
 		}
 		h1 = &qmtest_pdqtab[i];
-		/* DQTEST_LIST_PRINT(h1, HL_NEXT, "@@@@@ PRJ dqtestlist @@@@@"); */
 		for (d = (xfs_dqtest_t *) h1->qh_next; d != NULL; ) {
 			xfs_dqtest_cmp(d);
 			e = (xfs_dqtest_t *) d->HL_NEXT;
@@ -1436,6 +1464,7 @@ xfs_qm_internalqcheck(
 	}
 	kmem_free(qmtest_udqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));
 	kmem_free(qmtest_pdqtab, qmtest_hashmask * sizeof(xfs_dqhash_t));
+	mutex_unlock(&qcheck_lock);
 	return (qmtest_nfails);
 }
 
