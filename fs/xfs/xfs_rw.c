@@ -246,21 +246,21 @@ xfs_rw_enter_trace(
 	}
 
 	ktrace_enter(ip->i_rwtrace,
-		     (void*)tag,
+		     (void*)((unsigned long)tag),
 		     (void*)ip, 
 		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)(((__uint64_t)uiop->uio_offset >> 32) & 0xffffffff),
 		     (void*)(uiop->uio_offset & 0xffffffff),
 		     (void*)uiop->uio_resid,
-		     (void*)ioflags,
+		     (void*)((unsigned long)ioflags),
 		     (void*)((ip->i_next_offset >> 32) & 0xffffffff),
 		     (void*)(ip->i_next_offset & 0xffffffff),
-		     (void*)((ip->i_io_offset > 32) & 0xffffffff),
+		     (void*)((unsigned long)((ip->i_io_offset > 32) & 0xffffffff)),
 		     (void*)(ip->i_io_offset & 0xffffffff),
-		     (void*)(ip->i_io_size),
-		     (void*)(ip->i_last_req_sz),
-		     (void*)((ip->i_new_size > 32) & 0xffffffff),
+		     (void*)((unsigned long)(ip->i_io_size)),
+		     (void*)((unsigned long)(ip->i_last_req_sz)),
+		     (void*)((unsigned long)((ip->i_new_size > 32) & 0xffffffff)),
 		     (void*)(ip->i_new_size & 0xffffffff));
 }
 
@@ -276,19 +276,19 @@ xfs_iomap_enter_trace(
 	}
 
 	ktrace_enter(ip->i_rwtrace,
-		     (void*)tag,
+		     (void*)((unsigned long)tag),
 		     (void*)ip, 
 		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)(((__uint64_t)offset >> 32) & 0xffffffff),
 		     (void*)(offset & 0xffffffff),
-		     (void*)count,
+		     (void*)((unsigned long)count),
 		     (void*)((ip->i_next_offset >> 32) & 0xffffffff),
 		     (void*)(ip->i_next_offset & 0xffffffff),
 		     (void*)((ip->i_io_offset >> 32) & 0xffffffff),
 		     (void*)(ip->i_io_offset & 0xffffffff),
-		     (void*)(ip->i_io_size),
-		     (void*)(ip->i_last_req_sz),
+		     (void*)((unsigned long)(ip->i_io_size)),
+		     (void*)((unsigned long)(ip->i_last_req_sz)),
 		     (void*)((ip->i_new_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_new_size & 0xffffffff),
 		     (void*)0);
@@ -308,21 +308,21 @@ xfs_iomap_map_trace(
 	}
 
 	ktrace_enter(ip->i_rwtrace,
-		     (void*)tag,
+		     (void*)((unsigned long)tag),
 		     (void*)ip, 
 		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)(((__uint64_t)offset >> 32) & 0xffffffff),
 		     (void*)(offset & 0xffffffff),
-		     (void*)count,
+		     (void*)((unsigned long)count),
 		     (void*)((bmapp->offset >> 32) & 0xffffffff),
 		     (void*)(bmapp->offset & 0xffffffff),
-		     (void*)(bmapp->length),
-		     (void*)(bmapp->pboff),
-		     (void*)(bmapp->pbsize),
+		     (void*)((unsigned long)(bmapp->length)),
+		     (void*)((unsigned long)(bmapp->pboff)),
+		     (void*)((unsigned long)(bmapp->pbsize)),
 		     (void*)(bmapp->bn),
 		     (void*)(imapp->br_startoff),
-		     (void*)(imapp->br_blockcount),
+		     (void*)((unsigned long)(imapp->br_blockcount)),
 		     (void*)(imapp->br_startblock));
 }
 #endif	/* DEBUG */
@@ -544,7 +544,6 @@ xfs_iomap_extra(
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	end_fsb;
-	off_t		offset_bb;
 	xfs_extlen_t	block_off_bb;
 	xfs_fsize_t	nisize;
 	xfs_mount_t	*mp;
@@ -594,7 +593,6 @@ xfs_iomap_extra(
 		ASSERT(nimaps == 1);
 		*nbmaps = 1;
 		bmapp->eof = BMAP_EOF;
-		offset_bb = OFFTOBBT(offset);
 		if (imap.br_startblock == HOLESTARTBLOCK) {
 			bmapp->eof |= BMAP_HOLE;
 			bmapp->bn = -1;
@@ -1216,7 +1214,6 @@ xfs_write_bmap(
 	xfs_fileoff_t	ext_offset;
 	xfs_fileoff_t	last_file_fsb;
 	xfs_fsblock_t	start_block;
-	off_t		last_imap_byte;
 	
 	if (ioalign < imapp->br_startoff) {
 		/*
@@ -1256,8 +1253,6 @@ xfs_write_bmap(
 	extra_blocks = (off_t)(bmapp->offset + bmapp->length) -
 		       (__uint64_t)(imapp->br_startoff +
 				    imapp->br_blockcount);
-	last_imap_byte = XFS_FSB_TO_B(mp, imapp->br_startoff +
-				      imapp->br_blockcount);
 	if (extra_blocks > 0) {
 		bmapp->length -= extra_blocks;
 		ASSERT(bmapp->length > 0);
@@ -1284,7 +1279,6 @@ xfs_zero_last_block(
 	xfs_mount_t	*mp;
 	buf_t		*bp;
 	int		iosize;
-	vnode_t		*vp;
 	int		nimaps;
 	int		zero_offset;
 	int		zero_len;
@@ -1298,7 +1292,6 @@ xfs_zero_last_block(
 	ASSERT(offset > isize);
 
 	mp = ip->i_mount;
-	vp = XFS_ITOV(ip);
 
 	/*
 	 * If the file system block size is less than the page size,
@@ -1518,7 +1511,6 @@ xfs_iomap_write(
 	xfs_fileoff_t	last_fsb;
 	xfs_fileoff_t	bmap_end_fsb;
 	xfs_fileoff_t	last_file_fsb;
-	off_t		next_offset;
 	off_t		aligned_offset;
 	xfs_fsize_t	isize;
 	int		nimaps;
@@ -1721,14 +1713,13 @@ xfs_iomap_write(
 			 * entire buffer unless the count of bytes to
 			 * write runs out.
 			 */
-			next_offset = XFS_FSB_TO_B(mp, next_offset_fsb);
 			writing_bytes = next_bmapp->bsize;
 			if (writing_bytes > count_remaining) {
 				writing_bytes = count_remaining;
 			}
 			next_bmapp->pbsize = writing_bytes;
 			count_remaining -= writing_bytes;
-			ASSERT(count_remaining >= 0);
+			ASSERT(((long)count_remaining) >= 0);
 
 			filled_bmaps++;
 			curr_bmapp++;
@@ -1786,7 +1777,6 @@ xfs_write_file(
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	buf_t		*bp;
-	int		buffer_bytes_ok;
 	xfs_inode_t	*ip;
 	int		error;
 	int		eof_zeroed;
@@ -1809,7 +1799,6 @@ xfs_write_file(
 	}
 
 	error = 0;
-	buffer_bytes_ok = 0;
 	eof_zeroed = 0;
 	gaps_mapped = 0;
 	XFSSTATS.xs_write_calls++;
@@ -2491,7 +2480,7 @@ xfs_build_gap_list(
 		for (i = 0; i < nimaps; i++) {
 			imapp = &imaps[i];
 			count_fsb -= imapp->br_blockcount;
-			ASSERT(count_fsb >= 0);
+			ASSERT(((long)count_fsb) >= 0);
 			ASSERT(offset_fsb == imapp->br_startoff);
 			offset_fsb += imapp->br_blockcount;
 			ASSERT(offset_fsb <= last_fsb);
@@ -3002,37 +2991,37 @@ xfs_strat_write_bp_trace(
 	}
 
 	ktrace_enter(ip->i_strat_trace,
-		     (void*)tag,
+		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((bp->b_offset > 32) & 0xffffffff),
+		     (void*)((unsigned long)((bp->b_offset > 32) & 0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
-		     (void*)(bp->b_bcount),
-		     (void*)(bp->b_bufsize),
+		     (void*)((unsigned long)(bp->b_bcount)),
+		     (void*)((unsigned long)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)(bp->b_flags),
+		     (void*)((unsigned long)(bp->b_flags)),
 		     (void*)(bp->b_pages),
-		     (void*)(bp->b_pages->pf_pageno),
+		     (void*)((unsigned long)(bp->b_pages->pf_pageno)),
 		     (void*)0,
 		     (void*)0,
 		     (void*)0);
 
 	ktrace_enter(xfs_strat_trace_buf,
-		     (void*)tag,
+		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((bp->b_offset > 32) & 0xffffffff),
+		     (void*)((unsigned long)((bp->b_offset > 32) & 0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
-		     (void*)(bp->b_bcount),
-		     (void*)(bp->b_bufsize),
+		     (void*)((unsigned long)(bp->b_bcount)),
+		     (void*)((unsigned long)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)(bp->b_flags),
+		     (void*)((unsigned long)(bp->b_flags)),
 		     (void*)(bp->b_pages),
-		     (void*)(bp->b_pages->pf_pageno),
+		     (void*)((unsigned long)(bp->b_pages->pf_pageno)),
 		     (void*)0,
 		     (void*)0,
 		     (void*)0);
@@ -3054,39 +3043,39 @@ xfs_strat_write_subbp_trace(
 	}
 
 	ktrace_enter(ip->i_strat_trace,
-		     (void*)tag,
+		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
 		     (void*)rbp,
-		     (void*)((rbp->b_offset > 32) & 0xffffffff),
+		     (void*)((unsigned long)((rbp->b_offset > 32) & 0xffffffff)),
 		     (void*)(rbp->b_offset & 0xffffffff),
-		     (void*)(rbp->b_bcount),
+		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
-		     (void*)(rbp->b_flags),
+		     (void*)((unsigned long)(rbp->b_flags)),
 		     (void*)(rbp->b_un.b_addr),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
-		     (void*)(last_bcount),
+		     (void*)((unsigned long)(last_bcount)),
 		     (void*)(last_blkno));
 
 	ktrace_enter(xfs_strat_trace_buf,
-		     (void*)tag,
+		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((ip->i_d.di_size > 32) & 0xffffffff),
+		     (void*)((unsigned long)((ip->i_d.di_size > 32) & 0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
 		     (void*)rbp,
-		     (void*)((rbp->b_offset > 32) & 0xffffffff),
+		     (void*)((unsigned long)((rbp->b_offset > 32) & 0xffffffff)),
 		     (void*)(rbp->b_offset & 0xffffffff),
-		     (void*)(rbp->b_bcount),
+		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
-		     (void*)(rbp->b_flags),
+		     (void*)((unsigned long)(rbp->b_flags)),
 		     (void*)(rbp->b_un.b_addr),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
-		     (void*)(last_bcount),
+		     (void*)((unsigned long)(last_bcount)),
 		     (void*)(last_blkno));
 }
 
@@ -3107,13 +3096,11 @@ xfs_strat_write_check(
 	int		imap_count)
 {
 	xfs_extlen_t	count_fsb;
-	boolean_t	done;
 	int		nimaps;
 	int		n;
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	count_fsb = 0;
-	done = B_FALSE;
 	while (count_fsb < buf_fsb) {
 		nimaps = imap_count;
 		(void) xfs_bmapi(NULL, ip, (offset_fsb + count_fsb),
@@ -3157,8 +3144,8 @@ xfs_strat_write_relse(
 	forw = (buf_t*)rbp->b_fsprivate2;
 	back = (buf_t*)rbp->b_fsprivate;
 	ASSERT(back != NULL);
-	ASSERT(back->b_fsprivate2 == rbp);
-	ASSERT((forw == NULL) || (forw->b_fsprivate == rbp));
+	ASSERT(((buf_t *)back->b_fsprivate2) == rbp);
+	ASSERT((forw == NULL) || (((buf_t *)forw->b_fsprivate) == rbp));
 
 	/*
 	 * Pull ourselves from the list.
@@ -3545,7 +3532,7 @@ xfs_strat_write(
 			locals->map_start_fsb +=
 				locals->imapp->br_blockcount;
 			locals->count_fsb -= locals->imapp->br_blockcount;
-			ASSERT(locals->count_fsb >= 0);
+			ASSERT(((long)locals->count_fsb) >= 0);
 
 			locals->imap_index++;
 		}
@@ -3601,10 +3588,7 @@ xfs_strategy(
 	vnode_t	*vp,
 	buf_t	*bp)
 {
-	xfs_mount_t	*mp;
 	int		s;
-
-	mp = XFS_VFSTOM(vp->v_vfsp);
 
 	/*
 	 * If this is just a buffer whose underlying disk space
@@ -3798,9 +3782,9 @@ xfs_diostrat( buf_t *bp)
 	xfs_mount_t	*mp;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp, *timapp;
 	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
-	xfs_fileoff_t	offset_fsb, last_fsb;
+	xfs_fileoff_t	offset_fsb;
 	xfs_fsblock_t	firstfsb;
-	xfs_extlen_t	blocks, count_fsb, total;
+	xfs_extlen_t	count_fsb, total;
 	xfs_bmap_free_t free_list;
 	caddr_t		base;
 	ssize_t		resid, count, totxfer;
@@ -3865,9 +3849,7 @@ xfs_diostrat( buf_t *bp)
 	 */
 	while ( !error && !end_of_file && !resid && count ) {
 		offset_fsb = XFS_B_TO_FSBT( mp, offset );
-		last_fsb   = XFS_B_TO_FSB( mp, offset + count);
 		count_fsb  = XFS_B_TO_FSB( mp, count);
-		blocks     = (xfs_extlen_t)(last_fsb - offset_fsb);
 
 		tp = NULL;
 		exist = 1;
@@ -4196,7 +4178,7 @@ xfs_diordwr(vnode_t	*vp,
 	 * so we don't need to worry about read/modify/write stuff.
  	 */
 	if (!(vp->v_flag & VISSWAP) &&
-	    ((((int)(uiop->uio_iov->iov_base)) & BBMASK) ||
+	    ((((long)(uiop->uio_iov->iov_base)) & BBMASK) ||
 	     (uiop->uio_offset & mp->m_blockmask) ||
 	     (uiop->uio_resid & mp->m_blockmask))) {
 #ifndef SIM

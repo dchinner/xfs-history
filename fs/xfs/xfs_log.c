@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.110 $"
+#ident	"$Revision: 1.111 $"
 
 /*
  * High level interface routines for log manager
@@ -152,19 +152,19 @@ xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
 		     (void *)tic,
 		     (void *)log->l_reserve_headq,
 		     (void *)log->l_write_headq,
-		     (void *)log->l_grant_reserve_cycle,     
-		     (void *)log->l_grant_reserve_bytes,
-		     (void *)log->l_grant_write_cycle,
-		     (void *)log->l_grant_write_bytes,
-		     (void *)log->l_curr_cycle,
-		     (void *)log->l_curr_block,
-		     (void *)CYCLE_LSN(log->l_tail_lsn),
-		     (void *)BLOCK_LSN(log->l_tail_lsn),
+		     (void *)((unsigned long)log->l_grant_reserve_cycle),     
+		     (void *)((unsigned long)log->l_grant_reserve_bytes),
+		     (void *)((unsigned long)log->l_grant_write_cycle),
+		     (void *)((unsigned long)log->l_grant_write_bytes),
+		     (void *)((unsigned long)log->l_curr_cycle),
+		     (void *)((unsigned long)log->l_curr_block),
+		     (void *)((unsigned long)CYCLE_LSN(log->l_tail_lsn)),
+		     (void *)((unsigned long)BLOCK_LSN(log->l_tail_lsn)),
 		     (void *)string,
-		     (void *)13,
-		     (void *)14,
-		     (void *)15,
-		     (void *)16);
+		     (void *)((unsigned long)13),
+		     (void *)((unsigned long)14),
+		     (void *)((unsigned long)15),
+		     (void *)((unsigned long)16));
 }
 
 void
@@ -175,21 +175,21 @@ xlog_trace_tic(xlog_t *log, xlog_ticket_t *tic)
 
 	ktrace_enter(log->l_trace,
 		     (void *)tic,
-		     (void *)tic->t_curr_res,
-		     (void *)tic->t_unit_res,
-		     (void *)tic->t_ocnt,
-		     (void *)tic->t_cnt,
-		     (void *)tic->t_flags,
-		     (void *)7,
-		     (void *)8,
-		     (void *)9,
-		     (void *)10,
-		     (void *)11,
-		     (void *)12,
-		     (void *)13,
-		     (void *)14,
-		     (void *)15,
-		     (void *)16);
+		     (void *)((unsigned long)tic->t_curr_res),
+		     (void *)((unsigned long)tic->t_unit_res),
+		     (void *)((unsigned long)tic->t_ocnt),
+		     (void *)((unsigned long)tic->t_cnt),
+		     (void *)((unsigned long)tic->t_flags),
+		     (void *)((unsigned long)7),
+		     (void *)((unsigned long)8),
+		     (void *)((unsigned long)9),
+		     (void *)((unsigned long)10),
+		     (void *)((unsigned long)11),
+		     (void *)((unsigned long)12),
+		     (void *)((unsigned long)13),
+		     (void *)((unsigned long)14),
+		     (void *)((unsigned long)15),
+		     (void *)((unsigned long)16));
 }
 
 void
@@ -203,8 +203,8 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 	if (!iclog->ic_trace)
 		iclog->ic_trace = ktrace_alloc(256, 0);
 	ktrace_enter(iclog->ic_trace,
-		     (void *)state,
-		     (void *)pid,
+		     (void *)((unsigned long)state),
+		     (void *)((unsigned long)pid),
 		     (void *)0,
 		     (void *)0,
 		     (void *)0,
@@ -316,6 +316,8 @@ xfs_log_force(xfs_mount_t *mp,
 	} else
 		xlog_panic("xfs_log_force: illegal flags");
 
+	return( 0 );
+
 }	/* xfs_log_force */
 
 
@@ -350,6 +352,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 int
 xfs_log_init()
 {
+	return( 0 );
 }
 
 
@@ -702,8 +705,8 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 void
 xlog_iodone(buf_t *bp)
 {
-	ASSERT(bp->b_fsprivate2 == (void *)2);
-	bp->b_fsprivate2 = (void *)1;
+	ASSERT(bp->b_fsprivate2 == (void *)((unsigned long)2));
+	bp->b_fsprivate2 = (void *)((unsigned long)1);
 
 	xlog_state_done_syncing((xlog_in_core_t *)(bp->b_fsprivate));
 	if ( !(bp->b_flags & B_ASYNC) ) {
@@ -879,7 +882,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	bp->b_edev	   = log_dev;
 	bp->b_bufsize	   = log->l_iclog_size;
 	bp->b_iodone	   = xlog_iodone;
-	bp->b_fsprivate2   = (void *)1;
+	bp->b_fsprivate2   = (void *)((unsigned long)1);
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	initnlock(&log->l_icloglock, "iclog");
@@ -913,7 +916,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		bp->b_edev = log_dev;
 		bp->b_bufsize = log->l_iclog_size;
 		bp->b_iodone = xlog_iodone;
-		bp->b_fsprivate2 = (void *)1;
+		bp->b_fsprivate2 = (void *)((unsigned long)1);
 
 		iclog->ic_size = bp->b_bufsize - XLOG_HEADER_SIZE;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
@@ -1052,8 +1055,8 @@ xlog_sync(xlog_t		*log,
 	iclog->ic_header.h_len = iclog->ic_offset;	/* real byte length */
 
 	bp	    = iclog->ic_bp;
-	ASSERT(bp->b_fsprivate2 == (void *)1);
-	bp->b_fsprivate2 = (void *)2;
+	ASSERT(bp->b_fsprivate2 == (void *)((unsigned long)1));
+	bp->b_fsprivate2 = (void *)((unsigned long)2);
 	bp->b_blkno = BLOCK_LSN(iclog->ic_header.h_lsn);
 
 	/* Round byte count up to a BBSIZE chunk */
@@ -1103,8 +1106,8 @@ xlog_sync(xlog_t		*log,
 
 	if (split) {
 		bp		= iclog->ic_log->l_xbuf;
-		ASSERT(bp->b_fsprivate2 == (void *)1);
-		bp->b_fsprivate2 = (void *)2;
+		ASSERT(bp->b_fsprivate2 == (void *)((unsigned long)1));
+		bp->b_fsprivate2 = (void *)((unsigned long)2);
 		bp->b_blkno	= 0;		     /* logical 0 */
 		bp->b_bcount	= split;
 		bp->b_dmaaddr	= (caddr_t)((__psint_t)iclog+(__psint_t)count);
@@ -1672,7 +1675,6 @@ STATIC void
 xlog_grant_log_space(xlog_t	   *log,
 		     xlog_ticket_t *tic)
 {
-	xlog_ticket_t	 *head;
 	int		 free_bytes;
 	int		 need_bytes;
 	int		 spl;
@@ -1689,7 +1691,7 @@ xlog_grant_log_space(xlog_t	   *log,
 	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: enter");
 
 	/* something is already sleeping; insert new transaction at end */
-	if (head = log->l_reserve_headq) {
+	if (log->l_reserve_headq) {
 		XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 1");
@@ -2480,7 +2482,9 @@ xlog_verify_iclog(xlog_t	 *log,
 	xlog_op_header_t  *ophead;
 	xlog_rec_header_t *rec;
 	xlog_in_core_t	 *icptr;
+#ifndef _KERNEL
 	xlog_tid_t	 tid;
+#endif
 	caddr_t		 ptr;
 	char		 clientid;
 	int		 len, fd, i, op_len, cycle_no, spl;
@@ -2524,14 +2528,14 @@ xlog_verify_iclog(xlog_t	 *log,
 		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
 			xlog_panic("xlog_verify_iclog: illegal client");
 
+#ifndef _KERNEL
 		/* check tids */
 		if (syncing == B_FALSE ||
 		    ((__psint_t)&ophead->oh_tid & 0x1ff))
 			tid = ophead->oh_tid;
 		else
-			tid = (xlog_tid_t)iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_tid - (__psint_t)iclog->ic_data)];
+			tid = (xlog_tid_t)((unsigned long)iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_tid - (__psint_t)iclog->ic_data)]);
 
-#ifndef _KERNEL
 		/* This is a user space check */
 		if ((__psint_t)tid < 0x10000000 || (__psint_t)tid > 0x20000000)
 			xlog_panic("xlog_verify_iclog: illegal tid");

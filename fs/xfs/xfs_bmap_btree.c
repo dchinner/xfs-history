@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.50 $"
+#ident	"$Revision: 1.51 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -285,18 +285,18 @@ xfs_bmbt_trace_enter(
 	char			*name,
 	xfs_btree_cur_t		*cur,
 	int			type,
-	int			a0,
-	int			a1,
-	int			a2,
-	int			a3,
-	int			a4,
-	int			a5,
-	int			a6,
-	int			a7,
-	int			a8,
-	int			a9,
-	int			a10,
-	int			a11);
+	unsigned long		a0,
+	unsigned long		a1,
+	unsigned long		a2,
+	unsigned long		a3,
+	unsigned long		a4,
+	unsigned long		a5,
+	unsigned long		a6,
+	unsigned long		a7,
+	unsigned long		a8,
+	unsigned long		a9,
+	unsigned long		a10,
+	unsigned long		a11);
 #else
 #define	xfs_bmbt_trace_argbi(n,c,b,i)
 #define	xfs_bmbt_trace_argbii(n,c,b,i,j)
@@ -1506,7 +1506,7 @@ xfs_bmbt_trace_argbi(
 	int		i)
 {
 	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_ARGBI,
-		(int)b, i, 0, 0,
+		(unsigned long)b, i, 0, 0,
 		0, 0, 0, 0,
 		0, 0, 0, 0);
 }
@@ -1523,7 +1523,7 @@ xfs_bmbt_trace_argbii(
 	int		i1)
 {
 	xfs_bmbt_trace_enter(name, cur, XFS_BMBT_KTRACE_ARGBII,
-		(int)b, i0, i1, 0,
+		(unsigned long)b, i0, i1, 0,
 		0, 0, 0, 0,
 		0, 0, 0, 0);
 }
@@ -1644,8 +1644,8 @@ xfs_bmbt_trace_cursor(
 		(cur->bc_nlevels << 16) | cur->bc_private.b.flags,
 		cur->bc_private.b.allocated,
 		r.l0, r.l1, r.l2, r.l3,
-		(int)cur->bc_bufs[0], (int)cur->bc_bufs[1],
-		(int)cur->bc_bufs[2], (int)cur->bc_bufs[3],
+		(unsigned long)cur->bc_bufs[0], (unsigned long)cur->bc_bufs[1],
+		(unsigned long)cur->bc_bufs[2], (unsigned long)cur->bc_bufs[3],
 		(cur->bc_ptrs[0] << 16) | cur->bc_ptrs[1],
 		(cur->bc_ptrs[2] << 16) | cur->bc_ptrs[3]);
 }
@@ -1659,30 +1659,32 @@ xfs_bmbt_trace_enter(
 	char		*name,
 	xfs_btree_cur_t	*cur,
 	int		type,
-	int		a0,
-	int		a1,
-	int		a2,
-	int		a3,
-	int		a4,
-	int		a5,
-	int		a6,
-	int		a7,
-	int		a8,
-	int		a9,
-	int		a10,
-	int		a11)
+	unsigned long		a0,
+	unsigned long		a1,
+	unsigned long		a2,
+	unsigned long		a3,
+	unsigned long		a4,
+	unsigned long		a5,
+	unsigned long		a6,
+	unsigned long		a7,
+	unsigned long		a8,
+	unsigned long		a9,
+	unsigned long		a10,
+	unsigned long		a11)
 {
 	xfs_inode_t	*ip;
 
 	ip = cur->bc_private.b.ip;
 	ktrace_enter(xfs_bmbt_trace_buf,
-		(void *)type, (void *)name, (void *)ip, (void *)cur,
+		(void *)((unsigned long)type), 
+		(void *)name, (void *)ip, (void *)cur,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
 		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
 	ASSERT(ip->i_btrace);
 	ktrace_enter(ip->i_btrace,
-		(void *)type, (void *)name, (void *)ip, (void *)cur,
+		(void *)((unsigned long)type), 
+		(void *)name, (void *)ip, (void *)cur,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
 		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
 		(void *)a8, (void *)a9, (void *)a10, (void *)a11);
@@ -1702,13 +1704,11 @@ xfs_bmbt_updkey(
 	buf_t			*bp;
 	xfs_bmbt_key_t		*kp;
 	int			ptr;
-	xfs_trans_t		*tp;
 
 	ASSERT(level >= 1);
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_updkey entry", cur);
 	xfs_bmbt_trace_argik("xfs_bmbt_updkey args", cur, level, keyp);
-	tp = cur->bc_tp;
 	for (ptr = 1; ptr == 1 && level < cur->bc_nlevels; level++) {
 		block = xfs_bmbt_get_block(cur, level, &bp);
 		xfs_btree_check_lblock(cur, block, level);
@@ -2357,7 +2357,6 @@ xfs_bmbt_update(
 	xfs_bmbt_key_t		key;
 	int			ptr;
 	xfs_bmbt_rec_t		*rp;
-	xfs_trans_t		*tp;
 
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_update entry", cur);
@@ -2366,7 +2365,6 @@ xfs_bmbt_update(
 	block = xfs_bmbt_get_block(cur, 0, &bp);
 	xfs_btree_check_lblock(cur, block, 0);
 	ptr = cur->bc_ptrs[0];
-	tp = cur->bc_tp;
 	rp = XFS_BMAP_REC_IADDR(block, ptr, cur);
 	xfs_bmbt_set_startoff(rp, off);
 	xfs_bmbt_set_startblock(rp, bno);
