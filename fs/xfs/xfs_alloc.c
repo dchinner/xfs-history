@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -219,11 +219,17 @@ xfs_alloc_delrec(xfs_btree_cur_t *cur, int level)
 			agp->ag_longest = 0;
 		xfs_btree_log_ag(tp, agbuf, XFS_AG_LONGEST);
 	}
+	/*
+	 * We just did a join at the previous level.
+	 * Make the cursor point to the good (left) key.
+	 */
+	if (level > 0)
+		xfs_alloc_decrement(cur, level);
 	if (level == cur->bc_nlevels - 1) {
 		if (block->bb_numrecs == 1 && level > 0) {
-			xfs_alloc_put_freelist(tp, agbuf, buf);
 			agp->ag_roots[cur->bc_btnum] = *pp;
 			agp->ag_levels[cur->bc_btnum]--;
+			xfs_alloc_put_freelist(tp, agbuf, buf);
 			xfs_btree_log_ag(tp, agbuf,
 					 XFS_AG_ROOTS | XFS_AG_LEVELS);
 			xfs_btree_setbuf(cur, level, 0);
