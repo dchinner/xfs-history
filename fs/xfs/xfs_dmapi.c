@@ -165,14 +165,18 @@ xfs_dm_send_data_event(
 	 * so we go straight to XFS.
 	 */
 	ASSERT(BHV_IS_XFS(bdp));
-/*	VN_BHV_READ_LOCK(&vp->v_bh);   cell-only */
+#ifdef CELL_CAPABLE
+	VN_BHV_READ_LOCK(&vp->v_bh);
+#endif
 	if (locktype)
 		xfs_rwunlock(bdp, *locktype);
 	error = dm_send_data_event(event, bdp, DM_RIGHT_NULL,
 			offset, length, flags);
 	if (locktype)
 		xfs_rwlock(bdp, *locktype);
-/*	VN_BHV_READ_UNLOCK(&vp->v_bh);  cell-only */
+#ifdef CELL_CAPABLE
+	VN_BHV_READ_UNLOCK(&vp->v_bh);
+#endif
 
 	return error;
 }
@@ -992,6 +996,8 @@ xfs_dm_rdwr(
 	ssize_t		ret;
 	struct inode	*ip;
 	struct dentry	*dentry;
+	uio_t		uio;
+	iovec_t		iov;
 
 	if (off < 0 || vp->v_type != VREG)
 		return(EINVAL);
@@ -1051,10 +1057,17 @@ xfs_dm_rdwr(
 	}
 	file.f_flags = oflags;
 
+	uio.uio_iov = &iov;
+	uio.uio_offset = off;
+	uio.uio_fp = &file;
+	uio.uio_iovcnt = 1;
+	uio.uio_iov->iov_base = bufp;
+	uio.uio_iov->iov_len = uio.uio_resid = len;
+
 	if (fflag & FMODE_READ) {
-		VOP_READ(vp, &file, bufp, len, &off, ret);
+		VOP_READ(vp, &uio, 0, NULL, NULL, ret);
 	} else {
-		VOP_WRITE(vp, &file, bufp, len, &off, ret);
+		VOP_WRITE(vp, &uio, 0, NULL, NULL, ret);
 	}
 
 	dput(dentry);
