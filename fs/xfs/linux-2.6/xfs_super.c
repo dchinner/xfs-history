@@ -973,6 +973,7 @@ init_xfs_fs( void )
 
 	vn_init();
 	xfs_init();
+	uuid_init();
 	vfs_initdmapi();
 	vfs_initquota();
 
