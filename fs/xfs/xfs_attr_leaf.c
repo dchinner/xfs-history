@@ -701,7 +701,6 @@ xfs_attr_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 	xfs_attr_leaf_name_local_t *name_loc;
 	xfs_attr_leaf_name_remote_t *name_rmt;
 	xfs_attr_leaf_map_t *map;
-	xfs_fileoff_t blkno;
 	xfs_mount_t *mp;
 	int tmp, i;
 
@@ -754,11 +753,11 @@ xfs_attr_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 	/*
 	 * Copy the attribute name and value into the new space.
 	 *
-	 * For "remote" attribute values, simply identify the file-relative
-	 * logical blocks that will be used to store the value.  We cannot
-	 * actually allocate the extents in this transaction, it would take
-	 * too much log space, so we delay that until after we commit this
-	 * transaction.
+	 * For "remote" attribute values, simply note that we need to 
+	 * allocate space for the "remote" value.  We can't actually
+	 * allocate the extents in this transaction, and we can't decide
+	 * which blocks they should be as we might allocate more blocks
+	 * as part of this transaction (a split operation for example).
 	 */
 	if (entry->flags & XFS_ATTR_LOCAL) {
 		name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, args->index);
@@ -771,18 +770,11 @@ xfs_attr_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 		name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, args->index);
 		name_rmt->namelen = args->namelen;
 		bcopy(args->name, (char *)name_rmt->name, args->namelen);
+		entry->flags |= XFS_ATTR_INCOMPLETE;
 		name_rmt->valuelen = 0;	/* just in case */
 		name_rmt->valueblk = 0;
-		tmp = xfs_bmap_first_unused(trans, args->dp,
-				 (xfs_extlen_t)XFS_B_TO_FSB(mp, args->valuelen),
-				 &blkno, args->whichfork);
-		if (tmp)
-			return(tmp);
-		name_rmt->valuelen = args->valuelen;
-		name_rmt->valueblk = blkno;	/* fill in value bytes later */
-		entry->flags |= XFS_ATTR_INCOMPLETE;
-		args->rmtblkno = blkno;
-		args->rmtblkcnt = XFS_B_TO_FSB(mp, name_rmt->valuelen);
+		args->rmtblkno = 1;
+		args->rmtblkcnt = XFS_B_TO_FSB(mp, args->valuelen);
 	}
 	xfs_trans_log_buf(trans, bp,
 	     XFS_DA_LOGRANGE(leaf, XFS_ATTR_LEAF_NAME(leaf, args->index),
@@ -1962,10 +1954,16 @@ xfs_attr_leaf_clearflag(xfs_da_args_t *args)
 {
 	xfs_attr_leafblock_t *leaf;
 	xfs_attr_leaf_entry_t *entry;
+	xfs_attr_leaf_name_remote_t *name_rmt;
 	xfs_trans_t *trans;
 	xfs_inode_t *dp;
 	buf_t *bp;
 	int error;
+#ifdef DEBUG
+	xfs_attr_leaf_name_local_t *name_loc;
+	int namelen;
+	char *name;
+#endif /* DEBUG */
 
 	/*
 	 * Set up the transaction envelope.
@@ -1993,9 +1991,34 @@ xfs_attr_leaf_clearflag(xfs_da_args_t *args)
 	ASSERT(args->index >= 0);
 	entry = &leaf->entries[ args->index ];
 	ASSERT(entry->flags & XFS_ATTR_INCOMPLETE);
+
+#ifdef DEBUG
+	if (entry->flags & XFS_ATTR_LOCAL) {
+		name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, args->index);
+		namelen = name_loc->namelen;
+		name = (char *)name_loc->nameval;
+	} else {
+		name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, args->index);
+		namelen = name_rmt->namelen;
+		name = (char *)name_rmt->name;
+	}
+	ASSERT(entry->hashval == args->hashval);
+	ASSERT(namelen == args->namelen);
+	ASSERT(bcmp(name, args->name, namelen) == 0);
+#endif /* DEBUG */
+
 	entry->flags &= ~XFS_ATTR_INCOMPLETE;
 	xfs_trans_log_buf(trans, bp,
 			 XFS_DA_LOGRANGE(leaf, entry, sizeof(*entry)));
+
+	if (args->rmtblkno) {
+		ASSERT((entry->flags & XFS_ATTR_LOCAL) == 0);
+		name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, args->index);
+		name_rmt->valueblk = args->rmtblkno;
+		name_rmt->valuelen = args->valuelen;
+		xfs_trans_log_buf(trans, bp,
+			 XFS_DA_LOGRANGE(leaf, name_rmt, sizeof(*name_rmt)));
+	}
 
 	xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 	return(error);
@@ -2039,8 +2062,10 @@ xfs_attr_leaf_setflag(xfs_da_args_t *args)
 	ASSERT(args->index < leaf->hdr.count);
 	ASSERT(args->index >= 0);
 	entry = &leaf->entries[ args->index ];
+
 	ASSERT((entry->flags & XFS_ATTR_INCOMPLETE) == 0);
 	entry->flags |= XFS_ATTR_INCOMPLETE;
+
 	xfs_trans_log_buf(trans, bp,
 			 XFS_DA_LOGRANGE(leaf, entry, sizeof(*entry)));
 
@@ -2060,13 +2085,13 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 {
 	xfs_attr_leafblock_t *leaf1, *leaf2;
 	xfs_attr_leaf_entry_t *entry1, *entry2;
+	xfs_attr_leaf_name_remote_t *name_rmt;
 	xfs_trans_t *trans;
 	xfs_inode_t *dp;
 	buf_t *bp1, *bp2;
 	int error;
 #ifdef DEBUG
 	xfs_attr_leaf_name_local_t *name_loc;
-	xfs_attr_leaf_name_remote_t *name_rmt;
 	int namelen1, namelen2;
 	char *name1, *name2;
 #endif /* DEBUG */
@@ -2122,7 +2147,6 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 	entry2 = &leaf2->entries[ args->index2 ];
 
 #ifdef DEBUG
-	ASSERT(entry1->hashval == entry2->hashval);
 	if (entry1->flags & XFS_ATTR_LOCAL) {
 		name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf1, args->index);
 		namelen1 = name_loc->namelen;
@@ -2141,16 +2165,28 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 		namelen2 = name_rmt->namelen;
 		name2 = (char *)name_rmt->name;
 	}
+	ASSERT(entry1->hashval == entry2->hashval);
 	ASSERT(namelen1 == namelen2);
 	ASSERT(bcmp(name1, name2, namelen1) == 0);
 #endif /* DEBUG */
 
 	ASSERT(entry1->flags & XFS_ATTR_INCOMPLETE);
 	ASSERT((entry2->flags & XFS_ATTR_INCOMPLETE) == 0);
+
 	entry1->flags &= ~XFS_ATTR_INCOMPLETE;
-	entry2->flags |=  XFS_ATTR_INCOMPLETE;
 	xfs_trans_log_buf(trans, bp1,
 			 XFS_DA_LOGRANGE(leaf1, entry1, sizeof(*entry1)));
+
+	if (args->rmtblkno) {
+		ASSERT((entry1->flags & XFS_ATTR_LOCAL) == 0);
+		name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf1, args->index);
+		name_rmt->valueblk = args->rmtblkno;
+		name_rmt->valuelen = args->valuelen;
+		xfs_trans_log_buf(trans, bp1,
+			 XFS_DA_LOGRANGE(leaf1, name_rmt, sizeof(*name_rmt)));
+	}
+
+	entry2->flags |=  XFS_ATTR_INCOMPLETE;
 	xfs_trans_log_buf(trans, bp2,
 			 XFS_DA_LOGRANGE(leaf2, entry2, sizeof(*entry2)));
 
