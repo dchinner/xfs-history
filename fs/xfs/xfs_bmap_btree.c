@@ -779,12 +779,8 @@ xfs_bmbt_insrec(
 						xfs_btree_check_lblock(cur,
 							    block, level);
 						ptr = cur->bc_ptrs[level];
-						xfs_bmbt_set_startoff(&nrec,
-							   nkey.br_startoff);
-						xfs_bmbt_set_startblock(
-							    &nrec, 0);
-						xfs_bmbt_set_blockcount(
-							    &nrec, 0);
+						xfs_bmbt_set_allf(&nrec,
+							nkey.br_startoff, 0, 0);
 					} else {
 						xfs_bmbt_trace_cursor(
 						   "xfs_bmbt_insrec exit2",
@@ -2683,6 +2679,68 @@ xfs_bmbt_set_all(
 }
 
 /*
+ * Set all the fields in a bmap extent record from the arguments.
+ */
+void
+xfs_bmbt_set_allf(
+	xfs_bmbt_rec_t	*r,
+	xfs_fileoff_t	o,
+	xfs_fsblock_t	b,
+	xfs_filblks_t	c)
+{
+#if XFS_BIG_FILES
+	ASSERT((o & XFS_MASK64HI(9)) == 0);
+	ASSERT((c & XFS_MASK64HI(43)) == 0);
+#else	/* !XFS_BIG_FILES */
+	ASSERT((c & XFS_MASK32HI(11)) == 0);
+#endif	/* XFS_BIG_FILES */
+#if XFS_BIG_FILESYSTEMS
+	ASSERT((b & XFS_MASK64HI(12)) == 0);
+#endif	/* XFS_BIG_FILESYSTEMS */
+#if BMBT_USE_64
+#if XFS_BIG_FILESYSTEMS
+	r->l0 = ((xfs_bmbt_rec_base_t)o << 9) | ((xfs_bmbt_rec_base_t)b >> 43);
+	r->l1 = ((xfs_bmbt_rec_base_t)b << 21) | 
+		  ((xfs_bmbt_rec_base_t)c &
+		   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
+#else	/* !XFS_BIG_FILESYSTEMS */
+	if (ISNULLSTARTBLOCK(b)) {
+		r->l0 = ((xfs_bmbt_rec_base_t)o << 9) |
+			  (xfs_bmbt_rec_base_t)XFS_MASK64LO(9);
+		r->l1 = XFS_MASK64HI(11) |
+			  ((xfs_bmbt_rec_base_t)b << 21) |
+			  ((xfs_bmbt_rec_base_t)c &
+			   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
+	} else {
+		r->l0 = (xfs_bmbt_rec_base_t)o << 9;
+		r->l1 = ((xfs_bmbt_rec_base_t)b << 21) | 
+			  ((xfs_bmbt_rec_base_t)c &
+			   (xfs_bmbt_rec_base_t)XFS_MASK64LO(21));
+	}
+#endif	/* XFS_BIG_FILESYSTEMS */
+#else	/* !BMBT_USE_64 */
+	r->l0 = (xfs_bmbt_rec_base_t)(o >> 23);
+	r->l3 = (((xfs_bmbt_rec_base_t)b) << 21) |
+		  ((xfs_bmbt_rec_base_t)(c & XFS_MASK32LO(21)));
+#if XFS_BIG_FILESYSTEMS
+	r->l1 = (((xfs_bmbt_rec_base_t)o) << 9) |
+		  ((xfs_bmbt_rec_base_t)(b >> 43));
+	r->l2 = (xfs_bmbt_rec_base_t)(b >> 11);
+#else	/* !XFS_BIG_FILESYSTEMS */
+	if (ISNULLSTARTBLOCK(b)) {
+		r->l1 = (xfs_bmbt_rec_base_t)(o << 9) |
+			  (xfs_bmbt_rec_base_t)XFS_MASK32LO(9);
+		r->l2 = (xfs_bmbt_rec_base_t)XFS_MASK32HI(11) |
+			  (xfs_bmbt_rec_base_t)(b >> 11);
+	} else {
+		r->l1 = (xfs_bmbt_rec_base_t)(o << 9);
+		r->l2 = (xfs_bmbt_rec_base_t)(b >> 11);
+	}
+#endif	/* XFS_BIG_FILESYSTEMS */
+#endif	/* BMBT_USE_64 */
+}
+
+/*
  * Set the blockcount field in a bmap extent record.
  */
 void
@@ -2827,9 +2885,7 @@ xfs_bmbt_update(
 	xfs_btree_check_lblock(cur, block, 0);
 	ptr = cur->bc_ptrs[0];
 	rp = XFS_BMAP_REC_IADDR(block, ptr, cur);
-	xfs_bmbt_set_startoff(rp, off);
-	xfs_bmbt_set_startblock(rp, bno);
-	xfs_bmbt_set_blockcount(rp, len);
+	xfs_bmbt_set_allf(rp, off, bno, len);
 	xfs_bmbt_log_recs(cur, bp, ptr, ptr);
 	if (ptr > 1) {
 		xfs_bmbt_trace_cursor("xfs_bmbt_update exit0", cur);
