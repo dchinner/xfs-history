@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.217 $"
 
 /*
  * High level interface routines for log manager
@@ -381,7 +381,7 @@ xfs_log_force(xfs_mount_t *mp,
 
 	ASSERT(flags & XFS_LOG_FORCE);
 
-	XFSSTATS.xs_log_force++;
+	XFS_STATS_INC(xs_log_force);
 
 	if ((log->l_flags & XLOG_IO_ERROR) == 0) {
 		if (lsn == 0)
@@ -468,7 +468,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return XFS_ERROR(EIO);
 
-	XFSSTATS.xs_try_logspace++;
+	XFS_STATS_INC(xs_try_logspace);
 
 	if (*ticket != NULL) {
 		ASSERT(flags & XFS_LOG_PERM_RESERV);
@@ -1389,7 +1389,7 @@ xlog_sync(xlog_t		*log,
 	int		split = 0;	/* split write into two regions */
 	int		error;
 
-	XFSSTATS.xs_log_writes++;
+	XFS_STATS_INC(xs_log_writes);
 	ASSERT(iclog->ic_refcnt == 0);
 
 #ifdef DEBUG
@@ -1420,7 +1420,7 @@ xlog_sync(xlog_t		*log,
 
 	/* Add for LR header */
 	count += XLOG_HEADER_SIZE;
-	XFSSTATS.xs_log_blocks += BTOBB(count);
+	XFS_STATS_ADD(xs_log_blocks, BTOBB(count));
 
 	/* Do we need to split this write into 2 parts? */
 	if (XFS_BUF_ADDR(bp) + BTOBB(count) > log->l_logBBsize) {
@@ -2199,7 +2199,7 @@ restart:
 		log->l_flushcnt++;
 		LOG_UNLOCK(log, spl);
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
-		XFSSTATS.xs_log_noiclogs++;
+		XFS_STATS_INC(xs_log_noiclogs);
 		/* Ensure that log writes happen */
 		psema(&log->l_flushsema, PINOD);
 		goto restart;
@@ -2312,7 +2312,7 @@ xlog_grant_log_space(xlog_t	   *log,
 		if (XLOG_FORCED_SHUTDOWN(log)) 
 			goto error_return;
 
-		XFSSTATS.xs_sleep_logspace++;
+		XFS_STATS_INC(xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 		/*
 		 * If we got an error, and the filesystem is shutting down,
@@ -2338,7 +2338,7 @@ redo:
 			XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 2");
-		XFSSTATS.xs_sleep_logspace++;
+		XFS_STATS_INC(xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 		
 		if (XLOG_FORCED_SHUTDOWN(log)) {
@@ -2449,7 +2449,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 
 			xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: sleep 1");
-			XFSSTATS.xs_sleep_logspace++;
+			XFS_STATS_INC(xs_sleep_logspace);
 			sv_wait(&tic->t_sema, PINOD|PLTWAIT,
 				&log->l_grant_lock, spl); 
 
@@ -2478,7 +2478,7 @@ redo:
 	if (free_bytes < need_bytes) {
 		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
 			XLOG_INS_TICKETQ(log->l_write_headq, tic);
-		XFSSTATS.xs_sleep_logspace++;
+		XFS_STATS_INC(xs_sleep_logspace);
 		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 
 		/* If we're shutting down, this tic is already off the queue */
@@ -2876,7 +2876,7 @@ maybe_sleep:
 			LOG_UNLOCK(log, spl);
 			return XFS_ERROR(EIO);
 		}
-		XFSSTATS.xs_log_force_sleep++;
+		XFS_STATS_INC(xs_log_force_sleep);
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
@@ -2958,7 +2958,7 @@ try_again:
 		    (iclog->ic_prev->ic_state & (XLOG_STATE_WANT_SYNC |
 						 XLOG_STATE_SYNCING))) {
 			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
-			XFSSTATS.xs_log_force_sleep++;
+			XFS_STATS_INC(xs_log_force_sleep);
 			sv_wait(&iclog->ic_prev->ic_forcesema, PSWP,
 				&log->l_icloglock, spl);
 			already_slept = 1;
@@ -2984,7 +2984,7 @@ try_again:
 			LOG_UNLOCK(log, spl);
 			return XFS_ERROR(EIO);
 		}
-		XFSSTATS.xs_log_force_sleep++;
+		XFS_STATS_INC(xs_log_force_sleep);
 		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're

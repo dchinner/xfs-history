@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.463 $"
+#ident "$Revision: 1.464 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -1092,7 +1092,7 @@ xfs_setattr(
 	if (timeflags && !(flags & ATTR_DMI))
 		xfs_ichgtime(ip, timeflags);
 
-	XFSSTATS.xs_ig_attrchg++;
+	XFS_STATS_INC(xs_ig_attrchg);
 
 	/*
 	 * If this is a synchronous mount, make sure that the

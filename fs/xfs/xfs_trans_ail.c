@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.54 $"
 #include <xfs_os_defs.h>
 
 #ifdef SIM
@@ -154,7 +154,7 @@ xfs_trans_push_ail(
 		return (xfs_lsn_t)0;
 	}
 
-	XFSSTATS.xs_push_ail++;
+	XFS_STATS_INC(xs_push_ail);
 
 	/*
 	 * While the item we are looking at is below the given threshold
@@ -188,14 +188,14 @@ xfs_trans_push_ail(
 		switch (lock_result) {
 		      case XFS_ITEM_SUCCESS:
 			AIL_UNLOCK(mp, s);
-			XFSSTATS.xs_push_ail_success++;
+			XFS_STATS_INC(xs_push_ail_success);
 			IOP_PUSH(lip);
 			AIL_LOCK(mp,s);
 			break;
 
 		      case XFS_ITEM_PUSHBUF:
 			AIL_UNLOCK(mp, s);
-			XFSSTATS.xs_push_ail_pushbuf++;
+			XFS_STATS_INC(xs_push_ail_pushbuf);
 #ifdef XFSRACEDEBUG
 			delay_for_intr();
 			delay(300);
@@ -207,16 +207,16 @@ xfs_trans_push_ail(
 			break;
 
 		      case XFS_ITEM_PINNED:
-			XFSSTATS.xs_push_ail_pinned++;
+			XFS_STATS_INC(xs_push_ail_pinned);
 			flush_log = 1;
 			break;
 
 		      case XFS_ITEM_LOCKED:
-			XFSSTATS.xs_push_ail_locked++;
+			XFS_STATS_INC(xs_push_ail_locked);
 			break;
 
 		      case XFS_ITEM_FLUSHING:
-			XFSSTATS.xs_push_ail_flushing++;
+			XFS_STATS_INC(xs_push_ail_flushing);
 			break;
 
 		      default:
@@ -245,7 +245,7 @@ xfs_trans_push_ail(
 		 * move forward in the AIL.
 		 */
 		AIL_UNLOCK(mp, s);
-		XFSSTATS.xs_push_ail_flush++;
+		XFS_STATS_INC(xs_push_ail_flush);
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 		AIL_LOCK(mp, s);
 	}
@@ -471,7 +471,7 @@ xfs_trans_next_ail(
 		nlip = xfs_ail_min(&(mp->m_ail));
 		*gen = (int)mp->m_ail_gen;
 		if (restarts != NULL) {
-			XFSSTATS.xs_push_ail_restarts++;
+			XFS_STATS_INC(xs_push_ail_restarts);
 			(*restarts)++;
 		}
 	}

@@ -1502,7 +1502,7 @@ xfs_iomap_write_convert(
 	 */
 
 	 
-	XFSSTATS64.xs_xstrat_bytes += count;
+	XFS_STATS64_ADD(xs_xstrat_bytes, count);
 
 	if (is_xfs) {
 		ip = XFS_IO_INODE(io);
@@ -1646,7 +1646,7 @@ xfs_iomap_write_convert(
 				maps = min(nimaps - i, *npbmaps);
 				*npbmaps = _xfs_imap_to_bmap(io, offset, &imap[i],
 					pbmapp, maps, *npbmaps);
-				XFSSTATS.xs_xstrat_quick++;
+				XFS_STATS_INC(xs_xstrat_quick);
 				return 0;
 			}
 			count_fsb -= imap[i].br_blockcount; /* for next bmapi,
@@ -1665,7 +1665,7 @@ xfs_iomap_write_convert(
 		offset_fsb = imap[nimaps].br_startoff + imap[nimaps].br_blockcount;
 		offset_fsb_bb = XFS_FSB_TO_BB(mp, offset_fsb);
 		map_start_fsb = offset_fsb;
-		XFSSTATS.xs_xstrat_split++;
+		XFS_STATS_INC(xs_xstrat_split);
 	}
 
  	ASSERT(0); 	/* Should never get here */

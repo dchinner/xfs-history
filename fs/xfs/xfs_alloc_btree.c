@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.61 $"
 
 /*
  * Free space allocation for XFS.
@@ -270,7 +270,7 @@ xfs_alloc_delrec(
 		*stat = 0;
 		return 0;
 	}
-	XFSSTATS.xs_abt_delrec++;
+	XFS_STATS_INC(xs_abt_delrec);
 	/*
 	 * It's a nonleaf.  Excise the key and ptr being deleted, by
 	 * sliding the entries past them down one.
@@ -736,7 +736,7 @@ xfs_alloc_insrec(
 	 * and we're done.
 	 */
 	if (level >= cur->bc_nlevels) {
-		XFSSTATS.xs_abt_insrec++;
+		XFS_STATS_INC(xs_abt_insrec);
 		if (error = xfs_alloc_newroot(cur, &i))
 			return error;
 		*bnop = NULLAGBLOCK;
@@ -756,7 +756,7 @@ xfs_alloc_insrec(
 		*stat = 0;
 		return 0;
 	}
-	XFSSTATS.xs_abt_insrec++;
+	XFS_STATS_INC(xs_abt_insrec);
 	/*
 	 * Get pointers to the btree buffer and block.
 	 */
@@ -1056,7 +1056,7 @@ xfs_alloc_lookup(
 	int			level;	/* level in the btree */
 	xfs_mount_t		*mp;	/* file system mount point */
 
-	XFSSTATS.xs_abt_lookup++;
+	XFS_STATS_INC(xs_abt_lookup);
 	/*
 	 * Get the allocation group header, and the root block number.
 	 */
@@ -1151,7 +1151,7 @@ xfs_alloc_lookup(
 				xfs_extlen_t	blockcount;	/* key value */
 				xfs_agblock_t	startblock;	/* key value */
 
-				XFSSTATS.xs_abt_compare++;
+				XFS_STATS_INC(xs_abt_compare);
 				/*
 				 * keyno is average of low and high.
 				 */

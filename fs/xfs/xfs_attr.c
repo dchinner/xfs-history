@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.75 $"
 
 #include <xfs_os_defs.h>
 
@@ -136,7 +136,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	xfs_da_args_t args;
 	int error;
 
-	XFSSTATS.xs_attr_get++;
+	XFS_STATS_INC(xs_attr_get);
 
 	/*
 	 * Fill in the arg structure for this request.
@@ -205,7 +205,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	xfs_mount_t	*mp;
 	int rsvd = (flags & ATTR_ROOT) != 0;
 
-	XFSSTATS.xs_attr_set++;
+	XFS_STATS_INC(xs_attr_set);
 
 	/*
 	 * Do we answer them, or ignore them?
@@ -458,7 +458,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	int error;
 	xfs_mount_t *mp;
 
-	XFSSTATS.xs_attr_remove++;
+	XFS_STATS_INC(xs_attr_remove);
 
 	/*
 	 * Do we answer them, or ignore them?
@@ -607,7 +607,7 @@ xfs_attr_list(bhv_desc_t *bdp, char *buffer, int bufsize, int flags,
 	xfs_inode_t *dp;
 	int error;
 
-	XFSSTATS.xs_attr_list++;
+	XFS_STATS_INC(xs_attr_list);
 
 	/*
 	 * Validate the cursor.

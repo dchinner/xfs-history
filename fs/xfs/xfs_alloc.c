@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.133 $"
 
 /*
  * Free space allocation for XFS.
@@ -782,8 +782,8 @@ xfs_alloc_ag_vextent(
 			xfs_trans_mod_sb(args->tp,
 				args->wasdel ? XFS_TRANS_SB_RES_FDBLOCKS :
 					XFS_TRANS_SB_FDBLOCKS, -slen);
-		XFSSTATS.xs_allocx++;
-		XFSSTATS.xs_allocb += args->len;
+		XFS_STATS_INC(xs_allocx);
+		XFS_STATS_ADD(xs_allocb, args->len);
 	}
 	return 0;
 }
@@ -1946,8 +1946,8 @@ xfs_free_ag_extent(
 		xfs_alloc_log_agf(tp, agbp, XFS_AGF_FREEBLKS);
 		if (!isfl)
 			xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, (long)len);
-		XFSSTATS.xs_freex++;
-		XFSSTATS.xs_freeb += len;
+		XFS_STATS_INC(xs_freex);
+		XFS_STATS_ADD(xs_freeb, len);
 	}
 	TRACE_FREE(haveleft ?
 			(haveright ? "both" : "left") :

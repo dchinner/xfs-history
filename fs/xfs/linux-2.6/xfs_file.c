@@ -90,8 +90,8 @@ STATIC ssize_t linvfs_read(
 	vnode_t *vp;
 	int rv;
 	
-	XFSSTATS.xs_read_calls++;
-	XFSSTATS64.xs_read_bytes += size;
+	XFS_STATS_INC(xs_read_calls);
+	XFS_STATS64_ADD(xs_read_bytes, size);
 
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
@@ -145,8 +145,8 @@ STATIC ssize_t linvfs_write(
 	if (filp->f_flags & O_APPEND)
 		pos = inode->i_size;
 
-	XFSSTATS.xs_write_calls++;
-	XFSSTATS64.xs_write_bytes += size;
+	XFS_STATS_INC(xs_write_calls);
+	XFS_STATS64_ADD(xs_write_bytes, size);
 
 	vp = LINVFS_GET_VP(inode);
 

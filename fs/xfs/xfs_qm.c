@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.50 $"
+#ident "$Revision: 1.51 $"
 
 
 #include <sys/param.h>
@@ -849,7 +849,7 @@ xfs_qm_dqattach_one(
 			xfs_dqunlock(dqp);
 			xfs_dqunlock(udqhint);
 		}
-		/* XXX XFSSTATS */
+		/* XXX XFS_STATS */
 		goto done;
 	}
 	/*
@@ -2227,7 +2227,7 @@ xfs_qm_shake_freelist(
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS) 
 				return (nreclaimed != howmany);
 #ifndef _IRIX62_XFS_ONLY
-			XFSSTATS.xs_qm_dqwants++;
+			XFS_STATS_INC(xs_qm_dqwants);
 #endif
 			goto tryagain;
 		}
@@ -2243,7 +2243,7 @@ xfs_qm_shake_freelist(
 			ASSERT(dqp->HL_PREVP == NULL);
 			ASSERT(dqp->MPL_PREVP == NULL);
 #ifndef _IRIX62_XFS_ONLY
-			XFSSTATS.xs_qm_dqinact_reclaims++;
+			XFS_STATS_INC(xs_qm_dqinact_reclaims);
 #endif
 			nextdqp = dqp->dq_flnext;
 			goto off_freelist;
@@ -2338,7 +2338,7 @@ xfs_qm_shake_freelist(
 		xfs_dqunlock(dqp);
 		nreclaimed++;
 #ifndef _IRIX62_XFS_ONLY
-		XFSSTATS.xs_qm_dqshake_reclaims++;
+		XFS_STATS_INC(xs_qm_dqshake_reclaims);
 #endif
 		xfs_qm_dqdestroy(dqp);
 		dqp = nextdqp;
@@ -2416,7 +2416,7 @@ xfs_qm_dqreclaim_one(void)
 			if (++restarts >= XFS_QM_RECLAIM_MAX_RESTARTS) 
 				return (NULL);
 #ifndef _IRIX62_XFS_ONLY
-			XFSSTATS.xs_qm_dqwants++;
+			XFS_STATS_INC(xs_qm_dqwants);
 #endif
 			goto startagain;
 		}
@@ -2435,7 +2435,7 @@ xfs_qm_dqreclaim_one(void)
 			xfs_dqunlock(dqp);
 			dqpout = dqp;
 #ifndef _IRIX62_XFS_ONLY
-			XFSSTATS.xs_qm_dqinact_reclaims++;
+			XFS_STATS_INC(xs_qm_dqinact_reclaims);
 #endif
 			break;
 		}
@@ -2539,7 +2539,7 @@ xfs_qm_dqalloc_incore(
 		 */
 		if (dqp = xfs_qm_dqreclaim_one()) {
 #ifndef _IRIX62_XFS_ONLY
-			XFSSTATS.xs_qm_dqreclaims++;
+			XFS_STATS_INC(xs_qm_dqreclaims);
 #endif
 			/*
 			 * Just bzero the core here. The rest will get
@@ -2551,7 +2551,7 @@ xfs_qm_dqalloc_incore(
 			return (B_FALSE);
 		}
 #ifndef _IRIX62_XFS_ONLY
-		XFSSTATS.xs_qm_dqreclaim_misses++;
+		XFS_STATS_INC(xs_qm_dqreclaim_misses);
 #endif
 	}
 	/*

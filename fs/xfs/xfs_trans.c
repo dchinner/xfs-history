@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.114 $"
 
 #include <xfs_os_defs.h>
 
@@ -753,7 +753,7 @@ shut_us_down:
 		}
 		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
 		xfs_trans_free(tp);
-		XFSSTATS.xs_trans_empty++;
+		XFS_STATS_INC(xs_trans_empty);
 		if (commit_lsn_p)
 			*commit_lsn_p = commit_lsn;
 		return (shutdown);
@@ -900,9 +900,9 @@ shut_us_down:
 	if (sync) {
 		error = xfs_log_force(mp, commit_lsn, 
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-		XFSSTATS.xs_trans_sync++;
+		XFS_STATS_INC(xs_trans_sync);
 	} else {
-		XFSSTATS.xs_trans_async++;
+		XFS_STATS_INC(xs_trans_async);
 	}
 	return (error);
 }

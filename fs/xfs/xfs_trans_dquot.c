@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.25 $"
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
@@ -738,7 +738,7 @@ xfs_trans_dqresv(
 			 */
 			if (hardlimit > 0ULL &&
 			     (hardlimit <= nblks + *resbcountp)) {
-				/* XXX XFSSTATS */
+				/* XXX XFS_STATS */
 				error = EDQUOT;
 				goto error_return;
 			}
@@ -753,7 +753,7 @@ xfs_trans_dqresv(
 				    (dqp->q_core.d_bwarns != 0 && 
 				     dqp->q_core.d_bwarns >= 
 				     XFS_QI_BWARNLIMIT(dqp->q_mount))) {
-					/* XXX XFSSTATS */
+					/* XXX XFS_STATS */
 					error = EDQUOT;
 					goto error_return;
 				}
@@ -763,7 +763,7 @@ xfs_trans_dqresv(
 			if (dqp->q_core.d_ino_hardlimit > 0ULL &&
 			    dqp->q_core.d_icount >=
 			    dqp->q_core.d_ino_hardlimit) {
-				/* XXX XFSSTATS */
+				/* XXX XFS_STATS */
 				error = EDQUOT;
 				goto error_return;
 			} else if (dqp->q_core.d_ino_softlimit > 0ULL &&
@@ -778,7 +778,7 @@ xfs_trans_dqresv(
 				    (dqp->q_core.d_iwarns != 0 &&
 				     dqp->q_core.d_iwarns >= 
 				     XFS_QI_IWARNLIMIT(dqp->q_mount))) {
-					/* XXX XFSSTATS */
+					/* XXX XFS_STATS */
 					error = EDQUOT;
 					goto error_return;
 				}

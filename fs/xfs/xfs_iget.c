@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.122 $"
+#ident "$Revision: 1.123 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -250,7 +250,7 @@ xfs_iget_core(
 	xfs_chashlist_t	*chl, *chlnew;
 	SPLDECL(s);
 
-	XFSSTATS.xs_ig_attempts++;
+	XFS_STATS_INC(xs_ig_attempts);
 
 	ih = XFS_IHASH(mp, ino);
 
@@ -266,7 +266,7 @@ again:
 				if (ip->i_flags & XFS_IRECLAIM) {
 					mrunlock(&ih->ih_lock);
 					delay(1);
-					XFSSTATS.xs_ig_frecycle++;
+					XFS_STATS_INC(xs_ig_frecycle);
 
 					goto again;
 				}
@@ -302,7 +302,7 @@ again:
 				vn_bhv_insert_initial(VN_BHV_HEAD(vp),
 							&(ip->i_bhv_desc));
 
-				XFSSTATS.xs_ig_found++;
+				XFS_STATS_INC(xs_ig_found);
 
 				mrunlock(&ih->ih_lock);
 
@@ -351,7 +351,7 @@ again:
 
 			mrunlock(&ih->ih_lock);
 
-			XFSSTATS.xs_ig_found++;
+			XFS_STATS_INC(xs_ig_found);
 
 			/*
 			 * Get a reference to the vnode/inode.
@@ -374,7 +374,7 @@ again:
 			} else {
 				if ( ! (vp = vn_get(vp, &vmap, 0))) {
 #pragma mips_frequency_hint NEVER
-					XFSSTATS.xs_ig_frecycle++;
+					XFS_STATS_INC(xs_ig_frecycle);
 
 					goto again;
 				}
@@ -403,7 +403,7 @@ finish_inode:
 	 * Inode cache miss: save the hash chain version stamp and unlock
 	 * the chain, so we don't deadlock in vn_alloc.
 	 */
-	XFSSTATS.xs_ig_missed++;
+	XFS_STATS_INC(xs_ig_missed);
 
 	version = ih->ih_version;
 
@@ -495,7 +495,7 @@ finish_inode:
 #endif	/* ! SIM */
 				xfs_idestroy(ip);
 
-				XFSSTATS.xs_ig_dup++;
+				XFS_STATS_INC(xs_ig_dup);
 				goto again;
 			}
 		}
@@ -766,7 +766,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	/*
 	 * Remove from old hash list and mount list.
 	 */
-	XFSSTATS.xs_ig_reclaims++;
+	XFS_STATS_INC(xs_ig_reclaims);
 
 	xfs_iextract(ip);
 

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.113 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -418,7 +418,7 @@ xfs_bmbt_delrec(
 		*stat = 0;
 		return 0;
 	}
-	XFSSTATS.xs_bmbt_delrec++;
+	XFS_STATS_INC(xs_bmbt_delrec);
 	if (level > 0) {
 		kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 		pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
@@ -813,7 +813,7 @@ xfs_bmbt_insrec(
 		*stat = 0;
 		return 0;
 	}
-	XFSSTATS.xs_bmbt_insrec++;
+	XFS_STATS_INC(xs_bmbt_insrec);
 	block = xfs_bmbt_get_block(cur, level, &bp);
 #ifdef DEBUG
 	if (error = xfs_btree_check_lblock(cur, block, level, bp)) {
@@ -1168,7 +1168,7 @@ xfs_bmbt_lookup(
 	xfs_fileoff_t		startoff;
 	xfs_trans_t		*tp;
 
-	XFSSTATS.xs_bmbt_lookup++;
+	XFS_STATS_INC(xs_bmbt_lookup);
 	XFS_BMBT_TRACE_CURSOR(cur, ENTRY);
 	XFS_BMBT_TRACE_ARGI(cur, (int)dir);
 	tp = cur->bc_tp;
@@ -1213,7 +1213,7 @@ xfs_bmbt_lookup(
 				return 0;
 			}
 			while (low <= high) {
-				XFSSTATS.xs_bmbt_compare++;
+				XFS_STATS_INC(xs_bmbt_compare);
 				keyno = (low + high) >> 1;
 				if (level > 0) {
 					kkp = kkbase + keyno - 1;

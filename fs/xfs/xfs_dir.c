@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.126 $"
 
 #include <xfs_os_defs.h>
 
@@ -332,7 +332,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	if (retval = xfs_dir_ino_validate(trans->t_mountp, inum))
 		return (retval);
 
-	XFSSTATS.xs_dir_create++;
+	XFS_STATS_INC(xs_dir_create);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -438,7 +438,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	int count, totallen, newsize, retval;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	XFSSTATS.xs_dir_remove++;
+	XFS_STATS_INC(xs_dir_remove);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -493,7 +493,7 @@ xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		return(XFS_ERROR(EINVAL));
 	}
 
-	XFSSTATS.xs_dir_remove++;
+	XFS_STATS_INC(xs_dir_remove);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -542,7 +542,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 		return(XFS_ERROR(EINVAL));
 	}
 
-	XFSSTATS.xs_dir_lookup++;
+	XFS_STATS_INC(xs_dir_lookup);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -587,7 +587,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	xfs_dir_put_t put;
 	int error;
 
-	XFSSTATS.xs_dir_getdents++;
+	XFS_STATS_INC(xs_dir_getdents);
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 
 	/*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.292 $"
+#ident "$Revision: 1.293 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -3013,7 +3013,7 @@ xfs_iflush(
 	enum { INT_DELWRI = (1 << 0), INT_ASYNC = (1 << 1) };
 	SPLDECL(s);
 
-	XFSSTATS.xs_iflush_count++;
+	XFS_STATS_INC(xs_iflush_count);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
@@ -3188,8 +3188,8 @@ xfs_iflush(
 	mutex_spinunlock(&ch->ch_lock, s);
 
 	if (clcount) {
-	    XFSSTATS.xs_icluster_flushcnt++;
-	    XFSSTATS.xs_icluster_flushinode += clcount;
+		XFS_STATS_INC(xs_icluster_flushcnt);
+		XFS_STATS_ADD(xs_icluster_flushinode, clcount);
 	}
 
 	/*

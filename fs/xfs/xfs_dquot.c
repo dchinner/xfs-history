@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.47 $"
+#ident "$Revision: 1.48 $"
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
@@ -961,7 +961,7 @@ xfs_qm_dqget(
 	 */
 	if (xfs_qm_dqlookup(mp, id, h, O_dqpp) == 0) {
 #ifndef _IRIX62_XFS_ONLY
-		XFSSTATS.xs_qm_dqcachehits++;
+		XFS_STATS_INC(xs_qm_dqcachehits);
 #endif
 		/* 
 		 * The dquot was found, moved to the front of the chain, 
@@ -975,7 +975,7 @@ xfs_qm_dqget(
 		return (0);	/* success */
 	}
 #ifndef _IRIX62_XFS_ONLY
-	 XFSSTATS.xs_qm_dqcachemisses++;
+	 XFS_STATS_INC(xs_qm_dqcachemisses);
 #endif
 
 	/* 
@@ -1078,7 +1078,7 @@ xfs_qm_dqget(
 			XFS_DQ_HASH_UNLOCK(h);
 			xfs_qm_dqdestroy(dqp);
 #ifndef _IRIX62_XFS_ONLY
-			XFSSTATS.xs_qm_dquot_dups++; 
+			XFS_STATS_INC(xs_qm_dquot_dups); 
 #endif
 			goto again;
 		}

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision: 1.34 $"
 
 #include <xfs_os_defs.h>
 
@@ -174,7 +174,7 @@ vn_reclaim(struct vnode *vp, int flag)
 {
 	int error, s;
 
-	VOPINFO.vn_reclaim++;
+	XFS_STATS_INC(vn_reclaim);
 
 	vn_trace_entry(vp, "vn_reclaim", (inst_t *)__return_address);
 
@@ -268,7 +268,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	xfs_mount_t	*mp;
 
 	
-	VOPINFO.vn_active++;
+	XFS_STATS_INC(vn_active);
 
 	vp = LINVFS_GET_VN_ADDRESS(inode);
 
@@ -333,7 +333,7 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 	struct vnode	*vp;
 	xfs_ino_t	inum = (xfs_ino_t) ino;
 
-	VOPINFO.vn_alloc++;
+	XFS_STATS_INC(vn_alloc);
 
 #ifdef	CONFIG_XFS_DEBUG
 	inode = iget4_noallocate(vfsp->vfs_super, inum, NULL, NULL);
@@ -380,7 +380,7 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, dev_t dev)
 void
 vn_free(struct vnode *vp)
 {
-	VOPINFO.vn_free++;
+	XFS_STATS_INC(vn_free);
 
 	vn_trace_entry(vp, "vn_free", (inst_t *)__return_address);
 
@@ -401,7 +401,7 @@ vn_get(struct vnode *vp, vmap_t *vmap, uint flags)
 	struct inode	*inode;
 	xfs_ino_t	inum;
 
-	VOPINFO.vn_get++;
+	XFS_STATS_INC(vn_get);
 
 	inode = iget(vmap->v_vfsp->vfs_super, vmap->v_ino);
 
@@ -637,7 +637,7 @@ again:
 		return;
 	}
 
-	VOPINFO.vn_active--;
+	XFS_STATS_DEC(vn_active);
 	vp->v_flag |= VRECLM;
 	NESTED_VN_UNLOCK(vp);
 
@@ -665,7 +665,7 @@ vn_hold(struct vnode *vp)
 	register int s = VN_LOCK(vp);
 	struct inode *inode;
 
-	VOPINFO.vn_hold++;
+	XFS_STATS_INC(vn_hold);
 
 	inode = LINVFS_GET_IP(vp);
 
@@ -691,7 +691,7 @@ vn_rele(struct vnode *vp)
 	/* REFERENCED */
 	int cache;
 
-	VOPINFO.vn_rele++;
+	XFS_STATS_INC(vn_rele);
 
 	s = VN_LOCK(vp);
 
@@ -755,7 +755,7 @@ vn_remove(struct vnode *vp)
 	int cache;
 	vmap_t  vmap;
 
-	VOPINFO.vn_remove++;
+	XFS_STATS_INC(vn_remove);
 
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
 
