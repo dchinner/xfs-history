@@ -150,10 +150,12 @@ xfs_bmap_check_extents(
 STATIC int				/* inode logging flags */
 xfs_bmap_del_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
+	xfs_trans_t		*tp,	/* current trans pointer */
 	xfs_extnum_t		idx,	/* extent number to update/insert */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
-	xfs_bmbt_irec_t		*new);	/* new data to put in extent list */
+	xfs_bmbt_irec_t		*new,	/* new data to put in extent list */
+	int			iflags);/* input flags (meta-data or not) */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -1544,6 +1546,7 @@ xfs_bmap_btree_to_extents(
 	cblock = XFS_BUF_TO_BMBT_BLOCK(cbp);
 	ASSERT(cblock->bb_level == 0);
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
+	xfs_trans_set_sync(tp);
 	ip->i_d.di_nblocks--;
 	xfs_trans_binval(tp, cbp);
 	if (cur->bc_bufs[0] == cbp)
@@ -1583,10 +1586,12 @@ xfs_bmap_check_extents(
 STATIC int				/* inode logging flags */
 xfs_bmap_del_extent(
 	xfs_inode_t		*ip,	/* incore inode pointer */
+	xfs_trans_t		*tp,	/* current transaction pointer */
 	xfs_extnum_t		idx,	/* extent number to update/delete */
 	xfs_bmap_free_t		*flist,	/* list of extents to be freed */
 	xfs_btree_cur_t		*cur,	/* if null, not a btree */
-	xfs_bmbt_irec_t		*del)	/* data to remove from extent list */
+	xfs_bmbt_irec_t		*del,	/* data to remove from extent list */
+	int			iflags)	/* input flags */	    
 {
 	xfs_extlen_t		da_new;	/* new delay-alloc indirect blocks */
 	xfs_extlen_t		da_old;	/* old delay-alloc indirect blocks */
@@ -1646,6 +1651,18 @@ xfs_bmap_del_extent(
 			xfs_bmap_add_free(del->br_startblock,
 				del->br_blockcount, flist, ip->i_mount);
 			ip->i_d.di_nblocks -= del->br_blockcount;
+			/*
+			 * If we're freeing meta-data, then the transaction
+			 * that frees the blocks must be synchronous.  This
+			 * ensures that noone can reuse the blocks before
+			 * they are permanently free.  For regular data
+			 * it is the callers responsibility to make the
+			 * data permanently inaccessible before calling
+			 * here to free it.
+			 */
+			if (iflags & XFS_BMAPI_METADATA) {
+				xfs_trans_set_sync(tp);
+			}
 		}
 		flags = XFS_ILOG_CORE;
 		/*
@@ -2388,11 +2405,14 @@ xfs_bmap_compute_maxlevels(
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
  * caller.  Frees all the extents that need freeing, which must be done
  * last due to locking considerations.  We never free any extents in
- * the first transaction and we make the first a synchronous transaction
- * so that we can always be sure that the changes to structures pointing
- * to the freed block are permanent before we actually free the blocks.
- * This is necessary to prevent blocks from being reallocated and written
- * to before the free and reallocation are actually permanent.
+ * the first transaction.  This is to allow the caller to make the first
+ * transaction a synchronous one so that the pointers to the data being
+ * broken in this transaction will be permanent before the data is actually
+ * freed.  This is necessary to prevent blocks from being reallocated
+ * and written to before the free and reallocation are actually permanent.
+ * We do not just make the first transaction synchronous here, because
+ * there are more efficent ways to gain the same protection in some cases
+ * (see the file truncation code).
  *
  * Return 1 if the given transaction was committed and a new one
  * started, and 0 otherwise.
@@ -2422,7 +2442,6 @@ xfs_bmap_finish(
 		return 0;
 	ntp = *tp;
 	mp = ntp->t_mountp;
-	xfs_trans_set_sync(ntp);
 	efi = xfs_trans_get_efi(ntp, flist->xbf_count);
 	for (free = flist->xbf_first; free; free = free->xbfi_next)
 		xfs_trans_log_efi_extent(ntp, efi, free->xbfi_startblock,
@@ -3053,6 +3072,7 @@ xfs_bunmapi(
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		bno,		/* starting offset to unmap */
 	xfs_extlen_t		len,		/* length to unmap in file */
+	int			flags,		/* misc flags */	    
 	xfs_extnum_t		nexts,		/* number of extents max */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
@@ -3149,7 +3169,8 @@ xfs_bunmapi(
 					XFS_BTCUR_BPRV_WASDEL;
 		} else if (cur)
 			cur->bc_private.b.flags &= ~XFS_BTCUR_BPRV_WASDEL;
-		logflags |= xfs_bmap_del_extent(ip, lastx, flist, cur, &del);
+		logflags |= xfs_bmap_del_extent(ip, tp, lastx, flist,
+						cur, &del, flags);
 		bno = del.br_startoff - 1;
 		lastx = ip->i_lastex;
 		/*
