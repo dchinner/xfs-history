@@ -1,4 +1,4 @@
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 /*
  * xfs_dir_leaf.c
@@ -440,7 +440,7 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 
 	xfs_idata_realloc(dp, -size, XFS_DATA_FORK);
 	dp->i_d.di_size = 0;
-	retval = xfs_da_grow_inode(iargs, 1, &blkno);
+	retval = xfs_da_grow_inode(iargs, &blkno);
 	if (retval) {
 		dp->i_d.di_size = size;
 		xfs_idata_realloc(dp, size, XFS_DATA_FORK);
@@ -746,7 +746,7 @@ xfs_dir_leaf_to_shortform(xfs_da_args_t *iargs)
 			entry->nameidx = 0;
 		}
 	}
-	retval = xfs_da_shrink_inode(iargs, 0, 1, bp);
+	retval = xfs_da_shrink_inode(iargs, 0, bp);
 	if (retval)
 		goto out;
 	retval = xfs_dir_shortform_create(iargs, parent);
@@ -794,7 +794,7 @@ xfs_dir_leaf_to_node(xfs_da_args_t *args)
 	int retval;
 
 	dp = args->dp;
-	retval = xfs_da_grow_inode(args, 1, &blkno);
+	retval = xfs_da_grow_inode(args, &blkno);
 	ASSERT(blkno == 1);
 	if (retval)
 		return(retval);
@@ -885,7 +885,7 @@ xfs_dir_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	args = state->args;
 	ASSERT(args != NULL);
 	ASSERT(oldblk->magic == XFS_DIR_LEAF_MAGIC);
-	error = xfs_da_grow_inode(args, 1, &blkno);
+	error = xfs_da_grow_inode(args, &blkno);
 	if (error)
 		return(error);
 	error = xfs_dir_leaf_create(args, blkno, &newblk->bp);

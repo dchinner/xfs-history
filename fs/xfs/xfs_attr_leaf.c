@@ -295,7 +295,7 @@ xfs_attr_shortform_to_leaf(xfs_da_args_t *args)
 	sf = (xfs_attr_shortform_t *)tmpbuffer;
 
 	xfs_idata_realloc(dp, -size, XFS_ATTR_FORK);
-	error = xfs_da_grow_inode(args, 1, &blkno);
+	error = xfs_da_grow_inode(args, &blkno);
 	if (error) {
 		/*
 		 * If we hit an IO error middle of the transaction inside
@@ -311,7 +311,7 @@ xfs_attr_shortform_to_leaf(xfs_da_args_t *args)
 	ASSERT(blkno == 0);
 	error = xfs_attr_leaf_create(args, blkno, &bp);
 	if (error) {
-		error = xfs_da_shrink_inode(args, 0, 1, bp);
+		error = xfs_da_shrink_inode(args, 0, bp);
 		if (error)
 			goto out;
 		xfs_idata_realloc(dp, size, XFS_ATTR_FORK);	/* try to put */
@@ -556,7 +556,7 @@ xfs_attr_leaf_to_shortform(buf_t *bp, xfs_da_args_t *args)
 	/*
 	 * Clean out the prior contents of the attribute list.
 	 */
-	error = xfs_da_shrink_inode(args, 0, 1, bp);
+	error = xfs_da_shrink_inode(args, 0, bp);
 	if (error)
 		goto out;
 	error = xfs_attr_shortform_create(args);
@@ -610,7 +610,7 @@ xfs_attr_leaf_to_node(xfs_da_args_t *args)
 	int error;
 
 	dp = args->dp;
-	error = xfs_da_grow_inode(args, 1, &blkno);
+	error = xfs_da_grow_inode(args, &blkno);
 	if (error)
 		return(error);
 	error = xfs_da_read_buf(args->trans, args->dp, 0, -1, &bp1,
@@ -699,7 +699,7 @@ xfs_attr_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	 * Allocate space for a new leaf node.
 	 */
 	ASSERT(oldblk->magic == XFS_ATTR_LEAF_MAGIC);
-	error = xfs_da_grow_inode(state->args, 1, &blkno);
+	error = xfs_da_grow_inode(state->args, &blkno);
 	if (error)
 		return(error);
 	error = xfs_attr_leaf_create(state->args, blkno, &newblk->bp);
