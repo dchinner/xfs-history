@@ -294,10 +294,6 @@ extern int pagebuf_cond_lock(		/* lock buffer, if not locked	*/
 					/* (returns -EBUSY if locked)	*/
 		page_buf_t *);		/* buffer to lock		*/
 
-extern int pagebuf_is_locked(		/* test if buffer is locked	*/
-					/* (0 if unlocked, 1 if locked) */
-		page_buf_t *);		/* buffer to test		*/
-
 extern int pagebuf_lock_value(		/* return count on lock		*/
 		page_buf_t *);		/* buffer to check		*/
 
@@ -315,7 +311,7 @@ extern void pagebuf_target_blocksize(
 		pb_target_t *,
 		unsigned int);		/* block size			*/
 
-extern int pagebuf_target_clear(struct pb_target *);
+extern void pagebuf_target_clear(struct pb_target *);
 
 extern void pagebuf_unlock(		/* unlock buffer		*/
 		page_buf_t *);		/* buffer to unlock		*/
@@ -359,7 +355,7 @@ extern int pagebuf_iowait(		/* wait for buffer I/O done	*/
 
 extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 
-extern int pagebuf_iomove(		/* move data in/out of pagebuf	*/
+extern void pagebuf_iomove(		/* move data in/out of pagebuf	*/
 		page_buf_t *,		/* buffer to manipulate		*/
 		off_t,			/* starting buffer offset	*/
 		size_t,			/* length in buffer		*/

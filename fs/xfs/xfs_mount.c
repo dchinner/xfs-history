@@ -1128,7 +1128,7 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	 * does a two pass iteration thru the bufcache.
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-		(void)xfs_incore_relse(mp->m_ddev_targp, 0, 1); /* synchronous*/
+		xfs_incore_relse(mp->m_ddev_targp, 0, 1); /* synchronous */
 	}
 
 	xfs_unmountfs_close(mp, cr);

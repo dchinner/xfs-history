@@ -5648,7 +5648,8 @@ xfs_getbmap(
 
 	if (bmv->bmv_length == -1) {
 		fixlen = XFS_FSB_TO_BB(mp, XFS_B_TO_FSB(mp, fixlen));
-		bmv->bmv_length = MAX(fixlen - bmv->bmv_offset, (__int64_t)0);
+		bmv->bmv_length = MAX( (__int64_t)(fixlen - bmv->bmv_offset),
+					(__int64_t)0);
 	} else if (bmv->bmv_length < 0)
 		return XFS_ERROR(EINVAL);
 	if (bmv->bmv_length == 0) {
@@ -5761,7 +5762,8 @@ xfs_getbmap(
 			}
 
 			bmv->bmv_offset = out.bmv_offset + out.bmv_length;
-			bmv->bmv_length = MAX(0LL, bmvend - bmv->bmv_offset);
+			bmv->bmv_length = MAX( (__int64_t)0,
+					(__int64_t)(bmvend - bmv->bmv_offset) );
 
 			bmv->bmv_entries++;
 
@@ -5771,7 +5773,7 @@ xfs_getbmap(
 				ap = (void *)((struct getbmap *)ap + 1);
 		}
 	    }
-} while (nmap && nexleft && bmv->bmv_length);
+	} while (nmap && nexleft && bmv->bmv_length);
 
 unlock_and_return:
 	xfs_iunlock_map_shared(ip, lock);

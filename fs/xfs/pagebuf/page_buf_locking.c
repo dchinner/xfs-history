@@ -71,13 +71,12 @@
  *	concurrent use of page buffer objects, not for synchronizing independent
  *	access to the underlying pages.
  */
-
 int
 pagebuf_cond_lock(			/* lock buffer, if not locked	*/
 					/* returns -EBUSY if locked)	*/
-		  page_buf_t *pb)	/* buffer to lock		*/
+	page_buf_t		*pb)
 {
-	int	locked;
+	int			locked;
 
 	assert(pb->pb_flags & _PBF_LOCKABLE);
 
@@ -91,40 +90,18 @@ pagebuf_cond_lock(			/* lock buffer, if not locked	*/
 	return(locked ? 0 : -EBUSY);
 }
 
-
-/*
- *	pagebuf_is_locked
- *
- *	pagebuf_is_locked tests if the buffer is locked, return 1 if locked
- *	and 0 if not.  This routine is useful only for assertions that
- *	the buffer is locked, since the state could change at any time
- *	if the buffer is not locked.
- */
-
-int
-pagebuf_is_locked(			/* test if buffer is locked	*/
-		  page_buf_t *pb)	/* buffer to test		*/
-{
-	assert(pb->pb_flags & _PBF_LOCKABLE);
-
-	return(atomic_read(&PBP(pb)->pb_sema.count) <= 0 );
-}
-
 /*
  *	pagebuf_lock_value
  *
  *	Return lock value for a pagebuf
  */
-
 int
-pagebuf_lock_value(page_buf_t *pb)
+pagebuf_lock_value(
+	page_buf_t		*pb)
 {
 	assert(pb->pb_flags & _PBF_LOCKABLE);
-
 	return(atomic_read(&PBP(pb)->pb_sema.count));
 }
-
-
 
 /*
  *	pagebuf_lock
@@ -134,10 +111,9 @@ pagebuf_lock_value(page_buf_t *pb)
  *	concurrent use of page buffer objects, not for synchronizing independent
  *	access to the underlying pages.
  */
-
 int
-pagebuf_lock(				/* lock buffer			*/
-	     page_buf_t *pb)		/* buffer to lock		*/
+pagebuf_lock(
+	page_buf_t		*pb)
 {
 	assert(pb->pb_flags & _PBF_LOCKABLE);
 
@@ -147,19 +123,17 @@ pagebuf_lock(				/* lock buffer			*/
 	down(&PBP(pb)->pb_sema);
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, PB_TRACE_REC(locked), 0);
-	return(0);
+	return 0;
 }
-
 
 /*
  *	pagebuf_lock_disable
  *
  *	pagebuf_lock_disable disables buffer object locking for an inode.
  */
-
 void
-pagebuf_lock_disable(			/* disable buffer locking	*/
-		     pb_target_t *target)  /* inode for buffers		*/
+pagebuf_lock_disable(
+	pb_target_t		*target)
 {
 	pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
 	blkdev_put(target->pbr_bdev, BDEV_FS);
@@ -174,9 +148,9 @@ pagebuf_lock_enable(
 	dev_t			dev,
 	struct super_block	*sb)
 {
-	struct block_device *bdev;
-	pb_target_t	*target;
-	int		error = -ENOMEM;
+	struct block_device	*bdev;
+	pb_target_t		*target;
+	int			error = -ENOMEM;
 
 	target = kmalloc(sizeof(pb_target_t), GFP_KERNEL);
 	if (unlikely(!target))
@@ -213,22 +187,20 @@ fail:
 
 void
 pagebuf_target_blocksize(
-	pb_target_t	*target,
-	unsigned int	blocksize)
+	pb_target_t		*target,
+	unsigned int		blocksize)
 {
 	target->pbr_blocksize = blocksize;
 	target->pbr_blocksize_bits = ffs(blocksize) - 1;
 }
 
-int
+void
 pagebuf_target_clear(
-	pb_target_t	*target)
+	pb_target_t		*target)
 {
 	destroy_buffers(target->pbr_kdev);
 	truncate_inode_pages(target->pbr_mapping, 0LL);
-	return 0;
 }
-
 
 /*
  *	pagebuf_unlock
@@ -237,13 +209,11 @@ pagebuf_target_clear(
  *	pagebuf_lock or pagebuf_cond_lock (not any
  *	pinning of underlying pages created by pagebuf_pin).
  */
-
 void
 pagebuf_unlock(				/* unlock buffer		*/
-	       page_buf_t *pb)		/* buffer to unlock		*/
+	page_buf_t		*pb)	/* buffer to unlock		*/
 {
 	assert(pb->pb_flags & _PBF_LOCKABLE);
-
 	PB_CLEAR_OWNER(pb);
 	up(&PBP(pb)->pb_sema);
 	PB_TRACE(pb, PB_TRACE_REC(unlock), 0);
