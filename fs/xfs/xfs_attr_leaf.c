@@ -560,6 +560,10 @@ xfs_attr_shortform_allfit(xfs_dabuf_t *bp, xfs_inode_t *dp)
 		if (!(entry->flags & XFS_ATTR_LOCAL))
 			return(0);
 		name_loc = XFS_ATTR_LEAF_NAME_LOCAL(leaf, i);
+		if (name_loc->namelen >= XFS_ATTR_SF_ENTSIZE_MAX)
+			return(0);
+		if (name_loc->valuelen >= XFS_ATTR_SF_ENTSIZE_MAX)
+			return(0);
 		bytes += sizeof(struct xfs_attr_sf_entry)-1
 				+ name_loc->namelen
 				+ INT_GET(name_loc->valuelen, ARCH_CONVERT);
