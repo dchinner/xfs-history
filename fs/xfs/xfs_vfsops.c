@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.51 $"
+#ident  "$Revision: 1.52 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -1014,24 +1014,23 @@ xfs_statvfs(vfs_t	*vfsp,
 /*
  * xfs_sync flushes any pending I/O to file system vfsp.
  *
- * This routine is called by bdflush() to make sure that things make it
+ * This routine is called by vfs_sync() to make sure that things make it
  * out to disk eventually, on sync() system calls to flush out everything,
- * and when the file system is unmounted.  For the bdflush() case, all
+ * and when the file system is unmounted.  For the vfs_sync() case, all
  * we really need to do is sync out the log to make all of our meta-data
- * updates permanent (except for timestamps) and dirty pages are kept
- * moving by calling pdflush() on the inodes containing them.  We also
- * flush the inodes that we can lock without sleeping and the superblock if
- * we can lock it without sleeping from bdflush() so that items at the
- * tail of the log are always moving out.
+ * updates permanent (except for timestamps).  For calls from pflushd(),
+ * dirty pages are kept moving by calling pdflush() on the inodes
+ * containing them.  We also flush the inodes that we can lock without
+ * sleeping and the superblock if we can lock it without sleeping from
+ * vfs_sync() so that items at the tail of the log are always moving out.
  *
  * Flags:
- *      SYNC_BDFLUSH - We're being called from bdflush() so we don't want
- *		       to sleep if we can help it.  All we really need to
- *		       do is ensure that dirty pages are not building up
- *		       on the inodes (so we call pdflush()) and that the
- *		       log is synced at least periodically.  We also push
- *		       the inodes and superblock if we can lock them without
- *		       sleeping and they are not pinned.
+ *      SYNC_BDFLUSH - We're being called from vfs_sync() so we don't want
+ *		       to sleep if we can help it.  All we really need
+ *		       to do is ensure that the log is synced at least
+ *		       periodically.  We also push the inodes and
+ *		       superblock if we can lock them without sleeping
+ *			and they are not pinned.
  *      SYNC_ATTR    - We need to flush the inodes.  If SYNC_BDFLUSH is not
  *		       set, then we really want to lock each inode and flush
  *		       it.
@@ -1041,7 +1040,9 @@ xfs_statvfs(vfs_t	*vfsp,
  *		       inodes.  SYNC_WAIT and SYNC_BDFLUSH are used to
  *		       determine if they should be flushed sync, async, or
  *		       delwri.
- *      SYNC_CLOSE   - This flag is passed when the file system is being
+ *	SYNC_PDFLUSH - Make sure that dirty pages are kept moving by
+ *		       calling pdflush() on those inodes that have them.
+ *      SYNC_CLOSE   - This flag is passed when the system is being
  *		       unmounted.  We should sync and invalidate everthing.
  *      SYNC_FSDATA  - This indicates that the caller would like to make
  *		       sure the superblock is safe on disk.  We can ensure
@@ -1083,7 +1084,7 @@ xfs_sync(vfs_t		*vfsp,
 		fflag = 0;		/* synchronous overrides all */
 
 	lock_flags = XFS_ILOCK_SHARED;
-	if (flags & (SYNC_DELWRI | SYNC_CLOSE)) {
+	if (flags & (SYNC_DELWRI | SYNC_CLOSE | SYNC_PDFLUSH)) {
 		/*
 		 * We need the I/O lock if we're going to call any of
 		 * the flush/inval routines.
@@ -1104,23 +1105,31 @@ xfs_sync(vfs_t		*vfsp,
 	for (ip = mp->m_inodes; ip; ip = ip->i_mnext) {
 		vp = XFS_ITOV(ip);
 
-#if 0		
-		/*
-		 * Calls from bdflush() only want to keep files with
-		 * dirty pages moving along, so if this inode doesn't
-		 * have any then skip it.
-		 */
-		if ((flags & SYNC_BDFLUSH) && !(VN_DIRTY(vp))) {
-			continue;
-		}
-#endif
-
 		/*
 		 * We don't mess with swap files from here since it is
-		 * too easy to deadlock on memory here.
+		 * too easy to deadlock on memory.
 		 */
 		if (vp->v_flag & VISSWAP) {
 			continue;
+		}
+
+		/*
+		 * If this is just vfs_sync() or pflushd() calling
+		 * then we can skip inodes for which it looks like
+		 * there is nothing to do.  Since we don't have the
+		 * inode locked this is racey, but these are periodic
+		 * calls so it doesn't matter.  For the others we want
+		 * to know for sure, so we at least try to lock them.
+		 */
+		if (flags & SYNC_BDFLUSH) {
+			if (!(ip->i_item.ili_flags & XFS_ILOG_ALL) &&
+			    (ip->i_update_core == 0)) {
+				    continue;
+			    }
+		} else if (flags & SYNC_PDFLUSH) {
+			if (vp->v_dpages == NULL) {
+				continue;
+			}
 		}
 
 		/*
@@ -1183,29 +1192,65 @@ xfs_sync(vfs_t		*vfsp,
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			pflushinvalvp(vp, 0, XFS_ISIZE_MAX(ip));
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
-		}
 
-		if ((flags & SYNC_DELWRI) && VN_DIRTY(vp)) {
-			if (mount_locked) {
-				ireclaims = mp->m_ireclaims;
-				XFS_MOUNT_IUNLOCK(mp);
-				mount_locked = B_FALSE;
-			}
+		} else if (flags & SYNC_DELWRI) {
+			if (VN_DIRTY(vp)) {
+				if (mount_locked) {
+					ireclaims = mp->m_ireclaims;
+					XFS_MOUNT_IUNLOCK(mp);
+					mount_locked = B_FALSE;
+				}
 
-			/*
-			 * Drop the inode lock since we can't hold it
-			 * across calls to the buffer cache.
-			 */
-			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-			if (flags & SYNC_BDFLUSH) {
-				pdflush(vp, B_DELWRI);
-			} else {
+				/*
+				 * Drop the inode lock since we can't hold it
+				 * across calls to the buffer cache.
+				 */
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 				error = pflushvp(vp, ip->i_d.di_size, fflag);
+				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
-			xfs_ilock(ip, XFS_ILOCK_SHARED);
+
 		}
 
-		if (!(flags & SYNC_BDFLUSH)) {
+		if (flags & SYNC_PDFLUSH) {
+			if (vp->v_dpages) {
+				if (mount_locked) {
+					ireclaims = mp->m_ireclaims;
+					XFS_MOUNT_IUNLOCK(mp);
+					mount_locked = B_FALSE;
+				}
+
+				/*
+				 * Drop the inode lock since we can't hold it
+				 * across calls to the buffer cache.
+				 */
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
+				pdflush(vp, B_DELWRI);
+				xfs_ilock(ip, XFS_ILOCK_SHARED);
+			}
+
+		} else if (flags & SYNC_BDFLUSH) {
+			if ((flags & SYNC_ATTR) &&
+			    ((ip->i_update_core) ||
+			     (ip->i_item.ili_format.ilf_fields != 0))) {
+				if (mount_locked) {
+					ireclaims = mp->m_ireclaims;
+					XFS_MOUNT_IUNLOCK(mp);
+					mount_locked = B_FALSE;
+				}
+
+				/*
+				 * Since this is vfs_sync() calling we only
+				 * flush the inode out if we can lock it
+				 * without sleeping and it is not pinned.
+				 */
+				if ((ip->i_pincount == 0) &&
+				    xfs_iflock_nowait(ip)) {
+					xfs_iflush(ip, B_ASYNC);
+				}
+			}
+
+		} else {
 			if ((flags & SYNC_ATTR) &&
 			    ((ip->i_update_core) ||
 			     (ip->i_item.ili_format.ilf_fields != 0))) {
@@ -1218,27 +1263,8 @@ xfs_sync(vfs_t		*vfsp,
 				xfs_iflock(ip);
 				xfs_iflush(ip, fflag);
 			}
-		} else {
-			if ((flags & SYNC_ATTR) &&
-			    ((ip->i_update_core) ||
-			     (ip->i_item.ili_format.ilf_fields != 0))) {
-				if (mount_locked) {
-					ireclaims = mp->m_ireclaims;
-					XFS_MOUNT_IUNLOCK(mp);
-					mount_locked = B_FALSE;
-				}
-
-				/*
-				 * Since this is bdflush() calling we only
-				 * flush the inode out if we can lock it
-				 * without sleeping and it is not pinned.
-				 */
-				if ((ip->i_pincount == 0) &&
-				    xfs_iflock_nowait(ip)) {
-					xfs_iflush(ip, B_ASYNC);
-				}
-			}
 		}
+
 		xfs_iunlock(ip, lock_flags);
 		if (vnode_refed) {
 			/*
@@ -1276,7 +1302,7 @@ xfs_sync(vfs_t		*vfsp,
 
 	/*
 	 * Flushing out dirty data above probably generated more
-	 * log activity, so if this isn't bdflush() then flush
+	 * log activity, so if this isn't vfs_sync() then flush
 	 * the log again.  If SYNC_WAIT is set then do it synchronously.
 	 */
 	if (!(flags & SYNC_BDFLUSH)) {
@@ -1289,7 +1315,7 @@ xfs_sync(vfs_t		*vfsp,
 
 	if (flags & SYNC_FSDATA) {
 		/*
-		 * If this is bdflush() then only sync the superblock
+		 * If this is vfs_sync() then only sync the superblock
 		 * if we can lock it without sleeping and it is not pinned.
 		 */
 		if (flags & SYNC_BDFLUSH) {
