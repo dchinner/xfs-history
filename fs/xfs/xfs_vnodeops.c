@@ -2040,6 +2040,14 @@ xfs_lookup(
 
 	vp = XFS_ITOV(ip);
 
+	/* This extra access check was causing trouble on Linux nfs,
+	 * when nfs tried to lookup ".." for a directory without
+	 * execute permissions.  In general, access checks happen
+	 * above this anyway, and whether a chmod sneaks in on the middle
+	 * of this thread shouldn't really matter.  If we see problems
+	 * because of this window, this code can be re-enabled.
+	 */
+#if 1
 	if (dir_unlocked) {
 		/*
 		 * If the directory had to be unlocked in the call,
@@ -2052,6 +2060,7 @@ xfs_lookup(
 			return error;
 		}
 	}
+#endif
 	ITRACE(ip);
 
 	xfs_iunlock_map_shared(dp, lock_mode);
