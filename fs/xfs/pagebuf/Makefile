@@ -32,13 +32,8 @@
 # Makefile for the linux pagebuf routines.
 #
 
-# Debug options:
-#	-DDEBUG
-#	-DPAGEBUF_TRACKING
-#	-DPAGEBUF_TRACE
 ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
-	EXTRA_CFLAGS += -g -DDEBUG -DSTATIC="" \
-		-DPAGEBUF_TRACKING -DPAGEBUF_TRACE
+	EXTRA_CFLAGS += -g -DDEBUG -DSTATIC="" -DPAGEBUF_TRACE
 endif
 EXTRA_CFLAGS += -I..
 
