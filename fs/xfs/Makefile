@@ -44,11 +44,7 @@ i386cmd: xfs-cmds
 
 xfs-cmds:
 	echo "=== Making $@ `date`"
-	[ ! -L $(WORKAREA)/linux/include/asm ] && \
-		ln -s $(WORKAREA)/linux/include/asm-i386 \
-			$(WORKAREA)/linux/include/asm || exit 0
 	cd $(WORKAREA)/cmd/xfs && ./Makepkgs verbose
-	rm -f $(WORKAREA)/linux/include/asm
 
 clean:
 	rm -rf RPMS SRPMS BUILD SOURCES/linux-2.4.0-test5-xfs-alpha.patch
@@ -62,6 +58,5 @@ realclean: clean
 		rm SPECS/kernel-2.4.spec; \
 		mv SPECS/kernel-2.4.spec.old SPECS/kernel-2.4.spec; \
 	fi
-	rm -f $(WORKAREA)/linux/include/asm
 	cd $(WORKAREA)/cmd/xfs && make realclean
 
