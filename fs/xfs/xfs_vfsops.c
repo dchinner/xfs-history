@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.29 $"
+#ident  "$Revision: 1.30 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -68,6 +68,7 @@
 #undef _KERNEL
 #endif
 #include <sys/uuid.h>
+#include <sys/ktrace.h>
 #ifndef SIM
 #include <sys/xlv_base.h>
 #include <sys/xlv_tab.h>
@@ -85,11 +86,14 @@
 #include "xfs_alloc_btree.h"
 #include "xfs_btree.h"
 #include "xfs_ialloc.h"
+#include "xfs_alloc.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_ag.h"
 #include "xfs_error.h"
+#include "xfs_bmap.h"
+#include "xfs_rw.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -176,6 +180,16 @@ xfs_init(vfssw_t	*vswp,
 	extern sema_t	xfs_ancestormon;
 	extern lock_t	xfsd_lock;
 	extern sema_t	xfsd_wait;
+	extern zone_t	*xfs_bmap_free_item_zone;
+	extern zone_t	*xfs_btree_cur_zone;
+	extern zone_t	*xfs_inode_zone;
+	extern zone_t	*xfs_trans_zone;
+	extern zone_t	*xfs_irec_zone;
+	extern zone_t	*xfs_bmap_zone;
+	extern zone_t	*xfs_strat_write_zone;
+	extern ktrace_t	*xfs_alloc_trace_buf;
+	extern ktrace_t	*xfs_bmap_trace_buf;
+	extern ktrace_t	*xfs_bmbt_trace_buf;
 
 	xfs_type = fstype;
 
@@ -184,6 +198,31 @@ xfs_init(vfssw_t	*vswp,
 	initnlock(&xfsd_lock, "xfsd");
 	initnsema(&xfsd_wait, 0, "xfsd");
 
+	/*
+	 * Initialize all of the zone allocators we use.
+	 */
+	xfs_bmap_free_item_zone = kmem_zone_init(sizeof(xfs_bmap_free_item_t),
+						 "xfs_bmap_free_item");
+	xfs_btree_cur_zone = kmem_zone_init(sizeof(xfs_btree_cur_t),
+					    "xfs_btree_cur");
+	xfs_inode_zone = kmem_zone_init(sizeof(xfs_inode_t), "xfs_inode");
+	xfs_trans_zone = kmem_zone_init(sizeof(xfs_trans_t), "xfs_trans");
+	xfs_irec_zone = kmem_zone_init((XFS_BMAP_MAX_NMAP *
+					sizeof(xfs_bmbt_irec_t)), "xfs_irec");
+	xfs_bmap_zone = kmem_zone_init((XFS_ZONE_NBMAPS *
+					sizeof(struct bmapval)), "xfs_bmap");
+	xfs_strat_write_zone = kmem_zone_init(sizeof(xfs_strat_write_locals_t),
+					      "xfs_strat_write");
+
+	/*
+	 * Allocate global trace buffers.
+	 */
+#if defined(DEBUG) && !defined(SIM)
+	xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE);
+	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE);
+	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE);
+#endif
+	
 	/*
 	 * The inode hash table is created on a per mounted
 	 * file system bases.
