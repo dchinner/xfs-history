@@ -145,7 +145,6 @@ typedef __uint16_t      xfs_qwarncnt_t;
 #define XFS_MOUNT_QUOTA_MASK	(XFS_MOUNT_QUOTA_ALL | XFS_UQUOTA_ACTIVE | \
 				 XFS_PQUOTA_ACTIVE)
 
-#define XFS_PROC_PROJID(c)	  ((c)->p_arsess->as_prid)
 #define XFS_IS_REALTIME_INODE(ip) ((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME)
 
 /*
