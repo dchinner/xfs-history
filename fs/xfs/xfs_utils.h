@@ -46,6 +46,7 @@ xfs_dir_ialloc(
 	dev_t 		rdev,
 	cred_t 		*credp,
 	prid_t 		prid,
+	int		okalloc,
 	xfs_inode_t	**ipp,
 	int 		*committed);
 

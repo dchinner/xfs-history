@@ -1,4 +1,4 @@
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -302,6 +302,7 @@ xfs_dir_ialloc(
 	dev_t		rdev,
 	cred_t		*credp,
 	prid_t		prid,		/* project id */
+	int		okalloc,	/* ok to allocate new space */
 	xfs_inode_t	**ipp,		/* pointer to inode; it will be
 					   locked. */
 	int		*committed)
@@ -336,7 +337,7 @@ xfs_dir_ialloc(
 	 * transaction commit so that no other process can steal 
 	 * the inode(s) that we've just allocated.
 	 */
-	code = xfs_ialloc(tp, dp, mode, nlink, rdev, credp, prid,
+	code = xfs_ialloc(tp, dp, mode, nlink, rdev, credp, prid, okalloc,
 			  &ialloc_context, &call_again, &ip);
 
 	/*
@@ -435,7 +436,7 @@ xfs_dir_ialloc(
 		 * this call should always succeed.
 		 */
 		code = xfs_ialloc(tp, dp, mode, nlink, rdev, credp, prid,
-				  &ialloc_context, &call_again, &ip);
+				  okalloc, &ialloc_context, &call_again, &ip);
 
 		/*
 		 * If we get an error at this point, return to the caller
