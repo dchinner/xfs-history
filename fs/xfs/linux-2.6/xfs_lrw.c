@@ -530,9 +530,7 @@ xfs_zero_eof(
 			goto out_lock;
 		}
 
-		if (imap.br_startblock == DELAYSTARTBLOCK) {
-			pb->pb_bn = PAGE_BUF_DADDR_NULL;
-		} else {
+		if (imap.br_startblock != DELAYSTARTBLOCK) {
 			pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
 			if (imap.br_state == XFS_EXT_UNWRITTEN) {
 				printk("xfs_zero_eof: unwritten? what do we do here?\n");
@@ -544,6 +542,7 @@ xfs_zero_eof(
 			pagebuf_rele(pb);
 			goto out_lock;
 		}
+
 		if (imap.br_startblock == DELAYSTARTBLOCK ||
 		    imap.br_state == XFS_EXT_UNWRITTEN) { /* DELWRI */
 			pagebuf_rele(pb);
@@ -1247,9 +1246,6 @@ _xfs_imap_to_bmap(
 		}
 		
 		offset += pbmapp->pbm_bsize - pbmapp->pbm_delta;
-		if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
-			printk("bmap too small pbmap 0x%p\n", pbmapp);
-		}
 	}
 	return(pbm);	/* Return the number filled */
 }
@@ -1356,9 +1352,6 @@ xfs_iomap_write(
 		if (!(pbmapp->pbm_flags & PBMF_HOLE)) {
 			*npbmaps = 1; /* Only checked the first one. */
 					/* We could check more, ... */
-			if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
-				printk("xfsiomapw_read: bmap too small pbmap 0x%p\n", pbmapp);
-			}
 			goto out;
 		}
 	}
@@ -1368,15 +1361,9 @@ xfs_iomap_write(
 	if (ioflag & PBF_DIRECT) {
 		error = xfs_iomap_write_direct(io, offset, count, pbmapp,
 					npbmaps, ioflag, found);
-		if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
-			printk("xfsiomapw_direct: bmap too small pbmap 0x%p error %d\n", pbmapp, error);
-		}
 	} else {
 		error = xfs_iomap_write_delay(io, offset, count, pbmapp,
 				npbmaps, ioflag, found); 
-		if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
-			printk("xfsiomapw_delay: bmap too small pbmap 0x%p error %d\n", pbmapp, error);
-		}
 	}
 
 out:
@@ -1384,9 +1371,6 @@ out:
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 	XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
-	if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
-		printk("xfsiomapw: bmap too small pbmap 0x%p\n", pbmapp);
-	}
 	return XFS_ERROR(error);
 }
 
@@ -1715,10 +1699,6 @@ xfs_iomap_write_delay(
 		just handle one for now. To find the code on IRIX,
 		look in xfs_iomap_write() in xfs_rw.c. */
 
-	if (pbmapp->pbm_bsize == pbmapp->pbm_delta) {
-		printk("xfsiomapw_delay_return: bmap too small pbmap 0x%p\n",
-			pbmapp);
-	}
 	*npbmaps = 1;
 	return 0;
 }
@@ -1781,7 +1761,6 @@ xfs_delalloc_cleanup(
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 }
 
-int xfs_direct_offset, xfs_map_last, xfs_last_map;
 
 STATIC int
 xfs_iomap_write_direct(
@@ -1838,15 +1817,9 @@ xfs_iomap_write_direct(
 		map_last_fsb = XFS_B_TO_FSB(mp,
 			(pbmapp->pbm_bsize + pbmapp->pbm_offset));
 		
-		if (pbmapp->pbm_delta) {
-			xfs_direct_offset++;
-		}
 		if (map_last_fsb < last_fsb) {
-			xfs_map_last++;
 			last_fsb = map_last_fsb;
 			count_fsb = last_fsb - offset_fsb;
-		} else if (last_fsb < map_last_fsb) {
-			xfs_last_map++;
 		}
 		ASSERT(count_fsb > 0);
 	}
