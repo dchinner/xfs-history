@@ -374,6 +374,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	ASSERT(bp->b_fsprivate2 == tp);
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
 	ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
+	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	/*
 	 * Find the item descriptor pointing to this buffer's
 	 * log item.  It must be there.
@@ -413,6 +414,13 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	}
 
 	/*
+	 * Drop our reference to the buf log item.
+	 */
+	s = splockspl(xfs_bli_reflock, splhi);
+	bip->bli_refcount--;
+	spunlockspl(xfs_bli_reflock, s);
+
+	/*
 	 * If the buf item is not tracking data in the log, then
 	 * we must free it before releasing the buffer back to the
 	 * free pool.  Before releasing the buffer to the free pool,
@@ -424,13 +432,6 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	}
 	bp->b_fsprivate2 = NULL;
 
-	/*
-	 * Drop our reference to the buf log item.
-	 */
-	s = splockspl(xfs_bli_reflock, splhi);
-	bip->bli_refcount--;
-	spunlockspl(xfs_bli_reflock, s);
-	
 	/*
 	 * If we've still got a buf log item on the buffer, then
 	 * tell the AIL that the buffer is being unlocked.
@@ -599,12 +600,6 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
  * free it in xfs_buf_item_unpin().  Until it is cleaned up we
  * will keep the buffer locked so that the buffer and buf log item
  * are not reused.
- *
- * It is NOT the responsibility of this routine to ensure that
- * noone reuses the disk blocks represented by this buffer until
- * the transaction is committed to disk.  That needs to be taken
- * care of by another mechanism, for example not making the blocks
- * free to be reallocated until this transaction is permanent.
  */
 void
 xfs_trans_binval(
