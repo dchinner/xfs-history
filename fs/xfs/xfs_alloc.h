@@ -22,7 +22,9 @@ typedef struct xfs_alloc_rec
 {
 	xfs_agblock_t	ar_startblock;	/* starting block number */
 	xfs_extlen_t	ar_blockcount;	/* count of free blocks */
-} xfs_alloc_rec_t;
+} xfs_alloc_rec_t, xfs_alloc_key_t;
+
+typedef xfs_agblock_t xfs_alloc_ptr_t;	/* btree pointer type */
 
 /*
  * Real structures have a size equal to the disk block size.
@@ -31,11 +33,9 @@ typedef struct xfs_alloc_rec
 #define	XFS_ALLOC_BLOCK_SIZE(lev,cur)	(1 << (cur)->bc_blocklog)
 
 #define	XFS_ALLOC_BLOCK_MAXRECS(lev,cur)	\
-	XFS_BTREE_SBLOCK_MAXRECS(XFS_ALLOC_BLOCK_SIZE(lev,cur), \
-				 xfs_alloc_rec_t, lev)
+	XFS_BTREE_BLOCK_MAXRECS(XFS_ALLOC_BLOCK_SIZE(lev,cur), xfs_alloc, lev)
 #define	XFS_ALLOC_BLOCK_MINRECS(lev,cur)	\
-	XFS_BTREE_SBLOCK_MINRECS(XFS_ALLOC_BLOCK_SIZE(lev,cur), \
-				 xfs_alloc_rec_t, lev)
+	XFS_BTREE_BLOCK_MINRECS(XFS_ALLOC_BLOCK_SIZE(lev,cur), xfs_alloc, lev)
 
 #define	XFS_MIN_BLOCKSIZE_LOG	9
 #define	XFS_MAX_BLOCKSIZE_LOG	16
@@ -48,12 +48,16 @@ typedef struct xfs_alloc_rec
 #define	XFS_PREALLOC_BLOCKS(s)	((xfs_agblock_t)(XFS_CNT_BLOCK(s) + 1))
 
 #define	XFS_ALLOC_REC_ADDR(bb,i,cur)	\
-	XFS_BTREE_SREC_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
-			    xfs_alloc_rec_t, bb, i)
+	XFS_BTREE_REC_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
+			   xfs_alloc, bb, i)
+
+#define	XFS_ALLOC_KEY_ADDR(bb,i,cur)	\
+	XFS_BTREE_KEY_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
+			   xfs_alloc, bb, i)
 
 #define	XFS_ALLOC_PTR_ADDR(bb,i,cur)	\
-	XFS_BTREE_SPTR_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
-			    xfs_alloc_rec_t, bb, i)
+	XFS_BTREE_PTR_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
+			   xfs_alloc, bb, i)
 
 typedef enum xfs_alloctype
 {

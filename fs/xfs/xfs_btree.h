@@ -61,57 +61,19 @@ typedef struct xfs_btree_block
 #define	XFS_BB_NUM_BITS		5
 #define	XFS_BB_ALL_BITS		((1 << XFS_BB_NUM_BITS) - 1)
 
-#define	XFS_BTREE_SBLOCK_MAXRECS(bsz,t,lev)	\
-	((((int)(bsz)) - (int)sizeof(xfs_btree_sblock_t)) / \
-	 ((int)sizeof(t) + (int)sizeof(xfs_agblock_t) * ((lev) > 0)))
-#define	XFS_BTREE_SBLOCK_MINRECS(bsz,t,lev)	\
-	(XFS_BTREE_SBLOCK_MAXRECS(bsz,t,lev) / 2)
+#define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf)	\
+	((((int)(bsz)) - (int)(sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t))) / ((lf) ? sizeof(t ## _rec_t) : (sizeof(t ## _key_t) + sizeof(t ## _ptr_t))))
+#define	XFS_BTREE_BLOCK_MINRECS(bsz,t,lf)	\
+	(XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf) / 2)
 
-#define	XFS_BTREE_LBLOCK_MAXRECS(bsz,t,lev)	\
-	((((int)(bsz)) - (int)sizeof(xfs_btree_lblock_t)) / \
-	 ((int)sizeof(t) + (int)sizeof(xfs_fsblock_t) * ((lev) > 0)))
-#define	XFS_BTREE_LBLOCK_MINRECS(bsz,t,lev)	\
-	(XFS_BTREE_LBLOCK_MAXRECS(bsz,t,lev) / 2)
+#define	XFS_BTREE_REC_ADDR(bsz,t,bb,i)	\
+	((t ## _rec_t *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t) + ((i) - 1) * sizeof(t ## _rec_t)))
+#define	XFS_BTREE_KEY_ADDR(bsz,t,bb,i)	\
+	((t ## _key_t *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t) + ((i) - 1) * sizeof(t ## _key_t)))
+#define	XFS_BTREE_PTR_ADDR(bsz,t,bb,i)	\
+	((t ## _ptr_t *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t) + XFS_BTREE_BLOCK_MAXRECS(bsz,t,0) * sizeof(t ## _key_t) + ((i) - 1) * sizeof(t ## _ptr_t)))
 
-#define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lev,pt)	\
-	((((int)(bsz)) - (int)(sizeof(xfs_btree_hdr_t) + 2 * sizeof(pt))) / \
-	 ((int)sizeof(t) + (int)sizeof(pt) * ((lev) > 0)))
-#define	XFS_BTREE_BLOCK_MINRECS(bsz,t,lev,pt)	\
-	(XFS_BTREE_BLOCK_MAXRECS(bsz,t,lev,pt) / 2)
-
-#define	XFS_BTREE_SREC_ADDR(bsz,t,bb,i)	\
-	((t *)((char *)(bb) + sizeof(xfs_btree_sblock_t) + \
-		((i) - 1) * sizeof(t)))
-#define	XFS_BTREE_SPTR_ADDR(bsz,t,bb,i)	\
-	((xfs_agblock_t *)((char *)(bb) + sizeof(xfs_btree_sblock_t) + \
-		XFS_BTREE_SBLOCK_MAXRECS(bsz,t,(bb)->bb_level) * sizeof(t) + \
-		((i) - 1) * sizeof(xfs_agblock_t)))
-
-#define	XFS_BTREE_LREC_ADDR(bsz,t,bb,i)	\
-	((t *)((char *)(bb) + sizeof(xfs_btree_lblock_t) + \
-		((i) - 1) * sizeof(t)))
-#define	XFS_BTREE_LPTR_ADDR(bsz,t,bb,i)	\
-	((xfs_fsblock_t *)((char *)(bb) + sizeof(xfs_btree_lblock_t) + \
-		XFS_BTREE_LBLOCK_MAXRECS(bsz,t,(bb)->bb_level) * sizeof(t) + \
-		((i) - 1) * sizeof(xfs_fsblock_t)))
-
-#define	XFS_BTREE_REC_ADDR(bsz,t,bb,i,pt)	\
-	((t *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(pt) + \
-		((i) - 1) * sizeof(t)))
-#define	XFS_BTREE_PTR_ADDR(bsz,t,bb,i,pt)	\
-	((pt *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(pt) + \
-		XFS_BTREE_BLOCK_MAXRECS(bsz,t,(bb)->bb_level,pt) * sizeof(t) + \
-		((i) - 1) * sizeof(pt)))
-
-#define	XFS_BTREE_ROOT_LREC_ADDR(bsz,t,bb,i)	\
-	((t *)((char *)(bb) + sizeof(xfs_btree_lblock_t) + \
-		((i) - 1) * sizeof(t)))
-#define	XFS_BTREE_ROOT_LPTR_ADDR(bsz,t,bb,i)	\
-	((xfs_fsblock_t *)((char *)(bb) + sizeof(xfs_btree_lblock_t) + \
-		XFS_BTREE_LBLOCK_MAXRECS(bsz,t,1) * sizeof(t) + \
-		((i) - 1) * sizeof(xfs_fsblock_t)))
-
-#define	XFS_BTREE_MAXLEVELS	9	/* max of all btrees */
+#define	XFS_BTREE_MAXLEVELS	8	/* max of all btrees */
 typedef struct xfs_btree_cur
 {
 	xfs_trans_t	*bc_tp;	/* links cursors on freelist */
@@ -141,18 +103,20 @@ typedef struct xfs_btree_cur
 
 #ifdef XFSDEBUG
 void xfs_btree_check_block(xfs_btree_cur_t *, xfs_btree_block_t *, int);
+void xfs_btree_check_key(xfs_btnum_t, void *, void *);
 void xfs_btree_check_lblock(xfs_btree_cur_t *, xfs_btree_lblock_t *, int);
-void xfs_btree_check_sblock(xfs_btree_cur_t *, xfs_btree_sblock_t *, int);
 void xfs_btree_check_lptr(xfs_btree_cur_t *, xfs_fsblock_t, int);
 void xfs_btree_check_rec(xfs_btnum_t, void *, void *);
+void xfs_btree_check_sblock(xfs_btree_cur_t *, xfs_btree_sblock_t *, int);
 void xfs_btree_check_sptr(xfs_btree_cur_t *, xfs_agblock_t, int);
 int xfs_btree_maxrecs(xfs_btree_cur_t *, xfs_btree_block_t *);
 #else
 #define	xfs_btree_check_block(a,b,c)
+#define	xfs_btree_check_key(a,b,c)
 #define	xfs_btree_check_lblock(a,b,c)
-#define	xfs_btree_check_sblock(a,b,c)
 #define	xfs_btree_check_lptr(a,b,c)
 #define	xfs_btree_check_rec(a,b,c)
+#define	xfs_btree_check_sblock(a,b,c)
 #define	xfs_btree_check_sptr(a,b,c)
 #endif
 

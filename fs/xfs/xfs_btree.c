@@ -91,6 +91,33 @@ xfs_btree_check_block(xfs_btree_cur_t *cur, xfs_btree_block_t *block, int level)
 }
 
 /*
+ * Debug routine: check that keys are in the right order.
+ */
+void
+xfs_btree_check_key(xfs_btnum_t btnum, void *ak1, void *ak2)
+{
+	switch (btnum) {
+	case XFS_BTNUM_BNO: {
+		xfs_alloc_key_t *k1 = ak1, *k2 = ak2;
+		ASSERT(k1->ar_startblock < k2->ar_startblock);
+		break;
+	    }
+	case XFS_BTNUM_CNT: {
+		xfs_alloc_key_t *k1 = ak1, *k2 = ak2;
+		ASSERT(k1->ar_blockcount < k2->ar_blockcount ||
+		       (k1->ar_blockcount == k2->ar_blockcount &&
+			k1->ar_startblock < k2->ar_startblock));
+		break;
+	    }
+	case XFS_BTNUM_BMAP: {
+		xfs_bmbt_key_t *k1 = ak1, *k2 = ak2;
+		ASSERT(k1->br_startoff < k2->br_startoff);
+		break;
+	    }
+	}
+}
+
+/*
  * Debug routine: check that block header is ok.
  */
 void
@@ -106,26 +133,6 @@ xfs_btree_check_lblock(xfs_btree_cur_t *cur, xfs_btree_lblock_t *block, int leve
 	       block->bb_leftsib < sbp->sb_dblocks);
 	ASSERT(block->bb_rightsib == NULLFSBLOCK || 
 	       block->bb_rightsib < sbp->sb_dblocks);
-}
-
-/*
- * Debug routine: check that block header is ok.
- */
-void
-xfs_btree_check_sblock(xfs_btree_cur_t *cur, xfs_btree_sblock_t *block, int level)
-{
-	buf_t *agbuf;
-	xfs_agf_t *agf;
-
-	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
-	ASSERT(block->bb_level == level);
-	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
-	agbuf = cur->bc_agbuf;
-	agf = xfs_buf_to_agf(agbuf);
-	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
-	       block->bb_leftsib < agf->agf_length);
-	ASSERT(block->bb_rightsib == NULLAGBLOCK || 
-	       block->bb_rightsib < agf->agf_length);
 }
 
 /*
@@ -166,6 +173,26 @@ xfs_btree_check_rec(xfs_btnum_t btnum, void *ar1, void *ar2)
 		break;
 	    }
 	}
+}
+
+/*
+ * Debug routine: check that block header is ok.
+ */
+void
+xfs_btree_check_sblock(xfs_btree_cur_t *cur, xfs_btree_sblock_t *block, int level)
+{
+	buf_t *agbuf;
+	xfs_agf_t *agf;
+
+	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
+	ASSERT(block->bb_level == level);
+	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
+	agbuf = cur->bc_agbuf;
+	agf = xfs_buf_to_agf(agbuf);
+	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
+	       block->bb_leftsib < agf->agf_length);
+	ASSERT(block->bb_rightsib == NULLAGBLOCK || 
+	       block->bb_rightsib < agf->agf_length);
 }
 
 /*
