@@ -523,6 +523,46 @@ xfs_attrmulti_by_handle(
 	return error;
 }
 
+/* prototypes for a few of the stack-hungry cases that have
+ * their own functions.  Functions are defined after their use
+ * so gcc doesn't get fancy and inline them with -03 */
+
+int xfs_ioc_space(
+	bhv_desc_t		*bdp,
+	vnode_t			*vp,
+	struct file		*filp,
+	unsigned int		cmd,
+	unsigned long		arg);
+
+int xfs_ioc_bulkstat(
+	xfs_mount_t		*mp,
+	unsigned int		cmd,
+	unsigned long		arg);
+
+int xfs_ioc_fsgeometry_v1(
+	xfs_mount_t		*mp,
+	unsigned long		arg);
+
+int xfs_ioc_fsgeometry(
+	xfs_mount_t		*mp,
+	unsigned long		arg);
+
+int xfs_ioc_xattr(
+	vnode_t			*vp,
+	struct file		*filp,
+	unsigned int		cmd,
+	unsigned long		arg);
+
+int xfs_ioc_getbmap(
+	bhv_desc_t		*bdp,
+	struct file		*filp,
+	unsigned int		cmd,
+	unsigned long		arg);
+
+int xfs_ioc_getbmapx(
+	bhv_desc_t		*bdp,
+	unsigned long		arg);
+
 int
 xfs_ioctl(
 	bhv_desc_t		*bdp,
@@ -532,7 +572,6 @@ xfs_ioctl(
 	unsigned long		arg)
 {
 	int			error;
-	vattr_t			va;
 	vnode_t			*vp;
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
@@ -545,41 +584,16 @@ xfs_ioctl(
 	mp = ip->i_mount;
 
 	switch (cmd) {
+
 	case XFS_IOC_ALLOCSP:
 	case XFS_IOC_FREESP:
-
 	case XFS_IOC_RESVSP:
 	case XFS_IOC_UNRESVSP:
-
 	case XFS_IOC_ALLOCSP64:
 	case XFS_IOC_FREESP64:
-
 	case XFS_IOC_RESVSP64:
-	case XFS_IOC_UNRESVSP64: {
-		xfs_flock64_t	bf;
-		int		attr_flags = 0;
-
-		if (filp->f_flags & O_RDONLY)
-			return -XFS_ERROR(EBADF);
-
-		if (vp->v_type != VREG)
-			return -XFS_ERROR(EINVAL);
-
-		if (copy_from_user(&bf, (xfs_flock64_t *)arg, sizeof(bf)))
-			return -XFS_ERROR(EFAULT);
-
-		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
-			attr_flags |= ATTR_NONBLOCK;
-		if (filp->f_mode & FINVIS)
-			attr_flags |= ATTR_DMI;
-
-		error = xfs_change_file_space(bdp, cmd, &bf, filp->f_pos,
-						      NULL, attr_flags);
-		if (error)
-			return -error;
-
-		return 0;
-	}
+	case XFS_IOC_UNRESVSP64:
+		return xfs_ioc_space(bdp, vp, filp, cmd, arg);
 
 	case XFS_IOC_DIOINFO: {
 		struct dioattr	da;
@@ -602,143 +616,19 @@ xfs_ioctl(
 
 	case XFS_IOC_FSBULKSTAT_SINGLE:
 	case XFS_IOC_FSBULKSTAT:
-	case XFS_IOC_FSINUMBERS: {
-		xfs_fsop_bulkreq_t bulkreq;
-		int		count;		/* # of records returned */
-		xfs_ino_t	inlast;		/* last inode number */
-		int		done;
-		/* done = 1 if there are more stats to get and if bulkstat */
-		/* should be called again (unused here, but used in dmapi) */
+	case XFS_IOC_FSINUMBERS:
+		return xfs_ioc_bulkstat(mp, cmd, arg);
 
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
+	case XFS_IOC_FSGEOMETRY_V1:
+		return xfs_ioc_fsgeometry_v1(mp, arg);
 
-		if (XFS_FORCED_SHUTDOWN(mp))
-			return -XFS_ERROR(EIO);
+	case XFS_IOC_FSGEOMETRY:
+		return xfs_ioc_fsgeometry(mp, arg);
 
-		if (copy_from_user(&bulkreq, (xfs_fsop_bulkreq_t *)arg,
-						sizeof(xfs_fsop_bulkreq_t)))
-			return -XFS_ERROR(EFAULT);
-
-		if (copy_from_user(&inlast, (__s64 *)bulkreq.lastip,
-							sizeof(__s64)))
-			return -XFS_ERROR(EFAULT);
-
-		if ((count = bulkreq.icount) <= 0)
-			return -XFS_ERROR(EINVAL);
-
-		if (cmd == XFS_IOC_FSINUMBERS)
-			error = xfs_inumbers(mp, NULL, &inlast, &count,
-						bulkreq.ubuffer);
-		else if (cmd == XFS_IOC_FSBULKSTAT_SINGLE)
-			error = xfs_bulkstat_single(mp, &inlast,
-						bulkreq.ubuffer, &done);
-		else {	/* XFS_IOC_FSBULKSTAT */
-			if (count == 1 && inlast != 0) {
-				inlast++;
-				error = xfs_bulkstat_single(mp, &inlast,
-						bulkreq.ubuffer, &done);
-			} else {
-				error = xfs_bulkstat(mp, NULL, &inlast, &count,
-					(bulkstat_one_pf)xfs_bulkstat_one,
-					sizeof(xfs_bstat_t), bulkreq.ubuffer,
-					BULKSTAT_FG_QUICK, &done);
-			}
-		}
-
-		if (error)
-			return -error;
-
-		if (bulkreq.ocount != NULL) {
-			if (copy_to_user((xfs_ino_t *)bulkreq.lastip, &inlast,
-							sizeof(xfs_ino_t)))
-				return -XFS_ERROR(EFAULT);
-
-			if (copy_to_user((__s32 *)bulkreq.ocount, &count,
-							sizeof(count)))
-				return -XFS_ERROR(EFAULT);
-		}
-
-		return 0;
-	}
-
-	case XFS_IOC_FSGEOMETRY_V1: {
-		xfs_fsop_geom_v1_t	fsgeo;
-
-		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)&fsgeo, 3);
-		if (error)
-			return -error;
-
-		if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo, sizeof(fsgeo)))
-			return -XFS_ERROR(EFAULT);
-		return 0;
-	}
-
-	case XFS_IOC_FSGEOMETRY: {
-		xfs_fsop_geom_t fsgeo;
-
-		error = xfs_fs_geometry(mp, &fsgeo, 4);
-		if (error)
-			return -error;
-
-		if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo, sizeof(fsgeo)))
-			return -XFS_ERROR(EFAULT);
-		return 0;
-	}
-
-	case XFS_IOC_FSGETXATTR: {
-		struct fsxattr	fa;
-
-		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
-		VOP_GETATTR(vp, &va, 0, NULL, error);
-		if (error)
-			return -error;
-
-		fa.fsx_xflags	= va.va_xflags;
-		fa.fsx_extsize	= va.va_extsize;
-		fa.fsx_nextents = va.va_nextents;
-
-		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
-			return -XFS_ERROR(EFAULT);
-		return 0;
-	}
-
-	case XFS_IOC_FSSETXATTR: {
-		struct fsxattr	fa;
-		int		attr_flags = 0;
-
-		if (copy_from_user(&fa, (struct fsxattr *)arg, sizeof(fa)))
-			return -XFS_ERROR(EFAULT);
-
-		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
-		va.va_xflags  = fa.fsx_xflags;
-		va.va_extsize = fa.fsx_extsize;
-
-		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
-			attr_flags |= ATTR_NONBLOCK;
-
-		VOP_SETATTR(vp, &va, attr_flags, NULL, error);
-		if (error)
-			return -error;
-		return 0;
-	}
-
-	case XFS_IOC_FSGETXATTRA: {
-		struct fsxattr	fa;
-
-		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_ANEXTENTS;
-		VOP_GETATTR(vp, &va, 0, NULL, error);
-		if (error)
-			return -error;
-
-		fa.fsx_xflags	= va.va_xflags;
-		fa.fsx_extsize	= va.va_extsize;
-		fa.fsx_nextents = va.va_anextents;
-
-		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
-			return -XFS_ERROR(EFAULT);
-		return 0;
-	}
+	case XFS_IOC_FSGETXATTR:
+	case XFS_IOC_FSSETXATTR:
+	case XFS_IOC_FSGETXATTRA:
+		return xfs_ioc_xattr(vp, filp, cmd, arg);
 
 	case XFS_IOC_FSSETDM: {
 		struct fsdmidata	dmi;
@@ -754,64 +644,11 @@ xfs_ioctl(
 	}
 
 	case XFS_IOC_GETBMAP:
-	case XFS_IOC_GETBMAPA: {
-		struct getbmap	bm;
-		int		iflags;
+	case XFS_IOC_GETBMAPA:
+		return xfs_ioc_getbmap(bdp, filp, cmd, arg);
 
-		if (copy_from_user(&bm, (struct getbmap *)arg, sizeof(bm)))
-			return -XFS_ERROR(EFAULT);
-
-		if (bm.bmv_count < 2)
-			return -XFS_ERROR(EINVAL);
-
-		iflags = (cmd == XFS_IOC_GETBMAPA ? BMV_IF_ATTRFORK : 0);
-		if (filp->f_mode & FINVIS)
-			iflags |= BMV_IF_NO_DMAPI_READ;
-
-		error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg+1, iflags);
-		if (error)
-			return -error;
-
-		if (copy_to_user((struct getbmap *)arg, &bm, sizeof(bm)))
-			return -XFS_ERROR(EFAULT);
-		return 0;
-	}
-
-	case XFS_IOC_GETBMAPX: {
-		struct getbmapx bmx;
-		struct getbmap	bm;
-		int		iflags;
-
-		if (copy_from_user(&bmx, (struct getbmapx *)arg, sizeof(bmx)))
-			return -XFS_ERROR(EFAULT);
-
-		if (bmx.bmv_count < 2)
-			return -XFS_ERROR(EINVAL);
-
-		/*
-		 * Map input getbmapx structure to a getbmap
-		 * structure for xfs_getbmap.
-		 */
-		GETBMAP_CONVERT(bmx, bm);
-
-		iflags = bmx.bmv_iflags;
-
-		if (iflags & (~BMV_IF_VALID))
-			return -XFS_ERROR(EINVAL);
-
-		iflags |= BMV_IF_EXTENDED;
-
-		error = xfs_getbmap(bdp, &bm, (struct getbmapx *)arg+1, iflags);
-		if (error)
-			return -error;
-
-		GETBMAP_CONVERT(bm, bmx);
-
-		if (copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx)))
-			return -XFS_ERROR(EFAULT);
-
-		return 0;
-	}
+	case XFS_IOC_GETBMAPX:
+		return xfs_ioc_getbmapx(bdp, arg);
 
 	case XFS_IOC_FD_TO_HANDLE:
 	case XFS_IOC_PATH_TO_HANDLE:
@@ -963,4 +800,265 @@ xfs_ioctl(
 	default:
 		return -ENOTTY;
 	}
+}
+
+int xfs_ioc_space(
+	bhv_desc_t		*bdp,
+	vnode_t			*vp,
+	struct file		*filp,
+	unsigned int		cmd,
+	unsigned long		arg)
+{
+	xfs_flock64_t	bf;
+	int		attr_flags = 0;
+	int		error;
+
+	if (filp->f_flags & O_RDONLY)
+		return -XFS_ERROR(EBADF);
+
+	if (vp->v_type != VREG)
+		return -XFS_ERROR(EINVAL);
+
+	if (copy_from_user(&bf, (xfs_flock64_t *)arg, sizeof(bf)))
+		return -XFS_ERROR(EFAULT);
+
+	if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
+		attr_flags |= ATTR_NONBLOCK;
+	if (filp->f_mode & FINVIS)
+		attr_flags |= ATTR_DMI;
+
+	error = xfs_change_file_space(bdp, cmd, &bf, filp->f_pos,
+					      NULL, attr_flags);
+	return -error;
+}
+
+int xfs_ioc_bulkstat(
+	xfs_mount_t		*mp,
+	unsigned int		cmd,
+	unsigned long		arg)
+{
+	xfs_fsop_bulkreq_t bulkreq;
+	int		count;		/* # of records returned */
+	xfs_ino_t	inlast;		/* last inode number */
+	int		done;
+	int		error;
+	/* done = 1 if there are more stats to get and if bulkstat */
+	/* should be called again (unused here, but used in dmapi) */
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return -XFS_ERROR(EIO);
+
+	if (copy_from_user(&bulkreq, (xfs_fsop_bulkreq_t *)arg,
+					sizeof(xfs_fsop_bulkreq_t)))
+		return -XFS_ERROR(EFAULT);
+
+	if (copy_from_user(&inlast, (__s64 *)bulkreq.lastip,
+						sizeof(__s64)))
+		return -XFS_ERROR(EFAULT);
+
+	if ((count = bulkreq.icount) <= 0)
+		return -XFS_ERROR(EINVAL);
+
+	if (cmd == XFS_IOC_FSINUMBERS)
+		error = xfs_inumbers(mp, NULL, &inlast, &count,
+						bulkreq.ubuffer);
+	else if (cmd == XFS_IOC_FSBULKSTAT_SINGLE)
+		error = xfs_bulkstat_single(mp, &inlast,
+						bulkreq.ubuffer, &done);
+	else {	/* XFS_IOC_FSBULKSTAT */
+		if (count == 1 && inlast != 0) {
+			inlast++;
+			error = xfs_bulkstat_single(mp, &inlast,
+					bulkreq.ubuffer, &done);
+		} else {
+			error = xfs_bulkstat(mp, NULL, &inlast, &count,
+				(bulkstat_one_pf)xfs_bulkstat_one,
+				sizeof(xfs_bstat_t), bulkreq.ubuffer,
+				BULKSTAT_FG_QUICK, &done);
+		}
+	}
+
+	if (error)
+		return -error;
+
+	if (bulkreq.ocount != NULL) {
+		if (copy_to_user((xfs_ino_t *)bulkreq.lastip, &inlast,
+						sizeof(xfs_ino_t)))
+			return -XFS_ERROR(EFAULT);
+
+		if (copy_to_user((__s32 *)bulkreq.ocount, &count,
+						sizeof(count)))
+			return -XFS_ERROR(EFAULT);
+	}
+
+	return 0;
+}
+
+int xfs_ioc_fsgeometry_v1(
+	xfs_mount_t		*mp,
+	unsigned long		arg)
+{
+	xfs_fsop_geom_v1_t	fsgeo;
+	int			error;
+
+	error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)&fsgeo, 3);
+	if (error)
+		return -error;
+
+	if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo, sizeof(fsgeo)))
+		return -XFS_ERROR(EFAULT);
+	return 0;
+}
+
+int xfs_ioc_fsgeometry(
+	xfs_mount_t		*mp,
+	unsigned long		arg)
+{
+	xfs_fsop_geom_t fsgeo;
+	int		error;
+
+	error = xfs_fs_geometry(mp, &fsgeo, 4);
+	if (error)
+		return -error;
+
+	if (copy_to_user((xfs_fsop_geom_t *)arg, &fsgeo, sizeof(fsgeo)))
+		return -XFS_ERROR(EFAULT);
+	return 0;
+}
+
+int xfs_ioc_xattr(
+	vnode_t			*vp,
+	struct file		*filp,
+	unsigned int		cmd,
+	unsigned long		arg)
+{
+	struct fsxattr	fa;
+	vattr_t		va;
+	int		error;
+
+	switch (cmd) {
+	case XFS_IOC_FSGETXATTR: {
+		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
+		VOP_GETATTR(vp, &va, 0, NULL, error);
+		if (error)
+			return -error;
+
+		fa.fsx_xflags	= va.va_xflags;
+		fa.fsx_extsize	= va.va_extsize;
+		fa.fsx_nextents = va.va_nextents;
+
+		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
+			return -XFS_ERROR(EFAULT);
+		return 0;
+	}
+
+	case XFS_IOC_FSSETXATTR: {
+		int		attr_flags = 0;
+
+		if (copy_from_user(&fa, (struct fsxattr *)arg, sizeof(fa)))
+			return -XFS_ERROR(EFAULT);
+
+		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
+		va.va_xflags  = fa.fsx_xflags;
+		va.va_extsize = fa.fsx_extsize;
+
+		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
+			attr_flags |= ATTR_NONBLOCK;
+
+		VOP_SETATTR(vp, &va, attr_flags, NULL, error);
+		return -error;
+	}
+
+	case XFS_IOC_FSGETXATTRA: {
+
+		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_ANEXTENTS;
+		VOP_GETATTR(vp, &va, 0, NULL, error);
+		if (error)
+			return -error;
+
+		fa.fsx_xflags	= va.va_xflags;
+		fa.fsx_extsize	= va.va_extsize;
+		fa.fsx_nextents = va.va_anextents;
+
+		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
+			return -XFS_ERROR(EFAULT);
+		return 0;
+	}
+	
+	default:
+		return -ENOTTY;
+
+	}
+}
+
+int xfs_ioc_getbmap(
+	bhv_desc_t		*bdp,
+	struct file		*filp,
+	unsigned int		cmd,
+	unsigned long		arg)
+{
+	struct getbmap	bm;
+	int		iflags;
+	int		error;
+
+	if (copy_from_user(&bm, (struct getbmap *)arg, sizeof(bm)))
+		return -XFS_ERROR(EFAULT);
+
+	if (bm.bmv_count < 2)
+		return -XFS_ERROR(EINVAL);
+
+	iflags = (cmd == XFS_IOC_GETBMAPA ? BMV_IF_ATTRFORK : 0);
+	if (filp->f_mode & FINVIS)
+		iflags |= BMV_IF_NO_DMAPI_READ;
+
+	error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg+1, iflags);
+	if (error)
+		return -error;
+
+	if (copy_to_user((struct getbmap *)arg, &bm, sizeof(bm)))
+		return -XFS_ERROR(EFAULT);
+	return 0;
+}
+
+int xfs_ioc_getbmapx(
+	bhv_desc_t		*bdp,
+	unsigned long		arg)
+{
+	struct getbmapx bmx;
+	struct getbmap	bm;
+	int		iflags;
+	int		error;
+
+	if (copy_from_user(&bmx, (struct getbmapx *)arg, sizeof(bmx)))
+		return -XFS_ERROR(EFAULT);
+
+	if (bmx.bmv_count < 2)
+		return -XFS_ERROR(EINVAL);
+
+	/*
+	 * Map input getbmapx structure to a getbmap
+	 * structure for xfs_getbmap.
+	 */
+	GETBMAP_CONVERT(bmx, bm);
+
+	iflags = bmx.bmv_iflags;
+
+	if (iflags & (~BMV_IF_VALID))
+		return -XFS_ERROR(EINVAL);
+
+	iflags |= BMV_IF_EXTENDED;
+
+	error = xfs_getbmap(bdp, &bm, (struct getbmapx *)arg+1, iflags);
+	if (error)
+		return -error;
+
+	GETBMAP_CONVERT(bm, bmx);
+
+	if (copy_to_user((struct getbmapx *)arg, &bmx, sizeof(bmx)))
+		return -XFS_ERROR(EFAULT);
+
+	return 0;
 }
