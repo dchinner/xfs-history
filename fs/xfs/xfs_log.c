@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.105 $"
+#ident	"$Revision: 1.106 $"
 
 /*
  * High level interface routines for log manager
@@ -869,7 +869,6 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 		iclogp = &iclog->ic_next;
 	}
-	log->l_iclog_bak[i] = 0;
 	*iclogp = log->l_iclog;			/* complete ring */
 	log->l_iclog->ic_prev = prev_iclog;	/* re-write 1st prev ptr */
 	
