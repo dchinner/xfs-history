@@ -972,7 +972,7 @@ xlog_find_tail(xlog_t		*log,
 	 * We can't recover this device anyway, so it won't matter.
 	 */
 
-	if (!is_read_only(log->l_mp->m_logdev_targp->pbr_kdev)) {
+	if (!xfs_readonly_buftarg(log->l_mp->m_logdev_targp)) {
 		error = xlog_clear_stale_blocks(log, tail_lsn);
 	}
 #endif
