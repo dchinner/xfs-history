@@ -39,20 +39,28 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_next;	/* inode hash link forw */
 	struct xfs_inode	**i_prevp;	/* ptr to prev i_next */
 	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
-	struct xfs_inode	*i_mnext;	/* next inode in mount's list */
+	struct xfs_inode	*i_mnext;	/* next inode in mount list */
 	struct xfs_inode	**i_mprevp;	/* ptr to prev i_next */
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
-	dev_t			i_dev;		/* dev containing this inode */
-	xfs_ino_t		i_ino;		/* inode number (agno/agino) */
+	dev_t			i_dev;		/* dev for this inode */
+	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
 
 	/* Transaction and locking information. */
-	xfs_trans_t		*i_transp;	/* ptr to owning transaction */
+	xfs_trans_t		*i_transp;	/* ptr to owning transaction*/
 	xfs_inode_log_item_t	i_item;		/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
 	mrlock_t		i_iolock;	/* inode IO lock */
 	sema_t			i_flock;	/* inode flush lock */
 	unsigned int		i_pincount;	/* inode pin count */
 	sema_t			i_pinsema;	/* inode pin sema */
+
+	/* I/O state */
+	off_t			i_next_offset;	/* seq read detector */
+	off_t			i_io_offset;	/* last buf offset */
+	xfs_fsblock_t		i_reada_blkno;	/* next blk to start ra */
+	unsigned int		i_io_size;	/* file io buffer len */
+	unsigned int		i_last_req_sz;	/* last read size */
+	unsigned int		i_num_readaheads; /* # read ahead bufs */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
@@ -64,7 +72,7 @@ typedef struct xfs_inode {
 	size_t			i_bytes; 	/* bytes in i_u1 */	
 	xfs_extnum_t		i_lastex;	/* last iu_extents used */
 	union {
-		xfs_bmbt_rec_t	*iu_extents;	/* linear map of file extents */
+		xfs_bmbt_rec_t	*iu_extents;	/* linear map of file exts */
 		char		*iu_data;	/* inline file data */
 	} i_u1;
 	xfs_btree_lblock_t	*i_broot;	/* file's incore btree root */
