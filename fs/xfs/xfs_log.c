@@ -1068,10 +1068,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			log->l_iclog_hsize = xhdrs << BBSHIFT;
 			log->l_iclog_heads = xhdrs;
 		} else {
-			if (mp->m_logbsize > XLOG_BIG_RECORD_BSIZE) {
-				xlog_warn("xfs: log buffer size is too large.");
-				mp->m_logbsize = XLOG_BIG_RECORD_BSIZE;
-			}
+			ASSERT(mp->m_logbsize <= XLOG_BIG_RECORD_BSIZE);
 			log->l_iclog_hsize = BBSIZE;
 			log->l_iclog_heads = 1;
 		}

@@ -286,7 +286,9 @@ xfs_cmountfs(
 		if (ap->logbufs != 0 && ap->logbufs != -1 &&
 		    (ap->logbufs < XLOG_NUM_ICLOGS ||
 		     ap->logbufs > XLOG_MAX_ICLOGS)) {
-			cmn_err(CE_WARN, "XFS: invalid logbufs value");
+			cmn_err(CE_WARN, 
+				"XFS: invalid logbufs value: %d [not %d-%d]\n",
+				ap->logbufs, XLOG_NUM_ICLOGS, XLOG_MAX_ICLOGS);
 			error = XFS_ERROR(EINVAL);
 			goto error3;
 		}
@@ -297,7 +299,9 @@ xfs_cmountfs(
 		    ap->logbufsize != 64 * 1024 &&
 		    ap->logbufsize != 128 * 1024 &&
 		    ap->logbufsize != 256 * 1024) {
-			cmn_err(CE_WARN, "XFS: invalid logbufsize");
+			cmn_err(CE_WARN,
+		"XFS: invalid logbufsize: %d [not 16k,32k,64k,128k or 256k]\n",
+				ap->logbufsize);
 			error = XFS_ERROR(EINVAL);
 			goto error3;
 		}
@@ -361,7 +365,10 @@ xfs_cmountfs(
 		if (ap->flags & XFSMNT_IOSIZE) {
 			if (ap->iosizelog > XFS_MAX_IO_LOG ||
 			    ap->iosizelog < XFS_MIN_IO_LOG) {
-				cmn_err(CE_WARN, "XFS: invalid log iosize");
+				cmn_err(CE_WARN,
+			"XFS: invalid log iosize: %d [not %d-%d]",
+					ap->iosizelog, XFS_MIN_IO_LOG,
+					XFS_MAX_IO_LOG);
 				error = XFS_ERROR(EINVAL);
 				goto error3;
 			}
@@ -403,6 +410,15 @@ xfs_cmountfs(
 		    (ap->logbufsize < mp->m_sb.sb_logsunit)) {
 			cmn_err(CE_WARN, "XFS: "
 				"logbuf size must be greater than or equal to log stripe size");
+			xfs_freesb(mp);
+			error = XFS_ERROR(EINVAL);
+			goto error3;
+		}
+	} else {
+		/* Fail a mount if the logbuf is larger than 32K */
+		if (ap->logbufsize > XLOG_BIG_RECORD_BSIZE) {
+			cmn_err(CE_WARN, "XFS: "
+		"XFS: logbuf size for version 1 logs must be 16K or 32K");
 			xfs_freesb(mp);
 			error = XFS_ERROR(EINVAL);
 			goto error3;
