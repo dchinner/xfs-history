@@ -1,4 +1,4 @@
-#ident "$Revision: 1.295 $"
+#ident "$Revision: 1.296 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -298,7 +298,8 @@ xfs_ioctl(
 	void		*arg,
 	int		flag,
 	cred_t		*credp,
-	int		*rvalp);
+	int		*rvalp,
+        struct vopbd    *vbds);
 
 STATIC void
 xfs_itruncate_cleanup(
@@ -5396,7 +5397,8 @@ xfs_ioctl(
 	void		*arg,
 	int		flag,
 	cred_t		*credp,
-	int		*rvalp)
+	int		*rvalp,
+        struct vopbd    *vbds)
 {
 	return XFS_ERROR(ENOTTY);
 }
