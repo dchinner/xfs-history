@@ -1,4 +1,4 @@
-#ident "$Revision: 1.176 $"
+#ident "$Revision: 1.177 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -315,7 +315,7 @@ xfs_open(
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	if (ip->i_d.di_size > XFS_MAX_FILE_OFFSET)
-		rval = EFBIG;
+		rval = XFS_ERROR(EFBIG);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 #endif
 	return rval;
@@ -1589,7 +1589,7 @@ xfs_dir_lookup_int(
 		 * and try to create an entry with the given name.
 		 */
 		if (*ipp == NULL) {
-			return EIO;
+			return XFS_ERROR(EIO);
 		}
 		ASSERT(*ipp != NULL);
 		vp = XFS_ITOV(*ipp);
@@ -1603,7 +1603,7 @@ xfs_dir_lookup_int(
 			       (name[2] == 0));
 			*ipp = NULL;
 			VN_RELE (vp);
-			code = ENOENT;
+			code = XFS_ERROR(ENOENT);
 		} else {
 			dnlc_enter_fast(dir_vp, fd, vp, NOCRED);
 		}
@@ -1637,6 +1637,13 @@ xfs_lookup(
 	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_lookup");
+
+	/*
+	 * If it's not a directory, fail the request.
+	 */
+	if (dir_vp->v_type != VDIR)
+		return XFS_ERROR(ENOTDIR);
+
 	dp = XFS_VTOI(dir_vp);
 	lock_mode = xfs_ilock_map_shared(dp);
 
@@ -1645,7 +1652,7 @@ xfs_lookup(
 	 */
 	if (dp->i_d.di_nlink == 0) {
 		xfs_iunlock_map_shared(dp, lock_mode);
-		return ENOENT;
+		return XFS_ERROR(ENOENT);
 	}
 
 	if (code = xfs_iaccess(dp, IEXEC, credp)) {
@@ -1748,7 +1755,7 @@ xfs_dir_ialloc(
 	}
 	if (!call_again && (ip == NULL)) {
 		*ipp = NULL;
-		return ENOSPC;
+		return XFS_ERROR(ENOSPC);
 	}
 
 	/*
@@ -1975,7 +1982,7 @@ xfs_create(
 	 * If the directory has been removed, then fail all creates.
 	 */
 	if (dp->i_d.di_nlink == 0) {
-		error = ENOENT;
+		error = XFS_ERROR(ENOENT);
 		goto error_return;
 	}
 
@@ -2003,7 +2010,7 @@ xfs_create(
 		 * file size limit is set to 0.
 		 */
 		if (u.u_rlimit[RLIMIT_FSIZE].rlim_cur == 0) {
-			error = EFBIG;
+			error = XFS_ERROR(EFBIG);
 			goto error_return;
 		}
 
@@ -2149,7 +2156,7 @@ xfs_create(
 		 * We check this again since we dropped the directory lock.
 		 */
 		if (dp->i_d.di_nlink == 0) {
-			error = ENOENT;
+			error = XFS_ERROR(ENOENT);
 		} else if (I_mode) {
 			error = xfs_iaccess(ip, I_mode, credp);
 		}
@@ -2311,7 +2318,7 @@ xfs_lock_dir_and_entry(
 	if (dp->i_d.di_nlink == 0) {
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 		*ipp = NULL;
-		return ENOENT;
+		return XFS_ERROR(ENOENT);
 	}
 
 	error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp), DLF_IGET, name, 
@@ -2437,7 +2444,7 @@ xfs_lock_for_rename(
 	 */
 	if (dp1->i_d.di_nlink == 0) {
 		xfs_iunlock_map_shared(dp1, lock_mode);
-		return ENOENT;
+		return XFS_ERROR(ENOENT);
 	}
 
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp1), DLF_IGET,
@@ -2463,7 +2470,7 @@ xfs_lock_for_rename(
 	 */
 	if (dp2->i_d.di_nlink == 0) {
 		xfs_iunlock_map_shared(dp2, lock_mode);
-		return ENOENT;
+		return XFS_ERROR(ENOENT);
 	}
 
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp2), DLF_IGET,
@@ -2541,7 +2548,7 @@ xfs_lock_for_rename(
 		if (num_inodes == 4)
 			IRELE (ip2);
 		IRELE (ip1);
-		return EAGAIN;
+		return XFS_ERROR(EAGAIN);
         }
 
 
@@ -2764,7 +2771,7 @@ xfs_remove(
 			nospace = 2;
 			goto retry;
 		}
-		error = ENOSPC;
+		error = XFS_ERROR(ENOSPC);
 		remove_which_error_return = 10;
 		goto error_return;
 	}
@@ -2941,7 +2948,7 @@ xfs_link(
 	 * any more files in it.
 	 */
 	if (tdp->i_d.di_nlink == 0) {
-		error = ENOENT;
+		error = XFS_ERROR(ENOENT);
 		goto error_return;
 	}
 
@@ -3342,7 +3349,7 @@ xfs_rename(
 	 * and then we'd have noticed that its link count had gone to zero.
 	 */
 	if (target_dp->i_d.di_nlink == 0) {
-		error = ENOENT;
+		error = XFS_ERROR(ENOENT);
 		rename_which_error_return = 3;
 		goto error_return;
 	}
@@ -3908,7 +3915,7 @@ xfs_rmdir(
 	 * lookups and we know it has no entries.
 	 */
 	if (dp->i_d.di_nlink == 0) {
-		error = ENOENT;
+		error = XFS_ERROR(ENOENT);
 		goto error_return;
 	}
 
@@ -4173,7 +4180,7 @@ xfs_symlink(
 	 * anything in it.
 	 */
 	if (dp->i_d.di_nlink == 0) {
-		error = ENOENT;
+		error = XFS_ERROR(ENOENT);
 		goto error_return;
 	}
 
@@ -4349,7 +4356,7 @@ xfs_fast_fid(
 		 * If the ino won't fit into the __uint32_t that's
 		 * in our xfs_fid structure, then return an error.
 		 */
-		return EFBIG;
+		return XFS_ERROR(EFBIG);
 	}
 
 	ip = XFS_VTOI(vp);
@@ -4382,7 +4389,7 @@ xfs_fid(
 		 * in our xfs_fid structure, then return an error.
 		 */
 		*fidpp = NULL;
-		return EFBIG;
+		return XFS_ERROR(EFBIG);
 	}
 	
 	fid = (xfs_fid_t *) kmem_alloc (sizeof(xfs_fid_t), KM_SLEEP);
@@ -4747,9 +4754,9 @@ xfs_allocstore(
 	}
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	if (!error) {
-		error = ENOSPC;
+		error = XFS_ERROR(ENOSPC);
 	}
-	return XFS_ERROR(error);
+	return error;
 }
 
 
@@ -4885,13 +4892,13 @@ xfs_fcntl(
 
 		cmd = cmd;
 		if ((flags & FWRITE) == 0) {
-			error = EBADF;
+			error = XFS_ERROR(EBADF);
 		} else if (vp->v_type != VREG) {
-			error = EINVAL;
+			error = XFS_ERROR(EINVAL);
 #ifdef _K64U64
 		} else if (ABI_IS_IRIX5_64(u.u_procp->p_abi)) {
 			if (copyin((caddr_t)arg, &bf, sizeof bf)) {
-				error = EFAULT;
+				error = XFS_ERROR(EFAULT);
 				break;
 			}
 #endif
@@ -4906,7 +4913,7 @@ xfs_fcntl(
 			if (copyin_xlate((caddr_t)arg, &bf, sizeof bf,
 					 irix5_n32_to_flock,
 					 u.u_procp->p_abi, 1)) {
-				error = EFAULT;
+				error = XFS_ERROR(EFAULT);
 				break;
 			}
 		} else {
@@ -4916,7 +4923,7 @@ xfs_fcntl(
 			 * offsets in "struct flock" were preserved.
 			 */
 			if (copyin((caddr_t)arg, &i5_bf, sizeof i4_bf)) {
-				error = EFAULT;
+				error = XFS_ERROR(EFAULT);
 				break;
 			}
 			/* 
@@ -4953,7 +4960,7 @@ xfs_set_dmattrs (
 	int		error;
 
 	if (!_CAP_ABLE (CAP_DEVICE_MGT))
-		return EPERM;
+		return XFS_ERROR(EPERM);
 
         ip = XFS_VTOI (vp);
 	mp = ip->i_mount;
@@ -5030,20 +5037,20 @@ xfs_reclaim(
 	 */
 	if (!(flag & FSYNC_INVAL)) {
 		if (VN_DIRTY(vp) || (ip->i_queued_bufs > 0)) {
-			return EAGAIN;
+			return XFS_ERROR(EAGAIN);
 		}
 		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
-			return EAGAIN;
+			return XFS_ERROR(EAGAIN);
 		}
 		if (!xfs_iflock_nowait(ip)) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			return EAGAIN;
+			return XFS_ERROR(EAGAIN);
 		}
 		if ((ip->i_item.ili_format.ilf_fields != 0) ||
 		    (ip->i_item.ili_last_fields != 0)) {
 			(void) xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-			return EAGAIN;
+			return XFS_ERROR(EAGAIN);
 		}
 		locked = 1;
 	}
@@ -5140,7 +5147,7 @@ xfs_free_file_space(
 	 * Currently, can only free to eof
 	 */
 	if (len) {
-		return( EINVAL );
+		return( XFS_ERROR(EINVAL) );
 	}
 
 	ip = XFS_VTOI(vp);
@@ -5367,7 +5374,7 @@ xfs_change_file_space(
 	 * must be a regular file and have write permission
 	 */
 	if (vp->v_type != VREG) {
-		return(EINVAL);
+		return(XFS_ERROR(EINVAL));
 	}
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -5395,7 +5402,7 @@ xfs_change_file_space(
 			break;
 		default:
 			ASSERT(0);
-			return( EINVAL );
+			return( XFS_ERROR(EINVAL) );
 	}
 
 
@@ -5418,7 +5425,7 @@ xfs_change_file_space(
 		 */
 		startoffset = bf->l_start;
 	} else {
-		return EINVAL;
+		return XFS_ERROR(EINVAL);
 	}
 
 	/*
