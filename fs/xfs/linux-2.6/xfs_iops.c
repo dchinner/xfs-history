@@ -52,7 +52,6 @@
 #include <linux/mm.h>
 
 #include <sys/sysmacros.h>
-#include <sys/capability.h>
 #include <sys/vfs.h>
 #include <sys/pvfs.h>
 #include <sys/vnode.h>

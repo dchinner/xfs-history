@@ -29,61 +29,120 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-/*
- *
- * /ptools/plroot/pingu/slinx-xfs/kern/fs/xfs/pseudo-inc/sys/RCS/cred.h,v 1.1 1999/09/23 22:23:15 cattelan Exp
- * cattelan
- * cred.h,v 1.1 1999/09/23 22:23:15 cattelan Exp
- *
- * cred.h,v
- * Revision 1.1  1999/09/23 22:23:15  cattelan
- * kern/fs/xfs/linux-sys/cred.h 1.4 Renamed to kern/fs/xfs/pseudo-inc/sys/cred.h
- *
- * Revision 1.4  1999/08/27 22:00:32  cattelan
- * Header file checkpoint... libsim mkfs xfsdb build\n as well as most of the kernel files
- *
- * Revision 1.3  1999/08/26 19:43:29  mostek
- * Add some needed by linux_ops_super.c.
- *
- * Revision 1.2  1999/08/19 17:36:03  cattelan
- * Clean up most warning messages.
- *
- * Revision 1.1  1999/08/11 04:33:02  cattelan
- * TAKE - Additional include files for lib sim
- *
- */
 
-
-#ifndef _XFS_CRED_H    /* wrapper symbol for kernel use */
-#define _XFS_CRED_H    /* subject to change without notice */
+#ifndef __XFS_CRED_H__
+#define __XFS_CRED_H__
 
 #include <asm/param.h>		/* For NGROUPS */
-#include <sys/types.h>          /* REQUIRED */
-#include <sys/capability.h>     /* REQUIRED for cap_set_t */
-
-typedef struct cred {
-        int     cr_ref;                 /* reference count */
-        ushort  cr_ngroups;             /* number of groups in cr_groups */
-        uid_t   cr_uid;                 /* effective user id */
-        gid_t   cr_gid;                 /* effective group id */
-        uid_t   cr_ruid;                /* real user id */
-        gid_t   cr_rgid;                /* real group id */
-        uid_t   cr_suid;                /* "saved" user id (from exec) */
-        gid_t   cr_sgid;                /* "saved" group id (from exec) */
-        struct mac_label *cr_mac;       /* MAC label for B1 and beyond */
-        cap_set_t cr_cap;               /* capability (privilege) sets */
-#if CELL_CAPABLE || CELL_PREPARE
-        credid_t cr_id;                 /* cred id */
+#ifndef SIM
+#include <linux/capability.h>
+#include <linux/sched.h>
+#else
+#define capable(cap)	1
 #endif
-        gid_t   cr_groups[NGROUPS];	/* supplementary group list */
-} cred_t;
 
-#define	ANYCRED	((struct cred *)(__psint_t)-1)
-#define	NOCRED	((struct cred *)(__psint_t)0)
+/*
+ * Capabilities
+ */
+typedef __uint64_t cap_value_t;
+
+typedef struct cap_set {
+	cap_value_t	cap_effective;	/* use in capability checks */
+	cap_value_t	cap_permitted;	/* combined with file attrs */
+	cap_value_t	cap_inheritable;/* pass through exec */
+} cap_set_t;
+
+
+/*
+ * Mandatory Access Control
+ *
+ * Layout of a composite MAC label:
+ * ml_list contains the list of categories (MSEN) followed by the list of
+ * divisions (MINT). This is actually a header for the data structure which
+ * will have an ml_list with more than one element.
+ *
+ *      -------------------------------
+ *      | ml_msen_type | ml_mint_type |
+ *      -------------------------------
+ *      | ml_level     | ml_grade     |
+ *      -------------------------------
+ *      | ml_catcount                 |
+ *      -------------------------------
+ *      | ml_divcount                 |
+ *      -------------------------------
+ *      | category 1                  |
+ *      | . . .                       |
+ *      | category N                  | (where N = ml_catcount)
+ *      -------------------------------
+ *      | division 1                  |
+ *      | . . .                       |
+ *      | division M                  | (where M = ml_divcount)
+ *      -------------------------------
+ */
+#define MAC_MAX_SETS	250
+typedef struct mac_label {
+	unsigned char	ml_msen_type;	/* MSEN label type */
+	unsigned char	ml_mint_type;	/* MINT label type */
+	unsigned char	ml_level;	/* Hierarchical level  */
+	unsigned char	ml_grade;	/* Hierarchical grade  */
+	unsigned short	ml_catcount;	/* Category count */
+	unsigned short	ml_divcount;	/* Division count */
+					/* Category set, then Division set */
+	unsigned short	ml_list[MAC_MAX_SETS];
+} mac_label;
+
+/* Data types required by POSIX P1003.1eD15 */
+typedef struct mac_label * mac_t;
+
+extern int mac_enabled;
+static __inline void mac_never(void) {}
+struct xfs_inode;
+extern int mac_xfs_iaccess(struct xfs_inode *, mode_t);
+#define _MAC_XFS_IACCESS(i,m)	\
+	(mac_enabled? (mac_never(), mac_xfs_iaccess(i,m)): 0)
+#define MACWRITE	00200
+#define SGI_MAC_FILE "/dev/null"
+#define SGI_MAC_FILE_SIZE 10
+#define SGI_CAP_FILE "/dev/null"
+#define SGI_CAP_FILE_SIZE 10
+
+/* MSEN label type names. Choose an upper case ASCII character.  */
+#define MSEN_ADMIN_LABEL	'A'	/* Admin: low<admin != tcsec<high */
+#define MSEN_EQUAL_LABEL	'E'	/* Wildcard - always equal */
+#define MSEN_HIGH_LABEL		'H'	/* System High - always dominates */
+#define MSEN_MLD_HIGH_LABEL	'I'	/* System High, multi-level dir */
+#define MSEN_LOW_LABEL		'L'	/* System Low - always dominated */
+#define MSEN_MLD_LABEL		'M'	/* TCSEC label on a multi-level dir */
+#define MSEN_MLD_LOW_LABEL	'N'	/* System Low, multi-level dir */
+#define MSEN_TCSEC_LABEL	'T'	/* TCSEC label */
+#define MSEN_UNKNOWN_LABEL	'U'	/* unknown label */
+
+/* MINT label type names. Choose a lower case ASCII character.  */
+#define MINT_BIBA_LABEL		'b'	/* Dual of a TCSEC label */
+#define MINT_EQUAL_LABEL	'e'	/* Wildcard - always equal */
+#define MINT_HIGH_LABEL		'h'	/* High Grade - always dominates */
+#define MINT_LOW_LABEL		'l'	/* Low Grade - always dominated */
+
+
+/*
+ * Credentials
+ */
+typedef struct cred {
+	int	cr_ref;			/* reference count */
+	ushort	cr_ngroups;		/* number of groups in cr_groups */
+	uid_t	cr_uid;			/* effective user id */
+	gid_t	cr_gid;		 	/* effective group id */
+	uid_t	cr_ruid;		/* real user id */
+	gid_t	cr_rgid;		/* real group id */
+	uid_t	cr_suid;		/* "saved" user id (from exec) */
+	gid_t	cr_sgid;		/* "saved" group id (from exec) */
+	struct mac_label *cr_mac;	/* MAC label for B1 and beyond */
+	cap_set_t	  cr_cap;	/* capability (privilege) sets */
+	gid_t	cr_groups[NGROUPS];	/* supplementary group list */
+} cred_t;
 
 extern void cred_init(void);
 extern cred_t *get_current_cred(void);
-extern void cred_fill_from_current(cred_t *);
 extern struct cred *sys_cred;
 
 #endif  /* _XFS_CRED_H */

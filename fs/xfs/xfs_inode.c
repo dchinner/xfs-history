@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.293 $"
+#ident "$Revision: 1.294 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -45,8 +45,6 @@
 #include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/acl.h>
-#include <sys/mac_label.h>
-#include <sys/capability.h>
 #ifdef SIM
 #undef __KERNEL__
 #undef _KERNEL

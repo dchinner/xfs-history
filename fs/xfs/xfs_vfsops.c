@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.277 $"
+#ident  "$Revision: 1.278 $"
 
 #include <xfs_os_defs.h>
 
@@ -65,11 +65,11 @@
 #endif
 #include <sys/param.h>
 #include <linux/xfs_sema.h>
+#include <linux/xfs_cred.h>
 #include <sys/statvfs.h>
 #include <sys/uio.h>
 #include <sys/dirent.h>
 #include <sys/ktrace.h>
-#include <sys/capability.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"

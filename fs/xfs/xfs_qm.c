@@ -29,14 +29,13 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.51 $"
+#ident "$Revision: 1.52 $"
 
 
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/capability.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.464 $"
+#ident "$Revision: 1.465 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -65,8 +65,6 @@
 #include <linux/xfs_sema.h>
 #include <ksys/vfile.h>
 #include <sys/mode.h>
-#include <sys/mac_label.h>
-#include <sys/capability.h>
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <ksys/fsc_notify.h>

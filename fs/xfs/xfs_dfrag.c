@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: xfs_dfrag.c,v 1.17 2000/06/15 03:01:24 nathans Exp $"
+#ident "$Id: xfs_dfrag.c,v 1.18 2000/07/21 17:30:17 jtk Exp $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -46,15 +46,7 @@
 #include <ksys/vfile.h>
 #include <ksys/cell_config.h>
 #include <sys/vfs.h>
-#if defined(__sgi__)
-#include <sys/syssgi.h>
-#endif
-#include <sys/mac_label.h>
-#include <sys/capability.h>
 #include <sys/uuid.h>
-#if defined(__sgi__)
-#include <sys/hwgraph.h>
-#endif
 #include <sys/mode.h>
 
 #include "xfs_macros.h"

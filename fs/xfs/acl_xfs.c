@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,7 +40,6 @@
 #include <sys/mac_label.h>
 #include <sys/systm.h>
 #include <sys/attributes.h>
-#include <sys/capability.h>
 #include <sys/acl.h>
 #include <sys/uuid.h>
 #include "xfs_buf.h"

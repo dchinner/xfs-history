@@ -38,7 +38,6 @@
 
 #ifndef SIM
 typedef __u64    xfs_off_t;
-typedef __s32    xfs_off32_t;
 typedef	__u64    xfs_ino_t;		/* <inode> type */
 typedef	__s64    xfs_daddr_t;	/* <disk address> type */
 typedef	char *	 xfs_caddr_t;	/* ?<core address> type */
@@ -53,8 +52,5 @@ typedef	char *	xfs_caddr_t;	/* ?<core address> type */
 typedef ino_t   linux_ino_t;
 typedef off_t   linux_off_t;
 #endif
-
-typedef caddr_t linux_caddr_t;
-typedef daddr_t linux_daddr_t;
 
 #define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)
