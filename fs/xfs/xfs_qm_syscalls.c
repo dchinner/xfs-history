@@ -1,4 +1,4 @@
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -826,7 +826,7 @@ xfs_qm_scall_qwarn(
 #ifdef _IRIX62_XFS_ONLY
 	return (ENOTSUP);
 #else
-	
+	return (ENOTSUP); /* temp */
 #endif
 }
 	   

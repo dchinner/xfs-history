@@ -1,4 +1,4 @@
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -634,6 +634,7 @@ xfs_qm_dqtobp(
  * and release the buffer immediately.
  * 
  */
+/* ARGSUSED */
 STATIC int
 xfs_qm_dqread(
 	xfs_trans_t	*tp,
