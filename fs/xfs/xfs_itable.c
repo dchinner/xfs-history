@@ -78,12 +78,14 @@ xfs_inumbers(
 	bcount = MIN(left, NBPP / sizeof(*buffer));
 	buffer = kmem_alloc(bcount * sizeof(*buffer), KM_SLEEP);
 	error = bufidx = 0;
+	cur = NULL;
+	agbp = NULL;
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
-		if (agino == 0) {
+		if (agbp == NULL) {
 			agbp = xfs_ialloc_read_agi(mp, tp, agno);
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 				XFS_BTNUM_INO, (xfs_inode_t *)0);
-			(void)xfs_inobt_lookup_ge(cur, 0, 0, 0);
+			(void)xfs_inobt_lookup_ge(cur, agino, 0, 0);
 		}
 		if (!xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree)) {
 			xfs_trans_brelse(tp, agbp);
