@@ -726,6 +726,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 						      new_size);
 		ip->i_broot_bytes = new_size;
+		ASSERT(ip->i_broot_bytes <= XFS_LITINO(ip->i_mount));
 		/*
 		 * This depends on bcopy() handling overlapping buffers.
 		 */
@@ -780,6 +781,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 	kmem_free(ip->i_broot, ip->i_broot_bytes);
 	ip->i_broot = new_broot;
 	ip->i_broot_bytes = new_size;
+	ASSERT(ip->i_broot_bytes <= XFS_LITINO(ip->i_mount));
 	return;
 }
 	
@@ -945,6 +947,7 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 	}
 	ip->i_real_bytes = real_size;
 	ip->i_bytes = new_size;
+	ASSERT(ip->i_bytes <= XFS_LITINO(ip->i_mount));
 }
 
 		
@@ -1188,6 +1191,7 @@ xfs_iflush(xfs_inode_t	*ip,
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_DATA) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_data != NULL);
+			ASSERT(ip->i_bytes <= XFS_LITINO(ip->i_mount));
 			bcopy(ip->i_u1.iu_data, dip->di_u.di_c, ip->i_bytes);
 		}
 		break;
@@ -1198,6 +1202,7 @@ xfs_iflush(xfs_inode_t	*ip,
 		ASSERT((ip->i_u1.iu_extents == NULL) || (ip->i_bytes > 0));
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
 		    (ip->i_bytes > 0)) {
+			ASSERT(ip->i_bytes <= XFS_LITINO(ip->i_mount));
 			bcopy(ip->i_u1.iu_extents, dip->di_u.di_bmx,
 			      ip->i_bytes);
 		}
@@ -1206,6 +1211,7 @@ xfs_iflush(xfs_inode_t	*ip,
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
+			ASSERT(ip->i_broot_bytes <= XFS_LITINO(ip->i_mount));
 			xfs_bmbt_to_bmdr(ip->i_broot, ip->i_broot_bytes,
 			   &(dip->di_u.di_bmbt),
 			   XFS_BMAP_BROOT_SIZE(ip->i_mount->m_sb.sb_inodesize));
