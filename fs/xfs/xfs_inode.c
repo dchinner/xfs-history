@@ -1306,17 +1306,57 @@ xfs_iflush(xfs_inode_t	*ip,
 	return;
 }
 
-void
-xfs_iflush_all(xfs_mount_t *mp)
+/*
+ * Flush all inactive inodes in mp.  Return true if no user references
+ * were found, false otherwise.
+ */
+int
+xfs_iflush_all(xfs_mount_t *mp, int flag)
 {
-	xfs_inode_t *ip;
+	int		busy;
+	int		done;
+	xfs_inode_t	*ip;
+	vmap_t		vmap;
+	vnode_t		*vp;
 
-	for (ip = mp->m_inodes; ip; ip = ip->i_mnext) {
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		xfs_iflock(ip);
-		xfs_iflush(ip, B_DELWRI);
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	busy = done = 0;
+	while (!done) {
+		XFS_MOUNT_ILOCK(mp);
+		for (ip = mp->m_inodes; ip; ip = ip->i_mnext) {
+			/*
+			 * It's up to our caller to purge the root (and
+			 * when implemented, quotas) vnodes later.
+			 */
+			vp = XFS_ITOV(ip);
+			if (vp->v_count != 0) {
+				if (vp->v_count == 1 && ip == mp->m_rootip)
+					continue;
+				if (!(flag & XFS_FLUSH_ALL)) {
+					busy = 1;
+					done = 1;
+					break;
+				}
+				/*
+				 * Ignore busy inodes but continue flushing
+				 * others.
+				 */
+				continue;
+			}
+			/*
+			 * Sample vp mapping while holding mp locked on MP
+			 * systems, so we don't purge a reclaimed or
+			 * nonexistent vnode.
+			 */
+			VMAP(vp, vmap);
+			XFS_MOUNT_IUNLOCK(mp);
+			vn_purge(vp, &vmap);
+			break;
+		}
+		if (!ip)
+			done = 1;
 	}
+	XFS_MOUNT_IUNLOCK(mp);
+	return !busy;
 }
 
 void

@@ -121,6 +121,11 @@ typedef struct xfs_inode {
 #define	XFS_ILOCK_SHARED	0x8
 
 /*
+ * Flags for xfs_iflush_all.
+ */
+#define	XFS_FLUSH_ALL		0x1
+
+/*
  * Maximum number of extent pointers in i_u1.iu_extents.
  */
 #define	XFS_MAX_INCORE_EXTENTS	32768
@@ -192,7 +197,7 @@ void		xfs_iroot_realloc(xfs_inode_t *, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
 void		xfs_iflush(xfs_inode_t *, uint);
-void		xfs_iflush_all(xfs_mount_t *);
+int		xfs_iflush_all(xfs_mount_t *, int);
 void		xfs_iprint(xfs_inode_t *);
 int		xfs_iaccess(xfs_inode_t *, mode_t, struct cred *);
 
