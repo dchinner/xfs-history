@@ -931,7 +931,6 @@ xlog_alloc_log(xfs_mount_t	*mp,
 			kmem_zalloc(sizeof(xlog_in_core_t), VM_CACHEALIGN);
 
 		ASSERT(sizeof(xlog_in_core_t) >= 4096);
-		ASSERT(((__psint_t)*iclogp & (__psint_t)0xfff) == 0);
 
 		iclog = *iclogp;
 		iclog->ic_prev = prev_iclog;
