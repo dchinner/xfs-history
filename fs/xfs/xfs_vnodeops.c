@@ -3308,7 +3308,7 @@ xfs_fid(vnode_t	*vp,
 	fid->fid_len = sizeof(xfs_fid_t) - sizeof(fid->fid_len);
 	fid->fid_pad = 0;
 	ip = XFS_VTOI(vp);
-	fid->fid_gen = ip->i_gen;
+	fid->fid_gen = ip->i_d.di_gen;
 	fid->fid_ino = (xfs_fid_ino_t)ip->i_ino;
 
 	*fidpp = (struct fid *)fid;
