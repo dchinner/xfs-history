@@ -554,9 +554,6 @@ extern void pagebuf_pin(		/* pin buffer in memory		*/
 extern void pagebuf_unpin(		/* unpin buffered data		*/
 		page_buf_t *);		/* buffer to unpin		*/
 
-extern void pagebuf_wait_unpin(		/* wait for buffer to be unpinned */
-		page_buf_t *);		/* buffer for which to wait	*/
-
 extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 
 /* Reading and writing pages */

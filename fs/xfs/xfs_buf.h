@@ -223,7 +223,6 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 
 #define xfs_bpin(bp)		pagebuf_pin(bp)
 #define xfs_bunpin(bp)		pagebuf_unpin(bp)
-#define	xfs_bwait_unpin(bp)	pagebuf_wait_unpin(bp)
 
 #ifdef PAGEBUF_TRACE
 #define PB_DEFINE_TRACES
