@@ -299,7 +299,6 @@ xfs_ioctl(vnode_t	*vp,
 
 /*
  * xfs_getattr
- *
  */
 STATIC int
 xfs_getattr(vnode_t	*vp,
@@ -368,6 +367,14 @@ xfs_getattr(vnode_t	*vp,
 	 */
         vap->va_nblocks = BTOBB((u_long) (ip->i_d.di_size));
 
+	/*
+	 * XFS-added attributes
+	 */
+	vap->va_xflags = ip->i_d.di_flags;
+	vap->va_extsize = ip->i_d.di_extsize;
+	vap->va_nextents = ip->i_d.di_nextents;
+	vap->va_uuid = ip->i_d.di_uuid;
+
 	xfs_iunlock (ip, XFS_ILOCK_EXCL);
 
 	return 0;
@@ -376,8 +383,6 @@ xfs_getattr(vnode_t	*vp,
 
 /*
  * xfs_setattr
- *
- * This is a stub.
  */
 STATIC int
 xfs_setattr(vnode_t	*vp,
@@ -588,6 +593,26 @@ xfs_setattr(vnode_t	*vp,
 			ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
                 }
         }
+
+	/*
+	 * Change XFS-added attributes.
+	 */
+	if (mask & (AT_EXTSIZE|AT_XFLAGS)) {
+                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
+                        code = EPERM;
+                        goto error_return;
+                }
+		if (mask & AT_EXTSIZE) {
+			if (ip->i_d.di_nextents) {
+				code = EINVAL;	/* EFBIG? */
+				goto error_return;
+			}
+			ip->i_d.di_extsize = vap->va_extsize;
+		}
+		if (mask & AT_XFLAGS)
+			ip->i_d.di_flags = vap->va_xflags & XFS_DIFLAG_ALL;
+		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+	}
 
 	XFS_IGETINFO.ig_attrchg++;
 
