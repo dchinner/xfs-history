@@ -64,7 +64,7 @@
 #include <support/time.h>
 #include <support/kmem.h>
 
-#include <linux/xfs_fs.h>	/* for BBMASK */
+#include <xfs_fs.h>	/* for BBMASK */
 
 #include "page_buf_internal.h"
 
