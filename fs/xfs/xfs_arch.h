@@ -290,7 +290,7 @@
     INT_GET_UNALIGNED_64(pointer)
 #else
 /* MACHINE ARCHITECTURE dependent */
-#ifdef __LITLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN 
 #define DIRINO_GET_ARCH(pointer,arch) \
     DIRINO4_GET_ARCH((((__u8*)pointer)+4),arch)
 #else
