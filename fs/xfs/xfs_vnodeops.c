@@ -4287,8 +4287,8 @@ xfs_reclaim(vnode_t	*vp,
 	locked = 0;
 
 	/*
-	 * If this is not an unmount (flag == 0) and the inode or the
-	 * inode's data still needs to be flushed, then we do not allow
+	 * If this is not an unmount (flag == 0) and the inode's data
+	 * still needs to be flushed, then we do not allow
 	 * the inode to be reclaimed.  This is to avoid many different
 	 * deadlocks.
 	 *
@@ -4308,20 +4308,17 @@ xfs_reclaim(vnode_t	*vp,
 	 * delayed allocation dirty data which will require us to allocate
 	 * memory to flush, we can't do this from vhand.
 	 *
-	 * Flushing the inode from here requires the acquisition of the
-	 * inode's buffer.  This buffer could be locked by another
-	 * process which is waiting in a memory allocation.  If we're
-	 * called here via vhand, then waiting on that buffer would
-	 * cause us to deadlock.
-	 *
 	 * It is OK to return an error here.  The vnode cache will just
 	 * come back later.
+	 *
+	 * XXXajs Distinguish vhand from vn_alloc and fail vhand case
+	 * if the inode is dirty.  This will prevent deadlocks where the
+	 * process with the inode buffer locked needs memory.  We can't
+	 * always fail when the inode is dirty because then we don't
+	 * reclaim enough.  The vnode cache then grows far too large.
 	 */
 	if (!(flag & FSYNC_INVAL)) {
-		if (VN_DIRTY(vp) || (ip->i_queued_bufs > 0) ||
-		    (ip->i_update_core != 0) ||
-		    (ip->i_item.ili_format.ilf_fields != 0) ||
-		    (ip->i_item.ili_last_fields != 0)) {
+		if (VN_DIRTY(vp) || (ip->i_queued_bufs > 0)) {
 			return EAGAIN;
 		}
 		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
