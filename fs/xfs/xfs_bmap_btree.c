@@ -490,7 +490,7 @@ xfs_bmbt_delrec(
 				goto error0;
 			}
 			if (i) {
-				ASSERT(numrecs >=
+				ASSERT(INT_GET(block->bb_numrecs, ARCH_CONVERT) >=
 				       XFS_BMAP_BLOCK_IMINRECS(level, tcur));
 				xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 				tcur = NULL;
@@ -546,7 +546,7 @@ xfs_bmbt_delrec(
 				goto error0;
 			}
 			if (i) {
-				ASSERT(numrecs >=
+				ASSERT(INT_GET(block->bb_numrecs, ARCH_CONVERT) >=
 				       XFS_BMAP_BLOCK_IMINRECS(level, tcur));
 				xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 				tcur = NULL;
@@ -564,7 +564,7 @@ xfs_bmbt_delrec(
 	mp = cur->bc_mp;
 	ASSERT(bno != NULLFSBLOCK);
 	if (lbno != NULLFSBLOCK &&
-	    lrecs + numrecs <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
+	    lrecs + INT_GET(block->bb_numrecs, ARCH_CONVERT) <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
 		rbno = bno;
 		right = block;
 		rbp = bp;
@@ -579,7 +579,8 @@ xfs_bmbt_delrec(
 			goto error0;
 		}
 	} else if (rbno != NULLFSBLOCK &&
-		   rrecs + numrecs <= XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
+		   rrecs + INT_GET(block->bb_numrecs, ARCH_CONVERT) <=
+		   XFS_BMAP_BLOCK_IMAXRECS(level, cur)) {
 		lbno = bno;
 		left = block;
 		lbp = bp;
