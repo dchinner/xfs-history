@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_GROW_H
 #define	_FS_XFS_GROW_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.3 $"
 
 /*
  * File system growth interfaces
@@ -15,11 +15,13 @@
 #define	XFS_FSOPS_COUNT		5	/* count of operations */
 
 /*
- * Minimum sizes need for growth checks
+ * Minimum and maximum sizes need for growth checks
  */
 #define	XFS_MIN_LOG_BLOCKS	512
 #define	XFS_MIN_LOG_BYTES	(256 * 1024)
 #define	XFS_MIN_AG_BLOCKS	64
+#define	XFS_MAX_LOG_BLOCKS	32768
+#define	XFS_MAX_LOG_BYTES	(128 * 1024 * 1024)
 
 /*
  * Input and output structures
