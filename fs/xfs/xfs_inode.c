@@ -58,6 +58,15 @@ zone_t *xfs_inode_zone;
  */
 #define	XFS_ITRUNC_MAX_EXTENTS	128
 
+#ifdef DEBUG
+STATIC void
+xfs_validate_extents(
+	xfs_bmbt_rec_t	*ep,
+	int		nrecs);
+#else /* DEBUG */
+#define xfs_validate_extents(ep, nrecs)
+#endif /* DEBUG */		     
+
 /*
  * This routine is called to map an inode number within a file
  * system to the buffer containing the on-disk version of the
@@ -208,7 +217,9 @@ xfs_iformat(
 			ip->i_bytes = size;
 			ip->i_real_bytes = real_size;
 			if (size) {
-				bcopy(&dip->di_u.di_bmx, ip->i_u1.iu_extents, size); 
+				xfs_validate_extents(dip->di_u.di_bmx, nex);
+				bcopy(dip->di_u.di_bmx, ip->i_u1.iu_extents,
+				      size);
 				xfs_bmap_trace_exlist("xfs_iformat", ip, nex);
 			}
 			ip->i_flags |= XFS_IEXTENTS;
@@ -621,6 +632,8 @@ xfs_itruncate_finish(
 		(void) xfs_bmap_finish(tp, &free_list, first_block, 0);
 		xfs_trans_commit(*tp, 0);
 		*tp = ntp;
+		xfs_trans_reserve(ntp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
+				  XFS_TRANS_PERM_LOG_RES);
 
 		/*
 		 * Add the inode being truncated to the next chained
@@ -1165,6 +1178,26 @@ xfs_iunpin_wait(
 }
 
 
+#ifdef DEBUG
+/*
+ * Make sure that the extents in the given memory buffer
+ * are valid.
+ */
+STATIC void
+xfs_validate_extents(
+	xfs_bmbt_rec_t	*ep,
+	int		nrecs)
+{
+	xfs_bmbt_irec_t	irec;
+	int		i;
+
+	for (i = 0; i < nrecs; i++) {
+		xfs_bmbt_get_all(ep, &irec);
+		ep++;
+	}
+}
+#endif /* DEBUG */
+
 /*
  * xfs_iextents_copy()
  *
@@ -1194,6 +1227,7 @@ xfs_iextents_copy(
 
 	mp = ip->i_mount;
 	nrecs = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+	xfs_bmap_trace_exlist("xfs_iflush", ip, nrecs);
 	ASSERT(nrecs > 0);
 	if (nrecs == ip->i_d.di_nextents) {
 		/*
@@ -1204,7 +1238,7 @@ xfs_iextents_copy(
 		ASSERT(ip->i_bytes ==
 		       (ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t)));
 		bcopy(ip->i_u1.iu_extents, buffer, ip->i_bytes);
-
+		xfs_validate_extents((xfs_bmbt_rec_t*)buffer, nrecs);
 		return ip->i_bytes;
 	}
 
@@ -1234,7 +1268,9 @@ xfs_iextents_copy(
 		copied++;
 	}
 	ASSERT(copied != 0);
+	ASSERT(copied == ip->i_d.di_nextents);
 	ASSERT((copied * sizeof(xfs_bmbt_rec_t)) <= XFS_LITINO(mp));
+	xfs_validate_extents((xfs_bmbt_rec_t*)buffer, copied);
 
 	return (copied * sizeof(xfs_bmbt_rec_t));
 }		  
