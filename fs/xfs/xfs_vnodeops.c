@@ -1,4 +1,4 @@
-#ident "$Revision: 1.367 $"
+#ident "$Revision: 1.368 $"
 
 
 #ifdef SIM
@@ -1739,18 +1739,19 @@ xfs_inactive_symlink_rmt(
 	xfs_inode_t	*ip,
 	xfs_trans_t	**tpp)
 {
-	xfs_trans_t	*tp, *ntp;
-	xfs_fsblock_t	first_block;
-	xfs_bmap_free_t	free_list;
-	xfs_bmbt_irec_t	mval[SYMLINK_MAPS];
-	int		nmaps;
-	int		i;
-	int		size;
 	buf_t		*bp;
-	int		error;
 	int		committed;
 	int		done;
+	int		error;
+	xfs_fsblock_t	first_block;
+	xfs_bmap_free_t	free_list;
+	int		i;
 	xfs_mount_t	*mp;
+	xfs_bmbt_irec_t	mval[SYMLINK_MAPS];
+	int		nmaps;
+	xfs_trans_t	*ntp;
+	int		size;
+	xfs_trans_t	*tp;
 
 	tp = *tpp;
 	mp = ip->i_mount;
@@ -1762,116 +1763,127 @@ xfs_inactive_symlink_rmt(
 	 * either 1 or 2 extents and that we can
 	 * free them all in one bunmapi call.
 	 */
-	ASSERT((ip->i_d.di_nextents > 0) &&
-	       (ip->i_d.di_nextents <= 2));
-	error = xfs_trans_reserve(tp, 0,
-				  XFS_ITRUNCATE_LOG_RES(mp),
-				  0, XFS_TRANS_PERM_LOG_RES,
-				  XFS_ITRUNCATE_LOG_COUNT);
-	if (error) {
+	ASSERT(ip->i_d.di_nextents > 0 && ip->i_d.di_nextents <= 2);
+	if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_ITRUNCATE_LOG_COUNT)) {
+#pragma mips_frequency_hint NEVER
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		xfs_trans_cancel(tp, 0);
 		*tpp = NULL;
-		return (error);
+		return error;
 	}
-	
+	/*
+	 * Lock the inode, fix the size, and join it to the transaction.
+	 * Hold it so in the normal path, we still have it locked for
+	 * the second transaction.  In the error paths we need it 
+	 * held so the cancel won't rele it, see below.
+	 */
 	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	size = (int)ip->i_d.di_size;
 	ip->i_d.di_size = 0;
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 	xfs_trans_ihold(tp, ip);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-	
+	/*
+	 * Find the block(s) so we can inval and unmap them.
+	 */
 	done = 0;
 	XFS_BMAP_INIT(&free_list, &first_block);
 	nmaps = sizeof(mval) / sizeof(mval[0]);
-	error = xfs_bmapi(tp, ip, 0,
-			  XFS_B_TO_FSB(mp, size),
-			  XFS_BMAPI_METADATA, &first_block, 0,
-			  mval, &nmaps, &free_list);
-	if (error) 
+	if (error = xfs_bmapi(tp, ip, 0, XFS_B_TO_FSB(mp, size),
+			XFS_BMAPI_METADATA, &first_block, 0, mval, &nmaps,
+			&free_list))
 		goto error0;
-		
+	/*
+	 * Invalidate the block(s).
+	 */
 	for (i = 0; i < nmaps; i++) {
 		bp = xfs_trans_get_buf(tp, mp->m_ddev_targp,
-				       XFS_FSB_TO_DADDR(mp,
-							mval[i].br_startblock),
-				       XFS_FSB_TO_BB(mp,
-						     mval[i].br_blockcount), 0);
+			XFS_FSB_TO_DADDR(mp, mval[i].br_startblock),
+			XFS_FSB_TO_BB(mp, mval[i].br_blockcount), 0);
 		xfs_trans_binval(tp, bp);
 	}
-	error = xfs_bunmapi(tp, ip, 0, size,
-			    XFS_BMAPI_METADATA, nmaps,
-			    &first_block, &free_list,
-			    &done);
-	if (error) 
-		goto error1;
-
-	ASSERT(done);
-
-	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	/*
-	 * We don't have the inode added to the new transaction.
-	 * So trans_cancel won't do the unlocking for us.
+	 * Unmap the dead block(s) to the free_list.
 	 */
-	if (error) {
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-		goto error0;
-	}
-
-	if (committed) {
-		/*
-		 * The first xact was committed,
-		 * so add the inode to the new one.
-		 * Mark it dirty so it will be logged
-		 * and moved forward in the log as
-		 * part of every commit.
-		 */
-		xfs_trans_ijoin(tp, ip,
-				XFS_ILOCK_EXCL |
-				XFS_IOLOCK_EXCL);
-		xfs_trans_ihold(tp, ip);
-		xfs_trans_log_inode(tp, ip,
-				    XFS_ILOG_CORE);
-	}
-	
+	if (error = xfs_bunmapi(tp, ip, 0, size, XFS_BMAPI_METADATA, nmaps,
+			&first_block, &free_list, &done))
+		goto error1;
+	ASSERT(done);
+	/*
+	 * Commit the first transaction.  This logs the EFI and the inode.
+	 */
+	if (error = xfs_bmap_finish(&tp, &free_list, first_block, &committed))
+		goto error1;
+	/*
+	 * The transaction must have been committed, since there were
+	 * actually extents freed by xfs_bunmapi.  See xfs_bmap_finish.
+	 * The new tp has the extent freeing and EFDs.
+	 */
+	ASSERT(committed);
+	/*
+	 * The first xact was committed, so add the inode to the new one.
+	 * Mark it dirty so it will be logged and moved forward in the log as
+	 * part of every commit.
+	 */
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+	xfs_trans_ihold(tp, ip);
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	/*
+	 * Get a new, empty transaction to return to our caller.
+	 */
 	ntp = xfs_trans_dup(tp);
 	/*
-	 * If we get an error on the commit here,
-	 * we'll simply fall down and free the inode
-	 * using the already duped transaction.
+	 * Commit the transaction containing extent freeing and EFD's.
+	 * If we get an error on the commit here or on the reserve below,
+	 * we need to unlock the inode since the new transaction doesn't
+	 * have the inode attached.
 	 */
 	error = xfs_trans_commit(tp, 0);
 	tp = ntp;
 	if (error) {
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		goto error0;
 	}
-
-	if (ip->i_df.if_bytes) {
-		xfs_idata_realloc(ip,
-				  -(ip->i_df.if_bytes),
-				  XFS_DATA_FORK);
-	}
+	/*
+	 * Remove the memory for extent descriptions (just bookkeeping).
+	 */
+	if (ip->i_df.if_bytes)
+		xfs_idata_realloc(ip, -ip->i_df.if_bytes, XFS_DATA_FORK);
 	ASSERT(ip->i_df.if_bytes == 0);
-	error = xfs_trans_reserve(tp, 0,
-				  XFS_ITRUNCATE_LOG_RES(mp),
-				  0, XFS_TRANS_PERM_LOG_RES,
-				  XFS_ITRUNCATE_LOG_COUNT);
-	if (error) {
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+	/*
+	 * Put an itruncate log reservation in the new transaction
+	 * for our caller.
+	 */
+	if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_ITRUNCATE_LOG_COUNT)) {
+		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		goto error0;
 	}
+	/*
+	 * Return with the inode locked but not joined to the transaction.
+	 */
 	*tpp = tp;
-	return (0);
+	return 0;
 
  error1:
 	xfs_bmap_cancel(&free_list);
  error0:
-	xfs_trans_cancel(tp, (XFS_TRANS_RELEASE_LOG_RES |
-			      XFS_TRANS_ABORT));
+#pragma mips_frequency_hint NEVER
+	/*
+	 * Have to come here with the inode locked and either
+	 * (held and in the transaction) or (not in the transaction).
+	 * If the inode isn't held then cancel would iput it, but
+	 * that's wrong since this is inactive and the vnode ref
+	 * count is 0 already.
+	 * Cancel won't do anything to the inode if held, but it still
+	 * needs to be locked until the cancel is done, if it was
+	 * joined to the transaction.
+	 */
+	xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES | XFS_TRANS_ABORT);
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
 	*tpp = NULL;
-	return (error);
+	return error;
 
 }
 
@@ -4180,7 +4192,7 @@ xfs_mkdir(
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks, 1, 0)) {
-			error = EDQUOT;
+			error = XFS_ERROR(EDQUOT);
 			goto error_return;
 		}
 	} 
@@ -4824,7 +4836,7 @@ xfs_symlink(
 	 */
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (xfs_trans_reserve_quota(tp, udqp, pdqp, resblks, 1, 0)) {
-			error = EDQUOT;
+			error = XFS_ERROR(EDQUOT);
 			goto error_return;
 		}
 	}
