@@ -249,7 +249,7 @@ xfs_trans_next_ail(xfs_mount_t		*mp,
 			*gen = (int)mp->m_ail_gen;
 		}
 		if (restarts != NULL) {
-			*restarts++;
+			(*restarts)++;
 		}
 	}
 
