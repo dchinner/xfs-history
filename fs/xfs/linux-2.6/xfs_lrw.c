@@ -219,7 +219,7 @@ xfs_read(
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offset, size,
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, BHV_TO_VNODE(bdp), *offset, size,
 				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
 			if (!(ioflags & IO_ISLOCKED))
@@ -623,7 +623,7 @@ start:
 		loff_t		savedsize = *offset;
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
-		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, bdp,
+		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, vp,
 				      *offset, size,
 				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
