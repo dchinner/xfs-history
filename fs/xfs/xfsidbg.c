@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.90 $"
+#ident	"$Revision: 1.91 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3785,12 +3785,13 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_io_size);
 	qprintf("last_req_sz 0x%x new_size %llx\n",
 		ip->i_last_req_sz, ip->i_new_size);
-	qprintf("write off %llx gap list 0x%x ",
+	qprintf("write off %llx gap list 0x%x\n",
 		ip->i_write_offset, ip->i_gap_list);
 	qprintf(
-	"readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u\n",
+"readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
 		(unsigned int) ip->i_readio_log, ip->i_readio_blocks,
-		(unsigned int) ip->i_writeio_log, ip->i_writeio_blocks);
+		(unsigned int) ip->i_writeio_log, ip->i_writeio_blocks,
+		(unsigned int) ip->i_max_io_log);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
 	qprintf("update_core 0x%x\n", (int)(ip->i_update_core));
