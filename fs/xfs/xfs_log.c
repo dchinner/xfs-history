@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.104 $"
+#ident	"$Revision: 1.105 $"
 
 /*
  * High level interface routines for log manager
@@ -719,10 +719,26 @@ STATIC void
 xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			   xlog_t	*log)
 {
-	uint buf_size;
+	uint bs;					/* buffer size */
 
-	log->l_iclog_bufs = XLOG_NUM_ICLOGS;
+	if (mp->m_logbufs == 0) {			/* turn off log */
+		xlog_debug = 0;
+		xlog_devt = log->l_dev;			/* don't log this dev */
+		log->l_iclog_bufs = XLOG_NUM_ICLOGS;
+	} else {
+		if (mp->m_logbufs == -1) {		/* = -1 for default */
+			log->l_iclog_bufs = XLOG_NUM_ICLOGS;
+		} else {
+			log->l_iclog_bufs = mp->m_logbufs;
+		}
+		/* We are reactivating a filesystem after it was active */
+		if (log->l_dev == xlog_devt) {
+			xlog_devt = 1;
+			xlog_debug = 1;
+		}
+	}
 	if (physmem <= btoc(16*1024*1024)) {
+		/* Don't change; min configuration */
 		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 16k */
 		log->l_iclog_size_log = XLOG_RECORD_BSHIFT;
 	} else {
@@ -736,16 +752,18 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	 */
 	ASSERT(XLOG_MAX_RECORD_BSIZE == 32*1024);
 
-	if (mp->m_sb.sb_blocksize == XLOG_MAX_RECORD_BSIZE) {		/* 32k */
+	if (mp->m_sb.sb_blocksize == XLOG_MAX_RECORD_BSIZE) {	       /* 32k */
 		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
 		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
-		log->l_iclog_bufs = XLOG_NUM_ICLOGS*2;			/* 4 */
-	} else if (mp->m_sb.sb_blocksize > XLOG_MAX_RECORD_BSIZE) {	/* 64k */
+		if (mp->m_logbufs == -1)
+			log->l_iclog_bufs *= 2;				/* 4 */
+	} else if (mp->m_sb.sb_blocksize > XLOG_MAX_RECORD_BSIZE) {    /* 64k */
 		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
 		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
-		log->l_iclog_bufs = XLOG_MAX_ICLOGS;			/* 8 */
+		if (mp->m_logbufs == -1)
+			log->l_iclog_bufs  *= 4;			/* 8 */
 	}
-	if (xlogs != 0) {
+	if (xlogs != 0) {				/* debug code */
 		log->l_iclog_bufs = xlogs;
 		log->l_iclog_size = xlogsize;
 		log->l_iclog_size_log = xloglog;
@@ -1603,7 +1621,7 @@ xlog_grant_log_space(xlog_t	   *log,
 
 #ifdef DEBUG
 	if (log->l_flags & XLOG_ACTIVE_RECOVERY)
-		panic("regrant Recovery problem");
+		panic("grant Recovery problem");
 #endif
 
 	/* Is there space or do we need to sleep? */
