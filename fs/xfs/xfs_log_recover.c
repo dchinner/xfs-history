@@ -3437,7 +3437,7 @@ xlog_recover_check_summary(xlog_t	*log)
 		agfp = XFS_BUF_TO_AGF(agfbp);
 		ASSERT(INT_GET(agfp->agf_magicnum, arch) == XFS_AGF_MAGIC);
 		ASSERT(XFS_AGF_GOOD_VERSION(INT_GET(agfp->agf_versionnum, arch)));
-		ASSERT(INT_GET(agfp->agf_seqno, arch)) == agno);
+		ASSERT(INT_GET(agfp->agf_seqno, arch) == agno);
 
 		freeblks += INT_GET(agfp->agf_freeblks, arch) +
 			    INT_GET(agfp->agf_flcount, arch);
