@@ -70,7 +70,6 @@ XFS_OBJS  :=   xfs_alloc.o \
 		xfsrtstubs.o \
 		macstubs.o \
 		oplockstubs.o
-#                xfs_rpc_item.o
  
 FS_LINKS = xfs_alloc xfs_macros xfs_types xfs_inum xfs_log \
            xfs_ag xfs_sb xfs_trans xfs_dir xfs_dir2 xfs_mount \
@@ -81,7 +80,7 @@ FS_LINKS = xfs_alloc xfs_macros xfs_types xfs_inum xfs_log \
            xfs_trans_priv xfs_bit xfs_quota xfs_dqblk xfs_dquot_item \
            xfs_dquot xfs_qm xfs_rw xfs_btree xfs_bmap xfs_rtalloc xfs_da_btree \
            xfs_dir_leaf xfs_fsops xfs_attr_leaf xfs_dir2_data xfs_dir2_leaf \
-           xfs_dir2_block xfs_dir2_node
+           xfs_dir2_block xfs_dir2_node xfs_buf
 
 #O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS) linux/linux_xfs.o libgcc.a
 O_OBJS :=  $(XFS_OBJS) linux/linux_xfs.o libgcc.a
