@@ -11,6 +11,7 @@
 #include <sys/cred.h>
 #include <sys/sysmacros.h>
 #include <sys/pfdat.h>
+#include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif

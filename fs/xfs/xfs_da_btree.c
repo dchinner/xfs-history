@@ -14,6 +14,33 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
+#ifdef SIM
+#define _KERNEL
+#endif
+#include <sys/grio.h>
+#ifdef SIM
+#undef _KERNEL
+#endif
+#include "xfs_log.h"
+#include "xfs_trans.h"
+#include "xfs_sb.h"
+#include "xfs_mount.h"
+#include "xfs_alloc_btree.h"
+#include "xfs_bmap_btree.h"
+#include "xfs_bmap.h"
+#include "xfs_btree.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
+#include "xfs_dir.h"
+#include "xfs_dir_btree.h"
+#ifdef SIM
+#include "sim.h"
+#endif
+
+/*
+ * xfs_dir_btree.c
+ *
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"

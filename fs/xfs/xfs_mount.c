@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision: 1.26 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -8,6 +8,7 @@
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -24,7 +25,6 @@
 #include <stddef.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include <sys/grio.h>
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"

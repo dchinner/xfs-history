@@ -9,6 +9,7 @@
 #define _KERNEL
 #endif
 #include <sys/buf.h>
+#include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -25,7 +26,6 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include <sys/grio.h>
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"

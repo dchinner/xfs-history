@@ -12,6 +12,7 @@
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
 #include <sys/cred.h>
+#include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -41,7 +42,6 @@
 #include <sys/mode.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
-#include <sys/grio.h>
 #include <sys/var.h>
 #include <string.h>
 #include "xfs_types.h"

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.44 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -14,7 +14,13 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include <sys/grio.h>
+#ifdef SIM
+#define _KERNEL
+#endif
+#include "sys/grio.h"
+#ifdef SIM
+#undef _KERNEL
+#endif
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
