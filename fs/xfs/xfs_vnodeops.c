@@ -1,4 +1,4 @@
-#ident "$Revision: 1.403 $"
+#ident "$Revision: 1.404 $"
 
 
 #ifdef SIM
@@ -2882,8 +2882,11 @@ xfs_create_new(
 	 * Propogate the fact that the vnode changed after the 
 	 * xfs_inode locks have been released. 
 	 */
-	if ((inode_change == B_TRUE)&&cell_enabled)
-		VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
+	if (cell_enabled) {
+#pragma mips_frequency_hint NEVER
+		if (inode_change == B_TRUE) 
+			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
+	}
 #endif	/* CELL_CAPABLE */
 
         /*

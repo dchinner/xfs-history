@@ -824,6 +824,7 @@ xfs_fd_to_mp(
 	if (!bdp) {
 #if CELL_CAPABLE
 		if (cell_enabled && (rperm == 0)) {
+#pragma mips_frequency_hint NEVER
 			*mpp = get_cxfs_mountp(vfsp);
 			if (*mpp)
 				return 0;
