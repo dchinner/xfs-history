@@ -1,4 +1,4 @@
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.25 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -1250,8 +1250,8 @@ xfs_qm_dqflush(
 	
 	if (xfs_qm_dqcheck(&dqp->q_core, ddqp->d_id, 0, XFS_QMOPT_DOWARN, 
 			   "dqflush (incore copy)")) {
-		cmn_err(CE_PANIC, "XFS: Can't flush invalid dquot");
-		/* NOTREACHED */
+		xfs_force_shutdown(dqp->q_mount, XFS_CORRUPT_INCORE);
+		return XFS_ERROR(EIO);
 	}
 
 	/* This is the only portion of data that needs to persist */

@@ -1,9 +1,10 @@
-#ident "$Revision: 1.11 $"
+#ident "$Revision: 1.12 $"
 
 #ifdef SIM
 #define	_KERNEL 1
 #endif
 #include "sys/types.h"
+#include "sys/uuid.h"
 #include <sys/vfs.h>
 #ifdef SIM
 #undef _KERNEL
@@ -20,12 +21,18 @@
 #include "sys/kmem.h"
 #endif
 #include "sys/cmn_err.h"
+#include "xfs_types.h"
+#include "xfs_inum.h"
+#include "xfs_log.h"
+#include "xfs_cxfs.h"
+#include "xfs_sb.h"
+#include "xfs_trans.h"
+#include "xfs_mount.h"
 #include "xfs_error.h"
 
 #ifdef DEBUG
 int	xfs_etrap[XFS_ERROR_NTRAP] = { 0 }; /* We used to trap { EIO } */
 
-extern int xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid);
 
 int
 xfs_error_trap(int e)
@@ -57,6 +64,7 @@ xfs_error_trap(int e)
 int	xfs_etest[XFS_NUM_INJECT_ERROR];
 int64_t	xfs_etest_fsid[XFS_NUM_INJECT_ERROR];
 char *	xfs_etest_fsname[XFS_NUM_INJECT_ERROR];
+extern int xfs_get_fsinfo(int fd, char **fsname, int64_t *fsid);
 
 void
 xfs_error_test_init(void)
@@ -195,9 +203,25 @@ xfs_errortag_clearall(int fd)
 }
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
+void
+xfs_fs_cmn_err(int level, xfs_mount_t *mp, char *fmt, ...)
+{
+	va_list ap;
+	char	*newfmt;
+	int	len = 16 + mp->m_fsname_len + strlen(fmt);
+
+	newfmt = kmem_alloc(len, KM_SLEEP);
+	sprintf(newfmt, "Filesystem \"%s\": %s", mp->m_fsname, fmt);
+	va_start(ap, fmt);
+	icmn_err(level, newfmt, ap);
+	va_end(ap);
+	kmem_free(newfmt, len);
+}
+
+
 #ifndef SIM
 void
-xfs_cmn_err(uint64_t panic_tag, int level, char *fmt, ...)
+xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 {
 	va_list ap;
 
@@ -209,8 +233,9 @@ xfs_cmn_err(uint64_t panic_tag, int level, char *fmt, ...)
 			"Transforming an alert into a panic.");
 	}
 
+
 	va_start(ap, fmt);
-	icmn_err(level, fmt, ap);
+	xfs_fs_cmn_err(level, mp, fmt, ap);
 	va_end(ap);
 }
 #endif
