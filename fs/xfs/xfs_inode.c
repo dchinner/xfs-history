@@ -207,11 +207,11 @@ xfs_inobp_check(
 	for (i = 0; i < j; i++) {
 		dip = (xfs_dinode_t *)((char *)XFS_BUF_PTR(bp) +
 				       (i * mp->m_sb.sb_inodesize));
-		if (INT_ISZERO(dip->di_next_unlinked, arch))  {
+		if (INT_ISZERO(dip->di_next_unlinked, ARCH_UNKNOWN))  {
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"Detected a bogus zero next_unlinked field in incore inode buffer 0x%p.  About to pop an ASSERT.",
 				bp);
-			ASSERT(dip->di_next_unlinked != 0);
+			ASSERT(!INT_ISZERO(dip->di_next_unlinked, ARCH_UNKNOWN));
 		}
 	}
 }
@@ -1932,9 +1932,10 @@ xfs_iunlink(
 		if (error) {
 			return error;
 		}
-		ASSERT(dip->di_next_unlinked == NULLAGINO);
-		ASSERT(dip->di_next_unlinked != 0);
-		dip->di_next_unlinked = INT_GET(agi->agi_unlinked[bucket_index], arch);
+		ASSERT(INT_GET(dip->di_next_unlinked, arch) == NULLAGINO);
+		ASSERT(!INT_ISZERO(dip->di_next_unlinked, arch));
+		INT_SET(dip->di_next_unlinked, arch, 
+                        INT_GET(agi->agi_unlinked[bucket_index], arch));
 		offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
 			offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_inode_buf(tp, ibp);
@@ -2034,10 +2035,10 @@ xfs_iunlink_remove(
 		if (error) {
 			return error;
 		}
-		next_agino = dip->di_next_unlinked;
+		next_agino = INT_GET(dip->di_next_unlinked, arch);
 		ASSERT(next_agino != 0);
 		if (next_agino != NULLAGINO) {
-			dip->di_next_unlinked = NULLAGINO;
+			INT_SET(dip->di_next_unlinked, arch, NULLAGINO);
 			offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_inode_buf(tp, ibp);
@@ -2078,7 +2079,7 @@ xfs_iunlink_remove(
 			if (error) {
 				return error;
 			}
-			next_agino = last_dip->di_next_unlinked;
+			next_agino = INT_GET(last_dip->di_next_unlinked, arch);
 			ASSERT(next_agino != NULLAGINO);
 			ASSERT(next_agino != 0);
 		}
@@ -2090,11 +2091,11 @@ xfs_iunlink_remove(
 		if (error) {
 			return error;
 		}
-		next_agino = dip->di_next_unlinked;
+		next_agino = INT_GET(dip->di_next_unlinked, arch);
 		ASSERT(next_agino != 0);
 		ASSERT(next_agino != agino);
 		if (next_agino != NULLAGINO) {
-			dip->di_next_unlinked = NULLAGINO;
+			INT_SET(dip->di_next_unlinked, arch, NULLAGINO);
 			offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_inode_buf(tp, ibp);
@@ -2107,7 +2108,7 @@ xfs_iunlink_remove(
 		/*
 		 * Point the previous inode on the list to the next inode.
 		 */
-		last_dip->di_next_unlinked = next_agino;
+		INT_SET(last_dip->di_next_unlinked, arch, next_agino);
 		ASSERT(next_agino != 0);
 		offset = ((char *)last_dip -
 			  (char *)(XFS_BUF_PTR(last_ibp))) +

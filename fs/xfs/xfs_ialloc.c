@@ -381,7 +381,7 @@ xfs_ialloc_ag_alloc(
 		for (i = 0; i < ninodes; i++) {
 			free = XFS_MAKE_IPTR(args.mp, fbuf, i);
                         bcopy (&dic, &(free->di_core), sizeof(xfs_dinode_core_t));
-		        free->di_next_unlinked=NULLAGINO;
+		        INT_SET(free->di_next_unlinked, arch, NULLAGINO);
 			xfs_ialloc_log_di(tp, fbuf, i,
 				XFS_DI_CORE_BITS | XFS_DI_NEXT_UNLINKED);
 		}
