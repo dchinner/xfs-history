@@ -51,6 +51,7 @@ typedef struct xfs_inode {
 	xfs_trans_t		*i_transp;	/* ptr to owning transaction */
 	xfs_inode_log_item_t	i_item;		/* logging information */
 	mrlock_t		i_lock;		/* inode lock */
+	mrlock_t		i_iolock;	/* inode IO lock */
 	sema_t			i_flock;	/* inode flush lock */
 	unsigned int		i_pincount;	/* inode pin count */
 	sema_t			i_pinsema;	/* inode pin sema */
@@ -98,10 +99,12 @@ typedef struct xfs_inode {
 #define	XFS_IBROOT	0x0004	/* i_broot points to the bmap b-tree root */
 
 /*
- * Flags for iget.
+ * Flags for inode locking.
  */
-#define	XFS_ILOCK_EXCL		MR_UPDATE
-#define	XFS_ILOCK_SHARED	MR_ACCESS
+#define	XFS_IOLOCK_EXCL		0x1
+#define	XFS_IOLOCK_SHARED	0x2
+#define	XFS_ILOCK_EXCL		0x4
+#define	XFS_ILOCK_SHARED	0x8
 
 /*
  * Maximum number of extent pointers in i_u1.iu_extents.
@@ -124,10 +127,10 @@ extern void		xfs_ihash_init(xfs_mount_t *);
 extern xfs_inode_t	*xfs_inode_incore(xfs_mount_t *, xfs_ino_t,
 					  xfs_trans_t *);
 extern xfs_inode_t	*xfs_iget(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,uint);
-extern void		xfs_iput(xfs_inode_t *);
-extern void		xfs_ilock(xfs_inode_t *, int);
-extern int		xfs_ilock_nowait(xfs_inode_t *, int);
-extern void		xfs_iunlock(xfs_inode_t *);
+extern void		xfs_iput(xfs_inode_t *, uint);
+extern void		xfs_ilock(xfs_inode_t *, uint);
+extern int		xfs_ilock_nowait(xfs_inode_t *, uint);
+extern void		xfs_iunlock(xfs_inode_t *, uint);
 extern void		xfs_iflock(xfs_inode_t *);
 extern int		xfs_iflock_nowait(xfs_inode_t *);
 extern void		xfs_ifunlock(xfs_inode_t *);
