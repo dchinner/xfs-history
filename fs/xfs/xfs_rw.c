@@ -1,4 +1,4 @@
-#ident "$Revision: 1.258 $"
+#ident "$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1147,7 +1147,8 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	*pboff = *pbsize = -1;
 	error = 0;
 
-	xfs_rwlockf(bdp, VRWLOCK_READ, 0);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_rwlockf(bdp, VRWLOCK_READ, 0);
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
 		error = XFS_ERROR(EIO);
@@ -1226,7 +1227,8 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 
 	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 out:
-	xfs_rwunlockf(bdp, VRWLOCK_READ, 0);
+	if (!(ioflags & IO_ISLOCKED))
+		xfs_rwunlockf(bdp, VRWLOCK_READ, 0);
 	return XFS_ERROR(error);
 }
 
