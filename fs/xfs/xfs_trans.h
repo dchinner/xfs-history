@@ -252,9 +252,9 @@ typedef struct xfs_trans {
 #define XFS_DEFAULT_LOG_RES(mp)		XFS_FSB_TO_B(mp, 64)
 #define	XFS_ITRUNCATE_LOG_RES(mp)	XFS_FSB_TO_B(mp, 64)
 #define	XFS_IALLOC_LOG_RES(mp)		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp))
-#define	XFS_REMOVE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 10)
-#define	XFS_LINK_LOG_RES(mp)		XFS_FSB_TO_B(mp, 10)
-#define	XFS_RENAME_LOG_RES(mp)		XFS_FSB_TO_B(mp, 10)
+#define	XFS_REMOVE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 20)
+#define	XFS_LINK_LOG_RES(mp)		XFS_FSB_TO_B(mp, 20)
+#define	XFS_RENAME_LOG_RES(mp)		XFS_FSB_TO_B(mp, 20)
 #define	XFS_SYMLINK_LOG_RES(mp)		\
 		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp) + 12)
      
@@ -264,7 +264,7 @@ typedef struct xfs_trans {
      
 #define	XFS_MKDIR_LOG_RES(mp)		\
 		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp) + 10)
-#define	XFS_IFREE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 5)
+#define	XFS_IFREE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 10)
 #define	XFS_IUI_LOG_RES(mp)		512     
 
 
