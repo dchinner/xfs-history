@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.82 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -347,6 +347,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	caddr_t lockaddr;
 	int locklen = 0, alignment, retval, is32;
 	xfs_dir_put_t put;
+	int error;
 
 	XFSSTATS.xs_dir_getdents++;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
@@ -368,13 +369,11 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 			locklen = 0;
 			put = xfs_dir_put_dirent64_direct;
 		} else {
-			if (useracc(uio->uio_iov[0].iov_base,
+			if (error = useracc(uio->uio_iov[0].iov_base,
 				    uio->uio_iov[0].iov_len,
-				    (B_READ|B_PHYS)) == 0) {
+				    (B_READ|B_PHYS), NULL)) {
 				*eofp = 0;
-				return (curthreadp->k_error ?
-					curthreadp->k_error :
-					XFS_ERROR(EFAULT));
+				return (XFS_ERROR(error));
 			}
 			lockaddr = uio->uio_iov[0].iov_base;
 			locklen = uio->uio_iov[0].iov_len;
