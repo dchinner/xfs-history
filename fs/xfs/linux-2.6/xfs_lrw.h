@@ -50,15 +50,13 @@ extern ssize_t xfs_read (
          struct bhv_desc        *bdp,
          struct uio             *uiop,
          int                    ioflag,
-         struct cred            *credp,
-         struct flid            *fl);
+         struct cred            *credp);
 
 extern ssize_t xfs_write (
          struct bhv_desc        *bdp,
          struct uio             *uiop,
          int                    ioflag,
-         struct cred            *credp,
-         struct flid            *fl);
+         struct cred            *credp);
 
 extern int xfs_recover_read_only (xlog_t *);
 extern int xfs_quotacheck_read_only (xfs_mount_t *);

@@ -61,7 +61,7 @@ linvfs_read(
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, size);
         
-	VOP_READ(vp, &uio, 0, NULL, NULL, err);
+	VOP_READ(vp, &uio, 0, NULL, err);
         *offset = uio.uio_offset;
         
 	/*
@@ -196,7 +196,7 @@ linvfs_write(
 	uio.uio_iov->iov_base = (void *)buf;
 	uio.uio_iov->iov_len = uio.uio_resid = count;
         
-	VOP_WRITE(vp, &uio, file->f_flags, NULL, NULL, err);
+	VOP_WRITE(vp, &uio, file->f_flags, NULL, err);
 	/* xfs_write returns positive errors */
 	err = -err;	/* if it's 0 this is harmless */
 	*ppos = pos = uio.uio_offset;

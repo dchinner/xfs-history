@@ -73,8 +73,7 @@ xfs_read(
         bhv_desc_t      *bdp,
         uio_t           *uiop,
         int             ioflag,
-        cred_t          *credp,
-        flid_t          *fl)
+        cred_t          *credp)
 {
 	ssize_t		ret;
 	int		error = 0;
@@ -446,8 +445,7 @@ xfs_write(
         bhv_desc_t      *bdp,
         uio_t           *uiop,
         int             ioflags,
-        cred_t          *credp,
-        flid_t          *fl)
+        cred_t          *credp)
 {
 	xfs_inode_t	*xip;
 	struct file	*filp = uiop->uio_fp;

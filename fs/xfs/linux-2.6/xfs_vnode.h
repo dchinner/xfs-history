@@ -176,10 +176,8 @@ struct attrlist_cursor_kern;
 
 typedef	int	(*vop_open_t)(bhv_desc_t *, vnode_t **, mode_t, struct cred *);
 typedef	int	(*vop_close_t)(bhv_desc_t *, int, lastclose_t, struct cred *);
-typedef	ssize_t	(*vop_read_t)(bhv_desc_t *, struct uio *, int, struct cred *,
-                                struct flid *);
-typedef	ssize_t	(*vop_write_t)(bhv_desc_t *, struct uio *, int, struct cred *,
-                                struct flid *);
+typedef	ssize_t	(*vop_read_t)(bhv_desc_t *, struct uio *, int, struct cred *);
+typedef	ssize_t	(*vop_write_t)(bhv_desc_t *, struct uio *, int, struct cred *);
 typedef	int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 typedef	int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
@@ -293,16 +291,16 @@ typedef struct vnodeops {
  * original vnode and VOP_OPEN semantic allows the new vnode to be returned
  * in vpp. The practice of passing &vp for vpp just doesn't work.
  */
-#define VOP_READ(vp,uiop,iof,cr,fl,rv) 				        \
+#define VOP_READ(vp,uiop,iof,cr,rv) 				        \
 {       								\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-        rv = _VOP_(vop_read, vp)((vp)->v_fbhv,uiop,iof,cr,fl);	        \
+        rv = _VOP_(vop_read, vp)((vp)->v_fbhv,uiop,iof,cr);	        \
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define	VOP_WRITE(vp,uiop,iof,cr,fl,rv) 				\
+#define	VOP_WRITE(vp,uiop,iof,cr,rv)	 				\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,uiop,iof,cr,fl);	        \
+	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,uiop,iof,cr);	        \
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define	VOP_BMAP(vp,of,sz,rw,cr,b,n,rv) 				\
