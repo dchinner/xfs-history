@@ -7,6 +7,9 @@
  * Freespace on-disk structures
  */
 
+struct xfs_btree_sblock_t;
+struct xfs_btree_cur;
+
 /*
  * There are two on-disk btrees, one sorted by blockno and one sorted
  * by blockcount and blockno.  All blocks look the same to make the code
@@ -25,6 +28,8 @@ typedef struct xfs_alloc_rec
 } xfs_alloc_rec_t, xfs_alloc_key_t;
 
 typedef xfs_agblock_t xfs_alloc_ptr_t;	/* btree pointer type */
+					/* btree block header type */
+typedef	struct xfs_btree_sblock xfs_alloc_block_t;
 
 /*
  * Real block structures have a size equal to the disk block size.
@@ -67,8 +72,6 @@ typedef xfs_agblock_t xfs_alloc_ptr_t;	/* btree pointer type */
 #define	XFS_ALLOC_PTR_ADDR(bb,i,cur)	\
 	XFS_BTREE_PTR_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
 			   xfs_alloc, bb, i)
-
-struct xfs_btree_cur;
 
 /*
  * Prototypes for externally visible routines.

@@ -1406,9 +1406,8 @@ xfs_bmap_del_extent(
 	xfs_bmbt_get_all(ep, got);
 	del_endoff = del->br_startoff + del->br_blockcount;
 	got_endoff = got.br_startoff + got.br_blockcount;
-	ASSERT(ISNULLSTARTBLOCK(del->br_startblock) ==
-	       ISNULLSTARTBLOCK(got.br_startblock));
 	delay = ISNULLSTARTBLOCK(got.br_startblock);
+	ASSERT(ISNULLSTARTBLOCK(del->br_startblock) == delay);
 	flags = 0;
 	/*
 	 * If deleting a real allocation, must free up the disk space.
@@ -1429,6 +1428,7 @@ xfs_bmap_del_extent(
 		/*
 		 * Ordinary allocation.  Add it to list of extents to be
 		 * freed at the end of the transaction, and update di_nblocks.
+		 */
 		else {
 			xfs_bmap_add_free(del->br_startblock,
 				del->br_blockcount, flist);
