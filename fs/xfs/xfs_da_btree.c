@@ -1047,8 +1047,8 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 #ifndef SIM
 		} else if (current->magic == XFS_ATTR_LEAF_MAGIC) {
 			blk->hashval = xfs_attr_leaf_lasthash(blk->bp, NULL);
-#endif
 			break;
+#endif
 		} else if (current->magic == XFS_DIR_LEAF_MAGIC) {
 			blk->hashval = xfs_dir_leaf_lasthash(blk->bp, NULL);
 			break;
