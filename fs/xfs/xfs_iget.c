@@ -396,7 +396,7 @@ finish_inode:
 			mutex_spinunlock(&ch->ch_lock, s);
 			ASSERT(xfs_chashlist_zone != NULL);
 			chlnew = (xfs_chashlist_t *)
-					kmem_zone_zalloc(xfs_chashlist_zone,
+					kmem_zone_alloc(xfs_chashlist_zone,
 						KM_SLEEP);
 			ASSERT(chlnew != NULL);
 			goto chlredo;
