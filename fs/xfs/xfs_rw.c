@@ -1153,7 +1153,7 @@ xfs_read(
 	int		error;
 	xfs_mount_t	*mp;
 	size_t		resid;
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	ip = XFS_VTOI(vp);
 	type = ip->i_d.di_mode & IFMT;
@@ -2312,7 +2312,7 @@ xfs_write(
 	int		resid;
 	off_t		savedsize;
 	xfs_fsize_t	limit;
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 	int		eventsent = 0;
 
 
@@ -2528,7 +2528,7 @@ xfs_bmap(
 	struct bmapval	*bmapp,
 	int		*nbmaps)
 {
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 	xfs_inode_t	*ip;
 	int		error;
 
@@ -4034,7 +4034,7 @@ xfs_strategy(
 {
 	int		s;
 	struct bdevsw	*my_bdevsw;
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	/*
 	 * If this is just a buffer whose underlying disk space

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.221 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -368,7 +368,7 @@ xfs_close(
         xfs_inode_t	*ip;
 	struct file	*fp;
 	struct ufchunk	*ufp;
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	vn_trace_entry(vp, "xfs_close");
 	ip = XFS_VTOI(vp);
@@ -435,7 +435,7 @@ xfs_getattr(
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	vn_trace_entry(vp, "xfs_getattr");
 	ip = XFS_VTOI(vp);
@@ -563,7 +563,7 @@ xfs_setattr(
 	uid_t		uid;
 	gid_t		gid;
 	int		timeflags = 0;
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	vn_trace_entry(vp, "xfs_setattr");
 	/*
@@ -981,7 +981,7 @@ xfs_access(
 {
 	xfs_inode_t	*ip;
 	int		error;
-	vnode_t *vp = PVN_TO_VN(pvp);
+	vnode_t 	*vp = PVN_TO_VN(pvp);
 
 	vn_trace_entry(vp, "xfs_access");
 	ip = XFS_VTOI(vp);
