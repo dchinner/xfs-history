@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.80 $"
+#ident	"$Revision: 1.81 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3676,11 +3676,12 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		&ip->i_iolock);
 	qprintf("udquotp 0x%x pdquotp 0x%x\n",
 		ip->i_udquot, ip->i_pdquot);
-	qprintf("&flock 0x%x (%d) pinlock 0x%x pincount 0x%x &pinsema 0x%x\n",
+	qprintf("&flock 0x%x (%d) &pinlock 0x%x pincount 0x%x &pinsema 0x%x\n",
 		&ip->i_flock, valusema(&ip->i_flock),
-		ip->i_ipinlock,
+		&ip->i_ipinlock,
 		ip->i_pincount,
 		&ip->i_pinsema);
+	qprintf("&rlock 0x%x\n", &ip->i_rlock);
 #ifdef NOTYET
 	qprintf("range lock splock 0x%x sleep 0x%x list head 0x%x\n",
 		&ip->i_range_lock.r_spinlock, &ip->i_range_lock.r_sleep,
