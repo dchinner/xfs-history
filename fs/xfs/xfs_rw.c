@@ -4091,6 +4091,19 @@ xfs_start_daemons(void)
 	int	num_pages;
 
 	num_daemons = 4;
+#ifdef _K32U64
+	/*
+	 * For small memory systems we reduce the number of daemons
+	 * to conserve memory.  For systems with less than 32 MB of
+	 * memory we go with 2 daemons, and for systems with less
+	 * than 48 MB of memory we go with 3.
+	 */
+	if (physmem < 8192) {
+		num_daemons = 2;
+	} else if (physmem < 12288) {
+		num_daemons = 3;
+	}
+#endif
 	num_pages = (int)physmem - 32768;
 	while ((num_pages > 0) && (num_daemons < 13)) {
 		num_pages -= 32768;
