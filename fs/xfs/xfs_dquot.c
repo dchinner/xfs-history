@@ -1,4 +1,4 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -416,7 +416,7 @@ xfs_qm_init_dquot_blk(
 			    XFS_BLI_PDQUOT_BUF);
 	xfs_trans_log_buf(tp, bp, 0, BBTOB(mp->QI_DQCHUNKLEN) - 1);
 
-#ifdef QUOTADEBUG	
+#if 0
 	cmn_err(CE_NOTE, "logged IDs (%d - %d), bufsz = %d\n",
 	     (int) (id - XFS_QM_ID_TO_DQOFF(mp, id)),
 	     (int) (curid - 1),
@@ -484,8 +484,6 @@ xfs_qm_dqalloc(
 	ASSERT(nmaps == 1);
 	ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
 	       (map.br_startblock != HOLESTARTBLOCK));
-
-	quotip->i_d.di_nblocks += (xfs_drfsbno_t) map.br_blockcount;
 
 	/*
 	 * Keep track of the blkno to save a lookup later
@@ -1075,9 +1073,6 @@ xfs_qm_dqget(
 	dqp->q_hash = h;
 	XQM_HASHLIST_INSERT(h, dqp);
 
-#ifdef QUOTADEBUG
-	/* XQM_LIST_PRINT(h, HL_NEXT, "@@@@@++ Hashlist @@@@@+"); */
-#endif
 	/*
 	 * Attach this dquot to this filesystem's list of all dquots,
 	 * kept inside the mount structure in m_quotainfo field
@@ -1091,12 +1086,6 @@ xfs_qm_dqget(
 	dqp->q_nrefs = 1;
 	
 	XQM_MPLIST_INSERT(&(mp->QI_MPL_LIST), dqp);
-
-#ifdef QUOTADEBUG
-	/* XQM_LIST_PRINT(&(mp->QI_MPL_LIST), MPL_NEXT, 
-		       "[after insert] ++ Mp list @@@@@+"); */
-	/* printf("#mplist = %d\n", mp->QI_MPL_LIST.qh_nelems); */
-#endif
 
 	xfs_qm_mplist_unlock(mp);
 	XFS_DQ_HASH_UNLOCK(h);
@@ -1523,46 +1512,6 @@ xfs_qm_dqpurge(
 	ASSERT(dqp->q_pincount == 0);
 	ASSERT(! (dqp->q_logitem.qli_item.li_flags & XFS_LI_IN_AIL));
 
-
-
-#if 0
-	/* THis shouldn't happen anymore... */
-	/*
-	 * If this is pinned, then wait until the log write completes
-	 * and it gets unpinned. We don't want the IOP_UNPIN code find
-	 * some dangling dquot pointers.
-	 */
-	xfs_qm_dqunpin_wait(dqp);
-	
-	/*
-	 * If we are turning off quotas, then we don't want this dquot
-	 * to be sitting on the AIL. For one, that doesn't help our
-	 * general goal of keeping the log tail moving. More important,
-	 * we can't reclaim a (dirty) dquot that's on the AIL, because
-	 * eventually dqflush will discover that it has a dangling 
-	 * dquot pointer the hard way.
-	 * XXXsup - can this happen now? dquot can never be dirty at this
-	 * point...
-	 */
-	if (dqp->q_logitem.qli_item.li_flags & XFS_LI_IN_AIL) {
-		int s;
-		ASSERT(XFS_DQ_IS_DIRTY(dqp));
-		ASSERT(flags & XFS_QMOPT_QUOTAOFF);
-
-		/*
-		 * xfs_trans_delete_ail() drops the AIL lock.
-		 */
-		s = AIL_LOCK(mp);
-		xfs_trans_delete_ail(mp, (xfs_log_item_t *)&dqp->q_logitem, s);
-		xfs_dqtrace_entry(dqp, "DQPURGEALL: DELETE AIL");
-#ifdef QUOTADEBUG
-		printf("DQPURGEALL: DELETE AIL 0x%x\n", dqp);
-#endif
-	}
-#endif
-
-
-
 	nextdqp = dqp->MPL_NEXT;	
 	thishash = dqp->q_hash;
 	XQM_HASHLIST_REMOVE(thishash, dqp);
@@ -1577,11 +1526,7 @@ xfs_qm_dqpurge(
 	dqp->q_hash = NULL;
 	dqp->dq_flags = XFS_DQ_INACTIVE;
 	bzero(&dqp->q_core, sizeof(dqp->q_core));
-	
-#ifdef QUOTADEBUG
-	printf("--------- Purged #%d 0x%x------------\n",  
-	       (int)dqp->q_core.d_id, dqp);
-#endif	
+
 	xfs_dqfunlock(dqp);
 	xfs_dqunlock(dqp);
 	XFS_DQ_HASH_UNLOCK(thishash);
