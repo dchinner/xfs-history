@@ -1,4 +1,4 @@
-#ident "$Revision: 1.136 $"
+#ident "$Revision: 1.137 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2218,6 +2218,39 @@ error0:
 	return error;
 }
 
+/*
+ * This is a subroutine for xfs_write() which clears the setuid and
+ * setgid bits when a file is written.
+ */
+STATIC int
+xfs_write_clear_setuid(
+	xfs_inode_t	*ip)
+{
+	xfs_mount_t	*mp;
+	xfs_trans_t	*tp;
+	int		error;
+
+	mp = ip->i_mount;
+	tp = xfs_trans_alloc(mp, XFS_TRANS_WRITEID);
+	if (error = xfs_trans_reserve(tp, 0,
+				      XFS_WRITEID_LOG_RES(mp),
+				      0, 0, 0)) {
+		ASSERT(0);
+		xfs_trans_cancel(tp, 0);
+		return error;
+	}
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+	xfs_trans_ihold(tp, ip);
+	ip->i_d.di_mode &= ~ISUID;
+	if (ip->i_d.di_mode & (IEXEC >> 3)) {
+		ip->i_d.di_mode &= ~ISGID;
+	}
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	xfs_trans_set_sync(tp);
+	error = xfs_trans_commit(tp, 0);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+}
 
 /*
  * xfs_write
@@ -2313,6 +2346,19 @@ start:
 		 */
 		if ((ioflag & IO_APPEND) && savedsize != ip->i_d.di_size)
 			goto start;
+
+		/*
+		 * If we're writing the file then make sure to clear the
+		 * setuid and setgid bits if the process is not being run
+		 * by root.  This keeps people from modifying setuid and
+		 * setgid binaries.  Don't allow this to happen if this
+		 * file is a swap file (I know, weird).
+		 */
+		if (((ip->i_d.di_mode & (ISUID | ISGID)) &&
+		     (credp->cr_uid != 0)) &&
+		    !(vp->v_flag & VISSWAP)) {
+			xfs_write_clear_setuid(ip);
+		}
 retry:
 		if (ioflag & IO_DIRECT)
 			error = xfs_diordwr( vp, uiop, ioflag, credp, B_WRITE);
