@@ -310,15 +310,21 @@ xfs_open(
 	cred_t		*credp)
 {
 	int		rval = 0;
-#if XFS_BIG_FILES == 0
 	vnode_t		*vp = *vpp;
 	xfs_inode_t	*ip = XFS_VTOI(vp);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
+#if XFS_BIG_FILES == 0
 	if (ip->i_d.di_size > XFS_MAX_FILE_OFFSET)
 		rval = XFS_ERROR(EFBIG);
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 #endif
+	/*
+	 * If it's a directory with any blocks, read-ahead block 0
+	 * as we're almost certain to have the next operation be a read there.
+	 */
+	if (vp->v_type == VDIR && ip->i_d.di_nextents)
+		(void)xfs_da_reada_buf(NULL, ip, 0, XFS_DATA_FORK);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return rval;
 }
 
