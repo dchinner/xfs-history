@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.75 $"
+#ident	"$Revision: 1.76 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1349,6 +1349,7 @@ xfs_bmap_btree_to_extents(
 	rblock = ip->i_broot;
 	ASSERT(rblock->bb_level == 1);
 	ASSERT(rblock->bb_numrecs == 1);
+	ASSERT(XFS_BMAP_BROOT_MAXRECS(ip->i_broot_bytes) == 1);
 	mp = ip->i_mount;
 	sbp = &mp->m_sb;
 	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, ip->i_broot_bytes);
@@ -1366,6 +1367,8 @@ xfs_bmap_btree_to_extents(
 #endif
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
 	xfs_iroot_realloc(ip, -1);
+	ASSERT(ip->i_broot == NULL);
+	ASSERT((ip->i_flags & XFS_IBROOT) == 0);
 	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 	return XFS_ILOG_CORE;
 }
