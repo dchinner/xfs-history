@@ -5,6 +5,7 @@
 
 struct xfs_inode;
 struct ktrace;
+struct xfs_gap;
 	
 /*
  * This is the type used in the xfs inode hash table.
@@ -91,6 +92,7 @@ typedef struct xfs_inode {
 	unsigned int		i_num_readaheads; /* # read ahead bufs */
 	xfs_fsize_t		i_new_size;	/* sz when write completes */
 	off_t			i_write_offset;	/* start off of curr write */
+	struct xfs_gap		*i_gap_list;	/* hole list in write range */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
