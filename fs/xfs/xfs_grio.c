@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.65 1996/04/01 22:49:28 ajs Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.66 1996/04/12 21:14:23 huy Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -73,6 +73,7 @@ xfs_inode_t *
 xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 {
         struct vfs		*vfsp;
+	bhv_desc_t		*bdp;
         xfs_inode_t		*ip = NULL ;
 	int			error;
 
@@ -97,7 +98,9 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) 
 #endif
 		{
-                	error = xfs_iget( XFS_VFSTOM( vfsp ), 
+
+			bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+                	error = xfs_iget( XFS_BHVTOM( bdp ), 
 					NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
 
 			if ( error ) {

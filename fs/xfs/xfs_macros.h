@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MACROS_H
 #define	_FS_XFS_MACROS_H
 
-#ident 	"$Revision$"
+#ident 	"$Revision: 1.4 $"
 
 /*
  * Set for debug kernels and simulation, and 32-bit kernels,

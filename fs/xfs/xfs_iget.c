@@ -1,4 +1,4 @@
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.67 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -9,6 +9,7 @@
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
+#include <sys/vfs.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/sysinfo.h>
@@ -224,7 +225,7 @@ again:
 	if (error) {
 		return error;
 	}
-	vp = vn_alloc(mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
+	vp = vn_alloc(XFS_MTOVFS(mp), IFTOVT(ip->i_d.di_mode),
 		      ip->i_df.if_u2.if_rdev);
 	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops, 0);
 	bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
@@ -261,7 +262,6 @@ again:
 	/*
 	 * These values _must_ be set before releasing ihlock!
 	 */
-	ip->i_vnode = vp;
 	ip->i_hash = ih;
 	if (iq = ih->ih_next) {
 		iq->i_prevp = &ip->i_next;

@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.99 $"
+#ident "$Revision: 1.100 $"
 
 struct buf;
 struct cred;
@@ -105,7 +105,6 @@ typedef struct xfs_inode {
 	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
 	struct xfs_inode	*i_mnext;	/* next inode in mount list */
 	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
-	struct vnode		*i_vnode;	/* ptr to associated vnode */
 	struct bhv_desc		i_bhv_desc;	/* inode behavior descriptor*/
 
 	/* Extent information. */
@@ -297,7 +296,7 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #if 0
 #define	XFS_VTOI(vp)		((xfs_inode_t *)((vp)->v_data))
 #endif
-#define	XFS_ITOV(ip)		((struct vnode *)((ip)->i_vnode))
+#define	XFS_ITOV(ip)		BHV_TO_VNODE(XFS_ITOBHV(ip))
 #define	XFS_ITOBHV(ip)		((struct bhv_desc *)(&((ip)->i_bhv_desc)))
 #define	XFS_BHVTOI(bhvp)	((xfs_inode_t *)(BHV_PDATA(bhvp)))
 

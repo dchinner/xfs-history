@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 #define	XFS_MACRO_C
 
@@ -9,11 +9,11 @@
 #include <sys/buf.h>
 #include <sys/sema.h>
 #include <sys/debug.h>
+#include <sys/vnode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/vfs.h>
-#include <sys/vnode.h>
 #include <sys/pvnode.h>
 #include <sys/uuid.h>
 #include "xfs_macros.h"
@@ -1651,11 +1651,11 @@ xfs_sb_good_version(unsigned v)
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_VFSTOM)
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BHVTOM)
 xfs_mount_t *
-xfs_vfstom(vfs_t *vfsp)
+xfs_bhvtom(bhv_desc_t *bdp)
 {
-	return XFS_VFSTOM(vfsp);
+	return XFS_BHVTOM(bdp);
 }
 #endif
 

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.67 $"
 
 struct buf;
 struct cred;
@@ -33,7 +33,7 @@ typedef struct xfs_trans_reservations {
 } xfs_trans_reservations_t;
 
 typedef struct xfs_mount {
-	struct vfs		*m_vfsp;	/* ptr to vfs */
+	bhv_desc_t		m_bhv;		/* vfs xfs behavior */
 	xfs_tid_t		m_tid;		/* next unused tid for fs */
 	lock_t			m_ail_lock;	/* fs AIL mutex */
 	xfs_ail_entry_t		m_ail;		/* fs active log item list */
@@ -138,13 +138,13 @@ typedef struct xfs_mount {
 struct vfs *xfs_mtovfs(xfs_mount_t *mp);
 #define	XFS_MTOVFS(mp)		xfs_mtovfs(mp)
 #else
-#define	XFS_MTOVFS(mp)		((mp)->m_vfsp)
+#define	XFS_MTOVFS(mp)		(bhvtovfs(&(mp)->m_bhv))
 #endif
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_VFSTOM)
-xfs_mount_t *xfs_vfstom(struct vfs *vfsp);
-#define	XFS_VFSTOM(vfsp)	xfs_vfstom(vfsp)
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BHVTOM)
+xfs_mount_t *xfs_bhvtom(bhv_desc_t *bdp);
+#define	XFS_BHVTOM(bdp)	xfs_bhvtom(bdp)
 #else
-#define	XFS_VFSTOM(vfsp)	((xfs_mount_t *) (vfsp)->vfs_data)
+#define	XFS_BHVTOM(vfsp)	((xfs_mount_t *)BHV_PDATA(bdp))
 #endif
  
 /*
@@ -180,10 +180,10 @@ void		xfs_umount(xfs_mount_t *);
 void		xfs_mod_sb(xfs_trans_t *, __int64_t);
 xfs_mount_t	*xfs_mount_init(void);
 void		xfs_mount_free(xfs_mount_t *mp);
-int		xfs_mountfs(struct vfs *, dev_t);
+int		xfs_mountfs(struct vfs *, xfs_mount_t *mp, dev_t);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
 struct buf	*xfs_getsb(xfs_mount_t *, int);
-
+extern	struct vfsops xfs_vfsops;
 #endif	/* !_FS_XFS_MOUNT_H */

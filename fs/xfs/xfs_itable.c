@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.37 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -598,7 +598,7 @@ xfs_fd_to_mp(
 	file_t		*fp;
 	vfs_t		*vfsp;
 	vnode_t		*vp;
-	extern vfsops_t	xfs_vfsops;
+	bhv_desc_t *bdp;
 
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);
@@ -614,9 +614,10 @@ xfs_fd_to_mp(
 			return XFS_ERROR(EPERM);
 		vfsp = vp->v_vfsp;
 	}
-	if (vfsp->vfs_op != &xfs_vfsops)
+	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	if (!bdp)
 		return XFS_ERROR(EINVAL);
-	*mpp = vfsp->vfs_data;
+	*mpp = XFS_BHVTOM(bdp);
 	return 0;
 }
 

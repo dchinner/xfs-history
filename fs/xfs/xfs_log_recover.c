@@ -1,5 +1,5 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.88 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3027,7 +3027,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 				ASSERT(ip != NULL);
 				ASSERT(ip->i_d.di_nlink == 0);
 				ASSERT(ip->i_d.di_mode != 0);
-				ASSERT(ip->i_vnode->v_count == 1);
+				ASSERT(XFS_ITOV(ip)->v_count == 1);
 
 				/*
 				 * Drop our reference to the inode.  This
@@ -3035,7 +3035,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 				 * which will truncate the file and free
 				 * the inode.
 				 */
-				VN_RELE(ip->i_vnode);
+				VN_RELE(XFS_ITOV(ip));
 				last_ino = ino;
 			} else {
 				/*
@@ -3046,7 +3046,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 				 * the inode pointer in the bucket.
 				 */
 				if (!error) {
-					VN_RELE(ip->i_vnode);
+					VN_RELE(XFS_ITOV(ip));
 				}
 				xlog_recover_clear_agi_bucket(mp, agno,
 							      bucket);

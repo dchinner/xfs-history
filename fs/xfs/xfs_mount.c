@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.122 $"
+#ident	"$Revision: 1.123 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -10,6 +10,7 @@
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/vfs.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/debug.h>
@@ -119,6 +120,7 @@ xfs_mount_free(xfs_mount_t *mp)
 	if (mp->m_fsname != NULL) {
 		kmem_free(mp->m_fsname, mp->m_fsname_len);
 	}
+	VFS_REMOVEBHV(XFS_MTOVFS(mp), &mp->m_bhv);
 	kmem_free(mp, sizeof(xfs_mount_t));
 }	/* xfs_mount_free */
 
@@ -147,13 +149,12 @@ xfs_mount_free(xfs_mount_t *mp)
  *		code for fixing up the filesystem btrees.
  */
 STATIC int
-xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
+xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error = 0;
 	int		i;
-	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
 	vnode_t		*rbmvp;
@@ -167,7 +168,6 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
 
-	mp = XFS_VFSTOM(vfsp);
 
 	ASSERT(mp->m_sb_bp == 0);
 
@@ -597,9 +597,9 @@ xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
  * wrapper routine for the kernel
  */
 int
-xfs_mountfs(vfs_t *vfsp, dev_t dev)
+xfs_mountfs(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev)
 {
-	return(xfs_mountfs_int(vfsp, dev, 1));
+	return(xfs_mountfs_int(vfsp, mp, dev, 1));
 }
 
 #ifdef SIM
@@ -609,20 +609,18 @@ xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 	int		error;
 	xfs_mount_t	*mp;
 	vfs_t		*vfsp;
-	extern vfsops_t	xfs_vfsops;
 
 	mp = xfs_mount_init();
 	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
-	VFS_INIT(vfsp, &xfs_vfsops, NULL);
-	mp->m_vfsp = vfsp;
-	vfsp->vfs_data = mp;
+	VFS_INIT(vfsp);
+	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp, BHV_BASE_POSITION);
 	mp->m_dev = dev;
 	mp->m_rtdev = rtdev;
 	mp->m_logdev = logdev;
 	vfsp->vfs_dev = dev;
 
 
-        error = xfs_mountfs_int(vfsp, dev, read_rootinos);
+        error = xfs_mountfs_int(vfsp, mp, dev, read_rootinos);
 	if (error) {
 		kmem_free(mp, sizeof(*mp));
 		return 0;

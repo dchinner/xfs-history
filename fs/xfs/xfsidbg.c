@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision: 1.45 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1225,12 +1225,14 @@ xfs_inodebuf(buf_t *bp)
 	xfs_dinode_t *di;
 	int n, i;
 	vfs_t *vfsp;
+	bhv_desc_t *bdp;
 	xfs_mount_t *mp;
 
 	vfsp = vfs_devsearch_nolock(bp->b_edev);
 	if (!vfsp)
 		return;
-	mp = (xfs_mount_t *)vfsp->vfs_data;
+	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	mp = XFS_BHVTOM(bdp);
 	n = bp->b_bcount >> mp->m_sb.sb_inodelog;
 	for (i = 0, di = (xfs_dinode_t *)bp->b_un.b_addr;
 	     i < n;
@@ -2716,14 +2718,16 @@ xfsidbg_xfindi(__psunsigned_t ino)
 {
 	xfs_ino_t	xino;
 	vfs_t		*vfsp;
+	bhv_desc_t	*bdp;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
 
 	xino = (xfs_ino_t)ino;
 
 	for (vfsp = rootvfs; (vfsp != NULL); vfsp = vfsp->vfs_next) {
-		if (vfsp->vfs_op == &xfs_vfsops) {
-			mp = (xfs_mount_t*)vfsp->vfs_data;
+		bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+		if (bdp) {
+			mp = XFS_BHVTOM(bdp);
 			ip = mp->m_inodes;
 			do {
 				if (ip->i_ino == xino) {
@@ -3228,7 +3232,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 
 	qprintf("xfs_mount at 0x%x\n", mp);
 	qprintf("vfsp 0x%x tid 0x%x ail_lock 0x%x &ail 0x%x\n",
-		mp->m_vfsp, mp->m_tid, mp->m_ail_lock, &mp->m_ail);
+		XFS_MTOVFS(mp), mp->m_tid, mp->m_ail_lock, &mp->m_ail);
 	qprintf("ail_gen 0x%x &sb 0x%x\n",
 		mp->m_ail_gen, &mp->m_sb);
 	qprintf("sb_lock 0x%x sb_bp 0x%x dev 0x%x logdev 0x%x rtdev 0x%x\n",
@@ -3303,7 +3307,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	qprintf("mnext 0x%x mprev 0x%x vnode 0x%x \n",
 		ip->i_mnext,
 		ip->i_mprev,
-		ip->i_vnode);
+		XFS_ITOV(ip));
 	qprintf("dev %x ino %s\n",
 		ip->i_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
@@ -3764,10 +3768,12 @@ xfsidbg_vfs_data_print(void *p)
 static void
 xfsidbg_vfs_vnodes_print(vfs_t *vfsp, int all)
 {
+	bhv_desc_t *bdp;
 	xfs_mount_t *mp;
 	xfs_inode_t *xp;
 
-	mp = (xfs_mount_t*)vfsp->vfs_data;
+	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	mp = XFS_BHVTOM(bdp);
 	xp = mp->m_inodes;
 	if (xp != NULL) {
 		do {
@@ -3794,10 +3800,12 @@ xfsidbg_vnode_data_print(void *p)
 static vnode_t *
 xfsidbg_vnode_find(vfs_t *vfsp, long vnum)
 {
+	bhv_desc_t *bdp;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*xp;
 
-	mp = (xfs_mount_t *)vfsp->vfs_data;
+	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	mp = XFS_BHVTOM(bdp);
 	xp = mp->m_inodes;
 	if (xp != NULL) {
 		do {

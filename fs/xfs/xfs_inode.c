@@ -1,4 +1,4 @@
-#ident "$Revision: 1.178 $"
+#ident "$Revision: 1.179 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1167,7 +1167,7 @@ xfs_atruncate_start(
 #endif
 
 	ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) ||
-	       (ip->i_vnode->v_flag & VINACT));
+	       (XFS_ITOV(ip)->v_flag & VINACT));
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	error = xfs_bmap_last_offset(NULL, ip, &last_fsb, XFS_ATTR_FORK);
@@ -1526,10 +1526,10 @@ xfs_itruncate_finish(
 	xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||
-	       (!VN_DIRTY(ip->i_vnode) &&
+	       (!VN_DIRTY(XFS_ITOV(ip)) &&
 		(ip->i_delayed_blks == 0) &&
 		(ip->i_queued_bufs == 0) &&
-		(ip->i_vnode->v_buf == NULL)));
+		(XFS_ITOV(ip)->v_buf == NULL)));
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||
 	       (ip->i_d.di_nextents == 0));

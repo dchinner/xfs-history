@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -400,7 +400,7 @@ handle_to_vp (
 	vfsp = altgetvfs (&handlep->ha_fsid);
 	if (vfsp == NULL)
 		return NULL;
-	error = VFS_VGET (vfsp, &vp, &handlep->ha_fid);
+	VFS_VGET (vfsp, &vp, &handlep->ha_fid, error);
 	if (error)
 		return NULL;
 	return vp;

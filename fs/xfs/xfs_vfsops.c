@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.129 $"
+#ident  "$Revision: 1.130 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -130,36 +130,48 @@ xfs_vfsmount(
 	cred_t		*credp);
 
 STATIC int
-xfs_mountroot(
-	vfs_t			*vfsp,
+xfs_mntupdate(
+	bhv_desc_t	*bdp,
+	vnode_t		*mvp,
+	struct mounta	*uap,
+	cred_t		*credp);
+
+STATIC int
+xfs_rootinit(
+	vfs_t		*vfsp);
+
+
+STATIC int
+xfs_vfsmountroot(
+	bhv_desc_t		*bdp,
 	enum whymountroot	why);
 
 STATIC int
 xfs_unmount(
-	vfs_t	*vfsp,
+	bhv_desc_t	*bdp,
 	int	flags,
 	cred_t	*credp);
 
 STATIC int
 xfs_root(
-	vfs_t	*vfsp,
+	bhv_desc_t	*bdp,
 	vnode_t	**vpp);
 
 STATIC int
 xfs_statvfs(
-	vfs_t		*vfsp,
+	bhv_desc_t	*bdp,
 	statvfs_t	*statp,
 	vnode_t		*vp);
 
 STATIC int
 xfs_sync(
-	vfs_t		*vp,
+	bhv_desc_t	*bdp,
 	short		flags,
 	cred_t		*credp);
 
 STATIC int
 xfs_vget(
-	vfs_t		*vfsp,
+	bhv_desc_t	*bdp,
 	vnode_t		**vpp,
 	fid_t		*fidp);
 
@@ -503,7 +515,7 @@ xfs_cmountfs(
 #endif
 	}
 
-	if (error = xfs_mountfs(vfsp, ddev)) {
+	if (error = xfs_mountfs(vfsp, mp, ddev)) {
 		goto error3;
 	}
 
@@ -559,33 +571,24 @@ xfs_get_vfsmount(
 	xfs_mount_t *mp;
 
 	/*
-	 * Check whether dev is already mounted.
+	 * Allocate VFS private data (xfs mount structure).
 	 */
-	if (vfsp->vfs_flag & VFS_REMOUNT) {
-		mp = XFS_VFSTOM(vfsp);
-		(void) xfs_iflush_all(mp, XFS_FLUSH_ALL);
-	} else {
-		/*
-		 * Allocate VFS private data (xfs mount structure).
-		 */
-		mp = xfs_mount_init();
-		mp->m_vfsp   = vfsp;
-		mp->m_dev    = ddev;
-		mp->m_logdev = logdev;
-		mp->m_rtdev  = rtdev;
-		mp->m_ddevp  = NULL;
-		mp->m_logdevp = NULL;
-		mp->m_rtdevp = NULL;
+	mp = xfs_mount_init();
+	mp->m_dev    = ddev;
+	mp->m_logdev = logdev;
+	mp->m_rtdev  = rtdev;
+	mp->m_ddevp  = NULL;
+	mp->m_logdevp = NULL;
+	mp->m_rtdevp = NULL;
 
-		vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
-		/* vfsp->vfs_bsize filled in later from superblock */
-		vfsp->vfs_fstype = xfs_fstype;
-		vfsp->vfs_data = mp;
-		vfsp->vfs_dev = ddev;
-		vfsp->vfs_nsubmounts = 0;
-		vfsp->vfs_bcount = 0;
-		/* vfsp->vfs_fsid is filled in later from superblock */
-	}
+	vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
+	/* vfsp->vfs_bsize filled in later from superblock */
+	vfsp->vfs_fstype = xfs_fstype;
+	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp, BHV_BASE_POSITION);
+	vfsp->vfs_dev = ddev;
+	vfsp->vfs_nsubmounts = 0;
+	vfsp->vfs_bcount = 0;
+	/* vfsp->vfs_fsid is filled in later from superblock */
 
 	return mp;
 }	/* end of xfs_get_vfsmount() */
@@ -617,8 +620,9 @@ irix5_to_xfs_args(
 }
 #endif
 
+
 /*
- * xfs_vfsmount
+ * xfs_mount
  *
  * The file system configurations are:
  *	(1) device (partition) with data and internal log
@@ -627,7 +631,7 @@ irix5_to_xfs_args(
  *
  */ 
 STATIC int
-xfs_vfsmount(
+xfs_mount(
 	vfs_t		*vfsp,
 	vnode_t		*mvp,
 	struct mounta	*uap,
@@ -703,15 +707,37 @@ xfs_vfsmount(
 			int	errcode;
 
 			vfsp->vfs_flag &= ~VFS_DMI;
-			errcode = xfs_unmount(vfsp, 0, credp);
+			VFS_UNMOUNT(vfsp, 0, credp, errcode);
 			ASSERT (errcode == 0);
 		}
 	}
 
 	return error;
 
-}	/* end of xfs_vfsmount() */
+}	/* end of xfs_mount() */
 
+
+/* VFS_MOUNT */
+STATIC int
+xfs_vfsmount(
+	vfs_t           *vfsp,
+        vnode_t         *mvp,
+        struct mounta   *uap,
+        cred_t          *credp)
+{
+	return(xfs_mount(vfsp, mvp, uap, credp));
+}
+
+/* VFS_MNTUPDATE */
+STATIC int
+xfs_mntupdate(
+	bhv_desc_t	*bdp,
+        vnode_t         *mvp,
+        struct mounta   *uap,
+        cred_t          *credp)
+{
+	return(xfs_mount(bhvtovfs(bdp), mvp, uap, credp));
+}
 
 
 /*
@@ -746,7 +772,6 @@ xfs_isdev(
 	return error;
 }
 
-
 /*
  * xfs_mountroot() mounts the root file system.
  *
@@ -764,6 +789,7 @@ xfs_isdev(
 STATIC int
 xfs_mountroot(
 	vfs_t			*vfsp,
+	bhv_desc_t		*bdp,
 	enum whymountroot	why)
 {
 	int		error;
@@ -800,7 +826,7 @@ xfs_mountroot(
 		vfs_setflag(vfsp, VFS_REMOUNT);
 		break;
 	case ROOT_UNMOUNT:
-		mp = XFS_VFSTOM(vfsp);
+		mp = XFS_BHVTOM(bdp);
 		if (xfs_ibusy(mp)) {
 			/*
 			 * There are still busy vnodes in the file system.
@@ -821,7 +847,7 @@ xfs_mountroot(
 			 * being referenced.  xfs_iflush_all() will purge
 			 * and flush all the unreferenced vnodes.
 			 */
-			xfs_sync(vfsp,
+			xfs_sync(bdp,
 				 (SYNC_WAIT | SYNC_CLOSE |
 				  SYNC_ATTR | SYNC_FSDATA),
 				 cr);
@@ -867,7 +893,7 @@ xfs_mountroot(
 			}
 			return XFS_ERROR(EBUSY);
 		}
-		error = xfs_unmount(vfsp, 0, NULL);
+		error = xfs_unmount(bdp, 0, NULL);
 		return error;
 	}
 	error = vfs_lock(vfsp);
@@ -907,6 +933,23 @@ bad:
 
 } /* end of xfs_mountroot() */
 
+
+/* VFS_ROOTINIT */
+STATIC int
+xfs_rootinit(
+	vfs_t *vfsp)
+{
+	return(xfs_mountroot(vfsp, NULL, ROOT_INIT));
+}
+
+/* VFS_MOUNTROOT */
+STATIC int
+xfs_vfsmountroot(
+	bhv_desc_t *bdp,
+	enum whymountroot       why)
+{
+	return(xfs_mountroot(bhvtovfs(bdp), bdp, why));
+}
 
 /*
  * xfs_ibusy searches for a busy inode in the mounted file system.
@@ -967,7 +1010,7 @@ xfs_ibusy(
 /*ARGSUSED*/
 STATIC int
 xfs_unmount(
-	vfs_t	*vfsp,
+	bhv_desc_t	*bdp,
 	int	flags,
 	cred_t	*credp)
 {
@@ -978,11 +1021,12 @@ xfs_unmount(
 	int		vfs_flags;
 	int		sendunmountevent = 0;
 	int		error;
+	struct vfs 	*vfsp = bhvtovfs(bdp);
 
 	if (!_CAP_CRABLE(credp, CAP_MOUNT_MGT))
 		return XFS_ERROR(EPERM);
 
-	mp = XFS_VFSTOM(vfsp);
+	mp = XFS_BHVTOM(bdp);
 	rip = mp->m_rootip;
 	rvp = XFS_ITOV(rip);
 
@@ -1075,12 +1119,12 @@ out:
  */
 STATIC int
 xfs_root(
-	vfs_t	*vfsp,
+	bhv_desc_t	*bdp,
 	vnode_t	**vpp)
 {
 	vnode_t	*vp;
 
-	vp = XFS_ITOV((XFS_VFSTOM(vfsp))->m_rootip);	
+	vp = XFS_ITOV((XFS_BHVTOM(bdp))->m_rootip);	
 	VN_HOLD(vp);
 	*vpp = vp;
 	return 0;
@@ -1106,6 +1150,7 @@ devvptoxfs(
 	bhv_desc_t	*bdp;
 	bhv_head_t	*bhp;
 	struct snode	*sp;
+	bhv_desc_t	*vfs_bdp;
 
 	if (devvp->v_type != VBLK)
 		return XFS_ERROR(ENOTBLK);
@@ -1129,6 +1174,7 @@ devvptoxfs(
 
 	sp = (struct snode *)BHV_PDATA(bdp);
 	if (sp->s_flag & SMOUNTED) {
+		extern struct vfsops xfs_vfsops;
 		/*
 		 * Device is mounted.  Get an empty buffer to hold a
 		 * copy of its superblock, so we don't have to worry
@@ -1137,7 +1183,8 @@ devvptoxfs(
 		 */
 		bp = ngeteblk(BBSIZE);
 		fs = (xfs_sb_t *)bp->b_un.b_addr;
-		bcopy(&XFS_VFSTOM(vfs_devsearch(dev))->m_sb, fs, sizeof(*fs));
+		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfs_devsearch(dev)), &xfs_vfsops);
+		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
 	} else {
 		/*
 		 * If the buffer is already in core, it might be stale.
@@ -1220,7 +1267,7 @@ xfs_statdevvp(
 /*ARGSUSED*/
 STATIC int
 xfs_statvfs(
-	vfs_t		*vfsp,
+	bhv_desc_t	*bdp,
 	statvfs_t	*statp,
 	vnode_t		*vp)
 {
@@ -1229,8 +1276,9 @@ xfs_statvfs(
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	int		s;
+	struct vfs *vfsp = bhvtovfs(bdp);
 
-	mp = XFS_VFSTOM(vfsp);
+	mp = XFS_BHVTOM(bdp);
 	sbp = &(mp->m_sb);
 
 	s = XFS_SB_LOCK(mp);
@@ -1308,7 +1356,7 @@ xfs_statvfs(
 /*ARGSUSED*/
 STATIC int
 xfs_sync(
-	vfs_t		*vfsp,
+	bhv_desc_t	*bdp,
 	short		flags,
 	cred_t		*credp)
 {
@@ -1336,7 +1384,7 @@ xfs_sync(
 #define	RESTART_LIMIT	10
 #define PREEMPT_MASK	0x7f
 
-	mp = XFS_VFSTOM(vfsp);
+	mp = XFS_BHVTOM(bdp);
 	error = 0;
 	last_error = 0;
 	preempt = 0;
@@ -1835,7 +1883,7 @@ xfs_sync(
  */
 STATIC int
 xfs_vget(
-	vfs_t		*vfsp,
+	bhv_desc_t	*bdp,
 	vnode_t		**vpp,
 	fid_t		*fidp)
 {
@@ -1863,7 +1911,7 @@ xfs_vget(
 		 */
 		return XFS_ERROR(EINVAL);
 	}
-	mp = XFS_VFSTOM(vfsp);
+	mp = XFS_BHVTOM(bdp);
 	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_EXCL, &ip, 0);
 	if (error) {
 		*vpp = NULL;
@@ -1887,12 +1935,14 @@ xfs_vget(
 
 struct vfsops xfs_vfsops = {
 	xfs_vfsmount,
+	xfs_rootinit,
+	xfs_mntupdate,
 	xfs_unmount,
 	xfs_root,
 	xfs_statvfs,
 	xfs_sync,
 	xfs_vget,
-	xfs_mountroot,
+	xfs_vfsmountroot,
 	fs_nosys,	/* swapvp */
 };
 #else	/* SIM */

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.133 $"
+#ident	"$Revision: 1.134 $"
 
 /*
  * High level interface routines for log manager
@@ -425,7 +425,8 @@ xfs_log_stat(caddr_t mnt_pt, int *log_BBstart, int *log_BBsize)
 	if (vp->v_vfsp->vfs_fstype != xfs_fstype) {
 		error = XFS_ENOTXFS;
 	} else {
-		xmp = (xfs_mount_t *)vp->v_vfsp->vfs_data;
+		bhv_desc_t *bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vp->v_vfsp), &xfs_vfsops);
+		xmp = XFS_BHVTOM(bdp);
 		start = XFS_FSB_TO_DADDR(xmp, xmp->m_sb.sb_logstart);
 		size  = XFS_FSB_TO_BB(xmp, xmp->m_sb.sb_logblocks);
 		if ((error = copyout(&start, log_BBstart, sizeof(int))) == 0)
