@@ -16,6 +16,7 @@
 #include <linux/xfs_to_linux.h>
 
 #undef  NODEV
+#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
@@ -34,7 +35,7 @@
 #include <ksys/behavior.h>
 #include <sys/statvfs.h>
 #include <asm/uaccess.h>
-#include <asm/init.h>
+#include <linux/init.h>
 
 #if 0
 #undef MS_RDONLY
@@ -303,7 +304,11 @@ linvfs_read_super(
 	sb->s_op = &linvfs_sops;
 	unlock_super(sb);
 	locked = 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
 	sb->s_root = d_alloc_root(iget(sb, ino), NULL);
+#else
+	sb->s_root = d_alloc_root(iget(sb, ino));
+#endif
 	if (!sb->s_root)
 		goto fail_vnrele;
 
@@ -483,7 +488,7 @@ linvfs_write_super(
  	int		error; 
 
 
-	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
+	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_DELWRI|SYNC_NOWAIT,
 		sys_cred, error);
 
 	sb->s_dirt = 1;  /*  Keep the syncs coming.  */
@@ -569,7 +574,7 @@ static struct file_system_type xfs_fs_type = {
 	NULL
 };
 
-__initfunc(int init_xfs_fs(void))
+int __init init_xfs_fs(void)
 {
   ENTER("init_xfs_fs"); 
   cred_init();

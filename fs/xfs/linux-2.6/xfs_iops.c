@@ -14,6 +14,7 @@
 #include <linux/xfs_to_linux.h>
 
 #undef  NODEV
+#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/sched.h>	/* To get current */
 #include <linux/locks.h>
@@ -394,7 +395,11 @@ struct dentry * linvfs_follow_link(struct dentry *dentry,
 int linvfs_readpage(struct file *filp, struct page *page)
 {
 	int rval;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
 	rval = generic_readpage(filp, page);
+#else
+	rval = block_read_full_page(filp, page);
+#endif
 	return(rval);
 }
 
@@ -402,11 +407,15 @@ int linvfs_writepage(struct file *filp, struct page *page)
 {
 	int rval;
 	rval = -ENOSYS;
-	printk("linvfs_writepage: NOT IMPLEMENTED\n", rval);
+	printk("linvfs_writepage: NOT IMPLEMENTED\n");
 	return(rval);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
 int linvfs_bmap(struct inode *inode, int block)
+#else
+int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_result, int create)
+#endif
 {
 	vnode_t		*vp;
 	int		block_shift = inode->i_sb->s_blocksize_bits;
@@ -415,11 +424,11 @@ int linvfs_bmap(struct inode *inode, int block)
 	struct	bmapval	bmap;
 	int		nbmaps = 1;
 	int		error;
-	int		blockno;
+	long		blockno;
 
 	if (block < 0) {
-		printk("linvfs_bmap: called with block of -1\n");
-		return 0;
+		printk(__FUNCTION__": called with block of -1\n");
+		return -EIO;
 	}
 
 	vp = LINVFS_GET_VP(inode);
@@ -429,13 +438,13 @@ int linvfs_bmap(struct inode *inode, int block)
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 
 	if (error)
-		return 0;
+		return -EIO;
 	/*
 	 * JIMJIM This interface needs to be fixed to support 64 bit
 	 * block numbers.
 	 */
 
-	blockno = (int)bmap.bn;
+	blockno = (long)bmap.bn;
 	if (blockno < 0) return 0;
 
 	if (bmap.pboff) {
@@ -446,7 +455,19 @@ int linvfs_bmap(struct inode *inode, int block)
 		blockno += bmap.pboff >> 9;
 	}
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
 	return(blockno >> (block_shift - 9));
+#else
+	if (!create) {
+		bh_result->b_dev = inode->i_dev;
+		bh_result->b_blocknr = blockno >> (block_shift - 9);
+		bh_result->b_state |= (1UL << BH_Mapped);
+
+		return 0;
+	}
+
+	return -EIO;
+#endif
 }
 
 
@@ -495,9 +516,16 @@ struct inode_operations linvfs_file_inode_operations =
   NULL,	 /*  rename  */
   NULL,	 /*  readlink  */
   NULL,	 /*  follow_link  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
   linvfs_readpage,
   linvfs_writepage,
   linvfs_bmap,
+#else
+  linvfs_get_block,
+  linvfs_readpage,
+  linvfs_writepage,
+  block_flushpage,
+#endif
   NULL,	 /*  truncate  */
   NULL,  /*  permission  */
   NULL,	 /*  smap  */
