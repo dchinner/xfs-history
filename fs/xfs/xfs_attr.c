@@ -1,4 +1,4 @@
-#ident "$Revision: 1.54 $"
+#ident "$Revision: 1.55 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -343,6 +343,8 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 						*args.firstblock, &committed);
 		}
 		if (error) {
+			ASSERT(committed);
+			args.trans = NULL;
 			xfs_bmap_cancel(&flist);
 			goto out;
 		}
@@ -400,7 +402,9 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	return(error);
 
 out:
-	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
+	if (args.trans)
+		xfs_trans_cancel(args.trans,
+			XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return(error);
 }
@@ -553,7 +557,9 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	return(error);
 
 out:
-	xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
+	if (args.trans)
+		xfs_trans_cancel(args.trans,
+			XFS_TRANS_RELEASE_LOG_RES|XFS_TRANS_ABORT);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return(error);
 }
@@ -828,6 +834,8 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 						*args->firstblock, &committed);
 		}
 		if (error) {
+			ASSERT(committed);
+			args->trans = NULL;
 			xfs_bmap_cancel(args->flist);
 			return(error);
 		}
@@ -927,6 +935,8 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 							&committed);
 			}
 			if (error) {
+				ASSERT(committed);
+				args->trans = NULL;
 				xfs_bmap_cancel(args->flist);
 				return(error);
 			}
@@ -1000,6 +1010,8 @@ xfs_attr_leaf_removename(xfs_da_args_t *args)
 						*args->firstblock, &committed);
 		}
 		if (error) {
+			ASSERT(committed);
+			args->trans = NULL;
 			xfs_bmap_cancel(args->flist);
 			return(error);
 		}
@@ -1149,6 +1161,8 @@ restart:
 							&committed);
 			}
 			if (error) {
+				ASSERT(committed);
+				args->trans = NULL;
 				xfs_bmap_cancel(args->flist);
 				goto out;
 			}
@@ -1186,6 +1200,8 @@ restart:
 						*args->firstblock, &committed);
 		}
 		if (error) {
+			ASSERT(committed);
+			args->trans = NULL;
 			xfs_bmap_cancel(args->flist);
 			goto out;
 		}
@@ -1285,6 +1301,8 @@ restart:
 							&committed);
 			}
 			if (error) {
+				ASSERT(committed);
+				args->trans = NULL;
 				xfs_bmap_cancel(args->flist);
 				goto out;
 			}
@@ -1415,6 +1433,8 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 						*args->firstblock, &committed);
 		}
 		if (error) {
+			ASSERT(committed);
+			args->trans = NULL;
 			xfs_bmap_cancel(args->flist);
 			goto out;
 		}
@@ -1456,6 +1476,8 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 							&committed);
 			}
 			if (error) {
+				ASSERT(committed);
+				args->trans = NULL;
 				xfs_bmap_cancel(args->flist);
 				goto out;
 			}
@@ -1863,6 +1885,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 						*args->firstblock, &committed);
 		}
 		if (error) {
+			ASSERT(committed);
+			args->trans = NULL;
 			xfs_bmap_cancel(args->flist);
 			return(error);
 		}
@@ -2013,6 +2037,8 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 						*args->firstblock, &committed);
 		}
 		if (error) {
+			ASSERT(committed);
+			args->trans = NULL;
 			xfs_bmap_cancel(args->flist);
 			return(error);
 		}
