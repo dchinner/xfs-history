@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.97 $"
+#ident	"$Revision: 1.98 $"
 
 #include <sys/buf.h>	/* for buftarg_t */
 struct cred;
@@ -129,6 +129,8 @@ typedef struct xfs_mount {
 	uint			m_qflags;	/* quota status flags */
 	xfs_trans_reservations_t m_reservations; /* precomputed res values */
 	__uint64_t		m_maxicount;	/* maximum inode count */
+	__uint64_t		m_resblks;	 	 /* total reserved blocks */
+	__uint64_t		m_resblks_avail; /* available reserved blocks */
 #if XFS_BIG_FILESYSTEMS
 	xfs_ino_t		m_inoadd;	/* add value for ino64_offset */
 #endif
@@ -248,8 +250,8 @@ xfs_mount_t	*xfs_mount_init(void);
 void		xfs_mount_free(xfs_mount_t *mp);
 int		xfs_mountfs(struct vfs *, xfs_mount_t *mp, dev_t);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
-int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int);
-int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
+int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int, int);
+int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint, int);
 int		xfs_readsb(xfs_mount_t *mp, dev_t);
 struct buf	*xfs_getsb(xfs_mount_t *, int);
 void            xfs_freesb(xfs_mount_t *);
