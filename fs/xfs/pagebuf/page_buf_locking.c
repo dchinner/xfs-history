@@ -57,6 +57,7 @@
 
 #include "avl.h"
 #include "page_buf.h"
+#define _PAGE_BUF_INTERNAL_
 #define PB_DEFINE_TRACES
 #include "page_buf_trace.h"
 
@@ -315,6 +316,14 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 			if (not_locked)
 				spin_lock_irq(&PBP(pb)->pb_lock);
 			if (!(pb->pb_flags & PBF_FREED)) {
+				if (pb->pb_flags & PBF_STALE)
+					pb->pb_flags &=	PBF_MAPPABLE | \
+						PBF_MAPPED | \
+						_PBF_LOCKABLE | \
+						_PBF_ALL_PAGES_MAPPED | \
+						_PBF_SOME_INVALID_PAGES | \
+						_PBF_ADDR_ALLOCATED | \
+						_PBF_MEM_ALLOCATED;
 				spin_unlock_irq(&PBP(pb)->pb_lock);
 				PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
 				*pb_p = pb;
@@ -337,6 +346,11 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 		PB_CLEAR_OWNER(pb);
 		PB_TRACE(pb, PB_TRACE_REC(skip), 0);
 		up(&PBP(pb)->pb_sema);
+		if (pb->pb_flags & PBF_STALE) {
+			pagebuf_rele(pb);
+			continue;
+		}
+
 		pagebuf_rele(pb);
 
 		return -EBUSY;
@@ -396,6 +410,8 @@ retry_scan:
 			/* Race condition with another thread - try again,
 			 * set up locking state first.
 			 */
+			*pb_p = NULL;
+
 			goto retry_scan;
 		}
 		return(status);
