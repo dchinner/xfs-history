@@ -1,4 +1,4 @@
-#ident "$Revision: 1.134 $"
+#ident "$Revision: 1.136 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -219,6 +219,7 @@ grio_monitor_io_start(
 
 extern int
 grio_monitor_io_end(
+	stream_id_t *,
 	int);
 	
 
@@ -4658,7 +4659,7 @@ xfs_diordwr(vnode_t	*vp,
 	bp->b_flags = 0;
 
 	if ( bp->b_flags2 & B_GR_BUF ) {
-		grio_monitor_io_end( index );
+		grio_monitor_io_end( &stream_id, index );
 
 		ASSERT( BUF_GRIO_PRIVATE(bp) );
 		kmem_zone_free( grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
