@@ -1,4 +1,4 @@
-#ident "$Revision: 1.214 $"
+#ident "$Revision: 1.215 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -864,7 +864,7 @@ xfs_iomap_read(
 	    (((offset == ip->i_next_offset) &&
 	      (offset != 0) &&
 	      (offset_fsb >= ip->i_reada_blkno)) ||
-	     (retrieved_bytes < count))) {
+	     retrieved_bytes < count)) {
 		curr_bmapp = &bmapp[0];
 		next_bmapp = &bmapp[1];
 		last_bmapp = &bmapp[*nbmaps - 1];
@@ -1041,7 +1041,112 @@ xfs_iomap_read(
 	}
 	return 0;
 }				
-			
+
+/* ARGSUSED */
+int
+xfs_vop_readbuf(bhv_desc_t 	*bdp,
+		off_t		offset,
+		ssize_t		len,
+		int		ioflags,
+		struct cred	*creds,
+		flid_t		*fl,
+		buf_t		**rbuf,
+		int		*pboff,
+		int		*pbsize)
+{
+	vnode_t		*vp;
+	xfs_inode_t	*ip;
+	int		error;
+	struct bmapval	bmaps[2];
+	int		nmaps;
+	buf_t		*bp;
+	extern void	chunkrelse(buf_t *bp);
+
+	vp = BHV_TO_VNODE(bdp);
+	ip = XFS_BHVTOI(vp->v_fbhv);
+	*rbuf = NULL;
+	*pboff = *pbsize = -1;
+	error = 0;
+
+	xfs_rwlock(bdp, VRWLOCK_READ);
+
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
+		error = EIO;
+		goto out;
+	}
+
+#ifndef SIM
+	/*
+	 * blow this off if mandatory locking or DMI are involved
+	 */
+	if (MANDLOCK(vp, ip->i_d.di_mode))
+		goto out;
+
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_READ) && !(ioflags & IO_INVIS))
+		goto out;
+#endif
+
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+	if (offset >= ip->i_d.di_size) {
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		goto out;
+	}
+
+	/*
+	 * prohibit iomap read from giving us back our data in
+	 * two buffers but let it set up read-ahead.
+	 */
+	nmaps = 2;
+	error = xfs_iomap_read(ip, offset, len, bmaps, &nmaps, NULL);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+	/*
+	 * if the first bmap doesn't match the I/O request, forget it.
+	 * This means that we can't fit the request into one buffer.
+	 */
+	if (error ||
+	    ((bmaps[0].pbsize != len) &&
+	     (bmaps[0].eof & BMAP_EOF) == 0))
+		goto out;
+
+	/*
+	 * if the caller has specified that the I/O fit into
+	 * one page and it doesn't, forget it.  The caller won't
+	 * be able to use it.
+	 */
+	if ((ioflags & IO_ONEPAGE)
+	    && pnum(offset) != pnum(offset + bmaps[0].pbsize-1)) {
+		goto out;
+	}
+
+	bp = chunkread(vp, bmaps, nmaps, creds);
+
+	if (bp->b_flags & B_ERROR) {
+		error = geterror(bp);
+		ASSERT(error != EINVAL);
+		/*
+		 * b_relse functions like chunkhold
+		 * expect B_DONE to be there.
+		 */
+		bp->b_flags |= B_DONE|B_STALE;
+		brelse(bp);
+		goto out;
+	}
+
+	if ((bmaps[0].pboff + bmaps[0].pbsize) == bmaps[0].bsize)
+		bp->b_relse = chunkrelse;
+
+	*rbuf = bp;
+	*pboff = bmaps[0].pboff;
+	*pbsize = bmaps[0].pbsize;
+
+	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+out:
+	xfs_rwunlock(bdp, VRWLOCK_READ);
+	return XFS_ERROR(error);
+}
+
 /* ARGSUSED */		
 int
 xfs_read_file(
@@ -1309,8 +1414,10 @@ xfs_read(
 		    uiop->uio_readiolog >= XFS_UIO_MIN_READIO_LOG &&
 		    uiop->uio_readiolog <= XFS_UIO_MAX_READIO_LOG) {
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
+#if !(defined(DEBUG) && defined(UIOSZ_DEBUG))
 			if (!(ip->i_flags & XFS_IUIOSZ) ||
 			    uiop->uio_readiolog < ip->i_readio_log) {
+#endif /* ! (DEBUG && UIOSZ_DEBUG) */
 				ip->i_readio_log =  uiop->uio_readiolog;
 				ip->i_readio_blocks = 1 <<
 						(int) (ip->i_readio_log -
@@ -1326,7 +1433,16 @@ xfs_read(
 							    ip->i_readio_log));
 					ip->i_flags |= XFS_IUIOSZ;
 				}
+#if defined(DEBUG) && defined(UIOSZ_DEBUG)
+				atomicAddInt(&uiodbg_switch, 1);
+				atomicAddInt(
+					&(uiodbg_readiolog[ip->i_readio_log -
+						XFS_UIO_MIN_READIO_LOG]),
+					1);
+#endif
+#if !(defined(DEBUG) && defined(UIOSZ_DEBUG))
 			}
+#endif /* ! (DEBUG && UIOSZ_DEBUG) */
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 #endif /* !SIM */
@@ -2051,7 +2167,8 @@ xfs_iomap_write(
 				 * left off.
 				 */
 				ASSERT((XFS_FSB_TO_B(mp, next_offset_fsb) &
-					((1 << ip->i_writeio_log) - 1))==0);
+					((1 << (int) ip->i_writeio_log) - 1))
+					==0);
 				xfs_write_bmap(mp, curr_imapp, next_bmapp,
 					       iosize, next_offset_fsb,
 					       isize);
@@ -2824,10 +2941,10 @@ start:
 		    uiop->uio_writeiolog >= XFS_UIO_MIN_WRITEIO_LOG &&
 		    uiop->uio_writeiolog <= XFS_UIO_MAX_WRITEIO_LOG) {
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
-#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
+#if !(defined(DEBUG) && defined(UIOSZ_DEBUG))
 			if (!(ip->i_flags & XFS_IUIOSZ) ||
 			    uiop->uio_writeiolog < ip->i_writeio_log) {
-#endif
+#endif /* ! (DEBUG && UIOSZ_DEBUG) */
 				ip->i_writeio_log = uiop->uio_writeiolog;
 				ip->i_writeio_blocks = 1 <<
 					(int) (ip->i_writeio_log -
@@ -2849,9 +2966,9 @@ start:
 						XFS_UIO_MIN_WRITEIO_LOG]),
 					1);
 #endif
-#if defined(DEBUG) && !defined(UIOSZ_DEBUG)
+#if !(defined(DEBUG) && defined(UIOSZ_DEBUG))
 			}
-#endif
+#endif /* ! (DEBUG && UIOSZ_DEBUG) */
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 #endif /* !SIM */
