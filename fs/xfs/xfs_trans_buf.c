@@ -55,7 +55,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		  dev_t		dev,
 		  daddr_t	blkno,
 		  int		len,
-		  uint		lock_flags)
+		  uint		flags)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
@@ -64,7 +64,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * Default to a normal get_buf() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
-		return (get_buf(dev, blkno, len, lock_flags));
+		return (get_buf(dev, blkno, len, flags));
 	}
 
 	/*
@@ -80,7 +80,15 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		return (bp);
 	}
 
-	bp = xfs_get_buf(dev, blkno, len, lock_flags);
+	/*
+	 * We always specify the BUF_BUSY flag within a transaction so
+	 * that get_buf does not try to push out a delayed write buffer
+	 * which might cause another transaction to take place (if the
+	 * buffer was delayed alloc).  Such recursive transactions can
+	 * easily deadlock with our current transaction as well as cause
+	 * us to run out of stack space.
+	 */
+	bp = xfs_get_buf(dev, blkno, len, flags | BUF_BUSY);
 	if (bp == NULL) {
 		return NULL;
 	}
@@ -202,7 +210,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		   dev_t	dev,
 		   daddr_t	blkno,
 		   int		len,
-		   uint		lock_flags)
+		   uint		flags)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
@@ -211,7 +219,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 * Default to a normal read_buf() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
-		return (read_buf(dev, blkno, len, lock_flags));
+		return (read_buf(dev, blkno, len, flags));
 	}
 
 	/*
@@ -247,7 +255,15 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		return (bp);
 	}
 
-	bp = xfs_read_buf(dev, blkno, len, lock_flags);
+	/*
+	 * We always specify the BUF_BUSY flag within a transaction so
+	 * that get_buf does not try to push out a delayed write buffer
+	 * which might cause another transaction to take place (if the
+	 * buffer was delayed alloc).  Such recursive transactions can
+	 * easily deadlock with our current transaction as well as cause
+	 * us to run out of stack space.
+	 */
+	bp = xfs_read_buf(dev, blkno, len, flags | BUF_BUSY);
 	if (bp == NULL) {
 		return NULL;
 	}
