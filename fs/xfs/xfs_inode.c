@@ -169,13 +169,13 @@ xfs_iformat(xfs_mount_t		*mp,
 			} else {
 				real_size = (((size + 3) >> 2) << 2);
 				ip->i_u1.iu_data =
-					(char*)kmem_alloc(real_size,
-							  KM_SLEEP);
+					(char*)kmem_alloc(real_size, KM_SLEEP);
 			}
 			ip->i_bytes = size;
 			ip->i_real_bytes = real_size;
 			if (size)
 				bcopy(dip->di_u.di_c, ip->i_u1.iu_data, size);
+			ip->i_flags &= ~XFS_IEXTENTS;
 			ip->i_flags |= XFS_IINLINE;
 			return;
 
@@ -191,6 +191,7 @@ xfs_iformat(xfs_mount_t		*mp,
 			 */
 			nex = (int)dip->di_core.di_nextents;
 			size = nex * (int)sizeof(xfs_bmbt_rec_t);
+			real_size = 0;
 			if (nex == 0) {
 				ip->i_u1.iu_extents = NULL;
 			} else if (nex <= XFS_INLINE_EXTS) {
@@ -198,8 +199,10 @@ xfs_iformat(xfs_mount_t		*mp,
 			} else {
 				ip->i_u1.iu_extents = (xfs_bmbt_rec_t*)
 						kmem_alloc(size, KM_SLEEP);
+				real_size = size;
 			}
 			ip->i_bytes = size;
+			ip->i_real_bytes = real_size;
 			if (size)
 				bcopy(&dip->di_u.di_bmx, ip->i_u1.iu_extents, size); 
 			ip->i_flags |= XFS_IEXTENTS;
@@ -228,6 +231,7 @@ xfs_iformat(xfs_mount_t		*mp,
 			xfs_bmdr_to_bmbt(&dip->di_u.di_bmbt,
 				XFS_BMAP_BROOT_SIZE(dinode_size),
 				ip->i_broot, size);
+			ip->i_flags &= ~XFS_IEXTENTS;
 			ip->i_flags |= XFS_IBROOT;
 			return;
 
@@ -335,7 +339,7 @@ xfs_iread_extents(xfs_trans_t	*tp,
 	size = ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t);
 	ip->i_u1.iu_extents = kmem_alloc(size, KM_SLEEP);
 	ip->i_lastex = NULLEXTNUM;
-	ip->i_bytes = size;
+	ip->i_bytes = ip->i_real_bytes = size;
 	ip->i_flags |= XFS_IEXTENTS;
 	xfs_bmap_read_extents(tp, ip);
 }
@@ -445,7 +449,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 	case IFLNK:
 		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 		ip->i_flags |= XFS_IEXTENTS;
-		ip->i_bytes = 0;
+		ip->i_bytes = ip->i_real_bytes = 0;
 		ip->i_u1.iu_extents = NULL;
 		break;
 	case IFMNT:
@@ -813,9 +817,11 @@ xfs_iext_realloc(xfs_inode_t	*ip,
 
 	if (new_size == 0) {
 		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
+			ASSERT(ip->i_real_bytes != 0);
 			kmem_free(ip->i_u1.iu_extents, ip->i_real_bytes);
 		}
 		ip->i_u1.iu_extents = NULL;
+		rnew_size = 0;
 	} else if (new_size <= sizeof(ip->i_u2.iu_inline_ext)) {
 		/*
 		 * If the valid extents can fit in iu_inline_ext,
@@ -834,6 +840,7 @@ xfs_iext_realloc(xfs_inode_t	*ip,
 			}
 			ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
 		}
+		rnew_size = 0;
 	} else {
 		rnew_size = new_size;
 		if ((rnew_size & (rnew_size - 1)) != 0)
@@ -851,8 +858,8 @@ xfs_iext_realloc(xfs_inode_t	*ip,
 				kmem_realloc(ip->i_u1.iu_extents,
 					     rnew_size, KM_SLEEP);
 		}
-		ip->i_real_bytes = rnew_size;
 	}
+	ip->i_real_bytes = rnew_size;
 	ip->i_bytes = new_size;
 }
 
@@ -891,7 +898,7 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 			kmem_free(ip->i_u1.iu_data, ip->i_real_bytes);
 		}
 		ip->i_u1.iu_data = NULL;
-		ip->i_real_bytes = 0;
+		real_size = 0;
 	} else if (new_size <= sizeof(ip->i_u2.iu_inline_data)) {
 		/*
 		 * If the valid extents/data can fit in iu_inline_ext/data,
@@ -906,7 +913,7 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 			kmem_free(ip->i_u1.iu_data, ip->i_real_bytes);
 			ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
 		}
-		ip->i_real_bytes = 0;
+		real_size = 0;
 	} else {
 		/*
 		 * Stuck with malloc/realloc.
@@ -935,8 +942,8 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 			bcopy(ip->i_u2.iu_inline_data, ip->i_u1.iu_data,
 			      ip->i_bytes);
 		}
-		ip->i_real_bytes = real_size;
 	}
+	ip->i_real_bytes = real_size;
 	ip->i_bytes = new_size;
 }
 
@@ -996,12 +1003,18 @@ xfs_idestroy(xfs_inode_t *ip)
 		if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 			if ((ip->i_u1.iu_data != ip->i_u2.iu_inline_data) && 
 			    (ip->i_u1.iu_data != NULL)) {
-				kmem_free(ip->i_u1.iu_data, ip->i_bytes);
+				ASSERT(ip->i_real_bytes != 0);
+				kmem_free(ip->i_u1.iu_data, ip->i_real_bytes);
+				ip->i_u1.iu_data = NULL;
+				ip->i_real_bytes = 0;
 			}
 		} else if ((ip->i_flags & XFS_IEXTENTS) &&
 			   (ip->i_u1.iu_extents != NULL) &&
 			   (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext)) {
-			kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+			ASSERT(ip->i_real_bytes != 0);
+			kmem_free(ip->i_u1.iu_extents, ip->i_real_bytes);
+			ip->i_u1.iu_extents = NULL;
+			ip->i_real_bytes = 0;
 		}
 		break;
 	}
