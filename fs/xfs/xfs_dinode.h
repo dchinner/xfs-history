@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.37 $"
+#ident "$Revision: 1.38 $"
 
 struct buf;
 struct xfs_mount;
@@ -36,7 +36,7 @@ typedef struct xfs_dinode_core
 	__uint16_t	di_mode;	/* mode and type of file */
 	__int8_t	di_version;	/* inode version */
 	__int8_t	di_format;	/* format of di_c data */
-	__int16_t	di_nlink;	/* number of links to file */
+	__uint16_t	di_nlink;	/* number of links to file */
 	__uint32_t	di_uid;		/* owner's user id */
 	__uint32_t	di_gid;		/* owner's group id */
 	uuid_t		di_uuid;	/* file unique id */
@@ -80,6 +80,8 @@ typedef struct xfs_dinode
 		xfs_attr_shortform_t di_attrsf;	/* shortform attribute list */
 	}		di_a;
 } xfs_dinode_t;
+
+#define	XFS_MAXLINK		MAXLINK		/* for now, 30000 */
 
 /*
  * Bit names for logging disk inodes only
