@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -119,6 +119,7 @@ void xfs_log_print(struct xfs_mount *mp,
 		   dev_t	    log_dev,
 		   daddr_t	    start_block,
 		   int		    num_bblocks,
+		   int		    start_print_block,
 		   uint		    flags);
 
 
