@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.79 $"
+#ident	"$Revision: 1.82 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -978,7 +978,7 @@ xfs_bmbt_lookup(
 	xfs_bmbt_block_t	*block;
 	buf_t			*bp;
 	daddr_t			d;
-	int			diff;
+	xfs_sfiloff_t		diff;
 	int			error;
 	xfs_fsblock_t		fsbno;
 	int			high;
@@ -1059,7 +1059,8 @@ xfs_bmbt_lookup(
 					krp = krbase + keyno - 1;
 					startoff = xfs_bmbt_get_startoff(krp);
 				}
-				diff = (int)(startoff - rp->br_startoff);
+				diff = (xfs_sfiloff_t)
+						(startoff - rp->br_startoff);
 				if (diff < 0)
 					low = keyno + 1;
 				else if (diff > 0)
