@@ -144,10 +144,6 @@ typedef struct pb_target {
 	unsigned int		pbr_blocksize_bits;
 } pb_target_t;
 
-#define PBT_ADDR_SPACE(pbt)	((pbt)->pbr_mapping)
-#define PB_ADDR_SPACE(pb)	PBT_ADDR_SPACE((pb)->pb_target)
-
-
 /*
  *	page_buf_bmap_t:  File system I/O map
  *

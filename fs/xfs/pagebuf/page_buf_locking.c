@@ -383,7 +383,7 @@ pagebuf_target_clear(
 	pb_target_t	*target)
 {
 	destroy_buffers(target->pbr_kdev);
-	truncate_inode_pages(PBT_ADDR_SPACE(target), 0LL);
+	truncate_inode_pages(target->pbr_mapping, 0LL);
 	return 0;
 }
 
