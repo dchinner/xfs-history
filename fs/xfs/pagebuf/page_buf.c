@@ -665,7 +665,7 @@ _pagebuf_get_prealloc_bh(void)
 		do {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			spin_unlock_irqrestore(&pb_resv_bh_lock, flags);
-			run_task_queue(&tq_disk);
+			pagebuf_run_task_queue(NULL);
 			schedule();
 			spin_lock_irqsave(&pb_resv_bh_lock, flags);
 		} while (pb_resv_bh_cnt < 1);
@@ -1256,7 +1256,7 @@ _pagebuf_wait_unpin(
 		if (atomic_read(&PBP(pb)->pb_pin_count) == 0) {
 			break;
 		}
-		run_task_queue(&tq_disk);
+		pagebuf_run_task_queue(pb);
 		schedule();
 	}
 	remove_wait_queue(&PBP(pb)->pb_waiters, &wait);
@@ -1303,7 +1303,8 @@ pagebuf_iodone_sched(
 
 void
 pagebuf_iodone(
-	page_buf_t		*pb)
+	page_buf_t		*pb,
+	int			schedule)
 {
 	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
 	if (pb->pb_error == 0) {
@@ -1313,12 +1314,16 @@ pagebuf_iodone(
 	PB_TRACE(pb, PB_TRACE_REC(done), pb->pb_iodone);
 
 	if ((pb->pb_iodone) || (pb->pb_flags & PBF_ASYNC)) {
-		INIT_TQUEUE(&pb->pb_iodone_sched,
-			pagebuf_iodone_sched, (void *)pb);
+		if (schedule) {
+			INIT_TQUEUE(&pb->pb_iodone_sched,
+				pagebuf_iodone_sched, (void *)pb);
 
-		queue_task(&pb->pb_iodone_sched,
-				&pagebuf_iodone_tq[smp_processor_id()]);
-		wake_up(&pagebuf_iodone_wait[smp_processor_id()]);
+			queue_task(&pb->pb_iodone_sched,
+					&pagebuf_iodone_tq[smp_processor_id()]);
+			wake_up(&pagebuf_iodone_wait[smp_processor_id()]);
+		} else {
+			pagebuf_iodone_sched(pb);
+		}
 	} else {
 		up(&pb->pb_iodonesema);
 	}
@@ -1402,9 +1407,9 @@ STATIC inline void
 _pb_io_done(
 	page_buf_t		*pb)
 {
-	if (atomic_dec_and_test(&PBP(pb)->pb_io_remaining) == 1) {
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb);
+		pagebuf_iodone(pb, 1);
 	}
 }
 
@@ -1659,7 +1664,7 @@ request:
 		}
 
 		/* Indicate that there is another page in progress */
-		atomic_inc(&PBP(pb)->pb_io_remaining);
+		atomic_inc(&pb->pb_io_remaining);
 
 #ifdef RQ_WRITE_ORDERED
 		if (flush)
@@ -1786,14 +1791,12 @@ pagebuf_iorequest(			/* start real I/O		*/
 	 * completion callout which happens before we have started
 	 * all the I/O from calling iodone too early
 	 */
-	atomic_set(&PBP(pb)->pb_io_remaining, 1);
+	atomic_set(&pb->pb_io_remaining, 1);
 	status = _pagebuf_segment_apply(pb);
 
 	/* Drop our count and if everything worked we are done */
-	if (atomic_dec_and_test(&PBP(pb)->pb_io_remaining) == 1) {
-		pagebuf_iodone(pb);
-	} else if ((pb->pb_flags & (PBF_SYNC|PBF_ASYNC)) == PBF_SYNC)  {
-		run_task_queue(&tq_disk);
+	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
+		pagebuf_iodone(pb, 0);
 	}
 
 	return status < 0 ? status : 0;
@@ -1811,7 +1814,7 @@ pagebuf_iowait(
 	page_buf_t		*pb)
 {
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
-	run_task_queue(&tq_disk);
+	pagebuf_run_task_queue(pb);
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, PB_TRACE_REC(iowaited), (int)pb->pb_error);
 	return pb->pb_error;
@@ -2180,10 +2183,10 @@ pagebuf_daemon(
 			__pagebuf_iorequest(pb);
 		}
 
-		if (count)
-			run_task_queue(&tq_disk);
 		if (as_list_len > 0)
 			purge_addresses();
+		if (count)
+			pagebuf_run_task_queue(NULL);
 
 		force_flush = 0;
 	} while (pb_daemon->active == 1);
@@ -2255,7 +2258,7 @@ pagebuf_delwri_flush(
 
 	spin_unlock(&pb_daemon->pb_delwrite_lock);
 
-	run_task_queue(&tq_disk);
+	pagebuf_run_task_queue(NULL);
 
 	if (pinptr)
 		*pinptr = pincount;
