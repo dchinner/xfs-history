@@ -43,10 +43,11 @@ KALLSYMS	= /sbin/kallsyms
 MODFLAGS	= -DMODULE
 CFLAGS_KERNEL	=
 PERL		= perl
+AWK		= awk
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
 	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
-	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL
+	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS MODFLAGS PERL AWK
 
 all:	do-it-all
 
@@ -430,6 +431,8 @@ mrproper: clean archmrproper
 	rm -f $(TOPDIR)/include/linux/modversions.h
 	rm -rf $(TOPDIR)/include/linux/modules
 	$(MAKE) -C Documentation/DocBook mrproper
+	rm -rf kdb/gen-kdb_cmds.c
+
 distclean: mrproper
 	rm -f core `find . \( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
