@@ -123,7 +123,7 @@ unlock:
 	return (-status);
 }
 
-ssize_t				/* error (positive) */
+ssize_t			/* bytes read, or (-)  error */
 xfs_read(
 	bhv_desc_t	*bdp,
 	struct file	*file,
@@ -417,7 +417,7 @@ out_lock:
 	return error;
 }
 
-ssize_t				/* error (positive) */
+ssize_t				/* bytes written, or (-) error */
 xfs_write(
 	bhv_desc_t	*bdp,
 	struct file	*file,
@@ -453,14 +453,14 @@ xfs_write(
 	xfs_check_frozen(mp, bdp, XFS_FREEZE_WRITE);
 
 	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
-		return EIO;
+		return -EIO;
 	}
 
 	if (direct) {
 		if (((__psint_t)buf & BBMASK) ||
 		    (*offset & mp->m_blockmask) ||
 		    (size  & mp->m_blockmask)) {
-			return XFS_ERROR(EINVAL);
+			return XFS_ERROR(-EINVAL);
 		}
 		iolock = XFS_IOLOCK_SHARED;
 		locktype = VRWLOCK_WRITE_DIRECT;
@@ -479,7 +479,7 @@ start:
 	n = limit - *offset;
 	if (n <= 0) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
-		return EFBIG;
+		return -EFBIG;
 	}
 	if (n < size)
 		size = n;
@@ -499,7 +499,7 @@ start:
 				FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
 			xfs_iunlock(xip, iolock);
-			return error;
+			return -error;
 		}
 		xfs_ilock(xip, XFS_ILOCK_EXCL);
 		eventsent = 1;
@@ -544,7 +544,7 @@ start:
 			isize, *offset + size, NULL);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
-			return(error);
+			return(-error);
 		}
 	}
 	xfs_iunlock(xip, XFS_ILOCK_EXCL);
@@ -563,7 +563,7 @@ start:
 		error = xfs_write_clear_setuid(xip);
 		if (error) {
 			xfs_iunlock(xip, iolock);
-			return error;
+			return -error;
 		}
 	}
 
@@ -583,18 +583,14 @@ retry:
 				DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
 				0, 0, 0); /* Delay flag intentionally  unused */
 		if (error)
-			return error;
+			return -error;
 		xfs_rwlock(bdp, locktype);
 		*offset = xip->i_d.di_size;
 		goto retry;
 
 	}
 
-	if (ret <=0) {	/*
-			 * ret from pagebuf_generic_file_write <= 0, it's
-			 * an error, we want to return positive though
-			 * then bail out...
-			 */
+	if (ret <= 0) {
 		xfs_rwunlock(bdp, locktype);
 		return ret;
 	}
