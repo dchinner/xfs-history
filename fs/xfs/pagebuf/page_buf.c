@@ -1224,14 +1224,6 @@ _pagebuf_wait_unpin(
 	current->state = TASK_RUNNING;
 }
 
-void
-pagebuf_queue_task(
-	struct tq_struct	*task)
-{
-	queue_task(task, &pagebuf_iodone_tq[smp_processor_id()]);
-	wake_up(&pagebuf_iodone_wait[smp_processor_id()]);
-}
-
 
 /*
  *	Buffer Utility Routines

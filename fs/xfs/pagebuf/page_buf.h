@@ -304,9 +304,6 @@ static inline int pagebuf_geterror(page_buf_t *pb)
 	return (pb ? pb->pb_error : ENOMEM);
 }
 
-extern void pagebuf_queue_task(
-		struct tq_struct *);
-
 extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 		page_buf_t *,		/* buffer to mark		*/
 		int);			/* run completion locally, or in
