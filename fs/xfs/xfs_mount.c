@@ -618,13 +618,8 @@ xfs_mountfs(
 			readio_log = XFS_WSYNC_READIO_LOG;
 			writeio_log = XFS_WSYNC_WRITEIO_LOG;
 		} else {
-			if (physmem <= 8192) {		/* <= 32MB */
-				readio_log = XFS_READIO_LOG_SMALL;
-				writeio_log = XFS_WRITEIO_LOG_SMALL;
-			} else {
-				readio_log = XFS_READIO_LOG_LARGE;
-				writeio_log = XFS_WRITEIO_LOG_LARGE;
-			}
+			readio_log = XFS_READIO_LOG_LARGE;
+			writeio_log = XFS_WRITEIO_LOG_LARGE;
 		}
 	} else {
 		readio_log = mp->m_readio_log;
