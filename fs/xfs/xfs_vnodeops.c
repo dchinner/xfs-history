@@ -1786,6 +1786,9 @@ again:
  * exist under dp2.
  *
  * We are renaming dp1/name1 to dp2/name2.
+ *
+ * Return ENOENT if dp1 does not exist, other lookup errors, or 0 for success.
+ * Return EAGAIN if the caller needs to try again.
  */
 STATIC int
 xfs_lock_for_rename(
@@ -1891,23 +1894,19 @@ xfs_lock_for_rename(
 	 * interval between when the locks were released and when
 	 * they were reacquired.
 	 */
-	if (dp1->i_gen != dir_gen1) {
-		/*
-		 * This is an unimplemented case.
-		 */
-		ASSERT (0);
-	}
-        if (dp2->i_gen != dir_gen2) {
-                /*
-                 * This is an unimplemented case.
-                 */
-                ASSERT (0);
+	if (dp1->i_gen != dir_gen1 || dp2->i_gen != dir_gen2) {
 		/*
 		 * Someone else may have linked in a new inode
 		 * with the same name.  If so, we'll need to
 		 * release our locks & go through the whole
 		 * thing again.
 		 */
+		xfs_iunlock (i_tab[0], XFS_ILOCK_EXCL);
+		for (i=1; i < num_inodes; i++) {
+			if (i_tab[i] != i_tab[i-1])
+				xfs_iunlock (i_tab[i], XFS_ILOCK_EXCL);
+		}
+		return EAGAIN;
         }
 
 
@@ -2406,8 +2405,10 @@ start_over:
 	ASSERT (src_dp->i_d.di_nlink >= 2);
         target_dp = XFS_VTOI(target_dir_vp);
 	ASSERT (target_dp->i_d.di_nlink >= 2);
-	if (error = xfs_lock_for_rename(src_dp, target_dp, src_name,
-				        target_name, &src_ip, &target_ip))
+	while ((error = xfs_lock_for_rename(src_dp, target_dp, src_name,
+				target_name, &src_ip, &target_ip)) == EAGAIN)
+		continue;
+	if (error)
 		return error;
 
 	ASSERT (src_ip != NULL);
