@@ -143,6 +143,7 @@ linvfs_read_super(
 
 
 	MOD_INC_USE_COUNT;
+	ENTER("linvfs_read_super");
 
 	lock_super(sb);
 
@@ -196,6 +197,16 @@ linvfs_read_super(
 		}
     
 		break;
+	case 3:{ /* hd */
+	  int disk, partition;
+	  
+	  disk = MINOR(sb->s_dev) / 16;
+	  partition = MINOR(sb->s_dev) % 16;
+	  
+	  sprintf(spec, "/dev/sd%c%d", 'a' + disk, partition);
+	  printf ("Using device %s\n",spec);
+	}
+	break;
 	default:
 		panic("FixMe!!!  (uap->spec)\n");
 	};
@@ -271,6 +282,7 @@ linvfs_read_super(
 		unlock_super(sb);
 		MOD_DEC_USE_COUNT;
 
+		ENTER("linvfs_read_super <OK>");
 		return(NULL);
 }
 
@@ -517,9 +529,11 @@ static struct file_system_type linvfs_fs_type = {
 
 __initfunc(int init_linvfs_fs(void))
 {
-	cred_init();
-
-	return register_filesystem(&linvfs_fs_type);
+  ENTER("init_linvfs_fs"); 
+  cred_init();
+  
+  EXIT("init_linvfs_fs"); 
+  return register_filesystem(&linvfs_fs_type);
 }
 
 #ifdef MODULE

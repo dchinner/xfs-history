@@ -32,7 +32,7 @@
 #include <ksys/kern_heap.h>
 #include <sys/debug.h>
 
-#include "sim.h"
+#include "xfs_sim.h"
 
 zone_t	*bhv_global_zone;
 

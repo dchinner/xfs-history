@@ -77,6 +77,15 @@ XFS_OBJS  :=   xfs_alloc.o \
 		oplockstubs.o
 #                xfs_rpc_item.o
  
+FS_LINKS = xfs_alloc xfs_macros xfs_types xfs_inum xfs_log \
+           xfs_ag xfs_sb xfs_trans xfs_dir xfs_dir2 xfs_mount \
+           xfs_error xfs_bmap_btree xfs_attr_sf xfs_dir_sf xfs_dir2_sf \
+           xfs_dinode xfs_imap xfs_inode_item xfs_inode \
+           xfs_ialloc_btree xfs_ialloc xfs_log_priv \
+           xfs_buf_item xfs_alloc_btree xfs_log_recover xfs_extfree_item \
+           xfs_trans_priv xfs_bit xfs_quota xfs_dqblk xfs_dquot_item \
+           xfs_dquot xfs_qm xfs_rw 
+
 O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS) libgcc.a
 
 include $(TOPDIR)/Rules.make
@@ -92,5 +101,20 @@ CFLAGS	= -Wstrict-prototypes -O2 -fomit-frame-pointer
 #	) > $(dir $@)/.$(notdir $@).flags
 
 
-libgcc.a:
+links:  $(FS_LINKS) sys ksys fs 
+
+libgcc.a: 
 		ln -sf `find /usr/lib/gcc-lib -name libgcc.a -print | head -1`   
+
+sys:
+		rm -f $@; ln -s linux-sys $@
+
+ksys:
+		rm -f $@; ln -s linux-ksys $@
+
+fs:
+		rm -f $@; ln -s linux-fs $@
+
+$(FS_LINKS):
+		(cd linux-sys/fs;if [ -L $@.h ]; then rm -f $@.h; fi;  ln -s ../../$@.h $@.h)
+

@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Id: xfs_behavior.c,v 1.2 1999/09/02 22:24:14 cattelan Exp $"
+#ident "$Id: xfs_behavior.c,v 1.3 1999/09/10 18:00:00 cattelan Exp $"
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized 
@@ -32,7 +32,7 @@
 #include <ksys/kern_heap.h>
 #include <sys/debug.h>
 
-#include "sim.h"
+#include "xfs_sim.h"
 
 zone_t	*bhv_global_zone;
 
