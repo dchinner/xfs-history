@@ -429,6 +429,7 @@ inode_allocate:
 			error = xfs_iget_core(vp, mp, tp, ino,
 							lock_flags, ipp, bno);
 			if (error) {
+				remove_inode_hash(inode);
 				make_bad_inode(inode);
 				if (inode->i_state & I_NEW)
 					unlock_new_inode(inode);
@@ -556,6 +557,7 @@ xfs_iput_new(xfs_inode_t	*ip,
 
 	/* We shouldn't get here without this being true, but just in case */
 	if (inode->i_state & I_NEW) {
+		remove_inode_hash(inode);
 		make_bad_inode(inode);
 		unlock_new_inode(inode);
 	}
