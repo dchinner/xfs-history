@@ -947,12 +947,12 @@ found:
 	file.f_flags = oflags;
 
 	if (fmode & FMODE_READ) {
-		VOP_READ(vp, &file, bufp, len, &off, NULL, error);
+		VOP_READ(vp, &file, bufp, len, &off, NULL, xfer);
 	} else {
-		VOP_WRITE(vp, &file, bufp, len, &off, NULL, error);
+		VOP_WRITE(vp, &file, bufp, len, &off, NULL, xfer);
 	}
-	if (error >= 0) {
-		*rvp = xfer = error;
+	if (xfer >= 0) {
+		*rvp = xfer;
 		error = 0;
 		linvfs_revalidate_core(ip, ATTR_COMM);
 		if (fmode & FMODE_READ) {
@@ -961,7 +961,7 @@ found:
 			XFS_STATS_ADD(xfsstats.xs_write_bytes, xfer);
 		}
 	} else {
-		error = -error;
+		error = -(int)xfer;
 	}
 
 	if (file.f_mode & FMODE_WRITE)
