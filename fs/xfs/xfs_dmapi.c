@@ -327,7 +327,7 @@ xfs_ip_to_stat(
 	if ((vp->v_type == VREG) || (vp->v_type == VDIR)) {
 		buf->dt_rdev = 0;
 	} else if ((vp->v_type == VCHR) || (vp->v_type == VBLK) ) {
-		buf->dt_rdev = XFS_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev);
+		buf->dt_rdev = kdev_t_to_nr(XFS_DEV_TO_KDEVT(ip->i_df.if_u2.if_rdev));
 	} else {
 		buf->dt_rdev = 0;	/* not a b/c spec. */
 	}
