@@ -32,6 +32,10 @@
 # Makefile for XFS on Linux.
 #
 
+# Ensure that none of the new files for XFS try to include files from outside
+# the kernel.  These overrides are not required for kbuild 2.5.  KAO
+EXTRA_CFLAGS += $(kbuild_2_4_nostdinc)
+
 # This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
 # but I am not going to change every file at the moment.  It also needs

@@ -267,6 +267,17 @@ MRPROPER_DIRS = \
 
 include arch/$(ARCH)/Makefile
 
+# Optional cflags for kbuild 2.4, to prevent individual files or an entire
+# directory including files from outside the kernel.  To control an individual
+# file, use CFLAGS_foo.o += $(kbuild_2_4_nostdinc), to control an entire
+# directory use EXTRA_CFLAGS += $(kbuild_2_4_nostdinc).  In kbuild 2.5 the
+# default is to forbid includes from outside the kernel tree, you can use this
+# variable in kbuild 2.4 to ensure that your code is clean before 2.5.  KAO.
+
+kbuild_2_4_nostdinc     := -nostdinc $(shell $(CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp')
+export kbuild_2_4_nostdinc
+dummy := $(shell echo kbuild_2_4_nostdinc := $(kbuild_2_4_nostdinc) >&2)
+
 export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
 export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
