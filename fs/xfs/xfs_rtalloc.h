@@ -11,7 +11,11 @@
  * Constants for bit manipulations.
  */
 #define	XFS_NBBYLOG	3		/* log2(NBBY) */
+#if XFS_RTWORD_LL
+#define	XFS_WORDLOG	3		/* log2(sizeof(xfs_rtword_t)) */
+#else
 #define	XFS_WORDLOG	2		/* log2(sizeof(xfs_rtword_t)) */
+#endif
 #define	XFS_NBWORDLOG	(XFS_NBBYLOG + XFS_WORDLOG)
 #define	XFS_NBWORD	(1 << XFS_NBWORDLOG)
 #define	XFS_WORDMASK	((1 << XFS_WORDLOG) - 1)
@@ -38,6 +42,20 @@
 #define	XFS_RTMIN(a,b)	((a) < (b) ? (a) : (b))
 #define	XFS_RTMAX(a,b)	((a) > (b) ? (a) : (b))
 
+#if XFS_RTWORD_LL
+#define	XFS_RTLOBIT(w)	xfs_lowbit64(w)
+#define	XFS_RTHIBIT(w)	xfs_highbit64(w)
+#else
+#define	XFS_RTLOBIT(w)	xfs_lowbit32(w)
+#define	XFS_RTHIBIT(w)	xfs_highbit32(w)
+#endif
+
+#if XFS_BIG_FILESYSTEMS
+#define	XFS_RTBLOCKLOG(b)	xfs_highbit64(b)
+#else
+#define	XFS_RTBLOCKLOG(b)	xfs_highbit32(b)
+#endif
+
 /*
  * Function prototypes for exported functions.
  */
@@ -58,12 +76,6 @@ xfs_rtfree_extent(
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	len);
-
-#ifdef SIM
-int
-xfs_rthibit(
-	xfs_rtword_t	w);
-#endif
 
 void
 xfs_rtprint_range(

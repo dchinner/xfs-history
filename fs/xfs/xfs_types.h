@@ -47,7 +47,8 @@ typedef __int32_t	xfs_extnum_t;	/* # of extents in a file */
 typedef	__int64_t	xfs_fsize_t;	/* bytes in a file */
 
 typedef	__int32_t	xfs_suminfo_t;	/* type of bitmap summary info */
-typedef	__int32_t	xfs_rtword_t;	/* word type for bitmap manipulations */
+#define	XFS_RTWORD_LL	(_MIPS_SZLONG == 64)
+typedef	long		xfs_rtword_t;	/* word type for bitmap manipulations */
 
 typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
 typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
