@@ -174,7 +174,7 @@ xfs_dm_send_data_event(
 				offset, length, flags);
 		if (locktype)
 			xfs_rwlock(bdp, *locktype);
-	}  while (DM_EVENT_ENABLED(vp->v_vfsp, ip, event));
+	}  while (!error && DM_EVENT_ENABLED(vp->v_vfsp, ip, event));
 	
 	return error;
 }
