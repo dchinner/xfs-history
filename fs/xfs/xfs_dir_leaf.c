@@ -1,4 +1,4 @@
-#ident "$Revision: 1.58 $"
+#ident "$Revision: 1.59 $"
 
 /*
  * xfs_dir_leaf.c
@@ -149,6 +149,11 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	if (dp->di_core.di_format != XFS_DINODE_FMT_LOCAL) {
 		return 0;
 	}
+	if (dp->di_core.di_size < sizeof(sf->hdr)) {
+		xfs_fs_cmn_err(CE_WARN, mp, "Invalid shortform size: dp 0x%p\n",
+			dp);
+		return 1;
+	}
 	sf = (xfs_dir_shortform_t *)(&dp->di_u.di_dirsf);
 	ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
 	if (xfs_dir_ino_validate(mp, ino))
@@ -238,6 +243,19 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 
 	dp = args->dp;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
+	/*
+	 * Catch the case where the conversion from shortform to leaf
+	 * failed part way through.
+	 */
+	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
+		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
+		return XFS_ERROR(EIO);
+	}
+	ASSERT(dp->i_df.if_bytes == dp->i_d.di_size);
+	ASSERT(dp->i_df.if_u1.if_data != NULL);
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
@@ -278,6 +296,19 @@ xfs_dir_shortform_removename(xfs_da_args_t *args)
 
 	dp = args->dp;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
+	/*
+	 * Catch the case where the conversion from shortform to leaf
+	 * failed part way through.
+	 */
+	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
+		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
+		return XFS_ERROR(EIO);
+	}
+	ASSERT(dp->i_df.if_bytes == dp->i_d.di_size);
+	ASSERT(dp->i_df.if_u1.if_data != NULL);
 	base = sizeof(xfs_dir_sf_hdr_t);
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	sfe = &sf->list[0];
@@ -319,6 +350,19 @@ xfs_dir_shortform_lookup(xfs_da_args_t *args)
 
 	dp = args->dp;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
+	/*
+	 * Catch the case where the conversion from shortform to leaf
+	 * failed part way through.
+	 */
+	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
+		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
+		return XFS_ERROR(EIO);
+	}
+	ASSERT(dp->i_df.if_bytes == dp->i_d.di_size);
+	ASSERT(dp->i_df.if_u1.if_data != NULL);
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
@@ -359,6 +403,19 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 	buf_t *bp;
 
 	dp = iargs->dp;
+	/*
+	 * Catch the case where the conversion from shortform to leaf
+	 * failed part way through.
+	 */
+	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
+		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
+		return XFS_ERROR(EIO);
+	}
+	ASSERT(dp->i_df.if_bytes == dp->i_d.di_size);
+	ASSERT(dp->i_df.if_u1.if_data != NULL);
 	size = dp->i_df.if_bytes;
 	tmpbuffer = kmem_alloc(size, KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
@@ -598,6 +655,19 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 
 	dp = args->dp;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
+	/*
+	 * Catch the case where the conversion from shortform to leaf
+	 * failed part way through.
+	 */
+	if (dp->i_d.di_size < sizeof(xfs_dir_sf_hdr_t)) {
+#ifndef SIM
+#pragma mips_frequency_hint NEVER
+#endif
+		ASSERT(XFS_FORCED_SHUTDOWN(dp->i_mount));
+		return XFS_ERROR(EIO);
+	}
+	ASSERT(dp->i_df.if_bytes == dp->i_d.di_size);
+	ASSERT(dp->i_df.if_u1.if_data != NULL);
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
