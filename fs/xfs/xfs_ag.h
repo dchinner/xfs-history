@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 /*
  * Allocation group header
@@ -168,7 +168,8 @@ typedef struct xfs_perag
 	((xfs_agblock_t)((fsbno) & XFS_AGB_MASK((mp)->m_sb.sb_agblklog)))
 
 #define	XFS_AGB_TO_DADDR(mp,agno,agbno) \
-	(XFS_FSB_TO_BB(mp, (xfs_fsblock_t)(agno) * (mp)->m_sb.sb_agblocks + (agbno)))
+	((daddr_t)(XFS_FSB_TO_BB(mp, \
+		(xfs_fsblock_t)(agno) * (mp)->m_sb.sb_agblocks + (agbno))))
 #define	XFS_DADDR_TO_AGNO(mp,d) \
 	((xfs_agnumber_t)(XFS_BB_TO_FSBT(mp, d) / (mp)->m_sb.sb_agblocks))
 #define	XFS_DADDR_TO_AGBNO(mp,d) \
