@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 #define	XFS_MACRO_C
 
@@ -1703,6 +1703,14 @@ void
 xfs_sb_version_addattr(xfs_sb_t *sbp)
 {
 	XFS_SB_VERSION_ADDATTR(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_ADDDALIGN)
+void
+xfs_sb_version_adddalign(xfs_sb_t *sbp)
+{
+	XFS_SB_VERSION_ADDDALIGN(sbp);
 }
 #endif
 
