@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.112 $"
+#ident	"$Revision: 1.114 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3171,6 +3171,7 @@ xlog_do_recover(xlog_t	*log,
  * Perform recovery and re-initialize some log variables in xlog_find_tail.
  *
  * Return error or zero.
+ * clean set to 1 if and only if the fs was known to be cleanly unmounted
  */
 int
 xlog_recover(xlog_t *log, int readonly, int *clean)
