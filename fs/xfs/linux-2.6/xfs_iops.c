@@ -602,7 +602,7 @@ linvfs_get_block_core(
 	 * allocate in chunks
 	 */
 	if (create && (offset >= inode->i_size) && !(flags & PBF_SYNC))
-		size = XFS_WRITEIO_LOG_LARGE << inode->i_blkbits;
+		size = 1 << XFS_WRITE_IO_LOG;
 	else
 		size = 1 << inode->i_blkbits;
 
