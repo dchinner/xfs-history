@@ -439,10 +439,14 @@ xfs_btree_get_block(
 	int			level)	/* level in btree */
 {
 	xfs_btree_block_t	*block;	/* return value */
+	xfs_ifork_t		*ifp;	/* inode fork pointer */
+	int			whichfork; /* data or attr fork */
 
-	if (cur->bc_btnum == XFS_BTNUM_BMAP && level == cur->bc_nlevels - 1)
-		block = (xfs_btree_block_t *)cur->bc_private.b.ip->i_df.if_broot;
-	else
+	if (cur->bc_btnum == XFS_BTNUM_BMAP && level == cur->bc_nlevels - 1) {
+		whichfork = cur->bc_private.b.whichfork;
+		ifp = XFS_IFORK_PTR(cur->bc_private.b.ip, whichfork);
+		block = (xfs_btree_block_t *)ifp->if_broot;
+	} else
 		block = XFS_BUF_TO_BLOCK(cur->bc_bufs[level]);
 	ASSERT(block != NULL);
 	return block;

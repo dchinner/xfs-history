@@ -906,6 +906,7 @@ xfs_bmbt_killroot(
 	int			i;
 	xfs_bmbt_key_t		*kp;
 	xfs_inode_t		*ip;
+	xfs_ifork_t		*ifp;
 	int			level;
 	xfs_bmbt_ptr_t		*pp;
 
@@ -942,12 +943,13 @@ xfs_bmbt_killroot(
 	ASSERT(cblock->bb_leftsib == NULLDFSBNO);
 	ASSERT(cblock->bb_rightsib == NULLDFSBNO);
 	ip = cur->bc_private.b.ip;
+	ifp = XFS_IFORK_PTR(ip, cur->bc_private.b.whichfork);
 	ASSERT(XFS_BMAP_BLOCK_IMAXRECS(level, cur) ==
-	       XFS_BMAP_BROOT_MAXRECS(ip->i_df.if_broot_bytes));
+	       XFS_BMAP_BROOT_MAXRECS(ifp->if_broot_bytes));
 	i = (int)(cblock->bb_numrecs - XFS_BMAP_BLOCK_IMAXRECS(level, cur));
 	if (i) {
 		xfs_iroot_realloc(ip, i, cur->bc_private.b.whichfork);
-		block = ip->i_df.if_broot;
+		block = ifp->if_broot;
 	}
 	block->bb_numrecs += i;
 	ASSERT(block->bb_numrecs == cblock->bb_numrecs);
@@ -2111,6 +2113,7 @@ xfs_bmbt_get_block(
 	int			level,
 	buf_t			**bpp)
 {
+	xfs_ifork_t		*ifp;
 	xfs_bmbt_block_t	*rval;
 
 	if (level < cur->bc_nlevels - 1) {
@@ -2118,7 +2121,9 @@ xfs_bmbt_get_block(
 		rval = XFS_BUF_TO_BMBT_BLOCK(*bpp);
 	} else {
 		*bpp = 0;
-		rval = cur->bc_private.b.ip->i_df.if_broot;
+		ifp = XFS_IFORK_PTR(cur->bc_private.b.ip,
+			cur->bc_private.b.whichfork);
+		rval = ifp->if_broot;
 	}
 	return rval;
 }
@@ -2346,15 +2351,17 @@ xfs_bmbt_kcheck(
 	xfs_btree_cur_t		*cur)
 {
 	xfs_bmbt_block_t	*block;
-	xfs_dinode_core_t	*dip;
+	xfs_ifork_t		*ifp;
 	xfs_inode_t		*ip;
 	int			level;
 	int			levels;
+	int			whichfork;
 
 	ip = cur->bc_private.b.ip;
-	dip = &ip->i_d;
-	ASSERT(dip->di_format == XFS_DINODE_FMT_BTREE);
-	block = ip->i_df.if_broot;
+	whichfork = cur->bc_private.b.whichfork;
+	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE);
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	block = ifp->if_broot;
 	level = block->bb_level;
 	levels = level + 1;
 	ASSERT(levels == cur->bc_nlevels);
@@ -2564,20 +2571,22 @@ xfs_bmbt_rcheck(
 {
 	xfs_bmbt_block_t	*block;
 	xfs_fsblock_t		bno;
-	xfs_dinode_core_t	*dip;
 	xfs_fsblock_t		fbno;
+	xfs_ifork_t		*ifp;
 	xfs_inode_t		*ip;
 	xfs_bmbt_key_t		key;
 	int			level;
 	xfs_mount_t		*mp;
 	xfs_bmbt_rec_t		rec;
 	void			*rp;
+	int			whichfork;
 
 	mp = cur->bc_mp;
 	ip = cur->bc_private.b.ip;
-	dip = &ip->i_d;
-	ASSERT(dip->di_format == XFS_DINODE_FMT_BTREE);
-	block = ip->i_df.if_broot;
+	whichfork = cur->bc_private.b.whichfork;
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE);
+	block = ifp->if_broot;
 	level = cur->bc_nlevels - 1;
 	rp = level ? (void *)&key : (void *)&rec;
 	xfs_bmbt_rcheck_body(cur, block, &bno, rp, level);
