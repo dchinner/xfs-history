@@ -590,10 +590,13 @@ xfs_write(
 	int		eventsent = 0;
 	loff_t		savedsize = *offsetp;
 #endif
-                    
+	vrwlock_t	locktype;
 	char 		*buf;
 	size_t		size;
-        
+
+	locktype = (filp->f_flags & O_DIRECT) ?
+			VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
+                    
         ASSERT(uiop);                   /* we only support exactly 1  */
         ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
         ASSERT(uiop->uio_iov);      
@@ -712,10 +715,6 @@ retry:
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
 	    !(filp->f_flags & O_INVISIBLE)) {
-		vrwlock_t	locktype;
-
-		locktype = (filp->f_flags & O_DIRECT) ?
-			VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
 
 		VOP_RWUNLOCK(vp, locktype);
 		ret = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
@@ -838,7 +837,8 @@ retry:
 	if (!strcmp(current->comm, "nfsd"))
 		xfs_refcache_insert(xip);
 
-	xfs_iunlock(xip, iolock);
+	xfs_rwunlock(bdp, locktype);
+
 	return(ret);
 }
 
