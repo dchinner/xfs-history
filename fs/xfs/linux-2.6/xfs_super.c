@@ -444,7 +444,6 @@ linvfs_fill_super(
 	vfsops_t	*vfsops;
 	vnode_t		*rootvp;
 	struct inode	*ip;
-	struct mounta	ap;
 	struct xfs_args *args;
 	struct statfs	statvfs;
 	int		error;
@@ -461,19 +460,15 @@ linvfs_fill_super(
 	strncpy(args->fsname, bdevname(sb->s_bdev), MAXNAMELEN);
 	/* args->rtdev and args->logdev done in xfs_parseargs */
 
-	/*  Setup the generic "mounta" structure  */
-	memset(&ap, 0, sizeof(struct mounta));
-	ap.dataptr = (char *)args;
-	ap.datalen = sizeof(struct xfs_args);
-	ap.spec = args->fsname;
-
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 	vfsops = &xfs_vfsops;
 
 	/*  Set up the vfs_t structure	*/
 	vfsp = vfs_allocate();
-	if (!vfsp)
+	if (!vfsp) {
+		error = ENOMEM;
 		goto out_null;
+	}
 
 	if (sb->s_flags & MS_RDONLY)
 		vfsp->vfs_flag |= VFS_RDONLY;
@@ -487,7 +482,7 @@ linvfs_fill_super(
 
 	LINVFS_SET_VFS(sb, vfsp);
 
-	VFSOPS_MOUNT(vfsops, vfsp, NULL, &ap, NULL, sys_cred, error);
+	VFSOPS_MOUNT(vfsops, vfsp, args, sys_cred, error);
 	if (error)
 		goto fail_vfsop;
 

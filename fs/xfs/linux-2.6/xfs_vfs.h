@@ -40,6 +40,7 @@ struct cred;
 struct super_block;
 struct fid;
 struct dm_fcntl_vector;
+struct xfs_args;
 
 typedef struct vfs {
 	u_int		vfs_flag;	/* flags */
@@ -106,23 +107,12 @@ typedef struct vfs {
 #define SYNC_PDFLUSH	0x0040		/* push v_dpages */
 
 
-struct mounta {
-	char		*spec;
-	char		*dir;
-	sysarg_t	flags;
-	char		*dataptr;
-	sysarg_t	datalen;
-};
-
 typedef struct vfsops {
 #ifdef CELL_CAPABLE
 	bhv_position_t	vf_position;	/* position within behavior chain */
 #endif
-	int	(*vfs_mount)(struct vfs *, struct vnode *,
-			     struct mounta *, char *, struct cred *);
+	int	(*vfs_mount)(struct vfs *, struct xfs_args *, struct cred *);
 					/* mount file system */
-	int	(*vfs_rootinit)(struct vfs *);
-					/* 1st mount of root fs */
 	int	(*vfs_dounmount)(bhv_desc_t *, int, struct vnode *,
 				 struct cred *);
 					/* preparation and unmount */
@@ -193,8 +183,8 @@ typedef struct vfsops {
 
 #define VFSOPS_DMAPI_MOUNT(vfs_op, vfsp, dir_name, fsname, rv) \
 	rv = (*(vfs_op)->vfs_dmapi_mount)(vfsp, dir_name, fsname)
-#define VFSOPS_MOUNT(vfs_op, vfsp, mvp, uap, attrs, cr, rv) \
-	rv = (*(vfs_op)->vfs_mount)(vfsp, mvp, uap, attrs, cr)
+#define VFSOPS_MOUNT(vfs_op, vfsp, args, cr, rv) \
+	rv = (*(vfs_op)->vfs_mount)(vfsp, args, cr)
 
 #define VFS_REMOVEBHV(vfsp, bdp)\
 {	\
