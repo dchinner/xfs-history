@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.89 $"
+#ident	"$Revision: 1.90 $"
 
 #include <xfs_os_defs.h>
 #include <sys/sysmacros.h>
@@ -669,6 +669,15 @@ xfs_bulkstat_single(
 	int			error;	/* return value */
 	xfs_ino_t		ino;	/* filesystem inode number */
 	int			res;	/* result from bs1 */
+        
+        /* 
+         * note that requesting valid inode numbers which are not allocated
+         * to inodes will most likely cause xfs_itobp to generate warning
+         * messages about bad magic numbers. This is ok. The fact that
+         * the inode isn't actually an inode is handled by the
+         * error check below. Done this way to make the usual case faster
+         * at the expense of the error case.
+         */
 
 	ino = (xfs_ino_t)*lastinop;
 	error = xfs_bulkstat_one(mp, NULL, ino, &bstat, 0, 0, &res);
