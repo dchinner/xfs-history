@@ -151,7 +151,8 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
 
-	vp = LINVFS_GET_VP(dir);
+	if (dentry->d_name.len >= MAXNAMELEN)
+		return ERR_PTR(-ENAMETOOLONG);
 
 	/*
 	 * Initialize a pathname_t to pass down.
@@ -162,7 +163,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	pnp->pn_path = (char *)dentry->d_name.name;
 
 	cvp = NULL;
-
+	vp = LINVFS_GET_VP(dir);
 	VOP_LOOKUP(vp, (char *)dentry->d_name.name, &cvp, pnp, 0, NULL,
 						NULL, error);
 	if (!error) {
