@@ -114,7 +114,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		VOP_MKDIR(dvp, (char *)dentry->d_name.name, &va, &vp,
 			&cred, error);
 	} else {
-		error = -EINVAL;
+		error = EINVAL;
 	}
 
 	if (!error) {
@@ -128,7 +128,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		}
 		d_instantiate(dentry, ip);
 	}
-	return 0;
+	return -error;
 }
 
 
@@ -498,7 +498,7 @@ int linvfs_permission(struct inode *ip, int mode)
         vp = LINVFS_GET_VP(ip);
 	VOP_ACCESS(vp, mode, &cred, error);
 
-	return error ? -error : 0;
+	return -error;
 }
 
 /* Brute force approach for now - copy data into linux inode
@@ -517,19 +517,21 @@ int linvfs_revalidate(struct dentry *dentry)
         va.va_mask = AT_STAT;
         VOP_GETATTR(vp, &va, 0, &cred, error);
 
-        inode->i_mode = VTTOIF(va.va_type) | va.va_mode;
-        inode->i_nlink = va.va_nlink;
-        inode->i_uid = va.va_uid;
-        inode->i_gid = va.va_gid;
-        inode->i_rdev = va.va_rdev;
-        inode->i_size = va.va_size;
-        inode->i_blocks = va.va_nblocks >> (PAGE_SHIFT - 9);
-        inode->i_blksize = PAGE_SIZE;
-        inode->i_atime = va.va_atime.tv_sec;
-        inode->i_mtime = va.va_mtime.tv_sec;
-        inode->i_ctime = va.va_ctime.tv_sec;
+	if (!error) {
+		inode->i_mode = VTTOIF(va.va_type) | va.va_mode;
+		inode->i_nlink = va.va_nlink;
+		inode->i_uid = va.va_uid;
+		inode->i_gid = va.va_gid;
+		inode->i_rdev = va.va_rdev;
+		inode->i_size = va.va_size;
+		inode->i_blocks = va.va_nblocks >> (PAGE_SHIFT - 9);
+		inode->i_blksize = PAGE_SIZE;
+		inode->i_atime = va.va_atime.tv_sec;
+		inode->i_mtime = va.va_mtime.tv_sec;
+		inode->i_ctime = va.va_ctime.tv_sec;
+	}
 
-        return 0;
+        return -error;
 }
 
 int

@@ -683,6 +683,9 @@ xfs_bmap(bhv_desc_t	*bdp,
 	int		error;
 	int		unlocked;
 	int		lockmode;
+	int		fsynced;
+	int		ioflag = 0;	/* Needs to be passed in */
+	vnode_t		*vp;
 
 	ip = XFS_BHVTOI(bdp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
@@ -706,6 +709,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 /**
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
 **/
+		vp = BHV_TO_VNODE(bdp);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 		/* 
@@ -721,9 +725,47 @@ xfs_bmap(bhv_desc_t	*bdp,
 				}
 			}
 		}
+retry:
 		error = xfs_iomap_write(&ip->i_iocore, offset, count, 
 					pbmapp, npbmaps, flags, NULL);
 		/* xfs_iomap_write unlocks/locks/unlocks */
+
+		if (error == ENOSPC) {
+			xfs_fsize_t	last_byte;
+
+			switch (fsynced) {
+			case 0:
+				last_byte = xfs_file_last_byte(ip);
+				VOP_FLUSH_PAGES(vp, 0,
+					(off_t)XFS_LASTBYTE(ip->i_mount,
+							    &ip->i_iocore) - 1,
+					0, FI_NONE, error);
+				error = 0;
+				fsynced = 1;
+				xfs_ilock(ip, XFS_ILOCK_EXCL);
+				goto retry;
+			case 1:
+				fsynced = 2;
+				if (!(ioflag & O_SYNC)) {
+					ioflag |= O_SYNC;
+					error = 0;
+					xfs_ilock(ip, XFS_ILOCK_EXCL);
+					goto retry;
+				}
+			case 2:
+			case 3:
+				VFS_SYNC(vp->v_vfsp,
+					SYNC_NOWAIT|SYNC_BDFLUSH|SYNC_FSDATA,
+					NULL, error);
+				error = 0;
+/**
+				delay(HZ);
+**/
+				fsynced++;
+				xfs_ilock(ip, XFS_ILOCK_EXCL);
+				goto retry;
+			}
+		}
 	}
 	return error;
 }	
@@ -1096,7 +1138,6 @@ error_out: /* Just return error and any tracing at end of routine */
 
 out_no_unlock:
 	XFS_INODE_CLEAR_READ_AHEAD(&ip->i_iocore);
-	if (error) printk("xfs_iomap_write returning ERROR %d\n", error);
 	return error;
 }
 int
