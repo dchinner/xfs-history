@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.47 $"
+#ident	"$Revision: 1.48 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -56,6 +56,10 @@
 #include "xfs_log_recover.h"
 #include "xfs_rw.h"
 #include "xfs_bit.h"
+#include "xfs_quota.h"
+#include "xfs_dquot.h"
+#include "xfs_qm.h"
+#include "xfs_quota_priv.h"
 
 /*
  * External functions & data not in header files.
@@ -148,6 +152,22 @@ static void	xfsidbg_xlogitem(xfs_log_item_t *);
 static void	xfsidbg_xmount(xfs_mount_t *);
 static void 	xfsidbg_xnode(xfs_inode_t *ip);
 static void	xfsidbg_xperag(xfs_mount_t *);
+
+static void	xfsidbg_xqm();
+static void	xfsidbg_xqm_diskdq(xfs_disk_dquot_t *);
+static void	xfsidbg_xqm_dqattached_inos(xfs_mount_t *);
+static void	xfsidbg_xqm_dquot(xfs_dquot_t *);
+static void	xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title);
+static void	xfsidbg_xqm_freelist(void);
+static void	xfsidbg_xqm_htab(void);
+static void	xfsidbg_xqm_mplist(xfs_mount_t *);
+#ifdef DQUOT_TRACING
+static int	xfsidbg_xqm_pr_dqentry(ktrace_entry_t *ktep);
+static void 	xfsidbg_xqm_dqtrace(xfs_dquot_t *dqp);
+#endif
+static void	xfsidbg_xqm_qinfo(xfs_mount_t *mp);
+static void	xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp);
+
 #ifdef NOTYET
 static void	xfsidbg_xrange(xfs_range_t *);
 static void	xfsidbg_xrangelocks(xfs_inode_t *);
@@ -243,6 +263,18 @@ static struct xif {
     "xmount",	VD xfsidbg_xmount,	"Dump XFS mount structure",
     "xnode",	VD xfsidbg_xnode,	"Dump XFS inode",
     "xperag",	VD xfsidbg_xperag,	"Dump XFS per-allocation group data",
+ "xqm",	VD xfsidbg_xqm,		"Dump XFS quota manager structure",
+    "xdiskdq",	VD xfsidbg_xqm_diskdq,	"Dump XFS ondisk dquot (quota) structure",
+    "xdqatt",	VD xfsidbg_xqm_dqattached_inos, "All incore inodes with dquots",
+    "xdquot",	VD xfsidbg_xqm_dquot,	"Dump XFS dquot (quota) structure",
+    "xqmfree",	VD xfsidbg_xqm_freelist,"Dump XFS global freelist of dquots",
+    "xqmhtab",	VD xfsidbg_xqm_htab,	"Dump XFS hashtable of dquots",
+    "xqmplist",	VD xfsidbg_xqm_mplist,	"Dump XFS all dquots of a f/s",
+#ifdef DQUOT_TRACING
+    "xdqtrace", VD xfsidbg_xqm_dqtrace,	"Dump trace of a given dquot",
+#endif
+    "xqinfo",   VD xfsidbg_xqm_qinfo,	"Dump mount->m_quotainfo structure",
+    "xdqinfo",	VD xfsidbg_xqm_tpdqinfo, "Dump dqinfo structure of a trans",
 #ifdef NOTYET
     "xrange",   VD xfsidbg_xrange,	"Dump an xfs_range structure",
     "xranges",  VD xfsidbg_xrangelocks,	"Dump all range locks of an inode",
@@ -3171,6 +3203,7 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		"6-1-buf",	/* 7 */
 		"inode",	/* 8 */
 		"buf",		/* 9 */
+		"dquot",        /* 10 */
 		0
 		};
 	static char *li_flags[] = {
@@ -3225,8 +3258,16 @@ static void
 xfsidbg_xmount(xfs_mount_t *mp)
 {
 	static char *xmount_flags[] = {
-		"wsync",	/* 0x1 */
-		"ino64",	/* 0x2 */
+		"WSYNC",	/* 0x1 */
+		"INO64",	/* 0x2 */
+		"UQ",		/* 0x4 */
+		"UQE", 		/* 0x8 */
+		"UQCHKD",     	/* 0x10 */
+		"PQ",		/* 0x20 */
+		"PQE", 		/* 0x40 */
+		"PQCHKD",     	/* 0x80 */
+		"UQACTV",	/* 0x100 */
+		"PQACTV",	/* 0x200 */
 		0
 		};
 
@@ -3285,6 +3326,13 @@ xfsidbg_xmount(xfs_mount_t *mp)
 #else
 	qprintf("\n");
 #endif
+	if (mp->m_quotainfo)
+		qprintf("quotainfo 0x%x (uqip = 0x%x, pqip = 0x%x)\n",
+			mp->m_quotainfo, 
+			mp->m_quotainfo->qi_uquotaip,
+			mp->m_quotainfo->qi_pquotaip);
+	else 
+		qprintf("quotainfo NULL\n");
 }
 
 
@@ -3320,6 +3368,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_itemp,
 		&ip->i_lock,
 		&ip->i_iolock);
+	qprintf("udquotp 0x%x pdquotp 0x%x\n",
+		ip->i_udquot, ip->i_pdquot);
 	qprintf("&flock 0x%x (%d) pincount 0x%x &pinsema 0x%x\n",
 		&ip->i_flock, valusema(&ip->i_flock),
 		ip->i_pincount,
@@ -3375,6 +3425,330 @@ xfsidbg_xperag(xfs_mount_t *mp)
 			qprintf("    i_freecount %d\n", pag->pagi_freecount);
 	}
 }
+
+
+
+static void
+xfsidbg_xqm()
+{
+	extern xfs_qm_t	*G_xqm;
+
+	if (G_xqm == NULL) {
+		qprintf("NULL XQM!!\n");
+		return;
+	}
+
+	qprintf("usrhtab 0x%x\tprjhtab 0x%x\tndqfree 0x%x\thashmask 0x%x\n",
+		G_xqm->qm_usr_dqhtable,
+		G_xqm->qm_prj_dqhtable,
+		G_xqm->qm_dqfreelist.qh_nelems,
+		G_xqm->qm_dqhashmask);
+	qprintf("&freelist 0x%x, totaldquots 0x%x nrefs 0x%x\n",
+		&G_xqm->qm_dqfreelist,
+		G_xqm->qm_totaldquots,
+		G_xqm->qm_nrefs);
+}
+
+static void
+xfsidbg_xqm_diskdq(xfs_disk_dquot_t *d)
+{
+	qprintf("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n", d->d_magic,
+		d->d_version, d->d_id, d->d_id);
+	qprintf("blk_hard 0x%x\tblk_soft 0x%x\tino_hard 0x%x\tino_soft 0x%x\n",
+		(int)d->d_blk_hardlimit, (int)d->d_blk_softlimit,
+		(int)d->d_ino_hardlimit, (int)d->d_ino_softlimit);
+	qprintf("bcount 0x%x (%d) icount 0x%x (%d)\n",
+		(int)d->d_bcount, (int)d->d_bcount, 
+		(int)d->d_icount, (int)d->d_icount);
+	qprintf("btimer 0x%x itimer 0x%x \n",
+		(int)d->d_btimer, (int)d->d_itimer);
+}
+
+static void	
+xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
+{
+	static char *qflags[] = {
+		"USR",
+		"PRJ",
+		"LCKD",
+		"FLKD",
+		"DIRTY",
+		"WANT",	
+		"INACT",
+		"MARKER",
+		0
+	};
+	qprintf("mount 0x%x hash 0x%x pdquotp 0x%x HL_next 0x%x HL_prevp 0x%x\n",
+		dqp->q_mount,
+		dqp->q_hash,
+		dqp->q_pdquot,
+		dqp->HL_NEXT,
+		dqp->HL_PREVP);
+	qprintf("MPL_next 0x%x MPL_prevp 0x%x FL_next 0x%x FL_prev 0x%x\n",
+		dqp->MPL_NEXT,
+		dqp->MPL_PREVP,
+		dqp->dq_flnext,
+		dqp->dq_flprev);
+
+	qprintf("nrefs 0x%x, res_bcount %d, ", 
+		dqp->q_nrefs, (int) dqp->q_res_bcount);
+	printflags(dqp->dq_flags, qflags, "flags:");
+	qprintf("\nblkno 0x%x\tdev 0x%x\tboffset 0x%x\n", (int) dqp->q_blkno, 
+		(int) dqp->q_dev, (int) dqp->q_bufoffset);
+	qprintf("qlock 0x%x  flock 0x%x (%s) pincount 0x%x\n",
+		&dqp->q_qlock,
+		&dqp->q_flock, 
+		(valusema(&dqp->q_flock) <= 0) ? "LCK" : "UNLKD",
+		dqp->q_pincount);
+	qprintf("disk-dquot 0x%x\n", &dqp->q_core);
+	xfsidbg_xqm_diskdq(&dqp->q_core);
+	
+}
+
+
+#define XQMIDBG_LIST_PRINT(l, NXT) \
+{ \
+	  xfs_dquot_t	*dqp;\
+	  int i = 0; \
+	  qprintf("[#%d dquots]\n", (int) (l)->qh_nelems); \
+	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) {\
+	   qprintf( \
+	      "\t%d. [0x%x] \"%d (%s)\"\t blks = %d, inos = %d refs = %d\n", \
+			 ++i, dqp, (int) dqp->q_core.d_id, \
+		         DQFLAGTO_TYPESTR(dqp),      \
+			 (int) dqp->q_core.d_bcount, \
+			 (int) dqp->q_core.d_icount, \
+                         (int) dqp->q_nrefs); }\
+	  qprintf("\n"); \
+}
+
+static void
+xfsidbg_xqm_dqattached_inos(xfs_mount_t	*mp)
+{
+	xfs_inode_t	*ip;
+	int		n = 0;
+
+	ip = mp->m_inodes;
+	do {
+		if (ip->i_udquot || ip->i_pdquot) {
+			n++;
+			qprintf("inode = 0x%x, ino %d: udq 0x%x, pdq 0x%x\n", 
+				ip, (int) ip->i_ino, ip->i_udquot, ip->i_pdquot);
+		}
+		ip = ip->i_mnext;
+	} while (ip != mp->m_inodes);
+	qprintf("\nNumber of inodes with dquots attached: %d\n", n);
+
+}
+
+
+static void
+xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title) 
+{
+	xfs_dquot_t *dq;
+	int i = 0;
+	qprintf("%s (#%d)\n", title, (int) qlist->qh_nelems);		
+	for (dq = qlist->qh_next;
+	     dq != (xfs_dquot_t *)qlist;
+	     dq = dq->dq_flnext) {
+		qprintf("\t%d.\t\"%d (%s:0x%x)\"\t bcnt = %d, icnt = %d "
+		       "refs = %d\n",  
+		       ++i, (int) dq->q_core.d_id,
+		       DQFLAGTO_TYPESTR(dq), dq,     
+		       (int) dq->q_core.d_bcount, 
+		       (int) dq->q_core.d_icount, 
+		       (int) dq->q_nrefs);
+	}
+}
+
+static void	
+xfsidbg_xqm_freelist(void)
+{
+	extern xfs_qm_t	*G_xqm;
+	if (G_xqm) {
+		xfsidbg_xqm_freelist_print(&(G_xqm->qm_dqfreelist), "Freelist");
+	} else
+		qprintf("NULL XQM!!\n");
+}
+
+static void	
+xfsidbg_xqm_mplist(xfs_mount_t *mp)
+{
+	if (mp->m_quotainfo == NULL) {
+		printf("NULL quotainfo\n");
+		return;
+	}
+	
+	XQMIDBG_LIST_PRINT(&(mp->m_quotainfo->qi_dqlist), MPL_NEXT);
+
+}
+
+static void
+xfsidbg_xqm_htab(void)
+{
+	extern xfs_qm_t	*G_xqm;
+	int		i;
+	xfs_dqhash_t	*h;
+
+	if (G_xqm == NULL) {
+		qprintf("NULL XQM!!\n");
+		return;
+	}
+	for (i = 0; i <= G_xqm->qm_dqhashmask; i++) {
+		h = &G_xqm->qm_usr_dqhtable[i];
+		if (h->qh_next) {
+			qprintf("USR %d: ", i);
+			XQMIDBG_LIST_PRINT(h, HL_NEXT);
+		}
+	}
+	for (i = 0; i <= G_xqm->qm_dqhashmask; i++) {
+		h = &G_xqm->qm_prj_dqhtable[i];
+		if (h->qh_next) {
+			qprintf("PRJ %d: ", i);
+			XQMIDBG_LIST_PRINT(h, HL_NEXT);
+		}
+	}
+}
+#ifdef DQUOT_TRACING
+/* ARGSUSED */
+static int
+xfsidbg_xqm_pr_dqentry(ktrace_entry_t *ktep)
+{
+	qprintf("Dquot Tracing disabled\n");
+
+	static char *xdq_flags[] = {
+		"USR",		/* 0x1 */
+		"PRJ",		/* 0x2 */
+		"LCKD",		/* 0x4 */
+		"FLOCKD",	/* 0x08 */
+		"DIRTY",	/* 0x10 */
+		"WANT",		/* 0x20 */
+		"INACT",	/* 0x40 */
+		"MARKER",	/* 0x80 */
+		0
+	};
+
+        if ((__psint_t)ktep->val[0] == 0)
+                return 0;
+        switch ((__psint_t)ktep->val[0]) {
+	      case DQUOT_KTRACE_ENTRY:
+                qprintf("[%d] %s\t",
+			(__psint_t)ktep->val[12], /* pid */
+			(char *)ktep->val[1]);
+		printflags((__psint_t)ktep->val[3], xdq_flags,"flgs ");
+		qprintf("\nnrefs = %d, "
+			"flags = 0x%x, "
+			"id = %d, "
+			"res_bc = 0x%x\n"
+			"bcnt = 0x%x [0x%x | 0x%x], "
+			"icnt = 0x%x [0x%x | 0x%x]\n"
+			"@ %ld\n",
+			(__psint_t)ktep->val[2], /* nrefs */
+			(__psint_t)ktep->val[3], /* flags */
+			(__psint_t)ktep->val[11], /* ID */
+			(__psint_t)ktep->val[4], /* res_bc */
+			(__psint_t)ktep->val[5], /* bcnt */
+			(__psint_t)ktep->val[8], /* bsoft */
+			(__psint_t)ktep->val[7], /* bhard */
+			(__psint_t)ktep->val[6], /* icnt */
+			(__psint_t)ktep->val[10], /* isoft */
+			(__psint_t)ktep->val[9], /* ihard */
+			(long) ((__psint_t)ktep->val[13]) /* time */
+			);
+                break;
+
+	      default:
+                qprintf("unknown dqtrace record\n");
+		break;
+	}
+	return (1);
+}
+
+/* ARGSUSED */
+void
+xfsidbg_xqm_dqtrace(xfs_dquot_t *dqp)
+{
+	ktrace_entry_t  *ktep;
+        ktrace_snap_t   kts;
+
+        if (dqp->q_trace == NULL) {
+                qprintf("The xfs dquot trace buffer is not initialized\n");
+                return;
+        }
+	qprintf("xdqtrace dquot 0x%x\n", dqp);
+
+	ktep = ktrace_first(dqp->q_trace, &kts);
+        while (ktep != NULL) {
+
+		if (xfsidbg_xqm_pr_dqentry(ktep))
+			qprintf("---------------------------------\n");
+		ktep = ktrace_next(dqp->q_trace, &kts);
+	}
+}
+#endif
+
+static void
+xfsidbg_xqm_qinfo(xfs_mount_t *mp)
+{
+	if (mp == NULL || mp->m_quotainfo == NULL) {
+		printf("NULL quotainfo\n");
+		return;
+	}
+	
+	qprintf("uqip 0x%x, pqip 0x%x, &pinlock 0x%x &dqlist 0x%x\n",
+		mp->m_quotainfo->qi_uquotaip,
+		mp->m_quotainfo->qi_pquotaip,
+		&mp->m_quotainfo->qi_pinlock,
+		&mp->m_quotainfo->qi_dqlist);
+
+	qprintf("nreclaims %d, btmlimit 0x%x, itmlimit 0x%x, RTbtmlim 0x%x\n",
+		(int)mp->m_quotainfo->qi_dqreclaims,
+		(int)mp->m_quotainfo->qi_btimelimit,
+		(int)mp->m_quotainfo->qi_itimelimit,
+		(int)mp->m_quotainfo->qi_rtbtimelimit);
+
+	qprintf("bwarnlim 0x%x, iwarnlim 0x%x, &qofflock 0x%x, "
+		"chunklen 0x%x, dqperchunk 0x%x\n",
+		(int)mp->m_quotainfo->qi_bwarnlimit,
+		(int)mp->m_quotainfo->qi_iwarnlimit,
+		&mp->m_quotainfo->qi_quotaofflock,
+		(int)mp->m_quotainfo->qi_dqchunklen,
+		(int)mp->m_quotainfo->qi_dqperchunk);
+}
+
+static void
+xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
+{
+	xfs_dqtrx_t 	*qa, *q;
+	int		i,j;
+
+	qprintf("dqinfo 0x%x\n", tp->t_dqinfo);
+	if (! tp->t_dqinfo)
+		return;
+	qprintf("USR: \n");
+	qa = tp->t_dqinfo->dqa_usrdquots;
+	for (j = 0; j < 2; j++) {
+		for (i = 0; i < XFS_QM_TRANS_MAXDQS; i++) {
+			if (qa[i].qt_dquot == NULL)
+				break;
+			q = &qa[i];
+			qprintf(
+  "\"%d\"[0x%x]: bres %d, bres-used %d, bdelta %d, del-delta %d, icnt-delta %d\n",
+				(int) q->qt_dquot->q_core.d_id,
+				q->qt_dquot,
+				(int) q->qt_blk_res,
+				(int) q->qt_blk_res_used,
+				(int) q->qt_bcount_delta,
+				(int) q->qt_delbcnt_delta,
+				(int) q->qt_icount_delta);
+		}
+		if (j == 0) {
+			qa = tp->t_dqinfo->dqa_prjdquots;
+			qprintf("PRJ: \n");
+		}
+	}
+				
+}	
 
 #ifdef NOTYET
 /*
@@ -3513,6 +3887,13 @@ xfsidbg_xsb(xfs_sb_t *sbp)
 		sbp->sb_ifree,
 		sbp->sb_fdblocks,
 		sbp->sb_frextents);
+	if (sbp->sb_versionnum >= XFS_SB_VERSION_HASQUOTA) {
+		qprintf("uquotino %s ",
+			xfs_fmtino(sbp->sb_uquotino, NULL));
+		qprintf("pquotino %s ",
+			xfs_fmtino(sbp->sb_pquotino, NULL));
+		qprintf("qflags 0x%x\n", (int) sbp->sb_qflags);
+	}
 }
 
 #ifdef DEBUG
@@ -3665,6 +4046,14 @@ xfsidbg_xtp(xfs_trans_t *tp)
 	case XFS_TRANS_ATTR_RM:		qprintf("ATTR_RM");		break;
 	case XFS_TRANS_ATTR_FLAG:	qprintf("ATTR_FLAG");		break;
 	case XFS_TRANS_CLEAR_AGI_BUCKET:  qprintf("CLEAR_AGI_BUCKET");	break;
+	case XFS_TRANS_QM_SBCHANGE:	qprintf("QM_SBCHANGE"); 	break;
+	case XFS_TRANS_QM_QUOTAOFF:	qprintf("QM_QUOTAOFF"); 	break;
+	case XFS_TRANS_QM_DQALLOC:	qprintf("QM_DQALLOC");		break;
+	case XFS_TRANS_QM_SETQLIM:	qprintf("QM_SETQLIM");		break;
+	case XFS_TRANS_QM_DQCLUSTER:	qprintf("QM_DQCLUSTER");	break;
+	case XFS_TRANS_QM_QINOCREATE:	qprintf("QM_QINOCREATE");	break;
+	case XFS_TRANS_QM_QUOTAOFF_END:	qprintf("QM_QOFF_END");		break;
+
 	default:			qprintf("0x%x", tp->t_type);	break;
 	}
 	qprintf(" mount 0x%x\n", tp->t_mountp);
@@ -3692,6 +4081,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		tp->t_ag_btree_delta);
 	qprintf("dblocks delta %d agcount delta %d imaxpct delta %d\n",
 		tp->t_dblocks_delta, tp->t_agcount_delta, tp->t_imaxpct_delta);
+	qprintf("dqinfo 0x%x\n", tp->t_dqinfo);
 	qprintf("log items:\n");
 	licp = &tp->t_items;
 	chunk = 0;
