@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -154,7 +154,7 @@ xfs_trans_dup_dqinfo(
 }
 
 /*
- * Delayed allocation purposes only XXX why???
+ * Wrap around mod_dquot to account for both user and proj quotas.
  */
 int
 xfs_trans_mod_dquot_byino(
@@ -418,7 +418,6 @@ xfs_trans_apply_dquot_deltas(
 			/*
 			 * Start/reset the timer(s) if needed.
 			 */
-			/* if (XFS_IS_QUOTA_ENFORCED(tp->t_mountp)) */
 			xfs_qm_adjust_dqtimers(tp->t_mountp, d);
 
 			dqp->dq_flags |= XFS_DQ_DIRTY;
@@ -688,7 +687,6 @@ xfs_trans_dqresv(
 	if ((flags & XFS_QMOPT_FORCE_RES) == 0 &&
 	    dqp->q_core.d_id != 0 && 
 	    XFS_IS_QUOTA_ENFORCED(dqp->q_mount)) {
-
 		if (nblks > 0) {
 			/*
 			 * dquot is locked already. See if we'd go over the 
@@ -909,96 +907,6 @@ xfs_trans_reserve_quota_nblks(
 	return (error);
 	
 }
-
-#if 0
-/*
- * Just a wrapper around xfs_qm_check_inoquota()
- */
-int
-xfs_qm_check_inoquota2(
-	xfs_mount_t 	*mp,
-	xfs_dquot_t 	*udqp,
-	xfs_dquot_t 	*pdqp)
-{
-	int	error;
-
-	error = 0;
-	if (XFS_IS_QUOTA_ENFORCED(mp)) {
-		if (udqp) {
-			xfs_dqlock(udqp);
-			error = xfs_qm_check_inoquota(udqp);
-			xfs_dqunlock(udqp);
-			if (error)
-				return (error);
-		}
-		if (pdqp) {
-			xfs_dqlock(pdqp);
-			error = xfs_qm_check_inoquota(pdqp);
-			xfs_dqunlock(pdqp);
-		}
-	}
-	return (error);
-}
-
-/*
- * Returns EDQUOT if creating one more inode will exceed the hardlimit
- * or if the inode quota timer has already expired. It does NOT change
- * the dquot or associated data structures.
- */
-int
-xfs_qm_check_inoquota(
-	xfs_dquot_t 	*dqp)
-{
-
-#ifdef _SHAREII
-	uint	enforceflag;
-
-	
-	ASSERT(dqp->q_core.d_id != 0);
-	enforceflag = LI_ENFORCE; /* XXX */
-	if (IsShareRunning) {
-		if (SHlimitDisk(XFS_MTOVFS(dqp->q_mount),
-				dqp->q_core.d_id, 
-				1, 0,
-				LI_ENFORCE | enforceflag,
-				NULL))
-			return (EDQUOT);
-	}
-#endif /* _SHAREII */
-	ASSERT(dqp);
-	ASSERT(XFS_DQ_IS_LOCKED(dqp));
-	ASSERT(dqp->q_core.d_id != 0);
-
-	/* XXX check for warnings too */
-	if (XFS_IS_QUOTA_ENFORCED(dqp->q_mount)) {
-		/*
-		 * dquot is locked already. See if we'd go over the hardlimit or
-		 * if the timer has already expired.
-		 */
-		if (dqp->q_core.d_icount >= dqp->q_core.d_ino_hardlimit &&
-		    dqp->q_core.d_ino_hardlimit > 0ULL) {
-			return (EDQUOT);
-		} else if (dqp->q_core.d_icount >= 
-			   dqp->q_core.d_ino_softlimit &&
-			   dqp->q_core.d_ino_softlimit > 0ULL) {
-			
-			/*
-			 * If timer or warnings has expired, return EDQUOT
-			 */
-			if ((dqp->q_core.d_itimer != 0 &&
-			    time > dqp->q_core.d_itimer) || 
-			    (dqp->q_core.d_iwarns != 0 &&
-			     dqp->q_core.d_iwarns >= 
-			     dqp->q_mount->m_quotainfo->qi_iwarnlimit)) {
-				return (EDQUOT);
-			}
-			
-		}
-	}
-
-	return (0);
-}
-#endif
 
 /*
  * This routine is called to allocate a quotaoff log item. 
