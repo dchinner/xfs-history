@@ -16,9 +16,8 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.104 $"
+#ident  "$Revision$"
 
-#include <strings.h>
 #include <limits.h>
 #ifdef SIM
 #define _KERNEL	1
@@ -601,7 +600,7 @@ xfs_vfsmount(
 	 * Copy in XFS-specific arguments.
 	 */
 	bzero(&args, sizeof args);
-	if (copyin_xlate(uap->dataptr, &args, sizeof(args),
+	if (COPYIN_XLATE(uap->dataptr, &args, sizeof(args),
 			 irix5_to_xfs_args, u.u_procp->p_abi, 1))
 		return XFS_ERROR(EFAULT);
 
@@ -1737,6 +1736,19 @@ xfs_sync(
 			}
 		} else {
 			bp = xfs_getsb(mp, 0);
+			/*
+			 * If the buffer is pinned then push on the log so
+			 * we won't get stuck waiting in the write for
+			 * someone, maybe ourselves, to flush the log.
+			 * Even though we just pushed the log above, we
+			 * did not have the superblock buffer locked at
+			 * that point so it can become pinned in between
+			 * there and here.
+			 */
+			if (bp->b_pincount > 0) {
+				xfs_log_force(mp, (xfs_lsn_t)0,
+					      XFS_LOG_FORCE);
+			}
 			bp->b_flags |= fflag;
 			error = bwrite(bp);
 		}
