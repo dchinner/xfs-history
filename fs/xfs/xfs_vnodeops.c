@@ -1,4 +1,4 @@
-#ident "$Revision: 1.334 $"
+#ident "$Revision: 1.335 $"
 
 
 #ifdef SIM
@@ -5919,6 +5919,8 @@ vnodeops_t xfs_vnodeops = {
 	fs_flush_pages,
 	fs_invalfree_pages,
 	fs_pages_sethole,
+	(vop_commit_t)fs_nosys,
+	(vop_readbuf_t)fs_nosys,
 };
 
 #else
@@ -5977,6 +5979,8 @@ vnodeops_t xfs_vnodeops = {
 	fs_flush_pages,
 	fs_invalfree_pages,
 	fs_pages_sethole,
+	(vop_commit_t)fs_nosys,
+	(vop_readbuf_t)fs_nosys,
 };
 
 #endif /* SIM */
