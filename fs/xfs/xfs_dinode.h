@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.20 $"
+#ident "$Revision: 1.22 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -44,7 +44,6 @@ typedef struct xfs_dinode_core
 	__uint32_t	di_gen;		/* generation number */
 	xfs_extlen_t	di_extsize;	/* basic/minimum extent size for file */
 	__uint32_t	di_flags;	/* random flags, XFS_DIFLAG_... */
-	xfs_agino_t	di_nexti;	/* next allocated inode in ag */
 	xfs_drfsbno_t	di_nblocks;	/* # of direct & btree blocks used */
 } xfs_dinode_core_t;
 
@@ -52,7 +51,6 @@ typedef struct xfs_dinode
 {
 	xfs_dinode_core_t	di_core;
 	union {
-		xfs_agino_t	di_next;/* next inode for freelist inodes */
 		dev_t		di_dev;	/* device for IFCHR/IFBLK */
 		char		di_c[1];/* local contents */
 		xfs_bmbt_rec_t	di_bmx[1];/* extent list */
@@ -80,18 +78,17 @@ typedef struct xfs_dinode
 #define	XFS_DI_GEN	0x02000
 #define	XFS_DI_EXTSIZE	0x04000
 #define	XFS_DI_FLAGS	0x08000
-#define	XFS_DI_NEXTI	0x10000
-#define	XFS_DI_NBLOCKS	0x20000
-#define	XFS_DI_U	0x40000
-#define	XFS_DI_NUM_BITS	19
-#define	XFS_DI_ALL_BITS	((1 << XFS_DI_NUM_BITS) - 1)
+#define	XFS_DI_NBLOCKS	0x10000
+#define	XFS_DI_U	0x20000
+#define	XFS_DI_NUM_BITS	18
+#define	XFS_DI_ALL_BITS		((1 << XFS_DI_NUM_BITS) - 1)
+#define	XFS_DI_CORE_BITS	(XFS_DI_ALL_BITS & ~XFS_DI_U)
 
 /*
  * Values for di_format
  */
 typedef enum xfs_dinode_fmt
 {
-	XFS_DINODE_FMT_AGINO,		/* free inodes: di_next */
 	XFS_DINODE_FMT_DEV,		/* CHR, BLK: di_dev */
 	XFS_DINODE_FMT_LOCAL,		/* DIR, REG, LNK: di_c */
 	XFS_DINODE_FMT_EXTENTS,		/* DIR, REG, LNK: di_bmx */
