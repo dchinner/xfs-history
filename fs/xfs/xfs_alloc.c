@@ -1,11 +1,10 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
-#include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
 #endif
