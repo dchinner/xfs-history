@@ -129,8 +129,8 @@ pb_trace_func(
 
 STATIC kmem_cache_t *pagebuf_cache;
 
-#define MAX_IO_DAEMONS		4
-#define CPU_TO_DAEMON(cpu)	((cpu) & (MAX_IO_DAEMONS - 1))
+#define MAX_IO_DAEMONS		NR_CPUS
+#define CPU_TO_DAEMON(cpu)	(cpu)
 STATIC int pb_logio_daemons[MAX_IO_DAEMONS];
 STATIC struct list_head pagebuf_logiodone_tq[MAX_IO_DAEMONS];
 STATIC wait_queue_head_t pagebuf_logiodone_wait[MAX_IO_DAEMONS];
