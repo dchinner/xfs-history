@@ -2034,6 +2034,7 @@ xfs_strat_write(
 			spunlockspl(xfs_strat_lock, s);
 
 			rbp->b_relse = xfs_strat_write_relse;
+			rbp->b_flags |= B_ASYNC;
 
 			bdstrat(bmajor(rbp->b_edev), rbp);
 
