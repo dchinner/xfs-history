@@ -616,13 +616,18 @@ xfs_acl_set(vnode_t *vp, struct acl *acl, struct acl *dacl)
 
 	if (!acl && !dacl)
 		return (EINVAL);
-	if (acl && copy_from_user((caddr_t)&kacl, (caddr_t)acl, 
-	    sizeof (struct acl)))
-		return (EFAULT);
-	if (dacl && copy_from_user((caddr_t)&kdacl, (caddr_t)dacl, 
-	    sizeof (struct acl)))
-		return (EFAULT);
-
+	if (acl) {
+		if (copy_from_user(&kacl, acl, sizeof(kacl)))
+			return (EFAULT);
+		if (xfs_acl_invalid(&kacl))
+			return (EINVAL);
+	}
+	if (dacl) {
+		if (copy_from_user(&kdacl, dacl, sizeof(kdacl)))
+			return (EFAULT);
+		if (xfs_acl_invalid(&kdacl))
+			return (EINVAL);
+	}
 	VN_HOLD(vp);
 
 	/*
