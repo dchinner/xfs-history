@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.159 $"
+#ident	"$Revision: 1.160 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -881,7 +881,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	
 	binval(mp->m_dev);
 	bflushed(mp->m_dev);
-	if (mp->m_rtdev) {
+	if (mp->m_rtdev != NODEV) {
 		binval(mp->m_rtdev);
 	}
 	/*
