@@ -307,7 +307,7 @@ linvfs_readdir(
 			namelen = strlen(dbp->d_name);
 
 			if (filldir(dirent, dbp->d_name, namelen,
-					(off_t) dbp->d_off,
+					(loff_t) dbp->d_off,
 					(ino_t) dbp->d_ino,
 					DT_UNKNOWN)) {
 				goto done;
