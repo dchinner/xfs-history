@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.116 $"
+#ident "$Revision: 1.117 $"
 
 struct bhv_desc;
 struct buf;
@@ -164,6 +164,7 @@ typedef struct xfs_inode {
 	unsigned int		i_gen;		/* generation count */
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
 	struct xfs_ext_attr	*i_ext_attr;	/* Critical ext attributes */
+	void			*i_ilock_ra;	/* current ilock ret addr */
 
 	xfs_dinode_core_t	i_d;		/* most of ondisk inode */
 
