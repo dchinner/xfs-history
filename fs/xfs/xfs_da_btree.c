@@ -1632,7 +1632,7 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	xfs_fsblock_t firstblock = NULLFSBLOCK;
 #endif
 
-	if (mappedbno == -1) {
+	if (mappedbno == -1 || mappedbno == -2) {
 #ifdef DEBUG
 		error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
 					 XFS_BMAPI_AFLAG(whichfork),
@@ -1652,6 +1652,8 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 		}
 		if (fsb == NULLFSBLOCK) {
 			*bpp = NULL;
+			if (mappedbno == -2)
+				return 0;
 			return XFS_ERROR(EDIRCORRUPTED);
 		}
 		ASSERT(map.br_startblock == fsb);
