@@ -257,7 +257,7 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-#ifndef PAGEBUF_DEBUG
+#ifndef CONFIG_PAGEBUF_DEBUG
 	/*
 	 * Until this is fixed only page-sized data blocks work.
 	 */
