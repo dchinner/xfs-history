@@ -441,6 +441,7 @@ int linvfs_follow_link(struct dentry *dentry,
 	uio->uio_offset = 0;
 	uio->uio_segflg = UIO_SYSSPACE;
 	uio->uio_resid = MAXNAMELEN;
+	uio->uio_fmode = 0;
 
 	VOP_READLINK(vp, uio, NULL, error);
 	if (error) {

@@ -366,6 +366,7 @@ xfs_open_by_handle(
 		put_unused_fd(new_fd);
 		return -XFS_ERROR(-PTR_ERR(filp));
 	}
+	filp->f_mode |= FINVIS;
 
 	fd_install(new_fd, filp);
         return new_fd;
@@ -412,7 +413,7 @@ xfs_readlink_by_handle(
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= olen;
 
-	VOP_READLINK(vp, &auio, get_current_cred(), error);
+	VOP_READLINK(vp, &auio, NULL, error);
 
 	VN_RELE(vp);
 	return (olen - auio.uio_resid);
@@ -778,7 +779,7 @@ xfs_ioctl(
 
 		if (filp->f_flags & (O_NDELAY|O_NONBLOCK))
 			attr_flags |= ATTR_NONBLOCK;
-		if (filp->f_flags & O_INVISIBLE)
+		if (filp->f_mode & FINVIS)
 			attr_flags |= ATTR_DMI;
 
 		error = xfs_change_file_space(bdp, cmd, &bf, filp->f_pos,
@@ -986,7 +987,7 @@ xfs_ioctl(
 			return -XFS_ERROR(EINVAL);
 
 		iflags = (cmd == XFS_IOC_GETBMAPA ? BMV_IF_ATTRFORK : 0);
-		if (filp->f_flags & O_INVISIBLE)
+		if (filp->f_mode & FINVIS)
 			iflags |= BMV_IF_NO_DMAPI_READ;
 
 		error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg+1, iflags);

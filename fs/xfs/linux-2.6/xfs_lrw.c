@@ -129,7 +129,7 @@ xfs_read(
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
-	    !(filp->f_flags & (O_INVISIBLE))) {
+	    !(filp->f_mode & FINVIS)) {
 
 		vrwlock_t locktype = VRWLOCK_READ;
 
@@ -167,7 +167,7 @@ xfs_read(
 		error = -(int)ret;
 	}
 	
-	if (!(filp->f_flags & O_INVISIBLE))
+	if (!(filp->f_mode & FINVIS))
 		XFS_CHGTIME(mp, io, XFS_ICHGTIME_ACC);
 
 	ASSERT (error >= 0);
@@ -657,7 +657,7 @@ start:
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
-	    !(ioflags & O_INVISIBLE) && !eventsent)) {
+	    !(filp->f_mode & FINVIS) && !eventsent)) {
 
 		error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 				*offsetp, size,
@@ -691,7 +691,7 @@ start:
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
 	if (size) {
-		if (!(ioflags & O_INVISIBLE))
+		if (!(filp->f_mode & FINVIS))
 			xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	}
 
@@ -735,7 +735,7 @@ retry:
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
-	    !(ioflags & O_INVISIBLE)) {
+	    !(filp->f_mode & FINVIS)) {
 
 		xfs_rwunlock(bdp, locktype);
 		error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,

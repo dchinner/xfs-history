@@ -269,8 +269,6 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 
 #define FREAD		0x01
 #define FWRITE		0x02
-#define FNDELAY		0x04
-#define FNONBLOCK	0x80
 #define FINVIS		0x0100	/* don't update timestamps - XFS */
 #define FSOCKET		0x0200	/* open file refers to a vsocket */
 
