@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -30,7 +30,7 @@
 #endif
 
 /*
- * Prototypes for internal functions.
+ * Prototypes for internal btree functions.
  */
 
 #ifdef XFSDEBUG
@@ -65,6 +65,15 @@ STATIC int xfs_bmbt_rshift(xfs_btree_cur_t *, int);
 STATIC int xfs_bmbt_split(xfs_btree_cur_t *, int, xfs_bmbt_ptr_t *, xfs_bmbt_key_t *, xfs_btree_cur_t **);
 STATIC int xfs_bmbt_update(xfs_btree_cur_t *, xfs_fsblock_t, xfs_fsblock_t, xfs_extlen_t);
 STATIC void xfs_bmbt_updkey(xfs_btree_cur_t *, xfs_bmbt_key_t *, int);
+
+/*
+ * Prototypes for internal bmap routines.
+ */
+STATIC void
+xfs_bmap_local_to_extents(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip);
  
 /*
  * Debug functions.
@@ -714,11 +723,11 @@ xfs_bmbt_insert(xfs_btree_cur_t *cur)
 STATIC int
 xfs_bmbt_insrec(xfs_btree_cur_t *cur, int level, xfs_bmbt_ptr_t *bnop, xfs_bmbt_rec_t *recp, xfs_btree_cur_t **curp)
 {
+	xfs_fsblock_t askbno;
 	xfs_btree_lblock_t *block;
 	buf_t *buf;
 	xfs_btree_lblock_t *cblock;
 	xfs_bmbt_ptr_t cbno;
-	buf_t *cbuf;
 	xfs_bmbt_key_t *ckp;
 	xfs_bmbt_ptr_t *cpp;
 	xfs_bmbt_rec_t *crp;
@@ -773,12 +782,12 @@ xfs_bmbt_insrec(xfs_btree_cur_t *cur, int level, xfs_bmbt_ptr_t *bnop, xfs_bmbt_
 			/*
 			 * Copy the root into a real block.
 			 */
-			cbno = xfs_agb_to_fsb(sbp, cur->bc_agno, cur->bc_private.b.ip->i_bno);
-			cbno = xfs_alloc_extent(tp, cbno, 1, XFS_ALLOCTYPE_NEAR_BNO);
+			askbno = xfs_ino_to_fsb(sbp, ip->i_ino);
+			cbno = xfs_alloc_extent(tp, askbno, 1, XFS_ALLOCTYPE_START_BNO);
 			if (cbno == NULLFSBLOCK)
 				return 0;
-			cbuf = xfs_btree_get_bufl(mp, tp, cbno, 0);
-			cblock = xfs_buf_to_lblock(cbuf);
+			buf = xfs_btree_get_bufl(mp, tp, cbno, 0);
+			cblock = xfs_buf_to_lblock(buf);
 			*cblock = *block;
 			block->bb_level++;
 			block->bb_numrecs = 1;
@@ -792,14 +801,14 @@ xfs_bmbt_insrec(xfs_btree_cur_t *cur, int level, xfs_bmbt_ptr_t *bnop, xfs_bmbt_
 			bcopy(pp, cpp, cblock->bb_numrecs * (int)sizeof(*pp));
 			*pp = cbno;
 			xfs_iroot_realloc(ip, 1 - cblock->bb_numrecs);
-			xfs_btree_setbuf(cur, level, cbuf);
+			xfs_btree_setbuf(cur, level, buf);
 			/*
 			 * Do all this logging at the end so that 
 			 * the root is at the right level.
 			 */
-			xfs_bmbt_log_block(cur, cbuf, XFS_BB_ALL_BITS);
-			xfs_bmbt_log_keys(cur, cbuf, 1, cblock->bb_numrecs);
-			xfs_bmbt_log_ptrs(cur, cbuf, 1, cblock->bb_numrecs);
+			xfs_bmbt_log_block(cur, buf, XFS_BB_ALL_BITS);
+			xfs_bmbt_log_keys(cur, buf, 1, cblock->bb_numrecs);
+			xfs_bmbt_log_ptrs(cur, buf, 1, cblock->bb_numrecs);
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
 			block = cblock;
 		} else {
@@ -1286,7 +1295,8 @@ xfs_bmbt_rcheck(xfs_btree_cur_t *cur)
 		rp = level ? (void *)&key : (void *)&rec;
 		bno = xfs_bmbt_rcheck_btree(cur, bno, &fbno, rp, level);
 		while (bno != NULLFSBLOCK) {
-			ASSERT(bno < sbp->sb_dblocks);
+			ASSERT(xfs_fsb_to_agno(sbp, bno) < sbp->sb_agcount);
+			ASSERT(xfs_fsb_to_agbno(sbp, bno) < sbp->sb_agblocks);
 			bno = xfs_bmbt_rcheck_btree(cur, bno, (xfs_bmbt_ptr_t *)0, rp, level);
 		}
 	}
@@ -1497,7 +1507,7 @@ xfs_bmbt_split(xfs_btree_cur_t *cur, int level, xfs_bmbt_ptr_t *bnop, xfs_bmbt_k
 	lbuf = cur->bc_bufs[level];
 	lbno = xfs_daddr_to_fsb(sbp, lbuf->b_blkno);
 	left = xfs_buf_to_lblock(lbuf);
-	rbno = xfs_alloc_extent(tp, lbno, 1, XFS_ALLOCTYPE_NEAR_BNO);
+	rbno = xfs_alloc_extent(tp, lbno, 1, XFS_ALLOCTYPE_START_BNO);
 	if (rbno == NULLFSBLOCK)
 		return 0;
 	rbuf = xfs_btree_get_bufl(mp, tp, rbno, 0);
@@ -1617,6 +1627,54 @@ xfs_bmbt_updkey(xfs_btree_cur_t *cur, xfs_bmbt_key_t *keyp, int level)
 	xfs_bmbt_rcheck(cur);
 }
 
+STATIC void
+xfs_bmap_local_to_extents(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	xfs_inode_t	*ip)
+{
+	xfs_fsblock_t	askbno;
+	xfs_fsblock_t	bno;
+	buf_t		*buf;
+	char		*cp;
+	xfs_bmbt_rec_t	*ep;
+	int		flags = 0;
+	xfs_sb_t	*sbp;
+
+	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
+	sbp = &mp->m_sb;
+	if (ip->i_bytes) {
+		ASSERT(ip->i_flags & XFS_IINLINE);
+		/*
+		 * Allocate a block.  We know we need only one, since the
+		 * file currently fits in an inode.
+		 */
+		askbno = xfs_ino_to_fsb(sbp, ip->i_ino);
+		bno = xfs_alloc_extent(tp, askbno, 1, XFS_ALLOCTYPE_START_BNO);
+		/* 
+		 * Can't fail, the space was reserved.
+		 */
+		ASSERT(bno != NULLFSBLOCK);
+		buf = xfs_btree_get_bufl(mp, tp, bno, 0);
+		cp = (char *)buf->b_un.b_addr;
+		bcopy(ip->i_u1.iu_data, cp, ip->i_bytes);
+		xfs_idata_realloc(ip, -ip->i_bytes);
+		xfs_iext_realloc(ip, 1);
+		ep = ip->i_u1.iu_extents;
+		xfs_bmbt_set_startoff(ep, 0);
+		xfs_bmbt_set_startblock(ep, bno);
+		xfs_bmbt_set_blockcount(ep, 1);
+		ip->i_d.di_nextents = 1;
+		flags |= XFS_ILOG_EXT;
+	} else
+		ASSERT(ip->i_d.di_nextents == 0);
+	ip->i_flags &= ~XFS_IINLINE;
+	ip->i_flags |= XFS_IEXTENTS;
+	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
+	flags |= XFS_ILOG_CORE;
+	xfs_trans_log_inode(tp, ip, flags);
+}
+
 /*
  * Map file blocks to filesystem blocks.
  * Add blocks to file if a write into a hole/past eof.
@@ -1653,9 +1711,16 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 	xfs_sb_t *sbp;
 
 	ASSERT(*nmap >= 1 && *nmap <= XFS_BMAP_MAX_NMAP);
-	ASSERT(!(ip->i_flags & XFS_IINLINE));
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
-	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS);
+	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS ||
+	       ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
+	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
+		if (!wr) {
+			*nmap = 0;
+			return;
+		}
+		xfs_bmap_local_to_extents(mp, tp, ip);
+	}
 	if (!(ip->i_flags & XFS_IEXTENTS)) {
 		xfs_iread_extents(mp, tp, ip);
 		lastx = ip->i_lastex = NULLEXTNUM;
@@ -1717,8 +1782,8 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 			if (eof) {
 				asklen = len;
 				if (prev.br_startblock == NULLFSBLOCK)
-					askbno = xfs_agb_to_fsb(&mp->m_sb, agno,
-								ip->i_bno);
+					askbno = xfs_ino_to_fsb(&mp->m_sb,
+								ip->i_ino);
 				else
 					askbno = prev.br_startblock +
 						 prev.br_blockcount;
@@ -1727,12 +1792,9 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 				    xfs_extlen_min(got.br_startoff - bno, len);
 				askbno = got.br_startblock - asklen;
 			}
-			abno = xfs_alloc_vextent(tp, askbno, 1, asklen, &alen, XFS_ALLOCTYPE_NEAR_BNO);
-			if (abno == NULLFSBLOCK) {
-				abno = xfs_alloc_vextent(tp, askbno, 1, asklen, &alen, XFS_ALLOCTYPE_START_AG);
-				if (abno == NULLFSBLOCK)
-					break;
-			}
+			abno = xfs_alloc_vextent(tp, askbno, 1, asklen, &alen, XFS_ALLOCTYPE_START_BNO);
+			if (abno == NULLFSBLOCK)
+				break;
 			if ((ip->i_flags & XFS_IBROOT) && !cur) {
 				agbuf = xfs_bmbt_read_agf(mp, tp, agno);
 				cur = xfs_btree_init_cursor(mp, tp, agbuf, agno, XFS_BTNUM_BMAP, ip);
@@ -1836,16 +1898,12 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 		 */
 		ip->i_d.di_format = XFS_DINODE_FMT_BTREE;
 		logcore = 1;
-		abno = xfs_agb_to_fsb(sbp, agno, ip->i_bno);
-		abno = xfs_alloc_extent(tp, abno, 1, XFS_ALLOCTYPE_NEAR_BNO);
-		if (abno == NULLFSBLOCK) {
-			abno = xfs_agb_to_fsb(sbp, agno, ip->i_bno);
-			abno = xfs_alloc_extent(tp, abno, 1, XFS_ALLOCTYPE_START_AG);
-			/*
-			 * Allocation can't fail, the space was reserved.
-			 */
-			ASSERT(abno != NULLFSBLOCK);
-		}
+		abno = xfs_ino_to_fsb(sbp, ip->i_ino);
+		abno = xfs_alloc_extent(tp, abno, 1, XFS_ALLOCTYPE_START_BNO);
+		/*
+		 * Allocation can't fail, the space was reserved.
+		 */
+		ASSERT(abno != NULLFSBLOCK);
 		abuf = xfs_btree_get_bufl(mp, tp, abno, 0);
 		/*
 		 * Fill in the child block.
