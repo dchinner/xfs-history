@@ -714,6 +714,7 @@ linvfs_write_full_page(
 		lock_page(page); /* Wait for the page with inode I/O lock */
 	}
 	error = pagebuf_write_full_page(page);
+	UnlockPage(page);
 	VOP_RWUNLOCK(vp, VRWLOCK_WRITE);
 	return error;
 }
