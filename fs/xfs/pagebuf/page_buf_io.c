@@ -627,7 +627,7 @@ pagebuf_read_full_page(
 	if (!PageLocked(page))
 		PAGE_BUG(page);
 
-	if (DelallocPage(page)) {
+	if (PageDelalloc(page)) {
 		SetPageUptodate(page);
 		UnlockPage(page);
 		return 0;
@@ -697,7 +697,7 @@ pagebuf_release_page(
 	struct inode *inode = (struct inode*)page->mapping->host;
 	unsigned long pb_flags;
 
-	if (DelallocPage(page))
+	if (PageDelalloc(page))
 		pb_flags = PBF_WRITE|PBF_FILE_ALLOCATE;
 	else
 		pb_flags = PBF_WRITE|PBF_DIRECT;
@@ -718,7 +718,7 @@ pagebuf_write_full_page(
 	unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT, pb_flags;
 	int ret;
 
-	if (DelallocPage(page))
+	if (PageDelalloc(page))
 		pb_flags = PBF_WRITE|PBF_FILE_ALLOCATE;
 	else
 		pb_flags = PBF_WRITE|PBF_DIRECT;
@@ -740,7 +740,7 @@ out:
 		 * If it's delalloc and we have nowhere to put it,
 		 * throw it away.
 		 */
-		if (DelallocPage(page))
+		if (PageDelalloc(page))
 			block_flushpage(page, 0);
 		ClearPageUptodate(page);
 		UnlockPage(page);
@@ -848,7 +848,7 @@ __pb_block_prepare_write_async(
 {
 	struct buffer_head	*bh;
 	int 			err = 0;
-	int			dp = DelallocPage(page);
+	int			dp = PageDelalloc(page);
 	char			*kaddr = kmap(page);
 	page_buf_bmap_t		maps[PBF_MAX_MAPS];
 
@@ -1315,7 +1315,7 @@ probe_page(struct inode *inode, unsigned long index)
 		page_cache_release(page);
 		return NULL;
 	}
-	if (!page->mapping || !DelallocPage(page)) {
+	if (!page->mapping || !PageDelalloc(page)) {
 		UnlockPage(page);
 		page_cache_release(page);
 		return NULL;
@@ -1367,7 +1367,7 @@ convert_page(
 	/* Three possible conditions - page with delayed buffers,
 	 * page with real buffers, or page with no buffers (mmap)
 	 */
-	if (!bh || DelallocPage(page) || !buffer_mapped(bh)) {
+	if (!bh || PageDelalloc(page) || !buffer_mapped(bh)) {
 		hook_buffers_to_page(target, inode, page, mp, nmaps);
 	}
 
