@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.132 $"
 
 /*
  * High level interface routines for log manager
@@ -201,8 +201,7 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 {
 	pid_t pid;
 
-	if (curprocp)
-		pid = curprocp->p_pid;
+	pid = current_pid();
 
 	if (!iclog->ic_trace)
 		iclog->ic_trace = ktrace_alloc(256, 0);

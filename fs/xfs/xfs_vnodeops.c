@@ -1,4 +1,4 @@
-#ident "$Revision: 1.226 $"
+#ident "$Revision: 1.227 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -375,7 +375,7 @@ xfs_close(
 	 */
 	if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && lastclose &&
 	    !fdt_vnode_isopen(vp))
-		grio_remove_reservation(curprocp->p_pid, ip->i_dev, ip->i_ino);
+		grio_remove_reservation(current_pid(), ip->i_dev, ip->i_ino);
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	cleanlocks(vp, fl);
