@@ -6866,7 +6866,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 			 * the otherwise empty list, since it's about to be 
 			 * dequed and then we'll stop.
 			 */
-			if ((end_marker->av_forw == end_marker->av_back) && 
+			if ((end_marker->av_forw == end_marker) && 
 				(xfsd_list != end_marker)) {
 				break;
 			}
@@ -6877,7 +6877,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 			 * only thing on the list, since the end_marker should
 			 * be there too.
 			 */
-			if (cur_marker->av_forw == cur_marker->av_back) {
+			if (cur_marker->av_forw == cur_marker) {
 				bp = xfsd_list;
 			} else {
 				bp = cur_marker->av_forw;
@@ -7012,15 +7012,20 @@ xfsd(void)
 		xfsd_bufcount--;;
 		ASSERT(xfsd_bufcount >= 0);
 
-		mp_mutex_spinunlock(&xfsd_lock, s);
 		bp->av_forw = bp;
 		bp->av_back = bp;
 
 		/* Now make sure we didn't just process a marker */
 		if (bp->b_vp == (vnode_t *)-1L) {
-			s = mp_mutex_spinlock(&xfsd_lock);
 			continue;
 		}
+		/*
+		 * Don't give up the xfsd_lock until we have set the
+		 * av_forw and av_back pointers, because otherwise 
+		 * xfs_xfsd_list_evict() might be racing with us on
+		 * a marker that it placed and we just removed.
+		 */
+		mp_mutex_spinunlock(&xfsd_lock, s);
 
 		ASSERT((bp->b_flags & (B_BUSY | B_ASYNC | B_READ)) ==
 		       (B_BUSY | B_ASYNC));
