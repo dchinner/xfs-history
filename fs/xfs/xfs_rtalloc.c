@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision$"
 
 /*
  * Free realtime space allocation for XFS.
@@ -963,32 +963,23 @@ xfs_rtbuf_get(
 	buf_t		*bp;		/* block buffer, result */
 	daddr_t		d;		/* disk addr of block */
 	int		error;		/* error value */
-	xfs_fsblock_t	firstblock;	/* first alloc block for bmap */
-	xfs_bmap_free_t	*flist;		/* block freed list for bmap */
+	xfs_fsblock_t	fsb;		/* fs block number for block */
 	xfs_inode_t	*ip;		/* bitmap or summary inode */
-	xfs_bmbt_irec_t	map;		/* block map results */
-	int		nmap;		/* number of entries in "map" */
 
-	nmap = 1;
-	flist = NULL;
 	ip = issum ? mp->m_rsumip : mp->m_rbmip;
-	firstblock = NULLFSBLOCK;
 	/*
 	 * Map from the file offset (block) and inode number to the
 	 * file system block.
 	 */
-	error = xfs_bmapi(tp, ip, block, 1, 0, &firstblock, 0, &map, &nmap,
-		flist);
+	error = xfs_bmapi_single(tp, ip, XFS_DATA_FORK, &fsb, block);
 	if (error) {
 		return error;
 	}
-	ASSERT(nmap == 1);
-	ASSERT(flist == NULL);
-	ASSERT(firstblock == NULLFSBLOCK);
+	ASSERT(fsb != NULLFSBLOCK);
 	/*
 	 * Convert to disk address for buffer cache.
 	 */
-	d = XFS_FSB_TO_DADDR(mp, map.br_startblock);
+	d = XFS_FSB_TO_DADDR(mp, fsb);
 	/*
 	 * Read the buffer.
 	 */
