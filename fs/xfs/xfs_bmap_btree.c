@@ -1659,6 +1659,115 @@ xfs_bmbt_delete(
 }
 
 /*
+ * Convert a compressed bmap extent record to an uncompressed form.
+ * This code must be in sync with the next three routines.
+ */
+void
+xfs_bmbt_get_all(
+	xfs_bmbt_rec_t	*r,
+	xfs_bmbt_irec_t	*s)
+{
+#if XFS_BIG_FILES
+	s->br_startoff = (((xfs_fileoff_t)r->l0) << 23) |
+			 (((xfs_fileoff_t)r->l1) >> 9);
+#else	/* !XFS_BIG_FILES */
+#ifdef DEBUG
+	{
+		xfs_dfiloff_t	o;
+
+		o = (((xfs_dfiloff_t)r->l0) << 23) |
+		    (((xfs_dfiloff_t)r->l1) >> 9);
+		ASSERT((o >> 32) == 0);
+		s->br_startoff = (xfs_fileoff_t)o;
+	}
+#else	/* !DEBUG */
+	s->br_startoff = (((xfs_fileoff_t)r->l0) << 23) |
+			 ((((xfs_fileoff_t)r->l1) >> 9);
+#endif	/* DEBUG */
+#endif	/* XFS_BIG_FILES */
+#if XFS_BIG_FILESYSTEMS
+	s->br_startblock = (((xfs_fsblock_t)(r->l1 & 0x000001ff)) << 43) | 
+			   (((xfs_fsblock_t)r->l2) << 11) |
+			   (((xfs_fsblock_t)r->l3) >> 21);
+#else
+#ifdef DEBUG
+	{
+		xfs_dfsbno_t	b;
+
+		b = (((xfs_dfsbno_t)(r->l1 & 0x000001ff)) << 43) | 
+		    (((xfs_dfsbno_t)r->l2) << 11) |
+		    (((xfs_dfsbno_t)r->l3) >> 21);
+		ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
+		s->br_startblock = (xfs_fsblock_t)b;
+	}
+#else	/* !DEBUG */
+	s->br_startblock = (((xfs_fsblock_t)r->l2) << 11) |
+			   (((xfs_fsblock_t)r->l3) >> 21);
+#endif	/* DEBUG */
+#endif	/* XFS_BIG_FILESYSTEMS */
+	s->br_blockcount = (xfs_extlen_t)(r->l3 & 0x001fffff);
+}
+
+/*
+ * Extract the blockcount field from a bmap extent record.
+ */
+xfs_extlen_t
+xfs_bmbt_get_blockcount(
+	xfs_bmbt_rec_t	*r)
+{
+	return (xfs_extlen_t)(r->l3 & 0x001fffff);
+}
+
+/*
+ * Extract the startblock field from a bmap extent record.
+ */
+xfs_fsblock_t
+xfs_bmbt_get_startblock(
+	xfs_bmbt_rec_t	*r)
+{
+#if XFS_BIG_FILESYSTEMS
+	return (((xfs_fsblock_t)(r->l1 & 0x000001ff)) << 43) | 
+	       (((xfs_fsblock_t)r->l2) << 11) |
+	       (((xfs_fsblock_t)r->l3) >> 21);
+#else
+#ifdef DEBUG
+	xfs_dfsbno_t	b;
+
+	b = (((xfs_dfsbno_t)(r->l1 & 0x000001ff)) << 43) | 
+	    (((xfs_dfsbno_t)r->l2) << 11) |
+	    (((xfs_dfsbno_t)r->l3) >> 21);
+	ASSERT((b >> 32) == 0 || ISNULLDSTARTBLOCK(b));
+	return (xfs_fsblock_t)b;
+#else	/* !DEBUG */
+	return (((xfs_fsblock_t)r->l2) << 11) | (((xfs_fsblock_t)r->l3) >> 21);
+#endif	/* DEBUG */
+#endif	/* XFS_BIG_FILESYSTEMS */
+}
+
+/*
+ * Extract the startoff field from a bmap extent record.
+ */
+xfs_fileoff_t
+xfs_bmbt_get_startoff(
+	xfs_bmbt_rec_t	*r)
+{
+#if XFS_BIG_FILES
+	return (((xfs_fileoff_t)r->l0) << 23) |
+	       (((xfs_fileoff_t)r->l1) >> 9);
+#else	/* !XFS_BIG_FILES */
+#ifdef DEBUG
+	xfs_dfiloff_t	o;
+
+	o = (((xfs_dfiloff_t)r->l0) << 23) | (((xfs_dfiloff_t)r->l1) >> 9);
+	ASSERT((o >> 32) == 0);
+	return (xfs_fileoff_t)o;
+#else	/* !DEBUG */
+	return (((xfs_fileoff_t)r->l0) << 23) | ((((xfs_fileoff_t)r->l1) >> 9);
+#endif	/* DEBUG */
+#endif	/* XFS_BIG_FILES */
+}
+
+/*
  * Increment cursor by one record at the level.
  * For nonzero levels the leaf-ward information is untouched.
  */
@@ -1899,6 +2008,90 @@ xfs_bmbt_rcheck(
 	}
 }
 #endif	/* XFSDEBUG */
+
+/*
+ * Set all the fields in a bmap extent record from the uncompressed form.
+ */
+void
+xfs_bmbt_set_all(
+	xfs_bmbt_rec_t	*r,
+	xfs_bmbt_irec_t	*s)
+{
+#if XFS_BIG_FILES
+	ASSERT((s->br_startoff & ~((1LL << 55) - 1)) == 0);
+#endif
+#if XFS_BIG_FILESYSTEMS
+	ASSERT((s->br_startblock & ~((1LL << 52) - 1)) == 0);
+#endif
+	ASSERT((s->br_blockcount & 0xffe00000) == 0);
+	r->l0 = (__uint32_t)(s->br_startoff >> 23);
+	r->l3 = (((__uint32_t)s->br_startblock) << 21) |
+		((__uint32_t)(s->br_blockcount & 0x001fffff));
+#if XFS_BIG_FILESYSTEMS
+	r->l1 = (((__uint32_t)s->br_startoff) << 9) |
+		((__uint32_t)(s->br_startblock >> 43));
+	r->l2 = (__uint32_t)(s->br_startblock >> 11);
+#else
+	if (ISNULLSTARTBLOCK(s->br_startblock)) {
+		r->l1 = (__uint32_t)(s->br_startoff << 9) | 0x000001ff;
+		r->l2 = 0xffe00000 | (__uint32_t)(s->br_startblock >> 11);
+	} else {
+		r->l1 = (__uint32_t)(s->br_startoff << 9);
+		r->l2 = (__uint32_t)(s->br_startblock >> 11);
+	}
+#endif
+}
+
+/*
+ * Set the blockcount field in a bmap extent record.
+ */
+void
+xfs_bmbt_set_blockcount(
+	xfs_bmbt_rec_t	*r,
+	xfs_extlen_t	v)
+{
+	ASSERT((v & ~((1 << 21) - 1)) == 0);
+	r->l3 = (r->l3 & 0xffe00000) | ((__uint32_t)v & 0x001fffff);
+}
+
+/*
+ * Set the startblock field in a bmap extent record.
+ */
+void
+xfs_bmbt_set_startblock(
+	xfs_bmbt_rec_t	*r,
+	xfs_fsblock_t	v)
+{
+#if XFS_BIG_FILESYSTEMS
+	ASSERT((v & ~((1LL << 52) - 1)) == 0);
+	r->l1 = (r->l1 & 0xfffffe00) | (__uint32_t)(v >> 43);
+	r->l2 = (__uint32_t)(v >> 11);
+#else
+	if (ISNULLSTARTBLOCK(v)) {
+		r->l1 |= 0x000001ff;
+		r->l2 = 0xffe00000 | (__uint32_t)(v >> 11);
+	} else {
+		r->l1 &= ~0x000001ff;
+		r->l2 = (__uint32_t)(v >> 11);
+	}
+#endif	/* XFS_BIG_FILESYSTEMS */
+	r->l3 = (r->l3 & 0x001fffff) | (((__uint32_t)v) << 21);
+}
+
+/*
+ * Set the startoff field in a bmap extent record.
+ */
+void
+xfs_bmbt_set_startoff(
+	xfs_bmbt_rec_t	*r,
+	xfs_fileoff_t	v)
+{
+#if XFS_BIG_FILES
+	ASSERT((v & ~((1LL << 55) - 1)) == 0);
+#endif
+	r->l0 = (__uint32_t)(v >> 23);
+	r->l1 = (r->l1 & 0x000001ff) | (((__uint32_t)v) << 9);
+}
 
 /*
  * Convert in-memory form of btree root to on-disk form.
