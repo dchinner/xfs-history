@@ -7076,52 +7076,52 @@ xfs_error(
 
 vnodeops_t xfs_vnodeops = {
 	VNODE_POSITION_BASE,
-	fs_noerr,	/* open */
-	fs_nosys,	/* close */
-	fs_nosys,	/* read */
-	fs_nosys,	/* write */
-	fs_nosys,	/* ioctl */
-	fs_noerr,
-	fs_nosys,	/* getattr */
-	fs_nosys,	/* setattr */
-	fs_nosys,	/* access */
-	fs_nosys,	/* lookup */
-	fs_nosys,	/* create */
-	fs_nosys,	/* remove */
-	fs_nosys,	/* link */
-	fs_nosys,	/* rename */
-	fs_nosys,	/* mkdir */
-	fs_nosys,	/* rmdir */
-	fs_nosys,	/* readdir */
-	fs_nosys,	/* symlink */
-	fs_nosys,	/* readlink */
-	fs_nosys,	/* fsync */
+	(vop_open_t)fs_noerr,
+	(vop_close_t)fs_nosys,
+	(vop_read_t)fs_nosys,
+	(vop_write_t)fs_nosys,
+	(vop_ioctl_t)fs_nosys,
+	(vop_setfl_t)fs_noerr,
+	(vop_getattr_t)fs_nosys,
+	(vop_setattr_t)fs_nosys,
+	(vop_access_t)fs_nosys,
+	(vop_lookup_t)fs_nosys,
+	(vop_create_t)fs_nosys,
+	(vop_remove_t)fs_nosys,
+	(vop_link_t)fs_nosys,
+	(vop_rename_t)fs_nosys,
+	(vop_mkdir_t)fs_nosys,
+	(vop_rmdir_t)fs_nosys,
+	(vop_readdir_t)fs_nosys,
+	(vop_symlink_t)fs_nosys,
+	(vop_readlink_t)fs_nosys,
+	(vop_fsync_t)fs_nosys,
 	xfs_inactive,
-	fs_nosys,	/* fid */
-	fs_nosys,	/* fid2 */
-	(void (*)(bhv_desc_t *, vrwlock_t))fs_nosys,	/* rwlock */
-	(void (*)(bhv_desc_t *, vrwlock_t))fs_nosys,	/* rwunlock */
-	fs_nosys,	/* seek */
-	fs_nosys,
-	fs_nosys,	/* frlock */
-	fs_nosys,	/* realvp */
-	fs_nosys,	/* bmap */
-	(void (*)(bhv_desc_t *, buf_t *))fs_nosys,	/* strategy */
-	fs_nosys,	/* map */
-	fs_nosys,	/* addmap */
-	fs_nosys,	/* delmap */
-	(int (*)(bhv_desc_t *, short, int, short *, struct pollhead **))fs_nosys,
-	fs_nosys,	/* dump */
-	fs_nosys,	/* pathconf */
-	fs_nosys,	/* allocstore */
-	fs_nosys,	/* fcntl */
+	(vop_fid_t)fs_nosys,
+	(vop_fid2_t)fs_nosys,
+	(vop_rwlock_t)fs_nosys,
+	(vop_rwunlock_t)fs_nosys,
+	(vop_seek_t)fs_nosys,
+	(vop_cmp_t)fs_nosys,
+	(vop_frlock_t)fs_nosys,
+	(vop_realvp_t)fs_nosys,
+	(vop_bmap_t)fs_nosys,
+	(vop_strategy_t)fs_nosys,
+	(vop_map_t)fs_nosys,
+	(vop_addmap_t)fs_nosys,
+	(vop_delmap_t)fs_nosys,
+	(vop_poll_t)fs_nosys,
+	(vop_dump_t)fs_nosys,
+	(vop_pathconf_t)fs_nosys,
+	(vop_allocstore_t)fs_nosys,
+	(vop_fcntl_t)fs_nosys,
 	xfs_reclaim,
-	fs_nosys,	/* attr_get */
-	fs_nosys,	/* attr_set */
-	fs_nosys,	/* attr_remove */
-	fs_nosys,	/* attr_list */
-	fs_nosys,	/* mount */
-	(void (*)(bhv_desc_t *, vnode_t *, int))fs_nosys, /* link_removed */
+	(vop_attr_get_t)fs_nosys,
+	(vop_attr_set_t)fs_nosys,
+	(vop_attr_remove_t)fs_nosys,
+	(vop_attr_list_t)fs_nosys,
+	(vop_mount_t)fs_nosys,
+	(vop_link_removed_t)fs_nosys,
 };
 
 #else
@@ -7133,7 +7133,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_read,
 	xfs_write,
 	xfs_ioctl,
-	fs_noerr,
+	(vop_setfl_t)fs_noerr,
 	xfs_getattr,
 	xfs_setattr,
 	xfs_access,
@@ -7156,14 +7156,14 @@ vnodeops_t xfs_vnodeops = {
 	xfs_seek,
 	fs_cmp,
 	xfs_frlock,
-	fs_nosys,	/* realvp */
+	(vop_realvp_t)fs_nosys,
 	xfs_bmap,
 	xfs_strategy,
-	fs_noerr,
-	fs_noerr,	/* addmap */
-	fs_noerr,	/* delmap */
+	(vop_map_t)fs_noerr,
+	(vop_addmap_t)fs_noerr,
+	(vop_delmap_t)fs_noerr,
 	fs_poll,
-	fs_nosys,	/* dump */
+	(vop_dump_t)fs_nosys,
 	fs_pathconf,
 	xfs_allocstore,
 	xfs_fcntl,
@@ -7173,7 +7173,7 @@ vnodeops_t xfs_vnodeops = {
 	xfs_attr_remove,
 	xfs_attr_list,
 	fs_mount,
-	fs_noval,	/* link_removed */
+	(vop_link_removed_t)fs_noval,
 };
 
 #endif /* SIM */
