@@ -32,6 +32,7 @@
 
 #include <xfs.h>
 #include <linux/xfs_iops.h>
+#include <linux/pagemap.h>
 
 
 uint64_t vn_generation;		/* vnode generation number */
@@ -223,7 +224,7 @@ vn_revalidate(struct vnode *vp, int flags)
 		inode->i_gid	    = va.va_gid;
 		inode->i_rdev	    = mk_kdev(MAJOR(va.va_rdev),
 						MINOR(va.va_rdev));
-		inode->i_blksize    = va.va_blksize;
+		inode->i_blksize    = PAGE_CACHE_SIZE;
 		inode->i_generation = va.va_gencount;
 		if ((flags & ATTR_COMM) ||
 		    S_ISREG(inode->i_mode) ||
