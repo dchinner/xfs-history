@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision: 1.30 $"
 
 #include <sys/cmn_err.h>
 
@@ -11,8 +11,8 @@
 #define XLOG_NUM_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
 #define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* need to outlaw as cycle XXX*/
-#define XLOG_RECORD_BSIZE	(32*1024)	/* eventually 32k */
-#define XLOG_RECORD_BSHIFT	15		/* 4096 == 1 << 12 */
+#define XLOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
+#define XLOG_RECORD_BSHIFT	12		/* 4096 == 1 << 12 */
 #define XLOG_BTOLRBB(b)		((b)+XLOG_RECORD_BSIZE-1 >> XLOG_RECORD_BSHIFT)
 
 #define XLOG_HEADER_SIZE	512
@@ -235,7 +235,6 @@ typedef struct xlog_in_core {
  * overflow 31 bits worth of byte offset, so using a byte number will mean
  * that round off problems won't occur when releasing partial reservations.
  */
-struct xlog_recover_item;
 typedef struct log {
     xlog_ticket_t	*l_freelist;    /* free list of tickets */
     xlog_ticket_t	*l_tail;        /* free list of tickets */
@@ -255,7 +254,6 @@ typedef struct log {
     int			l_prev_cycle;   /* Cycle # b4 last block increment */
     int			l_curr_block;   /* current logical block of log */
     int			l_prev_block;   /* previous logical block of log */
-    struct xlog_recover_item *l_recover_extq;       /* recover q for extents */
     xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];/* for debuggin */
     int			l_iclog_size;   /* size of log in bytes; repeat */
 
