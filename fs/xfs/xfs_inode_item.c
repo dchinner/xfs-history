@@ -1,4 +1,4 @@
-#ident "$Revision: 1.52 $"
+#ident "$Revision: 1.53 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -99,6 +99,19 @@ xfs_inode_item_size(
 			ASSERT(ip->i_df.if_broot != NULL);
 			nvecs++;
 		} else {
+			ASSERT(!(iip->ili_format.ilf_fields &
+				 XFS_ILOG_DBROOT));
+#ifdef XFS_TRANS_DEBUG
+			if (iip->ili_root_size > 0) {
+				ASSERT(iip->ili_root_size ==
+				       ip->i_df.if_broot_bytes);
+				ASSERT(bcmp(iip->ili_orig_root,
+					    ip->i_df.if_broot,
+					    iip->ili_root_size) == 0);
+			} else {
+				ASSERT(ip->i_df.if_broot_bytes == 0);
+			}
+#endif
 			iip->ili_format.ilf_fields &= ~XFS_ILOG_DBROOT;
 		}
 		break;
@@ -732,6 +745,22 @@ xfs_inode_item_init(
 	iip->ili_format.ilf_blkno = ip->i_blkno;
 	iip->ili_format.ilf_len = ip->i_len;
 	iip->ili_format.ilf_boffset = ip->i_boffset;
+}
+
+/*
+ * Free the inode log item and any memory hanging off of it.
+ */
+void
+xfs_inode_item_destroy(
+	xfs_inode_t	*ip)
+{
+#ifdef XFS_TRANS_DEBUG
+	if (ip->i_itemp->ili_root_size != 0) {
+		kmem_free(ip->i_itemp->ili_orig_root,
+			  ip->i_itemp->ili_root_size);
+	}
+#endif
+	kmem_zone_free(xfs_ili_zone, ip->i_itemp);
 }
 
 

@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-#ident "$Revision: 1.26 $"
+#ident "$Revision: 1.27 $"
 
 struct buf;
 struct proc;
@@ -75,6 +75,10 @@ typedef struct xfs_inode_log_item {
 	struct xfs_bmbt_rec_32	*ili_extents_buf;  /* array of logged exts */
 	struct buf		*ili_bp;	   /* locked inode buffer */
 	struct proc		*ili_bp_owner;	   /* bp owner proc */
+#ifdef XFS_TRANS_DEBUG
+	int			ili_root_size;
+	char			*ili_orig_root;
+#endif
 	xfs_inode_log_format_t	ili_format;	   /* logged structure */
 } xfs_inode_log_item_t;
 
@@ -138,6 +142,7 @@ int xfs_ilog_fext(int w);
 
      
 void	xfs_inode_item_init(struct xfs_inode *, struct xfs_mount *);
+void	xfs_inode_item_destroy(struct xfs_inode *);
 void	xfs_iflush_done(struct buf *, xfs_inode_log_item_t *);
 
 #endif	/* _XFS_INODE_ITEM_H */

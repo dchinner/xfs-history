@@ -1,4 +1,4 @@
-#ident "$Revision: 1.21 $"
+#ident "$Revision: 1.23 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -42,6 +42,15 @@
 #include "sim.h"
 #endif
 
+#ifdef XFS_TRANS_DEBUG
+STATIC void
+xfs_trans_inode_broot_debug(
+	xfs_inode_t	*ip);
+#else
+#define	xfs_trans_inode_broot_debug(ip)
+#endif
+
+
 /*
  * Get and lock the inode for the caller if it is not already
  * locked within the given transaction.  If it is already locked
@@ -78,6 +87,7 @@ xfs_trans_iget(
 {
 	int			error;
 	xfs_inode_t		*ip;
+	xfs_inode_log_item_t	*iip;
 
 	/*
 	 * If the transaction pointer is NULL, just call the normal
@@ -136,18 +146,21 @@ xfs_trans_iget(
 	 */
 	if (ip->i_itemp == NULL)
 		xfs_inode_item_init(ip, mp);
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t *)(ip->i_itemp));
+	iip = ip->i_itemp;
+	(void) xfs_trans_add_item(tp, (xfs_log_item_t *)(iip));
+
+	xfs_trans_inode_broot_debug(ip);
 
 	/*
 	 * If the IO lock has been acquired, mark that in
 	 * the inode log item so we'll know to unlock it
 	 * when the transaction commits.
 	 */
-	ASSERT(ip->i_itemp->ili_flags == 0);
+	ASSERT(iip->ili_flags == 0);
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_EXCL;
+		iip->ili_flags |= XFS_ILI_IOLOCKED_EXCL;
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_SHARED;
+		iip->ili_flags |= XFS_ILI_IOLOCKED_SHARED;
 	}
 
 	/*
@@ -273,27 +286,32 @@ xfs_trans_ijoin(
 	xfs_inode_t	*ip,
 	uint		lock_flags)
 {
+	xfs_inode_log_item_t	*iip;
+
 	ASSERT(ip->i_transp == NULL);
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 	ASSERT(lock_flags & XFS_ILOCK_EXCL);
 	if (ip->i_itemp == NULL)
 		xfs_inode_item_init(ip, ip->i_mount);
-	ASSERT(ip->i_itemp->ili_flags == 0);
-	ASSERT(ip->i_itemp->ili_ilock_recur == 0);
-	ASSERT(ip->i_itemp->ili_iolock_recur == 0);
+	iip = ip->i_itemp;
+	ASSERT(iip->ili_flags == 0);
+	ASSERT(iip->ili_ilock_recur == 0);
+	ASSERT(iip->ili_iolock_recur == 0);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
 	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)(ip->i_itemp));
+	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)(iip));
+
+	xfs_trans_inode_broot_debug(ip);
 
 	/*
 	 * If the IO lock is already held, mark that in the inode log item.
 	 */
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_EXCL;
+		iip->ili_flags |= XFS_ILI_IOLOCKED_EXCL;
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		ip->i_itemp->ili_flags |= XFS_ILI_IOLOCKED_SHARED;
+		iip->ili_flags |= XFS_ILI_IOLOCKED_SHARED;
 	}
 
 	/*
@@ -379,4 +397,46 @@ xfs_trans_log_inode(
 	flags |= ip->i_itemp->ili_last_fields;
 	ip->i_itemp->ili_format.ilf_fields |= flags;
 }
+
+#ifdef XFS_TRANS_DEBUG
+/*
+ * Keep track of the state of the inode btree root to make sure we
+ * log it properly.
+ */
+STATIC void
+xfs_trans_inode_broot_debug(
+	xfs_inode_t	*ip)
+{
+	xfs_inode_log_item_t	*iip;
+
+	ASSERT(ip->i_itemp != NULL);
+	iip = ip->i_itemp;
+	if (iip->ili_root_size != 0) {
+		ASSERT(iip->ili_orig_root != NULL);
+		kmem_free(iip->ili_orig_root, iip->ili_root_size);
+		iip->ili_root_size = 0;
+		iip->ili_orig_root = NULL;
+	}
+	if (ip->i_d.di_format == XFS_DINODE_FMT_BTREE) {
+		ASSERT((ip->i_df.if_broot != NULL) &&
+		       (ip->i_df.if_broot_bytes > 0));
+		iip->ili_root_size = ip->i_df.if_broot_bytes;
+		iip->ili_orig_root =
+			(char*)kmem_alloc(iip->ili_root_size, KM_SLEEP);
+		bcopy((char*)(ip->i_df.if_broot), iip->ili_orig_root,
+		      iip->ili_root_size);
+	}
+}
+#endif
+
+
+
+
+
+
+
+
+
+
+
 
