@@ -722,7 +722,7 @@ xfs_iprint(xfs_inode_t *ip)
 
 	printf("Inode %x\n", ip);
 	printf("    i_dev %x\n", (uint)ip->i_dev);
-	printf("    i_ino %x\n", (uint)ip->i_ino);
+	printf("    i_ino %llx\n", ip->i_ino);
 	printf("    i_bno %x\n", (uint)ip->i_bno);
 	printf("    i_index %d\n", ip->i_index);
 
