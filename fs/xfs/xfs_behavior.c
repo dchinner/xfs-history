@@ -1,5 +1,4 @@
-/**************************************************************************
- *									  *
+/*
  * Copyright (c) 2000 Silicon Graphics, Inc.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
@@ -29,9 +28,8 @@
  * For further information regarding this notice, see: 
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
- *									  *
- **************************************************************************/
-#ident "$Id$"
+ * 
+ */
 
 /*
  * Source file used to associate/disassociate behaviors with virtualized 
@@ -48,8 +46,6 @@
 #include <ksys/behavior.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
-
-#include "xfs_sim.h"
 
 xfs_zone_t	*bhv_global_zone;
 
