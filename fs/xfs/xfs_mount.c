@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.232 $"
+#ident	"$Revision: 1.233 $"
 
 #include <xfs_os_defs.h>
 
@@ -83,6 +83,8 @@
 #include "xfs_quota.h"
 #include "xfs_cxfs.h"
 #include "xfs_arch.h"
+
+#include <linux/pagemap.h>
 
 #ifdef SIM
 #include "sim.h"
@@ -235,6 +237,18 @@ xfs_mount_validate_sb(
 	xfs_mount_t	*mp,
 	xfs_sb_t	*sbp)
 {
+	/*
+	 * Until this is fixed only page-sized data blocks work.
+	 */
+	if (sbp->sb_blocksize != PAGE_CACHE_SIZE) {
+		cmn_err(CE_WARN,
+		"XFS: Trying to mount file system with blocksize %d bytes\n",
+			sbp->sb_blocksize);
+		cmn_err(CE_WARN,
+		"XFS: Only page-sized (%d bytes) blocksize currently works.\n",
+					PAGE_CACHE_SIZE);
+                return XFS_ERROR(EWRONGFS);
+        }
 	/*
 	 * If the log device and data device have the 
 	 * same device number, the log is internal. 
