@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.6 1994/03/18 16:46:21 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.7 1994/03/24 15:53:54 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,7 +40,6 @@
 #ifdef SIM
 #include "sim.h"
 #include "stdio.h"
-/* extern xfs_mount_t *mountp; */
 #endif
 
 
@@ -101,32 +100,27 @@ xfs_get_inode(  dev_t fs_dev, int ino)
         xfs_inode_t *ip = NULL ;
 	extern struct vfs *vfs_devsearch( dev_t );
 
-#ifndef SIM
         vfsp = vfs_devsearch( fs_dev );
         if (vfsp) {
 		/*
 		 * Verify that this is an xfs file system.
 		 */
+#ifndef SIM
 		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) {
-                	ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, XFS_ILOCK_EXCL);
 #else
-/*BUGLY 		ip = xfs_iget( mountp, NULL, ino, XFS_ILOCK_EXCL); */
+		{
 #endif
+                	ip = xfs_iget( XFS_VFSTOM( vfsp ), NULL, ino, XFS_ILOCK_EXCL);
 
 #ifdef DEBUG
 			if (!ip) 
 				printf("xfs_get failed on %d \n",ino);
 #endif
 
-#ifndef SIM
 		}
-        } 
-#ifdef DEBUG
-	else {
+        } else {
 		printf("vfs_devsearch failed \n");
 	}
-#endif
-#endif
         return( ip );
 }
 
@@ -381,7 +375,8 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip,
                         /*
                          * Set the I/O to be equal to the guaranteed rate size.
                          */
-                        uiop->uio_resid = ticket->sz;
+                        uiop->uio_resid      = ticket->sz;
+			uiop->uio_iov[0].iov_len = ticket->sz;
                         remainingio    -= ticket->sz;
 
                         /*
@@ -435,7 +430,12 @@ xfs_request_larger_than_guarantee(xfs_inode_t *ip,
                 /*
                  * Add unperformed I/O count to the resid.
                  */
-                uiop->uio_resid += remainingio;
+		if (ret) {
+                	uiop->uio_resid += remainingio;
+		} else {
+                	uiop->uio_resid = remainingio;
+			uiop->uio_iov[0].iov_len = remainingio;
+		}
         }
         /*
          * Drop lock obtained by xfs_io_is_guaranteed().
@@ -665,11 +665,7 @@ xfs_get_block_size(dev_t fsdev, int *fs_size)
 	int ret = 0;
 	struct vfs *vfsp = NULL;
 
-#ifndef SIM
 	vfsp = vfs_devsearch( fsdev );
-#else
-/*	vfsp = mountp->m_vfsp; */
-#endif
 	if ( vfsp ) {
 		if (copyout(&(vfsp->vfs_bsize), fs_size, sizeof(*fs_size))) {
 			ret = EFAULT;
