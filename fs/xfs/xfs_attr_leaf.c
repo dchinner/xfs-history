@@ -12,6 +12,7 @@
 #include <sys/debug.h>
 #include <sys/systm.h>
 #include <sys/attributes.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_H
 #define	_FS_XFS_ATTR_H
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision$"
 
 /*
  * xfs_attr.h
@@ -16,6 +16,13 @@
  * as possible so as to fit into the literal area of the inode.
  */
 
+#ifdef XFS_ALL_TRACE
+#define	XFS_ATTR_TRACE
+#endif
+
+#if !defined(DEBUG) || defined(SIM)
+#undef XFS_ATTR_TRACE
+#endif
 
 /*========================================================================
  * Function prototypes for the kernel.
