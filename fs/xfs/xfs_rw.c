@@ -620,6 +620,8 @@ xfs_read_buf(
 	int 		 error;
 	
 	bp = xfs_buf_read(target, blkno, len, flags);
+	if (!bp)
+		return XFS_ERROR(EIO);
 	error = XFS_BUF_GETERROR(bp);
 	if (bp && !error && !XFS_FORCED_SHUTDOWN(mp)) {
 		*bpp = bp;
