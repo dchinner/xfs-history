@@ -39,28 +39,27 @@
  * Tunable xfs parameters
  */
 
-#define XFS_PARAM	2
+#define XFS_PARAM	3
 
 typedef union xfs_param {
 	struct {
 		ulong	refcache_size;	/* Size of nfs refcache */
 		ulong	refcache_purge;	/* # of entries to purge each time */
+		ulong	stats_clear;	/* reset all xfs stats to 0 */
 	} xfs_un;
 	ulong data[XFS_PARAM];
 } xfs_param_t;
 
 enum
 {
-        XFS_REFCACHE_SIZE = 1,
-        XFS_REFCACHE_PURGE = 2,
+	XFS_REFCACHE_SIZE = 1,
+	XFS_REFCACHE_PURGE = 2,
+	XFS_STATS_CLEAR = 3,
 };
 
 extern xfs_param_t	xfs_params;
 
 void	xfs_sysctl_register(void);
 void	xfs_sysctl_unregister(void);
-int	xfs_refcache_resize_proc_handler(
-		ctl_table *ctl, int write, struct file * filp,
-		void *buffer, size_t *lenp);
 
 #endif /* __XFS_SYSCNTL_H__ */

@@ -168,10 +168,10 @@ STATIC void pagebuf_daemon_wakeup(int);
  * /proc/sys/vm/pagebuf
  */
 
-unsigned long pagebuf_min[P_PARAM] = { HZ/2, 1*HZ,  1, 0 };
-unsigned long pagebuf_max[P_PARAM] = { HZ*30, HZ*300, 4096, 1 };
+unsigned long pagebuf_min[P_PARAM] = {  HZ/2,   1*HZ,    1, 0, 0 };
+unsigned long pagebuf_max[P_PARAM] = { HZ*30, HZ*300, 4096, 1, 1 };
 
-pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 256, 0 }};
+pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 256, 0, 0 }};
 
 /*
  * Pagebuf statistics variables
@@ -1732,23 +1732,47 @@ static int pagebuf_daemon_stop(void)
  * Pagebuf sysctl interface
  */
 
-static struct ctl_table_header *pagebuf_table_header;
+static int
+pb_stats_clear_handler(ctl_table *ctl, int write, struct file * filp,
+		       void *buffer, size_t *lenp)
+{
+	int		ret;
+	int		*valp = ctl->data;
 
+	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
+
+	if (!ret && write && *valp) {
+		printk("XFS Clearing pbstats\n");
+		memset(&pbstats, 0, sizeof(pbstats));
+		pb_params.p_un.stats_clear = 0;
+	}
+
+	return ret;
+}
+
+static struct ctl_table_header *pagebuf_table_header;
 
 static ctl_table pagebuf_table[] = {
 	{PB_FLUSH_INT, "flush_int", &pb_params.data[0],
 	sizeof(int), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[0], &pagebuf_max[0]},
+
 	{PB_FLUSH_AGE, "flush_age", &pb_params.data[1],
 	sizeof(int), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[1], &pagebuf_max[1]},
+
 	{PB_DIO_MAX, "max_dio_pages", &pb_params.data[2],
 	sizeof(int), 0644, NULL, &proc_doulongvec_minmax, &sysctl_intvec, NULL,
 	&pagebuf_min[2], &pagebuf_max[2]},
+
+	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[3],
+	sizeof(int), 0644, NULL, &pb_stats_clear_handler,
+	&sysctl_intvec, NULL, &pagebuf_min[3], &pagebuf_max[3]},
+
 #ifdef PAGEBUF_TRACE
-	{PB_DEBUG, "debug", &pb_params.data[3],
-	sizeof(int), 0644, NULL, &proc_doulongvec_minmax, &sysctl_intvec, NULL,
-	&pagebuf_min[3], &pagebuf_max[3]},
+	{PB_DEBUG, "debug", &pb_params.data[4],
+	sizeof(int), 0644, NULL, &proc_doulongvec_minmax,
+	&sysctl_intvec, NULL, &pagebuf_min[4], &pagebuf_max[4]},
 #endif
 	{0}
 };

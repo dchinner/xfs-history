@@ -46,10 +46,12 @@
  * Tunable xfs parameters
  */
 
-unsigned long xfs_min[XFS_PARAM] = {                     0,                      0 };
-unsigned long xfs_max[XFS_PARAM] = { XFS_REFCACHE_SIZE_MAX,  XFS_REFCACHE_SIZE_MAX };
+extern struct xfsstats xfsstats;
 
-xfs_param_t xfs_params = {{ 128, 32 }};
+unsigned long xfs_min[XFS_PARAM] = {                     0,                      0, 0 };
+unsigned long xfs_max[XFS_PARAM] = { XFS_REFCACHE_SIZE_MAX,  XFS_REFCACHE_SIZE_MAX, 1 };
+
+xfs_param_t xfs_params = {{ 128, 32, 0 }};
 
 static struct ctl_table_header *xfs_table_header;
 
@@ -57,7 +59,7 @@ static struct ctl_table_header *xfs_table_header;
 
 extern void xfs_refcache_resize(int xfs_refcache_new_size);
 
-int
+static int
 xfs_refcache_resize_proc_handler(ctl_table *ctl, int write, struct file * filp,
 		       void *buffer, size_t *lenp)
 {
@@ -66,14 +68,36 @@ xfs_refcache_resize_proc_handler(ctl_table *ctl, int write, struct file * filp,
 	int	xfs_refcache_new_size;
 	int	xfs_refcache_old_size = *valp;
 
-	ret = proc_dointvec_minmax(ctl, write, filp, buffer, lenp);
+	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
 	xfs_refcache_new_size = *valp;
 
-	if (write && xfs_refcache_new_size != xfs_refcache_old_size) {
+	if (!ret && write && xfs_refcache_new_size != xfs_refcache_old_size) {
 		xfs_refcache_resize(xfs_refcache_new_size);
 		/* Don't purge more than size of the cache */
 		if (xfs_refcache_new_size < xfs_params.xfs_un.refcache_purge)
 			xfs_params.xfs_un.refcache_purge = xfs_refcache_new_size;
+	}
+
+	return ret;
+}
+
+static int
+xfs_stats_clear_proc_handler(ctl_table *ctl, int write, struct file * filp,
+		       void *buffer, size_t *lenp)
+{
+	int		ret;
+	int		*valp = ctl->data;
+	__uint32_t 	vn_active;
+	
+	ret = proc_doulongvec_minmax(ctl, write, filp, buffer, lenp);
+
+	if (!ret && write && *valp) {
+		printk("XFS Clearing xfsstats\n");
+		/* save vn_active, it's a universal truth! */
+		vn_active = xfsstats.vn_active;
+		memset(&xfsstats, 0, sizeof(xfsstats));
+		xfsstats.vn_active = vn_active;
+		xfs_params.xfs_un.stats_clear = 0;
 	}
 
 	return ret;
@@ -88,6 +112,10 @@ static ctl_table xfs_table[] = {
 	sizeof(int), 0644, NULL, &proc_doulongvec_minmax,
 	&sysctl_intvec, NULL, &xfs_min[1], &xfs_params.xfs_un.refcache_size},
 	
+	{XFS_STATS_CLEAR, "stats_clear", &xfs_params.data[2],
+	sizeof(int), 0644, NULL, &xfs_stats_clear_proc_handler,
+	&sysctl_intvec, NULL, &xfs_min[2], &xfs_max[2]},
+
 	{0}
 };
 
