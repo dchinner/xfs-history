@@ -1,4 +1,4 @@
-#ident "$Revision: 1.227 $"
+#ident "$Revision: 1.228 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -309,7 +309,8 @@ int	xfs_do_fast_fid = 1;
 
 #define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
 #define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
-#define	ITRACE(ip)	vn_trace_ref(XFS_ITOV(ip), __FILE__, __LINE__)
+#define	ITRACE(ip)	vn_trace_ref(XFS_ITOV(ip), __FILE__, __LINE__, \
+				(inst_t *)__return_address)
 
 
 /*
@@ -365,7 +366,7 @@ xfs_close(
         xfs_inode_t	*ip;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_close");
+	vn_trace_entry(vp, "xfs_close", (inst_t *)__return_address);
 	ip = XFS_VTOI(vp);
 
 	/*
@@ -400,7 +401,7 @@ xfs_getattr(
 	xfs_mount_t	*mp;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_getattr");
+	vn_trace_entry(vp, "xfs_getattr", (inst_t *)__return_address);
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
 
@@ -528,7 +529,7 @@ xfs_setattr(
 	int		timeflags = 0;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_setattr");
+	vn_trace_entry(vp, "xfs_setattr", (inst_t *)__return_address);
 	/*
 	 * Cannot set certain attributes.
          */
@@ -946,7 +947,7 @@ xfs_access(
 	int		error;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_access");
+	vn_trace_entry(vp, "xfs_access", (inst_t *)__return_address);
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
 	error = xfs_iaccess(ip, mode, credp);
@@ -980,7 +981,7 @@ xfs_readlink(
 	vnode_t 	*vp = PVN_TO_VN(pvp);
         int             error = 0;
 
-	vn_trace_entry(vp, "xfs_readlink");
+	vn_trace_entry(vp, "xfs_readlink", (inst_t *)__return_address);
 	if (vp->v_type != VLNK)
                 return XFS_ERROR(EINVAL);
 
@@ -1087,7 +1088,7 @@ xfs_fsync(
 	buf_t		*bp;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_fsync");
+	vn_trace_entry(vp, "xfs_fsync", (inst_t *)__return_address);
 	ip = XFS_VTOI(vp);
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	last_byte = xfs_file_last_byte(ip);
@@ -1232,7 +1233,7 @@ xfs_inactive(
 	xfs_bmbt_irec_t	imap;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_inactive");
+	vn_trace_entry(vp, "xfs_inactive", (inst_t *)__return_address);
 	ip = XFS_VTOI(vp);
 
 	/*
@@ -1644,7 +1645,8 @@ xfs_dir_lookup_int(
 	int	   code = 0;
 	int	   do_iget;
 
-	vn_trace_entry(dir_vp, "xfs_dir_lookup_int");
+	vn_trace_entry(dir_vp, "xfs_dir_lookup_int",
+		(inst_t *)__return_address);
 	do_iget = flags & DLF_IGET;
 	ASSERT((flags & (DLF_IGET | DLF_NODNLC)) != (DLF_IGET | DLF_NODNLC));
 
@@ -1747,7 +1749,7 @@ xfs_lookup(
 	struct ncfastdata	fastdata;
 	vnode_t 		*dir_vp = PVN_TO_VN(dir_pvp);
 
-	vn_trace_entry(dir_vp, "xfs_lookup");
+	vn_trace_entry(dir_vp, "xfs_lookup", (inst_t *)__return_address);
 
 	/*
 	 * If it's not a directory, fail the request.
@@ -2091,7 +2093,7 @@ xfs_create(
 	int			committed;
 	struct ncfastdata	fastdata;
 
-	vn_trace_entry(dir_vp, "xfs_create");
+	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
 
         dp = XFS_VTOI(dir_vp);
 
@@ -2758,7 +2760,7 @@ xfs_remove(
 	int			entry_changed;
 
 	nospace = 0;
-	vn_trace_entry(dir_vp, "xfs_remove");
+	vn_trace_entry(dir_vp, "xfs_remove", (inst_t *)__return_address);
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_VTOI (dir_vp), DM_REMOVE)) {
@@ -3036,7 +3038,7 @@ xfs_link(
 	int			committed;
 	vnode_t 		*target_dir_vp = PVN_TO_VN(target_dir_pvp);
 
-	vn_trace_entry(target_dir_vp, "xfs_link");
+	vn_trace_entry(target_dir_vp, "xfs_link", (inst_t *)__return_address);
 	/*
 	 * Get the real vnode.
 	 */
@@ -3044,7 +3046,7 @@ xfs_link(
 	if (!error) {
                 src_vp = realvp;
 	}
-	vn_trace_entry(src_vp, "xfs_link");
+	vn_trace_entry(src_vp, "xfs_link", (inst_t *)__return_address);
         if (src_vp->v_type == VDIR) {
                 return XFS_ERROR(EPERM);
 	}
@@ -3789,8 +3791,8 @@ xfs_rename(
 	int		gencounts[4];
 	vnode_t 	*src_dir_vp = PVN_TO_VN(src_dir_pvp);
 
-	vn_trace_entry(src_dir_vp, "xfs_rename");
-	vn_trace_entry(target_dir_vp, "xfs_rename");
+	vn_trace_entry(src_dir_vp, "xfs_rename", (inst_t *)__return_address);
+	vn_trace_entry(target_dir_vp, "xfs_rename", (inst_t *)__return_address);
 
 	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_VTOI(src_dir_vp),
 			     DM_RENAME) ||
@@ -4204,7 +4206,7 @@ xfs_mkdir(
 		if (error)
 			return error;
 	}
-	vn_trace_entry(dir_vp, "xfs_mkdir");
+	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -4386,7 +4388,7 @@ xfs_rmdir(
 	int			entry_changed;
 	vnode_t 		*dir_vp = PVN_TO_VN(dir_pvp);
 
-	vn_trace_entry(dir_vp, "xfs_rmdir");
+	vn_trace_entry(dir_vp, "xfs_rmdir", (inst_t *)__return_address);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_VTOI (dir_vp), DM_REMOVE)) {
 		error = dm_namesp_event(DM_REMOVE, dir_vp, NULL,
@@ -4599,7 +4601,7 @@ xfs_readdir(
 	uint			lock_mode;
 	off_t			start_offset;
 
-	vn_trace_entry(dir_vp, "xfs_readdir");
+	vn_trace_entry(dir_vp, "xfs_readdir", (inst_t *)__return_address);
         dp = XFS_VTOI(dir_vp);
         lock_mode = xfs_ilock_map_shared(dp);
 
@@ -4658,7 +4660,7 @@ xfs_symlink(
 	uint			cancel_flags;
 	int			committed;
 
-	vn_trace_entry(dir_vp, "xfs_symlink");
+	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
 	/*
 	 * Check component lengths of the target path name.
          */
@@ -4922,7 +4924,7 @@ xfs_fid(
 	xfs_inode_t	*ip;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_fid");
+	vn_trace_entry(vp, "xfs_fid", (inst_t *)__return_address);
 	mp = XFS_VFSTOM(vp->v_vfsp);
 	if (XFS_INO_BITS(mp) > (NBBY * sizeof(xfs_fid_ino_t))) {
 		/*
@@ -4963,7 +4965,7 @@ xfs_fid2(
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 	xfs_fid2_t	*xfid = (xfs_fid2_t *)fidp;
 
-	vn_trace_entry(vp, "xfs_fid2");
+	vn_trace_entry(vp, "xfs_fid2", (inst_t *)__return_address);
 	ASSERT(sizeof(fid_t) >= sizeof(xfs_fid2_t));
 
 	ip = XFS_VTOI(vp);
@@ -5092,7 +5094,7 @@ xfs_frlock(
 	int		error;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_frlock");
+	vn_trace_entry(vp, "xfs_frlock", (inst_t *)__return_address);
 	ip = XFS_VTOI(vp);
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	error = fs_frlock(pvp, cmd, flockp, flag, offset, credp);
@@ -5242,7 +5244,7 @@ xfs_allocstore(
 	xfs_bmbt_irec_t	orig_imap[NDPP];
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 	
-	vn_trace_entry(vp, "xfs_allocstore");
+	vn_trace_entry(vp, "xfs_allocstore", (inst_t *)__return_address);
 	/*
 	 * This code currently only works for a single page.
 	 */
@@ -5378,7 +5380,7 @@ xfs_fcntl(
 	vnode_t 		*vp = PVN_TO_VN(pvp);
 	extern int		scache_linemask;
 	
-	vn_trace_entry(vp, "xfs_fcntl");
+	vn_trace_entry(vp, "xfs_fcntl", (inst_t *)__return_address);
 	mp = XFS_VFSTOM( vp->v_vfsp );
 	switch (cmd) {
 	case F_DIOINFO: {
@@ -5599,7 +5601,7 @@ xfs_reclaim(
 	int		error;
 	vnode_t 	*vp = PVN_TO_VN(pvp);
 
-	vn_trace_entry(vp, "xfs_reclaim");
+	vn_trace_entry(vp, "xfs_reclaim", (inst_t *)__return_address);
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_VTOI(vp);
 	ASSERT(ip->i_queued_bufs >= 0);
@@ -5745,7 +5747,7 @@ xfs_free_file_space(
         xfs_trans_t     *tp;
 	xfs_mount_t	*mp;
 
-	vn_trace_entry(vp, "xfs_free_file_space");
+	vn_trace_entry(vp, "xfs_free_file_space", (inst_t *)__return_address);
 
 	/*
 	 * Currently, can only free to eof
@@ -5827,7 +5829,7 @@ xfs_alloc_file_space(
 	xfs_bmbt_irec_t		imaps[1], *imapp;
 	xfs_bmap_free_t		free_list;
 
-	vn_trace_entry(vp, "xfs_alloc_file_space");
+	vn_trace_entry(vp, "xfs_alloc_file_space", (inst_t *)__return_address);
 	
 	ip = XFS_VTOI(vp);
 	mp = XFS_VFSTOM(vp->v_vfsp);
@@ -5971,7 +5973,7 @@ xfs_change_file_space(
 	vattr_t			va;
 	xfs_inode_t		*ip;
 
-	vn_trace_entry(vp, "xfs_change_file_space");
+	vn_trace_entry(vp, "xfs_change_file_space", (inst_t *)__return_address);
 	
 	len 	= bf->l_len;
 	ip 	= XFS_VTOI(vp);
