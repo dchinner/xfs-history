@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.41 $"
 
 struct buf;
 struct xfs_mount;
@@ -180,7 +180,7 @@ int xfs_cfork_q(xfs_dinode_core_t *dcp);
 int xfs_cfork_boff(xfs_dinode_core_t *dcp);
 #define	XFS_CFORK_BOFF(dcp)		xfs_cfork_boff(dcp)
 #else
-#define	XFS_CFORK_BOFF(dcp)	((dcp)->di_forkoff << 3)
+#define	XFS_CFORK_BOFF(dcp)	((int)((dcp)->di_forkoff << 3))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_CFORK_DSIZE)
 int xfs_cfork_dsize(xfs_dinode_core_t *dcp, struct xfs_mount *mp);
