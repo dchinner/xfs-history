@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.215 $"
+#ident	"$Revision: 1.216 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -12,6 +12,7 @@
 #endif
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
+#include <sys/cmn_err.h>
 #include <sys/fcntl.h>
 #include <sys/errno.h>
 #ifdef SIM
@@ -4122,8 +4123,16 @@ xfs_bmap_read_extents(
 	for (;;) {
 		xfs_bmbt_rec_t	*frp;
 		xfs_fsblock_t	nextbno;
+		xfs_extnum_t	num_recs;
 
-		ASSERT(i + block->bb_numrecs <= room);
+		num_recs = block->bb_numrecs;
+		if (i + num_recs > room) {
+			ASSERT(i + num_recs <= room);
+			xfs_fs_cmn_err(CE_WARN, ip->i_mount,
+	"corrupt dinode %llu, (btree extents). Unmount and run xfs_repair.",
+			ip->i_ino);
+			goto error0;
+		}
 		XFS_WANT_CORRUPTED_GOTO(
 			XFS_BMAP_SANITY_CHECK(mp, block, 0),
 			error0);
