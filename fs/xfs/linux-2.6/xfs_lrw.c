@@ -1163,7 +1163,7 @@ _xfs_incore_match(buftarg_t     *targ,
 			 int			field,
 			 void			*value)
 {
-  printk("_xfs_incore_relse not implemented\n");
+  printk("_xfs_incore_match not implemented\n");
   return NULL;
 }
 
@@ -1294,4 +1294,13 @@ XFS_bflush(buftarg_t target)
 {
 	run_task_queue(&tq_disk);
 }
+
+irix_dev_t
+XFS_pb_target(page_buf_t *bp) {
+	irix_dev_t	dev;
+
+	dev = makedev(MAJOR(bp->pb_target->i_dev), MINOR(bp->pb_target->i_dev));
+	return dev;
+}
+
 #endif

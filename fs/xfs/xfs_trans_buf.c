@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.73 $"
+#ident "$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -74,14 +74,12 @@ xfs_trans_buf_item_match(
 	daddr_t		blkno,
 	int		len);
 
-#ifdef DEBUG
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
 	daddr_t		blkno,
 	int		len);
-#endif
 
 
 /*
@@ -139,11 +137,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	if (tp->t_items.lic_next == NULL) {
 		bp = xfs_trans_buf_item_match(tp, target_dev, blkno, len);
 	} else {
-/* 		bp = xfs_incore_match(target_dev->dev, blkno, len, BUF_FSPRIV2, tp); */
-		bp = xfs_incore_match((*target_dev), blkno, len, BUF_FSPRIV2, tp);
-		if (bp)
-			ASSERT(xfs_trans_buf_item_match_all(tp, target_dev,
-				blkno, len) == bp);
+		bp  = xfs_trans_buf_item_match_all(tp, target_dev, blkno, len);
 	}
 	if (bp != NULL) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
@@ -402,11 +396,7 @@ xfs_trans_read_buf(
 	if (tp->t_items.lic_next == NULL) {
 		bp = xfs_trans_buf_item_match(tp, target, blkno, len);
 	} else {
-		/* bp = xfs_incore_match(target->dev, blkno, len, BUF_FSPRIV2, tp); */
-		bp = xfs_incore_match((*target), blkno, len, BUF_FSPRIV2, tp);
-		if (bp)
-			ASSERT(xfs_trans_buf_item_match_all(tp, target, blkno,
-				len) == bp);
+		bp = xfs_trans_buf_item_match_all(tp, target, blkno, len);
 	}
 	if (bp != NULL) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
@@ -1113,7 +1103,6 @@ xfs_trans_buf_item_match(
 	return bp;
 }
 
-#ifdef DEBUG
 /*
  * Check to see if a buffer matching the given parameters is already
  * a part of the given transaction.  Check all the chunks, we
@@ -1168,4 +1157,3 @@ xfs_trans_buf_item_match_all(
 	}
 	return NULL;
 }
-#endif	/* DEBUG */

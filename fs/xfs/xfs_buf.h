@@ -315,7 +315,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_UNSHUT(x)     	 /* error! not implemented yet */
 #define XFS_BUF_ISSHUT(x)        (0)
 
-#define XFS_BUF_HOLD(x)		pagebuf_hold(x)  
+#define XFS_BUF_HOLD(x)		pagebuf_hold(x)
 #define XFS_BUF_UNHOLD(x)       /* error! not implemented yet */
 #define XFS_BUF_ISHOLD(x)       (1)
 /* this may go away... calling iostart will define read or write */
@@ -356,7 +356,7 @@ struct inode;
 
 typedef struct buftarg {
 	struct inode	*inode;
-	dev_t		dev;
+	irix_dev_t	dev;
 } buftarg_t;
 
 typedef struct bfidev {
@@ -421,7 +421,9 @@ extern void xfs_pb_nfreer(page_buf_t *);
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target) 
 /* return the dev_t being used */
-#define XFS_BUF_TARGET(bp)  1
+extern irix_dev_t	XFS_pb_target(page_buf_t *);
+
+#define XFS_BUF_TARGET(bp)  XFS_pb_target(bp)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)	
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)	
