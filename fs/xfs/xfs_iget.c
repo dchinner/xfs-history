@@ -1,4 +1,4 @@
-#ident "$Revision: 1.77 $"
+#ident "$Revision: 1.78 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -548,15 +548,15 @@ xfs_ilock(xfs_inode_t	*ip,
 	ASSERT(lock_flags != 0);
 
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		mrlock(&ip->i_iolock, MR_UPDATE, PINOD);
+		mrupdate(&ip->i_iolock);
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		mrlock(&ip->i_iolock, MR_ACCESS, PINOD);
+		mraccess(&ip->i_iolock);
 	}
 
 	if (lock_flags & XFS_ILOCK_EXCL) {
-		mrlock(&ip->i_lock, MR_UPDATE, PINOD);
+		mrupdate(&ip->i_lock);
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
-		mrlock(&ip->i_lock, MR_ACCESS, PINOD);
+		mraccess(&ip->i_lock);
 	}
 
 }
@@ -596,19 +596,19 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 
 	iolocked = 0;
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		iolocked = cmrlock(&ip->i_iolock, MR_UPDATE);
+		iolocked = mrtryupdate(&ip->i_iolock);
 		if (!iolocked) {
 			return 0;
 		}
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		iolocked = cmrlock(&ip->i_iolock, MR_ACCESS);
+		iolocked = mrtryaccess(&ip->i_iolock);
 		if (!iolocked) {
 			return 0;
 		}
 	}
 
 	if (lock_flags & XFS_ILOCK_EXCL) {
-		ilocked = cmrlock(&ip->i_lock, MR_UPDATE);
+		ilocked = mrtryupdate(&ip->i_lock);
 		if (!ilocked) {
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
@@ -616,7 +616,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			return 0;
 		}
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
-		ilocked = cmrlock(&ip->i_lock, MR_ACCESS);
+		ilocked = mrtryaccess(&ip->i_lock);
 		if (!ilocked) {
 			if (iolocked) {
 				mrunlock(&ip->i_iolock);
