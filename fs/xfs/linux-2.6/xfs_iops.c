@@ -551,6 +551,7 @@ STATIC int
 linvfs_get_block_core(
 	struct inode		*inode,
 	sector_t		iblock,
+	int			blocks,
 	struct buffer_head	*bh_result,
 	int			create,
 	int			direct,
@@ -563,13 +564,17 @@ linvfs_get_block_core(
 	ssize_t			size;
 	loff_t			offset = (loff_t)iblock << inode->i_blkbits;
 
-	/* If we are doing writes at the end of the file,
-	 * allocate in chunks
-	 */
-	if (create && (offset >= inode->i_size) && !(flags & PBF_SYNC))
-		size = 1 << XFS_WRITE_IO_LOG;
-	else
-		size = 1 << inode->i_blkbits;
+	if (blocks) {
+		size = blocks << inode->i_blkbits;
+	} else {
+		/* If we are doing writes at the end of the file,
+		 * allocate in chunks
+		 */
+		if (create && (offset >= inode->i_size) && !(flags & PBF_SYNC))
+			size = 1 << XFS_WRITE_IO_LOG;
+		else
+			size = 1 << inode->i_blkbits;
+	}
 
 	VOP_BMAP(vp, offset, size,
 		create ? flags : PBF_READ, NULL,
@@ -609,6 +614,11 @@ linvfs_get_block_core(
 		set_buffer_delay(bh_result);
 	}
 
+	if (blocks) {
+		size = (pbmap.pbm_bsize - pbmap.pbm_delta); 
+		bh_result->b_size = min(size, blocks << inode->i_blkbits);
+	}
+
 	return 0;
 }
 
@@ -619,7 +629,7 @@ linvfs_get_block(
 	struct buffer_head	*bh_result,
 	int			create)
 {
-	return linvfs_get_block_core(inode, iblock, bh_result,
+	return linvfs_get_block_core(inode, iblock, 0, bh_result,
 					create, 0, PBF_WRITE);
 }
 
@@ -630,20 +640,21 @@ linvfs_get_block_sync(
 	struct buffer_head	*bh_result,
 	int			create)
 {
-	return linvfs_get_block_core(inode, iblock, bh_result,
+	return linvfs_get_block_core(inode, iblock, 0, bh_result,
 					create, 0, PBF_SYNC|PBF_WRITE);
 }
 
 
 
 int
-linvfs_get_block_direct(
+linvfs_get_blocks_direct(
 	struct inode		*inode,
 	sector_t		iblock,
+	unsigned long		max_blocks,
 	struct buffer_head	*bh_result,
 	int			create)
 {
-	return linvfs_get_block_core(inode, iblock, bh_result,
+	return linvfs_get_block_core(inode, iblock, max_blocks, bh_result,
 					create, 1, PBF_WRITE|PBF_DIRECT);
 }
 
@@ -652,7 +663,7 @@ linvfs_direct_IO(int rw, struct inode *inode, char *buf,
                         loff_t offset, size_t count)
 {
         return generic_direct_IO(rw, inode, buf, offset, count, 
-					linvfs_get_block_direct);
+					linvfs_get_blocks_direct);
 }
 
 int
@@ -708,7 +719,7 @@ linvfs_bmap(
 	}
 
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-	return generic_block_bmap(mapping, block, linvfs_get_block_direct);
+	return generic_block_bmap(mapping, block, linvfs_get_block);
 }
 
 STATIC int
