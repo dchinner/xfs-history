@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.59 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -16,7 +16,6 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
-#include <sys/user.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -27,6 +26,7 @@
 #include <bstring.h>
 #endif
 #include <sys/kmem.h>
+#include <sys/kabi.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -544,7 +544,7 @@ xfs_inode_item_trylock(
 			if (bp != NULL) {
 				if (bp->b_flags & B_DELWRI) {
 					iip->ili_bp = bp;
-					iip->ili_bp_owner = curprocp;
+					iip->ili_bp_owner = get_thread_id();
 					flushed = 1;
 				} else {
 					brelse(bp);
@@ -704,10 +704,10 @@ xfs_inode_item_push(
 	 */
 	bp = iip->ili_bp;
 	ip = iip->ili_inode;
-	if ((bp != NULL) && (iip->ili_bp_owner == curprocp)) {
+	if ((bp != NULL) && (iip->ili_bp_owner == get_thread_id())) {
 		ASSERT(iip->ili_bp->b_flags & B_BUSY);
 		iip->ili_bp = NULL;
-		iip->ili_bp_owner = NULL;
+		iip->ili_bp_owner = (uint64_t)-1;
 #ifndef SIM
 		buftrace("INODE ITEM PUSH", bp);
 #endif
