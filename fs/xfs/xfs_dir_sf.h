@@ -81,8 +81,14 @@ int xfs_dir_sf_allfit(int count, int totallen);
 	       (sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
 #endif
 
+#ifdef XFS_ALL_TRACE
+#define	XFS_DIR_TRACE
+#endif
 
-#if defined(DEBUG) && !defined(SIM)
+#if !defined(DEBUG) || defined(SIM)
+#undef XFS_DIR_TRACE
+#endif
+
 /*
  * Kernel tracing support for directories.
  */
@@ -103,6 +109,8 @@ struct xfs_dir_leaf_entry;
 #define	XFS_DIR_KTRACE_G_DUL	4	/* dp, uio, leaf */
 #define	XFS_DIR_KTRACE_G_DUE	5	/* dp, uio, leaf entry */
 #define	XFS_DIR_KTRACE_G_DUC	6	/* dp, uio, cookie */
+
+#if defined(XFS_DIR_TRACE)
 
 void xfs_dir_trace_g_du(char *where, struct xfs_inode *dp, struct uio *uio);
 void xfs_dir_trace_g_dub(char *where, struct xfs_inode *dp, struct uio *uio,

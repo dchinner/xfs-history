@@ -17,6 +17,7 @@
 #endif
 #include <sys/debug.h>
 #include <sys/kmem.h>
+#include <sys/uuid.h>
 #ifndef SIM
 #include <sys/systm.h>
 #else
