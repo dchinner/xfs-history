@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.234 $"
+#ident	"$Revision: 1.235 $"
 
 #include <xfs_os_defs.h>
 
@@ -84,7 +84,6 @@
 #include "xfs_cxfs.h"
 #include "xfs_arch.h"
 
-#include <linux/pagemap.h>
 
 #ifdef SIM
 #include "sim.h"
@@ -240,13 +239,13 @@ xfs_mount_validate_sb(
 	/*
 	 * Until this is fixed only page-sized data blocks work.
 	 */
-	if (sbp->sb_blocksize != PAGE_CACHE_SIZE) {
+	if (sbp->sb_blocksize != PAGE_SIZE) {
 		cmn_err(CE_WARN,
 		"XFS: Trying to mount file system with blocksize %d bytes\n",
 			sbp->sb_blocksize);
 		cmn_err(CE_WARN,
 		"XFS: Only page-sized (%d bytes) blocksize currently works.\n",
-					PAGE_CACHE_SIZE);
+					PAGE_SIZE);
                 return XFS_ERROR(EWRONGFS);
         }
 	/*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.126 $"
+#ident "$Revision: 1.127 $"
 
 #include <xfs_os_defs.h>
 
@@ -596,8 +596,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 * lock it down first.
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
-
-	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(xfs_off_t)) - 1;
+	alignment = (is32 ? sizeof(xfs32_off_t) : sizeof(xfs_off_t)) - 1;
 
 	put = is32 ?
 		xfs_dir_put_dirent32_uio :

@@ -40,12 +40,22 @@
 #include <asm/div64.h>
 
 typedef __u64    xfs_off_t;
+typedef __s32    xfs32_off_t;
 typedef	__u64    xfs_ino_t;		/* <inode> type */
 typedef	__s64    xfs_daddr_t;	/* <disk address> type */
 typedef	char *	 xfs_caddr_t;	/* ?<core address> type */
 
 typedef off_t linux_off_t;
 typedef __kernel_ino_t linux_ino_t;
+
+#undef bzero
+#define bzero(p,s) memset((p), 0, (s))
+
+#undef bcopy
+#define bcopy(s,d,n) memcpy((d),(s),(n))
+
+#define bcmp(s1,s2,l) memcmp(s1,s2,l)    
+
 
 /* Move the kernel do_div definition off to one side */
 
@@ -90,6 +100,7 @@ static inline __u32 xfs_do_mod(void *a, __u32 b, int n)
 
 #else
 typedef loff_t  xfs_off_t;
+typedef __s32   xfs32_off_t;
 typedef	__u64	xfs_ino_t;		/* <inode> type */
 typedef __s64   xfs_daddr_t;
 typedef	char *	xfs_caddr_t;	/* ?<core address> type */

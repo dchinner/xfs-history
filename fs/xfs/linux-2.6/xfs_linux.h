@@ -29,54 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-/*
- *
- * /ptools/plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_linux.h,v 1.1 1999/10/01 18:28:33 cattelan Exp
- * cattelan
- * xfs_linux.h,v 1.1 1999/10/01 18:28:33 cattelan Exp
- *
- * xfs_linux.h,v
- * Revision 1.1  1999/10/01 18:28:33  cattelan
- * kern/fs/xfs/xfs_linux.h 1.19 Renamed to kern/fs/xfs/linux/xfs_linux.h
- *
- * Revision 1.19  1999/09/29 17:55:19  lord
- * remove zone definition
- *
- * Revision 1.18  1999/09/10 18:00:00  cattelan
- * Added ENTER and EXIT macros. 
- *
- * Revision 1.16  1999/09/03 00:40:44  mostek
- * Add include of linux/string.h to get memcpy and friends from linux.
- *
- * Revision 1.14  1999/09/02 22:24:14  cattelan
- * No Message Supplied
- *
- * Revision 1.12  1999/09/02 18:49:02  mostek
- * Move _PAGESZ define up so that it is defined when used (see immu.h).
- *
- * Revision 1.11  1999/08/31 16:17:54  cattelan
- * Removed more stuff;
- *
- * Revision 1.9  1999/08/26 19:43:29  mostek
- * Remove stuff moved to other files and add protos for routines that
- * we will define in sim.random.c.
- *
- * Revision 1.8  1999/08/25 16:13:43  mostek
- * Don't typedef __kernel_clock_t if posix types has been included.
- * define bzero and bcopy (memset's)
- * extern for sys_cred that lots of folks will need.
- *
- * Revision 1.7  1999/08/25 02:22:32  cattelan
- * Many more header file fix ups.
- * Many more to come.
- *
- * Revision 1.5  1999/08/20 17:05:17  mostek
- * comment1
- *
- * Revision 1.4  1999/08/20 15:55:00  cattelan
- * Added a few more function decs
- *
- */
+ 
 #ifndef __XFS_LINUX_
 #define __XFS_LINUX_
 
@@ -152,15 +105,8 @@ extern unsigned long volatile jiffies;
 
 #define __return_address __builtin_return_address(0)
 
-/* ksys/dvh.h */
-#define	NPARTAB		16		/* 16 unix partitions */
-
 #define LONGLONG_MAX        9223372036854775807LL /* max "long long int" */
 
-#define _DIOC_(x) (('d'<<8) | x)
-#define DIOCGETVOLDEV	_DIOC_(36)	/* NEW: retrieve subvolume devices */
-
-typedef long int	irix5_off_t;
 
 typedef struct timespec	timespec_t;
 
@@ -168,16 +114,5 @@ typedef struct timespec	timespec_t;
 #define NBBY    8       /* number of bits per byte */
 #endif  /* NBBY */
 
-#define findrawpath(x) x
-#define findblockpath(x) x
-
-#undef bzero
-#define bzero(p,s) memset((p), 0, (s))
-
-#undef bcopy
-#define bcopy(s,d,n) memcpy((d),(s),(n))
-
-extern void *kern_malloc(size_t);
-#define bcmp(s1,s2,l) memcmp(s1,s2,l)    
 
 #endif /* __XFS_LINUX_ */

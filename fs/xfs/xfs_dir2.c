@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.20 $"
+#ident "$Revision: 1.21 $"
 
 /*
  * XFS v2 directory implmentation.
@@ -516,7 +516,7 @@ xfs_dir2_getdents(
 	 * lock it down first.
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
-	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(xfs_off_t)) - 1;
+	alignment = (is32 ? sizeof(xfs32_off_t) : sizeof(xfs_off_t)) - 1;
 #ifndef __linux__
 	if ((uio->uio_iovcnt == 1) &&
 #if CELL_CAPABLE
