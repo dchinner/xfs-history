@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -88,10 +88,10 @@ int					/* error status */
 xfs_itable(
 	int		opc,		/* op code */
 	int		fd,		/* file descriptor of file in fs. */
-	caddr_t		lastip,		/* last inode number pointer */
+	void		*lastip,	/* last inode number pointer */
 	int		icount,		/* count of entries in buffer */
-	caddr_t		ubuffer,	/* buffer with inode descriptions */
-	caddr_t		ocount);	/* output count */
+	void		*ubuffer,	/* buffer with inode descriptions */
+	void		*ocount);	/* output count */
 
 /* 
  * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
@@ -103,12 +103,19 @@ typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp,
 			       struct xfs_trans	*tp,
 			       xfs_ino_t   	ino,
 			       void	     	*buffer,
-			       daddr_t		bno);
+			       daddr_t		bno,
+			       int		*stat);
+/*
+ * Values for stat return value.
+ */
+#define	BULKSTAT_RV_NOTHING	0
+#define	BULKSTAT_RV_DIDONE	1
+#define	BULKSTAT_RV_GIVEUP	2
 
 /*
  * Return stat information in bulk (by-inode) for the filesystem.
  */
-int				/* error status */
+int					/* error status */
 xfs_bulkstat(
 	struct xfs_mount	*mp,	/* mount point for filesystem */
 	struct xfs_trans	*tp,	/* transaction pointer */

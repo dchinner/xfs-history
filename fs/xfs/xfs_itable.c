@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.50 $"
+#ident	"$Revision: 1.51 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -40,15 +40,16 @@
 
 /*
  * Return stat information for one inode.
- * Return 1 for success, 0 for failure in the stat parameter.
+ * Return 0 if ok, else errno.
  */
-STATIC int
+STATIC int				/* error status */
 xfs_bulkstat_one(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer,	/* buffer to place output in */
-	daddr_t		bno)		/* starting bno of inode cluster */
+	daddr_t		bno,		/* starting bno of inode cluster */
+	int		*stat)		/* BULKSTAT_RV_... */
 {
 	xfs_bstat_t	*buf;		/* return buffer */
 	int		error;		/* error value */
@@ -58,17 +59,20 @@ xfs_bulkstat_one(
 	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
 	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
 	     (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino))) {
-		return 0;
+		*stat = BULKSTAT_RV_NOTHING;
+		return XFS_ERROR(EINVAL);
 	}
 	error = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED, &ip, bno);
 	if (error) {
-		return 0;
+		*stat = BULKSTAT_RV_NOTHING;
+		return error;
 	}
 	ASSERT(ip != NULL);
 	ASSERT(ip->i_blkno != (daddr_t)0);
 	if (ip->i_d.di_mode == 0) {
 		xfs_iput(ip, XFS_ILOCK_SHARED);
-		return 0;
+		*stat = BULKSTAT_RV_NOTHING;
+		return XFS_ERROR(ENOENT);
 	}
 	buf->bs_ino = ip->i_ino;
 	buf->bs_mode = ip->i_d.di_mode;
@@ -83,8 +87,8 @@ xfs_bulkstat_one(
 	buf->bs_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec;
 	buf->bs_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
 	buf->bs_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
-	
-	/* convert di_flags to bs_xflags.
+	/*
+	 * convert di_flags to bs_xflags.
 	 */
 	buf->bs_xflags =
 		((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
@@ -120,7 +124,8 @@ xfs_bulkstat_one(
 		break;
 	}
 	xfs_iput(ip, XFS_ILOCK_SHARED);
-	return 1;
+	*stat = BULKSTAT_RV_DIDONE;
+	return 0;
 }
 
 /*
@@ -147,6 +152,7 @@ xfs_bulkstat(
 	xfs_btree_cur_t		*cur;	/* btree cursor for ialloc btree */
 	int			end_of_ag; /* set if we've seen the ag end */
 	int			error;	/* error code */
+	int                     fmterror;/* bulkstat formatter result */
 	__int32_t		gcnt;	/* current btree rec's count */
 	xfs_inofree_t		gfree;	/* current btree rec's free mask */
 	xfs_agino_t		gino;	/* current btree rec's start inode */
@@ -161,11 +167,11 @@ xfs_bulkstat(
 	int			nicluster; /* # of inodes in a cluster */
 	int			nimask;	/* mask for inode clusters */
 	int			nirbuf;	/* size of irbuf */
+	int			rval;	/* return value error code */
 	int			tmp;	/* result value from btree calls */
 	int			ubcount; /* size of user's buffer */
 	int			ubleft;	/* spaces left in user's buffer */
 	caddr_t			ubufp;	/* current pointer into user's buffer */
-	int                     fmterror;
 
 	/*
 	 * Get the last inode value, see if there's nothing to do.
@@ -193,9 +199,9 @@ xfs_bulkstat(
 	 * Lock down the user's buffer. If a buffer was not sent, as in the case
 	 * disk quota code calls here, we skip this.
 	 */
-	if (ubuffer)
-		if (error = useracc(ubuffer, ubcount * statstruct_size, 
-				    (B_READ|B_PHYS), NULL))
+	if (ubuffer &&
+	    (error = useracc(ubuffer, ubcount * statstruct_size,
+			(B_READ|B_PHYS), NULL)))
 		return error;
 	/*
 	 * Allocate a page-sized buffer for inode btree records.
@@ -208,6 +214,7 @@ xfs_bulkstat(
 	 * Loop over the allocation groups, starting from the last 
 	 * inode returned; 0 means start of the allocation group.
 	 */
+	rval = 0;
 	while (ubleft > 0 && agno < mp->m_sb.sb_agcount) {
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
 		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
@@ -401,16 +408,14 @@ xfs_bulkstat(
 				 * This is also used to count inodes/blks, etc
 				 * in xfs_qm_quotacheck.
 				 */
-				if (!(fmterror = 
-					(*formatter)(mp, tp, ino, ubufp, bno)))
+				error = formatter(mp, tp, ino, ubufp, bno,
+					&fmterror);
+				if (fmterror == BULKSTAT_RV_NOTHING)
 					continue;
-				if (fmterror < 0) {
-					/*
-					 * Quota code returns the negative
-					 * val of the error. Break out in that
-					 * case. XXXHack for quota patch.
-					 */
+				if (fmterror == BULKSTAT_RV_GIVEUP) {
 					ubleft = 0;
+					ASSERT(error);
+					rval = error;
 					break;
 				}
 				if (ubufp)
@@ -448,10 +453,7 @@ xfs_bulkstat(
 		*done = 1;
 	} else
 		*lastinop = (ino64_t)lastino;
-	/*
-	 * Temporary hack for the quota patch ... XXXsup
-	 */
-	return (fmterror < 0 ? -(fmterror) : 0);
+	return rval;
 }
 
 /*
@@ -461,27 +463,37 @@ xfs_bulkstat(
 STATIC int				/* error status */
 xfs_bulkstat_single(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
-	ino64_t			*lastino, /* last inode returned */
-	int			*count,	/* size of buffer/count returned */
+	ino64_t			*lastinop, /* inode to return */
 	caddr_t			buffer,	/* buffer with inode stats */
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_bstat_t		bstat;	/* one bulkstat result structure */
+	int			count;	/* count value for bulkstat call */
+	int			error;	/* return value */
 	xfs_ino_t		ino;	/* filesystem inode number */
+	int			res;	/* result from bs1 */
 
-	ino = (xfs_ino_t)*lastino + 1;
-	if (!xfs_bulkstat_one(mp, NULL, ino, &bstat, 0)) {
-		return xfs_bulkstat(mp, NULL, lastino, count, xfs_bulkstat_one,
-			sizeof(bstat), buffer, done);
-	}
-	if (copyout(&bstat, buffer, sizeof(bstat))) {
-		*done = 0;
-		*count = 0;
-		return XFS_ERROR(EFAULT);
+	ino = (xfs_ino_t)*lastinop;
+	error = xfs_bulkstat_one(mp, NULL, ino, &bstat, 0, &res);
+	if (error) {
+		/*
+		 * Special case way failed, do it the "long" way
+		 * to see if that works.
+		 */
+		(*lastinop)--;
+		count = 1;
+		if (xfs_bulkstat(mp, NULL, lastinop, &count, xfs_bulkstat_one,
+				sizeof(bstat), buffer, done))
+			return error;
+		if (count == 0 || (xfs_ino_t)*lastinop != ino)
+			return error == EFSCORRUPTED ?
+				XFS_ERROR(EINVAL) : error;
+		else
+			return 0;
 	}
 	*done = 0;
-	*count = 1;
-	*lastino = ino;
+	if (copyout(&bstat, buffer, sizeof(bstat)))
+		return XFS_ERROR(EFAULT);
 	return 0;
 }
 
@@ -669,10 +681,10 @@ int					/* error status */
 xfs_itable(
 	int		opc,		/* op code */
 	int		fd,		/* file descriptor of file in fs. */
-	caddr_t		lastip,		/* last inode number pointer */
+	void		*lastip,	/* last inode number pointer */
 	int		icount,		/* count of entries in buffer */
-	caddr_t		ubuffer,	/* buffer with inode descriptions */
-	caddr_t		ocount)		/* output count */
+	void		*ubuffer,	/* buffer with inode descriptions */
+	void		*ocount)	/* output count */
 {
 	int		count;		/* count of records returned */
 	int		error;		/* error return value */
@@ -686,8 +698,7 @@ xfs_itable(
 	if (error = xfs_fd_to_mp(fd, 0, &mp))
 		return error;
 	if (XFS_FORCED_SHUTDOWN(mp))
-		return (EIO);
-
+		return XFS_ERROR(EIO);
 	if (copyin((void *)lastip, &inlast, sizeof(inlast)))
 		return XFS_ERROR(EFAULT);
 	if ((count = icount) <= 0)
@@ -697,20 +708,23 @@ xfs_itable(
 		error = xfs_inumbers(mp, NULL, &inlast, &count, ubuffer);
 		break;
 	case SGI_FS_BULKSTAT:
-		if (count == 1 && inlast != 0)
-			error = xfs_bulkstat_single(mp, &inlast, &count,
-				ubuffer, &done);
-		else
-			error = xfs_bulkstat(mp, NULL, &inlast, &count, 
-				(bulkstat_one_pf)xfs_bulkstat_one,
-				sizeof(xfs_bstat_t), ubuffer, &done);
+		error = xfs_bulkstat(mp, NULL, &inlast, &count, 
+			(bulkstat_one_pf)xfs_bulkstat_one, sizeof(xfs_bstat_t),
+			ubuffer, &done);
+		break;
+	case SGI_FS_BULKSTAT_SINGLE:
+		error = xfs_bulkstat_single(mp, &inlast, ubuffer, &done);
+		break;
+	default:
+		error = XFS_ERROR(EINVAL);
 		break;
 	}
 	if (error)
 		return error;
-	if (copyout(&inlast, (void *)lastip, sizeof(inlast)))
-		return XFS_ERROR(EFAULT);
-	if (copyout(&count, (void *)ocount, sizeof(count)))
-		return XFS_ERROR(EFAULT);
+	if (ocount != NULL) {
+		if (copyout(&inlast, lastip, sizeof(inlast)) ||
+		    copyout(&count, ocount, sizeof(count)))
+			return XFS_ERROR(EFAULT);
+	}
 	return 0;
 }
