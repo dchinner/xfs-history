@@ -1,4 +1,4 @@
-#ident "$Revision: 1.262 $"
+#ident "$Revision: 1.263 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2492,13 +2492,16 @@ xfs_create(
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
 	arsess_t		*arsess;
+	vproc_t			*vpr;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
 
         dp = XFS_BHVTOI(dir_bdp);
 
-	VPROC_GETARSESS(curvprocp, &arsess);
+	vpr = VPROC_LOOKUP(current_pid(), ZNO);
+	VPROC_GETARSESS(vpr, &arsess);
+	VPROC_RELE(vpr);
 	prid = (xfs_prid_t)arsess->as_prid;
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_CREATE)) {
@@ -4782,6 +4785,7 @@ xfs_mkdir(
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
 	arsess_t		*arsess;
+	vproc_t			*vpr;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
         dp = XFS_BHVTOI(dir_bdp);
@@ -4797,7 +4801,9 @@ xfs_mkdir(
 	vn_trace_entry(dir_vp, "xfs_mkdir", (inst_t *)__return_address);
 	mp = dp->i_mount;
 
-	VPROC_GETARSESS(curvprocp, &arsess);
+	vpr = VPROC_LOOKUP(current_pid(), ZNO);
+	VPROC_GETARSESS(vpr, &arsess);
+	VPROC_RELE(vpr);
 	prid = (xfs_prid_t)arsess->as_prid;
 
 	udqp = pdqp = NULL;
@@ -5344,6 +5350,7 @@ xfs_symlink(
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
 	arsess_t		*arsess;
+	vproc_t			*vpr;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
 	vn_trace_entry(dir_vp, "xfs_symlink", (inst_t *)__return_address);
@@ -5377,7 +5384,9 @@ xfs_symlink(
         }
         dp = XFS_BHVTOI(dir_bdp);
 
-	VPROC_GETARSESS(curvprocp, &arsess);
+	vpr = VPROC_LOOKUP(current_pid(), ZNO);
+	VPROC_GETARSESS(vpr, &arsess);
+	VPROC_RELE(vpr);
 	prid = (xfs_prid_t)arsess->as_prid;
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_SYMLINK)) {
