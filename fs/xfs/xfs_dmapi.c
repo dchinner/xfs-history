@@ -157,6 +157,7 @@ xfs_dm_send_data_event(
 {
 	int		error;
 	vnode_t		*vp;
+	xfs_inode_t	*ip = XFS_BHVTOI(bdp);
 
 	vp = BHV_TO_VNODE(bdp);
 	/*
@@ -166,19 +167,15 @@ xfs_dm_send_data_event(
 	 * so we go straight to XFS.
 	 */
 	ASSERT(BHV_IS_XFS(bdp));
-#ifdef CELL_CAPABLE
-	VN_BHV_READ_LOCK(&vp->v_bh);
-#endif
-	if (locktype)
-		xfs_rwunlock(bdp, *locktype);
-	error = dm_send_data_event(event, bdp, DM_RIGHT_NULL,
-			offset, length, flags);
-	if (locktype)
-		xfs_rwlock(bdp, *locktype);
-#ifdef CELL_CAPABLE
-	VN_BHV_READ_UNLOCK(&vp->v_bh);
-#endif
-
+	do {
+		if (locktype)
+			xfs_rwunlock(bdp, *locktype);
+		error = dm_send_data_event(event, bdp, DM_RIGHT_NULL,
+				offset, length, flags);
+		if (locktype)
+			xfs_rwlock(bdp, *locktype);
+	}  while (DM_EVENT_ENABLED(vp->v_vfsp, ip, event));
+	
 	return error;
 }
 
