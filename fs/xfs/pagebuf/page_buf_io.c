@@ -847,7 +847,7 @@ pagebuf_delalloc_convert(
 
 	len = bh->b_size;
 	do {
-		if (!buffer_uptodate(bh)) {
+		if (!buffer_uptodate(bh) && !startio) {
 			goto next_bh;
 		}
 
