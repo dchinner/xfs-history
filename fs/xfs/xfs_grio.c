@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.30 1994/07/29 23:15:53 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.31 1994/08/09 17:19:47 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -127,9 +127,12 @@ xfs_get_inode(  dev_t fs_dev, int ino)
 #endif
 
 		}
-        } else {
+        } 
+#ifdef DEBUG
+	else {
 		printf("vfs_devsearch failed \n");
 	}
+#endif
         return( ip );
 }
 
