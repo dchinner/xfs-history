@@ -51,7 +51,7 @@
 #include "xfs_bmap.h"
 #include "xfs_error.h"
 #include "xfs_quota.h"
-#include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_utils.h"
 #include "xfs_trans_space.h"
 #include "xfs_da_btree.h"

@@ -51,6 +51,7 @@
 #include "xfs_fsops.h"
 #include "xfs_itable.h"
 #include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_trans_space.h"
 #include "xfs_rtalloc.h"
 #include "xfs_dir2.h"

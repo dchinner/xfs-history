@@ -59,6 +59,7 @@
 #include "xfs_da_btree.h"
 #include "xfs_attr.h"
 #include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_rtalloc.h"
@@ -1656,9 +1657,11 @@ xfs_release(
 	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)
 		return 0;
 
+#ifdef HAVE_REFCACHE
 	/* If we are in the NFS reference cache then don't do this now */
 	if (ip->i_refcache)
 		return 0;
+#endif
 
 	mp = ip->i_mount;
 
@@ -3755,9 +3758,7 @@ xfs_rwunlock(
 	vrwlock_t	locktype)
 {
 	xfs_inode_t     *ip;
-	xfs_inode_t	*release_ip;
 	vnode_t		*vp;
-	int		error;
 
 	vp = BHV_TO_VNODE(bdp);
 	if (vp->v_type == VDIR)
@@ -3771,14 +3772,7 @@ xfs_rwunlock(
 		 * clear the pointer and release the inode after unlocking
 		 * this one.
 		 */
-		release_ip = ip->i_release;
-		ip->i_release = NULL;
-		xfs_iunlock (ip, XFS_IOLOCK_EXCL);
-
-		if (release_ip != NULL) {
-			VOP_RELEASE(XFS_ITOV(release_ip), error);
-			VN_RELE(XFS_ITOV(release_ip));
-		}
+		xfs_refcache_iunlock(ip, XFS_IOLOCK_EXCL);
 	} else {
 		ASSERT((locktype == VRWLOCK_READ) ||
 		       (locktype == VRWLOCK_WRITE_DIRECT));

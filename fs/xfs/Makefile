@@ -118,6 +118,7 @@ obj-y				+= xfs_alloc.o \
 				   xfs_utils.o \
 				   xfs_vfsops.o \
 				   xfs_vnodeops.o \
+				   xfs_refcache.o \
 				   xfs_rw.o
 
 # Objects not built in this directory

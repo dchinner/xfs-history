@@ -60,6 +60,7 @@
 #include "xfs_bmap.h"
 #include "xfs_da_btree.h"
 #include "xfs_rw.h"
+#include "xfs_refcache.h"
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
 #include "xfs_quota.h"
@@ -171,14 +172,10 @@ xfs_cleanup(void)
 	extern kmem_zone_t	*xfs_efi_zone;
 	extern kmem_zone_t	*xfs_buf_item_zone;
 	extern kmem_zone_t	*xfs_chashlist_zone;
-	extern xfs_inode_t	**xfs_refcache;
 
 	xfs_cleanup_procfs();
 	xfs_sysctl_unregister();
-	if (xfs_refcache) {
-		kmem_free(xfs_refcache,
-			XFS_REFCACHE_SIZE_MAX * sizeof(xfs_inode_t *));
-	}
+	xfs_refcache_destroy();
 
 	kmem_cache_destroy(xfs_bmap_free_item_zone);
 	kmem_cache_destroy(xfs_btree_cur_zone);
