@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.41 $"
 
 #include <xfs_os_defs.h>
 
@@ -71,11 +71,6 @@
 #ifdef	CONFIG_XFS_VNODE_TRACING
 #include <sys/ktrace.h>
 #endif	/* CONFIG_XFS_VNODE_TRACING */
-
-#define LOCK_VFP()	       	mutex_spinlock(&vlistlock)
-#define UNLOCK_VFP(s)		mutex_spinunlock(&vlistlock, s)
-#define	NESTED_LOCK_VFP()	nested_spinlock(&vlistlock)
-#define	NESTED_UNLOCK_VFP()	nested_spinunlock(&vlistlock)
 
 /*
  * Private vnode spinlock manipulation.
@@ -258,7 +253,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 		{ int error;
 		error = linvfs_revalidate_core(inode);
 		if(error)
-			printk("vn_initialize: linvfs_revalidate_core"
+			printk("vn_initialize: linvfs_revalidate_core "
 				"error %d\n",error);
 		}
 	}
