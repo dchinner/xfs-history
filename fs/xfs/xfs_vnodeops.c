@@ -1,4 +1,4 @@
-#ident "$Revision: 1.180 $"
+#ident "$Revision: 1.181 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -195,10 +195,10 @@ STATIC int	xfs_fid(vnode_t	*vp,
 			fid_t	**fidpp);
 
 STATIC void	xfs_rwlock(vnode_t	*vp,
-			   int		write_lock);
+			   vrwlock_t	write_lock);
 
 STATIC void	xfs_rwunlock(vnode_t	*vp,
-			     int	write_lock);
+			     vrwlock_t	write_lock);
 
 STATIC int	xfs_seek(vnode_t	*vp,
 			 off_t		old_offset,
@@ -4452,14 +4452,16 @@ xfs_fid(
 STATIC void
 xfs_rwlock(
 	vnode_t		*vp,
-	int		write_lock)
+	vrwlock_t	locktype)
 {
 	xfs_inode_t	*ip;
 
 	ip = XFS_VTOI(vp);
-	if (write_lock) {
+	if (locktype == VRWLOCK_WRITE) {
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	} else {
+		ASSERT((locktype == VRWLOCK_READ) ||
+		       (locktype == VRWLOCK_WRITE_DIRECT));
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	}
 	return;
@@ -4473,13 +4475,13 @@ xfs_rwlock(
 STATIC void
 xfs_rwunlock(
 	vnode_t		*vp,
-	int		write_lock)
+	vrwlock_t	locktype)
 {
         xfs_inode_t     *ip;
 	xfs_inode_t	*release_ip;
 
         ip = XFS_VTOI(vp);
-	if (write_lock) {
+	if (locktype == VRWLOCK_WRITE) {
 		/*
 		 * In the write case, we may have added a new entry to
 		 * the reference cache.  This might store a pointer to
@@ -4495,6 +4497,8 @@ xfs_rwunlock(
 			VN_RELE(XFS_ITOV(release_ip));
 		}
 	} else {
+		ASSERT((locktype == VRWLOCK_READ) ||
+		       (locktype == VRWLOCK_WRITE_DIRECT));
         	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 	}
         return;
