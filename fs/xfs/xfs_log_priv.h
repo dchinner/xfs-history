@@ -8,7 +8,7 @@
 
 #define LOG_NUM_ICLOGS		2
 #define LOG_CALLBACK_SIZE	10
-#define LOG_HEADER_MAGIC_NUM	0xBADbabe
+#define LOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* need to outlaw as cycle XXX*/
 #define LOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
 #define LOG_RECORD_BSHIFT	12		/* 4096 == 1 << 12 */
 #define LOG_HEADER_SIZE		512
@@ -22,7 +22,7 @@
 #define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_curr_cycle; \
 				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
 #define CYCLE_LSN(lsn)		(((uint *)&(lsn))[0])
-#define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1] >> 32)
+#define BLOCK_LSN(lsn)		(((uint *)&(lsn))[1])
 #define log_panic(s)		{printf("%s\n", s); abort();}
 
 
@@ -61,11 +61,12 @@
 typedef void * log_tid_t;
 
 typedef struct log_ticket {
-	struct log_ticket *t_next;	/*			      4/8 b */
-	log_tid_t	  t_tid;	/* Transaction identifier	8 b */
-	uint		  t_reservation;/* Reservation in bytes;	4 b */
-	char		  t_clientid;	/* Who does this belong to;	1 b */
-	char		  t_flags;	/* 				1 b */
+	struct log_ticket *t_next;	/*			        : 4 */
+	log_tid_t	  t_tid;	/* transaction identifier	: 4 */
+	uint		  t_curr_reserv;/* current reservation in bytes : 4 */
+	uint		  t_orig_reserv;/* original reservation in bytes: 4 */
+	char		  t_clientid;	/* who does this belong to;	: 1 */
+	char		  t_flags;	/* 				: 1 */
 } log_ticket_t;
 
 
@@ -138,6 +139,7 @@ typedef struct log {
 	lock_t		l_icloglock;  /* grab to change iclog state	  :  4*/
 	xfs_lsn_t	l_sync_lsn;   /* lsn of 1st LR w/ unflushed buffers: 8*/
 	xfs_mount_t	*l_mp;	      /* mount point			   : 4*/
+    buf_t		*l_xbuf;      /* extra buffer for log wrapping	   : 4*/
 	dev_t		l_dev;	      /* dev_t of log			   : 4*/
 	int		l_logstart;   /* start block of log		   : 4*/
 	int		l_logsize;    /* size of log in bytes 		   : 4*/
