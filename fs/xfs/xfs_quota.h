@@ -1,6 +1,6 @@
 #ifndef __XFS_QUOTA_H__
 #define __XFS_QUOTA_H__
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.10 $"
 /*
  * External Interface to the XFS disk quota subsystem.
  */
@@ -43,6 +43,16 @@ typedef __uint16_t      xfs_qwarncnt_t;
  */
 #define XFS_UQUOTA_ACTIVE	0x0040  /* uquotas are being turned off */
 #define XFS_PQUOTA_ACTIVE	0x0080  /* pquotas are being turned off */
+
+/*
+ * Typically, we turn quotas off if we weren't explicitly asked to 
+ * mount quotas. This is the mount option not to do that.
+ * This option is handy in the miniroot, when trying to mount /root.
+ * We can't really know what's in /etc/fstab until /root is already mounted!
+ * This stops quotas getting turned off in the root filesystem everytime
+ * the system boots up a miniroot.
+ */
+#define XFS_QUOTA_MAYBE		0x0100 /* Turn quotas on if SB has quotas on */
 
 /*
  * Checking XFS_IS_*QUOTA_ON() while holding any inode lock guarantees
