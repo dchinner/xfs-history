@@ -261,6 +261,8 @@ xfs_log_force(xfs_mount_t *mp,
 {
 	xlog_t *log = mp->m_log;
 
+	if (! xlog_debug)
+		return 0;
 	if (flags & XFS_LOG_FORCE) {
 		return(xlog_state_sync(log, lsn, flags));
 	} else if (flags & XFS_LOG_URGE) {
@@ -286,6 +288,8 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 {
 	xlog_t *log = mp->m_log;
 
+	if (! xlog_debug)
+		return;
 	cb->cb_next = 0;
 	if (xlog_state_lsn_is_synced(log, lsn, cb))
 		cb->cb_func(cb->cb_arg);
@@ -348,6 +352,14 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 			((len + XLOG_RECORD_BSIZE - 1) >> XLOG_RECORD_BSHIFT);
 	}
 
+	/* xfs_trans_tail_ail returns 0 when there is nothing in the list.
+	 * The log manager must keep track of the last LR which was committed
+	 * to disk.  The lsn of this LR will become the new tail_lsn whenever
+	 * xfs_trans_tail_ail returns 0.  If we don't do this, we run into
+	 * the situation where stuff could be written into the log but nothing
+	 * was ever in the AIL when asked.  Eventually, we panic since the
+	 * tail hits the head.
+	 */
 	if ((tail_lsn = xfs_trans_tail_ail(mp)) != 0)
 		log->l_tail_lsn = tail_lsn;
 	else
