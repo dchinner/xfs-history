@@ -1450,15 +1450,8 @@ xlog_state_do_callback(xlog_t *log)
 			goto clean;
 
 		iclog->ic_state = XLOG_STATE_CALLBACK;
-		LOG_UNLOCK(log, spl);
 
-		/* perform callbacks in the order given */
-		for (cb = iclog->ic_callback; cb != 0; cb = cb_next) {
-			cb_next = cb->cb_next;
-			cb->cb_func(cb->cb_arg);
-		}
-		iclog->ic_callback_tail = &(iclog->ic_callback);
-		iclog->ic_callback = 0;
+		LOG_UNLOCK(log, spl);
 
 		/* l_last_sync_lsn field protected by GRANT_LOCK.
 		 * Don't worry about iclog's lsn.  No one else can
@@ -1468,7 +1461,30 @@ xlog_state_do_callback(xlog_t *log)
 		log->l_last_sync_lsn = iclog->ic_header.h_lsn;
 		GRANT_UNLOCK(log, spl);
 
+		/*
+		 * Keep processing entries in the callback list
+		 * until we come around and it is empty.  We need
+		 * to atomically see that the list is empty and change
+		 * the state to DIRTY so that we don't miss any more
+		 * callbacks being added.
+		 */
 		spl = LOG_LOCK(log);
+		cb = iclog->ic_callback;
+		while (cb != 0) {
+			iclog->ic_callback_tail = &(iclog->ic_callback);
+			iclog->ic_callback = 0;
+			LOG_UNLOCK(log, spl);
+
+			/* perform callbacks in the order given */
+			for (; cb != 0; cb = cb_next) {
+				cb_next = cb->cb_next;
+				cb->cb_func(cb->cb_arg);
+			}
+			spl = LOG_LOCK(log);
+			cb = iclog->ic_callback;
+		}
+
+		ASSERT(iclog->ic_callback == 0);
 		iclog->ic_state = XLOG_STATE_DIRTY;
 
 		/* wake up threads waiting in xfs_log_force() */
@@ -1925,8 +1941,7 @@ xlog_state_lsn_is_synced(xlog_t		    *log,
 			iclog = iclog->ic_next;
 			continue;
 		} else {
-			if ((iclog->ic_state == XLOG_STATE_CALLBACK) ||
-			    (iclog->ic_state == XLOG_STATE_DIRTY)) /* call it*/
+			if (iclog->ic_state == XLOG_STATE_DIRTY) /* call it*/
 				break;
 
 			/* insert callback onto end of list */
