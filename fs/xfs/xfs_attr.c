@@ -1,4 +1,4 @@
-#ident "$Revision: 1.47 $"
+#ident "$Revision: 1.48 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -42,6 +42,7 @@
 #include "xfs_bit.h"
 #include "xfs_quota.h"
 #include "xfs_rw.h"
+#include "xfs_trans_space.h"
 
 /*
  * xfs_attr.c
@@ -167,6 +168,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	xfs_bmap_free_t flist;
 	int 		error, committed;
 	uint	      	nblks;
+	xfs_mount_t	*mp;
 
 	XFSSTATS.xs_attr_set++;
 
@@ -174,7 +176,8 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * Do we answer them, or ignore them?
 	 */
 	dp = XFS_BHVTOI(bdp);
-	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
+	mp = dp->i_mount;
+	if (XFS_FORCED_SHUTDOWN(mp))
 		return (EIO);
 
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
@@ -187,7 +190,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	/*
 	 * Attach the dquots to the inode.
 	 */
-	if (XFS_IS_QUOTA_ON(dp->i_mount)) {
+	if (XFS_IS_QUOTA_ON(mp)) {
 		if (error = xfs_qm_dqattach(dp, 0))
 			return (error);
 	}
@@ -215,7 +218,8 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	args.dp = dp;
 	args.firstblock = &firstblock;
 	args.flist = &flist;
-	args.total = 10 + XFS_B_TO_FSB(dp->i_mount, valuelen);
+	nblks = XFS_ATTRSET_SPACE_RES(mp, valuelen);
+	args.total = nblks;
 	args.whichfork = XFS_ATTR_FORK;
 
 	/*
@@ -228,11 +232,9 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * the inode in every transaction to let it float upward through
 	 * the log.
 	 */
-	args.trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_SET);
-	nblks = 10 + XFS_B_TO_FSB(dp->i_mount, valuelen);
-	if (error = xfs_trans_reserve(args.trans,
-				      (uint) nblks,
-				      XFS_ATTRSET_LOG_RES(dp->i_mount),
+	args.trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
+	if (error = xfs_trans_reserve(args.trans, (uint) nblks,
+				      XFS_ATTRSET_LOG_RES(mp),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRSET_LOG_COUNT)) {
 		xfs_trans_cancel(args.trans, 0);
@@ -240,7 +242,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	}
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
-	if (XFS_IS_QUOTA_ON(dp->i_mount)) {
+	if (XFS_IS_QUOTA_ON(mp)) {
 		if (error = xfs_trans_reserve_blkquota(args.trans, dp, nblks)) {
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 			xfs_trans_cancel(args.trans, XFS_TRANS_RELEASE_LOG_RES);
@@ -282,7 +284,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 			 * the transaction goes to disk before returning
 			 * to the user.
 			 */
-			if (dp->i_mount->m_flags & XFS_MOUNT_WSYNC) {
+			if (mp->m_flags & XFS_MOUNT_WSYNC) {
 				xfs_trans_set_sync(args.trans);
 			}
 			error = xfs_trans_commit(args.trans, 
@@ -344,7 +346,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * If this is a synchronous mount, make sure that the
 	 * transaction goes to disk before returning to the user.
 	 */
-	if (dp->i_mount->m_flags & XFS_MOUNT_WSYNC) {
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
 		xfs_trans_set_sync(args.trans);
 	}
 
@@ -383,6 +385,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	xfs_fsblock_t firstblock;
 	xfs_bmap_free_t flist;
 	int error;
+	xfs_mount_t *mp;
 
 	XFSSTATS.xs_attr_remove++;
 
@@ -390,7 +393,8 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 * Do we answer them, or ignore them?
 	 */
 	dp = XFS_BHVTOI(bdp);
-	if (XFS_FORCED_SHUTDOWN(dp->i_mount))
+	mp = dp->i_mount;
+	if (XFS_FORCED_SHUTDOWN(mp))
 		return (EIO);
 
 	xfs_ilock(dp, XFS_ILOCK_SHARED);
@@ -422,8 +426,8 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	/*
 	 * Attach the dquots to the inode.
 	 */
-	if (XFS_IS_QUOTA_ON(dp->i_mount)) {
-		if (XFS_NOT_DQATTACHED(dp->i_mount, dp)) {
+	if (XFS_IS_QUOTA_ON(mp)) {
+		if (XFS_NOT_DQATTACHED(mp, dp)) {
 			if (error = xfs_qm_dqattach(dp, 0))
 				return (error);
 		}
@@ -438,9 +442,10 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 * the inode in every transaction to let it float upward through
 	 * the log.
 	 */
-	args.trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_RM);
-	if (error = xfs_trans_reserve(args.trans, 16,
-				      XFS_ATTRRM_LOG_RES(dp->i_mount),
+	args.trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_RM);
+	if (error = xfs_trans_reserve(args.trans,
+				      XFS_ATTRRM_SPACE_RES(mp),
+				      XFS_ATTRRM_LOG_RES(mp),
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRRM_LOG_COUNT)) {
 		xfs_trans_cancel(args.trans, 0);
@@ -484,7 +489,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 * If this is a synchronous mount, make sure that the
 	 * transaction goes to disk before returning to the user.
 	 */
-	if (dp->i_mount->m_flags & XFS_MOUNT_WSYNC) {
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
 		xfs_trans_set_sync(args.trans);
 	}
 
@@ -592,9 +597,11 @@ int								/* error */
 xfs_attr_inactive(xfs_inode_t *dp)
 {
 	xfs_trans_t *trans;
+	xfs_mount_t *mp;
 	int error;
 
-	ASSERT(! XFS_NOT_DQATTACHED(dp->i_mount, dp));
+	mp = dp->i_mount;
+	ASSERT(! XFS_NOT_DQATTACHED(mp, dp));
 
 	/* XXXsup - why on earth are we taking ILOCK_EXCL here??? */
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
@@ -617,10 +624,9 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * the inode in every transaction to let it float upward through
 	 * the log.
 	 */
-	trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTRINVAL);
-	if (error = xfs_trans_reserve(trans, 0,
-				      XFS_ATTRINVAL_LOG_RES(dp->i_mount),
-				      0, XFS_TRANS_PERM_LOG_RES,
+	trans = xfs_trans_alloc(mp, XFS_TRANS_ATTRINVAL);
+	if (error = xfs_trans_reserve(trans, 0, XFS_ATTRINVAL_LOG_RES(mp), 0,
+				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_ATTRINVAL_LOG_COUNT)) {
 		xfs_trans_cancel(trans, 0);
 		return(error);
@@ -656,7 +662,7 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * async inactive transactions are safe.
 	 */
 	if (error = xfs_itruncate_finish(&trans, dp, 0LL, XFS_ATTR_FORK,
-				(!(dp->i_mount->m_flags & XFS_MOUNT_WSYNC)
+				(!(mp->m_flags & XFS_MOUNT_WSYNC)
 				 ? 1 : 0)))
 		goto out;
 
