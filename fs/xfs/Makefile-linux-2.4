@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 6
-EXTRAVERSION =-pre2-xfs
+EXTRAVERSION =-pre3-xfs
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -105,7 +105,8 @@ export MODLIB
 CPPFLAGS := -D__KERNEL__ -I$(HPATH)
 CPPFLAGS += $(patsubst %,-I%,$(CROSS_COMPILE_INC))
 
-CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -O2 -fno-strict-aliasing
+CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
+          -fno-strict-aliasing
 ifndef CONFIG_FRAME_POINTER
 CFLAGS += -fomit-frame-pointer
 endif
