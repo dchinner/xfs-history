@@ -74,7 +74,12 @@
 #define GFP_NOFS	GFP_PAGE_IO
 #endif
 
-#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / 512)
+#define SECTOR_SHIFT	9
+#define SECTOR_SIZE     (1<<SECTOR_SHIFT)
+#define SECTOR_MASK	(SECTOR_SIZE - 1)
+#define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - SECTOR_SHIFT)) - 1)
+
+#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / SECTOR_SIZE)
 
 /*
  * Debug code
@@ -735,8 +740,8 @@ page_buf_t *pagebuf_find(	/* find buffer for block if     */
 {
 	page_buf_t *pb = NULL;
 
-	ioff <<= 9;
-	isize <<= 9;
+	ioff <<= SECTOR_SHIFT;
+	isize <<= SECTOR_SHIFT;
 
 	_pagebuf_find_lockable_buffer(target, ioff, isize, flags, &pb, NULL);
 
@@ -767,9 +772,9 @@ page_buf_t *pagebuf_get(	/* allocate a buffer            */
 
 	assert(target);
 
-	isize <<= 9;
+	isize <<= SECTOR_SHIFT;
 
-	rval = _pagebuf_get_lockable_buffer(target, ioff << 9,
+	rval = _pagebuf_get_lockable_buffer(target, ioff << SECTOR_SHIFT,
 						isize, flags, &pb);
 
 	if (rval != 0)
@@ -1392,7 +1397,6 @@ _pagebuf_page_io(
 	page_buf_t		*pb,	/* pagebuf holding it, can be NULL */
 	page_buf_daddr_t	bn,	/* starting block number */
 	kdev_t			dev,	/* device for I/O */
-	size_t			sector,	/* device block size */
 	size_t			blocksize,	/* filesystem block size */
 	off_t			pg_offset,	/* starting offset in page */
 	size_t			pg_length,	/* count of data to process */
@@ -1400,9 +1404,10 @@ _pagebuf_page_io(
 	int			rw,	/* read/write operation */
 	int			flush)
 {
+	size_t			sector;
 	size_t			blk_length = 0;
 	struct buffer_head	*bh, *head, *bufferlist[MAX_BUF_PER_PAGE];
-	int			concat_ok, multi_ok;
+	int			multi_ok;
 	int			i = 0, cnt = 0, err = 0;
 	int			public_bh = 0;
 
@@ -1425,15 +1430,16 @@ _pagebuf_page_io(
 		/* For now, all metadata buffer_heads for non-pagesize blksize
 		 * filesystems are 512 bytes long.
 		 */
-		sector = 1 << 9;
 		if (!page_has_buffers(page)) {
 			if (!locking) {
 				lock_page(page);
 				if (!page_has_buffers(page)) {
-					create_empty_buffers(page, dev, sector);				}
+					create_empty_buffers(page, dev,
+							SECTOR_SIZE);
+				}
 				UnlockPage(page);
 			} else {
-				create_empty_buffers(page, dev, sector);
+				create_empty_buffers(page, dev, SECTOR_SIZE);
 			}
 		}
 
@@ -1442,7 +1448,7 @@ _pagebuf_page_io(
 		do {
 			if (buffer_uptodate(bh) && cache_ok)
 				continue;
-			blk_length = i << 9;
+			blk_length = i << SECTOR_SHIFT;
 			if (blk_length < pg_offset)
 				continue;
 			if (blk_length >= pg_offset + pg_length)
@@ -1452,46 +1458,40 @@ _pagebuf_page_io(
 			get_bh(bh);
 			assert(!waitqueue_active(&bh->b_wait));
 
-			bh->b_size = sector;
-			bh->b_blocknr = bn + (i - (pg_offset >> 9));
+			bh->b_size = SECTOR_SIZE;
+			bh->b_blocknr = bn + (i - (pg_offset >> SECTOR_SHIFT));
 			bufferlist[cnt++] = bh;
 		} while (i++, (bh = bh->b_this_page) != head);
 		goto request;
-	}
-
-	/* This will attempt to make a request bigger than the sector
-	 * size if we are not running on the MD device - LVM need to be
-	 * added to this logic as well.
-	 *
-	 * If you think this change is causing problems initializing the
-	 * concat_ok variable will turn it off again.
-	 */
-	if ((MAJOR(dev) != LVM_BLK_MAJOR) && (MAJOR(dev) != MD_MAJOR)) {
-		concat_ok = 1;
-	} else if ((MAJOR(dev) == MD_MAJOR) && (pg_offset == 0) &&
-		   (pg_length == PAGE_CACHE_SIZE) &&
-		   ((bn & ((page_buf_daddr_t)(PAGE_CACHE_SIZE - 1) >> 9)) == 0)) {
-		concat_ok = 1;
-	} else {
-		concat_ok = 0;
 	}
 
 	/* Calculate the block offsets and length we will be using */
 	if (pg_offset) {
 		size_t	block_offset;
 
-		block_offset = pg_offset >> 9;
-		block_offset = pg_offset - (block_offset << 9);
-		blk_length = (pg_length + block_offset + sector - 1) >> 9;
+		block_offset = pg_offset >> SECTOR_SHIFT;
+		block_offset = pg_offset - (block_offset << SECTOR_SHIFT);
+		blk_length = (pg_length + block_offset + SECTOR_MASK) >>
+								SECTOR_SHIFT;
 	} else {
-		blk_length = (pg_length + sector - 1) >> 9;
+		blk_length = (pg_length + SECTOR_MASK) >> SECTOR_SHIFT;
 	}
 
-	if (concat_ok) {
-		/* This should just create one buffer head */
-		sector *= blk_length;
+	/* This will attempt to make a request bigger than the sector
+	 * size if we are well aligned.
+	 */
+	if ((MAJOR(dev) != LVM_BLK_MAJOR) && (MAJOR(dev) != MD_MAJOR)) {
+		sector = blk_length << SECTOR_SHIFT;
 		blk_length = 1;
+	 } else if ((MAJOR(dev) == MD_MAJOR) && (pg_offset == 0) &&
+		   (pg_length == PAGE_CACHE_SIZE) &&
+		   (((unsigned int) bn) & BN_ALIGN_MASK) == 0) {
+		sector = blk_length << SECTOR_SHIFT;
+		blk_length = 1;
+	} else {
+		sector = SECTOR_SIZE;
 	}
+
 	multi_ok = (blk_length != 1);
 
 	for (; blk_length > 0; blk_length--, pg_offset += sector) {
@@ -1592,7 +1592,6 @@ _page_buf_page_apply(
 	page_buf_daddr_t	bn = pb->pb_bn;
 	kdev_t			dev = pb->pb_target->pbr_device;
 	size_t			blocksize = pb->pb_target->pbr_blocksize;
-	size_t			sector = 1 << 9;
 	loff_t			pb_offset;
 	size_t			ret_len = pg_length;
 
@@ -1601,18 +1600,18 @@ _page_buf_page_apply(
 	if ((blocksize == PAGE_CACHE_SIZE) &&
 	    (pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
 	    (pb->pb_flags & PBF_READ) && pb->pb_locked) {
-		bn -= (pb->pb_offset >> 9);
+		bn -= (pb->pb_offset >> SECTOR_SHIFT);
 		pg_offset = 0;
 		pg_length = PAGE_CACHE_SIZE;
 	} else {
 		pb_offset = offset - pb->pb_file_offset;
 		if (pb_offset) {
-			bn += (pb_offset + sector - 1) >> 9;
+			bn += (pb_offset + SECTOR_MASK) >> SECTOR_SHIFT;
 		}
 	}
 
 	if (pb->pb_flags & PBF_READ) {
-		_pagebuf_page_io(page, pb, bn, dev, sector, blocksize,
+		_pagebuf_page_io(page, pb, bn, dev, blocksize,
 		    	(off_t)pg_offset, pg_length, pb->pb_locked, READ, 0);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
@@ -1620,7 +1619,7 @@ _page_buf_page_apply(
 		/* Check we need to lock pages */
 		if (locking && (pb->pb_locked == 0))
 			lock_page(page);
-		_pagebuf_page_io(page, pb, bn, dev, sector, blocksize,
+		_pagebuf_page_io(page, pb, bn, dev, blocksize,
 			(off_t)pg_offset, pg_length, locking, WRITE,
 			last && (pb->pb_flags & PBF_FLUSH));
 	}
