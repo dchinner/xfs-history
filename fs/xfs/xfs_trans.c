@@ -185,7 +185,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		}
 		error = xfs_log_reserve(tp->t_mountp, logspace,
 					&tp->t_ticket,
-					XFS_TRANSACTION_MANAGER, log_flags);
+					XFS_TRANSACTION, log_flags);
 #ifdef SIM
 		if (error != 0) {
 			printf("Log reservation failed\n");

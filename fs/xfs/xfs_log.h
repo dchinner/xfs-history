@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.18 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -54,11 +54,12 @@
  *	XFS_LOG_PRINT_FORCE:
  */
 #define XFS_LOG_PRINT_FORCE	0x1
+#define XFS_LOG_PRINT_NO_DATA	0x2
 
 
 /* Log Clients */
-#define XFS_TRANSACTION_MANAGER	1
-#define XFS_VOLUME_MANAGER	2
+#define XFS_TRANSACTION		1
+#define XFS_VOLUME		2
 
 
 typedef struct xfs_log_iovec {
