@@ -2,6 +2,9 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
+#define	XFS_LSN_CMP(x,y)	((x) - (y))
+#define	XFS_LSN_DIFF(x,y)	((x) - (y))
+
 #ifndef LOG_DEBUG
 caddr_t         xfs_log_alloc(size_t, uint, xfs_lsn_t*);
 void            xfs_log_free(caddr_t, size_t);
