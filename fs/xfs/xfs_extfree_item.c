@@ -292,11 +292,11 @@ xfs_efi_release(xfs_efi_log_item_t	*efip,
 	int		nexts;
 	SPLDECL(s);
 
-	ASSERT(efip->efi_next_extent > 0);
-
 	mp = efip->efi_item.li_mountp;
-	AIL_LOCK(mp, s);
+	ASSERT(efip->efi_next_extent > 0);
 	ASSERT(efip->efi_flags & XFS_EFI_COMMITTED);
+
+	AIL_LOCK(mp, s);
 	ASSERT(efip->efi_next_extent >= nextents);
 	efip->efi_next_extent -= nextents;
 	extents_left = efip->efi_next_extent;
