@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.34 $
+# $Revision: 1.35 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -35,7 +35,6 @@ XFS_CSRCS=	xfs_alloc.c \
 		xfs_error.c \
 		xfs_extfree_item.c \
 		xfs_fsops.c \
-		xfs_grio.c \
 		xfs_handle.c \
 		xfs_ialloc.c \
 		xfs_ialloc_btree.c \
@@ -46,7 +45,6 @@ XFS_CSRCS=	xfs_alloc.c \
 		xfs_log.c \
 		xfs_log_recover.c \
 		xfs_mount.c \
-		xfs_rtalloc.c \
 		xfs_rw.c \
 		xfs_trans.c \
 		xfs_trans_ail.c \
@@ -60,13 +58,19 @@ XFS_CSRCS=	xfs_alloc.c \
 XFS_OBJS=$(XFS_CSRCS:.c=.o)
 $(XFS_NAME):$(XFS_NAME)($(XFS_OBJS)) MAKELIB
 
+XFSRT_NAME=xfsrt.a
+XFSRT_CSRCS=	xfs_grio.c \
+		xfs_rtalloc.c
+XFSRT_OBJS=$(XFSRT_CSRCS:.c=.o)
+$(XFSRT_NAME):$(XFSRT_NAME)($(XFSRT_OBJS)) MAKELIB
+
 XIDBG_NAME=xfsidbg.o
 XIDBG_CSRCS=xfsidbg.c
 
-TARGETS=$(XFS_NAME) $(XIDBG_NAME)
+TARGETS=$(XFS_NAME) $(XFSRT_NAME) $(XIDBG_NAME)
 
 LINTNAME=xfs
-CFILES=$(XFS_CSRCS) $(XIDBG_CSRCS)
+CFILES=$(XFS_CSRCS) $(XFSRT_CSRCS) $(XIDBG_CSRCS)
 HFILES=	xfs_ag.h \
 	xfs_alloc.h \
 	xfs_alloc_btree.h \
@@ -117,6 +121,7 @@ $(KCOMMONPREF)default:$(TARGETS)
 
 $(KCOMMONPREF)install: $(KCOMMONPREF)default
 	${KINSTALL} ${XFS_NAME}
+	${KINSTALL} ${XFSRT_NAME}
 	${KINSTALL} ${XIDBG_NAME}
 	${KDEVINSTALL} ${TARGETS}
 
