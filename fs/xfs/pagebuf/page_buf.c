@@ -1547,41 +1547,8 @@ STATIC int _page_buf_page_apply(
 
 	if (pb->pb_flags & PBF_READ) {
 		/* We only need to do I/O on pages which are not upto date */
-		while (!Page_Uptodate(page) || (pb->pb_flags & PBF_FORCEIO)) {
-			/* Attempt to lock page */
-			if (pb->pb_locked || !TryLockPage(page)) {
-				_pagebuf_page_io(page, pb, bn, dev, sector,
-				    (off_t) pg_offset, pg_length, 1, READ);
-
-				/* When doing the I/O we need to setup a
-				 * completion routine which gets called for
-				 * each buffer_head completion. On completion
-				 * we will need to decrement a count and
-				 * mark the section of the page we deal
-				 * with upto date. Once the count reaches
-				 * zero we can update the PG_uptodate
-				 * and PG_partial fields, unlock the page
-				 * and wake up page waiters.
-				 *
-				 * We also need to locate the pagebuf and
-				 * decrement the a count of pending I/O,
-				 * should this count reach zero we need
-				 * to call the pagebuf_iodone() function.
-				 */
-
-				break;
-			} else {
-				/* we could not lock the page, this means
-				 * someone else is doing I/O in this page,
-				 * the possibilities are that either their
-				 * I/O will satisfy our I/O, or that we will
-				 * still need to do I/O when they are done.
-				 * There is no way to tell this until we can
-				 * lock the page - ugh!
-				 */
-				___wait_on_page(page);
-			}
-		}
+		_pagebuf_page_io(page, pb, bn, dev,
+		    sector, (off_t) pg_offset, pg_length, pb->pb_locked, READ);
 	} else if (pb->pb_flags & PBF_WRITE) {
 		int locking = (pb->pb_flags & _PBF_LOCKABLE) == 0;
 
