@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.87 $"
+#ident "$Revision: 1.88 $"
 
 #include <xfs_os_defs.h>
 
@@ -811,7 +811,7 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
 	ASSERT(lidp != NULL);
 
 	lidp->lid_flags |= XFS_LID_SYNC_UNLOCK;
-	xfs_buf_item_trace("BHOLD UNTILC OMMIT", bip);
+	xfs_buf_item_trace("BHOLD UNTIL COMMIT", bip);
 
 	xfs_trans_set_sync(tp);
 }
