@@ -226,7 +226,7 @@ typedef struct irix5_dirent {	/* Irix5 view of dirent structure */
 
 /* IRIX uses a dynamic sizing algorithm (ndquot = 200 + numprocs*2) */
 /* we may well need to fine-tune this if it ever becomes an issue.  */
-#define DQUOT_MAX_HEURISTIC	NR_DQUOTS
+#define DQUOT_MAX_HEURISTIC	1024	/* NR_DQUOTS */
 
 /* IRIX uses the current size of the name cache to guess a good value */
 /* - this isn't the same but is a good enough starting point for now. */
