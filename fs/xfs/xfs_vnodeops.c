@@ -4280,9 +4280,12 @@ xfs_reclaim(vnode_t	*vp,
 	locked = 0;
 
 	/*
-	 * If this is not an unmount (flag == 0) and there are dirty
-	 * buffers or pages still associated with the file, then don't
-	 * allow it to be reclaimed.  Doing the pflushinvalvp() can cause
+	 * If this is not an unmount (flag == 0) and the inode or the
+	 * inode's data still needs to be flushed, then we do not allow
+	 * the inode to be reclaimed.  This is to avoid many different
+	 * deadlocks.
+	 *
+	 * Doing the pflushinvalvp() can cause
 	 * us to wait in the buffer cache.  We can be called here via
 	 * vn_alloc() from xfs_iget().  We can be holding any number of
 	 * locks at that point in the middle of a transaction, so we
@@ -4298,11 +4301,20 @@ xfs_reclaim(vnode_t	*vp,
 	 * delayed allocation dirty data which will require us to allocate
 	 * memory to flush, we can't do this from vhand.
 	 *
+	 * Flushing the inode from here requires the acquisition of the
+	 * inode's buffer.  This buffer could be locked by another
+	 * process which is waiting in a memory allocation.  If we're
+	 * called here via vhand, then waiting on that buffer would
+	 * cause us to deadlock.
+	 *
 	 * It is OK to return an error here.  The vnode cache will just
 	 * come back later.
 	 */
 	if (!(flag & FSYNC_INVAL)) {
-		if (VN_DIRTY(vp) || (ip->i_queued_bufs > 0)) {
+		if (VN_DIRTY(vp) || (ip->i_queued_bufs > 0) ||
+		    (ip->i_update_core != 0) ||
+		    (ip->i_item.ili_format.ilf_fields != 0) ||
+		    (ip->i_item.ili_last_fields != 0)) {
 			return EAGAIN;
 		}
 		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
