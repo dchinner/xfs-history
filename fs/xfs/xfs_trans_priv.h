@@ -37,11 +37,5 @@ extern xfs_log_item_t	*xfs_trans_first_ail(xfs_mount_t *, int *);
 extern xfs_log_item_t	*xfs_trans_next_ail(xfs_mount_t *, xfs_log_item_t *,
 					    int *);
 
-/*
- * Other.
- */
-extern void		xfs_buf_iodone(buf_t *);
-
-
 
 #endif	/* _XFS_TRANS_PRIV_H */
