@@ -1129,12 +1129,6 @@ xfs_ialloc(
 		ip->i_df.if_bytes = ip->i_df.if_real_bytes = 0;
 		ip->i_df.if_u1.if_extents = NULL;
 		break;
-	case IFMNT:
-		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
-		ip->i_df.if_flags = 0;
-		uuid_create(&ip->i_df.if_u2.if_uuid);
-		flags |= XFS_ILOG_UUID;
-		break;
 	default:
 		ASSERT(0);
 	}

@@ -303,8 +303,6 @@ typedef struct xfs_mount {
 						/* which bits matter in rpc
 						   log item pin masks */
 	uint			m_cxfstype;	/* mounted shared, etc. */
-	uuid_t			m_newuuid;	/* saved copy of new uuid */
-	uuid_t			m_origuuid;	/* saved copy of original uuid */
 } xfs_mount_t;
 
 /*

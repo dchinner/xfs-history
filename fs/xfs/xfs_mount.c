@@ -37,7 +37,7 @@ STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int, int);
 STATIC void	xfs_sb_relse(xfs_buf_t *);
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
-STATIC void	xfs_uuid_mount(xfs_mount_t *);
+STATIC int	xfs_uuid_mount(xfs_mount_t *);
 
 mutex_t		xfs_uuidtabmon;		/* monitor for uuidtab */
 STATIC int	xfs_uuidtab_size;
@@ -600,8 +600,11 @@ xfs_mountfs(
 	 * partition volume/filesystem.
 	 */
 	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
+		if (xfs_uuid_mount(mp)) {
+	                error = XFS_ERROR(EINVAL);
+	                goto error1;
+                }
                 uuid_mounted=1;
-		xfs_uuid_mount(mp);	/* make sure it's really unique */
 		ret64 = uuid_hash64(&sbp->sb_uuid);
 		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
 	}
@@ -857,25 +860,6 @@ xfs_mountfs(
 		VN_RELE(rvp);
 		vn_purge(rvp, &vmap);
 		goto error2;
-	}
-
-	/*
-	 * Check if a new uuid was created, and if the new uuid was
-	 * overwritten by replaying the log
-	 */
-	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
-		if (!uuid_is_nil(&mp->m_newuuid)) {
-			if (!uuid_equal(&mp->m_sb.sb_uuid, &mp->m_newuuid)) {
-				bcopy(&mp->m_newuuid, &mp->m_sb.sb_uuid,
-					sizeof(uuid_t));
-			}
-			/*
-			 * uuid was updated... log it...
-			 */
-			update_flags |= XFS_SB_UUID;
-			/* XXXnathans TODO - if we get in here and we have */
-			/* an external log, we're in deep trouble on Linux */
-		}
 	}
 
 	/*
@@ -1465,31 +1449,31 @@ xfs_sb_relse(xfs_buf_t *bp)
 
 /*
  * See if the uuid is unique among mounted xfs filesystems.
- * If it's not, allocate a new one so it is.
+ * Mount fails if UUID is nil or a FS with the same UUID is already
+ * mounted
  */
-STATIC void
+STATIC int
 xfs_uuid_mount(xfs_mount_t *mp)
 {
 	int	hole;
 	int	i;
+        
+        if (uuid_is_nil(&mp->m_sb.sb_uuid)) {
+  	        cmn_err(CE_WARN, "XFS: Filesystem has nil UUID - can't mount");
+                return -1;
+        }
  
-        mp->m_origuuid = mp->m_sb.sb_uuid;
-
-	uuid_create_nil(&mp->m_newuuid);
 	mutex_lock(&xfs_uuidtabmon, PVFS);
 	for (i = 0, hole = -1; i < xfs_uuidtab_size; i++) {
 		if (uuid_is_nil(&xfs_uuidtab[i])) {
 			hole = i;
 			continue;
 		}
-		if (!uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i]))
-			continue;
-		uuid_create(&mp->m_sb.sb_uuid);
-		bcopy(&mp->m_sb.sb_uuid, &mp->m_newuuid, sizeof(uuid_t));
-		XFS_BUF_TO_SBP(mp->m_sb_bp)->sb_uuid = mp->m_sb.sb_uuid;
-		xfs_fs_cmn_err(CE_NOTE, mp, "Created a new filesystem uuid.");
-		i = -1;
-		/* restart loop from the top */
+		if (uuid_equal(&mp->m_sb.sb_uuid, &xfs_uuidtab[i])) {
+  	                cmn_err(CE_WARN, "XFS: Filesystem has duplicate UUID - can't mount");
+                        mutex_unlock(&xfs_uuidtabmon);
+                        return -1;
+                }
 	}
 	if (hole < 0) {
 		xfs_uuidtab = XFS_kmem_realloc(xfs_uuidtab,
@@ -1500,6 +1484,8 @@ xfs_uuid_mount(xfs_mount_t *mp)
 	}
 	xfs_uuidtab[hole] = mp->m_sb.sb_uuid;
 	mutex_unlock(&xfs_uuidtabmon);
+        
+        return 0;
 }
 
 /*
