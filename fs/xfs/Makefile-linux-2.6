@@ -48,9 +48,6 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 endif
 
 subdir-$(CONFIG_XFS_FS)		+= linux
-ifeq ($(CONFIG_HAVE_XFS_DMAPI),y)
-  subdir-$(CONFIG_XFS_FS)	+= dmapi
-endif
 
 # fs/Makefile enters fs/xfs twice if CONFIG_XFS_FS is y, once for kernel and
 # once for modules.  This is necessary because xfsidbg can be built as a module
@@ -81,7 +78,7 @@ endif
 ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
   obj-y				+= xfsdmapistubs.o
 else
-  obj-y				+= dmapi/dmapi.o xfs_dmapi.o
+  obj-y				+= xfs_dmapi.o
 endif
 
 ifeq ($(CONFIG_XFS_QUOTA),)

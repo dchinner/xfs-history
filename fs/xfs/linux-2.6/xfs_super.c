@@ -44,14 +44,6 @@ extern void vfsinit(void);
 extern int  xfs_init(int fstype);
 extern void xfs_cleanup(void);
 
-#ifdef CONFIG_HAVE_XFS_DMAPI
-extern void dmapi_init(void);
-extern void dmapi_uninit(void);
-#else
-# define dmapi_init()		do { } while (0)
-# define dmapi_uninit()		do { } while (0)
-#endif
-
 #ifdef CONFIG_XFS_GRIO
 extern void xfs_grio_init(void);
 extern void xfs_grio_uninit(void);
@@ -832,7 +824,6 @@ static int __init init_xfs_fs(void)
 	vfsinit();
 	xfs_init(0);
 	xfs_grio_init();
-	dmapi_init();
 
 	return register_filesystem(&xfs_fs_type);
 }
@@ -840,7 +831,6 @@ static int __init init_xfs_fs(void)
 
 static void __exit exit_xfs_fs(void)
 {
-        dmapi_uninit();
         xfs_grio_uninit();
 	xfs_cleanup();
         unregister_filesystem(&xfs_fs_type);
