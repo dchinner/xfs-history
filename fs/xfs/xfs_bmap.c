@@ -259,7 +259,6 @@ xfs_bmap_add_extent(
 	xfs_mount_t		*mp;	/* mount point structure */
 	xfs_extnum_t		nextents; /* number of extents in file now */
 	xfs_bmbt_irec_t		prev;	/* old extent at offset idx */
-	xfs_sb_t		*sbp;	/* superblock of filesystem */
 
 	cur = *curp;
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
@@ -319,9 +318,8 @@ xfs_bmap_add_extent(
 	 * Convert to a btree if necessary.
 	 */
 	mp = ip->i_mount;
-	sbp = &mp->m_sb;
 	if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
-	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize)) {
+	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(mp)) {
 		logflags |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 			first, flist, &cur);
 		*curp = cur;
@@ -369,7 +367,6 @@ xfs_bmap_add_extent_delay_real(
 	xfs_bmbt_irec_t		r[3];	/* neighbor extent entries */
 					/* left is 0, right is 1, prev is 2 */
 	int			rval;	/* return value */
-	xfs_sb_t		*sbp;	/* superblock structure */
 	int			state;	/* state bits, accessed thru macros */
 	xfs_extlen_t		temp;	/* value for dnew calculations */
 	xfs_extlen_t		temp2;	/* value for dnew calculations */
@@ -577,10 +574,8 @@ xfs_bmap_add_extent_delay_real(
 			xfs_bmbt_insert(cur);
 			rval = XFS_ILOG_CORE;
 		}
-		sbp = &ip->i_mount->m_sb;
 		if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
-		    ip->i_d.di_nextents >
-		    XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(ip->i_mount))
 			rval |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 				first, flist, &cur);
 		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
@@ -637,10 +632,8 @@ xfs_bmap_add_extent_delay_real(
 			xfs_bmbt_insert(cur);
 			rval = XFS_ILOG_CORE;
 		}
-		sbp = &ip->i_mount->m_sb;
 		if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
-		    ip->i_d.di_nextents >
-		    XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(ip->i_mount))
 			rval |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 				first, flist, &cur);
 		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
@@ -675,10 +668,8 @@ xfs_bmap_add_extent_delay_real(
 			xfs_bmbt_insert(cur);
 			rval = XFS_ILOG_CORE;
 		}
-		sbp = &ip->i_mount->m_sb;
 		if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
-		    ip->i_d.di_nextents >
-		    XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(ip->i_mount))
 			rval |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 				first, flist, &cur);
 		temp = xfs_bmap_worst_indlen(ip, temp);
@@ -1326,7 +1317,7 @@ xfs_bmap_btree_to_extents(
 {
 	xfs_bmbt_ptr_t		cbno;	/* child block number */
 	xfs_mount_t		*mp;	/* mount point structure */
-	xfs_btree_lblock_t	*rblock;/* root btree block */
+	xfs_bmbt_block_t	*rblock;/* root btree block */
 	xfs_sb_t		*sbp;	/* superblock structure pointer */
 
 	ASSERT(ip->i_flags & XFS_IEXTENTS);
@@ -1339,11 +1330,11 @@ xfs_bmap_btree_to_extents(
 	cbno = *XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, sbp->sb_inodesize);
 #ifdef XFSDEBUG
 	{
-		xfs_btree_lblock_t	*cblock;
+		xfs_bmbt_block_t	*cblock;
 		buf_t			*cbuf;
 
 		cbuf = xfs_btree_read_bufl(mp, tp, cbno, 0);
-		cblock = xfs_buf_to_lblock(cbuf);
+		cblock = xfs_buf_to_bmbt_block(cbuf);
 		ASSERT(cblock->bb_level == 0);
 	}
 #endif
@@ -1629,11 +1620,11 @@ xfs_bmap_extents_to_btree(
 	xfs_bmap_free_t		*flist,		/* blocks freed in xaction */
 	xfs_btree_cur_t		**curp)		/* cursor returned to caller */
 {
-	xfs_btree_lblock_t	*ablock;
+	xfs_bmbt_block_t	*ablock;
 	xfs_fsblock_t		abno;
 	buf_t			*abuf;
 	xfs_bmbt_rec_t		*arp;
-	xfs_btree_lblock_t	*block;
+	xfs_bmbt_block_t	*block;
 	xfs_btree_cur_t		*cur;
 	xfs_bmbt_rec_t		*ep;
 	xfs_extnum_t		i;
@@ -1688,7 +1679,7 @@ xfs_bmap_extents_to_btree(
 	/*
 	 * Fill in the child block.
 	 */
-	ablock = xfs_buf_to_lblock(abuf);
+	ablock = xfs_buf_to_bmbt_block(abuf);
 	ablock->bb_magic = XFS_BMAP_MAGIC;
 	ablock->bb_level = 0;
 	ablock->bb_numrecs = 0;
@@ -2114,7 +2105,7 @@ xfs_bmap_read_extents(
 	xfs_trans_t		*tp,	/* transaction pointer */
 	xfs_inode_t		*ip)	/* incore inode */
 {
-	xfs_btree_lblock_t	*block;	/* current btree block */
+	xfs_bmbt_block_t	*block;	/* current btree block */
 	xfs_bmbt_ptr_t		bno;	/* block # of "block" */
 	buf_t			*buf;	/* buffer for "block" */
 	xfs_extnum_t		i;	/* index into the extents list */
@@ -2138,7 +2129,7 @@ xfs_bmap_read_extents(
 	 */
 	while (block->bb_level) {
 		buf = xfs_btree_read_bufl(mp, tp, bno, 0);
-		block = xfs_buf_to_lblock(buf);
+		block = xfs_buf_to_bmbt_block(buf);
 		if (block->bb_level == 0)
 			break;
 		bno = *XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt,
@@ -2183,7 +2174,7 @@ xfs_bmap_read_extents(
 		if (bno == NULLFSBLOCK)
 			break;
 		buf = xfs_btree_read_bufl(mp, tp, bno, 0);
-		block = xfs_buf_to_lblock(buf);
+		block = xfs_buf_to_bmbt_block(buf);
 	}
 	kmem_check();
 }
@@ -2438,7 +2429,7 @@ xfs_bmapi(
 	 * Transform from btree to extents, give it cur.
 	 */
 	if (ip->i_d.di_format == XFS_DINODE_FMT_BTREE &&
-		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(mp))
 		logflags |= xfs_bmap_btree_to_extents(tp, ip, cur);
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
@@ -2577,14 +2568,14 @@ xfs_bunmapi(
 	 * Convert to a btree if necessary.
 	 */
 	if (ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS &&
-	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+	    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(mp))
 		logflags |= xfs_bmap_extents_to_btree(tp, ip, &firstblock,
 			flist, &cur);
 	/*
 	 * transform from btree to extents, give it cur
 	 */
 	else if (ip->i_d.di_format == XFS_DINODE_FMT_BTREE &&
-		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(sbp->sb_inodesize))
+		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(mp))
 		logflags |= xfs_bmap_btree_to_extents(tp, ip, cur);
 	/* transform from extents to local */
 	/*
