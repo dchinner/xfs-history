@@ -122,7 +122,6 @@ linvfs_common_cr(
 		}
 		if (ISVDEV(tp))
 			ip->i_rdev = to_kdev_t(rdev);
-		linvfs_set_inode_ops(ip);
 		/* linvfs_revalidate_core returns (-) errors */
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 		validate_fields(dir);
@@ -183,7 +182,6 @@ linvfs_lookup(
 			VN_RELE(cvp);
 			return ERR_PTR(-EACCES);
 		}
-		linvfs_set_inode_ops(ip);
 		error = -linvfs_revalidate_core(ip, ATTR_COMM);
 	}
 	if (error && (error != ENOENT))
@@ -284,7 +282,6 @@ linvfs_symlink(
 			error = ENOMEM;
 			VN_RELE(cvp);
 		} else {
-			linvfs_set_inode_ops(ip);
 			/* linvfs_revalidate_core returns (-) errors */
 			error = -linvfs_revalidate_core(ip, ATTR_COMM);
 			d_instantiate(dentry, ip);

@@ -191,9 +191,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 		if (xfs_vn_iget(vfsp, vp, (xfs_ino_t)inode->i_ino)) {
 			make_bad_inode(inode);
 		} else {
-			linvfs_set_inode_ops(inode);
 			vn_revalidate(vp, ATTR_LAZY|ATTR_COMM);
-
 		}
 		VN_UNLOCK(vp, s);
 	}
