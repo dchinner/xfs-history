@@ -1,4 +1,4 @@
-#ident "$Revision: 1.36 $"
+#ident "$Revision: 1.37 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -222,7 +222,6 @@ xfs_trans_unlocked_item(
 	xfs_log_item_t	*lip)
 {
 	xfs_log_item_t	*min_lip;
-	SPLDECL(s);
 
 	/*
 	 * If we're forcibly shutting down, we may have
@@ -235,9 +234,19 @@ xfs_trans_unlocked_item(
 		return;
 	}
 
-	AIL_LOCK(mp, s);
+	/*
+	 * This is the one case where we can call into xfs_ail_min()
+	 * without holding the AIL lock because we only care about the
+	 * case where we are at the tail of the AIL.  If the object isn't
+	 * at the tail, it doesn't matter what result we get back.  This
+	 * is slightly racy because since we were just unlocked, we could
+	 * go to sleep between the call to xfs_ail_min and the call to
+	 * xfs_log_move_tail, have someone else lock us, commit to us disk,
+	 * move us out of the tail of the AIL, and then we wake up.  However,
+	 * the call to xfs_log_move_tail() doesn't do anything if there's
+	 * not enough free space to wake people up so we're safe calling it.
+	 */
 	min_lip = xfs_ail_min(&mp->m_ail);
-	AIL_UNLOCK(mp, s);
 
 	if (min_lip == lip)
 		xfs_log_move_tail(mp, 1);
@@ -500,11 +509,11 @@ xfs_ail_min(
 	xfs_ail_entry_t	*base)
 /* ARGSUSED */
 {
-	if (base->ail_forw == (xfs_log_item_t*)base) {
+	register xfs_log_item_t *forw = base->ail_forw;
+	if (forw == (xfs_log_item_t*)base) {
 		return NULL;
 	}
-	return base->ail_forw;
-
+	return forw;
 }
 
 /*
