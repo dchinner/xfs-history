@@ -65,7 +65,7 @@ xfs_dir2_trace_enter(
 	ASSERT(xfs_dir2_trace_buf);
 	ASSERT(dp->i_dir_trace);
 	if (name)
-		bcopy(name, n, min(sizeof(n), namelen));
+		bcopy(name, n, min(int, sizeof(n), namelen));
 	else
 		bzero((char *)n, sizeof(n));
 	ktrace_enter(xfs_dir2_trace_buf,
