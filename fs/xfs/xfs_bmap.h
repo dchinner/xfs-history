@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.22 $"
+#ident "$Revision: 1.23 $"
 
 /*
  * List of extents to be free "later".
@@ -53,12 +53,16 @@ xfs_bmap_add_free(
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
  * caller.  Frees all the extents that need freeing, which must be done
  * last due to locking considerations.
+ *
+ * Return 1 if the given transaction was committed and a new one allocated,
+ * and 0 otherwise.
  */
-void
+int
 xfs_bmap_finish(
 	xfs_trans_t		**tp,		/* transaction pointer addr */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
-	xfs_fsblock_t		firstblock);	/* controlled a.g. for allocs */
+	xfs_fsblock_t		firstblock,	/* controlled a.g. for allocs */
+	int			commit_flags);	/* flags to pass to commit */
 
 /*
  * Read in the extents to iu_extents.
