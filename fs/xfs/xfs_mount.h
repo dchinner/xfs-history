@@ -1,9 +1,9 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.91 $"
+#ident	"$Revision: 1.92 $"
 
-struct buf;
+#include <sys/buf.h>	/* for buftarg_t */
 struct cred;
 struct vfs;
 struct vnode;
@@ -64,9 +64,6 @@ typedef struct xfs_mount {
 	struct buf		*m_sb_bp;	/* buffer for superblock */
 	char			*m_fsname; 	/* filesystem name */
 	int			m_fsname_len;	/* strlen of fs name */
-	dev_t			m_dev;		/* dev of fs meta-data */
-	dev_t			m_logdev;	/* dev of fs log data */
-	dev_t			m_rtdev;	/* dev of fs realtime data */
 	int			m_bsize;	/* fs logical block size */
 	xfs_agnumber_t		m_agfrotor;	/* last ag where space found */
 	xfs_agnumber_t		m_agirotor;	/* last ag dir inode alloced */
@@ -87,9 +84,16 @@ typedef struct xfs_mount {
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
 	struct xfs_inode	*m_rootip;	/* pointer to root directory */
 	struct xfs_quotainfo	*m_quotainfo;	/* disk quota information */
-	struct vnode 		*m_ddevp;	/* ptr to data dev vnode */
-	struct vnode 		*m_logdevp;	/* ptr to log dev vnode */
-	struct vnode 		*m_rtdevp;	/* ptr to rt dev vnode   */
+	buftarg_t		m_ddev_targ;	/* ptr to data device */
+	buftarg_t		m_logdev_targ;	/* ptr to log device */
+	buftarg_t		m_rtdev_targ;	/* ptr to rt device */
+	buftarg_t		*m_ddev_targp;	/* saves taking the address */
+#define m_ddevp		m_ddev_targ.specvp
+#define m_logdevp	m_logdev_targ.specvp
+#define m_rtdevp	m_rtdev_targ.specvp
+#define m_dev		m_ddev_targ.dev
+#define m_logdev	m_logdev_targ.dev
+#define m_rtdev		m_rtdev_targ.dev
 	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
 	__uint8_t		m_blkbit_log;	/* blocklog + NBBY */
 	__uint8_t		m_blkbb_log;	/* blocklog - BBSHIFT */
@@ -131,6 +135,11 @@ typedef struct xfs_mount {
 	int			m_swidth;	/* stripe width */
 	int			m_sinoalign;	/* stripe unit inode alignmnt */
 	int			m_da_magicpct;	/* 37% of the blocksize */
+#if CELL_IRIX
+	char			m_export[VFS_EILIMIT];
+						/* Info to export to other
+						 * cells. */
+#endif
 } xfs_mount_t;
 
 /*
@@ -228,7 +237,7 @@ void		xfs_umount(xfs_mount_t *);
 void		xfs_mod_sb(xfs_trans_t *, __int64_t);
 xfs_mount_t	*xfs_mount_init(void);
 void		xfs_mount_free(xfs_mount_t *mp);
-int		xfs_mountfs(struct vfs *, xfs_mount_t *mp);
+int		xfs_mountfs(struct vfs *, xfs_mount_t *mp, dev_t);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
