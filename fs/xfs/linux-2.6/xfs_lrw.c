@@ -735,8 +735,9 @@ xfs_iomap_read(
 	last_fsb = XFS_B_TO_FSB(mp, ((xfs_ufsize_t)nisize));
 /*	printk("offset %Ld nisize %dL\n", offset, nisize); */
 	if (offset >= nisize) {
-		printk("xfs_iomap_read about to call EXTRA!! %Ld %Ld\n",
-			offset, nisize);
+		// printk("xfs_iomap_read about to call EXTRA!! %Ld %Ld\n",
+		//	offset, nisize);
+
 		/*
 		 * The VM/chunk code is trying to map a page or part
 		 * of a page to be pushed out that is beyond the end
@@ -849,7 +850,13 @@ xfs_iomap_write(
 	delay = !(ioflag & PBF_DIRECT);
 	direct_io = ioflag & PBF_DIRECT;
 
-	if (!convert && offset < isize) { /* JIMJIM could have extents beyond EOF */
+	/*
+	 * If not doing forced allocation, try to lookup first.
+	 * We may need to constrain this with known (minimum)
+	 * allocated extents computed by  (di_nextents * di_extsize)
+	 * of the corresponding xfs_dinode_core.
+	 */
+	if (!convert)  {
 		error = xfs_iomap_read(io, offset, count,
 					pbmapp, npbmaps, NULL);
 
@@ -1069,7 +1076,7 @@ xfs_iomap_extra(
 	int		error;
 	xfs_bmbt_irec_t	imap;
 
-	printk("xfs_iomap_extra: CHECK THIS ROUTINE OUT, not really done\n");
+	// printk("xfs_iomap_extra: CHECK THIS ROUTINE OUT, not really done\n");
 	mp = io->io_mount;
 	nisize = io->io_new_size;
 	if (nisize < XFS_SIZE(mp, io)) {

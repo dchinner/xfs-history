@@ -273,8 +273,14 @@ linvfs_read_super(
 	vfsp->vfs_super = sb;
 
 
+#define XFS_DATA_BLOCKSIZE_4K
+#ifdef XFS_DATA_BLOCKSIZE_4K
+	sb->s_blocksize = 4096;
+	sb->s_blocksize_bits = 12;
+#else
 	sb->s_blocksize = 512;
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
+#endif
 	set_blocksize(sb->s_dev, 512);
 
 	VFSOPS_MOUNT(vfsops, vfsp, cvp, uap, NULL, sys_cred, error);
