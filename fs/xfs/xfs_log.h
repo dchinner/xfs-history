@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -51,9 +51,8 @@
 /*
  * Flags to xfs_log_print()
  *
- *	XFS_LOG_PRINT_FORCE:
  */
-#define XFS_LOG_PRINT_FORCE	0x1
+#define XFS_LOG_PRINT_EXIT	0x1
 #define XFS_LOG_PRINT_NO_DATA	0x2
 
 
