@@ -1,4 +1,4 @@
-#ident "$Revision: 1.233 $"
+#ident "$Revision: 1.235 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -912,6 +912,7 @@ xfs_iread_extents(
 	error = xfs_bmap_read_extents(tp, ip, whichfork);
 	if (error) {
 		kmem_free(ifp->if_u1.if_extents, size);
+		ifp->if_u1.if_extents = NULL;
 		ifp->if_bytes = ifp->if_real_bytes = 0;
 		ifp->if_flags &= ~XFS_IFEXTENTS;
 		return error;
@@ -2472,6 +2473,11 @@ xfs_idestroy(
 #endif
 #endif
 	if (ip->i_itemp) {
+#if 0
+		/* XXXdpd should be able to assert this but shutdown
+		 * is leaving the AIL behind. */
+		ASSERT((ip->i_itemp->ili_item.li_flags & XFS_LI_IN_AIL) == 0);
+#endif
 		xfs_inode_item_destroy(ip);
 	}
 	kmem_zone_free(xfs_inode_zone, ip);
@@ -3006,14 +3012,18 @@ xfs_iflush(
 		}
 	}
 
-	if (xfs_iflush_fork(ip, dip, iip, XFS_DATA_FORK, bp) == EIO) {
+	if (xfs_iflush_fork(ip, dip, iip, XFS_DATA_FORK, bp) == EFSCORRUPTED) {
 		goto corrupt_out;
 	}
 
-	if (XFS_IFORK_Q(ip))
+	if (XFS_IFORK_Q(ip)) {
+		/*
+		 * The only error from xfs_iflush_fork is on the data fork.
+		 */
 		(void) xfs_iflush_fork(ip, dip, iip, XFS_ATTR_FORK, bp);
+	}
 	xfs_inobp_check(mp, bp);
-	
+
 	/*
 	 * We've recorded everything logged in the inode, so we'd
 	 * like to clear the ilf_fields bits so we don't log and
@@ -3145,8 +3155,11 @@ xfs_iflush(
 
 corrupt_out:
 	brelse(bp);
-	xfs_ifunlock(ip);
 	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
+	xfs_iflush_abort(ip);
+	/*
+	 * Unlocks the flush lock
+	 */
 	return XFS_ERROR(EFSCORRUPTED);
 }
 

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.111 $"
+#ident	"$Revision: 1.112 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -892,6 +892,7 @@ nextag:
 			rec.ir_free))
 		goto error0;
 	agi->agi_freecount--;
+	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	mraccess(&mp->m_peraglock);
 	mp->m_perag[tagno].pagi_freecount--;
 	mraccunlock(&mp->m_peraglock);
@@ -915,7 +916,6 @@ nextag:
 	}
 #endif
 	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
-	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	*inop = ino;
 	return 0;
@@ -1032,6 +1032,7 @@ xfs_difree(
 	 * Change the inode free counts and log the ag/sb changes.
 	 */
 	agi->agi_freecount++;
+	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	mraccess(&mp->m_peraglock);
 	mp->m_perag[agno].pagi_freecount++;
 	mraccunlock(&mp->m_peraglock);
@@ -1055,7 +1056,6 @@ xfs_difree(
 	}
 #endif
 	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
-	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 	return 0;
 
