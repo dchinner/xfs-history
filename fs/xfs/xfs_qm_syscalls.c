@@ -1,4 +1,4 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -62,7 +62,7 @@ extern int 	xfs_fstype;
 
 STATIC int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
 STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint, caddr_t);
-STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, uint *);
+STATIC int	xfs_qm_scall_getqstat(xfs_mount_t *, caddr_t);
 STATIC int	xfs_qm_scall_setqlim(xfs_mount_t *, xfs_dqid_t, uint, caddr_t);
 STATIC int	xfs_qm_scall_quotaoff(xfs_mount_t *, uint);
 STATIC int	xfs_qm_scall_quotaon(xfs_mount_t *, uint);
@@ -88,11 +88,7 @@ xfs_qm_sysent(
 	xfs_mount_t	*mp;
 	int 		error;
 #ifndef _BANYAN_XFS
-	/* 
-	 * TEMP: XXX to keep various trees from getting out of sync. 
-	 * In the 6.2 code, project quotas and vfs behaviors
-	 * are not supported.
-	 */
+	/* TEMP: XXX to keep various trees from getting out of sync */
 	bhv_desc_t 	*bdp;
 
 	ASSERT(vfsp);
@@ -129,7 +125,7 @@ xfs_qm_sysent(
 		 */
 	      case Q_GETQSTAT:
 
-		return (xfs_qm_scall_getqstat(mp, (uint *)addr));
+		return (xfs_qm_scall_getqstat(mp, addr));
 
 		/*
 		 * QUOTAON for root f/s and quota enforcement on others..
@@ -224,9 +220,8 @@ xfs_qm_scall_trunc_qfiles(
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
 		return XFS_ERROR(EPERM);
 	error = 0;
-	if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASQUOTA)
-		return XFS_ERROR(EINVAL);
-	if (flags == 0)
+	if ((! XFS_QM_SB_HAS_QUOTA(mp)) ||
+	    flags == 0)
 		return XFS_ERROR(EINVAL);
 
 	if ((flags & XFS_DQ_USER) &&
@@ -291,7 +286,11 @@ xfs_qm_scall_quotaon(
 
 	rootfs = (boolean_t) (mp->m_dev == rootdev);
 	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
+#ifdef _BANYAN_XFS
+	flags &= (XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_UDQ_ENFD);
+#else
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
+#endif	
 	sbflags = 0;
 
 	if (flags == 0)
@@ -307,11 +306,32 @@ xfs_qm_scall_quotaon(
 #endif
 		return (EINVAL);
 	}
+	if (((flags & XFS_MOUNT_UDQ_ACCT) == 0 &&
+	    (mp->m_flags & XFS_MOUNT_UDQ_ACCT) == 0 &&
+	    (flags & XFS_MOUNT_UDQ_ENFD))
+	    ||
+	    ((flags & XFS_MOUNT_PDQ_ACCT) == 0 &&
+	    (mp->m_flags & XFS_MOUNT_PDQ_ACCT) == 0 &&
+	    (flags & XFS_MOUNT_PDQ_ENFD))) {
+		/*
+		 * Can't enforce without accounting.
+		 */
+#ifdef QUOTADEBUG
+		printf("Can't enforce without accounting.\n");
+#endif		
+		return (EINVAL);
+	}
+	/*
+	 * If everything's upto-date incore, then don't waste time.
+	 */
+	if ((mp->m_flags & flags) == flags)
+		return (EEXIST);
+
 	/*
 	 * Change superblock version (if needed) for the root filesystem
 	 */
 	if (rootfs && 
-	    mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASQUOTA) {
+	    (! XFS_QM_SB_HAS_QUOTA(mp))) {
 #ifdef DEBUG
 		cmn_err(CE_NOTE, 
 			"Old superblock version %d.0, converting to %d.0\n",
@@ -336,7 +356,10 @@ xfs_qm_scall_quotaon(
 	mp->m_sb.sb_qflags = qf | flags;
 	XFS_SB_UNLOCK(mp, s);
 	
-	if (qf == flags && sbflags == 0)  /* TMP - use ASSERT */
+	/*
+	 * There's nothing to change if it's the same.
+	 */
+	if (qf == flags && sbflags == 0) 
 		return (EEXIST);
 	sbflags |= XFS_SB_QFLAGS;
 
@@ -372,13 +395,64 @@ xfs_qm_scall_quotaon(
 STATIC int
 xfs_qm_scall_getqstat(
 	xfs_mount_t 	*mp,
-	uint		*flags)
+	caddr_t		addr)
 {
-	uint		fl;
+	fs_quota_stat_t	out;
+	xfs_inode_t	*uip, *pip;
+	boolean_t	tempuqip, temppqip;
 
-	fl = mp->m_flags & (XFS_ALL_QUOTA_ACCT|XFS_ALL_QUOTA_ENFD);
-	fl = xfs_qm_export_flags(fl);
-	if (suword(flags, fl))
+	uip = pip = NULL;
+	tempuqip = temppqip = B_FALSE;
+	bzero(&out, sizeof(fs_quota_stat_t));
+
+	out.qs_version = FS_QSTAT_VERSION;
+	if (! XFS_QM_SB_HAS_QUOTA(mp)) {
+		out.qs_uquota.qfs_ino = NULLFSINO;
+		out.qs_pquota.qfs_ino = NULLFSINO;
+		goto done;
+	}
+	out.qs_flags = (__uint16_t) xfs_qm_export_flags(mp->m_flags & 
+							(XFS_ALL_QUOTA_ACCT|
+							 XFS_ALL_QUOTA_ENFD));
+	out.qs_pad = 0;
+	out.qs_uquota.qfs_ino = mp->m_sb.sb_uquotino;
+	out.qs_pquota.qfs_ino = mp->m_sb.sb_pquotino;
+	if (mp->m_quotainfo) {
+		uip = mp->m_quotainfo->qi_uquotaip;
+		pip = mp->m_quotainfo->qi_pquotaip;
+	}
+	if (!uip && mp->m_sb.sb_uquotino != NULLFSINO) {
+		if (xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 0,
+			     &uip, 0) == 0) 
+			tempuqip = B_TRUE;
+	}
+	if (!pip && mp->m_sb.sb_pquotino != NULLFSINO) {
+		if (xfs_iget(mp, NULL, mp->m_sb.sb_pquotino, 0,
+			     &pip, 0) == 0) 
+			temppqip = B_TRUE;
+	}
+	if (uip) {
+		out.qs_uquota.qfs_nblks = uip->i_d.di_nblocks;
+		out.qs_uquota.qfs_nextents = uip->i_d.di_nextents;
+		if (tempuqip)
+			VN_RELE(XFS_ITOV(uip));
+	}
+	if (pip) {
+		out.qs_pquota.qfs_nblks = XFS_FSB_TO_BB(mp, pip->i_d.di_nblocks);
+		out.qs_pquota.qfs_nextents = pip->i_d.di_nextents;
+		if (temppqip)
+			VN_RELE(XFS_ITOV(pip));
+	}
+	if (mp->m_quotainfo) {
+		out.qs_incoredqs = mp->QI_MPLNDQUOTS;
+		out.qs_btimelimit = mp->QI_BTIMELIMIT;
+		out.qs_itimelimit = mp->QI_ITIMELIMIT;
+		out.qs_rtbtimelimit = mp->QI_RTBTIMELIMIT;
+		out.qs_bwarnlimit = mp->QI_BWARNLIMIT;
+		out.qs_iwarnlimit = mp->QI_IWARNLIMIT;
+	}
+ done:
+	if (copyout(&out, addr, sizeof(fs_quota_stat_t)))	
 		return XFS_ERROR(EFAULT);
 	return (0);
 }
@@ -482,15 +556,6 @@ xfs_qm_scall_setqlim(
 	else 
 		printf("ihard 0x%x < isoft 0x%x\n", hard, soft);
 #endif		
-		
-#ifdef QUOTADEBUG	
-	printf("@@@ ID %d: bsoft sent %llu, now %llu : isoft %llu, now %llu\n",
-	       (int) id,
-	       newlim.d_blk_softlimit, 
-	       ddq->d_blk_softlimit,
-	       newlim.d_ino_softlimit, 
-	       ddq->d_ino_softlimit);
-#endif
 	if (id == 0) {
 		/*
 		 * Timelimits for the super user set the relative time
@@ -514,14 +579,6 @@ xfs_qm_scall_setqlim(
 			newlim.d_iwarns : XFS_QM_IWARNLIMIT;
 
 	} else /* if (XFS_IS_QUOTA_ENFORCED(mp)) */ {
-#ifdef QUOTADEBUG	
-		printf("@@@ (before changing) ID %d: bsoft %d, bcount %d : "
-		       "ihard %d\n",
-		       (int) id,
-		       (int) ddq->d_blk_softlimit,
-		       (int) ddq->d_bcount,
-		       (int) ddq->d_ino_hardlimit);
-#endif
 		/*
 		 * If the user is now over quota, start the timelimit.
 		 * The user will not be 'warned'. Warnings increase only
@@ -529,13 +586,15 @@ xfs_qm_scall_setqlim(
 		 */
 		xfs_qm_adjust_dqtimers(mp, ddq);
 	}
-	
+	dqp->dq_flags |= XFS_DQ_DIRTY;
 	xfs_trans_log_dquot(tp, dqp);
+
 	xfs_dqtrace_entry(dqp, "Q_SETQLIM: COMMIT");
 	xfs_trans_commit(tp, 0);
 	xfs_qm_dqprint(dqp);
 	xfs_qm_dqrele(dqp);
 	mutex_unlock(&mp->QI_QOFFLOCK);
+
 	return (0);
 }
 
@@ -563,18 +622,9 @@ xfs_qm_scall_getquota(
 	 * we aren't passing the XFS_QMOPT_DOALLOC flag. If it doesn't
 	 * exist, we'll get ENOENT back.
 	 */
-#ifdef QUOTADEBUG
-	printf("Checking ID %d, type 0x%x in mp = 0x%x\n",
-	       id, type, mp);
-#endif
 	if (error = xfs_qm_dqget(mp, NULL, id, type, 0, &dqp)) {
 		if (error != ESRCH && error != ENOENT)
 			xfs_qm_force_quotaoff(mp);
-#ifdef QUOTADEBUG
-		else
-			printf("!ID %d, type 0x%x not in mp = 0x%x\n",
-			       id, type, mp);
-#endif
 		return (error);
 	}
 
@@ -615,25 +665,65 @@ xfs_qm_scall_quotaoff(
 	int			error;
 	uint			inactivate_flags;
 	xfs_qoff_logitem_t 	*qoffstart;
+	extern dev_t		rootdev;
 
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
 		return (EPERM);
-	
 	/*
-	 * quota utilities like quotaoff expect errno == EEXIST.
+	 * Only root file system can have quotas enabled on disk but not
+	 * in core. Note that quota utilities (like quotaoff) _expect_ 
+	 * errno == EEXIST here.
 	 */
-	if ((mp->m_flags & flags) == 0)
+	if (mp->m_dev != rootdev && (mp->m_flags & flags) == 0)
 		return (EEXIST);
-	
 	ASSERT(mp->m_quotainfo);
-	
+
+#ifdef _BANYAN_XFS
+	flags &= (XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_UDQ_ENFD);
+#else
+	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
+#endif	
 	/* 
 	 * We don't want to deal with two quotaoffs messing up each other,
 	 * so we're going to serialize it. quotaoff isn't exactly a performance
-	 * critical thing.
+	 * critical thing. XXXcurrently, we also take the vfslock.
 	 */
 	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
-	
+
+	/*
+	 * Root file system may or may not have quotas on in core.
+	 * We have to perform the quotaoff accordingly.
+	 */
+	if (mp->m_dev == rootdev) {
+		uint sbflags, newflags;
+		s = XFS_SB_LOCK(mp);
+		sbflags = mp->m_sb.sb_qflags;
+		if ((mp->m_flags & flags) == 0) {
+			error = 0;
+			mp->m_sb.sb_qflags &= flags;
+			newflags = mp->m_sb.sb_qflags;
+			XFS_SB_UNLOCK(mp, s);
+			mutex_unlock(&mp->QI_QOFFLOCK);
+			if (sbflags != newflags)
+			      error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
+			return (error);
+		}			
+		XFS_SB_UNLOCK(mp, s);
+			
+		if ((sbflags & flags) != (mp->m_flags & flags)) {
+			/*
+			 * Something must have been turned on, with
+			 * delayed effect. ie. Something's in the SB,
+			 * but not in the incore mount struct.
+			 */
+			ASSERT((sbflags & XFS_ALL_QUOTA_ACCT) != 
+			       (mp->m_flags & XFS_ALL_QUOTA_ACCT));
+			
+			/* XXX TBD */
+			/* We need to update the SB and mp separately */
+			return (EINVAL);
+		}
+	}
 	/*
 	 * if we're just turning off quota enforcement, change mp and go.
 	 */
@@ -790,12 +880,6 @@ xfs_qm_log_quotaoff_end(
 	int 			error;
 	xfs_qoff_logitem_t     *qoffi;
 
-#ifdef QUOTADEBUG	
-	printf("Writing QuotaOFF END record 0x%x, sb-qflags 0x%x\n",
-	       flags & XFS_ALL_QUOTA_ACCT,
-	       (mp->m_flags & ~(flags)) & XFS_MOUNT_QUOTA_ALL);
-#endif
-
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_QUOTAOFF_END);
 
 	/* XXX can this ever fail ??? */
@@ -832,11 +916,6 @@ xfs_qm_log_quotaoff(
 	xfs_qoff_logitem_t     *qoffi;
 	uint			oldsbqflag;
 
-#ifdef QUOTADEBUG	
-	printf("Writing QuotaOFF record 0x%x, sb-qflags 0x%x\n",
-	       flags & XFS_ALL_QUOTA_ACCT,
-	       (mp->m_flags & ~(flags)) & XFS_MOUNT_QUOTA_ALL);
-#endif
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_QUOTAOFF);
 	if (error = xfs_trans_reserve(tp, 0, 
 				      sizeof(xfs_qoff_logitem_t) * 2 +
@@ -896,7 +975,7 @@ xfs_qm_export_dquot(
 	struct fs_disk_quota	*dst)
 {
 	bzero(dst, sizeof(*dst));
-	dst->d_version = src->d_version;
+	dst->d_version = FS_DQUOT_VERSION;  /* different from src->d_version */
 	dst->d_flags = xfs_qm_export_qtype_flags(src->d_flags);
 	dst->d_id = src->d_id;
 	dst->d_blk_hardlimit = (__uint64_t) 
@@ -953,9 +1032,6 @@ xfs_qm_import_qtype_flags(
 	uint uflags;
 	
 	if (copyin(uflagsp, &uflags, sizeof(uint)) < 0) {
-#ifdef QUOTADEBUG
-		printf("copyin failed\n");
-#endif
 		return (0);
 	}
 
@@ -1340,6 +1416,7 @@ xfs_qm_internalqcheck_dqadjust(
 {
 	d->d_icount++;
 	d->d_bcount += (xfs_qcnt_t)ip->i_d.di_nblocks;
+	ASSERT(ip->i_delayed_blks == 0);
 	return (0);
 }
 
