@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * Inode allocation management for xFS.
@@ -220,6 +220,8 @@ xfs_inobt_delrec(
 	int			level)	/* level removing record from */
 {
 	buf_t			*agbp;	/* buffer for a.g. inode header */
+	xfs_agnumber_t		agfbno;	/* agf block of freed btree block */
+	buf_t			*agfbp;	/* bp of agf block of freed block */
 	xfs_agi_t		*agi;	/* allocation group inode header */
 	xfs_inobt_block_t	*block;	/* btree block record/key lives in */
 	xfs_agblock_t		bno;	/* btree block number */
@@ -345,6 +347,20 @@ xfs_inobt_delrec(
 			 */
 			cur->bc_bufs[level] = NULL;
 			cur->bc_nlevels--;
+			/*
+			 * To ensure that the freed block is not used for
+			 * user data until this transactin is permanent,
+			 * we lock the agf buffer for this ag until the
+			 * transaction record makes it to the on-disk log.
+			 */
+			agfbno = XFS_AG_DADDR(cur->bc_mp,
+					      cur->bc_private.i.agno,
+					      XFS_AGF_DADDR);
+			agfbp = xfs_trans_read_buf(cur->bc_tp,
+						   cur->bc_mp->m_dev,
+						   agfbno, 1, 0);
+			ASSERT(!geterror(agfbp));
+			xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);
 		}
 		xfs_inobt_rcheck(cur);
 		kmem_check();
@@ -582,6 +598,18 @@ xfs_inobt_delrec(
 	 */
 	xfs_free_extent(cur->bc_tp, rbno, 1);
 	xfs_trans_binval(cur->bc_tp, rbp);
+	/*
+	 * To ensure that the freed block is not used for
+	 * user data until this transactin is permanent,
+	 * we lock the agf buffer for this ag until the
+	 * transaction record makes it to the on-disk log.
+	 */
+	agfbno = XFS_AG_DADDR(cur->bc_mp, cur->bc_private.i.agno,
+			      XFS_AGF_DADDR);
+	agfbp = xfs_trans_read_buf(cur->bc_tp, cur->bc_mp->m_dev, agfbno,
+				   1, 0);
+	ASSERT(!geterror(agfbp));
+	xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);
 	/*
 	 * If we joined with the left neighbor, set the buffer in the
 	 * cursor to the left block, and fix up the index.
