@@ -1,4 +1,4 @@
-#ident "$Revision: 1.240 $"
+#ident "$Revision: 1.241 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5923,6 +5923,12 @@ xfs_allocstore(
 			ASSERT(curr_off_fsb <= last_fsb);
 		}
 	}
+
+	/*
+	 * Clear out any read-ahead info since the allocations may
+	 * have made it invalid.
+	 */
+	XFS_INODE_CLEAR_READ_AHEAD(ip);
 
 	if (count_fsb == 0) {
 		/*
