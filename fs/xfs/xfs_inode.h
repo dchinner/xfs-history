@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.88 $"
+#ident "$Revision: 1.91 $"
 
 struct buf;
 struct cred;
@@ -295,6 +295,9 @@ void		xfs_ireclaim(xfs_inode_t *);
  */
 int		xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			    xfs_dinode_t **, struct buf **);
+int		xfs_itobp(struct xfs_mount *, struct xfs_trans *,
+			  xfs_inode_t *, xfs_dinode_t **, struct buf **,
+			  daddr_t);
 int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			  xfs_inode_t **, daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
