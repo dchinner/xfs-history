@@ -120,6 +120,10 @@ static struct inode_operations linvfs_meta_ops = {
 	pagebuf_ioinitiate:	xfs_bdstrat_cb,
 };
 
+static struct address_space_operations linvfs_meta_aops = {
+	sync_page:		block_sync_page,
+};
+
 struct inode *
 linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 {
@@ -127,6 +131,7 @@ linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 
 	inode->i_dev = kdev;
 	inode->i_op = &linvfs_meta_ops;
+	inode->i_mapping->a_ops = &linvfs_meta_aops;
 	inode->i_sb = sb;
 
 
