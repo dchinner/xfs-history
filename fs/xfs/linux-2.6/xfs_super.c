@@ -634,7 +634,7 @@ linvfs_put_super(
 	struct super_block *sb)
 {
 	int		error;
-	int		sector_size = 512;
+	int		sector_size;
 	kdev_t		dev = sb->s_dev;
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t		*cvp;
@@ -658,8 +658,7 @@ linvfs_put_super(
 	/*  Do something to get rid of the VNODE/VFS layer here  */
 
 	/* Reset device block size */
-	if (hardsect_size[MAJOR(dev)])
-		sector_size = hardsect_size[MAJOR(dev)][MINOR(dev)];
+	sector_size = get_hardsect_size(dev);
 	set_blocksize(dev, sector_size);
 }
 
