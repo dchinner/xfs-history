@@ -334,7 +334,7 @@ xfs_getattr(vnode_t	*vp,
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
 
-	vap->va_size = (ulong) ip->i_d.di_size;
+	vap->va_size = ip->i_d.di_size;
         if (vap->va_mask == AT_SIZE) {
 		xfs_iunlock (ip, XFS_ILOCK_SHARED);
                 return 0;
@@ -2794,6 +2794,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_MKDIR_LOG_COUNT)) {
 		cancel_flags = 0;
+		dp = NULL;
 		goto error_return;
 	}
 
@@ -2878,7 +2879,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 error_return:
 	xfs_trans_cancel (tp, cancel_flags);
 
-	if (! dp_joined_to_trans)
+	if (! dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock (dp, XFS_ILOCK_EXCL);
 
 	return code;
@@ -3113,6 +3114,7 @@ xfs_symlink(vnode_t	*dir_vp,
 				       XFS_TRANS_PERM_LOG_RES,
 				       XFS_SYMLINK_LOG_COUNT)) {
 		cancel_flags = 0;
+		dp = NULL;
                 goto error_return;
 	}
 
@@ -3233,7 +3235,7 @@ error_return:
 
 	xfs_trans_cancel (tp, cancel_flags);
 
-	if (! dp_joined_to_trans)
+	if (! dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock (dp, XFS_ILOCK_EXCL);
 
 	return error;
