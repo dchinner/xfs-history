@@ -167,7 +167,7 @@ STATIC ssize_t linvfs_write(
         uio.uio_offset = pos;
         uio.uio_fp = filp;
         uio.uio_iovcnt = 1;
-        uio.uio_iov->iov_base = buf;
+        uio.uio_iov->iov_base = (void *)buf;
         uio.uio_iov->iov_len = uio.uio_resid = size;
         
 	VOP_WRITE(vp, &uio, 0, NULL, NULL, err);

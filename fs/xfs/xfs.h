@@ -62,6 +62,7 @@
 #include <linux/errno.h>
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/dmapi.h>
 #include <linux/dmapi_kern.h>
 
 #include <xfs_macros.h>
