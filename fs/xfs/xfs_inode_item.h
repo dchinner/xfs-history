@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.23 $"
 
 struct buf;
 struct proc;
@@ -24,7 +24,8 @@ typedef struct xfs_inode_log_format {
 	unsigned short		ilf_type;	/* inode log item type */
 	unsigned short		ilf_size;	/* size of this item */
 	uint			ilf_fields;	/* flags for fields logged */
-	uint			ilf_dsize;	/* size of data/ext/root */
+	ushort			ilf_asize;	/* size of attr d/ext/root */
+	ushort			ilf_dsize;	/* size of data/ext/root */
 	xfs_ino_t		ilf_ino;	/* inode number */
 	union {
 		dev_t		ilfu_rdev;	/* rdev value for dev inode*/
@@ -93,6 +94,13 @@ typedef struct xfs_inode_log_item {
 				 XFS_ILOG_DBROOT | XFS_ILOG_DEV | \
 				 XFS_ILOG_UUID | XFS_ILOG_ADATA | \
 				 XFS_ILOG_AEXT | XFS_ILOG_ABROOT)
+
+#define	XFS_ILOG_DFORK		(XFS_ILOG_DDATA | XFS_ILOG_DEXT | \
+				 XFS_ILOG_DBROOT | XFS_ILOG_DEV | \
+				 XFS_ILOG_UUID)
+
+#define	XFS_ILOG_AFORK		(XFS_ILOG_ADATA | XFS_ILOG_AEXT | \
+				 XFS_ILOG_ABROOT)
 
 #define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DDATA | \
 				 XFS_ILOG_DEXT | XFS_ILOG_DBROOT | \

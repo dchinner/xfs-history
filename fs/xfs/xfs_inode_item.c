@@ -1,4 +1,4 @@
-#ident "$Revision: 1.47 $"
+#ident "$Revision: 1.48 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -54,7 +54,8 @@
  * This returns the number of iovecs needed to log the given inode item.
  *
  * We need one iovec for the inode log format structure, one for the
- * inode core, and possibly one for the inode data/extents/b-tree root.
+ * inode core, and possibly one for the inode data/extents/b-tree root
+ * and one for the inode attribute data/extents/b-tree root.
  */
 uint
 xfs_inode_item_size(
@@ -131,6 +132,60 @@ xfs_inode_item_size(
 		break;
 	}
 
+	/*
+	 * If there are no attributes associated with this file,
+	 * then there cannot be anything more to log.
+	 */
+	if (!XFS_IFORK_Q(ip)) {
+		return nvecs;
+	}
+
+	/*
+	 * Log any necessary attribute data.
+	 */
+	switch (ip->i_d.di_aformat) {
+	case XFS_DINODE_FMT_EXTENTS:
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_ADATA | XFS_ILOG_ABROOT);
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_AEXT) &&
+		    (ip->i_d.di_anextents > 0) &&
+		    (ip->i_af.if_bytes > 0)) {
+			ASSERT(ip->i_af.if_u1.if_extents != NULL);
+			nvecs++;
+		} else {
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_AEXT;
+		}
+		break;
+
+	case XFS_DINODE_FMT_BTREE:
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_ADATA | XFS_ILOG_AEXT);
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_ABROOT) &&
+		    (ip->i_af.if_broot_bytes > 0)) {
+			ASSERT(ip->i_af.if_broot != NULL);
+			nvecs++;
+		} else {
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_ABROOT;
+		}
+		break;
+
+	case XFS_DINODE_FMT_LOCAL:
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_AEXT | XFS_ILOG_ABROOT);
+		if ((iip->ili_format.ilf_fields & XFS_ILOG_ADATA) &&
+		    (ip->i_af.if_bytes > 0)) {
+			ASSERT(ip->i_af.if_u1.if_data != NULL);
+			nvecs++;
+		} else {
+			iip->ili_format.ilf_fields &= ~XFS_ILOG_ADATA;
+		}
+		break;
+
+	default:
+		ASSERT(0);
+		break;
+	}
+
 	return nvecs; 
 }
 
@@ -138,7 +193,8 @@ xfs_inode_item_size(
  * This is called to fill in the vector of log iovecs for the
  * given inode log item.  It fills the first item with an inode
  * log format structure, the second with the on-disk inode structure,
- * and possible a third with the inode data/extents/b-tree root.
+ * and a possible third and/or fourth with the inode data/extents/b-tree
+ * root and inode attributes data/extents/b-tree root.
  */
 void
 xfs_inode_item_format(
@@ -266,6 +322,83 @@ xfs_inode_item_format(
 		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
 			iip->ili_format.ilf_u.ilfu_uuid =
 				ip->i_df.if_u2.if_uuid;
+		}
+		break;
+
+	default:
+		ASSERT(0);
+		break;
+	}
+
+	/*
+	 * If there are no attributes associated with the file,
+	 * then we're done.
+	 */
+	if (!XFS_IFORK_Q(ip)) {
+		ASSERT(nvecs == iip->ili_item.li_desc->lid_size);
+		iip->ili_format.ilf_size = nvecs;
+		return;
+	}
+
+	switch (ip->i_d.di_aformat) {
+	case XFS_DINODE_FMT_EXTENTS:
+		ASSERT(!(iip->ili_format.ilf_fields &
+			 (XFS_ILOG_ADATA | XFS_ILOG_ABROOT)));
+		if (iip->ili_format.ilf_fields & XFS_ILOG_AEXT) {
+			ASSERT(ip->i_af.if_bytes > 0);
+			ASSERT(ip->i_af.if_u1.if_extents != NULL);
+			ASSERT(ip->i_d.di_anextents > 0);
+#ifdef DEBUG
+			nrecs = ip->i_af.if_bytes / sizeof(xfs_bmbt_rec_t);
+#endif
+			ASSERT(nrecs > 0);
+			ASSERT(nrecs == ip->i_d.di_anextents);
+			/*
+			 * There are not delayed allocation extents
+			 * for attributes, so just point at the array.
+			 */
+			vecp->i_addr = (char *)(ip->i_af.if_u1.if_extents);
+			vecp->i_len = ip->i_af.if_bytes;
+			iip->ili_format.ilf_asize = vecp->i_len;
+			vecp++;
+			nvecs++;
+		}
+		break;
+
+	case XFS_DINODE_FMT_BTREE:
+		ASSERT(!(iip->ili_format.ilf_fields &
+			 (XFS_ILOG_ADATA | XFS_ILOG_AEXT)));
+		if (iip->ili_format.ilf_fields & XFS_ILOG_ABROOT) {
+			ASSERT(ip->i_af.if_broot_bytes > 0);
+			ASSERT(ip->i_af.if_broot != NULL);
+			vecp->i_addr = (caddr_t)ip->i_af.if_broot;
+			vecp->i_len = ip->i_af.if_broot_bytes;
+			vecp++;
+			nvecs++;
+			iip->ili_format.ilf_asize = ip->i_af.if_broot_bytes;
+		}
+		break;
+
+	case XFS_DINODE_FMT_LOCAL:
+		ASSERT(!(iip->ili_format.ilf_fields &
+			 (XFS_ILOG_ABROOT | XFS_ILOG_AEXT)));
+		if (iip->ili_format.ilf_fields & XFS_ILOG_ADATA) {
+			ASSERT(ip->i_af.if_bytes > 0);
+			ASSERT(ip->i_af.if_u1.if_data != NULL);
+
+			vecp->i_addr = (caddr_t)ip->i_af.if_u1.if_data;
+			/*
+			 * Round i_bytes up to a word boundary.
+			 * The underlying memory is guaranteed to
+			 * to be there by xfs_idata_realloc().
+			 */
+			data_bytes = roundup(ip->i_af.if_bytes, 4);
+			ASSERT((ip->i_af.if_real_bytes == 0) ||
+			       (ip->i_af.if_real_bytes == data_bytes));
+			vecp->i_len = data_bytes;
+			vecp++;
+			nvecs++;
+			iip->ili_format.ilf_asize = data_bytes;
 		}
 		break;
 
