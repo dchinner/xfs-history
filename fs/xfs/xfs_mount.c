@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.100 $"
+#ident	"$Revision: 1.101 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -505,7 +505,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	mp->m_sb_bp = NULL;
 	return error;
  error0:
-	brelse(bp);
 	nfreerbuf(bp);
 	return error;
 }	/* xfs_mountfs */
