@@ -334,9 +334,9 @@ extern int _xfs_incore_relse(buftarg_t *, int, int);
 #define xfs_incore_match(buftarg,blkno,len,field,value) _xfs_incore_match(buftarg,blkno,len,field,value) 
 
 #define xfs_baread(target, rablkno, ralen)  \
-		pagebuf_get((target)->inode, (rablkno) << 9, (ralen) << 9, \
-			PBF_TRYLOCK | PBF_READ | PBF_ASYNC | PBF_MAPPABLE)
-	
+	pagebuf_readahead((target)->inode, (rablkno) << 9, \
+			  (ralen) << 9, PBF_DONT_BLOCK)
+
 page_buf_t * xfs_pb_getr(int sleep, struct xfs_mount *mp);
 page_buf_t * xfs_pb_ngetr(int len, struct xfs_mount *mp); 
 void xfs_pb_freer(page_buf_t *bp);
