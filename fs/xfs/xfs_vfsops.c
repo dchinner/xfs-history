@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.33 $"
+#ident  "$Revision: 1.35 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -699,6 +699,9 @@ _xfs_ibusy(xfs_mount_t *mp)
 				continue;
 			if ((vp->v_count == 1) && (ip == mp->m_rsumip))
 				continue;
+#ifdef DEBUG
+			printf("busy vp=0x%x count=%d\n", vp, vp->v_count);
+#endif
 			busy++;
 		}
 	}
