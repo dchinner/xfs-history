@@ -1,4 +1,4 @@
-#ident "$Revision: 1.338 $"
+#ident "$Revision: 1.339 $"
 
 
 #ifdef SIM
@@ -445,8 +445,10 @@ xfs_getattr(
 #endif
         vap->va_nlink = ip->i_d.di_nlink;
 
-        if (vap->va_mask == (AT_FSID|AT_NODEID) || 
-	    vap->va_mask == AT_NLINK) {
+	/*
+	 * Quick exit for non-stat callers
+	 */
+	if ((vap->va_mask & ~(AT_SIZE|AT_FSID|AT_NODEID|AT_NLINK)) == 0) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
@@ -459,8 +461,6 @@ xfs_getattr(
         vap->va_uid = ip->i_d.di_uid;
         vap->va_gid = ip->i_d.di_gid;
 	vap->va_projid = ip->i_d.di_projid;
-        vap->va_vcode = 0L;
-	vap->va_gencount = ip->i_d.di_gen;
 	/*
 	 * Minor optimization, check the common cases first.
 	 */
@@ -504,41 +504,43 @@ xfs_getattr(
 		}
 		break;
         }
-
-	/*
-	 * XXX : truncate to 32 bits for now.
-	 */
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
 
 	/*
-	 * XFS-added attributes
+	 * Exit for stat callers.  See if any of the rest of the fields
+	 * to be filled in are needed.
 	 */
-	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS)) {
-		/*
-		 * convert di_flags to xflags
-		 */
-		vap->va_xflags = 0;
-		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-			vap->va_xflags |= XFS_XFLAG_REALTIME;
-		if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC)
-			vap->va_xflags |= XFS_XFLAG_PREALLOC;
-		vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
-		vap->va_nextents = (ip->i_df.if_flags & XFS_IFEXTENTS) ?
+	if ((vap->va_mask &
+	     (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS|
+	      AT_GENCOUNT|AT_VCODE)) == 0) {
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+                return 0;
+	}
+	/*
+	 * convert di_flags to xflags
+	 */
+	vap->va_xflags = 
+		((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
+			XFS_XFLAG_REALTIME : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ?
+			XFS_XFLAG_PREALLOC : 0);
+	vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
+	vap->va_nextents =
+		(ip->i_df.if_flags & XFS_IFEXTENTS) ?
 			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
-		if (ip->i_afp != NULL) {
-			vap->va_anextents =
-				(ip->i_afp->if_flags & XFS_IFEXTENTS) ?
-				 ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t) :
+	if (ip->i_afp != NULL)
+		vap->va_anextents =
+			(ip->i_afp->if_flags & XFS_IFEXTENTS) ?
+				ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t) :
 				 ip->i_d.di_anextents;
-		} else {
-			vap->va_anextents = 0;
-		}
-	}
+	else
+		vap->va_anextents = 0;
+	vap->va_gencount = ip->i_d.di_gen;
+	vap->va_vcode = 0L;
 
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
 	return 0;
 }
 
@@ -4981,20 +4983,27 @@ xfs_fcntl(
 		break;
 
 	case F_FSGETXATTR:
-	case F_FSGETXATTRA:
-		error = xfs_getattr(bdp, &va,
-			AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS, credp);
-		if (error) {
+		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
+		error = xfs_getattr(bdp, &va, 0, credp);
+		if (error)
 			break;
-		}
 		fa.fsx_xflags = va.va_xflags;
 		fa.fsx_extsize = va.va_extsize;
-		fa.fsx_nextents =
-			(cmd == F_FSGETXATTR) ?
-				va.va_nextents : va.va_anextents;
-		if (copyout(&fa, arg, sizeof(fa))) {
+		fa.fsx_nextents = va.va_nextents;
+		if (copyout(&fa, arg, sizeof(fa)))
 			error = XFS_ERROR(EFAULT);
-		}
+		break;
+
+	case F_FSGETXATTRA:
+		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_ANEXTENTS;
+		error = xfs_getattr(bdp, &va, 0, credp);
+		if (error)
+			break;
+		fa.fsx_xflags = va.va_xflags;
+		fa.fsx_extsize = va.va_extsize;
+		fa.fsx_nextents = va.va_anextents;
+		if (copyout(&fa, arg, sizeof(fa)))
+			error = XFS_ERROR(EFAULT);
 		break;
 
 	case F_FSSETXATTR:
