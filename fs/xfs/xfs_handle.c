@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.26 $"
+#ident "$Revision: 1.27 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -50,7 +50,7 @@ copyout_handle (
 {
 	if (copyout (handle, hbuf, (int) hsize))
 		return XFS_ERROR(EFAULT);
-#ifdef _K64U64
+#if _MIPS_SIM == _ABI64
 	if (ABI_IS_64BIT(get_current_abi())) {
 		if (copyout(&hsize, hlen, sizeof *hlen))
 			return XFS_ERROR(EFAULT);

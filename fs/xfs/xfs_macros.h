@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MACROS_H
 #define	_FS_XFS_MACROS_H
 
-#ident 	"$Revision: 1.4 $"
+#ident 	"$Revision: 1.5 $"
 
 /*
  * Set for debug kernels and simulation, and 32-bit kernels,
@@ -10,7 +10,7 @@
  */
 #define	XFS_WANT_SPACE_C	\
 	(!defined(_STANDALONE) && \
-	 (defined(DEBUG) || (defined(_KERNEL) && defined(_K32U64))))
+	 (defined(DEBUG) || (defined(_KERNEL) && _MIPS_SIM != _ABI64)))
 
 /*
  * Set for debug simulation and kernel builds, but not for standalone.

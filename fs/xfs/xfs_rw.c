@@ -1,4 +1,4 @@
-#ident "$Revision: 1.169 $"
+#ident "$Revision: 1.170 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4126,7 +4126,7 @@ xfs_start_daemons(void)
 	int	num_pages;
 
 	num_daemons = 4;
-#ifdef _K32U64
+#if _MIPS_SIM != _ABI64
 	/*
 	 * For small memory systems we reduce the number of daemons
 	 * to conserve memory.  For systems with less than 32 MB of

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.125 $"
+#ident	"$Revision: 1.126 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -317,7 +317,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		readio_log = XFS_WSYNC_READIO_LOG;
 		writeio_log = XFS_WSYNC_WRITEIO_LOG;
 	} else {
-#ifdef _K32U64
+#if _MIPS_SIM != _ABI64
 		if (physmem <= 8192) {		/* <= 32MB */
 			readio_log = XFS_READIO_LOG_SMALL;
 			writeio_log = XFS_WRITEIO_LOG_SMALL;
@@ -330,7 +330,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		writeio_log = XFS_WRITEIO_LOG_LARGE;
 #endif
 	}
-#ifdef _K32U64
+#if _MIPS_SIM != _ABI64
 	/*
 	 * Set the number of readahead buffers to use based on
 	 * physical memory size.

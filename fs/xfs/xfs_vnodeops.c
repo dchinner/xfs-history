@@ -91,7 +91,7 @@
 #include "sim.h"
 #endif
 
-#ifdef _K64U64
+#if _MIPS_SIM == _ABI64
 int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
 int flock_to_irix5(void *, int, xlate_info_t *);
 int irix5_n32_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
@@ -5786,7 +5786,7 @@ xfs_fcntl(
 			error = XFS_ERROR(EBADF);
 		} else if (vp->v_type != VREG) {
 			error = XFS_ERROR(EINVAL);
-#ifdef _K64U64
+#if _MIPS_SIM == _ABI64
 		} else if (ABI_IS_IRIX5_64(get_current_abi())) {
 			if (copyin((caddr_t)arg, &bf, sizeof bf)) {
 				error = XFS_ERROR(EFAULT);
