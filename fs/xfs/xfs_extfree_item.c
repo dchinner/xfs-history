@@ -31,11 +31,6 @@
 #include "xfs_sb.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
-#include "xfs_ag.h"
-#include "xfs_alloc.h"
-#include "xfs_ialloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
 #include "xfs_extfree_item.h"
 
 #ifdef SIM
