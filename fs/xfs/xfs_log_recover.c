@@ -294,37 +294,37 @@ xlog_find_verify_cycle( xlog_t 		*log,
 		       	int		nbblks,
 		       	uint		stop_on_cycle_no)
 {
-	int			i;
+	int			i, j;
 	uint			cycle;
     	xfs_buf_t		*bp;
     	char                    *buf        = NULL;
 	int			error       = 0;
 	int			smallmem    = 0;
+	int			bufblks	    = nbblks;
 
-	if (!(bp = xlog_get_bp(nbblks, log->l_mp))) {
+	while (!(bp = xlog_get_bp(bufblks, log->l_mp))) {
                 /* can't get enough memory to do everything in one big buffer */
-	        if (!(bp = xlog_get_bp(1, log->l_mp)))
+		bufblks >>= 1;
+	        if (!bufblks)
 	                return -ENOMEM;
                 smallmem = 1;
-        } else {
-		if ((error = xlog_bread(log, start_blk, nbblks, bp)))
-			goto out;
         }
         
-        buf = XFS_BUF_PTR(bp);
 
-	for (i=start_blk; i< start_blk + nbblks; i++) {
-                if (smallmem && (error = xlog_bread(log, i, 1, bp)))
+	for (i = start_blk; i < start_blk + nbblks; i += bufblks)  {
+                if (error = xlog_bread(log, i, bufblks, bp))
 		        goto out;
 
-		cycle = GET_CYCLE(buf, ARCH_CONVERT);
-		if (cycle == stop_on_cycle_no) {
-			error = i;
-			goto out;
-		}
+		buf = XFS_BUF_PTR(bp);
+		for (j = 0; j < bufblks; j++) {
+			cycle = GET_CYCLE(buf, ARCH_CONVERT);
+			if (cycle == stop_on_cycle_no) {
+				error = i;
+				goto out;
+			}
                 
-                if (!smallmem)
                         buf += BBSIZE;
+		}
 	}
 
 	error = -1;
