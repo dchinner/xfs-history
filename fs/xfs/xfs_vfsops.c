@@ -1713,7 +1713,6 @@ xfs_vget(
 	inode = LINVFS_GET_IP((*vpp));
         xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
-	linvfs_set_inode_ops(inode);
 	error = linvfs_revalidate_core(inode, ATTR_COMM);
 	if (error) {
 		iput(inode);

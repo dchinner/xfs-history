@@ -123,6 +123,13 @@ xfs_iget_vnode_init(
 	vp->v_vfsp  = XFS_MTOVFS(mp);
 	vp->v_inode = LINVFS_GET_IP(vp);
 	vp->v_type  = IFTOVT(ip->i_d.di_mode);
+
+	/* If we have a real type for an on-disk inode, we can set ops(&unlock)
+	 * now.  If it's a new inode being created, xfs_ialloc will handle it.
+	 */
+	if (vp->v_type != VNON) {
+		linvfs_set_inode_ops(LINVFS_GET_IP(vp));
+	}
 }
 
 
@@ -481,12 +488,12 @@ retry:
 			vn_initialize(XFS_MTOVFS(mp), inode, 0);
 			error = xfs_iget_core(vp, mp, tp, ino,
 							lock_flags, ipp, bno);
-			if (error)
+			if (error) {
 				make_bad_inode(inode);
-
-			unlock_new_inode(inode);
-			if (error)
+				if (inode->i_state == (I_NEW | I_LOCKED))
+					unlock_new_inode(inode);
 				iput(inode);
+			}
 		} else {
 			if (vp->v_flag & (VINACT | VRECLM)) {
 				vn_wait(vp);

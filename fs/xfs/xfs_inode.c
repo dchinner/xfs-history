@@ -1067,6 +1067,9 @@ xfs_ialloc(
 	ip->i_d.di_projid = prid;
 	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
 
+	/* now that we have a v_type we can set Linux inode ops (& unlock) */
+	linvfs_set_inode_ops(LINVFS_GET_IP(XFS_ITOV(ip)));
+
 	/*
 	 * If the superblock version is up to where we support new format
 	 * inodes and this is currently an old format inode, then change
