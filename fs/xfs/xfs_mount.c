@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.160 $"
+#ident	"$Revision: 1.161 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -740,6 +740,9 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			debug("qcheck failed");
 	}
 #endif
+
+	/* Make superblock exportable in cellular case */
+	VFS_EXPINFO(vfsp, &mp->m_sb, sizeof(xfs_sb_t));
 	return (0);
 
  error2:
