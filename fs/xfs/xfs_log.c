@@ -488,7 +488,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 		error = 0;
         
         if (error) {
-                cmn_err(CE_WARN, "XFS: log mount/recovery failed\n");
+                cmn_err(CE_WARN, "XFS: log mount/recovery failed");
 		xlog_unalloc_log(log);
         } else {
 	        /* Normal transactions can now occur */
@@ -1184,6 +1184,9 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		INT_SET(head->h_version, ARCH_CONVERT, 1);
 		INT_ZERO(head->h_lsn, ARCH_CONVERT);
 		INT_ZERO(head->h_tail_lsn, ARCH_CONVERT);
+                /* new fields */
+		INT_SET(head->h_fmt, ARCH_CONVERT, XLOG_FMT);
+                memcpy(&head->h_fs_uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t));
 
 		bp = iclog->ic_bp = XFS_getrbuf(0,mp);		/* my locked buffer */ /* mp need for pagebuf/linux only */
 		XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);

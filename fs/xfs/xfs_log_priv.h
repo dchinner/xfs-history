@@ -355,6 +355,23 @@ typedef struct xlog_op_header {
 } xlog_op_header_t;
 
 
+/* valid values for h_fmt */
+#define XLOG_FMT_UNKNOWN  0
+#define XLOG_FMT_LINUX_LE 1
+#define XLOG_FMT_LINUX_BE 2
+#define XLOG_FMT_IRIX_BE  3
+
+/* our fmt */
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+#define XLOG_FMT XLOG_FMT_LINUX_LE
+#else
+#if __BYTE_ORDER == __BIG_ENDIAN
+#define XLOG_FMT XLOG_FMT_LINUX_BE
+#else
+#error unknown byte order
+#endif
+#endif
+
 typedef struct xlog_rec_header {
 	uint	  h_magicno;	/* log record (LR) identifier		:  4 */
 	uint	  h_cycle;	/* write cycle of log			:  4 */
@@ -366,23 +383,10 @@ typedef struct xlog_rec_header {
 	int	  h_prev_block; /* block number to previous LR		:  4 */
 	int	  h_num_logops;	/* number of log operations in this LR	:  4 */
 	uint	  h_cycle_data[XLOG_MAX_RECORD_BSIZE / BBSIZE];
+        /* new fields */
+        int       h_fmt;        /* format of log record                 :  4 */
+        uuid_t    h_fs_uuid;    /* uuid of FS                           : 16 */
 } xlog_rec_header_t;
-
-/* external log footer
- *
- * define a magic number and a version - we don't accept logs made
- * with a different version, but don't expect the version to change
- */
-
-#define XFS_EXTERNAL_LOG_VERSION    1
-#define XFS_EXTERNAL_LOG_MAGIC      (uuid_t*)(void*)"XFS-external-log"
-
-typedef struct xlog_volume_footer {
-	uuid_t	  f_magic;	/* magic field */
-	uuid_t	  f_uuid;	/* uuid of this log's filesystem */
-	int	  f_version;	/* footer version */
-} xlog_volume_footer_t;
-
 
 #ifdef __KERNEL__
 /*

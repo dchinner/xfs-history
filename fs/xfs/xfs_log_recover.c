@@ -33,9 +33,8 @@
 #include <xfs.h>
 #include <xfs_log_recover.h>
 
-
-int		xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
-int		xlog_find_cycle_start(struct log *log,
+STATIC int	xlog_find_zeroed(struct log *log, xfs_daddr_t *blk_no);
+STATIC int	xlog_find_cycle_start(struct log *log,
 				      xfs_buf_t	*bp,	
 				      xfs_daddr_t	first_blk,
 				      xfs_daddr_t	*last_blk,
@@ -137,6 +136,81 @@ xlog_bwrite(
 	
 	return (error);
 }	/* xlog_bwrite */
+
+#ifdef DEBUG
+/*
+ * check log record header for recovery
+ */
+
+static void
+xlog_header_check_dump(xfs_mount_t *mp, xlog_rec_header_t *head)
+{
+    int b;
+
+    printk("xlog_header_check_dump:\n    SB : uuid = ");
+    for (b=0;b<16;b++) printk("%02x",((unsigned char *)&mp->m_sb.sb_uuid)[b]);
+    printk(", fmt = %d\n",XLOG_FMT);
+    printk("    log: uuid = ");
+    for (b=0;b<16;b++) printk("%02x",((unsigned char *)&head->h_fs_uuid)[b]);
+    printk(", fmt = %d\n", INT_GET(head->h_fmt, ARCH_CONVERT));
+}
+#endif
+       
+/*
+ * check log record header for recovery
+ */
+
+STATIC int
+xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
+{
+    ASSERT(INT_GET(head->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
+    
+    /*
+     * IRIX doesn't write the h_fmt field and leaves it zeroed
+     * (XLOG_FMT_UNKNOWN). This stops us from trying to recover
+     * a dirty log created in IRIX.
+     */
+    
+    if (INT_GET(head->h_fmt, ARCH_CONVERT) != XLOG_FMT) {
+	xlog_warn("XFS: dirty log written in incompatible format - can't recover");
+#ifdef DEBUG
+        xlog_header_check_dump(mp, head);
+#endif
+        return XFS_ERROR(EFSCORRUPTED); /* XXX is this what we want? */
+    }
+ 
+    return 0;   
+}
+
+/*
+ * read the head block of the log and check the header
+ */
+
+STATIC int
+xlog_header_check_mount(xfs_mount_t *mp, xlog_rec_header_t *head)
+{
+    ASSERT(INT_GET(head->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
+    
+    if (uuid_is_nil(&head->h_fs_uuid)) {
+        
+        /*
+         * IRIX doesn't write the h_fs_uuid or h_fmt fields. If 
+         * h_fs_uuid is nil, we assume this log was last mounted
+         * by IRIX and continue.
+         */
+        
+        xlog_warn("XFS: nil uuid in log - IRIX style log");
+        
+    } else if (!uuid_equal(&mp->m_sb.sb_uuid, &head->h_fs_uuid)) {
+	xlog_warn("XFS: log has mismatched uuid - can't recover");
+#ifdef DEBUG
+        xlog_header_check_dump(mp, head);
+#endif 
+        return XFS_ERROR(EFSCORRUPTED); /* XXX is this what we want? */
+    }
+    
+    return 0;
+}
 
 STATIC void
 xlog_recover_iodone(
@@ -276,8 +350,10 @@ xlog_find_verify_log_record(xlog_t	*log,
     for (i=(*last_blk)-1; i>=0; i--) {
 	if (i < start_blk) {
 	    /* legal log record not found */
-	    xlog_warn("XFS: xlog_find_verify_log_record: need to back-up");
+	    xlog_warn("XFS: Log inconsistent (didn't find previous header)");
+#ifdef __KERNEL__
 	    ASSERT(0);
+#endif
 	    error = XFS_ERROR(EIO);
 	    goto out;
 	}
@@ -301,6 +377,13 @@ xlog_find_verify_log_record(xlog_t	*log,
 	goto out;
     }
 
+    /* we have the final block of the good log (the first block
+     * of the log record _before_ the head. So we check the uuid.
+     */
+        
+    if (error = xlog_header_check_mount(log->l_mp, head))
+        goto out;
+    
     /*
      * We may have found a log record header before we expected one.
      * last_blk will be the 1st block # with a given cycle #.  We may end
@@ -317,7 +400,6 @@ out:
 
     return error;
 }	/* xlog_find_verify_log_record */
-
 
 /*
  * Head is defined to be the point of the log where the next log write
@@ -345,9 +427,19 @@ xlog_find_head(xlog_t  *log,
     uint    stop_on_cycle;
     int     error, log_bbnum = log->l_logBBsize;
 
-    /* special case freshly mkfs'ed filesystem; return immediately */
+    /* Is the end of the log device zeroed? */
     if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
 	*return_head_blk = first_blk;
+        
+        /* is the whole lot zeroed? */
+        if (!first_blk) {
+            /* Linux XFS shouldn't generate totally zeroed logs -
+             * mkfs etc write a dummy unmount record to a fresh
+             * log so we can store the uuid in there
+             */
+            xlog_warn("XFS: totally zeroed log\n");
+        }
+        
 	return 0;
     } else if (error) {
         xlog_warn("XFS: empty log check failed");
@@ -562,67 +654,6 @@ bp_err:
             
 	return error;
 }	/* xlog_find_head */
-
-/*
- * If we're mounting a device with an external log, check its magic bits to
- * make sure that we're mounting (a) a real log, and (b) the log associated
- * with this filesystem.
- *
- * It was added to support external logs on Linux, but could be used to
- * support non-volume-managed external logs on other OSes.
- */
-int
-xlog_test_footer(xlog_t *log)
-{
-    int error = 0;
-    xfs_buf_t *bp;
-    xlog_volume_footer_t *rfoot;
-
-    /* do we have an external log? */
-    if (log->l_mp->m_sb.sb_logstart != 0)
-        return 0;
-
-    bp = xlog_get_bp(1, log->l_mp);
-    if (!bp)
-        return -ENOMEM;
-
-    /* Read in the last physical block of the log and check its
-     * magic goo. */
-    
-    error = XFS_ERROR(EINVAL);
-    
-    if (xlog_bread(log, log->l_logBBsize - 1, 1, bp)) {
-  	xlog_warn("XFS: failed to read external log footer");
-    } else {
-        rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
-        
-        /* working on the assumption that changes to the footer will
-         * be backwards compatible, we ignore the version number here
-         */
-
-        if (uuid_compare(&rfoot->f_magic, XFS_EXTERNAL_LOG_MAGIC)) {
-            xlog_warn("XFS: bad external log (incorrect magic number)");
-        } else if (uuid_compare(&log->l_mp->m_origuuid, &rfoot->f_uuid)) {
-            xlog_warn("XFS: mismatched external log (incorrect uuid)");
-        } else {
-            /* footer checks out */
-            
-            error = 0;
-            
-            /* Since the last block of the log is this magic data,
-	     * decrease the effective size. */
-            
-            log->l_logsize -= BBSIZE;
-            log->l_logBBsize -= 1;
-            
-        }
-    }
-
-    xlog_put_bp(bp);
-
-    return error;
-}
-
 
 /*
  * Find the sync block number or the tail of the log.
@@ -844,11 +875,11 @@ xlog_find_zeroed(struct log	*log,
 		return 0;
 	} else if (first_cycle != 1) {
 		/*
-		 * Hopefully, this will catch the case where someone mkfs's
-		 * over a log partition.
+		 * If the cycle of the last block is zero, the cycle of
+                 * the first block must be 1. If it's not, maybe we're
+                 * not looking at a log... Bail out.
 		 */
-	xlog_warn("XFS: (xlog_find_zeroed): last cycle = 0; first cycle != 1");
-		ASSERT(first_cycle == 1);
+	        xlog_warn("XFS: Log inconsistent or not a log (last==0, first!=1)");
 		return XFS_ERROR(EINVAL);
 	}
         
@@ -2503,14 +2534,11 @@ xlog_recover_process_data(xlog_t	    *log,
     int			error;
     unsigned long	hash;
     uint		flags;
-
-#ifndef __KERNEL__
-    printf("\nLOG REC AT LSN cycle %d block %d (0x%x, 0x%x)\n",
-	   CYCLE_LSN(rhead->h_lsn, ARCH_CONVERT), 
-           BLOCK_LSN(rhead->h_lsn, ARCH_CONVERT),
-	   CYCLE_LSN(rhead->h_lsn, ARCH_CONVERT), 
-           BLOCK_LSN(rhead->h_lsn, ARCH_CONVERT));
-#endif
+    
+    /* check the log format matches our own - else we can't recover */
+    if (xlog_header_check_recover(log->l_mp, rhead))
+	    return (XFS_ERROR(EIO));
+    
     while (dp < lp) {
 	ASSERT(dp + sizeof(xlog_op_header_t) <= lp);
 	ohead = (xlog_op_header_t *)dp;
@@ -3016,7 +3044,7 @@ xlog_do_recovery_pass(xlog_t	*log,
 		goto bread_err;
 	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
 	    ASSERT(INT_GET(rhead->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM);
-	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));
+	    ASSERT(BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT) <= INT_MAX));            
 	    bblks = (int) BTOBB(INT_GET(rhead->h_len, ARCH_CONVERT));
 
 	    /* LR body must have data or it wouldn't have been written */
@@ -3219,7 +3247,6 @@ xlog_do_recover(xlog_t	*log,
 	return 0;
 }	/* xlog_do_recover */
 
-
 /*
  * Perform recovery and re-initialize some log variables in xlog_find_tail.
  *
@@ -3230,16 +3257,12 @@ xlog_recover(xlog_t *log, int readonly)
 {
 	xfs_daddr_t head_blk, tail_blk;
 	int	error;
-
-	/* Look for an external log signature, and adjust the log's length if
-	 * found. */
-	if ((error = xlog_test_footer(log)))
-		return error;
         
-        /* now find the tail of the log */
+        /* find the tail of the log */
         
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk, readonly))
-		return error;
+		return error; 
+    
 	if (tail_blk != head_blk) {
 #ifndef __KERNEL__
 		extern xfs_daddr_t HEAD_BLK, TAIL_BLK;
