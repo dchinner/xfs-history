@@ -204,7 +204,6 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define __return_address __builtin_return_address(0)
 #define LONGLONG_MAX	9223372036854775807LL	/* max "long long int" */
 #define nopkg()		( ENOSYS )
-#define getf(fd,fpp)	( printk("getf not implemented\n"), ASSERT(0), 0 )
 
 /* IRIX uses a dynamic sizing algorithm (ndquot = 200 + numprocs*2) */
 /* we may well need to fine-tune this if it ever becomes an issue.  */

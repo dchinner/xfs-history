@@ -256,28 +256,6 @@ vfs_unbusy_wakeup(register struct vfs *vfsp)
         }
 }
 
-/*
- * Same as vfs_devsearch without locking the list.
- * Useful for debugging code, but put it here anyway.
- */
-STATIC struct vfs *
-vfs_devsearch_nolock(dev_t dev, int fstype)
-{
-	struct vfs *vfsp = NULL;
-	kdev_t kdev = mk_kdev(MAJOR(dev), MINOR(dev));
-	struct super_block *sb;
-
-	sb = get_super(kdev);
-	if (sb) {
-		vfsp = LINVFS_GET_VFS(sb);
-		if (fstype != VFS_FSTYPE_ANY && fstype != vfsp->vfs_fstype)
-			vfsp = NULL;
-	}
-
-	drop_super(sb);
-	return vfsp;
-}
-
 void
 vfs_unbusy(struct vfs *vfsp)
 {
@@ -288,29 +266,6 @@ vfs_unbusy(struct vfs *vfsp)
 		vfs_unbusy_wakeup(vfsp);
 	spin_unlock(&vfslock);
 }
-
-/*
- * Search the vfs list for a specified device.  Returns a pointer to it
- * or NULL if no suitable entry is found.
- *
- * Any calls to this routine (as opposed to vfs_busydev) should
- * considered extremely suspicious.  Once the vfs_spinunlock is done,
- * there is likely to be nothing guaranteeing that the vfs pointer
- * returned continues to point to a vfs.  There are numerous bugs
- * which would quickly become intolerable if the frequency of unmount
- * was to rise above its typically low level.
- */
-struct vfs *
-vfs_devsearch(dev_t dev, int fstype)
-{
-	register struct vfs *vfsp;
-
-	spin_lock(&vfslock);
-	vfsp = vfs_devsearch_nolock(dev, fstype);
-	spin_unlock(&vfslock);
-	return vfsp;
-}
-
 
 void
 vfsinit(void)
