@@ -64,7 +64,13 @@ xfs_bulkstat_one(
 	buf->bs_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec;
 	buf->bs_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
 	buf->bs_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
-	buf->bs_xflags = ip->i_d.di_flags;
+
+	/* convert di_flags to bs_xflags.
+	 */
+	buf->bs_xflags = 0;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		buf->bs_xflags |= XFS_XFLAG_REALTIME;
+	}
 	buf->bs_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 	buf->bs_extents = ip->i_d.di_nextents;
 	buf->bs_gen = ip->i_d.di_gen;
