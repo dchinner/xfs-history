@@ -225,7 +225,7 @@ typedef __uint64_t bhv_posmask_t;
  * Note that the callouts will occur in the context of the last
  * accessor unlocking the behavior.
  */
-typedef void bhv_ucallout_t(bhv_head_t *bhp, void *, void *, caddr_t, size_t);
+typedef void bhv_ucallout_t(bhv_head_t *bhp, void *, void *, caddr_t, cell_size_t);
 
 #define BHV_WRITE_LOCK_CALLOUT(bhp, flags, func, arg1, arg2, argv, argvsz) \
  	bhv_queue_ucallout(bhp, flags, func, arg1, arg2, argv, argvsz)
@@ -281,6 +281,8 @@ extern void bhv_insert_initial(bhv_head_t *, bhv_desc_t *);
  	(bdp)->bd_next = NULL;				\
  }
 
+#define BHV_DESC_INIT(so,A,B)   bhv_desc_init(&(so->so_bhv),so,A,B)
+
 /*
  * Remove a behavior descriptor from a behavior chain.
  */
@@ -321,9 +323,9 @@ extern void             bhv_global_init(void);
 extern struct zone *    bhv_global_zone;
 extern void             bhv_queue_ucallout(bhv_head_t *bhp,
                              int flags, bhv_ucallout_t *func,
-                             void *, void *, caddr_t, size_t);
+                             void *, void *, caddr_t, cell_size_t);
 extern void             bhv_queue_ucallout_unlocked(bhv_head_t *bhp,
                              int flags, bhv_ucallout_t *func,
-                             void *, void *, caddr_t, size_t);
+                             void *, void *, caddr_t, cell_size_t);
 #endif /* CELL_CAPABLE */
 #endif /* __XFS_BEHAVIOR_H__ */
