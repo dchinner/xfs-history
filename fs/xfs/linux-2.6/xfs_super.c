@@ -313,7 +313,7 @@ xfs_setsize_buftarg(
 
 	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
 		printk(KERN_WARNING
-			"XFS: Cannot set_blocksize to %u on device 0x%x\n",
+			"XFS: Cannot set_blocksize to %u on device 0x%lx\n",
 			sectorsize, (unsigned long)btp->pbr_dev);
 	}
 }
