@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.27 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -225,6 +225,7 @@ xfs_growfs_data(
 		bp = get_buf(mp->m_dev,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp)),
 			BTOBB(bsize), 0);
+		bp->b_target = mp->m_ddev_targp;
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_IBT_MAGIC;
