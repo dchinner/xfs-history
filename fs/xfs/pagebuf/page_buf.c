@@ -2475,10 +2475,11 @@ pagebuf_readstats(
 }
 #endif  /* CONFIG_PROC_FS */
 
-STATIC void
-pagebuf_shaker(void)
+STATIC int
+pagebuf_shaker(int number, unsigned int mask)
 {
 	pagebuf_daemon_wakeup(1);
+	return 0;
 }
 
 
