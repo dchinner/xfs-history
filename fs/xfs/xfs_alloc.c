@@ -1473,7 +1473,7 @@ xfs_alloc_get_freelist(
 {
 	xfs_agf_t		*agf;	/* a.g. freespace structure */
 	xfs_agblock_t		bno;	/* block number returned */
-	xfs_btree_sblock_t	*block;	/* block's data */
+	xfs_alloc_block_t	*block;	/* block's data */
 	buf_t			*buf;	/* buffer for the block */
 	xfs_mount_t		*mp;	/* mount point for filesystem */
 
@@ -1486,7 +1486,7 @@ xfs_alloc_get_freelist(
 	if (bno == NULLAGBLOCK)
 		return NULLAGBLOCK;
 	buf = xfs_btree_read_bufs(mp, tp, agf->agf_seqno, bno, 0);
-	block = xfs_buf_to_sblock(buf);
+	block = xfs_buf_to_alloc_block(buf);
 	agf->agf_freecount--;
 	/*
 	 * The link to the next block is stored as the first word of the block.
@@ -1558,13 +1558,13 @@ xfs_alloc_put_freelist(
 	buf_t		*buf)	/* buffer for the block being freed */
 {
 	xfs_agf_t		*agf;	/* a.g. freespace structure */
-	xfs_btree_sblock_t	*block;	/* data of "buf" */
+	xfs_alloc_block_t	*block;	/* data of "buf" */
 	xfs_agblock_t		bno;	/* block number of buf */
 	xfs_mount_t		*mp;	/* mount point of filesystem */
 
 	mp = tp->t_mountp;
 	agf = xfs_buf_to_agf(agbuf);
-	block = xfs_buf_to_sblock(buf);
+	block = xfs_buf_to_alloc_block(buf);
 	/*
 	 * Point the new block to the old head of the list.
 	 */
@@ -1634,7 +1634,7 @@ xfs_alloc_vextent(
 		 * These three force us into a single a.g.
 		 */
 		agno = xfs_fsb_to_agno(mp, bno);
-		agbuf = xfs_alloc_fix_freelist(tp, agno, minlen, total, 1);
+		agbuf = xfs_alloc_fix_freelist(tp, agno, minlen, total, 0);
 		if (!agbuf)
 			break;
 		agbno = xfs_fsb_to_agbno(mp, bno);
@@ -1747,7 +1747,7 @@ xfs_free_extent(
 	ASSERT(agno < sbp->sb_agcount);
 	agbno = xfs_fsb_to_agbno(mp, bno);
 	ASSERT(agbno < sbp->sb_agblocks);
-	agbuf = xfs_alloc_fix_freelist(tp, agno, 0, 0, 1);
+	agbuf = xfs_alloc_fix_freelist(tp, agno, 0, 0, 0);
 	ASSERT(agbuf != NULL);
 	return xfs_free_ag_extent(tp, agbuf, agno, agbno, len);
 }
