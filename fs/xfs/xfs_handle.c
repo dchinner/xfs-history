@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.15 $"
+#ident "$Revision: 1.16 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -49,11 +49,15 @@ copyout_handle (
 	if (copyout (handle, hbuf, (int) hsize))
 		return EFAULT;
 #ifdef _K64U64
-	if (ABI_IS_64BIT(curprocp->p_abi))
-		return copyout (&hsize, hlen, sizeof *hlen);
-	else
+	if (ABI_IS_64BIT(curprocp->p_abi)) {
+		if (copyout (&hsize, hlen, sizeof *hlen))
+			return EFAULT;
+		return 0;
+	}
 #endif
-		return suword (hlen, (int) hsize);
+	if (suword (hlen, (int) hsize))
+		return EFAULT;
+	return 0;
 }
 
 

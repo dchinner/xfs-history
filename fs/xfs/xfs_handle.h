@@ -1,7 +1,7 @@
 #ifndef _XFS_HANDLE_H
 #define _XFS_HANDLE_H
 
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 /*
  *  Ok.  This file contains stuff that defines a general handle
@@ -16,9 +16,14 @@ union rval;
 struct vnode;
 
 typedef	struct handle {
-	fsid_t	ha_fsid;		/* unique file system identifier */
+	union {
+		long long align;	/* force alignment of ha_fid */
+		fsid_t	ha_fsid;	/* unique file system identifier */
+	} ha_u;
 	fid_t	ha_fid;			/* file system specific file ID */
 } handle_t;
+
+#define	ha_fsid	ha_u.ha_fsid
 
 /*
  *  Kernel only prototypes.
