@@ -1756,7 +1756,6 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 	target_abi = uio->uio_segflg == UIO_USERSPACE ?
 		u.u_procp->p_abi : ABI_IRIX5_64;
 	switch(target_abi) {
-#if (_MIPS_SIM == _MIPS_SIM_ABI64)
 	case ABI_IRIX5_64:
 	   {
 		dirent_t *idbp;
@@ -1794,7 +1793,7 @@ xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
 		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
 		break;
 	   }
-#endif
+
 	case ABI_IRIX5_N32:
 	   {
 		irix5_n32_dirent_t *idbp;
