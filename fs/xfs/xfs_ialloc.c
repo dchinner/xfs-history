@@ -313,6 +313,8 @@ xfs_ialloc_ag_select(
 	xfs_agnumber_t	agno;		/* current ag number */
 	xfs_agi_t	*agi;		/* allocation group header */
 	int		flags;		/* alloc buffer locking flags */
+	xfs_extlen_t	ineed;		/* blocks needed for inode allocation */
+	xfs_extlen_t	longest;	/* longest extent available */
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		needspace;	/* file mode implies space allocated */
 	xfs_perag_t	*pag;		/* per allocation group data */
@@ -334,7 +336,7 @@ xfs_ialloc_ag_select(
 	 * Loop through allocation groups, looking for one with a little
 	 * free space in it.  Note we don't look for free inodes, exactly.
 	 * Instead, we include whether there is a need to allocate inodes
-	 * to mean that at least one block must be allocated for them, 
+	 * to mean that blocks must be allocated for them, 
 	 * if none are currently free.
 	 */
 	agno = pagno;
@@ -353,12 +355,13 @@ xfs_ialloc_ag_select(
 		/*
 		 * Is there enough free space for the file plus a block
 		 * of inodes (if we need to allocate some)?
-		 * Note, this is just a guess, if we need to allocate inodes
-		 * then the space will have to be contiguous.
 		 */
+		ineed = pag->pagi_freecount ? 0 : XFS_IALLOC_BLOCKS(mp);
+		if (!(longest = pag->pagf_longest))
+			longest = pag->pagf_flcount > 0;
 		if (pag->pagf_init &&
-		    pag->pagf_freeblks >= needspace +
-		    (pag->pagi_freecount ? 0 : XFS_IALLOC_BLOCKS(mp))) {
+		    pag->pagf_freeblks >= needspace + ineed &&
+		    longest >= ineed) {
 			if (agbp == NULL)
 				agbp = xfs_ialloc_read_agi(mp, tp, agno);
 			if (S_ISDIR(mode))
