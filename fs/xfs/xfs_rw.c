@@ -2167,7 +2167,7 @@ xfs_diostrat( buf_t *bp)
 	ssize_t		bytes_this_req, resid, count, totxfer;
 	off_t		offset, offset_this_req;
 	int		i, j, error, writeflag, reccount;
-	int		end_of_file, bufsissued, totresid;
+	int		end_of_file, bufsissued, totresid, exist;
 	int		ioflag, blk_algn, rt, numrtextents, rtextsize;
 
 	dp        = (struct dio_s *)bp->b_private;
@@ -2230,6 +2230,7 @@ xfs_diostrat( buf_t *bp)
 		count_fsb  = xfs_b_to_fsb( sbp, count);
 		blocks     = (xfs_extlen_t)(last_fsb - offset_fsb);
 
+		exist = 1;
 		if ( writeflag ) {
 			/*
  			 * In the write case, need to call bmapi() with
@@ -2251,36 +2252,49 @@ xfs_diostrat( buf_t *bp)
 			imapp = &imaps[0];
 			count_fsb = imapp->br_blockcount;
 
-			if (rt) {
-				/*
-				 * Round up to even number of extents.
-				 */
-				numrtextents = (count_fsb + rtextsize -1) / 
-					rtextsize;
+			if ((imapp->br_startblock == DELAYSTARTBLOCK) ||
+			    (imapp->br_startblock == HOLESTARTBLOCK)) {
+				exist = 0;
 			}
 
-			/*
- 			 * Setup transactions.
- 			 */
-			tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
-			error = xfs_trans_reserve( tp, count_fsb, 
-						   XFS_DEFAULT_LOG_RES(sbp),
-						   numrtextents, 0 );
+                        /*
+                         * If blocks are not yet allocated for this part of
+                         * the file, allocate space for the transactions.
+                         */
+			if (!exist) {
+				if (rt) {
+					/*
+					 * Round up to even number of extents.
+					 */
+					numrtextents = (count_fsb+rtextsize-1)/
+						rtextsize;
+				}
 
-			if (error) {
 				/*
-				 * Ran out of file system space.
-				 * Free the transaction structure.
-				 */
-				ASSERT( error == ENOSPC );
-				xfs_trans_cancel(tp, 0);
-				xfs_iunlock( ip, XFS_ILOCK_EXCL);
-				break;
+ 				 * Setup transactions.
+ 				 */
+				tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
+				error = xfs_trans_reserve( tp, count_fsb, 
+					   XFS_DEFAULT_LOG_RES(sbp),
+					   numrtextents, 0 );
+
+				if (error) {
+					/*
+					 * Ran out of file system space.
+					 * Free the transaction structure.
+					 */
+					ASSERT( error == ENOSPC );
+					xfs_trans_cancel(tp, 0);
+					xfs_iunlock( ip, XFS_ILOCK_EXCL);
+					break;
+				} else {
+					xfs_trans_ijoin(tp,ip,XFS_ILOCK_EXCL);
+					xfs_trans_ihold( tp, ip);
+					free_list.xbf_first = NULL;
+					free_list.xbf_count = 0;
+				}
 			} else {
-				xfs_trans_ijoin( tp, ip, XFS_ILOCK_EXCL);
-				xfs_trans_ihold( tp, ip);
-				free_list.xbf_first = NULL;
-				free_list.xbf_count = 0;
+				tp = NULL;
 			}
 		} else {
 			/*
@@ -2305,12 +2319,22 @@ xfs_diostrat( buf_t *bp)
 			/*
  			 * Complete the bmapi() transactions.
 			 */
-			xfs_bmap_finish( &tp, &free_list, firstfsb, 0 );
-			xfs_trans_commit(tp , 0 );
+			if (!exist) {
+				xfs_bmap_finish( &tp, &free_list, firstfsb, 0 );
+				xfs_trans_commit(tp , 0 );
+			}
 			xfs_iunlock( ip, XFS_ILOCK_EXCL);
 		} else {
 			xfs_iunlock( ip, XFS_ILOCK_SHARED);
 		}
+
+                /*
+                 * xfs_bmapi() was unable to allocate space
+                 */
+                if (reccount == 0) {
+                        error = ENOSPC;
+                        break;
+                }
 
 		/*
    		 * Run through each extent.
