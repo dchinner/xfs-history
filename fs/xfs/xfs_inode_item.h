@@ -8,7 +8,13 @@ struct xfs_bmbt_rec_32;
 /*
  * This is the structure used to lay out an inode log item in the
  * log.  The size of the inline data/extents/b-tree root to be logged
- * (if any) is indicated in the ilf_dsize field.
+ * (if any) is indicated in the ilf_dsize field.  Changes to this structure
+ * must be added on to the end.
+ *
+ * -Version 1 of this structure (XFS_LI_OINODE) included up to the first
+ *	union (ilf_u) field.  This was released with IRIX 5.3-XFS.
+ * -Version 2 of this structure (XFS_LI_INODE) is currently the entire
+ *	structure.  This was released with IRIX 6.0.1-XFS and IRIX 6.1.
  */
 typedef struct xfs_inode_log_format {
 	unsigned short		ilf_type;	/* inode log item type */
@@ -24,6 +30,19 @@ typedef struct xfs_inode_log_format {
 	int			ilf_len;	/* len of inode buffer */
 	int			ilf_boffset;	/* off of inode in buffer */
 } xfs_inode_log_format_t;
+
+/* Initial version shipped with IRIX 5.3-XFS */
+typedef struct xfs_inode_log_format_v1 {
+	unsigned short		ilf_type;	/* inode log item type */
+	unsigned short		ilf_size;	/* size of this item */
+	uint			ilf_fields;	/* flags for fields logged */
+	uint			ilf_dsize;	/* size of data/ext/root */
+	xfs_ino_t		ilf_ino;	/* inode number */
+	union {
+		dev_t		ilfu_rdev;	/* rdev value for dev inode*/
+		uuid_t		ilfu_uuid;	/* mount point value */
+	} ilf_u;
+} xfs_inode_log_format_t_v1;
 
 struct proc;
 typedef struct xfs_inode_log_item {
