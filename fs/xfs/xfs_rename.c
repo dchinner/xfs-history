@@ -1,4 +1,4 @@
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -1001,6 +1001,19 @@ xfs_rename(
 		xfs_trans_set_sync(tp);
 	}
 
+	/*
+	 * Take refs. for vop_link_removed calls below.  No need to worry 
+	 * about directory refs. because the caller holds them.
+	 *
+	 * Do holds before the xfs_bmap_finish since it might rele them down
+	 * to zero.
+	 */
+
+	if (target_ip_dropped) 
+		IHOLD(target_ip);
+	if (src_dp_dropped)
+		IHOLD(src_ip);
+
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
 		xfs_bmap_cancel(&free_list);
@@ -1009,17 +1022,14 @@ xfs_rename(
 		if (target_ip != NULL) {
 			IRELE(target_ip);
 		}
+		if (target_ip_dropped) {
+			IRELE(target_ip);
+		}
+		if (src_dp_dropped) {
+			IRELE(src_ip);
+		}
 		goto std_return;
 	}
-	/*
-	 * Take refs. for vop_link_removed calls below.  No need to worry 
-	 * about directory refs. because the caller holds them.
-	 */
-	if (target_ip_dropped) 
-		IHOLD(target_ip);
-	if (src_dp_dropped)
-		IHOLD(src_ip);
-
 	/*
 	 * trans_commit will unlock src_ip, target_ip & decrement
 	 * the vnode references.
