@@ -326,14 +326,12 @@ pagebuf_lock(				/* lock buffer			*/
  *	pagebuf_lock_disable disables buffer object locking for an inode.
  */
 
-int
+void
 pagebuf_lock_disable(			/* disable buffer locking	*/
 		     pb_target_t *target)  /* inode for buffers		*/
 {
-	bdput(target->pbr_bdev);
+	blkdev_put(target->pbr_bdev, BDEV_FS);
 	kfree(target);
-
-	return(0);
 }
 /*
  *	pagebuf_lock_enable
@@ -341,26 +339,37 @@ pagebuf_lock_disable(			/* disable buffer locking	*/
 
 pb_target_t *
 pagebuf_lock_enable(
-	dev_t dev,
+	dev_t		dev,
 	struct super_block *sb)
 {
+	struct block_device *bdev;
 	pb_target_t	*target;
+	int		error;
 
 	target = kmalloc(sizeof(pb_target_t), GFP_KERNEL);
-	if (target) {
-		target->pbr_kdev = to_kdev_t(dev);
-		target->pbr_bdev = bdget(dev);
-		if (!target->pbr_bdev)
-			goto fail;
-		pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
-		target->pbr_mapping = target->pbr_bdev->bd_inode->i_mapping;
-		if ((MAJOR(dev) == MD_MAJOR) || (MAJOR(dev) == EVMS_MAJOR)) 
-			target->pbr_flags = PBR_ALIGNED_ONLY;
-		else if (MAJOR(dev) == LVM_BLK_MAJOR)
-			target->pbr_flags = PBR_SECTOR_ONLY;
-		else
-			target->pbr_flags = 0;
-	}
+	if (unlikely(!target))
+		return NULL;
+
+	bdev = bdget(dev);
+	if (unlikely(!bdev))
+		goto fail;
+
+	error = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
+	if (unlikely(error))
+		goto fail;
+
+	target->pbr_kdev = to_kdev_t(dev);
+	target->pbr_bdev = bdev;
+	target->pbr_mapping = bdev->bd_inode->i_mapping;
+
+	pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
+	
+	if ((MAJOR(dev) == MD_MAJOR) || (MAJOR(dev) == EVMS_MAJOR))
+		target->pbr_flags = PBR_ALIGNED_ONLY;
+	else if (MAJOR(dev) == LVM_BLK_MAJOR)
+		target->pbr_flags = PBR_SECTOR_ONLY;
+	else
+		target->pbr_flags = 0;
 
 	return target;
 
