@@ -56,7 +56,11 @@
  *     - support other architectures
  */
  
+#ifndef SIM
 #include <linux/autoconf.h>
+#else
+#define CONFIG_XFS_ARCH_MULTI
+#endif
 
 /* select native architecture */
   
