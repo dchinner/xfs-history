@@ -4584,6 +4584,7 @@ xfs_rmdir(
  * Read dp's entries starting at uiop->uio_offset and translate them into
  * bufsize bytes worth of struct dirents starting at bufbase.
  */
+/*ARGSUSED*/
 STATIC int
 xfs_readdir(
 	vnode_t		*dir_vp,
