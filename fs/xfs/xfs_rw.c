@@ -4001,8 +4001,17 @@ xfs_diostrat( buf_t *bp)
  				 	 * If trying to read past end of
  				 	 * file, shorten the request size.
 					 */
-					bytes_this_req = ip->i_d.di_size - 
-						offset_this_req;
+					if (ip->i_d.di_size > offset_this_req) {
+						bytes_this_req = 
+							ip->i_d.di_size - 
+							offset_this_req;
+					} else {
+						bytes_this_req =  0;
+					}
+
+
+
+
 					end_of_file = 1;
 
 					if (!bytes_this_req) {
