@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.88 $"
+#ident  "$Revision: 1.89 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -26,6 +26,12 @@
 #include <sys/types.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/pfdat.h>
+#include <sys/user.h>
+#include <sys/vnode.h>
+#include <sys/grio.h>
+#include <io/dmi/dmi_kern.h>
+#include <specfs/snode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -47,28 +53,10 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#ifdef SIM
-#define _KERNEL
-#endif
-#include <sys/pfdat.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include <sys/proc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>
 #include <sys/uio.h>
-#ifdef SIM
-#define _KERNEL
-#endif
-#include <sys/user.h>
-#include <sys/vnode.h>
-#include <sys/grio.h>
-#include <io/dmi/dmi_kern.h>
-#include <fs/specfs/snode.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include <sys/dirent.h>
 #include <sys/ktrace.h>
 #ifndef SIM
@@ -93,13 +81,13 @@
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
 #include "xfs_alloc.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_ag.h"
 #include "xfs_error.h"
 #include "xfs_bmap.h"
-#include "xfs_dir.h"
 #include "xfs_dir_btree.h"
 #include "xfs_rw.h"
 #include "xfs_buf_item.h"
@@ -244,7 +232,7 @@ xfs_init(vfssw_t	*vswp,
 	xfs_gap_zone = kmem_zone_init(sizeof(xfs_gap_t), "xfs_gap");
 #endif
 	xfs_dir_state_zone =
-		kmem_zone_init(sizeof(struct xfs_dir_state), "xfs_dir_state");
+		kmem_zone_init(sizeof(xfs_dir_state_t), "xfs_dir_state");
 
 	/*
 	 * The size of the zone allocated buf log item is the maximum
