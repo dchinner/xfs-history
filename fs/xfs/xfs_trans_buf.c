@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.86 $"
+#ident "$Revision: 1.87 $"
 
 #include <xfs_os_defs.h>
 
@@ -76,14 +76,14 @@ STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	xfs_daddr_t		blkno,
+	xfs_daddr_t	blkno,
 	int		len);
 
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	buftarg_t	*target,
-	xfs_daddr_t		blkno,
+	xfs_daddr_t	blkno,
 	int		len);
 
 
@@ -827,7 +827,7 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
  */
 void
 xfs_trans_log_buf(xfs_trans_t	*tp,
-		  xfs_buf_t		*bp,
+		  xfs_buf_t	*bp,
 		  uint		first,
 		  uint		last)
 {

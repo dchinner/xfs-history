@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.75 $"
+#ident "$Revision: 1.76 $"
 
 #include <xfs_os_defs.h>
 
@@ -206,7 +206,6 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	int rsvd = (flags & ATTR_ROOT) != 0;
 
 	XFS_STATS_INC(xs_attr_set);
-
 	/*
 	 * Do we answer them, or ignore them?
 	 */
@@ -846,7 +845,7 @@ xfs_attr_leaf_addname(xfs_da_args_t *args)
 			return(retval);
 		}
 		args->rename = 1;			/* an atomic rename */
-		args->blkno2 = args->blkno;		/* set 2nd entry info */
+		args->blkno2 = args->blkno;		/* set 2nd entry info*/
 		args->index2 = args->index;
 		args->rmtblkno2 = args->rmtblkno;
 		args->rmtblkcnt2 = args->rmtblkcnt;
@@ -1118,7 +1117,8 @@ xfs_attr_leaf_list(xfs_attr_list_context_t *context)
 		return(error);
 	ASSERT(bp != NULL);
 	leaf = bp->data;
-	if (leaf->hdr.info.magic != XFS_ATTR_LEAF_MAGIC) {
+	if (INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
+						!= XFS_ATTR_LEAF_MAGIC) {
 		xfs_da_brelse(NULL, bp);
 		return(XFS_ERROR(EFSCORRUPTED));
 	}
@@ -1178,7 +1178,7 @@ restart:
 		if (args->flags & ATTR_CREATE)
 			goto out;
 		args->rename = 1;			/* atomic rename op */
-		args->blkno2 = args->blkno;		/* set 2nd entry info */
+		args->blkno2 = args->blkno;		/* set 2nd entry info*/
 		args->index2 = args->index;
 		args->rmtblkno2 = args->rmtblkno;
 		args->rmtblkcnt2 = args->rmtblkcnt;
@@ -1526,8 +1526,9 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 						     XFS_ATTR_FORK);
 		if (error)
 			goto out;
-		ASSERT(((xfs_attr_leafblock_t *)bp->data)->hdr.info.magic
-		       == XFS_ATTR_LEAF_MAGIC);
+		ASSERT(INT_GET(((xfs_attr_leafblock_t *)
+				      bp->data)->hdr.info.magic, ARCH_CONVERT)
+						       == XFS_ATTR_LEAF_MAGIC);
 
 		if (xfs_attr_shortform_allfit(bp, dp)) {
 			XFS_BMAP_INIT(args->flist, args->firstblock);
@@ -1745,7 +1746,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 			return(error);
 		if (bp) {
 			node = bp->data;
-			switch (node->hdr.info.magic) {
+			switch (INT_GET(node->hdr.info.magic, ARCH_CONVERT)) {
 			case XFS_DA_NODE_MAGIC:
 				xfs_attr_trace_l_cn("wrong blk", context, node);
 				xfs_da_brelse(NULL, bp);
@@ -1754,13 +1755,17 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 			case XFS_ATTR_LEAF_MAGIC:
 				leaf = bp->data;
 				if (cursor->hashval >
-				    leaf->entries[leaf->hdr.count-1].hashval) {
+				    INT_GET(leaf->entries[
+					 INT_GET(leaf->hdr.count,
+						ARCH_CONVERT)-1].hashval,
+							ARCH_CONVERT)) {
 					xfs_attr_trace_l_cl("wrong blk",
 							   context, leaf);
 					xfs_da_brelse(NULL, bp);
 					bp = NULL;
 				} else if (cursor->hashval <=
-					       leaf->entries[0].hashval) {
+					     INT_GET(leaf->entries[0].hashval,
+							ARCH_CONVERT)) {
 					xfs_attr_trace_l_cl("maybe wrong blk",
 							   context, leaf);
 					xfs_da_brelse(NULL, bp);
@@ -1791,22 +1796,28 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 			if (bp == NULL)
 				return(XFS_ERROR(EFSCORRUPTED));
 			node = bp->data;
-			if (node->hdr.info.magic == XFS_ATTR_LEAF_MAGIC)
+			if (INT_GET(node->hdr.info.magic, ARCH_CONVERT)
+							== XFS_ATTR_LEAF_MAGIC)
 				break;
-			if (node->hdr.info.magic != XFS_DA_NODE_MAGIC) {
+			if (INT_GET(node->hdr.info.magic, ARCH_CONVERT)
+							!= XFS_DA_NODE_MAGIC) {
 				xfs_da_brelse(NULL, bp);
 				return(XFS_ERROR(EFSCORRUPTED));
 			}
 			btree = node->btree;
-			for (i = 0; i < node->hdr.count; btree++, i++) {
-				if (cursor->hashval <= btree->hashval) {
+			for (i = 0;
+				i < INT_GET(node->hdr.count, ARCH_CONVERT);
+								btree++, i++) {
+				if (cursor->hashval
+						<= INT_GET(btree->hashval,
+							    ARCH_CONVERT)) {
 					cursor->blkno = btree->before;
 					xfs_attr_trace_l_cb("descending",
 							    context, btree);
 					break;
 				}
 			}
-			if (i == node->hdr.count) {
+			if (i == INT_GET(node->hdr.count, ARCH_CONVERT)) {
 				xfs_da_brelse(NULL, bp);
 				return(0);
 			}
@@ -1822,14 +1833,15 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 	 */
 	for (;;) {
 		leaf = bp->data;
-		if (leaf->hdr.info.magic != XFS_ATTR_LEAF_MAGIC) {
+		if (INT_GET(leaf->hdr.info.magic, ARCH_CONVERT)
+						!= XFS_ATTR_LEAF_MAGIC) {
 			xfs_da_brelse(NULL, bp);
 			return(XFS_ERROR(EFSCORRUPTED));
 		}
 		error = xfs_attr_leaf_list_int(bp, context);
-		if (error || (leaf->hdr.info.forw == 0))
+		if (error || (INT_GET(leaf->hdr.info.forw, ARCH_CONVERT) == 0))
 			break;	/* not really an error, buffer full or EOF */
-		cursor->blkno = leaf->hdr.info.forw;
+		cursor->blkno = INT_GET(leaf->hdr.info.forw, ARCH_CONVERT);
 		xfs_da_brelse(NULL, bp);
 		error = xfs_da_read_buf(NULL, context->dp, cursor->blkno, -1,
 					      &bp, XFS_ATTR_FORK);
@@ -2185,9 +2197,9 @@ xfs_attr_trace_l_cn(char *where, struct xfs_attr_list_context *context,
 				: 0,
 		(__psunsigned_t)context->dupcnt,
 		(__psunsigned_t)context->flags,
-		(__psunsigned_t)node->hdr.count,
+		(__psunsigned_t)INT_GET(node->hdr.count, ARCH_CONVERT),
 		(__psunsigned_t)node->btree[0].hashval,
-		(__psunsigned_t)node->btree[node->hdr.count-1].hashval);
+		(__psunsigned_t)node->btree[INT_GET(node->hdr.count, ARCH_CONVERT)-1].hashval);
 }
 
 /*
@@ -2243,7 +2255,7 @@ xfs_attr_trace_l_cl(char *where, struct xfs_attr_list_context *context,
 		(__psunsigned_t)context->flags,
 		(__psunsigned_t)leaf->hdr.count,
 		(__psunsigned_t)leaf->entries[0].hashval,
-		(__psunsigned_t)leaf->entries[leaf->hdr.count-1].hashval);
+		(__psunsigned_t)leaf->entries[INT_GET(leaf->hdr.count, ARCH_CONVERT)-1].hashval);
 }
 
 /*

@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_ATTR_LEAF_H
 #define	_FS_XFS_ATTR_LEAF_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.24 $"
 
 /*
  * xfs_attr_leaf.h
@@ -155,7 +155,7 @@ xfs_attr_leaf_name_remote(xfs_attr_leafblock_t *leafp, int idx);
 #else
 #define XFS_ATTR_LEAF_NAME_REMOTE(leafp,idx)	/* remote name struct ptr */ \
 	((xfs_attr_leaf_name_remote_t *)		\
-	 &((char *)(leafp))[ (leafp)->entries[idx].nameidx ])
+	 &((char *)(leafp))[ INT_GET((leafp)->entries[idx].nameidx, ARCH_CONVERT) ])
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_LEAF_NAME_LOCAL)
 xfs_attr_leaf_name_local_t *
@@ -165,14 +165,14 @@ xfs_attr_leaf_name_local(xfs_attr_leafblock_t *leafp, int idx);
 #else
 #define XFS_ATTR_LEAF_NAME_LOCAL(leafp,idx)	/* local name struct ptr */ \
 	((xfs_attr_leaf_name_local_t *)		\
-	 &((char *)(leafp))[ (leafp)->entries[idx].nameidx ])
+	 &((char *)(leafp))[ INT_GET((leafp)->entries[idx].nameidx, ARCH_CONVERT) ])
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_LEAF_NAME)
 char *xfs_attr_leaf_name(xfs_attr_leafblock_t *leafp, int idx);
 #define XFS_ATTR_LEAF_NAME(leafp,idx)		xfs_attr_leaf_name(leafp,idx)
 #else
 #define XFS_ATTR_LEAF_NAME(leafp,idx)		/* generic name struct ptr */ \
-	(&((char *)(leafp))[ (leafp)->entries[idx].nameidx ])
+	(&((char *)(leafp))[ INT_GET((leafp)->entries[idx].nameidx, ARCH_CONVERT) ])
 #endif
 
 /*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.466 $"
+#ident "$Revision: 1.467 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -159,8 +159,8 @@ xfs_fsync(
 	bhv_desc_t	*bdp,
 	int		flag,
 	cred_t		*credp,
-	xfs_off_t		start,
-	xfs_off_t		stop);
+	xfs_off_t	start,
+	xfs_off_t	stop);
 
 STATIC int
 xfs_lookup(
@@ -6320,10 +6320,10 @@ vnodeops_t xfs_vnodeops = {
 	(vop_bmap_t)xfs_bmap,
 	(vop_fcntl_t)fs_nosys,
 	xfs_reclaim,
-	(vop_attr_get_t)fs_nosys,/* xfs_attr_get, */
-	(vop_attr_set_t)fs_nosys,/* xfs_attr_set, */
-	(vop_attr_remove_t)fs_nosys,/* xfs_attr_remove, */
-	(vop_attr_list_t)fs_nosys,/* xfs_attr_list, */
+	(vop_attr_get_t)xfs_attr_get,
+	(vop_attr_set_t)xfs_attr_set,
+	(vop_attr_remove_t)xfs_attr_remove,
+	(vop_attr_list_t)xfs_attr_list,
 	(vop_link_removed_t)fs_noval,
 	fs_vnode_change,
 	fs_tosspages,

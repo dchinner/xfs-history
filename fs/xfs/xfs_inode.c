@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.296 $"
+#ident "$Revision: 1.297 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -576,7 +576,7 @@ xfs_iformat(
 	switch (INT_GET(dip->di_core.di_aformat, ARCH_CONVERT)) {
 	case XFS_DINODE_FMT_LOCAL:
 		atp = (xfs_attr_shortform_t *)XFS_DFORK_APTR_ARCH(dip, ARCH_CONVERT);
-		size = (int)atp->hdr.totsize;
+		size = (int)INT_GET(atp->hdr.totsize, ARCH_CONVERT);
 		error = xfs_iformat_local(ip, dip, XFS_ATTR_FORK, size);
 		break;
 	case XFS_DINODE_FMT_EXTENTS:

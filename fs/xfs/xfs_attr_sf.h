@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_ATTR_SF_H
 #define	_FS_XFS_ATTR_SF_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.11 $"
 
 /*
  * xfs_attr_sf.h
@@ -104,7 +104,7 @@ int xfs_attr_sf_totsize(struct xfs_inode *dp);
 #define XFS_ATTR_SF_TOTSIZE(dp)		xfs_attr_sf_totsize(dp)
 #else
 #define XFS_ATTR_SF_TOTSIZE(dp)			/* total space in use */ \
-	(((xfs_attr_shortform_t *)((dp)->i_afp->if_u1.if_data))->hdr.totsize)
+	(INT_GET(((xfs_attr_shortform_t *)((dp)->i_afp->if_u1.if_data))->hdr.totsize, ARCH_CONVERT))
 #endif
 
 #ifdef XFS_ALL_TRACE

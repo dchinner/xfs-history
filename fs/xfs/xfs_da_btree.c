@@ -926,7 +926,9 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	 * We prefer coalescing with the lower numbered sibling so as
 	 * to shrink a directory over time.
 	 */
-	forward = (INT_GET(info->forw, ARCH_CONVERT) < INT_GET(info->back, ARCH_CONVERT));	/* start with smaller blk num */
+	/* start with smaller blk num */
+	forward = (INT_GET(info->forw, ARCH_CONVERT)
+				< INT_GET(info->back, ARCH_CONVERT));
 	for (i = 0; i < 2; forward = !forward, i++) {
 		if (forward)
 			blkno = INT_GET(info->forw, ARCH_CONVERT);
@@ -1373,7 +1375,8 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 		new_info->back = old_info->back; /* INT_: direct copy */
 		if (INT_GET(old_info->back, ARCH_CONVERT)) {
 			error = xfs_da_read_buf(args->trans, args->dp,
-						INT_GET(old_info->back, ARCH_CONVERT), -1, &bp,
+						INT_GET(old_info->back,
+							ARCH_CONVERT), -1, &bp,
 						args->whichfork);
 			if (error)
 				return(error);
@@ -1400,8 +1403,10 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 				return(error);
 			ASSERT(bp != NULL);
 			tmp_info = bp->data;
-			ASSERT(INT_GET(tmp_info->magic, ARCH_CONVERT) == INT_GET(old_info->magic, ARCH_CONVERT));
-			ASSERT(INT_GET(tmp_info->back, ARCH_CONVERT) == old_blk->blkno);
+			ASSERT(INT_GET(tmp_info->magic, ARCH_CONVERT)
+				    == INT_GET(old_info->magic, ARCH_CONVERT));
+			ASSERT(INT_GET(tmp_info->back, ARCH_CONVERT)
+				    == old_blk->blkno);
 			INT_SET(tmp_info->back, ARCH_CONVERT, new_blk->blkno);
 			xfs_da_log_buf(args->trans, bp, 0, sizeof(*tmp_info)-1);
 			xfs_da_buf_done(bp);
@@ -1491,7 +1496,8 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		save_info->back = drop_info->back; /* INT_: direct copy */
 		if (INT_GET(drop_info->back, ARCH_CONVERT)) {
 			error = xfs_da_read_buf(args->trans, args->dp,
-						INT_GET(drop_info->back, ARCH_CONVERT), -1, &bp,
+						INT_GET(drop_info->back,
+							ARCH_CONVERT), -1, &bp,
 						args->whichfork);
 			if (error)
 				return(error);
@@ -1514,8 +1520,10 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 				return(error);
 			ASSERT(bp != NULL);
 			tmp_info = bp->data;
-			ASSERT(INT_GET(tmp_info->magic, ARCH_CONVERT) == INT_GET(save_info->magic, ARCH_CONVERT));
-			ASSERT(INT_GET(tmp_info->back, ARCH_CONVERT) == drop_blk->blkno);
+			ASSERT(INT_GET(tmp_info->magic, ARCH_CONVERT)
+				    == INT_GET(save_info->magic, ARCH_CONVERT));
+			ASSERT(INT_GET(tmp_info->back, ARCH_CONVERT)
+				    == drop_blk->blkno);
 			INT_SET(tmp_info->back, ARCH_CONVERT, save_blk->blkno);
 			xfs_da_log_buf(args->trans, bp, 0,
 						    sizeof(*tmp_info) - 1);
@@ -1914,8 +1922,9 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
 			goto done;
 		sib_info = sib_buf->data;
-		if (INT_GET(sib_info->back, ARCH_CONVERT) != last_blkno ||
-		    INT_GET(sib_info->magic, ARCH_CONVERT) != INT_GET(dead_info->magic, ARCH_CONVERT)) {
+		if (   INT_GET(sib_info->back, ARCH_CONVERT) != last_blkno
+		    || INT_GET(sib_info->magic, ARCH_CONVERT)
+				!= INT_GET(dead_info->magic, ARCH_CONVERT)) {
 			error = XFS_ERROR(EFSCORRUPTED);
 			goto done;
 		}
@@ -2106,7 +2115,7 @@ xfs_da_do_buf(
 	xfs_trans_t	*trans,
 	xfs_inode_t	*dp,
 	xfs_dablk_t	bno,
-	xfs_daddr_t		*mappedbnop,
+	xfs_daddr_t	*mappedbnop,
 	xfs_dabuf_t	**bpp,
 	int		whichfork,
 	int		caller,
@@ -2118,7 +2127,7 @@ xfs_da_do_buf(
 	int		i;
 	xfs_bmbt_irec_t	map;
 	xfs_bmbt_irec_t	*mapp;
-	xfs_daddr_t		mappedbno;
+	xfs_daddr_t	mappedbno;
 	xfs_mount_t	*mp;
 	int		nbplist;
 	int		nfsb;
