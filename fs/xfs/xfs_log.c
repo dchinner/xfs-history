@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.218 $"
+#ident	"$Revision: 1.220 $"
 
 /*
  * High level interface routines for log manager
@@ -1302,6 +1302,7 @@ xlog_grant_push_ail(xfs_mount_t	*mp,
     int		free_blocks;		/* free blocks left to write to */
     int		free_bytes;		/* free bytes left to write to */
     int		threshold_block;	/* block in lsn we'd like to be at */
+    int		threshold_cycle;	/* lsn cycle we'd like to be at */
     int		spl;
     int		free_threshold;
 
@@ -1324,13 +1325,13 @@ xlog_grant_push_ail(xfs_mount_t	*mp,
     free_threshold = MAX(free_threshold, 256);
     if (free_blocks < free_threshold) {
 	threshold_block = BLOCK_LSN(tail_lsn, ARCH_NOCONVERT) + free_threshold;
+	threshold_cycle = CYCLE_LSN(tail_lsn, ARCH_NOCONVERT);
 	if (threshold_block >= log->l_logBBsize) {
 	    threshold_block -= log->l_logBBsize;
-	    ((uint *)&threshold_lsn)[0] = CYCLE_LSN(tail_lsn, ARCH_NOCONVERT) +1;
-	} else {
-	    ((uint *)&threshold_lsn)[0] = CYCLE_LSN(tail_lsn, ARCH_NOCONVERT);
+	    threshold_cycle += 1;
 	}
-	((uint *)&threshold_lsn)[1] = threshold_block;
+	ASSIGN_ANY_LSN(threshold_lsn, threshold_cycle,
+		       threshold_block, ARCH_NOCONVERT);
 
 	/* Don't pass in an lsn greater than the lsn of the last
 	 * log record known to be on disk.
