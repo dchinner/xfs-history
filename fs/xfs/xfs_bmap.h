@@ -99,6 +99,7 @@ typedef struct xfs_bmapi_locals {
 	int			eof;	/* we've hit the end of extent list */
 	int			logflags; /* flags for transaction logging */
 	int			n;	/* current extent index */
+	int			nallocs; /* number of extents alloc\'d */
 	int			orig_flags; /* original flags arg value */
 	struct xfs_bmbt_irec	*orig_mval; /* original value of mval */
 	struct xfs_bmbt_rec	*ep;	/* extent list entry pointer */

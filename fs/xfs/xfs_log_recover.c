@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.28 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -940,7 +940,6 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	return 0;
 }	/* xlog_recover_do_buffer_trans */
 
-
 STATIC int
 xlog_recover_do_inode_trans(xlog_t		*log,
 			    xlog_recover_item_t *item)
@@ -1311,8 +1310,7 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 	ASSERT(!(efip->efi_flags & XFS_EFI_RECOVERED));
 
 	tp = xfs_trans_alloc(mp, 0);
-	xfs_trans_reserve(tp, 0, XFS_DEFAULT_LOG_RES(mp), 0, 0,
-			  XFS_DEFAULT_LOG_COUNT);
+	xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0, 0, 0);
 	efdp = xfs_trans_get_efd(tp, efip, efip->efi_format.efi_nextents);
 
 	for (i = 0; i < efip->efi_format.efi_nextents; i++) {

@@ -347,6 +347,14 @@ xfs_iread(
 		ip->i_d.di_magic = dip->di_core.di_magic;
 		ip->i_d.di_version = dip->di_core.di_version;
 		ip->i_d.di_gen = dip->di_core.di_gen;
+		/*
+		 * Make sure to pull in the mode here as well in
+		 * case the inode is released without being used.
+		 * This ensures that xfs_inactive() will see that
+		 * the inode is already free and not try to mess
+		 * with the unitialized part of it.
+		 */
+		ip->i_d.di_mode = 0;
 	}	
 
 	ip->i_delayed_blks = 0;
