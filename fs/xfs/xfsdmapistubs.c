@@ -34,6 +34,8 @@
  * 	spec.
  */
 
+#include <xfs.h>
+
 
 int	xfs_dm_fcntl(void) { return nopkg(); }
 
