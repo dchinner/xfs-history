@@ -295,7 +295,7 @@ LD_VMLINUX	:= $(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o init/do_moun
 			$(LIBS) \
 			--end-group
 ifeq ($(CONFIG_KALLSYMS),y)
-LD_VMLINUX_KALLSYMS	:= $(TMPPREFIX).tmp_kallsyms2.o
+LD_VMLINUX_KALLSYMS	:= $(TMPPREFIX).tmp_kallsyms3.o
 else
 LD_VMLINUX_KALLSYMS	:=
 endif
@@ -313,6 +313,9 @@ ifeq ($(CONFIG_KALLSYMS),y)
 	@echo kallsyms pass 2
 	@$(LD_VMLINUX) $(TMPPREFIX).tmp_kallsyms1.o -o $(TMPPREFIX).tmp_vmlinux2
 	@$(KALLSYMS) $(TMPPREFIX).tmp_vmlinux2 > $(TMPPREFIX).tmp_kallsyms2.o
+	@echo kallsyms pass 3
+	@$(LD_VMLINUX) $(TMPPREFIX).tmp_kallsyms2.o -o $(TMPPREFIX).tmp_vmlinux3
+	@$(KALLSYMS) $(TMPPREFIX).tmp_vmlinux3 > $(TMPPREFIX).tmp_kallsyms3.o
 endif
 	$(LD_VMLINUX) $(LD_VMLINUX_KALLSYMS) -o $(TMPPREFIX)vmlinux
 ifneq ($(TMPPREFIX),)
