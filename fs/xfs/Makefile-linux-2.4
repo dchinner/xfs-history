@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 31
+SUBLEVEL = 32
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -121,6 +121,10 @@ ifdef CONFIG_DRM
 DRIVERS += drivers/char/drm/drm.o
 endif
 
+ifeq ($(CONFIG_AGP),y)
+DRIVERS += drivers/char/agp/agp.o
+endif
+
 ifdef CONFIG_NUBUS
 DRIVERS := $(DRIVERS) drivers/nubus/nubus.a
 endif
@@ -202,7 +206,7 @@ DRIVERS := $(DRIVERS) drivers/sgi/sgi.a
 endif
 
 ifdef CONFIG_VT
-DRIVERS := $(DRIVERS) drivers/video/video.a
+DRIVERS := $(DRIVERS) drivers/video/video.o
 endif
 
 ifeq ($(CONFIG_PARIDE),y)
