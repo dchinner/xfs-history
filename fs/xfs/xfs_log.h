@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -117,7 +117,7 @@ void xfs_log_print(struct xfs_mount *mp,
 		   uint		    flags);
 
 
-extern int log_debug;		/* set to 1 to enable real log */
+extern int xlog_debug;		/* set to 1 to enable real log */
 
 #define XFS_ERECOVER	4	/* Failure to recover log */
 #define XFS_ENOLOGSPACE	3	/* Reservation too large */

@@ -125,7 +125,7 @@ xfs_trans_dup(xfs_trans_t *tp)
 	XFS_LIC_INIT(&(ntp->t_items));
 
 	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
-	ASSERT(!log_debug || (tp->t_ticket != NULL));
+	ASSERT(!xlog_debug || (tp->t_ticket != NULL));
 	ntp->t_flags = XFS_TRANS_PERM_LOG_RES;
 	ntp->t_ticket = tp->t_ticket;
 	ntp->t_log_res = tp->t_log_res;
@@ -606,7 +606,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket,
 			      &(tp->t_lsn));
 	ASSERT(error == 0);
-	if (log_debug) {
+	if (xlog_debug) {
 		commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket,
 					  log_flags);
 	} else {
@@ -639,7 +639,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 * After this call we cannot reference tp, because the call
 	 * can happen at any time and tp can be freed.
 	 */
-	if (log_debug) {
+	if (xlog_debug) {
 		tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
 		tp->t_logcb.cb_arg = tp;
 		xfs_log_notify(tp->t_mountp, commit_lsn, &(tp->t_logcb));
