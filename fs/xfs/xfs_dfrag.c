@@ -219,6 +219,22 @@ xfs_swapext(
 		goto error0;
 	}
 
+	/* We need to fail if the file is memory mapped, we also need to
+	 * prevent it from getting mapped before we have tossed the existing
+	 * pages. By setting VREMAPPING here we force a pas_vfault to go to
+	 * the filesystem for pages. Once we have tossed all existing pages
+	 * we can clear VREMAPPING as the page fault will have no option but
+	 * to go to the filesystem for pages. By making the page fault call
+	 * VOP_READ (or write in the case of autogrow) they block on the iolock
+	 * until we have switched the extents.
+	 */
+	VN_FLAGSET(vp, VREMAPPING);
+	if (VN_MAPPED(vp)) {
+		error = XFS_ERROR(EBUSY);
+		VN_FLAGCLR(vp, VREMAPPING);
+		goto error0;
+	}
+
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	xfs_iunlock(tip, XFS_ILOCK_EXCL);
 
@@ -232,6 +248,7 @@ xfs_swapext(
 
 	last_byte = xfs_file_last_byte(ip);
 	VOP_TOSS_PAGES(vp, 0, last_byte, FI_REMAPF);
+	VN_FLAGCLR(vp, VREMAPPING);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SWAPEXT);
 	if (error = xfs_trans_reserve(tp, 0,
