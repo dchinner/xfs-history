@@ -444,11 +444,20 @@ linvfs_read_super(
 
 	/*  Set up the vfs_t structure  */
 	vfsp = vfs_allocate();
+	if (!vfsp) 
+		return NULL; 
+
 	if (sb->s_flags & MS_RDONLY)
 		vfsp->vfs_flag |= VFS_RDONLY;
 
 	/*  Setup up the cvp structure  */
-	cip = (struct inode *)kmem_alloc(sizeof(struct inode), 0);
+
+	cip = (struct inode *)kmem_alloc(sizeof(struct inode),0);
+	if (!cip) { 
+		vfs_deallocate(vfsp);
+		return NULL;
+	} 
+
 	bzero(cip, sizeof(*cip));
 	atomic_set(&cip->i_count, 1);
 
@@ -513,7 +522,12 @@ linvfs_read_super(
 	return(sb);
 
 fail_vnrele:
-	VN_RELE(rootvp);
+	if (sb->s_root) {
+		dput(sb->s_root);
+		sb->s_root = NULL;
+	} else {
+		VN_RELE(rootvp);
+	}
 
 fail_unmount:
 	VFS_UNMOUNT(vfsp, 0, sys_cred, error);
