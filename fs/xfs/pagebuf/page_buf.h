@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -98,7 +98,7 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 
 	PBF_FORCEIO = (1 << 22), /* ignore any cache state		   */
 	PBF_FLUSH = (1 << 23),	/* flush disk write cache		   */
-	PBF_READ_AHEAD = (1 << 24), /* asynchronous read-ahead
+	PBF_READ_AHEAD = (1 << 24), /* asynchronous read-ahead		   */
 	PBF_RUN_QUEUES = (1 << 25), /* run block device task queue	   */
 	PBF_DIRECTIO = (1 << 26), /* used for a direct IO mapping	   */
 
