@@ -105,7 +105,6 @@ xfs_swapext(
 	vnode_t 	*vp, *tvp;
         bhv_desc_t      *bdp, *tbdp;
         vn_bhv_head_t   *bhp, *tbhp;
-	xfs_fsize_t	last_byte;
 	uint		lock_flags;
 	int		ilf_fields, tilf_fields;
 	int		error = 0;
@@ -279,8 +278,7 @@ xfs_swapext(
 	 * fields change.
 	 */
 
-	last_byte = xfs_file_last_byte(ip);
-	VOP_TOSS_PAGES(vp, 0, last_byte - 1, FI_REMAPF);
+	VOP_TOSS_PAGES(vp, 0, FI_REMAPF);
 	VN_FLAGCLR(vp, VREMAPPING);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SWAPEXT);

@@ -1448,8 +1448,7 @@ xfs_inval_cached_pages(
 	}
 	xfs_inval_cached_trace(io, offset, len, ctooff(offtoct(offset)),
 		flush_end);
-	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), (off_t)flush_end,
-			FI_REMAPF_LOCKED);
+	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), FI_REMAPF_LOCKED);
 	if (relock) {
 		XFS_IUNLOCK(mp, io, XFS_IOLOCK_EXCL);
 		XFS_ILOCK(mp, io, XFS_IOLOCK_SHARED);

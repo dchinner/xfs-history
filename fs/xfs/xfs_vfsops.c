@@ -1542,7 +1542,6 @@ xfs_syncsub(
 	uint		log_flags;
 	boolean_t	mount_locked;
 	boolean_t	vnode_refed;
-	xfs_fsize_t	last_byte;
 	int		preempt;
 	xfs_dinode_t	*dip;
 	xfs_buf_log_item_t	*bip;
@@ -1777,26 +1776,22 @@ xfs_syncsub(
 			 * because we only come here when we're shutting
 			 * down anyway.
 			 */
-			last_byte = xfs_file_last_byte(ip);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			if (XFS_FORCED_SHUTDOWN(mp)) {
                                 if (xflags & XFS_XSYNC_RELOC) {
 					fs_tosspages(XFS_ITOBHV(ip), 0,
-						     last_byte - 1, FI_REMAPF);
+						     FI_REMAPF);
 				}
 				else {
-					VOP_TOSS_PAGES(vp, 0, last_byte - 1, 
-					               FI_REMAPF);
+					VOP_TOSS_PAGES(vp, 0, FI_REMAPF);
 				}
 			} else {
                                 if (xflags & XFS_XSYNC_RELOC) {
 					fs_flushinval_pages(XFS_ITOBHV(ip),
-							    0, last_byte - 1,
-							    FI_REMAPF);
+							    0, FI_REMAPF);
 				}
 				else {
-					VOP_FLUSHINVAL_PAGES(vp, 0, last_byte - 1, 
-							     FI_REMAPF);
+					VOP_FLUSHINVAL_PAGES(vp, 0, FI_REMAPF);
 				}
 			}
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -1814,9 +1809,8 @@ xfs_syncsub(
 				 * Drop the inode lock since we can't hold it
 				 * across calls to the buffer cache.
 				 */
-				last_byte = xfs_file_last_byte(ip);
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				VOP_FLUSH_PAGES(vp, (off_t)0, last_byte - 1,
+				VOP_FLUSH_PAGES(vp, (off_t)0,
 						fflag, FI_NONE, error);
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}

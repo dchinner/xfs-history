@@ -1350,7 +1350,7 @@ xfs_fsync(
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_df.if_flags & XFS_IFEXTENTS &&
 		    ip->i_df.if_bytes > 0) {
-			VOP_FLUSHINVAL_PAGES(vp, start, stop, FI_REMAPF_LOCKED);
+			VOP_FLUSHINVAL_PAGES(vp, start, FI_REMAPF_LOCKED);
 		}
 		ASSERT(syncall == 0 ||
 		       (vp->v_pgcnt == 0 && vp->v_buf == 0));
@@ -1360,7 +1360,7 @@ xfs_fsync(
 		 * flush all the dirty mmap'd pages.  That requires a
 		 * call to msync().
 		 */
-		VOP_FLUSH_PAGES(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : XFS_B_ASYNC,
+		VOP_FLUSH_PAGES(vp, start, (flag & FSYNC_WAIT) ? 0 : XFS_B_ASYNC,
 				FI_NONE, error2);
 	}
 
@@ -5439,7 +5439,6 @@ xfs_reclaim(
 	int		flag)
 {
 	xfs_inode_t	*ip;
-	xfs_fsize_t	last_byte;
 	int		locked;
 	int		error;
 	vnode_t 	*vp;
@@ -5524,7 +5523,6 @@ xfs_reclaim(
 				locked = 0;
 			}
 			xfs_ilock(ip, XFS_IOLOCK_EXCL);
-			last_byte = xfs_file_last_byte(ip);
 			
 			/*
 			 * If we hit an IO error, we need to make sure that the
@@ -5536,9 +5534,9 @@ xfs_reclaim(
 			 * hates that.
 			 */
 			if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
-				VOP_FLUSHINVAL_PAGES(vp, 0, last_byte - 1, FI_NONE);
+				VOP_FLUSHINVAL_PAGES(vp, 0, FI_NONE);
 			} else {
-				VOP_TOSS_PAGES(vp, 0, XFS_MAX_FILE_OFFSET, FI_NONE);
+				VOP_TOSS_PAGES(vp, 0, FI_NONE);
 			}
 			
 			ASSERT(!VN_DIRTY(vp) && 
@@ -5553,7 +5551,7 @@ xfs_reclaim(
 			 * di_size field may not be quite accurate if we're
 			 * shutting down.
 			 */
-			VOP_TOSS_PAGES(vp, 0, XFS_MAX_FILE_OFFSET, FI_NONE);
+			VOP_TOSS_PAGES(vp, 0, FI_NONE);
 			ASSERT(!VN_DIRTY(vp) && 
 			       (ip->i_iocore.io_queued_bufs == 0) &&
 			       (vp->v_pgcnt == 0) &&
