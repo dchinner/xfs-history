@@ -93,8 +93,8 @@ typedef union pagebuf_param {
 					 * delwri flush daemon.  */
 		ulong	age_buffer;	/* time for buffer to age before
 					 * we flush it.  */
-		ulong	debug;		/* debug tracing on or off */
 		ulong	stats_clear;	/* clear the pagebuf stats */
+		ulong	debug;		/* debug tracing on or off */
 	} p_un;
 	ulong data[P_PARAM];
 } pagebuf_param_t;
