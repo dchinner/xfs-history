@@ -2822,8 +2822,8 @@ xfs_bmap_btree_to_extents(
 	ASSERT(ifp->if_flags & XFS_IFEXTENTS);
 	ASSERT(XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE);
 	rblock = ifp->if_broot;
-	ASSERT(rblock->bb_level == 1);
-	ASSERT(rblock->bb_numrecs == 1);
+	ASSERT(INT_GET(rblock->bb_level, ARCH_UNKNOWN) == 1);
+	ASSERT(INT_GET(rblock->bb_numrecs, ARCH_UNKNOWN) == 1);
 	ASSERT(XFS_BMAP_BROOT_MAXRECS(ifp->if_broot_bytes) == 1);
 	mp = ip->i_mount;
 	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, ifp->if_broot_bytes);
@@ -3286,10 +3286,10 @@ xfs_bmap_extents_to_btree(
 	 * Fill in the root.
 	 */
 	block = ifp->if_broot;
-	block->bb_magic = XFS_BMAP_MAGIC;
-	block->bb_level = 1;
-	block->bb_numrecs = 1;
-	block->bb_leftsib = block->bb_rightsib = NULLDFSBNO;
+	INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_BMAP_MAGIC);
+	INT_SET(block->bb_level, ARCH_UNKNOWN, 1);
+	INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
+	INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLDFSBNO);
 	/*
 	 * Need a cursor.  Can't allocate until bb_level is filled in.
 	 */
@@ -3345,19 +3345,19 @@ xfs_bmap_extents_to_btree(
 	 * Fill in the child block.
 	 */
 	ablock = XFS_BUF_TO_BMBT_BLOCK(abp);
-	ablock->bb_magic = XFS_BMAP_MAGIC;
-	ablock->bb_level = 0;
-	ablock->bb_numrecs = 0;
-	ablock->bb_leftsib = ablock->bb_rightsib = NULLDFSBNO;
+	INT_SET(ablock->bb_magic, ARCH_UNKNOWN, XFS_BMAP_MAGIC);
+	INT_ZERO(ablock->bb_level, ARCH_UNKNOWN);
+	INT_ZERO(ablock->bb_numrecs, ARCH_UNKNOWN);
+	INT_SET(ablock->bb_leftsib, ARCH_UNKNOWN, ablock->bb_rightsib = NULLDFSBNO);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	for (ep = ifp->if_u1.if_extents, i = 0; i < nextents; i++, ep++) {
 		if (!ISNULLSTARTBLOCK(xfs_bmbt_get_startblock(ep))) {
 			*arp++ = *ep;
-			ablock->bb_numrecs++;
+			INT_MOD(ablock->bb_numrecs, ARCH_UNKNOWN, +1);
 		}
 	}
-	ASSERT(ablock->bb_numrecs == XFS_IFORK_NEXTENTS(ip, whichfork));
+	ASSERT(INT_GET(ablock->bb_numrecs, ARCH_UNKNOWN) == XFS_IFORK_NEXTENTS(ip, whichfork));
 	/*
 	 * Fill in the root key and pointer.
 	 */
@@ -3371,7 +3371,7 @@ xfs_bmap_extents_to_btree(
 	 * the root is at the right level.
 	 */
 	xfs_bmbt_log_block(cur, abp, XFS_BB_ALL_BITS);
-	xfs_bmbt_log_recs(cur, abp, 1, ablock->bb_numrecs);
+	xfs_bmbt_log_recs(cur, abp, 1, INT_GET(ablock->bb_numrecs, ARCH_UNKNOWN));
 	ASSERT(*curp == NULL);
 	*curp = cur;
 	*logflagsp = XFS_ILOG_CORE | XFS_ILOG_FBROOT(whichfork);
@@ -4491,8 +4491,8 @@ xfs_bmap_read_extents(
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
-	ASSERT(block->bb_level > 0);
-	level = block->bb_level;
+	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
+	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
 	ASSERT(*pp != NULLDFSBNO);
 	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
@@ -4533,7 +4533,7 @@ xfs_bmap_read_extents(
 		xfs_extnum_t	num_recs;
 
 
-		num_recs = block->bb_numrecs;
+		num_recs = INT_GET(block->bb_numrecs, ARCH_UNKNOWN);
 		if (i + num_recs > room) {
 			ASSERT(i + num_recs <= room);
 			xfs_fs_cmn_err(CE_WARN, ip->i_mount,
@@ -4547,7 +4547,7 @@ xfs_bmap_read_extents(
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
-		nextbno = block->bb_rightsib;
+		nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
 		if (nextbno != NULLFSBLOCK)
 			xfs_btree_reada_bufl(mp, nextbno, 1);
 		/*
@@ -4792,7 +4792,7 @@ xfs_bmapi(
 	}
 	if (wr && *firstblock == NULLFSBLOCK) {
 		if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE)
-			minleft = ifp->if_broot->bb_level + 1;
+			minleft = INT_GET(ifp->if_broot->bb_level, ARCH_UNKNOWN) + 1;
 		else
 			minleft = 1;
 	} else
@@ -6027,10 +6027,10 @@ xfs_check_block(
 	xfs_bmbt_ptr_t		*pp, *thispa;	/* pointer to block address */
 	xfs_bmbt_key_t		*prevp, *keyp;
 
-	ASSERT(block->bb_level > 0);
+	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
 
 	prevp = NULL;
-	for( i = 1; i <= block->bb_numrecs;i++) {
+	for( i = 1; i <= INT_GET(block->bb_numrecs, ARCH_UNKNOWN);i++) {
 		dmxr = mp->m_bmap_dmxr[0];
 
 		if (root) {
@@ -6055,7 +6055,7 @@ xfs_check_block(
 			pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize,
 				xfs_bmbt, block, i, dmxr);
 		}
-		for (j = i+1; j <= block->bb_numrecs; j++) {
+		for (j = i+1; j <= INT_GET(block->bb_numrecs, ARCH_UNKNOWN); j++) {
 			if (root) {
 				thispa = XFS_BMAP_BROOT_PTR_ADDR(block, j, sz);
 			} else {
@@ -6105,8 +6105,8 @@ xfs_bmap_check_leaf_extents(
 	/*
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
-	ASSERT(block->bb_level > 0);
-	level = block->bb_level;
+	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
+	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
 	xfs_check_block(block, mp, 1, ifp->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
 	ASSERT(*pp != NULLDFSBNO);
@@ -6166,13 +6166,13 @@ xfs_bmap_check_leaf_extents(
 		xfs_extnum_t	num_recs;
 
 
-		num_recs = block->bb_numrecs;
+		num_recs = INT_GET(block->bb_numrecs, ARCH_UNKNOWN);
 
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
 
-		nextbno = block->bb_rightsib;
+		nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
 
 		/*
 		 * Check all the extents to make sure they are OK.
@@ -6265,8 +6265,8 @@ xfs_bmap_count_blocks(
 	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
 	 */
 	block = ifp->if_broot;
-	ASSERT(block->bb_level > 0);
-	level = block->bb_level;
+	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
+	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
 	ASSERT(*pp != NULLDFSBNO);
 	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
@@ -6308,14 +6308,14 @@ xfs_bmap_count_tree(
 
 	if (--level) {
 		/* Not at node above leafs, count this level of nodes */
-		nextbno = block->bb_rightsib;
+		nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
 		while (nextbno != NULLFSBLOCK) {
 			if (error = xfs_btree_read_bufl(mp, tp, nextbno, 
 				0, &nbp, XFS_BMAP_BTREE_REF))
 				return error;
 			*count += 1;
 			nextblock = XFS_BUF_TO_BMBT_BLOCK(nbp);
-			nextbno = nextblock->bb_rightsib;
+			nextbno = INT_GET(nextblock->bb_rightsib, ARCH_UNKNOWN);
 			xfs_trans_brelse(tp, nbp);
 		}
 
@@ -6332,8 +6332,8 @@ xfs_bmap_count_tree(
 	} else {
 		/* count all level 1 nodes and their leaves */
 		for (;;) {
-			nextbno = block->bb_rightsib;
-			numrecs = block->bb_numrecs;
+			nextbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
+			numrecs = INT_GET(block->bb_numrecs, ARCH_UNKNOWN);
 			frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, 
 				xfs_bmbt, block, 1, mp->m_bmap_dmxr[0]);
 			if (xfs_bmap_count_leaves(frp, numrecs, count) < 0) {

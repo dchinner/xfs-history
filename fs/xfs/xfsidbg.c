@@ -1551,10 +1551,10 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	}
 	broot = f->if_broot;
 	printk("block @0x%p magic %x level %d numrecs %d\n",
-		broot, broot->bb_magic, broot->bb_level, broot->bb_numrecs);
+		broot, INT_GET(broot->bb_magic, ARCH_UNKNOWN), INT_GET(broot->bb_level, ARCH_UNKNOWN), INT_GET(broot->bb_numrecs, ARCH_UNKNOWN));
 	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, f->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
-	for (i = 1; i <= broot->bb_numrecs; i++)
+	for (i = 1; i <= INT_GET(broot->bb_numrecs, ARCH_UNKNOWN); i++)
 		printk("\t%d: startoff %Ld ptr %Lx %s\n",
 			i, kp[i - 1].br_startoff, pp[i - 1],
 			xfs_fmtfsblock(pp[i - 1], ip->i_mount));
@@ -1569,11 +1569,11 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 	int i;
 
 	printk("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
-		bt->bb_magic, bt->bb_level, bt->bb_numrecs,
-		bt->bb_leftsib, bt->bb_rightsib);
-	if (bt->bb_level == 0) {
+		INT_GET(bt->bb_magic, ARCH_UNKNOWN), INT_GET(bt->bb_level, ARCH_UNKNOWN), INT_GET(bt->bb_numrecs, ARCH_UNKNOWN),
+		INT_GET(bt->bb_leftsib, ARCH_UNKNOWN), INT_GET(bt->bb_rightsib, ARCH_UNKNOWN));
+	if (INT_GET(bt->bb_level, ARCH_UNKNOWN) == 0) {
 
-		for (i = 1; i <= bt->bb_numrecs; i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
 			xfs_alloc_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_alloc, bt, i, 0);
@@ -1584,7 +1584,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_alloc, 0);
-		for (i = 1; i <= bt->bb_numrecs; i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
 			xfs_alloc_key_t *k;
 			xfs_alloc_ptr_t *p;
 
@@ -1605,12 +1605,13 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 	int i;
 
 	printk("magic 0x%x level %d numrecs %d leftsib %Lx ",
-		bt->bb_magic, bt->bb_level, bt->bb_numrecs,
-		bt->bb_leftsib);
-	printk("rightsib %Lx\n", bt->bb_rightsib);
-	if (bt->bb_level == 0) {
-
-		for (i = 1; i <= bt->bb_numrecs; i++) {
+		INT_GET(bt->bb_magic, ARCH_UNKNOWN),
+		INT_GET(bt->bb_level, ARCH_UNKNOWN),
+		INT_GET(bt->bb_numrecs, ARCH_UNKNOWN),
+		INT_GET(bt->bb_leftsib, ARCH_UNKNOWN));
+	printk("rightsib %Lx\n", INT_GET(bt->bb_rightsib, ARCH_UNKNOWN));
+	if (INT_GET(bt->bb_level, ARCH_UNKNOWN) == 0) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
 			xfs_bmbt_rec_64_t *r;
 			xfs_dfiloff_t o;
 			xfs_dfsbno_t s;
@@ -1628,7 +1629,7 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_bmbt, 0);
-		for (i = 1; i <= bt->bb_numrecs; i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
 			xfs_bmbt_key_t *k;
 			xfs_bmbt_ptr_t *p;
 
@@ -1650,11 +1651,11 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 	int i;
 
 	printk("magic 0x%x level %d numrecs %d leftsib 0x%x rightsib 0x%x\n",
-		bt->bb_magic, bt->bb_level, bt->bb_numrecs,
-		bt->bb_leftsib, bt->bb_rightsib);
-	if (bt->bb_level == 0) {
+		INT_GET(bt->bb_magic, ARCH_UNKNOWN), INT_GET(bt->bb_level, ARCH_UNKNOWN), INT_GET(bt->bb_numrecs, ARCH_UNKNOWN),
+		INT_GET(bt->bb_leftsib, ARCH_UNKNOWN), INT_GET(bt->bb_rightsib, ARCH_UNKNOWN));
+	if (INT_GET(bt->bb_level, ARCH_UNKNOWN) == 0) {
 
-		for (i = 1; i <= bt->bb_numrecs; i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
 			xfs_inobt_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
@@ -1666,7 +1667,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 		int mxr;
 
 		mxr = XFS_BTREE_BLOCK_MAXRECS(bsz, xfs_inobt, 0);
-		for (i = 1; i <= bt->bb_numrecs; i++) {
+		for (i = 1; i <= INT_GET(bt->bb_numrecs, ARCH_UNKNOWN); i++) {
 			xfs_inobt_key_t *k;
 			xfs_inobt_ptr_t *p;
 
@@ -2572,34 +2573,34 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			printk("buf 0x%p agi 0x%p\n", bp, agi);
 			xfsidbg_xagi(agi);
 		}
-	} else if ((bta = d)->bb_magic == XFS_ABTB_MAGIC) {
+	} else if (INT_GET((bta = d)->bb_magic, ARCH_UNKNOWN) == XFS_ABTB_MAGIC) {
 		if (summary) {
 			printk("Alloc BNO Btree blk, level %d (at 0x%p)\n",
-				       bta->bb_level, bta);
+				       INT_GET(bta->bb_level, ARCH_UNKNOWN), bta);
 		} else {
 			printk("buf 0x%p abtbno 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
-	} else if ((bta = d)->bb_magic == XFS_ABTC_MAGIC) {
+	} else if (INT_GET((bta = d)->bb_magic, ARCH_UNKNOWN) == XFS_ABTC_MAGIC) {
 		if (summary) {
 			printk("Alloc COUNT Btree blk, level %d (at 0x%p)\n",
-				       bta->bb_level, bta);
+				       INT_GET(bta->bb_level, ARCH_UNKNOWN), bta);
 		} else {
 			printk("buf 0x%p abtcnt 0x%p\n", bp, bta);
 			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
-	} else if ((btb = d)->bb_magic == XFS_BMAP_MAGIC) {
+	} else if (INT_GET((btb = d)->bb_magic, ARCH_UNKNOWN) == XFS_BMAP_MAGIC) {
 		if (summary) {
 			printk("Bmap Btree blk, level %d (at 0x%p)\n",
-				      btb->bb_level, btb);
+				      INT_GET(btb->bb_level, ARCH_UNKNOWN), btb);
 		} else {
 			printk("buf 0x%p bmapbt 0x%p\n", bp, btb);
 			xfs_btbmap(btb, XFS_BUF_COUNT(bp));
 		}
-	} else if ((bti = d)->bb_magic == XFS_IBT_MAGIC) {
+	} else if (INT_GET((bti = d)->bb_magic, ARCH_UNKNOWN) == XFS_IBT_MAGIC) {
 		if (summary) {
 			printk("Inode Btree blk, level %d (at 0x%p)\n",
-				       bti->bb_level, bti);
+				       INT_GET(bti->bb_level, ARCH_UNKNOWN), bti);
 		} else {
 			printk("buf 0x%p inobt 0x%p\n", bp, bti);
 			xfs_btino(bti, XFS_BUF_COUNT(bp));

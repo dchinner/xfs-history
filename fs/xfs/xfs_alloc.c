@@ -504,7 +504,7 @@ xfs_alloc_fixup_trees(
 			bnoblock = XFS_BUF_TO_ALLOC_BLOCK(bno_cur->bc_bufs[0]);
 			cntblock = XFS_BUF_TO_ALLOC_BLOCK(cnt_cur->bc_bufs[0]);
 			XFS_WANT_CORRUPTED_RETURN(
-				bnoblock->bb_numrecs == cntblock->bb_numrecs);
+				INT_GET(bnoblock->bb_numrecs, ARCH_UNKNOWN) == INT_GET(cntblock->bb_numrecs, ARCH_UNKNOWN));
 		}
 	}
 #endif

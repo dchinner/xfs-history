@@ -257,10 +257,10 @@ xfs_growfs_data(
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
-		block->bb_magic = XFS_ABTB_MAGIC;
-		block->bb_level = 0;
-		block->bb_numrecs = 1;
-		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
+		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_ABTB_MAGIC);
+		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
+		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
+		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
@@ -277,10 +277,10 @@ xfs_growfs_data(
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
-		block->bb_magic = XFS_ABTC_MAGIC;
-		block->bb_level = 0;
-		block->bb_numrecs = 1;
-		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
+		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_ABTC_MAGIC);
+		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
+		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
+		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
@@ -298,10 +298,10 @@ xfs_growfs_data(
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
-		block->bb_magic = XFS_IBT_MAGIC;
-		block->bb_level = 0;
-		block->bb_numrecs = 0;
-		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
+		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_IBT_MAGIC);
+		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
+		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 0);
+		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLAGBLOCK);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;

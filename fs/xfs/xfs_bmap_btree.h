@@ -289,8 +289,10 @@ xfs_bmap_rec_daddr(xfs_bmbt_block_t *bb, int i, struct xfs_btree_cur *cur);
 #define	XFS_BMAP_REC_DADDR(bb,i,cur)		xfs_bmap_rec_daddr(bb,i,cur)
 #else
 #define	XFS_BMAP_REC_DADDR(bb,i,cur) \
-	XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_DSIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i, XFS_BMAP_BLOCK_DMAXRECS((bb)->bb_level, cur))
+	XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_DSIZE(		\
+		INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur),	\
+		xfs_bmbt, bb, i, XFS_BMAP_BLOCK_DMAXRECS(	\
+			INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_REC_IADDR)
 xfs_bmbt_rec_t *
@@ -298,8 +300,10 @@ xfs_bmap_rec_iaddr(xfs_bmbt_block_t *bb, int i, struct xfs_btree_cur *cur);
 #define	XFS_BMAP_REC_IADDR(bb,i,cur)		xfs_bmap_rec_iaddr(bb,i,cur)
 #else
 #define	XFS_BMAP_REC_IADDR(bb,i,cur) \
-	XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_ISIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i, XFS_BMAP_BLOCK_IMAXRECS((bb)->bb_level, cur))
+	XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_ISIZE(		\
+		INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur),	\
+		xfs_bmbt, bb, i, XFS_BMAP_BLOCK_IMAXRECS(	\
+			INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur))
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_KEY_DADDR)
@@ -308,8 +312,10 @@ xfs_bmap_key_daddr(xfs_bmbt_block_t *bb, int i, struct xfs_btree_cur *cur);
 #define	XFS_BMAP_KEY_DADDR(bb,i,cur)		xfs_bmap_key_daddr(bb,i,cur)
 #else
 #define	XFS_BMAP_KEY_DADDR(bb,i,cur) \
-	XFS_BTREE_KEY_ADDR(XFS_BMAP_BLOCK_DSIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i, XFS_BMAP_BLOCK_DMAXRECS((bb)->bb_level, cur))
+	XFS_BTREE_KEY_ADDR(XFS_BMAP_BLOCK_DSIZE(		\
+		INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur),	\
+		xfs_bmbt, bb, i, XFS_BMAP_BLOCK_DMAXRECS(	\
+			INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_KEY_IADDR)
 xfs_bmbt_key_t *
@@ -317,8 +323,10 @@ xfs_bmap_key_iaddr(xfs_bmbt_block_t *bb, int i, struct xfs_btree_cur *cur);
 #define	XFS_BMAP_KEY_IADDR(bb,i,cur)		xfs_bmap_key_iaddr(bb,i,cur)
 #else
 #define	XFS_BMAP_KEY_IADDR(bb,i,cur) \
-	XFS_BTREE_KEY_ADDR(XFS_BMAP_BLOCK_ISIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i, XFS_BMAP_BLOCK_IMAXRECS((bb)->bb_level, cur))
+	XFS_BTREE_KEY_ADDR(XFS_BMAP_BLOCK_ISIZE(		\
+		INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur),	\
+		xfs_bmbt, bb, i, XFS_BMAP_BLOCK_IMAXRECS(	\
+			INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur))
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_PTR_DADDR)
@@ -327,8 +335,10 @@ xfs_bmap_ptr_daddr(xfs_bmbt_block_t *bb, int i, struct xfs_btree_cur *cur);
 #define	XFS_BMAP_PTR_DADDR(bb,i,cur)		xfs_bmap_ptr_daddr(bb,i,cur)
 #else
 #define	XFS_BMAP_PTR_DADDR(bb,i,cur) \
-	XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_DSIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i, XFS_BMAP_BLOCK_DMAXRECS((bb)->bb_level, cur))
+	XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_DSIZE(		\
+		INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur),	\
+		xfs_bmbt, bb, i, XFS_BMAP_BLOCK_DMAXRECS(	\
+			INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_PTR_IADDR)
 xfs_bmbt_ptr_t *
@@ -336,8 +346,10 @@ xfs_bmap_ptr_iaddr(xfs_bmbt_block_t *bb, int i, struct xfs_btree_cur *cur);
 #define	XFS_BMAP_PTR_IADDR(bb,i,cur)		xfs_bmap_ptr_iaddr(bb,i,cur)
 #else
 #define	XFS_BMAP_PTR_IADDR(bb,i,cur) \
-	XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_ISIZE((bb)->bb_level,cur), xfs_bmbt, \
-			   bb, i, XFS_BMAP_BLOCK_IMAXRECS((bb)->bb_level, cur))
+	XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_ISIZE(		\
+		INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur),	\
+		xfs_bmbt, bb, i, XFS_BMAP_BLOCK_IMAXRECS(	\
+			INT_GET((bb)->bb_level, ARCH_UNKNOWN), cur))
 #endif
 
 /*
@@ -370,7 +382,7 @@ xfs_bmbt_ptr_t *xfs_bmap_broot_ptr_addr(xfs_bmbt_block_t *bb, int i, int sz);
 int xfs_bmap_broot_numrecs(xfs_bmdr_block_t *bb);
 #define	XFS_BMAP_BROOT_NUMRECS(bb)		xfs_bmap_broot_numrecs(bb)
 #else
-#define	XFS_BMAP_BROOT_NUMRECS(bb) ((bb)->bb_numrecs)
+#define	XFS_BMAP_BROOT_NUMRECS(bb) (INT_GET((bb)->bb_numrecs, ARCH_UNKNOWN))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_BROOT_MAXRECS)
 int xfs_bmap_broot_maxrecs(int sz);
@@ -390,7 +402,8 @@ int xfs_bmap_broot_space_calc(int nrecs);
 int xfs_bmap_broot_space(xfs_bmdr_block_t *bb);
 #define	XFS_BMAP_BROOT_SPACE(bb)		xfs_bmap_broot_space(bb)
 #else
-#define	XFS_BMAP_BROOT_SPACE(bb) XFS_BMAP_BROOT_SPACE_CALC((bb)->bb_numrecs)
+#define	XFS_BMAP_BROOT_SPACE(bb) \
+	XFS_BMAP_BROOT_SPACE_CALC(INT_GET((bb)->bb_numrecs, ARCH_UNKNOWN))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMDR_SPACE_CALC)
 int xfs_bmdr_space_calc(int nrecs);
@@ -418,10 +431,10 @@ int xfs_bmap_sanity_check(struct xfs_mount *mp, xfs_bmbt_block_t *bb,
 	xfs_bmap_sanity_check(mp,bb,level)
 #else
 #define	XFS_BMAP_SANITY_CHECK(mp,bb,level)	\
-	((bb)->bb_magic == XFS_BMAP_MAGIC && \
-	 (bb)->bb_level == level && \
-	 (bb)->bb_numrecs > 0 && \
-	 (bb)->bb_numrecs <= (mp)->m_bmap_dmxr[(level) != 0])
+	(INT_GET((bb)->bb_magic, (mp)->m_arch) == XFS_BMAP_MAGIC && \
+	 INT_GET((bb)->bb_level, (mp)->m_arch) == level && \
+	 INT_GET((bb)->bb_numrecs, (mp)->m_arch) > 0 &&	\
+	 INT_GET((bb)->bb_numrecs, (mp)->m_arch) <= (mp)->m_bmap_dmxr[(level) != 0])
 #endif
 
 /*

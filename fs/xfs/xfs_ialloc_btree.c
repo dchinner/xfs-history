@@ -274,7 +274,7 @@ xfs_inobt_delrec(
 	/*
 	 * Fail if we're off the end of the block.
 	 */
-	if (ptr > block->bb_numrecs) {
+	if (ptr > INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 		*stat = 0;
 		return 0;
 	}
@@ -287,18 +287,18 @@ xfs_inobt_delrec(
 		kp = XFS_INOBT_KEY_ADDR(block, 1, cur);
 		pp = XFS_INOBT_PTR_ADDR(block, 1, cur);
 #ifdef DEBUG
-		for (i = ptr; i < block->bb_numrecs; i++) {
+		for (i = ptr; i < INT_GET(block->bb_numrecs, ARCH_UNKNOWN); i++) {
 			if (error = xfs_btree_check_sptr(cur, pp[i], level))
 				return error;
 		}
 #endif
-		if (ptr < block->bb_numrecs) {
+		if (ptr < INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 			ovbcopy(&kp[ptr], &kp[ptr - 1],
-				(block->bb_numrecs - ptr) * sizeof(*kp));
+				(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr) * sizeof(*kp));
 			ovbcopy(&pp[ptr], &pp[ptr - 1],
-				(block->bb_numrecs - ptr) * sizeof(*pp));
-			xfs_inobt_log_keys(cur, bp, ptr, block->bb_numrecs - 1);
-			xfs_inobt_log_ptrs(cur, bp, ptr, block->bb_numrecs - 1);
+				(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr) * sizeof(*pp));
+			xfs_inobt_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - 1);
+			xfs_inobt_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - 1);
 		}
 	}
 	/*
@@ -307,10 +307,10 @@ xfs_inobt_delrec(
 	 */
 	else {
 		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
-		if (ptr < block->bb_numrecs) {
+		if (ptr < INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 			ovbcopy(&rp[ptr], &rp[ptr - 1],
-				(block->bb_numrecs - ptr) * sizeof(*rp));
-			xfs_inobt_log_recs(cur, bp, ptr, block->bb_numrecs - 1);
+				(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr) * sizeof(*rp));
+			xfs_inobt_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - 1);
 		}
 		/*
 		 * If it's the first record in the block, we'll need a key
@@ -324,7 +324,7 @@ xfs_inobt_delrec(
 	/*
 	 * Decrement and log the number of entries in the block.
 	 */
-	block->bb_numrecs--;
+	INT_MOD(block->bb_numrecs, ARCH_UNKNOWN, -1);
 	xfs_inobt_log_block(cur->bc_tp, bp, XFS_BB_NUMRECS);
 	/*
 	 * Is this the root level?  If so, we're almost done.
@@ -336,7 +336,7 @@ xfs_inobt_delrec(
 		 * and it's NOT the leaf level,
 		 * then we can get rid of this level.
 		 */
-		if (block->bb_numrecs == 1 && level > 0) {
+		if (INT_GET(block->bb_numrecs, ARCH_UNKNOWN) == 1 && level > 0) {
 			agbp = cur->bc_private.i.agbp;
 			agi = XFS_BUF_TO_AGI(agbp);
 			/*
@@ -390,7 +390,7 @@ xfs_inobt_delrec(
 	 * If the number of records remaining in the block is at least
 	 * the minimum, we're done.
 	 */
-	if (block->bb_numrecs >= XFS_INOBT_BLOCK_MINRECS(level, cur)) {
+	if (INT_GET(block->bb_numrecs, ARCH_UNKNOWN) >= XFS_INOBT_BLOCK_MINRECS(level, cur)) {
 		if (level > 0 &&
 		    (error = xfs_inobt_decrement(cur, level, &i)))
 			return error;
@@ -402,8 +402,8 @@ xfs_inobt_delrec(
 	 * tree balanced.  Look at the left and right sibling blocks to
 	 * see if we can re-balance by moving only one record.
 	 */
-	rbno = block->bb_rightsib;
-	lbno = block->bb_leftsib;
+	rbno = INT_GET(block->bb_rightsib, ARCH_UNKNOWN);
+	lbno = INT_GET(block->bb_leftsib, ARCH_UNKNOWN);
 	bno = NULLAGBLOCK;
 	ASSERT(rbno != NULLAGBLOCK || lbno != NULLAGBLOCK);
 	/*
@@ -440,18 +440,18 @@ xfs_inobt_delrec(
 		/*
 		 * Grab the current block number, for future use.
 		 */
-		bno = right->bb_leftsib;
+		bno = INT_GET(right->bb_leftsib, ARCH_UNKNOWN);
 		/*
 		 * If right block is full enough so that removing one entry
 		 * won't make it too empty, and left-shifting an entry out
 		 * of right to us works, we're done.
 		 */
-		if (right->bb_numrecs - 1 >=
+		if (INT_GET(right->bb_numrecs, ARCH_UNKNOWN) - 1 >=
 		     XFS_INOBT_BLOCK_MINRECS(level, cur)) {
 			if (error = xfs_inobt_lshift(tcur, level, &i))
 				goto error0;
 			if (i) {
-				ASSERT(block->bb_numrecs >=
+				ASSERT(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) >=
 				       XFS_INOBT_BLOCK_MINRECS(level, cur));
 				xfs_btree_del_cursor(tcur,
 						     XFS_BTREE_NOERROR);
@@ -468,7 +468,7 @@ xfs_inobt_delrec(
 		 * future reference, and fix up the temp cursor to point 
 		 * to our block again (last record).
 		 */
-		rrecs = right->bb_numrecs;
+		rrecs = INT_GET(right->bb_numrecs, ARCH_UNKNOWN);
 		if (lbno != NULLAGBLOCK) {
 			xfs_btree_firstrec(tcur, level);
 			if (error = xfs_inobt_decrement(tcur, level, &i))
@@ -500,18 +500,18 @@ xfs_inobt_delrec(
 		/*
 		 * Grab the current block number, for future use.
 		 */
-		bno = left->bb_rightsib;
+		bno = INT_GET(left->bb_rightsib, ARCH_UNKNOWN);
 		/*
 		 * If left block is full enough so that removing one entry
 		 * won't make it too empty, and right-shifting an entry out
 		 * of left to us works, we're done.
 		 */
-		if (left->bb_numrecs - 1 >=
+		if (INT_GET(left->bb_numrecs, ARCH_UNKNOWN) - 1 >=
 		     XFS_INOBT_BLOCK_MINRECS(level, cur)) {
 			if (error = xfs_inobt_rshift(tcur, level, &i))
 				goto error0;
 			if (i) {
-				ASSERT(block->bb_numrecs >=
+				ASSERT(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) >=
 				       XFS_INOBT_BLOCK_MINRECS(level, cur));
 				xfs_btree_del_cursor(tcur,
 						     XFS_BTREE_NOERROR);
@@ -525,7 +525,7 @@ xfs_inobt_delrec(
 		 * Otherwise, grab the number of records in right for
 		 * future reference.
 		 */
-		lrecs = left->bb_numrecs;
+		lrecs = INT_GET(left->bb_numrecs, ARCH_UNKNOWN);
 	}
 	/*
 	 * Delete the temp cursor, we're done with it.
@@ -539,7 +539,7 @@ xfs_inobt_delrec(
 	 * See if we can join with the left neighbor block.
 	 */
 	if (lbno != NULLAGBLOCK &&
-	    lrecs + block->bb_numrecs <= XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
+	    lrecs + INT_GET(block->bb_numrecs, ARCH_UNKNOWN) <= XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
 		/*
 		 * Set "right" to be the starting block,
 		 * "left" to be the left neighbor.
@@ -559,7 +559,7 @@ xfs_inobt_delrec(
 	 * If that won't work, see if we can join with the right neighbor block.
 	 */
 	else if (rbno != NULLAGBLOCK &&
-		 rrecs + block->bb_numrecs <=
+		 rrecs + INT_GET(block->bb_numrecs, ARCH_UNKNOWN) <=
 		  XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
 		/*
 		 * Set "left" to be the starting block,
@@ -594,57 +594,57 @@ xfs_inobt_delrec(
 		/*
 		 * It's a non-leaf.  Move keys and pointers.
 		 */
-		lkp = XFS_INOBT_KEY_ADDR(left, left->bb_numrecs + 1, cur);
-		lpp = XFS_INOBT_PTR_ADDR(left, left->bb_numrecs + 1, cur);
+		lkp = XFS_INOBT_KEY_ADDR(left, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1, cur);
+		lpp = XFS_INOBT_PTR_ADDR(left, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1, cur);
 		rkp = XFS_INOBT_KEY_ADDR(right, 1, cur);
 		rpp = XFS_INOBT_PTR_ADDR(right, 1, cur);
 #ifdef DEBUG
-		for (i = 0; i < right->bb_numrecs; i++) {
+		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_UNKNOWN); i++) {
 			if (error = xfs_btree_check_sptr(cur, rpp[i], level))
 				return error;
 		}
 #endif
-		bcopy(rkp, lkp, right->bb_numrecs * sizeof(*lkp));
-		bcopy(rpp, lpp, right->bb_numrecs * sizeof(*lpp));
-		xfs_inobt_log_keys(cur, lbp, left->bb_numrecs + 1,
-				   left->bb_numrecs + right->bb_numrecs);
-		xfs_inobt_log_ptrs(cur, lbp, left->bb_numrecs + 1,
-				   left->bb_numrecs + right->bb_numrecs);
+		bcopy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*lkp));
+		bcopy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*lpp));
+		xfs_inobt_log_keys(cur, lbp, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1,
+				   INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
+		xfs_inobt_log_ptrs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1,
+				   INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 	} else {
 		/*
 		 * It's a leaf.  Move records.
 		 */
-		lrp = XFS_INOBT_REC_ADDR(left, left->bb_numrecs + 1, cur);
+		lrp = XFS_INOBT_REC_ADDR(left, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1, cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		bcopy(rrp, lrp, right->bb_numrecs * sizeof(*lrp));
-		xfs_inobt_log_recs(cur, lbp, left->bb_numrecs + 1,
-				   left->bb_numrecs + right->bb_numrecs);
+		bcopy(rrp, lrp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*lrp));
+		xfs_inobt_log_recs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1,
+				   INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 	}
 	/*
 	 * Fix up the number of records in the surviving block.
 	 */
-	left->bb_numrecs += right->bb_numrecs;
+	INT_MOD(left->bb_numrecs, ARCH_UNKNOWN, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 	/*
 	 * Fix up the right block pointer in the surviving block, and log it.
 	 */
-	left->bb_rightsib = right->bb_rightsib;
+	INT_SET(left->bb_rightsib, ARCH_UNKNOWN, INT_GET(right->bb_rightsib, ARCH_UNKNOWN));
 	xfs_inobt_log_block(cur->bc_tp, lbp, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
 	/*
 	 * If there is a right sibling now, make it point to the 
 	 * remaining block.
 	 */
-	if (left->bb_rightsib != NULLAGBLOCK) {
+	if (INT_GET(left->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
 		xfs_inobt_block_t	*rrblock;
 		xfs_buf_t		*rrbp;
 
 		if (error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-				cur->bc_private.i.agno, left->bb_rightsib, 0,
+				cur->bc_private.i.agno, INT_GET(left->bb_rightsib, ARCH_UNKNOWN), 0,
 				&rrbp, XFS_INO_BTREE_REF))
 			return error;
 		rrblock = XFS_BUF_TO_INOBT_BLOCK(rrbp);
 		if (error = xfs_btree_check_sblock(cur, rrblock, level, rrbp))
 			return error;
-		rrblock->bb_leftsib = lbno;
+		INT_SET(rrblock->bb_leftsib, ARCH_UNKNOWN, lbno);
 		xfs_inobt_log_block(cur->bc_tp, rrbp, XFS_BB_LEFTSIB);
 	}
 	/*
@@ -672,7 +672,7 @@ xfs_inobt_delrec(
 	 */
 	if (bp != lbp) {
 		cur->bc_bufs[level] = lbp;
-		cur->bc_ptrs[level] += left->bb_numrecs;
+		cur->bc_ptrs[level] += INT_GET(left->bb_numrecs, ARCH_UNKNOWN);
 		cur->bc_ra[level] = 0;
 	}
 	/*
@@ -764,7 +764,7 @@ xfs_inobt_insrec(
 	/* 
 	 * Check that the new entry is being inserted in the right place.
 	 */
-	if (ptr <= block->bb_numrecs) {
+	if (ptr <= INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 		if (level == 0) {
 			rp = XFS_INOBT_REC_ADDR(block, ptr, cur);
 			xfs_btree_check_rec(cur->bc_btnum, recp, rp);
@@ -780,7 +780,7 @@ xfs_inobt_insrec(
 	 * If the block is full, we can't insert the new entry until we
 	 * make the block un-full.
 	 */
-	if (block->bb_numrecs == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
+	if (INT_GET(block->bb_numrecs, ARCH_UNKNOWN) == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
 		/*
 		 * First, try shifting an entry to the right neighbor.
 		 */
@@ -839,15 +839,15 @@ xfs_inobt_insrec(
 		kp = XFS_INOBT_KEY_ADDR(block, 1, cur);
 		pp = XFS_INOBT_PTR_ADDR(block, 1, cur);
 #ifdef DEBUG
-		for (i = block->bb_numrecs; i >= ptr; i--) {
+		for (i = INT_GET(block->bb_numrecs, ARCH_UNKNOWN); i >= ptr; i--) {
 			if (error = xfs_btree_check_sptr(cur, pp[i - 1], level))
 				return error;
 		}
 #endif
 		ovbcopy(&kp[ptr - 1], &kp[ptr],
-			(block->bb_numrecs - ptr + 1) * sizeof(*kp));
+			(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr + 1) * sizeof(*kp));
 		ovbcopy(&pp[ptr - 1], &pp[ptr],
-			(block->bb_numrecs - ptr + 1) * sizeof(*pp));
+			(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr + 1) * sizeof(*pp));
 		/*
 		 * Now stuff the new data in, bump numrecs and log the new data.
 		 */
@@ -857,23 +857,23 @@ xfs_inobt_insrec(
 #endif
 		kp[ptr - 1] = key;
 		pp[ptr - 1] = *bnop;
-		block->bb_numrecs++;
-		xfs_inobt_log_keys(cur, bp, ptr, block->bb_numrecs);
-		xfs_inobt_log_ptrs(cur, bp, ptr, block->bb_numrecs);
+		INT_MOD(block->bb_numrecs, ARCH_UNKNOWN, +1);
+		xfs_inobt_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN));
+		xfs_inobt_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN));
 	} else {
 		/*
 		 * It's a leaf entry.  Make a hole for the new record.
 		 */
 		rp = XFS_INOBT_REC_ADDR(block, 1, cur);
 		ovbcopy(&rp[ptr - 1], &rp[ptr],
-			(block->bb_numrecs - ptr + 1) * sizeof(*rp));
+			(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr + 1) * sizeof(*rp));
 		/*
 		 * Now stuff the new record in, bump numrecs
 		 * and log the new data.
 		 */
 		rp[ptr - 1] = *recp;
-		block->bb_numrecs++;
-		xfs_inobt_log_recs(cur, bp, ptr, block->bb_numrecs);
+		INT_MOD(block->bb_numrecs, ARCH_UNKNOWN, +1);
+		xfs_inobt_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN));
 	}
 	/*
 	 * Log the new number of records in the btree header.
@@ -883,7 +883,7 @@ xfs_inobt_insrec(
 	/*
 	 * Check that the key/record is in the right place, now.
 	 */
-	if (ptr < block->bb_numrecs) {
+	if (ptr < INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 		if (level == 0)
 			xfs_btree_check_rec(cur->bc_btnum, rp + ptr - 1,
 				rp + ptr);
@@ -1097,7 +1097,7 @@ xfs_inobt_lookup(
 			 * Set low and high entry numbers, 1-based.
 			 */
 			low = 1;
-			if (!(high = block->bb_numrecs)) {
+			if (!(high = INT_GET(block->bb_numrecs, ARCH_UNKNOWN))) {
 				/*
 				 * If the block is empty, the tree must
 				 * be an empty leaf.
@@ -1182,8 +1182,8 @@ xfs_inobt_lookup(
 		 * not the last block, we're in the wrong block.
 		 */
 		if (dir == XFS_LOOKUP_GE &&
-		    keyno > block->bb_numrecs &&
-		    block->bb_rightsib != NULLAGBLOCK) {
+		    keyno > INT_GET(block->bb_numrecs, ARCH_UNKNOWN) &&
+		    INT_GET(block->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
 			int	i;
 
 			cur->bc_ptrs[0] = keyno;
@@ -1200,7 +1200,7 @@ xfs_inobt_lookup(
 	/*
 	 * Return if we succeeded or not.
 	 */
-	if (keyno == 0 || keyno > block->bb_numrecs)
+	if (keyno == 0 || keyno > INT_GET(block->bb_numrecs, ARCH_UNKNOWN))
 		*stat = 0;
 	else
 		*stat = ((dir != XFS_LOOKUP_EQ) || (diff == 0));
@@ -1246,7 +1246,7 @@ xfs_inobt_lshift(
 	/*
 	 * If we've got no left sibling then we can't shift an entry left.
 	 */
-	if (right->bb_leftsib == NULLAGBLOCK) {
+	if (INT_GET(right->bb_leftsib, ARCH_UNKNOWN) == NULLAGBLOCK) {
 		*stat = 0;
 		return 0;
 	}
@@ -1262,7 +1262,7 @@ xfs_inobt_lshift(
 	 * Set up the left neighbor as "left".
 	 */
 	if (error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.i.agno, right->bb_leftsib, 0, &lbp,
+			cur->bc_private.i.agno, INT_GET(right->bb_leftsib, ARCH_UNKNOWN), 0, &lbp,
 			XFS_INO_BTREE_REF))
 		return error;
 	left = XFS_BUF_TO_INOBT_BLOCK(lbp);
@@ -1271,11 +1271,11 @@ xfs_inobt_lshift(
 	/*
 	 * If it's full, it can't take another entry.
 	 */
-	if (left->bb_numrecs == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
+	if (INT_GET(left->bb_numrecs, ARCH_UNKNOWN) == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
 		*stat = 0;
 		return 0;
 	}
-	nrec = left->bb_numrecs + 1;
+	nrec = INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1;
 	/*
 	 * If non-leaf, copy a key and a ptr to the left block.
 	 */
@@ -1305,7 +1305,7 @@ xfs_inobt_lshift(
 	/*
 	 * Bump and log left's numrecs, decrement and log right's numrecs.
 	 */
-	left->bb_numrecs++;
+	INT_MOD(left->bb_numrecs, ARCH_UNKNOWN, +1);
 	xfs_inobt_log_block(cur->bc_tp, lbp, XFS_BB_NUMRECS);
 #ifdef DEBUG
 	if (level > 0)
@@ -1313,26 +1313,26 @@ xfs_inobt_lshift(
 	else
 		xfs_btree_check_rec(cur->bc_btnum, lrp - 1, lrp);
 #endif
-	right->bb_numrecs--;
+	INT_MOD(right->bb_numrecs, ARCH_UNKNOWN, -1);
 	xfs_inobt_log_block(cur->bc_tp, rbp, XFS_BB_NUMRECS);
 	/*
 	 * Slide the contents of right down one entry.
 	 */
 	if (level > 0) {
 #ifdef DEBUG
-		for (i = 0; i < right->bb_numrecs; i++) {
+		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_UNKNOWN); i++) {
 			if (error = xfs_btree_check_sptr(cur, rpp[i + 1],
 					level))
 				return error;
 		}
 #endif
-		ovbcopy(rkp + 1, rkp, right->bb_numrecs * sizeof(*rkp));
-		ovbcopy(rpp + 1, rpp, right->bb_numrecs * sizeof(*rpp));
-		xfs_inobt_log_keys(cur, rbp, 1, right->bb_numrecs);
-		xfs_inobt_log_ptrs(cur, rbp, 1, right->bb_numrecs);
+		ovbcopy(rkp + 1, rkp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rkp));
+		ovbcopy(rpp + 1, rpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rpp));
+		xfs_inobt_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
+		xfs_inobt_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 	} else {
-		ovbcopy(rrp + 1, rrp, right->bb_numrecs * sizeof(*rrp));
-		xfs_inobt_log_recs(cur, rbp, 1, right->bb_numrecs);
+		ovbcopy(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
+		xfs_inobt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 		key.ir_startino = rrp->ir_startino;
 		rkp = &key;
 	}
@@ -1421,14 +1421,14 @@ xfs_inobt_newroot(
 	if (error = xfs_btree_check_sblock(cur, block, cur->bc_nlevels - 1, bp))
 		return error;
 #endif
-	if (block->bb_rightsib != NULLAGBLOCK) {
+	if (INT_GET(block->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
 		/*
 		 * Our block is left, pick up the right block.
 		 */
 		lbp = bp;
 		lbno = XFS_DADDR_TO_AGBNO(args.mp, XFS_BUF_ADDR(lbp));
 		left = block;
-		rbno = left->bb_rightsib;
+		rbno = INT_GET(left->bb_rightsib, ARCH_UNKNOWN);
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
 				rbno, 0, &rbp, XFS_INO_BTREE_REF))
 			return error;
@@ -1445,7 +1445,7 @@ xfs_inobt_newroot(
 		rbp = bp;
 		rbno = XFS_DADDR_TO_AGBNO(args.mp, XFS_BUF_ADDR(rbp));
 		right = block;
-		lbno = right->bb_leftsib;
+		lbno = INT_GET(right->bb_leftsib, ARCH_UNKNOWN);
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
 				lbno, 0, &lbp, XFS_INO_BTREE_REF))
 			return error;
@@ -1459,17 +1459,17 @@ xfs_inobt_newroot(
 	/*
 	 * Fill in the new block's btree header and log it.
 	 */
-	new->bb_magic = xfs_magics[cur->bc_btnum];
-	new->bb_level = (__uint16_t)cur->bc_nlevels;
-	new->bb_numrecs = 2;
-	new->bb_leftsib = new->bb_rightsib = NULLAGBLOCK;
+	INT_SET(new->bb_magic, ARCH_UNKNOWN, xfs_magics[cur->bc_btnum]);
+	INT_SET(new->bb_level, ARCH_UNKNOWN, (__uint16_t)cur->bc_nlevels);
+	INT_SET(new->bb_numrecs, ARCH_UNKNOWN, 2);
+	INT_SET(new->bb_leftsib, ARCH_UNKNOWN, new->bb_rightsib = NULLAGBLOCK);
 	xfs_inobt_log_block(args.tp, nbp, XFS_BB_ALL_BITS);
 	ASSERT(lbno != NULLAGBLOCK && rbno != NULLAGBLOCK);
 	/*
 	 * Fill in the key data in the new root.
 	 */
 	kp = XFS_INOBT_KEY_ADDR(new, 1, cur);
-	if (left->bb_level > 0) {
+	if (INT_GET(left->bb_level, ARCH_UNKNOWN) > 0) {
 		kp[0] = *XFS_INOBT_KEY_ADDR(left, 1, cur);
 		kp[1] = *XFS_INOBT_KEY_ADDR(right, 1, cur);
 	} else {
@@ -1533,7 +1533,7 @@ xfs_inobt_rshift(
 	/*
 	 * If we've got no right sibling then we can't shift an entry right.
 	 */
-	if (left->bb_rightsib == NULLAGBLOCK) {
+	if (INT_GET(left->bb_rightsib, ARCH_UNKNOWN) == NULLAGBLOCK) {
 		*stat = 0;
 		return 0;
 	}
@@ -1541,7 +1541,7 @@ xfs_inobt_rshift(
 	 * If the cursor entry is the one that would be moved, don't
 	 * do it... it's too complicated.
 	 */
-	if (cur->bc_ptrs[level] >= left->bb_numrecs) {
+	if (cur->bc_ptrs[level] >= INT_GET(left->bb_numrecs, ARCH_UNKNOWN)) {
 		*stat = 0;
 		return 0;
 	}
@@ -1549,7 +1549,7 @@ xfs_inobt_rshift(
 	 * Set up the right neighbor as "right".
 	 */
 	if (error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.i.agno, left->bb_rightsib, 0, &rbp,
+			cur->bc_private.i.agno, INT_GET(left->bb_rightsib, ARCH_UNKNOWN), 0, &rbp,
 			XFS_INO_BTREE_REF))
 		return error;
 	right = XFS_BUF_TO_INOBT_BLOCK(rbp);
@@ -1558,7 +1558,7 @@ xfs_inobt_rshift(
 	/*
 	 * If it's full, it can't take another entry.
 	 */
-	if (right->bb_numrecs == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
+	if (INT_GET(right->bb_numrecs, ARCH_UNKNOWN) == XFS_INOBT_BLOCK_MAXRECS(level, cur)) {
 		*stat = 0;
 		return 0;
 	}
@@ -1567,41 +1567,41 @@ xfs_inobt_rshift(
 	 * copy the last left block entry to the hole.
 	 */
 	if (level > 0) {
-		lkp = XFS_INOBT_KEY_ADDR(left, left->bb_numrecs, cur);
-		lpp = XFS_INOBT_PTR_ADDR(left, left->bb_numrecs, cur);
+		lkp = XFS_INOBT_KEY_ADDR(left, INT_GET(left->bb_numrecs, ARCH_UNKNOWN), cur);
+		lpp = XFS_INOBT_PTR_ADDR(left, INT_GET(left->bb_numrecs, ARCH_UNKNOWN), cur);
 		rkp = XFS_INOBT_KEY_ADDR(right, 1, cur);
 		rpp = XFS_INOBT_PTR_ADDR(right, 1, cur);
 #ifdef DEBUG
-		for (i = right->bb_numrecs - 1; i >= 0; i--) {
+		for (i = INT_GET(right->bb_numrecs, ARCH_UNKNOWN) - 1; i >= 0; i--) {
 			if (error = xfs_btree_check_sptr(cur, rpp[i], level))
 				return error;
 		}
 #endif
-		ovbcopy(rkp, rkp + 1, right->bb_numrecs * sizeof(*rkp));
-		ovbcopy(rpp, rpp + 1, right->bb_numrecs * sizeof(*rpp));
+		ovbcopy(rkp, rkp + 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rkp));
+		ovbcopy(rpp, rpp + 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rpp));
 #ifdef DEBUG
 		if (error = xfs_btree_check_sptr(cur, *lpp, level))
 			return error;
 #endif
 		*rkp = *lkp;
 		*rpp = *lpp;
-		xfs_inobt_log_keys(cur, rbp, 1, right->bb_numrecs + 1);
-		xfs_inobt_log_ptrs(cur, rbp, 1, right->bb_numrecs + 1);
+		xfs_inobt_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1);
+		xfs_inobt_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1);
 	} else {
-		lrp = XFS_INOBT_REC_ADDR(left, left->bb_numrecs, cur);
+		lrp = XFS_INOBT_REC_ADDR(left, INT_GET(left->bb_numrecs, ARCH_UNKNOWN), cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		ovbcopy(rrp, rrp + 1, right->bb_numrecs * sizeof(*rrp));
+		ovbcopy(rrp, rrp + 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
 		*rrp = *lrp;
-		xfs_inobt_log_recs(cur, rbp, 1, right->bb_numrecs + 1);
+		xfs_inobt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1);
 		key.ir_startino = rrp->ir_startino;
 		rkp = &key;
 	}
 	/*
 	 * Decrement and log left's numrecs, bump and log right's numrecs.
 	 */
-	left->bb_numrecs--;
+	INT_MOD(left->bb_numrecs, ARCH_UNKNOWN, -1);
 	xfs_inobt_log_block(cur->bc_tp, lbp, XFS_BB_NUMRECS);
-	right->bb_numrecs++;
+	INT_MOD(right->bb_numrecs, ARCH_UNKNOWN, +1);
 #ifdef DEBUG
 	if (level > 0)
 		xfs_btree_check_key(cur->bc_btnum, rkp, rkp + 1);
@@ -1693,17 +1693,17 @@ xfs_inobt_split(
 	/*
 	 * Fill in the btree header for the new block.
 	 */
-	right->bb_magic = xfs_magics[cur->bc_btnum];
-	right->bb_level = left->bb_level;
-	right->bb_numrecs = (__uint16_t)(left->bb_numrecs / 2);
+	INT_SET(right->bb_magic, ARCH_UNKNOWN, xfs_magics[cur->bc_btnum]);
+	INT_SET(right->bb_level, ARCH_UNKNOWN, INT_GET(left->bb_level, ARCH_UNKNOWN));
+	INT_SET(right->bb_numrecs, ARCH_UNKNOWN, (__uint16_t)(INT_GET(left->bb_numrecs, ARCH_UNKNOWN) / 2));
 	/*
 	 * Make sure that if there's an odd number of entries now, that
 	 * each new block will have the same number of entries.
 	 */
-	if ((left->bb_numrecs & 1) &&
-	    cur->bc_ptrs[level] <= right->bb_numrecs + 1)
-		right->bb_numrecs++;
-	i = left->bb_numrecs - right->bb_numrecs + 1;
+	if ((INT_GET(left->bb_numrecs, ARCH_UNKNOWN) & 1) &&
+	    cur->bc_ptrs[level] <= INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1)
+		INT_MOD(right->bb_numrecs, ARCH_UNKNOWN, +1);
+	i = INT_GET(left->bb_numrecs, ARCH_UNKNOWN) - INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1;
 	/*
 	 * For non-leaf blocks, copy keys and addresses over to the new block.
 	 */
@@ -1713,15 +1713,15 @@ xfs_inobt_split(
 		rkp = XFS_INOBT_KEY_ADDR(right, 1, cur);
 		rpp = XFS_INOBT_PTR_ADDR(right, 1, cur);
 #ifdef DEBUG
-		for (i = 0; i < right->bb_numrecs; i++) {
+		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_UNKNOWN); i++) {
 			if (error = xfs_btree_check_sptr(cur, lpp[i], level))
 				return error;
 		}
 #endif
-		bcopy(lkp, rkp, right->bb_numrecs * sizeof(*rkp));
-		bcopy(lpp, rpp, right->bb_numrecs * sizeof(*rpp));
-		xfs_inobt_log_keys(cur, rbp, 1, right->bb_numrecs);
-		xfs_inobt_log_ptrs(cur, rbp, 1, right->bb_numrecs);
+		bcopy(lkp, rkp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rkp));
+		bcopy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rpp));
+		xfs_inobt_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
+		xfs_inobt_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 		*keyp = *rkp;
 	}
 	/*
@@ -1730,36 +1730,36 @@ xfs_inobt_split(
 	else {
 		lrp = XFS_INOBT_REC_ADDR(left, i, cur);
 		rrp = XFS_INOBT_REC_ADDR(right, 1, cur);
-		bcopy(lrp, rrp, right->bb_numrecs * sizeof(*rrp));
-		xfs_inobt_log_recs(cur, rbp, 1, right->bb_numrecs);
+		bcopy(lrp, rrp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
+		xfs_inobt_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 		keyp->ir_startino = rrp->ir_startino;
 	}
 	/*
 	 * Find the left block number by looking in the buffer.
 	 * Adjust numrecs, sibling pointers.
 	 */
-	left->bb_numrecs -= right->bb_numrecs;
-	right->bb_rightsib = left->bb_rightsib;
-	left->bb_rightsib = args.agbno;
-	right->bb_leftsib = lbno;
+	INT_MOD(left->bb_numrecs, ARCH_UNKNOWN, -(INT_GET(right->bb_numrecs, ARCH_UNKNOWN)));
+	INT_SET(right->bb_rightsib, ARCH_UNKNOWN, INT_GET(left->bb_rightsib, ARCH_UNKNOWN));
+	INT_SET(left->bb_rightsib, ARCH_UNKNOWN, args.agbno);
+	INT_SET(right->bb_leftsib, ARCH_UNKNOWN, lbno);
 	xfs_inobt_log_block(args.tp, rbp, XFS_BB_ALL_BITS);
 	xfs_inobt_log_block(args.tp, lbp, XFS_BB_NUMRECS | XFS_BB_RIGHTSIB);
 	/*
 	 * If there's a block to the new block's right, make that block
 	 * point back to right instead of to left.
 	 */
-	if (right->bb_rightsib != NULLAGBLOCK) {
+	if (INT_GET(right->bb_rightsib, ARCH_UNKNOWN) != NULLAGBLOCK) {
 		xfs_inobt_block_t	*rrblock;	/* rr btree block */
 		xfs_buf_t		*rrbp;		/* buffer for rrblock */
 
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
-				right->bb_rightsib, 0, &rrbp,
+				INT_GET(right->bb_rightsib, ARCH_UNKNOWN), 0, &rrbp,
 				XFS_INO_BTREE_REF))
 			return error;
 		rrblock = XFS_BUF_TO_INOBT_BLOCK(rrbp);
 		if (error = xfs_btree_check_sblock(cur, rrblock, level, rrbp))
 			return error;
-		rrblock->bb_leftsib = args.agbno;
+		INT_SET(rrblock->bb_leftsib, ARCH_UNKNOWN, args.agbno);
 		xfs_inobt_log_block(args.tp, rrbp, XFS_BB_LEFTSIB);
 	}
 	/*
@@ -1767,9 +1767,9 @@ xfs_inobt_split(
 	 * If it's just pointing past the last entry in left, then we'll
 	 * insert there, so don't change anything in that case.
 	 */
-	if (cur->bc_ptrs[level] > left->bb_numrecs + 1) {
+	if (cur->bc_ptrs[level] > INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1) {
 		xfs_btree_setbuf(cur, level, rbp);
-		cur->bc_ptrs[level] -= left->bb_numrecs;
+		cur->bc_ptrs[level] -= INT_GET(left->bb_numrecs, ARCH_UNKNOWN);
 	}
 	/*
 	 * If there are more levels, we'll need another cursor which refers
@@ -1867,7 +1867,7 @@ xfs_inobt_decrement(
 	/*
 	 * If we just went off the left edge of the tree, return failure.
 	 */
-	if (block->bb_leftsib == NULLAGBLOCK) {
+	if (INT_GET(block->bb_leftsib, ARCH_UNKNOWN) == NULLAGBLOCK) {
 		*stat = 0;
 		return 0;
 	}
@@ -1906,7 +1906,7 @@ xfs_inobt_decrement(
 		block = XFS_BUF_TO_INOBT_BLOCK(bp);
 		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
-		cur->bc_ptrs[lev] = block->bb_numrecs;
+		cur->bc_ptrs[lev] = INT_GET(block->bb_numrecs, ARCH_UNKNOWN);
 	}
 	*stat = 1;
 	return 0;
@@ -1979,7 +1979,7 @@ xfs_inobt_get_rec(
 	/*
 	 * Off the right end or left end, return failure.
 	 */
-	if (ptr > block->bb_numrecs || ptr <= 0) {
+	if (ptr > INT_GET(block->bb_numrecs, ARCH_UNKNOWN) || ptr <= 0) {
 		*stat = 0;
 		return 0;
 	}
@@ -2027,14 +2027,14 @@ xfs_inobt_increment(
 	 * Increment the ptr at this level.  If we're still in the block
 	 * then we're done.
 	 */
-	if (++cur->bc_ptrs[level] <= block->bb_numrecs) {
+	if (++cur->bc_ptrs[level] <= INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 		*stat = 1;
 		return 0;
 	}
 	/*
 	 * If we just went off the right edge of the tree, return failure.
 	 */
-	if (block->bb_rightsib == NULLAGBLOCK) {
+	if (INT_GET(block->bb_rightsib, ARCH_UNKNOWN) == NULLAGBLOCK) {
 		*stat = 0;
 		return 0;
 	}
@@ -2049,7 +2049,7 @@ xfs_inobt_increment(
 		if (error = xfs_btree_check_sblock(cur, block, lev, bp))
 			return error;
 #endif
-		if (++cur->bc_ptrs[lev] <= block->bb_numrecs)
+		if (++cur->bc_ptrs[lev] <= INT_GET(block->bb_numrecs, ARCH_UNKNOWN))
 			break;
 		/*
 		 * Read-ahead the right block, we're going to read it
