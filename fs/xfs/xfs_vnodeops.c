@@ -485,6 +485,7 @@ xfs_getattr(
         vap->va_mode = ip->i_d.di_mode & MODEMASK;
         vap->va_uid = ip->i_d.di_uid;
         vap->va_gid = ip->i_d.di_gid;
+	vap->va_projid = ip->i_d.di_projid;
         vap->va_nlink = ip->i_d.di_nlink;
         vap->va_vcode = 0L;
 	/*
@@ -600,7 +601,6 @@ xfs_setattr(
 	}
 
         ip = XFS_BHVTOI(bdp);
-	tp = NULL;
 
         /*
          * Timestamps do not need to be logged and hence do not
@@ -614,7 +614,6 @@ xfs_setattr(
 		xfs_ichgtime(ip, timeflags);
 		return 0;
         }
-
 
 	mp = ip->i_mount;
 	olddquot1 = olddquot2 = NULL;
@@ -1526,18 +1525,17 @@ xfs_inactive(
 
 #ifndef SIM
 	mp = ip->i_mount;
+	quotainprogress = B_FALSE;
+	error = 0;
 	if (ip->i_d.di_nlink == 0) {
 		tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 		if (XFS_IS_QUOTA_ON(mp) && 
 		    ip->i_ino != mp->m_sb.sb_uquotino && 
-		    ip->i_ino != mp->m_sb.sb_uquotino) {
-			if (XFS_NOT_DQATTACHED(mp, ip)) {
+		    ip->i_ino != mp->m_sb.sb_pquotino) {
+			if (XFS_NOT_DQATTACHED(mp, ip)) 
 				error = xfs_qm_dqattach(ip, 0);
-				if (error)
-					quotainprogress = B_FALSE;
-			} else {
+			if (! error)
 				quotainprogress = B_TRUE;
-			}
 		}
 		if (truncate) {
 			/*
@@ -4431,6 +4429,12 @@ xfs_rename(
                 goto rele_return;
 	}
 
+	/* 
+	 * Attach the dquots to the inodes
+	 */
+	if (XFS_IS_QUOTA_ON(mp)) 
+		(void) xfs_qm_vop_rename_dqattach(inodes);
+
 	/*
 	 * Reacquire the inode locks we dropped above.  Then check the
 	 * generation counts on the inodes.  If any of them have changed,
@@ -5929,7 +5933,7 @@ xfs_allocstore(
 	 * have made it invalid.
 	 */
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
-
+	
 	if (count_fsb == 0) {
 		/*
 		 * We go it all, so get out of here.
