@@ -89,7 +89,7 @@ typedef struct log_rec_header {
 	uint	  h_cycle;	/* write cycle of log			:  4 */
 	int	  h_version;	/* LR version				:  4 */
 	xfs_lsn_t h_lsn;	/* lsn of this LR			:  8 */
-	xfs_lsn_t h_sync_lsn;	/* lsn of last LR with buffers committed:  8 */
+	xfs_lsn_t h_sync_lsn;	/* lsn of 1st LR w/ buffers not committed: 8 */
 	int	  h_len;	/* len in bytes; should be 64-bit aligned: 4 */
 	uint	  h_chksum;	/* may not be used; non-zero if used	:  4 */
 	int	  h_prev_offset;/* block offset to previous LR		:  4 */
@@ -147,7 +147,7 @@ typedef struct log {
 	xfs_mount_t	*l_mp;	      /* mount point			   : 4*/
 	buf_t		*l_xbuf;      /* extra buffer for log wrapping	   : 4*/
 	dev_t		l_dev;	      /* dev_t of log			   : 4*/
-	int		l_logstart;   /* start block of log		   : 4*/
+	int		l_logBBstart; /* start block of log		   : 4*/
 	int		l_logsize;    /* size of log in bytes 		   : 4*/
 	int		l_logBBsize;  /* size of log in 512 byte chunks    : 4*/
 	int		l_curr_cycle; /* Cycle number of log writes	   : 4*/
@@ -158,7 +158,5 @@ typedef struct log {
 	log_in_core_t	*l_iclog_bak[8];
 	int		l_iclog_size;
 } log_t;
-
-
 
 #endif	/* _XFS_LOG_PRIV_H */
