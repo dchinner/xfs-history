@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.42 1995/01/17 20:34:04 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.43 1995/01/27 19:35:35 benf Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -77,7 +77,6 @@ void ticket_unlock( xfs_inode_t *, int);
 extern int xfs_read_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_write_file(vnode_t *, uio_t *, int, cred_t *);
 extern int xfs_diordwr(vnode_t *,uio_t *, int, cred_t *,int);
-extern int strncmp(char *, char *, int);
 extern struct vfs *vfs_devsearch( dev_t );
 STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
 STATIC int xfs_crack_file_id(sysarg_t, dev_t *, xfs_ino_t *);
