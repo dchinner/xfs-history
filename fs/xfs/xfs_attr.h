@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_H
 #define	_FS_XFS_ATTR_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.7 $"
 
 /*
  * xfs_attr.h
@@ -36,10 +36,10 @@ struct attrlist_cursor_kern;
 /*
  * Overall external interface routines.
  */
-int xfs_attr_get(struct vnode *, char *, char *, int *, int, struct cred *);
-int xfs_attr_set(struct vnode *, char *, char *, int, int, struct cred *);
-int xfs_attr_remove(struct vnode *, char *, int, struct cred *);
-int xfs_attr_list(struct vnode *, char *, int, int,
+int xfs_attr_get(pvnode_t *, char *, char *, int *, int, struct cred *);
+int xfs_attr_set(pvnode_t *, char *, char *, int, int, struct cred *);
+int xfs_attr_remove(pvnode_t *, char *, int, struct cred *);
+int xfs_attr_list(pvnode_t *, char *, int, int,
 			 struct attrlist_cursor_kern *, struct cred *);
 int xfs_attr_inactive(struct xfs_inode *dp);
 #endif	/* !_FS_XFS_ATTR_H */
