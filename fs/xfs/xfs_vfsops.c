@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.215 $"
+#ident  "$Revision: 1.216 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -208,12 +208,14 @@ xfs_get_vfsmount(
 	dev_t	logdev,
 	dev_t	rtdev);
 
+#ifndef __linux__
 STATIC int
 spectodevs(
 	char	*spec,
 	dev_t	*ddevp,
 	dev_t   *logdevp,
         dev_t   *rtdevp);
+#endif
 
 STATIC int
 xfs_isdev(
@@ -414,6 +416,18 @@ xfs_init(
 
 
 #ifndef SIM
+#ifdef __linux__
+STATIC int
+spectodevs(
+	char	*spec,
+	dev_t	*ddevp,
+	dev_t   *logdevp,
+	dev_t   *rtdevp)
+{
+	printk("spectodevs: BUILD ME for LINUX!!!\n");
+	return(ENOENT);
+}
+#else
 /*
  * Resolve path name of special file to its device.
  */
@@ -458,6 +472,7 @@ spectodevs(
 	ASSERT(*ddevp && *logdevp);
 	return 0;
 }
+#endif
 
 
 /*
@@ -471,9 +486,42 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, vnode_t *vp)
 {
 	btp->dev    = dev;
 	btp->specvp = vp;
+#ifndef __linux__
 	btp->bdevsw = get_bdevsw(dev);
+#else
+	printk("xfs_fill_buftarg: add get_bdevsw !!!\n");
+#endif
 }
 
+#ifdef __linux__
+struct vnode *make_specvp(dev_t dev, enum vtype type)
+{
+	printk("make_specvp: need to return vp\n");
+	return NULL;
+}
+
+int
+copyinstr(char *cp, char *tp, size_t sz, size_t *sz2)
+{
+	printk("copyinstr: need to write\n");
+	return 0;
+}
+
+void
+clkset(time_t oldtime)
+{
+        printk("clkset: need to write\n");
+	return;
+}
+
+void
+spec_mounted(vp)
+{
+        printk("spec_mounted: need to write\n");
+	return;
+}
+
+#endif
 
 /*
  * xfs_cmountfs

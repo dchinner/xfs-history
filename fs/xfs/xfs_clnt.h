@@ -12,7 +12,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Revision$"
+#ident "$Revision: 1.15 $"
 
 #include <sys/types.h>
  
@@ -67,7 +67,11 @@ struct xfs_args {
 
 #ifdef _KERNEL
 
+#ifndef __linux__
 #include <fs/xfs/xfs_types.h>
+#else
+#include <xfs_types.h>
+#endif
  
 struct xfs_args32_ver_1 {
 	__int32_t	version;
