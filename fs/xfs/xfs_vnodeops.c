@@ -1219,6 +1219,7 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 			ASSERT((name[0] == '.') &&
 			       (name[1] == '.') &&
 			       (name[2] == 0));
+			*ip = NULL;
 			VN_RELE (vp);
 			code = ENOENT;
 		}
@@ -1966,6 +1967,9 @@ xfs_lock_for_rename(
 			if (i_tab[i] != i_tab[i-1])
 				xfs_iunlock (i_tab[i], XFS_ILOCK_EXCL);
 		}
+		if (num_inodes == 4)
+			IRELE (ip2);
+		IRELE (ip1);
 		return EAGAIN;
         }
 
