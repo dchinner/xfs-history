@@ -794,7 +794,7 @@ xfs_iroot_realloc(
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 						      new_size);
 		ip->i_broot_bytes = new_size;
-		ASSERT(ip->i_broot_bytes <= XFS_LITINO(ip->i_mount));
+		ASSERT(ip->i_broot_bytes <= XFS_LITINO_BROOT(ip->i_mount));
 		/*
 		 * This depends on bcopy() handling overlapping buffers.
 		 */
@@ -849,7 +849,7 @@ xfs_iroot_realloc(
 	kmem_free(ip->i_broot, ip->i_broot_bytes);
 	ip->i_broot = new_broot;
 	ip->i_broot_bytes = new_size;
-	ASSERT(ip->i_broot_bytes <= XFS_LITINO(ip->i_mount));
+	ASSERT(ip->i_broot_bytes <= XFS_LITINO_BROOT(ip->i_mount));
 	return;
 }
 	
@@ -1294,7 +1294,7 @@ xfs_iflush(
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
-			ASSERT(ip->i_broot_bytes <= XFS_LITINO(mp));
+			ASSERT(ip->i_broot_bytes <= XFS_LITINO_BROOT(mp));
 			xfs_bmbt_to_bmdr(ip->i_broot, ip->i_broot_bytes,
 			   &(dip->di_u.di_bmbt),
 			   XFS_BMAP_BROOT_SIZE(mp->m_sb.sb_inodesize));
