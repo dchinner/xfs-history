@@ -1,8 +1,9 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.26 $"
 
+struct bhv_desc;
 struct bmapval;
 struct buf;
 struct cred;
@@ -116,31 +117,35 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
  * Prototypes for functions in xfs_rw.c.
  */
 int
-xfs_read(bhv_desc_t	*bdp,
-	 struct uio	*uiop,
-	 int		ioflag,
-	 struct cred	*credp,
-	 struct flid	*fl);
+xfs_read(struct bhv_desc	*bdp,
+	 struct uio		*uiop,
+	 int			ioflag,
+	 struct cred		*credp,
+	 struct flid		*fl);
 
 int
-xfs_write(bhv_desc_t	*bdp,
-	  struct uio	*uiop,
-	  int		ioflag,
-	  struct cred	*credp,
-	  struct flid	*fl);
+xfs_write_clear_setuid(
+	struct xfs_inode	*ip);
+
+int
+xfs_write(struct bhv_desc	*bdp,
+	  struct uio		*uiop,
+	  int			ioflag,
+	  struct cred		*credp,
+	  struct flid		*fl);
 
 void
-xfs_strategy(bhv_desc_t	*bdp,
-	     struct buf	*bp);
+xfs_strategy(struct bhv_desc	*bdp,
+	     struct buf		*bp);
 
 int
-xfs_bmap(bhv_desc_t	*bdp,
-	 off_t		offset,
-	 ssize_t	count,
-	 int		flags,
-	 struct cred	*credp,
-	 struct bmapval	*bmapp,
-	 int		*nbmaps);
+xfs_bmap(struct bhv_desc	*bdp,
+	 off_t			offset,
+	 ssize_t		count,
+	 int			flags,
+	 struct cred		*credp,
+	 struct bmapval		*bmapp,
+	 int			*nbmaps);
 
 int
 xfs_zero_eof(struct xfs_inode	*ip,
@@ -148,6 +153,12 @@ xfs_zero_eof(struct xfs_inode	*ip,
 	     xfs_fsize_t	isize,
 	     struct cred	*credp,
 	     struct pm		*pmp);
+
+void
+xfs_inval_cached_pages(
+	struct xfs_inode	*ip,
+	off_t			offset,
+	off_t			len);
 
 void
 xfs_refcache_insert(
