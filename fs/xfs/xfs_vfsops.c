@@ -1724,42 +1724,6 @@ xfs_vget(
 }
 
 
-STATIC int
-xfs_get_vnode(bhv_desc_t *bdp,
-	vnode_t		**vpp,
-	xfs_ino_t		ino)
-{
-	xfs_mount_t	*mp;
-	xfs_ihash_t	*ih;
-	xfs_inode_t	*ip;
-
-	*vpp = NULL;
-
-	mp = XFS_BHVTOM(bdp);
-	ih = XFS_IHASH(mp, ino);
-
-	mraccess(&ih->ih_lock);
-
-	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
-		if (ip->i_ino == ino) {
-			*vpp = XFS_ITOV(ip);
-			break;
-		}
-	}
-
-	mrunlock(&ih->ih_lock);
-
-	if (!*vpp) {
-		if (xfs_iget(mp, NULL, (xfs_ino_t) ino, 0, &ip, 0)) {
-			return XFS_ERROR(ENOENT);
-		}
-		*vpp = XFS_ITOV(ip);
-	}
-	
-	return(0);
-}
-
-
 vfsops_t xfs_vfsops = {
 	vfs_mount:		xfs_vfsmount,
 	vfs_dounmount:		fs_dounmount,
@@ -1768,7 +1732,6 @@ vfsops_t xfs_vfsops = {
 	vfs_statvfs:		xfs_statvfs,
 	vfs_sync:		xfs_sync,
 	vfs_vget:		xfs_vget,
-	vfs_get_vnode:		xfs_get_vnode,
 	vfs_dmapi_mount:	xfs_dm_mount,
 	vfs_dmapi_fsys_vector:	xfs_dm_get_fsys_vector,
 };
