@@ -31,3 +31,7 @@
  */
 #include <linux/xfs_linux.h>
 #include <xfs_arch.h>
+
+#ifdef NEED_FS_H
+# include <linux/fs.h>
+#endif

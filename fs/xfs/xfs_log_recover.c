@@ -32,6 +32,7 @@
 
 #ident	"$Revision$"
 
+#define NEED_FS_H
 #include <xfs_os_defs.h>
 
 #ifdef SIM
@@ -736,7 +737,8 @@ xlog_find_tail(xlog_t  *log,
 
 	/* Look for an external log signature, and adjust the log's length if
 	 * found. */
-	xlog_test_footer(log);
+	if ((error = xlog_test_footer(log)))
+		return error;
 
 	/*
 	 * Find previous log record 
@@ -3334,6 +3336,7 @@ xlog_recover(xlog_t *log, int readonly)
 {
 	daddr_t head_blk, tail_blk;
 	int	error;
+	xfs_mount_t *mp;
 
 	if (error = xlog_find_tail(log, &head_blk, &tail_blk, readonly))
 		return error;
@@ -3343,13 +3346,32 @@ xlog_recover(xlog_t *log, int readonly)
 		head_blk = HEAD_BLK;
 		tail_blk = TAIL_BLK;
 #endif
-		/*
+		/* There used to be a comment here:
+		 *
 		 * disallow recovery on read-only mounts.  note -- mount
 		 * checks for ENOSPC and turns it into an intelligent
 		 * error message.
+		 * ...but this is no longer true.  Now, unless you specify
+		 * NORECOVERY (in which case this function would never be
+		 * called), it enables read-write access long enough to do
+		 * recovery.
 		 */
-		if (readonly)
-			return ENOSPC;
+		if (readonly) {
+			cmn_err(CE_NOTE, "XFS: WARNING: recovery required on readonly filesystem.\n");
+			mp = log->l_mp;
+#ifndef SIM
+			if (is_read_only(mp->m_dev) ||
+			    is_read_only(mp->m_logdev)) {
+#endif
+				cmn_err(CE_NOTE, "XFS: write access unavailable, cannot proceed.\n");
+#ifndef SIM
+				return -EROFS;
+			}
+#endif
+			cmn_err(CE_NOTE, "XFS: write access will be enabled during recovery.\n");
+			XFS_MTOVFS(mp)->vfs_flag &= ~VFS_RDONLY;
+		}
+
 #ifdef _KERNEL
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
@@ -3365,6 +3387,8 @@ xlog_recover(xlog_t *log, int readonly)
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
 		log->l_flags |= XLOG_RECOVERY_NEEDED;
+		if (readonly)
+			XFS_MTOVFS(mp)->vfs_flag |= VFS_RDONLY;
 	}
 	return error;
 }	/* xlog_recover */

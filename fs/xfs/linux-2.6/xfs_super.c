@@ -449,8 +449,32 @@ linvfs_remount(
 	int		*flags,
 	char		*options)
 {
-	printk(KERN_ERR "XFS:  Hoser!!!  Somebody called remountfs()\n");
-	return(-ENOSYS);
+	struct xfs_args args;
+	extern vfsops_t xfs_vfsops;
+	vfs_t *vfsp;
+	vnode_t *cvp;
+	extern int mountargs_xfs(char *options, struct xfs_args *args);
+
+	vfsp = LINVFS_GET_VFS(sb);
+	cvp = LINVFS_GET_CVP(sb);
+
+	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
+		return 0;
+
+	if (mountargs_xfs(options, &args) != 0)
+                return -ENOSPC;
+
+	if (*flags & MS_RDONLY || args.flags & MS_RDONLY) {
+		printk("XFS: Remounting read-only\n");
+		vfsp->vfs_flag |= VFS_RDONLY;
+		sb->s_flags |= MS_RDONLY;
+	} else {
+		printk("XFS: Remounting read-write\n");
+		vfsp->vfs_flag &= ~VFS_RDONLY;
+		sb->s_flags &= ~MS_RDONLY;
+	}
+
+	return 0;
 }
 
 
