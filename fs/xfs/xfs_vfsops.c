@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.8 $"
+#ident  "$Revision: 1.9 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -398,7 +398,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 	ddev = logdev = device;
 	rtdev = 0;
 #else
-	if (major(device) == XLV_MAJOR) {
+	if (emajor(device) == XLV_MAJOR) {
 		/*
 		 * logical volume
 		 */
