@@ -3494,11 +3494,20 @@ static void
 xfsidbg_xmount(xfs_mount_t *mp)
 {
 	static char *xmount_flags[] = {
-		"WSYNC",	/* 0x1 */
-		"INO64",	/* 0x2 */
-		"RQCHK",        /* 0x4 */
-		"FSCLEAN",	/* 0x8 */
-		"FSSHUTDN",	/* 0x10*/
+		"WSYNC",	/* 0x0001 */
+		"INO64",	/* 0x0002 */
+		"RQCHK",        /* 0x0004 */
+		"FSCLEAN",	/* 0x0008 */
+		"FSSHUTDN",	/* 0x0010 */
+		"NOATIME",	/* 0x0020 */
+		"RETERR",	/* 0x0040 */
+		"NOALIGN",	/* 0x0080 */
+		"UNSHRD",	/* 0x0100 */
+		"RGSTRD",	/* 0x0200 */
+		"NORECVR",	/* 0x0400 */
+		"SHRD",		/* 0x0800 */
+		"IOSZ",		/* 0x1000 */
+		"DSYNC",	/* 0x2000 */
 		0
 	};
 
