@@ -174,7 +174,7 @@ linvfs_read_super(
 
 	/* first mount pagebuf delayed write daemon not running yet */
 	if (pagebuf_daemon_start() < 0) {
-		goto fail_vnrele;
+		goto fail_daemon;
 	}
 
 	/*  Setup the uap structure  */
@@ -299,6 +299,15 @@ fail_unmount:
 fail_vfsop:
 	vfs_deallocate(vfsp);
 
+#ifdef  CONFIG_XFS_VNODE_TRACING
+	ktrace_free(cvp->v_trace);
+
+	cvp->v_trace = NULL;
+#endif  /* CONFIG_XFS_VNODE_TRACING */
+
+	kfree(cvp->v_inode);
+        
+fail_daemon:
 	MOD_DEC_USE_COUNT;
 
 	return(NULL);
@@ -358,7 +367,8 @@ linvfs_read_inode(
 
 void
 linvfs_write_inode(
-	struct inode	*inode)
+	struct inode	*inode,
+        int             sync)
 {
 	vnode_t	*vp = LINVFS_GET_VP(inode);
 
