@@ -725,47 +725,6 @@ xfs_mount(
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
 			     &args, uap, credp);
-	if (error) {
-		return error;
-	}
-	/*
-	 *  Don't set the VFS_DMI flag until here because we don't want
-	 *  to send events while replaying the log.
-	 */
-#if 0
-	if (uap->flags & MS_DMI) {
-#else
-	if (uap->dir && (args.flags & XFSMNT_DMAPI)) {
-#endif
-		vfsp->vfs_flag |= VFS_DMI;
-		/* Always send mount event (when mounted with dmi option) */
-		VFS_ROOT(vfsp, &rootvp, error);
-		if (error == 0) {
-			bhv_desc_t	*mbdp, *rootbdp;
-
-			mbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(mvp), &xfs_vnodeops);
-			rootbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rootvp), &xfs_vnodeops);
-			VN_RELE(rootvp);
-			error = dm_send_mount_event(vfsp, DM_RIGHT_NULL,
-						mbdp, DM_RIGHT_NULL,
-						rootbdp, DM_RIGHT_NULL,
-						uap->dir, uap->spec);
-		}
-		if (error) {
-#if 0
-/* XXX this stuff will be done when we get back to linvfs_read_super(). */
-			/* REFERENCED */
-			int	errcode;
-
-			vfsp->vfs_flag &= ~VFS_DMI;
-			VFS_UNMOUNT(vfsp, 0, credp, errcode);
-			ASSERT (errcode == 0);
-#else
-			vfsp->vfs_flag &= ~VFS_DMI;
-#endif
-		}
-	}
-
 	return error;
 
 }
@@ -2144,4 +2103,5 @@ vfsops_t xfs_vfsops = {
 	xfs_vget,
 	xfs_vfsmountroot,
 	xfs_get_vnode,
+	xfs_dm_mount
 };

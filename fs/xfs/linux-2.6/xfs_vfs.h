@@ -135,6 +135,9 @@ typedef struct vfsops {
                                         /* mount the root filesystem */
         int     (*vfs_get_vnode)(bhv_desc_t *, struct vnode **, xfs_ino_t);
                                         /* get vnode using an ino_t */
+	int	(*vfs_dmapi_mount)(struct vfs *, struct vnode *,
+				   char *, char *);
+					/* send dmapi mount event */
 } vfsops_t;
 
 #define VFS_DOUNMOUNT(vfsp,f,vp,cr, rv) \
@@ -186,6 +189,8 @@ typedef struct vfsops {
         BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
 
+#define VFSOPS_DMAPI_MOUNT(vfs_op, vfsp, mvp, dir_name, fsname, rv) \
+        rv = (*(vfs_op)->vfs_dmapi_mount)(vfsp, mvp, dir_name, fsname)
 #define VFSOPS_MOUNT(vfs_op, vfsp, mvp, uap, attrs, cr, rv) \
         rv = (*(vfs_op)->vfs_mount)(vfsp, mvp, uap, attrs, cr)
 #define VFSOPS_ROOTINIT(vfs_op, vfsp, rv) \

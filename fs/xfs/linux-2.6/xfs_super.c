@@ -141,7 +141,6 @@ linvfs_read_super(
 	sprintf(spec, bdevname(sb->s_dev));
 	uap->spec = spec;
 
-	/*  uap->dir not needed until DMI is in place  */
 	uap->flags = MS_DATA;
 
 	memset(args, 0, sizeof(struct xfs_args));
@@ -198,8 +197,7 @@ linvfs_read_super(
 
         cvp->v_flag |= VMOUNTING;
 
-	/*  When we support DMI, we need to set up the behavior
-		chain for this vnode  */
+	vn_bhv_head_init(VN_BHV_HEAD(cvp), "vnode");	/* for DMAPI */
 
 	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
@@ -239,6 +237,12 @@ linvfs_read_super(
 
 	if (is_bad_inode((struct inode *) sb->s_root))
 		goto fail_vnrele;
+
+	/* Don't set the VFS_DMI flag until here because we don't want
+	 * to send events while replaying the log.
+	 */
+	if (args->flags & XFSMNT_DMAPI)
+		vfsp->vfs_flag |= VFS_DMI;
 
 	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
 
@@ -556,12 +560,43 @@ linvfs_remount(
 }
 
 
+int
+linvfs_dmapi_mount(
+	struct super_block *sb,
+	char		*dir_name)
+{
+	vfsops_t	*vfsops;
+	extern vfsops_t xfs_vfsops;
+	char		fsname[256];
+	vnode_t		*cvp;	/* covered vnode */
+	vfs_t		*vfsp; /* mounted vfs */
+	int		error;
+
+	vfsp = LINVFS_GET_VFS(sb);
+	if ( ! (vfsp->vfs_flag & VFS_DMI) )
+		return 0;
+	cvp = LINVFS_GET_CVP(sb);
+	sprintf(fsname, bdevname(sb->s_dev));
+
+	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
+	vfsops = &xfs_vfsops;
+
+	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, cvp, dir_name, fsname, error);
+	if (error) {
+		vfsp->vfs_flag &= ~VFS_DMI;
+		return -error;
+	}
+	return 0;
+}
 
 
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 #ifdef	CONFIG_XFS_VNODE_TRACING
 	write_inode:		linvfs_write_inode,
+#endif
+#ifdef CONFIG_XFS_DMAPI
+	dmapi_mount_event:	linvfs_dmapi_mount,
 #endif
 	put_inode:		linvfs_put_inode,
 	delete_inode:		linvfs_delete_inode,
