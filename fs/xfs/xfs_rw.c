@@ -967,7 +967,7 @@ xfs_read_file(
 
 		bmapp = &bmaps[0];
 		read_bmaps = nbmaps;
-		ASSERT(BBTOB(bmapp->offset) <= uiop->uio_offset);
+		ASSERT(BBTOOFF(bmapp->offset) <= uiop->uio_offset);
 		/*
 		 * The first time through this loop we kick off I/O on
 		 * all the bmaps described by the iomap_read call.
@@ -3654,8 +3654,8 @@ xfs_diostrat( buf_t *bp)
 	xfs_extlen_t	blocks, count_fsb, total;
 	xfs_bmap_free_t free_list;
 	caddr_t		base;
-	ssize_t		bytes_this_req, resid, count, totxfer;
-	off_t		offset, offset_this_req;
+	ssize_t		resid, count, totxfer;
+	off_t		offset, offset_this_req, bytes_this_req;
 	int		i, j, error, writeflag, reccount;
 	int		end_of_file, bufsissued, totresid, exist;
 	int		ioflag, blk_algn, rt, numrtextents, rtextsize;
@@ -3668,7 +3668,7 @@ xfs_diostrat( buf_t *bp)
 	base	  = bp->b_un.b_addr;
 	error     = resid = totxfer = end_of_file = 0;
 	ioflag	  = dp->ioflag;
-	offset    = BBTOB(bp->b_blkno);
+	offset    = BBTOOFF((off_t)bp->b_blkno);
 	blk_algn  = 0;
 	totresid  = count  = bp->b_bcount;
 
@@ -3704,7 +3704,7 @@ xfs_diostrat( buf_t *bp)
 		/*
  		 * The request is NOT on a file system block boundary.
 		 */
-		blk_algn = BTOBB(offset & mp->m_blockmask);
+		blk_algn = OFFTOBB(offset & mp->m_blockmask);
 	}
 
 	/*
@@ -4082,7 +4082,7 @@ xfs_diordwr(vnode_t	*vp,
  	 * Perform I/O operation.
 	 */
 	error = biophysio(xfs_diostrat, bp, bp->b_edev, rw, 
-		(daddr_t)BTOBB(uiop->uio_offset), uiop);
+		(daddr_t)OFFTOBB(uiop->uio_offset), uiop);
 
 	/*
  	 * Free local buf structure.
