@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.33 $"
 
 #include <sys/cmn_err.h>
 
@@ -269,13 +269,14 @@ typedef struct log {
 
 
 /* common routines */
-extern int	xlog_find_head(xlog_t *log, daddr_t *head_blk);
-extern daddr_t  xlog_print_find_oldest(xlog_t *log);
-extern int	xlog_recover(xlog_t *log);
-extern void	xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
-extern buf_t *	xlog_get_bp(int);
-extern void	xlog_put_bp(buf_t *);
-extern int	xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
+extern xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
+extern int	 xlog_find_head(xlog_t *log, daddr_t *head_blk);
+extern daddr_t   xlog_print_find_oldest(xlog_t *log);
+extern int	 xlog_recover(xlog_t *log);
+extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
+extern buf_t *	 xlog_get_bp(int);
+extern void	 xlog_put_bp(buf_t *);
+extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
 
 #define XLOG_TRACE_GRAB_FLUSH  1
 #define XLOG_TRACE_REL_FLUSH   2
