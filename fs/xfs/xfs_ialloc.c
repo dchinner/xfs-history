@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -29,35 +29,58 @@
  * Prototypes for internal routines.
  */
 
+/*
+ * Log specified fields for the ag hdr (inode section)
+ */
 STATIC void
-xfs_ialloc_log_agi(xfs_trans_t *tp,	/* transaction pointer */
-		   buf_t *buf,		/* allocation group header buffer */
-		   int fields);		/* bitmask of fields to log */
+xfs_ialloc_log_agi(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	buf_t		*buf,		/* allocation group header buffer */
+	int		fields);	/* bitmask of fields to log */
 
+/*
+ * Log specified fields for the inode given by buf and off.
+ */
 STATIC void
-xfs_ialloc_log_di(xfs_trans_t *tp,	/* transaction pointer */
-	          buf_t *buf,		/* inode buffer */
-		  int off,		/* index of inode in buffer */
-		  int fields);		/* bitmask of fields to log */
+xfs_ialloc_log_di(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	buf_t		*buf,		/* inode buffer */
+	int		off,		/* index of inode in buffer */
+	int		fields);	/* bitmask of fields to log */
 
-STATIC buf_t *				/* allocation group header buffer */
-xfs_ialloc_read_agi(xfs_mount_t *mp,	/* file system mount structure */
-		    xfs_trans_t *tp,	/* transaction pointer */
-		    xfs_agnumber_t agno); /* allocation group number */
+/*
+ * Read in the allocation group header (inode allocation section)
+ */
+STATIC buf_t *				/* allocation group hdr buf */
+xfs_ialloc_read_agi(
+	xfs_mount_t	*mp,		/* file system mount structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_agnumber_t	agno);		/* allocation group number */
 
 /*
  * Prototypes for per-allocation group routines.
  */
 
+/*
+ * Allocate new inodes in the allocation group specified by agbuf.
+ * Return 0 for failure, 1 for success.
+ */
 STATIC int				/* success/failure */
-xfs_ialloc_ag_alloc(xfs_trans_t *tp,	/* transaction pointer */
-		    buf_t *agbuf);	/* alloc grp buffer */
+xfs_ialloc_ag_alloc(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	buf_t		*agbuf);	/* alloc group buffer */
 
+/*
+ * Select an allocation group to look for a free inode in, based on the parent
+ * inode and then mode.  sameag==1 forces the allocation to the same group
+ * as the parent.  Return the allocation group buffer.
+ */
 STATIC buf_t *				/* allocation group buffer */
-xfs_ialloc_ag_select(xfs_trans_t *tp,	/* transaction pointer */
-		     xfs_ino_t parent,	/* parent directory inode number */
-		     int sameag,	/* =1 to force to same ag. as parent */
-		     mode_t mode);	/* bits set to indicate file type */
+xfs_ialloc_ag_select(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_ino_t	parent,		/* parent directory inode number */
+	int		sameag,		/* =1 to force to same ag. as parent */
+	mode_t		mode);		/* bits set to indicate file type */
 
 /*
  * Internal functions.
@@ -67,11 +90,14 @@ xfs_ialloc_ag_select(xfs_trans_t *tp,	/* transaction pointer */
  * Log specified fields for the ag hdr (inode section)
  */
 STATIC void
-xfs_ialloc_log_agi(xfs_trans_t *tp, buf_t *buf, int fields)
+xfs_ialloc_log_agi(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	buf_t		*buf,		/* allocation group header buffer */
+	int		fields)		/* bitmask of fields to log */
 {
-	int	first;			/* first byte number */
-	int	last;			/* last byte number */
-	static const int offsets[] = {	/* field starting offsets */
+	int			first;		/* first byte number */
+	int			last;		/* last byte number */
+	static const int	offsets[] = {	/* field starting offsets */
 					/* keep in sync with bit definitions */
 		offsetof(xfs_agi_t, agi_magicnum),
 		offsetof(xfs_agi_t, agi_versionnum),
@@ -99,7 +125,11 @@ xfs_ialloc_log_agi(xfs_trans_t *tp, buf_t *buf, int fields)
  * Log specified fields for the inode given by buf and off.
  */
 STATIC void
-xfs_ialloc_log_di(xfs_trans_t *tp, buf_t *buf, int off, int fields)
+xfs_ialloc_log_di(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	buf_t		*buf,		/* inode buffer */
+	int		off,		/* index of inode in buffer */
+	int		fields)		/* bitmask of fields to log */
 {
 	xfs_dinode_t		*dip;		/* disk inode */
 	int			first;		/* first byte number */
@@ -162,8 +192,11 @@ xfs_ialloc_log_di(xfs_trans_t *tp, buf_t *buf, int off, int fields)
 /*
  * Read in the allocation group header (inode allocation section)
  */
-STATIC buf_t *
-xfs_ialloc_read_agi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno)
+STATIC buf_t *				/* allocation group hdr buf */
+xfs_ialloc_read_agi(
+	xfs_mount_t	*mp,		/* file system mount structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_agnumber_t	agno)		/* allocation group number */
 {
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
@@ -182,8 +215,10 @@ xfs_ialloc_read_agi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno)
  * Allocate new inodes in the allocation group specified by agbuf.
  * Return 0 for failure, 1 for success.
  */
-STATIC int
-xfs_ialloc_ag_alloc(xfs_trans_t *tp, buf_t *agbuf)
+STATIC int				/* success/failure */
+xfs_ialloc_ag_alloc(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	buf_t		*agbuf)		/* alloc group buffer */
 {
 	xfs_agi_t	*agi;		/* allocation group header */
 	buf_t		*fbuf;		/* new free inodes' buffer */
@@ -306,8 +341,12 @@ xfs_ialloc_ag_alloc(xfs_trans_t *tp, buf_t *agbuf)
  * inode and then mode.  sameag==1 forces the allocation to the same group
  * as the parent.  Return the allocation group buffer.
  */
-STATIC buf_t *
-xfs_ialloc_ag_select(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
+STATIC buf_t *				/* allocation group buffer */
+xfs_ialloc_ag_select(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_ino_t	parent,		/* parent directory inode number */
+	int		sameag,		/* =1 to force to same ag. as parent */
+	mode_t		mode)		/* bits set to indicate file type */
 {
 	buf_t		*agbuf;		/* allocation group header buffer */
 	xfs_agnumber_t	agcount;	/* number of ag's in the filesystem */
@@ -383,17 +422,22 @@ xfs_ialloc_ag_select(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
 }
 
 /* 
- * File system level functions.
+ * Visible inode allocation functions.
  */
 
 /*
  * Allocate an inode on disk.
  * Mode is used to tell whether the new inode will need space, and whether
  * it is a directory.
- * The sameag flag is used by mkfs only.
+ * The sameag flag is used by mkfs only, to force the root directory
+ * inode into the first allocation group.
  */
-xfs_ino_t
-xfs_dialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
+xfs_ino_t				/* inode number allocated */
+xfs_dialloc(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_ino_t	parent,		/* parent inode (directory) */
+	int		sameag,		/* 1 => must be in same a.g. */
+	mode_t		mode)		/* mode bits for new inode */
 {
 	xfs_agblock_t	agbno;		/* starting block number of inodes */
 	xfs_agnumber_t	agcount;	/* number of allocation groups */
@@ -482,11 +526,14 @@ xfs_dialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
 
 /*
  * Return the next (past agino) inode on the freelist for this allocation group
- * (given by agbuf). Used to traverse the whole list, e.g. for printing.
+ * (given by agbuf).  Used to traverse the whole list, e.g. for printing.
  */
-xfs_agino_t
-xfs_dialloc_next_free(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf,
-		      xfs_agino_t agino)
+xfs_agino_t				/* a.g. inode next on freelist */
+xfs_dialloc_next_free(
+	xfs_mount_t	*mp,		/* filesystem mount structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	buf_t		*agbuf,		/* buffer for ag.inode header */
+	xfs_agino_t	agino)		/* inode to get next free for */
 {
 	xfs_agblock_t	agbno;	/* block number in allocation group */
 	xfs_agi_t	*agi;	/* allocation group header */
@@ -509,11 +556,13 @@ xfs_dialloc_next_free(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf,
 }
 
 /*
- * Free disk inode.  Carefully avoid touching the incore inode, all
+ * Free disk inode.  Carefully avoids touching the incore inode, all
  * manipulations incore are the caller's responsibility.
  */
-xfs_agino_t
-xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
+xfs_agino_t				/* next value to be stored in di_un */
+xfs_difree(
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_ino_t	inode)		/* inode to be freed */
 {
 	xfs_agblock_t	agbno;	/* block number of inode relative to ag */
 	buf_t		*agbuf;	/* buffer containing allocation group header */
@@ -600,8 +649,12 @@ xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
  * Return the location of the inode in bno/off, for mapping it into a buffer.
  */
 void
-xfs_dilocate(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino,
-	     xfs_fsblock_t *bno, int *off)
+xfs_dilocate(
+	xfs_mount_t	*mp,		/* file system mount structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_ino_t	ino,		/* inode to locate */
+	xfs_fsblock_t	*bno,		/* output: block containing inode */
+	int		*off)		/* output: index in block of inode */
 {
 	xfs_agblock_t	agbno;	/* block number of inode in the alloc group */
 	xfs_agnumber_t	agno;	/* allocation group number */
