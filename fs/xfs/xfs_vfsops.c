@@ -585,7 +585,7 @@ out:
 	return XFS_ERROR(error);
 }
 
-static int
+STATIC int
 xfs_mntupdate(
 	bhv_desc_t			*bdp,
 	int				*flags,
@@ -593,7 +593,7 @@ xfs_mntupdate(
 {
 	struct vfs	*vfsp = bhvtovfs(bdp);
 	xfs_mount_t	*mp = XFS_BHVTOM(bdp);
-	int		pincount;
+	int		pincount, error;
 
 	if (args->flags & XFSMNT_NOATIME)
 		mp->m_flags |= XFS_MOUNT_NOATIME;
@@ -601,7 +601,7 @@ xfs_mntupdate(
 		mp->m_flags &= ~XFS_MOUNT_NOATIME;
 
 	if (!(vfsp->vfs_flag & VFS_RDONLY)) {
-		xfs_sync(bdp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR, NULL);
+		VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR, NULL, error);
 	}
 
 	if (*flags & MS_RDONLY) {
@@ -609,7 +609,7 @@ xfs_mntupdate(
 		xfs_finish_reclaim_all(mp);
 
 		do {
-			xfs_sync(bdp, SYNC_ATTR|SYNC_WAIT, NULL);
+			VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, NULL, error);
 			pagebuf_delwri_flush(mp->m_ddev_targp, PBDF_WAIT,
 								&pincount);
 		} while (pincount);
