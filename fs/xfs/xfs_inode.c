@@ -639,7 +639,7 @@ xfs_iformat_extents(
 	 * is wrong and we just bail out rather than crash in
 	 * kmem_alloc() or bcopy() below.
 	 */
-	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
+	if (size < 0 || size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
 			"corrupt inode %llu ((a)extents = %d).  Unmount and run xfs_repair.",
 			ip->i_ino, nex);
