@@ -1,4 +1,4 @@
-#ident "$Revision: 1.11 $"
+#ident "$Revision: 1.12 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -260,10 +260,6 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_bcount >= d->d_blk_softlimit)) ||
 		    (d->d_blk_hardlimit &&
 		    (d->d_bcount >= d->d_blk_hardlimit))) {
-#ifdef QUOTADEBUG
-		printf("----@@ starting btimer: %llu >= %llu \n",
-			       d->d_bcount, d->d_blk_softlimit);
-#endif
 			d->d_btimer = time + mp->QI_BTIMELIMIT;
 		}
 	} else {
@@ -271,10 +267,6 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_bcount < d->d_blk_softlimit)) &&
 		    (d->d_blk_hardlimit == 0 ||	
 		    (d->d_bcount < d->d_blk_hardlimit))) {
-#ifdef QUOTADEBUG
-			printf("----@@ stopping btimer: %llu < %llu\n",
-			        d->d_bcount, d->d_blk_softlimit);
-#endif
 			d->d_btimer = 0;
 		}
 	}
@@ -284,10 +276,6 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_icount >= d->d_ino_softlimit)) ||
 		    (d->d_ino_hardlimit &&
 		    (d->d_icount >= d->d_ino_hardlimit))) {
-#ifdef QUOTADEBUG
-			printf("----@@ starting itimer: %llu >= %llu\n",
-			       d->d_icount, d->d_ino_softlimit);
-#endif
 			d->d_itimer = time + mp->QI_ITIMELIMIT;
 		}
 	} else {
@@ -295,24 +283,9 @@ xfs_qm_adjust_dqtimers(
 		    (d->d_icount < d->d_ino_softlimit))  &&
 		    (d->d_ino_hardlimit == 0 ||	
 		    (d->d_icount < d->d_ino_hardlimit))) {
-#ifdef QUOTADEBUG
-			printf("----@@ stopping itimer: %llu < %llu\n",
-			       d->d_icount, d->d_ino_softlimit);
-#endif
 			d->d_itimer = 0;
 		}
 	}
-#ifdef QUOTADEBUG
-	if (d->d_itimer)
-		printf("--------@@Inode Timer running : %llu >= %llu\n", 
-		       d->d_icount, d->d_ino_softlimit);
-	if (d->d_btimer)
-		printf("--------@@Blks Timer running : %llu >= %llu\n",
-		       d->d_bcount, d->d_blk_softlimit);
-#endif
-	
-
-
 }
 
 /*

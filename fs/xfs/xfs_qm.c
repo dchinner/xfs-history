@@ -1,4 +1,4 @@
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 
 
 #include <sys/param.h>
@@ -1714,8 +1714,8 @@ xfs_qm_dqiterate(
 		ASSERT(nmaps <= XFS_DQITER_MAP_SIZE);
 		for (i = 0; i < nmaps; i++) {
 			ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
-			if (map[i].br_blockcount == 0)
-				continue;
+			ASSERT(map[i].br_blockcount);
+
 
 			lblkno += map[i].br_blockcount;
 
