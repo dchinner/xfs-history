@@ -50,7 +50,7 @@ objlink(!CONFIG_XFS_RT xfs.o xfsrtstubs.o)
 
 objlink(CONFIG_XFS_GRIO xfs.o xfs_grio.o)
 
-objlink(CONFIG_HAVE_XFS_DMAPI  xfs.o dmapi/dmapi.o xfs_dmapi.o)
+objlink(CONFIG_HAVE_XFS_DMAPI  xfs.o xfs_dmapi.o)
 objlink(!CONFIG_HAVE_XFS_DMAPI xfs.o xfsdmapistubs.o)
 
 objlink(CONFIG_XFS_QUOTA  xfs.o xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o)
