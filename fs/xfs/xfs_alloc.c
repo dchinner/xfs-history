@@ -47,6 +47,12 @@ ktrace_t	*xfs_alloc_trace_buf;
 #define	XFSA_FIXUP_BNO_OK	1
 #define	XFSA_FIXUP_CNT_OK	2
 
+int
+xfs_alloc_search_busy(xfs_trans_t *tp,
+		    xfs_agnumber_t agno,
+		    xfs_agblock_t bno,
+		    xfs_extlen_t len);
+
 #if defined(XFS_ALLOC_TRACE)
 #define	TRACE_ALLOC(s,a)	\
 	xfs_alloc_trace_alloc(fname, s, a, __LINE__)
@@ -54,10 +60,21 @@ ktrace_t	*xfs_alloc_trace_buf;
 	xfs_alloc_trace_free(fname, s, mp, a, b, x, f, __LINE__)
 #define	TRACE_MODAGF(s,a,f)	\
 	xfs_alloc_trace_modagf(fname, s, mp, a, f, __LINE__)
+#define	TRACE_BUSY(fname,s,ag,agb,l,sl,tp)	\
+	xfs_alloc_trace_busy(fname, s, mp, ag, agb, l, sl, tp, XFS_ALLOC_KTRACE_BUSY, __LINE__)
+#define	TRACE_UNBUSY(fname,s,ag,sl,tp)	\
+	xfs_alloc_trace_busy(fname, s, mp, ag, -1, -1, sl, tp, XFS_ALLOC_KTRACE_UNBUSY, __LINE__)
+#define	TRACE_BUSYSEARCH(fname,s,ag,agb,l,sl,tp)	\
+	xfs_alloc_trace_busy(fname, s, mp, ag, agb, l, sl, tp, XFS_ALLOC_KTRACE_BUSYSEARCH, __LINE__)
+
+
 #else
 #define	TRACE_ALLOC(s,a)
 #define	TRACE_FREE(s,a,b,x,f)
 #define	TRACE_MODAGF(s,a,f)
+#define	TRACE_BUSY(s,a,ag,agb,l,sl,tp)
+#define	TRACE_UNBUSY(fname,s,ag,sl,tp)
+#define	TRACE_BUSYSEARCH(fname,s,ag,agb,l,sl,tp)
 #endif	/* XFS_ALLOC_TRACE */
 
 /*
@@ -490,6 +507,32 @@ xfs_alloc_trace_modagf(
 		(void *)(__psunsigned_t)INT_GET(agf->agf_freeblks, ARCH_CONVERT),
 		(void *)(__psunsigned_t)INT_GET(agf->agf_longest, ARCH_CONVERT));
 }
+
+STATIC void
+xfs_alloc_trace_busy(
+	char		*name,		/* function tag string */
+	char		*str,		/* additional string */
+	xfs_mount_t	*mp,		/* file system mount poing */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	xfs_agblock_t	agbno,		/* a.g. relative block number */
+	xfs_extlen_t	len,		/* length of extent */
+	int		slot,		/* perag Busy slot */
+	xfs_trans_t	*tp,
+	int		trtype,		/* type: add, delete, search */
+	int		line)		/* source line number */
+{
+	ktrace_enter(xfs_alloc_trace_buf,
+		(void *)(__psint_t)(trtype | (line << 16)),
+		(void *)name,
+		(void *)str,
+		(void *)mp,
+		(void *)(__psunsigned_t)agno,
+		(void *)(__psunsigned_t)agbno,
+		(void *)(__psunsigned_t)len,
+		(void *)(__psint_t)slot,
+		(void *)tp,
+		NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+}
 #endif	/* XFS_ALLOC_TRACE */
 
 /*
@@ -564,6 +607,9 @@ xfs_alloc_ag_vextent(
 			TRACE_MODAGF(NULL, agf, XFS_AGF_FREEBLKS);
 			xfs_alloc_log_agf(args->tp, args->agbp,
 						XFS_AGF_FREEBLKS);
+			/* search the busylist for these blocks */
+			xfs_alloc_search_busy(args->tp, args->agno,
+					args->agbno, args->len);
 		}
 		if (!args->isfl)
 			xfs_trans_mod_sb(args->tp,
@@ -1423,17 +1469,6 @@ xfs_alloc_ag_vextent_small(
 				bp = xfs_btree_get_bufs(args->mp, args->tp,
 					args->agno, fbno, 0);
 				xfs_trans_binval(args->tp, bp);
-				/*
-				 * Since blocks move to the free list without
-				 * the coordination used in xfs_bmap_finish,
-				 * we can't allow the user to write to the
-				 * block until we know that the transaction
-				 * that moved it to the free list is
-				 * permanently on disk.  The only way to
-				 * ensure that is to make this transaction
-				 * synchronous.
-				 */
-				xfs_trans_set_sync(args->tp);
 			}
 			args->len = 1;
 			args->agbno = fbno;
@@ -1732,6 +1767,19 @@ xfs_free_ag_extent(
 			(haveright ? "both" : "left") :
 			(haveright ? "right" : "none"),
 		agno, bno, len, isfl);
+
+	/*
+	 * Since blocks move to the free list without the coordination
+	 * used in xfs_bmap_finish, we can't allow block to be available
+	 * for reallocation and non-transaction writing (user data)
+	 * until we know that the transaction that moved it to the free
+	 * list is permanently on disk.  We track the blocks by declaring 
+	 * these blocks as "busy"; the busy list is maintained on a per-ag 
+	 * basis and each transaction records which entries should be removed 
+	 * when the iclog commits to disk.  If a busy block is allocated,
+	 * the iclog is pushed up to the LSN that freed the block.
+	 */
+	xfs_alloc_mark_busy(tp, agno, bno, len);
 	return 0;
 
  error0:
@@ -1883,25 +1931,6 @@ xfs_alloc_fix_freelist(
 			return error;
 		bp = xfs_btree_get_bufs(mp, tp, args->agno, bno, 0);
 		xfs_trans_binval(tp, bp);
-		/*
-		 * Since blocks move to the free list without
-		 * the coordination used in xfs_bmap_finish,
-		 * we can't allow block to be available for reallocation
-		 * and non-transaction writing (user data)
-		 * until we know that the transaction
-		 * that moved it to the free list is
-		 * permanently on disk.  The only way to
-		 * ensure that is to make this transaction
-		 * synchronous.  The one exception to this
-		 * is in the case of wsync-mounted filesystem
-		 * where we know that any block that made it
-		 * onto the freelist won't be seen again in
-		 * the file from which it came since the transactions
-		 * that free metadata blocks or shrink inodes in
-		 * wsync filesystems are all themselves synchronous.
-		 */
-		if (!(mp->m_flags & XFS_MOUNT_WSYNC))
-			xfs_trans_set_sync(tp);
 	}
 	/*
 	 * Initialize the args structure.
@@ -2000,6 +2029,16 @@ xfs_alloc_get_freelist(
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLFIRST | XFS_AGF_FLCOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FLFIRST | XFS_AGF_FLCOUNT);
 	*bnop = bno;
+
+	/*
+	 * As blocks are freed, they are added to the per-ag busy list
+	 * and remain there until the freeing transaction is committed to
+	 * disk.  Now that we have allocated blocks, this list must be
+	 * searched to see if a block is being reused.  If one is, then
+	 * the freeing transaction must be pushed to disk NOW by forcing
+	 * to disk all iclogs up that transaction's LSN.
+	 */
+	xfs_alloc_search_busy(tp, INT_GET(agf->agf_seqno, ARCH_CONVERT), bno, 1);
 	return 0;
 }
 
@@ -2096,6 +2135,19 @@ xfs_alloc_put_freelist(
 		(int)((xfs_caddr_t)blockp - (xfs_caddr_t)agfl),
 		(int)((xfs_caddr_t)blockp - (xfs_caddr_t)agfl +
 			sizeof(xfs_agblock_t) - 1));
+	/*
+	 * Since blocks move to the free list without the coordination
+	 * used in xfs_bmap_finish, we can't allow block to be available
+	 * for reallocation and non-transaction writing (user data)
+	 * until we know that the transaction that moved it to the free
+	 * list is permanently on disk.  We track the blocks by declaring
+	 * these blocks as "busy"; the busy list is maintained on a per-ag
+	 * basis and each transaction records which entries should be removed
+	 * when the iclog commits to disk.  If a busy block is allocated,
+	 * the iclog is pushed up to the LSN that freed the block.
+	 */
+	xfs_alloc_mark_busy(tp, INT_GET(agf->agf_seqno, ARCH_CONVERT), bno, 1);
+
 	return 0;
 }
 
@@ -2179,6 +2231,7 @@ xfs_alloc_read_agf(
 			INT_GET(agf->agf_levels[XFS_BTNUM_BNOi], ARCH_CONVERT);
 		pag->pagf_levels[XFS_BTNUM_CNTi] =
 			INT_GET(agf->agf_levels[XFS_BTNUM_CNTi], ARCH_CONVERT);
+		spinlock_init(&pag->pagb_lock, "xfspagb");
 		pag->pagf_init = 1;
 	}
 #ifdef DEBUG
@@ -2427,4 +2480,149 @@ xfs_free_extent(
 error0:
 	mrunlock(&args.mp->m_peraglock);
 	return error;
+}
+
+
+/*
+ * AG Busy list management
+ * The busy list contains block ranges that have been freed but whose
+ * transacations have not yet hit disk.  If any block listed in a busy
+ * list is reused, the transaction that freed it must be forced to disk
+ * before continuing to use the block.
+ *
+ * xfs_alloc_mark_busy - add to the per-ag busy list
+ * xfs_alloc_clear_busy - remove an item from the per-ag busy list
+ */
+void
+xfs_alloc_mark_busy(xfs_trans_t *tp,
+		    xfs_agnumber_t agno,
+		    xfs_agblock_t bno,
+		    xfs_extlen_t len)
+{
+	xfs_mount_t		*mp;
+	xfs_perag_busy_t	*bsy;
+	int			n;
+	int			s;
+
+	mp = tp->t_mountp;
+	s = mutex_spinlock(&mp->m_perag[agno].pagb_lock);
+
+	/* search pagb_list for an open slot */
+	for (bsy = mp->m_perag[agno].pagb_list, n = 0;
+	     n < XFS_PAGB_NUM_SLOTS;
+	     bsy++, n++) {
+		if (bsy->busy_tp == NULL) {
+			break;
+		}
+	}
+
+	if (n < XFS_PAGB_NUM_SLOTS) {
+		bsy = &mp->m_perag[agno].pagb_list[n];
+		mp->m_perag[agno].pagb_count++;
+		TRACE_BUSY("xfs_alloc_mark_busy", "got", agno, bno, len, n, tp);
+		bsy->busy_start = bno;
+		bsy->busy_length = len;
+		bsy->busy_tp = tp;
+		xfs_trans_add_busy(tp, agno, n);
+	} else {
+		TRACE_BUSY("xfs_alloc_mark_busy", "FULL", agno, bno, len, -1, tp);
+		/*
+		 * The busy list is full!  Since it is now not possible to
+		 * track the free block, make this a synchronous transaction
+		 * to insure that the block is not reused before this
+		 * transaction commits.
+		 */
+		xfs_trans_set_sync(tp);
+	}
+
+	mutex_spinunlock(&mp->m_perag[agno].pagb_lock, s);
+}
+
+void
+xfs_alloc_clear_busy(xfs_trans_t *tp,
+		     xfs_agnumber_t agno,
+		     int idx)
+{
+	xfs_mount_t		*mp;
+	xfs_perag_busy_t	*list;
+	int			s;
+
+	mp = tp->t_mountp;
+
+	s = mutex_spinlock(&mp->m_perag[agno].pagb_lock);
+	list = mp->m_perag[agno].pagb_list;
+
+	ASSERT(idx < XFS_PAGB_NUM_SLOTS);
+	if (list[idx].busy_tp == tp) {
+		TRACE_UNBUSY("xfs_alloc_clear_busy", "found", agno, idx, tp);
+		list[idx].busy_tp = NULL;
+		mp->m_perag[agno].pagb_count--;
+	} else {
+		TRACE_UNBUSY("xfs_alloc_clear_busy", "missing", agno, idx, tp);
+	}
+
+	mutex_spinunlock(&mp->m_perag[agno].pagb_lock, s);
+}
+
+
+/*
+ * returns non-zero if any of (agno,bno):len is in a busy list
+ */
+int
+xfs_alloc_search_busy(xfs_trans_t *tp,
+		    xfs_agnumber_t agno,
+		    xfs_agblock_t bno,
+		    xfs_extlen_t len)
+{
+	xfs_mount_t		*mp;
+	xfs_perag_busy_t	*bsy;
+	int			n;
+	xfs_agblock_t		uend, bend;
+	xfs_lsn_t		lsn;
+	int			cnt, s;
+
+	mp = tp->t_mountp;
+
+	s = mutex_spinlock(&mp->m_perag[agno].pagb_lock);
+	cnt = mp->m_perag[agno].pagb_count;
+
+	uend = bno + len;
+
+	/* search pagb_list for this slot, skipping open slots */
+	for (bsy = mp->m_perag[agno].pagb_list, n = 0;
+	     cnt; bsy++, n++) {
+
+		/*
+		 * (start1,length1) within (start2, length2)
+		 */
+		if (bsy->busy_tp != NULL) {
+			bend = bsy->busy_start + bsy->busy_length;
+			if ( (bno >= bsy->busy_start && bno <= bend) ||
+			     (uend >= bsy->busy_start && uend <= bend) ||
+			     (bno <= bsy->busy_start && uend >= bsy->busy_start) ) {
+				TRACE_BUSYSEARCH("xfs_alloc_search_busy",
+						 "found1", agno, bno, len, n,
+						 tp);
+				break;
+			}
+			cnt--;
+		}
+	}
+
+	/*
+	 * If a block was found, force the log through the LSN of the
+	 * transaction that freed the block
+	 */
+	if (cnt) { 
+		TRACE_BUSYSEARCH("xfs_alloc_search_busy", "found", agno, bno, len, n, tp);
+		lsn = bsy->busy_tp->t_lsn;
+		mutex_spinunlock(&mp->m_perag[agno].pagb_lock, s);
+		xfs_log_force(mp, lsn, XFS_LOG_FORCE|XFS_LOG_SYNC);
+	} else {
+		TRACE_BUSYSEARCH("xfs_alloc_search_busy", "not-found", agno, bno, len, n, tp);
+		n = -1;
+		mutex_spinunlock(&mp->m_perag[agno].pagb_lock, s);
+	}
+
+	return n;
 }

@@ -125,7 +125,9 @@ _xfs_trans_alloc(
 	tp->t_type = type;
 	tp->t_mountp = mp;
 	tp->t_items_free = XFS_LIC_NUM_SLOTS;
+	tp->t_busy_free = XFS_LBC_NUM_SLOTS;
 	XFS_LIC_INIT(&(tp->t_items));
+	XFS_LBC_INIT(&(tp->t_busy));
 
 	return (tp);
 }
@@ -153,7 +155,9 @@ xfs_trans_dup(
 	ntp->t_type = tp->t_type;
 	ntp->t_mountp = tp->t_mountp;
 	ntp->t_items_free = XFS_LIC_NUM_SLOTS;
+	ntp->t_busy_free = XFS_LBC_NUM_SLOTS;
 	XFS_LIC_INIT(&(ntp->t_items));
+	XFS_LBC_INIT(&(ntp->t_busy));
 
 	ASSERT(tp->t_flags & XFS_TRANS_PERM_LOG_RES);
 
@@ -705,6 +709,7 @@ shut_us_down:
 				shutdown = XFS_ERROR(EIO);
 		}
 		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
+		xfs_trans_free_busy(tp);
 		xfs_trans_free(tp);
 		XFS_STATS_INC(xfsstats.xs_trans_empty);
 		if (commit_lsn_p)
@@ -932,6 +937,7 @@ xfs_trans_uncommit(
 	}
 	
 	xfs_trans_free_items(tp, flags);
+	xfs_trans_free_busy(tp);
 	xfs_trans_free(tp);
 }
 
@@ -1064,6 +1070,7 @@ xfs_trans_cancel(
 		xfs_log_done(tp->t_mountp, tp->t_ticket, log_flags);
 	}
 	xfs_trans_free_items(tp, flags);
+	xfs_trans_free_busy(tp);
 	xfs_trans_free(tp);
 
 	/* mark this thread as no longer being in a transaction */
@@ -1106,6 +1113,9 @@ xfs_trans_committed(
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_chunk_t	*next_licp;
+	xfs_log_busy_chunk_t	*lbcp;
+	xfs_log_busy_slot_t	*lbsp;
+	int			i;
 
 	/*
 	 * Call the transaction's completion callback if there
@@ -1134,6 +1144,21 @@ xfs_trans_committed(
 		kmem_free(licp, sizeof(xfs_log_item_chunk_t));
 		licp = next_licp;
 	}
+
+	/*
+	 * Clear all the per-AG busy list items listed in this transaction
+	 */
+	lbcp = &tp->t_busy;
+	while (lbcp != NULL) {
+		for (i = 0, lbsp = lbcp->lbc_busy; i < lbcp->lbc_unused; i++, lbsp++) {
+			if (!XFS_LBC_ISFREE(lbcp, i)) {
+				xfs_alloc_clear_busy(tp, lbsp->lbc_ag,
+						     lbsp->lbc_idx);
+			}
+		}
+		lbcp = lbcp->lbc_next;
+	}
+	xfs_trans_free_busy(tp);
 
 	/*
 	 * That's it for the transaction structure.  Free it.

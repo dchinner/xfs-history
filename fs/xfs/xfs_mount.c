@@ -145,7 +145,12 @@ xfs_mount_free(
 		xfs_chash_free(mp);
 
 	if (mp->m_perag) {
+		int	agno;
+
 		mrfree(&mp->m_peraglock);
+		for (agno = 0; agno < mp->m_maxagi; agno++)
+			kmem_free(mp->m_perag[agno].pagb_list,
+			  sizeof(xfs_perag_busy_t) * XFS_PAGB_NUM_SLOTS);
 		kmem_free(mp->m_perag,
 			  sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
 	}
@@ -572,7 +577,7 @@ xfs_mountfs(
 	uint		quotaflags, quotaondisk, rootqcheck, needquotacheck;
 	boolean_t	needquotamount;
 	__int64_t	update_flags;
-	int		noio;
+	int		agno, noio;
         int             uuid_mounted = 0;
 
 	noio = dev == 0 && mp->m_sb_bp != NULL;
@@ -883,6 +888,11 @@ xfs_mountfs(
 	mrinit(&mp->m_peraglock, "xperag");
 	mp->m_perag =
 		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
+	for (agno = 0; agno < sbp->sb_agcount; agno++) {
+		mp->m_perag[agno].pagb_count = 0;
+		mp->m_perag[agno].pagb_list = kmem_zalloc(XFS_PAGB_NUM_SLOTS *
+					sizeof(xfs_perag_busy_t), KM_SLEEP);
+	}
 
 	xfs_initialize_perag(mp, sbp->sb_agcount);
 
@@ -1043,6 +1053,9 @@ xfs_mountfs(
 	xfs_ihash_free(mp);
 	xfs_chash_free(mp);
 	mrfree(&mp->m_peraglock);
+	for (agno = 0; agno < sbp->sb_agcount; agno++)
+		kmem_free(mp->m_perag[agno].pagb_list,
+		  sizeof(xfs_perag_busy_t) * XFS_PAGB_NUM_SLOTS);
 	kmem_free(mp->m_perag, sbp->sb_agcount * sizeof(xfs_perag_t));
 	mp->m_perag = NULL;
 	/* FALLTHROUGH */

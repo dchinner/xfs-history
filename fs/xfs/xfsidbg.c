@@ -1464,6 +1464,46 @@ vn_trace_pr_entry(ktrace_entry_t *ktep)
 						(__psint_t)ktep->val[3]);
 		break;
 
+	case XFS_ALLOC_KTRACE_UNBUSY:
+		kdb_printf("unbusy %s [%s %d] mp 0x%x\n",
+			(char *)ktep->val[1],
+			ktep->val[2] ? (char *)ktep->val[2] : "",
+			(__psint_t)ktep->val[0] >> 16,
+			(xfs_mount_t *)ktep->val[3]);
+		kdb_printf("      agno %d slot %d tp 0x%x\n",
+			(__psunsigned_t)ktep->val[4],
+			(__psunsigned_t)ktep->val[7],
+			(__psunsigned_t)ktep->val[8]);
+		break;
+
+	case XFS_ALLOC_KTRACE_BUSY:
+		kdb_printf("busy %s [%s %d] mp 0x%x\n",
+			(char *)ktep->val[1],
+			ktep->val[2] ? (char *)ktep->val[2] : "",
+			(__psint_t)ktep->val[0] >> 16,
+			(xfs_mount_t *)ktep->val[3]);
+		kdb_printf("      agno %d agbno %d len %d slot %d tp 0x%x\n",
+			(__psunsigned_t)ktep->val[4],
+			(__psunsigned_t)ktep->val[5],
+			(__psunsigned_t)ktep->val[6],
+			(__psunsigned_t)ktep->val[7],
+			(__psunsigned_t)ktep->val[8]);
+		break;
+
+	case XFS_ALLOC_KTRACE_BUSYSEARCH:
+		kdb_printf("busy-search %s [%s %d] mp 0x%x\n",
+			(char *)ktep->val[1],
+			ktep->val[2] ? (char *)ktep->val[2] : "",
+			(__psint_t)ktep->val[0] >> 16,
+			(xfs_mount_t *)ktep->val[3]);
+		kdb_printf("      agno %d agbno %d len %d slot %d tp 0x%x\n",
+			(__psunsigned_t)ktep->val[4],
+			(__psunsigned_t)ktep->val[5],
+			(__psunsigned_t)ktep->val[6],
+			(__psunsigned_t)ktep->val[7],
+			(__psunsigned_t)ktep->val[8]);
+		break;
+        
 	default:
 		kdb_printf("unknown vntrace record\n");
 		return 1;
@@ -2616,7 +2656,7 @@ xfs_fmtlsn(xfs_lsn_t *lsnp)
 
 	wordp = (uint *)lsnp;
 	word2p = wordp++;
-	sprintf(buf, "[%x:%x]", *wordp, *word2p);
+	sprintf(buf, "[%u:%u]", *wordp, *word2p);
 
 	return buf;
 }
@@ -3982,8 +4022,9 @@ xfsidbg_xlog(xlog_t *log)
 		&log->l_flushsema, log->l_ticket_cnt, log->l_ticket_tcnt);
 	kdb_printf("freelist: 0x%p  tail: 0x%p  ICLOG: 0x%p  \n",
 		log->l_freelist, log->l_tail, log->l_iclog);
-	kdb_printf("&icloglock: 0x%p  tail_lsn: 0x%Lx  last_sync_lsn: 0x%Lx \n",
-		&log->l_icloglock, log->l_tail_lsn, log->l_last_sync_lsn);
+	kdb_printf("&icloglock: 0x%p  tail_lsn: %s  last_sync_lsn: %s \n",
+		&log->l_icloglock, xfs_fmtlsn(&log->l_tail_lsn),
+		xfs_fmtlsn(&log->l_last_sync_lsn));
 	kdb_printf("mp: 0x%p  xbuf: 0x%p  roundoff: %d  l_covered_state: %s \n",
 		log->l_mp, log->l_xbuf, log->l_roundoff,
 			xfsidbg_get_cstate(log->l_covered_state));
@@ -4621,8 +4662,13 @@ xfsidbg_xchashlist(xfs_chashlist_t *chl)
 	xfs_inode_t	*ip;
 
 	while (chl != NULL) {
-		kdb_printf("hashlist inode 0x%p blkno %Ld ",
+#ifdef DEBUG
+		kdb_printf("hashlist inode 0x%p blkno %Ld buf 0x%p",
+		       chl->chl_ip, chl->chl_blkno, chl->chl_buf);
+#else
+		kdb_printf("hashlist inode 0x%p blkno %Ld",
 		       chl->chl_ip, chl->chl_blkno);
+#endif
 
 		kdb_printf("\n");
 
@@ -4646,6 +4692,7 @@ xfsidbg_xperag(xfs_mount_t *mp)
 {
 	xfs_agnumber_t	agno;
 	xfs_perag_t	*pag;
+	int		busy;
 
 	pag = mp->m_perag;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++, pag++) {
@@ -4662,6 +4709,14 @@ xfsidbg_xperag(xfs_mount_t *mp)
 		if (pag->pagi_init)
 			kdb_printf("    i_freecount %d i_inodeok %d\n",
 				pag->pagi_freecount, pag->pagi_inodeok);
+
+		for (busy = 0; busy < XFS_PAGB_NUM_SLOTS; busy++) {
+			kdb_printf("     %04d: start %d length %d tp 0x%p\n",
+				busy,
+				pag->pagb_list[busy].busy_start,
+				pag->pagb_list[busy].busy_length,
+				pag->pagb_list[busy].busy_tp);
+		}
 	}
 }
 
@@ -4980,6 +5035,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_desc_t	*lidp;
+	xfs_log_busy_chunk_t	*lbcp;
 	int			i;
 	int			chunk;
 	static char *xtp_flags[] = {
@@ -5095,6 +5151,22 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		}
 		chunk++;
 		licp = licp->lic_next;
+	}
+
+	kdb_printf("log busy free %d, list:\n", tp->t_busy_free);
+	lbcp = &tp->t_busy;
+	chunk = 0;
+	while (lbcp != NULL) {
+		kdb_printf("Chunk %d at 0x%p next 0x%p free 0x%08x unused %d\n",
+			chunk, lbcp, lbcp->lbc_next, lbcp->lbc_free,
+			lbcp->lbc_unused);
+		for (i = 0; i < XFS_LBC_NUM_SLOTS; i++) {
+			kdb_printf("  %02d: ag %d idx %d\n",
+				i,
+				lbcp->lbc_busy[i].lbc_ag,
+				lbcp->lbc_busy[i].lbc_idx);
+		}
+		lbcp = lbcp->lbc_next;
 	}
 }
 

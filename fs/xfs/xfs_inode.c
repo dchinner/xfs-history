@@ -1546,8 +1546,6 @@ xfs_itruncate_finish(
 	if (fork == XFS_DATA_FORK) {
 		if (ip->i_d.di_nextents > 0) {
 			ip->i_d.di_size = new_size;
-			if (sync)
-				xfs_trans_set_sync(ntp);
 			xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 		}
 	} else if (sync) {
