@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.42 $"
 
 struct cred;
 struct xfs_ihash;
@@ -68,7 +68,13 @@ typedef struct xfs_mount {
 	xfs_extlen_t		m_rbmrotor;	/* rt bitmap allocation rotor */
 	int			m_fixedfsid[2];	/* unchanged for life of FS */
 	uint			m_dmevmask;	/* DMI events for this FS */
+	uint			m_flags;	/* global mount flags */
 } xfs_mount_t;
+
+/*
+ * Flags for m_flags.
+ */
+#define	XFS_MOUNT_WSYNC	0x00000001
 
 /*
  * Default minimum read and write sizes.

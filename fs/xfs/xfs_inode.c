@@ -743,14 +743,19 @@ xfs_itruncate_finish(
 	 * As long as we make the new_size permanent before actually
 	 * freeing any blocks it doesn't matter if they get writtten to.
 	 *
-	 * We actually only do this if there are blocks in the file.
-	 * We could restrict it even more if we wanted to check to see
-	 * if we'll actually be freeing any of them, but the common case
-	 * is to free them all so the check is not worth the expense.
+	 * We actually only do this if there are blocks in the file and
+	 * the link count is greater than 0 or this is not a synchronous
+	 * mount.  If this is a synchronous mount and the link count is
+	 * 0, then we know that the unlinking transaction was a synchronous
+	 * one.  Thus no user will ever see this data again after a crash
+	 * and we do not need to do another synchronous transaction here.
 	 */
 	if (ip->i_d.di_nblocks > 0) {
 		ip->i_d.di_size = new_size;
-		xfs_trans_set_sync(ntp);
+		if ((ip->i_d.di_nlink > 0) ||
+		    !(mp->m_flags & XFS_MOUNT_WSYNC)) {
+			xfs_trans_set_sync(ntp);
+		}
 	}
 
 	/*

@@ -12,7 +12,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
  * XFS arguments to the mount system call.
@@ -31,5 +31,6 @@ struct xfs_args {
  * XFS mount option flags
  */
 #define	XFSMNT_CHKLOG	0x0001	/* check log */
+#define	XFSMNT_WSYNC	0x0002	/* safe mode nfs mount compatible */
 
 #endif /* !__SYS_XFS_CLNT_H__ */
