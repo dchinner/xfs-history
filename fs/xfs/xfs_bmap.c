@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -130,8 +130,6 @@ xfs_bmbt_delete(xfs_btree_cur_t *cur)
 STATIC int
 xfs_bmbt_delrec(xfs_btree_cur_t *cur, int level)
 {
-	buf_t *agbuf;
-	xfs_aghdr_t *agp;
 	xfs_btree_block_t *block;
 	xfs_agblock_t bno;
 	buf_t *buf;
@@ -193,8 +191,12 @@ xfs_bmbt_delrec(xfs_btree_cur_t *cur, int level)
 		xfs_bmbt_log_recs(cur, buf, ptr, i - 1);
 	block->bb_numrecs--;
 	xfs_bmbt_log_block(cur, buf, XFS_BB_NUMRECS);
-	agbuf = cur->bc_agbuf;
-	agp = xfs_buf_to_agp(agbuf);
+	/*
+	 * We just did a join at the previous level.
+	 * Make the cursor point to the good (left) key.
+	 */
+	if (level > 0)
+		xfs_bmbt_decrement(cur, level);
 	if (level == cur->bc_nlevels - 1) {
 		/*
 		 * Only do this if the next level will fit.
@@ -1294,6 +1296,8 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 			eof = 1;
 			if (lastx)
 				xfs_bmbt_get_all(&ip->i_u1.iu_extents[lastx - 1], prev);
+			else
+				prev.br_startblock = NULLFSBLOCK;
 		} else
 			got.br_startblock = xfs_bmbt_get_startblock(ep);
 	}
