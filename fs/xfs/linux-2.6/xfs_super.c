@@ -651,7 +651,7 @@ int __init init_xfs_fs(void)
 {
   ENTER("init_xfs_fs"); 
   cred_init();
-#if defined(_USING_PAGEBUF_T)
+#if !defined(_USING_PAGEBUF_T)
   binit();
 #else
   printk("init_xfs_fs... do we need a pagebuf_init similar to the binit?\n");
