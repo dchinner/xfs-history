@@ -175,10 +175,9 @@ xfs_trans_getblk(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
 	 * it doesn't have one yet, then allocate one and initialize it.
+	 * The checks to see if one is there are in xfs_buf_item_init().
 	 */
-	if (bp->b_fsprivate == NULL) {
-		xfs_buf_item_init(bp, tp->t_mountp);
-	}
+	xfs_buf_item_init(bp, tp->t_mountp);
 
 	/*
 	 * Set the recursion count for the buffer within this transaction
@@ -270,10 +269,9 @@ xfs_trans_bread(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
 	 * it doesn't have one yet, then allocate one and initialize it.
+	 * The checks to see if one is there are in xfs_buf_item_init().
 	 */
-	if (bp->b_fsprivate == NULL) {
-		xfs_buf_item_init(bp, tp->t_mountp);
-	}
+	xfs_buf_item_init(bp, tp->t_mountp);
 
 	/*
 	 * Set the recursion count for the buffer within this transaction
@@ -346,10 +344,9 @@ xfs_trans_getchunk(xfs_trans_t *tp, vnode_t *vp,
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
 	 * it doesn't have one yet, then allocate one and initialize it.
+	 * The checks to see if one is there are in xfs_buf_item_init().
 	 */
-	if (bp->b_fsprivate == NULL) {
-		xfs_buf_item_init(bp, tp->t_mountp);
-	}
+	xfs_buf_item_init(bp, tp->t_mountp);
 
 	/*
 	 * Set the recursion count for the buffer within this transaction
@@ -442,10 +439,9 @@ xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
 	 * it doesn't have one yet, then allocate one and initialize it.
+	 * The checks to see if one is there are in xfs_buf_item_init().
 	 */
-	if (bp->b_fsprivate == NULL) {
-		xfs_buf_item_init(bp, tp->t_mountp);
-	}
+	xfs_buf_item_init(bp, tp->t_mountp);
 
 	/*
 	 * Set the recursion count for the buffer within this transaction
@@ -501,6 +497,7 @@ xfs_trans_brelse(xfs_trans_t *tp, buf_t *bp)
 
 	ASSERT(bp->b_fsprivate2 == tp);
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
+	ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
 	/*
 	 * Find the item descriptor pointing to this buffer's
 	 * log item.  It must be there.
@@ -571,10 +568,9 @@ xfs_trans_bjoin(xfs_trans_t *tp, buf_t *bp)
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
 	 * it doesn't have one yet, then allocate one and initialize it.
+	 * The checks to see if one is there are in xfs_buf_item_init().
 	 */
-	if (bp->b_fsprivate == NULL) {
-		xfs_buf_item_init(bp, tp->t_mountp);
-	}
+	xfs_buf_item_init(bp, tp->t_mountp);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -798,18 +794,23 @@ xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
 	ASSERT((xfs_trans_t*)bp->b_fsprivate2 == tp);
 	ASSERT(bp->b_fsprivate != NULL);
 	ASSERT((first <= last) && (last <= bp->b_bcount));
-	ASSERT((bp->b_iodone == NULL) || (bp->b_iodone == xfs_buf_iodone));
+	ASSERT((bp->b_iodone == NULL) ||
+	       (bp->b_iodone == xfs_buf_iodone_callbacks));
 
 	/*
 	 * Mark the buffer as needing to be written out eventually,
 	 * and set its iodone function to remove the buffer's buf log
 	 * item from the AIL and free it when the buffer is flushed
-	 * to disk.
+	 * to disk.  See xfs_buf_attach_iodone() for more details
+	 * on li_cb and xfs_buf_iodone_callbacks().
 	 */
-	bp->b_iodone = xfs_buf_iodone;
 	bp->b_flags |= B_DELWRI;
-
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
+	if (bp->b_iodone == NULL) {
+		bp->b_iodone = xfs_buf_iodone_callbacks;
+	}
+	bip->bli_item.li_cb = (void(*)(buf_t*,xfs_log_item_t*))xfs_buf_iodone;
+
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
 
@@ -827,6 +828,12 @@ xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
  * The values for fieldmask are defined in xfs_inode_item.h.  We always
  * log all of the core inode if any of it has changed, and we always log
  * all of the inline data/extents/b-tree root if any of them has changed.
+ *
+ * If this is the first time the inode has been logged since it was
+ * last flushed or brought in from disk, then take an extra reference
+ * on the inode.  This keeps the inode from being recycled until
+ * it is clean.  This should help to keep us from sleeping too much
+ * in the reclaim routine trying to flush out the inode.
  */
 void
 xfs_trans_log_inode(xfs_trans_t	*tp,
@@ -843,6 +850,13 @@ xfs_trans_log_inode(xfs_trans_t	*tp,
 
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
+
+	if (ip->i_item.ili_fields == 0) {
+		ASSERT(ip->i_item.ili_ref == 0);
+#ifdef NOTYET
+		vn_hold(XFS_ITOV(ip));
+#endif
+	}
 	ip->i_item.ili_fields |= flags;
 }
 
