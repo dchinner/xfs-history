@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision: 1.29 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -737,6 +737,7 @@ xlog_recover_unlink_tid(xlog_recover_t	**q,
 				found = 1;
 				break;
 			}
+			tp = tp->r_next;
 		}
 		if (!found) {
 			xlog_warn(
