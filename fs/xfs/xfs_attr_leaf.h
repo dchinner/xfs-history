@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_LEAF_H
 #define	_FS_XFS_ATTR_LEAF_H
 
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.19 $"
 
 /*
  * xfs_attr_leaf.h
@@ -268,6 +268,6 @@ int	xfs_attr_leaf_newentsize(struct xfs_da_args *args, int blocksize,
 int	xfs_attr_leaf_entsize(struct xfs_attr_leafblock *leaf, int index);
 int	xfs_attr_put_listent(struct xfs_attr_list_context *context,
 				    char *name, int namelen, int valuelen);
-void	xfs_attr_rolltrans(struct xfs_trans **transp, struct xfs_inode *dp);
+int	xfs_attr_rolltrans(struct xfs_trans **transp, struct xfs_inode *dp);
 
 #endif	/* !FS_XFS_ATTR_LEAF_H */
