@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.185 $"
+#ident  "$Revision: 1.186 $"
 
 
 #include <limits.h>
@@ -958,7 +958,7 @@ xfs_isdev(
 	if (!bdvalid(get_bdevsw(dev)))
 		return 1;
 	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
-	error = (bp->b_flags & B_ERROR);
+	error = (bp->b_flags & B_ERROR) ? 1 : 0;
 
 	if (error == 0) {
 		sbp = XFS_BUF_TO_SBP(bp);
@@ -1626,7 +1626,7 @@ xfs_sync(
 	vmap_t		vmap;
 	int		error;
 	int		last_error;
-	int		fflag;
+	uint64_t	fflag;
 	int		ireclaims;
 	int		restarts;
 	uint		lock_flags;

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.227 $"
+#ident "$Revision: 1.228 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -184,7 +184,7 @@ xfs_inobp_bwcheck(buf_t *bp)
 	int		j;
 	xfs_dinode_t	*dip;
 
-	ASSERT(bp->b_flags2 & B_XFS_INO);
+	ASSERT(bp->b_flags & B_XFS_INO);
 	ASSERT(bp->b_fsprivate3 != NULL);
 
 	mp = bp->b_fsprivate3;
@@ -416,7 +416,7 @@ xfs_itobp(
 	/*
 	 * Mark the buffer as an inode buffer now that it looks good
 	 */
-	bp->b_flags2 |= B_XFS_INO;
+	bp->b_flags |= B_XFS_INO;
 
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.

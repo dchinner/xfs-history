@@ -1,4 +1,4 @@
-#ident "$Revision: 1.226 $"
+#ident "$Revision: 1.227 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -215,7 +215,7 @@ xfs_diordwr(
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp,
-	int		rw);
+	uint64_t	rw);
 
 extern int
 xfs_io_is_guaranteed(
@@ -3898,40 +3898,40 @@ xfs_strat_write_bp_trace(
 	ktrace_enter(ip->i_strat_trace,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+		     (void*)((unsigned long)((ip->i_d.di_size >> 32) &
 					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((unsigned long)((bp->b_offset > 32) &
+		     (void*)((unsigned long)((bp->b_offset >> 32) &
 					     0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(bp->b_bcount)),
 		     (void*)((unsigned long)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)((unsigned long)(bp->b_flags)),
+		     (void*)((bp->b_flags >> 32) & 0xffffffff),
+		     (void*)(0xffffffff & bp->b_flags),
 		     (void*)(bp->b_pages),
 		     (void*)(bp->b_pages->pf_pageno),
-		     (void*)0,
 		     (void*)0,
 		     (void*)0);
 
 	ktrace_enter(xfs_strat_trace_buf,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+		     (void*)((unsigned long)((ip->i_d.di_size >> 32) &
 					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((unsigned long)((bp->b_offset > 32) &
+		     (void*)((unsigned long)((bp->b_offset >> 32) &
 					     0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(bp->b_bcount)),
 		     (void*)((unsigned long)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)((unsigned long)(bp->b_flags)),
+		     (void*)((bp->b_flags >> 32) & 0xffffffff),
+		     (void*)(0xffffffff & bp->b_flags),
 		     (void*)(bp->b_pages),
 		     (void*)(bp->b_pages->pf_pageno),
-		     (void*)0,
 		     (void*)0,
 		     (void*)0);
 }
@@ -3954,12 +3954,12 @@ xfs_strat_write_subbp_trace(
 	ktrace_enter(ip->i_strat_trace,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+		     (void*)((unsigned long)((ip->i_d.di_size >> 32) &
 					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
 		     (void*)rbp,
-		     (void*)((unsigned long)((rbp->b_offset > 32) &
+		     (void*)((unsigned long)((rbp->b_offset >> 32) &
 					     0xffffffff)),
 		     (void*)(rbp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(rbp->b_bcount)),
@@ -4794,7 +4794,7 @@ int
 xfs_bioerror_relse(
 	buf_t *bp)
 {
-	int fl;
+	int64_t fl;
 
 	ASSERT(bp->b_iodone != xfs_buf_iodone_callbacks);
 	ASSERT(bp->b_iodone != xlog_iodone);
@@ -5624,7 +5624,6 @@ retry:
 				CHECK_GRIO_TIMESTAMP(bp, 40);
 
 	     			nbp->b_flags     = bp->b_flags;
-	     			nbp->b_flags2    = bp->b_flags2;
 
 				nbp->b_grio_private = bp->b_grio_private;
 
@@ -5693,8 +5692,7 @@ retry:
 		for (j = 0; j < bufsissued ; j++) {
 	  		nbp = bps[j];
 	    		biowait(nbp);
-			nbp->b_flags2 &= ~B_GR_BUF;
-			nbp->b_flags2 &= ~B_PRIO_BUF;
+			nbp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
 
 	     		if (!error)
 				error = geterror(nbp);
@@ -5780,7 +5778,7 @@ xfs_diordwr(
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp,
-	int		rw)
+	uint64_t	rw)
 {
 	extern 		zone_t	*grio_buf_data_zone;
 
@@ -5868,13 +5866,12 @@ xfs_diordwr(
 	 */
 	if (!(ioflag & IO_PRIORITY)) {
 		bp->b_grio_private = NULL;
-		bp->b_flags2 &= ~B_GR_BUF;
-		bp->b_flags2 &= ~B_PRIO_BUF;
+		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
 	} else if (xfs_io_is_guaranteed((vfile_t *)uiop->uio_fp, &stream_id)) {
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-			bp->b_flags2 |= B_GR_BUF;
+			bp->b_flags |= B_GR_BUF;
 		else
-			bp->b_flags2 |= B_PRIO_BUF;
+			bp->b_flags |= B_PRIO_BUF;
 
 		ASSERT(bp->b_grio_private == NULL);
 		bp->b_grio_private = 
@@ -5886,8 +5883,7 @@ xfs_diordwr(
 		INIT_GRIO_TIMESTAMP(bp);
 	} else {
 		bp->b_grio_private = NULL;
-		bp->b_flags2 &= ~B_GR_BUF;
-		bp->b_flags2 &= ~B_PRIO_BUF;
+		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
 	}
 
 	/*
@@ -5910,8 +5906,7 @@ xfs_diordwr(
 		ASSERT(BUF_GRIO_PRIVATE(bp));
 		kmem_zone_free(grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
 		bp->b_grio_private = NULL;
-		bp->b_flags2 &= ~B_GR_BUF;
-		bp->b_flags2 &= ~B_PRIO_BUF;
+		bp->b_flags &= ~(B_GR_BUF|B_PRIO_BUF);
 	}
 
 #ifdef SIM

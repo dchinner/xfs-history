@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.81 $"
+#ident	"$Revision: 1.82 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -78,7 +78,6 @@ extern int		ktrace_nentries(ktrace_t *);
 extern ktrace_entry_t	*ktrace_next(ktrace_t *, ktrace_snap_t *);
 extern ktrace_entry_t	*ktrace_skip(ktrace_t *, int, ktrace_snap_t *);
 extern char		*tab_bflags[];
-extern char		*tab_bflags2[];
 #endif
 
 extern struct vfsops	xfs_vfsops;
@@ -1542,16 +1541,20 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 static void
 xfs_strat_enter_trace_entry(ktrace_entry_t *ktep)
 {
+	uint64_t	flags;
+
 	qprintf("inode 0x%x size 0x%x%x bp 0x%x\n",
 		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4]);
 	qprintf("bp offset 0x%x%x bcount 0x%x bufsize 0x%x blkno 0x%x\n",
 		ktep->val[5], ktep->val[6], ktep->val[7], ktep->val[8],
 		ktep->val[9]);
+	flags = (((uint64_t)ktep->val[10] << 32) & 0xFFFFFFFF00000000LL) |
+		(((uint64_t)ktep->val[11]) & 0x00000000FFFFFFFFLL);
 	qprintf("bp flags ");
-	printflags((int)((unsigned long)ktep->val[10]), tab_bflags,"bflags");
+	printflags(flags, tab_bflags,"bflags");
 	qprintf("\n");
 	qprintf("bp pages 0x%x pfdat pageno 0x%x\n",
-		ktep->val[11], ktep->val[12]);
+		ktep->val[12], ktep->val[13]);
 }
 
 /*
@@ -1560,14 +1563,16 @@ xfs_strat_enter_trace_entry(ktrace_entry_t *ktep)
 static void
 xfs_strat_sub_trace_entry(ktrace_entry_t *ktep)
 {
+	uint64_t	flags;
+
 	qprintf("inode 0x%x size 0x%x%x bp 0x%x rbp 0x%x\n",
 		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4],
 		ktep->val[5]);
 	qprintf("rbp bp offset 0x%x%x bcount 0x%x blkno 0x%x\n",
 		ktep->val[6], ktep->val[7], ktep->val[8], ktep->val[9]);
+	flags = (__psint_t) ktep->val[11];
 	qprintf("rbp flags ");
-	printflags((unsigned long)ktep->val[10], 
-		tab_bflags, "bflags");
+	printflags(flags, tab_bflags, "bflags");
 	qprintf("\n");
 	qprintf("rbp b_addr 0x%x pages 0x%x\n",
 		ktep->val[11], ktep->val[12]);
@@ -2094,6 +2099,7 @@ xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
+	uint64_t	flags;
 	static char *xbli_flags[] = {
 		"hold",		/* 0x1 */
 		"dirty",	/* 0x2 */
@@ -2122,12 +2128,11 @@ xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 "recur %d refcount %d blkno 0x%x bcount 0x%x\n",
 			ktep->val[3], ktep->val[4],
 			ktep->val[5], ktep->val[6]);
-		qprintf(
-"bp flags ");
-		printflags((__psint_t)(ktep->val[7]), tab_bflags,0);
-		qprintf(
-" bp flags2 ");
-		printflags((__psint_t)(ktep->val[8]), tab_bflags2,0);
+		flags = (((uint64_t)ktep->val[7] << 32) &
+					0xFFFFFFFF00000000LL) |
+			(((uint64_t)ktep->val[8]) & 0x00000000FFFFFFFFLL);
+		qprintf("bp flags ");
+		printflags(flags, tab_bflags,0);
 		qprintf("\n");
 		qprintf(
 "fsprivate 0x%x fsprivate2 0x%x pincount %d iodone 0x%x\n",
