@@ -658,6 +658,9 @@ xfs_iomap_read(
 		}
 		curr_bmapp->offset = XFS_FSB_TO_BB(mp, curr_bmapp->offset);
 		curr_bmapp->length = XFS_FSB_TO_BB(mp, curr_bmapp->length);
+		ASSERT((x == 0) ||
+		       ((bmapp[x - 1].offset + bmapp[x - 1].length) ==
+			curr_bmapp->offset));
 		if (curr_bmapp->bn != -1) {
 			curr_bmapp->bn =
 				XFS_FSB_TO_DADDR(mp, curr_bmapp->bn);
@@ -737,6 +740,7 @@ xfs_read_file(
 
 			if (bp->b_flags & B_ERROR) {
 				error = geterror(bp);
+				ASSERT(error != EINVAL);
 				break;
 			} else if (bp->b_resid != 0) {
 				buffer_bytes_ok = 0;
@@ -772,7 +776,8 @@ xfs_read_file(
 /*
  * xfs_read
  *
- * This is a stub.
+ * This is the xFS VOP_READ entry point.  It does some minimal
+ * error checking and then switches out based on the file type.
  */
 int
 xfs_read(
@@ -1211,6 +1216,9 @@ xfs_iomap_write(
 		}
 		curr_bmapp->offset = XFS_FSB_TO_BB(mp, curr_bmapp->offset);
 		curr_bmapp->length = XFS_FSB_TO_BB(mp, curr_bmapp->length);
+		ASSERT((x == 0) ||
+		       ((bmapp[x - 1].offset + bmapp[x - 1].length) ==
+			curr_bmapp->offset));
 		if (curr_bmapp->bn != -1) {
 			curr_bmapp->bn =
 				XFS_FSB_TO_DADDR(mp, curr_bmapp->bn);
@@ -1321,6 +1329,7 @@ xfs_write_file(
 			 */
 			if (bp->b_flags & B_ERROR) {
 				error = geterror(bp);
+				ASSERT(error != EINVAL);
 				brelse(bp);
 				break;
 			}
@@ -1377,6 +1386,8 @@ xfs_write_file(
 /*
  * xfs_write
  *
+ * This is the xFS VOP_WRITE entry point.  It does some minimal error
+ * checking and then switches out based on the file type.
  */
 int
 xfs_write(
@@ -1743,6 +1754,7 @@ xfs_strat_read(
 				if (rbp->b_flags & B_ERROR) {
 					bp->b_flags |= B_ERROR;
 					bp->b_error = XFS_ERROR(rbp->b_error);
+					ASSERT(bp->b_error != EINVAL);
 				}
 #ifndef SIM
 				if (BP_ISMAPPED(rbp)) {
@@ -1852,6 +1864,7 @@ xfs_strat_write_relse(
 		if (rbp->b_flags & B_ERROR) {
 			leader->b_flags |= B_ERROR;
 			leader->b_error = XFS_ERROR(rbp->b_error);
+			ASSERT(leader->b_error != EINVAL);
 		}
 		leader->b_flags &= ~B_LEADER;
 		spunlockspl(xfs_strat_lock, s);
@@ -1872,6 +1885,7 @@ xfs_strat_write_relse(
 		if (rbp->b_flags & B_ERROR) {
 			leader->b_flags |= B_ERROR;
 			leader->b_error = XFS_ERROR(rbp->b_error);
+			ASSERT(leader->b_error != EINVAL);
 		}
 		spunlockspl(xfs_strat_lock, s);
 	}
