@@ -1,4 +1,4 @@
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.30 $"
 
 
 #include <sys/param.h>
@@ -79,7 +79,7 @@ STATIC int	xfs_qm_dqusage_adjust(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,
 				      void *, daddr_t, int *);
 STATIC int	xfs_qm_quotacheck(xfs_mount_t *);
 
-STATIC int	xfs_qm_init_quotainos(xfs_mount_t *, int);
+STATIC int	xfs_qm_init_quotainos(xfs_mount_t *);
 STATIC int	xfs_qm_shake_freelist(int);
 STATIC int	xfs_qm_shake(int);
 STATIC xfs_dquot_t *xfs_qm_dqreclaim_one(void);
@@ -116,7 +116,7 @@ extern mutex_t	qcheck_lock;
  * not one each per file system.
  */
 struct xfs_qm *
-xfs_qm_init()
+xfs_qm_init(void)
 {
 	xfs_qm_t 	*xqm;
 	int		hsize, i;
@@ -345,8 +345,7 @@ xfs_qm_unmount_quotadestroy(
  */
 int
 xfs_qm_mount_quotas(
-	xfs_mount_t	*mp,
-	int		clean)
+	xfs_mount_t	*mp)
 {
 	int		s;
 	int		error;
@@ -425,7 +424,7 @@ xfs_qm_mount_quotas(
 	 * Allocate the quotainfo structure inside the mount struct, and
 	 * and create quotainode(s), and change/rev superblock if necessary.
 	 */
-	if (error = xfs_qm_init_quotainfo(mp, clean)) {
+	if (error = xfs_qm_init_quotainfo(mp)) {
 		/* 
 		 * We must turn off quotas.
 		 */
@@ -1232,8 +1231,7 @@ xfs_qm_sync(
  */
 int
 xfs_qm_init_quotainfo(
-	xfs_mount_t	*mp,
-	int		clean)
+	xfs_mount_t	*mp)
 {
 	xfs_quotainfo_t	*qinf;
 	int		error;
@@ -1248,7 +1246,7 @@ xfs_qm_init_quotainfo(
 	 * See if quotainodes are setup, and if not, allocate them,
 	 * and change the superblock accordingly.
 	 */
-	if (error = xfs_qm_init_quotainos(mp, clean)) {
+	if (error = xfs_qm_init_quotainos(mp)) {
 		kmem_free(qinf, sizeof(xfs_quotainfo_t));
 		mp->m_quotainfo = NULL;
 		return (error);
@@ -2054,8 +2052,7 @@ xfs_qm_quotacheck(
  */
 STATIC int
 xfs_qm_init_quotainos(
-	xfs_mount_t	*mp,
-	int		clean)
+	xfs_mount_t	*mp)
 {
 	xfs_inode_t	*uip, *pip;
 	int		error;
@@ -2100,7 +2097,7 @@ xfs_qm_init_quotainos(
 	 * the qino_alloc calls below.
 	 */
 	if (XFS_IS_UQUOTA_ON(mp) && uip == NULL) {
-		if (clean)
+		if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)
 			return XFS_ERROR(EROFS);
 		if (error = xfs_qm_qino_alloc(mp, &uip,
 					      sbflags | XFS_SB_UQUOTINO,
@@ -2108,7 +2105,7 @@ xfs_qm_init_quotainos(
 			return XFS_ERROR(error);
 	}
 	if (XFS_IS_PQUOTA_ON(mp) && pip == NULL) {
-		if (clean)  {
+		if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) {
 			if (uip)
 				VN_RELE(XFS_ITOV(uip));
 			return XFS_ERROR(EROFS);
