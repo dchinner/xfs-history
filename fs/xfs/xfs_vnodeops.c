@@ -1,4 +1,4 @@
-#ident "$Revision: 1.257 $"
+#ident "$Revision: 1.258 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1283,9 +1283,16 @@ xfs_fsync(
 	}
 
 	if (!(flag & FSYNC_DATA)) {
+		/*
+		 * We used to assert that i_delayed_blks was 0 here,
+		 * but we can't do that since xfs_allocstore() could
+		 * come in and add more even though we have the I/O
+		 * lock here.  All it needs to do so is the inode lock,
+		 * and we don't want to force it to acquire the I/O
+		 * lock unnecessarily.
+		 */
 		ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
 		       (!VN_DIRTY(vp) &&
-			(ip->i_delayed_blks == 0) &&
 			(ip->i_queued_bufs == 0)));
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
 		if (!xfs_iflock_nowait(ip)) {
