@@ -113,12 +113,6 @@ xfs_ibusy(
 
 
 /*
- * xfs_fstype is the number given to xfs to indicate
- * its type among vfs's.  It is initialized in xfs_init().
- */
-int	xfs_fstype;
-
-/*
  * xfs_init
  *
  * This is called through the vfs switch at system initialization
