@@ -860,6 +860,7 @@ xfs_trans_cancel(xfs_trans_t	*tp,
 STATIC void
 xfs_trans_free(xfs_trans_t *tp)
 {
+	freesema(&(tp->t_sema));
 	kmem_zone_free(xfs_trans_zone, tp);
 }
 
