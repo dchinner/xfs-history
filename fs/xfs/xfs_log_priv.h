@@ -37,9 +37,10 @@
 #define XLOG_STATE_ACTIVE    1 /* Current IC log being written to */
 #define XLOG_STATE_WANT_SYNC 2 /* Want to sync this iclog; no more writes */
 #define XLOG_STATE_SYNCING   3 /* This IC log is syncing */
-#define XLOG_STATE_CALLBACK  4 /* Callback functions now */
-#define XLOG_STATE_DIRTY	    5 /* Dirty IC log, not ready for ACTIVE status */
-#define XLOG_STATE_NOTUSED   6 /* This IC log not being used */
+#define XLOG_STATE_DONE_SYNC 4 /* Done syncing to disk */
+#define XLOG_STATE_CALLBACK  5 /* Callback functions now */
+#define XLOG_STATE_DIRTY     6 /* Dirty IC log, not ready for ACTIVE status */
+#define XLOG_STATE_NOTUSED   7 /* This IC log not being used */
 
 /*
  * Flags to log operation header
@@ -136,8 +137,22 @@ typedef struct xlog_in_core {
 	char	  		ic_state;
 } xlog_in_core_t;
 
-
 #define ic_header	ic_h.hic_header
+
+typedef struct xlog_in_core_core {
+	sema_t			ic_forcesema;
+	struct xlog_in_core	*ic_next;
+	buf_t	  		*ic_bp;
+	struct log		*ic_log;
+	xfs_log_callback_t	*ic_callback;
+	xfs_log_callback_t	**ic_callback_tail;
+	int	  		ic_size;
+	int	  		ic_offset;
+	int	  		ic_refcnt;
+	int			ic_bwritecnt;
+	char	  		ic_state;
+} xlog_in_core_core_t;
+
 
 /*
  *
