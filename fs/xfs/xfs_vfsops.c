@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.285 $"
+#ident  "$Revision: 1.286 $"
 
 #include <xfs_os_defs.h>
 
@@ -266,7 +266,6 @@ xfs_init(int	fstype)
 #endif
 #ifndef SIM
 	mutex_init(&xfs_uuidtabmon, MUTEX_DEFAULT, "xfs_uuidtab");
-	spinlock_init(&xfsd_lock, "xfsd");
 #endif	/* !SIM */
 
 	/*
