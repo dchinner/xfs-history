@@ -1,4 +1,4 @@
-#ident "$Revision: 1.311 $"
+#ident "$Revision: 1.312 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -344,8 +344,6 @@ xfs_ctrunc_trace(
 #endif /* DEBUG */
 
 #ifndef SIM
-int	xfs_do_fast_fid = 1;
-
 /*
  * For xfs, we check that the file isn't too big to be opened by this kernel.
  * No other open action is required for regular files.  Devices are handled
@@ -4260,8 +4258,6 @@ xfs_fast_fid(
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
-
-	ASSERT(xfs_do_fast_fid != 0);
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;

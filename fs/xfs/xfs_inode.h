@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.105 $"
+#ident "$Revision: 1.106 $"
 
 struct bhv_desc;
 struct buf;
@@ -432,7 +432,6 @@ void		xfs_inobp_check(struct xfs_mount *, struct buf *);
  */
 int		xfs_fast_fid(struct bhv_desc *, xfs_fid_t *);
 
-extern int		xfs_do_fast_fid;
 extern struct zone	*xfs_ifork_zone;
 extern struct zone	*xfs_inode_zone;
 extern struct zone	*xfs_ili_zone;
