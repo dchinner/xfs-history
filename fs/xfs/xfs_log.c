@@ -1234,13 +1234,13 @@ restart:
 	spl = splockspl(log->l_icloglock, splhi);
 
 	iclog = log->l_iclog;
-	if (! (iclog->ic_state == XLOG_STATE_ACTIVE ||
-	       iclog->ic_state == XLOG_STATE_DIRTY) ) {
+	if (! (iclog->ic_state == XLOG_STATE_ACTIVE)) {
 		spunlockspl(log->l_icloglock, spl);
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
 		psema(&log->l_flushsema, PINOD);
 		goto restart;
 	}
+	ASSERT(iclog->ic_state == XLOG_STATE_ACTIVE);
 	head = &iclog->ic_header;
 
 	iclog->ic_refcnt++;			/* prevents sync */
@@ -1267,9 +1267,7 @@ restart:
 	 * can fit into remaining data section.
 	 */
 	if (iclog->ic_size - iclog->ic_offset < 2*sizeof(xlog_op_header_t)) {
-		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
-
+		xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
 		if (iclog->ic_refcnt == 1) {		/* I'm the only one */
 			spunlockspl(log->l_icloglock, spl);
 			xlog_state_release_iclog(log, iclog); /* decrs refcnt */
@@ -1284,8 +1282,7 @@ restart:
 		*continued_write = 0;
 	} else {	/* take as much as possible and write rest in next LR */
 		*continued_write = 1;
-		if (iclog->ic_state == XLOG_STATE_ACTIVE)
-			xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
+		xlog_state_switch_iclogs(log, iclog, iclog->ic_size);
 		/* this iclog releases in xlog_write() */
 	}
 	*iclogp = iclog;
@@ -1413,6 +1410,7 @@ xlog_state_release_iclog(xlog_t		*log,
     spl = splockspl(log->l_icloglock, splhi);
     
     ASSERT(iclog->ic_refcnt > 0);
+    ASSERT(iclog->ic_state == XLOG_STATE_ACTIVE || iclog->ic_state == XLOG_STATE_WANT_SYNC);
     
     if (--iclog->ic_refcnt == 0 && iclog->ic_state == XLOG_STATE_WANT_SYNC) {
 	sync++;
@@ -1443,6 +1441,7 @@ xlog_state_switch_iclogs(xlog_t		*log,
 			 xlog_in_core_t *iclog,
 			 int		eventual_size)
 {
+	ASSERT(iclog->ic_state == XLOG_STATE_ACTIVE);
 	if (!eventual_size)
 		eventual_size = iclog->ic_offset;
 	iclog->ic_state = XLOG_STATE_WANT_SYNC;
@@ -1459,6 +1458,7 @@ xlog_state_switch_iclogs(xlog_t		*log,
 		log->l_curr_block -= log->l_logBBsize;
 		ASSERT(log->l_curr_block >= 0);
 	}
+	ASSERT(iclog == log->l_iclog);
 	log->l_iclog = iclog->ic_next;
 }	/* xlog_state_switch_iclogs */
 
@@ -1481,8 +1481,8 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 			ASSIGN_LSN(iclog->ic_header.h_lsn, log);
 			ASSERT(log->l_curr_block >= 0);
 		}
+		xlog_state_switch_iclogs(log, iclog, 0);
 		spunlockspl(log->l_icloglock, spl);
-		xlog_state_want_sync(log, iclog);
 		xlog_state_release_iclog(log, iclog);
 		spl = splockspl(log->l_icloglock, splhi);
 	}
@@ -1528,16 +1528,11 @@ xlog_state_sync(xlog_t	  *log,
 			iclog = iclog->ic_next;
 		} else {
 		    if (iclog->ic_state == XLOG_STATE_ACTIVE) {
+			    iclog->ic_refcnt++;
 			    xlog_state_switch_iclogs(log, iclog, 0);
-			    if (iclog->ic_refcnt == 0) {
-				    iclog->ic_header.h_cycle= log->l_curr_cycle;
-				    iclog->ic_refcnt++;
-				    ASSIGN_LSN(iclog->ic_header.h_lsn, log);
-				    ASSERT(log->l_curr_block >= 0);
-				    spunlockspl(log->l_icloglock, spl);
-				    xlog_state_release_iclog(log, iclog);
-				    spl = splockspl(log->l_icloglock, splhi);
-			    }
+			    spunlockspl(log->l_icloglock, spl);
+			    xlog_state_release_iclog(log, iclog);
+			    spl = splockspl(log->l_icloglock, splhi);
 		    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
 			    spunlockspl(log->l_icloglock, spl);
 			    return 0;
