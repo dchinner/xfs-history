@@ -1,5 +1,9 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
+#ident	"$Revision: 1.24 $"
+
+#include <sys/cmn_err.h>
+
 /*
  * Macros, structures, prototypes for internal log manager use.
  */
@@ -28,8 +32,8 @@
 
 
 #ifdef _KERNEL
-#define xlog_panic(s)		{panic(s); }
-#define xlog_exit(s)		{panic(s); }
+#define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
+#define xlog_exit(s)		{cmn_err(CE_PANIC, s); }
 #define xlog_warning(s)		{cmn_err(CE_WARN, s); }
 #else
 #define xlog_panic(s)		{printf("%s\n", s); abort();}
