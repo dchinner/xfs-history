@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.149 $"
+#ident	"$Revision: 1.150 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -55,6 +55,7 @@
 #include "xfs_bit.h"
 #include "xfs_rw.h"
 #include "xfs_quota.h"
+#include "xfs_fsops.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -132,6 +133,70 @@ xfs_mount_free(xfs_mount_t *mp)
 
 
 /*
+ * Check the validity of the SB found.
+ */
+STATIC int
+xfs_mount_validate_sb(
+	xfs_mount_t	*mp,
+	xfs_sb_t	*sbp)
+{
+	/*
+	 * If the log device and data device have the 
+	 * same device number, the log is internal. 
+	 * Consequently, the sb_logstart should be non-zero.  If
+	 * we have a zero sb_logstart in this case, we may be trying to mount
+	 * a volume filesystem in a non-volume manner.
+	 */
+	if ((sbp->sb_magicnum != XFS_SB_MAGIC)		||
+	    !XFS_SB_GOOD_VERSION(sbp)			||
+	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev))
+		return XFS_ERROR(EINVAL);
+
+	/* 
+	 * More sanity checking. These were stolen directly from
+	 * xfs_repair.
+	 */
+	if (sbp->sb_blocksize <= 0 					||
+	    sbp->sb_agcount <= 0 					||
+	    sbp->sb_sectsize <= 0 					||
+	    sbp->sb_blocklog < XFS_MIN_BLOCKSIZE_LOG			||
+	    sbp->sb_blocklog > XFS_MAX_BLOCKSIZE_LOG 			||
+	    sbp->sb_inodesize < XFS_DINODE_MIN_SIZE 			||
+	    sbp->sb_inodesize > XFS_DINODE_MAX_SIZE 			||
+	    (sbp->sb_rextsize * sbp->sb_blocksize > XFS_MAX_RTEXTSIZE) 	||
+	    (sbp->sb_rextsize * sbp->sb_blocksize < XFS_MIN_RTEXTSIZE) 	||
+	    sbp->sb_imax_pct > 100)
+		return XFS_ERROR(EINVAL);
+
+	/* 
+	 * sanity check ag count, size fields against data size field 
+	 */
+	if (sbp->sb_dblocks == 0 ||
+	    (sbp->sb_dblocks > (sbp->sb_agcount * sbp->sb_agblocks)) ||
+	    (sbp->sb_dblocks < ((sbp->sb_agcount - 1) * 
+			       sbp->sb_agblocks + XFS_MIN_AG_BLOCKS)))
+		return XFS_ERROR(EINVAL);
+
+#if !XFS_BIG_FILESYSTEMS
+	if (sbp->sb_dblocks > INT_MAX || sbp->sb_rblocks > INT_MAX)  {
+		cmn_err(CE_WARN,
+"XFS:  File systems greater than 1TB not supported on this system.\n");
+		return XFS_ERROR(E2BIG);
+	}
+#endif
+
+#ifndef SIM
+	/*
+	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
+	 */
+	if (sbp->sb_inprogress) 
+		return XFS_ERROR(EINVAL);
+#endif	
+	return (0);
+}
+
+
+/*
  * xfs_mountfs_int
  *
  * This function does the following on an initial mount of a file system:
@@ -204,36 +269,14 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	}
 
 	/*
-	 * Initialize the mount structure from the superblock.  If the log
-	 * device and data device have the same device number, the log is
-	 * internal.  Consequently, the sb_logstart should be non-zero.  If
-	 * we have a zero sb_logstart in this case, we may be trying to mount
-	 * a volume filesystem in a non-volume manner.
+	 * Initialize the mount structure from the superblock.
+	 * But first do some basic consistency checking.
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
-	if ((sbp->sb_magicnum != XFS_SB_MAGIC)		||
-	    !XFS_SB_GOOD_VERSION(sbp)			||
-	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev)) {
-		error = XFS_ERROR(EINVAL);
+	if (error = xfs_mount_validate_sb(mp, sbp)) {
 		goto error0;
 	}
-#if !XFS_BIG_FILESYSTEMS
-	if (sbp->sb_dblocks > INT_MAX || sbp->sb_rblocks > INT_MAX)  {
-		cmn_err(CE_WARN,
-"XFS:  File systems greater than 1TB not supported on this system.\n");
-		error = XFS_ERROR(E2BIG);
-		goto error0;
-	}
-#endif
-#ifndef SIM
-	/*
-	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
-	 */
-	if (sbp->sb_inprogress) {
-		error = XFS_ERROR(EINVAL);
-		goto error0;
-	}
-#endif
+
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;				/* bcopy structure */
 	brelse(bp);
