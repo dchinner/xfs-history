@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.92 $"
+#ident "$Revision: 1.94 $"
 
 struct buf;
 struct cred;
@@ -361,7 +361,7 @@ int		xfs_itobp(struct xfs_mount *, struct xfs_trans *,
 int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			  xfs_inode_t **, daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
-int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, ushort,
+int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
 		           dev_t, struct cred *, struct buf **, boolean_t *,
 			   xfs_inode_t **);
 #ifndef SIM
