@@ -1905,8 +1905,7 @@ xlog_recover_do_buffer_pass1(xlog_t			*log,
 	prevp = NULL;
 	nextp = *bucket;
 	while (nextp != NULL) {
-		if (nextp->bc_blkno == blkno) {
-			ASSERT(nextp->bc_len == len);
+		if (nextp->bc_blkno == blkno && nextp->bc_len == len) {
 			nextp->bc_refcount++;
 			return;
 		}
@@ -1948,27 +1947,21 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	xfs_buf_log_format_v1_t	*obuf_f;
 	daddr_t			blkno;
 	ushort			flags;
-#ifdef DEBUG
 	uint			len;
-#endif
 
 
 	switch (buf_f->blf_type) {
 	case XFS_LI_BUF:
 		blkno = buf_f->blf_blkno;
 		flags = buf_f->blf_flags;
-#ifdef DEBUG
 		len = buf_f->blf_len;
-#endif
 		break;
 	case XFS_LI_6_1_BUF:
 	case XFS_LI_5_3_BUF:
 		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
 		blkno = (daddr_t) obuf_f->blf_blkno;
 		flags = obuf_f->blf_flags;
-#ifdef DEBUG
 		len = (daddr_t) obuf_f->blf_len;
-#endif
 		break;
 	}
 	if (log->l_buf_cancel_table == NULL) {
@@ -1997,7 +1990,7 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 	 */
 	prevp = NULL;
 	while (bcp != NULL) {
-		if (bcp->bc_blkno == blkno) {
+		if (bcp->bc_blkno == blkno && bcp->bc_len == len) {
 			/*
 			 * We've go a match, so return 1 so that the
 			 * recovery of this buffer is cancelled.
@@ -2006,7 +1999,6 @@ xlog_recover_do_buffer_pass2(xlog_t			*log,
 			 * one in the table and remove it if this is the
 			 * last reference.
 			 */
-			ASSERT(bcp->bc_len == len);
 			if (flags & XFS_BLI_CANCEL) {
 				bcp->bc_refcount--;
 				if (bcp->bc_refcount == 0) {
