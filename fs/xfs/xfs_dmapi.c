@@ -3011,22 +3011,20 @@ xfs_dm_mapevent(
 
 
 
-/*	xfs_dm_testevent - test if events needed for memory mapping a file.
+/*	xfs_dm_testevent() - test if events needed for a memory mapped file.
  *
- *	xfs_dm_testevent is a workaround called for files that are about to be
- *	mapped.  DMAPI events are not being generated at a low enough level
- *	in the kernel for page reads/writes to generate the correct events.
- *	xfs_dm_testevent will check if an event will be generated for the
- *	region specified.  If (at least) one will be generated, it is up to
- *	the caller to drop any critical locks held and then issue the events
- *	via a DM_FCNTL_MAPEVENT fcntl call.
+ *	xfs_dm_testevent() is called when a page from a memory mapped
+ *	file is about to be modified.  xfs_dm_testevent() will check if
+ *	an event should be generated for the region specified.  If (at
+ *	least) one should be generated, it is up to the caller to drop
+ *	any critical locks held and then issue the events via a
+ *	DM_FCNTL_MAPEVENT fcntl() call.
  *
- *	Returns 0 if xfs_dm_testevent executed successfully.
- *	testevp->error = errno if an error detected.
- *	otherwise, testevp->error = 0 and testevp->issue_event =
- *		The "highest" event to be issued - DM_EVENT_WRITE,
- *		DM_EVENT_READ, or DM_EVENT_INVALID (for no event to
- *		be issued).
+ *	Returns 0 if xfs_dm_testevent() executed successfully.
+ *	testevp->error = errno if an error detected.  otherwise,
+ *	testevp->error = 0 and testevp->issue_event = The "highest"
+ *	event to be issued - DM_EVENT_WRITE, DM_EVENT_READ, or
+ *	DM_EVENT_INVALID (for no event to be issued).
  */
 
 /* ARGSUSED */
