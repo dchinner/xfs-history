@@ -1,4 +1,4 @@
-#ident "$Revision: 1.150 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4153,7 +4153,7 @@ xfsd(void)
 	 * Make us a high non-degrading priority process like bdflush(),
 	 * since that is who we're relieving of work.
 	 */
-	setinfoRunq(u.u_procp, RQRTPRI, NDPHIMIN);
+	setinfoRunq(curprocp, RQRTPRI, NDPHIMIN);
 
 	s = mp_mutex_spinlock(&xfsd_lock);
 	xfsd_count++;
