@@ -332,7 +332,7 @@ xfs_btree_del_cursor(
 	 */
 	for (i = 0; i < cur->bc_nlevels; i++) {
 		if (cur->bc_bufs[i])
-			xfs_btree_setbuf(cur, i, 0);
+			xfs_btree_setbuf(cur, i, NULL);
 		else
 			break;
 	}
@@ -380,6 +380,7 @@ xfs_btree_dup_cursor(
 	 */
 	for (i = 0; i < ncur->bc_nlevels; i++) {
 		ncur->bc_ptrs[i] = cur->bc_ptrs[i];
+		ncur->bc_ra[i] = cur->bc_ra[i];
 		if (bp = cur->bc_bufs[i]) {
 			(void) xfs_trans_read_buf(tp, mp->m_dev, bp->b_blkno,
 						  mp->m_bsize, 0, &bp);
@@ -387,7 +388,7 @@ xfs_btree_dup_cursor(
 			ASSERT(bp);
 			ASSERT(!geterror(bp));
 		} else
-			ncur->bc_bufs[i] = 0;
+			ncur->bc_bufs[i] = NULL;
 	}
 	/*
 	 * For bmap btrees, copy the firstblock, flist, and flags values,
@@ -732,19 +733,137 @@ xfs_btree_read_bufs(
 }
 
 /*
+ * Read-ahead the block, don't wait for it, don't return a buffer.
+ * Long-form addressing.
+ */
+void
+xfs_btree_reada_bufl(
+	xfs_mount_t	*mp,		/* file system mount point */
+	xfs_fsblock_t	fsbno,		/* file system block number */
+	xfs_extlen_t	count)		/* count of filesystem blocks */
+{
+	daddr_t		d;
+
+	ASSERT(fsbno != NULLFSBLOCK);
+#ifndef SIM
+	d = XFS_FSB_TO_DADDR(mp, fsbno);
+	baread(mp->m_dev, d, mp->m_bsize * count);
+#endif
+}
+
+/*
+ * Read-ahead the block, don't wait for it, don't return a buffer.
+ * Short-form addressing.
+ */
+void
+xfs_btree_reada_bufs(
+	xfs_mount_t	*mp,		/* file system mount point */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	xfs_agblock_t	agbno,		/* allocation group block number */
+	xfs_extlen_t	count)		/* count of filesystem blocks */
+{
+	daddr_t		d;
+
+	ASSERT(agno != NULLAGNUMBER);
+	ASSERT(agbno != NULLAGBLOCK);
+#ifndef SIM
+	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
+	baread(mp->m_dev, d, mp->m_bsize * count);
+#endif
+}
+
+/*
+ * Read-ahead btree blocks, at the given level.
+ * Bits in lr are set from XFS_BTCUR_{LEFT,RIGHT}RA.
+ */
+int
+xfs_btree_readahead(
+	xfs_btree_cur_t		*cur,		/* btree cursor */
+	int			lev,		/* level in btree */
+	int			lr)		/* left/right bits */
+{
+	xfs_alloc_block_t	*a;
+	xfs_bmbt_block_t	*b;
+	xfs_inobt_block_t	*i;
+	int			rval = 0;
+
+	ASSERT(cur->bc_bufs[lev] != NULL);
+	if ((cur->bc_ra[lev] | lr) == cur->bc_ra[lev])
+		return 0;
+	cur->bc_ra[lev] |= lr;
+	switch (cur->bc_btnum) {
+	case XFS_BTNUM_BNO:
+	case XFS_BTNUM_CNT:
+		a = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[lev]);
+		if ((lr & XFS_BTCUR_LEFTRA) && a->bb_leftsib != NULLAGBLOCK) {
+			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.a.agno,
+				a->bb_leftsib, 1);
+			rval++;
+		}
+		if ((lr & XFS_BTCUR_RIGHTRA) && a->bb_rightsib != NULLAGBLOCK) {
+			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.a.agno,
+				a->bb_rightsib, 1);
+			rval++;
+		}
+		break;
+	case XFS_BTNUM_BMAP:
+		b = XFS_BUF_TO_BMBT_BLOCK(cur->bc_bufs[lev]);
+		if ((lr & XFS_BTCUR_LEFTRA) && b->bb_leftsib != NULLDFSBNO) {
+			xfs_btree_reada_bufl(cur->bc_mp, b->bb_leftsib, 1);
+			rval++;
+		}
+		if ((lr & XFS_BTCUR_RIGHTRA) && b->bb_rightsib != NULLDFSBNO) {
+			xfs_btree_reada_bufl(cur->bc_mp, b->bb_rightsib, 1);
+			rval++;
+		}
+		break;
+	case XFS_BTNUM_INO:
+		i = XFS_BUF_TO_INOBT_BLOCK(cur->bc_bufs[lev]);
+		if ((lr & XFS_BTCUR_LEFTRA) && i->bb_leftsib != NULLAGBLOCK) {
+			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.i.agno,
+				i->bb_leftsib, 1);
+			rval++;
+		}
+		if ((lr & XFS_BTCUR_RIGHTRA) && i->bb_rightsib != NULLAGBLOCK) {
+			xfs_btree_reada_bufs(cur->bc_mp, cur->bc_private.i.agno,
+				i->bb_rightsib, 1);
+			rval++;
+		}
+		break;
+	}
+	return rval;
+}
+
+/*
  * Set the buffer for level "lev" in the cursor to bp, releasing
  * any previous buffer.
  */
 void
 xfs_btree_setbuf(
-	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		lev,		/* level in btree */
-	buf_t		*bp)		/* new buffer to set */
+	xfs_btree_cur_t		*cur,	/* btree cursor */
+	int			lev,	/* level in btree */
+	buf_t			*bp)	/* new buffer to set */
 {
-	buf_t		*obp;		/* old buffer pointer */
+	xfs_btree_block_t	*b;	/* btree block */
+	buf_t			*obp;	/* old buffer pointer */
 
 	obp = cur->bc_bufs[lev];
 	if (obp)
 		xfs_trans_brelse(cur->bc_tp, obp);
 	cur->bc_bufs[lev] = bp;
+	cur->bc_ra[lev] = 0;
+	if (!bp)
+		return;
+	b = XFS_BUF_TO_BLOCK(bp);
+	if (XFS_BTREE_LONG_PTRS(cur->bc_btnum)) {
+		if (b->bb_u.l.bb_leftsib == NULLDFSBNO)
+			cur->bc_ra[lev] |= XFS_BTCUR_LEFTRA;
+		if (b->bb_u.l.bb_rightsib == NULLDFSBNO)
+			cur->bc_ra[lev] |= XFS_BTCUR_RIGHTRA;
+	} else {
+		if (b->bb_u.s.bb_leftsib == NULLAGBLOCK)
+			cur->bc_ra[lev] |= XFS_BTCUR_LEFTRA;
+		if (b->bb_u.s.bb_rightsib == NULLAGBLOCK)
+			cur->bc_ra[lev] |= XFS_BTCUR_RIGHTRA;
+	}
 }

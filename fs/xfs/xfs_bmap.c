@@ -3339,6 +3339,12 @@ xfs_bmap_read_extents(
 
 		ASSERT(i + block->bb_numrecs <= room);
 		/*
+		 * Read-ahead the next leaf block, if any.
+		 */
+		nextbno = block->bb_rightsib;
+		if (nextbno != NULLFSBLOCK)
+			xfs_btree_reada_bufl(mp, nextbno, 1);
+		/*
 		 * Copy records into the extent list.
 		 */
 		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
@@ -3346,10 +3352,6 @@ xfs_bmap_read_extents(
 		bcopy(frp, trp, block->bb_numrecs * sizeof(*frp));
 		trp += block->bb_numrecs;
 		i += block->bb_numrecs;
-		/*
-		 * Get the next leaf block's address.
-		 */
-		nextbno = block->bb_rightsib;
 		xfs_trans_brelse(tp, bp);
 		bno = nextbno;
 		/*

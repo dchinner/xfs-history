@@ -134,9 +134,12 @@ typedef struct xfs_btree_cur
 	}		bc_rec;		/* current insert/search record value */
 	struct buf	*bc_bufs[XFS_BTREE_MAXLEVELS];	/* buf ptr per level */
 	int		bc_ptrs[XFS_BTREE_MAXLEVELS];	/* key/record # */
-	int		bc_nlevels;	/* number of levels in the tree */
+	__uint8_t	bc_ra[XFS_BTREE_MAXLEVELS];	/* readahead bits */
+#define	XFS_BTCUR_LEFTRA	1	/* left sibling has been read-ahead */
+#define	XFS_BTCUR_RIGHTRA	2	/* right sibling has been read-ahead */
+	__uint8_t	bc_nlevels;	/* number of levels in the tree */
+	__uint8_t	bc_blocklog;	/* log2(blocksize) of btree blocks */
 	xfs_btnum_t	bc_btnum;	/* identifies which btree type */
-	int		bc_blocklog;	/* log2(blocksize) of btree blocks */
 	union {
 		struct {			/* needed for BNO, CNT */
 			struct buf	*agbp;	/* agf buffer pointer */
@@ -364,6 +367,36 @@ xfs_btree_read_bufs(
 	uint			lock,	/* lock flags for read_buf */
 	struct buf		**bpp); /* buffer for agno/agbno */
 
+/*
+ * Read-ahead the block, don't wait for it, don't return a buffer.
+ * Long-form addressing.
+ */
+void					/* error */
+xfs_btree_reada_bufl(
+	struct xfs_mount	*mp,	/* file system mount point */
+	xfs_fsblock_t		fsbno,	/* file system block number */
+	xfs_extlen_t		count);	/* count of filesystem blocks */
+
+/*
+ * Read-ahead the block, don't wait for it, don't return a buffer.
+ * Short-form addressing.
+ */
+void					/* error */
+xfs_btree_reada_bufs(
+	struct xfs_mount	*mp,	/* file system mount point */
+	xfs_agnumber_t		agno,	/* allocation group number */
+	xfs_agblock_t		agbno,	/* allocation group block number */
+	xfs_extlen_t		count);	/* count of filesystem blocks */
+
+/*
+ * Read-ahead btree blocks, at the given level.
+ * Bits in lr are set from XFS_BTCUR_{LEFT,RIGHT}RA.
+ */
+int					/* readahead block count */
+xfs_btree_readahead(
+	xfs_btree_cur_t		*cur,	/* btree cursor */
+	int			lev,	/* level in btree */
+	int			lr);	/* left/right bits */
 /*
  * Set the buffer for level "lev" in the cursor to bp, releasing
  * any previous buffer.

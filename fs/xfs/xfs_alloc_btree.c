@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision: 1.30 $"
 
 /*
  * Free space allocation for XFS.
@@ -1415,7 +1415,7 @@ xfs_alloc_lshift(
 	/*
 	 * Set up the left neighbor as "left".
 	 */
-	error  = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+	error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
 			cur->bc_private.a.agno, right->bb_leftsib, 0, &lbp);
 	if (error) {
 		return error;
@@ -2111,6 +2111,10 @@ xfs_alloc_decrement(
 	int			lev;	/* btree level */
 
 	/*
+	 * Read-ahead to the left at this level.
+	 */
+	xfs_btree_readahead(cur, level, XFS_BTCUR_LEFTRA);
+	/*
 	 * Decrement the ptr at this level.  If we're still in the block
 	 * then we're done.
 	 */
@@ -2137,6 +2141,11 @@ xfs_alloc_decrement(
 	for (lev = level + 1; lev < cur->bc_nlevels; lev++) {
 		if (--cur->bc_ptrs[lev] > 0)
 			break;
+		/*
+		 * Read-ahead the left block, we're going to read it 
+		 * in the next loop.
+		 */
+		xfs_btree_readahead(cur, lev, XFS_BTCUR_LEFTRA);
 	}
 	/*
 	 * If we went off the root then we are seriously confused.
@@ -2259,6 +2268,10 @@ xfs_alloc_increment(
 	int			lev;	/* btree level */
 
 	/*
+	 * Read-ahead to the right at this level.
+	 */
+	xfs_btree_readahead(cur, level, XFS_BTCUR_RIGHTRA);
+	/*
 	 * Get a pointer to the btree block.
 	 */
 	block = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[level]);
@@ -2287,6 +2300,11 @@ xfs_alloc_increment(
 		xfs_btree_check_sblock(cur, block, lev);
 		if (++cur->bc_ptrs[lev] <= block->bb_numrecs)
 			break;
+		/*
+		 * Read-ahead the right block, we're going to read it 
+		 * in the next loop.
+		 */
+		xfs_btree_readahead(cur, lev, XFS_BTCUR_RIGHTRA);
 	}
 	/*
 	 * If we went off the root then we are seriously confused.
