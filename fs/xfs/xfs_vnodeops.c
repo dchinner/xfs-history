@@ -1,4 +1,4 @@
-#ident "$Revision: 1.387 $"
+#ident "$Revision: 1.388 $"
 
 
 #ifdef SIM
@@ -49,7 +49,6 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <ksys/vproc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>
 #include <sys/stat.h>
@@ -100,6 +99,12 @@
 #ifdef SIM
 #include "sim.h"
 #endif
+
+/*
+ * Here so that we do not need to include vproc.h -> vpgrp.h ->
+ * space.h -> vpag.h.
+ */
+extern prid_t dfltprid;
 
 #ifdef DATAPIPE
 /* data pipe functions */
