@@ -68,7 +68,7 @@
 #define	kmem_check()	/* dummy for memory-allocation checking */
 #endif
 
-#if defined(DEBUG) && !defined(SIM)
+#ifdef DEBUG
 ktrace_t	*xfs_bmap_trace_buf;
 #endif
 
@@ -301,7 +301,7 @@ xfs_bmap_search_extents(
 	xfs_bmbt_irec_t	*gotp,		/* out: extent entry found */
 	xfs_bmbt_irec_t	*prevp);	/* out: previous extent entry found */
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
@@ -370,7 +370,7 @@ xfs_bmap_trace_pre_update(
 #define	xfs_bmap_trace_insert(f,d,ip,i,c,r1,r2,w)
 #define	xfs_bmap_trace_post_update(f,d,ip,i,w)
 #define	xfs_bmap_trace_pre_update(f,d,ip,i,w)
-#endif	/* DEBUG && !SIM */
+#endif	/* XFS_BMAP_TRACE */
 
 /*
  * Compute the worst-case number of indirect blocks that will be used
@@ -519,7 +519,7 @@ xfs_bmap_add_extent(
 	xfs_filblks_t		da_new; /* new count del alloc blocks used */
 	xfs_filblks_t		da_old; /* old count del alloc blocks used */
 	int			error;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 	static char		fname[] = "xfs_bmap_add_extent";
 #endif
 	xfs_ifork_t		*ifp;	/* inode fork ptr */
@@ -677,7 +677,7 @@ xfs_bmap_add_extent_delay_real(
 	int			diff;	/* temp value */
 	xfs_bmbt_rec_t		*ep;	/* extent entry for idx */
 	int			error;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 	static char		fname[] = "xfs_bmap_add_extent_delay_real";
 #endif
 	int			i;	/* temp state */
@@ -1209,7 +1209,7 @@ xfs_bmap_add_extent_hole_delay(
 {
 	xfs_bmbt_rec_t		*base;	/* base of extent entry list */
 	xfs_bmbt_rec_t		*ep;	/* extent list entry for idx */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 	static char		fname[] = "xfs_bmap_add_extent_hole_delay";
 #endif
 	xfs_bmbt_irec_t		left;	/* left neighbor extent entry */
@@ -1377,7 +1377,7 @@ xfs_bmap_add_extent_hole_real(
 {
 	xfs_bmbt_rec_t		*ep;	/* pointer to extent entry ins. point */
 	int			error;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 	static char		fname[] = "xfs_bmap_add_extent_hole_real";
 #endif
 	int			i;	/* temp state */
@@ -2011,7 +2011,7 @@ xfs_bmap_del_extent(
 	xfs_bmbt_rec_t		*ep;	/* current extent entry pointer */
 	int			error;
 	int			flags;	/* inode logging flags */
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 	static char		fname[] = "xfs_bmap_del_extent";
 #endif
 	xfs_bmbt_irec_t		got;	/* current extent entry */
@@ -2479,7 +2479,7 @@ xfs_bmap_local_to_extents(
 {
 	int		error;
 	int		flags = 0;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 	static char	fname[] = "xfs_bmap_local_to_extents";
 #endif
 	xfs_ifork_t	*ifp;
@@ -2648,7 +2648,7 @@ xfs_bmap_search_extents(
 	return ep;
 }
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
@@ -2818,7 +2818,7 @@ xfs_bmap_trace_pre_update(
 	xfs_bmap_trace_addentry(XFS_BMAP_KTRACE_PRE_UP, fname, desc, ip, idx, 1,
 		&ifp->if_u1.if_extents[idx], NULL, whichfork);
 }
-#endif	/* DEBUG && !SIM */
+#endif	/* XFS_BMAP_TRACE */
 
 /*
  * Compute the worst-case number of indirect blocks that will be used
@@ -3291,7 +3291,7 @@ xfs_bmap_read_extents(
 	xfs_fsblock_t		bno;	/* block # of "block" */
 	buf_t			*bp;	/* buffer for "block" */
 	int			error;
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 	static char		fname[] = "xfs_bmap_read_extents";
 #endif
 	xfs_extnum_t		i;	/* index into the extents list */
@@ -3385,7 +3385,7 @@ xfs_bmap_read_extents(
 	return 0;
 }
 
-#if defined(DEBUG) && !defined(SIM)
+#if defined(XFS_BMAP_TRACE)
 /*
  * Add bmap trace insert entries for all the contents of the extent list.
  */
