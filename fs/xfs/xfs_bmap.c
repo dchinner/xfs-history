@@ -490,7 +490,8 @@ xfs_bmap_add_attrfork_local(
 		dargs.flist = flist;
 		dargs.total = 1;
 		dargs.whichfork = XFS_DATA_FORK;
-		error = xfs_dir_shortform_to_leaf(tp, &dargs);
+		dargs.trans = tp;
+		error = xfs_dir_shortform_to_leaf(&dargs);
 		*flags |= XFS_ILOG_DEXT;
 	} else {
 		error = xfs_bmap_local_to_extents(tp, ip, firstblock, 1, flags,
