@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.85 $"
+#ident	"$Revision: 1.86 $"
 
 #include <limits.h>
 #include <sys/param.h>
@@ -452,7 +452,6 @@ int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
 	buf_t	*bp;
-	dev_t	dev;
 	int	error;
 
 	xfs_iflush_all(mp, 0);
@@ -469,7 +468,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	bp->b_flags &= ~(B_DONE | B_READ);
 	bp->b_flags |= B_WRITE;
 	bwait_unpin(bp);
-	dev = mp->m_dev;
 	bdstrat(bmajor(mp->m_dev), bp);
 	error = iowait(bp);
 	ASSERT(error == 0);
@@ -477,15 +475,15 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
 	if (mp->m_ddevp) {
-		VOP_CLOSE(mp->m_ddevp, vfs_flags, 1, 0, cr);
+		VOP_CLOSE(mp->m_ddevp, vfs_flags, L_TRUE, 0, cr);
 		VN_RELE(mp->m_ddevp);
 	}
 	if (mp->m_rtdevp) {
-		VOP_CLOSE(mp->m_rtdevp, vfs_flags, 1, 0, cr);
+		VOP_CLOSE(mp->m_rtdevp, vfs_flags, L_TRUE, 0, cr);
 		VN_RELE(mp->m_rtdevp);
 	}
 	if (mp->m_logdevp && mp->m_logdevp != mp->m_ddevp) {
-		VOP_CLOSE(mp->m_logdevp, vfs_flags, 1, 0, cr);
+		VOP_CLOSE(mp->m_logdevp, vfs_flags, L_TRUE, 0, cr);
 		VN_RELE(mp->m_logdevp);
 	}
 
@@ -497,7 +495,9 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	ASSERT( mp->m_inodes == NULL );
 
 	xfs_mount_free(mp);
+	return( 0 );
 }	/* xfs_unmountfs */
+		
 
 
 #ifdef SIM
