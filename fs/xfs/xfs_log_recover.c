@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.99 $"
+#ident	"$Revision: 1.100 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3316,7 +3316,7 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 		 xlog_t		   *log)
 {
 	int i;
-#ifdef DEBUG
+#if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 	uint *up = (uint *)dp;
 	uint chksum = 0;
 #endif
@@ -3709,7 +3709,9 @@ xlog_recover_check_summary(xlog_t	*log)
 	daddr_t		agfdaddr;
 	daddr_t		agidaddr;
 	buf_t		*sbbp;
+#ifdef XFS_LOUD_RECOVERY
 	xfs_sb_t	*sbp;
+#endif
 	xfs_agnumber_t	agno;
 	__uint64_t	freeblks;
 	__uint64_t	itotal;
@@ -3754,7 +3756,6 @@ xlog_recover_check_summary(xlog_t	*log)
 	cmn_err(CE_NOTE,
 		"xlog_recover_check_summary: sb_fdblocks %lld freeblks %lld",
 		sbp->sb_fdblocks, freeblks);
-#endif
 #if 0
 	/*
 	 * This is turned off until I account for the allocation
@@ -3763,6 +3764,7 @@ xlog_recover_check_summary(xlog_t	*log)
 	ASSERT(sbp->sb_icount == itotal);
 	ASSERT(sbp->sb_ifree == ifree);
 	ASSERT(sbp->sb_fdblocks == freeblks);
+#endif
 #endif
 	brelse(sbbp);
 }
