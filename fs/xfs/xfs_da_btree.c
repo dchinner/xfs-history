@@ -2042,8 +2042,8 @@ xfs_da_do_buf(
 	int		caller,
 	inst_t		*ra)
 {
-	xfs_buf_t		*bp = 0;
-	xfs_buf_t		**bplist;
+	xfs_buf_t	*bp = 0;
+	xfs_buf_t	**bplist;
 	int		error=0;
 	int		i;
 	xfs_bmbt_irec_t	map;

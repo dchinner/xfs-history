@@ -2124,7 +2124,7 @@ xfs_bmap_alloc(
 	xfs_bmalloca_t	*ap)		/* bmap alloc argument struct */
 {
 	xfs_fsblock_t	adjust;		/* adjustment to block numbers */
-	xfs_alloctype_t	atype=0;		/* type for allocation routines */
+	xfs_alloctype_t	atype=0;	/* type for allocation routines */
 	int		error;		/* error return value */
 	xfs_agnumber_t	fb_agno;	/* ag number of ap->firstblock */
 	xfs_mount_t	*mp;		/* mount point structure */
@@ -2132,7 +2132,7 @@ xfs_bmap_alloc(
 	int		rt;		/* true if inode is realtime */
 #ifdef __KERNEL__
 	xfs_extlen_t	prod=0;		/* product factor for allocators */
-	xfs_extlen_t	ralen=0;		/* realtime allocation length */
+	xfs_extlen_t	ralen=0;	/* realtime allocation length */
 #endif
 
 #define	ISLEGAL(x,y)	\
@@ -4458,7 +4458,7 @@ xfs_bmap_read_extents(
 		if (bno == NULLFSBLOCK)
 			break;
 		if ((error = xfs_btree_read_bufl(mp, tp, bno, 0, &bp,
- 				XFS_BMAP_BTREE_REF)))
+				XFS_BMAP_BTREE_REF)))
 			return error;
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	}

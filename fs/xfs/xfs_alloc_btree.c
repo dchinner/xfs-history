@@ -1156,7 +1156,7 @@ xfs_alloc_lshift(
 			XFS_ALLOC_BTREE_REF)))
 		return error;
 	left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
-   	if ((error = xfs_btree_check_sblock(cur, left, level, lbp)))
+	if ((error = xfs_btree_check_sblock(cur, left, level, lbp)))
 		return error;
 	/*
 	 * If it's full, it can't take another entry.

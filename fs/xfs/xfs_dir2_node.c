@@ -428,10 +428,10 @@ xfs_dir2_leafn_lookup_int(
 	xfs_inode_t		*dp;		/* incore directory inode */
 	int			error;		/* error return value */
 	int			fi;		/* free entry index */
-	xfs_dir2_free_t		*free=NULL;		/* free block structure */
+	xfs_dir2_free_t		*free=NULL;	/* free block structure */
 	int			index;		/* leaf entry index */
 	xfs_dir2_leaf_t		*leaf;		/* leaf structure */
-	int			length=0;		/* length of new data entry */
+	int			length=0;	/* length of new data entry */
 	xfs_dir2_leaf_entry_t	*lep;		/* leaf entry */
 	xfs_mount_t		*mp;		/* filesystem mount point */
 	xfs_dir2_db_t		newdb;		/* new data block number */
@@ -1380,7 +1380,7 @@ xfs_dir2_node_addname_int(
 	int			findex;		/* freespace entry index */
 	xfs_dir2_db_t		foundbno=0;	/* found freespace block no */
 	int			foundindex;	/* found freespace entry idx */
-	xfs_dir2_free_t		*free=NULL;		/* freespace block structure */
+	xfs_dir2_free_t		*free=NULL;	/* freespace block structure */
 	xfs_dir2_db_t		ifbno;		/* initial freespace block no */
 	xfs_dir2_db_t		lastfbno;	/* highest freespace block no */
 	int			length;		/* length of the new entry */

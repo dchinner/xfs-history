@@ -52,7 +52,7 @@ xfs_dir2_data_check(
 {
 	xfs_dir2_dataptr_t	addr;		/* addr for leaf lookup */
 	xfs_dir2_data_free_t	*bf;		/* bestfree table */
-	xfs_dir2_block_tail_t	*btp=NULL;		/* block tail */
+	xfs_dir2_block_tail_t	*btp=NULL;	/* block tail */
 	int			count;		/* count of entries found */
 	xfs_dir2_data_t		*d;		/* data block pointer */
 	xfs_dir2_data_entry_t	*dep;		/* data entry */
@@ -63,7 +63,7 @@ xfs_dir2_data_check(
 	xfs_dahash_t		hash;		/* hash of current name */
 	int			i;		/* leaf index */
 	int			lastfree;	/* last entry was unused */
-	xfs_dir2_leaf_entry_t	*lep=NULL;		/* block leaf entries */
+	xfs_dir2_leaf_entry_t	*lep=NULL;	/* block leaf entries */
 	xfs_mount_t		*mp;		/* filesystem mount point */
 	char			*p;		/* current data position */
 	int			stale;		/* count of stale leaves */

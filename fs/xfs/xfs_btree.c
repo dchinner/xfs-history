@@ -761,7 +761,7 @@ xfs_btree_read_bufs(
 	int		refval)		/* ref count value for buffer */
 {
 	xfs_buf_t	*bp;		/* return value */
-	xfs_daddr_t		d;		/* real disk block address */
+	xfs_daddr_t	d;		/* real disk block address */
 	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);

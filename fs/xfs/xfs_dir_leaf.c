@@ -1037,7 +1037,7 @@ xfs_dir_leaf_compact(xfs_trans_t *trans, xfs_dabuf_t *bp, int musthave,
 	 */
 	if (musthave || justcheck) {
 	        tmpbuffer2 = kmem_alloc(lbsize, KM_SLEEP);
-      	  	bcopy(bp->data, tmpbuffer2, lbsize);
+		bcopy(bp->data, tmpbuffer2, lbsize);
 	} 
 	bzero(bp->data, lbsize);
 

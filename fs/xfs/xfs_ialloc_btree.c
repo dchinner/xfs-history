@@ -630,7 +630,7 @@ xfs_inobt_insrec(
 		/*
 		 * First, try shifting an entry to the right neighbor.
 		 */
-	  if ((error = xfs_inobt_rshift(cur, level, &i)))
+		if ((error = xfs_inobt_rshift(cur, level, &i)))
 			return error;
 		if (i) {
 			/* nothing */

@@ -114,7 +114,7 @@ xfs_ialloc_ag_alloc(
 	xfs_alloc_arg_t	args;		/* allocation argument structure */
 	int		blks_per_cluster;  /* fs blocks per inode cluster */
 	xfs_btree_cur_t	*cur;		/* inode btree cursor */
-	xfs_daddr_t		d;		/* disk addr of buffer */
+	xfs_daddr_t	d;		/* disk addr of buffer */
 	int		error;
 	xfs_buf_t	*fbuf;		/* new free inodes' buffer */
 	xfs_dinode_t	*free;		/* new free inode structure */
@@ -201,7 +201,7 @@ xfs_ialloc_ag_alloc(
 				args.alignment = args.mp->m_sb.sb_inoalignmt;
 		else
 			args.alignment = 1;
-   		if ((error = xfs_alloc_vextent(&args)))
+		if ((error = xfs_alloc_vextent(&args)))
        		         return error;
 	}
 	
@@ -649,7 +649,7 @@ nextag:
 	 * If in the same a.g. as the parent, try to get near the parent.
 	 */
 	if (pagno == agno) {
-	  if ((error = xfs_inobt_lookup_le(cur, pagino, 0, 0, &i)))
+		if ((error = xfs_inobt_lookup_le(cur, pagino, 0, 0, &i)))
 			goto error0;
 		if (i != 0 &&
 		    (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
@@ -688,7 +688,7 @@ nextag:
 				if ((error = xfs_inobt_get_rec(tcur,
 						&trec.ir_startino,
 						&trec.ir_freecount,
-					    &trec.ir_free, &i, ARCH_NOCONVERT)))
+						&trec.ir_free, &i, ARCH_NOCONVERT)))
 					goto error1;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
@@ -702,7 +702,7 @@ nextag:
 				if ((error = xfs_inobt_get_rec(cur,
 						&rec.ir_startino,
 						&rec.ir_freecount,
-					   &rec.ir_free, &i, ARCH_NOCONVERT)))
+						&rec.ir_free, &i, ARCH_NOCONVERT)))
 					goto error1;
 				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
