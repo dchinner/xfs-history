@@ -127,6 +127,10 @@ xfs_bmbt_insrec(
 	xfs_bmbt_rec_t *,
 	xfs_btree_cur_t **);
 
+STATIC int
+xfs_bmbt_killroot(
+	xfs_btree_cur_t		*cur);
+
 STATIC void
 xfs_bmbt_log_block(
 	xfs_btree_cur_t *,
@@ -781,39 +785,12 @@ xfs_bmbt_delrec(
 	 */
 	if (level > 0)
 		xfs_bmbt_decrement(cur, level);
-	if (level == cur->bc_nlevels - 1) {
-		/*
-		 * Only do this if the next level will fit.
-		 * Then the data must be copied up to the inode,
-		 * instead of freeing the root you free the next level
-		 */
-		buf = cur->bc_bufs[level - 1];
-		cblock = xfs_buf_to_lblock(buf);
-		ip = cur->bc_private.b.ip;
-		if (block->bb_numrecs == 1 && level > 1 &&
-		    cblock->bb_numrecs <= XFS_BMAP_BLOCK_DMAXRECS(level, cur)) {
-			ASSERT(cblock->bb_leftsib == NULLFSBLOCK);
-			ASSERT(cblock->bb_rightsib == NULLFSBLOCK);
-			if (i = (int)(cblock->bb_numrecs - XFS_BMAP_BLOCK_IMAXRECS(level, cur))) {
-				xfs_iroot_realloc(ip, i);
-				block = ip->i_broot;
-			}
-			*block = *cblock;
-			kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
-			ckp = XFS_BMAP_KEY_IADDR(cblock, 1, cur);
-			bcopy((caddr_t)ckp, (caddr_t)kp, block->bb_numrecs * (int)sizeof(*kp));
-			pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
-			cpp = XFS_BMAP_PTR_IADDR(cblock, 1, cur);
-			bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
-			xfs_bmap_add_free(xfs_daddr_to_fsb(sbp, buf->b_blkno), 1, cur->bc_private.b.flist);
-			xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
-			xfs_btree_setbuf(cur, level - 1, 0);
-			cur->bc_nlevels--;
-		} else
-			xfs_iroot_realloc(ip, -1);
-		xfs_bmbt_rcheck(cur);
-		return 1;
-	}
+	/*
+	 * We're at the root level.  Try to get rid of the next level down.
+	 * If we can't then there's nothing left to do.
+	 */
+	if (level == cur->bc_nlevels - 1)
+		return xfs_bmbt_killroot(cur);
 	if (ptr == 1)
 		xfs_bmbt_updkey(cur, kp, level + 1);
 	xfs_bmbt_rcheck(cur);
@@ -821,6 +798,14 @@ xfs_bmbt_delrec(
 		return 1;
 	rbno = block->bb_rightsib;
 	lbno = block->bb_leftsib;
+	/*
+	 * One child of root, need to get a chance to copy its contents
+	 * into the root and delete it. Can't go up to next level,
+	 * there's nothing to delete there.
+	 */
+	if (lbno == NULLFSBLOCK && rbno == NULLFSBLOCK &&
+	    level == cur->bc_nlevels - 2)
+		return xfs_bmbt_killroot(cur);
 	ASSERT(rbno != NULLFSBLOCK || lbno != NULLFSBLOCK);
 	tcur = xfs_btree_dup_cursor(cur);
 	bno = NULLFSBLOCK;
@@ -1262,6 +1247,73 @@ xfs_bmbt_kcheck_btree(
 	xfs_trans_brelse(tp, buf);
 }
 #endif
+
+STATIC int
+xfs_bmbt_killroot(
+	xfs_btree_cur_t		*cur)
+{
+	xfs_btree_lblock_t	*block;
+	xfs_btree_lblock_t	*cblock;
+	buf_t			*cbuf;
+	xfs_bmbt_key_t		*ckp;
+	xfs_bmbt_ptr_t		*cpp;
+	int			i;
+	xfs_bmbt_key_t		*kp;
+	xfs_inode_t		*ip;
+	int			level;
+	xfs_mount_t		*mp;
+	xfs_bmbt_ptr_t		*pp;
+	xfs_sb_t		*sbp;
+	xfs_trans_t		*tp;
+
+	level = cur->bc_nlevels - 1;
+	ASSERT(level >= 1);
+	/*
+	 * Don't deal with the root block needs to be a leaf case.
+	 * We're just going to turn the thing back into extents anyway.
+	 */
+	if (level == 1)
+		return 1;
+	block = xfs_bmbt_get_block(cur, level, &cbuf);
+	/*
+	 * Give up if the root has multiple children.
+	 */
+	if (block->bb_numrecs != 1)
+		return 1;
+	/*
+	 * Only do this if the next level will fit.
+	 * Then the data must be copied up to the inode,
+	 * instead of freeing the root you free the next level.
+	 */
+	cbuf = cur->bc_bufs[level - 1];
+	cblock = xfs_buf_to_lblock(buf);
+	if (cblock->bb_numrecs > XFS_BMAP_BLOCK_DMAXRECS(level, cur))
+		return 1;
+	ASSERT(cblock->bb_leftsib == NULLFSBLOCK);
+	ASSERT(cblock->bb_rightsib == NULLFSBLOCK);
+	ip = cur->bc_private.b.ip;
+	i = (int)(cblock->bb_numrecs - XFS_BMAP_BLOCK_IMAXRECS(level, cur));
+	if (i) {
+		xfs_iroot_realloc(ip, i);
+		block = ip->i_broot;
+	}
+	*block = *cblock;
+	kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
+	ckp = XFS_BMAP_KEY_IADDR(cblock, 1, cur);
+	bcopy((caddr_t)ckp, (caddr_t)kp, block->bb_numrecs * (int)sizeof(*kp));
+	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
+	cpp = XFS_BMAP_PTR_IADDR(cblock, 1, cur);
+	bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
+	tp = cur->bc_tp;
+	mp = cur->bc_mp;
+	sbp = &mp->m_sb;
+	xfs_bmap_add_free(xfs_daddr_to_fsb(sbp, buf->b_blkno), 1, cur->bc_private.b.flist);
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
+	xfs_btree_setbuf(cur, level - 1, 0);
+	cur->bc_nlevels--;
+	xfs_bmbt_rcheck(cur);
+	return 1;
+}
 
 /*
  * Log fields from the btree block header.
@@ -2166,13 +2218,13 @@ xfs_bmap_add_extent_delay_real(
 		kmem_check();
 		if (!btree)
 			return XFS_ILOG_CORE | XFS_ILOG_EXT;
-		xfs_bmbt_lookup_eq(cur, left.br_startoff, left.br_startblock,
-			left.br_blockcount);
+		xfs_bmbt_lookup_eq(cur, right.br_startoff, right.br_startblock,
+			right.br_blockcount);
+		xfs_bmbt_delete(cur);
+		xfs_bmbt_decrement(cur, 0);
 		xfs_bmbt_update(cur, left.br_startoff, left.br_startblock,
 			left.br_blockcount + prev.br_blockcount +
 			right.br_blockcount);
-		xfs_bmbt_increment(cur, 0);
-		xfs_bmbt_delete(cur);
 		kmem_check();
 		return XFS_ILOG_CORE;
 	}
@@ -2576,11 +2628,11 @@ xfs_bmap_add_extent_hole_real(
 		kmem_check();
 		if (!btree)
 			return XFS_ILOG_CORE | XFS_ILOG_EXT;
-		xfs_bmbt_lookup_eq(cur, left.br_startoff, left.br_startblock,
-			left.br_blockcount);
-		xfs_bmbt_update(cur, left.br_startoff, left.br_startblock, left.br_blockcount + new->br_blockcount + right.br_blockcount);
-		xfs_bmbt_increment(cur, 0);
+		xfs_bmbt_lookup_eq(cur, right.br_startoff, right.br_startblock,
+			right.br_blockcount);
 		xfs_bmbt_delete(cur);
+		xfs_bmbt_decrement(cur, 0);
+		xfs_bmbt_update(cur, left.br_startoff, left.br_startblock, left.br_blockcount + new->br_blockcount + right.br_blockcount);
 		kmem_check();
 		return XFS_ILOG_CORE;
 	}
@@ -2705,17 +2757,23 @@ xfs_bmap_alloc(
 	fb_agno = nullfb ? NULLAGNUMBER : xfs_fsb_to_agno(sbp, firstblock);
 	bno = nullfb ? xfs_ino_to_fsb(sbp, ip->i_ino) : firstblock;
 	if (eof && prevp->br_startoff != NULLFSBLOCK &&
-	    prevp->br_startblock != NULLSTARTBLOCK)
+	    prevp->br_startblock != NULLSTARTBLOCK) {
 		bno = prevp->br_startblock + prevp->br_blockcount;
-	else if (!eof) {
+		bno += off - (prevp->br_startoff + prevp->br_blockcount);
+		if (xfs_fsb_to_agno(sbp, bno) !=
+		    xfs_fsb_to_agno(sbp, prevp->br_startblock) ||
+		    xfs_fsb_to_agbno(sbp, bno) >= sbp->sb_agblocks)
+			bno = prevp->br_startblock + prevp->br_blockcount;
+	} else if (!eof) {
 		if (prevp->br_startoff != NULLFSBLOCK &&
 		    prevp->br_startblock != NULLSTARTBLOCK) {
 			prevdiff = off - (prevp->br_startoff + prevp->br_blockcount);
 			prevbno = prevp->br_startblock + prevp->br_blockcount + prevdiff;
-			if (xfs_fsb_to_agno(sbp, prevbno) !=
+			if (prevdiff > 2 * asklen ||
+			    xfs_fsb_to_agno(sbp, prevbno) !=
 			    xfs_fsb_to_agno(sbp, prevp->br_startblock) ||
-			    xfs_fsb_to_agbno(sbp, prevbno) >= sbp->sb_dblocks)
-				prevbno = prevp->br_startblock;
+			    xfs_fsb_to_agbno(sbp, prevbno) >= sbp->sb_agblocks)
+				prevbno = prevp->br_startblock + prevp->br_blockcount;
 			if (!nullfb && xfs_fsb_to_agno(sbp, prevbno) != fb_agno)
 				prevbno = NULLFSBLOCK;
 		} else
@@ -2723,9 +2781,10 @@ xfs_bmap_alloc(
 		if (gotp->br_startblock != NULLSTARTBLOCK) {
 			gotdiff = gotp->br_startoff - off;
 			gotbno = gotp->br_startblock - gotdiff;
-			if (xfs_fsb_to_agno(sbp, gotbno) !=
+			if (gotdiff > 2 * asklen ||
+			    xfs_fsb_to_agno(sbp, gotbno) !=
 			    xfs_fsb_to_agno(sbp, gotp->br_startblock))
-				gotbno = gotp->br_startblock;
+				gotbno = gotp->br_startblock - asklen;
 			if (!nullfb && xfs_fsb_to_agno(sbp, gotbno) != fb_agno)
 				gotbno = NULLFSBLOCK;
 		} else
