@@ -801,7 +801,8 @@ linvfs_dmapi_mount(
 
 	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, cvp, dir_name, fsname, error);
 	if (error) {
-		vfsp->vfs_flag &= ~VFS_DMI;
+		if (atomic_read(&sb->s_active) == 1)
+			vfsp->vfs_flag &= ~VFS_DMI;
 		return -error;
 	}
 	return 0;
