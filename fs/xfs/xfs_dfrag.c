@@ -1,6 +1,7 @@
 #ident "$Id$"
 
 #include <sys/param.h>
+#include <sys/buf.h>
 #include <sys/sema.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
@@ -18,7 +19,6 @@
 #include <sys/syssgi.h>
 #include <sys/mac_label.h>
 #include <sys/capability.h>
-#include <sys/kthread.h>
 #include <sys/uuid.h>
 #include <sys/hwgraph.h>
 #include <sys/mode.h>
