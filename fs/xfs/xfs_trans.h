@@ -211,7 +211,10 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_FREXTENTS		0x00000010
 #define	XFS_TRANS_SB_RES_FREXTENTS	0x00000020
 
-
+/*
+ * Transaction types to be passed to xfs_trans_alloc().
+ */
+#define	XFS_TRANS_FILE_WRITE	1
 
 struct xfs_inode;
 struct xfs_mount;
