@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.27 $"
+#ident  "$Revision: 1.28 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -962,9 +962,9 @@ xfs_sync(vfs_t		*vfsp,
 			 * we can't hold it across calls to the buffer
 			 * cache.
 			 */
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			pflushinvalvp(vp, 0, XFS_ISIZE_MAX(ip));
-			xfs_ilock(ip, XFS_ILOCK_EXCL);
+			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		}
 
 		if ((flags & SYNC_DELWRI) && VN_DIRTY(vp)) {
@@ -978,13 +978,13 @@ xfs_sync(vfs_t		*vfsp,
 			 * Drop the inode lock since we can't hold it
 			 * across calls to the buffer cache.
 			 */
-			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			if (flags & SYNC_BDFLUSH) {
 				pdflush(vp, B_DELWRI);
 			} else {
 				error = pflushvp(vp, ip->i_d.di_size, fflag);
 			}
-			xfs_ilock(ip, XFS_ILOCK_EXCL);
+			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		}
 
 		/*
