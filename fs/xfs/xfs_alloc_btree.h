@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_BTREE_H
 #define	_FS_XFS_ALLOC_BTREE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.1 $"
 
 /*
  * Freespace on-disk structures
@@ -37,12 +37,18 @@ typedef xfs_agblock_t xfs_alloc_ptr_t;	/* btree pointer type */
 #define	XFS_ALLOC_BLOCK_MINRECS(lev,cur)	\
 	XFS_BTREE_BLOCK_MINRECS(XFS_ALLOC_BLOCK_SIZE(lev,cur), xfs_alloc, lev)
 
+/*
+ * Minimum and maximum blocksize.
+ * The blocksize upper limit is pretty much arbitrary.
+ */
 #define	XFS_MIN_BLOCKSIZE_LOG	9	/* i.e. 512 bytes */
 #define	XFS_MAX_BLOCKSIZE_LOG	16	/* i.e. 65536 bytes */
 #define	XFS_MIN_BLOCKSIZE	(1 << XFS_MIN_BLOCKSIZE_LOG)
 #define	XFS_MAX_BLOCKSIZE	(1 << XFS_MAX_BLOCKSIZE_LOG)
 
-/* block numbers in the AG; SB is BB 0, AGF is BB 1, AGI is BB 2 */
+/*
+ * block numbers in the AG; SB is BB 0, AGF is BB 1, AGI is BB 2
+ */
 #define	XFS_BNO_BLOCK(s)	((xfs_agblock_t)(XFS_AGI_BLOCK(s) + 1))
 #define	XFS_CNT_BLOCK(s)	((xfs_agblock_t)(XFS_BNO_BLOCK(s) + 1))
 #define	XFS_PREALLOC_BLOCKS(s)	((xfs_agblock_t)(XFS_CNT_BLOCK(s) + 1))
@@ -68,29 +74,49 @@ struct xfs_btree_cur;
  * Prototypes for externally visible routines.
  */
 
-int
+/*
+ * Decrement cursor by one record at the level.
+ * For nonzero levels the leaf-ward information is untouched.
+ */
+int					/* success/failure */
 xfs_alloc_decrement(
-	struct xfs_btree_cur	*cur,
-	int			level);
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	int			level);	/* level in btree, 0 is leaf */
 
-int
+/*
+ * Delete the record pointed to by cur.
+ * The cursor refers to the place where the record was (could be inserted)
+ * when the operation returns.
+ */
+int					/* success/failure */
 xfs_alloc_delete(
-	struct xfs_btree_cur	*cur);
+	struct xfs_btree_cur	*cur);	/* btree cursor */
 
-int
+/*
+ * Get the data from the pointed-to record.
+ */
+int					/* success/failure */
 xfs_alloc_get_rec(
-	struct xfs_btree_cur	*cur,
-	xfs_agblock_t		*bno,
-	xfs_extlen_t		*len);
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	xfs_agblock_t		*bno,	/* output: starting block of extent */
+	xfs_extlen_t		*len);	/* output: length of extent */
 
-int
+/*
+ * Increment cursor by one record at the level.
+ * For nonzero levels the leaf-ward information is untouched.
+ */
+int					/* success/failure */
 xfs_alloc_increment(
-	struct xfs_btree_cur	*cur,
-	int			level);
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	int			level);	/* level in btree, 0 is leaf */
 
-int
+/*
+ * Insert the current record at the point referenced by cur.
+ * The cursor may be inconsistent on return if splits have been done.
+ */
+int					/* success/failure */
 xfs_alloc_insert(
-	struct xfs_btree_cur	*cur);
+	struct xfs_btree_cur	*cur);	/* btree cursor */
 
 #ifdef XFSDEBUG
 /*
@@ -98,28 +124,39 @@ xfs_alloc_insert(
  */
 void
 xfs_alloc_kcheck(
-	struct xfs_btree_cur	*cur);		/* btree cursor */
+	struct xfs_btree_cur	*cur);	/* btree cursor */
 #else
 #define	xfs_alloc_kcheck(a)
 #endif
 
-int
+/*
+ * Lookup the record equal to [bno, len] in the btree given by cur.
+ */
+int					/* success/failure */
 xfs_alloc_lookup_eq(
-	struct xfs_btree_cur	*cur,
-	xfs_agblock_t		bno,
-	xfs_extlen_t		len);
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	xfs_agblock_t		bno,	/* starting block of extent */
+	xfs_extlen_t		len);	/* length of extent */
 
-int
+/*
+ * Lookup the first record greater than or equal to [bno, len]
+ * in the btree given by cur.
+ */
+int					/* success/failure */
 xfs_alloc_lookup_ge(
-	struct xfs_btree_cur	*cur,
-	xfs_agblock_t		bno,
-	xfs_extlen_t		len);
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	xfs_agblock_t		bno,	/* starting block of extent */
+	xfs_extlen_t		len);	/* length of extent */
 
-int
+/*
+ * Lookup the first record less than or equal to [bno, len]
+ * in the btree given by cur.
+ */
+int					/* success/failure */
 xfs_alloc_lookup_le(
-	struct xfs_btree_cur	*cur,
-	xfs_agblock_t		bno,
-	xfs_extlen_t		len);
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	xfs_agblock_t		bno,	/* starting block of extent */
+	xfs_extlen_t		len);	/* length of extent */
  
 #ifdef XFSDEBUG
 /*
@@ -128,15 +165,18 @@ xfs_alloc_lookup_le(
  */
 void
 xfs_alloc_rcheck(
-	struct xfs_btree_cur	*cur);		/* btree cursor */
+	struct xfs_btree_cur	*cur);	/* btree cursor */
 #else
 #define	xfs_alloc_rcheck(a)
 #endif	/* XFSDEBUG */
 
-int
+/*
+ * Update the record referred to by cur, to the value given by [bno, len].
+ */
+int					/* success/failure */
 xfs_alloc_update(
-	struct xfs_btree_cur	*cur,
-	xfs_agblock_t		bno,
-	xfs_extlen_t		len);
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	xfs_agblock_t		bno,	/* starting block of extent */
+	xfs_extlen_t		len);	/* length of extent */
 
 #endif	/* !_FS_XFS_ALLOC_BTREE_H */
