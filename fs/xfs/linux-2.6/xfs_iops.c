@@ -600,7 +600,12 @@ linvfs_get_block_core(
 		set_buffer_mapped(bh_result);
 	}
 
-	if (create && !buffer_mapped(bh_result))
+	/* If we previously allocated a block out beyond eof and
+	 * we are now coming back to use it then we will need to
+	 * flag it as new even if it has a disk address.
+	 */
+	if (create && (!buffer_mapped(bh_result) ||
+				(offset >= inode->i_size)))
 		set_buffer_new(bh_result);
 
 	if (pbmap.pbm_flags & PBMF_DELAY) {
