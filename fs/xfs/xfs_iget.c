@@ -549,7 +549,9 @@ xfs_ireclaim(xfs_inode_t *ip)
 				chm = chl;
 			}
 		}
+#ifndef SIM
 		ASSERT_ALWAYS(chl != NULL);
+#endif
        } else {
 		/* delete one inode from a non-empty list */
 		iq = ip->i_cnext;
