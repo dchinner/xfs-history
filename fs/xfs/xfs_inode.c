@@ -33,9 +33,9 @@
 #include <xfs.h>
 
 
-xfs_zone_t *xfs_ifork_zone;
-xfs_zone_t *xfs_inode_zone;
-xfs_zone_t *xfs_chashlist_zone;
+kmem_zone_t *xfs_ifork_zone;
+kmem_zone_t *xfs_inode_zone;
+kmem_zone_t *xfs_chashlist_zone;
 
 /*
  * Used in xfs_itruncate().  This is the maximum number of extents

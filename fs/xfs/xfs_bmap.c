@@ -41,7 +41,7 @@ STATIC void
 xfs_bmap_check_leaf_extents(xfs_btree_cur_t *cur, xfs_inode_t *ip, int whichfork);
 #endif
 
-xfs_zone_t		*xfs_bmap_free_item_zone;
+kmem_zone_t		*xfs_bmap_free_item_zone;
 
 /*
  * Prototypes for internal bmap routines.

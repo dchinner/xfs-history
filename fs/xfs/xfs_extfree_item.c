@@ -38,8 +38,8 @@
 #include <xfs.h>
 
 
-xfs_zone_t	*xfs_efi_zone;
-xfs_zone_t	*xfs_efd_zone;
+kmem_zone_t	*xfs_efi_zone;
+kmem_zone_t	*xfs_efd_zone;
 
 STATIC void	xfs_efi_item_unlock(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_abort(xfs_efi_log_item_t *);

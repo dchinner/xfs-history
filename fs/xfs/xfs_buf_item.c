@@ -42,7 +42,7 @@
 
 #define ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
 
-xfs_zone_t	*xfs_buf_item_zone;
+kmem_zone_t	*xfs_buf_item_zone;
 
 #ifdef XFS_TRANS_DEBUG
 /*

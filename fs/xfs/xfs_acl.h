@@ -80,7 +80,7 @@ extern int xfs_acl_vset(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vget(struct vnode *, void *, size_t, int);
 extern int xfs_acl_vremove(struct vnode *vp, int);
 
-extern struct xfs_zone *xfs_acl_zone;
+extern struct kmem_zone *xfs_acl_zone;
 
 #define _ACL_TYPE_ACCESS	1
 #define _ACL_TYPE_DEFAULT	2

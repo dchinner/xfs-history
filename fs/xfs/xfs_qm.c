@@ -34,8 +34,8 @@
 #include <xfs_quota_priv.h>
 
 
-xfs_zone_t	*qm_dqzone;
-xfs_zone_t	*qm_dqtrxzone;
+kmem_zone_t	*qm_dqzone;
+kmem_zone_t	*qm_dqtrxzone;
 
 STATIC void	xfs_qm_list_init(xfs_dqlist_t *, char *, int);
 STATIC void	xfs_qm_list_destroy(xfs_dqlist_t *);

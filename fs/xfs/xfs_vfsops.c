@@ -53,16 +53,16 @@ STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
 int
 xfs_init(int	fstype)
 {
-	extern xfs_zone_t	*xfs_da_state_zone;
-	extern xfs_zone_t	*xfs_bmap_free_item_zone;
-	extern xfs_zone_t	*xfs_btree_cur_zone;
-	extern xfs_zone_t	*xfs_inode_zone;
-	extern xfs_zone_t	*xfs_chashlist_zone;
-	extern xfs_zone_t	*xfs_trans_zone;
-	extern xfs_zone_t	*xfs_buf_item_zone;
-	extern xfs_zone_t	*xfs_efd_zone;
-	extern xfs_zone_t	*xfs_efi_zone;
-	extern xfs_zone_t	*xfs_dabuf_zone;
+	extern kmem_zone_t	*xfs_da_state_zone;
+	extern kmem_zone_t	*xfs_bmap_free_item_zone;
+	extern kmem_zone_t	*xfs_btree_cur_zone;
+	extern kmem_zone_t	*xfs_inode_zone;
+	extern kmem_zone_t	*xfs_chashlist_zone;
+	extern kmem_zone_t	*xfs_trans_zone;
+	extern kmem_zone_t	*xfs_buf_item_zone;
+	extern kmem_zone_t	*xfs_efd_zone;
+	extern kmem_zone_t	*xfs_efi_zone;
+	extern kmem_zone_t	*xfs_dabuf_zone;
 	extern mutex_t		xfs_uuidtabmon;
 #ifdef DEBUG_NOT
 	extern ktrace_t		*xfs_alloc_trace_buf;
@@ -172,16 +172,16 @@ xfs_init(int	fstype)
 void
 xfs_cleanup(void)
 {
-	extern xfs_zone_t	*xfs_bmap_free_item_zone;
-	extern xfs_zone_t	*xfs_btree_cur_zone;
-	extern xfs_zone_t	*xfs_inode_zone;
-	extern xfs_zone_t	*xfs_trans_zone;
-	extern xfs_zone_t	*xfs_da_state_zone;
-	extern xfs_zone_t	*xfs_dabuf_zone;
-	extern xfs_zone_t	*xfs_efd_zone;
-	extern xfs_zone_t	*xfs_efi_zone;
-	extern xfs_zone_t	*xfs_buf_item_zone;
-	extern xfs_zone_t	*xfs_chashlist_zone;
+	extern kmem_zone_t	*xfs_bmap_free_item_zone;
+	extern kmem_zone_t	*xfs_btree_cur_zone;
+	extern kmem_zone_t	*xfs_inode_zone;
+	extern kmem_zone_t	*xfs_trans_zone;
+	extern kmem_zone_t	*xfs_da_state_zone;
+	extern kmem_zone_t	*xfs_dabuf_zone;
+	extern kmem_zone_t	*xfs_efd_zone;
+	extern kmem_zone_t	*xfs_efi_zone;
+	extern kmem_zone_t	*xfs_buf_item_zone;
+	extern kmem_zone_t	*xfs_chashlist_zone;
 	extern xfs_inode_t	**xfs_refcache;
 
 	xfs_cleanup_procfs();

@@ -2296,8 +2296,8 @@ xfs_da_log2_roundup(uint i)
 	return(rval);
 }
 
-xfs_zone_t *xfs_da_state_zone;	/* anchor for state struct zone */
-xfs_zone_t *xfs_dabuf_zone;		/* dabuf zone */
+kmem_zone_t *xfs_da_state_zone;	/* anchor for state struct zone */
+kmem_zone_t *xfs_dabuf_zone;		/* dabuf zone */
 
 /*
  * Allocate a dir-state structure.

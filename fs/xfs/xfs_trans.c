@@ -41,7 +41,7 @@ STATIC void	xfs_trans_committed(xfs_trans_t *, int);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t, int);
 STATIC void	xfs_trans_free(xfs_trans_t *);
 
-xfs_zone_t		*xfs_trans_zone;
+kmem_zone_t		*xfs_trans_zone;
 
 
 /*

@@ -39,7 +39,7 @@
 #include <xfs.h>
 
 
-xfs_zone_t	*xfs_ili_zone;		/* inode log item zone */
+kmem_zone_t	*xfs_ili_zone;		/* inode log item zone */
 
 /*
  * This returns the number of iovecs needed to log the given inode item.

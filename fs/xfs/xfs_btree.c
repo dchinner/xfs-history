@@ -39,7 +39,7 @@
 /*
  * Cursor allocation zone.
  */
-xfs_zone_t	*xfs_btree_cur_zone;
+kmem_zone_t	*xfs_btree_cur_zone;
 
 /*
  * Btree magic numbers.

@@ -43,7 +43,7 @@ STATIC void	xfs_acl_get_attr(vnode_t *, xfs_acl_t *, int, int, int *);
 STATIC void	xfs_acl_set_attr(vnode_t *, xfs_acl_t *, int, int *);
 STATIC int	xfs_acl_allow_set(vnode_t *, int);
 
-xfs_zone_t *xfs_acl_zone;
+kmem_zone_t *xfs_acl_zone;
 
 
 /*

@@ -335,6 +335,6 @@ void xfs_da_brelse(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 void xfs_da_binval(struct xfs_trans *tp, xfs_dabuf_t *dabuf);
 xfs_daddr_t xfs_da_blkno(xfs_dabuf_t *dabuf);
 
-extern struct xfs_zone *xfs_da_state_zone;
+extern struct kmem_zone *xfs_da_state_zone;
 
 #endif	/* __XFS_DA_BTREE_H__ */
