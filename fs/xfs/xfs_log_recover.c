@@ -1,5 +1,5 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.84 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -12,6 +12,7 @@
 #include <sys/buf.h>
 #include <sys/sema.h>
 #include <sys/vnode.h>
+#include <sys/debug.h>
 
 #ifdef SIM
 #undef _KERNEL
@@ -29,7 +30,6 @@
 
 #include <sys/errno.h>
 #include <sys/kmem.h>
-#include <sys/debug.h>
 #include <sys/ktrace.h>
 #include <sys/vfs.h>
 #include <sys/uuid.h>
@@ -3291,9 +3291,9 @@ xlog_do_recover(xlog_t	*log,
 #ifdef _KERNEL
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
+	struct bdevsw	*my_bdevsw;
 #endif
 	int		error;
-	struct bdevsw	*my_bdevsw;
 
 	/*
 	 * First replay the images in the log.

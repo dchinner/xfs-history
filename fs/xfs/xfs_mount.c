@@ -1,5 +1,5 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.118 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -12,10 +12,10 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif /* SIM */
-#include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/sema.h>

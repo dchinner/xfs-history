@@ -9,6 +9,7 @@
 #endif
 #include <sys/param.h>
 #include <sys/buf.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -16,7 +17,6 @@
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/dirent.h>
-#include <sys/debug.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.49 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -14,11 +14,11 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/atomic_ops.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
 #include <sys/vnode.h>
-#include <sys/debug.h>
 #include <sys/kmem.h>
 #ifdef SIM
 #include <bstring.h>

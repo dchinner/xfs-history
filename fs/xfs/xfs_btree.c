@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.50 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -12,10 +12,10 @@
 #include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/debug.h>
 #include <sys/kmem.h>
 #ifdef SIM
 #include <bstring.h>

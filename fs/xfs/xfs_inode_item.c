@@ -1,4 +1,4 @@
-#ident "$Revision: 1.59 $"
+#ident "$Revision: 1.60 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -16,14 +16,12 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
-#endif
-#include <sys/debug.h>
-#ifndef SIM
-#include <sys/systm.h>
-#else
 #include <bstring.h>
+#else
+#include <sys/systm.h>
 #endif
 #include <sys/kmem.h>
 #include <sys/kabi.h>
