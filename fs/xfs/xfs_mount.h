@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.79 $"
+#ident	"$Revision: 1.80 $"
 
 struct buf;
 struct cred;
@@ -166,7 +166,7 @@ typedef struct xfs_mount {
  * better for NFS.
  */
 #define	XFS_WSYNC_READIO_LOG	15
-#define	XFS_WSYNC_WRITEIO_LOG	13
+#define	XFS_WSYNC_WRITEIO_LOG	14
 
 /*
  * Macros for getting from mount to vfs and back.
