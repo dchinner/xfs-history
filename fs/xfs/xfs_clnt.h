@@ -53,7 +53,7 @@
  * For the Linux port, we kept this structure pretty much intact
  * and use it internally (because the existing code groks it).
  */
-struct xfs_args {
+struct xfs_mount_args {
 	int	flags;		/* flags -> see XFSMNT_... macros below */
 	int	logbufs;	/* Number of log buffers, -1 to default */
 	int	logbufsize;	/* Size of log buffers, -1 to default */

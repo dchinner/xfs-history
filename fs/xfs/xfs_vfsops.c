@@ -237,7 +237,7 @@ xfs_cmountfs(
 	kdev_t		ddev,
 	kdev_t		logdev,
 	kdev_t		rtdev,
-	struct xfs_args *ap,
+	struct xfs_mount_args *ap,
 	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
@@ -553,9 +553,9 @@ xfs_get_vfsmount(
  */
 STATIC int
 xfs_mount(
-	vfs_t		*vfsp,
-	struct xfs_args	*args,
-	cred_t		*credp)
+	vfs_t			*vfsp,
+	struct xfs_mount_args	*args,
+	cred_t			*credp)
 {
 	kdev_t		ddev;
 	kdev_t		logdev;
