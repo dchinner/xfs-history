@@ -242,6 +242,7 @@ again:
 	 * These values _must_ be set before releasing ihlock!
 	 */
 	ip->i_vnode = vp;
+	ip->i_mount = mp;
 	ip->i_hash = ih;
 	if (iq = ih->ih_next) {
 		iq->i_prevp = &ip->i_next;
@@ -250,14 +251,12 @@ again:
 	ip->i_prevp = &ih->ih_next;
 	ih->ih_next = ip;
 	ih->ih_version++;
-	XFS_IHUNLOCK(ih);
-
 	ip->i_dmevents = 0;
+	XFS_IHUNLOCK(ih);
 
 	/*
 	 * Link ip to its mount and thread it on the mount's inode list.
 	 */
-	ip->i_mount = mp;
 	XFS_MOUNT_ILOCK(mp);
 	if (iq = mp->m_inodes) {
 		iq->i_mprevp = &ip->i_mnext;

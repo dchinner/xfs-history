@@ -251,7 +251,6 @@ xfs_iformat(
 				xfs_bmap_trace_exlist("xfs_iformat", ip, nex);
 			}
 			ip->i_flags |= XFS_IEXTENTS;
-			xfs_isize_check(mp, ip, ip->i_d.di_size);
 			return;
 
 		case XFS_DINODE_FMT_BTREE:
@@ -666,28 +665,19 @@ xfs_itruncate_finish(
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 	ASSERT(ip->i_transp == *tp);
 	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
-	xfs_isize_check(ip->i_mount, ip, ip->i_d.di_size);
 
 	ntp = *tp;
 	mp = (ntp)->t_mountp;
 	first_unmap_block = XFS_B_TO_FSB(mp, new_size);
 	/*
-	 * Subtract 1 from the size so that we get the correct
-	 * last block when the size is a multiple of the block
-	 * size.
+	 * Since it is possible for space to become allocated beyond
+	 * the end of the file (in a crash where the space is allocated
+	 * but the inode size is not yet updated), simply remove any
+	 * blocks which show up between the new EOF and the maximum
+	 * possible file size.
 	 */
-	last_block = XFS_B_TO_FSBT(mp, ip->i_d.di_size - 1);
-	if (first_unmap_block > last_block) {
-		/*
-		 * The old size and new size both fall on the same
-		 * fs block, so there are no blocks to free.
-		 * Just set the new size of the inode and return.
-		 */
-		ip->i_d.di_size = new_size;
-		xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
-		xfs_isize_check(mp, ip, ip->i_d.di_size);
-		return;
-	}
+	last_block = XFS_B_TO_FSBT(mp, XFS_MAX_FILE_OFFSET);
+	ASSERT(first_unmap_block <= last_block);
 	done = 0;
 	unmap_len = last_block - first_unmap_block + 1;
 	while (!done) {
@@ -768,7 +758,8 @@ xfs_igrow_start(
 	if (isize != 0) {
 		/*
 		 * Zero any pages that may have been created by
-		 * xfs_write_file() beyond the end of the file.
+		 * xfs_write_file() beyond the end of the file
+		 * and any blocks between the old and new file sizes.
 		 */
 		xfs_zero_eof(ip, new_size, isize, credp);
 	}
@@ -794,7 +785,6 @@ xfs_igrow_finish(
 	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE) != 0);
 	ASSERT(ip->i_transp == tp);
 	ASSERT(new_size > ip->i_d.di_size);
-	xfs_isize_check(ip->i_mount, ip, ip->i_d.di_size);
 
 	/*
 	 * Update the file size and inode change timestamp.
