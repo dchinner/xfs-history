@@ -101,6 +101,7 @@ xfs_growfs_data_private(
 	xfs_buf_t		*bp;
 	int			bsize;
 	int			bucket;
+	xfs_daddr_t		disk_addr;
 	int			dpct;
 	int			error;
 	xfs_agnumber_t		nagcount;
@@ -161,8 +162,9 @@ xfs_growfs_data_private(
 		/*
 		 * AG freelist header block
 		 */
+		disk_addr = XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR);
 		bp = xfs_buf_get(mp->m_ddev_targp,
-				  XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR),
+				  disk_addr,
 			          sectbb, 0);
 		agf = XFS_BUF_TO_AGF(bp);
 		bzero(agf, mp->m_sb.sb_sectsize);
@@ -193,8 +195,9 @@ xfs_growfs_data_private(
 		/*
 		 * AG inode header block
 		 */
+		disk_addr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		bp = xfs_buf_get(mp->m_ddev_targp,
-				  XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR),
+				  disk_addr,
 				  sectbb, 0);
 		agi = XFS_BUF_TO_AGI(bp);
 		bzero(agi, mp->m_sb.sb_sectsize);
@@ -217,8 +220,9 @@ xfs_growfs_data_private(
 		/*
 		 * BNO btree root block
 		 */
+		disk_addr = XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp));
 		bp = xfs_buf_get(mp->m_ddev_targp,
-			XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp)),
+			disk_addr,
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
@@ -238,8 +242,9 @@ xfs_growfs_data_private(
 		/*
 		 * CNT btree root block
 		 */
+		disk_addr = XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp));
 		bp = xfs_buf_get(mp->m_ddev_targp,
-			XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp)),
+			disk_addr,
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
@@ -260,8 +265,9 @@ xfs_growfs_data_private(
 		/*
 		 * INO btree root block
 		 */
+		disk_addr = XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp));
 		bp = xfs_buf_get(mp->m_ddev_targp,
-			XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp)),
+			disk_addr,
 			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
