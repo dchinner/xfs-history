@@ -257,7 +257,7 @@ xfs_vget_fsop_handlereq(
 	if (ip == NULL)
 		return XFS_ERROR(EIO);
 	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
-		xfs_iput(ip, XFS_ILOCK_SHARED);
+		xfs_iput_new(ip, XFS_ILOCK_SHARED);
 		return XFS_ERROR(ENOENT);
 	}
 
