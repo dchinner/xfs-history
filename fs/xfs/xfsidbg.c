@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -24,6 +24,7 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/kmem.h>
+#include <sys/attributes.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -44,7 +45,6 @@
 #include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
-#include <attributes.h>
 #include "xfs_da_btree.h"
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
@@ -985,7 +985,9 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 	qprintf("nblocks %lld extsize 0x%x nextents 0x%x anextents 0x%x\n",
 		dip->di_nblocks, dip->di_extsize,
 		dip->di_nextents, dip->di_anextents);
-	qprintf("forkoff %d dmevmask 0x%x dmstate 0x%x ", dip->di_forkoff,
+	qprintf("forkoff %d aformat 0x%x (%s) dmevmask 0x%x dmstate 0x%x ",
+		dip->di_forkoff, dip->di_aformat,
+		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_aformat),
 		dip->di_dmevmask, dip->di_dmstate);
 	printflags(dip->di_flags, diflags, "flags");
 	qprintf("gen 0x%x\n", dip->di_gen);
@@ -1919,9 +1921,9 @@ idbg_xattrleaf(struct xfs_attr_leafblock *leaf)
 			j, m->base, m->size);
 	}
 	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
-		qprintf("[%2d] hash 0x%x nameidx %d local %d\n     name \"",
-			j, e->hashval, e->nameidx, e->local);
-		if (e->local) {
+		qprintf("[%2d] hash 0x%x nameidx %d flags 0x%x\n     name \"",
+			j, e->hashval, e->nameidx, e->flags);
+		if (e->flags & XFS_ATTR_LOCAL) {
 			l = XFS_ATTR_LEAF_NAME_LOCAL(leaf, j);
 			for (k = 0; k < l->namelen; k++)
 				qprintf("%c", l->nameval[k]);
