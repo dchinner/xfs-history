@@ -8,8 +8,10 @@
 
 #define LOG_TICKET_TABLE_SIZE	16		/* eventuall 512 */
 #define LOG_TICKET_MASK		0x1ff
+#define LOG_CALLBACK_SIZE	10
 #define LOG_HEADER_MAGIC_NUM	0xBADbabe
-#define LOG_RECORD_SIZE		8*1024		/* eventually 32k */
+#define LOG_RECORD_ISIZE	1024
+#define LOG_RECORD_BSIZE	(4*(LOG_RECORD_ISIZE))	/* eventually 32k */
 #define LOG_HEADER_SIZE		512
 #define LOG_BBSHIFT		12
 #define LOG_BBSIZE		(1<<LOG_BBSHIFT)	/* 4096 */
@@ -49,9 +51,6 @@ struct log_ticket {
     struct log_ticket	*t_next;	/* 4 or 8 b */
     xfs_tid_t		t_tid;		/* 8 b */
     uint		t_reservation;	/* Reservation in bytes;	4 b */
-#ifdef TICKET_INT
-    ushort		t_slot;		/* Slot in ticket table;	2 b */
-#endif
     char		t_clientid;	/* Who does this belong to;	1 b */
     char		reserved;	/* 32bit align;			1 b */
 };
@@ -81,6 +80,19 @@ struct log_rec_header {
 typedef struct log_rec_header log_rec_header_t;
 
 
+struct log_callback {
+	void (*cb_func)(void *);
+	void  *cb_arg;
+};
+typedef struct log_callback log_callback_t;
+
+struct log_callback_list {
+	struct log_callback_list *cb_next;
+	log_callback_t		 cb_chunk[LOG_CALLBACK_SIZE];
+};
+typedef struct log_callback_list log_callback_list_t;
+
+
 struct in_core_log {
     union {
 	log_rec_header_t	sic_header;
@@ -106,10 +118,6 @@ typedef struct in_core_log in_core_log_t;
  * l_dev	: device of log partition.
  */
 struct log {
-#ifdef TICKET_INT
-    sema_t		l_hash_lock;				/* 20b */
-    log_ticket_t	*l_hash[LOG_TICKET_TABLE_SIZE];		/* 4b */
-#endif
     log_ticket_t	*l_freelist;				/* 4b */
     in_core_log_t	*l_iclog;				/* 4b */
     in_core_log_t	*l_iclog2;				/* 4b */
@@ -124,20 +132,11 @@ struct log {
 typedef struct log log_t;
 
 
-#ifdef TICKET_INT
-int log_maketicket(log_t *log, xfs_tid_t tid, int len, char clientid);
-void log_alloc_tickets(log_t *log);
-int  log_getticket(log_t *log, int slot, log_ticket_t **ticket);
-void log_putticket(log_t *log, int slot);
-void log_relticket(log_ticket_t *ticket);
-int  log_recover(struct xfs_mount *mp, dev_t log_dev);
-#else
 log_ticket_t *log_maketicket(log_t *log, xfs_tid_t tid, int len, char clientid);
 void	     log_alloc_tickets(log_t *log);
 void	     log_putticket(log_t *log, log_ticket_t *ticket);
 void	     log_relticket(log_ticket_t *ticket);
 int	     log_recover(struct xfs_mount *mp, dev_t log_dev);
-#endif
 
 #endif	/* _XFS_LOG_PRIV_H */
 
