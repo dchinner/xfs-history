@@ -1,4 +1,5 @@
 
+
 #include <sys/param.h>
 #ifdef SIM
 #define _KERNEL
@@ -11,6 +12,7 @@
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/uuid.h>
+#include <stddef.h>
 #ifndef SIM
 #include <sys/sysinfo.h>
 #include <sys/kmem.h>
@@ -22,20 +24,12 @@
 #include "xfs_inum.h"
 #include "xfs.h"
 #include "xfs_trans.h"
-#include "xfs_buf_item.h"
 #include "xfs_bio.h"
 #include "xfs_log.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
-#include "xfs_alloc.h"
-#include "xfs_ialloc.h"
-#include "xfs_bmap.h"
-#include "xfs_btree.h"
-#include "xfs_dinode.h"
-#include "xfs_inode_item.h"
-#include "xfs_inode.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -44,9 +38,10 @@
 #define	XFS_TRANS_LOG_CHUNK	8192
 
 #ifndef SIM
-#define	ROUNDUP32(x)		(((x) + 31) & ~31)
+#define ROUNDUP32(x)		(((x) + 31) & ~31)
 #endif
 
+STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
 STATIC void	xfs_trans_do_commit(xfs_trans_t *, uint);
 STATIC void	xfs_trans_large_item(xfs_trans_t *, xfs_log_item_desc_t *);
 STATIC xfs_log_item_desc_t *xfs_trans_log_items(xfs_trans_t *,
@@ -57,7 +52,7 @@ STATIC void	xfs_trans_committed(xfs_trans_t *);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t);
 STATIC void	xfs_trans_free(xfs_trans_t *);
 
-struct zone *xfs_trans_zone;
+struct zone	*xfs_trans_zone;
 
 xfs_tid_t	
 xfs_trans_id_alloc(struct xfs_mount *mp)
@@ -84,26 +79,17 @@ xfs_trans_lsn_danger(struct xfs_mount *mp, xfs_lsn_t lsn)
 }
 
 /*
- * This routine is called to allocate a transaction structure and
- * reserve log space for the commit of the transaction. If the flags
- * value is XFS_TRANS_NOSLEEP, then the caller does not want to sleep
- * waiting for a log space reservation.
+ * This routine is called to allocate a transaction structure.
+ * The type parameter indicates the type of the transaction.  These
+ * are enumerated in xfs_trans.h.
  *
- * Call the log manager to reserve the log space for the transaction.
  * Dynamically allocate the transaction structure from the transaction
  * zone, initialize it, and return it to the caller.
  */
 xfs_trans_t *
-xfs_trans_alloc(struct xfs_mount *mp, uint type, uint reserve, uint flags)
+xfs_trans_alloc(struct xfs_mount *mp, uint type)
 {
 	xfs_trans_t	*tp;
-	/*
-	 * This call can only return NULL if the caller specified
-	 * the TRANS_NOSLEEP flag.
-	 */
-	if (xfs_log_reserve(mp, (int)reserve, (int)flags & XFS_TRANS_NOSLEEP) == 0) {
-		return (NULL);
-	}
 
 #ifndef SIM
 	tp = (xfs_trans_t*)kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP);
@@ -115,20 +101,82 @@ xfs_trans_alloc(struct xfs_mount *mp, uint type, uint reserve, uint flags)
 	 * Initialize the transaction structure.
 	 */
 	tp->t_tid = xfs_trans_id_alloc(mp);
-	tp->t_reserve = reserve;
 	tp->t_type = type;
 	tp->t_mountp = mp;
-	tp->t_callback = NULL;
-	tp->t_callarg = NULL;
-	tp->t_forw = NULL;
-	tp->t_back = NULL;
-	tp->t_flags = 0;
 	initnsema(&(tp->t_sema), 0, "xfs_trans");
 	tp->t_items_free = XFS_LIC_NUM_SLOTS;
 	XFS_LIC_INIT(&(tp->t_items));
 
 	return (tp);
 }
+
+/*
+ * This is called to reserve free disk blocks and log space for the
+ * given transaction.  This must be done before allocating any resources
+ * within the transaction.
+ *
+ * This will return ENOSPC if there are not enough blocks available.
+ * It will sleep waiting for available log space.
+ * The only valid value for the flags parameter is XFS_RES_LOG_PERM, which
+ * is used by long running transactions.
+ */
+int
+xfs_trans_reserve(xfs_trans_t *tp, uint blocks, uint logspace, uint flags)
+{
+	int		status;
+
+	/*
+	 * Attempt to reserve the needed disk blocks by decrementing
+	 * the number needed from the number available.  This will
+	 * fail if the count would go below zero.
+	 */
+	if (blocks > 0) {
+		status = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
+					   -blocks);
+		if (status != 0) {
+#if 0
+			printf("trans_reserve: reserve %u failed\n", blocks);
+#endif
+			return (status);
+		}
+		tp->t_blk_res = blocks;
+#if 0
+		printf("trans_reserve: reserved %u\n", blocks);
+#endif
+	}
+
+	/*
+	 * Reserve the log space needed for this transaction.
+	 */
+	if (logspace > 0) {
+		(void) xfs_log_reserve(tp->t_mountp, logspace, flags);
+		tp->t_log_res = logspace;
+	}
+
+	return (0);
+}
+
+#if 0
+/*
+ * xfs_trans_use_reserve() is called to indicate to the transaction
+ * mechanism that that some of the blocks reserved through a call
+ * to xfs_trans_reserve() have been used.  This should be called
+ * each time blocks are allocated.
+ */
+void
+xfs_trans_use_reserve(xfs_trans_t *tp, uint blocks)
+{
+	/*
+	 * Make sure that the number of blocks used is not greater
+	 * than the number reserved, and then simply decrement
+	 * the number used from the number reserved.
+	 */
+	ASSERT(tp->t_blk_res >= blocks);
+	tp->t_blk_res -= blocks;
+	printf("trans_use: used %u\n", blocks);
+}
+#endif
+	
 
 /*
  * This is called to set the a callback to be called when the given
@@ -146,739 +194,6 @@ xfs_trans_callback(xfs_trans_t *tp, xfs_trans_callback_t callback, void *arg)
 }
 
 /*
- * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it is already locked
- * within the transaction, just increment its lock recursion count
- * and return a pointer to it.
- *
- * Use the buffer cache routine incore_match() to find the buffer
- * if it is already owned by this transaction.
- *
- * If we don't already own the buffer, use xfs_getblk() to get it.
- * If it doesn't yet have an associated xfs_buf_log_item structure,
- * then allocate one and add the item to this transaction.
- *
- * If the transaction pointer is NULL, make this just a normal
- * getblk() call.
- */
-buf_t *
-xfs_trans_getblk(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
-{
-	buf_t			*bp;
-	xfs_buf_log_item_t	*bip;
-
-	/*
-	 * Default to a normal getblk() call if the tp is NULL.
-	 */
-	if (tp == NULL) {
-		return (getblk(dev, blkno, len));
-	}
-
-	/*
-	 * If we find the buffer in the cache with this transaction
-	 * pointer in its b_fsprivate2 field, then we know we already
-	 * have it locked.  In this case we just increment the lock
-	 * recursion count and return the buffer to the caller.
-	 */
-	if ((bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp)) != NULL) {
-		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-		ASSERT(bip != NULL);
-		bip->bli_recur++;
-		return (bp);
-	}
-
-	bp = xfs_getblk(dev, blkno, len);
-
-	/*
-	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
-	 * it doesn't have one yet, then allocate one and initialize it.
-	 * The checks to see if one is there are in xfs_buf_item_init().
-	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
-
-	/*
-	 * Set the recursion count for the buffer within this transaction
-	 * to 0.
-	 */
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	bip->bli_recur = 0;
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
-
-	/*
-	 * Initialize b_fsprivate2 so we can find it with incore_match()
-	 * above.
-	 */
-	bp->b_fsprivate2 = tp;
-
-	return (bp);
-}
-
-
-/*
- * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it has not yet been
- * read in, read it from disk. If it is already locked
- * within the transaction and already read in, just increment its
- * lock recursion count and return a pointer to it.
- *
- * Use the buffer cache routine incore_match() to find the buffer
- * if it is already owned by this transaction.
- *
- * If we don't already own the buffer, use xfs_bread() to get it.
- * If it doesn't yet have an associated xfs_buf_log_item structure,
- * then allocate one and add the item to this transaction.
- *
- * If the transaction pointer is NULL, make this just a normal
- * bread() call.
- */
-buf_t *
-xfs_trans_bread(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
-{
-	buf_t			*bp;
-	xfs_buf_log_item_t	*bip;
-
-	/*
-	 * Default to a normal bread() call if the tp is NULL.
-	 */
-	if (tp == NULL) {
-		return (bread(dev, blkno, len));
-	}
-
-	/*
-	 * If we find the buffer in the cache with this transaction
-	 * pointer in its b_fsprivate2 field, then we know we already
-	 * have it locked.  If it is already read in we just increment
-	 * the lock recursion count and return the buffer to the caller.
-	 * If the buffer is not yet read in, then we read it in, increment
-	 * the lock recursion count, and return it to the caller.
-	 */
-	if ((bp = incore_match(dev, blkno, len, BUF_FSPRIV2, tp)) != NULL) {
-		ASSERT(bp->b_fsprivate != NULL);
-		if (!(bp->b_flags & B_DONE)) {
-#ifndef SIM
-			SYSINFO.lread += len;
-#endif
-
-			ASSERT(!(bp->b_flags & B_ASYNC));
-			bp->b_flags |= B_READ;
-			bdstrat(bmajor(dev), bp);
-
-#ifndef SIM
-			u.u_ior++;
-			SYSINFO.bread += len;
-#endif
-
-			iowait(bp);
-		}
-
-		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-		bip->bli_recur++;
-
-		return (bp);
-	}
-
-	bp = xfs_bread(dev, blkno, len);
-
-	/*
-	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
-	 * it doesn't have one yet, then allocate one and initialize it.
-	 * The checks to see if one is there are in xfs_buf_item_init().
-	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
-
-	/*
-	 * Set the recursion count for the buffer within this transaction
-	 * to 0.
-	 */
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	bip->bli_recur = 0;
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
-
-	/*
-	 * Initialize b_fsprivate2 so we can find it with incore_match()
-	 * above.
-	 */
-	bp->b_fsprivate2 = tp;
-
-	return (bp);
-}
-
-
-/*
- * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it is already locked
- * within the transaction, just increment its lock recursion count
- * and return a pointer to it.
- *
- * Use the buffer cache routine findchunk_match() to find the buffer
- * if it is already owned by this transaction.
- *
- * If we don't already own the buffer, use xfs_getchunk() to get it.
- * If it doesn't yet have an associated xfs_buf_log_item structure,
- * then allocate one and add the item to this transaction.
- *
- * If the transaction pointer is NULL, make this just a normal
- * getchunk() call.
- */
-#ifndef SIM
-buf_t *
-xfs_trans_getchunk(xfs_trans_t *tp, vnode_t *vp,
-		   struct bmapval *bmap, struct cred *cred)
-{
-	buf_t			*bp;
-	xfs_buf_log_item_t	*bip;
-
-	/*
-	 * Default to a normal getchunk() call if the tp is NULL.
-	 */
-	if (tp == NULL) {
-		return (getchunk(vp, bmap, cred));
-	}
-
-	/*
-	 * If we find the buffer in the cache with this transaction
-	 * pointer in its b_fsprivate2 field, then we know we already
-	 * have it locked.  In this case we just increment the lock
-	 * recursion count and return the buffer to the caller.
-	 */
-	if ((bp = findchunk_match(vp, bmap, BUF_FSPRIV2, tp)) != NULL) {
-		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-		ASSERT(bip != NULL);
-		bip->bli_recur++;
-		return (bp);
-	}
-
-	bp = xfs_getchunk(vp, bmap, cred);
-
-	/*
-	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
-	 * it doesn't have one yet, then allocate one and initialize it.
-	 * The checks to see if one is there are in xfs_buf_item_init().
-	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
-
-	/*
-	 * Set the recursion count for the buffer within this transaction
-	 * to 0.
-	 */
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	bip->bli_recur = 0;
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
-
-	/*
-	 * Initialize b_fsprivate2 so we can find it with findchunk_match()
-	 * above.
-	 */
-	bp->b_fsprivate2 = tp;
-
-	return (bp);
-}
-#endif /* SIM */
-
-
-/*
- * Get and lock the buffer for the caller if it is not already
- * locked within the given transaction.  If it has not yet been
- * read in, read it from disk. If it is already locked
- * within the transaction and already read in, just increment its
- * lock recursion count and return a pointer to it.
- *
- * Use the buffer cache routine findchunk_match() to find the buffer
- * if it is already owned by this transaction.
- *
- * If we don't already own the buffer, use xfs_chunkread() to get it.
- * If it doesn't yet have an associated xfs_buf_log_item structure,
- * then allocate one and add the item to this transaction.
- *
- * If the transaction pointer is NULL, make this just a normal
- * chunkread() call.
- */
-#ifndef SIM
-buf_t *
-xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
-		    struct bmapval *bmap, struct cred *cred)
-{
-	buf_t			*bp;
-	xfs_buf_log_item_t	*bip;
-
-	/*
-	 * Default to a normal chunkread() call if the tp is NULL.
-	 */
-	if (tp == NULL) {
-		return (chunkread(vp, bmap, 1, cred));
-	}
-	/*
-	 * If we find the buffer in the cache with this transaction
-	 * pointer in its b_fsprivate2 field, then we know we already
-	 * have it locked.  If it is already read in we just increment
-	 * the lock recursion count and return the buffer to the caller.
-	 * If the buffer is not yet read in, then we read it in, increment
-	 * the lock recursion count, and return it to the caller.
-	 */
-	if ((bp = findchunk_match(vp, bmap, BUF_FSPRIV2, tp)) != NULL) {
-		if (!bp->b_flags & B_DONE) {
-#ifndef SIM
-			SYSINFO.lread += BTOBB(bmap->pbsize);
-#endif
-
-			ASSERT(!(bp->b_flags & B_ASYNC));
-			bp->b_flags |= B_READ;
-			VOP_STRATEGY(vp, bp);
-
-#ifndef SIM
-			u.u_ior++;
-			SYSINFO.bread += BTOBBT(bp->b_bcount);
-#endif
-
-			iowait(bp);
-		}
-
-		bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-		bip->bli_recur++;
-
-		return (bp);
-	}
-
-	bp = xfs_chunkread(vp, bmap, 1, cred);
-
-	/*
-	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
-	 * it doesn't have one yet, then allocate one and initialize it.
-	 * The checks to see if one is there are in xfs_buf_item_init().
-	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
-
-	/*
-	 * Set the recursion count for the buffer within this transaction
-	 * to 0.
-	 */
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	bip->bli_recur = 0;
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
-
-	/*
-	 * Initialize b_fsprivate2 so we can find it with incore_match()
-	 * above.
-	 */
-	bp->b_fsprivate2 = tp;
-
-	return (bp);
-}
-#endif /* SIM */
-
-
-/*
- * Release the buffer bp which was previously acquired with one of the
- * xfs_trans_... buffer allocation routines if the buffer has not
- * been modified within this transaction.  If the buffer is modified
- * within this transaction, do decrement the recursion count but do
- * not release the buffer even if the count goes to 0.  If the buffer is not
- * modified within the transaction, decrement the recursion count and
- * release the buffer if the recursion count goes to 0.
- *
- * If the buffer is to be released and it was not modified before
- * this transaction began, then free the buf_log_item associated with it.
- *
- * If the transaction pointer is NULL, make this just a normal
- * brelse() call.
- */
-void
-xfs_trans_brelse(xfs_trans_t *tp, buf_t *bp)
-{
-	xfs_buf_log_item_t	*bip;
-	xfs_log_item_desc_t	*lidp;
-
-	/*
-	 * Default to a normal brelse() call if the tp is NULL.
-	 */
-	if (tp == NULL) {
-		brelse(bp);
-		return;
-	}
-
-	ASSERT(bp->b_fsprivate2 == tp);
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
-	ASSERT(bip->bli_item.li_type == XFS_LI_BUF);
-	/*
-	 * Find the item descriptor pointing to this buffer's
-	 * log item.  It must be there.
-	 */
-	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
-	ASSERT(lidp != NULL);
-
-	/*
-	 * If the release is just for a recursive lock,
-	 * then decrement the count and return.
-	 */
-	if (bip->bli_recur > 0) {
-		bip->bli_recur--;
-		return;
-	}
-
-	/*
-	 * If the buffer is dirty within this transaction, we can't
-	 * release it until we commit.
-	 */
-	if (lidp->lid_flags & XFS_LID_DIRTY) {
-		return;
-	}
-
-	/*
-	 * Free up the log item descriptor tracking the released item.
-	 */
-	xfs_trans_free_item(tp, lidp);
-
-	/*
-	 * Clear the hold flag in the buf log item if it is set.
-	 * We wouldn't want the next user of the buffer to
-	 * get confused.
-	 */
-	if (bip->bli_flags & XFS_BLI_HOLD) {
-		bip->bli_flags &= ~XFS_BLI_HOLD;
-	}
-
-	/*
-	 * If the buf item is not tracking data in the log, then
-	 * we must free it before releasing the buffer back to the
-	 * free pool.  Before releasing the buffer to the free pool,
-	 * clear the transaction pointer in b_fsprivate2 to disolve
-	 * its relation to this transaction.
-	 */
-	if (!xfs_buf_item_dirty(bip)) {
-		xfs_buf_item_relse(bp);
-	}
-	bp->b_fsprivate2 = NULL;
-	xfs_brelse(bp);
-	return;
-}
-
-/*
- * Add the locked buffer to the transaction.
- * The buffer must be locked, and it cannot be associated with any
- * transaction.
- *
- * If the buffer does not yet have a buf log item associated with it,
- * then allocate one for it.  Then add the buf item to the transaction.
- */
-void
-xfs_trans_bjoin(xfs_trans_t *tp, buf_t *bp)
-{
-	ASSERT(bp->b_flags & B_BUSY);
-	ASSERT(bp->b_fsprivate2 == NULL);
-
-	/*
-	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
-	 * it doesn't have one yet, then allocate one and initialize it.
-	 * The checks to see if one is there are in xfs_buf_item_init().
-	 */
-	xfs_buf_item_init(bp, tp->t_mountp);
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, bp->b_fsprivate);
-
-	/*
-	 * Initialize b_fsprivate2 so we can find it with incore_match()
-	 * in xfs_trans_getblk() and friends above.
-	 */
-	bp->b_fsprivate2 = tp;
-}
-
-/*
- * Mark the buffer as not needing to be unlocked when the buf item's
- * IOP_UNLOCK() routine is called.  The buffer must already be locked
- * and associated with the given transaction.
- */
-void
-xfs_trans_bhold(xfs_trans_t *tp, buf_t *bp)
-{
-	xfs_buf_log_item_t	*bip;
-
-	ASSERT(bp->b_flags & B_BUSY);
-	ASSERT((xfs_trans_t*)(bp->b_fsprivate2) == tp);
-	ASSERT(bp->b_fsprivate != NULL);
-
-	bip = (xfs_buf_log_item_t*)(bp->b_fsprivate);
-	bip->bli_flags |= XFS_BLI_HOLD;
-}
-
-
-/*
- * Get and lock the inode for the caller if it is not already
- * locked within the given transaction.  If it is already locked
- * within the transaction, just increment its lock recursion count
- * and return a pointer to it.
- *
- * Use the inode cache routine xfs_inode_incore() to find the inode
- * if it is already owned by this transaction.
- *
- * If we don't already own the buffer, use xfs_iget() to get it.
- * Since the inode log item structure is embedded in the incore
- * inode structure and is initialized when the inode is brought
- * into memory, there is nothing to do with it here.
- *
- * If the given transaction pointer is NULL, just call xfs_iget().
- * This simplifies code which must handle both cases.
- */
-xfs_inode_t *
-xfs_trans_iget(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, uint flags)
-{
-	xfs_inode_log_item_t	*iip;
-	xfs_inode_t		*ip;
-
-	/*
-	 * If the transaction pointer is NULL, just call the normal
-	 * xfs_iget().
-	 */
-	if (tp == NULL) {
-		return (xfs_iget(mp, NULL, ino, flags));
-	}
-
-	/*
-	 * If we find the inode in core with this transaction
-	 * pointer in its i_transp field, then we know we already
-	 * have it locked.  In this case we just increment the lock
-	 * recursion count and return the inode to the caller.
-	 * Assert that the inode is already locked in the mode requested
-	 * by the caller.  We cannot do lock promotions yet, so
-	 * die if someone gets this wrong.
-	 */
-	if ((ip = xfs_inode_incore(tp->t_mountp, ino, tp)) != NULL) {
-		ASSERT(ismrlocked(&ip->i_lock, flags));
-		ip->i_item.ili_recur++;
-		return (ip);
-	}
-
-	ip = xfs_iget(tp->t_mountp, tp, ino, flags);
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)&(ip->i_item));
-
-	/*
-	 * Initialize i_transp so we can find it with xfs_inode_incore()
-	 * above.
-	 */
-	ip->i_transp = tp;
-
-	return (ip);
-}
-
-
-/*
- * Release the inode ip which was previously acquired with xfs_trans_iget()
- * or added with xfs_trans_ijoin(). This will decrement the lock
- * recursion count of the inode item.  If the count goes to less than 0,
- * the inode will be unlocked and disassociated from the transaction. 
- *
- * If the inode has been modified within the transaction, it will not be
- * unlocked until the transaction commits.
- */
-void
-xfs_trans_iput(xfs_trans_t *tp, xfs_inode_t *ip)
-{
-	xfs_inode_log_item_t	*iip;
-	xfs_log_item_desc_t	*lidp;
-
-	/*
-	 * If the transaction pointer is NULL, just call xfs_iput().
-	 */
-	if (tp == NULL) {
-		xfs_iput(ip);
-	}
-
-	ASSERT(ip->i_transp == tp);
-	iip = &ip->i_item;	
-
-	/*
-	 * Find the item descriptor pointing to this inode's
-	 * log item.  It must be there.
-	 */
-	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)iip);
-	ASSERT(lidp != NULL);
-
-	/*
-	 * If the release is just for a recursive lock,
-	 * then decrement the count and return.
-	 */
-	if (iip->ili_recur > 0) {
-		iip->ili_recur--;
-		return;
-	}
-
-	/*
-	 * If the inode was dirtied within this transaction, it cannot
-	 * be released until the transaction commits.
-	 */
-	if (lidp->lid_flags & XFS_LID_DIRTY) {
-		return;
-	}
-
-	xfs_trans_free_item(tp, lidp);
-
-	/*
-	 * Clear the hold flag in the inode log item.
-	 * We wouldn't want the next user of the inode to
-	 * get confused.
-	 */
-	if (iip->ili_flags & XFS_ILI_HOLD) {
-		iip->ili_flags &= ~XFS_ILI_HOLD;
-	}
-
-	/*
-	 * Unlike xfs_brelse() the inode log item cannot be
-	 * freed, because it is embedded within the inode.
-	 * All we have to do is release the inode.
-	 */
-	xfs_iput(ip);
-	return;
-}
-
-
-/*
- * Add the locked inode to the transaction.
- * The inode must be locked, and it cannot be associated with any
- * transaction.
- */
-void
-xfs_trans_ijoin(xfs_trans_t *tp, xfs_inode_t *ip)
-{
-	xfs_inode_log_item_t	*iip;
-
-	ASSERT(ip->i_transp == NULL);
-
-	/*
-	 * Get a log_item_desc to point at the new item.
-	 */
-	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)&(ip->i_item));
-
-	/*
-	 * Initialize i_transp so we can find it with xfs_inode_incore()
-	 * in xfs_trans_iget() above.
-	 */
-	ip->i_transp = tp;
-}
-
-
-
-/*
- * Mark the inode as not needing to be unlocked when the inode item's
- * IOP_UNLOCK() routine is called.  The inode must already be locked
- * and associated with the given transaction.
- */
-void
-xfs_trans_ihold(xfs_trans_t *tp, xfs_inode_t *ip)
-{
-	ASSERT(ip->i_transp == tp);
-
-	ip->i_item.ili_flags |= XFS_ILI_HOLD;
-}
-
-/*
- * This is called to mark bytes first through last inclusive of the given
- * buffer as needing to be logged when the transaction is committed.
- * The buffer must already be associated with the given transaction.
- *
- * First and last are numbers relative to the beginning of this buffer,
- * so the first byte in the buffer is numbered 0 regardless of the
- * value of b_blkno.
- */
-void
-xfs_trans_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last)
-{
-	xfs_buf_log_item_t	*bip;
-	xfs_log_item_desc_t	*lidp;
-
-	ASSERT(bp->b_flags & B_BUSY);
-	ASSERT((xfs_trans_t*)bp->b_fsprivate2 == tp);
-	ASSERT(bp->b_fsprivate != NULL);
-	ASSERT((first <= last) && (last <= bp->b_bcount));
-	ASSERT((bp->b_iodone == NULL) ||
-	       (bp->b_iodone == xfs_buf_iodone_callbacks));
-
-	/*
-	 * Mark the buffer as needing to be written out eventually,
-	 * and set its iodone function to remove the buffer's buf log
-	 * item from the AIL and free it when the buffer is flushed
-	 * to disk.  See xfs_buf_attach_iodone() for more details
-	 * on li_cb and xfs_buf_iodone_callbacks().
-	 */
-	bp->b_flags |= B_DELWRI;
-	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
-	if (bp->b_iodone == NULL) {
-		bp->b_iodone = xfs_buf_iodone_callbacks;
-	}
-	bip->bli_item.li_cb = (void(*)(buf_t*,xfs_log_item_t*))xfs_buf_iodone;
-
-	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
-	ASSERT(lidp != NULL);
-
-	tp->t_flags |= XFS_TRANS_DIRTY;
-	lidp->lid_flags |= XFS_LID_DIRTY;
-	xfs_buf_item_log(bip, first, last);
-}
-
-
-/*
- * This is called to mark the fields indicated in fieldmask as needing
- * to be logged when the transaction is committed.  The inode must
- * already be associated with the given transaction.
- *
- * The values for fieldmask are defined in xfs_inode_item.h.  We always
- * log all of the core inode if any of it has changed, and we always log
- * all of the inline data/extents/b-tree root if any of them has changed.
- *
- * If this is the first time the inode has been logged since it was
- * last flushed or brought in from disk, then take an extra reference
- * on the inode.  This keeps the inode from being recycled until
- * it is clean.  This should help to keep us from sleeping too much
- * in the reclaim routine trying to flush out the inode.
- */
-void
-xfs_trans_log_inode(xfs_trans_t	*tp,
-		    xfs_inode_t	*ip,
-		    uint	flags)
-{
-	xfs_inode_log_item_t	*iip;
-	xfs_log_item_desc_t	*lidp;
-
-	ASSERT(ip->i_transp == tp);
-
-	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)&(ip->i_item));
-	ASSERT(lidp != NULL);
-
-	tp->t_flags |= XFS_TRANS_DIRTY;
-	lidp->lid_flags |= XFS_LID_DIRTY;
-
-	if (ip->i_item.ili_fields == 0) {
-		ASSERT(ip->i_item.ili_ref == 0);
-#ifdef NOTYET
-		vn_hold(XFS_ITOV(ip));
-#endif
-	}
-	ip->i_item.ili_fields |= flags;
-}
-
-
-/*
  * Add the xfs_log_item structure to the list of items associated
  * with the transaction.  It should be logged when the transaction
  * is committed.
@@ -894,6 +209,157 @@ xfs_trans_log_op(xfs_trans_t *tp, xfs_log_item_t *op)
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp = xfs_trans_add_item(tp, op);
 	lidp->lid_flags |= XFS_LID_DIRTY;
+}
+
+/*
+ * Record the indicated change to the given field for application
+ * to the file system's superblock when the transaction commits.
+ * For now, just store the change in the transaction structure.
+ *
+ * Mark the transaction structure to indicate that the superblock
+ * needs to be updated before committing.
+ */
+void
+xfs_trans_mod_sb(xfs_trans_t *tp, uint field, int delta)
+{
+	switch (field) {
+	case XFS_SB_ICOUNT:
+		ASSERT(delta > 0);
+		tp->t_icount_delta += delta;
+		break;
+	case XFS_SB_IFREE:
+		tp->t_ifree_delta += delta;
+		break;
+	case XFS_SB_FDBLOCKS:
+#if 0
+		printf("trans_mod_sb: delta %d\n", delta);
+#endif
+		/*
+		 * Track the number of blocks allocated in the
+		 * transaction.  Make sure it does not exceed the
+		 * number reserved.
+		 */
+		if (delta < 0) {
+			tp->t_blk_res_used += (uint)-delta;
+			ASSERT(tp->t_blk_res_used <= tp->t_blk_res);
+		}
+		tp->t_fdblocks_delta += delta;
+		break;
+	case XFS_SB_FREXTENTS:
+		tp->t_frextents_delta += delta;
+		break;
+	default:
+		ASSERT(0);
+		return;
+	}
+
+	tp->t_flags |= (XFS_TRANS_SB_DIRTY | XFS_TRANS_DIRTY);
+}
+
+/*
+ * xfs_trans_apply_sb_deltas() is called from the commit code
+ * to bring the superblock buffer into the current transaction
+ * and modify it as requested by earlier calls to xfs_trans_mod_sb().
+ *
+ * For now we just look at each field allowed to change and change
+ * it if necessary.
+ */
+STATIC void
+xfs_trans_apply_sb_deltas(xfs_trans_t *tp)
+{
+	xfs_sb_t	*sbp;
+	buf_t		*bp;
+
+	bp = xfs_trans_getsb(tp);
+	sbp = xfs_buf_to_sbp(bp);
+
+	if (tp->t_icount_delta != 0) {
+		sbp->sb_icount += tp->t_icount_delta;
+	}
+	if (tp->t_ifree_delta != 0) {
+		sbp->sb_ifree += tp->t_ifree_delta;
+	}
+	if (tp->t_fdblocks_delta != 0) {
+		sbp->sb_fdblocks += tp->t_fdblocks_delta;
+	}
+	if (tp->t_frextents_delta != 0) {
+		sbp->sb_frextents += tp->t_frextents_delta;
+	}
+
+	/*
+	 * Since all the modifiable fields are contiguous, we
+	 * can get away with this.
+	 */
+	xfs_trans_log_buf(tp, bp, offsetof(xfs_sb_t, sb_icount),
+			  (offsetof(xfs_sb_t, sb_frextents) + 3));
+}
+
+/*
+ * xfs_trans_unreserve_and_mod_sb() is called to release unused
+ * reservations and apply superblock counter changes to the in-core
+ * superblock.
+ *
+ * This is done efficiently with a single call to xfs_mod_incore_sb_batch().
+ */
+void
+xfs_trans_unreserve_and_mod_sb(xfs_trans_t *tp)
+{
+	xfs_mod_sb_t	msb[5];		/* If you add cases, add entries */
+	xfs_mod_sb_t	*msbp;
+	int		n;
+	int		error;
+
+	msbp = &msb[0];
+	n = 0;
+
+	/*
+	 * Release any reserved blocks.  Any that were allocated
+	 * will be taken back again by fdblocks_delta below.
+	 */
+	if (tp->t_blk_res > 0) {
+		msbp->msb_field = XFS_SB_FDBLOCKS;
+		msbp->msb_delta = tp->t_blk_res;
+		msbp++;
+		n++;
+	}
+
+	/*
+	 * Apply any superblock modifications to the in-core version.
+	 */
+	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
+		if (tp->t_icount_delta != 0) {
+			msbp->msb_field = XFS_SB_ICOUNT;
+			msbp->msb_delta = tp->t_icount_delta;
+			msbp++;
+			n++;
+		}
+		if (tp->t_ifree_delta != 0) {
+			msbp->msb_field = XFS_SB_IFREE;
+			msbp->msb_delta = tp->t_ifree_delta;
+			msbp++;
+			n++;
+		}
+		if (tp->t_fdblocks_delta != 0) {
+			msbp->msb_field = XFS_SB_FDBLOCKS;
+			msbp->msb_delta = tp->t_fdblocks_delta;
+			msbp++;
+			n++;
+		}
+		if (tp->t_frextents_delta != 0) {
+			msbp->msb_field = XFS_SB_FREXTENTS;
+			msbp->msb_delta = tp->t_frextents_delta;
+			msbp++;
+			n++;
+		}
+	}
+
+	/*
+	 * If we need to change anything, do it.
+	 */
+	if (n > 0) {
+		error = xfs_mod_incore_sb_batch(tp->t_mountp, msb, n);
+		ASSERT(error == 0);
+	}
 }
 
 
@@ -1156,11 +622,21 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	 * If there is nothing to be logged by the transaction,
 	 * then unlock all of the items associated with the
 	 * transaction and free the transaction structure.
+	 * Also make sure to return any reserved blocks to
+	 * the free pool.
 	 */
 	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
+		xfs_trans_unreserve_and_mod_sb(tp);
 		xfs_trans_free_items(tp);
 		xfs_trans_free(tp);
 		return;
+	}
+
+	/*
+	 * If we need to update the superblock, then do it now.
+	 */
+	if (tp->t_flags & XFS_TRANS_SB_DIRTY) {
+		xfs_trans_apply_sb_deltas(tp);
 	}
 
 	/*
@@ -1168,6 +644,23 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 	 * them delayed write. They'll be written out eventually. 
 	 */
 	xfs_trans_unlock_items(tp);
+
+	/*
+	 * Once the transaction has been committed, unused
+	 * reservations need to be released and changes to
+	 * the superblock need to be reflected in the in-core
+	 * version.  Do that now.
+	 */
+#if 0
+	printf("trans_commit: blkres %u delta %d fdblocks %lld\n",
+	       tp->t_blk_res, tp->t_fdblocks_delta,
+	       tp->t_mountp->m_sb.sb_fdblocks);
+#endif
+	xfs_trans_unreserve_and_mod_sb(tp);
+#if 0
+	printf("trans committed: fdblocks == %lld\n",
+	       tp->t_mountp->m_sb.sb_fdblocks);
+#endif
 
 	/*
 	 * Free the transaction structure now that it has been committed.
@@ -1287,6 +780,7 @@ xfs_trans_cancel(xfs_trans_t *tp)
 {
 	ASSERT(!(tp->t_flags & XFS_TRANS_DIRTY));
 
+	xfs_trans_unreserve_and_mod_sb(tp);
 	xfs_trans_free_items(tp);
 	xfs_trans_free(tp);
 }
@@ -1300,7 +794,7 @@ STATIC void
 xfs_trans_free(xfs_trans_t *tp)
 {
 #ifndef SIM
-	xfs_log_unreserve(tp->t_mountp, tp->t_reserve);
+	xfs_log_unreserve(tp->t_mountp, tp->t_log_res);
 
 	kmem_zone_free(xfs_trans_zone, tp);
 #else
