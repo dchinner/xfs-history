@@ -693,7 +693,11 @@ xfs_ioctl(
 		xfs_fsop_resblks_t inout;
 		__uint64_t	   in;
 
-		if (!capable(CAP_SYS_ADMIN))
+		/* Only allow the sys admin to reserve space unless
+		 * unwritten extents are enabled.
+		 */
+		if (!XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) &&
+		    !capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
 		if (copy_from_user(&inout, (char *)arg, sizeof(inout)))
@@ -813,6 +817,9 @@ int xfs_ioc_space(
 	int		attr_flags = 0;
 	int		error;
 
+	if (!capable(CAP_SYS_ADMIN))
+		return -XFS_ERROR(EPERM);
+
 	if (filp->f_flags & O_RDONLY)
 		return -XFS_ERROR(EBADF);
 
@@ -845,7 +852,10 @@ int xfs_ioc_bulkstat(
 	/* done = 1 if there are more stats to get and if bulkstat */
 	/* should be called again (unused here, but used in dmapi) */
 
-	if (!capable(CAP_SYS_ADMIN))
+	/* Do not allow space reservation if this is not the admin and
+	 * unwritten extents are turned off.
+	 */
+	if (!XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) && !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	if (XFS_FORCED_SHUTDOWN(mp))
