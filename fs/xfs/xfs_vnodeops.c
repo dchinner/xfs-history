@@ -1,4 +1,4 @@
-#ident "$Revision: 1.196 $"
+#ident "$Revision: 1.197 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1599,11 +1599,17 @@ xfs_stickytest(
 	xfs_inode_t	*ip,
 	cred_t		*cr)
 {
+	extern int	xpg4_sticky_dir;
+
         if ((dp->i_d.di_mode & ISVTX) &&
 	    cr->cr_uid != 0 &&
 	    cr->cr_uid != ip->i_d.di_uid &&
 	    cr->cr_uid != dp->i_d.di_uid) {
-                return xfs_iaccess(ip, IWRITE, cr);
+		if (xpg4_sticky_dir) {
+			return EACCES;
+		} else {
+			return xfs_iaccess(ip, IWRITE, cr);
+		}
         }
         return 0;
 }
