@@ -1936,6 +1936,7 @@ vfsops_t xfs_vfsops = {
 	xfs_vfsmount,
 	xfs_rootinit,
 	xfs_mntupdate,
+	fs_dounmount,
 	xfs_unmount,
 	xfs_root,
 	xfs_statvfs,
