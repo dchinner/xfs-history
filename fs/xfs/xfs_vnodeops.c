@@ -45,6 +45,7 @@
 #include <sys/file.h>
 #include <sys/mode.h>
 #include <sys/var.h>
+#include <sys/capability.h>
 #include <string.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -230,6 +231,11 @@ STATIC int	xfs_fcntl(vnode_t	*vp,
 			  off_t		offset,
 			  cred_t	*credp,
 			  rval_t	*rvalp);
+
+STATIC int	xfs_set_dmattrs (vnode_t	*vp,
+				 u_int		evmask,
+				 u_int		state);
+
 #endif	/* !SIM */
 
 STATIC void	xfs_inactive(vnode_t	*vp,
@@ -3970,12 +3976,59 @@ xfs_fcntl(vnode_t	*vp,
 		break;
 	    }
 
+	case F_FSSETDM: {
+		u_int	values [2];
+
+		if (copyin (arg, values, sizeof values)) {
+			error = XFS_ERROR (EFAULT);
+			break;
+		}
+		error = xfs_set_dmattrs (vp, values [0], values [1]);
+		break;
+	    }
+
 	default:
 		error = XFS_ERROR(EINVAL);
 		break;
 	}
 	return error;
 }
+
+int
+xfs_set_dmattrs (
+	vnode_t *vp,
+	u_int	evmask,
+	u_int	state)
+{
+        xfs_inode_t     *ip;
+	xfs_trans_t	*tp;
+	xfs_mount_t	*mp;
+	int		error;
+
+	if (!_CAP_ABLE (CAP_DEVICE_MGT))
+		return EPERM;
+
+        ip = XFS_VTOI (vp);
+	mp = ip->i_mount;
+	tp = xfs_trans_alloc (mp, 0);
+	error = xfs_trans_reserve (tp, 0, XFS_ICHANGE_LOG_RES (mp), 0, 0, 0);
+	if (error) {
+		xfs_trans_cancel (tp, 0);
+		return error;
+	}
+        xfs_ilock (ip, XFS_ILOCK_EXCL);
+        xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+
+	ip->i_d.di_dmevmask = evmask;
+	ip->i_d.di_dmstate  = state;
+
+	xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+	IHOLD (ip);
+	xfs_trans_commit (tp, 0);
+
+	return 0;
+}
+
 #endif	/* !SIM */
 
 /*
