@@ -107,7 +107,9 @@ xlog_bread(xlog_t	*log,
 	bp->b_bcount	= BBTOB(nbblks);
 	bp->b_edev	= log->l_dev;
 
+#ifndef SIM
 	bp_dcache_wbinval(bp);
+#endif
 	bdstrat(bmajor(bp->b_edev), bp);
 	iowait(bp);
 
@@ -2605,7 +2607,9 @@ xlog_do_recover(xlog_t	*log,
 	bp = xfs_getsb(log->l_mp, 0);
 	bp->b_flags &= ~B_DONE;
 	bp->b_flags |= B_READ;
+#ifndef SIM
 	bp_dcache_wbinval(bp);
+#endif
 	bdstrat(bmajor(bp->b_edev), bp);
 	if (error = iowait(bp)) {
 		ASSERT(0);
