@@ -44,7 +44,7 @@ extern void vfsinit(void);
 extern int  xfs_init(int fstype);
 extern void xfs_cleanup(void);
 
-#ifdef CONFIG_XFS_DMAPI
+#ifdef CONFIG_HAVE_XFS_DMAPI
 extern void dmapi_init(void);
 extern void dmapi_uninit(void);
 #else
@@ -801,7 +801,7 @@ linvfs_dmapi_mount(
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 	write_inode:		linvfs_write_inode,
-#ifdef CONFIG_XFS_DMAPI
+#ifdef CONFIG_HAVE_XFS_DMAPI
 	dmapi_mount_event:	linvfs_dmapi_mount,
 #endif
 	put_inode:		linvfs_put_inode,

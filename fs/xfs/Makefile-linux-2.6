@@ -48,7 +48,7 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 endif
 
 subdir-$(CONFIG_XFS_FS)		+= linux
-ifeq ($(CONFIG_XFS_DMAPI),y)
+ifeq ($(CONFIG_HAVE_XFS_DMAPI),y)
   subdir-$(CONFIG_XFS_FS)	+= dmapi
 endif
 
@@ -78,7 +78,7 @@ ifneq ($(CONFIG_XFS_GRIO),)
   obj-y				+= xfs_grio.o
 endif
 
-ifeq ($(CONFIG_XFS_DMAPI),)
+ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
   obj-y				+= xfsdmapistubs.o
 else
   obj-y				+= dmapi/dmapi.o xfs_dmapi.o

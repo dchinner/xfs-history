@@ -362,7 +362,7 @@ done:
 
 
 
-#ifdef CONFIG_XFS_DMAPI
+#ifdef CONFIG_HAVE_XFS_DMAPI
 int linvfs_dmapi_map_event(struct file *filp, struct vm_area_struct *vma,
 			   unsigned int wantflag)
 {
@@ -435,7 +435,7 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 		if(ret)
 			goto out;
 
-#ifdef	CONFIG_XFS_DMAPI	/* Temporary until dmapi is in main kernel */
+#ifdef	CONFIG_HAVE_XFS_DMAPI	/* Temporary until dmapi is in main kernel */
 		if( filp->f_op->dmapi_map_event )
 			ret = -filp->f_op->dmapi_map_event( filp, vma, 0 );
 #endif
@@ -479,7 +479,7 @@ struct file_operations linvfs_file_operations =
 	open:		linvfs_open,
 	release:	linvfs_release,
 	fsync:		linvfs_fsync,
-#ifdef	CONFIG_XFS_DMAPI	/* Temporary until dmapi is in main kernel */
+#ifdef	CONFIG_HAVE_XFS_DMAPI	/* Temporary until dmapi is in main kernel */
 	dmapi_map_event:	linvfs_dmapi_map_event,
 #endif
 };
