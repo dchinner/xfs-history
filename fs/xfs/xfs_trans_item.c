@@ -1,4 +1,4 @@
-#ident "$Revision: 1.16 $"
+#ident "$Revision: 1.17 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -407,11 +407,15 @@ xfs_trans_unlock_chunk(
 		}
 		lip = lidp->lid_item;
 		lip->li_desc = NULL;
+		/* XXXsup */
+		if (abort)
+			lip->li_flags |= XFS_LI_ABORTED;
 
-		if (abort) {
+		/* if (abort) {
 			IOP_ABORT(lip);
-		} else if (!(lidp->lid_flags & XFS_LID_SYNC_UNLOCK) ||
-			   freeing_chunk) {
+		} else */
+		if (!(lidp->lid_flags & XFS_LID_SYNC_UNLOCK) ||
+			   freeing_chunk || abort) {
 			IOP_UNLOCK(lip);
 		}
 
@@ -420,7 +424,8 @@ xfs_trans_unlock_chunk(
 		 * within this transaction and the caller is not
 		 * going to just free the entire thing regardless.
 		 */
-		if (!(freeing_chunk) && !(lidp->lid_flags & XFS_LID_DIRTY)) {
+		if (!(freeing_chunk) && 
+		    (!(lidp->lid_flags & XFS_LID_DIRTY) || abort)) {
 			XFS_LIC_RELSE(licp, i);
 			freed++;
 		}
