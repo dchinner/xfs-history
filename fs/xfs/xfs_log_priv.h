@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.42 $"
 
 #include <sys/cmn_err.h>
 
@@ -91,10 +91,10 @@ struct xfs_mount;
 
 #define BLK_AVG(blk1, blk2)	((blk1+blk2) >> 1)
 
-#define GRANT_LOCK(log)		splockspl((log)->l_grant_lock, splhi)
-#define GRANT_UNLOCK(log, s)	spunlockspl((log)->l_grant_lock, s)
-#define LOG_LOCK(log)		splockspl((log)->l_icloglock, splhi)
-#define LOG_UNLOCK(log, s)	spunlockspl((log)->l_icloglock, s)
+#define GRANT_LOCK(log)		mutex_spinlock(&(log)->l_grant_lock)
+#define GRANT_UNLOCK(log, s)	mutex_spinunlock(&(log)->l_grant_lock, s)
+#define LOG_LOCK(log)		mutex_spinlock(&(log)->l_icloglock)
+#define LOG_UNLOCK(log, s)	mutex_spinunlock(&(log)->l_icloglock, s)
 
 #ifdef _KERNEL
 #define xlog_panic(s)		{cmn_err(CE_PANIC, s); }
@@ -160,7 +160,7 @@ struct xfs_mount;
 typedef __uint32_t xlog_tid_t;
 
 typedef struct xlog_ticket {
-	sema_t		   t_sema;	 /* sleep on this semaphore	 :20 */
+	sv_t		   t_sema;	 /* sleep on this semaphore	 :20 */
 	struct xlog_ticket *t_next;	 /*			         : 4 */
 	struct xlog_ticket *t_prev;	 /*				 : 4 */
 	xlog_tid_t	   t_tid;	 /* transaction identifier	 : 4 */
@@ -218,7 +218,7 @@ typedef struct xlog_in_core {
 		char		  hic_sector[XLOG_HEADER_SIZE];
 	} ic_h;
 	char		       ic_data[XLOG_MAX_RECORD_BSIZE-XLOG_HEADER_SIZE];
-	sema_t			ic_forcesema;
+	sv_t			ic_forcesema;
 	struct xlog_in_core	*ic_next;
 	struct xlog_in_core	*ic_prev;
 	struct buf  		*ic_bp;
@@ -252,7 +252,7 @@ typedef struct log {
     xlog_ticket_t	*l_unmount_free;/* kmem_free these addresses */
     xlog_ticket_t	*l_tail;        /* free list of tickets */
     xlog_in_core_t	*l_iclog;       /* head log queue	*/
-    lock_t		l_icloglock;    /* grab to change iclog state */
+    mutex_t		l_icloglock;    /* grab to change iclog state */
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
     struct xfs_mount	*l_mp;	        /* mount point */
