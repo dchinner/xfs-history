@@ -1,4 +1,4 @@
-#ident "$Revision: 1.85 $"
+#ident "$Revision: 1.86 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -51,8 +51,8 @@ extern vnodeops_t xfs_vnodeops;
 /*
  * Inode hashing and hash bucket locking.
  */
-#define XFS_IHASH(mp,ino)	((mp)->m_ihash + \
-				 (ino & (__uint64_t)((mp)->m_ihashmask)))
+#define XFS_BUCKETS 256
+#define XFS_IHASH(mp,ino)	((mp)->m_ihash + (ino % XFS_BUCKETS))
 #define	XFS_IHLOCK(ih)		mp_mutex_lock(&(ih)->ih_lock, PINOD)
 #define	XFS_IHUNLOCK(ih)	mp_mutex_unlock(&(ih)->ih_lock)
 
@@ -67,24 +67,11 @@ void
 xfs_ihash_init(xfs_mount_t *mp)
 {
 	int	i;
-	ulong	hsize;	
-	extern int	ncsize;
 
-	/*
-	 * For now just use a fixed size hash table per file system.
-	 * This MUST be changed eventually so we don't waste so much
-	 * memory.
-	 */
-	if (ncsize < 5000) {
-		hsize = 512;
-	} else {
-		hsize = 1024;
-	}
-	mp->m_ihashmask = hsize - 1;
-	mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(hsize * sizeof(xfs_ihash_t),
-						 KM_SLEEP);
+	mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(XFS_BUCKETS
+			       * sizeof(xfs_ihash_t), KM_SLEEP);
 	ASSERT(mp->m_ihash != NULL);
-	for (i = 0; i < hsize; i++) {
+	for (i = 0; i < XFS_BUCKETS; i++) {
 		init_mutex(&(mp->m_ihash[i].ih_lock), MUTEX_DEFAULT,
 			   "xihash", i);
 	}
@@ -96,14 +83,12 @@ xfs_ihash_init(xfs_mount_t *mp)
 void
 xfs_ihash_free(xfs_mount_t *mp)
 {
-	int	hsize, i;
+	int	i;
 
-	hsize = mp->m_ihashmask + 1;
-	for (i = 0; i < hsize; i++)
+	for (i = 0; i < XFS_BUCKETS; i++)
 		mutex_destroy(&mp->m_ihash[i].ih_lock);
-	kmem_free(mp->m_ihash, hsize * sizeof(xfs_ihash_t));
+	kmem_free(mp->m_ihash, XFS_BUCKETS * sizeof(xfs_ihash_t));
 	mp->m_ihash = NULL;
-	mp->m_ihashmask = 0;
 }
 
 /*
