@@ -44,6 +44,14 @@ STATIC int	xfs_buf_item_bits(uint *, uint, uint);
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
 STATIC int	xfs_buf_item_next_bit(uint *, uint, uint);
 
+#ifdef XFSDEBUG
+STATIC void	xfs_buf_item_log_debug(xfs_buf_log_item_t *, uint, uint);
+STATIC void	xfs_buf_item_log_check(xfs_buf_log_item_t *);
+#else
+#define		xfs_buf_item_log_debug(x,y,z)
+#define 	xfs_buf_item_log_check(x)
+#endif
+
 /*
  * This returns the number of log iovecs needed to log the
  * given buf log item.
@@ -178,6 +186,11 @@ xfs_buf_item_format(xfs_buf_log_item_t	*bip,
 		}
 	}
 	bip->bli_format.blf_size = total_size;
+
+	/*
+	 * Check to make sure everything is consistent.
+	 */
+	xfs_buf_item_log_check(bip);
 }
 
 /*
@@ -398,6 +411,20 @@ xfs_buf_item_init(buf_t		*bp,
 	bip->bli_format.blf_len = BTOBB(bp->b_bcount);
 	bip->bli_format.blf_map_size = map_size;
 
+#ifdef XFSDEBUG
+	/*
+	 * Allocate the arrays for tracking what needs to be logged
+	 * and what our callers request to be logged.  bli_orig
+	 * holds a copy of the original, clean buffer for comparison
+	 * against, and bli_logged keeps a 1 byte flag per byte in
+	 * the buffer to indicate which bytes the callers have asked
+	 * to have logged.
+	 */
+	bip->bli_orig = (char *)kmem_alloc(bp->b_bcount, KM_SLEEP);
+	bcopy(bp->b_un.b_addr, bip->bli_orig, bp->b_bcount);
+	bip->bli_logged = (char *)kmem_zalloc(bp->b_bcount, KM_SLEEP);
+#endif
+
 	/*
 	 * Put the buf item into the list of items attached to the
 	 * buffer at the front.
@@ -493,7 +520,91 @@ xfs_buf_item_log(xfs_buf_log_item_t	*bip,
 		mask = (1 << end_bit) - 1;
 		*wordp |= mask;
 	}
+
+	xfs_buf_item_log_debug(bip, first, last);
 }
+
+#ifdef XFSDEBUG
+/*
+ * This function uses an alternate strategy for tracking the bytes
+ * that the user requests to be logged.  This can then be used
+ * in conjunction with the bli_orig array in the buf log item to
+ * catch bugs in our callers' code.
+ *
+ * We also double check the bits set in xfs_buf_item_log using a
+ * simple algorithm to check that every byte is accounted for.
+ */
+STATIC void
+xfs_buf_item_log_debug(xfs_buf_log_item_t	*bip,
+		       uint			first,
+		       uint			last)
+{
+	char	*logged;
+	uint	x;
+	uint	byte;
+	uint	nbytes;
+	uint	chunk_num;
+	uint	word_num;
+	uint	bit_num;
+	uint	bit_set;
+	uint	*wordp;
+	
+
+	ASSERT(bip->bli_logged != NULL);
+	logged = bip->bli_logged + first;	/* pointer arithmetic */
+	byte = first;
+	nbytes = last - first + 1;
+	for (x = 0; x < nbytes; x++) { 
+		*logged = 1;
+		chunk_num = byte >> XFS_BLI_SHIFT;
+		word_num = 0xdeadbeaf;
+		word_num = chunk_num >> BIT_TO_WORD_SHIFT;
+		bit_num = chunk_num & (NBWORD - 1);
+		wordp = &(bip->bli_format.blf_data_map[word_num]);
+		bit_set = *wordp & (1 << bit_num);
+		ASSERT(bit_set);
+		logged++;
+		byte++;
+	}
+}
+
+/*
+ * This function is called to verify that our caller's have logged
+ * all the bytes that they changed.
+ *
+ * It does this by comparing the original copy of the buffer stored in
+ * the buf log item's bli_orig array to the current copy of the buffer
+ * and ensuring that all bytes which miscompare are set in the bli_logged
+ * array of the buf log item.
+ */
+STATIC void
+xfs_buf_item_log_check(xfs_buf_log_item_t *bip)
+{
+	char	*logged;
+	char	*orig;
+	char	*buffer;
+	int	x;
+	buf_t	*bp;
+
+	ASSERT(bip->bli_orig != NULL);
+	ASSERT(bip->bli_logged != NULL);
+
+	bp = bip->bli_buf;
+	ASSERT(bp->b_bcount > 0);
+	ASSERT(bp->b_un.b_addr != NULL);
+	logged = bip->bli_logged;
+	orig = bip->bli_orig;
+	buffer = bp->b_un.b_addr;
+	for (x = 0; x < bp->b_bcount; x++) {
+		if (*orig != *buffer) {
+			ASSERT(*logged == 1);
+		}
+		orig++;
+		buffer++;
+		logged++;
+	}
+}
+#endif /* XFSDEBUG */
 
 /*
  * Count the number of bits set in the bitmap starting with bit
