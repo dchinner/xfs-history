@@ -616,6 +616,8 @@ xfs_write(
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 
+	xfs_check_frozen(mp, XFS_FREEZE_WRITE);
+
 	if (direct) {
 		if (((__psint_t)buf & (ip->i_sb->s_blocksize - 1)) ||
 		    (uiop->uio_offset & mp->m_blockmask) ||
@@ -2087,11 +2089,11 @@ xfs_is_read_only(xfs_mount_t *mp)
 {
 	if (is_read_only(mp->m_dev) || is_read_only(mp->m_logdev)) {
 		cmn_err(CE_NOTE,
-			"XFS: write access unavailable, cannot proceed.\n");
+			"XFS: write access unavailable, cannot proceed.");
 		return EROFS;
 	}
 	cmn_err(CE_NOTE,
-		"XFS: write access will be enabled during mount.\n");
+		"XFS: write access will be enabled during mount.");
 	XFS_MTOVFS(mp)->vfs_flag &= ~VFS_RDONLY;
 	return 0;
 }
@@ -2100,7 +2102,7 @@ int
 xfs_recover_read_only(xlog_t *log)
 {
 	cmn_err(CE_NOTE, "XFS: WARNING: "
-		"recovery required on readonly filesystem.\n");
+		"recovery required on readonly filesystem.");
 	return xfs_is_read_only(log->l_mp);
 }
 
@@ -2108,6 +2110,6 @@ int
 xfs_quotacheck_read_only(xfs_mount_t *mp)
 {
 	cmn_err(CE_NOTE, "XFS: WARNING: "
-		"quotacheck required on readonly filesystem.\n");
+		"quotacheck required on readonly filesystem.");
 	return xfs_is_read_only(mp);
 }
