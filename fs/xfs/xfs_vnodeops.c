@@ -2269,7 +2269,8 @@ start_over:
 	 * we can rely on either trans_commit or trans_cancel to unlock
 	 * them.  Note that we need to add a vnode reference to the
 	 * directories since trans_commit & trans_cancel will decrement
-	 * them when they unlock the inodes.
+	 * them when they unlock the inodes.  Also, we need to be careful
+	 * not to add an inode to the transaction more than once.
 	 */
         VN_HOLD (src_dir_vp);
         xfs_trans_ijoin (tp, src_dp, XFS_ILOCK_EXCL);
@@ -2277,9 +2278,15 @@ start_over:
                 VN_HOLD (target_dir_vp);
                 xfs_trans_ijoin (tp, target_dp, XFS_ILOCK_EXCL);
         }
-        xfs_trans_ijoin (tp, src_ip, XFS_ILOCK_EXCL);
-        if (target_ip && (target_ip != src_ip))
+	if ((src_ip != src_dp) && (src_ip != target_dp)) {
+		xfs_trans_ijoin (tp, src_ip, XFS_ILOCK_EXCL);
+	}
+        if (target_ip &&
+	    (target_ip != src_ip) &&
+	    (target_ip != src_dp) &&
+	    (target_ip != target_dp)) {
                 xfs_trans_ijoin (tp, target_ip, XFS_ILOCK_EXCL);
+	}
 
 
 
