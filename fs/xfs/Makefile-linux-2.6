@@ -6,8 +6,9 @@
 # unless it's something special (ie not a .c file).
 #
 
-CFLAGS := $(filter-out -Wall,$(CFLAGS))
-EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -I./linux -I./pseudo-inc -I. -D_KERNEL
+#CFLAGS := $(filter-out -Wall,$(CFLAGS))
+EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -Wno-parentheses \
+                -Wno-uninitialized -I./linux -I./pseudo-inc -I. -D_KERNEL
 
 O_TARGET := xfs.o
 
