@@ -186,7 +186,7 @@ typedef struct log {
 
 
 /* common routines */
-extern uint	xlog_find_oldest(dev_t log_dev, uint log_bbnum);
 extern daddr_t	xlog_find_head(xlog_t *log);
+extern daddr_t  xlog_print_find_oldest(xlog_t *log);
 
 #endif	/* _XFS_LOG_PRIV_H */
