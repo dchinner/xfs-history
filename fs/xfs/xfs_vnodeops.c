@@ -1949,7 +1949,6 @@ xfs_lookup(
 	int			error;
 	uint			lock_mode;
 	uint			lookup_flags;
-	uint			dir_unlocked;
 	vnode_t			*dir_vp;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
@@ -1967,8 +1966,7 @@ xfs_lookup(
 	if (lock_mode == XFS_ILOCK_SHARED) {
 		lookup_flags |= DLF_LOCK_SHARED;
 	}
-	error = xfs_dir_lookup_int(dir_bdp, lookup_flags, dentry,
-				  &e_inum, &ip, &dir_unlocked);
+	error = xfs_dir_lookup_int(dir_bdp, lookup_flags, dentry, &e_inum, &ip);
 	if (error) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return error;
@@ -1976,27 +1974,6 @@ xfs_lookup(
 
 	vp = XFS_ITOV(ip);
 
-	/* This extra access check was causing trouble on Linux nfs,
-	 * when nfs tried to lookup ".." for a directory without
-	 * execute permissions.	 In general, access checks happen
-	 * above this anyway, and whether a chmod sneaks in on the middle
-	 * of this thread shouldn't really matter.  If we see problems
-	 * because of this window, this code can be re-enabled.
-	 */
-#if 0
-	if (dir_unlocked) {
-		/*
-		 * If the directory had to be unlocked in the call,
-		 * then its permissions may have changed.  Make sure
-		 * that it is OK to give this inode back to the caller.
-		 */
-		if ((error = xfs_iaccess(dp, IEXEC, credp))) {
-			xfs_iunlock_map_shared(dp, lock_mode);
-			VN_RELE(vp);
-			return error;
-		}
-	}
-#endif
 	ITRACE(ip);
 
 	xfs_iunlock_map_shared(dp, lock_mode);
@@ -2036,8 +2013,6 @@ xfs_ctrunc_trace(
 }
 #endif /* XFS_RW_TRACE */
 
-STATIC void xfs_create_broken(xfs_mount_t *, xfs_inode_t *, xfs_ino_t, uint);
-
 #define XFS_CREATE_NEW_MAXTRIES 10000
 
 /*
@@ -2071,7 +2046,6 @@ xfs_create(
 	int			dm_event_sent = 0;
 	uint			cancel_flags;
 	int			committed;
-	uint			dir_unlocked;
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
@@ -2162,8 +2136,7 @@ xfs_create(
 	 * In the case where there is an entry, we'll get it later after
 	 * dropping our transaction.
 	 */
-	error = xfs_dir_lookup_int(dir_bdp, DLF_NODNLC, dentry,
-				   &e_inum, NULL, NULL);
+	error = xfs_dir_lookup_int(dir_bdp, 0, dentry, &e_inum, NULL);
 	if (error && (error != ENOENT)) {
 		goto error_return;
 	}
@@ -2271,18 +2244,15 @@ xfs_create(
 		 * the entry is removed, then just start over.
 		 */
 		error = xfs_dir_lookup_int(dir_bdp, DLF_IGET, dentry,
-					   &e_inum, &ip, &dir_unlocked);
+					   &e_inum, &ip);
 		if (error) {
 			if (error == ENOENT) {
 				if (++xfs_create_retries >
 					XFS_CREATE_NEW_MAXTRIES) {
-					xfs_create_broken(mp, dp,
-						e_inum_saved, dir_unlocked);
 					error = XFS_ERROR(EFSCORRUPTED);
 					goto error_return;
 				}
 
-				ASSERT(dir_unlocked);
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
 				goto try_again;
 			}
@@ -2518,30 +2488,6 @@ std_return:
 	goto std_return;
 }
 
-
-/*
- * xfs_create_broken is a trap routine to isolate the cause of a infinite
- *	loop condition reported in IRIX 6.4 by PV 522864. If no occurances
- *	of this error recur (that is, the trap code isn't hit), this routine
- *	should be removed in future releases.
- */
-/* ARGSUSED */
-STATIC void
-xfs_create_broken(
-	xfs_mount_t *mp,
-	xfs_inode_t *dp,
-	xfs_ino_t e_inum_saved,
-	uint dir_unlocked)
-{
-	cmn_err(CE_WARN,
-		"xfs_create looping, dir ino 0x%Lx, ino 0x%Lx, %s\n",
-		dp->i_ino, e_inum_saved, mp->m_fsname);
-#ifdef	DEBUG
-	BUG();
-#endif	/* DEBUG */
-}
-
-
 /*
  * xfs_get_dir_entry is used to get a reference to an inode given
  * its parent directory inode and the name of the file.	 It does
@@ -2551,10 +2497,8 @@ xfs_create_broken(
  */
 STATIC int
 xfs_get_dir_entry(
-	xfs_inode_t	*dp,
 	struct dentry	*dentry,
-	xfs_inode_t	**ipp,	/* inode of entry 'name' */
-	int		*dir_generationp)
+	xfs_inode_t	**ipp)	/* inode of entry 'name' */
 {
 	struct inode		*inode = dentry->d_inode;
 	vnode_t			*vp = LINVFS_GET_VP(inode);
@@ -2566,9 +2510,7 @@ xfs_get_dir_entry(
 		return XFS_ERROR(ENOENT);
 	}
 	VN_HOLD(vp);
-	*dir_generationp = dp->i_gen;
 	*ipp = XFS_BHVTOI(bdp);
-
 	return 0;
 }
 
@@ -2616,13 +2558,10 @@ xfs_lock_dir_and_entry(
 	xfs_inode_t	*dp,
 	struct dentry	*dentry,
 	xfs_inode_t	*ip,	/* inode of entry 'name' */
-	int		dir_generation,
 	int		*entry_changed)
 {
 	int			attempts;
 	xfs_ino_t		e_inum;
-	int			error;
-	int			new_dir_gen;
 	xfs_inode_t		*ips[2];
 	xfs_log_item_t		*lp;
 
@@ -2635,33 +2574,7 @@ again:
 	*entry_changed = 0;
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 
-	if (dp->i_gen != dir_generation) {
-		/*
-		 * The directory has changed somehow, so do the lookup
-		 * for the entry again.	 If it is changed we'll have to
-		 * give up and return to our caller.
-		 */
-		error = xfs_dir_lookup_int(XFS_ITOBHV(dp), DLF_NODNLC,
-				dentry, &e_inum, NULL, NULL);
-		if (error) {
-			xfs_iunlock(dp, XFS_ILOCK_EXCL);
-			return error;
-		}
-
-		/*
-		 * The entry with the given name has changed since the
-		 * call to xfs_get_dir_entry().	 Just return with
-		 * *entry_changed set to 1 so the caller can deal with it.
-		 */
-		ASSERT(e_inum != 0);
-		if (e_inum != ip->i_ino) {
-			xfs_iunlock(dp, XFS_ILOCK_EXCL);
-			*entry_changed = 1;
-			return 0;
-		}
-	} else {
-		e_inum = ip->i_ino;
-	}
+	e_inum = ip->i_ino;
 
 	ITRACE(ip);
 
@@ -2705,40 +2618,11 @@ again:
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 		}
 	} else if (e_inum < dp->i_ino) {
-		new_dir_gen = dp->i_gen;
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 		ips[0] = ip;
 		ips[1] = dp;
 		xfs_lock_inodes(ips, 2, 0, XFS_ILOCK_EXCL);
-
-		/*
-		 * Make sure that things are still consistent during
-		 * the period we dropped the directory lock.
-		 * Do a new lookup if directory was changed.
-		 */
-		if (dp->i_gen != new_dir_gen) {
-			/*
-			 * The directory has changed somehow, so do the
-			 * lookup for the entry again.	If it is changed
-			 * we'll have to give up and return to our caller.
-			 */
-			error = xfs_dir_lookup_int(XFS_ITOBHV(dp),
-				   DLF_NODNLC, dentry, &e_inum, NULL, NULL);
-
-			if (error) {
-				xfs_iunlock(dp, XFS_ILOCK_EXCL);
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				return error;
-			}
-
-			if (e_inum != ip->i_ino) {
-				xfs_iunlock(dp, XFS_ILOCK_EXCL);
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				*entry_changed = 1;
-				return 0;
-			}
-		}
 	}
 	/* else	 e_inum == dp->i_ino */
 	/*     This can happen if we're asked to lock /x/..
@@ -2899,7 +2783,6 @@ xfs_remove(
 	xfs_fsblock_t		first_block;
 	int			cancel_flags;
 	int			committed;
-	int			dir_generation;
 	int			entry_changed;
 	int			dm_di_mode = 0;
 	int			link_zero;
@@ -2944,7 +2827,7 @@ xfs_remove(
 	 * when we call xfs_iget.  Instead we get an unlocked referece
 	 * to the inode before getting our log reservation.
 	 */
-	error = xfs_get_dir_entry(dp, dentry, &ip, &dir_generation);
+	error = xfs_get_dir_entry(dentry, &ip);
 	if (error) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto std_return;
@@ -2996,8 +2879,7 @@ xfs_remove(
 		return error;
 	}
 
-	error = xfs_lock_dir_and_entry(dp, dentry, ip, dir_generation,
-				       &entry_changed);
+	error = xfs_lock_dir_and_entry(dp, dentry, ip, &entry_changed);
 	if (error) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		xfs_trans_cancel(tp, cancel_flags);
@@ -3301,8 +3183,7 @@ xfs_link(
 	 * Make sure that nothing with the given name exists in the
 	 * target directory.
 	 */
-	error = xfs_dir_lookup_int(target_dir_bdp, DLF_NODNLC,
-			dentry, &e_inum, NULL, NULL);
+	error = xfs_dir_lookup_int(target_dir_bdp, 0, dentry, &e_inum, NULL);
 	if (error != ENOENT) {
 		if (error == 0) {
 			error = XFS_ERROR(EEXIST);
@@ -3486,8 +3367,7 @@ xfs_mkdir(
 	 * Make sure that nothing with the given name exists in the
 	 * target directory.
 	 */
-	error = xfs_dir_lookup_int(dir_bdp, DLF_NODNLC, dentry,
-				   &e_inum, NULL, NULL);
+	error = xfs_dir_lookup_int(dir_bdp, 0, dentry, &e_inum, NULL);
 	if (error != ENOENT) {
 		if (error == 0)
 			error = XFS_ERROR(EEXIST);
@@ -3658,7 +3538,6 @@ xfs_rmdir(
 	xfs_fsblock_t		first_block;
 	int			cancel_flags;
 	int			committed;
-	int			dir_generation;
 	int			entry_changed;
 	vnode_t			*dir_vp;
 	int			dm_di_mode = 0;
@@ -3703,7 +3582,7 @@ xfs_rmdir(
 	 * when we call xfs_iget.  Instead we get an unlocked referece
 	 * to the inode before getting our log reservation.
 	 */
-	error = xfs_get_dir_entry(dp, dentry, &cdp, &dir_generation);
+	error = xfs_get_dir_entry(dentry, &cdp);
 	if (error) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto std_return;
@@ -3760,8 +3639,7 @@ xfs_rmdir(
 	 * that the directory entry for the child directory inode has
 	 * not changed while we were obtaining a log reservation.
 	 */
-	error = xfs_lock_dir_and_entry(dp, dentry, cdp, dir_generation,
-				       &entry_changed);
+	error = xfs_lock_dir_and_entry(dp, dentry, cdp, &entry_changed);
 	if (error) {
 		xfs_trans_cancel(tp, cancel_flags);
 		IRELE(cdp);
@@ -4105,8 +3983,7 @@ xfs_symlink(
 	 * Since we've already started a transaction, we cannot allow
 	 * the lookup to do a vn_get().
 	 */
-	error = xfs_dir_lookup_int(dir_bdp, DLF_NODNLC, dentry,
-				   &e_inum, NULL, NULL);
+	error = xfs_dir_lookup_int(dir_bdp, 0, dentry, &e_inum, NULL);
 	if (error != ENOENT) {
 		if (!error) {
 			error = XFS_ERROR(EEXIST);

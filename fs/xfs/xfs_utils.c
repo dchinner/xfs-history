@@ -49,17 +49,14 @@ xfs_dir_lookup_int(
 	int			flags,
 	struct dentry		*dentry,
 	xfs_ino_t		*inum,
-	xfs_inode_t		**ipp,
-	uint			*dir_unlocked)
+	xfs_inode_t		**ipp)
 {
 	vnode_t		*dir_vp;
 	xfs_inode_t	*dp;
-	xfs_ino_t	curr_inum;
 	char		*name = (char *) dentry->d_name.name;
 	int		name_len = dentry->d_name.len;
 	int		error;
 	int		do_iget;
-	uint		dir_gen;
 	uint		lock_mode;
 	bhv_desc_t	*bdp;
 
@@ -67,12 +64,7 @@ xfs_dir_lookup_int(
 	vn_trace_entry(dir_vp, "xfs_dir_lookup_int",
 		       (inst_t *)__return_address);
 	do_iget = flags & DLF_IGET;
-	ASSERT((flags & (DLF_IGET | DLF_NODNLC)) != (DLF_IGET | DLF_NODNLC));
 	error = 0;
-	ASSERT(!(flags & DLF_IGET) || (dir_unlocked != NULL));
-	if (dir_unlocked != NULL) {
-		*dir_unlocked = 0;
-	}
 
 	if (dentry->d_inode) {
 		vnode_t *vp = LINVFS_GET_VP(dentry->d_inode);
@@ -116,93 +108,28 @@ xfs_dir_lookup_int(
 
 	error = XFS_DIR_LOOKUP(dp->i_mount, NULL, dp, name, name_len, inum);
 	if (!error && do_iget) {
-		*dir_unlocked = 1;
-		for (;;) {
-			/*
-			 * Unlock the directory and save the directory's
-			 * generation count.  We do this because we can't
-			 * hold the directory lock while doing the vn_get()
-			 * in xfs_iget().  Doing so could cause us to hold
-			 * a lock while waiting for the inode to finish
-			 * being inactive while it's waiting for a log
-			 * reservation in the inactive routine.
-			 */
-			dir_gen = dp->i_gen;
-			xfs_iunlock(dp, lock_mode);
+		/*
+		 * Unlock the directory. We do this because we can't
+		 * hold the directory lock while doing the vn_get()
+		 * in xfs_iget().  Doing so could cause us to hold
+		 * a lock while waiting for the inode to finish
+		 * being inactive while it's waiting for a log
+		 * reservation in the inactive routine.
+		 */
+		xfs_iunlock(dp, lock_mode);
 
-			if (bdp) {
-				VN_RELE(BHV_TO_VNODE(bdp));
-				bdp = NULL;
-			}
+		if (bdp) {
+			VN_RELE(BHV_TO_VNODE(bdp));
+			bdp = NULL;
+		}
 
-			error = xfs_iget(dp->i_mount, NULL, *inum,
-					 0, ipp, 0);
+		error = xfs_iget(dp->i_mount, NULL, *inum, 0, ipp, 0);
 
-			xfs_ilock(dp, lock_mode);
+		xfs_ilock(dp, lock_mode);
 
-			if (error) {
-				*ipp = NULL;
-				return error;
-			}
-
-			/*
-			 * If something changed in the directory try again.
-			 * If we get an error just return the error.  That
-			 * includes the case where the file is removed
-			 * (ENOENT).  If the inode number has changed, then
-			 * drop the inode we have and get the latest one.
-			 * If the inode number is the same, then we just
-			 * go with it.	This includes the case where the
-			 * inode is freed and recreated under the same
-			 * name while we're doing the iget.  It is OK
-			 * to use the inode we already have in that case,
-			 * as there is only one copy of an inode in the
-			 * cache at a time (regardless of generation count)
-			 * and it just looks like the first lookup never
-			 * occurred.
-			 */
-			if (dp->i_gen != dir_gen) {
-				/*
-				 * If the directory was removed while
-				 * we left it unlocked then just get
-				 * out of here.
-				 */
-				if (dp->i_d.di_nlink == 0) {
-					xfs_iunlock(dp, lock_mode);
-					xfs_iput_new(*ipp, 0);
-					xfs_ilock(dp, lock_mode);
-					return XFS_ERROR(ENOENT);
-				}
-
-				error = XFS_DIR_LOOKUP(dp->i_mount, NULL, dp,
-						       name, name_len,
-						       &curr_inum);
-
-				if (error || (curr_inum != *inum)) {
-					xfs_iunlock(dp, lock_mode);
-					xfs_iput_new(*ipp, 0);
-					xfs_ilock(dp, lock_mode);
-					if (error) {
-						return error;
-					} else {
-						/*
-						 * Drop the directory
-						 * lock and do the iget
-						 * again.  Save the ino
-						 * that we found in *inum
-						 * for when we do the
-						 * check again.
-						 */
-						*inum = curr_inum;
-						continue;
-					}
-				}
-			}
-			/*
-			 * Everything is consistent, so just go with
-			 * what we've got.
-			 */
-			break;
+		if (error) {
+			*ipp = NULL;
+			return error;
 		}
 
 		if ((*ipp)->i_d.di_mode == 0) {
@@ -228,7 +155,6 @@ xfs_dir_lookup_int(
 		xfs_iunlock(dp, lock_mode);
 		VN_RELE(BHV_TO_VNODE(bdp));
 		xfs_ilock(dp, lock_mode);
-		if (dir_unlocked != NULL) *dir_unlocked = 1;
 	}
 	return error;
 }

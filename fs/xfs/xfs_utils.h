@@ -69,8 +69,7 @@ xfs_dir_lookup_int(
 	int			flags,
 	struct dentry		*dentry,
 	xfs_ino_t		*inum,
-	struct xfs_inode	**ipp,
-	uint			*dir_unlocked);
+	struct xfs_inode	**ipp);
 
 extern int
 xfs_truncate_file(
