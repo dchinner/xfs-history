@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.97 $"
+#ident	"$Revision: 1.100 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -139,6 +139,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	int		writeio_log;
 	vmap_t		vmap;
 	__uint64_t	ret64;
+	daddr_t		d;
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
@@ -290,8 +291,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	/*
 	 * Check that the data (and log if separate) are an ok size.
 	 */
-	bp = read_buf(mp->m_dev, XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks) - 1,
-		      1, 0);
+	d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks);
+	if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_dblocks) {
+		error = XFS_ERROR(E2BIG);
+		goto error1;
+	}
+	bp = read_buf(mp->m_dev, d - 1, 1, 0);
 	ASSERT(bp);
 	error = geterror(bp);
 	brelse(bp);
@@ -303,8 +308,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	}
 
 	if (mp->m_logdev && mp->m_logdev != mp->m_dev) {
-		bp = read_buf(mp->m_logdev,
-			XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks) - 1, 1, 0);
+		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
+		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
+			error = XFS_ERROR(E2BIG);
+			goto error1;
+		}
+		bp = read_buf(mp->m_logdev, d - 1, 1, 0);
 		ASSERT(bp);
 		error = geterror(bp);
 		brelse(bp);
@@ -326,8 +335,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		/*
 		 * Check that the realtime section is an ok size.
 		 */
-		bp = read_buf(mp->m_rtdev,
-			XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks) - 1, 1, 0);
+		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
+		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_rblocks) {
+			error = XFS_ERROR(E2BIG);
+			goto error1;
+		}
+		bp = read_buf(mp->m_rtdev, d - 1, 1, 0);
 		ASSERT(bp);
 		error = geterror(bp);
 		brelse(bp);
