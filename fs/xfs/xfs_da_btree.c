@@ -1494,8 +1494,9 @@ xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_args_t *args,
 
 	dp = args->dp;
 	error = xfs_bunmapi(trans, dp, dead_blkno, (xfs_filblks_t)length,
-				   args->whichfork|XFS_BMAPI_METADATA, 1,
-				   args->firstblock, args->flist, &done);
+				   XFS_BMAPI_AFLAG(args->whichfork) |
+				   XFS_BMAPI_METADATA,
+				   1, args->firstblock, args->flist, &done);
 	if (error) {
 		return(error);
 	}
