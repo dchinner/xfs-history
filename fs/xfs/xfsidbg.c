@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision: 1.89 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3152,6 +3152,25 @@ xfsidbg_xinodes(xfs_mount_t *mp)
 	qprintf("\nEnd of Inodes\n");
 }
 
+static char *
+xfsidbg_get_cstate(int state)
+{
+	switch(state) {
+	case  XLOG_STATE_COVER_IDLE:
+		return("idle");
+	case  XLOG_STATE_COVER_NEED:
+		return("need");
+	case  XLOG_STATE_COVER_DONE:
+		return("done");
+	case  XLOG_STATE_COVER_NEED2:
+		return("need2");
+	case  XLOG_STATE_COVER_DONE2:
+		return("done2");
+	default:
+		return("unknown");
+	}
+}
+
 /*
  * Print out an XFS log structure.
  */
@@ -3175,12 +3194,12 @@ xfsidbg_xlog(xlog_t *log)
 		log->l_freelist, log->l_tail, log->l_iclog);
 	qprintf("&icloglock: 0x%x  tail_lsn: 0x%llx  last_sync_lsn: 0x%llx \n",
 		&log->l_icloglock, log->l_tail_lsn, log->l_last_sync_lsn);
-	qprintf("mp: 0x%x  xbuf: 0x%x  roundoff: %d  ",
-		log->l_mp, log->l_xbuf, log->l_roundoff);
+	qprintf("mp: 0x%x  xbuf: 0x%x  roundoff: %d  l_covered_state: %s \n",
+		log->l_mp, log->l_xbuf, log->l_roundoff,
+			xfsidbg_get_cstate(log->l_covered_state));
 	qprintf("flags: ");
 	printflags(log->l_flags, t_flags,"log");
-	qprintf("\n");
-	qprintf("dev: 0x%x  logBBstart: %d  logsize: %d  logBBsize: %d\n",
+	qprintf("  dev: 0x%x logBBstart: %d logsize: %d logBBsize: %d\n",
 		log->l_dev, log->l_logBBstart, log->l_logsize,log->l_logBBsize);
      qprintf("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
 	     log->l_curr_cycle, log->l_prev_cycle, log->l_curr_block,
