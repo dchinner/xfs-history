@@ -41,9 +41,7 @@ ifeq ($(CONFIG_XFS_TRACE),y)
 endif
 
 O_TARGET			:= xfs_quota.o
-ifneq ($(MAKECMDGOALS),modules_install)
-  obj-m				:= $(O_TARGET)
-endif
+obj-m				:= $(O_TARGET)
 
 obj-$(CONFIG_PROC_FS)		+= xfs_qm_stats.o
 

@@ -129,20 +129,22 @@ obj-y				+= linux-2.4/linux_xfs.o \
 				   support/support_xfs.o
 
 subdir-$(CONFIG_XFS_FS)		+= linux-2.4 support
+subdir-$(CONFIG_XFS_DMAPI)	+= dmapi
+subdir-$(CONFIG_XFS_QUOTA)	+= quota
 
-ifeq ($(CONFIG_XFS_DMAPI),y)
-  subdir-$(CONFIG_XFS_FS)	+= dmapi
+ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_DMAPI),yy)
   obj-y				+= dmapi/xfs_dmapi.o
 else
   obj-y				+= xfs_dmops.o
 endif
 
-ifeq ($(CONFIG_XFS_QUOTA),y)
-  subdir-$(CONFIG_XFS_FS)	+= quota
+ifeq ($(CONFIG_XFS_FS)$(CONFIG_XFS_QUOTA),yy)
   obj-y				+= quota/xfs_quota.o
 else
   obj-y				+= xfs_qmops.o
 endif
+
+export-objs			:= xfs_macros.o xfs_acl.o
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to
@@ -164,4 +166,4 @@ include $(TOPDIR)/Rules.make
 # This is really nasty, but Rules.make was never designed for multi directory
 # modules.  Keith Owens.
 
-xfs.o: $(patsubst %,_modsubdir_%,$(subdir-m))
+xfs.o: $(patsubst %,_modsubdir_%,$(filter linux-2.4 support,$(subdir-m)))
