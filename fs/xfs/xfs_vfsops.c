@@ -1582,10 +1582,8 @@ xfs_vget(
 	xfs_ino_t	ino;
 	unsigned int	igen;
 	xfs_mount_t	*mp;
-	struct inode	*inode = NULL;
 
 	xfid  = (struct xfs_fid *)fidp;
-
 	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
 		ino  = xfid->xfs_fid_ino;
 		igen = xfid->xfs_fid_gen;
@@ -1615,9 +1613,7 @@ xfs_vget(
 	}
 
 	*vpp = XFS_ITOV(ip);
-	inode = LINVFS_GET_IP((*vpp));
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
 	return 0;
 }
 
