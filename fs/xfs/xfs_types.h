@@ -19,6 +19,9 @@ typedef	__uint32_t	xfs_extlen_t;	/* extent length in blocks */
 typedef	__uint32_t	xfs_agnumber_t;	/* allocation group number */
 typedef __int64_t	xfs_extnum_t;	/* # of extents in a file */
 
+typedef	__int64_t	xfs_lsn_t;	/* log sequence number */
+typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
+
 #define	NULLFSBLOCK	((xfs_fsblock_t)-1)
 #define	NULLAGBLOCK	((xfs_agblock_t)-1)
 #define	NULLAGNUMBER	((xfs_agnumber_t)-1)
