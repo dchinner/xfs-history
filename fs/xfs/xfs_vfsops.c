@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.57 $"
+#ident  "$Revision: 1.58 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -1239,6 +1239,9 @@ xfs_sync(vfs_t		*vfsp,
 			last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
 			last_byte = XFS_FSB_TO_B(mp, last_byte);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+			if (VN_MAPPED(vp)) {
+				remapf(vp, 0, 1);
+			}
 			pflushinvalvp(vp, 0, last_byte);
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 

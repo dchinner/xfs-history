@@ -989,10 +989,18 @@ xfs_fsync(vnode_t	*vp,
 	last_byte = XFS_FSB_TO_B(mp, last_byte);
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_flags & XFS_IEXTENTS && ip->i_bytes > 0) {
+			if (VN_MAPPED(vp)) {
+				remapf(vp, 0, 1);
+			}
 			pflushinvalvp(vp, 0, last_byte);
 		}
 		ASSERT((vp->v_pgcnt == 0) && (vp->v_buf == 0));
 	} else {
+		/*
+		 * In the non-invalidating case calls to fsync() do not
+		 * flush all the dirty mmap'd pages.  That requires a
+		 * call to msync().
+		 */
 		pflushvp(vp, last_byte, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
 	}
 	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
@@ -1013,9 +1021,7 @@ xfs_fsync(vnode_t	*vp,
  *
  * This is called when the vnode reference count for the vnode
  * goes to zero.  If the file has been unlinked, then it must
- * now be truncated.  When we truncate the file we must also
- * call remapf() to invalidate any memory mappings to the file.
- * Also, we clear all of the read-ahead state
+ * now be truncated.  Also, we clear all of the read-ahead state
  * kept for the inode here since the file is now closed.
  */
 STATIC void
@@ -1199,15 +1205,6 @@ xfs_inactive(vnode_t	*vp,
 	 * be looking at this stuff.
 	 */
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
-
-	/*
-	 * Blow away any now stale mappings to the file.
-	 */
-#ifndef SIM
-	if (truncate && VN_MAPPED(vp)) {
-		remapf(vp, 0, 0);
-	}
-#endif
 
 	return;
 }
@@ -1847,9 +1844,6 @@ try_again:
                         return XFS_ERROR(ENOSYS);
                 vp = newvp;
         }
-
-	if (truncated && vp->v_type == VREG && VN_MAPPED(vp))
-                remapf(vp, 0, 0);
 
         *vpp = vp;
 
@@ -4103,6 +4097,10 @@ xfs_reclaim(vnode_t	*vp,
 		 * out while holding the proper lock.  We can't hold
 		 * the inode lock here since flushing out buffers may
 		 * cause us to try to get the lock in xfs_strategy().
+		 *
+		 * We don't have to call remapf() here, because there
+		 * cannot be any mapped file references to this vnode
+		 * since it is being reclaimed.
 		 */
 		last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
 		last_byte = XFS_FSB_TO_B(mp, last_byte);
