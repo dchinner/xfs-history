@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision$"
 
 /*
  * xfs_dir_leaf.h
@@ -22,6 +22,7 @@ struct xfs_bmap_free;
 struct xfs_da_args;
 struct xfs_da_state;
 struct xfs_da_state_blk;
+struct xfs_dir_put_args;
 struct xfs_inode;
 struct xfs_mount;
 struct xfs_trans;
@@ -68,7 +69,7 @@ typedef struct xfs_dir_leafblock {
 		} freemap[XFS_DIR_LEAF_MAPSIZE]; /* N largest free regions */
 	} hdr;
 	struct xfs_dir_leaf_entry {	/* sorted on key, not name */
-		__uint32_t hashval;	/* hash value of name */
+		xfs_dahash_t hashval;	/* hash value of name */
 		__uint16_t nameidx;	/* index into buffer of name */
 		__uint8_t namelen;	/* length of name string */
 		__uint8_t pad2;
@@ -82,6 +83,50 @@ typedef struct xfs_dir_leaf_hdr xfs_dir_leaf_hdr_t;
 typedef struct xfs_dir_leaf_map xfs_dir_leaf_map_t;
 typedef struct xfs_dir_leaf_entry xfs_dir_leaf_entry_t;
 typedef struct xfs_dir_leaf_name xfs_dir_leaf_name_t;
+
+typedef int (*xfs_dir_put_t)(struct xfs_dir_put_args *pa);
+
+typedef union {
+	off_t		o;		/* offset (cookie) */
+	/*
+	 * Watch the order here (endian-ness dependent).
+	 */
+	struct {
+		__uint32_t	be;	/* block and entry */
+		xfs_dahash_t	h;	/* hash value */
+	} s;
+} xfs_dircook_t;
+
+#define	XFS_PUT_COOKIE(c,mp,bno,entry,hash)	\
+	((c).s.be = XFS_DA_MAKE_BNOENTRY(mp, bno, entry), (c).s.h = (hash))
+
+#define	XFS_DI_LO(di)	\
+	(((di).i[4] << 24) | ((di).i[5] << 16) | ((di).i[6] << 8) | ((di).i[7]))
+/*
+ * Upper 8 bits of an inode number are always 0, see XFS_MAXINUMBER.
+ */
+#define	XFS_DI_HI(di)	\
+	(((di).i[1] << 16) | ((di).i[2] << 8) | ((di).i[3]))
+
+#if XFS_BIG_FILESYSTEMS
+#define	XFS_GET_DIR_INO(mp,di) \
+	(XFS_DI_LO(di) | ((xfs_intino_t)XFS_DI_HI(di) << 32))
+#else
+#define	XFS_GET_DIR_INO(mp,di) XFS_DI_LO(di)
+#endif
+
+typedef struct xfs_dir_put_args
+{
+	xfs_dircook_t	cook;		/* cookie of (next) entry */
+	xfs_intino_t	ino;		/* inode number */
+	struct dirent	*dbp;		/* buffer pointer */
+	char		*name;		/* directory entry name */
+	int		namelen;	/* length of name */
+	int		done;		/* output: set if value was stored */
+	xfs_dir_put_t	put;		/* put function ptr (i/o) */
+	xfs_dir_put_t	*putp;		/* ptr to put (original copy) */
+	struct uio	*uio;		/* uio control structure */
+} xfs_dir_put_args_t;
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_LEAF_ENTSIZE_BYNAME)
 int xfs_dir_leaf_entsize_byname(int len);
@@ -126,7 +171,8 @@ int xfs_dir_shortform_removename(struct xfs_trans *trans,
 					struct xfs_da_args *remove);
 int xfs_dir_shortform_getdents(struct xfs_trans *trans, struct xfs_inode *dp,
 					   struct uio *uio, int *eofp,
-					   struct dirent *dbp);
+					   struct dirent *dbp,
+					   xfs_dir_put_t *put);
 int xfs_dir_shortform_replace(struct xfs_trans *trans,
 					struct xfs_da_args *args);
 #endif	/* !SIM */
@@ -144,7 +190,7 @@ int xfs_dir_leaf_to_shortform(struct xfs_trans *trans,
  * Routines used for growing the Btree.
  */
 int	xfs_dir_leaf_create(struct xfs_trans *trans, struct xfs_inode *dp,
-					xfs_fileoff_t which_block,
+					xfs_dablk_t which_block,
 					struct buf **bpp);
 int	xfs_dir_leaf_split(struct xfs_da_state *state,
 					  struct xfs_da_state_blk *oldblk,
@@ -153,14 +199,16 @@ int	xfs_dir_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
 				     struct xfs_da_args *args,
 				     int insertion_index);
 int	xfs_dir_leaf_addname(struct xfs_trans *trans, struct xfs_da_args *args);
-int	xfs_dir_leaf_lookup_int(struct buf *leaf_buffer, struct xfs_da_args *args,
-				      int *index_found_at);
+int	xfs_dir_leaf_lookup_int(struct buf *leaf_buffer,
+				       struct xfs_da_args *args,
+				       int *index_found_at);
 #ifndef SIM
 int	xfs_dir_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 					int index_to_remove);
 int	xfs_dir_leaf_getdents_int(struct buf *bp, struct xfs_inode *dp,
-					__uint32_t bno, struct uio *uio,
-					int *eobp, struct dirent *dbp);
+					xfs_dablk_t bno, struct uio *uio,
+					int *eobp, struct dirent *dbp,
+					xfs_dir_put_t *put, daddr_t nextda);
 
 /*
  * Routines used for shrinking the Btree.
@@ -176,7 +224,16 @@ void	xfs_dir_leaf_unbalance(struct xfs_da_state *state,
  */
 uint	xfs_dir_leaf_lasthash(struct buf *bp, int *count);
 int	xfs_dir_leaf_order(struct buf *leaf1_bp, struct buf *leaf2_bp);
-int	xfs_dir_put_dirent(struct xfs_mount *mp, struct dirent *dbp,
-				xfs_ino_t ino, char *name, int namelen,
-				off_t doff, struct uio *uio, int *done);
+int	xfs_dir_put_dirent32_first(xfs_dir_put_args_t *pa);
+int	xfs_dir_put_dirent32_rest(xfs_dir_put_args_t *pa);
+int	xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa);
+int	xfs_dir_put_dirent64_first(xfs_dir_put_args_t *pa);
+int	xfs_dir_put_dirent64_rest(xfs_dir_put_args_t *pa);
+int	xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa);
+
+/*
+ * Global data.
+ */
+extern xfs_dahash_t	xfs_dir_hash_dot, xfs_dir_hash_dotdot;
+
 #endif /* !FS_XFS_DIR_LEAF_H */

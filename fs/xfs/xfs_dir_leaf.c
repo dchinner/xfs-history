@@ -119,7 +119,7 @@ xfs_dir_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_ino_t parent)
 	ASSERT(dp->i_df.if_bytes == 0);
 	xfs_idata_realloc(dp, sizeof(*hdr), XFS_DATA_FORK);
 	hdr = (xfs_dir_sf_hdr_t *)dp->i_df.if_u1.if_data;
-	bcopy((char *)&parent, hdr->parent, sizeof(xfs_ino_t));
+	hdr->parent = *(xfs_dir_ino_t *)&parent;
 	hdr->count = 0;
 	dp->i_d.di_size = sizeof(*hdr);
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE | XFS_ILOG_DDATA);
@@ -143,11 +143,10 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, xfs_da_args_t *args)
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
-		if (sfe->namelen == args->namelen) {
-			if (bcmp(args->name, sfe->name, args->namelen) == 0) {
-				return(XFS_ERROR(EEXIST));
-			}
-		}
+		if (sfe->namelen == args->namelen &&
+		    args->name[0] == sfe->name[0] &&
+		    bcmp(args->name, sfe->name, args->namelen) == 0)
+			return(XFS_ERROR(EEXIST));
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 
@@ -157,7 +156,7 @@ xfs_dir_shortform_addname(xfs_trans_t *trans, xfs_da_args_t *args)
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	sfe = (xfs_dir_sf_entry_t *)((char *)sf + offset);
 
-	bcopy((char *)&args->inumber, sfe->inumber, sizeof(xfs_ino_t));
+	sfe->inumber = *(xfs_dir_ino_t *)&args->inumber;
 	sfe->namelen = args->namelen;
 	bcopy(args->name, sfe->name, sfe->namelen);
 	sf->hdr.count++;
@@ -187,11 +186,10 @@ xfs_dir_shortform_removename(xfs_trans_t *trans, xfs_da_args_t *args)
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
 		size = XFS_DIR_SF_ENTSIZE_BYENTRY(sfe);
-		if (sfe->namelen == args->namelen) {
-			if (bcmp(sfe->name, args->name, args->namelen) == 0) {
-				break;
-			}
-		}
+		if (sfe->namelen == args->namelen &&
+		    sfe->name[0] == args->name[0] &&
+		    bcmp(sfe->name, args->name, args->namelen) == 0)
+			break;
 		base += size;
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
@@ -229,7 +227,7 @@ xfs_dir_shortform_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
-		bcopy(sf->hdr.parent, (char *)&args->inumber, sizeof(xfs_ino_t));
+		*(xfs_dir_ino_t *)&args->inumber = sf->hdr.parent;
 		return(XFS_ERROR(EEXIST));
 	}
 	if (args->namelen == 1 && args->name[0] == '.') {
@@ -238,12 +236,11 @@ xfs_dir_shortform_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 	}
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
-		if (sfe->namelen == args->namelen) {
-			if (bcmp(args->name, sfe->name, args->namelen) == 0) {
-				bcopy(sfe->inumber, (char *)&args->inumber,
-						    sizeof(xfs_ino_t));
-				return(XFS_ERROR(EEXIST));
-			}
+		if (sfe->namelen == args->namelen &&
+		    sfe->name[0] == args->name[0] &&
+		    bcmp(args->name, sfe->name, args->namelen) == 0) {
+			*(xfs_dir_ino_t *)&args->inumber = sfe->inumber;
+			return(XFS_ERROR(EEXIST));
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
@@ -263,7 +260,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 	xfs_ino_t inumber;
 	char *tmpbuffer;
 	int retval, i, size;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	buf_t *bp;
 
 	dp = iargs->dp;
@@ -274,7 +271,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 	bcopy(dp->i_df.if_u1.if_data, tmpbuffer, size);
 
 	sf = (xfs_dir_shortform_t *)tmpbuffer;
-	bcopy(sf->hdr.parent, (char *)&inumber, sizeof(xfs_ino_t));
+	*(xfs_dir_ino_t *)&inumber = sf->hdr.parent;
 
 	xfs_idata_realloc(dp, -size, XFS_DATA_FORK);
 	dp->i_d.di_size = 0;
@@ -293,7 +290,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 
 	args.name = ".";
 	args.namelen = 1;
-	args.hashval = xfs_da_hashname(".", 1);
+	args.hashval = xfs_dir_hash_dot;
 	args.inumber = dp->i_ino;
 	args.dp = dp;
 	args.firstblock = iargs->firstblock;
@@ -306,7 +303,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 
 	args.name = "..";
 	args.namelen = 2;
-	args.hashval = xfs_da_hashname("..", 2);
+	args.hashval = xfs_dir_hash_dotdot;
 	args.inumber = inumber;
 	retval = xfs_dir_leaf_addname(trans, &args);
 	if (retval)
@@ -318,7 +315,7 @@ xfs_dir_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 		args.namelen = sfe->namelen;
 		args.hashval = xfs_da_hashname((char *)(sfe->name),
 					       sfe->namelen);
-		bcopy(sfe->inumber, (char *)&args.inumber, sizeof(xfs_ino_t));
+		*(xfs_dir_ino_t *)&args.inumber = sfe->inumber;
 		retval = xfs_dir_leaf_addname(trans, &args);
 		if (retval)
 			goto out;
@@ -338,15 +335,15 @@ out:
 /*ARGSUSED*/
 int
 xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-				       int *eofp, dirent_t *dbp)
+				       int *eofp, dirent_t *dbp,
+				       xfs_dir_put_t *putp)
 {
 	xfs_dir_shortform_t *sf;
 	xfs_dir_sf_entry_t *sfe, *nextsfe;
-	int retval, done, first, i;
+	int retval, first, i;
 	xfs_mount_t *mp;
-	xfs_ino_t ino;
-	__uint32_t cookhash, hash;
-	off_t nextcook;
+	xfs_dahash_t cookhash, hash;
+	xfs_dir_put_args_t p;
 
 	mp = dp->i_mount;
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
@@ -354,40 +351,52 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 
 	xfs_dir_trace_g_du("sf: start", dp, uio);
 
+	p.dbp = dbp;
+	p.put = *putp;
+	p.putp = putp;
+	p.uio = uio;
+
 	/*
 	 * Special case fakery for first 2 entries: "." and ".."
 	 */
 	first = (uio->uio_offset == 0);
-	if (first || (cookhash == xfs_da_hashname(".", 1))) {
-		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0,
-						  xfs_da_hashname("..", 2));
-		retval = xfs_dir_put_dirent(mp, dbp, dp->i_ino, ".", 1,
-						nextcook, uio, &done);
-		if (!done) {
-			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0,
-						  xfs_da_hashname(".", 1));
+	if (first || (cookhash == xfs_dir_hash_dot)) {
+		XFS_PUT_COOKIE(p.cook, mp, 0, 0, xfs_dir_hash_dotdot);
+#if XFS_BIG_FILESYSTEMS
+		p.ino = dp->i_ino + mp->m_inoadd;
+#else
+		p.ino = dp->i_ino;
+#endif
+		p.name = ".";
+		p.namelen = 1;
+		retval = p.put(&p);
+		if (!p.done) {
+			uio->uio_offset =
+				XFS_DA_MAKE_COOKIE(mp, 0, 0, xfs_dir_hash_dot);
 			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
 			return(retval);
 		}
 		xfs_dir_trace_g_du("sf: added \".\"", dp, uio);
 	}
-	if (first || (cookhash == xfs_da_hashname("..", 2))) {
-		bcopy(sf->hdr.parent, (char *)&ino, sizeof(ino));
+	if (first || (cookhash == xfs_dir_hash_dotdot)) {
+		p.ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
 		if (sf->hdr.count > 0) {
 			sfe = &sf->list[0];
-			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0,
-					      xfs_da_hashname((char *)sfe->name,
-							      sfe->namelen));
+			XFS_PUT_COOKIE(p.cook, mp, 0, 0,
+				xfs_da_hashname((char *)sfe->name,
+						sfe->namelen));
 		} else {
-			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
 			xfs_dir_trace_g_duc("sf: last cookie  ",
-						 dp, uio, nextcook);
+						 dp, uio, p.cook.o);
 		}
-		retval = xfs_dir_put_dirent(mp, dbp, ino, "..", 2, nextcook,
-						uio, &done);
-		if (!done) {
-			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0,
-						  xfs_da_hashname("..", 2));
+		p.name = "..";
+		p.namelen = 2;
+		retval = p.put(&p);
+		if (!p.done) {
+			uio->uio_offset =
+				XFS_DA_MAKE_COOKIE(mp, 0, 0,
+						   xfs_dir_hash_dotdot);
 			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
 			return(retval);
 		}
@@ -430,22 +439,23 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
 			return XFS_ERROR(EDIRCORRUPTED);
 		}
-		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
+		p.ino = XFS_GET_DIR_INO(mp, sfe->inumber);
 		if (i < sf->hdr.count-1) {
 			nextsfe = XFS_DIR_SF_NEXTENTRY(sfe);
 			hash = xfs_da_hashname((char *)nextsfe->name,
 					       nextsfe->namelen);
-			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, hash);
+			XFS_PUT_COOKIE(p.cook, mp, 0, 0, hash);
 			xfs_dir_trace_g_duc("SF: middle cookie",
-						 dp, uio, nextcook);
+						 dp, uio, p.cook.o);
 		} else {
-			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
 			xfs_dir_trace_g_duc("sf: last cookie  ",
-						 dp, uio, nextcook);
+						 dp, uio, p.cook.o);
 		}
-		retval = xfs_dir_put_dirent(mp, dbp, ino, (char *)(sfe->name), 
-					    sfe->namelen, nextcook, uio, &done);
-		if (!done) {
+		p.name = (char *)sfe->name;
+		p.namelen = sfe->namelen;
+		retval = p.put(&p);
+		if (!p.done) {
 			hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
 			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0, hash);
 			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
@@ -453,7 +463,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
-	uio->uio_offset = nextcook;
+	uio->uio_offset = p.cook.o;
 	*eofp = 1;
 	xfs_dir_trace_g_du("sf: E-O-F", dp, uio);
 	return(0);
@@ -475,25 +485,23 @@ xfs_dir_shortform_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
 	if (args->namelen == 2 &&
 	    args->name[0] == '.' && args->name[1] == '.') {
-		ASSERT(bcmp((char *)&args->inumber, sf->hdr.parent,
+		ASSERT(bcmp((char *)&args->inumber, (char *)&sf->hdr.parent,
 			sizeof(xfs_ino_t)));
-		bcopy((char *)&args->inumber, sf->hdr.parent,
-			sizeof(xfs_ino_t));
+		sf->hdr.parent = *(xfs_dir_ino_t *)&args->inumber;
 		xfs_trans_log_inode(trans, dp, XFS_ILOG_DDATA);
 		return(0);
 	}
 	ASSERT(args->namelen != 1 || args->name[0] != '.');
 	sfe = &sf->list[0];
 	for (i = sf->hdr.count-1; i >= 0; i--) {
-		if (sfe->namelen == args->namelen) {
-			if (bcmp(args->name, sfe->name, args->namelen) == 0) {
-				ASSERT(bcmp((char *)&args->inumber,
-					sfe->inumber, sizeof(xfs_ino_t)));
-				bcopy((char *)&args->inumber, sfe->inumber,
-					sizeof(xfs_ino_t));
-				xfs_trans_log_inode(trans, dp, XFS_ILOG_DDATA);
-				return(0);
-			}
+		if (sfe->namelen == args->namelen &&
+		    sfe->name[0] == args->name[0] &&
+		    bcmp(args->name, sfe->name, args->namelen) == 0) {
+			ASSERT(bcmp((char *)&args->inumber,
+				(char *)&sfe->inumber, sizeof(xfs_ino_t)));
+			sfe->inumber = *(xfs_dir_ino_t *)&args->inumber;
+			xfs_trans_log_inode(trans, dp, XFS_ILOG_DDATA);
+			return(0);
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
@@ -540,8 +548,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_args_t *iargs)
 		if ((entry->namelen == 2) &&
 		    (namest->name[0] == '.') &&
 		    (namest->name[1] == '.')) {
-			bcopy(namest->inumber, (char *)&parent,
-					       sizeof(xfs_ino_t));
+			*(xfs_dir_ino_t *)&parent = namest->inumber;
 			entry->nameidx = 0;
 		} else if ((entry->namelen == 1) && (namest->name[0] == '.')) {
 			entry->nameidx = 0;
@@ -570,7 +577,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, xfs_da_args_t *iargs)
 		args.name = (char *)(namest->name);
 		args.namelen = entry->namelen;
 		args.hashval = entry->hashval;
-		bcopy(namest->inumber, (char *)&args.inumber, sizeof(xfs_ino_t));
+		*(xfs_dir_ino_t *)&args.inumber = namest->inumber;
 		xfs_dir_shortform_addname(trans, &args);
 	}
 
@@ -590,7 +597,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_da_intnode_t *node;
 	xfs_inode_t *dp;
 	buf_t *bp1, *bp2;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	int retval;
 
 	dp = args->dp;
@@ -636,7 +643,7 @@ xfs_dir_leaf_to_node(xfs_trans_t *trans, xfs_da_args_t *args)
  * or a leaf in a node directory.
  */
 int
-xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t blkno,
+xfs_dir_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t blkno,
 				buf_t **bpp)
 {
 	xfs_dir_leafblock_t *leaf;
@@ -671,7 +678,7 @@ int
 xfs_dir_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 				  xfs_da_state_blk_t *newblk)
 {
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	int error;
 
 	/*
@@ -837,7 +844,7 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp, xfs_da_args_t *args,
 	 * Copy the string and inode number into the new space.
 	 */
 	namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-	bcopy((char *)&args->inumber, namest->inumber, sizeof(xfs_ino_t));
+	namest->inumber = *(xfs_dir_ino_t *)&args->inumber;
 	bcopy(args->name, namest->name, args->namelen);
 	xfs_trans_log_buf(trans, bp,
 	    XFS_DA_LOGRANGE(leaf, namest, XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry)));
@@ -1140,7 +1147,7 @@ xfs_dir_leaf_toosmall(xfs_da_state_t *state, int *action)
 	xfs_da_state_blk_t *blk;
 	xfs_da_blkinfo_t *info;
 	int count, bytes, forward, error, retval, i;
-	xfs_fileoff_t blkno;
+	xfs_dablk_t blkno;
 	buf_t *bp;
 
 	/*
@@ -1514,7 +1521,7 @@ xfs_dir_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args, int *index)
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
 	int probe, span;
-	uint hashval;
+	xfs_dahash_t hashval;
 
 	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -1562,10 +1569,10 @@ xfs_dir_leaf_lookup_int(buf_t *bp, xfs_da_args_t *args, int *index)
 	 */
 	while ((probe < leaf->hdr.count) && (entry->hashval == hashval)) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		if ((entry->namelen == args->namelen) &&
-		    (bcmp(args->name, namest->name, args->namelen) == 0)) {
-			bcopy(namest->inumber, (char *)&args->inumber,
-					       sizeof(xfs_ino_t));
+		if (entry->namelen == args->namelen &&
+		    namest->name[0] == args->name[0] &&
+		    bcmp(args->name, namest->name, args->namelen) == 0) {
+			*(xfs_dir_ino_t *)&args->inumber = namest->inumber;
 			*index = probe;
 			return(XFS_ERROR(EEXIST));
 		}
@@ -1740,19 +1747,17 @@ xfs_dir_leaf_lasthash(buf_t *bp, int *count)
  * Copy out directory entries for getdents(), for leaf directories.
  */
 int
-xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
-				uio_t *uio, int *eobp, dirent_t *dbp)
+xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
+				uio_t *uio, int *eobp, dirent_t *dbp,
+				xfs_dir_put_t *putp, daddr_t nextda)
 {
-	xfs_dir_leafblock_t *leaf, *leaf2;
+	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
-	int retval, done, entno, i;
+	int entno, i;
 	xfs_mount_t *mp;
-	xfs_ino_t ino;
-	__uint32_t cookhash, lasthash;
-	off_t nextcook, lastoffset;
-	int lastresid;
-	buf_t *bp2;
+	xfs_dahash_t cookhash, lasthash;
+	xfs_dir_put_args_t p;
 
 	mp = dp->i_mount;
 	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
@@ -1767,8 +1772,9 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 	/*
 	 * Re-find our place.
 	 */
-	entry = &leaf->entries[0];
-	for (i = 0; i < leaf->hdr.count; entry++, i++) {
+	for (i = 0, entry = &leaf->entries[0];
+	     i < leaf->hdr.count;
+	     entry++, i++) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		if (((char *)namest < (char *)leaf) ||
 		    ((char *)namest >= (char *)leaf + bp->b_bcount) ||
@@ -1801,11 +1807,18 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 	}
 	xfs_dir_trace_g_due("leaf: hash found", dp, uio, entry);
 
+	p.dbp = dbp;
+	p.put = *putp;
+	p.putp = putp;
+	p.uio = uio;
+
 	/*
 	 * We're synchronized, start copying entries out to the user.
 	 */
 	lasthash = XFS_DA_MAXHASH;
 	for ( ; i < leaf->hdr.count; entry++, i++) {
+		int lastresid, retval;
+		xfs_dircook_t lastoffset;
 
 		/*
 		 * Check for a damaged directory leaf block and pick up
@@ -1818,21 +1831,23 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);
 			return XFS_ERROR(EDIRCORRUPTED);
 		}
-		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
 
 		/*
 		 * Find the next entry after this one (if there is one)
-		 * and calculate it's magic cookie (ie: directory offset).
+		 * and calculate its magic cookie (ie: directory offset).
 		 */
 		if (i < leaf->hdr.count-1) {
-			nextcook = XFS_DA_MAKE_COOKIE(mp, bno, 0,
-							  (entry+1)->hashval);
+			XFS_PUT_COOKIE(p.cook, mp, bno, 0, (entry+1)->hashval);
 			xfs_dir_trace_g_duc("leaf: middle cookie  ",
-						   dp, uio, nextcook);
+						   dp, uio, p.cook.o);
 		} else if (leaf->hdr.info.forw) {
+			buf_t *bp2;
+			xfs_dir_leafblock_t *leaf2;
+
+			ASSERT(nextda != -1);
 			retval = xfs_da_read_buf(dp->i_transp, dp,
-					  (xfs_fileoff_t)leaf->hdr.info.forw,
-					  -1, &bp2, XFS_DATA_FORK);
+						 leaf->hdr.info.forw, nextda,
+						 &bp2, XFS_DATA_FORK);
 			if (retval)
 				return(retval);
 			ASSERT(bp2 != NULL);
@@ -1841,15 +1856,15 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 			    (leaf2->hdr.info.back != bno)) {	/* GROT */
 				return(XFS_ERROR(EDIRCORRUPTED));
 			}
-			nextcook = XFS_DA_MAKE_COOKIE(mp, leaf->hdr.info.forw,
-						  0, leaf2->entries[0].hashval);
+			XFS_PUT_COOKIE(p.cook, mp, leaf->hdr.info.forw, 0,
+				       leaf2->entries[0].hashval);
 			xfs_trans_brelse(dp->i_transp, bp2);
 			xfs_dir_trace_g_duc("leaf: next blk cookie",
-						   dp, uio, nextcook);
+						   dp, uio, p.cook.o);
 		} else {
-			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+			XFS_PUT_COOKIE(p.cook, mp, 0, 0, XFS_DA_MAXHASH);
 			xfs_dir_trace_g_duc("leaf: EOF cookie",
-						   dp, uio, nextcook);
+						   dp, uio, p.cook.o);
 		}
 
 		/*
@@ -1857,13 +1872,12 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 		 * so that we can back them out if they don't all fit.
 		 */
 		if (entry->hashval != lasthash) {
-			lastoffset = XFS_DA_MAKE_COOKIE(mp, bno, 0,
-							    entry->hashval);
+			XFS_PUT_COOKIE(lastoffset, mp, bno, 0, entry->hashval);
 			lastresid = uio->uio_resid;
 			lasthash = entry->hashval;
 		} else {
 			xfs_dir_trace_g_duc("leaf: DUP COOKIES, skipped",
-						   dp, uio, nextcook);
+						   dp, uio, p.cook.o);
 		}
 
 		/*
@@ -1871,18 +1885,19 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 		 * then restore the UIO to the first entry in the current
 		 * run of equal-hashval entries (probably one 1 entry long).
 		 */
-		retval = xfs_dir_put_dirent(mp, dbp, ino, 
-					(char *)(namest->name), entry->namelen, 
-					nextcook, uio, &done);
-		if (!done) {
-			uio->uio_offset = lastoffset;
+		p.ino = XFS_GET_DIR_INO(mp, namest->inumber);
+		p.name = (char *)namest->name;
+		p.namelen = entry->namelen;
+		retval = p.put(&p);
+		if (!p.done) {
+			uio->uio_offset = lastoffset.o;
 			uio->uio_resid = lastresid;
 			*eobp = 1;
 			xfs_dir_trace_g_du("leaf: E-O-B", dp, uio);
 			return(retval);
 		}
 	}
-	uio->uio_offset = nextcook;
+	uio->uio_offset = p.cook.o;
 	*eobp = 0;
 	xfs_dir_trace_g_du("leaf: E-O-F", dp, uio);
 	return(0);
@@ -1890,141 +1905,225 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
 
 /*
  * Format a dirent structure and copy it out the the user's buffer.
- * A 32-bit process has a differently sized dirent structure than
- * the kernel does, so do the translation here based on the process'
- * abi.
  */
-/*ARGSUSED*/
 int
-xfs_dir_put_dirent(xfs_mount_t *mp, dirent_t *dbp, xfs_ino_t ino,
-			       char *name, int namelen, off_t doff,
-			       uio_t *uio, int *done)
+xfs_dir_put_dirent32_first(xfs_dir_put_args_t *pa)
 {
-	int		retval;
-	int		target_abi;
-	int		reclen;
-	iovec_t		*iovp;
+	iovec_t *iovp;
+	int reclen, namelen;
+	irix5_dirent_t *idbp;
+	uio_t *uio;
 
-	target_abi = GETDENTS_ABI(curprocp->p_abi, uio);
 #if XFS_BIG_FILESYSTEMS
-	if (mp->m_flags & XFS_MOUNT_INO64)
-		ino += XFS_INO64_OFFSET;
-#endif
-	switch(target_abi) {
-	case ABI_IRIX5_64:
-	   {
-		dirent_t *idbp;
-
-		reclen = DIRENTSIZE(namelen);
-		if (reclen > uio->uio_resid) {
-			*done = 0;
-			return 0;
-		}
-		iovp = uio->uio_iov;
-		if (dbp != NULL)
-			idbp = dbp;
-		else
-			idbp = (dirent_t *)iovp->iov_base;
-		idbp->d_reclen = reclen;
-		idbp->d_ino = ino;
-		bcopy(name, idbp->d_name, namelen);
-		idbp->d_name[namelen] = '\0';
-		idbp->d_off = doff;
-		if (dbp == NULL) {
-			/*
-			 * Our caller is either in the kernel
-			 * (probably NFS) or has locked the user
-			 * buffer down, so work directly in its buffer.
-			 */
-			iovp->iov_base = (char *)iovp->iov_base + reclen;
-			iovp->iov_len -= reclen;
-			uio->uio_resid -= reclen;
-			*done = 1;
-			return 0;
-		}
-		/*
-		 * Unaligned or non-single-iovec buffer.
-		 */
-		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
-		break;
-	   }
-
-	case ABI_IRIX5_N32:
-	   {
-		irix5_n32_dirent_t *idbp;
-
-		reclen = IRIX5_N32_DIRENTSIZE(namelen);
-		if (reclen > uio->uio_resid) {
-			*done = 0;
-			return 0;
-		}
-		iovp = uio->uio_iov;
-		if (dbp != NULL)
-			idbp = (irix5_n32_dirent_t *)dbp;
-		else
-			idbp = (irix5_n32_dirent_t *)iovp->iov_base;
-		idbp->d_reclen = reclen;
-		idbp->d_ino = ino;
-		bcopy(name, idbp->d_name, namelen);
-		idbp->d_name[namelen] = '\0';
-		idbp->d_off = doff;
-		if (dbp == NULL) {
-			/*
-			 * Our caller is either in the kernel
-			 * (probably NFS) or has locked the user
-			 * buffer down, so work directly in its buffer.
-			 */
-			iovp->iov_base = (char *)iovp->iov_base + reclen;
-			iovp->iov_len -= reclen;
-			uio->uio_resid -= reclen;
-			*done = 1;
-			return 0;
-		}
-		/*
-		 * Unaligned or non-single-iovec buffer.
-		 */
-		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
-		break;
-	   }
-
-	case ABI_IRIX5:
-	   {
-		irix5_dirent_t *idbp;
-
-		reclen = IRIX5_DIRENTSIZE(namelen);
-		if (reclen > uio->uio_resid) {
-			*done = 0;
-			return 0;
-		}
-		iovp = uio->uio_iov;
-		if (dbp != NULL)
-			idbp = (irix5_dirent_t *)dbp;
-		else
-			idbp = (irix5_dirent_t *)iovp->iov_base;
-		idbp->d_reclen = reclen;
-		idbp->d_ino = ino;
-		if (idbp->d_ino != ino) {		/* truncated */
-			*done = 1;
-			return XFS_ERROR(EOVERFLOW);
-		}
-		bcopy(name, idbp->d_name, namelen);
-		idbp->d_name[namelen] = '\0';
-		idbp->d_off = doff;
-		if (dbp == NULL) {
-			iovp->iov_base = (char *)iovp->iov_base + reclen;
-			iovp->iov_len -= reclen;
-			uio->uio_resid -= reclen;
-			*done = 1;
-			return 0;
-		}
-		/*
-		 * Unaligned or non-single-iovec buffer.
-		 */
-		retval = uiomove((caddr_t)idbp, idbp->d_reclen, UIO_READ, uio);
-		break;
-	   }
+	if (pa->ino > XFS_MAXINUMBER_32) {
+		pa->done = 0;
+		return XFS_ERROR(EOVERFLOW);
 	}
-	*done = (retval == 0);
+#endif
+	namelen = pa->namelen;
+	reclen = IRIX5_DIRENTSIZE(namelen);
+	uio = pa->uio;
+	if (reclen > uio->uio_resid) {
+		pa->done = 0;
+		return 0;
+	}
+	/*
+	 * If this is the first time here and we have a properly aligned 
+	 * user-mode buffer then we can just "map" it in.
+	 */
+	if (useracc(uio->uio_iov[0].iov_base,
+		    uio->uio_iov[0].iov_len, B_READ) == 0) {
+		pa->done = 0;
+		return(curthreadp->k_error ?
+			curthreadp->k_error : XFS_ERROR(EFAULT));
+	}
+	*(pa->putp) = pa->put = xfs_dir_put_dirent32_rest;
+	iovp = uio->uio_iov;
+	idbp = (irix5_dirent_t *)iovp->iov_base;
+	iovp->iov_base = (char *)idbp + reclen;
+	iovp->iov_len -= reclen;
+	uio->uio_resid -= reclen;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	pa->done = 1;
+	bcopy(pa->name, idbp->d_name, namelen);
+	return 0;
+}
+
+/*
+ * Format a dirent structure and copy it out the the user's buffer.
+ */
+int
+xfs_dir_put_dirent32_rest(xfs_dir_put_args_t *pa)
+{
+	iovec_t *iovp;
+	int reclen, namelen;
+	irix5_dirent_t *idbp;
+	uio_t *uio;
+
+#if XFS_BIG_FILESYSTEMS
+	if (pa->ino > XFS_MAXINUMBER_32) {
+		pa->done = 0;
+		return XFS_ERROR(EOVERFLOW);
+	}
+#endif
+	namelen = pa->namelen;
+	reclen = IRIX5_DIRENTSIZE(namelen);
+	uio = pa->uio;
+	if (reclen > uio->uio_resid) {
+		pa->done = 0;
+		return 0;
+	}
+	iovp = uio->uio_iov;
+	idbp = (irix5_dirent_t *)iovp->iov_base;
+	iovp->iov_base = (char *)idbp + reclen;
+	iovp->iov_len -= reclen;
+	uio->uio_resid -= reclen;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	pa->done = 1;
+	bcopy(pa->name, idbp->d_name, namelen);
+	return 0;
+}
+
+/*
+ * Format a dirent structure and copy it out the the user's buffer.
+ */
+int
+xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
+{
+	int retval, reclen, namelen;
+	irix5_dirent_t *idbp;
+	uio_t *uio;
+
+#if XFS_BIG_FILESYSTEMS
+	if (pa->ino > XFS_MAXINUMBER_32) {
+		pa->done = 0;
+		return XFS_ERROR(EOVERFLOW);
+	}
+#endif
+	namelen = pa->namelen;
+	reclen = IRIX5_DIRENTSIZE(namelen);
+	uio = pa->uio;
+	if (reclen > uio->uio_resid) {
+		pa->done = 0;
+		return 0;
+	}
+	idbp = (irix5_dirent_t *)pa->dbp;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	bcopy(pa->name, idbp->d_name, namelen);
+	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	pa->done = (retval == 0);
+	return retval;
+}
+
+/*
+ * Format a dirent64 structure and copy it out the the user's buffer.
+ */
+int
+xfs_dir_put_dirent64_first(xfs_dir_put_args_t *pa)
+{
+	iovec_t *iovp;
+	int reclen, namelen;
+	dirent_t *idbp;
+	uio_t *uio;
+
+	namelen = pa->namelen;
+	reclen = DIRENTSIZE(namelen);
+	uio = pa->uio;
+	if (reclen > uio->uio_resid) {
+		pa->done = 0;
+		return 0;
+	}
+	/*
+	 * If this is the first time here and we have a properly aligned 
+	 * user-mode buffer then we can just "map" it in.
+	 */
+	if (useracc(uio->uio_iov[0].iov_base,
+		    uio->uio_iov[0].iov_len, B_READ) == 0) {
+		pa->done = 0;
+		return(curthreadp->k_error ?
+			curthreadp->k_error : XFS_ERROR(EFAULT));
+	}
+	*(pa->putp) = pa->put = xfs_dir_put_dirent64_rest;
+	iovp = uio->uio_iov;
+	idbp = (dirent_t *)iovp->iov_base;
+	iovp->iov_base = (char *)idbp + reclen;
+	iovp->iov_len -= reclen;
+	uio->uio_resid -= reclen;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	pa->done = 1;
+	bcopy(pa->name, idbp->d_name, namelen);
+	return 0;
+}
+
+/*
+ * Format a dirent64 structure and copy it out the the user's buffer.
+ */
+int
+xfs_dir_put_dirent64_rest(xfs_dir_put_args_t *pa)
+{
+	iovec_t *iovp;
+	int reclen, namelen;
+	dirent_t *idbp;
+	uio_t *uio;
+
+	namelen = pa->namelen;
+	reclen = DIRENTSIZE(namelen);
+	uio = pa->uio;
+	if (reclen > uio->uio_resid) {
+		pa->done = 0;
+		return 0;
+	}
+	iovp = uio->uio_iov;
+	idbp = (dirent_t *)iovp->iov_base;
+	iovp->iov_base = (char *)idbp + reclen;
+	iovp->iov_len -= reclen;
+	uio->uio_resid -= reclen;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	pa->done = 1;
+	bcopy(pa->name, idbp->d_name, namelen);
+	return 0;
+}
+
+/*
+ * Format a dirent64 structure and copy it out the the user's buffer.
+ */
+int
+xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
+{
+	int retval, reclen, namelen;
+	dirent_t *idbp;
+	uio_t *uio;
+
+	namelen = pa->namelen;
+	reclen = DIRENTSIZE(namelen);
+	uio = pa->uio;
+	if (reclen > uio->uio_resid) {
+		pa->done = 0;
+		return 0;
+	}
+	idbp = pa->dbp;
+	idbp->d_reclen = reclen;
+	idbp->d_ino = pa->ino;
+	idbp->d_off = pa->cook.o;
+	idbp->d_name[namelen] = '\0';
+	bcopy(pa->name, idbp->d_name, namelen);
+	retval = uiomove((caddr_t)idbp, reclen, UIO_READ, uio);
+	pa->done = (retval == 0);
 	return retval;
 }
 #endif	/* !SIM */
