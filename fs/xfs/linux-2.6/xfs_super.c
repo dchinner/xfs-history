@@ -742,7 +742,6 @@ linvfs_clear_inode(
 		/*
 		 * Do all our cleanup, and remove this vnode.
 		 */
-		vp->v_flag |= VPURGE;
 		vn_remove(vp);
 	}
 }
