@@ -291,7 +291,7 @@ xfs_iread(xfs_mount_t	*mp,
 	 * Otherwise, just get the truly permanent information.
 	 */
 	if (dip->di_core.di_mode != 0) {
-		bcopy(&(dip->di_core), &(ip->i_d), sizeof(xfs_dinode_core_t));
+		bcopy(&(dip->di_core), &(ip->i_d),sizeof(xfs_dinode_core_t));
 		xfs_iformat(mp, ip, dip);
 	} else {
 		ip->i_d.di_magic = dip->di_core.di_magic;
@@ -459,6 +459,37 @@ xfs_ialloc(xfs_trans_t	*tp,
 	return ip;
 }
 
+/*
+ * This is called to return an inode to the inode free list.
+ * The inode should already be truncated to 0 length and have
+ * no pages associated with it.  This routine also assumes that
+ * the inode is already a part of the transaction.
+ *
+ * We need to set the format to AGINO to be consistent with it being
+ * on the free list and to set the inode mode to zero to also indicate
+ * that the inode is free.  There are places in the allocation code
+ * that assert that these fields are in this state, so don't change this.
+ *
+ * We don't do anything with the on-disk inode's pointer to the next
+ * free inode.  This is entirely maintained by xfs_dialloc() and
+ * xfs_difree().
+ */
+void
+xfs_ifree(xfs_trans_t	*tp,
+	  xfs_inode_t	*ip)
+{
+	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
+	ASSERT(ip->i_transp == tp);
+	ASSERT(ip->i_d.di_nlink == 0);
+	ASSERT(ip->i_d.di_nextents == 0);
+	ASSERT(ip->i_d.di_size == 0);
+
+	xfs_difree(tp, ip->i_ino);
+	ip->i_d.di_format = XFS_DINODE_FMT_AGINO;
+	ip->i_d.di_mode = 0;
+	ip->i_d.di_flags = 0;
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+}
 
 /*
  * Reallocate the space for i_broot based on the number of records
@@ -996,6 +1027,16 @@ xfs_iflush(xfs_inode_t	*ip,
 			dip->di_u.di_dev = ip->i_u2.iu_rdev;
 		}
 		break;
+		
+	case XFS_DINODE_FMT_AGINO:
+		/*
+		 * The pointer to the next free inode is maintained
+		 * by xfs_dialloc() and xfs_difree() in the disk
+		 * buffer containing the inode.  Here we make sure
+		 * to not overwrite that value.
+		 */
+		break;
+
 	default:
 		ASSERT(0);
 		break;
