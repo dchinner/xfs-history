@@ -1,4 +1,4 @@
-#ident "$Revision: 1.172 $"
+#ident "$Revision: 1.173 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -54,6 +54,7 @@
 #include <sys/flock.h>
 #include <sys/kfcntl.h>
 #include <string.h>
+#include <sys/dirent.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -69,10 +70,15 @@
 #include "xfs_ialloc.h"
 #include "xfs_alloc.h"
 #include "xfs_bmap.h"
-#include "xfs_dir.h"
+#include "xfs_attr_sf.h"
+#include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include <attributes.h>
+#include "xfs_da_btree.h"
+#include "xfs_attr.h"
+#include "xfs_dir.h"
 #include "xfs_rw.h"
 #include "xfs_error.h"
 
@@ -2606,6 +2612,8 @@ xfs_truncate_file(
 	return error;
 }
 
+int remove_which_error_return = 0;
+
 /*
  * xfs_remove
  *
@@ -2653,6 +2661,7 @@ xfs_remove(
 		 * just return an error.
 		 */
 		if ((error != ENOSPC) || (nospace > 0)) {
+			remove_which_error_return = 1;
 			goto error_return;
 		} else {
 			nospace = 1;
@@ -2664,6 +2673,7 @@ xfs_remove(
 
 	error = xfs_lock_dir_and_entry(dp, name, &ip);
 	if (error) {
+		remove_which_error_return = 2;
 		goto error_return;
 	}
 
@@ -2683,19 +2693,23 @@ xfs_remove(
 	}
  
 	if (error = xfs_iaccess(dp, IEXEC | IWRITE, credp)) {
+		remove_which_error_return = 3;
 		goto error_return;
 	}
 
 	if (error = xfs_stickytest(dp, ip, credp)) {
+		remove_which_error_return = 4;
 		goto error_return;
 	}
 
 	if (XFS_ITOV(ip)->v_vfsmountedhere) {
 		error = XFS_ERROR(EBUSY);
+		remove_which_error_return = 5;
 		goto error_return;
 	}
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
 		error = XFS_ERROR(EPERM);
+		remove_which_error_return = 6;
 		goto error_return;
 	}
 
@@ -2705,10 +2719,12 @@ xfs_remove(
 	if (name[0] == '.') {
 		if (name[1] == '\0') {
 			error = XFS_ERROR(EINVAL);
+			remove_which_error_return = 7;
 			goto error_return;
 		}
 		else if (name[1] == '.' && name[2] == '\0') {
 			error = XFS_ERROR(EEXIST);
+			remove_which_error_return = 8;
 			goto error_return;
 		}
 	} 
@@ -2730,12 +2746,14 @@ xfs_remove(
 			error = xfs_truncate_file(mp, ip);
 			IRELE(ip);
 			if (error) {
+				remove_which_error_return = 9;
 				return error;
 			}
 			nospace = 2;
 			goto retry;
 		}
 		error = ENOSPC;
+		remove_which_error_return = 10;
 		goto error_return;
 	}
 
@@ -2746,6 +2764,7 @@ xfs_remove(
 	error = xfs_dir_removename(tp, dp, name, &first_block, &free_list, 0);
 	if (error) {
 		ASSERT(error != ENOENT);
+		remove_which_error_return = 11;
 		goto error1;
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -2757,6 +2776,7 @@ xfs_remove(
 
 	error = xfs_droplink(tp, ip);
 	if (error) {
+		remove_which_error_return = 12;
 		goto error1;
 	}
 
@@ -2777,6 +2797,7 @@ xfs_remove(
 
 	error = xfs_bmap_finish(&tp, &free_list, first_block, &committed);
 	if (error) {
+		remove_which_error_return = 13;
 		goto error_rele;
 	}
 
@@ -3194,6 +3215,7 @@ xfs_ancestor_check(
 
 
 
+int rename_which_error_return = 0;
 
 /*
  * xfs_rename
@@ -3240,6 +3262,7 @@ xfs_rename(
 				      0, XFS_TRANS_PERM_LOG_RES,
 				      XFS_RENAME_LOG_COUNT)) {
 		cancel_flags = 0;
+		rename_which_error_return = 1;
                 goto error_return;
 	}
 
@@ -3257,6 +3280,7 @@ xfs_rename(
 				target_name, &src_ip, &target_ip)) == EAGAIN)
 		continue;
 	if (error) {
+		rename_which_error_return = 2;
 		goto error_return;
 	}
 
@@ -3307,28 +3331,40 @@ xfs_rename(
 	 */
 	if (target_dp->i_d.di_nlink == 0) {
 		error = ENOENT;
+		rename_which_error_return = 3;
 		goto error_return;
 	}
-	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE, credp))
+	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE, credp)) {
+		rename_which_error_return = 4;
                 goto error_return;
-	if (error = xfs_stickytest(src_dp, src_ip, credp))
+	}
+	if (error = xfs_stickytest(src_dp, src_ip, credp)) {
+		rename_which_error_return = 5;
 		goto error_return;
+	}
 
 	if (target_dp && (src_dp != target_dp)) {
-		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE, credp))
+		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE, credp)) {
+			rename_which_error_return = 6;
 			goto error_return;
+		}
 		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(target_dp, target_ip, credp)))
+		    (error = xfs_stickytest(target_dp, target_ip, credp))) {
+			rename_which_error_return = 7;
 			goto error_return;
+		}
 	}
 	else {
 		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(src_dp, target_ip, credp)))
+		    (error = xfs_stickytest(src_dp, target_ip, credp))) {
+			rename_which_error_return = 8;
                         goto error_return;
+		}
 	}
 
 	if ((src_ip == src_dp) || (target_ip == target_dp)) {
 		error = XFS_ERROR(EINVAL);
+		rename_which_error_return = 9;
 		goto error_return;
 	}
 
@@ -3337,6 +3373,7 @@ xfs_rename(
 	 */
 	if (src_ip == target_ip) {
 		error = 0;		/* no-op */
+		rename_which_error_return = 10;
 		goto error_return;
 	}
 
@@ -3355,11 +3392,13 @@ xfs_rename(
 		if ((src_name[0] == '.') && (src_name[1] == '.') &&
 		    (src_name[2] == '\0')) {
 			error = XFS_ERROR(EINVAL);
+			rename_which_error_return = 11;
 			goto error_return;
 		}
                 if ((target_name[0] == '.') && (target_name[1] == '.') &&
                     (target_name[2] == '\0')) {
                         error = XFS_ERROR(EINVAL);
+			rename_which_error_return = 12;
                         goto error_return;
                 }
 
@@ -3383,6 +3422,7 @@ xfs_rename(
 						   target_dp, target_ip,
 						   &state_has_changed);
 			if (error) {
+				rename_which_error_return = 13;
 				goto error_return;
 			}
 
@@ -3415,6 +3455,7 @@ xfs_rename(
 					   src_ip->i_ino, &first_block,
 					   &free_list, MAX_EXT_NEEDED);
 		if (error) {
+			rename_which_error_return = 14;
 			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3437,6 +3478,7 @@ xfs_rename(
 			 */
 			if (!src_is_directory) {
 				error = XFS_ERROR(EISDIR);
+				rename_which_error_return = 15;
 				goto error_return;
 			}
 
@@ -3446,18 +3488,21 @@ xfs_rename(
 			if (!(xfs_dir_isempty(target_ip)) || 
 			    (target_ip->i_d.di_nlink > 2)) {
 				error = XFS_ERROR(EEXIST);
+				rename_which_error_return = 16;
                                 goto error_return;
                         }
 
 			if (ABI_IS_SVR4(u.u_procp->p_abi) &&
                             XFS_ITOV(target_ip)->v_vfsmountedhere) {
                                 error = XFS_ERROR(EBUSY);
+				rename_which_error_return = 17;
                                 goto error_return;
                         }
 
 		} else {
 			if (src_is_directory) {
 				error = XFS_ERROR(ENOTDIR);
+				rename_which_error_return = 18;
 				goto error_return;
 			}
 		}
@@ -3480,6 +3525,7 @@ xfs_rename(
 			((target_pnp != NULL) ? target_pnp->pn_complen :
 			 strlen(target_name)), src_ip->i_ino);
 		if (error) {
+			rename_which_error_return = 19;
 			goto abort_return;
 		}
 		xfs_ichgtime(target_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3493,6 +3539,7 @@ xfs_rename(
 		 */
 		error = xfs_droplink(tp, target_ip);
 		if (error) {
+			rename_which_error_return = 20;
 			goto abort_return;;
 		}
 
@@ -3502,6 +3549,7 @@ xfs_rename(
 			 */
 			error = xfs_droplink(tp, target_ip);
 			if (error) {
+				rename_which_error_return = 21;
 				goto abort_return;
 			}
 		} 
@@ -3522,6 +3570,7 @@ xfs_rename(
 		error = xfs_dir_replace(tp, src_ip, "..", 2,
 					target_dp->i_ino);
 		if (error) {
+			rename_which_error_return = 22;
 			goto abort_return;
 		}
 		xfs_ichgtime(src_ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3534,6 +3583,7 @@ xfs_rename(
 		 */
 		error = xfs_droplink(tp, src_dp);
 		if (error) {
+			rename_which_error_return = 23;
 			goto abort_return;
 		}
 	}
@@ -3542,6 +3592,7 @@ xfs_rename(
 	error = xfs_dir_removename(tp, src_dp, src_name, &first_block,
 				   &free_list, MAX_EXT_NEEDED);
 	if (error) {
+		rename_which_error_return = 24;
 		goto abort_return;
 	}
 	xfs_ichgtime(src_dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -5499,6 +5550,10 @@ struct vnodeops xfs_vnodeops = {
 	fs_nosys,
 	fs_nosys,
 	xfs_reclaim,
+	fs_nosys,	/* attr_get */
+	fs_nosys,	/* attr_set */
+	fs_nosys,	/* attr_remove */
+	fs_nosys,	/* attr_list */
 };
 
 #else
@@ -5543,6 +5598,10 @@ struct vnodeops xfs_vnodeops = {
 	xfs_allocstore,
 	xfs_fcntl,
 	xfs_reclaim,
+	xfs_attr_get,	/* attr_get */
+	xfs_attr_set,	/* attr_set */
+	xfs_attr_remove,/* attr_remove */
+	xfs_attr_list,	/* attr_list */
 };
 
 #endif	/* SIM */
