@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.88 $"
+#ident	"$Revision: 1.89 $"
 
 #include <xfs_os_defs.h>
 #include <sys/sysmacros.h>
@@ -879,67 +879,3 @@ xfs_fd_to_mp(
 	*mpp = XFS_BHVTOM(bdp);
 	return 0;
 }
-
-#if defined(__sgi__)
-/*
- * Syssgi interface for bulkstat and inode-table.
- */
-int					/* error status */
-xfs_itable(
-	int		opc,		/* op code */
-	int		fd,		/* file descriptor of file in fs. */
-	void		*lastip,	/* last inode number pointer */
-	int		icount,		/* count of entries in buffer */
-	void		*ubuffer,	/* buffer with inode descriptions */
-	void		*ocount)	/* output count */
-{
-	int		count;		/* count of records returned */
-	int		error;		/* error return value */
-	ino64_t		inlast;		/* last inode number */
-	xfs_mount_t	*mp;		/* mount point for filesystem */
-	int		done;		/* = 1 if there are more stats to get 
-					   and if bulkstat should be called
-					   again. This is unused in syssgi
-					   but used in dmi */
-
-	if (error = xfs_fd_to_mp(fd, 0, &mp, 1))
-		return error;
-	if (XFS_FORCED_SHUTDOWN(mp))
-		return XFS_ERROR(EIO);
-	if (copyin((void *)lastip, &inlast, sizeof(inlast)))
-		return XFS_ERROR(EFAULT);
-	if ((count = icount) <= 0)
-		return XFS_ERROR(EINVAL);
-	switch (opc) {
-	case SGI_FS_INUMBERS:
-		error = xfs_inumbers(mp, NULL, &inlast, &count, ubuffer);
-		break;
-	case SGI_FS_BULKSTAT:
-		if (count == 1 && inlast != 0) {
-			inlast++;
-			error = xfs_bulkstat_single(mp, &inlast, ubuffer, 
-				&done);
-		} else {
-			error = xfs_bulkstat(mp, NULL, &inlast, &count,
-				(bulkstat_one_pf)xfs_bulkstat_one, 
-				sizeof(xfs_bstat_t), ubuffer, 
-				BULKSTAT_FG_QUICK, &done);
-		}
-		break;
-	case SGI_FS_BULKSTAT_SINGLE:
-		error = xfs_bulkstat_single(mp, &inlast, ubuffer, &done);
-		break;
-	default:
-		error = XFS_ERROR(EINVAL);
-		break;
-	}
-	if (error)
-		return error;
-	if (ocount != NULL) {
-		if (copyout(&inlast, lastip, sizeof(inlast)) ||
-		    copyout(&count, ocount, sizeof(count)))
-			return XFS_ERROR(EFAULT);
-	}
-	return 0;
-}
-#endif /* sgi */

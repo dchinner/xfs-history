@@ -32,7 +32,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.30 $"
 
 #ifdef _KERNEL
 
@@ -53,18 +53,6 @@ xfs_fd_to_mp(
 	int			wperm,	/* need write perm on device fd */
 	struct xfs_mount	**mpp,	/* output: mount structure pointer */
 	int			rperm);	/* need root perm on file fd */
-
-/*
- * Syssgi interface for bulkstat and inode-table.
- */
-int					/* error status */
-xfs_itable(
-	int		opc,		/* op code */
-	int		fd,		/* file descriptor of file in fs. */
-	void		*lastip,	/* last inode number pointer */
-	int		icount,		/* count of entries in buffer */
-	void		*ubuffer,	/* buffer with inode descriptions */
-	void		*ocount);	/* output count */
 
 /* 
  * xfs_bulkstat() is used to fill in xfs_bstat structures as well as dm_stat
