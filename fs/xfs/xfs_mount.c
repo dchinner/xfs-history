@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -7,10 +7,10 @@
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
+#include <sys/vnode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
@@ -177,11 +177,13 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 
 void
 xfs_umount(xfs_mount_t *mp)
-/* ARGSUSED */
 {
 	int	error;
 	buf_t	*bp;
 
+	xfs_iflush_all(mp);
+	/* someone needs to free the inodes' memory */
+	/* also need to give up if vnodes are referenced */
 	bp = xfs_getsb(mp);
 	bp->b_flags &= ~(B_DONE | B_READ);
 	bp->b_flags |= B_WRITE;
@@ -189,8 +191,9 @@ xfs_umount(xfs_mount_t *mp)
 	bdstrat(bmajor(mp->m_dev), bp);
 	error = iowait(bp);
 	ASSERT(error == 0);	
+	bflush(mp->m_dev);
 	freerbuf(bp);
-	/* what do we do for m_rsumip, mp_rbmip? */
+	kmem_free(mp, sizeof(*mp));
 }
 
 /*
