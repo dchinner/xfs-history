@@ -298,7 +298,6 @@ spectodevs(
 }
 
 static struct inode_operations linvfs_meta_ops = {
-	pagebuf_ioinitiate:	xfs_bdstrat_cb,
 };
 
 static struct address_space_operations linvfs_meta_aops = {

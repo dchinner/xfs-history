@@ -38,6 +38,7 @@
 #include <linux/page_buf.h>
 #include <linux/pagemap.h>
 #include <linux/capability.h>
+#include <linux/xfs_iops.h>
 
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -84,7 +85,6 @@ xfs_read(
 	ssize_t		ret;
 	xfs_fsize_t	n;
 	xfs_inode_t	*ip;
-	vnode_t		*vp;
 	struct file	*filp = uiop->uio_fp;
 	struct inode	*linux_ip = filp->f_dentry->d_inode;
 	char 		*buf;
@@ -127,28 +127,35 @@ xfs_read(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
 		return -EIO;
 	}
+
+	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+
 #ifdef CONFIG_XFS_DMAPI
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(filp->f_flags & (O_INVISIBLE))) {
 
-		/* linux does not hold a lock across reads */
-		/*vrwlock_t locktype = VRWLOCK_READ;*/
+		vrwlock_t locktype = VRWLOCK_READ;
 
 		ret = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
 					     *offsetp, size,
 					     FILP_DELAY_FLAG(filp),
 					     NULL /*&locktype*/);
-		if (ret)
+		if (ret) {
+			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 			return -ret;
+		}
 	}
 #endif /* CONFIG_XFS_DMAPI */
 
-	vp = BHV_TO_VNODE(bdp);
-
-	if ((filp->f_flags & O_DIRECT) && VN_DIRTY(vp)) {
-		pagebuf_flush(vp->v_inode, 0LL, 0);
+	if (filp->f_flags & O_DIRECT) {
+		fs_flush_pages(bdp, *offsetp, *offsetp + size, 0, FI_NONE);
+		ret = pagebuf_direct_file_read(filp, buf, size, offsetp,
+				linvfs_pb_bmap); 
+	} else {
+		ret = generic_file_read(filp, buf, size, offsetp);
 	}
-	ret = pagebuf_generic_file_read(filp, buf, size, offsetp); 
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+
 	if (!(filp->f_flags & O_INVISIBLE))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
@@ -578,6 +585,7 @@ xfs_write(
 	xfs_iocore_t    *io;
 	vnode_t		*vp;
 	int		iolock;
+	int		direct = filp->f_flags & O_DIRECT;
 #ifdef CONFIG_XFS_DMAPI
 	int		eventsent = 0;
 	loff_t		savedsize = *offsetp;
@@ -605,7 +613,7 @@ xfs_write(
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 
-	if (filp->f_flags & O_DIRECT) {
+	if (direct) {
 		if (((__psint_t)buf & (ip->i_sb->s_blocksize - 1)) ||
 		    (uiop->uio_offset & mp->m_blockmask) ||
 		    (size  & mp->m_blockmask)) {
@@ -634,8 +642,7 @@ start:
 	    !(filp->f_flags & O_INVISIBLE) && !eventsent)) {
 		vrwlock_t	locktype;
 
-		locktype = (filp->f_flags & O_DIRECT) ?
-			VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
+		locktype = direct ? VRWLOCK_WRITE_DIRECT:VRWLOCK_WRITE;
 
 		ret = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 				*offsetp, size,
@@ -680,7 +687,7 @@ start:
 	 * to zero it out up to the new size.
 	 */
 	
-	if (*offsetp > isize && isize) {
+	if (!direct && (*offsetp > isize && isize)) {
 		io->io_writeio_blocks = mp->m_writeio_blocks;
 		ret = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
 			isize, NULL);
@@ -694,11 +701,12 @@ start:
 #ifdef CONFIG_XFS_DMAPI
 retry:
 #endif
-	if (filp->f_flags & O_DIRECT) {
+	if (direct) {
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offsetp,
 			(xfs_off_t) size, (void *)vp);
 	}
-	ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
+	ret = pagebuf_generic_file_write(filp, buf, size, offsetp,
+							linvfs_pb_bmap);
 
 #ifdef CONFIG_XFS_DMAPI
 	if ((ret == -ENOSPC) &&

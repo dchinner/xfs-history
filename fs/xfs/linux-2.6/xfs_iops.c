@@ -675,12 +675,12 @@ linvfs_notify_change(
 
 int
 linvfs_pb_bmap(struct inode *inode, 
-			   loff_t offset,
-			   ssize_t count,
-			   struct page_buf_bmap_s *pbmapp,
-			   int maxpbbm, 
-			   int *retpbbm, 
-			   int flags/* page_buf_flags_t */)
+	loff_t offset,
+	ssize_t count,
+	page_buf_bmap_t *pbmapp,
+	int maxpbbm, 
+	int *retpbbm, 
+	int flags)
 {
 	vnode_t		*vp;
 	int		error;
@@ -700,23 +700,6 @@ linvfs_pb_bmap(struct inode *inode,
 
 	return -error;
 }
-
-void linvfs_file_read(
-	struct file *filp,
-	void * desc)
-{
-	struct inode *inode = filp->f_dentry->d_inode;
-	vnode_t		*vp;
-
-	vp = LINVFS_GET_VP(inode);
-	ASSERT(vp);
-
-	VOP_RWLOCK(vp, VRWLOCK_READ);
-	pagebuf_file_read(filp, desc);
-	VOP_RWUNLOCK(vp, VRWLOCK_READ);
-	return;
-}
-
 
 STATIC
 int linvfs_bmap(struct address_space *mapping, long block)
@@ -753,15 +736,41 @@ int linvfs_bmap(struct address_space *mapping, long block)
 	return (int)(bmap.pbm_bn + (bmap.pbm_delta >> 9));
 }
  
+STATIC int linvfs_read_full_page(struct file *filp, struct page *page)
+{
+	return pagebuf_read_full_page(filp, page, linvfs_pb_bmap);
+}
+
+STATIC int linvfs_write_full_page_unlock(struct page *page)
+{
+	int ret = pagebuf_write_full_page(page, linvfs_pb_bmap);
+	UnlockPage(page);
+	return ret > 0 ? 0 : ret;
+}
+
+STATIC int linvfs_write_full_page_nounlock(struct page *page)
+{
+	return pagebuf_write_full_page(page, linvfs_pb_bmap);
+}
+
+STATIC int linvfs_prepare_write(
+	struct file *file,
+	struct page *page,
+	unsigned from,
+	unsigned to)
+{
+	return pagebuf_prepare_write(file, page, from, to, linvfs_pb_bmap);
+}
+
 
 struct address_space_operations linvfs_aops = {
-  readpage:		pagebuf_read_full_page,
-  writepage:		pagebuf_write_full_page_unlock,
-  writepage_nounlock:	pagebuf_write_full_page_nounlock,
+  readpage:		linvfs_read_full_page,
+  writepage:		linvfs_write_full_page_unlock,
+  writepage_nounlock:	linvfs_write_full_page_nounlock,
   sync_page:		block_sync_page,
   bmap:			linvfs_bmap,
   toss_page:		pagebuf_toss_page,
-  prepare_write:	pagebuf_prepare_write,
+  prepare_write:	linvfs_prepare_write,
   commit_write:		pagebuf_commit_write,
 };
 
@@ -770,8 +779,6 @@ struct inode_operations linvfs_file_inode_operations =
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
   setattr:		linvfs_notify_change,
-  pagebuf_bmap:		linvfs_pb_bmap,
-  pagebuf_fileread:	linvfs_file_read,
   attrctl:		linvfs_attrctl,
 #ifdef CONFIG_FS_POSIX_ACL
   acl_get:		linvfs_acl_get,
