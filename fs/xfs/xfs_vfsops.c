@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.159 $"
+#ident  "$Revision: 1.160 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1256,14 +1256,12 @@ devvptoxfs(
 	int		error;
 	xfs_sb_t	*fs;
 	vnode_t		*openvp;
-#if     !VFILE_TEST
 #ifdef	OLDSPECFS
 	bhv_desc_t	*bdp;
 	bhv_head_t	*bhp;
 	struct snode	*sp;
 #endif	/* OLDSPECFS */
 	bhv_desc_t	*vfs_bdp;
-#endif
 
 	if (devvp->v_type != VBLK)
 		return XFS_ERROR(ENOTBLK);
@@ -1274,7 +1272,6 @@ devvptoxfs(
 	dev = devvp->v_rdev;
 	VOP_RWLOCK(devvp, VRWLOCK_WRITE);
 
-#if     !VFILE_TEST
 #ifdef	OLDSPECFS
 	/*
 	 * Find the spec behavior for this vnode so that we can look
@@ -1314,7 +1311,6 @@ devvptoxfs(
 					      &xfs_vfsops);
 		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
 	} else {
-#endif
 		/*
 		 * If the buffer is already in core, it might be stale.
 		 * User might have been doing block reads, then mkfs.
@@ -1336,9 +1332,7 @@ devvptoxfs(
 			brelse(bp);
 		} else
 			fs = (xfs_sb_t *)bp->b_un.b_addr;
-#if     !VFILE_TEST
 	}
-#endif 
 	VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
 	*bpp = bp;
 	*fsp = fs;
