@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.128 $"
+#ident	"$Revision: 1.129 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -855,7 +855,6 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 		offsetof(xfs_sb_t, sb_uquotino),
 		offsetof(xfs_sb_t, sb_pquotino),
 		offsetof(xfs_sb_t, sb_qflags),
-		offsetof(xfs_sb_t, sb_padding),
 		sizeof(xfs_sb_t)
 	};
  
