@@ -1048,6 +1048,7 @@ xfs_dm_rdwr(
 	struct inode	*inode;
 	struct dentry	*dentry;
 	bhv_desc_t	*xbdp;
+	int		have_write_access = 0;
 
 	if (off < 0 || vp->v_type != VREG)
 		return(EINVAL);
@@ -1086,12 +1087,16 @@ xfs_dm_rdwr(
 		return ENOMEM;
 	}
 
+	/* If the file is an executable, and some proc is trying to execute it
+	 * then get_write_access() will return ETXTBUSY.
+	 * We know that all threads, including any trying to execute
+	 * the file, are blocked on WRITE and READ events waiting for this
+	 * file to come online.
+	 */
 	if (fmode & FMODE_WRITE) {
 		error = -get_write_access(inode);
-		if (error) {
-			dput(dentry);
-			return error;
-		}
+		if (!error)
+			have_write_access = 1;
 	}
 
 	file = dentry_open(dentry, NULL, oflags);
@@ -1119,7 +1124,7 @@ xfs_dm_rdwr(
 
 	if (file->f_op->release)
 		file->f_op->release(file->f_dentry->d_inode, file);
-	if (fmode & FMODE_WRITE)
+	if ((fmode & FMODE_WRITE) && have_write_access)
 		put_write_access(inode);
 	dput(dentry);
 	return error;
