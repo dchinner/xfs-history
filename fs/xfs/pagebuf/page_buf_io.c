@@ -148,7 +148,7 @@ void pagebuf_flush(
 
 {
 	filemap_fdatasync(ip->i_mapping);
-	fsync_inode_buffers(ip);
+	fsync_inode_data_buffers(ip);
 	filemap_fdatawait(ip->i_mapping);
 }
 
@@ -777,7 +777,7 @@ hook_buffers_to_page_delay(struct inode *inode, struct page *page)
 	bh = page->buffers;
 	bh->b_state = (1 << BH_Delay) | (1 << BH_Mapped);
 	__mark_buffer_dirty(bh);
-	buffer_insert_inode_queue(bh, inode);
+	buffer_insert_inode_data_queue(bh, inode);
 	balance_dirty();
 }
 
@@ -839,7 +839,7 @@ set_buffer_dirty_uptodate(
 	__mark_buffer_dirty(bh);
 
 	if (need_balance_dirty) {
-		buffer_insert_inode_queue(bh, inode);
+		buffer_insert_inode_data_queue(bh, inode);
 		if (!partial)
 			balance_dirty();
 	}

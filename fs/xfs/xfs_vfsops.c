@@ -1293,7 +1293,7 @@ xfs_syncsub(
 					VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1,
 						fflag, FI_NONE, error);
 				} else {
-					fsync_inode_buffers(LINVFS_GET_IP(vp));
+					fsync_inode_data_buffers(LINVFS_GET_IP(vp));
 				}
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
