@@ -63,25 +63,15 @@ typedef struct vfs {
 
 
 #define VFS_RDONLY	0x0001		/* read-only vfs */
-#define VFS_GRPID	0x0008		/* group-ID assigned from directory */
-#define VFS_REMOUNT	0x0010		/* modify mount options only */
-#define VFS_NOTRUNC	0x0020		/* does not truncate long file names */
-#define VFS_MLOCK	0x0100		/* lock vfs so that subtree is stable */
-#define VFS_MWAIT	0x0200		/* waiting for access lock */
-#define VFS_MWANT	0x0400		/* waiting for update */
+#define VFS_GRPID	0x0002		/* group-ID assigned from directory */
+#define VFS_DMI		0x0004		/* filesystem has the DMI enabled */
 
-#define VFS_LOCAL	0x1000		/* local filesystem, for find */
-#define VFS_OFFLINE	0x2000		/* filesystem is being unmounted */
-#define VFS_DMI		0x4000		/* filesystem has the DMI enabled */
-
-#define SYNC_NOWAIT	0x0000		/* start delayed writes */
 #define SYNC_ATTR	0x0001		/* sync attributes */
 #define SYNC_CLOSE	0x0002		/* close file system down */
 #define SYNC_DELWRI	0x0004		/* look at delayed writes */
 #define SYNC_WAIT	0x0008		/* wait for i/o to complete */
 #define SYNC_FSDATA	0x0020		/* flush fs data (e.g. superblocks) */
 #define SYNC_BDFLUSH	0x0010		/* BDFLUSH is calling -- don't block */
-#define SYNC_PDFLUSH	0x0040		/* push v_dpages */
 
 
 typedef struct vfsops {

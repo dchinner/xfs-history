@@ -602,7 +602,7 @@ linvfs_write_super(
 	sb->s_dirt = 0;
 	if (sb->s_flags & MS_RDONLY)
 		return;
-	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
+	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_ATTR,
 		NULL, error);
 }
 

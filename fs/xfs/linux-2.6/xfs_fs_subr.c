@@ -68,7 +68,7 @@ fs_dounmount(
 	 * by making relocations invoked by unmount occur in a different
 	 * environment than those invoked by mount-update.
 	 */
-	PVFS_SYNC(fbdp, SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT, cr, error);
+	PVFS_SYNC(fbdp, SYNC_ATTR|SYNC_DELWRI, cr, error);
 	if (error == 0)
 		PVFS_UNMOUNT(fbdp, flags, cr, error);
 	return error;
