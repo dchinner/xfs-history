@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.83 $"
+#ident "$Revision: 1.84 $"
 
 struct buf;
 struct cred;
@@ -59,9 +59,9 @@ typedef struct xfs_range_lock {
 #define	XFS_INLINE_EXTS	2
 #define	XFS_INLINE_DATA	32
 typedef struct xfs_ifork {
-	size_t			if_bytes; 	/* bytes in if_u1 */
-	size_t			if_real_bytes;	/* bytes allocated in if_u1 */
-	size_t			if_broot_bytes;	/* bytes allocated for root */
+	int			if_bytes; 	/* bytes in if_u1 */
+	int			if_real_bytes;	/* bytes allocated in if_u1 */
+	int			if_broot_bytes;	/* bytes allocated for root */
 	xfs_bmbt_block_t	*if_broot;	/* file's incore btree root */
 	__uint16_t		if_flags;	/* per-fork flags */
 	__uint16_t		if_ext_max;	/* max # of extent records */
