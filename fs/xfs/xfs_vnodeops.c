@@ -1,4 +1,4 @@
-#ident "$Revision: 1.184 $"
+#ident "$Revision: 1.185 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1085,6 +1085,7 @@ xfs_fsync(
 	xfs_inode_t	*ip;
 	xfs_fsize_t	last_byte;
 	int		error;
+	buf_t		*bp;
 
 	vn_trace_entry(vp, "xfs_fsync");
 	ip = XFS_VTOI(vp);
@@ -1113,9 +1114,30 @@ xfs_fsync(
 			(ip->i_delayed_blks == 0) &&
 			(ip->i_queued_bufs == 0)));
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
-		xfs_iflock(ip);
-		error = xfs_iflush(ip, (flag & FSYNC_WAIT) ? XFS_IFLUSH_SYNC :
-				   XFS_IFLUSH_ASYNC);
+		if (!xfs_iflock_nowait(ip)) {
+			/*
+			 * If we can't grab the flush lock then check
+			 * to see if the inode has been flushed delayed
+			 * write.  If so, grab its buffer and send it
+			 * out immediately.  We'll be able to acquire
+			 * the flush lock when the I/O completes.
+			 */
+			bp = incore(ip->i_dev, ip->i_blkno, ip->i_len,
+				    INCORE_TRYLOCK);
+			if (bp != NULL) {
+				if (bp->b_flags & B_DELWRI) {
+#ifndef SIM
+					buftrace("XFS_FSYNC", bp);
+#endif
+					bawrite(bp);
+				} else {
+					brelse(bp);
+				}
+			}
+			xfs_iflock(ip);
+		}
+		error = xfs_iflush(ip, (flag & FSYNC_WAIT) ?
+				   XFS_IFLUSH_SYNC : XFS_IFLUSH_ASYNC);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
 	} else {
 		xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
