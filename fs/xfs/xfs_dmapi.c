@@ -32,6 +32,7 @@
 
 #include <xfs.h>
 #include <linux/xfs_iops.h> /* linvfs_revalidate_core() */
+#include <linux/spinlock.h>
 
 #define MAXNAMLEN MAXNAMELEN
 
@@ -270,27 +271,27 @@ STATIC int
 prohibited_mr_events(bhv_desc_t	*bdp)
 {
 	int	prohibited;
-#ifdef __sgi
-	preg_t	*preg;
-#endif
+	struct address_space *mapping;
+	struct vm_area_struct *vma;
+
 	vnode_t	*vp = BHV_TO_VNODE(bdp);
 
-	if (!VN_MAPPED(vp))
+	if(!VN_MAPPED(vp))
 		return 0;
 
 	prohibited = 1 << DM_EVENT_READ;
-#ifdef __sgi
-	s = mutex_spinlock(&mreg_lock);
-	for (preg = vp->v_mreg; preg; preg = preg->p_vchain) {
-		if ((preg->p_maxprots & PROT_WRITE) &&
-				preg->p_reg->r_type == RT_MAPFILE &&
-				(preg->p_reg->r_flags & RG_TEXT) == 0 ){
+	mapping = LINVFS_GET_IP(vp)->i_mapping;
+
+	spin_lock(&mapping->i_shared_lock);
+
+	for( vma = mapping->i_mmap_shared; vma; vma = vma->vm_next ) {
+		if( vma && (!vma->vm_flags & VM_DENYWRITE) ){
 			prohibited |= 1 << DM_EVENT_WRITE;
 			break;
 		}
 	}
-	mutex_spinunlock(&mreg_lock, s);
-#endif
+
+	spin_unlock(&mapping->i_shared_lock);
 	return prohibited;
 }
 
@@ -2693,13 +2694,9 @@ xfs_dm_set_region(
 
 	new_mask = 0;
 	if (nelem == 1) {
-#ifdef __sgi
-		if (copyin(regbufp, &region, sizeof(region)))
-			return(EFAULT);
-#else
 		if (copy_from_user( &region, regbufp, sizeof(region)))
 			return(EFAULT);
-#endif
+
 		if (region.rg_flags & ~(DM_REGION_READ|DM_REGION_WRITE|DM_REGION_TRUNCATE))
 			return(EINVAL);
 		if (region.rg_flags & DM_REGION_READ)
