@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -64,6 +64,7 @@
 
 #define NBBY		8
 #define BBSHIFT		9
+#define BBMASK		((1 << BBSHIFT) - 1)
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - BBSHIFT)) - 1)
 
 #ifndef GFP_READAHEAD
@@ -1502,18 +1503,18 @@ _pagebuf_page_io(
 
 		cache_ok = !((pb->pb_flags & PBF_FORCEIO) || (rw == WRITE));
 		public_bh = multi_ok = 1;
+		sector = 1 << sector_shift;
 
 		if (!page_has_buffers(page)) {
 			if (!locking) {
 				lock_page(page);
 				if (!page_has_buffers(page))
 					create_empty_buffers(page,
-							pbr->pbr_kdev,
-							1 << sector_shift);
+							pbr->pbr_kdev, sector);
 				unlock_page(page);
 			} else {
-				create_empty_buffers(page, pbr->pbr_kdev,
-							1 << sector_shift);
+				create_empty_buffers(page,
+						pbr->pbr_kdev, sector);
 			}
 		}
 
@@ -1530,8 +1531,8 @@ _pagebuf_page_io(
 
 			lock_buffer(bh);
 			get_bh(bh);
-			bh->b_size = 1 << sector_shift;
-			bh->b_blocknr = bn + (i - (pg_offset >> sector_shift));
+			bh->b_size = sector;
+			bh->b_blocknr = bn + i - (pg_offset >> BBSHIFT);
 			bufferlist[cnt++] = bh;
 		} while (i++, (bh = bh->b_this_page) != head);
 
@@ -1580,14 +1581,15 @@ _pagebuf_page_io(
 	}
 
 	multi_ok = (blk_length != 1);
+	i = sector >> BBSHIFT;
 
-	for (; blk_length > 0; blk_length--, pg_offset += sector) {
+	for (; blk_length > 0; bn += i, blk_length--, pg_offset += sector) {
 		bh = kmem_cache_alloc(bh_cachep, SLAB_NOFS);
 		if (!bh)
 			bh = _pagebuf_get_prealloc_bh();
 		memset(bh, 0, sizeof(*bh));
+		bh->b_blocknr = bn;
 		bh->b_size = sector;
-		bh->b_blocknr = bn++;
 		bh->b_dev = pbr->pbr_kdev;
 		set_bit(BH_Lock, &bh->b_state);
 		set_bh_page(bh, page, pg_offset);
@@ -1650,13 +1652,13 @@ _pagebuf_page_apply(
 	if ((pbr->pbr_bsize == PAGE_CACHE_SIZE) &&
 	    (pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
 	    (pb->pb_flags & PBF_READ) && pb->pb_locked) {
-		bn -= (pb->pb_offset >> pbr->pbr_sshift);
+		bn -= (pb->pb_offset >> BBSHIFT);
 		pg_offset = 0;
 		pg_length = PAGE_CACHE_SIZE;
 	} else {
 		pb_offset = offset - pb->pb_file_offset;
 		if (pb_offset) {
-			bn += (pb_offset + pbr->pbr_smask) >> pbr->pbr_sshift;
+			bn += (pb_offset + BBMASK) >> BBSHIFT;
 		}
 	}
 
