@@ -36,6 +36,8 @@
 #include <linux/slab.h>
 #include <linux/mman.h> /* for PROT_WRITE */
 
+static struct vm_operations_struct linvfs_file_vm_ops;
+
 
 STATIC ssize_t
 linvfs_read(
@@ -241,58 +243,27 @@ done:
 	return -error;
 }
 
-
 STATIC int
-linvfs_mprotect(
-	struct file	*filp,
-	struct vm_area_struct *vma,
-	unsigned int	newflags)
-{
-	vnode_t	*vp;
-	int	error = 0;
-
-	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
-	ASSERT(vp);
-
-	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
-		if((vma->vm_flags & VM_MAYSHARE) &&
-		   (newflags & PROT_WRITE) && !(vma->vm_flags & PROT_WRITE)){
-			error = xfs_dmapi_mmap_event(filp, vma, VM_WRITE);
-		}
-	}
-	return error;
-}
-
-
-STATIC int
-linvfs_generic_file_mmap(
+linvfs_file_mmap(
 	struct file	*filp,
 	struct vm_area_struct *vma)
 {
-	vnode_t		*vp;
-	int		ret;
-
-	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
-	ASSERT(vp);
+	struct inode	*ip = filp->f_dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(ip);
+	vattr_t		va = { .va_mask = AT_UPDATIME };
+	int		error;
 
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
-		ret = -xfs_dmapi_mmap_event( filp, vma, 0 );
-		if (ret)
-			goto out;
+		error = -xfs_dmapi_mmap_event(vma, 0);
+		if (error)
+			return error;
 	}
 
-	/* this will return a (-) error so flip */
-	ret = -generic_file_mmap(filp, vma);
-	if (!ret) {
-		vattr_t va, *vap;
+	vma->vm_ops = &linvfs_file_vm_ops;
 
-		vap = &va;
-		vap->va_mask = AT_UPDATIME;
-
-		VOP_SETATTR(vp, vap, AT_UPDATIME, NULL, ret);
-	}
-out:
-	return(-ret);
+	VOP_SETATTR(vp, &va, AT_UPDATIME, NULL, error);
+	UPDATE_ATIME(ip);
+	return 0;
 }
 
 
@@ -319,20 +290,35 @@ linvfs_ioctl(
 	return error;
 }
 
-
-struct file_operations linvfs_file_operations =
+#ifdef HAVE_VMOP_MPROTECT
+STATIC int
+linvfs_mprotect(
+	struct vm_area_struct *vma,
+	unsigned int	newflags)
 {
+	vnode_t		*vp = LINVFS_GET_VPTR(vma->vm_file->f_dentry->d_inode);
+	int		error = 0;
+
+	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
+		if ((vma->vm_flags & VM_MAYSHARE) &&
+		    (newflags & PROT_WRITE) && !(vma->vm_flags & PROT_WRITE)){
+			error = xfs_dmapi_mmap_event(vma, VM_WRITE);
+		    }
+	}
+	return error;
+}
+#endif /* HAVE_VMOP_MPROTECT */
+
+
+struct file_operations linvfs_file_operations = {
 	llseek:		generic_file_llseek,
 	read:		linvfs_read,
 	write:		linvfs_write,
 	ioctl:		linvfs_ioctl,
-	mmap:		linvfs_generic_file_mmap,
+	mmap:		linvfs_file_mmap,
 	open:		linvfs_open,
 	release:	linvfs_release,
 	fsync:		linvfs_fsync,
-#ifdef	CONFIG_HAVE_XFS_DMAPI
-	mprotect:	linvfs_mprotect,
-#endif
 };
 
 struct file_operations linvfs_dir_operations = {
@@ -340,4 +326,11 @@ struct file_operations linvfs_dir_operations = {
 	readdir:	linvfs_readdir,
 	ioctl:		linvfs_ioctl,
 	fsync:		linvfs_fsync,
+};
+
+static struct vm_operations_struct linvfs_file_vm_ops = {
+	nopage:		filemap_nopage,
+#ifdef HAVE_VMOP_MPROTECT
+	mprotect:	linvfs_mprotect,
+#endif
 };
