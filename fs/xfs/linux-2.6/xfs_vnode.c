@@ -231,14 +231,10 @@ vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, int flags)
 	struct inode	*inode;
 	struct vnode	*vp;
 	xfs_ino_t	inum = (xfs_ino_t) ino;
-	unsigned long save_flags = current->flags;
 
 	XFS_STATS_INC(vn_alloc);
 
-	if (flags)
-		current->flags |= PF_MEMALLOC;
 	inode = get_empty_inode();
-	current->flags = save_flags;
 
 	if (inode == NULL)
 		return NULL;
