@@ -351,7 +351,8 @@ xfs_inval_cached_pages(
 	 * to safely invalidate pages and mappings.
 	 */
 	if (relock) {
-		XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);
+		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
+		XFS_ILOCK(mp, io, XFS_IOLOCK_EXCL);
 	}
 
 	/* Writing beyond EOF creates a hole that must be zeroed */
