@@ -472,8 +472,8 @@ void
 linvfs_write_super(
 	struct super_block *sb)
 {
-/* 	vfs_t		*vfsp = LINVFS_GET_VFS(sb); */
-/* 	int		error; */
+ 	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
+ 	int		error; 
 
 
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
