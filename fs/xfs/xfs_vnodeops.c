@@ -1,4 +1,4 @@
-#ident "$Revision: 1.298 $"
+#ident "$Revision: 1.299 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2325,6 +2325,15 @@ xfs_create(
 		if (mp->m_flags & XFS_MOUNT_WSYNC) {
 			xfs_trans_set_sync(tp);
 		}
+
+		/*
+		 * Set the vnode's mandatory locking flag if necessary.
+		 * (Note:  only needed in case when creating a new file;
+		 * mode doesn't change when creating/truncating a file 
+		 * that already exists.
+		 */
+		if (MANDLOCK(XFS_ITOV(ip), ip->i_d.di_mode))
+			VN_FLAGSET(XFS_ITOV(ip), VENF_LOCKING);
 
 		dp->i_gen++;
 		/*
