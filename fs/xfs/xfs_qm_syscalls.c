@@ -33,6 +33,11 @@
 #include <xfs.h>
 #include <xfs_quota_priv.h>
 
+#ifdef DEBUG
+# define qdprintk(s, args...)		printk(s, ## args)
+#else
+# define qdprintk(s, args...)		do { } while (0)
+#endif			
 
 STATIC int	xfs_qm_scall_trunc_qfiles(xfs_mount_t *, uint);
 STATIC int	xfs_qm_scall_getquota(xfs_mount_t *, xfs_dqid_t, uint, xfs_caddr_t);
@@ -62,14 +67,7 @@ xfs_quotactl(
 	int		type,
 	xfs_caddr_t	addr)
 {
-
-#ifdef QUOTADEBUG
-	static int count = 0;
-	if (count++ == 50)
-		return xfs_qm_internalqcheck(mp);
-#endif
-
-	if (addr == NULL && cmd != Q_XQUOTAOFF)
+	if (addr == NULL && cmd != Q_XQUOTAOFF && cmd != Q_XDEBUG)
 		return XFS_ERROR(EINVAL);
 
 	/*
@@ -107,6 +105,8 @@ xfs_quotactl(
 			return xfs_qm_scall_quotaoff(mp,
 				xfs_qm_import_flags((uint *)addr), B_FALSE);
 		break;
+	case Q_XDEBUG:
+		return xfs_qm_internalqcheck(mp);
 	}
 
 	if (!XFS_IS_QUOTA_ON(mp))
@@ -441,9 +441,7 @@ xfs_qm_scall_quotaon(
 	    ((flags & XFS_GQUOTA_ACCT) == 0 &&
 	    (mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT) == 0 &&
 	    (flags & XFS_GQUOTA_ENFD))) {
-#ifdef QUOTADEBUG
-		printk("Can't enforce without accounting.\n");
-#endif		
+		qdprintk("Can't enforce without accounting.\n");
 		return XFS_ERROR(EINVAL);
 	}
 	/*
@@ -456,20 +454,14 @@ xfs_qm_scall_quotaon(
 	 * Change superblock version (if needed) for the root filesystem
 	 */
 	if (rootfs && !XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
-#ifdef DEBUG
-		unsigned oldv = mp->m_sb.sb_versionnum;
-#endif
+		qdprintk("Old superblock version %x\n", mp->m_sb.sb_versionnum);
 		s = XFS_SB_LOCK(mp);
 		XFS_SB_VERSION_ADDQUOTA(&mp->m_sb);
 		mp->m_sb.sb_uquotino = NULLFSINO;
 		mp->m_sb.sb_gquotino = NULLFSINO;
 		mp->m_sb.sb_qflags = 0;
 		XFS_SB_UNLOCK(mp, s);
-#ifdef DEBUG
-		printk(KERN_INFO
-			"Old superblock version %x, converting to %x.",
-			oldv, mp->m_sb.sb_versionnum);
-#endif
+		qdprintk("Converted sb to version %x\n", mp->m_sb.sb_versionnum);
 		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
 			    XFS_SB_GQUOTINO | XFS_SB_QFLAGS);
 	}
@@ -666,10 +658,9 @@ xfs_qm_scall_setqlim(
 		INT_SET(ddq->d_blk_hardlimit, ARCH_CONVERT, hard);
 		INT_SET(ddq->d_blk_softlimit, ARCH_CONVERT, soft);
 	}
-#ifdef QUOTADEBUG
-	else 
-		printk("blkhard %Ld < blksoft %Ld\n", hard, soft);
-#endif			
+	else {
+		qdprintk("blkhard %Ld < blksoft %Ld\n", hard, soft);
+	}
 	hard = (newlim.d_fieldmask & FS_DQ_RTBHARD) ?
 		(xfs_qcnt_t) XFS_BB_TO_FSB(mp, newlim.d_rtb_hardlimit) :
 			INT_GET(ddq->d_rtb_hardlimit, ARCH_CONVERT);
@@ -680,11 +671,9 @@ xfs_qm_scall_setqlim(
 		INT_SET(ddq->d_rtb_hardlimit, ARCH_CONVERT, hard);
 		INT_SET(ddq->d_rtb_softlimit, ARCH_CONVERT, soft);
 	}
-#ifdef QUOTADEBUG
 	else 
-		printk("rtbhard %Ld < rtbsoft %Ld\n", hard, soft);
-#endif	
-	
+		qdprintk("rtbhard %Ld < rtbsoft %Ld\n", hard, soft);
+
 	hard = (newlim.d_fieldmask & FS_DQ_IHARD) ?
 		(xfs_qcnt_t) newlim.d_ino_hardlimit : INT_GET(ddq->d_ino_hardlimit, ARCH_CONVERT);
 	soft = (newlim.d_fieldmask & FS_DQ_ISOFT) ?
@@ -693,10 +682,9 @@ xfs_qm_scall_setqlim(
 		INT_SET(ddq->d_ino_hardlimit, ARCH_CONVERT, hard);
 		INT_SET(ddq->d_ino_softlimit, ARCH_CONVERT, soft);
 	}
-#ifdef QUOTADEBUG
 	else 
-		printk("ihard %Ld < isoft %Ld\n", hard, soft);
-#endif		
+		qdprintk("ihard %Ld < isoft %Ld\n", hard, soft);
+
 	if (id == 0) {
 		/*
 		 * Timelimits for the super user set the relative time
@@ -715,23 +703,6 @@ xfs_qm_scall_setqlim(
 			mp->m_quotainfo->qi_rtbtimelimit = newlim.d_rtbtimer;
 			INT_SET(dqp->q_core.d_rtbtimer, ARCH_CONVERT, newlim.d_rtbtimer);
 		}
-#ifdef NOTYET
-		/*
-		 * Ditto, for warning limits.
-		 * XXXthese aren't quite in use yet.
-		 */
-		if (newlim.d_bwarns > 0) {
-			mp->m_quotainfo->qi_bwarnlimit = newlim.d_bwarns;
-			INT_SET(dqp->q_core.d_bwarns, ARCH_CONVERT, newlim.d_bwarns);
-		}
-		if (newlim.d_iwarns > 0) {
-			mp->m_quotainfo->qi_iwarnlimit = newlim.d_iwarns;
-			INT_SET(dqp->q_core.d_iwarns, ARCH_CONVERT, newlim.d_iwarns);
-		}
-		if (newlim.d_rtbwarns > 0) {
-			INT_SET(dqp->q_core.d_rtbwarns, ARCH_CONVERT, newlim.d_rtbwarns);
-		}
-#endif
 	} else /* if (XFS_IS_QUOTA_ENFORCED(mp)) */ {
 		/*
 		 * If the user is now over quota, start the timelimit.
@@ -934,8 +905,8 @@ xfs_qm_export_dquot(
 		dst->d_itimer = 0;
 		dst->d_rtbtimer = 0;
 	}
-	
-#ifdef QUOTADEBUG	
+
+#ifdef DEBUG	
 	if (XFS_IS_QUOTA_ENFORCED(mp) && dst->d_id != 0) {
 		if (((int) dst->d_bcount >= (int) dst->d_blk_softlimit) &&
 		    (dst->d_blk_softlimit > 0)) {
@@ -947,7 +918,7 @@ xfs_qm_export_dquot(
 		}
 	}
 #endif
-}	
+}
 
 STATIC uint
 xfs_qm_import_qtype_flags(

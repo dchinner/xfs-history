@@ -79,13 +79,8 @@ extern int cxfs_parseargs(char *, int, struct xfs_args *);
 # define set_max_bytes(sb)	do { } while (0)
 #endif
 
-#ifdef CONFIG_XFS_QUOTA
-# define set_quotactl(sb)	((sb)->s_dquot.quotactl = linvfs_quotactl)
-#else
-# define set_quotactl(sb)	do { } while (0)
-#endif
-
 static struct super_operations linvfs_sops;
+static struct quota_operations linvfs_qops;
 
 #define MNTOPT_LOGBUFS  "logbufs"       /* number of XFS log buffers */
 #define MNTOPT_LOGBSIZE "logbsize"      /* size of XFS log buffers */
@@ -381,28 +376,44 @@ linvfs_release_buftarg(
 	}
 }
 
-#ifdef CONFIG_XFS_QUOTA
 STATIC int
 linvfs_quotactl(
 	struct super_block *sb,
 	int		cmd,
 	int		type,
-	int		id,
+	qid_t		id,
 	void		*addr)
 {
 	xfs_mount_t	*mp;
 	vfs_t		*vfsp;
 	int		error;
 
-	if (!IS_XQM_CMD(cmd))
-		return -EINVAL;
-
-	if (type == USRQUOTA)
+	error = -EINVAL;
+	switch (type) {
+	case USRQUOTA:
 		type = XFS_DQ_USER;
-	else if (type == GRPQUOTA)
+		break;
+	case GRPQUOTA:
 		type = XFS_DQ_GROUP;
-	else
-		return -EINVAL;
+		break;
+	default:
+		return error;
+	}
+
+	error = -EPERM;
+	switch (cmd) {
+	case Q_XGETQSTAT:
+		break;
+	case Q_XGETQUOTA:
+		if (((type == XFS_DQ_USER && current->euid != id) ||
+		     (type == XFS_DQ_GROUP && !in_egroup_p(id))) &&
+		    !capable(CAP_SYS_RESOURCE))
+			return error;
+		break;
+	default:
+		if (!capable(CAP_SYS_RESOURCE))
+			return error;
+	}
 
 	vfsp = LINVFS_GET_VFS(sb);
 	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
@@ -410,10 +421,9 @@ linvfs_quotactl(
 
 	error = xfs_quotactl(mp, vfsp, cmd, id, type, (caddr_t)addr);
 	if (error)
-		return -error;
-	return 0;
+		error = -error;
+	return error;
 }
-#endif
 
 struct super_block *
 linvfs_read_super(
@@ -483,8 +493,8 @@ linvfs_read_super(
 	set_blocksize(sb->s_dev, 512);
 	set_posix_acl(sb);
 	set_max_bytes(sb);
-	set_quotactl(sb);
 	sb->s_op = &linvfs_sops;
+	sb->s_qop = &linvfs_qops;
 
 	LINVFS_SET_VFS(sb, vfsp);
 
@@ -851,6 +861,10 @@ static struct super_operations linvfs_sops = {
 	unlockfs:		linvfs_unfreeze_fs,
 	statfs:			linvfs_statfs,
 	remount_fs:		linvfs_remount
+};
+
+static struct quota_operations linvfs_qops = {
+	quotactl:		linvfs_quotactl
 };
 
 DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);

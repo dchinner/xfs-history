@@ -188,10 +188,6 @@ typedef struct xfs_dquot_acct {
 #define XFS_QM_HOLD(xqm)	((xqm)->qm_nrefs++)
 #define XFS_QM_RELE(xqm)	((xqm)->qm_nrefs--)
 
-#ifdef DEBUG
-extern int		xfs_qm_internalqcheck(xfs_mount_t *);
-#endif 
-
 extern int		xfs_qm_init_quotainfo(xfs_mount_t *);
 extern void 		xfs_qm_destroy_quotainfo(xfs_mount_t *);
 extern void		xfs_qm_dqunlink(xfs_dquot_t *);
@@ -209,10 +205,16 @@ extern int		xfs_qm_freelist_lock_nowait(xfs_qm_t *);
 extern int		xfs_qm_mplist_nowait(xfs_mount_t *);
 extern int		xfs_qm_dqhashlock_nowait(xfs_dquot_t *);
 
+#ifdef DEBUG
+extern int		xfs_qm_internalqcheck(xfs_mount_t *);
+#else
+#define xfs_qm_internalqcheck(mp)	(0)
+#endif
+
 #ifdef QUOTADEBUG
 extern void		xfs_qm_freelist_print(xfs_frlist_t *, char *);
 #else
-#define xfs_qm_freelist_print(a, b)
+#define xfs_qm_freelist_print(a, b)	do { } while (0)
 #endif
 
 #endif /* __XFS_QM_H__ */
