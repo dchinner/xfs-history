@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.182 $"
+#ident	"$Revision: 1.183 $"
 
 #include <xfs_os_defs.h>
 
@@ -343,7 +343,7 @@ xlog_find_verify_log_record(xfs_caddr_t	ba,	     /* update ptr as we go */
     for (i=(*last_blk)-1; i>=0; i--) {
 	if (i < start_blk) {
 	    /* legal log record not found */
-	    xlog_warn("XFS: xlog_find_verify_log_record: need to backup");
+	    xlog_warn("XFS: xlog_find_verify_log_record: need to back-up");
 	    ASSERT(0);
 	    return XFS_ERROR(EIO);
 	}
@@ -407,7 +407,7 @@ xlog_find_head(xlog_t  *log,
 	*return_head_blk = first_blk;
 	return 0;
     } else if (error) {
-        xlog_warn("XFS: empty log check failed\n");
+        xlog_warn("XFS: empty log check failed");
 	return error;
     }
 
@@ -637,7 +637,7 @@ bp_err:
 	xlog_put_bp(bp);
 
         if (error)
-            xlog_warn("XFS: failed to find log head\n");
+            xlog_warn("XFS: failed to find log head");
             
 	return error;
 }	/* xlog_find_head */
@@ -647,65 +647,62 @@ bp_err:
  * make sure that we're mounting (a) a real log, and (b) the log associated
  * with this filesystem.
  *
- * It was added to support external logs on Linux, but could be used to support
- * non-volume-managed external logs on other OSes.
+ * It was added to support external logs on Linux, but could be used to
+ * support non-volume-managed external logs on other OSes.
  */
-STATIC int
+int
 xlog_test_footer(xlog_t *log)
 {
 	int error = 0;
 	xfs_buf_t *bp;
+        xlog_volume_footer_t *rfoot;
+        unsigned char b_magic[]={
+            0x70, 0x68, 0x69, 0x6c,  /* declare as bytes to avoid */
+            0x26, 0x6d, 0x6b, 0x70,  /* endian confusion - uuids  */
+            0x77, 0x65, 0x72, 0x65,  /* are really a byte string! */
+            0x68, 0x65, 0x72, 0x65
+        };
+	uuid_t *magic=(uuid_t*)b_magic;
+        uint_t status;
+        
+        /* do we have an external log? */
+	if (log->l_mp->m_sb.sb_logstart != 0)
+            return 0;
 
 	bp = xlog_get_bp(1, log->l_mp);
 
-	if (log->l_mp->m_sb.sb_logstart == 0) {
-		uint_t status;
-		xlog_volume_footer_t *rfoot;
-                
-                unsigned char b_magic[]={
-                    0x70, 0x68, 0x69, 0x6c,  /* declare as bytes to avoid */
-                    0x26, 0x6d, 0x6b, 0x70,  /* endian confusion - uuids  */
-                    0x77, 0x65, 0x72, 0x65,  /* are really a byte string! */
-                    0x68, 0x65, 0x72, 0x65
-                };
-		uuid_t *magic=(uuid_t*)b_magic;
-                
-		/* Read in the last physical block of the log and check its
-		 * magic goo. */
-		if (error = xlog_bread(log, log->l_logBBsize - 1, 1, bp)) {
-  		        xlog_warn("XFS: failed to read external log footer\n");
-			goto exit;
+        /* Read in the last physical block of the log and check its
+	 * magic goo. */
+        if (error = xlog_bread(log, log->l_logBBsize - 1, 1, bp)) {
+  	        xlog_warn("XFS: failed to read external log footer");
+                error = XFS_ERROR(EINVAL);
+        } else {
+                rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
+
+                if (uuid_compare(&rfoot->f_magic, magic, &status) == 0) {
+	                /* This has the magic number--it is an external log.
+		         * Now make sure that it's associated with the
+		         * filesystem that we're trying to mount. */
+	                xfs_sb_t *super = &log->l_mp->m_sb;
+
+	                if (uuid_compare(&super->sb_uuid, &rfoot->f_uuid, 
+                            &status)) {
+  		                xlog_warn("XFS: mismatched external log (incorrect uuid)");
+                                error = XFS_ERROR(EINVAL);
+	                } else {
+	                        /* Since the last block of the log is this magic data,
+		                 * decrease the effective size. */
+	                        /* FIXME: is this the right thing to do? */
+	                        log->l_logsize -= BBSIZE;
+	                        log->l_iclog_size -= BBSIZE;
+	                        log->l_logBBsize -= 1;
+                        }
+                } else {
+  	                xlog_warn("XFS: invalid external log footer (not external log)");
+	                error = XFS_ERROR(EINVAL);
                 }
-		rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
-
-		if (uuid_compare(&(rfoot->f_magic), magic, &status) == 0) {
-			/* This has the magic number--it is an external log.
-			 * Now make sure that it's associated with the
-			 * filesystem that we're trying to mount. */
-			xfs_sb_t *super = &log->l_mp->m_sb;
-
-			if (uuid_compare(&(super->sb_uuid), &(rfoot->f_uuid),
-					 &status) != 0) {
-  		                xlog_warn("XFS: mismatched external log\n");
-				xlog_warn("XFS: This is not the log you're looking for.  Are you sure that this is the\n right device?\n");
-				error = XFS_ERROR(EINVAL);
-				goto exit;
-			}
-			/* Since the last block of the log is this magic data,
-			 * decrease the effective size. */
-			/* FIXME: is this the right thing to do? */
-			log->l_logsize -= BBSIZE;
-			log->l_iclog_size -= BBSIZE;
-			log->l_logBBsize -= 1;
-		} else {
-  		        xlog_warn("XFS: invalid external log footer\n");
-			xlog_warn("XFS: Did you use mkfs to create this log?");
-			error = XFS_ERROR(EINVAL);
-			goto exit;
-		}
-	}
-
- exit:
+        }
+        
 	xlog_put_bp(bp);
 
 	return error;
@@ -886,7 +883,7 @@ exit:
 	xlog_put_bp(bp);
 
         if (error) 
-                xlog_warn("XFS: failed to locate log tail\n");
+                xlog_warn("XFS: failed to locate log tail");
 
 	return error;
 }	/* xlog_find_tail */
@@ -2669,7 +2666,7 @@ xlog_recover_process_data(xlog_t	    *log,
 	dp += sizeof(xlog_op_header_t);
 	if (ohead->oh_clientid != XFS_TRANSACTION &&
 	    ohead->oh_clientid != XFS_LOG) {
-	    xlog_warn("XFS: xlog_recover_process_data: bad clientid ");
+	    xlog_warn("XFS: xlog_recover_process_data: bad clientid");
 	    ASSERT(0);
 	    return (XFS_ERROR(EIO));
         }
@@ -3096,10 +3093,10 @@ xlog_unpack_data(xlog_rec_header_t *rhead,
 	    if (!INT_ISZERO(rhead->h_chksum, ARCH_CONVERT) ||
 		((log->l_flags & XLOG_CHKSUM_MISMATCH) == 0)) {
 		    cmn_err(CE_DEBUG,
-		        "XFS: LogR chksum mismatch: was (0x%x) is (0x%x)\n",
+		        "XFS: LogR chksum mismatch: was (0x%x) is (0x%x)",
 			    INT_GET(rhead->h_chksum, ARCH_CONVERT), chksum);
 		    cmn_err(CE_DEBUG,
-"XFS: Disregard message if filesystem was created with non-DEBUG kernel\n");
+"XFS: Disregard message if filesystem was created with non-DEBUG kernel");
 		    log->l_flags |= XLOG_CHKSUM_MISMATCH;
 	    }
         }
@@ -3627,7 +3624,7 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 		break;
 	    } 
 	    default: {
-		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type\n");
+		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type");
 		break;
 	    }
 	}
