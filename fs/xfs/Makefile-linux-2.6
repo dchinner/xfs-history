@@ -7,6 +7,8 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
+XFS_CFLAGS	= -Wstrict-prototypes -O2 -fomit-frame-pointer
+
 EXTRA_CFLAGS += -I.. -I. -D_KERNEL
 
 O_TARGET := xfs.o
@@ -14,7 +16,7 @@ O_TARGET := xfs.o
 LINO_OBJS   := linux/xfs_file.o  linux/xfs_super.o \
  linux/xfs_vnode.o linux/xfs_behavior.o linux/xfs_vfs.o  linux/xfs_random.o \
  linux/xfs_locks.o linux/xfs_globals.o linux/xfs_debug.o linux/xfs_uuid.o \
- linux/xfs_dnlc.o linux/xfs_fs_bio.o linux/xfs_fs_subr.o
+ linux/xfs_dnlc.o linux/xfs_fs_bio.o linux/xfs_fs_subr.o  linux/xfs_griostubs.o
  
 # linux/xfs_inode.o
 
@@ -69,9 +71,18 @@ XFS_OBJS  :=   xfs_alloc.o \
 		xfsquotasstubs.o
 #                xfs_rpc_item.o
  
-O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS)
+O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS) libgcc.a
 
 include $(TOPDIR)/Rules.make
+
+#%.o: %.c
+#	$(CC) $(XFS_CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -c -o $@ $<
+#	@ ( \
+#		echo 'ifeq ($(strip $(subst $(comma),:,$(XFS_CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@))),$$(strip $$(subst $$(comma),:,$$(CFLAGS) $$(EXTRA_CFLAGS) $$(CFLAGS_$@))))' ; \
+#		echo 'FILES_FLAGS_UP_TO_DATE += $@' ; \
+#		echo 'endif' \
+#	) > $(dir $@)/.$(notdir $@).flags
+
 
 libgcc.a:
 		ln -sf `find /usr/lib/gcc-lib -name libgcc.a -print | head -1`   
