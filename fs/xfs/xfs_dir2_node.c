@@ -234,6 +234,10 @@ xfs_dir2_leafn_add(
 	ASSERT(index == 0 || leaf->ents[index - 1].hashval <= args->hashval);
 	ASSERT(index == leaf->hdr.count ||
 	       leaf->ents[index].hashval >= args->hashval);
+	
+	if (args->justcheck)
+		return 0;
+
 	/*
 	 * Compact out all but one stale leaf entry.  Leaves behind
 	 * the entry closest to index.
