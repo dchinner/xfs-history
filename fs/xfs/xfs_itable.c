@@ -323,7 +323,7 @@ xfs_bulkstat(
 		 * We can't hold any of the locks these represent
 		 * when calling iget.
 		 */
-		xfs_btree_del_cursor(cur);
+		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 		xfs_trans_brelse(tp, agbp);
 		/*
 		 * Now format all the good inodes into the user's buffer.
@@ -510,7 +510,7 @@ xfs_inumbers(
 				XFS_BTNUM_INO, (xfs_inode_t *)0, 0);
 			error = xfs_inobt_lookup_ge(cur, agino, 0, 0, &tmp);
 			if (error) {
-				xfs_btree_del_cursor(cur);
+				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				cur = NULL;
 				xfs_trans_brelse(tp, agbp);
 				agbp = NULL;
@@ -526,7 +526,7 @@ xfs_inumbers(
 		if (!xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree)) {
 			xfs_trans_brelse(tp, agbp);
 			agbp = NULL;
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 			cur = NULL;
 			agno++;
 			agino = 0;
@@ -551,7 +551,7 @@ xfs_inumbers(
 		if (left) {
 			error = xfs_inobt_increment(cur, 0, &tmp);
 			if (error) {
-				xfs_btree_del_cursor(cur);
+				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				cur = NULL;
 				xfs_trans_brelse(tp, agbp);
 				agbp = NULL;
@@ -576,7 +576,8 @@ xfs_inumbers(
 	}
 	kmem_free(buffer, bcount * sizeof(*buffer));
 	if (cur)
-		xfs_btree_del_cursor(cur);
+		xfs_btree_del_cursor(cur, (error ? XFS_BTREE_ERROR :
+					   XFS_BTREE_NOERROR));
 	if (agbp)
 		xfs_trans_brelse(tp, agbp);
 	return error;
