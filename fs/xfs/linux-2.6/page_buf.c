@@ -645,7 +645,7 @@ page_buf_t *pagebuf_get(	/* allocate a buffer		*/
 	PB_STATS_INC(pbstats.pb_get);
 
 	/* fill in any missing pages */
-	rval = _pagebuf_lookup_pages(pb, PB_ADDR_SPACE(pb), flags);
+	rval = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
 	if (rval != 0) {
 		pagebuf_free(pb);
 		return (NULL);
