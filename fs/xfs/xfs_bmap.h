@@ -32,18 +32,21 @@ typedef struct xfs_bmbt_rec
 	 ((s).br_startblock = xfs_bmbt_get_startblock(r)), \
 	 ((s).br_blockcount = xfs_bmbt_get_blockcount(r)))
 #define	xfs_bmbt_set_startoff(r,v)	\
-	((r)->l0 = (__uint32_t)((v) >> 23), \
-	 (r)->l1 = ((r)->l1 & 0x000001ff) | ((__uint32_t)(v) & 0x007fffff))
+	(((r)->l0 = (__uint32_t)((v) >> 23)), \
+	 ((r)->l1 = ((r)->l1 & 0x000001ff) | (((__uint32_t)(v)) << 9)))
 #define	xfs_bmbt_set_startblock(r,v)	\
-	((r)->l1 = ((r)->l1 & 0xfffffe00) | (__uint32_t)((v) >> 43), \
-	 (r)->l2 = (__uint32_t)((v) >> 11), \
-	 (r)->l3 = ((r)->l3 & 0x001fffff) | ((__uint32_t)(v) & 0x000007ff))
+	(((r)->l1 = ((r)->l1 & 0xfffffe00) | (__uint32_t)((v) >> 43)), \
+	 ((r)->l2 = (__uint32_t)((v) >> 11)), \
+	 ((r)->l3 = ((r)->l3 & 0x001fffff) | (((__uint32_t)(v)) << 21)))
 #define	xfs_bmbt_set_blockcount(r,v)	\
 	((r)->l3 = ((r)->l3 & 0xffe00000) | ((__uint32_t)(v) & 0x001fffff))
 #define	xfs_bmbt_set_all(r,s)	\
-	(xfs_bmbt_set_startoff(r, (s).br_startoff), \
-	 xfs_bmbt_set_startblock(r, (s).br_startblock), \
-	 xfs_bmbt_set_blockcount(r, (s).br_blockcount))
+	(((r)->l0 = (__uint32_t)((s).br_startoff >> 23)), \
+	 ((r)->l1 = ((((__uint32_t)(s).br_startoff) << 9) | \
+		    ((__uint32_t)((s).br_startblock >> 43)))), \
+	 ((r)->l2 = (__uint32_t)((s).br_startblock >> 11)), \
+	 ((r)->l3 = ((((__uint32_t)(s).br_startblock) << 21) | \
+		    ((__uint32_t)((s).br_blockcount & 0x001fffff)))))
 
 /*
  * Incore version of above.
