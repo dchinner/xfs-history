@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.105 $"
+#ident	"$Revision: 1.106 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2222,8 +2222,19 @@ xlog_recover_do_dquot_buffer(
 	xfs_buf_log_format_t	*buf_f)
 {
 	uint type;
-	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
 
+	/*
+	 * Non-root filesystems are required to send in quota flags
+	 * at mount time. However, we may also get QUOTA_MAYBE flag set,
+	 * indicating that quota should stay on (and stay consistent),
+	 * if it already is. (so, we have to replay dquot log records
+	 * when MAYBE flag's set).
+	 */
+	if (mp->m_qflags == 0 &&
+	    mp->m_dev != rootdev) {
+		return;
+	}
+	
 	type = 0;
 	if (buf_f->blf_flags & XFS_BLI_UDQUOT_BUF)
 		type |= XFS_DQ_USER;
@@ -2334,8 +2345,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	if (flags & XFS_BLI_INODE_BUF) {
 		xlog_recover_do_inode_buffer(mp, item, bp, buf_f);
 	} else if (flags & (XFS_BLI_UDQUOT_BUF | XFS_BLI_PDQUOT_BUF)) {
-		if (XFS_IS_QUOTA_ON(mp))
-			xlog_recover_do_dquot_buffer(mp, log, item, bp, buf_f);
+		xlog_recover_do_dquot_buffer(mp, log, item, bp, buf_f);
 	} else {
 		xlog_recover_do_reg_buffer(mp, item, bp, buf_f);
 	}
@@ -2593,7 +2603,6 @@ xlog_recover_do_quotaoff_trans(xlog_t			*log,
 			       int			pass)
 {
 	xfs_qoff_logformat_t *qoff_f;
-	ASSERT(XFS_IS_QUOTA_RUNNING(log->l_mp));
 
 	if (pass == XLOG_RECOVER_PASS2) {
 		return (0);
@@ -2629,23 +2638,42 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	int			error;
 	xfs_dq_logformat_t	*dq_f;
 	uint			type;
-	mp = log->l_mp;
-
-	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
 
 	if (pass == XLOG_RECOVER_PASS1) {
 		return 0;
 	}
+	mp = log->l_mp;
+
+	/*
+	 * Non-root filesystems are required to send in quota flags
+	 * at mount time. However, we may also get QUOTA_MAYBE flag set,
+	 * indicating that quota should stay on (and stay consistent),
+	 * if it already is. (so, we have to replay dquot log records
+	 * when MAYBE flag's set).
+	 */
+	if (mp->m_qflags == 0 &&
+	    mp->m_dev != rootdev) {
+		return (0);
+	}
+	
 	recddq = (xfs_disk_dquot_t *)item->ri_buf[1].i_addr;
 	ASSERT(recddq);
 	/*
-	 * This type of quotas was turned off, so ignore this buffer
+	 * This type of quotas was turned off, so ignore this record.
 	 */
 	type = recddq->d_flags & (XFS_DQ_USER|XFS_DQ_PROJ);
 	ASSERT(type);
 	if (log->l_quotaoffs_flag & type) 
 		return (0);
 
+	/*
+	 * At this point we know that if we are recovering a root filesystem
+	 * then quota was _not_ turned off. Since there is no other flag
+	 * indicate to us otherwise, this must mean that quota's on, 
+	 * and the dquot needs to be replayed. Remember that we may not have
+	 * fully recovered the superblock yet, so we can't do the usual trick
+	 * of looking at the SB quota bits.
+	 */
 	dq_f = (xfs_dq_logformat_t *)item->ri_buf[0].i_addr;
 	ASSERT(dq_f);
 	if (xfs_qm_dqcheck(recddq, 
@@ -2669,7 +2697,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		brelse(bp);
 		return error;
 	}
-	ddq = (xfs_disk_dquot_t *)((char *)bp->b_un.b_addr + dq_f->qlf_boffset);
+	ddq = (xfs_disk_dquot_t *) ((char *)bp->b_un.b_addr + dq_f->qlf_boffset);
 	
 	/* 
 	 * At least the magic num portion should be on disk because this
@@ -2865,19 +2893,13 @@ xlog_recover_do_trans(xlog_t	     *log,
 		} else if (ITEM_TYPE(item) == XFS_LI_EFD) {
 			xlog_recover_do_efd_trans(log, item, pass);
 		} else if (ITEM_TYPE(item) == XFS_LI_DQUOT) {
-			if (XFS_IS_QUOTA_ON(log->l_mp)) {
-				if (error = 
-				    xlog_recover_do_dquot_trans(log, item, 
-								pass))
-					break;
-			}
-		} else if ((ITEM_TYPE(item) == XFS_LI_QUOTAOFF)) {
-			if (XFS_IS_QUOTA_ON(log->l_mp)) {
-				if (error = 
-				    xlog_recover_do_quotaoff_trans(log, item, 
+			if (error = xlog_recover_do_dquot_trans(log, item,
 								   pass))
 					break;
-			}
+		} else if ((ITEM_TYPE(item) == XFS_LI_QUOTAOFF)) {
+			if (error = xlog_recover_do_quotaoff_trans(log, item,
+								   pass))
+					break;
 		} else {
 			xlog_warn("XFS: xlog_recover_do_trans");
 			ASSERT(0);
@@ -3819,13 +3841,13 @@ xlog_recover_check_summary(xlog_t	*log)
 #ifdef XFS_LOUD_RECOVERY
 	sbp = XFS_BUF_TO_SBP(sbbp);
 	cmn_err(CE_NOTE,
-		"xlog_recover_check_summary: sb_icount %lld itotal %lld",
+		"xlog_recover_check_summary: sb_icount %llu itotal %llu",
 		sbp->sb_icount, itotal);
 	cmn_err(CE_NOTE,
-		"xlog_recover_check_summary: sb_ifree %lld itotal %lld",
+		"xlog_recover_check_summary: sb_ifree %llu itotal %llu",
 		sbp->sb_ifree, ifree);
 	cmn_err(CE_NOTE,
-		"xlog_recover_check_summary: sb_fdblocks %lld freeblks %lld",
+		"xlog_recover_check_summary: sb_fdblocks %llu freeblks %llu",
 		sbp->sb_fdblocks, freeblks);
 #if 0
 	/*
