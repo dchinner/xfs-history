@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.193 $"
+#ident	"$Revision: 1.194 $"
 
 /*
  * High level interface routines for log manager
@@ -155,6 +155,7 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
+extern void ktrace_free(struct ktrace *ktp);
 #ifdef XFSDEBUG
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
 #endif
@@ -549,8 +550,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	 */
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY)) {
 		if ((error = xlog_recover(log,
-					XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY))
-				!= NULL) {
+				XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)) != 0) {
 			xlog_unalloc_log(log);
 		}
 	} else
@@ -3348,7 +3348,11 @@ xlog_verify_iclog(xlog_t	 *log,
 			clientid = ophead->oh_clientid;
 		} else {
 			idx = BTOBB(&ophead->oh_clientid - iclog->ic_data);
-			clientid = iclog->ic_header.h_cycle_data[idx]>>24;
+#ifdef __LITTLE_ENDIAN
+			clientid = iclog->ic_header.h_cycle_data[idx] & 0xff;
+#else
+			clientid = iclog->ic_header.h_cycle_data[idx] >> 24;
+#endif
 		}
 		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
 			xlog_panic("xlog_verify_iclog: illegal client");

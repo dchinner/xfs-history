@@ -1,4 +1,4 @@
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -598,7 +598,7 @@ xfs_ail_check(
 	while (lip != (xfs_log_item_t*)base) {
 		if (prev_lip != (xfs_log_item_t*)base) {
 			ASSERT(prev_lip->li_ail.ail_forw == lip);
-			ASSERT(prev_lip->li_lsn <= lip->li_lsn);
+			ASSERT(XFS_LSN_CMP(prev_lip->li_lsn, lip->li_lsn) <= 0);
 		}
 		ASSERT(lip->li_ail.ail_back == prev_lip);
 		ASSERT((lip->li_flags & XFS_LI_IN_AIL) != 0);

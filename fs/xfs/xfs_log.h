@@ -19,7 +19,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.42 $"
 
 #ifdef __LITTLE_ENDIAN
 /* Since the lsn comes out with the cycle number in the least significant
@@ -28,25 +28,22 @@
  * less code than a 64 bit compare anyway.
  */
 
-#ifndef CYCLE_LSN
-#define CYCLE_LSN(lsn)          (((uint *)&(lsn))[0])
-#define BLOCK_LSN(lsn)          (((uint *)&(lsn))[1])
-#define __REMOVE_CYCLE__
-#endif
+/*
+ * We need the signed in stuff here since we are trying to return
+ * negative values.
+ */
+
+#define CMP_CYCLE_LSN(lsn)          (((__int32_t *)&(lsn))[0])
+#define CMP_BLOCK_LSN(lsn)          (((__int32_t *)&(lsn))[1])
 
 static inline xfs_lsn_t	_lsn_cmp(xfs_lsn_t lsn1, xfs_lsn_t lsn2)
 {
-	if (CYCLE_LSN(lsn1) != CYCLE_LSN(lsn2)) {
-		return (CYCLE_LSN(lsn1) - CYCLE_LSN(lsn2));
+	if (CMP_CYCLE_LSN(lsn1) != CMP_CYCLE_LSN(lsn2)) {
+		return (CMP_CYCLE_LSN(lsn1) - CMP_CYCLE_LSN(lsn2));
 	}
 
-	return (BLOCK_LSN(lsn1) - BLOCK_LSN(lsn2));
+	return (CMP_BLOCK_LSN(lsn1) - CMP_BLOCK_LSN(lsn2));
 }
-
-#ifdef __REMOVE_CYCLE__
-#undef CYCLE_LSN
-#undef BLOCK_LSN
-#endif
 
 #define	XFS_LSN_CMP(x,y)	_lsn_cmp(x, y)
 #define	XFS_LSN_DIFF(x,y)	_lsn_cmp(x, y)

@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.236 $"
+#ident	"$Revision: 1.237 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -100,6 +100,12 @@
 
 #ifdef DEBUG
 ktrace_t	*xfs_bmap_trace_buf;
+#endif
+
+#ifdef XFSDEBUG
+#include "xfs_buf_item.h"
+STATIC void
+xfs_bmap_check_leaf_extents(xfs_btree_cur_t *cur, xfs_inode_t *ip, int whichfork);
 #endif
 
 zone_t		*xfs_bmap_free_item_zone;
@@ -737,6 +743,10 @@ xfs_bmap_add_extent(
 		*curp = cur;
 	}
 done:
+#ifdef XFSDEBUG
+	if (!error)
+		xfs_bmap_check_leaf_extents(*curp, ip, whichfork);
+#endif
 	*logflagsp = logflags;
 	return error;
 }
@@ -5893,6 +5903,283 @@ xfs_bmap_check_extents(
 	}
 }
 
+STATIC
+xfs_buf_t *
+xfs_bmap_get_bp(
+	xfs_btree_cur_t         *cur,
+	xfs_fsblock_t		bno)
+{
+	int i;
+	xfs_buf_t *bp;
+
+	if (!cur)
+		return(NULL);
+	
+	bp = NULL;
+	for(i = 0; i < XFS_BTREE_MAXLEVELS; i++) {
+		bp = cur->bc_bufs[i];
+		if (!bp) break;
+		if (XFS_BUF_ADDR(bp) == bno)
+			break;	/* Found it */
+	}
+	if (i == XFS_BTREE_MAXLEVELS)
+		bp = NULL;
+
+	if (!bp) { /* Chase down all the log items to see if the bp is there */
+		xfs_log_item_chunk_t    *licp;
+		xfs_trans_t		*tp;
+
+		tp = cur->bc_tp;
+		licp = &tp->t_items;
+		while (!bp && licp != NULL) {
+			if (XFS_LIC_ARE_ALL_FREE(licp)) {
+				licp = licp->lic_next;
+				continue;
+			}
+			for (i = 0; i < licp->lic_unused; i++) {
+				xfs_log_item_desc_t	*lidp;
+				xfs_log_item_t		*lip;
+				xfs_buf_log_item_t	*bip;
+				xfs_buf_t		*lbp;
+
+				if (XFS_LIC_ISFREE(licp, i)) {
+					continue;
+				}
+
+				lidp = XFS_LIC_SLOT(licp, i);
+				lip = lidp->lid_item;
+				if (lip->li_type != XFS_LI_BUF)
+					continue;
+
+				bip = (xfs_buf_log_item_t *)lip;
+				lbp = bip->bli_buf;
+
+				if (XFS_BUF_ADDR(lbp) == bno) {
+					bp = lbp;
+					break; /* Found it */
+				}
+			}
+			licp = licp->lic_next;
+		}
+	}
+	return(bp);
+}
+
+void
+xfs_check_block(
+	xfs_bmbt_block_t        *block,
+	xfs_mount_t		*mp,
+	int			root,
+	short			sz)
+{
+	int			i, j, dmxr;
+	xfs_bmbt_ptr_t		*pp, *thispa;	/* pointer to block address */
+	xfs_bmbt_key_t		*prevp, *keyp;
+
+	ASSERT(block->bb_level > 0);
+
+	prevp = NULL;
+	for( i = 1; i <= block->bb_numrecs;i++) {
+		dmxr = mp->m_bmap_dmxr[0];
+
+		if (root) {
+			keyp = XFS_BMAP_BROOT_KEY_ADDR(block, i, sz);
+		} else {
+			keyp = XFS_BTREE_KEY_ADDR(mp->m_sb.sb_blocksize,
+				xfs_bmbt, block, i, dmxr);
+		}
+
+		if (prevp) {
+			xfs_btree_check_key(XFS_BTNUM_BMAP, prevp, keyp);
+		}
+		prevp = keyp;
+
+		/*
+		 * Compare the block numbers to see if there are dups.
+		 */
+
+		if (root) {
+			pp = XFS_BMAP_BROOT_PTR_ADDR(block, i, sz);
+		} else {
+			pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize,
+				xfs_bmbt, block, i, dmxr);
+		}
+		for (j = i+1; j <= block->bb_numrecs; j++) {
+			if (root) {
+				thispa = XFS_BMAP_BROOT_PTR_ADDR(block, j, sz);
+			} else {
+				thispa = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize,
+					xfs_bmbt, block, j, dmxr);
+			}
+			if (*thispa == *pp) {
+				printk("xfs_check_block: thispa(%d) == pp(%d) %lld\n",
+						j, i, *thispa);
+				panic("xfs_check_block: ptrs are equal in node\n");
+			}
+		}
+	}
+}
+
+/*
+ * Check that the extents for the inode ip are in the right order in all
+ * btree leaves.
+ */
+
+STATIC void
+xfs_bmap_check_leaf_extents(
+	xfs_btree_cur_t		*cur,	/* btree cursor or null */
+	xfs_inode_t		*ip,		/* incore inode pointer */
+	int			whichfork)	/* data or attr fork */
+{
+	xfs_bmbt_block_t	*block;	/* current btree block */
+	xfs_fsblock_t		bno;	/* block # of "block" */
+	xfs_buf_t		*bp;	/* buffer for "block" */
+	int			error;	/* error return value */
+	xfs_extnum_t		i;	/* index into the extents list */
+	xfs_ifork_t		*ifp;	/* fork structure */
+	int			level;	/* btree level, for checking */
+	xfs_mount_t		*mp;	/* file system mount structure */
+	xfs_bmbt_ptr_t		*pp;	/* pointer to block address */
+	xfs_bmbt_rec_t		*ep, *lastp;	/* extent pointers in block entry */
+	int			bp_release = 0;
+
+	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE) {
+		return;
+	}
+
+	bno = NULLFSBLOCK;
+	mp = ip->i_mount;
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	block = ifp->if_broot;
+	/*
+	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
+	 */
+	ASSERT(block->bb_level > 0);
+	level = block->bb_level;
+	xfs_check_block(block, mp, 1, ifp->if_broot_bytes);
+	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
+	ASSERT(*pp != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
+	bno = *pp;
+	/*
+	 * Go down the tree until leaf level is reached, following the first
+	 * pointer (leftmost) at each level.
+	 */
+	while (level-- > 0) {
+		/* See if buf is in cur first */
+		bp = xfs_bmap_get_bp(cur, XFS_FSB_TO_DADDR(mp, bno));
+		if (bp) {
+			bp_release = 0;
+		} else {
+			bp_release = 1;
+		}
+		if (!bp && (error = xfs_btree_read_bufl(mp, NULL, bno, 0, &bp,
+				XFS_BMAP_BTREE_REF)))
+			goto error_norelse;
+		block = XFS_BUF_TO_BMBT_BLOCK(bp);
+		XFS_WANT_CORRUPTED_GOTO(
+			XFS_BMAP_SANITY_CHECK(mp, block, level),
+			error0);
+		if (level == 0)
+			break;
+		
+		/*
+		 * Check this block for basic sanity (increasing keys and
+		 * no duplicate blocks).
+		 */
+
+		xfs_check_block(block, mp, 0, 0);
+		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
+			1, mp->m_bmap_dmxr[1]);
+		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, *pp), error0);
+		bno = *pp;
+		if (bp_release) {
+			bp_release = 0;
+			xfs_trans_brelse(NULL, bp);
+		}
+	}
+
+	/*
+	 * Here with bp and block set to the leftmost leaf node in the tree.
+	 */
+	i = 0;
+
+	/*
+	 * Loop over all leaf nodes checking that all extents are in the right order.
+	 */
+	lastp = NULL;
+	for (;;) {
+		xfs_bmbt_rec_t	*frp;
+		xfs_fsblock_t	nextbno;
+		xfs_extnum_t	num_recs;
+
+
+		num_recs = block->bb_numrecs;
+
+		/*
+		 * Read-ahead the next leaf block, if any.
+		 */
+
+		nextbno = block->bb_rightsib;
+
+		/*
+		 * Check all the extents to make sure they are OK.
+		 * If we had a previous block, the last entry should
+		 * conform with the first entry in this one.
+		 */
+
+		frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt,
+			block, 1, mp->m_bmap_dmxr[0]);
+
+		for (ep = frp;ep < frp + (num_recs - 1); ep++) {
+			if (lastp) {
+				xfs_btree_check_rec(XFS_BTNUM_BMAP,
+					(void *)lastp, (void *)ep);
+			}
+			xfs_btree_check_rec(XFS_BTNUM_BMAP, (void *)ep,
+				(void *)(ep + 1));
+		}
+		lastp = frp + num_recs - 1; /* For the next iteration */
+
+		i += num_recs;
+		if (bp_release) {
+			bp_release = 0;
+			xfs_trans_brelse(NULL, bp);
+		}
+		bno = nextbno;
+		/*
+		 * If we've reached the end, stop.
+		 */
+		if (bno == NULLFSBLOCK)
+			break;
+
+		bp = xfs_bmap_get_bp(cur, XFS_FSB_TO_DADDR(mp, bno));
+		if (bp) {
+			bp_release = 0;
+		} else {
+			bp_release = 1;
+		}
+		if (!bp && (error = xfs_btree_read_bufl(mp, NULL, bno, 0, &bp,
+				XFS_BMAP_BTREE_REF)))
+			goto error_norelse;
+		block = XFS_BUF_TO_BMBT_BLOCK(bp);
+	}
+	if (bp_release) {
+		bp_release = 0;
+		xfs_trans_brelse(NULL, bp);
+	}
+	return;
+
+error0:
+	printk("at error0\n");
+	if (bp_release)
+		xfs_trans_brelse(NULL, bp);
+error_norelse:
+	printk("xfs_bmap_check_leaf_extents: BAD after btree leaves for %d extents\n", i);
+	panic("xfs_bmap_check_leaf_extents: CORRUPTED BTREE OR SOMETHING");
+	return;
+}
 #endif
 
 /*

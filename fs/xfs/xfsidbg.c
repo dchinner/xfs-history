@@ -15,7 +15,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  **************************************************************************/
-#ident	"$Revision: 1.113 $"
+#ident	"$Revision: 1.114 $"
 
 #define FSID_T
 #include <sys/types.h>
@@ -115,7 +115,7 @@ static void	xfsidbg_xattrleaf(xfs_attr_leafblock_t *);
 static void	xfsidbg_xattrsf(xfs_attr_shortform_t *);
 static void 	xfsidbg_xbirec(xfs_bmbt_irec_t *r);
 static void	xfsidbg_xbmalla(xfs_bmalloca_t *);
-static void	xfsidbg_xbrec(xfs_bmbt_rec_32_t *);
+static void	xfsidbg_xbrec(xfs_bmbt_rec_64_t *);
 static void	xfsidbg_xbroot(xfs_inode_t *);
 static void	xfsidbg_xbroota(xfs_inode_t *);
 static void	xfsidbg_xbtcur(xfs_btree_cur_t *);
@@ -372,7 +372,7 @@ static int	kdbm_xfs_xbrec(
 	if (diag)
 		return diag;
 
-	xfsidbg_xbrec((xfs_bmbt_rec_32_t *) addr);
+	xfsidbg_xbrec((xfs_bmbt_rec_64_t *) addr);
 	return 0;
 }
 
@@ -1317,7 +1317,7 @@ static struct xif {
 				"Dump XFS bmap incore record"},
   {  "xbmalla",	kdbm_xfs_xbmalla,	"<xfs_bmalloca_t>",
 				"Dump XFS bmalloc args structure"},
-  {  "xbrec",	kdbm_xfs_xbrec,		"<xfs_bmbt_rec_32_t",
+  {  "xbrec",	kdbm_xfs_xbrec,		"<xfs_bmbt_rec_64_t",
 			 	"Dump XFS bmap record"},
   {  "xbroot",	kdbm_xfs_xbroot,	"<xfs_inode_t>",
 			 	"Dump XFS bmap btree root (data)"},
@@ -1499,7 +1499,7 @@ static void xfs_btalloc(xfs_alloc_block_t *bt, int bsz);
 static void xfs_btbmap(xfs_bmbt_block_t *bt, int bsz);
 static void xfs_btino(xfs_inobt_block_t *bt, int bsz);
 static void xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary);
-static void xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op,
+static void xfs_convert_extent(xfs_bmbt_rec_64_t *rp, xfs_dfiloff_t *op,
 			xfs_dfsbno_t *sp, xfs_dfilblks_t *cp, int *fp);
 static void xfs_dastate_path(xfs_da_state_path_t *p);
 static void xfs_dir2data(void *addr, int size);
@@ -1607,13 +1607,13 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 	if (bt->bb_level == 0) {
 
 		for (i = 1; i <= bt->bb_numrecs; i++) {
-			xfs_bmbt_rec_32_t *r;
+			xfs_bmbt_rec_64_t *r;
 			xfs_dfiloff_t o;
 			xfs_dfsbno_t s;
 			xfs_dfilblks_t c;
 			int fl;
 
-			r = (xfs_bmbt_rec_32_t *)XFS_BTREE_REC_ADDR(bsz,
+			r = (xfs_bmbt_rec_64_t *)XFS_BTREE_REC_ADDR(bsz,
 				xfs_bmbt, bt, i, 0);
 			xfs_convert_extent(r, &o, &s, &c, &fl);
 			qprintf("rec %d startoff %lld ", i, o);
@@ -1723,7 +1723,7 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
  * Convert an external extent descriptor to internal form.
  */
 static void
-xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
+xfs_convert_extent(xfs_bmbt_rec_64_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 		   xfs_dfilblks_t *cp, int *fp)
 {
 	xfs_dfiloff_t o;
@@ -1731,6 +1731,7 @@ xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 	xfs_dfilblks_t c;
 	int flag;
 
+#ifndef __linux__
 	flag = (((xfs_dfiloff_t)rp->l0) >> 31) & 1;
 	o = ((((xfs_dfiloff_t)rp->l0) & 0x7fffffff) << 23) |
 	    (((xfs_dfiloff_t)rp->l1) >> 9);
@@ -1738,6 +1739,14 @@ xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op, xfs_dfsbno_t *sp,
 	    (((xfs_dfsbno_t)rp->l2) << 11) |
 	    (((xfs_dfsbno_t)rp->l3) >> 21);
 	c = (xfs_dfilblks_t)(rp->l3 & 0x001fffff);
+#else /* __linux__ */
+	flag = (int)((rp->l0) >> (64 - 1 ));
+	o = ((xfs_fileoff_t)rp->l0 &
+			   (((__uint64_t)1 << ( 64 - 1  )) - 1) ) >> 9;
+	s = (((xfs_fsblock_t)rp->l0 & (((__uint64_t)1 << ( 9 )) - 1) ) << 43) | 
+			   (((xfs_fsblock_t)rp->l1) >> 21);
+	c = (xfs_filblks_t)(rp->l1 & (((__uint64_t)1 << ( 21 )) - 1) );
+#endif
 	*op = o;
 	*sp = s;
 	*cp = c;
@@ -1864,7 +1873,7 @@ xfs_fmtfsblock(xfs_fsblock_t bno, xfs_mount_t *mp)
 	if (bno == NULLFSBLOCK)
 		sprintf(rval, "NULLFSBLOCK");
 	else if (ISNULLSTARTBLOCK(bno))
-		sprintf(rval, "NULLSTARTBLOCK(%d)", STARTBLOCKVAL(bno));
+		sprintf(rval, "NULLSTARTBLOCK(%lld)", STARTBLOCKVAL(bno));
 	else if (mp)
 		sprintf(rval, "%lld[%x:%x]", (xfs_dfsbno_t)bno,
 			XFS_FSB_TO_AGNO(mp, bno), XFS_FSB_TO_AGBNO(mp, bno));
@@ -1955,7 +1964,11 @@ xfs_fmtuuid(uuid_t *uu)
 	uint *ip = (uint *)uu;
 
 	ASSERT(sizeof(*uu) == 16);
-	sprintf(rval, "%w32x:%w32x:%w32x:%w32x", ip[0], ip[1], ip[2], ip[3]);
+#ifndef __linux__
+	sprintf(rval, "%32x:%w32x:%w32x:%w32x", ip[0], ip[1], ip[2], ip[3]);
+#else
+	sprintf(rval, "%x:%x:%x:%x", ip[0], ip[1], ip[2], ip[3]);
+#endif
 	return rval;
 }
 
@@ -2134,12 +2147,12 @@ xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	if (ifp->if_flags & XFS_IFEXTENTS) {
-		nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_32_t);
+		nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_64_t);
 		qprintf("inode 0x%p %cf extents 0x%p nextents 0x%x\n",
 			ip, "da"[whichfork], ifp->if_u1.if_extents, nextents);
 		for (i = 0; i < nextents; i++) {
 			xfs_convert_extent(
-				(xfs_bmbt_rec_32_t *)&ifp->if_u1.if_extents[i],
+				(xfs_bmbt_rec_64_t *)&ifp->if_u1.if_extents[i],
 				&o, &s, &c, &flag);
 			qprintf(
 		"%d: startoff %lld startblock %s blockcount %lld flag %d\n",
@@ -2416,7 +2429,7 @@ xfsidbg_xbmalla(xfs_bmalloca_t *a)
  * Print xfs bmap record
  */
 static void
-xfsidbg_xbrec(xfs_bmbt_rec_32_t *r)
+xfsidbg_xbrec(xfs_bmbt_rec_64_t *r)
 {
 	xfs_dfiloff_t o;
 	xfs_dfsbno_t s;

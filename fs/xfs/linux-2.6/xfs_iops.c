@@ -678,10 +678,8 @@ linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
 	
 	vp = LINVFS_GET_VP(inode);
 
-	VOP_RWLOCK(vp, VRWLOCK_READ);
 	VOP_BMAP(vp, page->offset, offset+bytes, B_WRITE,
 		(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
-	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	if (error)
 		return -EIO;
 
@@ -818,10 +816,8 @@ linvfs_pb_bmap(struct inode *inode,
 
 	*retpbbm = maxpbbm;
 
-	VOP_RWLOCK(vp, VRWLOCK_READ);
 	VOP_BMAP(vp, offset, count, vop_flags,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
-	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 
 	return error;
 }

@@ -2133,7 +2133,7 @@ xfs_iroot_realloc(
 		/*
 		 * This depends on bcopy() handling overlapping buffers.
 		 */
-		bcopy(op, np, cur_max * (uint)sizeof(xfs_dfsbno_t));
+		ovbcopy(op, np, cur_max * (uint)sizeof(xfs_dfsbno_t));
 		return;
 	}
 

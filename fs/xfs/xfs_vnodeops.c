@@ -16,7 +16,7 @@
  * along with this program; if not, write the Free Software Foundation,
  * Inc., 59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.431 $"
+#ident "$Revision: 1.432 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -7077,8 +7077,8 @@ vnodeops_t xfs_vnodeops = {
 	xfs_inactive,
 	(vop_fid_t)fs_nosys,/* xfs_fid, */
 	(vop_fid2_t)fs_nosys,/* xfs_fid2, */
-   	(vop_rwlock_t)fs_nosys,/* xfs_rwlock, */
-	(vop_rwunlock_t)fs_nosys,/* xfs_rwunlock, */
+   	(vop_rwlock_t)xfs_rwlock,/* fs_nosys, */
+	(vop_rwunlock_t)xfs_rwunlock,/* fs_nosys, */
 	xfs_seek,
 	(vop_cmp_t)fs_nosys,/* fs_cmp, */
 	(vop_frlock_t)fs_nosys,/* xfs_frlock, */
