@@ -190,9 +190,9 @@ xfs_ialloc_ag_alloc(xfs_trans_t *tp, buf_t *agbuf)
 	       XFS_DI_NEXTENTS | XFS_DI_SIZE | XFS_DI_NEXTI | XFS_DI_U;
 	for (j = (int)newblocks - 1; j >= 0; j--) {
 		/*
-		 * Bread the block.
+		 * Get the block.
 		 */
-		fbuf = xfs_btree_bread(mp, tp, agp->ag_seqno, newbno + j);
+		fbuf = xfs_btree_getblk(mp, tp, agp->ag_seqno, newbno + j);
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
@@ -457,9 +457,13 @@ xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
 	xfs_agnumber_t	agno;	/* allocation group number */
 	xfs_aghdr_t	*agp;	/* allocation group header */
 	buf_t		*fbuf;	/* buffer containing inode to be freed */
-	xfs_dinode_t	*free;	/* pointer into inode's buffer */
+	int		flags;	/* inode field logging flags */
+	int		found;	/* free inode in same block is found */
+	xfs_dinode_t	*free;	/* pointer into our inode's buffer */
+	int		i;	/* index of ip in fbuf */
+	xfs_dinode_t	*ip;	/* pointer to inodes in the buffer */
 	xfs_mount_t	*mp;	/* mount structure for filesystem */
-	int		off;	/* index of inode in fbuf */
+	int		off;	/* index of free in fbuf */
 	xfs_sb_t	*sbp;	/* superblock structure for filesystem */
 
 	mp = tp->t_mountp;
@@ -485,16 +489,45 @@ xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
 	free = xfs_make_iptr(sbp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
 	/*
-	 * Insert the inode to the freelist and log that change.
+	 * Look at other inodes in the same block; if there are any
+	 * then insert this one after.  This increases the locality
+	 * in the inode free list.
 	 */
-	free->di_u.di_next = agp->ag_iflist;
+	for (flags = 0, found = 0, i = 0, ip = xfs_make_iptr(sbp, fbuf, i);
+	     i < sbp->sb_inopblock;
+	     i++, ip = xfs_make_iptr(sbp, fbuf, i)) {
+		if (ip == free)
+			continue;
+		if (ip->di_core.di_format != XFS_DINODE_FMT_AGINO) 
+			continue;
+		free->di_u.di_next = ip->di_u.di_next;
+		ip->di_u.di_next = agino;
+		xfs_ialloc_log_di(tp, fbuf, i, XFS_DI_U);
+		found = 1;
+		break;
+	}
+	/*
+	 * Insert the inode to the freelist if a neighbor wasn't found.
+	 */
+	if (!found) {
+		free->di_u.di_next = agp->ag_iflist;
+		agp->ag_iflist = agino;
+		flags |= XFS_AG_IFLIST;
+	}
+	/*
+	 * Log the change to the newly freed inode.
+	 */
 	xfs_ialloc_log_di(tp, fbuf, off, XFS_DI_U);
-	agp->ag_iflist = agino;
+	/*
+	 * Change the inode free counts and log the ag/sb changes.
+	 */
 	agp->ag_ifcount++;
-	xfs_btree_log_ag(tp, agbuf, XFS_AG_IFLIST | XFS_AG_IFCOUNT);
+	flags |= XFS_AG_IFCOUNT;
+	xfs_btree_log_ag(tp, agbuf, flags);
 	xfs_trans_mod_sb(tp, XFS_SB_IFREE, 1);
 	/*
 	 * Return the value to be stored in the incore inode's union.
+	 * The caller must set the format field to XFS_DINODE_FMT_AGINO.
 	 */
 	return free->di_u.di_next;
 }
