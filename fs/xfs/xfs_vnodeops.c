@@ -842,7 +842,11 @@ error_return:
 /*
  * xfs_fsync
  *
- * This is a stub.
+ * This is called to sync the inode and its data out to disk.
+ * We need to hold the I/O lock while flushing the data, and
+ * the inode lock while flushing the inode.  The inode lock CANNOT
+ * be held while flushing the data, so acquire after we're done
+ * with that.
  */
 STATIC int
 xfs_fsync(vnode_t	*vp,
@@ -850,26 +854,22 @@ xfs_fsync(vnode_t	*vp,
 	  cred_t	*credp)
 {
 	xfs_inode_t *ip;
-	int error;
 
 	ip = XFS_VTOI(vp);
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_flags & XFS_IEXTENTS && ip->i_bytes > 0) {
-			xfs_fsblock_t	last;
-			xfs_sb_t	*sbp;
-
-			last = xfs_bmap_last_offset(NULL, ip);
-			sbp = &ip->i_mount->m_sb;
-			pflushinvalvp(vp, 0, xfs_fsb_to_bb(sbp, last));
+			pflushinvalvp(vp, 0, XFS_ISIZE_MAX(ip));
 		}
-	} else
+	} else {
 		pflushvp(vp, ip->i_d.di_size,
 			 (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
+	}
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	xfs_iflock(ip);
 	xfs_iflush(ip, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	return error;
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
+	return 0;
 }
 
 
@@ -3091,13 +3091,22 @@ xfs_rwunlock(vnode_t	*vp)
 /*
  * xfs_seek
  *
+ * Return an error if the new offset has overflowed and gone below
+ * 0 or is greater than our maximum defined file offset.  Just checking
+ * for overflow is not enough since off_t may be an __int64_t but the
+ * file size may be limited to some number of bits between 32 and 64.
  */
 STATIC int
 xfs_seek(vnode_t	*vp,
 	 off_t		old_offset,
 	 off_t		*new_offsetp)
 {
-	return *new_offsetp < 0 ? EINVAL : 0;
+	if ((*new_offsetp > XFS_MAX_FILE_OFFSET) ||
+	    (*new_offsetp < 0)) {
+		return EINVAL;
+	} else {
+		return 0;
+	}
 }
 
 
