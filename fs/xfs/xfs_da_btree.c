@@ -2460,7 +2460,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 	dabuf->dirty = 0;
 #ifdef XFS_DABUF_DEBUG
 	dabuf->ra = ra;
-	dabuf->dev = XFS_BUF_TAQRGET(bps[0]);
+	dabuf->dev = XFS_BUF_TARGET(bps[0]);
 	dabuf->blkno = XFS_BUF_ADDR(bps[0]);
 #endif
 	if (nbuf == 1) {
