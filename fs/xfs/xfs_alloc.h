@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision$"
 
 struct buf;
 struct xfs_mount;
@@ -69,11 +69,18 @@ typedef struct xfs_alloc_arg {
 #define	XFS_ALLOC_KTRACE_ALLOC	1
 #define	XFS_ALLOC_KTRACE_FREE	2
 #define	XFS_ALLOC_KTRACE_MODAGF	3
-
 /*
  * Allocation tracing buffer size.
  */
 #define	XFS_ALLOC_TRACE_SIZE	4096
+
+#ifdef	XFS_ALL_TRACE
+#define	XFS_ALLOC_TRACE
+#endif
+
+#if !defined(DEBUG) || defined(SIM)
+#undef	XFS_ALLOC_TRACE
+#endif
 
 /*
  * Prototypes for visible xfs_alloc.c routines
