@@ -702,17 +702,6 @@ xfs_mount(
 	if (error = spectodevs(vfsp->vfs_super, &args, &ddev, &logdev, &rtdev))
 		return error;
 
-	/*
-	 * Ensure that this device isn't already mounted,
-	 * unless this is a REMOUNT request
-	 */
-        if (vfs_devsearch(ddev, VFS_FSTYPE_ANY) == NULL) {
-		ASSERT((uap->flags & MS_REMOUNT) == 0);
-	} else {
-		if ((uap->flags & MS_REMOUNT) == 0)
-			return XFS_ERROR(EBUSY);
-	}
-
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
 			     &args, uap, credp);
 	return error;

@@ -211,14 +211,16 @@ vfs_busydev(dev_t dev, int type)
 	long s;
 	struct vfs *vfsp;
 	kdev_t	kdev = MKDEV(MAJOR(dev), MINOR(dev));
-	struct vfsmount *entry;
+	struct super_block *sb;
 
 	lock_kernel();
-	entry = lookup_vfsmnt(kdev);
-
+	sb = get_super(kdev);
 	unlock_kernel();
-	if (entry) {
-		vfsp = LINVFS_GET_VFS(entry->mnt_sb);
+
+	if (!sb)
+		return NULL;
+	
+	vfsp = LINVFS_GET_VFS(sb);
 again:
 		spin_lock_irqsave(&vfslock, s);
 		if (vfsp->vfs_dev == dev &&
@@ -241,9 +243,6 @@ again:
 		}
 		spin_unlock_irqrestore(&vfslock, s);
 		return vfsp;
-	} else {
-		return NULL;
-	}
 }
 
 void
@@ -312,14 +311,13 @@ vfs_devsearch_nolock(dev_t dev, int fstype)
 {
         register struct vfs *vfsp;
 	kdev_t	kdev = MKDEV(MAJOR(dev), MINOR(dev));
-	struct vfsmount *entry;
+	struct super_block *sb;
 
 	lock_kernel();
-	entry = lookup_vfsmnt(kdev);
+	sb = get_super(kdev);
 
-
-        if (entry) {
-		vfsp = LINVFS_GET_VFS(entry->mnt_sb);
+	if (sb) {
+		vfsp = LINVFS_GET_VFS(sb);
                 if ((vfsp->vfs_dev == dev) &&
                     (fstype == VFS_FSTYPE_ANY || fstype == vfsp->vfs_fstype)) {
 			unlock_kernel();
