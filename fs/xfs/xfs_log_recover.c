@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.183 $"
+#ident	"$Revision: 1.187 $"
 
 #include <xfs_os_defs.h>
 
@@ -691,7 +691,6 @@ xlog_test_footer(xlog_t *log)
 	     * decrease the effective size. */
             
             log->l_logsize -= BBSIZE;
-            log->l_iclog_size -= BBSIZE;
             log->l_logBBsize -= 1;
             
         }
