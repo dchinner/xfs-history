@@ -217,18 +217,16 @@ xfs_inode_item_push(xfs_inode_log_item_t *iip)
 	ASSERT(valusema(&(iip->ili_inode->i_flock)) <= 0);
 
 	/*
-	 * If there is nothing to flush, don't bother.
-	 * Someone else must have flushed the inode (not through
-	 * xfs_trans_push_ail()).  Just make sure it's off the
-	 * AIL and then release our reference to the vnode.
+	 * Since we were able to lock the inode's flush lock and
+	 * we found it on the AIL, the inode must be dirty.  This
+	 * is because the inode is removed from the AIL while still
+	 * holding the flush lock in xfs_iflush_done().  Thus, if
+	 * we found it in the AIL and were able to obtain the flush
+	 * lock without sleeping, then there must not have been
+	 * anyone in the process of flushing the inode.
 	 */
 	ip = iip->ili_inode;
-	if (iip->ili_fields == 0) {
-		xfs_trans_delete_ail(ip->i_mount, (xfs_log_item_t *)iip);
-		xfs_ifunlock(ip);
-		xfs_iput(ip);
-		return;
-	}
+	ASSERT(iip->ili_fields != 0);
 
 	/*
 	 * Write out the inode.  The completion routine will
