@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.115 $"
+#ident	"$Revision: 1.116 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -185,6 +185,7 @@ xlog_bwrite(
 	return (error);
 }	/* xlog_bwrite */
 
+#ifndef SIM
 STATIC void
 xlog_recover_iodone(
 	struct buf 	*bp)
@@ -204,6 +205,7 @@ xlog_recover_iodone(
 	bp->b_iodone = NULL;
 	biodone(bp);
 }
+#endif
 
 /*
  * This routine finds (to an approximation) the first block in the physical
