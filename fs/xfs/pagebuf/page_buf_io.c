@@ -196,7 +196,7 @@ _pb_direct_io(
 	}
 
 	offset = mp->pbm_delta >> 9;
-	pb->pb_dev = mp->pbm_dev;
+	pb->pb_dev = mp->pbm_target->pbr_device;
 	pb->pb_bn = mp->pbm_bn + offset;
 
 	/* Do our own allocation to avoid the buffer_head overhead */
@@ -514,7 +514,7 @@ __pb_map_buffer_at_offset(
 
 	lock_buffer(bh);
 	bh->b_blocknr = bn;
-	bh->b_dev = mp->pbm_dev;
+	bh->b_dev = mp->pbm_target->pbr_device;
 	set_bit(BH_Mapped, &bh->b_state);
 	clear_bit(BH_Delay, &bh->b_state);
 }
