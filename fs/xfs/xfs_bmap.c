@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.99 $"
+#ident	"$Revision: 1.100 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2379,7 +2379,12 @@ xfs_bmap_compute_maxlevels(
 /*
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
  * caller.  Frees all the extents that need freeing, which must be done
- * last due to locking considerations.
+ * last due to locking considerations.  We never free any extents in
+ * the first transaction and we make the first a synchronous transaction
+ * so that we can always be sure that the changes to structures pointing
+ * to the freed block are permanent before we actually free the blocks.
+ * This is necessary to prevent blocks from being reallocated and written
+ * to before the free and reallocation are actually permanent.
  *
  * Return 1 if the given transaction was committed and a new one
  * started, and 0 otherwise.
@@ -2409,17 +2414,7 @@ xfs_bmap_finish(
 		return 0;
 	ntp = *tp;
 	mp = ntp->t_mountp;
-	firstag = XFS_FSB_TO_AGNO(mp, firstblock);
-	for (prev = NULL, free = flist->xbf_first; free != NULL; free = next) {
-		next = free->xbfi_next;
-		if (XFS_FSB_TO_AGNO(mp, free->xbfi_startblock) < firstag)
-			continue;
-		xfs_free_extent(ntp, free->xbfi_startblock,
-			free->xbfi_blockcount);
-		xfs_bmap_del_free(flist, prev, free);
-	}
-	if (flist->xbf_count == 0)
-		return 0;
+	xfs_trans_set_sync(ntp);
 	efi = xfs_trans_get_efi(ntp, flist->xbf_count);
 	for (free = flist->xbf_first; free; free = free->xbfi_next)
 		xfs_trans_log_efi_extent(ntp, efi, free->xbfi_startblock,
