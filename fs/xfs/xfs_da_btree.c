@@ -1842,16 +1842,17 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 	entry_d = &leaf_d->leaves[start_d];
 	for (i = 0; i < count; entry_s++, entry_d++, i++) {
 		ASSERT(entry_s->nameidx >= hdr_s->firstused);
-		ASSERT(entry_s->nameidx < XFS_LBSIZE(mp));
 		ASSERT(entry_s->namelen < MAXNAMELEN);
 		tmp = XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry_s);
 		hdr_d->firstused -= tmp;
 		entry_d->hashval = entry_s->hashval;
 		entry_d->nameidx = hdr_d->firstused;
 		entry_d->namelen = entry_s->namelen;
+		ASSERT(entry_d->nameidx + tmp <= XFS_LBSIZE(mp));
 		bcopy((char *)XFS_DIR_LEAF_NAMESTRUCT(leaf_s, entry_s->nameidx),
 		      (char *)XFS_DIR_LEAF_NAMESTRUCT(leaf_d, entry_d->nameidx),
 		      tmp);
+		ASSERT(entry_s->nameidx + tmp <= XFS_LBSIZE(mp));
 		bzero((char *)XFS_DIR_LEAF_NAMESTRUCT(leaf_s, entry_s->nameidx),
 		      tmp);
 		hdr_s->namebytes -= entry_d->namelen;
@@ -1870,6 +1871,7 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 	if (start_s == hdr_s->count) {
 		tmp = count * sizeof(struct xfs_dir_leaf_entry);
 		entry_s = &leaf_s->leaves[start_s];
+		ASSERT((char *)entry_s + tmp <= (char *)leaf_s + XFS_LBSIZE(mp));
 		bzero((char *)entry_s, tmp);
 	} else {
 		/*
@@ -1884,6 +1886,7 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 
 		tmp = count * sizeof(struct xfs_dir_leaf_entry);
 		entry_s = &leaf_s->leaves[hdr_s->count];
+		ASSERT((char *)entry_s + tmp <= (char *)leaf_s + XFS_LBSIZE(mp));
 		bzero((char *)entry_s, tmp);
 	}
 
