@@ -153,12 +153,8 @@ extern ksa_t *ksaptr;
 
 #define	get_bdevsw(dev)	((struct bdevsw *)(__psint_t)(dev))
 
-
 #define bzero(p,s) memset((p), 0, (s))
 #define bcopy(s,d,n) memcpy((d),(s),(n))
-
-#define COPYIN_XLATE(from,to,size,func,abi,count) \
-	copyin(from, to, size)
 
 extern void *kern_malloc(size_t);
 #define bcmp(s1,s2,l) memcmp(s1,s2,l)    

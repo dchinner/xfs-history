@@ -775,125 +775,6 @@ xfs_get_vfsmount(
 	return mp;
 }	/* end of xfs_get_vfsmount() */
 
-#if _MIPS_SIM == _ABI64
-/*
- * xfs_args_ver_1
- * 
- * This is used with copyin_xlate() to copy a xfs_args version 1 structure
- * in from user space from a 32 bit application into a 64 bit kernel.
- */
-/*ARGSUSED*/
-int
-xfs_args_to_ver_1(
-	enum xlate_mode	mode,
-	void		*to,
-	int		count,
-	xlate_info_t	*info)
-{
-	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_1, xfs_args);
-
-	target->version = source->version;
-	target->flags = source->flags;
-	target->logbufs = source->logbufs;
-	target->logbufsize = source->logbufsize;
-	target->fsname = (char*)(__psint_t)source->fsname;
-
-	return 0;
-}
-
-/*
- * xfs_args_to_ver_2 
- * 
- * This is used with copyin_xlate() to copy a xfs_args version 2 structure
- * in from user space from a 32 bit application into a 64 bit kernel.
- */
-/*ARGSUSED*/
-int
-xfs_args_to_ver_2(
-	enum xlate_mode	mode,
-	void		*to,
-	int		count,
-	xlate_info_t	*info)
-{
-	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_2, xfs_args);
-
-	target->version = source->version;
-	target->flags = source->flags;
-	target->logbufs = source->logbufs;
-	target->logbufsize = source->logbufsize;
-	target->fsname = (char*)(__psint_t)source->fsname;
-	target->sunit = source->sunit;
-	target->swidth = source->swidth;
-
-	return 0;
-}
-
-/*
- * xfs_args_to_ver_3 
- * 
- * This is used with copyin_xlate() to copy a xfs_args version 3 structure
- * in from user space from a 32 bit application into a 64 bit kernel.
- */
-/*ARGSUSED*/
-int
-xfs_args_to_ver_3(
-	enum xlate_mode	mode,
-	void		*to,
-	int		count,
-	xlate_info_t	*info)
-{
-	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_3, xfs_args);
-
-	target->version = source->version;
-	target->flags = source->flags;
-	target->logbufs = source->logbufs;
-	target->logbufsize = source->logbufsize;
-	target->fsname = (char*)(__psint_t)source->fsname;
-	target->sunit = source->sunit;
-	target->swidth = source->swidth;
-	target->iosizelog = source->iosizelog;
-
-	return 0;
-}
-
-/*
- * xfs_args_to_ver_4 
- * 
- * This is used with copyin_xlate() to copy a xfs_args version 4 structure
- * in from user space from a 32 bit application into a 64 bit kernel.
- */
-/*ARGSUSED*/
-int
-xfs_args_to_ver_4(
-	enum xlate_mode	mode,
-	void		*to,
-	int		count,
-	xlate_info_t	*info)
-{
-	COPYIN_XLATE_PROLOGUE(xfs_args32_ver_4, xfs_args);
-
-	target->version = source->version;
-	target->flags = source->flags;
-	target->logbufs = source->logbufs;
-	target->logbufsize = source->logbufsize;
-	target->fsname = (char*)(__psint_t)source->fsname;
-	target->sunit = source->sunit;
-	target->swidth = source->swidth;
-	target->iosizelog = source->iosizelog;
-	target->servlist = (char **)(__psint_t)source->servlist;
-	target->servlistlen = (int *)(__psint_t)source->servlistlen;
-	target->sunit = source->sunit;
-	target->slcount = source->slcount;
-	target->stimeout = source->stimeout;
-	target->ctimeout = source->ctimeout;
-	target->server = (char *)(__psint_t)source->server;
-	target->servlen = source->servlen;
-	target->servcell = source->servcell;
-
-	return 0;
-}
-#endif
-
 /*
  * xfs_mountargs -- Copy in xfs mount arguments
  *
@@ -912,44 +793,18 @@ xfs_mountargs(
         ap->stimeout = -1;
 	ap->ctimeout = -1;
 
-#define copyin(from, to, len) (memcpy(to, from, len), /*return*/0)
-
 	if (uap->datalen && uap->dataptr) { 
 
 		/* Copy in the xfs_args version number */
-		if (copyin(uap->dataptr, ap, sizeof(ap->version)))
-			return XFS_ERROR(EFAULT);
+		memcpy(ap, uap->dataptr, sizeof(ap->version));
 
-		if (ap->version == 1) {
-			if (COPYIN_XLATE(uap->dataptr, ap, 
-					 sizeof(struct xfs_args_ver_1),
-					 xfs_args_to_ver_1, 
-					 get_current_abi(), 1))
-				return XFS_ERROR(EFAULT);
-		} else if (ap->version == 2) {
-			if (COPYIN_XLATE(uap->dataptr, ap, 
-					 sizeof(struct xfs_args_ver_2),
-					 xfs_args_to_ver_2, 
-					 get_current_abi(), 1))
-				return XFS_ERROR(EFAULT);
-		} else if (ap->version == 3) {
-			if (COPYIN_XLATE(uap->dataptr, ap, 
-					 sizeof(struct xfs_args_ver_3),
-					 xfs_args_to_ver_3, 
-					 get_current_abi(), 1))
-				return XFS_ERROR(EFAULT);
-		} else if (ap->version == 4) {
-			if (COPYIN_XLATE(uap->dataptr, ap, 
-					 sizeof(struct xfs_args),
-					 xfs_args_to_ver_4, 
-					 get_current_abi(), 1))
-				return XFS_ERROR(EFAULT);
-		} else
+		if (ap->version != 3) {
 			return XFS_ERROR(EINVAL);
+		}
+		memcpy(ap, uap->dataptr, sizeof(struct xfs_args_ver_3));
 	}
 
 	ap->fsname = uap->spec;
-#undef copyin
 
 	return (0);
 }
