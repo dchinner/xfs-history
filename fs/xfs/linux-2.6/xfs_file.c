@@ -194,15 +194,20 @@ STATIC int linvfs_release(
 
 STATIC int linvfs_fsync(
 	struct file *filp,
-	struct dentry *dentry)
+	struct dentry *dentry,
+	int datasync)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	vnode_t *vp = LINVFS_GET_VP(inode);
 	int	error;
+	int	flags = FSYNC_WAIT;
+
+	if (datasync)
+		flags |= FSYNC_DATA;
 
 	ASSERT(vp);
 
-	VOP_FSYNC(vp, FSYNC_WAIT, get_current_cred(),
+	VOP_FSYNC(vp, flags, get_current_cred(),
 		(off_t)0, (off_t)-1, error);
 
 	if (error)
