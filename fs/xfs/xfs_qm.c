@@ -1,4 +1,4 @@
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.9 $"
 
 
 #include <sys/param.h>
@@ -134,8 +134,10 @@ xfs_qm_init()
 	 */
 	hsize = (ncsize < XFS_QM_NCSIZE_THRESHOLD) ? 
 		XFS_QM_HASHSIZE_LOW : XFS_QM_HASHSIZE_HIGH;
-
 	xqm->qm_dqhashmask = hsize - 1;
+	xqm->qm_ndqhiwat =  (ncsize < XFS_QM_NCSIZE_THRESHOLD) ? 
+	      XFS_QM_NDQUOT_HIWAT_2 : XFS_QM_NDQUOT_HIWAT_1;
+
 	/*
 	 * XXXsup We can keep reference counts on user and proj quotas
 	 * inside XQM separately, and avoid having two hashtables even
@@ -689,10 +691,6 @@ xfs_qm_dqpurge_all(
 		dqp = xfs_qm_dqpurge(dqp);
 	}
 	xfs_qm_mplist_unlock(mp);
-#if 0
-	xfs_qm_freelist_print(&(G_xqm->qm_dqfreelist),
-			      "@@@@@++ Free list (After dqpurge_all) @@@@@+");
-#endif
 	return (0);
 }
 
@@ -777,6 +775,10 @@ xfs_qm_dqattach_one(
 	}
 
 	xfs_dqtrace_entry(dqp, "DQATTACH: found by dqget");
+	/*
+	 * dqget may have dropped and re-acquired the ilock, but it guarantees
+	 * that the dquot returned is the one that should go in the inode.
+	 */
 	*IO_idqpp = dqp;
 	ASSERT(dqp);
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
@@ -919,12 +921,10 @@ xfs_qm_dqattach(
 	mp = ip->i_mount;
 	ASSERT(ip->i_ino != mp->m_sb.sb_uquotino &&
 	       ip->i_ino != mp->m_sb.sb_pquotino);
+	
+	ASSERT((flags & XFS_QMOPT_ILOCKED) == 0 ||
+	       XFS_ISLOCKED_INODE_EXCL(ip));
 
-
-#ifdef QUOTADEBUG
-	if (flags & XFS_QMOPT_ILOCKED)
-		ASSERT(XFS_ISLOCKED_INODE_EXCL(ip));
-#endif
 	nquotas = 0;
 	error = 0;
 	if (! (flags & XFS_QMOPT_ILOCKED))
@@ -1059,24 +1059,13 @@ xfs_qm_unmount(
 
 
 /*
-   vfs_sync: SYNC_FSDATA|SYNC_ATTR|SYNC_BDFLUSH|SYNC_NOWAIT 0x31
-   syscall sync: SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI 0x25
-   umountroot : SYNC_WAIT | SYNC_CLOSE | SYNC_ATTR | SYNC_FSDATA
-*/
-#if 0
-/*
- * VFS_SYNC flags: left here for reference.
+ * This is called by xfs_sync and flags arg determines the caller,
+ * and its motives, as does in xfs_sync.
+ *
+ * vfs_sync: SYNC_FSDATA|SYNC_ATTR|SYNC_BDFLUSH|SYNC_NOWAIT 0x31
+ * syscall sync: SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI 0x25
+ * umountroot : SYNC_WAIT | SYNC_CLOSE | SYNC_ATTR | SYNC_FSDATA
  */
-#define SYNC_NOWAIT     0               /* start delayed writes */
-#define SYNC_ATTR       0x01            /* sync attributes */
-#define SYNC_CLOSE      0x02            /* close file system down */
-#define SYNC_DELWRI     0x04            /* look at delayed writes */
-#define SYNC_WAIT       0x08            /* wait for i/o to complete */
-#define SYNC_BDFLUSH    0x10            /* BDFLUSH is calling -- don't block */
-#define SYNC_FSDATA     0x20            /* flush fs data (e.g. superblocks) */
-#define SYNC_PDFLUSH    0x40            /* push v_dpages */
-
-#endif
 
 void
 xfs_qm_sync(
@@ -1355,6 +1344,7 @@ xfs_qm_dqget_noattach(
 	pdqp = NULL;
 
 	if (XFS_IS_UQUOTA_ON(mp)) { 
+		ASSERT(ip->i_udquot == NULL);
 		if (error = xfs_qm_dqget(mp, ip, ip->i_d.di_uid,
 					 XFS_DQ_USER, 
 					 XFS_QMOPT_DQALLOC, &udqp)) {
@@ -1370,6 +1360,7 @@ xfs_qm_dqget_noattach(
 	}
 	
 	if (XFS_IS_PQUOTA_ON(mp)) {
+		ASSERT(ip->i_pdquot == NULL);
 		if (udqp)
 			xfs_dqunlock(udqp);
 		if (error = xfs_qm_dqget(mp, ip, ip->i_d.di_projid,
@@ -2255,11 +2246,11 @@ xfs_qm_shake(int level)
 	
 	ASSERT(ndqused >= 0);
 	
-	if (nfree <= ndqused && nfree < XFS_QM_NDQUOT_HIWAT)
+	if (nfree <= ndqused && nfree < G_xqm->qm_ndqhiwat)
 		return 0;
 
-	ndqused *= G_xqm->qm_dqfree_ratio;	/* target # of free dquots */
-	n = nfree - ndqused - XFS_QM_NDQUOT_HIWAT;	/* # over target */
+	ndqused *= G_xqm->qm_dqfree_ratio;	 /* target # of free dquots */
+	n = nfree - ndqused - G_xqm->qm_ndqhiwat;/* # over target */
 	
 	return xfs_qm_shake_freelist(MAX(nfree, n));
 }
@@ -2421,7 +2412,7 @@ xfs_qm_dqalloc_incore(
 	 * Check against high water mark to see if we want to pop
 	 * a nincompoop dquot off the freelist.
 	 */
-	if (G_xqm->qm_totaldquots >= XFS_QM_NDQUOT_HIWAT) {
+	if (G_xqm->qm_totaldquots >= G_xqm->qm_ndqhiwat) {
 		/*
 		 * Try to recycle a dquot from the freelist.
 		 */
@@ -2530,16 +2521,25 @@ xfs_qm_vop_dqalloc(
 	if ((flags & XFS_QMOPT_UQUOTA) &&
 	    XFS_IS_UQUOTA_ON(mp)) {
 		if (ip->i_d.di_uid != uid) {
+			/*
+			 * What we need is the dquot that has this uid, and
+			 * if we send the inode to dqget, the uid of the inode
+			 * take precedent over what's sent in the uid argument.
+			 * We must unlock inode here before calling dqget if we're
+			 * not sending the inode, because otherwise we'll deadlock
+			 * by doing trans_reserve while holding ilock.
+			 */
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			if (error = xfs_qm_dqget(mp, NULL, (xfs_dqid_t) uid,
 						 XFS_DQ_USER, 
 						 XFS_QMOPT_DQALLOC,
 						 &uq)) {
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				ASSERT(error != ENOENT);
 				if (error != ESRCH)
 					xfs_qm_force_quotaoff(mp);
 				return (error);
 			}
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
 		} else {
 			/*
 			 * Take an extra reference, because we'll return 
@@ -2555,11 +2555,11 @@ xfs_qm_vop_dqalloc(
 	if ((flags & XFS_QMOPT_PQUOTA) &&
 	    XFS_IS_PQUOTA_ON(mp)) {
 		if (ip->i_d.di_projid != prid) {
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			if (error = xfs_qm_dqget(mp, NULL, (xfs_dqid_t)prid,
 						 XFS_DQ_PROJ, 
 						 XFS_QMOPT_DQALLOC,
 						 &pq)) {
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				if (uq)
 					xfs_qm_dqrele(uq);
 				ASSERT(error != ENOENT);
@@ -2567,6 +2567,7 @@ xfs_qm_vop_dqalloc(
 					xfs_qm_force_quotaoff(mp);
 				return (error);
 			}
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
 		} else {
 			ASSERT(ip->i_pdquot);
 			pq = ip->i_pdquot;
