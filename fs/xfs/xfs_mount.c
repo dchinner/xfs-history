@@ -272,6 +272,66 @@ xfs_mount_validate_sb(
 	return (0);
 }
 
+void
+xfs_initialize_perag(xfs_mount_t *mp, int agcount)
+{
+	int		index, max_metadata;
+	xfs_perag_t	*pag;
+	xfs_agino_t	agino;
+	xfs_ino_t	ino;
+	xfs_sb_t	*sbp = &mp->m_sb;
+	xfs_ino_t	max_inum = XFS_MAXINUMBER_32;
+
+	/* Check to see if the filesystem can overflow 32 bit inodes */
+	agino = XFS_OFFBNO_TO_AGINO(mp, sbp->sb_agblocks - 1, 0);
+	ino = XFS_AGINO_TO_INO(mp, agcount - 1, agino);
+
+	/* Clear the mount flag if no inode can overflow 32 bits
+	 * on this filesystem.
+	 */
+	if (ino <= max_inum) {
+		mp->m_flags &= ~XFS_MOUNT_32BITINODES;
+	}
+
+	/* If we can overflow then setup the ag headers accordingly */
+	if (mp->m_flags & XFS_MOUNT_32BITINODES) {
+		/* Calculate how much should be reserved for inodes to
+		 * meet the max inode percentage.
+		 */
+		if (mp->m_maxicount) {
+			__uint64_t	icount;
+
+			icount = sbp->sb_dblocks * sbp->sb_imax_pct;
+			do_div(icount, 100);
+			icount += sbp->sb_agblocks - 1;
+			do_div(icount, mp->m_ialloc_blks);
+			max_metadata = icount;
+		} else {
+			max_metadata = agcount;
+		}
+		for (index = 0; index < agcount; index++) {
+			ino = XFS_AGINO_TO_INO(mp, index, agino);
+			if (ino > max_inum) {
+				index++;
+				break;
+			}
+
+			/* This ag is prefered for inodes */
+			pag = &mp->m_perag[index];
+			pag->pagi_inodeok = 1;
+			if (index < max_metadata)
+				pag->pagf_metadata = 1;
+		}
+	} else {
+		/* Setup default behavior for smaller filesystems */
+		for (index = 0; index < agcount; index++) {
+			pag = &mp->m_perag[index];
+			pag->pagi_inodeok = 1;
+		}
+	}
+	mp->m_maxagi = index;
+}
+
 /*
  * xfs_xlatesb
  *
@@ -414,6 +474,7 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	int	i;
 
 	mp->m_agfrotor = mp->m_agirotor = 0;
+	mp->m_maxagi = mp->m_sb.sb_agcount;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
 	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
@@ -820,6 +881,8 @@ xfs_mountfs(
 	mrinit(&mp->m_peraglock, "xperag");
 	mp->m_perag =
 		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP_IO);
+
+	xfs_initialize_perag(mp, sbp->sb_agcount);
 
 	/*
 	 * log's mount-time initialization. Perform 1st part recovery if needed

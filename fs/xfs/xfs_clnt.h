@@ -120,7 +120,8 @@ struct xfs_args {
 #define XFSMNT_GQUOTAENF	0x00800000	/* group quota limit
 						 * enforcement */
 #define XFSMNT_NOUUID		0x01000000	/* Ignore fs uuid */
-
+#define XFSMNT_32BITINODES	0x02000000	/* restrict inodes to 32
+						 * bits of address space */
 
 /* Did we get any args for CXFS to consume? */
 #define XFSARGS_FOR_CXFSARR(ap)		\

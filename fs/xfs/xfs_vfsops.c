@@ -360,6 +360,9 @@ xfs_cmountfs(
 		if (ap->flags & XFSMNT_OSYNCISDSYNC)
 			mp->m_flags |= XFS_MOUNT_OSYNCISDSYNC;
 
+		if (ap->flags & XFSMNT_32BITINODES)
+			mp->m_flags |= XFS_MOUNT_32BITINODES;
+
 		if (ap->flags & XFSMNT_IOSIZE) {
 			if (ap->iosizelog > XFS_MAX_IO_LOG ||
 			    ap->iosizelog < XFS_MIN_IO_LOG) {

@@ -4284,13 +4284,15 @@ xfsidbg_xperag(xfs_mount_t *mp)
 			agno, pag->pagf_init, pag->pagi_init);
 		if (pag->pagf_init)
 			kdb_printf(
-	"    f_levels[b,c] %d,%d f_flcount %d f_freeblks %d f_longest %d\n",
+	"    f_levels[b,c] %d,%d f_flcount %d f_freeblks %d f_longest %d\n"
+	"    f__metadata %d\n",
 				pag->pagf_levels[XFS_BTNUM_BNOi],
 				pag->pagf_levels[XFS_BTNUM_CNTi],
 				pag->pagf_flcount, pag->pagf_freeblks,
-				pag->pagf_longest);
+				pag->pagf_longest, pag->pagf_metadata);
 		if (pag->pagi_init)
-			kdb_printf("    i_freecount %d\n", pag->pagi_freecount);
+			kdb_printf("    i_freecount %d i_inodeok %d\n",
+				pag->pagi_freecount, pag->pagi_inodeok);
 	}
 }
 

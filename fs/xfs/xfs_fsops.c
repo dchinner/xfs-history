@@ -145,6 +145,7 @@ xfs_growfs_data_private(
 			KM_SLEEP);
 		bzero(&mp->m_perag[oagcount],
 			(nagcount - oagcount) * sizeof(xfs_perag_t));
+		xfs_initialize_perag(mp, nagcount);
 		mrunlock(&mp->m_peraglock);
 	}
 	tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFS);
