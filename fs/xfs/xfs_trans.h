@@ -2,6 +2,8 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
+#include "xfs_types.h"
+
 struct xfs_item_ops;
 struct xfs_log_item_desc;
 
