@@ -1,5 +1,5 @@
 /*
- *  fs/xfs/xfs_linux_ops_super.c
+ *  fs/xfs/xfs_super.c
  *
  */
 
@@ -13,10 +13,22 @@
 #include "xfs_coda_oops.h"
 
 #undef  NODEV
+#undef off_t
+#undef ino_t
+#undef daddr_t
+#undef caddr_t
+#define off_t __kernel_off_t
+#define ino_t __kernel_ino_t
+#define daddr_t __kernel_daddr_t
+#define caddr_t __kernel_caddr_t
 #include <linux/fs.h>
 #include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/slab.h>
+#undef off_t
+#undef ino_t
+#undef daddr_t
+#undef caddr_t
 
 #include <sys/capability.h>
 #include <sys/cred.h>
@@ -40,6 +52,8 @@
 #include <sys/uuid.h>
 #include <sys/pvfs.h>
 #include <xfs_sb.h>
+
+
 /*
  * Global system credential structure.
  */
@@ -53,7 +67,6 @@ extern struct super_operations linvfs_sops;
 static void
 cred_init(void)
 {
-  ENTER("cred_init");
         memset(sys_cred, 0, sizeof(cred_t));
         sys_cred->cr_ref = 1;
 
@@ -61,7 +74,6 @@ cred_init(void)
         sys_cred->cr_cap.cap_inheritable = CAP_ALL_ON;
         sys_cred->cr_cap.cap_permitted = CAP_ALL_ON;
         /*_MAC_INIT_CRED();*/
-		EXIT("cred_init");
 }
 
 
@@ -83,7 +95,6 @@ linvfs_inode_attr_in(
 		printk("linvfs:  Whoah!  Bad VOP_GETATTR()\n");
 		return;
 	}
-
 
 	inode->i_mode = attr.va_mode & S_IALLUGO;
 
@@ -150,13 +161,14 @@ linvfs_read_super(
 	extern vfsops_t xfs_vfsops;
 	vfs_t		*vfsp;
 	vnode_t		*cvp, *rootvp;
+	unsigned long	ino;
 
 	struct mounta	ap;
 	struct mounta	*uap = &ap;
 	char		spec[256];
 	struct xfs_args	arg, *args = &arg;
 	char		fsname[256];
-	int		error;
+	int		error, locked = 1;
 	statvfs_t	statvfs;
 	vattr_t		attr;
 	dev_t		dev;
@@ -172,7 +184,6 @@ linvfs_read_super(
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 
 	vfsops = &xfs_vfsops;
-
 
 	/*  Set up the vfs_t structure  */
 
@@ -201,7 +212,7 @@ linvfs_read_super(
 	/*  When we support DMI, we need to set up the behavior
 		chain for this vnode  */
 
-	LINVFS_GET_CVP(sb) = cvp;
+	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
 
 
@@ -278,52 +289,50 @@ linvfs_read_super(
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
 	sb->s_magic = XFS_SB_MAGIC;
 	sb->s_dirt = 1;  /*  Make sure we get regular syncs  */
-	LINVFS_GET_VFS(sb) = vfsp;
-
+	LINVFS_SET_VFS(sb, vfsp);
 
         VFS_ROOT(vfsp, &rootvp, error);
         if (error)
                 goto fail_unmount;
 
-	memset(&attr, 0, sizeof(vattr_t));
 	attr.va_mask = AT_NODEID;
 
 	VOP_GETATTR(rootvp, &attr, 0, sys_cred, error);
 	if (error)
 		goto fail_vnrele;
 
+	ino = (unsigned long) attr.va_nodeid;
 	sb->s_dev = dev;
 	sb->s_op = &linvfs_sops;
-	sb->s_root = d_alloc_root(iget(sb, attr.va_nodeid), NULL);
+	unlock_super(sb);
+	locked = 0;
+	sb->s_root = d_alloc_root(iget(sb, ino), NULL);
 	if (!sb->s_root)
 		goto fail_vnrele;
 
-
-	unlock_super(sb);
-	EXIT("linvfs_read_super <SUCCESS>");
+	if (is_bad_inode(sb->s_root))
+		goto fail_vnrele;
 
 	EXIT("linvfs_read_super <OK>");
-	return(NULL);
+	return(sb);
 
+fail_vnrele:
+	VN_RELE(rootvp);
 
+fail_unmount:
+	VFS_UNMOUNT(vfsp, 0, sys_cred, error);
+	/*  We need to do something here to shut down the 
+		VNODE/VFS layer.  */
 
-	fail_vnrele:
-		VN_RELE(rootvp);
-
-	fail_unmount:
-		VFS_UNMOUNT(vfsp, 0, sys_cred, error);
-		/*  We need to do something here to shut down the 
-			VNODE/VFS layer.  */
-
-	fail_vfsop:
-		kfree(vfsp);
-
-	/* fail: */
+fail_vfsop:
+	vfs_deallocate(vfsp);
+	sb->s_dev = 0;
+	if (locked)
 		unlock_super(sb);
-		MOD_DEC_USE_COUNT;
+	MOD_DEC_USE_COUNT;
 
-		EXIT("linvfs_read_super <ERROR>");
-		return(NULL);
+	EXIT("linvfs_read_super <ERROR>");
+	return(NULL);
 }
 
 
@@ -333,21 +342,19 @@ linvfs_read_inode(
 {
 	vfs_t		*vfsp = LINVFS_GET_VFS(inode->i_sb);
 	vnode_t		*vp;
-	int		error;
+	int		error = ENOENT;
 
-	ENTER("linvfs_read_inode");
-	VFS_GET_VNODE(vfsp, &vp, inode->i_ino, error);
+	if (vfsp) {
+		VFS_GET_VNODE(vfsp, &vp, inode->i_ino, error);
+	}
 	if (error) {
 		make_bad_inode(inode);
-		EXIT("linvfs_read_inode <ERROR>");
 		return;
 	}
-
 
 	LINVFS_GET_VP(inode) = vp;
 
 	linvfs_inode_attr_in(inode);
-
 
 	if (S_ISREG(inode->i_mode))
 		inode->i_op = &linvfs_file_inode_operations;
@@ -362,8 +369,7 @@ linvfs_read_inode(
 	else if (S_ISFIFO(inode->i_mode))
 		init_fifo(inode);
 	else
-	  panic("XFS:  unknown file type:  %d\n", inode->i_mode);
-	EXIT("linvfs_read_inode");
+		panic("XFS:  unknown file type:  %d\n", inode->i_mode);
 }
 
 
