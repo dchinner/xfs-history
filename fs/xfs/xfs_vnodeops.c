@@ -4938,7 +4938,7 @@ xfs_set_uiosize(
 		ip->i_iocore.io_writeio_blocks = 1 << (int) (ip->i_iocore.io_writeio_log -
 						mp->m_sb.sb_blocklog);
 		ip->i_iocore.io_flags |= XFS_IOCORE_UIOSZ;
-		ip->i_iocore.io_max_io_log = MAX(max_iosizelog, ip->i_iocore.io_max_io_log);
+		ip->i_iocore.io_max_io_log = MAX((uchar_t)max_iosizelog, ip->i_iocore.io_max_io_log);
 	} else {
 		/*
 		 * if inode already has non-default values set,
@@ -4949,13 +4949,13 @@ xfs_set_uiosize(
 			ip->i_iocore.io_readio_log = (uchar_t) read_iosizelog;
 			ip->i_iocore.io_readio_blocks = 1 << (int) (ip->i_iocore.io_readio_log -
 							mp->m_sb.sb_blocklog);
-			ip->i_iocore.io_max_io_log = MAX(max_iosizelog, ip->i_iocore.io_max_io_log);
+			ip->i_iocore.io_max_io_log = MAX((uchar_t)max_iosizelog, ip->i_iocore.io_max_io_log);
 		}
 		if (write_iosizelog < ip->i_iocore.io_writeio_log || flags == 1) {
 			ip->i_iocore.io_writeio_log = (uchar_t) write_iosizelog;
 			ip->i_iocore.io_writeio_blocks = 1 << (int) (ip->i_iocore.io_writeio_log -
 							mp->m_sb.sb_blocklog);
-			ip->i_iocore.io_max_io_log = MAX(max_iosizelog, ip->i_iocore.io_max_io_log);
+			ip->i_iocore.io_max_io_log = MAX((uchar_t)max_iosizelog, ip->i_iocore.io_max_io_log);
 		}
 	}
 
@@ -5593,7 +5593,8 @@ xfs_free_file_space(
 	}
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-	rounding = MAX(1 << mp->m_sb.sb_blocklog, NBPP);
+	rounding = MAX((__uint8_t)(1 << mp->m_sb.sb_blocklog),
+			(__uint8_t)NBPP);
 	ilen = len + (offset & (rounding - 1));
 	ioffset = offset & ~(rounding - 1);
 	if (ilen & (rounding - 1))

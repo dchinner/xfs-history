@@ -1934,7 +1934,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	error = 0;
 	if ((INT_GET(*((__uint16_t *)(xfs_buf_offset(bp, 0))), ARCH_CONVERT) == XFS_DINODE_MAGIC) &&
 	    (XFS_BUF_COUNT(bp) != MAX(log->l_mp->m_sb.sb_blocksize,
-							 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
+			(__uint32_t)XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
 	  XFS_BUF_STALE(bp);
 	  error = xfs_bwrite(mp, bp);
 	} else {

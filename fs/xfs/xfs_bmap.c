@@ -5597,7 +5597,7 @@ xfs_getbmap(
 
 	if (bmv->bmv_length == -1) {
 		fixlen = XFS_FSB_TO_BB(mp, XFS_B_TO_FSB(mp, fixlen));
-		bmv->bmv_length = MAX(fixlen - bmv->bmv_offset, 0);
+		bmv->bmv_length = MAX(fixlen - bmv->bmv_offset, 0LL);
 	} else if (bmv->bmv_length < 0)
 		return XFS_ERROR(EINVAL);
 	if (bmv->bmv_length == 0) {
@@ -5712,7 +5712,7 @@ xfs_getbmap(
 			}
 
 			bmv->bmv_offset = out.bmv_offset + out.bmv_length;
-			bmv->bmv_length = MAX(0, bmvend - bmv->bmv_offset);
+			bmv->bmv_length = MAX(0LL, bmvend - bmv->bmv_offset);
 
 			bmv->bmv_entries++;
 

@@ -838,7 +838,7 @@ xfs_dir2_leaf_getdents(
 				 * directory block.
 				 */
 				for (i = mp->m_dirblkfsbs; i > 0; ) {
-					j = MIN(map->br_blockcount, i);
+					j = MIN((int)map->br_blockcount, i);
 					map->br_blockcount -= j;
 					map->br_startblock += j;
 					map->br_startoff += j;
@@ -990,8 +990,8 @@ xfs_dir2_leaf_getdents(
 					 * more than a dir block.
 					 */
 					length = MIN(mp->m_dirblkfsbs,
-						map[ra_index].br_blockcount -
-						ra_offset);
+						(int)(map[ra_index].br_blockcount -
+						ra_offset));
 					j += length;
 					ra_offset += length;
 					/*
