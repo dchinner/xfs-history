@@ -329,13 +329,15 @@ xfs_alloc_compute_diff(
 			newbno1 = newbno2;
 	} else if (freeend >= wantend) {
 		newbno1 = wantbno;
-	} else {
+	} else if (alignment > 1) {
 		newbno1 = roundup(freeend - wantlen, alignment);
-		if (newbno1 - alignment >= freebno)
+		if (newbno1 > freeend - wantlen &&
+		    newbno1 - alignment >= freebno)
 			newbno1 -= alignment;
 		else if (newbno1 >= freeend)
 			newbno1 = NULLAGBLOCK;
-	}
+	} else
+		newbno1 = freeend - wantlen;
 	*newbnop = newbno1;
 	return newbno1 == NULLAGBLOCK ? 0 : XFS_ABSDIFF(newbno1, wantbno);
 }
