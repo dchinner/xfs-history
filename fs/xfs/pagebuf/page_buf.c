@@ -1960,9 +1960,8 @@ pagebuf_delwri_queue(
 			atomic_dec(&pb->pb_hold);
 		}
 		list_del(&pb->pb_list);
-	} else {
-		pb_daemon->pb_delwri_cnt++;
 	}
+
 	list_add_tail(&pb->pb_list, &pb_daemon->pb_delwrite_l);
 	PBP(pb)->pb_flushtime = jiffies + pb_params.p_un.age_buffer;
 	spin_unlock(&pb_daemon->pb_delwrite_lock);
@@ -1980,7 +1979,6 @@ pagebuf_delwri_dequeue(
 	spin_lock(&pb_daemon->pb_delwrite_lock);
 	list_del_init(&pb->pb_list);
 	pb->pb_flags &= ~PBF_DELWRI;
-	pb_daemon->pb_delwri_cnt--;
 	spin_unlock(&pb_daemon->pb_delwrite_lock);
 }
 
@@ -2118,7 +2116,6 @@ pagebuf_daemon(
 				}
 
 				list_del(&pb->pb_list);
-				pb_daemon->pb_delwri_cnt--;
 				list_add(&pb->pb_list, &tmp);
 
 				count++;
@@ -2188,7 +2185,6 @@ pagebuf_delwri_flush(
 		}
 
 		list_del_init(&pb->pb_list);
-		pb_daemon->pb_delwri_cnt--;
 		if (flags & PBDF_WAIT) {
 			list_add(&pb->pb_list, &tmp);
 			pb->pb_flags &= ~PBF_ASYNC;
@@ -2242,8 +2238,6 @@ pagebuf_daemon_start(void)
 		}
 
 		pb_daemon->active = 1;
-		pb_daemon->io_active = 1;
-		pb_daemon->pb_delwri_cnt = 0;
 		pb_daemon->pb_delwrite_lock = SPIN_LOCK_UNLOCKED;
 
 		INIT_LIST_HEAD(&pb_daemon->pb_delwrite_l);
@@ -2282,7 +2276,6 @@ pagebuf_daemon_stop(void)
 		int		cpu;
 
 		pb_daemon->active = 0;
-		pb_daemon->io_active = 0;
 
 		wake_up_interruptible(&pbd_waitq);
 		while (pb_daemon->active == 0) {
