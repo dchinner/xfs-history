@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.22 $"
+#ident "$Revision: 1.24 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e	/* 'IN' */
@@ -47,6 +47,12 @@ typedef struct xfs_dinode_core
 typedef struct xfs_dinode
 {
 	xfs_dinode_core_t	di_core;
+	/*
+	 * In adding anything between the core and the union, be
+	 * sure to update the macros like XFS_LITINO below and
+	 * XFS_BMAP_BROOT_SIZE XFS_BMAP_RBLOCK_DSIZE in xfs_bmap_btree.h.
+	 */
+	xfs_agino_t		di_next_unlinked;/* agi unlinked list ptr */
 	union {
 		dev_t		di_dev;	/* device for IFCHR/IFBLK */
 		char		di_c[1];/* local contents */
@@ -59,25 +65,26 @@ typedef struct xfs_dinode
 /*
  * Bit names for logging disk inodes only
  */
-#define	XFS_DI_MAGIC	0x00001
-#define	XFS_DI_MODE	0x00002
-#define	XFS_DI_VERSION	0x00004
-#define	XFS_DI_FORMAT	0x00008
-#define	XFS_DI_NLINK	0x00010
-#define	XFS_DI_UID	0x00020
-#define	XFS_DI_GID	0x00040
-#define	XFS_DI_UUID	0x00080
-#define	XFS_DI_SIZE	0x00100
-#define	XFS_DI_NEXTENTS	0x00200
-#define	XFS_DI_ATIME	0x00400
-#define	XFS_DI_MTIME	0x00800
-#define	XFS_DI_CTIME	0x01000
-#define	XFS_DI_GEN	0x02000
-#define	XFS_DI_EXTSIZE	0x04000
-#define	XFS_DI_FLAGS	0x08000
-#define	XFS_DI_NBLOCKS	0x10000
-#define	XFS_DI_U	0x20000
-#define	XFS_DI_NUM_BITS	18
+#define	XFS_DI_MAGIC		0x00001
+#define	XFS_DI_MODE		0x00002
+#define	XFS_DI_VERSION		0x00004
+#define	XFS_DI_FORMAT		0x00008
+#define	XFS_DI_NLINK		0x00010
+#define	XFS_DI_UID		0x00020
+#define	XFS_DI_GID		0x00040
+#define	XFS_DI_UUID		0x00080
+#define	XFS_DI_SIZE		0x00100
+#define	XFS_DI_NEXTENTS		0x00200
+#define	XFS_DI_ATIME		0x00400
+#define	XFS_DI_MTIME		0x00800
+#define	XFS_DI_CTIME		0x01000
+#define	XFS_DI_GEN		0x02000
+#define	XFS_DI_EXTSIZE		0x04000
+#define	XFS_DI_FLAGS		0x08000
+#define	XFS_DI_NBLOCKS		0x10000
+#define	XFS_DI_NEXT_UNLINKED	0x20000
+#define	XFS_DI_U		0x40000
+#define	XFS_DI_NUM_BITS		19
 #define	XFS_DI_ALL_BITS		((1 << XFS_DI_NUM_BITS) - 1)
 #define	XFS_DI_CORE_BITS	(XFS_DI_ALL_BITS & ~XFS_DI_U)
 
@@ -104,7 +111,8 @@ typedef enum xfs_dinode_fmt
 /*
  * Inode size for given fs.
  */
-#define	XFS_LITINO(mp)	((mp)->m_sb.sb_inodesize - sizeof(xfs_dinode_core_t))
+#define	XFS_LITINO(mp)	((mp)->m_sb.sb_inodesize - \
+			 (sizeof(xfs_dinode_core_t) + sizeof(xfs_agino_t)))
 #define	XFS_LITINO_BROOT(mp)	\
 	(XFS_LITINO(mp) + sizeof(xfs_bmbt_block_t) - sizeof(xfs_bmdr_block_t))
 
