@@ -1,24 +1,27 @@
-/* Copyright (C) 1991, 1992, 1996, 1997 Free Software Foundation, Inc.
+/* Copyright (C) 1991, 1992, 1996, 1997, 1999 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
    Written by Douglas C. Schmidt (schmidt@ics.uci.edu).
 
    The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Library General Public License as
-   published by the Free Software Foundation; either version 2 of the
-   License, or (at your option) any later version.
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
 
    The GNU C Library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Library General Public License for more details.
+   Lesser General Public License for more details.
 
-   You should have received a copy of the GNU Library General Public
-   License along with the GNU C Library; see the file COPYING.LIB.  If not,
-   write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-   Boston, MA 02111-1307, USA.  */
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, write to the Free
+   Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
+   02111-1307 USA.  */
+
+/* If you consider tuning this algorithm, you should consult first:
+   Engineering a sort function; Jon Bentley and M. Douglas McIlroy;
+   Software - Practice and Experience; Vol. 23 (11), 1249-1265, 1993.  */
 
 #include <linux/kernel.h>
-#include <linux/slab.h>
 #include <linux/string.h>
 
 /* Byte-wise swap two items of size SIZE. */
@@ -47,6 +50,10 @@ typedef struct
   } stack_node;
 
 /* The next 4 #defines implement a very fast in-line stack abstraction. */
+/* The stack needs log (total_elements) entries (we could even subtract
+   log(MAX_THRESH)).  Since total_elements has type size_t, we get as
+   upper bound for log (total_elements):
+   bits per byte (CHAR_BIT) * sizeof(size_t).  */
 #define STACK_SIZE	(8 * sizeof(unsigned long int))
 #define PUSH(low, high)	((void) ((top->lo = (low)), (top->hi = (high)), ++top))
 #define	POP(low, high)	((void) (--top, (low = top->lo), (high = top->hi)))
@@ -58,9 +65,10 @@ typedef struct
 
    1. Non-recursive, using an explicit stack of pointer that store the
       next array partition to sort.  To save time, this maximum amount
-      of space required to store an array of MAX_INT is allocated on the
-      stack.  Assuming a 32-bit integer, this needs only 32 *
-      sizeof(stack_node) == 136 bits.  Pretty cheap, actually.
+      of space required to store an array of SIZE_MAX is allocated on the
+      stack.  Assuming a 32-bit (64 bit) integer for size_t, this needs
+      only 32 * sizeof(stack_node) == 256 bytes (for 64 bit: 1024 bytes).
+      Pretty cheap, actually.
 
    2. Chose the pivot element using a median-of-three decision tree.
       This reduces the probability of selecting a bad pivot value and
@@ -73,21 +81,15 @@ typedef struct
 
    4. The larger of the two sub-partitions is always pushed onto the
       stack first, with the algorithm then concentrating on the
-      smaller partition.  This *guarantees* no more than log (n)
+      smaller partition.  This *guarantees* no more than log (total_elems)
       stack size is needed (actually O(1) in this case)!  */
 
 void
-qsort (
-     void *const pbase,
-     size_t total_elems,
-     size_t size,
-     int (*cmp)(const void *, const void *))
+qsort (void *const pbase, size_t total_elems, size_t size,
+       int (*cmp)(const void *, const void *))
 {
   register char *base_ptr = (char *) pbase;
 
-  /* Allocating SIZE bytes for a pivot buffer facilitates a better
-     algorithm below since we can do comparisons directly on the pivot. */
-  char *pivot_buffer = (char *) kmalloc (size, GFP_KERNEL);
   const size_t max_thresh = MAX_THRESH * size;
 
   if (total_elems == 0)
@@ -98,7 +100,6 @@ qsort (
     {
       char *lo = base_ptr;
       char *hi = &lo[size * (total_elems - 1)];
-      /* Largest size needed for 32-bit int!!! */
       stack_node stack[STACK_SIZE];
       stack_node *top = stack + 1;
 
@@ -107,12 +108,11 @@ qsort (
           char *left_ptr;
           char *right_ptr;
 
-	  char *pivot = pivot_buffer;
-
 	  /* Select median value from among LO, MID, and HI. Rearrange
 	     LO and HI so the three values are sorted. This lowers the
 	     probability of picking a pathological pivot value and
-	     skips a comparison for both the LEFT_PTR and RIGHT_PTR. */
+	     skips a comparison for both the LEFT_PTR and RIGHT_PTR in
+	     the while loops. */
 
 	  char *mid = lo + size * ((hi - lo) / size >> 1);
 
@@ -125,8 +125,6 @@ qsort (
 	  if ((*cmp) ((void *) mid, (void *) lo) < 0)
 	    SWAP (mid, lo, size);
 	jump_over:;
-	  memcpy (pivot, mid, size);
-	  pivot = pivot_buffer;
 
 	  left_ptr  = lo + size;
 	  right_ptr = hi - size;
@@ -136,15 +134,19 @@ qsort (
 	     that this algorithm runs much faster than others. */
 	  do
 	    {
-	      while ((*cmp) ((void *) left_ptr, (void *) pivot) < 0)
+	      while ((*cmp) ((void *) left_ptr, (void *) mid) < 0)
 		left_ptr += size;
 
-	      while ((*cmp) ((void *) pivot, (void *) right_ptr) < 0)
+	      while ((*cmp) ((void *) mid, (void *) right_ptr) < 0)
 		right_ptr -= size;
 
 	      if (left_ptr < right_ptr)
 		{
 		  SWAP (left_ptr, right_ptr, size);
+		  if (mid == left_ptr)
+		    mid = right_ptr;
+		  else if (mid == right_ptr)
+		    mid = left_ptr;
 		  left_ptr += size;
 		  right_ptr -= size;
 		}
@@ -194,7 +196,6 @@ qsort (
      for partitions below MAX_THRESH size. BASE_PTR points to the beginning
      of the array to sort, and END_PTR points at the very last element in
      the array (*not* one beyond it!). */
-
   {
     char *const end_ptr = &base_ptr[size * (total_elems - 1)];
     char *tmp_ptr = base_ptr;
@@ -239,5 +240,4 @@ qsort (
           }
       }
   }
-  kfree(pivot_buffer);
 }
