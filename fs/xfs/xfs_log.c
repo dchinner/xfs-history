@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.98 $"
+#ident	"$Revision: 1.99 $"
 
 /*
  * High level interface routines for log manager
@@ -453,6 +453,10 @@ xfs_log_mount(xfs_mount_t	*mp,
 	if ((error = xlog_recover(log)) != NULL) {
 		xlog_unalloc_log(log);
 	}
+
+	/* Normal transactions can now occur */
+	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+
 	return error;
 }	/* xfs_log_mount */
 
