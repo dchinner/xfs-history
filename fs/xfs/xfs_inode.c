@@ -1822,7 +1822,7 @@ xfs_iunlink(
 	agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
 	ASSERT(agino != 0);
 	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
-	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT) != 0);
+	ASSERT(!INT_ISZERO(agi->agi_unlinked[bucket_index], ARCH_CONVERT));
 	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT) != agino);
 
 	if (INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT) != NULLAGINO) {
@@ -1928,7 +1928,7 @@ xfs_iunlink_remove(
 	ASSERT(agino != 0);
 	bucket_index = agino % XFS_AGI_UNLINKED_BUCKETS;
 	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT) != NULLAGINO);
-	ASSERT(INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT) != 0);
+	ASSERT(!INT_ISZERO(agi->agi_unlinked[bucket_index], ARCH_CONVERT));
 
 	if (INT_GET(agi->agi_unlinked[bucket_index], ARCH_CONVERT) == agino) {
 		/*

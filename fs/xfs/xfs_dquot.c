@@ -231,7 +231,7 @@ xfs_qm_adjust_dqtimers(
 	/* 
 	 * root's limits are not real limits.
 	 */
-	if (INT_GET(d->d_id, ARCH_CONVERT) == 0)
+	if (INT_ISZERO(d->d_id, ARCH_CONVERT))
 		return;
 
 #ifdef QUOTADEBUG
@@ -240,7 +240,7 @@ xfs_qm_adjust_dqtimers(
 	if (INT_GET(d->d_ino_hardlimit, ARCH_CONVERT))
 		ASSERT(INT_GET(d->d_ino_softlimit, ARCH_CONVERT) <= INT_GET(d->d_ino_hardlimit, ARCH_CONVERT));
 #endif
-	if (INT_GET(d->d_btimer, ARCH_CONVERT) == 0) {
+	if (INT_ISZERO(d->d_btimer, ARCH_CONVERT)) {
 		if ((INT_GET(d->d_blk_softlimit, ARCH_CONVERT) &&
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) >= INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) ||
 		    (INT_GET(d->d_blk_hardlimit, ARCH_CONVERT) &&
@@ -248,15 +248,15 @@ xfs_qm_adjust_dqtimers(
 			INT_SET(d->d_btimer, ARCH_CONVERT, CURRENT_TIME + XFS_QI_BTIMELIMIT(mp));
 		}
 	} else {
-		if ((INT_GET(d->d_blk_softlimit, ARCH_CONVERT) == 0 ||	
+		if ((INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT) ||	
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) < INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) &&
-		    (INT_GET(d->d_blk_hardlimit, ARCH_CONVERT) == 0 ||	
+		    (INT_ISZERO(d->d_blk_hardlimit, ARCH_CONVERT) ||	
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) < INT_GET(d->d_blk_hardlimit, ARCH_CONVERT)))) {
 			INT_ZERO(d->d_btimer, ARCH_CONVERT);
 		}
 	}
 
-	if (INT_GET(d->d_itimer, ARCH_CONVERT) == 0) {
+	if (INT_ISZERO(d->d_itimer, ARCH_CONVERT)) {
 		if ((INT_GET(d->d_ino_softlimit, ARCH_CONVERT) &&
 		    (INT_GET(d->d_icount, ARCH_CONVERT) >= INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) ||
 		    (INT_GET(d->d_ino_hardlimit, ARCH_CONVERT) &&
@@ -264,9 +264,9 @@ xfs_qm_adjust_dqtimers(
 			INT_SET(d->d_itimer, ARCH_CONVERT, CURRENT_TIME + XFS_QI_ITIMELIMIT(mp));
 		}
 	} else {
-		if ((INT_GET(d->d_ino_softlimit, ARCH_CONVERT) == 0 ||
+		if ((INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT) ||
 		    (INT_GET(d->d_icount, ARCH_CONVERT) < INT_GET(d->d_ino_softlimit, ARCH_CONVERT)))  &&
-		    (INT_GET(d->d_ino_hardlimit, ARCH_CONVERT) == 0 ||	
+		    (INT_ISZERO(d->d_ino_hardlimit, ARCH_CONVERT) ||	
 		    (INT_GET(d->d_icount, ARCH_CONVERT) < INT_GET(d->d_ino_hardlimit, ARCH_CONVERT)))) {
 			INT_ZERO(d->d_itimer, ARCH_CONVERT);
 		}
@@ -286,7 +286,7 @@ xfs_qm_dqwarn(
 	/* 
 	 * root's limits are not real limits.
 	 */
-	if (INT_GET(d->d_id, ARCH_CONVERT) == 0)
+	if (INT_ISZERO(d->d_id, ARCH_CONVERT))
 		return (0);
 
 	warned = 0;
@@ -297,7 +297,7 @@ xfs_qm_dqwarn(
 			warned++;
 		}
 	} else {
-		if (INT_GET(d->d_blk_softlimit, ARCH_CONVERT) == 0 ||	
+		if (INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT) ||	
 		    (INT_GET(d->d_bcount, ARCH_CONVERT) < INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) {
 			INT_ZERO(d->d_bwarns, ARCH_CONVERT);
 		}
@@ -310,7 +310,7 @@ xfs_qm_dqwarn(
 			warned++;
 		}
 	} else {
-		if ((INT_GET(d->d_ino_softlimit, ARCH_CONVERT) == 0) ||
+		if ((INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT)) ||
 		    (INT_GET(d->d_icount, ARCH_CONVERT) < INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) {
 			INT_ZERO(d->d_iwarns, ARCH_CONVERT);
 		}
@@ -1557,7 +1557,7 @@ xfs_qm_dqcheck(
 	if (! errs) {
 		if (INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT) &&
 		    INT_GET(ddq->d_bcount, ARCH_CONVERT) >= INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT)) {
-			if (INT_GET(ddq->d_btimer, ARCH_CONVERT) == 0 && INT_GET(ddq->d_id, ARCH_CONVERT) != 0) {
+			if (INT_ISZERO(ddq->d_btimer, ARCH_CONVERT) && !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%x) "
@@ -1568,7 +1568,7 @@ xfs_qm_dqcheck(
 		}
 		if (INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT) &&
 		    INT_GET(ddq->d_icount, ARCH_CONVERT) >= INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT)) {
-			if (INT_GET(ddq->d_itimer, ARCH_CONVERT) == 0 && INT_GET(ddq->d_id, ARCH_CONVERT) != 0) {
+			if (INT_ISZERO(ddq->d_itimer, ARCH_CONVERT) && !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%x) "

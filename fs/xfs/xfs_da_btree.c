@@ -786,8 +786,8 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 	} else {
 		ASSERT(INT_GET(blkinfo->magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC);
 	}
-	ASSERT(INT_GET(blkinfo->forw, ARCH_CONVERT) == 0);
-	ASSERT(INT_GET(blkinfo->back, ARCH_CONVERT) == 0);
+	ASSERT(INT_ISZERO(blkinfo->forw, ARCH_CONVERT));
+	ASSERT(INT_ISZERO(blkinfo->back, ARCH_CONVERT));
 	bcopy(bp->data, root_blk->bp->data, state->blocksize);
 	xfs_da_log_buf(args->trans, root_blk->bp, 0, state->blocksize - 1);
 	error = xfs_da_shrink_inode(args, child, bp);
@@ -1385,7 +1385,7 @@ xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count)
 	ASSERT(INT_GET(node->hdr.info.magic, ARCH_CONVERT) == XFS_DA_NODE_MAGIC);
 	if (count)
 		*count = INT_GET(node->hdr.count, ARCH_CONVERT);
-	if (INT_GET(node->hdr.count, ARCH_CONVERT) == 0)
+	if (INT_ISZERO(node->hdr.count, ARCH_CONVERT))
 		return(0);
 	return(INT_GET(node->btree[ INT_GET(node->hdr.count, ARCH_CONVERT)-1 ].hashval, ARCH_CONVERT));
 }

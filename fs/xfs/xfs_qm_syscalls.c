@@ -1208,8 +1208,8 @@ xfs_dqtest_cmp2(
 	}
 	if (INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) &&
 	    INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) >= INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT)) {
-		if (INT_GET(dqp->q_core.d_btimer, ARCH_CONVERT) == 0 &&
-		    INT_GET(dqp->q_core.d_id, ARCH_CONVERT) != 0) {
+		if (INT_ISZERO(dqp->q_core.d_btimer, ARCH_CONVERT) &&
+		    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT)) {
 			printk("%d [%s] [0x%p] BLK TIMER NOT STARTED\n", 
 			       d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
@@ -1217,8 +1217,8 @@ xfs_dqtest_cmp2(
 	}
 	if (INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) &&
 	    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >= INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT)) {
-		if (INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT) == 0 &&
-		    INT_GET(dqp->q_core.d_id, ARCH_CONVERT) != 0) {
+		if (INT_ISZERO(dqp->q_core.d_itimer, ARCH_CONVERT) &&
+		    !INT_ISZERO(dqp->q_core.d_id, ARCH_CONVERT)) {
 			printk("%d [%s] [0x%p] INO TIMER NOT STARTED\n", 
 			       d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;

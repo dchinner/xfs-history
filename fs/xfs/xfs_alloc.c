@@ -2002,7 +2002,7 @@ xfs_alloc_get_freelist(
 	/*
 	 * Freelist is empty, give up.
 	 */
-	if (INT_GET(agf->agf_flcount, ARCH_CONVERT) == 0) {
+	if (INT_ISZERO(agf->agf_flcount, ARCH_CONVERT)) {
 		*bnop = NULLAGBLOCK;
 		return 0;
 	}

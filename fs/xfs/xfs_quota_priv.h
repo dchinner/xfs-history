@@ -104,15 +104,15 @@ XQMISLCKD(xfs_dqhash_t *h)
 #define XFS_IS_DQTYPE_ON(mp, type)   (type == XFS_DQ_USER ? \
 				      XFS_IS_UQUOTA_ON(mp):XFS_IS_GQUOTA_ON(mp))
 #define XFS_IS_DQUOT_UNINITIALIZED(dqp)	( \
-	INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT) == 0ULL && \
-	INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) == 0ULL && \
-	INT_GET(dqp->q_core.d_rtb_hardlimit, ARCH_CONVERT) == 0ULL && \
-	INT_GET(dqp->q_core.d_rtb_softlimit, ARCH_CONVERT) == 0ULL && \
-	INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT) == 0ULL && \
-	INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) == 0ULL &&	\
-	INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) == 0ULL        &&	\
-	INT_GET(dqp->q_core.d_rtbcount, ARCH_CONVERT) == 0ULL      && \
-	INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) == 0ULL )
+	INT_ISZERO(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT) && \
+	INT_ISZERO(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) && \
+	INT_ISZERO(dqp->q_core.d_rtb_hardlimit, ARCH_CONVERT) && \
+	INT_ISZERO(dqp->q_core.d_rtb_softlimit, ARCH_CONVERT) && \
+	INT_ISZERO(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT) && \
+	INT_ISZERO(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) && \
+	INT_ISZERO(dqp->q_core.d_bcount, ARCH_CONVERT)        && \
+	INT_ISZERO(dqp->q_core.d_rtbcount, ARCH_CONVERT)      && \
+	INT_ISZERO(dqp->q_core.d_icount, ARCH_CONVERT))
 
 #define HL_PREVP	dq_hashlist.ql_prevp
 #define HL_NEXT		dq_hashlist.ql_next
@@ -174,7 +174,7 @@ for ((dqp) = (qlist)->qh_next; (dqp) != (xfs_dquot_t *)(qlist); \
 					 (tp)->t_dqinfo->dqa_usrdquots : \
 					 (tp)->t_dqinfo->dqa_grpdquots)
 #define XFS_IS_SUSER_DQUOT(dqp)		\
-	(INT_GET((dqp)->q_core.d_id, ARCH_CONVERT) == 0)
+	(INT_ISZERO((dqp)->q_core.d_id, ARCH_CONVERT))
 
 #define XFS_PURGE_INODE(ip) 		\
 	{ 				\
