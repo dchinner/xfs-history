@@ -905,7 +905,7 @@ xfs_setattr(
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_ATTRIBUTE) &&
 	    !(flags & ATTR_DMI)) {
-		(void) XFS_SEND_NAMESP(mp, DM_EVENT_ATTRIBUTE, bdp, DM_RIGHT_NULL,
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_ATTRIBUTE, vp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL, NULL, NULL,
 					0, 0, AT_DELAY_FLAG(flags));
 	}
@@ -1952,7 +1952,7 @@ xfs_create(
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
-				dir_bdp, DM_RIGHT_NULL, NULL,
+				dir_vp, DM_RIGHT_NULL, NULL,
 				DM_RIGHT_NULL, name, NULL,
 				dm_di_mode, 0, 0);
 
@@ -2118,8 +2118,8 @@ std_return:
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 							DM_EVENT_POSTCREATE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTCREATE,
-			dir_bdp, DM_RIGHT_NULL,
-			*vpp ? vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops):NULL,
+			dir_vp, DM_RIGHT_NULL,
+			*vpp ? vp:NULL,
 			DM_RIGHT_NULL, name, NULL,
 			dm_di_mode, error, 0);
 	}
@@ -2432,7 +2432,7 @@ xfs_remove(
 	namelen = VNAMELEN(dentry);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
-		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE, dir_bdp,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE, dir_vp,
 					DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
 					name, NULL, 0, 0, 0);
 		if (error)
@@ -2606,7 +2606,7 @@ xfs_remove(
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
 						DM_EVENT_POSTREMOVE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTREMOVE,
-				dir_bdp, DM_RIGHT_NULL,
+				dir_vp, DM_RIGHT_NULL,
 				NULL, DM_RIGHT_NULL,
 				name, NULL, dm_di_mode, error, 0);
 	}
@@ -2698,8 +2698,8 @@ xfs_link(
 
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_EVENT_LINK)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_LINK,
-					target_dir_bdp, DM_RIGHT_NULL,
-					src_bdp, DM_RIGHT_NULL,
+					target_dir_vp, DM_RIGHT_NULL,
+					src_vp, DM_RIGHT_NULL,
 					target_name, NULL, 0, 0, 0);
 		if (error)
 			return error;
@@ -2802,8 +2802,8 @@ std_return:
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, sip,
 						DM_EVENT_POSTLINK)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTLINK,
-				target_dir_bdp, DM_RIGHT_NULL,
-				src_bdp, DM_RIGHT_NULL,
+				target_dir_vp, DM_RIGHT_NULL,
+				src_vp, DM_RIGHT_NULL,
 				target_name, NULL, 0, error, 0);
 	}
 	return error;
@@ -2864,7 +2864,7 @@ xfs_mkdir(
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
-					dir_bdp, DM_RIGHT_NULL, NULL,
+					dir_vp, DM_RIGHT_NULL, NULL,
 					DM_RIGHT_NULL, dir_name, NULL,
 					dm_di_mode, 0, 0);
 		if (error)
@@ -3023,8 +3023,8 @@ std_return:
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 						DM_EVENT_POSTCREATE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTCREATE,
-					dir_bdp, DM_RIGHT_NULL,
-					created ? XFS_ITOBHV(cdp):NULL,
+					dir_vp, DM_RIGHT_NULL,
+					created ? XFS_ITOV(cdp):NULL,
 					DM_RIGHT_NULL,
 					dir_name, NULL,
 					dm_di_mode, error, 0);
@@ -3087,7 +3087,7 @@ xfs_rmdir(
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE,
-					dir_bdp, DM_RIGHT_NULL,
+					dir_vp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
 					name, NULL, 0, 0, 0);
 		if (error)
@@ -3281,7 +3281,7 @@ xfs_rmdir(
 std_return:
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_POSTREMOVE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTREMOVE,
-					dir_bdp, DM_RIGHT_NULL,
+					dir_vp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
 					name, NULL, dm_di_mode,
 					error, 0);
@@ -3425,7 +3425,7 @@ xfs_symlink(
 	}
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_SYMLINK)) {
-		error = XFS_SEND_NAMESP(mp, DM_EVENT_SYMLINK, dir_bdp,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_SYMLINK, dir_vp,
 					DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
 					link_name, target_path, 0, 0, 0);
 		if (error)
@@ -3617,8 +3617,8 @@ std_return:
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 			     DM_EVENT_POSTSYMLINK)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTSYMLINK,
-					dir_bdp, DM_RIGHT_NULL,
-					error ? NULL : XFS_ITOBHV(ip),
+					dir_vp, DM_RIGHT_NULL,
+					error ? NULL : XFS_ITOV(ip),
 					DM_RIGHT_NULL, link_name, target_path,
 					0, error, 0);
 	}
@@ -4272,8 +4272,8 @@ dmapi_enospc_check:
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_NOSPACE)) {
 
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_NOSPACE,
-				XFS_ITOBHV(ip), DM_RIGHT_NULL,
-				XFS_ITOBHV(ip), DM_RIGHT_NULL,
+				XFS_ITOV(ip), DM_RIGHT_NULL,
+				XFS_ITOV(ip), DM_RIGHT_NULL,
 				NULL, NULL, 0, 0, 0); /* Delay flag intentionally unused */
 		if (error == 0)
 			goto retry;	/* Maybe DMAPI app. has made space */
