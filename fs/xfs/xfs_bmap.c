@@ -1037,14 +1037,17 @@ xfs_bmap_alloc(
 		else
 			prod = 1;
 		asklen = (asklen + sbp->sb_rextsize - 1) / sbp->sb_rextsize;
+		askbno /= sbp->sb_rextsize;
 		abno = xfs_rtallocate_extent(tp, askbno, 1, asklen, &ralen,
 			type, wasdel, prod);
 		if (abno != NULLFSBLOCK) {
-			*alen = ralen * sbp->sb_rextsize;
-			ip->i_d.di_nblocks += *alen;
+			abno *= sbp->sb_rextsize;
+			ralen *= sbp->sb_rextsize;
+			*alen = ralen;
+			ip->i_d.di_nblocks += ralen;
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			if (wasdel)
-				ip->i_delayed_blks -= *alen;
+				ip->i_delayed_blks -= ralen;
 		} else
 			*alen = 0;
 	}
