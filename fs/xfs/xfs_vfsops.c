@@ -121,10 +121,10 @@ xfs_init(int	fstype)
                                   NBWORD) * sizeof(int))),
 			       "xfs_buf_item");
 	xfs_efd_zone = kmem_zone_init((sizeof(xfs_efd_log_item_t) +
-				       (15 * sizeof(xfs_extent_t))),
+				       ((XFS_EFD_MAX_FAST_EXTENTS - 1) * sizeof(xfs_extent_t))),
 				      "xfs_efd_item");
 	xfs_efi_zone = kmem_zone_init((sizeof(xfs_efi_log_item_t) +
-				       (15 * sizeof(xfs_extent_t))),
+				       ((XFS_EFI_MAX_FAST_EXTENTS - 1) * sizeof(xfs_extent_t))),
 				      "xfs_efi_item");
 	xfs_ifork_zone = kmem_zone_init(sizeof(xfs_ifork_t), "xfs_ifork");
 	xfs_ili_zone = kmem_zone_init(sizeof(xfs_inode_log_item_t), "xfs_ili");
