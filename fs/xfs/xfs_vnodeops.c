@@ -1,4 +1,4 @@
-#ident "$Revision: 1.390 $"
+#ident "$Revision$"
 
 
 #ifdef SIM
@@ -1381,6 +1381,14 @@ xfs_fsync(
 	}
 
 	/*
+	 * drop the exclusive i/o lock.  everything else we
+	 * can do just by holding and dropping the ilock (we hope)
+	 */
+	if (!(flag & FSYNC_INVAL)) {
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+	}
+
+	/*
 	 * If we're invalidating, always flush since we want to
 	 * tear things down.  Otherwise, don't flush anything if
 	 * we're not dirty.
@@ -1392,6 +1400,7 @@ xfs_fsync(
 		}
 		ASSERT(syncall == 0 ||
 		       (vp->v_pgcnt == 0 && vp->v_buf == 0));
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	} else if (VN_DIRTY(vp)) {
 		/*
 		 * In the non-invalidating case, calls to fsync() do not
@@ -1403,7 +1412,6 @@ xfs_fsync(
 	}
 
 	if (error2) {
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 		return XFS_ERROR(error2);
 	}
 
@@ -1415,10 +1423,10 @@ xfs_fsync(
 	 * lock here.  All it needs to do so is the inode lock,
 	 * and we don't want to force it to acquire the I/O
 	 * lock unnecessarily.
-	 */
 	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
 	       syncall == 0 ||
 	       (!VN_DIRTY(vp) && (ip->i_queued_bufs == 0)));
+	 */
 
 	/*
 	 * We always need to make sure that the required inode state
@@ -1455,11 +1463,9 @@ xfs_fsync(
 			 * be pinned.  If it is, force the log.
 			 */
 			if (xfs_ipincount(ip) == 0)  {
-				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
-						XFS_ILOCK_SHARED);
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			} else  {
-				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
-						XFS_ILOCK_SHARED);
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 				xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE |
 					      ((flag & FSYNC_WAIT)
@@ -1480,7 +1486,6 @@ xfs_fsync(
 					XFS_FSYNC_TS_LOG_RES(ip->i_mount),
 					0, 0, 0))  {
 				xfs_trans_cancel(tp, 0);
-				xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 				return error;
 			}
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1495,14 +1500,14 @@ xfs_fsync(
 			 * inode in another recent transaction.  So we
 			 * play it safe and fire off the transaction anyway.
 			 */
-			xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			if (flag & FSYNC_WAIT)
 				xfs_trans_set_sync(tp);
 			error = xfs_trans_commit(tp, 0, NULL);
 
-			xfs_iunlock(ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 	} else {
 		/*
@@ -1523,11 +1528,9 @@ xfs_fsync(
 			 * too much work but it's safe.
 			 */
 			if (xfs_ipincount(ip) == 0)  {
-				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
-						XFS_ILOCK_SHARED);
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			} else  {
-				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
-						XFS_ILOCK_SHARED);
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
 				xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE |
 					      ((flag & FSYNC_WAIT)
@@ -1549,7 +1552,6 @@ xfs_fsync(
 					XFS_FSYNC_TS_LOG_RES(ip->i_mount),
 					0, 0, 0))  {
 				xfs_trans_cancel(tp, 0);
-				xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 				return error;
 			}
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1564,14 +1566,14 @@ xfs_fsync(
 			 * inode in another recent transaction.  So we
 			 * play it safe and fire off the transaction anyway.
 			 */
-			xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 			if (flag & FSYNC_WAIT)
 				xfs_trans_set_sync(tp);
 			error = xfs_trans_commit(tp, 0, NULL);
 
-			xfs_iunlock(ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
 	}
 	return error;
