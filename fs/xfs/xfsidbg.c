@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.92 $"
+#ident	"$Revision: 1.93 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1605,8 +1605,8 @@ xfs_strat_enter_trace_entry(ktrace_entry_t *ktep)
 	qprintf("bp offset 0x%x%x bcount 0x%x bufsize 0x%x blkno 0x%x\n",
 		ktep->val[5], ktep->val[6], ktep->val[7], ktep->val[8],
 		ktep->val[9]);
-	flags = (((uint64_t)ktep->val[10] << 32) & 0xFFFFFFFF00000000ULL) |
-		(((uint64_t)ktep->val[11]) & 0x00000000FFFFFFFFULL);
+	flags = (((__psunsigned_t)ktep->val[10] << 32) & 0xFFFFFFFF00000000ULL) |
+		(((__psunsigned_t)ktep->val[11]) & 0x00000000FFFFFFFFULL);
 	qprintf("bp flags ");
 	printflags(flags, tab_bflags,"bflags");
 	qprintf("\n");
@@ -1627,7 +1627,7 @@ xfs_strat_sub_trace_entry(ktrace_entry_t *ktep)
 		ktep->val[5]);
 	qprintf("rbp bp offset 0x%x%x bcount 0x%x blkno 0x%x\n",
 		ktep->val[6], ktep->val[7], ktep->val[8], ktep->val[9]);
-	flags = (__psint_t) ktep->val[11];
+	flags = (__psunsigned_t) ktep->val[10];
 	qprintf("rbp flags ");
 	printflags(flags, tab_bflags, "bflags");
 	qprintf("\n");
