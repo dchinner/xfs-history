@@ -1,4 +1,4 @@
-#ident "$Revision: 1.312 $"
+#ident "$Revision: 1.313 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1286,7 +1286,6 @@ error_return:
 	return error;
 }
 
-
 /*
  * xfs_fsync
  *
@@ -1306,8 +1305,8 @@ xfs_fsync(
 	xfs_inode_t	*ip;
 	xfs_fsize_t	last_byte;
 	int		error;
-	buf_t		*bp;
 	vnode_t 	*vp;
+	xfs_trans_t	*tp;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_fsync", (inst_t *)__return_address);
@@ -1316,10 +1315,18 @@ xfs_fsync(
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
 		return XFS_ERROR(EIO);
 #endif
+
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	last_byte = xfs_file_last_byte(ip);
+
+	/*
+	 * If we're invalidating, always flush since we want to
+	 * tear things down.  Otherwise, don't flush anything if
+	 * we're not dirty.
+	 */
 	if (flag & FSYNC_INVAL) {
-		if (ip->i_df.if_flags & XFS_IFEXTENTS && ip->i_df.if_bytes > 0) {
+		if (ip->i_df.if_flags & XFS_IFEXTENTS &&
+		    ip->i_df.if_bytes > 0) {
 			/*
 			 * Set the VREMAPPING bit so that vfault can't
 			 * race in between the remapf and the pflushinvalvp
@@ -1333,7 +1340,7 @@ xfs_fsync(
 			VN_FLAGCLR(vp, VREMAPPING);
 		}
 		ASSERT((vp->v_pgcnt == 0) && (vp->v_buf == 0));
-	} else {
+	} else if (VN_DIRTY(vp)) {
 		/*
 		 * In the non-invalidating case calls to fsync() do not
 		 * flush all the dirty mmap'd pages.  That requires a
@@ -1342,6 +1349,27 @@ xfs_fsync(
 		pflushvp(vp, last_byte, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
 	}
 
+	/*
+	 * We always need to make sure that the required inode state
+	 * is safe on disk.  The vnode might be clean but because
+	 * of committed transactions that haven't hit the disk yet.
+	 * Likewise, there could be unflushed non-transactional
+	 * changes to the inode core that have to go to disk.
+	 *
+	 * The following code depends on one assumption:  that
+	 * any transaction that changes an inode logs the core
+	 * because it has to change some field in the inode core
+	 * (typically nextents or nblocks).  That assumption
+	 * implies that any transactions against an inode will
+	 * catch any non-transactional updates.  If inode-altering
+	 * transactions exist that violate this assumption, the
+	 * code breaks.  Right now, it figures that if the involved
+	 * update_* field is clear and the inode is unpinned, the
+	 * inode is clean.  Either it's been flushed or it's been
+	 * committed and the commit has hit the disk unpinning the inode.
+	 * (Note that xfs_inode_item_format() called at commit clears
+	 * the update_* fields.)
+	 */
 	if (!(flag & FSYNC_DATA)) {
 		/*
 		 * We used to assert that i_delayed_blks was 0 here,
@@ -1354,40 +1382,140 @@ xfs_fsync(
 		ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
 		       (!VN_DIRTY(vp) &&
 			(ip->i_queued_bufs == 0)));
+
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
-		if (!xfs_iflock_nowait(ip)) {
+
+		if (ip->i_update_core == 0)  {
 			/*
-			 * If we can't grab the flush lock then check
-			 * to see if the inode has been flushed delayed
-			 * write.  If so, grab its buffer and send it
-			 * out immediately.  We'll be able to acquire
-			 * the flush lock when the I/O completes.
+			 * Timestamps/size haven't changed since last inode
+			 * flush or inode transaction commit.  That means
+			 * either nothing got written or a transaction
+			 * committed which caught the updates.  If the
+			 * latter happened and the transaction hasn't
+			 * hit the disk yet, the inode will be still
+			 * be pinned.  If it is, force the log.
 			 */
-			bp = incore(ip->i_dev, ip->i_blkno, ip->i_len,
-				    INCORE_TRYLOCK);
-			if (bp != NULL) {
-				if (bp->b_flags & B_DELWRI) {
-					buftrace("XFS_FSYNC", bp);
-					if (bp->b_pincount > 0) {
-						xfs_log_force(ip->i_mount,
-							      (xfs_lsn_t)0,
-							      XFS_LOG_FORCE);
-					}
-					xfs_bawrite(ip->i_mount, bp);
-				} else {
-					brelse(bp);
-				}
+			if (xfs_ipincount(ip) == 0)  {
+				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
+						XFS_ILOCK_SHARED);
+			} else  {
+				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
+						XFS_ILOCK_SHARED);
+				xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
+					      XFS_LOG_FORCE |
+					      ((flag & FSYNC_WAIT)
+					       ? XFS_LOG_SYNC : 0));
 			}
-			xfs_iflock(ip);
+			error = 0;
+		} else  {
+			/*
+			 * Kick off a transaction to log the inode
+			 * core to get the updates.  Make it
+			 * sync if FSYNC_WAIT is passed in (which
+			 * is done by everybody but specfs).  The
+			 * sync transaction will also force the log.
+			 */
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+			tp = xfs_trans_alloc(ip->i_mount, XFS_TRANS_FSYNC_TS);
+			if (error = xfs_trans_reserve(tp, 0,
+					XFS_FSYNC_TS_LOG_RES(ip->i_mount),
+					0, 0, 0))  {
+				ASSERT(0);
+				xfs_trans_cancel(tp, 0);
+				xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+				return error;
+			}
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+			/*
+			 * Note - it's possible that we might have pushed
+			 * ourselves out of the way during trans_reserve
+			 * which would flush the inode.  But there's no
+			 * guarantee that the inode buffer has actually
+			 * gone out yet (it's delwri).  Plus the buffer
+			 * could be pinned anyway if it's part of an
+			 * inode in another recent transaction.  So we
+			 * play it safe and fire off the transaction anyway.
+			 */
+			xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+			if (flag & FSYNC_WAIT)
+				xfs_trans_set_sync(tp);
+			error = xfs_trans_commit(tp, 0);
+
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
 		}
-		error = xfs_iflush(ip, (flag & FSYNC_WAIT) ?
-				   XFS_IFLUSH_SYNC : XFS_IFLUSH_ASYNC);
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
 	} else {
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL );
-		xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
-			      XFS_LOG_FORCE | XFS_LOG_SYNC );
-		error = 0;
+		/*
+		 * We don't care about the timestamps here.  We
+		 * only care about the size field growing on us
+		 * and forcing any space allocation transactions.
+		 * We have to flush changes to the size fields
+		 * otherwise we could write out data that
+		 * becomes inaccessible after a crash.
+		 */
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+
+		if (ip->i_update_size == 0)  {
+			/*
+			 * Force the log if the inode is pinned.
+			 * That ensures that all transactions committed
+			 * against the inode hit the disk.  This may do
+			 * too much work but it's safe.
+			 */
+			if (xfs_ipincount(ip) == 0)  {
+				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
+						XFS_ILOCK_SHARED);
+			} else  {
+				xfs_iunlock(ip, XFS_IOLOCK_EXCL |
+						XFS_ILOCK_SHARED);
+				xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
+					      XFS_LOG_FORCE |
+					      ((flag & FSYNC_WAIT)
+					       ? XFS_LOG_SYNC : 0));
+			}
+			error = 0;
+		} else  {
+			/*
+			 * Kick off a sync transaction to log the inode
+			 * core.  The transaction has to be sync since
+			 * we need these updates to guarantee that the
+			 * data written will be seen.  The sync
+			 * transaction will also force the log.
+			 */
+			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+			tp = xfs_trans_alloc(ip->i_mount, XFS_TRANS_FSYNC_TS);
+			if (error = xfs_trans_reserve(tp, 0,
+					XFS_FSYNC_TS_LOG_RES(ip->i_mount),
+					0, 0, 0))  {
+				ASSERT(0);
+				xfs_trans_cancel(tp, 0);
+				xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+				return error;
+			}
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+			/*
+			 * Note - it's possible that we might have pushed
+			 * ourselves out of the way during trans_reserve
+			 * which would flush the inode.  But there's no
+			 * guarantee that the inode buffer has actually
+			 * gone out yet (it's delwri).  Plus the buffer
+			 * could be pinned anyway if it's part of an
+			 * inode in another recent transaction.  So we
+			 * play it safe and fire off the transaction anyway.
+			 */
+			xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+			if (flag & FSYNC_WAIT)
+				xfs_trans_set_sync(tp);
+			error = xfs_trans_commit(tp, 0);
+
+			xfs_iunlock(ip, XFS_IOLOCK_EXCL|XFS_ILOCK_EXCL);
+		}
 	}
 	return error;
 }
