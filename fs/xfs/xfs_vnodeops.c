@@ -1,4 +1,4 @@
-#ident "$Revision: 1.238 $"
+#ident "$Revision: 1.239 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -277,30 +277,6 @@ xfs_map(
 	off_t		offset,
 	void		*pregp,
 	addr_t		*addrp,
-	size_t		len,
-	uint		prot,
-	uint		max_prot,
-	uint		flags,
-	cred_t		*credp);
-
-STATIC int
-xfs_addmap(
-	bhv_desc_t	*bdp,
-	off_t		offset,
-	void		*pregp,
-	addr_t		addr,
-	size_t		len,
-	uint		prot,
-	uint		max_prot,
-	uint		flags,
-	cred_t		*credp);
-
-STATIC int
-xfs_delmap(
-	bhv_desc_t	*bdp,
-	off_t		offset,
-	void		*pregp,
-	addr_t		addr,
 	size_t		len,
 	uint		prot,
 	uint		max_prot,
@@ -5436,75 +5412,6 @@ xfs_map(
 
 
 /*
- * xfs_addmap
- *
- * This is called when new mappings are added to the given file.  All
- * we do here is record the number of pages mapped in this file so that
- * we can reject record locking while a file is mapped (see xfs_frlock()).
- */
-/*ARGSUSED*/
-STATIC int
-xfs_addmap(
-	bhv_desc_t	*bdp,
-	off_t		offset,
-	void		*pregp,
-	addr_t		addr,
-	size_t		len,
-	uint		prot,
-	uint		max_prot,
-	uint		flags,
-	cred_t		*credp)
-{
-#ifdef DEBUG
-	xfs_inode_t	*ip;
-	vnode_t		*vp;
-
-	ip = XFS_BHVTOI(bdp);
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	vp = BHV_TO_VNODE(bdp);
-	ASSERT(vp->v_mreg);
-	ip->i_mapcnt += btoc(len);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-#endif /* DEBUG */
-	return 0;
-}
-
-
-/*
- * xfs_delmap
- *
- * This is called when mappings to the given file are deleted.  All
- * we do is decrement our count of the number of pages mapped in this
- * file.  This count used to be used in xfs_frlock(), but now it is
- * used only for debugging.
- */
-/*ARGSUSED*/
-STATIC int
-xfs_delmap(
-	bhv_desc_t	*bdp,
-	off_t		offset,
-	void		*pregp,
-	addr_t		addr,
-	size_t		len,
-	uint		prot,
-	uint		max_prot,
-	uint		flags,
-	cred_t		*credp)
-{
-#ifdef DEBUG
-	xfs_inode_t	*ip;
-
-	ip = XFS_BHVTOI(bdp);
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	ip->i_mapcnt -= btoc(len);
-	ASSERT(((long)ip->i_mapcnt) >= 0);
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-#endif /* DEBUG */
-	return 0;
-}
-
-
-/*
  * xfs_allocstore
  *
  * This is called to reserve or allocate space for the given range.
@@ -6532,8 +6439,8 @@ vnodeops_t xfs_vnodeops = {
 	xfs_bmap,
 	xfs_strategy,
 	xfs_map,
-	xfs_addmap,
-	xfs_delmap,
+	fs_noerr,	/* addmap */
+	fs_noerr,	/* delmap */
 	fs_poll,
 	fs_nosys,	/* dump */
 	fs_pathconf,
