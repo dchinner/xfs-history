@@ -1,4 +1,4 @@
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -78,7 +78,12 @@ STATIC int		xfs_qm_dqalloc(xfs_trans_t*, xfs_mount_t *,
 				       xfs_fileoff_t, buf_t **);
 STATIC int		xfs_qm_dqread(xfs_trans_t*, xfs_dqid_t, xfs_dquot_t *,
 				      uint);
-
+#ifdef DEBUG
+int xfs_do_dqerror = 0;
+int xfs_dqreq_num = 0;
+int xfs_dqerror_mod = 33;
+dev_t xfs_dqerror_dev = 0;
+#endif
 
 /*
  * Allocate and initialize a dquot. We don't always allocate fresh memory;
@@ -882,7 +887,17 @@ xfs_qm_dqget(
 		return (ESRCH);
 	}
 	h = XFS_DQ_HASH(mp, id, type);
-	
+
+#ifdef DEBUG
+	if (xfs_do_dqerror) {
+		if (xfs_dqerror_dev == mp->m_dev &&
+		    (xfs_dqreq_num++ % xfs_dqerror_mod) == 0) {
+			printf("Returning error in dqget\n");
+			return (EIO);
+		}
+	}
+#endif
+
  again:
 
 #ifdef DEBUG
