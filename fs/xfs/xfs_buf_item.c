@@ -716,7 +716,7 @@ xfs_buf_item_log_check(xfs_buf_log_item_t *bip)
 
 /*
  * Count the number of bits set in the bitmap starting with bit
- * start_bit.  Size is the size of the bitmap in bytes.
+ * start_bit.  Size is the size of the bitmap in words.
  *
  * Do the counting by mapping a byte value to the number of set
  * bits for that value using the xfs_countbit array, i.e.
@@ -767,7 +767,74 @@ xfs_buf_item_bits(uint	*map,
 	}
 
 	return (bits);
-}
+}	/* xfs_buf_item_bits */
+	
+/*
+ * Count the number of contiguous bits set in the bitmap starting with bit
+ * start_bit.  Size is the size of the bitmap in words.
+ *
+ * Do the counting by mapping a byte value to the number of set
+ * bits for that value using the xfs_countbit array, i.e.
+ */
+int
+xfs_buf_item_contig_bits(uint	*map,
+			 uint	size,
+			 uint	start_bit)
+{
+	register int	bits;
+	register uint	*wordp;
+	register uint	cwordp;
+	register uint	*end_map;
+	int		word_bit;
+	int		cnt;
+
+	bits = 0;
+	end_map = (uint *)(map + size);
+	wordp = (uint *)(map + (start_bit >> 5));
+	word_bit = start_bit & 0x1F;
+
+	/*
+	 * If the caller fell off the end of the map, return 0.
+	 */
+	if (wordp >= end_map) {
+		return (0);
+	}
+
+	/*
+	 * If start_bit is not byte aligned, then process just the
+	 * relevant bits.
+	 */
+	if (word_bit != 0) {
+		cwordp = *wordp >> word_bit;
+	} else {
+		cwordp = *wordp;
+		word_bit = 0;
+	}
+
+	/*
+	 * Count the bits in each byte until the end of the bitmap.
+	 */
+	while (wordp < end_map) {
+		/*
+		 * Cycle through bits left in word.  If the low bit is
+		 * set, we've found a 'contingous' bit.
+		 */
+		for (cnt = NBPW*NBBY-word_bit; cnt > 0; cnt--) {
+			if (cwordp & 0x1)
+				bits++;
+			else
+				return bits;
+			cwordp >>= 1;
+		}
+
+		/* Grab another word */
+		wordp++;
+		cwordp = *wordp;
+		word_bit = 0;
+	}
+
+	return (bits);
+}	/* xfs_buf_item_contig_bits */
 	
 /*
  * This takes the bit number to start looking from and
