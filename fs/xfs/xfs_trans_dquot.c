@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -586,9 +586,8 @@ xfs_trans_unreserve_and_mod_dquots(
 			if (qtrx->qt_blk_res) {
 				xfs_dqlock(dqp);
 				locked = B_TRUE;
-				if (qtrx->qt_blk_res)
-					dqp->q_res_bcount -= 
-						(xfs_qcnt_t)qtrx->qt_blk_res; 
+				dqp->q_res_bcount -= 
+					(xfs_qcnt_t)qtrx->qt_blk_res; 
 #ifdef _SHAREII
 				if (IsShareRunning)
 					blkunres = (int)qtrx->qt_blk_res;
@@ -599,9 +598,8 @@ xfs_trans_unreserve_and_mod_dquots(
 					xfs_dqlock(dqp);
 					locked = B_TRUE;
 				}
-				if (qtrx->qt_ino_res)
-					dqp->q_res_icount -= 
-						(xfs_qcnt_t)qtrx->qt_ino_res; 
+				dqp->q_res_icount -= 
+					(xfs_qcnt_t)qtrx->qt_ino_res; 
 #ifdef _SHAREII
 				if (IsShareRunning) 
 					inounres = (int)qtrx->qt_blk_res;
@@ -609,11 +607,12 @@ xfs_trans_unreserve_and_mod_dquots(
 			}
 			
 			if (qtrx->qt_rtblk_res) {
-				xfs_dqlock(dqp);
-				if (qtrx->qt_rtblk_res)
-					dqp->q_res_rtbcount -= 
-						(xfs_qcnt_t)qtrx->qt_rtblk_res; 
-				xfs_dqunlock(dqp);
+				if (!locked) {
+					xfs_dqlock(dqp);
+					locked = B_TRUE;
+				}
+				dqp->q_res_rtbcount -= 
+					(xfs_qcnt_t)qtrx->qt_rtblk_res; 
 #ifdef _SHAREII
 				if (IsShareRunning)
 					blkunres += (int)qtrx->qt_blk_res;
@@ -637,6 +636,8 @@ xfs_trans_unreserve_and_mod_dquots(
 							0, LI_UPDATE, NULL);
 			}
 #endif /* _SHAREII */
+			if (locked)
+				xfs_dqunlock(dqp);
 					
 		}
 		qa = tp->t_dqinfo->dqa_prjdquots;
