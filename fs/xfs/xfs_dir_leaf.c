@@ -370,13 +370,10 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 
 	xfs_idata_realloc(dp, -size, XFS_DATA_FORK);
 	dp->i_d.di_size = 0;
+	xfs_trans_log_inode(iargs->trans, dp, XFS_ILOG_CORE);
 	retval = xfs_da_grow_inode(iargs, &blkno);
-	if (retval) {
-		dp->i_d.di_size = size;
-		xfs_idata_realloc(dp, size, XFS_DATA_FORK);
-		bcopy(tmpbuffer, dp->i_df.if_u1.if_data, size);
+	if (retval)
 		goto out;
-	}
 
 	ASSERT(blkno == 0);
 	retval = xfs_dir_leaf_create(iargs, blkno, &bp);
