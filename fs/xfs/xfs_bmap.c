@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.184 $"
+#ident	"$Revision: 1.185 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -453,6 +453,7 @@ xfs_bmap_add_attrfork_extents(
 
 	if (ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t) <= XFS_IFORK_DSIZE(ip))
 		return 0;
+	cur = NULL;
 	error = xfs_bmap_extents_to_btree(tp, ip, firstblock, flist, &cur, 0,
 		flags, XFS_DATA_FORK);
 	if (cur) {
