@@ -33,27 +33,252 @@
 #include <xfs.h>
 #include <linux/bitops.h>
 #include <linux/locks.h>
+#include <linux/smp_lock.h>
 #include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/page_buf.h>
 
-#define	MS_DATA		0x04
+/* xfs_vfs[ops].c */
+extern void vfsinit(void);
+extern int  xfs_init(int fstype);
+extern void xfs_cleanup(void);
 
-/* xfs_vfs.c */
-
-void vfsinit(void);
-
-/* xfs_vfs.c */
-int xfs_init(int fstype);
-
-void dmapi_init(void );
-void dmapi_uninit(void );
+extern void dmapi_init(void);
+extern void dmapi_uninit(void);
 
 static struct super_operations linvfs_sops;
 
 
-int spectodevs(
+#define	MS_DATA		0x04
+
+#define MNTOPT_LOGBUFS  "logbufs"       /* number of XFS log buffers */
+#define MNTOPT_LOGBSIZE "logbsize"      /* size of XFS log buffers */
+#define MNTOPT_LOGDEV	"logdev"	/* log device */
+#define MNTOPT_RTDEV	"rtdev"		/* realtime I/O device */
+#define MNTOPT_DMAPI    "dmapi"         /* DMI enabled (DMAPI / XDSM) */
+#define MNTOPT_XDSM     "xdsm"          /* DMI enabled (DMAPI / XDSM) */
+#define MNTOPT_BIOSIZE  "biosize"       /* log2 of preferred buffered io size */
+#define MNTOPT_WSYNC    "wsync"         /* safe-mode nfs compatible mount */
+#define MNTOPT_NOATIME  "noatime"       /* don't modify access times on reads */
+#define MNTOPT_INO64    "ino64"         /* force inodes into 64-bit range */
+#define MNTOPT_NOALIGN  "noalign"       /* turn off stripe alignment */
+#define MNTOPT_SUNIT    "sunit"         /* data volume stripe unit */
+#define MNTOPT_SWIDTH   "swidth"        /* data volume stripe width */
+#define MNTOPT_NORECOVERY "norecovery"  /* don't run XFS recovery */
+#define MNTOPT_OSYNCISDSYNC "osyncisdsync" /* o_sync == o_dsync on this fs */
+#define MNTOPT_QUOTA    "quota"         /* disk quotas */
+#define MNTOPT_MRQUOTA  "mrquota"       /* don't turnoff if SB has quotas on */
+#define MNTOPT_NOSUID   "nosuid"        /* disallow setuid program execution */
+#define MNTOPT_NOQUOTA  "noquota"       /* no quotas */
+#define MNTOPT_UQUOTA   "usrquota"      /* user quota enabled */
+#define MNTOPT_GQUOTA   "grpquota"      /* group quota enabled */
+#define MNTOPT_PQUOTA   "prjquota"      /* project quota enabled */
+#define MNTOPT_UQUOTANOENF "uqnoenforce"/* user quota limit enforcement */
+#define MNTOPT_GQUOTANOENF "gqnoenforce"/* group quota limit enforcement */
+#define MNTOPT_PQUOTANOENF "pqnoenforce"/* project quota limit enforcement */
+#define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
+#define MNTOPT_RO       "ro"            /* read only */
+#define MNTOPT_RW       "rw"            /* read/write */
+#define MNTOPT_NOKIO    "nokio"         /* no kiobuf io */
+#define MNTOPT_KIO      "kio"           /* use kiobuf io */
+#define MNTOPT_KIOCLUSTER "kiocluster"  /* use kiobuf io - with clustering */
+
+STATIC int
+mountargs_xfs(
+	char		*options,
+	struct xfs_args	*args)
+{
+	char	*this_char, *value, *eov;
+	int  logbufs = -1;
+	int  logbufsize = -1;
+	int dsunit, dswidth, vol_dsunit, vol_dswidth;
+	int iosize;
+	int error;
+
+	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
+	memset(args, 0, sizeof(*args));
+	args->version = 3;
+	for (this_char = strtok (options, ",");
+	     this_char != NULL;
+	     this_char = strtok (NULL, ",")) {
+
+		if ((value = strchr (this_char, '=')) != NULL)
+			*value++ = 0;
+
+		if (!strcmp(this_char, MNTOPT_LOGBUFS)) {
+			if (!strcmp(value, "none")) {
+				logbufs = 0;
+				printk(
+			    "mount: this FS is trash after writing to it\n");
+			} else {
+				logbufs = simple_strtoul(value, &eov, 10);
+				if (logbufs < 2 || logbufs > 8) {
+					printk(
+					"mount: Illegal logbufs amount: %d\n",
+						logbufs);
+					return 1;
+				}
+			}
+		} else if (!strcmp(this_char, MNTOPT_LOGBSIZE)) {
+			logbufsize = simple_strtoul(value, &eov, 10);
+			if (logbufsize != 16*1024 && logbufsize != 32*1024) {
+				printk(
+			"mount: Illegal logbufsize: %d (not 16k or 32k)\n",
+						logbufsize);
+				return 1;
+			}
+		} else if (!strcmp(this_char, MNTOPT_LOGDEV)) {
+			struct nameidata nd;
+
+			if (!value)
+				continue;
+
+			error = 0;
+			lock_kernel();
+			if (path_init(value, LOOKUP_FOLLOW, &nd))
+				error = path_walk(value, &nd);
+			
+			if (error) {
+				unlock_kernel();
+				printk(
+			"mount: Invalid log device \"%s\", error = %d\n",
+							       value, error);
+				return 1;
+			}
+			args->logdev = nd.dentry->d_inode->i_rdev;
+			path_release(&nd);
+			unlock_kernel();
+		} else if (!strcmp(this_char, MNTOPT_DMAPI)) {
+			args->flags |= XFSMNT_DMAPI;
+		} else if (!strcmp(this_char, MNTOPT_XDSM)) {
+			args->flags |= XFSMNT_DMAPI;
+                } else if (!strcmp(this_char, MNTOPT_RTDEV)) {
+			struct nameidata nd;
+
+                        if (!value)
+                                continue;
+
+			error = 0;
+                        lock_kernel();
+                        if (path_init(value, LOOKUP_FOLLOW, &nd))
+				error = path_walk(value, &nd);
+
+                        if (error) {
+				unlock_kernel();
+                                printk(
+			"mount: Invalid realtime device \"%s\", error = %d\n",
+							       value, error);
+                                return 1;
+                        }
+                        args->rtdev = nd.dentry->d_inode->i_rdev;       
+			path_release(&nd);
+			unlock_kernel();
+		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
+			iosize = simple_strtoul(value, &eov, 10);
+			if (iosize > 255 || iosize <= 0) {
+				printk(
+			"mount: illegal biosize %d, value out of bounds\n",
+						iosize);
+				return 1;
+			}
+			args->flags |= XFSMNT_IOSIZE;
+			args->iosizelog = (uint8_t) iosize;
+		} else if (!strcmp(this_char, MNTOPT_WSYNC)) {
+			args->flags |= XFSMNT_WSYNC;
+		} else if (!strcmp(this_char, MNTOPT_NOATIME)) {
+			args->flags |= XFSMNT_NOATIME;
+		} else if (!strcmp(this_char, MNTOPT_OSYNCISDSYNC)) {
+			args->flags |= XFSMNT_OSYNCISDSYNC;
+		} else if (!strcmp(this_char, MNTOPT_NORECOVERY)) {
+			args->flags |= XFSMNT_NORECOVERY;
+		} else if (!strcmp(this_char, MNTOPT_INO64)) {
+#ifdef XFS_BIG_FILESYSTEMS
+			args->flags |= XFSMNT_INO64;
+#else
+			printk("mount: ino64 option not allowed on this system\n");
+			return 1;
+#endif
+		} else if (!strcmp(this_char, MNTOPT_UQUOTA)) {
+			args->flags |= XFSMNT_UQUOTA | XFSMNT_UQUOTAENF;
+		} else if (!strcmp(this_char, MNTOPT_QUOTA)) {
+			args->flags |= XFSMNT_UQUOTA | XFSMNT_UQUOTAENF;
+		} else if (!strcmp(this_char, MNTOPT_UQUOTANOENF)) {
+			args->flags |= XFSMNT_UQUOTA;
+			args->flags &= ~XFSMNT_UQUOTAENF;
+		} else if (!strcmp(this_char, MNTOPT_QUOTANOENF)) {
+			args->flags |= XFSMNT_UQUOTA;
+			args->flags &= ~XFSMNT_UQUOTAENF;
+		} else if (!strcmp(this_char, MNTOPT_MRQUOTA)) {
+			args->flags |= XFSMNT_QUOTAMAYBE;
+		} else if (!strcmp(this_char, MNTOPT_NOALIGN)) {
+			args->flags |= XFSMNT_NOALIGN;
+		} else if (!strcmp(this_char, MNTOPT_SUNIT)) {
+			dsunit = simple_strtoul(value, &eov, 10);
+		} else if (!strcmp(this_char, MNTOPT_SWIDTH)) {
+			dswidth = simple_strtoul(value, &eov, 10);
+		} else if (!strcmp(this_char, MNTOPT_RO)) {
+			args->flags |= MS_RDONLY;
+		} else if (!strcmp(this_char, MNTOPT_NOSUID)) {
+			args->flags |= MS_NOSUID;
+		} else if (!strcmp(this_char, MNTOPT_KIO)) {
+			args->flags |= MS_KIOBUFIO;
+		} else if (!strcmp(this_char, MNTOPT_KIOCLUSTER)) {
+			args->flags |= MS_KIOBUFIO|MS_KIOCLUSTER;
+		} else {
+			printk(
+			"mount: unknown mount option \"%s\".\n", this_char);
+			return 1;
+                }
+                    
+	}
+
+	if (args->flags & XFSMNT_NORECOVERY) {
+		if ((args->flags & MS_RDONLY) == 0) {
+			printk(
+			"mount: no-recovery XFS mounts must be read-only.\n");
+			return 1;
+		}
+	}
+
+	if ((args->flags & XFSMNT_NOALIGN) && (dsunit || dswidth)) {
+		printk(
+"mount: sunit and swidth options are incompatible with the noalign option\n");
+		return 1;
+	}
+
+	if (dsunit && !dswidth || !dsunit && dswidth) {
+		printk(
+"mount: both sunit and swidth options have to be specified\n");
+		return 1;
+	}
+
+	if (dsunit && (dswidth % dsunit != 0)) {
+		printk(
+"mount: stripe width (%d) has to be a multiple of the stripe unit (%d)\n",
+			dswidth, dsunit);
+		return 1;
+	}
+
+	if ((args->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
+
+		if (dsunit) { 
+			args->sunit = dsunit;
+			args->flags |= XFSMNT_RETERR;
+		} else 
+			args->sunit = vol_dsunit;	
+		dswidth ? (args->swidth = dswidth) : 
+			  (args->swidth = vol_dswidth);
+	} else 
+		args->sunit = args->swidth = 0;
+
+	args->logbufs = logbufs;
+	args->logbufsize = logbufsize;
+	return 0;
+}
+
+int
+spectodevs(
 	struct super_block *sb,
 	struct xfs_args *args,
 	dev_t	*ddevp,
@@ -388,9 +613,10 @@ linvfs_clear_inode(
 }
 
 void 
-linvfs_put_inode(struct inode *inode)
+linvfs_put_inode(
+	struct inode	*inode)
 {
-	vnode_t	*vp = LINVFS_GET_VP(inode);
+	vnode_t		*vp = LINVFS_GET_VP(inode);
 
     	if (vp) vn_put(vp);
 }
@@ -450,7 +676,6 @@ linvfs_put_super(
 		sector_size = hardsect_size[MAJOR(dev)][MINOR(dev)];
 
 	set_blocksize(dev, sector_size);
-
 }
 
 
