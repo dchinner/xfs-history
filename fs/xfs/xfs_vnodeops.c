@@ -3290,7 +3290,10 @@ xfs_rwlock(vnode_t	*vp,
 	xfs_inode_t	*ip;
 
 	ip = XFS_VTOI(vp);
-	xfs_ilock (ip, XFS_IOLOCK_EXCL);
+	if (write_lock)
+		xfs_ilock (ip, XFS_IOLOCK_EXCL);
+	else
+		xfs_ilock (ip, XFS_IOLOCK_SHARED);
 	return;
 }
 
@@ -3306,7 +3309,10 @@ xfs_rwunlock(vnode_t	*vp,
         xfs_inode_t     *ip;
 
         ip = XFS_VTOI(vp);
-        xfs_iunlock (ip, XFS_IOLOCK_EXCL);
+	if (write_lock)
+        	xfs_iunlock (ip, XFS_IOLOCK_EXCL);
+	else
+        	xfs_iunlock (ip, XFS_IOLOCK_SHARED);
         return;
 }
 
