@@ -149,8 +149,7 @@ kmem_zalloc(size_t size, int flags)
 void
 kmem_free(void *ptr, size_t size)
 {
-	struct page	*p = virt_to_page(ptr);
-	if (VALID_PAGE(p) && PageSlab(p)) {
+	if (likely((unsigned long)ptr < VMALLOC_START)) {
 		kfree(ptr);
 	} else {
 		vfree(ptr);

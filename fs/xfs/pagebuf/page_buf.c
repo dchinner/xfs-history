@@ -843,6 +843,16 @@ pagebuf_get_empty(pb_target_t *target)
 	return (pb);
 }
 
+static inline struct page *
+mem_to_page(void * addr)
+{
+	if (likely((unsigned long)addr < VMALLOC_START)) {
+		return virt_to_page(addr);
+	} else {
+		return vmalloc_to_page(addr);
+	}
+}
+
 int
 pagebuf_associate_memory(
 	page_buf_t *pb,
@@ -876,12 +886,12 @@ pagebuf_associate_memory(
 	end = PAGE_CACHE_ALIGN((size_t) mem + len);
 	end_cur = end;
 	/* set up first page */
-	pb->pb_pages[0] = virt_to_page(mem);
+	pb->pb_pages[0] = mem_to_page(mem);
 
 	ptr += PAGE_CACHE_SIZE;
 	pb->pb_page_count = ++i;
 	while (ptr < end) {
-		pb->pb_pages[i] = virt_to_page(ptr);
+		pb->pb_pages[i] = mem_to_page((void *)ptr);
 		pb->pb_page_count = ++i;
 		ptr += PAGE_CACHE_SIZE;
 	}
