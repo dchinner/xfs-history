@@ -65,7 +65,6 @@ static inline void _sv_wait(sv_t *sv, spinlock_t *lock, int state,
 
 	schedule_timeout(timeout);
 
-	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&sv->waiters, &wait);
 }
 
