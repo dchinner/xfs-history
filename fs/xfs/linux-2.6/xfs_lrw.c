@@ -821,7 +821,15 @@ retry:
 			}
 		}
 	}	
-	
+
+	/*
+	 * If we are coming from an nfsd thread then insert into the
+	 * reference cache.
+	 */
+
+	if (!strcmp(current->comm, "nfsd"))
+		xfs_refcache_insert(xip);
+
 	xfs_iunlock(xip, iolock);
 	return(ret);
 }

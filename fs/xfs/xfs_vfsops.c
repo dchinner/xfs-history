@@ -150,6 +150,7 @@ xfs_init(int	fstype)
 #ifdef XFS_DABUF_DEBUG
 	extern lock_t	        xfs_dabuf_global_lock;
 #endif
+	extern int		xfs_refcache_size;
 
 	xfs_fstype = fstype;
 
@@ -239,6 +240,8 @@ xfs_init(int	fstype)
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
 	xfs_init_procfs();
+
+	xfs_refcache_size = 512;
 
 	/*
 	 * The inode hash table is created on a per mounted
@@ -991,6 +994,13 @@ xfs_unmount(
 		unmount_event_flags = (mp->m_dmevmask & (1 << DM_EVENT_UNMOUNT)) != 0 ?
 					0 : DM_FLAGS_UNWANTED;
 	}
+
+	/*
+	 * First blow any referenced inode from this file system
+	 * out of the reference cache.
+	 */
+	xfs_refcache_purge_mp(mp);
+
 
 	/*
 	 * Make sure there are no active users.
@@ -1921,6 +1931,15 @@ xfs_syncsub(
 		if (error) {
 			last_error = error;
 		}
+	}
+
+	/*
+	 * If this is the 30 second sync, then kick some entries out of
+	 * the reference cache.  This ensures that idle entries are
+	 * eventually kicked out of the cache.
+	 */
+	if (flags & SYNC_BDFLUSH) {
+		xfs_refcache_purge_some();
 	}
 
 	/*
