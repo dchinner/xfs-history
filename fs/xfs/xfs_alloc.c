@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.72 $"
+#ident	"$Revision: 1.73 $"
 
 /*
  * Free space allocation for xFS.
@@ -2162,10 +2162,12 @@ xfs_alloc_vextent(
 		args->fsbno = NULLFSBLOCK;
 	else {
 		args->fsbno = XFS_AGB_TO_FSB(mp, args->agno, args->agbno);
+#ifdef DEBUG
 		ASSERT(args->len >= args->minlen);
 		ASSERT(args->len <= args->maxlen);
 		XFS_AG_CHECK_DADDR(mp, XFS_FSB_TO_DADDR(mp, args->fsbno),
 			args->len);
+#endif
 	}
 }
 
