@@ -1,4 +1,4 @@
-#ident "$Revision: 1.364 $"
+#ident "$Revision: 1.365 $"
 
 
 #ifdef SIM
@@ -474,20 +474,37 @@ xfs_getattr(
 	 */
 	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
 		vap->va_rdev = 0;
-		vap->va_blksize = mp->m_swidth ? 
-			/*
-			 * If the underlying volume is a stripe, then return
-			 * the stripe width in bytes as the recommended I/O
-			 * size.
-			 */
-			(mp->m_swidth << mp->m_sb.sb_blocklog) :
-			/*
-			 * Return the largest of the preferred buffer sizes
-			 * since doing small I/Os into larger buffers causes
-			 * buffers to be decommissioned.  The value returned
-			 * is in bytes.
-			 */
-			(1 << (int)MAX(ip->i_readio_log, ip->i_writeio_log));
+
+		if (!(ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
+
+                        vap->va_blksize = mp->m_swidth ?
+                                /*
+                                 * If the underlying volume is a stripe, then
+                                 * return the stripe width in bytes as the
+                                 * recommended I/O size.
+                                */
+                                (mp->m_swidth << mp->m_sb.sb_blocklog) :
+                                /*
+                                 * Return the largest of the preferred buffer
+                                 * sizes since doing small I/Os into larger
+                                 * buffers causes buffers to be decommissioned.
+                                 * The value returned is in bytes.
+                                 */
+                                (1 << (int)MAX(ip->i_readio_log,
+                                               ip->i_writeio_log));
+
+		} else {
+
+                        /*
+                         * If the file blocks are being allocated from a
+                         * realtime partition, then return the inode's
+                         * realtime extent size or the realtime volume's
+                         * extent size.
+                         */
+                        vap->va_blksize = ip->i_d.di_extsize ?
+                                (ip->i_d.di_extsize << mp->m_sb.sb_blocklog) :
+                                (mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
+		}
 	} else {
                 vap->va_rdev = ip->i_df.if_u2.if_rdev;
                 vap->va_blksize = BLKDEV_IOSIZE;
