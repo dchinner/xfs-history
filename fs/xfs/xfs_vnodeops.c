@@ -195,6 +195,9 @@ STATIC int	xfs_symlink(vnode_t	*dir_vp,
 STATIC int	xfs_fid(vnode_t	*vp,
 			fid_t	**fidpp);
 
+STATIC int	xfs_fid2(vnode_t	*vp,
+			 fid_t		*fidp);
+
 STATIC void	xfs_rwlock(vnode_t	*vp,
 			   vrwlock_t	write_lock);
 
@@ -4570,6 +4573,35 @@ xfs_fid(
 
 
 /*
+ * xfs_fid2
+ *
+ * A fid routine that takes a pointer to a previously allocated
+ * fid structure (like xfs_fast_fid) but uses a 64 bit inode number.
+ * (xfs_fid_t uses the 32 bit type xfs_fid_ino_t for the ino because
+ * NFS 2 won't accept the additional 4 bytes.)
+ */
+STATIC int
+xfs_fid2(
+	vnode_t		*vp,
+	fid_t		*fidp)
+{
+	xfs_inode_t	*ip;
+	xfs_fid2_t	*xfid = (xfs_fid2_t *)fidp;
+
+	vn_trace_entry(vp, "xfs_fid2");
+	ASSERT(sizeof(fid_t) >= sizeof(xfs_fid2_t));
+
+	ip = XFS_VTOI(vp);
+	xfid->fid_len = sizeof(xfs_fid2_t) - sizeof(xfid->fid_len);
+	xfid->fid_pad = 0;
+	xfid->fid_ino = ip->i_ino;
+	xfid->fid_gen = ip->i_d.di_gen;	
+
+	return 0;
+}
+
+
+/*
  * xfs_rwlock
  *
  */
@@ -5712,12 +5744,12 @@ xfs_error(
 	case 1:
 		dev = mp->m_dev;
 		prdev("Process [%s] ran out of disk space",
-		      dev, u.u_comm);
+		      dev, curthreadp->k_name);
 		break;
 	case 2:
 		dev = mp->m_rtdev;
 		prdev("Process [%s] ran out of disk space",
-		      dev, u.u_comm);
+		      dev, curthreadp->k_name);
 		break;
 	}
 }
@@ -5726,44 +5758,45 @@ xfs_error(
 #ifdef SIM
 
 struct vnodeops xfs_vnodeops = {
+	fs_noerr,	/* open */
+	fs_nosys,	/* close */
+	fs_nosys,	/* read */
+	fs_nosys,	/* write */
+	fs_nosys,	/* ioctl */
 	fs_noerr,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_noerr,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
+	fs_nosys,	/* getattr */
+	fs_nosys,	/* setattr */
+	fs_nosys,	/* access */
+	fs_nosys,	/* lookup */
+	fs_nosys,	/* create */
+	fs_nosys,	/* remove */
+	fs_nosys,	/* link */
+	fs_nosys,	/* rename */
+	fs_nosys,	/* mkdir */
+	fs_nosys,	/* rmdir */
+	fs_nosys,	/* readdir */
+	fs_nosys,	/* symlink */
+	fs_nosys,	/* readlink */
+	fs_nosys,	/* fsync */
 	xfs_inactive,
+	fs_nosys,	/* fid */
+	fs_nosys,	/* fid2 */
+	(void (*)(vnode_t *, vrwlock_t))fs_nosys,	/* rwlock */
+	(void (*)(vnode_t *, vrwlock_t))fs_nosys,	/* rwunlock */
+	fs_nosys,	/* seek */
 	fs_nosys,
-	(void (*)(vnode_t *, vrwlock_t))fs_nosys,
-	(void (*)(vnode_t *, vrwlock_t))fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
+	fs_nosys,	/* frlock */
 	fs_nosys,	/* realvp */
-	fs_nosys,
-	(void (*)(vnode_t *, buf_t *))fs_nosys,
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
+	fs_nosys,	/* bmap */
+	(void (*)(vnode_t *, buf_t *))fs_nosys,		/* strategy */
+	fs_nosys,	/* map */
+	fs_nosys,	/* addmap */
+	fs_nosys,	/* delmap */
 	(int (*)(vnode_t *, short, int, short *, struct pollhead **))fs_nosys,
 	fs_nosys,	/* dump */
-	fs_nosys,
-	fs_nosys,
-	fs_nosys,
+	fs_nosys,	/* pathconf */
+	fs_nosys,	/* allocstore */
+	fs_nosys,	/* fcntl */
 	xfs_reclaim,
 	fs_nosys,	/* attr_get */
 	fs_nosys,	/* attr_set */
@@ -5796,6 +5829,7 @@ struct vnodeops xfs_vnodeops = {
 	xfs_fsync,
 	xfs_inactive,
 	xfs_fid,
+	xfs_fid2,
 	xfs_rwlock,
 	xfs_rwunlock,
 	xfs_seek,
@@ -5820,5 +5854,3 @@ struct vnodeops xfs_vnodeops = {
 };
 
 #endif	/* SIM */
-
-
