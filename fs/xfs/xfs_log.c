@@ -115,7 +115,14 @@ STATIC void		log_alloc_tickets(log_t *log);
 STATIC void		log_putticket(log_t *log, log_ticket_t *ticket);
 STATIC void		log_relticket(log_ticket_t *ticket);
 
-STATIC int	     log_recover(struct xfs_mount *mp, dev_t log_dev);
+STATIC int	log_recover(struct xfs_mount *mp, dev_t log_dev);
+
+STATIC void	log_verify_iclog(log_in_core_t *iclog, int count);
+
+#ifdef DEBUG
+int bytes_of_ticket_used;
+int log_debug = 1;
+#endif
 
 /*
  * NOTES:
@@ -125,7 +132,18 @@ STATIC int	     log_recover(struct xfs_mount *mp, dev_t log_dev);
  */
 
 /*
- *
+ * This routine is called when a user of a log manager ticket is done with
+ * the reservation.  If the ticket was ever used, then a commit record for
+ * the associated transaction is written out as a log operation header with
+ * no data.  The flag LOG_TIC_INITED is set when the first write occurs with
+ * a given ticket.  If the ticket was one with a permanent reservation, then
+ * a few operations are done differently.  Permanent reservation tickets by
+ * default don't release the reservation.  They just commit the current
+ * transaction with the belief that the reservation is still needed.  A flag
+ * must be passed in before permanent reservations are actually released.
+ * When these type of tickets are not released, they need to be set into
+ * the inited state again.  By doing this, a start record will be written
+ * out when the next write occurs.
  */
 xfs_lsn_t
 xfs_log_done(xfs_mount_t	*mp,
@@ -162,6 +180,15 @@ xfs_log_done(xfs_mount_t	*mp,
 /*
  * Force the in-core log to disk.  If flags == XFS_LOG_SYNC,
  *	the force is done synchronously.
+ *
+ * Asynchronous forces are implemented by setting the WANT_SYNC
+ * bit in the appropriate in-core log and then returning.
+ *
+ * Synchronous forces are implemented with a semaphore.  All callers
+ * to force a given lsn to disk will wait on a semaphore attached to the
+ * specific in-core log.  When given in-core log finally completes its
+ * write to disk, that thread will wake up all threads waiting on the
+ * semaphore.
  */
 int
 xfs_log_force(xfs_mount_t *mp,
@@ -182,11 +209,11 @@ xfs_log_force(xfs_mount_t *mp,
 
 
 /*
- * purpose: This function will take a log sequence number and check to
- *	see if that lsn has been flushed to disk.  If it has, then the
- *	callback function is called with the callback argument.  If the
- *	relevant in-core log has not been synced to disk, we add the callback
- *	to the callback list of the in-core log.
+ * This function will take a log sequence number and check to see if that
+ * lsn has been flushed to disk.  If it has, then the callback function is
+ * called with the callback argument.  If the relevant in-core log has not
+ * been synced to disk, we add the callback to the callback list of the
+ * in-core log.
  */
 void
 xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
@@ -232,8 +259,10 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (log_client != XFS_TRANSACTION_MANAGER)
 		return -1;
 	
-	if (flags & XFS_LOG_SLEEP)
+	if (flags & XFS_LOG_SLEEP) {
+		log_panic("xfs_log_reserve: not implemented");
 		return XFS_ENOTSUP;
+	}
 	
 	/*
 	 * Permanent reservations always have at least two active log
@@ -261,7 +290,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 #ifdef SIM
 #include <sys/stat.h>
 int
-	log_findlogsize(dev_t log_dev)
+log_findlogsize(dev_t log_dev)
 {
 	struct stat buf;
 	
@@ -333,6 +362,7 @@ log_alloc(xfs_mount_t	*mp,
 	log_in_core_t		**iclogp;
 	log_in_core_t		*iclog;
 	int i;
+	caddr_t			unaligned;
 	
 	/* LOG_RECORD_BSIZE must be multiple of BBSIZE; see log_rec_header_t */
 	ASSERT((LOG_RECORD_BSIZE & BBMASK) == 0);
@@ -358,7 +388,8 @@ log_alloc(xfs_mount_t	*mp,
 	log->l_logBBsize = BTOBB(log->l_logsize);
 	iclogp = &log->l_iclog;
 	for (i=0; i < LOG_NUM_ICLOGS; i++) {
-		*iclogp =(log_in_core_t *)kmem_zalloc(sizeof(log_in_core_t), 0);
+		unaligned = kmem_zalloc(sizeof(log_in_core_t)+4096, 0);
+		*iclogp =(log_in_core_t *)(((psint)unaligned+4095) & ~0xfff);
 		iclog = *iclogp;
 
 		head = &iclog->ic_header;
@@ -479,7 +510,6 @@ log_sync(log_t		*log,
 		count = BBTOB(log->l_logBBsize - bp->b_blkno);
 		iclog->ic_refcnt = 2;	/* split into 2 writes */
 	}
-
 	bp->b_dmaaddr	= (caddr_t) iclog;
 	bp->b_bcount	= bp->b_bufsize	= count;
 	bp->b_iodone	= log_iodone;
@@ -493,6 +523,11 @@ log_sync(log_t		*log,
 	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
 
+#ifdef DEBUG
+	if (log_debug)
+		log_verify_iclog(iclog, count);
+#endif
+
 	bwrite(bp);
 
 	if (bp->b_flags & B_ERROR == B_ERROR)
@@ -502,7 +537,7 @@ log_sync(log_t		*log,
 		bp		= iclog->ic_log->l_xbuf;
 		bp->b_blkno	= 0;			/* XXXmiken assumes 0 */
 		bp->b_bcount	= bp->b_bufsize = split;
-		bp->b_dmaaddr	= (caddr_t)(iclog+count);
+		bp->b_dmaaddr	= (caddr_t)((psint)iclog+(psint)count);
 		bp->b_iodone	= log_iodone;
 		bp->b_edev	= log->l_dev;
 		bp->b_fsprivate = iclog;
@@ -588,7 +623,7 @@ log_write(xfs_mount_t *		mp,
 
 	    for ( ;index < nentries; ) {
 		ASSERT(reg[index].i_len % sizeof(long) == 0);
-		ASSERT((uint)ptr % sizeof(long) == 0);
+		ASSERT((psint)ptr % sizeof(long) == 0);
 
 		/*
 		 * If first write for transaction, insert start record.
@@ -630,12 +665,16 @@ log_write(xfs_mount_t *		mp,
 		    if (remains_to_copy)
 			logop_head->oh_flags |= LOG_END_TRANS;
 		    remains_to_copy = 0;
-	        } else if (iclog->ic_size - log_offset < BBSIZE) { /* no room */
+	        } else 
+#if 0
+if (iclog->ic_size - log_offset < BBSIZE) { /* no room */
 		    log_state_want_sync(log, iclog);
 		    log_state_release_iclog(log, iclog);
 		    remains_to_copy = 0;
 		    break;			      /* break to outer loop */
-	        } else {				/* partial write */
+	        } else
+#endif
+ {				/* partial write */
 		    remains_to_copy = copy_len = logop_head->oh_len =
 			  iclog->ic_size - log_offset - sizeof(log_op_header_t);
 		    logop_head->oh_flags |= LOG_CONTINUE_TRANS;
@@ -830,9 +869,9 @@ restart:
 		ASSERT(log->l_curr_block >= 0);
 	}
 
-	/* If there is enough room to write everything, then do it.
-	 * Otherwise, claim the rest of the region and make sure the
-	 * LOG_STATE_WANT_SYNC bit is on, so this will get flushed out.
+	/* If there is enough room to write everything, then do it.  Otherwise,
+	 * claim the rest of the region and make sure the LOG_STATE_WANT_SYNC
+	 * bit is on, so this will get flushed out.
 	 */
 	if (len < iclog->ic_size - iclog->ic_offset) {
 	    iclog->ic_offset += len;
@@ -845,8 +884,8 @@ restart:
 		log->l_prev_block = log->l_curr_block;
 		log->l_prev_cycle = log->l_curr_cycle;
 
-		/* roll log? */
-		log->l_curr_block += BTOBB(iclog->ic_size);
+		/* roll log?: ic_offset changed later */
+		log->l_curr_block += BTOBB(iclog->ic_size)+1;
 		if (log->l_curr_block >= log->l_logBBsize) {
 		    log->l_curr_cycle++;
 		    log->l_curr_block -= log->l_logBBsize;
@@ -884,7 +923,7 @@ log_state_get_ticket(log_t	*log,
 
 	/* Eventually force out buffers */
 	if (log->l_logreserved + len > log->l_logsize)
-		log_panic("xfs_log_reserve: over reserved");
+		log_panic("log_state_get_ticket: over reserved");
 	log->l_logreserved += len;
 	tic = log_maketicket(log, len, log_client);
 	spunlockspl(log->l_icloglock, spl);
@@ -938,9 +977,13 @@ void
 log_state_put_ticket(log_t	  *log,
 		     log_ticket_t *tic)
 {
-	int		 spl;
+	int	spl;
 
 	spl = splockspl(log->l_icloglock, splhi);
+
+#ifdef DEBUG
+	bytes_of_ticket_used = tic->t_orig_reserv - tic->t_curr_reserv;
+#endif
 
 	log->l_logreserved -= tic->t_orig_reserv;
 	log_putticket(log, tic);
@@ -1022,31 +1065,31 @@ log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags)
 			iclog = iclog->ic_next;
 			continue;
 		} else {
-			if (iclog->ic_state == LOG_STATE_ACTIVE) {
-				iclog->ic_state = LOG_STATE_WANT_SYNC;
-				iclog->ic_header.h_prev_offset = log->l_prev_block;
-				log->l_prev_block = log->l_curr_block;
-				log->l_prev_cycle = log->l_curr_cycle;
+		    if (iclog->ic_state == LOG_STATE_ACTIVE) {
+			iclog->ic_state = LOG_STATE_WANT_SYNC;
+			iclog->ic_header.h_prev_offset = log->l_prev_block;
+			log->l_prev_block = log->l_curr_block;
+			log->l_prev_cycle = log->l_curr_cycle;
 				
-				/* roll log? */
-				log->l_curr_block += BTOBB(iclog->ic_offset)+1;
-				if (log->l_curr_block >= log->l_logBBsize) {
-					log->l_curr_cycle++;
-					log->l_curr_block -= log->l_logBBsize;
-					ASSERT(log->l_curr_block >= 0);
-				}
-				log->l_iclog = iclog->ic_next;
-				psema(&log->l_flushsema, PINOD);
-			} else if (iclog->ic_state == LOG_STATE_DIRTY) {
-				spunlockspl(log->l_icloglock, spl);
-				return 0;
-			}
-			if (flags & XFS_LOG_SYNC)		/* sleep */
-				spunlockspl_psema(log->l_icloglock, spl,
-						  &iclog->ic_forcesema, 0);
-			else					/* just return*/
-				spunlockspl(log->l_icloglock, spl);
+			/* roll log?: ic_offset changed later */
+			log->l_curr_block += BTOBB(iclog->ic_offset)+1;
+			if (log->l_curr_block >= log->l_logBBsize) {
+			    log->l_curr_cycle++;
+			    log->l_curr_block -= log->l_logBBsize;
+			    ASSERT(log->l_curr_block >= 0);
+		        }
+			log->l_iclog = iclog->ic_next;
+			psema(&log->l_flushsema, PINOD);
+		    } else if (iclog->ic_state == LOG_STATE_DIRTY) {
+			spunlockspl(log->l_icloglock, spl);
 			return 0;
+		    }
+		    if (flags & XFS_LOG_SYNC)		/* sleep */
+			spunlockspl_psema(log->l_icloglock, spl,
+					  &iclog->ic_forcesema, 0);
+		    else					/* just return*/
+			spunlockspl(log->l_icloglock, spl);
+		    return 0;
 		}
 	} while (iclog != log->l_iclog);
 
@@ -1068,7 +1111,7 @@ log_state_want_sync(log_t *log, log_in_core_t *iclog)
 		log->l_prev_block = log->l_curr_block;
 		log->l_prev_cycle = log->l_curr_cycle;
 		
-		/* roll log? */
+		/* roll log?: ic_offset changed later */
 		log->l_curr_block += BTOBB(iclog->ic_offset)+1;
 		if (log->l_curr_block >= log->l_logBBsize){
 			log->l_curr_cycle++;
@@ -1114,8 +1157,8 @@ log_alloc_tickets(log_t *log)
 		t_list->t_next = t_list+1;
 		t_list = t_list->t_next;
 	}
-	/* t_list->t_slot = 0; => zalloc() did this! */
 	t_list->t_next = 0;
+	log->l_tail = t_list;
 
 }	/* log_alloc_tickets */
 
@@ -1128,9 +1171,17 @@ void log_putticket(log_t	*log,
 {
 	log_ticket_t *t_list;
 
+#ifndef DEBUG
+	/* real code will want to use LIFO for caching */
 	ticket->t_next = log->l_freelist;
 	log->l_freelist = ticket;
 	/* no need to clear fields */
+#else
+	/* When we debug, it is easier if tickets are cycled */
+	ticket->t_next = 0;
+	log->l_tail->t_next = ticket;
+	log->l_tail = ticket;
+#endif
 }	/* log_putticket */
 
 
@@ -1142,7 +1193,7 @@ log_maketicket(log_t		*log,
 	log_ticket_t *tic;
 
 	if (log->l_freelist == NULL) {
-		/* do something here XXXmiken */
+		log_panic("xfs_log_ticket: ran out of tickets"); /* XXXmiken */
 	}
 
 	tic			= log->l_freelist;
@@ -1194,25 +1245,114 @@ log_end(struct xfs_mount *mp, dev_t log_dev)
 
 /******************************************************************************
  *
+ *		Log debug routines
+ *
+ ******************************************************************************
+ */
+void
+log_verify_iclog(log_in_core_t *iclog, int count)
+{
+	log_op_header_t  *ophead;
+	log_rec_header_t *rec;
+	log_tid_t	 tid;
+	log_t		 *log;
+	caddr_t		 ptr;
+	char		 clientid;
+	char		 buf[LOG_HEADER_SIZE];
+	int		 len;
+	int		 fd;
+	int		 i;
+	int		 op_len;
+	int		 cycle_no;
+
+	/* check log magic numbers */
+	ptr = (caddr_t) iclog;
+	if (*(uint *)ptr != LOG_HEADER_MAGIC_NUM)
+		log_panic("log_verify_iclog: illegal magic num");
+	
+	for (ptr += BBSIZE; ptr < (caddr_t)iclog+count; ptr += BBSIZE) {
+		if (*(uint *)ptr == LOG_HEADER_MAGIC_NUM)
+			log_panic("log_verify_iclog: unexpected magic num");
+	}
+	
+	/* check fields */
+	len = iclog->ic_header.h_len;
+	ptr = iclog->ic_data;
+	ophead = (log_op_header_t *)ptr;
+	for (i=0; i<iclog->ic_header.h_num_logops; i++) {
+		ophead = (log_op_header_t *)ptr;
+
+		/* clientid is only 1 byte */
+		if (((psint)&ophead->oh_clientid & 0x1ff) != 0)
+			clientid = ophead->oh_clientid;
+		else
+			clientid = iclog->ic_header.h_cycle_data[BTOBB(&ophead->oh_clientid - iclog->ic_data)]>>24;
+		if (clientid != XFS_TRANSACTION_MANAGER)
+			log_panic("log_verify_iclog: illegal client");
+
+		/* check tids */
+		if (((psint)&ophead->oh_tid & 0x1ff) != 0)
+			tid = ophead->oh_tid;
+		else
+			tid = (log_tid_t)iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_tid - (psint)iclog->ic_data)];
+		if ((psint)tid < 0x10000000 || (psint)tid > 0x20000000)
+			log_panic("log_verify_iclog: illegal tid");
+
+		/* check length */
+		if (((psint)&ophead->oh_len & 0x1ff) != 0)
+			op_len = ophead->oh_len;
+		else
+			op_len = iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_len - (psint)iclog->ic_data)];
+		len -= op_len;
+		len -= sizeof(log_op_header_t);
+		ptr += sizeof(log_op_header_t) + op_len;
+	}
+	if (len != 0)
+		log_panic("log_verify_iclog: illegal iclog");
+
+	/* check wrapping log */
+	if (BLOCK_LSN(iclog->ic_header.h_lsn) < 5) {
+		cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn);
+		log = iclog->ic_log;
+		fd = bmajor(log->l_dev);
+		if (lseek(fd, 0, SEEK_SET) < 0)
+			log_panic("log_verify_iclog: lseek 0 failed");
+		for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
+			if (read(fd, buf, LOG_HEADER_SIZE) == 0)
+				log_panic("log_find_head: bad read");
+			rec = (log_rec_header_t *)buf;
+			if (rec->h_magicno == LOG_HEADER_MAGIC_NUM &&
+			    CYCLE_LSN(rec->h_lsn) < cycle_no)
+				log_panic("log_verify_iclog: bad cycle no");
+		}
+	}
+}	/* log_verify_iclog */
+
+
+/******************************************************************************
+ *
  *		Log print routines
  *
  ******************************************************************************
  */
 
 #ifndef _KERNEL
-void print_lsn(caddr_t string, xfs_lsn_t *lsn)
+void
+print_lsn(caddr_t string, xfs_lsn_t *lsn)
 {
 	printf("%s: %x,%x", string, ((uint *)lsn)[0], ((uint *)lsn)[1]);
 }
 
 
 #if SIM
-void print_tid(caddr_t string, log_tid_t *tid)
+void
+print_tid(caddr_t string, log_tid_t *tid)
 {
 	printf("%s: %x", string, ((uint *)tid)[0]);
 }
 #else
-void print_tid(caddr_t string, log_tid_t *tid)
+void
+print_tid(caddr_t string, log_tid_t *tid)
 {
 	printf("%s: %x,%x,%x,%x", string,
 	       ((uint *)tid)[0], ((uint *)tid)[1],
@@ -1221,15 +1361,14 @@ void print_tid(caddr_t string, log_tid_t *tid)
 #endif
 
 
-int log_print_head(log_rec_header_t *head, int *len)
+int
+log_print_head(log_rec_header_t *head, int *len)
 {
 	uint *uint_ptr;
 	int i;
 	
-	if (head->h_magicno != LOG_HEADER_MAGIC_NUM) {
-		printf("Bad log record header or end of log\n");
-		exit(1);
-	}
+	if (head->h_magicno != LOG_HEADER_MAGIC_NUM)
+		return -1;
 	printf("cycle: %d	version: %d	", head->h_cycle, head->h_version);
 	print_lsn("	lsn", &head->h_lsn);
 	print_lsn("	sync_lsn", &head->h_sync_lsn);
@@ -1248,23 +1387,51 @@ int log_print_head(log_rec_header_t *head, int *len)
 }
 
 
-void log_print_record(int fd, int num_ops, int len, log_rec_header_t *rhead)
+int
+log_print_record(int		  fd,
+		 int		  num_ops,
+		 int		  len,
+		 int		  *partial_read,
+		 caddr_t	  *partial_buf,
+		 log_rec_header_t *rhead)
 {
-	caddr_t buf, ptr;
-	log_op_header_t *op_head;
-	int n, i = 1;
-	int read_len;
+	log_op_header_t  *op_head;
+	log_rec_header_t *rechead;
+	caddr_t		 buf;
+	caddr_t		 ptr;
+	int		 read_len;
+	int		 ret;
+	int		 n;
+	int		 i = 1;
 	
 	/* read_len must read up to some block boundary */
-	read_len = BBTOB(BTOBB(len + sizeof(log_op_header_t)));
-	ptr = buf = (caddr_t) kmem_alloc(read_len, 0);
-	if (read(fd, buf, read_len) == -1) {
+	read_len = BBTOB(BTOBB(len+sizeof(log_op_header_t)));
+	if (*partial_read != -1) {
+		read_len -= *partial_read;
+		ptr = buf =
+		      (caddr_t)((psint)(*partial_buf) + (psint)(*partial_read));
+	} else {
+		ptr = buf = (caddr_t) kmem_alloc(read_len, 0);
+	}
+	if ((ret = read(fd, buf, read_len)) == -1) {
 		printf("log_print_record: read error\n");
 		exit(1);
 	}
-	for (i = 0, ptr = buf;
-	     ptr < buf + read_len;
-	     ptr += BBSIZE, i++) {
+	if (ret == 0 || ret != read_len) {
+		*partial_read = ret;
+		*partial_buf = buf;
+		return 2;
+	}
+	if (*partial_read != -1)
+		read_len += *partial_read;
+	for (i = 0, ptr = buf; ptr < buf + read_len; ptr += BBSIZE, i++) {
+		rechead = (log_rec_header_t *)ptr;
+		if (rechead->h_magicno == LOG_HEADER_MAGIC_NUM) {
+		    if (lseek(fd, -read_len+i*BBSIZE, SEEK_CUR) < 0)
+			log_panic("log_print_record: lseek block # failed");
+		    free(buf);
+		    return 1;
+		}
 		*(uint *)ptr = rhead->h_cycle_data[i];
 	}
 	ptr = buf;
@@ -1299,6 +1466,8 @@ void log_print_record(int fd, int num_ops, int len, log_rec_header_t *rhead)
 		printf("\n");
 	}
 	printf("\n");
+	free(buf);
+	return 0;
 }
 
 
@@ -1306,14 +1475,18 @@ void log_print_record(int fd, int num_ops, int len, log_rec_header_t *rhead)
  * Code needs to look at cycle # at start of block  XXXmiken
  */
 int
-log_find_head(int fd)
+#ifdef LOG_BREAD
+log_find_head(dev_t log_dev, int log_size)
+#else
+log_find_head(int fd, int log_size)
+#endif
 {
-    char		hbuf[LOG_HEADER_SIZE];
     log_rec_header_t	*head;
-    int			done = 0;
     int			block_start = 0;
     int			block_no = 0;
     int			cycle_no = 0;
+#ifndef LOG_BREAD
+    char		hbuf[LOG_HEADER_SIZE];
 
     if (lseek(fd, 0, SEEK_SET) < 0)		/* start reading from 0 */
 	log_panic("log_find_head: lseek 0 failed");
@@ -1339,7 +1512,34 @@ log_find_head(int fd)
     } while (1);
     if (lseek(fd, block_start*LOG_HEADER_SIZE, SEEK_SET) < 0)
 	log_panic("log_find_head: lseek block # failed");
+#else
+    buf_t		*bp;
 
+    while (block_no < BTOBB(log_size)) {
+	    bp = bread(log_dev, block_no, 1);
+	    if (bp->b_flags & B_ERROR) {
+		    brelse(bp);
+		    log_panic("log_find_head");
+	    }
+	    head = (log_rec_header_t *)bp->b_dmaaddr;
+	    if (head->h_magicno != LOG_HEADER_MAGIC_NUM) {
+		    block_no++;
+		    brelse(bp);
+		    continue;
+	    }
+	    if (cycle_no == 0) {
+		    cycle_no	= CYCLE_LSN(head->h_lsn);
+		    block_start = block_no;
+	    } else if (CYCLE_LSN(head->h_lsn) < cycle_no) {
+		    cycle_no	= CYCLE_LSN(head->h_lsn);
+		    block_start	= block_no;
+		    brelse(bp);
+		    break;
+	    }
+	    block_no++;
+	    brelse(bp);
+    }
+#endif
     return block_start;
 }	/* log_find_head */
 
@@ -1347,41 +1547,123 @@ log_find_head(int fd)
 /*
  * XXXmiken: code assumes log starts at block 0
  */
-void xfs_log_print(xfs_mount_t *mp, dev_t log_dev)
+void xfs_log_print(xfs_mount_t *mp, dev_t log_dev, uint flags)
 {
-    int fd = bmajor(log_dev);
+    int  fd = bmajor(log_dev);
     char hbuf[LOG_HEADER_SIZE];
-    int loop = 0;
-    int num_ops, len, block_start, block_no;
-    int dont_loop = 0;
-    
-    block_start = log_find_head(fd);
+    int  num_ops;
+    int  len;
+    int  block_start;
+    int  block_no;
+    int  log_size;
+    int	 error;
+    int  partial_read = -1;
+    caddr_t partial_buf;
+
+    log_size = log_findlogsize(log_dev);
+
+#ifdef LOG_BREAD
+    block_start = log_find_head(log_dev, log_size);
+    if (lseek(fd, block_start*LOG_HEADER_SIZE, SEEK_SET) < 0)
+	log_panic("log_find_head: lseek block # failed");
+#else
+    block_start = log_find_head(fd, log_size);
+#endif
     block_no    = block_start;
 
-    if (block_start == 0)
-	dont_loop = 1;
-    do {
-	do {
-	    if (read(fd, hbuf, 512) == 0) {
-		printf("xfs_log_print: physical end of log\n");
-		printf("=================================\n");
-		break;
-	    }
-	    num_ops = log_print_head((log_rec_header_t *)hbuf, &len);
-	    block_no += BTOBB(len);
-	    log_print_record(fd, num_ops, len, (log_rec_header_t *)hbuf);
+    while (1) {
+	if (read(fd, hbuf, 512) == 0) {
+	    printf("xfs_log_print: physical end of log\n");
 	    printf("=================================\n");
-	    block_no++;
-	    if (loop && block_no == block_start)
-		goto end;
-	} while (1);
-	loop++;
-	if (dont_loop)
 	    break;
+        }
+	num_ops = log_print_head((log_rec_header_t *)hbuf, &len);
+	block_no++;
+	if (num_ops == -1) {
+		printf("*****************************\n");
+		printf("*			    *\n");
+		printf("* ERROR header (blk_no: %x) *\n", block_no-1);
+		printf("*			    *\n");
+		printf("*****************************\n");
+		if ( !(flags & XFS_LOG_PRINT_FORCE) )
+			log_panic("Bad log record header");
+		continue;
+	}
+	error =	log_print_record(fd, num_ops, len, &partial_read, &partial_buf,
+				 (log_rec_header_t *)hbuf);
+	switch (error) {
+		case 0: {
+			block_no += BTOBB(len);
+			break;
+		}
+		case 1: {
+			printf("*****************************\n");
+			printf("*			    *\n");
+			printf("* ERROR data (blk_no: %x)   *\n", block_no-1);
+			printf("*			    *\n");
+			printf("*****************************\n");
+			if ( !(flags & XFS_LOG_PRINT_FORCE) )
+				log_panic("Bad data in log");
+			block_no += BTOBB(len);
+			continue;
+		}
+		case 2: {
+			printf("=================================\n");
+			printf("xfs_log_print: physical end of log\n");
+			printf("=================================\n");
+			block_no = 0;
+			if (lseek(fd, 0, SEEK_SET) < 0)
+				log_panic("xfs_log_print: lseek error");
+			goto partial_log_read;
+		}
+		default: log_panic("illegal value");
+	}
+	printf("=================================\n");
+	if (block_no == block_start)
+	    goto end;
+    }
+    if (block_start != 0) {
 	block_no = 0;
 	if (lseek(fd, 0, SEEK_SET) < 0)
 	    log_panic("xfs_log_print: lseek error");
-    } while (block_no != block_start);
+	while (1) {
+	    if (read(fd, hbuf, 512) == 0)
+		log_panic("log_find_head: bad read");
+	    num_ops = log_print_head((log_rec_header_t *)hbuf, &len);
+	    block_no++;
+	    if (num_ops == -1) {
+		    printf("*****************************\n");
+		    printf("*				*\n");
+		    printf("* ERROR header (blk_no: %x) *\n", block_no-1);
+		    printf("*				*\n");
+		    printf("*****************************\n");
+		    if ( !(flags & XFS_LOG_PRINT_FORCE) )
+			    log_panic("Bad log record header");
+		    if (block_no >= block_start)
+			    break;
+		    continue;
+	    }
+partial_log_read:
+	    error= log_print_record(fd, num_ops, len, &partial_read,
+				    &partial_buf, (log_rec_header_t *)hbuf);
+	    if (!error)
+		    block_no += BTOBB(len);
+	    else {
+		    printf("*****************************\n");
+		    printf("*				*\n");
+		    printf("* ERROR data (blk_no: %x)   *\n", block_no-1);
+		    printf("*				*\n");
+		    printf("*****************************\n");
+		    if ( !(flags & XFS_LOG_PRINT_FORCE) )
+			    log_panic("Bad data in log");
+		    block_no += BTOBB(len);
+		    continue;
+	    }
+	    printf("=================================\n");
+	    if (block_no >= block_start)
+		break;
+        }
+    }
 
 end:
     printf("xfs_log_print: logical end of log\n");
