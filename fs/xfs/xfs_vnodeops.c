@@ -1,4 +1,4 @@
-#ident "$Revision: 1.320 $"
+#ident "$Revision: 1.321 $"
 
 
 #ifdef SIM
@@ -33,10 +33,10 @@
 #include <sys/debug.h>
 #include <sys/uthread.h>
 #include <sys/kmem.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include <sys/cmn_err.h>
 #include <sys/cred.h>
 #include <sys/errno.h>
 #include <sys/flock.h>
