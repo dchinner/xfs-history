@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.16 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -35,7 +35,7 @@
 
 /*
  * Return stat information for one inode.
- * Return 1 for success, 0 for failure.
+ * Return 1 for success, 0 for failure in the stat parameter.
  */
 STATIC int
 xfs_bulkstat_one(
@@ -44,13 +44,18 @@ xfs_bulkstat_one(
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		*buffer)	/* buffer to place output in */
 {
+	int		error;
 	xfs_inode_t	*ip;
 	xfs_bstat_t	*buf;
 
 	buf = (xfs_bstat_t *)buffer;
-	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino)
+	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino) {
 		return 0;
-	ip = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED);
+	}
+	error = xfs_iget(mp, tp, ino, XFS_ILOCK_SHARED, &ip);
+	if (error) {
+		return 0;
+	}
 	ASSERT(ip != NULL);
 	if (ip->i_d.di_mode == 0) {
 		xfs_iput(ip, XFS_ILOCK_SHARED);
@@ -135,6 +140,7 @@ xfs_bulkstat(
 	xfs_ino_t	ino;
 	int		left;
 	int		res;
+	int		tmp;
 
 	ino = (xfs_ino_t)*lastino;
 	agno = XFS_INO_TO_AGNO(mp, ino);
@@ -149,15 +155,41 @@ xfs_bulkstat(
 	agbp = NULL;
 	if (agno >= mp->m_sb.sb_agcount) {
 		*done = 1;
-		return 0;
+		error = 0;
+		goto out;
 	}
 	if (agino != 0) {
 		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
-		agbp = xfs_ialloc_read_agi(mp, tp, agno);
+		error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 		mrunlock(&mp->m_peraglock);
+		if (error) {
+			/*
+			 * Skip this allocation group and go on to
+			 * the next one.
+			 */
+			agbp = NULL;
+			agno++;
+			agino = 0;
+			i = XFS_INODES_PER_CHUNK;
+			goto next;
+		}
 		cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 			XFS_BTNUM_INO, (xfs_inode_t *)0);
-		(void)xfs_inobt_lookup_le(cur, agino, 0, 0);
+		error = xfs_inobt_lookup_le(cur, agino, 0, 0, &tmp);
+		if (error) {
+			/*
+			 * Stick with this ag, but jump to the next
+			 * record in the inode btree.  We don't need
+			 * to adjust agino, since below we'll do a
+			 * >= search rather than the <= search we did
+			 * here.
+			 */
+			xfs_btree_del_cursor(cur);
+			xfs_trans_brelse(tp, agbp);
+			agbp = NULL;
+			i = XFS_INODES_PER_CHUNK;
+			goto next;
+		}
 		if (!xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree))
 			i = XFS_INODES_PER_CHUNK;
 		else
@@ -166,14 +198,39 @@ xfs_bulkstat(
 		xfs_btree_del_cursor(cur);
 	} else
 		i = XFS_INODES_PER_CHUNK;
+ next:
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
 		if (i >= XFS_INODES_PER_CHUNK) {
 			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
-			agbp = xfs_ialloc_read_agi(mp, tp, agno);
+			error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 			mrunlock(&mp->m_peraglock);
+			if (error) {
+				/*
+				 * If we can't read the AGI, then skip
+				 * to the next ag.
+				 */
+				agbp = NULL;
+				agno++;
+				agino = 0;
+				i = XFS_INODES_PER_CHUNK;
+				continue;
+			}
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 				XFS_BTNUM_INO, (xfs_inode_t *)0);
-			(void)xfs_inobt_lookup_ge(cur, agino, 0, 0);
+			error = xfs_inobt_lookup_ge(cur, agino, 0, 0, &tmp);
+			if (error) {
+				/*
+				 * If we can't get this record, go on to
+				 * the next one.
+				 */
+				xfs_btree_del_cursor(cur);
+				cur = NULL;
+				xfs_trans_brelse(tp, agbp);
+				agbp = NULL;
+				agino += XFS_INODES_PER_CHUNK;
+				i = XFS_INODES_PER_CHUNK;
+				continue;
+			}
 			res = xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree);
 			xfs_trans_brelse(tp, agbp);
 			xfs_btree_del_cursor(cur);
@@ -196,7 +253,7 @@ xfs_bulkstat(
 		 * iget the inode and fill in a single buffer.
 		 * See: xfs_bulkstat_one() & dm_bulkstat_one()
 		 */
-		if (! (*formatter)(mp, tp, ino, bufp)) {
+		if (!(*formatter)(mp, tp, ino, bufp)) {
 			i++;
 			continue;
 		}
@@ -229,6 +286,7 @@ xfs_bulkstat(
 		if (agno >= mp->m_sb.sb_agcount)
 			*done = 1;
 	}
+ out:
 	kmem_free(buffer, bcount * statstruct_size);
 	return error;
 }
@@ -257,6 +315,7 @@ xfs_inumbers(
 	xfs_agino_t	gino;
 	xfs_ino_t	ino;
 	int		left;
+	int		tmp;
 
 	ino = (xfs_ino_t)*lastino;
 	agno = XFS_INO_TO_AGNO(mp, ino);
@@ -271,11 +330,35 @@ xfs_inumbers(
 	while (left > 0 && agno < mp->m_sb.sb_agcount) {
 		if (agbp == NULL) {
 			mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
-			agbp = xfs_ialloc_read_agi(mp, tp, agno);
+			error = xfs_ialloc_read_agi(mp, tp, agno, &agbp);
 			mrunlock(&mp->m_peraglock);
+			if (error) {
+				/*
+				 * If we can't read the AGI of this ag,
+				 * then just skip to the next one.
+				 */
+				ASSERT(cur == NULL);
+				agbp = NULL;
+				agno++;
+				agino = 0;
+				continue;
+			}
 			cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
 				XFS_BTNUM_INO, (xfs_inode_t *)0);
-			(void)xfs_inobt_lookup_ge(cur, agino, 0, 0);
+			error = xfs_inobt_lookup_ge(cur, agino, 0, 0, &tmp);
+			if (error) {
+				xfs_btree_del_cursor(cur);
+				cur = NULL;
+				xfs_trans_brelse(tp, agbp);
+				agbp = NULL;
+				/*
+				 * Move up the the last inode in the current
+				 * chunk.  The lookup_ge will always get
+				 * us the first inode in the next chunk.
+				 */
+				agino += XFS_INODES_PER_CHUNK - 1;
+				continue;
+			}
 		}
 		if (!xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree)) {
 			xfs_trans_brelse(tp, agbp);
@@ -302,8 +385,21 @@ xfs_inumbers(
 			*count += bufidx;
 			bufidx = 0;
 		}
-		if (left)
-			(void)xfs_inobt_increment(cur, 0);
+		if (left) {
+			error = xfs_inobt_increment(cur, 0, &tmp);
+			if (error) {
+				xfs_btree_del_cursor(cur);
+				cur = NULL;
+				xfs_trans_brelse(tp, agbp);
+				agbp = NULL;
+				/*
+				 * The agino value has already been bumped.
+				 * Just try to skip up to it.
+				 */
+				agino += XFS_INODES_PER_CHUNK - 1;
+				continue;
+			}
+		}
 	}
 	if (!error) {
 		if (bufidx) {

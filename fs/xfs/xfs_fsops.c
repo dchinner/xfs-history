@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -135,7 +135,10 @@ xfs_growfs_data(
 		agf->agf_flcount = 0;
 		agf->agf_freeblks = agf->agf_length - XFS_PREALLOC_BLOCKS(mp);
 		agf->agf_longest = agf->agf_freeblks;
-		bwrite(bp);
+		error = bwrite(bp);
+		if (error) {
+			goto error0;
+		}
 		/*
 		 * AG inode header block
 		 */
@@ -154,7 +157,10 @@ xfs_growfs_data(
 		agi->agi_dirino = NULLAGINO;
 		for (bucket = 0; bucket < XFS_AGI_UNLINKED_BUCKETS; bucket++)
 			agi->agi_unlinked[bucket] = NULLAGINO;
-		bwrite(bp);
+		error = bwrite(bp);
+		if (error) {
+			goto error0;
+		}
 		/*
 		 * BNO btree root block
 		 */
@@ -171,7 +177,10 @@ xfs_growfs_data(
 			mp->m_alloc_mxr[0]);
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
-		bwrite(bp);
+		error = bwrite(bp);
+		if (error) {
+			goto error0;
+		}
 		/*
 		 * CNT btree root block
 		 */
@@ -189,7 +198,10 @@ xfs_growfs_data(
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
 		nfree += arec->ar_blockcount;
-		bwrite(bp);
+		error = bwrite(bp);
+		if (error) {
+			goto error0;
+		}
 		/*
 		 * INO btree root block
 		 */
@@ -202,7 +214,10 @@ xfs_growfs_data(
 		block->bb_level = 0;
 		block->bb_numrecs = 0;
 		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
-		bwrite(bp);
+		error = bwrite(bp);
+		if (error) {
+			goto error0;
+		}		
 	}
 	xfs_trans_agblocks_delta(tp, nfree);
 	/*
@@ -212,7 +227,10 @@ xfs_growfs_data(
 		/*
 		 * Change the agi length.
 		 */
-		bp = xfs_ialloc_read_agi(mp, tp, agno);
+		error = xfs_ialloc_read_agi(mp, tp, agno, &bp);
+		if (error) {
+			goto error0;
+		}
 		ASSERT(bp);
 		agi = XFS_BUF_TO_AGI(bp);
 		agi->agi_length += new;
@@ -220,31 +238,48 @@ xfs_growfs_data(
 		/*
 		 * Change agf length.
 		 */
-		bp = xfs_alloc_read_agf(mp, tp, agno, 0);
+		error = xfs_alloc_read_agf(mp, tp, agno, 0, &bp);
+		if (error) {
+			goto error0;
+		}
 		ASSERT(bp);
 		agf = XFS_BUF_TO_AGF(bp);
 		agf->agf_length += new;
 		/*
 		 * Free the new space.
 		 */
-		xfs_free_extent(tp,
+		error = xfs_free_extent(tp,
 			XFS_AGB_TO_FSB(mp, agno, agf->agf_length - new), new);
+		if (error) {
+			goto error0;
+		}
 	}
 	if (nagcount > oagcount)
 		xfs_trans_mod_sb(tp, XFS_TRANS_SB_AGCOUNT, nagcount - oagcount);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_DBLOCKS, nb - mp->m_sb.sb_dblocks);
 	if (nfree)
 		xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, nfree);
-	xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0);
+	if (error) {
+		return error;
+	}
 	for (agno = 1; agno < nagcount; agno++) {
 		bp = read_buf(mp->m_dev,
 			XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
 			BTOBB(bsize), 0);
 		sbp = XFS_BUF_TO_SBP(bp);
 		*sbp = mp->m_sb;
+		/*
+		 * Don't worry about errors in writing out the alternate
+		 * superblocks.  The real work is already done and committed.
+		 */
 		bwrite(bp);
 	}
 	return 0;
+
+ error0:
+	xfs_trans_cancel(tp, 0);
+	return error;
 }
 
 STATIC int

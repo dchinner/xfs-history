@@ -1,4 +1,4 @@
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -109,6 +109,7 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 {
         struct vfs		*vfsp;
         xfs_inode_t		*ip = NULL ;
+	int			error;
 	extern struct vfs	*vfs_devsearch( dev_t );
 
 
@@ -134,9 +135,13 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 		if (strncmp(vfssw[vfsp->vfs_fstype].vsw_name, "xfs", 3) == 0) 
 #endif
 		{
-                	ip = xfs_iget( XFS_VFSTOM( vfsp ), 
-					NULL, ino, XFS_ILOCK_EXCL);
+                	error = xfs_iget( XFS_VFSTOM( vfsp ), 
+					NULL, ino, XFS_ILOCK_EXCL, &ip);
 
+
+			if ( error ) {
+				ip = NULL;
+			}
 
 			if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
 				if (ip) {
@@ -782,8 +787,12 @@ xfs_get_file_extents(sysarg_t fileidp, sysarg_t extents, sysarg_t count)
 		/*
 		 * Read in the file extents from disk if necessary.
 		 */
-		if (!(ip->i_flags & XFS_IEXTENTS))
-			xfs_iread_extents(NULL, ip);
+		if (!(ip->i_flags & XFS_IEXTENTS)) {
+			ret = xfs_iread_extents(NULL, ip);
+			if (ret) {
+				goto out;
+			}
+		}
 
 		recsize = sizeof(grio_bmbt_irec_t) * num_extents;
 		grec = kmem_alloc(recsize, KM_SLEEP );
@@ -815,6 +824,7 @@ xfs_get_file_extents(sysarg_t fileidp, sysarg_t extents, sysarg_t count)
 		ret = EFAULT;
 	}
 
+ out:
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	IRELE( ip );
 	return( ret );

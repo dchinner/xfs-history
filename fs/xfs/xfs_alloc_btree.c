@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.25 $"
 
 /*
  * Free space allocation for xFS.
@@ -54,22 +54,24 @@
  * Remove the record from its block then rebalance the tree.
  * Return 0 for error, 1 for done, 2 to go on to the next level.
  */
-STATIC int				/* fail/done/go-on */
+STATIC int				/* error */
 xfs_alloc_delrec(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level);		/* level removing record from */
+	int		level,		/* level removing record from */
+	int		*stat);		/* fail/done/go-on */
 
 /*
  * Insert one record/level.  Return information to the caller
  * allowing the next level up to proceed if necessary.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_insrec(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	int		level,		/* level to insert record at */
 	xfs_agblock_t	*bnop,		/* i/o: block number inserted */
 	xfs_alloc_rec_t	*recp,		/* i/o: record data inserted */
-	xfs_btree_cur_t	**curp);	/* output: new cursor replacing cur */
+	xfs_btree_cur_t	**curp,		/* output: new cursor replacing cur */
+	int		*stat);		/* output: success/failure */
 
 #ifdef XFSDEBUG
 /*
@@ -127,26 +129,29 @@ xfs_alloc_log_recs(
  * Lookup the record.  The cursor is made to point to it, based on dir.
  * Return 0 if can't find any such record, 1 for success.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_lookup(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	xfs_lookup_t	dir);		/* <=, ==, or >= */
+	xfs_lookup_t	dir,		/* <=, ==, or >= */
+	int		*stat);		/* success/failure */
 
 /*
  * Move 1 record left from cur/level if possible.
  * Update cur to reflect the new path.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_lshift(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level);		/* level to shift record on */
+	int		level,		/* level to shift record on */
+	int		*stat);		/* success/failure */
 
 /*
  * Allocate a new root block, fill it in.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_newroot(
-	xfs_btree_cur_t	*cur);		/* btree cursor */
+	xfs_btree_cur_t	*cur,		/* btree cursor */
+	int		*stat);		/* success/failure */
 
 #ifdef XFSDEBUG
 /*
@@ -179,23 +184,25 @@ xfs_alloc_rcheck_btree_block(
  * Move 1 record right from cur/level if possible.
  * Update cur to reflect the new path.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_rshift(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
-	int		level);		/* level to shift record on */
+	int		level,		/* level to shift record on */
+	int		*stat);		/* success/failure */
 
 /*
  * Split cur/level block in half.
  * Return new block number and its first record (to be inserted into parent).
  * Also returns a new cursor in this case, for next level of insert to use.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_split(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	int		level,		/* level to split */
 	xfs_agblock_t	*bnop,		/* output: block number allocated */
 	xfs_alloc_key_t	*keyp,		/* output: first key of new block */
-	xfs_btree_cur_t	**curp);	/* output: new cursor */
+	xfs_btree_cur_t	**curp,		/* output: new cursor */
+	int		*stat);		/* output: success/failure */
 
 /*
  * Update keys at all levels from here to the root along the cursor's path.
@@ -216,15 +223,17 @@ xfs_alloc_updkey(
  * Remove the record from its block then rebalance the tree.
  * Return 0 for error, 1 for done, 2 to go on to the next level.
  */
-STATIC int				/* fail/done/go-on */
+STATIC int				/* error */
 xfs_alloc_delrec(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	int			level)	/* level removing record from */
+	int			level,	/* level removing record from */
+	int			*stat)	/* fail/done/go-on */
 {
 	xfs_agf_t		*agf;	/* allocation group freelist header */
 	xfs_alloc_block_t	*block;	/* btree block record/key lives in */
 	xfs_agblock_t		bno;	/* btree block number */
 	buf_t			*bp;	/* buffer for block */
+	int			error;
 	int			i;	/* loop index */
 	xfs_alloc_key_t		key;	/* kp points here if block is level 0 */
 	xfs_agblock_t		lbno;	/* left block's block number */
@@ -249,8 +258,10 @@ xfs_alloc_delrec(
 	 * Get the index of the entry being deleted, check for nothing there.
 	 */
 	ptr = cur->bc_ptrs[level];
-	if (ptr == 0)
+	if (ptr == 0) {
+		*stat = 0;
 		return 0;
+	}
 	/*
 	 * Get the buffer & block containing the record or key/ptr.
 	 */
@@ -260,8 +271,10 @@ xfs_alloc_delrec(
 	/*
 	 * Fail if we're off the end of the block.
 	 */
-	if (ptr > block->bb_numrecs)
+	if (ptr > block->bb_numrecs) {
+		*stat = 0;
 		return 0;
+	}
 	XFSSTATS.xs_abt_delrec++;
 	/*
 	 * It's a nonleaf.  Excise the key and ptr being deleted, by
@@ -362,8 +375,11 @@ xfs_alloc_delrec(
 			/*
 			 * Put this buffer/block on the ag's freelist.
 			 */
-			xfs_alloc_put_freelist(cur->bc_tp,
-				cur->bc_private.a.agbp, NULL, bno);
+			error = xfs_alloc_put_freelist(cur->bc_tp,
+					cur->bc_private.a.agbp, NULL, bno);
+			if (error) {
+				return error;
+			}
 			xfs_trans_agbtree_delta(cur->bc_tp, -1);
 			xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 				XFS_AGF_ROOTS | XFS_AGF_LEVELS);
@@ -373,11 +389,16 @@ xfs_alloc_delrec(
 			xfs_btree_setbuf(cur, level, 0);
 			cur->bc_nlevels--;
 		}
-		if (level > 0)
-			xfs_alloc_decrement(cur, level);
+		if (level > 0) {
+			error = xfs_alloc_decrement(cur, level, &i);
+			if (error) {
+				return error;
+			}
+		}
 		xfs_alloc_rcheck(cur);
 		kmem_check();
-		return 1;
+		*stat = 1;
+		return 0;
 	}
 	/*
 	 * If we deleted the leftmost entry in the block, update the
@@ -390,11 +411,16 @@ xfs_alloc_delrec(
 	 * the minimum, we're done.
 	 */
 	if (block->bb_numrecs >= XFS_ALLOC_BLOCK_MINRECS(level, cur)) {
-		if (level > 0)
-			xfs_alloc_decrement(cur, level);
+		if (level > 0) {
+			error = xfs_alloc_decrement(cur, level, &i);
+			if (error) {
+				return error;
+			}
+		}
 		kmem_check();
 		xfs_alloc_rcheck(cur);
-		return 1;
+		*stat = 1;
+		return 0;
 	}
 	/*
 	 * Otherwise, we have to move some records around to keep the
@@ -420,7 +446,10 @@ xfs_alloc_delrec(
 		 * Actually any entry but the first would suffice.
 		 */
 		xfs_btree_lastrec(tcur, level);
-		xfs_alloc_increment(tcur, level);
+		error = xfs_alloc_increment(tcur, level, &i);
+		if (error) {
+			goto error0;
+		}
 		xfs_btree_lastrec(tcur, level);
 		/*
 		 * Grab a pointer to the block.
@@ -438,15 +467,26 @@ xfs_alloc_delrec(
 		 * of right to us works, we're done.
 		 */
 		if (right->bb_numrecs - 1 >=
-		     XFS_ALLOC_BLOCK_MINRECS(level, cur) &&
-		    xfs_alloc_lshift(tcur, level)) {
-			ASSERT(block->bb_numrecs >=
-			       XFS_ALLOC_BLOCK_MINRECS(level, cur));
-			xfs_btree_del_cursor(tcur);
-			if (level > 0)
-				xfs_alloc_decrement(cur, level);
-			kmem_check();
-			return 1;
+		     XFS_ALLOC_BLOCK_MINRECS(level, cur)) {
+			error = xfs_alloc_lshift(tcur, level, &i);
+			if (error) {
+				goto error0;
+			}
+			if (i) {
+				ASSERT(block->bb_numrecs >=
+				       XFS_ALLOC_BLOCK_MINRECS(level, cur));
+				xfs_btree_del_cursor(tcur);
+				if (level > 0) {
+					error = xfs_alloc_decrement(cur,
+						    		level, &i);
+					if (error) {
+						return error;
+					}
+				}
+				kmem_check();
+				*stat = 1;
+				return 0;
+			}
 		}
 		/*
 		 * Otherwise, grab the number of records in right for
@@ -456,7 +496,10 @@ xfs_alloc_delrec(
 		rrecs = right->bb_numrecs;
 		if (lbno != NULLAGBLOCK) {
 			xfs_btree_firstrec(tcur, level);
-			xfs_alloc_decrement(tcur, level);
+			error = xfs_alloc_decrement(tcur, level, &i);
+			if (error) {
+				goto error0;
+			}
 		}
 	}
 	/*
@@ -469,7 +512,10 @@ xfs_alloc_delrec(
 		 * previous block.
 		 */
 		xfs_btree_firstrec(tcur, level);
-		xfs_alloc_decrement(tcur, level);
+		error = xfs_alloc_decrement(tcur, level, &i);
+		if (error) {
+			goto error0;
+		}
 		xfs_btree_firstrec(tcur, level);
 		/*
 		 * Grab a pointer to the block.
@@ -487,15 +533,21 @@ xfs_alloc_delrec(
 		 * of left to us works, we're done.
 		 */
 		if (left->bb_numrecs - 1 >=
-		     XFS_ALLOC_BLOCK_MINRECS(level, cur) &&
-		    xfs_alloc_rshift(tcur, level)) {
-			ASSERT(block->bb_numrecs >=
-			       XFS_ALLOC_BLOCK_MINRECS(level, cur));
-			xfs_btree_del_cursor(tcur);
-			if (level == 0)
-				cur->bc_ptrs[0]++;
-			kmem_check();
-			return 1;
+		     XFS_ALLOC_BLOCK_MINRECS(level, cur)) {
+			error = xfs_alloc_rshift(tcur, level, &i);
+			if (error) {
+				goto error0;
+			}
+			if (i) {
+				ASSERT(block->bb_numrecs >=
+				       XFS_ALLOC_BLOCK_MINRECS(level, cur));
+				xfs_btree_del_cursor(tcur);
+				if (level == 0)
+					cur->bc_ptrs[0]++;
+				kmem_check();
+				*stat = 1;
+				return 0;
+			}
 		}
 		/*
 		 * Otherwise, grab the number of records in right for
@@ -523,8 +575,11 @@ xfs_alloc_delrec(
 		rbno = bno;
 		right = block;
 		rbp = bp;
-		lbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.a.agno, lbno, 0);
+		error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+				    cur->bc_private.a.agno, lbno, 0, &lbp);
+		if (error) {
+			return error;
+		}
 		left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 		xfs_btree_check_sblock(cur, left, level);
 	}
@@ -541,8 +596,11 @@ xfs_alloc_delrec(
 		lbno = bno;
 		left = block;
 		lbp = bp;
-		rbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.a.agno, rbno, 0);
+		error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+				cur->bc_private.a.agno, rbno, 0, &rbp);
+		if (error) {
+			return error;
+		}
 		right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
 		xfs_btree_check_sblock(cur, right, level);
 	}
@@ -551,11 +609,16 @@ xfs_alloc_delrec(
 	 * Just return.  This is probably a logic error, but it's not fatal.
 	 */
 	else {
-		if (level > 0)
-			xfs_alloc_decrement(cur, level);
+		if (level > 0) {
+			error = xfs_alloc_decrement(cur, level, &i);
+			if (error) {
+				return error;
+			}
+		}
 		xfs_alloc_rcheck(cur);
 		kmem_check();
-		return 1;
+		*stat = 1;
+		return 0;
 	}
 	/*
 	 * We're now going to join "left" and "right" by moving all the stuff
@@ -601,8 +664,12 @@ xfs_alloc_delrec(
 	 * If we joined with the right neighbor and there's a level above
 	 * us, increment the cursor at that level.
 	 */
-	else if (level + 1 < cur->bc_nlevels)
-		xfs_alloc_increment(cur, level + 1);
+	else if (level + 1 < cur->bc_nlevels) {
+		error = xfs_alloc_increment(cur, level + 1, &i);
+		if (error) {
+			return error;
+		}
+	}
 	/*
 	 * Fix up the number of records in the surviving block.
 	 */
@@ -620,8 +687,11 @@ xfs_alloc_delrec(
 		xfs_alloc_block_t	*rrblock;
 		buf_t			*rrbp;
 
-		rrbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.a.agno, left->bb_rightsib, 0);
+		error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+			cur->bc_private.a.agno, left->bb_rightsib, 0, &rrbp);
+		if (error) {
+			return error;
+		}
 		rrblock = XFS_BUF_TO_ALLOC_BLOCK(rrbp);
 		xfs_btree_check_sblock(cur, rrblock, level);
 		rrblock->bb_leftsib = lbno;
@@ -630,7 +700,11 @@ xfs_alloc_delrec(
 	/*
 	 * Free the deleting block by putting it on the freelist.
 	 */
-	xfs_alloc_put_freelist(cur->bc_tp, cur->bc_private.a.agbp, NULL, rbno);
+	error = xfs_alloc_put_freelist(cur->bc_tp, cur->bc_private.a.agbp,
+				       NULL, rbno);
+	if (error) {
+		return error;
+	}
 	xfs_trans_agbtree_delta(cur->bc_tp, -1);
 	xfs_alloc_rcheck(cur);
 	kmem_check();
@@ -644,24 +718,31 @@ xfs_alloc_delrec(
 	/* 
 	 * Return value means the next level up has something to do.
 	 */
-	return 2;
+	*stat = 2;
+	return 0;
+
+ error0:
+	xfs_btree_del_cursor(tcur);
+	return error;
 }
 
 /*
  * Insert one record/level.  Return information to the caller
  * allowing the next level up to proceed if necessary.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_insrec(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			level,	/* level to insert record at */
 	xfs_agblock_t		*bnop,	/* i/o: block number inserted */
 	xfs_alloc_rec_t		*recp,	/* i/o: record data inserted */
-	xfs_btree_cur_t		**curp)	/* output: new cursor replacing cur */
+	xfs_btree_cur_t		**curp,	/* output: new cursor replacing cur */
+	int			*stat)	/* output: success/failure */
 {
 	xfs_agf_t		*agf;	/* allocation group freelist header */
 	xfs_alloc_block_t	*block;	/* btree block record/key lives in */
 	buf_t			*bp;	/* buffer for block */
+	int			error;
 	int			i;	/* loop index */
 	xfs_alloc_key_t		key;	/* key value being inserted */
 	xfs_alloc_key_t		*kp;	/* pointer to btree keys */
@@ -680,10 +761,14 @@ xfs_alloc_insrec(
 	 */
 	if (level >= cur->bc_nlevels) {
 		XFSSTATS.xs_abt_insrec++;
-		i = xfs_alloc_newroot(cur);
+		error = xfs_alloc_newroot(cur, &i);
+		if (error) {
+			return error;
+		}
 		*bnop = NULLAGBLOCK;
 		kmem_check();
-		return i;
+		*stat = i;
+		return 0;
 	}
 	xfs_alloc_rcheck(cur);
 	/*
@@ -697,6 +782,7 @@ xfs_alloc_insrec(
 	 */
 	if (ptr == 0) {
 		kmem_check();
+		*stat = 0;
 		return 0;
 	}
 	XFSSTATS.xs_abt_insrec++;
@@ -730,34 +816,52 @@ xfs_alloc_insrec(
 		/*
 		 * First, try shifting an entry to the right neighbor.
 		 */
-		if (xfs_alloc_rshift(cur, level)) {
+		error = xfs_alloc_rshift(cur, level, &i);
+		if (error) {
+			return error;
+		}
+		if (i) {
 			/* nothing */
 		}
 		/*
 		 * Next, try shifting an entry to the left neighbor.
 		 */
-		else if (xfs_alloc_lshift(cur, level)) {
-			optr = ptr = cur->bc_ptrs[level];
-		}
-		/*
-		 * Next, try splitting the current block in half.
-		 * If this works we have to re-set our variables because
-		 * we could be in a different block now.
-		 */
-		else if (xfs_alloc_split(cur, level, &nbno, &nkey, &ncur)) {
-			bp = cur->bc_bufs[level];
-			block = XFS_BUF_TO_ALLOC_BLOCK(bp);
-			xfs_btree_check_sblock(cur, block, level);
-			ptr = cur->bc_ptrs[level];
-			nrec.ar_startblock = nkey.ar_startblock;
-			nrec.ar_blockcount = nkey.ar_blockcount;
-		}
-		/*
-		 * Otherwise the insert fails.
-		 */
 		else {
-			kmem_check();
-			return 0;
+			error = xfs_alloc_lshift(cur, level, &i);
+			if (error) {
+				return error;
+			}
+			if (i) {
+				optr = ptr = cur->bc_ptrs[level];
+			} else {
+				/*
+				 * Next, try splitting the current block in
+				 * half. If this works we have to re-set our
+				 * variables because we could be in a
+				 * different block now.
+				 */
+				error = xfs_alloc_split(cur, level, &nbno,
+							&nkey, &ncur, &i);
+				if (error) {
+					return error;
+				}
+				if (i) {
+					bp = cur->bc_bufs[level];
+					block = XFS_BUF_TO_ALLOC_BLOCK(bp);
+					xfs_btree_check_sblock(cur, block, level);
+					ptr = cur->bc_ptrs[level];
+					nrec.ar_startblock = nkey.ar_startblock;
+					nrec.ar_blockcount = nkey.ar_blockcount;
+				}
+				/*
+				 * Otherwise the insert fails.
+				 */
+				else {
+					kmem_check();
+					*stat = 0;
+					return 0;
+				}
+			}
 		}
 	}
 	/*
@@ -853,7 +957,8 @@ xfs_alloc_insrec(
 	} else
 		xfs_alloc_kcheck(cur);
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 #ifdef XFSDEBUG
@@ -1033,15 +1138,17 @@ xfs_alloc_log_recs(
  * Lookup the record.  The cursor is made to point to it, based on dir.
  * Return 0 if can't find any such record, 1 for success.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_lookup(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_lookup_t		dir)	/* <=, ==, or >= */
+	xfs_lookup_t		dir,	/* <=, ==, or >= */
+	int			*stat)	/* success/failure */
 {
 	xfs_agblock_t		agbno;	/* a.g. relative btree block number */
 	xfs_agnumber_t		agno;	/* allocation group number */
 	xfs_alloc_block_t	*block;	/* current btree block */
 	int			diff;	/* difference for the current key */
+	int			error;
 	int			keyno;	/* current key number */
 	int			level;	/* level in the btree */
 	xfs_mount_t		*mp;	/* file system mount point */
@@ -1086,8 +1193,11 @@ xfs_alloc_lookup(
 			 * Need to get a new buffer.  Read it, then 
 			 * set it in the cursor, releasing the old one.
 			 */
-			bp = xfs_trans_read_buf(cur->bc_tp, mp->m_dev, d,
-				mp->m_bsize, 0);
+			error = xfs_trans_read_buf(cur->bc_tp, mp->m_dev, d,
+						   mp->m_bsize, 0, &bp);
+			if (error) {
+				return error;
+			}
 			ASSERT(bp && !geterror(bp));
 			xfs_btree_setbuf(cur, level, bp);
 			bp->b_ref = XFS_ALLOC_BTREE_REF;
@@ -1131,6 +1241,7 @@ xfs_alloc_lookup(
 				ASSERT(level == 0 && cur->bc_nlevels == 1);
 				cur->bc_ptrs[0] = dir != XFS_LOOKUP_LE;
 				kmem_check();
+				*stat = 0;
 				return 0;
 			}
 			/*
@@ -1220,10 +1331,14 @@ xfs_alloc_lookup(
 			int	i;
 
 			cur->bc_ptrs[0] = keyno;
-			i = xfs_alloc_increment(cur, 0);
+			error = xfs_alloc_increment(cur, 0, &i);
+			if (error) {
+				return error;
+			}
 			ASSERT(i == 1);
 			kmem_check();
-			return 1;
+			*stat = 1;
+			return 0;
 		}
 	}
 	else if (dir == XFS_LOOKUP_LE && diff > 0)
@@ -1234,21 +1349,26 @@ xfs_alloc_lookup(
 	 * Return if we succeeded or not.
 	 */
 	if (keyno == 0 || keyno > block->bb_numrecs)
-		return 0;
+		*stat = 0;
 	else
-		return dir != XFS_LOOKUP_EQ || diff == 0;
+		*stat = ((dir != XFS_LOOKUP_EQ) || (diff == 0));
+	return 0;
 }
 
 /*
  * Move 1 record left from cur/level if possible.
  * Update cur to reflect the new path.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_lshift(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	int			level)	/* level to shift record on */
+	int			level,	/* level to shift record on */
+	int			*stat)	/* success/failure */
 {
+	int			error;
+#ifdef DEBUG
 	int			i;	/* loop index */
+#endif
 	xfs_alloc_key_t		key;	/* key value for leaf level upward */
 	buf_t			*lbp;	/* buffer for left neighbor block */
 	xfs_alloc_block_t	*left;	/* left neighbor btree block */
@@ -1269,19 +1389,26 @@ xfs_alloc_lshift(
 	/*
 	 * If we've got no left sibling then we can't shift an entry left.
 	 */
-	if (right->bb_leftsib == NULLAGBLOCK)
+	if (right->bb_leftsib == NULLAGBLOCK) {
+		*stat = 0;
 		return 0;
+	}
 	/*
 	 * If the cursor entry is the one that would be moved, don't 
 	 * do it... it's too complicated.
 	 */
-	if (cur->bc_ptrs[level] <= 1)
+	if (cur->bc_ptrs[level] <= 1) {
+		*stat = 0;
 		return 0;
+	}
 	/*
 	 * Set up the left neighbor as "left".
 	 */
-	lbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-		cur->bc_private.a.agno, right->bb_leftsib, 0);
+	error  = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+			cur->bc_private.a.agno, right->bb_leftsib, 0, &lbp);
+	if (error) {
+		return error;
+	}
 	left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 	xfs_btree_check_sblock(cur, left, level);
 	/*
@@ -1289,6 +1416,7 @@ xfs_alloc_lshift(
 	 */
 	if (left->bb_numrecs == XFS_ALLOC_BLOCK_MAXRECS(level, cur)) {
 		kmem_check();
+		*stat = 0;
 		return 0;
 	}
 	nrec = left->bb_numrecs + 1;
@@ -1358,16 +1486,19 @@ xfs_alloc_lshift(
 	cur->bc_ptrs[level]--;
 	xfs_alloc_rcheck(cur);
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 /*
  * Allocate a new root block, fill it in.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_newroot(
-	xfs_btree_cur_t		*cur)	/* btree cursor */
+	xfs_btree_cur_t		*cur,	/* btree cursor */
+	int			*stat)	/* success/failure */
 {
+	int			error;
 	xfs_agblock_t		lbno;	/* left block number */
 	buf_t			*lbp;	/* left btree buffer */
 	xfs_alloc_block_t	*left;	/* left btree block */
@@ -1384,15 +1515,24 @@ xfs_alloc_newroot(
 	/*
 	 * Get a buffer from the freelist blocks, for the new root.
 	 */
-	nbno = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp);
+	error = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp,
+				       &nbno);
+	if (error) {
+		return error;
+	}
 	/*
 	 * None available, we fail.
 	 */
-	if (nbno == NULLAGBLOCK)
+	if (nbno == NULLAGBLOCK) {
+		*stat = 0;
 		return 0;
+	}
 	xfs_trans_agbtree_delta(cur->bc_tp, 1);
-	nbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp, 
-		cur->bc_private.a.agno, nbno, 0);
+	error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp, 
+			cur->bc_private.a.agno, nbno, 0, &nbp);
+	if (error) {
+		return error;
+	}
 	new = XFS_BUF_TO_ALLOC_BLOCK(nbp);
 	/*
 	 * Set the root data in the a.g. freespace structure.
@@ -1422,8 +1562,11 @@ xfs_alloc_newroot(
 		 */
 		lbno = XFS_DADDR_TO_AGBNO(cur->bc_mp, lbp->b_blkno);
 		rbno = left->bb_rightsib;
-		rbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.a.agno, rbno, 0);
+		error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+				cur->bc_private.a.agno, rbno, 0, &rbp);
+		if (error) {
+			return error;
+		}
 		right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
 		xfs_btree_check_sblock(cur, right, cur->bc_nlevels - 1);
 		nptr = 1;
@@ -1435,8 +1578,11 @@ xfs_alloc_newroot(
 		right = left;
 		rbno = XFS_DADDR_TO_AGBNO(cur->bc_mp, rbp->b_blkno);
 		lbno = right->bb_leftsib;
-		lbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.a.agno, lbno, 0);
+		error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+				cur->bc_private.a.agno, lbno, 0, &lbp);
+		if (error) {
+			return error;
+		}
 		left = XFS_BUF_TO_ALLOC_BLOCK(lbp);
 		xfs_btree_check_sblock(cur, left, cur->bc_nlevels - 1);
 		nptr = 2;
@@ -1492,7 +1638,8 @@ xfs_alloc_newroot(
 	xfs_alloc_rcheck(cur);
 	xfs_alloc_kcheck(cur);
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 #ifdef XFSDEBUG
@@ -1618,11 +1765,13 @@ xfs_alloc_rcheck_btree_block(
  * Move 1 record right from cur/level if possible.
  * Update cur to reflect the new path.
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_rshift(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	int			level)	/* level to shift record on */
+	int			level,	/* level to shift record on */
+	int			*stat)	/* success/failure */
 {
+	int			error;
 	int			i;	/* loop index */
 	xfs_alloc_key_t		key;	/* key value for leaf level upward */
 	buf_t			*lbp;	/* buffer for left (current) block */
@@ -1641,19 +1790,26 @@ xfs_alloc_rshift(
 	/*
 	 * If we've got no right sibling then we can't shift an entry right.
 	 */
-	if (left->bb_rightsib == NULLAGBLOCK)
+	if (left->bb_rightsib == NULLAGBLOCK) {
+		*stat = 0;
 		return 0;
+	}
 	/*
 	 * If the cursor entry is the one that would be moved, don't
 	 * do it... it's too complicated.
 	 */
-	if (cur->bc_ptrs[level] >= left->bb_numrecs)
+	if (cur->bc_ptrs[level] >= left->bb_numrecs) {
+		*stat = 0;
 		return 0;
+	}
 	/*
 	 * Set up the right neighbor as "right".
 	 */
-	rbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-		cur->bc_private.a.agno, left->bb_rightsib, 0);
+	error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+			cur->bc_private.a.agno, left->bb_rightsib, 0, &rbp);
+	if (error) {
+		return error;
+	}
 	right = XFS_BUF_TO_ALLOC_BLOCK(rbp);
 	xfs_btree_check_sblock(cur, right, level);
 	/*
@@ -1661,6 +1817,7 @@ xfs_alloc_rshift(
 	 */
 	if (right->bb_numrecs == XFS_ALLOC_BLOCK_MAXRECS(level, cur)) {
 		kmem_check();
+		*stat = 0;
 		return 0;
 	}
 	/*
@@ -1718,27 +1875,34 @@ xfs_alloc_rshift(
 
 		tcur = xfs_btree_dup_cursor(cur);
 		xfs_btree_lastrec(tcur, level);
-		xfs_alloc_increment(tcur, level);
+		error = xfs_alloc_increment(tcur, level, &i);
+		if (error) {
+			xfs_btree_del_cursor(tcur);
+			return error;
+		}
 		xfs_alloc_updkey(tcur, rkp, level + 1);
 		xfs_btree_del_cursor(tcur);
 	}
 	xfs_alloc_rcheck(cur);
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 /*
  * Split cur/level block in half.
  * Return new block number and its first record (to be inserted into parent).
  */
-STATIC int				/* success/failure */
+STATIC int				/* error */
 xfs_alloc_split(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			level,	/* level to split */
 	xfs_agblock_t		*bnop,	/* output: block number allocated */
 	xfs_alloc_key_t		*keyp,	/* output: first key of new block */
-	xfs_btree_cur_t		**curp)	/* output: new cursor */
+	xfs_btree_cur_t		**curp,	/* output: new cursor */
+	int			*stat)	/* success/failure */
 {
+	int			error;
 	int			i;	/* loop index/record number */
 	xfs_agblock_t		lbno;	/* left (current) block number */
 	buf_t			*lbp;	/* buffer for left block */
@@ -1752,14 +1916,22 @@ xfs_alloc_split(
 	 * Allocate the new block from the freelist.
 	 * If we can't do it, we're toast.  Give up.
 	 */
-	rbno = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp);
+	error = xfs_alloc_get_freelist(cur->bc_tp, cur->bc_private.a.agbp,
+				       &rbno);
+	if (error) {
+		return error;
+	}
 	if (rbno == NULLAGBLOCK) {
 		kmem_check();
+		*stat = 0;
 		return 0;
 	}
 	xfs_trans_agbtree_delta(cur->bc_tp, 1);
-	rbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-		cur->bc_private.a.agno, rbno, 0);
+	error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+			cur->bc_private.a.agno, rbno, 0, &rbp);
+	if (error) {
+		return error;
+	}
 	/*
 	 * Set up the new block as "right".
 	 */
@@ -1840,8 +2012,12 @@ xfs_alloc_split(
 		xfs_alloc_block_t	*rrblock;	/* rr btree block */
 		buf_t			*rrbp;		/* buffer for rrblock */
 
-		rrbp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-			cur->bc_private.a.agno, right->bb_rightsib, 0);
+		error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+				cur->bc_private.a.agno, right->bb_rightsib,
+				0, &rrbp);
+		if (error) {
+			return error;
+		}
 		rrblock = XFS_BUF_TO_ALLOC_BLOCK(rrbp);
 		xfs_btree_check_sblock(cur, rrblock, level);
 		rrblock->bb_leftsib = rbno;
@@ -1867,7 +2043,8 @@ xfs_alloc_split(
 	*bnop = rbno;
 	xfs_alloc_rcheck(cur);
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 /*
@@ -1916,20 +2093,24 @@ xfs_alloc_updkey(
  * Decrement cursor by one record at the level.
  * For nonzero levels the leaf-ward information is untouched.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_decrement(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	int			level)	/* level in btree, 0 is leaf */
+	int			level,	/* level in btree, 0 is leaf */
+	int			*stat)	/* success/failure */
 {
 	xfs_alloc_block_t	*block;	/* btree block */
+	int			error;
 	int			lev;	/* btree level */
 
 	/*
 	 * Decrement the ptr at this level.  If we're still in the block
 	 * then we're done.
 	 */
-	if (--cur->bc_ptrs[level] > 0)
-		return 1;
+	if (--cur->bc_ptrs[level] > 0) {
+		*stat = 1;
+		return 0;
+	}
 	/*
 	 * Get a pointer to the btree block.
 	 */
@@ -1938,8 +2119,10 @@ xfs_alloc_decrement(
 	/*
 	 * If we just went off the left edge of the tree, return failure.
 	 */
-	if (block->bb_leftsib == NULLAGBLOCK)
+	if (block->bb_leftsib == NULLAGBLOCK) {
+		*stat = 0;
 		return 0;
+	}
 	/*
 	 * March up the tree decrementing pointers.
 	 * Stop when we don't go off the left edge of a block.
@@ -1963,15 +2146,19 @@ xfs_alloc_decrement(
 		block = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[lev]);
 		xfs_btree_check_sblock(cur, block, lev);
 		agbno = *XFS_ALLOC_PTR_ADDR(block, cur->bc_ptrs[lev], cur);
-		xfs_btree_setbuf(cur, lev - 1,
-			bp = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-				cur->bc_private.a.agno, agbno, 0));
+		error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+				cur->bc_private.a.agno, agbno, 0, &bp);
+		if (error) {
+			return error;
+		}
+		xfs_btree_setbuf(cur, lev - 1, bp);
 		block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 		xfs_btree_check_sblock(cur, block, lev - 1);
 		cur->bc_ptrs[lev - 1] = block->bb_numrecs;
 	}
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 /*
@@ -1979,10 +2166,12 @@ xfs_alloc_decrement(
  * The cursor refers to the place where the record was (could be inserted)
  * when the operation returns.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_delete(
-	xfs_btree_cur_t	*cur)		/* btree cursor */
+	xfs_btree_cur_t	*cur,		/* btree cursor */
+	int		*stat)		/* success/failure */
 {
+	int		error;
 	int		i;		/* result code */
 	int		level;		/* btree level */
 
@@ -1991,18 +2180,26 @@ xfs_alloc_delete(
 	 * If 2 is returned then a join was done; go to the next level.
 	 * Otherwise we are done.
 	 */
-	for (level = 0, i = 2; i == 2; level++)
-		i = xfs_alloc_delrec(cur, level);
+	for (level = 0, i = 2; i == 2; level++) {
+		error = xfs_alloc_delrec(cur, level, &i);
+		if (error) {
+			return error;
+		}
+	}
 	if (i == 0) {
 		for (level = 1; level < cur->bc_nlevels; level++) {
 			if (cur->bc_ptrs[level] == 0) {
-				xfs_alloc_decrement(cur, level);
+				error = xfs_alloc_decrement(cur, level, &i);
+				if (error) {
+					return error;
+				}
 				break;
 			}
 		}
 	}
 	xfs_alloc_kcheck(cur);
-	return i;
+	*stat = i;
+	return 0;
 }
 
 /* 
@@ -2043,12 +2240,15 @@ xfs_alloc_get_rec(
  * Increment cursor by one record at the level.
  * For nonzero levels the leaf-ward information is untouched.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_increment(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	int			level)	/* level in btree, 0 is leaf */
+	int			level,	/* level in btree, 0 is leaf */
+	int			*stat)	/* success/failure */
 {
 	xfs_alloc_block_t	*block;	/* btree block */
+	buf_t			*bp;	/* tree block buffer */
+	int			error;
 	int			lev;	/* btree level */
 
 	/*
@@ -2060,13 +2260,17 @@ xfs_alloc_increment(
 	 * Increment the ptr at this level.  If we're still in the block
 	 * then we're done.
 	 */
-	if (++cur->bc_ptrs[level] <= block->bb_numrecs)
-		return 1;
+	if (++cur->bc_ptrs[level] <= block->bb_numrecs) {
+		*stat = 1;
+		return 0;
+	}
 	/*
 	 * If we just went off the right edge of the tree, return failure.
 	 */
-	if (block->bb_rightsib == NULLAGBLOCK)
+	if (block->bb_rightsib == NULLAGBLOCK) {
+		*stat = 0;
 		return 0;
+	}
 	/*
 	 * March up the tree incrementing pointers.
 	 * Stop when we don't go off the right edge of a block.
@@ -2091,23 +2295,29 @@ xfs_alloc_increment(
 		block = XFS_BUF_TO_ALLOC_BLOCK(cur->bc_bufs[lev]);
 		xfs_btree_check_sblock(cur, block, lev);
 		agbno = *XFS_ALLOC_PTR_ADDR(block, cur->bc_ptrs[lev], cur);
-		xfs_btree_setbuf(cur, lev - 1,
-			xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
-				cur->bc_private.a.agno, agbno, 0));
+		error =	xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
+				cur->bc_private.a.agno, agbno, 0, &bp);
+		if (error) {
+			return error;
+		}
+		xfs_btree_setbuf(cur, lev - 1, bp);
 		cur->bc_ptrs[lev - 1] = 1;
 	}
 	kmem_check();
-	return 1;
+	*stat = 1;
+	return 0;
 }
 
 /*
  * Insert the current record at the point referenced by cur.
  * The cursor may be inconsistent on return if splits have been done.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_insert(
-	xfs_btree_cur_t	*cur)		/* btree cursor */
+	xfs_btree_cur_t	*cur,		/* btree cursor */
+	int		*stat)		/* success/failure */
 {
+	int		error;
 	int		i;		/* result value, 0 for failure */
 	int		level;		/* current level number in btree */
 	xfs_agblock_t	nbno;		/* new block number (split result) */
@@ -2130,7 +2340,14 @@ xfs_alloc_insert(
 		 * Insert nrec/nbno into this level of the tree.
 		 * Note if we fail, nbno will be null.
 		 */
-		i = xfs_alloc_insrec(pcur, level++, &nbno, &nrec, &ncur);
+		error = xfs_alloc_insrec(pcur, level++, &nbno, &nrec,
+					 &ncur, &i);
+		if (error) {
+			if (pcur != cur) {
+				xfs_btree_del_cursor(pcur);
+			}
+			return error;
+		}
 		/*
 		 * See if the cursor we just used is trash.
 		 * Can't trash the caller's cursor, but otherwise we should
@@ -2149,7 +2366,8 @@ xfs_alloc_insert(
 		}
 		kmem_check();
 	} while (nbno != NULLAGBLOCK);
-	return i;
+	*stat = i;
+	return 0;
 }
 
 #ifdef XFSDEBUG
@@ -2175,45 +2393,48 @@ xfs_alloc_kcheck(
 /*
  * Lookup the record equal to [bno, len] in the btree given by cur.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_lookup_eq(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	xfs_agblock_t	bno,		/* starting block of extent */
-	xfs_extlen_t	len)		/* length of extent */
+	xfs_extlen_t	len,		/* length of extent */
+	int		*stat)		/* success/failure */
 {
 	cur->bc_rec.a.ar_startblock = bno;
 	cur->bc_rec.a.ar_blockcount = len;
-	return xfs_alloc_lookup(cur, XFS_LOOKUP_EQ);
+	return xfs_alloc_lookup(cur, XFS_LOOKUP_EQ, stat);
 }
 
 /*
  * Lookup the first record greater than or equal to [bno, len]
  * in the btree given by cur.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_lookup_ge(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	xfs_agblock_t	bno,		/* starting block of extent */
-	xfs_extlen_t	len)		/* length of extent */
+	xfs_extlen_t	len,		/* length of extent */
+	int		*stat)		/* success/failure */
 {
 	cur->bc_rec.a.ar_startblock = bno;
 	cur->bc_rec.a.ar_blockcount = len;
-	return xfs_alloc_lookup(cur, XFS_LOOKUP_GE);
+	return xfs_alloc_lookup(cur, XFS_LOOKUP_GE, stat);
 }
 
 /*
  * Lookup the first record less than or equal to [bno, len]
  * in the btree given by cur.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_lookup_le(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	xfs_agblock_t	bno,		/* starting block of extent */
-	xfs_extlen_t	len)		/* length of extent */
+	xfs_extlen_t	len,		/* length of extent */
+	int		*stat)		/* success/failure */
 {
 	cur->bc_rec.a.ar_startblock = bno;
 	cur->bc_rec.a.ar_blockcount = len;
-	return xfs_alloc_lookup(cur, XFS_LOOKUP_LE);
+	return xfs_alloc_lookup(cur, XFS_LOOKUP_LE, stat);
 }
 
 #ifdef XFSDEBUG

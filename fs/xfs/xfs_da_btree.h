@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_BTREE_H
 #define	_FS_XFS_DIR_BTREE_H
 
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.13 $"
 
 /*
  * xfs_dir_btree.h
@@ -76,15 +76,16 @@ typedef struct xfs_dir_state {
 /*
  * Routines used for growing the Btree.
  */
-int	xfs_dir_split(xfs_dir_state_t *state);
+int	xfs_dir_split(xfs_dir_state_t *state, int *stat);
 int	xfs_dir_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
-			     xfs_dir_name_t *args, int insertion_index);
+				     xfs_dir_name_t *args,
+				     int insertion_index);
 
 /*
  * Routines used for shrinking the Btree.
  */
 #ifndef SIM
-int	xfs_dir_join(xfs_dir_state_t *state);
+int	xfs_dir_join(xfs_dir_state_t *state, int *stat);
 #endif	/* !SIM */
 void	xfs_dir_fixhashpath(xfs_dir_state_t *state,
 				   xfs_dir_state_path_t *path_to_to_fix);
@@ -98,7 +99,7 @@ int	xfs_dir_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
  */
 int	xfs_dir_leaf_lookup_int(struct buf *leaf_buffer, xfs_dir_name_t *args,
 				      int *index_found_at);
-int	xfs_dir_node_lookup_int(xfs_dir_state_t *state);
+int	xfs_dir_node_lookup_int(xfs_dir_state_t *state, int *stat);
 
 #ifndef SIM
 /*

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.45 $"
+#ident "$Revision: 1.46 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -109,38 +109,41 @@ xfs_bmap_compute_maxlevels(
  * Return 1 if the given transaction was committed and a new one allocated,
  * and 0 otherwise.
  */
-int
+int						/* error */
 xfs_bmap_finish(
 	struct xfs_trans	**tp,		/* transaction pointer addr */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
-	xfs_fsblock_t		firstblock);	/* controlled a.g. for allocs */
+	xfs_fsblock_t		firstblock,	/* controlled a.g. for allocs */
+	int			*committed);	/* xact committed or not */
 
 /*
  * Returns the file-relative block number of the first unused block in the file.
  * This is the lowest-address hole if the file has holes, else the first block
  * past the end of file.
  */
-xfs_fileoff_t
+int						/* error */
 xfs_bmap_first_unused(
-	struct xfs_trans	*tp,		/* transaction pointer */
-	struct xfs_inode	*ip);		/* incore inode */
+	struct xfs_trans		*tp,		/* transaction pointer */
+	struct xfs_inode	*ip,		/* incore inode */
+	xfs_fileoff_t		*unused);	/* unused block num */
 
 /*
  * Returns the file-relative block number of the first block past eof in
  * the file.  This is not based on i_size, it is based on the extent list.
  * Returns 0 for local files, as they do not have an extent list.
  */
-xfs_fileoff_t
+int						/* error */
 xfs_bmap_last_offset(
 	struct xfs_trans	*tp,		/* transaction pointer */
-	struct xfs_inode	*ip);		/* incore inode */
+	struct xfs_inode	*ip,		/* incore inode */
+	xfs_fileoff_t		*unused);	/* last block num */
 
 /*
  * Read in the extents to iu_extents.
  * All inode fields are set up by caller, we just traverse the btree
  * and copy the records in.
  */
-void
+int						/* error */
 xfs_bmap_read_extents(
 	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip);		/* incore inode */
@@ -165,20 +168,21 @@ xfs_bmap_trace_exlist(
  * into a hole or past eof.
  * Only allocates blocks from a single allocation group,
  * to avoid locking problems.
- * The return value from the first call in a transaction must be remembered
- * and presented to subsequent calls in "firstblock".  An upper bound for
- * the number of blocks to be allocated is supplied to the first call 
- * in "total"; if no allocation group has that many free blocks then 
- * the call will fail (return NULLFSBLOCK).
+ * The returned value in "firstblock" from the first call in a transaction
+ * must be remembered and presented to subsequent calls in "firstblock".
+ * An upper bound for the number of blocks to be allocated is supplied to
+ * the first call in "total"; if no allocation group has that many free
+ * blocks then  the call will fail (return NULLFSBLOCK in "firstblock"). 
  */
-xfs_fsblock_t					/* first allocated block */
+int						/* error */
 xfs_bmapi(
 	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		bno,		/* starting file offs. mapped */
 	xfs_filblks_t		len,		/* length to map in file */
 	int			flags,		/* XFS_BMAPI_... */
-	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
+	xfs_fsblock_t		*firstblock,	/* first allocated block
+						   controls a.g. for allocs */
 	xfs_extlen_t		total,		/* total blocks needed */
 	struct xfs_bmbt_irec	*mval,		/* output: map values */
 	int			*nmap,		/* i/o: mval size/count */
@@ -191,7 +195,7 @@ xfs_bmapi(
  * that value.  If not all extents in the block range can be removed then
  * *done is set.
  */
-xfs_fsblock_t					/* first allocated block */
+int						/* error */
 xfs_bunmapi(
 	struct xfs_trans	*tp,		/* transaction pointer */
 	struct xfs_inode	*ip,		/* incore inode */
@@ -199,7 +203,8 @@ xfs_bunmapi(
 	xfs_filblks_t		len,		/* length to unmap in file */
 	int			flags,		/* XFS_BMAPI_... */
 	xfs_extnum_t		nexts,		/* number of extents max */
-	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
+	xfs_fsblock_t		*firstblock,	/* first allocated block
+						   controls a.g. for allocs */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	int			*done);		/* set if not done yet */
 
@@ -213,4 +218,11 @@ xfs_getbmap(
 	void			*ap);		/* pointer to user's array */
 #endif	/* !SIM */
 
+/*
+ * Routine to clean up the free list data structure when
+ * an error occurs during a transaction.
+ */
+void
+xfs_bmap_cancel(
+	xfs_bmap_free_t	*flist);		/* free list to clean up */
 #endif	/* _FS_XFS_BMAP_H */

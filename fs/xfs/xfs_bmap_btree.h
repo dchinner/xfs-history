@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -209,11 +209,13 @@ xfs_bmdr_to_bmbt(
 int
 xfs_bmbt_decrement(
 	struct xfs_btree_cur *,
-	int);
+	int,
+	int *);
 
 int
 xfs_bmbt_delete(
-	struct xfs_btree_cur *);
+	struct xfs_btree_cur *,
+	int *);	       
 
 void
 xfs_bmbt_get_all(
@@ -241,11 +243,13 @@ xfs_bmbt_get_startoff(
 int
 xfs_bmbt_increment(
 	struct xfs_btree_cur *,
-	int);
+	int,
+	int *);
 
 int
 xfs_bmbt_insert(
-	struct xfs_btree_cur *);
+	struct xfs_btree_cur *,
+	int *);	       
 
 #ifdef XFSDEBUG
 void
@@ -273,21 +277,24 @@ xfs_bmbt_lookup_eq(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_filblks_t);
+	xfs_filblks_t,
+	int *);
 
 int
 xfs_bmbt_lookup_ge(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_filblks_t);
+	xfs_filblks_t,
+	int *);
 
 int
 xfs_bmbt_lookup_le(
 	struct xfs_btree_cur *,
 	xfs_fileoff_t,
 	xfs_fsblock_t,
-	xfs_filblks_t);
+	xfs_filblks_t,
+	int *);
 
 #ifdef XFSDEBUG
 void

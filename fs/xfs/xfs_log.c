@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.115 $"
+#ident	"$Revision: 1.116 $"
 
 /*
  * High level interface routines for log manager
@@ -491,7 +491,10 @@ int
 xfs_log_unmount(xfs_mount_t *mp)
 {
 	xlog_t		 *log = mp->m_log;
-	xlog_in_core_t	 *iclog, *first_iclog;
+	xlog_in_core_t	 *iclog;
+#ifdef DEBUG
+	xlog_in_core_t	 *first_iclog;
+#endif
 	xfs_log_iovec_t  reg[1];
 	xfs_log_ticket_t tic = 0;
 	xfs_lsn_t	 lsn;
@@ -1683,7 +1686,9 @@ xlog_grant_log_space(xlog_t	   *log,
 	int		 free_bytes;
 	int		 need_bytes;
 	int		 spl;
+#ifdef DEBUG
 	xfs_lsn_t	 tail_lsn;
+#endif
 	
 
 #ifdef DEBUG
@@ -1761,7 +1766,9 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 {
 	int		spl;
 	int		free_bytes, need_bytes;
+#ifdef DEBUG
 	xfs_lsn_t	tail_lsn;
+#endif
 
 	tic->t_curr_res = tic->t_unit_res;
 
@@ -2384,6 +2391,7 @@ xlog_ticket_get(xlog_t		*log,
  * one of the iclogs.  This uses backup pointers stored in a different
  * part of the log in case we trash the log structure.
  */
+/* ARGSUSED */
 void
 xlog_verify_dest_ptr(xlog_t     *log,
 		     __psint_t  ptr)
@@ -2426,7 +2434,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 }	/* xlog_verify_disk_cycle_no */
 #endif
 
-
+/*ARGSUSED*/
 STATIC void
 xlog_verify_grant_head(xlog_t *log, int equals)
 {
@@ -2443,6 +2451,7 @@ xlog_verify_grant_head(xlog_t *log, int equals)
 
 
 /* check if it will fit */
+/*ARGSUSED*/
 STATIC void
 xlog_verify_tail_lsn(xlog_t	    *log,
 		     xlog_in_core_t *iclog,
@@ -2485,6 +2494,7 @@ xlog_verify_tail_lsn(xlog_t	    *log,
  *	log, check the preceding blocks of the physical log to make sure all
  *	the cycle numbers agree with the current cycle number.
  */
+/*ARGSUSED*/
 STATIC void
 xlog_verify_iclog(xlog_t	 *log,
 		  xlog_in_core_t *iclog,

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.59 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -15,6 +15,7 @@
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/kmem.h>
+#include <sys/cmn_err.h>
 #include <stddef.h>
 #ifndef SIM
 #include <sys/conf.h>
@@ -555,7 +556,7 @@ xfs_trans_id(
 
 
 /*ARGSUSED*/
-void
+int
 xfs_trans_commit(
 	xfs_trans_t	*tp,
 	uint		flags)
@@ -598,7 +599,7 @@ xfs_trans_commit(
 		xfs_trans_free_items(tp);
 		xfs_trans_free(tp);
 		XFSSTATS.xs_trans_empty++;
-		return;
+		return 0;
 	}
 
 	/*
@@ -685,6 +686,7 @@ xfs_trans_commit(
 	} else {
 		XFSSTATS.xs_trans_async++;
 	}
+	return 0;
 }
 
 
@@ -797,7 +799,10 @@ xfs_trans_cancel(
 {
 	int	log_flags;
 
-	ASSERT(!(tp->t_flags & XFS_TRANS_DIRTY));
+	if (tp->t_flags & XFS_TRANS_DIRTY) {
+		cmn_err(CE_PANIC, "XFS aborting dirty transaction 0x%x\n",
+			tp);
+	}
 
 	xfs_trans_unreserve_and_mod_sb(tp);
 	if (tp->t_ticket) {

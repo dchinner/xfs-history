@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision: 1.36 $"
 
 struct buf;
 struct xfs_mount;
@@ -56,7 +56,8 @@ typedef struct xfs_alloc_arg {
 	xfs_extlen_t	len;		/* output: actual size of extent */
 	xfs_alloctype_t	type;		/* allocation type XFS_ALLOCTYPE_... */
 	xfs_alloctype_t	otype;		/* original allocation type */
-	short		wasdel;		/* set if allocation was prev delayed */
+	char		wasdel;		/* set if allocation was prev delayed */
+	char		wasfromfl;	/* set if allocation is from freelist */
 	char		isfl;		/* set if is freelist blocks - !actg */
 	char		userdata;	/* set if this is user data */
 	struct xfs_perag *pag;		/* per-ag struct for this agno */
@@ -90,7 +91,7 @@ xfs_alloc_compute_maxlevels(
  * If so, fix up the btree freelist's size.
  * This is external so mkfs can call it, too.
  */
-struct buf *			/* buffer for the a.g. freelist header */
+int				/* error */
 xfs_alloc_fix_freelist(
 	struct xfs_trans *tp,	/* transaction pointer */
 	xfs_agnumber_t	agno,	/* allocation group number */
@@ -98,16 +99,18 @@ xfs_alloc_fix_freelist(
 	xfs_extlen_t	total,	/* total free blocks, else reject */
 	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
 	int		flags,	/* XFS_ALLOC_FLAG_... */
-	struct xfs_perag *pag);	/* per allocation group data */
-
+	struct xfs_perag *pag,	/* per allocation group data */
+	struct buf	**agbpp); /* buffer for the a.g. freelist header */
+				     
 /*
  * Get a block from the freelist.
  * Returns with the buffer for the block gotten.
  */
-xfs_agblock_t			/* block address retrieved from freelist */
+int				/* error */
 xfs_alloc_get_freelist(
 	struct xfs_trans *tp,	/* transaction pointer */
-	struct buf	*agbp);	/* buffer containing the agf structure */
+	struct buf	*agbp,	/* buffer containing the agf structure */
+	xfs_agblock_t	*bnop);	/* block address retrieved from freelist */
 
 /*
  * Log the given fields from the agf structure.
@@ -121,7 +124,7 @@ xfs_alloc_log_agf(
 /*
  * Interface for inode allocation to force the pag data to be initialized.
  */
-void
+int				/* error */
 xfs_alloc_pagf_init(
 	struct xfs_mount *mp,	/* file system mount structure */
 	struct xfs_trans *tp,	/* transaction pointer */
@@ -131,7 +134,7 @@ xfs_alloc_pagf_init(
 /*
  * Put the block on the freelist for the allocation group.
  */
-void
+int				/* error */
 xfs_alloc_put_freelist(
 	struct xfs_trans *tp,	/* transaction pointer */
 	struct buf	*agbp,	/* buffer for a.g. freelist header */
@@ -141,17 +144,18 @@ xfs_alloc_put_freelist(
 /*
  * Read in the allocation group header (free/alloc section).
  */
-struct buf *				/* buffer for the ag freelist header */
+int					/* error  */
 xfs_alloc_read_agf(
 	struct xfs_mount *mp,		/* mount point structure */
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
-	int		flags);		/* XFS_ALLOC_FLAG_... */
+	int		flags,		/* XFS_ALLOC_FLAG_... */
+	struct buf		**bpp);	/* buffer for the ag freelist header */
 
 /*
  * Allocate an extent (variable-size).
  */
-void
+int				/* error */
 xfs_alloc_vextent(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
@@ -159,7 +163,7 @@ xfs_alloc_vextent(
 /*
  * Free an extent.
  */
-int				/* success/failure; will become void */
+int				/* error */
 xfs_free_extent(
 	struct xfs_trans *tp,	/* transaction pointer */
 	xfs_fsblock_t	bno,	/* starting block number of extent */

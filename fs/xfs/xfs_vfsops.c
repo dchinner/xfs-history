@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.91 $"
+#ident  "$Revision: 1.92 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -107,50 +107,78 @@ static char *whymount[] = { "initial mount", "remount", "unmount" };
 /*
  * Static function prototypes.
  */
-STATIC int	xfs_vfsmount(vfs_t		*vfsp,
-			     vnode_t		*mvp,
-			     struct mounta	*uap,
-			     cred_t		*credp);
+STATIC int
+xfs_vfsmount(
+	vfs_t		*vfsp,
+	vnode_t		*mvp,
+	struct mounta	*uap,
+	cred_t		*credp);
 
-STATIC int	xfs_mountroot(vfs_t		*vfsp,
-			      enum whymountroot	why);
+STATIC int
+xfs_mountroot(
+	vfs_t			*vfsp,
+	enum whymountroot	why);
 
-STATIC int	xfs_unmount(vfs_t	*vfsp,
-			    int		flags,
-			    cred_t	*credp);
+STATIC int
+xfs_unmount(
+	vfs_t	*vfsp,
+	int	flags,
+	cred_t	*credp);
 
-STATIC int	xfs_root(vfs_t		*vfsp,
-			 vnode_t	**vpp);
+STATIC int
+xfs_root(
+	vfs_t	*vfsp,
+	vnode_t	**vpp);
 
-STATIC int	xfs_statvfs(vfs_t	*vfsp,
-			    statvfs_t	*statp,
-			    vnode_t	*vp);
+STATIC int
+xfs_statvfs(
+	vfs_t		*vfsp,
+	statvfs_t	*statp,
+	vnode_t		*vp);
 
-STATIC int	xfs_sync(vfs_t		*vp,
-			 short		flags,
-			 cred_t		*credp);
+STATIC int
+xfs_sync(
+	vfs_t		*vp,
+	short		flags,
+	cred_t		*credp);
 
-STATIC int	xfs_vget(vfs_t		*vfsp,
-			 vnode_t	**vpp,
-			 fid_t		*fidp);
+STATIC int
+xfs_vget(
+	vfs_t		*vfsp,
+	vnode_t		**vpp,
+	fid_t		*fidp);
 
 
-STATIC int	xfs_cmountfs(struct vfs	*vfsp,
-			     dev_t		ddev,
-			     dev_t		logdev,
-			     dev_t		rtdev,
-			     whymount_t		why,
-			     struct xfs_args	*ap,
-			     struct cred	*cr);
+STATIC int
+xfs_cmountfs(
+	vfs_t		*vfsp,
+	dev_t		ddev,
+	dev_t		logdev,
+	dev_t		rtdev,
+	whymount_t	why,
+	struct xfs_args	*ap,
+	struct cred	*cr);
 
-STATIC xfs_mount_t *xfs_get_vfsmount(struct vfs	*vfsp,
-				     dev_t		ddev,
-				     dev_t		logdev,
-				     dev_t		rtdev);
+STATIC xfs_mount_t *
+xfs_get_vfsmount(
+	vfs_t	*vfsp,
+	dev_t	ddev,
+	dev_t	logdev,
+	dev_t	rtdev);
 
-STATIC int	spectodev(char *spec, dev_t *devp);
-STATIC int	xfs_isdev(dev_t dev);
-STATIC int	xfs_ibusy(xfs_mount_t *mp);
+STATIC int
+spectodev(
+	char	*spec,
+	dev_t	*devp);
+
+STATIC int
+xfs_isdev(
+	dev_t	dev);
+
+STATIC int
+xfs_ibusy(
+	xfs_mount_t	*mp);
+
 #endif	/* !SIM */
 
 
@@ -174,8 +202,9 @@ int	xfs_fstype;
  */
 /* ARGSUSED */
 int
-xfs_init(vfssw_t	*vswp,
-	 int		fstype)
+xfs_init(
+	vfssw_t	*vswp,
+	int	fstype)
 {
 	extern lock_t	xfs_bli_reflock;
 	extern zone_t	*xfs_dir_state_zone;
@@ -275,11 +304,12 @@ xfs_init(vfssw_t	*vswp,
  * Resolve path name of special file to its device.
  */
 STATIC int
-spectodev(char	 *spec,
-	   dev_t *devp)
+spectodev(
+	char	*spec,
+	dev_t	*devp)
 {
-	struct vnode *bvp;
-	int error;
+	vnode_t	*bvp;
+	int	error;
 
 	if (error = lookupname(spec, UIO_USERSPACE, FOLLOW, NULLVPP, &bvp))
 		return error;
@@ -299,13 +329,14 @@ spectodev(char	 *spec,
  * This function is the common mount file system function for xFS.
  */
 STATIC int
-xfs_cmountfs(struct vfs 	*vfsp,
-	     dev_t		ddev,
-	     dev_t		logdev,
-	     dev_t		rtdev,
-	     whymount_t		why,
-	     struct xfs_args	*ap,
-	     struct cred	*cr)
+xfs_cmountfs(
+	vfs_t		*vfsp,
+	dev_t		ddev,
+	dev_t		logdev,
+	dev_t		rtdev,
+	whymount_t	why,
+	struct xfs_args	*ap,
+	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
 	struct vnode 	*ddevvp, *rdevvp, *ldevvp;
@@ -332,7 +363,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		error = VOP_OPEN(&ddevvp, vfs_flags, cr);
 		if (error) {
 			VN_RELE(ddevvp);
-			return(error);
+			goto error0;
 		}
 		mp->m_ddevp = ddevvp;
 	} else {
@@ -343,12 +374,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		error = VOP_OPEN(&rdevvp, vfs_flags, cr);
 		if (error) {
 			VN_RELE(rdevvp);
-			if (ddevvp) {
-				VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
-				binval(ddev);
-				VN_RELE(ddevvp);
-			}
-			return(error);
+			goto error1;
 		}
 		mp->m_rtdevp = rdevvp;
 	} else {
@@ -363,17 +389,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			error = VOP_OPEN(&ldevvp, vfs_flags, cr);
 			if (error) {
 				VN_RELE(ldevvp);
-				if (rdevvp) {
-					VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr);
-					binval(rtdev);
-					VN_RELE(rdevvp);
-				}
-				if (ddevvp) {
-					VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
-					binval(ddev);
-					VN_RELE(ddevvp);
-				}
-				return(error);
+				goto error2;
 			}
 			mp->m_logdevp = ldevvp;
 		}
@@ -381,7 +397,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			/* Called through the mount system call */
 			if (ap->version != 1) {
 				error = XFS_ERROR(EINVAL);
-				goto error;
+				goto error3;
 			}
 			mp->m_logbufs = ap->logbufs;
 			mp->m_logbsize = ap->logbufsize;
@@ -389,7 +405,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 					      PATH_MAX, &n)) {
 				if (error == ENAMETOOLONG)
 					error = EINVAL;
-				goto error;
+				goto error3;
 			}
 		} else {
 			/*
@@ -413,24 +429,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	}
 
 	if (error = xfs_mountfs(vfsp, ddev)) {
-		xfs_mount_free(mp);
-error:
-		if (ldevvp) {
-			VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr);
-			binval(logdev);
-			VN_RELE(ldevvp);
-		}
-		if (rdevvp) {
-			VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr);
-			binval(rtdev);
-			VN_RELE(rdevvp);
-		}
-		if (ddevvp) {
-			VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
-			binval(ddev);
-			VN_RELE(ddevvp);
-		}
-		return error;		/* error should be in errno.h */
+		goto error3;
 	}
 
 	/*
@@ -443,11 +442,28 @@ error:
                 clkset( rtodc() );
         }
 
-	/*
-	 * XXX Anything special for read-only mounts?
-	 * if ((vfsp->vfs_flag & VFS_RDONLY) == 0) {}
-	 */
+	return error;
 
+ error3:
+	if (ldevvp) {
+		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr);
+		binval(logdev);
+		VN_RELE(ldevvp);
+	}
+ error2:
+	if (rdevvp) {
+		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr);
+		binval(rtdev);
+		VN_RELE(rdevvp);
+	}
+ error1:
+	if (ddevvp) {
+		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
+		binval(ddev);
+		VN_RELE(ddevvp);
+	}
+ error0:
+	xfs_mount_free(mp);
 	return error;
 }	/* end of xfs_cmountfs() */
 
@@ -459,10 +475,11 @@ error:
  * created and initialized.
  */
 STATIC xfs_mount_t *
-xfs_get_vfsmount(struct vfs	*vfsp,
-		  dev_t		ddev,
-		  dev_t		logdev,
-		  dev_t		rtdev)
+xfs_get_vfsmount(
+	vfs_t	*vfsp,
+	dev_t	ddev,
+	dev_t	logdev,
+	dev_t	rtdev)
 {
 	xfs_mount_t *mp;
 
@@ -475,7 +492,6 @@ xfs_get_vfsmount(struct vfs	*vfsp,
 	} else {
 		/*
 		 * Allocate VFS private data (xfs mount structure).
-		 * XXX Should the xfs_mount_t have a m_devvp for dio?
 		 */
 		mp = xfs_mount_init();
 		mp->m_vfsp   = vfsp;
@@ -537,10 +553,11 @@ irix5_to_xfs_args(
  *
  */ 
 STATIC int
-xfs_vfsmount(vfs_t		*vfsp,
-	     vnode_t		*mvp,
-	     struct mounta	*uap,
-	     cred_t		*credp)
+xfs_vfsmount(
+	vfs_t		*vfsp,
+	vnode_t		*mvp,
+	struct mounta	*uap,
+	cred_t		*credp)
 {
 	struct xfs_args	args;			/* xfs mount arguments */
 	dev_t		device;			/* device: block or logical */
@@ -620,8 +637,9 @@ xfs_vfsmount(vfs_t		*vfsp,
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
 			     &args, credp);
-	if (error)
+	if (error) {
 		return error;
+	}
 	/*
 	 *  Don't set the VFS_DMI flag until here because we don't want
 	 *  to send events while replaying the log.
@@ -630,7 +648,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 		vfsp->vfs_flag |= VFS_DMI;
 		/* Always send mount event (when mounted with dmi option) */
 		error = dm_namesp_event(DM_MOUNT, mvp, mvp,
-				uap->dir, uap->spec, 0, 0);
+					uap->dir, uap->spec, 0, 0);
 		if (error) {
 			int	errcode;
 
@@ -654,7 +672,8 @@ xfs_vfsmount(vfs_t		*vfsp,
  * Return 0 if device has a XFS file system.
  */
 STATIC int
-xfs_isdev(dev_t dev)
+xfs_isdev(
+	dev_t dev)
 {
 	xfs_sb_t *sbp;
 	buf_t	 *bp;
@@ -689,15 +708,11 @@ xfs_isdev(dev_t dev)
  *	ROOT_INIT	initial call.
  *	ROOT_REMOUNT	remount the root file system.
  *	ROOT_UNMOUNT	unmounting the root (e.g., as part a system shutdown).
- *
- * NOTE:
- *	Currently XFS doesn't support mounting a logical volume as root.
- * Mounting a logical volume as root requires xlv_assemble to run before
- * the mount.
  */
 STATIC int
-xfs_mountroot(vfs_t		*vfsp,
-	      enum whymountroot	why)
+xfs_mountroot(
+	vfs_t			*vfsp,
+	enum whymountroot	why)
 {
 	int		error = ENOSYS;
 	static int	xfsrootdone;
@@ -721,17 +736,17 @@ xfs_mountroot(vfs_t		*vfsp,
 	}
 	
 	switch (why) {
-	  case ROOT_INIT:
+	case ROOT_INIT:
 		if (xfsrootdone++)
 			return XFS_ERROR(EBUSY);
 		if (rootdev == NODEV)
 			return XFS_ERROR(ENODEV);
 		vfsp->vfs_dev = rootdev;
 		break;
-	  case ROOT_REMOUNT:
+	case ROOT_REMOUNT:
 		vfs_setflag(vfsp, VFS_REMOUNT);
 		break;
-	  case ROOT_UNMOUNT:
+	case ROOT_UNMOUNT:
 		mp = XFS_VFSTOM(vfsp);
 		if (xfs_ibusy(mp)) {
 			/*
@@ -801,8 +816,9 @@ xfs_mountroot(vfs_t		*vfsp,
 		return error;
 	}
 	error = vfs_lock(vfsp);
-	if (error)
+	if (error) {
 		goto bad;
+	}
 
 	if (emajor(rootdev) == XLV_MAJOR) {
 		/*
@@ -872,7 +888,8 @@ bad:
  * Return 0 if there are no active inodes otherwise return 1.
  */
 STATIC int
-xfs_ibusy(xfs_mount_t *mp)
+xfs_ibusy(
+	xfs_mount_t	*mp)
 {
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
@@ -924,9 +941,10 @@ xfs_ibusy(xfs_mount_t *mp)
  */
 /*ARGSUSED*/
 STATIC int
-xfs_unmount(vfs_t	*vfsp,
-	    int		flags,
-	    cred_t	*credp)
+xfs_unmount(
+	vfs_t	*vfsp,
+	int	flags,
+	cred_t	*credp)
 {
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip, *rbmip, *rsumip;
@@ -946,7 +964,7 @@ xfs_unmount(vfs_t	*vfsp,
 	if (vfsp->vfs_flag & VFS_DMI) {
 		if (mp->m_dmevmask & DM_ETOM(DM_PREUNMOUNT)) {
 			error = dm_namesp_event(DM_PREUNMOUNT,
-				rvp, rvp, 0, 0, 0, 0);
+						rvp, rvp, 0, 0, 0, 0);
 			if (error)
 				return XFS_ERROR(error);
 		}
@@ -1008,7 +1026,7 @@ xfs_unmount(vfs_t	*vfsp,
 out:
 	if (sendunmountevent) {
 		(void) dm_namesp_event(DM_UNMOUNT, (vnode_t *) vfsp,
-			0, 0, 0, 0, error);
+				       0, 0, 0, 0, error);
 	}
 	return XFS_ERROR(error);
 }
@@ -1024,10 +1042,11 @@ out:
  *         set to the desired fs root vnode
  */
 STATIC int
-xfs_root(vfs_t		*vfsp,
-	 vnode_t	**vpp)
+xfs_root(
+	vfs_t	*vfsp,
+	vnode_t	**vpp)
 {
-	struct vnode	*vp;
+	vnode_t	*vp;
 
 	vp = XFS_ITOV((XFS_VFSTOM(vfsp))->m_rootip);	
 	VN_HOLD(vp);
@@ -1041,7 +1060,11 @@ xfs_root(vfs_t		*vfsp,
  * Used by statfs.
  */
 static int
-devvptoxfs(vnode_t *devvp, buf_t **bpp, xfs_sb_t **fsp, cred_t *cr)
+devvptoxfs(
+	vnode_t		*devvp,
+	buf_t		**bpp,
+	xfs_sb_t	**fsp,
+	cred_t		*cr)
 {
 	buf_t		*bp;
 	dev_t		dev;
@@ -1097,7 +1120,9 @@ devvptoxfs(vnode_t *devvp, buf_t **bpp, xfs_sb_t **fsp, cred_t *cr)
  * Get file system statistics - from a device vp - used by statfs only
  */
 int
-xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
+xfs_statdevvp(
+	statvfs_t	*sp,
+	vnode_t		*devvp)
 {
 	buf_t		*bp;
 	int		error;
@@ -1124,8 +1149,9 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
 		sp->f_flag = 0;
 		sp->f_namemax = MAXNAMELEN - 1;
 		bzero(sp->f_fstr, sizeof(sp->f_fstr));
-	} else
+	} else {
 		error = EINVAL;
+	}
 	brelse(bp);
 	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, u.u_cred);
 	return error;
@@ -1140,9 +1166,10 @@ xfs_statdevvp(struct statvfs *sp, vnode_t *devvp)
  */
 /*ARGSUSED*/
 STATIC int
-xfs_statvfs(vfs_t	*vfsp,
-	    statvfs_t	*statp,
-	    vnode_t	*vp)
+xfs_statvfs(
+	vfs_t		*vfsp,
+	statvfs_t	*statp,
+	vnode_t		*vp)
 {
 	__uint64_t	fakeinos;
 	xfs_extlen_t	lsize;
@@ -1219,9 +1246,10 @@ xfs_statvfs(vfs_t	*vfsp,
  */
 /*ARGSUSED*/
 STATIC int
-xfs_sync(vfs_t		*vfsp,
-	 short		flags,
-	 cred_t		*credp)
+xfs_sync(
+	vfs_t		*vfsp,
+	short		flags,
+	cred_t		*credp)
 {
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
@@ -1470,9 +1498,12 @@ xfs_sync(vfs_t		*vfsp,
 				    xfs_iflock_nowait(ip)) {
 					xfs_ifunlock(ip);
 					xfs_iunlock(ip, XFS_ILOCK_SHARED);
-					bp = xfs_inotobp(mp, NULL, ip->i_ino,
-							 &dip);
-					brelse(bp);
+					error = xfs_inotobp(mp, NULL,
+							    ip->i_ino,
+							    &dip, &bp);
+					if (!error) {
+						brelse(bp);
+					}
 
 					/*
 					 * Since we dropped the inode lock,
@@ -1518,7 +1549,8 @@ xfs_sync(vfs_t		*vfsp,
 						ireclaims = mp->m_ireclaims;
 						XFS_MOUNT_IUNLOCK(mp);
 						mount_locked = B_FALSE;
-						xfs_iflush(ip, XFS_IFLUSH_DELWRI);
+						error = xfs_iflush(ip,
+							   XFS_IFLUSH_DELWRI);
 					}
 				}
 
@@ -1536,7 +1568,8 @@ xfs_sync(vfs_t		*vfsp,
 
 				if (flags & SYNC_WAIT) {
 					xfs_iflock(ip);
-					xfs_iflush(ip, XFS_IFLUSH_SYNC);
+					error = xfs_iflush(ip,
+							   XFS_IFLUSH_SYNC);
 				} else {
 					/*
 					 * If we can't acquire the flush
@@ -1548,7 +1581,7 @@ xfs_sync(vfs_t		*vfsp,
 					 * in each disk write.
 					 */
 					if (xfs_iflock_nowait(ip)) {
-						xfs_iflush(ip,
+						error = xfs_iflush(ip,
 							   XFS_IFLUSH_DELWRI);
 					}
 				}
@@ -1687,17 +1720,23 @@ xfs_sync(vfs_t		*vfsp,
  * xfs_vget
  */
 STATIC int
-xfs_vget(vfs_t		*vfsp,
-	 vnode_t	**vpp,
-	 fid_t		*fidp)
+xfs_vget(
+	vfs_t		*vfsp,
+	vnode_t		**vpp,
+	fid_t		*fidp)
 {
         xfs_fid_t	*xfid;
         xfs_inode_t	*ip;
+	int		error;
 
         xfid = (struct xfs_fid *)fidp;
-	ip = xfs_iget(XFS_VFSTOM(vfsp), NULL, (xfs_ino_t)(xfid->fid_ino),
-		      XFS_ILOCK_EXCL);
-        if (NULL == ip) {
+	error = xfs_iget(XFS_VFSTOM(vfsp), NULL, (xfs_ino_t)(xfid->fid_ino),
+			 XFS_ILOCK_EXCL, &ip);
+	if (error) {
+		*vpp = NULL;
+		return error;
+	}
+        if (ip == NULL) {
                 *vpp = NULL;
                 return XFS_ERROR(EIO);
         }
@@ -1728,3 +1767,20 @@ struct vfsops xfs_vfsops = {
 #else	/* SIM */
 struct vfsops xfs_vfsops;
 #endif	/* !SIM */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

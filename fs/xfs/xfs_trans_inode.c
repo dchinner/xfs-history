@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.18 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -67,13 +67,15 @@
  * If the given transaction pointer is NULL, just call xfs_iget().
  * This simplifies code which must handle both cases.
  */
-xfs_inode_t *
+int
 xfs_trans_iget(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
-	uint		lock_flags)
+	uint		lock_flags,
+	xfs_inode_t	**ipp)
 {
+	int			error;
 	xfs_inode_t		*ip;
 
 	/*
@@ -81,7 +83,7 @@ xfs_trans_iget(
 	 * xfs_iget().
 	 */
 	if (tp == NULL) {
-		return (xfs_iget(mp, NULL, ino, lock_flags));
+		return (xfs_iget(mp, NULL, ino, lock_flags, ipp));
 	}
 
 	/*
@@ -116,11 +118,15 @@ xfs_trans_iget(
 		if (lock_flags & XFS_ILOCK_EXCL) {
 			ip->i_item.ili_ilock_recur++;
 		}
-		return (ip);
+		*ipp = ip;
+		return 0;
 	}
 
 	ASSERT(lock_flags & XFS_ILOCK_EXCL);
-	ip = xfs_iget(tp->t_mountp, tp, ino, lock_flags);
+	error = xfs_iget(tp->t_mountp, tp, ino, lock_flags, &ip);
+	if (error) {
+		return error;
+	}
 	ASSERT(ip != NULL);
 
 	/*
@@ -146,7 +152,8 @@ xfs_trans_iget(
 	 */
 	ip->i_transp = tp;
 
-	return (ip);
+	*ipp = ip;
+	return 0;
 }
 
 
@@ -296,6 +303,7 @@ xfs_trans_ijoin(
  * IOP_UNLOCK() routine is called.  The inode must already be locked
  * and associated with the given transaction.
  */
+/* ARGSUSED */
 void
 xfs_trans_ihold(
 	xfs_trans_t	*tp,

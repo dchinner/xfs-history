@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.78 $"
+#ident "$Revision: 1.79 $"
 
 struct buf;
 struct cred;
@@ -265,8 +265,8 @@ void		xfs_ihash_init(struct xfs_mount *);
 void		xfs_ihash_free(struct xfs_mount *);
 xfs_inode_t	*xfs_inode_incore(struct xfs_mount *, xfs_ino_t,
 				  struct xfs_trans *);
-xfs_inode_t	*xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			  uint);
+int		xfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
+			 uint, xfs_inode_t **);
 void		xfs_iput(xfs_inode_t *, uint);
 void		xfs_ilock(xfs_inode_t *, uint);
 int		xfs_ilock_nowait(xfs_inode_t *, uint);
@@ -281,20 +281,22 @@ void		xfs_ireclaim(xfs_inode_t *);
 /*
  * xfs_inode.c prototypes.
  */
-struct buf	*xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			     xfs_dinode_t **);
-xfs_inode_t	*xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t);
-void		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *);
-xfs_inode_t	*xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, ushort,
-			    dev_t, struct cred *, struct buf **, boolean_t *);
+int		xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
+			    xfs_dinode_t **, struct buf **);
+int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
+			  xfs_inode_t **);
+int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *);
+int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, ushort,
+		           dev_t, struct cred *, struct buf **, boolean_t *,
+			   xfs_inode_t **);
 #ifndef SIM
-void		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
+int		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
 void		xfs_itruncate_start(xfs_inode_t *, uint, xfs_fsize_t);
-void		xfs_itruncate_finish(struct xfs_trans **, xfs_inode_t *,
+int		xfs_itruncate_finish(struct xfs_trans **, xfs_inode_t *,
 				     xfs_fsize_t);
-void		xfs_iunlink(struct xfs_trans *, xfs_inode_t *);
+int		xfs_iunlink(struct xfs_trans *, xfs_inode_t *);
 #endif	/* !SIM */
-void		xfs_igrow_start(xfs_inode_t *, xfs_fsize_t, struct cred *);
+int		xfs_igrow_start(xfs_inode_t *, xfs_fsize_t, struct cred *);
 void		xfs_igrow_finish(struct xfs_trans *, xfs_inode_t *,
 				 xfs_fsize_t);
 
@@ -305,7 +307,7 @@ void		xfs_iroot_realloc(xfs_inode_t *, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
 int		xfs_iextents_copy(xfs_inode_t *, xfs_bmbt_rec_32_t *);
-void		xfs_iflush(xfs_inode_t *, uint);
+int		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(struct xfs_mount *, int);
 #ifdef SIM
 void		xfs_iprint(xfs_inode_t *);

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_BTREE_H
 #define	_FS_XFS_IALLOC_BTREE_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 
 /*
  * Inode map on-disk structures
@@ -97,10 +97,11 @@ typedef	struct xfs_btree_sblock xfs_inobt_block_t;
  * Decrement cursor by one record at the level.
  * For nonzero levels the leaf-ward information is untouched.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_decrement(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
-	int			level);	/* level in btree, 0 is leaf */
+	int			level,	/* level in btree, 0 is leaf */
+	int			*stat); /* success/failure */
 
 #ifdef _NOTYET_
 /*
@@ -108,9 +109,10 @@ xfs_inobt_decrement(
  * The cursor refers to the place where the record was (could be inserted)
  * when the operation returns.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_delete(
-	struct xfs_btree_cur	*cur);	/* btree cursor */
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	int			*stat);	/* success/failure */
 #endif	/* _NOTYET_ */
 
 /*
@@ -127,18 +129,20 @@ xfs_inobt_get_rec(
  * Increment cursor by one record at the level.
  * For nonzero levels the leaf-ward information is untouched.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_increment(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
-	int			level);	/* level in btree, 0 is leaf */
+	int			level,	/* level in btree, 0 is leaf */
+	int			*stat);	/* success/failure */
 
 /*
  * Insert the current record at the point referenced by cur.
  * The cursor may be inconsistent on return if splits have been done.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_insert(
-	struct xfs_btree_cur	*cur);	/* btree cursor */
+	struct xfs_btree_cur	*cur,	/* btree cursor */
+	int			*stat);	/* success/failure */
 
 #ifdef XFSDEBUG
 /*
@@ -154,34 +158,37 @@ xfs_inobt_kcheck(
 /*
  * Lookup the record equal to ino in the btree given by cur.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_lookup_eq(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	xfs_agino_t		ino,	/* starting inode of chunk */
 	__int32_t		fcnt,	/* free inode count */
-	xfs_inofree_t		free);	/* free inode mask */
+	xfs_inofree_t		free,	/* free inode mask */
+	int			*stat);	/* success/failure */
 
 /*
  * Lookup the first record greater than or equal to ino
  * in the btree given by cur.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_lookup_ge(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	xfs_agino_t		ino,	/* starting inode of chunk */
 	__int32_t		fcnt,	/* free inode count */
-	xfs_inofree_t		free);	/* free inode mask */
+	xfs_inofree_t		free,	/* free inode mask */
+	int			*stat);	/* success/failure */
 
 /*
  * Lookup the first record less than or equal to ino
  * in the btree given by cur.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_lookup_le(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	xfs_agino_t		ino,	/* starting inode of chunk */
 	__int32_t		fcnt,	/* free inode count */
-	xfs_inofree_t		free);	/* free inode mask */
+	xfs_inofree_t		free,	/* free inode mask */
+	int			*stat);	/* success/failure */
  
 #ifdef XFSDEBUG
 /*

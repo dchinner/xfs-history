@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.39 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -1082,6 +1082,7 @@ xfs_buf_iodone_callbacks(buf_t *bp)
  * It is called by xfs_buf_iodone_callbacks() above which will take
  * care of cleaning up the buffer itself.
  */ 
+/* ARGSUSED */
 void
 xfs_buf_iodone(buf_t			*bp,
 	       xfs_buf_log_item_t	*bip)

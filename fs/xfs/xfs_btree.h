@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.33 $"
 
 struct buf;
 struct xfs_bmap_free;
@@ -341,24 +341,26 @@ xfs_btree_offsets(
  * Get a buffer for the block, return it read in.
  * Long-form addressing.
  */
-struct buf *				/* buffer for fsbno */
+int					/* error */
 xfs_btree_read_bufl(
 	struct xfs_mount	*mp,	/* file system mount point */
 	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_fsblock_t		fsbno,	/* file system block number */
-	uint			lock);	/* lock flags for read_buf */
+	uint			lock,	/* lock flags for read_buf */
+	struct buf		**bpp);	/* buffer for fsbno */
 
 /*
  * Get a buffer for the block, return it read in.
  * Short-form addressing.
  */
-struct buf *				/* buffer for agno/agbno */
+int					/* error */
 xfs_btree_read_bufs(
 	struct xfs_mount	*mp,	/* file system mount point */
 	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_agnumber_t		agno,	/* allocation group number */
 	xfs_agblock_t		agbno,	/* allocation group block number */
-	uint			lock);	/* lock flags for read_buf */
+	uint			lock,	/* lock flags for read_buf */
+	struct buf		**bpp); /* buffer for agno/agbno */
 
 /*
  * Set the buffer for level "lev" in the cursor to bp, releasing

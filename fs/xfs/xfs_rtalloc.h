@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -64,7 +64,7 @@ struct xfs_trans;
  */
 
 #ifndef SIM
-xfs_rtblock_t
+int
 xfs_rtallocate_extent(
 	struct xfs_trans	*tp,
 	xfs_rtblock_t		bno,
@@ -73,10 +73,11 @@ xfs_rtallocate_extent(
 	xfs_extlen_t		*len,
 	xfs_alloctype_t		type,
 	int			wasdel,
-	xfs_extlen_t		prod);
+	xfs_extlen_t		prod,
+	xfs_rtblock_t		*rtblock);		      
 #endif	/* !SIM */
 
-void
+int
 xfs_rtfree_extent(
 	struct xfs_trans	*tp,
 	xfs_rtblock_t		bno,

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.21 $"
 
 /*
  * xfs_dir.h
@@ -205,14 +205,15 @@ struct xfs_trans;
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
-struct buf *xfs_dir_leaf_create(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_fileoff_t which_block);
+int	xfs_dir_leaf_create(struct xfs_trans *trans, struct xfs_inode *dp,
+				xfs_fileoff_t which_block, struct buf **bpp);
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
-struct buf *xfs_dir_node_create(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_fileoff_t which_block, int leaf_block_next);
+int	xfs_dir_node_create(struct xfs_trans *trans, struct xfs_inode *dp,
+				xfs_fileoff_t which_block, int leaf_block_next,
+				struct buf **bpp);
 
 /*
  * Utility routines.
@@ -224,10 +225,11 @@ int	xfs_dir_shrink_inode(struct xfs_trans *trans, struct xfs_dir_name *args,
 				xfs_fileoff_t dead_logblock,
 				struct buf *dead_buf);
 #endif	/* !SIM */
-struct buf *xfs_dir_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_fileoff_t bno);
-struct buf *xfs_dir_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-				xfs_fileoff_t bno);
+
+int	xfs_dir_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
+				xfs_fileoff_t bno, struct buf **bpp);
+int	xfs_dir_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
+				xfs_fileoff_t bno, struct buf **bpp);
 #ifndef SIM
 int	xfs_dir_put_dirent(struct xfs_mount *mp, struct dirent *dbp,
 				xfs_ino_t ino, char *name, int namelen,

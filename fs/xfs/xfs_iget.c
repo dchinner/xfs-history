@@ -1,4 +1,4 @@
-#ident "$Revision: 1.47 $"
+#ident "$Revision: 1.48 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -130,17 +130,19 @@ xfs_ihash_free(xfs_mount_t *mp)
  * lock_flags -- flags indicating how to lock the inode.  See the comment
  *	 for xfs_ilock() for a list of valid values.
  */
-xfs_inode_t *
+int
 xfs_iget(xfs_mount_t	*mp,
 	 xfs_trans_t	*tp,
 	 xfs_ino_t	ino,
-	 uint		lock_flags)
+	 uint		lock_flags,
+	xfs_inode_t	**ipp)
 {
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*ip;
 	xfs_inode_t	*iq;
 	vnode_t		*vp;
 	ulong		version;
+	int		error;
 	vmap_t		vmap;
 	char		name[8];
 
@@ -192,8 +194,9 @@ again:
 			if (lock_flags != 0) {
 				xfs_ilock(ip, lock_flags);
 			}
-
-			return ip;
+			
+			*ipp = ip;
+			return 0;
 		}
 	}
 
@@ -211,9 +214,10 @@ again:
 	 * it soon if it's a dup.  This should also initialize i_dev, i_ino,
 	 * i_bno, and i_index;
 	 */
-	ip = xfs_iread(mp, tp, ino);
-	if (ip == NULL)
-		return NULL;
+	error = xfs_iread(mp, tp, ino, &ip);
+	if (error) {
+		return error;
+	}
 	vp = vn_alloc(&xfs_vnodeops, mp->m_vfsp, IFTOVT(ip->i_d.di_mode),
 		      ip->i_u2.iu_rdev, ip);
 
@@ -227,8 +231,9 @@ again:
 	sv_init(&ip->i_pinsema, SV_DEFAULT,
 		makesname(name, "pino", vp->v_number));
 	xfs_inode_item_init(ip, mp);
-	if (lock_flags != 0)
+	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
+	}
 
 	/*
 	 * Put ip on its hash chain, unless someone else hashed a duplicate
@@ -280,7 +285,8 @@ again:
 	mp->m_inodes = ip;
 	XFS_MOUNT_IUNLOCK(mp);
 
-	return ip;
+	*ipp = ip;
+	return 0;
 }
 
 /*

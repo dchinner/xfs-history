@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision: 1.26 $"
 
 struct buf;
 struct xfs_mount;
@@ -58,14 +58,15 @@ struct xfs_trans;
  *
  * *agbp should be set to NULL on the first call, *alloc_done set to FALSE.
  */
-xfs_ino_t				/* inode number allocated */
+int					/* error */
 xfs_dialloc(
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	mode_t		mode,		/* mode bits for new inode */
-	struct buf	**agbp,		/* buf for a.g. inode header */
-	boolean_t	*alloc_done);	/* an allocation was done to replenish
+	struct buf		**agbp,		/* buf for a.g. inode header */
+	boolean_t	*alloc_done,	/* an allocation was done to replenish
 					   the free inodes */
+	xfs_ino_t	*inop);		/* inode number allocated */
 #ifndef SIM
 /*
  * Free disk inode.  Carefully avoids touching the incore inode, all
@@ -73,7 +74,7 @@ xfs_dialloc(
  * The on-disk inode is not changed by this operation, only the
  * btree (free inode mask) is changed.
  */
-void
+int					/* error */
 xfs_difree(
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	inode);		/* inode to be freed */
@@ -112,10 +113,11 @@ xfs_ialloc_log_agi(
 /*
  * Read in the allocation group header (inode allocation section)
  */
-struct buf *				/* allocation group hdr buf */
+int					/* error */
 xfs_ialloc_read_agi(
 	struct xfs_mount *mp,		/* file system mount structure */
 	struct xfs_trans *tp,		/* transaction pointer */
-	xfs_agnumber_t	agno);		/* allocation group number */
+	xfs_agnumber_t	agno,		/* allocation group number */
+	struct buf	**bpp);		/* allocation group hdr buf */
 
 #endif	/* !_FS_XFS_IALLOC_H */

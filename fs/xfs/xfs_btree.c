@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.41 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -379,8 +379,9 @@ xfs_btree_dup_cursor(
 	for (i = 0; i < ncur->bc_nlevels; i++) {
 		ncur->bc_ptrs[i] = cur->bc_ptrs[i];
 		if (bp = cur->bc_bufs[i]) {
-			bp = ncur->bc_bufs[i] = xfs_trans_read_buf(tp,
-				mp->m_dev, bp->b_blkno, mp->m_bsize, 0);
+			(void) xfs_trans_read_buf(tp, mp->m_dev, bp->b_blkno,
+						  mp->m_bsize, 0, &bp);
+			ncur->bc_bufs[i] = bp;
 			ASSERT(bp);
 			ASSERT(!geterror(bp));
 		} else
@@ -662,50 +663,62 @@ xfs_btree_offsets(
  * Get a buffer for the block, return it read in.
  * Long-form addressing.
  */
-buf_t *					/* buffer for fsbno */
+int					/* error */
 xfs_btree_read_bufl(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_fsblock_t	fsbno,		/* file system block number */
-	uint		lock)		/* lock flags for read_buf */
+	uint		lock,		/* lock flags for read_buf */
+	buf_t		**bpp)		/* buffer for fsbno */
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
+	int		error;
 
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
-	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
+	error = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
+	if (error) {
+		return error;
+	}
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL) {
 		bp->b_ref = XFS_GEN_LBTREE_REF;
 	}
-	return bp;
+	*bpp = bp;
+	return 0;
 }
 
 /*
  * Get a buffer for the block, return it read in.
  * Short-form addressing.
  */
-buf_t *					/* buffer for agno/agbno */
+int					/* error */
 xfs_btree_read_bufs(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	xfs_agblock_t	agbno,		/* allocation group block number */
-	uint		lock)		/* lock flags for read_buf */
+	uint		lock,		/* lock flags for read_buf */
+	buf_t		**bpp)		/* buffer for agno/agbno */
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
+	int		error;
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
+	error = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock, &bp);
+	if (error) {
+		return error;
+	}
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL) {
 		bp->b_ref = XFS_GEN_SBTREE_REF;
 	}
-	return bp;
+	*bpp = bp;
+	return 0;
 }
 
 /*

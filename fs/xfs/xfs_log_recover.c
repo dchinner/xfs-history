@@ -1,4 +1,5 @@
-#ident	"$Revision: 1.55 $"
+
+#ident	"$Revision: 1.56 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -286,11 +287,11 @@ xlog_find_head(xlog_t  *log,
 	       daddr_t *return_head_blk)
 {
     buf_t   *bp, *big_bp;
-    daddr_t new_blk, first_blk, start_blk, mid_blk, last_blk, head_blk;
+    daddr_t new_blk, first_blk, start_blk, last_blk, head_blk;
     daddr_t num_scan_bblks;
-    uint    first_half_cycle, mid_cycle, last_half_cycle, cycle;
+    uint    first_half_cycle, last_half_cycle;
     caddr_t ba;
-    int     equals, error, i, log_bbnum = log->l_logBBsize;
+    int     equals, error, log_bbnum = log->l_logBBsize;
 
     /* special case freshly mkfs'ed filesystem; return immediately */
     if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
@@ -2301,6 +2302,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_agino_t	agino;
 	xfs_ino_t	ino;
 	int		bucket;
+	int		error;
 
 	mp = log->l_mp;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
@@ -2332,19 +2334,32 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			brelse(agibp);
 
 			ino = XFS_AGINO_TO_INO(mp, agno, agino);
-			ip = xfs_iget(mp, NULL, ino, 0);
-			ASSERT(ip != NULL);
-			ASSERT(ip->i_d.di_nlink == 0);
-			ASSERT(ip->i_d.di_mode != 0);
-			ASSERT(ip->i_vnode->v_count == 1);
+			error = xfs_iget(mp, NULL, ino, 0, &ip);
+			if (!error) {
+				ASSERT(ip != NULL);
+				ASSERT(ip->i_d.di_nlink == 0);
+				ASSERT(ip->i_d.di_mode != 0);
+				ASSERT(ip->i_vnode->v_count == 1);
 
-			/*
-			 * Drop our reference to the inode.  This
-			 * will send the inode to xfs_inactive()
-			 * which will truncate the file and free
-			 * the inode.
-			 */
-			VN_RELE(ip->i_vnode);
+				/*
+				 * Drop our reference to the inode.  This
+				 * will send the inode to xfs_inactive()
+				 * which will truncate the file and free
+				 * the inode.
+				 */
+				VN_RELE(ip->i_vnode);
+			} else {
+				/*
+				 * Skip this bucket if we can't read in
+				 * the inode it points to.
+				 *
+				 * XXXajs
+				 * We need to actuall fix up the bucket
+				 * to point at NULLAGINO.  That will
+				 * require a transaction.
+				 */
+				bucket++;
+			}
 
 			/*
 			 * Reacquire the agibuffer and continue around
@@ -2398,6 +2413,7 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 }	/* xlog_pack_data */
 
 
+/*ARGSUSED*/
 STATIC void
 xlog_unpack_data(xlog_rec_header_t *rhead,
 		 caddr_t	   dp,
@@ -2576,7 +2592,9 @@ xlog_do_log_recovery(xlog_t	*log,
 		     daddr_t	tail_blk)
 {
 	int		error;
+#ifdef DEBUG
 	int		i;
+#endif
 
 	/*
 	 * First do a pass to find all of the cancelled buf log items.

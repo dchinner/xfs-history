@@ -1,4 +1,5 @@
-#ident	"$Revision: 1.91 $"
+
+#ident	"$Revision: 1.92 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -112,7 +113,7 @@ xfs_mount_free(xfs_mount_t *mp)
 
 
 /*
- * xfs_mountfs		XXXjleong Needs more error checking
+ * xfs_mountfs
  *
  * This function does the following on an initial mount of a file system:
  *	- reads the superblock from disk and init the mount struct
@@ -131,8 +132,10 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
+	vnode_t		*rbmvp;
 	int		readio_log;
 	int		writeio_log;
+	vmap_t		vmap;
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount xFS filesystems */
 		return 0;
@@ -160,7 +163,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	bdstrat(bmajor(dev), bp);
 	if (error = iowait(bp)) {
 		ASSERT(error == 0);
-		goto bad;
+		goto error0;
 	}
 
 	/*
@@ -175,7 +178,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	    (sbp->sb_versionnum != XFS_SB_VERSION)	||
 	    (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev)) {
 		error = XFS_ERROR(EINVAL);
-		goto bad;
+		goto error0;
 	}
 #ifndef SIM
 	/*
@@ -183,7 +186,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 */
 	if (sbp->sb_inprogress) {
 		error = XFS_ERROR(EINVAL);
-		goto bad;
+		goto error0;
 	}
 #endif
 	mp->m_sb_bp = bp;
@@ -261,24 +264,29 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * Check that the data (and log if separate) are an ok size.
 	 */
 	bp = read_buf(mp->m_dev, XFS_FSB_TO_BB(mp, mp->m_sb.sb_dblocks) - 1,
-		1, 0);
+		      1, 0);
 	ASSERT(bp);
 	error = geterror(bp);
 	brelse(bp);
-	if (error == ENOSPC)
-		return XFS_ERROR(E2BIG);
-	else if (error)
-		return XFS_ERROR(error);
+	if (error) {
+		if (error == ENOSPC) {
+			error = XFS_ERROR(E2BIG);
+		}
+		goto error0;
+	}
+
 	if (mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		bp = read_buf(mp->m_logdev,
 			XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks) - 1, 1, 0);
 		ASSERT(bp);
 		error = geterror(bp);
 		brelse(bp);
-		if (error == ENOSPC)
-			return XFS_ERROR(E2BIG);
-		else if (error)
-			return XFS_ERROR(error);
+		if (error) {
+			if (error == ENOSPC) {
+				error = XFS_ERROR(E2BIG);
+			}
+			goto error0;
+		}
 	}
 	/*
 	 * Initialize realtime fields in the mount structure
@@ -296,16 +304,19 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		ASSERT(bp);
 		error = geterror(bp);
 		brelse(bp);
-		if (error == ENOSPC)
-			return XFS_ERROR(E2BIG);
-		else if (error)
-			return XFS_ERROR(error);
+		if (error) {
+			if (error == ENOSPC) {
+				error = XFS_ERROR(E2BIG);
+			}
+			goto error0;
+		}
 	}
 	/*
 	 *  Copies the low order bits of the timestamp and the randomly
 	 *  set "sequence" number out of a UUID.
 	 */
-	uuid_getnodeuniq (&sbp->sb_uuid, mp->m_fixedfsid);
+	uuid_getnodeuniq(&sbp->sb_uuid, mp->m_fixedfsid);
+				
 	/*
 	 *  The vfs structure needs to have a file system independent
 	 *  way of checking for the invariant file system ID.  Since it
@@ -315,7 +326,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 *  File systems that don't support user level file handles (i.e.
 	 *  all of them except for XFS) will leave vfs_altfsid as NULL.
 	 */
-	vfsp->vfs_altfsid = (fsid_t *) mp->m_fixedfsid;
+	vfsp->vfs_altfsid = (fsid_t *)mp->m_fixedfsid;
 	mp->m_dmevmask = 0;	/* not persistent; set after each mount */
 
 	/*
@@ -343,11 +354,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		error = xfs_log_mount(mp, mp->m_logdev,
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
-		if (error > 0) {
-			return (XFS_ERROR(error));
+		if (error) {
+			goto error1;
 		}
 	} else {	/* No log has been defined */
-		return (XFS_ERROR(EINVAL));
+		error = XFS_ERROR(EINVAL);
+		goto error1;
 	}
 
 #ifdef SIM
@@ -361,12 +373,14 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		 * Get and sanity-check the root inode.
 		 * Save the pointer to it in the mount structure.
 		 */
-		rip = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL);
+		error = xfs_iget(mp, NULL, sbp->sb_rootino, XFS_ILOCK_EXCL,
+				 &rip);
+		if (error) {
+			goto error1;
+		}
 		ASSERT(rip != NULL);
 		rvp = XFS_ITOV(rip);
 		if ((rip->i_d.di_mode & IFMT) != IFDIR) {
-			vmap_t vmap;
-
 			VMAP(rvp, vmap);
 			prdev("Root inode %d is not a directory",
 			      rip->i_dev, rip->i_ino);
@@ -374,7 +388,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			VN_RELE(rvp);
 			vn_purge(rvp, &vmap);
 			error = XFS_ERROR(EINVAL);
-			return (error);
+			goto error1;
 		}
 		VN_FLAGSET(rvp, VROOT);
 		mp->m_rootip = rip;				/* save it */
@@ -385,10 +399,35 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * Initialize realtime inode pointers in the mount structure
 	 */
 	if (sbp->sb_rbmino != NULLFSINO) {
-		mp->m_rbmip = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL);
+		error = xfs_iget(mp, NULL, sbp->sb_rbmino, NULL,
+				 &(mp->m_rbmip));
+		if (error) {
+			/*
+			 * Free up the root inode.
+			 */
+			VMAP(rvp, vmap);
+			VN_RELE(rvp);
+			vn_purge(rvp, &vmap);
+			goto error1;
+		}
 		ASSERT(mp->m_rbmip != NULL);
 		ASSERT(sbp->sb_rsumino != NULLFSINO);
-		mp->m_rsumip = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL);
+		error = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL,
+				 &(mp->m_rsumip));
+		if (error) {
+			/*
+			 * Free up the root and first rt inodes.
+			 */
+			VMAP(rvp, vmap);
+			VN_RELE(rvp);
+			vn_purge(rvp, &vmap);
+
+			rbmvp = XFS_ITOV(mp->m_rbmip);
+			VMAP(rbmvp, vmap);
+			VN_RELE(rbmvp);
+			vn_purge(rbmvp, &vmap);
+			goto error1;
+		}
 		ASSERT(mp->m_rsumip != NULL);
 	}
 
@@ -398,8 +437,11 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * were consistently read in.
 	 */
 #ifndef SIM
-	xfs_log_mount_finish(mp);
+	error = xfs_log_mount_finish(mp);
 #endif
+	if (error) {
+		goto error1;
+	}
 
 	/*
 	 * Initialize directory manager's entries.
@@ -407,9 +449,13 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_dir_mount(mp);
 
 	return 0;
-bad:
+
+ error1:
+	xfs_ihash_free(mp);
+	/* FALLTHROUGH */
+ error0:
 	brelse(bp);
-	freerbuf(bp);
+	nfreerbuf(bp);
 	return error;
 }	/* xfs_mountfs */
 
@@ -507,10 +553,10 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	/*
 	 * All inodes from this mount point should be freed.
 	 */
-	ASSERT( mp->m_inodes == NULL );
+	ASSERT(mp->m_inodes == NULL);
 
 	xfs_mount_free(mp);
-	return( 0 );
+	return 0;
 }	/* xfs_unmountfs */
 		
 

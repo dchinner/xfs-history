@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -985,6 +985,30 @@ xfs_rw_enter_trace_entry(ktrace_entry_t	*ktep)
 }
 
 /*
+ * Print itrunc entry trace.
+ */
+static void
+xfs_itrunc_trace_entry(ktrace_entry_t	*ktep)
+{
+	qprintf("ip 0x%x size 0x%x%x flag %d new size 0x%x%x\n",
+		ktep->val[1], ktep->val[2], ktep->val[3], ktep->val[4],
+		ktep->val[5], ktep->val[6]);
+	qprintf("toss start 0x%x%x toss finish 0x%x%x cpu id %d\n",
+		ktep->val[7], ktep->val[8], ktep->val[9], ktep->val[10],
+		ktep->val[11]);
+}
+
+/*
+ * Print itrunc entry trace.
+ */
+static void
+xfs_ctrunc_trace_entry(ktrace_entry_t	*ktep)
+{
+	qprintf("ip 0x%x cpu %d\n",
+		ktep->val[1], ktep->val[2]);
+}
+
+/*
  * Print read/write trace entry.
  */
 static int
@@ -1019,6 +1043,43 @@ xfs_rw_trace_entry(ktrace_entry_t *ktep)
 		qprintf("IOMAP WRITE MAP:\n");
 		xfs_iomap_map_trace_entry(ktep);
 		break;
+	case XFS_ITRUNC_START:
+		qprintf("ITRUNC START:\n");
+		xfs_itrunc_trace_entry(ktep);
+		break;
+	case XFS_ITRUNC_FINISH1:
+		qprintf("ITRUNC FINISH1:\n");
+		xfs_itrunc_trace_entry(ktep);
+		break;
+	case XFS_ITRUNC_FINISH2:
+		qprintf("ITRUNC FINISH2:\n");
+		xfs_itrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC1:
+		qprintf("CTRUNC1:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC2:
+		qprintf("CTRUNC2:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC3:
+		qprintf("CTRUNC3:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC4:
+		qprintf("CTRUNC4:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC5:
+		qprintf("CTRUNC5:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+	case XFS_CTRUNC6:
+		qprintf("CTRUNC6:\n");
+		xfs_ctrunc_trace_entry(ktep);
+		break;
+
 	default:
 		return 0;
 	}
@@ -2539,6 +2600,8 @@ idbg_xrangelocks(xfs_inode_t *ip)
 #endif /* NOTYET */
 
 #ifdef DEBUG
+
+int	rwentries = 64;
 /*
  * Print out the read/write trace buffer attached to the given inode.
  */
@@ -2547,14 +2610,39 @@ idbg_xrwtrace(xfs_inode_t *ip)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
+	int		nentries;
+	int		skip_entries;
+	int		count;
 
 	if (ip->i_rwtrace == NULL) {
 		qprintf("The inode trace buffer is not initialized\n");
 		return;
 	}
+	nentries = ktrace_nentries(ip->i_rwtrace);
+	count = rwentries;
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
 
 	ktep = ktrace_first(ip->i_rwtrace, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(ip->i_rwtrace, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
 	while (ktep != NULL) {
+		DELAY(1000);
 		if (xfs_rw_trace_entry(ktep))
 			qprintf("\n");
 		ktep = ktrace_next(ip->i_rwtrace, &kts);

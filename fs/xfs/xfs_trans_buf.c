@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.29 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -258,12 +258,13 @@ xfs_trans_getsb(xfs_trans_t	*tp,
  * If the transaction pointer is NULL, make this just a normal
  * read_buf() call.
  */
-buf_t *
+int
 xfs_trans_read_buf(xfs_trans_t	*tp,
 		   dev_t	dev,
 		   daddr_t	blkno,
 		   int		len,
-		   uint		flags)
+		   uint		flags,
+		   buf_t	**bpp)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
@@ -279,9 +280,11 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	if (tp == NULL) {
 		bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
 		if ((bp != NULL) && (geterror(bp) != 0)) {
-			cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
+			prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
+			return geterror(bp);
 		}
-		return bp;
+		*bpp = bp;
+		return 0;
 	}
 
 	/*
@@ -325,7 +328,8 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 
 		ASSERT(bip->bli_refcount > 0);
 		xfs_buf_item_trace("READ RECUR", bip);
-		return (bp);
+		*bpp = bp;
+		return 0;
 	}
 
 	/*
@@ -338,7 +342,8 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 */
 	bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
 	if (bp == NULL) {
-		return NULL;
+		*bpp = NULL;
+		return 0;
 	}
 	if (geterror(bp) != 0) {
 		cmn_err(CE_PANIC, "XFS dev 0x%x read error in file system meta-data", bp->b_edev);
@@ -380,7 +385,8 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	bp->b_fsprivate2 = tp;
 
 	xfs_buf_item_trace("READ", bip);
-	return (bp);
+	*bpp = bp;
+	return 0;
 }
 
 
@@ -583,6 +589,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
  * IOP_UNLOCK() routine is called.  The buffer must already be locked
  * and associated with the given transaction.
  */
+/* ARGSUSED */
 void
 xfs_trans_bhold(xfs_trans_t	*tp,
 		buf_t		*bp)
@@ -788,6 +795,7 @@ xfs_trans_binval(
  * All we do is set the XFS_BLI_INODE_BUF flag in the buffer's log
  * format structure so that we'll know what to do at recovery time.
  */
+/* ARGSUSED */
 void
 xfs_trans_inode_buf(
 	xfs_trans_t	*tp,
@@ -814,6 +822,7 @@ xfs_trans_inode_buf(
  * xfs_buf_item_committed() to ensure that the buffer remains in the
  * AIL at its original location even after it has been relogged.
  */
+/* ARGSUSED */
 void
 xfs_trans_inode_alloc_buf(
 	xfs_trans_t	*tp,

@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.15 $"
 
 struct bmapval;
 struct buf;
@@ -110,6 +110,15 @@ typedef struct xfs_gap {
 #define	XFS_IOMAP_READ_MAP	5
 #define	XFS_IOMAP_WRITE_MAP	6
 #define	XFS_IOMAP_WRITE_NOSPACE	7
+#define	XFS_ITRUNC_START	8
+#define	XFS_ITRUNC_FINISH1	9
+#define	XFS_ITRUNC_FINISH2	10
+#define	XFS_CTRUNC1		11
+#define	XFS_CTRUNC2		12
+#define	XFS_CTRUNC3		13
+#define	XFS_CTRUNC4		14
+#define	XFS_CTRUNC5		15
+#define	XFS_CTRUNC6		16     
 
 #define	XFS_STRAT_ENTER		1
 #define	XFS_STRAT_FAST		2
@@ -143,7 +152,7 @@ xfs_bmap(struct vnode	*vp,
 	 struct bmapval	*bmapp,
 	 int		*nbmaps);
 
-void
+int
 xfs_zero_eof(struct xfs_inode	*ip,
 	     off_t		offset,
 	     xfs_fsize_t	isize,

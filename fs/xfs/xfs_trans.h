@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.58 $"
+#ident "$Revision: 1.59 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -598,7 +598,8 @@ void		xfs_trans_callback(xfs_trans_t *,
 void		xfs_trans_mod_sb(xfs_trans_t *, uint, long);
 struct buf	*xfs_trans_get_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
 struct buf	*xfs_trans_getsb(xfs_trans_t *, int);
-struct buf	*xfs_trans_read_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
+int		xfs_trans_read_buf(xfs_trans_t *, dev_t, daddr_t,
+				   int, uint, struct buf **);
 void		xfs_trans_brelse(xfs_trans_t *, struct buf *);
 void		xfs_trans_bjoin(xfs_trans_t *, struct buf *);
 void		xfs_trans_bhold(xfs_trans_t *, struct buf *);
@@ -606,8 +607,8 @@ void		xfs_trans_bhold_until_committed(xfs_trans_t *, struct buf *);
 void		xfs_trans_binval(xfs_trans_t *, struct buf *);
 void		xfs_trans_inode_buf(xfs_trans_t *, struct buf *);
 void		xfs_trans_inode_alloc_buf(xfs_trans_t *, struct buf *);
-struct xfs_inode	*xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
-					xfs_ino_t , uint);
+int		xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
+			       xfs_ino_t , uint, struct xfs_inode **);
 void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);
 void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *, uint);
 void		xfs_trans_ihold(xfs_trans_t *, struct xfs_inode *);
@@ -628,7 +629,7 @@ void		xfs_trans_log_efd_extent(xfs_trans_t *,
 void		xfs_trans_log_iui(xfs_trans_t *, struct xfs_inode *);
 void		xfs_trans_log_iui_done(xfs_trans_t *, struct xfs_inode *);
 xfs_trans_id_t	xfs_trans_id(xfs_trans_t *);
-void		xfs_trans_commit(xfs_trans_t *, uint flags);
+int		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *, int);
 void		xfs_trans_ail_init(struct xfs_mount *);
