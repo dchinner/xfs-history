@@ -1,7 +1,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -50,7 +50,7 @@ typedef struct xfs_dq_logitem {
 	xfs_lsn_t		 qli_flush_lsn;	   /* lsn at last flush */
 	unsigned short		 qli_flags;	   /* XXX misc flags NEEDED ???*/
 	struct buf		*qli_bp;	   /* locked dquot buffer */
-	struct proc		*qli_bp_owner;	   /* bp owner proc */
+	pid_t			qli_bp_owner;	   /* bp owner pid */
 	xfs_dq_logformat_t	 qli_format;	   /* logged structure */
 } xfs_dq_logitem_t;
 

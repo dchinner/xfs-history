@@ -4,7 +4,8 @@
 #include <sys/uuid.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
+#include <sys/pda.h>
+#include <ksys/vproc.h>
 #include <sys/errno.h>
 #include <sys/vfs.h>
 #include <sys/systm.h>
@@ -141,7 +142,7 @@ xfs_qm_dquot_logitem_push(
          */
         bp = logitem->qli_bp;
         dqp = logitem->qli_dquot;
-        if ((bp != NULL) && (logitem->qli_bp_owner == curprocp)) {
+        if ((bp != NULL) && (logitem->qli_bp_owner == current_pid())) {
                 ASSERT(logitem->qli_bp->b_flags & B_BUSY);
                 logitem->qli_bp = NULL;
                 logitem->qli_bp_owner = NULL;
@@ -308,7 +309,7 @@ xfs_qm_dquot_logitem_trylock(
                         if (bp != NULL) {
                                 if (bp->b_flags & B_DELWRI) {
                                         qip->qli_bp = bp;
-                                        qip->qli_bp_owner = curprocp;
+                                        qip->qli_bp_owner = current_pid();
                                         flushed = 1;
                                 } else {
                                         brelse(bp);
