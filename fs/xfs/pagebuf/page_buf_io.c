@@ -52,6 +52,7 @@
 #include <linux/locks.h>
 #include <linux/swap.h>
 
+#include "avl.h"
 #include "page_buf.h"
 
 #define PAGE_CACHE_MASK_LL	(~((long long)(PAGE_CACHE_SIZE-1)))

@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: page_buf_locking.c,v 1.1 2002/01/11 23:31:51 lord Exp $"
 
 /*
  *	page_buf_locking.c
@@ -56,6 +55,7 @@
 #include <linux/pagemap.h>
 #include <linux/init.h>
 
+#include "avl.h"
 #include "page_buf.h"
 #define PB_DEFINE_TRACES
 #include "page_buf_trace.h"

@@ -29,7 +29,6 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: avl.c,v 1.1 2002/01/11 23:31:51 lord Exp $"
 
 /*
  * Generic AVL module:  avl
@@ -50,19 +49,14 @@
 
 #include <linux/config.h>
 #include <linux/version.h>
-
 #include <linux/module.h>
-
 #include <linux/stddef.h>
-#include <linux/avl.h>
 #include <linux/errno.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/init.h>
-
-#define assert(x) do { } while (0)
-#define bzero(loc,size)		memset(loc,0,size)
+#include "avl.h"
 
 typedef struct avl_entry_struct {
 	struct avl_entry_struct *avl_left;
@@ -576,7 +570,7 @@ avl_create(avl_handle_t *handle_p,
 	avl = kmem_cache_alloc(avl_object_cache,SLAB_KERNEL);
 	if (avl == NULL)
 		return(-ENOMEM);
-	bzero(avl,sizeof(avl_object_t));
+	memset(avl,0,sizeof(avl_object_t));
 	avl->avlo_options = options;
 	spin_lock_init(&avl->avlo_lock);
 	avl->avlo_compare = cmpfn;

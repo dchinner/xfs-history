@@ -34,8 +34,8 @@
  * Written by Steve Lord, Jim Mostek, Russell Cattelan at SGI
  */
 
-#ifndef _LINUX_PAGE_BUF_H
-#define _LINUX_PAGE_BUF_H
+#ifndef __PAGE_BUF_H__
+#define __PAGE_BUF_H__
 
 #include <linux/version.h>
 #include <linux/list.h>
@@ -47,7 +47,6 @@
 #include <linux/iobuf.h>
 #include <linux/smp_lock.h>
 #include <linux/uio.h>
-#include <linux/avl.h>
 
 
 /*
@@ -672,4 +671,4 @@ extern size_t pagebuf_max_direct(void);
 # define STATIC	static
 #endif
 
-#endif /* _LINUX_PAGE_BUF_H */
+#endif /* __PAGE_BUF_H__ */
