@@ -111,7 +111,6 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 #define XFS_BUF_UNUNINITIAL(x)   ((x)->pb_flags &= ~PBF_UNINITIAL)
 
 #define XFS_BUF_BP_ISMAPPED(bp)  1
-#define XFS_BUF_IS_GRIO(bp)      ((bp)->pb_flags & PBF_GRIO)
 
 typedef struct page_buf_s xfs_buf_t;
 #define xfs_buf page_buf_s

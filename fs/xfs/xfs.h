@@ -107,7 +107,6 @@
 #include <xfs_trans_space.h>
 #include <xfs_utils.h>
 #include <xfs_dmapi.h>
-#include <xfs_grio.h>
 
 #include <linux/xfs_lrw.h>
 
