@@ -70,9 +70,9 @@ xfs_strat_write_check(
 
 
 /*
- *	pagebuf_iozero
+ *	xfs_iozero
  *
- *	pagebuf_iozero clears the specified range of buffer supplied,
+ *	xfs_iozero clears the specified range of buffer supplied,
  *	and marks all the affected blocks as valid and modified.  If
  *	an affected block is not allocated, it will be allocated.  If
  *	an affected block is not completely overwritten, and is not
@@ -80,7 +80,7 @@ xfs_strat_write_check(
  *	being partially zeroed. 
  */
 STATIC int
-pagebuf_iozero(
+xfs_iozero(
 	struct inode		*ip,	/* inode owning buffer		*/
 	page_buf_t		*pb,	/* buffer to zero               */
 	off_t			boff,	/* offset in buffer             */
@@ -98,11 +98,11 @@ pagebuf_iozero(
 
 	/* check range */
 	if (boff > pb->pb_buffer_length)
-		return (-ENOENT);
+		return (ENOENT);
 
 	while (cboff < boff) {
 		if (pagebuf_segment(pb, &cboff, &page, &cpoff, &csize, 0)) {
-			return (-ENOMEM);
+			return (ENOMEM);
 		}
 		ASSERT(((csize + cpoff) <= PAGE_CACHE_SIZE));
 		lock_page(page);
@@ -299,7 +299,7 @@ xfs_zero_last_block(
 		}
 	}
 
-	error = -pagebuf_iozero(ip, pb, zero_offset, zero_len, end_size);
+	error = xfs_iozero(ip, pb, zero_offset, zero_len, end_size);
 	pagebuf_rele(pb);
 
 out_lock:
@@ -453,7 +453,7 @@ xfs_zero_eof(
 			}
 		}
 
-		error = -pagebuf_iozero(ip, pb, 0, lsize, end_size);
+		error = xfs_iozero(ip, pb, 0, lsize, end_size);
 		pagebuf_rele(pb);
 
 		if (error) {
