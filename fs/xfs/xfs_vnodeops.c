@@ -6346,9 +6346,6 @@ xfs_zero_remaining_bytes(
 		XFS_BUF_UNWRITE(bp);
 		XFS_BUF_READ(bp);
 		XFS_BUF_SET_ADDR(bp, XFS_FSB_TO_DB(ip, imap.br_startblock));
-#ifndef __linux__
-		bp_dcache_wbinval(bp);
-#endif
 		xfsbdstrat(mp, bp); 
 		if (error = xfs_iowait(bp))
 			break;

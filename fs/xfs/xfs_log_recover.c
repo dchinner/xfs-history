@@ -3230,9 +3230,6 @@ xlog_do_recover(xlog_t	*log,
 	bp = xfs_getsb(log->l_mp, 0);
 	XFS_BUF_UNDONE(bp);
 	XFS_BUF_READ(bp);
-#ifndef SIM
-	bp_dcache_wbinval(bp);
-#endif
 	xfsbdstrat(log->l_mp, bp);
 	if (error = xfs_iowait(bp)) {
 		ASSERT(0);
