@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.45 $"
+#ident	"$Revision: 1.47 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1470,6 +1470,67 @@ xfs_bmap_finish(
 	*tp = ntp;
 	kmem_check();
 	return 1;
+}
+
+/*
+ * Returns the file-relative block number of the first unused block in the file.
+ * This is the lowest-address hole if the file has holes, else the first block
+ * past the end of file.
+ * Return 0 if the file is currently local (in-inode).
+ */
+xfs_fsblock_t
+xfs_bmap_first_unused(
+	xfs_trans_t	*tp,			/* transaction pointer */
+	xfs_inode_t	*ip)			/* incore inode */
+{
+	xfs_bmbt_rec_t	*base;			/* base of extent array */
+	xfs_bmbt_rec_t	*ep;			/* pointer to an extent entry */
+	xfs_fsblock_t	lastaddr;		/* last block number seen */
+	xfs_fsblock_t	off;			/* offset for this block */
+	xfs_extnum_t	nextents;		/* number of extent entries */
+
+	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
+	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS ||
+	       ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
+	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL)
+		return 0;
+	if (!(ip->i_flags & XFS_IEXTENTS))
+		xfs_iread_extents(tp, ip);
+	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+	base = &ip->i_u1.iu_extents[0];
+	for (lastaddr = 0, ep = base; ep < &base[nextents]; ep++) {
+		if (lastaddr < (off = xfs_bmbt_get_startoff(ep)))
+			return lastaddr;
+		lastaddr = off + xfs_bmbt_get_blockcount(ep);
+	}
+	return lastaddr;
+}
+
+/*
+ * Returns the file-relative block number of the first block past eof in
+ * the file.  This is not based on i_size, it is based on the extent list.
+ * Returns 0 for local files, as they do not have an extent list.
+ */
+xfs_fsblock_t
+xfs_bmap_last_offset(
+	xfs_trans_t	*tp,			/* transaction pointer */
+	xfs_inode_t	*ip)			/* incore inode */
+{
+	xfs_bmbt_rec_t	*base;			/* base of extent array */
+	xfs_bmbt_rec_t	*ep;			/* pointer to last extent */
+	xfs_extnum_t	nextents;		/* number of extent entries */
+
+	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
+	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS ||
+	       ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
+	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL)
+		return 0;
+	if (!(ip->i_flags & XFS_IEXTENTS))
+		xfs_iread_extents(tp, ip);
+	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+	base = &ip->i_u1.iu_extents[0];
+	ep = &base[nextents - 1];
+	return xfs_bmbt_get_startoff(ep) + xfs_bmbt_get_blockcount(ep);
 }
 
 /*

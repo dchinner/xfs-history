@@ -67,6 +67,26 @@ xfs_bmap_finish(
 	int			commit_flags);	/* flags to pass to commit */
 
 /*
+ * Returns the file-relative block number of the first unused block in the file.
+ * This is the lowest-address hole if the file has holes, else the first block
+ * past the end of file.
+ */
+xfs_fsblock_t
+xfs_bmap_first_unused(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_inode	*ip);		/* incore inode */
+
+/*
+ * Returns the file-relative block number of the first block past eof in
+ * the file.  This is not based on i_size, it is based on the extent list.
+ * Returns 0 for local files, as they do not have an extent list.
+ */
+xfs_fsblock_t
+xfs_bmap_last_offset(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	struct xfs_inode	*ip);		/* incore inode */
+
+/*
  * Read in the extents to iu_extents.
  * All inode fields are set up by caller, we just traverse the btree
  * and copy the records in.
