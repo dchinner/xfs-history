@@ -11,7 +11,7 @@
 #include "xfs_error.h"
 
 #ifdef DEBUG
-int	xfs_etrap[XFS_ERROR_NTRAP] = { EIO };
+int	xfs_etrap[XFS_ERROR_NTRAP] = { EIO, EINVAL };
 
 #ifndef SIM
 extern void panicspin(void);
