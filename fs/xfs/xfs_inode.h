@@ -205,6 +205,7 @@ void		xfs_iext_realloc(xfs_inode_t *, int);
 void		xfs_iroot_realloc(xfs_inode_t *, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
+int		xfs_iextents_copy(xfs_inode_t *, char *);
 void		xfs_iflush(xfs_inode_t *, uint);
 int		xfs_iflush_all(xfs_mount_t *, int);
 #ifdef SIM
