@@ -116,7 +116,9 @@ xfs_itobp(xfs_mount_t	*mp,
  * is first referenced (see xfs_iread_extents()).
  */
 void
-xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
+xfs_iformat(xfs_mount_t		*mp,
+	    xfs_inode_t		*ip,
+	    xfs_dinode_t	*dip)
 {
 	register int		size;
 	register int		nex;
@@ -258,7 +260,9 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
  * already has them (it will not if the inode has no links).
  */
 xfs_inode_t *
-xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
+xfs_iread(xfs_mount_t	*mp,
+	  xfs_trans_t	*tp,
+	  xfs_ino_t	ino)
 {
 	buf_t		*bp;
 	xfs_dinode_t	*dip;
@@ -327,7 +331,9 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
  * Allocate and fill in iu_extents.  Real work is done in xfs_bmap.c.
  */
 void
-xfs_iread_extents(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip)
+xfs_iread_extents(xfs_mount_t	*mp,
+		  xfs_trans_t	*tp,
+		  xfs_inode_t	*ip)
 {
 	size_t size;
 
@@ -440,6 +446,10 @@ xfs_ialloc(xfs_trans_t	*tp,
  * if we adding records one will be allocated.  The caller must also
  * not request that the number of records go below zero, although
  * it can go to zero.
+ *
+ * ip -- the inode whose i_broot area is changing
+ * ext_diff -- the change in the number of records, positive or negative,
+ *	 requested for the i_broot array.
  */
 void
 xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
@@ -548,9 +558,14 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
  * inline buffer, then switch to using the inline buffer.  Othewise,
  * use kmem_realloc() or kmem_alloc() to adjust the size of the buffer
  * to what is needed.
+ *
+ * ip -- the inode whose iu_extents area is changing
+ * ext_diff -- the change in the number of extents, positive or negative,
+ *	 requested for the iu_extents array.
  */
 void
-xfs_iext_realloc(xfs_inode_t *ip, int ext_diff)
+xfs_iext_realloc(xfs_inode_t	*ip,
+		 int		ext_diff)
 {
 	int	byte_diff;
 	int	new_size;
@@ -614,9 +629,14 @@ xfs_iext_realloc(xfs_inode_t *ip, int ext_diff)
  * inline buffer, then switch to using the inline buffer.  Othewise,
  * use kmem_realloc() or kmem_alloc() to adjust the size of the buffer
  * to what is needed.
+ *
+ * ip -- the inode whose iu_data area is changing
+ * byte_diff -- the change in the number of bytes, positive or negative,
+ *	 requested for the iu_data array.
  */
 void
-xfs_idata_realloc(xfs_inode_t *ip, int byte_diff)
+xfs_idata_realloc(xfs_inode_t	*ip,
+		  int		byte_diff)
 {
 	int	new_size;
 
@@ -666,9 +686,18 @@ xfs_idata_realloc(xfs_inode_t *ip, int byte_diff)
 
 /*
  * Map inode to disk block and offset.
+ *
+ * mp -- the mount point structure for the current file system
+ * tp -- the current transaction
+ * ino -- the inode number of the inode to be located
+ * imap -- this structure is filled in with the information necessary
+ *	 to retrieve the given inode from disk
  */
 int
-xfs_imap(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, xfs_imap_t *imap)
+xfs_imap(xfs_mount_t	*mp,
+	 xfs_trans_t	*tp,
+	 xfs_ino_t	ino,
+	 xfs_imap_t	*imap)
 {
 	xfs_fsblock_t fsbno;
 	int off;
@@ -721,6 +750,9 @@ xfs_idestroy(xfs_inode_t *ip)
 		break;
 	}
 	mrfree(&ip->i_lock);
+	mrfree(&ip->i_iolock);
+	freesema(&ip->i_flock);
+	freesema(&ip->i_pinsema);
 #ifndef SIM
 	kmem_zone_free(xfs_inode_zone, ip);
 #else
@@ -819,7 +851,8 @@ xfs_iunpin_wait(xfs_inode_t *ip)
  * written out (0 indicating a synchronous write).
  */
 void
-xfs_iflush(xfs_inode_t *ip, uint flags)
+xfs_iflush(xfs_inode_t	*ip,
+	   uint		flags)
 {
 	xfs_inode_log_item_t	*iip;
 	buf_t			*bp;
