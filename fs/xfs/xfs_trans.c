@@ -93,6 +93,7 @@ xfs_trans_alloc(
 	/*
 	 * Initialize the transaction structure.
 	 */
+	tp->t_magic = XFS_TRANS_MAGIC;
 	tp->t_tid = xfs_trans_id_alloc(mp);
 	tp->t_type = type;
 	tp->t_mountp = mp;
@@ -123,6 +124,7 @@ xfs_trans_dup(
 	/*
 	 * Initialize the new transaction structure.
 	 */
+	ntp->t_magic = XFS_TRANS_MAGIC;
 	ntp->t_tid = xfs_trans_id_alloc(tp->t_mountp);
 	ntp->t_type = tp->t_type;
 	ntp->t_mountp = tp->t_mountp;
