@@ -184,9 +184,11 @@ again:
 				ih->ih_next = ip;
 			}
 			XFS_IHUNLOCK(ih);
-			if (lock_flags != 0)
+			if (lock_flags != 0) {
 				xfs_ilock(ip, lock_flags);
-			goto out;
+			}
+
+			return ip;
 		}
 	}
 
@@ -261,7 +263,6 @@ again:
 	mp->m_inodes = ip;
 	XFS_MOUNT_IUNLOCK(mp);
 
-out:
 	return ip;
 }
 
