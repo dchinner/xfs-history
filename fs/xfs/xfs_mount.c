@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.172 $"
+#ident	"$Revision: 1.173 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -27,6 +27,7 @@
 #else
 #include <sys/systm.h>
 #include <sys/conf.h>
+#include <sys/var.h>
 #include <fs/specfs/spec_lsnode.h>
 #endif /* SIM */
 #include <stddef.h>
@@ -68,6 +69,9 @@
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int, int);
 STATIC void	xfs_sb_relse(buf_t *);
 #ifndef SIM
+#ifdef DEBUG
+STATIC void	xfs_check_fsprivate(dev_t);
+#endif
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC void	xfs_uuid_mount(xfs_mount_t *);
@@ -882,6 +886,24 @@ xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 }
 #endif /* SIM */
 
+#if !defined(SIM) && defined(DEBUG)
+STATIC void
+xfs_check_fsprivate(dev_t dev)
+{
+	buf_t	*bp;
+	int	i;
+
+	for (bp = &global_buf_table[0], i = 0; i < v.v_buf; i++, bp++) {
+		if (bp->b_edev != dev)
+			continue;
+		psema(&bp->b_lock, PRIBIO);
+		if (bp->b_edev == dev)
+			ASSERT(bp->b_fsprivate2 == NULL);
+		vsema(&bp->b_lock);
+	}
+}
+#endif
+
 /*
  * xfs_unmountfs
  * 
@@ -999,8 +1021,11 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 * does a two pass iteration thru the bufcache.
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp))
-	    incore_delwri_relse(mp->m_dev, 1); /* synchronous */
+		incore_delwri_relse(mp->m_dev, 1); /* synchronous */
 
+#ifdef DEBUG
+	xfs_check_fsprivate(mp->m_dev);
+#endif
 	xfs_uuid_unmount(mp);
 
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
