@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.316 $"
+#ident "$Revision: 1.317 $"
 
 #include <xfs_os_defs.h>
 
@@ -910,14 +910,12 @@ xfs_ioerror_alert(
 	char 			*func,
 	struct xfs_mount	*mp,
 	dev_t			dev,
-	xfs_daddr_t			blkno)
+	xfs_daddr_t		blkno)
 {
 	cmn_err(CE_ALERT,
- "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%x (\"%s\")",
-		mp->m_fsname, 
-		dev,
-		blkno,
-		func);
+            "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%Lx:\n"
+            "    %s",
+		mp->m_fsname, (int)dev, (__uint64_t)blkno, func);
 }
 
 /*
