@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.132 $"
+#ident	"$Revision: 1.133 $"
 
 /*
  * High level interface routines for log manager
@@ -31,8 +31,6 @@
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
-#include <sys/pda.h>		/* depends on proc.h */
 #include <sys/sema.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
