@@ -1,4 +1,4 @@
-#ident "$Revision: 1.93 $"
+#ident "$Revision: 1.94 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -548,16 +548,16 @@ xfs_ilock_ra(xfs_inode_t	*ip,
 		return_address = (inst_t *)__return_address;
 
 	if (lock_flags & XFS_IOLOCK_EXCL) {
-		mrupdate(&ip->i_iolock);
+		mrupdatef(&ip->i_iolock, PLTWAIT);
 	} else if (lock_flags & XFS_IOLOCK_SHARED) {
-		mraccess(&ip->i_iolock);
+		mraccessf(&ip->i_iolock, PLTWAIT);
 	}
 
 	if (lock_flags & XFS_ILOCK_EXCL) {
-		mrupdate(&ip->i_lock);
+		mrupdatef(&ip->i_lock, PLTWAIT);
 		ip->i_ilock_ra = return_address;
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
-		mraccess(&ip->i_lock);
+		mraccessf(&ip->i_lock, PLTWAIT);
 	}
 #ifdef XFS_ILOCK_TRACE
 	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)return_address);
@@ -712,7 +712,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 void
 xfs_iflock(xfs_inode_t *ip)
 {
-	psema(&(ip->i_flock), PINOD);
+	psema(&(ip->i_flock), PINOD|PLTWAIT);
 }
 
 int

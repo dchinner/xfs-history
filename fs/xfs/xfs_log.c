@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.164 $"
+#ident	"$Revision: 1.165 $"
 
 /*
  * High level interface routines for log manager
@@ -2230,7 +2230,7 @@ xlog_grant_log_space(xlog_t	   *log,
 			goto error_return;
 
 		XFSSTATS.xs_sleep_logspace++;
-		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
+		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 		/*
 		 * If we got an error, and the filesystem is shutting down,
 		 * we'll catch it down below. So just continue...
@@ -2256,7 +2256,7 @@ redo:
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 2");
 		XFSSTATS.xs_sleep_logspace++;
-		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
+		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 		
 		if (XLOG_FORCED_SHUTDOWN(log)) {
 			spl = GRANT_LOCK(log);	
@@ -2367,7 +2367,8 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 			xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: sleep 1");
 			XFSSTATS.xs_sleep_logspace++;
-			sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl); 
+			sv_wait(&tic->t_sema, PINOD|PLTWAIT,
+				&log->l_grant_lock, spl); 
 
 			/* If we're shutting down, this tic is already
 			 * off the queue */
@@ -2395,7 +2396,7 @@ redo:
 		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
 			XLOG_INS_TICKETQ(log->l_write_headq, tic);
 		XFSSTATS.xs_sleep_logspace++;
-		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
+		sv_wait(&tic->t_sema, PINOD|PLTWAIT, &log->l_grant_lock, spl);
 
 		/* If we're shutting down, this tic is already off the queue */
 		if (XLOG_FORCED_SHUTDOWN(log)) {
