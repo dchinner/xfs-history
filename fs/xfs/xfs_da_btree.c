@@ -435,13 +435,13 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 	map->size -= XFS_DIR_LEAF_ENTSIZE_BYNAME(args->namelen);
 	entry->nameidx = map->base + map->size;
 	entry->hashval = args->hashval;
+	entry->namelen = args->namelen;
 
 	/*
 	 * Copy the string and inode number into the new space.
 	 */
 	namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 	bcopy((char *)&args->inumber, namest->inumber, sizeof(xfs_ino_t));
-	namest->namelen = args->namelen;
 	bcopy(args->name, namest->name, args->namelen);
 
 	/*
@@ -650,7 +650,6 @@ xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 	struct xfs_dir_leafblock *leaf1, *leaf2;
 	struct xfs_dir_leaf_hdr *hdr1, *hdr2;
 	struct xfs_dir_leaf_entry *entry;
-	struct xfs_dir_leaf_name *namest;
 	int count, max, totallen, half;
 	int lastdelta, foundit, tmp;
 
@@ -669,7 +668,7 @@ xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 	 * byte usage between the two blocks to a minimum.
 	 */
 	max = hdr1->count + hdr2->count;
-	half  = (max+1) * (sizeof(*entry)+sizeof(*namest)-1);
+	half  = (max+1) * (sizeof(*entry)+sizeof(struct xfs_dir_leaf_entry)-1);
 	half += hdr1->namebytes + hdr2->namebytes + state->args->namelen;
 	half /= 2;
 	lastdelta = state->blocksize;
@@ -701,9 +700,8 @@ xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 		/*
 		 * Figure out if next leaf entry would be too much.
 		 */
-		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf1, entry->nameidx);
 		tmp = totallen + sizeof(*entry)
-				+ XFS_DIR_LEAF_ENTSIZE_BYENTRY(namest);
+				+ XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry);
 		if (XFS_DIR_ABS(half - tmp) > lastdelta)
 			break;
 		lastdelta = XFS_DIR_ABS(half - tmp);
@@ -715,9 +713,9 @@ xfs_dir_leaf_figure_balance(struct xfs_dir_state *state,
 	 * Calculate the number of namebytes that will end up in lower block.
 	 * If new entry not in lower block, fix up the count.
 	 */
-	totallen -= count * (sizeof(*entry)+sizeof(*namest)-1);
+	totallen -= count * (sizeof(*entry)+sizeof(struct xfs_dir_leaf_entry)-1);
 	if (foundit) {
-		totallen -= ( (sizeof(*entry)+sizeof(*namest)-1) +
+		totallen -= ( (sizeof(*entry)+sizeof(struct xfs_dir_leaf_entry)-1) +
 			      state->args->namelen );
 	}
 
@@ -1239,7 +1237,6 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	struct xfs_dir_leaf_hdr *hdr;
 	struct xfs_dir_leaf_map *map;
 	struct xfs_dir_leaf_entry *entry;
-	struct xfs_dir_leaf_name *namest;
 	int before, after, smallest, entsize;
 	int tablesize, tmp, i;
 	xfs_mount_t *mp;
@@ -1267,8 +1264,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	tmp = map->size;
 	before = after = -1;
 	smallest = XFS_DIR_LEAF_MAPSIZE - 1;
-	namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-	entsize = XFS_DIR_LEAF_ENTSIZE_BYENTRY(namest);
+	entsize = XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry);
 	for (i = 0; i < XFS_DIR_LEAF_MAPSIZE; map++, i++) {
 		ASSERT(map->base < XFS_LBSIZE(mp));
 		ASSERT(map->size < XFS_LBSIZE(mp));
@@ -1328,13 +1324,13 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	/*
 	 * Compress the remaining entries and zero out the removed stuff.
 	 */
+	hdr->namebytes -= entry->namelen;
+	bzero((char *)XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx), entsize);
 	tmp = (hdr->count - index) * sizeof(struct xfs_dir_leaf_entry);
 	bcopy((char *)(entry+1), (char *)entry, tmp);
 	hdr->count--;
 	entry = &leaf->leaves[hdr->count];
 	bzero((char *)entry, sizeof(struct xfs_dir_leaf_entry));
-	hdr->namebytes -= namest->namelen;
-	bzero((char *)namest, entsize);
 
 	/*
 	 * If we removed the first entry, re-find the first used byte
@@ -1622,7 +1618,7 @@ xfs_dir_leaf_lookup_int(buf_t *bp, struct xfs_dir_name *args, int *index)
 	 */
 	while ((probe < leaf->hdr.count) && (entry->hashval == hashval)) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		if ((namest->namelen == args->namelen) &&
+		if ((entry->namelen == args->namelen) &&
 		    (bcmp(args->name, namest->name, args->namelen) == 0)) {
 			bcopy(namest->inumber, (char *)&args->inumber,
 					       sizeof(xfs_ino_t));
@@ -1769,7 +1765,6 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 {
 	struct xfs_dir_leaf_hdr *hdr_s, *hdr_d;
 	struct xfs_dir_leaf_entry *entry_s, *entry_d;
-	struct xfs_dir_leaf_name *namest_s, *namest_d;
 	int tmp, i;
 
 	/*
@@ -1814,17 +1809,19 @@ xfs_dir_leaf_moveents(struct xfs_dir_leafblock *leaf_s, int start_s,
 	for (i = 0; i < count; entry_s++, entry_d++, i++) {
 		ASSERT(entry_s->nameidx >= hdr_s->firstused);
 		ASSERT(entry_s->nameidx < XFS_LBSIZE(mp));
-		namest_s = XFS_DIR_LEAF_NAMESTRUCT(leaf_s, entry_s->nameidx);
-		ASSERT(namest_s->namelen < MAXNAMELEN);
-		tmp = XFS_DIR_LEAF_ENTSIZE_BYENTRY(namest_s);
+		ASSERT(entry_s->namelen < MAXNAMELEN);
+		tmp = XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry_s);
 		hdr_d->firstused -= tmp;
 		entry_d->hashval = entry_s->hashval;
 		entry_d->nameidx = hdr_d->firstused;
-		namest_d = XFS_DIR_LEAF_NAMESTRUCT(leaf_d, entry_d->nameidx);
-		bcopy((char *)namest_s, (char *)namest_d, tmp);
-		bzero((char *)namest_s, tmp);
-		hdr_s->namebytes -= namest_d->namelen;
-		hdr_d->namebytes += namest_d->namelen;
+		entry_d->namelen = entry_s->namelen;
+		bcopy((char *)XFS_DIR_LEAF_NAMESTRUCT(leaf_s, entry_s->nameidx),
+		      (char *)XFS_DIR_LEAF_NAMESTRUCT(leaf_d, entry_d->nameidx),
+		      tmp);
+		bzero((char *)XFS_DIR_LEAF_NAMESTRUCT(leaf_s, entry_s->nameidx),
+		      tmp);
+		hdr_s->namebytes -= entry_d->namelen;
+		hdr_d->namebytes += entry_d->namelen;
 		hdr_s->count--;
 		hdr_d->count++;
 	}
@@ -2142,7 +2139,8 @@ xfs_dir_leaf_print_int(buf_t *bp, xfs_inode_t *dp)
 	for (i = 0; i < leaf->hdr.count; entry++, i++) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
-		printf("%20lld  %*.*s\n", ino, namest->namelen, namest->namelen, namest->name);
+		printf("%20lld  %*.*s\n", ino,
+				entry->namelen, entry->namelen, namest->name);
 	}
 }
 
@@ -2183,7 +2181,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 		} else
 			nextcook = XFS_DIR_MAKE_COOKIE(mp, bno, i + 1);
 		retval = xfs_dir_put_dirent(mp, dbp, ino, namest->name,
-						namest->namelen, nextcook, uio,
+						entry->namelen, nextcook, uio,
 						&done);
 		if (!done) {
 			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, i);
@@ -2345,50 +2343,11 @@ xfsdir_dumptrace()
 }
 
 /*========================================================================
- * Check the internal consistency of a directory.
+ * Load all of the block in a directory into memory so they can be seen.
  *========================================================================*/
-
-#define BADNEWS0(MSG)			BADNEWSN((MSG), 0, 0, 0)
-#define BADNEWS1(MSG, VAL1)		BADNEWSN((MSG), (VAL1), 0, 0)
-#define BADNEWS2(MSG, VAL1, VAL2)	BADNEWSN((MSG), (VAL1), (VAL2), 0)
-#define BADNEWS3(MSG, VAL1, VAL2, VAL3)	BADNEWSN((MSG), (VAL1), (VAL2), (VAL3))
-#define BADNEWSN(MSG, VAL1, VAL2, VAL3)	retval++, printf((MSG), (VAL1), (VAL2), (VAL3))
-
-/*
- * Larger-context checking data structures.
- */
-char		*xfsdir_blockmap;
-int		xfsdir_maxblockmap;
-xfs_fsblock_t	*xfsdir_forw_links;
-xfs_fsblock_t	*xfsdir_back_links;
-int		xfsdir_maxlinkmap;
-
-int	xfsdir_total_namebytes;	/* total number of bytes used in filenames */
-int	xfsdir_total_freebytes;	/* total number of free bytes for filenames */
-int	xfsdir_total_holeblks;	/* total number of leaves with holes */
-int	xfsdir_total_entries;	/* total number of directory entries */
-
-int xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno,
-				  int firstlast, uint *hashval);
-int xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno,
-				  int depth, int firstlast, uint *hashval);
-int xfsdir_checkinum(char *inumber);
-int xfsdir_check_blockuse(int *node_cnt, int *leaf_cnt);
-int xfsdir_checkchain(xfs_fsblock_t parentblk, xfs_fsblock_t blkno,
-				    int forward);
-int xfsdir_endchain(xfs_fsblock_t blkno);
-int xfsdir_checkblock(xfs_fsblock_t blkno, int level);
-int xfsdir_checkname(char *name, int namelen, uint hashval);
-int xfsdir_printbytes(int bytes);
 
 int xfsdir_load_leaf(xfs_inode_t *dp, xfs_fsblock_t blkno);
 int xfsdir_load_node(xfs_inode_t *dp, xfs_fsblock_t blkno);
-
-uint xfs_dir_hashname(register char *name, register int namelen);
-
-/*========================================================================
- * Load all of the block in a directory into memory so they can bee seen.
- *========================================================================*/
 
 int
 xfsdir_loaddir(xfs_inode_t *dp)
@@ -2396,7 +2355,7 @@ xfsdir_loaddir(xfs_inode_t *dp)
 	int retval;
 
 	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
-		retval = 0; /* xfsdir_shortform_check(dp, &hashval); */
+		retval = 0;
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
 		retval = xfsdir_load_leaf(dp, 0);
 	} else {
@@ -2451,60 +2410,93 @@ xfsdir_load_node(xfs_inode_t *dp, xfs_fsblock_t blkno)
  * Check a directory for internal inconsistencies
  *========================================================================*/
 
+#define BADNEWS0(MSG)			BADNEWSN((MSG), 0, 0, 0)
+#define BADNEWS1(MSG, VAL1)		BADNEWSN((MSG), (VAL1), 0, 0)
+#define BADNEWS2(MSG, VAL1, VAL2)	BADNEWSN((MSG), (VAL1), (VAL2), 0)
+#define BADNEWS3(MSG, VAL1, VAL2, VAL3)	BADNEWSN((MSG), (VAL1), (VAL2), (VAL3))
+#define BADNEWSN(MSG, VAL1, VAL2, VAL3)	retval++, printf((MSG), (VAL1), (VAL2), (VAL3))
+
+/*
+ * Directory structure checking data, context for each process.
+ */
+struct xfsdir_context {
+	xfs_inode_t	*dp;
+	uint		hashval;
+	int		maxblockmap;
+	char		*blockmap;
+	int		maxlinkmap;
+	xfs_fsblock_t	*forw_links;
+	xfs_fsblock_t	*back_links;
+	int		namebytes;	/* total bytes used in filenames */
+	int		freebytes;	/* total free bytes for filenames */
+	int		holeblks;	/* total leaves with holes */
+	int		entries;	/* total directory entries */
+	int		nodes;		/* node blocks seen */
+	int		leaves;		/* leaf blocks seen */
+};
+
+
+int xfsdir_leaf_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+			     int firstlast);
+int xfsdir_node_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+			     int depth, int firstlast);
+int xfsdir_check_blockuse(struct xfsdir_context *con);
+int xfsdir_checkchain(struct xfsdir_context *con, xfs_fsblock_t parentblk,
+			     xfs_fsblock_t blkno, int forward);
+int xfsdir_endchain(struct xfsdir_context *con, xfs_fsblock_t blkno);
+int xfsdir_checkblock(struct xfsdir_context *con, xfs_fsblock_t blkno,
+			     int level);
+int xfsdir_checkname(char *name, int namelen, uint hashval);
+int xfsdir_printbytes(int bytes);
+
+extern uint xfs_dir_hashname(register char *name, register int namelen);
+
+
 int
 xfsdir_check(xfs_inode_t *dp)
 {
-	int numblks, leaves, nodes, tmp, noisy, retval;
+	struct xfsdir_context *con;
+	int numblks, tmp, retval;
 	uint hashval;
 
+	con = (struct xfsdir_context *)kmem_zalloc(sizeof(*con), KM_SLEEP);
 	numblks = (dp->i_d.di_size + XFS_LBSIZE(dp->i_mount) - 1) /
-				XFS_LBSIZE(dp->i_mount);
-
-	xfsdir_maxblockmap = numblks;
-	xfsdir_blockmap = (char *)kmem_zalloc(xfsdir_maxblockmap *
-					 sizeof(*xfsdir_blockmap), KM_SLEEP);
-	xfsdir_maxlinkmap = numblks;
-	xfsdir_forw_links = (xfs_fsblock_t *)kmem_zalloc(xfsdir_maxlinkmap *
-					     sizeof(*xfsdir_forw_links),
-					     KM_SLEEP);
-	xfsdir_back_links = (xfs_fsblock_t *)kmem_zalloc(xfsdir_maxlinkmap *
-					     sizeof(*xfsdir_back_links),
-					     KM_SLEEP);
-	xfsdir_total_namebytes = xfsdir_total_freebytes = 0;
-	xfsdir_total_holeblks = xfsdir_total_entries = 0;
+					XFS_LBSIZE(dp->i_mount);
+	con->maxblockmap = numblks;
+	con->blockmap = (char *)
+		kmem_zalloc(numblks * sizeof(*con->blockmap), KM_SLEEP);
+	con->maxlinkmap = numblks;
+	con->forw_links = (xfs_fsblock_t *)
+		kmem_zalloc(numblks * sizeof(*con->forw_links), KM_SLEEP);
+	con->back_links = (xfs_fsblock_t *)
+		kmem_zalloc(numblks * sizeof(*con->back_links), KM_SLEEP);
+	con->namebytes = con->freebytes = con->holeblks = con->entries = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
-	noisy = 1;
-	retval = hashval = 0;
+	con->dp = dp;
+	retval = 0;
 	if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
-		retval = 0; /* xfsdir_shortform_check(dp, &hashval); */
+		retval = 0; /* xfsdir_shortform_check(con); */
 	} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
-		retval = xfsdir_leaf_check(dp, 0, -2, &hashval);
+		retval = xfsdir_leaf_check(con, 0, -2);
 	} else {
-		retval = xfsdir_node_check(dp, (xfs_fsblock_t)0, 0, -2,
-					       &hashval);
-		retval += xfsdir_check_blockuse(&nodes, &leaves);
-
-		if (noisy || retval) {
-			printf("%d nodes, %d leaves, %d files, ",
-				   nodes, leaves, xfsdir_total_entries);
-			xfsdir_printbytes(xfsdir_total_namebytes);
-			printf(" used, ");
-			xfsdir_printbytes(xfsdir_total_freebytes);
-			tmp = xfsdir_total_namebytes+xfsdir_total_freebytes;
-			printf(" (%d%%) free\n",
-			     (tmp>0) ? ((xfsdir_total_freebytes*100)/tmp) : 0);
-		}
+		retval = xfsdir_node_check(con, (xfs_fsblock_t)0, 0, -2);
+		retval += xfsdir_check_blockuse(con);
+		printf("%d nodes, %d leaves, %d files, ",
+			   con->nodes, con->leaves, con->entries);
+		xfsdir_printbytes(con->namebytes);
+		printf(" used, ");
+		xfsdir_printbytes(con->freebytes);
+		tmp = con->namebytes + con->freebytes;
+		printf(" (%d%%) free\n", (tmp>0)?((con->freebytes*100)/tmp):0);
 	}
 
-	kmem_free(xfsdir_blockmap,
-		  xfsdir_maxblockmap * sizeof(*xfsdir_blockmap));
-	kmem_free(xfsdir_forw_links,
-		  xfsdir_maxlinkmap * sizeof(*xfsdir_forw_links));
-	kmem_free(xfsdir_back_links,
-		  xfsdir_maxlinkmap * sizeof(*xfsdir_back_links));
+	kmem_free(con->blockmap, con->maxblockmap * sizeof(*con->blockmap));
+	kmem_free(con->forw_links, con->maxlinkmap * sizeof(*con->forw_links));
+	kmem_free(con->back_links, con->maxlinkmap * sizeof(*con->back_links));
+	kmem_free(con, sizeof(*con));
 
 	if (retval) {
 		printf("Directory Contents --\n");
@@ -2520,7 +2512,7 @@ xfsdir_check(xfs_inode_t *dp)
 
 #ifdef NOTYET
 int
-xfsdir_shortform_check(xfs_inode_t *dp, uint *hashval)
+xfsdir_shortform_check(struct xfsdir_context *con)
 {
 	struct xfs_dir_shortform *sf;
 	struct xfs_dir_sf_entry *sfe;
@@ -2528,7 +2520,6 @@ xfsdir_shortform_check(xfs_inode_t *dp, uint *hashval)
 	buf_t *bp;
 
 	sf = (struct xfs_dir_shortform *)bp->buffer;
-	retval = xfsdir_checkinum(sf->hdr.parent);
 	if (sf->hdr.count > (XFS_LITINO(fs)/sizeof(struct xfs_dir_sf_entry)))
 		BADNEWS1("shortform entry count bad: count %d\n",
 				    sf->hdr.count);
@@ -2536,15 +2527,14 @@ xfsdir_shortform_check(xfs_inode_t *dp, uint *hashval)
 	sfe = &sf->list[0];
 	total = sizeof(struct xfs_dir_sf_hdr);
 	for (i = sf->hdr.count-1; i >= 0; i--) {
-		retval += xfsdir_checkinum(sfe->inumber);
-
 		if ((sfe->namelen == 0) || (sfe->namelen > MAXNAMELEN) ||
 		    (sfe->namelen > XFS_LITINO(fs)) ||
 		    ((sfe->namelen + total) > dp->i_d.di_size))
 			BADNEWS1("bad shortform name length: entry %d\n", i);
 
-		*hashval = xfsdir_hashname(sfe->name, sfe->namelen);
-		retval += xfsdir_checkname(sfe->name, sfe->namelen, *hashval);
+		con->hashval = xfsdir_hashname(sfe->name, sfe->namelen);
+		retval += xfsdir_checkname(sfe->name, sfe->namelen,
+						      con->hashval);
 
 		total += XFS_DIR_SF_ENTSIZE_BYENTRY(sfe);
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
@@ -2561,8 +2551,8 @@ xfsdir_shortform_check(xfs_inode_t *dp, uint *hashval)
  *========================================================================*/
 
 int
-xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
-			      uint *hashval)
+xfsdir_leaf_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+			 int firstlast)
 {
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_leaf_entry *entry;
@@ -2574,7 +2564,7 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
 	/*
 	 * Read in the leaf block.
 	 */
-	bp = xfs_dir_read_buf(dp->i_transp, dp, blkno);
+	bp = xfs_dir_read_buf(con->dp->i_transp, con->dp, blkno);
 	leaf = (struct xfs_dir_leafblock *)bp->b_un.b_addr;
 
 	/*
@@ -2583,7 +2573,7 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
 	retval = 0;
 	if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
 		BADNEWS1("not a leaf node: blkno 0x%x\n", blkno);
-		xfs_trans_brelse(dp->i_transp, bp);
+		xfs_trans_brelse(con->dp->i_transp, bp);
 		return(retval);
 	}
 	if (leaf->hdr.pad1 != 0)
@@ -2593,20 +2583,21 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
 	 * Check the chain of leaves
 	 */
 	if (firstlast == 0) {
-		retval += xfsdir_checkchain(blkno, leaf->hdr.info.forw, 1);
-		retval += xfsdir_checkchain(blkno, leaf->hdr.info.back, 0);
+		retval += xfsdir_checkchain(con, blkno, leaf->hdr.info.forw, 1);
+		retval += xfsdir_checkchain(con, blkno, leaf->hdr.info.back, 0);
 	} else {
-		retval += xfsdir_endchain(blkno);
+		retval += xfsdir_endchain(con, blkno);
 		if (firstlast < 0) {
 			if (firstlast == -1)
-				retval += xfsdir_checkchain(blkno,
+				retval += xfsdir_checkchain(con, blkno,
 						      leaf->hdr.info.forw, 1);
 			if (leaf->hdr.info.back != 0)
 				BADNEWS2("backward ref to leaf 0x%x in leaf 0x%x\n",
 						   leaf->hdr.info.back, blkno);
 		}
 		if (firstlast > 0) {
-			retval += xfsdir_checkchain(blkno, leaf->hdr.info.back, 0);
+			retval += xfsdir_checkchain(con, blkno,
+						 leaf->hdr.info.back, 0);
 			if (leaf->hdr.info.forw != 0)
 				BADNEWS2("forward ref to leaf 0x%x in leaf 0x%x\n",
 						  leaf->hdr.info.forw, blkno);
@@ -2618,21 +2609,21 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
 	 * XXX: check the count.
 	 */
 	bytes = 0;
-	lowest = XFS_LBSIZE(dp->i_mount);
+	lowest = XFS_LBSIZE(con->dp->i_mount);
 	entry = &leaf->leaves[0];
 	if (leaf->hdr.count == 0)
 		BADNEWS1("zero entry count: leaf 0x%x\n", blkno);
-	xfsdir_total_entries += leaf->hdr.count;
+	con->entries += leaf->hdr.count;
 	for (i = 0; i < leaf->hdr.count; entry++, i++) {
 		if ((entry->hashval == 0) || (entry->hashval == 0xffffffff))
 			BADNEWS2("hashval has reserved value: leaf 0x%x, index %d\n",
 					  blkno, i);
-		if (entry->hashval < *hashval) {
+		if (entry->hashval < con->hashval) {
 			BADNEWS2("hashval is smaller than last: leaf 0x%x, index %d\n",
 					  blkno, i);
 		}
-		*hashval = entry->hashval;
-		if (entry->nameidx >= XFS_LBSIZE(dp->i_mount))
+		con->hashval = entry->hashval;
+		if (entry->nameidx >= XFS_LBSIZE(con->dp->i_mount))
 			BADNEWS2("nameidx is too large: leaf 0x%x, index %d\n",
 					  blkno, i);
 		if (entry->nameidx < lowest)
@@ -2641,10 +2632,9 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
 			BADNEWS1("pad2 is non-zero: leaf 0x%x\n", blkno);
 
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		retval += xfsdir_checkinum(namest->inumber);
-		retval += xfsdir_checkname(namest->name, namest->namelen,
+		retval += xfsdir_checkname(namest->name, entry->namelen,
 							 entry->hashval);
-		bytes += namest->namelen;
+		bytes += entry->namelen;
 	}
 
 	/*
@@ -2653,17 +2643,17 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
 	if (leaf->hdr.namebytes != bytes)
 		BADNEWS3("namebytes (0x%x) not right (0x%x): leaf 0x%x\n",
 				    (int)leaf->hdr.namebytes, bytes, blkno);
-	xfsdir_total_namebytes += bytes;
+	con->namebytes += bytes;
 
 	map = &leaf->hdr.freemap[0];
 	for (i = 0; i < XFS_DIR_LEAF_MAPSIZE; map++, i++) {
 		/* XXX: check the fields in the freemap */
-		xfsdir_total_freebytes += map->size;
+		con->freebytes += map->size;
 	}
-	/* XXX: check xfsdir_totalfree against the freemap and "holes" */
+	/* XXX: check con->totalfree against the freemap and "holes" */
 
 	if (leaf->hdr.holes) {
-		xfsdir_total_holeblks++;
+		con->holeblks++;
 		if (leaf->hdr.firstused > lowest)
 			BADNEWS3("firstused (0x%x) not right (0x%x) holes: leaf 0x%x\n",
 					    (int)leaf->hdr.firstused,
@@ -2675,7 +2665,7 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
 					    lowest, blkno);
 	}
 
-	xfs_trans_brelse(dp->i_transp, bp);
+	xfs_trans_brelse(con->dp->i_transp, bp);
 	return(retval);
 }
 
@@ -2684,7 +2674,8 @@ xfsdir_leaf_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int firstlast,
  *========================================================================*/
 
 int
-xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int depth, int firstlast, uint *hashval)
+xfsdir_node_check(struct xfsdir_context *con, xfs_fsblock_t blkno,
+			 int depth, int firstlast)
 {
 	struct xfs_dir_intnode *node;
 	struct xfs_dir_node_entry *btree;
@@ -2694,7 +2685,7 @@ xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int depth, int firstlast
 	/*
 	 * Read the next node down in the tree.
 	 */
-	bp = xfs_dir_read_buf(dp->i_transp, dp, blkno);
+	bp = xfs_dir_read_buf(con->dp->i_transp, con->dp, blkno);
 	node = (struct xfs_dir_intnode *)bp->b_un.b_addr;
 
 	/*
@@ -2703,32 +2694,20 @@ xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int depth, int firstlast
 	retval = 0;
 	if (node->hdr.info.magic != XFS_DIR_NODE_MAGIC) {
 		BADNEWS1("not an int node: blkno 0x%x\n", blkno);
-		xfs_trans_brelse(dp->i_transp, bp);
+		xfs_trans_brelse(con->dp->i_transp, bp);
 		return(retval);
 	}
 	if (depth >= XFS_DIR_NODE_MAXDEPTH)
 		BADNEWS1("tree too deep: node 0x%x\n", blkno);
 #ifdef XXX
-	if ((node->hdr.pad1[0] != 0) ||
-	    (node->hdr.pad1[1] != 0) ||
-	    (node->hdr.pad1[2] != 0) ||
-	    (node->hdr.pad1[3] != 0) ||
-	    (node->hdr.pad1[4] != 0)) {
-		BADNEWS1("pad1 not zero: node 0x%x\n", blkno);
-	}
-	/* XXX: make this work */
 	if ((node->hdr.level != 0) && (node->hdr.level != 1))
 		BADNEWS1("level not right: node 0x%x\n", blkno);
-	if (node->hdr.freecount != 0)
-		BADNEWS1("freecount non-zero: node 0x%x\n", blkno);
-	if (node->hdr.freechain != 0)
-		BADNEWS1("freechain non-zero: node 0x%x\n", blkno);
 #endif
 	if (node->hdr.count == 0)
 		BADNEWS1("zero entry count: node 0x%x\n", blkno);
-	if (node->hdr.count > XFS_DIR_NODE_ENTRIES(dp->i_mount)) {
+	if (node->hdr.count > XFS_DIR_NODE_ENTRIES(con->dp->i_mount)) {
 		BADNEWS1("bad node entry count: node 0x%x\n", blkno);
-		count = XFS_DIR_NODE_ENTRIES(dp->i_mount);
+		count = XFS_DIR_NODE_ENTRIES(con->dp->i_mount);
 	} else
 		count = node->hdr.count;
 
@@ -2736,21 +2715,21 @@ xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int depth, int firstlast
 	 * Check the chain of nodes
 	 */
 	if (firstlast == 0) {
-		retval += xfsdir_checkchain(blkno, node->hdr.info.forw, 1);
-		retval += xfsdir_checkchain(blkno, node->hdr.info.back, 0);
+		retval += xfsdir_checkchain(con, blkno, node->hdr.info.forw, 1);
+		retval += xfsdir_checkchain(con, blkno, node->hdr.info.back, 0);
 	} else {
-		retval += xfsdir_endchain(blkno);
+		retval += xfsdir_endchain(con, blkno);
 		if (firstlast < 0) {
 			if (firstlast == -1)
-				retval += xfsdir_checkchain(blkno,
-							      node->hdr.info.forw,
-							      1);
+				retval += xfsdir_checkchain(con, blkno,
+						      node->hdr.info.forw, 1);
 			if (node->hdr.info.back != 0)
 				BADNEWS2("backward ref to node 0x%x in node 0x%x\n",
 						   node->hdr.info.back, blkno);
 		}
 		if (firstlast > 0) {
-			retval += xfsdir_checkchain(blkno, node->hdr.info.back, 0);
+			retval += xfsdir_checkchain(con, blkno,
+						 node->hdr.info.back, 0);
 			if (node->hdr.info.forw != 0)
 				BADNEWS2("forward ref to node 0x%x in node 0x%x\n",
 						  node->hdr.info.forw, blkno);
@@ -2761,17 +2740,15 @@ xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int depth, int firstlast
 	 * Do a linear pass through the entries.
 	 */
 	btree = &node->btree[0];
-	for (i = 0; i < XFS_DIR_NODE_ENTRIES(dp->i_mount); btree++, i++) {
+	for (i = 0; i < XFS_DIR_NODE_ENTRIES(con->dp->i_mount); btree++, i++) {
 		if (i < count) {
-			if ((btree->hashval == 0) &&
-			    (btree->before == 0)) {
+			if ((btree->hashval == 0) && (btree->before == 0)) {
 				BADNEWS1("zero entry, count too large: node 0x%x\n",
 					       blkno);
 				continue;
 			}
 		} else {
-			if ((btree->hashval == 0) &&
-			    (btree->before == 0)) {
+			if ((btree->hashval == 0) && (btree->before == 0)) {
 				continue;
 			}
 			BADNEWS1("non-zero entry, count too small: node 0x%x\n",
@@ -2781,12 +2758,13 @@ xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int depth, int firstlast
 		if ((btree->hashval == 0) || (btree->hashval == 0xffffffff))
 			BADNEWS2("hashval has reserved value: node 0x%x, index %d\n",
 					  blkno, i);
-		if (btree->hashval < *hashval) {
+		if (btree->hashval < con->hashval) {
 			BADNEWS2("hashval is smaller than last: node 0x%x, index %d\n",
 					  blkno, i);
 		}
 
-		if (tmp = xfsdir_checkblock(btree->before, node->hdr.level-1)) {
+		if (tmp = xfsdir_checkblock(con, btree->before,
+						 node->hdr.level-1)) {
 			retval += tmp;
 			BADNEWS1(" in: node 0x%x\n", blkno);
 			retval--;
@@ -2806,19 +2784,18 @@ xfsdir_node_check(xfs_inode_t *dp, xfs_fsblock_t blkno, int depth, int firstlast
 				tmp = 1;
 
 			if (node->hdr.level == 1) {
-				retval += xfsdir_leaf_check(dp, btree->before,
-								tmp, hashval);
+				retval += xfsdir_leaf_check(con, btree->before,
+								 tmp);
 			} else {
-				retval += xfsdir_node_check(dp, btree->before,
-								depth+1, tmp,
-								hashval);
+				retval += xfsdir_node_check(con, btree->before,
+								 depth+1, tmp);
 			}
 		}
 
-		*hashval = btree->hashval;
+		con->hashval = btree->hashval;
 	}
 
-	xfs_trans_brelse(dp->i_transp, bp);
+	xfs_trans_brelse(con->dp->i_transp, bp);
 	return(retval);
 }
 
@@ -2838,43 +2815,44 @@ xfsdir_checkname(char *name, int namelen, uint hashval)
 }
 
 int
-xfsdir_checkblock(xfs_fsblock_t blkno, int level)
+xfsdir_checkblock(struct xfsdir_context *con, xfs_fsblock_t blkno, int level)
 {
 	int retval;
 
 	retval = 0;
-	if ((blkno == 0) || (blkno >= xfsdir_maxblockmap))
+	if ((blkno == 0) || (blkno >= con->maxblockmap))
 		BADNEWS1("block number out of range: blkno 0x%x", blkno);
-	else if (xfsdir_blockmap[blkno] & 0x01)
+	else if (con->blockmap[blkno] & 0x01)
 		BADNEWS1("block multiply used: blkno 0x%x", blkno);
 	else {
-		xfsdir_blockmap[blkno] |= 0x01;
-		xfsdir_blockmap[blkno] |= (level == 0) ? 0x02 : 0x04;
+		con->blockmap[blkno] |= 0x01;
+		con->blockmap[blkno] |= (level == 0) ? 0x02 : 0x04;
 	}
 
 	return(retval);
 }
 
 int
-xfsdir_endchain(xfs_fsblock_t blkno)
+xfsdir_endchain(struct xfsdir_context *con, xfs_fsblock_t blkno)
 {
 	int retval;
 
 	retval = 0;
-	if (xfsdir_blockmap[blkno] & 0x20)
+	if (con->blockmap[blkno] & 0x20)
 		BADNEWS1("blkno 0x%x is already a start/end blk\n", blkno);
-	xfsdir_blockmap[blkno] |= 0x20;
+	con->blockmap[blkno] |= 0x20;
 	return(retval);
 }
 
 int
-xfsdir_checkchain(xfs_fsblock_t parentblk, xfs_fsblock_t blkno, int forward)
+xfsdir_checkchain(struct xfsdir_context *con, xfs_fsblock_t parentblk,
+			 xfs_fsblock_t blkno, int forward)
 {
 	int retval, tmp, i;
 	xfs_fsblock_t *links;
 
 	retval = 0;
-	if (blkno >= xfsdir_maxblockmap) {
+	if (blkno >= con->maxblockmap) {
 		BADNEWS2("block number 0x%x out of range in blkno 0x%x\n",
 				blkno, parentblk);
 		return(retval);
@@ -2886,76 +2864,69 @@ xfsdir_checkchain(xfs_fsblock_t parentblk, xfs_fsblock_t blkno, int forward)
 	}
 
 	if (forward) {
-		links = xfsdir_forw_links;
+		links = con->forw_links;
 		tmp = 0x80;
 	} else {
-		links = xfsdir_back_links;
+		links = con->back_links;
 		tmp = 0x40;
 	}
 
-	if (xfsdir_blockmap[blkno] & tmp) {
+	if (con->blockmap[blkno] & tmp) {
 		BADNEWS3("multiple %s references to blkno 0x%x; from blkno 0x%x",
 				   forward ? "forward" : "backward",
 				   blkno, parentblk);
-		for (i = 0; i < xfsdir_maxlinkmap; i++) {
+		for (i = 0; i < con->maxlinkmap; i++) {
 			if (links[i] == blkno) {
 				printf(" and blkno 0x%x", i);
 			}
 		}
 		printf("\n");
 	}
-	xfsdir_blockmap[blkno] |= tmp;
+	con->blockmap[blkno] |= tmp;
 	links[parentblk] = blkno;
 
 	return(retval);
 }
 
 int
-xfsdir_check_blockuse(int *node_cnt, int *leaf_cnt)
+xfsdir_check_blockuse(struct xfsdir_context *con)
 {
-	int leaves, nodes;
-	int retval, i;
+	int leaves, nodes, retval, i;
 
 	leaves = nodes = retval = 0;
-	for (i = 0; i < xfsdir_maxblockmap; i++) {
-		if ((xfsdir_blockmap[i] & 0x02) && (xfsdir_blockmap[i] & 0x04)) {
+	for (i = 0; i < con->maxblockmap; i++) {
+		if ((con->blockmap[i] & 0x02) && (con->blockmap[i] & 0x04)) {
 			BADNEWS1("block 0x%x is both a leaf and a node\n", i);
-		} else if ((xfsdir_blockmap[i] & 0x02) != 0) {
+		} else if ((con->blockmap[i] & 0x02) != 0) {
 			leaves++;
-		} else if (((xfsdir_blockmap[i] & 0x04) != 0) || (i == 0)) {
+		} else if (((con->blockmap[i] & 0x04) != 0) || (i == 0)) {
 			nodes++;
 		}
 
-		if ((xfsdir_blockmap[i] & 0x01) == 0) {
+		if ((con->blockmap[i] & 0x01) == 0) {
 #ifdef XXX
 			if (i != 0)
 				printf("block 0x%x not referenced\n", i);
 #endif
-			if ((xfsdir_blockmap[i] & 0x80) == 1)
+			if ((con->blockmap[i] & 0x80) == 1)
 				BADNEWS1("block 0x%x is someone's \"forward\"\n", i);
-			if ((xfsdir_blockmap[i] & 0x40) == 1)
+			if ((con->blockmap[i] & 0x40) == 1)
 				BADNEWS1("block 0x%x is someone's \"backward\"\n", i);
-		} else if ((xfsdir_blockmap[i] & 0x20) == 0) {
-			if ((xfsdir_blockmap[i] & 0x80) == 0)
+		} else if ((con->blockmap[i] & 0x20) == 0) {
+			if ((con->blockmap[i] & 0x80) == 0)
 				BADNEWS1("block 0x%x not someone's \"forward\"\n", i);
-			else if ((xfsdir_blockmap[i] & 0x40) == 0)
+			else if ((con->blockmap[i] & 0x40) == 0)
 				BADNEWS1("block 0x%x not someone's \"backward\"\n", i);
 		} else {
-			if ((xfsdir_blockmap[i] & 0x80) == 1)
+			if ((con->blockmap[i] & 0x80) == 1)
 				BADNEWS1("block 0x%x a start/end blk but also someone's \"forward\"\n", i);
-			else if ((xfsdir_blockmap[i] & 0x40) == 1)
+			else if ((con->blockmap[i] & 0x40) == 1)
 				BADNEWS1("block 0x%x a start/end blk but also someone's \"backward\"\n", i);
 		}
 	}
-	*node_cnt = nodes;
-	*leaf_cnt = leaves;
+	con->nodes = nodes;
+	con->leaves = leaves;
 	return(retval);
-}
-
-int
-xfsdir_checkinum(char *inumber)
-{
-	return(0);
 }
 
 int
