@@ -916,14 +916,14 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 	entry = &leaf->leaves[0];
 	for (i = hdr->count-1; i >= 0; entry++, i--) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		if ((namest->namelen == 2) &&
+		if ((entry->namelen == 2) &&
 		    (namest->name[0] == '.') &&
 		    (namest->name[1] == '.')) {
 			bcopy(namest->inumber, (char *)&parent,
 					       sizeof(xfs_ino_t));
 			entry->nameidx = 0;
 		}
-		if ((namest->namelen == 1) && (namest->name[0] == '.')) {
+		if ((entry->namelen == 1) && (namest->name[0] == '.')) {
 			entry->nameidx = 0;
 		}
 	}
@@ -947,7 +947,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 			continue;
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		args.name = namest->name;
-		args.namelen = namest->namelen;
+		args.namelen = entry->namelen;
 		args.hashval = entry->hashval;
 		bcopy(namest->inumber, (char *)&args.inumber, sizeof(xfs_ino_t));
 		xfs_dir_shortform_addname(trans, &args);

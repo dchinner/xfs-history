@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 
 /*
  * xfs_dir.h
@@ -114,19 +114,19 @@ struct xfs_dir_leafblock {
 	struct xfs_dir_leaf_entry {	/* sorted on key, not name */
 		__uint32_t hashval;	/* hash value of name */
 		__uint16_t nameidx;	/* index into buffer of name */
-		__uint16_t pad2;
+		__uint8_t namelen;	/* length of name string */
+		__uint8_t pad2;
 	} leaves[1];			/* var sized array */
 	struct xfs_dir_leaf_name {
 		xfs_dir_ino_t inumber;	/* inode number for this key */
-		__uint8_t namelen;	/* length of name string */
 		__uint8_t name[1];	/* name string itself */
 	} namelist[1];			/* grows from bottom of buf */
 };
 
 #define XFS_DIR_LEAF_ENTSIZE_BYNAME(LEN)	/* space a name will use */ \
 	(sizeof(struct xfs_dir_leaf_name)-1 + LEN)
-#define XFS_DIR_LEAF_ENTSIZE_BYENTRY(NAMEENT)	/* space an entry will use */ \
-	(sizeof(struct xfs_dir_leaf_name)-1 + (NAMEENT)->namelen)
+#define XFS_DIR_LEAF_ENTSIZE_BYENTRY(ENTRY)	/* space an entry will use */ \
+	(sizeof(struct xfs_dir_leaf_name)-1 + (ENTRY)->namelen)
 #define XFS_DIR_LEAF_NAMESTRUCT(LEAFP, OFFSET)	/* point to name struct */ \
 	((struct xfs_dir_leaf_name *)&((char *)(LEAFP))[OFFSET])
 
