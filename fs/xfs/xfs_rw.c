@@ -1587,6 +1587,66 @@ xfs_strat_read(vnode_t	*vp,
 }
 
 
+/*
+ * xfs_strat_write_count
+ *
+ * Figure out the number of fs blocks underlying the given
+ * delayed allocation buffer.  There may be a mix of allocated
+ * and delayed allocation extents beneath the buffer, but there
+ * should only be a hole (if any) at the end of the buffer.
+ * The hole would be the result of the aggressive buffer allocation
+ * we do (past the EOF) when writing a file.
+ */
+STATIC xfs_extlen_t
+xfs_strat_write_count(xfs_inode_t	*ip,
+		      xfs_fsblock_t	offset_fsb,
+		      xfs_extlen_t	buf_fsb,
+		      xfs_bmbt_irec_t	*imap,
+		      int		imap_count)
+{
+	xfs_fsblock_t	off_fsb;
+	xfs_extlen_t	count_fsb;
+	boolean_t	done;
+	int		nimaps;
+	int		n;
+
+	ASSERT(ismrlocked(&(ip->i_lock), MR_ACCESS | MR_UPDATE) != 0);
+	off_fsb = offset_fsb;
+	count_fsb = 0;
+	done = B_FALSE;
+	while ((count_fsb < buf_fsb) && (!done)) {
+		nimaps = imap_count;
+		(void) xfs_bmapi(NULL, ip, (off_fsb + count_fsb),
+				 (buf_fsb - count_fsb), 0, NULLFSBLOCK, 0,
+				 imap, &nimaps, NULL);
+		ASSERT(nimaps > 0);
+		n = 0;
+		while (n < nimaps) {
+			if (imap[n].br_startblock == HOLESTARTBLOCK) {
+				/*
+				 * We've hit the hole at the end of the
+				 * buffer, so that's it.  We assert
+				 * that there was at least some space
+				 * underlying the buffer and that the
+				 * hole we've found extends all the way
+				 * to the end of the buffer.
+				 */
+				ASSERT(count_fsb > 0);
+				ASSERT((imap[n].br_startoff +
+					imap[n].br_blockcount) ==
+				       (offset_fsb + buf_fsb));
+				done = B_TRUE;
+				break;
+			}
+			count_fsb += imap[n].br_blockcount;
+			ASSERT(count_fsb <= buf_fsb);
+			n++;
+		}
+	}
+		
+	return count_fsb;
+}
+
 
 /*
  * This is the completion routine for the heap-allocated buffers
@@ -1704,47 +1764,20 @@ xfs_strat_write(vnode_t	*vp,
 
 	/*
 	 * Figure out what the underlying mappings look like.
-	 * Since we're a delayed alloc buffer, we only need
-	 * to care about the one mapping that starts at the
-	 * beginning of the buffer.  While we may extend beyond
-	 * that, that could only be for space that was unallocated
-	 * when this buffer was created and has not been written
-	 * since.
+	 * We need to map out all the space underlying the
+	 * buffer to figure out whether the buffer extends
+	 * beyond the allocated (or at least reserved) space
+	 * and not to write that part.
 	 */
 	ASSERT(bp->b_blkno == -1);
 	offset_fsb = xfs_bb_to_fsbt(sbp, bp->b_offset);
 	count_fsb = xfs_b_to_fsb(sbp, bp->b_bcount);
-	nimaps = 1;
+
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
-	(void) xfs_bmapi(NULL, ip, offset_fsb, count_fsb, 0, NULLFSBLOCK, 0,
-			 imap, &nimaps, NULL);
-	ASSERT(nimaps == 1);
-	ASSERT(imap[0].br_startblock != HOLESTARTBLOCK);
+	count_fsb = xfs_strat_write_count(ip, offset_fsb, count_fsb, imap,
+					  XFS_STRAT_WRITE_IMAPS);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
-	/*
-	 * If the underlying space for the buffer has already been
-	 * allocated as a single extent, then write it out now.
-	 */
-	if ((imap[0].br_startblock != DELAYSTARTBLOCK) &&
-	    (imap[0].br_blockcount == count_fsb)) {
-		bp->b_blkno = xfs_fsb_to_daddr(sbp, imap[0].br_startblock);
-		bp->b_bcount = xfs_fsb_to_b(sbp, count_fsb);
-		bdstrat(bmajor(bp->b_edev), bp);
-		return;
-	}
-
-	/*
-	 * If the underlying mapping is still a delayed allocation
-	 * extent, then the amount we're to write is exactly as much
-	 * of that extent as fits within our buffer.  If the extent
-	 * is smaller than the buffer, then we are not responsible
-	 * for writing the data outside the extent.
-	 */
-	if (imap[0].br_startblock == DELAYSTARTBLOCK) {
-		count_fsb = imap[0].br_blockcount;
-	}
-		
 	map_start_fsb = offset_fsb;
 	while (count_fsb != 0) {
 		/*
