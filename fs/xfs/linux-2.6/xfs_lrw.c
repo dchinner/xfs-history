@@ -620,7 +620,7 @@ retry:
 	}
 	
 	/* Handle various SYNC-type writes */
-	if (file->f_flags & O_SYNC) {
+	if ((file->f_flags & O_SYNC) || IS_SYNC(ip)) {
 
 		/* Flush all inode data buffers */
 
