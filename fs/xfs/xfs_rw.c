@@ -2545,6 +2545,10 @@ xfs_diostrat( buf_t *bp)
  			 * Complete the bmapi() transactions.
 			 */
 			if (!exist) {
+
+
+
+
 				xfs_bmap_finish( &tp, &free_list, firstfsb );
 				xfs_trans_commit(tp ,
 						 XFS_TRANS_RELEASE_LOG_RES );
@@ -2719,6 +2723,12 @@ xfs_diostrat( buf_t *bp)
 	if ( writeflag ) {
 		timestruc_t tv;
 
+		tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
+		error = xfs_trans_reserve( tp,  0,
+			   XFS_DEFAULT_LOG_RES(mp),
+			   0, XFS_TRANS_PERM_LOG_RES,
+			   XFS_WRITE_LOG_COUNT );
+
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0){
 			ip->i_d.di_mode &= ~ISUID;
@@ -2727,7 +2737,17 @@ xfs_diostrat( buf_t *bp)
 		}
 		nanotime( &tv );
 		ip->i_d.di_mtime.t_sec = ip->i_d.di_ctime.t_sec = tv.tv_sec;
+
 		ip->i_update_core = 1;
+		/*
+		 * Write the new file size to disk.
+		 */
+		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+                xfs_trans_ihold(tp, ip);
+
+  		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+		xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
 
