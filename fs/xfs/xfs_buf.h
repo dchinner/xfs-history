@@ -89,6 +89,12 @@ typedef struct buf xfs_buf_t;
 			(buf)->b_fsprivate3 = (void *)(value)
 
 #define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
+#define XFS_BUF_ADDR(bp)	((bp)->b_blkno)
+#define XFS_BUF_SET_ADDR(bp, blk)		\
+			((bp)->b_blkno = blk)
+#define XFS_BUF_COUNT(bp)	((bp)->b_bcount)
+#define XFS_BUF_SET_COUNT(bp, cnt)		\
+			((bp)->b_bcount = cnt)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)	\
 			(bp)->b_bvtype = (type); \
 			(bp)->b_ref = (ref)
@@ -125,15 +131,15 @@ typedef struct buftarg {
 	dev_t		dev;
 } buftarg_t;
 
-#define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_done
+#define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
-			if ((buf)->pb_done == NULL) { \
+			if ((buf)->pb_iodone == NULL) { \
 				pagebuf_hold(buf); \
-				(buf)->pb_done = (func); \
+				(buf)->pb_iodone = (func); \
 			}
 #define XFS_BUF_CLR_IODONE_FUNC(buf)		\
-			if ((buf)->pb_done) { \
-				(buf)->pb_done = NULL; \
+			if ((buf)->pb_iodone) { \
+				(buf)->pb_iodone = NULL; \
 				pagebuf_rele(buf); \
 			}
 #define XFS_BUF_SET_BDSTRAT_FUNC(buf, func)
@@ -151,7 +157,13 @@ typedef struct buftarg {
 			((type)(buf)->pb_target.i_sb)
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
 
-#define XFS_BUF_PTR(bp)	((bp)->pb_addr)
+#define XFS_BUF_PTR(bp)		((bp)->pb_addr)
+#define XFS_BUF_ADDR(bp)	((bp)->pb_file_offset >> 9)
+#define XFS_BUF_SET_ADDR(bp, blk)		\
+			((bp)->pb_file_offset = (blk) << 9)
+#define XFS_BUF_COUNT(bp)	((bp)->pb_count_desired)
+#define XFS_BUF_SET_COUNT(bp, cnt)		\
+			((bp)->pb_count_desired = cnt)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)

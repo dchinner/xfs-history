@@ -6556,7 +6556,7 @@ xfs_zero_remaining_bytes(
 			continue;
 		bp->b_flags &= ~(B_DONE | B_WRITE);
 		bp->b_flags |= B_READ;
-		bp->b_blkno = XFS_FSB_TO_DB(ip, imap.br_startblock);
+		XFS_BUF_SET_ADDR(bp, XFS_FSB_TO_DB(ip, imap.br_startblock));
 		bp_dcache_wbinval(bp);
 		xfsbdstrat(mp, bp); 
 		if (error = iowait(bp))

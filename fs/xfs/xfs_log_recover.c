@@ -147,10 +147,10 @@ xlog_bread(xlog_t	*log,
 	ASSERT(nbblks > 0);
 	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
 
-	bp->b_blkno	= log->l_logBBstart + blk_no;
+	XFS_BUF_SET_ADDR(bp, log->l_logBBstart + blk_no);
 	XFS_BUF_READ(bp);
 	XFS_BUF_BUSY(bp);
-	bp->b_bcount	= BBTOB(nbblks);
+	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
 	bp->b_edev	= log->l_dev;
 	bp->b_target	= &log->l_mp->m_logdev_targ;
 
@@ -160,7 +160,7 @@ xlog_bread(xlog_t	*log,
 	xfsbdstrat(log->l_mp, bp);
 	if (error = iowait(bp)) {
 		xfs_ioerror_alert("xlog_bread", log->l_mp, 
-				  bp->b_edev, bp->b_blkno);
+				  bp->b_edev, XFS_BUF_ADDR(bp));
 		return (error);
 	}
 	return error;
@@ -184,15 +184,15 @@ xlog_bwrite(
 	ASSERT(nbblks > 0);
 	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
 
-	bp->b_blkno	= log->l_logBBstart + blk_no;
+	XFS_BUF_SET_ADDR(bp, log->l_logBBstart + blk_no);
 	bp->b_flags	= B_BUSY | B_HOLD;
-	bp->b_bcount	= BBTOB(nbblks);
+	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
 	bp->b_edev	= log->l_dev;
 	bp->b_target	= &log->l_mp->m_logdev_targ;
 
 	if (error = xfs_bwrite(log->l_mp, bp)) 
 		xfs_ioerror_alert("xlog_bwrite", log->l_mp, 
-				  bp->b_edev, bp->b_blkno);
+				  bp->b_edev, XFS_BUF_ADDR(bp));
 	
 	return (error);
 }	/* xlog_bwrite */
@@ -1559,7 +1559,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 	bit = 0;
 	nbits = 0;
 	item_index = 0;
-	inodes_per_buf = bp->b_bcount >> mp->m_sb.sb_inodelog;
+	inodes_per_buf = XFS_BUF_COUNT(bp) >> mp->m_sb.sb_inodelog;
 	for (i = 0; i < inodes_per_buf; i++) {
 		next_unlinked_offset = (i * mp->m_sb.sb_inodesize) +
 			offsetof(xfs_dinode_t, di_next_unlinked);
@@ -1601,7 +1601,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 
 		ASSERT(item->ri_buf[item_index].i_addr != NULL);
 		ASSERT((item->ri_buf[item_index].i_len % XFS_BLI_CHUNK) == 0);
-		ASSERT((reg_buf_offset + reg_buf_bytes) <= bp->b_bcount);
+		ASSERT((reg_buf_offset + reg_buf_bytes) <= XFS_BUF_COUNT(bp));
 
 		/*
 		 * The current logged region contains a copy of the
@@ -1668,7 +1668,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		nbits = xfs_buf_item_contig_bits(data_map, map_size, bit);
 		ASSERT(item->ri_buf[i].i_addr != 0);
 		ASSERT(item->ri_buf[i].i_len % XFS_BLI_CHUNK == 0);
-		ASSERT(bp->b_bcount >=
+		ASSERT(XFS_BUF_COUNT(bp) >=
 		       ((uint)bit << XFS_BLI_SHIFT)+(nbits<<XFS_BLI_SHIFT));
 		
 		/*
@@ -1857,7 +1857,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	 */
 	error = 0;
 	if ((*((__uint16_t *)(XFS_BUF_PTR(bp))) == XFS_DINODE_MAGIC) &&
-	    (bp->b_bcount != MAX(log->l_mp->m_sb.sb_blocksize,
+	    (XFS_BUF_COUNT(bp) != MAX(log->l_mp->m_sb.sb_blocksize,
 							 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
 	  XFS_BUF_STALE(bp);
 	  error = xfs_bwrite(mp, bp);
@@ -1992,7 +1992,8 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <= XFS_BUF_PTR(bp)+bp->b_bcount);
+	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <=
+			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
 	bcopy(item->ri_buf[1].i_addr, dip, item->ri_buf[1].i_len);
 
 	if (in_f->ilf_size == 2)
@@ -2008,7 +2009,8 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	switch (fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
-		ASSERT((caddr_t)&dip->di_u+len <= XFS_BUF_PTR(bp)+bp->b_bcount);
+		ASSERT((caddr_t)&dip->di_u+len <=
+			XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
 		bcopy(src, &dip->di_u, len);
 		break;
 
@@ -2056,7 +2058,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		case XFS_ILOG_ADATA:
 		case XFS_ILOG_AEXT:
 			dest = XFS_DFORK_APTR(dip);
-			ASSERT(dest+len <= XFS_BUF_PTR(bp)+bp->b_bcount);
+			ASSERT(dest+len <= XFS_BUF_PTR(bp)+XFS_BUF_COUNT(bp));
 			ASSERT(len <= XFS_DFORK_ASIZE(dip, mp));
 			bcopy(src, dest, len);
 			break;
@@ -2222,7 +2224,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		return XFS_ERROR(EIO);
 	}
 	ASSERT((caddr_t)ddq + item->ri_buf[1].i_len <=
-	       XFS_BUF_PTR(bp) + bp->b_bcount);
+	       XFS_BUF_PTR(bp) + XFS_BUF_COUNT(bp));
 
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
 

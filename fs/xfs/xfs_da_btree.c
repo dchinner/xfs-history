@@ -2435,25 +2435,25 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 #ifdef XFS_DABUF_DEBUG
 	dabuf->ra = ra;
 	dabuf->dev = bps[0]->b_edev;
-	dabuf->blkno = bps[0]->b_blkno;
+	dabuf->blkno = XFS_BUF_ADDR(bps[0]);
 #endif
 	if (nbuf == 1) {
 		dabuf->nbuf = 1;
 		bp = bps[0];
-		dabuf->bbcount = (short)BTOBB(bp->b_bcount);
+		dabuf->bbcount = (short)BTOBB(XFS_BUF_COUNT(bp));
 		dabuf->data = XFS_BUF_PTR(bp);
 		dabuf->bps[0] = bp;
 	} else {
 		dabuf->nbuf = nbuf;
 		for (i = 0, dabuf->bbcount = 0; i < nbuf; i++) {
 			dabuf->bps[i] = bp = bps[i];
-			dabuf->bbcount += BTOBB(bp->b_bcount);
+			dabuf->bbcount += BTOBB(XFS_BUF_COUNT(bp));
 		}
 		dabuf->data = kmem_alloc(BBTOB(dabuf->bbcount), KM_SLEEP);
-		for (i = off = 0; i < nbuf; i++, off += bp->b_bcount) {
+		for (i = off = 0; i < nbuf; i++, off += XFS_BUF_COUNT(bp)) {
 			bp = bps[i];
 			bcopy(XFS_BUF_PTR(bp), (char *)dabuf->data + off,
-				bp->b_bcount);
+				XFS_BUF_COUNT(bp));
 		}
 	}
 #ifdef XFS_DABUF_DEBUG
@@ -2490,10 +2490,11 @@ xfs_da_buf_clean(xfs_dabuf_t *dabuf)
 	if (dabuf->dirty) {
 		ASSERT(dabuf->nbuf > 1);
 		dabuf->dirty = 0;
-		for (i = off = 0; i < dabuf->nbuf; i++, off += bp->b_bcount) {
+		for (i = off = 0; i < dabuf->nbuf;
+				i++, off += XFS_BUF_COUNT(bp)) {
 			bp = dabuf->bps[i];
 			bcopy((char *)dabuf->data + off, XFS_BUF_PTR(bp),
-				bp->b_bcount);
+				XFS_BUF_COUNT(bp));
 		}
 	}
 }
@@ -2550,10 +2551,10 @@ xfs_da_log_buf(xfs_trans_t *tp, xfs_dabuf_t *dabuf, uint first, uint last)
 	}
 	dabuf->dirty = 1;
 	ASSERT(first <= last);
-	for (i = off = 0; i < dabuf->nbuf; i++, off += bp->b_bcount) {
+	for (i = off = 0; i < dabuf->nbuf; i++, off += XFS_BUF_COUNT(bp)) {
 		bp = dabuf->bps[i];
 		f = off;
-		l = f + bp->b_bcount - 1;
+		l = f + XFS_BUF_COUNT(bp) - 1;
 		if (f < first)
 			f = first;
 		if (l > last)
@@ -2689,5 +2690,5 @@ xfs_da_blkno(xfs_dabuf_t *dabuf)
 {
 	ASSERT(dabuf->nbuf);
 	ASSERT(dabuf->data);
-	return dabuf->bps[0]->b_blkno;
+	return XFS_BUF_ADDR(dabuf->bps[0]);
 }

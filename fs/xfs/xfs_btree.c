@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.66 $"
+#ident	"$Revision: 1.67 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -423,7 +423,7 @@ xfs_btree_dup_cursor(
 		new->bc_ra[i] = cur->bc_ra[i];
 		if (bp = cur->bc_bufs[i]) {
 			if (error = xfs_trans_read_buf(mp, tp, mp->m_dev,
-					bp->b_blkno, mp->m_bsize, 0, &bp)) {
+				XFS_BUF_ADDR(bp), mp->m_bsize, 0, &bp)) {
 #pragma mips_frequency_hint NEVER
 				xfs_btree_del_cursor(new, error);
 				*ncur = NULL;

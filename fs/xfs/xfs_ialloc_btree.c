@@ -1020,7 +1020,7 @@ xfs_inobt_lookup(
 		 * throw it away, otherwise just use it.
 		 */
 		bp = cur->bc_bufs[level];
-		if (bp && bp->b_blkno != d)
+		if (bp && XFS_BUF_ADDR(bp) != d)
 			bp = (xfs_buf_t *)0;
 		if (!bp) {
 			/*
@@ -1393,7 +1393,7 @@ xfs_inobt_newroot(
 		 * Our block is left, pick up the right block.
 		 */
 		lbp = bp;
-		lbno = XFS_DADDR_TO_AGBNO(args.mp, lbp->b_blkno);
+		lbno = XFS_DADDR_TO_AGBNO(args.mp, XFS_BUF_ADDR(lbp));
 		left = block;
 		rbno = left->bb_rightsib;
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
@@ -1410,7 +1410,7 @@ xfs_inobt_newroot(
 		 * Our block is right, pick up the left block.
 		 */
 		rbp = bp;
-		rbno = XFS_DADDR_TO_AGBNO(args.mp, rbp->b_blkno);
+		rbno = XFS_DADDR_TO_AGBNO(args.mp, XFS_BUF_ADDR(rbp));
 		right = block;
 		lbno = right->bb_leftsib;
 		if (error = xfs_btree_read_bufs(args.mp, args.tp, args.agno,
@@ -1627,7 +1627,7 @@ xfs_inobt_split(
 	lbp = cur->bc_bufs[level];
 	args.tp = cur->bc_tp;
 	args.mp = cur->bc_mp;
-	lbno = XFS_DADDR_TO_AGBNO(args.mp, lbp->b_blkno);
+	lbno = XFS_DADDR_TO_AGBNO(args.mp, XFS_BUF_ADDR(lbp));
 	/*
 	 * Allocate the new block.
 	 * If we can't do it, we're toast.  Give up.

@@ -247,7 +247,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 */
 	bp->b_edev = dev;
 	bp->b_relse = xfs_sb_relse;
-	bp->b_blkno = XFS_SB_DADDR;		
+	XFS_BUF_SET_ADDR(bp, XFS_SB_DADDR);
 	bp->b_flags |= B_READ;
 	bp->b_target = mp->m_ddev_targp;
 	xfsbdstrat(mp, bp);

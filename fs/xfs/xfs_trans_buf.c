@@ -824,7 +824,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT(XFS_BUF_FSPRIVATE2(bp, xfs_trans_t *) == tp);
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
-	ASSERT((first <= last) && (last < bp->b_bcount));
+	ASSERT((first <= last) && (last < XFS_BUF_COUNT(bp)));
 	ASSERT((XFS_BUF_IODONE_FUNC(bp) == NULL) ||
 	       (XFS_BUF_IODONE_FUNC(bp) == xfs_buf_iodone_callbacks));
 
@@ -1082,8 +1082,8 @@ xfs_trans_buf_item_match(
 
 			bp = blip->bli_buf;
 			if ((bp->b_edev == dev) &&
-			    (bp->b_blkno == blkno) &&
-			    (bp->b_bcount == len)) {
+			    (XFS_BUF_ADDR(bp) == blkno) &&
+			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
 				 * We found it.  Break out and
 				 * return the pointer to the buffer.
@@ -1140,8 +1140,8 @@ xfs_trans_buf_item_match_all(
 
 			bp = blip->bli_buf;
 			if ((bp->b_edev == dev) &&
-			    (bp->b_blkno == blkno) &&
-			    (bp->b_bcount == len)) {
+			    (XFS_BUF_ADDR(bp) == blkno) &&
+			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
 				 * We found it.  Break out and
 				 * return the pointer to the buffer.

@@ -642,7 +642,7 @@ xfs_buf_item_init(
 	 * truncate any pieces.  map_size is the size of the
 	 * bitmap needed to describe the chunks of the buffer.
 	 */
-	chunks = (int)((bp->b_bcount + (XFS_BLI_CHUNK - 1)) >> XFS_BLI_SHIFT);
+	chunks = (int)((XFS_BUF_COUNT(bp) + (XFS_BLI_CHUNK - 1)) >> XFS_BLI_SHIFT);
 	map_size = (int)((chunks + NBWORD) >> BIT_TO_WORD_SHIFT);
 
 	bip = (xfs_buf_log_item_t*)kmem_zone_zalloc(xfs_buf_item_zone,
@@ -652,8 +652,8 @@ xfs_buf_item_init(
 	bip->bli_item.li_mountp = mp;
 	bip->bli_buf = bp;
 	bip->bli_format.blf_type = XFS_LI_BUF;
-	bip->bli_format.blf_blkno = (__int64_t)bp->b_blkno;
-	bip->bli_format.blf_len = (ushort)BTOBB(bp->b_bcount);
+	bip->bli_format.blf_blkno = (__int64_t)XFS_BUF_ADDR(bp);
+	bip->bli_format.blf_len = (ushort)BTOBB(XFS_BUF_COUNT(bp));
 	bip->bli_format.blf_map_size = map_size;
 #ifdef XFS_BLI_TRACE
 	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, 0);
@@ -668,9 +668,9 @@ xfs_buf_item_init(
 	 * the buffer to indicate which bytes the callers have asked
 	 * to have logged.
 	 */
-	bip->bli_orig = (char *)kmem_alloc(bp->b_bcount, KM_SLEEP);
-	bcopy(XFS_BUF_PTR(bp), bip->bli_orig, bp->b_bcount);
-	bip->bli_logged = (char *)kmem_zalloc(bp->b_bcount / NBBY, KM_SLEEP);
+	bip->bli_orig = (char *)kmem_alloc(XFS_BUF_COUNT(bp), KM_SLEEP);
+	bcopy(XFS_BUF_PTR(bp), bip->bli_orig, XFS_BUF_COUNT(bp));
+	bip->bli_logged = (char *)kmem_zalloc(XFS_BUF_COUNT(bp) / NBBY, KM_SLEEP);
 #endif
 
 	/*
@@ -860,11 +860,11 @@ xfs_buf_item_log_check(
 	ASSERT(bip->bli_logged != NULL);
 
 	bp = bip->bli_buf;
-	ASSERT(bp->b_bcount > 0);
+	ASSERT(XFS_BUF_COUNT(bp) > 0);
 	ASSERT(XFS_BUF_PTR(bp) != NULL);
 	orig = bip->bli_orig;
 	buffer = XFS_BUF_PTR(bp);
-	for (x = 0; x < bp->b_bcount; x++) {
+	for (x = 0; x < XFS_BUF_COUNT(bp); x++) {
 		if (orig[x] != buffer[x] && !btst(bip->bli_logged, x))
 			cmn_err(CE_PANIC,
 	"xfs_buf_item_log_check bip %x buffer %x orig %x index %d",
@@ -1140,9 +1140,9 @@ xfs_buf_item_relse(
 	}
 
 #ifdef XFS_TRANS_DEBUG
-	kmem_free(bip->bli_orig, bp->b_bcount);
+	kmem_free(bip->bli_orig, XFS_BUF_COUNT(bp));
 	bip->bli_orig = NULL;
-	kmem_free(bip->bli_logged, bp->b_bcount / NBBY);
+	kmem_free(bip->bli_logged, XFS_BUF_COUNT(bp) / NBBY);
 	bip->bli_logged = NULL;
 #endif /* XFS_TRANS_DEBUG */
 
@@ -1263,7 +1263,7 @@ xfs_buf_iodone_callbacks(
 		if ((bp->b_edev != lastdev) || ((lbolt - lasttime) > 500)) {
 			prdev("XFS write error in file system meta-data "
 			      "block 0x%x in %s",
-			      (int)bp->b_edev, bp->b_blkno, 
+			      (int)bp->b_edev, XFS_BUF_ADDR(bp), 
 			      mp->m_fsname);
 			lasttime = lbolt;
 		}
@@ -1391,9 +1391,9 @@ xfs_buf_iodone(
 	xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip, s);
 
 #ifdef XFS_TRANS_DEBUG
-	kmem_free(bip->bli_orig, bp->b_bcount);
+	kmem_free(bip->bli_orig, XFS_BUF_COUNT(bp));
 	bip->bli_orig = NULL;
-	kmem_free(bip->bli_logged, bp->b_bcount / NBBY);
+	kmem_free(bip->bli_logged, XFS_BUF_COUNT(bp) / NBBY);
 	bip->bli_logged = NULL;
 #endif /* XFS_TRANS_DEBUG */
 
@@ -1419,8 +1419,8 @@ xfs_buf_item_trace(
 		     (void *)((unsigned long)bip->bli_flags),
 		     (void *)((unsigned long)bip->bli_recur),
 		     (void *)((unsigned long)bip->bli_refcount),
-		     (void *)bp->b_blkno,
-		     (void *)((unsigned long)bp->b_bcount),
+		     (void *)XFS_BUF_ADDR(bp),
+		     (void *)((unsigned long)XFS_BUF_COUNT(bp)),
 		     (void *)((unsigned long)(0xFFFFFFFF & (XFS_BFLAGS(bp) >> 32))),
 		     (void *)((unsigned long)(0xFFFFFFFF & XFS_BFLAGS(bp))),
 		     XFS_BUF_FSPRIVATE(bp, void *),

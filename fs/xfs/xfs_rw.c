@@ -2855,7 +2855,7 @@ xfs_zero_eof(
 #endif
 		{	
 			bp_mapin(bp);
-			bzero(XFS_BUF_PTR(bp), bp->b_bcount);
+			bzero(XFS_BUF_PTR(bp), XFS_BUF_COUNT(bp));
 	        }
 		ASSERT(bp->b_vp);
 		buftrace("XFS ZERO EOF", bp);
@@ -8178,7 +8178,7 @@ xfs_diostrat(
 	 */
 	if (!(diop->xd_ioflag & IO_IGNCACHE) && VN_CACHED(vp)) {
 		xfs_inval_cached_pages(vp, io,
-					offset, bp->b_bcount, diop);
+					offset, XFS_BUF_COUNT(bp), diop);
 	}
 
 	/*

@@ -212,7 +212,7 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 "Bad magic # 0x%x in XFS inode buffer 0x%llx, starting blockno %lld, offset 0x%x",
 				dip->di_core.di_magic,
 				(__uint64_t)(__psunsigned_t) bp,
-				(__int64_t) bp->b_blkno,
+				(__int64_t) XFS_BUF_ADDR(bp),
 				(__psint_t) dip - (__psint_t) XFS_BUF_PTR(bp));
 			xfs_fs_cmn_err(CE_WARN, mp,
 				"corrupt, unmount and run xfs_repair");
@@ -221,7 +221,7 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 			cmn_err(CE_WARN,
 "Bad next_unlinked field (0) in XFS inode buffer 0x%x, starting blockno %lld, offset 0x%x",
 				(__uint64_t)(__psunsigned_t) bp,
-				(__int64_t) bp->b_blkno,
+				(__int64_t) XFS_BUF_ADDR(bp),
 				(__psint_t) dip - (__psint_t) XFS_BUF_PTR(bp));
 			xfs_fs_cmn_err(CE_WARN, mp,
 				"corrupt, unmount and run xfs_repair");

@@ -673,7 +673,7 @@ xfs_bmbt_delrec(
 		rrblock->bb_leftsib = lbno;
 		xfs_bmbt_log_block(cur, rrbp, XFS_BB_LEFTSIB);
 	}
-	xfs_bmap_add_free(XFS_DADDR_TO_FSB(mp, rbp->b_blkno), 1,
+	xfs_bmap_add_free(XFS_DADDR_TO_FSB(mp, XFS_BUF_ADDR(rbp)), 1,
 		cur->bc_private.b.flist, mp);
 	if (!async)
 		xfs_trans_set_sync(cur->bc_tp);
@@ -1013,7 +1013,7 @@ xfs_bmbt_killroot(
 	}
 #endif
 	bcopy(cpp, pp, block->bb_numrecs * sizeof(*pp));
-	xfs_bmap_add_free(XFS_DADDR_TO_FSB(cur->bc_mp, cbp->b_blkno), 1,
+	xfs_bmap_add_free(XFS_DADDR_TO_FSB(cur->bc_mp, XFS_BUF_ADDR(cbp)), 1,
 		cur->bc_private.b.flist, cur->bc_mp);
 	if (!async)
 		xfs_trans_set_sync(cur->bc_tp);
@@ -1154,7 +1154,7 @@ xfs_bmbt_lookup(
 		if (level < cur->bc_nlevels - 1) {
 			d = XFS_FSB_TO_DADDR(mp, fsbno);
 			bp = cur->bc_bufs[level];
-			if (bp && bp->b_blkno != d)
+			if (bp && XFS_BUF_ADDR(bp) != d)
 				bp = (xfs_buf_t *)0;
 			if (!bp) {
 				if (error = xfs_btree_read_bufl(mp, tp, fsbno,
@@ -1583,7 +1583,7 @@ xfs_bmbt_split(
 	args.tp = cur->bc_tp;
 	args.mp = cur->bc_mp;
 	lbp = cur->bc_bufs[level];
-	lbno = XFS_DADDR_TO_FSB(args.mp, lbp->b_blkno);
+	lbno = XFS_DADDR_TO_FSB(args.mp, XFS_BUF_ADDR(lbp));
 	left = XFS_BUF_TO_BMBT_BLOCK(lbp);
 	args.fsbno = cur->bc_private.b.firstblock;
 	if (args.fsbno == NULLFSBLOCK) {

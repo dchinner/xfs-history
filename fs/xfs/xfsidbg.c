@@ -1442,7 +1442,7 @@ xfs_inodebuf(xfs_buf_t *bp)
 		return;
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 	mp = XFS_BHVTOM(bdp);
-	n = bp->b_bcount >> mp->m_sb.sb_inodelog;
+	n = XFS_BUF_COUNT(bp) >> mp->m_sb.sb_inodelog;
 	for (i = 0, di = (xfs_dinode_t *)XFS_BUF_PTR(bp);
 	     i < n;
 	     i++, di = (xfs_dinode_t *)((char *)di + mp->m_sb.sb_inodesize)) {
@@ -2592,7 +2592,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 				       bta->bb_level, bta);
 		} else {
 			qprintf("buf 0x%x abtbno 0x%x\n", bp, bta);
-			xfs_btalloc(bta, bp->b_bcount);
+			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
 	} else if ((bta = d)->bb_magic == XFS_ABTC_MAGIC) {
 		if (summary) {
@@ -2600,7 +2600,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 				       bta->bb_level, bta);
 		} else {
 			qprintf("buf 0x%x abtcnt 0x%x\n", bp, bta);
-			xfs_btalloc(bta, bp->b_bcount);
+			xfs_btalloc(bta, XFS_BUF_COUNT(bp));
 		}
 	} else if ((btb = d)->bb_magic == XFS_BMAP_MAGIC) {
 		if (summary) {
@@ -2608,7 +2608,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 				      btb->bb_level, btb);
 		} else {
 			qprintf("buf 0x%x bmapbt 0x%x\n", bp, btb);
-			xfs_btbmap(btb, bp->b_bcount);
+			xfs_btbmap(btb, XFS_BUF_COUNT(bp));
 		}
 	} else if ((bti = d)->bb_magic == XFS_IBT_MAGIC) {
 		if (summary) {
@@ -2616,7 +2616,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 				       bti->bb_level, bti);
 		} else {
 			qprintf("buf 0x%x inobt 0x%x\n", bp, bti);
-			xfs_btino(bti, bp->b_bcount);
+			xfs_btino(bti, XFS_BUF_COUNT(bp));
 		}
 	} else if ((aleaf = d)->hdr.info.magic == XFS_ATTR_LEAF_MAGIC) {
 		if (summary) {
@@ -2668,28 +2668,28 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			qprintf("Dir2 block (at 0x%x)\n", d2block);
 		} else {
 			qprintf("buf 0x%x dir2 block 0x%x\n", bp, d2block);
-			xfs_dir2data((void *)d2block, bp->b_bcount);
+			xfs_dir2data((void *)d2block, XFS_BUF_COUNT(bp));
 		}
 	} else if ((d2data = d)->hdr.magic == XFS_DIR2_DATA_MAGIC) {
 		if (summary) {
 			qprintf("Dir2 data (at 0x%x)\n", d2data);
 		} else {
 			qprintf("buf 0x%x dir2 data 0x%x\n", bp, d2data);
-			xfs_dir2data((void *)d2data, bp->b_bcount);
+			xfs_dir2data((void *)d2data, XFS_BUF_COUNT(bp));
 		}
 	} else if ((d2leaf = d)->hdr.info.magic == XFS_DIR2_LEAF1_MAGIC) {
 		if (summary) {
 			qprintf("Dir2 leaf(1) (at 0x%x)\n", d2leaf);
 		} else {
 			qprintf("buf 0x%x dir2 leaf 0x%x\n", bp, d2leaf);
-			xfs_dir2leaf(d2leaf, bp->b_bcount);
+			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
 	} else if (d2leaf->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC) {
 		if (summary) {
 			qprintf("Dir2 leaf(n) (at 0x%x)\n", d2leaf);
 		} else {
 			qprintf("buf 0x%x dir2 leaf 0x%x\n", bp, d2leaf);
-			xfs_dir2leaf(d2leaf, bp->b_bcount);
+			xfs_dir2leaf(d2leaf, XFS_BUF_COUNT(bp));
 		}
 	} else if ((d2free = d)->hdr.magic == XFS_DIR2_FREE_MAGIC) {
 		if (summary) {

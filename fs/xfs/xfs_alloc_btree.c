@@ -1056,7 +1056,7 @@ xfs_alloc_lookup(
 		 * throw it away, otherwise just use it.
 		 */
 		bp = cur->bc_bufs[level];
-		if (bp && bp->b_blkno != d)
+		if (bp && XFS_BUF_ADDR(bp) != d)
 			bp = (xfs_buf_t *)0;
 		if (!bp) {
 			/*
@@ -1432,7 +1432,7 @@ xfs_alloc_newroot(
 		/*
 		 * Our block is left, pick up the right block.
 		 */
-		lbno = XFS_DADDR_TO_AGBNO(mp, lbp->b_blkno);
+		lbno = XFS_DADDR_TO_AGBNO(mp, XFS_BUF_ADDR(lbp));
 		rbno = left->bb_rightsib;
 		if (error = xfs_btree_read_bufs(mp, cur->bc_tp,
 				cur->bc_private.a.agno, rbno, 0, &rbp,
@@ -1449,7 +1449,7 @@ xfs_alloc_newroot(
 		 */
 		rbp = lbp;
 		right = left;
-		rbno = XFS_DADDR_TO_AGBNO(mp, rbp->b_blkno);
+		rbno = XFS_DADDR_TO_AGBNO(mp, XFS_BUF_ADDR(rbp));
 		lbno = right->bb_leftsib;
 		if (error = xfs_btree_read_bufs(mp, cur->bc_tp,
 				cur->bc_private.a.agno, lbno, 0, &lbp,
@@ -1750,7 +1750,7 @@ xfs_alloc_split(
 	 * Find the left block number by looking in the buffer.
 	 * Adjust numrecs, sibling pointers.
 	 */
-	lbno = XFS_DADDR_TO_AGBNO(cur->bc_mp, lbp->b_blkno);
+	lbno = XFS_DADDR_TO_AGBNO(cur->bc_mp, XFS_BUF_ADDR(lbp));
 	left->bb_numrecs -= right->bb_numrecs;
 	right->bb_rightsib = left->bb_rightsib;
 	left->bb_rightsib = rbno;

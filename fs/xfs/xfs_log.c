@@ -1388,7 +1388,7 @@ xlog_sync(xlog_t		*log,
 	bp	    = iclog->ic_bp;
 	ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) == (unsigned long)1);
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
-	bp->b_blkno = BLOCK_LSN(iclog->ic_header.h_lsn);
+	XFS_BUF_SET_ADDR(bp, BLOCK_LSN(iclog->ic_header.h_lsn));
 
 	/* Round byte count up to a BBSIZE chunk */
 	count = BBTOB(BTOBB(iclog->ic_offset));
@@ -1408,15 +1408,15 @@ xlog_sync(xlog_t		*log,
 	XFSSTATS.xs_log_blocks += BTOBB(count);
 
 	/* Do we need to split this write into 2 parts? */
-	if (bp->b_blkno + BTOBB(count) > log->l_logBBsize) {
-		split = count - (BBTOB(log->l_logBBsize - bp->b_blkno));
-		count = BBTOB(log->l_logBBsize - bp->b_blkno);
+	if (XFS_BUF_ADDR(bp) + BTOBB(count) > log->l_logBBsize) {
+		split = count - (BBTOB(log->l_logBBsize - XFS_BUF_ADDR(bp)));
+		count = BBTOB(log->l_logBBsize - XFS_BUF_ADDR(bp));
 		iclog->ic_bwritecnt = 2;	/* split into 2 writes */
 	} else {
 		iclog->ic_bwritecnt = 1;
 	}
 	XFS_BUF_PTR(bp)	= (caddr_t) &(iclog->ic_header);
-	bp->b_bcount	= count;
+	XFS_BUF_SET_COUNT(bp, count);
 	XFS_BUF_SET_FSPRIVATE(bp, iclog);	/* save for later */
 	if (flags & XFS_LOG_SYNC){
 		XFS_BUF_BUSY(bp);
@@ -1426,20 +1426,20 @@ xlog_sync(xlog_t		*log,
 		XFS_BUF_ASYNC(bp);
 	}
 
-	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
-	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
+	ASSERT(XFS_BUF_ADDR(bp) <= log->l_logBBsize-1);
+	ASSERT(XFS_BUF_ADDR(bp) + BTOBB(count) <= log->l_logBBsize);
 
 	xlog_verify_iclog(log, iclog, count, B_TRUE);
 
 	/* account for log which doesn't start at block #0 */
-	bp->b_blkno += log->l_logBBstart;
+	XFS_BUF_ADDR(bp) += log->l_logBBstart;
 	/*
 	 * Don't call xfs_bwrite here. We do log-syncs even when the filesystem
 	 * is shutting down.
 	 */
 	if (error = bwrite(bp)) {
 		xfs_ioerror_alert("xlog_sync", log->l_mp, bp->b_edev, 
-				  bp->b_blkno);
+				  XFS_BUF_ADDR(bp));
 		return (error);
 	}
 	if (split) {
@@ -1447,8 +1447,8 @@ xlog_sync(xlog_t		*log,
 		ASSERT(XFS_BUF_FSPRIVATE2(bp, unsigned long) ==
 							(unsigned long)1);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
-		bp->b_blkno	= 0;		     /* logical 0 */
-		bp->b_bcount	= split;
+		XFS_BUF_SET_ADDR(bp, 0);	     /* logical 0 */
+		XFS_BUF_SET_COUNT(bp, split);
 		XFS_BUF_PTR(bp)	= (caddr_t)((__psint_t)&(iclog->ic_header)+
 					    (__psint_t)count);
 		XFS_BUF_SET_FSPRIVATE(bp, iclog);
@@ -1468,14 +1468,14 @@ xlog_sync(xlog_t		*log,
 			dptr += BBSIZE;
 		}
 
-		ASSERT(bp->b_blkno <= log->l_logBBsize-1);
-		ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
+		ASSERT(XFS_BUF_ADDR(bp) <= log->l_logBBsize-1);
+		ASSERT(XFS_BUF_ADDR(bp) + BTOBB(count) <= log->l_logBBsize);
 
 		/* account for internal log which does't start at block #0 */
-		bp->b_blkno += log->l_logBBstart;
+		XFS_BUF_SET_ADDR(bp, XFS_BUF_ADDR(bp) + log->l_logBBstart);
 		if (error = bwrite(bp)) {
 			xfs_ioerror_alert("xlog_sync (split)", log->l_mp, 
-					  bp->b_edev, bp->b_blkno);
+					  bp->b_edev, XFS_BUF_ADDR(bp));
 			return (error);
 		}
 	}
