@@ -5620,7 +5620,7 @@ xfs_getbmap(
 
 	if (whichfork == XFS_DATA_FORK && ip->i_delayed_blks) {
 
-		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, 0, FI_REMAPF, error);
+		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
 	}
 
 	ASSERT(whichfork == XFS_ATTR_FORK || ip->i_delayed_blks == 0);

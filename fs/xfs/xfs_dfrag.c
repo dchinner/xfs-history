@@ -240,7 +240,7 @@ xfs_swapext(
 	 * fields change.
 	 */
 
-	VOP_TOSS_PAGES(vp, 0, FI_REMAPF);
+	VOP_TOSS_PAGES(vp, 0, -1, FI_REMAPF);
 	VN_FLAGCLR(vp, VREMAPPING);
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SWAPEXT);

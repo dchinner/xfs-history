@@ -128,11 +128,13 @@ fs_vnode_change(
 
 /*
  * vnode pcache layer for vnode_tosspages.
+ * 'last' parameter unused but left in for IRIX compatibility
  */
 void
 fs_tosspages(
         bhv_desc_t	*bdp,
 	xfs_off_t	first,
+	xfs_off_t	last,
 	int		fiopt)
 {
 	if (BHV_TO_VNODE(bdp)->v_inode)
@@ -143,11 +145,13 @@ fs_tosspages(
 
 /*
  * vnode pcache layer for vnode_flushinval_pages.
+ * 'last' parameter unused but left in for IRIX compatibility
  */
 void
 fs_flushinval_pages(
         bhv_desc_t	*bdp,
 	xfs_off_t	first,
+	xfs_off_t	last,
 	int		fiopt)
 {
 	if (BHV_TO_VNODE(bdp)->v_inode)
@@ -159,11 +163,13 @@ fs_flushinval_pages(
 
 /*
  * vnode pcache layer for vnode_flush_pages.
+ * 'last' parameter unused but left in for IRIX compatibility
  */
 int
 fs_flush_pages(
         bhv_desc_t	*bdp,
 	xfs_off_t	first,
+	xfs_off_t	last,
 	uint64_t	flags,
 	int		fiopt)
 {
@@ -187,3 +193,16 @@ fs_pages_sethole(
 {
 	printk("XFS: fs_pages_sethole() NOT IMPLEMENTED\n");
 }
+
+#ifdef CELL_CAPABLE
+EXPORT_SYMBOL(fs_noerr);
+EXPORT_SYMBOL(fs_nosys);
+EXPORT_SYMBOL(fs_nodev);
+EXPORT_SYMBOL(fs_noval);
+EXPORT_SYMBOL(fs_vnode_change);
+EXPORT_SYMBOL(fs_dounmount);
+EXPORT_SYMBOL(fs_tosspages);
+EXPORT_SYMBOL(fs_flushinval_pages);
+EXPORT_SYMBOL(fs_flush_pages);
+EXPORT_SYMBOL(fs_pages_sethole);
+#endif

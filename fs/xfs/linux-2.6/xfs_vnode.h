@@ -226,9 +226,9 @@ typedef	int	(*vop_attr_list_t)(bhv_desc_t *, char *, int, int,
 				struct attrlist_cursor_kern *, struct cred *);
 typedef	void	(*vop_link_removed_t)(bhv_desc_t *, vnode_t *, int);
 typedef	void	(*vop_vnode_change_t)(bhv_desc_t *, vchange_t, __psint_t);
-typedef	void	(*vop_ptossvp_t)(bhv_desc_t *, xfs_off_t, int);
-typedef	void	(*vop_pflushinvalvp_t)(bhv_desc_t *, xfs_off_t, int);
-typedef	int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, uint64_t, int);
+typedef	void	(*vop_ptossvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
+typedef	void	(*vop_pflushinvalvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
+typedef	int	(*vop_pflushvp_t)(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);
 typedef	void	(*vop_sethole_t)(bhv_desc_t *, void *, int, int, xfs_off_t);
 typedef	int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 
@@ -490,23 +490,30 @@ typedef struct vnodeops {
 }
 /*
  * These are page cache functions that now go thru VOPs.
+ * 'last' parameter is unused and left in for IRIX compatibility
  */
-#define VOP_TOSS_PAGES(vp, first, fiopt)				\
+#define VOP_TOSS_PAGES(vp, first, last, fiopt)				\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	_VOP_(vop_tosspages, vp)((vp)->v_fbhv,first,fiopt);	\
+	_VOP_(vop_tosspages, vp)((vp)->v_fbhv,first, last, fiopt);	\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_FLUSHINVAL_PAGES(vp, first, fiopt)			\
+/*
+ * 'last' parameter is unused and left in for IRIX compatibility
+ */
+#define VOP_FLUSHINVAL_PAGES(vp, first, last, fiopt)			\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	_VOP_(vop_flushinval_pages, vp)((vp)->v_fbhv,first,fiopt);	\
+	_VOP_(vop_flushinval_pages, vp)((vp)->v_fbhv,first,last,fiopt);	\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
-#define VOP_FLUSH_PAGES(vp, first, flags, fiopt, rv)			\
+/*
+ * 'last' parameter is unused and left in for IRIX compatibility
+ */
+#define VOP_FLUSH_PAGES(vp, first, last, flags, fiopt, rv)		\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_flush_pages, vp)((vp)->v_fbhv,first,flags,fiopt);\
+	rv = _VOP_(vop_flush_pages, vp)((vp)->v_fbhv,first,last,flags,fiopt);\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_PAGES_SETHOLE(vp, pfd, cnt, doremap, remapoffset)		\

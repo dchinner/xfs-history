@@ -772,7 +772,7 @@ int linvfs_bmap(struct address_space *mapping, long block)
 
 	if (inode->i_data.nrpages) {
 		VOP_RWLOCK(vp, VRWLOCK_READ);
-		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, 0, FI_REMAPF, error);
+		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1, 0, FI_REMAPF, error);
 		VOP_RWUNLOCK(vp, VRWLOCK_READ);
 		if (error)
 			return -1;

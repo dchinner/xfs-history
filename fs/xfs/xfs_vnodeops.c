@@ -1272,7 +1272,7 @@ xfs_fsync(
 	if (flag & FSYNC_INVAL) {
 		if (ip->i_df.if_flags & XFS_IFEXTENTS &&
 		    ip->i_df.if_bytes > 0) {
-			VOP_FLUSHINVAL_PAGES(vp, start, FI_REMAPF_LOCKED);
+			VOP_FLUSHINVAL_PAGES(vp, start, -1, FI_REMAPF_LOCKED);
 		}
 		ASSERT(syncall == 0 || (VN_CACHED(vp) == 0));
 	} else {
@@ -1281,7 +1281,8 @@ xfs_fsync(
 		 * flush all the dirty mmap'd pages.  That requires a
 		 * call to msync().
 		 */
-		VOP_FLUSH_PAGES(vp, start, (flag & FSYNC_WAIT) ? 0 : XFS_B_ASYNC,
+		VOP_FLUSH_PAGES(vp, start, -1,
+				(flag & FSYNC_WAIT) ? 0 : XFS_B_ASYNC,
 				FI_NONE, error2);
 	}
 
@@ -5297,9 +5298,9 @@ xfs_reclaim(
 			 * hates that.
 			 */
 			if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
-				VOP_FLUSHINVAL_PAGES(vp, 0, FI_NONE);
+				VOP_FLUSHINVAL_PAGES(vp, 0, -1, FI_NONE);
 			} else {
-				VOP_TOSS_PAGES(vp, 0, FI_NONE);
+				VOP_TOSS_PAGES(vp, 0, -1, FI_NONE);
 			}
 			
 			ASSERT((ip->i_iocore.io_queued_bufs == 0) &&
@@ -5312,7 +5313,7 @@ xfs_reclaim(
 			 * di_size field may not be quite accurate if we're
 			 * shutting down.
 			 */
-			VOP_TOSS_PAGES(vp, 0, FI_NONE);
+			VOP_TOSS_PAGES(vp, 0, -1, FI_NONE);
 			ASSERT((ip->i_iocore.io_queued_bufs == 0) &&
 			       (VN_CACHED(vp) == 0));
 		}

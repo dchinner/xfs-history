@@ -1381,9 +1381,9 @@ xfs_itruncate_start(
 			 last_byte);
 	if (last_byte > toss_start) {
 		if (flags & XFS_ITRUNC_DEFINITE) {
-			VOP_TOSS_PAGES(vp, toss_start, FI_REMAPF_LOCKED);
+			VOP_TOSS_PAGES(vp, toss_start, -1, FI_REMAPF_LOCKED);
 		} else {
-			VOP_FLUSHINVAL_PAGES(vp, toss_start, FI_REMAPF_LOCKED);
+			VOP_FLUSHINVAL_PAGES(vp, toss_start, -1, FI_REMAPF_LOCKED);
 		}
 	}
 

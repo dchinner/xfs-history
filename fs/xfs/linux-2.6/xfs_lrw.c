@@ -824,7 +824,7 @@ retry:
 		if (error == ENOSPC) {
 			switch (fsynced) {
 			case 0:
-				VOP_FLUSH_PAGES(vp, 0, 0, FI_NONE, error);
+				VOP_FLUSH_PAGES(vp, 0, -1, 0, FI_NONE, error);
 				error = 0;
 				fsynced = 1;
 				xfs_ilock(ip, XFS_ILOCK_EXCL);

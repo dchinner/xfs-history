@@ -1585,19 +1585,19 @@ xfs_syncsub(
 
 			if (XFS_FORCED_SHUTDOWN(mp)) {
                                 if (xflags & XFS_XSYNC_RELOC) {
-					fs_tosspages(XFS_ITOBHV(ip), 0,
+					fs_tosspages(XFS_ITOBHV(ip), 0, -1,
 						     FI_REMAPF);
 				}
 				else {
-					VOP_TOSS_PAGES(vp, 0, FI_REMAPF);
+					VOP_TOSS_PAGES(vp, 0, -1, FI_REMAPF);
 				}
 			} else {
                                 if (xflags & XFS_XSYNC_RELOC) {
 					fs_flushinval_pages(XFS_ITOBHV(ip),
-							    0, FI_REMAPF);
+							    0, -1, FI_REMAPF);
 				}
 				else {
-					VOP_FLUSHINVAL_PAGES(vp, 0, FI_REMAPF);
+					VOP_FLUSHINVAL_PAGES(vp, 0, -1, FI_REMAPF);
 				}
 			}
 
@@ -1618,7 +1618,7 @@ xfs_syncsub(
 				 * across calls to the buffer cache.
 				 */
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				VOP_FLUSH_PAGES(vp, (xfs_off_t)0,
+				VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1,
 						fflag, FI_NONE, error);
 
 				xfs_ilock(ip, XFS_ILOCK_SHARED);

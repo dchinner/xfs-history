@@ -42,9 +42,9 @@ extern int	fs_nodev(void);
 extern void	fs_noval(void);
 extern void	fs_vnode_change(bhv_desc_t *, vchange_t, __psint_t);
 extern int 	fs_dounmount(bhv_desc_t *, int, vnode_t *, cred_t *);
-extern void	fs_tosspages(bhv_desc_t *, xfs_off_t, int);
-extern void 	fs_flushinval_pages(bhv_desc_t *, xfs_off_t, int);
-extern int 	fs_flush_pages(bhv_desc_t *, xfs_off_t, uint64_t, int);
+extern void	fs_tosspages(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
+extern void 	fs_flushinval_pages(bhv_desc_t *, xfs_off_t, xfs_off_t, int);
+extern int 	fs_flush_pages(bhv_desc_t *, xfs_off_t, xfs_off_t, uint64_t, int);
 extern void 	fs_pages_sethole(bhv_desc_t *, void*, int, int, xfs_off_t);
 
 #endif	/* __XFS_FS_SUBR_H__ */
