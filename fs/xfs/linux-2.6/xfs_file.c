@@ -240,7 +240,7 @@ STATIC int linvfs_fsync(
 	struct dentry *dentry,
 	int datasync)
 {
-	struct inode *inode = filp->f_dentry->d_inode;
+	struct inode *inode = dentry->d_inode;
 	vnode_t *vp = LINVFS_GET_VP(inode);
 	int	error;
 	int	flags = FSYNC_WAIT;
