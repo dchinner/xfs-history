@@ -2860,13 +2860,13 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	int		bucket;
 	int		error;
 	xfs_ino_t	last_ino;
-#if CONFIG_XFS_DMAPI
+#ifdef CONFIG_XFS_DMAPI
 	uint		mp_dmevmask;
 #endif /* CONFIG_XFS_DMAPI */
 
 	mp = log->l_mp;
 
-#if CONFIG_XFS_DMAPI
+#ifdef CONFIG_XFS_DMAPI
 	/*
 	 * Prevent any DMAPI event from being while in this function.
 	 * Not a problem for xfs since the file system isn't mounted

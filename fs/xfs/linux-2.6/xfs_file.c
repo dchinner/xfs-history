@@ -479,7 +479,7 @@ struct file_operations linvfs_file_operations =
 	open:		linvfs_open,
 	release:	linvfs_release,
 	fsync:		linvfs_fsync,
-#ifdef CONFIG_XFS_DMAPI
+#ifdef	CONFIG_XFS_DMAPI	/* Temporary until dmapi is in main kernel */
 	dmapi_map_event:	linvfs_dmapi_map_event,
 #endif
 };
