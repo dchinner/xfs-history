@@ -255,7 +255,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 		ASSERT(cvp->v_type == VLNK);
 		ip = LINVFS_GET_IP(cvp);
 		if (!ip) {
-			error = -ENOMEM;
+			error = ENOMEM;
 			VN_RELE(cvp);
 		} else {
 			linvfs_set_inode_ops(ip);
