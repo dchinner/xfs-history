@@ -25,6 +25,7 @@
 #else
 #include <bstring.h>
 #endif
+#include <sys/kmem.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -149,6 +150,8 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 	xfs_log_iovec_t	*vecp;
 	xfs_inode_t	*ip;
 	size_t		data_bytes;
+	char		*ext_buffer;
+	int		nrecs;
 
 	ip = iip->ili_inode;
 	vecp = log_vector;
@@ -173,11 +176,37 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 			ASSERT(ip->i_bytes > 0);
 			ASSERT(ip->i_u1.iu_extents != NULL);
 			ASSERT(ip->i_d.di_nextents > 0);
-			vecp->i_addr = (caddr_t)ip->i_u1.iu_extents;
-			vecp->i_len = ip->i_bytes;
+			ASSERT(iip->ili_extents_buf == NULL);
+			nrecs = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+			ASSERT(nrecs > 0);
+			if (nrecs == ip->i_d.di_nextents) {
+				/*
+				 * There are no delayed allocation
+				 * extents, so just point to the
+				 * real extents array.
+				 */
+				vecp->i_addr = (char *)(ip->i_u1.iu_extents);
+				vecp->i_len = ip->i_bytes;
+			} else {
+				/*
+				 * There are delayed allocation extents
+				 * in the inode.  Use xfs_iextents_copy()
+				 * to copy only the real extents into
+				 * a separate buffer.  We'll free the
+				 * buffer in the unlock routine.
+				 */
+				ext_buffer = (char *)kmem_alloc(ip->i_bytes,
+								KM_SLEEP);
+				iip->ili_extents_buf =
+					(xfs_bmbt_rec_t *)ext_buffer;
+				vecp->i_addr = ext_buffer;
+				vecp->i_len = xfs_iextents_copy(ip,
+								ext_buffer);
+			}
+			ASSERT(vecp->i_len <= ip->i_bytes);
+			iip->ili_format.ilf_dsize = vecp->i_len;
 			vecp++;
 			nvecs++;
-			iip->ili_format.ilf_dsize = ip->i_bytes;
 		}
 		break;
 
@@ -314,12 +343,14 @@ xfs_inode_item_trylock(xfs_inode_log_item_t *iip)
 void
 xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
 {
-	uint	hold;
-	uint	iolocked;
-	uint	lock_flags;
+	uint		hold;
+	uint		iolocked;
+	uint		lock_flags;
+	xfs_inode_t	*ip;
 
 	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), MR_UPDATE));
-	ASSERT((!(iip->ili_inode->i_item.ili_flags & XFS_ILI_IOLOCKED_EXCL))||
+	ASSERT((!(iip->ili_inode->i_item.ili_flags &
+		  XFS_ILI_IOLOCKED_EXCL)) ||
 	       ismrlocked(&(iip->ili_inode->i_iolock), MR_UPDATE));
 	ASSERT((!(iip->ili_inode->i_item.ili_flags &
 		  XFS_ILI_IOLOCKED_SHARED)) ||
@@ -327,7 +358,21 @@ xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
 	/*
 	 * Clear the transaction pointer in the inode.
 	 */
-	iip->ili_inode->i_transp = NULL;
+	ip = iip->ili_inode;
+	ip->i_transp = NULL;
+
+	/*
+	 * If the inode needed a separate buffer with which to log
+	 * its extents, then free it now.
+	 */
+	if (iip->ili_extents_buf != NULL) {
+		ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS);
+		ASSERT(ip->i_d.di_nextents > 0);
+		ASSERT(iip->ili_format.ilf_fields & XFS_ILOG_EXT);
+		ASSERT(ip->i_bytes > 0);
+		kmem_free(iip->ili_extents_buf, ip->i_bytes);
+		iip->ili_extents_buf = NULL;
+	}
 
 	/*
 	 * Figure out if we should unlock the inode or not.
@@ -445,6 +490,7 @@ xfs_inode_item_init(xfs_inode_t	*ip,
 	iip->ili_item.li_ops = &xfs_inode_item_ops;
 	iip->ili_item.li_mountp = mp;
 	iip->ili_inode = ip;
+	iip->ili_extents_buf = NULL;
 	iip->ili_format.ilf_type = XFS_LI_INODE;
 }
 
