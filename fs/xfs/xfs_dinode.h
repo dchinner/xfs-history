@@ -22,7 +22,7 @@ typedef struct xfs_dinode_core
 	__uint16_t	di_uid;		/* owner's user id */
 	__uint16_t	di_gid;		/* owner's group id */
 	__int64_t	di_size;	/* number of bytes in file */
-	xfs_uuid_t	di_uuid;	/* file unique id */
+	uuid_t		di_uuid;	/* file unique id */
 	__int64_t	di_nextents;	/* number of extents in file */
 	/*
 	 * Should these be timestruc_t's??
@@ -46,9 +46,30 @@ typedef struct xfs_dinode
 		char		di_c[1];/* local contents */
 		xfs_bmbt_rec_t	di_bmx[1];/* extent list */
 		xfs_btree_block_t di_bmbt;/* btree root */
-		xfs_uuid_t	di_muuid;/* mount point value */
+		uuid_t		di_muuid;/* mount point value */
 	}		di_u;
 } xfs_dinode_t;
+
+/*
+ * Bit names for logging disk inodes only
+ */
+#define	XFS_DI_MAGIC	0x0001
+#define	XFS_DI_MODE	0x0002
+#define	XFS_DI_VERSION	0x0004
+#define	XFS_DI_FORMAT	0x0008
+#define	XFS_DI_NLINK	0x0010
+#define	XFS_DI_UID	0x0020
+#define	XFS_DI_GID	0x0040
+#define	XFS_DI_SIZE	0x0080
+#define	XFS_DI_UUID	0x0100
+#define	XFS_DI_NEXTENTS	0x0200
+#define	XFS_DI_ATIME	0x0400
+#define	XFS_DI_MTIME	0x0800
+#define	XFS_DI_CTIME	0x1000
+#define	XFS_DI_GEN	0x2000
+#define	XFS_DI_U	0x4000
+#define	XFS_DI_NUM_BITS	15
+#define	XFS_DI_ALL_BITS	((1 << XFS_DI_NUM_BITS) - 1)
 
 /*
  * Values for di_format
