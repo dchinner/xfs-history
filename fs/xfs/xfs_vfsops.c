@@ -233,28 +233,30 @@ xfs_cmountfs(
 	/*
 	 * Open data, real time, and log devices now - order is important.
 	 */
-	mp->m_ddev_targp = pagebuf_lock_enable(ddev, vfsp->vfs_super);
+	mp->m_ddev_targp = pagebuf_lock_enable(ddev, vfsp->vfs_super, 0);
 	if (IS_ERR(mp->m_ddev_targp)) {
 		error = PTR_ERR(mp->m_ddev_targp);
 		goto error2;
 	}
 
 	if (rtdev != 0) {
-		mp->m_rtdev_targp = pagebuf_lock_enable(rtdev, vfsp->vfs_super);
+		mp->m_rtdev_targp = 
+				pagebuf_lock_enable(rtdev, vfsp->vfs_super, 1);
 		if (IS_ERR(mp->m_rtdev_targp)) {
 			error = PTR_ERR(mp->m_rtdev_targp);
-			pagebuf_lock_disable(mp->m_ddev_targp);
+			pagebuf_lock_disable(mp->m_ddev_targp, 0);
 			goto error2;
 		}
 	}
 
 	if (logdev != ddev) {
-		mp->m_logdev_targp = pagebuf_lock_enable(logdev, vfsp->vfs_super);
+		mp->m_logdev_targp = 
+				pagebuf_lock_enable(logdev, vfsp->vfs_super, 1);
 		if (IS_ERR(mp->m_logdev_targp)) {
 			error = PTR_ERR(mp->m_logdev_targp);
-			pagebuf_lock_disable(mp->m_ddev_targp);
+			pagebuf_lock_disable(mp->m_ddev_targp, 1);
 			if (mp->m_rtdev_targp)
-				pagebuf_lock_disable(mp->m_rtdev_targp);
+				pagebuf_lock_disable(mp->m_rtdev_targp, 1);
 			goto error2;
 		}
 	}
@@ -487,14 +489,14 @@ xfs_cmountfs(
  error3:
 	/* It's impossible to get here before buftargs are filled */
 	xfs_binval(mp->m_ddev_targp);
-	pagebuf_lock_disable(mp->m_ddev_targp);
+	pagebuf_lock_disable(mp->m_ddev_targp, 0);
 	if (logdev && logdev != ddev) {
 		xfs_binval(mp->m_logdev_targp);
-		pagebuf_lock_disable(mp->m_logdev_targp);
+		pagebuf_lock_disable(mp->m_logdev_targp, 1);
 	}
 	if (rtdev != 0) {
 		xfs_binval(mp->m_rtdev_targp);
-		pagebuf_lock_disable(mp->m_rtdev_targp);
+		pagebuf_lock_disable(mp->m_rtdev_targp, 1);
 	}
  error2:
 	if (error) {

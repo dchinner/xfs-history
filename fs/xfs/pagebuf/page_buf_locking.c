@@ -130,23 +130,31 @@ pagebuf_lock(
  *	pagebuf_lock_disable
  *
  *	pagebuf_lock_disable disables buffer object locking for an inode.
+ *	remove_super() does a blkdev_put for us on the data device, hence
+ * 	the do_blkdev_put argument.
  */
 void
 pagebuf_lock_disable(
-	pb_target_t		*target)
+	pb_target_t		*target,
+	int			do_blkdev_put)
 {
 	pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
-	blkdev_put(target->pbr_bdev, BDEV_FS);
+	if (do_blkdev_put)
+		blkdev_put(target->pbr_bdev, BDEV_FS);
 	kfree(target);
 }
 
 /*
  *	pagebuf_lock_enable
+ *
+ *	get_sb_bdev() does a blkdev_get for us on the data device, hence
+ *	the do_blkdev_get argument.
  */
 pb_target_t *
 pagebuf_lock_enable(
 	dev_t			dev,
-	struct super_block	*sb)
+	struct super_block	*sb,
+	int			do_blkdev_get)
 {
 	struct block_device	*bdev;
 	pb_target_t		*target;
@@ -160,9 +168,11 @@ pagebuf_lock_enable(
 	if (unlikely(!bdev))
 		goto fail;
 
-	error = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-	if (unlikely(error))
-		goto fail;
+	if (do_blkdev_get) {
+		error = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
+		if (unlikely(error))
+			goto fail;
+	}
 
 	target->pbr_dev = dev;
 	target->pbr_kdev = to_kdev_t(dev);

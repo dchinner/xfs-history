@@ -1153,15 +1153,15 @@ xfs_unmountfs_close(xfs_mount_t *mp, struct cred *cr)
 	int		have_logdev = (mp->m_logdev_targp != mp->m_ddev_targp);
 
 	if (mp->m_ddev_targp) {
-		pagebuf_lock_disable(mp->m_ddev_targp);
+		pagebuf_lock_disable(mp->m_ddev_targp, 0);
 		mp->m_ddev_targp = NULL;
 	}
 	if (mp->m_rtdev_targp) {
-		pagebuf_lock_disable(mp->m_rtdev_targp);
+		pagebuf_lock_disable(mp->m_rtdev_targp, 1);
 		mp->m_rtdev_targp = NULL;
 	}
 	if (mp->m_logdev_targp && have_logdev) {
-		pagebuf_lock_disable(mp->m_logdev_targp);
+		pagebuf_lock_disable(mp->m_logdev_targp, 1);
 		mp->m_logdev_targp = NULL;
 	}
 }
