@@ -1,4 +1,4 @@
-#ident "$Revision: 1.208 $"
+#ident "$Revision: 1.209 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2569,6 +2569,27 @@ xfs_iunpin(
 		sv_broadcast(&ip->i_pinsema);
 	}
 	mutex_spinunlock(&mp->m_ipinlock, s);
+}
+
+/*
+ * Returns the pincount at this given moment.
+ * Synchronizes with ipin/iunpin out of paranoia
+ */
+unsigned int
+xfs_ipincount(
+	xfs_inode_t	*ip)
+{
+	int		s;
+	unsigned int	cnt;
+	/* REFERENCED */
+	xfs_mount_t	*mp;
+
+	mp = ip->i_mount;
+	s = mutex_spinlock(&mp->m_ipinlock);
+	cnt = ip->i_pincount;
+	mutex_spinunlock(&mp->m_ipinlock, s);
+
+	return cnt;
 }
 
 /*
