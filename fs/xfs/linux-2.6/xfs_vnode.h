@@ -231,7 +231,6 @@ typedef int	(*vop_fid2_t)(bhv_desc_t *, struct fid *);
 typedef int	(*vop_release_t)(bhv_desc_t *);
 typedef int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
-typedef int	(*vop_seek_t)(bhv_desc_t *, xfs_off_t, xfs_off_t*);
 typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
 typedef int	(*vop_strategy_t)(bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, struct page_buf_bmap_s *, int *);
 typedef int	(*vop_reclaim_t)(bhv_desc_t *, int);
@@ -274,7 +273,6 @@ typedef struct vnodeops {
 	vop_fid2_t		vop_fid2;
 	vop_rwlock_t		vop_rwlock;
 	vop_rwunlock_t		vop_rwunlock;
-	vop_seek_t		vop_seek;
 	vop_bmap_t		vop_bmap;
 	vop_strategy_t		vop_strategy;
 	vop_reclaim_t		vop_reclaim;
@@ -444,12 +442,6 @@ typedef struct vnodeops {
 #define VOP_RWUNLOCK(vp,i)						\
 {	/* "prevent" was done by rwlock */				\
 	(void)_VOP_(vop_rwunlock, vp)((vp)->v_fbhv, i);			\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
-}
-#define VOP_SEEK(vp, ooff, noffp, rv)					\
-{									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_seek, vp)((vp)->v_fbhv, ooff, noffp);		\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_RECLAIM(vp, flag, rv)					\
