@@ -238,7 +238,7 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define EFSCORRUPTED    990		/* Filesystem is corrupted */
 
 #ifndef ENOATTR
-#edfine ENOATTR		ENODATA		/* Attribute not found */
+#define ENOATTR		ENODATA		/* Attribute not found */
 #endif
 
 #define SYNCHRONIZE()	barrier()
