@@ -581,7 +581,7 @@ xfs_bmap_add_extent_delay_real(
 				first, flist, &cur);
 		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
 			STARTBLOCKVAL(r[0].br_startblock) -
-			cur->bc_private.b.allocated);
+			(cur ? cur->bc_private.b.allocated : 0));
 		base = ip->i_u1.iu_extents;
 		ep = &base[idx];
 		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
@@ -641,7 +641,7 @@ xfs_bmap_add_extent_delay_real(
 				first, flist, &cur);
 		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
 			STARTBLOCKVAL(r[0].br_startblock) -
-			cur->bc_private.b.allocated);
+			(cur ? cur->bc_private.b.allocated : 0));
 		base = ip->i_u1.iu_extents;
 		ep = &base[idx];
 		xfs_bmbt_set_startblock(ep, NULLSTARTBLOCK(temp));
@@ -2012,7 +2012,10 @@ xfs_bmap_last_offset(
 	if (!(ip->i_flags & XFS_IEXTENTS))
 		xfs_iread_extents(tp, ip);
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+	if (!nextents)
+		return 0;
 	base = &ip->i_u1.iu_extents[0];
+	ASSERT(base != NULL);
 	ep = &base[nextents - 1];
 	return xfs_bmbt_get_startoff(ep) + xfs_bmbt_get_blockcount(ep);
 }
