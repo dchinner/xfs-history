@@ -1,4 +1,4 @@
-#ident "$Revision: 1.237 $"
+#ident "$Revision: 1.238 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1831,21 +1831,28 @@ xfs_zero_eof(
 {
 	xfs_fileoff_t	start_zero_fsb;
 	xfs_fileoff_t	end_zero_fsb;
+	xfs_fileoff_t	prev_zero_fsb;
 	xfs_fileoff_t	zero_count_fsb;
 	xfs_fileoff_t	last_fsb;
 	xfs_fsblock_t	firstblock;
 	xfs_extlen_t	buf_len_fsb;
+	xfs_extlen_t	prev_zero_count;
 	xfs_mount_t	*mp;
 	buf_t		*bp;
 	int		nimaps;
 	int		error;
 	xfs_bmbt_irec_t	imap;
 	struct bmapval	bmap;
+	pfd_t		*pfdp;
+	int		i;
+	vnode_t		*vp;
+	int		length;
 
 	ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE));
 	ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE));
 
 	mp = ip->i_mount;
+	vp = XFS_ITOV(ip);
 
 	/*
 	 * First handle zeroing the block on which isize resides.
@@ -1879,6 +1886,8 @@ xfs_zero_eof(
 	}
 
 	ASSERT(start_zero_fsb <= end_zero_fsb);
+	prev_zero_fsb = NULLFILEOFF;
+	prev_zero_count = 0;
 	while (start_zero_fsb <= end_zero_fsb) {
 		nimaps = 1;
 		zero_count_fsb = end_zero_fsb - start_zero_fsb + 1;
@@ -1893,7 +1902,41 @@ xfs_zero_eof(
 		ASSERT(nimaps > 0);
 
 		if (imap.br_startblock == HOLESTARTBLOCK) {
-			start_zero_fsb = imap.br_startoff +
+			/* 
+			 * This loop handles initializing pages that were
+			 * partially initialized by the code below this 
+			 * loop. It basically zeroes the part of the page
+			 * that sits on a hole and sets the page as P_HOLE
+			 * and calls remapf if it is a mapped file.
+			 */	
+			if ((prev_zero_fsb != NULLFILEOFF) && 
+			    (dtopt(XFS_FSB_TO_BB(mp, prev_zero_fsb)) ==
+			     dtopt(XFS_FSB_TO_BB(mp, imap.br_startoff)) ||
+			     dtopt(XFS_FSB_TO_BB(mp, prev_zero_fsb + 
+						     prev_zero_count)) ==
+			     dtopt(XFS_FSB_TO_BB(mp, imap.br_startoff)))) {
+
+				pfdp = pfind(vp, dtopt(XFS_FSB_TO_BB(mp, 
+						imap.br_startoff)), VM_ATTACH);
+
+				if (pfdp != NULL) {
+					i = poff(XFS_FSB_TO_B(mp, 
+							imap.br_startoff));
+					length = MIN(NBPP - i, XFS_FSB_TO_B(mp, 
+							 imap.br_blockcount));
+
+					page_zero(pfdp, NOCOLOR, i, length);
+
+					if (VN_MAPPED(vp))
+                                        	VOP_PAGES_SETHOLE(vp, pfdp, 1, 1, 
+							ctooff(offtoct(XFS_FSB_TO_B(mp, 
+								imap.br_startoff))));
+                                        pagefree(pfdp);
+                                }
+			}
+		   	prev_zero_fsb = NULLFILEOFF;
+			prev_zero_count = 0;
+		   	start_zero_fsb = imap.br_startoff +
 					 imap.br_blockcount;
 			ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
 			continue;
@@ -1955,6 +1998,8 @@ xfs_zero_eof(
 			}
 		}
 
+		prev_zero_fsb = start_zero_fsb;
+		prev_zero_count = buf_len_fsb;
 		start_zero_fsb = imap.br_startoff + buf_len_fsb;
 		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
 
