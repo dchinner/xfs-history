@@ -339,8 +339,8 @@ xfs_iomap_read(xfs_inode_t	*ip,
 #define	XFS_READ_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_READ_IMAPS];
 
-	mp = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
-	sbp = &mp->m_sb;
+	mp = ip->i_mount;
+	sbp = &(mp->m_sb);
 	nisize = ip->i_new_size;
 	if (nisize < ip->i_d.di_size) {
 		nisize = ip->i_d.di_size;
@@ -348,6 +348,11 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	offset_fsb = xfs_b_to_fsbt(sbp, offset);
 	nimaps = XFS_READ_IMAPS;
 	last_fsb = xfs_b_to_fsb(sbp, nisize);
+	if (xfs_fsb_to_b(sbp, last_fsb) < nisize) {
+		debug(0);
+		last_fsb = xfs_b_to_fsb(sbp, nisize);
+	}
+	ASSERT(xfs_fsb_to_b(sbp, last_fsb) >= nisize);
 	if (last_fsb <= offset_fsb) {
 		/*
 		 * One of the pages beyond the EOF created by the
@@ -357,6 +362,16 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		 * than the page size then this may even be only a
 		 * part of a page.
 		 */
+#ifdef DEBUG
+		if (offset < nisize) {
+			printf("xfs_iomap_read: offset %d nisize %d offset_fsb %d last_fsb %d\n", offset, (int)nisize, (int)offset_fsb, (int)last_fsb);
+#ifdef SIM
+			abort(0);
+#else
+			debug(0);
+#endif
+		}
+#endif
 		xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
 		return;
 	}
@@ -902,8 +917,8 @@ xfs_zero_eof(xfs_inode_t	*ip,
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 	ASSERT(offset > isize);
 
-	mp = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
-	sbp = &mp->m_sb;
+	mp = ip->i_mount;
+	sbp = &(mp->m_sb);
 	vp = XFS_ITOV(ip);
 	ioalign = XFS_WRITEIO_ALIGN(mp, isize);
 
@@ -1016,12 +1031,16 @@ xfs_iomap_write(xfs_inode_t	*ip,
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 
-	mp = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
-	sbp = &mp->m_sb;
+	mp = ip->i_mount;
+	sbp = &(mp->m_sb);
 	isize = ip->i_d.di_size;
 	offset_fsb = xfs_b_to_fsbt(sbp, offset);
 	nimaps = XFS_WRITE_IMAPS;
 	last_fsb = xfs_b_to_fsb(sbp, offset + count);
+	if (xfs_fsb_to_b(sbp, last_fsb) < (offset + count)) {
+		debug(0);
+		last_fsb = xfs_b_to_fsb(sbp, offset + count);
+	}
 	(void) xfs_bmapi(NULL, ip, offset_fsb,
 			 (xfs_extlen_t)(last_fsb - offset_fsb),
 			 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
@@ -1651,7 +1670,7 @@ xfs_strat_read(vnode_t	*vp,
 	ASSERT(bp->b_blkno == -1);
 	ip = XFS_VTOI(vp);
 	mp = XFS_VFSTOM(vp->v_vfsp);
-	sbp = &mp->m_sb;
+	sbp = &(mp->m_sb);
 	offset_fsb = xfs_bb_to_fsbt(sbp, bp->b_offset);
 	/*
 	 * Only read up to the EOF.
@@ -1907,7 +1926,7 @@ xfs_strat_write(vnode_t	*vp,
 	
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
-	sbp = &mp->m_sb;
+	sbp = &(mp->m_sb);
 	bp->b_flags |= B_STALE;
 
 	/*
@@ -2089,7 +2108,7 @@ xfs_strategy(vnode_t	*vp,
 	xfs_sb_t	*sbp;
 
 	mp = XFS_VFSTOM(vp->v_vfsp);
-	sbp = &mp->m_sb;
+	sbp = &(mp->m_sb);
 
 	/*
 	 * If this is just a buffer whose underlying disk space
