@@ -33,6 +33,7 @@
 #include <xfs.h>
 #include <linux/xfs_iops.h> /* linvfs_revalidate_core() */
 #include <linux/spinlock.h>
+#include <linux/iobuf.h>
 
 #define MAXNAMLEN MAXNAMELEN
 
