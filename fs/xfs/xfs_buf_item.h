@@ -13,8 +13,8 @@ typedef struct xfs_buf_log_format {
 	daddr_t		blf_blkno;	/* starting blkno of this buf */
 	uint		blf_len;	/* number of blocks in this buf */
 	unsigned int	blf_map_size;	/* size of data bitmap in words */
-	unsigned int	blf_data_map[1]; /* variable size bitmap of */
-					/* regions of buffer in this item */
+	unsigned int	blf_data_map[1];/* variable size bitmap of */
+					/*   regions of buffer in this item */
 } xfs_buf_log_format_t;
 
 #define	XFS_BLI_CHUNK		128
@@ -49,6 +49,7 @@ void	xfs_buf_item_init(buf_t *, struct xfs_mount *);
 void	xfs_buf_item_relse(buf_t *);
 void	xfs_buf_item_log(xfs_buf_log_item_t *, uint, uint);
 uint	xfs_buf_item_dirty(xfs_buf_log_item_t *);
+int	xfs_buf_item_bits(uint *, uint, uint);
 int	xfs_buf_item_next_bit(uint *, uint, uint);
 void	xfs_buf_attach_iodone(buf_t *, void(*)(buf_t*, xfs_log_item_t *),
 			      xfs_log_item_t *);

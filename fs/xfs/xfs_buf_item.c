@@ -41,7 +41,6 @@
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~NBWORD)
 
 
-STATIC int	xfs_buf_item_bits(uint *, uint, uint);
 STATIC void	xfs_buf_item_set_bit(uint *, uint, uint);
 
 #ifdef XFSDEBUG
@@ -615,7 +614,7 @@ xfs_buf_item_log_check(xfs_buf_log_item_t *bip)
  * xfs_countbit[0] == 0, xfs_countbit[1] == 1, xfs_countbit[2] == 1,
  * xfs_countbit[3] == 2, etc.
  */
-STATIC int
+int
 xfs_buf_item_bits(uint	*map,
 		  uint	size,
 		  uint	start_bit)
