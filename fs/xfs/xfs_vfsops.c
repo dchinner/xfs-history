@@ -150,12 +150,6 @@ xfs_init(void)
 
 	xfs_init_procfs();
 	xfs_sysctl_register();
-
-	/*
-	 * The inode hash table is created on a per mounted
-	 * file system bases.
-	 */
-
 	return 0;
 }
 
@@ -483,7 +477,7 @@ xfs_mount(
 	}
 	if (rtdev)
 		xfs_setsize_buftarg(mp->m_rtdev_targp, mp->m_sb.sb_blocksize,
-				    mp->m_sb.sb_sectsize);
+				    mp->m_sb.sb_blocksize);
 
 	if (!(error = XFS_IOINIT(vfsp, args, flags)))
 		return 0;
@@ -779,7 +773,7 @@ xfs_statvfs(
 		if (!mp->m_inoadd)
 #endif
 			statp->f_files =
-			    MIN(statp->f_files, (long)mp->m_maxicount);
+			    min_t(sector_t, statp->f_files, mp->m_maxicount);
 	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
@@ -1673,7 +1667,7 @@ xfs_parseargs(
 		} else if (!strcmp(this_char, MNTOPT_BIOSIZE)) {
 			if (!value || !*value) {
 				printk("XFS: %s option requires an argument\n",
-					MNTOPT_BIOSIZE);
+					MNTOPT_BIOSIZE); 
 				return EINVAL;
 			}
 			iosize = simple_strtoul(value, &eov, 10);

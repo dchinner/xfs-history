@@ -41,10 +41,10 @@
 #include <asm/byteorder.h>
 
 #ifdef __LITTLE_ENDIAN
-#define __BYTE_ORDER	__LITTLE_ENDIAN
+# define __BYTE_ORDER	__LITTLE_ENDIAN
 #endif
 #ifdef __BIG_ENDIAN
-#define __BYTE_ORDER	__BIG_ENDIAN
+# define __BYTE_ORDER	__BIG_ENDIAN
 #endif
 
 #endif	/* __KERNEL__ */
@@ -53,9 +53,9 @@
 
 #define ARCH_NOCONVERT 1
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-#define ARCH_CONVERT   0
+# define ARCH_CONVERT	0
 #else
-#define ARCH_CONVERT   ARCH_NOCONVERT
+# define ARCH_CONVERT	ARCH_NOCONVERT
 #endif
 
 /* generic swapping macros */
