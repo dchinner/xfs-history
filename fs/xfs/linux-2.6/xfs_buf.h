@@ -304,11 +304,12 @@ extern int pagebuf_lock(		/* lock buffer			*/
 		page_buf_t *);		/* buffer to lock		*/
 
 extern void pagebuf_lock_disable(	/* disable buffer locking	*/
-		struct pb_target *);	/* inode for buffers		*/
+		struct pb_target *,	/* inode for buffers		*/
+		int);			/* do blkdev_put?		*/
 
 extern struct pb_target *pagebuf_lock_enable(
 		dev_t,
-		struct super_block *);
+		int);			/* do blkdev_get?		*/
 
 extern void pagebuf_target_blocksize(
 		pb_target_t *,
