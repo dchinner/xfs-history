@@ -829,12 +829,95 @@ xfs_fsync(vnode_t	*vp,
 /*
  * xfs_inactive
  *
- * This is a stub.
+ * This is called when the vnode reference count for the vnode
+ * goes to zero.  If the file has been unlinked, then it must
+ * now be truncated.  When we truncate the file we must also
+ * call remapf() to invalidate any memory mappings to the file.
+ * Also, we clear all of the read-ahead state
+ * kept for the inode here since the file is now closed.
  */
 STATIC void
 xfs_inactive(vnode_t	*vp,
 	     cred_t	*credp)
 {
+	xfs_inode_t	*ip;
+	xfs_trans_t	*tp;
+	int		truncate;
+	int		status;
+
+	ip = XFS_VTOI(vp);
+	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+
+	ASSERT(ip->i_d.di_nlink >= 0);
+	if (ip->i_d.di_nlink == 0) {
+		tp = xfs_trans_alloc(ip->i_mount, 0);
+
+		/*
+		 * Only do a truncate if it's a regular file with
+		 * some actual space in it.
+		 */
+		truncate = ((ip->i_d.di_size > 0) &&
+			    ((ip->i_d.di_mode & IFMT) == IFREG));
+		if (truncate) {
+			status = xfs_trans_reserve(tp, 10,
+						   XFS_ITRUNCATE_LOG_RES, 0,
+						   XFS_TRANS_PERM_LOG_RES);
+			if (status != 0) {
+				ASSERT(0);
+			}
+
+			xfs_trans_ijoin(tp, ip,
+					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+
+			xfs_itruncate(&tp, ip, 0);
+			xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+
+			/*
+			 * Since we used up the first transaction, allocate
+			 * a new one to free the inode with.
+			 */
+			tp = xfs_trans_alloc(ip->i_mount, 0);
+		}
+
+		status = xfs_trans_reserve(tp, 0, XFS_IFREE_LOG_RES, 0, 0);
+		if (status != 0) {
+			ASSERT(0);
+		}
+
+		/*
+		 * Free the inode and clean up the iunlink item that
+		 * was logged when the link count went to 0.
+		 */
+		xfs_trans_ijoin(tp, ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+		xfs_trans_ihold(tp, ip);
+		xfs_ifree(tp, ip);
+		xfs_trans_log_iui_done(tp, ip);
+
+		xfs_trans_commit(tp , 0);
+	}
+
+	/*
+	 * Clear all the inode's read-ahead state.
+	 */
+	ip->i_next_offset = 0;
+	ip->i_io_offset = 0;
+	ip->i_reada_blkno = 0;
+	ip->i_io_size = 0;
+	ip->i_last_req_sz = 0;
+	ip->i_num_readaheads = 0;
+
+	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+
+	/*
+	 * Blow away any now stale mappings to the file.
+	 */
+#ifndef SIM
+	if (truncate && VN_MAPPED(vp)) {
+		remapf(vp, 0, 0);
+	}
+#endif
+
 	return;
 }
 
@@ -1105,17 +1188,16 @@ xfs_droplink (xfs_trans_t *tp,
 	      xfs_inode_t *ip)
 {
         ASSERT (ip->i_d.di_nlink > 0);
+	ASSERT (tp->t_flags & XFS_TRANS_PERM_LOG_RES);
         ip->i_d.di_nlink--;
         xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
-        if ((ip->i_d.di_nlink == 0) &&
-	    ((ip->i_d.di_mode & IFMT) == IFREG)) {
+        if (ip->i_d.di_nlink == 0) {
                 /*
-                 * We're droppin the last link to this file.
+                 * We're dropping the last link to this file.
 		 * Log an inode unlink record as part of this
 		 * transaction.  From xfs_inactive() we will
-		 * truncate the file and clean up the inode
-		 * unlink record we're creating here.
+		 * free the inode.
                  */
 		xfs_trans_log_iui(tp, ip);
 		return 0;
@@ -1608,14 +1690,14 @@ xfs_remove(vnode_t	*dir_vp,
         xfs_trans_t             *tp = NULL;
         xfs_ino_t               e_inum;
         int                     error = 0;
-	int			release_res;
+	boolean_t		release_res;
 	int			commit_flag;
 	int			committed;
 	unsigned long		dir_generation;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 
-	release_res = 1;
+	release_res = B_TRUE;
 	tp = xfs_trans_alloc (XFS_VFSTOM(dir_vp->v_vfsp), XFS_TRANS_WAIT);
         if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES, 0,
 				       XFS_TRANS_PERM_LOG_RES)) 
@@ -1686,7 +1768,9 @@ xfs_remove(vnode_t	*dir_vp,
 	dp->i_gen++;
 	xfs_trans_log_inode (tp, dp, XFS_ILOG_CORE);
 
-	release_res = xfs_droplink (tp, ip);
+	if (!(xfs_droplink (tp, ip))) {
+		release_res = B_FALSE;
+	}
 
 	if (release_res) {
 		commit_flag = XFS_TRANS_RELEASE_LOG_RES;
@@ -1822,13 +1906,17 @@ xfs_rename(vnode_t	*src_dir_vp,
 	boolean_t	new_parent;		/* moving to a new dir */
 	boolean_t	src_is_directory;	/* src_name is a directory */
 	int		error;		
+	boolean_t	release_res;
+	boolean_t	committed;
+	uint		commit_flags;
         xfs_bmap_free_t free_list;
         xfs_fsblock_t   first_block;
 
 
-	tp = xfs_trans_alloc (XFS_VFSTOM(src_dir_vp->v_vfsp),
-                              XFS_TRANS_WAIT);
-        if (error = xfs_trans_reserve (tp, 10, XFS_RENAME_LOG_RES, 0, 0))
+	release_res = B_TRUE;
+	tp = xfs_trans_alloc (XFS_VFSTOM(src_dir_vp->v_vfsp), 0);
+        if (error = xfs_trans_reserve (tp, 10, XFS_RENAME_LOG_RES, 0,
+				       XFS_TRANS_PERM_LOG_RES))
                 goto error_return;
 
 	XFS_BMAP_INIT(&free_list, &first_block);
@@ -2040,13 +2128,17 @@ xfs_rename(vnode_t	*src_dir_vp,
 		 * Decrement the link count on the target since the target
 		 * dir no longer points to it.
 		 */
-		xfs_droplink (tp, target_ip);
+		if (!(xfs_droplink (tp, target_ip))) {
+			release_res = B_FALSE;
+		}
 
 		if (src_is_directory) {
 			/*
 			 * Drop the link from the old "." entry.
 			 */
-			xfs_droplink (tp, target_ip);
+			if (!(xfs_droplink (tp, target_ip))) {
+				release_res = B_FALSE;
+			}
 		} 
 
 
@@ -2069,7 +2161,9 @@ xfs_rename(vnode_t	*src_dir_vp,
 		 * Decrement link count on src_directory since the
 		 * entry that's moved no longer points to it.
 		 */
-		xfs_droplink(tp, src_dp);
+		if (!(xfs_droplink(tp, src_dp))) {
+			ASSERT(0);
+		}
 
 	}
 
@@ -2093,20 +2187,39 @@ xfs_rename(vnode_t	*src_dir_vp,
                 xfs_trans_log_inode (tp, target_dp, XFS_ILOG_CORE);
 	}
 
+	if (release_res) {
+		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
+	} else {
+		commit_flags = 0;
+	}
+	committed = xfs_bmap_finish (&tp, &free_list, first_block,
+				     commit_flags);
 
-	(void) xfs_bmap_finish (&tp, &free_list, first_block, 0);
+	/*
+	 * If xfs_bmap_finish() committed our original transaction and
+	 * created a new one, then we won't have a permanent reservation
+	 * any longer so we'd better not drop one.
+	 */
+	if (committed) {
+		commit_flags = 0;
+	}
 
 	/*
 	 * trans_commit will unlock src_ip, target_ip & decrement
 	 * the vnode references.
 	 */
-	xfs_trans_commit (tp, 0);
+	xfs_trans_commit (tp, commit_flags);
 
 	return 0;
 
 error_return:
 
-	xfs_trans_cancel (tp, 0);
+	if (release_res) {
+		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
+	} else {
+		commit_flags = 0;
+	}
+	xfs_trans_cancel (tp, commit_flags);
 	return error;
 
 }
@@ -2246,11 +2359,17 @@ xfs_rmdir(vnode_t	*dir_vp,
         mode_t                  mode;
         struct xfs_mount        *mp;
         int                     error;
+	int			drop_res;
+	uint			commit_flags;
+	boolean_t		release_res;
+	int			committed;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 
+	release_res = B_TRUE;
 	tp = xfs_trans_alloc (XFS_VFSTOM(dir_vp->v_vfsp), XFS_TRANS_WAIT);
-        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES, 0, 0))
+        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES, 0,
+				       XFS_TRANS_PERM_LOG_RES))
                 goto error_return;
 	XFS_BMAP_INIT(&free_list, &first_block);
 
@@ -2304,25 +2423,48 @@ xfs_rmdir(vnode_t	*dir_vp,
 	/*
 	 * Drop the link from cdp's "..".
 	 */
-	xfs_droplink (tp, dp);
+	drop_res = xfs_droplink (tp, dp);
+	ASSERT(drop_res != 0);
 
 	/*
 	 * Drop the link from dp to cdp.
 	 */
-	xfs_droplink (tp, cdp);
+	drop_res = xfs_droplink (tp, cdp);
+	ASSERT(drop_res != 0);
 
 	/*
 	 * Drop the "." link from cdp to self.
 	 */
-	xfs_droplink (tp, cdp);
+	if (!(xfs_droplink (tp, cdp))) {
+		release_res = B_FALSE;
+	}
 
-	(void) xfs_bmap_finish (&tp, &free_list, first_block, 0);
-	xfs_trans_commit (tp, 0);
+	if (release_res) {
+		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
+	} else {
+		commit_flags = 0;
+	}
+	committed = xfs_bmap_finish (&tp, &free_list, first_block,
+				     commit_flags);
+	/*
+	 * If xfs_bmap_finish() committed our original transaction and
+	 * created a new one, then we won't have a permanent reservation
+	 * any longer so we'd better not drop one.
+	 */
+	if (committed) {
+		commit_flags = 0;
+	}
+	xfs_trans_commit (tp, commit_flags);
 
 	return 0;
 
 error_return:
-	xfs_trans_cancel (tp, 0);
+	if (release_res) {
+		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
+	} else {
+		commit_flags = 0;
+	}
+	xfs_trans_cancel (tp, commit_flags);
 	return error;
 }
 
