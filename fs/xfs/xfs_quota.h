@@ -1,6 +1,6 @@
 #ifndef __XFS_QUOTA_H__
 #define __XFS_QUOTA_H__
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.6 $"
 /*
  * External Interface to the XFS disk quota subsystem.
  */
@@ -46,7 +46,7 @@ typedef __uint16_t      xfs_qwarncnt_t;
 #define XFS_QMOPT_PQUOTA	0x000008 /* proj dquot requested */
 #define XFS_QMOPT_FORCE_RES	0x000010 /* ignore quota limits */
 #define XFS_QMOPT_DQSUSER	0x000020 /* don't cache super users dquot */
-#define XFS_QMOPT_INOQCHK	0x000040 /* do a inoquotacheck */
+#define XFS_QMOPT_SBVERSION	0x000040 /* change superblock version num */
 #define XFS_QMOPT_QUOTAOFF	0x000080 /* quotas are being turned off */
 #define XFS_QMOPT_UMOUNTING	0x000100 /* filesys is being unmounted */
 #define XFS_QMOPT_DOLOG		0x000200 /* log buf changes (in quotacheck) */
@@ -63,6 +63,7 @@ typedef __uint16_t      xfs_qwarncnt_t;
 #define XFS_QMOPT_RTBCOUNT	0x010000
 #define XFS_QMOPT_DELBCOUNT	0x020000
 #define XFS_QMOPT_DELRTBCOUNT	0x040000
+#define XFS_QMOPT_RES_INOS	0x080000
 
 /*
  * flags for dqflush and dqflush_all.
@@ -76,6 +77,7 @@ typedef __uint16_t      xfs_qwarncnt_t;
  */
 #define XFS_TRANS_DQ_RES_BLKS	XFS_QMOPT_RES_REGBLKS
 #define XFS_TRANS_DQ_RES_RTBLKS	XFS_QMOPT_RES_RTBLKS
+#define XFS_TRANS_DQ_RES_INOS	XFS_QMOPT_RES_INOS
 #define XFS_TRANS_DQ_BCOUNT	XFS_QMOPT_BCOUNT
 #define XFS_TRANS_DQ_DELBCOUNT	XFS_QMOPT_DELBCOUNT
 #define XFS_TRANS_DQ_ICOUNT	XFS_QMOPT_ICOUNT
@@ -100,6 +102,12 @@ typedef __uint16_t      xfs_qwarncnt_t;
 				    (XFS_IS_PQUOTA_ON(mp) && \
 				     (ip)->i_pdquot == NULL))
 
+#define XFS_QM_NEED_QUOTACHECK(mp) ((XFS_IS_UQUOTA_ON(mp) && \
+				     (mp->m_sb.sb_qflags & \
+				      XFS_MOUNT_UDQ_CHKD) == 0) || \
+				    (XFS_IS_PQUOTA_ON(mp) && \
+				     (mp->m_sb.sb_qflags & \
+				      XFS_MOUNT_PDQ_CHKD) == 0))
 
 #define XFS_MOUNT_QUOTA_ALL	(XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_UDQ_ENFD|\
 				 XFS_MOUNT_UDQ_CHKD|XFS_MOUNT_PDQ_ACCT|\
@@ -109,8 +117,6 @@ typedef __uint16_t      xfs_qwarncnt_t;
 
 #define XFS_PROC_PROJID(c)	  ((c)->p_arsess->as_prid)
 #define XFS_IS_REALTIME_INODE(ip) ((ip)->i_d.di_flags & XFS_DIFLAG_REALTIME)
-
-#ifdef _KERNEL
 
 /*
  * Quota Manager Interface.
@@ -127,13 +133,9 @@ extern int		xfs_qm_mount_quotas(struct xfs_mount *);
 extern void 		xfs_qm_unmount_quotas(struct xfs_mount *);
 extern void		xfs_qm_dqdettach_inode(struct xfs_inode *ip);
 extern void 		xfs_qm_sync(struct xfs_mount *mp, short flags);
-extern int		xfs_qm_check_inoquota(struct xfs_dquot *dqp);
-extern int		xfs_qm_check_inoquota2(struct xfs_mount *mp,
-					       struct xfs_dquot *udqp,
-					       struct xfs_dquot *pdqp);
 
 /*
- * dquot interface
+ * dquot interface.
  */
 extern void		xfs_dqlock(struct xfs_dquot *dqp);
 extern void		xfs_dqunlock(struct xfs_dquot *dqp);
@@ -152,7 +154,9 @@ extern int 		xfs_qm_dqcheck(struct xfs_disk_dquot *,
 				       xfs_dqid_t, char *);
 
 /*
- * vnodeops stuff
+ * Vnodeops specific code that should actually be _in_ xfs_vnodeops.c, but
+ * is here because it's nicer to keep vnodeops (therefore, XFS) lean 
+ * and clean.
  */
 extern struct xfs_dquot *	xfs_qm_vop_chown(struct xfs_trans *tp, 
 						 struct xfs_inode *ip, 
@@ -204,16 +208,17 @@ extern int		xfs_trans_mod_dquot_byino(struct xfs_trans *tp,
 extern void		xfs_trans_apply_dquot_deltas(struct xfs_trans *tp);
 extern void		xfs_trans_unreserve_and_mod_dquots(struct xfs_trans *tp);
 
-extern int		xfs_trans_reserve_quota(struct xfs_trans *tp,
-						struct xfs_inode *ip,
-						long nblks,
-						uint type);
+extern int		xfs_trans_reserve_quota_nblks(struct xfs_trans *tp,
+						      struct xfs_inode *ip,
+						      long nblks, long ninos,
+						      uint type);
 
 
 extern int		xfs_trans_reserve_quota_bydquots(struct xfs_trans *tp,
 							 struct xfs_dquot *udqp,
 							 struct xfs_dquot *pdqp,
 							 long nblks,
+							 long ninos,
 							 uint flags);
 extern void		xfs_trans_log_dquot(struct xfs_trans *tp, 
 					    struct xfs_dquot *dqp);
@@ -226,31 +231,30 @@ extern void		xfs_trans_dqjoin(struct xfs_trans *tp,
  * Regular disk block quota reservations 
  */
 #define 	xfs_trans_reserve_blkquota(tp, ip, nblks) \
-xfs_trans_reserve_quota(tp, ip, nblks, XFS_QMOPT_RES_REGBLKS)
+xfs_trans_reserve_quota_nblks(tp, ip, nblks, 0, XFS_QMOPT_RES_REGBLKS)
 						  
 #define 	xfs_trans_unreserve_blkquota(tp, ip, nblks) \
-xfs_trans_reserve_quota(tp, ip, -nblks, XFS_QMOPT_RES_REGBLKS)
+xfs_trans_reserve_quota_nblks(tp, ip, -(nblks), 0, XFS_QMOPT_RES_REGBLKS)
 
-#define 	xfs_trans_reserve_blkquota_bydquots(tp, udq, pdq, nblks, f) \
-xfs_trans_reserve_quota_bydquots(tp, udq, pdq, nblks, f|XFS_QMOPT_RES_REGBLKS) 
+#define 	xfs_trans_reserve_quota(tp, udq, pdq, nb, ni, f) \
+xfs_trans_reserve_quota_bydquots(tp, udq, pdq, nb, ni, f|XFS_QMOPT_RES_REGBLKS) 
 
-#define 	xfs_trans_unreserve_blkquota_bydquots(tp, udq, pdq, nblks, f) \
-xfs_trans_reserve_quota_bydquots(tp, udq, pdq, -nblks, f|XFS_QMOPT_RES_REGBLKS)
+#define 	xfs_trans_unreserve_quota(tp, ud, pd, b, i, f) \
+xfs_trans_reserve_quota_bydquots(tp, ud, pd, -(b), -(i), f|XFS_QMOPT_RES_REGBLKS)
 
 /*
  * Realtime disk block quota reservations 
  */
 #define 	xfs_trans_reserve_rtblkquota(mp, tp, ip, nblks) \
-xfs_trans_reserve_quota(tp, ip, nblks, XFS_QMOPT_RES_RTBLKS)
+xfs_trans_reserve_quota_nblks(tp, ip, nblks, 0, XFS_QMOPT_RES_RTBLKS)
 						  
 #define 	xfs_trans_unreserve_rtblkquota(tp, ip, nblks) \
-xfs_trans_reserve_quota(tp, ip, -nblks, XFS_QMOPT_RES_RTBLKS)
+xfs_trans_reserve_quota_nblks(tp, ip, -(nblks), 0, XFS_QMOPT_RES_RTBLKS)
 
-#define 	xfs_trans_reserve_rtblkquota_bydquots(mp, tp, udq, pdq, nblks, f) \
-xfs_trans_reserve_quota_bydquots(mp, tp, udq, pdq, nblks, f|XFS_QMOPT_RES_RTBLKS) 
+#define 	xfs_trans_reserve_rtquota(mp, tp, uq, pq, blks, f) \
+xfs_trans_reserve_quota_bydquots(mp, tp, uq, pq, blks, 0, f|XFS_QMOPT_RES_RTBLKS) 
 
-#define 	xfs_trans_unreserve_rtblkquota_bydquots(tp, udq, pdq, nblks) \
-xfs_trans_reserve_quota_bydquots(tp, udq, pdq, -nblks, XFS_QMOPT_RES_RTBLKS)
+#define 	xfs_trans_unreserve_rtquota(tp, uq, pq, blks) \
+xfs_trans_reserve_quota_bydquots(tp, uq, pq, -(blks), XFS_QMOPT_RES_RTBLKS)
 
-#endif	/* _KERNEL */
 #endif	/* !__XFS_QUOTA_H__ */
