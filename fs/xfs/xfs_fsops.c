@@ -260,7 +260,7 @@ xfs_growfs_log(
 	 * Can have shorter or longer log in the same space,
 	 * or transform internal to external log or vice versa.
 	 */
-	return XFS_ERROR(EINVAL);
+	return XFS_ERROR(ENOSYS);
 }
 
 STATIC int
@@ -275,7 +275,7 @@ xfs_growfs_rt(
 	 * then it won't have been opened at mount, so we need to do
 	 * that here.  Otherwise we can check the device size as for data.
 	 */
-	return XFS_ERROR(EINVAL);
+	return XFS_ERROR(ENOSYS);
 }
 
 int					/* error status */
