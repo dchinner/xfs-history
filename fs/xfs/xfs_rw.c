@@ -3554,40 +3554,6 @@ xfs_write_file(
 				fillhole = 0;
 			}
 
-			if (error)  {
-				/*
-				 * If the buffer is already done then just
-				 * mark it dirty without copying any more
-				 * data into it.  It is already fully
-				 * initialized.
-				 * Otherwise, we must have getchunk()'d
-				 * the buffer above.  Use chunkreread()
-				 * to get it initialized by xfs_strategy()
-				 * and then write it out.
-				 * We write the data out synchronously here
-				 * so that we don't have to worry about
-				 * having buffers possibly out beyond the
-				 * EOF when we later flush or truncate
-				 * the file.  We set the B_STALE bit so
-				 * that the buffer will be decommissioned
-				 * after it is synced out.
-				 */
-				if (useracced) {
-					xfs_unlock_iopages(uaccmaps,
-							nuaccmaps);
-					useracced = 0;
-				}
-				if (!(bp->b_flags & B_DONE)) {
-					chunkreread(bp);
-				}
-
-				bp->b_flags |= B_STALE;
-				(void) bwrite(bp);
-				bmapp++;
-				nbmaps--;
-				continue;
-			}
-
 			/*
 			 * reset offset/count to reflect the biomove
 			 */
@@ -3620,31 +3586,62 @@ xfs_write_file(
 					    XFS_BB_TO_FSBT(mp, bp->b_offset),
 					    XFS_B_TO_FSBT(mp, bp->b_bcount));
 			ASSERT(bp->b_vp);
-			if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
-				if ((bmapp->pboff + bmapp->pbsize) ==
-				    bmapp->bsize) {
-					bp->b_relse = chunkrelse;
-				}
+
+			if (error)  {
 				/*
-				 * save the commit lsn for dsync writes
-				 * so xfs_write can force the log up to
-				 * the appropriate point.  don't bother
-				 * doing this for sync writes since xfs_write
-				 * will have to kick off a sync xaction to
-				 * log the timestamp updates anyway.
+				 * If the buffer is already done then just
+				 * mark it dirty without copying any more
+				 * data into it.  It is already fully
+				 * initialized.
+				 * Otherwise, we must have getchunk()'d
+				 * the buffer above.  Use chunkreread()
+				 * to get it initialized by xfs_strategy()
+				 * and then write it out.
+				 * We write the data out synchronously here
+				 * so that we don't have to worry about
+				 * having buffers possibly out beyond the
+				 * EOF when we later flush or truncate
+				 * the file.  We set the B_STALE bit so
+				 * that the buffer will be decommissioned
+				 * after it is synced out.
 				 */
-				if (ioflag & IO_DSYNC) {
-					bp->b_fsprivate3 = commit_lsn_p;
-					bp->b_flags |= B_HOLD;
+
+				if (!(bp->b_flags & B_DONE)) {
+					chunkreread(bp);
 				}
-				error = bwrite(bp);
-				if (ioflag & IO_DSYNC) {
-					bp->b_fsprivate3 = NULL;
-					bp->b_flags &= ~B_HOLD;
-					brelse(bp);
-				}
+
+				bp->b_flags |= B_STALE;
+				(void) bwrite(bp);
 			} else {
-				bdwrite(bp);
+
+				if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
+					if ((bmapp->pboff + bmapp->pbsize) ==
+					    bmapp->bsize) {
+						bp->b_relse = chunkrelse;
+					}
+
+					/* save the commit lsn for dsync
+					 * writes so xfs_write can force the
+					 * log up to the appropriate point.
+					 * don't bother doing this for sync
+					 * writes since xfs_write will have to
+					 * kick off a sync xaction to log the
+					 * timestamp updates anyway.
+					 */
+
+					if (ioflag & IO_DSYNC) {
+						bp->b_fsprivate3 = commit_lsn_p;
+						bp->b_flags |= B_HOLD;
+					}
+					error = bwrite(bp);
+					if (ioflag & IO_DSYNC) {
+						bp->b_fsprivate3 = NULL;
+						bp->b_flags &= ~B_HOLD;
+						brelse(bp);
+					}
+				} else {
+					bdwrite(bp);
+				}
 			}
 
 			if (useracced) {

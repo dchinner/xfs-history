@@ -2048,12 +2048,12 @@ xfs_inactive(
 	error = 0;
 	if (ip->i_d.di_nlink != 0) {
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
-		     (ip->i_d.di_size > 0) &&
+		     ((ip->i_d.di_size > 0) || (vp->v_pgcnt > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
 		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
 			if (error = xfs_inactive_free_eofblocks(mp, ip))
 				return (VN_INACTIVE_CACHE);
-		} 
+		}
 		goto out;
 	}
 
