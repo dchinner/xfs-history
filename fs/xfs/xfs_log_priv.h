@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.56 $"
+#ident	"$Revision: 1.57 $"
 
 #include <sys/cmn_err.h>
 
@@ -139,15 +139,17 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 /*
  * In core log state
  */
-#define XLOG_STATE_ACTIVE    0x01 /* Current IC log being written to */
-#define XLOG_STATE_WANT_SYNC 0x02 /* Want to sync this iclog; no more writes */
-#define XLOG_STATE_SYNCING   0x04 /* This IC log is syncing */
-#define XLOG_STATE_DONE_SYNC 0x08 /* Done syncing to disk */
-#define XLOG_STATE_CALLBACK  0x10 /* Callback functions now */
-#define XLOG_STATE_DIRTY     0x20 /* Dirty IC log, not ready for ACTIVE status*/
-#define XLOG_STATE_IOERROR   0x40 /* IO error happened in sync'ing log */
-#define XLOG_STATE_ALL	     0x7F /* All possible valid flags */
-#define XLOG_STATE_NOTUSED   0x80 /* This IC log not being used */
+#define XLOG_STATE_ACTIVE    0x0001 /* Current IC log being written to */
+#define XLOG_STATE_WANT_SYNC 0x0002 /* Want to sync this iclog; no more writes */
+#define XLOG_STATE_SYNCING   0x0004 /* This IC log is syncing */
+#define XLOG_STATE_DONE_SYNC 0x0008 /* Done syncing to disk */
+#define XLOG_STATE_DO_CALLBACK \
+			     0x0010 /* Process callback functions */
+#define XLOG_STATE_CALLBACK  0x0020 /* Callback functions now */
+#define XLOG_STATE_DIRTY     0x0040 /* Dirty IC log, not ready for ACTIVE status*/
+#define XLOG_STATE_IOERROR   0x0080 /* IO error happened in sync'ing log */
+#define XLOG_STATE_ALL	     0x7FFF /* All possible valid flags */
+#define XLOG_STATE_NOTUSED   0x8000 /* This IC log not being used */
 
 /*
  * Flags to log operation header
@@ -259,7 +261,7 @@ typedef struct xlog_iclog_fields {
 	int	  		ic_refcnt;
 	int			ic_roundoff;
 	int			ic_bwritecnt;
-	uchar_t	  		ic_state;
+	ushort_t		ic_state;
 } xlog_iclog_fields_t;
 
 typedef struct xlog_in_core {
