@@ -2499,11 +2499,11 @@ xfs_iflush_fork(
 	char			*cp;
 	xfs_ifork_t		*ifp;
 	xfs_mount_t		*mp;
-	static int		brootflag[2] =
+	static const short	brootflag[2] =
 		{ XFS_ILOG_DBROOT, XFS_ILOG_ABROOT };
-	static int		dataflag[2] =
+	static const short	dataflag[2] =
 		{ XFS_ILOG_DDATA, XFS_ILOG_ADATA };
-	static int		extflag[2] =
+	static const short	extflag[2] =
 		{ XFS_ILOG_DEXT, XFS_ILOG_AEXT };
 
 	if (iip == NULL)
