@@ -47,7 +47,25 @@
 #include <linux/pagemap.h>
 #include <linux/locks.h>
 
-#include "page_buf_internal.h"
+#include "page_buf.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
+#define page_buffers(page)	((page)->buffers)
+#define page_has_buffers(page)	((page)->buffers)
+#endif
+
+#undef assert
+#ifdef PAGEBUF_DEBUG
+# define assert(expr) \
+	if (!(expr)) {						\
+		printk("Assertion failed: %s\n%s::%s line %d\n",\
+		#expr,__FILE__,__FUNCTION__,__LINE__);		\
+		BUG();						\
+	}
+#else
+# define assert(x)	do { } while (0)
+#endif
+
 
 
 /*
@@ -58,14 +76,14 @@ extern int linvfs_pb_bmap(struct inode *, loff_t, ssize_t, page_buf_bmap_t *, in
 /*
  * Forward declarations.
  */
-STATIC int  pagebuf_delalloc_convert(struct inode *, struct page *, int, int);
+static int  pagebuf_delalloc_convert(struct inode *, struct page *, int, int);
 
 /*
  * __pb_match_offset_to_mapping
  * Finds the corresponding mapping in block @map array of the
  * given @offset within a @page.
  */
-STATIC page_buf_bmap_t *
+static page_buf_bmap_t *
 __pb_match_offset_to_mapping(
 	struct page		*page,
 	page_buf_bmap_t		*map,
@@ -86,7 +104,7 @@ __pb_match_offset_to_mapping(
 	return NULL;
 }
 
-STATIC void
+static void
 __pb_map_buffer_at_offset(
 	struct page		*page,
 	struct buffer_head	*bh,
@@ -202,7 +220,7 @@ out:
  * Look for a page at index which is unlocked and not mapped
  * yet - clustering for mmap write case.
  */
-STATIC unsigned int
+static unsigned int
 probe_unmapped_page(
 	struct address_space	*mapping,
 	unsigned long		index,
@@ -240,7 +258,7 @@ probe_unmapped_page(
 	return ret;
 }
 
-STATIC unsigned int
+static unsigned int
 probe_unmapped_cluster(
 	struct inode		*inode,
 	struct page		*startpage,
@@ -283,7 +301,7 @@ probe_unmapped_cluster(
  * Probe for a given page (index) in the inode & test if it is delayed.
  * Returns page locked and with an extra reference count.
  */
-STATIC struct page *
+static struct page *
 probe_page(
 	struct inode		*inode,
 	unsigned long		index)
@@ -310,7 +328,7 @@ probe_page(
 	return NULL;
 }
 
-STATIC void
+static void
 submit_page(
 	struct page		*page,
 	struct buffer_head	*bh_arr[],
@@ -333,7 +351,7 @@ submit_page(
 		unlock_page(page);
 }
 
-STATIC int
+static int
 map_page(
 	struct inode		*inode,
 	struct page		*page,
@@ -388,7 +406,7 @@ map_page(
  * delalloc pages only, for the original page it is possible that
  * the page has no mapping at all.
  */
-STATIC void
+static void
 convert_page(
 	struct inode		*inode,
 	struct page		*page,
@@ -408,7 +426,7 @@ convert_page(
  * Convert & write out a cluster of pages in the same extent as defined
  * by mp and following the start page.
  */
-STATIC void
+static void
 cluster_write(
 	struct inode		*inode,
 	unsigned long		tindex,
@@ -435,7 +453,7 @@ cluster_write(
  * EOF and therefore need to allocate space for unmapped portions of the
  * page.
  */
-STATIC int
+static int
 pagebuf_delalloc_convert(
 	struct inode		*inode,		/* inode containing page */
 	struct page		*page,		/* page to convert - locked */
