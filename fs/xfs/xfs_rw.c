@@ -1,4 +1,4 @@
-#ident "$Revision: 1.121 $"
+#ident "$Revision: 1.122 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1655,7 +1655,7 @@ xfs_iomap_write(
 		if (NBPP > mp->m_sb.sb_blocksize) {
 			aligned_offset = ctooff(offtoct(offset));
 			ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
-			last_page_offset = ctob(btoc64(offset + count));
+			last_page_offset = ctob64(btoc64(offset + count));
 			iosize = XFS_B_TO_FSBT(mp, last_page_offset -
 					       aligned_offset);
 		} else {
