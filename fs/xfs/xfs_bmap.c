@@ -4330,6 +4330,7 @@ xfs_getbmap(
 	__int64_t		bmvend;		/* last block requested */
 	int			error;		/* return value */
 	xfs_fsblock_t		firstblock;	/* start block for bmapi */
+	__int64_t		fixlen;		/* length for -1 case */
 	int			i;		/* extent number */
 	xfs_inode_t		*ip;		/* xfs incore inode pointer */
 	vnode_t			*vp;		/* corresponding vnode */
@@ -4359,34 +4360,34 @@ xfs_getbmap(
 		   ip->i_d.di_format != XFS_DINODE_FMT_LOCAL)
 		return XFS_ERROR(EINVAL);
 	mp = ip->i_mount;
+	fixlen = 0;
 	if (whichfork == XFS_DATA_FORK &&
 	    ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) {
 		prealloced = 1;
 		if (bmv->bmv_length == -1)
-			bmv->bmv_length =
-				XFS_FSB_TO_BB(mp,
-					XFS_B_TO_FSB(mp, XFS_MAX_FILE_OFFSET));
+			fixlen = XFS_FSB_TO_BB(mp,
+				XFS_B_TO_FSB(mp, XFS_MAX_FILE_OFFSET));
 	} else if (whichfork == XFS_DATA_FORK) {
 		prealloced = 0;
 		if (bmv->bmv_length == -1)
-			bmv->bmv_length =
-				XFS_FSB_TO_BB(mp,
-					XFS_B_TO_FSB(mp, ip->i_d.di_size));
+			fixlen = XFS_FSB_TO_BB(mp,
+				XFS_B_TO_FSB(mp, ip->i_d.di_size));
 	} else {
 		prealloced = 0;
 		if (bmv->bmv_length == -1)
-			bmv->bmv_length =
-				XFS_FSB_TO_BB(mp, XFS_B_TO_FSB(mp, 1LL << 32));
+			fixlen = XFS_FSB_TO_BB(mp, XFS_B_TO_FSB(mp, 1LL << 32));
 	}
-	bmvend = bmv->bmv_offset + bmv->bmv_length;
-	nex = bmv->bmv_count - 1;
-	ASSERT(nex > 0);
-	if (bmv->bmv_length < 0)
+	if (fixlen)
+		bmv->bmv_length = MAX(fixlen - bmv->bmv_offset, 0);
+	else if (bmv->bmv_length < 0)
 		return XFS_ERROR(EINVAL);
 	if (bmv->bmv_length == 0) {
 		bmv->bmv_entries = 0;
 		return 0;
 	}
+	nex = bmv->bmv_count - 1;
+	ASSERT(nex > 0);
+	bmvend = bmv->bmv_offset + bmv->bmv_length;
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	if (whichfork == XFS_DATA_FORK && ip->i_delayed_blks) {
 		last_byte = xfs_file_last_byte(ip);
