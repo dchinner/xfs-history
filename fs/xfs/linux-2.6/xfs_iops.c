@@ -745,17 +745,9 @@ STATIC int linvfs_read_full_page(struct file *filp, struct page *page)
 	return pagebuf_read_full_page(filp, page, linvfs_pb_bmap);
 }
 
-STATIC int linvfs_write_full_page_unlock(struct page *page)
+STATIC int linvfs_write_full_page(struct page *page)
 {
 	int ret = pagebuf_write_full_page(page, linvfs_pb_bmap);
-	UnlockPage(page);
-	return ret > 0 ? 0 : ret;
-}
-
-STATIC int linvfs_write_full_page_nounlock(struct page *page)
-{
-	int ret = pagebuf_write_full_page(page, linvfs_pb_bmap);
-	/* In this case return how much we flushed, not errors */
 	return ret < 0 ? 0 : ret;
 }
 
@@ -771,8 +763,7 @@ STATIC int linvfs_prepare_write(
 
 struct address_space_operations linvfs_aops = {
   readpage:		linvfs_read_full_page,
-  writepage:		linvfs_write_full_page_unlock,
-  writepage_nounlock:	linvfs_write_full_page_nounlock,
+  writepage:		linvfs_write_full_page,
   sync_page:		block_sync_page,
   bmap:			linvfs_bmap,
   toss_page:		pagebuf_toss_page,
