@@ -10,9 +10,9 @@ KERNEL_VERSION = 2.4.2
 
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
-COMMANDS =	cmd/attr cmd/xfsprogs cmd/xfsdump cmd/acl cmd/dmapi
-COMMANDRPMS =	attr attr-devel xfsprogs xfsprogs-devel xfsdump acl acl-devel \
-		dmapi dmapi-devel
+COMMANDS =	cmd/acl cmd/attr cmd/xfsprogs cmd/dmapi cmd/xfsdump
+COMMANDRPMS =	attr attr-devel acl acl-devel dmapi dmapi-devel \
+		xfsprogs xfsprogs-devel xfsdump
 
 default all: checkproc tarballs kernel cmds quota
 
