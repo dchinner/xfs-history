@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.226 $"
+#ident	"$Revision$"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -436,6 +436,20 @@ xfs_bunmap_trace(
 #else
 #define	xfs_bunmap_trace(ip, bno, len, flags, ra)
 #endif	/* DEBUG && XFS_RW_TRACE */
+
+STATIC int
+xfs_bmap_count_tree(
+        xfs_mount_t     *mp,
+        xfs_trans_t     *tp,
+        xfs_fsblock_t   blockno,
+        int             levelin,
+	int		*count);
+
+STATIC int
+xfs_bmap_count_leaves(
+	xfs_bmbt_rec_t		*frp,
+	int			numrecs,
+	int			*count);
 
 /*
  * Bmap internal routines.
@@ -5628,3 +5642,141 @@ xfs_bmap_check_extents(
 }
 
 #endif
+
+/*
+ * Count fsblocks of the given fork.
+ */
+int						/* error */
+xfs_bmap_count_blocks(
+	xfs_trans_t		*tp,		/* transaction pointer */
+	xfs_inode_t		*ip,		/* incore inode */
+	int			whichfork,	/* data or attr fork */
+	int			*count)		/* out: count of blocks */
+{
+	xfs_bmbt_block_t	*block;	/* current btree block */
+	xfs_fsblock_t		bno;	/* block # of "block" */
+	xfs_ifork_t		*ifp;	/* fork structure */
+	int			level;	/* btree level, for checking */
+	xfs_mount_t		*mp;	/* file system mount structure */
+	xfs_bmbt_ptr_t		*pp;	/* pointer to block address */
+
+	bno = NULLFSBLOCK;
+	mp = ip->i_mount;
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	if ( XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_EXTENTS ) {
+		if (xfs_bmap_count_leaves(ifp->if_u1.if_extents, 
+			ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t), 
+			count) < 0)
+			return XFS_ERROR(EFSCORRUPTED);
+		return 0;
+	}
+
+	/*
+	 * Root level must use BMAP_BROOT_PTR_ADDR macro to get ptr out.
+	 */
+	block = ifp->if_broot;
+	ASSERT(block->bb_level > 0);
+	level = block->bb_level;
+	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
+	ASSERT(*pp != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
+	bno = *pp;
+
+	if (xfs_bmap_count_tree(mp, tp, bno, level, count) < 0)
+		return XFS_ERROR(EFSCORRUPTED);
+
+	return 0;
+}
+
+/*
+ * Recursively walks each level of a btree
+ * to count total fsblocks is use.
+ */
+int                                     /* error */
+xfs_bmap_count_tree(
+        xfs_mount_t     *mp,            /* file system mount point */
+        xfs_trans_t     *tp,            /* transaction pointer */
+        xfs_fsblock_t   blockno,	/* file system block number */
+        int             levelin,	/* level in btree */
+	int		*count)		/* Count of blocks */        
+{
+	int			error;
+	buf_t			*bp, *nbp;
+	int			level = levelin;
+	xfs_bmbt_ptr_t          *pp;
+	xfs_fsblock_t           bno = blockno;
+	xfs_fsblock_t		nextbno;
+	xfs_bmbt_block_t        *block, *nextblock;
+	int			numrecs;
+	xfs_bmbt_rec_t		*frp;
+
+	if (error = xfs_btree_read_bufl(mp, tp, bno, 0, &bp, XFS_BMAP_BTREE_REF))
+		return error;
+	*count += 1;
+	block = XFS_BUF_TO_BMBT_BLOCK(bp);
+
+	if (--level) {
+		/* Not at node above leafs, count this level of nodes */
+		nextbno = block->bb_rightsib;
+		while (nextbno != NULLFSBLOCK) {
+			if (error = xfs_btree_read_bufl(mp, tp, nextbno, 
+				0, &nbp, XFS_BMAP_BTREE_REF))
+				return error;
+			*count += 1;
+			nextblock = XFS_BUF_TO_BMBT_BLOCK(nbp);
+			nextbno = nextblock->bb_rightsib;
+			xfs_trans_brelse(tp, nbp);
+		}
+
+		/* Dive to the next level */
+		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, 
+			xfs_bmbt, block, 1, mp->m_bmap_dmxr[1]);
+		bno = *pp;
+		if ((error = 
+		     xfs_bmap_count_tree(mp, tp, bno, level, count)) < 0) {
+			xfs_trans_brelse(tp, bp);
+			return XFS_ERROR(EFSCORRUPTED);
+		}
+		xfs_trans_brelse(tp, bp);
+	} else {
+		/* count all level 1 nodes and their leaves */
+		for (;;) {
+			nextbno = block->bb_rightsib;
+			numrecs = block->bb_numrecs;
+			frp = XFS_BTREE_REC_ADDR(mp->m_sb.sb_blocksize, 
+				xfs_bmbt, block, 1, mp->m_bmap_dmxr[0]);
+			if (xfs_bmap_count_leaves(frp, numrecs, count) < 0) {
+				xfs_trans_brelse(tp, bp);
+				return XFS_ERROR(EFSCORRUPTED);
+			}
+			xfs_trans_brelse(tp, bp);
+			if (nextbno == NULLFSBLOCK)
+				break;
+			bno = nextbno;
+			if (error = xfs_btree_read_bufl(mp, tp, bno, 0, &bp,
+                                XFS_BMAP_BTREE_REF))
+				return error;
+			*count += 1;
+			block = XFS_BUF_TO_BMBT_BLOCK(bp);
+		}
+	}
+	return 0;
+}
+
+/*
+ * Count leaf blocks given a pointer to an extent list.
+ */
+int
+xfs_bmap_count_leaves(
+	xfs_bmbt_rec_t		*frp,
+	int			numrecs,
+	int			*count) 
+{
+	int		b;
+
+	for ( b = 1; b <= numrecs; b++, frp++)
+		*count += xfs_bmbt_get_blockcount(frp);
+	return 0;
+}
+

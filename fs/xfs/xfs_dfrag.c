@@ -1,4 +1,4 @@
-#ident "$Id: xfs_dfrag.c,v 1.5 1999/05/14 20:13:13 lord Exp $"
+#ident "$Id$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -60,6 +60,8 @@
 
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
 	
+extern int xfs_bmap_count_blocks( xfs_trans_t *, xfs_inode_t *, int, int *); 
+
 /*
  * Syssgi interface for swapext
  */
@@ -84,6 +86,7 @@ xfs_swapext(
 	xfs_ifork_t	tempif, *ifp, *tifp;
 	__uint64_t	tmp;
 	__uint64_t	cxfs_val;
+	int		aforkblks = 0;
 
 	if (copyin(sxp, &sx, sizeof sx))
 		return XFS_ERROR(EFAULT);
@@ -201,21 +204,13 @@ xfs_swapext(
 		error = XFS_ERROR(EFAULT);
 		goto error0;
 	}
-		
-	/* 
-	 * This version does not know how to distinguish
-	 * the attribute fork blocks from the data fork
-	 * blocks in the di_nblocks value.  Code needs to
-	 * be written to walk and count the data fork blocks
-	 * and indirect blocks.  Until then,  we do not 
-	 * support swapping files that have attributes.
-	 */
-	if ( ((XFS_IFORK_Q(ip) != 0) && (ip->i_d.di_anextents > 0)) ||
-	     ((XFS_IFORK_Q(tip) != 0) && (tip->i_d.di_anextents > 0)) ) {
+
+	/* Verify that ftmp does not contain extended attrs */
+	if ( ((XFS_IFORK_Q(tip) != 0) && (tip->i_d.di_anextents > 0)) ) {
 		error = XFS_ERROR(ENOTSUP);
 		goto error0;
 	}
-
+		
 	/* 
 	 * Compare the current change & modify times with that 
 	 * passed in.  If they differ, we abort this swap.
@@ -266,10 +261,26 @@ xfs_swapext(
 	if (error = xfs_trans_reserve(tp, 0,
 				     XFS_ICHANGE_LOG_RES(mp), 0,
 				     0, 0)) {
+		xfs_iunlock(ip,  XFS_IOLOCK_EXCL);
+		xfs_iunlock(tip, XFS_IOLOCK_EXCL);
 		xfs_trans_cancel(tp, 0);
 		return error;
 	}
 	xfs_lock_inodes(ips, 2, 0, XFS_ILOCK_EXCL);
+
+	/*
+	 * Count the number of extended attribute blocks 
+	 */
+	if ( ((XFS_IFORK_Q(ip) != 0) && (ip->i_d.di_anextents > 0)) &&
+	     (ip->i_d.di_aformat != XFS_DINODE_FMT_LOCAL)) {
+		error = xfs_bmap_count_blocks(tp, ip, XFS_ATTR_FORK, &aforkblks);
+		if (error) {
+			xfs_iunlock(ip,  lock_flags);
+			xfs_iunlock(tip, lock_flags);
+			xfs_trans_cancel(tp, 0);
+			return error;
+		}
+	}
 
 	/* 
 	 * Swap the data forks of the inodes 
@@ -282,18 +293,10 @@ xfs_swapext(
 
 	/* 
 	 * Fix the on-disk inode values
-	 * 
-	 * The di_nblocks value includes data blocks, attribute
-	 * blocks and indirect blocks.  The only reason I can
-	 * copy this value like I'm doing is that I've already
-	 * checked that no attribute blocks are involved with
-	 * these two inodes.  To handle attributes, I need to
-	 * walk one of the forks to count all blocks and re-do
-	 * calculation.
 	 */
 	tmp = (__uint64_t)ip->i_d.di_nblocks;
-	ip->i_d.di_nblocks = tip->i_d.di_nblocks;
-	tip->i_d.di_nblocks = tmp;
+	ip->i_d.di_nblocks = tip->i_d.di_nblocks + aforkblks;
+	tip->i_d.di_nblocks = tmp - aforkblks;
 
 	tmp = (__uint64_t) ip->i_d.di_nextents;
 	ip->i_d.di_nextents = tip->i_d.di_nextents;
