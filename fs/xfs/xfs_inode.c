@@ -927,6 +927,12 @@ xfs_ialloc(
 	ip->i_d.di_uid = cr->cr_uid;
 	ip->i_d.di_gid = cr->cr_gid;
 	ip->i_d.di_projid = prid;
+	ASSERT(ip->i_mount->m_readio_log <= 0xff);
+	ASSERT(ip->i_mount->m_writeio_log <= 0xff);
+	ip->i_readio_log = (uchar_t) ip->i_mount->m_readio_log;
+	ip->i_writeio_log = (uchar_t) ip->i_mount->m_writeio_log;
+	ip->i_readio_blocks = ip->i_mount->m_readio_blocks;
+	ip->i_writeio_blocks = ip->i_mount->m_writeio_blocks;
 	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
 
 	/*
