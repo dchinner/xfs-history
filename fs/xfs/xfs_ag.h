@@ -3,8 +3,6 @@
 
 #ident	"$Revision: 1.3 $"
 
-#include "xfs_types.h"
-
 /*
  * Allocation group header
  */
@@ -14,7 +12,8 @@
 
 typedef enum
 {
-	XFS_BTNUM_BNO, XFS_BTNUM_CNT, XFS_BTNUM_IBT, XFS_BTNUM_MAX
+	XFS_BTNUM_BNO, XFS_BTNUM_CNT, XFS_BTNUM_IBT, XFS_BTNUM_BMAP,
+	XFS_BTNUM_MAX
 } xfs_btnum_t;
 
 typedef struct xfs_aghdr
@@ -26,9 +25,9 @@ typedef struct xfs_aghdr
 	/*
 	 * Freespace information
 	 */
-	xfs_agblock_t	xfsag_roots[XFS_BTNUM_MAX - 1];
+	xfs_agblock_t	xfsag_roots[XFS_BTNUM_MAX - 2];
 	xfs_agblock_t	xfsag_freelist;	/* free blocks */
-	__uint16_t	xfsag_levels[XFS_BTNUM_MAX - 1];
+	__uint16_t	xfsag_levels[XFS_BTNUM_MAX - 2];
 	xfs_extlen_t	xfsag_flist_count;	/* #blocks */
 	xfs_extlen_t	xfsag_freeblks;	/* total free blocks */
 	xfs_extlen_t	xfsag_longest;	/* longest free space */
