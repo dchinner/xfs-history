@@ -62,6 +62,7 @@ xlog_get_bp(int num_bblks,xfs_mount_t *mp)
 	xfs_buf_t   *bp;
 
 	ASSERT(num_bblks > 0);
+
 	bp = XFS_ngetrbuf(BBTOB(num_bblks),mp);
 	return bp;
 }	/* xlog_get_bp */
@@ -176,7 +177,13 @@ xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
 #ifdef DEBUG
         xlog_header_check_dump(mp, head);
 #endif
-        return XFS_ERROR(EFSCORRUPTED); /* XXX is this what we want? */
+        return XFS_ERROR(EFSCORRUPTED);
+    } else if (!uuid_equal(&mp->m_sb.sb_uuid, &head->h_fs_uuid)) {
+	xlog_warn("XFS: dirty log entry has mismatched uuid - can't recover");
+#ifdef DEBUG
+        xlog_header_check_dump(mp, head);
+#endif 
+        return XFS_ERROR(EFSCORRUPTED);
     }
  
     return 0;   
@@ -206,7 +213,7 @@ xlog_header_check_mount(xfs_mount_t *mp, xlog_rec_header_t *head)
 #ifdef DEBUG
         xlog_header_check_dump(mp, head);
 #endif 
-        return XFS_ERROR(EFSCORRUPTED); /* XXX is this what we want? */
+        return XFS_ERROR(EFSCORRUPTED);
     }
     
     return 0;
@@ -290,22 +297,34 @@ xlog_find_verify_cycle( xlog_t 		*log,
 	int			i;
 	uint			cycle;
     	xfs_buf_t		*bp;
-	int			error = 0;
+    	char                    *buf        = NULL;
+	int			error       = 0;
+	int			smallmem    = 0;
 
-	bp = xlog_get_bp(1, log->l_mp);
-	if (!bp)
-	    return -ENOMEM;
+	if (!(bp = xlog_get_bp(nbblks, log->l_mp))) {
+                /* can't get enough memory to do everything in one big buffer */
+	        if (!(bp = xlog_get_bp(1, log->l_mp)))
+	                return -ENOMEM;
+                smallmem = 1;
+        } else {
+		if ((error = xlog_bread(log, start_blk, nbblks, bp)))
+			goto out;
+        }
+        
+        buf = XFS_BUF_PTR(bp);
 
 	for (i=start_blk; i< start_blk + nbblks; i++) {
-		error = xlog_bread(log, i, 1, bp);
-		if (error)
-			goto out;
+                if (smallmem && (error = xlog_bread(log, i, 1, bp)))
+		        goto out;
 
-		cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
+		cycle = GET_CYCLE(buf, ARCH_CONVERT);
 		if (cycle == stop_on_cycle_no) {
 			error = i;
 			goto out;
 		}
+                
+                if (!smallmem)
+                        buf += BBSIZE;
 	}
 
 	error = -1;
@@ -338,14 +357,25 @@ xlog_find_verify_log_record(xlog_t	*log,
 {
     xfs_daddr_t         i;
     xfs_buf_t		*bp;
+    char                *buf        = NULL;
     xlog_rec_header_t	*head;
-    int			error = 0;
+    int			error       = 0;
+    int                 smallmem    = 0;
+    int                 num_blks    = *last_blk - start_blk;
 
     ASSERT(start_blk != 0 || *last_blk != start_blk);
 
-    bp = xlog_get_bp(1, log->l_mp);
-    if (!bp)
-    	return -ENOMEM;
+    if (!(bp = xlog_get_bp(num_blks, log->l_mp))) {
+        if (!(bp = xlog_get_bp(1, log->l_mp))) 
+    	    return -ENOMEM;
+        smallmem = 1;
+        buf = XFS_BUF_PTR(bp);
+    } else {
+	if ((error = xlog_bread(log, start_blk, num_blks, bp)))
+	    goto out;
+        buf = XFS_BUF_PTR(bp) + (num_blks - 1) * BBSIZE;
+    }
+    
 
     for (i=(*last_blk)-1; i>=0; i--) {
 	if (i < start_blk) {
@@ -358,13 +388,15 @@ xlog_find_verify_log_record(xlog_t	*log,
 	    goto out;
 	}
 
-	error = xlog_bread(log, i, 1, bp);
-	if (error)
-		goto out;
-    	head = (xlog_rec_header_t*)XFS_BUF_PTR(bp);
+	if (smallmem && (error = xlog_bread(log, i, 1, bp)))
+	    goto out;
+    	head = (xlog_rec_header_t*)buf;
 	
 	if (INT_GET(head->h_magicno, ARCH_CONVERT) == XLOG_HEADER_MAGIC_NUM)
 	    break;
+        
+        if (!smallmem)
+            buf -= BBSIZE;
     }
 
     /*
@@ -944,14 +976,21 @@ xlog_write_log_records(
 {
 	xlog_rec_header_t	*recp;
 	int			i;
-	int			error = 0;
+	int			error       = 0;
 	xfs_buf_t		*bp;
+	char		        *buf;
+        int                     smallmem    = 0;
 
-        bp = xlog_get_bp(1, log->l_mp);
-	if (!bp)
-		return -ENOMEM;
-	recp = (xlog_rec_header_t*)(XFS_BUF_PTR(bp));
+        if (!(bp = xlog_get_bp(blocks, log->l_mp))) {
+                if (!(bp = xlog_get_bp(1, log->l_mp)))
+		        return -ENOMEM;
+                smallmem = 1;
+        }
+        
+        buf = XFS_BUF_PTR(bp);
+	recp = (xlog_rec_header_t*)buf;
 
+        memset(buf, 0, BBSIZE);
         INT_SET(recp->h_magicno, ARCH_CONVERT, XLOG_HEADER_MAGIC_NUM);
         INT_SET(recp->h_cycle, ARCH_CONVERT, cycle);
         INT_SET(recp->h_version, ARCH_CONVERT, 1);
@@ -960,13 +999,28 @@ xlog_write_log_records(
         INT_ZERO(recp->h_chksum, ARCH_CONVERT);
         INT_ZERO(recp->h_prev_block, ARCH_CONVERT);	/* unused */
         INT_ZERO(recp->h_num_logops, ARCH_CONVERT);
-
-	for (i = start_block; i < start_block + blocks; i++) {
-		ASSIGN_ANY_LSN(recp->h_lsn, cycle, i, ARCH_CONVERT);
-		error = xlog_bwrite(log, i, 1, bp);
-		if (error)
-			break;
-	}
+        
+        if (smallmem) {
+                /* for small mem, we keep modifying the block and writing */
+	        for (i = start_block; i < start_block + blocks; i++) {
+		        ASSIGN_ANY_LSN(recp->h_lsn, cycle, i, ARCH_CONVERT);
+		        if ((error = xlog_bwrite(log, i, 1, bp)))
+			        break;
+	        }
+        } else {
+		ASSIGN_ANY_LSN(recp->h_lsn, cycle, start_block, ARCH_CONVERT);
+	        for (i = start_block+1; i < start_block + blocks; i++) {
+                        /* with plenty of memory, we duplicate the block
+                         * right through the buffer and modify each entry
+                         */
+                        buf += BBSIZE;
+	                recp = (xlog_rec_header_t*)buf;
+                        memcpy(buf, XFS_BUF_PTR(bp), BBSIZE);
+		        ASSIGN_ANY_LSN(recp->h_lsn, cycle, i, ARCH_CONVERT);
+                }
+                /* then write the whole lot out at once */
+		error = xlog_bwrite(log, start_block, blocks, bp);
+        }
 	xlog_put_bp(bp);
 
 	return error;
@@ -3289,7 +3343,7 @@ xlog_recover(xlog_t *log, int readonly)
 		  return ENOSPC;
 #endif
 		}
-
+                
 #ifdef __KERNEL__
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
