@@ -502,7 +502,9 @@ xfs_inode_item_push(
 		ASSERT(iip->ili_bp->b_flags & B_BUSY);
 		iip->ili_bp = NULL;
 		iip->ili_bp_owner = NULL;
+#ifndef SIM
 		buftrace("INODE ITEM PUSH", bp);
+#endif
 		bawrite(bp);
 		return;
 	}
