@@ -149,9 +149,9 @@ xfs_intino_t xfs_dir2_sf_get_inumber(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from);
 	((sfp)->hdr.i8count == 0 ? \
 		(xfs_intino_t)XFS_DIR2_SF_GET_INO4_ARCH(*(from), arch) : \
 		(xfs_intino_t)XFS_DIR2_SF_GET_INO8_ARCH(*(from), arch))
-#endif
 #define	XFS_DIR2_SF_GET_INUMBER(sfp, from)	\
         XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, from, ARCH_NOCONVERT)
+#endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_PUT_INUMBER)
 void xfs_dir2_sf_put_inumber_arch(xfs_dir2_sf_t *sfp, xfs_ino_t *from,
@@ -169,9 +169,9 @@ void xfs_dir2_sf_put_inumber(xfs_dir2_sf_t *sfp, xfs_ino_t *from,
         } else { \
             DIRINO_COPY_ARCH(from,to,arch); \
         }
-#endif
 #define	XFS_DIR2_SF_PUT_INUMBER(sfp,from,to)	        \
         XFS_DIR2_SF_PUT_INUMBER_ARCH(sfp,from,to,ARCH_NOCONVERT)	 
+#endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_GET_OFFSET)
 xfs_dir2_data_aoff_t xfs_dir2_sf_get_offset_arch(xfs_dir2_sf_entry_t *sfep, 
@@ -184,9 +184,9 @@ xfs_dir2_data_aoff_t xfs_dir2_sf_get_offset(xfs_dir2_sf_entry_t *sfep);
 #else
 #define	XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,arch)	\
         INT_GET_UNALIGNED_16_ARCH(&(sfep)->offset.i,arch)
-#endif
 #define	XFS_DIR2_SF_GET_OFFSET(sfep)	\
         XFS_DIR2_SF_GET_OFFSET_ARCH(sfep,ARCH_NOCONVERT)
+#endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_PUT_OFFSET)
 void xfs_dir2_sf_put_offset_arch(xfs_dir2_sf_entry_t *sfep,
@@ -200,9 +200,9 @@ void xfs_dir2_sf_put_offset(xfs_dir2_sf_entry_t *sfep,
 #else
 #define	XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,arch)	\
         INT_SET_UNALIGNED_16_ARCH(&(sfep)->offset.i,off,arch)
-#endif
 #define	XFS_DIR2_SF_PUT_OFFSET(sfep,off)	\
         XFS_DIR2_SF_PUT_OFFSET_ARCH(sfep,off,ARCH_NOCONVERT)
+#endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR2_SF_ENTSIZE_BYNAME)
 int xfs_dir2_sf_entsize_byname(xfs_dir2_sf_t *sfp, int len);
