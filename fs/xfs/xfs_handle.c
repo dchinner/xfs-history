@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -399,6 +399,8 @@ gethandle (
 		return EFAULT;
 	if (hlen < sizeof *hp)
 		bzero (((char *) hp) + hlen, sizeof *hp - hlen);
+	if (hlen == sizeof hp->ha_fsid)	
+		return 0;	/* FS handle, nothing more to check */
 	if (hp->ha_fid.fid_len != (hlen - sizeof hp->ha_fsid -
 	    sizeof hp->ha_fid.fid_len) || *((short *) hp->ha_fid.fid_data))
 	{

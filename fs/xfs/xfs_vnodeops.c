@@ -1606,6 +1606,14 @@ xfs_create(vnode_t	*dir_vp,
 
 	vn_trace_entry(dir_vp, "xfs_create");
 
+        dp = XFS_VTOI(dir_vp);
+
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_CREATE)) {
+		error = dm_namesp_event(DM_CREATE, dir_vp, NULL, name, NULL,
+			vap->va_mode, 0);
+		if (error)
+			return error;
+	}
 try_again:
 
 	ip = NULL;
@@ -1632,7 +1640,6 @@ try_again:
 		goto error_return;
 	}
 
-        dp = XFS_VTOI(dir_vp);
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
 
 	/*
@@ -1860,10 +1867,6 @@ error_return:
 	if (!dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	ASSERT(!truncated);
-	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_POSTCREATE)) {
-		(void) dm_namesp_event(DM_POSTCREATE, dir_vp, vp, name, NULL,
-			ip->i_d.di_mode, error);
-	}
 	return error;
 }
 
@@ -2378,10 +2381,6 @@ xfs_remove(vnode_t	*dir_vp,
 
 error_return:
 	xfs_trans_cancel(tp, cancel_flags);
-	if (DM_EVENT_ENABLED (dir_vp->v_vfsp, dp, DM_POSTREMOVE)) {
-		(void) dm_namesp_event (DM_POSTREMOVE, dir_vp, NULL,
-			name, NULL, ip->i_d.di_mode, error);
-	}
 	return error;
 }
 
@@ -2417,6 +2416,16 @@ xfs_link(vnode_t	*target_dir_vp,
         if (src_vp->v_type == VDIR)
                 return XFS_ERROR(EPERM);
 
+	sip = XFS_VTOI(src_vp);
+	tdp = XFS_VTOI(target_dir_vp);
+
+	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_LINK)) {
+		error = dm_namesp_event(DM_LINK, target_dir_vp, src_vp,
+			target_name, NULL, 0, 0);
+		if (error)
+			return error;
+	}
+
 	mp = XFS_VFSTOM(target_dir_vp->v_vfsp);
         tp = xfs_trans_alloc(mp, XFS_TRANS_LINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
@@ -2426,9 +2435,6 @@ xfs_link(vnode_t	*target_dir_vp,
 		cancel_flags = 0;
                 goto error_return;
 	}
-
-	sip = XFS_VTOI(src_vp);
-	tdp = XFS_VTOI(target_dir_vp);
 
 	xfs_lock_2_inodes (sip, tdp);
 
@@ -2481,6 +2487,10 @@ xfs_link(vnode_t	*target_dir_vp,
 
 	dnlc_enter_fast (target_dir_vp, &fastdata, XFS_ITOV(sip), credp);
 
+	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_POSTLINK)) {
+		(void) dm_namesp_event(DM_POSTLINK, target_dir_vp, src_vp,
+			target_name, NULL, 0, 0);
+	}
 	return 0;
 
 error_return:
@@ -3082,11 +3092,6 @@ start_over:
 error_return:
 
 	xfs_trans_cancel(tp, cancel_flags);
-	if (DM_EVENT_ENABLED(src_dir_vp->v_vfsp, XFS_VTOI(src_dir_vp), DM_POSTRENAME) ||
-	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp, XFS_VTOI(target_dir_vp), DM_POSTRENAME)) {
-		(void) dm_namesp_event (DM_POSTRENAME, src_dir_vp,
-			target_dir_vp, src_name, target_name, 0, error);
-	}
 	return error;
 }
 
@@ -3116,6 +3121,14 @@ xfs_mkdir(vnode_t	*dir_vp,
 	boolean_t		dp_joined_to_trans = B_FALSE;
 	struct ncfastdata	fastdata;
 
+        dp = XFS_VTOI(dir_vp);
+
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_CREATE)) {
+		code = dm_namesp_event(DM_CREATE, dir_vp, NULL, dir_name,
+			NULL, vap->va_mode, 0);
+		if (code)
+			return code;
+	}
 	vn_trace_entry(dir_vp, "xfs_mkdir");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
@@ -3131,10 +3144,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 		goto error_return;
 	}
 
-        dp = XFS_VTOI(dir_vp);
-
         xfs_ilock (dp, XFS_ILOCK_EXCL);
-
 
 	/*
 	 * Since dp was not locked between VOP_LOOKUP and VOP_MKDIR,
@@ -3209,6 +3219,10 @@ xfs_mkdir(vnode_t	*dir_vp,
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
 
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_POSTCREATE)) {
+		(void) dm_namesp_event(DM_POSTCREATE, dir_vp, NULL, dir_name,
+			NULL, cdp->i_d.di_mode, 0);
+	}
 	return 0;
 
 error_return:
@@ -3452,6 +3466,14 @@ xfs_symlink(vnode_t	*dir_vp,
                 pn_free(&cpn);
                 pn_free(&ccpn);
         }
+        dp = XFS_VTOI(dir_vp);
+
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_SYMLINK)) {
+		error = dm_namesp_event(DM_SYMLINK, dir_vp, NULL,
+			link_name, target_path, 0, 0);
+		if (error)
+			return error;
+	}
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc(mp, XFS_TRANS_SYMLINK);
@@ -3467,8 +3489,6 @@ xfs_symlink(vnode_t	*dir_vp,
                 goto error_return;
 	}
 
-
-        dp = XFS_VTOI(dir_vp);
 	xfs_ilock (dp, XFS_ILOCK_EXCL);
 
 	/*
@@ -3589,6 +3609,10 @@ xfs_symlink(vnode_t	*dir_vp,
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
 
+	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_POSTSYMLINK)) {
+		(void) dm_namesp_event(DM_POSTSYMLINK, dir_vp, XFS_ITOV(ip),
+			link_name, target_path, 0, 0);
+	}
 	return 0;
 
 error_return:
@@ -3599,7 +3623,6 @@ error_return:
 		xfs_iunlock (dp, XFS_ILOCK_EXCL);
 
 	return error;
-
 }
 
 
