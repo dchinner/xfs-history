@@ -22,6 +22,7 @@ typedef struct xfs_inode_log_format {
 	} ilf_u;
 } xfs_inode_log_format_t;
 
+struct proc;
 typedef struct xfs_inode_log_item {
 	xfs_log_item_t		ili_item;	   /* common portion */
 	struct xfs_inode	*ili_inode;	   /* inode ptr */
@@ -33,6 +34,7 @@ typedef struct xfs_inode_log_item {
 	unsigned int		ili_last_fields;   /* fields when flushed */
 	struct xfs_bmbt_rec	*ili_extents_buf;  /* array of logged exts */
 	buf_t			*ili_bp;	   /* locked inode buffer */
+	struct proc		*ili_bp_owner;	   /* bp owner proc */
 	xfs_inode_log_format_t	ili_format;	   /* logged structure */
 } xfs_inode_log_item_t;
 

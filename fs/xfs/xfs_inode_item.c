@@ -14,6 +14,7 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
+#include <sys/user.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -354,6 +355,7 @@ xfs_inode_item_trylock(
 			if (bp != NULL) {
 				if (bp->b_flags & B_DELWRI) {
 					iip->ili_bp = bp;
+					iip->ili_bp_owner = u.u_procp;
 					flushed = 1;
 				} else {
 					brelse(bp);
@@ -495,10 +497,13 @@ xfs_inode_item_push(
 	 * the device strategy routine might sleep.  Instead we stored it
 	 * and write it out here.
 	 */
-	if (iip->ili_bp != NULL) {
+	bp = iip->ili_bp;
+	if ((bp != NULL) && (iip->ili_bp_owner == u.u_procp)) {
 		ASSERT(iip->ili_bp->b_flags & B_BUSY);
-		bawrite(iip->ili_bp);
 		iip->ili_bp = NULL;
+		iip->ili_bp_owner = NULL;
+		buftrace("INODE ITEM PUSH", bp);
+		bawrite(bp);
 		return;
 	}
 
