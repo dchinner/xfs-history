@@ -1,4 +1,4 @@
-#ident "$Revision: 1.79 $"
+#ident "$Revision: 1.80 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -590,6 +590,17 @@ xfs_trans_commit(
 	 */
 	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
+		/*
+		 * It is indeed possible for the transaction to be
+		 * not dirty but the dqinfo portion to be. All that
+		 * means is that we have some (non-persistent) quota
+		 * reservations that need to be unreserved.
+		 */
+		if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY)) {
+#ifndef SIM
+			xfs_trans_unreserve_and_mod_dquots(tp);
+#endif
+		}
 		if (tp->t_ticket) {
 			xfs_log_done(mp, tp->t_ticket, log_flags);
 		}
@@ -834,7 +845,7 @@ xfs_trans_cancel(
 
 	xfs_trans_unreserve_and_mod_sb(tp);
 	
-	if (tp->t_dqinfo)
+	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY))
 		xfs_trans_unreserve_and_mod_dquots(tp);
 
 	if (tp->t_ticket) {
