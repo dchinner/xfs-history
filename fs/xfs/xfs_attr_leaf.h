@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_LEAF_H
 #define	_FS_XFS_ATTR_LEAF_H
 
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision$"
 
 /*
  * xfs_attr_leaf.h
@@ -72,7 +72,7 @@ typedef struct xfs_attr_leafblock {
 		} freemap[XFS_ATTR_LEAF_MAPSIZE]; /* N largest free regions */
 	} hdr;
 	struct xfs_attr_leaf_entry {	/* sorted on key, not name */
-		__uint32_t hashval;	/* hash value of name */
+		xfs_dahash_t hashval;	/* hash value of name */
 		__uint16_t nameidx;	/* index into buffer of name/value */
 		__uint8_t flags;	/* LOCAL, ROOT and INCOMPLETE flags */
 		__uint8_t pad2;		/* unused pad byte */
@@ -83,7 +83,7 @@ typedef struct xfs_attr_leafblock {
 		__uint8_t nameval[1];	/* name/value bytes */
 	} namelist;			/* grows from bottom of buf */
 	struct xfs_attr_leaf_name_remote {
-		__uint32_t valueblk;	/* block number of value bytes */
+		xfs_dablk_t valueblk;	/* block number of value bytes */
 		__uint32_t valuelen;	/* number of bytes in value */
 		__uint8_t namelen;	/* length of name bytes */
 		__uint8_t name[1];	/* name bytes */
@@ -209,7 +209,7 @@ int	xfs_attr_leaf_flipflags(xfs_da_args_t *args);
  * Routines used for growing the Btree.
  */
 int	xfs_attr_leaf_create(struct xfs_trans *trans, struct xfs_inode *dp,
-				    xfs_fileoff_t which_block,
+				    xfs_dablk_t which_block,
 				    struct buf **bpp);
 int	xfs_attr_leaf_split(struct xfs_da_state *state,
 				   struct xfs_da_state_blk *oldblk,
@@ -234,7 +234,8 @@ void	xfs_attr_leaf_unbalance(struct xfs_da_state *state,
 int	xfs_attr_root_inactive(struct xfs_inode *dp);
 int	xfs_attr_node_inactive(struct xfs_inode *dp, struct buf *bp, int level);
 int	xfs_attr_leaf_inactive(struct xfs_inode *dp, struct buf *bp);
-int	xfs_attr_leaf_freextent(struct xfs_inode *dp, int blkno, int blkcnt);
+int	xfs_attr_leaf_freextent(struct xfs_inode *dp, xfs_dablk_t blkno,
+				       int blkcnt);
 
 /*
  * Utility routines.
