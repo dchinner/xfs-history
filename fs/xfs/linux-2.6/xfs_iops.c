@@ -438,17 +438,15 @@ int linvfs_bmap(struct inode *inode, int block)
 	blockno = (int)bmap.bn;
 	if (blockno < 0) return 0;
 
-	if(bmap.pboff) {
+	if (bmap.pboff) {
 		if (bmap.pboff % count) {
 			printk("this shouldn't happen %d %d %d!\n",
 				bmap.pboff % count, bmap.pboff, count);
 		}
-		printk("blockno %d moving to %d\n",
-				blockno, blockno+bmap.pboff/count);
-		blockno += bmap.pboff/count;
+		blockno += bmap.pboff >> 9;
 	}
 
-	return(blockno);
+	return(blockno >> (block_shift - 9));
 }
 
 

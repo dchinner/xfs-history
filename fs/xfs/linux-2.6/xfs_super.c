@@ -271,9 +271,6 @@ linvfs_read_super(
 	uap->dataptr = (char *)args;
 	uap->datalen = sizeof(*args);
 
-	/* Tell device driver layers we want 512 byte resolution */
-	set_blocksize(sb->s_dev, BBSIZE);
-
 	VFSOPS_MOUNT(vfsops, vfsp, cvp, uap, NULL, sys_cred, error);
 	if (error)
 		goto fail_vfsop;
@@ -283,13 +280,9 @@ linvfs_read_super(
 	if (error)
 		goto fail_unmount;
 
-#ifdef notdef
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
-#else
-	sb->s_blocksize = 512;
-	sb->s_blocksize_bits = 9;
-#endif
+	set_blocksize(sb->s_dev, sb->s_blocksize);
 	sb->s_magic = XFS_SB_MAGIC;
 	sb->s_dirt = 1;  /*  Make sure we get regular syncs  */
 	LINVFS_SET_VFS(sb, vfsp);
@@ -398,11 +391,9 @@ linvfs_notify_change(
 	int		error;
 	struct inode	*inode;
 
-	ENTER("linvfs_notify_change");
 	inode = dentry->d_inode;
 	error = inode_change_ok(inode, attr);
 	if (error){
-	  EXIT("linvfs_notify_change <ERROR>");
 	  return(error);
 	}
 
@@ -448,7 +439,6 @@ linvfs_notify_change(
 
 	linvfs_inode_attr_in(inode);
 
-	EXIT("linvfs_notify_change");
 	return(-error);
 }
 
@@ -458,7 +448,6 @@ linvfs_put_super(
 	struct super_block *sb)
 {
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
-/* 	vnode_t		*rootvp; */
 	int		error;
 
 	ENTER("linvfs_put_super");
