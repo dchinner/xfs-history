@@ -580,7 +580,7 @@ xfs_bmap_add_extent_delay_real(
 		    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(ip->i_mount))
 			rval |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 				first, flist, &cur, 1);
-		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
+		temp = XFS_EXTLEN_MIN(xfs_bmap_worst_indlen(ip, temp),
 			STARTBLOCKVAL(PREV.br_startblock) -
 			(cur ? cur->bc_private.b.allocated : 0));
 		base = ip->i_u1.iu_extents;
@@ -638,7 +638,7 @@ xfs_bmap_add_extent_delay_real(
 		    ip->i_d.di_nextents > XFS_BMAP_EXT_MAXRECS(ip->i_mount))
 			rval |= xfs_bmap_extents_to_btree(ip->i_transp, ip,
 				first, flist, &cur, 1);
-		temp = xfs_extlen_min(xfs_bmap_worst_indlen(ip, temp),
+		temp = XFS_EXTLEN_MIN(xfs_bmap_worst_indlen(ip, temp),
 			STARTBLOCKVAL(PREV.br_startblock) -
 			(cur ? cur->bc_private.b.allocated : 0));
 		base = ip->i_u1.iu_extents;
@@ -1078,8 +1078,8 @@ xfs_bmap_alloc(
 	sbp = &mp->m_sb;
 	nullfb = firstb == NULLFSBLOCK;
 	rt = ip->i_d.di_flags & XFS_DIFLAG_REALTIME;
-	fb_agno = nullfb ? NULLAGNUMBER : xfs_fsb_to_agno(mp, firstb);
-	bno = rt ? 0 : (nullfb ? xfs_ino_to_fsb(mp, ip->i_ino) : firstb);
+	fb_agno = nullfb ? NULLAGNUMBER : XFS_FSB_TO_AGNO(mp, firstb);
+	bno = rt ? 0 : (nullfb ? XFS_INO_TO_FSB(mp, ip->i_ino) : firstb);
 	/*
 	 * If allocating at eof, and there's a previous real block,
 	 * try to use it's last block as our starting point.
@@ -1098,9 +1098,9 @@ xfs_bmap_alloc(
 		 * Reject adjustment if the resulting block is illegal.
 		 */
 		if ((!rt &&
-		     (xfs_fsb_to_agno(mp, bno) !=
-		      xfs_fsb_to_agno(mp, prevp->br_startblock) ||
-		      xfs_fsb_to_agbno(mp, bno) >= sbp->sb_agblocks)) ||
+		     (XFS_FSB_TO_AGNO(mp, bno) !=
+		      XFS_FSB_TO_AGNO(mp, prevp->br_startblock) ||
+		      XFS_FSB_TO_AGBNO(mp, bno) >= sbp->sb_agblocks)) ||
 		    (rt && bno >= sbp->sb_rextents))
 			bno -= adjust;
 	}
@@ -1141,9 +1141,9 @@ xfs_bmap_alloc(
 			 */
 			if (prevdiff > 2 * asklen ||
 			    (!rt &&
-			     (xfs_fsb_to_agno(mp, prevbno) !=
-			      xfs_fsb_to_agno(mp, prevp->br_startblock) ||
-			      xfs_fsb_to_agbno(mp, prevbno) >=
+			     (XFS_FSB_TO_AGNO(mp, prevbno) !=
+			      XFS_FSB_TO_AGNO(mp, prevp->br_startblock) ||
+			      XFS_FSB_TO_AGBNO(mp, prevbno) >=
 			      sbp->sb_agblocks)) ||
 			    (rt && prevbno >= sbp->sb_rextents)) {
 				prevbno -= adjust;
@@ -1154,7 +1154,7 @@ xfs_bmap_alloc(
 			 * must use default.
 			 */
 			if (!rt && !nullfb &&
-			    xfs_fsb_to_agno(mp, prevbno) != fb_agno)
+			    XFS_FSB_TO_AGNO(mp, prevbno) != fb_agno)
 				prevbno = NULLFSBLOCK;
 		}
 		/*
@@ -1185,18 +1185,18 @@ xfs_bmap_alloc(
 			 */
 			if (gotdiff > 2 * asklen ||
 			    (!rt &&
-			     (xfs_fsb_to_agno(mp, gotbno) !=
-			      xfs_fsb_to_agno(mp, gotp->br_startblock))) ||
+			     (XFS_FSB_TO_AGNO(mp, gotbno) !=
+			      XFS_FSB_TO_AGNO(mp, gotp->br_startblock))) ||
 			    (rt && gotbno >= sbp->sb_rextents)) {
 				gotbno = gotp->br_startblock - asklen;
 				gotdiff = asklen;
 				if ((!rt &&
-				     (xfs_fsb_to_agno(mp, gotbno) !=
-				      xfs_fsb_to_agno(mp,
+				     (XFS_FSB_TO_AGNO(mp, gotbno) !=
+				      XFS_FSB_TO_AGNO(mp,
 					      gotp->br_startblock))) ||
 				    (rt && gotbno >= sbp->sb_rextents)) {
-					gotbno = xfs_agb_to_fsb(mp,
-						xfs_fsb_to_agno(mp,
+					gotbno = XFS_AGB_TO_FSB(mp,
+						XFS_FSB_TO_AGNO(mp,
 						gotp->br_startblock), 0);
 					gotdiff = gotp->br_startblock - gotbno;
 				}
@@ -1206,7 +1206,7 @@ xfs_bmap_alloc(
 			 * must use default.
 			 */
 			if (!rt && !nullfb &&
-			    xfs_fsb_to_agno(mp, gotbno) != fb_agno)
+			    XFS_FSB_TO_AGNO(mp, gotbno) != fb_agno)
 				gotbno = NULLFSBLOCK;
 		}
 		/*
@@ -1229,7 +1229,7 @@ xfs_bmap_alloc(
 	 * If allowed, use bno; otherwise must use firstblock since
 	 * it's in the right allocation group.
 	 */
-	if (nullfb || rt || xfs_fsb_to_agno(mp, bno) == fb_agno)
+	if (nullfb || rt || XFS_FSB_TO_AGNO(mp, bno) == fb_agno)
 		askbno = bno;
 	else
 		askbno = firstb;
@@ -1339,7 +1339,7 @@ xfs_bmap_btree_to_extents(
 		buf_t			*cbuf;
 
 		cbuf = xfs_btree_read_bufl(mp, tp, cbno, 0);
-		cblock = xfs_buf_to_bmbt_block(cbuf);
+		cblock = XFS_BUF_TO_BMBT_BLOCK(cbuf);
 		ASSERT(cblock->bb_level == 0);
 	}
 #endif
@@ -1670,7 +1670,7 @@ xfs_bmap_extents_to_btree(
 	ip->i_d.di_format = XFS_DINODE_FMT_BTREE;
 	if (*firstblock == NULLFSBLOCK) {
 		type = XFS_ALLOCTYPE_START_BNO;
-		abno = xfs_ino_to_fsb(mp, ip->i_ino);
+		abno = XFS_INO_TO_FSB(mp, ip->i_ino);
 	} else {
 		type = XFS_ALLOCTYPE_NEAR_BNO;
 		abno = *firstblock;
@@ -1688,7 +1688,7 @@ xfs_bmap_extents_to_btree(
 	/*
 	 * Fill in the child block.
 	 */
-	ablock = xfs_buf_to_bmbt_block(abuf);
+	ablock = XFS_BUF_TO_BMBT_BLOCK(abuf);
 	ablock->bb_magic = XFS_BMAP_MAGIC;
 	ablock->bb_level = 0;
 	ablock->bb_numrecs = 0;
@@ -1780,7 +1780,7 @@ xfs_bmap_local_to_extents(
 		 * file currently fits in an inode.
 		 */
 		if (*firstblock == NULLFSBLOCK) {
-			askbno = xfs_ino_to_fsb(mp, ip->i_ino);
+			askbno = XFS_INO_TO_FSB(mp, ip->i_ino);
 			type = XFS_ALLOCTYPE_START_BNO;
 			total++;
 		} else {
@@ -1962,8 +1962,8 @@ xfs_bmap_add_free(
 
 	ASSERT(bno != NULLFSBLOCK);
 	ASSERT(!ISNULLSTARTBLOCK(bno));
-	agno = xfs_fsb_to_agno(mp, bno);
-	agbno = xfs_fsb_to_agbno(mp, bno);
+	agno = XFS_FSB_TO_AGNO(mp, bno);
+	agbno = XFS_FSB_TO_AGBNO(mp, bno);
 	ASSERT(agno < mp->m_sb.sb_agcount);
 	ASSERT(agbno < mp->m_sb.sb_agblocks);
 #endif
@@ -2052,10 +2052,10 @@ xfs_bmap_finish(
 		return 0;
 	ntp = *tp;
 	mp = ntp->t_mountp;
-	firstag = xfs_fsb_to_agno(mp, firstblock);
+	firstag = XFS_FSB_TO_AGNO(mp, firstblock);
 	for (prev = NULL, free = flist->xbf_first; free != NULL; free = next) {
 		next = free->xbfi_next;
-		if (xfs_fsb_to_agno(mp, free->xbfi_startblock) < firstag)
+		if (XFS_FSB_TO_AGNO(mp, free->xbfi_startblock) < firstag)
 			continue;
 		xfs_free_extent(ntp, free->xbfi_startblock,
 			free->xbfi_blockcount);
@@ -2182,8 +2182,8 @@ xfs_bmap_read_extents(
 	if (level = block->bb_level) {
 		pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ip->i_broot_bytes);
 		ASSERT(*pp != NULLDFSBNO &&
-		       xfs_fsb_to_agno(mp, *pp) < mp->m_sb.sb_agcount &&
-		       xfs_fsb_to_agbno(mp, *pp) < mp->m_sb.sb_agblocks);
+		       XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount &&
+		       XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
 	}
 	/*
@@ -2192,14 +2192,14 @@ xfs_bmap_read_extents(
 	 */
 	while (level-- > 0) {
 		buf = xfs_btree_read_bufl(mp, tp, bno, 0);
-		block = xfs_buf_to_bmbt_block(buf);
+		block = XFS_BUF_TO_BMBT_BLOCK(buf);
 		ASSERT(block->bb_level == level);
 		if (level == 0)
 			break;
 		pp = XFS_BTREE_PTR_ADDR(sbp->sb_blocksize, xfs_bmbt, block, 1);
 		ASSERT(*pp != NULLDFSBNO &&
-		       xfs_fsb_to_agno(mp, *pp) < mp->m_sb.sb_agcount &&
-		       xfs_fsb_to_agbno(mp, *pp) < mp->m_sb.sb_agblocks);
+		       XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount &&
+		       XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
 		bno = *pp;
 		xfs_trans_brelse(tp, buf);
 	}
@@ -2241,7 +2241,7 @@ xfs_bmap_read_extents(
 		if (bno == NULLFSBLOCK)
 			break;
 		buf = xfs_btree_read_bufl(mp, tp, bno, 0);
-		block = xfs_buf_to_bmbt_block(buf);
+		block = XFS_BUF_TO_BMBT_BLOCK(buf);
 	}
 	kmem_check();
 }
@@ -2292,7 +2292,7 @@ xfs_bmapi(
 	xfs_mount_t		*mp;
 	int			n;
 	xfs_extnum_t		nextents;
-	xfs_fsblock_t		obno;
+	xfs_fileoff_t		obno;
 	xfs_bmbt_irec_t		prev;
 	xfs_sb_t		*sbp;
 	int			trim;
@@ -2369,7 +2369,7 @@ xfs_bmapi(
 				minlen = (bno - aoff) + 1;
 			} else {
 				alen = eof ? len :
-					xfs_extlen_min(got.br_startoff - bno,
+					XFS_EXTLEN_MIN(got.br_startoff - bno,
 						       len);
 				aoff = bno;
 				minlen = 1;
@@ -2422,7 +2422,7 @@ xfs_bmapi(
 			 */
 			mval->br_startoff = bno;
 			mval->br_startblock = HOLESTARTBLOCK;
-			mval->br_blockcount = xfs_extlen_min(len, got.br_startoff - bno);
+			mval->br_blockcount = XFS_EXTLEN_MIN(len, got.br_startoff - bno);
 			bno += mval->br_blockcount;
 			len -= mval->br_blockcount;
 			mval++;
@@ -2434,7 +2434,7 @@ xfs_bmapi(
 		 */
 		ASSERT(ep != NULL);
 		if (trim && (got.br_startoff + got.br_blockcount > obno)) {
-			bno = xfs_fsbno_max(bno, obno);
+			bno = XFS_FILEOFF_MAX(bno, obno);
 			ASSERT((bno >= obno) || (n == 0));
 			mval->br_startoff = bno;
 			if (ISNULLSTARTBLOCK(got.br_startblock)) {
@@ -2444,7 +2444,7 @@ xfs_bmapi(
 				mval->br_startblock = got.br_startblock +
 					(bno - got.br_startoff);
 			mval->br_blockcount =
-				xfs_extlen_min(len, got.br_blockcount -
+				XFS_EXTLEN_MIN(len, got.br_blockcount -
 					(bno - got.br_startoff));
 		} else {
 			*mval = got;

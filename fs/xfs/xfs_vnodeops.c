@@ -390,7 +390,7 @@ xfs_getattr(vnode_t	*vp,
 		break;
 	case XFS_DINODE_FMT_EXTENTS:
 	case XFS_DINODE_FMT_BTREE:
-		vap->va_nblocks = xfs_fsb_to_bb(mp,
+		vap->va_nblocks = XFS_FSB_TO_BB(mp,
 			ip->i_d.di_nblocks + ip->i_delayed_blks);
 		break;
 	default:
@@ -839,15 +839,15 @@ xfs_readlink(vnode_t	*vp,
 
 		mp = XFS_VFSTOM(vp->v_vfsp);
                 first_fsb = 0;
-                fs_blocks = xfs_b_to_fsb(mp, pathlen);
+                fs_blocks = XFS_B_TO_FSB(mp, pathlen);
                 nmaps = SYMLINK_MAPS;
 
                 (void) xfs_bmapi (tp, ip, first_fsb, fs_blocks,
                          0, NULLFSBLOCK, 0, mval, &nmaps, &free_list);
 
                 for (n = 0; n < nmaps; n++) {
-                        d = xfs_fsb_to_daddr(mp, mval[n].br_startblock);
-                        byte_cnt = xfs_fsb_to_b(mp, mval[n].br_blockcount);
+                        d = XFS_FSB_TO_DADDR(mp, mval[n].br_startblock);
+                        byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
                         bp = xfs_read_buf (mp->m_dev, d, BTOBB(byte_cnt), 0);
                         if (pathlen < byte_cnt)
                                 byte_cnt = pathlen;
@@ -2999,7 +2999,7 @@ xfs_symlink(vnode_t	*dir_vp,
 		struct 		buf *bp;
 
 		first_fsb = 0;
-		fs_blocks = xfs_b_to_fsb(mp, pathlen);
+		fs_blocks = XFS_B_TO_FSB(mp, pathlen);
 		nmaps = SYMLINK_MAPS;
 
 		first_block = xfs_bmapi (tp, ip, first_fsb, fs_blocks,
@@ -3011,8 +3011,8 @@ xfs_symlink(vnode_t	*dir_vp,
 
 		cur_chunk = target_path;
 		for (n = 0; n < nmaps; n++) {
-			d = xfs_fsb_to_daddr(mp, mval[n].br_startblock);
-			byte_cnt = xfs_fsb_to_b(mp, mval[n].br_blockcount);
+			d = XFS_FSB_TO_DADDR(mp, mval[n].br_startblock);
+			byte_cnt = XFS_FSB_TO_B(mp, mval[n].br_blockcount);
 			bp = xfs_trans_get_buf (tp, mp->m_dev, d, 
 				BTOBB(byte_cnt), 0);
 			ASSERT(bp && !geterror(bp));
@@ -3295,7 +3295,7 @@ xfs_allocstore(vnode_t	*vp,
 	ASSERT(count == NBPP);
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
-	offset_fsb = xfs_b_to_fsbt(mp, offset);
+	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	isize = ip->i_d.di_size;
 	if (offset >= isize) {
@@ -3305,7 +3305,7 @@ xfs_allocstore(vnode_t	*vp,
 	if ((offset + count) > isize) {
 		count = isize - offset;
 	}
-	last_fsb = xfs_b_to_fsb(mp, offset + count);
+	last_fsb = XFS_B_TO_FSB(mp, offset + count);
 	count_fsb = (xfs_extlen_t)(last_fsb - offset_fsb);
 	orig_nimaps = NDPP;
 	(void) xfs_bmapi(NULL, ip, offset_fsb, count_fsb, 0, NULLFSBLOCK, 0,

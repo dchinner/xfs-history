@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.19 $"
+#ident  "$Revision: 1.20 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -299,7 +299,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * At this point, the super block has been read into
 	 * the mount structure - get the pointer to it.
 	 */
-	sbp = xfs_buf_to_sbp(mp->m_sb_bp);
+	sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
 
 	/*
 	 * XXX Anything special for root mounts?
@@ -316,8 +316,8 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * xfs_log_mount() always does XFS_LOG_RECOVER.
 	 */
 	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
-	error = xfs_log_mount(mp, ddev, xfs_fsb_to_daddr(mp, sbp->sb_logstart),
-			      xfs_btod(mp, sbp->sb_logblocks), lflags);
+	error = xfs_log_mount(mp, ddev, XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
+			      XFS_BTOD(mp, sbp->sb_logblocks), lflags);
 	if (error > 0) {
 		/*
 		 * XXX	log recovery failure - What action should be taken?
@@ -507,7 +507,7 @@ _xfs_isdev(dev_t dev)
 	error = (bp->b_flags & B_ERROR);
 
 	if (error == 0) {
-		sbp = xfs_buf_to_sbp(bp);
+		sbp = XFS_BUF_TO_SBP(bp);
 		error = ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
 			 (sbp->sb_versionnum != XFS_SB_VERSION));
 	}

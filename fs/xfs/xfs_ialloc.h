@@ -9,7 +9,9 @@
  */
 #define	XFS_IALLOC_MAX_EVER_BLOCKS	16
 #define	XFS_IALLOC_MAX_EVER_INODES	256
-#define	XFS_IALLOC_MAX_EVER(mp,a)	xfs_extlen_min(XFS_IALLOC_MAX_EVER_BLOCKS, XFS_IALLOC_MAX_EVER_INODES >> (mp)->m_sb.sb_inopblog)
+#define	XFS_IALLOC_MAX_EVER(mp,a)	\
+	XFS_EXTLEN_MIN(XFS_IALLOC_MAX_EVER_BLOCKS, \
+		XFS_IALLOC_MAX_EVER_INODES >> (mp)->m_sb.sb_inopblog)
 
 #define	XFS_IALLOC_MIN_ALLOC(mp,a)	1
 #define XFS_IALLOC_MAX_ALLOC(mp,a)	\
@@ -22,9 +24,8 @@
 /*
  * Make an inode pointer out of the buffer/offset.
  */
-#define	xfs_make_iptr(mp,b,o) \
-	((xfs_dinode_t *)((caddr_t)xfs_buf_to_block(b) + \
-			  ((o) << (mp)->m_sb.sb_inodelog)))
+#define	XFS_MAKE_IPTR(mp,b,o) \
+	((xfs_dinode_t *)((b)->b_un.b_addr + ((o) << (mp)->m_sb.sb_inodelog)))
 
 /*
  * Prototypes for visible xfs_ialloc.c routines.

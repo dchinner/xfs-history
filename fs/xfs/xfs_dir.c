@@ -1366,7 +1366,7 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 	if (nmap < 1)
 		return ENOSPC;
 	*new_blkno = bno;
-	dp->i_d.di_size = xfs_fsb_to_b(mp, xfs_bmap_last_offset(trans, dp));
+	dp->i_d.di_size = XFS_FSB_TO_B(mp, xfs_bmap_last_offset(trans, dp));
 
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
 
@@ -1387,7 +1387,7 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 					  *(args->firstblock), args->flist,
 					  &done);
 	ASSERT(done);
-	dp->i_d.di_size = xfs_fsb_to_b(mp, xfs_bmap_last_offset(trans, dp));
+	dp->i_d.di_size = XFS_FSB_TO_B(mp, xfs_bmap_last_offset(trans, dp));
 
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
 

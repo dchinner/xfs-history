@@ -132,7 +132,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	/*
 	 * Initialize the mount structure from the superblock.
 	 */
-	sbp = xfs_buf_to_sbp(bp);
+	sbp = XFS_BUF_TO_SBP(bp);
 	if ((sbp->sb_magicnum != XFS_SB_MAGIC) ||
 	    (sbp->sb_versionnum != XFS_SB_VERSION)) {
 		error = EINVAL;		/* or EIO ? */
@@ -168,8 +168,8 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	}
 	xfs_alloc_compute_maxlevels(mp);
 	xfs_bmap_compute_maxlevels(mp);
-	mp->m_bsize = xfs_btod(mp, 1);
-	vfsp->vfs_bsize = xfs_fsb_to_b(mp, 1);
+	mp->m_bsize = XFS_BTOD(mp, 1);
+	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
 
 	/*
 	 * Set the default minimum read and write sizes.
@@ -298,10 +298,10 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 		xfs_sb_t *sbp;
 		xfs_fsblock_t logstart;
 
-		sbp = xfs_buf_to_sbp(mp->m_sb_bp);
+		sbp = XFS_BUF_TO_SBP(mp->m_sb_bp);
 		logstart = sbp->sb_logstart;
-		xfs_log_mount(mp, logdev, xfs_fsb_to_daddr(mp, logstart),
-			      xfs_btod(mp, sbp->sb_logblocks), 0);
+		xfs_log_mount(mp, logdev, XFS_FSB_TO_DADDR(mp, logstart),
+			      XFS_BTOD(mp, sbp->sb_logblocks), 0);
 	}
 
 	return mp;
@@ -419,7 +419,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
  
 	mp = tp->t_mountp;
 	buf = xfs_trans_getsb(tp);
-	sbp = xfs_buf_to_sbp(buf);
+	sbp = XFS_BUF_TO_SBP(buf);
 	xfs_btree_offsets(fields, offsets, XFS_SB_NUM_BITS, &first, &last);
 	bcopy((caddr_t)&mp->m_sb + first, (caddr_t)sbp + first, last - first + 1);
 	xfs_trans_log_buf(tp, buf, first, last);

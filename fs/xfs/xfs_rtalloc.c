@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -477,7 +477,7 @@ xfs_rtbuf_get(
 	(void)xfs_bmapi(tp, ip, block, 1, 0, NULLFSBLOCK, 0, &map, &nmap, flist);
 	ASSERT(nmap == 1);
 	ASSERT(flist == NULL);
-	d = xfs_fsb_to_daddr(mp, map.br_startblock);
+	d = XFS_FSB_TO_DADDR(mp, map.br_startblock);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, 0);
 	ASSERT(bp && !geterror(bp));
 	return bp;

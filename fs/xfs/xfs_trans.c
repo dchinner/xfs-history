@@ -355,7 +355,7 @@ xfs_trans_apply_sb_deltas(xfs_trans_t *tp)
 	buf_t		*bp;
 
 	bp = xfs_trans_getsb(tp);
-	sbp = xfs_buf_to_sbp(bp);
+	sbp = XFS_BUF_TO_SBP(bp);
 
 	if (tp->t_icount_delta != 0) {
 		sbp->sb_icount += tp->t_icount_delta;

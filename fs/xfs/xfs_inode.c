@@ -529,20 +529,20 @@ xfs_itruncate(xfs_trans_t	**tp,
 	 * so that we don't toss things on the same block as
 	 * new_size but before it.
 	 */
-	toss_start = xfs_b_to_fsb(mp, new_size);
-	toss_start = xfs_fsb_to_b(mp, toss_start);
+	toss_start = XFS_B_TO_FSB(mp, new_size);
+	toss_start = XFS_FSB_TO_B(mp, toss_start);
 	last_byte = ip->i_d.di_size + (1 << mp->m_writeio_log);
 	if (last_byte > toss_start) {
 		ptossvp(XFS_ITOV(ip), toss_start, last_byte);
 	}
 
-	first_unmap_block = xfs_b_to_fsb(mp, new_size);
+	first_unmap_block = XFS_B_TO_FSB(mp, new_size);
 	/*
 	 * Subtract 1 from the size so that we get the correct
 	 * last block when the size is a multiple of the block
 	 * size.
 	 */
-	last_block = xfs_b_to_fsbt(mp, ip->i_d.di_size - 1);
+	last_block = XFS_B_TO_FSBT(mp, ip->i_d.di_size - 1);
 	if (first_unmap_block > last_block) {
 		/*
 		 * The old size and new size both fall on the same
@@ -969,9 +969,9 @@ xfs_imap(xfs_mount_t	*mp,
 	int off;
 
 	xfs_dilocate(mp, tp, ino, &fsbno, &off);
-	imap->im_blkno = xfs_fsb_to_daddr(mp, fsbno);
-	imap->im_len = xfs_btod(mp, 1);
-	imap->im_agblkno = xfs_fsb_to_agbno(mp, fsbno);
+	imap->im_blkno = XFS_FSB_TO_DADDR(mp, fsbno);
+	imap->im_len = XFS_BTOD(mp, 1);
+	imap->im_agblkno = XFS_FSB_TO_AGBNO(mp, fsbno);
 	imap->im_ioffset = (ushort)off;
 	imap->im_boffset = (ushort)(off << mp->m_sb.sb_inodelog);
 	return 1;

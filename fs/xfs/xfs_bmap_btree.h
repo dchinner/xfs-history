@@ -66,7 +66,7 @@ typedef xfs_dfsbno_t xfs_bmbt_ptr_t, xfs_bmdr_ptr_t;	/* btree pointer type */
 					/* btree block header type */
 typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 
-#define	xfs_buf_to_bmbt_block(buf) ((xfs_bmbt_block_t *)((buf)->b_un.b_addr))
+#define	XFS_BUF_TO_BMBT_BLOCK(buf) ((xfs_bmbt_block_t *)((buf)->b_un.b_addr))
 
 #define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) \
 	((cur)->bc_private.b.inodesize - (int)sizeof(xfs_dinode_core_t))

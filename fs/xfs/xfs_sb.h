@@ -94,34 +94,34 @@ typedef struct xfs_sb
 #define	XFS_SB_ALL_BITS		((1 << XFS_SB_NUM_BITS) - 1)
 
 #define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
-#define	XFS_SB_BLOCK(mp)	xfs_hdr_block(mp, XFS_SB_DADDR)
+#define	XFS_SB_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_SB_DADDR)
 
-#define	xfs_hdr_block(mp,d)	((xfs_agblock_t)(xfs_dtobt(mp,d)))
-#define	xfs_daddr_to_fsb(mp,d) \
-	xfs_agb_to_fsb(mp, xfs_daddr_to_agno(mp,d), xfs_daddr_to_agbno(mp,d))
-#define	xfs_fsb_to_daddr(mp,fsbno) \
-	xfs_agb_to_daddr(mp, xfs_fsb_to_agno(mp,fsbno), \
-			 xfs_fsb_to_agbno(mp,fsbno))
+#define	XFS_HDR_BLOCK(mp,d)	((xfs_agblock_t)(XFS_DTOBT(mp,d)))
+#define	XFS_DADDR_TO_FSB(mp,d) \
+	XFS_AGB_TO_FSB(mp, XFS_DADDR_TO_AGNO(mp,d), XFS_DADDR_TO_AGBNO(mp,d))
+#define	XFS_FSB_TO_DADDR(mp,fsbno) \
+	XFS_AGB_TO_DADDR(mp, XFS_FSB_TO_AGNO(mp,fsbno), \
+			 XFS_FSB_TO_AGBNO(mp,fsbno))
 
 /*
  * File system block to basic block conversions.
  */
-#define	xfs_fsb_to_bb(mp,fsbno)	((fsbno) << (mp)->m_blkbb_log)
-#define	xfs_bb_to_fsb(mp,bb)	\
-	(((bb) + (xfs_fsb_to_bb(mp,1) - 1)) >> (mp)->m_blkbb_log)
-#define	xfs_bb_to_fsbt(mp,bb)	((bb) >> (mp)->m_blkbb_log)
+#define	XFS_FSB_TO_BB(mp,fsbno)	((fsbno) << (mp)->m_blkbb_log)
+#define	XFS_BB_TO_FSB(mp,bb)	\
+	(((bb) + (XFS_FSB_TO_BB(mp,1) - 1)) >> (mp)->m_blkbb_log)
+#define	XFS_BB_TO_FSBT(mp,bb)	((bb) >> (mp)->m_blkbb_log)
 
 /*
  * File system block to byte conversions.
  */
-#define	xfs_fsb_to_b(mp,fsbno)	((fsbno) << (mp)->m_sb.sb_blocklog)
-#define	xfs_b_to_fsb(mp,b)	\
+#define	XFS_FSB_TO_B(mp,fsbno)	((fsbno) << (mp)->m_sb.sb_blocklog)
+#define	XFS_B_TO_FSB(mp,b)	\
 	(((b) + (mp)->m_blockmask) >> (mp)->m_sb.sb_blocklog)
-#define	xfs_b_to_fsbt(s,b)	((b) >> (mp)->m_sb.sb_blocklog)
+#define	XFS_B_TO_FSBT(s,b)	((b) >> (mp)->m_sb.sb_blocklog)
      
-#define	xfs_btod(mp,l)	((daddr_t)((l) << (mp)->m_blkbb_log))
-#define	xfs_dtobt(mp,l)	((l) >> (mp)->m_blkbb_log)
+#define	XFS_BTOD(mp,l)	((daddr_t)((l) << (mp)->m_blkbb_log))
+#define	XFS_DTOBT(mp,l)	((l) >> (mp)->m_blkbb_log)
 
-#define	xfs_buf_to_sbp(buf)	((xfs_sb_t *)(buf)->b_un.b_addr)
+#define	XFS_BUF_TO_SBP(buf)	((xfs_sb_t *)(buf)->b_un.b_addr)
 
 #endif	/* !_FS_XFS_SB_H */

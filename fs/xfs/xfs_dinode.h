@@ -137,6 +137,6 @@ typedef enum xfs_dinode_fmt
 
 #define	XFS_DIFLAG_ALL	(XFS_DIFLAG_REALTIME)
 
-#define	xfs_buf_to_dinode(buf)	((xfs_dinode_t *)(buf->b_un.b_addr))
+#define	XFS_BUF_TO_DINODE(buf)	((xfs_dinode_t *)(buf->b_un.b_addr))
 
 #endif	/* _FS_XFS_DINODE_H */

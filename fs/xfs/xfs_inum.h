@@ -17,32 +17,32 @@ typedef	__uint32_t	xfs_agino_t;	/* within allocation grp inode number */
 #define	NULLAGINO	((xfs_agino_t)-1)
 #define	NULLAGINO_ALLOC	((xfs_agino_t)0)
 
-#define	xfs_ino_mask(k)	((1 << (k)) - 1)
-#define	xfs_ino_offset_bits(mp)	((mp)->m_sb.sb_inopblog)
-#define	xfs_ino_agbno_bits(mp)	((mp)->m_sb.sb_agblklog)
-#define	xfs_ino_agino_bits(mp)	\
-	(xfs_ino_offset_bits(mp) + xfs_ino_agbno_bits(mp))
-#define	xfs_ino_agno_bits(mp)	32
+#define	XFS_INO_MASK(k)	((1 << (k)) - 1)
+#define	XFS_INO_OFFSET_BITS(mp)	((mp)->m_sb.sb_inopblog)
+#define	XFS_INO_AGBNO_BITS(mp)	((mp)->m_sb.sb_agblklog)
+#define	XFS_INO_AGINO_BITS(mp)	\
+	(XFS_INO_OFFSET_BITS(mp) + XFS_INO_AGBNO_BITS(mp))
+#define	XFS_INO_AGNO_BITS(mp)	32
 
-#define	xfs_ino_to_agno(mp,i)	\
-	((xfs_agnumber_t)((i) >> xfs_ino_agino_bits(mp)))
-#define	xfs_ino_to_agino(mp,i)	\
-	((xfs_agino_t)(i) & xfs_ino_mask(xfs_ino_agino_bits(mp)))
-#define	xfs_ino_to_agbno(mp,i)	\
-	(((xfs_agblock_t)(i) >> xfs_ino_offset_bits(mp)) & \
-	 xfs_ino_mask(xfs_ino_agbno_bits(mp)))
-#define	xfs_ino_to_offset(mp,i)	\
-	((int)(i) & xfs_ino_mask(xfs_ino_offset_bits(mp)))
-#define	xfs_ino_to_fsb(mp,i)	\
-	xfs_agb_to_fsb(mp, xfs_ino_to_agno(mp,i), xfs_ino_to_agbno(mp,i))
+#define	XFS_INO_TO_AGNO(mp,i)	\
+	((xfs_agnumber_t)((i) >> XFS_INO_AGINO_BITS(mp)))
+#define	XFS_INO_TO_AGINO(mp,i)	\
+	((xfs_agino_t)(i) & XFS_INO_MASK(XFS_INO_AGINO_BITS(mp)))
+#define	XFS_INO_TO_AGBNO(mp,i)	\
+	(((xfs_agblock_t)(i) >> XFS_INO_OFFSET_BITS(mp)) & \
+	 XFS_INO_MASK(XFS_INO_AGBNO_BITS(mp)))
+#define	XFS_INO_TO_OFFSET(mp,i)	\
+	((int)(i) & XFS_INO_MASK(XFS_INO_OFFSET_BITS(mp)))
+#define	XFS_INO_TO_FSB(mp,i)	\
+	XFS_AGB_TO_FSB(mp, XFS_INO_TO_AGNO(mp,i), XFS_INO_TO_AGBNO(mp,i))
 
-#define	xfs_agino_to_ino(mp,a,i)	\
-	(((xfs_ino_t)(a) << xfs_ino_agino_bits(mp)) | (i))
-#define	xfs_agino_to_agbno(mp,i)	((i) >> xfs_ino_offset_bits(mp))
-#define	xfs_agino_to_offset(mp,i)	\
-	((i) & xfs_ino_mask(xfs_ino_offset_bits(mp)))
+#define	XFS_AGINO_TO_INO(mp,a,i)	\
+	(((xfs_ino_t)(a) << XFS_INO_AGINO_BITS(mp)) | (i))
+#define	XFS_AGINO_TO_AGBNO(mp,i)	((i) >> XFS_INO_OFFSET_BITS(mp))
+#define	XFS_AGINO_TO_OFFSET(mp,i)	\
+	((i) & XFS_INO_MASK(XFS_INO_OFFSET_BITS(mp)))
 
-#define	xfs_offbno_to_agino(mp,b,o)	\
-	((xfs_agino_t)(((b) << xfs_ino_offset_bits(mp)) | (o)))
+#define	XFS_OFFBNO_TO_AGINO(mp,b,o)	\
+	((xfs_agino_t)(((b) << XFS_INO_OFFSET_BITS(mp)) | (o)))
 
 #endif	/* !_FS_XFS_INUM_H */
