@@ -285,14 +285,19 @@ xfs_bmap_add_extent(
 	/*
 	 * Any kind of new delayed allocation goes here.
 	 */
-	else if (ISNULLSTARTBLOCK(new->br_startblock))
+	else if (ISNULLSTARTBLOCK(new->br_startblock)) {
+		if (cur)
+			ASSERT(cur->bc_private.b.wasdel == 0);
 		logflags = xfs_bmap_add_extent_hole_delay(ip, idx, cur, new);
+	}
 	/*
 	 * Real allocation off the end of the file.
 	 */
-	else if (idx == nextents)
+	else if (idx == nextents) {
+		if (cur)
+			ASSERT(cur->bc_private.b.wasdel == 0);
 		logflags = xfs_bmap_add_extent_hole_real(ip, idx, cur, new);
-	else {
+	} else {
 		/*
 		 * Get the record referred to by idx.
 		 */
@@ -306,6 +311,8 @@ xfs_bmap_add_extent(
 		    new->br_startoff + new->br_blockcount > prev.br_startoff) {
 			ASSERT(ISNULLSTARTBLOCK(prev.br_startblock));
 			da_old = STARTBLOCKVAL(prev.br_startblock);
+			if (cur)
+				ASSERT(cur->bc_private.b.wasdel == 1);
 			logflags = xfs_bmap_add_extent_delay_real(ip, idx,
 				&cur, new, &da_new, first, flist);
 			ASSERT(*curp == cur || *curp == NULL);
@@ -313,9 +320,12 @@ xfs_bmap_add_extent(
 		/*
 		 * Otherwise we're filling in a hole with an allocation.
 		 */
-		else
+		else {
+			if (cur)
+				ASSERT(cur->bc_private.b.wasdel == 0);
 			logflags = xfs_bmap_add_extent_hole_real(ip, idx,
 				cur, new);
+		}
 	}
 	/*
 	 * Convert to a btree if necessary.
@@ -1700,6 +1710,7 @@ xfs_bmap_extents_to_btree(
 	cur = xfs_btree_init_cursor(mp, tp, NULL, 0, XFS_BTNUM_BMAP, ip);
 	cur->bc_private.b.firstblock = *firstblock;
 	cur->bc_private.b.flist = flist;
+	cur->bc_private.b.wasdel = wasdel;
 	/*
 	 * Convert to a btree with two levels, one record in root.
 	 */
@@ -2435,6 +2446,8 @@ xfs_bmapi(
 					cur->bc_private.b.flist = flist;
 				}
 			}
+			if (cur)
+				cur->bc_private.b.wasdel = wasdelay;
 			got.br_startoff = aoff;
 			got.br_startblock = abno;
 			got.br_blockcount = alen;
@@ -2662,7 +2675,10 @@ xfs_bunmapi(
 			xfs_mod_incore_sb(mp, XFS_SB_FDBLOCKS,
 				del.br_blockcount);
 			ip->i_delayed_blks -= del.br_blockcount;
-		}
+			if (cur)
+				cur->bc_private.b.wasdel = 1;
+		} else if (cur)
+			cur->bc_private.b.wasdel = 0;
 		logflags |= xfs_bmap_del_extent(ip, lastx, flist, cur, &del);
 		bno = del.br_startoff - 1;
 		lastx = ip->i_lastex;

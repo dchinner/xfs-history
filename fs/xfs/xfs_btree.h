@@ -136,6 +136,7 @@ typedef struct xfs_btree_cur
 			xfs_fsblock_t	firstblock;	/* 1st blk allocated */
 			struct xfs_bmap_free *flist;	/* list to free after */
 			int		allocated;	/* count of alloced */
+			int		wasdel;		/* was-delayed flag */
 		} b;
 	}		bc_private;	/* per-btree type data */
 } xfs_btree_cur_t;

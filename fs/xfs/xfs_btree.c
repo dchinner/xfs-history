@@ -360,12 +360,13 @@ xfs_btree_dup_cursor(
 			ncur->bc_bufs[i] = 0;
 	}
 	/*
-	 * For bmap btrees, copy the firstblock and flist values, since
-	 * init cursor doesn't get them.
+	 * For bmap btrees, copy the firstblock, flist, and wasdel values,
+	 * since init cursor doesn't get them.
 	 */
 	if (ncur->bc_btnum == XFS_BTNUM_BMAP) {
 		ncur->bc_private.b.firstblock = cur->bc_private.b.firstblock;
 		ncur->bc_private.b.flist = cur->bc_private.b.flist;
+		ncur->bc_private.b.wasdel = cur->bc_private.b.wasdel;
 	}
 	return ncur;
 }
@@ -530,6 +531,7 @@ xfs_btree_init_cursor(
 		cur->bc_private.b.firstblock = NULLFSBLOCK;
 		cur->bc_private.b.flist = NULL;
 		cur->bc_private.b.allocated = 0;
+		cur->bc_private.b.wasdel = 0;
 		break;
 	default:
 		ASSERT(0);

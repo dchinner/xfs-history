@@ -471,7 +471,8 @@ xfs_bmbt_insrec(
 				type = XFS_ALLOCTYPE_START_BNO;
 			} else
 				type = XFS_ALLOCTYPE_NEAR_BNO;
-			cbno = xfs_alloc_extent(tp, askbno, 1, type, 0, 0);
+			cbno = xfs_alloc_extent(tp, askbno, 1, type, 0,
+				cur->bc_private.b.wasdel);
 			if (cbno == NULLFSBLOCK)
 				return 0;
 			cur->bc_private.b.allocated++;
@@ -1194,7 +1195,7 @@ xfs_bmbt_split(
 		type = XFS_ALLOCTYPE_START_BNO;
 	} else
 		type = XFS_ALLOCTYPE_NEAR_BNO;
-	rbno = xfs_alloc_extent(tp, bno, 1, type, 0, 0);
+	rbno = xfs_alloc_extent(tp, bno, 1, type, 0, cur->bc_private.b.wasdel);
 	if (rbno == NULLFSBLOCK)
 		return 0;
 	cur->bc_private.b.allocated++;
