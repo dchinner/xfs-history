@@ -1351,7 +1351,7 @@ xfs_iomap_write_delay(
 	 * This can be EDQUOT, if nimaps == 0
 	 */
 	if (error) {
-		return error;
+		return XFS_ERROR(error);
 	}
 	/*
 	 * If bmapi returned us nothing, and if we didn't get back EDQUOT,
