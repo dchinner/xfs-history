@@ -199,11 +199,11 @@
     ((reference) = 0)
    
 #define DIRINO4_GET(pointer,arch) \
-    INT_GET_UNALIGNED_32_NATIVE(pointer);
+    INT_GET_UNALIGNED_32_NATIVE(pointer)
     
 #ifdef XFS_BIG_FILESYSTEMS
 #define DIRINO_GET(pointer,arch) \
-    INT_GET_UNALIGNED_64_NATIVE(pointer);
+    INT_GET_UNALIGNED_64_NATIVE(pointer)
 #else
 #define DIRINO_GET(pointer,arch) \
     DIRINO4_GET(pointer,arch)
@@ -268,11 +268,11 @@
     ((reference) = 0)
         
 #define DIRINO4_GET(pointer,arch) \
-    INT_GET_UNALIGNED_32_BE(pointer);
+    INT_GET_UNALIGNED_32_BE(pointer)
     
 #ifdef XFS_BIG_FILESYSTEMS
 #define DIRINO_GET(pointer,arch) \
-    INT_GET_UNALIGNED_64_BE(pointer);
+    INT_GET_UNALIGNED_64_BE(pointer)
 #else
 #define DIRINO_GET(pointer,arch) \
     DIRINO4_GET(pointer,arch)
