@@ -1,4 +1,4 @@
-#ident "$Revision: 1.91 $"
+#ident "$Revision: 1.92 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -673,6 +673,7 @@ xfs_trans_commit(
 	 * Also make sure to return any reserved blocks to
 	 * the free pool.
 	 */
+shut_us_down:
 	shutdown = XFS_FORCED_SHUTDOWN(mp) ? EIO : 0;
 	if (!(tp->t_flags & XFS_TRANS_DIRTY) || shutdown) {
 		xfs_trans_unreserve_and_mod_sb(tp);
@@ -723,6 +724,12 @@ xfs_trans_commit(
 	 * by using a vector from the stack when it fits.
 	 */
 	nvec = xfs_trans_count_vecs(tp);
+
+	if (nvec == 0) {
+		xfs_force_shutdown(mp, XFS_LOG_IO_ERROR);
+		goto shut_us_down;
+	}
+		
 
 	if (nvec <= XFS_TRANS_LOGVEC_COUNT) {
 		log_vector = log_vector_fast;
@@ -840,6 +847,14 @@ xfs_trans_count_vecs(
 	nvecs = 1;
 	lidp = xfs_trans_first_item(tp);
 	ASSERT(lidp != NULL);
+
+	/* In the non-debug case we need to start bailing out if we
+	 * didn't find a log_item here, return zero and let trans_commit
+	 * deal with it.
+	 */
+	if (lidp == NULL)
+		return 0;
+
 	while (lidp != NULL) {
 		/*
 		 * Skip items which aren't dirty in this transaction.
