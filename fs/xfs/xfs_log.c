@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.134 $"
+#ident	"$Revision: 1.135 $"
 
 /*
  * High level interface routines for log manager
@@ -923,6 +923,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_grant_reserve_cycle = 1;
 	log->l_grant_write_bytes = 0;
 	log->l_grant_write_cycle = 1;
+	log->l_quotaoffs_flag = 0;      /* XFS_LI_QUOTAOFF logitems */
 
 	xlog_get_iclog_buffer_size(mp, log);
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
