@@ -330,6 +330,37 @@ xfs_bulkstat(
 }
 
 /*
+ * Return stat information in bulk (by-inode) for the filesystem.
+ * Special case for non-sequential one inode bulkstat.
+ */
+STATIC int				/* error status */
+xfs_bulkstat_single(
+	xfs_mount_t		*mp,	/* mount point for filesystem */
+	ino64_t			*lastino, /* last inode returned */
+	int			*count,	/* size of buffer/count returned */
+	caddr_t			buffer,	/* buffer with inode stats */
+	int			*done)	/* 1 if there're more stats to get */
+{
+	xfs_bstat_t		bstat;
+	xfs_ino_t		ino;
+
+	ino = (xfs_ino_t)*lastino + 1;
+	if (!xfs_bulkstat_one(mp, NULL, ino, &bstat, 0)) {
+		return xfs_bulkstat(mp, NULL, lastino, count, xfs_bulkstat_one,
+			sizeof(bstat), buffer, done);
+	}
+	if (copyout(&bstat, buffer, sizeof(bstat))) {
+		*done = 0;
+		*count = 0;
+		return EFAULT;
+	}
+	*done = 0;
+	*count = 1;
+	*lastino = ino;
+	return 0;
+}
+
+/*
  * Return inode number table for the filesystem.
  */
 STATIC int				/* error status */
@@ -527,11 +558,13 @@ xfs_itable(
 		error = xfs_inumbers(mp, NULL, &inlast, &count, ubuffer);
 		break;
 	case SGI_FS_BULKSTAT:
-		error = xfs_bulkstat(mp, NULL, &inlast, &count, 
-				     (bulkstat_one_pf) xfs_bulkstat_one,
-				     sizeof(xfs_bstat_t),
-				     ubuffer,
-				     &done);
+		if (count == 1)
+			error = xfs_bulkstat_single(mp, &inlast, &count,
+				ubuffer, &done);
+		else
+			error = xfs_bulkstat(mp, NULL, &inlast, &count, 
+				(bulkstat_one_pf)xfs_bulkstat_one,
+				sizeof(xfs_bstat_t), ubuffer, &done);
 		break;
 	}
 	if (error)
