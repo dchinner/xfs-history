@@ -1,4 +1,4 @@
-#ident "$Revision: 1.27 $"
+#ident "$Revision: 1.30 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -44,6 +44,8 @@ STATIC uint	xfs_efi_item_size(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_format(xfs_efi_log_item_t *, xfs_log_iovec_t *);
 STATIC void	xfs_efi_item_pin(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_unpin(xfs_efi_log_item_t *);
+STATIC void	xfs_efi_item_unpin_remove(xfs_efi_log_item_t *,
+					  xfs_trans_t *tp);
 STATIC uint	xfs_efi_item_trylock(xfs_efi_log_item_t *);
 STATIC void	xfs_efi_item_unlock(xfs_efi_log_item_t *);
 STATIC xfs_lsn_t	xfs_efi_item_committed(xfs_efi_log_item_t *,
@@ -56,6 +58,7 @@ STATIC uint	xfs_efd_item_size(xfs_efd_log_item_t *);
 STATIC void	xfs_efd_item_format(xfs_efd_log_item_t *, xfs_log_iovec_t *);
 STATIC void	xfs_efd_item_pin(xfs_efd_log_item_t *);
 STATIC void	xfs_efd_item_unpin(xfs_efd_log_item_t *);
+STATIC void	xfs_efd_item_unpin_remove(xfs_efd_log_item_t *, xfs_trans_t *);
 STATIC uint	xfs_efd_item_trylock(xfs_efd_log_item_t *);
 STATIC void	xfs_efd_item_unlock(xfs_efd_log_item_t *);
 STATIC void	xfs_efd_item_abort(xfs_efd_log_item_t *);
@@ -155,6 +158,54 @@ xfs_efi_item_unpin(xfs_efi_log_item_t *efip)
 }
 
 /*
+ * like unpin only we have to also clear the xaction descriptor
+ * pointing the log item if we free the item.  This routine duplicates
+ * unpin because efi_flags is protected by the AIL lock.  Freeing
+ * the descriptor and then calling unpin would force us to drop the AIL
+ * lock which would open up a race condition.
+ */
+STATIC void
+xfs_efi_item_unpin_remove(xfs_efi_log_item_t *efip, xfs_trans_t *tp)
+{
+	int		nexts;
+	int		size;
+	xfs_mount_t	*mp;
+	xfs_log_item_desc_t	*lidp;
+	SPLDECL(s);
+
+	mp = efip->efi_item.li_mountp;
+	AIL_LOCK(mp, s);
+	if (efip->efi_flags & XFS_EFI_CANCELED) {
+		/*
+		 * free the xaction descriptor pointing to this item
+		 */
+		lidp = xfs_trans_find_item(tp, (xfs_log_item_t *) efip);
+		xfs_trans_free_item(tp, lidp);
+		/*
+		 * pull the item off the AIL.
+		 * xfs_trans_delete_ail() drops the AIL lock.
+		 */
+		xfs_trans_delete_ail(mp, (xfs_log_item_t *)efip, s);
+		/*
+		 * now free the item itself
+		 */
+		nexts = efip->efi_format.efi_nextents;
+		if (nexts > XFS_EFI_MAX_FAST_EXTENTS) {
+			size = sizeof(xfs_efi_log_item_t);
+			size += (nexts - 1) * sizeof(xfs_extent_t);
+			kmem_free(efip, size);
+		} else {
+			kmem_zone_free(xfs_efi_zone, efip);
+		}
+	} else {
+		efip->efi_flags |= XFS_EFI_COMMITTED;
+		AIL_UNLOCK(mp, s);
+	}
+
+	return;
+}
+
+/*
  * Efi items have no locking or pushing.  However, since EFIs are
  * pulled from the AIL when their corresponding EFDs are committed
  * to disk, their situation is very similar to being pinned.  Return
@@ -195,7 +246,9 @@ xfs_efi_item_committed(xfs_efi_log_item_t *efip, xfs_lsn_t lsn)
 
 /*
  * This is called when the transaction logging the EFI is aborted.
- * Free up the EFI and return.
+ * Free up the EFI and return.  No need to clean up the slot for
+ * the item in the transaction.  That was done by the unpin code
+ * which is called prior to this routine in the abort/fs-shutdown path.
  */
 STATIC void
 xfs_efi_item_abort(xfs_efi_log_item_t *efip)
@@ -234,6 +287,7 @@ struct xfs_item_ops xfs_efi_item_ops = {
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_efi_item_format,
 	(void(*)(xfs_log_item_t*))xfs_efi_item_pin,
 	(void(*)(xfs_log_item_t*))xfs_efi_item_unpin,
+	(void(*)(xfs_log_item_t*, xfs_trans_t *))xfs_efi_item_unpin_remove,
 	(uint(*)(xfs_log_item_t*))xfs_efi_item_trylock,
 	(void(*)(xfs_log_item_t*))xfs_efi_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efi_item_committed,
@@ -427,6 +481,13 @@ xfs_efd_item_unpin(xfs_efd_log_item_t *efdp)
 	return;
 }
 
+/*ARGSUSED*/
+STATIC void
+xfs_efd_item_unpin_remove(xfs_efd_log_item_t *efdp, xfs_trans_t *tp)
+{
+	return;
+}
+
 /*
  * Efd items have no locking, so just return success.
  */
@@ -486,7 +547,9 @@ xfs_efd_item_committed(xfs_efd_log_item_t *efdp, xfs_lsn_t lsn)
 /*
  * The transaction of which this EFD is a part has been aborted.
  * Inform its companion EFI of this fact and then clean up after
- * ourselves.
+ * ourselves.  No need to clean up the slot for the item in the
+ * transaction.  That was done by the unpin code which is called
+ * prior to this routine in the abort/fs-shutdown path.
  */
 STATIC void
 xfs_efd_item_abort(xfs_efd_log_item_t *efdp)
@@ -532,6 +595,7 @@ struct xfs_item_ops xfs_efd_item_ops = {
 	(void(*)(xfs_log_item_t*, xfs_log_iovec_t*))xfs_efd_item_format,
 	(void(*)(xfs_log_item_t*))xfs_efd_item_pin,
 	(void(*)(xfs_log_item_t*))xfs_efd_item_unpin,
+	(void(*)(xfs_log_item_t*, xfs_trans_t*))xfs_efd_item_unpin_remove,
 	(uint(*)(xfs_log_item_t*))xfs_efd_item_trylock,
 	(void(*)(xfs_log_item_t*))xfs_efd_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efd_item_committed,
