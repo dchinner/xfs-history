@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -69,7 +69,8 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 #define	XFS_BUF_TO_BMBT_BLOCK(bp) ((xfs_bmbt_block_t *)((bp)->b_un.b_addr))
 
 #define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) \
-	((cur)->bc_private.b.inodesize - (int)sizeof(xfs_dinode_core_t))
+	((cur)->bc_private.b.inodesize - \
+	 (int)(sizeof(xfs_dinode_core_t) + sizeof(xfs_agino_t)))
 #define	XFS_BMAP_RBLOCK_ISIZE(lev,cur) \
 	((int)(cur)->bc_private.b.ip->i_broot_bytes)
 #define	XFS_BMAP_IBLOCK_SIZE(lev,cur) (1 << (cur)->bc_blocklog)
@@ -126,7 +127,8 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
  * These are to be used when we know the size of the block and
  * we don't have a cursor.
  */
-#define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - sizeof(xfs_dinode_core_t)) 
+#define	XFS_BMAP_BROOT_SIZE(isz) ((isz) - \
+     (sizeof(xfs_dinode_core_t) + sizeof(xfs_agino_t))) 
 #define	XFS_BMAP_BROOT_REC_ADDR(bb,i,sz) \
 	XFS_BTREE_REC_ADDR(sz,xfs_bmbt,bb,i,XFS_BMAP_BROOT_MAXRECS(sz))
 #define	XFS_BMAP_BROOT_KEY_ADDR(bb,i,sz) \
