@@ -2954,7 +2954,8 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 					ASSERT(ip->i_d.di_mode != 0);
 
 					/* setup for the next pass */
-					agino = dip->di_next_unlinked;
+					agino = INT_GET(dip->di_next_unlinked,
+							ARCH_CONVERT);
 					xfs_buf_relse(ibp);
 					/*
 					 * Prevent any DMAPI event from
