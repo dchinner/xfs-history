@@ -83,7 +83,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = tp;
 	have_default_acl = _ACL_GET_DEFAULT(dvp, &pdacl);
-	if (!have_default_acl)
+	if (IS_POSIX_ACL(dir) && !have_default_acl)
 		mode &= ~current->fs->umask;
 	va.va_mode = mode;	
 	va.va_size = 0;
