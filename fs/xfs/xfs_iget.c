@@ -1,4 +1,4 @@
-#ident "$Revision: 1.73 $"
+#ident "$Revision: 1.75 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -420,12 +420,6 @@ xfs_ireclaim(xfs_inode_t *ip)
 			mp->m_inodes = iq;
 		}
 	}
-	/*
-	 * Release dquots (and their references) if any
-	 */
-	if (ip->i_udquot || ip->i_pdquot) {
-		xfs_qm_dqdettach_inode(ip);
-	}
 	
 	mp->m_ireclaims++;
 	XFS_MOUNT_IUNLOCK(mp);
@@ -442,6 +436,14 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 */
 	xfs_ilock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 
+	/*
+	 * Release dquots (and their references) if any. An inode may escape 
+	 * xfs_inactive and get here via vn_alloc->vn_reclaim path.
+	 */
+	if (ip->i_udquot || ip->i_pdquot) {
+		xfs_qm_dqdettach_inode(ip);
+	}
+	
 	/*
 	 * Pull our behavior descriptor from the vnode chain.
 	 */
