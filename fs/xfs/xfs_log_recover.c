@@ -2530,21 +2530,8 @@ xlog_do_recover(xlog_t	*log,
 
 	xlog_recover_check_summary(log);
 
-
 	/* Normal transactions can now occur */
 	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
-
-	/*
-	 * Now we're ready to do the transactions needed for the
-	 * rest of recovery.  Start with completing all the extent
-	 * free intent records and then process the unlinked inode
-	 * lists.  At this point, we essentially run in normal mode
-	 * except that we're still performing recovery actions
-	 * rather than accepting new requests.
-	 */
-	xlog_recover_process_efis(log);
-	xlog_recover_process_iunlinks(log);
-	xlog_recover_check_summary(log);
 #endif /* _KERNEL */
 	return 0;
 }	/* xlog_do_recover */
@@ -2571,10 +2558,41 @@ xlog_recover(xlog_t *log)
 		cmn_err(CE_NOTE, 
 			"Ending xFS recovery on (major: %d) (minor: %d)",
 			emajor(log->l_dev), eminor(log->l_dev));
+		log->l_flags |= XLOG_RECOVERY_NEEDED;
 	}
 	return error;
 }	/* xlog_recover */
 
+/*
+ * In the first part of recovery we replay inodes and buffers and build
+ * up the list of extent free items which need to be processed.  Here
+ * we process the extent free items and clean up the on disk unlinked
+ * inode lists.  This is separated from the first part of recovery so
+ * that the root and real-time bitmap inodes can be read in from disk in
+ * between the two stages.  This is necessary so that we can free space
+ * in the real-time portion of the file system.
+ */
+int
+xlog_recover_finish(xlog_t *log)
+{
+	/*
+	 * Now we're ready to do the transactions needed for the
+	 * rest of recovery.  Start with completing all the extent
+	 * free intent records and then process the unlinked inode
+	 * lists.  At this point, we essentially run in normal mode
+	 * except that we're still performing recovery actions
+	 * rather than accepting new requests.
+	 */
+	if (log->l_flags & XLOG_RECOVERY_NEEDED) {
+#ifdef _KERNEL
+		xlog_recover_process_efis(log);
+		xlog_recover_process_iunlinks(log);
+		xlog_recover_check_summary(log);
+#endif /* _KERNEL */
+		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
+	}
+	return 0;
+}
 
 #ifdef DEBUG
 /*

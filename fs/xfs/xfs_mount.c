@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.77 $"
+#ident	"$Revision: 1.78 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -329,6 +329,15 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		ASSERT(sbp->sb_rsumino != NULLFSINO);
 		mp->m_rsumip = xfs_iget(mp, NULL, sbp->sb_rsumino, NULL);
 	}
+
+	/*
+	 * Finish recovering the file system.  This part needed to be
+	 * delayed until after the root and real-time bitmap inodes
+	 * were consistently read in.
+	 */
+#ifndef SIM
+	xfs_log_mount_finish(mp);
+#endif
 
 	/*
 	 * Initialize directory manager's entries.
