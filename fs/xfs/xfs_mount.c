@@ -880,7 +880,7 @@ xfs_mountfs(
 	/*
 	 * Allocate and initialize the per-ag data.
 	 */
-	mrinit(&mp->m_peraglock, "xperag");
+	mrlock_init(&mp->m_peraglock, MRLOCK_BARRIER, "xperag", -1);
 	mp->m_perag =
 		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
 

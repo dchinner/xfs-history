@@ -50,7 +50,7 @@ xfs_ihash_init(xfs_mount_t *mp)
 				      * sizeof(xfs_ihash_t), KM_SLEEP);
 	ASSERT(mp->m_ihash != NULL);
 	for (i = 0; i < mp->m_ihsize; i++) {
-		mrinit(&(mp->m_ihash[i].ih_lock),"xfshash");
+		mrlock_init(&(mp->m_ihash[i].ih_lock), MRLOCK_BARRIER, "xfshash", i);
 	}
 }
 
@@ -552,7 +552,8 @@ xfs_inode_lock_init(
 	xfs_inode_t	*ip,
 	vnode_t		*vp)
 {
-	mrlock_init(&ip->i_lock, MRLOCK_ALLOW_EQUAL_PRI, "xfsino", (long)vp->v_number);
+	mrlock_init(&ip->i_lock, MRLOCK_ALLOW_EQUAL_PRI|MRLOCK_BARRIER,
+		     "xfsino", (long)vp->v_number);
 	mrlock_init(&ip->i_iolock, MRLOCK_BARRIER, "xfsio", vp->v_number);
 #ifdef NOTYET
 	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
