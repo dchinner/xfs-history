@@ -177,6 +177,7 @@ linvfs_write(
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
         
+	*ppos = pos;
 	VOP_WRITE(vp, file, buf, count, ppos, NULL, err);
 out:
 	up(&inode->i_sem);
