@@ -35,8 +35,8 @@
 #include <linux/config.h>
 
 #include <xfs_types.h>
+#include <xfs_arch.h>
 
-#include <support/arch.h>
 #include <support/kmem.h>
 #include <support/mrlock.h>
 #include <support/qsort.h>
@@ -50,8 +50,6 @@
 #include <support/move.h>
 #include <support/uuid.h>
 #include <support/time.h>
-
-#include <xfs_arch.h>
 
 #include <linux/xfs_linux.h>
 

@@ -41,6 +41,7 @@
 #endif
 
 #include <xfs_types.h>
+#include <xfs_arch.h>
 #include "time.h"
 #include "move.h"
 #include "arch.h"
