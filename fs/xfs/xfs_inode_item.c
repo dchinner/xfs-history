@@ -312,7 +312,7 @@ xfs_inode_item_push(xfs_inode_log_item_t *iip)
 	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 
-	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), XFS_ILOCK_SHARED));
+	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), MR_ACCESS));
 	ASSERT(valusema(&(iip->ili_inode->i_flock)) <= 0);
 
 	/*
@@ -333,6 +333,7 @@ xfs_inode_item_push(xfs_inode_log_item_t *iip)
 	 * the inode.
 	 */
 	xfs_iflush(ip, B_ASYNC);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 }
 
 /*
