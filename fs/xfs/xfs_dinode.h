@@ -209,19 +209,19 @@ int xfs_cfork_size(xfs_dinode_core_t *dcp, struct xfs_mount *mp, int w);
 int xfs_dfork_dsize(xfs_dinode_t *dip, struct xfs_mount *mp);
 #define	XFS_DFORK_DSIZE(dip,mp)		xfs_dfork_dsize(dip,mp)
 #else
-#define	XFS_DFORK_DSIZE(dip,mp)		XFS_CFORK_DSIZE(&dip->di_core, mp)
+#define	XFS_DFORK_DSIZE(dip,mp)		XFS_CFORK_DSIZE(&(dip)->di_core, mp)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DFORK_ASIZE)
 int xfs_dfork_asize(xfs_dinode_t *dip, struct xfs_mount *mp);
 #define	XFS_DFORK_ASIZE(dip,mp)		xfs_dfork_asize(dip,mp)
 #else
-#define	XFS_DFORK_ASIZE(dip,mp)		XFS_CFORK_ASIZE(&dip->di_core, mp)
+#define	XFS_DFORK_ASIZE(dip,mp)		XFS_CFORK_ASIZE(&(dip)->di_core, mp)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DFORK_SIZE)
 int xfs_dfork_size(xfs_dinode_t *dip, struct xfs_mount *mp, int w);
 #define	XFS_DFORK_SIZE(dip,mp,w)	xfs_dfork_size(dip,mp,w)
 #else
-#define	XFS_DFORK_SIZE(dip,mp,w)	XFS_CFORK_SIZE(&dip->di_core, mp, w)
+#define	XFS_DFORK_SIZE(dip,mp,w)	XFS_CFORK_SIZE(&(dip)->di_core, mp, w)
 #endif
 
 /*
@@ -231,7 +231,7 @@ int xfs_dfork_size(xfs_dinode_t *dip, struct xfs_mount *mp, int w);
 int xfs_dfork_q(xfs_dinode_t *dip);
 #define	XFS_DFORK_Q(dip)		xfs_dfork_q(dip)
 #else
-#define	XFS_DFORK_Q(dip)	XFS_CFORK_Q(&dip->di_core)
+#define	XFS_DFORK_Q(dip)	XFS_CFORK_Q(&(dip)->di_core)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DFORK_BOFF)
 int xfs_dfork_boff(xfs_dinode_t *dip);
@@ -294,25 +294,26 @@ void xfs_cfork_next_set(xfs_dinode_core_t *dcp, int w, int n);
 int xfs_dfork_format(xfs_dinode_t *dip, int w);
 #define	XFS_DFORK_FORMAT(dip,w) 	xfs_dfork_format(dip,w)
 #else
-#define	XFS_DFORK_FORMAT(dip,w) 	XFS_CFORK_FORMAT(&dip->di_core, w)
+#define	XFS_DFORK_FORMAT(dip,w) 	XFS_CFORK_FORMAT(&(dip)->di_core, w)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DFORK_FMT_SET)
 void xfs_dfork_fmt_set(xfs_dinode_t *dip, int w, int n);
 #define	XFS_DFORK_FMT_SET(dip,w,n)	xfs_dfork_fmt_set(dip,w,n)
 #else
-#define	XFS_DFORK_FMT_SET(dip,w,n)	XFS_CFORK_FMT_SET(&dip->di_core, w, n)
+#define	XFS_DFORK_FMT_SET(dip,w,n)	XFS_CFORK_FMT_SET(&(dip)->di_core, w, n)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DFORK_NEXTENTS)
 int xfs_dfork_nextents(xfs_dinode_t *dip, int w);
 #define	XFS_DFORK_NEXTENTS(dip,w)	xfs_dfork_nextents(dip,w)
 #else
-#define	XFS_DFORK_NEXTENTS(dip,w)	XFS_CFORK_NEXTENTS(&dip->di_core, w)
+#define	XFS_DFORK_NEXTENTS(dip,w)	XFS_CFORK_NEXTENTS(&(dip)->di_core, w)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DFORK_NEXT_SET)
 void xfs_dfork_next_set(xfs_dinode_t *dip, int w, int n);
 #define	XFS_DFORK_NEXT_SET(dip,w,n)	xfs_dfork_next_set(dip,w,n)
 #else
-#define	XFS_DFORK_NEXT_SET(dip,w,n)	XFS_CFORK_NEXT_SET(&dip->di_core, w, n)
+#define	XFS_DFORK_NEXT_SET(dip,w,n)	\
+	XFS_CFORK_NEXT_SET(&(dip)->di_core, w, n)
 #endif
 
 /*
@@ -342,7 +343,7 @@ void xfs_dfork_next_set(xfs_dinode_t *dip, int w, int n);
 xfs_dinode_t *xfs_buf_to_dinode(struct buf *bp);
 #define	XFS_BUF_TO_DINODE(bp)	xfs_buf_to_dinode(bp)
 #else
-#define	XFS_BUF_TO_DINODE(bp)	((xfs_dinode_t *)(bp->b_un.b_addr))
+#define	XFS_BUF_TO_DINODE(bp)	((xfs_dinode_t *)((bp)->b_un.b_addr))
 #endif
 
 /*
