@@ -67,6 +67,79 @@
 #define AT_DELAY_FLAG(f) ((f&ATTR_NONBLOCK) ? DM_FLAGS_NDELAY : 0)
 
 
+
+/* events valid in dm_set_eventlist() when called with a filesystem handle.
+   These events are not persistent.
+*/
+
+#define	DM_XFS_VALID_FS_EVENTS		( \
+	(1 << DM_EVENT_PREUNMOUNT)	| \
+	(1 << DM_EVENT_UNMOUNT)		| \
+	(1 << DM_EVENT_NOSPACE)		| \
+	(1 << DM_EVENT_DEBUT)		| \
+	(1 << DM_EVENT_CREATE)		| \
+	(1 << DM_EVENT_POSTCREATE)	| \
+	(1 << DM_EVENT_REMOVE)		| \
+	(1 << DM_EVENT_POSTREMOVE)	| \
+	(1 << DM_EVENT_RENAME)		| \
+	(1 << DM_EVENT_POSTRENAME)	| \
+	(1 << DM_EVENT_LINK)		| \
+	(1 << DM_EVENT_POSTLINK)	| \
+	(1 << DM_EVENT_SYMLINK)		| \
+	(1 << DM_EVENT_POSTSYMLINK)	| \
+	(1 << DM_EVENT_ATTRIBUTE)	| \
+	(1 << DM_EVENT_DESTROY)		)
+
+/* Events valid in dm_set_eventlist() when called with a file handle for
+   a regular file or a symlink.  These events are persistent.
+*/
+
+#define	DM_XFS_VALID_FILE_EVENTS	( \
+	(1 << DM_EVENT_ATTRIBUTE)	| \
+	(1 << DM_EVENT_DESTROY)		)
+
+/* Events valid in dm_set_eventlist() when called with a file handle for
+   a directory.  These events are persistent.
+*/
+
+#define	DM_XFS_VALID_DIRECTORY_EVENTS	( \
+	(1 << DM_EVENT_CREATE)		| \
+	(1 << DM_EVENT_POSTCREATE)	| \
+	(1 << DM_EVENT_REMOVE)		| \
+	(1 << DM_EVENT_POSTREMOVE)	| \
+	(1 << DM_EVENT_RENAME)		| \
+	(1 << DM_EVENT_POSTRENAME)	| \
+	(1 << DM_EVENT_LINK)		| \
+	(1 << DM_EVENT_POSTLINK)	| \
+	(1 << DM_EVENT_SYMLINK)		| \
+	(1 << DM_EVENT_POSTSYMLINK)	| \
+	(1 << DM_EVENT_ATTRIBUTE)	| \
+	(1 << DM_EVENT_DESTROY)		)
+
+
+/* Events supported by the XFS filesystem. */
+#define	DM_XFS_SUPPORTED_EVENTS		( \
+	(1 << DM_EVENT_MOUNT)		| \
+	(1 << DM_EVENT_PREUNMOUNT)	| \
+	(1 << DM_EVENT_UNMOUNT)		| \
+	(1 << DM_EVENT_NOSPACE)		| \
+	(1 << DM_EVENT_CREATE)		| \
+	(1 << DM_EVENT_POSTCREATE)	| \
+	(1 << DM_EVENT_REMOVE)		| \
+	(1 << DM_EVENT_POSTREMOVE)	| \
+	(1 << DM_EVENT_RENAME)		| \
+	(1 << DM_EVENT_POSTRENAME)	| \
+	(1 << DM_EVENT_LINK)		| \
+	(1 << DM_EVENT_POSTLINK)	| \
+	(1 << DM_EVENT_SYMLINK)		| \
+	(1 << DM_EVENT_POSTSYMLINK)	| \
+	(1 << DM_EVENT_READ)		| \
+	(1 << DM_EVENT_WRITE)		| \
+	(1 << DM_EVENT_TRUNCATE)	| \
+	(1 << DM_EVENT_ATTRIBUTE)	| \
+	(1 << DM_EVENT_DESTROY)		)
+
+
 extern int
 xfs_dm_mount(
 	vfs_t		*vfsp,
