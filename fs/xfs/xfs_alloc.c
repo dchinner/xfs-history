@@ -563,7 +563,7 @@ xfs_alloc_ag_vextent_exact(
 		/*
 		 * Didn't find it, return null.
 		 */
-		xfs_btree_del_cursor(bno_cur);
+		xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 		args->agbno = NULLAGBLOCK;
 		args->wasfromfl = 0;
 		return 0;
@@ -580,7 +580,7 @@ xfs_alloc_ag_vextent_exact(
 	 * Give up if the freespace isn't long enough for the minimum request.
 	 */
 	if (fend < minend) {
-		xfs_btree_del_cursor(bno_cur);
+		xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 		args->agbno = NULLAGBLOCK;
 		args->wasfromfl = 0;
 		return 0;
@@ -596,7 +596,7 @@ xfs_alloc_ag_vextent_exact(
 	args->len = end - args->agbno;
 	xfs_alloc_fix_len(args);
 	if (!xfs_alloc_fix_minleft(args)) {
-		xfs_btree_del_cursor(bno_cur);
+		xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 		args->wasfromfl = 0;
 		return 0;
 	}
@@ -614,8 +614,8 @@ xfs_alloc_ag_vextent_exact(
 	 */
 	error = xfs_alloc_lookup_eq(cnt_cur, fbno, flen, &i);
 	if (error) {
-		xfs_btree_del_cursor(bno_cur);
-		xfs_btree_del_cursor(cnt_cur);
+		xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 		return error;
 	}
 	ASSERT(i == 1);
@@ -624,8 +624,8 @@ xfs_alloc_ag_vextent_exact(
 	 */
 	error = xfs_alloc_delete(cnt_cur, &i);
 	if (error) {
-		xfs_btree_del_cursor(bno_cur);
-		xfs_btree_del_cursor(cnt_cur);
+		xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 		return error;
 	}
 	/*
@@ -636,14 +636,14 @@ xfs_alloc_ag_vextent_exact(
 		error = xfs_alloc_lookup_eq(cnt_cur, fbno,
 					    args->agbno - fbno, &i);
 		if (error) {
-			xfs_btree_del_cursor(bno_cur);
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		error = xfs_alloc_insert(cnt_cur, &i);
 		if (error) {
-			xfs_btree_del_cursor(bno_cur);
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 			return error;
 		}
 	}
@@ -654,20 +654,20 @@ xfs_alloc_ag_vextent_exact(
 	if (fend > end) {
 		error = xfs_alloc_lookup_eq(cnt_cur, end, fend - end, &i);
 		if (error) {
-			xfs_btree_del_cursor(bno_cur);
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		error = xfs_alloc_insert(cnt_cur, &i);
 		if (error) {
-			xfs_btree_del_cursor(bno_cur);
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 			return error;
 		}
 	}
 	xfs_alloc_rcheck(cnt_cur);
 	xfs_alloc_kcheck(cnt_cur);
-	xfs_btree_del_cursor(cnt_cur);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 	/*
 	 * If the found freespace matches the allocation, just delete it
 	 * from the by-bno btree.
@@ -675,7 +675,7 @@ xfs_alloc_ag_vextent_exact(
 	if (fbno == args->agbno && fend == end) {
 		error = xfs_alloc_delete(bno_cur, &i);
 		if (error) {
-			xfs_btree_del_cursor(bno_cur);
+			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
 			return error;
 		}
 	}
@@ -699,19 +699,21 @@ xfs_alloc_ag_vextent_exact(
 			error = xfs_alloc_lookup_eq(bno_cur, end,
 						    fend - end, &i);
 			if (error) {
-				xfs_btree_del_cursor(bno_cur);
+				xfs_btree_del_cursor(bno_cur,
+						     XFS_BTREE_ERROR);
 				return error;
 			}
 			error = xfs_alloc_insert(bno_cur, &i);
 			if (error) {
-				xfs_btree_del_cursor(bno_cur);
+				xfs_btree_del_cursor(bno_cur,
+						     XFS_BTREE_ERROR);
 				return error;
 			}
 		}
 	}
 	xfs_alloc_rcheck(bno_cur);
 	xfs_alloc_kcheck(bno_cur);
-	xfs_btree_del_cursor(bno_cur);
+	xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 	args->len = rlen;
 	ASSERT(args->agbno + args->len <=
 	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
@@ -816,7 +818,8 @@ xfs_alloc_ag_vextent_near(
 					 */
 					xfs_trans_set_sync(args->tp);
 				}
-				xfs_btree_del_cursor(cnt_cur);
+				xfs_btree_del_cursor(cnt_cur,
+						     XFS_BTREE_NOERROR);
 				args->len = 1;
 				args->agbno = ltbno;
 				ASSERT(args->agbno + args->len <=
@@ -830,7 +833,7 @@ xfs_alloc_ag_vextent_near(
 		 * If nothing, or what we got is too small, give up.
 		 */
 		if (ltlen < args->minlen) {
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 			args->agbno = NULLAGBLOCK;
 			args->wasfromfl = 0;
 			return 0;
@@ -906,7 +909,7 @@ xfs_alloc_ag_vextent_near(
 		args->len = XFS_EXTLEN_MIN(ltlen, args->maxlen);
 		xfs_alloc_fix_len(args);
 		if (!xfs_alloc_fix_minleft(args)) {
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 			return 0;
 		}
 		rlen = args->len;
@@ -1028,10 +1031,10 @@ xfs_alloc_ag_vextent_near(
 		}
 		xfs_alloc_rcheck(cnt_cur);
 		xfs_alloc_kcheck(cnt_cur);
-		xfs_btree_del_cursor(cnt_cur);
+		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 		xfs_alloc_rcheck(bno_cur_lt);
 		xfs_alloc_kcheck(bno_cur_lt);
-		xfs_btree_del_cursor(bno_cur_lt);
+		xfs_btree_del_cursor(bno_cur_lt, XFS_BTREE_NOERROR);
 		args->agbno = ltnew;
 		ASSERT(args->agbno + args->len <=
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
@@ -1084,7 +1087,7 @@ xfs_alloc_ag_vextent_near(
 		/*
 		 * It failed, there are no rightward entries.
 		 */
-		xfs_btree_del_cursor(bno_cur_gt);
+		xfs_btree_del_cursor(bno_cur_gt, XFS_BTREE_NOERROR);
 		bno_cur_gt = 0;
 	}
 	/*
@@ -1102,7 +1105,8 @@ xfs_alloc_ag_vextent_near(
 				goto error2;
 			}
 			if (!i) {
-				xfs_btree_del_cursor(bno_cur_lt);
+				xfs_btree_del_cursor(bno_cur_lt,
+						     XFS_BTREE_NOERROR);
 				bno_cur_lt = 0;
 			}
 		}
@@ -1115,7 +1119,8 @@ xfs_alloc_ag_vextent_near(
 				goto error2;
 			}
 			if (!i) {
-				xfs_btree_del_cursor(bno_cur_gt);
+				xfs_btree_del_cursor(bno_cur_gt,
+						     XFS_BTREE_NOERROR);
 				bno_cur_gt = 0;
 			}
 		}
@@ -1156,7 +1161,8 @@ xfs_alloc_ag_vextent_near(
 					 */
 					if (gtbno >= args->agbno + ltdiff) {
 						xfs_btree_del_cursor(
-							bno_cur_gt);
+							bno_cur_gt,
+							XFS_BTREE_NOERROR);
 						bno_cur_gt = 0;
 						break;
 					}
@@ -1178,7 +1184,8 @@ xfs_alloc_ag_vextent_near(
 						 */
 						if (gtdiff < ltdiff) {
 							xfs_btree_del_cursor(
-								bno_cur_lt);
+								bno_cur_lt,
+								XFS_BTREE_NOERROR);
 							bno_cur_lt = 0;
 						}
 						/*
@@ -1186,7 +1193,8 @@ xfs_alloc_ag_vextent_near(
 						 */
 						else {
 							xfs_btree_del_cursor(
-								bno_cur_gt);
+								bno_cur_gt,
+								XFS_BTREE_NOERROR);
 							bno_cur_gt = 0;
 						}
 						break;
@@ -1201,7 +1209,8 @@ xfs_alloc_ag_vextent_near(
 					}
 					if (!i) {
 						xfs_btree_del_cursor(
-							bno_cur_gt);
+							bno_cur_gt,
+							XFS_BTREE_NOERROR);
 						bno_cur_gt = 0;
 						break;
 					}
@@ -1211,7 +1220,8 @@ xfs_alloc_ag_vextent_near(
 			 * The left side is perfect, trash the right side.
 			 */
 			else {
-				xfs_btree_del_cursor(bno_cur_gt);
+				xfs_btree_del_cursor(bno_cur_gt,
+						     XFS_BTREE_NOERROR);
 				bno_cur_gt = 0;
 			}
 		}
@@ -1243,7 +1253,8 @@ xfs_alloc_ag_vextent_near(
 					 */
 					if (ltbno <= args->agbno - gtdiff) {
 						xfs_btree_del_cursor(
-							bno_cur_lt);
+							bno_cur_lt,
+							XFS_BTREE_NOERROR);
 						bno_cur_lt = 0;
 						break;
 					}
@@ -1264,7 +1275,8 @@ xfs_alloc_ag_vextent_near(
 						 */
 						if (ltdiff < gtdiff) {
 							xfs_btree_del_cursor(
-								bno_cur_gt);
+								bno_cur_gt,
+								XFS_BTREE_NOERROR);
 							bno_cur_gt = 0;
 						}
 						/*
@@ -1272,7 +1284,8 @@ xfs_alloc_ag_vextent_near(
 						 */
 						else {
 							xfs_btree_del_cursor(
-								bno_cur_lt);
+								bno_cur_lt,
+								XFS_BTREE_NOERROR);
 							bno_cur_lt = 0;
 						}
 						break;
@@ -1287,7 +1300,8 @@ xfs_alloc_ag_vextent_near(
 					}
 					if (!i) {
 						xfs_btree_del_cursor(
-							bno_cur_lt);
+							bno_cur_lt,
+							XFS_BTREE_NOERROR);
 						bno_cur_lt = 0;
 						break;
 					}
@@ -1297,7 +1311,8 @@ xfs_alloc_ag_vextent_near(
 			 * The right side is perfect, trash the left side.
 			 */
 			else {
-				xfs_btree_del_cursor(bno_cur_lt);
+				xfs_btree_del_cursor(bno_cur_lt,
+						     XFS_BTREE_NOERROR);
 				bno_cur_lt = 0;
 			}
 		}
@@ -1317,8 +1332,8 @@ xfs_alloc_ag_vextent_near(
 		args->len = XFS_EXTLEN_MIN(ltlen, args->maxlen);
 		xfs_alloc_fix_len(args);
 		if (!xfs_alloc_fix_minleft(args)) {
-			xfs_btree_del_cursor(bno_cur_lt);
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(bno_cur_lt, XFS_BTREE_NOERROR);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 			return 0;
 		}
 		rlen = args->len;
@@ -1422,10 +1437,10 @@ xfs_alloc_ag_vextent_near(
 		}
 		xfs_alloc_rcheck(cnt_cur);
 		xfs_alloc_kcheck(cnt_cur);
-		xfs_btree_del_cursor(cnt_cur);
+		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 		xfs_alloc_rcheck(bno_cur_lt);
 		xfs_alloc_kcheck(bno_cur_lt);
-		xfs_btree_del_cursor(bno_cur_lt);
+		xfs_btree_del_cursor(bno_cur_lt, XFS_BTREE_NOERROR);
 		args->agbno = ltnew;
 		ASSERT(args->agbno + args->len <=
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
@@ -1442,8 +1457,8 @@ xfs_alloc_ag_vextent_near(
 		args->len = XFS_EXTLEN_MIN(gtlen, args->maxlen);
 		xfs_alloc_fix_len(args);
 		if (!xfs_alloc_fix_minleft(args)) {
-			xfs_btree_del_cursor(bno_cur_gt);
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(bno_cur_gt, XFS_BTREE_NOERROR);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 			return 0;
 		}
 		rlen = args->len;
@@ -1497,10 +1512,10 @@ xfs_alloc_ag_vextent_near(
 		}
 		xfs_alloc_rcheck(cnt_cur);
 		xfs_alloc_kcheck(cnt_cur);
-		xfs_btree_del_cursor(cnt_cur);
+		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 		xfs_alloc_rcheck(bno_cur_gt);
 		xfs_alloc_kcheck(bno_cur_gt);
-		xfs_btree_del_cursor(bno_cur_gt);
+		xfs_btree_del_cursor(bno_cur_gt, XFS_BTREE_NOERROR);
 		args->agbno = gtnew;
 		ASSERT(args->agbno + args->len <=
 		       XFS_BUF_TO_AGF(args->agbp)->agf_length);
@@ -1509,21 +1524,21 @@ xfs_alloc_ag_vextent_near(
 	return 0;
 
  error0:
-	xfs_btree_del_cursor(cnt_cur);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 	return error;
 
  error1:
-	xfs_btree_del_cursor(cnt_cur);
-	xfs_btree_del_cursor(bno_cur_lt);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
+	xfs_btree_del_cursor(bno_cur_lt, XFS_BTREE_ERROR);
 	return error;
 
  error2:
-	xfs_btree_del_cursor(cnt_cur);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 	if (bno_cur_lt != NULL) {
-		xfs_btree_del_cursor(bno_cur_lt);
+		xfs_btree_del_cursor(bno_cur_lt, XFS_BTREE_ERROR);
 	}
 	if (bno_cur_gt != NULL) {
-		xfs_btree_del_cursor(bno_cur_gt);
+		xfs_btree_del_cursor(bno_cur_gt, XFS_BTREE_ERROR);
 	}
 	return error;
 }
@@ -1607,7 +1622,8 @@ xfs_alloc_ag_vextent_size(
 					 */
 					xfs_trans_set_sync(args->tp);
 				}
-				xfs_btree_del_cursor(cnt_cur);
+				xfs_btree_del_cursor(cnt_cur,
+						     XFS_BTREE_NOERROR);
 				args->len = 1;
 				args->agbno = fbno;
 				ASSERT(args->agbno + args->len <=
@@ -1625,7 +1641,7 @@ xfs_alloc_ag_vextent_size(
 		 * Nothing as big as minlen, give up.
 		 */
 		if (flen < args->minlen) {
-			xfs_btree_del_cursor(cnt_cur);
+			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 			args->agbno = NULLAGBLOCK;
 			args->wasfromfl = 0;
 			return 0;
@@ -1646,7 +1662,7 @@ xfs_alloc_ag_vextent_size(
 	args->len = rlen;
 	xfs_alloc_fix_len(args);
 	if (!xfs_alloc_fix_minleft(args)) {
-		xfs_btree_del_cursor(cnt_cur);
+		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 		return 0;
 	}
 	rlen = args->len;
@@ -1698,10 +1714,10 @@ xfs_alloc_ag_vextent_size(
 	}
 	xfs_alloc_rcheck(bno_cur);
 	xfs_alloc_kcheck(bno_cur);
-	xfs_btree_del_cursor(bno_cur);
+	xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 	xfs_alloc_rcheck(cnt_cur);
 	xfs_alloc_kcheck(cnt_cur);
-	xfs_btree_del_cursor(cnt_cur);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 	args->len = rlen;
 	args->agbno = fbno;
 	ASSERT(args->agbno + args->len <=
@@ -1710,12 +1726,12 @@ xfs_alloc_ag_vextent_size(
 	return 0;
 
  error0:
-	xfs_btree_del_cursor(cnt_cur);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 	return error;
 
  error1:
-	xfs_btree_del_cursor(cnt_cur);
-	xfs_btree_del_cursor(bno_cur);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
+	xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
 	return error;
 }
 
@@ -1778,7 +1794,7 @@ xfs_free_ag_extent(
 		 * invalid, it's (partly) already free.
 		 */
 		else if (ltbno + ltlen > bno) {
-			xfs_btree_del_cursor(bno_cur);
+			xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 			return 0;
 			/* WILL BE ASSERT XXX */
 		}
@@ -1806,7 +1822,7 @@ xfs_free_ag_extent(
 		 * invalid, it's (partly) already free.
 		 */
 		else if (gtbno < bno + len) {
-			xfs_btree_del_cursor(bno_cur);
+			xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 			return 0;
 			/* WILL BE ASSERT XXX */
 		}
@@ -1948,7 +1964,7 @@ xfs_free_ag_extent(
 	}
 	xfs_alloc_rcheck(bno_cur);
 	xfs_alloc_kcheck(bno_cur);
-	xfs_btree_del_cursor(bno_cur);
+	xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
 	/*
 	 * In all cases we need to insert the new freespace in the by-size tree.
 	 */
@@ -1962,7 +1978,7 @@ xfs_free_ag_extent(
 	}
 	xfs_alloc_rcheck(cnt_cur);
 	xfs_alloc_kcheck(cnt_cur);
-	xfs_btree_del_cursor(cnt_cur);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 	/*
 	 * Update the freespace totals in the ag and superblock.
 	 */
@@ -1987,12 +2003,12 @@ xfs_free_ag_extent(
 	return 0;
 
  error0:
-	xfs_btree_del_cursor(bno_cur);
+	xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
 	return error;
 
  error1:
-	xfs_btree_del_cursor(bno_cur);
-	xfs_btree_del_cursor(cnt_cur);
+	xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
 	return error;
 }
 #endif	/* !SIM */
