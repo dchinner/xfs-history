@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 21
-EXTRAVERSION = -rc3-xfs
+EXTRAVERSION = -rc6-xfs
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -90,7 +90,6 @@ export MODLIB
 #
 
 CPPFLAGS := -D__KERNEL__ -I$(HPATH)
-CPPFLAGS += $(patsubst %,-I%,$(CROSS_COMPILE_INC))
 
 CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  -fno-strict-aliasing -fno-common
