@@ -1985,6 +1985,8 @@ xlog_state_do_callback(
 				 * we don't miss any more callbacks being added.
 				 */
 				spl = LOG_LOCK(log);
+			} else {
+				ioerrors++;
 			}
 			cb = iclog->ic_callback;
 	
