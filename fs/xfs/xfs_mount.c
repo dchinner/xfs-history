@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.129 $"
+#ident	"$Revision: 1.130 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -618,7 +618,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	 */
 	xfs_dir_mount(mp);
 
-	return 0;
+	return (0);
 
  error2:
 	xfs_ihash_free(mp);
@@ -733,10 +733,15 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	xfs_iflush_all(mp, XFS_FLUSH_ALL);
 	
 #ifndef SIM
-	xfs_qm_dqflush_all(mp, XFS_QMOPT_SYNC);
-	xfs_qm_dqpurge_all(mp, 
-			   XFS_QMOPT_UQUOTA|XFS_QMOPT_PQUOTA|
-			   XFS_QMOPT_UMOUNTING);
+	/*
+	 * Flush and purge the dquot cache.
+	 */
+	if (mp->m_quotainfo) {
+		xfs_qm_dqflush_all(mp, XFS_QMOPT_SYNC);
+		xfs_qm_dqpurge_all(mp, 
+				   XFS_QMOPT_UQUOTA|XFS_QMOPT_PQUOTA|
+				   XFS_QMOPT_UMOUNTING);
+	}
 #endif
 	/*
 	 * Flush out the log synchronously so that we know for sure
