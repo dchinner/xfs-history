@@ -929,8 +929,6 @@ xfs_dm_rdwr(
 	struct file	file;
 	struct inode	*ip;
 	struct dentry	*dentry;
-	uio_t		uio;
-	iovec_t		iov;
 	struct list_head *lp;
 
 	if (off < 0 || vp->v_type != VREG)
@@ -1008,28 +1006,22 @@ found:
 
 	file.f_flags = oflags;
 
-	uio.uio_iov = &iov;
-	uio.uio_offset = off;
-	uio.uio_fp = &file;
-	uio.uio_iovcnt = 1;
-	uio.uio_iov->iov_base = bufp;
-	uio.uio_iov->iov_len = uio.uio_resid = len;
-
 	if (fmode & FMODE_READ) {
-		VOP_READ(vp, &uio, 0, NULL, error);
+		VOP_READ(vp, &file, bufp, len, &off, NULL, error);
 	} else {
-		VOP_WRITE(vp, &uio, file.f_flags, NULL, error);
+		VOP_WRITE(vp, &file, bufp, len, &off, NULL, error);
 	}
-
-	if (!error)
+	if (error >= 0) {
+		*rvp = xfer = error;
+		error = 0;
 		linvfs_revalidate_core(ip, ATTR_COMM);
-
-	*rvp = xfer = len - uio.uio_resid;
-
-	if (fmode & FMODE_READ) {
-	        XFS_STATS_ADD(xfsstats.xs_read_bytes, xfer);
+		if (fmode & FMODE_READ) {
+			XFS_STATS_ADD(xfsstats.xs_read_bytes, xfer);
+		} else {
+			XFS_STATS_ADD(xfsstats.xs_write_bytes, xfer);
+		}
 	} else {
-	        XFS_STATS_ADD(xfsstats.xs_write_bytes, xfer);
+		error = -error;
 	}
 
 	if (file.f_mode & FMODE_WRITE)
