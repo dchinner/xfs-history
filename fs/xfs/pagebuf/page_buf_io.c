@@ -642,7 +642,7 @@ pagebuf_read_full_page(
 				PAGE_CACHE_SIZE, &map, 1, &nmaps, PBF_READ);
 
 		if (error)
-			BUG();
+			return error;
 		hook_buffers_to_page(target, inode, page, &map, nmaps);
 		bh = head = page->buffers;
 		if (map.pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
