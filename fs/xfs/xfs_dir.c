@@ -1,4 +1,4 @@
-#ident "$Revision: 1.73 $"
+#ident "$Revision: 1.74 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -20,6 +20,7 @@
 #include <sys/dirent.h>
 #include <sys/user.h>
 #include <sys/grio.h>
+#include <sys/ktrace.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
 #include <sys/fcntl.h>
@@ -102,6 +103,10 @@ uint xfs_dir_log2_roundup(uint i);
 xfs_da_state_t *xfs_da_state_alloc(void);
 void xfs_da_state_free(xfs_da_state_t *state);
 
+#if defined(DEBUG) && !defined(SIM)
+ktrace_t *xfs_dir_trace_buf;
+#endif
+
 
 /*========================================================================
  * Overall external interface routines.
@@ -167,16 +172,9 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	xfs_da_args_t args;
 	int retval, newsize, namelen;
 
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("create", __FILE__, __LINE__);
-#endif /* XFSDADEBUG */
-
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN) {
-#ifdef XFSDADEBUG
-		xfsda_t_reinit("create", "return value", EINVAL);
-#endif /* XFSDADEBUG */
 		return(XFS_ERROR(EINVAL));
 	}
 
@@ -218,9 +216,6 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	} else {
 		retval = xfs_dir_node_addname(trans, &args);
 	}
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("create", "return value", retval);
-#endif /* XFSDADEBUG */
 	return(retval);
 }
 
@@ -237,16 +232,9 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	xfs_da_args_t args;
 	int count, totallen, newsize, retval, namelen;
 
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("remove", __FILE__, __LINE__);
-#endif /* XFSDADEBUG */
-
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN) {
-#ifdef XFSDADEBUG
-		xfsda_t_reinit("remove", "return value", EINVAL);
-#endif /* XFSDADEBUG */
 		return(XFS_ERROR(EINVAL));
 	}
 
@@ -282,9 +270,6 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	} else {
 		retval = xfs_dir_node_removename(trans, &args);
 	}
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("remove", "return value", retval);
-#endif /* XFSDADEBUG */
 	return(retval);
 }
 #endif	/* !SIM */
@@ -296,15 +281,8 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	xfs_da_args_t args;
 	int retval;
 
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("lookup", __FILE__, __LINE__);
-#endif /* XFSDADEBUG */
-
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (namelen >= MAXNAMELEN) {
-#ifdef XFSDADEBUG
-		xfsda_t_reinit("lookup", "return value", EINVAL);
-#endif /* XFSDADEBUG */
 		return(XFS_ERROR(EINVAL));
 	}
 
@@ -334,12 +312,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	}
 	if (retval == EEXIST)
 		retval = 0;
-
 	*inum = args.inumber;
-
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("lookup", "return value", retval);
-#endif /* XFSDADEBUG */
 	return(retval);
 }
 
@@ -356,10 +329,6 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	int locklen = 0;
 	int abi;
 	int alignment;
-
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("getdents", __FILE__, __LINE__);
-#endif /* XFSDADEBUG */
 
 	XFSSTATS.xs_dir_getdents++;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
@@ -384,23 +353,22 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	} else {
 		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
 	}
-	*eofp = 0;
+
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
+	*eofp = 0;
 	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL)
 		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp);
 	else if (xfs_bmap_one_block(dp, XFS_DATA_FORK))
 		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp);
 	else
 		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp);
+
 	if (dbp != NULL)
 		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
 	else if (locklen)
 		unuseracc(lockaddr, locklen, B_READ);
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("getdents", "return value", retval);
-#endif /* XFSDADEBUG */
 	return(retval);
 }
 
@@ -411,15 +379,8 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	xfs_da_args_t args;
 	int retval;
 
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("replace", __FILE__, __LINE__);
-#endif /* XFSDADEBUG */
-
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 	if (namelen >= MAXNAMELEN) {
-#ifdef XFSDADEBUG
-		xfsda_t_reinit("replace", "return value", EINVAL);
-#endif /* XFSDADEBUG */
 		return(XFS_ERROR(EINVAL));
 	}
 
@@ -447,9 +408,6 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 		retval = xfs_dir_node_replace(trans, &args);
 	}
 
-#ifdef XFSDADEBUG
-	xfsda_t_reinit("replace", "return value", retval);
-#endif /* XFSDADEBUG */
 	return(retval);
 }
 #endif	/* !SIM */
@@ -537,25 +495,18 @@ xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
  */
 STATIC int
 xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-			int *eofp, dirent_t *dbp)
+				  int *eofp, dirent_t *dbp)
 {
 	buf_t *bp;
 	int retval, eob;
 
-	if (XFS_DA_COOKIE_BNO(dp->i_mount, uio->uio_offset) > 0) {
-		*eofp = 1;
-		if (uio->uio_offset == XFS_DA_MAKE_COOKIE(dp->i_mount, 1, 0))
-			return(0);
-		return(XFS_ERROR(ENOENT));
-	}
 	retval = xfs_da_read_buf(trans, dp, 0, -1, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
-	retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, dbp);
+	retval = xfs_dir_leaf_getdents_int(bp, dp, 0, uio, &eob, dbp);
 	xfs_trans_brelse(trans, bp);
-	if (*eofp = eob)
-		uio->uio_offset = XFS_DA_MAKE_COOKIE(dp->i_mount, 1, 0);
+	*eofp = (eob == 0);
 	return(retval);
 }
 
@@ -747,97 +698,134 @@ xfs_dir_node_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 #ifndef SIM
 STATIC int
 xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
-			int *eofp, dirent_t *dbp)
+				  int *eofp, dirent_t *dbp)
 {
+	xfs_da_intnode_t *node;
+	xfs_da_node_entry_t *btree;
 	xfs_dir_leafblock_t *leaf;
-	xfs_mount_t *mp;
-	__uint32_t bno, maxbno;
-	int retval, eob;
-	buf_t *bp;
+	__uint32_t bno, cookhash, hash;
 	daddr_t mappedbno;
+	xfs_mount_t *mp;
+	int error, eob, i;
+	buf_t *bp;
 
+	/*
+	 * Pick up our context.
+	 */
 	mp = dp->i_mount;
-	if (uio->uio_offset == 0) {
+	bp = NULL;
+	bno = (__uint32_t)XFS_DA_COOKIE_BNO(mp, uio->uio_offset);
+	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
+
+	xfs_dir_trace_g_du("node: start", dp, uio);
+
+	/*
+	 * Re-find our place, even if we're confused about what our place is.
+	 *
+	 * First we check the block number from the magic cookie, it is a
+	 * cache of where we ended last time.  If we find a leaf block, and
+	 * the starting hashval in that block is less than our desired
+	 * hashval, then we run with it.
+	 */
+	if (bno > 0) {
+		error = xfs_da_read_buf(trans, dp, bno, -1, &bp, XFS_DATA_FORK);
+		if (error)
+			return(error);
+		if (bp) {
+			leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+			if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
+				xfs_dir_trace_g_dub("node: block not a leaf",
+							   dp, uio, bno);
+				xfs_trans_brelse(trans, bp);
+				bp = NULL;
+			}
+			if (leaf->entries[0].hashval >= cookhash) {
+				xfs_dir_trace_g_dub("node: leaf hash too small",
+							   dp, uio, bno);
+				xfs_trans_brelse(trans, bp);
+				bp = NULL;
+			}
+		}
+	}
+
+	/*
+	 * If we did not find a leaf block from the blockno in the cookie,
+	 * or we there was no blockno in the cookie (eg: first time thru),
+	 * the we start at the top of the Btree and re-find our hashval.
+	 */
+	if (bp == NULL) {
+		xfs_dir_trace_g_du("node: start at root" , dp, uio);
 		bno = 0;
 		for (;;) {
-			xfs_da_intnode_t *node;
-			xfs_da_node_entry_t *btree;
-
-			retval = xfs_da_read_buf(trans, dp, bno, -1, &bp,
-							XFS_DATA_FORK);
-			if (retval)
-				return(retval);
+			error = xfs_da_read_buf(trans, dp, bno, -1, &bp,
+						       XFS_DATA_FORK);
+			if (error)
+				return(error);
 			ASSERT(bp != NULL);
 			node = (xfs_da_intnode_t *)bp->b_un.b_addr;
 			if (node->hdr.info.magic != XFS_DA_NODE_MAGIC)
 				break;
 			btree = &node->btree[0];
-			bno = btree->before;
-			xfs_trans_brelse(trans, bp);
-			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, 0);
-		}
-	} else {
-		bno = XFS_DA_COOKIE_BNO(mp, uio->uio_offset);
-		maxbno = XFS_B_TO_FSBT(mp, dp->i_d.di_size);
-		if (bno >= maxbno) {
-			if (bno == maxbno &&
-			    XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset) == 0) {
-				*eofp = 1;
-				return(0);
-			} else
+			xfs_dir_trace_g_dun("node: node detail", dp, uio, node);
+			if (uio->uio_offset == (off_t)0) {
+				bno = btree->before;
+				xfs_trans_brelse(trans, bp);
+				continue;
+			}
+			for (i = 0; i < node->hdr.count; btree++, i++) {
+				if (btree->hashval >= cookhash) {
+					bno = btree->before;
+					break;
+				}
+			}
+			if (i == node->hdr.count) {
+				xfs_dir_trace_g_du("node: hash not found",
+							  dp, uio);
+				xfs_trans_brelse(trans, bp);
 				return(XFS_ERROR(ENOENT));
-		}
-		retval = xfs_da_read_buf(trans, dp, bno, -1, &bp,
-						XFS_DATA_FORK);
-		if (retval)
-			return(retval);
-		if (bp == NULL)
-			return(XFS_ERROR(ENOENT));
-		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-		if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
+			}
+			xfs_dir_trace_g_dub("node: going to block",
+						   dp, uio, bno);
 			xfs_trans_brelse(trans, bp);
-			return(XFS_ERROR(ENOENT));
 		}
 	}
+	ASSERT(cookhash != XFS_DA_MAXHASH);
+
+	/*
+	 * We've dropped down to the (first) leaf block that contains the
+	 * hashval we are interested in.  Continue rolling upward thru the
+	 * leaf blocks until we fill up our buffer.
+	 */
 	for (;;) {
 		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
 		if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
+			xfs_dir_trace_g_dul("node: not a leaf", dp, uio, leaf);
 			xfs_trans_brelse(trans, bp);
 			return XFS_ERROR(EDIRCORRUPTED);
 		}
+		xfs_dir_trace_g_dul("node: leaf detail", dp, uio, leaf);
+		error = xfs_dir_leaf_getdents_int(bp, dp, bno, uio, &eob, dbp);
 		bno = leaf->hdr.info.forw;
-		if (bno != 0) {
-			if (XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset) == 0) {
-				mappedbno = xfs_da_reada_buf(trans, dp, bno,
-							     XFS_DATA_FORK);
-			} else {
-				mappedbno = -1;
-			}
-		}
-		retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, dbp);
-		if (!eob) {
-			*eofp = 0;
-			xfs_trans_brelse(trans, bp);
-			return(retval);
-		}
 		xfs_trans_brelse(trans, bp);
+		if (eob) {
+			xfs_dir_trace_g_dub("node: E-O-B", dp, uio, bno);
+			*eofp = 0;
+			return(error);
+		}
 		if (bno == 0)
 			break;
-		uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, 0);
-		retval = xfs_da_read_buf(trans, dp, bno, mappedbno, &bp,
-						XFS_DATA_FORK);
-		if (retval)
-			return(retval);
+		error = xfs_da_read_buf(trans, dp, bno, -1, &bp, XFS_DATA_FORK);
+		if (error)
+			return(error);
 		ASSERT(bp != NULL);
 	}
 	*eofp = 1;
-	bno = XFS_B_TO_FSBT(mp, dp->i_d.di_size);
-	uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, 0);
+	xfs_dir_trace_g_du("node: E-O-F", dp, uio);
 	return(0);
 }
 
 /*
- * Look up a filename in a int directory, replace the inode number.
+ * Look up a filename in an int directory, replace the inode number.
  * Use an internal routine to actually do the lookup.
  */
 STATIC int
@@ -890,4 +878,128 @@ xfs_dir_node_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_da_state_free(state);
 	return(retval);
 }
+
+#if defined(DEBUG)
+/*
+ * Add a trace buffer entry for an inode and a uio.
+ */
+void
+xfs_dir_trace_g_du(char *where, xfs_inode_t *dp, uio_t *uio)
+{
+	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DU, where,
+		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
+		     (__psunsigned_t)(uio->uio_offset >> 32),
+		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
+		     (__psunsigned_t)uio->uio_resid,
+		     NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+}
+
+/*
+ * Add a trace buffer entry for an inode and a uio.
+ */
+void
+xfs_dir_trace_g_dub(char *where, xfs_inode_t *dp, uio_t *uio, __uint32_t bno)
+{
+	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUB, where,
+		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
+		     (__psunsigned_t)(uio->uio_offset >> 32),
+		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
+		     (__psunsigned_t)uio->uio_resid,
+		     (__psunsigned_t)bno,
+		     NULL, NULL, NULL, NULL, NULL, NULL);
+}
+
+/*
+ * Add a trace buffer entry for an inode and a uio.
+ */
+void
+xfs_dir_trace_g_dun(char *where, xfs_inode_t *dp, uio_t *uio,
+			xfs_da_intnode_t *node)
+{
+	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUN, where,
+		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
+		     (__psunsigned_t)(uio->uio_offset >> 32),
+		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
+		     (__psunsigned_t)uio->uio_resid,
+		     (__psunsigned_t)node->hdr.info.forw,
+		     (__psunsigned_t)node->hdr.count,
+		     (__psunsigned_t)node->btree[0].hashval,
+		     (__psunsigned_t)node->btree[node->hdr.count-1].hashval,
+		     NULL, NULL, NULL);
+}
+
+/*
+ * Add a trace buffer entry for an inode and a uio.
+ */
+void
+xfs_dir_trace_g_dul(char *where, xfs_inode_t *dp, uio_t *uio,
+			xfs_dir_leafblock_t *leaf)
+{
+	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUL, where,
+		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
+		     (__psunsigned_t)(uio->uio_offset >> 32),
+		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
+		     (__psunsigned_t)uio->uio_resid,
+		     (__psunsigned_t)leaf->hdr.info.forw,
+		     (__psunsigned_t)leaf->hdr.count,
+		     (__psunsigned_t)leaf->entries[0].hashval,
+		     (__psunsigned_t)leaf->entries[ leaf->hdr.count-1 ].hashval,
+		     NULL, NULL, NULL);
+}
+
+/*
+ * Add a trace buffer entry for an inode and a uio.
+ */
+void
+xfs_dir_trace_g_due(char *where, xfs_inode_t *dp, uio_t *uio,
+			xfs_dir_leaf_entry_t *entry)
+{
+	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUE, where,
+		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
+		     (__psunsigned_t)(uio->uio_offset >> 32),
+		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
+		     (__psunsigned_t)uio->uio_resid,
+		     (__psunsigned_t)entry->hashval,
+		     NULL, NULL, NULL, NULL, NULL, NULL);
+}
+
+/*
+ * Add a trace buffer entry for an inode and a uio.
+ */
+void
+xfs_dir_trace_g_duc(char *where, xfs_inode_t *dp, uio_t *uio, off_t cookie)
+{
+	xfs_dir_trace_enter(XFS_DIR_KTRACE_G_DUC, where,
+		     (__psunsigned_t)dp, (__psunsigned_t)dp->i_mount,
+		     (__psunsigned_t)(uio->uio_offset >> 32),
+		     (__psunsigned_t)(uio->uio_offset & 0xFFFFFFFF),
+		     (__psunsigned_t)uio->uio_resid,
+		     (__psunsigned_t)(cookie >> 32),
+		     (__psunsigned_t)(cookie & 0xFFFFFFFF),
+		     NULL, NULL, NULL, NULL, NULL);
+}
+
+/*
+ * Add a trace buffer entry for the arguments given to the routine,
+ * generic form.
+ */
+void
+xfs_dir_trace_enter(int type, char *where,
+			__psunsigned_t a0, __psunsigned_t a1,
+			__psunsigned_t a2, __psunsigned_t a3,
+			__psunsigned_t a4, __psunsigned_t a5,
+			__psunsigned_t a6, __psunsigned_t a7,
+			__psunsigned_t a8, __psunsigned_t a9,
+			__psunsigned_t a10, __psunsigned_t a11)
+{
+	ASSERT(xfs_dir_trace_buf);
+	ktrace_enter(xfs_dir_trace_buf, (void *)((__psunsigned_t)type),
+					(void *)where,
+					(void *)a0, (void *)a1, (void *)a2,
+					(void *)a3, (void *)a4, (void *)a5,
+					(void *)a6, (void *)a7, (void *)a8,
+					(void *)a9, (void *)a10, (void *)a11,
+					NULL, NULL);
+}
+#endif	/* DEBUG */
 #endif	/* !SIM */
