@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.119 $"
+#ident "$Revision: 1.121 $"
 
 #include <xfs_os_defs.h>
 #include <linux/stat.h>
@@ -267,13 +267,13 @@ again:
 					mrunlock(&ih->ih_lock);
 					delay(1);
 					XFSSTATS.xs_ig_frecycle++;
+
 					goto again;
 				}
 					
 				if (preallocated_vnode) {
 					/*
-					 * Vnode provided by
-					 * vn_initialize.
+					 * Vnode provided by vn_initialize.
 					 */
 					vp = preallocated_vnode;
 
@@ -284,11 +284,14 @@ again:
 						    eminor(ip->i_df.if_u2.
 								if_rdev));
 
+					mrunlock(&ih->ih_lock);
 					vp = vn_alloc(XFS_MTOVFS(mp), ino,
 						      IFTOVT(ip->i_d.di_mode),
 						      dev);
 
+					preallocated_vnode = vp;
 					vn_alloc_used = 1;
+					goto again;
 				}
 
 				vn_trace_exit(vp, "xfs_iget.alloc",
@@ -301,10 +304,16 @@ again:
 
 				XFSSTATS.xs_ig_found++;
 
+				mrunlock(&ih->ih_lock);
+
 				goto finish_inode;
 
 			} else if (preallocated_vnode) {
-				if (preallocated_vnode != vp) {
+				if (vn_alloc_used) {
+					vn_put(preallocated_vnode);
+					preallocated_vnode = NULL;
+					vn_alloc_used = 0;
+				} else if (preallocated_vnode != vp) {
 					cmn_err(CE_PANIC,
 			"xfs_iget_core: ambiguous vns: vp/0x%p, invp/0x%p",
 						vp, preallocated_vnode);
@@ -334,9 +343,8 @@ again:
 				ih->ih_next = ip;
 			}
 
-#ifdef	SIM
 			mrunlock(&ih->ih_lock);
-#endif
+
 			XFSSTATS.xs_ig_found++;
 
 			/*
@@ -350,14 +358,6 @@ again:
 			 * looking for the same inode so we have to at
 			 * least look.
 			 */
-#ifndef	SIM
-			/*
-			 * In the linux kernel implementation, we hang
-			 * onto the hash queue lock until after we've
-			 * coordinated with the I_FREEING state via a
-			 * call to vn_get.
-			 */
-#endif
 			if (preallocated_vnode) {
 				/*
 				 * Vnode provided by vn_initialize.
@@ -368,11 +368,6 @@ again:
 			} else {
 				if ( ! (vp = vn_get(vp, &vmap, 0))) {
 #pragma mips_frequency_hint NEVER
-#ifndef	SIM
-					mrunlock(&ih->ih_lock);
-
-					delay(1);
-#endif
 					XFSSTATS.xs_ig_frecycle++;
 
 					goto again;
@@ -380,10 +375,6 @@ again:
 			}
 
 finish_inode:
-
-#ifndef	SIM
-			mrunlock(&ih->ih_lock);
-#endif
 			if (lock_flags != 0) {
 				xfs_ilock(ip, lock_flags);
 			}
