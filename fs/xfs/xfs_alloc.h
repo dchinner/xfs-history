@@ -31,6 +31,30 @@ typedef enum xfs_alloctype
 #define	XFS_ALLOC_FLAG_TRYLOCK	0x00000001  /* use trylock for buffer locking */
 
 /*
+ * Argument structure for xfs_alloc routines.
+ * This is turned into a structure to avoid having 12 arguments passed
+ * down several levels of the stack.
+ */
+typedef struct xfs_alloc_arg {
+	xfs_trans_t	*tp;		/* transaction pointer */
+	xfs_mount_t	*mp;		/* file system mount point */
+	buf_t		*agbp;		/* buffer for a.g. freelist header */
+	xfs_fsblock_t	fsbno;		/* file system block number */
+	xfs_agnumber_t	agno;		/* allocation group number */
+	xfs_agblock_t	agbno;		/* allocation group-relative block # */
+	xfs_extlen_t	minlen;		/* minimum size of extent */
+	xfs_extlen_t	maxlen;		/* maximum size of extent */
+	xfs_extlen_t	mod;		/* mod value for extent size */
+	xfs_extlen_t	prod;		/* prod value for extent size */
+	xfs_extlen_t	minleft;	/* min blocks must be left after us */
+	xfs_extlen_t	total;		/* total blocks needed in xaction */
+	xfs_extlen_t	len;		/* output: actual size of extent */
+	xfs_alloctype_t	type;		/* allocation type XFS_ALLOCTYPE_... */
+	short		wasdel;		/* set if allocation was prev delayed */
+	short		isfl;		/* set if is freelist blocks - !actg */
+} xfs_alloc_arg_t;
+
+/*
  * Prototypes for visible xfs_alloc.c routines
  */
 
@@ -52,20 +76,6 @@ xfs_alloc_compute_maxlevels(
 	xfs_mount_t	*mp);		/* file system mount structure */
 
 /*
- * Allocate an extent (fixed-size).
- * Return the extent's starting block, NULLFSBLOCK on failure.
- */
-xfs_fsblock_t				/* extent's starting block */
-xfs_alloc_extent(
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_fsblock_t	bno,		/* requested starting block */
-	xfs_extlen_t	len,		/* requested length */
-	xfs_alloctype_t	type,		/* allocation type, see above defn */
-	xfs_extlen_t	total,		/* total blocks needed in transaction */
-	xfs_extlen_t	minleft,	/* min blocks must be left afterwards */
-	int		wasdel);	/* extent was previously del-alloced */
-
-/*
  * Decide whether to use this allocation group for this allocation.
  * If so, fix up the btree freelist's size.
  * This is external so mkfs can call it, too.
@@ -74,8 +84,8 @@ buf_t *				/* buffer for the a.g. freelist header */
 xfs_alloc_fix_freelist(
 	xfs_trans_t	*tp,	/* transaction pointer */
 	xfs_agnumber_t	agno,	/* allocation group number */
-	xfs_extlen_t	minlen,	/* minimum length extent needed now */
-	xfs_extlen_t	total,	/* maximum blocks needed during transaction */
+	xfs_extlen_t	minlen,	/* minimum extent length, else reject */
+	xfs_extlen_t	total,	/* total free blocks, else reject */
 	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
 	int		flags);	/* XFS_ALLOC_FLAG_... */
 
