@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision$"
+#ident	"$Revision: 1.52 $"
 
 #include <sys/cmn_err.h>
 
@@ -343,6 +343,7 @@ typedef struct log {
     struct ktrace	*l_grant_trace;
 #endif
     uint		l_flags;
+    uint		l_quotaoffs_flag;/* XFS_DQ_*, if QUOTAOFFs found */
     struct xfs_buf_cancel **l_buf_cancel_table;	
 } xlog_t;
 
