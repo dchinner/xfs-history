@@ -392,6 +392,54 @@ xfs_ireclaim(xfs_inode_t *ip)
 }
 
 
+/*
+ * This is a wrapper routine around the xfs_ilock() routine
+ * used to centralize some grungy code.  It is used in places
+ * that wish to lock the inode solely for reading the extents.
+ * The reason these places can't just call xfs_ilock(SHARED)
+ * is that the inode lock also guards to bringing in of the
+ * extents from disk for a file in b-tree format.  If the inode
+ * is in b-tree format, then we need to lock the inode exclusively
+ * until the extents are read in.  Locking it exclusively all
+ * the time would limit our parallelism unnecessarily, though.
+ * What we do instead is check to see if the extents have been
+ * read in yet, and only lock the inode exclusively if they
+ * have not.
+ *
+ * The function returns a value which should be given to the
+ * corresponding xfs_iunlock_map_shared().  This value is
+ * the mode in which the lock was actually taken.
+ */
+uint
+xfs_ilock_map_shared(
+	xfs_inode_t	*ip)
+{
+	uint	lock_mode;
+
+	if ((ip->i_d.di_format == XFS_DINODE_FMT_BTREE) &&
+	    ((ip->i_flags & XFS_IEXTENTS) == 0)) {
+		lock_mode = XFS_ILOCK_EXCL;
+	} else {
+		lock_mode = XFS_ILOCK_SHARED;
+	}
+
+	xfs_ilock(ip, lock_mode);
+
+	return lock_mode;
+}
+
+/*
+ * This is simply the unlock routine to go with xfs_ilock_map_shared().
+ * All it does is call xfs_iunlock() with the given lock_mode.
+ */
+void
+xfs_iunlock_map_shared(
+	xfs_inode_t	*ip,
+	unsigned int	lock_mode)
+{
+	xfs_iunlock(ip, lock_mode);
+}
+
 
 /*
  * The xfs inode contains 2 locks: a multi-reader lock called the
@@ -543,12 +591,18 @@ xfs_iunlock(xfs_inode_t	*ip,
 	ASSERT(lock_flags != 0);
 
 	if (lock_flags & (XFS_IOLOCK_SHARED | XFS_IOLOCK_EXCL)) {
-		ASSERT(ismrlocked(&ip->i_iolock, (MR_UPDATE | MR_ACCESS)));
+		ASSERT(!(lock_flags & XFS_IOLOCK_SHARED) ||
+		       (ismrlocked(&ip->i_iolock, MR_ACCESS)));
+		ASSERT(!(lock_flags & XFS_IOLOCK_EXCL) ||
+		       (ismrlocked(&ip->i_iolock, MR_UPDATE)));
 		mrunlock(&ip->i_iolock);
 	}
 
 	if (lock_flags & (XFS_ILOCK_SHARED | XFS_ILOCK_EXCL)) {
-		ASSERT(ismrlocked(&ip->i_lock, (MR_UPDATE | MR_ACCESS)));
+		ASSERT(!(lock_flags & XFS_ILOCK_SHARED) ||
+		       (ismrlocked(&ip->i_lock, MR_ACCESS)));
+		ASSERT(!(lock_flags & XFS_ILOCK_EXCL) ||
+		       (ismrlocked(&ip->i_lock, MR_UPDATE)));
 		mrunlock(&ip->i_lock);
 	}
 
@@ -571,17 +625,18 @@ xfs_iunlock(xfs_inode_t	*ip,
 void
 xfs_iflock(xfs_inode_t *ip)
 {
-	psema(&ip->i_flock, PINOD);
+	psema(&(ip->i_flock), PINOD);
 }
 
 int
 xfs_iflock_nowait(xfs_inode_t *ip)
 {
-	return (cpsema(&ip->i_flock));
+	return (cpsema(&(ip->i_flock)));
 }
 
 void
 xfs_ifunlock(xfs_inode_t *ip)
 {
-	vsema(&ip->i_flock);
+	ASSERT(valusema(&(ip->i_flock)) <= 0);
+	vsema(&(ip->i_flock));
 }
