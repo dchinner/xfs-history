@@ -49,10 +49,12 @@
 #define	kmem_check()		/* dummy for memory-allocation checking */
 #endif
 
+#if defined(DEBUG) && !defined(SIM)
 /*
  * Allocation tracing.
  */
 ktrace_t	*xfs_alloc_trace_buf;
+#endif
 
 /*
  * Prototypes for internal functions.
@@ -175,6 +177,7 @@ STATIC int			/* error */
 xfs_alloc_ag_vextent(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
+#if 0
 /*
  * Allocate a variable extent at exactly agno/bno.
  * Extent's length (returned in *len) will be between minlen and maxlen,
@@ -184,6 +187,7 @@ xfs_alloc_ag_vextent(
 STATIC int			/* error */
 xfs_alloc_ag_vextent_exact(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
+#endif
 
 /*
  * Allocate a variable extent near bno in the allocation group agno.
@@ -470,9 +474,11 @@ xfs_alloc_ag_vextent(
 	case XFS_ALLOCTYPE_NEAR_BNO:
 		error = xfs_alloc_ag_vextent_near(args);
 		break;
+#if 0
 	case XFS_ALLOCTYPE_THIS_BNO:
 		error = xfs_alloc_ag_vextent_exact(args);
 		break;
+#endif
 	default:
 		ASSERT(0);
 		/* NOTREACHED */
@@ -512,6 +518,7 @@ xfs_alloc_ag_vextent(
 	return 0;
 }
 
+#if 0
 /*
  * Allocate a variable extent at exactly agno/bno.
  * Extent's length (returned in *len) will be between minlen and maxlen,
@@ -711,6 +718,7 @@ xfs_alloc_ag_vextent_exact(
 	args->wasfromfl = 0;
 	return 0;
 }
+#endif
 
 /*
  * Allocate a variable extent near bno in the allocation group agno.
@@ -2259,7 +2267,7 @@ xfs_alloc_log_agf(
 {
 	int	first;		/* first byte offset */
 	int	last;		/* last byte offset */
-	static const int	offsets[] = {
+	static const short	offsets[] = {
 		offsetof(xfs_agf_t, agf_magicnum),
 		offsetof(xfs_agf_t, agf_versionnum),
 		offsetof(xfs_agf_t, agf_seqno),
@@ -2456,7 +2464,9 @@ xfs_alloc_vextent(
 	switch (type) {
 	case XFS_ALLOCTYPE_THIS_AG:
 	case XFS_ALLOCTYPE_NEAR_BNO:
+#if 0
 	case XFS_ALLOCTYPE_THIS_BNO:
+#endif
 		/*
 		 * These three force us into a single a.g.
 		 */
