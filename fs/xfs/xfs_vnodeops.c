@@ -60,7 +60,6 @@
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <sys/arsess.h>
-#include <sys/prio.h>
 #include <sys/major.h>
 #include <ksys/fdt.h>
 #include "xfs_macros.h"
@@ -102,12 +101,6 @@ extern	int fspe_destroy_cookie(void *);
 extern	int fspe_get_ops(void *);
 extern	int xfs_prio_set_bw(void *);
 extern	int xfs_prio_get_bw(void *);
-
-extern	xfs_inode_t *xfs_get_inode(dev_t, ino_t);
-extern	int xlv_file_to_disks(dev_t fs_dev, ino_t inode, dev_t *disks, int *disk_count);
-int	xfs_file_to_disks(int, dev_t *, int *);
-int	xfs_get_inumber_fs_dev(int, xfs_ino_t *, dev_t *);
-int	xfs_match_file_open_mode(int , int );
 
 #if _MIPS_SIM == _ABI64
 int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
@@ -6081,29 +6074,6 @@ xfs_fcntl(
 		error = xfs_prio_get_bw(arg);
 		break;
 
-			total_bytesec = total_bytesec + bytesec;
-
-		}
-
-		req_info.bytesec = total_bytesec;
-
-		if (arg == NULL) {
-			error = EINVAL;
-			goto out;
-		} else {
-			if (copyout((caddr_t) &req_info, (caddr_t) arg,
-		                             sizeof(prioAllocReq_t)) != 0) {
-				error = EINVAL;
-				goto out;
-			}
-		}
-
-out:
-		kmem_free(disks, MAX_NUM_DISKS * sizeof (dev_t));
-
-#endif /* IP30 || IP27 */
-
-		break;
 	case F_DIOINFO:
                 /*
 		 * We align to the secondary cache line size so that we
