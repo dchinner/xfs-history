@@ -45,24 +45,13 @@ xfs_log_reserve(struct xfs_mount *mp, int reserve, int flags)
 /* Local function prototypes */
 STATIC void log_alloc(xfs_mount_t *mp, dev_t log_dev);
 STATIC void log_clean(log_t *log);
-STATIC void log_commit_record(xfs_mount_t *mp,
-#ifdef TICKET_INT
-			      int slot
-#else
-			      log_ticket_t *ticket
-#endif
-			      );
+STATIC void log_commit_record(xfs_mount_t *mp, log_ticket_t *ticket);
 STATIC void log_copy(in_core_log_t *, xfs_log_iovec_t region[], int i, int n,
 		     int offset, xfs_lsn_t *lsn);
 STATIC void log_sync(log_t *log, xfs_lsn_t *lsn, uint flags);
 STATIC void log_unalloc(void);
 STATIC int  log_write(xfs_mount_t *mp, xfs_log_iovec_t	region[], int nentries,
-#ifdef TICKET_INT
-		      int slot,
-#else
-		      xfs_log_ticket_t	tic,
-#endif
-		      int commit);
+		      xfs_log_ticket_t	tic, int commit);
 
 
 /*
@@ -95,13 +84,9 @@ xfs_log_notify(xfs_mount_t *mp,		/* mount of partition */
 
 void
 xfs_log_done(xfs_mount_t	*mp,
-#ifdef TICKET_INT
-	     int		slot)
-#else
 	     xfs_log_ticket_t	tic)
-#endif
 {
-    log_t *log = mp->m_log;
+    log_t	 *log = mp->m_log;
     log_ticket_t *ticket = (xfs_log_ticket_t) tic;
 
     log_commit_record(mp, ticket);
@@ -115,16 +100,12 @@ xfs_log_done(xfs_mount_t	*mp,
  *	the force is done synchronously.
  */
 int
-xfs_log_force(xfs_mount_t *mp,
-#ifdef TICKET_INT
-	      int	  slot,
-#else
-	      xfs_log_ticket_t ticket,
-#endif
-	      uint	  flags)
+xfs_log_force(xfs_mount_t	*mp,
+	      xfs_log_ticket_t	ticket,
+	      uint		flags)
 {
-    xfs_lsn_t lsn;
-    log_t *log = mp->m_log;
+    xfs_lsn_t	lsn;
+    log_t	*log = mp->m_log;
 
     ASSIGN_LSN(lsn, log->l_cycle, log->l_currblock);
 
@@ -144,23 +125,13 @@ xfs_log_force(xfs_mount_t *mp,
  *	it with a new transaction id.  Do not change the reservation.
  */
 int
-xfs_log_new_transaction(xfs_mount_t *mp,	/* mount point */
-#ifdef TICKET_INT
-			int	    slot,	/* ticket # */
-#else
+xfs_log_new_transaction(xfs_mount_t	 *mp,	/* mount point */
 			xfs_log_ticket_t tic,
-#endif
-			xfs_tid_t   otid,	/* old tid */
-			xfs_tid_t   ntid)	/* new tid */
+			xfs_tid_t	 otid,	/* old tid */
+			xfs_tid_t	 ntid)	/* new tid */
 {
     log_ticket_t *ticket = (log_ticket_t *)tic;
-#ifdef TICKET_INT
-    int		 error;
 
-    if ((error = log_getticket(mp->m_log, slot, &ticket)) != 0) {
-	log_panic("xfs_log_new_transaction: log_getticket");
-    }
-#endif
     if (ticket->t_tid != otid)
 	return (-1);
     ticket->t_tid = ntid;
@@ -185,11 +156,7 @@ int
 xfs_log_reserve(xfs_mount_t	 *mp,
 		xfs_tid_t	 tid,
 		uint		 len,
-#ifdef TICKET_INT
-		int		 *slot,
-#else
 		xfs_log_ticket_t *x_ticket,
-#endif
 		char		 log_client,
 		uint		 flags)
 {
@@ -207,12 +174,8 @@ xfs_log_reserve(xfs_mount_t	 *mp,
     if (log->l_logreserved + len > log->l_logsize)
 	return XFS_ENOLOGSPACE;
     log->l_logreserved += len;
-#ifdef TICKET_INT
-    *slot =
-#else
-    *x_ticket = (xfs_log_ticket_t)
-#endif
-	log_maketicket(mp->m_log, tid, len, log_client);
+    *x_ticket =
+	(xfs_log_ticket_t) log_maketicket(mp->m_log, tid, len, log_client);
 
     return 0;
 }	/* log_reserve */
@@ -244,7 +207,6 @@ log_findlogsize(dev_t log_dev)
 int
 xfs_log_mount(xfs_mount_t *mp, dev_t log_dev, uint flags)
 {
-    uint err;
     log_t *log;
 
     if ((flags & XFS_LOG_RECOVER) && log_recover(mp, log_dev) != 0) {
@@ -265,17 +227,9 @@ int
 xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_iovec_t	reg[],
 	      int		nentries,
-#ifdef TICKET_INT
-	      int		slot)
-#else
 	      xfs_log_ticket_t	tic)
-#endif
 {
-#ifdef TICKET_INT
-    log_write(mp, reg, nentries, slot, 0);
-#else
     log_write(mp, reg, nentries, tic, 0);
-#endif
 }	/* xfs_log_write */
 
 
@@ -287,11 +241,7 @@ int
 log_write(xfs_mount_t *		mp,
 	  xfs_log_iovec_t	reg[],
 	  int			nentries,
-#ifdef TICKET_INT
-	  int			slot,
-#else
 	  xfs_log_ticket_t	tic,
-#endif
 	  int			commit)
 {
     int len, i, error, log_offset;
@@ -305,19 +255,12 @@ log_write(xfs_mount_t *		mp,
 	len += reg[i].i_len;
     }
 
-#ifdef TICKET_INT
-    error = log_getticket(log, slot, &ticket);
-#else
     ticket = (log_ticket_t *)tic;
-#endif
     if (ticket->t_reservation < len) {
 	return -1;
     } else {
 	ticket->t_reservation -= len;
     }
-#ifdef TICKET_INT
-    log_relticket(ticket);
-#endif
 
     log_clean(log);
     ic_log		   = log->l_iclog;
@@ -428,22 +371,14 @@ log_clean(log_t *log)
 
 
 void
-log_commit_record(xfs_mount_t *mp,
-#ifdef TICKET_INT
-		  int slot)
-#else
+log_commit_record(xfs_mount_t  *mp,
 		  log_ticket_t *ticket)
-#endif
 {
     int			error;
     xfs_log_iovec_t	reg[1];
     int			nentries = 0;
 
-#ifdef TICKET_INT
-    error = log_write(mp, reg, nentries, slot, 1);
-#else
     error = log_write(mp, reg, nentries, ticket, 1);
-#endif
     if (error)
 	log_panic("log_commit_record");
 }	/* log_commit_record */
@@ -575,9 +510,6 @@ log_alloc_tickets(log_t *log)
 
     t_list = log->l_freelist = (log_ticket_t *)buf;
     do {
-#ifdef TICKET_INT
-	t_list->t_slot = i;
-#endif
 	t_list->t_next = t_list+1;
 	t_list = t_list->t_next;
     } while (i-- > 0);
@@ -586,42 +518,10 @@ log_alloc_tickets(log_t *log)
 }	/* log_alloc_tickets */
 
 
-#ifdef TICKET_INT
-/*
- * name:	log_geticket()
- * purpose: Look through the ticket hash table for this log and look for
- *	the one with the slot number which matches.  On success, return
- *	with the lock held for the ticket.
- */
-int
-log_getticket(log_t *log, int slot, log_ticket_t **ticket)
-{
-    log_ticket_t *t_list = log->l_hash[slot & LOG_TICKET_MASK];
-
-    while (t_list) {
-	if (t_list->t_slot == slot) {
-	    LOG_LOCK(t_list->t_lock);
-	    *ticket = t_list;
-	    return (0);
-	} else if (t_list->t_next == NULL) {
-	    return -1;
-	} else {
-	    t_list = t_list->t_next;
-	}
-    }
-    return -1;
-}	/* log_getticket */
-#endif
-
-
 /*
  *
  */
-#ifdef TICKET_INT
-void log_putticket(log_t *log, int slot)
-#else
 void log_putticket(log_t *log, log_ticket_t *ticket)
-#endif
 {
     log_ticket_t *t_list;
 
@@ -637,17 +537,10 @@ void log_putticket(log_t *log, log_ticket_t *ticket)
 void
 log_relticket(log_ticket_t *tic)
 {
-#ifdef TICKET_INT
-    LOG_UNLOCK(tic->t_lock);
-#endif
 }	/* log_relticket */
 
 
-#ifdef TICKET_INT
-int
-#else
 log_ticket_t *
-#endif
 log_maketicket(log_t		*log,
 	       xfs_tid_t	tid,
 	       int		len,
@@ -655,9 +548,6 @@ log_maketicket(log_t		*log,
 {
     log_ticket_t *tic;
 
-#ifdef TICKET_INT
-    LOG_LOCK(log->l_hash_lock);
-#endif
     if (log->l_freelist == NULL) {
 	/* do something here */
     }
@@ -666,34 +556,9 @@ log_maketicket(log_t		*log,
     tic->t_reservation = len;
     tic->t_tid = tid;
     tic->t_clientid = log_clientid;
-#ifdef TICKET_INT
-    log_puthash(log->l_hash, tic);
-    LOG_UNLOCK(log->l_hash_lock);
-    return(tic->t_slot);
-#else
     return(tic);
-#endif
 }	/* log_maketicket */
 
-#ifdef TICKET_INT
-/*
- *
- */
-void
-log_puthash(log_ticket_t *hash[], log_ticket_t *tic)
-{
-    register uint slot = tic->t_slot;
-
-    if (hash[slot] == NULL) {
-	hash[slot] = tic;
-	tic->t_next = NULL;
-    } else {
-	tic->t_next = hash[slot];
-	hash[slot] = tic;
-    }
-}	/* log_puthash */
-#else
-#endif
 
 /******************************************************************************
  *
@@ -707,13 +572,13 @@ int
 log_recover(struct xfs_mount *mp, dev_t log_dev)
 {
     return 0;
-#if XXX
+#if XXXmiken
     blkno = xfs_log_end(mp, log_dev);
     xfs_log_read(blkno, log_dev);
 #endif
 }
 
-#if XXX
+#if XXXmiken
 uint
 log_end(struct xfs_mount *mp, dev_t log_dev)
 {
