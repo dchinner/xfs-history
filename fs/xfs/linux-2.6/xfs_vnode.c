@@ -516,6 +516,10 @@ vn_remove(struct vnode *vp)
 	/* REFERENCED */
 	vmap_t  vmap;
 
+	/* Make sure we don't do this to the same vnode twice */
+	if (!(vp->v_fbhv))
+		return;
+
 	XFS_STATS_INC(xfsstats.vn_remove);
 
 	vn_trace_exit(vp, "vn_remove", (inst_t *)__return_address);
