@@ -1,6 +1,11 @@
-
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
+
+#ident "$Revision$"
+
+struct buf;
+struct ktrace;
+struct xfs_mount;
 
 /*
  * This is the structure used to lay out a buf log item in the
@@ -34,7 +39,6 @@ typedef struct xfs_buf_log_format {
 #define	BIT_TO_WORD_SHIFT	5
 #define	NBWORD			(NBBY * sizeof(unsigned int))
 
-struct ktrace;
 /*
  * This is the in core log item structure used to track information
  * needed to log buffers.  It tracks how many times the lock has been
@@ -42,7 +46,7 @@ struct ktrace;
  */
 typedef struct xfs_buf_log_item {
 	xfs_log_item_t		bli_item;	/* common item structure */
-	buf_t			*bli_buf;	/* real buffer pointer */
+	struct buf		*bli_buf;	/* real buffer pointer */
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
 	unsigned int		bli_refcount;	/* cnt of tp refs */
@@ -86,16 +90,17 @@ void	xfs_buf_item_trace(char *, xfs_buf_log_item_t *);
 #define	xfs_buf_item_trace(id, bip)
 #endif
 
-void	xfs_buf_item_init(buf_t *, struct xfs_mount *);
-void	xfs_buf_item_relse(buf_t *);
+void	xfs_buf_item_init(struct buf *, struct xfs_mount *);
+void	xfs_buf_item_relse(struct buf *);
 void	xfs_buf_item_log(xfs_buf_log_item_t *, uint, uint);
 uint	xfs_buf_item_dirty(xfs_buf_log_item_t *);
 int	xfs_buf_item_bits(uint *, uint, uint);
 int	xfs_buf_item_contig_bits(uint *, uint, uint);
 int	xfs_buf_item_next_bit(uint *, uint, uint);
-void	xfs_buf_attach_iodone(buf_t *, void(*)(buf_t*, xfs_log_item_t *),
+void	xfs_buf_attach_iodone(struct buf *,
+			      void(*)(struct buf *, xfs_log_item_t *),
 			      xfs_log_item_t *);
-void	xfs_buf_iodone_callbacks(buf_t *);
-void	xfs_buf_iodone(buf_t *, xfs_buf_log_item_t *);
+void	xfs_buf_iodone_callbacks(struct buf *);
+void	xfs_buf_iodone(struct buf *, xfs_buf_log_item_t *);
 
 #endif	/* _XFS_BUF_ITEM_H */

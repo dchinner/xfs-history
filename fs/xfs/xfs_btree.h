@@ -1,6 +1,14 @@
 #ifndef _FS_XFS_BTREE_H
 #define	_FS_XFS_BTREE_H
 
+#ident "$Revision$"
+
+struct buf;
+struct xfs_bmap_free;
+struct xfs_inode;
+struct xfs_mount;
+struct xfs_trans;
+
 /*
  * This nonsense is to make -wlint happy.
  */
@@ -117,21 +125,21 @@ extern __uint32_t	xfs_magics[];
  */
 typedef struct xfs_btree_cur
 {
-	xfs_trans_t	*bc_tp;		/* transaction we're in, if any */
-	xfs_mount_t	*bc_mp;		/* file system mount struct */
+	struct xfs_trans	*bc_tp;	/* transaction we're in, if any */
+	struct xfs_mount	*bc_mp;	/* file system mount struct */
 	union {
 		xfs_alloc_rec_t		a;
 		xfs_bmbt_irec_t		b;
 		xfs_inobt_rec_t		i;
 	}		bc_rec;		/* current insert/search record value */
-	buf_t		*bc_bufs[XFS_BTREE_MAXLEVELS];	/* buf ptr per level */
+	struct buf	*bc_bufs[XFS_BTREE_MAXLEVELS];	/* buf ptr per level */
 	int		bc_ptrs[XFS_BTREE_MAXLEVELS];	/* key/record # */
 	int		bc_nlevels;	/* number of levels in the tree */
 	xfs_btnum_t	bc_btnum;	/* identifies which btree type */
 	int		bc_blocklog;	/* log2(blocksize) of btree blocks */
 	union {
 		struct {			/* needed for BNO, CNT */
-			buf_t		*agbp;	/* agf buffer pointer */
+			struct buf	*agbp;	/* agf buffer pointer */
 			xfs_agnumber_t	agno;	/* ag number */
 		} a;
 		struct {			/* needed for BMAP */
@@ -145,7 +153,7 @@ typedef struct xfs_btree_cur
 #define	XFS_BTCUR_BPRV_LOWSPC	2			/* in low-space mode */
 		} b;
 		struct {			/* needed for INO */
-			buf_t		*agbp;	/* agi buffer pointer */
+			struct buf	*agbp;	/* agi buffer pointer */
 			xfs_agnumber_t	agno;	/* ag number */
 		} i;
 	}		bc_private;	/* per-btree type data */
@@ -268,10 +276,10 @@ xfs_btree_get_block(
  * Get a buffer for the block, return it with no data read.
  * Long-form addressing.
  */
-buf_t *					/* buffer for fsbno */
+struct buf *				/* buffer for fsbno */
 xfs_btree_get_bufl(
-	xfs_mount_t		*mp,	/* file system mount point */
-	xfs_trans_t		*tp,	/* transaction pointer */
+	struct xfs_mount	*mp,	/* file system mount point */
+	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_fsblock_t		fsbno,	/* file system block number */
 	uint			lock);	/* lock flags for get_buf */
 
@@ -279,10 +287,10 @@ xfs_btree_get_bufl(
  * Get a buffer for the block, return it with no data read.
  * Short-form addressing.
  */
-buf_t *					/* buffer for agno/agbno */
+struct buf *				/* buffer for agno/agbno */
 xfs_btree_get_bufs(
-	xfs_mount_t		*mp,	/* file system mount point */
-	xfs_trans_t		*tp,	/* transaction pointer */
+	struct xfs_mount	*mp,	/* file system mount point */
+	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_agnumber_t		agno,	/* allocation group number */
 	xfs_agblock_t		agbno,	/* allocation group block number */
 	uint			lock);	/* lock flags for get_buf */
@@ -293,9 +301,9 @@ xfs_btree_get_bufs(
  */
 xfs_btree_cur_t *			/* new btree cursor */
 xfs_btree_init_cursor(
-	xfs_mount_t		*mp,	/* file system mount point */
-	xfs_trans_t		*tp,	/* transaction pointer */
-	buf_t			*agbp,	/* (A only) buffer for agf structure */
+	struct xfs_mount	*mp,	/* file system mount point */
+	struct xfs_trans	*tp,	/* transaction pointer */
+	struct buf		*agbp,	/* (A only) buffer for agf structure */
 	xfs_agnumber_t		agno,	/* (A only) allocation group number */
 	xfs_btnum_t		btnum,	/* btree identifier */
 	struct xfs_inode	*ip);	/* (B only) inode owning the btree */
@@ -333,10 +341,10 @@ xfs_btree_offsets(
  * Get a buffer for the block, return it read in.
  * Long-form addressing.
  */
-buf_t *					/* buffer for fsbno */
+struct buf *				/* buffer for fsbno */
 xfs_btree_read_bufl(
-	xfs_mount_t		*mp,	/* file system mount point */
-	xfs_trans_t		*tp,	/* transaction pointer */
+	struct xfs_mount	*mp,	/* file system mount point */
+	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_fsblock_t		fsbno,	/* file system block number */
 	uint			lock);	/* lock flags for read_buf */
 
@@ -344,10 +352,10 @@ xfs_btree_read_bufl(
  * Get a buffer for the block, return it read in.
  * Short-form addressing.
  */
-buf_t *					/* buffer for agno/agbno */
+struct buf *				/* buffer for agno/agbno */
 xfs_btree_read_bufs(
-	xfs_mount_t		*mp,	/* file system mount point */
-	xfs_trans_t		*tp,	/* transaction pointer */
+	struct xfs_mount	*mp,	/* file system mount point */
+	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_agnumber_t		agno,	/* allocation group number */
 	xfs_agblock_t		agbno,	/* allocation group block number */
 	uint			lock);	/* lock flags for read_buf */
@@ -360,7 +368,7 @@ void
 xfs_btree_setbuf(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			lev,	/* level in btree */
-	buf_t			*bp);	/* new buffer to set */
+	struct buf		*bp);	/* new buffer to set */
 
 /*
  * Min and max functions for extlen, agblock, fileoff, and filblks types.
