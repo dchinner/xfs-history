@@ -1,4 +1,5 @@
 
+#include <strings.h>
 #include <sys/types.h>
 #ifdef SIM
 #define _KERNEL
@@ -36,6 +37,8 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_mount.h"
+
 
 #ifdef SIM
 #include "sim.h"
@@ -44,10 +47,10 @@
 /*
  * Static function prototypes.
  */
-STATIC int	xfs_mount(vfs_t		*vfsp,
-			  vnode_t	*mvp,
-			  struct mounta	*map,
-			  cred_t	*credp);
+STATIC int	xfs_vfsmount(vfs_t		*vfsp,
+			     vnode_t	*mvp,
+			     struct mounta	*map,
+			     cred_t	*credp);
 
 STATIC int	xfs_mountroot(vfs_t		*vfsp,
 			      enum whymountroot	why);
@@ -104,10 +107,10 @@ xfs_init(vfssw_t	*vswp,
  * This is just a stub.
  */ 
 STATIC int
-xfs_mount(vfs_t		*vfsp,
-	  vnode_t	*mvp,
-	  struct mounta	*map,
-	  cred_t	*credp)
+xfs_vfsmount(vfs_t		*vfsp,
+	     vnode_t	*mvp,
+	     struct mounta	*map,
+	     cred_t	*credp)
 {
 	return 0;
 }
@@ -156,13 +159,37 @@ xfs_root(vfs_t		*vfsp,
 /*
  * xfs_statvfs
  *
- * This is just a stub
+ * Fill in the statvfs structure for the given file system.  We use
+ * the superblock lock in the mount structure to ensure a consistent
+ * snapshot of the counters returned.
  */
 STATIC int
 xfs_statvfs(vfs_t	*vfsp,
 	    statvfs_t	*statp,
 	    vnode_t	*vp)
 {
+	xfs_mount_t	*mp;
+	xfs_sb_t	*sbp;
+	int		s;
+
+	mp = XFS_VFSTOM(vfsp);
+	sbp = &(mp->m_sb);
+
+	s = XFS_SB_LOCK(mp);
+	statp->f_bsize = sbp->sb_blocksize;
+	statp->f_frsize = sbp->sb_blocksize;
+	statp->f_blocks = sbp->sb_dblocks;
+	statp->f_bfree = sbp->sb_fdblocks;
+	statp->f_files = sbp->sb_icount;
+	statp->f_ffree = sbp->sb_ifree;
+	statp->f_flag = vf_to_stf(vfsp->vfs_flag);
+	XFS_SB_UNLOCK(mp, s);
+
+	statp->f_fsid = mp->m_dev;
+	(void) strcpy(statp->f_basetype, vfssw[xfs_type].vsw_name);
+	statp->f_namemax = MAXNAMELEN;
+	bzero(statp->f_fstr, sizeof(statp->f_fstr));
+
 	return 0;
 }
 
@@ -197,7 +224,7 @@ xfs_vget(vfs_t		*vfsp,
 
 
 struct vfsops xfs_vfsops = {
-	xfs_mount,
+	xfs_vfsmount,
 	xfs_unmount,
 	xfs_root,
 	xfs_statvfs,
