@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.88 $"
+#ident "$Revision: 1.89 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -49,6 +49,7 @@ typedef struct xfs_log_item {
 } xfs_log_item_t;
 
 #define	XFS_LI_IN_AIL	0x1
+#define XFS_LI_ABORTED	0x2
 
 /*
  * Log item types.
