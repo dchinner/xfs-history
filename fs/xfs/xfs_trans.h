@@ -216,9 +216,12 @@ typedef struct xfs_trans {
 /*
  * Values for t_flags.
  */
-#define	XFS_TRANS_DIRTY		0x1
-#define	XFS_TRANS_SB_DIRTY	0x2
-#define	XFS_TRANS_PERM_LOG_RES	0x4
+#define	XFS_TRANS_DIRTY		0x01	/* something needs to be logged */
+#define	XFS_TRANS_SB_DIRTY	0x02	/* superblock is modified */
+#define	XFS_TRANS_PERM_LOG_RES	0x04	/* xact took a permanent log res */
+#define	XFS_TRANS_FIRST		0x08	/* original xact in a dup chain */
+#define	XFS_TRANS_SECOND	0x10	/* second xact in a dup chain */
+#define	XFS_TRANS_CONTINUED	0x20	/* third+ xact in a dup chain */
 
 /*
  * Values for call flags parameter.
@@ -259,6 +262,7 @@ typedef struct xfs_trans {
 #define	XFS_MKDIR_LOG_RES(mp)		\
 		XFS_FSB_TO_B(mp, XFS_IALLOC_BLOCKS(mp) + 10)
 #define	XFS_IFREE_LOG_RES(mp)		XFS_FSB_TO_B(mp, 5)
+#define	XFS_IUI_LOG_RES(mp)		512     
 
 
 /*
