@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.76 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -178,7 +178,7 @@ xlog_find_cycle_start(xlog_t	*log,
 
 
 /*
- * Check that the range of blocks given all start with the cycle number
+ * Check that the range of blocks does not contain the cycle number
  * given.  The scan needs to occur from front to back and the ptr into the
  * region must be updated since a later routine will need to perform another
  * test.  If the region is completely good, we end up returning the same
@@ -191,29 +191,17 @@ STATIC daddr_t
 xlog_find_verify_cycle(caddr_t	*bap,		/* update ptr as we go */
 		       daddr_t	start_blk,
 		       int	nbblks,
-		       uint	verify_cycle_no,
-		       int	equals)
+		       uint	stop_on_cycle_no)
 {
 	int	i;
 	uint	cycle;
 
-	if (equals == 1) {
-		for (i=0; i<nbblks; i++) {
-			cycle = GET_CYCLE(*bap);
-			if (cycle == verify_cycle_no) {
-				(*bap) += BBSIZE;
-			} else {
-				return (start_blk+i);
-			}
-		}
-	} else {
-		for (i=0; i<nbblks; i++) {
-			cycle = GET_CYCLE(*bap);
-			if (cycle != verify_cycle_no) {
-				(*bap) += BBSIZE;
-			} else {
-				return (start_blk+i);
-			}
+	for (i=0; i<nbblks; i++) {
+		cycle = GET_CYCLE(*bap);
+		if (cycle != stop_on_cycle_no) {
+			(*bap) += BBSIZE;
+		} else {
+			return (start_blk+i);
 		}
 	}
 	return -1;
@@ -303,8 +291,9 @@ xlog_find_head(xlog_t  *log,
     daddr_t new_blk, first_blk, start_blk, last_blk, head_blk;
     int     num_scan_bblks;
     uint    first_half_cycle, last_half_cycle;
+    uint    stop_on_cycle;
     caddr_t ba;
-    int     equals, error, log_bbnum = log->l_logBBsize;
+    int     error, log_bbnum = log->l_logBBsize;
 
     /* special case freshly mkfs'ed filesystem; return immediately */
     if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
@@ -337,11 +326,52 @@ xlog_find_head(xlog_t  *log,
      * in a circular file.
      */
     if (first_half_cycle == last_half_cycle) {
+	/*
+	 * In this case we believe that the entire log should have cycle
+	 * number last_half_cycle.  We need to scan backwards from the
+	 * end verifying that there are no holes still containing
+	 * last_half_cycle - 1.  If we find such a hole, then the start
+	 * of that hole will be the new head.  The simple case looks like
+	 *        x | x ... | x - 1 | x
+	 * Another case that fits this picture would be
+	 *        x | x + 1 | x ... | x
+	 * In this case the head really is somwhere at the end of the
+	 * log, as one of the latest writes at the beginning was incomplete.
+	 * One more case is
+	 *        x | x + 1 | x ... | x - 1 | x
+	 * This is really the combination of the above two cases, and the
+	 * head has to end up at the start of the x-1 hole at the end of
+	 * the log.
+	 * 
+	 * In the 256k log case, we will read from the beginning to the
+	 * end of the log and search for cycle numbers equal to x-1.  We
+	 * don't worry about the x+1 blocks that we encounter, because
+	 * we know that they cannot be the head since the log started with
+	 * x.
+	 */
 	head_blk = log_bbnum;
-	equals = 1;
+	stop_on_cycle = last_half_cycle - 1;
     } else {
-	/* Find 1st block # with cycle # matching last_half_cycle */
-	equals = 0;
+	/*
+	 * In this case we want to find the first block with cycle number
+	 * matching last_half_cycle.  We expect the log to be some
+	 * variation on
+	 *        x + 1 ... | x ...
+	 * The first block with cycle number x (last_half_cycle) will be
+	 * where the new head belongs.  First we do a binary search for
+	 * the first occurrence of last_half_cycle.  The binary search
+	 * may not be totally accurate, so then we scan back from there
+	 * looking for occurrences of last_half_cycle before us.  If
+	 * that backwards scan wraps around the beginning of the log,
+	 * then we look for occurrences of last_half_cycle - 1 at the
+	 * end of the log.  The cases we're looking for look like
+	 *        x + 1 ... | x | x + 1 | x ...
+	 *                               ^ binary search stopped here
+	 * or
+	 *        x + 1 ... | x ... | x - 1 | x
+	 *        <---------> less than scan distance
+	 */
+	stop_on_cycle = last_half_cycle;
 	if (error = xlog_find_cycle_start(log, bp, first_blk,
 					  &head_blk, last_half_cycle))
 	    goto bp_err;
@@ -366,16 +396,34 @@ xlog_find_head(xlog_t  *log,
 	    goto big_bp_err;
 	ba = big_bp->b_dmaaddr;
 	new_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks,
-					 last_half_cycle, equals);
+					 stop_on_cycle);
 	if (new_blk != -1)
 	    head_blk = new_blk;
     } else {			/* need to read 2 parts of log */
-	/*
-	 * We need to read the log in 2 parts.  Scan the physical end of log
-	 * first.  If all the cycle numbers are good, we can then move to the
-	 * beginning of the log.  head_blk should be a # close to the beginning
-	 * of the log.  In the case of 3 cycle #s, the verification of the
-	 * last part of the log is still good.
+        /*
+	 * We are going to scan backwards in the log in two parts.  First
+	 * we scan the physical end of the log.  In this part of the log,
+	 * we are looking for blocks with cycle number last_half_cycle - 1.
+	 * If we find one, then we know that the log starts there, as we've
+	 * found a hole that didn't get written in going around the end
+	 * of the physical log.  The simple case for this is
+	 *        x + 1 ... | x ... | x - 1 | x
+	 *        <---------> less than scan distance
+	 * If all of the blocks at the end of the log have cycle number
+	 * last_half_cycle, then we check the blocks at the start of the
+	 * log looking for occurrences of last_half_cycle.  If we find one,
+	 * then our current estimate for the location of the first
+	 * occurrence of last_half_cycle is wrong and we move back to the
+	 * hole we've found.  This case looks like
+	 *        x + 1 ... | x | x + 1 | x ...
+	 *                               ^ binary search stopped here	 
+	 * Another case we need to handle that only occurs in 256k logs is
+	 *        x + 1 ... | x ... | x+1 | x ...
+	 *                   ^ binary search stops here
+	 * In a 256k log, the scan at the end of the log will see the x+1
+	 * blocks.  We need to skip past those since that is certainly not
+	 * the head of the log.  By searching for last_half_cycle-1 we
+	 * accomplish that.
 	 */
 	start_blk = log_bbnum - num_scan_bblks + head_blk;
 	ASSERT(head_blk <= INT_MAX && (daddr_t) num_scan_bblks-head_blk >= 0);
@@ -384,7 +432,7 @@ xlog_find_head(xlog_t  *log,
 	    goto big_bp_err;
 	ba = big_bp->b_dmaaddr;
 	new_blk= xlog_find_verify_cycle(&ba, start_blk,
-			num_scan_bblks-(int)head_blk, last_half_cycle, 1);
+		     num_scan_bblks-(int)head_blk, (stop_on_cycle - 1));
 	if (new_blk != -1) {
 	    head_blk = new_blk;
 	    goto bad_blk;
@@ -401,7 +449,7 @@ xlog_find_head(xlog_t  *log,
 	    goto big_bp_err;
 	ba = big_bp->b_dmaaddr;
 	new_blk = xlog_find_verify_cycle(&ba, start_blk, (int) head_blk,
-					 last_half_cycle, 0);
+					 stop_on_cycle);
 	if (new_blk != -1)
 	    head_blk = new_blk;
     }
@@ -727,8 +775,14 @@ xlog_find_zeroed(xlog_t	 *log,
 	if (error = xlog_bread(log, start_blk, (int)num_scan_bblks, big_bp))
 		goto big_bp_err;
 	ba = big_bp->b_dmaaddr;
+	/*
+	 * We search for any instances of cycle number 0 that occur before
+	 * our current estimate of the head.  What we're trying to detect is
+	 *        1 ... | 0 | 1 | 0...
+	 *                       ^ binary search ends here
+	 */
 	new_blk = xlog_find_verify_cycle(&ba, start_blk,
-					(int)num_scan_bblks, 1, 1);
+					 (int)num_scan_bblks, 0);
 	if (new_blk != -1)
 		last_blk = new_blk;
 
@@ -3104,6 +3158,14 @@ xlog_recover_finish(xlog_t *log)
 		char devnm[MAXDEVNAME];
 #ifdef _KERNEL
 		xlog_recover_process_efis(log);
+		/*
+		 * Sync the log to get all the EFIs out of the AIL.
+		 * This isn't absolutely necessary, but it helps in
+		 * case the unlink transactions would have problems
+		 * pushing the EFIs out of the way.
+		 */
+		xfs_log_force(log->l_mp, (xfs_lsn_t)0,
+			      (XFS_LOG_FORCE | XFS_LOG_SYNC));
 		xlog_recover_process_iunlinks(log);
 		xlog_recover_check_summary(log);
 #endif /* _KERNEL */
