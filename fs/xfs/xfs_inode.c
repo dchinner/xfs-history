@@ -4,14 +4,15 @@
 #endif
 #include <sys/buf.h>
 #include <sys/vnode.h>
+#include <sys/cred.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
+#include <sys/vfs.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/mode.h>
-#include <sys/cred.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
 #ifdef SIM
@@ -1191,14 +1192,31 @@ xfs_iprint(xfs_inode_t *ip)
 	printf("   di_extsize %d\n", dip->di_extsize);
 	printf("   di_flags %x\n", dip->di_flags);
 }
+
+/*
+ * xfs_iaccess: check accessibility of inode/cred for mode.
+ */
+int
+xfs_iaccess(xfs_inode_t *ip, mode_t mode, cred_t *cr)
+{
+#if 0
+	/*
+	 * For TIRIX: Verify that the label allows access.
+	 */
+	if (_MAC_XFS_IACCESS(ip, cr, mode))
+		return EACCESS;
+#endif
 	
-
-
-
-
-
-
-
-
-
-
+	if ((mode & IWRITE) && !WRITEALLOWED(XFS_ITOV(ip), cr))
+		return EROFS;
+	if (cr->cr_uid == 0)
+		return 0;
+	if (cr->cr_uid != ip->i_d.di_uid) {
+		mode >>= 3;
+		if (!groupmember(ip->i_d.di_gid, cr))
+			mode >>= 3;
+	}
+	if ((ip->i_d.di_mode & mode) != mode)
+		return EACCES;
+	return 0;
+}

@@ -164,6 +164,7 @@ void		xfs_iunpin(xfs_inode_t *);
 void		xfs_iflush(xfs_inode_t *, uint);
 void		xfs_iflush_all(xfs_mount_t *);
 void		xfs_iprint(xfs_inode_t *);
+int		xfs_iaccess(xfs_inode_t *, mode_t, struct cred *);
 
 extern struct zone	*xfs_inode_zone;
 
