@@ -61,6 +61,7 @@ typedef struct xfs_inode {
 	unsigned int		i_io_size;	/* file io buffer len */
 	unsigned int		i_last_req_sz;	/* last read size */
 	unsigned int		i_num_readaheads; /* # read ahead bufs */
+	__int64_t		i_new_size;	/* sz when write completes */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
@@ -83,7 +84,7 @@ typedef struct xfs_inode {
 						/* very small file extents */
 		char		iu_inline_data[XFS_INLINE_DATA];
 						/* very small file data */
-		dev_t		iu_rdev;	/* dev number if special */
+		dev_t		iu_rdev;	/* dev number if special*/
 		uuid_t		iu_uuid;	/* mount point value */
 	} i_u2;
 
@@ -149,6 +150,7 @@ xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
 void		xfs_iread_extents(xfs_trans_t *, xfs_inode_t *);
 xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
 			    dev_t, struct cred *, buf_t **, boolean_t *);
+void		xfs_ifree(xfs_trans_t *, xfs_inode_t *);
 
 void		xfs_idestroy(xfs_inode_t *);
 void		xfs_idata_realloc(xfs_inode_t *, int);
