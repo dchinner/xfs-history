@@ -72,11 +72,9 @@ xfs_stickytest(
  */
 int
 xfs_dir_lookup_int(
-	xfs_trans_t  		*tp,
 	bhv_desc_t     		*dir_bdp,
 	int		 	flags,
-	char         		*name,
-	struct pathname		*pnp,
+	struct dentry  		*dentry,
 	xfs_ino_t    		*inum,
 	xfs_inode_t  		**ipp,
 	uint			*dir_unlocked)
@@ -84,7 +82,8 @@ xfs_dir_lookup_int(
 	vnode_t		*dir_vp;	   
 	xfs_inode_t	*dp;
 	xfs_ino_t	curr_inum;
-	int		name_len;
+	char		*name = (char *) dentry->d_name.name;
+	int		name_len = dentry->d_name.len;
 	int		error;
 	int		do_iget;
 	uint		dir_gen;
@@ -102,13 +101,28 @@ xfs_dir_lookup_int(
 		*dir_unlocked = 0;
 	}
 
+	if (dentry->d_inode) {
+		vnode_t	*vp = LINVFS_GET_VPTR(dentry->d_inode);
+		bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
+		if (!bdp) {
+			return ENOENT;
+		}
+		if (do_iget) {
+			VN_HOLD(vp);
+			*ipp = XFS_BHVTOI(bdp);
+		}
+		*inum = XFS_BHVTOI(bdp)->i_ino;
+
+		return 0;
+	}
+
 	/*
 	 * Handle degenerate pathname component.
 	 */
 	if (*name == '\0') {
-		VN_HOLD(dir_vp);
 		*inum = XFS_BHVTOI(dir_bdp)->i_ino;
 		if (do_iget) {
+			VN_HOLD(dir_vp);
 			*ipp = XFS_BHVTOI(dir_bdp);
 		}
 		return 0;
@@ -126,12 +140,8 @@ xfs_dir_lookup_int(
 	/*
 	 * If all else fails, call the directory code.
 	 */
-	if (pnp != NULL)
-		name_len = pnp->pn_complen;
-	else
-		name_len = strlen(name);
 
-	error = XFS_DIR_LOOKUP(dp->i_mount, tp, dp, name, name_len, inum);
+	error = XFS_DIR_LOOKUP(dp->i_mount, NULL, dp, name, name_len, inum);
 	if (!error && do_iget) {
 		*dir_unlocked = 1;
 		for (;;) {
@@ -191,7 +201,7 @@ xfs_dir_lookup_int(
 					return XFS_ERROR(ENOENT);
 				}
 
-				error = XFS_DIR_LOOKUP(dp->i_mount, tp, dp,
+				error = XFS_DIR_LOOKUP(dp->i_mount, NULL, dp,
 						       name, name_len,
 						       &curr_inum);
 
@@ -282,7 +292,7 @@ xfs_dir_ialloc(
 	xfs_trans_t	*tp;
 	xfs_trans_t	*ntp;
 	xfs_inode_t	*ip;
-	xfs_buf_t		*ialloc_context = NULL;
+	xfs_buf_t	*ialloc_context = NULL;
 	boolean_t	call_again = B_FALSE;
 	int		code;
 	uint		log_res;

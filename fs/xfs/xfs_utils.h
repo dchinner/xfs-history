@@ -52,9 +52,9 @@ struct xfs_trans;
 extern int
 xfs_rename(
 	struct bhv_desc	*src_dir_bdp,
-	char		*src_name,
+	struct dentry	*src_dentry,
 	struct vnode	*target_dir_vp,
-	char		*target_name,
+	struct dentry	*target_dentry,
 	struct pathname	*target_pnp,
 	struct cred	*credp);
 
@@ -62,7 +62,7 @@ extern int
 xfs_link(
 	bhv_desc_t	*target_dir_bdp,
 	struct vnode	*src_vp,
-	char		*target_name,
+	struct dentry	*target_dentry,
 	struct cred	*credp);
 
 #ifdef	CELL_CAPABLE
@@ -86,11 +86,9 @@ cxfs_link(
 
 extern int
 xfs_dir_lookup_int(
-	struct xfs_trans	*tp,
 	struct bhv_desc		*dir_bdp,
 	int		 	flags,
-	char         		*name,
-	struct pathname   	*pnp,
+	struct dentry  		*dentry,
 	xfs_ino_t    		*inum,
 	struct xfs_inode	**ipp,
 	uint			*dir_unlocked);

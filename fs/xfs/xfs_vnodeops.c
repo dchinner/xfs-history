@@ -1981,9 +1981,8 @@ xfs_inactive(
 STATIC int
 xfs_lookup(
 	bhv_desc_t	*dir_bdp,
-	char		*name,
+	struct dentry	*dentry,
 	vnode_t		**vpp,
-	pathname_t	*pnp,
 	int		flags,
 	vnode_t		*rdir, 
 	cred_t		*credp)
@@ -2027,7 +2026,7 @@ xfs_lookup(
 	if (lock_mode == XFS_ILOCK_SHARED) {
 		lookup_flags |= DLF_LOCK_SHARED;
 	}
-	error = xfs_dir_lookup_int(NULL, dir_bdp, lookup_flags, name, pnp,
+	error = xfs_dir_lookup_int(dir_bdp, lookup_flags, dentry,
 				  &e_inum, &ip, &dir_unlocked);
 	if (error) {
 		xfs_iunlock_map_shared(dp, lock_mode);
@@ -2108,13 +2107,14 @@ STATIC void xfs_create_broken(xfs_mount_t *, xfs_inode_t *, xfs_ino_t, uint);
 STATIC int
 xfs_create(
 	bhv_desc_t	*dir_bdp,
-	char		*name,
+	struct dentry	*dentry,
 	vattr_t		*vap,
 	int		flags,
 	int		I_mode,
 	vnode_t		**vpp,
 	cred_t		*credp)
 {
+	char			*name = (char *)dentry->d_name.name;
 	vnode_t 		*dir_vp;
 	xfs_inode_t      	*dp, *ip;
         vnode_t		        *vp=NULL;
@@ -2148,7 +2148,7 @@ xfs_create(
 	vn_trace_entry(dir_vp, "xfs_create", (inst_t *)__return_address);
 
 	dm_di_mode = vap->va_mode|VTTOIF(vap->va_type);
-	namelen = strlen(name);
+	namelen = dentry->d_name.len;
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 
@@ -2232,8 +2232,8 @@ xfs_create(
 	 * In the case where there is an entry, we'll get it later after
 	 * dropping our transaction.
 	 */
-	error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, name,
-				   NULL, &e_inum, NULL, NULL);
+	error = xfs_dir_lookup_int(dir_bdp, DLF_NODNLC, dentry,
+				   &e_inum, NULL, NULL);
 	if (error && (error != ENOENT)) {
 		goto error_return;
 	}
@@ -2349,8 +2349,8 @@ xfs_create(
 		 * have to drop the directory lock in the call and
 		 * the entry is removed, then just start over.
 		 */
-		error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_IGET, name,
-					   NULL, &e_inum, &ip, &dir_unlocked);
+		error = xfs_dir_lookup_int(dir_bdp, DLF_IGET, dentry,
+					   &e_inum, &ip, &dir_unlocked);
 		if (error) {
 			if (error == ENOENT) {
 				if (++xfs_create_retries >
@@ -2640,48 +2640,23 @@ xfs_create_broken(
 STATIC int
 xfs_get_dir_entry(
 	xfs_inode_t	*dp,
-	char		*name,
+	struct dentry	*dentry,
 	xfs_inode_t	**ipp,	/* inode of entry 'name' */
 	int		*dir_generationp)
 {
-	xfs_inode_t		*ip;
-	xfs_ino_t		e_inum;
-	int			error;
-	uint			dir_unlocked;
+	struct inode		*inode = dentry->d_inode;
+	vnode_t			*vp = LINVFS_GET_VPTR(inode);
+	bhv_desc_t		*bdp;
 
-        xfs_ilock(dp, XFS_ILOCK_EXCL);
-
-	/*
-	 * If the link count on the directory is 0, there are no
-	 * entries to look for.
-	 */
-	if (dp->i_d.di_nlink == 0) {
-		xfs_iunlock(dp, XFS_ILOCK_EXCL);
+	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
+	if (!bdp) {
 		*ipp = NULL;
 		return XFS_ERROR(ENOENT);
 	}
-
-	if (*ipp == NULL) {
-		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp), DLF_IGET,
-					   name, NULL, &e_inum, &ip, 
-					   &dir_unlocked);
-		if (error) {
-			xfs_iunlock(dp, XFS_ILOCK_EXCL);
-			*ipp = NULL;
-			return error;
-		}
-		ASSERT((e_inum != 0) && ip);
-	} else {
-		VN_HOLD(XFS_ITOV(*ipp));
-		ip = *ipp;
-	}
-
-	ITRACE(ip);
-
+	VN_HOLD(vp);
 	*dir_generationp = dp->i_gen;
-	xfs_iunlock(dp, XFS_ILOCK_EXCL);
+	*ipp = XFS_BHVTOI(bdp);
 
-	*ipp = ip;
 	return 0;
 }
 
@@ -2727,7 +2702,7 @@ int xfs_rm_attempts;
 STATIC int
 xfs_lock_dir_and_entry(
 	xfs_inode_t	*dp,
-	char		*name,
+	struct dentry	*dentry,
 	xfs_inode_t	*ip,	/* inode of entry 'name' */
 	int		dir_generation,
 	int		*entry_changed)		       
@@ -2762,8 +2737,8 @@ again:
 		 * for the entry again.  If it is changed we'll have to
 		 * give up and return to our caller.
 		 */
-		error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp), DLF_NODNLC,
-				name, NULL, &e_inum, NULL, NULL);
+		error = xfs_dir_lookup_int(XFS_ITOBHV(dp), DLF_NODNLC,
+				dentry, &e_inum, NULL, NULL);
 		if (error) {
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 			return error;
@@ -2853,8 +2828,8 @@ again:
 			 * lookup for the entry again.  If it is changed
 			 * we'll have to give up and return to our caller.
 			 */
-			error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp),
-				   DLF_NODNLC, name, NULL, &e_inum, NULL, NULL);
+			error = xfs_dir_lookup_int(XFS_ITOBHV(dp),
+				   DLF_NODNLC, dentry, &e_inum, NULL, NULL);
 
                         if (error) {
 				xfs_iunlock(dp, XFS_ILOCK_EXCL);
@@ -3016,10 +2991,11 @@ int remove_which_error_return = 0;
 STATIC int
 xfs_remove(
 	bhv_desc_t	*dir_bdp,
-	char		*name,
+	struct dentry	*dentry,
 	cred_t		*credp)
 {
 	vnode_t 		*dir_vp;
+	char			*name = (char *) dentry->d_name.name;
         xfs_inode_t             *dp, *ip;
         xfs_trans_t             *tp = NULL;
 	xfs_mount_t		*mp;
@@ -3046,7 +3022,7 @@ xfs_remove(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	namelen = strlen(name);
+	namelen = dentry->d_name.len;
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
@@ -3073,7 +3049,7 @@ xfs_remove(
 	 * when we call xfs_iget.  Instead we get an unlocked referece
 	 * to the inode before getting our log reservation.
 	 */
-	error = xfs_get_dir_entry(dp, name, &ip, &dir_generation);
+	error = xfs_get_dir_entry(dp, dentry, &ip, &dir_generation);
 	if (error) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto std_return;
@@ -3125,7 +3101,7 @@ xfs_remove(
 		return error;
 	}
 
-	error = xfs_lock_dir_and_entry(dp, name, ip, dir_generation,
+	error = xfs_lock_dir_and_entry(dp, dentry, ip, dir_generation,
 				       &entry_changed);
 	if (error) {
 		REMOVE_DEBUG_TRACE(__LINE__);
@@ -3318,7 +3294,7 @@ int
 xfs_link(
 	bhv_desc_t	*target_dir_bdp,
 	vnode_t		*src_vp,
-	char		*target_name,
+	struct dentry	*dentry,
 	cred_t		*credp)
 {
 	vnode_t			*realvp;
@@ -3335,13 +3311,14 @@ xfs_link(
 	vnode_t 		*target_dir_vp;
 	bhv_desc_t		*src_bdp;
 	int			resblks;
+	char			*target_name = (char *)dentry->d_name.name;
 	int			target_namelen;
 
 	target_dir_vp = BHV_TO_VNODE(target_dir_bdp);
 
 	vn_trace_entry(target_dir_vp, "xfs_link", (inst_t *)__return_address);
 
-	target_namelen = strlen(target_name);
+	target_namelen = dentry->d_name.len;
 	if (target_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 	/*
@@ -3464,8 +3441,8 @@ xfs_link(
 	 * Make sure that nothing with the given name exists in the
 	 * target directory.
 	 */
-	error = xfs_dir_lookup_int(NULL, target_dir_bdp, DLF_NODNLC,
-			target_name, NULL, &e_inum, NULL, NULL);
+	error = xfs_dir_lookup_int(target_dir_bdp, DLF_NODNLC,
+			dentry, &e_inum, NULL, NULL);
 	if (error != ENOENT) {
 		if (error == 0) {
 			error = XFS_ERROR(EEXIST);
@@ -3544,11 +3521,12 @@ std_return:
 STATIC int
 xfs_mkdir(
 	bhv_desc_t	*dir_bdp,
-	char		*dir_name,
+	struct dentry	*dentry,
 	vattr_t		*vap,
 	vnode_t		**vpp,
 	cred_t		*credp)
 {
+	char			*dir_name = (char *)dentry->d_name.name;
         xfs_inode_t             *dp;
 	xfs_inode_t		*cdp;	/* inode of created dir */
 	vnode_t			*cvp;	/* vnode of created dir */
@@ -3579,7 +3557,7 @@ xfs_mkdir(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	dir_namelen = strlen(dir_name);
+	dir_namelen = dentry->d_name.len;
 	if (dir_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 
@@ -3657,8 +3635,8 @@ xfs_mkdir(
 	 * Make sure that nothing with the given name exists in the
 	 * target directory.
 	 */
-        error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, dir_name,
-				   NULL, &e_inum, NULL, NULL);
+        error = xfs_dir_lookup_int(dir_bdp, DLF_NODNLC, dentry,
+				   &e_inum, NULL, NULL);
         if (error != ENOENT) {
 		if (error == 0)
 			error = XFS_ERROR(EEXIST);
@@ -3815,10 +3793,11 @@ std_return:
 STATIC int
 xfs_rmdir(
 	bhv_desc_t	*dir_bdp,
-	char		*name,
+	struct dentry	*dentry,
 	vnode_t		*current_dir_vp,
 	cred_t		*credp)
 {
+	char			*name = (char *)dentry->d_name.name;
         xfs_inode_t             *dp;
         xfs_inode_t             *cdp;   /* child directory */
         xfs_trans_t             *tp;
@@ -3844,7 +3823,7 @@ xfs_rmdir(
 
 	if (XFS_FORCED_SHUTDOWN(XFS_BHVTOI(dir_bdp)->i_mount))
 		return XFS_ERROR(EIO);
-	namelen = strlen(name);
+	namelen = dentry->d_name.len;
 	if (namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 
@@ -3874,7 +3853,7 @@ xfs_rmdir(
 	 * when we call xfs_iget.  Instead we get an unlocked referece
 	 * to the inode before getting our log reservation.
 	 */
-	error = xfs_get_dir_entry(dp, name, &cdp, &dir_generation);
+	error = xfs_get_dir_entry(dp, dentry, &cdp, &dir_generation);
 	if (error) {
 		REMOVE_DEBUG_TRACE(__LINE__);
 		goto std_return;
@@ -3931,7 +3910,7 @@ xfs_rmdir(
 	 * that the directory entry for the child directory inode has
 	 * not changed while we were obtaining a log reservation.
 	 */
-	error = xfs_lock_dir_and_entry(dp, name, cdp, dir_generation,
+	error = xfs_lock_dir_and_entry(dp, dentry, cdp, dir_generation,
 				       &entry_changed);
 	if (error) {
 		xfs_trans_cancel(tp, cancel_flags);
@@ -4146,7 +4125,7 @@ xfs_readdir(
 STATIC int
 xfs_symlink(
 	bhv_desc_t	*dir_bdp,
-	char	       	*link_name,
+	struct dentry	*dentry,
 	vattr_t		*vap,
 	char		*target_path,
 	vnode_t		**vpp,
@@ -4178,6 +4157,7 @@ xfs_symlink(
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *gdqp;
 	uint			resblks;
+	char	       		*link_name = (char *)dentry->d_name.name;
 	int			link_namelen;
 
 	*vpp = NULL;
@@ -4195,7 +4175,7 @@ xfs_symlink(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	link_namelen = strlen(link_name);
+	link_namelen = dentry->d_name.len;
 	if (link_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 	/*
@@ -4299,8 +4279,8 @@ xfs_symlink(
 	 * Since we've already started a transaction, we cannot allow
 	 * the lookup to do a vn_get().
 	 */
-        error = xfs_dir_lookup_int(NULL, dir_bdp, DLF_NODNLC, link_name,
-				   NULL, &e_inum, NULL, NULL);
+        error = xfs_dir_lookup_int(dir_bdp, DLF_NODNLC, dentry,
+				   &e_inum, NULL, NULL);
 	if (error != ENOENT) {
 		if (!error) {
 			error = XFS_ERROR(EEXIST);
@@ -4857,7 +4837,6 @@ xfs_reclaim(
 	xfs_inode_t	*ip;
 	int		locked;
 	vnode_t 	*vp;
-	xfs_ihash_t	*ih;
 
 	vp = BHV_TO_VNODE(bdp);
 
@@ -4970,10 +4949,7 @@ xfs_reclaim(
 		}
 	}
 
-	ih = ip->i_hash;
-	mrupdate(&ih->ih_lock);
 	vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
-	mrunlock(&ih->ih_lock);
 
 	if (!ip->i_update_core && (ip->i_itemp == NULL)) {
 		return xfs_finish_reclaim(ip, locked, 0);

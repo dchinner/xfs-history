@@ -105,8 +105,8 @@ STATIC int
 xfs_rename_check_ok(
 	xfs_inode_t	*dp1,	/* old (source) directory inode */
 	xfs_inode_t	*dp2,	/* new (target) directory inode */
-	char		*name1,	/* old entry name */
-	char		*name2,	/* new entry name */
+	struct dentry	*dentry1,	/* old entry name */
+	struct dentry	*dentry2,	/* new entry name */
 	xfs_inode_t	*ip1,	/* inode of old entry */
 	xfs_inode_t	*ip2)	/* inode of new entry, if it 
 		           	   already existed, NULL otherwise. */
@@ -144,8 +144,8 @@ xfs_rename_check_ok(
 	 * locks.
 	 */
 
-        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp1), DLF_NODNLC,
-				   name1, NULL, &inum1, NULL, NULL);
+        error = xfs_dir_lookup_int(XFS_ITOBHV(dp1), DLF_NODNLC,
+				   dentry1, &inum1, NULL, NULL);
 
 	if (error) {	/* name1 must be gone or .... */
 		return(0);
@@ -165,8 +165,8 @@ xfs_rename_check_ok(
 	 * locks.
 	 */
 
-        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp2), DLF_NODNLC,
-				   name2, NULL, &inum2, NULL, NULL);
+        error = xfs_dir_lookup_int(XFS_ITOBHV(dp2), DLF_NODNLC,
+				   dentry2, &inum2, NULL, NULL);
 
 	/*
 	 * If we have an unsuccessful lookup and ip2 was passed in, the dest is
@@ -207,8 +207,8 @@ STATIC int
 xfs_lock_for_rename(
 	xfs_inode_t	*dp1,	/* old (source) directory inode */
 	xfs_inode_t	*dp2,	/* new (target) directory inode */
-	char		*name1,	/* old entry name */
-	char		*name2,	/* new entry name */
+	struct dentry	*dentry1, /* old entry name */
+	struct dentry	*dentry2, /* new entry name */
 	xfs_inode_t	**ipp1,	/* inode of old entry */
 	xfs_inode_t	**ipp2,	/* inode of new entry, if it 
 		           	   already exists, NULL otherwise. */
@@ -248,8 +248,8 @@ xfs_lock_for_rename(
 	if (lock_mode == XFS_ILOCK_SHARED) {
 		lookup_flags |= DLF_LOCK_SHARED;
 	}
-        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp1), lookup_flags,
-				   name1, NULL, &inum1, &ip1, &dir_unlocked);
+        error = xfs_dir_lookup_int(XFS_ITOBHV(dp1), lookup_flags,
+				   dentry1, &inum1, &ip1, &dir_unlocked);
 
 	/*
 	 * Save the current generation so that we can detect if it's
@@ -287,8 +287,8 @@ xfs_lock_for_rename(
 	if (lock_mode == XFS_ILOCK_SHARED) {
 		lookup_flags |= DLF_LOCK_SHARED;
 	}
-        error = xfs_dir_lookup_int(NULL, XFS_ITOBHV(dp2), lookup_flags,
-				   name2, NULL, &inum2, &ip2, &dir_unlocked);
+        error = xfs_dir_lookup_int(XFS_ITOBHV(dp2), lookup_flags,
+				   dentry2, &inum2, &ip2, &dir_unlocked);
 	dir_gen2 = dp2->i_gen;
 	if (error == ENOENT) {		/* target does not need to exist. */
 		inum2 = 0;
@@ -440,34 +440,6 @@ xfs_rename_error_checks(
 		*status = __LINE__;
 		goto error_return;
 	}
-#if 0
-	if (error = xfs_iaccess(src_dp, IEXEC | IWRITE, credp)) {
-		*status = __LINE__;
-                goto error_return;
-	}
-	if (error = xfs_stickytest(src_dp, src_ip, credp)) {
-		*status = __LINE__;
-		goto error_return;
-	}
-
-	if (target_dp && (src_dp != target_dp)) {
-		if (error = xfs_iaccess(target_dp, IEXEC | IWRITE, credp)) {
-			*status = __LINE__;
-			goto error_return;
-		}
-		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(target_dp, target_ip, credp))) {
-			*status = __LINE__;
-			goto error_return;
-		}
-	} else {
-		if ((target_ip != NULL) &&
-		    (error = xfs_stickytest(src_dp, target_ip, credp))) {
-			*status = __LINE__;
-                        goto error_return;
-		}
-	}
-#endif
 
 	if ((src_ip == src_dp) || (target_ip == target_dp)) {
 		error = XFS_ERROR(EINVAL);
@@ -600,9 +572,9 @@ int xfs_rename_retries3;
 int
 xfs_rename(
 	bhv_desc_t	*src_dir_bdp,
-	char		*src_name,
+	struct dentry	*src_dentry,
 	vnode_t		*target_dir_vp,
-	char		*target_name,
+	struct dentry	*target_dentry,
 	pathname_t	*target_pnp,
 	cred_t		*credp)
 {
@@ -625,6 +597,8 @@ xfs_rename(
 	int		spaceres;
 	int 		target_link_zero = 0;
 	int		num_inodes;
+	char		*src_name = (char *)src_dentry->d_name.name;
+	char		*target_name = (char *)target_dentry->d_name.name;
 	int		src_namelen;
 	int		target_namelen;
 #ifdef DEBUG
@@ -645,10 +619,10 @@ xfs_rename(
 	if (target_dir_bdp == NULL) {
 		return XFS_ERROR(EXDEV);
 	}
-	src_namelen = strlen(src_name);
+	src_namelen = src_dentry->d_name.len;
 	if (src_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
-	target_namelen = strlen(target_name);
+	target_namelen = target_dentry->d_name.len;
 	if (target_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
 	src_dp = XFS_BHVTOI(src_dir_bdp);
@@ -681,8 +655,8 @@ xfs_rename(
 	 */
 	tp = NULL;
 	do {
-		error = xfs_lock_for_rename(src_dp, target_dp, src_name,
-				target_name, &src_ip, &target_ip, inodes,
+		error = xfs_lock_for_rename(src_dp, target_dp, src_dentry,
+				target_dentry, &src_ip, &target_ip, inodes,
 				&num_inodes, gencounts);
 #ifdef DEBUG
 		if (error == EAGAIN) xfs_rename_agains++;
@@ -762,8 +736,8 @@ xfs_rename(
 		 * to start over.
 		 */
 
-		if(!xfs_rename_check_ok(src_dp, target_dp, src_name,
-				target_name, src_ip, target_ip)) {
+		if(!xfs_rename_check_ok(src_dp, target_dp, src_dentry,
+				target_dentry, src_ip, target_ip)) {
 			xfs_trans_cancel(tp, cancel_flags);
 			xfs_rename_unlock4(inodes, XFS_ILOCK_EXCL);
 			IRELE(src_ip);
