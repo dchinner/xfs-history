@@ -191,6 +191,11 @@ static unsigned int	pb_hash_shift;
 static unsigned int	pb_order;
 #define pb_hash(pb)	&pbhash[pb->pb_hash_index]
 
+/*
+ * This hash is the same one as used on the Linux buffer cache,
+ * see fs/buffer.c
+ */
+
 #define _hashfn(dev,block)      \
         ((((dev)<<(pb_hash_shift - 6)) ^ ((dev)<<(pb_hash_shift - 9))) ^ \
          (((block)<<(pb_hash_shift - 6)) ^ ((block) >> 13) ^ \
@@ -2351,6 +2356,8 @@ pagebuf_init(void)
 	mempages *= sizeof(pb_hash_t);
 	for (order = 0; (1 << order) < mempages; order++)
 		;
+
+	if (order > 3) order = 3;	/* cap us at 2K buckets */
 
 	do {
 		unsigned long tmp;
