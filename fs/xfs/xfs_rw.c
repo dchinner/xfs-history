@@ -718,6 +718,8 @@ xfs_read_file(vnode_t	*vp,
 				break;
 			} else {
 				buffer_bytes_ok = 1;
+				ASSERT((BBTOB(bmapp->offset) + bmapp->pboff)
+				       == uiop->uio_offset);
 				error = biomove(bp, bmapp->pboff,
 						bmapp->pbsize, UIO_READ,
 						uiop);
@@ -1336,6 +1338,8 @@ xfs_write_file(vnode_t	*vp,
 				break;
 			}
 
+			ASSERT((BBTOB(bmapp->offset) + bmapp->pboff) ==
+			       uiop->uio_offset);
 			if (error = biomove(bp, bmapp->pboff, bmapp->pbsize,
 					    UIO_WRITE, uiop)) {
 				if (!(bp->b_flags & B_DONE)) {
