@@ -18,6 +18,7 @@ typedef struct xfs_btree_block
 
 #define	XFS_BTREE_REC_ADDR(bsz,t,bb,i)	((t *)((char *)(bb) + sizeof(xfs_btree_block_t) + ((i) - 1) * sizeof(t)))
 #define	XFS_BTREE_PTR_ADDR(bsz,t,bb,i)	((xfs_agblock_t *)((char *)(bb) + sizeof(xfs_btree_block_t) + XFS_BTREE_BLOCK_MAXRECS(bsz,t,(bb)->bb_level) * sizeof(t) + ((i) - 1) * sizeof(xfs_agblock_t)))
+#define	XFS_BTREE_ROOT_PTR_ADDR(bsz,t,bb,i)	((xfs_agblock_t *)((char *)(bb) + sizeof(xfs_btree_block_t) + XFS_BTREE_BLOCK_MAXRECS(bsz,t,1) * sizeof(t) + ((i) - 1) * sizeof(xfs_agblock_t)))
 
 #define	XFS_BTREE_MAXLEVELS	5	/* should be max of all */
 typedef struct xfs_btree_cur
