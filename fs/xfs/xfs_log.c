@@ -45,6 +45,21 @@ xfs_log_reserve(xfs_mount_t	 *mp,
         return (1);
 }
 
+int
+xfs_log_write(xfs_mount_t *	mp,
+	      xfs_log_iovec_t	reg[],
+	      int		nentries,
+	      xfs_log_ticket_t	tic)
+{
+	return 0;
+}	/* xfs_log_write */
+
+void
+xfs_log_done(xfs_mount_t	*mp,
+	     xfs_log_ticket_t	tic)
+{
+	return;
+}	/* xfs_log_done */
 #else
 
 
