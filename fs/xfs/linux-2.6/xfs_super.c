@@ -595,7 +595,6 @@ int __init init_xfs_fs(void)
 	cred_init();
 
 	vfsinit();
-	uuid_init();
 	xfs_init(0);
 
 #ifdef CONFIG_XFS_GRIO
