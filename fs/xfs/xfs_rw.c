@@ -1039,7 +1039,7 @@ xfs_zero_eof(
 	return;
 }
 
-STATIC void
+STATIC int
 xfs_iomap_write(
 	xfs_inode_t	*ip,
 	off_t		offset,
@@ -1082,6 +1082,13 @@ xfs_iomap_write(
 			 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
 			 XFS_BMAPI_ENTIRE, NULLFSBLOCK, 1, imap,
 			 &nimaps, NULL);
+
+	/*
+	 * If bmapi returned us nothing, then we must have run out of space.
+	 */
+	if (nimaps == 0) {
+		return ENOSPC;
+	}
 	
 	iosize = mp->m_writeio_blocks;
 	ioalign = XFS_WRITEIO_ALIGN(mp, offset);
@@ -1262,6 +1269,7 @@ xfs_iomap_write(
 	 */
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
 	kmem_zone_free(xfs_irec_zone, imap);
+	return 0;
 }
 
 
@@ -1325,8 +1333,8 @@ xfs_write_file(
 		}
 
 		nbmaps = XFS_WRITE_BMAPS;
-		xfs_iomap_write(ip, uiop->uio_offset, uiop->uio_resid,
-				bmaps, &nbmaps);
+		error = xfs_iomap_write(ip, uiop->uio_offset,
+					uiop->uio_resid, bmaps, &nbmaps);
 
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
@@ -1568,6 +1576,7 @@ xfs_bmap(
 {
 	xfs_inode_t	*ip;
 	uint		lock_mode;
+	int		error;
 
 	ip = XFS_VTOI(vp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
@@ -1578,14 +1587,15 @@ xfs_bmap(
 		lock_mode = xfs_ilock_map_shared(ip);
 		xfs_iomap_read(ip, offset, count, bmapp, nbmaps);
 		xfs_iunlock_map_shared(ip, lock_mode);
+		error = 0;
 	} else {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		ASSERT(ip->i_d.di_size >= (offset + count));
-		xfs_iomap_write(ip, offset, count, bmapp, nbmaps);
+		error = xfs_iomap_write(ip, offset, count, bmapp, nbmaps);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
 
-	return 0;
+	return error;
 }
 
 /*
