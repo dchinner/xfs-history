@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.25 $"
+#ident	"$Revision$"
 
 /*
  * Inode allocation management for XFS.
@@ -15,6 +15,7 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include <sys/uuid.h>
 #include <stddef.h>
 #ifdef SIM
 #include <stdlib.h>
