@@ -1,4 +1,4 @@
-#ident "$Revision: 1.87 $"
+#ident "$Revision: 1.88 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -16,6 +16,7 @@
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #include <sys/imon.h>
+#include <sys/cred.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -41,6 +42,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_quota.h"
+#include "xfs_utils.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -359,6 +361,7 @@ xfs_iput(xfs_inode_t	*ip,
 	 uint		lock_flags)
 {
 	xfs_iunlock(ip, lock_flags);
+	ITRACE(ip);
 	VN_RELE(XFS_ITOV(ip));
 }
 
