@@ -77,6 +77,15 @@
 #include <xfs_dinode.h>
 #include <xfs_inode.h>
 
+#include <xfs_bit.h> /* xfs_ag.h depends on xfs_bit.h */
+#include <xfs_ag.h> /* xfs_sb.h depends on xfs_ag.h */
+#include <xfs_sb.h> /* xfs_rw.h depends on xfs_sb.h */
+#include <xfs_rw.h> /* for XFS_FSB_TO_DB */
+
+#include <xfs_log.h> /* xfs_trans.h depends on xfs_log.h */
+#include <xfs_trans.h> /* xfs_mount.h depends on xfs_trans.h */
+#include <xfs_mount.h> /* for xfs_mount_t */
+
 #include <asm/uaccess.h> /* For copy_from_user */
 
 /*
@@ -720,13 +729,66 @@ void linvfs_file_read(
 	return;
 }
 
+static int linvfs_bmap(struct address_space *mapping, long block)
+{
+	struct inode *inode = (struct inode *)mapping->host;
+	xfs_bmbt_irec_t mval;
+	int error, nmaps = 1;
+	xfs_fsblock_t output;
+	long xfsblock;
+	xfs_mount_t *mp;
+
+	vnode_t *vp = LINVFS_GET_VP(inode);
+	xfs_inode_t *xfs_inode;
+
+	ASSERT(vp);
+
+	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
+
+	xfs_inode = XFS_BHVTOI(vp->v_fbhv);
+	mp = XFS_BHVTOM(vp->v_fbhv);
+
+	/* The blockno passed is in terms of basic blocks */
+#if 0
+	printk("mp: %p, blocklog: %u, BBSHIFT: %d, blkbblog: %lu\n",
+	       mp, (unsigned int)(mp->m_sb.sb_blocklog), BBSHIFT,
+	       (unsigned long)mp->m_blkbb_log);
+#endif
+	xfsblock = XFS_BB_TO_FSBT(mp, block);
+
+	error = xfs_bmapi(NULL, xfs_inode, xfsblock, 1, 0, NULL, 0, &mval,
+			  &nmaps, NULL);
+
+#if 0
+	printk("bmapi.br_startoff  : %u\n", (int)(mval.br_startoff));
+	printk("bmapi.br_startblock: %u\n", (int)(mval.br_startblock));
+	printk("bmapi.br_blockcount: %u\n", (int)(mval.br_blockcount));
+	printk("extent: %d\n", (int)(mval.br_startblock + (block - mval.br_startoff)));
+#endif
+
+	if (error) {
+		printk("error (%d)!\n", error);
+		return -1;
+	}
+
+	if (mval.br_startblock == HOLESTARTBLOCK) {
+		return -1;
+	} else {
+		output = XFS_FSB_TO_DB(xfs_inode, mval.br_startblock) +
+			 XFS_BB_FSB_OFFSET(mp, block);
+#if 0
+		printk("bmapi: %ld\n", output);
+#endif
+		return (int)output;
+	}
+}
+
 struct address_space_operations linvfs_aops = {
   readpage:		linvfs_read_full_page,
   writepage:		linvfs_write_full_page,
-
+  bmap:			linvfs_bmap,
 	/* prepare_write: ext2_prepare_write,   */
 	/* commit_write: generic_commit_write,  */
-	/* bmap: ext2_bmap			*/
 
 };
 
