@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.37 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -61,7 +61,7 @@ xfs_mount_init(void)
 
 	initnlock(&mp->m_ail_lock, "xfs_ail");
 	initnlock(&mp->m_async_lock, "xfs_async");
-	initnlock(&mp->m_ilock, "xfs_ilock");
+	initnsema(&mp->m_ilock, 1, "xfs_ilock");
 	initnlock(&mp->m_ipinlock, "xfs_ipin");
 	initnlock(&mp->m_sb_lock, "xfs_sb");
 	/*
@@ -312,6 +312,12 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr )
 
 	brelse(bp);
 	freerbuf(bp);
+
+	freesplock(mp->m_ail_lock);
+	freesplock(mp->m_async_lock);
+	freesema(&mp->m_ilock);
+	freesplock(mp->m_ipinlock);
+	freesplock(mp->m_sb_lock);
 	kmem_free(mp, sizeof(*mp));
 }
 
