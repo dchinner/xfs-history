@@ -1,4 +1,4 @@
-#ident "$Revision: 1.18 $"
+#ident "$Revision: 1.19 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -48,7 +48,7 @@
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
-
+#include "xfs_rw.h"
 
 /*
    LOCK ORDER
@@ -114,7 +114,7 @@ xfs_qm_dqinit(
 	 */
 	if (brandnewdquot) {
 		dqp->dq_flnext = dqp->dq_flprev = dqp;
-		mutex_init(&dqp->q_qlock, MUTEX_DEFAULT, "xdq"); 
+		mutex_init(&dqp->q_qlock,  MUTEX_DEFAULT, "xdq"); 
 		initnsema(&dqp->q_flock, 1, "fdq");
 		sv_init(&dqp->q_pinwait, SV_DEFAULT, "pdq");
 
@@ -584,7 +584,7 @@ xfs_qm_dqtobp(
 	 */
 	if (! newdquot) {
 		xfs_dqtrace_entry(dqp, "DQTOBP READBUF");
-		if (error = xfs_trans_read_buf(tp, mp->m_dev,
+		if (error = xfs_trans_read_buf(mp, tp, mp->m_dev,
 					       dqp->q_blkno,
 					       XFS_QI_DQCHUNKLEN(mp),
 					       0, &bp)) {
@@ -737,11 +737,7 @@ xfs_qm_idtodq(
 		goto error_return;
 	}
 	if (tp) {
-		if (error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES)) {
-			xfs_qm_dqdestroy(dqp);
-			*O_dqpp = NULL;
-			return (error);
-		}
+		(void) xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
 	}
 	
 	*O_dqpp = dqp;
@@ -1224,6 +1220,17 @@ xfs_qm_dqflush(
 	xfs_qm_dqunpin_wait(dqp);
 
 	/*
+	 * This may have been unpinned because the filesystem is shutting
+	 * down forcibly. If that's the case we must not write this dquot
+	 * to disk, because the log record didn't make it to disk!
+	 */
+	if (XFS_FORCED_SHUTDOWN(dqp->q_mount)) {
+		dqp->dq_flags &= ~(XFS_DQ_DIRTY);
+		xfs_dqfunlock(dqp);
+		return XFS_ERROR(EIO);
+	}
+		
+	/*
 	 * Get the buffer containing the on-disk dquot 
 	 * We don't need a transaction envelope because we know that the
 	 * the ondisk-dquot has already been allocated for.
@@ -1274,17 +1281,17 @@ xfs_qm_dqflush(
 	}
 	
         if (flags & XFS_QMOPT_DELWRI) {
-                bdwrite(bp);
+                xfs_bdwrite(mp, bp);
         } else if (flags & XFS_QMOPT_ASYNC) {
-                bawrite(bp);
+                xfs_bawrite(mp, bp);
         } else {
-                error = bwrite(bp);
+                error = xfs_bwrite(mp, bp);
         }
 	xfs_dqtrace_entry(dqp, "DQFLUSH END");
 	/* 
 	 * dqp is still locked, but caller is free to unlock it now.
 	 */
-	return (0);
+	return (error);
 	
 }
 
@@ -1423,7 +1430,11 @@ xfs_qm_dqid(
 /*
  * Take a dquot out of the mount's dqlist as well as the hashlist.
  * This is called via unmount as well as quotaoff, and the purge
- * will always succeed.
+ * will always succeed unless there are soft (temp) references
+ * outstanding.
+ * 
+ * This returns 0 if it was purged, 1 if it wasn't. It's not an error code
+ * that we're returning! XXXsup - not cool.
  */
 /* ARGSUSED */
 int
@@ -1484,12 +1495,16 @@ xfs_qm_dqpurge(
 		 * Given that dqpurge is a very rare occurence, it is OK
 		 * that we're holding the hashlist and mplist locks
 		 * across the disk write. But, ... XXXsup
+		 * 
+		 * We don't care about getting disk errors here. We need 
+		 * to purge this dquot anyway, so we go ahead regardless.
 		 */
 		(void) xfs_qm_dqflush(dqp, XFS_QMOPT_SYNC);
 		xfs_dqflock(dqp); 
 	}
 	ASSERT(dqp->q_pincount == 0);
-	ASSERT(! (dqp->q_logitem.qli_item.li_flags & XFS_LI_IN_AIL));
+	ASSERT(XFS_FORCED_SHUTDOWN(mp) ||
+	       !(dqp->q_logitem.qli_item.li_flags & XFS_LI_IN_AIL));
 
 	thishash = dqp->q_hash;
 	XQM_HASHLIST_REMOVE(thishash, dqp);
@@ -1504,7 +1519,6 @@ xfs_qm_dqpurge(
 	dqp->q_hash = NULL;
 	dqp->dq_flags = XFS_DQ_INACTIVE;
 	bzero(&dqp->q_core, sizeof(dqp->q_core));
-
 	xfs_dqfunlock(dqp);
 	xfs_dqunlock(dqp);
 	XFS_DQ_HASH_UNLOCK(thishash);
@@ -1681,7 +1695,7 @@ xfs_qm_dqflock_pushbuf_wait(
 					      (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);
 			}
-			bawrite(bp);
+			xfs_bawrite(dqp->q_mount, bp);
 		} else {
 			brelse(bp);
 		}
