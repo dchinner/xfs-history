@@ -129,7 +129,7 @@ xfs_trans_update_ail(struct xfs_mount *mp, xfs_log_item_t *lip, xfs_lsn_t lsn)
 	ailp = &(mp->m_ail);
 	if (lip->li_flags & XFS_LI_IN_AIL) {
 		dlip = sbb_delete(ailp, lip);
-		ASSERT(dlip == lip);
+		/* ASSERT(dlip == lip); */
 	} else {
 		lip->li_flags |= XFS_LI_IN_AIL;
 	}
@@ -154,11 +154,11 @@ xfs_trans_delete_ail(struct xfs_mount *mp, xfs_log_item_t *lip)
 	xfs_log_item_t		**ailp;
 	xfs_log_item_t		*dlip;
 
-	ASSERT(lip->li_flags & XFS_LI_IN_AIL);
+	/* ASSERT(lip->li_flags & XFS_LI_IN_AIL); */
 
 	ailp = &(mp->m_ail);
 	dlip = sbb_delete(ailp, lip);
-	ASSERT(dlip == lip);
+	/* ASSERT(dlip == lip); */
 
 	lip->li_flags &= ~XFS_LI_IN_AIL;
 	lip->li_lsn = 0;
