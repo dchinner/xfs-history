@@ -73,6 +73,8 @@
 #define GFP_NOFS	GFP_PAGE_IO
 #endif
 
+#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / 512)
+
 /*
  * Debug code
  */
@@ -154,8 +156,6 @@ void	pb_tracking_free(page_buf_t *pb)
 #define pb_tracking_get(pb)	do { } while (0)
 #define pb_tracking_free(pb)	do { } while (0)
 #endif	/* PAGEBUF_TRACKING */
-
-void pagebuf_terminate(void);
 
 /*
  *	External locking functions
@@ -276,6 +276,9 @@ _pagebuf_get_object(
 {
 	page_buf_t *pb;
 	
+	if (!target)
+		BUG();
+
 	pb = kmem_cache_alloc(pagebuf_cache,
 		(flags & PBF_DONT_BLOCK) ? SLAB_NOFS : SLAB_KERNEL);
 	if (pb == NULL)
@@ -290,9 +293,7 @@ _pagebuf_get_object(
 	init_MUTEX_LOCKED(&PBP(pb)->pb_sema); /* held, no waiters */
 	PB_SET_OWNER(pb);
 	pb->pb_target = target;
-	if (target) {
-		pb->pb_dev = target->pbr_device;
-	}
+	pb->pb_dev = target->pbr_device;
 	pb->pb_file_offset = range_base;
 	pb->pb_buffer_length = pb->pb_count_desired = range_length; 
 	/* set buffer_length and count_desired to the same value initially 
@@ -673,6 +674,8 @@ page_buf_t *pagebuf_get(	/* allocate a buffer            */
 	int rval;
 	page_buf_t *pb;
 
+	assert(target);
+
 	isize <<= 9;
 
 	rval = _pagebuf_get_lockable_buffer(target, ioff << 9,
@@ -725,19 +728,21 @@ page_buf_t *pagebuf_get(	/* allocate a buffer            */
  * Create a pagebuf and populate it with pages from the address
  * space of the passed in inode.
  */
-
-page_buf_t *pagebuf_lookup(
-    struct inode *inode,
-    loff_t ioff,
-    size_t isize,
-    int flags)
+page_buf_t *
+pagebuf_lookup(
+	struct pb_target	*target,
+	struct inode		*inode,
+	loff_t			ioff,
+	size_t			isize,
+	int			flags)
 {
-	page_buf_t	*pb = NULL;
-	int		status;
+	page_buf_t		*pb = NULL;
+	int			status;
 
-	_pagebuf_get_object(NULL, ioff, isize, flags, &pb);
+	assert(target);
+	_pagebuf_get_object(target, ioff, isize, flags, &pb);
 	if (pb) {
-		pb->pb_dev = inode->i_sb->s_dev;
+		pb->pb_dev = target->pbr_device;
 		if (flags & PBF_ENTER_PAGES) {
 			status = _pagebuf_lookup_pages(pb, &inode->i_data, 0);
 			if (status != 0) {

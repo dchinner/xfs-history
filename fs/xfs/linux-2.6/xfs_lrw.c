@@ -145,8 +145,10 @@ xfs_read(
 	if (filp->f_flags & O_DIRECT) {
 		/* Flush and keep lock to keep out buffered writers */
 		fs_flush_pages(bdp, *offsetp, *offsetp + size, 0, FI_NONE);
-		ret = pagebuf_direct_file_read(filp, buf, size, offsetp,
-				linvfs_pb_bmap); 
+		ret = pagebuf_direct_file_read(
+			(io->io_flags & XFS_IOCORE_RT)?
+			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
+			filp, buf, size, offsetp, linvfs_pb_bmap); 
 	} else {
 		ret = generic_file_read(filp, buf, size, offsetp);
 	}
@@ -328,17 +330,14 @@ xfs_zero_last_block(
 	zero_offset = isize_fsb_offset;
 	zero_len = mp->m_sb.sb_blocksize - isize_fsb_offset;
 
-	/*
-	 * Realtime needs work here
-	 */
-	pb = pagebuf_lookup(ip, loff, lsize, PBF_ENTER_PAGES);
+	pb = pagebuf_lookup(
+		(io->io_flags & XFS_IOCORE_RT)?
+		mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
+		ip, loff, lsize, PBF_ENTER_PAGES);
 	if (!pb) {
 		error = ENOMEM;
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		return error;
-	}
-	if (io->io_flags & XFS_IOCORE_RT) {
-		pb->pb_dev = mp->m_rtdev;
 	}
 
 	if ((imap.br_startblock > 0) &&
@@ -357,7 +356,8 @@ xfs_zero_last_block(
 	}
 
 	npbmaps = _xfs_imap_to_bmap(io, offset, &imap, &pbmap, nimaps, npbmaps);
-	error = -pagebuf_iozero(ip, pb, zero_offset, zero_len, end_size, &pbmap);
+	error = -pagebuf_iozero(ip, pb, zero_offset, zero_len, end_size,
+			&pbmap, npbmaps);
 	pagebuf_rele(pb);
 
 out_lock:
@@ -497,11 +497,11 @@ xfs_zero_eof(
 
 		loff = XFS_FSB_TO_B(mp, start_zero_fsb);
 		lsize = XFS_FSB_TO_B(mp, buf_len_fsb);
-		/*
-		 * real-time files need work here
-		 */
 
-		pb = pagebuf_lookup(ip, loff, lsize, PBF_ENTER_PAGES);
+		pb = pagebuf_lookup(
+			(io->io_flags & XFS_IOCORE_RT)?
+			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
+			ip, loff, lsize, PBF_ENTER_PAGES);
 		if (!pb) {
 			error = ENOMEM;
 			goto out_lock;
@@ -514,10 +514,10 @@ xfs_zero_eof(
 			}
 		}
 
-		npbmaps = _xfs_imap_to_bmap(io, offset, &imap, &pbmap, nimaps, npbmaps);
-
-		/* pagebuf_iozero returns negative error */
-		error = -pagebuf_iozero(ip, pb, 0, lsize, end_size, &pbmap);
+		npbmaps = _xfs_imap_to_bmap(io, offset,
+				&imap, &pbmap, nimaps, npbmaps);
+		error = -pagebuf_iozero(ip, pb, 0, lsize, end_size,
+				&pbmap, npbmaps);
 		pagebuf_rele(pb);
 
 		if (error) {
@@ -695,8 +695,10 @@ retry:
 	 * for the moment, but flip error sign before we pass it up
 	 */
 
-	ret = pagebuf_generic_file_write(filp, buf, size, offsetp,
-							linvfs_pb_bmap);
+	ret = pagebuf_generic_file_write(
+			(io->io_flags & XFS_IOCORE_RT)?
+			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
+			filp, buf, size, offsetp, linvfs_pb_bmap);
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((ret == -ENOSPC) &&
@@ -1198,16 +1200,10 @@ _xfs_imap_to_bmap(
 		nisize = io->io_new_size;
 
 	for (im=0, pbm=0; im < imaps && pbm < pbmaps; im++,pbmapp++,imap++,pbm++) {
-		if (io->io_flags & XFS_IOCORE_RT) {
-			pbmapp->pbm_dev = mp->m_rtdev;
-		} else {
-			pbmapp->pbm_dev = mp->m_dev;
-		}
 		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
 		pbmapp->pbm_flags = 0;
-		
 
 		start_block = imap->br_startblock;
 		if (start_block == HOLESTARTBLOCK) {

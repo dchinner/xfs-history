@@ -44,6 +44,9 @@ EXTRA_CFLAGS +=  -I. -funsigned-char
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
+ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
+	EXTRA_CFLAGS += -DPAGEBUF_TRACE
+endif
 
 subdir-$(CONFIG_XFS_FS)		+= pagebuf linux
 

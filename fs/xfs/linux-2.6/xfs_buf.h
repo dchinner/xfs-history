@@ -105,7 +105,6 @@ typedef enum {
 
 typedef struct page_buf_bmap_s {
 	page_buf_daddr_t pbm_bn;	/* block number in file system 	    */
-	kdev_t		pbm_dev;	/* device for I/O		    */
 	loff_t 		pbm_offset;	/* byte offset of mapping in file   */
 	size_t		pbm_delta;	/* offset of request into bmap	    */
 	size_t		pbm_bsize;	/* size of this mapping in bytes    */
@@ -184,8 +183,7 @@ typedef enum page_buf_flags_e {
 
 typedef struct pb_target {
 	kdev_t			pbr_device;
-	unsigned short		pbr_sector;
-	unsigned short		pbr_blocksize;
+	unsigned int		pbr_blocksize;
 	unsigned int 		pbr_blocksize_bits;
 	struct address_space 	*pbr_addrspace;
 	avl_handle_t		pbr_buffers;
@@ -198,8 +196,7 @@ typedef struct pb_target {
 
 typedef struct pb_target {
 	kdev_t			pbr_device;
-	unsigned short		pbr_sector;
-	unsigned short		pbr_blocksize;
+	unsigned int		pbr_blocksize;
 	unsigned int 		pbr_blocksize_bits;
 	struct inode	 	*pbr_inode;
 	avl_handle_t		pbr_buffers;
@@ -392,6 +389,7 @@ extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
 					/* PBF_ASYNC, PBF_SEQUENTIAL    */
 
 extern page_buf_t *pagebuf_lookup(
+		struct pb_target *,
 		struct inode *,
 		loff_t,			/* starting offset of range     */
 		size_t,			/* length of range              */
@@ -521,7 +519,8 @@ extern int pagebuf_iozero(		/* zero contents of buffer	*/
 		off_t,			/* offset in buffer		*/
 		size_t, 		/* size of data to zero		*/
 		loff_t,			/* last permissible isize value */
-		pb_bmap_t *);		/* pointer to pagebuf bmap	*/
+		pb_bmap_t *,		/* pointer to pagebuf bmap	*/
+		int);			/* number of maps               */
 
 extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 
@@ -559,6 +558,7 @@ extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 /* Reading and writing pages */
 
 extern ssize_t pagebuf_direct_file_read(
+		struct pb_target *,
 		struct file *,		/* file to read			*/
 		char *,			/* buffer address		*/
 		size_t,			/* size of buffer		*/
@@ -575,6 +575,7 @@ extern ssize_t pagebuf_direct_file_read(
 
 
 extern ssize_t pagebuf_generic_file_write(
+		struct pb_target *,
 		struct file *,		/* file to write		*/
 		char *,			/* buffer address		*/
 		size_t,			/* size of buffer		*/
@@ -591,26 +592,28 @@ extern ssize_t pagebuf_generic_file_write(
 	 */
 
 extern int pagebuf_read_full_page(	/* read a page via pagebuf	*/
-		struct file *, 		/* file to read			*/
+		struct pb_target *,
 		struct page *, 		/* page to read			*/
 		pagebuf_bmap_fn_t);	/* bmap function		*/
 
 extern int pagebuf_write_full_page(	/* write a page via pagebuf	*/
+		struct pb_target *,
 		struct page *,		/* page to write		*/
 		pagebuf_bmap_fn_t);	/* bmap function		*/
 
 extern void pagebuf_release_page(	/* Attempt to convert a delalloc page */
-		struct page *,		/* page to write		*/
+		struct pb_target *,
+		struct page *,		/* page to release		*/
 		pagebuf_bmap_fn_t);	/* bmap function		*/
 
 extern int pagebuf_commit_write(
-		struct file *,		/* file to write		*/
+		struct pb_target *,
 		struct page *,		/* page to write		*/
 		unsigned,		/* from offset			*/
 		unsigned);		/* to offset			*/
 
 extern int pagebuf_prepare_write(
-		struct file *,		/* file to write		*/
+		struct pb_target *,
 		struct page *,		/* page to write		*/
 		unsigned,		/* from offset			*/
 		unsigned,		/* to offset			*/

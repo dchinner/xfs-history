@@ -52,12 +52,37 @@ extern ssize_t xfs_read (
          int                    ioflag,
          struct cred            *credp,
          struct flid            *fl);
+
 extern ssize_t xfs_write (
          struct bhv_desc        *bdp,
          struct uio             *uiop,
          int                    ioflag,
          struct cred            *credp,
          struct flid            *fl);
+
+extern int xfs_release_page (
+	struct bhv_desc		*bdp,
+	struct page		*page);
+
+extern int xfs_read_full_page (
+	struct bhv_desc		*bdp,
+	struct page		*page);
+
+extern int xfs_write_full_page (
+	struct bhv_desc		*bdp,
+	struct page		*page);
+
+extern int xfs_prepare_write (
+	struct bhv_desc		*bdp,
+	struct page		*page,
+	unsigned int		from,
+	unsigned int		to);
+
+extern int xfs_commit_write (
+	struct bhv_desc		*bdp,
+	struct page		*page,
+	unsigned int		from,
+	unsigned int		to);
 
 extern int xfs_recover_read_only (xlog_t *);
 extern int xfs_quotacheck_read_only (xfs_mount_t *);

@@ -181,6 +181,13 @@ typedef	ssize_t	(*vop_read_t)(bhv_desc_t *, struct uio *, int, struct cred *,
                                 struct flid *);
 typedef	ssize_t	(*vop_write_t)(bhv_desc_t *, struct uio *, int, struct cred *,
                                 struct flid *);
+typedef int	(*vop_release_page_t)(bhv_desc_t *, struct page *);
+typedef	int	(*vop_read_full_page_t)(bhv_desc_t *, struct page *);
+typedef	int	(*vop_write_full_page_t)(bhv_desc_t *, struct page *);
+typedef	int	(*vop_prepare_write_t)(bhv_desc_t *, struct page *,
+				unsigned int, unsigned int);
+typedef	int	(*vop_commit_write_t)(bhv_desc_t *, struct page *,
+				unsigned int, unsigned int);
 typedef	int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 typedef	int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
@@ -243,6 +250,11 @@ typedef struct vnodeops {
 	vop_close_t		vop_close;
 	vop_read_t		vop_read;
 	vop_write_t		vop_write;
+	vop_release_page_t	vop_release_page;
+	vop_read_full_page_t	vop_read_full_page;
+	vop_write_full_page_t	vop_write_full_page;
+	vop_prepare_write_t	vop_prepare_write;
+	vop_commit_write_t	vop_commit_write;
 	vop_ioctl_t		vop_ioctl;
 	vop_getattr_t		vop_getattr;
 	vop_setattr_t		vop_setattr;
@@ -304,6 +316,36 @@ typedef struct vnodeops {
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,uiop,iof,cr,fl);	        \
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define VOP_RELEASE_PAGE(vp,pg,rv)					\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_release_page, vp)((vp)->v_fbhv,pg);		\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define VOP_READ_FULL_PAGE(vp,pg,rv)				        \
+{       								\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+        rv = _VOP_(vop_read_full_page, vp)((vp)->v_fbhv,pg);	        \
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define	VOP_WRITE_FULL_PAGE(vp,pg,rv) 					\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_write_full_page, vp)((vp)->v_fbhv,pg);		\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define	VOP_PREPARE_WRITE(vp,pg,from,to,rv) 				\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_prepare_write, vp)((vp)->v_fbhv,pg,from,to);	\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
+#define	VOP_COMMIT_WRITE(vp,pg,from,to,rv) 				\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	rv = _VOP_(vop_commit_write, vp)((vp)->v_fbhv,pg,from,to);	\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define	VOP_BMAP(vp,of,sz,rw,cr,b,n,rv) 				\
