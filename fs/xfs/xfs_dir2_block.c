@@ -1200,7 +1200,7 @@ xfs_dir2_sf_to_block(
 	 */
 	dep = (xfs_dir2_data_entry_t *)
 		((char *)block + XFS_DIR2_DATA_DOTDOT_OFFSET);
-	dep->inumber = XFS_DIR2_SF_GET_INUMBER(sfp, &sfp->hdr.parent);
+	dep->inumber = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, mp->m_arch);
 	dep->namelen = 2;
 	dep->name[0] = dep->name[1] = '.';
 	tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
@@ -1228,7 +1228,7 @@ xfs_dir2_sf_to_block(
 		if (sfep == NULL)
 			newoffset = endoffset;
 		else
-			newoffset = XFS_DIR2_SF_GET_OFFSET(sfep);
+			newoffset = XFS_DIR2_SF_GET_OFFSET_ARCH(sfep, mp->m_arch);
 		/*
 		 * There should be a hole here, make one.
 		 */
@@ -1251,8 +1251,8 @@ xfs_dir2_sf_to_block(
 		 */
 		dep = (xfs_dir2_data_entry_t *)((char *)block + newoffset);
 		dep->inumber =
-			XFS_DIR2_SF_GET_INUMBER(sfp,
-				XFS_DIR2_SF_INUMBERP(sfep));
+			XFS_DIR2_SF_GET_INUMBER_ARCH(sfp,
+				XFS_DIR2_SF_INUMBERP(sfep), mp->m_arch);
 		dep->namelen = sfep->namelen;
 		bcopy(sfep->name, dep->name, dep->namelen);
 		tagp = XFS_DIR2_DATA_ENTRY_TAG_P(dep);
