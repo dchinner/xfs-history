@@ -138,9 +138,8 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 	 * Reserve the log space needed for this transaction.
 	 */
 	if (logspace > 0) {
-		(void) xfs_log_reserve(tp->t_mountp, tp->t_tid, logspace,
-				       &tp->t_ticket, XFS_TRANSACTION_MANAGER,
-				       flags);
+		(void) xfs_log_reserve(tp->t_mountp, logspace, &tp->t_ticket,
+				       XFS_TRANSACTION_MANAGER, flags);
 		tp->t_log_res = logspace;
 	}
 
@@ -429,7 +428,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	 */
 	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
-		xfs_log_done(tp->t_mountp, tp->t_ticket); 
+		xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
 		xfs_trans_free_items(tp);
 		xfs_trans_free(tp);
 		return;
@@ -460,7 +459,7 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
 	error = xfs_log_write(tp->t_mountp, log_vector, nvec, tp->t_ticket);
 	ASSERT(error == 0);
 	tp->t_lsn = log_vector[0].i_lsn;
-	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket);
+	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
 
 	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
 
@@ -553,7 +552,7 @@ xfs_trans_do_commit(xfs_trans_t *tp, uint flags)
 */
 	tp->t_lsn = trans_lsn++;
 /*
-	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket);
+	commit_lsn = xfs_log_done(tp->t_mountp, tp->t_ticket, 0);
 */
 
 	kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
