@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.62 $"
+#ident	"$Revision: 1.63 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1869,10 +1869,10 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		break;
 
 	default:
-		xlog_warn("XFS: xlog_recover_do_inode_trans: Illegal flag");
-		ASSERT(0);
-		brelse(bp);
-		return XFS_ERROR(EIO);
+		/*
+		 * There are no data fork flags set.
+		 */
+		break;
 	}
 
 	/*
@@ -1890,16 +1890,16 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		src = item->ri_buf[attr_index].i_addr;
 		ASSERT(len == in_f->ilf_asize);
 
-		switch (in_f->ilf_fields & XFS_ILOG_DFORK) {
-		case XFS_ILOG_DDATA:
-		case XFS_ILOG_DEXT:
+		switch (in_f->ilf_fields & XFS_ILOG_AFORK) {
+		case XFS_ILOG_ADATA:
+		case XFS_ILOG_AEXT:
 			dest = XFS_DFORK_APTR(dip);
 			ASSERT(dest+len <= bp->b_dmaaddr+bp->b_bcount);
 			ASSERT(len < XFS_DFORK_ASIZE(dip, mp));
 			bcopy(src, dest, len);
 			break;
 
-		case XFS_ILOG_DBROOT:
+		case XFS_ILOG_ABROOT:
 			dest = XFS_DFORK_APTR(dip);
 			xfs_bmbt_to_bmdr((xfs_bmbt_block_t *)src, len,
 					 (xfs_bmdr_block_t*)dest,
