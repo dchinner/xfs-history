@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.117 $"
+#ident "$Revision: 1.118 $"
 
 struct bhv_desc;
 struct buf;
@@ -29,6 +29,9 @@ typedef struct xfs_ihash {
 	mrlock_t		ih_lock;
 	uint			ih_version;
 } xfs_ihash_t;
+#if defined(MP)
+#pragma set type attribute xfs_ihash align=128
+#endif
 
 #ifdef NOTYET
 /*
@@ -356,10 +359,10 @@ void xfs_inode_clear_read_ahead(xfs_inode_t *ip);
  */
 typedef __uint32_t	xfs_fid_ino_t;
 typedef struct xfs_fid {
-	u_short		fid_len;       /* length of remainder */
-        u_short		fid_pad;       /* padding, must be zero */
+	u_short		fid_len;       /* length of remainder (ten!) */
+        u_short		fid_pad;       /* middle 16 bits inode number */
 	__uint32_t	fid_gen;       /* generation number */
-        xfs_fid_ino_t	fid_ino;       /* inode number */
+        xfs_fid_ino_t	fid_ino;       /* lo 32 bits inode number */
 } xfs_fid_t;
 
 typedef struct xfs_fid2 {
