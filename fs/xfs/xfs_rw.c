@@ -1,4 +1,4 @@
-#ident "$Revision: 1.248 $"
+#ident "$Revision: 1.249 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2847,6 +2847,7 @@ xfs_write_file(
 				error = bwrite(bp);
 				if (ioflag & IO_DSYNC) {
 					bp->b_fsprivate3 = NULL;
+					bp->b_flags &= ~B_HOLD;
 					brelse(bp);
 				}
 			} else {
@@ -4372,7 +4373,6 @@ xfs_strat_comp(void)
 		ASSERT(bdp);
 		ip = XFS_BHVTOI(bdp);
 		mp = ip->i_mount;
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 		count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
 		do {
@@ -4396,6 +4396,7 @@ xfs_strat_comp(void)
 				goto error0;
 			}
 
+			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 			xfs_trans_ihold(tp, ip);
 			xfs_strat_write_bp_trace(XFS_STRAT_ENTER, ip, bp);
@@ -4413,6 +4414,7 @@ xfs_strat_comp(void)
 				xfs_trans_cancel(tp,
 					 (XFS_TRANS_RELEASE_LOG_RES |
 					  XFS_TRANS_ABORT));
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				goto error0;
 			}
 			error = xfs_bmap_finish(&(tp), &(free_list),
@@ -4424,11 +4426,13 @@ xfs_strat_comp(void)
 					  XFS_TRANS_ABORT));
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 				goto error0;
 			}
 
 			error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
 							NULL);
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			if (error) {
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
@@ -4452,9 +4456,7 @@ xfs_strat_comp(void)
 		/* fall through on normal completion */
 
 error0:
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		biodone(bp);
-
 		s = mp_mutex_spinlock(&xfsc_lock);
 	}
 }
