@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.111 $"
+#ident	"$Revision: 1.112 $"
 
 /*
  * High level interface routines for log manager
@@ -1286,8 +1286,8 @@ xlog_write(xfs_mount_t *	mp,
 	 * of space which was allocated by xlog_state_get_iclog_space().
 	 */
 	while (index < nentries) {
-	    ASSERT(reg[index].i_len % sizeof(long) == 0);
-	    ASSERT((__psint_t)ptr % sizeof(long) == 0);
+	    ASSERT(reg[index].i_len % sizeof(__int32_t) == 0);
+	    ASSERT((__psint_t)ptr % sizeof(__int32_t) == 0);
 	    start_rec_copy = 0;
 	    
 	    /* If first write for transaction, insert start record.
@@ -2350,7 +2350,7 @@ xlog_ticket_get(xlog_t		*log,
 	tic->t_curr_res		= unit_bytes;
 	tic->t_cnt		= cnt;
 	tic->t_ocnt		= cnt;
-	tic->t_tid		= (xlog_tid_t)tic;
+	tic->t_tid		= (xlog_tid_t)((__psint_t)tic & 0xffffffff);
 	tic->t_clientid		= client;
 	tic->t_flags		= XLOG_TIC_INITED;
 	if (xflags & XFS_LOG_PERM_RESERV)
@@ -2534,7 +2534,7 @@ xlog_verify_iclog(xlog_t	 *log,
 		    ((__psint_t)&ophead->oh_tid & 0x1ff))
 			tid = ophead->oh_tid;
 		else
-			tid = (xlog_tid_t)((unsigned long)iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_tid - (__psint_t)iclog->ic_data)]);
+			tid = (xlog_tid_t)(iclog->ic_header.h_cycle_data[BTOBB((__psint_t)&ophead->oh_tid - (__psint_t)iclog->ic_data)]);
 
 		/* This is a user space check */
 		if ((__psint_t)tid < 0x10000000 || (__psint_t)tid > 0x20000000)
