@@ -825,9 +825,10 @@ linvfs_unfreeze_fs(
 
 int
 linvfs_dmapi_mount(
-	struct super_block *sb,
+	struct vfsmount *mnt,
 	char		*dir_name)
 {
+	struct super_block *sb = mnt->mnt_sb;
 	vfsops_t	*vfsops;
 	vnode_t		*cvp;	/* covered vnode */
 	vfs_t		*vfsp; /* mounted vfs */
@@ -841,7 +842,7 @@ linvfs_dmapi_mount(
 	/*  Kludge in XFS until we have other VFS/VNODE FSs  */
 	vfsops = &xfs_vfsops;
 
-	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, cvp, dir_name, sb->s_id, error);
+	VFSOPS_DMAPI_MOUNT(vfsops, vfsp, cvp, dir_name, sb->s_id, mnt, error);
 	if (error) {
 		if (atomic_read(&sb->s_active) == 1)
 			vfsp->vfs_flag &= ~VFS_DMI;
