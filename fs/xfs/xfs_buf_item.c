@@ -910,7 +910,9 @@ xfs_buf_item_relse(buf_t *bp)
 	bip->bli_logged = NULL;
 #endif /* DEBUG */
 
+#ifndef SIM
 	ktrace_free(bip->bli_trace);
+#endif
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
 		  ((bip->bli_format.blf_map_size - 1) * sizeof(int)));
 }
@@ -1014,12 +1016,14 @@ xfs_buf_iodone(buf_t			*bp,
 	bip->bli_logged = NULL;
 #endif /* DEBUG */
 
+#ifndef SIM
 	ktrace_free(bip->bli_trace);
+#endif
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
 		  ((bip->bli_format.blf_map_size - 1) * sizeof(int)));
 }
 
-#ifdef DEBUG
+#if	(defined(DEBUG) && !defined(SIM))
 void
 xfs_buf_item_trace(
 	char			*id,
