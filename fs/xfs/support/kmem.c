@@ -54,7 +54,7 @@ static __inline unsigned int flag_convert(int flags)
 	if (flags & KM_NOSLEEP)
 		return GFP_ATOMIC;
 	/* If we're in a transaction, FS activity is not ok */
-	else if (current->flags & PF_FSTRANS)
+	else if ((current->flags & PF_FSTRANS) || (flags & KM_NOFS))
 		return GFP_NOFS;
 	else
 		return GFP_KERNEL;
