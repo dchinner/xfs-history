@@ -43,6 +43,8 @@ i386cmd: xfs-cmds
 
 xfs-cmds:
 	echo "=== Making $@ `date`"
+	[ ! -L $(WORKAREA)/linux/include/asm ] && \
+	ln -s $(WORKAREA)/linux/include/asm-i386 $(WORKAREA)/linux/include/asm
 	cd $(WORKAREA)/cmd/xfs && ./Makepkgs verbose
 
 clean:
@@ -57,5 +59,6 @@ realclean: clean
 		rm SPECS/kernel-2.4.0.spec; \
 		mv SPECS/kernel-2.4.0.spec.old SPECS/kernel-2.4.0.spec; \
 	fi
+	rm -f $(WORKAREA)/linux/include/asm
 	cd $(WORKAREA)/cmd/xfs && make clean
 
