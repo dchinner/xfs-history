@@ -1449,17 +1449,12 @@ xlog_sync(xlog_t		*log,
 	xlog_verify_iclog(log, iclog, count, B_TRUE);
 
 	/* account for log which doesn't start at block #0 */
-	{ loff_t t;
-	/* pagebuf uses bytes and struct buf uses sectors 
-	 * Macro does the shift for us, but in this case we
-	 * need a temp variable to do the math.
-	 */
-	t = XFS_BUF_ADDR(bp); t += log->l_logBBstart; XFS_BUF_SET_ADDR(bp,t);
-	}
+	XFS_BUF_SET_ADDR(bp, XFS_BUF_ADDR(bp) + log->l_logBBstart);
 	/*
 	 * Don't call xfs_bwrite here. We do log-syncs even when the filesystem
 	 * is shutting down.
 	 */
+	XFS_BUF_WRITE(bp);
 	if (error = XFS_bwrite(bp)) {
 		xfs_ioerror_alert("xlog_sync", log->l_mp, XFS_BUF_TARGET(bp), 
 				  XFS_BUF_ADDR(bp));

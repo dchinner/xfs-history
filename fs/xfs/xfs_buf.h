@@ -315,7 +315,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_UNSHUT(x)     	 /* error! not implemented yet */
 #define XFS_BUF_ISSHUT(x)        (0)
 
-#define XFS_BUF_HOLD(x)        /* error! not implemented yet */  
+#define XFS_BUF_HOLD(x)		pagebuf_hold(x)  
 #define XFS_BUF_UNHOLD(x)       /* error! not implemented yet */
 #define XFS_BUF_ISHOLD(x)       (1)
 /* this may go away... calling iostart will define read or write */
@@ -363,17 +363,18 @@ typedef struct bfidev {
   /* this is for CXFS server relocation... probably won't need this for a while 01/06/2000 RMC */
 } bfidev_t; 
 
+struct xfs_mount;
+
+extern page_buf_t *xfs_pb_getr(int, struct xfs_mount *);
+extern page_buf_t *xfs_pb_getr(int, struct xfs_mount *);
+extern void xfs_pb_freer(page_buf_t *);
+extern void xfs_pb_nfreer(page_buf_t *);
+
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
-			if ((buf)->pb_iodone == NULL) { \
-				pagebuf_hold(buf); \
-			}				\
-			(buf)->pb_iodone = (func)
+			pagebuf_set_iodone(buf, func)
 #define XFS_BUF_CLR_IODONE_FUNC(buf)		\
-			if ((buf)->pb_iodone) { \
-				(buf)->pb_iodone = NULL; \
-				pagebuf_rele(buf); \
-			}
+			pagebuf_set_iodone(buf, NULL)
 #define XFS_BUF_SET_BDSTRAT_FUNC(buf, func)
 #define XFS_BUF_CLR_BDSTRAT_FUNC(buf)
 
@@ -390,19 +391,15 @@ typedef struct bfidev {
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
 #define XFS_BUF_SET_START(buf)
 
-#define XFS_BUF_SET_BRELSE_FUNC(buf, value) 
+#define XFS_BUF_SET_BRELSE_FUNC(buf, value) \
+			(buf)->pb_relse = (value)
 
 
 #define XFS_BUF_PTR(bp)		(caddr_t)((bp)->pb_addr)
-/*#define XFS_BUF_ADDR(bp)	((bp)->pb_file_offset >> 9) */
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
 #define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset >> 9)
-/*
 #define XFS_BUF_SET_ADDR(bp, blk)		\
-			((bp)->pb_file_offset = (blk) << 9)
-*/
-#define XFS_BUF_SET_ADDR(bp, blk)		\
-			((bp)->pb_bn = (blk))
+			((bp)->pb_bn = (__kernel_daddr_t)(blk))
 #define XFS_BUF_COUNT(bp)	((bp)->pb_count_desired)
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->pb_count_desired = cnt)
@@ -435,25 +432,29 @@ typedef struct bfidev {
 #define xfs_buf_get(target, blkno, len, flags) \
 		pagebuf_get((target)->inode, (blkno) << 9, (len) << 9, \
 				PBF_LOCK | PBF_MAPPED)
-#define xfs_bdwrite(mp, bp)			\
-			bp->pb_flags |= PBF_DELWRI; \
-			pagebuf_unlock(bp)
 
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
-#define xfs_buf_relse(bp)	\
-			pagebuf_unlock(bp)
+static inline void	xfs_buf_relse(page_buf_t *bp)
+{
+	if (bp->pb_relse == NULL)
+		pagebuf_unlock(bp);
 
-#define xfs_bpin(bp)                 \
-     pagebuf_pin(bp)
+	pagebuf_rele(bp);
+}
 
-#define xfs_bunpin(bp)               \
-     pagebuf_unpin(bp)
-#define	xfs_bwait_unpin(bp)          \
-     pagebuf_wait_unpin(bp)
+
+#define xfs_bpin(bp)            \
+			pagebuf_pin(bp)
+
+#define xfs_bunpin(bp)          \
+			pagebuf_unpin(bp)
+
+#define	xfs_bwait_unpin(bp)     \
+			pagebuf_wait_unpin(bp)
 
 #define xfs_bp_mapin(bp)             \
-        pagebuf_mapin(bp)
+			pagebuf_mapin(bp)
 
 #define xfs_xfsd_list_evict(x)       printk("xfs_xfsd_list_evict not implemented\n")
 #define xfs_buftrace(x,y)     
@@ -464,15 +465,18 @@ typedef struct bfidev {
 #define xfs_incore(buftarg,blkno,len,lockit) \
             pagebuf_find(buftarg.inode,blkno,len,lockit)
 
-#define XFS_bwrite(pb)              \
-            pagebuf_iostart(pb,PBF_WRITE)
+#define XFS_bwrite(pb)			\
+	    pagebuf_iostart(pb,		\
+		(pb->pb_flags & (PBF_WRITE|PBF_DELWRI|PBF_ASYNC)) | PBF_SYNC)
 
 #define XFS_bdwrite(pb)              \
-	    pb->pb_flags |= PBF_DELWRI; \
-            pagebuf_unlock(pb)
+            pagebuf_iostart(pb, PBF_DELWRI | PBF_ASYNC)
+
+#define xfs_bdwrite(mp, bp)	XFS_bdwrite(bp)
 
 #define xfs_iowait(pb)              \
-    pagebuf_iowait(pb)
+	    pagebuf_iowait(pb)
+
 #define xfs_binval(buftarg)  /* hmm this is going to be tricky binval
 			      * wants to flush all delay write buffers
 			      * on device...  how do we do this with pagebuf? */
@@ -480,7 +484,7 @@ typedef struct bfidev {
 #define xfs_bflushed(buftarg) printk("XFS_bflushed not implemented\n")
 /* assert the buffers for dev are really flushed */
 
-#define XFS_bflush(buftarg) printk("XFS_bflush not implemented\n")
+extern void XFS_bflush(buftarg_t);
 
 #define xfs_incore_relse(buftarg,delwri_only,wait) _xfs_incore_relse(buftarg,delwri_only,wait)
 /*
@@ -491,7 +495,10 @@ typedef struct bfidev {
  */
 #define xfs_incore_match(buftarg,blkno,len,field,value) _xfs_incore_match(buftarg,blkno,len,field,value) 
 
-#define xfs_baread(target, rablkno, ralen) 
+#define xfs_baread(target, rablkno, ralen)  \
+		pagebuf_get((target)->inode, (rablkno) << 9, (ralen) << 9, \
+				PBF_TRYLOCK | PBF_READ | PBF_MAPPED | PBF_ASYNC)
+	
 
 #define XFS_pdflush(vnode,flags) printk("XFS_pdflush not implemeneted\n")
 

@@ -6640,6 +6640,7 @@ xfs_bwrite(
 	ASSERT(bp->b_vp == NULL);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xfs_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE3(bp, mp);
+	XFS_BUF_WRITE(bp);
 
    	if (error = XFS_bwrite(bp)) {
 		ASSERT(mp);

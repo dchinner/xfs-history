@@ -308,10 +308,7 @@ xfs_zero_last_block(
 	if (error = pagebuf_iozero(pb, zero_offset, zero_len)) {
 		goto out_lock;
 	}
-	pb->pb_flags &= ~PBF_READ;
-	pb->pb_flags |= PBF_WRITE;
-	/* JIMJIM maybe use iostart? What about DELWRI?? */
-	if (error = pagebuf_iorequest(pb)) {
+	if (error = pagebuf_iostart(pb, PBF_WRITE)) {
 		goto out_lock;
 	}
 
@@ -507,8 +504,7 @@ xfs_zero_eof(
 		if (error = pagebuf_iozero(pb, loff, lsize)) {
 			goto out_lock;
 		}
-		pb->pb_flags |= PBF_WRITE;
-		if (error = pagebuf_iorequest(pb)) {
+		if (error = pagebuf_iostart(pb, PBF_WRITE)) {
 			goto out_lock;
 		}
 		if (imap.br_startblock == DELAYSTARTBLOCK ||
@@ -1156,8 +1152,8 @@ _xfs_incore_relse(buftarg_t *targ,
 				  int	delwri_only,
 				  int	wait)
 {
-  printk("_xfs_incore_relse not implemented\n");
-  return 0;
+	truncate_inode_pages(targ->inode, 0LL);
+	return 0;
 } 
 
 xfs_buf_t *
@@ -1226,8 +1222,9 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
  * is the superblock.
  */
 int
-xfsbdstrat( struct xfs_mount 	*mp,
-			struct xfs_buf		*bp)
+xfsbdstrat(
+	struct xfs_mount 	*mp,
+	struct xfs_buf		*bp)
 {
 #if !defined(_USING_PAGEBUF_T)
   	int		dev_major = emajor(bp->b_edev);
@@ -1255,9 +1252,9 @@ xfsbdstrat( struct xfs_mount 	*mp,
 		}
 #else
 		if (XFS_BUF_IS_GRIO(bp)) {
-		  printk("xfsbdstrat needs griostrategy\n");
+			printk("xfsbdstrat needs griostrategy\n");
 		} else {
-		  pagebuf_iorequest(bp);
+			pagebuf_iorequest(bp);
 		}
 #endif
 
@@ -1268,31 +1265,33 @@ xfsbdstrat( struct xfs_mount 	*mp,
 	return (xfs_bioerror_relse(bp));
 }
 
-#define BREAKPOINT() asm("   int $3")
 
+#ifdef _USING_PAGEBUF_T
 page_buf_t *
 xfs_pb_getr(int sleep, xfs_mount_t *mp){
-  
-  printk("xfs_pb_nget DUDE!\n");
-  return pagebuf_get_empty(sleep,mp->m_ddev_targ.inode);
+	return pagebuf_get_empty(sleep,mp->m_ddev_targ.inode);
 }
 
 page_buf_t *
 xfs_pb_ngetr(int len, xfs_mount_t *mp){
-  page_buf_t *bp;
-  bp = pagebuf_get_no_daddr(len,mp->m_ddev_targ.inode);
-/*   printk("xfs_pb_ngetr DUDE! len:%d 0x%x\n",len,bp); */
-  return bp;
+	page_buf_t *bp;
+	bp = pagebuf_get_no_daddr(len,mp->m_ddev_targ.inode);
+	return bp;
 }
 
 void
 xfs_pb_freer(page_buf_t *bp) {
- /*  printk("xfs_pb_freer DUDE!\n"); */
-  pagebuf_free(bp);
+	pagebuf_free(bp);
 }
 
 void
 xfs_pb_nfreer(page_buf_t *bp){
-/*   printk("xfs_pb_nfreer DUDE!\n"); */
-  pagebuf_free(bp);
+	pagebuf_free(bp);
 }
+
+void
+XFS_bflush(buftarg_t target)
+{
+	run_task_queue(&tq_disk);
+}
+#endif

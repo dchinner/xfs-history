@@ -27,6 +27,7 @@
 #include <linux/xfs_to_linux.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
+#include <linux/wait.h>
 #include <linux/linux_to_xfs.h>
 
 #undef INLINE
@@ -1422,7 +1423,7 @@ printflags(register uint64_t flags,
         register uint64_t mask = 1;
 
         if (name)
-                qprintf("%s 0x%llx <", name, flags);
+                qprintf("%s 0x%Lx <", name, flags);
         while (flags != 0 && *strings) {
                 if (mask & flags) {
                         qprintf("%s ", *strings);
@@ -1553,7 +1554,7 @@ xfs_broot(xfs_inode_t *ip, xfs_ifork_t *f)
 	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, f->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, f->if_broot_bytes);
 	for (i = 1; i <= broot->bb_numrecs; i++)
-		qprintf("\t%d: startoff %lld ptr %llx %s\n",
+		qprintf("\t%d: startoff %Ld ptr %Lx %s\n",
 			i, kp[i - 1].br_startoff, pp[i - 1],
 			xfs_fmtfsblock(pp[i - 1], ip->i_mount));
 }
@@ -1602,10 +1603,10 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 {
 	int i;
 
-	qprintf("magic 0x%x level %d numrecs %d leftsib %llx ",
+	qprintf("magic 0x%x level %d numrecs %d leftsib %Lx ",
 		bt->bb_magic, bt->bb_level, bt->bb_numrecs,
 		bt->bb_leftsib);
-	qprintf("rightsib %llx\n", bt->bb_rightsib);
+	qprintf("rightsib %Lx\n", bt->bb_rightsib);
 	if (bt->bb_level == 0) {
 
 		for (i = 1; i <= bt->bb_numrecs; i++) {
@@ -1618,9 +1619,9 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			r = (xfs_bmbt_rec_64_t *)XFS_BTREE_REC_ADDR(bsz,
 				xfs_bmbt, bt, i, 0);
 			xfs_convert_extent(r, &o, &s, &c, &fl);
-			qprintf("rec %d startoff %lld ", i, o);
-			qprintf("startblock %llx ", s);
-			qprintf("blockcount %lld flag %d\n", c, fl);
+			qprintf("rec %d startoff %Ld ", i, o);
+			qprintf("startblock %Lx ", s);
+			qprintf("blockcount %Ld flag %d\n", c, fl);
 		}
 	} else {
 		int mxr;
@@ -1632,9 +1633,9 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_bmbt, bt, i, mxr);
-			qprintf("key %d startoff %lld ",
+			qprintf("key %d startoff %Ld ",
 				i, k->br_startoff);
-			qprintf("ptr %llx\n", *p);
+			qprintf("ptr %Lx\n", *p);
 		}
 	}
 }
@@ -1656,7 +1657,7 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			xfs_inobt_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
-			qprintf("rec %d startino 0x%x freecount %d, free %llx\n",
+			qprintf("rec %d startino 0x%x freecount %d, free %Lx\n",
 				i, r->ir_startino, r->ir_freecount,
 				r->ir_free);
 		}
@@ -1697,7 +1698,7 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 		};
 
 	if (summary) {
-		qprintf("buf 0x%p blkno 0x%llx ", blip->bli_buf,
+		qprintf("buf 0x%p blkno 0x%Lx ", blip->bli_buf,
 			     blip->bli_format.blf_blkno);
 		printflags(blip->bli_flags, bli_flags, "flags:");
 		qprintf("\n   ");
@@ -1708,7 +1709,7 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 		blip->bli_buf, blip->bli_recur, blip->bli_refcount);
 	printflags(blip->bli_flags, bli_flags, NULL);
 	qprintf("\n");
-	qprintf("size %d blkno 0x%llx len 0x%x map size %d map 0x%p\n",
+	qprintf("size %d blkno 0x%Lx len 0x%x map size %d map 0x%p\n",
 		blip->bli_format.blf_size, blip->bli_format.blf_blkno,
 		(uint) blip->bli_format.blf_len, blip->bli_format.blf_map_size,
 		&(blip->bli_format.blf_data_map[0]));
@@ -1795,7 +1796,7 @@ xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary)
 	xfs_extent_t	*ep;
 
 	if (summary) {
-		qprintf("Extent Free Done: ID 0x%llx nextents %d (at 0x%p)\n",
+		qprintf("Extent Free Done: ID 0x%Lx nextents %d (at 0x%p)\n",
 				efdp->efd_format.efd_efi_id,
 				efdp->efd_format.efd_nextents, efdp);
 		return;
@@ -1803,11 +1804,11 @@ xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary)
 	qprintf("size %d nextents %d next extent %d efip 0x%p\n",
 		efdp->efd_format.efd_size, efdp->efd_format.efd_nextents,
 		efdp->efd_next_extent, efdp->efd_efip);
-	qprintf("efi_id 0x%llx\n", efdp->efd_format.efd_efi_id);
+	qprintf("efi_id 0x%Lx\n", efdp->efd_format.efd_efi_id);
 	qprintf("efd extents:\n");
 	ep = &(efdp->efd_format.efd_extents[0]);
 	for (i = 0; i < efdp->efd_next_extent; i++, ep++) {
-		qprintf("    block %llx len %d\n",
+		qprintf("    block %Lx len %d\n",
 			ep->ext_start, ep->ext_len);
 	}
 }
@@ -1828,7 +1829,7 @@ xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary)
 		};
 
 	if (summary) {
-		qprintf("Extent Free Intention: ID 0x%llx nextents %d (at 0x%p)\n",
+		qprintf("Extent Free Intention: ID 0x%Lx nextents %d (at 0x%p)\n",
 				efip->efi_format.efi_id,
 				efip->efi_format.efi_nextents, efip);
 		return;
@@ -1836,13 +1837,13 @@ xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary)
 	qprintf("size %d nextents %d next extent %d\n",
 		efip->efi_format.efi_size, efip->efi_format.efi_nextents,
 		efip->efi_next_extent);
-	qprintf("id %llx", efip->efi_format.efi_id);
+	qprintf("id %Lx", efip->efi_format.efi_id);
 	printflags(efip->efi_flags, efi_flags, "flags :");
 	qprintf("\n");
 	qprintf("efi extents:\n");
 	ep = &(efip->efi_format.efi_extents[0]);
 	for (i = 0; i < efip->efi_next_extent; i++, ep++) {
-		qprintf("    block %llx len %d\n",
+		qprintf("    block %Lx len %d\n",
 			ep->ext_start, ep->ext_len);
 	}
 }
@@ -1875,12 +1876,12 @@ xfs_fmtfsblock(xfs_fsblock_t bno, xfs_mount_t *mp)
 	if (bno == NULLFSBLOCK)
 		sprintf(rval, "NULLFSBLOCK");
 	else if (ISNULLSTARTBLOCK(bno))
-		sprintf(rval, "NULLSTARTBLOCK(%lld)", STARTBLOCKVAL(bno));
+		sprintf(rval, "NULLSTARTBLOCK(%Ld)", STARTBLOCKVAL(bno));
 	else if (mp)
-		sprintf(rval, "%lld[%x:%x]", (xfs_dfsbno_t)bno,
+		sprintf(rval, "%Ld[%x:%x]", (xfs_dfsbno_t)bno,
 			XFS_FSB_TO_AGNO(mp, bno), XFS_FSB_TO_AGBNO(mp, bno));
 	else
-		sprintf(rval, "%lld", (xfs_dfsbno_t)bno);
+		sprintf(rval, "%Ld", (xfs_dfsbno_t)bno);
 	return rval;
 }
 
@@ -1893,10 +1894,10 @@ xfs_fmtino(xfs_ino_t ino, xfs_mount_t *mp)
 	static char rval[50];
 
 	if (mp)
-		sprintf(rval, "%lld[%x:%x:%x]", ino, XFS_INO_TO_AGNO(mp, ino),
+		sprintf(rval, "%Ld[%x:%x:%x]", ino, XFS_INO_TO_AGNO(mp, ino),
 			XFS_INO_TO_AGBNO(mp, ino), XFS_INO_TO_OFFSET(mp, ino));
 	else
-		sprintf(rval, "%lld", ino);
+		sprintf(rval, "%Ld", ino);
 	return rval;
 }
 
@@ -2008,7 +2009,7 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		qprintf("\n");
 		return;
 	}
-	qprintf("inode 0x%p ino 0x%llx logged %d flags: ",
+	qprintf("inode 0x%p ino 0x%Lx logged %d flags: ",
 		ilip->ili_inode, ilip->ili_format.ilf_ino, ilip->ili_logged);
 	printflags(ilip->ili_flags, ili_flags, NULL);
 	qprintf("\n");
@@ -2028,7 +2029,7 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		ilip->ili_format.ilf_dsize,
 		ilip->ili_format.ilf_asize,
 		ilip->ili_format.ilf_u.ilfu_rdev);
-	qprintf("blkno 0x%llx len 0x%x boffset 0x%x\n",
+	qprintf("blkno 0x%Lx len 0x%x boffset 0x%x\n",
 		ilip->ili_format.ilf_blkno,
 		ilip->ili_format.ilf_len,
 		ilip->ili_format.ilf_boffset);
@@ -2122,8 +2123,8 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		dip->di_atime.t_sec, dip->di_atime.t_nsec,
 		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
 		dip->di_ctime.t_sec, dip->di_ctime.t_nsec);
-	qprintf("size 0x%llx ", dip->di_size);
-	qprintf("nblocks %lld extsize 0x%x nextents 0x%x anextents 0x%x\n",
+	qprintf("size 0x%Lx ", dip->di_size);
+	qprintf("nblocks %Ld extsize 0x%x nextents 0x%x anextents 0x%x\n",
 		dip->di_nblocks, dip->di_extsize,
 		dip->di_nextents, dip->di_anextents);
 	qprintf("forkoff %d aformat 0x%x (%s) dmevmask 0x%x dmstate 0x%x ",
@@ -2157,7 +2158,7 @@ xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
 				(xfs_bmbt_rec_64_t *)&ifp->if_u1.if_extents[i],
 				&o, &s, &c, &flag);
 			qprintf(
-		"%d: startoff %lld startblock %s blockcount %lld flag %d\n",
+		"%d: startoff %Ld startblock %s blockcount %Ld flag %d\n",
 				i, o, xfs_fmtfsblock(s, ip->i_mount), c, flag);
 		}
 	}
@@ -2399,7 +2400,7 @@ static void
 xfsidbg_xbirec(xfs_bmbt_irec_t *r)
 {
 	qprintf(
-	"startoff %lld startblock %llx blockcount %lld state %lld\n",
+	"startoff %Ld startblock %Lx blockcount %Ld state %Ld\n",
 		(__uint64_t)r->br_startoff,
 		(__uint64_t)r->br_startblock,
 		(__uint64_t)r->br_blockcount,
@@ -2439,7 +2440,7 @@ xfsidbg_xbrec(xfs_bmbt_rec_64_t *r)
 	int flag;
 
 	xfs_convert_extent(r, &o, &s, &c, &flag);
-	qprintf("startoff %lld startblock %llx blockcount %lld flag %d\n",
+	qprintf("startoff %Ld startblock %Lx blockcount %Ld flag %d\n",
 		o, s, c, flag);
 }
 
@@ -2477,7 +2478,7 @@ xfsidbg_xbtcur(xfs_btree_cur_t *c)
 		qprintf("rec.b ");
 		xfsidbg_xbirec(&c->bc_rec.b);
 	} else if (c->bc_btnum == XFS_BTNUM_INO) {
-		qprintf("rec.i startino 0x%x freecount 0x%x free %llx\n",
+		qprintf("rec.i startino 0x%x freecount 0x%x free %Lx\n",
 			c->bc_rec.i.ir_startino, c->bc_rec.i.ir_freecount,
 			c->bc_rec.i.ir_free);
 	} else {
@@ -2743,7 +2744,7 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
 	qprintf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno2, n->index2, n->rmtblkno2, n->rmtblkcnt2);
-	qprintf(" inumber %lld dp 0x%p firstblock 0x%p flist 0x%p\n",
+	qprintf(" inumber %Ld dp 0x%p firstblock 0x%p flist 0x%p\n",
 		  n->inumber, n->dp, n->firstblock, n->flist);
 	qprintf(" trans 0x%p total %d\n",
 		  n->trans, n->total);
@@ -2847,7 +2848,7 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
 		XFS_DIR_SF_GET_DIRINO(&n->inumber, &ino);
-		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld ",
+		qprintf("leaf %d hashval 0x%x nameidx %d inumber %Ld ",
 			j, (uint_t)e->hashval, e->nameidx, ino);
 		qprintf("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
@@ -2903,7 +2904,7 @@ xfs_dir2data(void *addr, int size)
 			continue;
 		}
 		e = (xfs_dir2_data_entry_t *)p;
-		qprintf("0x%x entry inumber %lld namelen %d name \"",
+		qprintf("0x%x entry inumber %Ld namelen %d name \"",
 			p - (char *)addr, e->inumber, e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			qprintf("%c", e->name[k]);
@@ -2971,11 +2972,11 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 
 	sfh = &s->hdr;
 	XFS_DIR_SF_GET_DIRINO(&sfh->parent, &ino);
-	qprintf("hdr parent %lld", ino);
+	qprintf("hdr parent %Ld", ino);
 	qprintf(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
 		XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &ino);
-		qprintf("entry %d inumber %lld", i, ino);
+		qprintf("entry %d inumber %Ld", i, ino);
 		qprintf(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			qprintf("%c", sfe->name[j]);
@@ -2997,11 +2998,11 @@ xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
 
 	sfh = &s->hdr;
 	ino = XFS_DIR2_SF_GET_INUMBER(s, &sfh->parent);
-	qprintf("hdr count %d i8count %d parent %lld\n",
+	qprintf("hdr count %d i8count %d parent %Ld\n",
 		sfh->count, sfh->i8count, ino);
 	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
 		ino = XFS_DIR2_SF_GET_INUMBER(s, XFS_DIR2_SF_INUMBERP(sfe));
-		qprintf("entry %d inumber %lld offset 0x%x namelen %d name \"",
+		qprintf("entry %d inumber %Ld offset 0x%x namelen %d name \"",
 			i, ino, XFS_DIR2_SF_GET_OFFSET(sfe), sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			qprintf("%c", sfe->name[j]);
@@ -3049,7 +3050,7 @@ xfsidbg_xflist(xfs_bmap_free_t *flist)
 	qprintf("flist@0x%p: first 0x%p count %d low %d\n", flist,
 		flist->xbf_first, flist->xbf_count, flist->xbf_low);
 	for (item = flist->xbf_first; item; item = item->xbfi_next) {
-		qprintf("item@0x%p: startblock %llx blockcount %d", item,
+		qprintf("item@0x%p: startblock %Lx blockcount %d", item,
 			(xfs_dfsbno_t)item->xbfi_startblock,
 			item->xbfi_blockcount);
 	}
@@ -3110,10 +3111,10 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 	};
 
 	qprintf("xlog_in_core/header at 0x%p\n", iclog);
-	qprintf("magicno: %x  cycle: %d  version: %d  lsn: 0x%llx\n",
+	qprintf("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
 		iclog->ic_header.h_magicno, iclog->ic_header.h_cycle,
 		iclog->ic_header.h_version, iclog->ic_header.h_lsn);
-	qprintf("tail_lsn: 0x%llx  len: %d  prev_block: %d  num_ops: %d\n",
+	qprintf("tail_lsn: 0x%Lx  len: %d  prev_block: %d  num_ops: %d\n",
 		iclog->ic_header.h_tail_lsn, iclog->ic_header.h_len,
 		iclog->ic_header.h_prev_block, iclog->ic_header.h_num_logops);
 	qprintf("cycle_data: ");
@@ -3236,7 +3237,7 @@ xfsidbg_xlog(xlog_t *log)
 		&log->l_flushsema, log->l_ticket_cnt, log->l_ticket_tcnt);
 	qprintf("freelist: 0x%p  tail: 0x%p  ICLOG: 0x%p  \n",
 		log->l_freelist, log->l_tail, log->l_iclog);
-	qprintf("&icloglock: 0x%p  tail_lsn: 0x%llx  last_sync_lsn: 0x%llx \n",
+	qprintf("&icloglock: 0x%p  tail_lsn: 0x%Lx  last_sync_lsn: 0x%Lx \n",
 		&log->l_icloglock, log->l_tail_lsn, log->l_last_sync_lsn);
 	qprintf("mp: 0x%p  xbuf: 0x%p  roundoff: %d  l_covered_state: %s \n",
 		log->l_mp, log->l_xbuf, log->l_roundoff,
@@ -3660,13 +3661,13 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	printflags(mp->m_flags, xmount_flags,"flags");
 	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
-	qprintf("attroffset %d da_node_ents %d maxicount %lld inoalign_mask %d\n",
+	qprintf("attroffset %d da_node_ents %d maxicount %Ld inoalign_mask %d\n",
 		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount,
 		mp->m_inoalign_mask);
-	qprintf("resblks %lld resblks_avail %lld\n", mp->m_resblks, 
+	qprintf("resblks %Ld resblks_avail %Ld\n", mp->m_resblks, 
 		mp->m_resblks_avail);
 #if XFS_BIG_FILESYSTEMS
-	qprintf(" inoadd %llx\n", mp->m_inoadd);
+	qprintf(" inoadd %Lx\n", mp->m_inoadd);
 #else
 	qprintf("\n");
 #endif
@@ -3685,7 +3686,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	qprintf("mk_sharedro %d dirversion %d dirblkfsbs %d &dirops 0x%p\n",
 		mp->m_mk_sharedro, mp->m_dirversion, mp->m_dirblkfsbs,
 		&mp->m_dirops);
-	qprintf("dirblksize %d dirdatablk 0x%llx dirleafblk 0x%llx dirfreeblk 0x%llx\n",
+	qprintf("dirblksize %d dirdatablk 0x%Lx dirleafblk 0x%Lx dirfreeblk 0x%Lx\n",
 		mp->m_dirblksize,
 		(xfs_dfiloff_t)mp->m_dirdatablk,
 		(xfs_dfiloff_t)mp->m_dirleafblk,
@@ -3804,14 +3805,14 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_pincount,
 		&ip->i_pinsema);
 	qprintf("&rlock 0x%p\n", &ip->i_iocore.io_rlock);
-	qprintf("next_offset %llx ", ip->i_iocore.io_next_offset);
-	qprintf("io_offset %llx reada_blkno %s io_size 0x%x\n",
+	qprintf("next_offset %Lx ", ip->i_iocore.io_next_offset);
+	qprintf("io_offset %Lx reada_blkno %s io_size 0x%x\n",
 		ip->i_iocore.io_offset,
 		xfs_fmtfsblock(ip->i_iocore.io_reada_blkno, ip->i_mount),
 		ip->i_iocore.io_size);
-	qprintf("last_req_sz 0x%x new_size %llx\n",
+	qprintf("last_req_sz 0x%x new_size %Lx\n",
 		ip->i_iocore.io_last_req_sz, ip->i_iocore.io_new_size);
-	qprintf("write off %llx gap list 0x%p\n",
+	qprintf("write off %Lx gap list 0x%p\n",
 		ip->i_iocore.io_write_offset, ip->i_iocore.io_gap_list);
 	qprintf(
 "readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
@@ -3852,14 +3853,14 @@ xfsidbg_xcore(xfs_iocore_t *io)
 	qprintf("&lock 0x%p &iolock 0x%p &flock 0x%p &rlock 0x%p\n",
 		io->io_lock, io->io_iolock,
 		io->io_flock, &io->io_rlock);
-	qprintf("next_offset %llx ", io->io_next_offset);
-	qprintf("io_offset %llx reada_blkno %s io_size 0x%x\n",
+	qprintf("next_offset %Lx ", io->io_next_offset);
+	qprintf("io_offset %Lx reada_blkno %s io_size 0x%x\n",
 		io->io_offset,
 		xfs_fmtfsblock(io->io_reada_blkno, io->io_mount),
 		io->io_size);
-	qprintf("last_req_sz 0x%x new_size %llx\n",
+	qprintf("last_req_sz 0x%x new_size %Lx\n",
 		io->io_last_req_sz, io->io_new_size);
-	qprintf("write off %llx gap list 0x%p\n",
+	qprintf("write off %Lx gap list 0x%p\n",
 		io->io_write_offset, io->io_gap_list);
 	qprintf(
 "readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
@@ -4194,10 +4195,10 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
 static void
 xfsidbg_xsb(xfs_sb_t *sbp)
 {
-	qprintf("magicnum 0x%x blocksize 0x%x dblocks %lld rblocks %lld\n",
+	qprintf("magicnum 0x%x blocksize 0x%x dblocks %Ld rblocks %Ld\n",
 		sbp->sb_magicnum, sbp->sb_blocksize,
 		sbp->sb_dblocks, sbp->sb_rblocks);
-	qprintf("rextents %lld uuid %s logstart %s\n",
+	qprintf("rextents %Ld uuid %s logstart %s\n",
 		sbp->sb_rextents,
 		xfs_fmtuuid(&sbp->sb_uuid),
 		xfs_fmtfsblock(sbp->sb_logstart, NULL));
@@ -4228,7 +4229,7 @@ xfsidbg_xsb(xfs_sb_t *sbp)
 		sbp->sb_rextslog,
 		sbp->sb_inprogress,
 		sbp->sb_imax_pct);
-	qprintf("icount %llx ifree %llx fdblocks %llx frextents %llx\n",
+	qprintf("icount %Lx ifree %Lx fdblocks %Lx frextents %Lx\n",
 		sbp->sb_icount,
 		sbp->sb_ifree,
 		sbp->sb_fdblocks,

@@ -564,7 +564,7 @@ xfs_cmountfs(
 	/*REFERENCED*/
 	int		noerr;
 #ifdef __linux__
-	extern linvfs_release_inode(struct inode *);
+	extern void linvfs_release_inode(struct inode *);
 #endif
 
 	/*

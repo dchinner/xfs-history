@@ -174,26 +174,10 @@ int spectodevs(
 	return 0;
 }
 
+extern int xfs_bdstrat_cb(page_buf_t *);
+
 static struct inode_operations linvfs_meta_ops = {
-	NULL,			/* default file-ops */
-        NULL,                   /* create */
-        NULL,                   /* lookup */
-        NULL,                   /* link */
-        NULL,                   /* unlink */
-        NULL,                   /* symlink */
-        NULL,                   /* mkdir */
-        NULL,                   /* rmdir */
-        NULL,                   /* mknod */
-        NULL,                   /* rename */
-        NULL,                   /* readlink */
-        NULL,                   /* follow_link */
-        NULL,                   /* readpage */
-        NULL,                   /* writepage */
-        NULL,                   /* bmap */
-        NULL,                   /* truncate */
-        NULL,                   /* permission */
-        NULL,                   /* updatepage */
-        NULL                    /* revalidate */
+	pagebuf_ioinitiate:	xfs_bdstrat_cb,
 };
 
 struct inode *
@@ -214,6 +198,7 @@ void
 linvfs_release_inode(struct inode *inode)
 {
 	pagebuf_lock_disable(inode);
+	truncate_inode_pages(inode, 0L);
 	iput(inode);
 }
 
