@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.159 $"
+#ident	"$Revision: 1.160 $"
 
 /*
  * High level interface routines for log manager
@@ -81,7 +81,7 @@ STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 
 /* local state machine functions */
 STATIC void xlog_state_done_syncing(xlog_in_core_t *iclog, int);
-STATIC void xlog_state_do_callback(xlog_t *log,int aborted);
+STATIC void xlog_state_do_callback(xlog_t *log,int aborted, xlog_in_core_t *iclog);
 STATIC void xlog_state_finish_copy(xlog_t	   *log,
 				   xlog_in_core_t  *iclog,
 				   int		   first_write,
@@ -1777,16 +1777,19 @@ xlog_state_clean_log(xlog_t *log)
 STATIC void
 xlog_state_do_callback(
 	xlog_t 		*log,
-	int		aborted)
+	int		aborted,
+	xlog_in_core_t	*ciclog)
 {
 	xlog_in_core_t	   *iclog, *first_iclog;
 	xfs_log_callback_t *cb, *cb_next;
 	int		   spl;
 	int		   flushcnt = 0;
+	int		   done = 0;
 
 	spl = LOG_LOCK(log);
 	first_iclog = iclog = log->l_iclog;
 
+retry:
 	do {
 		/* skip all iclogs in the ACTIVE & DIRTY states */
 		if (iclog->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_DIRTY)) {
@@ -1801,12 +1804,23 @@ xlog_state_do_callback(
 		 * in case of just a SHUTDOWN w/o a LOG_IO_ERROR.
 		 */
 		if (!(iclog->ic_state & XLOG_STATE_IOERROR)) {
-			/* Can only perform callbacks in order.  Since
-			 * this iclog is not in the DONE_SYNC state, we skip
-			 * the rest and just try to clean up.
+			/*
+			 * Can only perform callbacks in order.  Since
+			 * this iclog is not in the DONE_SYNC/DO_CALLBACK 
+			 * state, we skip the rest and just try to clean up.
+			 * If we set our iclog to DO_CALLBACK, we will not
+			 * process it when we retry since a previous iclog is
+			 * in the CALLBACK and the state cannot change 
+			 * since we are holding the LOG_LOCK.
 			 */
-			if (iclog->ic_state != XLOG_STATE_DONE_SYNC)
+			if (!(iclog->ic_state & (XLOG_STATE_DONE_SYNC | 
+						 XLOG_STATE_DO_CALLBACK))) {
+				if (ciclog && (ciclog->ic_state == 
+						XLOG_STATE_DONE_SYNC))
+				    	ciclog->ic_state = XLOG_STATE_DO_CALLBACK; 
 				goto clean;
+			}
+
 			iclog->ic_state = XLOG_STATE_CALLBACK;
 
 			LOG_UNLOCK(log, spl);
@@ -1854,7 +1868,24 @@ xlog_state_do_callback(
 		iclog = iclog->ic_next;
 	} while (first_iclog != iclog);
 
+	/* Loop thro' the iclogs to check if any are marked in
+	 * XLOG_STATE_DO_CALLBACK and need processing.
+	 */
+
 clean:
+	iclog = first_iclog;
+
+	if (!done) {
+		done = 1;
+		do {
+		    if (iclog->ic_state == XLOG_STATE_DO_CALLBACK) {
+			iclog = first_iclog;
+			goto retry;
+		    }
+		    iclog = iclog->ic_next;
+		} while (first_iclog != iclog);
+	}	
+
 	/*
 	 * Transition from DIRTY to ACTIVE if applicable. NOP if
 	 * STATE_IOERROR.
@@ -1923,7 +1954,7 @@ xlog_state_done_syncing(
 	if (iclog->ic_next->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_IOERROR))
 		sv_signal(&iclog->ic_next->ic_forcesema);
 	LOG_UNLOCK(log, spl);
-	xlog_state_do_callback(log, aborted);	/* also cleans log */
+	xlog_state_do_callback(log, aborted, iclog);	/* also cleans log */
 }	/* xlog_state_done_syncing */
 
 
@@ -1985,7 +2016,7 @@ xlog_state_get_iclog_space(xlog_t	  *log,
 	xlog_in_core_t	  *iclog;
 	int		  error;
 
-	xlog_state_do_callback(log, 0);	/* also cleans log */
+	xlog_state_do_callback(log, 0, NULL);	/* also cleans log */
 
 restart:
 	spl = LOG_LOCK(log);
@@ -3313,7 +3344,7 @@ xfs_log_force_umount(
 	 * Callback all log item committed functions as if the
 	 * log writes were completed.
 	 */
-	xlog_state_do_callback(log, XFS_LI_ABORTED);
+	xlog_state_do_callback(log, XFS_LI_ABORTED, NULL);
 
 #ifdef XFSERRORDEBUG
 	{
