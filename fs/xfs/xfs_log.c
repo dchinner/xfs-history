@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.49 $"
+#ident	"$Revision: 1.50 $"
 
 /*
  * High level interface routines for log manager
@@ -193,7 +193,7 @@ xfs_log_force(xfs_mount_t *mp,
 	      uint	  flags)
 {
 	xlog_t *log = mp->m_log;
-	
+
 	if (flags & XFS_LOG_FORCE) {
 		return(xlog_state_sync(log, lsn, flags));
 	} else if (flags & XFS_LOG_URGE) {
@@ -201,7 +201,7 @@ xfs_log_force(xfs_mount_t *mp,
 		return -1;
 	} else
 		xlog_panic("xfs_log_force: illegal flags");
-	
+
 }	/* xfs_log_force */
 
 
@@ -764,7 +764,7 @@ xlog_find_oldest(dev_t log_dev,
 	int			block_no = 0;
 	int			cycle_no = 0;
 	int			binary_block_start = 0;
-	buf_t		*bp;
+	buf_t			*bp;
 	
 	/* read through all blocks to find start of on-disk log */
 	while (block_no < log_bbnum) {
@@ -790,7 +790,7 @@ xlog_find_oldest(dev_t log_dev,
 		block_no++;
 		brelse(bp);
 	}
-	
+
 	return (uint)block_start;
 }	/* xlog_find_oldest */
 
@@ -871,57 +871,6 @@ exit:
 	xlog_put_bp(bp, 1);
 
 	return tail_blk;
-#ifdef LINEAR_SCAN
-	xlog_rec_header_t	*head;
-	uint			block_start = 0;
-	uint			block_no = 0;
-	uint			cycle_no = 0;
-	uint			binary_block_start = 0;
-	uint			last_log_rec_blk = 0;
-	buf_t			*bp;
-	daddr_t			blk_offset = log->l_logBBstart;
-	dev_t			log_dev = log->l_dev;
-	int			log_bbnum = log->l_logBBsize;
-	
-	/* read through all blocks to find start of on-disk log */
-	while (block_no < log_bbnum) {
-		bp = bread(log_dev, block_no+blk_offset, 1);
-		if (bp->b_flags & B_ERROR) {
-			xlog_panic("xlog_find_sync");
-		}
-		head = (xlog_rec_header_t *)bp->b_dmaaddr;
-		if (head->h_magicno != XLOG_HEADER_MAGIC_NUM) {
-			block_no++;
-			if (cycle_no == 0) {
-				cycle_no = *(uint *)head;
-			} else if (*(uint *)head < cycle_no) {
-				brelse(bp);
-				break;
-			}
-		} else {
-			if (cycle_no == 0) {
-				cycle_no         = CYCLE_LSN(head->h_lsn);
-				last_log_rec_blk = block_no;
-			} else if (CYCLE_LSN(head->h_lsn) < cycle_no) {
-				brelse(bp);
-				break;
-			} else {
-				last_log_rec_blk = block_no;
-			}
-		}
-		block_no++;
-		brelse(bp);
-	}
-	
-	bp = bread(log_dev, last_log_rec_blk+blk_offset, 1);
-	if (bp->b_flags & B_ERROR) {
-		xlog_panic("xlog_find_sync");
-	}
-	brelse(bp);
-
-	head = (xlog_rec_header_t *)bp->b_dmaaddr;
-	return (uint)BLOCK_LSN(head->h_tail_lsn);
-#endif
 }	/* xlog_find_sync */
 
 
@@ -1311,7 +1260,7 @@ xlog_write(xfs_mount_t *	mp,
 
 	    /* make copy_len total bytes copied, including headers */
 	    copy_len += start_rec_copy + sizeof(xlog_op_header_t);
-	    xlog_state_finish_copy(log, iclog, firstwr, (contwr ? copy_len : 0));
+	    xlog_state_finish_copy(log, iclog, firstwr, (contwr? copy_len : 0));
 	    firstwr = 0;
 	    if (partial_copy) {			/* copied partial region */
 		/* already marked WANT_SYNC */
@@ -1394,8 +1343,12 @@ xlog_state_do_callback(xlog_t *log)
 	first_iclog = iclog = log->l_iclog;
 
 	do {
+		if (iclog->ic_state == XLOG_STATE_ACTIVE ||
+		    iclog->ic_state == XLOG_STATE_DIRTY) {
+			iclog = iclog->ic_next;
+			continue;
+		}
 		if (iclog->ic_state != XLOG_STATE_DONE_SYNC) {
-			/* XXXmiken: should I skip the first and continue? */
 			goto clean;
 		}
 		iclog->ic_state = XLOG_STATE_CALLBACK;
@@ -1643,11 +1596,7 @@ xlog_state_lsn_is_synced(xlog_t		    *log,
 			    (iclog->ic_state == XLOG_STATE_DIRTY)) /* call it*/
 				break;
 
-			/* insert callback into list */
-#if 0
-			cb->cb_next = iclog->ic_callback;
-			iclog->ic_callback = cb;
-#endif
+			/* insert callback onto end of list */
 			cb->cb_next = 0;
 			*(iclog->ic_callback_tail) = cb;
 			iclog->ic_callback_tail = &(cb->cb_next);
@@ -1714,23 +1663,23 @@ xlog_state_release_iclog(xlog_t		*log,
 	else
 	    iclog->ic_header.h_tail_lsn = log->l_tail_lsn = tail_lsn;
 
+#ifdef XFSDEBUGG
 	/* check if it will fit */
-	if (xlog_debug > 1) {
-	    if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
+	if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
 		blocks =
-		    log->l_logBBsize - (log->l_prev_block -BLOCK_LSN(tail_lsn));
+			log->l_logBBsize - (log->l_prev_block -BLOCK_LSN(tail_lsn));
 		if (blocks < BTOBB(iclog->ic_offset)+1)
-		    xlog_panic("ran out of log space");
-	    } else {
+			xlog_panic("ran out of log space");
+	} else {
 		ASSERT(CYCLE_LSN(tail_lsn)+1 == log->l_prev_cycle);
 		if (BLOCK_LSN(tail_lsn) == log->l_prev_block)
-		    xlog_panic("ran out of log space");
+			xlog_panic("ran out of log space");
 		
 		blocks = BLOCK_LSN(tail_lsn) - log->l_prev_block;
 		if (blocks < BTOBB(iclog->ic_offset) + 1)
-		    xlog_panic("ran out of log space");
-	    }
+			xlog_panic("ran out of log space");
 	}
+#endif /* XFSDEBUG */
 
 	/* cycle incremented when incrementing curr_block */
     }
@@ -1777,30 +1726,29 @@ xlog_state_switch_iclogs(xlog_t		*log,
 int
 xlog_state_sync_all(xlog_t *log, uint flags)
 {
-	xlog_in_core_t *iclog;
-	int spl;
+	xlog_in_core_t	*iclog;
+	xfs_lsn_t	lsn;
+	int		spl;
 
 	spl = splockspl(log->l_icloglock, splhi);
 
 	iclog = log->l_iclog;
-	do {
-		iclog = iclog->ic_next;
-		if (iclog->ic_state == XLOG_STATE_ACTIVE) {
-			xlog_state_switch_iclogs(log, iclog, 0);
-		} else if (iclog->ic_state == XLOG_STATE_DIRTY) {
-			spunlockspl(log->l_icloglock, spl);
-			return 0;
-		}
-		if (flags & XFS_LOG_SYNC)		/* sleep */
-			spunlockspl_psema(log->l_icloglock, spl,
-					  &iclog->ic_forcesema, 0);
-		else				/* just return */
-			spunlockspl(log->l_icloglock, spl);
-		return 0;
-	} while (iclog != log->l_iclog);
+	lsn = iclog->ic_header.h_lsn;
+	if (iclog->ic_state == XLOG_STATE_ACTIVE) {
+		iclog->ic_refcnt++;
+		spunlockspl(log->l_icloglock, spl);
+		xlog_state_want_sync(log, iclog);
+		xlog_state_release_iclog(log, iclog);
 
-	spunlockspl(log->l_icloglock, spl);
-	return XFS_ENOTFOUND;
+	}
+	spl = splockspl(log->l_icloglock, splhi);
+	if (iclog->ic_header.h_lsn == lsn		&&
+	    !(iclog->ic_state == XLOG_STATE_ACTIVE ||
+	      iclog->ic_state == XLOG_STATE_DIRTY)	&&
+	    flags & XFS_LOG_SYNC)
+		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
+				  &iclog->ic_forcesema, 0);
+	return 0;
 }	/* xlog_state_sync_all */
 
 
