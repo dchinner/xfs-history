@@ -1,4 +1,4 @@
-#ident "$Revision: 1.253 $"
+#ident "$Revision: 1.254 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -89,6 +89,7 @@
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
+#include "os/proc/pproc_private.h"	/* XXX bogus */
 
 #ifdef SIM
 #include "sim.h"
