@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.37 1994/11/11 21:09:14 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.38 1994/11/15 22:16:54 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -37,6 +37,7 @@
 #include <sys/fs/xfs_dinode.h>
 #include <sys/fs/xfs_inode_item.h>
 #include <sys/fs/xfs_inode.h>
+#include <sys/fs/xfs_itable.h>
 
 #ifdef SIM
 #include "sim.h"
