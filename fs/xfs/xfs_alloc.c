@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.59 $"
+#ident	"$Revision: 1.60 $"
 
 /*
  * Free space allocation for xFS.
@@ -716,6 +716,17 @@ xfs_alloc_ag_vextent_near(
 				bp = xfs_btree_read_bufs(args->mp, args->tp,
 					args->agno, ltbno, 0);
 				xfs_trans_binval(args->tp, bp);
+				/*
+				 * Since blocks move to the free list without
+				 * the coordination used in xfs_bmap_finish,
+				 * we can't allow the user to write to the
+				 * block until we know that the transaction
+				 * that moved it to the free list is
+				 * permanently on disk.  The only way to
+				 * ensure that is to make this transaction
+				 * synchronous.
+				 */
+				xfs_trans_set_sync(args->tp);
 			}
 			xfs_btree_del_cursor(cnt_cur);
 			args->len = 1;
@@ -1317,6 +1328,17 @@ xfs_alloc_ag_vextent_size(
 				bp = xfs_btree_read_bufs(args->mp, args->tp,
 					args->agno, fbno, 0);
 				xfs_trans_binval(args->tp, bp);
+				/*
+				 * Since blocks move to the free list without
+				 * the coordination used in xfs_bmap_finish,
+				 * we can't allow the user to write to the
+				 * block until we know that the transaction
+				 * that moved it to the free list is
+				 * permanently on disk.  The only way to
+				 * ensure that is to make this transaction
+				 * synchronous.
+				 */
+				xfs_trans_set_sync(args->tp);
 			}
 			xfs_btree_del_cursor(cnt_cur);
 			args->len = 1;
@@ -1743,6 +1765,18 @@ xfs_alloc_fix_freelist(
 		xfs_free_ag_extent(tp, agbp, agno, bno, 1, 1);
 		bp = xfs_btree_read_bufs(mp, tp, agno, bno, 0);
 		xfs_trans_binval(tp, bp);
+		/*
+		 * Since blocks move to the free list without
+		 * the coordination used in xfs_bmap_finish,
+		 * we can't allow block to be available for reallocation
+		 * and non-transaction writing (user data)
+		 * until we know that the transaction
+		 * that moved it to the free list is
+		 * permanently on disk.  The only way to
+		 * ensure that is to make this transaction
+		 * synchronous.
+		 */
+		xfs_trans_set_sync(tp);
 	}
 	/*
 	 * Allocate and initialize the args structure.
