@@ -75,6 +75,7 @@
 #include <xfs_iops.h>
 #include <linux/dmapi_kern.h>
 #include <xfs_dmapi.h>
+#include <xfs_dfrag.h>
 
 #include <linux/smp_lock.h>
 
@@ -824,7 +825,7 @@ int xfs_ioctl (
 	case XFS_IOC_FSBULKSTAT_SINGLE:
 	case XFS_IOC_FSBULKSTAT: {
 		int		count;		/* # of records returned */
-		xfs_ino_t		inlast;		/* last inode number */
+		xfs_ino_t	inlast;		/* last inode number */
 		int		done;		/* = 1 if there are more
 						 * stats to get and if
 						 * bulkstat should be called
@@ -1064,6 +1065,16 @@ int xfs_ioctl (
 	case XFS_IOC_READLINK_BY_HANDLE: {
 
 		return xfs_readlink_by_handle(cmd, arg, filp, inode, vfsp, mp);
+	}
+
+	case XFS_IOC_SWAPEXT: {
+
+                error = xfs_swapext((struct xfs_swapext *)arg);
+
+		if (error)
+			return -error;
+		return error;
+
 	}
 
 	case XFS_IOC_GETFSUUID: {
