@@ -1298,7 +1298,7 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 		nmap = ATTR_RMTVALUE_MAPSIZE;
 		error = xfs_bmapi(NULL, args->dp, lblkno, args->rmtblkcnt,
 				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-				  &firstblock, 0, map, &nmap, 0);
+				  &firstblock, 0, map, &nmap, NULL);
 		if (error)
 			return(error);
 		ASSERT(nmap >= 1);
@@ -1352,8 +1352,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 	daddr_t dblkno;
 	caddr_t src;
 	buf_t *bp;
-	int lblkno, blkcnt, bbsperblk, valuelen;
-	int nmap, error, tmp, committed, j;
+	xfs_fileoff_t lblkno;
+	int blkcnt, bbsperblk, valuelen, nmap, error, tmp, committed, j;
 
 	mp = args->dp->i_mount;
 	src = args->value;
@@ -1361,8 +1361,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 	/*
 	 * Roll through the "value", allocating blocks on disk as required.
 	 */
-	lblkno = args->rmtblkno;
-	blkcnt = args->rmtblkcnt;
+	lblkno = 0;
+	blkcnt = XFS_B_TO_FSB(mp, args->valuelen);
 	while (blkcnt > 0) {
 		/*
 		 * Start a new transaction.
@@ -1378,6 +1378,19 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		xfs_trans_ihold(trans, args->dp);
 
 		/*
+		 * Decide where we are going to put the "remote" value.
+		 */
+		if (lblkno == 0) {
+			error = xfs_bmap_first_unused(trans, args->dp, blkcnt,
+						     &lblkno, XFS_ATTR_FORK);
+			if (error)
+				return(error);
+			args->rmtblkno = lblkno;
+			args->rmtblkcnt = blkcnt;
+		}
+
+
+		/*
 		 * Allocate a single extent, up to the size of the value.
 		 */
 		XFS_BMAP_INIT(&flist, &firstblock);
@@ -1385,7 +1398,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		error = xfs_bmapi(trans, args->dp, lblkno, blkcnt,
 				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA |
 					XFS_BMAPI_WRITE,
-				  &firstblock, 0, &map, &nmap, 0);
+				  &firstblock, blkcnt, &map, &nmap, &flist);
 		if (error)
 			goto out1;
 		ASSERT(nmap == 1);
@@ -1420,7 +1433,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		nmap = 1;
 		error = xfs_bmapi(NULL, args->dp, lblkno, args->rmtblkcnt,
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-					&firstblock, 0, &map, &nmap, 0);
+					&firstblock, 0, &map, &nmap, NULL);
 		if (error)
 			goto out3;
 		ASSERT(nmap == 1);
@@ -1525,7 +1538,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		nmap = 1;
 		error = xfs_bmapi(NULL, args->dp, lblkno, args->rmtblkcnt,
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-					&firstblock, 0, &map, &nmap, 0);
+					&firstblock, 0, &map, &nmap, &flist);
 		if (error)
 			goto out3;
 		ASSERT(nmap == 1);
