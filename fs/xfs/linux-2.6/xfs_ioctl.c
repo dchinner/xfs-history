@@ -788,7 +788,7 @@ xfs_ioctl(
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
 
-	vp = LINVFS_GET_VP(inode);
+	vp = LINVFS_GET_VN_ADDRESS(inode);
 
 	ASSERT(vp);
 
