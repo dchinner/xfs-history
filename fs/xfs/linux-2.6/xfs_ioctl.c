@@ -842,7 +842,7 @@ xfs_ioctl(
 	case XFS_IOC_DIOINFO:
 		da.d_miniosz = mp->m_sb.sb_blocksize;
 
-		da.d_mem = 4096;
+		da.d_mem = 512;
 
 		/*
 		 * this only really needs to be BBSIZE.

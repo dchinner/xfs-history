@@ -778,9 +778,7 @@ typedef struct vnode_map {
 #define	VMAP(vp, ip, vmap)	{(vmap).v_vfsp   = (vp)->v_vfsp,	\
 				 (vmap).v_number = (vp)->v_number,	\
 				 (vmap).v_ino    = (ip)->i_ino; }
-extern int	vn_cached(struct vnode *);
 extern int	vn_count(struct vnode *);
-extern int	vn_mapped(struct vnode *);
 extern void	vn_purge(struct vnode *, vmap_t *);
 extern vnode_t  *vn_get(struct vnode *, vmap_t *, uint);
 extern int	vn_revalidate(struct vnode *, int);
@@ -841,8 +839,9 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 /*
  * Some useful predicates.
  */
-#define	VN_MAPPED(vp)	(vn_mapped(vp))
-#define	VN_CACHED(vp)	(vn_cached(vp))
+#define	VN_MAPPED(vp)	(LINVFS_GET_IP(vp)->i_data.i_mmap != NULL)
+#define	VN_CACHED(vp)	(LINVFS_GET_IP(vp)->i_data.nrpages)
+#define VN_DIRTY(vp)	(!list_empty(&(LINVFS_GET_IP(vp)->i_dirty_buffers)))
 
 /*
  * Flags to VOP_SETATTR/VOP_GETATTR.

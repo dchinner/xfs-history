@@ -84,20 +84,38 @@ xfs_read(
 	ssize_t		ret;
 	xfs_fsize_t	n;
 	xfs_inode_t	*ip;
-        
-	struct file	*filp;
+	vnode_t		*vp;
+	struct file	*filp = uiop->uio_fp;
+	struct inode	*linux_ip = filp->f_dentry->d_inode;
 	char 		*buf;
 	size_t		size;
 	loff_t		*offsetp;
+	xfs_iocore_t	*io;
+	xfs_mount_t	*mp;
         
         ASSERT(uiop);                   /* we only support exactly 1  */
         ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
         ASSERT(uiop->uio_iov);      
         
-        filp = uiop->uio_fp;
         buf = uiop->uio_iov->iov_base;
         size = uiop->uio_iov->iov_len;
         offsetp = &uiop->uio_offset;
+
+	ip = XFS_BHVTOI(bdp);
+	io = &(ip->i_iocore);
+	mp = io->io_mount;
+
+	if (filp->f_flags & O_DIRECT) {
+		if (((__psint_t)buf & (linux_ip->i_sb->s_blocksize - 1)) ||
+		    (uiop->uio_offset & mp->m_blockmask) ||
+		    (size & mp->m_blockmask)) {
+			if (uiop->uio_offset == XFS_SIZE(mp, io)) {
+				return (0);
+			}
+			return XFS_ERROR(EINVAL);
+		}
+	}
+
 
 	n = XFS_MAX_FILE_OFFSET - *offsetp;
 	if ((n <= 0) || (size == 0))
@@ -106,7 +124,6 @@ xfs_read(
 	if (n < size)
 		size = n;
 
-	ip = XFS_BHVTOI(bdp);
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
 		return -EIO;
 	}
@@ -126,6 +143,11 @@ xfs_read(
 	}
 #endif /* CONFIG_XFS_DMAPI */
 
+	vp = BHV_TO_VNODE(bdp);
+
+	if ((filp->f_flags & O_DIRECT) && VN_DIRTY(vp)) {
+		pagebuf_flush(vp->v_inode, 0LL, 0);
+	}
 	ret = pagebuf_generic_file_read(filp, buf, size, offsetp); 
 	if (!(filp->f_flags & O_INVISIBLE))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
@@ -545,8 +567,7 @@ xfs_write(
 {
 	xfs_inode_t	*xip;
 	struct file	*filp = uiop->uio_fp;
-	struct dentry	*dentry = filp->f_dentry;
-	struct inode	*ip = dentry->d_inode;
+	struct inode	*ip = filp->f_dentry->d_inode;
         loff_t          *offsetp = &uiop->uio_offset;   
 	xfs_mount_t	*mp;
 	xfs_trans_t	*tp;
@@ -556,6 +577,7 @@ xfs_write(
 	xfs_fsize_t	n, limit = XFS_MAX_FILE_OFFSET;
 	xfs_iocore_t    *io;
 	vnode_t		*vp;
+	int		iolock;
 #ifdef CONFIG_XFS_DMAPI
 	int		eventsent = 0;
 	loff_t		savedsize = *offsetp;
@@ -582,7 +604,18 @@ xfs_write(
 
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
-	xfs_ilock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
+
+	if (filp->f_flags & O_DIRECT) {
+		if (((__psint_t)buf & (ip->i_sb->s_blocksize - 1)) ||
+		    (uiop->uio_offset & mp->m_blockmask) ||
+		    (size  & mp->m_blockmask)) {
+			return XFS_ERROR(EINVAL);
+		}
+	}
+
+	iolock = (filp->f_flags & O_DIRECT) ?
+			XFS_IOLOCK_SHARED : XFS_IOLOCK_EXCL;
+	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
 	isize = xip->i_d.di_size;
 
 #ifdef CONFIG_XFS_DMAPI
@@ -590,7 +623,7 @@ start:
 #endif
 	n = limit - *offsetp;
 	if (n <= 0) {
-		xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
+		xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 		return EFBIG;
 	}
 	if (n < size)
@@ -608,7 +641,7 @@ start:
 				*offsetp, size,
 				FILP_DELAY_FLAG(filp), &locktype);
 		if (ret) {
-			xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
+			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 			return -ret;
 		}
 		eventsent = 1;
@@ -652,7 +685,7 @@ start:
 		ret = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
 			isize, NULL);
 		if (ret) {
-			xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
+			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 			return(ret); /* JIMJIM should this be negative? */
 		}
 	}
@@ -661,6 +694,10 @@ start:
 #ifdef CONFIG_XFS_DMAPI
 retry:
 #endif
+	if (filp->f_flags & O_DIRECT) {
+		xfs_inval_cached_pages(vp, &xip->i_iocore, *offsetp,
+			(xfs_off_t) size, (void *)vp);
+	}
 	ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
 
 #ifdef CONFIG_XFS_DMAPI
@@ -785,7 +822,7 @@ retry:
 		}
 	}	
 	
-	xfs_iunlock(xip, XFS_IOLOCK_EXCL);
+	xfs_iunlock(xip, iolock);
 	return(ret);
 }
 
@@ -2082,12 +2119,6 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
  
 	/* Ok now write out an unmount record */
 	xfs_log_unmount_write(mp);            
-}
-
-dev_t
-XFS_pb_target(page_buf_t *bp) {
-
-	return bp->pb_target->i_dev;
 }
 
 void

@@ -89,9 +89,6 @@ STATIC ssize_t linvfs_read(
         uio_t uio;
         iovec_t iov;
 	
-	XFS_STATS_INC(xs_read_calls);
-	XFS_STATS64_ADD(xs_read_bytes, size);
-
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
 		printk("EXIT linvfs_read -EBADF\n");
@@ -99,6 +96,7 @@ STATIC ssize_t linvfs_read(
 	}
 
 	inode = filp->f_dentry->d_inode;
+
 	vp = LINVFS_GET_VP(inode);
 
 	ASSERT(vp);
@@ -109,6 +107,9 @@ STATIC ssize_t linvfs_read(
         uio.uio_iovcnt = 1;
         uio.uio_iov->iov_base = buf;
         uio.uio_iov->iov_len = uio.uio_resid = size;
+
+	XFS_STATS_INC(xs_read_calls);
+	XFS_STATS64_ADD(xs_read_bytes, size);
         
 	VOP_READ(vp, &uio, 0, NULL, NULL, rv);
         *offset = uio.uio_offset;

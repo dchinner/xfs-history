@@ -353,45 +353,6 @@ vn_count(struct vnode *vp)
 	return atomic_read(&inode->i_count);
 }
 
-
-/*
- * "Temporary" routine to return the linux inode
- * 'pages mapped' state, after everybody else can
- * directly reference the inode (header magic!),
- * this routine is dead meat..
- */
-int
-vn_mapped(struct vnode *vp)
-{
-	struct inode *inode;
-
-	inode = LINVFS_GET_IP(vp);
-
-	ASSERT(inode);
-
-	return inode->i_data.i_mmap != NULL;
-}
-
-
-/*
- * "Temporary" routine to return the linux inode
- * # pages cached count, after everybody else can
- * directly reference the inode (header magic!),
- * this routine is dead meat..
- */
-int
-vn_cached(struct vnode *vp)
-{
-	struct inode *inode;
-
-	inode = LINVFS_GET_IP(vp);
-
-	ASSERT(inode);
-
-	return inode->i_data.nrpages;
-}
-
-
 /*
  * "hash" the linux inode.
  */
