@@ -1,4 +1,4 @@
-#ident "$Revision: 1.233 $"
+#ident "$Revision: 1.234 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -266,11 +266,12 @@ int    xfs_bioerror_relse(buf_t *bp);
 #define	xfs_rw_enter_trace(tag, ip, uiop, ioflags)
 #define	xfs_iomap_enter_trace(tag, ip, offset, count);
 #define	xfs_iomap_map_trace(tag, ip, offset, count, bmapp, imapp)
+#define xfs_inval_cached_trace(ip, offset, len, first, last)
 #else
 /*
  * Trace routine for the read/write path.  This is the routine entry trace.
  */
-void
+static void
 xfs_rw_enter_trace(
 	int		tag,	     
 	xfs_inode_t	*ip,
@@ -303,7 +304,7 @@ xfs_rw_enter_trace(
 		     (void*)(ip->i_new_size & 0xffffffff));
 }
 
-void
+static void
 xfs_iomap_enter_trace(
 	int		tag,
 	xfs_inode_t	*ip,
@@ -333,7 +334,7 @@ xfs_iomap_enter_trace(
 		     (void*)0);
 }
 
-void
+static void
 xfs_iomap_map_trace(
 	int		tag,	     
 	xfs_inode_t	*ip,
@@ -363,6 +364,35 @@ xfs_iomap_map_trace(
 		     (void*)(__psint_t)(imapp->br_startoff),
 		     (void*)((unsigned long)(imapp->br_blockcount)),
 		     (void*)(__psint_t)(imapp->br_startblock));
+}
+
+static void
+xfs_inval_cached_trace(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	off_t		len,
+	off_t		first,
+	off_t		last)
+{
+	if (ip->i_rwtrace == NULL)
+		return;
+	ktrace_enter(ip->i_rwtrace,
+		(void *)(__psint_t)XFS_INVAL_CACHED,
+		(void *)ip,
+		(void *)(((__uint64_t)offset >> 32) & 0xffffffff),
+		(void *)(offset & 0xffffffff),
+		(void *)(((__uint64_t)len >> 32) & 0xffffffff),
+		(void *)(len & 0xffffffff),
+		(void *)(((__uint64_t)first >> 32) & 0xffffffff),
+		(void *)(first & 0xffffffff),
+		(void *)(((__uint64_t)last >> 32) & 0xffffffff),
+		(void *)(last & 0xffffffff),
+		(void *)0,
+		(void *)0,
+		(void *)0,
+		(void *)0,
+		(void *)0,
+		(void *)0);
 }
 #endif	/* XFS_RW_TRACE */
 	     
@@ -4313,6 +4343,9 @@ xfs_delalloc_cleanup(
 		n = 0;
 		while (n < nimaps) {
 			if (imap[n].br_startblock == DELAYSTARTBLOCK) {
+				if (!XFS_FORCED_SHUTDOWN(ip->i_mount))
+					xfs_force_shutdown(ip->i_mount,
+						XFS_METADATA_IO_ERROR);
 				error = xfs_bunmapi(NULL, ip,
 						    imap[n].br_startoff,
 						    imap[n].br_blockcount,
@@ -5300,6 +5333,8 @@ xfs_inval_cached_pages(
 	if (flush_end > (__uint64_t)LONGLONG_MAX) {
 		flush_end = LONGLONG_MAX;
 	}
+	xfs_inval_cached_trace(ip, offset, len, ctooff(offtoct(offset)),
+		flush_end);
 	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), (off_t)flush_end,
 			FI_REMAPF_LOCKED);
 	if (relock) {
