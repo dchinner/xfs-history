@@ -15,6 +15,7 @@ typedef struct xfs_inode_log_format {
 	unsigned short		ilf_size;	/* size of this item */
 	uint			ilf_fields;	/* flags for fields logged */
 	uint			ilf_dsize;	/* size of data/ext/root */
+	xfs_ino_t		ilf_ino;	/* inode number */
 	union {
 		dev_t		ilfu_rdev;	/* rdev value for dev inode*/
 		uuid_t		ilfu_uuid;	/* mount point value */
