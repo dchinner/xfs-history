@@ -70,7 +70,7 @@ typedef struct xfs_trans_reservations {
 struct cred;
 struct vfs;
 struct vnode;
-struct xfs_args;
+struct xfs_mount_args;
 struct xfs_ihash;
 struct xfs_chash;
 struct xfs_inode;
@@ -117,32 +117,17 @@ typedef xfs_fsize_t	(*xfs_setsize_t)(void *, xfs_off_t);
 typedef xfs_fsize_t	(*xfs_lastbyte_t)(void *);
 
 typedef struct xfs_ioops {
-	xfs_dio_write_t		xfs_dio_write_func;
-	xfs_dio_read_t		xfs_dio_read_func;
-	xfs_strat_write_t	xfs_strat_write_func;
 	xfs_bmapi_t		xfs_bmapi_func;
 	xfs_bmap_eof_t		xfs_bmap_eof_func;
-	xfs_rsync_t		xfs_rsync_func;
-	xfs_lck_map_shared_t	xfs_lck_map_shared;
 	xfs_lock_t		xfs_ilock;
 	xfs_lock_demote_t	xfs_ilock_demote;
 	xfs_lock_nowait_t	xfs_ilock_nowait;
 	xfs_unlk_t		xfs_unlock;
 	xfs_chgtime_t		xfs_chgtime;
 	xfs_size_t		xfs_size_func;
-	xfs_setsize_t		xfs_setsize_func;
 	xfs_lastbyte_t		xfs_lastbyte;
 } xfs_ioops_t;
 
-
-#define XFS_DIO_WRITE(mp, diop) \
-	(*(mp)->m_io_ops.xfs_dio_write_func)(diop)
-
-#define XFS_DIO_READ(mp, diop) \
-	(*(mp)->m_io_ops.xfs_dio_read_func)(diop)
-
-#define XFS_STRAT_WRITE(mp, io, bp) \
-	(*(mp)->m_io_ops.xfs_strat_write_func)(io, bp)
 
 #define XFS_BMAPI(mp, trans,io,bno,len,f,first,tot,mval,nmap,flist)	\
 	(*(mp)->m_io_ops.xfs_bmapi_func) \
@@ -152,20 +137,8 @@ typedef struct xfs_ioops {
 	(*(mp)->m_io_ops.xfs_bmap_eof_func) \
 		((io)->io_obj, endoff, whichfork, eof)
 
-#define XFS_RSYNC(mp, io, ioflag, start, end) \
-	(*(mp)->m_io_ops.xfs_rsync_func)((io)->io_obj, ioflag, start, end)
-
-#define XFS_LCK_MAP_SHARED(mp, io) \
-	(*(mp)->m_io_ops.xfs_lck_map_shared)((io)->io_obj)
-
-#define XFS_UNLK_MAP_SHARED(mp, io, mode) \
-	(*(mp)->m_io_ops.xfs_unlock)((io)->io_obj, mode)
-
 #define XFS_ILOCK(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_ilock)((io)->io_obj, mode)
-
-#define XFS_ILOCK_NOWAIT(mp, io, mode) \
-	(*(mp)->m_io_ops.xfs_ilock_nowait)((io)->io_obj, mode)
 
 #define XFS_IUNLOCK(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_unlock)((io)->io_obj, mode)
@@ -173,14 +146,8 @@ typedef struct xfs_ioops {
 #define XFS_ILOCK_DEMOTE(mp, io, mode) \
 	(*(mp)->m_io_ops.xfs_ilock_demote)((io)->io_obj, mode)
 
-#define XFS_CHGTIME(mp, io, flags) \
-	(*(mp)->m_io_ops.xfs_chgtime)((io)->io_obj, flags)
-
 #define XFS_SIZE(mp, io) \
 	(*(mp)->m_io_ops.xfs_size_func)((io)->io_obj)
-
-#define XFS_SETSIZE(mp, io, newsize) \
-	(*(mp)->m_io_ops.xfs_setsize_func)((io)->io_obj, newsize)
 
 #define XFS_LASTBYTE(mp, io) \
 	(*(mp)->m_io_ops.xfs_lastbyte)((io)->io_obj)

@@ -40,48 +40,14 @@ xfs_size_fn(
 	return (ip->i_d.di_size);
 }
 
-static xfs_fsize_t
-xfs_setsize_fn(
-	xfs_inode_t	*ip,
-	xfs_fsize_t	newsize)
-{
-	xfs_fsize_t	isize;
-
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-	if (newsize  > ip->i_d.di_size) {
-		vnode_t		*vp = XFS_ITOV(ip);
-		struct inode	*inode = LINVFS_GET_IP(vp);
-
-		inode->i_size = ip->i_d.di_size = newsize;
-		ip->i_update_core = 1;
-		ip->i_update_size = 1;
-		isize = newsize;
-	} else {
-		isize = ip->i_d.di_size;
-	}
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-
-	return isize;
-}
-
-
 xfs_ioops_t	xfs_iocore_xfs = {
-/*	xfs_dio_write_func:	(xfs_dio_write_t) xfs_dio_write, */
-	xfs_dio_write_func:	(xfs_dio_write_t)fs_nosys,
-/*	xfs_dio_read_func:	(xfs_dio_read_t) xfs_dio_read, */
-	xfs_dio_read_func:	(xfs_dio_read_t)fs_nosys,
-/*	xfs_strat_write_func:	(xfs_strat_write_t) xfs_strat_write, */
-	xfs_strat_write_func:	(xfs_strat_write_t)fs_nosys,
 	xfs_bmapi_func:		(xfs_bmapi_t) xfs_bmapi,
 	xfs_bmap_eof_func:	(xfs_bmap_eof_t) xfs_bmap_eof,
-	xfs_lck_map_shared:	(xfs_lck_map_shared_t) xfs_ilock_map_shared,
 	xfs_ilock:		(xfs_lock_t) xfs_ilock,
 	xfs_ilock_demote:	(xfs_lock_demote_t) xfs_ilock_demote,
 	xfs_ilock_nowait:	(xfs_lock_nowait_t) xfs_ilock_nowait,
 	xfs_unlock:		(xfs_unlk_t) xfs_iunlock,
-	xfs_chgtime:		(xfs_chgtime_t) xfs_ichgtime,
 	xfs_size_func:		(xfs_size_t) xfs_size_fn,
-	xfs_setsize_func:	(xfs_setsize_t) xfs_setsize_fn,
 	xfs_lastbyte:		(xfs_lastbyte_t) xfs_file_last_byte,
 };
 
