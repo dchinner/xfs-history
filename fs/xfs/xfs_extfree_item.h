@@ -1,7 +1,7 @@
 #ifndef	_XFS_EXTFREE_ITEM_H
 #define	_XFS_EXTFREE_ITEM_H
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.6 $"
 
 typedef struct xfs_extent {
 	xfs_dfsbno_t	ext_start;
@@ -20,6 +20,11 @@ typedef struct xfs_efi_log_format {
 	__uint64_t		efi_id;		/* efi identifier */
 	xfs_extent_t		efi_extents[1];	/* array of extents to free */
 } xfs_efi_log_format_t;
+
+/*
+ * Max number of extents in fast allocation path.
+ */
+#define	XFS_EFI_MAX_FAST_EXTENTS	16
 
 /*
  * Define EFI flags.
@@ -63,6 +68,15 @@ typedef struct xfs_efd_log_item {
 	uint			efd_next_extent;
 	xfs_efd_log_format_t	efd_format;
 } xfs_efd_log_item_t;
+
+/*
+ * Max number of extents in fast allocation path.
+ */
+#define	XFS_EFD_MAX_FAST_EXTENTS	16
+
+struct zone;
+extern struct zone	*xfs_efi_zone;
+extern struct zone	*xfs_efd_zone;
 
 xfs_efi_log_item_t	*xfs_efi_init(xfs_mount_t *, uint);
 xfs_efd_log_item_t	*xfs_efd_init(xfs_mount_t *, xfs_efi_log_item_t *,
