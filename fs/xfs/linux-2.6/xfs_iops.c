@@ -529,7 +529,9 @@ struct inode_operations linvfs_file_inode_operations =
   NULL,	 /*  truncate  */
   NULL,  /*  permission  */
   NULL,	 /*  smap  */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
   NULL,  /*  updatepage  */
+#endif
   linvfs_revalidate
 };
 
