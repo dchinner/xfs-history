@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.74 $"
+#ident	"$Revision: 1.75 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2486,11 +2486,15 @@ xfs_bmapi(
 		}
 		bno = mval->br_startoff + mval->br_blockcount;
 		len = end - bno;
-		if (n > 0 && mval->br_startblock != DELAYSTARTBLOCK &&
-		    mval[-1].br_startblock != DELAYSTARTBLOCK &&
-		    mval[-1].br_startblock != HOLESTARTBLOCK &&
-		    mval->br_startblock ==
-		    mval[-1].br_startblock + mval[-1].br_blockcount) {
+		if (n > 0 && mval->br_startoff == mval[-1].br_startoff) {
+			ASSERT(mval->br_startblock == mval[-1].br_startblock);
+			ASSERT(mval->br_blockcount > mval[-1].br_blockcount);
+			mval[-1].br_blockcount = mval->br_blockcount;
+		} else if (n > 0 && mval->br_startblock != DELAYSTARTBLOCK &&
+			   mval[-1].br_startblock != DELAYSTARTBLOCK &&
+			   mval[-1].br_startblock != HOLESTARTBLOCK &&
+			   mval->br_startblock ==
+			   mval[-1].br_startblock + mval[-1].br_blockcount) {
 			ASSERT(mval->br_startoff ==
 			       mval[-1].br_startoff + mval[-1].br_blockcount);
 			mval[-1].br_blockcount += mval->br_blockcount;
