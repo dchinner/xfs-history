@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.93 $"
+#ident	"$Revision: 1.94 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -62,6 +62,7 @@
 #include <sys/fs/xfs_trans_priv.h>
 #include <sys/fs/xfs_bit.h>
 #include <sys/fs/xfs_quota.h>
+#include <sys/fs/xfs_dqblk.h>
 #include <sys/fs/xfs_dquot.h>
 #include <sys/fs/xfs_qm.h>
 
@@ -2516,10 +2517,7 @@ xlog_recover_do_quotaoff_trans(xlog_t			*log,
 	
 	qoff_f = (xfs_qoff_logformat_t *)item->ri_buf[0].i_addr;
 	ASSERT(qoff_f);
-#ifdef QUOTADEBUG
-	cmn_err(CE_NOTE, "QUOTAOFF 0x%x record found in recovery\n", 
-		qoff_f->qf_flags);
-#endif	
+
 	/*
 	 * The logitem format's flag tells us if this was user quotaoff, 
 	 * project quotaoff or both. 
@@ -2561,12 +2559,8 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	 */
 	type = recddq->d_flags & (XFS_DQ_USER|XFS_DQ_PROJ);
 	ASSERT(type);
-	if (log->l_quotaoffs_flag & type) {
-#ifdef QUOTADEBUG
-		cmn_err(CE_NOTE, "skipping");
-#endif
+	if (log->l_quotaoffs_flag & type) 
 		return (0);
-	}
 
 	dq_f = (xfs_dq_logformat_t *)item->ri_buf[0].i_addr;
 	ASSERT(dq_f);
@@ -2590,8 +2584,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		brelse(bp);
 		return error;
 	}
-	ddq = (xfs_disk_dquot_t *)((xfs_dqblk_t *)bp->b_un.b_addr +
-				   dq_f->qlf_boffset);
+	ddq = (xfs_disk_dquot_t *)((char *)bp->b_un.b_addr + dq_f->qlf_boffset);
 	
 	/* 
 	 * At least the magic num portion should be on disk because this
