@@ -55,7 +55,7 @@ typedef struct xfs_bmbt_rec
 #define	ISNULLSTARTBLOCK(x)	(((x) & STARTBLOCKMASK) == STARTBLOCKMASK)
 #define	NULLSTARTBLOCK(k)	\
 	((xfs_fsblock_t)(STARTBLOCKMASK | (long long)(k)))
-#define	STARTBLOCKVAL(x)	((x) & ~STARTBLOCKMASK)
+#define	STARTBLOCKVAL(x)	((xfs_extlen_t)((x) & ~STARTBLOCKMASK))
 
 /*
  * Incore version of above.
