@@ -794,6 +794,14 @@ xfs_buf_item_relse(buf_t *bp)
 	if ((bp->b_fsprivate == NULL) && (bp->b_iodone != NULL)) {
 		bp->b_iodone = NULL;
 	}
+
+#ifdef XFSDEBUG
+	kmem_free(bip->bli_orig, bp->b_bcount);
+	bip->bli_orig = NULL;
+	kmem_free(bip->bli_logged, bp->b_bcount);
+	bip->bli_logged = NULL;
+#endif /* XFSDEBUG */
+
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
 		  ((bip->bli_format.blf_map_size - 1) * sizeof(int)));
 }
