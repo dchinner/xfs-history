@@ -59,7 +59,6 @@
 	  (off) += (bytes);}
 
 /* Local miscellaneous function prototypes */
-STATIC void	 xlog_init_log(xlog_t *log);
 STATIC xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
 STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
 STATIC int	 xlog_find_zeroed(xlog_t *log, daddr_t *blk_no);
@@ -442,7 +441,6 @@ xfs_log_mount(xfs_mount_t	*mp,
 		return 0;
 
 	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
-	xlog_init_log(log);
 	if (xlog_recover(log) != 0) {
 		xlog_unalloc_log(log);
 		return XFS_ERECOVER;
@@ -499,6 +497,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	      iclog->ic_state == XLOG_STATE_DIRTY))
 		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
 				  &iclog->ic_forcesema, 0);
+	xlog_state_put_ticket(log, tic);
 	xlog_unalloc_log(log);
 
 	return 0;
@@ -675,7 +674,12 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	       daddr_t		blk_offset,
 	       int		num_bblks)
 {
-	xlog_t *log;
+	xlog_t			*log;
+	xlog_rec_header_t	*head;
+	xlog_in_core_t		**iclogp;
+	xlog_in_core_t		*iclog, *prev_iclog;
+	buf_t			*bp;
+	int			i;
 
 	log = mp->m_log = (void *)kmem_zalloc(sizeof(xlog_t), 0);
 	
@@ -695,30 +699,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_grant_reserve_cycle = 1;
 	log->l_grant_write_bytes = 0;
 	log->l_grant_write_cycle = 1;
-}	/* xlog_alloc_log */
 
-
-/*
- * 
- *
- * Perform all the specific initialization required during a log mount.
- * Values passed down from xfs_log_mount() were placed in log structure
- * in xlog_alloc_log().
- */
-STATIC void
-xlog_init_log(xlog_t *log)
-{
-	xfs_mount_t		*mp;
-	xlog_rec_header_t	*head;
-	xlog_in_core_t		**iclogp;
-	xlog_in_core_t		*iclog, *prev_iclog;
-	caddr_t			unaligned;
-	dev_t			log_dev;
-	buf_t			*bp;
-	int			i;
-	
-	log_dev = log->l_dev;
-	mp = log->l_mp;
 	/* XLOG_RECORD_BSIZE must be mult of BBSIZE; see xlog_rec_header_t */
 	ASSERT((XLOG_RECORD_BSIZE & BBMASK) == 0);
 
@@ -775,9 +756,11 @@ xlog_init_log(xlog_t *log)
 	}
 	log->l_iclog_bak[i] = 0;
 	log->l_iclog_size = XLOG_RECORD_BSIZE;
-	*iclogp = log->l_iclog;		/* complete ring */
-	log->l_iclog->ic_prev = prev_iclog;	/* re-write prev ptr in first iclog */
-}	/* xlog_init_log */
+	*iclogp = log->l_iclog;			/* complete ring */
+	log->l_iclog->ic_prev = prev_iclog;	/* re-write 1st prev ptr */
+	
+	return log;
+}	/* xlog_alloc_log */
 
 
 /*
@@ -977,13 +960,40 @@ xlog_sync(xlog_t		*log,
 
 
 /*
- * Unallocate a log
+ * Unallocate a log structure
  */
 void
 xlog_unalloc_log(xlog_t *log)
 {
-	cmn_err(CE_WARN, "xlog_unalloc: FIX ME I'M A MEMORY LEAK");
-}	/* xlog_unalloc */
+	xlog_in_core_t	*iclog, *next_iclog;
+	xlog_ticket_t	*tic, *next_tic;
+	int		i;
+
+	iclog = log->l_iclog;
+	for (i=0; i<XLOG_NUM_ICLOGS; i++) {
+		freesema(&iclog->ic_forcesema);
+		freerbuf(iclog->ic_bp);
+		next_iclog = iclog->ic_next;
+		kmem_free(iclog, sizeof(xlog_in_core_t));
+		iclog = next_iclog;
+	}
+	freesema(&log->l_flushsema);
+	freesplock(log->l_icloglock);
+	freesplock(log->l_grant_lock);
+	if (log->l_ticket_cnt != log->l_ticket_tcnt) {
+		cmn_err(CE_WARN,
+			"xlog_unalloc_log: (cnt: %d, total: %d)",
+			log->l_ticket_cnt, log->l_ticket_tcnt);
+		ASSERT(log->l_ticket_cnt == log->l_ticket_tcnt);
+	} else {
+		tic = log->l_unmount_free;
+		while (tic) {
+			next_tic = tic->t_next;
+			kmem_free(tic, NBPP);
+			tic = next_tic;
+		}
+	}
+}	/* xlog_unalloc_log */
 
 
 /*
@@ -1972,30 +1982,44 @@ xlog_state_ticket_alloc(xlog_t *log)
 	xlog_ticket_t	*t_list;
 	caddr_t		buf;
 	int		spl;
-	uint		i = (NBPP / sizeof(xlog_ticket_t)) - 1;
+	uint		i = (NBPP / sizeof(xlog_ticket_t)) - 2;
 
 	/*
-	 * XXXmiken: may want to account for differing sizes of pointers
-	 * or allocate one page at a time.  The kmem_zalloc may sleep, so
-	 * we shouldn't be holding the global lock.
+	 * The kmem_zalloc may sleep, so we shouldn't be holding the
+	 * global lock.  XXXmiken: may want to use zone allocator.
 	 */
 	buf = (caddr_t) kmem_zalloc(NBPP, 0);
 
 	spl = LOG_LOCK(log);
-	t_list = log->l_freelist = (xlog_ticket_t *)buf;
+
+	/* Attach 1st ticket to Q, so we can keep track of allocated memory */
+	t_list = (xlog_ticket_t *)buf;
+	t_list->t_next = log->l_unmount_free;
+	log->l_unmount_free = t_list;
+	log->l_ticket_cnt++;
+	log->l_ticket_tcnt++;
+
+	/* Next ticket becomes first ticket attached to ticket free list */
+	log->l_freelist = ++t_list;
+	log->l_ticket_cnt++;
+	log->l_ticket_tcnt++;
+
+	/* Cycle through rest of alloc'ed memory, building up free Q */
 	for ( ; i > 0; i--) {
-		t_list->t_next = t_list+1;
-		t_list = t_list->t_next;
+		t_list->t_next = ++t_list;
+		log->l_ticket_cnt++;
+		log->l_ticket_tcnt++;
 	}
 	t_list->t_next = 0;
 	log->l_tail = t_list;
 	LOG_UNLOCK(log, spl);
-
 }	/* xlog_state_ticket_alloc */
 
 
 /*
  * Put ticket into free list
+ *
+ * Assumption: log lock is held around this call.
  */
 STATIC void
 xlog_ticket_put(xlog_t		*log,
@@ -2003,7 +2027,7 @@ xlog_ticket_put(xlog_t		*log,
 {
 	xlog_ticket_t *t_list;
 
-	freesema(&(ticket->t_sema));
+	freesema(&ticket->t_sema);
 #ifndef DEBUG
 	/* real code will want to use LIFO for caching */
 	ticket->t_next = log->l_freelist;
@@ -2015,6 +2039,7 @@ xlog_ticket_put(xlog_t		*log,
 	log->l_tail->t_next = ticket;
 	log->l_tail	    = ticket;
 #endif /* DEBUG */
+	log->l_ticket_cnt++;
 }	/* xlog_ticket_put */
 
 
@@ -2037,6 +2062,7 @@ xlog_ticket_get(xlog_t		*log,
 	spl = LOG_LOCK(log);
 	tic		= log->l_freelist;
 	log->l_freelist	= tic->t_next;
+	log->l_ticket_cnt--;
 	LOG_UNLOCK(log, spl);
 
 	/*
