@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.102 $"
+#ident	"$Revision: 1.103 $"
 
 /*
  * Free space allocation for XFS.
@@ -2053,9 +2053,16 @@ xfs_alloc_fix_freelist(
 		 * that moved it to the free list is
 		 * permanently on disk.  The only way to
 		 * ensure that is to make this transaction
-		 * synchronous.
+		 * synchronous.  The one exception to this
+		 * is in the case of wsync-mounted filesystem
+		 * where we know that any block that made it
+		 * onto the freelist won't be seen again in
+		 * the file from which it came since the transactions
+		 * that free metadata blocks or shrink inodes in
+		 * wsync filesystems are all themselves synchronous.
 		 */
-		xfs_trans_set_sync(tp);
+		if (!(mp->m_flags & XFS_MOUNT_WSYNC))
+			xfs_trans_set_sync(tp);
 	}
 	/*
 	 * Initialize the args structure.
