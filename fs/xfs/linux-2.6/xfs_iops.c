@@ -313,7 +313,27 @@ int linvfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	       struct inode *ndir, struct dentry *ndentry)
 {
-  return(-ENOSYS);
+	int		error;
+	vnode_t		*fvp;	/* from directory */
+	vnode_t		*tvp;	/* target directory */
+	pathname_t	pn;
+	pathname_t      *pnp = &pn;
+	struct inode	*ip = NULL;
+
+	bzero(pnp, sizeof(pathname_t));
+	pnp->pn_complen = ndentry->d_name.len;
+	pnp->pn_hash = ndentry->d_name.hash;
+	pnp->pn_path = (char *)ndentry->d_name.name;
+
+	fvp = LINVFS_GET_VP(odir);
+	tvp = LINVFS_GET_VP(ndir);
+
+	VOP_RENAME(fvp, (char *)odentry->d_name.name, tvp,
+		   (char *)ndentry->d_name.name, pnp, sys_cred, error);
+	if (error)
+		return -error;
+
+	return 0;
 }
 
 
