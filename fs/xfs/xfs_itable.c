@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.47 $"
+#ident	"$Revision: 1.48 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -6,7 +6,6 @@
 #include <sys/vnode.h>
 #include <sys/systm.h>
 #include <sys/sema.h>
-#include <specfs/snode.h>
 #include <sys/immu.h>
 #include <sys/kmem.h>
 #include <sys/time.h>
