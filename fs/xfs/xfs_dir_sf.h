@@ -49,6 +49,18 @@ typedef struct xfs_dir_sf_sort {
 	char		*name;		/* name value, pointer into buffer */
 } xfs_dir_sf_sort_t;
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_GET_DIRINO)
+void xfs_dir_sf_get_dirino(xfs_dir_ino_t *from, xfs_ino_t *to);
+#define	XFS_DIR_SF_GET_DIRINO(from,to)		xfs_dir_sf_get_dirino(from, to)
+#else
+#define	XFS_DIR_SF_GET_DIRINO(from,to)	(*(xfs_dir_ino_t *)(to) = *(from))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_PUT_DIRINO)
+void xfs_dir_sf_put_dirino(xfs_ino_t *from, xfs_dir_ino_t *to);
+#define	XFS_DIR_SF_PUT_DIRINO(from,to)		xfs_dir_sf_put_dirino(from, to)
+#else
+#define	XFS_DIR_SF_PUT_DIRINO(from,to)	(*(to) = *(xfs_dir_ino_t *)(from))
+#endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_DIR_SF_ENTSIZE_BYNAME)
 int xfs_dir_sf_entsize_byname(int len);
 #define XFS_DIR_SF_ENTSIZE_BYNAME(len)		xfs_dir_sf_entsize_byname(len)
