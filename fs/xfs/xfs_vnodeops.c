@@ -1,4 +1,4 @@
-#ident "$Revision: 1.247 $"
+#ident "$Revision: 1.248 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1676,10 +1676,15 @@ xfs_inactive(
 
 				xfs_ilock(ip, XFS_ILOCK_EXCL |
 					  XFS_IOLOCK_EXCL);
-				ASSERT(ip->i_df.if_bytes > 0);
-				xfs_idata_realloc(ip, -(ip->i_df.if_bytes),
-					XFS_DATA_FORK);
-				ASSERT(ip->i_df.if_bytes == 0);
+				/*
+				 * Zero length symlinks _can_ exist.
+				 */
+				if (ip->i_df.if_bytes > 0) {
+					xfs_idata_realloc(ip, 
+							  -(ip->i_df.if_bytes),
+							  XFS_DATA_FORK);
+					ASSERT(ip->i_df.if_bytes == 0);
+				}
 			}
 
 			xfs_trans_ijoin(tp, ip,
@@ -6793,7 +6798,7 @@ xfs_error(
 		break;
 	case 2:
 		dev = mp->m_rtdev;
-		prdev("Process [%s] ran out of disk space",
+		prdev("Process [%s] ran out of rt disk space",
 		      dev, get_current_name());
 		break;
 	}

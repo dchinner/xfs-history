@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3399,6 +3399,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	else 
 		qprintf("quotainfo NULL\n");
 	printflags(mp->m_qflags, quota_flags,"quotaflags");
+	qprintf("\n");
 }
 
 
