@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -52,7 +52,6 @@
  * External functions & data not in header files.
  */
 extern vfs_t		*devtovfs(dev_t);
-extern char		*fmtll(__int64_t, char);
 extern char		*fmtuuid(uuid_t *);
 #ifdef DEBUG
 extern ktrace_entry_t	*ktrace_first(ktrace_t *, ktrace_snap_t *);
@@ -388,10 +387,9 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	r.l2 = (xfs_bmbt_rec_base_t)ktep->val[10];
 	r.l3 = (xfs_bmbt_rec_base_t)ktep->val[11];
 	xfs_convert_extent(&r, &o, &b, &c);
-	qprintf(" offset %s block %s",
-		fmtll(o, 'd'),
+	qprintf(" offset %lld block %s", o,
 		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
-	qprintf(" count %s\n", fmtll(c, 'd'));
+	qprintf(" count %lld\n", c);
 	if ((__psint_t)ktep->val[5] != 2)
 		return 1;
 	r.l0 = (xfs_bmbt_rec_base_t)ktep->val[12];
@@ -399,10 +397,9 @@ xfs_bmap_trace_entry(ktrace_entry_t *ktep)
 	r.l2 = (xfs_bmbt_rec_base_t)ktep->val[14];
 	r.l3 = (xfs_bmbt_rec_base_t)ktep->val[15];
 	xfs_convert_extent(&r, &o, &b, &c);
-	qprintf(" offset %s block %s",
-		fmtll(o, 'd'),
+	qprintf(" offset %lld block %s", o,
 		xfs_fmtfsblock((xfs_fsblock_t)b, ip->i_mount));
-	qprintf(" count %s\n", fmtll(c, 'd'));
+	qprintf(" count %lld\n", c);
 	return 1;
 }
 
@@ -545,11 +542,10 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 {
 	int i;
 
-	qprintf("magic 0x%x level %d numrecs %d leftsib %s ",
+	qprintf("magic 0x%x level %d numrecs %d leftsib %llx ",
 		bt->bb_magic, bt->bb_level, bt->bb_numrecs,
-		fmtll(bt->bb_leftsib, 'x'));
-	qprintf("rightsib %s\n",
-		fmtll(bt->bb_rightsib, 'x'));
+		bt->bb_leftsib);
+	qprintf("rightsib %llx\n", bt->bb_rightsib);
 	if (bt->bb_level == 0) {
 
 		for (i = 1; i <= bt->bb_numrecs; i++) {
@@ -561,9 +557,9 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 			r = (xfs_bmbt_rec_32_t *)XFS_BTREE_REC_ADDR(bsz,
 				xfs_bmbt, bt, i, 0);
 			xfs_convert_extent(r, &o, &s, &c);
-			qprintf("rec %d startoff %s ", i, fmtll(o, 'd'));
-			qprintf("startblock %s ", fmtll(s, 'x'));
-			qprintf("blockcount %s\n", fmtll(c, 'd'));
+			qprintf("rec %d startoff %lld ", i, o);
+			qprintf("startblock %llx ", s);
+			qprintf("blockcount %lld\n", c);
 		}
 	} else {
 		int mxr;
@@ -575,9 +571,9 @@ xfs_btbmap(xfs_bmbt_block_t *bt, int bsz)
 
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_bmbt, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_bmbt, bt, i, mxr);
-			qprintf("key %d startoff %s ",
-				i, fmtll(k->br_startoff, 'd'));
-			qprintf("ptr %s\n", fmtll(*p, 'x'));
+			qprintf("key %d startoff %lld ",
+				i, k->br_startoff);
+			qprintf("ptr %llx\n", *p);
 		}
 	}
 }
@@ -599,9 +595,9 @@ xfs_btino(xfs_inobt_block_t *bt, int bsz)
 			xfs_inobt_rec_t *r;
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_inobt, bt, i, 0);
-			qprintf("rec %d startino 0x%x freecount %d, free %s\n",
+			qprintf("rec %d startino 0x%x freecount %d, free %llx\n",
 				i, r->ir_startino, r->ir_freecount,
-				fmtll(r->ir_free, 'x'));
+				r->ir_free);
 		}
 	} else {
 		int mxr;
@@ -680,8 +676,8 @@ xfs_efd_item_print(xfs_efd_log_item_t *efdp)
 	qprintf("efd extents:\n");
 	ep = &(efdp->efd_format.efd_extents[0]);
 	for (i = 0; i < efdp->efd_next_extent; i++, ep++) {
-		qprintf("    block %s len %d\n",
-			fmtll(ep->ext_start, 'x'), ep->ext_len);
+		qprintf("    block %llx len %d\n",
+			ep->ext_start, ep->ext_len);
 	}
 }
 
@@ -697,12 +693,12 @@ xfs_efi_item_print(xfs_efi_log_item_t *efip)
 	qprintf("size %d nextents %d next extent %d\n",
 		efip->efi_format.efi_size, efip->efi_format.efi_nextents,
 		efip->efi_next_extent);
-	qprintf("id %s\n", fmtll(efip->efi_format.efi_id, 'x'));
+	qprintf("id %llx\n", efip->efi_format.efi_id);
 	qprintf("efi extents:\n");
 	ep = &(efip->efi_format.efi_extents[0]);
 	for (i = 0; i < efip->efi_next_extent; i++, ep++) {
-		qprintf("    block %s len %d\n",
-			fmtll(ep->ext_start, 'x'), ep->ext_len);
+		qprintf("    block %llx len %d\n",
+			ep->ext_start, ep->ext_len);
 	}
 }
 
@@ -941,9 +937,9 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 		dip->di_atime.t_sec, dip->di_atime.t_nsec,
 		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
 		dip->di_ctime.t_sec, dip->di_ctime.t_nsec);
-	qprintf("size %s ", fmtll(dip->di_size, 'x'));
-	qprintf("nblocks %s extsize 0x%x nextents 0x%x nattrextents 0x%x\n",
-		fmtll(dip->di_nblocks, 'd'), dip->di_extsize,
+	qprintf("size %llx ", dip->di_size);
+	qprintf("nblocks %lld extsize 0x%x nextents 0x%x nattrextents 0x%x\n",
+		dip->di_nblocks, dip->di_extsize,
 		dip->di_nextents, dip->di_nattrextents);
 	qprintf("forkoff %d dmevmask 0x%x dmstate 0x%x ", dip->di_forkoff,
 		dip->di_dmevmask, dip->di_dmstate);
@@ -961,8 +957,8 @@ xfs_prdir_state_path(char *f, xfs_dir_state_path_t *p)
 
 	qprintf("%s active %d\n", f, p->active);
 	for (i = 0; i < XFS_DIR_NODE_MAXDEPTH; i++) {
-		qprintf("blk %d bp 0x%x blkno %s index %d hashval 0x%x leafblk %d\n",
-			i, p->blk[i].bp, fmtll(p->blk[i].blkno, 'x'),
+		qprintf("blk %d bp 0x%x blkno %llx index %d hashval 0x%x leafblk %d\n",
+			i, p->blk[i].bp, p->blk[i].blkno,
 			p->blk[i].index, p->blk[i].hashval, p->blk[i].leafblk);
 	}
 }
@@ -1401,9 +1397,9 @@ idbg_xarg(int xarg)
 void
 idbg_xbirec(xfs_bmbt_irec_t *r)
 {
-	qprintf("startoff %s ", fmtll(r->br_startoff, 'd'));
-	qprintf("startblock %s ", fmtll(r->br_startblock, 'x'));
-	qprintf("blockcount %s\n", fmtll(r->br_blockcount, 'd'));
+	qprintf("startoff %lld ", r->br_startoff);
+	qprintf("startblock %llx ", r->br_startblock);
+	qprintf("blockcount %lld\n", r->br_blockcount);
 }
 
 #ifdef DEBUG
@@ -1590,9 +1586,9 @@ idbg_xbrec(xfs_bmbt_rec_32_t *r)
 	xfs_dfilblks_t c;
 
 	xfs_convert_extent(r, &o, &s, &c);
-	qprintf("startoff %s ", fmtll(o, 'd'));
-	qprintf("startblock %s ", fmtll(s, 'x'));
-	qprintf("blockcount %s\n", fmtll(c, 'd'));
+	qprintf("startoff %lld ", o);
+	qprintf("startblock %llx ", s);
+	qprintf("blockcount %lld\n", c);
 }
 
 /*
@@ -1617,9 +1613,9 @@ idbg_xbroot(xfs_inode_t *ip)
 	kp = XFS_BMAP_BROOT_KEY_ADDR(broot, 1, ip->i_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(broot, 1, ip->i_broot_bytes);
 	for (i = 1; i <= broot->bb_numrecs; i++) {
-		qprintf("\t%d: startoff %s ",
-			i, fmtll(kp[i - 1].br_startoff, 'd'));
-		qprintf("ptr %s\n", fmtll(pp[i - 1], 'x'));
+		qprintf("\t%d: startoff %lld ",
+			i, kp[i - 1].br_startoff);
+		qprintf("ptr %llx\n", pp[i - 1]);
 	}
 }
 
@@ -1638,9 +1634,9 @@ idbg_xbtcur(xfs_btree_cur_t *c)
 		qprintf("rec.b ");
 		idbg_xbirec(&c->bc_rec.b);
 	} else if (c->bc_btnum == XFS_BTNUM_INO) {
-		qprintf("rec.i startino 0x%x freecount 0x%x free %s\n",
+		qprintf("rec.i startino 0x%x freecount 0x%x free %llx\n",
 			c->bc_rec.i.ir_startino, c->bc_rec.i.ir_freecount,
-			fmtll(c->bc_rec.i.ir_free, 'x'));
+			c->bc_rec.i.ir_free);
 	} else {
 		qprintf("rec.a startblock 0x%x blockcount 0x%x\n",
 			c->bc_rec.a.ar_startblock,
@@ -1879,8 +1875,8 @@ idbg_xdirlf(xfs_dir_leafblock_t *leaf)
 	for (j = 0, e = leaf->leaves; j < h->count; j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
 		bcopy(n->inumber, (char *)&ino, sizeof(ino));
-		qprintf("leaf %d hashval 0x%x nameidx %d inumber %s namelen %d name '",
-			j, e->hashval, e->nameidx, fmtll(ino, 'd'),
+		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld namelen %d name '",
+			j, e->hashval, e->nameidx, ino,
 			e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			qprintf("%c", n->name[k]);
@@ -1924,12 +1920,12 @@ idbg_xdirsf(xfs_dir_shortform_t *s)
 
 	sfh = &s->hdr;
 	bcopy(sfh->parent, &ino, sizeof(ino));
-	qprintf("hdr parent %s count %d\n",
-		fmtll(ino, 'd'), sfh->count);
+	qprintf("hdr parent %lld count %d\n",
+		ino, sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
 		bcopy(sfe->inumber, &ino, sizeof(ino));
-		qprintf("entry %d inumber %s namelen %d name '",
-			i, fmtll(ino, 'd'), sfe->namelen);
+		qprintf("entry %d inumber %lld namelen %d name '",
+			i, ino, sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			qprintf("%c", sfe->name[j]);
 		qprintf("'\n");
@@ -1948,8 +1944,8 @@ idbg_xdname(xfs_dir_name_t *n)
 	qprintf("name '");
 	for (i = 0; i < n->namelen; i++)
 		qprintf("%c", n->name[i]);
-	qprintf("' namelen %d hashval 0x%x inumber %s\n",
-		n->namelen, n->hashval, fmtll(n->inumber, 'd'));
+	qprintf("' namelen %d hashval 0x%x inumber %lld\n",
+		n->namelen, n->hashval, n->inumber);
 	qprintf("dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
 		n->dp, n->firstblock, n->flist, n->total);
 }
@@ -1987,9 +1983,9 @@ idbg_xexlist(xfs_inode_t *ip)
 	for (i = 0; i < nextents; i++) {
 		xfs_convert_extent((xfs_bmbt_rec_32_t *)&ip->i_u1.iu_extents[i],
 			&o, &s, &c);
-		qprintf("%d: startoff %s ", i, fmtll(o, 'd'));
+		qprintf("%d: startoff %lld ", i, o);
 		qprintf("startblock %s ", xfs_fmtfsblock(s, ip->i_mount));
-		qprintf("blockcount %s\n", fmtll(c, 'd'));
+		qprintf("blockcount %lld\n", c);
 	}
 }
 
@@ -2004,8 +2000,8 @@ idbg_xflist(xfs_bmap_free_t *flist)
 	qprintf("flist@0x%x: first 0x%x count %d\n", flist,
 		flist->xbf_first, flist->xbf_count);
 	for (item = flist->xbf_first; item; item = item->xbfi_next) {
-		qprintf("item@0x%x: startblock %s blockcount %d", item,
-			fmtll((xfs_dfsbno_t)item->xbfi_startblock, 'x'),
+		qprintf("item@0x%x: startblock %llx blockcount %d", item,
+			(xfs_dfsbno_t)item->xbfi_startblock,
 			item->xbfi_blockcount);
 	}
 }
@@ -2488,17 +2484,17 @@ idbg_xnode(xfs_inode_t *ip)
 		&ip->i_range_lock.r_splock, &ip->i_range_lock.r_sleep,
 		ip->i_range_lock.r_range_list);
 #endif
-	qprintf("next_offset %s ", fmtll(ip->i_next_offset, 'x'));
-	qprintf("io_offset %s reada_blkno %s io_size 0x%x\n",
-		fmtll(ip->i_io_offset, 'x'),
+	qprintf("next_offset %llx ", ip->i_next_offset);
+	qprintf("io_offset %llx reada_blkno %s io_size 0x%x\n",
+		ip->i_io_offset,
 		xfs_fmtfsblock(ip->i_reada_blkno, ip->i_mount),
 		ip->i_io_size);
-	qprintf("last_req_sz 0x%x num_readaheads 0x%x new_size %s\n",
+	qprintf("last_req_sz 0x%x num_readaheads 0x%x new_size %llx\n",
 		ip->i_last_req_sz,
 		ip->i_num_readaheads,
-		fmtll(ip->i_new_size, 'x'));
-	qprintf("write off %s gap list 0x%x ",
-		fmtll(ip->i_write_offset, 'x'), ip->i_gap_list);
+		ip->i_new_size);
+	qprintf("write off %llx gap list 0x%x ",
+		ip->i_write_offset, ip->i_gap_list);
 	printflags(ip->i_flags, tab_flags, "flags");
 	qprintf("\n");
 	qprintf("vcode 0x%x mapcnt 0x%x update_core 0x%x gen 0x%x qbufs %d\n",
@@ -2656,13 +2652,13 @@ idbg_xrwtrace(xfs_inode_t *ip)
 void
 idbg_xsb(xfs_sb_t *sbp)
 {
-	qprintf("magicnum 0x%x blocksize 0x%x dblocks %s ",
+	qprintf("magicnum 0x%x blocksize 0x%x dblocks %lld ",
 		sbp->sb_magicnum, sbp->sb_blocksize,
-		fmtll(sbp->sb_dblocks, 'd'));
-	qprintf("rblocks %s\n",
-		fmtll(sbp->sb_rblocks, 'd'));
-	qprintf("rextents %s uuid %s logstart %s\n",
-		fmtll(sbp->sb_rextents, 'd'),
+		sbp->sb_dblocks);
+	qprintf("rblocks %lld\n",
+		sbp->sb_rblocks);
+	qprintf("rextents %lld uuid %s logstart %s\n",
+		sbp->sb_rextents,
 		fmtuuid(&sbp->sb_uuid),
 		xfs_fmtfsblock(sbp->sb_logstart, NULL));
 	qprintf("rootino %s ",
@@ -2691,14 +2687,10 @@ idbg_xsb(xfs_sb_t *sbp)
 		sbp->sb_agblklog,
 		sbp->sb_rextslog,
 		sbp->sb_inprogress);
-	qprintf("icount %s ",
-		fmtll(sbp->sb_icount, 'x'));
-	qprintf("ifree %s ",
-		fmtll(sbp->sb_ifree, 'x'));
-	qprintf("fdblocks %s ",
-		fmtll(sbp->sb_fdblocks, 'x'));
-	qprintf("frextents %s\n",
- 		fmtll(sbp->sb_frextents, 'x'));
+	qprintf("icount %llx ", sbp->sb_icount);
+	qprintf("ifree %llx ", sbp->sb_ifree);
+	qprintf("fdblocks %llx ", sbp->sb_fdblocks);
+	qprintf("frextents %llx\n", sbp->sb_frextents);
 }
 
 #ifdef DEBUG
@@ -2806,16 +2798,16 @@ idbg_xstrat_write(xfs_strat_write_locals_t *locals)
 	int	i;
 
 	qprintf("locals 0x%x\n");
-	qprintf("offset_fsb %s ",
-		fmtll((__int64_t)locals->offset_fsb, 'x'));
-	qprintf("map_start_fsb %s ",
-		fmtll((__int64_t)locals->map_start_fsb, 'x'));
-	qprintf("imap_offset %s\n", 
-		fmtll((__int64_t)locals->imap_offset, 'x'));
-	qprintf("first_block %s ",
-		fmtll((__int64_t)locals->first_block, 'x'));
-	qprintf("real_size %s count_fsb 0x%x\n",
-		fmtll(locals->real_size, 'x'), locals->count_fsb);
+	qprintf("offset_fsb %llx ",
+		(__int64_t)locals->offset_fsb);
+	qprintf("map_start_fsb %llx ",
+		(__int64_t)locals->map_start_fsb);
+	qprintf("imap_offset %llx\n", 
+		(__int64_t)locals->imap_offset);
+	qprintf("first_block %llx ",
+		(__int64_t)locals->first_block);
+	qprintf("real_size %llx count_fsb 0x%x\n",
+		locals->real_size, locals->count_fsb);
 	qprintf("imap_blocks 0x%x x %d datap 0x%x rbp 0x%x\n",
 		locals->imap_blocks, locals->x, locals->datap, locals->rbp);
 	qprintf("mp 0x%x ip 0x%x tp 0x%x error %d\n",
@@ -2825,8 +2817,8 @@ idbg_xstrat_write(xfs_strat_write_locals_t *locals)
 	qprintf("rbp_len 0x%x set_lead %d s 0x%x imap_index %d\n",
 		locals->rbp_len, locals->set_lead,
 		locals->s, locals->imap_index);
-	qprintf("rbp count %d last rbp offset %s bcount %x blkno 0x%x\n",
-		locals->rbp_count, fmtll(locals->last_rbp_offset, 'x'),
+	qprintf("rbp count %d last rbp offset %llx bcount %x blkno 0x%x\n",
+		locals->rbp_count, locals->last_rbp_offset,
 		locals->last_rbp_bcount, locals->last_rbp_blkno);
 	qprintf("nimaps %d &imap 0x%x\n",
 		locals->nimaps, &(locals->imap));
