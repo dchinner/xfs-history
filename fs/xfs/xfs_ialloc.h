@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision$"
 
 struct buf;
 struct xfs_dinode;
@@ -26,8 +26,14 @@ xfs_extlen_t xfs_ialloc_blocks(struct xfs_mount *mp);
 
 /*
  * For small block file systems, move inodes in clusters of this size.
+ * When we don't have a lot of memory, however, we go a bit smaller
+ * to reduce the number of AGI and ialloc btree blocks we need to keep
+ * around for xfs_dilocate().  We choose which one to use in
+ * xfs_mount_int().
  */
-#define	XFS_INODE_CLUSTER_SIZE	8192
+#define	XFS_INODE_BIG_CLUSTER_SIZE	8192
+#define	XFS_INODE_SMALL_CLUSTER_SIZE	4096
+#define	XFS_INODE_CLUSTER_SIZE(mp)	(mp)->m_inode_cluster_size
 
 /*
  * Make an inode pointer out of the buffer/offset.
