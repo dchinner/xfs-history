@@ -1,4 +1,4 @@
-#ident "$Revision: 1.214 $"
+#ident "$Revision: 1.216 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -783,10 +783,14 @@ xfs_iread(
 
 	ip->i_delayed_blks = 0;
 
+	/*
+	 * initialize read/write io sizes
+	 */
 	ASSERT(mp->m_readio_log <= 0xff);
 	ASSERT(mp->m_writeio_log <= 0xff);
 	ip->i_readio_log = (uchar_t) mp->m_readio_log;
 	ip->i_writeio_log = (uchar_t) mp->m_writeio_log;
+	ip->i_max_io_log = (uchar_t) mp->m_writeio_log;
 	ip->i_readio_blocks = mp->m_readio_blocks;
 	ip->i_writeio_blocks = mp->m_writeio_blocks;
 
@@ -935,12 +939,6 @@ xfs_ialloc(
 	ip->i_d.di_uid = cr->cr_uid;
 	ip->i_d.di_gid = cr->cr_gid;
 	ip->i_d.di_projid = prid;
-	ASSERT(ip->i_mount->m_readio_log <= 0xff);
-	ASSERT(ip->i_mount->m_writeio_log <= 0xff);
-	ip->i_readio_log = (uchar_t) ip->i_mount->m_readio_log;
-	ip->i_writeio_log = (uchar_t) ip->i_mount->m_writeio_log;
-	ip->i_readio_blocks = ip->i_mount->m_readio_blocks;
-	ip->i_writeio_blocks = ip->i_mount->m_writeio_blocks;
 	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
 
 	/*
@@ -1153,7 +1151,7 @@ xfs_file_last_byte(
 	if (last_byte < 0) {
 		return XFS_MAX_FILE_OFFSET;
 	}
-	last_byte += (1 << mp->m_writeio_log);
+	last_byte += (1 << ip->i_max_io_log);
 	if (last_byte < 0) {
 		return XFS_MAX_FILE_OFFSET;
 	}
@@ -1669,8 +1667,7 @@ xfs_itruncate_finish(
 		error = xfs_bunmapi(ntp, ip, first_unmap_block,
 				    unmap_len,
 				    XFS_BMAPI_AFLAG(fork) |
-				      ((mp->m_flags & XFS_MOUNT_WSYNC)
-				       ? XFS_BMAPI_ASYNC : 0),
+				      (sync ? 0 : XFS_BMAPI_ASYNC),
 				    XFS_ITRUNC_MAX_EXTENTS,
 				    &first_block, &free_list, &done);
 		if (error) {
@@ -1689,8 +1686,8 @@ xfs_itruncate_finish(
 		 * Duplicate the transaction that has the permanent
 		 * reservation and commit the old transaction.
 		 */
-		error = xfs_bmap_finish(tp, &free_list,
-					first_block, &committed);
+		error = xfs_bmap_finish(tp, &free_list, first_block,
+					&committed);
 		ntp = *tp;
 		if (error) {
 			/*
