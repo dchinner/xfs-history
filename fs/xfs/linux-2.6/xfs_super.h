@@ -86,30 +86,34 @@
 struct buftarg;
 struct xfs_args;
 
-int
+extern int
 linvfs_fill_buftarg(
 	struct buftarg	*btp,
 	kdev_t		dev,
 	struct super_block *sb,
 	int		data);
 
-void
+extern void
 linvfs_bsize_buftarg(
 	struct buftarg	*btp,
 	unsigned int	bsize);
 
-void
+extern void
 linvfs_release_buftarg(
 	struct buftarg	*btp);
 
-int
+extern void
+linvfs_set_inode_ops(
+	struct inode	*inode);
+
+extern int
 fs_dounmount(
         bhv_desc_t      *bdp,
         int             flags,
         vnode_t         *rootvp,
         cred_t          *cr);
 
-int
+extern int
 spectodevs(
 	struct super_block *sb,
         struct xfs_args	*args,

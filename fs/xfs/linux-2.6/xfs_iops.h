@@ -43,7 +43,6 @@ extern struct address_space_operations linvfs_aops;
 
 extern int linvfs_revalidate_core(struct inode *, int);
 
-extern void linvfs_set_inode_ops(struct inode *);
 extern int linvfs_pb_bmap(struct inode *, loff_t, ssize_t, page_buf_bmap_t *,
 			   int, int *, int);
 
