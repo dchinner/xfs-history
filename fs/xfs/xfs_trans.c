@@ -16,6 +16,7 @@
 #include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
+#include <sys/uuid.h>
 #include <stddef.h>
 #ifndef SIM
 #include <sys/conf.h>

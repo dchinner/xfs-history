@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.17 $"
+#ident "$Revision$"
 
 struct bmapval;
 struct buf;
@@ -129,6 +129,16 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #define	XFS_STRAT_ENTER		1
 #define	XFS_STRAT_FAST		2
 #define	XFS_STRAT_SUB		3
+
+#if defined(XFS_ALL_TRACE)
+#define	XFS_RW_TRACE
+#define	XFS_STRAT_TRACE
+#endif
+
+#if !defined(DEBUG) || defined(SIM)
+#undef XFS_RW_TRACE
+#undef XFS_STRAT_TRACE
+#endif
 
 /*
  * Prototypes for functions in xfs_rw.c.
