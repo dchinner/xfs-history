@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Portions Copyright (c) 2002 Christoph Hellwig.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -32,65 +33,62 @@
 #ifndef __XFS_SUPPORT_SV_H__
 #define __XFS_SUPPORT_SV_H__
 
-#include <linux/version.h>
-#include <linux/time.h>
 #include <linux/wait.h>
-#include <asm/atomic.h>
-#include <asm/semaphore.h>
+#include <linux/sched.h>
+#include <linux/spinlock.h>
 
-/* 
- * Synchronisation variables 
+/*
+ * Synchronisation variables.
  *
- * parameters "pri", "svf" and "rts" are not (yet?) implemented
- *
+ * (Parameters "pri", "svf" and "rts" are not implemented)
  */
-
-#define init_sv(sv,type,name,flag) \
-            _sv_init(sv)
-#define sv_init(sv,flag,name) \
-            _sv_init(sv)
-#define sv_wait(sv, pri, lock, s) \
-	    _sv_wait(sv, lock, s, 0, NULL)
-#define sv_wait_sig(sv, pri, lock, s)	\
-            _sv_wait(sv, lock, s, 1, NULL)
-#define sv_timedwait(sv, pri, lock, s, svf, ts, rts) \
-            _sv_wait(sv, lock, s, 0, ts)
-#define sv_timedwait_sig(sv, pri, lock, s, svf, ts, rts) \
-            _sv_wait(sv, lock, s, 1, ts)
-#define mp_sv_wait(sv, pri, lock, s) \
-            _sv_wait(sv, lock, s, 0, NULL)
-#define mp_sv_wait_sig(sv, pri, lock, s) \
-            _sv_wait(sv, lock, s, 1, NULL)
-#define sv_broadcast(sv) \
-            _sv_broadcast(sv)
 
 typedef struct sv_s {
 	wait_queue_head_t waiters;
 } sv_t;
 
-void _sv_init(sv_t *sv);
-void _sv_wait(sv_t *sv, spinlock_t *lock, unsigned long s, int intr, struct timespec *timeout);
-void _sv_broadcast(sv_t *sv);
-void _sv_signal(sv_t *sv);
+#define SV_FIFO		0x0		/* sv_t is FIFO type */
+#define SV_LIFO		0x2		/* sv_t is LIFO type */
+#define SV_PRIO		0x4		/* sv_t is PRIO type */
+#define SV_KEYED	0x6		/* sv_t is KEYED type */
+#define SV_DEFAULT      SV_FIFO
 
-#define sv_signal(sv)		_sv_signal(sv)
-#define sv_broadcast(sv)	_sv_broadcast(sv)
-#define sv_destroy(sv)
 
-/*
- * Initialize sync variables.
- *
- * void	sv_init(sv_t *svp, int type, char *name);
- * void	init_sv(sv_t *svp, int type, char *name, long sequencer);
- *
- * Name may be null; used only when metering routines are installed
- * (see mutex_init, init_mutex above).
- */
+static inline void _sv_wait(sv_t *sv, spinlock_t *lock, int state,
+			     unsigned long timeout)
+{
+	DECLARE_WAITQUEUE(wait, current);
 
-#define SV_FIFO         0x0             /* sv_t is FIFO type */
-#define SV_LIFO         0x2             /* sv_t is LIFO type */
-#define SV_PRIO         0x4             /* sv_t is PRIO type */
-#define SV_KEYED        0x6             /* sv_t is KEYED type */
-#define SV_DEFAULT      SV_FIFO                                          
+	add_wait_queue_exclusive(&sv->waiters, &wait);
+	set_current_state(state);
+	spin_unlock(lock);
+
+	schedule_timeout(timeout);
+
+	set_current_state(TASK_RUNNING);
+	remove_wait_queue(&sv->waiters, &wait);
+}
+
+#define init_sv(sv,type,name,flag) \
+	init_waitqueue_head(&(sv)->waiters)
+#define sv_init(sv,flag,name) \
+	init_waitqueue_head(&(sv)->waiters)
+#define sv_destroy(sv) \
+	/*NOTHING*/
+#define sv_wait(sv, pri, lock, s) \
+	_sv_wait(sv, lock, TASK_UNINTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT)
+#define sv_wait_sig(sv, pri, lock, s)   \
+	_sv_wait(sv, lock, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT)
+#define sv_timedwait(sv, pri, lock, s, svf, ts, rts) \
+	_sv_wait(sv, lock, TASK_UNINTERRUPTIBLE, timespec_to_jiffies(ts))
+#define sv_timedwait_sig(sv, pri, lock, s, svf, ts, rts) \
+	_sv_wait(sv, lock, TASK_INTERRUPTIBLE, timespec_to_jiffies(ts))
+/* this one is used only by dmapi */
+#define mp_sv_wait_sig(sv, pri, lock, s) \
+	sv_wait_sig(sv, pri, lock, s)
+#define sv_signal(sv) \
+	wake_up(&(sv)->waiters)
+#define sv_broadcast(sv) \
+	wake_up_all(&(sv)->waiters)
 
 #endif /* __XFS_SUPPORT_SV_H__ */

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Portions Copyright (c) 2002 Christoph Hellwig.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -32,20 +33,7 @@
 #ifndef __XFS_SUPPORT_SPIN_H__
 #define __XFS_SUPPORT_SPIN_H__
 
-#include <linux/version.h>
-#include <linux/time.h>
-#include <linux/wait.h>
-#include <asm/atomic.h>
-#include <asm/semaphore.h>
 #include <linux/spinlock.h>
-
-/*
- * Map the spinlocks from IRIX to Linux.
- * For now, make them all as if they were used in interrupt thread (irq safe).
- */
-#define spinlock_init(lock, name)	spin_lock_init(lock)
-#define init_spinlock(lock, name, ll)	spin_lock_init(lock)
-#define	spinlock_destroy(lock)
 
 /*
  * Map lock_t from IRIX to Linux spinlocks.
@@ -59,8 +47,35 @@
 
 typedef spinlock_t lock_t;
 
-#define nested_spinunlock(a)	spin_unlock(a)
-#define nested_spinlock(a)	spin_lock(a)
-#define nested_spintrylock(a)	spin_trylock(a)
+#define spinlock_init(lock, name)	spin_lock_init(lock)
+#define init_spinlock(lock, name, ll)	spin_lock_init(lock)
+#define	spinlock_destroy(lock)
+
+static inline unsigned long mutex_spinlock(lock_t *lock)
+{
+	spin_lock(lock);
+	return 0;
+}
+
+/*ARGSUSED*/
+static inline void mutex_spinunlock(lock_t *lock, unsigned long s)
+{
+	spin_unlock(lock);
+}
+
+static inline void nested_spinlock(lock_t *lock)
+{
+	spin_lock(lock);
+}
+
+static inline void nested_spinunlock(lock_t *lock)
+{
+	spin_unlock(lock);
+}
+
+static inline int nested_spintrylock(lock_t *lock)
+{
+	return spin_trylock(lock);
+}
 
 #endif /* __XFS_SUPPORT_SPIN_H__ */

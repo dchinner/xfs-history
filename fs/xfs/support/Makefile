@@ -46,9 +46,7 @@ obj-y				:= debug.o \
 				   ktrace.o \
 				   move.o \
 				   mrlock.o \
-				   mutex.o \
 				   qsort.o \
-				   sv.o \
 				   uuid.o
 
 include $(TOPDIR)/Rules.make

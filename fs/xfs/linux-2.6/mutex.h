@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Portions Copyright (c) 2002 Christoph Hellwig.  All Rights Reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -32,11 +33,7 @@
 #ifndef __XFS_SUPPORT_MUTEX_H__
 #define __XFS_SUPPORT_MUTEX_H__
 
-#include <linux/version.h>
-#include <linux/time.h>
-#include <linux/wait.h>
-#include <linux/sched.h>
-#include <asm/atomic.h>
+#include <linux/spinlock.h>
 #include <asm/semaphore.h>
 
 /*
@@ -45,57 +42,14 @@
  * Destroy just simply initializes to -99 which should block all other
  * callers.
  */
-
-typedef struct mutex_s {
-	struct semaphore sema;
-	int state;
-} mutex_t;
-
-
-#define init_mutex(ptr, type, name, sequence) mutex_init(ptr, type, name)
-
-void _mutex_init( mutex_t *mutex);
-void _mutex_lock( mutex_t *mutex);
-void _mutex_unlock( mutex_t *mutex);
-int  _mutex_trylock( mutex_t *mutex);
-void _mutex_destroy( mutex_t *mutex);
-
-#define mutex_init(lock, type, name)	_mutex_init(lock)
-#define mutex_lock(lock, num)		_mutex_lock(lock)
-#define mutex_trylock(lock)		_mutex_trylock(lock)
-#define mutex_unlock(lock)		_mutex_unlock(lock)
-#define mutex_destroy(lock)		_mutex_destroy(lock)
-
-static inline unsigned long mutex_spinlock(spinlock_t *lock)
-{
-	spin_lock(lock);
-	return 0;
-}
-
-/*ARGSUSED*/
-static inline void mutex_spinunlock(spinlock_t *lock, unsigned long s)
-{
-	spin_unlock(lock);
-}
-
-
-/*
- * Types for mutex_init(), mutex_alloc()
- */
 #define MUTEX_DEFAULT		0x0
+typedef struct semaphore	mutex_t;
 
-/*
- * void mutex_init(mutex_t *mp, int type, char *name);
- * void	init_mutex(mutex_t *mp, int type, char *name, long sequence);
- *
- * Name may be null -- it is only used when metering mutexes are installed,
- * tag the metering structure with an ascii name.
- * Only METER_NAMSZ-1 characters are recorded.
- *
- * If init_mutex interface is used to initialize, metering name is
- * constructed from 'name' prefix and and ascii suffix generated from
- * the 'sequence' argument:  [ "MyLock", 12 ] becomes "MyLock00012"
- */
-
+#define mutex_init(lock, type, name)		sema_init(lock, 1)
+#define init_mutex(ptr, type, name, sequence)	sema_init(lock, 1)
+#define mutex_destroy(lock)			sema_init(lock, -99)
+#define mutex_lock(lock, num)			down(lock)
+#define mutex_trylock(lock)			(down_trylock(lock) ? 0 : 1)
+#define mutex_unlock(lock)			up(lock)
 
 #endif /* __XFS_SUPPORT_MUTEX_H__ */
