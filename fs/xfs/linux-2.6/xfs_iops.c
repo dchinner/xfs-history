@@ -1,6 +1,8 @@
 
 /*
- *  fs/xfs/xfs_linux_ops_inode.c
+ *  fs/xfs/linux/xfs_iops.c
+ *     This file would be called xfs_inode.c, but that is already taken
+ *     in the standard XFS code.
  *
  */
 

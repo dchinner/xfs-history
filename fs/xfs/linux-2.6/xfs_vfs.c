@@ -30,7 +30,7 @@
  */
 
 /*#ident	"@(#)uts-comm:fs/vfs.c	1.18"*/
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -91,7 +91,7 @@ void
 vfs_add(vnode_t *coveredvp, struct vfs *vfsp, int mflag)
 {
 	struct vfs *vfsq;
-	int s;
+	long s;
 
 	s = vfs_spinlock();
 	if (coveredvp != NULL) {
@@ -155,7 +155,7 @@ vfs_remove(struct vfs *vfsp)
 {
 	register vnode_t *vp;
 	register struct vfs *vfsq;
-	int s;
+	long s;
 
 	/*
 	 * Can't unmount root.  Should never happen because fs will
@@ -230,7 +230,7 @@ static int
 vfs_lock_flags(struct vfs *vfsp, int flags)
 {
 	register int error;
-	int s;
+	long s;
 
 	s = vfs_spinlock();
 	if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
@@ -297,7 +297,7 @@ vfs_lock_offline(struct vfs *vfsp)
 void
 vfs_unlock(register struct vfs *vfsp)
 {
-	int s = vfs_spinlock();
+	long s = vfs_spinlock();
 	ASSERT((vfsp->vfs_flag & (VFS_MWANT|VFS_MLOCK)) == VFS_MLOCK);
 	vfsp->vfs_flag &= ~(VFS_MLOCK|VFS_OFFLINE);
 
@@ -318,7 +318,7 @@ vfs_unlock(register struct vfs *vfsp)
 int
 vfs_busy(struct vfs *vfsp)
 {
-	int s = vfs_spinlock();
+	long s = vfs_spinlock();
 	ASSERT((vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)) != VFS_OFFLINE);
 	while (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
 		ASSERT(vfsp->vfs_flag & VFS_MWANT || vfsp->vfs_busycnt == 0);
@@ -349,7 +349,7 @@ vfs_busy(struct vfs *vfsp)
 struct vfs *
 vfs_busydev(dev_t dev, int type)
 {
-	int s;
+	long s;
 	struct vfs *vfsp;
 again:
 	s = vfs_spinlock();
@@ -381,7 +381,7 @@ again:
 void
 vfs_unbusy(struct vfs *vfsp)
 {
-	int s = vfs_spinlock();
+	long s = vfs_spinlock();
 	ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
 	ASSERT(vfsp->vfs_busycnt > 0);
 	if (--vfsp->vfs_busycnt == 0)
@@ -425,7 +425,7 @@ vfs_devsearch(dev_t dev, int fstype)
 {
 	register struct vfs *vfsp;
 
-	int s = vfs_spinlock();
+	long s = vfs_spinlock();
 	vfsp = vfs_devsearch_nolock(dev, fstype);
 	vfs_spinunlock(s);
 	return vfsp;

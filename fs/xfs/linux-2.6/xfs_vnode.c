@@ -30,7 +30,7 @@
  *  
  */
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -717,7 +717,12 @@ again:
 			}
 			NESTED_UNLOCK_VFP(vfp);
 			vp->v_flag |= VWAIT;
+#ifndef __linux__
 			sv_bitlock_wait(vptosync(vp), PINOD, &vp->v_flag, VLOCK, s);
+#else /* __linux__ */
+	/* No bit locks */
+			sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
+#endif /* __linux__ */
 			VOPINFO.vn_gchg++;
 			goto again;
 		}
@@ -837,7 +842,12 @@ again:
 		ASSERT(vp->v_count == 0);
 		NESTED_UNLOCK_VFP(vfp);
 		vp->v_flag |= VWAIT;
+#ifndef __linux__
 		sv_bitlock_wait(vptosync(vp), PINOD, &vp->v_flag, VLOCK, s);
+#else /* __linux__ */
+	/* No bit locks */
+		sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
+#endif /* __linux__ */
 		goto again;
 	}
 
