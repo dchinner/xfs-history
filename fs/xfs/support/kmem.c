@@ -223,9 +223,14 @@ kmem_zone_zalloc(kmem_zone_t *zone, int flags)
 	void	*ptr = NULL;
 
 repeat:
-	ptr = kmem_cache_zalloc(zone, flag_convert(flags));
+	ptr = kmem_cache_alloc(zone, flag_convert(flags));
 
-	if (ptr || (flags & KM_NOSLEEP))
+	if (ptr) {
+		memset(ptr, 0, kmem_cache_size(zone));
+		return ptr;
+	}
+
+	if (flags & KM_NOSLEEP)
 		return ptr;
 
 	/*
