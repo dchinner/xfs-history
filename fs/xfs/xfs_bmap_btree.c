@@ -817,9 +817,7 @@ xfs_bmbt_killroot(
 	xfs_bmbt_key_t		*kp;
 	xfs_inode_t		*ip;
 	int			level;
-	xfs_mount_t		*mp;
 	xfs_bmbt_ptr_t		*pp;
-	xfs_trans_t		*tp;
 
 	xfs_bmbt_trace_cursor("xfs_bmbt_killroot entry", cur);
 	level = cur->bc_nlevels - 1;
@@ -861,22 +859,22 @@ xfs_bmbt_killroot(
 		xfs_iroot_realloc(ip, i);
 		block = ip->i_broot;
 	}
-	*block = *cblock;
+	block->bb_numrecs += i;
+	ASSERT(block->bb_numrecs == cblock->bb_numrecs);
 	kp = XFS_BMAP_KEY_IADDR(block, 1, cur);
 	ckp = XFS_BMAP_KEY_IADDR(cblock, 1, cur);
 	bcopy((caddr_t)ckp, (caddr_t)kp, block->bb_numrecs * (int)sizeof(*kp));
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 	cpp = XFS_BMAP_PTR_IADDR(cblock, 1, cur);
 #ifdef DEBUG
-	for (i = 0; i < block->bb_numrecs; i++)
-		xfs_btree_check_lptr(cur, cpp[i], level);
+	for (i = 0; i < cblock->bb_numrecs; i++)
+		xfs_btree_check_lptr(cur, cpp[i], level - 1);
 #endif
 	bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
-	tp = cur->bc_tp;
-	mp = cur->bc_mp;
-	xfs_bmap_add_free(XFS_DADDR_TO_FSB(mp, cbp->b_blkno), 1,
-		cur->bc_private.b.flist, mp);
-	xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
+	xfs_bmap_add_free(XFS_DADDR_TO_FSB(cur->bc_mp, cbp->b_blkno), 1,
+		cur->bc_private.b.flist, cur->bc_mp);
+	block->bb_level--;
+	xfs_trans_log_inode(cur->bc_tp, ip, XFS_ILOG_BROOT);
 	xfs_btree_setbuf(cur, level - 1, 0);
 	cur->bc_nlevels--;
 	xfs_bmbt_rcheck(cur);
