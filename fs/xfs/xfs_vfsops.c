@@ -604,6 +604,7 @@ xfs_mntupdate(
 
 	if (*flags & MS_RDONLY) {
 		xfs_refcache_purge_mp(mp);
+		pagebuf_delwri_flush(mp->m_ddev_targp, 0, NULL);
 		xfs_finish_reclaim_all(mp);
 
 		do {
