@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.191 $"
+#ident  "$Revision: 1.192 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -694,6 +694,8 @@ xfs_cmountfs(
 
                 clkset( rtodc() );
         }
+
+	spec_mounted(ddevvp);
 
 	return error;
 
@@ -1526,15 +1528,29 @@ devvptoxfs(
 
 	if (retval) {
 		extern vfsops_t xfs_vfsops;
+		struct vfs *vfsp;
 		/*
 		 * Device is mounted.  Get an empty buffer to hold a
 		 * copy of its superblock, so we don't have to worry
 		 * about racing with unmount.  Hold devvp's lock to
 		 * block unmount here.
 		 */
-		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfs_devsearch(dev, 
-							  xfs_fstype)),
-					      &xfs_vfsops);
+
+		/* Just because it is mounted does not mean it is XFS */
+		if ((vfsp = vfs_devsearch(dev, xfs_fstype)) == NULL) {
+			VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
+			return XFS_ERROR(EINVAL);
+		}
+		
+		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+
+		/* Race with unmount ? */
+
+		if (vfs_bdp == NULL) {
+			VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
+			return XFS_ERROR(EINVAL);
+		}
+
 		/*
 		 * If the filesystem is shutting down, typically because of
 		 * an I/O error, the SB may be inconsistent. Get outta here.
