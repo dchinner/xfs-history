@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.84 $"
+#ident	"$Revision: 1.86 $"
 
 /*
  * High level interface routines for log manager
@@ -143,7 +143,7 @@ void
 xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, caddr_t string)
 {
 	if (! log->l_grant_trace)
-		log->l_grant_trace = ktrace_alloc(100);
+		log->l_grant_trace = ktrace_alloc(100, 0);
 
 	ktrace_enter(log->l_grant_trace,
 		     (void *)tic,
@@ -168,7 +168,7 @@ void
 xlog_trace_tic(xlog_t *log, xlog_ticket_t *tic)
 {
 	if (! log->l_trace)
-		log->l_trace = ktrace_alloc(256);
+		log->l_trace = ktrace_alloc(256, 0);
 
 	ktrace_enter(log->l_trace,
 		     (void *)tic,
@@ -198,7 +198,7 @@ xlog_trace_iclog(xlog_in_core_t *iclog, uint state)
 		pid = private.p_curproc->p_pid;
 
 	if (!iclog->ic_trace)
-		iclog->ic_trace = ktrace_alloc(256);
+		iclog->ic_trace = ktrace_alloc(256, 0);
 	ktrace_enter(iclog->ic_trace,
 		     (void *)state,
 		     (void *)pid,

@@ -342,8 +342,8 @@ xfs_iread(
 	 * Initialize inode's trace buffers.
 	 * Do this before xfs_iformat in case it adds entries.
 	 */
-	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE);
-	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE);
+	ip->i_xtrace = ktrace_alloc(XFS_BMAP_KTRACE_SIZE, 0);
+	ip->i_btrace = ktrace_alloc(XFS_BMBT_KTRACE_SIZE, 0);
 #endif
 
 	/*

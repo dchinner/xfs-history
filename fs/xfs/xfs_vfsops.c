@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.38 $"
+#ident  "$Revision: 1.39 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -230,9 +230,9 @@ xfs_init(vfssw_t	*vswp,
 	 * Allocate global trace buffers.
 	 */
 #if defined(DEBUG) && !defined(SIM)
-	xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE);
-	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE);
-	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE);
+	xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE, 0);
+	xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE, 0);
+	xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE, 0);
 #endif
 	
 	/*

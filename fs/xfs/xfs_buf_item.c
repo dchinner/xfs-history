@@ -516,7 +516,7 @@ xfs_buf_item_init(buf_t		*bp,
 	bip->bli_format.blf_len = BTOBB(bp->b_bcount);
 	bip->bli_format.blf_map_size = map_size;
 #ifndef SIM
-	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE);
+	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, 0);
 #endif
 
 #ifdef DEBUG
