@@ -83,6 +83,27 @@ xfs_validate_extents(
 
 
 /*
+ * Check that none of the inode's in the buffer have a next
+ * unlinked field of 0.
+ */
+#ifdef DEBUG
+void
+xfs_inobp_check(
+	xfs_mount_t	*mp,
+	buf_t		*bp)
+{
+	int		i;
+	xfs_dinode_t	*dip;
+
+	for (i = 0; i < mp->m_sb.sb_inopblock; i++) {
+		dip = (xfs_dinode_t *)((char *)bp->b_un.b_addr +
+				       (i * mp->m_sb.sb_inodesize));
+		ASSERT(dip->di_next_unlinked != 0);
+	}
+}
+#endif
+
+/*
  * This routine is called to map an inode number within a file
  * system to the buffer containing the on-disk version of the
  * inode.  It returns a pointer to the buffer containing the
@@ -102,6 +123,7 @@ xfs_inotobp(
 	xfs_imap_t	imap;
 	buf_t		*bp;
 	dev_t		dev;
+	int		i;
 
 	/*
 	 * Call the space managment code to find the location of the
@@ -122,6 +144,8 @@ xfs_inotobp(
 	if (bp->b_flags & B_ERROR) {
 		ASSERT(0);
 	}
+
+	xfs_inobp_check(mp, bp);
 
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.
@@ -841,11 +865,13 @@ xfs_iunlink(
 			offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_log_buf(tp, ibp, offset,
 				  (offset + sizeof(xfs_agino_t)));
+		xfs_inobp_check(mp, ibp);
 	}
 
 	/*
 	 * Point the bucket head pointer at the inode being inserted.
 	 */
+	ASSERT(agino != 0);
 	agi->agi_unlinked[bucket_index] = agino;
 	offset = offsetof(xfs_agi_t, agi_unlinked) +
 		(sizeof(xfs_agino_t) * bucket_index);
@@ -918,12 +944,14 @@ xfs_iunlink_remove(
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_log_buf(tp, ibp, offset,
 					  (offset + sizeof(xfs_agino_t)));
+			xfs_inobp_check(mp, ibp);
 		} else {
 			xfs_trans_brelse(tp, ibp);
 		}
 		/*
 		 * Point the bucket head pointer at the next inode.
 		 */
+		ASSERT(next_agino != 0);
 		agi->agi_unlinked[bucket_index] = next_agino;
 		offset = offsetof(xfs_agi_t, agi_unlinked) +
 			(sizeof(xfs_agino_t) * bucket_index);
@@ -963,6 +991,7 @@ xfs_iunlink_remove(
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_log_buf(tp, ibp, offset,
 					  (offset + sizeof(xfs_agino_t)));
+			xfs_inobp_check(mp, ibp);
 		} else {
 			xfs_trans_brelse(tp, ibp);
 		}
@@ -970,11 +999,13 @@ xfs_iunlink_remove(
 		 * Point the previous inode on the list to the next inode.
 		 */
 		last_dip->di_next_unlinked = next_agino;
+		ASSERT(next_agino != 0);
 		offset = ((char *)last_dip -
 			  (char *)(last_ibp->b_un.b_addr)) +
 			 offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_log_buf(tp, last_ibp, offset,
 				  (offset + sizeof(xfs_agino_t)));
+		xfs_inobp_check(mp, ibp);
 	}
 }
 
@@ -1385,9 +1416,14 @@ xfs_idestroy(
 		ASSERT(ip->i_real_bytes == 0);
 		break;
 	}
+	if (ip->i_range_lock.r_sleep != NULL) {
+		freesema(ip->i_range_lock.r_sleep);
+		kmem_free(ip->i_range_lock.r_sleep, sizeof(sema_t));
+	}
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
 	freesplock(ip->i_ticketlock);
+	freesplock(ip->i_range_lock.r_splock);
 	freesema(&ip->i_flock);
 	freesema(&ip->i_pinsema);
 #ifndef SIM
@@ -1710,6 +1746,8 @@ xfs_iflush(
 		ASSERT(0);
 		break;
 	}
+
+	xfs_inobp_check(mp, bp);
 	
 	/*
 	 * We've recorded everything logged in the inode, so we'd
