@@ -92,6 +92,8 @@ struct xfs_mount;
 struct pb_target;
 struct block_device;
 
+extern __uint64_t xfs_max_file_offset(unsigned int);
+
 extern struct inode *xfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
 
