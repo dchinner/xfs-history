@@ -51,7 +51,11 @@ typedef struct xfs_bmbt_rec
 	 ((r)->l3 = ((((__uint32_t)(s).br_startblock) << 21) | \
 		    ((__uint32_t)((s).br_blockcount & 0x001fffff)))))
 
-#define	NULLSTARTBLOCK	((xfs_fsblock_t)((1LL << 52) - 1))
+#define	STARTBLOCKMASK	((xfs_fsblock_t)(((1LL << 36) - 1) << 16))
+#define	ISNULLSTARTBLOCK(x)	(((x) & STARTBLOCKMASK) == STARTBLOCKMASK)
+#define	NULLSTARTBLOCK(k)	\
+	((xfs_fsblock_t)(STARTBLOCKMASK | (long long)(k)))
+#define	STARTBLOCKVAL(x)	((x) & ~STARTBLOCKMASK)
 
 /*
  * Incore version of above.
