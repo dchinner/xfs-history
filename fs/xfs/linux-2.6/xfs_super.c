@@ -421,6 +421,7 @@ linvfs_read_inode(
 	}
 
 	LINVFS_GET_VP(inode) = vp;
+	vp->v_inode = inode;
 
 	linvfs_inode_attr_in(inode);
 

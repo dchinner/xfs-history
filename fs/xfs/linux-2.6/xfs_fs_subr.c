@@ -21,12 +21,13 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 #include <xfs_linux.h>
 #include <sys/types.h>
 #undef sysinfo
 #include <linux/kernel.h> /* for printk... remove later if needed */
+#include <linux/page_buf.h>
 #include <ksys/as.h>
 #include <sys/cmn_err.h>
 #include <sys/cred.h>
@@ -263,9 +264,7 @@ fs_tosspages(
 	off_t		last,
 	int		fiopt)
 {
-/***
-	printk("XFS: fs_tosspages() NOT IMPLEMENTED\n");
-***/
+	pagebuf_inval(BHV_TO_VNODE(bdp)->v_inode, first, last - first, 0);
 }
 
 
@@ -279,7 +278,7 @@ fs_flushinval_pages(
 	off_t		last,
 	int		fiopt)
 {
-	printk("XFS: fs_flushinval_pages() NOT IMPLEMENTED\n");
+	pagebuf_flushinval(BHV_TO_VNODE(bdp)->v_inode, first, last - first, 0);
 }
 
 
@@ -295,7 +294,7 @@ fs_flush_pages(
 	uint64_t	flags,
 	int		fiopt)
 {
-	printk("XFS: fs_flush_pages() NOT IMPLEMENTED\n");
+	pagebuf_flush(BHV_TO_VNODE(bdp)->v_inode, first, last - first, 0);
 	return 0;
 }
 
