@@ -8,6 +8,7 @@
 #endif
 #include <sys/debug.h>
 #include <sys/errno.h>
+#include <sys/stat.h>
 #include <sys/mode.h>
 #include <sys/vnode.h>
 #include <sys/cred.h>
@@ -360,9 +361,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 {
 	xfs_ino_t	ino;
 	xfs_inode_t	*ip;
-#ifdef NOTYET
 	vnode_t		*vp;
-#endif
 	uint		flags;
 	error_status_t	status;
 	__int32_t	curr_time;
@@ -382,11 +381,9 @@ xfs_ialloc(xfs_trans_t	*tp,
 	ip = xfs_trans_iget(tp->t_mountp, tp, ino, XFS_ILOCK_EXCL);
 	ASSERT(ip != NULL);
 
-#ifdef NOTYET
 	vp = XFS_ITOV(ip); 
 	vp->v_type = IFTOVT(mode);
 	vp->v_rdev = rdev;
-#endif
 	ip->i_d.di_mode = (__uint16_t)mode;
 	ip->i_d.di_nlink = (__int16_t)nlink;
 	ip->i_d.di_uid = (__uint16_t)cr->cr_uid;
