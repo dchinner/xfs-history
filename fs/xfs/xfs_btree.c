@@ -210,9 +210,9 @@ xfs_btree_check_lptr(
 
 	ASSERT(level > 0);
 	mp = cur->bc_mp;
-	ASSERT(ptr != NULLDFSBNO &&
-	       XFS_FSB_TO_AGNO(mp, ptr) < mp->m_sb.sb_agcount &&
-	       XFS_FSB_TO_AGBNO(mp, ptr) < mp->m_sb.sb_agblocks);
+	ASSERT(ptr != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, ptr) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, ptr) < mp->m_sb.sb_agblocks);
 }
 
 /*
@@ -309,7 +309,8 @@ xfs_btree_check_sptr(
 	ASSERT(level > 0);
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
-	ASSERT(ptr != NULLAGBLOCK && ptr < agf->agf_length);
+	ASSERT(ptr != NULLAGBLOCK);
+	ASSERT(ptr < agf->agf_length);
 }
 #endif	/* DEBUG */
 
@@ -378,7 +379,8 @@ xfs_btree_dup_cursor(
 		if (bp = cur->bc_bufs[i]) {
 			bp = ncur->bc_bufs[i] = xfs_trans_read_buf(tp,
 				mp->m_dev, bp->b_blkno, mp->m_bsize, 0);
-			ASSERT(bp && !geterror(bp));
+			ASSERT(bp);
+			ASSERT(!geterror(bp));
 		} else
 			ncur->bc_bufs[i] = 0;
 	}
@@ -458,7 +460,8 @@ xfs_btree_get_bufl(
 	ASSERT(fsbno != NULLFSBLOCK);
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
 	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
-	ASSERT(bp && !geterror(bp));
+	ASSERT(bp);
+	ASSERT(!geterror(bp));
 	return bp;
 }
 
@@ -481,7 +484,8 @@ xfs_btree_get_bufs(
 	ASSERT(agbno != NULLAGBLOCK);
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
 	bp = xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock);
-	ASSERT(bp && !geterror(bp));
+	ASSERT(bp);
+	ASSERT(!geterror(bp));
 	return bp;
 }
 

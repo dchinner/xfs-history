@@ -2,6 +2,8 @@
 #ifdef SIM
 #define _KERNEL 1
 #endif
+#include <sys/time.h>
+#include <sys/timers.h>
 #include <sys/buf.h>
 #include <sys/uio.h>
 #include <sys/user.h>
