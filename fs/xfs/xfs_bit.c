@@ -122,7 +122,7 @@ static const char xfs_countbit[256] = {
 /*
  * xfs_highbit32: get high bit set out of 32-bit argument, -1 if none set.
  */
-int inline
+inline int
 xfs_highbit32(
 	__uint32_t	v)
 {
@@ -239,7 +239,8 @@ int
 xfs_contig_bits(uint *map, uint	size, uint start_bit)
 {
 #if BITS_PER_LONG == 32
-	return find_next_zero_bit(map,size*sizeof(uint)*8,start_bit) - start_bit;
+	return find_next_zero_bit((unsigned long *)map,
+			size * sizeof(uint) * 8, start_bit) - start_bit;
 #else
 	/*
 	 * The first argument to find_next_zero_bit needs to be aligned,
@@ -256,7 +257,8 @@ xfs_contig_bits(uint *map, uint	size, uint start_bit)
 	addr = (void *)kmem_alloc(bitmap_size, KM_SLEEP);
 	memcpy(addr, map, size * sizeof(uint));
 
-	bit = find_next_zero_bit(addr,size*sizeof(uint)*8,start_bit) - start_bit;
+	bit = find_next_zero_bit((unsigned long *)addr,
+			size * sizeof(uint) * 8, start_bit) - start_bit;
 
 	kmem_free(addr, bitmap_size);
 
