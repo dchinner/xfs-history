@@ -19,23 +19,41 @@ typedef struct xfs_bmdr_block_t
 
 /*
  * Bmap btree record and extent descriptor.
- * l0:0-31 and l1:9-31 are startoff.
- * l1:0-8, l2:0-31, and l3:21-31 are startblock.
- * l3:0-20 are blockcount.
+ * For 32-bit kernels,
+ *  l0:0-31 and l1:9-31 are startoff.
+ *  l1:0-8, l2:0-31, and l3:21-31 are startblock.
+ *  l3:0-20 are blockcount.
+ * For 64-bit kernels,
+ *  l0:9-63 are startoff.
+ *  l0:0-8 and l1:21-63 are startblock.
+ *  l1:0-20 are blockcount.
  */
+#define	BMBT_TOTAL_BITLEN	128	/* 128 bits, 16 bytes */
 #define	BMBT_STARTOFF_BITOFF	0
 #define	BMBT_STARTOFF_BITLEN	55
 #define	BMBT_STARTBLOCK_BITOFF	(BMBT_STARTOFF_BITOFF + BMBT_STARTOFF_BITLEN)
 #define	BMBT_STARTBLOCK_BITLEN	52
 #define	BMBT_BLOCKCOUNT_BITOFF	\
 	(BMBT_STARTBLOCK_BITOFF + BMBT_STARTBLOCK_BITLEN)
-#define	BMBT_BLOCKCOUNT_BITLEN	\
-	(sizeof(xfs_bmbt_rec_t) * NBBY - BMBT_BLOCKCOUNT_BITOFF)
+#define	BMBT_BLOCKCOUNT_BITLEN	(BMBT_TOTAL_BITLEN - BMBT_BLOCKCOUNT_BITOFF)
 
-typedef struct xfs_bmbt_rec
+#define	BMBT_USE_64	(_MIPS_SZLONG == 64)
+typedef	unsigned long	xfs_bmbt_rec_base_t;	/* use this for casts */
+
+typedef struct xfs_bmbt_rec_32
 {
-	__uint32_t	l0, l1, l2, l3;
-} xfs_bmbt_rec_t, xfs_bmdr_rec_t;
+	__uint32_t		l0, l1, l2, l3;
+} xfs_bmbt_rec_32_t;
+typedef struct xfs_bmbt_rec_64
+{
+	__uint64_t		l0, l1;
+} xfs_bmbt_rec_64_t;
+
+#if BMBT_USE_64
+typedef xfs_bmbt_rec_64_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
+#else	/* !BMBT_USE_64 */
+typedef xfs_bmbt_rec_32_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
+#endif	/* BMBT_USE_64 */
 
 /*
  * Values and macros for delayed-allocation startblock fields.

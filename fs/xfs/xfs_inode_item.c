@@ -191,10 +191,9 @@ xfs_inode_item_format(
 				 * a separate buffer.  We'll free the
 				 * buffer in the unlock routine.
 				 */
-				ext_buffer = (char *)kmem_alloc(ip->i_bytes,
-								KM_SLEEP);
+				ext_buffer = kmem_alloc(ip->i_bytes, KM_SLEEP);
 				iip->ili_extents_buf =
-					(xfs_bmbt_rec_t *)ext_buffer;
+					(xfs_bmbt_rec_32_t *)ext_buffer;
 				vecp->i_addr = ext_buffer;
 				vecp->i_len = xfs_iextents_copy(ip,
 								ext_buffer);

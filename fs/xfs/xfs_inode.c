@@ -69,8 +69,8 @@ xfs_iunlink_remove(
 #ifdef DEBUG
 STATIC void
 xfs_validate_extents(
-	xfs_bmbt_rec_t	*ep,
-	int		nrecs);
+	xfs_bmbt_rec_32_t	*ep,
+	int			nrecs);
 #else /* DEBUG */
 #define xfs_validate_extents(ep, nrecs)
 #endif /* DEBUG */		     
@@ -519,7 +519,8 @@ xfs_iread_extents(
 	ip->i_bytes = ip->i_real_bytes = size;
 	ip->i_flags |= XFS_IEXTENTS;
 	xfs_bmap_read_extents(tp, ip);
-	xfs_validate_extents(ip->i_u1.iu_extents, ip->i_d.di_nextents);
+	xfs_validate_extents((xfs_bmbt_rec_32_t *)ip->i_u1.iu_extents,
+		ip->i_d.di_nextents);
 }
 
 /*
@@ -1746,14 +1747,16 @@ xfs_iunpin_wait(
  */
 STATIC void
 xfs_validate_extents(
-	xfs_bmbt_rec_t	*ep,
-	int		nrecs)
+	xfs_bmbt_rec_32_t	*ep,
+	int			nrecs)
 {
-	xfs_bmbt_irec_t	irec;
-	int		i;
+	xfs_bmbt_irec_t		irec;
+	int			i;
+	xfs_bmbt_rec_t		rec;
 
 	for (i = 0; i < nrecs; i++) {
-		xfs_bmbt_get_all(ep, &irec);
+		bcopy(ep, &rec, sizeof(rec));
+		xfs_bmbt_get_all(&rec, &irec);
 		ep++;
 	}
 }
@@ -1799,7 +1802,7 @@ xfs_iextents_copy(
 		ASSERT(ip->i_bytes ==
 		       (ip->i_d.di_nextents * sizeof(xfs_bmbt_rec_t)));
 		bcopy(ip->i_u1.iu_extents, buffer, ip->i_bytes);
-		xfs_validate_extents((xfs_bmbt_rec_t*)buffer, nrecs);
+		xfs_validate_extents((xfs_bmbt_rec_32_t *)buffer, nrecs);
 		return ip->i_bytes;
 	}
 
@@ -1831,7 +1834,7 @@ xfs_iextents_copy(
 	ASSERT(copied != 0);
 	ASSERT(copied == ip->i_d.di_nextents);
 	ASSERT((copied * sizeof(xfs_bmbt_rec_t)) <= XFS_LITINO(mp));
-	xfs_validate_extents((xfs_bmbt_rec_t*)buffer, copied);
+	xfs_validate_extents((xfs_bmbt_rec_32_t *)buffer, copied);
 
 	return (copied * sizeof(xfs_bmbt_rec_t));
 }		  

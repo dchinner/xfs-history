@@ -3,7 +3,7 @@
 #define	_XFS_INODE_ITEM_H
 
 struct xfs_inode;
-struct xfs_bmbt_rec;
+struct xfs_bmbt_rec_32;
 
 /*
  * This is the structure used to lay out an inode log item in the
@@ -35,7 +35,7 @@ typedef struct xfs_inode_log_item {
 	unsigned short		ili_flags;	   /* misc flags */
 	unsigned short		ili_logged;	   /* flushed logged data */
 	unsigned int		ili_last_fields;   /* fields when flushed */
-	struct xfs_bmbt_rec	*ili_extents_buf;  /* array of logged exts */
+	struct xfs_bmbt_rec_32	*ili_extents_buf;  /* array of logged exts */
 	buf_t			*ili_bp;	   /* locked inode buffer */
 	struct proc		*ili_bp_owner;	   /* bp owner proc */
 	xfs_inode_log_format_t	ili_format;	   /* logged structure */
