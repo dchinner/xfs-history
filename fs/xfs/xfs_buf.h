@@ -299,7 +299,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 
 #define xfs_bdwrite(mp, bp)	XFS_bdwrite(bp)
 
-#define XFS_bdstrat(bp)  pagbuf_iorequest(bp)
+#define XFS_bdstrat(bp)  pagebuf_iorequest(bp)
 
 #define xfs_iowait(pb)              \
 	    pagebuf_iowait(pb)
