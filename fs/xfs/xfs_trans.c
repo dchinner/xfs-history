@@ -1,4 +1,4 @@
-#ident "$Revision: 1.84 $"
+#ident "$Revision: 1.85 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1085,17 +1085,3 @@ xfs_trans_chunk_committed(
 		IOP_UNPIN(lip);
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
