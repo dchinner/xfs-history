@@ -1,4 +1,4 @@
-#ident "$Revision: 1.219 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -494,7 +494,13 @@ xfs_getattr(
                 vap->va_blksize = BLKDEV_IOSIZE;
                 break;
           default:
-		vap->va_blksize = mp->m_sb.sb_blocksize;	/* in bytes */
+		/*
+		 * We use the read buffer size as a recommended I/O
+		 * size.  This should always be larger than the
+		 * write buffer size, so it should be OK.
+		 * The value returned is in bytes.
+		 */
+		vap->va_blksize = 1 << mp->m_readio_log;
 		break;
         }
 
@@ -1176,6 +1182,7 @@ xfs_fsync(
 				   XFS_IFLUSH_SYNC : XFS_IFLUSH_ASYNC);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
 	} else {
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL );
 		xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
 			      XFS_LOG_FORCE | XFS_LOG_SYNC );
 		error = 0;
@@ -4987,7 +4994,6 @@ xfs_fid2(
 	ip = XFS_VTOI(vp);
 	xfid->fid_len = sizeof(xfs_fid2_t) - sizeof(xfid->fid_len);
 	xfid->fid_pad = 0;
-	xfid->fid_ino = ip->i_ino;
 	/*
 	 * use bcopy because the inode is a long long and there's no
 	 * assurance that xfid->fid_ino is properly aligned.
