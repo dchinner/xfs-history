@@ -142,6 +142,7 @@ xfs_dir_mount(xfs_mount_t *mp)
 		     sizeof(struct xfs_dir_leaf_name));
 	count = shortcount > leafcount ? shortcount : leafcount;
 	mp->m_dircook_elog = xfs_dir_log2_roundup(count);
+	ASSERT(mp->m_dircook_elog <= mp->m_sb.sb_blocklog);
 }
 
 /*
@@ -682,6 +683,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	int entry;
 	int retval;
 	int done;
+	off_t nextcook;
 
 	mp = dp->i_mount;
 	bno = (__uint32_t)XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
@@ -693,15 +695,17 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		return(XFS_ERROR(ENOENT));
 
 	if (entry == 0) {
-		retval = xfs_dir_put_dirent(mp, dbp, dp->i_ino, ".", 1, bno,
-						entry, uio, &done);
+		nextcook = XFS_DIR_MAKE_COOKIE(mp, 0, 1);
+		retval = xfs_dir_put_dirent(mp, dbp, dp->i_ino, ".", 1,
+			nextcook, uio, &done);
 		if (!done)
 			return(retval);
 		entry++;
 	}
 	if (entry == 1) {
 		bcopy(sf->hdr.parent, (char *)&ino, sizeof(ino));
-		retval = xfs_dir_put_dirent(mp, dbp, ino, "..", 2, bno, entry,
+		nextcook = XFS_DIR_MAKE_COOKIE(mp, 0, 2);
+		retval = xfs_dir_put_dirent(mp, dbp, ino, "..", 2, nextcook,
 						uio, &done);
 		if (!done) {
 			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
@@ -714,8 +718,9 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	for (; i < sf->hdr.count; i++, entry++) {
 		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
+		nextcook = XFS_DIR_MAKE_COOKIE(mp, 0, entry + 1);
 		retval = xfs_dir_put_dirent(mp, dbp, ino, sfe->name,
-						sfe->namelen, bno, entry, uio,
+						sfe->namelen, nextcook, uio,
 						&done);
 		if (!done) {
 			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
@@ -724,7 +729,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 	*eofp = 1;
-	uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
+	uio->uio_offset = dp->i_d.di_size;
 	return(0);
 }
 
@@ -1013,9 +1018,14 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 
 	bp = xfs_dir_read_buf(trans, dp, 0);
 	ASSERT(bp != NULL);
+	if (XFS_DIR_COOKIE_BNO(dp->i_mount, uio->uio_offset) > 0) {
+		*eofp = 1;
+		return(XFS_ERROR(ENOENT));
+	}
 	retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, dbp);
 	xfs_trans_brelse(trans, bp);
-	*eofp = eob;
+	if (*eofp = eob)
+		uio->uio_offset = XFS_DIR_MAKE_COOKIE(dp->i_mount, 1, 0);
 	return(retval);
 }
 
@@ -1296,6 +1306,8 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		ASSERT(bp != NULL);
 	}
 	*eofp = 1;
+	bno = XFS_B_TO_FSBT(mp, dp->i_d.di_size);
+	uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, 0);
 	return(0);
 }
 
@@ -1485,8 +1497,7 @@ xfs_dir_put_dirent(
 	xfs_ino_t	ino,
 	char		*name,
 	int		namelen,
-	__uint32_t	bno,
-	int		entry,
+	off_t		doff,
 	uio_t		*uio,
 	int		*done)
 {
@@ -1512,7 +1523,7 @@ xfs_dir_put_dirent(
 			dbp->d_ino = ino;
 			bcopy(name, dbp->d_name, namelen);
 			dbp->d_name[namelen] = '\0';
-			dbp->d_off = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
+			dbp->d_off = doff;
 			retval = uiomove((caddr_t)dbp, dbp->d_reclen,
 					 UIO_READ, uio);
 			*done = (retval == 0);
@@ -1527,7 +1538,7 @@ xfs_dir_put_dirent(
 			i5_dbp->d_ino = ino;
 			bcopy(name, i5_dbp->d_name, namelen);
 			i5_dbp->d_name[namelen] = '\0';
-			i5_dbp->d_off = XFS_DIR_MAKE_COOKIE(mp, bno, entry);
+			i5_dbp->d_off = doff;
 			retval = uiomove((caddr_t)i5_dbp, i5_dbp->d_reclen,
 					 UIO_READ, uio);
 			*done = (retval == 0);

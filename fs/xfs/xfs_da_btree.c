@@ -2145,6 +2145,7 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 	struct xfs_dir_leafblock *leaf;
 	struct xfs_dir_leaf_entry *entry;
 	struct xfs_dir_leaf_name *namest;
+	off_t nextcook;
 
 	mp = dp->i_mount;
 	bno = (__uint32_t)XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
@@ -2159,8 +2160,15 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
 	for (i = entno; i < leaf->hdr.count; entry++, i++) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
+		if (i == leaf->hdr.count - 1) {
+			if (leaf->hdr.info.forw)
+				nextcook = XFS_DIR_MAKE_COOKIE(mp, leaf->hdr.info.forw, 0);
+			else
+				nextcook = XFS_DIR_MAKE_COOKIE(mp, XFS_B_TO_FSBT(mp, dp->i_d.di_size), 0);
+		} else
+			nextcook = XFS_DIR_MAKE_COOKIE(mp, bno, i + 1);
 		retval = xfs_dir_put_dirent(mp, dbp, ino, namest->name,
-						namest->namelen, bno, i, uio,
+						namest->namelen, nextcook, uio,
 						&done);
 		if (!done) {
 			uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, bno, i);
