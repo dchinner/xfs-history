@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.76 $"
+#ident "$Revision: 1.77 $"
 
 #include <xfs_os_defs.h>
 
@@ -1811,7 +1811,7 @@ xfs_attr_node_list(xfs_attr_list_context_t *context)
 				if (cursor->hashval
 						<= INT_GET(btree->hashval,
 							    ARCH_CONVERT)) {
-					cursor->blkno = btree->before;
+					cursor->blkno = INT_GET(btree->before, ARCH_CONVERT);
 					xfs_attr_trace_l_cb("descending",
 							    context, btree);
 					break;
@@ -2198,8 +2198,8 @@ xfs_attr_trace_l_cn(char *where, struct xfs_attr_list_context *context,
 		(__psunsigned_t)context->dupcnt,
 		(__psunsigned_t)context->flags,
 		(__psunsigned_t)INT_GET(node->hdr.count, ARCH_CONVERT),
-		(__psunsigned_t)node->btree[0].hashval,
-		(__psunsigned_t)node->btree[INT_GET(node->hdr.count, ARCH_CONVERT)-1].hashval);
+		(__psunsigned_t)INT_GET(node->btree[0].hashval, ARCH_CONVERT),
+		(__psunsigned_t)INT_GET(node->btree[INT_GET(node->hdr.count, ARCH_CONVERT)-1].hashval, ARCH_CONVERT));
 }
 
 /*
@@ -2225,8 +2225,8 @@ xfs_attr_trace_l_cb(char *where, struct xfs_attr_list_context *context,
 				: 0,
 		(__psunsigned_t)context->dupcnt,
 		(__psunsigned_t)context->flags,
-		(__psunsigned_t)btree->hashval,
-		(__psunsigned_t)btree->before,
+		(__psunsigned_t)INT_GET(btree->hashval, ARCH_CONVERT),
+		(__psunsigned_t)INT_GET(btree->before, ARCH_CONVERT),
 		(__psunsigned_t)NULL);
 }
 
@@ -2253,9 +2253,9 @@ xfs_attr_trace_l_cl(char *where, struct xfs_attr_list_context *context,
 				: 0,
 		(__psunsigned_t)context->dupcnt,
 		(__psunsigned_t)context->flags,
-		(__psunsigned_t)leaf->hdr.count,
-		(__psunsigned_t)leaf->entries[0].hashval,
-		(__psunsigned_t)leaf->entries[INT_GET(leaf->hdr.count, ARCH_CONVERT)-1].hashval);
+		(__psunsigned_t)INT_GET(leaf->hdr.count, ARCH_CONVERT),
+		(__psunsigned_t)INT_GET(leaf->entries[0].hashval, ARCH_CONVERT),
+		(__psunsigned_t)INT_GET(leaf->entries[INT_GET(leaf->hdr.count, ARCH_CONVERT)-1].hashval, ARCH_CONVERT));
 }
 
 /*

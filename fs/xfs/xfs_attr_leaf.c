@@ -700,7 +700,7 @@ xfs_attr_leaf_to_node(xfs_da_args_t *args)
 			INT_GET(leaf->entries[INT_GET(leaf->hdr.count,
 						ARCH_CONVERT)-1 ].hashval,
 								ARCH_CONVERT));
-	node->btree[0].before = blkno;
+	INT_SET(node->btree[0].before, ARCH_CONVERT, blkno);
 	INT_SET(node->hdr.count, ARCH_CONVERT, 1);
 	xfs_da_log_buf(args->trans, bp1, 0, XFS_LBSIZE(dp->i_mount) - 1);
 	error = 0;
@@ -773,7 +773,7 @@ xfs_attr_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	/*
 	 * Allocate space for a new leaf node.
 	 */
-	ASSERT(INT_GET(oldblk->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC);
+	ASSERT(oldblk->magic == XFS_ATTR_LEAF_MAGIC);
 	error = xfs_da_grow_inode(state->args, &blkno);
 	if (error)
 		return(error);
@@ -781,7 +781,7 @@ xfs_attr_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	if (error)
 		return(error);
 	newblk->blkno = blkno;
-	INT_SET(newblk->magic, ARCH_CONVERT, XFS_ATTR_LEAF_MAGIC);
+	newblk->magic = XFS_ATTR_LEAF_MAGIC;
 
 	/*
 	 * Rebalance the entries across the two leaves.
@@ -807,10 +807,8 @@ xfs_attr_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	/*
 	 * Update last hashval in each block since we added the name.
 	 */
-	INT_SET(oldblk->hashval, ARCH_CONVERT,
-				xfs_attr_leaf_lasthash(oldblk->bp, NULL));
-	INT_SET(newblk->hashval, ARCH_CONVERT,
-				xfs_attr_leaf_lasthash(newblk->bp, NULL));
+	oldblk->hashval = xfs_attr_leaf_lasthash(oldblk->bp, NULL);
+	newblk->hashval = xfs_attr_leaf_lasthash(newblk->bp, NULL);
 	return(error);
 }
 
@@ -1095,8 +1093,8 @@ xfs_attr_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	/*
 	 * Set up environment.
 	 */
-	ASSERT(INT_GET(blk1->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC);
-	ASSERT(INT_GET(blk2->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC);
+	ASSERT(blk1->magic == XFS_ATTR_LEAF_MAGIC);
+	ASSERT(blk2->magic == XFS_ATTR_LEAF_MAGIC);
 	leaf1 = blk1->bp->data;
 	leaf2 = blk2->bp->data;
 	ASSERT(INT_GET(leaf1->hdr.info.magic, ARCH_CONVERT)
@@ -1207,12 +1205,12 @@ xfs_attr_leaf_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	/*
 	 * Copy out last hashval in each block for B-tree code.
 	 */
-	INT_SET(blk1->hashval, ARCH_CONVERT,
+	blk1->hashval =
 	    INT_GET(leaf1->entries[INT_GET(leaf1->hdr.count,
-				    ARCH_CONVERT)-1].hashval, ARCH_CONVERT));
-	INT_SET(blk2->hashval, ARCH_CONVERT,
+				    ARCH_CONVERT)-1].hashval, ARCH_CONVERT);
+	blk2->hashval =
 	    INT_GET(leaf2->entries[INT_GET(leaf2->hdr.count,
-				    ARCH_CONVERT)-1].hashval, ARCH_CONVERT));
+				    ARCH_CONVERT)-1].hashval, ARCH_CONVERT);
 
 	/*
 	 * Adjust the expected index for insertion.
@@ -1671,8 +1669,8 @@ xfs_attr_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 * Set up environment.
 	 */
 	mp = state->mp;
-	ASSERT(INT_GET(drop_blk->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC);
-	ASSERT(INT_GET(save_blk->magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC);
+	ASSERT(drop_blk->magic == XFS_ATTR_LEAF_MAGIC);
+	ASSERT(save_blk->magic == XFS_ATTR_LEAF_MAGIC);
 	drop_leaf = drop_blk->bp->data;
 	save_leaf = save_blk->bp->data;
 	ASSERT(INT_GET(drop_leaf->hdr.info.magic, ARCH_CONVERT)
@@ -1685,10 +1683,10 @@ xfs_attr_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	/*
 	 * Save last hashval from dying block for later Btree fixup.
 	 */
-	INT_SET(drop_blk->hashval, ARCH_CONVERT,
+	drop_blk->hashval =
 		INT_GET(drop_leaf->entries[INT_GET(drop_leaf->hdr.count,
 						ARCH_CONVERT)-1].hashval,
-								ARCH_CONVERT));
+								ARCH_CONVERT);
 
 	/*
 	 * Check if we need a temp buffer, or can we do it in place.
@@ -1754,10 +1752,10 @@ xfs_attr_leaf_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	/*
 	 * Copy out last hashval in each block for B-tree code.
 	 */
-	INT_SET(save_blk->hashval, ARCH_CONVERT,
+	save_blk->hashval =
 		INT_GET(save_leaf->entries[INT_GET(save_leaf->hdr.count,
 						ARCH_CONVERT)-1].hashval,
-								ARCH_CONVERT));
+								ARCH_CONVERT);
 }
 
 /*========================================================================
@@ -2532,7 +2530,7 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 		namelen2 = name_rmt->namelen;
 		name2 = (char *)name_rmt->name;
 	}
-	ASSERT(INT_GET(entry1->hashval, ARCH_CONVERT) == entry2->hashval);
+	ASSERT(INT_GET(entry1->hashval, ARCH_CONVERT) == INT_GET(entry2->hashval, ARCH_CONVERT));
 	ASSERT(namelen1 == namelen2);
 	ASSERT(bcmp(name1, name2, namelen1) == 0);
 #endif /* DEBUG */
@@ -2664,7 +2662,7 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, xfs_dabuf_t *bp,
 		xfs_da_brelse(*trans, bp);
 		return(0);
 	}
-	child_fsb = node->btree[0].before;
+	child_fsb = INT_GET(node->btree[0].before, ARCH_CONVERT);
 	xfs_da_brelse(*trans, bp);	/* no locks for later trans */
 
 	/*
@@ -2726,7 +2724,7 @@ xfs_attr_node_inactive(xfs_trans_t **trans, xfs_inode_t *dp, xfs_dabuf_t *bp,
 				&bp, XFS_ATTR_FORK);
 			if (error)
 				return(error);
-			child_fsb = node->btree[i+1].before;
+			child_fsb = INT_GET(node->btree[i+1].before, ARCH_CONVERT);
 			xfs_da_brelse(*trans, bp);
 		}
 		/*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.145 $"
+#ident	"$Revision: 1.146 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -425,7 +425,7 @@ static int	kdbm_xfs_xattrleaf(
 	if (diag)
 		return diag;
 
-	xfsidbg_xattrleaf((struct xfs_attr_leafblock *) addr);
+	xfsidbg_xattrleaf((xfs_attr_leafblock_t *) addr);
 	return 0;
 }
 
@@ -446,7 +446,7 @@ static int	kdbm_xfs_xattrsf(
 	if (diag)
 		return diag;
 
-	xfsidbg_xattrsf((struct xfs_attr_shortform *) addr);
+	xfsidbg_xattrsf((xfs_attr_shortform_t *) addr);
 	return 0;
 }
 
@@ -2818,7 +2818,7 @@ xfsidbg_xalloc(xfs_alloc_arg_t *args)
  * Print an attr_list() context structure.
  */
 static void
-xfsidbg_xattrcontext(struct xfs_attr_list_context *context)
+xfsidbg_xattrcontext(xfs_attr_list_context_t *context)
 {
 	static char *attr_arg_flags[] = {
 		"DONTFOLLOW",	/* 0x0001 */
@@ -2853,14 +2853,14 @@ xfsidbg_xattrcontext(struct xfs_attr_list_context *context)
  * Print attribute leaf block.
  */
 static void
-xfsidbg_xattrleaf(struct xfs_attr_leafblock *leaf)
+xfsidbg_xattrleaf(xfs_attr_leafblock_t *leaf)
 {
-	struct xfs_attr_leaf_hdr *h;
-	struct xfs_da_blkinfo *i;
-	struct xfs_attr_leaf_map *m;
-	struct xfs_attr_leaf_entry *e;
-	struct xfs_attr_leaf_name_local *l;
-	struct xfs_attr_leaf_name_remote *r;
+	xfs_attr_leaf_hdr_t *h;
+	xfs_da_blkinfo_t *i;
+	xfs_attr_leaf_map_t *m;
+	xfs_attr_leaf_entry_t *e;
+	xfs_attr_leaf_name_local_t *l;
+	xfs_attr_leaf_name_remote_t *r;
 	int j, k;
 
 	h = &leaf->hdr;
@@ -2868,14 +2868,18 @@ xfsidbg_xattrleaf(struct xfs_attr_leafblock *leaf)
 	kdb_printf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
 		i->forw, i->back, i->magic);
 	kdb_printf("hdr count %d usedbytes %d firstused %d holes %d\n",
-		h->count, h->usedbytes, h->firstused, h->holes);
+		INT_GET(h->count, ARCH_CONVERT),
+                INT_GET(h->usedbytes, ARCH_CONVERT), 
+                INT_GET(h->firstused, ARCH_CONVERT), h->holes);
 	for (j = 0, m = h->freemap; j < XFS_ATTR_LEAF_MAPSIZE; j++, m++) {
 		kdb_printf("hdr freemap %d base %d size %d\n",
-			j, m->base, m->size);
+			j, INT_GET(m->base, ARCH_CONVERT), 
+                        INT_GET(m->size, ARCH_CONVERT));
 	}
-	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
+	for (j = 0, e = leaf->entries; j < INT_GET(h->count, ARCH_CONVERT); j++, e++) {
 		kdb_printf("[%2d] hash 0x%x nameidx %d flags 0x%x",
-			j, e->hashval, e->nameidx, e->flags);
+			j, INT_GET(e->hashval, ARCH_CONVERT), 
+                        INT_GET(e->nameidx, ARCH_CONVERT), e->flags);
 		if (e->flags & XFS_ATTR_LOCAL)
 			kdb_printf("LOCAL ");
 		if (e->flags & XFS_ATTR_ROOT)
@@ -2891,17 +2895,20 @@ xfsidbg_xattrleaf(struct xfs_attr_leafblock *leaf)
 			for (k = 0; k < l->namelen; k++)
 				kdb_printf("%c", l->nameval[k]);
 			kdb_printf("\"(%d) value \"", l->namelen);
-			for (k = 0; (k < l->valuelen) && (k < 32); k++)
+			for (k = 0; (k < INT_GET(l->valuelen, ARCH_CONVERT)) && (k < 32); k++)
 				kdb_printf("%c", l->nameval[l->namelen + k]);
 			if (k == 32)
 				kdb_printf("...");
-			kdb_printf("\"(%d)\n", l->valuelen);
+			kdb_printf("\"(%d)\n", 
+                                INT_GET(l->valuelen, ARCH_CONVERT));
 		} else {
 			r = XFS_ATTR_LEAF_NAME_REMOTE(leaf, j);
 			for (k = 0; k < r->namelen; k++)
 				kdb_printf("%c", r->name[k]);
 			kdb_printf("\"(%d) value blk 0x%x len %d\n",
-				   r->namelen, r->valueblk, r->valuelen);
+				    r->namelen, 
+                                    INT_GET(r->valueblk, ARCH_CONVERT), 
+                                    INT_GET(r->valuelen, ARCH_CONVERT));
 		}
 	}
 }
@@ -2910,20 +2917,20 @@ xfsidbg_xattrleaf(struct xfs_attr_leafblock *leaf)
  * Print a shortform attribute list.
  */
 static void
-xfsidbg_xattrsf(struct xfs_attr_shortform *s)
+xfsidbg_xattrsf(xfs_attr_shortform_t *s)
 {
-	struct xfs_attr_sf_hdr *sfh;
-	struct xfs_attr_sf_entry *sfe;
+	xfs_attr_sf_hdr_t *sfh;
+        xfs_attr_sf_entry_t *sfe;
 	int i, j;
 
 	sfh = &s->hdr;
-	kdb_printf("hdr count %d\n", sfh->count);
-	for (i = 0, sfe = s->list; i < sfh->count; i++) {
+	kdb_printf("hdr count %d\n", INT_GET(sfh->count, ARCH_CONVERT));
+	for (i = 0, sfe = s->list; i < INT_GET(sfh->count, ARCH_CONVERT); i++) {
 		kdb_printf("entry %d namelen %d name \"", i, sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
 			kdb_printf("%c", sfe->nameval[j]);
-		kdb_printf("\" valuelen %d value \"", sfe->valuelen);
-		for (j = 0; (j < sfe->valuelen) && (j < 32); j++)
+		kdb_printf("\" valuelen %d value \"", INT_GET(sfe->valuelen, ARCH_CONVERT));
+		for (j = 0; (j < INT_GET(sfe->valuelen, ARCH_CONVERT)) && (j < 32); j++)
 			kdb_printf("%c", sfe->nameval[sfe->namelen + j]);
 		if (j == 32)
 			kdb_printf("...");
@@ -3147,10 +3154,10 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			kdb_printf("buf 0x%p inobt 0x%p\n", bp, bti);
 			xfs_btino(bti, XFS_BUF_COUNT(bp));
 		}
-	} else if ((aleaf = d)->hdr.info.magic == XFS_ATTR_LEAF_MAGIC) {
+	} else if (INT_GET((aleaf = d)->hdr.info.magic, ARCH_CONVERT) == XFS_ATTR_LEAF_MAGIC) {
 		if (summary) {
 			kdb_printf("Attr Leaf, 1st hash 0x%x (at 0x%p)\n",
-				      aleaf->entries[0].hashval, aleaf);
+				      INT_GET(aleaf->entries[0].hashval, ARCH_CONVERT), aleaf);
 		} else {
 			kdb_printf("buf 0x%p attr leaf 0x%p\n", bp, aleaf);
 			xfsidbg_xattrleaf(aleaf);
@@ -3314,7 +3321,7 @@ xfsidbg_xdabuf(xfs_dabuf_t *dabuf)
  * Print a directory/attribute internal node block.
  */
 static void
-xfsidbg_xdanode(struct xfs_da_intnode *node)
+xfsidbg_xdanode(xfs_da_intnode_t *node)
 {
 	xfs_da_node_hdr_t *h;
 	xfs_da_blkinfo_t *i;
