@@ -4647,14 +4647,15 @@ xfs_diordwr(vnode_t	*vp,
 	buf_t		*bp;
 	int		error, index;
 	__int64_t	iosize;
+	extern int	scache_linemask;
 
 	ip = XFS_VTOI(vp);
 	mp = XFS_VFSTOM(vp->v_vfsp);
 
 	/*
- 	 * Check that the user buffer address is on a BBISZE offset, 
-	 * while file offset, and
- 	 * request size are all multiples of file system block size. 
+ 	 * Check that the user buffer address is on a secondary cache
+	 * line offset, while file offset and
+ 	 * request size are both multiples of file system block size. 
 	 * This prevents the need for read/modify/write operations.
 	 *
 	 * This enforces the alignment restrictions indicated by 
@@ -4665,7 +4666,7 @@ xfs_diordwr(vnode_t	*vp,
 	 * so we don't need to worry about read/modify/write stuff.
  	 */
 	if (!(vp->v_flag & VISSWAP) &&
-	    ((((long)(uiop->uio_iov->iov_base)) & BBMASK) ||
+	    ((((long)(uiop->uio_iov->iov_base)) & scache_linemask) ||
 	     (uiop->uio_offset & mp->m_blockmask) ||
 	     (uiop->uio_resid & mp->m_blockmask))) {
 
@@ -4685,7 +4686,7 @@ xfs_diordwr(vnode_t	*vp,
 	/*
  	 * Do maxio check.
  	 */
-	if (uiop->uio_resid > ctooff(v.v_maxdmasz)) {
+	if (uiop->uio_resid > ctooff(v.v_maxdmasz - 1)) {
 #ifndef SIM
 		return XFS_ERROR(EINVAL);
 #endif
