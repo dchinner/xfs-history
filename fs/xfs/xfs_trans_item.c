@@ -290,7 +290,7 @@ xfs_trans_free_items(xfs_trans_t *tp)
 	 */
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
-		(void) xfs_trans_unlock_chunk(licp, 0);
+		(void) xfs_trans_unlock_chunk(licp, 1);
 		next_licp = licp->lic_next;
 		kmem_free(licp, sizeof(xfs_log_item_chunk_t));
 		licp = next_licp;
@@ -324,17 +324,17 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 	 * Special case the embedded chunk so we don't free.
 	 */
 	if (!XFS_LIC_ARE_ALL_FREE(licp)) {
-		freed = xfs_trans_unlock_chunk(licp, 1);
+		freed = xfs_trans_unlock_chunk(licp, 0);
 	}
 	licp = licp->lic_next;
 
 	/*
 	 * Unlock each item in each chunk, free non-dirty descriptors,
 	 * and free empty chunks.
-	 */
+p	 */
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
-		freed += xfs_trans_unlock_chunk(licp, 1);
+		freed += xfs_trans_unlock_chunk(licp, 0);
 		next_licp = licp->lic_next;
 		if (XFS_LIC_ARE_ALL_FREE(licp)) {
 			kmem_free(licp, sizeof(xfs_log_item_chunk_t));
@@ -351,12 +351,13 @@ xfs_trans_unlock_items(xfs_trans_t *tp)
 
 /*
  * Unlock each item pointed to by a descriptor in the given chunk.
- * Free descriptors pointing to items which are not dirty if free_clean
- * is non-zero.
+ * Free descriptors pointing to items which are not dirty if freeing_chunk
+ * is zero. If freeing_chunk is non-zero, then we need to unlock all
+ * items in the chunk including those with XFS_LID_SYNC_UNLOCK set.
  * Return the number of descriptors freed.
  */
 STATIC int
-xfs_trans_unlock_chunk(xfs_log_item_chunk_t *licp, int free_clean)
+xfs_trans_unlock_chunk(xfs_log_item_chunk_t *licp, int freeing_chunk)
 {
 	xfs_log_item_desc_t	*lidp;
 	int			i;
@@ -371,14 +372,18 @@ xfs_trans_unlock_chunk(xfs_log_item_chunk_t *licp, int free_clean)
 		}
 
 		lidp->lid_item->li_desc = NULL;
-		IOP_UNLOCK(lidp->lid_item);
+
+		if (!(lidp->lid_flags & XFS_LID_SYNC_UNLOCK) ||
+		    freeing_chunk) {
+			IOP_UNLOCK(lidp->lid_item);
+		}
 
 		/*
 		 * Free the descriptor if the item is not dirty
-		 * within this transaction and the caller has
-		 * asked us to do so.
+		 * within this transaction and the caller is not
+		 * going to just free the entire thing regardless.
 		 */
-		if ((free_clean) && !(lidp->lid_flags & XFS_LID_DIRTY)) {
+		if (!(freeing_chunk) && !(lidp->lid_flags & XFS_LID_DIRTY)) {
 			XFS_LIC_RELSE(licp, i);
 			freed++;
 		}
