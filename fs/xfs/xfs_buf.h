@@ -532,7 +532,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
             pagebuf_iodone(pb)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
-            pagebuf_find(buftarg.inode,blkno,len,lockit)
+            pagebuf_find(buftarg.inode,blkno<<9,len<<9,lockit)
 
 void xfs_trigger_io(void);
 
