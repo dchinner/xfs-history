@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.287 $"
+#ident  "$Revision: 1.288 $"
 
 #include <xfs_os_defs.h>
 
@@ -114,7 +114,6 @@
 
 #ifndef SIM
 #define	NONROOT_MOUNT	ROOT_UNMOUNT
-#define MS_DMI          0x1000  /* enable DMI interfaces (XFS only) */
 #define	whymount_t	whymountroot_t
 static char *whymount[] = { "initial mount", "remount", "unmount" };
 
@@ -671,7 +670,11 @@ xfs_cmountfs(
 		/*
 		 * Shared XFS V0 can't deal with DMI.  Return EINVAL.
 		 */
+#if 0
 		if (mp->m_sb.sb_shared_vn == 0 && (args->flags & MS_DMI)) {
+#else
+		if (mp->m_sb.sb_shared_vn == 0 && (ap->flags & XFSMNT_DMAPI)) {
+#endif
 			error = XFS_ERROR(EINVAL);
 			xfs_freesb(mp);
 			goto error3;
@@ -852,7 +855,11 @@ xfs_mount(
 	 *  Don't set the VFS_DMI flag until here because we don't want
 	 *  to send events while replaying the log.
 	 */
+#if 0
 	if (uap->flags & MS_DMI) {
+#else
+	if (args.flags & XFSMNT_DMAPI) {
+#endif
 		vfsp->vfs_flag |= VFS_DMI;
 		/* Always send mount event (when mounted with dmi option) */
 		VFS_ROOT(vfsp, &rootvp, error);

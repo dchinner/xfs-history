@@ -34,7 +34,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  *									  *
  **************************************************************************/
-#ident "$Revision$"
+#ident "$Revision: 1.19 $"
 
 #include <sys/types.h>
  
@@ -228,5 +228,6 @@ struct xfs_args_ver_3 {
                                                 /* only) */
 #define XFSMNT_NOTSERVER        0x00100000      /* give up being the server */
                                                 /* (remount only) */
+#define XFSMNT_DMAPI		0x00200000	/* enable dmapi/xdsm */
 
 #endif /* !__SYS_XFS_CLNT_H__ */
