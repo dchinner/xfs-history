@@ -147,9 +147,9 @@ extern unsigned long volatile jiffies;
 #define _DIOC_(x) (('d'<<8) | x)
 #define DIOCGETVOLDEV	_DIOC_(36)	/* NEW: retrieve subvolume devices */
 
-typedef long int            irix5_off_t;
+typedef long int	irix5_off_t;
 
-
+typedef struct timespec	timespec_t;
 
 #ifndef NBBY
 #define NBBY    8       /* number of bits per byte */

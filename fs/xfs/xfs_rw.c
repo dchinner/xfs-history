@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.314 $"
 
 #include <xfs_os_defs.h>
 
@@ -44,9 +44,7 @@
 #include <sys/dmi_kern.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/var.h>
 #include <sys/systm.h>
-#include <sys/uthread.h>
 #include <sys/kmem.h>
 #include <linux/xfs_sema.h>
 #include <ksys/vfile.h>

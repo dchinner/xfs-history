@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Id: xfs_dfrag.c,v 1.15 2000/06/09 03:24:37 lord Exp $"
+#ident "$Id: xfs_dfrag.c,v 1.16 2000/06/13 20:06:43 jtk Exp $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -44,7 +44,6 @@
 
 #include <sys/kabi.h>
 #include <ksys/vfile.h>
-#include <ksys/fdt.h>
 #include <ksys/cell_config.h>
 #include <sys/vfs.h>
 #if defined(__sgi__)
@@ -86,7 +85,7 @@
 #include "xfs_cxfs.h"
 
 extern void xfs_lock_inodes (xfs_inode_t **, int, int, uint);
-	
+extern int getf(int, struct vfile **);
 extern int xfs_bmap_count_blocks( xfs_trans_t *, xfs_inode_t *, int, int *); 
 
 /*

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.452 $"
+#ident "$Revision: 1.453 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -50,7 +50,6 @@
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
 #include <sys/debug.h>
-#include <sys/uthread.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
 #ifdef SIM
@@ -65,15 +64,12 @@
 #include <sys/param.h>
 #include <sys/pathname.h>
 #include <linux/xfs_sema.h>
-#include <sys/statvfs.h>
 #include <ksys/vfile.h>
 #include <sys/mode.h>
-#include <sys/var.h>
 #include <sys/mac_label.h>
 #include <sys/capability.h>
 #include <sys/dirent.h>
 #include <sys/attributes.h>
-#include <ksys/fdt.h>
 #include <ksys/fsc_notify.h>
 #include <ksys/cell_config.h>
 #include "xfs_macros.h"
@@ -5186,40 +5182,6 @@ xfs_allocstore(
 	}
 	return error;
 }
-
-#ifdef DATAPIPE
-/*
- * xfs_fspe_dioinfo: called by file system pipe end.
- */
-int 
-xfs_fspe_dioinfo(
-        struct vnode *vp,
-	struct dioattr *da)
-{
-	bhv_desc_t    *bdp;
-	xfs_inode_t   *ip;
-	xfs_mount_t   *mp;
-
-	bdp = vp->v_fbhv;
-	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
-
-	/* It's a copy of the code in xfs_fcntl - XFS_IOC_DIOINFO cmd */
-	
-	ASSERT(scache_linemask != 0);
-#ifdef R10000_SPECULATION_WAR
-	da->d_mem = _PAGESZ;
-#else
-	da->d_mem = scache_linemask + 1;
-#endif
-
-	da->d_miniosz = mp->m_sb.sb_blocksize;
-	da->d_maxiosz = XFS_FSB_TO_B(mp,
-				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
-
-	return 0;
-}
-#endif /* DATAPIPE */
 
 /*
  * xfs_get_uiosize - get uio size info

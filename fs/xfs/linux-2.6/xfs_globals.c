@@ -31,9 +31,9 @@
  */
 /*
  *
- * $Header$
- * $Author$
- * $Id$
+ * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/linux/fs/xfs/linux/RCS/xfs_globals.c,v 1.13 2000/06/09 06:40:03 ananth Exp $
+ * $Author: ananth $
+ * $Id: xfs_globals.c,v 1.13 2000/06/09 06:40:03 ananth Exp $
  *
  * Revision 1.12  2000/06/09 02:50:02  kenmcd
  * Updated copyright and license notices, ready for open source release
@@ -49,7 +49,6 @@
 #include <xfs_os_defs.h>
 
 #include <sys/types.h>
-#include <sys/var.h>
 #include <sys/vfs.h>
 #include <linux/xfs_cred.h>
 
@@ -57,17 +56,14 @@ int    		xfs_refcache_percent = 100;
 int		mac_enabled = 0;
 int		acl_enabled = 0;
 int		ncsize = 792;
-int		nclrus = 0;
 int		xpg4_sticky_dir = 1; /* see xfs_stickytest */
 int		imon_enabled;
-int		xfsd_pri = 0x5c;	/* priority of xfsd thread(s) */
 uint64_t	xfs_panic_mask;		/* set to cause more panics */
 int		xfs_nfs_io_units = 10;	/* Ignore for now. Affects NFS performance. */
-struct var	v = {
-		  512,	/* v_buf * Nbr of I/O buffers.                  */
-		  8,	/* v_hbuf * Nbr of hash buffers to allocate.     */
-		  /* v_maxdmaszi * Max dma unbroken dma transfer size. */
-		};
+struct var {
+	int	v_buf;	/* Nbr of I/O buffers.             */
+	int	v_hbuf;	/* Nbr of hash buffers to allocate */
+} v = { 512, 8 };
 
 dev_t           rootdev = NODEV;
 int             restricted_chown = 0;
@@ -75,7 +71,7 @@ int     	scache_linemask = 0x1f;       /* second level cache line size mask */
 int		imon_enabled;
 prid_t		dfltprid;
 long            physmem;
-int		maxdmasz = 0x401;	/* Obviously needs to be set dynamically */
+
 #ifdef SIM
 time_t		jiffies;
 #endif

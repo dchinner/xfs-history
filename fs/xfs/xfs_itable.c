@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision$"
+#ident	"$Revision: 1.85 $"
 
 #include <xfs_os_defs.h>
 #include <sys/sysmacros.h>
@@ -42,7 +42,6 @@
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <ksys/vfile.h>
-#include <ksys/fdt.h>
 #include <sys/vfs.h>
 #include <sys/capability.h>
 #include <sys/uuid.h>
@@ -846,6 +845,7 @@ xfs_fd_to_mp(
 	vnode_t		*vp;
 	bhv_desc_t 	*bdp;
 	extern int	xfs_fstype;
+	extern int	getf(int, struct vfile **);
 
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);

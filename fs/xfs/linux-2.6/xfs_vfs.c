@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.15 $"
 
 #include <xfs_os_defs.h>
 
@@ -48,7 +48,6 @@
 
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
-#include <sys/statvfs.h>
 #include <sys/vnode.h>
 
 

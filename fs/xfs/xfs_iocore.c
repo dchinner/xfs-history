@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.17 $"
 
 #include <xfs_os_defs.h>
 
@@ -49,7 +49,6 @@
 #endif
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/var.h>
 #ifdef SIM
 #include <stdio.h>
 #else
