@@ -1,24 +1,13 @@
-
-#ifdef SIM
-#define _KERNEL 1
-#endif
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/proc.h>
 #include <sys/errno.h>
 #include <sys/vfs.h>
-#ifdef SIM
-#include <bstring.h>
-#else
 #include <sys/systm.h>
-#endif
 #include <sys/atomic_ops.h>
 
 #include "xfs_macros.h"
@@ -45,16 +34,10 @@
 #include "xfs_trans_priv.h"
 #include "xfs_error.h"
 #include "xfs_quota.h"
+#include "xfs_dqblk.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
-
-
-#ifdef SIM
-#include "sim.h"
-#include <stdio.h>
-#include <stdlib.h>
-#endif
 
 STATIC uint		xfs_qm_dquot_logitem_size(xfs_dq_logitem_t *logitem);
 STATIC void		xfs_qm_dquot_logitem_format(xfs_dq_logitem_t *logitem,
@@ -421,7 +404,14 @@ xfs_qm_dquot_logitem_init(
         lp->qli_format.qlf_id = dqp->q_core.d_id;
         lp->qli_format.qlf_blkno = dqp->q_blkno;
         lp->qli_format.qlf_len = 1;
-        lp->qli_format.qlf_boffset = dqp->q_bufoffset;
+	/*
+	 * This is just the offset of this dquot within its buffer
+	 * (which is currently 1 FSB and probably won't change).
+	 * Hence 32 bits for this offset should be just fine. 
+	 * Alternatively, we can store (bufoffset / sizeof(xfs_dqblk_t))
+	 * here, and recompute it at recovery time.
+	 */
+        lp->qli_format.qlf_boffset = (__uint32_t)dqp->q_bufoffset;
 }
 	
 /*------------------  QUOTAOFF LOG ITEMS  -------------------*/
