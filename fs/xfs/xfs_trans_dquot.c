@@ -394,25 +394,25 @@ xfs_trans_apply_dquot_deltas(
 				qtrx->qt_delrtb_delta;
 #ifdef QUOTADEBUG
 			if (totalbdelta < 0)
-				ASSERT(d->d_bcount >= 
+				ASSERT(INT_GET(d->d_bcount, ARCH_CONVERT) >= 
 				       (xfs_qcnt_t) -totalbdelta);
 
 			if (totalrtbdelta < 0)
-				ASSERT(d->d_rtbcount >= 
+				ASSERT(INT_GET(d->d_rtbcount, ARCH_CONVERT) >= 
 				       (xfs_qcnt_t) -totalrtbdelta);
 
 			if (qtrx->qt_icount_delta < 0)
-				ASSERT(d->d_icount >= 
+				ASSERT(INT_GET(d->d_icount, ARCH_CONVERT) >= 
 				       (xfs_qcnt_t) -qtrx->qt_icount_delta);
 #endif
 			if (totalbdelta)
-				d->d_bcount += (xfs_qcnt_t)totalbdelta;
+				INT_MOD(d->d_bcount, ARCH_CONVERT, (xfs_qcnt_t)totalbdelta);
 
 			if (qtrx->qt_icount_delta)
-				d->d_icount += (xfs_qcnt_t)qtrx->qt_icount_delta;
+				INT_MOD(d->d_icount, ARCH_CONVERT, (xfs_qcnt_t)qtrx->qt_icount_delta);
 
 			if (totalrtbdelta)
-				d->d_rtbcount += (xfs_qcnt_t)totalrtbdelta;
+				INT_MOD(d->d_rtbcount, ARCH_CONVERT, (xfs_qcnt_t)totalrtbdelta);
 	
 			/*
 			 * Start/reset the timer(s) if needed.
@@ -498,9 +498,9 @@ xfs_trans_apply_dquot_deltas(
 				      (int) qtrx->qt_rtblk_res,
 				      dqp);
 #endif
-			ASSERT(dqp->q_res_bcount >= dqp->q_core.d_bcount);
-			ASSERT(dqp->q_res_icount >= dqp->q_core.d_icount);
-			ASSERT(dqp->q_res_rtbcount >= dqp->q_core.d_rtbcount);
+			ASSERT(dqp->q_res_bcount >= INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT));
+			ASSERT(dqp->q_res_icount >= INT_GET(dqp->q_core.d_icount, ARCH_CONVERT));
+			ASSERT(dqp->q_res_rtbcount >= INT_GET(dqp->q_core.d_rtbcount, ARCH_CONVERT));
 		}
 		/*
 		 * Do the project quotas next
@@ -600,21 +600,21 @@ xfs_trans_dqresv(
 	} 
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	if (flags & XFS_TRANS_DQ_RES_BLKS) {
-		hardlimit = dqp->q_core.d_blk_hardlimit;
-		softlimit = dqp->q_core.d_blk_softlimit;
-		btimer = dqp->q_core.d_btimer;
+		hardlimit = INT_GET(dqp->q_core.d_blk_hardlimit, ARCH_CONVERT);
+		softlimit = INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT);
+		btimer = INT_GET(dqp->q_core.d_btimer, ARCH_CONVERT);
 		resbcountp = &dqp->q_res_bcount;
 	} else {
 		ASSERT(flags & XFS_TRANS_DQ_RES_RTBLKS);
-		hardlimit = dqp->q_core.d_rtb_hardlimit;
-		softlimit = dqp->q_core.d_rtb_softlimit;
-		btimer = dqp->q_core.d_rtbtimer;
+		hardlimit = INT_GET(dqp->q_core.d_rtb_hardlimit, ARCH_CONVERT);
+		softlimit = INT_GET(dqp->q_core.d_rtb_softlimit, ARCH_CONVERT);
+		btimer = INT_GET(dqp->q_core.d_rtbtimer, ARCH_CONVERT);
 		resbcountp = &dqp->q_res_rtbcount;
 	}
 	error = 0;
 
 	if ((flags & XFS_QMOPT_FORCE_RES) == 0 &&
-	    dqp->q_core.d_id != 0 && 
+	    INT_GET(dqp->q_core.d_id, ARCH_CONVERT) != 0 && 
 	    XFS_IS_QUOTA_ENFORCED(dqp->q_mount)) {
 #ifdef QUOTADEBUG
 		printk("BLK Res: nblks=%ld + resbcount=%Ld > hardlimit=%Ld?\n",
@@ -639,8 +639,8 @@ xfs_trans_dqresv(
 				 * return EDQUOT
 				 */
 				if ((btimer != 0 && CURRENT_TIME > btimer) ||
-				    (dqp->q_core.d_bwarns != 0 && 
-				     dqp->q_core.d_bwarns >= 
+				    (INT_GET(dqp->q_core.d_bwarns, ARCH_CONVERT) != 0 && 
+				     INT_GET(dqp->q_core.d_bwarns, ARCH_CONVERT) >= 
 				     XFS_QI_BWARNLIMIT(dqp->q_mount))) {
 					error = EDQUOT;
 					goto error_return;
@@ -648,22 +648,22 @@ xfs_trans_dqresv(
 			}
 		}
 		if (ninos > 0) {
-			if (dqp->q_core.d_ino_hardlimit > 0ULL &&
-			    dqp->q_core.d_icount >=
-			    dqp->q_core.d_ino_hardlimit) {
+			if (INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT) > 0ULL &&
+			    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >=
+			    INT_GET(dqp->q_core.d_ino_hardlimit, ARCH_CONVERT)) {
 				error = EDQUOT;
 				goto error_return;
-			} else if (dqp->q_core.d_ino_softlimit > 0ULL &&
-				   dqp->q_core.d_icount >= 
-				   dqp->q_core.d_ino_softlimit) {
+			} else if (INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) > 0ULL &&
+				   INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >= 
+				   INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT)) {
 				/*
 				 * If timer or warnings has expired,
 				 * return EDQUOT
 				 */
-				if ((dqp->q_core.d_itimer != 0 &&
-				     CURRENT_TIME > dqp->q_core.d_itimer) || 
-				    (dqp->q_core.d_iwarns != 0 &&
-				     dqp->q_core.d_iwarns >= 
+				if ((INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT) != 0 &&
+				     CURRENT_TIME > INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT)) || 
+				    (INT_GET(dqp->q_core.d_iwarns, ARCH_CONVERT) != 0 &&
+				     INT_GET(dqp->q_core.d_iwarns, ARCH_CONVERT) >= 
 				     XFS_QI_IWARNLIMIT(dqp->q_mount))) {
 					error = EDQUOT;
 					goto error_return;
@@ -699,9 +699,9 @@ xfs_trans_dqresv(
 					    XFS_TRANS_DQ_RES_INOS, 
 					    ninos);
 	} 
-	ASSERT(dqp->q_res_bcount >= dqp->q_core.d_bcount);
-	ASSERT(dqp->q_res_rtbcount >= dqp->q_core.d_rtbcount);
-	ASSERT(dqp->q_res_icount >= dqp->q_core.d_icount);
+	ASSERT(dqp->q_res_bcount >= INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT));
+	ASSERT(dqp->q_res_rtbcount >= INT_GET(dqp->q_core.d_rtbcount, ARCH_CONVERT));
+	ASSERT(dqp->q_res_icount >= INT_GET(dqp->q_core.d_icount, ARCH_CONVERT));
 
 error_return:
 	if (! (flags & XFS_QMOPT_DQLOCK)) {

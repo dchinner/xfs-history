@@ -2232,7 +2232,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 			    int			pass)
 {
 	xfs_mount_t		*mp;
-	xfs_buf_t			*bp;
+	xfs_buf_t		*bp;
 	struct xfs_disk_dquot	*ddq, *recddq;
 	int			error;
 	xfs_dq_logformat_t	*dq_f;
@@ -2260,7 +2260,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	/*
 	 * This type of quotas was turned off, so ignore this record.
 	 */
-	type = recddq->d_flags & (XFS_DQ_USER|XFS_DQ_PROJ);
+	type = INT_GET(recddq->d_flags, ARCH_CONVERT)&(XFS_DQ_USER|XFS_DQ_PROJ);
 	ASSERT(type);
 	if (log->l_quotaoffs_flag & type) 
 		return (0);
@@ -2298,7 +2298,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		return error;
 	}
 	ASSERT(bp);
-	ddq = (xfs_disk_dquot_t *) xfs_buf_offset(bp, dq_f->qlf_boffset);
+	ddq = (xfs_disk_dquot_t *)xfs_buf_offset(bp, dq_f->qlf_boffset);
 	
 	/* 
 	 * At least the magic num portion should be on disk because this
@@ -2806,7 +2806,7 @@ xlog_recover_clear_agi_bucket(
 {
 	xfs_trans_t	*tp;
 	xfs_agi_t	*agi;
-	xfs_daddr_t		agidaddr;
+	xfs_daddr_t	agidaddr;
 	xfs_buf_t	*agibp;
 	int		offset;
 	int		error;
@@ -2857,7 +2857,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_mount_t	*mp;
 	xfs_agnumber_t	agno;
 	xfs_agi_t	*agi;
-	xfs_daddr_t		agidaddr;
+	xfs_daddr_t	agidaddr;
 	xfs_buf_t	*agibp;
 	xfs_inode_t	*ip;
 	xfs_agino_t	agino;
@@ -3434,8 +3434,8 @@ xlog_recover_check_summary(xlog_t	*log)
 	xfs_agi_t	*agip;
 	xfs_buf_t	*agfbp;
 	xfs_buf_t	*agibp;
-	xfs_daddr_t		agfdaddr;
-	xfs_daddr_t		agidaddr;
+	xfs_daddr_t	agfdaddr;
+	xfs_daddr_t	agidaddr;
 	xfs_buf_t	*sbbp;
 #ifdef XFS_LOUD_RECOVERY
 	xfs_sb_t	*sbp;

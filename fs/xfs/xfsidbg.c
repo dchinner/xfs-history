@@ -3000,11 +3000,11 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			xfsidbg_xsb(sb, 1); 
 		}
 	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
-#define XFSIDBG_DQTYPESTR(d)     (((d)->d_flags & XFS_DQ_USER) ? "USR" : \
-                                 (((d)->d_flags & XFS_DQ_PROJ) ? "PRJ" : "???"))
-
+#define XFSIDBG_DQTYPESTR(d)     \
+	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_USER) ? "USR" : \
+	((INT_GET((d)->d_flags, ARCH_CONVERT) & XFS_DQ_PROJ) ? "PRJ" : "???"))
 		kdb_printf("Quota blk starting ID [%d], type %s at 0x%p\n",
-			dqb->d_id, XFSIDBG_DQTYPESTR(dqb), dqb);
+			INT_GET(dqb->d_id, ARCH_CONVERT), XFSIDBG_DQTYPESTR(dqb), dqb);
 		
 	} else if (INT_GET((d2block = d)->hdr.magic, ARCH_CONVERT) == XFS_DIR2_BLOCK_MAGIC) {
 		if (summary) {
@@ -4324,16 +4324,16 @@ xfsidbg_xqm()
 static void
 xfsidbg_xqm_diskdq(xfs_disk_dquot_t *d)
 {
-	kdb_printf("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n", d->d_magic,
-		d->d_version, d->d_id, d->d_id);
+	kdb_printf("magic 0x%x\tversion 0x%x\tID 0x%x (%d)\t\n", INT_GET(d->d_magic, ARCH_CONVERT),
+		INT_GET(d->d_version, ARCH_CONVERT), INT_GET(d->d_id, ARCH_CONVERT), INT_GET(d->d_id, ARCH_CONVERT));
 	kdb_printf("blk_hard 0x%x\tblk_soft 0x%x\tino_hard 0x%x\tino_soft 0x%x\n",
-		(int)d->d_blk_hardlimit, (int)d->d_blk_softlimit,
-		(int)d->d_ino_hardlimit, (int)d->d_ino_softlimit);
+		(int)INT_GET(d->d_blk_hardlimit, ARCH_CONVERT), (int)INT_GET(d->d_blk_softlimit, ARCH_CONVERT),
+		(int)INT_GET(d->d_ino_hardlimit, ARCH_CONVERT), (int)INT_GET(d->d_ino_softlimit, ARCH_CONVERT));
 	kdb_printf("bcount 0x%x (%d) icount 0x%x (%d)\n",
-		(int)d->d_bcount, (int)d->d_bcount, 
-		(int)d->d_icount, (int)d->d_icount);
+		(int)INT_GET(d->d_bcount, ARCH_CONVERT), (int)INT_GET(d->d_bcount, ARCH_CONVERT), 
+		(int)INT_GET(d->d_icount, ARCH_CONVERT), (int)INT_GET(d->d_icount, ARCH_CONVERT));
 	kdb_printf("btimer 0x%x itimer 0x%x \n",
-		(int)d->d_btimer, (int)d->d_itimer);
+		(int)INT_GET(d->d_btimer, ARCH_CONVERT), (int)INT_GET(d->d_itimer, ARCH_CONVERT));
 }
 
 static void	
@@ -4386,10 +4386,10 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 	  for (dqp = (l)->qh_next; dqp != NULL; dqp = dqp->NXT) {\
 	   kdb_printf( \
 	      "\t%d. [0x%p] \"%d (%s)\"\t blks = %d, inos = %d refs = %d\n", \
-			 ++i, dqp, (int) dqp->q_core.d_id, \
+			 ++i, dqp, (int) INT_GET(dqp->q_core.d_id, ARCH_CONVERT), \
 		         DQFLAGTO_TYPESTR(dqp),      \
-			 (int) dqp->q_core.d_bcount, \
-			 (int) dqp->q_core.d_icount, \
+			 (int) INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT), \
+			 (int) INT_GET(dqp->q_core.d_icount, ARCH_CONVERT), \
                          (int) dqp->q_nrefs); }\
 	  kdb_printf("\n"); \
 }
@@ -4427,10 +4427,10 @@ xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title)
 	FOREACH_DQUOT_IN_FREELIST(dq, qlist) {
 		kdb_printf("\t%d.\t\"%d (%s:0x%p)\"\t bcnt = %d, icnt = %d "
 		       "refs = %d\n",  
-		       ++i, (int) dq->q_core.d_id,
+		       ++i, (int) INT_GET(dq->q_core.d_id, ARCH_CONVERT),
 		       DQFLAGTO_TYPESTR(dq), dq,     
-		       (int) dq->q_core.d_bcount, 
-		       (int) dq->q_core.d_icount, 
+		       (int) INT_GET(dq->q_core.d_bcount, ARCH_CONVERT), 
+		       (int) INT_GET(dq->q_core.d_icount, ARCH_CONVERT), 
 		       (int) dq->q_nrefs);
 	}
 }

@@ -663,24 +663,24 @@ xfs_qm_scall_setqlim(
 	 * Make sure that hardlimits are >= soft limits before changing.
 	 */
 	hard = (newlim.d_fieldmask & FS_DQ_BHARD) ?
-		(xfs_qcnt_t) newlim.d_blk_hardlimit : ddq->d_blk_hardlimit;
+		(xfs_qcnt_t) newlim.d_blk_hardlimit : INT_GET(ddq->d_blk_hardlimit, ARCH_CONVERT);
 	soft = (newlim.d_fieldmask & FS_DQ_BSOFT) ?
-		(xfs_qcnt_t) newlim.d_blk_softlimit : ddq->d_blk_softlimit;
+		(xfs_qcnt_t) newlim.d_blk_softlimit : INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT);
 	if (hard == 0 || hard >= soft) {
-		ddq->d_blk_hardlimit = hard;
-		ddq->d_blk_softlimit = soft;
+		INT_SET(ddq->d_blk_hardlimit, ARCH_CONVERT, hard);
+		INT_SET(ddq->d_blk_softlimit, ARCH_CONVERT, soft);
 	}
 #ifdef QUOTADEBUG
 	else 
 		printk("blkhard %Ld < blksoft %Ld\n", hard, soft);
 #endif			
 	hard = (newlim.d_fieldmask & FS_DQ_RTBHARD) ?
-		(xfs_qcnt_t) newlim.d_rtb_hardlimit : ddq->d_rtb_hardlimit;
+		(xfs_qcnt_t) newlim.d_rtb_hardlimit : INT_GET(ddq->d_rtb_hardlimit, ARCH_CONVERT);
 	soft = (newlim.d_fieldmask & FS_DQ_RTBSOFT) ?
-		(xfs_qcnt_t) newlim.d_rtb_softlimit : ddq->d_rtb_softlimit;
+		(xfs_qcnt_t) newlim.d_rtb_softlimit : INT_GET(ddq->d_rtb_softlimit, ARCH_CONVERT);
 	if (hard == 0 || hard >= soft) {
-		ddq->d_rtb_hardlimit = hard;
-		ddq->d_rtb_softlimit = soft;
+		INT_SET(ddq->d_rtb_hardlimit, ARCH_CONVERT, hard);
+		INT_SET(ddq->d_rtb_softlimit, ARCH_CONVERT, soft);
 	}
 #ifdef QUOTADEBUG
 	else 
@@ -688,12 +688,12 @@ xfs_qm_scall_setqlim(
 #endif	
 	
 	hard = (newlim.d_fieldmask & FS_DQ_IHARD) ?
-		(xfs_qcnt_t) newlim.d_ino_hardlimit : ddq->d_ino_hardlimit;
+		(xfs_qcnt_t) newlim.d_ino_hardlimit : INT_GET(ddq->d_ino_hardlimit, ARCH_CONVERT);
 	soft = (newlim.d_fieldmask & FS_DQ_ISOFT) ?
-		(xfs_qcnt_t) newlim.d_ino_softlimit : ddq->d_ino_softlimit;
+		(xfs_qcnt_t) newlim.d_ino_softlimit : INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT);
 	if (hard == 0 || hard >= soft) {
-		ddq->d_ino_hardlimit = hard;
-		ddq->d_ino_softlimit = soft;
+		INT_SET(ddq->d_ino_hardlimit, ARCH_CONVERT, hard);
+		INT_SET(ddq->d_ino_softlimit, ARCH_CONVERT, soft);
 	}
 #ifdef QUOTADEBUG
 	else 
@@ -707,15 +707,15 @@ xfs_qm_scall_setqlim(
 		 */
 		if (newlim.d_fieldmask & FS_DQ_BTIMER) {
 			mp->m_quotainfo->qi_btimelimit = newlim.d_btimer;
-			dqp->q_core.d_btimer = newlim.d_btimer;
+			INT_SET(dqp->q_core.d_btimer, ARCH_CONVERT, newlim.d_btimer);
 		}
 		if (newlim.d_fieldmask & FS_DQ_ITIMER) {
 			mp->m_quotainfo->qi_itimelimit = newlim.d_itimer;
-			dqp->q_core.d_itimer = newlim.d_itimer;
+			INT_SET(dqp->q_core.d_itimer, ARCH_CONVERT, newlim.d_itimer);
 		}
 		if (newlim.d_fieldmask & FS_DQ_RTBTIMER) {
 			mp->m_quotainfo->qi_rtbtimelimit = newlim.d_rtbtimer;
-			dqp->q_core.d_rtbtimer = newlim.d_rtbtimer;
+			INT_SET(dqp->q_core.d_rtbtimer, ARCH_CONVERT, newlim.d_rtbtimer);
 		}
 #ifdef NOTYET
 		/*
@@ -724,14 +724,14 @@ xfs_qm_scall_setqlim(
 		 */
 		if (newlim.d_bwarns > 0) {
 			mp->m_quotainfo->qi_bwarnlimit = newlim.d_bwarns;
-			dqp->q_core.d_bwarns = newlim.d_bwarns;
+			INT_SET(dqp->q_core.d_bwarns, ARCH_CONVERT, newlim.d_bwarns);
 		}
 		if (newlim.d_iwarns > 0) {
 			mp->m_quotainfo->qi_iwarnlimit = newlim.d_iwarns;
-			dqp->q_core.d_iwarns = newlim.d_iwarns;
+			INT_SET(dqp->q_core.d_iwarns, ARCH_CONVERT, newlim.d_iwarns);
 		}
 		if (newlim.d_rtbwarns > 0) {
-			dqp->q_core.d_rtbwarns = newlim.d_rtbwarns;
+			INT_SET(dqp->q_core.d_rtbwarns, ARCH_CONVERT, newlim.d_rtbwarns);
 		}
 #endif
 	} else /* if (XFS_IS_QUOTA_ENFORCED(mp)) */ {
@@ -900,25 +900,25 @@ xfs_qm_export_dquot(
 	struct fs_disk_quota	*dst)
 {
 	bzero(dst, sizeof(*dst));
-	dst->d_version = FS_DQUOT_VERSION;  /* different from src->d_version */
-	dst->d_flags = xfs_qm_export_qtype_flags(src->d_flags);
-	dst->d_id = src->d_id;
-	dst->d_blk_hardlimit = (__uint64_t) src->d_blk_hardlimit;
-	dst->d_blk_softlimit = (__uint64_t) src->d_blk_softlimit;
-	dst->d_ino_hardlimit = (__uint64_t) src->d_ino_hardlimit;
-	dst->d_ino_softlimit = (__uint64_t) src->d_ino_softlimit;
-	dst->d_bcount = (__uint64_t) src->d_bcount;
-	dst->d_icount = (__uint64_t) src->d_icount;
-	dst->d_btimer = (__uint32_t) src->d_btimer;
-	dst->d_itimer = (__uint32_t) src->d_itimer;
-	dst->d_iwarns = src->d_iwarns;
-	dst->d_bwarns = src->d_bwarns;
+	dst->d_version = FS_DQUOT_VERSION;  /* different from INT_GET(src->d_version, ARCH_CONVERT) */
+	dst->d_flags = xfs_qm_export_qtype_flags(INT_GET(src->d_flags, ARCH_CONVERT));
+	dst->d_id = INT_GET(src->d_id, ARCH_CONVERT);
+	dst->d_blk_hardlimit = (__uint64_t) INT_GET(src->d_blk_hardlimit, ARCH_CONVERT);
+	dst->d_blk_softlimit = (__uint64_t) INT_GET(src->d_blk_softlimit, ARCH_CONVERT);
+	dst->d_ino_hardlimit = (__uint64_t) INT_GET(src->d_ino_hardlimit, ARCH_CONVERT);
+	dst->d_ino_softlimit = (__uint64_t) INT_GET(src->d_ino_softlimit, ARCH_CONVERT);
+	dst->d_bcount = (__uint64_t) INT_GET(src->d_bcount, ARCH_CONVERT);
+	dst->d_icount = (__uint64_t) INT_GET(src->d_icount, ARCH_CONVERT);
+	dst->d_btimer = (__uint32_t) INT_GET(src->d_btimer, ARCH_CONVERT);
+	dst->d_itimer = (__uint32_t) INT_GET(src->d_itimer, ARCH_CONVERT);
+	dst->d_iwarns = INT_GET(src->d_iwarns, ARCH_CONVERT);
+	dst->d_bwarns = INT_GET(src->d_bwarns, ARCH_CONVERT);
 
-	dst->d_rtb_hardlimit = (__uint64_t) src->d_rtb_hardlimit;
-	dst->d_rtb_softlimit = (__uint64_t) src->d_rtb_softlimit;
-	dst->d_rtbcount = (__uint64_t) src->d_rtbcount;
-	dst->d_rtbtimer = (__uint32_t) src->d_rtbtimer;
-	dst->d_rtbwarns = src->d_rtbwarns;
+	dst->d_rtb_hardlimit = (__uint64_t) INT_GET(src->d_rtb_hardlimit, ARCH_CONVERT);
+	dst->d_rtb_softlimit = (__uint64_t) INT_GET(src->d_rtb_softlimit, ARCH_CONVERT);
+	dst->d_rtbcount = (__uint64_t) INT_GET(src->d_rtbcount, ARCH_CONVERT);
+	dst->d_rtbtimer = (__uint32_t) INT_GET(src->d_rtbtimer, ARCH_CONVERT);
+	dst->d_rtbwarns = INT_GET(src->d_rtbwarns, ARCH_CONVERT);
 	
 	/*
 	 * Internally, we don't reset all the timers when quota enforcement
@@ -1159,10 +1159,10 @@ mutex_t	      qcheck_lock;
 	  for (dqp = (xfs_dqtest_t *)(l)->qh_next; dqp != NULL; \
 	       dqp = (xfs_dqtest_t *)dqp->NXT) { \
 	    printk("\t%d\.\t\"%d (%s)\"\t bcnt = %d, icnt = %d\n", \
-			 ++i, (int) dqp->d_id, \
+			 ++i, (int) INT_GET(dqp->d_id, ARCH_CONVERT), \
 		         DQFLAGTO_TYPESTR(dqp),      \
-			 (int) dqp->d_bcount, \
-			 (int) dqp->d_icount); } \
+			 (int) INT_GET(dqp->d_bcount, ARCH_CONVERT), \
+			 (int) INT_GET(dqp->d_icount, ARCH_CONVERT)); } \
 }
 	
 typedef struct dqtest {
@@ -1191,16 +1191,16 @@ xfs_qm_dqtest_print(
 	xfs_dqtest_t	*d)
 {
 	printk( "-----------DQTEST DQUOT----------------\n");
-	printk( "---- dquot ID	=  %d\n", (int) d->d_id);
+	printk( "---- dquot ID	=  %d\n", (int) INT_GET(d->d_id, ARCH_CONVERT));
 	printk( "---- type      =  %s\n", XFS_QM_ISUDQ(d) ? "USR" :
 	       "PRJ");
 	printk( "---- fs        =  0x%p\n", d->q_mount);
 	printk( "---- bcount	=  %Lu (0x%x)\n", 
-	       d->d_bcount,
-	       (int)d->d_bcount);
+	       INT_GET(d->d_bcount, ARCH_CONVERT),
+	       (int)INT_GET(d->d_bcount, ARCH_CONVERT));
 	printk( "---- icount	=  %Lu (0x%x)\n", 
-	       d->d_icount,
-	       (int)d->d_icount);
+	       INT_GET(d->d_icount, ARCH_CONVERT),
+	       (int)INT_GET(d->d_icount, ARCH_CONVERT));
 	printk( "---------------------------\n");
 }
 
@@ -1216,10 +1216,10 @@ xfs_qm_dqtest_failed(
 	qmtest_nfails++;
 	if (error)
 		printk("quotacheck failed for %d, error = %d\nreason = %s\n",
-		       d->d_id, error, reason);
+		       INT_GET(d->d_id, ARCH_CONVERT), error, reason);
 	else
 		printk("quotacheck failed for %d (%s) [%d != %d]\n",
-		       d->d_id, reason, (int)a, (int)b);
+		       INT_GET(d->d_id, ARCH_CONVERT), reason, (int)a, (int)b);
 	xfs_qm_dqtest_print(d);
 	if (dqp)
 		xfs_qm_dqprint(dqp);
@@ -1231,31 +1231,31 @@ xfs_dqtest_cmp2(
 	xfs_dquot_t	*dqp)
 {
 	int err = 0;
-	if (dqp->q_core.d_icount != d->d_icount) {
+	if (INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) != INT_GET(d->d_icount, ARCH_CONVERT)) {
 		xfs_qm_dqtest_failed(d, dqp, "icount mismatch", 
-				     dqp->q_core.d_icount, d->d_icount, 0);
+				     INT_GET(dqp->q_core.d_icount, ARCH_CONVERT), INT_GET(d->d_icount, ARCH_CONVERT), 0);
 		err++;
 	}
-	if (dqp->q_core.d_bcount != d->d_bcount) {
+	if (INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) != INT_GET(d->d_bcount, ARCH_CONVERT)) {
 		xfs_qm_dqtest_failed(d, dqp, "bcount mismatch", 
-				     dqp->q_core.d_bcount, d->d_bcount, 0);
+				     INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT), INT_GET(d->d_bcount, ARCH_CONVERT), 0);
 		err++;
 	}
-	if (dqp->q_core.d_blk_softlimit &&
-	    dqp->q_core.d_bcount >= dqp->q_core.d_blk_softlimit) {
-		if (dqp->q_core.d_btimer == 0 &&
-		    dqp->q_core.d_id != 0) {
+	if (INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT) &&
+	    INT_GET(dqp->q_core.d_bcount, ARCH_CONVERT) >= INT_GET(dqp->q_core.d_blk_softlimit, ARCH_CONVERT)) {
+		if (INT_GET(dqp->q_core.d_btimer, ARCH_CONVERT) == 0 &&
+		    INT_GET(dqp->q_core.d_id, ARCH_CONVERT) != 0) {
 			printk("%d [%s] [0x%p] BLK TIMER NOT STARTED\n", 
-			       (int) d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
+			       (int) INT_GET(d->d_id, ARCH_CONVERT), DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
 		}
 	}
-	if (dqp->q_core.d_ino_softlimit &&
-	    dqp->q_core.d_icount >= dqp->q_core.d_ino_softlimit) {
-		if (dqp->q_core.d_itimer == 0 &&
-		    dqp->q_core.d_id != 0) {
+	if (INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT) &&
+	    INT_GET(dqp->q_core.d_icount, ARCH_CONVERT) >= INT_GET(dqp->q_core.d_ino_softlimit, ARCH_CONVERT)) {
+		if (INT_GET(dqp->q_core.d_itimer, ARCH_CONVERT) == 0 &&
+		    INT_GET(dqp->q_core.d_id, ARCH_CONVERT) != 0) {
 			printk("%d [%s] [0x%p] INO TIMER NOT STARTED\n", 
-			       (int) d->d_id, DQFLAGTO_TYPESTR(d), 
+			       (int) INT_GET(d->d_id, ARCH_CONVERT), DQFLAGTO_TYPESTR(d), 
 			       d->q_mount);
 			err++;
 		}
@@ -1263,7 +1263,7 @@ xfs_dqtest_cmp2(
 #if 0
 	if (!err) {
 		printk("%d [%s] [0x%p] qchecked\n", 
-		       (int) d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "PRJ", d->q_mount);
+		       (int) INT_GET(d->d_id, ARCH_CONVERT), XFS_QM_ISUDQ(d) ? "USR" : "PRJ", d->q_mount);
 	}
 #endif
 	return (err);
@@ -1277,7 +1277,7 @@ xfs_dqtest_cmp(
 	int		error;
 
 	/* xfs_qm_dqtest_print(d); */
-	if (error = xfs_qm_dqget(d->q_mount, NULL, d->d_id, d->dq_flags, 0,
+	if (error = xfs_qm_dqget(d->q_mount, NULL, INT_GET(d->d_id, ARCH_CONVERT), d->dq_flags, 0,
 				 &dqp)) {
 		xfs_qm_dqtest_failed(d, NULL, "dqget failed", 0, 0, error);
 		return;
@@ -1300,14 +1300,14 @@ xfs_qm_internalqcheck_dqget(
 	for (d = (xfs_dqtest_t *) h->qh_next; d != NULL; 
 	     d = (xfs_dqtest_t *) d->HL_NEXT) {
 		/* DQTEST_LIST_PRINT(h, HL_NEXT, "@@@@@ dqtestlist @@@@@"); */
-		if (d->d_id == id && mp == d->q_mount) {
+		if (INT_GET(d->d_id, ARCH_CONVERT) == id && mp == d->q_mount) {
 			*O_dq = d;
 			return (0);
 		}
 	}
 	d = kmem_zalloc(sizeof(xfs_dqtest_t), KM_SLEEP);
 	d->dq_flags = type;
-	d->d_id = id;
+	INT_SET(d->d_id, ARCH_CONVERT, id);
 	d->q_mount = mp;
 	d->q_hash = h;
 	xfs_qm_hashinsert(h, d);
@@ -1336,8 +1336,8 @@ xfs_qm_internalqcheck_dqadjust(
 	xfs_inode_t		*ip,
 	xfs_dqtest_t        	*d)
 {
-	d->d_icount++;
-	d->d_bcount += (xfs_qcnt_t)ip->i_d.di_nblocks;
+	INT_MOD(d->d_icount, ARCH_CONVERT, +1);
+	INT_MOD(d->d_bcount, ARCH_CONVERT, (xfs_qcnt_t)ip->i_d.di_nblocks);
 	return (0);
 }
 

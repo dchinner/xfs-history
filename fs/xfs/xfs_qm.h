@@ -115,8 +115,8 @@ typedef struct xfs_qm {
 	atomic_t	 qm_totaldquots; /* total incore dquots */
 	uint		 qm_nrefs;	 /* file systems with quota on */
 	int		 qm_dqfree_ratio;/* ratio of free to inuse dquots */
-	xfs_zone_t		*qm_dqzone;	 /* dquot mem-alloc zone */
-	xfs_zone_t		*qm_dqtrxzone;	 /* t_dqinfo of transactions */
+	xfs_zone_t	*qm_dqzone;	 /* dquot mem-alloc zone */
+	xfs_zone_t	*qm_dqtrxzone;	 /* t_dqinfo of transactions */
 } xfs_qm_t;
 
 /*

@@ -464,13 +464,13 @@ xfs_qm_dquot_logitem_init(
 	lp = &dqp->q_logitem;
 
 	lp->qli_item.li_type = XFS_LI_DQUOT;
-        lp->qli_item.li_ops = &xfs_dquot_item_ops;
-        lp->qli_item.li_mountp = dqp->q_mount;
+	lp->qli_item.li_ops = &xfs_dquot_item_ops;
+	lp->qli_item.li_mountp = dqp->q_mount;
 	lp->qli_dquot = dqp;
-        lp->qli_format.qlf_type = XFS_LI_DQUOT;
-        lp->qli_format.qlf_id = dqp->q_core.d_id;
-        lp->qli_format.qlf_blkno = dqp->q_blkno;
-        lp->qli_format.qlf_len = 1;
+	lp->qli_format.qlf_type = XFS_LI_DQUOT;
+	lp->qli_format.qlf_id = INT_GET(dqp->q_core.d_id, ARCH_CONVERT);
+	lp->qli_format.qlf_blkno = dqp->q_blkno;
+	lp->qli_format.qlf_len = 1;
 	/*
 	 * This is just the offset of this dquot within its buffer
 	 * (which is currently 1 FSB and probably won't change).
@@ -478,15 +478,15 @@ xfs_qm_dquot_logitem_init(
 	 * Alternatively, we can store (bufoffset / sizeof(xfs_dqblk_t))
 	 * here, and recompute it at recovery time.
 	 */
-        lp->qli_format.qlf_boffset = (__uint32_t)dqp->q_bufoffset;
+	lp->qli_format.qlf_boffset = (__uint32_t)dqp->q_bufoffset;
 }
-	
+
 /*------------------  QUOTAOFF LOG ITEMS  -------------------*/
 
 /*
  * This returns the number of iovecs needed to log the given quotaoff item.
- * We only need 1 iovec for an quotaoff item.  It just logs the quotaoff_log_format
- * structure.
+ * We only need 1 iovec for an quotaoff item.  It just logs the
+ * quotaoff_log_format structure.
  */
 /*ARGSUSED*/
 STATIC uint
@@ -565,8 +565,8 @@ xfs_qm_qoff_logitem_unlock(xfs_qoff_logitem_t *qf)
 }
 
 /*
- * The quotaoff-start-item is logged only once and cannot be moved in the log, so
- * simply return the lsn at which it's been logged.  
+ * The quotaoff-start-item is logged only once and cannot be moved in the log,
+ * so simply return the lsn at which it's been logged.  
  */
 /*ARGSUSED*/
 STATIC xfs_lsn_t
