@@ -67,9 +67,24 @@ static ssize_t linvfs_read(
 	size_t size,
 	loff_t *offset)
 {
-	int rval;
-	rval = generic_file_read(filp, buf, size, offset);
-	return(rval);
+	struct inode *inode;
+	vnode_t *vp;
+	int rv;
+	
+	printk("ENTER linvfs_read\n");
+
+	if (!filp || !filp->f_dentry ||
+			!(inode = filp->f_dentry->d_inode)) {
+		printk("EXIT linvfs_read -EBADF\n");
+		return -EBADF;
+	}
+
+	inode = filp->f_dentry->d_inode;
+	vp = LINVFS_GET_VP(inode);
+
+	VOP_READ(vp, filp, buf, size, offset, rv);
+	printk("EXIT  linvfs_read %d\n", rv);
+	return(rv);
 }
 
 
@@ -78,35 +93,26 @@ static ssize_t linvfs_write(
 	const char *buf,
 	size_t size,
 	loff_t *offset)
-{	
-  struct inode *inode = filp->f_dentry->d_inode;
-  vnode_t *vp = LINVFS_GET_VP(inode);
-  int rv;
-  struct cred *cr;
-  flid_t *fl;
-  uio_t uio;
-  iovec_t iov;
-  int ioflag = 0; /* nothing special for the moment */
-  
-  printk("ENTER linvfs_write\n");
-  iov.iov_base = (void *)buf;
-  iov.iov_len = size; /* Arbitrary. The real size is held in
-								 * the abstract structure pointed to by dirent *
-								 * filldir will return an error if we go
-								 * beyond the buffer. */
-  uio.uio_iov = &iov;
-  uio.uio_iovcnt = 1;
-  uio.uio_copy = NULL;
-  uio.uio_fmode = filp->f_mode;
-  uio.uio_offset = filp->f_pos;
-  uio.uio_segflg = UIO_USERSPACE;
-  uio.uio_resid = size;
-  uio.uio_limit = PAGE_SIZE;
+{
+	struct inode *inode;
+	vnode_t *vp;
+	int rv;
+	
+	printk("ENTER linvfs_write\n");
 
-  VOP_WRITE(vp, &uio, ioflag, cr, fl, rv);
-  printk("EXIT  linvfs_write %d\n",rv);
-  return(rv);
- 
+	if (!filp || !filp->f_dentry ||
+			!(inode = filp->f_dentry->d_inode)) {
+		printk("EXIT linvfs_write -EBADF\n");
+		return -EBADF;
+	}
+
+	inode = filp->f_dentry->d_inode;
+	vp = LINVFS_GET_VP(inode);
+
+	VOP_WRITE(vp, (void *)filp, buf, size, offset, rv);
+
+	printk("EXIT  linvfs_write %d\n", rv);
+	return(rv);
 }
 
 

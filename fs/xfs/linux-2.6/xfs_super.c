@@ -21,7 +21,7 @@
 #include <linux/sched.h>
 #include <linux/locks.h>
 #include <linux/slab.h>
-#include <linux/xfs_inode.h>
+#include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
 
 #include <linux/linux_to_xfs.h>

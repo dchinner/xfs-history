@@ -1,4 +1,4 @@
-#ident "$Revision: 1.424 $"
+#ident "$Revision: 1.427 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -4818,8 +4818,6 @@ xfs_symlink(
 	xfs_inode_t		*ip;
         int 			error;
 	int			pathlen;
-        struct pathname		cpn;
-	struct pathname		ccpn;
 	xfs_ino_t		e_inum;
 	dev_t			rdev;
 	xfs_bmap_free_t		free_list;
@@ -4865,22 +4863,29 @@ xfs_symlink(
         if (pathlen >= MAXPATHLEN)      /* total string too long */
                 return XFS_ERROR(ENAMETOOLONG);
         if (pathlen >= MAXNAMELEN) {    /* is any component too long? */
-                pn_alloc(&cpn);
-                pn_alloc(&ccpn);
-                bcopy(target_path, cpn.pn_path, pathlen);
-                cpn.pn_pathlen = pathlen;
-                while (cpn.pn_pathlen > 0 && !error) {
-                        if (error = pn_getcomponent(&cpn, ccpn.pn_path, 0)) {
-                                pn_free(&cpn);
-                                pn_free(&ccpn);
-                                if (error == ENAMETOOLONG)
-                                        return error;
-                        } else if (cpn.pn_pathlen) {    /* advance past slash */                                cpn.pn_path++;
-                                cpn.pn_pathlen--;
-                        }
-                }
-                pn_free(&cpn);
-                pn_free(&ccpn);
+		int len, max, total;
+		char *path;
+
+		for(total = 0, path = target_path; total < pathlen;) {
+			/*
+			 * Skip any slashes.
+			 */
+			while(*path == '/') {
+				total++;
+				path++;
+			}
+
+			/*
+			 * Count up to the next slash or end of path.
+			 * Error out if the component is bigger than MAXNAMELEN.
+			 */
+			for(len = 0; *path != '/' && total < pathlen;total++, path++) {
+				if (++len >= MAXNAMELEN) {
+					error = ENAMETOOLONG;
+					return error;
+				}
+			}
+		}
         }
 
 #ifndef SIM
@@ -7024,13 +7029,12 @@ vnodeops_t xfs_vnodeops = {
 };
 
 #else
-#if 1
 vnodeops_t xfs_vnodeops = {
 	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
 	xfs_open,
 	xfs_close,
-	(vop_read_t)fs_nosys, /*xfs_read, */
-	(vop_write_t)fs_nosys,/* xfs_write, */
+	(vop_read_t)xfs_read,
+	(vop_write_t)xfs_write,
 	(vop_ioctl_t)fs_nosys,/* xfs_ioctl, */
 	(vop_setfl_t)fs_noerr,
 	xfs_getattr,
@@ -7084,5 +7088,4 @@ vnodeops_t xfs_vnodeops = {
 	fs_strgetmsg,
 	fs_strputmsg,
 };
-#endif /* if 0 */
 #endif /* SIM */
