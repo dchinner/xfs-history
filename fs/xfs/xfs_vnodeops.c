@@ -1,4 +1,4 @@
-#ident "$Revision: 1.273 $"
+#ident "$Revision: 1.274 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -269,18 +269,6 @@ xfs_frlock(
 	flock_t		*flockp,
 	int		flag,
 	off_t		offset,
-	cred_t		*credp);
-
-STATIC int
-xfs_map(
-	bhv_desc_t	*bdp,
-	off_t		offset,
-	void		*pregp,
-	addr_t		*addrp,
-	size_t		len,
-	uint		prot,
-	uint		max_prot,
-	uint		flags,
 	cred_t		*credp);
 
 STATIC int
@@ -5874,42 +5862,6 @@ xfs_frlock(
 	return error;
 }
 
-
-/*
- * xfs_map
- *
- * This is called when a file is first mapped by a process by either
- * a call to mmap() or an exec().  All the work is simply done in the
- * fs_map_subr() routine, which sets up the mapping in the process'
- * address space by making lots of VM specific calls.  These calls may
- * in turn call back to the xfs_addmap() routine, so we need to ensure
- * that we don't lock the inode across the call to fs_map_subr().
- */
-STATIC int
-xfs_map(
-	bhv_desc_t	*bdp,
-	off_t		offset,
-	void		*pregp,
-	addr_t		*addrp,
-	size_t		len,
-	uint		prot,
-	uint		max_prot,
-	uint		flags,
-	cred_t		*credp)
-{
-	xfs_inode_t	*ip;
-	int		error;
-	vnode_t 	*vp;
-
-	vp = BHV_TO_VNODE(bdp);
-	ip = XFS_BHVTOI(bdp);
-	error = fs_map_subr(vp, ip->i_d.di_size, ip->i_d.di_mode,
-			    offset, pregp, *addrp, len, prot,
-			    max_prot, flags, credp);
-	return error;
-}
-
-
 /*
  * xfs_allocstore
  *
@@ -7315,7 +7267,7 @@ vnodeops_t xfs_vnodeops = {
 	fs_nosys,	/* realvp */
 	xfs_bmap,
 	xfs_strategy,
-	xfs_map,
+	fs_noerr,
 	fs_noerr,	/* addmap */
 	fs_noerr,	/* delmap */
 	fs_poll,
