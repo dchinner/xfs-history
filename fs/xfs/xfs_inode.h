@@ -152,5 +152,8 @@ extern void		xfs_iunlock(xfs_inode_t *);
  */
 extern xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
 extern void		xfs_idestroy(xfs_inode_t *);
+extern void		xfs_idata_realloc(xfs_inode_t *, int);
+extern void		xfs_iext_realloc(xfs_inode_t *, int);
+extern void		xfs_iroot_realloc(xfs_inode_t *, int);
 
 #endif	/* _XFS_INODE_H */
