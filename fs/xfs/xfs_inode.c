@@ -1,4 +1,4 @@
-#ident "$Revision: 1.176 $"
+#ident "$Revision: 1.177 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1901,6 +1901,7 @@ xfs_ifree(
 	ip->i_d.di_flags = 0;
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_forkoff = 0;		/* mark the attr fork not in use */
+	ip->i_df.if_ext_max = XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 
@@ -2688,6 +2689,8 @@ xfs_iflush(
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
+	ASSERT(ip->i_d.di_format != XFS_DINODE_FMT_BTREE ||
+	       ip->i_d.di_nextents > ip->i_df.if_ext_max);
 
 	iip = ip->i_itemp;
 	mp = ip->i_mount;
