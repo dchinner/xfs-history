@@ -295,30 +295,20 @@ xfs_open_by_handle(
 	vfs_t		*vfsp,
 	xfs_mount_t	*mp)
 {
-	int			i;
 	int			error;
-	int			klocked = 0;
-	int			newfd = -1;
+	int			new_fd;
 	int			permflag;
-	char			sname[(2 * MAXFIDSZ) + 1];
-	char			*cpi;
-	char			*cpo;
 	__u32			igen;
 	struct dentry		*dentry = NULL;
-	struct dentry		*pardentry;
-	struct file		*filp;
+	struct file		*filp = NULL;
 	struct inode		*inode = NULL;
-	struct qstr		sqstr;
 	void			*hanp;
 	size_t			hlen;
-	vnode_t			*vp = NULL;
+	ino_t                   ino;
 	xfs_fid_t		*xfid;
 	xfs_handle_t		*handlep;
 	xfs_handle_t		handle;
-	xfs_ino_t		ino;
-	xfs_inode_t		*ip = NULL;
 	xfs_fsop_handlereq_t	hreq;
-
 
 #ifndef	PERMISSIONS_BY_USER
 	/*
@@ -377,11 +367,6 @@ xfs_open_by_handle(
 	 * Crack the handle, obtain the inode # & generation #
 	 */
 
-	/*
-	 * handle_to_vp(&handle)
-	 * VFS_VGET (vfsp, &vp, &handlep->ha_fid, error)
-	 *	     bdp, **vp, fidp;
-	 */
 	xfid = (struct xfs_fid *)&handlep->ha_fid;
 
 	if (xfid->xfs_fid_len == sizeof(*xfid) - sizeof(xfid->xfs_fid_len)) {
@@ -395,223 +380,122 @@ xfs_open_by_handle(
 		return -XFS_ERROR(EINVAL);
 	}
 
+	/*
+	 * Get the inode.
+	 */
+	inode = iget(parfilp->f_dentry->d_inode->i_sb, ino);
+	if (is_bad_inode(inode) ||
+	    igen != inode->i_generation) {
+	  	iput(inode);
+		return -XFS_ERROR(ENOENT);
+	}
+
 
 	/*
-	 * Make a unique name for dcache.
+ 	 * Why do we need to do this?
+	 * XFS_IOC_FSBULKSTAT_SINGLE  does a xfs_iget on the inode 
+	 * and puts it in the linux inode cache with out 
+	 * calling linvfs_set_inode_ops.  The next time
+	 * the linux iget is called on the inode it will find the inode in the linux
+	 * cache so read_inode is not called and the inode ops field is never
+	 * initialized.
 	 */
-	cpi = (char *)handlep;
-	cpo = sname;
-
-	for (i = 0; i < hlen && i < MAXFIDSZ; i++) {
-		sprintf(cpo, "%02x", *cpi);
-
-		cpi++;
-		cpo += 2;
-	}
-
-	*cpo = '\0';
-
+	linvfs_set_inode_ops(inode);
 	/*
-	 * Obtain/create a 'dentry'.
+	 * Fix the mode flags that linvfs_set_inode_ops bashes.
 	 */
-	sqstr.name = sname;
-	sqstr.len  = 2 * hlen;
-	sqstr.hash = full_name_hash(sname, hlen);
-
-	pardentry = parfilp->f_dentry;
-
-
-	down(&parinode->i_sem);
-
-	dentry = d_lookup(pardentry, &sqstr);	/* There already? */
-	if (!dentry) {
-		dentry = d_alloc(pardentry, &sqstr);
-
-		if (! dentry) {
-			up(&parinode->i_sem);
-			return -ENOMEM;
-		}
-        }
-
-	up(&parinode->i_sem);
-	inode = dentry->d_inode;
-
-	/*
-	 * Get the XFS inode, building a vnode to go with it 
-	 */
-	error = xfs_iget(mp, NULL, inode?inode->i_ino:ino, XFS_ILOCK_SHARED, &ip, 0);
-
-	if (error) {
-		error = -error;
-
-		goto cleanup_dentry;
-	}
-
-	if (ip == NULL) {
-		error = -XFS_ERROR(EIO);
-
-		goto cleanup_dentry;
-	}
-
-	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
-
-		xfs_iput(ip, XFS_ILOCK_SHARED);
-
-		error = -XFS_ERROR(ENOENT);
-
-		goto cleanup_dentry;
-	}
-
-	vp = XFS_ITOV(ip);
-
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
-	if (inode == NULL) {
-		inode = igrab(vp->v_inode);
-
-		if (! inode) {
-			error = -EACCES;
-
-			VN_RELE(vp);
-
-			goto cleanup_dentry;
-		}
-
-		/*
-		 * Set xfs inode ops.
-		 */
-		linvfs_set_inode_ops(inode);
-		d_add(dentry, inode);
-	}
+	linvfs_revalidate_core(inode);
 
 	/*
 	 * Restrict handle operations to directories & regular files.
-	 */
+         */
 	if (! (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)) ) {
-
-		error = -XFS_ERROR(EINVAL);
-
-		goto cleanup_dentry;
-	}
+	  	iput(inode);
+                return -XFS_ERROR(EINVAL);
+	}       
 
 	/*
-	 * Get a file descriptor # to use.
+	 * Put open permission in namei format.
 	 */
-	lock_kernel();
+        permflag = hreq.oflags;
+        if ((permflag+1) & O_ACCMODE)
+                permflag++;
+        if (permflag & O_TRUNC)
+                permflag |= 2;
 
-	klocked = 1;
-
-	newfd = get_unused_fd();
-
-	if (newfd < 0) {
-		error = newfd;
-
-		goto cleanup_dentry;
-	}
-
-	/*
-	 * Get a file table entry.
-	 */
-	filp = get_empty_filp();
-
-	if (! filp) {
-		error = -ENFILE;
-
-		goto cleanup_fd;
-	}
-
-	filp->f_flags = hreq.oflags;
-
-	filp->f_mode = (hreq.oflags + 1) & O_ACCMODE;
-
-#ifdef	PERMISSIONS_BY_USER
-	/*
-	 * Do permission/write checks
-	 */
-	permflag = 0;
-
-	if (filp->f_mode & FMODE_READ)
-		permflag |= MAY_READ;
-
-	if (filp->f_mode & FMODE_WRITE)
-		permflag |= MAY_WRITE;
-
-	if (error = permission(inode, permflag))
-		goto cleanup_file;
-
-#endif	/* PERMISSIONS_BY_USER */
-
-	if (filp->f_mode & FMODE_WRITE) {
-
-		if (vp->v_type == VDIR) {	/* Can't write directories */
-			error = -EISDIR;
-
-			goto cleanup_file;
-		}
-
-		error = get_write_access(inode);
-
-		if (error)
-			goto cleanup_file;
-	}
-
-
-	/*
-	 * Stitch it all together.
-	 */
-	filp->f_dentry = dentry;
-	filp->f_pos    = 0;
-	filp->f_reada  = 0;
-	filp->f_op     = inode->i_fop;
-
-	
-	
-	if (inode->i_sb)
-		file_move(filp, &inode->i_sb->s_files);
-
-	if (filp->f_op && filp->f_op->open) {
-
-		error = filp->f_op->open(inode, filp);
-
-		if (error)
-			goto cleanup_all;
-	}
-
-	filp->f_flags &= ~(O_CREAT | O_EXCL | O_NOCTTY | O_TRUNC);
-
-
-	if (klocked)
-		unlock_kernel();
-	klocked = 0;
-
-	fd_install(newfd, filp);
+        /*
+         * Can't write directories.
+         */
+        if ( S_ISDIR(inode->i_mode) && (permflag & FMODE_WRITE)) {
+                iput(inode);
+                return -XFS_ERROR(EISDIR);
+        }
         
-        iput(inode);
+	/*
+         * Create new_fd
+ 	 */
+	if ((new_fd = get_unused_fd()) < 0) {
+	  	iput(inode);
+		return new_fd;
+	}
+    
+	/*
+	 * Create anonymous dcache entry.
+	 */
+	dentry = d_alloc_root(inode);
+	if (dentry == NULL) {
+  		iput(inode);
+	     	put_unused_fd(new_fd);
+		return -XFS_ERROR(ENOMEM);
+	}
 
-	return newfd;
+	/*
+	 * Keep nfsd happy.
+	 */
+	dentry->d_flags |= DCACHE_NFSD_DISCONNECTED;
 
+	/*
+	 * Make sure dput can find this dcache entry.
+	 */
+        d_rehash(dentry);
 
-cleanup_all:
-	if (filp->f_mode & FMODE_WRITE)
-		put_write_access(inode);
+	/*
+         * Make sure umount returns an EBUSY on umounts while this file is open.
+	 */
+	mntget(parfilp->f_vfsmnt);
 
-cleanup_file:
-	filp->f_dentry = NULL;
-	put_filp(filp);
+	/*
+	 * Create file pointer.
+	 */
+     	filp = dentry_open(dentry, parfilp->f_vfsmnt, hreq.oflags);
+	if (IS_ERR(filp)) {
+	     	put_unused_fd(new_fd);
+		return -XFS_ERROR(-PTR_ERR(filp));
+	}
 
-cleanup_fd:
-	if (newfd >= 0)
-		put_unused_fd(newfd);
+#ifdef  PERMISSIONS_BY_USER
+        /*
+         * Do permission/write checks
+         */
+        permflag = 0;
 
-cleanup_dentry:
-        if (inode)
-            iput(inode);
-	dput(dentry);
+        if (filp->f_mode & FMODE_READ)
+                permflag |= MAY_READ;
 
-	if (klocked)
-		unlock_kernel();
+        if (filp->f_mode & FMODE_WRITE)
+                permflag |= MAY_WRITE;
 
-	return error;
+        if (error = permission(inode, permflag)) {
+	     	put_unused_fd(new_fd);
+		fput(filp);
+		return -XFS_ERROR(-error);
+
+	}
+#endif  /* PERMISSIONS_BY_USER */
+
+	fd_install(new_fd, filp);
+
+        return new_fd;
 }
 
 
