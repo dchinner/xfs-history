@@ -1197,8 +1197,6 @@ xfs_ialloc(
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_dmstate = 0;
 	ip->i_d.di_flags = 0;
-	if ((pip->i_d.di_flags & XFS_DIFLAG_NODUMP) && xfs_inherit_nodump)
-		ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
 	flags = XFS_ILOG_CORE;
 	switch (mode & IFMT) {
 	case IFIFO:
@@ -1212,8 +1210,6 @@ xfs_ialloc(
 		break;
 	case IFREG:
 	case IFDIR:
-		if ((pip->i_d.di_flags & XFS_DIFLAG_SYNC) && xfs_inherit_sync)
-			ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
 	case IFLNK:
 		ip->i_d.di_format = XFS_DINODE_FMT_EXTENTS;
 		ip->i_df.if_flags = XFS_IFEXTENTS;
@@ -3504,9 +3500,6 @@ xfs_iaccess(
 		if (IS_RDONLY(inode) &&
 		    (S_ISREG(imode) || S_ISDIR(imode) || S_ISLNK(imode)))
 			return XFS_ERROR(EROFS);
-
-		if (IS_IMMUTABLE(inode))
-			return XFS_ERROR(EACCES);
 	}
 
 	/*
@@ -3630,7 +3623,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 	 * Don't update access timestamps on reads if mounted "noatime"
 	 * Throw it away if anyone asks us.
 	 */
-	if ((ip->i_mount->m_flags & XFS_MOUNT_NOATIME || IS_NOATIME(inode)) &&
+	if (ip->i_mount->m_flags & XFS_MOUNT_NOATIME &&
 	    ((flags & (XFS_ICHGTIME_ACC|XFS_ICHGTIME_MOD|XFS_ICHGTIME_CHG))
 			== XFS_ICHGTIME_ACC))
 		return;
