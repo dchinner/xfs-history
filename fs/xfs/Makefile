@@ -11,7 +11,8 @@ KERNEL_VERSION = 2.4.2
 SGI_VERSION = `cat $(WORKAREA)/SPECS/_sgi_kvers_`
 
 COMMANDS = cmd/attr cmd/acl cmd/xfsprogs cmd/dmapi cmd/xfsdump
-COMMANDRPMS = attr attr-devel dmapi dmapi-devel xfsprogs xfsprogs-devel xfsdump
+COMMANDRPMS = libattr attr attr-devel libacl acl acl-devel \
+	dmapi dmapi-devel xfsprogs xfsprogs-devel xfsdump
 
 default all: checkproc tarballs kernel cmds 
 
