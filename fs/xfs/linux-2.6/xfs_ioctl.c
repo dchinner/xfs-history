@@ -1174,6 +1174,9 @@ xfs_ioctl(
                 xfs_fsop_resblks_t inout;
                 __uint64_t in; 
                               
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		error = copy_from_user(&inout, (char *)arg, sizeof(xfs_fsop_resblks_t));
                 if (error)
                         return -XFS_ERROR(EFAULT);
@@ -1190,7 +1193,10 @@ xfs_ioctl(
             
         case XFS_IOC_GET_RESBLKS: {
                 xfs_fsop_resblks_t out;
-                
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
 		error = xfs_reserve_blocks(mp, NULL, &out);
                 if (error)
                         return -error;
