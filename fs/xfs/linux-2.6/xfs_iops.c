@@ -315,13 +315,56 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 
 int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 {
-  return(-ENOSYS);
+	vnode_t	*vp;
+	uio_t	uio;
+	iovec_t	iov;
+	int	error = 0;
+
+	vp = LINVFS_GET_VP(dentry->d_inode);
+	iov.iov_base = buf;
+	iov.iov_len = size;
+
+	uio.uio_iov = &iov;
+	uio.uio_offset = 0;
+	uio.uio_segflg = UIO_USERSPACE;
+	uio.uio_resid = size;
+
+	VOP_READLINK(vp, &uio, sys_cred, error);
+	if (error)
+		return -error;
+
+	return (size - uio.uio_resid);
 }
 
 
-struct dentry * linvfs_follow_link(struct dentry *dentry, struct dentry *base, unsigned int follow)
+struct dentry * linvfs_follow_link(struct dentry *dentry,
+				   struct dentry *base,
+				   unsigned int follow)
 {
-  return(NULL);
+	vnode_t	*vp;
+	uio_t	uio;
+	iovec_t	iov;
+	int	error = 0;
+	char	*link = kmalloc(MAXNAMELEN, GFP_KERNEL); 
+
+	vp = LINVFS_GET_VP(dentry->d_inode);
+	iov.iov_base = link;
+	iov.iov_len = MAXNAMELEN;
+
+	uio.uio_iov = &iov;
+	uio.uio_offset = 0;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_resid = MAXNAMELEN;
+
+	VOP_READLINK(vp, &uio, sys_cred, error);
+	if (error) {
+		kfree_s(link, MAXNAMELEN);
+		return NULL;
+	}
+
+	base = lookup_dentry(link, base, follow);
+	kfree_s(link, MAXNAMELEN);
+	return base;
 }
 
 
