@@ -279,6 +279,8 @@ struct xfsstats {
 # define XFS_STATS64_ADD(count, inc)
 #endif	/* !CONFIG_PROC_FS */
 
+/* juggle IRIX device numbers - still used in ondisk structures */
+
 #define IRIX_DEV_BITSMAJOR      14
 #define IRIX_DEV_BITSMINOR      18 
 #define IRIX_DEV_MAXMAJ         0x1ff 
@@ -291,5 +293,21 @@ struct xfsstats {
                                     
 #define IRIX_DEV_TO_KDEVT(dev)  MKDEV(IRIX_DEV_MAJOR(dev),IRIX_DEV_MINOR(dev))
 #define IRIX_DEV_TO_DEVT(dev)   ((IRIX_DEV_MAJOR(dev)<<8)|IRIX_DEV_MINOR(dev))
+
+/* __psint_t is the same size as a pointer */
+
+#ifndef SIM
+
+#if (BITS_PER_LONG == 32)
+typedef __int32_t __psint_t;
+typedef __uint32_t __psunsigned_t;
+#elif (BITS_PER_LONG == 64)
+typedef __int64_t __psint_t;
+typedef __uint64_t __psunsigned_t;
+#else
+#error BITS_PER_LONG must be 32 or 64
+#endif
+
+#endif
 
 #endif	/* !__XFS_TYPES_H */

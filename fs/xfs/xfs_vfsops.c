@@ -2233,7 +2233,7 @@ vfsops_t xfs_vfsops = {
 	xfs_root,
 	xfs_statvfs,
 	xfs_sync,
-	fs_nosys,
+	(void*)fs_nosys,
 	xfs_vfsmountroot,
 	xfs_get_vnode,
 };
