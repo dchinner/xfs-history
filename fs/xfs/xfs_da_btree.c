@@ -330,7 +330,7 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	 */
 	args = state->args;
 	ASSERT(args != NULL);
-	error = xfs_da_grow_inode(args, 1, &blkno);
+	error = xfs_da_grow_inode(args, &blkno);
 	if (error)
 		return(error);
 	error = xfs_da_get_buf(args->trans, args->dp, blkno, &bp,
@@ -387,7 +387,7 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 		 * Allocate a new node, add to the doubly linked chain of
 		 * nodes, then move some of our excess entries into it.
 		 */
-		error = xfs_da_grow_inode(state->args, 1, &blkno);
+		error = xfs_da_grow_inode(state->args, &blkno);
 		if (error)
 			return(error);	/* GROT: dir is inconsistent */
 		
@@ -665,7 +665,7 @@ xfs_da_join(xfs_da_state_t *state)
 		error = xfs_da_blk_unlink(state, drop_blk, save_blk);
 		if (error)
 			return(error);
-		error = xfs_da_shrink_inode(state->args, drop_blk->blkno, 1,
+		error = xfs_da_shrink_inode(state->args, drop_blk->blkno,
 							 drop_blk->bp);
 		if (error)
 			return(error);
@@ -744,7 +744,7 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 	ASSERT(blkinfo->back == 0);
 	bcopy(bp->b_un.b_addr, root_blk->bp->b_un.b_addr, state->blocksize);
 	xfs_trans_log_buf(args->trans, root_blk->bp, 0, state->blocksize - 1);
-	error = xfs_da_shrink_inode(args, child, 1, bp);
+	error = xfs_da_shrink_inode(args, child, bp);
 	return(error);
 }
 
@@ -1498,78 +1498,188 @@ xfs_da_hashname(register char *name, register int namelen)
 }
 
 int
-xfs_da_grow_inode(xfs_da_args_t *args, int length, xfs_dablk_t *new_blkno)
+xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 {
 	xfs_fileoff_t bno;
 	xfs_bmbt_irec_t map;
 	xfs_inode_t *dp;
-	int nmap, error;
+	int nmap, error, w;
+	xfs_fsize_t size;
+	xfs_trans_t *tp;
 
 	dp = args->dp;
-	error = xfs_bmap_first_unused(args->trans, dp, (xfs_extlen_t)length,
-						   &bno, args->whichfork);
-	if (error) {
-		return(error);
-	}
-	nmap = 1;	/* GROT: max of 1 extent is not enough */
+	w = args->whichfork;
+	tp = args->trans;
+	if (error = xfs_bmap_first_unused(tp, dp, 1, &bno, w))
+		return error;
+	nmap = 1;
 	ASSERT(args->firstblock != NULL);
-	error = xfs_bmapi(args->trans, dp, bno, (xfs_filblks_t)length,
-			  XFS_BMAPI_AFLAG(args->whichfork) |
-					 XFS_BMAPI_WRITE|XFS_BMAPI_METADATA,
-			  args->firstblock, args->total, &map, &nmap,
-			  args->flist);
-	if (error) {
-		return(error);
-	}
+	if (error = xfs_bmapi(tp, dp, bno, 1,
+			XFS_BMAPI_AFLAG(w)|XFS_BMAPI_WRITE|XFS_BMAPI_METADATA,
+			args->firstblock, args->total, &map, &nmap,
+			args->flist))
+		return error;
 	if (nmap < 1) {
 		ASSERT(0);
-		return(XFS_ERROR(ENOSPC));
+		return XFS_ERROR(ENOSPC);
 	}
 	*new_blkno = (xfs_dablk_t)bno;
-	if (args->whichfork == XFS_DATA_FORK) {
-		error = xfs_bmap_last_offset(args->trans, dp, &bno,
-							  args->whichfork);
-		if (error) {
-			return(error);
+	if (w == XFS_DATA_FORK) {
+		if (error = xfs_bmap_last_offset(tp, dp, &bno, w))
+			return error;
+		size = XFS_FSB_TO_B(dp->i_mount, bno);
+		if (size != dp->i_d.di_size) {
+			dp->i_d.di_size = size;
+			xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
 		}
-		dp->i_d.di_size = XFS_FSB_TO_B(dp->i_mount, bno);
 	}
+	return 0;
+}
 
-	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_CORE);
+STATIC int
+xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
+		      buf_t **dead_bufp)
+{
+	xfs_dablk_t dead_blkno, last_blkno, sib_blkno, par_blkno;
+	buf_t *dead_buf, *last_buf, *sib_buf, *par_buf;
+	xfs_fileoff_t lastoff;
+	xfs_inode_t *ip;
+	xfs_trans_t *tp;
+	xfs_mount_t *mp;
+	int error, w, entno, level, dead_level;
+	xfs_da_blkinfo_t *dead_info, *sib_info;
+	xfs_da_intnode_t *par_node, *dead_node;
 
-	return(0);
+	dead_buf = *dead_bufp;
+	dead_blkno = *dead_blknop;
+	tp = args->trans;
+	ip = args->dp;
+	w = args->whichfork;
+	if (error = xfs_bmap_last_offset(tp, ip, &lastoff, w))
+		return error;
+	if (lastoff == 0)
+		return XFS_ERROR(EFSCORRUPTED);
+	last_blkno = lastoff - 1;
+	if (error = xfs_da_read_buf(tp, ip, last_blkno, -1, &last_buf, w))
+		return error;
+	mp = ip->i_mount;
+	bcopy(last_buf->b_un.b_addr, dead_buf->b_un.b_addr,
+		mp->m_sb.sb_blocksize);
+	xfs_trans_log_buf(tp, dead_buf, 0, mp->m_sb.sb_blocksize - 1);
+	dead_info = (xfs_da_blkinfo_t *)dead_buf->b_un.b_addr;
+	dead_node = (xfs_da_intnode_t *)dead_info;
+	dead_level = dead_info->magic == XFS_DIR_LEAF_MAGIC ?
+			0 : dead_node->hdr.level;
+	if (sib_blkno = dead_info->back) {
+		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
+			return error;
+		sib_info = (xfs_da_blkinfo_t *)sib_buf->b_un.b_addr;
+		if (sib_info->forw != last_blkno ||
+		    sib_info->magic != dead_info->magic)
+			return XFS_ERROR(EFSCORRUPTED);
+		sib_info->forw = dead_blkno;
+		xfs_trans_log_buf(tp, sib_buf,
+			XFS_DA_LOGRANGE(sib_info, &sib_info->forw,
+					sizeof(sib_info->forw)));
+		xfs_trans_brelse(tp, sib_buf);
+	}
+	if (sib_blkno = dead_info->forw) {
+		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
+			return error;
+		sib_info = (xfs_da_blkinfo_t *)sib_buf->b_un.b_addr;
+		if (sib_info->back != last_blkno ||
+		    sib_info->magic != dead_info->magic)
+			return XFS_ERROR(EFSCORRUPTED);
+		sib_info->back = dead_blkno;
+		xfs_trans_log_buf(tp, sib_buf,
+			XFS_DA_LOGRANGE(sib_info, &sib_info->back,
+					sizeof(sib_info->back)));
+		xfs_trans_brelse(tp, sib_buf);
+	}
+	/*
+	 * Clearly room for improvement here, just get it to work for now.
+	 */
+	for (par_blkno = 0, level = -1; ; ) {
+		if (error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w))
+			return error;
+		par_node = (xfs_da_intnode_t *)par_buf->b_un.b_addr;
+		if (par_node->hdr.info.magic != XFS_DA_NODE_MAGIC)
+			return XFS_ERROR(EFSCORRUPTED);
+		if (level >= 0 && level != par_node->hdr.level + 1)
+			return XFS_ERROR(EFSCORRUPTED);
+		level = par_node->hdr.level;
+		if (level == dead_level + 1)
+			break;
+		par_blkno = par_node->btree[0].before;
+		xfs_trans_brelse(tp, par_buf);
+	}
+	for (;;) {
+		for (entno = 0;
+		     entno < par_node->hdr.count &&
+		     par_node->btree[entno].before != last_blkno;
+		     entno++)
+			continue;
+		if (entno < par_node->hdr.count)
+			break;
+		par_blkno = par_node->hdr.info.forw;
+		xfs_trans_brelse(tp, par_buf);
+		if (par_blkno == 0)
+			return XFS_ERROR(EFSCORRUPTED);
+		if (error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w))
+			return error;
+		par_node = (xfs_da_intnode_t *)par_buf->b_un.b_addr;
+		if (par_node->hdr.level != level ||
+		    par_node->hdr.info.magic != XFS_DA_NODE_MAGIC)
+			return XFS_ERROR(EFSCORRUPTED);
+	}
+	par_node->btree[entno].before = dead_blkno;
+	xfs_trans_log_buf(tp, par_buf,
+		XFS_DA_LOGRANGE(par_node, &par_node->btree[entno].before,
+				sizeof(par_node->btree[entno].before)));
+	xfs_trans_brelse(tp, par_buf);
+	*dead_blknop = last_blkno;
+	*dead_bufp = last_buf;
+	return 0;
 }
 
 int
-xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno, int length,
-				  buf_t *dead_buf)
+xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
+		    buf_t *dead_buf)
 {
 	xfs_inode_t *dp;
-	int done, error;
+	int done, error, w;
 	xfs_fileoff_t bno;
+	xfs_fsize_t size;
+	xfs_trans_t *tp;
 
 	dp = args->dp;
-	error = xfs_bunmapi(args->trans, dp, (xfs_fileoff_t)dead_blkno,
-			    (xfs_filblks_t)length,
-			    XFS_BMAPI_AFLAG(args->whichfork)|XFS_BMAPI_METADATA,
-			    1, args->firstblock, args->flist, &done);
-	if (error) {
-		return(error);
+	w = args->whichfork;
+	tp = args->trans;
+	for (;;) {
+		if ((error = xfs_bunmapi(tp, dp, dead_blkno, 1,
+				XFS_BMAPI_AFLAG(w)|XFS_BMAPI_METADATA,
+				1, args->firstblock, args->flist,
+				&done)) == ENOSPC) {
+			if (error = xfs_da_swap_lastblock(args, &dead_blkno,
+					&dead_buf))
+				return error;
+		} else if (error)
+			return error;
+		else
+			break;
 	}
 	ASSERT(done);
-	xfs_trans_binval(args->trans, dead_buf);
-	if (args->whichfork == XFS_DATA_FORK) {
-		error = xfs_bmap_last_offset(args->trans, dp, &bno,
-							  args->whichfork);
-		if (error) {
-			return (error);
+	xfs_trans_binval(tp, dead_buf);
+	if (w == XFS_DATA_FORK) {
+		if (error = xfs_bmap_last_offset(tp, dp, &bno, w))
+			return error;
+		size = XFS_FSB_TO_B(dp->i_mount, bno);
+		if (size != dp->i_d.di_size) {
+			dp->i_d.di_size = size;
+			xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
 		}
-		dp->i_d.di_size = XFS_FSB_TO_B(dp->i_mount, bno);
 	}
-
-	xfs_trans_log_inode(args->trans, dp, XFS_ILOG_CORE);
-
-	return(0);
+	return 0;
 }
 
 int
