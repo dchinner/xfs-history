@@ -2173,6 +2173,7 @@ pagebuf_daemon(
 				}
 
 				list_del(&pb->pb_list);
+				pb_daemon->pb_delwri_cnt--;
 				list_add(&pb->pb_list, &tmp);
 
 				count++;
@@ -2243,6 +2244,7 @@ pagebuf_delwri_flush(
 		}
 
 		list_del_init(&pb->pb_list);
+		pb_daemon->pb_delwri_cnt--;
 		if (flags & PBDF_WAIT) {
 			list_add(&pb->pb_list, &tmp);
 			pb->pb_flags &= ~PBF_ASYNC;
