@@ -408,6 +408,9 @@ linvfs_read_super(
 	LINVFS_SET_CVP(sb, cvp);
 	vfsp->vfs_super = sb;
 
+#ifdef CONFIG_FS_POSIX_ACL
+	sb->s_posix_acl_flag = 1;
+#endif
 
 	sb->s_blocksize = 512;
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
@@ -731,6 +734,10 @@ linvfs_remount(
 
 	vfsp = LINVFS_GET_VFS(sb);
 	cvp = LINVFS_GET_CVP(sb);
+
+#ifdef CONFIG_FS_POSIX_ACL
+	sb->s_posix_acl_flag = 1;
+#endif
 
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;

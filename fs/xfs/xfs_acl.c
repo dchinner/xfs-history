@@ -40,7 +40,6 @@ STATIC void     xfs_acl_filter_mode(mode_t, struct acl *);
 STATIC void	xfs_acl_get_endian(struct acl *);
 STATIC int	xfs_acl_access(uid_t, gid_t, struct acl *, mode_t, cred_t *);
 STATIC int	xfs_acl_invalid (struct acl *aclp);
-STATIC int	xfs_acl_vtoacl(vnode_t *vp, struct acl *access_acl, struct acl *default_acl);
 STATIC void	xfs_acl_sync_mode(mode_t mode, struct acl *acl);
 
 int
@@ -382,18 +381,18 @@ xfs_acl_vtoacl(vnode_t *vp, struct acl *access_acl, struct acl *default_acl)
  */
 
 int
-xfs_acl_inherit(vnode_t *pvp, vnode_t *vp, vattr_t *vap)
+xfs_acl_inherit(vnode_t *vp, vattr_t *vap, struct acl *pdaclp)
 {
-	struct acl pdacl, cacl;
+	struct acl cacl;
 	int error = 0;
 
 	/*
 	 * If the parent does not have a default ACL, or it's an
 	 * invalid ACL, we're done.
 	 */
-	if (pvp == NULL || vp == NULL)
+	if (vp == NULL)
 		return (0);
-	if (xfs_acl_vtoacl(pvp, NULL, &pdacl) || xfs_acl_invalid(&pdacl))
+	if (pdaclp == NULL || xfs_acl_invalid(pdaclp))
 		return (0);
 
 	/*
@@ -403,7 +402,7 @@ xfs_acl_inherit(vnode_t *pvp, vnode_t *vp, vattr_t *vap)
 	 * the u::,g::[m::], and o:: entries.  This is what makes
 	 * umask() "work" with ACL's.
 	 */
-        memcpy(&cacl, &pdacl, sizeof(cacl));
+        memcpy(&cacl, pdaclp, sizeof(cacl));
 	xfs_acl_filter_mode(vap->va_mode, &cacl);
 
 	/* set the mode to the acl */ 
@@ -418,7 +417,7 @@ xfs_acl_inherit(vnode_t *pvp, vnode_t *vp, vattr_t *vap)
 	 *
 	 */
 	if (vp->v_type == VDIR) {
-		xfs_acl_set_attr(vp, &pdacl, ACL_DEFAULT, &error);
+		xfs_acl_set_attr(vp, pdaclp, ACL_DEFAULT, &error);
 	}
 	if (!error) {
 		xfs_acl_set_attr(vp, &cacl, ACL_ACCESS, &error);
@@ -825,5 +824,5 @@ xfs_acl_filter_mode(mode_t mode, struct acl *acl)
 	 * Set the ACL_GROUP_OBJ if there's no ACL_MASK
 	 */
 	if (gap && nomask)
-		gap->ae_perm = (mode >> 3) & 0x7;
+		gap->ae_perm &= (mode >> 3) & 0x7;
 }

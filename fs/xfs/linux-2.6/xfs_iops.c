@@ -72,6 +72,8 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	vnode_t		*dvp, *vp;
 	struct inode	*ip;
 	vattr_t		va;
+	struct acl	pdacl; /* parent default ACL */
+	int		have_default_acl;
 
 	dvp = LINVFS_GET_VN_ADDRESS(dir);
 	ASSERT(dvp);
@@ -82,8 +84,12 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	bzero(&va, sizeof(va));
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = tp;
-	va.va_mode = mode;	/* Do we need to pass this through? JIMJIM
-				va.va_mode = 0777 & ~current->fs->umask; */
+	have_default_acl = _ACL_GET_DEFAULT(dvp, &pdacl);
+        if (!have_default_acl) {
+	    mode &= ~current->fs->umask;
+	}
+			
+	va.va_mode = mode;	
 	va.va_size = 0;
 
 	if (tp == VREG) {
@@ -125,8 +131,8 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		d_instantiate(dentry, ip);
 	}
 
-        if (!error) {
-	    error = _ACL_INHERIT(dvp, vp, &va);
+        if (!error && have_default_acl) {
+	    error = _ACL_INHERIT(vp, &va, &pdacl);
         }
 
 	return -error;
