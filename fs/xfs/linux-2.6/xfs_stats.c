@@ -43,7 +43,7 @@
 
 #ifdef CONFIG_PROC_FS
 static int
-xfs_read_xfsstats(char *buffer, char **start, linux_off_t offset,
+xfs_read_xfsstats(char *buffer, char **start, off_t offset,
 			int count, int *eof, void *data)
 {
 	int	i, j, len;
@@ -98,7 +98,7 @@ xfs_read_xfsstats(char *buffer, char **start, linux_off_t offset,
 }
 
 static int
-xfs_read_xfsquota(char *buffer, char **start, linux_off_t offset,
+xfs_read_xfsquota(char *buffer, char **start, off_t offset,
 			int count, int *eof, void *data)
 {
 	int	len;

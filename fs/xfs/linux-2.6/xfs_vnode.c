@@ -33,14 +33,6 @@
 #include <xfs.h>
 #include <linux/xfs_iops.h>
 
-/*
- * Private vnode spinlock manipulation.
- *
- * Nested means there is no need to deal with interrupts (disable/enable)
- * so we can be quick about it.
- */
-#define NESTED_VN_LOCK(vp)      spin_lock(&(vp)->v_lock)
-#define NESTED_VN_UNLOCK(vp)    spin_unlock(&(vp)->v_lock)
 
 uint64_t vn_generation;		/* vnode generation number */
 
@@ -104,7 +96,7 @@ vn_reclaim(struct vnode *vp, int flag)
 	VN_LOCK(vp);
 
 	vp->v_flag &= (VRECLM|VWAIT);
-	VN_UNLOCK(vp, 0);
+	VN_UNLOCK(vp);
 
 	vp->v_type = VNON;
 	vp->v_fbhv = NULL;
@@ -126,20 +118,19 @@ vn_wakeup(struct vnode *vp)
 		sv_broadcast(vptosync(vp));
 	}
 	vp->v_flag &= ~(VRECLM|VWAIT|VMODIFIED);
-	VN_UNLOCK(vp, 0);
+	VN_UNLOCK(vp);
 }
 
 int 
 vn_wait(struct vnode *vp)
 {
-	NESTED_VN_LOCK(vp);
-
+	VN_LOCK(vp);
 	if (vp->v_flag & (VINACT | VRECLM)) {
 		vp->v_flag |= VWAIT;
 		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
 		return 1;
 	}
-	NESTED_VN_UNLOCK(vp);
+	VN_UNLOCK(vp);
 	return 0;
 }
 
@@ -276,9 +267,9 @@ again:
 	 * sampled its version while holding a filesystem cache lock that
 	 * its VOP_RECLAIM function acquires.
 	 */
-	NESTED_VN_LOCK(vp);
+	VN_LOCK(vp);
 	if (vp->v_number != vmap->v_number) {
-		NESTED_VN_UNLOCK(vp);
+		VN_UNLOCK(vp);
 		return;
 	}
 
@@ -299,13 +290,13 @@ again:
 	 * Another process could have raced in and gotten this vnode...
 	 */
 	if (vn_count(vp) > 0) {
-		NESTED_VN_UNLOCK(vp);
+		VN_UNLOCK(vp);
 		return;
 	}
 
 	XFS_STATS_DEC(xfsstats.vn_active);
 	vp->v_flag |= VRECLM;
-	NESTED_VN_UNLOCK(vp);
+	VN_UNLOCK(vp);
 
 	/*
 	 * Call VOP_RECLAIM and clean vp. The FSYNC_INVAL flag tells
@@ -329,17 +320,13 @@ struct vnode *
 vn_hold(struct vnode *vp)
 {
 	struct inode *inode;
-	unsigned long s;
 
 	XFS_STATS_INC(xfsstats.vn_hold);
 
-	s = VN_LOCK(vp);
-	inode = LINVFS_GET_IP(vp);
-
-	inode = igrab(inode);
-
+	VN_LOCK(vp);
+	inode = igrab(LINVFS_GET_IP(vp));
 	ASSERT(inode);
-	VN_UNLOCK(vp, s);
+	VN_UNLOCK(vp);
 
 	return vp;
 }
@@ -373,7 +360,7 @@ vn_rele(struct vnode *vp)
 		 * until we turn off VINACT or VRECLM
 		 */
 		vp->v_flag |= VINACT;
-		VN_UNLOCK(vp, 0);
+		VN_UNLOCK(vp);
 
 		/*
 		 * Do not make the VOP_INACTIVE call if there
@@ -394,7 +381,7 @@ vn_rele(struct vnode *vp)
 
 	}
 
-	VN_UNLOCK(vp, 0);
+	VN_UNLOCK(vp);
 
 	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 }

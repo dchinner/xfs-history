@@ -69,17 +69,10 @@
 
 #include "page_buf_internal.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,6)
-#define SLAB_NOFS	SLAB_PAGE_IO
-#define GFP_NOFS	GFP_PAGE_IO
-#endif
-
 #define SECTOR_SHIFT	9
 #define SECTOR_SIZE     (1<<SECTOR_SHIFT)
 #define SECTOR_MASK	(SECTOR_SIZE - 1)
 #define BN_ALIGN_MASK	((1 << (PAGE_CACHE_SHIFT - SECTOR_SHIFT)) - 1)
-
-#define MAX_BUF_PER_PAGE	(PAGE_CACHE_SIZE / SECTOR_SIZE)
 
 /*
  * Debug code

@@ -48,23 +48,6 @@ extern ushort           vttoif_tab[];
 #define MAKEIMODE(T, M)	(VTTOIF(T) | ((M) & ~S_IFMT))
 
 /*
- * One file structure is allocated for each call to open/creat/pipe.
- * Mainly used to hold the read/write pointer associated with each
- * open file.
- * vf_lock protects:
- *      vf_flag
- */
-typedef struct vfile {
-	lock_t	vf_lock;	/* spinlock for vf_flag */
-	int	vf_flag;
-	void	*__vf_data__;	/* DON'T ACCESS DIRECTLY */
-} vfile_t;
-
-#define VF_TO_VNODE(vfp)	\
-	(ASSERT(!((vfp)->vf_flag & FSOCKET)), (vnode_t *)(vfp)->__vf_data__)
-#define VF_IS_VNODE(vfp)	(!((vfp)->vf_flag & FSOCKET))
-
-/*
  * Vnode flags.
  *
  * The vnode flags fall into two categories:  
@@ -761,8 +744,8 @@ extern void	vn_rele(struct vnode *);
 /*
  * Vnode spinlock manipulation.
  */
-#define	VN_LOCK(vp)		mutex_spinlock(&(vp)->v_lock)
-#define	VN_UNLOCK(vp,s)		mutex_spinunlock(&(vp)->v_lock,s)
+#define	VN_LOCK(vp)		spin_lock(&(vp)->v_lock)
+#define	VN_UNLOCK(vp)		spin_unlock(&(vp)->v_lock)
 #define VN_FLAGSET(vp,b)	vn_flagset(vp,b)
 #define VN_FLAGCLR(vp,b)	vn_flagclr(vp,b)
 

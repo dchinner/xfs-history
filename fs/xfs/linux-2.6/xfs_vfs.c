@@ -50,10 +50,11 @@ vfs_allocate(void)
 {
 	vfs_t	*vfsp;
 
-        vfsp = kmalloc(sizeof(vfs_t), GFP_KERNEL);
-	memset(vfsp, 0, sizeof(vfs_t));
-	ASSERT(vfsp);
-	VFS_INIT(vfsp);
+	vfsp = kmalloc(sizeof(vfs_t), GFP_KERNEL);
+	if (vfsp) {
+		memset(vfsp, 0, sizeof(vfs_t));
+		VFS_INIT(vfsp);
+	}
 	return (vfsp);
 }
 
