@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.180 $"
+#ident  "$Revision: 1.181 $"
 
 
 #include <limits.h>
@@ -1170,19 +1170,28 @@ xfs_unmount(
 	if ((rbmip = mp->m_rbmip) != NULL) {
 		xfs_ilock(rbmip, XFS_ILOCK_EXCL);
 		xfs_iflock(rbmip);
-		xfs_iflush(rbmip, XFS_IFLUSH_SYNC);
+		error = xfs_iflush(rbmip, XFS_IFLUSH_SYNC);
 		xfs_iunlock(rbmip, XFS_ILOCK_EXCL);
+		if (error == EFSCORRUPTED)
+			goto fscorrupt_out;
 		ASSERT(XFS_ITOV(rbmip)->v_count == 1);
 
 		rsumip = mp->m_rsumip;
 		xfs_ilock(rsumip, XFS_ILOCK_EXCL);
 		xfs_iflock(rsumip);
-		xfs_iflush(rsumip, XFS_IFLUSH_SYNC);
+		error = xfs_iflush(rsumip, XFS_IFLUSH_SYNC);
 		xfs_iunlock(rsumip, XFS_ILOCK_EXCL);
+		if (error == EFSCORRUPTED)
+			goto fscorrupt_out;
 		ASSERT(XFS_ITOV(rsumip)->v_count == 1);
 	}
 
-	xfs_iflush(rip, XFS_IFLUSH_SYNC);   /* synchronously flush to disk */
+	/*
+	 * synchronously flush root inode to disk
+	 */
+	error = xfs_iflush(rip, XFS_IFLUSH_SYNC);
+	if (error == EFSCORRUPTED)
+		goto fscorrupt_out2;
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		error = XFS_ERROR(EBUSY);
@@ -1192,7 +1201,9 @@ xfs_unmount(
 	 * Release dquot that rootinode, rbmino and rsumino might be holding,
 	 * flush and purge the quota inodes.
 	 */
-	xfs_qm_unmount_quotas(mp);
+	error = xfs_qm_unmount_quotas(mp);
+	if (error == EFSCORRUPTED)
+		goto fscorrupt_out2;
 
 	if (rbmip) {
 		VN_RELE(XFS_ITOV(rbmip));
@@ -1216,9 +1227,11 @@ xfs_unmount(
 	 * we want to make sure we invalidate dirty pages that belong to
 	 * referenced vnodes as well.
 	 */
-	if (XFS_FORCED_SHUTDOWN(mp))
-		xfs_sync(&mp->m_bhv,
+	if (XFS_FORCED_SHUTDOWN(mp))  {
+		error = xfs_sync(&mp->m_bhv,
 			 (SYNC_WAIT | SYNC_CLOSE), credp);
+		ASSERT(error != EFSCORRUPTED);
+	}
 	xfs_unmountfs(mp, vfs_flags, credp);	
 out:
 	if (sendunmountevent) {
@@ -1226,6 +1239,14 @@ out:
 				       0, 0, 0, 0, error);
 	}
 	return XFS_ERROR(error);
+
+fscorrupt_out:
+	xfs_ifunlock(rip);
+
+fscorrupt_out2:
+	xfs_iunlock(rip, XFS_ILOCK_EXCL);
+
+	return XFS_ERROR(EFSCORRUPTED);
 }
 
 
@@ -1898,6 +1919,14 @@ xfs_sync(
 		if (error) {
 			last_error = error;
 		}
+		/*
+		 * bail out if the filesystem is corrupted.
+		 */
+		if (error == EFSCORRUPTED)  {
+			if (mount_locked)
+				XFS_MOUNT_IUNLOCK(mp);
+			return XFS_ERROR(error);
+		}
 		if ((++preempt & PREEMPT_MASK) == 0) {
 			if (mount_locked) {
 				ireclaims = mp->m_ireclaims;
@@ -1962,7 +1991,7 @@ xfs_sync(
 			 */
 			ASSERT(error != EIO || XFS_FORCED_SHUTDOWN(mp));
 			if (XFS_FORCED_SHUTDOWN(mp))
-				return (error);
+				return XFS_ERROR(error);
 		}
 	}
 	/*
@@ -2031,7 +2060,7 @@ xfs_sync(
 		xfs_refcache_purge_some();
 	}
 
-	return last_error;
+	return XFS_ERROR(last_error);
 }
 
 
@@ -2069,7 +2098,7 @@ xfs_vget(
 		return XFS_ERROR(EINVAL);
 	}
 	mp = XFS_BHVTOM(bdp);
-	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_EXCL, &ip, 0);
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
 	if (error) {
 		*vpp = NULL;
 		return error;
@@ -2079,18 +2108,13 @@ xfs_vget(
                 return XFS_ERROR(EIO);
         }
 
-	if (ip->i_d.di_mode == 0) {
-		xfs_iput(ip, XFS_ILOCK_EXCL);
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+		xfs_iput(ip, XFS_ILOCK_SHARED);
 		*vpp = NULL;
 		return 0;
-	}
-
-	if (ip->i_d.di_gen != igen) {
-                xfs_iput(ip, XFS_ILOCK_EXCL);
-                *vpp = NULL;
-                return 0;
         }
-        xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+        xfs_iunlock(ip, XFS_ILOCK_SHARED);
         *vpp = XFS_ITOV(ip);
         return 0;
 }
