@@ -1,4 +1,4 @@
-#include <sys/types.h>
+#include <sys/param.h>
 #ifdef SIM
 #define _KERNEL 1
 #endif
@@ -30,7 +30,6 @@
 #endif
 #include <sys/kmem.h>
 #include <sys/sema.h>
-#include <sys/param.h>
 #include <sys/file.h>
 #include <sys/region.h>
 #include <sys/runq.h>
@@ -2433,11 +2432,11 @@ xfs_diostrat( buf_t *bp)
 	/*
  	 * Check if the request is on a file system block boundary.
 	 */
-	if ( (offset % mp->m_sb.sb_blocksize) != 0 ) {
+	if ( (offset & mp->m_blockmask) != 0 ) {
 		/*
  		 * The request is NOT on a file system block boundary.
 		 */
-		blk_algn =  BTOBB(offset % mp->m_sb.sb_blocksize);
+		blk_algn = BTOBB(offset & mp->m_blockmask);
 	}
 
 	/*
@@ -2747,7 +2746,7 @@ xfs_diostrat( buf_t *bp)
  * xfs_diordwr()
  *	This routine sets up a buf structure to be used to perform 
  * 	direct I/O operations to user space. The user specified 
- *	paramters are checked for alignment and size limitations. A buf
+ *	parameters are checked for alignment and size limitations. A buf
  *	structure is allocated an biophysio() is called.
  *
  * RETURNS:
