@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_BTREE_H
 #define	_FS_XFS_DIR_BTREE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.8 $"
 
 /*
  * xfs_dir_btree.h
@@ -79,9 +79,8 @@ int	xfs_dir_leaf_add(xfs_trans_t *trans, buf_t *leaf_buffer,
  */
 int	xfs_dir_join(struct xfs_dir_state *state);
 void	xfs_dir_fixhashpath(struct xfs_dir_state *state,
-				   struct xfs_dir_state_path *path_to_to_fix,
-				   int level_in_path);
-void	xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *leaf_buffer,
+				   struct xfs_dir_state_path *path_to_to_fix);
+int	xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *leaf_buffer,
 					int index_to_remove);
 
 /*
@@ -97,5 +96,30 @@ int	xfs_dir_node_lookup_int(struct xfs_dir_state *state);
 void	xfs_dir_leaf_print_int(buf_t *leaf_buffer, xfs_inode_t *dir_inode);
 int	xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio,
 					int *eobp, dirent_t *dbp);
+
+#ifdef XFSDIRDEBUG
+#define xfs_trans_binval(T,B)	xfsdir_t_binval(T,B,__FILE__,__LINE__)
+#define xfs_trans_brelse(T,B)	xfsdir_t_brelse(T,B,__FILE__,__LINE__)
+#define xfs_trans_log_buf(T,B,F,L) xfsdir_t_log_buf(T,B,F,L,__FILE__,__LINE__)
+#define xfs_trans_log_inode(T,I,F) xfsdir_t_log_inode(T,I,F,__FILE__,__LINE__)
+#define xfs_dir_read_buf(T,I,B) xfsdir_t_dir_read_buf(T,I,B,__FILE__,__LINE__)
+void xfsdir_t_reinit(char *description, char *file, int line);
+void xfsdir_t_binval(xfs_trans_t *tp, buf_t *bp, char *file, int line);
+void xfsdir_t_brelse(xfs_trans_t *tp, buf_t *bp, char *file, int line);
+void xfsdir_t_log_buf(xfs_trans_t *tp, buf_t *bp, uint first, uint last,
+				  char *file, int line);
+void xfsdir_t_log_inode(xfs_trans_t *tp, xfs_inode_t *ip, uint flags,
+				    char *file, int line);
+buf_t *xfsdir_t_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,
+					 xfs_fsblock_t bno,
+					 char *file, int line);
+#define BUFTRACEMAX	128
+struct xfsdir_buftrace {
+	short	which;
+	short	line;
+	char	*file;
+	buf_t	*bp;
+};
+#endif /* XFSDIRDEBUG */
 
 #endif	/* !FS_XFS_DIR_BTREE_H */
