@@ -1954,7 +1954,7 @@ char *tab_vflags[] = {
 	"VOPLOCK",		/* 0x20000000 */
 	"VPURGE",		/* 0x40000000 */
 	"INVALID0x80000000",	/* 0x80000000 */
-	0
+	NULL
 };
 
 
@@ -2937,7 +2937,7 @@ static struct xif xfsidbg_funcs[] = {
 				"Dump XFS transaction structure"},
   {  "xtrres",	kdbm_xfs_xtrans_res,	"<xfs_mount_t>",
 				"Dump XFS reservation values"},
-  {  0,		0,	0 }
+  {  NULL,		NULL,	NULL }
 };
 
 static struct xif pb_funcs[] = {
@@ -2949,7 +2949,7 @@ static struct xif pb_funcs[] = {
   {  "pbtrace",	kdbm_pbtrace,	"<vaddr>|<count>",	"xfs_buf_t trace" },
   {  "pboffset",kdbm_pbtrace_offset, "<daddr> [<mask>]","xfs_buf_t trace" },
 #endif
-  {  0,		0,	0 }
+  {  NULL,		NULL,	NULL }
 };
 
 static int
@@ -3570,12 +3570,12 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 		"logged",	/* 0x8 */
 		"ialloc",	/* 0x10 */
 		"inode_stale",  /* 0x20 */
-		0
+		NULL
 		};
 	static char *blf_flags[] = {
 		"inode",	/* 0x1 */
 		"cancel",	/* 0x2 */
-		0
+		NULL
 		};
 
 	if (summary) {
@@ -3837,7 +3837,7 @@ xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary)
 		"recovered",	/* 0x1 */
 		"committed",	/* 0x2 */
 		"cancelled",	/* 0x4 */
-		0,
+		NULL,
 		};
 
 	if (summary) {
@@ -4001,7 +4001,7 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		"hold",		/* 0x1 */
 		"iolock excl",	/* 0x2 */
 		"iolock shrd",	/* 0x4 */
-		0
+		NULL
 		};
 	static char *ilf_fields[] = {
 		"core",		/* 0x001 */
@@ -4013,7 +4013,7 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 		"adata",	/* 0x040 */
 		"aext",		/* 0x080 */
 		"abroot",	/* 0x100 */
-		0
+		NULL
 		};
 
 	if (summary) {
@@ -4137,7 +4137,7 @@ xfs_iomap_map_trace_entry(ktrace_entry_t *ktep)
 		"sync",		/* BMAPI_SYNC */
 		"trylock",	/* BMAPI_TRYLOCK */
 		"device",	/* BMAPI_DEVICE */
-		0
+		NULL
 	};
 
 	qprintf("ip 0x%p size 0x%x%x offset 0x%x%x count 0x%x\n",
@@ -4196,7 +4196,7 @@ xfs_bunmap_trace_entry(ktrace_entry_t   *ktep)
 		"attrfork",     /* 0x20 */
 		"async",	/* 0x40 */
 		"rsvblocks",    /* 0x80 */
-		0
+		NULL
 	};
 
 	qprintf("ip 0x%p size 0x%x%x bno 0x%x%x len 0x%x cpu id %ld\n",
@@ -4959,11 +4959,11 @@ xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 		"dirty",	/* 0x02 */
 		"stale",	/* 0x04 */
 		"logged",	/* 0x08 */
-		0
+		NULL
 		};
 	static char *xli_flags[] = {
 		"in ail",       /* 0x1 */
-		0
+		NULL
 		};
 
 	if (bip->bli_trace == NULL) {
@@ -4986,7 +4986,7 @@ xfsidbg_xblitrace(xfs_buf_log_item_t *bip)
 			(((uint64_t)(unsigned long)ktep->val[8]) &
 					0x00000000FFFFFFFFULL);
 		qprintf("bp flags ");
-		printflags(flags, pb_flag_vals, 0);
+		printflags(flags, pb_flag_vals, NULL);
 		qprintf("\n");
 		qprintf("fspriv 0x%p fspriv2 0x%p pincount %ld iodone 0x%p\n",
 			ktep->val[9], ktep->val[10],
@@ -5481,7 +5481,7 @@ xfsidbg_xilock_trace_entry(ktrace_entry_t *ktep)
 		"ILOCK_EXCL",
 		"ILOCK_SHAR",
 		"IUNLK_NONOT",
-		0
+		NULL
 	};
 
 	if ((__psint_t)ktep->val[0] &&
@@ -5538,7 +5538,7 @@ xfsidbg_xilock_trace(xfs_inode_t *ip)
 		"ILOCK_EXCL",
 		"ILOCK_SHAR",
 		"IUNLK_NONOT",
-		0
+		NULL
 	};
 
 	ktrace_entry_t  *ktep;
@@ -6173,7 +6173,7 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 		"DIRTY",	/* 0X0040 */
 		"IOERROR",	/* 0X0080 */
 		"NOTUSED",	/* 0X8000 */
-		0
+		NULL
 	};
 
 	kdb_printf("xlog_in_core/header at 0x%p/0x%p\n",
@@ -6396,7 +6396,7 @@ xfsidbg_xlog(xlog_t *log)
 		"ACTIVE_RECOVERY",	/* 0x02 */
 		"RECOVERY_NEEDED",	/* 0x04 */
 		"IO_ERROR",		/* 0x08 */
-		0
+		NULL
 	};
 
 	kdb_printf("xlog at 0x%p\n", log);
@@ -6625,7 +6625,7 @@ xfsidbg_xlog_tic(xlog_ticket_t *tic)
 		"INIT",		/* 0x1 */
 		"PERM_RES",	/* 0x2 */
 		"IN_Q",		/* 0x4 */
-		0
+		NULL
 	};
 
 	kdb_printf("xlog_ticket at 0x%p\n", tic);
@@ -6658,11 +6658,11 @@ xfsidbg_xlogitem(xfs_log_item_t *lip)
 		"inode",	/* 8 */
 		"buf",		/* 9 */
 		"dquot",	/* 10 */
-		0
+		NULL
 		};
 	static char *li_flags[] = {
 		"in ail",	/* 0x1 */
-		0
+		NULL
 		};
 
 	kdb_printf("type %s mountp 0x%p flags ",
@@ -6730,11 +6730,11 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		"inode",	/* 8 */
 		"buf",		/* 9 */
 		"dquot",	/* 10 */
-		0
+		NULL
 		};
 	static char *li_flags[] = {
 		"in ail",	/* 0x1 */
-		0
+		NULL
 		};
 	int count;
 
@@ -6806,7 +6806,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"NOUUID",	/* 0x4000 */
 		"32BIT",	/* 0x8000 */
 		"NOLOGFLUSH",	/* 0x10000 */
-		0
+		NULL
 	};
 
 	static char *quota_flags[] = {
@@ -6820,7 +6820,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"UQACTV",	/* 0x0080 */
 		"GQACTV",	/* 0x0100 */
 		"QMAYBE",	/* 0x0200 */
-		0
+		NULL
 	};
 
 	kdb_printf("xfs_mount at 0x%p\n", mp);
@@ -7201,7 +7201,7 @@ xfsidbg_xqm_dquot(xfs_dquot_t *dqp)
 		"WANT",
 		"INACT",
 		"MARKER",
-		0
+		NULL
 	};
 	kdb_printf("mount 0x%p hash 0x%p gdquotp 0x%p HL_next 0x%p HL_prevp 0x%p\n",
 		dqp->q_mount,
@@ -7340,7 +7340,7 @@ xfsidbg_xqm_pr_dqentry(ktrace_entry_t *ktep)
 		"WANT",	 /* 0x20 */
 		"INACT",	/* 0x40 */
 		"MARKER",       /* 0x80 */
-		0
+		NULL
 	};
 
 	if ((__psint_t)ktep->val[0] == 0)
@@ -7594,14 +7594,14 @@ xfsidbg_xtp(xfs_trans_t *tp)
 		"perm_log_res",	/* 0x4 */
 		"sync",		 /* 0x08 */
 		"dq_dirty",     /* 0x10 */
-		0
+		NULL
 		};
 	static char *lid_flags[] = {
 		"dirty",	/* 0x1 */
 		"pinned",	/* 0x2 */
 		"sync unlock",	/* 0x4 */
 		"buf stale",	/* 0x8 */
-		0
+		NULL
 		};
 
 	kdb_printf("tp 0x%p type ", tp);
