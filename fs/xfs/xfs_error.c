@@ -1,4 +1,4 @@
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.9 $"
 
 #include "sys/types.h"
 #include "sys/pda.h"
@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #else
 #include "sys/systm.h"
+#include "sys/cmn_err.h"
 #endif
 #include "xfs_error.h"
 
@@ -29,6 +30,7 @@ xfs_error_trap(int e)
 #ifdef SIM
 		abort();
 #else
+		cmn_err(CE_NOTE, "xfs_error_trap: error %d", e);
 		debug_stop_all_cpus((void *)-1LL);
 		debug("xfs");
 #endif
