@@ -7,13 +7,15 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"$Revision: 1.101 $"
+#ident	"$Revision: 1.3 $"
 
 /*
  * Generic vnode operations.
  */
 #include <xfs_linux.h>
 #include <sys/types.h>
+#undef sysinfo
+#include <linux/kernel.h> /* for printk... remove later if needed */
 #include <ksys/as.h>
 #include <sys/cmn_err.h>
 #include <sys/cred.h>
@@ -44,7 +46,6 @@
 #include <sys/kmem.h>
 #include <sys/dnlc.h>
 #include <sys/imon.h>
-
 
 /*
  * Cover a vnode.  Implementation routine for VOP_COVER.

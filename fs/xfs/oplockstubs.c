@@ -3,13 +3,13 @@
 #include <sys/errno.h>
 
 int
-oplock_fcntl()
+oplock_fcntl(void)
 {
 	return (EINVAL);
 }
 
 void
-oplock_fs_create()
+oplock_fs_create(void)
 {
 	return;
 }

@@ -4,7 +4,7 @@
 /*
  * Mandatory Access Control stubs.
  */
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 #ifdef DEBUG
 #define DOPANIC(s) panic(s)
@@ -12,291 +12,291 @@
 #define DOPANIC(s)
 #endif /* DEBUG */
 
-int mac_access()
+int mac_access(void)
 {
 	DOPANIC("mac_access stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_cat_equ()
+int mac_cat_equ(void)
 {
 	DOPANIC("mac_cat_equ stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_clntkudp_soattr()
+int mac_clntkudp_soattr(void)
 {
 	DOPANIC("mac_clntkudp_soattr stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_copy()
+int mac_copy(void)
 {
 	DOPANIC("mac_copy stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_copyin_label()
+int mac_copyin_label(void)
 {
 	DOPANIC("mac_copyin_label stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_dom()
+int mac_dom(void)
 {
 	DOPANIC("mac_dom stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_autofs_attr_get()
+int mac_autofs_attr_get(void)
 {
         DOPANIC("mac_autofs_attr_get stub");
-        /* NOTREACHED */
+        /* NOTREACHED */ return 0;
 }
 
-int mac_autofs_attr_set()
+int mac_autofs_attr_set(void)
 {
         DOPANIC("mac_autofs_attr_set stub");
-        /* NOTREACHED */
+        /* NOTREACHED */ return 0;
 }
 
-int mac_autofs_attr_list()
+int mac_autofs_attr_list(void)
 {
         DOPANIC("mac_autofs_attr_list stub");
-        /* NOTREACHED */
+        /* NOTREACHED */ return 0;
 }
 
 
-int mac_eag_getlabel()
+int mac_eag_getlabel(void)
 {
 	DOPANIC("mac_eag_getlabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_efs_attr_get()
+int mac_efs_attr_get(void)
 {
 	DOPANIC("mac_efs_attr_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_efs_attr_set()
+int mac_efs_attr_set(void)
 {
 	DOPANIC("mac_efs_attr_set stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_fdfs_attr_get()
+int mac_fdfs_attr_get(void)
 {
 	DOPANIC("mac_fdfs_attr_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_fifo_attr_get()
+int mac_fifo_attr_get(void)
 {
 	DOPANIC("mac_fifo_attr_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_pipe_attr_get()
+int mac_pipe_attr_get(void)
 {
 	DOPANIC("mac_pipe_attr_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_pipe_attr_set()
+int mac_pipe_attr_set(void)
 {
 	DOPANIC("mac_pipe_attr_set stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_proc_attr_get()
+int mac_proc_attr_get(void)
 {
 	DOPANIC("mac_proc_attr_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_efs_iaccess()
+int mac_efs_iaccess(void)
 {
 	DOPANIC("mac_efs_iaccess stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_efs_setlabel()
+int mac_efs_setlabel(void)
 {
 	DOPANIC("mac_efs_setlabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_xfs_ext_attr_fetch()
+int mac_xfs_ext_attr_fetch(void)
 {
 	DOPANIC("mac_xfs_ext_attr_fetch stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_xfs_attr_get()
+int mac_xfs_attr_get(void)
 {
 	DOPANIC("mac_xfs_attr_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_spec_attr_get()
+int mac_spec_attr_get(void)
 {
 	DOPANIC("mac_spec_attr_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_xfs_attr_set()
+int mac_xfs_attr_set(void)
 {
 	DOPANIC("mac_xfs_attr_set stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_xfs_iaccess()
+int mac_xfs_iaccess(void)
 {
 	DOPANIC("mac_xfs_iaccess stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_xfs_setlabel()
+int mac_xfs_setlabel(void)
 {
 	DOPANIC("mac_xfs_setlabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int  mac_hwg_iaccess()	{ DOPANIC("mac_hwg_iaccess stub"); /* NOTREACHED */ }
-int  mac_hwg_get()	{ DOPANIC("mac_hwg_get stub"); /* NOTREACHED */ }
-int  mac_hwg_match()	{ DOPANIC("mac_hwg_match stub"); /* NOTREACHED */ }
+int  mac_hwg_iaccess(void)	{ DOPANIC("mac_hwg_iaccess stub"); /* NOTREACHED */ return 0; }
+int  mac_hwg_get(void)	{ DOPANIC("mac_hwg_get stub"); /* NOTREACHED */ return 0; }
+int  mac_hwg_match(void)	{ DOPANIC("mac_hwg_match stub"); /* NOTREACHED */ return 0; }
 
-int mac_nfs_iaccess()
+int mac_nfs_iaccess(void)
 {
 	DOPANIC("mac_nfs_iaccess stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_nfs_default()
+int mac_nfs_default(void)
 {
 	DOPANIC("mac_nfs_default stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_nfs_get()
+int mac_nfs_get(void)
 {
 	DOPANIC("mac_nfs_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_equ()
+int mac_equ(void)
 {
 	DOPANIC("mac_equ stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_get()
+int mac_get(void)
 {
 	DOPANIC("mac_get stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_getplabel()
+int mac_getplabel(void)
 {
 	DOPANIC("mac_getplabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_inrange()
+int mac_inrange(void)
 {
 	DOPANIC("mac_inrange stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_invalid()
+int mac_invalid(void)
 {
 	DOPANIC("mac_invalid stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_is_moldy()
+int mac_is_moldy(void)
 {
 	DOPANIC("mac_is_moldy stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_mint_equ()
+int mac_mint_equ(void)
 {
 	DOPANIC("mac_mint_equ stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_moldy_path()
+int mac_moldy_path(void)
 {
 	DOPANIC("mac_moldy_path stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_initial_path()
+int mac_initial_path(void)
 {
 	DOPANIC("mac_initial_path stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_msg_access()
+int mac_msg_access(void)
 {
 	DOPANIC("mac_msg_access stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_revoke()
+int mac_revoke(void)
 {
 	DOPANIC("mac_revoke stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_same()
+int mac_same(void)
 {
 	DOPANIC("mac_same stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_sem_access()
+int mac_sem_access(void)
 {
 	DOPANIC("mac_sem_access stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_vsetlabel()
+int mac_vsetlabel(void)
 {
 	DOPANIC("mac_vsetlabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_set()
+int mac_set(void)
 {
 	DOPANIC("mac_set stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_setplabel()
+int mac_setplabel(void)
 {
 	DOPANIC("mac_setplabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_shm_access()
+int mac_shm_access(void)
 {
 	DOPANIC("mac_shm_access stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-ssize_t mac_size()
+ssize_t mac_size(void)
 {
 	DOPANIC("mac_size stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mac_vaccess()
+int mac_vaccess(void)
 {
 	DOPANIC("mac_vaccess stub");
-	/* NOTREACHED */}
+	/* NOTREACHED */ return 0;}
 
 struct mac_label;
 
@@ -309,107 +309,106 @@ struct cred;
 
 struct cred *mac_process_cred;
 
-struct mac_label *mac_vtolp()
+struct mac_label *mac_vtolp(void)
 {
 	DOPANIC("mac_vtolp stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-void mac_importlabel()
+void mac_importlabel(void)
 {
 	DOPANIC("mac_importlabel stub");
-	/* NOTREACHED */
 }
 
 
-struct mac_label *mac_add_label()
+struct mac_label *mac_add_label(void)
 {
 	DOPANIC("mac_add_label stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_label *mac_unmold()
+struct mac_label *mac_unmold(void)
 {
 	DOPANIC("mac_unmold stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int msen_valid()
+int msen_valid(void)
 {
 	DOPANIC("msen_valid stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-int mint_valid()
+int mint_valid(void)
 {
 	DOPANIC("mint_valid stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_b_label *msen_add_label()
+struct mac_b_label *msen_add_label(void)
 {
 	DOPANIC("msen_add_label stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_b_label *mint_add_label()
+struct mac_b_label *mint_add_label(void)
 {
 	DOPANIC("mint_add_label stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-ssize_t msen_size()
+ssize_t msen_size(void)
 {
 	DOPANIC("msen_size stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-ssize_t mint_size()
+ssize_t mint_size(void)
 {
 	DOPANIC("mint_size stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_label *mac_demld()
+struct mac_label *mac_demld(void)
 {
 	DOPANIC("mac_demld stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_label *mac_dup()
+struct mac_label *mac_dup(void)
 {
 	DOPANIC("mac_dup stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_label *mac_efs_getlabel()
+struct mac_label *mac_efs_getlabel(void)
 {
 	DOPANIC("mac_efs_getlabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_label *mac_xfs_getlabel()
+struct mac_label *mac_xfs_getlabel(void)
 {
 	DOPANIC("mac_xfs_getlabel stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
-struct mac_label *mac_set_moldy()
+struct mac_label *mac_set_moldy(void)
 {
 	DOPANIC("mac_set_moldy stub");
-	/* NOTREACHED */
+	/* NOTREACHED */ return 0;
 }
 
 
-void mac_init()	{}	/* Do not put a DOPANIC in this stub! */
-void mac_eag_enable()	{ DOPANIC("mac_eag_enable stub"); }
-void mac_confignote()	{ DOPANIC("mac_confignote stub"); }
-void mac_mount()	{ DOPANIC("mac_mount stub"); }
-void mac_mountroot()	{ DOPANIC("mac_mountroot stub"); }
-void mac_init_cred()	{ DOPANIC("mac_init_cred stub"); }
-void mac_msg_init()	{ DOPANIC("mac_msg_init stub"); }
-void mac_msg_setlabel()	{ DOPANIC("mac_msg_setlabel stub"); }
-void mac_sem_init()	{ DOPANIC("mac_sem_init stub"); }
-void mac_sem_setlabel()	{ DOPANIC("mac_sem_setlabel stub"); }
-void mac_shm_init()	{ DOPANIC("mac_shm_init stub"); }
-void mac_shm_setlabel() { DOPANIC("mac_shm_setlabel stub"); }
+void mac_init(void)	{}	/* Do not put a DOPANIC in this stub! */
+void mac_eag_enable(void)	{ DOPANIC("mac_eag_enable stub"); }
+void mac_confignote(void)	{ DOPANIC("mac_confignote stub"); }
+void mac_mount(void)	{ DOPANIC("mac_mount stub"); }
+void mac_mountroot(void)	{ DOPANIC("mac_mountroot stub"); }
+void mac_init_cred(void)	{ DOPANIC("mac_init_cred stub"); }
+void mac_msg_init(void)	{ DOPANIC("mac_msg_init stub"); }
+void mac_msg_setlabel(void)	{ DOPANIC("mac_msg_setlabel stub"); }
+void mac_sem_init(void)	{ DOPANIC("mac_sem_init stub"); }
+void mac_sem_setlabel(void)	{ DOPANIC("mac_sem_setlabel stub"); }
+void mac_shm_init(void)	{ DOPANIC("mac_shm_init stub"); }
+void mac_shm_setlabel(void) { DOPANIC("mac_shm_setlabel stub"); }

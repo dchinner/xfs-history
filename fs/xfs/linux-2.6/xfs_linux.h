@@ -1,10 +1,13 @@
 /*
  *
- * $Header: /plroot/pingu/slinx-xfs/.RCS/PL/kern/fs/xfs/RCS/xfs_linux.h,v 1.19 1999/09/29 17:55:19 lord Exp $
- * $Author: lord $
- * $Id: xfs_linux.h,v 1.19 1999/09/29 17:55:19 lord Exp $
+ * /ptools/plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_linux.h,v 1.1 1999/10/01 18:28:33 cattelan Exp
+ * cattelan
+ * xfs_linux.h,v 1.1 1999/10/01 18:28:33 cattelan Exp
  *
- * $Log: xfs_linux.h,v $
+ * xfs_linux.h,v
+ * Revision 1.1  1999/10/01 18:28:33  cattelan
+ * kern/fs/xfs/xfs_linux.h 1.19 Renamed to kern/fs/xfs/linux/xfs_linux.h
+ *
  * Revision 1.19  1999/09/29 17:55:19  lord
  * remove zone definition
  *
@@ -48,10 +51,13 @@
 
 #define STATIC static 
 #include <sys/types.h>
+
 #ifndef SIM
 #include <linux/string.h>   /* to get memcpy, and friends */
 #endif
-#include <sys/syslog.h>
+
+/* #include <sys/syslog.h> */
+
 #include <asm/page.h>
 #define _PAGESZ PAGE_SIZE
 // #include <asm/semaphore.h> */
@@ -90,7 +96,6 @@ extern time_t          lbolt;                  /* time in HZ since last boot */
 /* ksys/dvh.h */
 #define	NPARTAB		16		/* 16 unix partitions */
 
-
 #define LONGLONG_MAX        9223372036854775807LL /* max "long long int" */
 
 /* stropts.h */
@@ -107,7 +112,8 @@ struct strbuf {
 
 #define NBPP _PAGESZ 
 
-/* sys/ktypes.h */
+/* sys/kt
+   ypes.h */
 typedef long int            irix5_off_t;
 
 
@@ -148,5 +154,11 @@ struct __vhandl_s {
 // extern void kmem_free(void *, size_t);
 extern void *kern_malloc(size_t);
 #define bcmp(s1,s2,l) memcmp(s1,s2,l)    
+
+/* sys/ktime.h */
+#if 0
+struct timespec;
+extern void nanotime_syscall(timespec_t *);
+#endif
 
 #endif /* __XFS_LINUX_ */

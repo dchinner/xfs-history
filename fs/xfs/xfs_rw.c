@@ -1,4 +1,4 @@
-#ident "$Revision: 1.273 $"
+#ident "$Revision: 1.274 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -91,7 +91,26 @@ int uiodbg_switch = 0;
 #define XFS_NUMVNMAPS 10	    /* number of uacc maps to pass to VM */
 
 extern int xfs_nfs_io_units;
+typedef	uuid_t		stream_id_t;
+void daemonize(void); /* from linux/xfs_thread.c */
+void set_thread_name(char *name); /* from linux/xfs_thread.c */
+extern void griostrategy(buf_t *bp);  /* prototype -- where to find it? */
+int grio_io_is_guaranteed( vfile_t *fp, stream_id_t *stream_id);  /* prototype -- where to find it? */
+extern int			grio_monitor_start( sysarg_t );
+int grio_monitor_io_start( stream_id_t *stream_id, __int64_t iosize);
+int grio_monitor_io_end( stream_id_t *stream_id, int index );
 
+int sthread_create(char *name,
+				   caddr_t stack_addr,
+				   uint_t stack_size,
+				   uint_t flags,
+				   uint_t pri,
+				   uint_t schedflags,
+				   st_func_t func,
+				   void *arg0,
+				   void *arg1,
+				   void *arg2,
+				   void *arg3);  /* from linux/xfs_thread.c */
 /*
  * This lock is used by xfs_strat_write().
  * The xfs_strat_lock is initialized in xfs_init().
@@ -7646,6 +7665,7 @@ retry:
  * RETURNS:
  *	error
  */
+int
 xfs_dio_write(
 	xfs_dio_t *diop)
 {

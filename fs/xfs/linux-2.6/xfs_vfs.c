@@ -30,7 +30,7 @@
  */
 
 /*#ident	"@(#)uts-comm:fs/vfs.c	1.18"*/
-#ident	"$Revision: 1.137 $"
+#ident	"$Revision: 1.4 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -474,9 +474,9 @@ vf_to_stf(u_long vf)
 	return stf;
 }
 void
-vfsinit()
+vfsinit(void)
 {
-	register int i;
+/* 	register int i; */
 	/*
 	 * Initialize vfs stuff.
 	 */

@@ -1654,6 +1654,7 @@ xfs_da_hashname(char *name, int namelen)
 	/* NOTREACHED */
 #endif
 #undef ROTL
+	return 0; /* keep gcc happy */
 }
 
 /*

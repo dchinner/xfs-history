@@ -7,9 +7,9 @@
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
 
-XFS_CFLAGS	= -Wstrict-prototypes -O2 -fomit-frame-pointer
+#XFS_CFLAGS	= -Wstrict-prototypes -O2 -fomit-frame-pointer
 
-EXTRA_CFLAGS += -g3  -I./linux -I./pseudo-inc -I. -D_KERNEL
+EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -I./linux -I./pseudo-inc -I. -D_KERNEL
 
 O_TARGET := xfs.o
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 /*
  * xfsrt stubs
  */
@@ -18,10 +18,10 @@
 
 extern int nopkg(void);
 
-int xfs_rtallocate_extent() { return nopkg(); }
-int xfs_rtfree_extent() { return nopkg(); }
-int xfs_growfs_rt() { return nopkg(); }
-int xfs_rtpick_extent() { return nopkg(); }
+int xfs_rtallocate_extent(void) { return nopkg(); }
+int xfs_rtfree_extent(void) { return nopkg(); }
+int xfs_growfs_rt(void) { return nopkg(); }
+int xfs_rtpick_extent(void) { return nopkg(); }
 
 int
 xfs_rtmount_init(xfs_mount_t *mp)

@@ -34,9 +34,13 @@
 #include <asm/uaccess.h>
 #include <asm/init.h>
 
+#if 0
 #undef MS_RDONLY
 #undef MS_REMOUNT
 #include <sys/mount.h>
+#endif
+#define	MS_DATA		0x04	/* 6-argument mount */
+
 
 #include <xfs_clnt.h>
 #include <xfs_inum.h>
@@ -44,6 +48,15 @@
 #include <sys/pvfs.h>
 #include <xfs_sb.h>
 
+/* xfs_fs_bio.c */
+void binit(void);
+
+/* xfs_vfs.c */
+
+void vfsinit(void);
+
+/* xfs_vfs.c */
+int xfs_init( vfssw_t *vswp, int fstype);
 
 /*
  * Global system credential structure.
@@ -292,7 +305,7 @@ linvfs_read_super(
 	if (!sb->s_root)
 		goto fail_vnrele;
 
-	if (is_bad_inode(sb->s_root))
+	if (is_bad_inode((struct inode *) sb->s_root))
 		goto fail_vnrele;
 
 	return(sb);
@@ -438,7 +451,7 @@ linvfs_put_super(
 	struct super_block *sb)
 {
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
-	vnode_t		*rootvp;
+/* 	vnode_t		*rootvp; */
 	int		error;
 
 	ENTER("linvfs_put_super");
@@ -459,8 +472,8 @@ void
 linvfs_write_super(
 	struct super_block *sb)
 {
-	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
-	int		error;
+/* 	vfs_t		*vfsp = LINVFS_GET_VFS(sb); */
+/* 	int		error; */
 
 
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,

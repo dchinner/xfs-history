@@ -30,13 +30,14 @@
  *  
  */
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
 
 #define _KERNEL 1
 
+#define FSID_T
 #include <limits.h>
 #include <sys/types.h>
 #include <sys/cred.h>
@@ -46,11 +47,11 @@
 #include <sys/flock.h>
 #include <sys/fs_subr.h>
 #include <ksys/kern_heap.h>
-#include <sys/mount.h>
+/* #include <sys/mount.h> */
 #include <sys/param.h>
 #include <sys/pathname.h>
 #include <sys/sema.h>
-#include <sys/stat.h>
+#include <sys/stat.h> 
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
@@ -621,7 +622,7 @@ vn_free(struct vnode *vp)
 
 	ASSERT(vp->v_count == 1);
 	if (vp->v_intpcount)
-		printf("vn_free: v_intpcount = %d\n", vp->v_intpcount);
+		printk("vn_free: v_intpcount = %d\n", vp->v_intpcount);
 	ASSERT(vp->v_intpcount == 0);
 
 	if (vfreelistmask) {
@@ -1066,7 +1067,7 @@ vnode_pfind(vnode_t *vp, pgno_t pgno, int acquire)
 	return(NULL);
 }
 
-typedef void *ckpt_handle_t;
+/*typedef void *ckpt_handle_t; */
 
 int
 lookupname(char *fnamep,                /* user pathname */

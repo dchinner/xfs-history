@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.218 $"
+#ident  "$Revision: 1.220 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -514,11 +514,13 @@ clkset(time_t oldtime)
 	return;
 }
 
+#if 0
 void
 spec_mounted(vp)
 {
 	return;
 }
+#endif
 
 #endif
 
@@ -2775,8 +2777,7 @@ xfs_vget(
 }
 
 int
-xfs_force_pinned(bdp)
-bhv_desc_t	*bdp;
+xfs_force_pinned(bhv_desc_t	*bdp)
 {
 	xfs_mount_t	*mp;
 	

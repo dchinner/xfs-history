@@ -2123,6 +2123,7 @@ xfs_bmap_add_extent_hole_real(
 #undef	SWITCH_STATE
 	/* NOTREACHED */
 	ASSERT(0);
+	return 0; /* keep gcc quite */
 }
 
 #define XFS_ALLOC_GAP_UNITS	4
