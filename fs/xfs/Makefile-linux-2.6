@@ -19,7 +19,18 @@ O_TARGET := xfs.o
 
 xfs.o:	sub_dirs
 
-M_OBJS   := $(O_TARGET)
+ifeq ($(CONFIG_XFS_FS),m)
+  M_OBJS   := $(O_TARGET)
+  ifeq ($(CONFIG_KDB),y)
+    M_OBJS += xfsidbg.o
+  endif
+else
+ifeq ($(CONFIG_KDB),y)
+  M_OBJS := xfsidbg.o
+endif
+endif
+
+
 XFS_OBJS  :=   xfs_alloc.o \
                 xfs_alloc_btree.o \
                 xfs_attr.o \
@@ -85,12 +96,8 @@ FS_LINKS = xfs_alloc xfs_macros xfs_types xfs_inum xfs_log \
            xfs_dir2_block xfs_dir2_node xfs_buf xfs_attr xfs_trans_space
 
 O_OBJS :=  $(XFS_OBJS) 
-ifeq ($(CONFIG_XFS_FS),y)
-  O_OBJS += linux/linux_xfs.o
-endif 
-ifeq ($(CONFIG_XFS_FS),m)
-  O_OBJS += linux/linux_xfs.o
-endif 
+
+O_OBJS += linux/linux_xfs.o
 
 
 include $(TOPDIR)/Rules.make
