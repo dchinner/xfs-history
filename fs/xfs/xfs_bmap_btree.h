@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.30 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -412,14 +412,6 @@ xfs_bmbt_insert(
 	struct xfs_btree_cur *,
 	int *);	       
 
-#ifdef XFSDEBUG
-void
-xfs_bmbt_kcheck(
-	struct xfs_btree_cur *);
-#else
-#define	xfs_bmbt_kcheck(a)
-#endif	/* XFSDEBUG */
-
 void
 xfs_bmbt_log_block(
 	struct xfs_btree_cur *,
@@ -466,14 +458,6 @@ xfs_bmbt_newroot(
 	struct xfs_btree_cur	*cur,		/* btree cursor */
 	int			*logflags,	/* logging flags for inode */
 	int			*stat);		/* return status - 0 fail */
-
-#ifdef XFSDEBUG
-void
-xfs_bmbt_rcheck(
-	struct xfs_btree_cur *);
-#else
-#define	xfs_bmbt_rcheck(a)
-#endif
 
 void
 xfs_bmbt_set_all(
