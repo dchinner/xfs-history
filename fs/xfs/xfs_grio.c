@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.26 1994/06/09 19:38:44 wei_hu Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.27 1994/07/08 23:24:03 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -163,6 +163,7 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 			if (id->vod_rotate_slot != NULL_VOD_SLOT) {
 				ticket->rotator_slot = id->vod_rotate_slot;
 				ticket->rotator_group_size = id->vod_group_size;
+				ticket->type = ROTATE_TYPE;
 			}
 
 			if (ip->i_ticket) 
