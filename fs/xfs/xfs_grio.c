@@ -1,6 +1,7 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.43 1995/01/27 19:35:35 benf Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.44 1995/01/29 21:49:42 jwag Exp $"
 
 #include <sys/types.h>
+#include <string.h>
 #include <sys/param.h>
 #include <sys/errno.h>
 #ifndef SIM
