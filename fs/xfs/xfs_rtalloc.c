@@ -51,6 +51,7 @@
  * Prototypes for internal functions.
  */
 
+#ifndef SIM
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_block(
 	xfs_trans_t	*tp,
@@ -112,6 +113,7 @@ xfs_rtany_summary(
 	xfs_rtblock_t	bbno,
 	buf_t		**rbpp,
 	xfs_fsblock_t	*rsb);
+#endif	/* !SIM */
 
 STATIC buf_t *
 xfs_rtbuf_get(
@@ -127,12 +129,14 @@ xfs_rtcheck_alloc_range(
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	len);
 
+#ifdef XFSDEBUG
 STATIC int
 xfs_rtcheck_bit(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	start,
 	int		val);
+#endif	/* XFSDEBUG */
 
 STATIC int
 xfs_rtcheck_free_range(
@@ -172,6 +176,7 @@ xfs_rtfree_range(
 	buf_t		**rbpp,
 	xfs_fsblock_t	*rsb);
 
+#if defined(XFSDEBUG) || !defined(SIM)
 STATIC xfs_suminfo_t
 xfs_rtget_summary(
 	xfs_mount_t	*mp,
@@ -180,6 +185,7 @@ xfs_rtget_summary(
 	xfs_rtblock_t	bbno,
 	buf_t		**rbpp,
 	xfs_fsblock_t	*rsb);
+#endif	/* XFSDEBUG || !SIM */
 
 STATIC void
 xfs_rtmodify_range(
@@ -201,6 +207,7 @@ xfs_rtmodify_summary(
  * Internal functions.
  */
 
+#ifndef SIM
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_block(
 	xfs_trans_t	*tp,
@@ -447,6 +454,7 @@ xfs_rtany_summary(
 	}
 	return 0;
 }
+#endif	/* !SIM */
 
 STATIC buf_t *
 xfs_rtbuf_get(
@@ -486,6 +494,7 @@ xfs_rtcheck_alloc_range(
 	return xfs_rtcheck_range(mp, tp, bno, len, 0, &new);
 }
 
+#ifdef XFSDEBUG
 STATIC int
 xfs_rtcheck_bit(
 	xfs_mount_t	*mp,
@@ -511,6 +520,7 @@ xfs_rtcheck_bit(
 	wdiff = (wval ^ -val) & ((xfs_rtword_t)1 << bit);
 	return !wdiff;
 }
+#endif	/* XFSDEBUG */
 
 STATIC int
 xfs_rtcheck_free_range(
@@ -777,6 +787,7 @@ xfs_rtfree_range(
 	xfs_rtmodify_summary(tp, XFS_RTBLOCKLOG(postblock + 1 - preblock), XFS_BITTOBLOCK(mp, preblock), 1, rbpp, rsb);
 }
 
+#if defined(XFSDEBUG) || !defined(SIM)
 STATIC xfs_suminfo_t
 xfs_rtget_summary(
 	xfs_mount_t	*mp,
@@ -811,6 +822,7 @@ xfs_rtget_summary(
 		xfs_trans_brelse(tp, bp);
 	return rval;
 }
+#endif	/* XFSDEBUG || !SIM */
 
 STATIC void
 xfs_rtmodify_range(
@@ -919,6 +931,7 @@ xfs_rtmodify_summary(
  * Visible (exported) functions.
  */
 
+#ifndef SIM
 xfs_rtblock_t
 xfs_rtallocate_extent(
 	xfs_trans_t	*tp,
@@ -973,6 +986,7 @@ xfs_rtallocate_extent(
 	}
 	return r;
 }
+#endif	/* !SIM */
 
 void
 xfs_rtfree_extent(
@@ -991,6 +1005,7 @@ xfs_rtfree_extent(
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FREXTENTS, (int)len);
 }
 
+#ifdef XFSDEBUG
 void
 xfs_rtprint_range(
 	xfs_mount_t	*mp,
@@ -1034,3 +1049,4 @@ xfs_rtprint_summary(
 	if (sumbp)
 		xfs_trans_brelse(tp, sumbp);
 }
+#endif	/* XFSDEBUG */

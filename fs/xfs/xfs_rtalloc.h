@@ -60,6 +60,7 @@
  * Function prototypes for exported functions.
  */
 
+#ifndef SIM
 xfs_rtblock_t
 xfs_rtallocate_extent(
 	xfs_trans_t	*tp,
@@ -70,6 +71,7 @@ xfs_rtallocate_extent(
 	xfs_alloctype_t	type,
 	int		wasdel,
 	xfs_extlen_t	prod);
+#endif	/* !SIM */
 
 void
 xfs_rtfree_extent(
@@ -77,6 +79,7 @@ xfs_rtfree_extent(
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	len);
 
+#ifdef XFSDEBUG
 void
 xfs_rtprint_range(
 	xfs_mount_t	*mp,
@@ -88,5 +91,6 @@ void
 xfs_rtprint_summary(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp);
+#endif	/* XFSDEBUG */
 
 #endif	/* !_FS_XFS_RTALLOC_H */
