@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.94 $"
+#ident	"$Revision: 1.96 $"
 
 /*
  * Free space allocation for XFS.
@@ -189,7 +189,6 @@ STATIC int			/* error */
 xfs_alloc_ag_vextent(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
 
-#if 0
 /*
  * Allocate a variable extent at exactly agno/bno.
  * Extent's length (returned in *len) will be between minlen and maxlen,
@@ -199,7 +198,6 @@ xfs_alloc_ag_vextent(
 STATIC int			/* error */
 xfs_alloc_ag_vextent_exact(
 	xfs_alloc_arg_t	*args);	/* allocation argument structure */
-#endif
 
 /*
  * Allocate a variable extent near bno in the allocation group agno.
@@ -698,11 +696,9 @@ xfs_alloc_ag_vextent(
 	case XFS_ALLOCTYPE_NEAR_BNO:
 		error = xfs_alloc_ag_vextent_near(args);
 		break;
-#if 0
 	case XFS_ALLOCTYPE_THIS_BNO:
 		error = xfs_alloc_ag_vextent_exact(args);
 		break;
-#endif
 	default:
 		ASSERT(0);
 		/* NOTREACHED */
@@ -743,7 +739,6 @@ xfs_alloc_ag_vextent(
 	return 0;
 }
 
-#if 0
 /*
  * Allocate a variable extent at exactly agno/bno.
  * Extent's length (returned in *len) will be between minlen and maxlen,
@@ -831,115 +826,24 @@ xfs_alloc_ag_vextent_exact(
 	 */
 	cnt_cur = xfs_btree_init_cursor(args->mp, args->tp, args->agbp,
 		args->agno, XFS_BTNUM_CNT, 0, 0);
-	/*
-	 * Look up the previously found extent.
-	 */
-	error = xfs_alloc_lookup_eq(cnt_cur, fbno, flen, &i);
-	if (error) {
-		xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
-		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
-		return error;
-	}
-	ASSERT(i == 1);
-	/*
-	 * Delete the extent from the by-size btree.
-	 */
-	error = xfs_alloc_delete(cnt_cur, &i);
-	if (error) {
-		xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
-		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
-		return error;
-	}
-	/*
-	 * If the found freespace starts left of the allocation, add back the
-	 * leftover freespace to the by-size btree.
-	 */
-	if (fbno < args->agbno) {
-		error = xfs_alloc_lookup_eq(cnt_cur, fbno,
-					    args->agbno - fbno, &i);
-		if (error) {
-			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
-			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
-			return error;
-		}
-		error = xfs_alloc_insert(cnt_cur, &i);
-		if (error) {
-			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
-			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
-			return error;
-		}
-	}
-	/*
-	 * If the found freespace ends right of the allocation, add back the
-	 * leftover freespace to the by-size btree.
-	 */
-	if (fend > end) {
-		error = xfs_alloc_lookup_eq(cnt_cur, end, fend - end, &i);
-		if (error) {
-			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
-			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
-			return error;
-		}
-		error = xfs_alloc_insert(cnt_cur, &i);
-		if (error) {
-			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
-			xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
-			return error;
-		}
-	}
-	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
-	/*
-	 * If the found freespace matches the allocation, just delete it
-	 * from the by-bno btree.
-	 */
-	if (fbno == args->agbno && fend == end) {
-		error = xfs_alloc_delete(bno_cur, &i);
-		if (error) {
-			xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
-			return error;
-		}
-	}
-	/*
-	 * If the found freespace starts at the same block but is longer,
-	 * just update the by-bno btree entry to be shorter.
-	 */
-	else if (fbno == args->agbno)
-		xfs_alloc_update(bno_cur, end, fend - end);
-	else {
-		/*
-		 * If the found freespace starts left of the allocation,
-		 * update the length of that by-bno entry.
-		 */
-		xfs_alloc_update(bno_cur, fbno, args->agbno - fbno);
-		/*
-		 * ... and if the found freespace ends right of the
-		 * allocation, add another btree entry with the leftover space.
-		 */
-		if (fend > end) {
-			error = xfs_alloc_lookup_eq(bno_cur, end,
-						    fend - end, &i);
-			if (error) {
-				xfs_btree_del_cursor(bno_cur,
-						     XFS_BTREE_ERROR);
-				return error;
-			}
-			error = xfs_alloc_insert(bno_cur, &i);
-			if (error) {
-				xfs_btree_del_cursor(bno_cur,
-						     XFS_BTREE_ERROR);
-				return error;
-			}
-		}
-	}
-	xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
-	args->len = rlen;
+
 	ASSERT(args->agbno + args->len <=
 	       XFS_BUF_TO_AGF(args->agbp)->agf_length);
+
+	if (error = xfs_alloc_fixup_trees(cnt_cur, bno_cur, fbno, flen, 
+			args->agbno, args->len, XFSA_FIXUP_BNO_OK, &i)) {
+		xfs_btree_del_cursor(bno_cur, XFS_BTREE_ERROR);
+		xfs_btree_del_cursor(cnt_cur, XFS_BTREE_ERROR);
+		return error;
+	}
+		
+
+	xfs_btree_del_cursor(bno_cur, XFS_BTREE_NOERROR);
+	xfs_btree_del_cursor(cnt_cur, XFS_BTREE_NOERROR);
 	xfs_alloc_trace_alloc(fname, NULL, args);
 	args->wasfromfl = 0;
 	return 0;
 }
-#endif
 
 /*
  * Allocate a variable extent near bno in the allocation group agno.
@@ -1405,6 +1309,7 @@ xfs_alloc_ag_vextent_near(
 	 */
 	if (bno_cur_lt == NULL && bno_cur_gt == NULL) {
 		xfs_alloc_trace_alloc(fname, "neither", args);
+		args->agbno = NULLAGBLOCK;
 		return 0;
 	}
 	/*
@@ -2427,9 +2332,7 @@ xfs_alloc_vextent(
 	switch (type) {
 	case XFS_ALLOCTYPE_THIS_AG:
 	case XFS_ALLOCTYPE_NEAR_BNO:
-#if 0
 	case XFS_ALLOCTYPE_THIS_BNO:
-#endif
 		/*
 		 * These three force us into a single a.g.
 		 */
@@ -2511,7 +2414,6 @@ xfs_alloc_vextent(
 				if (error) {
 					goto error0;
 				}
-				ASSERT(args->agbno != NULLAGBLOCK);
 				mrunlock(&mp->m_peraglock);
 				break;
 			}
