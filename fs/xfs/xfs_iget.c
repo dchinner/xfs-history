@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.107 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -533,66 +533,13 @@ xfs_iput(xfs_inode_t	*ip,
 void
 xfs_ireclaim(xfs_inode_t *ip)
 {
-	xfs_ihash_t	*ih;
-	xfs_inode_t	*iq;
-	xfs_mount_t	*mp;
 	vnode_t		*vp;
-	xfs_chash_t	*ch;
-	xfs_chashlist_t	*chl, *chm;
-	SPLDECL(s);
 
 	/*
 	 * Remove from old hash list and mount list.
 	 */
 	XFSSTATS.xs_ig_reclaims++;
 	xfs_iextract(ip);
-
-	/*
-	 * Remove from cluster hash list
-	 *   1) delete the chashlist if this is the last inode on the chashlist
-	 *   2) unchain from list of inodes
-	 *   3) point chashlist->chl_ip to 'chl_next' if to this inode.
-	 */
-	mp = ip->i_mount;
-	ch = XFS_CHASH(mp, ip->i_blkno);
-	s = mutex_spinlock(&ch->ch_lock);
-
-	if (ip->i_cnext == ip) {
-		/* Last inode on chashlist */
-		ASSERT(ip->i_cnext == ip && ip->i_cprev == ip);
-		ASSERT(ip->i_chash != NULL);
-		chm=NULL;
-		for (chl = ch->ch_list; chl != NULL; chl = chl->chl_next) {
-			if (chl->chl_blkno == ip->i_blkno) {
-				if (chm == NULL) {
-					/* first item on the list */
-					ch->ch_list = chl->chl_next;
-				} else {
-					chm->chl_next = chl->chl_next;
-				}
-				kmem_zone_free(xfs_chashlist_zone, chl);
-				break;
-			} else {
-				ASSERT(chl->chl_ip != ip);
-				chm = chl;
-			}
-		}
-#ifndef SIM
-		ASSERT_ALWAYS(chl != NULL);
-#endif
-       } else {
-		/* delete one inode from a non-empty list */
-		iq = ip->i_cnext;
-		iq->i_cprev = ip->i_cprev;
-		ip->i_cprev->i_cnext = iq;
-		if (ip->i_chash->chl_ip == ip) {
-			ip->i_chash->chl_ip = iq;
-		}
-		ip->i_chash = __return_address;
-		ip->i_cprev = __return_address;
-		ip->i_cnext = __return_address;
-	}
-	mutex_spinunlock(&ch->ch_lock, s);
 
 	/*
 	 * Here we do a spurious inode lock in order to coordinate with
@@ -641,6 +588,9 @@ xfs_iextract(
 	xfs_ihash_t	*ih;
 	xfs_inode_t	*iq;
 	xfs_mount_t	*mp;
+	xfs_chash_t	*ch;
+	xfs_chashlist_t *chl, *chm;
+	SPLDECL(s);
  
 	ih = ip->i_hash;
 	mrupdate(&ih->ih_lock);
@@ -648,12 +598,58 @@ xfs_iextract(
 		iq->i_prevp = ip->i_prevp;
 	}
 	*ip->i_prevp = iq;
+
+	/*
+	 * Remove from cluster hash list
+	 *   1) delete the chashlist if this is the last inode on the chashlist
+	 *   2) unchain from list of inodes
+	 *   3) point chashlist->chl_ip to 'chl_next' if to this inode.
+	 */
+	mp = ip->i_mount;
+	ch = XFS_CHASH(mp, ip->i_blkno);
+	s = mutex_spinlock(&ch->ch_lock);
+
+	if (ip->i_cnext == ip) {
+		/* Last inode on chashlist */
+		ASSERT(ip->i_cnext == ip && ip->i_cprev == ip);
+		ASSERT(ip->i_chash != NULL);
+		chm=NULL;
+		for (chl = ch->ch_list; chl != NULL; chl = chl->chl_next) {
+			if (chl->chl_blkno == ip->i_blkno) {
+				if (chm == NULL) {
+					/* first item on the list */
+					ch->ch_list = chl->chl_next;
+				} else {
+					chm->chl_next = chl->chl_next;
+				}
+				kmem_zone_free(xfs_chashlist_zone, chl);
+				break;
+			} else {
+				ASSERT(chl->chl_ip != ip);
+				chm = chl;
+			}
+		}
+#ifndef SIM
+		ASSERT_ALWAYS(chl != NULL);
+#endif
+       } else {
+		/* delete one inode from a non-empty list */
+		iq = ip->i_cnext;
+		iq->i_cprev = ip->i_cprev;
+		ip->i_cprev->i_cnext = iq;
+		if (ip->i_chash->chl_ip == ip) {
+			ip->i_chash->chl_ip = iq;
+		}
+		ip->i_chash = __return_address;
+		ip->i_cprev = __return_address;
+		ip->i_cnext = __return_address;
+	}
+	mutex_spinunlock(&ch->ch_lock, s);
 	mrunlock(&ih->ih_lock);
 
 	/*
 	 * Remove from mount's inode list.
 	 */
-	mp = ip->i_mount;
 	XFS_MOUNT_ILOCK(mp);
 	ASSERT((ip->i_mnext != NULL) && (ip->i_mprev != NULL));
 	iq = ip->i_mnext;
