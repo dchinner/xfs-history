@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.56 $"
+#ident	"$Revision: 1.57 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2130,8 +2130,9 @@ xfsidbg_xbmalla(xfs_bmalloca_t *a)
 	qprintf("off %s wasdel %d userdata %d minlen %d\n",
 		xfs_fmtfsblock(a->off, a->ip->i_mount), a->wasdel,
 		a->userdata, a->minlen);
-	qprintf("minleft %d low %d rval %s\n",
-		a->minleft, a->low, xfs_fmtfsblock(a->rval, a->ip->i_mount));
+	qprintf("minleft %d low %d rval %s aeof %d\n",
+		a->minleft, a->low, xfs_fmtfsblock(a->rval, a->ip->i_mount),
+		a->aeof);
 }
 
 #ifdef DEBUG
@@ -3407,6 +3408,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		qprintf("quotainfo NULL\n");
 	printflags(mp->m_qflags, quota_flags,"quotaflags");
 	qprintf("\n");
+	qprintf("data alignment %d stripe width %d\n", mp->m_dalign,
+		mp->m_swidth);
 }
 
 
