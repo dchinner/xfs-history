@@ -136,6 +136,9 @@ xfs_parseargs(
 		args->flags |= XFSMNT_NOATIME;
 
 	args->flags |= XFSMNT_32BITINODES;
+
+	if (!options)
+		return 0;
 	
 	for (this_char = strtok (options, ",");
 	     this_char != NULL;
@@ -716,7 +719,7 @@ linvfs_remount(
 		return 0;
 
 	if (xfs_parseargs(options, *flags, &args))
-                return -ENOSPC;
+                return -EINVAL;
 
 	if (*flags & MS_RDONLY || args.flags & MS_RDONLY) {
 		sb->s_flags |= MS_RDONLY;
