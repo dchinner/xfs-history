@@ -1,4 +1,4 @@
-#ident "$Revision: 1.97 $"
+#ident "$Revision: 1.98 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1039,7 +1039,8 @@ xfs_trans_cancel(
 				}
 
 				lip = lidp->lid_item;
-				ASSERT(!(lip->li_type == XFS_LI_EFD));
+				if (!XFS_FORCED_SHUTDOWN(tp->t_mountp))
+					ASSERT(!(lip->li_type == XFS_LI_EFD));
 			}
 			licp = licp->lic_next;
 		}
