@@ -314,7 +314,7 @@ xfs_setsize_buftarg(
 	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
 		printk(KERN_WARNING
 			"XFS: Cannot set_blocksize to %u on device 0x%x\n",
-			sectorsize, btp->pbr_dev);
+			sectorsize, (unsigned long)btp->pbr_dev);
 	}
 }
 
@@ -371,7 +371,8 @@ STATIC int
 init_inodecache( void )
 {
 	linvfs_inode_cachep = kmem_cache_create("linvfs_icache",
-				sizeof(vnode_t), 0, SLAB_HWCACHE_ALIGN,
+				sizeof(vnode_t), 0,
+				SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
 				init_once, NULL);
 
 	if (linvfs_inode_cachep == NULL)
@@ -638,7 +639,6 @@ linvfs_get_dentry(
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
-	result->d_vfs_flags |= DCACHE_REFERENCED;
 	return result;
 }
 
