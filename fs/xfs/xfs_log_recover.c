@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.131 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -7,12 +7,12 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
-
 #include <sys/sysmacros.h>
 #include <sys/buf.h>
 #include <sys/sema.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include <sys/cmn_err.h>
 
 #ifdef SIM
 #undef _KERNEL
@@ -41,12 +41,15 @@
 #include <sys/fs/xfs_ag.h>		/* needed by xfs_sb.h */
 #include <sys/fs/xfs_sb.h>		/* depends on xfs_types.h, xfs_inum.h */
 #include <sys/fs/xfs_trans.h>
+#include <sys/fs/xfs_dir.h>
+#include <sys/fs/xfs_dir2.h>
 #include <sys/fs/xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
 #include <sys/fs/xfs_error.h>
 #include <sys/fs/xfs_bmap_btree.h>
 #include <sys/fs/xfs_alloc.h>
 #include <sys/fs/xfs_attr_sf.h>
 #include <sys/fs/xfs_dir_sf.h>
+#include <sys/fs/xfs_dir2_sf.h>
 #include <sys/fs/xfs_dinode.h>
 #include <sys/fs/xfs_imap.h>
 #include <sys/fs/xfs_inode_item.h>
@@ -2077,7 +2080,7 @@ write_inode_buffer:
 	 * Can't do this if the transaction didn't log the current
 	 * contents, e.g. rmdir.
 	 */
-	xfs_dir_shortform_validate_ondisk(mp, dip);
+	XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp, dip);
 #endif
 	xfs_inobp_check(mp, bp);
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {

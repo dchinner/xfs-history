@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.67 $"
+#ident "$Revision$"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -46,6 +46,7 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_PREALLOC	0x100	/* preallocation op: unwritten space */
 #define	XFS_BMAPI_IGSTATE	0x200	/* Ignore state - */
 					/* combine contig. space */
+#define	XFS_BMAPI_CONTIG	0x400	/* must allocate only one extent */
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAPI_AFLAG)
 int xfs_bmapi_aflag(int w);
@@ -185,6 +186,19 @@ xfs_bmap_first_unused(
 	int			whichfork);	/* data or attr fork */
 
 /*
+ * Returns the file-relative block number of the last block + 1 before
+ * last_block (input value) in the file.
+ * This is not based on i_size, it is based on the extent list.
+ * Returns 0 for local files, as they do not have an extent list.
+ */
+int						/* error */
+xfs_bmap_last_before(
+	struct xfs_trans	*tp,		/* transaction pointer */
+	struct xfs_inode	*ip,		/* incore inode */
+	xfs_fileoff_t		*last_block,	/* last block */
+	int			whichfork);	/* data or attr fork */
+
+/*
  * Returns the file-relative block number of the first block past eof in
  * the file.  This is not based on i_size, it is based on the extent list.
  * Returns 0 for local files, as they do not have an extent list.
@@ -195,6 +209,20 @@ xfs_bmap_last_offset(
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fileoff_t		*unused,	/* last block num */
 	int			whichfork);	/* data or attr fork */
+
+#ifdef SIM
+/*
+ * Given a block number in a fork, return the next valid block number
+ * (not a hole).
+ * If this is the last block number then NULLFILEOFF is returned.
+ */
+int
+xfs_bmap_next_offset(
+	struct xfs_trans	*tp,		/* transaction pointer */
+	struct xfs_inode	*ip,		/* incore inode */
+	xfs_fileoff_t		*bnop,		/* current block */
+	int			whichfork);	/* data or attr fork */
+#endif	/* SIM */
 
 /*
  * Returns whether the selected fork of the inode has exactly one
@@ -273,6 +301,7 @@ xfs_bmapi_single(
 	xfs_fsblock_t		*fsb,		/* output: mapped block */
 	xfs_fileoff_t		bno);		/* starting file offs. mapped */
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -291,6 +320,7 @@ xfs_bunmapi(
 						   controls a.g. for allocs */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	int			*done);		/* set if not done yet */
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 #ifndef SIM
 /*

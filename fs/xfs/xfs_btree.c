@@ -30,6 +30,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -38,6 +40,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_bit.h"
@@ -200,11 +203,9 @@ xfs_btree_check_lblock(
 		 XFS_FSB_SANITY_CHECK(mp, block->bb_rightsib));
 	if (XFS_TEST_ERROR(!lblock_ok, mp, XFS_ERRTAG_BTREE_CHECK_LBLOCK,
 			XFS_RANDOM_BTREE_CHECK_LBLOCK)) {
-#ifndef SIM
 #pragma mips_frequency_hint NEVER
 		if (bp)
 			buftrace("LBTREE ERROR", bp);
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;
@@ -317,11 +318,9 @@ xfs_btree_check_sblock(
 	if (XFS_TEST_ERROR(!sblock_ok, cur->bc_mp,
 			XFS_ERRTAG_BTREE_CHECK_SBLOCK,
 			XFS_RANDOM_BTREE_CHECK_SBLOCK)) {
-#ifndef SIM
 #pragma mips_frequency_hint NEVER
 		if (bp)
 			buftrace("SBTREE ERROR", bp);
-#endif
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;
@@ -422,9 +421,7 @@ xfs_btree_dup_cursor(
 		if (bp = cur->bc_bufs[i]) {
 			if (error = xfs_trans_read_buf(mp, tp, mp->m_dev,
 					bp->b_blkno, mp->m_bsize, 0, &bp)) {
-#ifndef SIM
 #pragma mips_frequency_hint NEVER
-#endif
 				xfs_btree_del_cursor(new, error);
 				*ncur = NULL;
 				return error;
@@ -746,9 +743,7 @@ xfs_btree_read_bufl(
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
 	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
 			&bp)) {
-#ifndef SIM
 #pragma mips_frequency_hint NEVER
-#endif
 		return error;
 	}
 	ASSERT(!bp || !geterror(bp));
@@ -783,9 +778,7 @@ xfs_btree_read_bufs(
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
 	if (error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, lock,
 			&bp)) {
-#ifndef SIM
 #pragma mips_frequency_hint NEVER
-#endif
 		return error;
 	}
 	ASSERT(!bp || !geterror(bp));

@@ -32,6 +32,8 @@
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
 #include "xfs_ag.h"
@@ -42,6 +44,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -776,9 +779,7 @@ xfs_inode_item_pushbuf(
 				  (valusema(&(ip->i_flock)) <= 0));
 			iip->ili_pushbuf_flag = 0;
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-#ifndef SIM
 			buftrace("INODE ITEM PUSH", bp);
-#endif
 			if (bp->b_pincount > 0) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);

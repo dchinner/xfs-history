@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision$"
 
 #define	XFS_MACRO_C
 
@@ -16,6 +16,7 @@
 #include <sys/vfs.h>
 #include <sys/pvnode.h>
 #include <sys/uuid.h>
+#include <stddef.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -23,6 +24,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_ialloc_btree.h"
@@ -31,6 +34,7 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_ialloc.h"
 #include "xfs_inode_item.h"
@@ -40,6 +44,10 @@
 #include "xfs_da_btree.h"
 #include "xfs_attr_leaf.h"
 #include "xfs_dir_leaf.h"
+#include "xfs_dir2_data.h"
+#include "xfs_dir2_leaf.h"
+#include "xfs_dir2_block.h"
+#include "xfs_dir2_node.h"
 #include "xfs_bit.h"
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_ISNULLDSTARTBLOCK)
@@ -654,14 +662,6 @@ xfs_buf_to_bmbt_block(buf_t *bp)
 }
 #endif
 
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_DA_INTNODE)
-xfs_da_intnode_t *
-xfs_buf_to_da_intnode(struct buf *bp)
-{
-	return XFS_BUF_TO_DA_INTNODE(bp);
-}
-#endif
-
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_DINODE)
 xfs_dinode_t *
 xfs_buf_to_dinode(buf_t *bp)
@@ -683,14 +683,6 @@ xfs_btree_lblock_t *
 xfs_buf_to_lblock(buf_t *bp)
 {
 	return XFS_BUF_TO_LBLOCK(bp);
-}
-#endif
-
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_LEAFDIRBLK)
-xfs_dir_leafblock_t *
-xfs_buf_to_leafdirblk(struct buf *bp)
-{
-	return XFS_BUF_TO_LEAFDIRBLK(bp);
 }
 #endif
 
@@ -1037,6 +1029,266 @@ void
 xfs_dir_sf_put_dirino(xfs_ino_t *from, xfs_dir_ino_t *to)
 {
 	XFS_DIR_SF_PUT_DIRINO(from, to);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_BLOCK_LEAF_P)
+xfs_dir2_leaf_entry_t *
+xfs_dir2_block_leaf_p(xfs_dir2_block_tail_t *btp)
+{
+	return XFS_DIR2_BLOCK_LEAF_P(btp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_BLOCK_TAIL_P)
+xfs_dir2_block_tail_t *
+xfs_dir2_block_tail_p(xfs_mount_t *mp, xfs_dir2_block_t *block)
+{
+	return XFS_DIR2_BLOCK_TAIL_P(mp, block);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_BYTE_TO_DA)
+xfs_dablk_t
+xfs_dir2_byte_to_da(xfs_mount_t *mp, xfs_dir2_off_t by)
+{
+	return XFS_DIR2_BYTE_TO_DA(mp, by);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_BYTE_TO_DATAPTR)
+/* ARGSUSED */
+xfs_dir2_dataptr_t
+xfs_dir2_byte_to_dataptr(xfs_mount_t *mp, xfs_dir2_off_t by)
+{
+	return XFS_DIR2_BYTE_TO_DATAPTR(mp, by);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_BYTE_TO_DB)
+xfs_dir2_db_t
+xfs_dir2_byte_to_db(xfs_mount_t *mp, xfs_dir2_off_t by)
+{
+	return XFS_DIR2_BYTE_TO_DB(mp, by);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_BYTE_TO_OFF)
+xfs_dir2_data_aoff_t
+xfs_dir2_byte_to_off(xfs_mount_t *mp, xfs_dir2_off_t by)
+{
+	return XFS_DIR2_BYTE_TO_OFF(mp, by);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DA_TO_BYTE)
+xfs_dir2_off_t
+xfs_dir2_da_to_byte(xfs_mount_t *mp, xfs_dablk_t da)
+{
+	return XFS_DIR2_DA_TO_BYTE(mp, da);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DA_TO_DB)
+xfs_dir2_db_t
+xfs_dir2_da_to_db(xfs_mount_t *mp, xfs_dablk_t da)
+{
+	return XFS_DIR2_DA_TO_DB(mp, da);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DATA_ENTRY_TAG_P)
+xfs_dir2_data_off_t *
+xfs_dir2_data_entry_tag_p(xfs_dir2_data_entry_t *dep)
+{
+	return XFS_DIR2_DATA_ENTRY_TAG_P(dep);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DATA_ENTSIZE)
+int
+xfs_dir2_data_entsize(int n)
+{
+	return XFS_DIR2_DATA_ENTSIZE(n);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DATA_UNUSED_TAG_P)
+xfs_dir2_data_off_t *
+xfs_dir2_data_unused_tag_p(xfs_dir2_data_unused_t *dup)
+{
+	return XFS_DIR2_DATA_UNUSED_TAG_P(dup);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DATAPTR_TO_BYTE)
+/* ARGSUSED */
+xfs_dir2_off_t
+xfs_dir2_dataptr_to_byte(xfs_mount_t *mp, xfs_dir2_dataptr_t dp)
+{
+	return XFS_DIR2_DATAPTR_TO_BYTE(mp, dp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DATAPTR_TO_DB)
+xfs_dir2_db_t
+xfs_dir2_dataptr_to_db(xfs_mount_t *mp, xfs_dir2_dataptr_t dp)
+{
+	return XFS_DIR2_DATAPTR_TO_DB(mp, dp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DATAPTR_TO_OFF)
+xfs_dir2_data_aoff_t
+xfs_dir2_dataptr_to_off(xfs_mount_t *mp, xfs_dir2_dataptr_t dp)
+{
+	return XFS_DIR2_DATAPTR_TO_OFF(mp, dp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DB_OFF_TO_BYTE)
+xfs_dir2_off_t
+xfs_dir2_db_off_to_byte(xfs_mount_t *mp, xfs_dir2_db_t db,
+			xfs_dir2_data_aoff_t o)
+{
+	return XFS_DIR2_DB_OFF_TO_BYTE(mp, db, o);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DB_OFF_TO_DATAPTR)
+xfs_dir2_dataptr_t
+xfs_dir2_db_off_to_dataptr(xfs_mount_t *mp, xfs_dir2_db_t db,
+			   xfs_dir2_data_aoff_t o)
+{
+	return XFS_DIR2_DB_OFF_TO_DATAPTR(mp, db, o);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DB_TO_DA)
+xfs_dablk_t
+xfs_dir2_db_to_da(xfs_mount_t *mp, xfs_dir2_db_t db)
+{
+	return XFS_DIR2_DB_TO_DA(mp, db);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DB_TO_FDB)
+xfs_dir2_db_t
+xfs_dir2_db_to_fdb(xfs_mount_t *mp, xfs_dir2_db_t db)
+{
+	return XFS_DIR2_DB_TO_FDB(mp, db);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_DB_TO_FDINDEX)
+int
+xfs_dir2_db_to_fdindex(xfs_mount_t *mp, xfs_dir2_db_t db)
+{
+	return XFS_DIR2_DB_TO_FDINDEX(mp, db);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_LEAF_BESTS_P)
+xfs_dir2_data_off_t *
+xfs_dir2_leaf_bests_p(xfs_dir2_leaf_tail_t *ltp)
+{
+	return XFS_DIR2_LEAF_BESTS_P(ltp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_LEAF_TAIL_P)
+xfs_dir2_leaf_tail_t *
+xfs_dir2_leaf_tail_p(xfs_mount_t *mp, xfs_dir2_leaf_t *lp)
+{
+	return XFS_DIR2_LEAF_TAIL_P(mp, lp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_MAX_LEAF_ENTS)
+int
+xfs_dir2_max_leaf_ents(xfs_mount_t *mp)
+{
+	return XFS_DIR2_MAX_LEAF_ENTS(mp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_ENTSIZE_BYENTRY)
+int
+xfs_dir2_sf_entsize_byentry(xfs_dir2_sf_t *sfp, xfs_dir2_sf_entry_t *sfep)
+{
+	return XFS_DIR2_SF_ENTSIZE_BYENTRY(sfp, sfep);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_FIRSTENTRY)
+xfs_dir2_sf_entry_t *
+xfs_dir2_sf_firstentry(xfs_dir2_sf_t *sfp)
+{
+	return XFS_DIR2_SF_FIRSTENTRY(sfp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_ENTSIZE_BYNAME)
+int
+xfs_dir2_sf_entsize_byname(xfs_dir2_sf_t *sfp, int len)
+{
+	return XFS_DIR2_SF_ENTSIZE_BYNAME(sfp, len);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_GET_INUMBER)
+xfs_intino_t
+xfs_dir2_sf_get_inumber(xfs_dir2_sf_t *sfp, xfs_dir2_inou_t *from)
+{
+	return XFS_DIR2_SF_GET_INUMBER(sfp, from);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_GET_OFFSET)
+xfs_dir2_data_aoff_t
+xfs_dir2_sf_get_offset(xfs_dir2_sf_entry_t *sfep)
+{
+	return XFS_DIR2_SF_GET_OFFSET(sfep);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_HDR_SIZE)
+int
+xfs_dir2_sf_hdr_size(int i8count)
+{
+	return XFS_DIR2_SF_HDR_SIZE(i8count);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_INUMBERP)
+xfs_dir2_inou_t *
+xfs_dir2_sf_inumberp(xfs_dir2_sf_entry_t *sfep)
+{
+	return XFS_DIR2_SF_INUMBERP(sfep);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_NEXTENTRY)
+xfs_dir2_sf_entry_t *
+xfs_dir2_sf_nextentry(xfs_dir2_sf_t *sfp, xfs_dir2_sf_entry_t *sfep)
+{
+	return XFS_DIR2_SF_NEXTENTRY(sfp, sfep);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_PUT_INUMBER)
+void
+xfs_dir2_sf_put_inumber(xfs_dir2_sf_t *sfp, xfs_ino_t *from, xfs_dir2_inou_t *to)
+{
+	XFS_DIR2_SF_PUT_INUMBER(sfp, from, to);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DIR2_SF_PUT_OFFSET)
+void
+xfs_dir2_sf_put_offset(xfs_dir2_sf_entry_t *sfep, xfs_dir2_data_aoff_t off)
+{
+	XFS_DIR2_SF_PUT_OFFSET(sfep, off);
 }
 #endif
 
@@ -1768,6 +2020,14 @@ int
 xfs_sb_version_hasdalign(xfs_sb_t *sbp)
 {
 	return XFS_SB_VERSION_HASDALIGN(sbp);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASDIRV2)
+int
+xfs_sb_version_hasdirv2(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASDIRV2(sbp);
 }
 #endif
 

@@ -192,6 +192,7 @@ typedef struct xfs_inode {
 	struct ktrace		*i_rwtrace;	/* inode read/write trace */
 	struct ktrace		*i_strat_trace;	/* inode strat_write trace */
 	struct ktrace		*i_lock_trace;	/* inode lock/unlock trace */
+	struct ktrace		*i_dir_trace;	/* inode directory trace */
 #endif /* DEBUG */
 } xfs_inode_t;
 
@@ -476,7 +477,7 @@ extern struct zone	*xfs_ili_zone;
 extern struct vnodeops	xfs_vnodeops;
 
 #ifdef XFS_ILOCK_TRACE
-#define XFS_ILOCK_KTRACE_SIZE	256
+#define XFS_ILOCK_KTRACE_SIZE	32
 void	xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, 
 			inst_t *ra);
 #endif

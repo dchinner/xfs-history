@@ -9,7 +9,6 @@
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <sys/vfs.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/debug.h>
@@ -38,6 +37,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -46,9 +47,9 @@
 #include "xfs_ialloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
-#include "xfs_dir.h"
 #include "xfs_alloc.h"
 #include "xfs_rtalloc.h"
 #include "xfs_bmap.h"
@@ -182,9 +183,10 @@ xfs_mount_validate_sb(
 	 * sanity check ag count, size fields against data size field 
 	 */
 	if (sbp->sb_dblocks == 0 ||
-	    (sbp->sb_dblocks > (sbp->sb_agcount * sbp->sb_agblocks)) ||
-	    (sbp->sb_dblocks < ((sbp->sb_agcount - 1) * 
-			       sbp->sb_agblocks + XFS_MIN_AG_BLOCKS)))
+	    sbp->sb_dblocks >
+	     (xfs_drfsbno_t)sbp->sb_agcount * sbp->sb_agblocks ||
+	    sbp->sb_dblocks < (xfs_drfsbno_t)(sbp->sb_agcount - 1) * 
+			      sbp->sb_agblocks + XFS_MIN_AG_BLOCKS)
 		return XFS_ERROR(EFSCORRUPTED);
 
 #if !XFS_BIG_FILESYSTEMS
@@ -312,17 +314,17 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	boolean_t	needquotamount;
 	__int64_t	update_flags;
 #endif
+	int		noio;
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
 
+	noio = dev == 0 && mp->m_sb_bp != NULL;
 	if (mp->m_sb_bp == NULL) {
 		if (error = xfs_readsb(mp, dev)) {
 			return (error);
 		}
 	}
-	bp = mp->m_sb_bp;
-
 	mp->m_agfrotor = mp->m_agirotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
@@ -568,17 +570,19 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 		error = XFS_ERROR(E2BIG);
 		goto error1;
 	}
-	error = xfs_read_buf(mp, mp->m_ddev_targp, d - 1, 1, 0, &bp);
-	if (!error) {
-		brelse(bp);
-	} else {
-		if (error == ENOSPC) {
-			error = XFS_ERROR(E2BIG);
+	if (!noio) {
+		error = xfs_read_buf(mp, mp->m_ddev_targp, d - 1, 1, 0, &bp);
+		if (!error) {
+			brelse(bp);
+		} else {
+			if (error == ENOSPC) {
+				error = XFS_ERROR(E2BIG);
+			}
+			goto error1;
 		}
-		goto error1;
 	}
 
-	if (!cxfs_mount && mp->m_logdev && mp->m_logdev != mp->m_dev) {
+	if (!noio && !cxfs_mount && mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
 			error = XFS_ERROR(E2BIG);
@@ -627,20 +631,37 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
 	mp->m_dmevmask = 0;	/* not persistent; set after each mount */
 
 	/*
+	 * Select the right directory manager.
+	 */
+	mp->m_dirops =
+		XFS_SB_VERSION_HASDIRV2(&mp->m_sb) ?
+			xfsv2_dirops :
+			xfsv1_dirops;
+
+	/*
 	 * Initialize directory manager's entries.
 	 */
-	xfs_dir_mount(mp);
+	XFS_DIR_MOUNT(mp);
+
+	/*
+	 * Initialize the attribute manager's entries.
+	 */
+	mp->m_attr_magicpct = (mp->m_sb.sb_blocksize * 37) / 100;
+
+	/*
+	 * Initialize the precomputed transaction reservations values.
+	 */
+	xfs_trans_init(mp);
+	if (noio) {
+		ASSERT(read_rootinos == 0 && cxfs_mount == 0);
+		return 0;
+	}
 
 	/*
 	 * Allocate and initialize the inode hash table for this
 	 * file system.
 	 */
 	xfs_ihash_init(mp);
-
-	/*
-	 * Initialize the precomputed transaction reservations values.
-	 */
-	xfs_trans_init(mp);
 
 	/*
 	 * Allocate and initialize the per-ag data.
@@ -1100,6 +1121,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 		offsetof(xfs_sb_t, sb_inoalignmt),
 		offsetof(xfs_sb_t, sb_unit),
 		offsetof(xfs_sb_t, sb_width),
+		offsetof(xfs_sb_t, sb_dirblklog),
 		sizeof(xfs_sb_t)
 	};
  

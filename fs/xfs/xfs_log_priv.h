@@ -1,8 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.58 $"
-
-#include <sys/cmn_err.h>
+#ident	"$Revision$"
 
 #if defined(XFS_ALL_TRACE)
 #define	XFS_LOG_TRACE

@@ -12,6 +12,7 @@
 #include <sys/errno.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
+#include <sys/buf.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -19,17 +20,19 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_error.h"
 #include "xfs_quota.h"
-#include "xfs_dir.h"
 #include "xfs_rw.h"
 #include "xfs_utils.h"
 #include "xfs_trans_space.h"
@@ -705,7 +708,7 @@ xfs_rename_target_checks(
 		/*
 		 * Make sure target dir is empty.
 		 */
-		if (!(xfs_dir_isempty(target_ip)) || 
+		if (!(XFS_DIR_ISEMPTY(target_ip->i_mount, target_ip)) || 
 		    (target_ip->i_d.di_nlink > 2)) {
 			error = XFS_ERROR(EEXIST);
 			rename_which_error_return = __LINE__;
@@ -1032,7 +1035,7 @@ xfs_rename(
 		 * fit before actually inserting it.
 		 */
 		if (spaceres == 0 &&
-		    (error = xfs_dir_canenter(tp, target_dp, target_name,
+		    (error = XFS_DIR_CANENTER(mp, tp, target_dp, target_name,
 				target_namelen))) {
 			rename_which_error_return = __LINE__;
 			goto error_return;
@@ -1042,7 +1045,7 @@ xfs_rename(
 		 * directories, adjust the target directory link count
 		 * to account for the ".." reference from the new entry.
 		 */
-		error = xfs_dir_createname(tp, target_dp, target_name,
+		error = XFS_DIR_CREATENAME(mp, tp, target_dp, target_name,
 					   target_namelen, src_ip->i_ino,
 					   &first_block, &free_list, spaceres);
 		if (error == ENOSPC) {
@@ -1084,9 +1087,10 @@ xfs_rename(
 		 * In case there is already an entry with the same
 		 * name at the destination directory, remove it first.
 		 */
-		error = xfs_dir_replace(tp, target_dp, target_name,
+		error = XFS_DIR_REPLACE(mp, tp, target_dp, target_name,
 			((target_pnp != NULL) ? target_pnp->pn_complen :
-			 target_namelen), src_ip->i_ino);
+			 target_namelen), src_ip->i_ino, &first_block,
+			 &free_list, spaceres);
 		if (error) {
 			rename_which_error_return = __LINE__;
 			goto abort_return;
@@ -1129,8 +1133,10 @@ xfs_rename(
 		 * Rewrite the ".." entry to point to the new 
 	 	 * directory.
 		 */
-		error = xfs_dir_replace(tp, src_ip, "..", 2,
-					target_dp->i_ino);
+		error = XFS_DIR_REPLACE(mp, tp, src_ip, "..", 2,
+					target_dp->i_ino, &first_block,
+					&free_list, spaceres);
+		ASSERT(error != EEXIST);
 		if (error) {
 			rename_which_error_return = __LINE__;
 			goto abort_return;
@@ -1170,8 +1176,8 @@ xfs_rename(
 		src_dp_dropped = 1;
 	}
 
-	error = xfs_dir_removename(tp, src_dp, src_name, src_namelen,
-			&first_block, &free_list, spaceres);
+	error = XFS_DIR_REMOVENAME(mp, tp, src_dp, src_name, src_namelen,
+			src_ip->i_ino, &first_block, &free_list, spaceres);
 	if (error) {
 		rename_which_error_return = __LINE__;
 		goto abort_return;

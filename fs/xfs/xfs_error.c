@@ -1,4 +1,4 @@
-#ident "$Revision: 1.14 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -8,6 +8,7 @@
 #include <sys/vfs.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
+#include <sys/buf.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -22,6 +23,7 @@
 #else
 #include <sys/systm.h>
 #endif
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -30,12 +32,19 @@
 #endif
 #include "xfs_sb.h"
 #include "xfs_trans.h"
+#include "xfs_dir.h"
 #include "xfs_mount.h"
 #include "xfs_utils.h"
 #include "xfs_error.h"
 
 #ifdef DEBUG
-int	xfs_etrap[XFS_ERROR_NTRAP] = { 0 }; /* We used to trap { EIO } */
+int	xfs_etrap[XFS_ERROR_NTRAP] = {
+#ifdef SIM
+	EFSCORRUPTED,
+#else
+	0,
+#endif
+};
 
 int
 xfs_error_trap(int e)

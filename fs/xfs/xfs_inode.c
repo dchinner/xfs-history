@@ -42,6 +42,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -53,6 +55,7 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -60,6 +63,7 @@
 #include "xfs_rw.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
+#include "xfs_dir2_trace.h"
 #ifdef DEBUG
 #include "xfs_quota.h"
 #endif
@@ -332,16 +336,16 @@ xfs_itobp(
 {
 	buf_t		*bp;
 	dev_t		dev;
-	int		di_ok;
-	xfs_dinode_t	*dip;
 	int		error;
-	int		i;
 	xfs_imap_t	imap;
+#ifndef XFS_REPAIR_SIM
+	int		i;
 	int		ni;
+#endif
 
 	if (ip->i_blkno == (daddr_t)0) {
 		/*
-		 * Call the space managment code to find the location of the
+		 * Call the space management code to find the location of the
 		 * inode on disk.
 		 */
 		imap.im_blkno = bno;
@@ -390,22 +394,25 @@ xfs_itobp(
 	if (error) {
 		return error;
 	}
+#ifndef XFS_REPAIR_SIM
 	/*
 	 * Validate the magic number and version of every inode in the buffer
 	 * (if DEBUG kernel) or the first inode in the buffer, otherwise.
 	 */
-#ifdef DEBUG
+#if defined(DEBUG)
 	ni = BBTOB(imap.im_len) >> mp->m_sb.sb_inodelog;
 #else
 	ni = 1;
 #endif
 	for (i = 0; i < ni; i++) {
-		 dip = (xfs_dinode_t *)(bp->b_un.b_addr +
+		int		di_ok;
+		xfs_dinode_t	*dip;
+
+		dip = (xfs_dinode_t *)(bp->b_un.b_addr +
 					(i << mp->m_sb.sb_inodelog));
-		 di_ok =
-			 dip->di_core.di_magic == XFS_DINODE_MAGIC &&
-			 XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
-		 if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
+		di_ok = dip->di_core.di_magic == XFS_DINODE_MAGIC &&
+			XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
+		if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
 				 XFS_RANDOM_ITOBP_INOTOBP)) {
 #ifdef DEBUG
 			prdev("bad inode magic/vsn daddr 0x%x #%d", (int)dev,
@@ -415,6 +422,7 @@ xfs_itobp(
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 	}
+#endif /* !XFS_REPAIR_SIM */
 
 	xfs_inobp_check(mp, bp);
 
@@ -786,6 +794,9 @@ xfs_iread(
 #endif
 #ifdef XFS_ILOCK_TRACE
 	ip->i_lock_trace = ktrace_alloc(XFS_ILOCK_KTRACE_SIZE, 0);
+#endif
+#ifdef XFS_DIR2_TRACE
+	ip->i_dir_trace = ktrace_alloc(XFS_DIR2_KTRACE_SIZE, 0);
 #endif
 #endif /* !SIM */
 
@@ -2480,6 +2491,9 @@ xfs_idestroy(
 #ifdef XFS_ILOCK_TRACE
 	ktrace_free(ip->i_lock_trace);
 #endif
+#ifdef XFS_DIR2_TRACE
+	ktrace_free(ip->i_dir_trace);
+#endif
 #endif
 	if (ip->i_itemp) {
 #if 0
@@ -2632,8 +2646,9 @@ xfs_iextents_copy(
 	int			copied;
 	xfs_bmbt_rec_32_t	*dest_ep;
 	xfs_bmbt_rec_t		*ep;
-				/* REFERENCED */
+#ifdef DEBUG
 	xfs_exntfmt_t		fmt = XFS_EXTFMT_INODE(ip);
+#endif
 #ifdef XFS_BMAP_TRACE
 	static char		fname[] = "xfs_iextents_copy";
 #endif
@@ -2756,7 +2771,7 @@ xfs_iflush_fork(
 #endif
 		}
 		if (whichfork == XFS_DATA_FORK) {
-			if (xfs_dir_shortform_validate_ondisk(mp, dip)) {
+			if (XFS_DIR_SHORTFORM_VALIDATE_ONDISK(mp, dip)) {
 				return XFS_ERROR(EFSCORRUPTED);
 			}
 		}

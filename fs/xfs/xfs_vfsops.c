@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.208 $"
+#ident  "$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -73,6 +73,8 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_ialloc_btree.h"
@@ -83,6 +85,7 @@
 #include "xfs_alloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -93,9 +96,9 @@
 #include "xfs_rw.h"
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
-#include "xfs_dir.h"
 #include "xfs_quota.h"
 #include "xfs_dmapi.h"
+#include "xfs_dir2_trace.h"
 
 #if CELL || NOTYET
 #include "cxfs_clnt.h"
@@ -269,6 +272,7 @@ xfs_init(
 #endif
 	extern zone_t	*xfs_efd_zone;
 	extern zone_t	*xfs_efi_zone;
+	extern zone_t	*xfs_dabuf_zone;
 #ifndef SIM
 	extern lock_t	xfs_strat_lock;
 	extern lock_t	xfsd_lock;
@@ -285,11 +289,18 @@ xfs_init(
 	extern ktrace_t	*xfs_strat_trace_buf;
 	extern ktrace_t	*xfs_dir_trace_buf;
 	extern ktrace_t	*xfs_attr_trace_buf;
+	extern ktrace_t	*xfs_dir2_trace_buf;
 #endif	/* DEBUG */
 #endif	/* !SIM */
+#ifdef XFS_DABUF_DEBUG
+	extern lock_t	xfs_dabuf_global_lock;
+#endif
 
 	xfs_fstype = fstype;
 
+#ifdef XFS_DABUF_DEBUG
+	spinlock_init(&xfs_dabuf_global_lock, "xfsda");
+#endif
 #ifndef SIM
 	spinlock_init(&xfs_strat_lock, "xfsstrat");
 	mutex_init(&xfs_ancestormon, MUTEX_DEFAULT, "xfs_ancestor");
@@ -327,6 +338,7 @@ xfs_init(
 #endif
 	xfs_da_state_zone =
 		kmem_zone_init(sizeof(xfs_da_state_t), "xfs_da_state");
+	xfs_dabuf_zone = kmem_zone_init(sizeof(xfs_dabuf_t), "xfs_dabuf");
 
 	/*
 	 * The size of the zone allocated buf log item is the maximum
@@ -367,6 +379,9 @@ xfs_init(
 #endif
 #ifdef XFS_ATTR_TRACE
 	xfs_attr_trace_buf = ktrace_alloc(XFS_ATTR_TRACE_SIZE, 0);
+#endif
+#ifdef XFS_DIR2_TRACE
+	xfs_dir2_trace_buf = ktrace_alloc(XFS_DIR2_GTRACE_SIZE, 0);
 #endif
 
 	xfs_dir_startup();

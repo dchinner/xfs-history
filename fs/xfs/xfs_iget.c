@@ -34,6 +34,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -42,6 +44,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_quota.h"
@@ -190,9 +193,7 @@ again:
 			 * least look.
 			 */
 			if (!(vp = vn_get(vp, &vmap, 0))) {
-#ifndef SIM
 #pragma mips_frequency_hint NEVER
-#endif
 				XFSSTATS.xs_ig_frecycle++;
 				goto again;
 			}

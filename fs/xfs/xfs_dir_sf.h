@@ -93,12 +93,6 @@ int xfs_dir_sf_allfit(int count, int totallen);
 	       ((uint)sizeof(xfs_dir_sf_entry_t)-1)*(count) + (totallen))
 #endif
 
-struct xfs_dinode;
-struct xfs_inode;
-
-int	xfs_dir_shortform_validate_ondisk(struct xfs_mount *, struct xfs_dinode *);
-
-
 #ifdef XFS_ALL_TRACE
 #define	XFS_DIR_TRACE
 #endif
@@ -113,6 +107,7 @@ int	xfs_dir_shortform_validate_ondisk(struct xfs_mount *, struct xfs_dinode *);
 struct uio;
 struct xfs_inode;
 struct xfs_da_intnode;
+struct xfs_dinode;
 struct xfs_dir_leafblock;
 struct xfs_dir_leaf_entry;
 
@@ -156,4 +151,4 @@ void xfs_dir_trace_enter(int type, char *where,
 #define	xfs_dir_trace_g_due(w,d,u,e)
 #define	xfs_dir_trace_g_duc(w,d,u,c)
 #endif /* DEBUG && !SIM */
-#endif	/* !XFS_XFS_DIR_SF_H */
+#endif	/* !_FS_XFS_DIR_SF_H */

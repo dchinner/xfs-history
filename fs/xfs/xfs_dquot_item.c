@@ -1,4 +1,4 @@
-#ident "$Revision: 1.8 $"
+#ident "$Revision: 1.9 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -20,6 +20,8 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -31,6 +33,7 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_da_btree.h"

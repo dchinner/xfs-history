@@ -23,17 +23,19 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_error.h"
 #include "xfs_quota.h"
-#include "xfs_dir.h"
 #include "xfs_rw.h"
 #include "xfs_itable.h"
 #include "xfs_utils.h"
@@ -193,7 +195,7 @@ retry_dnlc:
 	else
 		name_len = strlen(name);
 
-	error = xfs_dir_lookup(tp, dp, name, name_len, inum);
+	error = XFS_DIR_LOOKUP(dp->i_mount, tp, dp, name, name_len, inum);
 	if (!error && do_iget) {
 		*dir_unlocked = 1;
 		for (;;) {
@@ -254,8 +256,9 @@ retry_dnlc:
 					return XFS_ERROR(ENOENT);
 				}
 
-				error = xfs_dir_lookup(tp, dp, name,
-						       name_len, &curr_inum);
+				error = XFS_DIR_LOOKUP(dp->i_mount, tp, dp,
+						       name, name_len,
+						       &curr_inum);
 
 				if (error || (curr_inum != *inum)) {
 					vp = XFS_ITOV(*ipp);

@@ -1,7 +1,5 @@
 /*
  * xfs_da_btree.c
- *
- * GROT: figure out how to recover gracefully when bmap returns ENOSPC.
  */
 
 #ifdef SIM
@@ -32,6 +30,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -41,6 +41,7 @@
 #include "xfs_btree.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -49,21 +50,16 @@
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
 #endif
-#include "xfs_dir.h"
 #include "xfs_dir_leaf.h"
+#include "xfs_dir2_data.h"
+#include "xfs_dir2_leaf.h"
+#include "xfs_dir2_block.h"
+#include "xfs_dir2_node.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
 #ifdef SIM
 #include "sim.h"
 #endif
-
-#ifdef XFSDADEBUG
-int xfsda_debug = 1;		/* interval for fsck at split/join ops */
-int xfsda_debug_cnt = 1;	/* counter for fsck at split/join ops */
-int xfsda_check(xfs_inode_t *dp, int whichfork);
-int xfsda_loaddir(xfs_inode_t *dp);
-int xfsda_loadattr(xfs_inode_t *dp);
-#endif /* XFSDADEBUG */
 
 /*
  * xfs_da_btree.c
@@ -97,6 +93,7 @@ STATIC void xfs_da_node_add(xfs_da_state_t *state,
 /*
  * Routines used for shrinking the Btree.
  */
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 STATIC int xfs_da_root_join(xfs_da_state_t *state,
 					   xfs_da_state_blk_t *root_blk);
 STATIC int xfs_da_node_toosmall(xfs_da_state_t *state, int *retval);
@@ -105,12 +102,14 @@ STATIC void xfs_da_node_remove(xfs_da_state_t *state,
 STATIC void xfs_da_node_unbalance(xfs_da_state_t *state,
 					 xfs_da_state_blk_t *src_node_blk,
 					 xfs_da_state_blk_t *dst_node_blk);
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Utility routines.
  */
-uint	xfs_da_node_lasthash(buf_t *bp, int *count);
-int	xfs_da_node_order(buf_t *node1_bp, buf_t *node2_bp);
+STATIC uint	xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count);
+STATIC int	xfs_da_node_order(xfs_dabuf_t *node1_bp, xfs_dabuf_t *node2_bp);
+STATIC xfs_dabuf_t *xfs_da_buf_make(int nbuf, buf_t **bps, inst_t *ra);
 
 
 /*========================================================================
@@ -122,10 +121,10 @@ int	xfs_da_node_order(buf_t *node1_bp, buf_t *node2_bp);
  */
 int
 xfs_da_node_create(xfs_da_args_t *args, xfs_dablk_t blkno, int level,
-				 buf_t **bpp, int whichfork)
+				 xfs_dabuf_t **bpp, int whichfork)
 {
 	xfs_da_intnode_t *node;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	int error;
 	xfs_trans_t *tp;
 
@@ -134,14 +133,14 @@ xfs_da_node_create(xfs_da_args_t *args, xfs_dablk_t blkno, int level,
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
-	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+	node = bp->data;
 	node->hdr.info.forw = node->hdr.info.back = 0;
 	node->hdr.info.magic = XFS_DA_NODE_MAGIC;
 	node->hdr.info.pad = 0;
 	node->hdr.count = 0;
 	node->hdr.level = level;
 
-	xfs_trans_log_buf(tp, bp,
+	xfs_da_log_buf(tp, bp,
 		XFS_DA_LOGRANGE(node, &node->hdr, sizeof(node->hdr)));
 
 	*bpp = bp;
@@ -157,7 +156,7 @@ xfs_da_split(xfs_da_state_t *state)
 {
 	xfs_da_state_blk_t *oldblk, *newblk, *addblk;
 	xfs_da_intnode_t *node;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	int max, action, error, i;
 
 	/*
@@ -168,8 +167,9 @@ xfs_da_split(xfs_da_state_t *state)
 	 */
 	max = state->path.active - 1;
 	ASSERT((max >= 0) && (max < XFS_DA_NODE_MAXDEPTH));
-	ASSERT((state->path.blk[max].magic == XFS_ATTR_LEAF_MAGIC) || \
-	       (state->path.blk[max].magic == XFS_DIR_LEAF_MAGIC));
+	ASSERT(state->path.blk[max].magic == XFS_ATTR_LEAF_MAGIC ||
+	       state->path.blk[max].magic == XFS_DIRX_LEAF_MAGIC(state->mp));
+
 	addblk = &state->path.blk[max];		/* initial dummy value */
 	for (i = max; (i >= 0) && addblk; state->path.active--, i--) {
 		oldblk = &state->path.blk[i];
@@ -188,19 +188,12 @@ xfs_da_split(xfs_da_state_t *state)
 #else
 			error = xfs_attr_leaf_split(state, oldblk, newblk);
 			if ((error != 0) && (error != ENOSPC)) {
-				return(error);	/* GROT: dir is inconsistent */
+				return(error);	/* GROT: attr is inconsistent */
 			}
 			if (!error) {
 				addblk = newblk;
 				break;
 			}
-#ifdef XFSDADEBUG
-if (xfsda_debug) {
-	printf("\nATTR: Doing a double-split operation\n");
-}
-xfsda_debug_cnt = 0;	/* force an FSCK */
-#endif /* XFSDADEBUG */
-
 			/*
 			 * Entry wouldn't fit, split the leaf again.
 			 */
@@ -209,20 +202,18 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 				state->extraafter = 0;	/* before newblk */
 				error = xfs_attr_leaf_split(state, oldblk,
 							    &state->extrablk);
-				if (error)
-					return(error);	/* GROT: dir incon. */
-				addblk = newblk;
 			} else {
 				state->extraafter = 1;	/* after newblk */
 				error = xfs_attr_leaf_split(state, newblk,
 							    &state->extrablk);
-				if (error)
-					return(error);	/* GROT: dir incon. */
-				addblk = newblk;
 			}
+			if (error)
+				return(error);	/* GROT: attr inconsistent */
+			addblk = newblk;
 			break;
 #endif
 		case XFS_DIR_LEAF_MAGIC:
+			ASSERT(XFS_DIR_IS_V1(state->mp));
 			error = xfs_dir_leaf_split(state, oldblk, newblk);
 			if ((error != 0) && (error != ENOSPC)) {
 				return(error);	/* GROT: dir is inconsistent */
@@ -231,13 +222,6 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 				addblk = newblk;
 				break;
 			}
-#ifdef XFSDADEBUG
-if (xfsda_debug) {
-	printf("\nDIR: Doing a double-split operation\n");
-}
-xfsda_debug_cnt = 0;	/* force an FSCK */
-#endif /* XFSDADEBUG */
-
 			/*
 			 * Entry wouldn't fit, split the leaf again.
 			 */
@@ -258,9 +242,18 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 				addblk = newblk;
 			}
 			break;
+		case XFS_DIR2_LEAFN_MAGIC:
+			ASSERT(XFS_DIR_IS_V2(state->mp));
+			error = xfs_dir2_leafn_split(state, oldblk, newblk);
+			if (error)
+				return error;
+			addblk = newblk;
+			break;
 		case XFS_DA_NODE_MAGIC:
 			error = xfs_da_node_split(state, oldblk, newblk, addblk,
 							 max - i, &action);
+			xfs_da_buf_done(addblk->bp);
+			addblk->bp = NULL;
 			if (error)
 				return(error);	/* GROT: dir is inconsistent */
 			/*
@@ -277,25 +270,29 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 		 * Update the btree to show the new hashval for this child.
 		 */
 		xfs_da_fixhashpath(state, &state->path);
+		/*
+		 * If we won't need this block again, it's getting dropped
+		 * from the active path by the loop control, so we need
+		 * to mark it done now.
+		 */
+		if (i > 0 || !addblk)
+			xfs_da_buf_done(oldblk->bp);
 	}
-	if (!addblk) {
-#ifdef XFSDADEBUG
-		if (xfsda_debug && ((xfsda_debug_cnt % xfsda_debug) == 0))
-			xfsda_check(state->args->dp, state->args->whichfork);
-		xfsda_debug_cnt++;
-#endif /* XFSDADEBUG */
+	if (!addblk)
 		return(0);
-	}
 
 	/*
 	 * Split the root node.
 	 */
+	ASSERT(state->path.active == 0);
 	oldblk = &state->path.blk[0];
-	ASSERT(oldblk->bp->b_offset == 0);	/* root must be at block 0 */
-	ASSERT(oldblk->blkno == 0);
 	error = xfs_da_root_split(state, oldblk, addblk);
-	if (error)
+	if (error) {
+		xfs_da_buf_done(oldblk->bp);
+		xfs_da_buf_done(addblk->bp);
+		addblk->bp = NULL;
 		return(error);	/* GROT: dir is inconsistent */
+	}
 
 	/*
 	 * Update pointers to the node which used to be block 0 and
@@ -304,7 +301,7 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 	 * and the original block 0 could be at any position in the list.
 	 */
 
-	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
+	node = oldblk->bp->data;
 	if (node->hdr.info.forw) {
 		if (node->hdr.info.forw == addblk->blkno) {
 			bp = addblk->bp;
@@ -312,13 +309,13 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 			ASSERT(state->extravalid);
 			bp = state->extrablk.bp;
 		}
-		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+		node = bp->data;
 		node->hdr.info.back = oldblk->blkno;
-		xfs_trans_log_buf(state->args->trans, bp,
+		xfs_da_log_buf(state->args->trans, bp,
 		    XFS_DA_LOGRANGE(node, &node->hdr.info,
 		    sizeof(node->hdr.info)));
 	}
-	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
+	node = oldblk->bp->data;
 	if (node->hdr.info.back) {
 		if (node->hdr.info.back == addblk->blkno) {
 			bp = addblk->bp;
@@ -326,18 +323,15 @@ xfsda_debug_cnt = 0;	/* force an FSCK */
 			ASSERT(state->extravalid);
 			bp = state->extrablk.bp;
 		}
-		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+		node = bp->data;
 		node->hdr.info.forw = oldblk->blkno;
-		xfs_trans_log_buf(state->args->trans, bp,
+		xfs_da_log_buf(state->args->trans, bp,
 		    XFS_DA_LOGRANGE(node, &node->hdr.info,
 		    sizeof(node->hdr.info)));
 	}
-
-#ifdef XFSDADEBUG
-	if (xfsda_debug && ((xfsda_debug_cnt % xfsda_debug) == 0))
-		xfsda_check(state->args->dp, state->args->whichfork);
-	xfsda_debug_cnt++;
-#endif /* XFSDADEBUG */
+	xfs_da_buf_done(oldblk->bp);
+	xfs_da_buf_done(addblk->bp);
+	addblk->bp = NULL;
 	return(0);
 }
 
@@ -353,10 +347,12 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	xfs_da_intnode_t *node, *oldroot;
 	xfs_da_args_t *args;
 	xfs_dablk_t blkno;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	int error, size;
 	xfs_inode_t *dp;
 	xfs_trans_t *tp;
+	xfs_mount_t *mp;
+	xfs_dir2_leaf_t *leaf;
 
 	/*
 	 * Copy the existing (incorrect) block from the root node position
@@ -369,37 +365,55 @@ xfs_da_root_split(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		return(error);
 	dp = args->dp;
 	tp = args->trans;
+	mp = state->mp;
 	error = xfs_da_get_buf(tp, dp, blkno, -1, &bp, args->whichfork);
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
-	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
-	oldroot = (xfs_da_intnode_t *)blk1->bp->b_un.b_addr;
-	ASSERT(oldroot->hdr.info.magic == XFS_DA_NODE_MAGIC);
-	size = (int)((char *)&oldroot->btree[oldroot->hdr.count] -
-		     (char *)oldroot);
+	node = bp->data;
+	oldroot = blk1->bp->data;
+	if (oldroot->hdr.info.magic == XFS_DA_NODE_MAGIC) {
+		size = (int)((char *)&oldroot->btree[oldroot->hdr.count] -
+			     (char *)oldroot);
+	} else {
+		ASSERT(XFS_DIR_IS_V2(mp));
+		ASSERT(oldroot->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC);
+		leaf = (xfs_dir2_leaf_t *)oldroot;
+		size = (int)((char *)&leaf->ents[leaf->hdr.count] -
+			     (char *)leaf);
+	}
 	bcopy(oldroot, node, size);
-	xfs_trans_log_buf(tp, bp, 0, size - 1);
+	xfs_da_log_buf(tp, bp, 0, size - 1);
+	xfs_da_buf_done(blk1->bp);
 	blk1->bp = bp;
 	blk1->blkno = blkno;
 
 	/*
 	 * Set up the new root node.
 	 */
-	error = xfs_da_node_create(args, 0, node->hdr.level + 1, &bp,
-					 args->whichfork);
+	error = xfs_da_node_create(args,
+		args->whichfork == XFS_DATA_FORK &&
+		XFS_DIR_IS_V2(mp) ? mp->m_dirleafblk : 0,
+		node->hdr.level + 1, &bp, args->whichfork);
 	if (error)
 		return(error);
-	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+	node = bp->data;
 	node->btree[0].hashval = blk1->hashval;
 	node->btree[0].before = blk1->blkno;
 	node->btree[1].hashval = blk2->hashval;
 	node->btree[1].before = blk2->blkno;
 	node->hdr.count = 2;
+	if (XFS_DIR_IS_V2(mp)) {
+		ASSERT(blk1->blkno >= mp->m_dirleafblk &&
+		       blk1->blkno < mp->m_dirfreeblk);
+		ASSERT(blk2->blkno >= mp->m_dirleafblk &&
+		       blk2->blkno < mp->m_dirfreeblk);
+	}
 	/* Header is already logged by xfs_da_node_create */
-	xfs_trans_log_buf(tp, bp,
+	xfs_da_log_buf(tp, bp,
 		XFS_DA_LOGRANGE(node, node->btree,
 			sizeof(xfs_da_node_entry_t) * 2));
+	xfs_da_buf_done(bp);
 
 	return(0);
 }
@@ -416,14 +430,19 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	xfs_da_intnode_t *node;
 	xfs_dablk_t blkno;
 	int newcount, error;
+	int useextra;
 
-	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
+	node = oldblk->bp->data;
 	ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 
 	/*
+	 * With V2 the extra block is data or freespace.
+	 */
+	useextra = state->extravalid && XFS_DIR_IS_V1(state->mp);
+	newcount = 1 + useextra;
+	/*
 	 * Do we have to split the node?
 	 */
-	newcount = 1 + (state->extravalid ? 1 : 0);
 	if ((node->hdr.count + newcount) > XFS_DA_NODE_ENTRIES(state->mp)) {
 		/*
 		 * Allocate a new node, add to the doubly linked chain of
@@ -460,11 +479,11 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	 *
 	 * If we had double-split op below us, then add the extra block too.
 	 */
-	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
+	node = oldblk->bp->data;
 	if (oldblk->index <= node->hdr.count) {
 		oldblk->index++;
 		xfs_da_node_add(state, oldblk, addblk);
-		if (state->extravalid) {
+		if (useextra) {
 			if (state->extraafter)
 				oldblk->index++;
 			xfs_da_node_add(state, oldblk, &state->extrablk);
@@ -473,7 +492,7 @@ xfs_da_node_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	} else {
 		newblk->index++;
 		xfs_da_node_add(state, newblk, addblk);
-		if (state->extravalid) {
+		if (useextra) {
 			if (state->extraafter)
 				newblk->index++;
 			xfs_da_node_add(state, newblk, &state->extrablk);
@@ -499,8 +518,8 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	int count, tmp;
 	xfs_trans_t *tp;
 
-	node1 = (xfs_da_intnode_t *)blk1->bp->b_un.b_addr;
-	node2 = (xfs_da_intnode_t *)blk2->bp->b_un.b_addr;
+	node1 = blk1->bp->data;
+	node2 = blk2->bp->data;
 	/*
 	 * Figure out how many entries need to move, and in which direction.
 	 * Swap the nodes around if that makes it simpler.
@@ -527,7 +546,6 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		 * Move elements in node2 up to make a hole.
 		 */
 		if ((tmp = node2->hdr.count) > 0) {
-			tmp  = node2->hdr.count;
 			tmp *= (uint)sizeof(xfs_da_node_entry_t);
 			btree_s = &node2->btree[0];
 			btree_d = &node2->btree[count];
@@ -544,6 +562,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		btree_d = &node2->btree[0];
 		bcopy(btree_s, btree_d, tmp);
 		node1->hdr.count -= count;
+
 	} else {
 		/*
 		 * Move the req'd B-tree elements from low in node2 to
@@ -555,7 +574,7 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 		btree_d = &node1->btree[node1->hdr.count];
 		bcopy(btree_s, btree_d, tmp);
 		node1->hdr.count += count;
-		xfs_trans_log_buf(tp, blk1->bp,
+		xfs_da_log_buf(tp, blk1->bp,
 			XFS_DA_LOGRANGE(node1, btree_d, tmp));
 
 		/*
@@ -572,9 +591,9 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	/*
 	 * Log header of node 1 and all current bits of node 2.
 	 */
-	xfs_trans_log_buf(tp, blk1->bp,
+	xfs_da_log_buf(tp, blk1->bp,
 		XFS_DA_LOGRANGE(node1, &node1->hdr, sizeof(node1->hdr)));
-	xfs_trans_log_buf(tp, blk2->bp,
+	xfs_da_log_buf(tp, blk2->bp,
 		XFS_DA_LOGRANGE(node2, &node2->hdr,
 			sizeof(node2->hdr) +
 			sizeof(node2->btree[0]) * node2->hdr.count));
@@ -583,8 +602,8 @@ xfs_da_node_rebalance(xfs_da_state_t *state, xfs_da_state_blk_t *blk1,
 	 * Record the last hashval from each block for upward propagation.
 	 * (note: don't use the swapped node pointers)
 	 */
-	node1 = (xfs_da_intnode_t *)blk1->bp->b_un.b_addr;
-	node2 = (xfs_da_intnode_t *)blk2->bp->b_un.b_addr;
+	node1 = blk1->bp->data;
+	node2 = blk2->bp->data;
 	blk1->hashval = node1->btree[ node1->hdr.count-1 ].hashval;
 	blk2->hashval = node2->btree[ node2->hdr.count-1 ].hashval;
 
@@ -607,11 +626,16 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	xfs_da_intnode_t *node;
 	xfs_da_node_entry_t *btree;
 	int tmp;
+	xfs_mount_t *mp;
 
-	node = (xfs_da_intnode_t *)oldblk->bp->b_un.b_addr;
+	node = oldblk->bp->data;
+	mp = state->mp;
 	ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 	ASSERT((oldblk->index >= 0) && (oldblk->index <= node->hdr.count));
 	ASSERT(newblk->blkno != 0);
+	if (state->args->whichfork == XFS_DATA_FORK && XFS_DIR_IS_V2(mp))
+		ASSERT(newblk->blkno >= mp->m_dirleafblk &&
+		       newblk->blkno < mp->m_dirfreeblk);
 
 	/*
 	 * We may need to make some room before we insert the new node.
@@ -624,10 +648,10 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
 	}
 	btree->hashval = newblk->hashval;
 	btree->before = newblk->blkno;
-	xfs_trans_log_buf(state->args->trans, oldblk->bp,
+	xfs_da_log_buf(state->args->trans, oldblk->bp,
 		XFS_DA_LOGRANGE(node, btree, tmp + sizeof(*btree)));
 	node->hdr.count++;
-	xfs_trans_log_buf(state->args->trans, oldblk->bp,
+	xfs_da_log_buf(state->args->trans, oldblk->bp,
 		XFS_DA_LOGRANGE(node, &node->hdr, sizeof(node->hdr)));
 
 	/*
@@ -640,6 +664,7 @@ xfs_da_node_add(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
  * Routines used for shrinking the Btree.
  *========================================================================*/
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Deallocate an empty leaf node, remove it from its parent,
  * possibly deallocating that block, etc...
@@ -654,8 +679,8 @@ xfs_da_join(xfs_da_state_t *state)
 	drop_blk = &state->path.blk[ state->path.active-1 ];
 	save_blk = &state->altpath.blk[ state->path.active-1 ];
 	ASSERT(state->path.blk[0].magic == XFS_DA_NODE_MAGIC);
-	ASSERT((drop_blk->magic == XFS_ATTR_LEAF_MAGIC) || \
-	       (drop_blk->magic == XFS_DIR_LEAF_MAGIC));
+	ASSERT(drop_blk->magic == XFS_ATTR_LEAF_MAGIC ||
+	       drop_blk->magic == XFS_DIRX_LEAF_MAGIC(state->mp));
 
 	/*
 	 * Walk back up the tree joining/deallocating as necessary.
@@ -685,12 +710,22 @@ xfs_da_join(xfs_da_state_t *state)
 #endif
 			break;
 		case XFS_DIR_LEAF_MAGIC:
+			ASSERT(XFS_DIR_IS_V1(state->mp));
 			error = xfs_dir_leaf_toosmall(state, &action);
 			if (error)
 				return(error);
 			if (action == 0)
 				return(0);
 			xfs_dir_leaf_unbalance(state, drop_blk, save_blk);
+			break;
+		case XFS_DIR2_LEAFN_MAGIC:
+			ASSERT(XFS_DIR_IS_V2(state->mp));
+			error = xfs_dir2_leafn_toosmall(state, &action);
+			if (error)
+				return error;
+			if (action == 0)
+				return 0;
+			xfs_dir2_leafn_unbalance(state, drop_blk, save_blk);
 			break;
 		case XFS_DA_NODE_MAGIC:
 			/*
@@ -703,20 +738,21 @@ xfs_da_join(xfs_da_state_t *state)
 			if (error)
 				return(error);
 			if (action == 0)
-				goto out;
+				return 0;
 			xfs_da_node_unbalance(state, drop_blk, save_blk);
 			break;
 		}
 		xfs_da_fixhashpath(state, &state->altpath);
 		error = xfs_da_blk_unlink(state, drop_blk, save_blk);
+		xfs_da_state_kill_altpath(state);
 		if (error)
 			return(error);
 		error = xfs_da_shrink_inode(state->args, drop_blk->blkno,
 							 drop_blk->bp);
+		drop_blk->bp = NULL;
 		if (error)
 			return(error);
 	}
-
 	/*
 	 * We joined all the way to the top.  If it turns out that
 	 * we only have one entry in the root, make the child block
@@ -725,16 +761,7 @@ xfs_da_join(xfs_da_state_t *state)
 	xfs_da_node_remove(state, drop_blk);
 	xfs_da_fixhashpath(state, &state->path);
 	error = xfs_da_root_join(state, &state->path.blk[0]);
-	if (error)
-		return(error);
-
-out:
-#ifdef XFSDADEBUG
-	if (xfsda_debug && ((xfsda_debug_cnt % xfsda_debug) == 0))
-		xfsda_check(state->args->dp, state->args->whichfork);
-	xfsda_debug_cnt++;
-#endif /* XFSDADEBUG */
-	return(0);
+	return(error);
 }
 
 /*
@@ -749,15 +776,13 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 	xfs_da_blkinfo_t *blkinfo;
 	xfs_da_args_t *args;
 	xfs_dablk_t child;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	int error;
 
 	args = state->args;
 	ASSERT(args != NULL);
-	ASSERT(root_blk->bp->b_offset == 0);
-	ASSERT(root_blk->blkno == 0);
 	ASSERT(root_blk->magic == XFS_DA_NODE_MAGIC);
-	oldroot = (xfs_da_intnode_t *)root_blk->bp->b_un.b_addr;
+	oldroot = root_blk->bp->data;
 	ASSERT(oldroot->hdr.info.magic == XFS_DA_NODE_MAGIC);
 	ASSERT(oldroot->hdr.info.forw == 0);
 	ASSERT(oldroot->hdr.info.back == 0);
@@ -779,17 +804,17 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 	if (error)
 		return(error);
 	ASSERT(bp != NULL);
-	blkinfo = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+	blkinfo = bp->data;
 	if (oldroot->hdr.level == 1) {
-		ASSERT((blkinfo->magic == XFS_DIR_LEAF_MAGIC) || \
-		       (blkinfo->magic == XFS_ATTR_LEAF_MAGIC));
+		ASSERT(blkinfo->magic == XFS_DIRX_LEAF_MAGIC(state->mp) ||
+		       blkinfo->magic == XFS_ATTR_LEAF_MAGIC);
 	} else {
 		ASSERT(blkinfo->magic == XFS_DA_NODE_MAGIC);
 	}
 	ASSERT(blkinfo->forw == 0);
 	ASSERT(blkinfo->back == 0);
-	bcopy(bp->b_un.b_addr, root_blk->bp->b_un.b_addr, state->blocksize);
-	xfs_trans_log_buf(args->trans, root_blk->bp, 0, state->blocksize - 1);
+	bcopy(bp->data, root_blk->bp->data, state->blocksize);
+	xfs_da_log_buf(args->trans, root_blk->bp, 0, state->blocksize - 1);
 	error = xfs_da_shrink_inode(args, child, bp);
 	return(error);
 }
@@ -811,7 +836,7 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	xfs_da_blkinfo_t *info;
 	int count, forward, error, retval, i;
 	xfs_dablk_t blkno;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 
 	/*
 	 * Check for the degenerate case of the block being over 50% full.
@@ -819,7 +844,7 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	 * to coalesce with a sibling.
 	 */
 	blk = &state->path.blk[ state->path.active-1 ];
-	info = (xfs_da_blkinfo_t *)blk->bp->b_un.b_addr;
+	info = blk->bp->data;
 	ASSERT(info->magic == XFS_DA_NODE_MAGIC);
 	node = (xfs_da_intnode_t *)info;
 	count = node->hdr.count;
@@ -878,13 +903,12 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 		count  = XFS_DA_NODE_ENTRIES(state->mp);
 		count -= XFS_DA_NODE_ENTRIES(state->mp) >> 2;
 		count -= node->hdr.count;
-		node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+		node = bp->data;
 		ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 		count -= node->hdr.count;
+		xfs_da_brelse(state->args->trans, bp);
 		if (count >= 0)
 			break;	/* fits with at least 25% to spare */
-
-		xfs_trans_brelse(state->args->trans, bp);
 	}
 	if (i >= 2) {
 		*action = 0;
@@ -920,6 +944,7 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 	*action = 1;
 	return(0);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Walk back up the tree adjusting hash values as necessary,
@@ -945,7 +970,14 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 		break;
 #endif
 	case XFS_DIR_LEAF_MAGIC:
+		ASSERT(XFS_DIR_IS_V1(state->mp));
 		lasthash = xfs_dir_leaf_lasthash(blk->bp, &count);
+		if (count == 0)
+			return;
+		break;
+	case XFS_DIR2_LEAFN_MAGIC:
+		ASSERT(XFS_DIR_IS_V2(state->mp));
+		lasthash = xfs_dir2_leafn_lasthash(blk->bp, &count);
 		if (count == 0)
 			return;
 		break;
@@ -956,19 +988,20 @@ xfs_da_fixhashpath(xfs_da_state_t *state, xfs_da_state_path_t *path)
 		break;
 	}
 	for (blk--, level--; level >= 0; blk--, level--) {
-		node = (xfs_da_intnode_t *)blk->bp->b_un.b_addr;
+		node = blk->bp->data;
 		ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 		btree = &node->btree[ blk->index ];
 		if (btree->hashval == lasthash)
 			break;
 		blk->hashval = btree->hashval = lasthash;
-		xfs_trans_log_buf(state->args->trans, blk->bp,
+		xfs_da_log_buf(state->args->trans, blk->bp,
 				  XFS_DA_LOGRANGE(node, btree, sizeof(*btree)));
 
 		lasthash = node->btree[ node->hdr.count-1 ].hashval;
 	}
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove an entry from an intermediate node.
  */
@@ -979,7 +1012,7 @@ xfs_da_node_remove(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk)
 	xfs_da_node_entry_t *btree;
 	int tmp;
 
-	node = (xfs_da_intnode_t *)drop_blk->bp->b_un.b_addr;
+	node = drop_blk->bp->data;
 	ASSERT(drop_blk->index < node->hdr.count);
 	ASSERT(drop_blk->index >= 0);
 
@@ -991,15 +1024,15 @@ xfs_da_node_remove(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk)
 		tmp  = node->hdr.count - drop_blk->index - 1;
 		tmp *= (uint)sizeof(xfs_da_node_entry_t);
 		ovbcopy(btree + 1, btree, tmp);
-		xfs_trans_log_buf(state->args->trans, drop_blk->bp,
+		xfs_da_log_buf(state->args->trans, drop_blk->bp,
 		    XFS_DA_LOGRANGE(node, btree, tmp));
 		btree = &node->btree[ node->hdr.count-1 ];
 	}
 	bzero((char *)btree, sizeof(xfs_da_node_entry_t));
-	xfs_trans_log_buf(state->args->trans, drop_blk->bp,
+	xfs_da_log_buf(state->args->trans, drop_blk->bp,
 	    XFS_DA_LOGRANGE(node, btree, sizeof(*btree)));
 	node->hdr.count--;
-	xfs_trans_log_buf(state->args->trans, drop_blk->bp,
+	xfs_da_log_buf(state->args->trans, drop_blk->bp,
 	    XFS_DA_LOGRANGE(node, &node->hdr, sizeof(node->hdr)));
 
 	/*
@@ -1022,8 +1055,8 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	int tmp;
 	xfs_trans_t *tp;
 
-	drop_node = (xfs_da_intnode_t *)drop_blk->bp->b_un.b_addr;
-	save_node = (xfs_da_intnode_t *)save_blk->bp->b_un.b_addr;
+	drop_node = drop_blk->bp->data;
+	save_node = save_blk->bp->data;
 	ASSERT(drop_node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 	ASSERT(save_node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 	tp = state->args->trans;
@@ -1040,13 +1073,13 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		tmp = save_node->hdr.count * (uint)sizeof(xfs_da_node_entry_t);
 		ovbcopy(&save_node->btree[0], btree, tmp);
 		btree = &save_node->btree[0];
-		xfs_trans_log_buf(tp, save_blk->bp,
+		xfs_da_log_buf(tp, save_blk->bp,
 			XFS_DA_LOGRANGE(save_node, btree,
 				(save_node->hdr.count + drop_node->hdr.count) *
 				sizeof(xfs_da_node_entry_t)));
 	} else {
 		btree = &save_node->btree[ save_node->hdr.count ];
-		xfs_trans_log_buf(tp, save_blk->bp,
+		xfs_da_log_buf(tp, save_blk->bp,
 			XFS_DA_LOGRANGE(save_node, btree,
 				drop_node->hdr.count *
 				sizeof(xfs_da_node_entry_t)));
@@ -1059,7 +1092,7 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	bcopy(&drop_node->btree[0], btree, tmp);
 	save_node->hdr.count += drop_node->hdr.count;
 
-	xfs_trans_log_buf(tp, save_blk->bp,
+	xfs_da_log_buf(tp, save_blk->bp,
 		XFS_DA_LOGRANGE(save_node, &save_node->hdr,
 			sizeof(save_node->hdr)));
 
@@ -1068,6 +1101,7 @@ xfs_da_node_unbalance(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 */
 	save_blk->hashval = save_node->btree[ save_node->hdr.count-1 ].hashval;
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*========================================================================
  * Routines used for finding things in the Btree.
@@ -1094,12 +1128,17 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 	xfs_dablk_t blkno;
 	int probe, span, max, error, retval;
 	xfs_dahash_t hashval;
+	xfs_da_args_t *args;
 
+	args = state->args;
 	/*
 	 * Descend thru the B-tree searching each level for the right
 	 * node to use, until the right hashval is found.
 	 */
-	blkno = 0;
+	if (args->whichfork == XFS_DATA_FORK && XFS_DIR_IS_V2(state->mp))
+		blkno = state->mp->m_dirleafblk;
+	else
+		blkno = 0;
 	for (blk = &state->path.blk[0], state->path.active = 1;
 			 state->path.active <= XFS_DA_NODE_MAXDEPTH;
 			 blk++, state->path.active++) {
@@ -1116,17 +1155,17 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 			return(error);
 		}
 		ASSERT(blk->bp != NULL);
-		current = (xfs_da_blkinfo_t *)blk->bp->b_un.b_addr;
-		ASSERT((current->magic == XFS_DA_NODE_MAGIC) || \
-		       (current->magic == XFS_DIR_LEAF_MAGIC) || \
-		       (current->magic == XFS_ATTR_LEAF_MAGIC));
+		current = blk->bp->data;
+		ASSERT(current->magic == XFS_DA_NODE_MAGIC ||
+		       current->magic == XFS_DIRX_LEAF_MAGIC(state->mp) ||
+		       current->magic == XFS_ATTR_LEAF_MAGIC);
 
 		/*
 		 * Search an intermediate node for a match.
 		 */
 		blk->magic = current->magic;
 		if (current->magic == XFS_DA_NODE_MAGIC) {
-			node = (xfs_da_intnode_t *)blk->bp->b_un.b_addr;
+			node = blk->bp->data;
 			blk->hashval = node->btree[ node->hdr.count-1 ].hashval;
 
 			/*
@@ -1171,13 +1210,19 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 				blk->index = probe;
 				blkno = btree->before;	
 			}
+		}
 #ifndef SIM
-		} else if (current->magic == XFS_ATTR_LEAF_MAGIC) {
+		else if (current->magic == XFS_ATTR_LEAF_MAGIC) {
 			blk->hashval = xfs_attr_leaf_lasthash(blk->bp, NULL);
 			break;
+		}
 #endif
-		} else if (current->magic == XFS_DIR_LEAF_MAGIC) {
+		else if (current->magic == XFS_DIR_LEAF_MAGIC) {
 			blk->hashval = xfs_dir_leaf_lasthash(blk->bp, NULL);
+			break;
+		}
+		else if (current->magic == XFS_DIR2_LEAFN_MAGIC) {
+			blk->hashval = xfs_dir2_leafn_lasthash(blk->bp, NULL);
 			break;
 		}
 	}
@@ -1190,15 +1235,21 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 	 */
 	for (;;) {
 		if (blk->magic == XFS_DIR_LEAF_MAGIC) {
+			ASSERT(XFS_DIR_IS_V1(state->mp));
 			retval = xfs_dir_leaf_lookup_int(blk->bp, state->args,
-								 &blk->index);
+								  &blk->index);
+		} else if (blk->magic == XFS_DIR2_LEAFN_MAGIC) {
+			ASSERT(XFS_DIR_IS_V2(state->mp));
+			retval = xfs_dir2_leafn_lookup_int(blk->bp, state->args,
+							&blk->index, state);
+		}
 #ifndef SIM
-		} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
+		else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
 			retval = xfs_attr_leaf_lookup_int(blk->bp, state->args);
 			blk->index = state->args->index;
 			state->args->blkno = blk->blkno;
-#endif
 		}
+#endif
 		if (((retval == ENOENT) || (retval == ENOATTR)) &&
 		    (blk->hashval == state->args->hashval)) {
 			error = xfs_da_path_shift(state, &state->path, 1, 1,
@@ -1207,12 +1258,13 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 				return(error);
 			if (retval == 0) {
 				continue;
+			}
 #ifndef SIM
-			} else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
+			else if (blk->magic == XFS_ATTR_LEAF_MAGIC) {
 				/* path_shift() gives ENOENT */
 				retval = XFS_ERROR(ENOATTR);
-#endif
 			}
+#endif
 		}
 		break;
 	}
@@ -1234,18 +1286,18 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 	xfs_da_blkinfo_t *old_info, *new_info, *tmp_info;
 	xfs_da_args_t *args;
 	int before, error;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 
 	/*
 	 * Set up environment.
 	 */
 	args = state->args;
 	ASSERT(args != NULL);
-	old_info = (xfs_da_blkinfo_t *)old_blk->bp->b_un.b_addr;
-	new_info = (xfs_da_blkinfo_t *)new_blk->bp->b_un.b_addr;
-	ASSERT((old_blk->magic == XFS_DA_NODE_MAGIC) || \
-	       (old_blk->magic == XFS_DIR_LEAF_MAGIC) || \
-	       (old_blk->magic == XFS_ATTR_LEAF_MAGIC));
+	old_info = old_blk->bp->data;
+	new_info = new_blk->bp->data;
+	ASSERT(old_blk->magic == XFS_DA_NODE_MAGIC ||
+	       old_blk->magic == XFS_DIRX_LEAF_MAGIC(state->mp) ||
+	       old_blk->magic == XFS_ATTR_LEAF_MAGIC);
 	ASSERT(old_blk->magic == old_info->magic);
 	ASSERT(new_blk->magic == new_info->magic);
 	ASSERT(old_blk->magic == new_blk->magic);
@@ -1257,7 +1309,12 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 		break;
 #endif
 	case XFS_DIR_LEAF_MAGIC:
+		ASSERT(XFS_DIR_IS_V1(state->mp));
 		before = xfs_dir_leaf_order(old_blk->bp, new_blk->bp);
+		break;
+	case XFS_DIR2_LEAFN_MAGIC:
+		ASSERT(XFS_DIR_IS_V2(state->mp));
+		before = xfs_dir2_leafn_order(old_blk->bp, new_blk->bp);
 		break;
 	case XFS_DA_NODE_MAGIC:
 		before = xfs_da_node_order(old_blk->bp, new_blk->bp);
@@ -1280,12 +1337,12 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 			if (error)
 				return(error);
 			ASSERT(bp != NULL);
-			tmp_info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+			tmp_info = bp->data;
 			ASSERT(tmp_info->magic == old_info->magic);
 			ASSERT(tmp_info->forw == old_blk->blkno);
 			tmp_info->forw = new_blk->blkno;
-			xfs_trans_log_buf(args->trans, bp, 0,
-						       sizeof(*tmp_info)-1);
+			xfs_da_log_buf(args->trans, bp, 0, sizeof(*tmp_info)-1);
+			xfs_da_buf_done(bp);
 		}
 		old_info->back = new_blk->blkno;
 	} else {
@@ -1301,32 +1358,32 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 			if (error)
 				return(error);
 			ASSERT(bp != NULL);
-			tmp_info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+			tmp_info = bp->data;
 			ASSERT(tmp_info->magic == old_info->magic);
 			ASSERT(tmp_info->back == old_blk->blkno);
 			tmp_info->back = new_blk->blkno;
-			xfs_trans_log_buf(args->trans, bp, 0,
-						       sizeof(*tmp_info)-1);
+			xfs_da_log_buf(args->trans, bp, 0, sizeof(*tmp_info)-1);
+			xfs_da_buf_done(bp);
 		}
 		old_info->forw = new_blk->blkno;
 	}
 
-	xfs_trans_log_buf(args->trans, old_blk->bp, 0, sizeof(*tmp_info) - 1);
-	xfs_trans_log_buf(args->trans, new_blk->bp, 0, sizeof(*tmp_info) - 1);
+	xfs_da_log_buf(args->trans, old_blk->bp, 0, sizeof(*tmp_info) - 1);
+	xfs_da_log_buf(args->trans, new_blk->bp, 0, sizeof(*tmp_info) - 1);
 	return(0);
 }
 
 /*
  * Compare two intermediate nodes for "order".
  */
-int
-xfs_da_node_order(buf_t *node1_bp, buf_t *node2_bp)
+STATIC int
+xfs_da_node_order(xfs_dabuf_t *node1_bp, xfs_dabuf_t *node2_bp)
 {
 	xfs_da_intnode_t *node1, *node2;
 
-	node1 = (xfs_da_intnode_t *)node1_bp->b_un.b_addr;
-	node2 = (xfs_da_intnode_t *)node2_bp->b_un.b_addr;
-	ASSERT((node1->hdr.info.magic == XFS_DA_NODE_MAGIC) && \
+	node1 = node1_bp->data;
+	node2 = node2_bp->data;
+	ASSERT((node1->hdr.info.magic == XFS_DA_NODE_MAGIC) &&
 	       (node2->hdr.info.magic == XFS_DA_NODE_MAGIC));
 	if ((node1->hdr.count > 0) && (node2->hdr.count > 0) && 
 	    ((node2->btree[ 0 ].hashval <
@@ -1341,12 +1398,12 @@ xfs_da_node_order(buf_t *node1_bp, buf_t *node2_bp)
 /*
  * Pick up the last hashvalue from an intermediate node.
  */
-uint
-xfs_da_node_lasthash(buf_t *bp, int *count)
+STATIC uint
+xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count)
 {
 	xfs_da_intnode_t *node;
 
-	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+	node = bp->data;
 	ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 	if (count)
 		*count = node->hdr.count;
@@ -1355,6 +1412,7 @@ xfs_da_node_lasthash(buf_t *bp, int *count)
 	return(node->btree[ node->hdr.count-1 ].hashval);
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Unlink a block from a doubly linked list of blocks.
  */
@@ -1364,7 +1422,7 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 {
 	xfs_da_blkinfo_t *drop_info, *save_info, *tmp_info;
 	xfs_da_args_t *args;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	int error;
 
 	/*
@@ -1372,11 +1430,11 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 	 */
 	args = state->args;
 	ASSERT(args != NULL);
-	save_info = (xfs_da_blkinfo_t *)save_blk->bp->b_un.b_addr;
-	drop_info = (xfs_da_blkinfo_t *)drop_blk->bp->b_un.b_addr;
-	ASSERT((save_blk->magic == XFS_DA_NODE_MAGIC) || \
-	       (save_blk->magic == XFS_DIR_LEAF_MAGIC) || \
-	       (save_blk->magic == XFS_ATTR_LEAF_MAGIC));
+	save_info = save_blk->bp->data;
+	drop_info = drop_blk->bp->data;
+	ASSERT(save_blk->magic == XFS_DA_NODE_MAGIC ||
+	       save_blk->magic == XFS_DIRX_LEAF_MAGIC(state->mp) ||
+	       save_blk->magic == XFS_ATTR_LEAF_MAGIC);
 	ASSERT(save_blk->magic == save_info->magic);
 	ASSERT(drop_blk->magic == drop_info->magic);
 	ASSERT(save_blk->magic == drop_blk->magic);
@@ -1397,12 +1455,13 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 			if (error)
 				return(error);
 			ASSERT(bp != NULL);
-			tmp_info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+			tmp_info = bp->data;
 			ASSERT(tmp_info->magic == save_info->magic);
 			ASSERT(tmp_info->forw == drop_blk->blkno);
 			tmp_info->forw = save_blk->blkno;
-			xfs_trans_log_buf(args->trans, bp, 0,
-						       sizeof(*tmp_info) - 1);
+			xfs_da_log_buf(args->trans, bp, 0,
+						    sizeof(*tmp_info) - 1);
+			xfs_da_buf_done(bp);
 		}
 	} else {
 		save_info->forw = drop_info->forw;
@@ -1413,18 +1472,20 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 			if (error)
 				return(error);
 			ASSERT(bp != NULL);
-			tmp_info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+			tmp_info = bp->data;
 			ASSERT(tmp_info->magic == save_info->magic);
 			ASSERT(tmp_info->back == drop_blk->blkno);
 			tmp_info->back = save_blk->blkno;
-			xfs_trans_log_buf(args->trans, bp, 0,
-						       sizeof(*tmp_info) - 1);
+			xfs_da_log_buf(args->trans, bp, 0,
+						    sizeof(*tmp_info) - 1);
+			xfs_da_buf_done(bp);
 		}
 	}
 
-	xfs_trans_log_buf(args->trans, save_blk->bp, 0, sizeof(*save_info) - 1);
+	xfs_da_log_buf(args->trans, save_blk->bp, 0, sizeof(*save_info) - 1);
 	return(0);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Move a path "forward" or "!forward" one block at the current level.
@@ -1457,7 +1518,7 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 	level = (path->active-1) - 1;	/* skip bottom layer in path */
 	for (blk = &path->blk[level]; level >= 0; blk--, level--) {
 		ASSERT(blk->bp != NULL);
-		node = (xfs_da_intnode_t *)blk->bp->b_un.b_addr;
+		node = blk->bp->data;
 		ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
 		if (forward && (blk->index < node->hdr.count-1)) {
 			blk->index++;
@@ -1471,6 +1532,7 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 	}
 	if (level < 0) {
 		*result = XFS_ERROR(ENOENT);	/* we're out of our tree */
+		ASSERT(args->oknoent);
 		return(0);
 	}
 
@@ -1484,7 +1546,7 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 		 * (if it's dirty, trans won't actually let go)
 		 */
 		if (release)
-			xfs_trans_brelse(args->trans, blk->bp);
+			xfs_da_brelse(args->trans, blk->bp);
 
 		/*
 		 * Read the next child block.
@@ -1495,10 +1557,10 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 		if (error)
 			return(error);
 		ASSERT(blk->bp != NULL);
-		info = (xfs_da_blkinfo_t *)blk->bp->b_un.b_addr;
-		ASSERT((info->magic == XFS_DA_NODE_MAGIC) || \
-		       (info->magic == XFS_DIR_LEAF_MAGIC) || \
-		       (info->magic == XFS_ATTR_LEAF_MAGIC));
+		info = blk->bp->data;
+		ASSERT(info->magic == XFS_DA_NODE_MAGIC ||
+		       info->magic == XFS_DIRX_LEAF_MAGIC(state->mp) ||
+		       info->magic == XFS_ATTR_LEAF_MAGIC);
 		blk->magic = info->magic;
 		if (info->magic == XFS_DA_NODE_MAGIC) {
 			node = (xfs_da_intnode_t *)info;
@@ -1519,12 +1581,19 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 				break;
 #endif
 			case XFS_DIR_LEAF_MAGIC:
+				ASSERT(XFS_DIR_IS_V1(state->mp));
 				blk->hashval = xfs_dir_leaf_lasthash(blk->bp,
 								     NULL);
 				break;
+			case XFS_DIR2_LEAFN_MAGIC:
+				ASSERT(XFS_DIR_IS_V2(state->mp));
+				blk->hashval = xfs_dir2_leafn_lasthash(blk->bp,
+								       NULL);
+				break;
 			default:
-				ASSERT((blk->magic == XFS_ATTR_LEAF_MAGIC) || \
-				       (blk->magic == XFS_DIR_LEAF_MAGIC));
+				ASSERT(blk->magic == XFS_ATTR_LEAF_MAGIC ||
+				       blk->magic ==
+				       XFS_DIRX_LEAF_MAGIC(state->mp));
 				break;
 			}
 		}
@@ -1584,37 +1653,116 @@ xfs_da_hashname(char *name, int namelen)
 #undef ROTL
 }
 
+/*
+ * Add a block to the btree aread of the file.
+ * Return the new block number to the caller.
+ */
 int
 xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 {
-	xfs_fileoff_t bno;
+	xfs_fileoff_t bno, b;
 	xfs_bmbt_irec_t map;
+	xfs_bmbt_irec_t	*mapp;
 	xfs_inode_t *dp;
-	int nmap, error, w;
+	int nmap, error, w, count, c, got, i, mapi;
 	xfs_fsize_t size;
 	xfs_trans_t *tp;
+	xfs_mount_t *mp;
 
 	dp = args->dp;
+	mp = dp->i_mount;
 	w = args->whichfork;
 	tp = args->trans;
-	if (error = xfs_bmap_first_unused(tp, dp, 1, &bno, w))
+	/*
+	 * For new directories adjust the file offset and block count.
+	 */
+	if (w == XFS_DATA_FORK && XFS_DIR_IS_V2(mp)) {
+		bno = mp->m_dirleafblk;
+		count = mp->m_dirblkfsbs;
+	} else {
+		bno = 0;
+		count = 1;
+	}
+	/*
+	 * Find a spot in the file space to put the new block.
+	 */
+	if (error = xfs_bmap_first_unused(tp, dp, count, &bno, w)) {
+#pragma mips_frequency_hint NEVER
 		return error;
+	}
+	if (w == XFS_DATA_FORK && XFS_DIR_IS_V2(mp))
+		ASSERT(bno >= mp->m_dirleafblk && bno < mp->m_dirfreeblk);
+	/*
+	 * Try mapping it in one filesystem block.
+	 */
 	nmap = 1;
 	ASSERT(args->firstblock != NULL);
-	if (error = xfs_bmapi(tp, dp, bno, 1,
-			XFS_BMAPI_AFLAG(w)|XFS_BMAPI_WRITE|XFS_BMAPI_METADATA,
+	if (error = xfs_bmapi(tp, dp, bno, count,
+			XFS_BMAPI_AFLAG(w)|XFS_BMAPI_WRITE|XFS_BMAPI_METADATA|
+			XFS_BMAPI_CONTIG,
 			args->firstblock, args->total, &map, &nmap,
-			args->flist))
+			args->flist)) {
+#pragma mips_frequency_hint NEVER
 		return error;
-	if (nmap < 1) {
-		ASSERT(0);
+	}
+	ASSERT(nmap <= 1);
+	if (nmap == 1) {
+		mapp = &map;
+		mapi = 1;
+	}
+	/*
+	 * If we didn't get it and the block might work if fragmented,
+	 * try without the CONTIG flag.  Loop until we get it all.
+	 */
+	else if (nmap == 0 && count > 1) {
+#pragma mips_frequency_hint NEVER
+		mapp = kmem_alloc(sizeof(*mapp) * count, KM_SLEEP);
+		for (b = bno, mapi = 0; b < bno + count; ) {
+			nmap = MIN(XFS_BMAP_MAX_NMAP, count);
+			c = (int)(bno + count - b);
+			if (error = xfs_bmapi(tp, dp, b, c,
+					XFS_BMAPI_AFLAG(w)|XFS_BMAPI_WRITE|
+					XFS_BMAPI_METADATA,
+					args->firstblock, args->total,
+					&mapp[mapi], &nmap, args->flist)) {
+				kmem_free(mapp, sizeof(*mapp) * count);
+				return error;
+			}
+			if (nmap < 1)
+				break;
+			mapi += nmap;
+			b = mapp[mapi - 1].br_startoff +
+			    mapp[mapi - 1].br_blockcount;
+		}
+	} else {
+#pragma mips_frequency_hint NEVER
+		mapi = 0;
+		mapp = NULL;
+	}
+	/*
+	 * Count the blocks we got, make sure it matches the total.
+	 */
+	for (i = 0, got = 0; i < mapi; i++)
+		got += mapp[i].br_blockcount;
+	if (got != count || mapp[0].br_startoff != bno ||
+	    mapp[mapi - 1].br_startoff + mapp[mapi - 1].br_blockcount !=
+	    bno + count) {
+#pragma mips_frequency_hint NEVER
+		if (mapp != &map)
+			kmem_free(mapp, sizeof(*mapp) * count);
 		return XFS_ERROR(ENOSPC);
 	}
+	if (mapp != &map)
+		kmem_free(mapp, sizeof(*mapp) * count);
 	*new_blkno = (xfs_dablk_t)bno;
-	if (w == XFS_DATA_FORK) {
+	/*
+	 * For version 1 directories, adjust the file size if it changed.
+	 */
+	if (w == XFS_DATA_FORK && XFS_DIR_IS_V1(mp)) {
+		ASSERT(mapi == 1);
 		if (error = xfs_bmap_last_offset(tp, dp, &bno, w))
 			return error;
-		size = XFS_FSB_TO_B(dp->i_mount, bno);
+		size = XFS_FSB_TO_B(mp, bno);
 		if (size != dp->i_d.di_size) {
 			dp->i_d.di_size = size;
 			xfs_trans_log_inode(tp, dp, XFS_ILOG_CORE);
@@ -1623,12 +1771,21 @@ xfs_da_grow_inode(xfs_da_args_t *args, xfs_dablk_t *new_blkno)
 	return 0;
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
+/*
+ * Ick.  We need to always be able to remove a btree block, even
+ * if there's no space reservation because the filesystem is full.
+ * This is called if xfs_bunmapi on a btree block fails due to ENOSPC.
+ * It swaps the target block with the last block in the file.  The
+ * last block in the file can always be removed since it can't cause
+ * a bmap btree split to do that.
+ */
 STATIC int
 xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
-		      buf_t **dead_bufp)
+		      xfs_dabuf_t **dead_bufp)
 {
 	xfs_dablk_t dead_blkno, last_blkno, sib_blkno, par_blkno;
-	buf_t *dead_buf, *last_buf, *sib_buf, *par_buf;
+	xfs_dabuf_t *dead_buf, *last_buf, *sib_buf, *par_buf;
 	xfs_fileoff_t lastoff;
 	xfs_inode_t *ip;
 	xfs_trans_t *tp;
@@ -1637,6 +1794,7 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	xfs_da_blkinfo_t *dead_info, *sib_info;
 	xfs_da_intnode_t *par_node, *dead_node;
 	xfs_dir_leafblock_t *dead_leaf;
+	xfs_dir2_leaf_t *dead_leaf2;
 	xfs_dahash_t dead_hash;
 
 	dead_buf = *dead_bufp;
@@ -1644,75 +1802,122 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	tp = args->trans;
 	ip = args->dp;
 	w = args->whichfork;
-	if (error = xfs_bmap_last_offset(tp, ip, &lastoff, w))
+	ASSERT(w == XFS_DATA_FORK);
+	mp = ip->i_mount;
+	if (XFS_DIR_IS_V2(mp)) {
+		lastoff = mp->m_dirfreeblk;
+		error = xfs_bmap_last_before(tp, ip, &lastoff, w);
+	} else
+		error = xfs_bmap_last_offset(tp, ip, &lastoff, w);
+	if (error)
 		return error;
 	if (lastoff == 0)
 		return XFS_ERROR(EFSCORRUPTED);
-	last_blkno = (xfs_dablk_t)lastoff - 1;
+	/*
+	 * Read the last block in the btree space.
+	 */
+	last_blkno = (xfs_dablk_t)lastoff - mp->m_dirblkfsbs;
 	if (error = xfs_da_read_buf(tp, ip, last_blkno, -1, &last_buf, w))
 		return error;
-	mp = ip->i_mount;
-	bcopy(last_buf->b_un.b_addr, dead_buf->b_un.b_addr,
-		mp->m_sb.sb_blocksize);
-	xfs_trans_log_buf(tp, dead_buf, 0, mp->m_sb.sb_blocksize - 1);
-	dead_info = (xfs_da_blkinfo_t *)dead_buf->b_un.b_addr;
+	/*
+	 * Copy the last block into the dead buffer and log it.
+	 */
+	bcopy(last_buf->data, dead_buf->data, mp->m_dirblksize);
+	xfs_da_log_buf(tp, dead_buf, 0, mp->m_dirblksize - 1);
+	dead_info = dead_buf->data;
+	/*
+	 * Get values from the moved block.
+	 */
 	if (dead_info->magic == XFS_DIR_LEAF_MAGIC) {
+		ASSERT(XFS_DIR_IS_V1(mp));
 		dead_leaf = (xfs_dir_leafblock_t *)dead_info;
 		dead_level = 0;
 		dead_hash =
 			dead_leaf->entries[dead_leaf->hdr.count - 1].hashval;
+	} else if (dead_info->magic == XFS_DIR2_LEAFN_MAGIC) {
+		ASSERT(XFS_DIR_IS_V2(mp));
+		dead_leaf2 = (xfs_dir2_leaf_t *)dead_info;
+		dead_level = 0;
+		dead_hash = dead_leaf2->ents[dead_leaf2->hdr.count - 1].hashval;
 	} else {
+		ASSERT(dead_info->magic == XFS_DA_NODE_MAGIC);
 		dead_node = (xfs_da_intnode_t *)dead_info;
 		dead_level = dead_node->hdr.level;
 		dead_hash = dead_node->btree[dead_node->hdr.count - 1].hashval;
 	}
+	sib_buf = par_buf = NULL;
+	/*
+	 * If the moved block has a left sibling, fix up the pointers.
+	 */
 	if (sib_blkno = dead_info->back) {
 		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
-			return error;
-		sib_info = (xfs_da_blkinfo_t *)sib_buf->b_un.b_addr;
+			goto done;
+		sib_info = sib_buf->data;
 		if (sib_info->forw != last_blkno ||
-		    sib_info->magic != dead_info->magic)
-			return XFS_ERROR(EFSCORRUPTED);
+		    sib_info->magic != dead_info->magic) {
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto done;
+		}
 		sib_info->forw = dead_blkno;
-		xfs_trans_log_buf(tp, sib_buf,
+		xfs_da_log_buf(tp, sib_buf,
 			XFS_DA_LOGRANGE(sib_info, &sib_info->forw,
 					sizeof(sib_info->forw)));
-		xfs_trans_brelse(tp, sib_buf);
+		xfs_da_buf_done(sib_buf);
+		sib_buf = NULL;
 	}
+	/*
+	 * If the moved block has a right sibling, fix up the pointers.
+	 */
 	if (sib_blkno = dead_info->forw) {
 		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
-			return error;
-		sib_info = (xfs_da_blkinfo_t *)sib_buf->b_un.b_addr;
+			goto done;
+		sib_info = sib_buf->data;
 		if (sib_info->back != last_blkno ||
-		    sib_info->magic != dead_info->magic)
-			return XFS_ERROR(EFSCORRUPTED);
+		    sib_info->magic != dead_info->magic) {
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto done;
+		}
 		sib_info->back = dead_blkno;
-		xfs_trans_log_buf(tp, sib_buf,
+		xfs_da_log_buf(tp, sib_buf,
 			XFS_DA_LOGRANGE(sib_info, &sib_info->back,
 					sizeof(sib_info->back)));
-		xfs_trans_brelse(tp, sib_buf);
+		xfs_da_buf_done(sib_buf);
+		sib_buf = NULL;
 	}
-	for (par_blkno = 0, level = -1; ; ) {
+	par_blkno = XFS_DIR_IS_V1(mp) ? 0 : mp->m_dirleafblk;
+	level = -1;
+	/*
+	 * Walk down the tree looking for the parent of the moved block.
+	 */
+	for (;;) {
 		if (error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w))
-			return error;
-		par_node = (xfs_da_intnode_t *)par_buf->b_un.b_addr;
-		if (par_node->hdr.info.magic != XFS_DA_NODE_MAGIC)
-			return XFS_ERROR(EFSCORRUPTED);
-		if (level >= 0 && level != par_node->hdr.level + 1)
-			return XFS_ERROR(EFSCORRUPTED);
+			goto done;
+		par_node = par_buf->data;
+		if (par_node->hdr.info.magic != XFS_DA_NODE_MAGIC ||
+		    (level >= 0 && level != par_node->hdr.level + 1)) {
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto done;
+		}
 		level = par_node->hdr.level;
 		for (entno = 0;
 		     entno < par_node->hdr.count &&
 		     par_node->btree[entno].hashval < dead_hash;
 		     entno++)
 			continue;
-		if (entno == par_node->hdr.count)
-			return XFS_ERROR(EFSCORRUPTED);
+		if (entno == par_node->hdr.count) {
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto done;
+		}
 		par_blkno = par_node->btree[entno].before;
 		if (level == dead_level + 1)
 			break;
-		xfs_trans_brelse(tp, par_buf);
+		xfs_da_brelse(tp, par_buf);
+		par_buf = NULL;
 	}
+	/*
+	 * We're in the right parent block.
+	 * Look for the right entry.
+	 */
 	for (;;) {
 		for (;
 		     entno < par_node->hdr.count &&
@@ -1722,56 +1927,90 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		if (entno < par_node->hdr.count)
 			break;
 		par_blkno = par_node->hdr.info.forw;
-		xfs_trans_brelse(tp, par_buf);
-		if (par_blkno == 0)
-			return XFS_ERROR(EFSCORRUPTED);
+		xfs_da_brelse(tp, par_buf);
+		par_buf = NULL;
+		if (par_blkno == 0) {
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto done;
+		}
 		if (error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w))
-			return error;
-		par_node = (xfs_da_intnode_t *)par_buf->b_un.b_addr;
+			goto done;
+		par_node = par_buf->data;
 		if (par_node->hdr.level != level ||
-		    par_node->hdr.info.magic != XFS_DA_NODE_MAGIC)
-			return XFS_ERROR(EFSCORRUPTED);
+		    par_node->hdr.info.magic != XFS_DA_NODE_MAGIC) {
+			error = XFS_ERROR(EFSCORRUPTED);
+			goto done;
+		}
 		entno = 0;
 	}
+	/*
+	 * Update the parent entry pointing to the moved block.
+	 */
 	par_node->btree[entno].before = dead_blkno;
-	xfs_trans_log_buf(tp, par_buf,
+	xfs_da_log_buf(tp, par_buf,
 		XFS_DA_LOGRANGE(par_node, &par_node->btree[entno].before,
 				sizeof(par_node->btree[entno].before)));
-	xfs_trans_brelse(tp, par_buf);
+	xfs_da_buf_done(par_buf);
+	xfs_da_buf_done(dead_buf);
 	*dead_blknop = last_blkno;
 	*dead_bufp = last_buf;
 	return 0;
+done:
+	if (par_buf)
+		xfs_da_brelse(tp, par_buf);
+	if (sib_buf)
+		xfs_da_brelse(tp, sib_buf);
+	xfs_da_brelse(tp, last_buf);
+	return error;
 }
 
+/*
+ * Remove a btree block from a directory or attribute.
+ */
 int
 xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
-		    buf_t *dead_buf)
+		    xfs_dabuf_t *dead_buf)
 {
 	xfs_inode_t *dp;
-	int done, error, w;
+	int done, error, w, count;
 	xfs_fileoff_t bno;
 	xfs_fsize_t size;
 	xfs_trans_t *tp;
+	xfs_mount_t *mp;
 
 	dp = args->dp;
 	w = args->whichfork;
 	tp = args->trans;
+	mp = dp->i_mount;
+	if (w == XFS_DATA_FORK && XFS_DIR_IS_V2(mp))
+		count = mp->m_dirblkfsbs;
+	else
+		count = 1;
 	for (;;) {
-		if ((error = xfs_bunmapi(tp, dp, dead_blkno, 1,
+		/*
+		 * Remove extents.  If we get ENOSPC for a dir we have to move
+		 * the last block to the place we want to kill.
+		 */
+		if ((error = xfs_bunmapi(tp, dp, dead_blkno, count,
 				XFS_BMAPI_AFLAG(w)|XFS_BMAPI_METADATA,
-				1, args->firstblock, args->flist,
+				0, args->firstblock, args->flist,
 				&done)) == ENOSPC) {
+			if (w != XFS_DATA_FORK)
+				goto done;
 			if (error = xfs_da_swap_lastblock(args, &dead_blkno,
 					&dead_buf))
-				return error;
+				goto done;
 		} else if (error)
-			return error;
+			goto done;
 		else
 			break;
 	}
 	ASSERT(done);
-	xfs_trans_binval(tp, dead_buf);
-	if (w == XFS_DATA_FORK) {
+	xfs_da_binval(tp, dead_buf);
+	/*
+	 * Adjust the directory size for version 1.
+	 */
+	if (w == XFS_DATA_FORK && XFS_DIR_IS_V1(mp)) {
 		if (error = xfs_bmap_last_offset(tp, dp, &bno, w))
 			return error;
 		size = XFS_FSB_TO_B(dp->i_mount, bno);
@@ -1781,163 +2020,322 @@ xfs_da_shrink_inode(xfs_da_args_t *args, xfs_dablk_t dead_blkno,
 		}
 	}
 	return 0;
+done:
+	xfs_da_binval(tp, dead_buf);
+	return error;
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
-int
-xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
-			   daddr_t mappedbno, buf_t **bpp, int whichfork)
+/*
+ * See if the mapping(s) for this btree block are valid, i.e.
+ * don't contain holes, are logically contiguous, and cover the whole range.
+ */
+STATIC int
+xfs_da_map_covers_blocks(
+	int		nmap,
+	xfs_bmbt_irec_t	*mapp,
+	xfs_dablk_t	bno,
+	int		count)
 {
-	int error;
-	xfs_fsblock_t fsb;
-	buf_t *bp;
-#ifdef DEBUG
-	xfs_bmbt_irec_t map;
-	int nmap = 1;
-	xfs_fsblock_t firstblock = NULLFSBLOCK;
-#endif
-	if (mappedbno == -1) {
-#ifdef DEBUG
-		error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
-				  XFS_BMAPI_AFLAG(whichfork), &firstblock, 0,
-				  &map, &nmap, 0);
-		if (!error) {
-			ASSERT(nmap == 1);
-			ASSERT(map.br_startblock != DELAYSTARTBLOCK);
-			ASSERT(map.br_startblock != HOLESTARTBLOCK);
-			ASSERT(map.br_startblock != NULLFSBLOCK);
+	int		i;
+	xfs_fileoff_t	off;
+
+	for (i = 0, off = bno; i < nmap; i++) {
+		if (mapp[i].br_startblock == HOLESTARTBLOCK ||
+		    mapp[i].br_startblock == DELAYSTARTBLOCK) {
+#pragma mips_frequency_hint NEVER
+			return 0;
 		}
-#endif
-		error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
-					 (xfs_fileoff_t)bno);
-		if (error) {
-			return(error);
+		if (off != mapp[i].br_startoff) {
+#pragma mips_frequency_hint NEVER
+			return 0;
 		}
-		ASSERT(map.br_startblock == fsb);
-		if (fsb == NULLFSBLOCK) {
-			*bpp = NULL;
-			return XFS_ERROR(EFSCORRUPTED);
-		}
-		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, fsb);
+		off += mapp[i].br_blockcount;
 	}
-	bp = xfs_trans_get_buf(trans, dp->i_mount->m_ddev_targp, mappedbno,
-			       dp->i_mount->m_bsize, 0);
-	ASSERT(bp);
-	if (!bp)
-		return XFS_ERROR(EFSCORRUPTED);
-	ASSERT(!geterror(bp));
-	*bpp = bp;
-	return geterror(bp);
+	return off == bno + count;
 }
 
-int
-xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
-			    daddr_t mappedbno, buf_t **bpp, int whichfork)
+/*
+ * Make a dabuf.
+ * Used for get_buf, read_buf, read_bufr, and reada_buf.
+ */
+STATIC int
+xfs_da_do_buf(
+	xfs_trans_t	*trans,
+	xfs_inode_t	*dp,
+	xfs_dablk_t	bno,
+	daddr_t		*mappedbnop,
+	xfs_dabuf_t	**bpp,
+	int		whichfork,
+	int		caller,
+	inst_t		*ra)
 {
-	xfs_fsblock_t fsb;
-	xfs_da_blkinfo_t *info;
-	int error;
-	buf_t *bp;
-#ifdef DEBUG
-	xfs_bmbt_irec_t map;
-	int nmap = 1;
-	xfs_fsblock_t firstblock = NULLFSBLOCK;
-#endif
+	buf_t		*bp;
+	buf_t		**bplist;
+	int		error;
+	int		i;
+	xfs_bmbt_irec_t	map;
+	xfs_bmbt_irec_t	*mapp;
+	daddr_t		mappedbno;
+	xfs_mount_t	*mp;
+	int		nbplist;
+	int		nfsb;
+	int		nmap;
+	xfs_dabuf_t	*rbp;
 
+	mp = dp->i_mount;
+	if (whichfork == XFS_DATA_FORK && XFS_DIR_IS_V2(mp))
+		nfsb = mp->m_dirblkfsbs;
+	else
+		nfsb = 1;
+	mappedbno = *mappedbnop;
+	/*
+	 * Caller doesn't have a mapping.  -2 means don't complain
+	 * if we land in a hole.
+	 */
 	if (mappedbno == -1 || mappedbno == -2) {
-#ifdef DEBUG
-		error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
-					 XFS_BMAPI_AFLAG(whichfork),
-					 &firstblock, 0, &map, &nmap, 0);
-		if (error)
-			return (error);
+		/*
+		 * Optimize the one-block case.
+		 */
+		if (nfsb == 1) {
+			xfs_fsblock_t	fsb;
 
-		if (!error) {
-			ASSERT(nmap == 0 || nmap == 1);
-			if (nmap == 1) {
-				ASSERT(map.br_startblock != DELAYSTARTBLOCK);
-				ASSERT(map.br_startblock != NULLFSBLOCK);
+			if (error =
+			    xfs_bmapi_single(trans, dp, whichfork, &fsb,
+				    (xfs_fileoff_t)bno)) {
+#pragma mips_frequency_hint NEVER
+				return error;
+			}
+			mapp = &map;
+			if (fsb == NULLFSBLOCK) {
+#pragma mips_frequency_hint NEVER
+				nmap = 0;
+			} else {
+				map.br_startblock = fsb;
+				map.br_startoff = (xfs_fileoff_t)bno;
+				map.br_blockcount = 1;
+				nmap = 1;
+			}
+		} else {
+#pragma mips_frequency_hint NEVER
+			xfs_fsblock_t	firstblock;
+
+			firstblock = NULLFSBLOCK;
+			mapp = kmem_alloc(sizeof(*mapp) * nfsb, KM_SLEEP);
+			nmap = nfsb;
+			if (error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno,
+					nfsb,
+					XFS_BMAPI_METADATA |
+						XFS_BMAPI_AFLAG(whichfork),
+					&firstblock, 0, mapp, &nmap, NULL))
+				goto exit0;
+		}
+	} else {
+		map.br_startblock = XFS_DADDR_TO_FSB(mp, mappedbno);
+		map.br_startoff = (xfs_fileoff_t)bno;
+		map.br_blockcount = nfsb;
+		mapp = &map;
+		nmap = 1;
+	}
+	if (!xfs_da_map_covers_blocks(nmap, mapp, bno, nfsb)) {
+#pragma mips_frequency_hint NEVER
+		error = mappedbno == -2 ? 0 : XFS_ERROR(EFSCORRUPTED);
+		goto exit0;
+	}
+	if (caller != 3 && nmap > 1) {
+#pragma mips_frequency_hint NEVER
+		bplist = kmem_alloc(sizeof(*bplist) * nmap, KM_SLEEP);
+		nbplist = 0;
+	} else
+		bplist = NULL;
+	/*
+	 * Turn the mapping(s) into buffer(s).
+	 */
+	for (i = 0; i < nmap; i++) {
+		int	nmapped;
+
+		mappedbno = XFS_FSB_TO_DADDR(mp, mapp[i].br_startblock);
+		if (i == 0)
+			*mappedbnop = mappedbno;
+		nmapped = (int)XFS_FSB_TO_BB(mp, mapp[i].br_blockcount);
+		switch (caller) {
+		case 0:
+			bp = xfs_trans_get_buf(trans, mp->m_ddev_targp,
+				mappedbno, nmapped, 0);
+			error = bp ? geterror(bp) : XFS_ERROR(EIO);
+			break;
+		case 1:
+#ifdef XFS_REPAIR_SIM
+		case 2:
+#endif /* XFS_REPAIR_SIM */
+			bp = NULL;
+			error = xfs_trans_read_buf(mp, trans, mp->m_dev,
+				mappedbno, nmapped, 0, &bp);
+			break;
+#ifndef SIM
+		case 3:
+			baread(mp->m_ddev_targp, mappedbno, nmapped);
+			error = 0;
+			bp = NULL;
+			break;
+#endif /* !SIM */
+		}
+		if (error) {
+#pragma mips_frequency_hint NEVER
+			if (bp)
+				xfs_trans_brelse(trans, bp);
+			goto exit1;
+		}
+		if (!bp)
+			continue;
+		if (caller == 1) {
+			if (whichfork == XFS_ATTR_FORK) {
+				bp->b_ref = XFS_ATTR_BTREE_REF;
+				bp->b_bvtype = B_FS_ATTR_BTREE;
+			} else {
+				bp->b_ref = XFS_DIR_BTREE_REF;
+				bp->b_bvtype = B_FS_DIR_BTREE;
 			}
 		}
-#endif
-		error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
-						(xfs_fileoff_t)bno);
-		if (error) {
-			return(error);
+		if (bplist) {
+#pragma mips_frequency_hint NEVER
+			bplist[nbplist++] = bp;
 		}
-		if (fsb == NULLFSBLOCK) {
-			*bpp = NULL;
-			if (mappedbno == -2)
-				return 0;
-			return XFS_ERROR(EFSCORRUPTED);
+	}
+	/*
+	 * Build a dabuf structure.
+	 */
+	if (bplist) {
+#pragma mips_frequency_hint NEVER
+		rbp = xfs_da_buf_make(nbplist, bplist, ra);
+	} else if (bp)
+		rbp = xfs_da_buf_make(1, &bp, ra);
+	else
+		rbp = NULL;
+	/*
+	 * For read_buf, check the magic number.
+	 */
+	if (caller == 1) {
+		xfs_dir2_data_t		*data;
+		xfs_dir2_free_t		*free;
+		xfs_da_blkinfo_t	*info;
+
+		info = rbp->data;
+		data = rbp->data;
+		free = rbp->data;
+		if (XFS_TEST_ERROR((info->magic != XFS_DA_NODE_MAGIC) &&
+				   (info->magic != XFS_DIR_LEAF_MAGIC) &&
+				   (info->magic != XFS_ATTR_LEAF_MAGIC) &&
+				   (info->magic != XFS_DIR2_LEAF1_MAGIC) &&
+				   (info->magic != XFS_DIR2_LEAFN_MAGIC) &&
+				   (data->hdr.magic != XFS_DIR2_BLOCK_MAGIC) &&
+				   (data->hdr.magic != XFS_DIR2_DATA_MAGIC) &&
+				   (free->hdr.magic != XFS_DIR2_FREE_MAGIC),
+				mp, XFS_ERRTAG_DA_READ_BUF,
+				XFS_RANDOM_DA_READ_BUF)) {
+#pragma mips_frequency_hint NEVER
+			buftrace("DA READ ERROR", rbp->bps[0]);
+			error = XFS_ERROR(EFSCORRUPTED);
+			xfs_da_brelse(trans, rbp);
+			nbplist = 0;
+			goto exit1;
 		}
-		ASSERT(map.br_startblock == fsb);
-		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, fsb);
 	}
-	error = xfs_trans_read_buf(dp->i_mount, trans, 
-				   dp->i_mount->m_dev, mappedbno,
-				   dp->i_mount->m_bsize, 0, &bp);
-	if (error)
-		return error;
-	ASSERT(bp != NULL && !geterror(bp));
-	if (whichfork == XFS_ATTR_FORK) {
-		bp->b_ref = XFS_ATTR_BTREE_REF;
-		bp->b_bvtype = B_FS_ATTR_BTREE;
-	} else {
-		bp->b_ref = XFS_DIR_BTREE_REF;
-		bp->b_bvtype = B_FS_DIR_BTREE;
+	if (bplist) {
+#pragma mips_frequency_hint NEVER
+		kmem_free(bplist, sizeof(*bplist) * nmap);
 	}
-	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
-	if (XFS_TEST_ERROR((info->magic != XFS_DA_NODE_MAGIC) &&
-			   (info->magic != XFS_DIR_LEAF_MAGIC) &&
-			   (info->magic != XFS_ATTR_LEAF_MAGIC),
-			dp->i_mount,
-			XFS_ERRTAG_DA_READ_BUF, XFS_RANDOM_DA_READ_BUF)) {
-#ifndef SIM
-		buftrace("DA READ ERROR", bp);
-#endif
-		xfs_trans_brelse(trans, bp);
-		*bpp = NULL;
-		return XFS_ERROR(EFSCORRUPTED);
+	if (mapp != &map) {
+#pragma mips_frequency_hint NEVER
+		kmem_free(mapp, sizeof(*mapp) * nfsb);
 	}
-	*bpp = bp;
+	if (bpp)
+		*bpp = rbp;
 	return 0;
+exit1:
+	if (bplist) {
+		for (i = 0; i < nbplist; i++)
+			xfs_trans_brelse(trans, bplist[i]);
+		kmem_free(bplist, sizeof(*bplist) * nmap);
+	}
+exit0:
+	if (mapp != &map)
+		kmem_free(mapp, sizeof(*mapp) * nfsb);
+	if (bpp)
+		*bpp = NULL;
+	return error;
 }
 
-#ifndef SIM
-daddr_t
-xfs_da_reada_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
-			     int whichfork)
+/*
+ * Get a buffer for the dir/attr block.
+ */
+int
+xfs_da_get_buf(
+	xfs_trans_t	*trans,
+	xfs_inode_t	*dp,
+	xfs_dablk_t	bno,
+	daddr_t		mappedbno,
+	xfs_dabuf_t	**bpp,
+	int		whichfork)
 {
-	xfs_fsblock_t fsb;
-	xfs_mount_t *mp;
-	int error;
-	daddr_t rval;
-#ifdef DEBUG
-	xfs_bmbt_irec_t map;
-	int nmap = 1;
-	xfs_fsblock_t firstblock = NULLFSBLOCK;
+	return xfs_da_do_buf(trans, dp, bno, &mappedbno, bpp, whichfork, 0,
+		(inst_t *)__return_address);
+}
 
-	error = xfs_bmapi(trans, dp, (xfs_fileoff_t)bno, 1,
-				 XFS_BMAPI_AFLAG(whichfork), &firstblock,
-				 0, &map, &nmap, 0);
-	if (!error) {
-		ASSERT(nmap == 0 || nmap == 1);
-		if (nmap == 1) {
-			ASSERT(map.br_startblock != DELAYSTARTBLOCK);
-			ASSERT(map.br_startblock != NULLFSBLOCK);
-		}
-	}
-#endif
-	error = xfs_bmapi_single(trans, dp, whichfork, &fsb,
-					(xfs_fileoff_t)bno);
-	if (error || fsb == NULLFSBLOCK)
+/*
+ * Get a buffer for the dir/attr block, fill in the contents.
+ */
+int
+xfs_da_read_buf(
+	xfs_trans_t	*trans,
+	xfs_inode_t	*dp,
+	xfs_dablk_t	bno,
+	daddr_t		mappedbno,
+	xfs_dabuf_t	**bpp,
+	int		whichfork)
+{
+	return xfs_da_do_buf(trans, dp, bno, &mappedbno, bpp, whichfork, 1,
+		(inst_t *)__return_address);
+}
+
+#ifdef XFS_REPAIR_SIM
+/*
+ * Get a buffer for the dir/attr block, fill in the contents.
+ * Don't check magic number, the caller will (it's xfs_repair).
+ */
+int
+xfs_da_read_bufr(
+	xfs_trans_t	*trans,
+	xfs_inode_t	*dp,
+	xfs_dablk_t	bno,
+	daddr_t		mappedbno,
+	xfs_dabuf_t	**bpp,
+	int		whichfork)
+{
+	return xfs_da_do_buf(trans, dp, bno, &mappedbno, bpp, whichfork, 2,
+		(inst_t *)__return_address);
+}
+#endif /* XFS_REPAIR_SIM */
+
+#ifndef SIM
+/*
+ * Readahead the dir/attr block.
+ */
+daddr_t
+xfs_da_reada_buf(
+	xfs_trans_t	*trans,
+	xfs_inode_t	*dp,
+	xfs_dablk_t	bno,
+	int		whichfork)
+{
+	daddr_t		rval;
+
+	rval = -1;
+	if (xfs_da_do_buf(trans, dp, bno, &rval, NULL, whichfork, 3,
+			(inst_t *)__return_address))
 		return -1;
-	ASSERT(map.br_startblock == fsb);
-	mp = dp->i_mount;
-	ASSERT(mp != NULL);
-	rval = XFS_FSB_TO_DADDR(mp, fsb);
-	baread(mp->m_ddev_targp, rval, mp->m_bsize);
-	return rval;
+	else
+		return rval;
 }
 #endif	/* !SIM */
 
@@ -1957,6 +2355,7 @@ xfs_da_log2_roundup(uint i)
 }
 
 zone_t *xfs_da_state_zone;	/* anchor for state struct zone */
+zone_t *xfs_dabuf_zone;		/* dabuf zone */
 
 /*
  * Allocate a dir-state structure.
@@ -1969,1069 +2368,322 @@ xfs_da_state_alloc(void)
 }
 
 /*
+ * Kill the altpath contents of a da-state structure.
+ */
+void
+xfs_da_state_kill_altpath(xfs_da_state_t *state)
+{
+	int	i;
+
+	for (i = 0; i < state->altpath.active; i++) {
+		if (state->altpath.blk[i].bp) {
+			if (state->altpath.blk[i].bp != state->path.blk[i].bp)
+				xfs_da_buf_done(state->altpath.blk[i].bp);
+			state->altpath.blk[i].bp = NULL;
+		}
+	}
+	state->altpath.active = 0;
+}
+
+/*
  * Free a da-state structure.
  */
 void
 xfs_da_state_free(xfs_da_state_t *state)
 {
+	int	i;
+
+	xfs_da_state_kill_altpath(state);
+	for (i = 0; i < state->path.active; i++) {
+		if (state->path.blk[i].bp)
+			xfs_da_buf_done(state->path.blk[i].bp);
+	}
+	if (state->extravalid && state->extrablk.bp)
+		xfs_da_buf_done(state->extrablk.bp);
 #ifdef DEBUG
 	bzero((char *)state, sizeof(*state));
 #endif /* DEBUG */
 	kmem_zone_free(xfs_da_state_zone, state);
 }
 
-
-#ifdef XFSDADEBUG
-
-/*========================================================================
- * Load all of the block in a directory into memory so they can be seen.
- *========================================================================*/
-
-int xfsda_load_leaf(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork);
-int xfsda_load_node(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork);
-
-int
-xfsda_loaddir(xfs_inode_t *dp)
-{
-	int retval;
-
-	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
-		retval = 0;
-	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
-		retval = xfsda_load_leaf(dp, 0, XFS_DATA_FORK);
-	} else {
-		retval = xfsda_load_node(dp, 0, XFS_DATA_FORK);
-	}
-	return(retval);
-}
-
-int
-xfsda_loadattr(xfs_inode_t *dp)
-{
-	int retval;
-
-	if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
-		retval = 0;
-	} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
-		retval = xfsda_load_leaf(dp, 0, XFS_ATTR_FORK);
-	} else {
-		retval = xfsda_load_node(dp, 0, XFS_ATTR_FORK);
-	}
-	return(retval);
-}
-
-int
-xfsda_load_leaf(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork)
-{
-	xfs_attr_leafblock_t *aleaf;
-	xfs_dir_leafblock_t *dleaf;
-	xfs_da_blkinfo_t *info;
-	buf_t *bp;
-
-	(void) xfs_da_read_buf(dp->i_transp, dp, blkno, -1, &bp, whichfork);
-	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
-	printf("leaf[0x%x]  bp 0x%x  forw 0x%x  back 0x%x  ",
-			blkno, bp, info->forw, info->back);
-	switch(info->magic) {
-	case XFS_ATTR_LEAF_MAGIC:
-		aleaf = (xfs_attr_leafblock_t *)info;
-		printf("count %d\n", aleaf->hdr.count);
-		break;
-	case XFS_DIR_LEAF_MAGIC:
-		dleaf = (xfs_dir_leafblock_t *)info;
-		printf("count %d\n", dleaf->hdr.count);
-		break;
-	}
-	return(0);
-}
-
-int
-xfsda_load_node(xfs_inode_t *dp, xfs_dablk_t blkno, int whichfork)
-{
-	xfs_da_intnode_t *node;
-	xfs_da_node_entry_t *btree;
-	int retval, i;
-	buf_t *bp;
-
-	(void) xfs_da_read_buf(dp->i_transp, dp, blkno, -1, &bp, whichfork);
-	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
-	printf("node[0x%x]  bp 0x%x  forw 0x%x  back 0x%x  count %d  level %d\n",
-			    blkno, bp,
-			    node->hdr.info.forw, node->hdr.info.back,
-			    node->hdr.count, node->hdr.level);
-	btree = &node->btree[0];
-	for (i = 0; i < node->hdr.count; btree++, i++) {
-		if (node->hdr.level == 1) {
-			retval += xfsda_load_leaf(dp, btree->before, whichfork);
-		} else {
-			retval += xfsda_load_node(dp, btree->before, whichfork);
-		}
-	}
-	return(retval);
-}
-
-
-/*========================================================================
- * Check a directory for internal inconsistencies
- *========================================================================*/
-
-#define BADNEWS0(MSG)			BADNEWSN(MSG, 0, 0, 0)
-#define BADNEWS1(MSG, VAL1)		BADNEWSN(MSG, VAL1, 0, 0)
-#define BADNEWS2(MSG, VAL1, VAL2)	BADNEWSN(MSG, VAL1, VAL2, 0)
-#define BADNEWS3(MSG, VAL1, VAL2, VAL3)	BADNEWSN(MSG, VAL1, VAL2, VAL3)
-#define BADNEWSN(MSG, VAL1, VAL2, VAL3)	retval++, printf("bp 0x%x " MSG, \
-					     bp, VAL1, VAL2, VAL3)
-
-/*
- * Block usage information.
- */
-#define XFSDA_BLK_INUSE		0x01	/* block in is use */
-#define XFSDA_BLK_LEAF		0x02	/* block is a leaf */
-#define XFSDA_BLK_NODE		0x04	/* block is a node */
-#define XFSDA_BLK_VALUE		0x08	/* block is an attr remote value */
-#define XFSDA_BLK_MULTI		0x10	/* block is multiply used */
-#define XFSDA_BLK_FORWARD	0x20	/* block is someone's "forward" */
-#define XFSDA_BLK_BACKWARD	0x40	/* block is someone's "backward" */
-#define XFSDA_BLK_ENDCHAIN	0x80	/* block is beginning/end of chain */
-
-/*
- * Directory/attribute structure checking data, context for each process.
- */
-typedef struct xfsda_context {
-	xfs_inode_t	*dp;		/* directory inode */
-	int		whichfork;	/* checking directory or attrributes? */
-	xfs_dahash_t	hashval;	/* last hashval seen in tree */
-	int		maxblockmap;	/* size of block-use map */
-	char		*blockmap;	/* map of blocks and their uses */
-	int		maxlinkmap;	/* size of forw/back link map */
-	xfs_dablk_t	*forw_links;	/* map of forward chain links */
-	xfs_dablk_t	*back_links;	/* map of backward chain links */
-	int		bytemapsize;	/* size of used/free bytemap */
-	char		*bytemap;	/* used/free bytes in leaf blk */
-	int		usedbytes;	/* total bytes used in entries */
-	int		freebytes;	/* total free bytes for filenames */
-	int		wastedbytes;	/* total wasted bytes, remote values */
-	int		holeblks;	/* total leaves with holes */
-	int		entries;	/* total directory entries */
-	int		nodes;		/* node blocks seen */
-	int		leaves;		/* leaf blocks seen */
-	int		values;		/* "remote" value blocks seen */
-	int		multichk;	/* show uses of mutiply used blocks */
-} xfsda_context_t;
-
-
-int xfsda_leaf_check(xfsda_context_t *con, xfs_dablk_t blkno, int firstlast);
-int xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
-					  int firstlast);
-int xfsda_attr_leaf_recheck(xfsda_context_t *con, xfs_dablk_t blkno);
-int xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
-					 int firstlast);
-int xfsda_node_check(xfsda_context_t *con, xfs_dablk_t blkno, int depth,
-				     int firstlast);
-int xfsda_attr_node_recheck(xfsda_context_t *con, xfs_dablk_t blkno);
-int xfsda_check_blockuse(xfsda_context_t *con);
-int xfsda_checkchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t parentblk,
-				     xfs_dablk_t blkno, int forward);
-int xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno);
-int xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
-				     int blktype);
-int xfsda_checkname(buf_t *bp, char *name, int namelen, int index,
-			  xfs_dahash_t hashval);
-void xfsda_printbytes(int bytes);
-
-extern xfs_dahash_t xfs_da_hashname(register char *name, register int namelen);
-
-int
-xfsda_checkdir(xfs_inode_t *dp)
-{
-	return(xfsda_check(dp, XFS_DATA_FORK));
-}
-
-int
-xfsda_checkattr(xfs_inode_t *dp)
-{
-	return(xfsda_check(dp, XFS_ATTR_FORK));
-}
-
-int
-xfsda_check(xfs_inode_t *dp, int whichfork)
-{
-	xfsda_context_t *con;
-	int numblks, tmp, retval;
-
-	con = (xfsda_context_t *)kmem_zalloc(sizeof(*con), KM_SLEEP);
-	numblks = 10000;/* GROT: this should be a calculation, not a constant */
-	con->maxblockmap = numblks;
-	con->blockmap = (char *)
-		kmem_zalloc(numblks * sizeof(*con->blockmap), KM_SLEEP);
-	con->maxlinkmap = numblks;
-	con->forw_links = (xfs_dablk_t *)
-		kmem_zalloc(numblks * sizeof(*con->forw_links), KM_SLEEP);
-	con->back_links = (xfs_dablk_t *)
-		kmem_zalloc(numblks * sizeof(*con->back_links), KM_SLEEP);
-	con->bytemapsize = XFS_LBSIZE(dp->i_mount);
-	con->bytemap = (char *)
-		kmem_zalloc(con->bytemapsize * sizeof(*con->bytemap), KM_SLEEP);
-	con->usedbytes = con->freebytes = con->wastedbytes = 0;
-	con->holeblks = con->entries = 0;
-
-	/*
-	 * Decide on what work routines to call based on the inode size.
-	 */
-	printf("XFSDA_CHECK: ");
-	con->whichfork = whichfork;
-	con->dp = dp;
-	retval = 0;
-	if (whichfork == XFS_ATTR_FORK) {
-		if (XFS_IFORK_Q(dp) == 0) {
-			retval = 0; /* xfsda_shortform_check(con); */
-		} else if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {
-			retval = 0; /* xfsda_shortform_check(con); */
-		} else if (xfs_bmap_one_block(dp, XFS_ATTR_FORK)) {
-			retval = xfsda_leaf_check(con, 0, -2);
-			if (con->multichk) {
-				retval = xfsda_attr_leaf_recheck(con, 0);
-			}
-		} else {
-			retval = xfsda_node_check(con, (xfs_dablk_t)0, -1, -2);
-			if (con->multichk) {
-				retval = xfsda_attr_node_recheck(con, 0);
-			}
-		}
-	} else {
-		if (dp->i_d.di_size <= XFS_LITINO(dp->i_mount)) {
-			retval = 0; /* xfsda_shortform_check(con); */
-		} else if (dp->i_d.di_size == XFS_LBSIZE(dp->i_mount)) {
-			retval = xfsda_leaf_check(con, 0, -2);
-		} else {
-			retval = xfsda_node_check(con, (xfs_dablk_t)0, -1, -2);
-		}
-	}
-	retval += xfsda_check_blockuse(con);
-
-	printf("%d entries, blocks(n/l/v): %d/%d/%d, bytes(u/f/w): ",
-		   con->entries, con->nodes, con->leaves, con->values);
-	xfsda_printbytes(con->usedbytes);
-	printf("/");
-	xfsda_printbytes(con->freebytes);
-	printf("/");
-	xfsda_printbytes(con->wastedbytes);
-	tmp = con->usedbytes + con->freebytes + con->wastedbytes;
-	printf(" (%d%% util)\n",
-		 (tmp>0)?(((con->freebytes+con->wastedbytes)*100)/tmp):0);
-
-	kmem_free(con->bytemap, con->bytemapsize * sizeof(*con->bytemap));
-	kmem_free(con->blockmap, con->maxblockmap * sizeof(*con->blockmap));
-	kmem_free(con->forw_links, con->maxlinkmap * sizeof(*con->forw_links));
-	kmem_free(con->back_links, con->maxlinkmap * sizeof(*con->back_links));
-	kmem_free(con, sizeof(*con));
-
-	if (retval) {
-		debug("directory check");
-	}
-	return(retval);
-}
-
-/*========================================================================
- * Short form checking routines.
- *========================================================================*/
-
-#ifdef NOTYET
-int
-xfsda_shortform_check(xfsda_context_t *con)
-{
-	xfs_dir_shortform_t *sf;
-	xfs_dir_sf_entry_t *sfe;
-	int retval, total, i;
-	buf_t *bp;
-
-	sf = (xfs_dir_shortform_t *)bp->buffer;
-	if (sf->hdr.count > (XFS_LITINO(fs)/sizeof(xfs_dir_sf_entry_t)))
-		BADNEWS1("shortform entry count bad: count %d\n",
-				    sf->hdr.count);
-
-	sfe = &sf->list[0];
-	total = sizeof(xfs_dir_sf_hdr_t);
-	for (i = sf->hdr.count-1; i >= 0; i--) {
-		if ((sfe->namelen == 0) || (sfe->namelen > MAXNAMELEN) ||
-		    (sfe->namelen > XFS_LITINO(fs)) ||
-		    ((sfe->namelen + total) > dp->i_d.di_size))
-			BADNEWS1("bad shortform name length: entry %d\n", i);
-
-		con->hashval = xfs_da_hashname(sfe->name, sfe->namelen);
-		retval += xfsda_checkname(sfe->name, sfe->namelen,
-						      con->hashval);
-
-		total += XFS_DIR_SF_ENTSIZE_BYENTRY(sfe);
-		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
-	}
-	if (total != dp->i_d.di_size)
-		BADNEWS0("more stuff in inode than should be\n");
-	xfs_trans_irelse(NULL, bp);
-	return(retval);
-}
-#endif /* NOTYET */
-
-/*========================================================================
- * Long form manipulation routines.
- *========================================================================*/
-
-int
-xfsda_leaf_check(xfsda_context_t *con, xfs_dablk_t blkno, int firstlast)
-{
-	xfs_da_blkinfo_t *info;
-	int retval;
-	buf_t *bp;
-
-	/*
-	 * Read in the leaf block.
-	 */
-	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
-						  con->whichfork);
-	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
-
-	/*
-	 * Check the header fields.
-	 */
-	retval = 0;
-	if ((info->magic != XFS_ATTR_LEAF_MAGIC) &&
-	    (info->magic != XFS_DIR_LEAF_MAGIC)) {
-		BADNEWS1("not a leaf node: blkno 0x%x\n", blkno);
-		xfs_trans_brelse(con->dp->i_transp, bp);
-		return(retval);
-	}
-
-	/*
-	 * Check the chain of leaves
-	 */
-	if (firstlast == 0) {
-		retval += xfsda_checkchain(con, bp, blkno, info->forw, 1);
-		retval += xfsda_checkchain(con, bp, blkno, info->back, 0);
-	} else {
-		retval += xfsda_endchain(con, bp, blkno);
-		if (firstlast < 0) {
-			if (firstlast == -1)
-				retval += xfsda_checkchain(con, bp, blkno,
-						      info->forw, 1);
-			if (info->back != 0)
-				BADNEWS2("backward ref to leaf 0x%x in leaf 0x%x\n",
-						   info->back, blkno);
-		}
-		if (firstlast > 0) {
-			retval += xfsda_checkchain(con, bp, blkno, info->back,
-							0);
-			if (info->forw != 0)
-				BADNEWS2("forward ref to leaf 0x%x in leaf 0x%x\n",
-						  info->forw, blkno);
-		}
-	}
-
-	if (info->magic == XFS_ATTR_LEAF_MAGIC) {
-		retval += xfsda_attr_leaf_check(con, bp, blkno, firstlast);
-	} else if (info->magic == XFS_DIR_LEAF_MAGIC) {
-		retval += xfsda_dir_leaf_check(con, bp, blkno, firstlast);
-	}
-	return(retval);
-}
-
-/*ARGSUSED*/
-int
-xfsda_attr_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
-				      int firstlast)
-{
-	xfs_attr_leafblock_t *leaf;
-	xfs_attr_leaf_entry_t *entry;
-	xfs_attr_leaf_map_t *map;
-	xfs_attr_leaf_name_local_t *localp;
-	xfs_attr_leaf_name_remote_t *remotep;
-	int lowest, bytes, retval, i, j, k, n, tmp;
-	char *ch;
-
-	retval = 0;
-	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
-	if (leaf->hdr.pad1 != 0)
-		BADNEWS1("pad1 is non-zero: leaf 0x%x\n", blkno);
-
-	/*
-	 * Set up the used/free byte map for this block.
-	 */
-	bzero(con->bytemap, con->bytemapsize);
-	j = leaf->hdr.count * sizeof(xfs_attr_leaf_entry_t)
-				+ sizeof(xfs_attr_leaf_hdr_t);
-	for (ch = con->bytemap, i = 0; i < j; i++)
-		*ch++ = 1;
-
-	/*
-	 * Check the entries
-	 * XXX: check the count.
-	 */
-	bytes = 0;
-	lowest = XFS_LBSIZE(con->dp->i_mount);
-	if (lowest == 64*1024)
-		lowest = XFS_LBSIZE(con->dp->i_mount) - 1;
-	entry = &leaf->entries[0];
-	if (leaf->hdr.count == 0)
-		BADNEWS1("zero entry count: leaf 0x%x\n", blkno);
-	con->entries += leaf->hdr.count;
-	for (i = 0; i < leaf->hdr.count; entry++, i++) {
-		if (entry->hashval < con->hashval) {
-			BADNEWS2("hashval is smaller than last: leaf 0x%x, index %d\n",
-					  blkno, i);
-		}
-		con->hashval = entry->hashval;
-		if (entry->nameidx >= XFS_LBSIZE(con->dp->i_mount)) {
-			BADNEWS2("nameidx is too large: leaf 0x%x, index %d\n",
-					  blkno, i);
-		} else {
-			if (entry->nameidx < lowest)
-				lowest = entry->nameidx;
-
-			if (entry->flags & XFS_ATTR_LOCAL) {
-				localp = XFS_ATTR_LEAF_NAME_LOCAL(leaf, i);
-				retval += xfsda_checkname(bp,
-							  (char *)localp->nameval,
-							  localp->namelen, i,
-							  entry->hashval);
-				k = XFS_ATTR_LEAF_ENTSIZE_LOCAL(localp->namelen, localp->valuelen);
-				bytes += k;
-				ch = &con->bytemap[entry->nameidx];
-				for (j = 0; j < k; j++) {
-					*ch++ = 1;
-				}
-			} else {
-				remotep = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
-				retval += xfsda_checkname(bp,
-							  (char *)remotep->name,
-							  remotep->namelen, i,
-							  entry->hashval);
-				k = XFS_ATTR_LEAF_ENTSIZE_REMOTE(remotep->namelen);
-				bytes += k;
-				ch = &con->bytemap[entry->nameidx];
-				for (j = 0; j < k; j++) {
-					*ch++ = 1;
-				}
-
-				k = remotep->valueblk;
-				n = XFS_B_TO_FSB(con->dp->i_mount,
-						 remotep->valuelen);
-				con->wastedbytes += XFS_FSB_TO_B(con->dp->i_mount, n)
-							- remotep->valuelen;
-				for (j = 0; j < n; k++, j++) {
-					tmp = xfsda_checkblock(con, NULL, k,
-							    XFSDA_BLK_VALUE);
-					if (tmp) {
-						retval += tmp;
-						BADNEWS1(" in: leaf 0x%x\n",
-							   blkno);
-						retval--;
-					}
-				}
-			}
-		}
-		if (entry->pad2 != 0)
-			BADNEWS1("pad2 is non-zero: leaf 0x%x\n", blkno);
-	}
-
-	/*
-	 * Check more header fields after looking at each entry.
-	 */
-	if (leaf->hdr.usedbytes != bytes)
-		BADNEWS3("usedbytes (0x%x) not right (0x%x): leaf 0x%x\n",
-				    (int)leaf->hdr.usedbytes, bytes, blkno);
-	con->usedbytes += bytes;
-
-	map = &leaf->hdr.freemap[0];
-	for (i = 0; i < XFS_ATTR_LEAF_MAPSIZE; map++, i++) {
-		if (map->base >= XFS_LBSIZE(con->dp->i_mount)) {
-			BADNEWS2("freemap[%d].base is too large: leaf 0x%x\n",
-						   i, blkno);
-			continue;
-		}
-		j = sizeof(xfs_attr_leaf_hdr_t) +
-			leaf->hdr.count * sizeof(xfs_attr_leaf_entry_t);
-		if ((map->base < j) && (map->size > 0)) {
-			BADNEWS2("freemap[%d].base is too small: leaf 0x%x\n",
-						   i, blkno);
-			continue;
-		}
-		if (map->size >= XFS_LBSIZE(con->dp->i_mount)) {
-			BADNEWS2("freemap[%d].size is too large: leaf 0x%x\n",
-						   i, blkno);
-			continue;
-		}
-
-		for (ch = &con->bytemap[map->base], j = k = 0; j < map->size; j++) {
-			if ((*ch != 0) && (k == 0)) {
-				BADNEWS2("freemap[%d] overlaps used space: leaf 0x%x\n",
-						      i, blkno);
-			      k = 1;	/* don't print more than one message */
-			}
-			*ch++ = 1;
-		}
-		con->freebytes += map->size;
-	}
-
-	if (leaf->hdr.holes == 0) {
-		for (ch = con->bytemap, i = 0; i < con->bytemapsize; i++) {
-			if (*ch++ == 0) {
-				BADNEWS1("space not mapped but holes == 0: leaf 0x%x\n",
-						blkno);
-				break;
-			}
-		}
-	}
-
-	if (leaf->hdr.holes) {
-		con->holeblks++;
-		if (leaf->hdr.firstused > lowest)
-			BADNEWS3("firstused (0x%x) too high (0x%x), holes: leaf 0x%x\n",
-					    (int)leaf->hdr.firstused,
-					    lowest, blkno);
-	} else {
-		if (leaf->hdr.firstused != lowest)
-			BADNEWS3("firstused (0x%x) not right (0x%x), no holes: leaf 0x%x\n",
-					    (int)leaf->hdr.firstused,
-					    lowest, blkno);
-	}
-
-	if (retval == 0)
-		xfs_trans_brelse(con->dp->i_transp, bp);
-	return(retval);
-}
-
-/*ARGSUSED*/
-int
-xfsda_attr_leaf_recheck(xfsda_context_t *con, xfs_dablk_t blkno)
-{
-	xfs_attr_leafblock_t *leaf;
-	xfs_attr_leaf_entry_t *entry;
-	xfs_attr_leaf_name_remote_t *remotep;
-	int i, j, base, len, retval;
-	buf_t *bp;
-
-	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
-						  con->whichfork);
-	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
-
-	/*
-	 * Check the entries
-	 */
-	retval = 0;
-	entry = &leaf->entries[0];
-	for (i = 0; i < leaf->hdr.count; entry++, i++) {
-		if (entry->flags & XFS_ATTR_LOCAL)
-			continue;
-		remotep = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
-		base = remotep->valueblk;
-		len = XFS_B_TO_FSB(con->dp->i_mount, remotep->valuelen);
-		for (j = 0; j < len; base++, j++) {
-			if (con->blockmap[base] & XFSDA_BLK_MULTI) {
-				BADNEWS3("Block 0x%x used in leaf 0x%x, bp 0x%x\n",
-						base, blkno, bp);
-			}
-		}
-	}
-
-	if (retval == 0)
-		xfs_trans_brelse(con->dp->i_transp, bp);
-	return(retval);
-}
-
-/*ARGSUSED*/
-int
-xfsda_dir_leaf_check(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
-				     int firstlast)
-{
-	xfs_dir_leafblock_t *leaf;
-	xfs_dir_leaf_entry_t *entry;
-	xfs_dir_leaf_name_t *namest;
-	xfs_dir_leaf_map_t *map;
-	int lowest, bytes, retval, i, j, k;
-	char *ch;
-
-	retval = 0;
-	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-	if (leaf->hdr.pad1 != 0)
-		BADNEWS1("pad1 is non-zero: leaf 0x%x\n", blkno);
-
-	/*
-	 * Set up the used/free byte map for this block.
-	 */
-	bzero(con->bytemap, con->bytemapsize);
-	j = leaf->hdr.count * sizeof(xfs_dir_leaf_entry_t)
-				+ sizeof(xfs_dir_leaf_hdr_t);
-	for (ch = con->bytemap, i = 0; i < j; i++)
-		*ch++ = 1;
-
-	/*
-	 * Check the entries
-	 * XXX: check the count.
-	 */
-	bytes = 0;
-	lowest = XFS_LBSIZE(con->dp->i_mount);
-	if (lowest == 64*1024)
-		lowest = XFS_LBSIZE(con->dp->i_mount) - 1;
-	entry = &leaf->entries[0];
-	if (leaf->hdr.count == 0)
-		BADNEWS1("zero entry count: leaf 0x%x\n", blkno);
-	con->entries += leaf->hdr.count;
-	for (i = 0; i < leaf->hdr.count; entry++, i++) {
-		if (entry->hashval < con->hashval) {
-			BADNEWS2("hashval is smaller than last: leaf 0x%x, index %d\n",
-					  blkno, i);
-		}
-		con->hashval = entry->hashval;
-		if (entry->nameidx >= XFS_LBSIZE(con->dp->i_mount)) {
-			BADNEWS2("nameidx is too large: leaf 0x%x, index %d\n",
-					  blkno, i);
-		} else {
-			if (entry->nameidx < lowest)
-				lowest = entry->nameidx;
-
-			namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-			retval += xfsda_checkname(bp, (char *)namest->name,
-						       entry->namelen, i,
-						       entry->hashval);
-			bytes += entry->namelen;
-
-			ch = &con->bytemap[entry->nameidx];
-			for (j = 0; j < XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry); j++) {
-				*ch++ = 1;
-			}
-		}
-		if (entry->pad2 != 0)
-			BADNEWS1("pad2 is non-zero: leaf 0x%x\n", blkno);
-	}
-
-	/*
-	 * Check more header fields after looking at each entry.
-	 */
-	if (leaf->hdr.namebytes != bytes)
-		BADNEWS3("namebytes (0x%x) not right (0x%x): leaf 0x%x\n",
-				    (int)leaf->hdr.namebytes, bytes, blkno);
-	con->usedbytes += bytes;
-
-	map = &leaf->hdr.freemap[0];
-	for (i = 0; i < XFS_DIR_LEAF_MAPSIZE; map++, i++) {
-		if (map->base >= XFS_LBSIZE(con->dp->i_mount)) {
-			BADNEWS2("freemap[%d].base is too large: leaf 0x%x\n",
-						   i, blkno);
-			continue;
-		}
-		j = sizeof(xfs_dir_leaf_hdr_t) +
-			leaf->hdr.count * sizeof(xfs_dir_leaf_entry_t);
-		if ((map->base < j) && (map->size > 0)) {
-			BADNEWS2("freemap[%d].base is too small: leaf 0x%x\n",
-						   i, blkno);
-			continue;
-		}
-		if (map->size >= XFS_LBSIZE(con->dp->i_mount)) {
-			BADNEWS2("freemap[%d].size is too large: leaf 0x%x\n",
-						   i, blkno);
-			continue;
-		}
-
-		for (ch = &con->bytemap[map->base], j = k = 0; j < map->size; j++) {
-			if ((*ch != 0) && (k == 0)) {
-				BADNEWS2("freemap[%d] overlaps used space: leaf 0x%x\n",
-						      i, blkno);
-			      k = 1;	/* don't print more than one message */
-			}
-			*ch++ = 1;
-		}
-		con->freebytes += map->size;
-	}
-
-	if (leaf->hdr.holes == 0) {
-		for (ch = con->bytemap, i = 0; i < con->bytemapsize; i++) {
-			if (*ch++ == 0) {
-				BADNEWS1("space not mapped but holes == 0: leaf 0x%x\n",
-						blkno);
-				break;
-			}
-		}
-	}
-
-	if (leaf->hdr.holes) {
-		con->holeblks++;
-		if (leaf->hdr.firstused > lowest)
-			BADNEWS3("firstused (0x%x) too high (0x%x), holes: leaf 0x%x\n",
-					    (int)leaf->hdr.firstused,
-					    lowest, blkno);
-	} else {
-		if (leaf->hdr.firstused != lowest)
-			BADNEWS3("firstused (0x%x) not right (0x%x), no holes: leaf 0x%x\n",
-					    (int)leaf->hdr.firstused,
-					    lowest, blkno);
-	}
-
-	if (retval == 0)
-		xfs_trans_brelse(con->dp->i_transp, bp);
-	return(retval);
-}
-
-/*========================================================================
- * Huge form manipulation routines.
- *========================================================================*/
-
-int
-xfsda_node_check(xfsda_context_t *con, xfs_dablk_t blkno,
-				 int depth, int firstlast)
-{
-	xfs_da_intnode_t *node;
-	xfs_da_blkinfo_t *info;
-	xfs_da_node_entry_t *btree;
-	int retval, count, tmp, i;
-	buf_t *bp;
-
-	/*
-	 * Read the next node down in the tree.
-	 */
-	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
-						  con->whichfork);
-	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
-	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
-
-	/*
-	 * Check the header fields.
-	 */
-	retval = 0;
-	if (info->magic == XFS_ATTR_LEAF_MAGIC) {
-		/*
-		 * check leaf, may have "remote" value (why we ended up here)
-		 */
-		if (blkno != 0) {
-			BADNEWS1("leaf block not block 0: bp 0x%x\n", bp);
-		} else {
-			retval = xfsda_leaf_check(con, 0, -2);
-		}
-		xfs_trans_brelse(con->dp->i_transp, bp);
-		return(retval);
-	}
-	if (info->magic != XFS_DA_NODE_MAGIC) {
-		BADNEWS1("not an int node: blkno 0x%x\n", blkno);
-		xfs_trans_brelse(con->dp->i_transp, bp);
-		return(retval);
-	}
-	if (depth >= XFS_DA_NODE_MAXDEPTH)
-		BADNEWS1("tree too deep: node 0x%x\n", blkno);
-	if ((depth >= 0) && (node->hdr.level != depth))
-		BADNEWS1("level not right: node 0x%x\n", blkno);
-	depth = node->hdr.level;
-	if (node->hdr.count == 0)
-		BADNEWS1("zero entry count: node 0x%x\n", blkno);
-	if (node->hdr.count > XFS_DA_NODE_ENTRIES(con->dp->i_mount)) {
-		BADNEWS1("bad node entry count: node 0x%x\n", blkno);
-		count = XFS_DA_NODE_ENTRIES(con->dp->i_mount);
-	} else
-		count = node->hdr.count;
-
-	/*
-	 * Check the chain of nodes
-	 */
-	if (firstlast == 0) {
-		retval += xfsda_checkchain(con, bp, blkno, info->forw, 1);
-		retval += xfsda_checkchain(con, bp, blkno, info->back, 0);
-	} else {
-		retval += xfsda_endchain(con, bp, blkno);
-		if (firstlast < 0) {
-			if (firstlast == -1)
-				retval += xfsda_checkchain(con, bp, blkno,
-						      info->forw, 1);
-			if (info->back != 0)
-				BADNEWS2("backward ref to node 0x%x in node 0x%x\n",
-						   info->back, blkno);
-		}
-		if (firstlast > 0) {
-			retval += xfsda_checkchain(con, bp, blkno, info->back,
-							0);
-			if (info->forw != 0)
-				BADNEWS2("forward ref to node 0x%x in node 0x%x\n",
-						  info->forw, blkno);
-		}
-	}
-
-	/*
-	 * Do a linear pass through the entries.
-	 */
-	btree = &node->btree[0];
-	for (i = 0; i < XFS_DA_NODE_ENTRIES(con->dp->i_mount); btree++, i++) {
-		if (i < count) {
-			if ((btree->hashval == 0) && (btree->before == 0)) {
-				BADNEWS1("zero entry, count too large: node 0x%x\n",
-					       blkno);
-				continue;
-			}
-		} else {
-			if ((btree->hashval == 0) && (btree->before == 0)) {
-				continue;
-			}
-			BADNEWS1("non-zero entry, count too small: node 0x%x\n",
-					   blkno);
-		}
-
-		if (btree->hashval < con->hashval) {
-			BADNEWS2("hashval is smaller than last: node 0x%x, index %d\n",
-					  blkno, i);
-		}
-
-		if ((node->hdr.level-1) > 0) {
-			tmp = xfsda_checkblock(con, bp, btree->before,
-						    XFSDA_BLK_NODE);
-		} else {
-			tmp = xfsda_checkblock(con, bp, btree->before,
-						    XFSDA_BLK_LEAF);
-		}
-		if (tmp) {
-			retval += tmp;
-			BADNEWS1(" in: node 0x%x\n", blkno);
-			retval--;
-		} else {
-			/*
-			 * Track first/last on each level of tree.
-			 */
-			tmp = 0;
-			if (firstlast == -2) {
-				if (i == 0)
-					tmp = -1;
-				else if (i == count-1)
-					tmp = 1;
-			} else if ((firstlast < 0) && (i == 0))
-				tmp = -1;
-			else if ((firstlast > 0) && (i == (count-1)))
-				tmp = 1;
-
-			if (node->hdr.level == 1) {
-				retval += xfsda_leaf_check(con, btree->before,
-								tmp);
-			} else {
-				retval += xfsda_node_check(con, btree->before,
-								depth-1, tmp);
-			}
-		}
-
-		con->hashval = btree->hashval;
-	}
-
-	if (retval == 0)
-		xfs_trans_brelse(con->dp->i_transp, bp);
-	return(retval);
-}
-
-int
-xfsda_attr_node_recheck(xfsda_context_t *con, xfs_dablk_t blkno)
-{
-	xfs_da_intnode_t *node;
-	xfs_da_blkinfo_t *info;
-	xfs_da_node_entry_t *btree;
-	int retval, count, i;
-	buf_t *bp;
-
-	/*
-	 * Read the next node down in the tree.
-	 */
-	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
-						  con->whichfork);
-	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
-	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
-
-	/*
-	 * Check the header fields.
-	 */
-	retval = 0;
-	if (info->magic == XFS_ATTR_LEAF_MAGIC) {
-		/*
-		 * check leaf, may have "remote" value (why we ended up here)
-		 */
-		if (blkno != 0) {
-			BADNEWS1("leaf block not block 0: bp 0x%x\n", bp);
-		} else {
-			retval = xfsda_attr_leaf_recheck(con, 0);
-		}
-		return(retval);
-	}
-	count = node->hdr.count;
-
-	/*
-	 * Do a linear pass through the entries.
-	 */
-	btree = &node->btree[0];
-	for (i = 0; i < count; btree++, i++) {
-		if (con->blockmap[btree->before] & XFSDA_BLK_MULTI) {
-			BADNEWS3("Block 0x%x used in node 0x%x, bp 0x%x\n",
-					btree->before, blkno, bp);
-		}
-
-		if (node->hdr.level == 1) {
-			retval += xfsda_attr_leaf_recheck(con, btree->before);
-		} else {
-			retval += xfsda_attr_node_recheck(con, btree->before);
-		}
-	}
-
-	if (retval == 0)
-		xfs_trans_brelse(con->dp->i_transp, bp);
-	return(retval);
-}
-
-/*========================================================================
- * Utility routines.
- *========================================================================*/
-
-int
-xfsda_checkname(buf_t *bp, char *name, int namelen, int index,
-		      xfs_dahash_t hashval)
-{
-	int retval;
-
-	retval = 0;
-	if (xfs_da_hashname(name, namelen) != hashval)
-		BADNEWS2("hashval doesn't match name at index %d: \"%s\"\n",
-				  index, name);
-	return(retval);
-}
-
-int
-xfsda_checkblock(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno,
-				 int blktype)
-{
-	int retval;
-
-	retval = 0;
-	if ((blkno == 0) || (blkno >= con->maxblockmap)) {
-		BADNEWS1("block number out of range: blkno 0x%x,", blkno);
-	} else if (con->blockmap[blkno] & XFSDA_BLK_INUSE) {
-		BADNEWS1("block multiply used: blkno 0x%x, ", blkno);
-		con->blockmap[blkno] |= XFSDA_BLK_MULTI;
-		con->multichk++;
-	}
-	con->blockmap[blkno] |= (XFSDA_BLK_INUSE | blktype);
-
-	return(retval);
-}
-
-int
-xfsda_endchain(xfsda_context_t *con, buf_t *bp, xfs_dablk_t blkno)
-{
-	int retval;
-
-	retval = 0;
-	if (con->blockmap[blkno] & XFSDA_BLK_ENDCHAIN)
-		BADNEWS1("blkno 0x%x is already a start/end blk\n", blkno);
-	con->blockmap[blkno] |= XFSDA_BLK_ENDCHAIN;
-	return(retval);
-}
-
-int
-xfsda_checkchain(xfsda_context_t *con, buf_t *bp,
-			 xfs_dablk_t parentblk, xfs_dablk_t blkno, int forward)
-{
-	int retval, tmp, i;
-	xfs_dablk_t *links;
-
-	retval = 0;
-	if (blkno >= con->maxblockmap) {
-		BADNEWS2("block number 0x%x out of range in blkno 0x%x\n",
-				blkno, parentblk);
-		return(retval);
-	} else if (blkno == 0) {
-		BADNEWS2("zero %s reference from blkno 0x%x\n",
-			       forward ? "forward" : "backward",
-			       parentblk);
-		return(retval);
-	}
-
-	if (forward) {
-		links = con->forw_links;
-		tmp = XFSDA_BLK_FORWARD;
-	} else {
-		links = con->back_links;
-		tmp = XFSDA_BLK_BACKWARD;
-	}
-
-	if (con->blockmap[blkno] & tmp) {
-		BADNEWS3("multiple %s references to blkno 0x%x; from blkno 0x%x",
-				   forward ? "forward" : "backward",
-				   blkno, parentblk);
-		for (i = 0; i < con->maxlinkmap; i++) {
-			if (links[i] == blkno) {
-				printf(" and blkno 0x%x", i);
-			}
-		}
-		printf("\n");
-	}
-	con->blockmap[blkno] |= tmp;
-	links[parentblk] = blkno;
-
-	return(retval);
-}
-
-int
-xfsda_check_blockuse(xfsda_context_t *con)
-{
-	int leaves, nodes, values, retval, i;
-	char *bmp;
-	buf_t *bp;
-
-	bp = NULL;
-	leaves = nodes = values = retval = 0;
-	bmp = con->blockmap;
-	for (i = 0; i < con->maxblockmap; bmp++, i++) {
-		if (*bmp & XFSDA_BLK_VALUE) {
-			values++;
-			if ((*bmp & XFSDA_BLK_LEAF) != 0) {
-				BADNEWS1("block 0x%x is a remote value and also a leaf\n", i);
-			}
-			if (((*bmp & XFSDA_BLK_NODE) != 0) || (i == 0)) {
-				BADNEWS1("block 0x%x a remote value and is also a node\n", i);
-			}
-		}
-		if ((*bmp & XFSDA_BLK_LEAF) && (*bmp & XFSDA_BLK_NODE)) {
-			BADNEWS1("block 0x%x is both a leaf and a node\n", i);
-		} else if ((*bmp & XFSDA_BLK_LEAF) != 0) {
-			leaves++;
-		} else if (((*bmp & XFSDA_BLK_NODE) != 0) || (i == 0)) {
-			nodes++;
-		}
-
-		if (*bmp & XFSDA_BLK_VALUE) {
-			;
-		} else if ((*bmp & XFSDA_BLK_INUSE) == 0) {
-#ifdef XXX
-			if (i != 0)
-				printf("block 0x%x not referenced\n", i);
+#ifdef XFS_DABUF_DEBUG
+xfs_dabuf_t	*xfs_dabuf_global_list;
+lock_t		xfs_dabuf_global_lock;
 #endif
-			if (*bmp & XFSDA_BLK_FORWARD)
-				BADNEWS1("block 0x%x is someone's \"forward\"\n", i);
-			if (*bmp & XFSDA_BLK_BACKWARD)
-				BADNEWS1("block 0x%x is someone's \"backward\"\n", i);
-		} else if ((*bmp & XFSDA_BLK_ENDCHAIN) == 0) {
-			if ((*bmp & XFSDA_BLK_FORWARD) == 0)
-				BADNEWS1("block 0x%x not someone's \"forward\"\n", i);
-			else if ((*bmp & XFSDA_BLK_BACKWARD) == 0)
-				BADNEWS1("block 0x%x not someone's \"backward\"\n", i);
-		} else {
-			if ((*bmp & XFSDA_BLK_FORWARD) == 1)
-				BADNEWS1("block 0x%x a start/end blk but also someone's \"forward\"\n", i);
-			else if ((*bmp & XFSDA_BLK_BACKWARD) == 1)
-				BADNEWS1("block 0x%x a start/end blk but also someone's \"backward\"\n", i);
+
+/*
+ * Create a dabuf.
+ */
+/* ARGSUSED */
+STATIC xfs_dabuf_t *
+xfs_da_buf_make(int nbuf, buf_t **bps, inst_t *ra)
+{
+	buf_t		*bp;
+	xfs_dabuf_t	*dabuf;
+	int		i;
+	int		off;
+
+	if (nbuf == 1)
+		dabuf = kmem_zone_alloc(xfs_dabuf_zone, KM_SLEEP);
+	else
+		dabuf = kmem_alloc(XFS_DA_BUF_SIZE(nbuf), KM_SLEEP);
+	dabuf->dirty = 0;
+#ifdef XFS_DABUF_DEBUG
+	dabuf->ra = ra;
+	dabuf->dev = bps[0]->b_edev;
+	dabuf->blkno = bps[0]->b_blkno;
+#endif
+	if (nbuf == 1) {
+		dabuf->nbuf = 1;
+		bp = bps[0];
+		dabuf->bbcount = (short)BTOBB(bp->b_bcount);
+		dabuf->data = bp->b_un.b_addr;
+		dabuf->bps[0] = bp;
+	} else {
+		dabuf->nbuf = nbuf;
+		for (i = 0, dabuf->bbcount = 0; i < nbuf; i++) {
+			dabuf->bps[i] = bp = bps[i];
+			dabuf->bbcount += BTOBB(bp->b_bcount);
+		}
+		dabuf->data = kmem_alloc(BBTOB(dabuf->bbcount), KM_SLEEP);
+		for (i = off = 0; i < nbuf; i++, off += bp->b_bcount) {
+			bp = bps[i];
+			bcopy(bp->b_un.b_addr, (char *)dabuf->data + off,
+				bp->b_bcount);
 		}
 	}
-	con->nodes = nodes;
-	con->leaves = leaves;
-	con->values = values;
-	return(retval);
+#ifdef XFS_DABUF_DEBUG
+	{
+		int		s;
+		xfs_dabuf_t	*p;
+
+		s = mutex_spinlock(&xfs_dabuf_global_lock);
+		for (p = xfs_dabuf_global_list; p; p = p->next) {
+			ASSERT(p->blkno != dabuf->blkno ||
+			       p->dev != dabuf->dev);
+		}
+		dabuf->prev = NULL;
+		if (xfs_dabuf_global_list)
+			xfs_dabuf_global_list->prev = dabuf;
+		dabuf->next = xfs_dabuf_global_list;
+		xfs_dabuf_global_list = dabuf;
+		mutex_spinunlock(&xfs_dabuf_global_lock, s);
+	}
+#endif
+	return dabuf;
 }
 
-void
-xfsda_printbytes(int bytes)
+/*
+ * Un-dirty a dabuf.
+ */
+STATIC void
+xfs_da_buf_clean(xfs_dabuf_t *dabuf)
 {
-	if (bytes >= 1024*1024) {
-		printf("%d.%dMB", bytes/(1024*1024), (bytes%(1024*1024))/10240);
-	} else if (bytes >= 1024) {
-		printf("%d.%dKB", bytes/1024, (bytes%1024)/102);
-	} else {
-		printf("%dB", bytes);
+	buf_t	*bp;
+	int	i;
+	int	off;
+
+	if (dabuf->dirty) {
+		ASSERT(dabuf->nbuf > 1);
+		dabuf->dirty = 0;
+		for (i = off = 0; i < dabuf->nbuf; i++, off += bp->b_bcount) {
+			bp = dabuf->bps[i];
+			bcopy((char *)dabuf->data + off, bp->b_un.b_addr,
+				bp->b_bcount);
+		}
 	}
 }
-#endif /* XFSDADEBUG */
+
+/*
+ * Release a dabuf.
+ */
+void
+xfs_da_buf_done(xfs_dabuf_t *dabuf)
+{
+	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
+	if (dabuf->dirty)
+		xfs_da_buf_clean(dabuf);
+	if (dabuf->nbuf > 1)
+		kmem_free(dabuf->data, BBTOB(dabuf->bbcount));
+#ifdef XFS_DABUF_DEBUG
+	{
+		int	s;
+
+		s = mutex_spinlock(&xfs_dabuf_global_lock);
+		if (dabuf->prev)
+			dabuf->prev->next = dabuf->next;
+		else
+			xfs_dabuf_global_list = dabuf->next;
+		if (dabuf->next)
+			dabuf->next->prev = dabuf->prev;
+		mutex_spinunlock(&xfs_dabuf_global_lock, s);
+	}
+	bzero(dabuf, XFS_DA_BUF_SIZE(dabuf->nbuf));
+#endif
+	if (dabuf->nbuf == 1)
+		kmem_zone_free(xfs_dabuf_zone, dabuf);
+	else
+		kmem_free(dabuf, XFS_DA_BUF_SIZE(dabuf->nbuf));
+}
+
+/*
+ * Log transaction from a dabuf.
+ */
+void
+xfs_da_log_buf(xfs_trans_t *tp, xfs_dabuf_t *dabuf, uint first, uint last)
+{
+	buf_t	*bp;
+	uint	f;
+	int	i;
+	uint	l;
+	int	off;
+
+	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
+	if (dabuf->nbuf == 1) {
+		ASSERT(dabuf->data == (void *)dabuf->bps[0]->b_un.b_addr);
+		xfs_trans_log_buf(tp, dabuf->bps[0], first, last);
+		return;
+	}
+	dabuf->dirty = 1;
+	ASSERT(first <= last);
+	for (i = off = 0; i < dabuf->nbuf; i++, off += bp->b_bcount) {
+		bp = dabuf->bps[i];
+		f = off;
+		l = f + bp->b_bcount - 1;
+		if (f < first)
+			f = first;
+		if (l > last)
+			l = last;
+		if (f <= l)
+			xfs_trans_log_buf(tp, bp, f - off, l - off);
+		/* 
+		 * B_DONE is set by xfs_trans_log buf.
+		 * If we don't set it on a new buffer (get not read)
+		 * then if we don't put anything in the buffer it won't
+		 * be set, and at commit it it released into the cache,
+		 * and then a read will fail.
+		 */
+		else if (!(bp->b_flags & B_DONE))
+			bp->b_flags |= B_DONE;
+	}
+	ASSERT(last < off);
+}
+
+/*
+ * Release dabuf from a transaction.
+ * Have to free up the dabuf before the buffers are released,
+ * since the synchronization on the dabuf is really the lock on the buffer.
+ */
+void
+xfs_da_brelse(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
+{
+	buf_t	*bp;
+	buf_t	**bplist;
+	int	i;
+	int	nbuf;
+
+	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
+	if ((nbuf = dabuf->nbuf) == 1) {
+		bplist = &bp;
+		bp = dabuf->bps[0];
+	} else {
+		bplist = kmem_alloc(nbuf * sizeof(*bplist), KM_SLEEP);
+		bcopy(dabuf->bps, bplist, nbuf * sizeof(*bplist));
+	}
+	xfs_da_buf_done(dabuf);
+	for (i = 0; i < nbuf; i++)
+		xfs_trans_brelse(tp, bplist[i]);
+	if (bplist != &bp)
+		kmem_free(bplist, nbuf * sizeof(*bplist));
+}
+
+#ifdef XFS_REPAIR_SIM
+/*
+ * Write dabuf from simulation, no transaction.
+ * Have to free up the dabuf before the buffers are released,
+ * since the synchronization on the dabuf is really the lock on the buffer.
+ */
+void
+xfs_da_bwrite(xfs_dabuf_t *dabuf)
+{
+	buf_t	*bp;
+	buf_t	**bplist;
+	int	i;
+	int	nbuf;
+
+	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
+	if ((nbuf = dabuf->nbuf) == 1) {
+		bplist = &bp;
+		bp = dabuf->bps[0];
+	} else {
+		bplist = kmem_alloc(nbuf * sizeof(*bplist), KM_SLEEP);
+		bcopy(dabuf->bps, bplist, nbuf * sizeof(*bplist));
+	}
+	xfs_da_buf_done(dabuf);
+	for (i = 0; i < nbuf; i++)
+		bwrite(bplist[i]);
+	if (bplist != &bp)
+		kmem_free(bplist, nbuf * sizeof(*bplist));
+}
+
+/*
+ * Hold dabuf at transaction commit.
+ */
+void
+xfs_da_bhold(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
+{
+	int	i;
+
+	for (i = 0; i < dabuf->nbuf; i++)
+		xfs_trans_bhold(tp, dabuf->bps[i]);
+}
+
+/*
+ * Join dabuf to transaction.
+ */
+void
+xfs_da_bjoin(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
+{
+	int	i;
+
+	for (i = 0; i < dabuf->nbuf; i++)
+		xfs_trans_bjoin(tp, dabuf->bps[i]);
+}
+#endif	/* XFS_REPAIR_SIM */
+
+/*
+ * Invalidate dabuf from a transaction.
+ */
+void
+xfs_da_binval(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
+{
+	buf_t	*bp;
+	buf_t	**bplist;
+	int	i;
+	int	nbuf;
+
+	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
+	if ((nbuf = dabuf->nbuf) == 1) {
+		bplist = &bp;
+		bp = dabuf->bps[0];
+	} else {
+		bplist = kmem_alloc(nbuf * sizeof(*bplist), KM_SLEEP);
+		bcopy(dabuf->bps, bplist, nbuf * sizeof(*bplist));
+	}
+	xfs_da_buf_done(dabuf);
+	for (i = 0; i < nbuf; i++)
+		xfs_trans_binval(tp, bplist[i]);
+	if (bplist != &bp)
+		kmem_free(bplist, nbuf * sizeof(*bplist));
+}
+
+/*
+ * Get the first daddr from a dabuf.
+ */
+daddr_t
+xfs_da_blkno(xfs_dabuf_t *dabuf)
+{
+	ASSERT(dabuf->nbuf);
+	ASSERT(dabuf->data);
+	return dabuf->bps[0]->b_blkno;
+}

@@ -1,9 +1,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.9 $"
-
-#include "xfs_quota.h"
+#ident "$Revision: 1.10 $"
 
 struct  xfs_dqhash;
 struct  xfs_inode;

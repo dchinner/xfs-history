@@ -18,6 +18,7 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
 #include "xfs_mount.h"
 #include "xfs_ag.h"
 #include "xfs_alloc_btree.h"
@@ -76,12 +77,12 @@ xfs_fs_geometry(
 			(XFS_SB_VERSION_HASSHARED(&mp->m_sb) ?
 				XFS_FSOP_GEOM_FLAGS_SHARED : 0) |
 			(XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) ?
-				XFS_FSOP_GEOM_FLAGS_EXTFLG : 0);
-		/* XFS_FSOP_GEOM_FLAGS_DIRV2 not yet set XXX */
+				XFS_FSOP_GEOM_FLAGS_EXTFLG : 0) |
+			(XFS_SB_VERSION_HASDIRV2(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_DIRV2 : 0);
 		geo->logsectsize = mp->m_sb.sb_sectsize;	/* XXX */
 		geo->rtsectsize = mp->m_sb.sb_sectsize;		/* XXX */
-		geo->dirblocksize = mp->m_sb.sb_blocksize;
-		/* XXX geo->dirblocksize = mp->m_dirblksize; */
+		geo->dirblocksize = mp->m_dirblksize;
 	}
 	return 0;
 }
@@ -117,8 +118,8 @@ xfs_growfs_data(
 	if (nb < mp->m_sb.sb_dblocks || pct < 0 || pct > 100)
 		return XFS_ERROR(EINVAL);
 	dpct = pct - mp->m_sb.sb_imax_pct;
-	error = xfs_read_buf(mp, mp->m_ddev_targp, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0, 
-			     &bp);
+	error = xfs_read_buf(mp, mp->m_ddev_targp, XFS_FSB_TO_BB(mp, nb) - 1, 1,
+		0, &bp);
 	if (error)
 		return error;
 	ASSERT(bp);
@@ -137,8 +138,11 @@ xfs_growfs_data(
 	oagcount = mp->m_sb.sb_agcount;
 	if (nagcount > oagcount) {
 		mrlock(&mp->m_peraglock, MR_UPDATE, PINOD);
-		mp->m_perag = kmem_realloc(mp->m_perag, sizeof(xfs_perag_t) * nagcount, KM_SLEEP);
-		bzero(&mp->m_perag[oagcount], (nagcount - oagcount) * sizeof(xfs_perag_t));
+		mp->m_perag =
+			kmem_realloc(mp->m_perag,
+				sizeof(xfs_perag_t) * nagcount, KM_SLEEP);
+		bzero(&mp->m_perag[oagcount],
+			(nagcount - oagcount) * sizeof(xfs_perag_t));
 		mrunlock(&mp->m_peraglock);
 	}
 	tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFS);
@@ -164,7 +168,9 @@ xfs_growfs_data(
 		agf->agf_versionnum = XFS_AGF_VERSION;
 		agf->agf_seqno = agno;
 		if (agno == nagcount - 1)
-			agsize = nb - (agno * mp->m_sb.sb_agblocks);
+			agsize =
+				nb -
+				(agno * (xfs_rfsblock_t)mp->m_sb.sb_agblocks);
 		else
 			agsize = mp->m_sb.sb_agblocks;
 		agf->agf_length = agsize;
@@ -184,7 +190,8 @@ xfs_growfs_data(
 		/*
 		 * AG inode header block
 		 */
-		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR), sectbb, 0);
+		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR),
+			sectbb, 0);
 		bp->b_target =  mp->m_ddev_targp;
 		agi = XFS_BUF_TO_AGI(bp);
 		bzero(agi, mp->m_sb.sb_sectsize);
@@ -280,6 +287,8 @@ xfs_growfs_data(
 		ASSERT(bp);
 		agi = XFS_BUF_TO_AGI(bp);
 		agi->agi_length += new;
+		ASSERT(agno < mp->m_sb.sb_agcount - 1 ||
+		       agi->agi_length == mp->m_sb.sb_agblocks);
 		xfs_ialloc_log_agi(tp, bp, XFS_AGI_LENGTH);
 		/*
 		 * Change agf length.
@@ -291,6 +300,7 @@ xfs_growfs_data(
 		ASSERT(bp);
 		agf = XFS_BUF_TO_AGF(bp);
 		agf->agf_length += new;
+		ASSERT(agf->agf_length == agi->agi_length);
 		/*
 		 * Free the new space.
 		 */

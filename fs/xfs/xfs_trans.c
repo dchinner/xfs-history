@@ -29,6 +29,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_error.h"
 #include "xfs_trans_priv.h"
@@ -41,11 +43,13 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_da_btree.h"
 #include "xfs_quota.h"
 #include "xfs_dqblk.h" /* XFS_DQUOT_LOGRES(mp) */
+#include "xfs_trans_space.h"
 
 #ifdef SIM
 #include "sim.h"

@@ -43,6 +43,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -51,6 +53,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_dmapi.h"
 #include "xfs_inode_item.h"
@@ -220,6 +223,7 @@ xfs_bmap_check_extents(
 #define	xfs_bmap_check_extents(ip,w)
 #endif
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -236,6 +240,7 @@ xfs_bmap_del_extent(
 	int			*logflagsp,/* inode logging flags */
 	int			whichfork, /* data or attr fork */
 	int			rsvd);	 /* OK to allocate reserved blocks */
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -514,19 +519,20 @@ xfs_bmap_add_attrfork_local(
 {
 	xfs_da_args_t		dargs;		/* args for dir/attr code */
 	int			error;		/* error return value */
+	xfs_mount_t		*mp;		/* mount structure pointer */
 
 	if (ip->i_df.if_bytes <= XFS_IFORK_DSIZE(ip))
 		return 0;
 	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
+		mp = ip->i_mount;
 		bzero(&dargs, sizeof(dargs));
 		dargs.dp = ip;
 		dargs.firstblock = firstblock;
 		dargs.flist = flist;
-		dargs.total = 1;
+		dargs.total = mp->m_dirblkfsbs;
 		dargs.whichfork = XFS_DATA_FORK;
 		dargs.trans = tp;
-		error = xfs_dir_shortform_to_leaf(&dargs);
-		*flags |= XFS_ILOG_DEXT;
+		error = XFS_DIR_SHORTFORM_TO_SINGLE(mp, &dargs);
 	} else
 		error = xfs_bmap_local_to_extents(tp, ip, firstblock, 1, flags,
 			XFS_DATA_FORK);
@@ -2659,6 +2665,7 @@ xfs_bmap_btree_to_extents(
 	return 0;
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Called by xfs_bmapi to update extent list structure and the btree
  * after removing space (or undoing a delayed allocation).
@@ -2998,6 +3005,7 @@ done:
 	*logflagsp = flags;
 	return error;
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Remove the entry "free" from the free item list.  Prev points to the
@@ -3418,8 +3426,8 @@ xfs_bmap_search_extents(
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	base = &ifp->if_u1.if_extents[0];
 
-	return(xfs_bmap_do_search_extents(base, lastx, nextents, bno, eofp,
-					  lastxp, gotp, prevp));
+	return xfs_bmap_do_search_extents(base, lastx, nextents, bno, eofp,
+					  lastxp, gotp, prevp);
 }
 
 
@@ -3918,7 +3926,7 @@ xfs_bmap_finish(
 	*committed = 1;
 	/*
 	 * We have a new transaction, so we should return committed=1,
-	 * eventhough we're returning an error.
+	 * even though we're returning an error.
 	 */
 	if (error) {
 		return error;
@@ -3998,7 +4006,7 @@ xfs_bmap_check_swappable(
 	ASSERT(XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_BTREE ||
 	       XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_EXTENTS);
 
-	ifp = XFS_IFORK_PTR(ip, XFS_DATA_FORK);
+	ifp = &ip->i_df;
 	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
 	    (retval = xfs_iread_extents(NULL, ip, XFS_DATA_FORK)))
 		goto check_done;
@@ -4049,6 +4057,8 @@ xfs_bmap_first_unused(
 	int		error;			/* error return value */
 	xfs_ifork_t	*ifp;			/* inode fork pointer */
 	xfs_fileoff_t	lastaddr;		/* last block number seen */
+	xfs_fileoff_t	lowest;			/* lowest useful block */
+	xfs_fileoff_t	max;			/* starting useful block */
 	xfs_fileoff_t	off;			/* offset for this block */
 	xfs_extnum_t	nextents;		/* number of extent entries */
 
@@ -4063,16 +4073,73 @@ xfs_bmap_first_unused(
 	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
 	    (error = xfs_iread_extents(tp, ip, whichfork)))
 		return error;
+	lowest = *first_unused;
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	base = &ifp->if_u1.if_extents[0];
-	for (lastaddr = 0, ep = base; ep < &base[nextents]; ep++) {
-		if (lastaddr + len <= (off = xfs_bmbt_get_startoff(ep))) {
-			*first_unused = lastaddr;
+	for (lastaddr = 0, max = lowest, ep = base;
+	     ep < &base[nextents];
+	     ep++) {
+		off = xfs_bmbt_get_startoff(ep);
+		/*
+		 * See if the hole before this extent will work.
+		 */
+		if (off >= lowest + len && off - max >= len) {
+			*first_unused = max;
 			return 0;
 		}
 		lastaddr = off + xfs_bmbt_get_blockcount(ep);
+		max = XFS_FILEOFF_MAX(lastaddr, lowest);
 	}
-	*first_unused = lastaddr;
+	*first_unused = max;
+	return 0;
+}
+
+/*
+ * Returns the file-relative block number of the last block + 1 before
+ * last_block (input value) in the file.
+ * This is not based on i_size, it is based on the extent list.
+ * Returns 0 for local files, as they do not have an extent list.
+ */
+int						/* error */
+xfs_bmap_last_before(
+	xfs_trans_t	*tp,			/* transaction pointer */
+	xfs_inode_t	*ip,			/* incore inode */
+	xfs_fileoff_t	*last_block,		/* last block */
+	int		whichfork)		/* data or attr fork */
+{
+	xfs_fileoff_t	bno;			/* input file offset */
+	int		eof;			/* hit end of file */
+	xfs_bmbt_rec_t	*ep;			/* pointer to last extent */
+	int		error;			/* error return value */
+	xfs_bmbt_irec_t	got;			/* current extent value */
+	xfs_ifork_t	*ifp;			/* inode fork pointer */
+	xfs_extnum_t	lastx;			/* last extent used */
+	xfs_bmbt_irec_t	prev;			/* previous extent value */
+
+	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
+	       return XFS_ERROR(EIO);
+	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
+		*last_block = 0;
+		return 0;
+	}
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
+	    (error = xfs_iread_extents(tp, ip, whichfork)))
+		return error;
+	bno = *last_block - 1;
+	ep = xfs_bmap_search_extents(ip, bno, whichfork, &eof, &lastx, &got,
+		&prev);
+	if (eof || xfs_bmbt_get_startoff(ep) > bno) {
+		if (prev.br_startoff == NULLFILEOFF)
+			*last_block = 0;
+		else
+			*last_block = prev.br_startoff + prev.br_blockcount;
+	}
+	/*
+	 * Otherwise *last_block is already the right answer.
+	 */
 	return 0;
 }
 
@@ -4095,8 +4162,8 @@ xfs_bmap_last_offset(
 	xfs_extnum_t	nextents;		/* number of extent entries */
 
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
-	       XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
-	       XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
 	       return XFS_ERROR(EIO);
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
 		*last_block = 0;
@@ -4118,6 +4185,49 @@ xfs_bmap_last_offset(
 	return 0;
 }
 
+#ifdef SIM
+/*
+ * Given a block number in a fork, return the next valid block number
+ * (not a hole).
+ * If this is the last block number then NULLFILEOFF is returned.
+ */
+int
+xfs_bmap_next_offset(
+	xfs_trans_t	*tp,			/* transaction pointer */
+	xfs_inode_t	*ip,			/* incore inode */
+	xfs_fileoff_t	*bnop,			/* current block */
+	int		whichfork)		/* data or attr fork */
+{
+	xfs_fileoff_t	bno;			/* current block */
+	int		eof;			/* hit end of file */
+	int		error;			/* error return value */
+	xfs_bmbt_irec_t	got;			/* current extent value */
+	xfs_ifork_t	*ifp;			/* inode fork pointer */
+	xfs_extnum_t	lastx;			/* last extent used */
+	xfs_bmbt_irec_t	prev;			/* previous extent value */
+
+	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_LOCAL)
+	       return XFS_ERROR(EIO);
+	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_LOCAL) {
+		*bnop = NULLFILEOFF;
+		return 0;
+	}
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
+	    (error = xfs_iread_extents(tp, ip, whichfork)))
+		return error;
+	bno = *bnop + 1;
+	xfs_bmap_search_extents(ip, bno, whichfork, &eof, &lastx, &got, &prev);
+	if (eof)
+		*bnop = NULLFILEOFF;
+	else
+		*bnop = got.br_startoff < bno ? bno : got.br_startoff;
+	return 0;
+}
+#endif	/* SIM */
+	
 /*
  * Returns whether the selected fork of the inode has exactly one
  * block or not.  For the data fork we check this matches di_size,
@@ -4391,6 +4501,7 @@ xfs_bmapi(
 	xfs_extlen_t	alen;		/* allocated extent length */
 	xfs_fileoff_t	aoff;		/* allocated file offset */
 	xfs_bmalloca_t	bma;		/* args for xfs_bmap_alloc */
+	int		contig;		/* allocation must be one extent */
 	xfs_btree_cur_t	*cur;		/* bmap btree cursor */
 	char		delay;		/* this request is for delayed alloc */
 	xfs_fileoff_t	end;		/* end of mapped file region */
@@ -4456,6 +4567,7 @@ xfs_bmapi(
 	userdata = (flags & XFS_BMAPI_METADATA) == 0;
 	exact = (flags & XFS_BMAPI_EXACT) != 0;
 	rsvd = (flags & XFS_BMAPI_RSVBLOCKS) != 0;
+	contig = (flags & XFS_BMAPI_CONTIG) != 0;
 	/*
 	 * stateless is used to combine extents which
 	 * differ only due to the state of the extents.
@@ -4541,7 +4653,7 @@ xfs_bmapi(
 							got.br_startoff - bno);
 				aoff = bno;
 			}
-			minlen = 1;
+			minlen = contig ? alen : 1;
 			if (delay) {
 				indlen = (xfs_extlen_t)
 					xfs_bmap_worst_indlen(ip, alen);
@@ -4897,7 +5009,7 @@ error0:
 
 /*
  * Map file blocks to filesystem blocks, simple version.
- * One block only, read-only.
+ * One block (extent) only, read-only.
  * For flags, only the XFS_BMAPI_ATTRFORK flag is examined.
  * For the other flag values, the effect is as if XFS_BMAPI_METADATA
  * was set and all the others were clear.
@@ -4944,6 +5056,7 @@ xfs_bmapi_single(
 	return 0;
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Unmap (remove) blocks from a file.
  * If nexts is nonzero then the number of extents to remove is limited to
@@ -4997,7 +5110,7 @@ xfs_bunmapi(
 	async = flags & XFS_BMAPI_ASYNC;
 	rsvd = (flags & XFS_BMAPI_RSVBLOCKS) != 0;
 	ASSERT(len > 0);
-	ASSERT(nexts > 0);
+	ASSERT(nexts >= 0);
 	ASSERT(ifp->if_ext_max ==
 	       XFS_IFORK_SIZE(ip, whichfork) / (uint)sizeof(xfs_bmbt_rec_t));
 	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
@@ -5203,6 +5316,7 @@ error0:
 	}
 	return error;
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 #ifndef SIM
 /*

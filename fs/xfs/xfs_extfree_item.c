@@ -23,12 +23,14 @@
 #else
 #include <bstring.h>
 #endif
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
 #include "xfs_extfree_item.h"

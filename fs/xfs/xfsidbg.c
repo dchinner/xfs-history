@@ -27,11 +27,15 @@
 #include <sys/kmem.h>
 #include <sys/attributes.h>
 #include <sys/uuid.h>
+#include <stddef.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc.h"
 #include "xfs_ag.h"
@@ -45,13 +49,18 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_da_btree.h"
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
-#include "xfs_dir.h"
 #include "xfs_dir_leaf.h"
+#include "xfs_dir2_data.h"
+#include "xfs_dir2_leaf.h"
+#include "xfs_dir2_block.h"
+#include "xfs_dir2_node.h"
+#include "xfs_dir2_trace.h"
 #include "xfs_log_priv.h"
 #include "xfs_log_recover.h"
 #include "xfs_rw.h"
@@ -129,12 +138,17 @@ static void	xfsidbg_xbxstrace(xfs_inode_t *);
 #endif
 static void 	xfsidbg_xchksum(uint *);
 static void	xfsidbg_xdaargs(xfs_da_args_t *);
+static void	xfsidbg_xdabuf(xfs_dabuf_t *);
 static void	xfsidbg_xdanode(xfs_da_intnode_t *);
 static void	xfsidbg_xdastate(xfs_da_state_t *);
 static void	xfsidbg_xdirleaf(xfs_dir_leafblock_t *);
 static void	xfsidbg_xdirsf(xfs_dir_shortform_t *);
+static void	xfsidbg_xdir2free(xfs_dir2_free_t *);
+static void	xfsidbg_xdir2sf(xfs_dir2_sf_t *);
 #ifdef DEBUG
 static void	xfsidbg_xdirtrace(int);
+static void	xfsidbg_xdir2atrace(int);
+static void	xfsidbg_xdir2itrace(xfs_inode_t *);
 #endif /* DEBUG */
 static void	xfsidbg_xexlist(xfs_inode_t *);
 static void	xfsidbg_xfindi(__psunsigned_t);
@@ -246,11 +260,20 @@ static struct xif {
     "xbxstrc",	VD xfsidbg_xbxstrace,	"Dump XFS bmap extent inode trace",
 #endif
     "xchksum",	VD xfsidbg_xchksum,	"Dump chksum",
+#ifdef DEBUG
+    "xd2atrc",	VD xfsidbg_xdir2atrace,	"Dump XFS directory v2 count trace",
+#endif
+    "xd2free",	VD xfsidbg_xdir2free,	"Dump XFS directory v2 freemap",
+#ifdef DEBUG
+    "xd2itrc",	VD xfsidbg_xdir2itrace,	"Dump XFS directory v2 per-inode trace",
+#endif
     "xdaargs",	VD xfsidbg_xdaargs,	"Dump XFS dir/attr args structure",
+    "xdabuf",	VD xfsidbg_xdabuf,	"Dump XFS dir/attr buf structure",
     "xdanode",	VD xfsidbg_xdanode,	"Dump XFS dir/attr node block",
     "xdastat",	VD xfsidbg_xdastate,	"Dump XFS dir/attr state_blk struct",
     "xdirlf",	VD xfsidbg_xdirleaf,	"Dump XFS directory leaf block",
     "xdirsf",	VD xfsidbg_xdirsf,	"Dump XFS directory shortform",
+    "xdir2sf",	VD xfsidbg_xdir2sf,	"Dump XFS directory v2 shortform",
 #ifdef DEBUG
     "xdirtrc",	VD xfsidbg_xdirtrace,	"Dump XFS directory getdents() trace",
 #endif
@@ -388,7 +411,10 @@ static void xfs_convert_extent(xfs_bmbt_rec_32_t *rp, xfs_dfiloff_t *op,
 static void xfs_dastate_path(xfs_da_state_path_t *p);
 #ifdef DEBUG
 static int xfs_dir_trace_entry(ktrace_entry_t *ktep);
+static int xfs_dir2_trace_entry(ktrace_entry_t *ktep);
 #endif
+static void xfs_dir2data(void *addr, int size);
+static void xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size);
 static void xfs_dquot_item_print(xfs_dq_logitem_t *lip, int summary);
 static void xfs_efd_item_print(xfs_efd_log_item_t *efdp, int summary);
 static void xfs_efi_item_print(xfs_efi_log_item_t *efip, int summary);
@@ -985,11 +1011,12 @@ xfs_dastate_path(xfs_da_state_path_t *p)
 #endif
 			i, p->blk[i].bp, p->blk[i].blkno);
 		qprintf(" index %d hashval 0x%x ",
-			p->blk[i].index, p->blk[i].hashval);
+			p->blk[i].index, (uint_t)p->blk[i].hashval);
 		switch(p->blk[i].magic) {
 		case XFS_DA_NODE_MAGIC:		qprintf("NODE\n");	break;
 		case XFS_DIR_LEAF_MAGIC:	qprintf("DIR\n");	break;
 		case XFS_ATTR_LEAF_MAGIC:	qprintf("ATTR\n");	break;
+		case XFS_DIR2_LEAFN_MAGIC:	qprintf("DIR2\n");	break;
 		default:			qprintf("type ??\n");	break;
 		}
 	}
@@ -1055,6 +1082,67 @@ xfs_dir_trace_entry(ktrace_entry_t *ktep)
 		break;
 	default:
 		qprintf("unknown dir trace record format");
+		break;
+	}
+	return 1;
+}
+
+/*
+ * Print xfs a directory v2 trace buffer entry.
+ */
+static int
+xfs_dir2_trace_entry(ktrace_entry_t *ktep)
+{
+	char		*cp;
+	int		i;
+	int		len;
+
+	if (!ktep->val[0])
+		return 0;
+	cp = (char *)&ktep->val[10];
+	qprintf("%s: '", (char *)ktep->val[1]);
+	len = min((__psint_t)ktep->val[9], sizeof(ktep->val[10]) * 6);
+	for (i = 0; i < len; i++)
+		qprintf("%c", cp[i]);
+	qprintf("'(%d)", (__psint_t)ktep->val[9]);
+	if ((__psunsigned_t)ktep->val[0] != XFS_DIR2_KTRACE_ARGS_BIBII)
+		qprintf(" hashval 0x%llx inumber %lld dp 0x%x tp 0x%x check %d",
+			(__uint64_t)ktep->val[2], (__int64_t)ktep->val[3],
+			ktep->val[4], ktep->val[5],
+			(int)(__psint_t)ktep->val[6]);
+	switch ((__psunsigned_t)ktep->val[0]) {
+	case XFS_DIR2_KTRACE_ARGS:
+		break;
+	case XFS_DIR2_KTRACE_ARGS_B:
+		qprintf(" bp 0x%x", ktep->val[7]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_BB:
+		qprintf(" lbp 0x%x dbp 0x%x", ktep->val[7], ktep->val[8]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_BIBII:
+		qprintf(" dp 0x%x tp 0x%x srcbp 0x%x srci %d dstbp 0x%x dsti %d count %d",
+			ktep->val[2], ktep->val[3], ktep->val[4],
+			(int)(__psint_t)ktep->val[5], ktep->val[6],
+			(int)(__psint_t)ktep->val[7],
+			(int)(__psint_t)ktep->val[8]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_DB:
+		qprintf(" db 0x%x bp 0x%x",
+			(xfs_dir2_db_t)(__psunsigned_t)ktep->val[7],
+			ktep->val[8]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_I:
+		qprintf(" i 0x%llx", (xfs_ino_t)ktep->val[7]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_S:
+		qprintf(" s 0x%x", (int)(__psint_t)ktep->val[7]);
+		break;
+	case XFS_DIR2_KTRACE_ARGS_SB:
+		qprintf(" s 0x%x bp 0x%x", (int)(__psint_t)ktep->val[7],
+			ktep->val[8]);
+		break;
+	default:
+		qprintf("unknown dirv2 trace record format");
 		break;
 	}
 	return 1;
@@ -1605,8 +1693,8 @@ xfs_strat_enter_trace_entry(ktrace_entry_t *ktep)
 	qprintf("bp offset 0x%x%x bcount 0x%x bufsize 0x%x blkno 0x%x\n",
 		ktep->val[5], ktep->val[6], ktep->val[7], ktep->val[8],
 		ktep->val[9]);
-	flags = (((__psunsigned_t)ktep->val[10] << 32) & 0xFFFFFFFF00000000ULL) |
-		(((__psunsigned_t)ktep->val[11]) & 0x00000000FFFFFFFFULL);
+	flags = (((__uint64_t)ktep->val[10] << 32) & 0xFFFFFFFF00000000ULL) |
+		(((__uint64_t)ktep->val[11]) & 0x00000000FFFFFFFFULL);
 	qprintf("bp flags ");
 	printflags(flags, tab_bflags,"bflags");
 	qprintf("\n");
@@ -1905,8 +1993,8 @@ xfsidbg_xalgtrace(xfs_agnumber_t agno)
 static void
 xfsidbg_xalloc(xfs_alloc_arg_t *args)
 {
-	qprintf("tp 0x%x mp 0x%x agbp 0x%x fsbno %s\n",
-		args->tp, args->mp, args->agbp,
+	qprintf("tp 0x%x mp 0x%x agbp 0x%x pag 0x%x fsbno %s\n",
+		args->tp, args->mp, args->agbp, args->pag,
 		xfs_fmtfsblock(args->fsbno, args->mp));
 	qprintf("agno 0x%x agbno 0x%x minlen 0x%x maxlen 0x%x mod 0x%x\n",
 		args->agno, args->agbno, args->minlen, args->maxlen, args->mod);
@@ -2462,6 +2550,10 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 	xfs_da_intnode_t *node;
 	xfs_dinode_t *di;
 	xfs_disk_dquot_t *dqb;
+	xfs_dir2_block_t *d2block;
+	xfs_dir2_data_t *d2data;
+	xfs_dir2_leaf_t *d2leaf;
+	xfs_dir2_free_t *d2free;
 
 	d = bp->b_un.b_addr;
 	if ((agf = d)->agf_magicnum == XFS_AGF_MAGIC) {
@@ -2557,6 +2649,41 @@ xfsidbg_xbuf_real(buf_t *bp, int summary)
 		qprintf("Quota blk starting ID [%d], type %s at 0x%x\n",
 			dqb->d_id, XFSIDBG_DQTYPESTR(dqb), dqb);
 		
+	} else if ((d2block = d)->hdr.magic == XFS_DIR2_BLOCK_MAGIC) {
+		if (summary) {
+			qprintf("Dir2 block (at 0x%x)\n", d2block);
+		} else {
+			qprintf("buf 0x%x dir2 block 0x%x\n", bp, d2block);
+			xfs_dir2data((void *)d2block, bp->b_bcount);
+		}
+	} else if ((d2data = d)->hdr.magic == XFS_DIR2_DATA_MAGIC) {
+		if (summary) {
+			qprintf("Dir2 data (at 0x%x)\n", d2data);
+		} else {
+			qprintf("buf 0x%x dir2 data 0x%x\n", bp, d2data);
+			xfs_dir2data((void *)d2data, bp->b_bcount);
+		}
+	} else if ((d2leaf = d)->hdr.info.magic == XFS_DIR2_LEAF1_MAGIC) {
+		if (summary) {
+			qprintf("Dir2 leaf(1) (at 0x%x)\n", d2leaf);
+		} else {
+			qprintf("buf 0x%x dir2 leaf 0x%x\n", bp, d2leaf);
+			xfs_dir2leaf(d2leaf, bp->b_bcount);
+		}
+	} else if (d2leaf->hdr.info.magic == XFS_DIR2_LEAFN_MAGIC) {
+		if (summary) {
+			qprintf("Dir2 leaf(n) (at 0x%x)\n", d2leaf);
+		} else {
+			qprintf("buf 0x%x dir2 leaf 0x%x\n", bp, d2leaf);
+			xfs_dir2leaf(d2leaf, bp->b_bcount);
+		}
+	} else if ((d2free = d)->hdr.magic == XFS_DIR2_FREE_MAGIC) {
+		if (summary) {
+			qprintf("Dir2 free (at 0x%x)\n", d2free);
+		} else {
+			qprintf("buf 0x%x dir2 free 0x%x\n", bp, d2free);
+			xfsidbg_xdir2free(d2free);
+		}
 	} else {
 		qprintf("buf 0x%x unknown 0x%x\n", bp, d);
 	}
@@ -2752,7 +2879,7 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 		qprintf("(NULL)(%d)\n", n->valuelen);
 	}
 	qprintf(" hashval 0x%x whichfork %d flags <",
-		  n->hashval, n->whichfork);
+		  (uint_t)n->hashval, n->whichfork);
 	if (n->flags & ATTR_ROOT)
 		qprintf("ROOT ");
 	if (n->flags & ATTR_CREATE)
@@ -2764,13 +2891,36 @@ xfsidbg_xdaargs(xfs_da_args_t *n)
 	i = ~(ATTR_ROOT | ATTR_CREATE | ATTR_REPLACE | XFS_ATTR_INCOMPLETE);
 	if ((n->flags & i) != 0)
 		qprintf("0x%x", n->flags & i);
-	qprintf("> rename %d justcheck %d\n", n->rename, n->justcheck);
+	qprintf(">\n");
+	qprintf(" rename %d justcheck %d addname %d oknoent %d\n",
+		  n->rename, n->justcheck, n->addname, n->oknoent);
 	qprintf(" leaf: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno, n->index, n->rmtblkno, n->rmtblkcnt);
 	qprintf(" leaf2: blkno %d index %d rmtblkno %d rmtblkcnt %d\n",
 		  n->blkno2, n->index2, n->rmtblkno2, n->rmtblkcnt2);
-	qprintf(" inumber %lld dp 0x%x firstblock 0x%x flist 0x%x total %d\n",
-		  n->inumber, n->dp, n->firstblock, n->flist, n->total);
+	qprintf(" inumber %lld dp 0x%x firstblock 0x%x flist 0x%x\n",
+		  n->inumber, n->dp, n->firstblock, n->flist);
+	qprintf(" trans 0x%x total %d\n",
+		  n->trans, n->total);
+}
+
+/*
+ * Print a da buffer structure.
+ */
+static void
+xfsidbg_xdabuf(xfs_dabuf_t *dabuf)
+{
+	int	i;
+
+	qprintf("nbuf %d dirty %d bbcount %d data 0x%x bps",
+		dabuf->nbuf, dabuf->dirty, dabuf->bbcount, dabuf->data);
+	for (i = 0; i < dabuf->nbuf; i++)
+		qprintf(" %d:0x%x", i, dabuf->bps[i]);
+	qprintf("\n");
+#ifdef XFS_DABUF_DEBUG
+	qprintf(" ra 0x%x prev 0x%x next 0x%x dev 0x%x blkno 0x%x\n",
+		dabuf->ra, dabuf->prev, dabuf->next, dabuf->dev, dabuf->blkno);
+#endif
 }
 
 /*
@@ -2792,7 +2942,7 @@ xfsidbg_xdanode(struct xfs_da_intnode *node)
 		h->count, h->level);
 	for (j = 0, e = node->btree; j < h->count; j++, e++) {
 		qprintf("btree %d hashval 0x%x before 0x%x\n",
-			j, e->hashval, e->before);
+			j, (uint_t)e->hashval, e->before);
 	}
 }
 
@@ -2822,7 +2972,7 @@ xfsidbg_xdastate(xfs_da_state_t *s)
 #else
 	qprintf(" bp 0x%x blkno 0x%x ", eblk->bp, eblk->blkno);
 #endif
-	qprintf("index %d hashval 0x%x\n", eblk->index, eblk->hashval);
+	qprintf("index %d hashval 0x%x\n", eblk->index, (uint_t)eblk->hashval);
 }
 
 /*
@@ -2853,12 +3003,114 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
 		XFS_DIR_SF_GET_DIRINO(&n->inumber, &ino);
 		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld ",
-			j, e->hashval, e->nameidx, ino);
+			j, (uint_t)e->hashval, e->nameidx, ino);
 		qprintf("namelen %d name \"", e->namelen);
 		for (k = 0; k < e->namelen; k++)
 			qprintf("%c", n->name[k]);
 		qprintf("\"\n");
 	}
+}
+
+/*
+ * Print a directory v2 data block, single or multiple.
+ */
+static void
+xfs_dir2data(void *addr, int size)
+{
+	xfs_dir2_data_t *db;
+	xfs_dir2_block_t *bb;
+	xfs_dir2_data_hdr_t *h;
+	xfs_dir2_data_free_t *m;
+	xfs_dir2_data_entry_t *e;
+	xfs_dir2_data_unused_t *u;
+	xfs_dir2_leaf_entry_t *l;
+	int j, k;
+	char *p;
+	char *t;
+	xfs_dir2_block_tail_t *tail;
+
+	db = (xfs_dir2_data_t *)addr;
+	bb = (xfs_dir2_block_t *)addr;
+	h = &db->hdr;
+	qprintf("hdr magic 0x%x (%s)\nhdr bestfree", h->magic,
+		h->magic == XFS_DIR2_DATA_MAGIC ? "DATA" :
+			(h->magic == XFS_DIR2_BLOCK_MAGIC ? "BLOCK" : ""));
+	for (j = 0, m = h->bestfree; j < XFS_DIR2_DATA_FD_COUNT; j++, m++) {
+		qprintf(" %d: 0x%x@0x%x", j, m->length, m->offset);
+	}
+	qprintf("\n");
+	if (h->magic == XFS_DIR2_DATA_MAGIC)
+		t = (char *)db + size;
+	else {
+		/* XFS_DIR2_BLOCK_TAIL_P */
+		tail = (xfs_dir2_block_tail_t *)
+		       ((char *)bb + size - sizeof(xfs_dir2_block_tail_t));
+		l = XFS_DIR2_BLOCK_LEAF_P(tail);
+		t = (char *)l;
+	}
+	for (p = (char *)(h + 1); p < t; ) {
+		u = (xfs_dir2_data_unused_t *)p;
+		if (u->freetag == XFS_DIR2_DATA_FREE_TAG) {
+			qprintf("0x%x unused freetag 0x%x length 0x%x tag 0x%x\n",
+				p - (char *)addr, u->freetag, u->length,
+				*XFS_DIR2_DATA_UNUSED_TAG_P(u));
+			p += u->length;
+			continue;
+		}
+		e = (xfs_dir2_data_entry_t *)p;
+		qprintf("0x%x entry inumber %lld namelen %d name \"",
+			p - (char *)addr, e->inumber, e->namelen);
+		for (k = 0; k < e->namelen; k++)
+			qprintf("%c", e->name[k]);
+		qprintf("\" tag 0x%x\n", *XFS_DIR2_DATA_ENTRY_TAG_P(e));
+		p += XFS_DIR2_DATA_ENTSIZE(e->namelen);
+	}
+	if (h->magic == XFS_DIR2_DATA_MAGIC)
+		return;
+	for (j = 0; j < tail->count; j++, l++) {
+		qprintf("0x%x leaf %d hashval 0x%x address 0x%x (byte 0x%x)\n",
+			(char *)l - (char *)addr, j,
+			(uint_t)l->hashval, l->address,
+			/* XFS_DIR2_DATAPTR_TO_BYTE */
+			l->address << XFS_DIR2_DATA_ALIGN_LOG);
+	}
+	qprintf("0x%x tail count %d\n",
+		(char *)tail - (char *)addr, tail->count);
+}
+
+static void
+xfs_dir2leaf(xfs_dir2_leaf_t *leaf, int size)
+{
+	xfs_dir2_leaf_hdr_t *h;
+	xfs_da_blkinfo_t *i;
+	xfs_dir2_leaf_entry_t *e;
+	xfs_dir2_data_off_t *b;
+	xfs_dir2_leaf_tail_t *t;
+	int j;
+
+	h = &leaf->hdr;
+	i = &h->info;
+	e = leaf->ents;
+	qprintf("hdr info forw 0x%x back 0x%x magic 0x%x\n",
+		i->forw, i->back, i->magic);
+	qprintf("hdr count %d stale %d\n", h->count, h->stale);
+	for (j = 0; j < h->count; j++, e++) {
+		qprintf("0x%x ent %d hashval 0x%x address 0x%x (byte 0x%x)\n",
+			(char *)e - (char *)leaf, j,
+			(uint_t)e->hashval, e->address,
+			/* XFS_DIR2_DATAPTR_TO_BYTE */
+			e->address << XFS_DIR2_DATA_ALIGN_LOG);
+	}
+	if (i->magic == XFS_DIR2_LEAFN_MAGIC)
+		return;
+	/* XFS_DIR2_LEAF_TAIL_P */
+	t = (xfs_dir2_leaf_tail_t *)((char *)leaf + size - sizeof(*t));
+	b = XFS_DIR2_LEAF_BESTS_P(t);
+	for (j = 0; j < t->bestcount; j++, b++) {
+		qprintf("0x%x best %d 0x%x\n",
+			(char *)b - (char *)leaf, j, *b);
+	}
+	qprintf("tail bestcount %d\n", t->bestcount);
 }
 
 /*
@@ -2887,6 +3139,47 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 	}
 }
 
+/*
+ * Print a shortform v2 directory.
+ */
+static void
+xfsidbg_xdir2sf(xfs_dir2_sf_t *s)
+{
+	xfs_dir2_sf_hdr_t *sfh;
+	xfs_dir2_sf_entry_t *sfe;
+	xfs_ino_t ino;
+	int i, j;
+
+	sfh = &s->hdr;
+	ino = XFS_DIR2_SF_GET_INUMBER(s, &sfh->parent);
+	qprintf("hdr count %d i8count %d parent %lld\n",
+		sfh->count, sfh->i8count, ino);
+	for (i = 0, sfe = XFS_DIR2_SF_FIRSTENTRY(s); i < sfh->count; i++) {
+		ino = XFS_DIR2_SF_GET_INUMBER(s, XFS_DIR2_SF_INUMBERP(sfe));
+		qprintf("entry %d inumber %lld offset 0x%x namelen %d name \"",
+			i, ino, XFS_DIR2_SF_GET_OFFSET(sfe), sfe->namelen);
+		for (j = 0; j < sfe->namelen; j++)
+			qprintf("%c", sfe->name[j]);
+		qprintf("\"\n");
+		sfe = XFS_DIR2_SF_NEXTENTRY(s, sfe);
+	}
+}
+
+/*
+ * Print a node-form v2 directory freemap block.
+ */
+static void
+xfsidbg_xdir2free(xfs_dir2_free_t *f)
+{
+	int	i;
+
+	qprintf("hdr magic 0x%x firstdb %d nvalid %d nused %d\n",
+		f->hdr.magic, f->hdr.firstdb, f->hdr.nvalid, f->hdr.nused);
+	for (i = 0; i < f->hdr.nvalid; i++) {
+		qprintf("entry %d db %d count %d\n",
+			i, i + f->hdr.firstdb, f->bests[i]);
+	}
+}
 
 #ifdef DEBUG
 /*
@@ -2931,6 +3224,72 @@ xfsidbg_xdirtrace(int count)
 		if (xfs_dir_trace_entry(ktep))
 			qprintf("\n");
 		ktep = ktrace_next(xfs_dir_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print out the last "count" entries in the directory v2 trace buffer.
+ */
+static void
+xfsidbg_xdir2atrace(int count)
+{
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+	int		nentries;
+	int		skip_entries;
+
+	if (xfs_dir2_trace_buf == NULL) {
+		qprintf("The xfs dirv2 trace buffer is not initialized\n");
+		return;
+	}
+	nentries = ktrace_nentries(xfs_dir2_trace_buf);
+	if (count == -1) {
+		count = nentries;
+	}
+	if ((count <= 0) || (count > nentries)) {
+		qprintf("Invalid count.  There are %d entries.\n", nentries);
+		return;
+	}
+
+	ktep = ktrace_first(xfs_dir2_trace_buf, &kts);
+	if (count != nentries) {
+		/*
+		 * Skip the total minus the number to look at minus one
+		 * for the entry returned by ktrace_first().
+		 */
+		skip_entries = nentries - count - 1;
+		ktep = ktrace_skip(xfs_dir2_trace_buf, skip_entries, &kts);
+		if (ktep == NULL) {
+			qprintf("Skipped them all\n");
+			return;
+		}
+	}
+	while (ktep != NULL) {
+		if (xfs_dir2_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(xfs_dir2_trace_buf, &kts);
+	}
+}
+
+/*
+ * Print out the directory v2 trace buffer attached to the given inode.
+ */
+static void
+xfsidbg_xdir2itrace(xfs_inode_t *ip)
+{
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
+
+	if (ip->i_dir_trace == NULL) {
+		qprintf("The inode trace buffer is not initialized\n");
+		return;
+	}
+
+	ktep = ktrace_first(ip->i_dir_trace, &kts);
+	while (ktep != NULL) {
+		if (xfs_dir2_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(ip->i_dir_trace, &kts);
 	}
 }
 #endif /* DEBUG */
@@ -3674,17 +4033,16 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	printflags(mp->m_flags, xmount_flags,"flags");
 	qprintf("ialloc_inos %d ialloc_blks %d litino %d\n",
 		mp->m_ialloc_inos, mp->m_ialloc_blks, mp->m_litino);
-	qprintf("attroffset %d da_node_ents %d maxicount %lld inoalign_mask %d",
+	qprintf("attroffset %d da_node_ents %d maxicount %lld inoalign_mask %d\n",
 		mp->m_attroffset, mp->m_da_node_ents, mp->m_maxicount,
 		mp->m_inoalign_mask);
+	qprintf("resblks %lld resblks_avail %lld\n", mp->m_resblks, 
+		mp->m_resblks_avail);
 #if XFS_BIG_FILESYSTEMS
 	qprintf(" inoadd %llx\n", mp->m_inoadd);
 #else
 	qprintf("\n");
 #endif
-	qprintf("resblks %lld resblks_avail %lld\n", mp->m_resblks, 
-		mp->m_resblks_avail);
-
 	if (mp->m_quotainfo)
 		qprintf("quotainfo 0x%x (uqip = 0x%x, pqip = 0x%x)\n",
 			mp->m_quotainfo, 
@@ -3694,8 +4052,17 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		qprintf("quotainfo NULL\n");
 	printflags(mp->m_qflags, quota_flags,"quotaflags");
 	qprintf("\n");
-	qprintf("data alignment %d stripe width %d sinoalign %d da_magicpct %d\n", 
-		mp->m_dalign, mp->m_swidth, mp->m_sinoalign, mp->m_da_magicpct);
+	qprintf("dalign %d swidth %d sinoalign %d attr_magicpct %d dir_magicpct %d\n", 
+		mp->m_dalign, mp->m_swidth, mp->m_sinoalign,
+		mp->m_attr_magicpct, mp->m_dir_magicpct);
+	qprintf("mk_sharedro %d dirversion %d dirblkfsbs %d &dirops 0x%x\n",
+		mp->m_mk_sharedro, mp->m_dirversion, mp->m_dirblkfsbs,
+		&mp->m_dirops);
+	qprintf("dirblksize %d dirdatablk 0x%llx dirleafblk 0x%llx dirfreeblk 0x%llx\n",
+		mp->m_dirblksize,
+		(xfs_dfiloff_t)mp->m_dirdatablk,
+		(xfs_dfiloff_t)mp->m_dirleafblk,
+		(xfs_dfiloff_t)mp->m_dirfreeblk);
 	if (mp->m_fsname != NULL)
 		qprintf("mountpoint \"%s\"\n", mp->m_fsname);
 	else
@@ -3828,7 +4195,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_queued_bufs,
 		ip->i_delayed_blks);
 #ifdef	DEBUG
-	qprintf("&traces = 0x%x", &(ip->i_xtrace));
+	qprintf(" &traces = 0x%x", &(ip->i_xtrace));
 #endif
 	qprintf("\n");
 	xfs_xnode_fork("data", &ip->i_df);
@@ -4337,9 +4704,11 @@ xfsidbg_xsb(xfs_sb_t *sbp)
 		sbp->sb_frextents);
 	qprintf("uquotino %s ", xfs_fmtino(sbp->sb_uquotino, NULL));
 	qprintf("pquotino %s ", xfs_fmtino(sbp->sb_pquotino, NULL));
-	qprintf("qflags 0x%x inoaligmt %d\n",
-		sbp->sb_qflags, sbp->sb_inoalignmt);
-	qprintf("unit %d width %d\n", sbp->sb_unit, sbp->sb_width);
+	qprintf("qflags 0x%x flags 0x%x shared_vn %d inoaligmt %d\n",
+		sbp->sb_qflags, sbp->sb_flags, sbp->sb_shared_vn,
+		sbp->sb_inoalignmt);
+	qprintf("unit %d width %d dirblklog %d\n",
+		sbp->sb_unit, sbp->sb_width, sbp->sb_dirblklog);
 }
 
 #ifdef DEBUG

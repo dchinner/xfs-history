@@ -30,12 +30,14 @@
 #include <sys/ktrace.h>
 #include <sys/cmn_err.h>
 #include <sys/uuid.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
 #include "xfs_rw.h" 
@@ -263,9 +265,7 @@ xfs_buf_item_pin(
 	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
 	       (bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("PIN", bip);
-#ifndef SIM
 	buftrace("XFS_PIN", bp);
-#endif
 	bpin(bp);
 }
 
@@ -293,9 +293,7 @@ xfs_buf_item_unpin(
 	ASSERT((xfs_buf_log_item_t*)(bp->b_fsprivate) == bip);
 	ASSERT(bip->bli_refcount > 0);
 	xfs_buf_item_trace("UNPIN", bip);
-#ifndef SIM
 	buftrace("XFS_UNPIN", bp);
-#endif
 
 	refcount = atomicAddInt(&bip->bli_refcount, -1);
 	mp = bip->bli_item.li_mountp;
@@ -307,9 +305,7 @@ xfs_buf_item_unpin(
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
-#ifndef SIM
 		buftrace("XFS_UNPIN STALE", bp);
-#endif
 		AIL_LOCK(mp,s);
 		/*
 		 * If we get called here because of an IO error, we may
@@ -348,9 +344,7 @@ xfs_buf_item_unpin_remove(
 	if (bip->bli_refcount == 1 && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(valusema(&bip->bli_buf->b_lock) <= 0);
 		xfs_buf_item_trace("UNPIN REMOVE", bip);
-#ifndef SIM
 		buftrace("XFS_UNPIN_REMOVE", bp);
-#endif
 		/*
 		 * yes -- clear the xaction descriptor in-use flag
 		 * and free the chunk if required.  We can safely
@@ -434,9 +428,7 @@ xfs_buf_item_unlock(
 	uint	hold;
 
 	bp = bip->bli_buf;
-#ifndef SIM
 	buftrace("XFS_UNLOCK", bp);
-#endif
 
 	/*
 	 * Clear the buffer's association with this transaction.
@@ -551,9 +543,7 @@ xfs_buf_item_abort(
 	buf_t 	*bp;
 
 	bp = bip->bli_buf;
-#ifndef SIM
 	buftrace("XFS_ABORT", bp);
-#endif
 	bp->b_flags &= ~(B_DELWRI|B_DONE);
 	bp->b_flags |= B_STALE;
 	xfs_buf_item_unlock(bip);
@@ -1130,9 +1120,7 @@ xfs_buf_item_relse(
 {
 	xfs_buf_log_item_t	*bip;
 
-#ifndef SIM
 	buftrace("XFS_RELSE", bp);
-#endif
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	bp->b_fsprivate = bip->bli_item.li_bio_list;
 	if ((bp->b_fsprivate == NULL) && (bp->b_iodone != NULL)) {
@@ -1242,9 +1230,7 @@ xfs_buf_iodone_callbacks(
 			ASSERT(bp->b_edev == mp->m_dev);
 			bp->b_flags |= B_STALE;
 			bp->b_flags &= ~(B_DONE|B_DELWRI);
-#ifndef SIM
 			buftrace("BUF_IODONE_CB", bp);
-#endif
 			xfs_buf_do_callbacks(bp, lip);
 			bp->b_fsprivate = NULL;
 			bp->b_iodone = NULL;
@@ -1292,9 +1278,7 @@ xfs_buf_iodone_callbacks(
 				bp->b_start = lbolt;
 			}
 			ASSERT(bp->b_iodone);
-#ifndef SIM
 			buftrace("BUF_IODONE ASYNC", bp);
-#endif
 			brelse(bp);
 		} else {
 			/*
@@ -1344,9 +1328,7 @@ xfs_buf_error_relse(
 	bp->b_flags |= B_STALE|B_DONE;
 	bp->b_flags &= ~(B_DELWRI|B_ERROR);
 	bp->b_error = 0;
-#ifndef SIM
 	buftrace("BUF_ERROR_RELSE", bp);
-#endif
 	if (! XFS_FORCED_SHUTDOWN(mp)) 		
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	/*

@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.11 $"
+#ident "$Revision$"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -46,19 +46,22 @@
 
 #include <string.h>
 
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_itable.h"
-#include "xfs_dir.h"
 #include "xfs_inode_item.h"
 #include "xfs_bmap.h"
 #include "xfs_dmapi.h"
@@ -260,7 +263,7 @@ xfs_dm_send_create_event(
 	 */
 
 	name_len = strlen(name);
-	error = xfs_dir_lookup(NULL, dip, name, name_len, &inum);
+	error = XFS_DIR_LOOKUP(dip->i_mount, NULL, dip, name, name_len, &inum);
 	xfs_iunlock (dip, XFS_ILOCK_EXCL);
 	if (error != ENOENT)
 		return 0;
@@ -597,7 +600,7 @@ xfs_get_dirents(
 	auio.uio_segflg = UIO_SYSSPACE;
 	auio.uio_resid = bufsz;
 
-	rval = xfs_dir_getdents(NULL, dirp, &auio, &sink);
+	rval = XFS_DIR_GETDENTS(dirp->i_mount, NULL, dirp, &auio, &sink);
 	if (! rval) {
 		*locp = (off_t) auio.uio_offset;
 

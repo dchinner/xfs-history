@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.165 $"
+#ident	"$Revision$"
 
 /*
  * High level interface routines for log manager
@@ -45,6 +45,7 @@
 #include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
 #include "xfs_log.h"
 #include "xfs_trans.h"
+#include "xfs_dir.h"
 #include "xfs_mount.h"		/* depends on xfs_trans.h & xfs_sb.h */
 #include "xfs_error.h"
 #include "xfs_log_priv.h"	/* depends on all above */
@@ -996,9 +997,7 @@ xlog_bdstrat_cb(struct buf *bp)
 		return 0;
 	} 
 
-#ifndef SIM
 	buftrace("XLOG__BDSTRAT IOERROR", bp);
-#endif
 	bioerror(bp, EIO);
 	bp->b_flags |= B_STALE;
 	biodone(bp);
@@ -1380,7 +1379,7 @@ xlog_sync(xlog_t		*log,
 	count = BBTOB(BTOBB(iclog->ic_offset));
 	if (iclog->ic_offset != count) {
 		/* count of 0 is already accounted for up in
-		 * xlog_state_sync_all().  Once in this rountine, operations
+		 * xlog_state_sync_all().  Once in this routine, operations
 		 * on the iclog are single threaded.
 		 *
 		 * Difference between rounded up size and size

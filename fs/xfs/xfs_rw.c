@@ -42,6 +42,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -53,6 +55,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -6162,8 +6165,8 @@ xfs_strat_write(
  */
 void
 xfs_force_shutdown(
-	struct xfs_mount	*mp,
-	int			flags)
+	xfs_mount_t	*mp,
+	int		flags)
 {
 	int ntries;
 	int logerror;
@@ -7515,6 +7518,7 @@ xfs_dio_write(
 	struct dio_s	*dp;
 	xfs_inode_t 	*ip;
 	xfs_trans_t	*tp;
+			/* REFERENCED */
 	vnode_t		*vp;
 	xfs_mount_t	*mp;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;

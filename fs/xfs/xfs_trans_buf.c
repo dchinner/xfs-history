@@ -1,4 +1,4 @@
-#ident "$Revision: 1.57 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -35,6 +35,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
 #include "xfs_error.h"
@@ -126,9 +127,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		ASSERT(valusema(&bp->b_lock) <= 0);
 		bp->b_target = target_dev;
 		if (XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
-#ifndef SIM
 			buftrace("TRANS GET RECUR SHUT", bp);
-#endif
 			bp->b_flags &= ~(B_DONE|B_DELWRI);
 			bp->b_flags |= B_STALE;
 		}
@@ -138,9 +137,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		 * caller isn't allowed to use the data anyway.
 		 */
 		else if (bp->b_flags & B_STALE) {
-#ifndef SIM
 			buftrace("TRANS GET RECUR STALE", bp);
-#endif
 			ASSERT((bp->b_flags & B_DELWRI) == 0);
 		}
 		ASSERT(bp->b_fsprivate2 == tp);
@@ -148,9 +145,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		ASSERT(bip != NULL);
 		ASSERT(bip->bli_refcount > 0);
 		bip->bli_recur++;
-#ifndef SIM
 		buftrace("TRANS GET RECUR", bp);
-#endif
 		xfs_buf_item_trace("GET RECUR", bip);
 		return (bp);
 	}
@@ -208,9 +203,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 */
 	bp->b_fsprivate2 = tp;
 
-#ifndef SIM
 	buftrace("TRANS GET", bp);
-#endif
 	xfs_buf_item_trace("GET", bip);
 	return (bp);
 }
@@ -401,8 +394,8 @@ xfs_trans_read_buf(
 		ASSERT((bp->b_flags & B_ERROR) == 0);
 		bp->b_target = mp->m_ddev_targp;
 		if (!(bp->b_flags & B_DONE)) {
-#ifndef SIM
 			buftrace("READ_BUF_INCORE !DONE", bp);
+#ifndef SIM
 			SYSINFO.lread += len;
 #endif
 			ASSERT(!(bp->b_flags & B_ASYNC));
@@ -436,9 +429,7 @@ xfs_trans_read_buf(
 		 * brelse it either. Just get out.
 		 */
 		if (XFS_FORCED_SHUTDOWN(mp)) {
-#ifndef SIM
 			buftrace("READ_BUF_INCORE XFSSHUTDN", bp);
-#endif
 			*bpp = NULL;
 			return XFS_ERROR(EIO);
 		}
@@ -473,9 +464,7 @@ xfs_trans_read_buf(
 	if (geterror(bp) != 0) {
 		bp->b_flags |= B_STALE;
 		bp->b_flags &= ~(B_DONE|B_DELWRI);
-#ifndef SIM
 		buftrace("READ ERROR", bp);
-#endif
 		error = geterror(bp);
 			
 		xfs_ioerror_alert("xfs_trans_read_buf", mp, 
@@ -534,9 +523,7 @@ xfs_trans_read_buf(
 	 */
 	bp->b_fsprivate2 = tp;
 
-#ifndef SIM
 	buftrace("TRANS READ", bp);
-#endif
 	xfs_buf_item_trace("READ", bip);
 	*bpp = bp;
 	return 0;
@@ -554,9 +541,7 @@ shutdown_abort:
 #endif
 	ASSERT((bp->b_flags & (B_STALE|B_DELWRI)) != (B_STALE|B_DELWRI));
 
-#ifndef SIM
 	buftrace("READ_BUF XFSSHUTDN", bp);
-#endif
 	brelse(bp);	
 	*bpp = NULL;
 	return XFS_ERROR(EIO);
@@ -890,7 +875,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
  * We prevent the buffer from being written out by clearing the
  * B_DELWRI flag.  We can't always
  * get rid of the buf log item at this point, though, because
- * the buffer may still be pinned by other transaction.  If that
+ * the buffer may still be pinned by another transaction.  If that
  * is the case, then we'll wait until the buffer is committed to
  * disk for the last time (we can tell by the ref count) and
  * free it in xfs_buf_item_unpin().  Until it is cleaned up we
@@ -926,9 +911,7 @@ xfs_trans_binval(
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		ASSERT(lidp->lid_flags & XFS_LID_DIRTY);
 		ASSERT(tp->t_flags & XFS_TRANS_DIRTY);
-#ifndef SIM
 		buftrace("XFS_BINVAL RECUR", bp);
-#endif
 		xfs_buf_item_trace("BINVAL RECUR", bip);
 		return;
 	}
@@ -963,9 +946,7 @@ xfs_trans_binval(
 	      (bip->bli_format.blf_map_size * sizeof(uint)));
 	lidp->lid_flags |= XFS_LID_DIRTY;
 	tp->t_flags |= XFS_TRANS_DIRTY;
-#ifndef SIM
 	buftrace("XFS_BINVAL", bp);
-#endif
 	xfs_buf_item_trace("BINVAL", bip);
 }
 

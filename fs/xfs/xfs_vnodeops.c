@@ -71,6 +71,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -82,12 +84,12 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_da_btree.h"
 #include "xfs_attr.h"
-#include "xfs_dir.h"
 #include "xfs_rw.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
@@ -484,7 +486,7 @@ xfs_getattr(
                                  * If the underlying volume is a stripe, then
                                  * return the stripe width in bytes as the
                                  * recommended I/O size.
-                                */
+                                 */
                                 (mp->m_swidth << mp->m_sb.sb_blocklog) :
                                 /*
                                  * Return the largest of the preferred buffer
@@ -2594,7 +2596,7 @@ xfs_create_new(
 			}
 		}
 		if (resblks == 0 &&
-		    (error = xfs_dir_canenter(tp, dp, name, namelen)))
+		    (error = XFS_DIR_CANENTER(mp, tp, dp, name, namelen)))
 			goto error_return;
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 		error = xfs_dir_ialloc(&tp, dp, 
@@ -2626,7 +2628,7 @@ xfs_create_new(
 		xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
 		dp_joined_to_trans = B_TRUE;
 
-		error = xfs_dir_createname(tp, dp, name, namelen, ip->i_ino,
+		error = XFS_DIR_CREATENAME(mp, tp, dp, name, namelen, ip->i_ino,
 			&first_block, &free_list,
 			resblks ? resblks - XFS_IALLOC_SPACE_RES(mp) : 0);
 		if (error) {
@@ -3758,7 +3760,7 @@ xfs_remove(
 	 * Entry must exist since we did a lookup in xfs_lock_dir_and_entry.
 	 */
 	XFS_BMAP_INIT(&free_list, &first_block);
-	error = xfs_dir_removename(tp, dp, name, namelen,
+	error = XFS_DIR_REMOVENAME(mp, tp, dp, name, namelen, ip->i_ino,
 		&first_block, &free_list, 0);
 	if (error) {
 		ASSERT(error != ENOENT);
@@ -4038,12 +4040,13 @@ xfs_link(
 	}
 
 	if (resblks == 0 &&
-	    (error = xfs_dir_canenter(tp, tdp, target_name, target_namelen)))
+	    (error = XFS_DIR_CANENTER(mp, tp, tdp, target_name,
+			target_namelen)))
 		goto error_return;
 
 	XFS_BMAP_INIT(&free_list, &first_block);
 
-	error = xfs_dir_createname(tp, tdp, target_name, target_namelen,
+	error = XFS_DIR_CREATENAME(mp, tp, tdp, target_name, target_namelen,
 				   sip->i_ino, &first_block, &free_list,
 				   resblks);
 	if (error)
@@ -4256,7 +4259,7 @@ xfs_mkdir(
 	} 
 
 	if (resblks == 0 &&
-	    (error = xfs_dir_canenter(tp, dp, dir_name, dir_namelen)))
+	    (error = XFS_DIR_CANENTER(mp, tp, dp, dir_name, dir_namelen)))
 		goto error_return;
 	/*
 	 * create the directory inode.
@@ -4284,7 +4287,7 @@ xfs_mkdir(
 
 	XFS_BMAP_INIT(&free_list, &first_block);
 
-	error = xfs_dir_createname(tp, dp, dir_name, dir_namelen,
+	error = XFS_DIR_CREATENAME(mp, tp, dp, dir_name, dir_namelen,
 			cdp->i_ino, &first_block, &free_list,
 			resblks ? resblks - XFS_IALLOC_SPACE_RES(mp) : 0);
 	if (error) {
@@ -4308,7 +4311,7 @@ xfs_mkdir(
 	 */
 	dp->i_gen++;
 	
-	error = xfs_dir_init(tp, cdp, dp);
+	error = XFS_DIR_INIT(mp, tp, cdp, dp);
 	if (error) {
 		goto error2;
 	}
@@ -4582,12 +4585,12 @@ xfs_rmdir(
 		error = XFS_ERROR(EEXIST);
 		goto error_return;
         }
-	if (!xfs_dir_isempty(cdp)) {
+	if (!XFS_DIR_ISEMPTY(mp, cdp)) {
 		error = XFS_ERROR(EEXIST);
 		goto error_return;
 	}
 
-	error = xfs_dir_removename(tp, dp, name, namelen,
+	error = XFS_DIR_REMOVENAME(mp, tp, dp, name, namelen, cdp->i_ino,
 		&first_block, &free_list, resblks);
 	if (error) {
 		goto error1;
@@ -4733,7 +4736,7 @@ xfs_readdir(
         }
 
 	start_offset = uiop->uio_offset;
-	error  = xfs_dir_getdents(tp, dp, uiop, eofp);
+	error = XFS_DIR_GETDENTS(dp->i_mount, tp, dp, uiop, eofp);
 	if (start_offset != uiop->uio_offset) {
 		xfs_ichgtime(dp, XFS_ICHGTIME_ACC);
 	}
@@ -4923,7 +4926,7 @@ xfs_symlink(
 	 * Check for ability to enter directory entry, if no space reserved.
 	 */
 	if (resblks == 0 &&
-	    (error = xfs_dir_canenter(tp, dp, link_name, link_namelen)))
+	    (error = XFS_DIR_CANENTER(mp, tp, dp, link_name, link_namelen)))
 		goto error_return;
 	/*
 	 * Initialize the bmap freelist prior to calling either
@@ -5014,7 +5017,7 @@ xfs_symlink(
 	/*
 	 * Create the directory entry for the symlink.
 	 */
-	error = xfs_dir_createname(tp, dp, link_name, link_namelen,
+	error = XFS_DIR_CREATENAME(mp, tp, dp, link_name, link_namelen,
 			ip->i_ino, &first_block, &free_list, resblks);
 	if (error) {
 		goto error1;

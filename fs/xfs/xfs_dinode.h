@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.42 $"
+#ident "$Revision$"
 
 struct buf;
 struct xfs_mount;
@@ -73,6 +73,7 @@ typedef struct xfs_dinode
 		xfs_bmdr_block_t di_bmbt;	/* btree root block */
 		xfs_bmbt_rec_32_t di_bmx[1];	/* extent list */
 		xfs_dir_shortform_t di_dirsf;	/* shortform directory */
+		xfs_dir2_sf_t	di_dir2sf;	/* shortform directory v2 */
 		char		di_c[1];	/* local contents */
 		dev_t		di_dev;		/* device for IFCHR/IFBLK */
 		uuid_t		di_muuid;	/* mount point value */

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.30 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -26,6 +26,8 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -37,6 +39,7 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_buf_item.h"
@@ -150,7 +153,7 @@ xfs_quotactl(
 	}
 
 	if (! XFS_IS_QUOTA_ON(mp))
-		return (ESRCH);
+		return XFS_ERROR(ESRCH);
 
 	switch (cmd) {
 	      case Q_QUOTAOFF:
@@ -193,7 +196,7 @@ xfs_quotactl(
 #else	
 	      case Q_XSETPQLIM:
 	      case Q_XGETPQUOTA:
-		error = ENOTSUP;
+		error = XFS_ERROR(ENOTSUP);
 		break;
 #endif
 		/*
@@ -217,7 +220,7 @@ xfs_quotactl(
 	      case Q_SETQLIM:
 	      case Q_SETPQLIM:
 	      case Q_SYNC:
-		error = ENOTSUP;
+		error = XFS_ERROR(ENOTSUP);
 		break;
 
 	      default:
@@ -254,14 +257,14 @@ xfs_qm_scall_quotaoff(
 	int			nculprits;
 
 	if (!force && !_CAP_ABLE(CAP_QUOTA_MGT))
-		return (EPERM);
+		return XFS_ERROR(EPERM);
 	/*
 	 * Only root file system can have quotas enabled on disk but not
 	 * in core. Note that quota utilities (like quotaoff) _expect_ 
 	 * errno == EEXIST here.
 	 */
 	if (mp->m_dev != rootdev && (mp->m_qflags & flags) == 0)
-		return (EEXIST);
+		return XFS_ERROR(EEXIST);
 	error = 0;
 
 #ifdef _NOPROJQUOTAS
@@ -314,7 +317,7 @@ xfs_qm_scall_quotaoff(
 			
 			/* XXX TBD Finish this for proj quota support */
 			/* We need to update the SB and mp separately */
-			return (EINVAL);
+			return XFS_ERROR(EINVAL);
 		}
 	}
 	ASSERT(mp->m_quotainfo);
@@ -466,10 +469,10 @@ xfs_qm_scall_trunc_qfiles(
 	extern int  xfs_truncate_file(xfs_mount_t *mp, xfs_inode_t *ip);
 
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
-		return (EPERM);
+		return XFS_ERROR(EPERM);
 	error = 0;
 	if (!XFS_SB_VERSION_HASQUOTA(&mp->m_sb) || flags == 0)
-		return (EINVAL);
+		return XFS_ERROR(EINVAL);
 
 	if ((flags & XFS_DQ_USER) &&
 	    mp->m_sb.sb_uquotino != NULLFSINO) {
@@ -520,7 +523,7 @@ xfs_qm_scall_quotaon(
 	boolean_t	delay;
 	
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
-		return (EPERM);
+		return XFS_ERROR(EPERM);
 
 	rootfs = (boolean_t) (mp->m_dev == rootdev);
 
@@ -545,7 +548,7 @@ xfs_qm_scall_quotaon(
 	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
 
 	if (flags == 0)
-		return (EINVAL);
+		return XFS_ERROR(EINVAL);
 
 	/* Only rootfs can turn on quotas with a delayed effect */
 	ASSERT(!delay || rootfs);
@@ -565,13 +568,13 @@ xfs_qm_scall_quotaon(
 #ifdef QUOTADEBUG
 		printf("Can't enforce without accounting.\n");
 #endif		
-		return (EINVAL);
+		return XFS_ERROR(EINVAL);
 	}
 	/*
 	 * If everything's upto-date incore, then don't waste time.
 	 */
 	if ((mp->m_qflags & flags) == flags)
-		return (EEXIST);
+		return XFS_ERROR(EEXIST);
 
 	/*
 	 * Change superblock version (if needed) for the root filesystem
@@ -608,11 +611,11 @@ xfs_qm_scall_quotaon(
 	 * There's nothing to change if it's the same.
 	 */
 	if ((qf & flags) == flags && sbflags == 0) 
-		return (EEXIST);
+		return XFS_ERROR(EEXIST);
 	sbflags |= XFS_SB_QFLAGS;
 
 	if (error = xfs_qm_write_sb_changes(mp, sbflags))
-		return XFS_ERROR(error);
+		return (error);
 	/*
 	 * If we had just turned on quotas (ondisk) for rootfs, or if we aren't
 	 * trying to switch on quota enforcement, we are done.
@@ -891,9 +894,9 @@ xfs_qm_scall_qwarn(
 	 * filesystem.  That has to be enforced in xfs_qm_sysent().
 	 */
 #ifdef _IRIX62_XFS_ONLY
-	return (ENOTSUP);
+	return XFS_ERROR(ENOTSUP);
 #else
-	return (ENOTSUP); /* temp */
+	return XFS_ERROR(ENOTSUP); /* temp */
 #endif
 }
 	   
@@ -926,7 +929,7 @@ xfs_qm_scall_getquota(
 	 */
 	if (XFS_IS_DQUOT_UNINITIALIZED(dqp)) {
 		xfs_qm_dqput(dqp);
-		return (ENOENT);
+		return XFS_ERROR(ENOENT);
 	}
 	/* xfs_qm_dqprint(dqp); */
 	/*
@@ -935,7 +938,7 @@ xfs_qm_scall_getquota(
 	xfs_qm_export_dquot(mp, &dqp->q_core, &out);
 	error = copyout(&out, addr, sizeof(out));
 	xfs_qm_dqput(dqp);
-	return (error ? EFAULT : 0);
+	return (error ? XFS_ERROR(EFAULT) : 0);
 }
 
 
@@ -1584,7 +1587,7 @@ xfs_qm_internalqcheck(
 	qmtest_nfails = 0;
 	
 	if (! XFS_IS_QUOTA_ON(mp))
-		return (ESRCH);
+		return XFS_ERROR(ESRCH);
 	
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 	bflush(mp->m_dev);

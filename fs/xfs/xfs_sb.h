@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision$"
 
 /*
  * Super block
@@ -28,8 +28,10 @@ struct xfs_mount;
 #define	XFS_SB_VERSION_DALIGNBIT	0x0100
 #define	XFS_SB_VERSION_SHAREDBIT	0x0200
 #define	XFS_SB_VERSION_EXTFLGBIT	0x1000
+#define	XFS_SB_VERSION_DIRV2BIT		0x2000
 #define	XFS_SB_VERSION_OKSASHFBITS	\
-	(XFS_SB_VERSION_EXTFLGBIT)
+	(XFS_SB_VERSION_EXTFLGBIT | \
+	 XFS_SB_VERSION_DIRV2BIT)
 #define	XFS_SB_VERSION_OKREALFBITS	\
 	(XFS_SB_VERSION_ATTRBIT | \
 	 XFS_SB_VERSION_NLINKBIT | \
@@ -45,12 +47,13 @@ struct xfs_mount;
 	(XFS_SB_VERSION_NUMBITS | \
 	 XFS_SB_VERSION_OKREALFBITS | \
 	 XFS_SB_VERSION_OKSASHFBITS)
-#define	XFS_SB_VERSION_MKFS(ia,dia,extflag)	\
-	(((ia) || (dia) || (extflag)) ? \
+#define	XFS_SB_VERSION_MKFS(ia,dia,extflag,dirv2)	\
+	(((ia) || (dia) || (extflag) || (dirv2)) ? \
 		(XFS_SB_VERSION_4 | \
 		 ((ia) ? XFS_SB_VERSION_ALIGNBIT : 0) | \
 		 ((dia) ? XFS_SB_VERSION_DALIGNBIT : 0) | \
-		 ((extflag) ? XFS_SB_VERSION_EXTFLGBIT : 0)) : \
+		 ((extflag) ? XFS_SB_VERSION_EXTFLGBIT : 0) | \
+		 ((dirv2) ? XFS_SB_VERSION_DIRV2BIT : 0)) : \
 		XFS_SB_VERSION_1)
 
 typedef struct xfs_sb
@@ -105,6 +108,7 @@ typedef struct xfs_sb
 	xfs_extlen_t	sb_inoalignmt;	/* inode chunk alignment, fsblocks */
 	__uint32_t	sb_unit;	/* stripe or raid unit */
 	__uint32_t	sb_width;	/* stripe or raid width */	
+	__uint8_t	sb_dirblklog;	/* log2 of dir block size (fsbs) */
 } xfs_sb_t;
 
 /*
@@ -121,7 +125,8 @@ typedef enum {
 	XFS_SBS_REXTSLOG, XFS_SBS_INPROGRESS, XFS_SBS_IMAX_PCT, XFS_SBS_ICOUNT,
 	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS, XFS_SBS_UQUOTINO,
 	XFS_SBS_PQUOTINO, XFS_SBS_QFLAGS, XFS_SBS_FLAGS, XFS_SBS_SHARED_VN,
-	XFS_SBS_INOALIGNMT, XFS_SBS_UNIT, XFS_SBS_WIDTH, XFS_SBS_FIELDCOUNT
+	XFS_SBS_INOALIGNMT, XFS_SBS_UNIT, XFS_SBS_WIDTH, XFS_SBS_DIRBLKLOG,
+	XFS_SBS_FIELDCOUNT
 } xfs_sb_field_t;
 
 /*
@@ -136,9 +141,9 @@ typedef enum {
 #define XFS_SB_UQUOTINO		XFS_SB_MVAL(UQUOTINO)
 #define XFS_SB_PQUOTINO		XFS_SB_MVAL(PQUOTINO)
 #define XFS_SB_QFLAGS		XFS_SB_MVAL(QFLAGS)
+#define XFS_SB_SHARED_VN	XFS_SB_MVAL(SHARED_VN)
 #define XFS_SB_UNIT		XFS_SB_MVAL(UNIT)
 #define XFS_SB_WIDTH		XFS_SB_MVAL(WIDTH)
-#define XFS_SB_SHARED_VN	XFS_SB_MVAL(SHARED_VN)
 #define	XFS_SB_NUM_BITS		((int)XFS_SBS_FIELDCOUNT)
 #define	XFS_SB_ALL_BITS		((1LL << XFS_SB_NUM_BITS) - 1)
 #define	XFS_SB_MOD_BITS		\
@@ -352,6 +357,15 @@ int xfs_sb_version_subshared(xfs_sb_t *sbp);
 #define XFS_SB_VERSION_SUBSHARED(sbp)	\
         ((sbp)->sb_versionnum = \
                 ((sbp)->sb_versionnum & ~XFS_SB_VERSION_SHAREDBIT))
+#endif
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_VERSION_HASDIRV2)
+int xfs_sb_version_hasdirv2(xfs_sb_t *sbp);
+#define XFS_SB_VERSION_HASDIRV2(sbp)	xfs_sb_version_hasdirv2(sbp)
+#else
+#define XFS_SB_VERSION_HASDIRV2(sbp)	\
+        ((XFS_SB_VERSION_NUM(sbp) == XFS_SB_VERSION_4) && \
+	 ((sbp)->sb_versionnum & XFS_SB_VERSION_DIRV2BIT))
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_VERSION_HASEXTFLGBIT)

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -41,11 +41,14 @@
 #include <sys/fs/xfs_ag.h>		/* needed by xfs_sb.h */
 #include <sys/fs/xfs_sb.h>		/* depends on xfs_types.h, xfs_inum.h*/
 #include <sys/fs/xfs_trans.h>
+#include <sys/fs/xfs_dir.h>
+#include <sys/fs/xfs_dir2.h>
 #include <sys/fs/xfs_mount.h>		/* depends on xfs_trans.h & xfs_sb.h */
 #include <sys/fs/xfs_bmap_btree.h>
 #include <sys/fs/xfs_alloc.h>
 #include <sys/fs/xfs_attr_sf.h>
 #include <sys/fs/xfs_dir_sf.h>
+#include <sys/fs/xfs_dir2_sf.h>
 #include <sys/fs/xfs_dinode.h>
 #include <sys/fs/xfs_imap.h>
 #include <sys/fs/xfs_inode_item.h>

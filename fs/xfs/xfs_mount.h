@@ -1,9 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.99 $"
+#ident	"$Revision$"
 
-#include <sys/buf.h>	/* for buftarg_t */
 struct cred;
 struct vfs;
 struct vnode;
@@ -127,18 +126,26 @@ typedef struct xfs_mount {
 	int			m_litino;	/* size of inode union area */
 	int			m_inoalign_mask;/* mask sb_inoalignmt if used */
 	uint			m_qflags;	/* quota status flags */
-	xfs_trans_reservations_t m_reservations; /* precomputed res values */
+	xfs_trans_reservations_t m_reservations;/* precomputed res values */
 	__uint64_t		m_maxicount;	/* maximum inode count */
-	__uint64_t		m_resblks;	 	 /* total reserved blocks */
-	__uint64_t		m_resblks_avail; /* available reserved blocks */
+	__uint64_t		m_resblks;	/* total reserved blocks */
+	__uint64_t		m_resblks_avail;/* available reserved blocks */
 #if XFS_BIG_FILESYSTEMS
 	xfs_ino_t		m_inoadd;	/* add value for ino64_offset */
 #endif
 	int			m_dalign;	/* stripe unit */
 	int			m_swidth;	/* stripe width */
 	int			m_sinoalign;	/* stripe unit inode alignmnt */
-	int			m_da_magicpct;	/* 37% of the blocksize */
+	int			m_attr_magicpct;/* 37% of the blocksize */
+	int			m_dir_magicpct;	/* 37% of the dir blocksize */
 	__uint8_t		m_mk_sharedro;	/* mark shared ro on unmount */
+	__uint8_t		m_dirversion;	/* 1 or 2 */
+	xfs_dirops_t		m_dirops;	/* table of dir funcs */
+	int			m_dirblksize;	/* directory block sz--bytes */
+	int			m_dirblkfsbs;	/* directory block sz--fsbs */
+	xfs_dablk_t		m_dirdatablk;	/* blockno of dir data v2 */
+	xfs_dablk_t		m_dirleafblk;	/* blockno of dir non-data v2 */
+	xfs_dablk_t		m_dirfreeblk;	/* blockno of dirfreeindex v2 */
 #if CELL_IRIX
 	int			m_export[VFS_EILIMIT/sizeof(int)];
 						/* Info to export to other
@@ -193,7 +200,7 @@ typedef struct xfs_mount {
 #define	XFS_UIO_MAX_WRITEIO_LOG	16
 #define	XFS_UIO_MAX_READIO_LOG	16
 
-#if defined(SIM)
+#if defined(SIM) || defined(_STANDALONE)
 #define XFS_MIN_IO_LOG		13	/* 8K for simulation */
 #define	XFS_UIO_MIN_WRITEIO_LOG	13
 #define	XFS_UIO_MIN_READIO_LOG	13

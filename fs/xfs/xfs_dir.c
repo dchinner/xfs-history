@@ -6,6 +6,7 @@
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/debug.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #undef _KERNEL
 #endif /* SIM */
@@ -41,6 +42,8 @@
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_dir.h"
+#include "xfs_dir2.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_bmap_btree.h"
@@ -50,11 +53,11 @@
 #include "xfs_btree.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
+#include "xfs_dir2_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_bmap.h"
 #include "xfs_da_btree.h"
-#include "xfs_dir.h"
 #include "xfs_dir_leaf.h"
 #include "xfs_error.h"
 #if	CELL
@@ -75,40 +78,143 @@
  *========================================================================*/
 
 /*
+ * Functions for the dirops interfaces.
+ */
+static void	xfs_dir_mount(struct xfs_mount *mp);
+
+static int	xfs_dir_isempty(struct xfs_inode *dp);
+
+static int	xfs_dir_init(struct xfs_trans *trans,
+			     struct xfs_inode *dir,
+			     struct xfs_inode *parent_dir);
+
+static int	xfs_dir_createname(struct xfs_trans *trans,
+				   struct xfs_inode *dp,
+				   char *name_string,
+				   int name_len,
+				   xfs_ino_t inode_number,
+				   xfs_fsblock_t *firstblock,
+				   xfs_bmap_free_t *flist,
+				   xfs_extlen_t total);
+
+static int	xfs_dir_lookup(struct xfs_trans *tp,
+			       struct xfs_inode *dp,
+			       char *name_string,
+			       int name_length,
+			       xfs_ino_t *inode_number);
+
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
+static int	xfs_dir_removename(struct xfs_trans *trans,
+				   struct xfs_inode *dp,
+				   char *name_string,
+				   int name_length,
+				   xfs_ino_t ino,
+				   xfs_fsblock_t *firstblock,
+				   xfs_bmap_free_t *flist,
+				   xfs_extlen_t total);
+#endif /* XFS_REPAIR_SIM || !SIM */
+
+#ifdef XFS_REPAIR_SIM
+static int	xfs_dir_bogus_removename(xfs_trans_t *trans,
+					 xfs_inode_t *dp,
+					 char *name,
+					 xfs_fsblock_t *firstblock,
+					 xfs_bmap_free_t *flist,
+					 xfs_extlen_t total,
+					 xfs_dahash_t hashval,
+					 int namelen);
+#endif /* XFS_REPAIR_SIM */
+
+#ifndef SIM
+static int	xfs_dir_getdents(struct xfs_trans *tp,
+				 struct xfs_inode *dp,
+				 struct uio *uiop,
+				 int *eofp);
+#endif /* !SIM */
+
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
+static int	xfs_dir_replace(struct xfs_trans *tp,
+				struct xfs_inode *dp,
+				char *name_string,
+				int name_length,
+				xfs_ino_t inode_number,
+				xfs_fsblock_t *firstblock,
+				xfs_bmap_free_t *flist,
+				xfs_extlen_t total);
+#endif /* XFS_REPAIR_SIM || !SIM */
+
+static int	xfs_dir_canenter(struct xfs_trans *tp,
+				 struct xfs_inode *dp,
+				 char *name_string,
+				 int name_length);
+
+static int	xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp,
+						  xfs_dinode_t *dip);
+
+xfs_dirops_t xfsv1_dirops = {
+	xfs_dir_mount,
+	xfs_dir_isempty,
+	xfs_dir_init,
+	xfs_dir_createname,
+	xfs_dir_lookup,
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
+	xfs_dir_removename,
+#endif /* XFS_REPAIR_SIM || !SIM */
+#ifdef XFS_REPAIR_SIM
+	xfs_dir_bogus_removename,
+#endif /* XFS_REPAIR_SIM */
+#ifndef SIM
+	xfs_dir_getdents,
+#endif /* !SIM */
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
+	xfs_dir_replace,
+#endif /* XFS_REPAIR_SIM || !SIM */
+	xfs_dir_canenter,
+	xfs_dir_shortform_validate_ondisk,
+	xfs_dir_shortform_to_leaf,
+};
+
+/*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_leaf_lookup(xfs_da_args_t *args);
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 STATIC int xfs_dir_leaf_removename(xfs_da_args_t *args, int *number_entries,
 						 int *total_namebytes);
+#endif /* XFS_REPAIR_SIM || !SIM */
 #ifndef SIM
 STATIC int xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp,
 					     xfs_dir_put_t put);
-#endif
+#endif /* !SIM */
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 STATIC int xfs_dir_leaf_replace(xfs_da_args_t *args);
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Internal routines when dirsize > XFS_LBSIZE(mp).
  */
 STATIC int xfs_dir_node_addname(xfs_da_args_t *args);
 STATIC int xfs_dir_node_lookup(xfs_da_args_t *args);
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 STATIC int xfs_dir_node_removename(xfs_da_args_t *args);
+#endif /* XFS_REPAIR_SIM || !SIM */
 #ifndef SIM
 STATIC int xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp,
 					     uio_t *uio, int *eofp,
 					     dirent_t *dbp,
 					     xfs_dir_put_t put);
-#endif
+#endif /* !SIM */
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 STATIC int xfs_dir_node_replace(xfs_da_args_t *args);
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Utility routines.
  */
 xfs_dahash_t xfs_dir_hashname(char *name_string, int name_length);
 uint xfs_dir_log2_roundup(uint i);
-xfs_da_state_t *xfs_da_state_alloc(void);
-void xfs_da_state_free(xfs_da_state_t *state);
 
 #if defined(DEBUG) && !defined(SIM)
 ktrace_t *xfs_dir_trace_buf;
@@ -134,11 +240,12 @@ xfs_dir_startup(void)
 /*
  * Initialize directory-related fields in the mount structure.
  */
-void
+static void
 xfs_dir_mount(xfs_mount_t *mp)
 {
 	uint shortcount, leafcount, count;
 
+	mp->m_dirversion = 1;
 	shortcount = (mp->m_attroffset - (uint)sizeof(xfs_dir_sf_hdr_t)) /
 		     (uint)sizeof(xfs_dir_sf_entry_t);
 	leafcount = (XFS_LBSIZE(mp) - (uint)sizeof(xfs_dir_leaf_hdr_t)) /
@@ -150,13 +257,15 @@ xfs_dir_mount(xfs_mount_t *mp)
 	mp->m_da_node_ents =
 		(XFS_LBSIZE(mp) - (uint)sizeof(xfs_da_node_hdr_t)) /
 		(uint)sizeof(xfs_da_node_entry_t);
-	mp->m_da_magicpct = (XFS_LBSIZE(mp) * 37) / 100;
+	mp->m_dir_magicpct = (XFS_LBSIZE(mp) * 37) / 100;
+	mp->m_dirblksize = mp->m_sb.sb_blocksize;
+	mp->m_dirblkfsbs = 1;
 }
 
 /*
  * Return 1 if directory contains only "." and "..".
  */
-int
+static int
 xfs_dir_isempty(xfs_inode_t *dp)
 {
 	xfs_dir_sf_hdr_t *hdr;
@@ -173,7 +282,7 @@ xfs_dir_isempty(xfs_inode_t *dp)
 /*
  * Initialize a directory with its "." and ".." entries.
  */
-int
+static int
 xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
 {
 	xfs_da_args_t args;
@@ -194,13 +303,13 @@ xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
  * Generic handler routine to add a name to a directory.
  * Transitions directory from shortform to Btree as necessary.
  */
-int							/* error */
+static int							/* error */
 xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		   int namelen, xfs_ino_t inum, xfs_fsblock_t *firstblock,
 		   xfs_bmap_free_t *flist, xfs_extlen_t total)
 {
 	xfs_da_args_t args;
-	int retval, newsize;
+	int retval, newsize, done;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 
@@ -222,33 +331,35 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
 	args.justcheck = 0;
+	args.addname = args.oknoent = 1;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
 	 */
+	done = 0;
 	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		newsize = XFS_DIR_SF_ENTSIZE_BYNAME(args.namelen);
 		if ((dp->i_d.di_size + newsize) <= XFS_IFORK_DSIZE(dp)) {
 			retval = xfs_dir_shortform_addname(&args);
+			done = 1;
 		} else {
 			if (total == 0)
 				return XFS_ERROR(ENOSPC);
 			retval = xfs_dir_shortform_to_leaf(&args);
-			if (retval == 0) {
-				retval = xfs_dir_leaf_addname(&args);
-			}
+			done = retval != 0;
 		}
-	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
+	}
+	if (!done && xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_addname(&args);
-		if (retval == ENOSPC) {
+		done = retval != ENOSPC;
+		if (!done) {
 			if (total == 0)
 				return XFS_ERROR(ENOSPC);
 			retval = xfs_dir_leaf_to_node(&args);
-			if (retval == 0) {
-				retval = xfs_dir_node_addname(&args);
-			}
+			done = retval != 0;
 		}
-	} else {
+	}
+	if (!done) {
 		retval = xfs_dir_node_addname(&args);
 	}
 	return(retval);
@@ -258,14 +369,13 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
  * Generic handler routine to check if a name can be added to a directory,
  * without adding any blocks to the directory.
  */
-int							/* error */
+static int							/* error */
 xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen)
 {
 	xfs_da_args_t args;
 	int retval, newsize;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -279,7 +389,7 @@ xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen)
 	args.total = 0;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
-	args.justcheck = 1;
+	args.justcheck = args.addname = args.oknoent = 1;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -298,20 +408,20 @@ xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen)
 	return(retval);
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Generic handler routine to remove a name from a directory.
  * Transitions directory from Btree to shortform as necessary.
  */
-int							/* error */
+static int							/* error */
 xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
-		   int namelen, xfs_fsblock_t *firstblock,
+		   int namelen, xfs_ino_t ino, xfs_fsblock_t *firstblock,
 		   xfs_bmap_free_t *flist, xfs_extlen_t total)
 {
 	xfs_da_args_t args;
 	int count, totallen, newsize, retval;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-
 	XFSSTATS.xs_dir_remove++;
 	/*
 	 * Fill in the arg structure for this request.
@@ -319,14 +429,14 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.name = name;
 	args.namelen = namelen;
 	args.hashval = xfs_da_hashname(name, namelen);
-	args.inumber = 0;
+	args.inumber = ino;
 	args.dp = dp;
 	args.firstblock = firstblock;
 	args.flist = flist;
 	args.total = total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
-	args.justcheck = 0;
+	args.justcheck = args.addname = args.oknoent = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -346,14 +456,15 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	}
 	return(retval);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
-#ifdef SIM
+#ifdef XFS_REPAIR_SIM
 /*
  * Like above only for removing entries with (name, hashvalue)
  * pairs that may not be consistent (hashvalue may not be correctly
  * set for the name)
  */
-int							/* error */
+static int							/* error */
 xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		   xfs_fsblock_t *firstblock, xfs_bmap_free_t *flist,
 		   xfs_extlen_t total, xfs_dahash_t hashval, int namelen)
@@ -380,7 +491,8 @@ xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.total = total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
-	args.justcheck = 0;
+	args.justcheck = args.addname = 0;
+	args.oknoent = 1;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -400,9 +512,9 @@ xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	}
 	return(retval);
 }
-#endif /* SIM */
+#endif /* XFS_REPAIR_SIM */
 
-int							/* error */
+static int							/* error */
 xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 				   xfs_ino_t *inum)
 {
@@ -428,7 +540,8 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.total = 0;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
-	args.justcheck = 0;
+	args.justcheck = args.addname = 0;
+	args.oknoent = 1;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -450,7 +563,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 /*
  * Implement readdir.
  */
-int							/* error */
+static int							/* error */
 xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 {
 	dirent_t *dbp;
@@ -506,8 +619,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	 */
 	*eofp = 0;
 	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
-		retval = xfs_dir_shortform_getdents(trans, dp, uio, eofp, dbp,
-						    put);
+		retval = xfs_dir_shortform_getdents(dp, uio, eofp, dbp, put);
 	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_getdents(trans, dp, uio, eofp, dbp, put);
 	} else {
@@ -522,9 +634,11 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 }
 #endif	/* !SIM */
 
-int							/* error */
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
+static int							/* error */
 xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
-				    xfs_ino_t inum)
+				    xfs_ino_t inum, xfs_fsblock_t *firstblock,
+				    xfs_bmap_free_t *flist, xfs_extlen_t total)
 {
 	xfs_da_args_t args;
 	int retval;
@@ -545,12 +659,12 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.hashval = xfs_da_hashname(name, namelen);
 	args.inumber = inum;
 	args.dp = dp;
-	args.firstblock = NULL;
-	args.flist = NULL;
-	args.total = 0;
+	args.firstblock = firstblock;
+	args.flist = flist;
+	args.total = total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
-	args.justcheck = 0;
+	args.justcheck = args.addname = args.oknoent = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -565,7 +679,75 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 
 	return(retval);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
+#ifndef XFS_REPAIR_SIM
+static int
+xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
+{
+	xfs_ino_t		ino;
+	int			namelen_sum;
+	int			count;
+	xfs_dir_shortform_t	*sf;
+	xfs_dir_sf_entry_t	*sfe;
+	int			i;
+	
+	if ((dp->di_core.di_mode & IFMT) != IFDIR) {
+		return 0;
+	}
+	if (dp->di_core.di_format != XFS_DINODE_FMT_LOCAL) {
+		return 0;
+	}
+	if (dp->di_core.di_size < sizeof(sf->hdr)) {
+		xfs_fs_cmn_err(CE_WARN, mp, "Invalid shortform size: dp 0x%p\n",
+			dp);
+		return 1;
+	}
+	sf = (xfs_dir_shortform_t *)(&dp->di_u.di_dirsf);
+	ino = XFS_GET_DIR_INO(mp, sf->hdr.parent);
+	if (xfs_dir_ino_validate(mp, ino))
+		return 1;
+
+	count =	sf->hdr.count;
+	if ((count < 0) || ((count * 10) > XFS_LITINO(mp))) {
+		xfs_fs_cmn_err(CE_WARN, mp,
+			"Invalid shortform count: dp 0x%p\n", dp);
+		return(1);
+	}
+
+	if (count == 0) {
+		return 0;
+	}
+
+	namelen_sum = 0;
+	sfe = &sf->list[0];
+	for (i = sf->hdr.count - 1; i >= 0; i--) {
+		ino = XFS_GET_DIR_INO(mp, sfe->inumber);
+		xfs_dir_ino_validate(mp, ino);
+		if (sfe->namelen >= XFS_LITINO(mp)) {
+			xfs_fs_cmn_err(CE_WARN, mp,
+				"Invalid shortform namelen: dp 0x%p\n", dp);
+			return 1;
+		}
+		namelen_sum += sfe->namelen;
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
+	if (namelen_sum >= XFS_LITINO(mp)) {
+		xfs_fs_cmn_err(CE_WARN, mp,
+			"Invalid shortform namelen: dp 0x%p\n", dp);
+		return 1;
+	}
+
+	return 0;
+}
+#else
+/* ARGSUSED */
+static int
+xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
+{
+	return 0;
+}
+#endif /* !XFS_REPAIR_SIM */
 
 /*========================================================================
  * External routines when dirsize == XFS_LBSIZE(dp->i_mount).
@@ -579,7 +761,7 @@ int
 xfs_dir_leaf_addname(xfs_da_args_t *args)
 {
 	int index, retval;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 
 	retval = xfs_da_read_buf(args->trans, args->dp, 0, -1, &bp,
 					      XFS_DATA_FORK);
@@ -588,13 +770,13 @@ xfs_dir_leaf_addname(xfs_da_args_t *args)
 	ASSERT(bp != NULL);
 
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
-	if (retval != ENOENT)
-		return(retval);
-
-	retval = xfs_dir_leaf_add(bp, args, index);
+	if (retval == ENOENT)
+		retval = xfs_dir_leaf_add(bp, args, index);
+	xfs_da_buf_done(bp);
 	return(retval);
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove a name from the leaf directory structure
  * This is the external routine.
@@ -604,24 +786,26 @@ xfs_dir_leaf_removename(xfs_da_args_t *args, int *count, int *totallen)
 {
 	xfs_dir_leafblock_t *leaf;
 	int index, retval;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 
 	retval = xfs_da_read_buf(args->trans, args->dp, 0, -1, &bp,
 					      XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
-	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+	leaf = bp->data;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
-	if (retval != EEXIST)
-		return(retval);
-
-	(void)xfs_dir_leaf_remove(args->trans, bp, index);
-	*count = leaf->hdr.count;
-	*totallen = leaf->hdr.namebytes;
-	return(0);
+	if (retval == EEXIST) {
+		(void)xfs_dir_leaf_remove(args->trans, bp, index);
+		*count = leaf->hdr.count;
+		*totallen = leaf->hdr.namebytes;
+		retval = 0;
+	}
+	xfs_da_buf_done(bp);
+	return(retval);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Look up a name in a leaf directory structure.
@@ -631,7 +815,7 @@ STATIC int
 xfs_dir_leaf_lookup(xfs_da_args_t *args)
 {
 	int index, retval;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 
 	retval = xfs_da_read_buf(args->trans, args->dp, 0, -1, &bp,
 					      XFS_DATA_FORK);
@@ -639,7 +823,7 @@ xfs_dir_leaf_lookup(xfs_da_args_t *args)
 		return(retval);
 	ASSERT(bp != NULL);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
-	xfs_trans_brelse(args->trans, bp);
+	xfs_da_brelse(args->trans, bp);
 	return(retval);
 }
 
@@ -651,7 +835,7 @@ STATIC int
 xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				  int *eofp, dirent_t *dbp, xfs_dir_put_t put)
 {
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	int retval, eob;
 
 	retval = xfs_da_read_buf(dp->i_transp, dp, 0, -1, &bp, XFS_DATA_FORK);
@@ -659,12 +843,13 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		return(retval);
 	ASSERT(bp != NULL);
 	retval = xfs_dir_leaf_getdents_int(bp, dp, 0, uio, &eob, dbp, put, -1);
-	xfs_trans_brelse(trans, bp);
+	xfs_da_brelse(trans, bp);
 	*eofp = (eob == 0);
 	return(retval);
 }
 #endif	/* !SIM */
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Look up a name in a leaf directory structure, replace the inode number.
  * This is the external routine.
@@ -673,7 +858,7 @@ STATIC int
 xfs_dir_leaf_replace(xfs_da_args_t *args)
 {
 	int index, retval;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	xfs_ino_t inum;
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_entry_t *entry;
@@ -687,19 +872,21 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
 	ASSERT(bp != NULL);
 	retval = xfs_dir_leaf_lookup_int(bp, args, &index);
 	if (retval == EEXIST) {
-		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+		leaf = bp->data;
 		entry = &leaf->entries[index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		ASSERT(bcmp((char *)&inum, (char *)&namest->inumber,
 			sizeof(inum)));
 		XFS_DIR_SF_PUT_DIRINO(&inum, &namest->inumber);
-		xfs_trans_log_buf(args->trans, bp, 
+		xfs_da_log_buf(args->trans, bp, 
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
+		xfs_da_buf_done(bp);
 		retval = 0;
 	} else
-		xfs_trans_brelse(args->trans, bp);
+		xfs_da_brelse(args->trans, bp);
 	return(retval);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 
 /*========================================================================
@@ -762,6 +949,7 @@ error:
 	return(retval);
 }
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Remove a name from a B-tree directory.
  *
@@ -813,6 +1001,7 @@ xfs_dir_node_removename(xfs_da_args_t *args)
 		return(error);
 	return(0);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 /*
  * Look up a filename in a int directory.
@@ -841,8 +1030,10 @@ xfs_dir_node_lookup(xfs_da_args_t *args)
 	/* 
 	 * If not in a transaction, we have to release all the buffers.
 	 */
-	for (i = 0; i < state->path.active; i++)
-		xfs_trans_brelse(args->trans, state->path.blk[i].bp);
+	for (i = 0; i < state->path.active; i++) {
+		xfs_da_brelse(args->trans, state->path.blk[i].bp);
+		state->path.blk[i].bp = NULL;
+	}
 
 	xfs_da_state_free(state);
 	return(retval);
@@ -860,7 +1051,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	xfs_dahash_t cookhash;
 	xfs_mount_t *mp;
 	int error, eob, i;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 	daddr_t nextda;
 
 	/*
@@ -886,24 +1077,24 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		if ((error != 0) && (error != EFSCORRUPTED))
 			return(error);
 		if (bp)
-			leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+			leaf = bp->data;
 		if (bp && leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
 			xfs_dir_trace_g_dub("node: block not a leaf",
 						   dp, uio, bno);
-			xfs_trans_brelse(trans, bp);
+			xfs_da_brelse(trans, bp);
 			bp = NULL;
 		}
 		if (bp && leaf->entries[0].hashval > cookhash) {
 			xfs_dir_trace_g_dub("node: leaf hash too large",
 						   dp, uio, bno);
-			xfs_trans_brelse(trans, bp);
+			xfs_da_brelse(trans, bp);
 			bp = NULL;
 		}
 		if (bp &&
 		    cookhash > leaf->entries[leaf->hdr.count - 1].hashval) {
 			xfs_dir_trace_g_dub("node: leaf hash too small",
 						   dp, uio, bno);
-			xfs_trans_brelse(trans, bp);
+			xfs_da_brelse(trans, bp);
 			bp = NULL;
 		}
 	}
@@ -923,7 +1114,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				return(error);
 			if (bp == NULL)
 				return(XFS_ERROR(EFSCORRUPTED));
-			node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+			node = bp->data;
 			if (node->hdr.info.magic != XFS_DA_NODE_MAGIC)
 				break;
 			btree = &node->btree[0];
@@ -935,7 +1126,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				}
 			}
 			if (i == node->hdr.count) {
-				xfs_trans_brelse(trans, bp);
+				xfs_da_brelse(trans, bp);
 				xfs_dir_trace_g_du("node: hash beyond EOF",
 							  dp, uio);
 				uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0,
@@ -945,7 +1136,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			}
 			xfs_dir_trace_g_dub("node: going to block",
 						   dp, uio, bno);
-			xfs_trans_brelse(trans, bp);
+			xfs_da_brelse(trans, bp);
 		}
 	}
 	ASSERT(cookhash != XFS_DA_MAXHASH);
@@ -956,10 +1147,10 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	 * leaf blocks until we fill up our buffer.
 	 */
 	for (;;) {
-		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+		leaf = bp->data;
 		if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
 			xfs_dir_trace_g_dul("node: not a leaf", dp, uio, leaf);
-			xfs_trans_brelse(trans, bp);
+			xfs_da_brelse(trans, bp);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 		xfs_dir_trace_g_dul("node: leaf detail", dp, uio, leaf);
@@ -970,7 +1161,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			nextda = -1;
 		error = xfs_dir_leaf_getdents_int(bp, dp, bno, uio, &eob, dbp,
 						  put, nextda);
-		xfs_trans_brelse(trans, bp);
+		xfs_da_brelse(trans, bp);
 		bno = nextbno;
 		if (eob) {
 			xfs_dir_trace_g_dub("node: E-O-B", dp, uio, bno);
@@ -992,6 +1183,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 }
 #endif	/* !SIM */
 
+#if defined(XFS_REPAIR_SIM) || !defined(SIM)
 /*
  * Look up a filename in an int directory, replace the inode number.
  * Use an internal routine to actually do the lookup.
@@ -1006,7 +1198,7 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 	xfs_dir_leaf_name_t *namest;
 	xfs_ino_t inum;
 	int retval, error, i;
-	buf_t *bp;
+	xfs_dabuf_t *bp;
 
 	state = xfs_da_state_alloc();
 	state->args = args;
@@ -1027,25 +1219,31 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 		blk = &state->path.blk[state->path.active - 1];
 		ASSERT(blk->magic == XFS_DIR_LEAF_MAGIC);
 		bp = blk->bp;
-		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+		leaf = bp->data;
 		entry = &leaf->entries[blk->index];
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 		ASSERT(bcmp((char *)&inum, (char *)&namest->inumber,
 			sizeof(inum)));
 		XFS_DIR_SF_PUT_DIRINO(&inum, &namest->inumber);
-		xfs_trans_log_buf(args->trans, bp,
+		xfs_da_log_buf(args->trans, bp,
 		    XFS_DA_LOGRANGE(leaf, namest, sizeof(namest->inumber)));
+		xfs_da_buf_done(bp);
+		blk->bp = NULL;
 		retval = 0;
 	} else {
 		i = state->path.active - 1;
-		xfs_trans_brelse(args->trans, state->path.blk[i].bp);
+		xfs_da_brelse(args->trans, state->path.blk[i].bp);
+		state->path.blk[i].bp = NULL;
 	}
-	for (i = 0; i < state->path.active - 1; i++)
-		xfs_trans_brelse(args->trans, state->path.blk[i].bp);
+	for (i = 0; i < state->path.active - 1; i++) {
+		xfs_da_brelse(args->trans, state->path.blk[i].bp);
+		state->path.blk[i].bp = NULL;
+	}
 
 	xfs_da_state_free(state);
 	return(retval);
 }
+#endif /* XFS_REPAIR_SIM || !SIM */
 
 #if defined(XFS_DIR_TRACE)
 /*
@@ -1170,4 +1368,3 @@ xfs_dir_trace_enter(int type, char *where,
 					NULL, NULL);
 }
 #endif	/* XFS_DIR_TRACE */
-
