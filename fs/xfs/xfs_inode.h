@@ -162,6 +162,7 @@ void		xfs_iroot_realloc(xfs_inode_t *, int);
 void		xfs_ipin(xfs_inode_t *);
 void		xfs_iunpin(xfs_inode_t *);
 void		xfs_iflush(xfs_inode_t *, uint);
+void		xfs_iflush_all(xfs_mount_t *);
 void		xfs_iprint(xfs_inode_t *);
 
 extern struct zone	*xfs_inode_zone;

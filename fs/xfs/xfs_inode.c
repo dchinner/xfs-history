@@ -3,6 +3,7 @@
 #define	_KERNEL
 #endif
 #include <sys/buf.h>
+#include <sys/vnode.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -10,7 +11,6 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/mode.h>
-#include <sys/vnode.h>
 #include <sys/cred.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
@@ -1111,6 +1111,18 @@ xfs_iflush(xfs_inode_t	*ip,
 	return;
 }
 
+void
+xfs_iflush_all(xfs_mount_t *mp)
+{
+	xfs_inode_t *ip;
+
+	for (ip = mp->m_inodes; ip; ip = ip->i_mnext) {
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		xfs_iflock(ip);
+		xfs_iflush(ip, B_DELWRI);
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
+}
 
 void
 xfs_iprint(xfs_inode_t *ip)
