@@ -62,6 +62,234 @@ STATIC int xfs_bmbt_rshift(xfs_btree_cur_t *, int);
 STATIC int xfs_bmbt_split(xfs_btree_cur_t *, int, xfs_agblock_t *, xfs_bmbt_rec_t *, xfs_btree_cur_t **);
 STATIC int xfs_bmbt_update(xfs_btree_cur_t *, xfs_fsblock_t, xfs_fsblock_t, xfs_extlen_t);
 STATIC void xfs_bmbt_updkey(xfs_btree_cur_t *, xfs_bmbt_rec_t *, int);
+ 
+/*
+ * Debug functions.
+ * These are macros in a non-debug kernel.
+ */
+
+#ifdef XFSDEBUG
+int
+XFS_BMAP_RBLOCK_DSIZE(int lev, xfs_btree_cur_t *cur)
+{
+	return cur->bc_private.b.inodesize - (int)sizeof(xfs_dinode_core_t);
+}
+
+int
+XFS_BMAP_RBLOCK_ISIZE(int lev, xfs_btree_cur_t *cur)
+{
+	return (int)cur->bc_private.b.ip->i_broot_bytes;
+}
+
+int
+XFS_BMAP_IBLOCK_SIZE(int lev, xfs_btree_cur_t *cur)
+{
+	return 1 << cur->bc_blocklog;
+}
+
+int
+XFS_BMAP_BLOCK_DSIZE(int lev, xfs_btree_cur_t *cur)
+{
+	int rval;
+
+	if (lev == cur->bc_nlevels - 1)
+		rval = XFS_BMAP_RBLOCK_DSIZE(lev, cur);
+	else
+		rval = XFS_BMAP_IBLOCK_SIZE(lev, cur);
+	return rval;
+}
+
+int
+XFS_BMAP_BLOCK_ISIZE(int lev, xfs_btree_cur_t *cur)
+{
+	int rval;
+
+	if (lev == cur->bc_nlevels - 1)
+		rval = XFS_BMAP_RBLOCK_ISIZE(lev, cur);
+	else
+		rval = XFS_BMAP_IBLOCK_SIZE(lev, cur);
+	return rval;
+}
+
+int
+XFS_BMAP_BLOCK_DMAXRECS(int lev, xfs_btree_cur_t *cur)
+{
+	int dsize;
+	int rval;
+
+	dsize = XFS_BMAP_BLOCK_DSIZE(lev, cur);
+	rval = XFS_BTREE_BLOCK_MAXRECS(dsize, xfs_bmbt_rec_t, lev);
+	return rval;
+}
+
+int
+XFS_BMAP_BLOCK_IMAXRECS(int lev, xfs_btree_cur_t *cur)
+{
+	int isize;
+	int rval;
+
+	isize = XFS_BMAP_BLOCK_ISIZE(lev, cur);
+	rval = XFS_BTREE_BLOCK_MAXRECS(isize, xfs_bmbt_rec_t, lev);
+	return rval;
+}
+
+int
+XFS_BMAP_BLOCK_DMINRECS(int lev, xfs_btree_cur_t *cur)
+{
+	int dsize;
+	int rval;
+
+	dsize = XFS_BMAP_BLOCK_DSIZE(lev, cur);
+	rval = XFS_BTREE_BLOCK_MINRECS(dsize, xfs_bmbt_rec_t, lev);
+	return rval;
+}
+
+int
+XFS_BMAP_BLOCK_IMINRECS(int lev, xfs_btree_cur_t *cur)
+{
+	int isize;
+	int rval;
+
+	isize = XFS_BMAP_BLOCK_ISIZE(lev, cur);
+	rval = XFS_BTREE_BLOCK_MINRECS(isize, xfs_bmbt_rec_t, lev);
+	return rval;
+}
+
+xfs_bmbt_rec_t *
+XFS_BMAP_REC_DADDR(xfs_btree_block_t *bb, int i, xfs_btree_cur_t *cur)
+{
+	int dsize;
+	xfs_bmbt_rec_t *rval;
+
+	dsize = XFS_BMAP_BLOCK_DSIZE(bb->bb_level, cur);
+	rval = XFS_BTREE_REC_ADDR(dsize, xfs_bmbt_rec_t, bb, i);
+	return rval;
+}
+
+xfs_bmbt_rec_t *
+XFS_BMAP_REC_IADDR(xfs_btree_block_t *bb, int i, xfs_btree_cur_t *cur)
+{
+	int isize;
+	xfs_bmbt_rec_t *rval;
+
+	isize = XFS_BMAP_BLOCK_ISIZE(bb->bb_level, cur);
+	rval = XFS_BTREE_REC_ADDR(isize, xfs_bmbt_rec_t, bb, i);
+	return rval;
+}
+
+xfs_agblock_t *
+XFS_BMAP_PTR_DADDR(xfs_btree_block_t *bb, int i, xfs_btree_cur_t *cur)
+{
+	int dsize;
+	xfs_agblock_t *rval;
+
+	dsize = XFS_BMAP_BLOCK_DSIZE(bb->bb_level, cur);
+	rval = XFS_BTREE_PTR_ADDR(dsize, xfs_bmbt_rec_t, bb, i);
+	return rval;
+}
+
+xfs_agblock_t *
+XFS_BMAP_PTR_IADDR(xfs_btree_block_t *bb, int i, xfs_btree_cur_t *cur)
+{
+	int isize;
+	xfs_agblock_t *rval;
+
+	isize = XFS_BMAP_BLOCK_ISIZE(bb->bb_level, cur);
+	rval = XFS_BTREE_PTR_ADDR(isize, xfs_bmbt_rec_t, bb, i);
+	return rval;
+}
+
+/*
+ * These are to be used when we know the size of the block and
+ * we don't have a cursor.
+ */
+int
+XFS_BMAP_BROOT_SIZE(int isz)
+{
+	return isz - sizeof(xfs_dinode_core_t);
+}
+
+xfs_bmbt_rec_t *
+XFS_BMAP_BROOT_REC_ADDR(xfs_btree_block_t *bb, int i, int isz)
+{
+	xfs_bmbt_rec_t *rval;
+
+	rval = XFS_BTREE_REC_ADDR(isz, xfs_bmbt_rec_t, bb, i);
+	return rval;
+}
+
+xfs_agblock_t *
+XFS_BMAP_BROOT_PTR_ADDR(xfs_btree_block_t *bb, int i, int isz)
+{
+	xfs_agblock_t *rval;
+
+	rval = XFS_BTREE_ROOT_PTR_ADDR(isz, xfs_bmbt_rec_t, bb, i);
+	return rval;
+}
+
+int
+XFS_BMAP_BROOT_NUMRECS(xfs_btree_block_t *bb)
+{
+	return bb->bb_numrecs;
+}
+
+int
+XFS_BMAP_BROOT_MAXRECS(int sz)
+{
+	int rval;
+
+	rval = XFS_BTREE_BLOCK_MAXRECS(sz, xfs_bmbt_rec_t, 1);
+	return rval;
+}
+
+int
+XFS_BMAP_BROOT_SPACE(xfs_btree_block_t *bb)
+{
+	int rval;
+
+	rval = (int)(sizeof(xfs_btree_block_t) +
+		     bb->bb_numrecs *
+		         (sizeof(xfs_bmbt_rec_t) + sizeof(xfs_agblock_t)));
+	return rval;
+}
+
+int
+XFS_BMAP_BROOT_SPACE_CALC(int nrecs)
+{
+	int rval;
+
+	rval = (int)(sizeof(xfs_btree_block_t) +
+		     nrecs * (sizeof(xfs_bmbt_rec_t) + sizeof(xfs_agblock_t)));
+	return rval;
+}
+
+/*
+ * Number of extent records that fit in the inode.
+ */
+int
+XFS_BMAP_EXT_MAXRECS(int isz)
+{
+	int rval;
+
+	rval = XFS_BMAP_BROOT_SIZE(isz) / sizeof(xfs_bmbt_rec_t);
+	return rval;
+}
+
+xfs_btree_block_t *
+xfs_bmbt_get_block(xfs_btree_cur_t *cur, int level, buf_t **bpp)
+{
+	xfs_btree_block_t *rval;
+
+	if (level < cur->bc_nlevels - 1) {
+		*bpp = cur->bc_bufs[level];
+		rval = xfs_buf_to_block(*bpp);
+	} else {
+		*bpp = 0;
+		rval = cur->bc_private.b.ip->i_broot;
+	}
+	return rval;
+}
+#endif	/* XFSDEBUG */
 
 /*
  * Internal functions.
@@ -415,9 +643,7 @@ xfs_bmbt_insert(xfs_btree_cur_t *cur)
 
 	level = 0;
 	nbno = NULLAGBLOCK;
-	xfs_bmbt_set_startoff(&nrec, cur->bc_rec.b.br_startoff);
-	xfs_bmbt_set_startblock(&nrec, cur->bc_rec.b.br_startblock);
-	xfs_bmbt_set_blockcount(&nrec, cur->bc_rec.b.br_blockcount);
+	xfs_bmbt_set_all(&nrec, cur->bc_rec.b);
 	ncur = (xfs_btree_cur_t *)0;
 	pcur = cur;
 	do {
@@ -484,6 +710,7 @@ xfs_bmbt_insrec(xfs_btree_cur_t *cur, int level, xfs_agblock_t *bnop, xfs_bmbt_r
 			 * A root block, that can be made bigger.
 			 */
 			xfs_iroot_realloc(ip, 1);
+			block = xfs_bmbt_get_block(cur, level, &buf);
 		} else if (level == cur->bc_nlevels - 1) {
 			/*
 			 * Copy the root into a real block.
@@ -496,27 +723,26 @@ xfs_bmbt_insrec(xfs_btree_cur_t *cur, int level, xfs_agblock_t *bnop, xfs_bmbt_r
 			cbuf = xfs_btree_bread(mp, tp, cur->bc_agno, cbno);
 			cblock = xfs_buf_to_block(cbuf);
 			*cblock = *block;
-			rp = XFS_BMAP_REC_IADDR(block, 1, cur);
-			crp = XFS_BMAP_REC_IADDR(cblock, 1, cur);
-			bcopy(rp, crp, block->bb_numrecs * (int)sizeof(*rp));
-			pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
-			cpp = XFS_BMAP_PTR_IADDR(cblock, 1, cur);
-			bcopy(pp, cpp, block->bb_numrecs * (int)sizeof(*pp));
-			xfs_iroot_realloc(ip, 1 - block->bb_numrecs);
-			block = xfs_bmbt_get_block(cur, level, &buf);
 			block->bb_level++;
 			block->bb_numrecs = 1;
-			*pp = cbno;
-			xfs_btree_setbuf(cur, level, cbuf);
 			cur->bc_nlevels++;
 			cur->bc_ptrs[level + 1] = 1;
+			rp = XFS_BMAP_REC_IADDR(block, 1, cur);
+			crp = XFS_BMAP_REC_IADDR(cblock, 1, cur);
+			bcopy(rp, crp, cblock->bb_numrecs * (int)sizeof(*rp));
+			pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
+			cpp = XFS_BMAP_PTR_IADDR(cblock, 1, cur);
+			bcopy(pp, cpp, cblock->bb_numrecs * (int)sizeof(*pp));
+			*pp = cbno;
+			xfs_iroot_realloc(ip, 1 - cblock->bb_numrecs);
+			xfs_btree_setbuf(cur, level, cbuf);
 			/*
 			 * Do all this logging at the end so that 
 			 * the root is at the right level.
 			 */
 			xfs_bmbt_log_block(cur, cbuf, XFS_BB_ALL_BITS);
-			xfs_bmbt_log_recs(cur, cbuf, 1, block->bb_numrecs);
-			xfs_bmbt_log_ptrs(cur, cbuf, 1, block->bb_numrecs);
+			xfs_bmbt_log_recs(cur, cbuf, 1, cblock->bb_numrecs);
+			xfs_bmbt_log_ptrs(cur, cbuf, 1, cblock->bb_numrecs);
 			xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
 			block = cblock;
 		} else {
@@ -548,8 +774,8 @@ xfs_bmbt_insrec(xfs_btree_cur_t *cur, int level, xfs_agblock_t *bnop, xfs_bmbt_r
 			rp[i] = rp[i - 1];
 	}
 	rp[i] = *recp;
-	xfs_bmbt_log_recs(cur, buf, ptr, block->bb_numrecs + 1);
 	block->bb_numrecs++;
+	xfs_bmbt_log_recs(cur, buf, ptr, block->bb_numrecs);
 	xfs_bmbt_log_block(cur, buf, XFS_BB_NUMRECS);
 	if (ptr < block->bb_numrecs)
 		xfs_btree_check_rec(XFS_BTNUM_BMAP, rp + i, rp + i + 1);
@@ -602,7 +828,7 @@ xfs_bmbt_kcheck_body(xfs_btree_cur_t *cur, xfs_aghdr_t *agp, xfs_btree_block_t *
 	xfs_btree_check_block(cur, block, level);
 	rp = XFS_BMAP_REC_IADDR(block, 1, cur);
 	if (kp)
-		ASSERT(bcmp(rp, kp, sizeof(*kp)) == 1);
+		ASSERT(bcmp(rp, kp, sizeof(*kp)) == 0);
 	if (level > 0) {
 		pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
 		if (*pp != NULLAGBLOCK) {
@@ -1245,7 +1471,9 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 	int logcore = 0;
 	int logext = 0;
 	int n;
+	xfs_agblock_t *pp;
 	xfs_bmbt_irec_t prev;
+	xfs_bmbt_rec_t *rp;
 	xfs_sb_t *sbp;
 
 	ASSERT(*nmap >= 1 && *nmap <= XFS_BMAP_MAX_NMAP);
@@ -1313,11 +1541,14 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 			if (eof) {
 				asklen = len;
 				if (prev.br_startblock == NULLFSBLOCK)
-					askbno = xfs_agb_to_fsb(&mp->m_sb, agno, ip->i_bno);
+					askbno = xfs_agb_to_fsb(&mp->m_sb, agno,
+								ip->i_bno);
 				else
-					askbno = prev.br_startblock + prev.br_blockcount;
+					askbno = prev.br_startblock +
+						 prev.br_blockcount;
 			} else {
-				asklen = (xfs_extlen_t)(got.br_startoff - bno);
+				asklen =
+				    xfs_extlen_min(got.br_startoff - bno, len);
 				askbno = got.br_startblock - asklen;
 			}
 			abno = xfs_alloc_vextent(tp, askbno, 1, asklen, &alen, XFS_ALLOCTYPE_NEAR_BNO);
@@ -1351,7 +1582,7 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 				ip->i_u1.iu_extents[i + 1] = ip->i_u1.iu_extents[i];
 			xfs_bmbt_set_all(ep, *mval);
 			if (cur) {
-				cur->bc_rec.b = *mval;
+				xfs_bmbt_lookup_eq(cur, bno, abno, alen);
 				xfs_bmbt_insert(cur);
 			}
 			ip->i_d.di_nextents++;
@@ -1409,6 +1640,7 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 		 * Make space in the inode incore.
 		 */
 		xfs_iroot_realloc(ip, 1);
+		ip->i_flags |= XFS_IBROOT;
 		/*
 		 * Fill in the root.
 		 */
@@ -1450,16 +1682,19 @@ xfs_bmapi(xfs_mount_t *mp, xfs_trans_t *tp, xfs_inode_t *ip, xfs_fsblock_t bno,
 		/*
 		 * Fill in the root record and pointer.
 		 */
-		*XFS_BMAP_REC_IADDR(block, 1, cur) = *arp;
-		*XFS_BMAP_PTR_IADDR(block, 1, cur) = abno;
+		rp = XFS_BMAP_REC_IADDR(block, 1, cur);
+		*rp = *arp;
+		pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
+		*pp = agbno;
 		/*
 		 * Do all this logging at the end so that 
 		 * the root is at the right level.
 		 */
 		xfs_bmbt_log_block(cur, abuf, XFS_BB_ALL_BITS);
 		xfs_bmbt_log_recs(cur, abuf, 1, ablock->bb_numrecs);
-		xfs_bmbt_log_ptrs(cur, abuf, 1, ablock->bb_numrecs);
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_BROOT);
+		xfs_bmbt_rcheck(cur);
+		xfs_bmbt_kcheck(cur);
 	}
 	/*
 	 * Log everything.  Do this after conversion, there's no point in

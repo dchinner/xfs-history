@@ -5,6 +5,9 @@
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
+struct xfs_btree_cur;
+struct xfs_btree_block;
+
 /*
  * Bmap btree record and extent descriptor.
  */
@@ -58,6 +61,8 @@ typedef struct xfs_bmbt_irec
 	xfs_extlen_t	br_blockcount;	/* number of block */
 } xfs_bmbt_irec_t;
 
+#ifndef XFSDEBUG
+
 #define	XFS_BMAP_RBLOCK_DSIZE(lev,cur) ((cur)->bc_private.b.inodesize - (int)sizeof(xfs_dinode_core_t))
 #define	XFS_BMAP_RBLOCK_ISIZE(lev,cur) ((int)(cur)->bc_private.b.ip->i_broot_bytes)
 #define	XFS_BMAP_IBLOCK_SIZE(lev,cur) (1 << (cur)->bc_blocklog)
@@ -94,13 +99,54 @@ typedef struct xfs_bmbt_irec
 #define	XFS_BMAP_EXT_MAXRECS(isz)	\
 	(XFS_BMAP_BROOT_SIZE(isz) / sizeof(xfs_bmbt_rec_t))
 
-#define	XFS_BMAP_MAXLEVELS	5	/* ??? */
-#define	XFS_BMAP_MAX_NMAP	4
-
 #define	xfs_bmbt_get_block(cur, level, bpp) \
 	((level) < (cur)->bc_nlevels - 1 ? \
 	 ((*bpp = (cur)->bc_bufs[level]), xfs_buf_to_block(*bpp)) : \
 	 ((*bpp = 0), (cur)->bc_private.b.ip->i_broot))
+
+#else	/* XFSDEBUG */
+
+int XFS_BMAP_RBLOCK_DSIZE(int, struct xfs_btree_cur *);
+int XFS_BMAP_RBLOCK_ISIZE(int, struct xfs_btree_cur *);
+int XFS_BMAP_IBLOCK_SIZE(int, struct xfs_btree_cur *);
+int XFS_BMAP_BLOCK_DSIZE(int, struct xfs_btree_cur *);
+int XFS_BMAP_BLOCK_ISIZE(int, struct xfs_btree_cur *);
+
+int XFS_BMAP_BLOCK_DMAXRECS(int, struct xfs_btree_cur *);
+int XFS_BMAP_BLOCK_IMAXRECS(int, struct xfs_btree_cur *);
+int XFS_BMAP_BLOCK_DMINRECS(int, struct xfs_btree_cur *);
+int XFS_BMAP_BLOCK_IMINRECS(int, struct xfs_btree_cur *);
+
+xfs_bmbt_rec_t *XFS_BMAP_REC_DADDR(struct xfs_btree_block *, int, struct xfs_btree_cur *);
+xfs_bmbt_rec_t *XFS_BMAP_REC_IADDR(struct xfs_btree_block *, int, struct xfs_btree_cur *);
+
+xfs_agblock_t *XFS_BMAP_PTR_DADDR(struct xfs_btree_block *, int, struct xfs_btree_cur *);
+xfs_agblock_t *XFS_BMAP_PTR_IADDR(struct xfs_btree_block *, int, struct xfs_btree_cur *);
+
+/*
+ * These are to be used when we know the size of the block and
+ * we don't have a cursor.
+ */
+int XFS_BMAP_BROOT_SIZE(int);
+xfs_bmbt_rec_t *XFS_BMAP_BROOT_REC_ADDR(struct xfs_btree_block *, int, int);
+xfs_agblock_t *XFS_BMAP_BROOT_PTR_ADDR(struct xfs_btree_block *, int, int);
+
+int XFS_BMAP_BROOT_NUMRECS(struct xfs_btree_block *);
+int XFS_BMAP_BROOT_MAXRECS(int);
+int XFS_BMAP_BROOT_SPACE(struct xfs_btree_block *);
+int XFS_BMAP_BROOT_SPACE_CALC(int);
+
+/*
+ * Number of extent records that fit in the inode.
+ */
+int XFS_BMAP_EXT_MAXRECS(int);
+
+struct xfs_btree_block *xfs_bmbt_get_block(struct xfs_btree_cur *, int, buf_t **);
+
+#endif	/* !XFSDEBUG */
+
+#define	XFS_BMAP_MAXLEVELS	5	/* ??? */
+#define	XFS_BMAP_MAX_NMAP	4
 
 void xfs_bmapi(xfs_mount_t *, xfs_trans_t *, struct xfs_inode *, xfs_fsblock_t, xfs_extlen_t, int, xfs_bmbt_irec_t *, int *);
 void xfs_bmap_read_extents(xfs_mount_t *, xfs_trans_t *, struct xfs_inode *);
