@@ -66,7 +66,7 @@ acl_ext_attr_to_xfs(acl_ea_header *src, size_t size, xfs_acl_t *dest)
 		return EINVAL;
 
 	count = acl_ea_count(size);
-	if (count <= 0)
+	if (count <= 0 || count > XFS_ACL_MAX_ENTRIES)
 		return EINVAL;
 
 	memset(dest, 0, sizeof(xfs_acl_t));
