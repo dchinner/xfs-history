@@ -146,8 +146,6 @@ typedef struct bhv_head {
 	struct bhv_desc *bh_first;	/* first behavior in chain */
 #if defined(CELL_CAPABLE) || defined(CELL_PREPARE)
 	bhv_head_lock_t *bh_lockp;	/* pointer to lock info struct */
-	void		*bh_unused1;
-	__u64		bh_unused2;
 #endif
 } bhv_head_t;
 
@@ -192,41 +190,17 @@ typedef bhv_identity_t bhv_position_t;
 #define BHV_POSITION_TOP	63	/* top (first) implementation layer */
 
 /*
- * Define stuff for behavior position masks
- */
-#ifdef CELL_CAPABLE
-typedef __uint64_t bhv_posmask_t;
-#define BHV_POSMASK_NULL	((bhv_posmask_t) 0)
-#define BHV_POSMASK_ONE(a)	(((bhv_posmask_t) 1) << (a))
-#define BHV_POSMASK_RANGE(a, b) (((((bhv_posmask_t) 1) << ((b)-(a)))-1) << (a))
-#define BHV_POSMASK_TEST(a, b)	((a) & BHV_POSMASK(b))
-#define BHV_POMASK_TESTID(a, b) BHV_POS_MASK((b)->bi_position)
-#endif
-
-/*
  * Plumbing macros.
  */
 #define BHV_HEAD_FIRST(bhp)	(ASSERT((bhp)->bh_first), (bhp)->bh_first)
-#ifdef CELL_CAPABLE
 #define BHV_NEXT(bdp)		(ASSERT((bdp)->bd_next), (bdp)->bd_next)
 #define BHV_NEXTNULL(bdp)	((bdp)->bd_next)
-#endif
 #define BHV_VOBJ(bdp)		(ASSERT((bdp)->bd_vobj), (bdp)->bd_vobj)
 #define BHV_VOBJNULL(bdp)	((bdp)->bd_vobj)
 #define BHV_PDATA(bdp)		(bdp)->bd_pdata
 #define BHV_OPS(bdp)		(bdp)->bd_ops
 #define BHV_IDENTITY(bdp)	((bhv_identity_t *)(bdp)->bd_ops)
 #define BHV_POSITION(bdp)	(BHV_IDENTITY(bdp)->bi_position)
-
-// /*
-//  * This is used to mark an op table entry for an operation that has
-//  * been deleted but the entry remains reserved so that alignment
-//  * is maintained for compatibility for all subsequent operations.
-//  */
-// #define BHV_OP_DELETED		NULL
-
-
-
 
 #ifdef CELL_CAPABLE
 
@@ -322,7 +296,7 @@ bhv_try_deferred_ucallout(mrlock_t *mrp)
 {
      bhv_head_lock_t *bhl;
 
-     bhl = MR_TO_BHVL(mrp);
+     bhl = (bhv_head_lock_t*) mrp;
      if (kcallout_isempty(&bhl->bhl_ucallout))
 	     return 0;
      return bhv_try_deferred_ucalloutp(bhl);
@@ -389,8 +363,6 @@ extern bhv_desc_t *	bhv_lookup_range(bhv_head_t *bhp, int lpos, int hpos);
 extern bhv_desc_t *	bhv_base_unlocked(bhv_head_t *bhp);
 
 #ifdef CELL_CAPABLE
-extern void		bhv_global_init(void);
-extern struct zone *	bhv_global_zone;
 extern void		bhv_queue_ucallout(bhv_head_t *bhp,
 			     int flags, bhv_ucallout_t *func,
 			     void *, void *, caddr_t, cell_size_t);

@@ -63,24 +63,6 @@ xfs_link(
 	struct dentry	*target_dentry,
 	struct cred	*credp);
 
-#ifdef	CELL_CAPABLE
-extern int
-cxfs_rename(
-	struct bhv_desc *src_dir_bdp,
-	char		*src_name,
-	struct vnode	*target_dir_vp,
-	char		*target_name,
-	struct cred	*credp);
-
-extern int
-cxfs_link(
-	bhv_desc_t	*target_dir_bdp,
-	struct vnode	*src_vp,
-	char		*target_name,
-	struct cred	*credp);
-
-#endif	/* CELL_CAPABLE */
-
 extern int
 xfs_dir_lookup_int(
 	struct bhv_desc		*dir_bdp,

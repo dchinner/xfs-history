@@ -41,11 +41,9 @@ STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
 
 #ifdef CELL_CAPABLE
-extern void cxfs_arrinit(void);
 extern int  cxfs_mount(xfs_mount_t *, struct xfs_args *, dev_t, int *);
 extern void cxfs_unmount(mp);
 #else
-# define cxfs_arrinit()		do { } while (0)
 # define cxfs_mount(mp,ap,d,c)	(0)
 # define cxfs_unmount(mp)	do { } while (0)
 #endif
@@ -162,11 +160,6 @@ xfs_init(int	fstype)
 
 	xfs_dir_startup();
 
-	/*
-	 * Special initialization for cxfs
-	 */
-	cxfs_arrinit();
-
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 	xfs_error_test_init();
 #endif /* DEBUG || INDUCE_IO_ERROR */
@@ -243,14 +236,12 @@ xfs_cmountfs(
 	xfs_mount_t	*mp;
 	int		error = 0;
 	int		client = 0;
-	int		vfs_flags;
 
 	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
 	/*
 	 * Open data, real time, and log devices now - order is important.
 	 */
-	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	linvfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super, 1);
 	if (rtdev != 0 &&
 		(error = linvfs_fill_buftarg(
@@ -632,7 +623,6 @@ xfs_unmount(
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
-	int		vfs_flags;
 	struct vfs	*vfsp = bhvtovfs(bdp);
 	int		unmount_event_wanted = 0;
 	int		unmount_event_flags = 0;
@@ -720,8 +710,7 @@ out:
 		 * Call common unmount function to flush to disk
 		 * and free the super block buffer & mount structures.
 		 */
-		vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
-		xfs_unmountfs(mp, vfs_flags, credp);
+		xfs_unmountfs(mp, credp);
 	}
 
 	return XFS_ERROR(error);
@@ -1712,6 +1701,7 @@ vfsops_t xfs_vfsops = {
 	.vfs_statvfs		= xfs_statvfs,
 	.vfs_sync		= xfs_sync,
 	.vfs_vget		= xfs_vget,
+	.vfs_force_shutdown	= xfs_do_force_shutdown,
 #ifdef CONFIG_XFS_DMAPI
 	.vfs_dmapi_mount	= xfs_dm_mount,
 	.vfs_dmapi_fsys_vector	= xfs_dm_get_fsys_vector,

@@ -2504,20 +2504,15 @@ xfs_create(
 	if (gdqp)
 		xfs_qm_dqrele(gdqp);
 
-#ifdef	CELL_CAPABLE
 	/*
 	 * Propogate the fact that the vnode changed after the
 	 * xfs_inode locks have been released.
 	 */
-	if (cell_enabled) {
-#pragma mips_frequency_hint NEVER
-		if (inode_change == B_TRUE) {
-			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
-		} else {
-			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 3);
-		}
+	if (inode_change == B_TRUE) {
+		VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
+	} else {
+		VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 3);
 	}
-#endif	/* CELL_CAPABLE */
 
 	*vpp = vp;
 

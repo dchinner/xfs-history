@@ -83,21 +83,16 @@ xfs_write_clear_setuid(
  */
 
 void
-_xfs_force_shutdown(
-	xfs_mount_t	*mp,
+xfs_do_force_shutdown(
+	bhv_desc_t	*bdp,
 	int		flags,
 	char		*fname,
 	int		lnnum)
 {
 	int		logerror;
+	xfs_mount_t	*mp;
 
-#if defined(XFSDEBUG) && 0
-	printk("xfs_force_shutdown entered [0x%p, %d]\n",
-		mp, flags);
-	KDB_ENTER();
-#endif
-
-#define XFS_MAX_DRELSE_RETRIES	10
+	mp = XFS_BHVTOM(bdp);
 	logerror = flags & XFS_LOG_IO_ERROR;
 
 	if (!(flags & XFS_FORCE_UMOUNT)) {
@@ -132,14 +127,7 @@ _xfs_force_shutdown(
 			cmn_err(CE_ALERT,
 			"Log I/O Error Detected.  Shutting down filesystem: %s",
 				mp->m_fsname);
-		} else {
-#if CELL_CAPABLE
-			if (flags & XFS_SHUTDOWN_REMOTE_REQ)
-				cmn_err(CE_ALERT,
-	"CXFS Shutdown request from remote cell. Shutting down filesystem: %s",
-				mp->m_fsname);
-			else
-#endif
+		} else if (!(flags & XFS_SHUTDOWN_REMOTE_REQ)) {
 			cmn_err(CE_ALERT,
 				"I/O Error Detected.  Shutting down filesystem: %s",
 				mp->m_fsname);
@@ -149,21 +137,6 @@ _xfs_force_shutdown(
 		cmn_err(CE_ALERT,
 		"Please umount the filesystem, and rectify the problem(s)");
 	}
-
-#if CELL_CAPABLE
-	if (cell_enabled && !(flags & XFS_SHUTDOWN_REMOTE_REQ) &&
-	    (mp->m_cxfstype & XFS_CXFS_SERVER) ) {
-		extern void cxfs_force_shutdown(xfs_mount_t *, int); /*@@@*/
-
-		/*
-		 * We're being called for a problem discovered locally.
-		 * Tell CXFS to pass along the shutdown request.
-		 * The check for cxfs server is done because xfs_goingdown
-		 * will set forced_shutdown and we don't want it propagated.
-		 */
-		cxfs_force_shutdown(mp, flags);
-	}
-#endif /* CELL_CAPABLE */
 }
 
 

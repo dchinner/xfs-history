@@ -1093,7 +1093,7 @@ xfs_mountfs(
  * log and makes sure that incore structures are freed.
  */
 int
-xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
+xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 {
 	int		ndquots;
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
@@ -1147,7 +1147,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	if (XFS_FORCED_SHUTDOWN(mp)) {
 		(void)xfs_incore_relse(&mp->m_ddev_targ, 0, 1); /* synchronous*/
 	}
-	xfs_unmountfs_close(mp, vfs_flags, cr);
+	xfs_unmountfs_close(mp, cr);
 	if ((mp->m_flags & XFS_MOUNT_NOUUID) == 0)
 		xfs_uuid_unmount(mp);
 
@@ -1165,7 +1165,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 }
 
 void
-xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
+xfs_unmountfs_close(xfs_mount_t *mp, struct cred *cr)
 {
 	if (mp->m_ddev_targ.pb_targ)
 		linvfs_release_buftarg(&mp->m_ddev_targ);

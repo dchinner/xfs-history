@@ -336,7 +336,7 @@ typedef struct xfs_mount {
 #define XFS_WSYNC_READIO_LOG	15	/* 32K */
 #define XFS_WSYNC_WRITEIO_LOG	14	/* 16K */
 
-#define xfs_force_shutdown(m,f) _xfs_force_shutdown(m,f,__FILE__,__LINE__);
+#define xfs_force_shutdown(m,f)	VFS_FORCE_SHUTDOWN(XFS_MTOVFS(m),f)
 /*
  * Flags sent to xfs_force_shutdown.
  */
@@ -344,9 +344,7 @@ typedef struct xfs_mount {
 #define XFS_LOG_IO_ERROR	0x2
 #define XFS_FORCE_UMOUNT	0x4
 #define XFS_CORRUPT_INCORE	0x8	/* corrupt in-memory data structures */
-#if CELL_CAPABLE
-#define XFS_SHUTDOWN_REMOTE_REQ 0x10	/* shutdown req came from remote cell */
-#endif
+#define XFS_SHUTDOWN_REMOTE_REQ 0x10	/* shutdown came from remote cell */
 
 /*
  * xflags for xfs_syncsub
@@ -428,8 +426,8 @@ xfs_mount_t	*xfs_mount_init(void);
 void		xfs_mount_free(xfs_mount_t *mp, int remove_bhv);
 int		xfs_mountfs(struct vfs *, xfs_mount_t *mp, dev_t, int);
 
-int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
-void		xfs_unmountfs_close(xfs_mount_t *, int, struct cred *);
+int		xfs_unmountfs(xfs_mount_t *, struct cred *);
+void		xfs_unmountfs_close(xfs_mount_t *, struct cred *);
 int		xfs_unmountfs_writesb(xfs_mount_t *);
 int		xfs_unmount_flush(xfs_mount_t *, int);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int, int);
@@ -437,7 +435,7 @@ int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint, int);
 int		xfs_readsb(xfs_mount_t *mp);
 struct xfs_buf	*xfs_getsb(xfs_mount_t *, int);
 void		xfs_freesb(xfs_mount_t *);
-void		_xfs_force_shutdown(struct xfs_mount *, int, char *, int);
+void		xfs_do_force_shutdown(bhv_desc_t *, int, char *, int);
 int		xfs_syncsub(xfs_mount_t *, int, int, int *);
 void		xfs_initialize_perag(xfs_mount_t *, int);
 void		xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t, __int64_t);
