@@ -33,6 +33,7 @@
 #include <support/kmem.h>
 #include <support/debug.h>
 
+#include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/time.h>
 #include <linux/vmalloc.h>
