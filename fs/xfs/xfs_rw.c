@@ -77,7 +77,8 @@ xfs_diordwr(vnode_t	*vp,
 	 cred_t		*credp,
 	 int		rw);
 
-extern int xfs_grio_req(xfs_inode_t *,int,uio_t *,int,cred_t *,int);
+extern int xfs_grio_req( xfs_inode_t *, struct reservation_id *, 
+	uio_t *, int, cred_t *, int);
 /*
  * Round the given file offset down to the nearest read/write
  * size boundary.
@@ -660,12 +661,12 @@ xfs_read(vnode_t	*vp,
 	 int		ioflag,
 	 cred_t		*credp)
 {
+	struct reservation_id id;
 	xfs_inode_t	*ip;
 	int		type;
 	off_t		offset;
 	size_t		count;
 	int		error;
-	int		id;
 
 
 	ip = XFS_VTOI(vp);
@@ -698,8 +699,9 @@ xfs_read(vnode_t	*vp,
 		ASSERT((ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS) ||
 		       (ip->i_d.di_format == XFS_DINODE_FMT_BTREE));
 
-		id = u.u_procp->p_pid;
-		error = xfs_grio_req(ip, id, uiop, ioflag, credp, UIO_READ);
+		id.pid = u.u_procp->p_pid;
+		id.ino = ip->i_ino;
+		error  = xfs_grio_req(ip, &id, uiop, ioflag, credp, UIO_READ);
 
 		break;
 
@@ -1228,6 +1230,7 @@ xfs_write(vnode_t	*vp,
 	  int		ioflag,
 	  cred_t	*credp)
 {
+	struct reservation_id id;
 	xfs_inode_t	*ip;
 	int		type;
 	off_t		offset;
@@ -1236,7 +1239,6 @@ xfs_write(vnode_t	*vp,
 	int		n;
 	int		resid;
 	timestruc_t	tv;
-	int		id;
 
 
 	ip = XFS_VTOI(vp);
@@ -1285,8 +1287,10 @@ xfs_write(vnode_t	*vp,
 			resid = 0;
 		}
 
-		id = u.u_procp->p_pid;
-		error = xfs_grio_req( ip, id, uiop, ioflag, credp, UIO_WRITE);
+		id.pid = u.u_procp->p_pid;
+		id.ino = ip->i_ino;
+		error = xfs_grio_req( ip, &id, uiop, ioflag, credp, UIO_WRITE);
+
 		/*
 		 * Add back whatever we refused to do because of
 		 * uio_limit.
@@ -2095,7 +2099,6 @@ xfs_diostrat( buf_t *bp)
 				ASSERT( error == ENOSPC );
 				xfs_trans_cancel(tp, 0);
 				xfs_iunlock( ip, XFS_ILOCK_EXCL);
-printf("RAN OUT OF SPACE \n");
 				break;
 			} else {
 				xfs_trans_ijoin( tp, ip, XFS_ILOCK_EXCL);
