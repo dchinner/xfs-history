@@ -49,13 +49,16 @@
 
 #include "page_buf_internal.h"
 
-#define PBF_MAX_MAPS		1 /* TODO: XFS_BMAP_MAX_NMAP? */
+
+/*
+ * External declarations.
+ */
+extern int linvfs_pb_bmap(struct inode *, loff_t, ssize_t, page_buf_bmap_t *, int);
 
 /*
  * Forward declarations.
  */
-STATIC int  pagebuf_delalloc_convert(
-		struct inode *, struct page *, pagebuf_bmap_fn_t, int, int);
+STATIC int  pagebuf_delalloc_convert(struct inode *, struct page *, int, int);
 
 /*
  * __pb_match_offset_to_mapping
@@ -124,12 +127,11 @@ __pb_map_buffer_at_offset(
  */
 void
 pagebuf_release_page(
-	struct page		*page,
-	pagebuf_bmap_fn_t	bmap)
+	struct page		*page)
 {
 	struct inode		*inode = (struct inode*)page->mapping->host;
 
-	pagebuf_delalloc_convert(inode, page, bmap, 0, 0);
+	pagebuf_delalloc_convert(inode, page, 0, 0);
 }
 
 /*
@@ -139,8 +141,7 @@ pagebuf_release_page(
 int
 pagebuf_write_full_page(
 	struct page		*page,
-	int			delalloc,
-	pagebuf_bmap_fn_t	bmap)
+	int			delalloc)
 {
 	struct inode		*inode = (struct inode*)page->mapping->host;
 	unsigned long		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
@@ -156,11 +157,10 @@ pagebuf_write_full_page(
 	}
 
 	if (!page_has_buffers(page)) {
-		create_empty_buffers(page, inode->i_dev,
-					   1 << inode->i_blkbits);
+		create_empty_buffers(page, inode->i_dev, 1 << inode->i_blkbits);
 	}
 
-	ret = pagebuf_delalloc_convert(inode, page, bmap, 1, delalloc == 0);
+	ret = pagebuf_delalloc_convert(inode, page, 1, delalloc == 0);
 
 out:
 	if (ret < 0) {
@@ -418,15 +418,14 @@ STATIC int
 pagebuf_delalloc_convert(
 	struct inode		*inode,		/* inode containing page */
 	struct page		*page,		/* page to convert - locked */
-	pagebuf_bmap_fn_t	bmap,		/* bmap function */
 	int			startio,	/* start io on the page */
 	int			allocate_space)
 {
 	struct buffer_head	*bh, *head;
 	struct buffer_head	*bh_arr[MAX_BUF_PER_PAGE];
-	page_buf_bmap_t		*mp, maps[PBF_MAX_MAPS];
+	page_buf_bmap_t		*mp, map;
 	int			i, cnt = 0;
-	int			len, err, nmaps;
+	int			len, err;
 	unsigned long		p_offset = 0;
 	loff_t			offset;
 	loff_t			end_offset;
@@ -446,17 +445,16 @@ pagebuf_delalloc_convert(
 		}
 
 		if (mp) {
-			mp = __pb_match_offset_to_mapping(page, maps, p_offset);
+			mp = __pb_match_offset_to_mapping(page, &map, p_offset);
 		}
 
 		if (buffer_delay(bh)) {
 			if (!mp) {
-				err = bmap(inode, offset, len, maps,
-						PBF_MAX_MAPS, &nmaps,
+				err = linvfs_pb_bmap(inode, offset, len, &map,
 						PBF_WRITE|PBF_FILE_ALLOCATE);
 				if (err)
 					goto error;
-				mp = __pb_match_offset_to_mapping(page, maps,
+				mp = __pb_match_offset_to_mapping(page, &map,
 								p_offset);
 			}
 			if (mp) {
@@ -478,12 +476,11 @@ pagebuf_delalloc_convert(
 			if (!mp) {
 				size = probe_unmapped_cluster(inode, page,
 								bh, head);
-				err = bmap(inode, offset, size, maps,
-						PBF_MAX_MAPS, &nmaps,
+				err = linvfs_pb_bmap(inode, offset, size, &map,
 						PBF_WRITE|PBF_DIRECT);
 				if (err)
 					goto error;
-				mp = __pb_match_offset_to_mapping(page, maps,
+				mp = __pb_match_offset_to_mapping(page, &map,
 								p_offset);
 			}
 			if (mp) {
