@@ -33,6 +33,7 @@
 #include "xfs_sb.h"
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
+#include "xfs_bit.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -611,9 +612,9 @@ xfs_buf_item_log_check(xfs_buf_log_item_t *bip)
  * start_bit.  Size is the size of the bitmap in bytes.
  *
  * Do the counting by mapping a byte value to the number of set
- * bits for that value using the byte_to_bits array, i.e.
- * byte_to_bits[0] == 0, byte_to_bits[1] == 1, byte_to_bits[2] == 1,
- * byte_to_bits[3] == 2, etc.
+ * bits for that value using the xfs_countbit array, i.e.
+ * xfs_countbit[0] == 0, xfs_countbit[1] == 1, xfs_countbit[2] == 1,
+ * xfs_countbit[3] == 2, etc.
  */
 STATIC int
 xfs_buf_item_bits(uint	*map,
@@ -624,7 +625,6 @@ xfs_buf_item_bits(uint	*map,
 	register char	*bytep;
 	register char	*end_map;
 	int		byte_bit;
-	extern char	byte_to_bits[];
 
 	bits = 0;
 	end_map = (char*)(map + size);
@@ -645,9 +645,9 @@ xfs_buf_item_bits(uint	*map,
 	if (byte_bit != 0) {
 		/*
 		 * Shift off the bits we don't want to look at,
-		 * before indexing into byte_to_bits.
+		 * before indexing into xfs_countbit.
 		 */
-		bits += byte_to_bits[(*bytep >> byte_bit)];
+		bits += xfs_countbit[(*bytep >> byte_bit)];
 		bytep++;
 	}
 
@@ -655,7 +655,7 @@ xfs_buf_item_bits(uint	*map,
 	 * Count the bits in each byte until the end of the bitmap.
 	 */
 	while (bytep < end_map) {
-		bits += byte_to_bits[*bytep];
+		bits += xfs_countbit[*bytep];
 		bytep++;
 	}
 

@@ -11,10 +11,10 @@ KPATH=$(TOP)/fs/xfs
 KCOPTS=-fullwarn -g
 
 XFS_NAME=xfs.a
-XFS_CSRCS=	byte_to_bits.c \
-		xfs_alloc.c \
+XFS_CSRCS=	xfs_alloc.c \
 		xfs_alloc_btree.c \
 		xfs_bio.c \
+		xfs_bit.c \
 		xfs_bmap.c \
 		xfs_bmap_btree.c \
 		xfs_btree.c \
@@ -57,6 +57,7 @@ HFILES=	xfs_ag.h \
 	xfs_alloc.h \
 	xfs_alloc_btree.h \
 	xfs_bio.h \
+	xfs_bit.h \
 	xfs_bmap.h \
 	xfs_bmap_btree.h \
 	xfs_btree.h \
