@@ -135,8 +135,11 @@ vn_wait(struct vnode *vp)
 	NESTED_VN_LOCK(vp);
 
 	if (vp->v_flag & (VINACT | VRECLM)) {
+		int	s;
+
+		local_irq_save(s);
 		vp->v_flag |= VWAIT;
-		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
+		sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
 		return 1;
 	}
 	NESTED_VN_UNLOCK(vp);
@@ -357,9 +360,12 @@ again:
 	 * reclaim can fail.
 	 */
 	if (vp->v_flag & (VINACT | VRECLM)) {
+		int	s;
+
+		local_irq_save(s);
 		ASSERT(vn_count(vp) == 0);
 		vp->v_flag |= VWAIT;
-		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
+		sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
 		goto again;
 	}
 
