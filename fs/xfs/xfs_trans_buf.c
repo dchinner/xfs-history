@@ -1,4 +1,4 @@
-#ident "$Revision: 1.53 $"
+#ident "$Revision: 1.54 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -25,6 +25,7 @@
 #include <sys/kthread.h>
 #include <sys/conf.h>
 #include <sys/systm.h>
+#include <sys/cmn_err.h>
 #endif
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -502,17 +503,26 @@ xfs_trans_read_buf(
 	*bpp = bp;
 	return 0;
 
- shutdown_abort:
+shutdown_abort:
+	/*
+	 * the theory here is that buffer is good but we're
+	 * bailing out because the filesystem is being forcibly
+	 * shut down.  So we should leave the b_flags alone since
+	 * the buffer's not staled and just get out.
+	 */
+#if defined(DEBUG) && !defined(SIM)
+	if ((bp->b_flags & (B_STALE|B_DELWRI)) == (B_STALE|B_DELWRI))
+		cmn_err(CE_NOTE, "about to pop assert, bp == 0x%x\n", bp);
+#endif
+	ASSERT((bp->b_flags & (B_STALE|B_DELWRI)) != (B_STALE|B_DELWRI));
 
-	bp->b_flags &= ~(B_DONE|B_DELWRI);
-	bp->b_flags |= B_STALE;
 #ifndef SIM
 	buftrace("READ_BUF XFSSHUTDN", bp);
 #endif
 	brelse(bp);	
 	*bpp = NULL;
 	return XFS_ERROR(EIO);
-}	
+}
 
 
 /*
@@ -761,7 +771,6 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
 
 	xfs_trans_set_sync(tp);
 }
-
 
 /*
  * This is called to mark bytes first through last inclusive of the given
