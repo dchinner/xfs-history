@@ -382,6 +382,7 @@ typedef struct vnodeops {
 /*
  * Flags for read/write calls - same values as IRIX
  */
+#define IO_ISAIO	0x00001		/* don't wait for completion */
 #define IO_ISDIRECT	0x00004		/* bypass page cache */
 #define IO_INVIS	0x00020		/* don't update inode timestamps */
 #define IO_ISLOCKED	0x00800		/* don't do inode locking */
