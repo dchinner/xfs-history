@@ -1,4 +1,4 @@
-#ident "$Revision: 1.154 $"
+#ident "$Revision: 1.156 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1038,16 +1038,17 @@ xfs_atruncate_invalidate(
 			/*
 			 * We try to do up to XFS_ATRUNC_MAX_BUFS in a single
 			 * transaction.  This reduces the total number of
-			 * transactions.  These transactions don't need to
-			 * be synchronous, because the case we are worried
-			 * about is when the blocks are reallocated to a
-			 * file.  If the reallocation makes it to the
-			 * log then the freeing of the blocks and the
-			 * cancellation of the buffer writes will have
-			 * made it as well.
+			 * transactions.  These transactions are done
+			 * synchronously, because the buffers logged in
+			 * them will not be unlocked until the transaction
+			 * is committed to disk (a side effect of the
+			 * xfs_trans_binval code).  We don't want to lock
+			 * too many buffers at once waiting for the log to
+			 * be synced.
 			 */
 			cancelled_bufs++;
 			if (cancelled_bufs == XFS_ATRUNC_MAX_BUFS) {
+				xfs_trans_set_sync(tp);
 				error = xfs_trans_commit(tp, 0);
 				if (error) {
 					return error;
@@ -1091,13 +1092,9 @@ xfs_atruncate_invalidate(
  * Since this is a part of an operation to free the blocks in the
  * attribute fork, at some point we need to make sure that the
  * unlink of the inode is permanent before we free its blocks.
- * We delay this until the xfs_itruncate_finish() call in the hope
- * that we can bunch up anything logged here along with what we
- * log synchronously in xfs_itruncate_finish().  It is safe to log
- * the invalidation records here even if the unlink is not yet
- * permanent, because they will come after the unlink in the log
- * and they don't pull the cancelled buffer from the AIL until the
- * cancel is committed to the on disk log.
+ * We have to log the invalidation transactions in xfs_atruncate_invalidate
+ * called from here synchronously, so we know that the unlink will
+ * be permanent before we free and invalidate the blocks.
  */
 int
 xfs_atruncate_start(
