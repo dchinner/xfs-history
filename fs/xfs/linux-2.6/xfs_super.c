@@ -608,7 +608,7 @@ static struct super_operations linvfs_sops = {
 	remount_fs:		linvfs_remount
 };
 
-DECLARE_FSTYPE_DEV(xfs_fs_type, "xfs", linvfs_read_super);
+DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);
 
 int __init init_xfs_fs(void)
 {

@@ -1227,7 +1227,7 @@ xfs_statvfs(
 	XFS_SB_UNLOCK(mp, s);
 
 	statp->f_fsid = mp->m_dev;
-	strcpy(statp->f_basetype, "xfs");
+	strcpy(statp->f_basetype, XFS_NAME);
 	statp->f_namemax = MAXNAMELEN - 1;
 	bcopy((char *)&(mp->m_sb.sb_uuid), statp->f_fstr, sizeof(uuid_t));
 	bzero(&(statp->f_fstr[sizeof(uuid_t)]),
