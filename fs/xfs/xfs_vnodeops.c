@@ -1,4 +1,4 @@
-#ident "$Revision: 1.366 $"
+#ident "$Revision: 1.367 $"
 
 
 #ifdef SIM
@@ -5470,7 +5470,6 @@ xfs_fcntl(
 	struct dioattr		da;
 	struct fsxattr		fa;
 	vattr_t			va;
-	struct getbmap		bm;
 	struct fsdmidata	d;
 	extern int		scache_linemask;
 	int			nonblock_flag;
@@ -5569,7 +5568,10 @@ xfs_fcntl(
 		break;
 
 	case F_GETBMAP:
-	case F_GETBMAPA:
+	case F_GETBMAPA: {
+		struct	getbmap	bm;
+		int		iflags;
+
 		if (copyin(arg, &bm, sizeof(bm))) {
 			error = XFS_ERROR(EFAULT);
 			break;
@@ -5578,13 +5580,49 @@ xfs_fcntl(
 			error = XFS_ERROR(EINVAL);
 			break;
 		}
-		error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg + 1,
-			cmd == F_GETBMAP ? XFS_DATA_FORK : XFS_ATTR_FORK);
+
+		iflags = (cmd == F_GETBMAPA ? BMV_IF_ATTRFORK : 0);
+		error = xfs_getbmap(bdp, &bm, (struct getbmap *)arg + 1, iflags);
+
 		if (!error && copyout(&bm, arg, sizeof(bm))) {
 			error = XFS_ERROR(EFAULT);
 		}
 		break;
+	}
+	case F_GETBMAPX: {
+		struct	getbmapx	bmx;
+		struct	getbmap		bm;
+		int			iflags;
 
+
+		if (copyin(arg, &bmx, sizeof(bmx))) {
+			error = XFS_ERROR(EFAULT);
+			break;
+		}
+		if (bmx.bmv_count < 2) {
+			error = XFS_ERROR(EINVAL);
+			break;
+		}
+		/* Map input getbmapx structure to a getbmap
+		 * structure for xfs_getbmap.
+		 */
+		GETBMAP_CONVERT(bmx,bm);
+
+		iflags = bmx.bmv_iflags;
+		if (iflags & (~BMV_IF_VALID)) {
+			error = XFS_ERROR(EINVAL);
+			break;
+		}
+		iflags |= BMV_IF_EXTENDED;
+		error = xfs_getbmap(bdp, &bm, (struct getbmapx *)arg + 1, iflags);
+		if (error)
+			break;
+		GETBMAP_CONVERT(bm,bmx);
+		if (copyout(&bmx, arg, sizeof(bmx))) {
+			error = XFS_ERROR(EFAULT);
+		}
+		break;
+	}
 	case F_FSSETDM:
 		if (copyin(arg, &d, sizeof d)) {
 			error = XFS_ERROR (EFAULT);
