@@ -34,7 +34,7 @@ STATIC xfs_btree_cur_t *xfs_btree_curfreelist;
 
 __uint32_t xfs_magics[XFS_BTNUM_MAX] =
 {
-	XFS_ABTB_MAGIC, XFS_ABTC_MAGIC, XFS_IBT_MAGIC, XFS_BMAP_MAGIC
+	XFS_ABTB_MAGIC, XFS_ABTC_MAGIC, XFS_BMAP_MAGIC
 };
 
 /*
@@ -108,14 +108,9 @@ xfs_btree_check_rec(xfs_btnum_t btnum, void *ar1, void *ar2)
 			r1->ar_startblock < r2->ar_startblock));
 		break;
 	    }
-	case XFS_BTNUM_IBT: {
-		xfs_ialloc_rec_t *r1 = ar1, *r2 = ar2;
-		ASSERT(r1->ir_startinode + r1->ir_inodecount <= r2->ir_startinode);
-		break;
-	    }
 	case XFS_BTNUM_BMAP: {
 		xfs_bmbt_rec_t *r1 = ar1, *r2 = ar2;
-		ASSERT(xfs_offset_ptox(r1->br_startoff) + xfs_extlen_ptox(r1->br_blockcount) <= xfs_offset_ptox(r2->br_startoff));
+		ASSERT(xfs_bmbt_get_startoff(r1) + xfs_bmbt_get_blockcount(r1) <= xfs_bmbt_get_startoff(r2));
 		break;
 	    }
 	}
@@ -211,9 +206,6 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 	case XFS_BTNUM_CNT:
 		nlevels = agp->ag_levels[btnum];
 		break;
-	case XFS_BTNUM_IBT:
-		nlevels = agp->ag_ilevels;
-		break;
 	case XFS_BTNUM_BMAP:
 		nlevels = ip->i_broot->bb_level + 1;
 		break;
@@ -278,9 +270,9 @@ xfs_btree_log_ag(xfs_trans_t *tp, buf_t *buf, int fields)
 		offsetof(xfs_aghdr_t, ag_flist_count),
 		offsetof(xfs_aghdr_t, ag_freeblks),
 		offsetof(xfs_aghdr_t, ag_longest),
-		offsetof(xfs_aghdr_t, ag_iroot),
 		offsetof(xfs_aghdr_t, ag_icount),
-		offsetof(xfs_aghdr_t, ag_ilevels),
+		offsetof(xfs_aghdr_t, ag_ifirst),
+		offsetof(xfs_aghdr_t, ag_ilast),
 		offsetof(xfs_aghdr_t, ag_iflist),
 		offsetof(xfs_aghdr_t, ag_ifcount),
 		sizeof(xfs_aghdr_t)
@@ -323,9 +315,6 @@ xfs_btree_maxrecs(xfs_btree_cur_t *cur, xfs_btree_block_t *block)
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
 		maxrecs = XFS_ALLOC_BLOCK_MAXRECS(block->bb_level, cur);
-		break;
-	case XFS_BTNUM_IBT:
-		maxrecs = XFS_IALLOC_BLOCK_MAXRECS(block->bb_level, cur);
 		break;
 	case XFS_BTNUM_BMAP:
 		maxrecs = XFS_BMAP_BLOCK_IMAXRECS(block->bb_level, cur);

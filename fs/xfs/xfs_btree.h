@@ -41,7 +41,6 @@ typedef struct xfs_btree_cur
 	union {
 		xfs_alloc_rec_t		a;
 		xfs_bmbt_irec_t		b;
-		xfs_ialloc_rec_t	i;
 	}		bc_rec;
 	buf_t		*bc_bufs[XFS_BTREE_MAXLEVELS];
 	int		bc_ptrs[XFS_BTREE_MAXLEVELS];
