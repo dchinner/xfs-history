@@ -1,4 +1,3 @@
- 
 #include <sys/types.h>
 #ifdef SIM
 #define _KERNEL 1
@@ -8,6 +7,7 @@
 #include <sys/user.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <fs/specfs/snode.h>
 #include <sys/systm.h>
 #include <sys/dnlc.h>
 #include <sys/sysmacros.h>
@@ -38,6 +38,8 @@
 #include <fs/specfs/snode.h>
 #include <sys/stat.h>
 #include <sys/mode.h>
+#include <sys/sysinfo.h>
+#include <sys/ksa.h>
 #include <sys/grio.h>
 #include <string.h>
 #include "xfs_types.h"
@@ -239,6 +241,13 @@ STATIC int	xfs_fcntl(vnode_t	*vp,
 			  cred_t	*credp,
 			  rval_t	*rvalp);
 
+
+extern struct igetstats XFS_IGETINFO;
+
+#define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
+#define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
+
+
 /*
  * xfs_open
  *
@@ -289,7 +298,6 @@ xfs_ioctl(vnode_t	*vp,
 /*
  * xfs_getattr
  *
- * This is a stub.
  */
 STATIC int
 xfs_getattr(vnode_t	*vp,
@@ -297,6 +305,64 @@ xfs_getattr(vnode_t	*vp,
 	    int		flags,
 	    cred_t	*credp)
 {
+	xfs_inode_t	*ip;
+	xfs_mount_t	*mp;
+
+	ip = XFS_VTOI(vp);
+
+	vap->va_size = (ulong) ip->i_d.di_size;
+        if (vap->va_mask == AT_SIZE)
+                return 0;
+        vap->va_fsid = ip->i_dev;
+
+	/* XXX trunc to 32 bits for now. */
+
+        vap->va_nodeid = ip->i_ino;
+
+        if (vap->va_mask == (AT_FSID|AT_NODEID))
+                return 0;
+
+	/*
+         * Copy from in-core inode.
+         */
+        vap->va_type = vp->v_type;
+        vap->va_mode = ip->i_d.di_mode & MODEMASK;
+        vap->va_uid = ip->i_d.di_uid;
+        vap->va_gid = ip->i_d.di_gid;
+        vap->va_nlink = ip->i_d.di_nlink;
+        vap->va_vcode = ip->i_vcode;
+        if (vp->v_type == VCHR || vp->v_type == VBLK || vp->v_type == VXNAM)
+                vap->va_rdev = ip->i_u2.iu_rdev;
+        else
+                vap->va_rdev = 0;       /* not a b/c spec. */
+
+	/*
+	 * Note: Although we store 64 bit timestamps, the code 
+	 * currently only updates the upper 32 bits.
+	 */
+        vap->va_atime.tv_sec = ip->i_d.di_atime.t_sec;
+        vap->va_atime.tv_nsec = ip->i_d.di_atime.t_nsec;
+        vap->va_mtime.tv_sec = ip->i_d.di_mtime.t_sec;
+        vap->va_mtime.tv_nsec = ip->i_d.di_mtime.t_nsec;
+        vap->va_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
+        vap->va_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
+
+        switch (ip->i_d.di_mode & IFMT) {
+          case IFBLK:
+          case IFCHR:
+                vap->va_blksize = BLKDEV_IOSIZE;
+                break;
+          default:
+		mp = XFS_VFSTOM(vp->v_vfsp);
+		vap->va_blksize = mp->m_sb.sb_blocksize;	/* in bytes */
+		break;
+        }
+
+	/*
+	 * XXX : truncate to 32 bites for now.
+	 */
+        vap->va_nblocks = BTOBB((u_long) (ip->i_d.di_size));
+
 	return 0;
 }
 
@@ -312,7 +378,187 @@ xfs_setattr(vnode_t	*vp,
 	    int		flags,
 	    cred_t	*credp)
 {
+        xfs_inode_t     *ip;
+	xfs_trans_t	*tp = NULL;
+	int		mask;
+	int		code;
+	timestruc_t 	tv;
+
+	/*
+	 * Cannot set certain attributes.
+         */
+        mask = vap->va_mask;
+        if (mask & AT_NOSET)
+                return EINVAL;
+
+        ip = XFS_VTOI(vp);
+
+	/*
+	 * Timestamps do not need to be logged and hence do not
+	 * need to be done within a transaction.
+	 */
+	if (mask & AT_UPDTIMES) {
+		/*
+		 * NOTE: Although we set all 64 bits of the timestamp,
+		 * the underlying code will ignore the low order 32
+		 * bits.  The low order 32 bits will always be zero
+		 * on disk.
+		 */
+                ASSERT((mask & ~AT_UPDTIMES) == 0);
+                nanotime(&tv);
+
+                if (mask & AT_UPDATIME) {
+                        ip->i_d.di_atime.t_sec = tv.tv_sec;
+			ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+		}
+                if (mask & AT_UPDCTIME) {
+			ip->i_d.di_ctime.t_sec = tv.tv_sec;
+                        ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
+		}
+                if (mask & AT_UPDMTIME) {
+			ip->i_d.di_mtime.t_sec = tv.tv_sec;
+                        ip->i_d.di_mtime.t_nsec = tv.tv_nsec;
+		}
+        }
+
+	tp = xfs_trans_alloc (XFS_VFSTOM((XFS_ITOV(ip))->v_vfsp),
+                        XFS_TRANS_WAIT);
+	if (code = xfs_trans_reserve (tp, 10, 10, 0, 0)) {
+		xfs_trans_cancel (tp, 0);
+		return code;
+	}
+
+	xfs_ilock (ip, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+
+        /*
+         * Change file access modes.  Must be owner or privileged.
+         */
+        if (mask & AT_MODE) {
+                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
+                        code = EPERM;
+                        goto error_return;
+                }
+                ip->i_d.di_mode &= IFMT;
+                ip->i_d.di_mode |= vap->va_mode & ~IFMT;
+                /*
+                 * A non-privileged user can set the sticky and sgid
+                 * bits on a directory.
+                 */
+                if (!crsuser(credp)) {
+                        if (vp->v_type != VDIR && (ip->i_d.di_mode & ISVTX))
+                                ip->i_d.di_mode &= ~ISVTX;
+                        if (!groupmember(ip->i_d.di_gid, credp) && 
+			    (ip->i_d.di_mode & ISGID))
+                                ip->i_d.di_mode &= ~ISGID;
+                }
+		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+        }
+
+	/*
+	 * Change file ownership.  Must be the owner or privileged.
+         * If the system was configured with the "restricted_chown"
+         * option, the owner is not permitted to give away the file,
+         * and can change the group id only to a group of which he
+         * or she is a member.
+         */
+        if (mask & (AT_UID|AT_GID)) {
+                uid_t uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
+                gid_t gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
+
+                if (!crsuser(credp)) {
+                        if (credp->cr_uid != ip->i_d.di_uid ||
+                                (restricted_chown &&
+                                (ip->i_d.di_uid != uid || 
+				 !groupmember(gid, credp)))) {
+                                code = EPERM;
+                                goto error_return;
+                        }
+                        ip->i_d.di_mode &= ~(ISUID|ISGID);
+                }
+                if (ip->i_d.di_uid == uid) {
+                        /*
+                         * XXX This won't work once we have group quotas
+                         */
+                        ip->i_d.di_gid = gid;
+                } else {
+                        ip->i_d.di_uid = uid;
+                        ip->i_d.di_gid = gid;
+                }
+		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
+        }
+
+	/*
+         * Truncate file.  Must have write permission and not be a directory.
+         */
+        if (mask & AT_SIZE) {
+                if (vp->v_type == VDIR) {
+                        code = EISDIR;
+                        goto error_return;
+                }
+
+		/* XXX Check for write access to inode */
+
+                if (vp->v_type == VREG && (code = fs_vcode(vp, &ip->i_vcode)))
+                        goto error_return;
+
+		/* Call xfs_itrunc to vap->va_size */
+		ASSERT (0);
+ 
+        }
+
+	/*
+         * Change file access or modified times.
+         */
+        if (mask & (AT_ATIME|AT_MTIME)) {
+                if (credp->cr_uid != ip->i_d.di_uid && !crsuser(credp)) {
+			if (flags & ATTR_UTIME) {
+				code = EPERM;
+				goto error_return;
+			}
+
+			/* Check for WRITE access */
+                }
+                /*
+                 * since utime() always updates both mtime and atime
+                 * ctime will always be set, as it need to be so there
+                 * no reason to set ICHG
+                 */
+                if (mask & AT_ATIME) {
+                        ip->i_d.di_atime.t_sec = vap->va_atime.tv_sec;
+			ip->i_d.di_atime.t_nsec = vap->va_atime.tv_nsec;
+                }
+                if (mask & AT_MTIME) {
+                        nanotime(&tv);
+			ip->i_d.di_mtime.t_sec = vap->va_mtime.tv_sec;
+			ip->i_d.di_mtime.t_nsec = vap->va_mtime.tv_nsec;
+			ip->i_d.di_ctime.t_sec = tv.tv_sec;
+			ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
+                }
+        }
+
+	XFS_IGETINFO.ig_attrchg++;
+
+	if (tp) {
+		IHOLD (ip);
+		xfs_trans_commit (tp, 0);
+	}
+
 	return 0;
+
+
+
+
+error_return:
+
+	/*
+	 * Retain our vnode reference.
+	 */
+	IHOLD (ip);
+	xfs_trans_cancel (tp, 0);
+
+	return code;
+
 }
 
 
@@ -372,12 +618,6 @@ xfs_inactive(vnode_t	*vp,
 }
 
 
-/*
- * The following vnodeops are all involved in directory manipulation.
- */
-
-#define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
-#define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
 
 /*
  * Max number of extents needed for directory create + symlink.
@@ -1863,7 +2103,8 @@ error_return:
 /*
  * xfs_readdir
  *
- * This is a stub.
+ * Read dp's entries starting at uiop->uio_offset and translate them into
+ * bufsize bytes worth of struct dirents starting at bufbase.
  */
 STATIC int
 xfs_readdir(vnode_t	*dir_vp,
@@ -1871,7 +2112,30 @@ xfs_readdir(vnode_t	*dir_vp,
 	    cred_t	*credp,
 	    int		*eofp)
 {
-	return 0;
+        xfs_inode_t             *dp;
+        xfs_trans_t             *tp = NULL;
+	int			status;
+
+        dp = XFS_VTOI(dir_vp);
+        xfs_ilock (dp, XFS_ILOCK_SHARED);
+
+        if ((dp->i_d.di_mode & IFMT) != IFDIR) {
+		xfs_iunlock(dp, XFS_ILOCK_SHARED);
+                return ENOTDIR;
+        }
+
+
+	/* If the directory has been removed after it was opened. */
+        if (dp->i_d.di_nlink <= 0) {
+                xfs_iunlock(dp, XFS_ILOCK_SHARED);
+                return 0;
+        }
+
+	status = xfs_dir_getdents (tp, dp, uiop, eofp);
+
+	xfs_iunlock(dp, XFS_ILOCK_SHARED);
+	
+	return status;
 }
 
 
@@ -2072,11 +2336,14 @@ xfs_fid(vnode_t	*vp,
 /*
  * xfs_rwlock
  *
- * This is a stub.
  */
 STATIC void
 xfs_rwlock(vnode_t	*vp)
 {
+	xfs_inode_t	*ip;
+
+	ip = XFS_VTOI(vp);
+	xfs_ilock (ip, XFS_IOLOCK_EXCL);
 	return;
 }
 
@@ -2084,26 +2351,28 @@ xfs_rwlock(vnode_t	*vp)
 /*
  * xfs_rwunlock
  *
- * This is a stub.
  */
 STATIC void
 xfs_rwunlock(vnode_t	*vp)
 {
-	return;
+        xfs_inode_t     *ip;
+
+        ip = XFS_VTOI(vp);
+        xfs_iunlock (ip, XFS_IOLOCK_EXCL);
+        return;
 }
 
 
 /*
  * xfs_seek
  *
- * This is a stub.
  */
 STATIC int
 xfs_seek(vnode_t	*vp,
 	 off_t		old_offset,
 	 off_t		*new_offsetp)
 {
-	return 0;
+	return *new_offsetp < 0 ? EINVAL : 0;
 }
 
 
@@ -2316,7 +2585,7 @@ struct vnodeops xfs_vnodeops = {
 	xfs_rwlock,
 	xfs_rwunlock,
 	xfs_seek,
-	xfs_cmp,
+	fs_cmp,
 	xfs_frlock,
 	xfs_realvp,
 	xfs_bmap,
