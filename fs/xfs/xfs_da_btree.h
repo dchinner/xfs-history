@@ -1,13 +1,13 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.34 $"
 
 /*
  * xfs_da_btree.h
  */
 
-struct buf;
+struct xfs_buf;
 struct xfs_bmap_free;
 struct xfs_inode;
 struct xfs_mount;
@@ -199,10 +199,10 @@ typedef struct xfs_dabuf {
 	dev_t		dev;		/* device for buffer */
 	daddr_t		blkno;		/* daddr first in bps[0] */
 #endif
-	struct buf	*bps[1];	/* actually nbuf of these */
+	struct xfs_buf	*bps[1];	/* actually nbuf of these */
 } xfs_dabuf_t;
 #define	XFS_DA_BUF_SIZE(n)	\
-	(sizeof(xfs_dabuf_t) + sizeof(struct buf *) * ((n) - 1))
+	(sizeof(xfs_dabuf_t) + sizeof(struct xfs_buf *) * ((n) - 1))
 
 #ifdef XFS_DABUF_DEBUG
 extern xfs_dabuf_t	*xfs_dabuf_global_list;

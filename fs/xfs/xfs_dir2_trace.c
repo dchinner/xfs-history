@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
  * xfs_dir2_trace.c
@@ -9,7 +9,7 @@
 #endif
 
 #include <sys/types.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/debug.h>
 #include <sys/ktrace.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 /*
  * xfsrt stubs
  */
@@ -6,7 +6,7 @@
 #include <sys/uuid.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <ksys/behavior.h>
 #include <sys/fs/xfs_types.h>
 #include <sys/fs/xfs_inum.h>

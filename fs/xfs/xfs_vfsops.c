@@ -26,7 +26,7 @@
 #define _KERNEL	1
 #endif
 #include <sys/types.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/cred.h>
 #include <sys/vfs.h>
 #include <sys/pfdat.h>
@@ -1294,7 +1294,7 @@ xfs_isdev(
 	dev_t dev)
 {
 	xfs_sb_t *sbp;
-	buf_t	 *bp;
+	xfs_buf_t	 *bp;
 	int	 error;
 
 	if (!bdvalid(get_bdevsw(dev)))
@@ -1340,7 +1340,7 @@ xfs_mountroot(
 	struct cred	*cr = get_current_cred();
 	dev_t		ddev, logdev, rtdev;
 	xfs_mount_t	*mp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 
 	/*
@@ -1784,12 +1784,12 @@ static int
 devvptoxfs(
 	vnode_t		*devvp,
 	vnode_t		**vpp,
-	buf_t		**bpp,
+	xfs_buf_t		**bpp,
 	xfs_sb_t	**fsp,
 	cred_t		*cr)
 {
 	int		retval;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	dev_t		dev;
 	int		error;
 	xfs_sb_t	*fs;
@@ -1910,7 +1910,7 @@ xfs_statdevvp(
 	statvfs_t	*sp,
 	vnode_t		*devvp)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		error;
 	/*REFERENCED*/
 	int  		unused;
@@ -2086,7 +2086,7 @@ xfs_syncsub(
 {
 	xfs_inode_t	*ip = NULL;
 	xfs_inode_t	*ip_next;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	vnode_t		*vp;
 	vmap_t		vmap;
 	int		error;

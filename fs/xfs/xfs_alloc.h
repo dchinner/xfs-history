@@ -1,9 +1,9 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.43 $"
 
-struct buf;
+struct xfs_buf;
 struct xfs_mount;
 struct xfs_perag;
 struct xfs_trans;
@@ -35,7 +35,7 @@ typedef enum xfs_alloctype
 typedef struct xfs_alloc_arg {
 	struct xfs_trans *tp;		/* transaction pointer */
 	struct xfs_mount *mp;		/* file system mount point */
-	struct buf	*agbp;		/* buffer for a.g. freelist header */
+	struct xfs_buf	*agbp;		/* buffer for a.g. freelist header */
 	struct xfs_perag *pag;		/* per-ag struct for this agno */
 	xfs_fsblock_t	fsbno;		/* file system block number */
 	xfs_agnumber_t	agno;		/* allocation group number */
@@ -104,7 +104,7 @@ xfs_alloc_fix_freelist(
 int				/* error */
 xfs_alloc_get_freelist(
 	struct xfs_trans *tp,	/* transaction pointer */
-	struct buf	*agbp,	/* buffer containing the agf structure */
+	struct xfs_buf	*agbp,	/* buffer containing the agf structure */
 	xfs_agblock_t	*bnop);	/* block address retrieved from freelist */
 
 /*
@@ -113,7 +113,7 @@ xfs_alloc_get_freelist(
 void
 xfs_alloc_log_agf(
 	struct xfs_trans *tp,	/* transaction pointer */
-	struct buf	*bp,	/* buffer for a.g. freelist header */
+	struct xfs_buf	*bp,	/* buffer for a.g. freelist header */
 	int		fields);/* mask of fields to be logged (XFS_AGF_...) */
 
 /*
@@ -132,8 +132,8 @@ xfs_alloc_pagf_init(
 int				/* error */
 xfs_alloc_put_freelist(
 	struct xfs_trans *tp,	/* transaction pointer */
-	struct buf	*agbp,	/* buffer for a.g. freelist header */
-	struct buf	*agflbp,/* buffer for a.g. free block array */
+	struct xfs_buf	*agbp,	/* buffer for a.g. freelist header */
+	struct xfs_buf	*agflbp,/* buffer for a.g. free block array */
 	xfs_agblock_t	bno);	/* block being freed */
 
 /*
@@ -145,7 +145,7 @@ xfs_alloc_read_agf(
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags,		/* XFS_ALLOC_FLAG_... */
-	struct buf	**bpp);		/* buffer for the ag freelist header */
+	struct xfs_buf	**bpp);		/* buffer for the ag freelist header */
 
 /*
  * Allocate an extent (variable-size).

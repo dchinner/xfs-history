@@ -1,10 +1,10 @@
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.37 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
 
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <ksys/vfile.h>
@@ -101,7 +101,7 @@ xfs_growfs_data(
 	xfs_extlen_t		agsize;
 	xfs_alloc_rec_t		*arec;
 	xfs_btree_sblock_t	*block;
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	int			bsize;
 	int			bucket;
 	int			dpct;

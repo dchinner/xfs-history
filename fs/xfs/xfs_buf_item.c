@@ -1,4 +1,4 @@
-#ident "$Revision: 1.72 $"
+#ident "$Revision: 1.73 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -16,7 +16,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/atomic_ops.h>
 #include <sys/debug.h>
 #ifdef SIM
@@ -74,7 +74,7 @@ xfs_buf_item_log_check(
 #define 	xfs_buf_item_log_check(x)
 #endif
 
-STATIC void	xfs_buf_error_relse(buf_t *bp);
+STATIC void	xfs_buf_error_relse(xfs_buf_t *bp);
 
 /*
  * This returns the number of log iovecs needed to log the
@@ -155,7 +155,7 @@ xfs_buf_item_format(
 	uint		base_size;
 	uint		nvecs;
 	xfs_log_iovec_t	*vecp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		first_bit;
 	int		last_bit;
 	int		next_bit;
@@ -261,7 +261,7 @@ void
 xfs_buf_item_pin(
 	xfs_buf_log_item_t	*bip)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 
 	bp = bip->bli_buf;
 	ASSERT(bp->b_flags & B_BUSY);
@@ -288,7 +288,7 @@ xfs_buf_item_unpin(
 	xfs_buf_log_item_t	*bip)
 {
 	xfs_mount_t	*mp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		refcount;
 	SPLDECL(s);
 
@@ -338,7 +338,7 @@ xfs_buf_item_unpin_remove(
 	xfs_trans_t		*tp)
 {
 	/* REFERENCED */
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	xfs_log_item_desc_t	*lidp;
 
 	bp = bip->bli_buf;
@@ -381,7 +381,7 @@ uint
 xfs_buf_item_trylock(
 	xfs_buf_log_item_t	*bip)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 
 	bp = bip->bli_buf;
 
@@ -428,7 +428,7 @@ xfs_buf_item_unlock(
 	xfs_buf_log_item_t	*bip)
 {
 	int	aborted;
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 	uint	hold;
 
 	bp = bip->bli_buf;
@@ -544,7 +544,7 @@ void
 xfs_buf_item_abort(
 	xfs_buf_log_item_t	*bip)
 {
-	buf_t 	*bp;
+	xfs_buf_t 	*bp;
 
 	bp = bip->bli_buf;
 	buftrace("XFS_ABORT", bp);
@@ -565,7 +565,7 @@ void
 xfs_buf_item_push(
 	xfs_buf_log_item_t	*bip)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 
 	ASSERT(!(bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("PUSH", bip);
@@ -613,7 +613,7 @@ struct xfs_item_ops xfs_buf_item_ops = {
  */
 void
 xfs_buf_item_init(
-	buf_t		*bp,
+	xfs_buf_t		*bp,
 	xfs_mount_t	*mp)
 {
 	xfs_log_item_t		*lip;
@@ -822,7 +822,7 @@ xfs_buf_item_log_debug(
  */
 void
 xfs_buf_item_flush_log_debug(
-	buf_t	*bp,
+	xfs_buf_t	*bp,
 	uint	first,
 	uint	last)
 {
@@ -855,7 +855,7 @@ xfs_buf_item_log_check(
 	char	*orig;
 	char	*buffer;
 	int	x;
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 
 	ASSERT(bip->bli_orig != NULL);
 	ASSERT(bip->bli_logged != NULL);
@@ -1127,7 +1127,7 @@ xfs_buf_item_dirty(
  */
 void
 xfs_buf_item_relse(
-	buf_t	*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -1164,8 +1164,8 @@ xfs_buf_item_relse(
  */
 void
 xfs_buf_attach_iodone(
-	buf_t		*bp,
-	void		(*cb)(buf_t *, xfs_log_item_t *),
+	xfs_buf_t		*bp,
+	void		(*cb)(xfs_buf_t *, xfs_log_item_t *),
 	xfs_log_item_t	*lip)
 {
 	xfs_log_item_t	*head_lip;
@@ -1191,7 +1191,7 @@ xfs_buf_attach_iodone(
 
 STATIC void
 xfs_buf_do_callbacks(
-	buf_t		*bp,
+	xfs_buf_t		*bp,
 	xfs_log_item_t	*lip)
 {
 	xfs_log_item_t	*nlip;
@@ -1220,7 +1220,7 @@ xfs_buf_do_callbacks(
  */
 void
 xfs_buf_iodone_callbacks(
-	buf_t	*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_log_item_t	*lip;
 	static time_t	lasttime;
@@ -1327,7 +1327,7 @@ xfs_buf_iodone_callbacks(
  */
 STATIC void
 xfs_buf_error_relse(
-	buf_t	*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_log_item_t 	*lip;
 	xfs_mount_t	*mp;
@@ -1366,7 +1366,7 @@ xfs_buf_error_relse(
 /* ARGSUSED */
 void
 xfs_buf_iodone(
-	buf_t			*bp,
+	xfs_buf_t			*bp,
 	xfs_buf_log_item_t	*bip)
 {
 	struct xfs_mount	*mp;
@@ -1410,7 +1410,7 @@ xfs_buf_item_trace(
 	char			*id,
 	xfs_buf_log_item_t	*bip)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 	ASSERT(bip->bli_trace != NULL);
 
 	bp = bip->bli_buf;

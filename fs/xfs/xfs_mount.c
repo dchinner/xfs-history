@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.186 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -8,7 +8,7 @@
 #define _KERNEL	1
 #endif /* SIM */
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -69,7 +69,7 @@
 
 
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int, int);
-STATIC void	xfs_sb_relse(buf_t *);
+STATIC void	xfs_sb_relse(xfs_buf_t *);
 #ifndef SIM
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
@@ -227,7 +227,7 @@ xfs_mount_validate_sb(
 int
 xfs_readsb(xfs_mount_t *mp, dev_t dev)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error = 0;
 
@@ -314,7 +314,7 @@ xfs_mountfs_int(
 	dev_t 		dev, 
 	int             mfsi_flags)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	xfs_sb_t	*sbp = &(mp->m_sb);
 	int		error = 0;
 	int		i;
@@ -1047,7 +1047,7 @@ xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 int
 xfs_unmountfs_writesb(xfs_mount_t *mp)
 {
-	buf_t		*sbp;
+	xfs_buf_t		*sbp;
 	xfs_sb_t	*sb;
 	int		error = 0;
 
@@ -1107,7 +1107,7 @@ xfs_umount(xfs_mount_t *mp)
 void
 xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		first;
 	int		last;
 	xfs_mount_t	*mp;
@@ -1444,11 +1444,11 @@ xfs_mod_incore_sb_batch(xfs_mount_t *mp, xfs_mod_sb_t *msb, uint nmsb, int rsvd)
  * the superblock buffer if it can be locked without sleeping.
  * If it can't then we'll return NULL.
  */
-buf_t *
+xfs_buf_t *
 xfs_getsb(xfs_mount_t	*mp,
 	  int		flags)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 
 	ASSERT(mp->m_sb_bp != NULL);
 	bp = mp->m_sb_bp;
@@ -1470,7 +1470,7 @@ void
 xfs_freesb(
         xfs_mount_t	*mp)
 {
-        buf_t	*bp;
+        xfs_buf_t	*bp;
 
 	/*
 	 * Use xfs_getsb() so that the buffer will be locked
@@ -1487,7 +1487,7 @@ xfs_freesb(
  * flags.
  */
 STATIC void
-xfs_sb_relse(buf_t *bp)
+xfs_sb_relse(xfs_buf_t *bp)
 {
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT(valusema(&bp->b_lock) <= 0);

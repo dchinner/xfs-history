@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.111 $"
+#ident	"$Revision: 1.113 $"
 
 /*
  * Free space allocation for XFS.
@@ -12,7 +12,7 @@
 #endif
 #include <sys/param.h>
 #include <sys/sysinfo.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/ksa.h>
 #include <sys/debug.h>
 #ifdef SIM
@@ -136,7 +136,7 @@ xfs_alloc_read_agfl(
 	xfs_mount_t	*mp,		/* mount point structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
-	buf_t		**bpp);		/* buffer for the ag free block array */
+	xfs_buf_t		**bpp);		/* buffer for the ag free block array */
 
 #if defined(XFS_ALLOC_TRACE)
 /*
@@ -252,7 +252,7 @@ xfs_alloc_ag_vextent_small(
 STATIC int			/* error */
 xfs_free_ag_extent(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbp,	/* buffer for a.g. freelist header */
+	xfs_buf_t		*agbp,	/* buffer for a.g. freelist header */
 	xfs_agnumber_t	agno,	/* allocation group number */
 	xfs_agblock_t	bno,	/* starting block number */
 	xfs_extlen_t	len,	/* length of extent */
@@ -565,9 +565,9 @@ xfs_alloc_read_agfl(
 	xfs_mount_t	*mp,		/* mount point structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
-	buf_t		**bpp)		/* buffer for the ag free block array */
+	xfs_buf_t		**bpp)		/* buffer for the ag free block array */
 {
-	buf_t		*bp;		/* return value */
+	xfs_buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	int		error;
 
@@ -1601,7 +1601,7 @@ xfs_alloc_ag_vextent_small(
 			goto error0;
 		if (fbno != NULLAGBLOCK) {
 			if (args->userdata) {
-				buf_t	*bp;
+				xfs_buf_t	*bp;
 
 				bp = xfs_btree_get_bufs(args->mp, args->tp,
 					args->agno, fbno, 0);
@@ -1665,7 +1665,7 @@ error0:
 STATIC int			/* error */
 xfs_free_ag_extent(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbp,	/* buffer for a.g. freelist header */
+	xfs_buf_t		*agbp,	/* buffer for a.g. freelist header */
 	xfs_agnumber_t	agno,	/* allocation group number */
 	xfs_agblock_t	bno,	/* starting block number */
 	xfs_extlen_t	len,	/* length of extent */
@@ -1960,9 +1960,9 @@ xfs_alloc_fix_freelist(
 	xfs_alloc_arg_t	*args,	/* allocation argument structure */
 	int		flags)	/* XFS_ALLOC_FLAG_... */
 {
-	buf_t		*agbp;	/* agf buffer pointer */
+	xfs_buf_t		*agbp;	/* agf buffer pointer */
 	xfs_agf_t	*agf;	/* a.g. freespace structure pointer */
-	buf_t		*agflbp;/* agfl buffer pointer */
+	xfs_buf_t		*agflbp;/* agfl buffer pointer */
 	xfs_agblock_t	bno;	/* freelist block */
 	xfs_extlen_t	delta;	/* new blocks needed in freelist */
 	int		error;	/* error result code */
@@ -2042,7 +2042,7 @@ xfs_alloc_fix_freelist(
 	 * Make the freelist shorter if it's too long.
 	 */
 	while (agf->agf_flcount > need) {
-		buf_t	*bp;
+		xfs_buf_t	*bp;
 
 		if (error = xfs_alloc_get_freelist(tp, agbp, &bno))
 			return error;
@@ -2122,12 +2122,12 @@ xfs_alloc_fix_freelist(
 int				/* error */
 xfs_alloc_get_freelist(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*agbp,	/* buffer containing the agf structure */
+	xfs_buf_t		*agbp,	/* buffer containing the agf structure */
 	xfs_agblock_t	*bnop)	/* block address retrieved from freelist */
 {
 	xfs_agf_t	*agf;	/* a.g. freespace structure */
 	xfs_agfl_t	*agfl;	/* a.g. freelist structure */
-	buf_t		*agflbp;/* buffer for a.g. freelist structure */
+	xfs_buf_t		*agflbp;/* buffer for a.g. freelist structure */
 	xfs_agblock_t	bno;	/* block number returned */
 	int		error;
 #ifdef XFS_ALLOC_TRACE
@@ -2174,7 +2174,7 @@ xfs_alloc_get_freelist(
 void
 xfs_alloc_log_agf(
 	xfs_trans_t	*tp,	/* transaction pointer */
-	buf_t		*bp,	/* buffer for a.g. freelist header */
+	xfs_buf_t		*bp,	/* buffer for a.g. freelist header */
 	int		fields)	/* mask of fields to be logged (XFS_AGF_...) */
 {
 	int	first;		/* first byte offset */
@@ -2208,7 +2208,7 @@ xfs_alloc_pagf_init(
 	xfs_agnumber_t		agno,	/* allocation group number */
 	int			flags)	/* XFS_ALLOC_FLAGS_... */
 {
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	int			error;
 
 	if (error = xfs_alloc_read_agf(mp, tp, agno, flags, &bp))
@@ -2224,8 +2224,8 @@ xfs_alloc_pagf_init(
 int					/* error */
 xfs_alloc_put_freelist(
 	xfs_trans_t		*tp,	/* transaction pointer */
-	buf_t			*agbp,	/* buffer for a.g. freelist header */
-	buf_t			*agflbp,/* buffer for a.g. free block array */
+	xfs_buf_t			*agbp,	/* buffer for a.g. freelist header */
+	xfs_buf_t			*agflbp,/* buffer for a.g. free block array */
 	xfs_agblock_t		bno)	/* block being freed */
 {
 	xfs_agf_t		*agf;	/* a.g. freespace structure */
@@ -2269,11 +2269,11 @@ xfs_alloc_read_agf(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
 	int		flags,		/* XFS_ALLOC_FLAG_... */
-	buf_t		**bpp)		/* buffer for the ag freelist header */
+	xfs_buf_t		**bpp)		/* buffer for the ag freelist header */
 {
 	xfs_agf_t	*agf;		/* ag freelist header */
 	int		agf_ok;		/* set if agf is consistent */
-	buf_t		*bp;		/* return value */
+	xfs_buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	int		error;
 	xfs_perag_t	*pag;		/* per allocation group data */

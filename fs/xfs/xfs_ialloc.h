@@ -1,9 +1,9 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.31 $"
+#ident	"$Revision: 1.32 $"
 
-struct buf;
+struct xfs_buf;
 struct xfs_dinode;
 struct xfs_mount;
 struct xfs_trans;
@@ -39,7 +39,7 @@ xfs_extlen_t xfs_ialloc_blocks(struct xfs_mount *mp);
  * Make an inode pointer out of the buffer/offset.
  */
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MAKE_IPTR)
-struct xfs_dinode *xfs_make_iptr(struct xfs_mount *mp, struct buf *b, int o);
+struct xfs_dinode *xfs_make_iptr(struct xfs_mount *mp, struct xfs_buf *b, int o);
 #define	XFS_MAKE_IPTR(mp,b,o) 		xfs_make_iptr(mp,b,o)
 #else
 #define	XFS_MAKE_IPTR(mp,b,o) \
@@ -88,7 +88,7 @@ xfs_dialloc(
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	mode_t		mode,		/* mode bits for new inode */
 	int		okalloc,	/* ok to allocate more space */
-	struct buf	**agbp,		/* buf for a.g. inode header */
+	struct xfs_buf	**agbp,		/* buf for a.g. inode header */
 	boolean_t	*alloc_done,	/* an allocation was done to replenish
 					   the free inodes */
 	xfs_ino_t	*inop);		/* inode number allocated */
@@ -132,7 +132,7 @@ xfs_ialloc_compute_maxlevels(
 void
 xfs_ialloc_log_agi(
 	struct xfs_trans *tp,		/* transaction pointer */
-	struct buf	*bp,		/* allocation group header buffer */
+	struct xfs_buf	*bp,		/* allocation group header buffer */
 	int		fields);	/* bitmask of fields to log */
 
 /*
@@ -143,6 +143,6 @@ xfs_ialloc_read_agi(
 	struct xfs_mount *mp,		/* file system mount structure */
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
-	struct buf	**bpp);		/* allocation group hdr buf */
+	struct xfs_buf	**bpp);		/* allocation group hdr buf */
 
 #endif	/* !_FS_XFS_IALLOC_H */

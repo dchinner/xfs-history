@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.63 $"
+#ident	"$Revision: 1.65 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -11,7 +11,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
@@ -116,7 +116,7 @@ xfs_btree_check_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block,	/* generic btree block pointer */
 	int			level,	/* level of the btree block */
-	buf_t			*bp)	/* buffer containing block, if any */
+	xfs_buf_t			*bp)	/* buffer containing block, if any */
 {
 	if (XFS_BTREE_LONG_PTRS(cur->bc_btnum))
 		xfs_btree_check_lblock(cur, (xfs_btree_lblock_t *)block, level,
@@ -187,7 +187,7 @@ xfs_btree_check_lblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
 	int			level,	/* level of the btree block */
-	buf_t			*bp)	/* buffer for block, if any */
+	xfs_buf_t			*bp)	/* buffer for block, if any */
 {
 	int			lblock_ok; /* block passes checks */
 	xfs_mount_t		*mp;	/* file system mount point */
@@ -299,9 +299,9 @@ xfs_btree_check_sblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_sblock_t	*block,	/* btree short form block pointer */
 	int			level,	/* level of the btree block */
-	buf_t			*bp)	/* buffer containing block */
+	xfs_buf_t			*bp)	/* buffer containing block */
 {
-	buf_t			*agbp;	/* buffer for ag. freespace struct */
+	xfs_buf_t			*agbp;	/* buffer for ag. freespace struct */
 	xfs_agf_t		*agf;	/* ag. freespace structure */
 	int			sblock_ok; /* block passes checks */
 
@@ -338,7 +338,7 @@ xfs_btree_check_sptr(
 	xfs_agblock_t	ptr,		/* btree block disk address */
 	int		level)		/* btree block level */
 {
-	buf_t		*agbp;		/* buffer for ag. freespace struct */
+	xfs_buf_t		*agbp;		/* buffer for ag. freespace struct */
 	xfs_agf_t	*agf;		/* ag. freespace structure */
 
 	agbp = cur->bc_private.a.agbp;
@@ -396,7 +396,7 @@ xfs_btree_dup_cursor(
 	xfs_btree_cur_t	*cur,		/* input cursor */
 	xfs_btree_cur_t	**ncur)		/* output cursor */
 {
-	buf_t		*bp;		/* btree block's buffer pointer */
+	xfs_buf_t		*bp;		/* btree block's buffer pointer */
 	int 		error;		/* error return value */
 	int		i;		/* level number of btree block */
 	xfs_mount_t	*mp;		/* mount structure for filesystem */
@@ -458,7 +458,7 @@ xfs_btree_firstrec(
 	int			level)	/* level to change */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
-	buf_t			*bp;	/* buffer containing block */
+	xfs_buf_t			*bp;	/* buffer containing block */
 
 	/*
 	 * Get the block pointer for this level.
@@ -485,10 +485,10 @@ xfs_btree_block_t *			/* generic btree block pointer */
 xfs_btree_get_block(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			level,	/* level in btree */
-	buf_t			**bpp)	/* buffer containing the block */
+	xfs_buf_t			**bpp)	/* buffer containing the block */
 {
 	xfs_btree_block_t	*block;	/* return value */
-	buf_t			*bp;	/* return buffer */
+	xfs_buf_t			*bp;	/* return buffer */
 	xfs_ifork_t		*ifp;	/* inode fork pointer */
 	int			whichfork; /* data or attr fork */
 
@@ -510,14 +510,14 @@ xfs_btree_get_block(
  * Get a buffer for the block, return it with no data read.
  * Long-form addressing.
  */
-buf_t *					/* buffer for fsbno */
+xfs_buf_t *					/* buffer for fsbno */
 xfs_btree_get_bufl(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_fsblock_t	fsbno,		/* file system block number */
 	uint		lock)		/* lock flags for get_buf */
 {
-	buf_t		*bp;		/* buffer pointer (return value) */
+	xfs_buf_t		*bp;		/* buffer pointer (return value) */
 	daddr_t		d;		/* real disk block address */
 
 	ASSERT(fsbno != NULLFSBLOCK);
@@ -532,7 +532,7 @@ xfs_btree_get_bufl(
  * Get a buffer for the block, return it with no data read.
  * Short-form addressing.
  */
-buf_t *					/* buffer for agno/agbno */
+xfs_buf_t *					/* buffer for agno/agbno */
 xfs_btree_get_bufs(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -540,7 +540,7 @@ xfs_btree_get_bufs(
 	xfs_agblock_t	agbno,		/* allocation group block number */
 	uint		lock)		/* lock flags for get_buf */
 {
-	buf_t		*bp;		/* buffer pointer (return value) */
+	xfs_buf_t		*bp;		/* buffer pointer (return value) */
 	daddr_t		d;		/* real disk block address */
 
 	ASSERT(agno != NULLAGNUMBER);
@@ -560,7 +560,7 @@ xfs_btree_cur_t *			/* new btree cursor */
 xfs_btree_init_cursor(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbp,		/* (A only) buffer for agf structure */
+	xfs_buf_t		*agbp,		/* (A only) buffer for agf structure */
 					/* (I only) buffer for agi structure */
 	xfs_agnumber_t	agno,		/* (AI only) allocation group number */
 	xfs_btnum_t	btnum,		/* btree identifier */
@@ -650,7 +650,7 @@ xfs_btree_islastblock(
 	int			level)	/* level to check */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
-	buf_t			*bp;	/* buffer containing block */
+	xfs_buf_t			*bp;	/* buffer containing block */
 
 	block = xfs_btree_get_block(cur, level, &bp);
 	xfs_btree_check_block(cur, block, level, bp);
@@ -670,7 +670,7 @@ xfs_btree_lastrec(
 	int			level)	/* level to change */
 {
 	xfs_btree_block_t	*block;	/* generic btree block pointer */
-	buf_t			*bp;	/* buffer containing block */
+	xfs_buf_t			*bp;	/* buffer containing block */
 
 	/*
 	 * Get the block pointer for this level.
@@ -735,10 +735,10 @@ xfs_btree_read_bufl(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_fsblock_t	fsbno,		/* file system block number */
 	uint		lock,		/* lock flags for read_buf */
-	buf_t		**bpp,		/* buffer for fsbno */
+	xfs_buf_t		**bpp,		/* buffer for fsbno */
 	int		refval)		/* ref count value for buffer */
 {
-	buf_t		*bp;		/* return value */
+	xfs_buf_t		*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
 	int		error;
 
@@ -769,10 +769,10 @@ xfs_btree_read_bufs(
 	xfs_agnumber_t	agno,		/* allocation group number */
 	xfs_agblock_t	agbno,		/* allocation group block number */
 	uint		lock,		/* lock flags for read_buf */
-	buf_t		**bpp,		/* buffer for agno/agbno */
+	xfs_buf_t		**bpp,		/* buffer for agno/agbno */
 	int		refval)		/* ref count value for buffer */
 {
-	buf_t		*bp;		/* return value */
+	xfs_buf_t		*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
 	int		error;
 
@@ -915,10 +915,10 @@ void
 xfs_btree_setbuf(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	int			lev,	/* level in btree */
-	buf_t			*bp)	/* new buffer to set */
+	xfs_buf_t			*bp)	/* new buffer to set */
 {
 	xfs_btree_block_t	*b;	/* btree block */
-	buf_t			*obp;	/* old buffer pointer */
+	xfs_buf_t			*obp;	/* old buffer pointer */
 
 	obp = cur->bc_bufs[lev];
 	if (obp)

@@ -1,9 +1,9 @@
 #ifndef	_XFS_BUF_ITEM_H
 #define	_XFS_BUF_ITEM_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.24 $"
 
-struct buf;
+struct xfs_buf;
 struct ktrace;
 struct xfs_mount;
 
@@ -69,7 +69,7 @@ typedef struct xfs_buf_log_format_t {
  */
 typedef struct xfs_buf_log_item {
 	xfs_log_item_t		bli_item;	/* common item structure */
-	struct buf		*bli_buf;	/* real buffer pointer */
+	struct xfs_buf		*bli_buf;	/* real buffer pointer */
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
 	int			bli_refcount;	/* cnt of tp refs */
@@ -120,23 +120,23 @@ void	xfs_buf_item_trace(char *, xfs_buf_log_item_t *);
 #define	xfs_buf_item_trace(id, bip)
 #endif
 
-void	xfs_buf_item_init(struct buf *, struct xfs_mount *);
-void	xfs_buf_item_relse(struct buf *);
+void	xfs_buf_item_init(struct xfs_buf *, struct xfs_mount *);
+void	xfs_buf_item_relse(struct xfs_buf *);
 void	xfs_buf_item_log(xfs_buf_log_item_t *, uint, uint);
 uint	xfs_buf_item_dirty(xfs_buf_log_item_t *);
 int	xfs_buf_item_bits(uint *, uint, uint);
 int	xfs_buf_item_contig_bits(uint *, uint, uint);
 int	xfs_buf_item_next_bit(uint *, uint, uint);
-void	xfs_buf_attach_iodone(struct buf *,
-			      void(*)(struct buf *, xfs_log_item_t *),
+void	xfs_buf_attach_iodone(struct xfs_buf *,
+			      void(*)(struct xfs_buf *, xfs_log_item_t *),
 			      xfs_log_item_t *);
-void	xfs_buf_iodone_callbacks(struct buf *);
-void	xfs_buf_iodone(struct buf *, xfs_buf_log_item_t *);
+void	xfs_buf_iodone_callbacks(struct xfs_buf *);
+void	xfs_buf_iodone(struct xfs_buf *, xfs_buf_log_item_t *);
 
 #ifdef XFS_TRANS_DEBUG
 void
 xfs_buf_item_flush_log_debug(
-	struct buf *bp,			     
+	struct xfs_buf *bp,			     
 	uint	first,
 	uint	last);
 #else

@@ -1,10 +1,10 @@
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 
 #include <sys/param.h>
 #ifdef SIM
 #define _KERNEL	1
 #endif
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #ifdef SIM
 #undef _KERNEL
 #endif

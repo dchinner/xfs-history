@@ -14,7 +14,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/debug.h>
 #include <sys/uuid.h>
 #include <sys/fcntl.h>

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.28 $"
 
 /*
  * Allocation group header
@@ -9,7 +9,7 @@
  * buffers after a copy of the superblock (also in a 512-byte buffer).
  */
 
-struct buf;
+struct xfs_buf;
 struct xfs_mount;
 
 #define	XFS_AGF_MAGIC	0x58414746	/* 'XAGF' */
@@ -286,19 +286,19 @@ daddr_t xfs_ag_daddr(struct xfs_mount *mp, xfs_agnumber_t agno, daddr_t d);
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_AGF)
-xfs_agf_t *xfs_buf_to_agf(struct buf *bp);
+xfs_agf_t *xfs_buf_to_agf(struct xfs_buf *bp);
 #define	XFS_BUF_TO_AGF(bp)		xfs_buf_to_agf(bp)
 #else
 #define	XFS_BUF_TO_AGF(bp)	((xfs_agf_t *)(bp)->b_un.b_addr)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_AGI)
-xfs_agi_t *xfs_buf_to_agi(struct buf *bp);
+xfs_agi_t *xfs_buf_to_agi(struct xfs_buf *bp);
 #define	XFS_BUF_TO_AGI(bp)		xfs_buf_to_agi(bp)
 #else
 #define	XFS_BUF_TO_AGI(bp)	((xfs_agi_t *)(bp)->b_un.b_addr)
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_AGFL)
-xfs_agfl_t *xfs_buf_to_agfl(struct buf *bp);
+xfs_agfl_t *xfs_buf_to_agfl(struct xfs_buf *bp);
 #define	XFS_BUF_TO_AGFL(bp)		xfs_buf_to_agfl(bp)
 #else
 #define	XFS_BUF_TO_AGFL(bp)	((xfs_agfl_t *)(bp)->b_un.b_addr)

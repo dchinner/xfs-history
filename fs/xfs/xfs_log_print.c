@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -12,7 +12,7 @@
 #include <sys/param.h>
 
 #include <sys/sysmacros.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sema.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
@@ -76,7 +76,7 @@
 #ifndef _KERNEL
 extern int		xlog_find_zeroed(struct log *log, daddr_t *blk_no);
 extern int		xlog_find_cycle_start(struct log *log,
-					      buf_t	*bp,	
+					      xfs_buf_t	*bp,	
 					      daddr_t	first_blk,
 					      daddr_t	*last_blk,
 					      uint	cycle);
@@ -91,7 +91,7 @@ xlog_print_find_oldest(
 	struct log  *log,
 	daddr_t *last_blk)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 	daddr_t	first_blk;
 	uint	first_half_cycle, last_half_cycle;
 	int	error;

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.28 $"
+#ident "$Revision: 1.29 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -7,7 +7,7 @@
 #define _KERNEL	1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sysmacros.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>

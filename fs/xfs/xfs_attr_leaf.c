@@ -9,7 +9,7 @@
 
 #include <sys/param.h>
 #include <sys/errno.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
@@ -2623,7 +2623,7 @@ xfs_attr_leaf_freextent(xfs_trans_t **trans, xfs_inode_t *dp,
 	xfs_dablk_t tblkno;
 	int tblkcnt, dblkcnt, nmap, error;
 	daddr_t dblkno;
-	buf_t *bp;
+	xfs_buf_t *bp;
 
 	/*
 	 * Roll through the "value", invalidating the attribute value's

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.35 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -13,7 +13,7 @@
 #define _KERNEL	1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #ifdef SIM

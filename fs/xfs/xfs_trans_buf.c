@@ -1,4 +1,4 @@
-#ident "$Revision: 1.59 $"
+#ident "$Revision: 1.60 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -8,7 +8,7 @@
 #define _KERNEL	1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sysmacros.h>
 #include <sys/atomic_ops.h>
 #include <sys/debug.h>
@@ -49,7 +49,7 @@
 #include "sim.h"
 #endif
 
-STATIC buf_t *
+STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
 	dev_t		dev,
@@ -57,7 +57,7 @@ xfs_trans_buf_item_match(
 	int		len);
 
 #ifdef DEBUG
-STATIC buf_t *
+STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	dev_t		dev,
@@ -83,14 +83,14 @@ xfs_trans_buf_item_match_all(
  * If the transaction pointer is NULL, make this just a normal
  * get_buf() call.
  */
-buf_t *
+xfs_buf_t *
 xfs_trans_get_buf(xfs_trans_t	*tp,
 		  buftarg_t	*target_dev,
 		  daddr_t	blkno,
 		  int		len,
 		  uint		flags)
 {
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 
 	/*
@@ -220,12 +220,12 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
  * buffer is a private buffer which we keep a pointer to in the
  * mount structure.
  */
-buf_t *
+xfs_buf_t *
 xfs_trans_getsb(xfs_trans_t	*tp,
 		struct xfs_mount *mp,
 		int		flags)
 {
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 
 	/*
@@ -327,9 +327,9 @@ xfs_trans_read_buf(
 	daddr_t		blkno,
 	int		len,
 	uint		flags,
-	buf_t		**bpp)
+	xfs_buf_t		**bpp)
 {
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 	int			error;
 	
@@ -573,7 +573,7 @@ shutdown_abort:
  */
 void
 xfs_trans_brelse(xfs_trans_t	*tp,
-		 buf_t		*bp)
+		 xfs_buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
 	xfs_log_item_t		*lip;
@@ -708,7 +708,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
  */
 void
 xfs_trans_bjoin(xfs_trans_t	*tp,
-		buf_t		*bp)
+		xfs_buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -753,7 +753,7 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 /* ARGSUSED */
 void
 xfs_trans_bhold(xfs_trans_t	*tp,
-		buf_t		*bp)
+		xfs_buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -781,7 +781,7 @@ xfs_trans_bhold(xfs_trans_t	*tp,
  */
 void
 xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
-				buf_t		*bp)
+				xfs_buf_t		*bp)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*bip;
@@ -814,7 +814,7 @@ xfs_trans_bhold_until_committed(xfs_trans_t	*tp,
  */
 void
 xfs_trans_log_buf(xfs_trans_t	*tp,
-		  buf_t		*bp,
+		  xfs_buf_t		*bp,
 		  uint		first,
 		  uint		last)
 {
@@ -845,7 +845,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	if (bp->b_iodone == NULL) {
 		bp->b_iodone = xfs_buf_iodone_callbacks;
 	}
-	bip->bli_item.li_cb = (void(*)(buf_t*,xfs_log_item_t*))xfs_buf_iodone;
+	bip->bli_item.li_cb = (void(*)(xfs_buf_t*,xfs_log_item_t*))xfs_buf_iodone;
 
 	/*
 	 * If we invalidated the buffer within this transaction, then
@@ -893,7 +893,7 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 void
 xfs_trans_binval(
 	xfs_trans_t	*tp,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*bip;
@@ -972,7 +972,7 @@ xfs_trans_binval(
 void
 xfs_trans_inode_buf(
 	xfs_trans_t	*tp,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -999,7 +999,7 @@ xfs_trans_inode_buf(
 void
 xfs_trans_inode_alloc_buf(
 	xfs_trans_t	*tp,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_buf_log_item_t	*bip;
 
@@ -1029,7 +1029,7 @@ xfs_trans_inode_alloc_buf(
 void
 xfs_trans_dquot_buf(
 	xfs_trans_t	*tp,
-	buf_t		*bp,
+	xfs_buf_t		*bp,
 	uint		type)
 {
 	xfs_buf_log_item_t	*bip;
@@ -1051,7 +1051,7 @@ xfs_trans_dquot_buf(
  * a part of the given transaction.  Only check the first, embedded
  * chunk, since we don't want to spend all day scanning large transactions.
  */
-STATIC buf_t *
+STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
 	dev_t		dev,
@@ -1061,7 +1061,7 @@ xfs_trans_buf_item_match(
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*blip;
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	int			i;
 
 	bp = NULL;
@@ -1105,7 +1105,7 @@ xfs_trans_buf_item_match(
  * a part of the given transaction.  Check all the chunks, we
  * want to be thorough.
  */
-STATIC buf_t *
+STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
 	dev_t		dev,
@@ -1115,7 +1115,7 @@ xfs_trans_buf_item_match_all(
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_desc_t	*lidp;
 	xfs_buf_log_item_t	*blip;
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	int			i;
 
 	bp = NULL;

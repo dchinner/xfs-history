@@ -9,7 +9,7 @@
 #endif
 #include <sys/param.h>
 #include <sys/sema.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -2768,7 +2768,7 @@ xfs_bmap_btree_to_extents(
 	/* REFERENCED */
 	xfs_bmbt_block_t	*cblock;/* child btree block */
 	xfs_fsblock_t		cbno;	/* child block number */
-	buf_t			*cbp;	/* child block's buffer */
+	xfs_buf_t			*cbp;	/* child block's buffer */
 	int			error;	/* error return value */
 	xfs_ifork_t		*ifp;	/* inode fork data */
 	xfs_mount_t		*mp;	/* mount point structure */
@@ -3216,7 +3216,7 @@ xfs_bmap_extents_to_btree(
 	int			whichfork)	/* data or attr fork */
 {
 	xfs_bmbt_block_t	*ablock;	/* allocated (child) bt block */
-	buf_t			*abp;		/* buffer for ablock */
+	xfs_buf_t			*abp;		/* buffer for ablock */
 	xfs_alloc_arg_t		args;		/* allocation arguments */
 	xfs_bmbt_rec_t		*arp;		/* child record pointer */
 	xfs_bmbt_block_t	*block;		/* btree root block */
@@ -3397,7 +3397,7 @@ xfs_bmap_local_to_extents(
 	error = 0;
 	if (ifp->if_bytes) {
 		xfs_alloc_arg_t	args;	/* allocation arguments */
-		buf_t		*bp;	/* buffer for extent list block */
+		xfs_buf_t		*bp;	/* buffer for extent list block */
 		xfs_bmbt_rec_t	*ep;	/* extent list pointer */
 
 		args.tp = tp;
@@ -4424,7 +4424,7 @@ xfs_bmap_read_extents(
 {
 	xfs_bmbt_block_t	*block;	/* current btree block */
 	xfs_fsblock_t		bno;	/* block # of "block" */
-	buf_t			*bp;	/* buffer for "block" */
+	xfs_buf_t			*bp;	/* buffer for "block" */
 	int			error;	/* error return value */
 	xfs_exntfmt_t		exntf;	/* XFS_EXTFMT_NOSTATE, if checking */
 #ifdef XFS_BMAP_TRACE
@@ -5927,7 +5927,7 @@ xfs_bmap_count_tree(
 	int		*count)		/* Count of blocks */        
 {
 	int			error;
-	buf_t			*bp, *nbp;
+	xfs_buf_t			*bp, *nbp;
 	int			level = levelin;
 	xfs_bmbt_ptr_t          *pp;
 	xfs_fsblock_t           bno = blockno;

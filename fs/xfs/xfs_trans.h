@@ -1,9 +1,9 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.101 $"
 
-struct buf;
+struct xfs_buf;
 struct buftarg;
 struct xfs_efd_log_item;
 struct xfs_efi_log_item;
@@ -42,7 +42,7 @@ typedef struct xfs_log_item {
 	uint				li_type;	/* item type */
 	uint				li_flags;	/* misc flags */
 	struct xfs_log_item		*li_bio_list;	/* buffer item list */
-	void				(*li_cb)(struct buf *,
+	void				(*li_cb)(struct xfs_buf *,
 						 struct xfs_log_item *);
 							/* buffer item iodone */
 							/* callback func */
@@ -898,27 +898,27 @@ int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint,
 void		xfs_trans_callback(xfs_trans_t *,
 				   void (*)(xfs_trans_t *, void *), void *);
 void		xfs_trans_mod_sb(xfs_trans_t *, uint, long);
-struct buf	*xfs_trans_get_buf(xfs_trans_t *, struct buftarg *, daddr_t,
+struct xfs_buf	*xfs_trans_get_buf(xfs_trans_t *, struct buftarg *, daddr_t,
 				   int, uint);
 int		xfs_trans_read_buf(struct xfs_mount *, xfs_trans_t *,
-				   dev_t, daddr_t, int, uint, struct buf **);
-struct buf	*xfs_trans_getsb(xfs_trans_t *, struct xfs_mount *, int);
+				   dev_t, daddr_t, int, uint, struct xfs_buf **);
+struct xfs_buf	*xfs_trans_getsb(xfs_trans_t *, struct xfs_mount *, int);
 
-void		xfs_trans_brelse(xfs_trans_t *, struct buf *);
-void		xfs_trans_bjoin(xfs_trans_t *, struct buf *);
-void		xfs_trans_bhold(xfs_trans_t *, struct buf *);
-void		xfs_trans_bhold_until_committed(xfs_trans_t *, struct buf *);
-void		xfs_trans_binval(xfs_trans_t *, struct buf *);
-void		xfs_trans_inode_buf(xfs_trans_t *, struct buf *);
-void		xfs_trans_dquot_buf(xfs_trans_t *, struct buf *, uint);
-void		xfs_trans_inode_alloc_buf(xfs_trans_t *, struct buf *);
+void		xfs_trans_brelse(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_bjoin(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_bhold(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_bhold_until_committed(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_binval(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_inode_buf(xfs_trans_t *, struct xfs_buf *);
+void		xfs_trans_dquot_buf(xfs_trans_t *, struct xfs_buf *, uint);
+void		xfs_trans_inode_alloc_buf(xfs_trans_t *, struct xfs_buf *);
 int		xfs_trans_iget(struct xfs_mount *, xfs_trans_t *,
 			       xfs_ino_t , uint, struct xfs_inode **);
 void		xfs_trans_iput(xfs_trans_t *, struct xfs_inode *, uint);
 void		xfs_trans_ijoin(xfs_trans_t *, struct xfs_inode *, uint);
 void		xfs_trans_ihold(xfs_trans_t *, struct xfs_inode *);
 void		xfs_trans_ihold_release(xfs_trans_t *, struct xfs_inode *);
-void		xfs_trans_log_buf(xfs_trans_t *, struct buf *, uint, uint);
+void		xfs_trans_log_buf(xfs_trans_t *, struct xfs_buf *, uint, uint);
 void		xfs_trans_log_inode(xfs_trans_t *, struct xfs_inode *, uint);
 struct xfs_efi_log_item	*xfs_trans_get_efi(xfs_trans_t *, uint);
 void		xfs_efi_release(struct xfs_efi_log_item *, uint);

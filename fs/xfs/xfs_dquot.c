@@ -1,7 +1,7 @@
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.33 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/ksa.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
@@ -72,15 +72,15 @@ STATIC int		xfs_qm_dqlookup(xfs_mount_t *, xfs_dqid_t,
 					xfs_dqhash_t *,	xfs_dquot_t **);
 STATIC int		xfs_qm_idtodq(xfs_mount_t *, xfs_dqid_t,
 				      uint, uint, xfs_dquot_t **);
-STATIC void 		xfs_qm_dqflush_done(buf_t *, xfs_dq_logitem_t *);
+STATIC void 		xfs_qm_dqflush_done(xfs_buf_t *, xfs_dq_logitem_t *);
 STATIC int		xfs_qm_dqtobp(xfs_trans_t *, xfs_dquot_t *,
-				      xfs_disk_dquot_t **, buf_t **, uint);
+				      xfs_disk_dquot_t **, xfs_buf_t **, uint);
 STATIC void		xfs_qm_init_dquot_blk(xfs_trans_t *, xfs_mount_t *,
-					      xfs_dqid_t, uint, buf_t *);
+					      xfs_dqid_t, uint, xfs_buf_t *);
 STATIC void		xfs_qm_dqinit_core(xfs_dqid_t, uint, xfs_dqblk_t *);
 STATIC int		xfs_qm_dqalloc(xfs_trans_t*, xfs_mount_t *,
 				       xfs_dquot_t*, xfs_inode_t *,
-				       xfs_fileoff_t, buf_t **);
+				       xfs_fileoff_t, xfs_buf_t **);
 STATIC int		xfs_qm_dqread(xfs_trans_t*, xfs_dqid_t, xfs_dquot_t *,
 				      uint);
 #ifdef DEBUG
@@ -369,7 +369,7 @@ xfs_qm_init_dquot_blk(
 	xfs_mount_t	*mp,
 	xfs_dqid_t	id,
 	uint		type,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_dqblk_t	*d;
 	int		curid, i;
@@ -409,13 +409,13 @@ xfs_qm_dqalloc(
 	xfs_dquot_t	*dqp,
 	xfs_inode_t 	*quotip,
 	xfs_fileoff_t   offset_fsb,
-	buf_t		**O_bpp)
+	xfs_buf_t		**O_bpp)
 {
 	xfs_fsblock_t   firstblock;
 	xfs_bmap_free_t flist;
 	xfs_bmbt_irec_t map;
 	int		nmaps, error, committed;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 
 	ASSERT(tp != NULL);
 	xfs_dqtrace_entry(dqp, "DQALLOC");
@@ -501,13 +501,13 @@ xfs_qm_dqtobp(
 	xfs_trans_t		*tp,
 	xfs_dquot_t    		*dqp,
 	xfs_disk_dquot_t	**O_ddpp,
-	buf_t          		**O_bpp,
+	xfs_buf_t          		**O_bpp,
 	uint			flags)
 {
 	xfs_fsblock_t   firstblock;
 	xfs_bmbt_irec_t map;
 	int             nmaps, error;
-	buf_t           *bp;
+	xfs_buf_t           *bp;
 	xfs_inode_t     *quotip;
 	xfs_mount_t	*mp;
 	xfs_disk_dquot_t *ddq;
@@ -640,7 +640,7 @@ xfs_qm_dqread(
 	uint        	flags)
 {
 	xfs_disk_dquot_t *ddqp;
-	buf_t		 *bp;
+	xfs_buf_t		 *bp;
 	int		 error;
 
 	/* 
@@ -1205,7 +1205,7 @@ xfs_qm_dqflush(
 	uint			flags)
 {
 	xfs_mount_t		*mp;
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	xfs_disk_dquot_t 	*ddqp;
 	int			error;
 	SPLDECL(s);
@@ -1277,7 +1277,7 @@ xfs_qm_dqflush(
 	 * Attach an iodone routine so that we can remove this dquot from the
 	 * AIL and release the flush lock once the dquot is synced to disk.
 	 */
-	xfs_buf_attach_iodone(bp, (void(*)(buf_t*,xfs_log_item_t*))
+	xfs_buf_attach_iodone(bp, (void(*)(xfs_buf_t*,xfs_log_item_t*))
 			      xfs_qm_dqflush_done, &(dqp->q_logitem.qli_item));
 	/*
 	 * If the buffer is pinned then push on the log so we won't
@@ -1313,7 +1313,7 @@ xfs_qm_dqflush(
 /*ARGSUSED*/
 STATIC void
 xfs_qm_dqflush_done(
-        buf_t         		*bp,
+        xfs_buf_t         		*bp,
         xfs_dq_logitem_t	*qip)
 {
         xfs_dquot_t     	*dqp;
@@ -1686,7 +1686,7 @@ void
 xfs_qm_dqflock_pushbuf_wait(
 	xfs_dquot_t *dqp)
 {
-	buf_t *bp;
+	xfs_buf_t *bp;
 	
 	/*
 	 * Check to see if the dquot has been flushed delayed

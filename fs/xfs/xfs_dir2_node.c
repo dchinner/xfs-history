@@ -1,4 +1,4 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 /*
  * xfs_dir2_node.c
@@ -13,7 +13,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/debug.h>
 #include <sys/uuid.h>
 #ifdef SIM

@@ -10,7 +10,7 @@
 #undef XFS_LOG_TRACE
 #endif
 
-struct buf;
+struct xfs_buf;
 struct ktrace;
 struct log;
 struct xfs_buf_cancel;
@@ -327,7 +327,7 @@ typedef struct xlog_iclog_fields {
 	sv_t			ic_forcesema;
 	struct xlog_in_core	*ic_next;
 	struct xlog_in_core	*ic_prev;
-	struct buf  		*ic_bp;
+	struct xfs_buf  		*ic_bp;
 	struct log		*ic_log;
 	xfs_log_callback_t	*ic_callback;
 	xfs_log_callback_t	**ic_callback_tail;
@@ -394,7 +394,7 @@ typedef struct log {
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
     struct xfs_mount	*l_mp;	        /* mount point */
-    struct buf		*l_xbuf;        /* extra buffer for log wrapping */
+    struct xfs_buf		*l_xbuf;        /* extra buffer for log wrapping */
     dev_t		l_dev;	        /* dev_t of log */
     daddr_t		l_logBBstart;   /* start block of log */
     int			l_logsize;      /* size of log in bytes */
@@ -443,9 +443,9 @@ extern int	 xlog_print_find_oldest(xlog_t *log, daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log, int readonly);
 extern int	 xlog_recover_finish(xlog_t *log, int mfsi_flags);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
-extern struct buf *xlog_get_bp(int);
-extern void	 xlog_put_bp(struct buf *);
-extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, struct buf *bp);
+extern struct xfs_buf *xlog_get_bp(int);
+extern void	 xlog_put_bp(struct xfs_buf *);
+extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, struct xfs_buf *bp);
 extern void	 xlog_recover_process_iunlinks(xlog_t *log);
 
 #define XLOG_TRACE_GRAB_FLUSH  1

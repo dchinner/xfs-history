@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.117 $"
+#ident	"$Revision: 1.118 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -10,7 +10,7 @@
 #endif
 #include <sys/param.h>
 #include <sys/vnode.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/debug.h>
@@ -64,7 +64,7 @@
 STATIC void
 xfs_ialloc_log_di(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*bp,		/* inode buffer */
+	xfs_buf_t		*bp,		/* inode buffer */
 	int		off,		/* index of inode in buffer */
 	int		fields);	/* bitmask of fields to log */
 
@@ -79,14 +79,14 @@ xfs_ialloc_log_di(
 STATIC int				/* error code or 0 */
 xfs_ialloc_ag_alloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbp,		/* alloc group buffer */
+	xfs_buf_t		*agbp,		/* alloc group buffer */
 	int		*stat);		/* success/failure */		    
 
 /*
  * Select an allocation group to look for a free inode in, based on the parent
  * inode and then mode.  Return the allocation group buffer.
  */
-STATIC buf_t *				/* allocation group buffer */
+STATIC xfs_buf_t *				/* allocation group buffer */
 xfs_ialloc_ag_select(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent directory inode number */
@@ -103,7 +103,7 @@ xfs_ialloc_ag_select(
 STATIC void
 xfs_ialloc_log_di(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*bp,		/* inode buffer */
+	xfs_buf_t		*bp,		/* inode buffer */
 	int		off,		/* index of inode in buffer */
 	int		fields)		/* bitmask of fields to log */
 {
@@ -172,7 +172,7 @@ xfs_ialloc_log_di(
 STATIC int				/* error code or 0 */
 xfs_ialloc_ag_alloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*agbp,		/* alloc group buffer */
+	xfs_buf_t		*agbp,		/* alloc group buffer */
 	int		*alloc)
 {
 	xfs_agi_t	*agi;		/* allocation group header */
@@ -181,7 +181,7 @@ xfs_ialloc_ag_alloc(
 	xfs_btree_cur_t	*cur;		/* inode btree cursor */
 	daddr_t		d;		/* disk addr of buffer */
 	int		error;
-	buf_t		*fbuf;		/* new free inodes' buffer */
+	xfs_buf_t		*fbuf;		/* new free inodes' buffer */
 	xfs_dinode_t	*free;		/* new free inode structure */
 	int		i;		/* inode counter */
 	int		j;		/* block counter */
@@ -392,14 +392,14 @@ xfs_ialloc_ag_alloc(
  * Select an allocation group to look for a free inode in, based on the parent
  * inode and then mode.  Return the allocation group buffer.
  */
-STATIC buf_t *				/* allocation group buffer */
+STATIC xfs_buf_t *				/* allocation group buffer */
 xfs_ialloc_ag_select(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent directory inode number */
 	mode_t		mode,		/* bits set to indicate file type */
 	int		okalloc)	/* ok to allocate more space */
 {
-	buf_t		*agbp;		/* allocation group header buffer */
+	xfs_buf_t		*agbp;		/* allocation group header buffer */
 	xfs_agnumber_t	agcount;	/* number of ag's in the filesystem */
 	xfs_agnumber_t	agno;		/* current ag number */
 	int		flags;		/* alloc buffer locking flags */
@@ -482,13 +482,13 @@ nextag:
 		 * down.
 		 */
 		if (XFS_FORCED_SHUTDOWN(mp))
-			return (buf_t *)0;
+			return (xfs_buf_t *)0;
 		agno++;
 		if (agno == agcount)
 			agno = 0;
 		if (agno == pagno) {
 			if (flags == 0)
-				return (buf_t *)0;
+				return (xfs_buf_t *)0;
 			flags = 0;
 		}
 	}
@@ -529,13 +529,13 @@ xfs_dialloc(
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	mode_t		mode,		/* mode bits for new inode */
 	int		okalloc,	/* ok to allocate more space */
-	buf_t		**IO_agbp,	/* in/out ag header's buffer */
+	xfs_buf_t		**IO_agbp,	/* in/out ag header's buffer */
 	boolean_t	*alloc_done,	/* true if we needed to replenish
 					   inode freelist */
 	xfs_ino_t	*inop)		/* inode number allocated */
 {
 	xfs_agnumber_t	agcount;	/* number of allocation groups */
-	buf_t		*agbp;		/* allocation group header's buffer */
+	xfs_buf_t		*agbp;		/* allocation group header's buffer */
 	xfs_agnumber_t	agno;		/* allocation group number */
 	xfs_agi_t	*agi;		/* allocation group header structure */
 	xfs_btree_cur_t	*cur;		/* inode allocation btree cursor */
@@ -948,7 +948,7 @@ xfs_difree(
 {
 	/* REFERENCED */
 	xfs_agblock_t	agbno;	/* block number containing inode */
-	buf_t		*agbp;	/* buffer containing allocation group header */
+	xfs_buf_t		*agbp;	/* buffer containing allocation group header */
 	xfs_agino_t	agino;	/* inode number relative to allocation group */
 	xfs_agnumber_t	agno;	/* allocation group number */
 	xfs_agi_t	*agi;	/* allocation group header */
@@ -1088,7 +1088,7 @@ xfs_dilocate(
 	uint		flags)	/* flags concerning inode lookup */	     
 {
 	xfs_agblock_t	agbno;	/* block number of inode in the alloc group */
-	buf_t		*agbp;	/* agi buffer */
+	xfs_buf_t		*agbp;	/* agi buffer */
 	xfs_agino_t	agino;	/* inode number within alloc group */
 	xfs_agnumber_t	agno;	/* allocation group number */
 	int		blks_per_cluster; /* num blocks per inode cluster */
@@ -1201,7 +1201,7 @@ xfs_ialloc_compute_maxlevels(
 void
 xfs_ialloc_log_agi(
 	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*bp,		/* allocation group header buffer */
+	xfs_buf_t		*bp,		/* allocation group header buffer */
 	int		fields)		/* bitmask of fields to log */
 {
 	int			first;		/* first byte number */
@@ -1245,11 +1245,11 @@ xfs_ialloc_read_agi(
 	xfs_mount_t	*mp,		/* file system mount structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
-	buf_t		**bpp)		/* allocation group hdr buf */
+	xfs_buf_t		**bpp)		/* allocation group hdr buf */
 {
 	xfs_agi_t	*agi;		/* allocation group header */
 	int		agi_ok;		/* agi is consistent */
-	buf_t		*bp;		/* allocation group hdr buf */
+	xfs_buf_t		*bp;		/* allocation group hdr buf */
 	daddr_t		d;		/* disk block address */
 	int		error;
 #ifdef DEBUG

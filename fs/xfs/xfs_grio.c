@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.78 1999/02/04 01:28:30 doucette Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.79 1999/11/17 19:22:23 lord Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -8,7 +8,7 @@
 #include <sys/systm.h>
 #endif
 #include <sys/debug.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sema.h>
 #include <sys/lock.h>
 #ifdef SIM

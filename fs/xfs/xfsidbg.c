@@ -12,7 +12,7 @@
 #ident	"$Revision$"
 
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/cred.h>
 #include <sys/debug.h>
 #include <sys/dirent.h>
@@ -129,8 +129,8 @@ static void	xfsidbg_xbrec(xfs_bmbt_rec_32_t *);
 static void	xfsidbg_xbroot(xfs_inode_t *);
 static void	xfsidbg_xbroota(xfs_inode_t *);
 static void	xfsidbg_xbtcur(xfs_btree_cur_t *);
-static void	xfsidbg_xbuf(buf_t *);
-static void	xfsidbg_xbuf_real(buf_t *, int);
+static void	xfsidbg_xbuf(xfs_buf_t *);
+static void	xfsidbg_xbuf_real(xfs_buf_t *, int);
 #ifdef DEBUG
 static void	xfsidbg_xbxatrace(int);
 static void	xfsidbg_xbxitrace(xfs_inode_t *);
@@ -207,7 +207,7 @@ static void	xfsidbg_xsb(xfs_sb_t *);
 static void 	xfsidbg_xstrat_atrace(int);
 static void 	xfsidbg_xstrat_itrace(xfs_inode_t *);
 static void 	xfsidbg_xstrat_strace(xfs_inode_t *);
-static void	xfsidbg_xstrat_btrace(buf_t *);
+static void	xfsidbg_xstrat_btrace(xfs_buf_t *);
 #endif
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
@@ -432,7 +432,7 @@ static char *xfs_fmtmode(int m);
 static char *xfs_fmtsize(size_t i);
 static char *xfs_fmtuuid(uuid_t *);
 static void xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary);
-static void xfs_inodebuf(buf_t *bp);
+static void xfs_inodebuf(xfs_buf_t *bp);
 #ifdef DEBUG
 static void xfs_iomap_enter_trace_entry(ktrace_entry_t *ktep);
 static void xfs_iomap_map_trace_entry(ktrace_entry_t *ktep);
@@ -693,12 +693,12 @@ xfs_bmbt_trace_entry(
 	switch (type) {
 	case XFS_BMBT_KTRACE_ARGBI:
 		qprintf(" buf 0x%x i %d\n",
-			(buf_t *)ktep->val[5],
+			(xfs_buf_t *)ktep->val[5],
 			(__psint_t)ktep->val[6]);
 		break;
 	case XFS_BMBT_KTRACE_ARGBII:
 		qprintf(" buf 0x%x i0 %d i1 %d\n",
-			(buf_t *)ktep->val[5],
+			(xfs_buf_t *)ktep->val[5],
 			(__psint_t)ktep->val[6],
 			(__psint_t)ktep->val[7]);
 		break;
@@ -753,10 +753,10 @@ xfs_bmbt_trace_entry(
 		r.l3 = (xfs_bmbt_rec_base_t)ktep->val[9];
 		xfsidbg_xbrec(&r);
 		qprintf(" bufs 0x%x 0x%x 0x%x 0x%x ",
-			(buf_t *)ktep->val[10],
-			(buf_t *)ktep->val[11],
-			(buf_t *)ktep->val[12],
-			(buf_t *)ktep->val[13]);
+			(xfs_buf_t *)ktep->val[10],
+			(xfs_buf_t *)ktep->val[11],
+			(xfs_buf_t *)ktep->val[12],
+			(xfs_buf_t *)ktep->val[13]);
 		qprintf("ptrs %d %d %d %d\n",
 			(__psint_t)ktep->val[14] >> 16,
 			(__psint_t)ktep->val[14] & 0xffff,
@@ -1428,7 +1428,7 @@ xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary)
  * Print buffer full of inodes.
  */
 static void
-xfs_inodebuf(buf_t *bp)
+xfs_inodebuf(xfs_buf_t *bp)
 {
 	xfs_dinode_t *di;
 	int n, i;
@@ -2540,7 +2540,7 @@ xfsidbg_xbtcur(xfs_btree_cur_t *c)
  * and invoke a print routine.
  */
 static void
-xfsidbg_xbuf(buf_t *bp)
+xfsidbg_xbuf(xfs_buf_t *bp)
 {
 	xfsidbg_xbuf_real(bp, 0);
 }
@@ -2550,7 +2550,7 @@ xfsidbg_xbuf(buf_t *bp)
  * and invoke a print routine (if asked to).
  */
 static void
-xfsidbg_xbuf_real(buf_t *bp, int summary)
+xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 {
 	void *d;
 	xfs_agf_t *agf;
@@ -4915,7 +4915,7 @@ xfsidbg_xstrat_strace(xfs_inode_t *ip)
  * Print global strategy trace entries for a particular buffer.
  */
 static void
-xfsidbg_xstrat_btrace(struct buf *bp)
+xfsidbg_xstrat_btrace(struct xfs_buf *bp)
 {
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
@@ -4929,7 +4929,7 @@ xfsidbg_xstrat_btrace(struct buf *bp)
 	qprintf("xstratb bp 0x%x\n", bp);
 	ktep = ktrace_first(xfs_strat_trace_buf, &kts);
 	while (ktep != NULL) {
-		if ((struct buf *)(ktep->val[4]) == bp) {
+		if ((struct xfs_buf *)(ktep->val[4]) == bp) {
 			qprintf("\n");
 			xfs_strat_trace_entry(ktep);
 		}

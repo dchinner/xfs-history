@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.15 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -15,7 +15,7 @@
 #include <sys/errno.h>
 #include <sys/dmi.h>
 #include <sys/dmi_kern.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <ksys/fsc_notify.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"

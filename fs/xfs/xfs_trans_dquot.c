@@ -1,6 +1,6 @@
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/errno.h>

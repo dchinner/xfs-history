@@ -14,7 +14,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished - 
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -25,7 +25,7 @@
 #include <sys/systm.h>
 #include <sys/attributes.h>
 #include <sys/uuid.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"

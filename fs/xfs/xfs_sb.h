@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.39 $"
 
 /*
  * Super block
@@ -9,7 +9,7 @@
  * Only the first of these is ever updated except during growfs.
  */
 
-struct buf;
+struct xfs_buf;
 struct xfs_mount;
 
 #define	XFS_SB_MAGIC		0x58465342	/* 'XFSB' */
@@ -449,7 +449,7 @@ daddr_t xfs_fsb_to_daddr(struct xfs_mount *mp, xfs_fsblock_t fsbno);
 #define	XFS_B_FSB_OFFSET(mp,b)	((b) & (mp)->m_blockmask)     
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_SBP)
-xfs_sb_t *xfs_buf_to_sbp(struct buf *bp);
+xfs_sb_t *xfs_buf_to_sbp(struct xfs_buf *bp);
 #define	XFS_BUF_TO_SBP(bp)	xfs_buf_to_sbp(bp)
 #else
 #define	XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)(bp)->b_un.b_addr)

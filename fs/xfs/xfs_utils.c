@@ -1,7 +1,7 @@
-#ident "$Revision$"
+#ident "$Revision: 1.17 $"
 
 #include <sys/types.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/uuid.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -351,7 +351,7 @@ xfs_dir_ialloc(
 	xfs_trans_t	*tp;
 	xfs_trans_t	*ntp;
 	xfs_inode_t	*ip;
-	buf_t		*ialloc_context = NULL;
+	xfs_buf_t		*ialloc_context = NULL;
 	boolean_t	call_again = B_FALSE;
 	int		code;
 	uint		log_res;

@@ -1,10 +1,10 @@
-#ident "$Id$"
+#ident "$Id: xfs_dfrag.c,v 1.7 1999/10/28 10:27:04 lord Exp $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
 
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sema.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>

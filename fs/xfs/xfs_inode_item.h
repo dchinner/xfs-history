@@ -1,9 +1,9 @@
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.32 $"
 
-struct buf;
+struct xfs_buf;
 struct proc;
 struct xfs_bmbt_rec_32;
 struct xfs_inode;
@@ -148,7 +148,7 @@ int xfs_ilog_fext(int w);
      
 void	xfs_inode_item_init(struct xfs_inode *, struct xfs_mount *);
 void	xfs_inode_item_destroy(struct xfs_inode *);
-void	xfs_iflush_done(struct buf *, xfs_inode_log_item_t *);
+void	xfs_iflush_done(struct xfs_buf *, xfs_inode_log_item_t *);
 void	xfs_iflush_abort(struct xfs_inode *);
 
 #endif	/* _XFS_INODE_ITEM_H */

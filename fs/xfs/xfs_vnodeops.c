@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/timers.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -1269,7 +1269,7 @@ xfs_readlink(
 	daddr_t         d;
 	int             byte_cnt;
 	int		n;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_readlink", (inst_t *)__return_address);
@@ -1762,7 +1762,7 @@ xfs_inactive_symlink_rmt(
 	xfs_inode_t	*ip,
 	xfs_trans_t	**tpp)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		committed;
 	int		done;
 	int		error;
@@ -4836,7 +4836,7 @@ xfs_symlink(
 	char			*cur_chunk;
 	int			byte_cnt;
 	int			n;
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	xfs_prid_t		prid;
 	struct xfs_dquot	*udqp, *pdqp;
 	uint			resblks;
@@ -6516,7 +6516,7 @@ xfs_zero_remaining_bytes(
 	off_t			startoff,
 	off_t			endoff)
 {
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	int			error;
 	xfs_bmbt_irec_t		imap;
 	off_t			lastoffset;

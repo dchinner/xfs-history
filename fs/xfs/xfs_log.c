@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.174 $"
 
 /*
  * High level interface routines for log manager
@@ -14,7 +14,7 @@
 #endif
 
 #include <sys/sysmacros.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
@@ -70,7 +70,7 @@
 	  (off) += (bytes);}
 
 /* Local miscellaneous function prototypes */
-STATIC int	 xlog_bdstrat_cb(struct buf *);
+STATIC int	 xlog_bdstrat_cb(struct xfs_buf *);
 STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
 				    xfs_lsn_t *);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
@@ -948,7 +948,7 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
  * happens with the buffer after the write completes.
  */
 void
-xlog_iodone(buf_t *bp)
+xlog_iodone(xfs_buf_t *bp)
 {
 	xlog_in_core_t *iclog;
 	int		aborted;
@@ -996,7 +996,7 @@ xlog_iodone(buf_t *bp)
  * started or completed afterwards.
  */
 STATIC int
-xlog_bdstrat_cb(struct buf *bp)
+xlog_bdstrat_cb(struct xfs_buf *bp)
 {
 	xlog_in_core_t *iclog;
 
@@ -1147,7 +1147,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_rec_header_t	*head;
 	xlog_in_core_t		**iclogp;
 	xlog_in_core_t		*iclog, *prev_iclog;
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	int			i;
 	int			iclogsize;
 
@@ -1368,7 +1368,7 @@ xlog_sync(xlog_t		*log,
 	  uint			flags)
 {
 	caddr_t		dptr;		/* pointer to byte sized element */
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		i;
 	uint		count;		/* byte count of bwrite */
 	int		split = 0;	/* split write into two regions */
@@ -3195,7 +3195,7 @@ STATIC void
 xlog_verify_disk_cycle_no(xlog_t	 *log,
 			  xlog_in_core_t *iclog)
 {
-    buf_t	*bp;
+    xfs_buf_t	*bp;
     uint	cycle_no;
     daddr_t	i;
 

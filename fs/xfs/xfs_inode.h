@@ -1,10 +1,10 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.126 $"
 
 struct bhv_desc;
-struct buf;
+struct xfs_buf;
 struct cred;
 struct grio_ticket;
 struct ktrace;
@@ -27,7 +27,7 @@ struct xfs_trans;
 struct xfs_bmbt_irec;
 struct xfs_mount;
 struct cred;
-struct buf;
+struct xfs_buf;
 struct flid;
 struct pm;
 
@@ -57,7 +57,7 @@ struct pm;
  * and file for xfs_dio_write and xfs_dio_read.
  */
 typedef	struct xfs_dio {
-	struct buf	*xd_bp;
+	struct xfs_buf	*xd_bp;
 	bhv_desc_t	*xd_bdp;
 	struct xfs_inode *xd_ip;
 	struct xfs_iocore *xd_io;
@@ -178,7 +178,7 @@ typedef struct xfs_chashlist {
 	daddr_t			chl_blkno;	/* starting block number of 
 						 * the cluster */
 #ifdef DEBUG
-	struct buf		*chl_buf;	/* debug: the inode buffer */
+	struct xfs_buf		*chl_buf;	/* debug: the inode buffer */
 #endif
 } xfs_chashlist_t;
 
@@ -580,16 +580,16 @@ void		xfs_ireclaim(xfs_inode_t *);
  * xfs_inode.c prototypes.
  */
 int		xfs_inotobp(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
-			    xfs_dinode_t **, struct buf **);
+			    xfs_dinode_t **, struct xfs_buf **);
 int		xfs_itobp(struct xfs_mount *, struct xfs_trans *,
-			  xfs_inode_t *, xfs_dinode_t **, struct buf **,
+			  xfs_inode_t *, xfs_dinode_t **, struct xfs_buf **,
 			  daddr_t);
 int		xfs_iread(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 			  xfs_inode_t **, daddr_t);
 int		xfs_iread_extents(struct xfs_trans *, xfs_inode_t *, int);
 int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
 		           dev_t, struct cred *, xfs_prid_t, int,
-			   struct buf **, boolean_t *, xfs_inode_t **);
+			   struct xfs_buf **, boolean_t *, xfs_inode_t **);
 #ifndef SIM
 int		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
 int		xfs_atruncate_start(xfs_inode_t *);
@@ -630,7 +630,7 @@ void		xfs_isize_check(struct xfs_mount *, xfs_inode_t *, xfs_fsize_t);
 #endif	/* DEBUG */
 
 #if defined(DEBUG) && !defined(XFS_REPAIR_SIM)
-void		xfs_inobp_check(struct xfs_mount *, struct buf *);
+void		xfs_inobp_check(struct xfs_mount *, struct xfs_buf *);
 #else
 #define	xfs_inobp_check(mp, bp)
 #endif /* DEBUG && !XFS_REPAIR_SIM */

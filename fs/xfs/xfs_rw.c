@@ -4,7 +4,7 @@
 #endif
 
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -94,7 +94,7 @@ extern int xfs_nfs_io_units;
 typedef	uuid_t		stream_id_t;
 void daemonize(void); /* from linux/xfs_thread.c */
 void set_thread_name(char *name); /* from linux/xfs_thread.c */
-extern void griostrategy(buf_t *bp);  /* prototype -- where to find it? */
+extern void griostrategy(xfs_buf_t *bp);  /* prototype -- where to find it? */
 int grio_io_is_guaranteed( vfile_t *fp, stream_id_t *stream_id);  /* prototype -- where to find it? */
 extern int			grio_monitor_start( sysarg_t );
 int grio_monitor_io_start( stream_id_t *stream_id, __int64_t iosize);
@@ -123,7 +123,7 @@ lock_t	xfs_strat_lock;
  * in xfs_init();
  */
 static int	xfsc_count;
-static buf_t	*xfsc_list;
+static xfs_buf_t	*xfsc_list;
 static int	xfsc_bufcount;
 lock_t		xfsc_lock;
 sv_t		xfsc_wait;
@@ -134,7 +134,7 @@ sv_t		xfsc_wait;
  * in xfs_init();
  */
 static int	xfsd_count;
-static buf_t	*xfsd_list;
+static xfs_buf_t	*xfsd_list;
 static int	xfsd_bufcount;
 lock_t		xfsd_lock;
 sv_t		xfsd_wait;
@@ -167,7 +167,7 @@ xfs_zero_last_block(
 
 STATIC void
 xfs_zero_bp(
-	buf_t	*bp,
+	xfs_buf_t	*bp,
 	int	data_offset,
 	int	data_len);
 
@@ -199,14 +199,14 @@ xfs_strat_write_check(
 STATIC void
 xfs_check_rbp(
 	xfs_iocore_t	*io,
-	buf_t		*bp,
-	buf_t		*rbp,
+	xfs_buf_t		*bp,
+	xfs_buf_t		*rbp,
 	int		locked);
 
 STATIC void
 xfs_check_bp(
 	xfs_iocore_t	*io,
-	buf_t		*bp);
+	xfs_buf_t		*bp);
 
 STATIC void
 xfs_check_gap_list(
@@ -227,7 +227,7 @@ xfs_free_gap_list(
 STATIC void
 xfs_cmp_gap_list_and_zero(
 	xfs_iocore_t	*ip,
-	buf_t		*bp);
+	xfs_buf_t		*bp);
 
 STATIC void
 xfs_delete_gap_list(
@@ -243,12 +243,12 @@ xfsd(void);
 
 void
 xfs_strat_write_iodone(
-	buf_t		*bp);
+	xfs_buf_t		*bp);
 
 STATIC int
 xfs_dio_write_zero_rtarea(
 	xfs_inode_t	*ip,
-	struct buf	*bp,
+	struct xfs_buf	*bp,
 	xfs_fileoff_t	offset_fsb,
 	xfs_filblks_t	count_fsb);
 #if defined(__sgi__)
@@ -259,7 +259,7 @@ grio_io_is_guaranteed(
 
 extern void
 griostrategy(
-	buf_t	*);
+	xfs_buf_t	*);
 
 extern int
 grio_monitor_io_start( 
@@ -282,8 +282,8 @@ xfs_delalloc_cleanup(
 	xfs_fileoff_t	start_fsb,
 	xfs_filblks_t	count_fsb);
 
-extern void xfs_buf_iodone_callbacks(struct buf *);
-extern void xlog_iodone(struct buf *);
+extern void xfs_buf_iodone_callbacks(struct xfs_buf *);
+extern void xlog_iodone(struct xfs_buf *);
 
 /*
  * Round the given file offset down to the nearest read/write
@@ -1150,7 +1150,7 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 		int		ioflags,
 		struct cred	*creds,
 		flid_t		*fl,
-		buf_t		**rbuf,
+		xfs_buf_t		**rbuf,
 		int		*pboff,
 		int		*pbsize)
 {
@@ -1159,8 +1159,8 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 	int		error;
 	struct bmapval	bmaps[2];
 	int		nmaps;
-	buf_t		*bp;
-	extern void	chunkrelse(buf_t *bp);
+	xfs_buf_t		*bp;
+	extern void	chunkrelse(xfs_buf_t *bp);
 	int		unlocked;
 	int		lockmode;
 
@@ -1657,7 +1657,7 @@ xfs_unlock_iopages(
  */
 int
 xfs_mapped_biomove(
-	struct buf	*bp,
+	struct xfs_buf	*bp,
 	u_int		pboff,
 	size_t		io_len,
 	enum uio_rw	rw,
@@ -1778,7 +1778,7 @@ xfs_read_file(
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	vnode_t		*vp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		read_bmaps;
 	int		buffer_bytes_ok;
 	int		error;
@@ -2492,7 +2492,7 @@ xfs_zero_last_block(
 	xfs_fileoff_t	end_fsb;
 	xfs_fsblock_t	firstblock;
 	xfs_mount_t	*mp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		nimaps;
 	int		zero_offset;
 	int		zero_len;
@@ -2691,7 +2691,7 @@ xfs_zero_eof(
 	xfs_extlen_t	buf_len_fsb;
 	xfs_extlen_t	prev_zero_count;
 	xfs_mount_t	*mp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		nimaps;
 	int		error;
 	xfs_bmbt_irec_t	imap;
@@ -2832,7 +2832,7 @@ xfs_zero_eof(
 
 #ifdef _VCE_AVOIDANCE
 		if (vce_avoidance) {
-			extern void biozero(struct buf *, u_int, int);
+			extern void biozero(struct xfs_buf *, u_int, int);
 			biozero(bp, 0, bmap.bsize);
 		} else
 #endif
@@ -3255,7 +3255,7 @@ xfs_write_file(
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	vnode_t		*vp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		error;
 	int		eof_zeroed;
 	int		fillhole;
@@ -3267,7 +3267,7 @@ xfs_write_file(
 	xfs_fsize_t	new_size;
 	xfs_mount_t	*mp;
 	int		fsynced;
-	extern void	chunkrelse(buf_t*);
+	extern void	chunkrelse(xfs_buf_t*);
 	int		useracced = 0;
 	vnmap_t		*cur_ldvnmap = vnmaps;
 	int		num_ldvnmaps = numvnmaps;
@@ -4370,8 +4370,8 @@ xfs_bmap(
  */
 STATIC void
 xfs_overlap_bp(
-	buf_t	*bp,
-	buf_t	*rbp,
+	xfs_buf_t	*bp,
+	xfs_buf_t	*rbp,
 	uint	rbp_offset,
 	uint	rbp_len)
 {
@@ -4435,7 +4435,7 @@ xfs_overlap_bp(
  */
 STATIC void
 xfs_zero_bp(
-	buf_t	*bp,
+	xfs_buf_t	*bp,
 	int	data_offset,
 	int	data_len)
 {
@@ -4703,7 +4703,7 @@ xfs_free_gap_list(
 STATIC void
 xfs_cmp_gap_list_and_zero(
 	xfs_iocore_t	*io,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	off_t		bp_offset_bb;
 	int		bp_len_bb;
@@ -4817,7 +4817,7 @@ xfs_cmp_gap_list_and_zero(
 int
 xfs_strat_read(
 	xfs_iocore_t	*io,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t   map_start_fsb;
@@ -4833,7 +4833,7 @@ xfs_strat_read(
 	off_t		init_limit;
 	int		x;
 	caddr_t		datap;
-	buf_t		*rbp;
+	xfs_buf_t		*rbp;
 	xfs_mount_t	*mp;
 	int		count;
 	int		block_off;
@@ -5074,7 +5074,7 @@ void
 xfs_strat_write_bp_trace(
 	int		tag,
 	xfs_inode_t	*ip,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	if (ip->i_strat_trace == NULL) {
 		return;
@@ -5126,8 +5126,8 @@ void
 xfs_strat_write_subbp_trace(
 	int		tag,
 	xfs_iocore_t	*io,
-	buf_t		*bp,
-	buf_t		*rbp,
+	xfs_buf_t		*bp,
+	xfs_buf_t		*rbp,
 	off_t		last_off,
 	int		last_bcount,
 	daddr_t		last_blkno)			    
@@ -5243,7 +5243,7 @@ xfs_strat_write_check(
  */
 void
 xfs_strat_write_iodone(
-	buf_t	*bp)
+	xfs_buf_t	*bp)
 {
 	int		s;
 
@@ -5290,7 +5290,7 @@ xfs_strat_write_iodone(
 
 void	xfs_strat_complete_buf(
 	bhv_desc_t	*bdp,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
@@ -5394,9 +5394,9 @@ error0:
 STATIC void
 xfs_strat_comp(void)
 {
-	buf_t		*bp;
-	buf_t		*forw;
-	buf_t		*back;
+	xfs_buf_t		*bp;
+	xfs_buf_t		*forw;
+	xfs_buf_t		*back;
 	int		s;
 	bhv_desc_t	*bdp;
 
@@ -5462,22 +5462,22 @@ xfs_strat_comp(void)
  */
 STATIC void
 xfs_strat_write_relse(
-	buf_t	*rbp)
+	xfs_buf_t	*rbp)
 {
 	int	s;
-	buf_t	*leader;
-	buf_t	*forw;
-	buf_t	*back;
+	xfs_buf_t	*leader;
+	xfs_buf_t	*forw;
+	xfs_buf_t	*back;
 	
 
 	s = mutex_spinlock(&xfs_strat_lock);
 	ASSERT(rbp->b_flags & B_DONE);
 
-	forw = (buf_t*)rbp->b_fsprivate2;
-	back = (buf_t*)rbp->b_fsprivate;
+	forw = (xfs_buf_t*)rbp->b_fsprivate2;
+	back = (xfs_buf_t*)rbp->b_fsprivate;
 	ASSERT(back != NULL);
-	ASSERT(((buf_t *)back->b_fsprivate2) == rbp);
-	ASSERT((forw == NULL) || (((buf_t *)forw->b_fsprivate) == rbp));
+	ASSERT(((xfs_buf_t *)back->b_fsprivate2) == rbp);
+	ASSERT((forw == NULL) || (((xfs_buf_t *)forw->b_fsprivate) == rbp));
 
 	/*
 	 * Pull ourselves from the list.
@@ -5513,7 +5513,7 @@ xfs_strat_write_relse(
 		 * In this case just pass any errors on to the lead buffer.
 		 */
 		while (!(back->b_flags & B_LEADER)) {
-			back = (buf_t*)back->b_fsprivate;
+			back = (xfs_buf_t*)back->b_fsprivate;
 		}
 		ASSERT(back != NULL);
 		ASSERT(back->b_flags & B_LEADER);
@@ -5542,8 +5542,8 @@ xfs_strat_write_relse(
 void
 xfs_check_rbp(
 	xfs_iocore_t	*io,
-	buf_t		*bp,
-	buf_t		*rbp,
+	xfs_buf_t		*bp,
+	xfs_buf_t		*rbp,
 	int		locked)
 {
 	xfs_mount_t	*mp;
@@ -5603,7 +5603,7 @@ xfs_check_rbp(
 void
 xfs_check_bp(
 	xfs_iocore_t	*io,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_mount_t	*mp;
 	int		nimaps;
@@ -5690,7 +5690,7 @@ xfs_check_bp(
 int
 xfs_strat_write_unwritten(
 	xfs_iocore_t	*io,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_fileoff_t	offset_fsb;
 	off_t		offset_fsb_bb;
@@ -5869,7 +5869,7 @@ xfs_delalloc_cleanup(
 int
 xfs_strat_write(
 	xfs_iocore_t	*io,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_inode_t	*ip;
 
@@ -5889,7 +5889,7 @@ xfs_strat_write(
 int
 xfs_strat_write_core(
 	xfs_iocore_t	*io,
-	buf_t		*bp,
+	xfs_buf_t		*bp,
 	int		is_xfs)
 {
 	xfs_fileoff_t	offset_fsb;
@@ -5906,7 +5906,7 @@ xfs_strat_write_core(
 #endif
 	/* REFERENCED */
 	int		rbp_count;
-	buf_t		*rbp;
+	xfs_buf_t		*rbp;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
 	xfs_trans_t	*tp;
@@ -6223,7 +6223,7 @@ xfs_strat_write_core(
 			rbp->b_fsprivate = bp;
 			rbp->b_fsprivate2 = bp->b_fsprivate2;
 			if (bp->b_fsprivate2 != NULL) {
-				((buf_t*)(bp->b_fsprivate2))->b_fsprivate =
+				((xfs_buf_t*)(bp->b_fsprivate2))->b_fsprivate =
 								rbp;
 			}
 			bp->b_fsprivate2 = rbp;
@@ -6393,7 +6393,7 @@ xfs_force_shutdown(
  */
 int
 xfs_bioerror(
-	buf_t *bp)
+	xfs_buf_t *bp)
 {
 
 #ifdef XFSERRORDEBUG
@@ -6429,7 +6429,7 @@ xfs_bioerror(
  */
 int
 xfs_bioerror_relse(
-	buf_t *bp)
+	xfs_buf_t *bp)
 {
 	int64_t fl;
 
@@ -6499,9 +6499,9 @@ xfs_read_buf(
         daddr_t 	 blkno,
         int              len,
         uint             flags,
-	buf_t		 **bpp)
+	xfs_buf_t		 **bpp)
 {
-	buf_t		 *bp;
+	xfs_buf_t		 *bp;
 	int 		 error;
 	
 	bp = read_buf_targ(target, blkno, len, flags);
@@ -6531,7 +6531,7 @@ xfs_read_buf(
 int
 xfs_bwrite(
 	struct xfs_mount *mp,
-	struct buf	 *bp)
+	struct xfs_buf	 *bp)
 {
 	int	error;
 
@@ -6563,7 +6563,7 @@ xfs_bwrite(
  * after prematurely unpinning it to forcibly shutdown the filesystem.
  */
 int
-xfs_bdstrat_cb(struct buf *bp)
+xfs_bdstrat_cb(struct xfs_buf *bp)
 {
 
 	xfs_mount_t	*mp;
@@ -6602,7 +6602,7 @@ xfs_bdstrat_cb(struct buf *bp)
 int
 xfsbdstrat(
 	struct xfs_mount 	*mp,
-	struct buf		*bp)
+	struct xfs_buf		*bp)
 {
 	int		dev_major = emajor(bp->b_edev);
 
@@ -6648,7 +6648,7 @@ xfsbdstrat(
 void
 xfs_strategy(
 	bhv_desc_t	*bdp,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	xfs_inode_t	*ip;
 
@@ -6660,7 +6660,7 @@ xfs_strategy(
 void
 xfs_strat_core(
 	xfs_iocore_t	*io,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	int		s;
 	xfs_mount_t	*mp;
@@ -6825,18 +6825,18 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 				 * termination if buffers are being added to
 				 * the head of the list 
 				 */
-	buf_t	*bp;
-	buf_t	*forw;
-	buf_t	*back;
-	buf_t	*next_bp;
+	xfs_buf_t	*bp;
+	xfs_buf_t	*forw;
+	xfs_buf_t	*back;
+	xfs_buf_t	*next_bp;
 	
 	/* List and count of the saved buffers */
-	buf_t	*bufs;
+	xfs_buf_t	*bufs;
 	unsigned int bufcount;
 
 	/* Marker Buffers */
-	buf_t	*cur_marker;
-	buf_t	*end_marker;
+	xfs_buf_t	*cur_marker;
+	xfs_buf_t	*end_marker;
 	
 	vp = BHV_TO_VNODE(bdp);
 	
@@ -6845,7 +6845,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 	bufcount = 0;
 
 	/* Allocate both markers at once... it's a little nicer. */
-	cur_marker = (buf_t *)kmem_alloc(sizeof(buf_t)*2, KM_SLEEP);
+	cur_marker = (xfs_buf_t *)kmem_alloc(sizeof(xfs_buf_t)*2, KM_SLEEP);
 	
 	/* A little sketchy pointer-math, but should be ok. */
 	end_marker = cur_marker + 1;
@@ -6856,7 +6856,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 	if (xfsd_list == NULL) {
 		mp_mutex_spinunlock(&xfsd_lock, s);
 		
-		kmem_free(cur_marker, sizeof(buf_t)*2);
+		kmem_free(cur_marker, sizeof(xfs_buf_t)*2);
 		return;
 	}
 
@@ -7091,7 +7091,7 @@ void xfs_xfsd_list_evict(bhv_desc_t * bdp)
 	}
 	
 	mp_mutex_spinunlock(&xfsd_lock, s);
-	kmem_free(cur_marker, sizeof(buf_t)*2);	
+	kmem_free(cur_marker, sizeof(xfs_buf_t)*2);	
 	
 	/*
 	 * At this point, bufs contains the list of buffers that would have
@@ -7133,9 +7133,9 @@ STATIC int
 xfsd(void)
 {
 	int		s;
-	buf_t		*bp;
-	buf_t		*forw;
-	buf_t		*back;
+	xfs_buf_t		*bp;
+	xfs_buf_t		*forw;
+	xfs_buf_t		*back;
 	xfs_iocore_t	*io;
 
 #ifdef __linux__
@@ -7279,7 +7279,7 @@ xfs_inval_cached_pages(
 STATIC int
 xfs_dio_write_zero_rtarea(
 	xfs_inode_t	*ip,
-	struct buf	*bp,
+	struct xfs_buf	*bp,
 	xfs_fileoff_t	offset_fsb,
 	xfs_filblks_t	count_fsb)
 {
@@ -7289,7 +7289,7 @@ xfs_dio_write_zero_rtarea(
 	xfs_mount_t	*mp;
 	struct bdevsw	*my_bdevsw;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;
-	buf_t		*nbp;
+	xfs_buf_t		*nbp;
 	int		reccount, sbrtextsize;
 	xfs_fsblock_t	firstfsb;
 	xfs_fileoff_t	zero_offset_fsb, limit_offset_fsb;
@@ -7388,12 +7388,12 @@ int
 xfs_dio_read(
 	xfs_dio_t *diop)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	xfs_iocore_t 	*io;
 	xfs_trans_t	*tp;
 	xfs_mount_t	*mp;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;
-	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
+	xfs_buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
 	xfs_fileoff_t	offset_fsb;
 	xfs_fsblock_t	firstfsb;
 	xfs_filblks_t	count_fsb;
@@ -7665,7 +7665,7 @@ int
 xfs_dio_write(
 	xfs_dio_t *diop)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	xfs_iocore_t	*io;
 	xfs_inode_t 	*ip;
 	xfs_trans_t	*tp;
@@ -7673,7 +7673,7 @@ xfs_dio_write(
 	vnode_t		*vp;
 	xfs_mount_t	*mp;
 	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp;
-	buf_t		*nbp;
+	xfs_buf_t		*nbp;
 	xfs_fileoff_t	offset_fsb;
 	xfs_fsblock_t	firstfsb;
 	xfs_filblks_t	count_fsb, datablocks;
@@ -8126,7 +8126,7 @@ retry:
  */
 int
 xfs_diostrat(
-	buf_t	*bp)
+	xfs_buf_t	*bp)
 {
 	xfs_dio_t	*diop;
 	xfs_iocore_t	*io;
@@ -8215,7 +8215,7 @@ xfs_diordwr(
 	xfs_dio_t	dio;
 	xfs_mount_t	*mp;
 	uuid_t		stream_id;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		error, index;
 	__int64_t	iosize;
 	extern int	scache_linemask;

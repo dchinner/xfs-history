@@ -1,8 +1,8 @@
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.31 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/ksa.h>
 #include <sys/vnode.h>
 #include <sys/pfdat.h>

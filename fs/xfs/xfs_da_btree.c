@@ -9,7 +9,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
@@ -112,7 +112,7 @@ STATIC void xfs_da_node_unbalance(xfs_da_state_t *state,
  */
 STATIC uint	xfs_da_node_lasthash(xfs_dabuf_t *bp, int *count);
 STATIC int	xfs_da_node_order(xfs_dabuf_t *node1_bp, xfs_dabuf_t *node2_bp);
-STATIC xfs_dabuf_t *xfs_da_buf_make(int nbuf, buf_t **bps, inst_t *ra);
+STATIC xfs_dabuf_t *xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra);
 
 
 /*========================================================================
@@ -2074,8 +2074,8 @@ xfs_da_do_buf(
 	int		caller,
 	inst_t		*ra)
 {
-	buf_t		*bp = 0;
-	buf_t		**bplist;
+	xfs_buf_t		*bp = 0;
+	xfs_buf_t		**bplist;
 	int		error;
 	int		i;
 	xfs_bmbt_irec_t	map;
@@ -2420,9 +2420,9 @@ lock_t		xfs_dabuf_global_lock;
  */
 /* ARGSUSED */
 STATIC xfs_dabuf_t *
-xfs_da_buf_make(int nbuf, buf_t **bps, inst_t *ra)
+xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	xfs_dabuf_t	*dabuf;
 	int		i;
 	int		off;
@@ -2483,7 +2483,7 @@ xfs_da_buf_make(int nbuf, buf_t **bps, inst_t *ra)
 STATIC void
 xfs_da_buf_clean(xfs_dabuf_t *dabuf)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 	int	i;
 	int	off;
 
@@ -2536,7 +2536,7 @@ xfs_da_buf_done(xfs_dabuf_t *dabuf)
 void
 xfs_da_log_buf(xfs_trans_t *tp, xfs_dabuf_t *dabuf, uint first, uint last)
 {
-	buf_t	*bp;
+	xfs_buf_t	*bp;
 	uint	f;
 	int	i;
 	uint	l;
@@ -2581,8 +2581,8 @@ xfs_da_log_buf(xfs_trans_t *tp, xfs_dabuf_t *dabuf, uint first, uint last)
 void
 xfs_da_brelse(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 {
-	buf_t	*bp;
-	buf_t	**bplist;
+	xfs_buf_t	*bp;
+	xfs_buf_t	**bplist;
 	int	i;
 	int	nbuf;
 
@@ -2610,8 +2610,8 @@ xfs_da_brelse(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 void
 xfs_da_bwrite(xfs_dabuf_t *dabuf)
 {
-	buf_t	*bp;
-	buf_t	**bplist;
+	xfs_buf_t	*bp;
+	xfs_buf_t	**bplist;
 	int	i;
 	int	nbuf;
 
@@ -2661,8 +2661,8 @@ xfs_da_bjoin(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 void
 xfs_da_binval(xfs_trans_t *tp, xfs_dabuf_t *dabuf)
 {
-	buf_t	*bp;
-	buf_t	**bplist;
+	xfs_buf_t	*bp;
+	xfs_buf_t	**bplist;
 	int	i;
 	int	nbuf;
 

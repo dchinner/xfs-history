@@ -11,7 +11,7 @@
 #define _KERNEL	1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/time.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
@@ -93,7 +93,7 @@ xfs_rtallocate_extent_block(
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
 	xfs_rtblock_t	*nextp,		/* out: next block to try */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock);	/* out: start block allocated */
@@ -112,7 +112,7 @@ xfs_rtallocate_extent_exact(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock);	/* out: start block allocated */
@@ -130,7 +130,7 @@ xfs_rtallocate_extent_near(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock);	/* out: start block allocated */
@@ -147,7 +147,7 @@ xfs_rtallocate_extent_size(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock);	/* out: start block allocated */
@@ -162,7 +162,7 @@ xfs_rtallocate_range(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_rtblock_t	start,		/* start block to allocate */
 	xfs_extlen_t	len,		/* length to allocate */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb);		/* in/out: summary block number */
 
 /*
@@ -176,7 +176,7 @@ xfs_rtany_summary(
 	int		low,		/* low log2 extent size */
 	int		high,		/* high log2 extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	int		*stat);		/* out: any good extents here? */
 #endif	/* !SIM */
@@ -191,7 +191,7 @@ xfs_rtbuf_get(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_rtblock_t	block,		/* block number in bitmap or summary */
 	int		issum,		/* is summary not bitmap */
-	buf_t		**bpp);		/* output: buffer for the block */
+	xfs_buf_t		**bpp);		/* output: buffer for the block */
 
 #ifdef DEBUG
 /*
@@ -293,7 +293,7 @@ xfs_rtfree_range(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_rtblock_t	start,		/* starting block to free */
 	xfs_extlen_t	len,		/* length to free */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb);		/* in/out: summary block number */
 
 #if defined(DEBUG) || !defined(SIM)
@@ -309,7 +309,7 @@ xfs_rtget_summary(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	int		log,		/* log2 of extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_suminfo_t	*sum);		/* out: summary info for this block */
 #endif	/* DEBUG || !SIM */
@@ -339,7 +339,7 @@ xfs_rtmodify_summary(
 	int		log,		/* log2 of extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
 	int		delta,		/* change to make to summary info */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb);		/* in/out: summary block number */
 
 #ifdef DEBUG
@@ -378,7 +378,7 @@ xfs_growfs_rt_alloc(
 	xfs_ino_t	ino)		/* inode number (bitmap/summary) */
 {
 	xfs_fileoff_t	bno;		/* block number in file */
-	buf_t		*bp;		/* temporary buffer for zeroing */
+	xfs_buf_t		*bp;		/* temporary buffer for zeroing */
 	int		cancelflags;	/* flags for xfs_trans_cancel */
 	int		committed;	/* transaction committed flag */
 	daddr_t		d;		/* disk block address */
@@ -497,7 +497,7 @@ xfs_rtallocate_extent_block(
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
 	xfs_rtblock_t	*nextp,		/* out: next block to try */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock)	/* out: start block allocated */
@@ -609,7 +609,7 @@ xfs_rtallocate_extent_exact(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock)	/* out: start block allocated */
@@ -688,7 +688,7 @@ xfs_rtallocate_extent_near(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock)	/* out: start block allocated */
@@ -881,7 +881,7 @@ xfs_rtallocate_extent_size(
 	xfs_extlen_t	minlen,		/* minimum length to allocate */
 	xfs_extlen_t	maxlen,		/* maximum length to allocate */
 	xfs_extlen_t	*len,		/* out: actual length allocated */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_extlen_t	prod,		/* extent product factor */
 	xfs_rtblock_t	*rtblock)	/* out: start block allocated */
@@ -1020,7 +1020,7 @@ xfs_rtallocate_range(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_rtblock_t	start,		/* start block to allocate */
 	xfs_extlen_t	len,		/* length to allocate */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb)		/* in/out: summary block number */
 {
 	xfs_rtblock_t	end;		/* end of the allocated extent */
@@ -1098,7 +1098,7 @@ xfs_rtany_summary(
 	int		low,		/* low log2 extent size */
 	int		high,		/* high log2 extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	int		*stat)		/* out: any good extents here? */
 {
@@ -1143,9 +1143,9 @@ xfs_rtbuf_get(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_rtblock_t	block,		/* block number in bitmap or summary */
 	int		issum,		/* is summary not bitmap */
-	buf_t		**bpp)		/* output: buffer for the block */
+	xfs_buf_t		**bpp)		/* output: buffer for the block */
 {
-	buf_t		*bp;		/* block buffer, result */
+	xfs_buf_t		*bp;		/* block buffer, result */
 	daddr_t		d;		/* disk addr of block */
 	int		error;		/* error value */
 	xfs_fsblock_t	fsb;		/* fs block number for block */
@@ -1208,7 +1208,7 @@ xfs_rtcheck_bit(
 {
 	int		bit;		/* bit number in the word */
 	xfs_rtblock_t	block;		/* bitmap block number */
-	buf_t		*bp;		/* buf for the block */
+	xfs_buf_t		*bp;		/* buf for the block */
 	xfs_rtword_t	*bufp;		/* pointer into the buffer */
 	/* REFERENCED */
 	int		error;		/* error value */
@@ -1264,7 +1264,7 @@ xfs_rtcheck_range(
 	xfs_rtword_t	*b;		/* current word in buffer */
 	int		bit;		/* bit number in the word */
 	xfs_rtblock_t	block;		/* bitmap block number */
-	buf_t		*bp;		/* buf for the block */
+	xfs_buf_t		*bp;		/* buf for the block */
 	xfs_rtword_t	*bufp;		/* starting word in buffer */
 	int		error;		/* error value */
 	xfs_rtblock_t	i;		/* current bit number rel. to start */
@@ -1436,7 +1436,7 @@ xfs_rtcopy_summary(
 	xfs_trans_t	*tp)		/* transaction pointer */
 {
 	xfs_rtblock_t	bbno;		/* bitmap block number */
-	buf_t		*bp;		/* summary buffer */
+	xfs_buf_t		*bp;		/* summary buffer */
 	int		error;		/* error return value */
 	int		log;		/* summary level number (log length) */
 	xfs_suminfo_t	sum;		/* summary data */
@@ -1483,7 +1483,7 @@ xfs_rtfind_back(
 	xfs_rtword_t	*b;		/* current word in buffer */
 	int		bit;		/* bit number in the word */
 	xfs_rtblock_t	block;		/* bitmap block number */
-	buf_t		*bp;		/* buf for the block */
+	xfs_buf_t		*bp;		/* buf for the block */
 	xfs_rtword_t	*bufp;		/* starting word in buffer */
 	int		error;		/* error value */
 	xfs_rtblock_t	firstbit;	/* first useful bit in the word */
@@ -1658,7 +1658,7 @@ xfs_rtfind_forw(
 	xfs_rtword_t	*b;		/* current word in buffer */
 	int		bit;		/* bit number in the word */
 	xfs_rtblock_t	block;		/* bitmap block number */
-	buf_t		*bp;		/* buf for the block */
+	xfs_buf_t		*bp;		/* buf for the block */
 	xfs_rtword_t	*bufp;		/* starting word in buffer */
 	int		error;		/* error value */
 	xfs_rtblock_t	i;		/* current bit number rel. to start */
@@ -1823,7 +1823,7 @@ xfs_rtfree_range(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_rtblock_t	start,		/* starting block to free */
 	xfs_extlen_t	len,		/* length to free */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb)		/* in/out: summary block number */
 {
 	xfs_rtblock_t	end;		/* end of the freed extent */
@@ -1900,11 +1900,11 @@ xfs_rtget_summary(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	int		log,		/* log2 of extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb,		/* in/out: summary block number */
 	xfs_suminfo_t	*sum)		/* out: summary info for this block */
 {
-	buf_t		*bp;		/* buffer for summary block */
+	xfs_buf_t		*bp;		/* buffer for summary block */
 	int		error;		/* error value */
 	xfs_fsblock_t	sb;		/* summary fsblock */
 	int		so;		/* index into the summary file */
@@ -1973,7 +1973,7 @@ xfs_rtmodify_range(
 	xfs_rtword_t	*b;		/* current word in buffer */
 	int		bit;		/* bit number in the word */
 	xfs_rtblock_t	block;		/* bitmap block number */
-	buf_t		*bp;		/* buf for the block */
+	xfs_buf_t		*bp;		/* buf for the block */
 	xfs_rtword_t	*bufp;		/* starting word in buffer */
 	int		error;		/* error value */
 	xfs_rtword_t	*first;		/* first used word in the buffer */
@@ -2128,10 +2128,10 @@ xfs_rtmodify_summary(
 	int		log,		/* log2 of extent size */
 	xfs_rtblock_t	bbno,		/* bitmap block number */
 	int		delta,		/* change to make to summary info */
-	buf_t		**rbpp,		/* in/out: summary block buffer */
+	xfs_buf_t		**rbpp,		/* in/out: summary block buffer */
 	xfs_fsblock_t	*rsb)		/* in/out: summary block number */
 {
-	buf_t		*bp;		/* buffer for the summary block */
+	xfs_buf_t		*bp;		/* buffer for the summary block */
 	int		error;		/* error value */
 	xfs_fsblock_t	sb;		/* summary fsblock */
 	int		so;		/* index into the summary file */
@@ -2195,7 +2195,7 @@ xfs_growfs_rt(
 	xfs_growfs_rt_t	*in)		/* growfs rt input struct */
 {
 	xfs_rtblock_t	bmbno;		/* bitmap block number */
-	buf_t		*bp;		/* temporary buffer */
+	xfs_buf_t		*bp;		/* temporary buffer */
 	int		cancelflags;	/* flags for xfs_trans_cancel */
 	int		error;		/* error return value */
 	xfs_inode_t	*ip;		/* bitmap inode, used as lock */
@@ -2421,7 +2421,7 @@ xfs_rtallocate_extent(
 	xfs_mount_t	*mp;		/* file system mount structure */
 	xfs_rtblock_t	r;		/* result allocated block */
 	xfs_fsblock_t	sb;		/* summary file block number */
-	buf_t		*sumbp;		/* summary file block buffer */
+	xfs_buf_t		*sumbp;		/* summary file block buffer */
 
 	ASSERT(minlen > 0 && minlen <= maxlen);
 	mp = tp->t_mountp;
@@ -2499,7 +2499,7 @@ xfs_rtfree_extent(
 	xfs_inode_t	*ip;		/* bitmap file inode */
 	xfs_mount_t	*mp;		/* file system mount structure */
 	xfs_fsblock_t	sb;		/* summary file block number */
-	buf_t		*sumbp;		/* summary file block buffer */
+	xfs_buf_t		*sumbp;		/* summary file block buffer */
 
 	mp = tp->t_mountp;
 	/*
@@ -2556,7 +2556,7 @@ int				/* error */
 xfs_rtmount_init(
 	xfs_mount_t	*mp)	/* file system mount structure */
 {
-	buf_t		*bp;	/* buffer for last block of subvolume */
+	xfs_buf_t		*bp;	/* buffer for last block of subvolume */
 	daddr_t		d;	/* address of last block of subvolume */
 	int		error;	/* error return value */
 	xfs_sb_t	*sbp;	/* filesystem superblock copy in mount */
@@ -2704,7 +2704,7 @@ xfs_rtprint_summary(
 	int		l;		/* summary information level */
 	int		p;		/* flag for printed anything */
 	xfs_fsblock_t	sb;		/* summary block number */
-	buf_t		*sumbp;		/* summary block buffer */
+	xfs_buf_t		*sumbp;		/* summary block buffer */
 
 	sumbp = NULL;
 	for (l = 0; l < mp->m_rsumlevels; l++) {

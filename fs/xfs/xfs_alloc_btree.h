@@ -1,13 +1,13 @@
 #ifndef _FS_XFS_ALLOC_BTREE_H
 #define	_FS_XFS_ALLOC_BTREE_H
 
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 
 /*
  * Freespace on-disk structures
  */
 
-struct buf;
+struct xfs_buf;
 struct xfs_btree_cur;
 struct xfs_btree_sblock;
 struct xfs_mount;
@@ -34,7 +34,7 @@ typedef xfs_agblock_t xfs_alloc_ptr_t;	/* btree pointer type */
 typedef	struct xfs_btree_sblock xfs_alloc_block_t;
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_ALLOC_BLOCK)
-xfs_alloc_block_t *xfs_buf_to_alloc_block(struct buf *bp);
+xfs_alloc_block_t *xfs_buf_to_alloc_block(struct xfs_buf *bp);
 #define	XFS_BUF_TO_ALLOC_BLOCK(bp)	xfs_buf_to_alloc_block(bp)
 #else
 #define	XFS_BUF_TO_ALLOC_BLOCK(bp) ((xfs_alloc_block_t *)((bp)->b_un.b_addr))

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.78 $"
+#ident "$Revision: 1.79 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -15,7 +15,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
@@ -738,7 +738,7 @@ xfs_inode_item_pushbuf(
 {
 	xfs_inode_t	*ip;
 	xfs_mount_t 	*mp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	uint		dopush;
 
 	ip = iip->ili_inode;
@@ -941,7 +941,7 @@ xfs_inode_item_destroy(
 /*ARGSUSED*/
 void
 xfs_iflush_done(
-	buf_t			*bp,
+	xfs_buf_t			*bp,
 	xfs_inode_log_item_t	*iip)
 {
 	xfs_inode_t	*ip;

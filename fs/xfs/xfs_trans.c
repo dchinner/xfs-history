@@ -1,4 +1,4 @@
-#ident "$Revision: 1.103 $"
+#ident "$Revision: 1.104 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -7,7 +7,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sysmacros.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
@@ -446,7 +446,7 @@ xfs_trans_apply_sb_deltas(
 	xfs_trans_t	*tp)
 {
 	xfs_sb_t	*sbp;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	int		whole = 0;
 
 	bp = xfs_trans_getsb(tp, tp->t_mountp, 0);

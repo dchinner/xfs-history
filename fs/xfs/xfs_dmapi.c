@@ -10,13 +10,13 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision$"
+#ident "$Revision: 1.14 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
 #include <sys/attributes.h>
 #include <ksys/behavior.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/capability.h>
 #include <sys/conf.h>
 #include <sys/cred.h>

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.2 $"
+#ident "$Revision: 1.3 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -14,7 +14,7 @@
 
 #include <sys/param.h>
 #include <sys/kmem.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>

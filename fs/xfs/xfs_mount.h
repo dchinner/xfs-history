@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.109 $"
+#ident	"$Revision: 1.104 $"
 
 struct cred;
 struct mounta;
@@ -70,7 +70,7 @@ typedef struct xfs_trans_reservations {
 
 typedef int		(*xfs_dio_write_t)(struct xfs_dio *);
 typedef int		(*xfs_dio_read_t)(struct xfs_dio *);
-typedef int		(*xfs_strat_write_t)(struct xfs_iocore *, struct buf *);
+typedef int		(*xfs_strat_write_t)(struct xfs_iocore *, struct xfs_buf *);
 typedef int		(*xfs_bmapi_t)(struct xfs_trans *, void *,
 				xfs_fileoff_t, xfs_filblks_t, int,
 				xfs_fsblock_t *, xfs_extlen_t,
@@ -180,7 +180,7 @@ typedef struct xfs_mount {
 	uint			m_ail_gen;	/* fs AIL generation count */
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
 	lock_t			m_sb_lock;	/* sb counter mutex */
-	struct buf		*m_sb_bp;	/* buffer for superblock */
+	struct xfs_buf		*m_sb_bp;	/* buffer for superblock */
 	char			*m_fsname; 	/* filesystem name */
 	int			m_fsname_len;	/* strlen of fs name */
 	int			m_bsize;	/* fs logical block size */
@@ -436,7 +436,7 @@ int             xfs_unmount_flush(xfs_mount_t *, int);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint, int);
 int		xfs_readsb(xfs_mount_t *mp, dev_t);
-struct buf	*xfs_getsb(xfs_mount_t *, int);
+struct xfs_buf	*xfs_getsb(xfs_mount_t *, int);
 void            xfs_freesb(xfs_mount_t *);
 void		xfs_force_shutdown(struct xfs_mount *, int);
 int		xfs_syncsub(xfs_mount_t *, int, int, int *);

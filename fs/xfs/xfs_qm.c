@@ -1,9 +1,9 @@
-#ident "$Revision: 1.39 $"
+#ident "$Revision: 1.40 $"
 
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/ksa.h>
 #include <sys/vnode.h>
 #include <sys/pfdat.h>
@@ -74,7 +74,7 @@ STATIC int 	xfs_qm_dqget_noattach(xfs_inode_t *, xfs_dquot_t **,
 				      xfs_dquot_t **);
 STATIC int	xfs_qm_qino_alloc(xfs_mount_t *, xfs_inode_t **, __int64_t,
 				  uint);
-STATIC int	xfs_qm_reset_dqcounts(xfs_mount_t *, buf_t *, xfs_dqid_t, uint);
+STATIC int	xfs_qm_reset_dqcounts(xfs_mount_t *, xfs_buf_t *, xfs_dqid_t, uint);
 STATIC int	xfs_qm_dqiter_bufs(xfs_mount_t *, xfs_dqid_t, xfs_fsblock_t,
 				   xfs_filblks_t, uint);
 STATIC int	xfs_qm_dqiterate(xfs_mount_t *, xfs_inode_t *, uint);
@@ -1581,7 +1581,7 @@ xfs_qm_qino_alloc(
 STATIC int
 xfs_qm_reset_dqcounts(
 	xfs_mount_t	*mp,
-	buf_t		*bp,
+	xfs_buf_t		*bp,
 	xfs_dqid_t	id,
 	uint		type)
 {
@@ -1626,7 +1626,7 @@ xfs_qm_dqiter_bufs(
 	xfs_filblks_t	blkcnt,
 	uint		flags)
 {
-	buf_t		*bp;	
+	xfs_buf_t		*bp;	
 	int		error;
 	int		notcommitted;
 	int		incr;

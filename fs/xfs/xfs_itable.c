@@ -1,11 +1,11 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.65 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #include <sys/sysmacros.h>
 #endif
 
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/errno.h>
 #include <sys/vnode.h>
 #include <sys/systm.h>
@@ -215,7 +215,7 @@ xfs_bulkstat(
 	int			*done)	/* 1 if there're more stats to get */
 {
 	xfs_agblock_t		agbno;	/* allocation group block number */
-	buf_t			*agbp;	/* agi header buffer */
+	xfs_buf_t			*agbp;	/* agi header buffer */
 	xfs_agi_t		*agi;	/* agi header data */
 	xfs_agino_t		agino;	/* inode # in allocation group */
 	xfs_agnumber_t		agno;	/* allocation group number */
@@ -245,7 +245,7 @@ xfs_bulkstat(
 	int			ubcount; /* size of user's buffer */
 	int			ubleft;	/* spaces left in user's buffer */
 	caddr_t			ubufp;	/* current pointer into user's buffer */
-	buf_t			*bp;	/* ptr to on-disk inode cluster buf */
+	xfs_buf_t			*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
 	vfs_t			*vfsp;
@@ -669,7 +669,7 @@ xfs_inumbers(
 	int		*count,		/* size of buffer/count returned */
 	caddr_t		ubuffer)	/* buffer with inode descriptions */
 {
-	buf_t		*agbp;
+	xfs_buf_t		*agbp;
 	xfs_agino_t	agino;
 	xfs_agnumber_t	agno;
 	int		bcount;

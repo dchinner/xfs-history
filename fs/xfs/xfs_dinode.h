@@ -1,9 +1,9 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.45 $"
 
-struct buf;
+struct xfs_buf;
 struct xfs_mount;
 
 #define	XFS_DINODE_VERSION_1	1
@@ -341,7 +341,7 @@ void xfs_dfork_next_set(xfs_dinode_t *dip, int w, int n);
 #define	IEXEC		0100
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_DINODE)
-xfs_dinode_t *xfs_buf_to_dinode(struct buf *bp);
+xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);
 #define	XFS_BUF_TO_DINODE(bp)	xfs_buf_to_dinode(bp)
 #else
 #define	XFS_BUF_TO_DINODE(bp)	((xfs_dinode_t *)((bp)->b_un.b_addr))

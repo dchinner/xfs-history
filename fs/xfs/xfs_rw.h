@@ -6,7 +6,7 @@
 struct bhv_desc;
 struct bdevsw;
 struct bmapval;
-struct buf;
+struct xfs_buf;
 struct cred;
 struct flid;
 struct uio;
@@ -141,7 +141,7 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 		int		ioflags,
 		struct cred	*creds,
 		struct flid	*fl,
-		struct buf	**rbuf,
+		struct xfs_buf	**rbuf,
 		int		*pboff,
 		int		*pbsize);
 
@@ -159,18 +159,18 @@ xfs_write(struct bhv_desc	*bdp,
 int 
 xfs_bwrite(
 	struct xfs_mount 	*mp,
-	struct buf		*bp);
+	struct xfs_buf		*bp);
 int
 xfsbdstrat(
 	struct xfs_mount 	*mp,
-	struct buf		*bp);
+	struct xfs_buf		*bp);
 
 void
 xfs_strategy(struct bhv_desc	*bdp,
-	     struct buf		*bp);
+	     struct xfs_buf		*bp);
 
 void
-xfs_strat_write_iodone(struct buf *bp);
+xfs_strat_write_iodone(struct xfs_buf *bp);
 
 int
 xfs_bmap(struct bhv_desc	*bdp,
@@ -213,7 +213,7 @@ void
 xfs_refcache_purge_some(void);
 
 int
-xfs_bioerror(struct buf *b);
+xfs_bioerror(struct xfs_buf *b);
 
 #ifndef SIM
 /*
@@ -229,20 +229,20 @@ extern int xfs_read_core(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
 			struct vnmap *, int, const uint,
 			xfs_uaccmap_t *, xfs_fsize_t, int,
 			vrwlock_t *);
-extern int xfs_diostrat(struct buf *);
+extern int xfs_diostrat(struct xfs_buf *);
 extern int xfs_diordwr(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
                         struct cred *, uint64_t, off_t *, size_t *);
-extern int xfs_strat_read(struct xfs_iocore *, struct buf *);
-extern int xfs_strat_write(struct xfs_iocore *, struct buf *);
-extern int xfs_strat_write_core(struct xfs_iocore *, struct buf *, int);
+extern int xfs_strat_read(struct xfs_iocore *, struct xfs_buf *);
+extern int xfs_strat_write(struct xfs_iocore *, struct xfs_buf *);
+extern int xfs_strat_write_core(struct xfs_iocore *, struct xfs_buf *, int);
 extern int xfs_iomap_read(struct xfs_iocore *, off_t, size_t, struct bmapval *,
                         int *, struct pm *, int *, unsigned int);
-extern int xfs_bioerror_relse(struct buf *);
-extern void xfs_strat_core(struct xfs_iocore *, struct buf *);
+extern int xfs_bioerror_relse(struct xfs_buf *);
+extern void xfs_strat_core(struct xfs_iocore *, struct xfs_buf *);
 extern int xfs_write_file(bhv_desc_t *, struct xfs_iocore *, uio_t *, int,
 			 struct cred *, xfs_lsn_t *, struct vnmap *, int,
 			 const uint, xfs_uaccmap_t *);
-extern int xfs_strat_write_unwritten(struct xfs_iocore *, struct buf *);
+extern int xfs_strat_write_unwritten(struct xfs_iocore *, struct xfs_buf *);
 extern int xfs_check_mapped_io(struct vnode *, uio_t *, struct vnmap**,
 			int *, int *, int *, xfs_fsize_t *, xfs_uaccmap_t **);
 extern int xfs_is_nested_locking_enabled(void);
@@ -286,10 +286,10 @@ xfs_read_buf(
         daddr_t 	 blkno,
         int              len,
         uint             flags,
-	struct buf	 **bpp);
+	struct xfs_buf	 **bpp);
 
 int
-xfs_bdstrat_cb(struct buf *bp);
+xfs_bdstrat_cb(struct xfs_buf *bp);
 
 void
 xfs_ioerror_alert(

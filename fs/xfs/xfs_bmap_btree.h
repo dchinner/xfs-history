@@ -1,11 +1,11 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.39 $"
+#ident "$Revision: 1.40 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
-struct buf;
+struct xfs_buf;
 struct xfs_btree_cur;
 struct xfs_btree_lblock;
 struct xfs_mount;
@@ -164,7 +164,7 @@ typedef xfs_dfsbno_t xfs_bmbt_ptr_t, xfs_bmdr_ptr_t;	/* btree pointer type */
 typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_BMBT_BLOCK)
-xfs_bmbt_block_t *xfs_buf_to_bmbt_block(struct buf *bp);
+xfs_bmbt_block_t *xfs_buf_to_bmbt_block(struct xfs_buf *bp);
 #define	XFS_BUF_TO_BMBT_BLOCK(bp)		xfs_buf_to_bmbt_block(bp)
 #else
 #define	XFS_BUF_TO_BMBT_BLOCK(bp) ((xfs_bmbt_block_t *)((bp)->b_un.b_addr))
@@ -449,7 +449,7 @@ xfs_bmbt_block_t *
 xfs_bmbt_get_block(
 	struct xfs_btree_cur	*cur,
 	int			level,
-	struct buf		**bpp);
+	struct xfs_buf		**bpp);
 
 xfs_filblks_t
 xfs_bmbt_get_blockcount(
@@ -488,13 +488,13 @@ xfs_bmbt_insert_many(
 void
 xfs_bmbt_log_block(
 	struct xfs_btree_cur *,
-	struct buf *,
+	struct xfs_buf *,
 	int);
 
 void
 xfs_bmbt_log_recs(
 	struct xfs_btree_cur *,
-	struct buf *,
+	struct xfs_buf *,
 	int,
 	int);
 

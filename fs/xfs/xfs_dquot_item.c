@@ -1,7 +1,7 @@
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
@@ -264,7 +264,7 @@ xfs_qm_dquot_logitem_pushbuf(
 {
 	xfs_dquot_t	*dqp;
 	xfs_mount_t	*mp;
-        buf_t	 	*bp;
+        xfs_buf_t	 	*bp;
 	uint		dopush;
 
 	dqp = qip->qli_dquot;

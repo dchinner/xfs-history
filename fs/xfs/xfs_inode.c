@@ -7,7 +7,7 @@
 #define	_KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/pfdat.h>
 #include <sys/cred.h>
@@ -91,12 +91,12 @@ xfs_iflush_fork(
 	xfs_dinode_t		*dip,
 	xfs_inode_log_item_t	*iip,
 	int			whichfork,
-	buf_t			*bp);
+	xfs_buf_t			*bp);
 
 STATIC int
 xfs_iflush_int(
 	xfs_inode_t		*ip,
-	buf_t			*bp);
+	xfs_buf_t			*bp);
 
 STATIC int
 xfs_iformat(
@@ -166,7 +166,7 @@ xfs_get_inode(dev_t , xfs_ino_t);
 void
 xfs_inobp_check(
 	xfs_mount_t	*mp,
-	buf_t		*bp)
+	xfs_buf_t		*bp)
 {
 	int		i;
 	int		j;
@@ -192,7 +192,7 @@ xfs_inobp_check(
  * called from bwrite on xfs inode buffers
  */
 void
-xfs_inobp_bwcheck(buf_t *bp)
+xfs_inobp_bwcheck(xfs_buf_t *bp)
 {
 	xfs_mount_t	*mp;
 	int		i;
@@ -254,11 +254,11 @@ xfs_inotobp(
 	xfs_trans_t	*tp,
 	xfs_ino_t	ino,
 	xfs_dinode_t	**dipp,
-	buf_t		**bpp)
+	xfs_buf_t		**bpp)
 {
 	int		di_ok;
 	xfs_imap_t	imap;
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	dev_t		dev;
 	int		error;
 	xfs_dinode_t	*dip;
@@ -341,10 +341,10 @@ xfs_itobp(
 	xfs_trans_t	*tp,
 	xfs_inode_t	*ip,	
 	xfs_dinode_t	**dipp,
-	buf_t		**bpp,
+	xfs_buf_t		**bpp,
 	daddr_t		bno)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	dev_t		dev;
 	int		error;
 	xfs_imap_t	imap;
@@ -759,7 +759,7 @@ xfs_iread(
 	xfs_inode_t	**ipp,
 	daddr_t		bno)
 {
-	buf_t		*bp;
+	xfs_buf_t		*bp;
 	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 	int		error;
@@ -974,7 +974,7 @@ xfs_ialloc(
 	cred_t		*cr,
 	xfs_prid_t	prid,   
 	int		okalloc,
-	buf_t		**ialloc_context,
+	xfs_buf_t		**ialloc_context,
 	boolean_t	*call_again,
 	xfs_inode_t	**ipp)	   
 {
@@ -1760,8 +1760,8 @@ xfs_iunlink(
 	xfs_mount_t	*mp;
 	xfs_agi_t	*agi;
 	xfs_dinode_t	*dip;
-	buf_t		*agibp;
-	buf_t		*ibp;
+	xfs_buf_t		*agibp;
+	xfs_buf_t		*ibp;
 	xfs_agnumber_t	agno;
 	daddr_t		agdaddr;
 	xfs_agino_t	agino;
@@ -1855,13 +1855,13 @@ xfs_iunlink_remove(
 	xfs_mount_t	*mp;
 	xfs_agi_t	*agi;
 	xfs_dinode_t	*dip;
-	buf_t		*agibp;
-	buf_t		*ibp;
+	xfs_buf_t		*agibp;
+	xfs_buf_t		*ibp;
 	xfs_agnumber_t	agno;
 	daddr_t		agdaddr;
 	xfs_agino_t	agino;
 	xfs_agino_t	next_agino;
-	buf_t		*last_ibp;
+	xfs_buf_t		*last_ibp;
 	xfs_dinode_t	*last_dip;
 	short		bucket_index;
 	int		offset;
@@ -2740,7 +2740,7 @@ xfs_iflush_fork(
 	xfs_dinode_t		*dip,
 	xfs_inode_log_item_t	*iip,
 	int			whichfork,
-	buf_t			*bp)
+	xfs_buf_t			*bp)
 {
 	char			*cp;
 	xfs_ifork_t		*ifp;
@@ -2881,7 +2881,7 @@ xfs_iflush(
 	uint			flags)
 {
 	xfs_inode_log_item_t	*iip;
-	buf_t			*bp;
+	xfs_buf_t			*bp;
 	xfs_dinode_t		*dip;
 	xfs_mount_t		*mp;
 	int			error;
@@ -3158,7 +3158,7 @@ cluster_corrupt_out:
 STATIC int
 xfs_iflush_int(
 	xfs_inode_t		*ip,
-	buf_t			*bp)
+	xfs_buf_t			*bp)
 {
 	xfs_inode_log_item_t	*iip;
 	xfs_dinode_t		*dip;
@@ -3359,7 +3359,7 @@ xfs_iflush_int(
 		 * and unlock the inode's flush lock when the inode is
 		 * completely written to disk.
 		 */
-		xfs_buf_attach_iodone(bp, (void(*)(buf_t*,xfs_log_item_t*))
+		xfs_buf_attach_iodone(bp, (void(*)(xfs_buf_t*,xfs_log_item_t*))
 				      xfs_iflush_done, (xfs_log_item_t *)iip);
 
 		ASSERT(bp->b_fsprivate != NULL);

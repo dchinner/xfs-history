@@ -8,7 +8,7 @@
 #define _KERNEL 1
 #endif /* SIM */
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
 #ifdef SIM

@@ -1,11 +1,11 @@
-#ident "$Revision: 1.58 $"
+#ident "$Revision: 1.59 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
 
 #include <sys/param.h>
 #include <sys/errno.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/cred.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
@@ -1833,7 +1833,7 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 	xfs_mount_t *mp;
 	daddr_t dblkno;
 	caddr_t dst;
-	buf_t *bp;
+	xfs_buf_t *bp;
 	int nmap, error, tmp, valuelen, blkcnt, i;
 	xfs_dablk_t lblkno;
 
@@ -1889,7 +1889,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 	xfs_bmbt_irec_t map;
 	daddr_t dblkno;
 	caddr_t src;
-	buf_t *bp;
+	xfs_buf_t *bp;
 	xfs_dablk_t lblkno;
 	int blkcnt, valuelen, nmap, error, tmp, committed;
 
@@ -2017,7 +2017,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 {
 	xfs_mount_t *mp;
 	xfs_bmbt_irec_t map;
-	buf_t *bp;
+	xfs_buf_t *bp;
 	daddr_t dblkno;
 	xfs_dablk_t lblkno;
 	int valuelen, blkcnt, nmap, error, done, committed;

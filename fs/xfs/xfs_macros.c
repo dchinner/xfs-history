@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.25 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -10,7 +10,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/param.h>
-#include <sys/buf.h>
+#include "xfs_buf.h"
 #include <sys/sema.h>
 #include <sys/debug.h>
 #include <sys/vnode.h>
@@ -620,7 +620,7 @@ xfs_btree_long_ptrs(xfs_btnum_t btnum)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_AGF)
 xfs_agf_t *
-xfs_buf_to_agf(buf_t *bp)
+xfs_buf_to_agf(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_AGF(bp);
 }
@@ -628,7 +628,7 @@ xfs_buf_to_agf(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_AGFL)
 xfs_agfl_t *
-xfs_buf_to_agfl(buf_t *bp)
+xfs_buf_to_agfl(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_AGFL(bp);
 }
@@ -636,7 +636,7 @@ xfs_buf_to_agfl(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_AGI)
 xfs_agi_t *
-xfs_buf_to_agi(buf_t *bp)
+xfs_buf_to_agi(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_AGI(bp);
 }
@@ -644,7 +644,7 @@ xfs_buf_to_agi(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_ALLOC_BLOCK)
 xfs_alloc_block_t *
-xfs_buf_to_alloc_block(buf_t *bp)
+xfs_buf_to_alloc_block(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_ALLOC_BLOCK(bp);
 }
@@ -652,7 +652,7 @@ xfs_buf_to_alloc_block(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_BLOCK)
 xfs_btree_block_t *
-xfs_buf_to_block(buf_t *bp)
+xfs_buf_to_block(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_BLOCK(bp);
 }
@@ -660,7 +660,7 @@ xfs_buf_to_block(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_BMBT_BLOCK)
 xfs_bmbt_block_t *
-xfs_buf_to_bmbt_block(buf_t *bp)
+xfs_buf_to_bmbt_block(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_BMBT_BLOCK(bp);
 }
@@ -668,7 +668,7 @@ xfs_buf_to_bmbt_block(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_DINODE)
 xfs_dinode_t *
-xfs_buf_to_dinode(buf_t *bp)
+xfs_buf_to_dinode(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_DINODE(bp);
 }
@@ -676,7 +676,7 @@ xfs_buf_to_dinode(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_INOBT_BLOCK)
 xfs_inobt_block_t *
-xfs_buf_to_inobt_block(buf_t *bp)
+xfs_buf_to_inobt_block(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_INOBT_BLOCK(bp);
 }
@@ -684,7 +684,7 @@ xfs_buf_to_inobt_block(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_LBLOCK)
 xfs_btree_lblock_t *
-xfs_buf_to_lblock(buf_t *bp)
+xfs_buf_to_lblock(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_LBLOCK(bp);
 }
@@ -692,7 +692,7 @@ xfs_buf_to_lblock(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_SBLOCK)
 xfs_btree_sblock_t *
-xfs_buf_to_sblock(buf_t *bp)
+xfs_buf_to_sblock(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_SBLOCK(bp);
 }
@@ -700,7 +700,7 @@ xfs_buf_to_sblock(buf_t *bp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BUF_TO_SBP)
 xfs_sb_t *
-xfs_buf_to_sbp(buf_t *bp)
+xfs_buf_to_sbp(xfs_buf_t *bp)
 {
 	return XFS_BUF_TO_SBP(bp);
 }
@@ -1861,7 +1861,7 @@ xfs_litino(xfs_mount_t *mp)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_MAKE_IPTR)
 xfs_dinode_t *
-xfs_make_iptr(xfs_mount_t *mp, buf_t *b, int o)
+xfs_make_iptr(xfs_mount_t *mp, xfs_buf_t *b, int o)
 {
 	return XFS_MAKE_IPTR(mp, b, o);
 }
