@@ -550,7 +550,7 @@ xfs_acl_set_attr(vnode_t *vp, xfs_acl_t *aclp, int kind, int *error)
 {
 	xfs_acl_entry_t *ace, *newace, *end;
 	xfs_acl_t newacl;
-	int len = sizeof(xfs_acl_t);
+	int len = sizeof(xfs_acl_t) - (sizeof(xfs_acl_entry_t)*(XFS_ACL_MAX_ENTRIES - aclp->acl_cnt));
 
 	end = &aclp->acl_entry[0]+aclp->acl_cnt;
 	for (ace = &aclp->acl_entry[0], newace = &newacl.acl_entry[0];
