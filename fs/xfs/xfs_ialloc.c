@@ -156,7 +156,7 @@ xfs_ialloc_log_di(
 	};
         xfs_arch_t  arch;
         
-        arch=((xfs_mount_t *)bp->b_fsprivate)->m_arch;
+        arch=XFS_BUF_FSPRIVATE(bp,xfs_mount_t *)->m_arch;
 
 	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
 	ASSERT((fields & (XFS_DI_U|XFS_DI_A)) == 0);
