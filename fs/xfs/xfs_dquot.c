@@ -1,4 +1,4 @@
-#ident "$Revision: 1.16 $"
+#ident "$Revision: 1.17 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -1203,9 +1203,12 @@ xfs_qm_dqflush(
 	buf_t			*bp;
 	xfs_disk_dquot_t 	*ddqp;
 	int			error;
+#ifdef _BANYAN_XFS
+	int			s;
+#else
 	SPLDECL(s);
+#endif
 
-	
 	ASSERT(XFS_DQ_IS_LOCKED(dqp));
 	ASSERT(XFS_DQ_IS_FLUSH_LOCKED(dqp));
 	xfs_dqtrace_entry(dqp, "DQFLUSH");
@@ -1254,7 +1257,11 @@ xfs_qm_dqflush(
 	mp = dqp->q_mount;
 
 	/* lsn is 64 bits */
+#ifdef _BANYAN_XFS
+	s = AIL_LOCK(mp);
+#else
 	AIL_LOCK(mp, s);
+#endif
 	dqp->q_logitem.qli_flush_lsn = dqp->q_logitem.qli_item.li_lsn;
 	AIL_UNLOCK(mp, s);
 
@@ -1302,8 +1309,11 @@ xfs_qm_dqflush_done(
         xfs_dq_logitem_t	*qip)
 {
         xfs_dquot_t     	*dqp;
+#ifdef _BANYAN_XFS
+        int             	s;
+#else
 	SPLDECL(s);
-
+#endif
         dqp = qip->qli_dquot;
 
         /*
@@ -1316,7 +1326,11 @@ xfs_qm_dqflush_done(
          */
         if ((qip->qli_item.li_flags & XFS_LI_IN_AIL) &&
 	    qip->qli_item.li_lsn == qip->qli_flush_lsn) {
-                AIL_LOCK(dqp->q_mount, s);
+#ifdef _BANYAN_XFS
+                s = AIL_LOCK(dqp->q_mount);
+#else
+		AIL_LOCK(dqp->q_mount, s);
+#endif
 		/*
 		 * xfs_trans_delete_ail() drops the AIL lock.
 		 */
@@ -1423,15 +1437,13 @@ xfs_qm_dqid(
  * Take a dquot out of the mount's dqlist as well as the hashlist.
  * This is called via unmount as well as quotaoff, and the purge
  * will always succeed.
- * This also returns a pointer to the next dquot in the mount's dquot list.
  */
 /* ARGSUSED */
-xfs_dquot_t *
+int
 xfs_qm_dqpurge(
 	xfs_dquot_t	*dqp,
 	uint		flags)
 {
-	xfs_dquot_t 	*nextdqp;
 	xfs_dqhash_t	*thishash;
 	xfs_mount_t	*mp;
 
@@ -1444,11 +1456,17 @@ xfs_qm_dqpurge(
 	/*
 	 * We really can't afford to purge a dquot that is
 	 * referenced, because these are hard refs.
-	 * It shouldn't happen because we went thru _all_ inodes in 
-	 * dqrele_all_inodes before calling this from
-	 * quotaoff code, and didn't let the mountlock go.
+	 * It shouldn't happen in general because we went thru _all_ inodes in 
+	 * dqrele_all_inodes before calling this and didn't let the mountlock go.
+	 * However it is possible that we have dquots with temporary 
+	 * references that are not attached to an inode. e.g. see xfs_setattr().
 	 */
-	ASSERT(dqp->q_nrefs == 0);
+	if (dqp->q_nrefs != 0) {
+		xfs_dqunlock(dqp);
+		XFS_DQ_HASH_UNLOCK(dqp->q_hash);
+		return (1);
+	}
+		
 	ASSERT(XFS_DQ_IS_ON_FREELIST(dqp));
 
 	/*
@@ -1486,7 +1504,6 @@ xfs_qm_dqpurge(
 	ASSERT(dqp->q_pincount == 0);
 	ASSERT(! (dqp->q_logitem.qli_item.li_flags & XFS_LI_IN_AIL));
 
-	nextdqp = dqp->MPL_NEXT;	
 	thishash = dqp->q_hash;
 	XQM_HASHLIST_REMOVE(thishash, dqp);
 	XQM_MPLIST_REMOVE(&(mp->QI_MPL_LIST), dqp);
@@ -1504,7 +1521,7 @@ xfs_qm_dqpurge(
 	xfs_dqfunlock(dqp);
 	xfs_dqunlock(dqp);
 	XFS_DQ_HASH_UNLOCK(thishash);
-	return (nextdqp);
+	return (0);
 }
 
 
