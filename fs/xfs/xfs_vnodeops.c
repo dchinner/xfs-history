@@ -70,6 +70,7 @@
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <sys/major.h>
+#include <sys/ddi.h>
 #include <ksys/fdt.h>
 #include <ksys/fsc_notify.h>
 #include <ksys/cell_config.h>
@@ -5753,6 +5754,7 @@ xfs_set_uiosize(
 	return 0;
 }
 
+
 /*
  * xfs_fcntl
  */
@@ -5806,13 +5808,20 @@ xfs_fcntl(
 		 * than maxdmasz.  This is for the case of a maximum
 		 * size I/O that is not page aligned.  It requires the
 		 * maximum size plus 1 pages.
+		 *
+		 * Note: there are three additional pieced of code that
+		 * replicate F_DIOINFO: xfs_fspe_dioinfo(),
+		 * xfs_dm_get_dioinfo(), efs_fspe_dioinfo. 
+		 * They are *not* identical
                  */
 		ASSERT(scache_linemask != 0);
+		da.d_miniosz = mp->m_sb.sb_blocksize;
 
 #ifdef MH_R10000_SPECULATION_WAR
-		if (IS_R10000())
+		if (IS_R10000()) {
 			da.d_mem = _PAGESZ;
-		else
+			da.d_miniosz = ptob(btopr(mp->m_sb.sb_blocksize));
+		} else
 			da.d_mem = scache_linemask + 1;
 #elif R10000_SPECULATION_WAR	/* makes tlb invalidate during dma more
 	effective, by decreasing the likelihood of a valid reference in the
@@ -5831,7 +5840,6 @@ xfs_fcntl(
 		 * avoid having to do block zeroing on short writes.
 		 */
 #if 0
-		da.d_miniosz = mp->m_sb.sb_blocksize;
 		da.d_maxiosz = XFS_FSB_TO_B(mp,
 				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
 #endif
