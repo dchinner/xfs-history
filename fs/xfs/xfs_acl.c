@@ -31,6 +31,7 @@
  */
 
 #include <xfs.h>
+#include <linux/posix_acl_xattr.h>
 
 STATIC int	xfs_acl_setmode(vnode_t *, xfs_acl_t *);
 STATIC void     xfs_acl_filter_mode(mode_t, xfs_acl_t *);
