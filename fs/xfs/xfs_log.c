@@ -457,7 +457,6 @@ xfs_log_mount(xfs_mount_t	*mp,
 	      int		num_bblks)
 {
 	xlog_t *log;
-	int    error;
 	
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
 		cmn_err(CE_NOTE,
@@ -481,22 +480,22 @@ xfs_log_mount(xfs_mount_t	*mp,
 	 * skip log recovery on a norecovery mount.  pretend it all
 	 * just worked.
 	 */
-	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
-		error = xlog_recover(log,
-			XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
-	else
-		error = 0;
-        
-        if (error) {
-                cmn_err(CE_WARN, "XFS: log mount/recovery failed");
-		xlog_unalloc_log(log);
-        } else {
-	        /* Normal transactions can now occur */
-	        log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY)) {
+        	int    error;
+                
+                error = xlog_recover(log,XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
+                if (error) {
+	                cmn_err(CE_WARN, "XFS: log mount/recovery failed");
+			xlog_unalloc_log(log);
+                        return error;
+                }
         }
 
+        /* Normal transactions can now occur */
+        log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+
 	/* End mounting message in xfs_log_mount_finish */
-	return error;
+	return 0;
 }	/* xfs_log_mount */
 
 /*
