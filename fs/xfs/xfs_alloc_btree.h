@@ -1,14 +1,14 @@
 #ifndef _FS_XFS_ALLOC_BTREE_H
 #define	_FS_XFS_ALLOC_BTREE_H
 
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * Freespace on-disk structures
  */
 
-struct xfs_btree_sblock_t;
 struct xfs_btree_cur;
+struct xfs_btree_sblock;
 
 /*
  * There are two on-disk btrees, one sorted by blockno and one sorted
