@@ -5797,7 +5797,7 @@ xfs_change_file_space(
 		if (startoffset > fsize &&
 		    (error = xfs_alloc_file_space(ip, fsize,
 			    startoffset - fsize)))
-			break;
+			return error;
 		va.va_mask = AT_SIZE;
 		va.va_size = startoffset;
 		if (error = xfs_setattr(bdp, &va, 0, credp))
