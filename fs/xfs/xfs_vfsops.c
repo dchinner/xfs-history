@@ -747,21 +747,34 @@ _xfs_ibusy(xfs_mount_t *mp)
 
 	XFS_MOUNT_ILOCK(mp);
 
-	for (ip = mp->m_inodes; ip && !busy; ip = ip->i_mnext) {
+	ip = mp->m_inodes;
+	if (ip == NULL) {
+		XFS_MOUNT_IUNLOCK(mp);
+		return busy;
+	}
+
+	do {
 		vp = XFS_ITOV(ip);
 		if (vp->v_count != 0) {
-			if ((vp->v_count == 1) && (ip == mp->m_rootip))
+			if ((vp->v_count == 1) && (ip == mp->m_rootip)) {
+				ip = ip->i_mnext;
 				continue;
-			if ((vp->v_count == 1) && (ip == mp->m_rbmip))
+			}
+			if ((vp->v_count == 1) && (ip == mp->m_rbmip)) {
+				ip = ip->i_mnext;
 				continue;
-			if ((vp->v_count == 1) && (ip == mp->m_rsumip))
+			}
+			if ((vp->v_count == 1) && (ip == mp->m_rsumip)) {
+				ip = ip->i_mnext;
 				continue;
+			}
 #ifdef DEBUG
 			printf("busy vp=0x%x count=%d\n", vp, vp->v_count);
 #endif
 			busy++;
 		}
-	}
+		ip = ip->i_mnext;
+	} while ((ip != mp->m_inodes) && !busy);
 	
 	XFS_MOUNT_IUNLOCK(mp);
 
@@ -854,6 +867,7 @@ xfs_unmount(vfs_t	*vfsp,
 	 * XXX Later when xfs_unmount()'s inode freeing is implemented, do:
 	 * ASSERT(mp->m_inodes == NULL);
 	 */
+	ASSERT(mp->m_inodes == NULL);
 
 	return 0;	/* XXX Must determine unmount return value. */
 }
@@ -1065,18 +1079,23 @@ xfs_sync(vfs_t		*vfsp,
 	int		last_error;
 	int		fflag;
 	int		ireclaims;
+	int		restarts;
 	uint		lock_flags;
 	uint		log_flags;
 	boolean_t	mount_locked;
 	boolean_t	vnode_refed;
 	xfs_fsize_t	last_byte;
 	int		preempt;
+	int		i;
+
+#define	RESTART_LIMIT	10
 #define PREEMPT_MASK	0x7f
 
 	mp = XFS_VFSTOM(vfsp);
 	error = 0;
 	last_error = 0;
 	preempt = 0;
+	restarts = 0;
 
 	fflag = B_ASYNC;		/* default is don't wait */
 	if (flags & SYNC_BDFLUSH)
@@ -1103,7 +1122,16 @@ xfs_sync(vfs_t		*vfsp,
 	XFS_MOUNT_ILOCK(mp);
 	mount_locked = B_TRUE;
 	vnode_refed = B_FALSE;
-	for (ip = mp->m_inodes; ip; ip = ip->i_mnext) {
+	ip = mp->m_inodes;
+	do {
+		/*
+		 * There were no inodes in the list, just break out
+		 * of the loop.
+		 */
+		if (ip == NULL) {
+			break;
+		}
+
 		vp = XFS_ITOV(ip);
 
 		/*
@@ -1111,6 +1139,7 @@ xfs_sync(vfs_t		*vfsp,
 		 * too easy to deadlock on memory.
 		 */
 		if (vp->v_flag & VISSWAP) {
+			ip = ip->i_mnext;
 			continue;
 		}
 
@@ -1125,10 +1154,12 @@ xfs_sync(vfs_t		*vfsp,
 		if (flags & SYNC_BDFLUSH) {
 			if (!(ip->i_item.ili_flags & XFS_ILOG_ALL) &&
 			    (ip->i_update_core == 0)) {
-				    continue;
+				ip = ip->i_mnext;
+				continue;
 			    }
 		} else if (flags & SYNC_PDFLUSH) {
 			if (vp->v_dpages == NULL) {
+				ip = ip->i_mnext;
 				continue;
 			}
 		}
@@ -1152,6 +1183,7 @@ xfs_sync(vfs_t		*vfsp,
 		 */
 		if (xfs_ilock_nowait(ip, lock_flags) == 0) {
 			if (flags & SYNC_BDFLUSH) {
+				ip = ip->i_mnext;
 				continue;
 			}
 
@@ -1175,7 +1207,19 @@ xfs_sync(vfs_t		*vfsp,
 				 * The vnode was reclaimed once we let go
 				 * of the inode list lock.  Start again
 				 * at the beginning of the list.
+				 * If the caller didn't want to wait
+				 * anyway, then only spend so much
+				 * time trying to get through
+				 * the entire list.  This keeps
+				 * us from spending all day here
+				 * on busy file systems.
 				 */
+				if (!(flags & SYNC_WAIT) &&
+				    (restarts == RESTART_LIMIT)) {
+					XFS_MOUNT_ILOCK(mp);
+					break;
+				}
+				restarts++;
 				goto loop;
 			}
 			xfs_ilock(ip, lock_flags);
@@ -1297,12 +1341,45 @@ xfs_sync(vfs_t		*vfsp,
 		if (!mount_locked) {
 			XFS_MOUNT_ILOCK(mp);
 			if (mp->m_ireclaims != ireclaims) {
+				if (!(flags & SYNC_WAIT) &&
+				    (restarts == RESTART_LIMIT)) {
+					/*
+					 * If the caller didn't want to wait
+					 * anyway, then only spend so much
+					 * time trying to get through
+					 * the entire list.  This keeps
+					 * us from spending all day here
+					 * on busy file systems.
+					 */
+					break;
+				}
+				restarts++;
 				XFS_MOUNT_IUNLOCK(mp);
 				goto loop;
 			}
 			mount_locked = B_TRUE;
 		}
-			
+
+		ip = ip->i_mnext;
+	} while (ip != mp->m_inodes);
+	if ((restarts == RESTART_LIMIT) && !(flags & SYNC_WAIT) &&
+	    (mp->m_inodes != NULL)) {
+		/*
+		 * We may have missed some of the inodes at the end
+		 * of the list.  Rotate the list so that some of the
+		 * inodes at the tail of the list are now at the head
+		 * so that they get looked at eventually.  This is
+		 * actually necessary and not just nice since we depend
+		 * on vfs_sync() to push out dirty inodes eventually
+		 * as part of guaranteeing that the tail of the log
+		 * will move forward eventually.
+		 */
+		ip = mp->m_inodes;
+		for (i = 0; i < 10; i++) {
+			ip = ip->i_mprev;
+		}
+		ASSERT(ip != NULL);
+		mp->m_inodes = ip;
 	}
 	XFS_MOUNT_IUNLOCK(mp);
 
