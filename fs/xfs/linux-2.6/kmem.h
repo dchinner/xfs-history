@@ -66,6 +66,10 @@ typedef unsigned long xfs_pflags_t;
 	current->flags = *(STATEP);	\
 } while (0)
 
+#define PFLAGS_CLEAR_FSTRANS(STATEP) do {	\
+	*(STATEP) &= ~PF_FSTRANS;	\
+} while (0)
+
 /*
  * XXX get rid of the unconditional  __GFP_NOFAIL by adding
  * a KM_FAIL flag and using it where we're allowed to fail.
