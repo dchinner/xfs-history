@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.80 $"
+#ident  "$Revision: 1.81 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -100,6 +100,7 @@
 #include "xfs_dir.h"
 #include "xfs_dir_btree.h"
 #include "xfs_rw.h"
+#include "xfs_buf_item.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -1204,6 +1205,8 @@ xfs_sync(vfs_t		*vfsp,
 	xfs_fsize_t	last_byte;
 	int		preempt;
 	int		i;
+	xfs_dinode_t	*dip;
+	xfs_buf_log_item_t	*bip;
 
 #define	RESTART_LIMIT	10
 #define PREEMPT_MASK	0x7f
@@ -1412,14 +1415,57 @@ xfs_sync(vfs_t		*vfsp,
 				}
 
 				/*
-				 * Since this is vfs_sync() calling we only
-				 * flush the inode out if we can lock it
-				 * without sleeping and it is not pinned.
+				 * We don't want the periodic flushing of the
+				 * inodes by vfs_sync() to interfere with
+				 * I/O to the file, especially read I/O
+				 * where it is only the access time stamp
+				 * that is being flushed out.  To prevent
+				 * long periods where we have both inode
+				 * locks held shared here while reading the
+				 * inode's buffer in from disk, we drop the
+				 * inode lock while reading in the inode
+				 * buffer.  We have to release the buffer
+				 * and reacquire the inode lock so that they
+				 * are acquired in the proper order (inode
+				 * locks first).  The buffer will go at the
+				 * end of the lru chain, though, so we can
+				 * expect it to still be there when we go
+				 * for it again in xfs_iflush().
 				 */
 				if ((ip->i_pincount == 0) &&
 				    xfs_iflock_nowait(ip)) {
-					xfs_iflush(ip, XFS_IFLUSH_DELWRI);
+					xfs_ifunlock(ip);
+					xfs_iunlock(ip, XFS_ILOCK_SHARED);
+					bp = xfs_inotobp(mp, NULL, ip->i_ino,
+							 &dip);
+					brelse(bp);
+
+					if (xfs_ilock_nowait(ip,
+						    XFS_ILOCK_SHARED) == 0) {
+						/*
+						 * We failed to reacquire
+						 * the inode lock without
+						 * sleeping, so just skip
+						 * the inode for now.  We
+						 * clear the ILOCK bit from
+						 * the lock_flags so that we
+						 * won't try to drop a lock
+						 * we don't hold below.
+						 */
+						lock_flags &= ~XFS_ILOCK_SHARED;
+					} else if ((ip->i_pincount == 0) &&
+						   xfs_iflock_nowait(ip)) {
+						/*
+						 * Since this is vfs_sync()
+						 * calling we only flush the
+						 * inode out if we can lock
+						 * it without sleeping and
+						 * it is not pinned.
+						 */
+						xfs_iflush(ip, XFS_IFLUSH_DELWRI);
+					}
 				}
+
 			}
 
 		} else {
@@ -1542,9 +1588,15 @@ xfs_sync(vfs_t		*vfsp,
 		if (flags & SYNC_BDFLUSH) {
 			bp = xfs_getsb(mp, BUF_TRYLOCK);
 			if (bp != NULL) {
-				if (bp->b_pincount == 0) {
-					bp->b_flags |= B_ASYNC;
-					error = bwrite(bp);
+				bip = (xfs_buf_log_item_t *)bp->b_fsprivate;
+				if ((bip != NULL) &&
+				    xfs_buf_item_dirty(bip)) {
+					if (bp->b_pincount == 0) {
+						bp->b_flags |= B_ASYNC;
+						error = bwrite(bp);
+					} else {
+						brelse(bp);
+					}
 				} else {
 					brelse(bp);
 				}
@@ -1558,7 +1610,6 @@ xfs_sync(vfs_t		*vfsp,
 			last_error = error;
 		}
 	}
-
 
 	return last_error;
 }
