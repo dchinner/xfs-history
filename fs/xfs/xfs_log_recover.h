@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_RECOVER_H
 #define _XFS_LOG_RECOVER_H
 
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 /*
  * Macros, structures, prototypes for internal log manager use.
@@ -11,7 +11,7 @@
 #define XLOG_RHASH_SIZE	16
 #define XLOG_RHASH_SHIFT 2
 #define XLOG_RHASH(tid)	\
-	((((ulong)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1))
+	((((__uint32_t)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1))
 
 #define XLOG_MAX_REGIONS_IN_ITEM   (XFS_MAX_BLOCKSIZE / XFS_BLI_CHUNK / 2 + 1)
 
