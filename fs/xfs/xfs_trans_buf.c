@@ -59,6 +59,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
+	int			s;
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
@@ -112,6 +113,13 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	bip->bli_recur = 0;
 
 	/*
+	 * Take a reference for this transaction on the buf item.
+	 */
+	s = splockspl(xfs_bli_reflock, splhi);
+	bip->bli_refcount++;
+	spunlockspl(xfs_bli_reflock, s);
+
+	/*
 	 * Get a log_item_desc to point at the new item.
 	 */
 	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
@@ -138,6 +146,7 @@ xfs_trans_getsb(xfs_trans_t *tp)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
+	int			s;
 
 	/*
 	 * Default to just trying to lock the superblock buffer
@@ -176,6 +185,13 @@ xfs_trans_getsb(xfs_trans_t *tp)
 	 */
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;
 	bip->bli_recur = 0;
+
+	/*
+	 * Take a reference for this transaction on the buf item.
+	 */
+	s = splockspl(xfs_bli_reflock, splhi);
+	bip->bli_refcount++;
+	spunlockspl(xfs_bli_reflock, s);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
@@ -218,6 +234,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
+	int			s;
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
@@ -291,6 +308,13 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	bip->bli_recur = 0;
 
 	/*
+	 * Take a reference for this transaction on the buf item.
+	 */
+	s = splockspl(xfs_bli_reflock, splhi);
+	bip->bli_refcount++;
+	spunlockspl(xfs_bli_reflock, s);
+
+	/*
 	 * Get a log_item_desc to point at the new item.
 	 */
 	(void) xfs_trans_add_item(tp, (xfs_log_item_t*)bip);
@@ -326,6 +350,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 {
 	xfs_buf_log_item_t	*bip;
 	xfs_log_item_desc_t	*lidp;
+	int			s;
 
 	/*
 	 * Default to a normal brelse() call if the tp is NULL.
@@ -400,6 +425,13 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 	bp->b_fsprivate2 = NULL;
 
 	/*
+	 * Drop our reference to the buf log item.
+	 */
+	s = splockspl(xfs_bli_reflock, splhi);
+	bip->bli_refcount--;
+	spunlockspl(xfs_bli_reflock, s);
+	
+	/*
 	 * If we've still got a buf log item on the buffer, then
 	 * tell the AIL that the buffer is being unlocked.
 	 */
@@ -423,6 +455,9 @@ void
 xfs_trans_bjoin(xfs_trans_t	*tp,
 		buf_t		*bp)
 {
+	int			s;
+	xfs_buf_log_item_t	*bip;
+
 	ASSERT(bp->b_flags & B_BUSY);
 	ASSERT(bp->b_fsprivate2 == NULL);
 
@@ -432,11 +467,19 @@ xfs_trans_bjoin(xfs_trans_t	*tp,
 	 * The checks to see if one is there are in xfs_buf_item_init().
 	 */
 	xfs_buf_item_init(bp, tp->t_mountp);
+	bip = bp->b_fsprivate;
+
+	/*
+	 * Take a reference for this transaction on the buf item.
+	 */
+	s = splockspl(xfs_bli_reflock, splhi);
+	bip->bli_refcount++;
+	spunlockspl(xfs_bli_reflock, s);
 
 	/*
 	 * Get a log_item_desc to point at the new item.
 	 */
-	(void) xfs_trans_add_item(tp, bp->b_fsprivate);
+	(void) xfs_trans_add_item(tp, (xfs_log_item_t *)bip);
 
 	/*
 	 * Initialize b_fsprivate2 so we can find it with incore_match()
@@ -536,5 +579,81 @@ xfs_trans_log_buf(xfs_trans_t	*tp,
 	tp->t_flags |= XFS_TRANS_DIRTY;
 	lidp->lid_flags |= XFS_LID_DIRTY;
 	xfs_buf_item_log(bip, first, last);
+}
+
+
+/*
+ * This called to invalidate a buffer that is being used within
+ * a transaction.  Typically this is because the blocks in the
+ * buffer are being freed, so we need to prevent it from being
+ * written out when we're done.  Allowing it to be written again
+ * might overwrite data in the free blocks if they are reallocated
+ * to a file.
+ *
+ * We prevent the buffer from being written out by clearing the
+ * B_DELWRI flag.  We can't always
+ * get rid of the buf log item at this point, though, because
+ * the buffer may still be pinned by other transaction.  If that
+ * is the case, then we'll wait until the buffer is committed to
+ * disk for the last time (we can tell by the ref count) and
+ * free it in xfs_buf_item_unpin().
+ */
+void
+xfs_trans_binval(
+	xfs_trans_t	*tp,
+	buf_t		*bp)
+{
+	xfs_log_item_desc_t	*lidp;
+	xfs_buf_log_item_t	*bip;
+	xfs_log_item_chunk_t	*licp;
+
+	ASSERT(bp->b_flags & B_BUSY);
+	ASSERT((xfs_trans_t*)(bp->b_fsprivate2) == tp);
+	ASSERT(bp->b_fsprivate != NULL);
+
+	bip = (xfs_buf_log_item_t *)(bp->b_fsprivate);
+	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
+	ASSERT(lidp != NULL);
+
+	if (!(bp->b_flags & B_DELWRI)) {
+		/*
+		 * The buffer isn't dirty so the buf item isn't
+		 * in the AIL and the buffer isn't pinned.
+		 * In this case we can just free the buf item
+		 * and release the buffer from the transaction.
+		 */
+		ASSERT(bp->b_pincount == 0);
+		ASSERT(!(bip->bli_item.li_flags & XFS_LI_IN_AIL));
+		ASSERT(bip->bli_refcount == 1);
+		xfs_buf_item_relse(bp);
+		/*
+		 * There had better not be any log items attached to
+		 * this buffer waiting for it to be written out, because
+		 * it is never going out.
+		 */
+		ASSERT(bp->b_fsprivate == NULL);
+		/*
+		 * Free up the descriptor pointing at the buf log item.
+		 */
+		licp = XFS_LIC_DESC_TO_CHUNK(lidp);
+		XFS_LIC_RELSE(licp, XFS_LIC_DESC_TO_SLOT(lidp));
+		brelse(bp);
+		return;
+	}
+
+	/*
+	 * The buffer is dirty, so we can't clean it up until this
+	 * transaction is permanent on disk.  Mark the buf item descriptor
+	 * dirty so that we'll keep it around across the commit.
+	 * Clear the B_DELWRI flag in the buffer so that it won't be
+	 * written out anymore.  We set the XFS_BLI_STALE flag in the
+	 * buf log item to indicate to the xfs_buf_item_unpin() that
+	 * it should clean up when the last reference to the buf item
+	 * is given up.
+	 */
+	bp->b_flags &= ~B_DELWRI;
+	bip->bli_flags |= XFS_BLI_STALE;
+	lidp->lid_flags |= XFS_LID_DIRTY;
+	tp->t_flags |= XFS_TRANS_DIRTY;
 }
 
