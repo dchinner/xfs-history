@@ -411,7 +411,7 @@ xfs_sendfile(
 		}
 	}
 	xfs_rw_enter_trace(XFS_SENDFILE_ENTER, &ip->i_iocore,
-				iovp, segs, *offset, ioflags);
+				target, count, *offset, ioflags);
 	ret = generic_file_sendfile(filp, offset, count, actor, target);
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
