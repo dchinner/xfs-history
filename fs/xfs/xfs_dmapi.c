@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -970,10 +970,10 @@ xfs_dm_rdwr(
 
 	if (fflag & FREAD) {
 		SYSINFO.sysread++;
-		atomicAddUlong(&ut->ut_pproxy->prxy_syscr, 1);
+		ut->ut_acct.ua_syscr++;
 	} else {
 		SYSINFO.syswrite++;
-		atomicAddUlong(&ut->ut_pproxy->prxy_syscw, 1);
+		ut->ut_acct.ua_syscw++;
 	}
 
 	/* Build file descriptor flags and I/O flags.  FNONBLOCK is needed so
@@ -1030,10 +1030,10 @@ xfs_dm_rdwr(
 
 	if (fflag & FREAD) {
 		SYSINFO.readch += xfer;
-		atomicAddUint64(&ut->ut_pproxy->prxy_bread, xfer);
+		ut->ut_acct.ua_bread += xfer;
 	} else {
 		SYSINFO.writech += xfer;
-		atomicAddUint64(&ut->ut_pproxy->prxy_bwrit, xfer);
+		ut->ut_acct.ua_bwrit += xfer;
 	}
 	if (vp->v_vfsp != NULL)
 		vp->v_vfsp->vfs_bcount += xfer >> SCTRSHFT;
