@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.79 $"
+#ident "$Revision: 1.80 $"
 
 struct buf;
 struct cred;
@@ -78,8 +78,6 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_mnext;	/* next inode in mount list */
 	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
-	struct grio_ticket	*i_ticket;	/* grio ticket list */
-	lock_t			i_ticketlock;
 
 	/* Inode location stuff */
 	dev_t			i_dev;		/* dev for this inode */
