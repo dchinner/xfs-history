@@ -133,8 +133,7 @@ xfs_close(
 	bhv_desc_t	*bdp,
 	int		flag,
 	lastclose_t	lastclose,
-	cred_t		*credp,
-	struct flid	*fl);
+	cred_t		*credp);
 
 STATIC int
 xfs_getattr(
@@ -383,8 +382,7 @@ xfs_close(
 	bhv_desc_t	*bdp,
 	int		flag,
 	lastclose_t	lastclose,
-	cred_t		*credp,
-	struct flid	*fl)
+	cred_t		*credp)
 {
 
 	extern 	int	grio_remove_reservation(pid_t, dev_t, gr_ino_t);
