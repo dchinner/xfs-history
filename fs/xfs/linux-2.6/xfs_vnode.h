@@ -62,7 +62,7 @@
 struct uio;
 struct file;
 struct vattr;
-struct page_buf_bmap_s;
+struct xfs_iomap;
 struct attrlist_cursor_kern;
 
 /*
@@ -228,7 +228,7 @@ typedef void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	int	(*vop_frlock_t)(bhv_desc_t *, int, struct file_lock *,int,
 				xfs_off_t, struct cred *);
 typedef int	(*vop_bmap_t)(bhv_desc_t *, xfs_off_t, ssize_t, int,
-				struct page_buf_bmap_s *, int *);
+				struct xfs_iomap *, int *);
 typedef int	(*vop_reclaim_t)(bhv_desc_t *);
 typedef int	(*vop_attr_get_t)(bhv_desc_t *, char *, char *, int *, int,
 				struct cred *);
