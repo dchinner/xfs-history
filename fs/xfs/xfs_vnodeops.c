@@ -1590,7 +1590,7 @@ trans_error_return:
 	IHOLD (src_dp);
 	if (src_dp != target_dp)
 		IHOLD (src_dp);
-	xfs_trans_cancel (tp);
+	xfs_trans_cancel (tp, 0);
 	return error;
 }
 
