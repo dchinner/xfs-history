@@ -1584,7 +1584,7 @@ _pagebuf_page_io(
 	/* If we are doing I/O larger than the bh->b_size field then
 	 * we need to split this request up.
 	 */
-	while (sector > ((1UL << NBBY * sizeof(bh->b_size)) - 1)) {
+	while (sector > ((1ULL << NBBY * sizeof(bh->b_size)) - 1)) {
 		sector >>= 1;
 		blk_length++;
 	}
