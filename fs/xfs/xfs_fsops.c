@@ -1,10 +1,10 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.22 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
-#include <sys/file.h>
+#include <ksys/vfile.h>
 #include <sys/kmem.h>
 #include <sys/sema.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.44 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -11,7 +11,7 @@
 #include <sys/kmem.h>
 #include <sys/time.h>
 #include <sys/debug.h>
-#include <sys/file.h>
+#include <ksys/vfile.h>
 #include <ksys/fdt.h>
 #include <sys/vfs.h>
 #include <sys/syssgi.h>
@@ -620,16 +620,16 @@ xfs_fd_to_mp(
 	xfs_mount_t	**mpp)			/* return mount pointer */
 {
 	int		error;
-	file_t		*fp;
+	vfile_t		*fp;
 	vfs_t		*vfsp;
 	vnode_t		*vp;
 	bhv_desc_t *bdp;
 
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);
-	vp = fp->f_vnode;
+	vp = fp->vf_vnode;
 	if (vp->v_type == VBLK || vp->v_type == VCHR) {
-		if (wperm && !(fp->f_flag & FWRITE))
+		if (wperm && !(fp->vf_flag & FWRITE))
 			return XFS_ERROR(EPERM);
 		vfsp = vfs_devsearch(vp->v_rdev);
 		if (vfsp == NULL)

@@ -10,14 +10,14 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.30 $"
+#ident "$Revision: 1.31 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/cred.h>
-#include <sys/file.h>
+#include <ksys/vfile.h>
 #include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/proc.h>
@@ -121,13 +121,13 @@ fd_to_handle (
 {
 	int		error;
 	vnode_t		*vp;
-	file_t		*fp;
+	vfile_t		*fp;
 	handle_t	handle;
 
 	error = getf (fd, &fp);
 	if (error)
 		return error;
-	vp = fp->f_vnode;
+	vp = fp->vf_vnode;
 	error = vp_to_handle (vp, &handle);
 	if (error)
 		return error;
@@ -204,7 +204,7 @@ open_by_handle (
 	rval_t		*rvp)
 {
 	vnode_t		*vp;
-	file_t		*fp;
+	vfile_t		*fp;
 	int		fd;
 	int		error;
 	handle_t	handle;
@@ -232,7 +232,7 @@ open_by_handle (
 			goto out;
 	}
 
-	error = falloc ((vnode_t *) NULL, filemode, &fp, &fd);
+	error = vfile_alloc ((vnode_t *) NULL, filemode, &fp, &fd);
 	if (error)
 		goto out;
 
@@ -252,11 +252,11 @@ open_by_handle (
 
 	curuthread->ut_openfp = NULL;
 	if (error)
-		falloc_undo(fd, fp);
+		vfile_alloc_undo(fd, fp);
 	else {
-		fp->f_vnode = vp;
+		fp->vf_vnode = vp;
 		rvp->r_val1 = fd;
-		fready (fp);
+		vfile_ready (fp);
 	}
 
 out:

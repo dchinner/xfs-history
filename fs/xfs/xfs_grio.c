@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.69 1996/09/09 04:34:00 montep Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.70 1996/09/17 16:00:09 henseler Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -15,7 +15,7 @@
 #define _KERNEL 1
 #endif
 #include <sys/vnode.h>
-#include <sys/file.h>
+#include <ksys/vfile.h>
 #include <ksys/fdt.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
@@ -308,7 +308,7 @@ xfs_io_is_guaranteed( xfs_inode_t *ip, stream_id_t *stream_id)
 xfs_ino_t 
 xfs_grio_get_inumber( int fdes )
 {
-	file_t	*fp;
+	vfile_t	*fp;
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
 	bhv_desc_t	*bdp;
@@ -319,7 +319,7 @@ xfs_grio_get_inumber( int fdes )
 		return( (xfs_ino_t)0 );
 	}
 
-	vp = fp->f_vnode;
+	vp = fp->vf_vnode;
 	bhp = VN_BHV_HEAD(vp);
 	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);
@@ -347,7 +347,7 @@ xfs_grio_get_inumber( int fdes )
 dev_t 
 xfs_grio_get_fs_dev( int fdes )
 {
-	file_t	*fp;
+	vfile_t	*fp;
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
 	bhv_desc_t	*bdp;
@@ -358,7 +358,7 @@ xfs_grio_get_fs_dev( int fdes )
 		return( 0 );
 	}
 
-	vp = fp->f_vnode;
+	vp = fp->vf_vnode;
 	bhp = VN_BHV_HEAD(vp);
 	BHV_READ_LOCK(bhp);
 	bdp = bhv_lookup(bhp, &xfs_vnodeops);
