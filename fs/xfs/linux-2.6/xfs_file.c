@@ -77,7 +77,7 @@ static ssize_t linvfs_read(
 	vnode_t *vp;
 	int rv;
 	
-	printk("ENTER linvfs_read\n");
+/* 	printk("ENTER linvfs_read\n"); */
 
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
@@ -89,7 +89,7 @@ static ssize_t linvfs_read(
 	vp = LINVFS_GET_VP(inode);
 
 	VOP_READ(vp, filp, buf, size, offset, rv);
-	printk("EXIT  linvfs_read %d\n", rv);
+/* 	printk("EXIT  linvfs_read %d\n", rv); */
 	return(rv);
 }
 

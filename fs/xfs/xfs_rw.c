@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident "$Revision: 1.292 $"
+#ident "$Revision: 1.293 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -805,7 +805,7 @@ xfs_iomap_extra(
  * the inode lock can be held in SHARED mode. The only time we need it 
  * in EXCL mode is when it is being read in the first time.  
  */
-#if 1/*  !defined(__linux__) */
+#if  !defined(__linux__)
 int					/* error */
 xfs_iomap_read(
 	xfs_iocore_t	*io,
@@ -4376,7 +4376,7 @@ out:
  * before doing the requested action and released afterwards.
  */
 /* ARGSUSED */
-#if 1 
+#if 0
 int
 xfs_bmap(
 	bhv_desc_t	*bdp,

@@ -58,6 +58,7 @@
 
 #include <linux/xfs_file.h>
 
+#include <linux/page_buf.h>
 
 /*
  * Common code used to create/instantiate various things in a directory.
@@ -444,8 +445,8 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	int		block_shift = inode->i_sb->s_blocksize_bits;
 	off_t		offset = block << block_shift;
 	ssize_t		count = inode->i_sb->s_blocksize;
-	struct	bmapval	bmap;
-	int		nbmaps = 1;
+	pb_bmap_t pbmap;
+	int     npbmaps =1;
 	int		error;
 	long		blockno;
 
@@ -457,7 +458,7 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	vp = LINVFS_GET_VP(inode);
 
 	VOP_RWLOCK(vp, VRWLOCK_READ);
-	VOP_BMAP(vp, offset, count, B_READ, sys_cred, &bmap, &nbmaps, error);
+	VOP_BMAP(vp, offset, count, B_READ,(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 
 	if (error)
@@ -466,16 +467,15 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	 * JIMJIM This interface needs to be fixed to support 64 bit
 	 * block numbers.
 	 */
-
-	blockno = (long)bmap.bn;
+	
+	blockno = (long)pbmap.pbm_bn;
 	if (blockno < 0) return 0;
-
-	if (bmap.pboff) {
-		if (bmap.pboff % count) {
-			printk("this shouldn't happen %d %d %d!\n",
-				bmap.pboff % count, bmap.pboff, count);
-		}
-		blockno += bmap.pboff >> 9;
+	if (pbmap.pbm_offset) {
+	  if ( pbmap.pbm_offset % count) {
+		printk("this shouldn't happen %d %d %d!\n",
+			   pbmap.pbm_offset % count, pbmap.pbm_offset, count);
+	  }
+	  blockno += pbmap.pbm_offset >> 9;
 	}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
@@ -524,6 +524,16 @@ int linvfs_revalidate(struct dentry *dentry)
         return 0;
 }
 
+int
+linvfs_pb_bmap(struct inode *lnode, 
+			   loff_t io_offset,
+			   size_t io_count,
+			   pb_bmap_t *pbmapp,
+			   int maxpbbm, 
+			   int *retpbbm, 
+			   int flags/* page_buf_flags_t */){
+  return -EIO;
+}
 
 struct inode_operations linvfs_file_inode_operations =
 {
@@ -556,6 +566,9 @@ struct inode_operations linvfs_file_inode_operations =
   NULL,  /*  updatepage  */
 #endif
   linvfs_revalidate
+#if defined(CONFIG_PAGE_BUF) || defined(CONFIG_PAGE_BUF_MODULE)
+  ,0 /*linvfs_pb_bmap */
+#endif
 };
 
 struct inode_operations linvfs_dir_inode_operations =
