@@ -1178,7 +1178,7 @@ xfs_buf_iodone_callbacks(
 		if (XFS_FORCED_SHUTDOWN(lip->li_mountp)) {
 			ASSERT(bp->b_edev == lip->li_mountp->m_dev);
 			bp->b_flags |= B_STALE;
-			bp->b_flags &= ~(B_DONE|B_DELWRI); 
+			bp->b_flags &= ~(B_DONE|B_DELWRI);
 #ifndef SIM
 			buftrace("BUF_IODONE_CB", bp);
 #endif
@@ -1257,10 +1257,7 @@ xfs_buf_iodone_callbacks(
 
 /*
  * This is a callback routine attached to a buffer which gets an error
- * when being written out synchronously.  If the buffer is not made stale
- * by the code doing the write, then it clears the error state in the buffer
- * and writes it out again delayed write.  It is up to the code doing the
- * bwrite() to clean up the buffer if it marks it stale.
+ * when being written out synchronously. 
  */
 STATIC void
 xfs_buf_error_relse(
@@ -1271,9 +1268,10 @@ xfs_buf_error_relse(
 	lip = (xfs_log_item_t *)bp->b_fsprivate;
 
 	ASSERT(bp->b_edev == lip->li_mountp->m_dev);
-	bioerror(bp, EIO);
+
 	bp->b_flags |= B_STALE|B_DONE;
-	bp->b_flags &= ~(B_DELWRI);
+	bp->b_flags &= ~(B_DELWRI|B_ERROR);
+	bp->b_error = 0;
 #ifndef SIM
 	buftrace("BUF_ERROR_RELSE", bp);
 #endif
