@@ -1,7 +1,7 @@
 #ifndef _XFS_HANDLE_H
 #define _XFS_HANDLE_H
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 /*
  *  Ok.  This file contains stuff that defines a general handle
@@ -32,6 +32,8 @@ int	gethandle		(void *hanp, size_t hlen, handle_t *handlep);
 struct vnode *	handle_to_vp (handle_t *handlep);
 int		vp_to_handle (vnode_t *vp, handle_t *handlep);
 
+struct vfs *	altgetvfs (fsid_t *fsid);
+
 /*
  *  Kernel #defines.
  */
@@ -39,6 +41,9 @@ int		vp_to_handle (vnode_t *vp, handle_t *handlep);
 #define	HSIZE(handle)	(((char *) &(handle).ha_fid.fid_data - \
 			  (char *) &(handle)) + (handle).ha_fid.fid_len)
 #define	HANDLE_CMP(h1, h2)	bcmp(h1, h2, sizeof (handle_t))
+
+#define	FSHSIZE		sizeof (fsid_t)
+#define	ISFSHANDLE	((handle)->ha_fid.fid_len == 0)
 
 #endif	/* _KERNEL */
 

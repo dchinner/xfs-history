@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.74 $"
+#ident	"$Revision: 1.77 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -9,10 +9,10 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/grio.h>
+#include <sys/uuid.h>
 #ifdef SIM
 #undef _KERNEL
 #endif /* SIM */
-#include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/kmem.h>
@@ -242,6 +242,22 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_rsumsize = roundup(mp->m_rsumsize, sbp->sb_blocksize);
 		mp->m_rbmip = mp->m_rsumip = NULL;
 	}
+	/*
+	 *  Copies the low order bits of the timestamp and the randomly
+	 *  set "sequence" number out of a UUID.
+	 */
+	uuid_getnodeuniq (&sbp->sb_uuid, mp->m_fixedfsid);
+	/*
+	 *  The vfs structure needs to have a file system independent
+	 *  way of checking for the invariant file system ID.  Since it
+	 *  can't look at mount structures it has a pointer to the data
+	 *  in the mount structure.
+	 *
+	 *  File systems that don't support user level file handles (i.e.
+	 *  all of them except for XFS) will leave vfs_altfsid as NULL.
+	 */
+	vfsp->vfs_altfsid = (fsid_t *) mp->m_fixedfsid;
+	mp->m_dmevmask = 0;	/* not persistent; set after each mount */
 
 	/*
 	 * Allocate and initialize the inode hash table for this

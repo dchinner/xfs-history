@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -335,6 +335,8 @@ vp_to_handle (
 	int		error;
 	struct	fid	*fidp = NULL;
 
+	if (vp->v_vfsp->vfs_altfsid == NULL)
+		return EINVAL;
 	switch (vp->v_type) {
 		case VREG:
 		case VDIR:
@@ -349,7 +351,7 @@ vp_to_handle (
 	if (fidp == NULL)
 		return EIO;		/* FIX: what real errno? */
 	bzero (handlep, sizeof *handlep);
-	bcopy (&vp->v_vfsp->vfs_fsid, &handlep->ha_fsid, sizeof (fsid_t));
+	bcopy (vp->v_vfsp->vfs_altfsid, &handlep->ha_fsid, sizeof (fsid_t));
 	bcopy (fidp, &handlep->ha_fid, sizeof *fidp);
 	freefid (fidp);
 	return 0;
@@ -368,7 +370,7 @@ handle_to_vp (
 	struct	vnode	*vp;
 		int	error;
 
-	vfsp = getvfs (&handlep->ha_fsid);
+	vfsp = altgetvfs (&handlep->ha_fsid);
 	if (vfsp == NULL)
 		return NULL;
 	error = VFS_VGET (vfsp, &vp, &handlep->ha_fid);
@@ -380,23 +382,55 @@ handle_to_vp (
 
 /*
  *  Get a handle of the form (void *, size_t) from user space and
- *  convert it to a handle_t handle.
+ *  convert it to a handle_t handle.  Do as much validation of the
+ *  result as possible; the content of each fid still has to be
+ *  checked by its consumer.
  */
 
 int
 gethandle (
 	void		*hanp,		/* input,  handle data */
 	size_t		hlen,		/* input,  size of handle data */
-	handle_t	*handlep)	/* output, copy of data */
+	handle_t	*hp)		/* output, copy of data */
 {
-	if (hlen < sizeof handlep->ha_fsid || hlen > sizeof *handlep)
+	if (hlen < sizeof hp->ha_fsid || hlen > sizeof *hp)
 		return EINVAL;
-	if (copyin (hanp, handlep, hlen))
+	if (copyin (hanp, hp, hlen))
 		return EFAULT;
-	if (hlen < sizeof *handlep)
-		bzero (((char *) handlep) + hlen, sizeof *handlep - hlen);
-	if (handlep->ha_fid.fid_len >
-	    (sizeof handlep->ha_fid - sizeof handlep->ha_fid.fid_len))
+	if (hlen < sizeof *hp)
+		bzero (((char *) hp) + hlen, sizeof *hp - hlen);
+	if (hp->ha_fid.fid_len != (hlen - sizeof hp->ha_fsid -
+	    sizeof hp->ha_fid.fid_len) || *((short *) hp->ha_fid.fid_data))
+	{
 		return EINVAL;
+	}
 	return 0;
+}
+
+
+/*
+ *  An alternate version of getvfs.  Needed because handles require
+ *  a file system ID that remains constant for the life of the file
+ *  system.  Cloned from getvfs in os/vfs.c, where this might arguably
+ *  belong.  It's here because it's only used by things related to
+ *  these handles.
+ */
+
+struct vfs *
+altgetvfs (fsid_t *fsid)
+{
+	int s;
+	register struct vfs *vfsp;
+
+	s = splock(vfslock);
+	for (vfsp = rootvfs; vfsp != NULL; vfsp = vfsp->vfs_next) {
+		if (vfsp->vfs_altfsid &&
+		    vfsp->vfs_altfsid->val[0] == fsid->val[0] &&
+		    vfsp->vfs_altfsid->val[1] == fsid->val[1] &&
+		    !(vfsp->vfs_flag & VFS_OFFLINE)) {
+			break;
+		}
+	}
+	spunlock(vfslock, s);
+	return vfsp;
 }

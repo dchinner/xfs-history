@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.39 $"
+#ident	"$Revision: 1.40 $"
 
 struct cred;
 struct xfs_ihash;
@@ -66,6 +66,8 @@ typedef struct xfs_mount {
 	mrlock_t		m_peraglock;	/* lock for m_perag (pointer) */
 	sema_t			m_growlock;	/* growfs mutex */
 	xfs_extlen_t		m_rbmrotor;	/* rt bitmap allocation rotor */
+	int			m_fixedfsid[2];	/* unchanged for life of FS */
+	uint			m_dmevmask;	/* DMI events for this FS */
 } xfs_mount_t;
 
 /*
