@@ -241,12 +241,7 @@ typedef struct xlog_rec_header {
  * - ic_refcnt is bumped when someone is writing to the log.
  * - ic_state is the state of the iclog.
  */
-typedef struct xlog_in_core {
-	union {
-		xlog_rec_header_t hic_header;
-		char		  hic_sector[XLOG_HEADER_SIZE];
-	} ic_h;
-	char		       ic_data[XLOG_MAX_RECORD_BSIZE-XLOG_HEADER_SIZE];
+typedef struct xlog_iclog_fields {
 	sv_t			ic_forcesema;
 	struct xlog_in_core	*ic_next;
 	struct xlog_in_core	*ic_prev;
@@ -263,9 +258,38 @@ typedef struct xlog_in_core {
 	int			ic_roundoff;
 	int			ic_bwritecnt;
 	uchar_t	  		ic_state;
+} xlog_iclog_fields_t;
+
+typedef struct xlog_in_core {
+	union {
+		xlog_iclog_fields_t	hic_fields;
+		char			hic_pad[BBSIZE];
+	} ic_h1;
+	union {
+		xlog_rec_header_t hic_header;
+		char		  hic_sector[XLOG_HEADER_SIZE];
+	} ic_h2;
+	char		       ic_data[1];
 } xlog_in_core_t;
 
-#define ic_header	ic_h.hic_header
+/*
+ * Defines to save our code from this glop.
+ */
+#define	ic_forcesema	ic_h1.hic_fields.ic_forcesema
+#define	ic_next		ic_h1.hic_fields.ic_next
+#define	ic_prev		ic_h1.hic_fields.ic_prev
+#define	ic_bp		ic_h1.hic_fields.ic_bp
+#define	ic_log		ic_h1.hic_fields.ic_log
+#define	ic_callback	ic_h1.hic_fields.ic_callback
+#define	ic_callback_tail ic_h1.hic_fields.ic_callback_tail
+#define	ic_trace	ic_h1.hic_fields.ic_trace
+#define	ic_size		ic_h1.hic_fields.ic_size
+#define	ic_offset	ic_h1.hic_fields.ic_offset
+#define	ic_refcnt	ic_h1.hic_fields.ic_refcnt
+#define	ic_roundoff	ic_h1.hic_fields.ic_roundoff
+#define	ic_bwritecnt	ic_h1.hic_fields.ic_bwritecnt
+#define	ic_state	ic_h1.hic_fields.ic_state
+#define ic_header	ic_h2.hic_header
 
 /*
  * The reservation head lsn is not made up of a cycle number and block number.
@@ -302,7 +326,7 @@ typedef struct log {
     int			l_iclog_bufs;	 /* number of iclog buffers */
 
     /* The following field are used for debugging; need to hold icloglock */
-    xlog_in_core_t	*l_iclog_bak[XLOG_MAX_ICLOGS];
+    char		*l_iclog_bak[XLOG_MAX_ICLOGS];
 
     /* The following block of fields are changed while holding grant_lock */
     lock_t		l_grant_lock;		/* protects below fields */
