@@ -18,6 +18,30 @@ typedef struct xfs_ihash {
 } xfs_ihash_t;
 
 /*
+ * The range structure is used to describe a locked range
+ * within a file.  It is used in conjunction with the
+ * xfs_range_lock_t defined below.
+ */
+typedef struct xfs_range {
+	struct xfs_range	*r_forw;	/* range list pointer */
+	struct xfs_range	*r_back;	/* range list pointer */
+	xfs_fileoff_t		r_off;		/* start of range */
+	xfs_fileoff_t		r_len;		/* length of range */
+	int			r_sleepers;	/* count of sleepers */
+} xfs_range_t;
+
+/*
+ * This is a structure embedded in the incore inode for
+ * tracking range locks over the file.  The semaphore is
+ * dynamically allocated to reduce our memory consumption.
+ */
+typedef struct xfs_range_lock {
+	lock_t		r_splock;	/* lock to make sleeps atomic */
+	sema_t		*r_sleep;	/* semaphore for sleeping on */
+	xfs_range_t	*r_range_list;	/* list of locked ranges */
+} xfs_range_lock_t;
+
+/*
  * This is the xfs in-core inode structure.
  * Most of the on-disk inode is embedded in the i_d field.
  *
@@ -32,7 +56,6 @@ typedef struct xfs_ihash {
  * Other state kept in the in-core inode is used for identification,
  * locking, transactional updating, etc of the inode.
  */
-struct xfs_iunlink_log_item;
 #define	XFS_INLINE_EXTS	2
 #define	XFS_INLINE_DATA	32
 typedef struct xfs_inode {
@@ -57,7 +80,7 @@ typedef struct xfs_inode {
 	sema_t			i_flock;	/* inode flush lock */
 	unsigned int		i_pincount;	/* inode pin count */
 	sema_t			i_pinsema;	/* inode pin sema */
-	struct xfs_iunlink_log_item	*i_iui;	/* unlink log item */
+	xfs_range_lock_t	i_range_lock;	/* range lock base */
 
 	/* I/O state */
 	off_t			i_next_offset;	/* seq read detector */
@@ -246,8 +269,10 @@ uint		xfs_iroundup(uint);
 
 #ifdef DEBUG
 void		xfs_isize_check(xfs_mount_t *, xfs_inode_t *, xfs_fsize_t);
+void		xfs_inobp_check(xfs_mount_t *, buf_t *);
 #else	/* DEBUG */
 #define xfs_isize_check(mp, ip, isize)
+#define	xfs_inobp_check(mp, bp)
 #endif	/* DEBUG */
 
 extern struct zone	*xfs_inode_zone;
