@@ -61,13 +61,6 @@ zone_t *xfs_inode_zone;
  */
 #define	XFS_ITRUNC_MAX_EXTENTS	2
 
-STATIC buf_t *
-xfs_inotobp(
-	xfs_mount_t	*mp,
-	xfs_trans_t	*tp,
-	xfs_ino_t	ino,
-	xfs_dinode_t	**dipp);
-	
 STATIC void
 xfs_iunlink_remove(
 	xfs_trans_t	*tp,
@@ -114,7 +107,7 @@ xfs_inobp_check(
  * Use xfs_imap() to determine the size and location of the
  * buffer to read from disk.
  */
-STATIC buf_t *
+buf_t *
 xfs_inotobp(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
