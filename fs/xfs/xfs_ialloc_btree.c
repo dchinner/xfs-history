@@ -442,7 +442,7 @@ xfs_inobt_delrec(
 		xfs_btree_lastrec(tcur, level);
 		error = xfs_inobt_increment(tcur, level, &i);
 		if (error) {
-			xfs_btree_del_cursor(tcur);
+			xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 			return error;
 		}
 		xfs_btree_lastrec(tcur, level);
@@ -465,13 +465,14 @@ xfs_inobt_delrec(
 		     XFS_INOBT_BLOCK_MINRECS(level, cur)) {
 			error = xfs_inobt_lshift(tcur, level, &i);
 			if (error) {
-				xfs_btree_del_cursor(tcur);
+				xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 				return error;
 			}
 			if (i) {
 				ASSERT(block->bb_numrecs >=
 				       XFS_INOBT_BLOCK_MINRECS(level, cur));
-				xfs_btree_del_cursor(tcur);
+				xfs_btree_del_cursor(tcur,
+						     XFS_BTREE_NOERROR);
 				if (level > 0) {
 					error = xfs_inobt_decrement(cur,
 							    level, &i);
@@ -494,7 +495,7 @@ xfs_inobt_delrec(
 			xfs_btree_firstrec(tcur, level);
 			error = xfs_inobt_decrement(tcur, level, &i);
 			if (error) {
-				xfs_btree_del_cursor(tcur);
+				xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 				return error;
 			}
 		}
@@ -511,7 +512,7 @@ xfs_inobt_delrec(
 		xfs_btree_firstrec(tcur, level);
 		error = xfs_inobt_decrement(tcur, level, &i);
 		if (error) {
-			xfs_btree_del_cursor(tcur);
+			xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 			return error;
 		}
 		xfs_btree_firstrec(tcur, level);
@@ -534,13 +535,14 @@ xfs_inobt_delrec(
 		     XFS_INOBT_BLOCK_MINRECS(level, cur)) {
 			error = xfs_inobt_rshift(tcur, level, &i);
 			if (error) {
-				xfs_btree_del_cursor(tcur);
+				xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 				return error;
 			}
 			if (i) {
 				ASSERT(block->bb_numrecs >=
 				       XFS_INOBT_BLOCK_MINRECS(level, cur));
-				xfs_btree_del_cursor(tcur);
+				xfs_btree_del_cursor(tcur,
+						     XFS_BTREE_NOERROR);
 				if (level == 0)
 					cur->bc_ptrs[0]++;
 				kmem_check();
@@ -557,7 +559,7 @@ xfs_inobt_delrec(
 	/*
 	 * Delete the temp cursor, we're done with it.
 	 */
-	xfs_btree_del_cursor(tcur);
+	xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 	/*
 	 * If here, we need to do a join to keep the tree balanced.
 	 */
@@ -1842,11 +1844,11 @@ xfs_inobt_rshift(
 	xfs_btree_lastrec(tcur, level);
 	error = xfs_inobt_increment(tcur, level, &i);
 	if (error) {
-		xfs_btree_del_cursor(tcur);
+		xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
 		return error;
 	}
 	xfs_inobt_updkey(tcur, rkp, level + 1);
-	xfs_btree_del_cursor(tcur);
+	xfs_btree_del_cursor(tcur, XFS_BTREE_NOERROR);
 	xfs_inobt_rcheck(cur);
 	kmem_check();
 	*stat = 1;
@@ -2368,7 +2370,7 @@ xfs_inobt_insert(
 					 &ncur, &i);
 		if (error) {
 			if (pcur != cur) {
-				xfs_btree_del_cursor(pcur);
+				xfs_btree_del_cursor(pcur, XFS_BTREE_ERROR);
 			}
 			return error;
 		}
@@ -2379,7 +2381,7 @@ xfs_inobt_insert(
 		 */
 		if (pcur != cur && (ncur || nbno == NULLAGBLOCK)) {
 			cur->bc_nlevels = pcur->bc_nlevels;
-			xfs_btree_del_cursor(pcur);
+			xfs_btree_del_cursor(pcur, XFS_BTREE_NOERROR);
 		}
 		/*
 		 * If we got a new cursor, switch to it.
