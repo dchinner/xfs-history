@@ -48,12 +48,6 @@ extern int cxfs_parseargs(char *, int, struct xfs_args *);
 # define cxfs_parseargs(opt,flag,xargs)	(0) /* success */
 #endif
 
-#ifdef CONFIG_FS_POSIX_ACL
-# define set_posix_acl(sb)	((sb)->s_xattr_flags|= XATTR_MNT_FLAG_POSIX_ACL)
-#else
-# define set_posix_acl(sb)	do { } while (0)
-#endif
-
 /* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
 # define set_max_bytes(sb)	((sb)->s_maxbytes = XFS_MAX_FILE_OFFSET)
@@ -491,8 +485,6 @@ linvfs_fill_super(
 
 	vfsp->vfs_super = sb;
 	set_blocksize(sb->s_bdev, BBSIZE);
-	set_posix_acl(sb);
-	sb->s_xattr_flags |= XATTR_MNT_FLAG_USER;
 	set_max_bytes(sb);
 	set_quota_ops(sb);
 	sb->s_op = &linvfs_sops;
@@ -705,9 +697,6 @@ linvfs_remount(
 	vfs_t		*vfsp;
 
 	vfsp = LINVFS_GET_VFS(sb);
-
-	set_posix_acl(sb);
-	sb->s_xattr_flags |= XATTR_MNT_FLAG_USER;
 
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;

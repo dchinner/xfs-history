@@ -36,22 +36,24 @@
 #include <linux/mm.h>
 #include <linux/xfs_fs.h>
 #include <linux/xfs_vfs.h>
-#include <linux/xfs_vnode.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <pagebuf/page_buf.h>
 #include <linux/file.h>
 #include <linux/swap.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/bitops.h>
+#include <linux/posix_acl_xattr.h>
 #include <asm/page.h>
 #include <asm/div64.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
+
+#include <pagebuf/page_buf.h>
 #include <linux/xfs_cred.h>
+#include <linux/xfs_vnode.h>
 #include <linux/xfs_stats.h>
 #include <linux/xfs_sysctl.h>
 #include <linux/xfs_super.h>

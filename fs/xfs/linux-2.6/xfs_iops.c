@@ -60,6 +60,18 @@ validate_fields(
 	ip->i_blocks = va.va_nblocks;
 }
 
+#ifdef CONFIG_FS_POSIX_ACL
+/*
+ * Determine whether a process has a valid fs_struct (kernel daemons
+ * like knfsd don't have an fs_struct).
+ */
+STATIC int inline
+has_fs_struct(struct task_struct *task)
+{
+	return (task->fs != init_task.fs);
+}
+#endif
+
 /*
  * Common code used to create/instantiate various things in a directory.
  */
@@ -82,12 +94,11 @@ linvfs_common_create(
 		have_default_acl = test_default_acl(dvp);
 
 #ifdef CONFIG_FS_POSIX_ACL
-	/* FIXME: This is a workaround for the XFS/NFS ACL/umask problem.
-	 * Review once we discuss with Andreas how the mask is to be handled.
-	 * Its wrapped in CONFIG_FS_POSIX_ACL so this code can compile without
-	 * applying the ACL patch.
+	/* Conditionally compiled so that the ACL base kernel changes can be
+	 * split out into separate patches - remove this once the S_POSIXACL
+	 * flag is accepted, or some other way to implement this exists.
 	 */
-	if (IS_POSIX_ACL(dir) && !have_default_acl)
+	if (IS_POSIXACL(dir) && !have_default_acl && has_fs_struct(current))
 		mode &= ~current->fs->umask;
 #endif
 
@@ -305,17 +316,10 @@ linvfs_rmdir(
 {
 	int		error;
 	vnode_t		*dvp,		/* directory with name to remove */
-			*pwd_vp;	/* current working directory, vnode */
+			*pwd_vp = NULL;	/* current working directory, vnode */
 	struct inode	*inode = dentry->d_inode;
 
 	dvp = LINVFS_GET_VPTR(dir);
-
-	pwd_vp = NULL;			/* Used for an unnecessary test */
-
-	/*
-	 * Someday we could pass the dentry->d_inode into VOP_REMOVE so
-	 * that it can skip the lookup.
-	 */
 	VOP_RMDIR(dvp, dentry, pwd_vp, NULL, error);
 	if (!error) {
 		validate_fields(inode);
