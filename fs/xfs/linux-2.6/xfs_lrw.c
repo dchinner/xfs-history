@@ -943,9 +943,14 @@ retry:
 		if ((error == ENOSPC) && strcmp(current->comm, "nfsd")) {
 			switch (fsynced) {
 			case 0:
-				VOP_FLUSH_PAGES(vp, 0, -1, 0, FI_NONE, error);
+				if (ip->i_delayed_blks) {
+					fsync_inode_buffers(vp->v_inode);
+					fsynced = 1;
+				} else {
+					fsynced = 2;
+					flags |= PBF_SYNC;
+				}
 				error = 0;
-				fsynced = 1;
 				xfs_ilock(ip, XFS_ILOCK_EXCL);
 				goto retry;
 			case 1:
@@ -957,9 +962,8 @@ retry:
 					goto retry;
 				}
 			case 2:
-			case 3:
 				VFS_SYNC(vp->v_vfsp,
-					SYNC_NOWAIT|SYNC_BDFLUSH|SYNC_FSDATA,
+					SYNC_NOWAIT|SYNC_DELWRI|SYNC_BDFLUSH|SYNC_FSDATA,
 					NULL, error);
 				error = 0;
 /**

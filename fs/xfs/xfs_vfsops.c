@@ -956,7 +956,7 @@ xfs_syncsub(
 {
 	xfs_inode_t	*ip = NULL;
 	xfs_inode_t	*ip_next;
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	vnode_t		*vp = NULL;
 	vmap_t		vmap;
 	int		error;
@@ -968,6 +968,7 @@ xfs_syncsub(
 	boolean_t	mount_locked;
 	boolean_t	vnode_refed;
 	int		preempt;
+	int		do_mmap_flush;
 	xfs_dinode_t	*dip;
 	xfs_buf_log_item_t	*bip;
 	xfs_iptr_t	*ipointer;
@@ -1038,6 +1039,8 @@ xfs_syncsub(
 		fflag = XFS_B_DELWRI;
 	if (flags & SYNC_WAIT)
 		fflag = 0;		/* synchronous overrides all */
+	do_mmap_flush = (flags & (SYNC_DELWRI|SYNC_BDFLUSH)) !=
+						(SYNC_DELWRI|SYNC_BDFLUSH);
 
 	base_lock_flags = XFS_ILOCK_SHARED;
 	if (flags & (SYNC_DELWRI | SYNC_CLOSE)) {
@@ -1277,9 +1280,12 @@ xfs_syncsub(
 				 * across calls to the buffer cache.
 				 */
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1,
+				if (do_mmap_flush) {
+					VOP_FLUSH_PAGES(vp, (xfs_off_t)0, -1,
 						fflag, FI_NONE, error);
-
+				} else {
+					fsync_inode_buffers(vp->v_inode);
+				}
 				xfs_ilock(ip, XFS_ILOCK_SHARED);
 			}
 
