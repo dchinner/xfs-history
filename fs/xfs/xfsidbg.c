@@ -41,6 +41,10 @@
 #include <linux/kdbprivate.h>
 #include <linux/mm.h>
 
+MODULE_AUTHOR("SGI <sgi.com>");
+MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
+MODULE_LICENSE("GPL");
+
 /*
  * External functions & data not in header files.
  */
@@ -1320,13 +1324,17 @@ static void	printvnode(vnode_t *vp)
 	kdb_symtab_t	 symtab;
 
 
-	kdb_printf("vnode: 0x%p type %s\n", vp, vnode_type[vp->v_type]);
+	kdb_printf("vnode: 0x%p type ", vp);
+	if ((size_t)vp->v_type >= sizeof(vnode_type)/sizeof(vnode_type[0]))
+		kdb_printf("out of range 0x%x\n", vp->v_type);
+	else
+		kdb_printf("%s\n", vnode_type[vp->v_type]);
 
 	if ((bh = vp->v_bh.bh_first)) {
 		kdb_printf("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
 						vp->v_inode, bh, bh->bd_pdata);
 
-		if (kdbnearsym((unsigned int)bh->bd_ops, &symtab))
+		if (kdbnearsym((unsigned long)bh->bd_ops, &symtab))
 			kdb_printf("   ops %s ", symtab.sym_name);
 		else
 			kdb_printf("   ops %s/0x%p ",
@@ -4157,7 +4165,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("&lock 0x%p &iolock 0x%p ni_lock_ra",
 		&ip->i_lock,
 		&ip->i_iolock);
-	kdb_symbol_print((unsigned int) ip->i_ilock_ra, NULL,
+	kdb_symbol_print((kdb_machreg_t) ip->i_ilock_ra, NULL,
 		KDB_SP_SPACEB|KDB_SP_PAREN|KDB_SP_NEWLINE);
 	kdb_printf("&flock 0x%p (%d) &pinlock 0x%p pincount 0x%x &pinsema 0x%p\n",
 		&ip->i_flock, valusema(&ip->i_flock),
