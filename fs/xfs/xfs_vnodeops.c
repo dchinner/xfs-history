@@ -251,10 +251,43 @@ xfs_close(vnode_t	*vp,
 	  off_t		offset,
 	  cred_t	*credp)
 {
+	extern int 	xfs_remove_grio_guarantee( xfs_inode_t *, pid_t);
         xfs_inode_t	*ip;
+	struct ufchunk  *ufp;
+	struct file	*fp;
+	int		i, vpcount, ret;
 
         ip = XFS_VTOI(vp);
+
+	/*
+ 	 * If this is a last close and the file was marked 
+	 * as being used for grio, check for tickets to remove.
+	 */
+	if (lastclose && (ip->i_flags & XFS_IGRIO)) {
+
+		vpcount = 0;
+		for (i = 0 ; i < u.u_nofiles; i++ ) {
+			ufp = (struct ufchunk *)&(u.u_flist);
+			if ((ret = ufget( i,(int)(u.u_nofiles),&ufp,&fp)) == 0){
+				if ((fp->f_vnode == vp) && (fp->f_count > 0)) {
+					vpcount++;
+				}
+			}
+		}
+
+		/*
+		 * If this process is nolonger accessing 
+ 		 * this file, remove any guarantees that
+		 * were made by this process on this file.
+		 */
+		if (!vpcount) {
+			xfs_remove_grio_guarantee(ip, u.u_procp->p_pid);
+		}
+	}
+
         xfs_ilock(ip, XFS_ILOCK_SHARED);
+
+
         cleanlocks(vp, u.u_procp->p_epid, u.u_procp->p_sysid);
         xfs_iunlock(ip, XFS_ILOCK_SHARED);
         return 0;
