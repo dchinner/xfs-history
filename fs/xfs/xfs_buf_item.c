@@ -1,4 +1,4 @@
-#ident "$Revision: 1.60 $"
+#ident "$Revision: 1.61 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -1367,8 +1367,8 @@ xfs_buf_item_trace(
 		     (void *)((unsigned long)bip->bli_refcount),
 		     (void *)bp->b_blkno,
 		     (void *)((unsigned long)bp->b_bcount),
-		     (void *)((unsigned long)(0xFFFFFFFF & (bp->b_flags >> 32)),
-		     (void *)((unsigned long)(0xFFFFFFFF & bp->b_flags),
+		     (void *)((unsigned long)(0xFFFFFFFF & (bp->b_flags >> 32))),
+		     (void *)((unsigned long)(0xFFFFFFFF & bp->b_flags)),
 		     (void *)bp->b_fsprivate,
 		     (void *)bp->b_fsprivate2,
 		     (void *)((unsigned long)bp->b_pincount),
