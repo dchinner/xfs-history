@@ -1,4 +1,5 @@
-#ident	"$Revision: 1.70 $"
+
+#ident	"$Revision: 1.71 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -9,6 +10,7 @@
 #endif
 #include <sys/stat.h>
 #include <sys/debug.h>
+#include <sys/errno.h>
 #include <stddef.h>
 #ifdef SIM
 #define _KERNEL
@@ -158,13 +160,17 @@ xfs_ialloc_ag_alloc(
 {
 	xfs_agi_t	*agi;		/* allocation group header */
 	xfs_alloc_arg_t	*args;		/* allocation argument structure */
+	int		blks_per_cluster;  /* fs blocks per inode cluster */
 	xfs_btree_cur_t	*cur;		/* inode btree cursor */
+	daddr_t		d;		/* disk addr of buffer */
 	buf_t		*fbuf;		/* new free inodes' buffer */
 	xfs_dinode_t	*free;		/* new free inode structure */
 	int		i;		/* inode counter */
 	int		j;		/* block counter */
+	int		nbufs;		/* num bufs of new inodes */
 	xfs_agino_t	newino;		/* new first inode's number */
 	xfs_agino_t	newlen;		/* new number of inodes */
+	int		ninodes;	/* num inodes per buf */
 	xfs_agino_t	thisino;	/* current inode number, for loop */
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
 	static uuid_t	zuuid;		/* zero uuid */
@@ -209,19 +215,34 @@ xfs_ialloc_ag_alloc(
 	newino = XFS_OFFBNO_TO_AGINO(args->mp, args->agbno, 0);
 	/*
 	 * Loop over the new block(s), filling in the inodes.
+	 * For small block sizes, manipulate the inodes in buffers
+	 * which are multiples of the blocks size.
 	 */
-	for (j = 0; j < (int)args->len; j++) {
+	if (args->mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE) {
+		blks_per_cluster = 1;
+		nbufs = (int)args->len;
+		ninodes = args->mp->m_sb.sb_inopblock;
+	} else {
+		blks_per_cluster = XFS_INODE_CLUSTER_SIZE /
+			           args->mp->m_sb.sb_blocksize;
+		nbufs = (int)args->len / blks_per_cluster;
+		ninodes = blks_per_cluster * args->mp->m_sb.sb_inopblock;
+	}
+	for (j = 0; j < nbufs; j++) {
 		/*
 		 * Get the block.
 		 */
-		fbuf = xfs_btree_get_bufs(args->mp, tp, agi->agi_seqno,
-					  args->agbno + j, 0);
+		d = XFS_AGB_TO_DADDR(args->mp, agi->agi_seqno,
+				     args->agbno + (j * blks_per_cluster));
+		fbuf = xfs_trans_get_buf(tp, args->mp->m_dev, d,
+					 args->mp->m_bsize * blks_per_cluster,
+					 0);
+		ASSERT(fbuf);
+		ASSERT(!geterror(fbuf));		
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
-		for (i = 0; i < args->mp->m_sb.sb_inopblock; i++) {
-			thisino = XFS_OFFBNO_TO_AGINO(args->mp,
-				args->agbno + j, i);
+		for (i = 0; i < ninodes; i++) {
 			free = XFS_MAKE_IPTR(args->mp, fbuf, i);
 			free->di_core.di_magic = XFS_DINODE_MAGIC;
 			free->di_core.di_mode = 0;
@@ -803,17 +824,30 @@ xfs_difree(
  * Return the location of the inode in bno/off, for mapping it into a buffer.
  */
 /*ARGSUSED*/
-void
+int
 xfs_dilocate(
 	xfs_mount_t	*mp,	/* file system mount structure */
 	xfs_trans_t	*tp,	/* transaction pointer */
 	xfs_ino_t	ino,	/* inode to locate */
 	xfs_fsblock_t	*bno,	/* output: block containing inode */
-	int		*off)	/* output: index in block of inode */
+	int		*len,	/* output: num blocks in inode cluster */
+	int		*off,	/* output: index in block of inode */
+	uint		flags)	/* flags concerning inode lookup */	     
 {
 	xfs_agblock_t	agbno;	/* block number of inode in the alloc group */
+	buf_t		*agbp;	/* agi buffer */
+	xfs_agino_t	agino;	/* inode number within alloc group */
 	xfs_agnumber_t	agno;	/* allocation group number */
+	int		blks_per_cluster; /* num blocks per inode cluster */
+	xfs_agblock_t	chunk_agbno;	/* first block in inode chunk */
+	xfs_agino_t	chunk_agino;	/* first agino in inode chunk */
+	__int32_t	chunk_cnt;	/* count of free inodes in chunk */
+	xfs_inofree_t	chunk_free;	/* mask of free inodes in chunk */
+	xfs_agblock_t	cluster_agbno;	/* first block in inode cluster */
+	xfs_btree_cur_t	*cur;	/* inode btree cursor */
+	int		error;	/* error code */
 	int		offset;	/* index of inode in its buffer */
+	int		offset_agbno;	/* blks from chunk start to inode */
 
 	ASSERT(ino != NULLFSINO);
 	/*
@@ -823,13 +857,51 @@ xfs_dilocate(
 	ASSERT(agno < mp->m_sb.sb_agcount);
 	agbno = XFS_INO_TO_AGBNO(mp, ino);
 	ASSERT(agbno < mp->m_sb.sb_agblocks);
-	offset = XFS_INO_TO_OFFSET(mp, ino);
-	ASSERT(offset < mp->m_sb.sb_inopblock);
-	/*
-	 * Store the results in the output parameters.
-	 */
-	*bno = XFS_AGB_TO_FSB(mp, agno, agbno);
-	*off = offset;
+	if ((agno >= mp->m_sb.sb_agcount) ||
+	    (agbno >= mp->m_sb.sb_agblocks)) {
+		return EINVAL;
+	}
+
+	error = 0;
+	if ((mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE) ||
+	    !(flags & XFS_IMAP_LOOKUP)) {
+		offset = XFS_INO_TO_OFFSET(mp, ino);
+		ASSERT(offset < mp->m_sb.sb_inopblock);
+		*bno = XFS_AGB_TO_FSB(mp, agno, agbno);
+		*off = offset;
+		*len = 1;
+	} else {
+		agino = XFS_INO_TO_AGINO(mp, ino);
+		mrlock(&mp->m_peraglock, MR_ACCESS, PINOD);
+		agbp = xfs_ialloc_read_agi(mp, tp, agno);
+		mrunlock(&mp->m_peraglock);
+		cur = xfs_btree_init_cursor(mp, tp, agbp, agno,
+			XFS_BTNUM_INO, (xfs_inode_t *)0);
+		(void)xfs_inobt_lookup_le(cur, agino, 0, 0);
+		if (!xfs_inobt_get_rec(cur, &chunk_agino, &chunk_cnt,
+				       &chunk_free)) {
+			error = EINVAL;
+		} else {
+			chunk_agbno = XFS_AGINO_TO_AGBNO(mp, chunk_agino);
+			ASSERT(agbno >= chunk_agbno);
+			offset_agbno = agbno - chunk_agbno;
+			blks_per_cluster = XFS_INODE_CLUSTER_SIZE /
+				           mp->m_sb.sb_blocksize;
+			cluster_agbno = chunk_agbno +
+				        ((offset_agbno / blks_per_cluster) *
+					 blks_per_cluster);
+			offset = ((agbno - cluster_agbno) *
+				  mp->m_sb.sb_inopblock) +
+				 XFS_INO_TO_OFFSET(mp, ino);
+			*bno = XFS_AGB_TO_FSB(mp, agno, cluster_agbno);
+			*off = offset;
+			*len = blks_per_cluster;
+		}
+		xfs_trans_brelse(tp, agbp);
+		xfs_btree_del_cursor(cur);		
+	}
+
+	return error;
 }
 
 /*
