@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.27 $"
+#ident "$Revision$"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -346,6 +346,15 @@ int xfs_bm_maxlevels(struct xfs_mount *mp, int w);
 
 #define	XFS_BMBT_TRACE_SIZE	4096	/* size of global trace buffer */     
 #define	XFS_BMBT_KTRACE_SIZE	32	/* size of per-inode trace buffer */
+
+#if defined(XFS_ALL_TRACE)
+#define	XFS_BMBT_TRACE
+#endif
+
+#if !defined(DEBUG) || defined(SIM)
+#undef XFS_BMBT_TRACE
+#endif
+
 
 /*
  * Prototypes for xfs_bmap.c to call.

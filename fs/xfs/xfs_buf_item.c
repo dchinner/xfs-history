@@ -1,4 +1,4 @@
-#ident "$Revision: 1.46 $"
+#ident "$Revision$"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -27,6 +27,7 @@
 #endif
 #include <sys/ktrace.h>
 #include <sys/cmn_err.h>
+#include <sys/uuid.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -563,7 +564,7 @@ xfs_buf_item_init(
 	bip->bli_format.blf_blkno = (__int64_t)bp->b_blkno;
 	bip->bli_format.blf_len = BTOBB(bp->b_bcount);
 	bip->bli_format.blf_map_size = map_size;
-#ifndef SIM
+#ifdef XFS_BLI_TRACE
 	bip->bli_trace = ktrace_alloc(XFS_BLI_TRACE_SIZE, 0);
 #endif
 
@@ -1065,7 +1066,7 @@ xfs_buf_item_relse(
 	bip->bli_logged = NULL;
 #endif /* XFS_TRANS_DEBUG */
 
-#ifndef SIM
+#ifdef XFS_BLI_TRACE
 	ktrace_free(bip->bli_trace);
 #endif
 	kmem_zone_free(xfs_buf_item_zone, bip);
@@ -1237,13 +1238,13 @@ xfs_buf_iodone(
 	bip->bli_logged = NULL;
 #endif /* XFS_TRANS_DEBUG */
 
-#ifndef SIM
+#ifdef XFS_BLI_TRACE
 	ktrace_free(bip->bli_trace);
 #endif
 	kmem_zone_free(xfs_buf_item_zone, bip);
 }
 
-#if	(defined(DEBUG) && !defined(SIM))
+#if defined(XFS_BLI_TRACE)
 void
 xfs_buf_item_trace(
 	char			*id,
@@ -1271,6 +1272,6 @@ xfs_buf_item_trace(
 		     (void *)bip->bli_item.li_desc,
 		     (void *)((unsigned long)bip->bli_item.li_flags));
 }
-#endif /* DEBUG */
+#endif /* XFS_BLI_TRACE */
 
 
