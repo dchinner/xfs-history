@@ -3273,21 +3273,23 @@ xfs_getbmap(
 	int			error;		/* return value */
 	int			i;		/* extent number */
 	xfs_inode_t		*ip;		/* xfs incore inode pointer */
+	xfs_fsize_t		last_byte;	/* last cached byte */
 	int			lock;		/* lock state */
 	xfs_bmbt_irec_t		*map;		/* buffer for user's data */
+	xfs_mount_t		*mp;		/* file system mount point */
 	int			nex;		/* # of extents can do */
 	int			nmap;		/* number of map entries */
 	struct getbmap		out;		/* output structure */
 	xfs_trans_t		*tp;		/* transaction pointer */
-	xfs_mount_t		*mp;		/* mount pointer */
-	xfs_fsize_t		last_byte;	/* last cached byte */
 
 	ip = XFS_VTOI(vp);
 	if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&
 	    ip->i_d.di_format != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EINVAL);
+	mp = ip->i_mount;
 	if (bmv->bmv_length == -1)
-		bmv->bmv_length = OFFTOBB(ip->i_d.di_size);
+		bmv->bmv_length = XFS_FSB_TO_BB(mp,
+			XFS_B_TO_FSB(mp, ip->i_d.di_size));
 	bmvend = bmv->bmv_offset + bmv->bmv_length;
 	nex = bmv->bmv_count - 1;
 	ASSERT(nex > 0);
@@ -3299,7 +3301,6 @@ xfs_getbmap(
 	}
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	if (ip->i_delayed_blks) {
-		mp = ip->i_mount;
 		last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
 		last_byte = XFS_FSB_TO_B(mp, last_byte);
 		if (VN_MAPPED(vp)) {
@@ -3327,28 +3328,28 @@ xfs_getbmap(
 	map = kmem_alloc(nex * sizeof(*map), KM_SLEEP);
 	bmv->bmv_entries = 0;
 	nmap = nex;
-	(void)xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(ip->i_mount, bmv->bmv_offset),
-		XFS_BB_TO_FSB(ip->i_mount, bmv->bmv_length), 0, NULLFSBLOCK, 0,
+	(void)xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(mp, bmv->bmv_offset),
+		XFS_BB_TO_FSB(mp, bmv->bmv_length), 0, NULLFSBLOCK, 0,
 		map, &nmap, NULL);
 	xfs_iunlock_map_shared(ip, lock);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 	ASSERT(nmap <= nex);
-	for (error = i = 0; i < nmap; i++) {
-		out.bmv_offset = XFS_FSB_TO_BB(ip->i_mount, map[i].br_startoff);
+	for (error = i = 0; i < nmap && bmv->bmv_length; i++) {
+		out.bmv_offset = XFS_FSB_TO_BB(mp, map[i].br_startoff);
 		out.bmv_length =
-			XFS_FSB_TO_BB(ip->i_mount, map[i].br_blockcount);
+			XFS_FSB_TO_BB(mp, map[i].br_blockcount);
 		ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
 		if (map[i].br_startblock == HOLESTARTBLOCK)
 			out.bmv_block = -1;
 		else
-			out.bmv_block = XFS_FSB_TO_DADDR(ip->i_mount,
+			out.bmv_block = XFS_FSB_TO_DADDR(mp,
 				map[i].br_startblock);
 		if (copyout(&out, ap, sizeof(out))) {
 			error = XFS_ERROR(EFAULT);
 			break;
 		}
 		bmv->bmv_offset = out.bmv_offset + out.bmv_length;
-		bmv->bmv_length = bmvend - bmv->bmv_offset;
+		bmv->bmv_length = MAX(0, bmvend - bmv->bmv_offset);
 		bmv->bmv_entries++;
 		ap = (void *)((struct getbmap *)ap + 1);
 	}
