@@ -1674,8 +1674,7 @@ xfs_strat_read(vnode_t	*vp,
 		
 		for (x = 0; x < nimaps; x++) {
 			imap_offset = imap[x].br_startoff;
-			ASSERT(xfs_fsb_to_bb(sbp, imap_offset) ==
-			       map_start_fsb);
+			ASSERT(imap_offset == map_start_fsb);
 			imap_blocks = imap[x].br_blockcount;
 			ASSERT(imap_blocks <= count_fsb);
 			if ((imap[x].br_startblock == DELAYSTARTBLOCK) ||
