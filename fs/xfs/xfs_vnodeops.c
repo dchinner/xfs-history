@@ -2614,7 +2614,7 @@ xfs_get_dir_entry(
 	int		*dir_generationp)
 {
 	struct inode		*inode = dentry->d_inode;
-	vnode_t			*vp = LINVFS_GET_VPTR(inode);
+	vnode_t			*vp = LINVFS_GET_VP(inode);
 	bhv_desc_t		*bdp;
 
 	bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);

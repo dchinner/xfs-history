@@ -75,7 +75,7 @@ xfs_dir_lookup_int(
 	}
 
 	if (dentry->d_inode) {
-		vnode_t *vp = LINVFS_GET_VPTR(dentry->d_inode);
+		vnode_t *vp = LINVFS_GET_VP(dentry->d_inode);
 		bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops);
 		if (!bdp) {
 			return ENOENT;
