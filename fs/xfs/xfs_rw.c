@@ -42,6 +42,7 @@
 #include <sys/ktrace.h>
 #include <sys/sysinfo.h>
 #include <sys/ksa.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -63,7 +64,9 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_error.h"
+#include "xfs_bit.h"
 #include "xfs_rw.h"
+#include <limits.h>
 
 #ifdef SIM
 #include "sim.h"
@@ -201,7 +204,7 @@ xfsd(void);
 
 int
 xfs_diordwr(
-	vnode_t	*vp,
+	vnode_t		*vp,
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp,
@@ -621,7 +624,7 @@ xfs_iomap_extra(
 			bmapp->eof |= BMAP_DELAY;
 			bmapp->bn = -1;
 		} else {
-			bmapp->bn = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
+			bmapp->bn = XFS_FSB_TO_DB(ip, imap.br_startblock);
 		}
 		bmapp->offset = XFS_FSB_TO_BB(mp, offset_fsb);
 		bmapp->length =	XFS_FSB_TO_BB(mp, imap.br_blockcount);
@@ -1005,8 +1008,7 @@ xfs_iomap_read(
 		       ((bmapp[x - 1].offset + bmapp[x - 1].length) ==
 			curr_bmapp->offset));
 		if (curr_bmapp->bn != -1) {
-			curr_bmapp->bn = XFS_FSB_TO_DB(mp, ip,
-						       curr_bmapp->bn);
+			curr_bmapp->bn = XFS_FSB_TO_DB(ip, curr_bmapp->bn);
 		}
 	}
 	return 0;
@@ -1424,7 +1426,7 @@ xfs_zero_last_block(
 	}
 	bmap.eof = BMAP_EOF;
 	if (imap.br_startblock != DELAYSTARTBLOCK) {
-		bmap.bn = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
+		bmap.bn = XFS_FSB_TO_DB(ip, imap.br_startblock);
 	} else {
 		bmap.bn = -1;
 		bmap.eof |= BMAP_DELAY;
@@ -1559,7 +1561,7 @@ xfs_zero_eof(
 			bmap.eof |= BMAP_DELAY;
 			bmap.bn = -1;
 		} else {
-			bmap.bn = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
+			bmap.bn = XFS_FSB_TO_DB(ip, imap.br_startblock);
 		}
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 			bmap.pbdev = mp->m_rtdev;
@@ -1925,8 +1927,7 @@ xfs_iomap_write(
 		       ((bmapp[x - 1].offset + bmapp[x - 1].length) ==
 			curr_bmapp->offset));
 		if (curr_bmapp->bn != -1) {
-			curr_bmapp->bn = XFS_FSB_TO_DB(mp, ip,
-						       curr_bmapp->bn);
+			curr_bmapp->bn = XFS_FSB_TO_DB(ip, curr_bmapp->bn);
 		}
 	}
 
@@ -3197,7 +3198,7 @@ xfs_strat_read(
 				rbp = getrbuf(KM_SLEEP);
 				xfs_overlap_bp(bp, rbp, data_offset,
 					       data_bytes);
-				rbp->b_blkno = XFS_FSB_TO_DB(mp, ip,
+				rbp->b_blkno = XFS_FSB_TO_DB(ip,
 						   imap[x].br_startblock) +
 					       block_off;
 				rbp->b_offset = XFS_FSB_TO_BB(mp,
@@ -3514,7 +3515,7 @@ xfs_check_rbp(
 
 	ASSERT(imap.br_startoff == rbp_offset_fsb);
 	ASSERT(imap.br_blockcount == rbp_len_fsb);
-	ASSERT((XFS_FSB_TO_DB(mp, ip, imap.br_startblock) +
+	ASSERT((XFS_FSB_TO_DB(ip, imap.br_startblock) +
 		XFS_BB_FSB_OFFSET(mp, rbp->b_offset)) ==
 	       rbp->b_blkno);
 
@@ -3594,7 +3595,7 @@ xfs_check_bp(
 	ASSERT(nimaps == 1);
 	ASSERT(imap.br_startoff == bp_offset_fsb);
 	ASSERT(imap.br_blockcount == bp_len_fsb);
-	ASSERT((XFS_FSB_TO_DB(mp, ip, imap.br_startblock) +
+	ASSERT((XFS_FSB_TO_DB(ip, imap.br_startblock) +
 		XFS_BB_FSB_OFFSET(mp, bp->b_offset)) ==
 	       bp->b_blkno);
 }
@@ -3818,8 +3819,7 @@ xfs_strat_write(
 		if ((map_start_fsb == offset_fsb) &&
 		    (imap[0].br_blockcount == count_fsb)) {
 			ASSERT(nimaps == 1);
-			bp->b_blkno = XFS_FSB_TO_DB(mp, ip,
-					    imap[0].br_startblock);
+			bp->b_blkno = XFS_FSB_TO_DB(ip, imap[0].br_startblock);
 			bp->b_bcount = XFS_FSB_TO_B(mp,
 						    count_fsb);
 			xfs_strat_write_bp_trace(XFS_STRAT_FAST,
@@ -3874,8 +3874,7 @@ xfs_strat_write(
 			xfs_overlap_bp(bp, rbp, rbp_offset,
 				       rbp_len);
 			rbp->b_blkno =
-				XFS_FSB_TO_DB(mp, ip,
-					      imapp->br_startblock);
+				XFS_FSB_TO_DB(ip, imapp->br_startblock);
 			rbp->b_offset = XFS_FSB_TO_BB(mp,
 						      imap_offset);
 			xfs_strat_write_subbp_trace(XFS_STRAT_SUB,
@@ -4191,12 +4190,69 @@ xfsd(void)
 }
 #endif	/* !SIM */
 
-
 struct dio_s {
 	struct vnode *vp;
 	struct cred *cr;
 	int 	ioflag;
 };
+
+/*
+ * xfs_dio_cache_inval()
+ * This routine is responsible for keeping direct I/O and buffered I/O
+ * somewhat coherent.  For here we make sure that we're at least
+ * temporarily holding the inode I/O lock exclusively and then call
+ * the page cache to flush and invalidate any cached pages.  If there
+ * are no cached pages this routine will be very quick.
+ */
+void
+xfs_dio_cache_inval(
+	xfs_inode_t	*ip,
+	off_t		offset,
+	size_t		len)		    
+{
+	vnode_t		*vp;
+	int		relock;
+	__uint64_t	flush_end;
+
+	vp = XFS_ITOV(ip);
+	if (!VN_CACHED(vp)) {
+		return;
+	}
+	/*
+	 * We need to get the I/O lock exclusively in order
+	 * to safely invalidate pages and mappings.
+	 */
+	relock = ismrlocked(&(ip->i_iolock), MR_ACCESS);
+	if (relock) {
+		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+		xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	}
+	if (VN_MAPPED(vp)) {
+		/*
+		 * Blow away mmap mappings to the files pages
+		 * since we're going to invalidate the pages.
+		 * Round the offset down to a page boundary since
+		 * remapf() rounds it up and we don't want it to
+		 * miss anything.
+		 */
+		remapf(vp, ctooff(offtoct(offset)), 1);
+	}
+	/*
+	 * Watch out for overflow.  We subtract 1 from offset+len,
+	 * because pflushinvalvp() takes start and end values not
+	 * start and length.
+	 */
+	flush_end = (__uint64_t)(offset + len - 1);
+	if (flush_end > (__uint64_t)LONGLONG_MAX) {
+		flush_end = LONGLONG_MAX;
+	}
+	pflushinvalvp(vp, ctooff(offtoct(offset)), (off_t)flush_end);
+	if (relock) {
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	}
+}
+
 
 /*
  * xfs_diostrat()
@@ -4279,6 +4335,16 @@ xfs_diostrat( buf_t *bp)
  		 * The request is NOT on a file system block boundary.
 		 */
 		blk_algn = OFFTOBB(offset & mp->m_blockmask);
+	}
+	/*
+	 * We're going to access the disk directly.
+	 * Blow anything in the range of the request out of the
+	 * buffer cache first.  This isn't perfect because we allow
+	 * simultaneous direct I/O writers and buffered readers, but
+	 * it should be good enough.
+	 */
+	if (!(dp->ioflag & IO_IGNCACHE) && VN_CACHED(vp)) {
+		xfs_dio_cache_inval(ip, offset, totresid);
 	}
 
 	/*
