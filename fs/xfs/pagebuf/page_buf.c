@@ -623,7 +623,7 @@ _pagebuf_get_prealloc_bh(void)
 		do {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			spin_unlock_irqrestore(&pb_resv_bh_lock, flags);
-			pagebuf_run_task_queue(NULL);
+			pagebuf_run_queues(NULL);
 			schedule();
 			spin_lock_irqsave(&pb_resv_bh_lock, flags);
 		} while (pb_resv_bh_cnt < 1);
@@ -1217,7 +1217,7 @@ _pagebuf_wait_unpin(
 		if (atomic_read(&PBP(pb)->pb_pin_count) == 0) {
 			break;
 		}
-		pagebuf_run_task_queue(pb);
+		pagebuf_run_queues(pb);
 		schedule();
 	}
 	remove_wait_queue(&PBP(pb)->pb_waiters, &wait);
@@ -1767,7 +1767,7 @@ pagebuf_iowait(
 	page_buf_t		*pb)
 {
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
-	pagebuf_run_task_queue(pb);
+	pagebuf_run_queues(pb);
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, PB_TRACE_REC(iowaited), (int)pb->pb_error);
 	return pb->pb_error;
@@ -2138,7 +2138,7 @@ pagebuf_daemon(
 		if (as_list_len > 0)
 			purge_addresses();
 		if (count)
-			pagebuf_run_task_queue(NULL);
+			pagebuf_run_queues(NULL);
 
 		force_flush = 0;
 	} while (pb_daemon->active == 1);
@@ -2210,7 +2210,7 @@ pagebuf_delwri_flush(
 
 	spin_unlock(&pb_daemon->pb_delwrite_lock);
 
-	pagebuf_run_task_queue(NULL);
+	pagebuf_run_queues(NULL);
 
 	if (pinptr)
 		*pinptr = pincount;
