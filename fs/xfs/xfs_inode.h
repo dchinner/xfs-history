@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.112 $"
+#ident "$Revision: 1.113 $"
 
 struct bhv_desc;
 struct buf;
@@ -98,6 +98,9 @@ typedef struct xfs_ifork {
  *
  * Other state kept in the in-core inode is used for identification,
  * locking, transactional updating, etc of the inode.
+ *
+ * Generally, we do not want to hold the i_rlock while holding the 
+ * i_ilock. Hierarchy is i_iolock followed by i_rlock. 
  */
 typedef struct xfs_inode {
 	/* Inode linking and identification information. */
@@ -131,6 +134,7 @@ typedef struct xfs_inode {
 	unsigned int		i_pincount;	/* inode pin count */
 	sv_t			i_pinsema;	/* inode pin sema */
 	lock_t			i_ipinlock;	/* inode pinning mutex */
+	mutex_t			i_rlock;	/* inode readahead mutex */
 #ifdef NOTYET
 	xfs_range_lock_t	i_range_lock;	/* range lock base */
 #endif /* NOTYET */
@@ -138,14 +142,14 @@ typedef struct xfs_inode {
 	struct xfs_inode	*i_release;	/* inode to unref */
 
 	/* I/O state */
-	off_t			i_next_offset;	/* seq read detector */
 	off_t			i_io_offset;	/* last buf offset */
+	off_t			i_next_offset;	/* seq read detector */
+	unsigned int		i_last_req_sz;	/* last read size */
+	unsigned int		i_io_size;	/* file io buffer len */
 	xfs_fsize_t		i_new_size;	/* sz when write completes */
 	off_t			i_write_offset;	/* start off of curr write */
 	xfs_fileoff_t		i_reada_blkno;	/* next blk to start ra */
 	struct xfs_gap		*i_gap_list;	/* hole list in write range */
-	unsigned int		i_io_size;	/* file io buffer len */
-	unsigned int		i_last_req_sz;	/* last read size */
 	unsigned int		i_readio_blocks;	/* read buffer size */
 	unsigned int		i_writeio_blocks;	/* write buffer size */
 	uchar_t			i_readio_log;	/* log2 of read buffer size */
@@ -336,8 +340,10 @@ void xfs_inode_clear_read_ahead(xfs_inode_t *ip);
 #define	XFS_INODE_CLEAR_READ_AHEAD(ip)		xfs_inode_clear_read_ahead(ip)
 #else
 #define	XFS_INODE_CLEAR_READ_AHEAD(ip)	{	\
+		mutex_lock(&((ip)->i_rlock), PINOD);	\
 		ip->i_next_offset = 0;		\
-		ip->i_last_req_sz = 0; }
+		ip->i_last_req_sz = 0; 		\
+		mutex_unlock(&((ip)->i_rlock)); }
 #endif
 
 /*
