@@ -4497,13 +4497,14 @@ xfs_rwunlock(
 }
 
 STATIC int
-xfs_inode_flush(bhv_desc_t	*bdp)
+xfs_inode_flush(bhv_desc_t	*bdp,
+		int		flags)
 {
 	xfs_inode_t	*ip;
 	xfs_dinode_t	*dip;
 	xfs_mount_t	*mp;
 	xfs_buf_t	*bp;
-	int		error;
+	int		error = 0;
 
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
@@ -4519,33 +4520,70 @@ xfs_inode_flush(bhv_desc_t	*bdp)
 	     !(ip->i_itemp->ili_format.ilf_fields & XFS_ILOG_ALL)))
 		return 0;
 
+	if (flags & FLUSH_LOG) {
+		xfs_inode_log_item_t *iip = ip->i_itemp;
+ 
+		if (iip && iip->ili_last_lsn) {
+			xlog_t	*log = mp->m_log;
+			xfs_lsn_t	sync_lsn;
+			int		s, log_flags = XFS_LOG_FORCE;
+
+			s = GRANT_LOCK(log);
+			sync_lsn = log->l_last_sync_lsn;
+			GRANT_UNLOCK(log, s);
+
+			if ((XFS_LSN_CMP(iip->ili_last_lsn, sync_lsn) <= 0))
+				return 0;
+
+			if (flags & FLUSH_SYNC)
+				log_flags |= XFS_LOG_SYNC;
+			return xfs_log_force(mp, iip->ili_last_lsn,
+						log_flags);
+		}
+	}
+
 	/* We make this non-blocking if the inode is contended,
 	 * return EAGAIN to indicate to the caller that they
 	 * did not succeed. This prevents the flush path from
 	 * blocking on inodes inside another operation right
 	 * now, they get caught later by xfs_sync.
 	 */
-	if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED)) {
-		if ((xfs_ipincount(ip) == 0) && xfs_iflock_nowait(ip)) {
-			xfs_ifunlock(ip);
+	if (flags & FLUSH_INODE) {
+		if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED)) {
+			if ((xfs_ipincount(ip) == 0) && xfs_iflock_nowait(ip)) {
+				int	flush_flags;
+
+#if 0
+				/* not turning this on until some
+				 * performance analysis is done
+				 */
+				if (flags & FLUSH_SYNC)
+					flush_flags = XFS_IFLUSH_SYNC;
+				else
+#endif
+					flush_flags = XFS_IFLUSH_DELWRI;
+
+				xfs_ifunlock(ip);
+				xfs_iunlock(ip, XFS_ILOCK_SHARED);
+				error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
+				if (error)
+					goto eagain;
+				xfs_buf_relse(bp);
+
+				if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED) == 0)
+					goto eagain;
+
+				if ((xfs_ipincount(ip) == 0) &&
+				     xfs_iflock_nowait(ip))
+					error = xfs_iflush(ip, flush_flags);
+			} else {
+				error = EAGAIN;
+			}
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-			error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
-			if (error)
-				goto eagain;
-			xfs_buf_relse(bp);
-
-			if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED) == 0)
-				goto eagain;
-
-			if ((xfs_ipincount(ip) == 0) && xfs_iflock_nowait(ip))
-				error = xfs_iflush(ip, XFS_IFLUSH_DELWRI);
 		} else {
+eagain:
 			error = EAGAIN;
 		}
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
-	} else {
-eagain:
-		error = EAGAIN;
 	}
 
 	return error;
