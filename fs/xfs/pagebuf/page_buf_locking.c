@@ -77,7 +77,7 @@ _bhash(kdev_t d, loff_t b)
         /*
          * dev_t is 32 bits, daddr_t is always 64 bits
          */
-        b ^= (unsigned)d;
+        b ^= kdev_val(d);
         for (bit = hval = 0; b != 0 && bit < sizeof(b) * 8; bit += NBITS) {
                 hval ^= (int)b & (NHASH-1);
                 b >>= NBITS;
@@ -327,7 +327,6 @@ pagebuf_lock_disable(			/* disable buffer locking	*/
 
 	return(0);
 }
-
 /*
  *	pagebuf_lock_enable
  */
@@ -341,7 +340,7 @@ pagebuf_lock_enable(
 
 	target = kmalloc(sizeof(pb_target_t), GFP_KERNEL);
 	if (target) {
-		target->pbr_bdev = bdget(kdev);
+		target->pbr_bdev = bdget(kdev_t_to_nr(kdev));
 		if (!target->pbr_bdev)
 			goto fail;
 		target->pbr_device = kdev;
@@ -350,6 +349,7 @@ pagebuf_lock_enable(
 	}
 
 	return target;
+
 fail:
 	kfree(target);
 	return NULL;

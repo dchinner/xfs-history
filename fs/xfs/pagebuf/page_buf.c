@@ -1480,12 +1480,11 @@ _pagebuf_page_io(
 	if (pg_offset) {
 		size_t	block_offset;
 
-		block_offset = pg_offset >> PB_SECTOR_BITS;
-		block_offset = pg_offset - (block_offset << PB_SECTOR_BITS);
-		blk_length = (pg_length + block_offset + sector - 1) >>
-				PB_SECTOR_BITS;
+		block_offset = pg_offset >> 9;
+		block_offset = pg_offset - (block_offset << 9);
+		blk_length = (pg_length + block_offset + sector - 1) >> 9;
 	} else {
-		blk_length = (pg_length + sector - 1) >> PB_SECTOR_BITS;
+		blk_length = (pg_length + sector - 1) >> 9;
 	}
 
 	if (concat_ok) {
@@ -1593,7 +1592,7 @@ _page_buf_page_apply(
 	page_buf_daddr_t	bn = pb->pb_bn;
 	kdev_t			dev = pb->pb_target->pbr_device;
 	size_t			blocksize = pb->pb_target->pbr_blocksize;
-	size_t			sector = 1 << PB_SECTOR_BITS;
+	size_t			sector = 1 << 9;
 	loff_t			pb_offset;
 	size_t			ret_len = pg_length;
 
@@ -1602,13 +1601,13 @@ _page_buf_page_apply(
 	if ((blocksize == PAGE_CACHE_SIZE) &&
 	    (pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
 	    (pb->pb_flags & PBF_READ) && pb->pb_locked) {
-		bn -= (pb->pb_offset >> PB_SECTOR_BITS);
+		bn -= (pb->pb_offset >> 9);
 		pg_offset = 0;
 		pg_length = PAGE_CACHE_SIZE;
 	} else {
 		pb_offset = offset - pb->pb_file_offset;
 		if (pb_offset) {
-			bn += (pb_offset + sector - 1) >> PB_SECTOR_BITS;
+			bn += (pb_offset + sector - 1) >> 9;
 		}
 	}
 

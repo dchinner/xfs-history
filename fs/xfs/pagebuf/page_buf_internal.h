@@ -47,6 +47,9 @@
 #define page_buffers(page)	((page)->buffers)
 #define page_has_buffers(page)	((page)->buffers)
 #endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,2)
+#define kdev_val(dev)		(unsigned)(dev)
+#endif
 
 typedef struct page_buf_private_s {
 	page_buf_t		pb_common;	/* public part of structure */

@@ -1616,7 +1616,7 @@ static void	printinode(struct inode *ip)
 					addr + offsetof(struct inode, i_data),
 					ip->i_data.nrpages);
 
-	kdb_printf("  vnode ptr 0x%p\n", LINVFS_GET_VN_ADDRESS(ip));
+	kdb_printf("  vnode ptr 0x%p\n", LINVFS_GET_VPTR(ip));
 }
 
 

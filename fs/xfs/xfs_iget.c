@@ -483,7 +483,7 @@ retry:
 		int		newnode;
 
 
-		vp = LINVFS_GET_VN_ADDRESS(inode);
+		vp = LINVFS_GET_VPTR(inode);
 		if (inode->i_state & I_NEW) {
 			XFS_STATS_INC(xfsstats.vn_alloc);
 			vn_initialize(XFS_MTOVFS(mp), inode, 0);
