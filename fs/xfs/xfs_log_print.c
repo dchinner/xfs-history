@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.2 $"
+#ident	"$Revision: 1.3 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -128,7 +128,7 @@ xlog_recover_print_trans_head(
 {
 	static char *trans_type[] = {
 		"",
-		"SETATTR",
+		"SETATTR_NOT_SIZE",
 		"SETATTR_SIZE",
 		"INACTIVE",
 		"CREATE",
@@ -154,15 +154,19 @@ xlog_recover_print_trans_head(
 		"ATTR_FLAG",
 		"CLEAR_AGI_BUCKET",
 		"QM_SBCHANGE",
-		"",
-		"",
+		"DUMMY1",
+		"DUMMY2",
 		"QM_QUOTAOFF",
 		"QM_DQALLOC",
 		"QM_SETQLIM",
 		"QM_DQCLUSTER",
 		"QM_QINOCREATE",
 		"QM_QUOTAOFF_END",
-		"SB_UNIT"
+		"SB_UNIT",
+		"FSYNC_TS",
+		"GROWFSRT_ALLOC",
+		"GROWFSRT_ZERO",
+		"GROWFSRT_FREE",
 	};
 
 	printf("TRANS: tid:0x%x  type:%s  #items:%d  trans:0x%x  q:0x%x\n",
@@ -383,6 +387,8 @@ xlog_recover_print_inode(
 {
 	xfs_inode_log_format_t *f;
 	int			   attr_index;
+	int			   hasdata;
+	int			   hasattr;
 	extern int		   print_inode, print_data;
 
 	f = (xfs_inode_log_format_t *)item->ri_buf[0].i_addr;
@@ -395,10 +401,12 @@ xlog_recover_print_inode(
 	xlog_recover_print_inode_core((xfs_dinode_core_t *)
 				      item->ri_buf[1].i_addr);
 
+	hasdata = (f->ilf_fields & XFS_ILOG_DFORK) != 0;
+	hasattr = (f->ilf_fields & XFS_ILOG_AFORK) != 0;
 	/* does anything come next */
 	switch (f->ilf_fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	      case XFS_ILOG_DEXT: {
-		      ASSERT(f->ilf_size <= 4);
+		      ASSERT(f->ilf_size == 3 + hasattr);
 		      printf("		DATA FORK EXTENTS inode data:\n");
 		      if (print_inode && print_data) {
 			      xlog_recover_print_data(item->ri_buf[2].i_addr,
@@ -407,7 +415,7 @@ xlog_recover_print_inode(
 		      break;
 	      }
 	      case XFS_ILOG_DBROOT: {
-		      ASSERT(f->ilf_size == 3);
+		      ASSERT(f->ilf_size == 3 + hasattr);
 		      printf("		DATA FORK BTREE inode data:\n");
 		      if (print_inode && print_data) {
 			      xlog_recover_print_data(item->ri_buf[2].i_addr,
@@ -416,7 +424,7 @@ xlog_recover_print_inode(
 		      break;
 	      }
 	      case XFS_ILOG_DDATA: {
-		      ASSERT(f->ilf_size == 3);
+		      ASSERT(f->ilf_size == 3 + hasattr);
 		      printf("		DATA FORK LOCAL inode data:\n");
 		      if (print_inode && print_data) {
 			      xlog_recover_print_data(item->ri_buf[2].i_addr,
@@ -425,19 +433,19 @@ xlog_recover_print_inode(
 		      break;
 	      }
 	      case XFS_ILOG_DEV: {
-		      ASSERT(f->ilf_size == 2);
+		      ASSERT(f->ilf_size == 2 + hasattr);
 		      printf("		DEV inode: no extra region\n");
 		      break;
 	      }
 	      case XFS_ILOG_UUID: {
-		      ASSERT(f->ilf_size == 2);
+		      ASSERT(f->ilf_size == 2 + hasattr);
 		      printf("		UUID inode: no extra region\n");
 		      break;
 	      }
 
 
 	      case 0: {
-		      ASSERT(f->ilf_size == 2);
+		      ASSERT(f->ilf_size == 2 + hasattr);
 		      break;
 	      }
 	      default: {
@@ -445,15 +453,11 @@ xlog_recover_print_inode(
 	      }
 	}
 
-	if (f->ilf_fields & XFS_ILOG_AFORK) {
-		if (f->ilf_fields & XFS_ILOG_DFORK) {
-			attr_index = 3;
-		} else {
-			attr_index = 2;
-		}
+	if (hasattr) {
+		attr_index = 2 + hasdata;
 		switch (f->ilf_fields & XFS_ILOG_AFORK) {
 		      case XFS_ILOG_AEXT: {
-			      ASSERT(f->ilf_size <= 4);
+			      ASSERT(f->ilf_size == 3 + hasdata);
 			      printf("		ATTR FORK EXTENTS inode data:\n");
 			      if (print_inode && print_data) {
 				      xlog_recover_print_data(
@@ -463,7 +467,7 @@ xlog_recover_print_inode(
 			      break;
 		      }
 		      case XFS_ILOG_ABROOT: {
-			      ASSERT(f->ilf_size <= 4);
+			      ASSERT(f->ilf_size == 3 + hasdata);
 			      printf("		ATTR FORK BTREE inode data:\n");
 			      if (print_inode && print_data) {
 				      xlog_recover_print_data(
@@ -473,7 +477,7 @@ xlog_recover_print_inode(
 			      break;
 		      }
 		      case XFS_ILOG_ADATA: {
-			      ASSERT(f->ilf_size <= 4);
+			      ASSERT(f->ilf_size == 3 + hasdata);
 			      printf("		ATTR FORK LOCAL inode data:\n");
 			      if (print_inode && print_data) {
 				      xlog_recover_print_data(
@@ -544,7 +548,7 @@ xlog_recover_print_efi(
 	       f->efi_size, f->efi_nextents, f->efi_id);
 	ex = f->efi_extents;
 	printf("	");
-	for (i=0; i< f->efi_size; i++) {
+	for (i=0; i< f->efi_nextents; i++) {
 		printf("(s: 0x%llx, l: %d) ", ex->ext_start, ex->ext_len);
 		if (i % 4 == 3) printf("\n");
 		ex++;

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.129 $"
+#ident	"$Revision: 1.130 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1965,7 +1965,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	if (dicp->di_nextents + dicp->di_anextents > dicp->di_nblocks) {
 		brelse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
-			"xfs_inode_recover: Bad inode log record, rec ptr 0x%p, dino ptr 0x%p, dino bp 0x%p, ino %lld, total extents = %d, nblocks = %ld",
+			"xfs_inode_recover: Bad inode log record, rec ptr 0x%p, dino ptr 0x%p, dino bp 0x%p, ino %lld, total extents = %d, nblocks = %lld",
 			item, dip, bp, ino,
 			dicp->di_nextents + dicp->di_anextents,
 			dicp->di_nblocks);
