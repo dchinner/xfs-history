@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.106 $"
+#ident	"$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -21,6 +21,7 @@
 #include <sys/sema.h>
 #include <sys/open.h>
 #include <sys/cred.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #include <bstring.h>
 #else
@@ -43,7 +44,6 @@
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
-#include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_dir.h"
 #include "xfs_alloc.h"
@@ -69,10 +69,8 @@ xfs_mount_init(void)
 	xfs_mount_t *mp;
 
 	mp = kmem_zalloc(sizeof(*mp), 0);
-	mp->m_fsname = kmem_alloc(PATH_MAX, 0);
 
 	mutex_init(&mp->m_ail_lock, MUTEX_SPIN, "xfs_ail");
-	mutex_init(&mp->m_async_lock, MUTEX_SPIN, "xfs_async");
 	mutex_init(&mp->m_ipinlock, MUTEX_SPIN, "xfs_ipin");
 	mutex_init(&mp->m_sb_lock, MUTEX_SPIN, "xfs_sb");
 	mutex_init(&mp->m_ilock, MUTEX_DEFAULT, "xfs_ilock");
@@ -103,22 +101,25 @@ xfs_mount_free(xfs_mount_t *mp)
 	}
 	
 	mutex_destroy(&mp->m_ail_lock);
-	mutex_destroy(&mp->m_async_lock);
 	mutex_destroy(&mp->m_ipinlock);
 	mutex_destroy(&mp->m_sb_lock);
 	mutex_destroy(&mp->m_ilock);
 	freesema(&mp->m_growlock);
 
-	kmem_free(mp->m_fsname, PATH_MAX);
+	if (mp->m_fsname != NULL) {
+		kmem_free(mp->m_fsname, mp->m_fsname_len);
+	}
 	kmem_free(mp, sizeof(xfs_mount_t));
 }	/* xfs_mount_free */
 
 
 /*
- * do_xfs_mountfs
+ * xfs_mountfs_int
  *
  * This function does the following on an initial mount of a file system:
  *	- reads the superblock from disk and init the mount struct
+ *	- if we're an o32 kernel, do a size check on the superblock
+ *		so we don't mount terabyte filesystems
  *	- init mount struct realtime fields
  *	- allocate inode hash table for fs
  *	- init directory manager
@@ -136,7 +137,7 @@ xfs_mount_free(xfs_mount_t *mp)
  *		code for fixing up the filesystem btrees.
  */
 STATIC int
-do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
+xfs_mountfs_int(vfs_t *vfsp, dev_t dev, int read_rootinos)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
@@ -198,6 +199,13 @@ do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
 		error = XFS_ERROR(EINVAL);
 		goto error0;
 	}
+#if !XFS_BIG_FILESYSTEMS
+	if (sbp->sb_dblocks > INT_MAX || sbp->sb_rblocks > INT_MAX)  {
+		cmn_err(CE_WARN,
+"XFS:  File systems greater than 1TB not supported on this system.\n");
+		error = XFS_ERROR(E2BIG);
+	}
+#endif
 #ifndef SIM
 	/*
 	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
@@ -286,8 +294,18 @@ do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
 		readio_log = XFS_WSYNC_READIO_LOG;
 		writeio_log = XFS_WSYNC_WRITEIO_LOG;
 	} else {
-		readio_log = XFS_READIO_LOG;
-		writeio_log = XFS_WRITEIO_LOG;
+#ifdef _K32U64
+		if (physmem <= 8192) {		/* <= 32MB */
+			readio_log = XFS_READIO_LOG_SMALL;
+			writeio_log = XFS_WRITEIO_LOG_SMALL;
+		} else {
+			readio_log = XFS_READIO_LOG_LARGE;
+			writeio_log = XFS_WRITEIO_LOG_LARGE;
+		}
+#else
+		readio_log = XFS_READIO_LOG_LARGE;
+		writeio_log = XFS_WRITEIO_LOG_LARGE;
+#endif
 	}
 	if (sbp->sb_blocklog > readio_log) {
 		mp->m_readio_log = sbp->sb_blocklog;
@@ -521,7 +539,7 @@ do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
  error0:
 	nfreerbuf(bp);
 	return error;
-}	/* do_xfs_mountfs */
+}	/* xfs_mountfs_int */
 
 /*
  * wrapper routine for the kernel
@@ -529,12 +547,12 @@ do_xfs_mountfs(vfs_t *vfsp, dev_t dev, int read_rootinos)
 int
 xfs_mountfs(vfs_t *vfsp, dev_t dev)
 {
-	return(do_xfs_mountfs(vfsp, dev, 1));
+	return(xfs_mountfs_int(vfsp, dev, 1));
 }
 
 #ifdef SIM
 STATIC xfs_mount_t *
-do_xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
+xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 {
 	int		error;
 	xfs_mount_t	*mp;
@@ -552,7 +570,7 @@ do_xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 	vfsp->vfs_dev = dev;
 
 
-        error = do_xfs_mountfs(vfsp, dev, read_rootinos);
+        error = xfs_mountfs_int(vfsp, dev, read_rootinos);
 	if (error) {
 		kmem_free(mp, sizeof(*mp));
 		return 0;
@@ -581,7 +599,7 @@ do_xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 xfs_mount_t *
 xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 {
-	return(do_xfs_mount(dev, logdev, rtdev, 1));
+	return(xfs_mount_int(dev, logdev, rtdev, 1));
 }
 
 /*
@@ -592,7 +610,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 xfs_mount_t *
 xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 {
-	return(do_xfs_mount(dev, logdev, rtdev, 0));
+	return(xfs_mount_int(dev, logdev, rtdev, 0));
 }
 #endif /* SIM */
 

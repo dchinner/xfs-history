@@ -1,4 +1,4 @@
-#ident "$Revision: 1.35 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -82,7 +82,14 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * the buffer cache.
 	 */
 	if (tp == NULL) {
+#ifdef SIM
+		/*
+		 * There's no bdflush daemon in simulation.
+		 */
+		return (get_buf(dev, blkno, len, flags));
+#else
 		return (get_buf(dev, blkno, len, flags | BUF_BUSY));
+#endif
 	}
 
 	/*
@@ -114,7 +121,11 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 * easily deadlock with our current transaction as well as cause
 	 * us to run out of stack space.
 	 */
+#ifdef SIM
+	bp = get_buf(dev, blkno, len, flags);
+#else
 	bp = get_buf(dev, blkno, len, flags | BUF_BUSY);
+#endif
 	if (bp == NULL) {
 		return NULL;
 	}
@@ -283,7 +294,14 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 * the buffer cache.
 	 */
 	if (tp == NULL) {
+#ifdef SIM
+		/*
+		 * There's no bdflush daemon in simulation.
+		 */
+		bp = read_buf(dev, blkno, len, flags);
+#else
 		bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
+#endif
 		if ((bp != NULL) && (geterror(bp) != 0)) {
 			prdev("XFS read error in file system meta-data block %ld", bp->b_edev, bp->b_blkno);
 			error = geterror(bp);
@@ -364,7 +382,11 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	 * easily deadlock with our current transaction as well as cause
 	 * us to run out of stack space.
 	 */
+#ifdef SIM
+	bp = read_buf(dev, blkno, len, flags);
+#else
 	bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
+#endif
 	if (bp == NULL) {
 		*bpp = NULL;
 		return 0;
