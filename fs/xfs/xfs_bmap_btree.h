@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.18 $"
+#ident "$Revision: 1.19 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -23,6 +23,15 @@ typedef struct xfs_bmdr_block_t
  * l1:0-8, l2:0-31, and l3:21-31 are startblock.
  * l3:0-20 are blockcount.
  */
+#define	BMBT_STARTOFF_BITOFF	0
+#define	BMBT_STARTOFF_BITLEN	55
+#define	BMBT_STARTBLOCK_BITOFF	(BMBT_STARTOFF_BITOFF + BMBT_STARTOFF_BITLEN)
+#define	BMBT_STARTBLOCK_BITLEN	52
+#define	BMBT_BLOCKCOUNT_BITOFF	\
+	(BMBT_STARTBLOCK_BITOFF + BMBT_STARTBLOCK_BITLEN)
+#define	BMBT_BLOCKCOUNT_BITLEN	\
+	(sizeof(xfs_bmbt_rec_t) * NBBY - BMBT_BLOCKCOUNT_BITOFF)
+
 typedef struct xfs_bmbt_rec
 {
 	__uint32_t	l0, l1, l2, l3;
