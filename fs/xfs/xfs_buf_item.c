@@ -1,4 +1,4 @@
-#ident "$Revision: 1.42 $"
+#ident "$Revision: 1.43 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -310,6 +310,7 @@ xfs_buf_item_unpin(xfs_buf_log_item_t *bip)
 	bunpin(bp);
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(!(bp->b_flags & B_DELWRI));
+		ASSERT(bp->b_flags & B_STALE);
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
