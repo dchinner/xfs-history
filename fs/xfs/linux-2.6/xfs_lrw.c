@@ -43,6 +43,7 @@
 #include <ksys/behavior.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
+#include <sys/major.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -793,7 +794,7 @@ int
 xfsbdstrat( struct xfs_mount 	*mp,
 			struct xfs_buf		*bp)
 {
-  //	int		dev_major = emajor(bp->b_edev);
+  	int		dev_major = emajor(bp->b_edev);
 
 	ASSERT(mp);
 	ASSERT(bp->b_target);
@@ -805,12 +806,10 @@ xfsbdstrat( struct xfs_mount 	*mp,
 		 * that, use griostrategy2.
 		 */
 #if !defined(_USING_PAGEBUF_T)
-#if 0
 		if ( (XFS_BUF_IS_GRIO(bp)) &&
 				(dev_major != XLV_MAJOR) ) {
 			griostrategy(bp);
 		} else
-#endif
 			{
 			struct bdevsw	*my_bdevsw;
 

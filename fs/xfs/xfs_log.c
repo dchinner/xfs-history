@@ -21,7 +21,7 @@
  * this program; if not, write the Free Software Foundation, Inc., 59 Temple
  * Place - Suite 330, Boston MA 02111-1307, USA.
  */
-#ident	"$Revision: 1.188 $"
+#ident	"$Revision: 1.190 $"
 
 /*
  * High level interface routines for log manager
@@ -1026,7 +1026,7 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
-#if defined(_USING_BUF_T)
+#if !defined(_USING_PAGEBUF_T)
 		struct bdevsw	*my_bdevsw;
 
 		my_bdevsw = bp->b_target->bdevsw;
