@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -650,10 +650,6 @@ xlog_recover_print_item(xlog_recover_item_t *item)
 		cmn_err(CE_CONT, "EFI ");
 		break;
 	    }
-	    case XFS_LI_IUNLINK: {
-		cmn_err(CE_CONT, "IUN ");
-		break;
-	    }
 	    default: {
 		cmn_err(CE_PANIC, "xlog_recover_print_item: illegal type\n");
 		break;
@@ -731,10 +727,6 @@ xlog_recover_reorder_trans(xlog_t	  *log,
 	    case XFS_LI_EFD:
 	    case XFS_LI_EFI: {
 		xlog_recover_insert_item_backq(&log->l_recover_extq, itemq);
-		break;
-	    }
-	    case XFS_LI_IUNLINK: {
-		xlog_recover_insert_item_backq(&log->l_recover_iunlinkq, itemq);
 		break;
 	    }
 	    default: {
