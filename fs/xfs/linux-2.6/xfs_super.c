@@ -426,6 +426,13 @@ linvfs_clear_inode(
 	}
 }
 
+void 
+linvfs_put_inode(struct inode *inode)
+{
+	vnode_t	*vp = LINVFS_GET_VP(inode);
+
+    	if (vp) vn_put(vp);
+}
 
 void
 linvfs_put_super(
@@ -598,11 +605,13 @@ linvfs_remount(
 
 
 
+
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
 #ifdef	CONFIG_XFS_VNODE_TRACING
 	write_inode:		linvfs_write_inode,
 #endif
+	put_inode:		linvfs_put_inode,
 	delete_inode:		linvfs_delete_inode,
 	clear_inode:		linvfs_clear_inode,
 	put_super:		linvfs_put_super,

@@ -87,18 +87,6 @@
 
 #include <asm/uaccess.h> /* For copy_from_user */
 
-static struct dentry_operations linvfs_dops;
-
-/*
- * assign dentry ops to a dentry to prevent reference leak on dput
- */
-
-void
-linvfs_set_dentry_ops(struct dentry *dentry)
-{
-    ASSERT(dentry);
-    dentry->d_op = &linvfs_dops;
-}
 
 /*
  * Pull the link count and size up from the xfs inode to the linux inode
@@ -175,7 +163,6 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		linvfs_set_inode_ops(ip);
 		error = linvfs_revalidate_core(ip);
 		validate_fields(dir);
-                linvfs_set_dentry_ops(dentry);
 		d_instantiate(dentry, ip);
 	}
 
@@ -222,7 +209,6 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 			VN_RELE(cvp);
 			return ERR_PTR(-EACCES);
 		}
-                linvfs_set_dentry_ops(dentry);
 		linvfs_set_inode_ops(ip);
 		error = linvfs_revalidate_core(ip);
 	}
@@ -254,7 +240,6 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 		ip->i_ctime = CURRENT_TIME;
 		VN_HOLD(vp);
 		validate_fields(ip);
-                linvfs_set_dentry_ops(dentry);
 		d_instantiate(dentry, ip);
 	}
 	return -error;
@@ -325,7 +310,6 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 		} else {
 			linvfs_set_inode_ops(ip);
 			error = linvfs_revalidate_core(ip);
-                        linvfs_set_dentry_ops(dentry);
 			d_instantiate(dentry, ip);
 		}
 	}
@@ -932,22 +916,6 @@ int linvfs_bmap(struct address_space *mapping, long block)
 	}
 }
 
-/* This is used to wrap iput calls from above the vfs layer, we can
- * add our own locking to kill races between xfs_iget and iput.
- */
-
-STATIC
-void linvfs_d_iput(struct dentry *dentry, struct inode *inode)
-{
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-
-	if (vp) {
-		vn_rele(vp);
-	} else {
-		iput(inode);
-	}
-}
-
 
 struct address_space_operations linvfs_aops = {
   readpage:		linvfs_read_full_page,
@@ -1004,10 +972,5 @@ struct inode_operations linvfs_symlink_inode_operations =
   attr_set:		linvfs_attr_set,
   attr_remove:		linvfs_attr_remove,
   attr_list:		linvfs_attr_list,
-};
-
-static struct dentry_operations linvfs_dops =
-{
-  d_iput:		linvfs_d_iput,
 };
 

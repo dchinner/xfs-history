@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.42 $"
 
 #include <xfs_os_defs.h>
 
@@ -583,13 +583,20 @@ vn_hold(struct vnode *vp)
 	return vp;
 }
 
-
 /*
- * Release a vnode.  Decrements reference count and calls
- * VOP_INACTIVE on last reference.
+ * Release a vnode. 
  */
 void
 vn_rele(struct vnode *vp)
+{
+	iput(LINVFS_GET_IP(vp));
+}
+
+/*
+ *  Call VOP_INACTIVE on last reference.
+ */
+void
+vn_put(struct vnode *vp)
 {
 	int	s;
 	int	vcnt;
@@ -607,9 +614,9 @@ vn_rele(struct vnode *vp)
 	ASSERT(vcnt > 0);
 
 	/*
-	 * Note that we are allowing for the fact that the
-	 * i_count won't be decremented until we do the
-	 * 'iput' below.
+	 * Since we always get called from put_inode we know 
+	 * that i_count won't be decremented after we
+	 * return. 
 	 */
 	if (vcnt == 1) {
 		/*
@@ -638,18 +645,9 @@ vn_rele(struct vnode *vp)
 
 		vp->v_flag &= ~(VINACT|VWAIT|VRECLM|VGONE);
 
-		vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
-
-		VN_UNLOCK(vp, s);
-
-		iput(LINVFS_GET_IP(vp));
-
-		return;
 	}
 
 	VN_UNLOCK(vp, s);
-
-	iput(LINVFS_GET_IP(vp));
 
 	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 }
