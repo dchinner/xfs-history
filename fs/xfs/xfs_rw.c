@@ -308,9 +308,14 @@ xfs_iomap_extra(
 {
 	xfs_fileoff_t	offset_fsb;
 	xfs_fileoff_t	count_fsb;
+	xfs_fsize_t	nisize;
 	xfs_mount_t	*mp;
 
-	ASSERT((offset == BTOBB(BBTOB(ip->i_d.di_size))) && (count < NBPP));
+	nisize = ip->i_new_size;
+	if (nisize < ip->i_d.di_size) {
+		nisize = ip->i_d.di_size;
+	}
+	ASSERT((offset == BTOBB(BBTOB(nisize))) && (count < NBPP));
 	ASSERT(ip->i_mount->m_sb.sb_blocksize < NBPP);
 
 	mp = ip->i_mount;
