@@ -2983,6 +2983,7 @@ xfs_symlink(vnode_t	*dir_vp,
 		 * XXX This is temporary, should be removed later.
 		 */
 		ip->i_d.di_mode = (ip->i_d.di_mode & ~IFMT) | IFLNK;
+		ip->i_d.di_format = XFS_DINODE_FMT_LOCAL;
 
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_DATA | XFS_ILOG_CORE);
 	}
@@ -3256,16 +3257,133 @@ xfs_delmap(vnode_t	*vp,
 /*
  * xfs_allocstore
  *
- * This is a stub.
+ * This is called to reserve or allocate space for the given range.
+ * Currently, this only supports reserving the space for a single
+ * page.  By using NDPP (number of BBs per page) bmbt_irec structures,
+ * we ensure that the entire page can be mapped in a single bmap call.
+ * This simplifies the back out code in that all the information we need
+ * to back out is in the single bmbt_irec array orig_imap.
  */
 STATIC int
 xfs_allocstore(vnode_t	*vp,
 	       uint	offset,
-	       uint	len,
+	       uint	count,
 	       cred_t	*credp)
 {
-	ASSERT (0);
-	return 0;
+	xfs_mount_t	*mp;
+	xfs_inode_t	*ip;
+	off_t		isize;
+	xfs_fileoff_t	offset_fsb;
+	xfs_fileoff_t	last_fsb;
+        xfs_fileoff_t	curr_off_fsb;
+	xfs_fileoff_t	unmap_offset_fsb;
+	xfs_extlen_t	count_fsb;
+	xfs_extlen_t	unmap_len_fsb;
+	xfs_bmbt_irec_t	*imapp;
+	xfs_bmbt_irec_t	*last_imapp;
+	int		i;
+	int		nimaps;
+	int		orig_nimaps;
+	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];
+	xfs_bmbt_irec_t	orig_imap[NDPP];
+	
+	/*
+	 * This code currently only works for a single page.
+	 */
+	ASSERT(poff(offset) == 0);
+	ASSERT(count == NBPP);
+	ip = XFS_VTOI(vp);
+	mp = ip->i_mount;
+	offset_fsb = xfs_b_to_fsbt(mp, offset);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	isize = ip->i_d.di_size;
+	if (offset >= isize) {
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		return EINVAL;
+	}
+	if ((offset + count) > isize) {
+		count = isize - offset;
+	}
+	last_fsb = xfs_b_to_fsb(mp, offset + count);
+	count_fsb = (xfs_extlen_t)(last_fsb - offset_fsb);
+	orig_nimaps = NDPP;
+	(void) xfs_bmapi(NULL, ip, offset_fsb, count_fsb, 0, NULLFSBLOCK, 0,
+			 orig_imap, &orig_nimaps, NULL);
+	ASSERT(orig_nimaps > 0);
+
+	curr_off_fsb = offset_fsb;
+	while (count_fsb > 0) {
+		nimaps = XFS_BMAP_MAX_NMAP;
+		(void) xfs_bmapi(NULL, ip, curr_off_fsb,
+				 (xfs_extlen_t)(last_fsb - curr_off_fsb),
+				 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE,
+				 NULLFSBLOCK, 1, imap, &nimaps, NULL);
+		if (nimaps == 0) {
+			/*
+			 * If we didn't get anything back, we must be
+			 * out of space.  Break out of the loop and
+			 * back out whatever we've done so far.
+			 */
+			break;
+		}
+
+		/*
+		 * Count up the amount of space returned.
+		 */
+		for (i = 0; i < nimaps; i++) {
+			ASSERT(imap[i].br_startblock != HOLESTARTBLOCK);
+			count_fsb -= imap[i].br_blockcount;
+			ASSERT(count_fsb >= 0);
+			curr_off_fsb += imap[i].br_blockcount;
+			ASSERT(curr_off_fsb <= last_fsb);
+		}
+	}
+
+	if (count_fsb == 0) {
+		/*
+		 * We go it all, so get out of here.
+		 */
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		return 0;
+	}
+
+	/*
+	 * We didn't get it all, so back out anything new that we did
+	 * create.  What we do is unmap all of the holes in the original
+	 * map.  This will do at least one unnecessary unmap, but it's
+	 * much simpler than being exact and it still works fine since
+	 * we hold the inode lock all along.
+	 */
+	unmap_offset_fsb = offset_fsb;
+	imapp = &orig_imap[0];
+	last_imapp = &orig_imap[orig_nimaps - 1];
+	while (imapp <= last_imapp) {
+		if (unmap_offset_fsb != imapp->br_startoff) {
+			unmap_len_fsb = imapp->br_startoff -
+				        unmap_offset_fsb;
+			(void) xfs_bunmapi(NULL, ip, unmap_offset_fsb,
+					   unmap_len_fsb, 1, NULLFSBLOCK,
+					   NULL, NULL);
+		}
+		unmap_offset_fsb = imapp->br_startoff + imapp->br_blockcount;
+		if (imapp == last_imapp) {
+			if (unmap_offset_fsb < (offset_fsb + count_fsb)) {
+				/*
+				 * There is a hole after the last original
+				 * imap, so unmap it as well.
+				 */
+				unmap_len_fsb = (offset_fsb + count_fsb) -
+					        unmap_offset_fsb;
+				(void) xfs_bunmapi(NULL, ip,
+						   unmap_offset_fsb,
+						   unmap_len_fsb, 1,
+						   NULLFSBLOCK, NULL, NULL);
+			}
+		}
+		imapp++;
+	}
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	return ENOSPC;
 }
 
 
