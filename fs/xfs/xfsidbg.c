@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.50 $"
+#ident	"$Revision: 1.51 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
