@@ -1026,13 +1026,13 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 	iclog = XFS_BUF_FSPRIVATE(bp, xlog_in_core_t *);
 
 	if ((iclog->ic_state & XLOG_STATE_IOERROR) == 0) {
-#if !(defined(CONFIG_PAGE_BUF) || defined(CONFIG_PAGE_BUF_MODULE))
+#if defined(_USING_BUF_T)
 		struct bdevsw	*my_bdevsw;
 
 		my_bdevsw = bp->b_target->bdevsw;
 		ASSERT(my_bdevsw != NULL);
 		bdstrat(my_bdevsw, bp);
-#else
+#elif defined(_USING_PAGEBUF_T)
 		pagebuf_iostart(bp,0);
 #endif
 		return 0;

@@ -1502,7 +1502,7 @@ xfs_sb_relse(xfs_buf_t *bp)
 	ASSERT(valusema(&bp->b_lock) <= 0);
 	XFS_BUF_UNASYNC(bp);
 	XFS_BUF_UNREAD(bp);
-#if !(defined(CONFIG_PAGE_BUF) || defined(CONFIG_PAGE_BUF_MODULE))
+#if defined(_USING_BUF_T)
 	bp->av_forw = NULL;
 	bp->av_back = NULL;
 #endif

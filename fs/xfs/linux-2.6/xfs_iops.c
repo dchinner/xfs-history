@@ -761,7 +761,7 @@ struct inode_operations linvfs_file_inode_operations =
   linvfs_updatepage,  /*  updatepage  */
 #endif
   linvfs_revalidate
-#if defined(CONFIG_PAGE_BUF) || defined(CONFIG_PAGE_BUF_MODULE)
+#if defined(_USING_BUF_T)
   , linvfs_pb_bmap
 #endif
 };
