@@ -165,7 +165,7 @@ xfs_btree_check_key(
 
 		k1 = ak1;
 		k2 = ak2;
-		ASSERT(k1->ar_startblock < k2->ar_startblock);
+		ASSERT(INT_GET(k1->ar_startblock, ARCH_UNKNOWN) < INT_GET(k2->ar_startblock, ARCH_UNKNOWN));
 		break;
 	    }
 	case XFS_BTNUM_CNT: {
@@ -174,9 +174,9 @@ xfs_btree_check_key(
 
 		k1 = ak1;
 		k2 = ak2;
-		ASSERT(k1->ar_blockcount < k2->ar_blockcount ||
-		       (k1->ar_blockcount == k2->ar_blockcount &&
-			k1->ar_startblock < k2->ar_startblock));
+		ASSERT(INT_GET(k1->ar_blockcount, ARCH_UNKNOWN) < INT_GET(k2->ar_blockcount, ARCH_UNKNOWN) ||
+		       (INT_GET(k1->ar_blockcount, ARCH_UNKNOWN) == INT_GET(k2->ar_blockcount, ARCH_UNKNOWN) &&
+			INT_GET(k1->ar_startblock, ARCH_UNKNOWN) < INT_GET(k2->ar_startblock, ARCH_UNKNOWN)));
 		break;
 	    }
 	case XFS_BTNUM_BMAP: {
@@ -275,8 +275,8 @@ xfs_btree_check_rec(
 
 		r1 = ar1;
 		r2 = ar2;
-		ASSERT(r1->ar_startblock + r1->ar_blockcount <=
-		       r2->ar_startblock);
+		ASSERT(INT_GET(r1->ar_startblock, ARCH_UNKNOWN) + INT_GET(r1->ar_blockcount, ARCH_UNKNOWN) <=
+		       INT_GET(r2->ar_startblock, ARCH_UNKNOWN));
 		break;
 	    }
 	case XFS_BTNUM_CNT: {
@@ -285,9 +285,9 @@ xfs_btree_check_rec(
 		
 		r1 = ar1;
 		r2 = ar2;
-		ASSERT(r1->ar_blockcount < r2->ar_blockcount ||
-		       (r1->ar_blockcount == r2->ar_blockcount &&
-			r1->ar_startblock < r2->ar_startblock));
+		ASSERT(INT_GET(r1->ar_blockcount, ARCH_UNKNOWN) < INT_GET(r2->ar_blockcount, ARCH_UNKNOWN) ||
+		       (INT_GET(r1->ar_blockcount, ARCH_UNKNOWN) == INT_GET(r2->ar_blockcount, ARCH_UNKNOWN) &&
+			INT_GET(r1->ar_startblock, ARCH_UNKNOWN) < INT_GET(r2->ar_startblock, ARCH_UNKNOWN)));
 		break;
 	    }
 	case XFS_BTNUM_BMAP: {

@@ -3289,7 +3289,8 @@ xfs_bmap_extents_to_btree(
 	INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_BMAP_MAGIC);
 	INT_SET(block->bb_level, ARCH_UNKNOWN, 1);
 	INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
-	INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLDFSBNO);
+	INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLDFSBNO);
+        INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLDFSBNO);
 	/*
 	 * Need a cursor.  Can't allocate until bb_level is filled in.
 	 */
@@ -3348,7 +3349,8 @@ xfs_bmap_extents_to_btree(
 	INT_SET(ablock->bb_magic, ARCH_UNKNOWN, XFS_BMAP_MAGIC);
 	INT_ZERO(ablock->bb_level, ARCH_UNKNOWN);
 	INT_ZERO(ablock->bb_numrecs, ARCH_UNKNOWN);
-	INT_SET(ablock->bb_leftsib, ARCH_UNKNOWN, ablock->bb_rightsib = NULLDFSBNO);
+	INT_SET(ablock->bb_leftsib, ARCH_UNKNOWN, NULLDFSBNO);
+        INT_SET(ablock->bb_rightsib, ARCH_UNKNOWN, NULLDFSBNO);
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
 	for (ep = ifp->if_u1.if_extents, i = 0; i < nextents; i++, ep++) {

@@ -1462,7 +1462,8 @@ xfs_inobt_newroot(
 	INT_SET(new->bb_magic, ARCH_UNKNOWN, xfs_magics[cur->bc_btnum]);
 	INT_SET(new->bb_level, ARCH_UNKNOWN, (__uint16_t)cur->bc_nlevels);
 	INT_SET(new->bb_numrecs, ARCH_UNKNOWN, 2);
-	INT_SET(new->bb_leftsib, ARCH_UNKNOWN, new->bb_rightsib = NULLAGBLOCK);
+	INT_SET(new->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
+        INT_SET(new->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
 	xfs_inobt_log_block(args.tp, nbp, XFS_BB_ALL_BITS);
 	ASSERT(lbno != NULLAGBLOCK && rbno != NULLAGBLOCK);
 	/*

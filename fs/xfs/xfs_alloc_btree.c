@@ -283,15 +283,15 @@ xfs_alloc_delrec(
 		lpp = XFS_ALLOC_PTR_ADDR(block, 1, cur);
 #ifdef DEBUG
 		for (i = ptr; i < INT_GET(block->bb_numrecs, ARCH_UNKNOWN); i++) {
-			if (error = xfs_btree_check_sptr(cur, lpp[i], level))
+			if (error = xfs_btree_check_sptr(cur, INT_GET(lpp[i], ARCH_UNKNOWN), level))
 				return error;
 		}
 #endif
 		if (ptr < INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 			ovbcopy(&lkp[ptr], &lkp[ptr - 1],
-				(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr) * sizeof(*lkp));
+				(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr) * sizeof(*lkp)); /* INT_: mem copy */
 			ovbcopy(&lpp[ptr], &lpp[ptr - 1],
-				(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr) * sizeof(*lpp));
+				(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr) * sizeof(*lpp)); /* INT_: mem copy */
 			xfs_alloc_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - 1);
 			xfs_alloc_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - 1);
 		}
@@ -312,8 +312,8 @@ xfs_alloc_delrec(
 		 * structure to pass up to the next level (updkey).
 		 */
 		if (ptr == 1) {
-			key.ar_startblock = lrp->ar_startblock;
-			key.ar_blockcount = lrp->ar_blockcount;
+			INT_SET(key.ar_startblock, ARCH_UNKNOWN, INT_GET(lrp->ar_startblock, ARCH_UNKNOWN));
+			INT_SET(key.ar_blockcount, ARCH_UNKNOWN, INT_GET(lrp->ar_blockcount, ARCH_UNKNOWN));
 			lkp = &key;
 		}
 	}
@@ -342,7 +342,7 @@ xfs_alloc_delrec(
 		 */
 		if (INT_GET(block->bb_numrecs, ARCH_UNKNOWN)) {
 			rrp = XFS_ALLOC_REC_ADDR(block, INT_GET(block->bb_numrecs, ARCH_UNKNOWN), cur);
-			INT_SET(agf->agf_longest, arch, rrp->ar_blockcount);
+			INT_SET(agf->agf_longest, arch, INT_GET(rrp->ar_blockcount, ARCH_UNKNOWN));
 		}
 		/*
 		 * No free extents left.
@@ -370,7 +370,7 @@ xfs_alloc_delrec(
 			 * Make it the new root of the btree.
 			 */
 			bno = INT_GET(agf->agf_roots[cur->bc_btnum], arch);
-			INT_SET(agf->agf_roots[cur->bc_btnum], arch, *lpp);
+			INT_SET(agf->agf_roots[cur->bc_btnum], arch, INT_GET(*lpp, ARCH_UNKNOWN));
 			INT_MOD(agf->agf_levels[cur->bc_btnum], arch, -1);
 			mp->m_perag[INT_GET(agf->agf_seqno, arch)].pagf_levels[cur->bc_btnum]--;
 			/*
@@ -616,12 +616,12 @@ xfs_alloc_delrec(
 		rpp = XFS_ALLOC_PTR_ADDR(right, 1, cur);
 #ifdef DEBUG
 		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_UNKNOWN); i++) {
-			if (error = xfs_btree_check_sptr(cur, rpp[i], level))
+			if (error = xfs_btree_check_sptr(cur, INT_GET(rpp[i], ARCH_UNKNOWN), level))
 				return error;
 		}
 #endif
-		bcopy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*lkp));
-		bcopy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*lpp));
+		bcopy(rkp, lkp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*lkp)); /* INT_: structure copy */
+		bcopy(rpp, lpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*lpp)); /* INT_: structure copy */
 		xfs_alloc_log_keys(cur, lbp, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1,
 				   INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 		xfs_alloc_log_ptrs(cur, lbp, INT_GET(left->bb_numrecs, ARCH_UNKNOWN) + 1,
@@ -733,7 +733,7 @@ xfs_alloc_insrec(
 	xfs_alloc_rec_t		*rp;	/* pointer to btree records */
 	xfs_arch_t		arch;	/* on-disk architecture type */
 
-	ASSERT(recp->ar_blockcount > 0);
+	ASSERT(INT_GET(recp->ar_blockcount, ARCH_UNKNOWN) > 0);
 	/*
 	 * If we made it to the root level, allocate a new root block
 	 * and we're done.
@@ -749,8 +749,8 @@ xfs_alloc_insrec(
 	/*
 	 * Make a key out of the record data to be inserted, and save it.
 	 */
-	key.ar_startblock = recp->ar_startblock;
-	key.ar_blockcount = recp->ar_blockcount;
+	INT_SET(key.ar_startblock, ARCH_UNKNOWN, INT_GET(recp->ar_startblock, ARCH_UNKNOWN));
+	INT_SET(key.ar_blockcount, ARCH_UNKNOWN, INT_GET(recp->ar_blockcount, ARCH_UNKNOWN));
 	optr = ptr = cur->bc_ptrs[level];
 	/*
 	 * If we're off the left edge, return failure.
@@ -824,8 +824,8 @@ xfs_alloc_insrec(
 						return error;
 #endif
 					ptr = cur->bc_ptrs[level];
-					nrec.ar_startblock = nkey.ar_startblock;
-					nrec.ar_blockcount = nkey.ar_blockcount;
+					INT_SET(nrec.ar_startblock, ARCH_UNKNOWN, INT_GET(nkey.ar_startblock, ARCH_UNKNOWN));
+					INT_SET(nrec.ar_blockcount, ARCH_UNKNOWN, INT_GET(nkey.ar_blockcount, ARCH_UNKNOWN));
 				}
 				/*
 				 * Otherwise the insert fails.
@@ -850,14 +850,14 @@ xfs_alloc_insrec(
 		pp = XFS_ALLOC_PTR_ADDR(block, 1, cur);
 #ifdef DEBUG
 		for (i = INT_GET(block->bb_numrecs, ARCH_UNKNOWN); i >= ptr; i--) {
-			if (error = xfs_btree_check_sptr(cur, pp[i - 1], level))
+			if (error = xfs_btree_check_sptr(cur, INT_GET(pp[i - 1], ARCH_UNKNOWN), level))
 				return error;
 		}
 #endif
 		ovbcopy(&kp[ptr - 1], &kp[ptr],
-			(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr + 1) * sizeof(*kp));
+			(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr + 1) * sizeof(*kp)); /* INT_: copy */
 		ovbcopy(&pp[ptr - 1], &pp[ptr],
-			(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr + 1) * sizeof(*pp));
+			(INT_GET(block->bb_numrecs, ARCH_UNKNOWN) - ptr + 1) * sizeof(*pp)); /* INT_: copy */
 #ifdef DEBUG
 		if (error = xfs_btree_check_sptr(cur, *bnop, level))
 			return error;
@@ -866,7 +866,7 @@ xfs_alloc_insrec(
 		 * Now stuff the new data in, bump numrecs and log the new data.
 		 */
 		kp[ptr - 1] = key;
-		pp[ptr - 1] = *bnop;
+		INT_SET(pp[ptr - 1], ARCH_UNKNOWN, *bnop);
 		INT_MOD(block->bb_numrecs, ARCH_UNKNOWN, +1);
 		xfs_alloc_log_keys(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN));
 		xfs_alloc_log_ptrs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN));
@@ -886,7 +886,7 @@ xfs_alloc_insrec(
 		 * Now stuff the new record in, bump numrecs
 		 * and log the new data.
 		 */
-		rp[ptr - 1] = *recp;
+		rp[ptr - 1] = *recp; /* INT_: struct copy */
 		INT_MOD(block->bb_numrecs, ARCH_UNKNOWN, +1);
 		xfs_alloc_log_recs(cur, bp, ptr, INT_GET(block->bb_numrecs, ARCH_UNKNOWN));
 #ifdef DEBUG
@@ -913,15 +913,15 @@ xfs_alloc_insrec(
 	if (level == 0 &&
 	    cur->bc_btnum == XFS_BTNUM_CNT &&
 	    INT_GET(block->bb_rightsib, ARCH_UNKNOWN) == NULLAGBLOCK &&
-	    recp->ar_blockcount > INT_GET(agf->agf_longest, arch)) {
+	    INT_GET(recp->ar_blockcount, ARCH_UNKNOWN) > INT_GET(agf->agf_longest, arch)) {
 		/*
 		 * If this is a leaf in the by-size btree and there
 		 * is no right sibling block and this block is bigger
 		 * than the previous longest block, update it.
 		 */
-		INT_SET(agf->agf_longest, arch, recp->ar_blockcount);
+		INT_SET(agf->agf_longest, arch, INT_GET(recp->ar_blockcount, ARCH_UNKNOWN));
 		cur->bc_mp->m_perag[INT_GET(agf->agf_seqno, arch)].pagf_longest
-			= recp->ar_blockcount;
+			= INT_GET(recp->ar_blockcount, ARCH_UNKNOWN);
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_LONGEST);
 	}
@@ -931,8 +931,8 @@ xfs_alloc_insrec(
 	 */
 	*bnop = nbno;
 	if (nbno != NULLAGBLOCK) {
-		*recp = nrec;
-		*curp = ncur;
+		*recp = nrec; /* INT_: struct copy */
+		*curp = ncur; /* INT_: struct copy */
 	}
 	*stat = 1;
 	return 0;
@@ -1012,7 +1012,7 @@ xfs_alloc_log_ptrs(
 STATIC void
 xfs_alloc_log_recs(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_buf_t			*bp,	/* buffer containing btree block */
+	xfs_buf_t		*bp,	/* buffer containing btree block */
 	int			rfirst,	/* index of first record to log */
 	int			rlast)	/* index of last record to log */
 {
@@ -1020,7 +1020,9 @@ xfs_alloc_log_recs(
 	int			first;	/* first byte offset logged */
 	int			last;	/* last byte offset logged */
 	xfs_alloc_rec_t		*rp;	/* record pointer for btree block */
+	xfs_arch_t		arch;	/* on-disk architecture type */
 
+	arch = ARCH_GET(cur->bc_mp->m_arch);
 	block = XFS_BUF_TO_ALLOC_BLOCK(bp);
 	rp = XFS_ALLOC_REC_ADDR(block, 1, cur);
 #ifdef DEBUG
@@ -1030,8 +1032,8 @@ xfs_alloc_log_recs(
 
 		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
 		for (p = &rp[rfirst - 1]; p <= &rp[rlast - 1]; p++)
-			ASSERT(p->ar_startblock + p->ar_blockcount <=
-			       INT_GET(agf->agf_length, cur->bc_mp->m_arch));
+			ASSERT(INT_GET(p->ar_startblock, arch) + INT_GET(p->ar_blockcount, arch) <=
+			       INT_GET(agf->agf_length, arch));
 	}
 #endif
 	first = (int)((caddr_t)&rp[rfirst - 1] - (caddr_t)block);
@@ -1166,14 +1168,14 @@ xfs_alloc_lookup(
 					xfs_alloc_key_t	*kkp;
 
 					kkp = kkbase + keyno - 1;
-					startblock = kkp->ar_startblock;
-					blockcount = kkp->ar_blockcount;
+					startblock = INT_GET(kkp->ar_startblock, ARCH_UNKNOWN);
+					blockcount = INT_GET(kkp->ar_blockcount, ARCH_UNKNOWN);
 				} else {
 					xfs_alloc_rec_t	*krp;
 
 					krp = krbase + keyno - 1;
-					startblock = krp->ar_startblock;
-					blockcount = krp->ar_blockcount;
+					startblock = INT_GET(krp->ar_startblock, ARCH_UNKNOWN);
+					blockcount = INT_GET(krp->ar_blockcount, ARCH_UNKNOWN);
 				}
 				/*
 				 * Compute difference to get next direction.
@@ -1213,7 +1215,7 @@ xfs_alloc_lookup(
 			 */
 			if (diff > 0 && --keyno < 1)
 				keyno = 1;
-			agbno = *XFS_ALLOC_PTR_ADDR(block, keyno, cur);
+			agbno = INT_GET(*XFS_ALLOC_PTR_ADDR(block, keyno, cur), ARCH_UNKNOWN);
 #ifdef DEBUG
 			if (error = xfs_btree_check_sptr(cur, agbno, level))
 				return error;
@@ -1337,10 +1339,10 @@ xfs_alloc_lshift(
 		lpp = XFS_ALLOC_PTR_ADDR(left, nrec, cur);
 		rpp = XFS_ALLOC_PTR_ADDR(right, 1, cur);
 #ifdef DEBUG
-		if (error = xfs_btree_check_sptr(cur, *rpp, level))
+		if (error = xfs_btree_check_sptr(cur, INT_GET(*rpp, ARCH_UNKNOWN), level))
 			return error;
 #endif
-		*lpp = *rpp;
+		*lpp = *rpp; /* INT_: copy */
 		xfs_alloc_log_ptrs(cur, lbp, nrec, nrec);
 		xfs_btree_check_key(cur->bc_btnum, lkp - 1, lkp);
 	}
@@ -1369,7 +1371,7 @@ xfs_alloc_lshift(
 	if (level > 0) {
 #ifdef DEBUG
 		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_UNKNOWN); i++) {
-			if (error = xfs_btree_check_sptr(cur, rpp[i + 1],
+			if (error = xfs_btree_check_sptr(cur, INT_GET(rpp[i + 1], ARCH_UNKNOWN),
 					level))
 				return error;
 		}
@@ -1381,8 +1383,8 @@ xfs_alloc_lshift(
 	} else {
 		ovbcopy(rrp + 1, rrp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
 		xfs_alloc_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
-		key.ar_startblock = rrp->ar_startblock;
-		key.ar_blockcount = rrp->ar_blockcount;
+		INT_SET(key.ar_startblock, ARCH_UNKNOWN, INT_GET(rrp->ar_startblock, ARCH_UNKNOWN));
+		INT_SET(key.ar_blockcount, ARCH_UNKNOWN, INT_GET(rrp->ar_blockcount, ARCH_UNKNOWN));
 		rkp = &key;
 	}
 	/*
@@ -1506,7 +1508,8 @@ xfs_alloc_newroot(
 	INT_SET(new->bb_magic, ARCH_UNKNOWN, xfs_magics[cur->bc_btnum]);
 	INT_SET(new->bb_level, ARCH_UNKNOWN, (__uint16_t)cur->bc_nlevels);
 	INT_SET(new->bb_numrecs, ARCH_UNKNOWN, 2);
-	INT_SET(new->bb_leftsib, ARCH_UNKNOWN, new->bb_rightsib = NULLAGBLOCK);
+	INT_SET(new->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
+        INT_SET(new->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
 	xfs_alloc_log_block(cur->bc_tp, nbp, XFS_BB_ALL_BITS);
 	ASSERT(lbno != NULLAGBLOCK && rbno != NULLAGBLOCK);
 	/*
@@ -1517,17 +1520,17 @@ xfs_alloc_newroot(
 
 		kp = XFS_ALLOC_KEY_ADDR(new, 1, cur);
 		if (INT_GET(left->bb_level, ARCH_UNKNOWN) > 0) {
-			kp[0] = *XFS_ALLOC_KEY_ADDR(left, 1, cur);
-			kp[1] = *XFS_ALLOC_KEY_ADDR(right, 1, cur);
+			kp[0] = *XFS_ALLOC_KEY_ADDR(left, 1, cur); /* INT_: structure copy */
+			kp[1] = *XFS_ALLOC_KEY_ADDR(right, 1, cur);/* INT_: structure copy */
 		} else {
 			xfs_alloc_rec_t	*rp;	/* btree record pointer */
 
 			rp = XFS_ALLOC_REC_ADDR(left, 1, cur);
-			kp[0].ar_startblock = rp->ar_startblock;
-			kp[0].ar_blockcount = rp->ar_blockcount;
+			INT_SET(kp[0].ar_startblock, ARCH_UNKNOWN, INT_GET(rp->ar_startblock, ARCH_UNKNOWN));
+			INT_SET(kp[0].ar_blockcount, ARCH_UNKNOWN, INT_GET(rp->ar_blockcount, ARCH_UNKNOWN));
 			rp = XFS_ALLOC_REC_ADDR(right, 1, cur);
-			kp[1].ar_startblock = rp->ar_startblock;
-			kp[1].ar_blockcount = rp->ar_blockcount;
+			INT_SET(kp[1].ar_startblock, ARCH_UNKNOWN, INT_GET(rp->ar_startblock, ARCH_UNKNOWN));
+			INT_SET(kp[1].ar_blockcount, ARCH_UNKNOWN, INT_GET(rp->ar_blockcount, ARCH_UNKNOWN));
 		}
 	}
 	xfs_alloc_log_keys(cur, nbp, 1, 2);
@@ -1538,8 +1541,8 @@ xfs_alloc_newroot(
 		xfs_alloc_ptr_t		*pp;	/* btree address pointer */
 
 		pp = XFS_ALLOC_PTR_ADDR(new, 1, cur);
-		pp[0] = lbno;
-		pp[1] = rbno;
+		INT_SET(pp[0], ARCH_UNKNOWN, lbno);
+		INT_SET(pp[1], ARCH_UNKNOWN, rbno);
 	}
 	xfs_alloc_log_ptrs(cur, nbp, 1, 2);
 	/*
@@ -1628,18 +1631,18 @@ xfs_alloc_rshift(
 		rpp = XFS_ALLOC_PTR_ADDR(right, 1, cur);
 #ifdef DEBUG
 		for (i = INT_GET(right->bb_numrecs, ARCH_UNKNOWN) - 1; i >= 0; i--) {
-			if (error = xfs_btree_check_sptr(cur, rpp[i], level))
+			if (error = xfs_btree_check_sptr(cur, INT_GET(rpp[i], ARCH_UNKNOWN), level))
 				return error;
 		}
 #endif
 		ovbcopy(rkp, rkp + 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rkp));
 		ovbcopy(rpp, rpp + 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rpp));
 #ifdef DEBUG
-		if (error = xfs_btree_check_sptr(cur, *lpp, level))
+		if (error = xfs_btree_check_sptr(cur, INT_GET(*lpp, ARCH_UNKNOWN), level))
 			return error;
 #endif
-		*rkp = *lkp;
-		*rpp = *lpp;
+		*rkp = *lkp; /* INT_: copy */
+		*rpp = *lpp; /* INT_: copy */
 		xfs_alloc_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1);
 		xfs_alloc_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1);
 		xfs_btree_check_key(cur->bc_btnum, rkp, rkp + 1);
@@ -1652,8 +1655,8 @@ xfs_alloc_rshift(
 		ovbcopy(rrp, rrp + 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
 		*rrp = *lrp;
 		xfs_alloc_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) + 1);
-		key.ar_startblock = rrp->ar_startblock;
-		key.ar_blockcount = rrp->ar_blockcount;
+		INT_SET(key.ar_startblock, ARCH_UNKNOWN, INT_GET(rrp->ar_startblock, ARCH_UNKNOWN));
+		INT_SET(key.ar_blockcount, ARCH_UNKNOWN, INT_GET(rrp->ar_blockcount, ARCH_UNKNOWN));
 		rkp = &key;
 		xfs_btree_check_rec(cur->bc_btnum, rrp, rrp + 1);
 	}
@@ -1761,12 +1764,12 @@ xfs_alloc_split(
 		rpp = XFS_ALLOC_PTR_ADDR(right, 1, cur);
 #ifdef DEBUG
 		for (i = 0; i < INT_GET(right->bb_numrecs, ARCH_UNKNOWN); i++) {
-			if (error = xfs_btree_check_sptr(cur, lpp[i], level))
+			if (error = xfs_btree_check_sptr(cur, INT_GET(lpp[i], ARCH_UNKNOWN), level))
 				return error;
 		}
 #endif
-		bcopy(lkp, rkp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rkp));
-		bcopy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rpp));
+		bcopy(lkp, rkp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rkp)); /* INT_: copy */
+		bcopy(lpp, rpp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rpp));/* INT_: copy */
 		xfs_alloc_log_keys(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 		xfs_alloc_log_ptrs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
 		*keyp = *rkp;
@@ -1782,8 +1785,8 @@ xfs_alloc_split(
 		rrp = XFS_ALLOC_REC_ADDR(right, 1, cur);
 		bcopy(lrp, rrp, INT_GET(right->bb_numrecs, ARCH_UNKNOWN) * sizeof(*rrp));
 		xfs_alloc_log_recs(cur, rbp, 1, INT_GET(right->bb_numrecs, ARCH_UNKNOWN));
-		keyp->ar_startblock = rrp->ar_startblock;
-		keyp->ar_blockcount = rrp->ar_blockcount;
+		INT_SET(keyp->ar_startblock, ARCH_UNKNOWN, INT_GET(rrp->ar_startblock, ARCH_UNKNOWN));
+		INT_SET(keyp->ar_blockcount, ARCH_UNKNOWN, INT_GET(rrp->ar_blockcount, ARCH_UNKNOWN));
 	}
 	/*
 	 * Find the left block number by looking in the buffer.
@@ -1948,7 +1951,7 @@ xfs_alloc_decrement(
 		xfs_agblock_t	agbno;	/* block number of btree block */
 		xfs_buf_t		*bp;	/* buffer pointer for block */
 
-		agbno = *XFS_ALLOC_PTR_ADDR(block, cur->bc_ptrs[lev], cur);
+		agbno = INT_GET(*XFS_ALLOC_PTR_ADDR(block, cur->bc_ptrs[lev], cur), ARCH_UNKNOWN);
 		if (error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
 				cur->bc_private.a.agno, agbno, 0, &bp,
 				XFS_ALLOC_BTREE_REF))
@@ -2036,8 +2039,8 @@ xfs_alloc_get_rec(
 		xfs_alloc_rec_t		*rec;	/* record data */
 
 		rec = XFS_ALLOC_REC_ADDR(block, ptr, cur);
-		*bno = rec->ar_startblock;
-		*len = rec->ar_blockcount;
+		*bno = INT_GET(rec->ar_startblock, ARCH_UNKNOWN);
+		*len = INT_GET(rec->ar_blockcount, ARCH_UNKNOWN);
 	}
 	*stat = 1;
 	return 0;
@@ -2118,7 +2121,7 @@ xfs_alloc_increment(
 	     lev > level; ) {
 		xfs_agblock_t	agbno;	/* block number of btree block */
 
-		agbno = *XFS_ALLOC_PTR_ADDR(block, cur->bc_ptrs[lev], cur);
+		agbno = INT_GET(*XFS_ALLOC_PTR_ADDR(block, cur->bc_ptrs[lev], cur), ARCH_UNKNOWN);
 		if (error = xfs_btree_read_bufs(cur->bc_mp, cur->bc_tp,
 				cur->bc_private.a.agno, agbno, 0, &bp,
 				XFS_ALLOC_BTREE_REF))
@@ -2153,7 +2156,8 @@ xfs_alloc_insert(
 
 	level = 0;
 	nbno = NULLAGBLOCK;
-	nrec = cur->bc_rec.a;
+	INT_SET(nrec.ar_startblock, ARCH_UNKNOWN, cur->bc_rec.a.ar_startblock);
+	INT_SET(nrec.ar_blockcount, ARCH_UNKNOWN, cur->bc_rec.a.ar_blockcount);
 	ncur = (xfs_btree_cur_t *)0;
 	pcur = cur;
 	/*
@@ -2274,8 +2278,8 @@ xfs_alloc_update(
 		/*
 		 * Fill in the new contents and log them.
 		 */
-		rp->ar_startblock = bno;
-		rp->ar_blockcount = len;
+		INT_SET(rp->ar_startblock, ARCH_UNKNOWN, bno);
+		INT_SET(rp->ar_blockcount, ARCH_UNKNOWN, len);
 		xfs_alloc_log_recs(cur, cur->bc_bufs[0], ptr, ptr);
 	}
 	/*
@@ -2302,8 +2306,8 @@ xfs_alloc_update(
 	if (ptr == 1) {
 		xfs_alloc_key_t	key;	/* key containing [bno, len] */
 
-		key.ar_startblock = bno;
-		key.ar_blockcount = len;
+		INT_SET(key.ar_startblock, ARCH_UNKNOWN, bno);
+		INT_SET(key.ar_blockcount, ARCH_UNKNOWN, len);
 		if (error = xfs_alloc_updkey(cur, &key, 1))
 			return error;
 	}

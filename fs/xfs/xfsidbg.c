@@ -1578,7 +1578,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 
 			r = XFS_BTREE_REC_ADDR(bsz, xfs_alloc, bt, i, 0);
 			printk("rec %d startblock 0x%x blockcount %d\n",
-				i, r->ar_startblock, r->ar_blockcount);
+				i, INT_GET(r->ar_startblock, ARCH_UNKNOWN), INT_GET(r->ar_blockcount, ARCH_UNKNOWN));
 		}
 	} else {
 		int mxr;
@@ -1591,7 +1591,7 @@ xfs_btalloc(xfs_alloc_block_t *bt, int bsz)
 			k = XFS_BTREE_KEY_ADDR(bsz, xfs_alloc, bt, i, mxr);
 			p = XFS_BTREE_PTR_ADDR(bsz, xfs_alloc, bt, i, mxr);
 			printk("key %d startblock 0x%x blockcount %d ptr 0x%x\n",
-				i, k->ar_startblock, k->ar_blockcount, *p);
+				i, INT_GET(k->ar_startblock, ARCH_UNKNOWN), INT_GET(k->ar_blockcount, ARCH_UNKNOWN), *p);
 		}
 	}
 }

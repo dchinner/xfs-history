@@ -260,11 +260,12 @@ xfs_growfs_data(
 		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_ABTB_MAGIC);
 		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
 		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
-		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLAGBLOCK);
+		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
+                INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
-		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
-		arec->ar_blockcount = agsize - arec->ar_startblock;
+		INT_SET(arec->ar_startblock, ARCH_UNKNOWN, XFS_PREALLOC_BLOCKS(mp));
+		INT_SET(arec->ar_blockcount, ARCH_UNKNOWN, agsize - INT_GET(arec->ar_startblock, ARCH_UNKNOWN));
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -280,12 +281,13 @@ xfs_growfs_data(
 		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_ABTC_MAGIC);
 		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
 		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 1);
-		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLAGBLOCK);
+		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
+                INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
 		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
 			mp->m_alloc_mxr[0]);
-		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
-		arec->ar_blockcount = agsize - arec->ar_startblock;
-		nfree += arec->ar_blockcount;
+		INT_SET(arec->ar_startblock, ARCH_UNKNOWN, XFS_PREALLOC_BLOCKS(mp));
+		INT_SET(arec->ar_blockcount, ARCH_UNKNOWN, agsize - INT_GET(arec->ar_startblock, ARCH_UNKNOWN));
+		nfree += INT_GET(arec->ar_blockcount, ARCH_UNKNOWN);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
@@ -301,7 +303,8 @@ xfs_growfs_data(
 		INT_SET(block->bb_magic, ARCH_UNKNOWN, XFS_IBT_MAGIC);
 		INT_SET(block->bb_level, ARCH_UNKNOWN, 0);
 		INT_SET(block->bb_numrecs, ARCH_UNKNOWN, 0);
-		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, block->bb_rightsib = NULLAGBLOCK);
+		INT_SET(block->bb_leftsib, ARCH_UNKNOWN, NULLAGBLOCK);
+                INT_SET(block->bb_rightsib, ARCH_UNKNOWN, NULLAGBLOCK);
 		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
