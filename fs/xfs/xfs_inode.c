@@ -24,8 +24,8 @@
 #include "xfs_imap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
-#include "xfs_inode.h"
 #include "xfs_inode_item.h"
+#include "xfs_inode.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -140,6 +140,9 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			 * iu_data to point at the data.
 			 */
 			size = (int) ip->i_d.di_size;
+			if (size == 0) {
+				return;
+			}
 			if (size <= sizeof(ip->i_u2.iu_inline_data)) {
 				ip->i_bytes = sizeof(ip->i_u2.iu_inline_data);
 				ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
@@ -149,7 +152,6 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 				ip->i_bytes = size;
 			}
 			bcopy(dip->di_u.di_c, ip->i_u1.iu_data, size);
-			ip->i_flags |= XFS_IINLINE;
 			return;
 
 		case XFS_DINODE_FMT_EXTENTS:
@@ -164,6 +166,10 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			 */
 			nex = (int)dip->di_core.di_nextents;
 			size = nex * (int)sizeof(xfs_bmbt_rec_t);
+			if (nex == 0) {
+				ip->i_flags & XFS_IEXTENTS;
+				return;
+			}
 			if (nex <= XFS_INLINE_EXTS) {
 				ip->i_bytes = sizeof(ip->i_u2.iu_inline_ext);
 				ip->i_u1.iu_extents = ip->i_u2.iu_inline_ext;
@@ -173,7 +179,7 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 				ip->i_bytes = size;
 			}
 			bcopy(&(dip->di_u.di_bmx), ip->i_u1.iu_extents, size); 
-			ip->i_flags |= XFS_IEXTENTS;
+			ip->i_flags & XFS_IEXTENTS;
 			return;
 
 		case XFS_DINODE_FMT_BTREE:
@@ -187,6 +193,7 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			 */
 			size = XFS_BMAP_BROOT_SPACE(&(dip->di_u.di_bmbt));
 			nrecs = XFS_BMAP_BROOT_NUMRECS(&(dip->di_u.di_bmbt));
+			ASSERT(nrecs > 0);
 			ip->i_broot_bytes = size;
 			ip->i_broot = kmem_alloc(size, KM_SLEEP);
 			dinode_size = mp->m_sb.sb_inodesize;
@@ -392,9 +399,7 @@ xfs_ialloc(xfs_trans_t	*tp,
 	/*
 	 * Log the new values stuffed into the inode.
 	 */
-#ifdef NOTYET
-	xfs_trans_log_inode(tp, ip, flags, 0, 0);
-#endif
+	xfs_trans_log_inode(tp, ip, flags);
 	return ip;
 }
 
@@ -533,11 +538,18 @@ xfs_iext_realloc(xfs_inode_t *ip, int ext_diff)
 
 	byte_diff = ext_diff * (int)sizeof(xfs_bmbt_rec_t);
 	new_size = (int)ip->i_bytes + byte_diff;
-	/*
-	 * If the valid extents can fit in iu_inline_ext,
-	 * copy them from the malloc'd vector and free it.
-	 */
-	if (new_size <= sizeof(ip->i_u2.iu_inline_ext)) {
+	ASSERT(new_size >= 0);
+
+	if (new_size == 0) {
+		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
+			kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
+		}
+		ip->i_u1.iu_extents = NULL;
+	} else if (new_size <= sizeof(ip->i_u2.iu_inline_ext)) {
+		/*
+		 * If the valid extents can fit in iu_inline_ext,
+		 * copy them from the malloc'd vector and free it.
+		 */
 		if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
 			bcopy(ip->i_u1.iu_extents, ip->i_u2.iu_inline_ext,
 			      new_size);
@@ -585,11 +597,17 @@ xfs_idata_realloc(xfs_inode_t *ip, int byte_diff)
 
 	new_size = (int)ip->i_bytes + byte_diff;
 	ASSERT(new_size >= 0);
-	/*
-	 * If the valid extents/data can fit in iu_inline_ext/data,
-	 * copy them from the malloc'd vector and free it.
-	 */
-	if (new_size <= sizeof(ip->i_u2.iu_inline_data)) {
+
+	if (new_size == 0) {
+		if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+			kmem_free(ip->i_u1.iu_data, ip->i_bytes);
+		}
+		ip->i_u1.iu_data = NULL;
+	} else if (new_size <= sizeof(ip->i_u2.iu_inline_data)) {
+		/*
+		 * If the valid extents/data can fit in iu_inline_ext/data,
+		 * copy them from the malloc'd vector and free it.
+		 */
 		if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
 			bcopy(ip->i_u1.iu_data, ip->i_u2.iu_inline_data,
 			      new_size);
@@ -651,18 +669,25 @@ xfs_idestroy(xfs_inode_t *ip)
 	case IFREG:
 	case IFDIR:
 	case IFLNK:
-		if (ip->i_flags & XFS_IBROOT) {
-			ASSERT(ip->i_broot != NULL);
+		if (ip->i_broot != NULL) {
 			kmem_free(ip->i_broot, ip->i_broot_bytes);
 		}
-		if (ip->i_flags & XFS_IEXTENTS) {
-			if (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext) {
-				kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
-			}
-		} else if (ip->i_flags & XFS_IINLINE) {
-			if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+
+		/*
+		 * If the format is local, then we can't have an extents
+		 * array so just look for an inline data array.  If we're
+		 * not local then we may or may not have an extents list,
+		 * so check and free it up if we do.
+		 */
+		if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
+			if ((ip->i_u1.iu_data != ip->i_u2.iu_inline_data) && 
+			    (ip->i_u1.iu_data != NULL)) {
 				kmem_free(ip->i_u1.iu_data, ip->i_bytes);
 			}
+		} else if ((ip->i_flags & XFS_IEXTENTS) &&
+			   (ip->i_u1.iu_extents != NULL) &&
+			   (ip->i_u1.iu_extents != ip->i_u2.iu_inline_ext)) {
+			kmem_free(ip->i_u1.iu_extents, ip->i_bytes);
 		}
 		break;
 	}
@@ -672,4 +697,21 @@ xfs_idestroy(xfs_inode_t *ip)
 #else
 	kmem_free(ip, sizeof(xfs_inode_t));
 #endif
+}
+
+
+void
+xfs_ipin(xfs_inode_t *ip)
+{
+	return;
+}
+void
+xfs_iunpin(xfs_inode_t *ip)
+{
+	return;
+}
+void
+xfs_iflush(xfs_inode_t *ip)
+{
+	return;
 }
