@@ -936,6 +936,9 @@ xfs_inactive(vnode_t	*vp,
 	xfs_mount_t	*mp;
 	int		truncate;
 	int		status;
+	int		done;
+	xfs_fsblock_t	first_block;
+	xfs_bmap_free_t	free_list;
 
 	ip = XFS_VTOI(vp);
 	/*
@@ -964,9 +967,7 @@ xfs_inactive(vnode_t	*vp,
 			status = xfs_trans_reserve(tp, 0,
 						  XFS_ITRUNCATE_LOG_RES(mp),
 						  0, XFS_TRANS_PERM_LOG_RES);
-			if (status != 0) {
-				ASSERT(0);
-			}
+			ASSERT(status == 0);
 
 			xfs_trans_ijoin(tp, ip,
 					XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
@@ -979,14 +980,45 @@ xfs_inactive(vnode_t	*vp,
 			 * Since we used up the first transaction, allocate
 			 * a new one to free the inode with.
 			 */
-			tp = xfs_trans_alloc(ip->i_mount, 0);
+			tp = xfs_trans_alloc(mp, 0);
+		} else if (((ip->i_d.di_mode & IFMT) == IFLNK) &&
+			   (ip->i_d.di_size > XFS_LITINO(mp))) {
+			/*
+			 * We're freeing a symlink that has some blocks
+			 * allocated to it.  Free the blocks here.  We
+			 * know that we've got either 1 or 2 extents and
+			 * that we can free them all in one bunmapi call.
+			 */
+			ASSERT((ip->i_d.di_nextents > 0) &&
+			       (ip->i_d.di_nextents <= 2));
+			status = xfs_trans_reserve(tp, 0,
+						   XFS_ITRUNCATE_LOG_RES(mp),
+						   0, 0);
+			ASSERT(status == 0);
+
+			xfs_trans_ijoin(tp, ip,
+					XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+			xfs_trans_ihold(tp, ip);
+
+			done = 0;
+			XFS_BMAP_INIT(&free_list, &first_block);
+			first_block = xfs_bunmapi(tp, ip, 0, 2, 2,
+						  first_block, &free_list,
+						  &done);
+			ASSERT(done);
+			(void) xfs_bmap_finish(&tp, &free_list,
+					       first_block, 0);
+			xfs_trans_commit(tp, 0);
+			/*
+			 * Since we used up the first transaction, allocate
+			 * a new one to free the inode with.
+			 */
+			tp = xfs_trans_alloc(mp, 0);
 		}
 
 		status = xfs_trans_reserve(tp, 0, XFS_IFREE_LOG_RES(mp),
 					   0, 0);
-		if (status != 0) {
-			ASSERT(0);
-		}
+		ASSERT(status == 0);
 
 		/*
 		 * Free the inode and clean up the iunlink item that
@@ -2435,7 +2467,7 @@ start_over:
 
 
 		if (src_dp != target_dp) {
-			/*
+		/*
 			 * Check whether the rename would orphan the tree
 			 * rooted at src_ip by moving it under itself.
 			 *
