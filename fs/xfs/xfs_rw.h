@@ -154,8 +154,7 @@ xfs_inval_cached_pages(
 	struct vnode		*vp,
 	struct xfs_iocore	*io,
 	xfs_off_t		offset,
-	xfs_off_t		len,
-	void			*dio,
+	int			write,
 	int			relock);
 
 void

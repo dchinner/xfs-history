@@ -41,16 +41,13 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/stddef.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
 #include <linux/pagemap.h>
-#include <linux/init.h>
 #include <linux/locks.h>
-#include <linux/swap.h>
 
 #include "page_buf_internal.h"
 
@@ -62,68 +59,6 @@
  */
 STATIC int  pagebuf_delalloc_convert(
 		struct inode *, struct page *, pagebuf_bmap_fn_t, int, int);
-
-/*
- *	pagebuf_iozero
- *
- *	pagebuf_iozero clears the specified range of buffer supplied,
- *	and marks all the affected blocks as valid and modified.  If
- *	an affected block is not allocated, it will be allocated.  If
- *	an affected block is not completely overwritten, and is not
- *	valid before the operation, it will be read from disk before
- *	being partially zeroed. 
- */
-int
-pagebuf_iozero(
-	struct inode		*ip,	/* inode owning buffer		*/
-	page_buf_t		*pb,	/* buffer to zero               */
-	off_t			boff,	/* offset in buffer             */
-	size_t			bsize,	/* size of data to zero         */
-	loff_t			end_size)	/* max file size to set	*/
-{
-	loff_t			cboff, pos;
-	size_t			cpoff, csize;
-	struct page		*page;
-	struct address_space	*mapping;
-	char			*kaddr;
-
-	cboff = boff;
-	boff += bsize; /* last */
-
-	/* check range */
-	if (boff > pb->pb_buffer_length)
-		return (-ENOENT);
-
-	while (cboff < boff) {
-		if (pagebuf_segment(pb, &cboff, &page, &cpoff, &csize, 0)) {
-			return (-ENOMEM);
-		}
-		assert(((csize + cpoff) <= PAGE_CACHE_SIZE));
-		lock_page(page);
-
-		mapping = page->mapping;
-
-		kaddr = kmap(page);
-		mapping->a_ops->prepare_write(NULL, page, cpoff, cpoff+csize);
-
-		memset((void *) (kaddr + cpoff), 0, csize);
-		flush_dcache_page(page);
-		mapping->a_ops->commit_write(NULL, page, cpoff, cpoff+csize);
-		pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) +
-			cpoff + csize;
-		if (pos > ip->i_size)
-			ip->i_size = pos < end_size ? pos : end_size;
-
-		kunmap(page);
-		UnlockPage(page);
-	}
-
-	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
-	pb->pb_flags &= ~(PBF_PARTIAL | PBF_NONE);
-
-	return (0);
-}
-
 
 /* 
  *	Reading and writing files

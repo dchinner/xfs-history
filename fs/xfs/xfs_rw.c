@@ -365,12 +365,9 @@ xfs_inval_cached_pages(
 	vnode_t		*vp,
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,
-	xfs_off_t	len,
-	void		*dio,
+	int		write,
 	int		relock)
 {
-	xfs_dio_t	*diop = (xfs_dio_t *)dio;
-	__uint64_t	flush_end;
 	xfs_mount_t	*mp;
 
 	if (!VN_CACHED(vp)) {
@@ -389,7 +386,7 @@ xfs_inval_cached_pages(
 	}
 
 	/* Writing beyond EOF creates a hole that must be zeroed */
-	if (diop && (offset > XFS_SIZE(mp, io))) {
+	if (write && (offset > XFS_SIZE(mp, io))) {
 		xfs_fsize_t	isize;
 
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
@@ -400,23 +397,6 @@ xfs_inval_cached_pages(
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 	}
 
-	/*
-	 * Round up to the next page boundary and then back
-	 * off by one byte.  We back off by one because this
-	 * is a first byte/last byte interface rather than
-	 * a start/len interface.  We round up to a page
-	 * boundary because the page/chunk cache code is
-	 * slightly broken and won't invalidate all the right
-	 * buffers otherwise.
-	 *
-	 * We also have to watch out for overflow, so if we
-	 * go over the maximum off_t value we just pull back
-	 * to that max.
-	 */
-	flush_end = (__uint64_t)ctooff(offtoc(offset + len)) - 1;
-	if (flush_end > (__uint64_t)LONGLONG_MAX) {
-		flush_end = LONGLONG_MAX;
-	}
 	VOP_FLUSHINVAL_PAGES(vp, ctooff(offtoct(offset)), -1, FI_REMAPF_LOCKED);
 	if (relock) {
 		XFS_ILOCK_DEMOTE(mp, io, XFS_IOLOCK_EXCL);

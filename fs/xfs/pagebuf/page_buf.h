@@ -361,13 +361,6 @@ extern int pagebuf_iorequest(		/* start real I/O		*/
 extern int pagebuf_iowait(		/* wait for buffer I/O done	*/
 		page_buf_t *);		/* buffer to wait on		*/
 
-extern int pagebuf_iozero(		/* zero contents of buffer	*/
-		struct inode *,		/* inode owning pages		*/
-		page_buf_t *,		/* buffer to zero		*/
-		off_t,			/* offset in buffer		*/
-		size_t, 		/* size of data to zero		*/
-		loff_t);		/* last permissible isize value */
-
 extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 
 extern int pagebuf_segment(		/* return next segment of buffer */

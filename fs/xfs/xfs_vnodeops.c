@@ -5459,8 +5459,7 @@ xfs_free_file_space(
 	ioffset = offset & ~(rounding - 1);
 	if (ilen & (rounding - 1))
 		ilen = (ilen + rounding) & ~(rounding - 1);
-	xfs_inval_cached_pages(XFS_ITOV(ip), &(ip->i_iocore),
-				ioffset, ilen, NULL, 0);
+	xfs_inval_cached_pages(XFS_ITOV(ip), &(ip->i_iocore), ioffset, 0, 0);
 	/*
 	 * Need to zero the stuff we're not freeing, on disk.
 	 * If its specrt (realtime & can't use unwritten extents) then
