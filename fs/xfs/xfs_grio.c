@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.16 1994/04/15 20:00:33 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.17 1994/04/19 16:25:02 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -61,6 +61,8 @@ extern int	grio_debug;
 #else
 #define GRIO_DBPRNT(s1, s2 )
 #endif
+
+#define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
 
 int xfs_grio_add_ticket( file_id_t *, int, char *);
 int xfs_grio_remove_ticket( file_id_t *, char *);
@@ -220,6 +222,7 @@ xfs_grio_add_ticket( file_id_t *fileidp, int sz, char *idptr)
         if (ip = xfs_get_inode( fs_dev, ino )) {
 		ret = xfs_add_ticket_to_inode( ip, sz, &id );
 		xfs_iunlock( ip, XFS_ILOCK_EXCL );
+		IRELE( ip );
         }
 #ifdef DEBUG
         else {
@@ -318,6 +321,7 @@ xfs_grio_remove_ticket( file_id_t *fileidp, char *idptr)
 	if (ip = xfs_get_inode( fs_dev, ino)) {
 		xfs_remove_ticket_from_inode (ip, &id);
 		xfs_iunlock( ip, XFS_ILOCK_EXCL );
+		IRELE( ip );
 	}
 	return(0);
 }
@@ -535,7 +539,8 @@ xfs_grio_req( xfs_inode_t *ip,
 				 * requestor will not be out of step forever?
 				 * The max we delay is every other time.
  				 */
-                        	ticket->lastreq = 0;
+			/*     	ticket->lastreq = 0; */
+                       		ticket->lastreq = lbolt;
 			} else {
 				ticket->lastreq = lbolt;
 			}
@@ -723,6 +728,7 @@ xfs_get_file_extents(file_id_t *fileidp, xfs_bmbt_irec_t extents[], int *count)
 	}
 
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	IRELE( ip );
 	return( ret );
 }
 
@@ -773,6 +779,7 @@ xfs_get_file_rt( file_id_t *fileidp, int *rt)
 	}
 
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	IRELE( ip );
 	return( ret );
 
 }
@@ -944,6 +951,7 @@ xfs_mark_inode_grio( file_id_t *fileidp)
 	} 
 
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	IRELE( ip );
 	return( 0 );
 
 }
@@ -984,6 +992,7 @@ xfs_clear_inode_grio( file_id_t *fileidp)
 		ip->i_flags &= ~XFS_IGRIO;
 	} 
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	IRELE( ip );
 	return( 0 );
 }
 
