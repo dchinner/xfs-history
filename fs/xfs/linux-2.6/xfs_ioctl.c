@@ -116,7 +116,7 @@ xfs_find_handle(
 		return -XFS_ERROR(EINVAL);
 	}
 
-	if (inode->i_fop != &linvfs_file_operations) {
+	if (inode->i_sb->s_magic != XFS_SB_MAGIC) {
 		/* we're not in XFS anymore, Toto */
 		iput(inode);
 		return -XFS_ERROR(EINVAL);
