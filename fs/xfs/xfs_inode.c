@@ -3138,7 +3138,7 @@ cluster_corrupt_out:
 			XFS_BUF_STALE(bp);
 			XFS_BUF_SHUT(bp);
 			XFS_BUF_ERROR(bp,EIO);
-			biodone(bp);
+			xfs_biodone(bp);
 		} else {
 			XFS_BUF_STALE(bp);
 			xfs_buf_relse(bp);

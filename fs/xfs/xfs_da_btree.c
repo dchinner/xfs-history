@@ -2178,7 +2178,7 @@ xfs_da_do_buf(
 			break;
 #ifndef SIM
 		case 3:
-			baread(mp->m_ddev_targp, mappedbno, nmapped);
+			xfs_baread(mp->m_ddev_targp, mappedbno, nmapped);
 			error = 0;
 			bp = NULL;
 			break;
@@ -2238,7 +2238,7 @@ xfs_da_do_buf(
 				mp, XFS_ERRTAG_DA_READ_BUF,
 				XFS_RANDOM_DA_READ_BUF)) {
 #pragma mips_frequency_hint NEVER
-			buftrace("DA READ ERROR", rbp->bps[0]);
+			xfs_buftrace("DA READ ERROR", rbp->bps[0]);
 			error = XFS_ERROR(EFSCORRUPTED);
 			xfs_da_brelse(trans, rbp);
 			nbplist = 0;

@@ -269,7 +269,7 @@ xfs_buf_item_pin(
 	ASSERT((bip->bli_flags & XFS_BLI_LOGGED) ||
 	       (bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("PIN", bip);
-	buftrace("XFS_PIN", bp);
+	xfs_buftrace("XFS_PIN", bp);
 	xfs_bpin(bp);
 }
 
@@ -297,7 +297,7 @@ xfs_buf_item_unpin(
 	ASSERT(XFS_BUF_FSPRIVATE(bp, xfs_buf_log_item_t *) == bip);
 	ASSERT(bip->bli_refcount > 0);
 	xfs_buf_item_trace("UNPIN", bip);
-	buftrace("XFS_UNPIN", bp);
+	xfs_buftrace("XFS_UNPIN", bp);
 
 	refcount = atomicAddInt(&bip->bli_refcount, -1);
 	mp = bip->bli_item.li_mountp;
@@ -309,7 +309,7 @@ xfs_buf_item_unpin(
 		ASSERT(bp->b_pincount == 0);
 		ASSERT(bip->bli_format.blf_flags & XFS_BLI_CANCEL);
 		xfs_buf_item_trace("UNPIN STALE", bip);
-		buftrace("XFS_UNPIN STALE", bp);
+		xfs_buftrace("XFS_UNPIN STALE", bp);
 		AIL_LOCK(mp,s);
 		/*
 		 * If we get called here because of an IO error, we may
@@ -348,7 +348,7 @@ xfs_buf_item_unpin_remove(
 	if (bip->bli_refcount == 1 && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(XFS_BUF_VALUSEMA(bip->bli_buf) <= 0);
 		xfs_buf_item_trace("UNPIN REMOVE", bip);
-		buftrace("XFS_UNPIN_REMOVE", bp);
+      	xfs_buftrace("XFS_UNPIN_REMOVE", bp);
 		/*
 		 * yes -- clear the xaction descriptor in-use flag
 		 * and free the chunk if required.  We can safely
@@ -432,7 +432,7 @@ xfs_buf_item_unlock(
 	uint		hold;
 
 	bp = bip->bli_buf;
-	buftrace("XFS_UNLOCK", bp);
+	xfs_buftrace("XFS_UNLOCK", bp);
 
 	/*
 	 * Clear the buffer's association with this transaction.
@@ -1254,7 +1254,7 @@ xfs_buf_iodone_callbacks(
 			    XFS_BUF_UNSHUT(bp);
 				xfs_buf_relse(bp);
 			} else {
-				biodone(bp);
+			  xfs_biodone(bp);
 			}
 			
 			return;
@@ -1317,7 +1317,7 @@ xfs_buf_iodone_callbacks(
 	xfs_buf_do_callbacks(bp, lip);
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
-	biodone(bp);
+	xfs_biodone(bp);
 }
 
 /*
@@ -1339,7 +1339,7 @@ xfs_buf_error_relse(
 	XFS_BUF_DONE(bp);
 	XFS_BUF_UNDELAYWRITE(bp);
 	XFS_BUF_ERROR(bp,0)
-	buftrace("BUF_ERROR_RELSE", bp);
+    xfs_buftrace("BUF_ERROR_RELSE", bp);
 	if (! XFS_FORCED_SHUTDOWN(mp)) 		
 		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	/*

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.3 $"
+#ident "$Revision: 1.4 $"
 
 /*
  * xfs_dir2_leaf.c
@@ -998,7 +998,7 @@ xfs_dir2_leaf_getdents(
 				if (i > ra_current &&
 				    map[ra_index].br_blockcount >=
 				    mp->m_dirblkfsbs) {
-					baread(mp->m_ddev_targp,
+					xfs_baread(mp->m_ddev_targp,
 						XFS_FSB_TO_DADDR(mp,
 						   map[ra_index].br_startblock +
 						   ra_offset),

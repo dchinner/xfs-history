@@ -187,6 +187,40 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define xfs_xfsd_list_evict(x)       \
         _xfs_xfsd_list_evict(x) 
 
+#define xfs_buftrace(x,y)            \
+            buftrace(x,y)
+
+#define xfs_biodone(bp)             \
+            biodone(bp)
+
+#define xfs_incore(buftarg,blkno,len,lockit) \
+            incore(buftarg.dev,blkno,len,lockit)
+
+/* already a function xfs_bwrite... fix this */
+#define XFS_bwrite(bp)              \
+            bwrite(bp)
+
+#define XFS_bdwrite(bp)              \
+            bdwrite(bp)
+
+#define xfs_iowait(bp)              \
+            iowait(bp)   
+
+#define xfs_binval(buftarg)             \
+            binval(buftarg.dev)
+
+#define xfs_bflushed(buftarg)           \
+            bflushed(buftarg.dev) 
+
+#define xfs_incore_relse(buftarg,delwri_only,wait) \
+            incore_relse(buftarg.dev,delwri_only,wait)
+
+#define xfs_incore_match(buftarg,blkno,len,field,value) \
+            incore_match(buftarg.dev,blkno,len,field,value)
+
+#define xfs_baread(target, rablkno, ralen) \
+            baread(target, rablkno, ralen)
+            
 #endif /* _USING_BUF_T */
 
 #ifdef _USING_PAGEBUF_T
@@ -362,8 +396,39 @@ typedef struct buftarg {
 #define xfs_bp_mapin(bp)             \
         pagebuf_mapin(bp)
 
-#define xfs_xfsd_list_evict(x)       
-       
+#define xfs_xfsd_list_evict(x)       sleep(0)
+#define xfs_buftrace(x,y)     
+
+#define xfs_biodone(pb)             \
+            pagebuf_iodone(pb)
+
+#define xfs_incore(buftarg,blkno,len,lockit) \
+            pagebuf_find(buftarg,blkno,len,lockit)
+
+#define XFS_bwrite(pb)              \
+            pagebuf_iostart(pb,PBF_WRITE)
+
+#define XFS_bdwrite(pb)              \
+            pagebuf_iostart(pb,PBF_WRITE|PBF_DELWRI)
+
+#define xfs_iowait(pb)              \
+    pagebuf_iowait(pb)
+#define xfs_binval(buftarg)  /* hmm this is going to be tricky binval wants to flush all 
+						  * delay write buffers on device...  how do we do this with pagebuf? */
+
+#define xfs_bflushed(buftarg) /* assert the buffers for dev are really flushed */
+
+#define xfs_incore_relse(buftarg,delwri_only,wait) 
+/*
+ * Go through all incore buffers, and release buffers
+ * if they belong to the given device. This is used in
+ * filesystem error handling to preserve the consistency
+ * of its metadata.
+ */
+#define xfs_incore_match(buftarg,blkno,len,field,value) 
+
+#define xfs_baread(target, rablkno, ralen) 
+
 #endif /* _USING_PAGEBUF_T */
 
 #endif

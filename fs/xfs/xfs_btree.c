@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.67 $"
+#ident	"$Revision: 1.70 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -208,7 +208,7 @@ xfs_btree_check_lblock(
 			XFS_RANDOM_BTREE_CHECK_LBLOCK)) {
 #pragma mips_frequency_hint NEVER
 		if (bp)
-			buftrace("LBTREE ERROR", bp);
+			xfs_buftrace("LBTREE ERROR", bp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;
@@ -323,7 +323,7 @@ xfs_btree_check_sblock(
 			XFS_RANDOM_BTREE_CHECK_SBLOCK)) {
 #pragma mips_frequency_hint NEVER
 		if (bp)
-			buftrace("SBTREE ERROR", bp);
+			xfs_buftrace("SBTREE ERROR", bp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	return 0;
@@ -815,7 +815,7 @@ xfs_btree_reada_bufl(
 	ASSERT(fsbno != NULLFSBLOCK);
 #ifndef SIM
 	d = XFS_FSB_TO_DADDR(mp, fsbno);
-	baread(mp->m_ddev_targp, d, mp->m_bsize * count);
+	xfs_baread(mp->m_ddev_targp, d, mp->m_bsize * count);
 #endif
 }
 
@@ -839,7 +839,7 @@ xfs_btree_reada_bufs(
 	ASSERT(agbno != NULLAGBLOCK);
 #ifndef SIM
 	d = XFS_AGB_TO_DADDR(mp, agno, agbno);
-	baread(mp->m_ddev_targp, d, mp->m_bsize * count);
+    xfs_baread(mp->m_ddev_targp, d, mp->m_bsize * count);
 #endif
 }
 

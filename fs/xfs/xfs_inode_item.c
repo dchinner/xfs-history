@@ -765,7 +765,7 @@ xfs_inode_item_pushbuf(
 	}
 	
 	mp = ip->i_mount;
-	bp = incore(mp->m_dev, iip->ili_format.ilf_blkno,
+	bp = xfs_incore(mp->m_ddev_targ, iip->ili_format.ilf_blkno,
 		    iip->ili_format.ilf_len, INCORE_TRYLOCK);
 
 	if (bp != NULL) {
@@ -782,7 +782,7 @@ xfs_inode_item_pushbuf(
 				  (valusema(&(ip->i_flock)) <= 0));
 			iip->ili_pushbuf_flag = 0;
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-			buftrace("INODE ITEM PUSH", bp);
+			xfs_buftrace("INODE ITEM PUSH", bp);
 			if (XFS_BUF_ISPINNED(bp)) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);

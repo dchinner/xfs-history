@@ -121,7 +121,8 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	if (tp->t_items.lic_next == NULL) {
 		bp = xfs_trans_buf_item_match(tp, target_dev, blkno, len);
 	} else {
-		bp = incore_match(target_dev->dev, blkno, len, BUF_FSPRIV2, tp);
+/* 		bp = xfs_incore_match(target_dev->dev, blkno, len, BUF_FSPRIV2, tp); */
+		bp = xfs_incore_match((*target_dev), blkno, len, BUF_FSPRIV2, tp);
 		if (bp)
 			ASSERT(xfs_trans_buf_item_match_all(tp, target_dev,
 				blkno, len) == bp);
@@ -129,7 +130,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	if (bp != NULL) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
 		if (XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
-			buftrace("TRANS GET RECUR SHUT", bp);
+			xfs_buftrace("TRANS GET RECUR SHUT", bp);
 			XFS_BUF_SUPER_STALE(bp);
 		}
 		/*
@@ -148,7 +149,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 		ASSERT(bip != NULL);
 		ASSERT(bip->bli_refcount > 0);
 		bip->bli_recur++;
-		buftrace("TRANS GET RECUR", bp);
+		xfs_buftrace("TRANS GET RECUR", bp);
 		xfs_buf_item_trace("GET RECUR", bip);
 		return (bp);
 	}
@@ -205,7 +206,7 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	 */
 	XFS_BUF_SET_FSPRIVATE2(bp, tp);
 
-	buftrace("TRANS GET", bp);
+    xfs_buftrace("TRANS GET", bp);
 	xfs_buf_item_trace("GET", bip);
 	return (bp);
 }
@@ -383,7 +384,8 @@ xfs_trans_read_buf(
 	if (tp->t_items.lic_next == NULL) {
 		bp = xfs_trans_buf_item_match(tp, target, blkno, len);
 	} else {
-		bp = incore_match(target->dev, blkno, len, BUF_FSPRIV2, tp);
+		/* bp = xfs_incore_match(target->dev, blkno, len, BUF_FSPRIV2, tp); */
+		bp = xfs_incore_match((*target), blkno, len, BUF_FSPRIV2, tp);
 		if (bp)
 			ASSERT(xfs_trans_buf_item_match_all(tp, target, blkno,
 				len) == bp);
@@ -394,7 +396,7 @@ xfs_trans_read_buf(
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
 		ASSERT((bp->b_flags & B_ERROR) == 0);
 		if (!(XFS_BUF_ISDONE(bp))) {
-			buftrace("READ_BUF_INCORE !DONE", bp);
+			xfs_buftrace("READ_BUF_INCORE !DONE", bp);
 #ifndef SIM
 #ifdef PAIN_IN_THE_ASS_UNDER_LINUX
 			SYSINFO.lread += len;
@@ -409,7 +411,7 @@ xfs_trans_read_buf(
 			SYSINFO.bread += len;
 #endif
 #endif
-			iowait(bp);
+			xfs_iowait(bp);
 			if (XFS_BUF_GETERROR(bp) != 0) {
 				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
 						  target->dev, blkno);

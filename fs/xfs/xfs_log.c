@@ -1011,10 +1011,10 @@ xlog_bdstrat_cb(struct xfs_buf *bp)
 		return 0;
 	} 
 
-	buftrace("XLOG__BDSTRAT IOERROR", bp);
+	xfs_buftrace("XLOG__BDSTRAT IOERROR", bp);
 	XFS_BUF_ERROR(bp, EIO);
 	XFS_BUF_STALE(bp);
-	biodone(bp);
+    xfs_biodone(bp);
 	return (XFS_ERROR(EIO));
 	
 
@@ -1435,7 +1435,7 @@ xlog_sync(xlog_t		*log,
 	 * Don't call xfs_bwrite here. We do log-syncs even when the filesystem
 	 * is shutting down.
 	 */
-	if (error = bwrite(bp)) {
+	if (error = XFS_bwrite(bp)) {
 		xfs_ioerror_alert("xlog_sync", log->l_mp, XFS_BUF_TARGET(bp), 
 				  XFS_BUF_ADDR(bp));
 		return (error);
@@ -1471,7 +1471,7 @@ xlog_sync(xlog_t		*log,
 
 		/* account for internal log which does't start at block #0 */
 		XFS_BUF_SET_ADDR(bp, XFS_BUF_ADDR(bp) + log->l_logBBstart);
-		if (error = bwrite(bp)) {
+		if (error = XFS_bwrite(bp)) {
 			xfs_ioerror_alert("xlog_sync (split)", log->l_mp, 
 					  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
 			return (error);

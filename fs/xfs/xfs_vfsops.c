@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.238 $"
+#ident  "$Revision: 1.239 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -876,7 +876,7 @@ xfs_cmountfs(
  error3:
 #ifdef __linux__
 	if (ldevvp) {
-		binval(logdev);
+		xfs_binval(mp->m_logdev_targ);
 	}
 #else
 	if (ldevvp) {
@@ -888,7 +888,7 @@ xfs_cmountfs(
  error2:
 #ifdef __linux__
 	if (rdevvp) {
-		binval(rtdev);
+		xfs_binval(mp->m_rtdev_targ);
 	}
 #else
 	if (rdevvp) {
@@ -899,7 +899,7 @@ xfs_cmountfs(
 #endif /* __linux__ */
  #ifdef __linux__
 	if (ddevvp) {
-		binval(ddev);
+		xfs_binval(mp->m_ddev_targ);
 	}
 #else
  error1:
@@ -1331,6 +1331,7 @@ xfs_isdev(
 	if (!bdvalid(get_bdevsw(dev)))
 		return 1;
 
+	/* this is the only place we call bread... think about changing this a bit */
 	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
 	error = (XFS_BUF_ISERROR(bp)) ? 1 : 0;
 
@@ -1451,9 +1452,9 @@ xfs_mountroot(
 			 */
 			xfs_log_force(mp, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-			binval(mp->m_dev);
+			xfs_binval(mp->m_ddev_targ);
 			if (mp->m_rtdev != NODEV) {
-				binval(mp->m_rtdev);
+				xfs_binval(mp->m_rtdev_targ);
 			}
 
 			/*
@@ -1465,7 +1466,7 @@ xfs_mountroot(
 			 */
 			xfs_log_force(mp, (xfs_lsn_t)0,
 				      XFS_LOG_FORCE | XFS_LOG_SYNC);
-			binval(mp->m_dev);
+			xfs_binval(mp->m_ddev_targ);
 
 			/*
 			 * Finally, try to flush out the superblock.  If
@@ -1481,7 +1482,7 @@ xfs_mountroot(
 				XFS_BUF_WRITE(bp);
 				ASSERT(mp->m_dev == XFS_BUF_TARGET(bp));
 				xfsbdstrat(mp, bp);
-				(void) iowait(bp);
+				(void) xfs_iowait(bp);
 			}
 			return XFS_ERROR(EBUSY);
 		}
@@ -1912,7 +1913,7 @@ devvptoxfs(
 		 * If buffer is marked DELWRI, then use it since it reflects
 		 * what should be on the disk.
 		 */
-		bp = incore(dev, XFS_SB_DADDR, BLKDEV_BB, 1);
+		bp = xfs_incore(target, XFS_SB_DADDR, BLKDEV_BB, 1);
 		if (bp && !(XFS_BUF_ISDELAYWRITE(bp))) {
 			XFS_BUF_STALE(bp);
 			xfs_buf_relse(bp);

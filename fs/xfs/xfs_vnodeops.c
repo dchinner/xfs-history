@@ -6558,7 +6558,7 @@ xfs_zero_remaining_bytes(
 		XFS_BUF_SET_ADDR(bp, XFS_FSB_TO_DB(ip, imap.br_startblock));
 		bp_dcache_wbinval(bp);
 		xfsbdstrat(mp, bp); 
-		if (error = iowait(bp))
+		if (error = xfs_iowait(bp))
 			break;
 		bzero(XFS_BUF_PTR(bp) +
 			(offset - XFS_FSB_TO_B(mp, imap.br_startoff)),
@@ -6567,7 +6567,7 @@ xfs_zero_remaining_bytes(
 		XFS_BUF_UNREAD(bp);
 		XFS_BUF_WRITE(bp);
 		xfsbdstrat(mp, bp);
-		if (error = iowait(bp))
+		if (error = xfs_iowait(bp))
 			break;
 	}
 	nfreerbuf(bp);

@@ -2694,9 +2694,9 @@ xfs_zero_last_block(
 	ASSERT(bp->b_vp);
 	if (imap.br_startblock == DELAYSTARTBLOCK ||
 	    imap.br_state == XFS_EXT_UNWRITTEN) {
-		bdwrite(bp);
+		XFS_bdwrite(bp);
 	} else {
-		error = bwrite(bp);
+		error = XFS_bwrite(bp);
 	}
 
 	XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
@@ -2882,12 +2882,12 @@ xfs_zero_eof(
 			bzero(XFS_BUF_PTR(bp), XFS_BUF_COUNT(bp));
 	        }
 		ASSERT(bp->b_vp);
-		buftrace("XFS ZERO EOF", bp);
+		xfs_buftrace("XFS ZERO EOF", bp);
 		if (imap.br_startblock == DELAYSTARTBLOCK ||
 		    imap.br_state == XFS_EXT_UNWRITTEN) {
-			bdwrite(bp);
+			XFS_bdwrite(bp);
 		} else {
-			error = bwrite(bp);
+			error = XFS_bwrite(bp);
 			if (error) {
 				XFS_ILOCK(mp, io, XFS_ILOCK_EXCL);
 				return error;
@@ -6423,7 +6423,7 @@ xfs_force_shutdown(
 #ifdef XFSERRORDEBUG
 	{
 		int nbufs;
-		while (nbufs = incore_relse(mp->m_dev, 1, 0)) {
+		while (nbufs = xfs_incore_relse(mp->m_ddev_targ, 1, 0)) {
 			printf("XFS: released 0x%x bufs\n", nbufs);
 			if (ntries >= XFS_MAX_DRELSE_RETRIES) {
 				printf("XFS: ntries 0x%x\n", ntries);
@@ -6434,7 +6434,7 @@ xfs_force_shutdown(
 		}
 	}
 #else
-	while (incore_relse(mp->m_dev, 1, 0)) {
+	while (xfs_incore_relse(mp->m_ddev_targ, 1, 0)) {
 		if (ntries >= XFS_MAX_DRELSE_RETRIES)
 			break;
 		delay(++ntries * 5);
@@ -6476,7 +6476,7 @@ xfs_bioerror(
 	 * No need to wait until the buffer is unpinned.
 	 * We aren't flushing it.
 	 */
-	buftrace("XFS IOERROR", bp);
+    xfs_buftrace("XFS IOERROR", bp);
 	XFS_BUF_ERROR(bp, EIO);
 	/*
 	 * We're calling biodone, so delete B_DONE flag. Either way
@@ -6489,8 +6489,8 @@ xfs_bioerror(
 	XFS_BUF_UNDONE(bp);
 	XFS_BUF_STALE(bp);
 
-	bp->b_bdstrat = NULL;
-	biodone(bp);
+	XFS_BUF_CLR_BDSTRAT_FUNC(bp);
+	xfs_biodone(bp);
 	
 	return (EIO);
 }
@@ -6512,7 +6512,7 @@ xfs_bioerror_relse(
 	ASSERT(bp->b_iodone != xfs_buf_iodone_callbacks);
 	ASSERT(bp->b_iodone != xlog_iodone);
 
-	buftrace("XFS IOERRELSE", bp);
+	xfs_buftrace("XFS IOERRELSE", bp);
 	fl = XFS_BUF_BFLAGS(bp);
 	/*
 	 * No need to wait until the buffer is unpinned.
@@ -6625,7 +6625,7 @@ xfs_bwrite(
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xfs_bdstrat_cb);
 	XFS_BUF_SET_FSPRIVATE3(bp, mp);
 
-	if (error = bwrite(bp)) {
+   	if (error = XFS_bwrite(bp)) {
 		ASSERT(mp);
 		/* 
 		 * Cannot put a buftrace here since if the buffer is not 
@@ -6662,7 +6662,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp)
 		bdstrat(my_bdevsw, bp);
 		return 0;
 	} else { 
-		buftrace("XFS__BDSTRAT IOERROR", bp);
+		xfs_buftrace("XFS__BDSTRAT IOERROR", bp);
 		/*
 		 * Metadata write that didn't get logged but 
 		 * written delayed anyway. These aren't associated

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.148 $"
+#ident	"$Revision: 1.149 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -157,7 +157,7 @@ xlog_bread(xlog_t	*log,
 	bp_dcache_wbinval(bp);
 #endif
 	xfsbdstrat(log->l_mp, bp);
-	if (error = iowait(bp)) {
+	if (error = xfs_iowait(bp)) {
 		xfs_ioerror_alert("xlog_bread", log->l_mp, 
 				  XFS_BUF_TARGET(bp), XFS_BUF_ADDR(bp));
 		return (error);
@@ -215,7 +215,7 @@ xlog_recover_iodone(
 	}
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
-	biodone(bp);
+	xfs_biodone(bp);
 }
 #endif
 
@@ -3212,7 +3212,7 @@ xlog_do_recover(xlog_t	*log,
 	bp_dcache_wbinval(bp);
 #endif
 	xfsbdstrat(log->l_mp, bp);
-	if (error = iowait(bp)) {
+	if (error = xfs_iowait(bp)) {
 		ASSERT(0);
 		xfs_buf_relse(bp);
 		return error;

@@ -251,7 +251,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	XFS_BUF_READ(bp);
 	XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
 	xfsbdstrat(mp, bp);
-	if (error = iowait(bp)) {
+	if (error = xfs_iowait(bp)) {
 		goto err;
 	}
 
@@ -972,11 +972,10 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 */
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 	
-	
-	binval(mp->m_dev);
-	bflushed(mp->m_dev);
+	xfs_binval(mp->m_ddev_targ);
+	xfs_bflushed(mp->m_ddev_targ);
 	if (mp->m_rtdev != NODEV) {
-		binval(mp->m_rtdev);
+		xfs_binval(mp->m_rtdev_targ);
 	}
 
 	(void) xfs_unmountfs_writesb(mp);
@@ -999,7 +998,8 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 * does a two pass iteration thru the bufcache.
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-		(void)incore_relse(mp->m_dev, 0, 1); /* synchronous */
+	  /* 		(void)xfs_incore_relse(mp->m_dev, 0, 1); *//* synchronous */
+		(void)xfs_incore_relse(mp->m_ddev_targ, 0, 1); /* synchronous */
 	}
 	xfs_uuid_unmount(mp);
 
@@ -1079,7 +1079,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		ASSERT(XFS_BUF_TARGET(sbp) == mp->m_dev);
 		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
-		error = iowait(sbp);
+		error = xfs_iowait(sbp);
 		if (error && mp->m_mk_sharedro)
 			xfs_fs_cmn_err(CE_ALERT, mp, "Superblock write error detected while unmounting.  Filesystem may not be marked shared readonly");
 	}
