@@ -1943,6 +1943,7 @@ xfs_bmbt_decrement(
 
 	xfs_bmbt_trace_cursor("xfs_bmbt_decrement entry", cur);
 	xfs_bmbt_trace_argi("xfs_bmbt_decrement entry", cur, level);
+	ASSERT(level < cur->bc_nlevels);
 	if (level < cur->bc_nlevels - 1)
 		xfs_btree_readahead(cur, level, XFS_BTCUR_LEFTRA);
 	if (--cur->bc_ptrs[level] > 0) {
@@ -2251,6 +2252,7 @@ xfs_bmbt_increment(
 
 	xfs_bmbt_trace_cursor("xfs_bmbt_increment entry", cur);
 	xfs_bmbt_trace_argi("xfs_bmbt_increment args", cur, level);
+	ASSERT(level < cur->bc_nlevels);
 	if (level < cur->bc_nlevels - 1)
 		xfs_btree_readahead(cur, level, XFS_BTCUR_RIGHTRA);
 	block = xfs_bmbt_get_block(cur, level, &bp);
