@@ -387,7 +387,6 @@ _pb_direct_io(
 	rval = map_user_kiobuf(rdwr ? WRITE : READ,
 			kp, (unsigned long) user_addr, pb_size);
 	if (rval == 0) {
-		pagebuf_hold(pb);
 		pb->pb_pages = kp->maplist;
 		pb->pb_page_count = kp->nr_pages;
 		pb->pb_offset = kp->offset;

@@ -1283,8 +1283,6 @@ int pagebuf_iostart(		/* start I/O on a buffer          */
 	/* Wait for I/O if we are not an async request */
 	if ((status == 0) && (flags & PBF_ASYNC) == 0) {
 		status = pagebuf_iowait(pb);
-		if (flags & (PBF_WRITE| PBF_DELWRI))
-			pagebuf_rele(pb);
 	}
 
 	return status;
