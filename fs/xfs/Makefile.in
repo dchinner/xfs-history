@@ -33,18 +33,6 @@
 # Makefile for XFS on Linux.
 #
 
-# This needs fs/xfs because everything does #include <xfs.h> instead of "xfs.h".
-# The code is wrong, local files should be included using "xfs.h", not <xfs.h>
-# but I am not going to change every file at the moment.  It also needs fs to
-# pick up #include <xfs_support/xxx>, the support files should really be in
-# linux/include/xfs_support, not hidden under fs.  Keith Owens.
-
-XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs) $(src_includelist /fs) -funsigned-char
-ifsel(CONFIG_XFS_DEBUG)
-  XFS_EXTRA_CFLAGS	+= -g -DSTATIC="" -DDEBUG -DXFSDEBUG
-endif
-extra_cflags_all($(XFS_EXTRA_CFLAGS))
-
 objlink(CONFIG_XFS_RT  xfs.o xfs_rtalloc.o xfs_rtbit.o)
 objlink(!CONFIG_XFS_RT xfs.o xfsrtstubs.o)
 
@@ -84,5 +72,17 @@ ifsel(CONFIG_KDB_MODULES)
     select(CONFIG_XFS_FS xfsidbg.o)
   endif
 endif
+
+# This needs fs/xfs because everything does #include <xfs.h> instead of "xfs.h".
+# The code is wrong, local files should be included using "xfs.h", not <xfs.h>
+# but I am not going to change every file at the moment.  It also needs fs to
+# pick up #include <xfs_support/xxx>, the support files should really be in
+# linux/include/xfs_support, not hidden under fs.  Keith Owens.
+
+XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs) $(src_includelist /fs) -funsigned-char
+ifsel(CONFIG_XFS_DEBUG)
+  XFS_EXTRA_CFLAGS	+= -g -DSTATIC="" -DDEBUG -DXFSDEBUG
+endif
+extra_cflags_all($(XFS_EXTRA_CFLAGS))
 
 extra_cflags(xfsidbg.o $(src_includelist /arch/$(ARCH)/kdb))
