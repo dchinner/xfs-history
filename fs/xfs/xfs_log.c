@@ -1,3 +1,5 @@
+#ident	"$Revision: 1.37 $"
+
 /*
  * High level interface routines for log manager
  */
@@ -51,6 +53,8 @@
 STATIC void	 log_alloc(xfs_mount_t *mp, dev_t log_dev, int start_block,
 			   int num_bblocks);
 STATIC xfs_lsn_t log_commit_record(xfs_mount_t *mp, log_ticket_t *ticket);
+STATIC int	 log_find_end(dev_t log_dev, int log_bbnum);
+int	 log_find_start(dev_t log_dev, int log_bbnum);
 STATIC void	 log_push_buffers_to_disk(xfs_mount_t *mp, log_t *log);
 STATIC void	 log_sync(log_t *log, log_in_core_t *iclog, uint flags);
 STATIC void	 log_unalloc(void);
@@ -240,7 +244,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (! log_debug)
 		return 0;
 
-	if (client != XFS_TRANSACTION_MANAGER)
+	if (client != XFS_TRANSACTION)
 		return -1;
 	
 	if (flags & XFS_LOG_SLEEP) {
@@ -374,11 +378,11 @@ log_alloc(xfs_mount_t	*mp,
 	log->l_mp	   = mp;
 	log->l_dev	   = log_dev;
 /*	log->l_logreserved = 0; done with kmem_zalloc()*/
-/*	log->l_curr_block  = 0; done with kmem_zalloc()*/
 	log->l_prev_block  = -1;
 	log->l_sync_lsn    = 0x100000000LL;  /* cycle = 1; current block = 0 */
 	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
 	log->l_xbuf	   = getrbuf(0);	/* get my locked buffer */
+	log->l_curr_block  = log_find_end(log_dev, num_bblocks);
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	initnlock(&log->l_icloglock, "iclog");
@@ -444,6 +448,125 @@ log_commit_record(xfs_mount_t  *mp,
 
 	return commit_lsn;
 }	/* log_commit_record */
+
+
+/*
+ * Code needs to look at cycle # at start of block  XXXmiken
+ */
+int
+log_find_start(dev_t log_dev, int log_bbnum)
+{
+    log_rec_header_t	*head;
+    int			block_start = 0;
+    int			block_no = 0;
+    int			cycle_no = 0;
+    int			binary_block_start = 0;
+    buf_t		*bp;
+    
+    /* read through all blocks to find start of on-disk log */
+    while (block_no < log_bbnum) {
+	bp = bread(log_dev, block_no, 1);
+	if (bp->b_flags & B_ERROR) {
+	    brelse(bp);
+	    log_panic("log_find_start");
+	}
+	head = (log_rec_header_t *)bp->b_dmaaddr;
+	if (head->h_magicno != LOG_HEADER_MAGIC_NUM) {
+	    block_no++;
+	    brelse(bp);
+	    continue;
+	}
+	if (cycle_no == 0) {
+	    cycle_no	= CYCLE_LSN(head->h_lsn);
+	    block_start = block_no;
+	} else if (CYCLE_LSN(head->h_lsn) < cycle_no) {
+	    cycle_no	= CYCLE_LSN(head->h_lsn);
+	    block_start	= block_no;
+	    brelse(bp);
+	    break;
+	}
+	block_no++;
+	brelse(bp);
+    }
+
+    return block_start;
+}	/* log_find_start */
+
+
+/*
+ *
+ */
+int
+log_find_end(dev_t log_dev, int log_bbnum)
+{
+	log_rec_header_t  *head;		/* ptr to log record header */
+	int		  log_rec_block_no = 0;	/* last start of log record */
+	int		  block_no = 0;		/* current block number */
+	int		  cycle_no = 0;		/* current cycle number */
+	int		  start_block = 0;	/* block to start writing at */
+	int		  log_rec_bblocks;	/* num of bblocks in log rec */
+	int		  skip_first_part_of_log;
+	buf_t		  *bp;
+	int		  i;
+	int		  *int_ptr;
+    
+	skip_first_part_of_log = 1;
+	while (block_no < log_bbnum) {
+		bp = bread(log_dev, block_no, 1);
+		if (bp->b_flags & B_ERROR) {
+			brelse(bp);
+			log_panic("log_find_end");
+		}
+		head = (log_rec_header_t *)bp->b_dmaaddr;
+		if (head->h_magicno != LOG_HEADER_MAGIC_NUM) {
+			if (skip_first_part_of_log) {
+				block_no++;
+				brelse(bp);
+				continue;
+			} else {
+				goto end;
+			}
+		}
+		skip_first_part_of_log = 0;
+		
+		if (cycle_no == 0) {
+			cycle_no	 = CYCLE_LSN(head->h_lsn);
+			start_block	 = log_rec_block_no = block_no;
+			log_rec_bblocks  = BTOBB(head->h_len);
+		} else if (CYCLE_LSN(head->h_lsn) < cycle_no) {
+			cycle_no	 = CYCLE_LSN(head->h_lsn);
+			log_rec_block_no = block_no;
+			goto end;
+		} else {	/* cycle num equal */
+			ASSERT(CYCLE_LSN(head->h_lsn) == cycle_no);
+			
+			log_rec_block_no = block_no;
+			log_rec_bblocks  = BTOBB(head->h_len);
+		}
+		brelse(bp);
+		block_no++;
+		
+		/* verify log record data cycle numbers */
+		for (i=0; i<log_rec_bblocks; i++) {
+			bp = bread(log_dev, block_no, 1);
+			if (bp->b_flags & B_ERROR) {
+				brelse(bp);
+				log_panic("log_find_end");
+			}
+			int_ptr = (int *)bp->b_dmaaddr;
+			if (*int_ptr != cycle_no)	/* invalid data blk */
+				goto end;
+			brelse(bp);
+		}
+		block_no += log_rec_bblocks;
+		log_rec_block_no = block_no;	/* OK to this point */
+	}
+	
+end:
+	start_block = log_rec_block_no;
+	brelse(bp);
+	return start_block;
+}	/* log_find_end */
 
 
 /*
@@ -1490,7 +1613,7 @@ log_verify_iclog(log_t		*log,
 			clientid = ophead->oh_clientid;
 		else
 			clientid = iclog->ic_header.h_cycle_data[BTOBB(&ophead->oh_clientid - iclog->ic_data)]>>24;
-		if (clientid != XFS_TRANSACTION_MANAGER)
+		if (clientid != XFS_TRANSACTION)
 			log_panic("log_verify_iclog: illegal client");
 
 		/* check tids */
@@ -1525,7 +1648,7 @@ log_verify_iclog(log_t		*log,
 			log_panic("log_verify_iclog: lseek 0 failed");
 		for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
 			if (read(fd, buf, LOG_HEADER_SIZE) == 0)
-				log_panic("log_find_head: bad read");
+				log_panic("log_verify_iclog: bad read");
 			rec = (log_rec_header_t *)buf;
 			if (rec->h_magicno == LOG_HEADER_MAGIC_NUM &&
 			    CYCLE_LSN(rec->h_lsn) < cycle_no)
