@@ -1,4 +1,4 @@
-#ident "$Revision: 1.213 $"
+#ident "$Revision: 1.214 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -30,6 +30,9 @@
 #include <stdio.h>
 #else
 #include <sys/systm.h>
+#ifdef XFS_ILOCK_TRACE
+#include <ksys/vproc.h>	/* current_pid() */
+#endif
 #endif
 #include <stddef.h>
 #include "xfs_macros.h"
@@ -710,7 +713,9 @@ xfs_iread(
 #ifdef XFS_STRAT_TRACE
 	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, 0);
 #endif
-
+#ifdef XFS_ILOCK_TRACE
+	ip->i_lock_trace = ktrace_alloc(XFS_ILOCK_KTRACE_SIZE, 0);
+#endif
 	/*
 	 * If we got something that isn't an inode it means someone
 	 * (nfs or dmi) has a stale handle.
@@ -1730,7 +1735,7 @@ xfs_itruncate_finish(
 			xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 		}
 		ntp = xfs_trans_dup(ntp);
-		xfs_trans_commit(*tp, 0);
+		(void) xfs_trans_commit(*tp, 0);
 		*tp = ntp;
 		error = xfs_trans_reserve(ntp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
 					  XFS_TRANS_PERM_LOG_RES,
@@ -2577,6 +2582,7 @@ xfs_idestroy(
 	ktrace_free(ip->i_xtrace);
 	ktrace_free(ip->i_rwtrace);
 	ktrace_free(ip->i_strat_trace);
+	ktrace_free(ip->i_lock_trace);
 #endif
 	if (ip->i_itemp) {
 		xfs_inode_item_destroy(ip);
@@ -3644,4 +3650,21 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 
 	return( ip );
 }
+
+#ifdef XFS_ILOCK_TRACE
+void
+xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, inst_t *ra)
+{
+        ktrace_enter(ip->i_lock_trace, 
+		     (void *)ip,
+		      (void *)(__psint_t)lock,		/* 1 = LOCK, 3=UNLOCK, etc */
+		     (void *)(__psint_t)lockflags, 	/* XFS_ILOCK_EXCL etc */
+		     (void *)ra,	      		/* caller of ilock */
+		     (void *)(__psint_t)cpuid(),
+		     (void *)(__psint_t)current_pid(),
+		     0,0,0,0,0,0,0,0,0,0);
+		     
+}
+#endif /* ILOCK_TRACE */
+
 #endif /* SIM */
