@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.230 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1327,7 +1327,7 @@ xfs_isdev(
 	}
 
 	bp->b_flags |= B_AGE;
-	brelse(bp);
+	xfs_buf_relse(bp);
 	return error;
 }
 
@@ -1898,7 +1898,7 @@ devvptoxfs(
 		bp = incore(dev, XFS_SB_DADDR, BLKDEV_BB, 1);
 		if (bp && !(bp->b_flags & B_DELWRI)) {
 			bp->b_flags |= B_STALE;
-			brelse(bp);
+			xfs_buf_relse(bp);
 			bp = NULL;
 		}
 		if (!bp) {
@@ -1907,7 +1907,7 @@ devvptoxfs(
 		}
 		if (bp->b_flags & B_ERROR) {
 			error = bp->b_error;
-			brelse(bp);
+			xfs_buf_relse(bp);
 			bp = NULL;
 		} else
 			fs = (xfs_sb_t *)XFS_BUF_PTR(bp);
@@ -1962,7 +1962,7 @@ xfs_statdevvp(
 	} else {
 		error = XFS_ERROR(EINVAL);
 	}
-	brelse(bp);
+	xfs_buf_relse(bp);
 	VOP_CLOSE(devvp, FREAD, L_TRUE, get_current_cred(), unused);
 	return error;
 }
@@ -2454,7 +2454,7 @@ xfs_syncsub(
 					error = xfs_itobp(mp, NULL, ip,
 							  &dip, &bp, 0);
 					if (!error) {
-						brelse(bp);
+						xfs_buf_relse(bp);
 					} else {
 						/* Bailing out, remove the
 						 * marker and free it.
@@ -2670,10 +2670,10 @@ xfs_syncsub(
 						bp->b_flags |= B_ASYNC;
 						error = xfs_bwrite(mp, bp);
 					} else {
-						brelse(bp);
+						xfs_buf_relse(bp);
 					}
 				} else {
-					brelse(bp);
+					xfs_buf_relse(bp);
 				}
 			}
 		} else {

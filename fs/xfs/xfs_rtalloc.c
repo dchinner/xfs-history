@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.50 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -2230,7 +2230,7 @@ xfs_growfs_rt(
 	if (error)
 		return error;
 	ASSERT(bp);
-	brelse(bp);
+	xfs_buf_relse(bp);
 	/*
 	 * Calculate new parameters.  These are the final values to be reached.
 	 */
@@ -2583,7 +2583,7 @@ xfs_rtmount_init(
 		return XFS_ERROR(E2BIG);
 	else if (error)
 		return error;
-	brelse(bp);
+	xfs_buf_relse(bp);
 	return 0;
 }
 

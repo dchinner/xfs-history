@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.186 $"
+#ident	"$Revision: 1.187 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -266,7 +266,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;				/* bcopy structure */
-	brelse(bp);
+	xfs_buf_relse(bp);
 	ASSERT(valusema(&bp->b_lock) > 0);
 	return 0;
 
@@ -588,7 +588,7 @@ xfs_mountfs_int(
 	if (!noio) {
 		error = xfs_read_buf(mp, mp->m_ddev_targp, d - 1, 1, 0, &bp);
 		if (!error) {
-			brelse(bp);
+			xfs_buf_relse(bp);
 		} else {
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
@@ -606,7 +606,7 @@ xfs_mountfs_int(
 		}
 		error = xfs_read_buf(mp, &mp->m_logdev_targ, d - 1, 1, 0, &bp);
 		if (!error) {
-			brelse(bp);
+			xfs_buf_relse(bp);
 		} else {
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
@@ -1080,7 +1080,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		if (error && mp->m_mk_sharedro)
 			xfs_fs_cmn_err(CE_ALERT, mp, "Superblock write error detected while unmounting.  Filesystem may not be marked shared readonly");
 	}
-	brelse(sbp);
+	xfs_buf_relse(sbp);
 	return (error);
 }
 	

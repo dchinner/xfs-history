@@ -1,4 +1,4 @@
-#ident "$Revision: 1.60 $"
+#ident "$Revision: 1.63 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -327,7 +327,7 @@ xfs_trans_read_buf(
 	daddr_t		blkno,
 	int		len,
 	uint		flags,
-	xfs_buf_t		**bpp)
+	xfs_buf_t	**bpp)
 {
 	xfs_buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
@@ -355,14 +355,14 @@ xfs_trans_read_buf(
 		if ((bp != NULL) && (geterror(bp) != 0)) {
 			xfs_ioerror_alert("xfs_trans_read_buf", mp, dev, blkno);
 			error = geterror(bp);
-			brelse(bp);
+			xfs_buf_relse(bp);
 			return error;
 		}
 #ifdef DEBUG
 		if (xfs_do_error && (bp != NULL)) {
 			if (xfs_error_dev == bp->b_edev) {
 				if (((xfs_req_num++) % xfs_error_mod) == 0) {
-					brelse(bp);
+					xfs_buf_relse(bp);
 					printf("Returning error!\n");
 					return XFS_ERROR(EIO);
 				}
@@ -419,7 +419,7 @@ xfs_trans_read_buf(
 				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
 						  dev, blkno);
 				error = geterror(bp);
-				brelse(bp);
+				xfs_buf_relse(bp);
 				/*
 				 * We can gracefully recover from most
 				 * read errors. Ones we can't are those
@@ -479,7 +479,7 @@ xfs_trans_read_buf(
 				  dev, blkno);
 		if (tp->t_flags & XFS_TRANS_DIRTY)
 			xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
-		brelse(bp);
+		xfs_buf_relse(bp);
 		return error;
 	}
 #ifdef DEBUG
@@ -488,7 +488,7 @@ xfs_trans_read_buf(
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
 				xfs_force_shutdown(tp->t_mountp, 
 						   XFS_METADATA_IO_ERROR);
-				brelse(bp);
+				xfs_buf_relse(bp);
 				printf("Returning error in trans!\n");
 				return XFS_ERROR(EIO);
 			}
@@ -550,7 +550,7 @@ shutdown_abort:
 	ASSERT((bp->b_flags & (B_STALE|B_DELWRI)) != (B_STALE|B_DELWRI));
 
 	buftrace("READ_BUF XFSSHUTDN", bp);
-	brelse(bp);	
+	xfs_buf_relse(bp);	
 	*bpp = NULL;
 	return XFS_ERROR(EIO);
 }
@@ -598,7 +598,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 						lip);
 			}
 		}
-		brelse(bp);
+		xfs_buf_relse(bp);
 		return;
 	}
 
@@ -694,7 +694,7 @@ xfs_trans_brelse(xfs_trans_t	*tp,
 					(xfs_log_item_t*)bip);
 	}
 
-	brelse(bp);
+	xfs_buf_relse(bp);
 	return;
 }
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.11 $"
+#ident "$Revision: 1.12 $"
 
 #include <sys/param.h>
 #include "xfs_buf.h"
@@ -310,12 +310,12 @@ xfs_qm_dquot_logitem_pushbuf(
 #endif				
 				xfs_bawrite(mp, bp);
 			} else {
-				brelse(bp);
+				xfs_buf_relse(bp);
 			}
 		} else {
 			qip->qli_pushbuf_flag = 0;
 			xfs_dqunlock(dqp);		
-			brelse(bp);
+			xfs_buf_relse(bp);
 		}
 		return;
 	}

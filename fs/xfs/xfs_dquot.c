@@ -1,4 +1,4 @@
-#ident "$Revision: 1.35 $"
+#ident "$Revision: 1.36 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include "xfs_buf.h"
@@ -1705,7 +1705,7 @@ xfs_qm_dqflock_pushbuf_wait(
 			}
 			xfs_bawrite(dqp->q_mount, bp);
 		} else {
-			brelse(bp);
+			xfs_buf_relse(bp);
 		}
 	}
 	xfs_dqflock(dqp);

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #include <sys/types.h>
 #include "xfs_buf.h"
@@ -443,7 +443,7 @@ xfs_dir_ialloc(
 		 * to the caller.
 		 */
 		if (code) {
-			brelse(ialloc_context);
+			xfs_buf_relse(ialloc_context);
 			if (dqinfo) {
 				tp->t_dqinfo = dqinfo;
 				xfs_trans_free_dqinfo(tp);
@@ -463,7 +463,7 @@ xfs_dir_ialloc(
 		}
 		
 		if (code) {
-			brelse(ialloc_context);
+			xfs_buf_relse(ialloc_context);
 			*tpp = ntp;
 			*ipp = NULL;
 			return code;

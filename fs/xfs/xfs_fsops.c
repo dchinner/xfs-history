@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision: 1.38 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -126,7 +126,7 @@ xfs_growfs_data(
 	if (error)
 		return error;
 	ASSERT(bp);
-	brelse(bp);
+	xfs_buf_relse(bp);
 
 	nagcount = (nb / mp->m_sb.sb_agblocks) +
 		   ((nb % mp->m_sb.sb_agblocks) != 0);

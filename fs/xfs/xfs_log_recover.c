@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.141 $"
+#ident	"$Revision: 1.142 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1825,7 +1825,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 		xfs_ioerror_alert("xlog_recover_do..(read)", log->l_mp, 
 				  mp->m_dev, blkno);
 		error = bp->b_error;
-		brelse(bp);
+		xfs_buf_relse(bp);
 		return error;
 	}
 
@@ -1921,7 +1921,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
 				  mp->m_dev, imap.im_blkno);
 		error = bp->b_error;
-		brelse(bp);
+		xfs_buf_relse(bp);
 		return error;
 	}
 	error = 0;
@@ -1934,7 +1934,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	 * like an inode!
 	 */
 	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode magic number, dino ptr = 0x%p, dino bp = 0x%p, ino = %lld",
 			dip, bp, ino);
@@ -1942,7 +1942,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	}
 	dicp = (xfs_dinode_core_t*)(item->ri_buf[1].i_addr);
 	if (dicp->di_magic != XFS_DINODE_MAGIC) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log record, rec ptr 0x%p, ino %lld",
 			item, ino);
@@ -1951,7 +1951,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	if ((dicp->di_mode & IFMT) == IFREG) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {
-			brelse(bp);
+			xfs_buf_relse(bp);
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"xfs_inode_recover: Bad regular inode log record, rec ptr 0x%p, ino ptr = 0x%p, ino bp = 0x%p, ino %lld",
 				item, dip, bp, ino);
@@ -1961,7 +1961,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE) &&
 		    (dicp->di_format != XFS_DINODE_FMT_LOCAL)) {
-			brelse(bp);
+			xfs_buf_relse(bp);
 			xfs_fs_cmn_err(CE_ALERT, mp,
 				"xfs_inode_recover: Bad dir inode log record, rec ptr 0x%p, ino ptr = 0x%p, ino bp = 0x%p, ino %lld",
 				item, dip, bp, ino);
@@ -1969,7 +1969,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		}
 	}
 	if (dicp->di_nextents + dicp->di_anextents > dicp->di_nblocks) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log record, rec ptr 0x%p, dino ptr 0x%p, dino bp 0x%p, ino %lld, total extents = %d, nblocks = %lld",
 			item, dip, bp, ino,
@@ -1978,14 +1978,14 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (dicp->di_forkoff > mp->m_sb.sb_inodesize) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log rec ptr 0x%p, dino ptr 0x%p, dino bp 0x%p, ino %lld, forkoff 0x%x",
 			item, dip, bp, ino, dicp->di_forkoff);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 	if (item->ri_buf[1].i_len > sizeof(xfs_dinode_core_t)) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 		xfs_fs_cmn_err(CE_ALERT, mp,
 			"xfs_inode_recover: Bad inode log record length %d, rec ptr 0x%p",
 			item->ri_buf[1].i_len, item);
@@ -2071,7 +2071,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		default:
 			xlog_warn("XFS: xlog_recover_do_inode_trans: Illegal flag");
 			ASSERT(0);
-			brelse(bp);
+			xfs_buf_relse(bp);
 			return XFS_ERROR(EIO);
 		}
 	}
@@ -2218,7 +2218,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	 */
 	if (xfs_qm_dqcheck(ddq, dq_f->qlf_id, 0, XFS_QMOPT_DOWARN,
 			   "xlog_recover_do_dquot_trans")) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 		return XFS_ERROR(EIO);
 	}
 	ASSERT((caddr_t)ddq + item->ri_buf[1].i_len <=
@@ -2825,7 +2825,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			 * be acquired in the normal course of the
 			 * transaction to truncate and free the inode.
 			 */
-			brelse(agibp);
+			xfs_buf_relse(agibp);
 
 			ino = XFS_AGINO_TO_INO(mp, agno, agino);
 			error = xfs_iget(mp, NULL, ino, 0, &ip, 0);
@@ -2884,7 +2884,7 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		 * Release the buffer for the current agi so we can
 		 * go on to the next one.
 		 */
-		brelse(agibp);
+		xfs_buf_relse(agibp);
 	}
 }	/* xlog_recover_process_iunlinks */
 #endif /* !SIM */
@@ -3211,14 +3211,14 @@ xlog_do_recover(xlog_t	*log,
 	xfsbdstrat(log->l_mp, bp);
 	if (error = iowait(bp)) {
 		ASSERT(0);
-		brelse(bp);
+		xfs_buf_relse(bp);
 		return error;
 	}
 	sbp = XFS_BUF_TO_SBP(bp);
 	ASSERT(sbp->sb_magicnum == XFS_SB_MAGIC);
 	ASSERT(XFS_SB_GOOD_VERSION(sbp));
 	log->l_mp->m_sb = *sbp;
-	brelse(bp);
+	xfs_buf_relse(bp);
 
 	xlog_recover_check_summary(log);
 
@@ -3385,7 +3385,7 @@ xlog_recover_check_summary(xlog_t	*log)
 		ASSERT(agfp->agf_seqno == agno);
 
 		freeblks += agfp->agf_freeblks + agfp->agf_flcount;
-		brelse(agfbp);
+		xfs_buf_relse(agfbp);
 
 		agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 		agibp = read_buf_targ(mp->m_ddev_targp, agidaddr, 1, 0);
@@ -3396,7 +3396,7 @@ xlog_recover_check_summary(xlog_t	*log)
 
 		itotal += agip->agi_count;
 		ifree += agip->agi_freecount;
-		brelse(agibp);
+		xfs_buf_relse(agibp);
 	}
 
 	sbbp = xfs_getsb(mp, 0);
@@ -3421,7 +3421,7 @@ xlog_recover_check_summary(xlog_t	*log)
 	ASSERT(sbp->sb_fdblocks == freeblks);
 #endif
 #endif
-	brelse(sbbp);
+	xfs_buf_relse(sbbp);
 }
 #endif /* DEBUG && !SIM */
 

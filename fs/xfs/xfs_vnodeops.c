@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.419 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1331,7 +1331,7 @@ xfs_readlink(
 				      BTOBB(byte_cnt), 0);
 			error = geterror(bp);
 			if (error) {
-				brelse(bp);
+				xfs_buf_relse(bp);
 				goto error_return;
 			}
                         if (pathlen < byte_cnt)
@@ -1340,7 +1340,7 @@ xfs_readlink(
 
                         error = uiomove(XFS_BUF_PTR(bp), byte_cnt,
 					 UIO_READ, uiop);
-			brelse (bp);
+			xfs_buf_relse (bp);
                 }
 
 	}

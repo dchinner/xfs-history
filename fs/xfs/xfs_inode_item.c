@@ -1,4 +1,4 @@
-#ident "$Revision: 1.79 $"
+#ident "$Revision: 1.80 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -790,12 +790,12 @@ xfs_inode_item_pushbuf(
 			if (dopush) {
 				xfs_bawrite(mp, bp);
 			} else {
-				brelse(bp);
+				xfs_buf_relse(bp);
 			}
 		} else {
 			iip->ili_pushbuf_flag = 0;
 			xfs_iunlock(ip, XFS_ILOCK_SHARED); 
-			brelse(bp);
+			xfs_buf_relse(bp);
 		}
 		return;
 	}

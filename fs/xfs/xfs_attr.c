@@ -1,4 +1,4 @@
-#ident "$Revision: 1.61 $"
+#ident "$Revision: 1.62 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1865,7 +1865,7 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 			tmp = (valuelen < bp->b_bufsize)
 				? valuelen : bp->b_bufsize;
 			bcopy(XFS_BUF_PTR(bp), dst, tmp);
-			brelse(bp);
+			xfs_buf_relse(bp);
 			dst += tmp;
 			valuelen -= tmp;
 
@@ -2058,7 +2058,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		if (bp) {
 		    XFS_BUF_STALE(bp);
 		    XFS_BUF_UNDELAYWRITE(bp);
-			brelse(bp);
+			xfs_buf_relse(bp);
 			bp = NULL;
 		}
 

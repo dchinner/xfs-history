@@ -479,6 +479,7 @@ xfs_dir2_getdents(
 	 */
 	is32 = ABI_IS_IRIX5(GETDENTS_ABI(get_current_abi(), uio));
 	alignment = (is32 ? sizeof(irix5_off_t) : sizeof(off_t)) - 1;
+#ifndef __linux__
 	if ((uio->uio_iovcnt == 1) &&
 #if CELL_CAPABLE
 	    !KT_CUR_ISXTHREAD() &&
@@ -523,6 +524,12 @@ xfs_dir2_getdents(
 			xfs_dir2_put_dirent32_uio :
 			xfs_dir2_put_dirent64_uio;
 	}
+#else
+	dbp = NULL;
+	put = is32 ?
+		xfs_dir2_put_dirent32_uio :
+		xfs_dir2_put_dirent64_uio;
+#endif /* __linux__ */
 	*eofp = 0;
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -536,10 +543,12 @@ xfs_dir2_getdents(
 		rval = xfs_dir2_block_getdents(tp, dp, uio, eofp, dbp, put);
 	else
 		rval = xfs_dir2_leaf_getdents(tp, dp, uio, eofp, dbp, put);
+#ifndef __linux__
 	if (dbp != NULL)
 		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
 	else if (locklen)
 		unuseracc(lockaddr, locklen, B_READ|B_PHYS);
+#endif /* __linux__ */
 	return rval;
 }
 #endif	/* !SIM */

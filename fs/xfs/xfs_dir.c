@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.111 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -630,10 +630,12 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp, put);
 	}
 
+#ifndef __linux__
 	if (dbp != NULL)
 		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
 	else if (locklen)
 		unuseracc(lockaddr, locklen, (B_READ|B_PHYS));
+#endif
 	return(retval);
 }
 #endif	/* !SIM */

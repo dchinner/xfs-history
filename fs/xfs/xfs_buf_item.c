@@ -1,4 +1,4 @@
-#ident "$Revision: 1.78 $"
+#ident "$Revision: 1.79 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -320,7 +320,7 @@ xfs_buf_item_unpin(
 		xfs_trans_delete_ail(mp, (xfs_log_item_t *)bip, s);
 		xfs_buf_item_relse(bp);
 		ASSERT(XFS_BUF_FSPRIVATE(bp, void *) == NULL);
-		brelse(bp);
+		xfs_buf_relse(bp);
 	}
 
 }
@@ -499,7 +499,7 @@ xfs_buf_item_unlock(
 	 * Release the buffer if XFS_BLI_HOLD was not set.
 	 */
 	if (!hold) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 	}
 }
 
@@ -574,7 +574,7 @@ xfs_buf_item_push(
 	if (XFS_BUF_ISDELAYWRITE(bp)) {
 		xfs_bawrite(bip->bli_item.li_mountp, bp);
 	} else {
-		brelse(bp);
+		xfs_buf_relse(bp);
 	}
 }
 
@@ -1252,7 +1252,7 @@ xfs_buf_iodone_callbacks(
 			 */
 			if (XFS_BUF_ISSHUT(bp)) {
 			    XFS_BUF_UNSHUT(bp);
-				brelse(bp);
+				xfs_buf_relse(bp);
 			} else {
 				biodone(bp);
 			}
@@ -1288,7 +1288,7 @@ xfs_buf_iodone_callbacks(
 			}
 			ASSERT(XFS_BUF_IODONE_FUNC(bp));
 			buftrace("BUF_IODONE ASYNC", bp);
-			brelse(bp);
+			xfs_buf_relse(bp);
 		} else {
 			/*
 			 * If the write of the buffer was not asynchronous,
@@ -1349,7 +1349,7 @@ xfs_buf_error_relse(
 	XFS_BUF_SET_FSPRIVATE(bp, NULL);
 	XFS_BUF_CLR_IODONE_FUNC(bp);
 	bp->b_relse = NULL;
-	brelse(bp);
+	xfs_buf_relse(bp);
 	return;
 
 }

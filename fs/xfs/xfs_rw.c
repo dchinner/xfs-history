@@ -1,4 +1,4 @@
-#ident "$Revision: 1.280 $"
+#ident "$Revision: 1.281 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1237,7 +1237,7 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 		 * expect B_DONE to be there.
 		 */
 		bp->b_flags |= B_DONE|B_STALE;
-		brelse(bp);
+		xfs_buf_relse(bp);
 		goto out;
 	}
 
@@ -1918,12 +1918,12 @@ xfs_read_file(
 				 * expect B_DONE to be there.
 				 */
 				bp->b_flags |= B_DONE|B_STALE;
-				brelse(bp);
+				xfs_buf_relse(bp);
 				break;
 			} else if (bp->b_resid != 0) {
 				buffer_bytes_ok = 0;
 				bp->b_flags |= B_DONE|B_STALE;
-				brelse(bp);
+				xfs_buf_relse(bp);
 				break;
 			} else {
 				buffer_bytes_ok = 1;
@@ -1950,12 +1950,12 @@ xfs_read_file(
 				}
 				if (error) {
 					bp->b_flags |= B_DONE|B_STALE;
-					brelse(bp);
+					xfs_buf_relse(bp);
 					break;
 				}
 			}
 
-			brelse(bp);
+			xfs_buf_relse(bp);
 
 			if (useracced) {
 				xfs_unlock_iopages(uaccmaps, nuaccmaps);
@@ -2649,7 +2649,7 @@ xfs_zero_last_block(
 	if (bp->b_flags & B_ERROR) {
 		error = geterror(bp);
 		bp->b_flags |= B_DONE|B_STALE;
-		brelse(bp);
+		xfs_buf_relse(bp);
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		return error;
 	}
@@ -3526,7 +3526,7 @@ xfs_write_file(
 				ASSERT(error != EINVAL);
 				bp->b_flags |= B_DONE|B_STALE;
 				bp->b_flags &= ~(B_DELWRI);
-				brelse(bp);
+				xfs_buf_relse(bp);
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -3731,7 +3731,7 @@ xfs_write_file(
 					if (ioflag & IO_DSYNC) {
 						bp->b_fsprivate3 = NULL;
 						bp->b_flags &= ~B_HOLD;
-						brelse(bp);
+						xfs_buf_relse(bp);
 					}
 				} else {
 					bdwrite(bp);
@@ -6477,7 +6477,7 @@ xfs_bioerror_relse(
 		bioerror(bp, EIO);
 		vsema(&bp->b_iodonesema);
 	} else {
-		brelse(bp);
+		xfs_buf_relse(bp);
 	}
 	return (EIO);
 }
@@ -6535,7 +6535,7 @@ xfs_read_buf(
 			/* 
 			 * brelse clears B_ERROR and b_error
 			 */
-			brelse(bp);
+			xfs_buf_relse(bp);
 		}
 	}
 	return (error);

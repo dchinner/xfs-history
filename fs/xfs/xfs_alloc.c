@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.115 $"
+#ident	"$Revision: 1.116 $"
 
 /*
  * Free space allocation for XFS.
@@ -565,9 +565,9 @@ xfs_alloc_read_agfl(
 	xfs_mount_t	*mp,		/* mount point structure */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno,		/* allocation group number */
-	xfs_buf_t		**bpp)		/* buffer for the ag free block array */
+	xfs_buf_t	**bpp)		/* buffer for the ag free block array */
 {
-	xfs_buf_t		*bp;		/* return value */
+	xfs_buf_t	*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	int		error;
 

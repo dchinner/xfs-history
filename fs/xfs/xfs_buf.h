@@ -107,14 +107,16 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 	{ ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
 		(bp)->b_fsprivate3 = (mp); bawrite(bp);}
 
+#define xfs_buf_relse(bp)			\
+		brelse(bp)
 
 #endif /* _USING_BUF_T */
 
 #ifdef _USING_PAGEBUF_T
 #include <linux/page_buf.h>
 
-typedef struct page_buf xfs_buf_t;
-#define xfs_buf page_buf
+typedef struct page_buf_s xfs_buf_t;
+#define xfs_buf page_buf_s
 
 struct inode;
 
@@ -156,6 +158,9 @@ typedef struct buftarg {
 
 #define xfs_bdwrite(mp, bp) pagebuf_iostart(bp, PBF_DELWRI)
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
+
+#define xfs_buf_relse(bp)	\
+			pagebuf_rele(bp)
 
 #endif /* _USING_PAGEBUF_T */
 

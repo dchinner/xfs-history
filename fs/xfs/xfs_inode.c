@@ -1,4 +1,4 @@
-#ident "$Revision: 1.256 $"
+#ident "$Revision: 1.257 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -3102,7 +3102,7 @@ xfs_iflush(
 	return error;
 
 corrupt_out:
-	brelse(bp);
+	xfs_buf_relse(bp);
 	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
 	xfs_iflush_abort(ip);
 	/*
@@ -3122,7 +3122,7 @@ cluster_corrupt_out:
 	 * filesystem before releasing the buffer.
 	 */
 	if ((bufwasdelwri= XFS_BUF_ISDELAYWRITE(bp))) {
-		brelse(bp);
+		xfs_buf_relse(bp);
 	}
 
 	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
@@ -3143,7 +3143,7 @@ cluster_corrupt_out:
 			biodone(bp);
 		} else {
 			XFS_BUF_STALE(bp);
-			brelse(bp);
+			xfs_buf_relse(bp);
 		}
 	}
 
