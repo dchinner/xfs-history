@@ -319,9 +319,8 @@ linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 void
 linvfs_release_inode(struct inode *inode)
 {
-	int	pincount; /* not used here */
 	if (inode) {
-		pagebuf_delwri_flush(inode, PBDF_WAIT,&pincount);
+		pagebuf_delwri_flush(inode, PBDF_WAIT, NULL);
 		pagebuf_lock_disable(inode);
 		truncate_inode_pages(&inode->i_data, 0L);
 		iput(inode);

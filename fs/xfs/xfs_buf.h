@@ -317,9 +317,9 @@ static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
 #define xfs_iowait(pb)              \
 	    pagebuf_iowait(pb)
 
-#define xfs_binval(buftarg) /* NOT used with pagebufs... do nothing */
 
 extern void XFS_bflush(buftarg_t);
+#define xfs_binval(buftarg) XFS_bflush(buftarg)
 
 #define xfs_incore_relse(buftarg,delwri_only,wait)	\
        _xfs_incore_relse(buftarg,delwri_only,wait)

@@ -235,7 +235,8 @@ xfs_zero_last_block(
 
 		page = find_lock_page(&ip->i_data, isize >> PAGE_CACHE_SHIFT);
 		if (page) {
-			memset((void *)page_address(page)+i, 0, PAGE_SIZE-i);
+			memset((void *)kmap(page)+i, 0, PAGE_SIZE-i);
+			kunmap(page);
 
 			/*
 			 * Now we check to see if there are any holes in the
@@ -355,8 +356,6 @@ xfs_zero_last_block(
 				goto out_lock;
 			}
 		}
-	} else {
-		pb->pb_bn = PAGE_BUF_DADDR_NULL;
 	}
 
 
@@ -537,9 +536,6 @@ xfs_zero_eof(
 			pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
 			if (imap.br_state == XFS_EXT_UNWRITTEN) {
 				printk("xfs_zero_eof: unwritten? what do we do here?\n");
-			}
-			if (io->io_flags & XFS_IOCORE_RT) {
-				printk("xfs_zero_eof: real time device? use diff inode\n");
 			}
 		}
 
@@ -2109,8 +2105,7 @@ xfs_pb_nfreer(page_buf_t *bp){
 void
 XFS_bflush(buftarg_t target)
 {
-	int pincount = 0;  /* unused */
-	pagebuf_delwri_flush(target.inode, PBDF_WAIT, &pincount);
+	pagebuf_delwri_flush(target.inode, PBDF_WAIT, NULL);
 }
 
 
@@ -2137,7 +2132,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 	do {
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 		pagebuf_delwri_flush(mp->m_ddev_targ.inode,
-				PBDF_WAIT|PBDF_PINCOUNT, &pincount);
+				PBDF_WAIT, &pincount);
 		if (pincount == 0) {delay(50); count++;}
 	}  while (count < 2);
   
@@ -2152,7 +2147,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 	do {
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 		pagebuf_delwri_flush(mp->m_ddev_targ.inode,
-			PBDF_WAIT|PBDF_PINCOUNT, &pincount);
+			PBDF_WAIT, &pincount);
 	}  while (pincount);
  
 	/* Ok now write out an unmount record */
