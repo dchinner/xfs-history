@@ -963,9 +963,11 @@ xfs_read_file(
 			if (bp->b_flags & B_ERROR) {
 				error = geterror(bp);
 				ASSERT(error != EINVAL);
+				brelse(bp);
 				break;
 			} else if (bp->b_resid != 0) {
 				buffer_bytes_ok = 0;
+				brelse(bp);
 				break;
 			} else {
 				buffer_bytes_ok = 1;
@@ -975,6 +977,7 @@ xfs_read_file(
 						bmapp->pbsize, UIO_READ,
 						uiop);
 				if (error) {
+					brelse(bp);
 					break;
 				}
 			}
@@ -1884,7 +1887,7 @@ xfs_write_file(
 				xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			}
 
-			if (uiop->uio_fmode & FSYNC) {
+			if (ioflag & IO_SYNC) {
 				bwrite(bp);
 			} else {
 				bdwrite(bp);

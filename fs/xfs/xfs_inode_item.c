@@ -467,7 +467,7 @@ xfs_inode_item_push(
 	 * pull it from the AIL, mark it clean, and xfs_iput()
 	 * the inode.
 	 */
-	xfs_iflush(ip, B_ASYNC);
+	xfs_iflush(ip, XFS_IFLUSH_ASYNC);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 }
 

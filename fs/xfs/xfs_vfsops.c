@@ -826,19 +826,19 @@ xfs_unmount(vfs_t	*vfsp,
 	if ((rbmip = mp->m_rbmip) != NULL) {
 		xfs_ilock(rbmip, XFS_ILOCK_EXCL);
 		xfs_iflock(rbmip);
-		xfs_iflush(rbmip, 0);
+		xfs_iflush(rbmip, XFS_IFLUSH_SYNC);
 		xfs_iunlock(rbmip, XFS_ILOCK_EXCL);
 		ASSERT(XFS_ITOV(rbmip)->v_count == 1);
 
 		rsumip = mp->m_rsumip;
 		xfs_ilock(rsumip, XFS_ILOCK_EXCL);
 		xfs_iflock(rsumip);
-		xfs_iflush(rsumip, 0);
+		xfs_iflush(rsumip, XFS_IFLUSH_SYNC);
 		xfs_iunlock(rsumip, XFS_ILOCK_EXCL);
 		ASSERT(XFS_ITOV(rsumip)->v_count == 1);
 	}
 
-	xfs_iflush(rip, 0);		/* synchronously flush to disk */
+	xfs_iflush(rip, XFS_IFLUSH_SYNC);   /* synchronously flush to disk */
 	rvp = XFS_ITOV(rip);
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
@@ -1301,7 +1301,8 @@ xfs_sync(vfs_t		*vfsp,
 				 */
 				if ((ip->i_pincount == 0) &&
 				    xfs_iflock_nowait(ip)) {
-					xfs_iflush(ip, B_ASYNC);
+					xfs_iflush(ip,
+					       XFS_IFLUSH_DELWRI_ELSE_ASYNC);
 				}
 			}
 
@@ -1316,7 +1317,17 @@ xfs_sync(vfs_t		*vfsp,
 				}
 
 				xfs_iflock(ip);
-				xfs_iflush(ip, fflag);
+				if (flags & SYNC_WAIT) {
+					xfs_iflush(ip, XFS_IFLUSH_SYNC);
+				} else {
+					/*
+					 * Tell xfs_iflush() to use a delwri
+					 * flush if it can and to otherwise
+					 * do it async.
+					 */
+					xfs_iflush(ip,
+					       XFS_IFLUSH_DELWRI_ELSE_ASYNC);
+				}
 			}
 		}
 

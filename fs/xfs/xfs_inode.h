@@ -158,6 +158,15 @@ typedef struct xfs_inode {
 #define	XFS_IUNLOCK_NONOTIFY	0x10
 
 /*
+ * Flags for xfs_iflush()
+ */
+#define	XFS_IFLUSH_DELWRI_ELSE_SYNC	1
+#define	XFS_IFLUSH_DELWRI_ELSE_ASYNC	2
+#define	XFS_IFLUSH_SYNC			3
+#define	XFS_IFLUSH_ASYNC		4
+#define	XFS_IFLUSH_DELWRI		5
+
+/*
  * Flags for xfs_iflush_all.
  */
 #define	XFS_FLUSH_ALL		0x1
