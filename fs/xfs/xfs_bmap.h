@@ -143,7 +143,6 @@ typedef struct xfs_bmalloca {
 	int			userdata;/* set if is user data */
 	int			low;	/* low on space, using seq'l ags */
 	int			aeof;   /* allocated space at eof */
-	int			prealloc;/* pre-allocate request */
 } xfs_bmalloca_t;
 
 #ifdef __KERNEL__

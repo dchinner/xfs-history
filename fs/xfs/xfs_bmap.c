@@ -2596,25 +2596,21 @@ xfs_bmap_alloc(
 		 * If we are not low on available data blocks, and the 
 		 * underlying logical volume manager is a stripe, and
 		 * the file offset is zero then try to allocate data 
-		 * blocks on stripe unit/width boundary. 
+		 * blocks on stripe unit boundary.
 		 * NOTE: ap->aeof is only set if the allocation length
 		 * is >= the stripe unit and the allocation offset is
 		 * at the end of file. 
 		 */ 
 		if (!ap->low && ap->aeof) {
 			if (!ap->off) {
-				args.alignment = mp->m_swidth;
-
+				args.alignment = mp->m_dalign;
 				atype = args.type;
-
 				isaligned = 1;
-
 				/*
 				 * Adjust for alignment
 				 */
 				if (blen > args.alignment && blen <= ap->alen) 
 					args.minlen = blen - args.alignment;
-
 				args.minalignslop = 0;
 			} else {
 				/*
@@ -2623,29 +2619,23 @@ xfs_bmap_alloc(
 				 * allocation with alignment turned on.
 			 	 */
 				atype = args.type;
-
 				tryagain = 1;
-
 				args.type = XFS_ALLOCTYPE_THIS_BNO;
 				args.alignment = 1;
-
 				/*
 				 * Compute the minlen+alignment for the
 				 * next case.  Set slop so that the value
 				 * of minlen+alignment+slop doesn't go up
 				 * between the calls.
 				 */
-				if (   blen  > mp->m_swidth
-				    && blen <= ap->alen) 
-					nextminlen = blen - mp->m_swidth;
+				if (blen > mp->m_dalign && blen <= ap->alen) 
+					nextminlen = blen - mp->m_dalign;
 				else
 					nextminlen = args.minlen;
-
-				if (nextminlen + mp->m_swidth
-							> args.minlen + 1)
-					args.minalignslop = nextminlen
-							  + mp->m_swidth
-							  - args.minlen - 1;
+				if (nextminlen + mp->m_dalign > args.minlen + 1)
+					args.minalignslop =
+						nextminlen + mp->m_dalign -
+						args.minlen - 1;
 				else
 					args.minalignslop = 0;
 			}
@@ -2653,49 +2643,26 @@ xfs_bmap_alloc(
 			args.alignment = 1;
 			args.minalignslop = 0;
 		}
-
 		args.minleft = ap->minleft;
 		args.wasdel = ap->wasdel;
 		args.isfl = 0;
 		args.userdata = ap->userdata;
-
 		if (error = xfs_alloc_vextent(&args))
 			return error;
-
 		if (tryagain && args.fsbno == NULLFSBLOCK) {
 			/*
 			 * Exact allocation failed. Now try with alignment
-			 * turned on for a swidth.
-			 */
-			args.type	  = atype;
-			args.fsbno	  = ap->rval;
-			args.alignment	  = mp->m_swidth;
-			args.minlen	  = nextminlen;
-			args.minalignslop = 0;
-
-			isaligned = 1;
-
-			if (error = xfs_alloc_vextent(&args))
-				return error;
-		}
-
-		if (tryagain && args.fsbno == NULLFSBLOCK) {
-			/*
-			 * Exact allocation failed. Now try with alignment
-			 * turned on for a sunit.
+			 * turned on.
 			 */
                         args.type = atype;
                         args.fsbno = ap->rval;
                         args.alignment = mp->m_dalign;
 			args.minlen = nextminlen;
 			args.minalignslop = 0;
-
 			isaligned = 1;
-
                         if (error = xfs_alloc_vextent(&args))
                                 return error;
                 }
-
 		if (isaligned && args.fsbno == NULLFSBLOCK) {
 			/* 
 			 * allocation failed, so turn off alignment and
@@ -2704,44 +2671,33 @@ xfs_bmap_alloc(
 			args.type = atype;
 			args.fsbno = ap->rval;
 			args.alignment = 0;
-
 			if (error = xfs_alloc_vextent(&args))
 				return error;
 		}
-
 		if (args.fsbno == NULLFSBLOCK && nullfb &&
 		    args.minlen > ap->minlen) {
 			args.minlen = ap->minlen;
 			args.type = XFS_ALLOCTYPE_START_BNO;
 			args.fsbno = ap->rval;
-
 			if (error = xfs_alloc_vextent(&args))
 				return error;
 		}
-
 		if (args.fsbno == NULLFSBLOCK && nullfb) {
 			args.fsbno = 0;
 			args.type = XFS_ALLOCTYPE_FIRST_AG;
 			args.total = ap->minlen;
 			args.minleft = 0;
-
 			if (error = xfs_alloc_vextent(&args))
 				return error;
-
 			ap->low = 1;
 		}
-
 		if (args.fsbno != NULLFSBLOCK) {
 			ap->firstblock = ap->rval = args.fsbno;
-
 			ASSERT(nullfb || fb_agno == args.agno ||
 			       (ap->low && fb_agno < args.agno));
-
 			ap->alen = args.len;
 			ap->ip->i_d.di_nblocks += args.len;
-
 			xfs_trans_log_inode(ap->tp, ap->ip, XFS_ILOG_CORE);
-
 			if (ap->wasdel)
 				ap->ip->i_delayed_blks -= args.len;
 			/*
@@ -2761,9 +2717,7 @@ xfs_bmap_alloc(
 			ap->alen = 0;
 		}
 	}
-
 	return 0;
-
 #undef	ISLEGAL
 }
 
@@ -4659,7 +4613,6 @@ xfs_bmapi(
 	int		whichfork;	/* data or attr fork */
 	char		wr;		/* this is a write request */
 	int		rsvd;		/* OK to allocate reserved blocks */
-	int		prealloc;	/* pre-allocate request */
 #ifdef DEBUG
 	xfs_fileoff_t	orig_bno;	/* original block number value */
 	int		orig_flags;	/* original flags arg value */
@@ -4672,7 +4625,6 @@ xfs_bmapi(
 	orig_flags = flags;
 	orig_mval = mval;
 	orig_nmap = *nmap;
-
 #endif
 	ASSERT(*nmap >= 1);
 	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP || !(flags & XFS_BMAPI_WRITE));
@@ -4698,7 +4650,6 @@ xfs_bmapi(
 	exact = (flags & XFS_BMAPI_EXACT) != 0;
 	rsvd = (flags & XFS_BMAPI_RSVBLOCKS) != 0;
 	contig = (flags & XFS_BMAPI_CONTIG) != 0;
-	prealloc = (flags & XFS_BMAPI_PREALLOC) != 0;
 	/*
 	 * stateless is used to combine extents which
 	 * differ only due to the state of the extents.
@@ -4844,16 +4795,13 @@ xfs_bmapi(
 				bma.minlen = minlen;
 				bma.low = flist->xbf_low;
 				bma.minleft = minleft;
-				bma.prealloc = prealloc;
 				/*
-				 * Only want to do the alignment at the eof
-				 * if it is userdata and allocation length 
-				 * is >= than a stripe unit.
+				 * Only want to do the alignment at the
+				 * eof if it is userdata and allocation length 
+				 * is larger than a stripe unit.
 				 */
-				if (   mp->m_dalign
-				    && alen >= mp->m_dalign
-				    && userdata
-				    && whichfork == XFS_DATA_FORK) {
+				if (mp->m_dalign && alen >= mp->m_dalign &&
+				    userdata && whichfork == XFS_DATA_FORK) {
 					if (error = xfs_bmap_isaeof(ip, aoff,
 							whichfork, &bma.aeof))
 						goto error0;

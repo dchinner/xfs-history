@@ -526,36 +526,19 @@ xfs_mountfs(
 				error = XFS_ERROR(EINVAL);
 				goto error1;
 			}
-
-#ifdef	DEBUG
-			xfs_fs_cmn_err(CE_WARN, mp,
-"XFS:  File system stripe alignment turned off: dalign(%d)/swidth(%d) not compatible with fsblksize(%d)",
-					mp->m_dalign, mp->m_swidth,
-					mp->m_blockmask +1);
-#endif	/* DEBUG */
 			mp->m_dalign = mp->m_swidth = 0;
-
 		} else {
 			/*
 			 * Convert the stripe unit and width to FSBs.
 			 */
 			mp->m_dalign = XFS_BB_TO_FSBT(mp, mp->m_dalign);
-
 			if (mp->m_dalign && (sbp->sb_agblocks % mp->m_dalign)) {
 				if (mp->m_flags & XFS_MOUNT_RETERR) {
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
-
-#ifdef	DEBUG
-				xfs_fs_cmn_err(CE_WARN, mp,
-"XFS:  File system stripe alignment turned off: dalign(%d)/swidth(%d) not compatible with agsize(%d)",
-					mp->m_dalign, mp->m_swidth,
-					sbp->sb_agblocks);
-#endif	/* DEBUG */
 				mp->m_dalign = 0;
 				mp->m_swidth = 0;
-
 			} else if (mp->m_dalign) {
 				mp->m_swidth = XFS_BB_TO_FSBT(mp, mp->m_swidth);
 			} else {
@@ -564,12 +547,6 @@ xfs_mountfs(
 					error = XFS_ERROR(EINVAL);
 					goto error1;
 				}
-
-#ifdef	DEBUG
-				xfs_fs_cmn_err(CE_WARN, mp,
-"XFS:  File system stripe alignment turned off: dalign(%d) less than fsblksize(%d)",
-					mp->m_dalign, mp->m_blockmask +1);
-#endif	/* DEBUG */
 				mp->m_swidth = 0;
 			}
 		}
@@ -699,8 +676,8 @@ xfs_mountfs(
 	 * If we are using stripe alignment, check whether
 	 * the stripe unit is a multiple of the inode alignment
 	 */
-	if (   mp->m_dalign
-	    && mp->m_inoalign_mask && !(mp->m_dalign & mp->m_inoalign_mask))
+	if (mp->m_dalign && mp->m_inoalign_mask &&
+	    !(mp->m_dalign & mp->m_inoalign_mask))
 		mp->m_sinoalign = mp->m_dalign;
 	else
 		mp->m_sinoalign = 0;

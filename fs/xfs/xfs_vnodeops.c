@@ -5549,7 +5549,7 @@ retry:
 		 * allocate and setup the transaction
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_DIOSTRAT);
-		resblks = (uint)XFS_DIOSTRAT_SPACE_RES(mp, datablocks);
+		resblks = XFS_DIOSTRAT_SPACE_RES(mp, datablocks);
 		error = xfs_trans_reserve(tp,
 					  resblks,
 					  XFS_WRITE_LOG_RES(mp),
