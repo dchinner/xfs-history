@@ -369,6 +369,12 @@ xfs_trans_apply_sb_deltas(
 	bp = xfs_trans_getsb(tp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
 
+	/*
+	 * Check that superblock mods match the mods made to AGF counters.
+	 */
+	ASSERT((tp->t_fdblocks_delta + tp->t_res_fdblocks_delta) ==
+	       (tp->t_ag_freeblks_delta + tp->t_ag_flist_delta));
+
 	if (tp->t_icount_delta != 0) {
 		sbp->sb_icount += tp->t_icount_delta;
 	}
@@ -509,6 +515,8 @@ xfs_trans_commit(
 	int			sync;
 	static xfs_lsn_t	trans_lsn = 1;
 
+	ASSERT((tp->t_flags & XFS_TRANS_SB_DIRTY) ||
+	       ((tp->t_ag_freeblks_delta == 0) && (tp->t_ag_flist_delta == 0)));
 	/*
 	 * Determine whether this commit is releasing a permanent
 	 * log reservation or not.

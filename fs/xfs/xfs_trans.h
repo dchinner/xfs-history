@@ -210,6 +210,8 @@ typedef struct xfs_trans {
 	int			t_res_fdblocks_delta; /* on-disk only chg */
 	int			t_frextents_delta;/* superblock freextents chg*/
 	int			t_res_frextents_delta; /* on-disk only chg */
+	int			t_ag_freeblks_delta; /* debugging counter */
+	int			t_ag_flist_delta; /* debugging counter */
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
@@ -296,6 +298,14 @@ struct xfs_efd_log_item;
 #define	xfs_trans_get_log_count(tp)	((tp)->t_log_count)
 #define	xfs_trans_get_block_res(tp)	((tp)->t_blk_res)
 #define	xfs_trans_set_sync(tp)		((tp)->t_flags |= XFS_TRANS_SYNC)
+
+#ifdef DEBUG
+#define	xfs_trans_agblocks_delta(tp, d)	((tp)->t_ag_freeblks_delta += d)
+#define	xfs_trans_agflist_delta(tp, d)	((tp)->t_ag_flist_delta += d)
+#else
+#define	xfs_trans_agblocks_delta(tp, d)
+#define	xfs_trans_agflist_delta(tp, d)
+#endif
 
 /*
  * xFS transaction mechanism exported interfaces.

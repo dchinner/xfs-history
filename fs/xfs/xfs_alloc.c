@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.61 $"
+#ident	"$Revision: 1.63 $"
 
 /*
  * Free space allocation for xFS.
@@ -518,6 +518,7 @@ xfs_alloc_ag_vextent(
 		if (!wasfromfl) {
 			agf = XFS_BUF_TO_AGF(args->agbp);
 			agf->agf_freeblks -= args->len;
+			xfs_trans_agblocks_delta(args->tp, -(args->len));
 			args->pag->pagf_freeblks -= args->len;
 			ASSERT(agf->agf_freeblks <= agf->agf_length);
 			xfs_alloc_trace_modagf("xfs_alloc_ag_vextent", NULL,
@@ -1646,6 +1647,7 @@ xfs_free_ag_extent(
 		agf = XFS_BUF_TO_AGF(agbp);
 		pag = &mp->m_perag[agno];
 		agf->agf_freeblks += len;
+		xfs_trans_agblocks_delta(tp, len);
 		pag->pagf_freeblks += len;
 		ASSERT(agf->agf_freeblks <= agf->agf_length);
 		xfs_alloc_trace_modagf(fname, NULL, mp, agf, XFS_AGF_FREEBLKS);
@@ -1879,6 +1881,7 @@ xfs_alloc_get_freelist(
 		agf->agf_flfirst = 0;
 	pag = &tp->t_mountp->m_perag[agf->agf_seqno];
 	agf->agf_flcount--;
+	xfs_trans_agflist_delta(tp, -1);
 	pag->pagf_flcount--;
 	xfs_alloc_trace_modagf(fname, NULL, tp->t_mountp, agf,
 		XFS_AGF_FLFIRST | XFS_AGF_FLCOUNT);
@@ -1961,6 +1964,7 @@ xfs_alloc_put_freelist(
 		agf->agf_fllast = 0;
 	pag = &tp->t_mountp->m_perag[agf->agf_seqno];
 	agf->agf_flcount++;
+	xfs_trans_agflist_delta(tp, 1);
 	pag->pagf_flcount++;
 	ASSERT(agf->agf_flcount <= XFS_AGFL_SIZE);
 	blockp = &agfl->agfl_bno[agf->agf_fllast];
