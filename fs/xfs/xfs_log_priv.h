@@ -9,21 +9,16 @@
  */
 
 #define XLOG_NUM_ICLOGS		8
+#define XLOG_MAX_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
-#define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* need to outlaw as cycle XXX*/
+#define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
 #define XLOG_RECORD_BSIZE	(4*1024)	/* eventually 32k */
+#define XLOG_MAX_RECORD_BSIZE	(32*1024)
 #define XLOG_RECORD_BSHIFT	12		/* 4096 == 1 << 12 */
+#define XLOG_MAX_RECORD_BSHIFT	15		/* 32k == 1 << 15 */
 #define XLOG_BTOLRBB(b)		((b)+XLOG_RECORD_BSIZE-1 >> XLOG_RECORD_BSHIFT)
 
 #define XLOG_HEADER_SIZE	512
-#if 0
-#define XLOG_BBSHIFT		12
-#define XLOG_BBSIZE		(1<<XLOG_BBSHIFT)	/* 4096 */
-#define XLOG_BBMASK		(XLOG_BBSIZE-1)
-#define XLOGBB_TO_BB(x)		(((x) << XLOG_BBSHIFT) >> BBSHIFT)
-
-#define XLOG_NBLKS(size)	((size)+XLOG_BBSIZE-1 >> XLOG_BBSHIFT)
-#endif /* 0 */
 
 #define ASSIGN_LSN(lsn,log)	{ ((uint *)&(lsn))[0] = (log)->l_curr_cycle; \
 				  ((uint *)&(lsn))[1] = (log)->l_curr_block; }
@@ -274,13 +269,13 @@ typedef struct log {
 
 
 /* common routines */
-extern daddr_t	xlog_find_head(xlog_t *log);
+extern int	xlog_find_head(xlog_t *log, daddr_t *head_blk);
 extern daddr_t  xlog_print_find_oldest(xlog_t *log);
 extern int	xlog_recover(xlog_t *log);
 extern void	xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
 extern buf_t *	xlog_get_bp(int);
 extern void	xlog_put_bp(buf_t *);
-extern void	xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
+extern int	xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
 
 #define XLOG_TRACE_GRAB_FLUSH  1
 #define XLOG_TRACE_REL_FLUSH   2
