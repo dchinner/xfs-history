@@ -219,9 +219,9 @@ typedef struct page_buf_s {
 	void			*pb_fspriv;
 	void			*pb_fspriv2;
 	void			*pb_fspriv3;
-	short			pb_error;	/* error code on I/O */
-	short			pb_page_count;	/* size of page array */
-	short			pb_offset;	/* page offset in first page */
+	unsigned short		pb_error;	/* error code on I/O */
+	unsigned short		pb_page_count;	/* size of page array */
+	unsigned short		pb_offset;	/* page offset in first page */
 	unsigned char		pb_locked;	/* page array is locked */
 	unsigned char		pb_hash_index;	/* hash table index	*/
 	struct page		**pb_pages;	/* array of page pointers */
@@ -332,7 +332,7 @@ extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 
 extern void pagebuf_ioerror(		/* mark buffer in error (or not) */
 		page_buf_t *,		/* buffer to mark		*/
-		int);			/* error to store (0 if none)	*/
+		unsigned int);		/* error to store (0 if none)	*/
 
 extern int pagebuf_iostart(		/* start I/O on a buffer	*/
 		page_buf_t *,		/* buffer to start		*/

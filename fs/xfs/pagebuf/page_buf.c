@@ -1332,10 +1332,10 @@ void pagebuf_iodone(		/* mark buffer I/O complete	*/
 
 void pagebuf_ioerror(	/* mark buffer in error (or not) */
     page_buf_t * pb,	/* buffer to mark		*/
-    int serror)		/* error to store (0 if none)	  */
+    unsigned int error)	/* error to store (0 if none)	  */
 {
-	pb->pb_error = serror;
-	PB_TRACE(pb, PB_TRACE_REC(ioerror), serror);
+	pb->pb_error = error;
+	PB_TRACE(pb, PB_TRACE_REC(ioerror), error);
 }
 
 /*
@@ -1614,6 +1614,15 @@ _pagebuf_page_io(
 		/* Fallthrough, same as default */
 	default:
 		sector = SECTOR_SIZE;
+	}
+
+	/* The b_size field of struct buffer_head is an unsigned short
+	 * ... we may need to split this request up.  [64K is too big]
+	 */
+	assert(sizeof(bh->b_size) == 2);
+	while (sector > 0xffff) {
+		sector >>= 1;
+		blk_length++;
 	}
 
 	multi_ok = (blk_length != 1);

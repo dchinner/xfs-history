@@ -1796,9 +1796,9 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx\n",
 		   bp.pb_common.pb_bn,
 		   (unsigned long) bp.pb_common.pb_count_desired);
-	kdb_printf("  pb_io_remaining %d pb_error %d\n",
+	kdb_printf("  pb_io_remaining %d pb_error %u\n",
 		   bp.pb_io_remaining.counter, bp.pb_common.pb_error);
-	kdb_printf("  pb_page_count %d pb_offset 0x%x pb_pages 0x%p\n",
+	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
 		bp.pb_common.pb_page_count, bp.pb_common.pb_offset,
 		bp.pb_common.pb_pages);
 #ifdef PAGEBUF_LOCK_TRACKING
