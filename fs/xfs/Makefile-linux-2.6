@@ -2,7 +2,7 @@
 #
 # Makefile for SGI XFS File System
 #
-# $Revision: 1.49 $
+# $Revision: 1.50 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -46,6 +46,7 @@ XFS_CSRCS=	xfs_alloc.c \
 		xfs_log.c \
 		xfs_log_recover.c \
 		xfs_macros.c \
+		xfs_misc.c \
 		xfs_mount.c \
 		xfs_rename.c \
 		xfs_rw.c \
