@@ -1122,20 +1122,20 @@ xfs_buf_item_trace(
 	ktrace_enter(bip->bli_trace,
 		     (void *)id,
 		     (void *)bip->bli_buf,
-		     (void *)bip->bli_flags,
-		     (void *)bip->bli_recur,
-		     (void *)bip->bli_refcount,
+		     (void *)((unsigned long)bip->bli_flags),
+		     (void *)((unsigned long)bip->bli_recur),
+		     (void *)((unsigned long)bip->bli_refcount),
 		     (void *)bp->b_blkno,
-		     (void *)bp->b_bcount,
-		     (void *)bp->b_flags,
-		     (void *)bp->b_flags2,
+		     (void *)((unsigned long)bp->b_bcount),
+		     (void *)((unsigned long)bp->b_flags),
+		     (void *)((unsigned long)bp->b_flags2),
 		     (void *)bp->b_fsprivate,
 		     (void *)bp->b_fsprivate2,
-		     (void *)bp->b_pincount,
+		     (void *)((unsigned long)bp->b_pincount),
 		     (void *)bp->b_iodone,
-		     (void *)(valusema(&(bp->b_lock))),
+		     (void *)((unsigned long)(valusema(&(bp->b_lock)))),
 		     (void *)bip->bli_item.li_desc,
-		     (void *)bip->bli_item.li_flags);
+		     (void *)((unsigned long)bip->bli_item.li_flags));
 }
 #endif /* DEBUG */
 
