@@ -1,4 +1,4 @@
-#ident "$Revision: 1.294 $"
+#ident "$Revision: 1.295 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -101,13 +101,14 @@
 #include "sim.h"
 #endif
 
+#ifdef DATAPIPE
 /* data pipe functions */
-#ifdef TO_LOOK_AT_LATER
 extern	int fspe_get_ops(void *);
-#endif /* TO_LOOK_AT_LATER */
+int         xfs_fspe_dioinfo(struct vnode *, struct dioattr *);
+#endif
+
 extern	int xfs_prio_set_bw(void *);
 extern	int xfs_prio_get_bw(void *);
-int         xfs_fspe_dioinfo(struct vnode *, struct dioattr *);
 
 #if _MIPS_SIM == _ABI64
 int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
@@ -4456,7 +4457,7 @@ xfs_allocstore(
 	return error;
 }
 
-
+#ifdef DATAPIPE
 /*
  * xfs_fspe_dioinfo: called by file system pipe end.
  */
@@ -4488,6 +4489,7 @@ xfs_fspe_dioinfo(
 
 	return 0;
 }
+#endif /* DATAPIPE */
 
 /*
  * xfs_fcntl
@@ -4521,11 +4523,11 @@ xfs_fcntl(
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 	switch (cmd) {
+#ifdef DATAPIPE
 	case F_GETOPS:
-#ifdef TO_LOOK_AT_LATER
 		fspe_get_ops(arg);
-#endif /* TO_LOOK_AT_LATER */
 		break;
+#endif
 	case F_SETBW:
 		error = xfs_prio_set_bw(arg);
 		break;
