@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.86 $"
+#ident	"$Revision: 1.87 $"
 
 /*
  * High level interface routines for log manager
@@ -69,7 +69,7 @@ STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
 				int		num_bblks);
 STATIC int	 xlog_space_left(xlog_t *log, int cycle, int bytes);
 STATIC void	 xlog_sync(xlog_t *log, xlog_in_core_t *iclog, uint flags);
-STATIC void	 xlog_unalloc_log(xfs_mount_t *mp);
+STATIC void	 xlog_unalloc_log(xlog_t *log);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
 			    xfs_lsn_t *start_lsn, uint flags);
@@ -442,10 +442,11 @@ xfs_log_mount(xfs_mount_t	*mp,
 		return 0;
 
 	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
+	xlog_init_log(log);
 	if (xlog_recover(log) != 0) {
+		xlog_unalloc_log(log);
 		return XFS_ERECOVER;
 	}
-	xlog_init_log(log);
 	return 0;
 }	/* xfs_log_mount */
 
@@ -498,7 +499,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	      iclog->ic_state == XLOG_STATE_DIRTY))
 		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
 				  &iclog->ic_forcesema, 0);
-	xlog_unalloc_log(mp);
+	xlog_unalloc_log(log);
 
 	return 0;
 }	/* xfs_log_unmount */
@@ -723,6 +724,7 @@ xlog_init_log(xlog_t *log)
 
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
 	bp->b_edev	   = log_dev;
+	bp->b_bufsize	   = XLOG_RECORD_BSIZE;
 	bp->b_iodone	   = xlog_iodone;
 	bp->b_fsprivate2   = (void *)1;
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
@@ -734,10 +736,12 @@ xlog_init_log(xlog_t *log)
 	
 	iclogp = &log->l_iclog;
 	for (i=0; i < XLOG_NUM_ICLOGS; i++) {
-		unaligned =
-			(caddr_t)kmem_zalloc(sizeof(xlog_in_core_t)+NBPP, 0);
 		*iclogp = (xlog_in_core_t *)
-			((__psint_t)(unaligned+NBPP-1) & ~(NBPP-1));
+			kmem_zalloc(sizeof(xlog_in_core_t), VM_CACHEALIGN);
+
+		ASSERT(sizeof(xlog_in_core_t) >= 4096);
+		ASSERT(((__psint_t)*iclogp & (__psint_t)0xfff) == 0);
+
 		iclog = *iclogp;
 		iclog->ic_prev = prev_iclog;
 		prev_iclog = iclog;
@@ -760,6 +764,7 @@ xlog_init_log(xlog_t *log)
 
 		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
 		bp->b_edev = log_dev;
+		bp->b_bufsize = XLOG_RECORD_BSIZE;
 		bp->b_iodone = xlog_iodone;
 		bp->b_fsprivate2 = (void *)1;
 		ASSERT(iclog->ic_bp->b_flags & B_BUSY);
@@ -918,7 +923,7 @@ xlog_sync(xlog_t		*log,
 		iclog->ic_bwritecnt = 1;
 	}
 	bp->b_dmaaddr	= (caddr_t) iclog;
-	bp->b_bcount	= bp->b_bufsize	= count;
+	bp->b_bcount	= count;
 	bp->b_fsprivate	= iclog;		/* save for later */
 	if (flags & XFS_LOG_SYNC)
 		bp->b_flags |= (B_BUSY | B_HOLD);
@@ -942,7 +947,7 @@ xlog_sync(xlog_t		*log,
 		ASSERT(bp->b_fsprivate2 == (void *)1);
 		bp->b_fsprivate2 = (void *)2;
 		bp->b_blkno	= 0;		     /* logical 0 */
-		bp->b_bcount	= bp->b_bufsize = split;
+		bp->b_bcount	= split;
 		bp->b_dmaaddr	= (caddr_t)((__psint_t)iclog+(__psint_t)count);
 		bp->b_fsprivate = iclog;
 		if (flags & XFS_LOG_SYNC)
@@ -975,9 +980,9 @@ xlog_sync(xlog_t		*log,
  * Unallocate a log
  */
 void
-xlog_unalloc_log(xfs_mount_t *mp)
+xlog_unalloc_log(xlog_t *log)
 {
-	
+	cmn_err(CE_WARN, "xlog_unalloc: FIX ME I'M A MEMORY LEAK");
 }	/* xlog_unalloc */
 
 
