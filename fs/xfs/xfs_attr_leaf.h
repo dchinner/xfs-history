@@ -35,6 +35,17 @@
  * takes the first-in-the-block key match found, so we should only have
  * to work "forw"ard.  If none matches, continue with the "forw"ard leaf
  * nodes until the hash key changes or the attribute name is found.
+ *
+ * We store the fact that an attribute is a ROOT versus USER attribute in
+ * the leaf_entry.  The namespaces are independent only because we also look
+ * at the root/user bit when we are looking for a matching attribute name.
+ *
+ * We also store a "incomplete" bit in the leaf_entry.  It shows that an
+ * attribute is in the middle of being created and should not be shown to
+ * the user if we crash during the time that the bit is set.  We clear the
+ * bit when we have finished setting up the attribute.  We do this because
+ * we cannot create some large attributes inside a single transaction, and we
+ * need some indication that we weren't finished if we crash in the middle.
  */
 #define XFS_ATTR_LEAF_MAPSIZE	3	/* how many freespace slots */
 
@@ -54,8 +65,8 @@ typedef struct xfs_attr_leafblock {
 	struct xfs_attr_leaf_entry {	/* sorted on key, not name */
 		__uint32_t hashval;	/* hash value of name */
 		__uint16_t nameidx;	/* index into buffer of name/value */
-		__uint8_t local;	/* 1=>struct local; 0=>struct remote */
-		__uint8_t pad2;
+		__uint8_t flags;	/* LOCAL, ROOT and INCOMPLETE flags */
+		__uint8_t pad2;		/* unused pad byte */
 	} entries[1];			/* variable sized array */
 	struct xfs_attr_leaf_name_local {
 		__uint16_t valuelen;	/* number of bytes in value */
@@ -74,6 +85,13 @@ typedef struct xfs_attr_leaf_map xfs_attr_leaf_map_t;
 typedef struct xfs_attr_leaf_entry xfs_attr_leaf_entry_t;
 typedef struct xfs_attr_leaf_name_local xfs_attr_leaf_name_local_t;
 typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
+
+/*
+ * Flags used in the leaf_entry[i].flags field.
+ */
+#define XFS_ATTR_LOCAL		0x01	/* attr is stored locally */
+#define XFS_ATTR_ROOT		0x02	/* limit access to attr to userid 0 */
+#define XFS_ATTR_INCOMPLETE	0x80	/* attr in middle of create/delete */
 
 /*
  * Cast typed pointers for "local" and "remote" name/value structs.
@@ -105,68 +123,88 @@ typedef struct xfs_attr_leaf_name_remote xfs_attr_leaf_name_remote_t;
  * Function prototypes for the kernel.
  *========================================================================*/
 
+struct attrlist;
+struct attrlist_cursor_kern;
+struct buf;
 struct xfs_da_name;
-struct uio;
-struct xfs_bmap_free;
+struct xfs_da_state;
+struct xfs_da_state_blk;
+struct xfs_inode;
+struct xfs_trans;
 
 /*
  * Internal routines when dirsize < XFS_LITINO(mp).
  */
-int	xfs_attr_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp);
-int	xfs_attr_shortform_addname(xfs_trans_t *trans, xfs_da_name_t *add);
-int	xfs_attr_shortform_lookup(xfs_trans_t *trans, xfs_da_name_t *args);
-int	xfs_attr_shortform_getvalue(xfs_trans_t *trans, xfs_da_name_t *args);
-int	xfs_attr_shortform_to_leaf(xfs_trans_t *trans, xfs_da_name_t *args);
-int	xfs_attr_shortform_removename(xfs_trans_t *trans,
-						  xfs_da_name_t *remove);
-void	xfs_attr_shortform_print(xfs_trans_t *trans, xfs_inode_t *dp);
-int	xfs_attr_shortform_list(xfs_inode_t *dp, attrlist_t *alist,
-					    attrlist_cursor_kern_t *cursor);
-int	xfs_attr_shortform_replace(xfs_trans_t *trans, xfs_da_name_t *args);
-int	xfs_attr_shortform_allfit(buf_t *bp, xfs_inode_t *dp);
+int	xfs_attr_shortform_create(struct xfs_trans *trans,
+					 struct xfs_inode *dp);
+int	xfs_attr_shortform_addname(struct xfs_trans *trans,
+					  struct xfs_da_name *add);
+int	xfs_attr_shortform_lookup(struct xfs_trans *trans,
+					 struct xfs_da_name *args);
+int	xfs_attr_shortform_getvalue(struct xfs_trans *trans,
+					   struct xfs_da_name *args);
+int	xfs_attr_shortform_to_leaf(struct xfs_trans *trans,
+					  struct xfs_da_name *args);
+int	xfs_attr_shortform_removename(struct xfs_trans *trans,
+					     struct xfs_da_name *remove);
+int	xfs_attr_shortform_list(struct xfs_inode *dp, struct attrlist *alist,
+				       int flags,
+				       struct attrlist_cursor_kern *cursor);
+int	xfs_attr_shortform_replace(struct xfs_trans *trans,
+					  struct xfs_da_name *args);
+int	xfs_attr_shortform_allfit(struct buf *bp, struct xfs_inode *dp);
 
 /*
  * Internal routines when dirsize == XFS_LBSIZE(mp).
  */
-int	xfs_attr_leaf_to_node(xfs_trans_t *trans, xfs_da_name_t *args);
-int	xfs_attr_leaf_to_shortform(xfs_trans_t *trans, xfs_da_name_t *args);
+int	xfs_attr_leaf_to_node(struct xfs_trans *trans,
+				     struct xfs_da_name *args);
+int	xfs_attr_leaf_to_shortform(struct xfs_trans *trans, buf_t *bp,
+					  struct xfs_da_name *args);
 
 /*
  * Routines used for growing the Btree.
  */
-int	xfs_attr_leaf_create(xfs_trans_t *trans, xfs_inode_t *dp,
-					 xfs_fileoff_t which_block,
-					 buf_t **bpp);
-int	xfs_attr_leaf_split(xfs_da_state_t *state, xfs_da_state_blk_t *oldblk,
-					   xfs_da_state_blk_t *newblk);
-int	xfs_attr_leaf_lookup_int(buf_t *leaf_buffer, xfs_da_name_t *args,
-				       int *index_found_at);
-int	xfs_attr_leaf_getvalue(buf_t *bp, xfs_da_name_t *args, int index);
-int	xfs_attr_leaf_add(xfs_trans_t *trans, buf_t *leaf_buffer,
-				      xfs_da_name_t *args, int insertion_index);
-int	xfs_attr_leaf_addname(xfs_trans_t *trans, xfs_da_name_t *args);
-int	xfs_attr_leaf_remove(xfs_trans_t *trans, buf_t *leaf_buffer,
-					int index_to_remove, int *result);
-int	xfs_attr_leaf_list_int(buf_t *bp, attrlist_t *alist,
-				     attrlist_cursor_kern_t *cursor);
-void	xfs_attr_leaf_print_int(buf_t *leaf_buffer, xfs_inode_t *attr_inode);
+int	xfs_attr_leaf_create(struct xfs_trans *trans, struct xfs_inode *dp,
+				    xfs_fileoff_t which_block,
+				    struct buf **bpp);
+int	xfs_attr_leaf_split(struct xfs_da_state *state,
+				   struct xfs_da_state_blk *oldblk,
+				   struct xfs_da_state_blk *newblk);
+int	xfs_attr_leaf_lookup_int(struct buf *leaf_buffer,
+					struct xfs_da_name *args,
+					int *index_found_at);
+int	xfs_attr_leaf_getvalue(struct xfs_trans *trans, struct buf *bp,
+				      struct xfs_da_name *args, int index);
+int	xfs_attr_leaf_add(struct xfs_trans *trans, struct buf *leaf_buffer,
+				 struct xfs_da_name *args,
+				 int insertion_index);
+int	xfs_attr_leaf_addname(struct xfs_trans *trans,
+				     struct xfs_da_name *args);
+int	xfs_attr_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
+				    int index_to_remove, int *result);
+int	xfs_attr_leaf_list_int(struct buf *bp, struct attrlist *alist,
+				      int flags,
+				      struct attrlist_cursor_kern *cursor);
+
 /*
  * Routines used for shrinking the Btree.
  */
-int	xfs_attr_leaf_toosmall(xfs_da_state_t *state, int *retval);
-void	xfs_attr_leaf_unbalance(xfs_da_state_t *state,
-					       xfs_da_state_blk_t *drop_blk,
-					       xfs_da_state_blk_t *save_blk);
+int	xfs_attr_leaf_toosmall(struct xfs_da_state *state, int *retval);
+void	xfs_attr_leaf_unbalance(struct xfs_da_state *state,
+				       struct xfs_da_state_blk *drop_blk,
+				       struct xfs_da_state_blk *save_blk);
 
 /*
  * Utility routines.
  */
-uint	xfs_attr_leaf_lasthash(buf_t *bp, int *count);
-int	xfs_attr_leaf_order(buf_t *leaf1_bp, buf_t *leaf2_bp);
-int	xfs_attr_leaf_newentsize(xfs_da_name_t *args, int blocksize,
-					       int *local);
-int	xfs_attr_leaf_entsize(xfs_attr_leafblock_t *leaf, int index);
-int	xfs_attr_put_listent(attrlist_t *alist, char *name, int namelen,
-				int valuelen, attrlist_cursor_kern_t *cursor);
+uint	xfs_attr_leaf_lasthash(struct buf *bp, int *count);
+int	xfs_attr_leaf_order(struct buf *leaf1_bp, struct buf *leaf2_bp);
+int	xfs_attr_leaf_newentsize(struct xfs_da_name *args, int blocksize,
+					int *local);
+int	xfs_attr_leaf_entsize(struct xfs_attr_leafblock *leaf, int index);
+int	xfs_attr_put_listent(struct attrlist *alist, char *name, int namelen,
+				    int valuelen,
+				    struct attrlist_cursor_kern *cursor);
 
 #endif	/* !FS_XFS_ATTR_LEAE_H */
