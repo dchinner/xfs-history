@@ -17,8 +17,6 @@
 #include <sys/kmem.h>
 #include <sys/dirent.h>
 #include <sys/debug.h>
-#include <sys/proc.h>
-#include <sys/user.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
@@ -1937,7 +1935,7 @@ int
 xfs_dir_put_dirent32_first(xfs_dir_put_args_t *pa)
 {
 	iovec_t *iovp;
-	int reclen, namelen;
+	int error, reclen, namelen;
 	irix5_dirent_t *idbp;
 	uio_t *uio;
 
@@ -1958,11 +1956,10 @@ xfs_dir_put_dirent32_first(xfs_dir_put_args_t *pa)
 	 * If this is the first time here and we have a properly aligned 
 	 * user-mode buffer then we can just "map" it in.
 	 */
-	if (useracc(uio->uio_iov[0].iov_base,
-		    uio->uio_iov[0].iov_len, B_READ) == 0) {
+	if (error = useracc(uio->uio_iov[0].iov_base,
+		    uio->uio_iov[0].iov_len, B_READ, NULL)) {
 		pa->done = 0;
-		return(curthreadp->k_error ?
-			curthreadp->k_error : XFS_ERROR(EFAULT));
+		return(XFS_ERROR(error));
 	}
 	*(pa->putp) = pa->put = xfs_dir_put_dirent32_rest;
 	iovp = uio->uio_iov;
@@ -2058,7 +2055,7 @@ int
 xfs_dir_put_dirent64_first(xfs_dir_put_args_t *pa)
 {
 	iovec_t *iovp;
-	int reclen, namelen;
+	int error, reclen, namelen;
 	dirent_t *idbp;
 	uio_t *uio;
 
@@ -2073,11 +2070,10 @@ xfs_dir_put_dirent64_first(xfs_dir_put_args_t *pa)
 	 * If this is the first time here and we have a properly aligned 
 	 * user-mode buffer then we can just "map" it in.
 	 */
-	if (useracc(uio->uio_iov[0].iov_base,
-		    uio->uio_iov[0].iov_len, B_READ) == 0) {
+	if (error = useracc(uio->uio_iov[0].iov_base,
+		    uio->uio_iov[0].iov_len, B_READ, NULL)) {
 		pa->done = 0;
-		return(curthreadp->k_error ?
-			curthreadp->k_error : XFS_ERROR(EFAULT));
+		return(XFS_ERROR(error));
 	}
 	*(pa->putp) = pa->put = xfs_dir_put_dirent64_rest;
 	iovp = uio->uio_iov;
