@@ -553,7 +553,9 @@ xfs_setattr(vnode_t	*vp,
 			xfs_extlen_t	size;
 
 			sbp = &ip->i_mount->m_sb;
-			if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+			if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ||
+			    ((mask & AT_XFLAGS) && 
+			    (vap->va_xflags & XFS_DIFLAG_REALTIME)))
 				size = sbp->sb_rextsize << sbp->sb_blocklog;
 			else
 				size = sbp->sb_blocksize;
@@ -570,7 +572,9 @@ xfs_setattr(vnode_t	*vp,
 			xfs_sb_t	*sbp;
 
 			sbp = &ip->i_mount->m_sb;
-			if (sbp->sb_rextsize == 0) {
+			if ((sbp->sb_rextsize == 0)  ||
+			    (ip->i_d.di_extsize % sbp->sb_rextsize)) {
+
 				code = EINVAL;	/* ??? */
 				goto error_return;
 			}
