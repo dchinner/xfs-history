@@ -1,8 +1,4 @@
-#ident "$Revision: 1.4 $"
-
-#ifdef SIM
-#define	_KERNEL 1
-#endif
+#ident "$Revision: 1.5 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -10,10 +6,6 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/atomic_ops.h>
-#ifdef SIM
-#undef _KERNEL
-#endif
-
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/proc.h>
@@ -22,18 +14,12 @@
 #include <sys/idbg.h>
 #include <sys/idbgentry.h>
 #include <sys/errno.h>
-
-#ifdef SIM
-#include <bstring.h>
-#include <stdio.h>
-#else
 #include <sys/systm.h>
 #include <sys/ktrace.h>
-#endif
-#include "xfs_macros.h"
-#include "xfs_types.h"
 #include <sys/quota.h>
 
+#include "xfs_macros.h"
+#include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
@@ -58,6 +44,7 @@
 #include "xfs_itable.h"
 #include "xfs_bit.h"
 #include "xfs_quota.h"
+#include "xfs_dqblk.h"
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
@@ -144,6 +131,7 @@ xfs_qm_dqinit(
 		 dqp->q_transp = NULL;
 		 dqp->q_pdquot = NULL;
 		 dqp->q_res_bcount = 0;
+		 dqp->q_res_icount = 0;
 		 dqp->q_res_rtbcount = 0;
 		 dqp->q_pincount = 0;
 		 dqp->q_hash = 0;
@@ -184,7 +172,7 @@ xfs_qm_dqdestroy(
 }
 
 /*
- * This is what a 'fresh' dquot inside a dquot cluster looks like on disk.
+ * This is what a 'fresh' dquot inside a dquot chunk looks like on disk.
  */
 STATIC void
 xfs_qm_dqinit_core(
@@ -192,7 +180,9 @@ xfs_qm_dqinit_core(
 	uint		 type,
 	xfs_dqblk_t 	 *d)
 {
-	bzero(d, sizeof(xfs_dqblk_t));
+	/*
+	 * Caller has bzero'd the entire dquot 'chunk' already.
+	 */
 	d->dd_diskdq.d_magic = XFS_DQUOT_MAGIC;
 	d->dd_diskdq.d_version = XFS_DQUOT_VERSION;
 	d->dd_diskdq.d_id = id;
@@ -210,7 +200,6 @@ xfs_dqtrace_entry(
 	xfs_dquot_t *dqp, 
 	char *func)
 {
-#if 0
 	extern time_t	time;
 
 	ASSERT(dqp->q_trace);
@@ -230,7 +219,6 @@ xfs_dqtrace_entry(
 		     (void *)(__psint_t)curprocp->p_pid,
 		     (void *)(__psint_t)time,
 		     0, 0);
-#endif
 	return;
 }
 #endif
@@ -252,7 +240,6 @@ xfs_qm_adjust_dqtimers(
 	xfs_mount_t		*mp,
 	xfs_disk_dquot_t	*d)
 {
-	/* ASSERT(XFS_IS_QUOTA_ENFORCED(mp)); */
 	/*
 	 * The dquot had better be locked. We are modifying it here.
 	 */
@@ -406,8 +393,9 @@ xfs_qm_init_dquot_blk(
 	/* 
 	 * ID of the first dquot in the block - id's are zero based.
 	 */
-	curid = id - XFS_QM_ID_TO_DQOFF(mp, id);
+	curid = id - (id % XFS_QM_DQPERBLK(mp));
 	ASSERT(curid >= 0);
+	bzero(d, BBTOB(mp->QI_DQCHUNKLEN));
 	for (i = 0; i < XFS_QM_DQPERBLK(mp); i++, d++, curid++)
 		xfs_qm_dqinit_core(curid, type, d);
 	xfs_trans_dquot_buf(tp, bp, 
@@ -415,13 +403,6 @@ xfs_qm_init_dquot_blk(
 			    XFS_BLI_UDQUOT_BUF :
 			    XFS_BLI_PDQUOT_BUF);
 	xfs_trans_log_buf(tp, bp, 0, BBTOB(mp->QI_DQCHUNKLEN) - 1);
-
-#if 0
-	cmn_err(CE_NOTE, "logged IDs (%d - %d), bufsz = %d\n",
-	     (int) (id - XFS_QM_ID_TO_DQOFF(mp, id)),
-	     (int) (curid - 1),
-	     (int) (BBTOB(mp->QI_DQCHUNKLEN) - 1));
-#endif
 
 }
 
@@ -498,7 +479,7 @@ xfs_qm_dqalloc(
 	if (!bp || (error = geterror(bp)))
 		goto error1;
 	/*
-	 * Make a cluster of dquots out of this buffer and log
+	 * Make a chunk of dquots out of this buffer and log
 	 * the entire thing.
 	 */
 	xfs_qm_init_dquot_blk(tp, mp, dqp->q_core.d_id, 
@@ -583,7 +564,11 @@ xfs_qm_dqtobp(
 		ASSERT(nmaps == 1);
 		ASSERT(map.br_blockcount == 1);
 
-		dqp->q_bufoffset = XFS_QM_ID_TO_DQOFF(mp, id);
+		/*
+		 * offset of dquot in the (fixed sized) dquot chunk.
+		 */
+		dqp->q_bufoffset = (id % XFS_QM_DQPERBLK(mp)) * 
+			sizeof(xfs_dqblk_t);
 		if (map.br_startblock == HOLESTARTBLOCK) {
 			/*
 			 * We don't allocate unless we're asked to 
@@ -628,8 +613,7 @@ xfs_qm_dqtobp(
 	/* 
 	 * calculate the location of the dquot inside the buffer.
 	 */
-	ddq = (xfs_disk_dquot_t *)((xfs_dqblk_t *)bp->b_un.b_addr + 
-				   dqp->q_bufoffset);
+	ddq = (xfs_disk_dquot_t *)((char *)bp->b_un.b_addr + dqp->q_bufoffset);
 
 	/*
 	 * A simple sanity check in case we got a corrupted dquot...
@@ -681,6 +665,7 @@ xfs_qm_dqread(
 	 * to avoid having to add everytime.
 	 */
 	dqp->q_res_bcount = ddqp->d_bcount;
+	dqp->q_res_icount = ddqp->d_icount;
 	dqp->q_res_rtbcount = ddqp->d_rtbcount;
 
 	/* Mark the buf so that this will stay incore a little longer */
