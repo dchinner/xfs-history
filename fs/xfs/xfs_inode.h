@@ -2,6 +2,8 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
+#include "xfs_dinode.h"
+
 struct xfs_inode;
 
 typedef struct xfs_inode_log_item {
@@ -19,6 +21,7 @@ typedef struct xfs_inode {
 	xfs_inode_log_item_t	i_item;
 	xfs_trans_t		*i_transp;
 	unsigned int		i_flags;
+	xfs_dinode_t		i_d;
 } xfs_inode_t;
 
 #define	I_LOCKED	0x1
