@@ -37,6 +37,21 @@ static xfs_mac_label_t *mac_high_low_lp;
 static xfs_mac_label_t *mac_admin_high_lp;
 static xfs_mac_label_t *mac_equal_equal_lp;
 
+/*
+ * Test for the existence of a MAC label as efficiently as possible.
+ */
+int
+xfs_mac_vhaslabel(
+	vnode_t		*vp)
+{
+	int		error;
+	int		len = sizeof(xfs_mac_label_t);
+	int		flags = ATTR_KERNOVAL|ATTR_ROOT;
+
+	VOP_ATTR_GET(vp, SGI_MAC_FILE, NULL, &len, flags, sys_cred, error);
+	return (error == 0);
+}
+
 int
 xfs_mac_iaccess(xfs_inode_t *ip, mode_t mode, struct cred *cr)
 {

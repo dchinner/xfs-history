@@ -37,10 +37,11 @@ objlink(!CONFIG_HAVE_XFS_DMAPI	xfs.o xfsdmapistubs.o)
 
 objlink(CONFIG_XFS_RT		xfs.o xfs_rtalloc.o)
 
-objlink(CONFIG_XFS_QUOTA	xfs.o xfs_dquot.o xfs_dquot_item.o xfs_trans_dquot.o xfs_qm_syscalls.o xfs_qm.o)
+objlink(CONFIG_XFS_QUOTA	xfs.o xfs_qm_syscalls.o
+	xfs_qm.o xfs_dquot.o xfs_dquot_item.o xfs_trans_dquot.o)
 
 objlink(CONFIG_FS_POSIX_ACL	xfs.o xfs_acl.o)
-# objlink(CONFIG_FS_POSIX_CAP	xfs.o xfs_cap.o) No source for xfs_cap
+objlink(CONFIG_FS_POSIX_CAP	xfs.o xfs_cap.o)
 objlink(CONFIG_FS_POSIX_MAC	xfs.o xfs_mac.o)
 
 objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
