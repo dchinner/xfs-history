@@ -4036,7 +4036,7 @@ xfs_strat_write(
 	 * Drop the count of queued buffers. We need to do
 	 * this before the bdstrat(s) because callers of
 	 * pflushinvalvp(), for example, may expect the queued_buf
-	 * count to be down when it returns. See xfs_itruncate_start.
+	 * count to be down when it rturns. See xfs_itruncate_start.
 	 */
 	atomicAddInt(&(ip->i_queued_bufs), -1);
 	ASSERT(ip->i_queued_bufs >= 0);
@@ -4367,10 +4367,10 @@ xfs_force_shutdown(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return;
 
-	cmn_err(CE_NOTE,
+	cmn_err(CE_ALERT,
 		"I/O Error Detected. Shutting down filesystem: %s",
 		mp->m_fsname);
-	cmn_err(CE_NOTE,
+	cmn_err(CE_ALERT,
 		"Please umount the filesystem, and rectify the problem(s)");
 	/*
 	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
@@ -4392,7 +4392,7 @@ xfs_force_shutdown(
 	/*
 	 * Release all delayed write buffers for this device.
 	 */
-#ifdef DEBUG
+#ifdef XFSERRORDEBUG
 	{
 		int nbufs;
 		while (nbufs = incore_delwri_relse(mp->m_dev, EIO))
@@ -4419,9 +4419,12 @@ xfs_bioerror(
 
 	if (bp->b_iodone == NULL) {
 #ifdef XFSERRORDEBUG
-		printf("bp->b_iodone == NULL\n");
+		printf("bp->b_iodone == NULL 0x%x\n", bp);
 #endif
-		return xfs_bioerror_relse(bp);
+		if ((bp->b_flags & B_READ) == 0) {
+			buftrace("XFS IOERR BIODONE NULL", bp);
+			return xfs_bioerror_relse(bp);
+		}
 	}
 
 	/*
@@ -4464,9 +4467,11 @@ xfs_bioerror_relse(
 	fl = bp->b_flags;
 	/*
 	 * No need to wait until the buffer is unpinned.
-	 * We aren't flushing it.
+	 * We aren't flushing it. XXXsup Should I do bioerror
+	 * only for non-async bufs where somebody's waiting for
+	 * the error value?
 	 */    
-	bioerror(bp, EIO);
+	/* bioerror(bp, EIO); */
 	/*
 	 * chunkhold expects B_DONE to be there, whether
 	 * we actually finish the I/O or not. We don't want to
@@ -4476,11 +4481,12 @@ xfs_bioerror_relse(
 	bp->b_flags |= B_DONE|B_STALE;
 	bp->b_iodone = NULL;
 	bp->b_bdstrat = NULL;
-	if (!(fl & B_ASYNC))
+	if (!(fl & B_ASYNC)) {
+		bioerror(bp, EIO);
 		vsema(&bp->b_iodonesema);
-	else
+	} else {
 		brelse(bp);
-
+	}
 	return (EIO);
 }
 
