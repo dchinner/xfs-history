@@ -1,4 +1,4 @@
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.68 $"
 
 /*
  * xfs_dir_leaf.c
@@ -267,7 +267,7 @@ xfs_dir_shortform_removename(xfs_da_args_t *args)
 	}
 
 	if ((base + size) != dp->i_d.di_size) {
-		bcopy(&((char *)sf)[base+size], &((char *)sf)[base],
+		ovbcopy(&((char *)sf)[base+size], &((char *)sf)[base],
 					      dp->i_d.di_size - (base+size));
 	}
 	sf->hdr.count--;
@@ -974,7 +974,7 @@ xfs_dir_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int index,
 	if (index < hdr->count) {
 		tmp  = hdr->count - index;
 		tmp *= (uint)sizeof(xfs_dir_leaf_entry_t);
-		bcopy(entry, entry + 1, tmp);
+		ovbcopy(entry, entry + 1, tmp);
 		xfs_da_log_buf(args->trans, bp,
 		    XFS_DA_LOGRANGE(leaf, entry, tmp + (uint)sizeof(*entry)));
 	}
