@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.15 1994/04/14 18:47:30 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.16 1994/04/15 20:00:33 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -23,6 +23,7 @@
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
@@ -890,22 +891,21 @@ int
 xfs_remove_grio_guarantee(xfs_inode_t *ip, pid_t pid)
 {
 	int		ret;
-	grio_msg_t 	griomsg;
-	extern int	grio_issue_async_grio_req(grio_msg_t *);
+	grio_blk_t 	grioblk;
+	extern int	grio_issue_async_grio_req(grio_blk_t *);
 	extern void	bzero( void *, int);
 
-	bzero(&griomsg, sizeof(grio_msg_t));
+	bzero(&grioblk, sizeof(grio_blk_t));
 
-	griomsg.pid 			= pid;
-	griomsg.grioblk.resv_type 	= GRIO_UNRESV_FILE_ASYNC;
-	griomsg.grioblk.procid 		= pid;
-	griomsg.grioblk.ino		= ip->i_ino;
-	griomsg.grioblk.fs_dev		= ip->i_dev;
+	grioblk.resv_type 	= GRIO_UNRESV_FILE_ASYNC;
+	grioblk.procid 		= pid;
+	grioblk.ino		= ip->i_ino;
+	grioblk.fs_dev		= ip->i_dev;
 
 	/*
  	 * Issue the message, do not wait for completion.
  	 */
-	ret = grio_issue_async_grio_req(&griomsg);
+	ret = grio_issue_async_grio_req(&grioblk);
 	return( ret );
 }
 
