@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.42 $"
 
 /*
  * Free space allocation for xFS.
@@ -1561,7 +1561,7 @@ xfs_alloc_get_freelist(
 	if (bufp)
 		*bufp = bp;
 	else
-		brelse(bp);
+		xfs_trans_brelse(tp, bp);
 	kmem_check();
 	return bno;
 }
