@@ -315,15 +315,16 @@ extern void pdflush(struct vnode *, uint64_t);
 static inline void xfs_buf_undelay(page_buf_t *pb)
 {
 	if (pb->pb_list.next != &pb->pb_list) {
-	    pagebuf_delwri_dequeue(pb);
-		/* hold count should be at least 2 here.
-		 * 1 for the lookup 2 when the thing was queued. 
+		pagebuf_delwri_dequeue(pb);
+
+		/*
+		 * Usually the hold count would be at least 2
+		 * here, with the irritating exception of
+		 * the superblock case.
 		 */
-		if(pb->pb_hold > 1 ){
-		  pagebuf_rele(pb);
-		} else {
-		  printk("hmm this doesn't seem right hold count should be > 1 xfs_buf_undelay pb:0x%p hold %d\n",pb,pb->pb_hold);
-		}
+		if (pb->pb_hold > 1 )
+			pagebuf_rele(pb);
+
 	} else {
 		pb->pb_flags &= ~PBF_DELWRI;
 	}
@@ -519,20 +520,25 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 #define xfs_incore(buftarg,blkno,len,lockit) \
             pagebuf_find(buftarg.inode,blkno,len,lockit)
 
+void xfs_trigger_io(void);
+
+
 static inline int	XFS_bwrite(page_buf_t *pb)
 {
 	int	sync = (pb->pb_flags & PBF_ASYNC) == 0;
 	int	error;
 
 	pb->pb_flags |= PBF_SYNC;
-/**
-	pb->pb_flags &= ~PBF_ASYNC;
-**/
+
+	xfs_buf_undelay(pb);
+
 	pagebuf_iorequest(pb);
+
 	if (sync) {
 		error = pagebuf_iowait(pb);
 		xfs_buf_relse(pb);
 	} else {
+		xfs_trigger_io();
 		error = 0;
 	}
 
@@ -580,7 +586,6 @@ page_buf_t * xfs_pb_getr(int sleep, struct xfs_mount *mp);
 page_buf_t * xfs_pb_ngetr(int len, struct xfs_mount *mp); 
 void xfs_pb_freer(page_buf_t *bp);
 void xfs_pb_nfreer(page_buf_t *bp);
-void xfs_trigger_io(void);
 
 
 #define XFS_getrbuf(sleep,mp) xfs_pb_getr(sleep,mp)
