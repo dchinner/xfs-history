@@ -3135,7 +3135,16 @@ xfs_realvp(vnode_t	*vp,
 /*
  * xfs_map
  *
- * This is a stub.
+ * This is called when a file is first mapped by a process by either
+ * a call to mmap() or an exec().  All the work is simply done in the
+ * fs_map_subr() routine, which sets up the mapping in the process'
+ * address space by making lots of VM specific calls.  These calls may
+ * in turn call back to the xfs_addmap() routine, so we need to ensure
+ * that we don't lock the inode across the call to fs_map_subr().
+ *
+ * XXXajs
+ * This is a ridiculous layering of the code.  Why is all this VM
+ * baggage embedded in the file system?
  */
 STATIC int
 xfs_map(vnode_t	*vp,
@@ -3148,15 +3157,23 @@ xfs_map(vnode_t	*vp,
 	uint	flags,
 	cred_t	*credp)
 {
-	ASSERT (0);
-	return 0;
+	xfs_inode_t	*ip;
+	int		error;
+
+	ip = XFS_VTOI(vp);
+	error = fs_map_subr(vp, ip->i_d.di_size, ip->i_d.di_mode,
+			    offset, pregp, *addrp, len, prot,
+			    max_prot, flags, credp);
+	return error;
 }
 
 
 /*
  * xfs_addmap
  *
- * This is a stub.
+ * This is called when new mappings are added to the given file.  All
+ * we do here is record the number of pages mapped in this file so that
+ * we can reject record locking while a file is mapped (see xfs_frlock()).
  */
 STATIC int
 xfs_addmap(vnode_t	*vp,
@@ -3169,7 +3186,13 @@ xfs_addmap(vnode_t	*vp,
 	   uint		flags,
 	   cred_t	*credp)
 {
-	ASSERT (0);
+	xfs_inode_t	*ip;
+
+	ip = XFS_VTOI(vp);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	ASSERT(vp->v_mreg);
+	ip->i_mapcnt += btoc(len);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return 0;
 }
 
@@ -3177,7 +3200,10 @@ xfs_addmap(vnode_t	*vp,
 /*
  * xfs_delmap
  *
- * This is a stub.
+ * This is called when mappings to the given file are deleted.  All
+ * we do is decrement our count of the number of pages mapped in this
+ * file.  This count is only used in xfs_frlock() in deciding whether
+ * to accept a call.
  */
 STATIC int
 xfs_delmap(vnode_t	*vp,
@@ -3190,7 +3216,13 @@ xfs_delmap(vnode_t	*vp,
 	   uint		flags,
 	   cred_t	*credp)
 {
-	ASSERT (0);
+	xfs_inode_t	*ip;
+
+	ip = XFS_VTOI(vp);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	ip->i_mapcnt -= btoc(len);
+	ASSERT(ip->i_mapcnt >= 0);
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	return 0;
 }
 
