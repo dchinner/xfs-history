@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.44 $"
 
 /*
  * High level interface routines for log manager
@@ -293,6 +293,12 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 }	/* xfs_log_reserve */
 
 
+int
+xfs_log_stat(dev_t log_dev)
+{
+}	/* xfs_log_stat */
+
+
 /*
  * Mount a log filesystem.
  *
@@ -315,8 +321,6 @@ xfs_log_mount(xfs_mount_t	*mp,
 	if (! xlog_debug)
 		return 0;
 
-	num_bblks <<= (mp->m_sb.sb_blocksize >> BBSHIFT);
-	blk_offset <<= (mp->m_sb.sb_blocksize >> BBSHIFT);
 	log = xlog_init_log(mp, log_dev, blk_offset, num_bblks);
 	if (xlog_recover(log) != 0) {
 		return XFS_ERECOVER;
