@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.100 $"
+#ident	"$Revision: 1.102 $"
 
 /*
  * Free space allocation for XFS.
@@ -1464,8 +1464,8 @@ xfs_alloc_ag_vextent_size(
 	xfs_alloc_compute_aligned(fbno, flen, args->alignment, args->minlen,
 		&rbno, &rlen);
 	rlen = XFS_EXTLEN_MIN(args->maxlen, rlen);
-	XFS_WANT_CORRUPTED_GOTO(rlen <= flen && rbno + rlen <= fbno + flen,
-		error0);
+	XFS_WANT_CORRUPTED_GOTO(rlen == 0 || 
+			(rlen <= flen && rbno + rlen <= fbno + flen), error0);
 	if (rlen < args->maxlen) {
 		xfs_agblock_t	bestfbno;
 		xfs_extlen_t	bestflen;
@@ -1490,8 +1490,8 @@ xfs_alloc_ag_vextent_size(
 			xfs_alloc_compute_aligned(fbno, flen, args->alignment,
 				args->minlen, &rbno, &rlen);
 			rlen = XFS_EXTLEN_MIN(args->maxlen, rlen);
-			XFS_WANT_CORRUPTED_GOTO(
-				rlen <= flen && rbno + rlen <= fbno + flen,
+			XFS_WANT_CORRUPTED_GOTO(rlen == 0 ||
+				(rlen <= flen && rbno + rlen <= fbno + flen),
 				error0);
 			if (rlen > bestrlen) {
 				bestrlen = rlen;
