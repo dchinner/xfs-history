@@ -46,6 +46,7 @@
 #include "xfs_rtalloc.h"
 #include "xfs_bmap.h"
 #include "xfs_error.h"
+#include "xfs_bit.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -144,6 +145,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	mp->m_agfrotor = mp->m_agirotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
+	mp->m_agno_log = xfs_highbit32(sbp->sb_agcount - 1) + 1;
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
