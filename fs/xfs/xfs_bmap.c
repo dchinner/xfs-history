@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.68 $"
+#ident	"$Revision: 1.72 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1414,10 +1414,16 @@ xfs_bmap_del_extent(
 		 */
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 			xfs_sb_t	*sbp;	/* superblock of filesystem */
+			xfs_extlen_t	len;
+
+	
+			sbp = &ip->i_mount->m_sb;
+
+			ASSERT((del->br_blockcount % sbp->sb_rextsize) == 0);
+			len = del->br_blockcount / sbp->sb_rextsize;
 
 			xfs_rtfree_extent(ip->i_transp, del->br_startblock,
-				del->br_blockcount);
-			sbp = &ip->i_mount->m_sb;
+				len);
 			ip->i_d.di_nblocks -=
 				del->br_blockcount * sbp->sb_rextsize;
 		}
