@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.114 $"
+#ident  "$Revision$"
 
 #include <limits.h>
 #ifdef SIM
@@ -1244,6 +1244,11 @@ xfs_statvfs(
 	fakeinos += mp->m_inoadd;
 #endif
 	statp->f_files = MIN(sbp->sb_icount + fakeinos, XFS_MAXINUMBER);
+	if (mp->m_maxicount)
+#if XFS_BIG_FILESYSTEMS
+		if (!mp->m_inoadd)
+#endif
+			statp->f_files = MIN(statp->f_files, mp->m_maxicount);
 	statp->f_ffree = statp->f_favail =
 		statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	statp->f_flag = vf_to_stf(vfsp->vfs_flag);
