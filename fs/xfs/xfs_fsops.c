@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.32 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -56,9 +56,32 @@ xfs_fs_geometry(
 	geo->rtextents = mp->m_sb.sb_rextents;
 	geo->logstart = mp->m_sb.sb_logstart;
 	geo->uuid = mp->m_sb.sb_uuid;
-	if (new_version == 1) {
+	if (new_version >= 2) {
 		geo->sunit = mp->m_sb.sb_unit;
 		geo->swidth = mp->m_sb.sb_width;
+	}
+	if (new_version >= 3) {
+		geo->version = XFS_FSOP_GEOM_VERSION;
+		geo->flags =
+			(XFS_SB_VERSION_HASATTR(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_ATTR : 0) |
+			(XFS_SB_VERSION_HASNLINK(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_NLINK : 0) |
+			(XFS_SB_VERSION_HASQUOTA(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_QUOTA : 0) |
+			(XFS_SB_VERSION_HASALIGN(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_IALIGN : 0) |
+			(XFS_SB_VERSION_HASDALIGN(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_DALIGN : 0) |
+			(XFS_SB_VERSION_HASSHARED(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_SHARED : 0) |
+			(XFS_SB_VERSION_HASEXTFLGBIT(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_EXTFLG : 0);
+		/* XFS_FSOP_GEOM_FLAGS_DIRV2 not yet set XXX */
+		geo->logsectsize = mp->m_sb.sb_sectsize;	/* XXX */
+		geo->rtsectsize = mp->m_sb.sb_sectsize;		/* XXX */
+		geo->dirblocksize = mp->m_sb.sb_blocksize;
+		/* XXX geo->dirblocksize = mp->m_dirblksize; */
 	}
 	return 0;
 }
@@ -456,7 +479,8 @@ xfs_fsoperations(
 		0,				/* XFS_FS_COUNTS */
 		sizeof(__uint64_t),		/* XFS_SET_RESBLKS */
 		0,				/* XFS_GET_RESBLKS */
-		0				/* XFS_FS_GEOMETRY */
+		0,				/* XFS_FS_GEOMETRY_V2 */
+		0,				/* XFS_FS_GEOMETRY */
 	};
 	static const short	cosize[XFS_FSOPS_COUNT] =
 	{
@@ -467,8 +491,8 @@ xfs_fsoperations(
 		sizeof(xfs_fsop_counts_t),	/* XFS_FS_COUNTS */
 		sizeof(xfs_fsops_getblks_t),	/* XFS_SET_RESBLKS */
 		sizeof(xfs_fsops_getblks_t),	/* XFS_GET_RESBLKS */
-		sizeof(xfs_fsop_geom_t)		/* XFS_FS_GEOMETRY */
-
+		sizeof(xfs_fsop_geom_v2_t),	/* XFS_FS_GEOMETRY_V2 */
+		sizeof(xfs_fsop_geom_t),	/* XFS_FS_GEOMETRY */
 	};
 	static const short	wperm[XFS_FSOPS_COUNT] =
 	{
@@ -479,6 +503,7 @@ xfs_fsoperations(
 		0,	/* XFS_FS_COUNTS */
 		1,	/* XFS_SET_RESBLKS */
 		0,  	/* XFS_GET_RESBLKS */
+		0,	/* XFS_FS_GEOMETRY_V2 */
 		0,	/* XFS_FS_GEOMETRY */
 	};
 
@@ -505,10 +530,13 @@ xfs_fsoperations(
 	switch (opcode)
 	{
 	case XFS_FS_GEOMETRY_V1:
-		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 0);
+		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 1);
+		break;
+	case XFS_FS_GEOMETRY_V2:
+		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 2);
 		break;
 	case XFS_FS_GEOMETRY:
-		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 1);
+		error = xfs_fs_geometry(mp, (xfs_fsop_geom_t *)outb, 3);
 		break;
 	case XFS_GROWFS_DATA:
 		if (!cpsema(&mp->m_growlock))
