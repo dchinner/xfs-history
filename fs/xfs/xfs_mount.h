@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.105 $"
+#ident	"$Revision$"
 
 struct cred;
 struct mounta;
@@ -278,6 +278,7 @@ typedef struct xfs_mount {
 						/* which bits matter in rpc
 						   log item pin masks */
 	uint			m_cxfstype;	/* mounted shared, etc. */
+        xfs_arch_t              m_arch;         /* arch of fs */
 } xfs_mount_t;
 
 /*

@@ -19,7 +19,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision$"
 
 /*
  * XFS types
@@ -112,6 +112,8 @@ typedef	__uint32_t	xfs_fileoff_t;	/* block number in a file */
 typedef	__int32_t	xfs_sfiloff_t;	/* signed block number in a file */
 typedef	__uint32_t	xfs_filblks_t;	/* number of blocks in a file */
 #endif
+
+typedef __uint8_t       xfs_arch_t;     /* architecutre of an xfs fs */
 
 /*
  * Null values for the types.
