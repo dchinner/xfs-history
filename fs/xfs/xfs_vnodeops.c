@@ -236,8 +236,8 @@ extern struct igetstats XFS_IGETINFO;
 
 sema_t xfs_ancestormon;		/* initialized in xfs_init */
 
-#define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
-#define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
+#define IRELE(ip)	(vn_trace_rele(XFS_ITOV(ip), fname, __LINE__), VN_RELE(XFS_ITOV(ip)))
+#define IHOLD(ip)	(VN_HOLD(XFS_ITOV(ip)), vn_trace_hold(XFS_ITOV(ip), fname, __LINE__))
 
 
 
@@ -440,6 +440,9 @@ xfs_setattr(vnode_t	*vp,
 	timestruc_t 	tv;
 	uid_t		uid;
 	gid_t		gid;
+#ifdef DEBUG
+	static char	fname[] = "xfs_setattr";
+#endif
 
 	/*
 	 * Cannot set certain attributes.
@@ -1128,6 +1131,9 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 	int		   name_len;
 	int		   code = 0;
 	boolean_t	   do_iget;
+#ifdef DEBUG
+	static char	   fname[] = "xfs_dir_lookup_int";
+#endif
 
 	do_iget = flag & DLF_IGET;
 
@@ -1135,7 +1141,7 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 	 * Handle degenerate pathname component.
 	 */
 	if (*name == '\0') {
-		vn_hold(dir_vp);
+		VN_HOLD(dir_vp);
 		*inum = XFS_VTOI(dir_vp)->i_ino;
 		if (do_iget)
 			*ip = XFS_VTOI(dir_vp);
@@ -1151,6 +1157,7 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 			*ip = XFS_VTOI(vp);
 			ASSERT((*ip)->i_d.di_mode != 0);
 		} else {
+			vn_trace_rele(vp, fname, __LINE__);
 			VN_RELE (vp);
 		}
 		return 0;
@@ -1176,6 +1183,7 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 			ASSERT((name[0] == '.') &&
 			       (name[1] == '.') &&
 			       (name[2] == 0));
+			vn_trace_rele(vp, fname, __LINE__);
 			VN_RELE (vp);
 			code = ENOENT;
 		}
@@ -1204,6 +1212,9 @@ xfs_lookup(vnode_t	*dir_vp,
 	xfs_ino_t		e_inum;
 	int			code = 0;
 	uint			lock_mode;
+#ifdef DEBUG
+	static char		fname[] = "xfs_lookup";
+#endif
 
 	dp = XFS_VTOI(dir_vp);
 	lock_mode = xfs_ilock_map_shared(dp);
@@ -1229,6 +1240,7 @@ xfs_lookup(vnode_t	*dir_vp,
          */
         if (ISVDEV(vp->v_type)) {
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
+		vn_trace_rele(vp, fname, __LINE__);
                 VN_RELE(vp);
                 if (newvp == NULL)
                         return XFS_ERROR(ENOSYS);
@@ -1419,6 +1431,9 @@ xfs_create(vnode_t	*dir_vp,
 	int			committed;
 	uint			truncate_flag;
 	timestruc_t		tv;
+#ifdef DEBUG
+	static char		fname[] = "xfs_create";
+#endif
 
 
 try_again:
@@ -1481,6 +1496,7 @@ try_again:
 		 */
 
 		VN_HOLD (dir_vp);
+		vn_trace_hold(dir_vp, fname, __LINE__);
 		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 		dp_joined_to_trans = B_TRUE;
 
@@ -1653,6 +1669,7 @@ try_again:
          */
         if (ISVDEV(vp->v_type)) {
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
+		vn_trace_rele(vp, fname, __LINE__);
                 VN_RELE(vp);
                 if (newvp == NULL)
                         return XFS_ERROR(ENOSYS);
@@ -1702,6 +1719,9 @@ xfs_lock_dir_and_entry (xfs_inode_t	*dp,
 	xfs_ino_t	e_inum;
 	unsigned long	dir_generation;
 	int		error;
+#ifdef DEBUG
+	static char	fname[] = "xfs_lock_dir_and_entry";
+#endif
 
 again:
 
@@ -1807,6 +1827,9 @@ xfs_lock_for_rename(
 	int		num_inodes;
 	int		i, j;
 	uint		lock_mode;
+#ifdef DEBUG
+	static char	fname[] = "xfs_lock_for_rename";
+#endif
 
 	ip2 = NULL;
 
@@ -1959,6 +1982,9 @@ xfs_remove(vnode_t	*dir_vp,
 	unsigned long		dir_generation;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
+#ifdef DEBUG
+	static char		fname[] = "xfs_remove";
+#endif
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, 0);
@@ -2070,6 +2096,9 @@ xfs_link(vnode_t	*target_dir_vp,
 	int			error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
+#ifdef DEBUG
+	static char		fname[] = "xfs_link";
+#endif
 
 	/*
 	 * Get the real vnode.
@@ -2096,7 +2125,9 @@ xfs_link(vnode_t	*target_dir_vp,
 	 * decrement the associated ref counts.
 	 */
 	VN_HOLD(src_vp);
+	vn_trace_hold(src_vp, fname, __LINE__);
 	VN_HOLD(target_dir_vp);
+	vn_trace_hold(target_dir_vp, fname, __LINE__);
 	xfs_trans_ijoin (tp, sip, XFS_ILOCK_EXCL);
         xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
 
@@ -2173,6 +2204,9 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 	xfs_inode_t	*ip;
 	xfs_ino_t	root_ino;
 	int		error = 0;
+#ifdef DEBUG
+	static char	fname[] = "xfs_ancestor_check";
+#endif
 
 	mp = src_dp->i_mount;
 	root_ino = mp->m_sb.sb_rootino;
@@ -2350,6 +2384,9 @@ xfs_rename(vnode_t	*src_dir_vp,
 	int		error;		
         xfs_bmap_free_t free_list;
         xfs_fsblock_t   first_block;
+#ifdef DEBUG
+	static char	fname[] = "xfs_rename";
+#endif
 
 
 start_over:
@@ -2395,9 +2432,11 @@ start_over:
 	 * not to add an inode to the transaction more than once.
 	 */
         VN_HOLD (src_dir_vp);
+	vn_trace_hold(src_dir_vp, fname, __LINE__);
         xfs_trans_ijoin (tp, src_dp, XFS_ILOCK_EXCL);
         if (new_parent) {
                 VN_HOLD (target_dir_vp);
+		vn_trace_hold(target_dir_vp, fname, __LINE__);
                 xfs_trans_ijoin (tp, target_dp, XFS_ILOCK_EXCL);
         }
 	if ((src_ip != src_dp) && (src_ip != target_dp)) {
@@ -2697,6 +2736,9 @@ xfs_mkdir(vnode_t	*dir_vp,
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	boolean_t		dp_joined_to_trans = B_FALSE;
+#ifdef DEBUG
+	static char		fname[] = "xfs_mkdir";
+#endif
 
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
@@ -2752,6 +2794,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 	 * earlier, the locks might have gotten released.
 	 */
 	VN_HOLD (dir_vp);
+	vn_trace_hold(dir_vp, fname, __LINE__);
         xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 	dp_joined_to_trans = B_TRUE;
 
@@ -2812,6 +2855,9 @@ xfs_rmdir(vnode_t	*dir_vp,
         int                     error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
+#ifdef DEBUG
+	static char		fname[] = "xfs_rmdir";
+#endif
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, 0);
@@ -2823,6 +2869,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 	cdp = NULL;
 
 	VN_HOLD (dir_vp);
+	vn_trace_hold(dir_vp, fname, __LINE__);
         xfs_ilock (dp, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
@@ -2975,6 +3022,9 @@ xfs_symlink(vnode_t	*dir_vp,
 	xfs_bmap_free_t free_list;
 	xfs_fsblock_t   first_block;
 	boolean_t	dp_joined_to_trans = B_FALSE;
+#ifdef DEBUG
+	static char	fname[] = "xfs_symlink";
+#endif
 
 	/*
 	 * Check component lengths of the target path name.
@@ -3039,6 +3089,7 @@ xfs_symlink(vnode_t	*dir_vp,
 		goto error_return;
 
 	VN_HOLD (dir_vp);
+	vn_trace_hold(dir_vp, fname, __LINE__);
         xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
         dp_joined_to_trans = B_TRUE;
 
