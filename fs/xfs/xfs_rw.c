@@ -127,6 +127,7 @@ xfs_next_bmap(xfs_mount_t	*mp,
 	int		extra_blocks;
 	xfs_fileoff_t	size_diff;
 	xfs_fileoff_t	ext_offset;
+	xfs_fsblock_t	start_block;
 
 	/*
 	 * Make sure that the request offset lies in the extent given.
@@ -204,13 +205,16 @@ xfs_next_bmap(xfs_mount_t	*mp,
 		}
 
 	}
-	if ((imapp->br_startblock != DELAYSTARTBLOCK) &&
-	    (imapp->br_startblock != HOLESTARTBLOCK)) {
-		bmapp->bn = imapp->br_startblock + ext_offset;
-		bmapp->eof = 0;
-	} else {
+	start_block = imapp->br_startblock;
+	if (start_block == HOLESTARTBLOCK) {
 		bmapp->bn = -1;
 		bmapp->eof = BMAP_HOLE;
+	} else if (start_block == DELAYSTARTBLOCK) {
+		bmapp->bn = -1;
+		bmapp->eof = BMAP_DELAY;
+	} else {
+		bmapp->bn = start_block + ext_offset;
+		bmapp->eof = 0;
 	}
 	bmapp->length = iosize;
 	
@@ -308,8 +312,13 @@ xfs_iomap_extra(xfs_inode_t	*ip,
 	offset_fsb = xfs_b_to_fsbt(mp, offset);
 	count_fsb = xfs_b_to_fsb(mp, count);
 
+	/*
+	 * We set BMAP_DELAY rather than BMAP_HOLE in the bmap
+	 * to be consistent with what the write code is doing for
+	 * these extra pages.
+	 */
 	*nbmaps = 1;
-	bmapp->eof = BMAP_HOLE | BMAP_EOF;
+	bmapp->eof = BMAP_DELAY | BMAP_EOF;
 	bmapp->bn = -1;
 	bmapp->offset = xfs_fsb_to_bb(mp, offset_fsb);
 	bmapp->length = xfs_fsb_to_bb(mp, count_fsb);
@@ -828,6 +837,7 @@ xfs_write_bmap(xfs_mount_t	*mp,
 	int		extra_blocks;
 	xfs_fileoff_t	size_diff;
 	xfs_fileoff_t	ext_offset;
+	xfs_fsblock_t	start_block;
 	off_t		last_imap_byte;
 	
 	if (ioalign < imapp->br_startoff) {
@@ -850,13 +860,14 @@ xfs_write_bmap(xfs_mount_t	*mp,
 		ext_offset = ioalign - imapp->br_startoff;
 		bmapp->offset = ioalign;
 	}
-	ASSERT(imapp->br_startblock != HOLESTARTBLOCK);
-	if (imapp->br_startblock != DELAYSTARTBLOCK) {
-		bmapp->bn = imapp->br_startblock + ext_offset;
+	start_block = imapp->br_startblock;
+	ASSERT(start_block != HOLESTARTBLOCK);
+	if (start_block != DELAYSTARTBLOCK) {
+		bmapp->bn = start_block + ext_offset;
 		bmapp->eof = 0;
 	} else {
 		bmapp->bn = -1;
-		bmapp->eof = BMAP_HOLE;
+		bmapp->eof = BMAP_DELAY;
 	}
 	bmapp->length = iosize;
 
@@ -943,6 +954,7 @@ xfs_zero_eof(xfs_inode_t	*ip,
 		pfdp = pfind(vp, page_start, VM_ATTACH);
 		if (pfdp != NULL) {
 			page_zero(pfdp, 0, page_off, NBPP - page_off);
+			pageflags(pfdp, P_HOLE, 1);
 			pagefree(pfdp);
 		}
 		page_off = 0;
@@ -990,12 +1002,13 @@ xfs_zero_eof(xfs_inode_t	*ip,
 		bmap.bn = xfs_fsb_to_daddr(mp, imap.br_startblock);
 	} else {
 		bmap.bn = -1;
-		bmap.eof |= BMAP_HOLE;
+		bmap.eof |= BMAP_DELAY;
 	}
 	bp = chunkread(XFS_ITOV(ip), &bmap, 1, credp);
-	zero_offset = isize - xfs_fsb_to_b(mp, last_fsb);
-	zero_len = xfs_fsb_to_b(mp, 1) - isize;
-	xfs_zero_bp(bp, zero_offset, zero_len);
+	/*
+	 * We did the zeroing in the page loop above.
+	 * Just write it out.
+	 */
 	bawrite(bp);
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	return;
@@ -1953,7 +1966,13 @@ xfs_strat_write(vnode_t	*vp,
 		 * backing store for the file.
 		 */
 		tp = xfs_trans_alloc(mp, XFS_TRANS_FILE_WRITE);
+/*
 		error = xfs_trans_reserve(tp, 0, XFS_DEFAULT_LOG_RES(mp),
+					  0, 0);
+
+		For now reserve some space as a work-around.
+*/
+		error = xfs_trans_reserve(tp, 20, XFS_DEFAULT_LOG_RES(mp),
 					  0, 0);
 		ASSERT(error == 0);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
