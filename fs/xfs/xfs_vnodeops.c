@@ -6191,6 +6191,7 @@ xfs_reclaim(
 				xfs_ireclaim(ip);
 				return (0);
 			}
+			xfs_iflock(ip); /* synchronize with xfs_iflush_done */
 		}
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		ASSERT(ip->i_update_core == 0);

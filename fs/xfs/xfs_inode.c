@@ -2503,11 +2503,10 @@ xfs_idestroy(
 #endif
 #endif
 	if (ip->i_itemp) {
-#if 0
 		/* XXXdpd should be able to assert this but shutdown
 		 * is leaving the AIL behind. */
-		ASSERT((ip->i_itemp->ili_item.li_flags & XFS_LI_IN_AIL) == 0);
-#endif
+		ASSERT(((ip->i_itemp->ili_item.li_flags & XFS_LI_IN_AIL) == 0) ||
+		       XFS_FORCED_SHUTDOWN(ip->i_mount));
 		xfs_inode_item_destroy(ip);
 	}
 	kmem_zone_free(xfs_inode_zone, ip);
@@ -2885,6 +2884,7 @@ xfs_iflush(
 	xfs_inode_t		*iq;
 	int			clcount;	/* count of inodes clustered */
 	vnode_t			*vp;
+	int			bufwasdelwri;
 	SPLDECL(s);
 
 	XFSSTATS.xs_iflush_count++;
@@ -2903,6 +2903,8 @@ xfs_iflush(
 	 */
 	if ((ip->i_update_core == 0) &&
 	    ((iip == NULL) || !(iip->ili_format.ilf_fields & XFS_ILOG_ALL))) {
+		ASSERT((iip != NULL) ?
+			 !(iip->ili_item.li_flags & XFS_LI_IN_AIL) : 1);
 		xfs_ifunlock(ip);
 		return 0;
 	}
@@ -2938,11 +2940,58 @@ xfs_iflush(
 	}
 
 	/*
+	 * Decide how buffer will be flushed out.  This is done before
+	 * the call to xfs_iflush_int because this field is zeroed by it.
+	 */
+	if (iip != NULL && iip->ili_format.ilf_fields != 0) {
+		/*
+		 * Flush out the inode buffer according to the directions
+		 * of the caller.  In the cases where the caller has given
+		 * us a choice choose the non-delwri case.  This is because
+		 * the inode is in the AIL and we need to get it out soon.
+		 */
+		switch (flags) {
+		case XFS_IFLUSH_SYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
+			flags = 0;
+			break;
+		case XFS_IFLUSH_ASYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
+			flags = B_ASYNC;
+			break;
+		case XFS_IFLUSH_DELWRI:
+			flags = B_DELWRI;
+			break;
+		default:
+			ASSERT(0);
+			flags = 0;
+			break;
+		}
+	} else {
+		switch (flags) {
+		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
+		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
+		case XFS_IFLUSH_DELWRI:
+			flags = B_DELWRI;
+			break;
+		case XFS_IFLUSH_ASYNC:
+			flags = B_ASYNC;
+			break;
+		case XFS_IFLUSH_SYNC:
+			flags = 0;
+			break;
+		default:
+			ASSERT(0);
+			flags = 0;
+			break;
+		}
+	}
+
+	/*
 	 * First flush out the inode that xfs_iflush was called with.
 	 */
 	error = xfs_iflush_int(ip, bp);
 	if (error) {
-		xfs_ifunlock(ip);
 		goto corrupt_out;
 	}
 
@@ -2977,7 +3026,7 @@ xfs_iflush(
 		 * We don't mess with swap files from here since it is
 		 * too easy to deadlock on memory.
 		 */
-		vp = XFS_ITOV(ip);
+		vp = XFS_ITOV(iq);
 		if (vp->v_flag & VISSWAP) {
 			continue;
 		}
@@ -3005,10 +3054,9 @@ xfs_iflush(
 						clcount++;
 						error = xfs_iflush_int(iq, bp);
 						if (error) {
-							xfs_ifunlock(iq);
 							xfs_iunlock(iq,
 								    XFS_ILOCK_SHARED);
-							goto corrupt_out;
+							goto cluster_corrupt_out;
 						}
 					} else {
 						xfs_ifunlock(iq);
@@ -3024,54 +3072,6 @@ xfs_iflush(
 
 	if (!clcount) {
 	    XFSSTATS.xs_icluster_flushzero++;
-	}
-
-	iip = ip->i_itemp;   /* go back to passed-in inode, not last checked */
-	if (iip != NULL && iip->ili_format.ilf_fields != 0) {
-		/*
-		 * Flush out the inode buffer according to the directions
-		 * of the caller.  In the cases where the caller has given
-		 * us a choice choose the non-delwri case.  This is because
-		 * the inode is in the AIL and we need to get it out soon.
-		 */
-		switch (flags) {
-		case XFS_IFLUSH_SYNC:
-		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
-			flags = 0;
-			break;
-		case XFS_IFLUSH_ASYNC:
-		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
-			flags = B_ASYNC;
-			break;
-		case XFS_IFLUSH_DELWRI:
-			flags = B_DELWRI;
-			break;
-		default:
-			ASSERT(0);
-			flags = 0;
-			break;
-		}
-
-		ASSERT(bp->b_fsprivate != NULL);
-		ASSERT(bp->b_iodone != NULL);
-	} else {
-		switch (flags) {
-		case XFS_IFLUSH_DELWRI_ELSE_SYNC:
-		case XFS_IFLUSH_DELWRI_ELSE_ASYNC:
-		case XFS_IFLUSH_DELWRI:
-			flags = B_DELWRI;
-			break;
-		case XFS_IFLUSH_ASYNC:
-			flags = B_ASYNC;
-			break;
-		case XFS_IFLUSH_SYNC:
-			flags = 0;
-			break;
-		default:
-			ASSERT(0);
-			flags = 0;
-			break;
-		}
 	}
 
 	/*
@@ -3100,6 +3100,48 @@ corrupt_out:
 	brelse(bp);
 	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
 	xfs_iflush_abort(ip);
+	/*
+	 * Unlocks the flush lock
+	 */
+	return XFS_ERROR(EFSCORRUPTED);
+
+cluster_corrupt_out:
+	/* Corruption detected in the clustering loop.  Invalidate the
+	 * inode buffer and shut down the filesystem.
+	 */
+	mutex_spinunlock(&ch->ch_lock, s);
+
+	/*
+	 * Clean up the buffer.  If it was B_DELWRI, just release it -- 
+	 * brelse can handle it with no problems.  If not, shut down the 
+	 * filesystem before releasing the buffer.
+	 */
+	if ((bufwasdelwri=bp->b_flags & B_DELWRI)) {
+		brelse(bp);
+	}
+
+	xfs_force_shutdown(mp, XFS_CORRUPT_INCORE);
+
+	if(!bufwasdelwri)  {
+		/*
+		 * Just like incore_relse: if we have b_iodone functions,
+		 * mark the buffer as an error and call them.  Otherwise
+		 * mark it as stale and brelse.
+		 */
+		if (bp->b_iodone) {
+			bp->b_bdstrat = NULL;
+			bp->b_target = NULL;
+			bp->b_flags &= ~(B_DONE);
+			bp->b_flags |= B_STALE|B_ERROR|B_XFS_SHUT;
+			bp->b_error = EIO;
+			biodone(bp);
+		} else {
+			bp->b_flags |= B_STALE;
+			brelse(bp);
+		}
+	}
+
+	xfs_iflush_abort(iq);
 	/*
 	 * Unlocks the flush lock
 	 */

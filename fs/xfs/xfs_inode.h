@@ -157,8 +157,8 @@ typedef struct xfs_inode {
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
 	daddr_t			i_blkno;	/* blkno of inode buffer */
 	dev_t			i_dev;		/* dev for this inode */
-	short			i_len;		/* len of inode buffer */
-	short			i_boffset;	/* off of inode in buffer */
+	ushort			i_len;		/* len of inode buffer */
+	ushort			i_boffset;	/* off of inode in buffer */
 
 	/* Extent information. */
 	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
