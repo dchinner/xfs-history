@@ -37,7 +37,6 @@
  * somewhere else in IRIX.
  */
 
-extern int	xfs_fstype;
 extern uint64_t xfs_panic_mask;		/* set to cause more panics */
 
 extern int	restricted_chown;

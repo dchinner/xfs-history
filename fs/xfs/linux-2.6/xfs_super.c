@@ -40,7 +40,7 @@
 #include "xfs_version.h"
 
 /* xfs_vfs[ops].c */
-extern int  xfs_init(int fstype);
+extern int  xfs_init(void);
 extern void xfs_cleanup(void);
 
 /* For kernels which have the s_maxbytes field - set it */
@@ -787,7 +787,7 @@ static int __init init_xfs_fs(void)
 
 	cred_init();
 	vn_init();
-	xfs_init(0);
+	xfs_init();
 	dmapi_init();
 
 	error = register_filesystem(&xfs_fs_type);

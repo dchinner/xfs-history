@@ -655,11 +655,6 @@ static inline int vn_count(struct vnode *vp)
 }
 
 /*
- * Flags for vn_get().
- */
-#define VN_GET_NOWAIT	0x1	/* Don't wait for inactive or reclaim */
-
-/*
  * Vnode reference counting functions (and macros for compatibility).
  */
 extern vnode_t	*vn_hold(struct vnode *);
