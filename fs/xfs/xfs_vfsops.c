@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.55 $"
+#ident  "$Revision: 1.56 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -1152,7 +1152,8 @@ xfs_sync(vfs_t		*vfsp,
 		 * to know for sure, so we at least try to lock them.
 		 */
 		if (flags & SYNC_BDFLUSH) {
-			if (!(ip->i_item.ili_flags & XFS_ILOG_ALL) &&
+			if (!(ip->i_item.ili_format.ilf_fields &
+			      XFS_ILOG_ALL) &&
 			    (ip->i_update_core == 0)) {
 				ip = ip->i_mnext;
 				continue;
