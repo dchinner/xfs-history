@@ -1,13 +1,24 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.9 $"
 
 struct xfs_mount;
 
 /*
  * Structures returned from xfs_bulkstat syssgi routine.
  */
+
+/*
+ * This is just like a timestruc_t but the size is the same 
+ * for 32 and 64 bit applications.
+ */
+typedef struct xfs_bstime
+{
+	time_t		tv_sec;		/* seconds */
+	__int32_t	tv_nsec;	/* and nanoseconds */
+} xfs_bstime_t;
+
 typedef struct xfs_bstat
 {
 	ino64_t		bs_ino;		/* inode number */
@@ -18,9 +29,9 @@ typedef struct xfs_bstat
 	dev_t		bs_rdev;	/* device value */
 	__int32_t	bs_blksize;	/* block size */		
 	off64_t		bs_size;	/* file size */
-	timestruc_t	bs_atime;	/* access time */
-	timestruc_t	bs_mtime;	/* modify time */
-	timestruc_t	bs_ctime;	/* inode change time */
+	xfs_bstime_t	bs_atime;	/* access time */
+	xfs_bstime_t	bs_mtime;	/* modify time */
+	xfs_bstime_t	bs_ctime;	/* inode change time */
 	__int64_t	bs_blocks;	/* number of blocks */
 	__uint32_t	bs_xflags;	/* extended flags */
 	__int32_t	bs_extsize;	/* extent size */
