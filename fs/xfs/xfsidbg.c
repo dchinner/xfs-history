@@ -1366,13 +1366,13 @@ printflags(register uint64_t flags,
 }
 
 
-static void	printvnode(vnode_t *vp)
+static void	printvnode(vnode_t *vp, unsigned long addr)
 {
 	bhv_desc_t	*bh;
 	kdb_symtab_t	 symtab;
 
 
-	kdb_printf("vnode: 0x%p type ", vp);
+	kdb_printf("vnode: 0x%lx type ", addr);
 	if ((size_t)vp->v_type >= sizeof(vnode_type)/sizeof(vnode_type[0]))
 		kdb_printf("out of range 0x%x", vp->v_type);
 	else
@@ -1381,7 +1381,8 @@ static void	printvnode(vnode_t *vp)
 
 	if ((bh = vp->v_bh.bh_first)) {
 		kdb_printf("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
-					LINVFS_GET_IP(vp), bh, bh->bd_pdata);
+					LINVFS_GET_IP((struct vnode *) addr),
+					bh, bh->bd_pdata);
 
 		if (kdbnearsym((unsigned long)bh->bd_ops, &symtab))
 			kdb_printf("   ops %s ", symtab.sym_name);
@@ -1390,7 +1391,7 @@ static void	printvnode(vnode_t *vp)
 						"???", (void *)bh->bd_ops);
 	} else {
 		kdb_printf("   v_inode 0x%p v_bh->bh_first = NULLBHV ",
-					LINVFS_GET_IP(vp));
+					LINVFS_GET_IP((struct vnode *) addr));
 	}
 
 	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
@@ -1404,7 +1405,6 @@ static void	printvnode(vnode_t *vp)
 		vp->v_vfsp, vp->v_number);
 }
 
-
 static int	kdbm_vnode(
 	int	argc,
 	const char **argv,
@@ -1415,9 +1415,7 @@ static int	kdbm_vnode(
 	int nextarg = 1;
 	long offset = 0;
 	int diag;
-	vnode_t		*vp;
-/*	bhv_desc_t	*bh; */
-/*	kdb_symtab_t	 symtab;*/
+	vnode_t		vp;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -1427,12 +1425,49 @@ static int	kdbm_vnode(
 	if (diag)
 		return diag;
 
-	vp = (vnode_t *)addr;
+	if ((diag = kdb_getarea(vp, addr)))
+		return diag;
 
-	printvnode(vp);
+	printvnode(&vp, addr);
 
 	return 0;
 }
+
+static void
+print_vfs(vfs_t	*vfs, unsigned long addr)
+{
+	kdb_printf("vfsp at 0x%lx", addr);
+	kdb_printf("  vfs_fbhv 0x%p sb 0x%p\n", vfs->vfs_fbhv, vfs->vfs_super);
+}
+
+static int	kdbm_vfs(
+	int	argc,
+	const char **argv,
+	const char **envp,
+	struct pt_regs *regs)
+{
+	unsigned long addr;
+	int nextarg = 1;
+	long offset = 0;
+	int diag;
+	vfs_t		vfs;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+
+	if (diag)
+		return diag;
+
+	if ((diag = kdb_getarea(vfs, addr)))
+		return diag;
+
+	print_vfs(&vfs, addr);
+
+	return 0;
+}
+
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 /*
@@ -1686,7 +1721,7 @@ static int	kdbm_vn(
 	ktrace_entry_t	*ktep;
 	ktrace_snap_t	kts;
 #endif
-	vnode_t		*vp;
+	vnode_t		vp;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -1696,15 +1731,16 @@ static int	kdbm_vn(
 	if (diag)
 		return diag;
 
-	vp = (vnode_t *)addr;
+	if ((diag = kdb_getarea(vp, addr)))
+		return diag;
 
-	ip = LINVFS_GET_IP(vp);
+	ip = LINVFS_GET_IP((vnode_t *)addr);
 
 	kdb_printf("--> Inode @ 0x%p\n", ip);
 	printinode(ip);
 
-	kdb_printf("--> Vnode @ 0x%p\n", vp);
-	printvnode(vp);
+	kdb_printf("--> Vnode @ 0x%lx\n", addr);
+	printvnode(&vp, addr);
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 
@@ -1792,6 +1828,53 @@ kdbm_pb_flags(int argc, const char **argv, const char **envp, struct pt_regs *re
 	return 0;
 }
 
+static void
+print_pagebuf(
+	page_buf_t	*pb,
+	unsigned long addr)
+{
+	kdb_printf("page_buf_t at 0x%lx\n", addr);
+	kdb_printf("  pb_flags %s\n", pb_flags(pb->pb_flags));
+	kdb_printf("  pb_target 0x%p pb_hold %d pb_next 0x%p pb_prev 0x%p\n",
+		   pb->pb_target, pb->pb_hold.counter,
+		   list_entry(pb->pb_list.next, page_buf_t, pb_list),
+		   list_entry(pb->pb_list.prev, page_buf_t, pb_list));
+	kdb_printf("  pb_hash_index %d pb_hash_next 0x%p pb_hash_prev 0x%p\n",
+		   pb->pb_hash_index,
+		   list_entry(pb->pb_hash_list.next, page_buf_t, pb_hash_list),
+		   list_entry(pb->pb_hash_list.prev, page_buf_t, pb_hash_list));
+	kdb_printf("  pb_file_offset 0x%llx pb_buffer_length 0x%llx pb_addr 0x%p\n",
+		   (unsigned long long) pb->pb_file_offset,
+		   (unsigned long long) pb->pb_buffer_length,
+		   pb->pb_addr);
+	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx\n",
+		   pb->pb_bn,
+		   (unsigned long) pb->pb_count_desired);
+	kdb_printf("  pb_flushtime %ld (%ld) pb_io_remaining %d pb_error %u\n",
+		   pb->pb_flushtime, pb->pb_flushtime - jiffies,
+		   pb->pb_io_remaining.counter, pb->pb_error);
+	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
+		pb->pb_page_count, pb->pb_offset,
+		pb->pb_pages);
+#ifdef PAGEBUF_LOCK_TRACKING
+	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d) last holder %d\n",
+		   pb->pb_iodonesema.count.counter,
+		   pb->pb_iodonesema.sleepers,
+		   pb->pb_sema.count.counter, pb->pb_sema.sleepers,
+		   pb->pb_pin_count.counter, pb->pb_last_holder);
+#else
+	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
+		   pb->pb_iodonesema.count.counter,
+		   pb->pb_iodonesema.sleepers,
+		   pb->pb_sema.count.counter, pb->pb_sema.sleepers,
+		   pb->pb_pin_count.counter);
+#endif
+	if (pb->pb_fspriv || pb->pb_fspriv2) {
+		kdb_printf(  "pb_fspriv 0x%p pb_fspriv2 0x%p\n",
+			   pb->pb_fspriv, pb->pb_fspriv2);
+	}
+}
+
 static int
 kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
@@ -1809,98 +1892,50 @@ kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 	    (diag = kdb_getarea(bp, addr)))
 		return diag;
 
-	kdb_printf("page_buf_t at 0x%lx\n", addr);
-	kdb_printf("  pb_flags %s\n", pb_flags(bp.pb_flags));
-	kdb_printf("  pb_target 0x%p pb_hold %d pb_next 0x%p pb_prev 0x%p\n",
-		   bp.pb_target, bp.pb_hold.counter,
-		   bp.pb_list.next, bp.pb_list.prev);
-	kdb_printf("  pb_hash_index %d pb_hash_next 0x%p pb_hash_prev 0x%p\n",
-		   bp.pb_hash_index,
-		   bp.pb_hash_list.next,
-		   bp.pb_hash_list.prev);
-	kdb_printf("  pb_file_offset 0x%llx pb_buffer_length 0x%llx pb_addr 0x%p\n",
-		   (unsigned long long) bp.pb_file_offset,
-		   (unsigned long long) bp.pb_buffer_length,
-		   bp.pb_addr);
-	kdb_printf("  pb_bn 0x%Lx pb_count_desired 0x%lx\n",
-		   bp.pb_bn,
-		   (unsigned long) bp.pb_count_desired);
-	kdb_printf("  pb_io_remaining %d pb_error %u\n",
-		   bp.pb_io_remaining.counter,
-		   bp.pb_error);
-	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
-		bp.pb_page_count, bp.pb_offset,
-		bp.pb_pages);
-#ifdef PAGEBUF_LOCK_TRACKING
-	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d) last holder %d\n",
-		   bp.pb_iodonesema.count.counter,
-		   bp.pb_iodonesema.sleepers,
-		   bp.pb_sema.count.counter, bp.pb_sema.sleepers,
-		   bp.pb_pin_count.counter, bp.pb_last_holder);
-#else
-	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
-		   bp.pb_iodonesema.count.counter,
-		   bp.pb_iodonesema.sleepers,
-		   bp.pb_sema.count.counter, bp.pb_sema.sleepers,
-		   bp.pb_pin_count.counter);
-#endif
-	if (bp.pb_fspriv || bp.pb_fspriv2) {
-		kdb_printf(  "pb_fspriv 0x%p pb_fspriv2 0x%p\n",
-			   bp.pb_fspriv, bp.pb_fspriv2);
-	}
+	print_pagebuf(&bp, addr);
 
 	return 0;
 }
 
-/* XXXXXXXXXXXXXXXXXXXXXX */
-/* The start of this deliberately looks like a read_descriptor_t in layout */
-typedef struct {
-	read_descriptor_t io_rdesc;
-
-	/* 0x10 */
-	page_buf_rw_t io_dir;	/* read or write */
-	loff_t io_offset;	/* Starting offset of I/O */
-	int io_iovec_nr;	/* Number of entries in iovec */
-
-	/* 0x20 */
-	struct iovec **io_iovec;	/* iovec list indexed by iovec_index */
-	loff_t io_iovec_offset;	/* offset into current iovec. */
-	int io_iovec_index;	/* current iovec being processed */
-	unsigned int io_sshift;	/* sector bit shift */
-	loff_t io_i_size;	/* size of the file */
-} pb_io_desc_t;
-
 static int
-kdbm_pbiodesc(int argc, const char **argv, const char **envp,
+kdbm_pbdelay(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
-	pb_io_desc_t	pbio;
+	unsigned long	verbose = 0;
+	int	count = 0;
+	struct list_head	*curr, *next;
+	page_buf_t	bp;
 	unsigned long addr;
-	long	offset=0;
-	int nextarg;
 	int diag;
+	extern struct list_head pbd_delwrite_queue;
 
-	if (argc != 1)
+	if (argc > 1)
 		return KDB_ARGCOUNT;
 
-	nextarg = 1;
-	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
-	    (diag = kdb_getarea(pbio, addr)))
+	if (argc == 1) {
+		if ((diag = kdbgetularg(argv[1], &verbose))) {
+			return diag;
+		}
+	}
 
-	kdb_printf("pb_io_desc_t at 0x%lx\n", addr);
-	kdb_printf("  io_rdesc [ written 0x%lx count 0x%lx buf 0x%p error %d ]\n",
-			(unsigned long) pbio.io_rdesc.written,
-			(unsigned long) pbio.io_rdesc.count,
-			pbio.io_rdesc.buf, pbio.io_rdesc.error);
+	if (!verbose) {
+		kdb_printf("index pb       pin   flushtime\n");
+	}
 
-	kdb_printf("  io_dir %d io_offset 0x%Lx io_iovec_nr 0x%d\n",
-			pbio.io_dir, pbio.io_offset, pbio.io_iovec_nr);
+	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
+		addr = (unsigned long)list_entry(curr, page_buf_t, pb_list);
+		if ((diag = kdb_getarea(bp, addr)))
+			return diag;
 
-	kdb_printf("  io_iovec 0x%p io_iovec_offset 0x%Lx io_iovec_index 0x%d\n",
-		pbio.io_iovec, pbio.io_iovec_offset, pbio.io_iovec_index);
-
-	kdb_printf("  io_sshift 0x%d io_i_size 0x%Lx\n",
-		pbio.io_sshift, pbio.io_i_size);
+		if (verbose) {
+			print_pagebuf(&bp, addr);
+		} else {
+			kdb_printf("%4d  0x%lx   %d   %ld\n",
+				count++, addr, 
+				bp.pb_pin_count.counter,
+				bp.pb_flushtime - jiffies);
+		}
+	}
 
 	return 0;
 }
@@ -2099,6 +2134,7 @@ static struct xif {
 } xfsidbg_funcs[] = {
   {  "vn",	kdbm_vn,	"<vnode>", "Dump inode/vnode/trace"},
   {  "vnode",	kdbm_vnode,	"<vnode>", "Dump vnode"},
+  {  "vfs",	kdbm_vfs,	"<vfs>", "Dump vfs"},
 #ifdef	CONFIG_XFS_VNODE_TRACING
   {  "vntrace",	kdbm_vntrace,	"<vntrace>", "Dump vnode Trace"},
   {  "vntraceaddr",	kdbm_vntraceaddr, "<vntrace>", "Dump vnode Trace by Address"},
@@ -2235,10 +2271,10 @@ __init xfsidbg_init(void)
 	kdb_register("pb", kdbm_pb, "<vaddr>", "Display page_buf_t", 0);
 	kdb_register("pbflags", kdbm_pb_flags, "<flags>",
 					"Display page buf flags", 0);
-	kdb_register("pbiodesc", kdbm_pbiodesc, "<pb_io_desc_t *>",
-					"Display I/O Descriptor", 0);
 	kdb_register("pbmap", kdbm_pbmap, "<page_buf_bmap_t *>",
 					"Display Bmap", 0);
+	kdb_register("pbdelay", kdbm_pbdelay, "0|1",
+					"Display delwri pagebufs", 0);
 	kdb_register("pbtrace", kdbm_pbtrace, "<vaddr>|<count>",
 					"page_buf_t trace", 0);
 #ifdef PAGEBUF_TRACE
@@ -2259,7 +2295,7 @@ __exit xfsidbg_exit(void)
 	kdb_unregister("pb");
 	kdb_unregister("pbflags");
 	kdb_unregister("pbmap");
-	kdb_unregister("pbiodesc");
+	kdb_unregister("pbdelay");
 	kdb_unregister("pbtrace");
 #ifdef PAGEBUF_TRACE
 	kdb_unregister("pboffset");

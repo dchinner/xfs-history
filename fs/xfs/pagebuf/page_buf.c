@@ -1858,7 +1858,7 @@ _pagebuf_ioapply(			/* apply function to pages	*/
  */
 
 STATIC int pbd_active = 1;
-STATIC LIST_HEAD(pbd_delwrite_queue);
+LIST_HEAD(pbd_delwrite_queue);
 STATIC spinlock_t pbd_delwrite_lock = SPIN_LOCK_UNLOCKED;
 
 STATIC void
@@ -2417,3 +2417,4 @@ pagebuf_terminate(void)
  *	Module management (for kernel debugger module)
  */
 EXPORT_SYMBOL(pagebuf_offset);
+EXPORT_SYMBOL(pbd_delwrite_queue);
