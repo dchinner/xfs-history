@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.79 $"
+#ident	"$Revision: 1.81 $"
 
 /*
  * High level interface routines for log manager
@@ -536,6 +536,8 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	xlog_t		*log = mp->m_log; 
 	int		need_bytes, free_bytes, cycle, bytes, spl;
 
+	if (!xlog_debug)
+		return;
 	if (tail_lsn == 0) {
 		/* needed since sync_lsn is 64 bits */
 		spl = LOG_LOCK(log);
