@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.107 $"
+#ident	"$Revision: 1.108 $"
 
 /*
  * High level interface routines for log manager
@@ -2229,7 +2229,12 @@ xlog_ticket_put(xlog_t		*log,
 	xlog_ticket_t *t_list;
 
 	freesema(&ticket->t_sema);
-#ifndef DEBUG
+
+	/*
+	 * Don't think caching will make that much difference.  It's
+	 * more important to make debug easier.
+	 */
+#if 0
 	/* real code will want to use LIFO for caching */
 	ticket->t_next = log->l_freelist;
 	log->l_freelist = ticket;
