@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.226 $"
+#ident	"$Revision: 1.228 $"
 
 #include <xfs_os_defs.h>
 
@@ -1732,9 +1732,9 @@ xfs_uuid_mount(xfs_mount_t *mp)
 	}
 	if (hole < 0) {
 		xfs_uuidtab = XFS_kmem_realloc(xfs_uuidtab,
-									   (xfs_uuidtab_size + 1) * sizeof(*xfs_uuidtab),
-									   xfs_uuidtab_size  * sizeof(*xfs_uuidtab),
-									   KM_SLEEP);
+	                (xfs_uuidtab_size + 1) * sizeof(*xfs_uuidtab),
+	                xfs_uuidtab_size  * sizeof(*xfs_uuidtab),
+	                KM_SLEEP);
 		hole = xfs_uuidtab_size++;
 	}
 	xfs_uuidtab[hole] = mp->m_sb.sb_uuid;
