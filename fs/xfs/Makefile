@@ -63,7 +63,6 @@ obj-$(CONFIG_XFS_POSIX_MAC)	+= xfs_mac.o
 obj-y				+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
-				   xfs_attr_fetch.o \
 				   xfs_attr_leaf.o \
 				   xfs_bit.o \
 				   xfs_bmap.o \
