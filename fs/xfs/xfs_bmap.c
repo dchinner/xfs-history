@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.220 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1357,15 +1357,21 @@ xfs_bmap_add_extent_unwritten_real(
 			rval = XFS_ILOG_CORE | XFS_ILOG_DEXT;
 		else {
 			rval = XFS_ILOG_CORE;
-			if (error = xfs_bmbt_lookup_eq(cur, LEFT.br_startoff,
-					LEFT.br_startblock,
-					LEFT.br_blockcount, &i))
+			if (error = xfs_bmbt_lookup_eq(cur, RIGHT.br_startoff,
+					RIGHT.br_startblock,
+					RIGHT.br_blockcount, &i))
 				goto done;
 			ASSERT(i == 1);
 			if (error = xfs_bmbt_delete(cur, 0, &i))
 				goto done;
 			ASSERT(i == 1);
+			if (error = xfs_bmbt_decrement(cur, 0, &i))
+				goto done;
+			ASSERT(i == 1);
 			if (error = xfs_bmbt_delete(cur, 0, &i))
+				goto done;
+			ASSERT(i == 1);
+			if (error = xfs_bmbt_decrement(cur, 0, &i))
 				goto done;
 			ASSERT(i == 1);
 			if (error = xfs_bmbt_update(cur, LEFT.br_startoff,
