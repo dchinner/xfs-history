@@ -29,7 +29,7 @@ typedef struct xfs_mount {
 #define	XFS_MOUNT_ILOCK(mp)	splockspl((mp)->m_ilock, splhi)
 #define	XFS_MOUNT_IUNLOCK(mp,s)	spunlockspl((mp)->m_ilock,(s))
 
-void xfs_mod_sb(xfs_trans_t *, int, int);
+void xfs_mod_sb(xfs_trans_t *, int);
 void xfs_mount(xfs_mount_t *, dev_t);
 void xfs_umount(xfs_mount_t *);
 
