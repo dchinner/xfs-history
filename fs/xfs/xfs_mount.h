@@ -28,6 +28,13 @@ typedef struct xfs_mount {
 	lock_t			m_ilock;	/* inode list mutex */
 	void			*m_log;		/* log specific stuff */
 } xfs_mount_t;
+
+/*
+ * Macros for getting from mount to vfs and back.
+ */
+#define	XFS_MTOVFS(mp)	((mp)->m_vfsp)
+#define	XFS_VFSTOM(vfsp)	((vfsp)->vfs_data)
+
  
 /*
  * This structure is for use by the xfs_mod_incore_sb_batch() routine.
