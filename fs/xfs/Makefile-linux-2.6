@@ -44,6 +44,7 @@ XFS_CSRCS=	xfs_alloc.c \
 		xfs_itable.c \
 		xfs_log.c \
 		xfs_log_recover.c \
+		xfs_macros.c \
 		xfs_mount.c \
 		xfs_rw.c \
 		xfs_trans.c \
@@ -60,7 +61,8 @@ $(XFS_NAME):$(XFS_NAME)($(XFS_OBJS)) MAKELIB
 
 XFSRT_NAME=xfsrt.a
 XFSRT_CSRCS=	xfs_grio.c \
-		xfs_rtalloc.c
+		xfs_rtalloc.c \
+		xfs_rtbit.c
 XFSRT_OBJS=$(XFSRT_CSRCS:.c=.o)
 $(XFSRT_NAME):$(XFSRT_NAME)($(XFSRT_OBJS)) MAKELIB
 
@@ -102,6 +104,7 @@ HFILES=	xfs_ag.h \
 	xfs_log.h \
 	xfs_log_priv.h \
 	xfs_log_recover.h \
+	xfs_macros.h \
 	xfs_mount.h \
 	xfs_rtalloc.h \
 	xfs_rw.h \
