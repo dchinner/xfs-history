@@ -1,7 +1,7 @@
 #ifndef _XFS_DQUOT__H_
 #define _XFS_DQUOT__H_
 
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 /* 
  * Dquots are structures that hold quota information about a user or a project,
@@ -113,23 +113,23 @@ typedef struct xfs_dquot {
 /*
  * Quota Accounting flags
  */
-#define XFS_ALL_QUOTA_ACCT	(XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_PDQ_ACCT)
-#define XFS_ALL_QUOTA_ENFD	(XFS_MOUNT_UDQ_ENFD | XFS_MOUNT_PDQ_ENFD)
-#define XFS_ALL_QUOTA_CHKD	(XFS_MOUNT_UDQ_CHKD | XFS_MOUNT_PDQ_CHKD)
-#define XFS_ALL_QUOTA_ACTV	(XFS_MOUNT_UDQ_ACTIVE | XFS_MOUNT_PDQ_ACTIVE)
-#define XFS_ALL_QUOTA_ACCT_ENFD	(XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_UDQ_ENFD|\
-				 XFS_MOUNT_PDQ_ACCT|XFS_MOUNT_PDQ_ENFD)	
+#define XFS_ALL_QUOTA_ACCT	(XFS_UQUOTA_ACCT | XFS_PQUOTA_ACCT)
+#define XFS_ALL_QUOTA_ENFD	(XFS_UQUOTA_ENFD | XFS_PQUOTA_ENFD)
+#define XFS_ALL_QUOTA_CHKD	(XFS_UQUOTA_CHKD | XFS_PQUOTA_CHKD)
+#define XFS_ALL_QUOTA_ACTV	(XFS_UQUOTA_ACTIVE | XFS_PQUOTA_ACTIVE)
+#define XFS_ALL_QUOTA_ACCT_ENFD	(XFS_UQUOTA_ACCT|XFS_UQUOTA_ENFD|\
+				 XFS_PQUOTA_ACCT|XFS_PQUOTA_ENFD)	
 
-#define	XFS_IS_QUOTA_RUNNING(mp)  ((mp)->m_flags & XFS_ALL_QUOTA_ACCT)
-#define XFS_IS_UQUOTA_RUNNING(mp) ((mp)->m_flags & XFS_MOUNT_UDQ_ACCT)
-#define XFS_IS_PQUOTA_RUNNING(mp) ((mp)->m_flags & XFS_MOUNT_PDQ_ACCT)
+#define	XFS_IS_QUOTA_RUNNING(mp)  ((mp)->m_qflags & XFS_ALL_QUOTA_ACCT)
+#define XFS_IS_UQUOTA_RUNNING(mp) ((mp)->m_qflags & XFS_UQUOTA_ACCT)
+#define XFS_IS_PQUOTA_RUNNING(mp) ((mp)->m_qflags & XFS_PQUOTA_ACCT)
 
 /* 
  * Quota Limit Enforcement flags
  */
-#define	XFS_IS_QUOTA_ENFORCED(mp) 	((mp)->m_flags & XFS_ALL_QUOTA_ENFD)
-#define XFS_IS_UQUOTA_ENFORCED(mp)	((mp)->m_flags & XFS_MOUNT_UDQ_ENFD)
-#define XFS_IS_PQUOTA_ENFORCED(mp)	((mp)->m_flags & XFS_MOUNT_PDQ_ENFD)
+#define	XFS_IS_QUOTA_ENFORCED(mp) 	((mp)->m_qflags & XFS_ALL_QUOTA_ENFD)
+#define XFS_IS_UQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_UQUOTA_ENFD)
+#define XFS_IS_PQUOTA_ENFORCED(mp)	((mp)->m_qflags & XFS_PQUOTA_ENFD)
 
 #define XFS_DQ_IS_LOCKED(dqp)	(mutex_mine(&(dqp)->q_qlock))
 
