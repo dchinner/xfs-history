@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.11 $"
+#ident  "$Revision: 1.12 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -560,6 +560,10 @@ _xfs_ibusy(xfs_mount_t *mp)
 		if (vp->v_count != 0) {
 			if ((vp->v_count == 1) && (ip == mp->m_rootip))
 				continue;
+			if ((vp->v_count == 1) && (ip == mp->m_rbmip))
+				continue;
+			if ((vp->v_count == 1) && (ip == mp->m_rsumip))
+				continue;
 			busy++;
 		}
 	}
@@ -581,7 +585,7 @@ xfs_unmount(vfs_t	*vfsp,
 	    cred_t	*credp)
 {
 	xfs_mount_t	*mp;
-	xfs_inode_t	*rip;
+	xfs_inode_t	*rip, *rbmip, *rsumip;
 	vnode_t		*rvp = 0;
 	vmap_t		vmap;
 
@@ -605,12 +609,37 @@ xfs_unmount(vfs_t	*vfsp,
 	rip = mp->m_rootip;
 	xfs_ilock(rip, XFS_ILOCK_EXCL);
 	xfs_iflock(rip);
+
+	/*
+	 * Flush out the real time inodes.
+	 */
+	if ((rbmip = mp->m_rbmip) != NULL) {
+		xfs_ilock(rbmip, XFS_ILOCK_EXCL);
+		xfs_iflock(rbmip);
+		xfs_iflush(rbmip, 0);
+		xfs_iunlock(rbmip, XFS_ILOCK_EXCL);
+		ASSERT(XFS_ITOV(rbmip)->v_count == 1);
+
+		rsumip = mp->m_rsumip;
+		xfs_ilock(rsumip, XFS_ILOCK_EXCL);
+		xfs_iflock(rsumip);
+		xfs_iflush(rsumip, 0);
+		xfs_iunlock(rsumip, XFS_ILOCK_EXCL);
+		ASSERT(XFS_ITOV(rsumip)->v_count == 1);
+	}
+
 	xfs_iflush(rip, 0);		/* synchronously flush to disk */
 	rvp = XFS_ITOV(rip);
 	if (rvp->v_count != 1) {
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		return EBUSY;
 	}
+
+	if (rbmip) {
+		VN_RELE(XFS_ITOV(rbmip));
+		VN_RELE(XFS_ITOV(rsumip));
+	}
+
 	xfs_iunlock(rip, XFS_ILOCK_EXCL);
 	VMAP(rvp, vmap);
 	VN_RELE(rvp);
