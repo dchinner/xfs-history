@@ -201,8 +201,9 @@ linvfs_link(
 	if (S_ISDIR(ip->i_mode))
 		return -EPERM;
 
-	tdvp = LINVFS_GET_VPTR(dir);
-	vp = LINVFS_GET_VPTR(ip);
+	tdvp = LINVFS_GET_VP(dir);
+
+	vp = LINVFS_GET_VP(ip);
 
 	error = 0;
 	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, NULL, error);
@@ -506,14 +507,20 @@ linvfs_revalidate_core(
 }
 
 STATIC int
-linvfs_revalidate(
-	struct dentry	*dentry)
+linvfs_getattr(
+	struct vfsmount *mnt,
+	struct dentry	*dentry,
+	struct kstat	*stat)
 {
-	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);
+	struct inode *inode = dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	int		error = 0;
 
 	if (vp->v_flag & VMODIFIED) {
-		return linvfs_revalidate_core(dentry->d_inode, 0);
+		error = linvfs_revalidate_core(inode, 0);
 	}
+	if (!error)
+		generic_fillattr(inode, stat);
 	return 0;
 }
 
@@ -964,7 +971,7 @@ struct address_space_operations linvfs_aops = {
 struct inode_operations linvfs_file_inode_operations =
 {
 	permission:		linvfs_permission,
-	revalidate:		linvfs_revalidate,
+	getattr:		linvfs_getattr,
 	setattr:		linvfs_setattr,
 	setxattr:		linvfs_setxattr,
 	getxattr:		linvfs_getxattr,
@@ -984,7 +991,7 @@ struct inode_operations linvfs_dir_inode_operations =
 	mknod:			linvfs_mknod,	
 	rename:			linvfs_rename,	
 	permission:		linvfs_permission,
-	revalidate:		linvfs_revalidate,
+	getattr:		linvfs_getattr,
 	setattr:		linvfs_setattr,
 	setxattr:		linvfs_setxattr,
 	getxattr:		linvfs_getxattr,
@@ -997,7 +1004,7 @@ struct inode_operations linvfs_symlink_inode_operations =
 	readlink:		linvfs_readlink,
 	follow_link:		linvfs_follow_link,
 	permission:		linvfs_permission,
-	revalidate:		linvfs_revalidate,
+	getattr:		linvfs_getattr,
 	setattr:		linvfs_setattr,
 	setxattr:		linvfs_setxattr,
 	getxattr:		linvfs_getxattr,

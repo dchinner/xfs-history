@@ -976,9 +976,7 @@ void pagebuf_rele(page_buf_t * pb)
  *	pagebuf_pin should be used by the file system when it wants be
  *	assured that no attempt will be made to force the affected
  *	memory to disk.  It does not assure that a given logical page
- *	will not be moved to a different physical page.  Only the
- *	raw_count field of mem_map_t can in general assure that a
- *	logical page will not be moved to a different physical page. 
+ *	will not be moved to a different physical page. 
  */
 
 void pagebuf_pin(	/* pin buffer in memory         */
@@ -1032,7 +1030,7 @@ static inline void	_pagebuf_wait_unpin(page_buf_t * pb)
 		if (atomic_read(&PBP(pb)->pb_pin_count) == 0) {
 			break;
 		}
-		run_task_queue(&tq_disk);
+		blk_run_queues();
 		schedule();
 	}
 	remove_wait_queue(&PBP(pb)->pb_waiters, &wait);
@@ -1368,7 +1366,7 @@ io_submitted:
 	if (atomic_dec_and_test(&PBP(pb)->pb_io_remaining) == 1) {
 		pagebuf_iodone(pb);
 	} else if ((pb->pb_flags & (PBF_SYNC|PBF_ASYNC)) == PBF_SYNC)  {
-		run_task_queue(&tq_disk);
+		blk_run_queues();
 	}
 
 	return status < 0 ? status : 0;
@@ -1385,7 +1383,7 @@ io_submitted:
 int pagebuf_iowait(page_buf_t * pb) /* buffer to wait on              */
 {
 	PB_TRACE(pb, PB_TRACE_REC(iowait), 0);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, PB_TRACE_REC(iowaited), (int)pb->pb_error);
 	return (pb->pb_error);
@@ -1434,7 +1432,7 @@ pagebuf_offset(page_buf_t *pb, off_t offset)
  *	retrieval, and a negative error code on any error (including
  *	-ENOENT when the loff_t is out of range). 
  *
- *	The mem_map_t * return value may be set to NULL if the
+ *	The struct page * return value may be set to NULL if the
  *	page is outside of main memory (as in the case of memory on a controller
  *	card).  The page_buf_pgno_t may be set to PAGE_BUF_PGNO_NULL
  *	as well, if the page is not actually allocated, unless the
@@ -1446,7 +1444,7 @@ int pagebuf_segment(		/* return next segment of buffer */
     page_buf_t * pb,		/* buffer to examine            */
     loff_t * boff_p,		/* offset in buffer of next     */
 				/* segment (updated)            */
-    mem_map_t ** spage_p,	/* page (updated)               */
+    struct page ** spage_p,	/* page (updated)               */
 				/* (NULL if not in mem_map[])   */
     size_t * soff_p,		/* offset in page (updated)     */
     size_t * ssize_p,		/* length of segment (updated)  */
@@ -1692,7 +1690,7 @@ pagebuf_daemon(void *data)
 		}
 
 		if (count)
-			run_task_queue(&tq_disk);
+			blk_run_queues();
 
 #ifdef REMAPPING_SUPPORT
 		if (as_list_len > 0)
@@ -1767,7 +1765,7 @@ pagebuf_delwri_flush(pb_target_t *target, u_long flags, int *pinptr)
 
 	spin_unlock(&pb_daemon->pb_delwrite_lock);
 
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 
 	if (pinptr)
 		*pinptr = pincount;

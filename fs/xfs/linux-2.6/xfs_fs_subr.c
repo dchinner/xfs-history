@@ -182,15 +182,3 @@ fs_flush_pages(
 	return 0;
 }
 
-
-#ifdef CELL_CAPABLE
-EXPORT_SYMBOL(fs_noerr);
-EXPORT_SYMBOL(fs_nosys);
-EXPORT_SYMBOL(fs_nodev);
-EXPORT_SYMBOL(fs_noval);
-EXPORT_SYMBOL(fs_vnode_change);
-EXPORT_SYMBOL(fs_dounmount);
-EXPORT_SYMBOL(fs_tosspages);
-EXPORT_SYMBOL(fs_flushinval_pages);
-EXPORT_SYMBOL(fs_flush_pages);
-#endif

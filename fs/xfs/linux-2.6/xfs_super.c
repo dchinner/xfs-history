@@ -35,6 +35,7 @@
 #include <linux/smp_lock.h>
 #include <linux/xfs_iops.h>
 #include <linux/blkdev.h>
+#include <linux/namei.h>
 #include <linux/init.h>
 
 /* xfs_vfs[ops].c */
@@ -709,7 +710,6 @@ linvfs_put_super(
 {
 	int		error;
 	int		sector_size;
-	kdev_t		dev = sb->s_dev;
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t		*cvp;
 
@@ -732,7 +732,7 @@ linvfs_put_super(
 	/*  Do something to get rid of the VNODE/VFS layer here  */
 
 	/* Reset device block size */
-	sector_size = get_hardsect_size(dev);
+	sector_size = bdev_hardsect_size(sb->s_bdev);
 	set_blocksize(sb->s_bdev, sector_size);
 }
 

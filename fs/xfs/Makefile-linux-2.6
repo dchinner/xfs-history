@@ -48,55 +48,10 @@ ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
 	EXTRA_CFLAGS += -DPAGEBUF_TRACE
 endif
 
-subdir-$(CONFIG_XFS_FS)		+= pagebuf linux support
+obj-$(CONFIG_XFS_FS)		+= xfs.o
+obj-$(CONFIG_XFS_FS)		+= pagebuf/ linux/ support/
 
-# fs/Makefile enters fs/xfs twice if CONFIG_XFS_FS is y, once for kernel and
-# once for modules.  This is necessary because xfsidbg can be built as a module
-# even if xfs is in kernel.  Alas the shorthand form
-#   O_TARGET := xfs.o
-#   obj-m := $(O_TARGET)
-# fails when the makefile is run more than once, code gets compiled as both
-# kernel and as module, which one gets linked depends on the phase of the moon.
-# I just love these layer violations where a makefile behaves differently
-# depending on changes to its parent.  Work around by only setting obj-m when
-# xfs is selected as a module.  Keith Owens.
-
-O_TARGET			:= xfs.o
-ifeq ($(CONFIG_XFS_FS),m)
-  obj-m				:= $(O_TARGET)
-endif
-
-ifeq ($(CONFIG_XFS_RT),)
-  obj-y				+= xfsrtstubs.o
-else
-  obj-y				+= xfs_rtalloc.o xfs_rtbit.o
-endif
-
-ifneq ($(CONFIG_XFS_GRIO),)
-  obj-y				+= xfs_grio.o
-endif
-
-ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
-  obj-y				+= xfsdmapistubs.o
-else
-  obj-y				+= xfs_dmapi.o
-endif
-
-ifeq ($(CONFIG_XFS_QUOTA),)
-  obj-y				+= xfsquotasstubs.o
-else
-  obj-y				+= xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
-endif
-
-ifneq ($(CONFIG_FS_POSIX_ACL),)
-  obj-y				+= xfs_acl.o
-endif
-
-ifneq ($(CONFIG_FS_POSIX_MAC),)
-  obj-y				+= xfs_mac.o
-endif
-
-obj-y				+= xfs_alloc.o \
+xfs-objs			+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
 				   xfs_attr_fetch.o \
@@ -144,10 +99,41 @@ obj-y				+= xfs_alloc.o \
 				   xfs_rw.o \
 				   xfs_log_lsn.o
 
-# Objects not built in this directory
-obj-y				+= pagebuf/pagebuf.o \
+ifeq ($(CONFIG_XFS), m)
+  xfs-objs +=			   pagebuf/pagebuf.o \
 				   linux/linux_xfs.o \
 				   support/support_xfs.o
+endif
+
+ifeq ($(CONFIG_XFS_RT),)
+  xfs-objs			+= xfsrtstubs.o
+else
+  xfs-objs			+= xfs_rtalloc.o xfs_rtbit.o
+endif
+
+ifneq ($(CONFIG_XFS_GRIO),)
+  xfs-objs			+= xfs_grio.o
+endif
+
+ifeq ($(CONFIG_HAVE_XFS_DMAPI),)
+  xfs-objs			+= xfsdmapistubs.o
+else
+  xfs-objs			+= xfs_dmapi.o
+endif
+
+ifeq ($(CONFIG_XFS_QUOTA),)
+  xfs-objs			+= xfsquotasstubs.o
+else
+  xfs-objs			+= xfs_dquot.o xfs_trans_dquot.o xfs_dquot_item.o xfs_qm_syscalls.o xfs_qm.o
+endif
+
+ifneq ($(CONFIG_FS_POSIX_ACL),)
+  xfs-objs			+= xfs_acl.o
+endif
+
+ifneq ($(CONFIG_FS_POSIX_MAC),)
+  xfs-objs			+= xfs_mac.o
+endif
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to
@@ -158,15 +144,12 @@ ifneq ($(CONFIG_KDB_MODULES),)
   ifeq ($(CONFIG_XFS_FS),y)
     obj-$(CONFIG_KDB_MODULES)	+= xfsidbg.o
   else
-    obj-$(CONFIG_XFS_FS)	+= xfsidbg.o
+    xfs-objs			+= xfsidbg.o
   endif
 endif
 
 CFLAGS_xfsidbg.o += -I $(TOPDIR)/arch/$(ARCH)/kdb
 
 include $(TOPDIR)/Rules.make
-
-# This is really nasty, but Rules.make was never designed for multi directory
-# modules.  Keith Owens.
 
 xfs.o: $(patsubst %,_modsubdir_%,$(subdir-m))
