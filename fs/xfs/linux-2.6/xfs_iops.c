@@ -72,7 +72,9 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	vnode_t		*dvp, *vp;
 	struct inode	*ip;
 	vattr_t		va;
+#ifdef CONFIG_FS_POSIX_ACL
 	struct acl	pdacl; /* parent default ACL */
+#endif
 	int		have_default_acl;
 
 	dvp = LINVFS_GET_VN_ADDRESS(dir);
