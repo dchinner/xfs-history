@@ -292,6 +292,8 @@ pagebuf_iozero(
 	loff_t pos;
 	int at_eof;
 
+	assert(pb->pb_target);
+
 	cboff = boff;
 	boff += bsize; /* last */
 
@@ -515,9 +517,10 @@ pagebuf_direct_file_read(
 		if (rounded_offset + rounded_size > rounded_isize)
 			rounded_size = rounded_isize - rounded_offset;
 
-		rdp->io_error = bmap(inode, rounded_offset, rounded_size,
-					&maps[0], PBF_MAX_MAPS,
-					&maps_returned, PBF_READ);
+		rdp->io_error = bmap(inode,
+					rounded_offset, rounded_size,
+					maps, PBF_MAX_MAPS, &maps_returned,
+					PBF_READ);
 
 		map_entry = 0;
 
@@ -633,17 +636,19 @@ pagebuf_read_full_page(
 
 	bh = head = page->buffers;
 	if (!bh || !buffer_mapped(bh)) {
-		page_buf_bmap_t	map;
+		page_buf_bmap_t	maps[PBF_MAX_MAPS];
 		int		nmaps;
-		
-		error = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
-				PAGE_CACHE_SIZE, &map, 1, &nmaps, PBF_READ);
+
+		error = bmap(inode,
+				((loff_t)page->index << PAGE_CACHE_SHIFT),
+				PAGE_CACHE_SIZE, maps, PBF_MAX_MAPS, &nmaps,
+			 	PBF_READ);
 		if (error)
 			BUG();
-		if (map.pbm_bn >= 0) {
-			hook_buffers_to_page(target, inode, page, &map, nmaps);
+		if (maps[0].pbm_bn >= 0) {
+			hook_buffers_to_page(target, inode, page, maps, nmaps);
 			bh = head = page->buffers;
-		} else if (map.pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
+		} else if (maps[0].pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
 			memset(kmap(page), 0, PAGE_CACHE_SIZE);
 			flush_dcache_page(page);
 			kunmap(page);
@@ -655,7 +660,7 @@ pagebuf_read_full_page(
 	do {
 		if (buffer_uptodate(bh))
 			continue;
-
+		assert(buffer_mapped(bh));
 		arr[nr] = bh;
 		nr++;
 	} while ((bh = bh->b_this_page) != head);
@@ -850,7 +855,7 @@ __pb_block_prepare_write_async(
 	int 			err = 0;
 	int			dp = DelallocPage(page);
 	char			*kaddr = kmap(page);
-	page_buf_bmap_t		map[PBF_MAX_MAPS];
+	page_buf_bmap_t		maps[PBF_MAX_MAPS];
 
 	/*
 	 * Create & map buffer.
@@ -863,9 +868,11 @@ __pb_block_prepare_write_async(
 	if ((!bh || buffer_delay(bh)) && (!dp || (flags & PBF_FILE_ALLOCATE)))
 	{
 		if (!mp) {
-			mp = map;
-			err = bmap(inode, ((loff_t)page->index << PAGE_CACHE_SHIFT),
-				PAGE_CACHE_SIZE, mp, 1, &nmaps, flags);
+			mp = maps;
+			err = bmap(inode,
+				((loff_t)page->index << PAGE_CACHE_SHIFT),
+				PAGE_CACHE_SIZE, mp, PBF_MAX_MAPS, &nmaps,
+				flags);
 			if (err < 0) {
 				goto out;
 			}
@@ -1065,7 +1072,7 @@ _pagebuf_file_write(
 {
 	struct inode		*inode = filp->f_dentry->d_inode;
 	page_buf_bmap_t		map[PBF_MAX_MAPS];
-	int			maps_returned;
+	int			maps_returned, i;
 	unsigned long		map_size, size;
 	int			status = 0, written = 0;
 	loff_t			foff = *lp;
@@ -1133,21 +1140,25 @@ _pagebuf_file_write(
 		 * care about to the end of the mapping. Then,
 		 * reduce the size to lesser of the user's or the
 		 * piece in the map.
-		 */
-
-		map_size = map[0].pbm_bsize - map[0].pbm_delta;
-		size = min((unsigned long)map_size, size);
-
-		/*
+		 *
 		 * Holes mean we came to the end of the space returned
 		 * from the file system. We need to go back and ask for
 		 * more space.
 		 */
-		if (map[0].pbm_flags & PBMF_HOLE) {
-			printk("pbfwa: HOLE ro 0x%Lx size 0x%lx mp 0x%p\n",
-				rounded_offset, size, &map[0]);
-			break;
+
+		map_size = 0;
+		for (i = 0; i < maps_returned; i++) {
+			if (map[i].pbm_flags & PBMF_HOLE) {
+				printk("HOLE ro 0x%Lx size 0x%lx mp 0x%p\n",
+					rounded_offset, size, map);
+				break;
+			}
+			map_size += map[i].pbm_bsize - map[i].pbm_delta;
 		}
+		if (i < maps_returned)
+			break;
+		size = min((unsigned long)map_size, size);
+
 		/*
 		 * Handle delwri or direct I/O
 		 */
@@ -1158,6 +1169,7 @@ _pagebuf_file_write(
 		} else {
 			int	io_size = (int)min(size, (unsigned long) len);
 
+			assert(maps_returned == 1);
 			status = _pb_direct_io(target, inode, rounded_offset,
 					io_size, map, buf, NULL, 1);
 			if (status > 0)
@@ -1388,11 +1400,13 @@ cluster_write(
 	int			nmaps,
 	int			async_write)
 {
-	unsigned long tindex, tlast;
-	struct page *page;
+	unsigned long		tindex, tlast;
+	struct page		*page;
+	loff_t			sz = 0;
+	int			i;
 
 	if (startpage->index != 0) {
-		tlast = mp->pbm_offset >> PAGE_CACHE_SHIFT;
+		tlast = mp[0].pbm_offset >> PAGE_CACHE_SHIFT;
 		for (tindex = startpage->index-1; tindex >= tlast; tindex--) {
 			if (!(page = probe_page(inode, tindex)))
 				break;
@@ -1400,8 +1414,9 @@ cluster_write(
 		}
 	}
 	convert_page(target, inode, startpage, mp, nmaps, async_write);
-	tlast = PAGE_CACHE_ALIGN_LL(mp->pbm_offset + mp->pbm_bsize) >>
-							PAGE_CACHE_SHIFT;
+	for (i = 0; i < nmaps; i++)
+		sz += mp[i].pbm_bsize;
+	tlast = PAGE_CACHE_ALIGN_LL(mp[0].pbm_offset + sz) >> PAGE_CACHE_SHIFT;
 	for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
 		if (!(page = probe_page(inode, tindex)))
 			break;
@@ -1419,9 +1434,9 @@ pagebuf_delalloc_convert(
 	pagebuf_bmap_fn_t	bmap,	/* bmap function */
 	int			async_write)
 {
-	page_buf_bmap_t maps[PBF_MAX_MAPS];
-	int maps_returned, error;
-	loff_t rounded_offset;
+	page_buf_bmap_t		maps[PBF_MAX_MAPS];
+	int			maps_returned, error;
+	loff_t			rounded_offset;
 
 	/* Fast path for mapped page */
 	if (page->buffers && !buffer_delay(page->buffers)) {
@@ -1431,21 +1446,24 @@ pagebuf_delalloc_convert(
 		return 0;
 	}
 
-	rounded_offset = ((unsigned long long) page->index) << PAGE_CACHE_SHIFT;
+	rounded_offset = ((loff_t)page->index) << PAGE_CACHE_SHIFT;
 	error = bmap(inode, rounded_offset, PAGE_CACHE_SIZE,
-			&maps[0], PBF_MAX_MAPS, &maps_returned, flags);
+			maps, PBF_MAX_MAPS, &maps_returned, flags);
 	if (error)
 		return error;
 
-	if ((maps[0].pbm_flags & PBMF_HOLE)) {
-		printk("delalloc page 0x%p with no extent index 0x%lx\n",
-			page, page->index);
+	if (maps[0].pbm_delta & ~PAGE_CACHE_MASK) {
+		printk("pagebuf_delalloc_convert: pbm_delta not page-aligned; "
+			"map=0x%p\n", maps);
 		BUG();
 	}
-
-	if (maps[0].pbm_delta % PAGE_CACHE_SIZE) {
-		printk("PCD: pbm_delta not page aligned mp 0x%p\n", &maps[0]);
-		return -EIO;
+	for (error = 0; error < maps_returned; error++) {
+		if ((maps[error].pbm_flags & PBMF_HOLE)) {
+			printk("pagebuf_delalloc_convert: delalloc page 0x%p "
+				"with no extent index 0x%lx, map[%d]=0x%p\n",
+				page, page->index, error, &maps[error]);
+			BUG();
+		}
 	}
 
 	/*
@@ -1454,6 +1472,5 @@ pagebuf_delalloc_convert(
 	 */
 	page_cache_get(page);
 	return cluster_write(target, inode, page,
-				&maps[0], maps_returned, async_write);
+				maps, maps_returned, async_write);
 }
-
