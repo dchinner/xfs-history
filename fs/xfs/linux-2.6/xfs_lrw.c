@@ -396,12 +396,13 @@ int xfs_zeof_debug = 0;
 
 int					/* error */
 xfs_zero_eof(
-	struct inode	*ip,
+	vnode_t		*vp,
 	xfs_iocore_t	*io,
 	off_t		offset,
 	xfs_fsize_t	isize,
 	struct pm       *pmp)
 {
+	struct inode	*ip = vp->v_inode;
 	xfs_fileoff_t	start_zero_fsb;
 	xfs_fileoff_t	end_zero_fsb;
 	xfs_fileoff_t	prev_zero_fsb;
@@ -637,7 +638,8 @@ xfs_write(
 	if (*offsetp > isize && isize) {
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_RD);
 		io->io_writeio_blocks = mp->m_writeio_blocks;
-		ret = xfs_zero_eof(ip, io, *offsetp, isize, NULL);
+		ret = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
+			isize, NULL);
 		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_RD);
 		if (ret) {
 			xfs_rwunlock(bdp, VRWLOCK_WRITE);
