@@ -1080,7 +1080,6 @@ xfs_dm_get_allocinfo_rvp(
 
 	while (fsb_length && elem < nelem) {
 		xfs_bmbt_irec_t bmp[50];
-		xfs_fsblock_t	firstblock;	/* start block for bmapi */
 		dm_extent_t	extent;
 		xfs_filblks_t	fsb_bias;
 		dm_size_t	bias;
@@ -1098,9 +1097,8 @@ xfs_dm_get_allocinfo_rvp(
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 		lock = xfs_ilock_map_shared(ip);
 
-		firstblock = NULLFSBLOCK;
 		error = xfs_bmapi(NULL, ip, fsb_offset, fsb_length,
-			XFS_BMAPI_ENTIRE, &firstblock, 0, bmp, &num, NULL);
+			XFS_BMAPI_ENTIRE, NULL, 0, bmp, &num, NULL);
 
 		xfs_iunlock_map_shared(ip, lock);
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);

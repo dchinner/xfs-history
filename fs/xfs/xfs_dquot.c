@@ -469,7 +469,6 @@ xfs_qm_dqtobp(
 	xfs_buf_t		**O_bpp,
 	uint			flags)
 {
-	xfs_fsblock_t	firstblock;
 	xfs_bmbt_irec_t map;
 	int		nmaps, error;
 	xfs_buf_t	*bp;
@@ -479,7 +478,6 @@ xfs_qm_dqtobp(
 	xfs_dqid_t	id;
 	boolean_t	newdquot;
 
-	firstblock = NULLFSBLOCK;
 	mp = dqp->q_mount;
 	id = INT_GET(dqp->q_core.d_id, ARCH_CONVERT);
 	nmaps = 1;
@@ -509,9 +507,7 @@ xfs_qm_dqtobp(
 		error = xfs_bmapi(NULL, quotip, dqp->q_fileoffset,
 				  XFS_DQUOT_CLUSTER_SIZE_FSB,
 				  XFS_BMAPI_METADATA,
-				  &firstblock,
-				  0,
-				  &map, &nmaps, NULL);
+				  NULL, 0, &map, &nmaps, NULL);
 
 		xfs_iunlock(quotip, XFS_ILOCK_SHARED);
 		if (error)

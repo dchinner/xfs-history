@@ -1876,7 +1876,6 @@ STATIC int
 xfs_attr_rmtval_get(xfs_da_args_t *args)
 {
 	xfs_bmbt_irec_t map[ATTR_RMTVALUE_MAPSIZE];
-	xfs_fsblock_t firstblock;
 	xfs_mount_t *mp;
 	xfs_daddr_t dblkno;
 	xfs_caddr_t dst;
@@ -1891,12 +1890,11 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 	valuelen = args->valuelen;
 	lblkno = args->rmtblkno;
 	while (valuelen > 0) {
-		firstblock = NULLFSBLOCK;
 		nmap = ATTR_RMTVALUE_MAPSIZE;
 		error = xfs_bmapi(args->trans, args->dp, (xfs_fileoff_t)lblkno,
 				  args->rmtblkcnt,
 				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
-				  &firstblock, 0, map, &nmap, NULL);
+				  NULL, 0, map, &nmap, NULL);
 		if (error)
 			return(error);
 		ASSERT(nmap >= 1);

@@ -5562,7 +5562,6 @@ xfs_getbmap(
 {
 	__int64_t		bmvend;		/* last block requested */
 	int			error;		/* return value */
-	xfs_fsblock_t		firstblock;	/* start block for bmapi */
 	__int64_t		fixlen;		/* length for -1 case */
 	int			i;		/* extent number */
 	xfs_inode_t		*ip;		/* xfs incore inode pointer */
@@ -5699,8 +5698,6 @@ xfs_getbmap(
 		goto unlock_and_return;
 	}
 
-	firstblock = NULLFSBLOCK;
-
 	nexleft = nex;
 
 	do {
@@ -5711,7 +5708,7 @@ xfs_getbmap(
 
 	    error = xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(mp, bmv->bmv_offset),
 					XFS_BB_TO_FSB(mp, bmv->bmv_length),
-					bmapi_flags, &firstblock, 0,
+					bmapi_flags, NULL, 0,
 					map, &nmap, NULL);
 	    ASSERT(nmap <= subnex);
 

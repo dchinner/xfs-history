@@ -948,7 +948,6 @@ xfs_readlink(
 	vnode_t		*vp;
 	int		error = 0;
 	xfs_mount_t	*mp;
-	xfs_fsblock_t	firstblock;
 	int		nmaps;
 	xfs_bmbt_irec_t mval[SYMLINK_MAPS];
 	xfs_daddr_t	d;
@@ -1002,10 +1001,9 @@ xfs_readlink(
 		 * Symlink not inline.	Call bmap to get it in.
 		 */
 		nmaps = SYMLINK_MAPS;
-		firstblock = NULLFSBLOCK;
 
 		error = xfs_bmapi(NULL, ip, 0, XFS_B_TO_FSB(mp, pathlen),
-				  0, &firstblock, 0, mval, &nmaps, NULL);
+				  0, NULL, 0, mval, &nmaps, NULL);
 
 		if (error) {
 			goto error_return;
@@ -1341,7 +1339,6 @@ xfs_inactive_free_eofblocks(
 	xfs_filblks_t	map_len;
 	int		nimaps;
 	xfs_bmbt_irec_t imap;
-	xfs_fsblock_t	first_block;
 
 	/*
 	 * Figure out if there are any blocks beyond the end
@@ -1354,11 +1351,9 @@ xfs_inactive_free_eofblocks(
 		return (0);
 
 	nimaps = 1;
-	first_block = NULLFSBLOCK;
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	error = xfs_bmapi(NULL, ip, end_fsb, map_len, 0,
-			  &first_block, 0, &imap, &nimaps,
-			  NULL);
+			  NULL, 0, &imap, &nimaps, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 	if (!error && (nimaps != 0) &&

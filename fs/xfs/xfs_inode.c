@@ -1193,7 +1193,6 @@ xfs_isize_check(
 	xfs_inode_t	*ip,
 	xfs_fsize_t	isize)
 {
-	xfs_fsblock_t	firstblock;
 	xfs_fileoff_t	map_first;
 	int		nimaps;
 	xfs_bmbt_irec_t imaps[2];
@@ -1206,7 +1205,6 @@ xfs_isize_check(
 
 	nimaps = 2;
 	map_first = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
-	firstblock = NULLFSBLOCK;
 	/*
 	 * The filesystem could be shutting down, so bmapi may return
 	 * an error.
@@ -1215,7 +1213,7 @@ xfs_isize_check(
 			 (XFS_B_TO_FSB(mp,
 				       (xfs_ufsize_t)XFS_MAX_FILE_OFFSET) -
 			  map_first),
-			 XFS_BMAPI_ENTIRE, &firstblock, 0, imaps, &nimaps,
+			 XFS_BMAPI_ENTIRE, NULL, 0, imaps, &nimaps,
 			 NULL))
 	    return;
 	ASSERT(nimaps == 1);
