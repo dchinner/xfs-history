@@ -1198,7 +1198,7 @@ xfs_stickytest(xfs_inode_t *dp, xfs_inode_t *ip, struct cred *cr)
  * xfs_dir_lookup_int flags.
  */
 
-#define DLF_IGET	0x01/* get entry inode if name lookup succeeds */
+#define DLF_IGET	0x01	/* get entry inode if name lookup succeeds */
 
 /*
  * Wrapper around xfs_dir_lookup. This routine will first look in
@@ -1215,10 +1215,10 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
                     char         *name,
                     pathname_t   *pnp,
 		    xfs_ino_t    *inum,
-		    xfs_inode_t  **ip)
+		    xfs_inode_t  **ip,
+		    struct ncfastdata *fd)
 {
 	vnode_t		   *vp;
-	struct ncfastdata  fastdata;
 	int		   name_len;
 	int		   code = 0;
 	boolean_t	   do_iget;
@@ -1240,7 +1240,7 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
         /*
          * Try the directory name lookup cache.
          */
-        if (vp = dnlc_lookup(dir_vp, name, NOCRED)) {
+        if (vp = dnlc_lookup_fast(dir_vp, name, pnp, fd, NOCRED)) {
                 *inum = XFS_VTOI(vp)->i_ino;
 		if (do_iget) {
 			*ip = XFS_VTOI(vp);
@@ -1273,7 +1273,8 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 			*ip = NULL;
 			VN_RELE (vp);
 			code = ENOENT;
-		}
+		} else
+			dnlc_enter_fast(dir_vp, fd, vp, NOCRED);
 	}
 
 	return (code);
@@ -1299,6 +1300,7 @@ xfs_lookup(vnode_t	*dir_vp,
 	xfs_ino_t		e_inum;
 	int			code = 0;
 	uint			lock_mode;
+	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_lookup");
 	dp = XFS_VTOI(dir_vp);
@@ -1318,7 +1320,7 @@ xfs_lookup(vnode_t	*dir_vp,
 	}
 
 	code = xfs_dir_lookup_int (NULL, dir_vp, DLF_IGET, name, pnp, 
-				   &e_inum, &ip);
+				   &e_inum, &ip, &fastdata);
 	if (code) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return code;
@@ -1536,6 +1538,7 @@ xfs_create(vnode_t	*dir_vp,
 	int			committed;
 	uint			truncate_flag;
 	timestruc_t		tv;
+	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_create");
 
@@ -1578,7 +1581,7 @@ try_again:
                 goto error_return;
 
 	error = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name, NULL, 
-				   &e_inum, &ip);
+				   &e_inum, &ip, &fastdata);
 	if ((error != 0) && (error != ENOENT)) 
 		goto error_return;
 
@@ -1629,7 +1632,7 @@ try_again:
 			ASSERT (0);	/* we've reserved the space. */
 
 		dp->i_gen++;
-		dnlc_enter(dir_vp, name, XFS_ITOV(ip), NOCRED);
+		dnlc_enter_fast(dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
 
 	} else {
 		ASSERT(ip != NULL);
@@ -1814,10 +1817,11 @@ xfs_lock_dir_and_entry (xfs_inode_t	*dp,
 			char		*name,
 			xfs_inode_t	**ipp)	/* inode of entry 'name' */
 {
-	xfs_inode_t	*ip, *new_ip;
-	xfs_ino_t	e_inum;
-	unsigned long	dir_generation;
-	int		error;
+	xfs_inode_t		*ip, *new_ip;
+	xfs_ino_t		e_inum;
+	unsigned long		dir_generation;
+	int			error;
+	struct ncfastdata	fastdata;
 
 again:
 
@@ -1834,7 +1838,7 @@ again:
 	}
 
 	error = xfs_dir_lookup_int (NULL, XFS_ITOV(dp), DLF_IGET, name, 
-				    NULL, &e_inum, &ip);
+				    NULL, &e_inum, &ip, &fastdata);
         if (error) {
                 xfs_iunlock (dp, XFS_ILOCK_EXCL);
 		*ipp = NULL;
@@ -1870,7 +1874,8 @@ again:
                  */
                 if (dp->i_gen != dir_generation) {
 			error = xfs_dir_lookup_int (NULL, XFS_ITOV(dp),
-				DLF_IGET, name, NULL, &e_inum, &new_ip);
+				DLF_IGET, name, NULL, &e_inum, &new_ip,
+				&fastdata);
 
                         if (error) {
 				xfs_iunlock (dp, XFS_ILOCK_EXCL);
@@ -1930,14 +1935,15 @@ xfs_lock_for_rename(
 		 xfs_inode_t    **ipp2) /* inode of new entry, if it 
 				           already exists, NULL otherwise. */
 {
-	xfs_inode_t	*ip1, *ip2, *temp;
-	xfs_ino_t	inum1, inum2;
-	unsigned long	dir_gen1, dir_gen2;
-	int		error;
-	xfs_inode_t	*i_tab[4];
-	int		num_inodes;
-	int		i, j;
-	uint		lock_mode;
+	xfs_inode_t		*ip1, *ip2, *temp;
+	xfs_ino_t		inum1, inum2;
+	unsigned long		dir_gen1, dir_gen2;
+	int			error;
+	xfs_inode_t		*i_tab[4];
+	int			num_inodes;
+	int			i, j;
+	uint			lock_mode;
+	struct ncfastdata	fastdata;
 
 	ip2 = NULL;
 
@@ -1958,7 +1964,7 @@ xfs_lock_for_rename(
 	}
 
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp1), DLF_IGET,
-				   name1, NULL, &inum1, &ip1);
+				   name1, NULL, &inum1, &ip1, &fastdata);
 
 	/*
 	 * Save the current generation so that we can detect if it's
@@ -1984,7 +1990,7 @@ xfs_lock_for_rename(
 	}
 
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp2), DLF_IGET,
-				   name2, NULL, &inum2, &ip2);
+				   name2, NULL, &inum2, &ip2, &fastdata);
 	dir_gen2 = dp2->i_gen;
         xfs_iunlock_map_shared (dp2, lock_mode);
 	if (error == ENOENT) {		/* target does not need to exist. */
@@ -2316,6 +2322,7 @@ xfs_link(vnode_t	*target_dir_vp,
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	int			cancel_flags;
+	struct ncfastdata	fastdata;
 
 	vn_trace_entry(target_dir_vp, "xfs_link");
 	/*
@@ -2365,7 +2372,7 @@ xfs_link(vnode_t	*target_dir_vp,
                 goto error_return;
 
 	error = xfs_dir_lookup_int(NULL, target_dir_vp, 0, target_name, 
-				   NULL, &e_inum, NULL);
+				   NULL, &e_inum, NULL, &fastdata);
 	if (error != ENOENT) {
 		if (error == 0) 
 			error = XFS_ERROR(EEXIST);
@@ -2388,7 +2395,7 @@ xfs_link(vnode_t	*target_dir_vp,
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
 
-	dnlc_enter (target_dir_vp, target_name, XFS_ITOV(sip), credp);
+	dnlc_enter_fast (target_dir_vp, &fastdata, XFS_ITOV(sip), credp);
 
 	return 0;
 
@@ -2428,12 +2435,13 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 	struct {
 		xfs_inode_t     *ip;
 		unsigned long   gen;
-	}		i_tab[4], temp;
-	int		i, j, num_inodes;
-	xfs_mount_t	*mp;
-	xfs_inode_t	*ip;
-	xfs_ino_t	root_ino;
-	int		error = 0;
+	}			i_tab[4], temp;
+	int			i, j, num_inodes;
+	xfs_mount_t		*mp;
+	xfs_inode_t		*ip;
+	xfs_ino_t		root_ino;
+	int			error = 0;
+	struct ncfastdata	fastdata;
 
 	mp = src_dp->i_mount;
 	root_ino = mp->m_sb.sb_rootino;
@@ -2537,7 +2545,8 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 			break;
 		}
 		if (error = xfs_dir_lookup_int (NULL, XFS_ITOV(ip), 0, "..",
-						NULL, &parent_ino, NULL))
+						NULL, &parent_ino, NULL,
+						&fastdata))
 			break;
 		if (parent_ino == ip->i_ino) {
 			prdev("Directory inode %lld has bad parent link",
@@ -2768,7 +2777,7 @@ start_over:
 
 
 		if (src_dp != target_dp) {
-		/*
+			/*
 			 * Check whether the rename would orphan the tree
 			 * rooted at src_ip by moving it under itself.
 			 *
@@ -2996,6 +3005,7 @@ xfs_mkdir(vnode_t	*dir_vp,
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	boolean_t		dp_joined_to_trans = B_FALSE;
+	struct ncfastdata	fastdata;
 
 
 	vn_trace_entry(dir_vp, "xfs_mkdir");
@@ -3026,7 +3036,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 	}
 
         code = xfs_dir_lookup_int(NULL, dir_vp, 0, dir_name, NULL,
-				  &e_inum, NULL);
+				  &e_inum, NULL, &fastdata);
         if (code != ENOENT) {
 		if (code == 0)
 			code = XFS_ERROR(EEXIST);
@@ -3069,7 +3079,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 				       MAX_EXT_NEEDED)) 
  		ASSERT (0);
 
-	dnlc_enter (dir_vp, dir_name, XFS_ITOV(cdp), NOCRED);
+	dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(cdp), NOCRED);
 	
 	if (code = xfs_dir_init(tp, cdp, dp))
 		ASSERT (0);
@@ -3120,6 +3130,7 @@ xfs_rmdir(vnode_t	*dir_vp,
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	int			cancel_flags;
+	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_rmdir");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
@@ -3153,7 +3164,7 @@ xfs_rmdir(vnode_t	*dir_vp,
                 goto error_return;
 
         if (error = xfs_dir_lookup_int(NULL, dir_vp, DLF_IGET, name, NULL,
-				       &e_inum, &cdp))
+				       &e_inum, &cdp, &fastdata))
 		goto error_return;
 
 	ITRACE(cdp);
@@ -3189,7 +3200,7 @@ xfs_rmdir(vnode_t	*dir_vp,
         error = xfs_dir_removename (tp, dp, name, &first_block, &free_list, 0);
         ASSERT (! error);
 
-	dnlc_remove (dir_vp, name);
+	dnlc_remove_fast (dir_vp, &fastdata);
 
 	/*
 	 * Drop the link from cdp's "..".
@@ -3290,17 +3301,18 @@ xfs_symlink(vnode_t	*dir_vp,
 	    char	*target_path,
 	    cred_t	*credp)
 {
-	xfs_trans_t	*tp = NULL;
-	xfs_mount_t	*mp;
-	xfs_inode_t	*dp, *ip;
-        int 		error = 0, pathlen;
-        struct pathname cpn, ccpn;
-	xfs_ino_t	e_inum;
-	dev_t		rdev;
-	xfs_bmap_free_t free_list;
-	xfs_fsblock_t   first_block;
-	boolean_t	dp_joined_to_trans = B_FALSE;
-	uint		cancel_flags;
+	xfs_trans_t		*tp = NULL;
+	xfs_mount_t		*mp;
+	xfs_inode_t		*dp, *ip;
+        int 			error = 0, pathlen;
+        struct pathname		cpn, ccpn;
+	xfs_ino_t		e_inum;
+	dev_t			rdev;
+	xfs_bmap_free_t		free_list;
+	xfs_fsblock_t		first_block;
+	boolean_t		dp_joined_to_trans = B_FALSE;
+	uint			cancel_flags;
+	struct ncfastdata	fastdata;
 
 	vn_trace_entry(dir_vp, "xfs_symlink");
 	/*
@@ -3357,7 +3369,7 @@ xfs_symlink(vnode_t	*dir_vp,
                 goto error_return;
 
         error = xfs_dir_lookup_int(NULL, dir_vp, 0, link_name, NULL,
-                                       &e_inum, NULL);
+                                       &e_inum, NULL, &fastdata);
 	if (error != ENOENT) {
 		error = XFS_ERROR(EEXIST);
                 goto error_return;
@@ -3454,7 +3466,7 @@ xfs_symlink(vnode_t	*dir_vp,
 					&first_block, &free_list,
 					MAX_EXT_NEEDED))
                 ASSERT (0);
-        dnlc_enter (dir_vp, link_name, XFS_ITOV(ip), NOCRED);
+        dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
 
 
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
