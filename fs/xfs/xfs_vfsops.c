@@ -40,14 +40,6 @@ STATIC int xfs_ibusy(xfs_mount_t *);
 STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
 
-#ifdef CELL_CAPABLE
-extern int  cxfs_mount(xfs_mount_t *, struct xfs_args *, dev_t, int *);
-extern void cxfs_unmount(mp);
-#else
-# define cxfs_mount(mp,ap,d,c)	(0)
-# define cxfs_unmount(mp)	do { } while (0)
-#endif
-
 /*
  * xfs_init
  *
@@ -235,7 +227,6 @@ xfs_cmountfs(
 {
 	xfs_mount_t	*mp;
 	int		error = 0;
-	int		client = 0;
 
 	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
@@ -479,19 +470,8 @@ xfs_cmountfs(
 		}
 	}
 
-	/* Default to local - cxfs_arrmount will change this if necessary. */
-	mp->m_cxfstype = XFS_CXFS_NOT;
-
-	error = cxfs_mount(mp, ap, ddev, &client);
-	if (error)
-		goto error3;
-
-	if (client == 0) {
-		if ((error = xfs_mountfs(vfsp, mp, ddev, 0)))
-			goto error3;
-	}
-
-	return error;
+	if ((error = xfs_mountfs(vfsp, mp, ddev, 0)) == 0)
+		return 0;
 
 	/*
 	 * Be careful not to clobber the value of 'error' here.
@@ -510,7 +490,6 @@ xfs_cmountfs(
 	}
  error2:
 	if (error) {
-		cxfs_unmount(mp);
 		xfs_mount_free(mp, 1);
 	}
 	return error;

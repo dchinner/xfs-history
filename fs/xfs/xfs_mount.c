@@ -32,12 +32,6 @@
 
 #include <xfs.h>
 
-#ifdef CELL_CAPABLE
-void cxfs_unmount(xfs_mount_t *);
-#else
-# define cxfs_unmount(mp)	do { } while (0)
-#endif
-
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
 STATIC int	xfs_uuid_mount(xfs_mount_t *);
@@ -406,10 +400,7 @@ xfs_xlatesb(void *data, xfs_sb_t *sb, int dir, xfs_arch_t arch,
 /*
  * xfs_readsb
  *
- * Does the initial read of the superblock.  This has been split out from
- * xfs_mountfs so that the cxfs v1 array mount code can get at the
- * unique id for the file system before deciding whether we are going
- * to mount things as a cxfs client or server.
+ * Does the initial read of the superblock.
  */
 int
 xfs_readsb(xfs_mount_t *mp)
@@ -545,13 +536,6 @@ extern void xfs_refcache_sbdirty(struct super_block*);
  *	- allocate inode hash table for fs
  *	- init directory manager
  *	- perform recovery and init the log manager
- *	- if XFS_MFSI_CLIENT is set then we are doing an import
- *		or an enterprise mount in client mode.	We do not go
- *		near the log, and do not mess with a bunch of stuff.
- *	- If XFS_MFSI_SECOND is set then we are doing a secondary
- *		mount operation for cxfs which may be client mode
- *		import or enterprise or a server-mode secondary
- *		mount operation as part of relocation or recovery.
  */
 int
 xfs_mountfs(
@@ -1159,7 +1143,6 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	(void) xfs_errortag_clearall_umount(fsid, mp->m_fsname, 0);
 #endif
 
-	cxfs_unmount(mp);
 	xfs_mount_free(mp, 1);
 	return 0;
 }
