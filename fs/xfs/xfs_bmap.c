@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.216 $"
+#ident	"$Revision: 1.217 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -5117,6 +5117,7 @@ xfs_getbmap(
 						/* extents listed seperately */
 	int			bmapi_flags;	/* flags for xfs_bmapi */
 	__int32_t		oflags;		/* getbmapx bmv_oflags field */
+	xfs_agblock_t		rtextsize;	/* realtime extent size */
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -5224,8 +5225,15 @@ xfs_getbmap(
 	for (error = i = 0; i < nmap && bmv->bmv_length; i++) {
 		oflags = 0;
 		out.bmv_offset = XFS_FSB_TO_BB(mp, map[i].br_startoff);
-		out.bmv_length =
-			XFS_FSB_TO_BB(mp, map[i].br_blockcount);
+		if (!ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+			out.bmv_length = 
+				XFS_FSB_TO_BB(mp, map[i].br_blockcount);
+		} else {		/* realtime extent allocation */
+			rtextsize = mp->m_sb.sb_rextsize;
+			out.bmv_length = 
+				XFS_FSB_TO_BB(mp, (((map[i].br_blockcount +
+				rtextsize -1) / rtextsize) * rtextsize));
+		}
 		ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
 		if (prealloced && 
 		    map[i].br_startblock == HOLESTARTBLOCK &&

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.381 $"
+#ident "$Revision: 1.382 $"
 
 
 #ifdef SIM
@@ -6352,8 +6352,15 @@ xfs_zero_remaining_bytes(
 	mp = ip->i_mount;
 	bp = ngetrbuf(mp->m_sb.sb_blocksize);
 	ASSERT(!geterror(bp));
-	bp->b_edev = mp->m_dev;
-	bp->b_target = mp->m_ddev_targp;
+
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		bp->b_edev = mp->m_rtdev;
+		bp->b_target = &mp->m_rtdev_targ;
+	} else {
+		bp->b_edev = mp->m_dev;
+		bp->b_target = mp->m_ddev_targp;
+	}
+
 	for (offset = startoff; offset <= endoff; offset = lastoffset + 1) {
 		offset_fsb = XFS_B_TO_FSBT(mp, offset);
 		nimap = 1;
@@ -6419,6 +6426,7 @@ xfs_free_file_space(
 	xfs_mount_t		*mp;
 	uint			resblks;
 	int			rounding;
+	int			rtextsize;
 	int			rt;
 	xfs_fileoff_t		startoffset_fsb;
 	off_t			end_dmi_offset;
@@ -6457,7 +6465,9 @@ xfs_free_file_space(
 	}
 
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
-	rt = (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0;
+	if (rt = ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0)) {
+		rtextsize = mp->m_sb.sb_rextsize;
+	}
 	rounding = MAX((rt ? mp->m_sb.sb_rextsize : 1) << mp->m_sb.sb_blocklog,
 		       NBPP);
 	ilen = len + (offset & (rounding - 1));
@@ -6465,6 +6475,12 @@ xfs_free_file_space(
 	if (ilen & (rounding - 1))
 		ilen = (ilen + rounding) & ~(rounding - 1);
 	xfs_inval_cached_pages(ip, ioffset, ilen);
+	if (rt) {
+		if (startoffset_fsb & (rtextsize - 1)) {
+			startoffset_fsb += rtextsize & ~(rtextsize - 1);
+		}
+		endoffset_fsb = endoffset_fsb & ~(rtextsize - 1);
+	}
 	/* need to zero the stuff we're not freeing, on disk */
 	if (done = endoffset_fsb <= startoffset_fsb)
 		/*
