@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.44 $"
 
 #include <sys/cmn_err.h>
 
@@ -21,7 +21,7 @@ struct xfs_mount;
 #define XLOG_MAX_RECORD_BSIZE	(32*1024)
 #define XLOG_RECORD_BSHIFT	14		/* 16384 == 1 << 14 */
 #define XLOG_MAX_RECORD_BSHIFT	15		/* 32k == 1 << 15 */
-#define XLOG_BTOLRBB(b)		((b)+XLOG_RECORD_BSIZE-1 >> XLOG_RECORD_BSHIFT)
+#define XLOG_BTOLRBB(b)		(((b)+XLOG_RECORD_BSIZE-1) >> XLOG_RECORD_BSHIFT)
 
 #define XLOG_HEADER_SIZE	512
 
@@ -47,7 +47,7 @@ struct xfs_mount;
 		}							\
 	 }								\
     }
-#define XLOG_GRANT_ADD_SPACE(l, bytes, type)				\
+#define XLOG_GRANT_ADD_SPACE(log, bytes, type)				\
     {									\
 	if (type == 'w') {						\
 		(log)->l_grant_write_bytes += (bytes);			\
