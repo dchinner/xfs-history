@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.31 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -283,7 +283,7 @@ xfs_growfs_data(
 		xfs_trans_mod_sb(tp, XFS_TRANS_SB_FDBLOCKS, nfree);
 	if (dpct)
 		xfs_trans_mod_sb(tp, XFS_TRANS_SB_IMAXPCT, dpct);
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, 0, NULL);
 	if (error) {
 		return error;
 	}

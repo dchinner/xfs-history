@@ -1,4 +1,4 @@
-#ident "$Revision: 1.26 $"
+#ident "$Revision: 1.27 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -739,7 +739,8 @@ xfs_qm_idtodq(
 		goto error0;
 	}
 	if (tp) {
-		if (error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES))
+		if (error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES,
+					     NULL))
 			goto error1;
 	}
 	

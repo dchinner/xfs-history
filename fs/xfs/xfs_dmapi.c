@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -809,7 +809,7 @@ xfs_dm_f_set_eventlist(
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	VN_HOLD(vp);
-	xfs_trans_commit(tp, 0);
+	xfs_trans_commit(tp, 0, NULL);
 
 	return(0);
 }
@@ -2163,7 +2163,7 @@ xfs_dm_punch_hole(
 	if (mp->m_flags & XFS_MOUNT_WSYNC) {
 		xfs_trans_set_sync(tp);
 	}
-	xfs_trans_commit(tp, commit_flags);
+	xfs_trans_commit(tp, commit_flags, NULL);
 	/* --- end of truncate --- */
 
 	/* --- start of grow --- */
@@ -2176,7 +2176,7 @@ xfs_dm_punch_hole(
 	if (mp->m_flags & XFS_MOUNT_WSYNC) {
 		xfs_trans_set_sync(tp2);
 	}
-	xfs_trans_commit(tp2, commit_flags);
+	xfs_trans_commit(tp2, commit_flags, NULL);
 	/* --- end of grow --- */
 
 	/* ip unlocked during the commit */
@@ -2491,7 +2491,7 @@ xfs_dm_set_region(
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	VN_HOLD(BHV_TO_VNODE(bdp));
-	xfs_trans_commit(tp, 0);
+	xfs_trans_commit(tp, 0, NULL);
 
 	/* Return the proper value for *exactflagp depending upon whether or not
 	   we "changed" the user's managed region.  In other words, if the user

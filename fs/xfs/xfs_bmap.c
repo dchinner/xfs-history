@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.212 $"
+#ident	"$Revision: 1.213 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3212,7 +3212,7 @@ xfs_bmap_add_attrfork(
 	}
 	if (error = xfs_bmap_finish(&tp, &flist, firstblock, &committed))
 		goto error2;
-	error = xfs_trans_commit(tp, XFS_TRANS_PERM_LOG_RES);
+	error = xfs_trans_commit(tp, XFS_TRANS_PERM_LOG_RES, NULL);
 	ASSERT(ip->i_df.if_ext_max ==
 	       XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t));
 	return error;
@@ -3360,7 +3360,7 @@ xfs_bmap_finish(
 	logres = ntp->t_log_res;
 	logcount = ntp->t_log_count;
 	ntp = xfs_trans_dup(*tp);
-	error = xfs_trans_commit(*tp, 0);
+	error = xfs_trans_commit(*tp, 0, NULL);
 	*tp = ntp;
 	*committed = 1;
 	/*

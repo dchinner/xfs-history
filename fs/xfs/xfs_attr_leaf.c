@@ -2677,7 +2677,7 @@ xfs_attr_rolltrans(xfs_trans_t **transp, xfs_inode_t *dp)
 	 * is in progress. The caller takes the responsibility to cancel
 	 * the duplicate transaction that gets returned.
 	 */
-	if (error = xfs_trans_commit(trans, 0))
+	if (error = xfs_trans_commit(trans, 0, NULL))
 		return (error);
 
 	trans = *transp;

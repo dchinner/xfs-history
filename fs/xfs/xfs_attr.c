@@ -1,4 +1,4 @@
-#ident "$Revision: 1.53 $"
+#ident "$Revision: 1.54 $"
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/buf.h>
@@ -319,7 +319,8 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 				xfs_trans_set_sync(args.trans);
 			}
 			err2 = xfs_trans_commit(args.trans, 
-						 XFS_TRANS_RELEASE_LOG_RES);
+						 XFS_TRANS_RELEASE_LOG_RES,
+						 NULL);
 			xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 			/*
@@ -385,7 +386,8 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 * Commit the last in the sequence of transactions.
 	 */
 	xfs_trans_log_inode(args.trans, dp, XFS_ILOG_CORE);
-	error = xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES,
+				 NULL);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 	/*
@@ -537,7 +539,8 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 * Commit the last in the sequence of transactions.
 	 */
 	xfs_trans_log_inode(args.trans, dp, XFS_ILOG_CORE);
-	error = xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(args.trans, XFS_TRANS_RELEASE_LOG_RES,
+				 NULL);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 	/*
@@ -710,7 +713,8 @@ xfs_attr_inactive(xfs_inode_t *dp)
 	 * Commit the last in the sequence of transactions.
 	 */
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
-	error = xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+	error = xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES,
+				 NULL);
 	xfs_iunlock(dp, XFS_ILOCK_EXCL);
 
 	return(error);
