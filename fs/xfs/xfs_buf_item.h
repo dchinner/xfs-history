@@ -10,7 +10,7 @@
 typedef struct xfs_buf_log_format {
 	unsigned short	blf_type;	/* buf log item type indicator */
 	unsigned short	blf_size;	/* size of this item */
-	daddr_t		blf_blkno;	/* starting blkno of this buf */
+	__int32_t	blf_blkno;	/* starting blkno of this buf */
 	ushort		blf_flags;	/* misc state */
 	ushort		blf_len;	/* number of blocks in this buf */
 	unsigned int	blf_map_size;	/* size of data bitmap in words */
