@@ -728,6 +728,36 @@ linvfs_remount(
 	return 0;
 }
 
+void
+linvfs_freeze_fs(
+	struct super_block *sb)
+{
+	vfs_t *vfsp;
+	vnode_t *vp;
+	int error;
+
+	vfsp = LINVFS_GET_VFS(sb);
+        if (sb->s_flags & MS_RDONLY) {
+                return;
+        }
+
+	VFS_ROOT(vfsp, &vp, error);
+	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_FREEZE, 0, error);
+	VN_RELE(vp);
+}
+
+void
+linvfs_unfreeze_fs(
+	struct super_block *sb)
+{
+	vfs_t *vfsp;
+	vnode_t *vp;
+	int error;
+
+	vfsp = LINVFS_GET_VFS(sb);
+	VFS_ROOT(vfsp, &vp, error);
+	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_THAW, 0, error);
+}
 
 int
 linvfs_dmapi_mount(
@@ -810,6 +840,8 @@ static struct super_operations linvfs_sops = {
 	clear_inode:		linvfs_clear_inode,
 	put_super:		linvfs_put_super,
 	write_super:		linvfs_write_super,
+	write_super_lockfs:	linvfs_freeze_fs,
+	unlockfs:		linvfs_unfreeze_fs,
 	statfs:			linvfs_statfs,
 	remount_fs:		linvfs_remount
 };

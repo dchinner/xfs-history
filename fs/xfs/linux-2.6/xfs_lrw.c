@@ -616,6 +616,8 @@ xfs_write(
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 
+	xfs_check_frozen(mp, XFS_FREEZE_WRITE);
+
 	if (direct) {
 		if (((__psint_t)buf & (ip->i_sb->s_blocksize - 1)) ||
 		    (uiop->uio_offset & mp->m_blockmask) ||

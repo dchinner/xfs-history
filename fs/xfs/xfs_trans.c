@@ -105,6 +105,8 @@ xfs_trans_alloc(
 {
 	xfs_trans_t	*tp;
 
+	xfs_check_frozen(mp, XFS_FREEZE_TRANS);
+
 	ASSERT(xfs_trans_zone != NULL);
 	tp = kmem_zone_zalloc(xfs_trans_zone, KM_SLEEP_IO);
 	tp->t_dqinfo = NULL;
@@ -165,6 +167,8 @@ xfs_trans_dup(
 	 */
 	if (tp->t_dqinfo) 
 		xfs_trans_dup_dqinfo(tp, ntp);
+
+	atomic_inc(&tp->t_mountp->m_active_trans);
 	return ntp;
 }
 
@@ -1052,6 +1056,7 @@ STATIC void
 xfs_trans_free(
 	xfs_trans_t	*tp)
 {
+	atomic_dec(&tp->t_mountp->m_active_trans);
 	if (tp->t_dqinfo)
 		xfs_trans_free_dqinfo(tp);
 	kmem_zone_free(xfs_trans_zone, tp);

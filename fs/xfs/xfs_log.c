@@ -802,6 +802,9 @@ xfs_log_need_covered(xfs_mount_t *mp)
 	int 		spl, needed = 0, gen;
 	xlog_t		*log = mp->m_log; 
 
+	if (mp->m_frozen)
+		return 0;
+
 	spl = LOG_LOCK(log);
 	if (((log->l_covered_state == XLOG_STATE_COVER_NEED) ||
 		(log->l_covered_state == XLOG_STATE_COVER_NEED2))

@@ -1239,6 +1239,48 @@ xfs_ioctl(
 		return 0;
 	}
 
+	case XFS_IOC_FREEZE: {
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
+		/* Stop new writers */
+		xfs_start_freeze(mp, XFS_FREEZE_WRITE);
+
+		/* Flush delalloc and delwri data */
+		VFS_SYNC(vfsp, SYNC_DELWRI|SYNC_WAIT, sys_cred, error);
+
+		/* Pause transaction subsystem */
+		xfs_start_freeze(mp, XFS_FREEZE_TRANS);
+
+		/* Flush log to disk */
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE|XFS_LOG_SYNC);
+
+		/* Flush any remaining inodes into buffers */
+		VFS_SYNC(vfsp, SYNC_BDFLUSH|SYNC_ATTR, sys_cred, error);
+
+		/* Push all the buffers out to disk */
+		xfs_binval(mp->m_ddev_targ);
+		if (mp->m_rtdev != NODEV) {
+			xfs_binval(mp->m_rtdev_targ);
+		}
+
+		/* Push the superblock and write an unmount record */
+		xfs_log_unmount_write(mp);
+		xfs_unmountfs_writesb(mp);
+		return 0;
+	}
+
+	case XFS_IOC_THAW: {
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
+		xfs_unmountfs_writesb(mp);
+		xfs_finish_freeze(mp);
+		return 0;
+	}
+
 #if (defined(DEBUG) || defined(INDUCE_IO_ERROR))
 	case XFS_IOC_ERROR_INJECTION: {
 		xfs_error_injection_t in;
