@@ -3,6 +3,8 @@
 
 #ident	"$Revision: 1.5 $"
 
+struct xfs_mount;
+
 /*
  * Structures returned from xfs_bulkstat syssgi routine.
  */
@@ -46,26 +48,25 @@ typedef struct xfs_inogrp
  */
 
 /*
- * Return stat information in bulk (by-inode) for the filesystem.
+ * Convert file descriptor of a file in the filesystem to
+ * a mount structure pointer.
  */
 int					/* error status */
-xfs_bulkstat(
-	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	ino64_t		*lastino,	/* last inode returned */
-	int		*count,		/* size of buffer/count returned */
-	caddr_t		ubuffer);	/* buffer with inode stats */
+xfs_fd_to_mp(
+	int			fd,	/* file descriptor */
+	struct xfs_mount	**mpp);	/* output: mount structure pointer */
 
 /*
- * Return inode number table for the filesystem.
+ * Syssgi interface for bulkstat and inode-table.
  */
 int					/* error status */
-xfs_inumbers(
-	xfs_mount_t	*mp,		/* mount point for filesystem */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	ino64_t		*lastino,	/* last inode returned */
-	int		*count,		/* size of buffer/count returned */
-	caddr_t		ubuffer);	/* buffer with inode descriptions */
+xfs_itable(
+	int		opc,		/* op code */
+	int		fd,		/* file descriptor of file in fs. */
+	caddr_t		lastip,		/* last inode number pointer */
+	int		icount,		/* count of entries in buffer */
+	caddr_t		ubuffer,	/* buffer with inode descriptions */
+	caddr_t		ocount);	/* output count */
 #endif	/* _KERNEL */
 
 #endif	/* !_FS_XFS_ITABLE_H */

@@ -25,6 +25,7 @@
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
 #include "xfs_fsops.h"
+#include "xfs_itable.h"
 
 /*
  * File system operations
@@ -153,28 +154,34 @@ xfs_growfs_data(
 		/*
 		 * BNO btree root block
 		 */
-		bp = get_buf(mp->m_dev, XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp)), bsize, 0);
+		bp = get_buf(mp->m_dev,
+			XFS_AGB_TO_DADDR(mp, agno, XFS_BNO_BLOCK(mp)),
+			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_ABTB_MAGIC;
 		block->bb_level = 0;
 		block->bb_numrecs = 1;
 		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
-		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1, XFS_BTREE_BLOCK_MAXRECS(bsize, xfs_alloc, 1));
+		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
+			XFS_BTREE_BLOCK_MAXRECS(bsize, xfs_alloc, 1));
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
 		bwrite(bp);
 		/*
 		 * CNT btree root block
 		 */
-		bp = get_buf(mp->m_dev, XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp)), bsize, 0);
+		bp = get_buf(mp->m_dev,
+			XFS_AGB_TO_DADDR(mp, agno, XFS_CNT_BLOCK(mp)),
+			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_ABTC_MAGIC;
 		block->bb_level = 0;
 		block->bb_numrecs = 1;
 		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
-		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1, XFS_BTREE_BLOCK_MAXRECS(bsize, xfs_alloc, 1));
+		arec = XFS_BTREE_REC_ADDR(bsize, xfs_alloc, block, 1,
+			XFS_BTREE_BLOCK_MAXRECS(bsize, xfs_alloc, 1));
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
 		nfree += arec->ar_blockcount;
@@ -182,7 +189,9 @@ xfs_growfs_data(
 		/*
 		 * INO btree root block
 		 */
-		bp = get_buf(mp->m_dev, XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp)), bsize, 0);
+		bp = get_buf(mp->m_dev,
+			XFS_AGB_TO_DADDR(mp, agno, XFS_IBT_BLOCK(mp)),
+			BTOBB(bsize), 0);
 		block = XFS_BUF_TO_SBLOCK(bp);
 		bzero(block, bsize);
 		block->bb_magic = XFS_IBT_MAGIC;
@@ -225,7 +234,8 @@ xfs_growfs_data(
 	xfs_trans_commit(tp, 0);
 	for (agno = 1; agno < nagcount; agno++) {
 		bp = read_buf(mp->m_dev,
-			XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)), bsize, 0);
+			XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
+			BTOBB(bsize), 0);
 		sbp = XFS_BUF_TO_SBP(bp);
 		*sbp = mp->m_sb;
 		bwrite(bp);
@@ -276,13 +286,9 @@ xfs_fsoperations(
 	void		*out)		/* output structure */
 {
 	int		error;
-	file_t		*fp;
 	void		*inb;
 	xfs_mount_t	*mp;
 	void		*outb;
-	vfs_t		*vfsp;
-	vnode_t		*vp;
-	extern vfsops_t	xfs_vfsops;
 	static int	cisize[] =
 	{
 		0,				/* XFS_FS_GEOMETRY */
@@ -302,12 +308,8 @@ xfs_fsoperations(
 
 	if (opcode < 0 || opcode >= XFS_FSOPS_COUNT)
 		return XFS_ERROR(EINVAL);
-	if (error = getf(fd, &fp))
-		return XFS_ERROR(error);
-	vp = fp->f_vnode;
-	vfsp = vp->v_vfsp;
-	if (vfsp->vfs_op != &xfs_vfsops)
-		return XFS_ERROR(EINVAL);
+	if (error = xfs_fd_to_mp(fd, &mp))
+		return error;
 	if (cisize[opcode]) {
 		inb = kmem_alloc(cisize[opcode], KM_SLEEP);
 		if (error = copyin(in, inb, cisize[opcode])) {
@@ -320,7 +322,6 @@ xfs_fsoperations(
 		outb = kmem_alloc(cosize[opcode], KM_SLEEP);
 	else
 		outb = NULL;
-	mp = vfsp->vfs_data;
 	switch (opcode)
 	{
 	case XFS_FS_GEOMETRY:

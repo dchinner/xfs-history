@@ -11,6 +11,9 @@
 #include <sys/kmem.h>
 #include <sys/time.h>
 #include <sys/debug.h>
+#include <sys/file.h>
+#include <sys/vfs.h>
+#include <sys/syssgi.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -27,6 +30,7 @@
 #include "xfs_inode.h"
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
+#include "xfs_error.h"
 
 /*
  * Return stat information for one inode.
@@ -92,7 +96,7 @@ xfs_bulkstat_one(
 /*
  * Return stat information in bulk (by-inode) for the filesystem.
  */
-int					/* error status */
+STATIC int				/* error status */
 xfs_bulkstat(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -203,7 +207,7 @@ xfs_bulkstat(
 /*
  * Return inode number table for the filesystem.
  */
-int					/* error status */
+STATIC int				/* error status */
 xfs_inumbers(
 	xfs_mount_t	*mp,		/* mount point for filesystem */
 	xfs_trans_t	*tp,		/* transaction pointer */
@@ -289,4 +293,67 @@ xfs_inumbers(
 	if (agbp)
 		xfs_trans_brelse(tp, agbp);
 	return error;
+}
+
+/*
+ * Convert file descriptor of a file in the filesystem to
+ * a mount structure pointer.
+ */
+int
+xfs_fd_to_mp(int fd, xfs_mount_t **mpp)
+{
+	int		error;
+	file_t		*fp;
+	vfs_t		*vfsp;
+	vnode_t		*vp;
+	extern vfsops_t	xfs_vfsops;
+
+	if (error = getf(fd, &fp))
+		return XFS_ERROR(error);
+	vp = fp->f_vnode;
+	vfsp = vp->v_vfsp;
+	if (vfsp->vfs_op != &xfs_vfsops)
+		return XFS_ERROR(EINVAL);
+	*mpp = vfsp->vfs_data;
+	return 0;
+}
+
+/*
+ * Syssgi interface for bulkstat and inode-table.
+ */
+int					/* error status */
+xfs_itable(
+	int		opc,		/* op code */
+	int		fd,		/* file descriptor of file in fs. */
+	caddr_t		lastip,		/* last inode number pointer */
+	int		icount,		/* count of entries in buffer */
+	caddr_t		ubuffer,	/* buffer with inode descriptions */
+	caddr_t		ocount)		/* output count */
+{
+	int		count;		/* count of records returned */
+	int		error;		/* error return value */
+	ino64_t		inlast;		/* last inode number */
+	xfs_mount_t	*mp;		/* mount point for filesystem */
+
+	if (error = xfs_fd_to_mp(fd, &mp))
+		return error;
+	if (copyin((void *)lastip, &inlast, sizeof(inlast)))
+		return XFS_ERROR(EFAULT);
+	if ((count = icount) <= 0)
+		return XFS_ERROR(EINVAL);
+	switch (opc) {
+	case SGI_FS_INUMBERS:
+		error = xfs_inumbers(mp, NULL, &inlast, &count, ubuffer);
+		break;
+	case SGI_FS_BULKSTAT:
+		error = xfs_bulkstat(mp, NULL, &inlast, &count, ubuffer);
+		break;
+	}
+	if (error)
+		return error;
+	if (copyout(&inlast, (void *)lastip, sizeof(inlast)))
+		return XFS_ERROR(EFAULT);
+	if (copyout(&count, (void *)ocount, sizeof(count)))
+		return XFS_ERROR(EFAULT);
+	return 0;
 }
