@@ -121,6 +121,7 @@ xfs_next_bmap(xfs_mount_t	*mp,
 	      xfs_bmbt_irec_t	*imapp,
 	      struct bmapval	*bmapp,
 	      int		iosize,
+	      int		last_iosize,
 	      xfs_fileoff_t	ioalign,
 	      xfs_fileoff_t	last_offset,
 	      xfs_fileoff_t	req_offset)
@@ -177,7 +178,7 @@ xfs_next_bmap(xfs_mount_t	*mp,
 			 * that this one will at least start on.
 			 * This assumes that we're going sequentially.
 			 */
-			if (req_offset < (last_offset + iosize)) {
+			if (req_offset < (last_offset + last_iosize)) {
 				/*
 				 * This request overlaps the buffer
 				 * we used for the last request.  Just
@@ -186,6 +187,7 @@ xfs_next_bmap(xfs_mount_t	*mp,
 				ext_offset = last_offset -
 					     imapp->br_startoff;
 				bmapp->offset = last_offset;
+				iosize = last_iosize;
 			} else {
 				/*
 				 * This request does not overlap the buffer
@@ -350,6 +352,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	off_t		offset_page;
 	int		nimaps;
 	unsigned int	iosize;
+	unsigned int	last_iosize;
 	unsigned int	retrieved_bytes;
 	unsigned int	total_retrieved_bytes;
 	short		filled_bmaps;
@@ -452,7 +455,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	 * so start figuring out how to align our
 	 * buffers.
 	 */
-	xfs_next_bmap(mp, imap, bmapp, iosize, ioalign,
+	xfs_next_bmap(mp, imap, bmapp, iosize, iosize, ioalign,
 		      last_offset, offset_fsb);
 	ASSERT((bmapp->length > 0) &&
 	       (offset >= xfs_fsb_to_b(mp, bmapp->offset)));
@@ -479,7 +482,7 @@ xfs_iomap_read(xfs_inode_t	*ip,
 	first_read_ahead_bmapp = NULL;
 	if ((*nbmaps > 1) &&
 	    (((offset == ip->i_next_offset) &&
-	     (offset_fsb >= ip->i_reada_blkno)) ||
+	      (offset_fsb >= ip->i_reada_blkno)) ||
 	     (retrieved_bytes < count))) {
 		curr_bmapp = &bmapp[0];
 		next_bmapp = &bmapp[1];
@@ -495,21 +498,20 @@ xfs_iomap_read(xfs_inode_t	*ip,
 		while (next_bmapp <= last_bmapp) {
 			next_offset = curr_bmapp->offset +
 				      curr_bmapp->length;
+			last_iosize = curr_bmapp->length;
 			if (next_offset <
 			    (curr_imapp->br_startoff +
 			     curr_imapp->br_blockcount)) {
 				xfs_next_bmap(mp, curr_imapp,
-					 next_bmapp, iosize, -1,
-					 curr_bmapp->offset,
-					 next_offset);
+					 next_bmapp, iosize, last_iosize, -1,
+					 curr_bmapp->offset, next_offset);
 			} else {
 				curr_imapp++;
 				if (curr_imapp <= last_imapp) {
 					xfs_next_bmap(mp,
 					    curr_imapp, next_bmapp,
-					    iosize, -1,
-					    curr_bmapp->offset,
-					    next_offset);
+					    iosize, last_iosize, -1,
+					    curr_bmapp->offset, next_offset);
 				} else {
 					/*
 					 * We're out of imaps.  We
