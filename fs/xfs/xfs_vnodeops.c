@@ -17,6 +17,7 @@
 #include <sys/sysmacros.h>
 #include <sys/prctl.h>
 #include <sys/cred.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
 #include <sys/sysinfo.h>
@@ -289,7 +290,7 @@ STATIC void	xfs_inactive(vnode_t	*vp,
 STATIC int	xfs_reclaim(vnode_t	*vp,
 			    int		flag);
 
-#ifdef DEBUG
+#ifdef XFS_RW_TRACE
 STATIC void
 xfs_ctrunc_trace(
 	int		tag,
@@ -498,7 +499,7 @@ xfs_getattr(
 	/*
 	 * XFS-added attributes
 	 */
-	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID|AT_ANEXTENTS)) {
+	if (flags & (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS)) {
 		/*
 		 * convert di_flags to xflags
 		 */
@@ -511,7 +512,6 @@ xfs_getattr(
 		vap->va_nextents = (ip->i_df.if_flags & XFS_IFEXTENTS) ?
 			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
-		bzero(&(vap->va_uuid), sizeof(vap->va_uuid));
 		if (ip->i_afp != NULL) {
 			vap->va_anextents =
 				(ip->i_afp->if_flags & XFS_IFEXTENTS) ?
@@ -2049,7 +2049,7 @@ xfs_bumplink(
 }
 
 
-#ifdef DEBUG
+#ifdef XFS_RW_TRACE
 STATIC void
 xfs_ctrunc_trace(
 	int		tag,
@@ -2077,7 +2077,7 @@ xfs_ctrunc_trace(
 		     (void*)0,
 		     (void*)0);
 }
-#endif /* DEBUG */
+#endif /* XFS_RW_TRACE */
 
 
 /*
@@ -5409,8 +5409,7 @@ xfs_fcntl(
 		vattr_t va;
 
 		error = xfs_getattr(vp, &va,
-			AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_UUID|AT_ANEXTENTS,
-			credp);
+			AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS, credp);
 		if (error) {
 			break;
 		}
@@ -5419,7 +5418,6 @@ xfs_fcntl(
 		fa.fsx_nextents =
 			(cmd == F_FSGETXATTR) ?
 				va.va_nextents : va.va_anextents;
-		fa.fsx_uuid = va.va_uuid;
 		if (copyout(&fa, arg, sizeof(fa))) {
 			error = XFS_ERROR(EFAULT);
 		}
