@@ -1,7 +1,7 @@
 #ifndef _XFS_HANDLE_H
 #define _XFS_HANDLE_H
 
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 /*
  *  Ok.  This file contains stuff that defines a general handle
@@ -12,6 +12,9 @@
 
 #ifdef _KERNEL
 
+union rval;
+struct vnode;
+
 typedef	struct handle {
 	fsid_t	ha_fsid;		/* unique file system identifier */
 	fid_t	ha_fid;			/* file system specific file ID */
@@ -20,7 +23,6 @@ typedef	struct handle {
 /*
  *  Kernel only prototypes.
  */
-union rval;
 
 int	path_to_handle		(char *path, void *hbuf, size_t *hlen);
 int	path_to_fshandle	(char *path, void *hbuf, size_t *hlen);
@@ -31,7 +33,7 @@ int	readlink_by_handle	(void *hanp, size_t hlen, void *buf, size_t bs,
 int	gethandle		(void *hanp, size_t hlen, handle_t *handlep);
 
 struct vnode *	handle_to_vp (handle_t *handlep);
-int		vp_to_handle (vnode_t *vp, handle_t *handlep);
+int		vp_to_handle (struct vnode *vp, handle_t *handlep);
 
 struct vfs *	altgetvfs (fsid_t *fsid);
 #define HANDLE_TO_VFS(h) 	altgetvfs(&((h)->ha_fsid))

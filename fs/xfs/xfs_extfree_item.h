@@ -1,7 +1,10 @@
 #ifndef	_XFS_EXTFREE_ITEM_H
 #define	_XFS_EXTFREE_ITEM_H
 
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
+
+struct xfs_mount;
+struct zone;
 
 typedef struct xfs_extent {
 	xfs_dfsbno_t	ext_start;
@@ -74,12 +77,11 @@ typedef struct xfs_efd_log_item {
  */
 #define	XFS_EFD_MAX_FAST_EXTENTS	16
 
-struct zone;
 extern struct zone	*xfs_efi_zone;
 extern struct zone	*xfs_efd_zone;
 
-xfs_efi_log_item_t	*xfs_efi_init(xfs_mount_t *, uint);
-xfs_efd_log_item_t	*xfs_efd_init(xfs_mount_t *, xfs_efi_log_item_t *,
+xfs_efi_log_item_t	*xfs_efi_init(struct xfs_mount *, uint);
+xfs_efd_log_item_t	*xfs_efd_init(struct xfs_mount *, xfs_efi_log_item_t *,
 				      uint);
 
 #endif	/* _XFS_EXTFREE_ITEM_H */

@@ -1,7 +1,10 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.7 $"
+
+struct xfs_mount;
+struct xfs_trans;
 
 /* Min and max rt extent sizes, specified in bytes */
 #define	XFS_MAX_RTEXTSIZE	(1024 * 1024 * 1024)	/* 1GB */
@@ -63,34 +66,34 @@
 #ifndef SIM
 xfs_rtblock_t
 xfs_rtallocate_extent(
-	xfs_trans_t	*tp,
-	xfs_rtblock_t	bno,
-	xfs_extlen_t	minlen,
-	xfs_extlen_t	maxlen,
-	xfs_extlen_t	*len,
-	xfs_alloctype_t	type,
-	int		wasdel,
-	xfs_extlen_t	prod);
+	struct xfs_trans	*tp,
+	xfs_rtblock_t		bno,
+	xfs_extlen_t		minlen,
+	xfs_extlen_t		maxlen,
+	xfs_extlen_t		*len,
+	xfs_alloctype_t		type,
+	int			wasdel,
+	xfs_extlen_t		prod);
 #endif	/* !SIM */
 
 void
 xfs_rtfree_extent(
-	xfs_trans_t	*tp,
-	xfs_rtblock_t	bno,
-	xfs_extlen_t	len);
+	struct xfs_trans	*tp,
+	xfs_rtblock_t		bno,
+	xfs_extlen_t		len);
 
 #ifdef XFSDEBUG
 void
 xfs_rtprint_range(
-	xfs_mount_t	*mp,
-	xfs_trans_t	*tp,
-	xfs_rtblock_t	start,
-	xfs_extlen_t	len);
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp,
+	xfs_rtblock_t		start,
+	xfs_extlen_t		len);
 
 void
 xfs_rtprint_summary(
-	xfs_mount_t	*mp,
-	xfs_trans_t	*tp);
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp);
 #endif	/* XFSDEBUG */
 
 #endif	/* !_FS_XFS_RTALLOC_H */

@@ -1,8 +1,13 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.40 $"
+#ident	"$Revision: 1.41 $"
 
 #include <sys/cmn_err.h>
+
+struct buf;
+struct ktrace;
+struct xfs_buf_cancel;
+struct xfs_mount;
 
 /*
  * Macros, structures, prototypes for internal log manager use.
@@ -216,11 +221,11 @@ typedef struct xlog_in_core {
 	sema_t			ic_forcesema;
 	struct xlog_in_core	*ic_next;
 	struct xlog_in_core	*ic_prev;
-	buf_t	  		*ic_bp;
+	struct buf  		*ic_bp;
 	struct log		*ic_log;
 	xfs_log_callback_t	*ic_callback;
 	xfs_log_callback_t	**ic_callback_tail;
-	ktrace_t		*ic_trace;
+	struct ktrace		*ic_trace;
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
@@ -230,8 +235,6 @@ typedef struct xlog_in_core {
 } xlog_in_core_t;
 
 #define ic_header	ic_h.hic_header
-
-struct xfs_buf_cancel;
 
 /*
  * The reservation head lsn is not made up of a cycle number and block number.
@@ -252,8 +255,8 @@ typedef struct log {
     lock_t		l_icloglock;    /* grab to change iclog state */
     xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
-    xfs_mount_t		*l_mp;	        /* mount point */
-    buf_t		*l_xbuf;        /* extra buffer for log wrapping */
+    struct xfs_mount	*l_mp;	        /* mount point */
+    struct buf		*l_xbuf;        /* extra buffer for log wrapping */
     dev_t		l_dev;	        /* dev_t of log */
     int			l_logBBstart;   /* start block of log */
     int			l_logsize;      /* size of log in bytes */
@@ -280,15 +283,16 @@ typedef struct log {
     int			l_grant_write_bytes;	/* */
 
     /* The following fields don't need locking */
-    ktrace_t		*l_trace;
-    ktrace_t		*l_grant_trace;
+    struct ktrace	*l_trace;
+    struct ktrace	*l_grant_trace;
     uint		l_flags;
-    struct xfs_buf_cancel	**l_buf_cancel_table;	
+    struct xfs_buf_cancel **l_buf_cancel_table;	
 } xlog_t;
 
 
 /* common routines */
-extern xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
+extern xfs_lsn_t xlog_assign_tail_lsn(struct xfs_mount *mp,
+				      xlog_in_core_t *iclog);
 extern int	 xlog_find_head(xlog_t *log, daddr_t *head_blk);
 extern int	 xlog_find_tail(xlog_t	*log,
 				daddr_t *head_blk,
@@ -297,9 +301,9 @@ extern int	 xlog_print_find_oldest(xlog_t *log, daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log);
 extern int	 xlog_recover_finish(xlog_t *log);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
-extern buf_t *	 xlog_get_bp(int);
-extern void	 xlog_put_bp(buf_t *);
-extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
+extern struct buf *xlog_get_bp(int);
+extern void	 xlog_put_bp(struct buf *);
+extern int	 xlog_bread(xlog_t *, daddr_t blkno, int bblks, struct buf *bp);
 
 #define XLOG_TRACE_GRAB_FLUSH  1
 #define XLOG_TRACE_REL_FLUSH   2

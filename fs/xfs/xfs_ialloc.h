@@ -1,7 +1,11 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.25 $"
+
+struct buf;
+struct xfs_mount;
+struct xfs_trans;
 
 /*
  * Allocation parameters for inode allocation.
@@ -56,10 +60,10 @@
  */
 xfs_ino_t				/* inode number allocated */
 xfs_dialloc(
-	xfs_trans_t	*tp,		/* transaction pointer */
+	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	mode_t		mode,		/* mode bits for new inode */
-	buf_t		**agbp,		/* buf for a.g. inode header */
+	struct buf	**agbp,		/* buf for a.g. inode header */
 	boolean_t	*alloc_done);	/* an allocation was done to replenish
 					   the free inodes */
 #ifndef SIM
@@ -71,7 +75,7 @@ xfs_dialloc(
  */
 void
 xfs_difree(
-	xfs_trans_t	*tp,		/* transaction pointer */
+	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	inode);		/* inode to be freed */
 #endif	/* !SIM */
 
@@ -81,8 +85,8 @@ xfs_difree(
  */
 int
 xfs_dilocate(
-	xfs_mount_t	*mp,		/* file system mount structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
+	struct xfs_mount *mp,		/* file system mount structure */
+	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	ino,		/* inode to locate */
 	xfs_fsblock_t	*bno,		/* output: block containing inode */
 	int		*len,		/* output: num blocks in cluster*/
@@ -94,24 +98,24 @@ xfs_dilocate(
  */
 void
 xfs_ialloc_compute_maxlevels(
-	xfs_mount_t	*mp);		/* file system mount structure */
+	struct xfs_mount *mp);		/* file system mount structure */
 
 /*
  * Log specified fields for the ag hdr (inode section)
  */
 void
 xfs_ialloc_log_agi(
-	xfs_trans_t	*tp,		/* transaction pointer */
-	buf_t		*bp,		/* allocation group header buffer */
+	struct xfs_trans *tp,		/* transaction pointer */
+	struct buf	 *bp,		/* allocation group header buffer */
 	int		fields);	/* bitmask of fields to log */
 
 /*
  * Read in the allocation group header (inode allocation section)
  */
-buf_t *					/* allocation group hdr buf */
+struct buf *				/* allocation group hdr buf */
 xfs_ialloc_read_agi(
-	xfs_mount_t	*mp,		/* file system mount structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
+	struct xfs_mount *mp,		/* file system mount structure */
+	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_agnumber_t	agno);		/* allocation group number */
 
 #endif	/* !_FS_XFS_IALLOC_H */

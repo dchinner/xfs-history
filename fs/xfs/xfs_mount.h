@@ -1,10 +1,15 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision: 1.46 $"
 
+struct buf;
 struct cred;
+struct vfs;
+struct vnode;
 struct xfs_ihash;
+struct xfs_inode;
+struct xfs_perag;
 
 typedef struct xfs_trans_reservations {
 	uint	tr_write;	/* extent alloc trans */
@@ -32,7 +37,7 @@ typedef struct xfs_mount {
 	lock_t			m_async_lock;	/* async trans list mutex */
 	xfs_sb_t		m_sb;		/* copy of fs superblock */
 	lock_t			m_sb_lock;	/* sb counter mutex */
-	buf_t			*m_sb_bp;	/* buffer for superblock */
+	struct buf		*m_sb_bp;	/* buffer for superblock */
 	char			*m_fsname; /* filesystem name */
 	dev_t			m_dev;		/* dev of fs meta-data */
 	dev_t			m_logdev;	/* dev of fs log data */
@@ -143,6 +148,6 @@ int		xfs_mountfs(struct vfs *, dev_t);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
-buf_t		*xfs_getsb(xfs_mount_t *, int);
+struct buf	*xfs_getsb(xfs_mount_t *, int);
 
 #endif	/* !_FS_XFS_MOUNT_H */
