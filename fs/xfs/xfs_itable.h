@@ -41,7 +41,7 @@ typedef struct xfs_bstat
 	uuid_t		bs_uuid;	/* unique id of file */
 	__uint32_t	bs_dmevmask;	/* DMIG event mask */
 	ushort_t	bs_dmstate;	/* DMIG state info */
-	ushort_t	bs_padding;	/* not used */
+	ushort_t	bs_aextents;	/* attribute number of extents */
 } xfs_bstat_t;
 
 /*
@@ -51,7 +51,9 @@ typedef struct xfs_bstat
  */
 #define XFS_XFLAG_REALTIME	0x1
 #define	XFS_XFLAG_PREALLOC	0x2
-#define XFS_XFLAG_ALL		( XFS_XFLAG_REALTIME|XFS_XFLAG_PREALLOC )
+#define	XFS_XFLAG_HASATTR	0x80000000	/* no DIFLAG for this */
+#define XFS_XFLAG_ALL		\
+	( XFS_XFLAG_REALTIME|XFS_XFLAG_PREALLOC|XFS_XFLAG_HASATTR )
 
 /*
  * Structures returned from xfs_inumbers syssgi routine.
@@ -99,7 +101,8 @@ xfs_itable(
 typedef int (*bulkstat_one_pf)(struct xfs_mount	*mp, 
 			       struct xfs_trans	*tp,
 			       xfs_ino_t   	ino,
-			       void	     	*buffer);
+			       void	     	*buffer,
+			       daddr_t		bno);
 
 /*
  * Return stat information in bulk (by-inode) for the filesystem.
