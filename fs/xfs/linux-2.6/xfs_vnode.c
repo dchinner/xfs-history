@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.25 $"
 
 #include <xfs_os_defs.h>
 
@@ -39,6 +39,7 @@
 #include <stdio.h>
 #define _KERNEL 1
 #endif
+#include <linux/config.h>
 #include <sys/types.h>
 #include <sys/debug.h>
 #include <sys/file.h>

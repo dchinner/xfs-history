@@ -34,10 +34,9 @@
 #define FSID_T /* wrapper hack... border files have type problems */
 #include <sys/types.h> 
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/errno.h>
-
-#include <config/xfs/grio.h>    	/* CONFIG_XFS_GRIO */
 
 #undef  NODEV
 #include <linux/version.h>
@@ -623,7 +622,7 @@ int __init init_xfs_fs(void)
 	uuid_init();
 	xfs_init(0);
 
-#if CONFIG_XFS_GRIO
+#ifdef CONFIG_XFS_GRIO
         xfs_grio_init();
 #endif
         
@@ -644,7 +643,7 @@ void cleanup_module(void)
 {
 	extern void xfs_cleanup(void);
 
-#if CONFIG_XFS_GRIO
+#ifdef CONFIG_XFS_GRIO
         xfs_grio_uninit();
 #endif
 	xfs_cleanup();
