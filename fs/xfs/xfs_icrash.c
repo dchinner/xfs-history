@@ -1,7 +1,7 @@
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 #include <sys/types.h>
-#include <sys/arsess.h>
+#include <ksys/vpag.h>
 #include <sys/kmem.h>
 #include <sys/uuid.h>
 #include <sys/vnode.h>
