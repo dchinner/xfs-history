@@ -624,7 +624,10 @@ xfs_itruncate_start(
 		}
 	}
 	ASSERT((new_size != 0) ||
-	       (!VN_DIRTY(ip->i_vnode) && (ip->i_queued_bufs == 0)));
+	       (!VN_DIRTY(ip->i_vnode) &&
+		(ip->i_queued_bufs == 0) &&
+		(ip->i_vnode->v_buf == NULL) &&
+		(ip->i_vnode->v_pgcnt == 0)));
 }		    
 
 /*
@@ -762,7 +765,8 @@ xfs_itruncate_finish(
 	ASSERT((new_size != 0) ||
 	       (!VN_DIRTY(ip->i_vnode) &&
 		(ip->i_delayed_blks == 0) &&
-		(ip->i_queued_bufs == 0)));
+		(ip->i_queued_bufs == 0) &&
+		(ip->i_vnode->v_buf == NULL)));
 }
 
 
@@ -1854,22 +1858,30 @@ xfs_iflush_all(
 {
 	int		busy;
 	int		done;
+	int		purged;
 	xfs_inode_t	*ip;
 	vmap_t		vmap;
 	vnode_t		*vp;
 
 	busy = done = 0;
 	while (!done) {
+		purged = 0;
 		XFS_MOUNT_ILOCK(mp);
-		for (ip = mp->m_inodes; ip; ip = ip->i_mnext) {
+		ip = mp->m_inodes;
+		if (ip == NULL) {
+			break;
+		}
+		do {
 			/*
 			 * It's up to our caller to purge the root (and
 			 * when implemented, quotas) vnodes later.
 			 */
 			vp = XFS_ITOV(ip);
 			if (vp->v_count != 0) {
-				if (vp->v_count == 1 && ip == mp->m_rootip)
+				if (vp->v_count == 1 && ip == mp->m_rootip) {
+					ip = ip->i_mnext;
 					continue;
+				}
 				if (!(flag & XFS_FLUSH_ALL)) {
 					busy = 1;
 					done = 1;
@@ -1879,20 +1891,37 @@ xfs_iflush_all(
 				 * Ignore busy inodes but continue flushing
 				 * others.
 				 */
+				ip = ip->i_mnext;
 				continue;
 			}
 			/*
 			 * Sample vp mapping while holding mp locked on MP
 			 * systems, so we don't purge a reclaimed or
-			 * nonexistent vnode.
+			 * nonexistent vnode.  We break from the loop
+			 * since we know that we modify
+			 * it by pulling ourselves from it in xfs_reclaim()
+			 * called via vn_purge() below.  Set ip to the next
+			 * entry in the list anyway so we'll know below
+			 * whether we reached the end or not.
 			 */
 			VMAP(vp, vmap);
 			XFS_MOUNT_IUNLOCK(mp);
 			vn_purge(vp, &vmap);
+			purged = 1;
 			break;
-		}
-		if (!ip)
+		} while (ip != mp->m_inodes);
+		/*
+		 * We need to distinguish between when we exit the loop
+		 * after a purge and when we simply hit the end of the
+		 * list.  We can't use the (ip == mp->m_inodes) test,
+		 * because when we purge an inode at the start of the list
+		 * the next inode on the list becomes mp->m_inodes.  That
+		 * would cause such a test to bail out early.  The purged
+		 * variable tells us how we got out of the loop.
+		 */
+		if (!purged) {
 			done = 1;
+		}
 	}
 	XFS_MOUNT_IUNLOCK(mp);
 	return !busy;

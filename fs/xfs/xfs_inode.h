@@ -65,7 +65,7 @@ typedef struct xfs_inode {
 	struct xfs_inode	**i_prevp;	/* ptr to prev i_next */
 	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
 	struct xfs_inode	*i_mnext;	/* next inode in mount list */
-	struct xfs_inode	**i_mprevp;	/* ptr to prev i_next */
+	struct xfs_inode	*i_mprev;	/* ptr to prev inode */
 	struct vnode		*i_vnode;	/* ptr to associated vnode */
 	struct grio_ticket	*i_ticket;	/* grio ticket list */
 	lock_t			i_ticketlock;

@@ -130,6 +130,8 @@ xfs_retrieved(
 #ifndef DEBUG
 
 #define	xfs_strat_write_check(ip,off,count,imap,nimap)
+#define	xfs_check_rbp(ip,bp,rbp,locked)
+#define	xfs_check_bp(ip,bp)
 
 #else /* DEBUG */
 
@@ -140,6 +142,18 @@ xfs_strat_write_check(
 	xfs_extlen_t	buf_fsb,
 	xfs_bmbt_irec_t	*imap,
 	int		imap_count);
+
+STATIC void
+xfs_check_rbp(
+	xfs_inode_t	*ip,
+	buf_t		*bp,
+	buf_t		*rbp,
+	int		locked);
+
+STATIC void
+xfs_check_bp(
+	xfs_inode_t	*ip,
+	buf_t		*bp);
 
 #endif /* DEBUG */		      
 
@@ -2258,9 +2272,12 @@ xfs_strat_read(
 					       data_len);
 				rbp->b_blkno = XFS_FSB_TO_DADDR(mp,
 						imap[x].br_startblock);
+				rbp->b_offset = XFS_FSB_TO_BB(mp,
+							      imap_offset);
 				rbp->b_flags |= B_READ;
 				rbp->b_flags &= ~B_ASYNC;
 
+				xfs_check_rbp(ip, bp, rbp, 1);
 				bdstrat(bmajor(rbp->b_edev), rbp);
 				iowait(rbp);
 
@@ -2515,11 +2532,13 @@ xfs_strat_write_relse(
 	freerbuf(rbp);
 }
 
+#ifdef DEBUG
 void
 xfs_check_rbp(
 	xfs_inode_t	*ip,
 	buf_t		*bp,
-	buf_t		*rbp)
+	buf_t		*rbp,
+	int		locked)
 {
 	xfs_mount_t	*mp;
 	int		nimaps;
@@ -2534,10 +2553,14 @@ xfs_check_rbp(
 	rbp_len_fsb = XFS_B_TO_FSBT(mp, rbp->b_bcount);
 	ASSERT(XFS_FSB_TO_B(mp, rbp_len_fsb) == rbp->b_bcount);
 	nimaps = 1;
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	if (!locked) {
+		xfs_ilock(ip, XFS_ILOCK_SHARED);
+	}
 	(void) xfs_bmapi(NULL, ip, rbp_offset_fsb, rbp_len_fsb, 0,
 			 NULLFSBLOCK, 0, &imap, &nimaps, NULL);
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	if (!locked) {
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	}
 
 	ASSERT(imap.br_startoff == rbp_offset_fsb);
 	ASSERT(imap.br_blockcount == rbp_len_fsb);
@@ -2558,6 +2581,62 @@ xfs_check_rbp(
 		       dpoff(rbp->b_offset));
 	}
 }
+
+/*
+ * Verify that the given buffer is going to the right place in its
+ * file.  Also check that it is properly mapped and points to the
+ * right page.  We can only do a trylock from here in order to prevent
+ * deadlocks, since this is called from the strategy routine.
+ */
+void
+xfs_check_bp(
+	xfs_inode_t	*ip,
+	buf_t		*bp)
+{
+	xfs_mount_t	*mp;
+	int		nimaps;
+	xfs_bmbt_irec_t	imap;
+	xfs_fileoff_t	bp_offset_fsb;
+	xfs_extlen_t	bp_len_fsb;
+	pfd_t		*pfdp;
+	int		locked;
+
+	mp = ip->i_mount;
+
+	if (bp->b_flags & B_PAGEIO) {
+		pfdp = NULL;
+		pfdp = getnextpg(bp, pfdp);
+		ASSERT(pfdp != NULL);
+		ASSERT(dtopt(bp->b_offset) == pfdp->pf_pageno);
+		if (dpoff(bp->b_offset)) {
+			ASSERT(bp->b_flags & B_MAPPED);
+		}
+	}
+
+	if (bp->b_flags & B_MAPPED) {
+		ASSERT(BTOBB(poff(bp->b_un.b_addr)) ==
+		       dpoff(bp->b_offset));
+	}
+
+	bp_offset_fsb = XFS_BB_TO_FSB(mp, bp->b_offset);
+	ASSERT(XFS_FSB_TO_BB(mp, bp_offset_fsb) == bp->b_offset);
+	bp_len_fsb = XFS_B_TO_FSBT(mp, bp->b_bcount);
+	ASSERT(XFS_FSB_TO_B(mp, bp_len_fsb) == bp->b_bcount);
+	nimaps = 1;
+
+	locked = xfs_ilock_nowait(ip, XFS_ILOCK_SHARED);
+	if (!locked) {
+		return;
+	}
+	(void) xfs_bmapi(NULL, ip, bp_offset_fsb, bp_len_fsb, 0,
+			 NULLFSBLOCK, 0, &imap, &nimaps, NULL);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+	ASSERT(imap.br_startoff == bp_offset_fsb);
+	ASSERT(imap.br_blockcount == bp_len_fsb);
+	ASSERT(XFS_FSB_TO_DADDR(mp, imap.br_startblock) == bp->b_blkno);
+}
+#endif /* DEBUG */
 
 STATIC void
 xfs_strat_write(
@@ -2641,6 +2720,7 @@ xfs_strat_write(
 						    locals->count_fsb);
 			xfs_strat_write_bp_trace(XFS_STRAT_FAST,
 						 locals->ip, bp);
+			xfs_check_bp(locals->ip, bp);
 			bdstrat(bmajor(bp->b_edev), bp);
 			/*
 			 * Drop the count of queued buffers.
@@ -2697,7 +2777,7 @@ xfs_strat_write(
 						    locals->last_rbp_bcount,
 						    locals->last_rbp_blkno);
 #ifdef DEBUG
-			xfs_check_rbp(locals->ip, bp, locals->rbp);
+			xfs_check_rbp(locals->ip, bp, locals->rbp, 0);
 			if (locals->rbp_count > 0) {
 				ASSERT((locals->last_rbp_offset +
 					BTOBB(locals->last_rbp_bcount)) ==
@@ -2815,6 +2895,7 @@ xfs_strategy(
 	 * is already allocated, then just do the requested I/O.
 	 */
 	if (bp->b_blkno >= 0) {
+		xfs_check_bp(XFS_VTOI(vp), bp);
 		bdstrat(bmajor(bp->b_edev), bp);
 		return;
 	}
