@@ -95,37 +95,52 @@ xfs_setattr(
 #define BREAK_LEASE(inode,flag)		get_lease(inode,flag)
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
-#define DOWN_TRUNC_SEM(inode)				\
-	do {						\
-		down(&inode->i_sem);			\
-		down_write(&inode->i_alloc_sem);	\
-	} while(0)
-#define UP_TRUNC_SEM(inode)				\
-	do {						\
-		up_write(&inode->i_alloc_sem);		\
-		up(&inode->i_sem);			\
-	} while(0)
+static void up_rw_sems(struct inode *ip, int flags)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	if (flags & DM_FLAGS_IALLOCSEM_WR)
+		up_write(&ip->i_alloc_sem);
+	if (flags & DM_FLAGS_ISEM)
+		up(&ip->i_sem);
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)) && \
+    (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22))
+	if (flags & DM_FLAGS_ISEM)
+		up(&ip->i_sem);
+	if (flags & DM_FLAGS_IALLOCSEM_RD)
+		up_read(&ip->i_alloc_sem);
+	else if (flags & DM_FLAGS_IALLOCSEM_WR)
+		up_write(&ip->i_alloc_sem);
+#endif
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,21)
+	if (flags & DM_FLAGS_ISEM)
+		up(&ip->i_sem);
+#endif
+}
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,4,21)) && \
-    (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
-#define DOWN_TRUNC_SEM(inode)				\
-	do {						\
-		down_write(&inode->i_alloc_sem);	\
-		down(&inode->i_sem);			\
-	} while(0)
-#define UP_TRUNC_SEM(inode)				\
-	do {						\
-		up(&inode->i_sem);			\
-		up_write(&inode->i_alloc_sem);		\
-	} while(0)
+static void down_rw_sems(struct inode *ip, int flags)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	if (flags & DM_FLAGS_ISEM)
+		down(&ip->i_sem);
+	if (flags & DM_FLAGS_IALLOCSEM_WR)
+		down_write(&ip->i_alloc_sem);
 #endif
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)) && \
+    (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22))
+	if (flags & DM_FLAGS_IALLOCSEM_RD)
+		down_read(&ip->i_alloc_sem);
+	else if (flags & DM_FLAGS_IALLOCSEM_WR)
+		down_write(&ip->i_alloc_sem);
+	if (flags & DM_FLAGS_ISEM)
+		down(&ip->i_sem);
+#endif
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,4,21)
+	if (flags & DM_FLAGS_ISEM)
+		down(&ip->i_sem);
+#endif
+}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,22)
-#define DOWN_TRUNC_SEM(inode)	down(&inode->i_sem)
-#define UP_TRUNC_SEM(inode)	up(&inode->i_sem)
-#endif
 
 /* Structure used to hold the on-disk version of a dm_attrname_t.  All
    on-disk attribute names start with the 8-byte string "SGI_DMI_".
@@ -198,31 +213,13 @@ xfs_dm_send_data_event(
 		if (locktype)
 			xfs_rwunlock(bdp, *locktype);
 
-		if (flags & DM_FLAGS_ISEM)
-			up(&inode->i_sem);
-#ifdef DM_FLAGS_IALLOCSEM_WR
-		if (flags & DM_FLAGS_IALLOCSEM_WR)
-			up_write(&inode->i_alloc_sem);
-#endif
-#ifdef DM_FLAGS_IALLOCSEM_RD
-		if (flags & DM_FLAGS_IALLOCSEM_RD)
-			up_read(&inode->i_alloc_sem);
-#endif
+		up_rw_sems(inode, flags);
 
 		error = dm_send_data_event(event, inode, DM_RIGHT_NULL,
 				offset, length, flags);
 		error = -error; /* DMAPI returns negative errors */
 
-		if (flags & DM_FLAGS_ISEM)
-			down(&inode->i_sem);
-#ifdef DM_FLAGS_IALLOCSEM_WR
-		if (flags & DM_FLAGS_IALLOCSEM_WR)
-			down_write(&inode->i_alloc_sem);
-#endif
-#ifdef DM_FLAGS_IALLOCSEM_RD
-		if (flags & DM_FLAGS_IALLOCSEM_RD)
-			down_read(&inode->i_alloc_sem);
-#endif
+		down_rw_sems(inode, flags);
 
 		if (locktype)
 			xfs_rwlock(bdp, *locktype);
@@ -2484,7 +2481,7 @@ xfs_dm_punch_hole(
 		goto put_and_out;
 	}
 
-	DOWN_TRUNC_SEM(inode);
+	down_rw_sems(inode, DM_SEM_FLAG_WR);
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
 	if ((off >= xip->i_d.di_size) || ((off+len) > xip->i_d.di_size)) {
@@ -2521,7 +2518,7 @@ xfs_dm_punch_hole(
 	xfs_iunlock(xip, XFS_IOLOCK_EXCL);
 
 up_and_out:
-	UP_TRUNC_SEM(inode);
+	up_rw_sems(inode, DM_SEM_FLAG_WR);
 
 put_and_out:
 	put_write_access(inode);
