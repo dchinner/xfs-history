@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.4 $"
+#ident "$Revision: 1.5 $"
 
 #include <sys/types.h>
 #include <sys/sysinfo.h>
@@ -83,7 +83,7 @@ typedef	struct	{
 
 STATIC	const	char	dmattr_prefix[DMATTR_PREFIXLEN + 1] = "SGI_DMI_";
 
-STATIC	dm_size_t  dm_min_dio_xfer = 0;	/* direct I/O disabled for now */
+STATIC	dm_size_t  dm_min_dio_xfer = 0; /* direct I/O disabled for now */
 
 
 /* See xfs_dm_get_dmattr() for a description of why this is needed. */
@@ -2846,6 +2846,8 @@ xfs_dm_fcntl(
 		return(xfs_dm_mapevent(bdp, flags, offset, dmfcntlp));
 	case DM_FCNTL_TESTEVENT:
 		return(xfs_dm_testevent(bdp, flags, offset, dmfcntlp));
+	case DM_FCNTL_FSSETDM:
+		return EINVAL;	/* F_FSSETDM by handle someday */
 	default:
 		break;
 	}
