@@ -55,44 +55,8 @@ ifeq ($(CONFIG_XFS_TRACE),y)
 endif
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
-
-xfs-$(CONFIG_XFS_DMAPI)		+= $(addprefix dmapi/, \
-				   dmapi_sysent.o \
-				   dmapi_attr.o \
-				   dmapi_config.o \
-				   dmapi_bulkattr.o \
-				   dmapi_dmattr.o \
-				   dmapi_event.o \
-				   dmapi_handle.o \
-				   dmapi_hole.o \
-				   dmapi_io.o \
-				   dmapi_mountinfo.o \
-				   dmapi_region.o \
-				   dmapi_register.o \
-				   dmapi_right.o \
-				   dmapi_session.o \
-				   dmapi_xfs.o)
-ifneq ($(CONFIG_XFS_DMAPI),y)
-xfs-y				+= xfs_dmops.o
-endif
-
-xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
-				   xfs_dquot.o \
-				   xfs_dquot_item.o \
-				   xfs_trans_dquot.o \
-				   xfs_qm_syscalls.o \
-				   xfs_qm_bhv.o \
-				   xfs_qm.o)
-
-ifeq ($(CONFIG_MODULES),y)
-xfs-$(CONFIG_XFS_QUOTA)		+= quota/xfs_qm_ksyms.o
-endif
-
-ifeq ($(CONFIG_XFS_QUOTA),y)
-xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
-else
-xfs-y				+= xfs_qmops.o
-endif
+obj-$(CONFIG_XFS_DMAPI)		+= dmapi/
+obj-$(CONFIG_XFS_QUOTA)		+= quota/
 
 xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
@@ -147,8 +111,9 @@ xfs-y				+= xfs_alloc.o \
 				   xfs_vnodeops.o \
 				   xfs_rw.o \
 				   xfs_behavior.o \
-				   xfs_iomap.o
-
+				   xfs_iomap.o \
+				   xfs_dmops.o \
+				   xfs_qmops.o
 
 xfs-$(CONFIG_XFS_TRACE)		+= xfs_dir2_trace.o
 
@@ -166,9 +131,8 @@ xfs-y				+= $(addprefix $(XFS_LINUX)/, \
 				   xfs_super.o \
 				   xfs_vfs.o \
 				   xfs_vnode.o \
-				   xfs_buf.o)
-
-xfs-$(CONFIG_MODULES)		+= $(XFS_LINUX)/xfs_ksyms.o
+				   xfs_buf.o \
+				   xfs_ksyms.o)
 
 # Objects in support/
 xfs-y				+= $(addprefix support/, \

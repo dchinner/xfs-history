@@ -911,7 +911,6 @@ init_xfs_fs( void )
 	vn_init();
 	xfs_init();
 	uuid_init();
-	vfs_initquota();
 
 	error = register_filesystem(&xfs_fs_type);
 	if (error)
@@ -932,7 +931,6 @@ STATIC void __exit
 exit_xfs_fs( void )
 {
 	unregister_filesystem(&xfs_fs_type);
-	vfs_exitquota();
 	xfs_cleanup();
 	pagebuf_terminate();
 	destroy_inodecache();

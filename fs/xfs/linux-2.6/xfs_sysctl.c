@@ -103,6 +103,16 @@ STATIC ctl_table xfs_table[] = {
 	&sysctl_intvec, NULL, 
 	&xfs_params.sync_interval.min, &xfs_params.sync_interval.max},
 
+	{XFS_PROBE_DMAPI, "probe_dmapi", &xfs_params.probe_dmapi.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.probe_dmapi.min, &xfs_params.probe_dmapi.max},
+
+	{XFS_PROBE_QUOTA, "probe_quota", &xfs_params.probe_quota.val,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
+	&sysctl_intvec, NULL,
+	&xfs_params.probe_quota.min, &xfs_params.probe_quota.max},
+
 	{XFS_INHERIT_SYNC, "inherit_sync", &xfs_params.inherit_sync.val,
 	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,

@@ -64,8 +64,3 @@ EXPORT_SYMBOL(xfs_trans_reserve_quota_bydquots);
 MODULE_AUTHOR("Silicon Graphics, Inc.");
 MODULE_DESCRIPTION("SGI XFS quota management subsystem");
 MODULE_LICENSE("GPL");
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-module_init(xfs_qm_init);
-module_exit(xfs_qm_exit);
-#endif

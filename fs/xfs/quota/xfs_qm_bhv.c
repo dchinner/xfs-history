@@ -388,7 +388,7 @@ struct bhv_vfsops xfs_qmops = { {
 };
 
 
-int __init
+static int __init
 xfs_qm_init(void)
 {
 	static char	message[] __initdata =
@@ -402,7 +402,7 @@ xfs_qm_init(void)
 	return 0;
 }
 
-void __exit
+static void __exit
 xfs_qm_exit(void)
 {
 	xfs_qm_cleanup_procfs();
@@ -413,3 +413,6 @@ xfs_qm_exit(void)
 	if (qm_dqtrxzone)
 		kmem_cache_destroy(qm_dqtrxzone);
 }
+
+module_init(xfs_qm_init);
+module_exit(xfs_qm_exit);
