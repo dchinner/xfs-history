@@ -39,7 +39,6 @@
 #ifndef _LOG_DEBUG
 int
 xfs_log_reserve(xfs_mount_t	 *mp,
-		xfs_tid_t	 tid,
 		uint		 len,
 		xfs_log_ticket_t *x_ticket,
 		char		 log_client,
@@ -59,7 +58,8 @@ xfs_log_write(xfs_mount_t *	mp,
 
 void
 xfs_log_done(xfs_mount_t	*mp,
-	     xfs_log_ticket_t	tic)
+	     xfs_log_ticket_t	tic,
+	     uint		flags)
 {
 	return;
 }	/* xfs_log_done */
