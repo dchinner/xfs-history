@@ -262,6 +262,10 @@ xfs_init(int	fstype)
 	extern zone_t	*xfs_efd_zone;
 	extern zone_t	*xfs_efi_zone;
 	extern zone_t	*xfs_dabuf_zone;
+#if	(defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING))
+	extern zone_t	*xfs_ktrace_hdr_zone;
+	extern zone_t	*xfs_ktrace_ent_zone;
+#endif	/* (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)) */
 #ifndef SIM
 	extern lock_t	xfs_strat_lock;
 	extern lock_t	xfsd_lock;
@@ -352,6 +356,14 @@ xfs_init(int	fstype)
 	xfs_chashlist_zone = kmem_zone_init(sizeof(xfs_chashlist_t),
 					    "xfs_chashlist");
 
+#if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
+	xfs_ktrace_hdr_zone = kmem_zone_init(sizeof(ktrace_t),
+					"xfs_ktrace_hdr");
+	xfs_ktrace_ent_zone = kmem_zone_init(VNODE_TRACE_SIZE
+					* sizeof(ktrace_entry_t),
+					"xfs_ktrace_ent");
+#endif
+
 	/*
 	 * Allocate global trace buffers.
 	 */
@@ -438,6 +450,10 @@ xfs_cleanup(void)
 	extern zone_t	*xfs_efi_zone;
 	extern zone_t	*xfs_buf_item_zone;
 	extern zone_t	*xfs_chashlist_zone;
+#if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
+	extern zone_t	*xfs_ktrace_hdr_zone;
+	extern zone_t	*xfs_ktrace_ent_zone;
+#endif
 
 #if !CONFIG_PAGE_BUF_META
 	kmem_cache_destroy(buf_zone);
@@ -455,6 +471,10 @@ xfs_cleanup(void)
 	kmem_cache_destroy(xfs_ifork_zone);
 	kmem_cache_destroy(xfs_ili_zone);
 	kmem_cache_destroy(xfs_chashlist_zone);
+#if  (! defined(SIM) && (defined(DEBUG) || defined(CONFIG_XFS_VNODE_TRACING)))
+	kmem_cache_destroy(xfs_ktrace_hdr_zone);
+	kmem_cache_destroy(xfs_ktrace_ent_zone);
+#endif
 
 }
 #endif
