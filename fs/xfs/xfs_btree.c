@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.28 $"
+#ident	"$Revision: 1.31 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -31,9 +31,10 @@
 #include "xfs_ag.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
-#include "xfs_ialloc.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_ialloc.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -51,7 +52,7 @@ STATIC zone_t	*xfs_btree_cur_zone;
  */
 __uint32_t xfs_magics[XFS_BTNUM_MAX] =
 {
-	XFS_ABTB_MAGIC, XFS_ABTC_MAGIC, XFS_BMAP_MAGIC
+	XFS_ABTB_MAGIC, XFS_ABTC_MAGIC, XFS_BMAP_MAGIC, XFS_IBT_MAGIC
 };
 
 /* 
@@ -90,6 +91,9 @@ xfs_btree_maxrecs(
 		break;
 	case XFS_BTNUM_BMAP:
 		maxrecs = XFS_BMAP_BLOCK_IMAXRECS(block->bb_h.bb_level, cur);
+		break;
+	case XFS_BTNUM_INO:
+		maxrecs = XFS_INOBT_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
 		break;
 	}
 	return maxrecs;
@@ -153,6 +157,15 @@ xfs_btree_check_key(
 		k1 = ak1; 
 		k2 = ak2;
 		ASSERT(k1->br_startoff < k2->br_startoff);
+		break;
+	    }
+	case XFS_BTNUM_INO: {
+		xfs_inobt_key_t	*k1;
+		xfs_inobt_key_t	*k2;
+
+		k1 = ak1;
+		k2 = ak2;
+		ASSERT(k1->ir_startino < k2->ir_startino);
 		break;
 	    }
 	}
@@ -242,6 +255,16 @@ xfs_btree_check_rec(
 		ASSERT(xfs_bmbt_get_startoff(r1) +
 		        xfs_bmbt_get_blockcount(r1) <=
 		       xfs_bmbt_get_startoff(r2));
+		break;
+	    }
+	case XFS_BTNUM_INO: {
+		xfs_inobt_rec_t	*r1;
+		xfs_inobt_rec_t	*r2;
+
+		r1 = ar1;
+		r2 = ar2;
+		ASSERT(r1->ir_startino + XFS_INODES_PER_CHUNK <=
+		       r2->ir_startino);
 		break;
 	    }
 	}
@@ -464,18 +487,20 @@ xfs_btree_get_bufs(
 
 /*
  * Allocate a new btree cursor.
- * The cursor is either for allocation (A) or bmap (B).
+ * The cursor is either for allocation (A) or bmap (B) or inodes (I).
  */
 xfs_btree_cur_t *			/* new btree cursor */
 xfs_btree_init_cursor(
 	xfs_mount_t	*mp,		/* file system mount point */
 	xfs_trans_t	*tp,		/* transaction pointer */
 	buf_t		*agbp,		/* (A only) buffer for agf structure */
-	xfs_agnumber_t	agno,		/* (A only) allocation group number */
+					/* (I only) buffer for agi structure */
+	xfs_agnumber_t	agno,		/* (AI only) allocation group number */
 	xfs_btnum_t	btnum,		/* btree identifier */
 	xfs_inode_t	*ip)		/* (B only) inode owning the btree */
 {
 	xfs_agf_t	*agf;		/* (A) allocation group freespace */
+	xfs_agi_t	*agi;		/* (I) allocation group inodespace */
 	xfs_btree_cur_t	*cur;		/* return value */
 	int		nlevels;	/* number of levels in the btree */
 
@@ -500,6 +525,10 @@ xfs_btree_init_cursor(
 		break;
 	case XFS_BTNUM_BMAP:
 		nlevels = ip->i_broot->bb_level + 1;
+		break;
+	case XFS_BTNUM_INO:
+		agi = XFS_BUF_TO_AGI(agbp);
+		nlevels = agi->agi_level;
 		break;
 	}
 	/*
@@ -532,6 +561,13 @@ xfs_btree_init_cursor(
 		cur->bc_private.b.flist = NULL;
 		cur->bc_private.b.allocated = 0;
 		cur->bc_private.b.wasdel = 0;
+		break;
+	case XFS_BTNUM_INO:
+		/*
+		 * Inode allocation btree fields.
+		 */
+		cur->bc_private.i.agbp = agbp;
+		cur->bc_private.i.agno = agno;
 		break;
 	default:
 		ASSERT(0);

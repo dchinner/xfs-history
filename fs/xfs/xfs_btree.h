@@ -11,6 +11,7 @@
 #define	XFS_BTNUM_BNO	((xfs_btnum_t)XFS_BTNUM_BNOi)
 #define	XFS_BTNUM_CNT	((xfs_btnum_t)XFS_BTNUM_CNTi)
 #define	XFS_BTNUM_BMAP	((xfs_btnum_t)XFS_BTNUM_BMAPi)
+#define	XFS_BTNUM_INO	((xfs_btnum_t)XFS_BTNUM_INOi)
 
 /*
  * Short form header: space allocation btrees.
@@ -119,6 +120,7 @@ typedef struct xfs_btree_cur
 	union {
 		xfs_alloc_rec_t		a;
 		xfs_bmbt_irec_t		b;
+		xfs_inobt_rec_t		i;
 	}		bc_rec;		/* current insert/search record value */
 	buf_t		*bc_bufs[XFS_BTREE_MAXLEVELS];	/* buf ptr per level */
 	int		bc_ptrs[XFS_BTREE_MAXLEVELS];	/* key/record # */
@@ -138,6 +140,10 @@ typedef struct xfs_btree_cur
 			int		allocated;	/* count of alloced */
 			int		wasdel;		/* was-delayed flag */
 		} b;
+		struct {			/* needed for INO */
+			buf_t		*agbp;	/* agi buffer pointer */
+			xfs_agnumber_t	agno;	/* ag number */
+		} i;
 	}		bc_private;	/* per-btree type data */
 } xfs_btree_cur_t;
 
