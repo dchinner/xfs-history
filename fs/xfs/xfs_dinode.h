@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DINODE_H
 #define	_FS_XFS_DINODE_H
 
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 #define	XFS_DINODE_VERSION	1
 #define	XFS_DINODE_MAGIC	0x494e4f44	/* 'INOD' */
@@ -42,6 +42,7 @@ typedef struct xfs_dinode_core
 	 * Should this be 64 bits? What does nfs3.0 want?
 	 */
 	__uint32_t	di_gen;		/* generation number */
+	xfs_agino_t	di_nexti;	/* next allocated inode in ag */
 } xfs_dinode_core_t;
 
 typedef struct xfs_dinode
@@ -74,8 +75,9 @@ typedef struct xfs_dinode
 #define	XFS_DI_MTIME	0x0800
 #define	XFS_DI_CTIME	0x1000
 #define	XFS_DI_GEN	0x2000
-#define	XFS_DI_U	0x4000
-#define	XFS_DI_NUM_BITS	15
+#define	XFS_DI_NEXTI	0x4000
+#define	XFS_DI_U	0x8000
+#define	XFS_DI_NUM_BITS	16
 #define	XFS_DI_ALL_BITS	((1 << XFS_DI_NUM_BITS) - 1)
 
 /*
