@@ -270,6 +270,7 @@ xfs_growfs_data(
 			BTOBB(bsize), 0);
 		sbp = XFS_BUF_TO_SBP(bp);
 		*sbp = mp->m_sb;
+		sbp->sb_versionnum = XFS_SB_VERSION_HIGH;
 		/*
 		 * If we get an error writing out the alternate superblocks,
 		 * just issue a warning and continue.  The real work is
