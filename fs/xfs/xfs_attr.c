@@ -1036,6 +1036,8 @@ restart:
 		args->index2 = args->index;
 		args->rmtblkno2 = args->rmtblkno;
 		args->rmtblkcnt2 = args->rmtblkcnt;
+		args->rmtblkno = 0;
+		args->rmtblkcnt = 0;
 	}
 		
 	retval = xfs_attr_leaf_add(blk->bp, state->args);
