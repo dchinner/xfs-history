@@ -1,4 +1,4 @@
-#ident "$Revision: 1.96 $"
+#ident "$Revision: 1.97 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1014,6 +1014,12 @@ xfs_trans_cancel(
 	int			i;
 #endif
 	
+	/*
+	 * See if the caller is being too lazy to figure out if
+	 * the transaction really needs an abort.
+	 */
+	if ((flags & XFS_TRANS_ABORT) && !(tp->t_flags & XFS_TRANS_DIRTY))
+		flags &= ~XFS_TRANS_ABORT;
 	/* 
 	 * See if the caller is relying on us to shut down the
 	 * filesystem.  This happens in paths where we detect
