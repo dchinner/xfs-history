@@ -1,9 +1,9 @@
-#ident	"$Revision: 1.70 $"
+#ident	"$Revision: 1.71 $"
 
 #include <sys/param.h>
 #ifdef SIM
 #define _KERNEL
-#endif
+#endif /* SIM */
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
@@ -11,7 +11,7 @@
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
-#endif
+#endif /* SIM */
 #include <sys/uuid.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
@@ -23,7 +23,7 @@
 #else
 #include <sys/systm.h>
 #include <sys/conf.h>
-#endif
+#endif /* SIM */
 #include <stddef.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -49,7 +49,7 @@
 
 #ifdef SIM
 #include "sim.h"
-#endif
+#endif /* SIM */
 
 
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, uint, int);
@@ -76,8 +76,33 @@ xfs_mount_init(void)
 	xfs_trans_ail_init(mp);
 
 	return mp;
-}
+}	/* xfs_mount_init */
 	
+/*
+ * Free up the resources associated with a mount structure.  Assume that
+ * the structure was initially zeroed, so we can tell which fields got
+ * initialized.
+ */
+void
+xfs_mount_free(xfs_mount_t *mp)
+{
+	if (mp->m_ihashmask)
+		xfs_ihash_free(mp);
+
+	if (mp->m_perag)
+		kmem_free(mp->m_perag,
+			  sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
+	
+	freesplock(mp->m_ail_lock);
+	freesplock(mp->m_async_lock);
+	freesema(&mp->m_ilock);
+	freesplock(mp->m_ipinlock);
+	freesplock(mp->m_sb_lock);
+
+	kmem_free(mp, sizeof(xfs_mount_t));
+}	/* xfs_mount_free */
+
+
 /*
  * xfs_mountfs		XXXjleong Needs more error checking
  *
@@ -235,16 +260,10 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error > 0) {
-			error = XFS_ERROR(error);
-			kmem_free(mp->m_perag,
-				  sbp->sb_agcount * sizeof(xfs_perag_t));
-			return error;
+			return (XFS_ERROR(error));
 		}
 	} else {	/* No log has been defined */
-		error = XFS_ERROR(EINVAL);
-		kmem_free(mp->m_perag,
-			  sbp->sb_agcount * sizeof(xfs_perag_t));
-		return error;
+		return (XFS_ERROR(EINVAL));
 	}
 
 #ifdef SIM
@@ -252,7 +271,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	 * Mkfs calls mount before the root inode is allocated.
 	 */
 	if (sbp->sb_rootino != NULLFSINO)
-#endif
+#endif /* SIM */
 	{
 		/*
 		 * Get and sanity-check the root inode.
@@ -272,8 +291,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 
 			error = XFS_ERROR(EINVAL);
 			xfs_iunlock(rip, XFS_ILOCK_EXCL);
-			kmem_free(mp->m_perag,
-				  sbp->sb_agcount * sizeof(xfs_perag_t));
 			return (error);
 		}
 		s = VN_LOCK(rvp);
@@ -302,7 +319,7 @@ bad:
 	brelse(bp);
 	freerbuf(bp);
 	return error;
-}
+}	/* xfs_mountfs */
 
 #ifdef SIM
 /*
@@ -348,7 +365,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 
 	return mp;
 }
-#endif
+#endif /* SIM */
 
 /*
  * xfs_unmountfs
@@ -389,16 +406,8 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	}
 
 	nfreerbuf(bp);
-	xfs_ihash_free(mp);
-	kmem_free(mp->m_perag, sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
-
-	freesplock(mp->m_ail_lock);
-	freesplock(mp->m_async_lock);
-	freesema(&mp->m_ilock);
-	freesplock(mp->m_ipinlock);
-	freesplock(mp->m_sb_lock);
-	kmem_free(mp, sizeof(*mp));
-}
+	xfs_mount_free(mp);
+}	/* xfs_unmountfs */
 
 
 #ifdef SIM
@@ -411,7 +420,7 @@ xfs_umount(xfs_mount_t *mp)
 {
 	xfs_unmountfs(mp, 0, NULL);
 }
-#endif
+#endif /* SIM */
 
 
 /*

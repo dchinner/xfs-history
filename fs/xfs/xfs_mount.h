@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.35 $"
 
 struct cred;
 struct xfs_ihash;
@@ -78,7 +78,6 @@ typedef struct xfs_mount {
  
 /*
  * This structure is for use by the xfs_mod_incore_sb_batch() routine.
- *
  */
 typedef struct xfs_mod_sb {
 	uint	msb_field;	/* Field to modify, see below */
@@ -102,6 +101,7 @@ void		xfs_umount(xfs_mount_t *);
 
 void		xfs_mod_sb(xfs_trans_t *, int);
 xfs_mount_t	*xfs_mount_init(void);
+void		xfs_mount_free(xfs_mount_t *mp);
 int		xfs_mountfs(struct vfs *, dev_t);
 int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
