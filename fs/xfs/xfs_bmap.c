@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.44 $"
+#ident	"$Revision: 1.45 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1411,12 +1411,16 @@ xfs_bmap_add_free(
  * Routine to be called at transaction's end by xfs_bmapi, xfs_bunmapi 
  * caller.  Frees all the extents that need freeing, which must be done
  * last due to locking considerations.
+ *
+ * Return 1 if the given transaction was committed and a new one
+ * started, and 0 otherwise.
  */
-void
+int
 xfs_bmap_finish(
 	xfs_trans_t		**tp,		/* transaction pointer addr */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
-	xfs_fsblock_t		firstblock)	/* controlled ag for allocs */
+	xfs_fsblock_t		firstblock,	/* controlled ag for allocs */
+	int			commit_flags)	/* flags to pass to commit */
 {
 	unsigned int		blkres;
 	xfs_efd_log_item_t	*efd;
@@ -1432,7 +1436,7 @@ xfs_bmap_finish(
 	xfs_sb_t		*sbp;
 
 	if (flist->xbf_count == 0)
-		return;
+		return 0;
 	ntp = *tp;
 	mp = ntp->t_mountp;
 	sbp = &mp->m_sb;
@@ -1446,14 +1450,14 @@ xfs_bmap_finish(
 		xfs_bmap_del_free(flist, prev, free);
 	}
 	if (flist->xbf_count == 0)
-		return;
+		return 0;
 	efi = xfs_trans_get_efi(ntp, flist->xbf_count);
 	for (free = flist->xbf_first, i = 0; free; free = free->xbfi_next, i++)
 		xfs_trans_log_efi_extent(ntp, efi + i, free->xbfi_startblock,
 			free->xbfi_blockcount);
 	logres = ntp->t_log_res;
 	blkres = ntp->t_blk_res - ntp->t_blk_res_used;
-	xfs_trans_commit(ntp, 0);
+	xfs_trans_commit(ntp, commit_flags);
 	ntp = xfs_trans_alloc(mp, 0);
 	xfs_trans_reserve(ntp, blkres, logres, 0, 0);
 	efd = xfs_trans_get_efd(ntp, efi, flist->xbf_count);
@@ -1465,6 +1469,7 @@ xfs_bmap_finish(
 	}
 	*tp = ntp;
 	kmem_check();
+	return 1;
 }
 
 /*
