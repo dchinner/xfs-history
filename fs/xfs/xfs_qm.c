@@ -58,9 +58,12 @@ extern mutex_t	qcheck_lock;
  * alot of allocs - on Linux, we need to ensure we don't alloc
  * without bound.
  */
-#define XQM_CHECK_FREE	do { \
-				if (free_shortage()) { xfs_qm_shake((0)); } \
-			} while (0)
+#define XQM_CHECK_FREE							\
+	do {								\
+		if (!start_aggressive_readahead(GFP_HIGHUSER)) {	\
+			xfs_qm_shake((0));				\
+		}							\
+	} while (0)
 
 #ifdef QUOTADEBUG
 #define XQM_LIST_PRINT(l, NXT, title) \
