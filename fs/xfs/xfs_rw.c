@@ -1,4 +1,4 @@
-#ident "$Revision: 1.124 $"
+#ident "$Revision: 1.125 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4034,7 +4034,7 @@ xfs_diostrat( buf_t *bp)
 	xfs_bmap_free_t free_list;
 	caddr_t		base;
 	ssize_t		resid, count, totxfer;
-	off_t		offset, offset_this_req, bytes_this_req;
+	off_t		offset, offset_this_req, bytes_this_req, trail = 0;
 	int		i, j, error, writeflag, reccount;
 	int		end_of_file, bufsissued, totresid, exist;
 	int		ioflag, blk_algn, rt, numrtextents, rtextsize;
@@ -4156,12 +4156,15 @@ xfs_diostrat( buf_t *bp)
  				 * Setup transactions.
  				 */
 				tp = xfs_trans_alloc( mp, XFS_TRANS_DIOSTRAT);
+
+				xfs_iunlock( ip, XFS_ILOCK_EXCL );
 				error = xfs_trans_reserve( tp, 
 					   XFS_BM_MAXLEVELS(mp) + datablocks, 
 					   XFS_WRITE_LOG_RES(mp),
 					   numrtextents,
 					   XFS_TRANS_PERM_LOG_RES,
 					   XFS_WRITE_LOG_COUNT );
+				xfs_ilock( ip, XFS_ILOCK_EXCL );
 
 				if (error) {
 					/*
@@ -4276,9 +4279,11 @@ xfs_diostrat( buf_t *bp)
  				 	 * file, shorten the request size.
 					 */
 					if (ip->i_d.di_size > offset_this_req) {
-						bytes_this_req = 
-							ip->i_d.di_size - 
+						trail = ip->i_d.di_size - 
 							offset_this_req;
+						bytes_this_req = trail;
+						bytes_this_req &= ~BBMASK;
+						bytes_this_req += BBSIZE;
 					} else {
 						bytes_this_req =  0;
 					}
@@ -4353,7 +4358,10 @@ xfs_diostrat( buf_t *bp)
 				/*
 				 * Bump the transfer count.
 				 */
-				totxfer += bytes_this_req;
+				if (trail) 
+					totxfer += trail;
+				else
+					totxfer += bytes_this_req;
 			}
 
 			/*
@@ -4380,7 +4388,16 @@ xfs_diostrat( buf_t *bp)
 
 	     		if (!error && !resid) {
 				resid = nbp->b_resid;
-				totxfer += (nbp->b_bcount - resid);
+
+				/*
+				 * prevent adding up partial xfers
+				 */
+				if (trail && (j == (bufsissued -1 )) ) {
+					if (resid <= (nbp->b_bcount - trail) )
+						totxfer += trail;
+				} else {
+					totxfer += (nbp->b_bcount - resid);
+				}
 			} 
 	    	 	nbp->b_flags = 0;
 	     		nbp->b_un.b_addr = 0;
@@ -4391,7 +4408,12 @@ xfs_diostrat( buf_t *bp)
 
 	/*
  	 * Fill in resid count for original buffer.
+	 * if any of the io's fail, the whole thing fails
 	 */
+	if ( error ) {
+		totxfer = 0;
+	}
+
 	bp->b_resid = totresid - totxfer;
 
 	/*
@@ -4463,6 +4485,15 @@ xfs_diordwr(vnode_t	*vp,
 	    ((((long)(uiop->uio_iov->iov_base)) & BBMASK) ||
 	     (uiop->uio_offset & mp->m_blockmask) ||
 	     (uiop->uio_resid & mp->m_blockmask))) {
+
+		/*
+		 * if the user tries to start reading at the
+		 * end of the file, just return 0.
+		 */
+		if ( (rw & B_READ) &&
+	  	     (uiop->uio_offset == ip->i_d.di_size) ) {
+			return( 0 );
+		}
 #ifndef SIM
 		return XFS_ERROR(EINVAL);
 #endif
