@@ -1,4 +1,4 @@
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -236,7 +236,8 @@ struct xfs_item_ops xfs_efi_item_ops = {
 	(void(*)(xfs_log_item_t*))xfs_efi_item_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_efi_item_committed,
 	(void(*)(xfs_log_item_t*))xfs_efi_item_push,
-	(void(*)(xfs_log_item_t*))xfs_efi_item_abort
+	(void(*)(xfs_log_item_t*))xfs_efi_item_abort,
+	NULL
 };
 
 
