@@ -50,11 +50,25 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 endif
 
 subdir-$(CONFIG_XFS_FS)		+= linux
-#subdir-$(CONFIG_XFS_GRIO)	+= grio		
-subdir-$(CONFIG_XFS_DMAPI)	+= dmapi
+ifeq ($(CONFIG_XFS_DMAPI),y)
+  subdir-$(CONFIG_XFS_FS)	+= dmapi
+endif
+
+# fs/Makefile enters fs/xfs twice if CONFIG_XFS_FS is y, once for kernel and
+# once for modules.  This is necessary because xfsidbg is built as a module even
+# if xfs is in kernel.  Alas the shorthand form
+#   O_TARGET := xfs.o
+#   obj-m := $(O_TARGET)
+# fails when the makefile is run more than once, code gets compiled as both
+# kernel and as module, which one gets linked depends on the phase of the moon.
+# I just love these layer violations where a makefile behaves differently
+# depending on changes to its parent.  Work around by only setting obj-m when
+# xfs is selected as a module.  Keith Owens.
 
 O_TARGET			:= xfs.o
-obj-m				:= $(O_TARGET)
+ifeq ($(CONFIG_XFS_FS),m)
+  obj-m				:= $(O_TARGET)
+endif
 
 # xfsidbg is always a module, but only if kdb is available.
 ifeq ($(CONFIG_KDB),y)
