@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.68 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -82,6 +82,8 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_WRITE_SYNC		17
 #define	XFS_TRANS_WRITEID		18
 #define	XFS_TRANS_ADDAFORK		19
+#define	XFS_TRANS_AINVAL		20
+#define	XFS_ATRUNCATE			21
 
 
 typedef struct xfs_item_ops {
@@ -560,6 +562,16 @@ typedef struct xfs_trans {
 #define	XFS_ADDAFORK_LOG_RES(mp)	((mp)->m_reservations.tr_addafork)
 
 /*
+ * Logging an invalidated buffer when truncating the attribute fork.
+ *	"max bufs" buffer log items
+ */
+#define	XFS_ATRUNC_MAX_BUFS	8     
+#define	XFS_CALC_AINVAL_LOG_RES(mp) \
+     	((XFS_ATRUNC_MAX_BUFS * 128) + 128)
+
+#define	XFS_AINVAL_LOG_RES(mp)	((mp)->m_reservations.tr_ainval)     
+
+/*
  * Various log count values.
  */
 #define	XFS_DEFAULT_LOG_COUNT		1
@@ -573,6 +585,7 @@ typedef struct xfs_trans {
 #define	XFS_RENAME_LOG_COUNT		2
 #define	XFS_WRITE_LOG_COUNT		2     
 #define	XFS_ADDAFORK_LOG_COUNT		2
+#define	XFS_AINVAL_LOG_COUNT		1     
 
 
 /*
