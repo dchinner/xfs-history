@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.198 $"
+#ident	"$Revision: 1.199 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1566,7 +1566,7 @@ xfs_bmap_alloc(
 	 */
 	mp = ap->ip->i_mount;
 	nullfb = ap->firstblock == NULLFSBLOCK;
-	rt = ap->ip->i_d.di_flags & XFS_DIFLAG_REALTIME;
+	rt = (ap->ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && ap->userdata;
 	fb_agno = nullfb ? NULLAGNUMBER : XFS_FSB_TO_AGNO(mp, ap->firstblock);
 	if (rt) {
 		if (!ap->eof || ap->off != 0 || mp->m_sb.sb_rbmblocks == 1)
@@ -1726,7 +1726,6 @@ xfs_bmap_alloc(
 		xfs_extlen_t	ralen;
 		xfs_alloctype_t	type;		/* allocation type flag */
 
-		ASSERT(ap->userdata == 1);
 		type = ap->rval == 0 ?
 			XFS_ALLOCTYPE_ANY_AG : XFS_ALLOCTYPE_NEAR_BNO;
 		if (ap->ip->i_d.di_extsize) {
@@ -4097,6 +4096,7 @@ xfs_bunmapi(
 	xfs_extnum_t		extno;		/* extent number in list */
 	xfs_bmbt_irec_t		got;		/* current extent list entry */
 	xfs_ifork_t		*ifp;		/* inode fork pointer */
+	int			isrt;		/* freeing in rt area */
 	xfs_extnum_t		lastx;		/* last extent index used */
 	int			logflags;	/* transaction logging flags */
 	xfs_mount_t		*mp;		/* mount structure */
@@ -4130,12 +4130,13 @@ xfs_bunmapi(
 		return 0;
 	}
 	XFSSTATS.xs_blk_unmap++;
+	isrt = (whichfork == XFS_DATA_FORK) &&
+	       (ip->i_d.di_flags & XFS_DIFLAG_REALTIME);
 	/*
 	 * Adjust the arguments silently if this is a realtime file,
 	 * so the bno and length are on the right boundary.
 	 */
-	if (whichfork == XFS_DATA_FORK &&
-	    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
+	if (isrt) {
 		xfs_extlen_t	mod;	/* modulus value for rt allocation */
 
 		if (mod = bno % mp->m_sb.sb_rextsize) {
@@ -4211,7 +4212,7 @@ xfs_bunmapi(
 			if (XFS_IS_QUOTA_ON(ip->i_mount)) {
 				ASSERT(ip->i_ino != mp->m_sb.sb_uquotino);
 				ASSERT(ip->i_ino != mp->m_sb.sb_pquotino);
-				if (!(ip->i_d.di_flags & XFS_DIFLAG_REALTIME))
+				if (!isrt)
 					xfs_trans_unreserve_blkquota(NULL, ip, 
 					      (long)del.br_blockcount);
 				else
