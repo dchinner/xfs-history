@@ -54,9 +54,6 @@
 
 #include "page_buf_internal.h"
 
-#define PAGE_CACHE_MASK_LL	(~((long long)(PAGE_CACHE_SIZE-1)))
-#define PAGE_CACHE_ALIGN_LL(addr) \
-			(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK_LL)
 #define MAX_BUF_PER_PAGE 	(PAGE_CACHE_SIZE / 512)
 #define PBF_IO_CHUNKSIZE 	65536
 #define PBF_MAX_MAPS		1 /* TODO: XFS_BMAP_MAX_NMAP? */
@@ -72,9 +69,6 @@ STATIC int  __pb_block_prepare_write_async(
 STATIC int  pagebuf_delalloc_convert(
 		pb_target_t *, struct inode *, struct page *, unsigned long,
 		pagebuf_bmap_fn_t, int);
-STATIC void hook_buffers_to_page(
-		pb_target_t *, struct inode *, struct page *,
-		page_buf_bmap_t *, int);
 
 /*
  * The following structure is used to communicate between various levels
@@ -611,14 +605,14 @@ STATIC void end_pb_buffer_io_sync(struct buffer_head *bh, int uptodate)
 
 
 /*
- * match_offset_to_mapping
+ * __pb_match_offset_to_mapping
  * Finds the corresponding mapping in block @map array of the
  * given @offset within a @page.
  * @index keeps track of where we were in @map after previous
  * calls with earlier @offsets.
  */
-STATIC page_buf_bmap_t *
-match_offset_to_mapping(
+page_buf_bmap_t *
+__pb_match_offset_to_mapping(
 	struct page		*page,
 	page_buf_bmap_t		*map,
 	int			nmaps,
@@ -643,12 +637,13 @@ match_offset_to_mapping(
 	return &map[i];
 }
 
-STATIC void
-map_buffer_at_offset(
+void
+__pb_map_buffer_at_offset(
 	struct pb_target	*target,
 	struct page		*page,
 	struct buffer_head	*bh,
 	unsigned long		offset,
+	int			block_bits,
 	page_buf_bmap_t		*mp)
 {
 	page_buf_daddr_t	bn;
@@ -664,9 +659,9 @@ map_buffer_at_offset(
 	delta <<= PAGE_CACHE_SHIFT;
 	delta -= mp->pbm_offset;
 	delta += offset;
-	delta >>= target->pbr_blocksize_bits;
+	delta >>= block_bits;
 
-	sector_shift = target->pbr_blocksize_bits - 9;
+	sector_shift = block_bits - 9;
 	bn = mp->pbm_bn >> sector_shift;
 	bn += delta;
 	assert((bn << sector_shift) >= mp->pbm_bn);
@@ -715,6 +710,7 @@ pagebuf_read_full_page(
 	struct buffer_head	*bh, *head, *arr[MAX_BUF_PER_PAGE];
 	page_buf_bmap_t		*tmp, *mp = NULL, maps[PBF_MAX_MAPS];
 	int			err, index = 0, nmaps = 0, i = 0, nr = 0;
+	int			bbits = target->pbr_blocksize_bits;
 
 	if (!PageLocked(page))
 		PAGE_BUG(page);
@@ -752,7 +748,7 @@ pagebuf_read_full_page(
 			continue;
 		if (buffer_mapped(bh))
 			continue;
-		offset = i << target->pbr_blocksize_bits;
+		offset = i << bbits;
 		if (!mp) {
 remap:
 			index = 0;
@@ -767,7 +763,8 @@ remap:
 				return err;
 			}
 		}
-		tmp = match_offset_to_mapping(page, mp, nmaps, offset, &index);
+		tmp = __pb_match_offset_to_mapping(page, mp, nmaps,
+							offset, &index);
 		if (!tmp || tmp->pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
 			if (!tmp) {
 				/*
@@ -782,7 +779,7 @@ remap:
 			zero_buffer_at_offset(target, page, bh, offset);
 			continue;
 		}
-		map_buffer_at_offset(target, page, bh, offset, tmp);
+		__pb_map_buffer_at_offset(target, page, bh, offset, bbits, tmp);
 		arr[nr++] = bh;
 	} while (i++, (bh = bh->b_this_page) != head);
 
@@ -871,90 +868,6 @@ out:
 	return ret;
 }
 
-STATIC void
-hook_buffers_to_page_delay(
-	pb_target_t		*target,
-	struct inode		*inode,
-	struct page		*page)
-{
-	struct buffer_head 	*bh;
-
-	if (!page->buffers)
-		create_empty_buffers(page, target->pbr_device, PAGE_CACHE_SIZE);
-	bh = page->buffers;
-	bh->b_state = (1 << BH_Delay) | (1 << BH_Mapped);
-	__mark_buffer_dirty(bh);
-	buffer_insert_inode_data_queue(bh, inode);
-	balance_dirty();
-}
-
-STATIC void
-hook_buffers_to_page(
-	pb_target_t		*target,
-	struct inode		*inode,
-	struct page		*page,
-	page_buf_bmap_t		*mp,
-	int			nmaps)
-{
-	struct buffer_head 	*bh;
-	page_buf_daddr_t	bn;
-	loff_t			delta;
-
-	if (!page->buffers)
-		create_empty_buffers(page, target->pbr_device, PAGE_CACHE_SIZE);
-	/*
-	 * pbm_offset:pbm_bn :: (page's offset):???
-	 * 
-	 * delta = offset of _this_ page in extent.
-	 * pbm_offset = offset in file corresponding to pbm_bn.
-	 */
-
-	if (mp->pbm_bn >= 0) {
-		delta = page->index;	    /* do computations in 64 bit  */
-		delta <<= PAGE_CACHE_SHIFT; /* delta is offset from 0 of page */
-		delta -= mp->pbm_offset;    /* delta is offset in extent */
-		bn = mp->pbm_bn >>
-			(PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
-		bn += (delta >> PAGE_CACHE_SHIFT);
-		bh = page->buffers;
-		lock_buffer(bh);
-		bh->b_blocknr = bn; 
-		bh->b_dev = target->pbr_device;
-		set_bit(BH_Mapped, &bh->b_state);
-		clear_bit(BH_Delay, &bh->b_state);
-		unlock_buffer(bh);
-	}
-}
-
-STATIC void
-set_buffer_dirty_uptodate(
-	struct inode *inode,
-	struct buffer_head *bh,
-	int partial)
-{
-	int need_balance_dirty = 0;
-
-#ifdef PAGEBUF_DEBUG
-	/* negative blocknr is always bad; 
-	 */
-	if (bh->b_blocknr < 0) {
-		printk("Warning: buffer 0x%p with weird blockno (%ld)\n",
-			bh, bh->b_blocknr);
-	}
-#endif /* PAGEBUF_DEBUG */
-	set_bit(BH_Uptodate, &bh->b_state);
-	if (!buffer_dirty(bh)) {
-		need_balance_dirty = 1;
-	}
-	__mark_buffer_dirty(bh);
-
-	if (need_balance_dirty) {
-		buffer_insert_inode_data_queue(bh, inode);
-		if (!partial)
-			balance_dirty();
-	}
-}
-
 STATIC int
 __pb_block_prepare_write_async(
 	pb_target_t		*target,
@@ -968,80 +881,90 @@ __pb_block_prepare_write_async(
 	int			nmaps,
 	int			flags)
 {
-	struct buffer_head	*bh;
-	int 			err = 0;
-	int			dp = PageDelalloc(page);
+	struct buffer_head	*bh, *head, *arr[MAX_BUF_PER_PAGE];
+	unsigned long		offset;
+	int			index = 0, i = 0, nr = 0, err = 0;
+	int			bbits = target->pbr_blocksize_bits;
 	char			*kaddr = kmap(page);
-	page_buf_bmap_t		maps[PBF_MAX_MAPS];
+	page_buf_bmap_t		*tmp, maps[PBF_MAX_MAPS];
 
-	/*
-	 * Create & map buffer.
-	 *
-	 * If we are not already mapped via buffers to a disk address,
-	 * or the page is not already marked delalloc, then we need to
-	 * go get some space.
-	 */
-	bh = page->buffers;
-	if (!bh || !buffer_mapped(bh)) {
+	if (!page->buffers)
+		create_empty_buffers(page, target->pbr_device,
+					   target->pbr_blocksize);
+
+	bh = head = page->buffers;
+	do {
+		if (buffer_mapped(bh))
+			continue;
+		offset = i << bbits;
 		if (!mp) {
+remap:
+			index = 0;
 			mp = maps;
 			err = bmap(inode,
-				((loff_t)page->index << PAGE_CACHE_SHIFT),
-				PAGE_CACHE_SIZE, mp, PBF_MAX_MAPS, &nmaps,
-				flags);
-			if (err < 0) {
-				goto out;
-			}
+				((loff_t)page->index << PAGE_CACHE_SHIFT) +
+					offset,
+				PAGE_CACHE_SIZE - offset,
+				maps, PBF_MAX_MAPS, &nmaps, flags);
+			if (err < 0)
+				return err;
 		}
-		hook_buffers_to_page(target, inode, page, mp, nmaps);
-		bh = page->buffers;
-	}
+		tmp = __pb_match_offset_to_mapping(page, mp, nmaps,
+							offset, &index);
+		if (!tmp || tmp->pbm_flags & (PBMF_HOLE|PBMF_DELAY)) {
+			if (!tmp) {
+				/*
+				 * No mapping for this offset.  2 cases:
+				 * - last mapping was at eof (zero to end)
+				 * - we need more mappings (try, try again)
+				 */
+				if (!(mp[nmaps - 1].pbm_flags & PBMF_EOF)) {
+					goto remap;
+				}
+			}
+			zero_buffer_at_offset(target, page, bh, offset);
+			continue;
+		}
+		__pb_map_buffer_at_offset(target, page, bh, offset, bbits, tmp);
+		arr[nr++] = bh;
+	} while (i++, (bh = bh->b_this_page) != head);
 
 	/* Is the write over the entire page?  */
 	if (from == 0 && to == PAGE_CACHE_SIZE)
-		goto out;
+		return 0;
 
 	/*  Partial write. Is the page valid anyway?  */
-	if (Page_Uptodate(page) || dp)
-		goto out;
+	if (Page_Uptodate(page) || nr == 0)
+		return 0;
 
 	/*
 	 * If writing at eof and the i_size at beginning of page
 	 * then we can zero the page (or parts of it).
 	 */
-	if ((at_eof && (!bh || buffer_delay(bh) ||
-		(inode->i_size & ~PAGE_CACHE_MASK_LL) == 0)) ||
-		(mp && (mp->pbm_flags & (PBMF_DELAY|PBMF_UNWRITTEN)))) {
-
-		/*
-		 * Zero the parts of page not covered by this I/O
-		 */
-		if (PAGE_CACHE_SIZE > to) {
+	if (at_eof && ((inode->i_size & ~PAGE_CACHE_MASK_LL) == 0)) {
+		if (PAGE_CACHE_SIZE > to)
 			memset(kaddr+to, 0, PAGE_CACHE_SIZE-to);
-		}
-		if (0 < from) {
+		if (0 < from)
 			memset(kaddr, 0, from);
-		}
 		if ((0 < from) || (PAGE_CACHE_SIZE > to))
 			flush_dcache_page(page);
-		goto out;
+		return 0;
 	}
-	/*
-	 * Ensure only one block allocated.
-	 */
-	if (bh != bh->b_this_page) {
-		printk("bh 0x%p != bh->b_this_page 0x%p\n",bh,bh->b_this_page);
-		err = -EIO;
-		goto out;
-	}
-	lock_buffer(bh);
-	bh->b_end_io = end_pb_buffer_io_sync;
 
-	submit_bh(READ,bh);
-	wait_on_buffer(bh);
-	if (!buffer_uptodate(bh))
-		err = -EIO;
-out:
+	for (i = 0; i < nr; i++) {
+		lock_buffer(arr[i]);
+		arr[i]->b_end_io = end_pb_buffer_io_sync;
+	}
+
+	for (i = 0; i < nr; i++)
+		submit_bh(READ, arr[i]);
+
+	for (i = 0; i < nr; i++) {
+		wait_on_buffer(arr[i]);
+		if (!buffer_uptodate(arr[i]))
+			err = -EIO;
+	}
+
 	return err;
 }
 
@@ -1075,18 +998,51 @@ __pb_block_commit_write_async(
 	struct page 		*page,
 	int			partial)
 {
-	struct buffer_head	*bh;
+	struct buffer_head	*bh, *head;
+	int			nr = 0;
 
 	/*
 	 * Prepare write took care of reading/zero-out
 	 * parts of page not covered by from/to. Page is now fully valid.
 	 */
 	SetPageUptodate(page);
-	if ((bh = page->buffers) && buffer_mapped(bh)) {
-		set_buffer_dirty_uptodate(inode, page->buffers, partial);
-	} else {
-		hook_buffers_to_page_delay(target, inode, page);
-	}
+	if (!page->buffers)
+		create_empty_buffers(page, target->pbr_device,
+					   target->pbr_blocksize);
+	bh = head = page->buffers;
+	do {
+		if (buffer_mapped(bh)) {
+			int need_balance_dirty = 0;
+
+#ifdef PAGEBUF_DEBUG
+			/* negative blocknr is always bad; */
+			if (bh->b_blocknr < 0) {
+				printk(
+			"Warning: buffer 0x%p with weird blockno (%ld)\n",
+					bh, bh->b_blocknr);
+			}
+#endif /* PAGEBUF_DEBUG */
+			set_bit(BH_Uptodate, &bh->b_state);
+			if (!buffer_dirty(bh))
+				need_balance_dirty++;
+			__mark_buffer_dirty(bh);
+
+			if (need_balance_dirty) {
+				buffer_insert_inode_data_queue(bh, inode);
+				if (!partial)
+					nr++;
+			}
+		}
+		else {
+			nr++;
+			bh->b_state = (1 << BH_Delay) | (1 << BH_Mapped);
+			__mark_buffer_dirty(bh);
+			buffer_insert_inode_data_queue(bh, inode);
+		}
+	} while ((bh = bh->b_this_page) != head);
+
+	if (nr)
+		balance_dirty();
 }
 
 STATIC int
@@ -1145,20 +1101,13 @@ __pagebuf_do_delwri(
 		err = __pb_block_prepare_write_async(target, inode, page,
 			offset, offset + bytes,
 			at_eof, NULL, mp, nmaps, PBF_WRITE);
-		if (err) {
-			ClearPageUptodate(page);
-			kunmap(page);
+		if (err)
 			goto unlock;
-		}
 		kaddr = page_address(page);
 
 		err = __copy_from_user(kaddr + offset, buf, bytes);
-		if (err) {
-			err = -EFAULT;
-			kunmap(page);
-			ClearPageUptodate(page);
+		if (err)
 			goto unlock;
-		}
 
 		pagebuf_commit_write(target, page, offset, offset + bytes);
 
@@ -1389,21 +1338,14 @@ pagebuf_generic_file_write(
 			offset, offset + bytes, at_eof, bmap,
 			NULL, 0, pb_flags);
 			
-		if (status) {
-			ClearPageUptodate(page);
-			kunmap(page);
+		if (status)
 			goto unlock;
-		}
 
 		kaddr = page_address(page);
 		status = __copy_from_user(kaddr+offset, buf, bytes);
 
-		if (status) {
-			status = -EFAULT;
-			kunmap(page);
-			ClearPageUptodate(page);
+		if (status)
 			goto unlock;
-		}
 
 		pagebuf_commit_write(target, page, offset, offset + bytes);
 
@@ -1455,30 +1397,111 @@ probe_page(struct inode *inode, unsigned long index)
 static void
 submit_page_io(struct page *page)
 {
-	struct buffer_head *head, *bh;
+	struct buffer_head	*bh, *head, *arr[MAX_BUF_PER_PAGE];
+	int			i, nr = 0;
 
-	head = bh = page->buffers;
+	bh = head = page->buffers;
 	do {
+		if (buffer_uptodate(bh))
+			continue;
+		assert(buffer_mapped(bh));
+		assert(!buffer_delay(bh));
+		arr[nr++] = bh;
+	} while ((bh = bh->b_this_page) != head);
+
+	if (!nr) {
+		SetPageUptodate(page);
+		UnlockPage(page);
+		return;
+	}
+
+	for (i = 0; i < nr; i++) {
+		bh = arr[i];
 		lock_buffer(bh);
 		set_buffer_async_io(bh);
 		set_bit(BH_Uptodate, &bh->b_state);
 		clear_bit(BH_Dirty, &bh->b_state);
-		bh = bh->b_this_page;
-	} while (bh != head);
+	}
 
-	do {
-		struct buffer_head *next = bh->b_this_page;
-		submit_bh(WRITE, bh);
-		bh = next;
-	} while (bh != head);
+	for (i = 0; i < nr; i++)
+		submit_bh(WRITE, arr[i]);
 
 	SetPageUptodate(page);
+}
+
+
+STATIC int
+map_page(
+	struct pb_target	*target,
+	struct inode		*inode,
+	struct page		*page,
+	page_buf_bmap_t		*maps,	/* mappings, may start as NULL */
+	int			*nmaps,	/* number of mappings [in/out] */
+	pagebuf_bmap_fn_t	bmap,	/* bmap function */
+	int			flags)	/* allocation mode to use */
+{
+	struct buffer_head 	*bh, *head;
+	page_buf_bmap_t		*mp = maps, *tmp;
+	unsigned long		offset;
+	int			index = 0, i = 0, nr;
+	int			bbits = target->pbr_blocksize_bits;
+
+	if (!page->buffers)
+		create_empty_buffers(page, target->pbr_device,
+					   target->pbr_blocksize);
+	bh = head = page->buffers;
+	do {
+		offset = i << bbits;
+		if (!mp) {
+remap:
+			index = 0;
+			mp = maps;
+			assert(bmap);
+			nr = bmap(inode,
+				((loff_t)page->index << PAGE_CACHE_SHIFT) +
+					offset,
+				PAGE_CACHE_SIZE - offset,
+				maps, PBF_MAX_MAPS, nmaps, flags);
+			if (nr)
+				return nr;
+#if 1	/* PAGEBUF_DEBUG? */
+			for (nr = 0; nr < *nmaps; nr++) {
+				if ((mp[nr].pbm_flags & PBMF_HOLE)) {
+					printk(
+				"map_page_buffers: writing delalloc page 0x%p "
+				"with no extent index 0x%lx, map[%d]=0x%p\n",
+						page, page->index, nr, &mp[nr]);
+					BUG();
+				}
+			}
+#endif
+		}
+		tmp = __pb_match_offset_to_mapping(page, mp, *nmaps,
+							offset, &index);
+		if (!tmp) {
+			/*
+			 * No mapping for this offset.  2 cases:
+			 * - last mapping was at eof (zero to end)
+			 * - we need more mappings (try, try again)
+			 */
+			if (!(mp[*nmaps - 1].pbm_flags & PBMF_EOF)) {
+				goto remap;
+			}
+			zero_buffer_at_offset(target, page, bh, offset);
+			continue;
+		}
+		assert(!(tmp->pbm_flags & PBMF_HOLE));
+		assert(!(tmp->pbm_flags & PBMF_DELAY));
+		__pb_map_buffer_at_offset(target, page, bh, offset, bbits, tmp);
+	} while (i++, (bh = bh->b_this_page) != head);
+
+	return 0;
 }
 
 /*
  * Allocate & map buffers for page given the extent map. Write it out.
  * except for the original page of a writepage, this is called on
- * delalloc pages only, for the original page it is possible that 
+ * delalloc pages only, for the original page it is possible that
  * the page has no mapping at all.
  */
 STATIC void
@@ -1486,18 +1509,13 @@ convert_page(
 	pb_target_t		*target,
 	struct inode		*inode,
 	struct page		*page,
-	page_buf_bmap_t		*mp,
-	int			nmaps,
+	page_buf_bmap_t		*maps,
+	int			*nmaps,
+	unsigned long		flags,	/* allocation mode to use */
+	pagebuf_bmap_fn_t	bmap,	/* bmap function */
 	int			async_write)
 {
-	struct buffer_head *bh = page->buffers;
-
-	/* Three possible conditions - page with delayed buffers,
-	 * page with real buffers, or page with no buffers (mmap)
-	 */
-	if (!bh || PageDelalloc(page) || !buffer_mapped(bh)) {
-		hook_buffers_to_page(target, inode, page, mp, nmaps);
-	}
+	map_page(target, inode, page, maps, nmaps, bmap, flags);
 
 	if (async_write) {
 		submit_page_io(page);
@@ -1505,7 +1523,6 @@ convert_page(
 
 	page_cache_release(page);
 }
-
 
 /*
  * Convert & write out a cluster of pages in the same extent as defined
@@ -1518,6 +1535,8 @@ cluster_write(
 	struct page		*startpage,
 	page_buf_bmap_t		*mp,
 	int			nmaps,
+	unsigned long		flags,	/* allocation mode to use */
+	pagebuf_bmap_fn_t	bmap,	/* bmap function */
 	int			async_write)
 {
 	unsigned long		tindex, tlast;
@@ -1527,20 +1546,32 @@ cluster_write(
 
 	if (startpage->index != 0) {
 		tlast = mp[0].pbm_offset >> PAGE_CACHE_SHIFT;
+		/*
+		 * NB: This mapping is guaranteed to cover full pages
+		 * by the above calculation and because its actually a
+		 * mapping for "startpage" not "page".  Hence bmap can
+		 * be passed in as NULL below, ensuring this is true.
+		 */
 		for (tindex = startpage->index-1; tindex >= tlast; tindex--) {
 			if (!(page = probe_page(inode, tindex)))
 				break;
-			convert_page(target, inode, page, mp, nmaps, 1);
+			convert_page(target, inode, page,
+						mp, &nmaps, flags, NULL, 1);
 		}
 	}
-	convert_page(target, inode, startpage, mp, nmaps, async_write);
+
+	convert_page(target, inode, startpage,
+				mp, &nmaps, flags, bmap, async_write);
+
 	for (i = 0; i < nmaps; i++)
 		sz += mp[i].pbm_bsize;
-	tlast = PAGE_CACHE_ALIGN_LL(mp[0].pbm_offset + sz) >> PAGE_CACHE_SHIFT;
+	tlast = PAGE_CACHE_ALIGN_LL(mp[0].pbm_offset + sz);
+	tlast >>= PAGE_CACHE_SHIFT;
 	for (tindex = startpage->index + 1; tindex < tlast; tindex++) {
 		if (!(page = probe_page(inode, tindex)))
 			break;
-		convert_page(target, inode, page, mp, nmaps, 1);
+		convert_page(target, inode, page,
+					mp, &nmaps, flags, NULL, 1);
 	}
 	return 0;
 }
@@ -1554,38 +1585,39 @@ pagebuf_delalloc_convert(
 	pagebuf_bmap_fn_t	bmap,	/* bmap function */
 	int			async_write)
 {
+	struct buffer_head 	*bh, *head;
 	page_buf_bmap_t		maps[PBF_MAX_MAPS];
-	int			maps_returned, error;
-	loff_t			rounded_offset;
+	int			nmaps, nr = 0;
 
-	/* Fast path for mapped page */
-	if (page->buffers && !buffer_delay(page->buffers) &&
-	    buffer_mapped(page->buffers)) {
-		if (async_write) {
-			submit_page_io(page);
-		}
-		return 0;
-	}
+	/* Fast path for completely mapped page */
+	if ((bh = head = page->buffers) != NULL) {
+		do {
+			if (!buffer_delay(bh) && buffer_mapped(bh))
+				continue;
+			nr++;
+		} while ((bh = bh->b_this_page) != head && !nr);
 
-	rounded_offset = ((loff_t)page->index) << PAGE_CACHE_SHIFT;
-	error = bmap(inode, rounded_offset, PAGE_CACHE_SIZE,
-			maps, PBF_MAX_MAPS, &maps_returned, flags);
-	if (error)
-		return error;
-
-	if (maps[0].pbm_delta & ~PAGE_CACHE_MASK) {
-		printk("pagebuf_delalloc_convert: pbm_delta not page-aligned; "
-			"map=0x%p\n", maps);
-		BUG();
-	}
-	for (error = 0; error < maps_returned; error++) {
-		if ((maps[error].pbm_flags & PBMF_HOLE)) {
-			printk("pagebuf_delalloc_convert: delalloc page 0x%p "
-				"with no extent index 0x%lx, map[%d]=0x%p\n",
-				page, page->index, error, &maps[error]);
-			BUG();
+		if (!nr) {
+			if (async_write)
+				submit_page_io(page);
+			return 0;
 		}
 	}
+
+	/*
+	 * Get an initial mapping - the extent(s) returned are
+	 * only guaranteed to cover the first block, but may
+	 * also cover multiple pages surrounding this page (we
+	 * want to write 'em all if they're delalloc) and also
+	 * may end in the middle of the page (for block sizes
+	 * less than the page size).  In that situation, we'll
+	 * need to go back and get subsequent mappings later.
+	 */
+	nr = bmap(inode,
+		((loff_t)page->index << PAGE_CACHE_SHIFT),
+		PAGE_CACHE_SIZE, maps, PBF_MAX_MAPS, &nmaps, flags);
+	if (nr)
+		return nr;
 
 	/*
 	 * page needs to be setup as though find_page(...) returned it,
@@ -1593,5 +1625,5 @@ pagebuf_delalloc_convert(
 	 */
 	page_cache_get(page);
 	return cluster_write(target, inode, page,
-				maps, maps_returned, async_write);
+				maps, nmaps, flags, bmap, async_write);
 }

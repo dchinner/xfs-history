@@ -43,6 +43,10 @@
 #define PB_DEFINE_TRACES
 #include "page_buf_trace.h"
 
+#define PAGE_CACHE_OFF_LL	((long long)(PAGE_CACHE_SIZE-1))
+#define PAGE_CACHE_MASK_LL	(~((long long)(PAGE_CACHE_SIZE-1)))
+#define PAGE_CACHE_ALIGN_LL(addr) \
+				(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK_LL)
 
 typedef struct page_buf_private_s {
 	page_buf_t		pb_common;	/* public part of structure */
@@ -98,7 +102,7 @@ typedef struct pagebuf_daemon {
 	struct list_head	pb_delwrite_l;
 	int			pb_delwri_cnt;
 } pagebuf_daemon_t;
-	
+
 #define NBITS   5
 #define NHASH   (1<<NBITS)
 
@@ -183,6 +187,14 @@ extern int _pagebuf_initialize(
 		loff_t,
 		size_t,
 		page_buf_flags_t);
+
+extern page_buf_bmap_t *
+__pb_match_offset_to_mapping(
+		struct page *, page_buf_bmap_t *, int, unsigned long, int *);
+extern void
+__pb_map_buffer_at_offset(
+		pb_target_t *, struct page *, struct buffer_head *,
+		unsigned long, int, page_buf_bmap_t *);
 
 extern int pagebuf_locking_init(void);
 extern void pagebuf_locking_terminate(void);
