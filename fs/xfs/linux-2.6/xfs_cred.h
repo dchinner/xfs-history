@@ -32,6 +32,8 @@
 #ifndef __XFS_CRED_H__
 #define __XFS_CRED_H__
 
+#include <xfs_cap.h>
+#include <xfs_mac.h>
 #include <asm/param.h>		/* For NGROUPS */
 #include <linux/capability.h>
 #include <linux/sched.h>
