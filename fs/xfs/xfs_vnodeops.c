@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.410 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -70,7 +70,9 @@
 #include <sys/dirent.h>
 #include <sys/attributes.h>
 #include <sys/major.h>
+#ifndef __linux__
 #include <sys/ddi.h>
+#endif
 #include <ksys/fdt.h>
 #include <ksys/fsc_notify.h>
 #include <ksys/cell_config.h>
@@ -5839,11 +5841,12 @@ xfs_fcntl(
 		 * it is set to the file system block size to
 		 * avoid having to do block zeroing on short writes.
 		 */
-#if 0
+#ifndef __linux__
 		da.d_maxiosz = XFS_FSB_TO_B(mp,
 				    XFS_B_TO_FSBT(mp, ctob(v.v_maxdmasz - 1)));
-#endif
+#else
 		printk("xfs_vnodeops.c Fix Me Fix Me\n");
+#endif
 
 		if (copyout(&da, arg, sizeof(da))) {
 			error = XFS_ERROR(EFAULT);
