@@ -96,7 +96,7 @@ typedef struct xfs_sb
 #define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
 #define	XFS_SB_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_SB_DADDR)
 
-#define	XFS_HDR_BLOCK(mp,d)	((xfs_agblock_t)(XFS_DTOBT(mp,d)))
+#define	XFS_HDR_BLOCK(mp,d)	((xfs_agblock_t)(XFS_BB_TO_FSBT(mp,d)))
 #define	XFS_DADDR_TO_FSB(mp,d) \
 	XFS_AGB_TO_FSB(mp, XFS_DADDR_TO_AGNO(mp,d), XFS_DADDR_TO_AGBNO(mp,d))
 #define	XFS_FSB_TO_DADDR(mp,fsbno) \
@@ -121,9 +121,6 @@ typedef struct xfs_sb
 #define	XFS_B_TO_FSBT(mp,b)	((b) >> (mp)->m_sb.sb_blocklog)
 #define	XFS_B_FSB_OFFSET(mp,b)	((b) & (mp)->m_blockmask)     
      
-#define	XFS_BTOD(mp,l)	((daddr_t)((l) << (mp)->m_blkbb_log))
-#define	XFS_DTOBT(mp,l)	((l) >> (mp)->m_blkbb_log)
-
 #define	XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)(bp)->b_un.b_addr)
 
 #endif	/* !_FS_XFS_SB_H */
