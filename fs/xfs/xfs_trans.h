@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.85 $"
+#ident "$Revision: 1.86 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -94,12 +94,19 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_ATTR_FLAG		24
 #define	XFS_TRANS_CLEAR_AGI_BUCKET	25
 #define XFS_TRANS_QM_SBCHANGE		26
+/*
+ * Dummy entries since we use the transaction type to index into the
+ * trans_type[] in xlog_recover_print_trans_head()
+ */
+#define XFS_TRANS_DUMMY1		27
+#define XFS_TRANS_DUMMY2		28
 #define XFS_TRANS_QM_QUOTAOFF		29
 #define XFS_TRANS_QM_DQALLOC		30
 #define XFS_TRANS_QM_SETQLIM		31
 #define XFS_TRANS_QM_DQCLUSTER		32
 #define XFS_TRANS_QM_QINOCREATE		33
 #define XFS_TRANS_QM_QUOTAOFF_END	34
+#define XFS_TRANS_SB_UNIT		35
 
 typedef struct xfs_item_ops {
 	uint (*iop_size)(xfs_log_item_t *);
