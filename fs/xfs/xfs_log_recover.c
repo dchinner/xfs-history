@@ -452,6 +452,7 @@ xlog_find_tail(xlog_t  *log,
 		if (op_head->oh_flags & XLOG_UNMOUNT_TRANS) {
 			log->l_tail_lsn =
 			     ((long long)log->l_curr_cycle<< 32)|((uint)(i+2));
+			*tail_blk = i+2;
 		}
 	}
 exit:
