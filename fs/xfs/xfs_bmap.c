@@ -1551,12 +1551,13 @@ xfs_bmap_alloc(
 	int		nullfb;		/* true if ap->firstblock isn't set */
 	/* REFERENCED */
 	xfs_extlen_t	prod;		/* product factor for allocators */
-	xfs_extlen_t	rotor;		/* rt rotor value */
 	int		rt;		/* true if inode is realtime */
+	/* REFERENCED */
+	xfs_rtblock_t	rtx;		/* realtime extent number */
 
 #define	ISLEGAL(x,y)	\
 	(rt ? \
-		(x) < mp->m_sb.sb_rextents : \
+		(x) < mp->m_sb.sb_rblocks : \
 		XFS_FSB_TO_AGNO(mp, x) == XFS_FSB_TO_AGNO(mp, y) && \
 		XFS_FSB_TO_AGNO(mp, x) < mp->m_sb.sb_agcount && \
 		XFS_FSB_TO_AGBNO(mp, x) < mp->m_sb.sb_agblocks)
@@ -1568,19 +1569,17 @@ xfs_bmap_alloc(
 	nullfb = ap->firstblock == NULLFSBLOCK;
 	rt = (ap->ip->i_d.di_flags & XFS_DIFLAG_REALTIME) && ap->userdata;
 	fb_agno = nullfb ? NULLAGNUMBER : XFS_FSB_TO_AGNO(mp, ap->firstblock);
-	if (rt) {
-		if (!ap->eof || ap->off != 0 || mp->m_sb.sb_rbmblocks == 1)
-			ap->rval = 0;
-		else {
-			rotor = mp->m_rbmrotor;
-			ap->rval = XFS_BLOCKTOBIT(mp, rotor) *
-				   mp->m_sb.sb_rextsize;
-			ASSERT(ap->rval < mp->m_sb.sb_rblocks);
-			if (++rotor == mp->m_sb.sb_rbmblocks)
-				rotor = 0;
-			mp->m_rbmrotor = rotor;
-		}
-	} else if (nullfb)
+#ifndef SIM
+	if (rt && ap->eof && ap->off == 0) {
+		error = xfs_rtpick_extent(mp, ap->tp, &rtx);
+		if (error)
+			return error;
+		ap->rval = rtx * mp->m_sb.sb_rextsize;
+	} else
+#endif	/* !SIM */
+	if (rt)
+		ap->rval = 0;
+	else if (nullfb)
 		ap->rval = XFS_INO_TO_FSB(mp, ap->ip->i_ino);
 	else
 		ap->rval = ap->firstblock;
