@@ -50,7 +50,7 @@
 
 static void validate_fields(struct inode *ip)
 {
-	vnode_t	*vp = LINVFS_GET_VN_ADDRESS(ip);
+	vnode_t	*vp = LINVFS_GET_VP(ip);
 	vattr_t va;
 	int	error;
 
@@ -76,7 +76,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	xfs_acl_t	pdacl; /* parent default ACL */
 	int		have_default_acl;
 
-	dvp = LINVFS_GET_VN_ADDRESS(dir);
+	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
 
 	bzero(&va, sizeof(va));
@@ -159,7 +159,7 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
 
-	vp = LINVFS_GET_VN_ADDRESS(dir);
+	vp = LINVFS_GET_VP(dir);
 
 	/*
 	 * Initialize a pathname_t to pass down.
@@ -199,9 +199,9 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 	if (S_ISDIR(ip->i_mode))
 		return -EPERM;
 
-	tdvp = LINVFS_GET_VN_ADDRESS(dir);
+	tdvp = LINVFS_GET_VP(dir);
 
-	vp = LINVFS_GET_VN_ADDRESS(ip);
+	vp = LINVFS_GET_VP(ip);
 
 	error = 0;
 	VOP_LINK(tdvp, vp, (char *)dentry->d_name.name, NULL, error);
@@ -226,7 +226,7 @@ int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 
 	inode = dentry->d_inode;
 
-	dvp = LINVFS_GET_VN_ADDRESS(dir);
+	dvp = LINVFS_GET_VP(dir);
 
 	VOP_REMOVE(dvp, (char *)dentry->d_name.name, NULL, error);
 
@@ -253,7 +253,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 	vattr_t		va;
 	struct inode	*ip = NULL;
 
-	dvp = LINVFS_GET_VN_ADDRESS(dir);
+	dvp = LINVFS_GET_VP(dir);
 
 	bzero(&va, sizeof(va));
 	va.va_type = VLNK;
@@ -297,7 +297,7 @@ int linvfs_rmdir(struct inode *dir, struct dentry *dentry)
 			*pwd_vp;	/* current working directory, vnode */
 	struct inode *inode = dentry->d_inode;
 
-	dvp = LINVFS_GET_VN_ADDRESS(dir);
+	dvp = LINVFS_GET_VP(dir);
 
 	pwd_vp = NULL;			/* Used for an unnecessary test */
 
@@ -359,9 +359,9 @@ int linvfs_rename(struct inode *odir, struct dentry *odentry,
 	pnp->pn_hash = ndentry->d_name.hash;
 	pnp->pn_path = (char *)ndentry->d_name.name;
 
-	fvp = LINVFS_GET_VN_ADDRESS(odir);
+	fvp = LINVFS_GET_VP(odir);
 
-	tvp = LINVFS_GET_VN_ADDRESS(ndir);
+	tvp = LINVFS_GET_VP(ndir);
 
 	new_inode = ndentry->d_inode;
 
@@ -394,7 +394,7 @@ int linvfs_readlink(struct dentry *dentry, char *buf, int size)
 	iovec_t	iov;
 	int	error = 0;
 
-	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
+	vp = LINVFS_GET_VP(dentry->d_inode);
 
 	iov.iov_base = buf;
 	iov.iov_len = size;
@@ -439,7 +439,7 @@ int linvfs_follow_link(struct dentry *dentry,
 		return -ENOMEM;
 	}
 
-	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
+	vp = LINVFS_GET_VP(dentry->d_inode);
 
 	iov.iov_base = link;
 	iov.iov_len = MAXNAMELEN;
@@ -496,7 +496,7 @@ int linvfs_attrctl(
 		if ((ops[i].flags & ATTR_ROOT) && ! capable(CAP_SYS_ADMIN))
 			return -EPERM;
 
-		vp = LINVFS_GET_VN_ADDRESS(inode);
+		vp = LINVFS_GET_VP(inode);
 
 		switch (ops[i].opcode) {
 		case ATTR_OP_GET:
@@ -560,7 +560,7 @@ int linvfs_acl_get(
 	int	error = 0;
 	vnode_t	*vp;
 
-	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
+	vp = LINVFS_GET_VP(dentry->d_inode);
 
 	VOP_ACL_GET(vp, (xfs_acl_t *)acl, (xfs_acl_t *)dacl, error);
 	return -error;
@@ -575,7 +575,7 @@ int linvfs_acl_set(
 	int	error = 0;
 	vnode_t	*vp;
 
-	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
+	vp = LINVFS_GET_VP(dentry->d_inode);
 
 	VOP_ACL_SET(vp, (xfs_acl_t *)acl, (xfs_acl_t *)dacl, error);
 	VMODIFY(vp);
@@ -590,7 +590,7 @@ int linvfs_permission(struct inode *ip, int mode)
 	int	error;
 
 	mode <<= 6;		/* convert from linux to vnode access bits */
-	vp = LINVFS_GET_VN_ADDRESS(ip);
+	vp = LINVFS_GET_VP(ip);
 	VOP_ACCESS(vp, mode, NULL, error);
 	return -error;
 }
@@ -626,7 +626,7 @@ linvfs_notify_change(
 	struct dentry	*dentry,
 	struct iattr	*attr)
 {
-	vnode_t		*vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
+	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);
 	vattr_t		vattr;
 
 	unsigned int	ia_valid = attr->ia_valid;
@@ -694,7 +694,7 @@ linvfs_pb_bmap(struct inode *inode,
 	vnode_t		*vp;
 	int		error;
 
-	vp = LINVFS_GET_VN_ADDRESS(inode);
+	vp = LINVFS_GET_VP(inode);
 
 	*retpbbm = maxpbbm;
 
@@ -715,7 +715,7 @@ STATIC
 int linvfs_bmap(struct address_space *mapping, long block)
 {
 	struct inode        *inode          = (struct inode *)mapping->host;
-	vnode_t             *vp             = LINVFS_GET_VN_ADDRESS(inode);
+	vnode_t             *vp             = LINVFS_GET_VP(inode);
         pb_bmap_t           bmap            = {0};
         int                 nbm             = 1;
 	int                 error;

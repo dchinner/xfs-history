@@ -751,7 +751,6 @@ typedef struct vattr {
 extern void	vn_init(void);
 extern void	vn_free(struct vnode *);
 extern int	vn_wait(struct vnode *);
-extern vnode_t  *vn_address(struct inode *);
 extern vnode_t  *vn_initialize(struct vfs *, struct inode *, int);
 
 /*

@@ -93,7 +93,6 @@ static struct super_operations linvfs_sops;
 #define MNTOPT_BIOSIZE  "biosize"       /* log2 of preferred buffered io size */
 #define MNTOPT_WSYNC    "wsync"         /* safe-mode nfs compatible mount */
 #define MNTOPT_NOATIME  "noatime"       /* don't modify access times on reads */
-#define MNTOPT_INO64    "ino64"         /* force inodes into 64-bit range */
 #define MNTOPT_NOALIGN  "noalign"       /* turn off stripe alignment */
 #define MNTOPT_SUNIT    "sunit"         /* data volume stripe unit */
 #define MNTOPT_SWIDTH   "swidth"        /* data volume stripe width */
@@ -197,13 +196,6 @@ xfs_parseargs(
 			args->flags |= XFSMNT_OSYNCISDSYNC;
 		} else if (!strcmp(this_char, MNTOPT_NORECOVERY)) {
 			args->flags |= XFSMNT_NORECOVERY;
-		} else if (!strcmp(this_char, MNTOPT_INO64)) {
-#ifdef XFS_BIG_FILESYSTEMS
-			args->flags |= XFSMNT_INO64;
-#else
-			printk("XFS: ino64 option not allowed on this system\n");
-			return rval;
-#endif
 		} else if (!strcmp(this_char, MNTOPT_UQUOTA)) {
 			args->flags |= XFSMNT_UQUOTA | XFSMNT_UQUOTAENF;
 		} else if (!strcmp(this_char, MNTOPT_QUOTA)) {
@@ -416,7 +408,7 @@ static struct inode *linvfs_alloc_inode(struct super_block *sb)
 
 static void linvfs_destroy_inode(struct inode *inode)
 {
-	kmem_cache_free(linvfs_inode_cachep, LINVFS_GET_VN_ADDRESS(inode));
+	kmem_cache_free(linvfs_inode_cachep, LINVFS_GET_VP(inode));
 }
 
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
@@ -491,7 +483,7 @@ linvfs_read_super(
 
 	atomic_set(&cip->i_count, 1);
 
-	cvp = LINVFS_GET_VN_ADDRESS(cip);
+	cvp = LINVFS_GET_VP(cip);
 	cvp->v_type   = VDIR;
 	cvp->v_number = 1;		/* Place holder */
 
@@ -580,7 +572,7 @@ linvfs_set_inode_ops(
 {
 	vnode_t		*vp;
 
-	vp = LINVFS_GET_VN_ADDRESS(inode);
+	vp = LINVFS_GET_VP(inode);
 
 	inode->i_mode = VTTOIF(vp->v_type);
 
@@ -857,7 +849,7 @@ STATIC int linvfs_dentry_to_fh(
 	int need_parent)
 {
 	struct inode *inode = dentry->d_inode ;
-	vnode_t *vp = LINVFS_GET_VN_ADDRESS(inode);
+	vnode_t *vp = LINVFS_GET_VP(inode);
 	int maxlen = *lenp;
 	xfs_fid2_t fid;
 	int error;
@@ -874,7 +866,7 @@ STATIC int linvfs_dentry_to_fh(
 		return 3 ;
 
 	inode = dentry->d_parent->d_inode ;
-	vp = LINVFS_GET_VN_ADDRESS(inode);
+	vp = LINVFS_GET_VP(inode);
 
 	VOP_FID2(vp, (struct fid *)&fid, error);
 	memcpy(&data[3], &fid.fid_ino, sizeof(__u64));

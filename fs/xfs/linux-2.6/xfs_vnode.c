@@ -143,23 +143,6 @@ vn_wait(struct vnode *vp)
 	return 0;
 }
 
-struct vnode *
-vn_address(struct inode *inode)
-{
-	vnode_t		*vp;
-
-
-	vp = LINVFS_GET_VN_ADDRESS(inode);
-
-	/*
-	 * Catch half-constructed linux-inode/vnode/xfs-inode setups.
-	 */
-	if (vp->v_fbhv == NULL)
-		return NULL;
-
-	return vp;
-}
-
 
 struct vnode *
 vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
@@ -170,7 +153,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 	
 	XFS_STATS_INC(xfsstats.vn_active);
 
-	vp = LINVFS_GET_VN_ADDRESS(inode);
+	vp = LINVFS_GET_VP(inode);
 
 	vp->v_flag = VMODIFIED;
 
