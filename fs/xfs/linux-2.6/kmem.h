@@ -55,6 +55,4 @@ extern void	    *kmem_realloc(void *, size_t, size_t, int);
 extern void	    *kmem_zalloc(size_t, int);
 extern void         kmem_free(void *, size_t);
 
-#define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)
-
 #endif /* __XFS_SUPPORT_KMEM_H__ */

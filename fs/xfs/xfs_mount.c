@@ -1475,7 +1475,7 @@ xfs_uuid_mount(xfs_mount_t *mp)
                 }
 	}
 	if (hole < 0) {
-		xfs_uuidtab = XFS_kmem_realloc(xfs_uuidtab,
+		xfs_uuidtab = kmem_realloc(xfs_uuidtab,
 	                (xfs_uuidtab_size + 1) * sizeof(*xfs_uuidtab),
 	                xfs_uuidtab_size  * sizeof(*xfs_uuidtab),
 	                KM_SLEEP);

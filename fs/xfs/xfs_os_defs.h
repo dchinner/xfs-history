@@ -35,24 +35,6 @@
 #include <linux/xfs_linux.h>
 #include <asm/div64.h>
 
-typedef __u64    xfs_off_t;
-typedef __s32    xfs32_off_t;
-typedef	__u64    xfs_ino_t;	/* <inode> type */
-typedef	__s64    xfs_daddr_t;	/* <disk address> type */
-typedef	char *	 xfs_caddr_t;	/* <core address> type */
-typedef off_t	linux_off_t;
-typedef __kernel_ino_t	linux_ino_t;
-typedef __uint32_t	xfs_dev_t;
-
-#undef bzero
-#define bzero(p,s) memset((p), 0, (s))
-
-#undef bcopy
-#define bcopy(s,d,n) memcpy((d),(s),(n))
-
-#define bcmp(s1,s2,l) memcmp(s1,s2,l)    
-
-
 /* Move the kernel do_div definition off to one side */
 static inline __u32 xfs_do_div(void *a, __u32 b, int n)
 {
@@ -92,7 +74,5 @@ static inline __u32 xfs_do_mod(void *a, __u32 b, int n)
 #undef do_div
 #define do_div(a, b)	xfs_do_div(&(a), (b), sizeof(a))
 #define do_mod(a, b)	xfs_do_mod(&(a), (b), sizeof(a))
-
-#define XFS_kmem_realloc(ptr,new,old,flag) kmem_realloc(ptr,new,old,flag)
 
 #endif	/* __XFS_OS_DEFS_H__ */

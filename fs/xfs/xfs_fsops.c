@@ -138,7 +138,7 @@ xfs_growfs_data_private(
 	oagcount = mp->m_sb.sb_agcount;
 	if (nagcount > oagcount) {
 		mrlock(&mp->m_peraglock, MR_UPDATE, PINOD);
-		mp->m_perag = XFS_kmem_realloc(mp->m_perag,
+		mp->m_perag = kmem_realloc(mp->m_perag,
 			sizeof(xfs_perag_t) * nagcount,
 			sizeof(xfs_perag_t) * oagcount,
 			KM_SLEEP);
