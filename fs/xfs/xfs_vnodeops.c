@@ -434,6 +434,8 @@ xfs_setattr(vnode_t	*vp,
 	uint		lock_flags;
 	boolean_t	ip_held;
 	timestruc_t 	tv;
+	uid_t		uid;
+	gid_t		gid;
 
 	/*
 	 * Cannot set certain attributes.
@@ -512,8 +514,8 @@ xfs_setattr(vnode_t	*vp,
          * or she is a member.
          */
         if (mask & (AT_UID|AT_GID)) {
-                uid_t uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
-                gid_t gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
+                uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
+                gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
 
                 if (!crsuser(credp)) {
                         if (credp->cr_uid != ip->i_d.di_uid ||
@@ -581,10 +583,8 @@ xfs_setattr(vnode_t	*vp,
 		 * size, if set at all.
 		 */
 		if ((mask & AT_EXTSIZE) && vap->va_extsize != 0) {
-			xfs_mount_t	*mp;
 			xfs_extlen_t	size;
 
-			mp = ip->i_mount;
 			if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ||
 			    ((mask & AT_XFLAGS) && 
 			    (vap->va_xflags & XFS_DIFLAG_REALTIME)))
@@ -602,9 +602,6 @@ xfs_setattr(vnode_t	*vp,
 		 */
 		if ((mask & AT_XFLAGS) &&
 		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
-			xfs_mount_t	*mp;
-
-			mp = ip->i_mount;
 			if ((mp->m_sb.sb_rextsize == 0)  ||
 			    (ip->i_d.di_extsize % mp->m_sb.sb_rextsize)) {
 
@@ -676,8 +673,8 @@ xfs_setattr(vnode_t	*vp,
          * or she is a member.
          */
         if (mask & (AT_UID|AT_GID)) {
-                uid_t uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
-                gid_t gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
+                uid = (mask & AT_UID) ? vap->va_uid : ip->i_d.di_uid;
+                gid = (mask & AT_GID) ? vap->va_gid : ip->i_d.di_gid;
 
                 if (!crsuser(credp)) {
                         ip->i_d.di_mode &= ~(ISUID|ISGID);
@@ -794,7 +791,6 @@ xfs_readlink(vnode_t	*vp,
 	     uio_t	*uiop,
 	     cred_t	*credp)
 {
-        xfs_mount_t     *mp;
         xfs_inode_t     *ip;
 	int		count;
 	off_t		offset;
@@ -842,25 +838,18 @@ xfs_readlink(vnode_t	*vp,
 		/*
 		 * Symlink not inline.  Call bmap to get it in.
 		 */
-		xfs_trans_t	*tp = NULL;
 		xfs_mount_t	*mp;
-                xfs_fsblock_t   first_fsb;
-                xfs_extlen_t    fs_blocks;
                 int             nmaps;
                 xfs_bmbt_irec_t mval [SYMLINK_MAPS];
                 daddr_t         d;
-                char            *cur_chunk;
                 int             byte_cnt, n;
                 struct          buf *bp;
-		xfs_bmap_free_t free_list;
 
 		mp = XFS_VFSTOM(vp->v_vfsp);
-                first_fsb = 0;
-                fs_blocks = XFS_B_TO_FSB(mp, pathlen);
                 nmaps = SYMLINK_MAPS;
 
-                (void) xfs_bmapi (tp, ip, first_fsb, fs_blocks,
-                         0, NULLFSBLOCK, 0, mval, &nmaps, &free_list);
+                (void) xfs_bmapi (NULL, ip, 0, XFS_B_TO_FSB(mp, pathlen),
+                         0, NULLFSBLOCK, 0, mval, &nmaps, NULL);
 
                 for (n = 0; n < nmaps; n++) {
                         d = XFS_FSB_TO_DADDR(mp, mval[n].br_startblock);
@@ -1195,7 +1184,6 @@ xfs_lookup(vnode_t	*dir_vp,
 	xfs_inode_t		*dp, *ip;
 	struct vnode		*vp, *newvp;
 	xfs_ino_t		e_inum;
-	struct xfs_mount	*mp;
 	int			code = 0;
 	uint			lock_mode;
 
@@ -3546,8 +3534,6 @@ xfs_allocstore(vnode_t	*vp,
 
 /*
  * xfs_reclaim
- *
- * This is a stub.
  */
 STATIC int
 xfs_reclaim(vnode_t	*vp,
