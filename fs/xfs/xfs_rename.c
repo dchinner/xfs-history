@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 
 #include <xfs_os_defs.h>
 
@@ -40,8 +40,8 @@
 #include <sys/systm.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
-#include <sys/dmi.h>
-#include <sys/dmi_kern.h>
+#include <linux/xfs_fs.h>
+#include <linux/dmapi_kern.h>
 #include "xfs_buf.h"
 #include <ksys/fsc_notify.h>
 #include "xfs_macros.h"

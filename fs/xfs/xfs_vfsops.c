@@ -46,7 +46,8 @@
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/dmi_kern.h>
+#include <linux/xfs_fs.h>
+#include <linux/dmapi_kern.h>
 #include <sys/kmem.h>
 #ifdef SIM
 #undef _KERNEL

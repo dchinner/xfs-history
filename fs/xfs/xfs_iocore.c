@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #include <xfs_os_defs.h>
 
@@ -43,7 +43,6 @@
 #include <sys/vnode.h>
 #include <sys/sysmacros.h>
 #include <sys/uuid.h>
-#include <sys/dmi_kern.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -58,8 +57,8 @@
 #include <linux/xfs_sema.h>
 #include <ksys/vfile.h>
 #include <sys/fs_subr.h>
-#include <sys/dmi.h>
-#include <sys/dmi_kern.h>
+#include <linux/xfs_fs.h>
+#include <linux/dmapi_kern.h>
 #include <sys/ktrace.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
