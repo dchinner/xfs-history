@@ -45,7 +45,6 @@
 #include <asm/system.h>
 #include <linux/mm.h>
 #include <linux/fs.h>
-#include <linux/iobuf.h>
 #include <linux/smp_lock.h>
 #include <linux/uio.h>
 
@@ -181,10 +180,9 @@ typedef page_buf_bmap_t pb_bmap_t;
  *
  * This buffer structure is used by the page cache buffer management routines
  * to refer to an assembly of pages forming a logical buffer.  The actual
- * I/O is performed with kiobuf or buffer_head structures, as required by
- * drivers, for drivers which do not understand this structure.
- * The buffer structure is used on temporary basis only, and
- * discarded when released.  
+ * I/O is performed with buffer_head or bio structures, as required by drivers,
+ * for drivers which do not understand this structure.  The buffer structure is
+ * used on temporary basis only, and discarded when released.  
  *
  * The real data storage is recorded in the page cache.  Metadata is
  * hashed to the inode for the block device on which the file system resides.
