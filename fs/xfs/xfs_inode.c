@@ -1,4 +1,4 @@
-#ident "$Revision: 1.180 $"
+#ident "$Revision: 1.181 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3048,9 +3048,6 @@ xfs_iprint(
 	}
 	printf("\n");
 
-#ifdef DEBUG
-	printf("    i_mapcnt %x\n", ip->i_mapcnt);
-#endif
 	printf("    i_df.if_bytes %d\n", ip->i_df.if_bytes);
 	printf("    i_df.if_u1.if_extents/if_data %x\n", ip->i_df.if_u1.if_extents);
 	if (ip->i_df.if_flags & XFS_IFEXTENTS) {
