@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.58 $"
+#ident	"$Revision: 1.59 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -102,15 +102,20 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_core_t, di_uid),
 		offsetof(xfs_dinode_core_t, di_gid),
 		offsetof(xfs_dinode_core_t, di_uuid),
-		offsetof(xfs_dinode_core_t, di_size),
-		offsetof(xfs_dinode_core_t, di_nextents),
 		offsetof(xfs_dinode_core_t, di_atime),
 		offsetof(xfs_dinode_core_t, di_mtime),
 		offsetof(xfs_dinode_core_t, di_ctime),
-		offsetof(xfs_dinode_core_t, di_gen),
-		offsetof(xfs_dinode_core_t, di_extsize),
-		offsetof(xfs_dinode_core_t, di_flags),
+		offsetof(xfs_dinode_core_t, di_size),
 		offsetof(xfs_dinode_core_t, di_nblocks),
+		offsetof(xfs_dinode_core_t, di_extsize),
+		offsetof(xfs_dinode_core_t, di_nextents),
+		offsetof(xfs_dinode_core_t, di_nattrextents),
+		offsetof(xfs_dinode_core_t, di_forkoff),
+		offsetof(xfs_dinode_core_t, di_pad1),
+		offsetof(xfs_dinode_core_t, di_dmevmask),
+		offsetof(xfs_dinode_core_t, di_dmstate),
+		offsetof(xfs_dinode_core_t, di_flags),
+		offsetof(xfs_dinode_core_t, di_gen),
 		offsetof(xfs_dinode_t, di_next_unlinked),
 		offsetof(xfs_dinode_t, di_u),
 		sizeof(xfs_dinode_t)
@@ -217,16 +222,21 @@ xfs_ialloc_ag_alloc(
 			free->di_core.di_nlink = 0;
 			free->di_core.di_uid = 0;
 			free->di_core.di_gid = 0;
-			free->di_core.di_nextents = 0;
 			free->di_core.di_uuid = zuuid;
-			free->di_core.di_size = 0;
 			free->di_core.di_atime = ztime;
 			free->di_core.di_mtime = ztime;
 			free->di_core.di_ctime = ztime;
-			free->di_core.di_gen = 0;
-			free->di_core.di_extsize = 0;
-			free->di_core.di_flags = 0;
+			free->di_core.di_size = 0;
 			free->di_core.di_nblocks = 0;
+			free->di_core.di_extsize = 0;
+			free->di_core.di_nextents = 0;
+			free->di_core.di_nattrextents = 0;
+			free->di_core.di_forkoff = 0;
+			free->di_core.di_pad1 = 0;
+			free->di_core.di_dmevmask = 0;
+			free->di_core.di_dmstate = 0;
+			free->di_core.di_flags = 0;
+			free->di_core.di_gen = 0;
 			free->di_next_unlinked = NULLAGINO;
 			xfs_ialloc_log_di(tp, fbuf, i,
 					  (XFS_DI_CORE_BITS |
