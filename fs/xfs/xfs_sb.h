@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
 
 /*
  * Super block
@@ -33,11 +33,11 @@ typedef struct xfs_sb
 	__uint16_t	sb_inopblock;	/* inodes per block */
 	char		sb_fname[6];	/* file system name */
 	char		sb_fpack[6];	/* file system pack name */
-	__uint8_t	sb_blocklog;	/* log2 of xfs_blocksize */
-	__uint8_t	sb_sectlog;	/* log2 of xfs_sectsize */
-	__uint8_t	sb_inodelog;	/* log2 of xfs_inodesize */
-	__uint8_t	sb_inopblog;	/* log2 of xfs_inopblock */
-	__uint8_t	sb_smallfiles;	/* set if small files in inodes */
+	__uint8_t	sb_blocklog;	/* log2 of sb_blocksize */
+	__uint8_t	sb_sectlog;	/* log2 of sb_sectsize */
+	__uint8_t	sb_inodelog;	/* log2 of sb_inodesize */
+	__uint8_t	sb_inopblog;	/* log2 of sb_inopblock */
+	__uint8_t	sb_agblklog;	/* log2 of sb_agblocks (rounded up) */
 					/* other inode config information? */
 					/* statistics */
 	/*
@@ -73,7 +73,7 @@ typedef struct xfs_sb
 #define	XFS_SB_SECTLOG		0x0040000
 #define	XFS_SB_INODELOG		0x0080000
 #define	XFS_SB_INOPBLOG		0x0100000
-#define	XFS_SB_SMALLFILES	0x0200000
+#define	XFS_SB_AGBLKLOG		0x0200000
 #define	XFS_SB_ICOUNT		0x0400000
 #define	XFS_SB_IFREE		0x0800000
 #define	XFS_SB_FDBLOCKS		0x1000000
@@ -81,14 +81,14 @@ typedef struct xfs_sb
 #define	XFS_SB_NUM_BITS		26
 #define	XFS_SB_ALL_BITS		((1 << XFS_SB_NUM_BITS) - 1)
 
-#define	XFS_SB_DADDR	((daddr_t)0)	/* daddr in filesystem */
+#define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem */
 #define	XFS_SB_FSB	((xfs_fsblock_t)0)	/* fsblock in filesystem */
-#define	XFS_SB_BLOCK	((xfs_agblock_t)0) /* block number in the AG */
+#define	XFS_SB_BLOCK	((xfs_agblock_t)0)	/* block number in the AG */
 
 #define	xfs_daddr_to_fsb(s,d) \
-	((xfs_fsblock_t)((d) >> ((s)->sb_blocklog - BBSHIFT)))
+	xfs_agb_to_fsb(s, xfs_daddr_to_agno(s,d), xfs_daddr_to_agbno(s,d))
 #define	xfs_fsb_to_daddr(s,fsbno) \
-	((daddr_t)((fsbno) << ((s)->sb_blocklog - BBSHIFT)))
+	xfs_agb_to_daddr(s, xfs_fsb_to_agno(s,fsbno), xfs_fsb_to_agbno(s,fsbno))
 #define	xfs_btod(s,l)	((l) << ((s)->sb_blocklog - BBSHIFT))
 #define	xfs_dtobt(s,l)	((l) >> ((s)->sb_blocklog - BBSHIFT))
 
