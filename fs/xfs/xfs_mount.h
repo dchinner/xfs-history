@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.89 $"
+#ident	"$Revision: 1.90 $"
 
 struct buf;
 struct cred;
@@ -120,7 +120,7 @@ typedef struct xfs_mount {
 	int			m_ialloc_inos;	/* inodes in inode allocation */
 	int			m_ialloc_blks;	/* blocks in inode allocation */
 	int			m_litino;	/* size of inode union area */
-	uint			m_inoalign;	/* doing inode alignment */
+	int			m_inoalign_mask;/* mask sb_inoalignmt if used */
 	uint			m_qflags;	/* quota status flags */
 	xfs_trans_reservations_t m_reservations; /* precomputed res values */
 	__uint64_t		m_maxicount;	/* maximum inode count */
@@ -130,6 +130,7 @@ typedef struct xfs_mount {
 	int			m_dalign;	/* stripe unit */
 	int			m_swidth;	/* stripe width */
 	int			m_sinoalign;	/* stripe unit inode alignmnt */
+	int			m_da_magicpct;	/* 37% of the blocksize */
 } xfs_mount_t;
 
 /*
