@@ -43,10 +43,12 @@ typedef	struct xfs_bmap_free
 /*
  * Trace operations for bmap extent tracing
  */
-#define	XFS_BMAP_TRACE_DELETE	1
-#define	XFS_BMAP_TRACE_INSERT	2
-#define	XFS_BMAP_TRACE_PRE_UP	3
-#define	XFS_BMAP_TRACE_POST_UP	4
+#define	XFS_BMAP_KTRACE_DELETE	1
+#define	XFS_BMAP_KTRACE_INSERT	2
+#define	XFS_BMAP_KTRACE_PRE_UP	3
+#define	XFS_BMAP_KTRACE_POST_UP	4
+
+#define	XFS_BMAP_KTRACE_SIZE	32	/* size of per-inode trace buffer */
 
 #define	XFS_BMAP_INIT(flp, fbp)	\
 	((flp)->xbf_first = NULL, (flp)->xbf_count = 0, *(fbp) = NULLFSBLOCK)
