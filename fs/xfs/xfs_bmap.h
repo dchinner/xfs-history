@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.24 $"
+#ident "$Revision: 1.31 $"
 
 struct xfs_inode;
 
@@ -48,6 +48,7 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAP_KTRACE_PRE_UP	3
 #define	XFS_BMAP_KTRACE_POST_UP	4
 
+#define	XFS_BMAP_TRACE_SIZE	4096	/* size of global trace buffer */
 #define	XFS_BMAP_KTRACE_SIZE	32	/* size of per-inode trace buffer */
 
 #define	XFS_BMAP_INIT(flp, fbp)	\

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.20 $"
+#ident	"$Revision: 1.26 $"
 
 /*
  * Freespace allocation types.  Argument to xfs_alloc_[v]extent.
@@ -60,6 +60,11 @@ typedef struct xfs_alloc_arg {
 #define	XFS_ALLOC_KTRACE_ALLOC	1
 #define	XFS_ALLOC_KTRACE_FREE	2
 #define	XFS_ALLOC_KTRACE_MODAGF	3
+
+/*
+ * Allocation tracing buffer size.
+ */
+#define	XFS_ALLOC_TRACE_SIZE	10240
 
 /*
  * Prototypes for visible xfs_alloc.c routines
