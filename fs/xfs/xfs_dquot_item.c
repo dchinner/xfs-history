@@ -1,11 +1,14 @@
+#ident "$Revision: 1.5 $"
+
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
+#ifdef DEBUG
 #include <sys/debug.h>
-#include <sys/pda.h>
-#include <ksys/vproc.h>
+#include <sys/kabi.h>
+#endif
 #include <sys/errno.h>
 #include <sys/vfs.h>
 #include <sys/systm.h>
@@ -146,47 +149,13 @@ STATIC void
 xfs_qm_dquot_logitem_push(
 	xfs_dq_logitem_t	*logitem)
 {
-	buf_t           *bp;
 	xfs_dquot_t	*dqp;
 
-	ASSERT(logitem->qli_bp != NULL || 
-	       XFS_DQ_IS_LOCKED(logitem->qli_dquot));
-	ASSERT(logitem->qli_bp != NULL || 
-	       XFS_DQ_IS_FLUSH_LOCKED(logitem->qli_dquot));  
+	dqp = logitem->qli_dquot;
+	
+	ASSERT(XFS_DQ_IS_LOCKED(dqp));
+	ASSERT(XFS_DQ_IS_FLUSH_LOCKED(dqp));  
      
-	/*
-         * If the dquot item's buffer pointer is non-NULL, then we were
-         * unable to lock the dquot in the trylock routine but we were
-         * able to lock the dquot's buffer and it was marked delayed write.
-         * We didn't want to write it out from the trylock routine, because
-         * the device strategy routine might sleep.  Instead we stored it
-         * and write it out here.
-         */
-        bp = logitem->qli_bp;
-        dqp = logitem->qli_dquot;
-        if ((bp != NULL) && (logitem->qli_bp_owner == current_pid())) {
-                ASSERT(logitem->qli_bp->b_flags & B_BUSY);
-                logitem->qli_bp = NULL;
-                logitem->qli_bp_owner = NULL;
-#ifndef SIM
-                buftrace("DQUOT ITEM PUSH", bp);
-#endif
-                /*
-                 * If the buffer is pinned then push on the log so we won't
-                 * deadlock waiting for the buffer to be unpinned while we
-                 * hold other locks.
-                 */
-                if (bp->b_pincount > 0) {
-                        xfs_log_force(dqp->q_mount, (xfs_lsn_t)0,
-                                      XFS_LOG_FORCE);
-                }
-#ifdef SIM
-		bwrite(bp);
-#else
-                bawrite(bp);
-#endif
-                return;
-        }
         /*
          * Since we were able to lock the dquot's flush lock and
          * we found it on the AIL, the dquot must be dirty.  This
@@ -245,6 +214,84 @@ xfs_qm_dqunpin_wait(
 }
 
 /*
+ * This is called when IOP_TRYLOCK returns XFS_ITEM_PUSHBUF to indicate that
+ * the dquot is locked by us, but the flush lock isn't. So, here we are
+ * going to see if the relevant dquot buffer is incore, waiting on DELWRI.
+ * If so, we want to push it out to help us take this item off the AIL as soon
+ * as possible.
+ *
+ * We must not be holding the AIL_LOCK at this point. Calling incore() to
+ * search the buffercache can be a time consuming thing, and AIL_LOCK is a
+ * spinlock.
+ */
+STATIC void
+xfs_qm_dquot_logitem_pushbuf(
+        xfs_dq_logitem_t    *qip)
+{
+	xfs_dquot_t	*dqp;
+	xfs_mount_t	*mp;
+        buf_t	 	*bp;
+	uint		dopush;
+
+	dqp = qip->qli_dquot;
+	ASSERT(XFS_DQ_IS_LOCKED(dqp));
+
+	/*
+	 * The qli_pushbuf_flag keeps others from
+	 * trying to duplicate our effort.
+	 */
+	ASSERT(qip->qli_pushbuf_flag != 0);
+	ASSERT(qip->qli_push_owner == get_thread_id());
+	
+	/*
+	 * If flushlock isn't locked anymore, chances are that the
+	 * inode flush completed and the inode was taken off the AIL.
+	 * So, just get out.
+	 */
+	if ((valusema(&(dqp->q_flock)) > 0)  ||
+	    ((qip->qli_item.li_flags & XFS_LI_IN_AIL) == 0)) {
+		qip->qli_pushbuf_flag = 0;
+		xfs_dqunlock(dqp);
+	    	return;
+	}
+	mp = dqp->q_mount;
+	bp = incore(mp->m_dev, qip->qli_format.qlf_blkno, 
+		    mp->QI_DQCHUNKLEN,
+		    INCORE_TRYLOCK);
+	if (bp != NULL) {
+		if (bp->b_flags & B_DELWRI) {
+			dopush = ((qip->qli_item.li_flags & XFS_LI_IN_AIL) && 
+				  (valusema(&(dqp->q_flock)) <= 0));
+			qip->qli_pushbuf_flag = 0;
+			xfs_dqunlock(dqp);
+
+			if (bp->b_pincount > 0) {
+				xfs_log_force(mp, (xfs_lsn_t)0,
+					      XFS_LOG_FORCE);
+			}
+			if (dopush) {
+#ifdef XFSRACEDEBUG
+				delay_for_intr();
+				delay(300);
+#endif				
+				bawrite(bp);
+			} else {
+				brelse(bp);
+			}
+		} else {
+			qip->qli_pushbuf_flag = 0;
+			xfs_dqunlock(dqp);		
+			brelse(bp);
+		}
+		return;
+	}
+
+	qip->qli_pushbuf_flag = 0;
+	xfs_dqunlock(dqp);	
+	return;
+}
+
+/*
  * This is called to attempt to lock the dquot associated with this
  * dquot log item.  Don't sleep on the dquot lock or the flush lock.
  * If the flush lock is already held, indicating that the dquot has
@@ -259,9 +306,7 @@ xfs_qm_dquot_logitem_trylock(
         xfs_dq_logitem_t    *qip)
 {
 	xfs_dquot_t	        *dqp;
-	xfs_mount_t             *mp;
-        buf_t                   *bp;
-        int                     flushed;
+	uint			retval;
 
 	dqp = qip->qli_dquot;
 	if (dqp->q_pincount > 0)
@@ -270,40 +315,41 @@ xfs_qm_dquot_logitem_trylock(
 	if (! xfs_qm_dqlock_nowait(dqp))
 		return (XFS_ITEM_LOCKED);
 	
+	retval = XFS_ITEM_SUCCESS;
 	if (! xfs_qm_dqflock_nowait(dqp)) {
-		/*
+		/* 
                  * The dquot is already being flushed.  It may have been
                  * flushed delayed write, however, and we don't want to
-                 * get stuck waiting for that to complete.  So, we check
+                 * get stuck waiting for that to complete.  So, we want to check
                  * to see if we can lock the dquot's buffer without sleeping.
                  * If we can and it is marked for delayed write, then we
                  * hold it and send it out from the push routine.  We don't
                  * want to do that now since we might sleep in the device
-                 * strategy routine.  Make sure to only return success
-                 * if we set qip->qli_bp ourselves.  If someone else is
-                 * doing it then we don't want to go to the push routine
-                 * and duplicate their efforts.
+                 * strategy routine.  We also don't want to grab the buffer lock
+		 * here because we'd like not to call into the buffer cache while
+		 * holding the AIL_LOCK.
+		 * Make sure to only return PUSHBUF if we set pushbuf_flag
+		 * ourselves.  If someone else is doing it then we don't 
+		 * want to go to the push routine and duplicate their efforts.
                  */
-                flushed = 0;
-                if (qip->qli_bp == NULL) {
-                        mp = dqp->q_mount;
-                        bp = incore(mp->m_dev, dqp->q_blkno, 
-				    mp->QI_DQCHUNKLEN,
-				    INCORE_TRYLOCK);
-                        if (bp != NULL) {
-                                if (bp->b_flags & B_DELWRI) {
-                                        qip->qli_bp = bp;
-                                        qip->qli_bp_owner = current_pid();
-                                        flushed = 1;
-                                } else {
-                                        brelse(bp);
-                                }
-                        }
-                }
-		xfs_dqunlock_nonotify(dqp);
-		return (flushed ? XFS_ITEM_SUCCESS : XFS_ITEM_FLUSHING);
+                if (qip->qli_pushbuf_flag == 0) {
+			qip->qli_pushbuf_flag = 1;
+			ASSERT(qip->qli_format.qlf_blkno == dqp->q_blkno);
+#ifdef DEBUG
+			qip->qli_push_owner = get_thread_id();
+#endif
+			/*
+			 * The dquot is left locked.
+			 */
+			retval = XFS_ITEM_PUSHBUF;
+		} else {
+			retval = XFS_ITEM_FLUSHING;
+			xfs_dqunlock_nonotify(dqp);
+		}
 	}
-	return (XFS_ITEM_SUCCESS);
+	
+	ASSERT(qip->qli_item.li_flags & XFS_LI_IN_AIL);
+	return (retval);
 }
 
 
@@ -335,7 +381,6 @@ xfs_qm_dquot_logitem_unlock(
 	 * for the logitem.
 	 */
 	xfs_dqunlock(dqp);
-	ql->qli_flags = 0;	
 }
 
 
@@ -365,7 +410,8 @@ struct xfs_item_ops xfs_dquot_item_ops = {
 	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_unlock,
 	(xfs_lsn_t(*)(xfs_log_item_t*, xfs_lsn_t))xfs_qm_dquot_logitem_committed,
 	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_push,
-	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_abort
+	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_abort,
+	(void(*)(xfs_log_item_t*))xfs_qm_dquot_logitem_pushbuf
 };
 
 /*
@@ -384,7 +430,6 @@ xfs_qm_dquot_logitem_init(
         lp->qli_item.li_ops = &xfs_dquot_item_ops;
         lp->qli_item.li_mountp = dqp->q_mount;
 	lp->qli_dquot = dqp;
-        lp->qli_bp = NULL;
         lp->qli_format.qlf_type = XFS_LI_DQUOT;
         lp->qli_format.qlf_id = dqp->q_core.d_id;
         lp->qli_format.qlf_blkno = dqp->q_blkno;
