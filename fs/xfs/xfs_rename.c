@@ -41,7 +41,7 @@
 STATIC void
 xfs_rename_unlock4(
 	xfs_inode_t	**i_tab,
-	uint lock_mode)
+	uint		lock_mode)
 {
 	int	i;
 
@@ -104,14 +104,6 @@ xfs_lock_for_rename(
 	 */
 	lock_mode = xfs_ilock_map_shared(dp1);
 
-	/*
-	 * We don't want to do lookups in unlinked directories.
-	 */
-	if (dp1->i_d.di_nlink == 0) {
-		xfs_iunlock_map_shared(dp1, lock_mode);
-		return XFS_ERROR(ENOENT);
-	}
-
 	lookup_flags = DLF_IGET;
 	if (lock_mode == XFS_ILOCK_SHARED) {
 		lookup_flags |= DLF_LOCK_SHARED;
@@ -123,7 +115,8 @@ xfs_lock_for_rename(
 		xfs_iunlock_map_shared(dp1, lock_mode);
 		return error;
 	}
-	ASSERT (ip1);
+
+	ASSERT(ip1);
 	ITRACE(ip1);
 
 	/*
@@ -133,15 +126,7 @@ xfs_lock_for_rename(
 	if (diff_dirs) {
 		xfs_iunlock_map_shared(dp1, lock_mode);
 		lock_mode = xfs_ilock_map_shared(dp2);
-		/*
-		 * We don't want to do lookups in unlinked directories.
-		 */
-		if (dp2->i_d.di_nlink == 0) {
-			xfs_iunlock_map_shared(dp2, lock_mode);
-			return XFS_ERROR(ENOENT);
-		}
 	}
-
 
 	lookup_flags = DLF_IGET;
 	if (lock_mode == XFS_ILOCK_SHARED) {
@@ -238,57 +223,6 @@ xfs_lock_for_rename(
 
 int rename_which_error_return = 0;
 
-/*
- * Perform error checking on the target inode after the ancestor check
- * has been done in xfs_rename().
- */
-STATIC int
-xfs_rename_target_checks(
-	xfs_inode_t	*target_ip,
-	int		src_is_directory)
-{
-	int	error;
-
-	error = 0;
-	/*
-	 * If target exists and it's a directory, check that both
-	 * target and source are directories and that target can be
-	 * destroyed, or that neither is a directory.
-	 */
-	if ((target_ip->i_d.di_mode & IFMT) == IFDIR) {
-
-		/*
-		 * Make sure src is a directory.
-		 */
-		if (!src_is_directory) {
-			error = XFS_ERROR(EISDIR);
-			rename_which_error_return = __LINE__;
-			goto error_return;
-		}
-
-		/*
-		 * Make sure target dir is empty.
-		 */
-		if (!(XFS_DIR_ISEMPTY(target_ip->i_mount, target_ip)) ||
-		    (target_ip->i_d.di_nlink > 2)) {
-			error = XFS_ERROR(EEXIST);
-			rename_which_error_return = __LINE__;
-			goto error_return;
-		}
-
-	} else {
-
-		if (src_is_directory) {
-			error = XFS_ERROR(ENOTDIR);
-			rename_which_error_return = __LINE__;
-			goto error_return;
-		}
-	}
-
- error_return:
-	return error;
-}
-
 #ifdef DEBUG
 int xfs_rename_agains;
 int xfs_renames;
@@ -383,9 +317,11 @@ xfs_rename(
 				target_dentry, &src_ip, &target_ip, inodes,
 				&num_inodes);
 #ifdef DEBUG
-		if (error == EAGAIN) xfs_rename_agains++;
+		if (error == EAGAIN)
+			xfs_rename_agains++;
 #endif
 	} while (error == EAGAIN);
+
 	if (error) {
 		rename_which_error_return = __LINE__;
 		/*
@@ -518,10 +454,21 @@ xfs_rename(
 		}
 	} else { /* target_ip != NULL */
 
-		error = xfs_rename_target_checks(target_ip,
-						 src_is_directory);
-		if (error) {
-			goto error_return;
+		/*
+		 * If target exists and it's a directory, check that both
+		 * target and source are directories and that target can be
+		 * destroyed, or that neither is a directory.
+		 */
+		if ((target_ip->i_d.di_mode & IFMT) == IFDIR) {
+			/*
+			 * Make sure target dir is empty.
+			 */
+			if (!(XFS_DIR_ISEMPTY(target_ip->i_mount, target_ip)) ||
+			    (target_ip->i_d.di_nlink > 2)) {
+				error = XFS_ERROR(EEXIST);
+				rename_which_error_return = __LINE__;
+				goto error_return;
+			}
 		}
 
 		/*
