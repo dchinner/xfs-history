@@ -47,6 +47,8 @@
 #include <sys/mode.h>
 #include <sys/var.h>
 #include <sys/capability.h>
+#include <sys/flock.h>
+#include <sys/kfcntl.h>
 #include <string.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -73,6 +75,14 @@
 #ifdef SIM
 #include "sim.h"
 #endif
+
+#ifdef _K64U64
+int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
+int flock_to_irix5(void *, int, xlate_info_t *);
+int irix5_n32_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
+int flock_to_irix5_n32(void *, int, xlate_info_t *);
+#endif
+
 
 #ifndef SIM
 STATIC int	xfs_truncate_file(xfs_mount_t	*mp,
@@ -234,9 +244,14 @@ STATIC int	xfs_fcntl(vnode_t	*vp,
 			  rval_t	*rvalp);
 
 STATIC int	xfs_set_dmattrs (vnode_t	*vp,
-				 u_int		evmask,
-				 u_int		state);
+			 u_int		evmask,
+			 u_int		state);
 
+STATIC int 	xfs_change_file_space( vnode_t *,
+			int,
+			flock_t *,
+			off_t,
+			cred_t *);
 #endif	/* !SIM */
 
 STATIC void	xfs_inactive(vnode_t	*vp,
@@ -1131,8 +1146,8 @@ xfs_inactive(vnode_t	*vp,
 	 * only one with a reference to the inode.
 	 */
 	truncate = ((ip->i_d.di_nlink == 0) &&
-		    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
-		    ((ip->i_d.di_mode & IFMT) == IFREG));
+	    ((ip->i_d.di_size != 0) || (ip->i_d.di_nextents > 0)) &&
+	    ((ip->i_d.di_mode & IFMT) == IFREG));
 
 	if (ip->i_d.di_nlink == 0 &&
 			DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_DESTROY)) {
@@ -1276,9 +1291,10 @@ xfs_inactive(vnode_t	*vp,
 
 		xfs_trans_commit(tp , commit_flags);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-	} else if (((ip->i_d.di_mode & IFMT) == IFREG) &&
+	} else if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		   (ip->i_d.di_size > 0) &&
-		   (ip->i_flags & XFS_IEXTENTS)) {
+		   (ip->i_flags & XFS_IEXTENTS))  &&
+		   (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC)) ) { 
 		/*
 		 * Figure out if there are any blocks beyond the end
 		 * of the file.  If not, then there is nothing to do.
@@ -4237,9 +4253,13 @@ xfs_fcntl(vnode_t	*vp,
 	  cred_t	*credp,
 	  rval_t	*rvalp)
 {
-	int		error = 0;
-	xfs_mount_t	*mp;
+	int			error = 0;
+	xfs_mount_t		*mp;
+	struct flock		bf;
+	struct irix4_flock	i4_bf;
+	struct irix5_flock	i5_bf;
 
+	
 	vn_trace_entry(vp, "xfs_fcntl");
 	mp = XFS_VFSTOM( vp->v_vfsp );
 	switch (cmd) {
@@ -4331,6 +4351,60 @@ xfs_fcntl(vnode_t	*vp,
 		error = xfs_set_dmattrs (vp, values [0], values [1]);
 		break;
 	    }
+
+	case F_ALLOCSP:
+	case F_FREESP:
+	case F_ALLOCSP64:
+	case F_FREESP64:
+		cmd = cmd;
+		if ((flags & FWRITE) == 0) {
+			error = EBADF;
+		} else if (vp->v_type != VREG) {
+			error = EINVAL;
+#ifdef _K64U64
+		} else if (ABI_IS_IRIX5_64(u.u_procp->p_abi)) {
+			if (copyin((caddr_t)arg, &bf, sizeof bf)) {
+				error = EFAULT;
+				break;
+			}
+#endif
+		} else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64 ||
+			ABI_IS_IRIX5_N32(u.u_procp->p_abi)) {
+			/* 
+			 * The n32 flock structure is the same size as the
+			 * o32 flock64 structure. So the copyin_xlate
+			 * with irix5_n32_to_flock works here.
+			 */
+			if (copyin_xlate((caddr_t)arg, &bf, sizeof bf,
+					irix5_n32_to_flock,
+					u.u_procp->p_abi, 1)) {
+				error = EFAULT;
+				break;
+			}
+		} else {
+			/*
+			 * For compatibility we overlay an SVR3 flock on an
+			 * SVR4 flock.  This works because the input field
+			 * offsets in "struct flock" were preserved.
+			 */
+			if (copyin((caddr_t)arg, &i5_bf, sizeof i4_bf)) {
+				error = EFAULT;
+				break;
+			}
+			/* 
+			 * Now expand to 64 bit sizes. 
+			 */
+			bf.l_type = i5_bf.l_type;
+			bf.l_whence = i5_bf.l_whence;
+			bf.l_start = i5_bf.l_start;
+			bf.l_len = i5_bf.l_len;
+		}
+
+		if (!error) {
+			error = xfs_change_file_space( vp, cmd, 
+					&bf, offset, u.u_cred );
+		}
+		break;
 
 	default:
 		error = XFS_ERROR(EINVAL);
@@ -4503,6 +4577,322 @@ xfs_reclaim(vnode_t	*vp,
 	return 0;
 }
 
+
+/*
+ * xfs_free_file_space()
+ *      This routine frees disk space for the given file.
+ *
+ * RETURNS:
+ *       0 on success
+ *      errno on error
+ *
+ */
+STATIC int
+xfs_free_file_space( 
+	vnode_t 	*vp,
+	off_t 		offset,
+	off_t		len)
+{
+
+        int             error;
+	xfs_inode_t	*ip;
+        xfs_trans_t     *tp;
+	xfs_mount_t	*mp;
+
+	vn_trace_entry( vp, "xfs_free_file_space" );
+
+	/*
+	 * Currently, can only free to eof
+	 */
+	if ( len ) {
+		return( EINVAL );
+	}
+
+	ip = XFS_VTOI( vp );
+	mp = XFS_VFSTOM( vp->v_vfsp );
+	ip->i_d.di_flags &= ~XFS_DIFLAG_PREALLOC;
+
+        /*
+         * Make the call to xfs_itruncate_start before starting the
+         * transaction, because we cannot make the call while we're
+         * in a transaction.
+         */
+        xfs_ilock(ip, XFS_IOLOCK_EXCL);
+        xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t)offset);
+
+        tp = xfs_trans_alloc(mp, XFS_TRANS_TRUNCATE_FILE);
+        if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
+                                      XFS_TRANS_PERM_LOG_RES,
+                                      XFS_ITRUNCATE_LOG_COUNT)) {
+                xfs_trans_cancel(tp, 0);
+                return error;
+        }
+
+        /*
+         * Follow the normal truncate locking protocol.  Since we
+         * hold the inode in the transaction, we know that it's number
+         * of references will stay constant.
+         */
+        xfs_ilock(ip, XFS_ILOCK_EXCL);
+        xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+        xfs_trans_ihold(tp, ip);
+        xfs_itruncate_finish(&tp, ip, (xfs_fsize_t)offset);
+        xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+        xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+        xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+
+        return 0;
+
+}
+
+/*
+ * xfs_alloc_file_space()
+ *      This routine allocates disk space for the given file.
+ *
+ * RETURNS:
+ *       0 on success
+ *      errno on error
+ *
+ */
+STATIC int
+xfs_alloc_file_space( 
+	vnode_t 	*vp,
+	off_t 		offset,
+	off_t		len)
+{
+	int			error, reccount, rt; 
+	int			rtextsize, numrtextents;
+	off_t			count;
+	xfs_trans_t		*tp;
+	xfs_inode_t		*ip;
+	xfs_mount_t		*mp;
+	xfs_fileoff_t		startoffset_fsb;
+	xfs_filblks_t		allocatesize_fsb, allocated_fsb, datablocks;
+	xfs_fsblock_t		firstfsb;
+	xfs_bmbt_irec_t		imaps[1], *imapp;
+	xfs_bmap_free_t		free_list;
+
+	vn_trace_entry( vp, "xfs_alloc_file_space" );
+	
+	ip = XFS_VTOI( vp );
+	mp = XFS_VFSTOM( vp->v_vfsp );
+	ip->i_d.di_flags |= XFS_DIFLAG_PREALLOC;
+
+	/*
+	 * determine if this is a realtime file
+	 */
+        if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
+                rt = 1;
+                rtextsize = mp->m_sb.sb_rextsize;
+        } else {
+                rt = 0;
+                rtextsize = 0;
+        }
+
+	count  			= len;
+	error			= 0;
+	imapp 			= &imaps[0];
+	reccount 		= 1;
+	startoffset_fsb		= XFS_B_TO_FSBT( mp, offset );
+	allocatesize_fsb	= XFS_B_TO_FSB( mp, count );
+
+	/*
+	 * allocate file space until done or until there is an error	
+ 	 */
+	while ( allocatesize_fsb && (!error) ) {
+
+		xfs_ilock( ip, XFS_ILOCK_EXCL );
+
+		/*
+		 * determine if reserving space on
+		 * the data or realtime partition.
+		 */
+		if (rt) {
+			numrtextents = (allocatesize_fsb + rtextsize - 1) /
+					rtextsize;
+			datablocks = 0;
+		} else {
+			datablocks = allocatesize_fsb;
+		}
+
+		/*
+		 * allocate and setup the transaction
+		 */
+		tp = xfs_trans_alloc( mp, XFS_TRANS_DIOSTRAT);
+		error = xfs_trans_reserve( tp,
+			XFS_BM_MAXLEVELS(mp) + datablocks,
+			XFS_WRITE_LOG_RES(mp),
+			numrtextents,
+			XFS_TRANS_PERM_LOG_RES,
+			XFS_WRITE_LOG_COUNT );
+
+		/*
+		 * check for running out of space
+		 */
+		if (error) {
+			/*
+			 * Free the transaction structure.
+			 */
+			ASSERT( error == ENOSPC );
+			xfs_trans_cancel(tp, 0);
+			xfs_iunlock( ip, XFS_ILOCK_EXCL);
+			break;
+		} else {
+			xfs_trans_ijoin( tp, ip, XFS_ILOCK_EXCL);
+			xfs_trans_ihold( tp, ip);
+		}
+
+		/*
+		 * issue the bmapi() call to allocate the blocks
+	 	 */
+		XFS_BMAP_INIT( &free_list, &firstfsb );
+		firstfsb = xfs_bmapi( tp, ip, startoffset_fsb, 
+			allocatesize_fsb, 1, firstfsb, 0, imapp, 
+			&reccount, &free_list);
+
+		/*
+		 * complete the transaction
+		 */
+		xfs_bmap_finish( &tp, &free_list, firstfsb );
+		xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES );
+		xfs_iunlock( ip, XFS_ILOCK_EXCL );
+		allocated_fsb = imapp->br_blockcount;
+
+		if (reccount == 0 ) {
+			error = XFS_ERROR(ENOSPC);
+			break;
+		}
+
+		startoffset_fsb 	+= allocated_fsb;
+		allocatesize_fsb  	-= allocated_fsb;
+	}
+
+	return( error );
+}
+
+
+/*
+ * xfs_change_file_space()
+ *      This routine allocates or frees disk space for the given file.
+ *      The user specified parameters are checked for alignment and size
+ *      limitations.
+ *
+ * RETURNS:
+ *       0 on success
+ *      errno on error
+ *
+ */
+STATIC int
+xfs_change_file_space( 
+	vnode_t 	*vp,
+	int		cmd,
+	flock_t 	*bf,
+	off_t 		offset,
+	cred_t  	*credp)
+{
+	int			error;
+	int			allocspace;
+	off_t			startoffset, len;
+	xfs_inode_t		*ip;
+
+	vn_trace_entry( vp, "xfs_change_file_space" );
+	
+	len 	= bf->l_len;
+	ip 	= XFS_VTOI( vp );
+
+	/*
+	 * must be a regular file and have write permission
+	 */
+	if (vp->v_type != VREG) {
+		return( EINVAL );
+	}
+
+	if (error = xfs_iaccess( ip, IWRITE, credp ) ) {
+		return( error );
+	}
+
+	switch ( cmd ) {
+		case F_ALLOCSP:
+		case F_ALLOCSP64:
+			allocspace = 1;
+			break;
+		case F_FREESP:
+		case F_FREESP64:
+			allocspace = 0;
+			break;
+		default:
+			ASSERT(0);
+			return( EINVAL );
+	}
+
+
+	/*
+	 * determine how much to allocate/free starting from where
+	 */
+	if ( bf->l_whence == 1 ) {
+		/*
+		 * relative to current offset
+		 */
+		startoffset = bf->l_start + offset;
+	} else if ( bf->l_whence == 2 ) {
+		/*
+		 * relative to end of file
+		 */
+		startoffset = bf->l_start + ip->i_d.di_size;
+	} else if ( bf->l_whence == 0 ) {
+		/*
+		 * relative to start of file. 
+		 */
+		startoffset = bf->l_start;
+	} else {
+		return( EINVAL );
+	}
+
+	if ( allocspace ) {
+		error = xfs_alloc_file_space( vp, 
+			startoffset, 
+			len);
+	} else {
+		/*
+		 * len is currently assumed to be zero,
+		 * which means to free to end-of-file
+		 */
+		if (startoffset > ip->i_d.di_size) {
+			/*
+			 * freeing after end-of-file means to extend the file.
+			 */
+			error = xfs_alloc_file_space( vp, 
+				ip->i_d.di_size,
+				(startoffset - ip->i_d.di_size));
+		} else {
+			/*
+			 * free from startoffset to end-of-file
+			 */
+			error = xfs_free_file_space( vp, 							startoffset, 
+				0);
+		}
+	}
+
+
+	/*
+	 *  update the inode timestamp 
+	 */
+	if ( !error ) {
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+		if ((ip->i_d.di_mode & (ISUID|ISGID)) && credp->cr_uid != 0) {
+			ip->i_d.di_mode &= ~ISUID;
+			if (ip->i_d.di_mode & (IEXEC >> 3))
+				ip->i_d.di_mode &= ~ISGID;
+		}
+		xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
+
+	return( error );
+}
+
 /*
  * print out error describing the problem with the fs
  *
@@ -4621,4 +5011,5 @@ struct vnodeops xfs_vnodeops = {
 };
 
 #endif	/* SIM */
+
 
