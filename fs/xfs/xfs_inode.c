@@ -595,6 +595,10 @@ xfs_isize_check(
 
 	if ((ip->i_d.di_mode & IFMT) != IFREG)
 		return;
+
+	if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )
+		return;
+
 	nimaps = 2;
 	map_first = XFS_B_TO_FSB(mp, isize);
 	(void) xfs_bmapi(NULL, ip, map_first,
