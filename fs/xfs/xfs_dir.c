@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.56 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -729,17 +729,18 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	__uint32_t bno;
 	off_t nextcook;
 
-	if (uio->uio_offset == dp->i_d.di_size) {
+	mp = dp->i_mount;
+	sf = (xfs_dir_shortform_t *)dp->i_u1.iu_data;
+	if (uio->uio_offset ==
+	    XFS_DIR_MAKE_COOKIE(mp, 0, sf->hdr.count + 2)) {
 		*eofp = 1;
 		return(0);
 	}
-	mp = dp->i_mount;
 	bno = (__uint32_t)XFS_DIR_COOKIE_BNO(mp, uio->uio_offset);
 	if (bno != 0)
 		return(XFS_ERROR(ENOENT));
 
 	entry = XFS_DIR_COOKIE_ENTRY(mp, uio->uio_offset);
-	sf = (xfs_dir_shortform_t *)dp->i_u1.iu_data;
 	if (entry >= sf->hdr.count + 2)
 		return(XFS_ERROR(ENOENT));
 
@@ -784,7 +785,7 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
 	*eofp = 1;
-	uio->uio_offset = dp->i_d.di_size;
+	uio->uio_offset = XFS_DIR_MAKE_COOKIE(mp, 0, sf->hdr.count + 2);
 	return(0);
 }
 
@@ -1638,8 +1639,8 @@ xfs_dir_put_dirent(
 				iovp->iov_base += reclen;
 				iovp->iov_len -= reclen;
 				uio->uio_resid -= reclen;
-				uio->uio_offset += reclen;
-				*done = retval = 0;
+				*done = 1;
+				retval = 0;
 			}
 		}
 	} else {
