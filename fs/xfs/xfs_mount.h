@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.21 $"
+#ident	"$Revision: 1.22 $"
 
 struct xfs_ihash;
 
@@ -36,6 +36,8 @@ typedef struct xfs_mount {
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
 	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
 	struct xfs_inode	*m_rootip;	/* pointer to root directory */
+	struct vnode 		*m_ddevp;	/* ptr to data dev vnode */
+	struct vnode 		*m_rtdevp;	/* prt to rt dev vnode   */
 } xfs_mount_t;
 
 /*
@@ -78,7 +80,7 @@ void		xfs_umount(xfs_mount_t *);
 void		xfs_mod_sb(xfs_trans_t *, int);
 xfs_mount_t	*xfs_mount_init(void);
 int		xfs_mountfs(struct vfs *, dev_t);
-int		xfs_unmountfs(xfs_mount_t *);
+int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, uint, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
 buf_t		*xfs_getsb(xfs_mount_t *);
