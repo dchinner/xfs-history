@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.39 1994/12/13 00:04:25 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.40 1994/12/28 23:05:43 rcc Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -958,6 +958,20 @@ loop:
 			 * check if the file system is in the process
 			 * of being mounted or unmounted.
 			 */
+#ifdef REDWOOD
+			/*
+			 * redwood uses a different vfs
+			 * locking protocol
+			 */
+			if (vfsp->vfs_flag & VFS_MPBUSY) {
+				vfsp->vfs_flag |= VFS_MPWAIT;
+				if (spunlock_psema(vfslock,
+						s, &vfsp->vfs_mbusy, PVFS|PCATCH))
+					return EINTR;
+				s = splock(vfslock);
+                        	goto loop;
+			} else {
+#else
   			if (vfsp->vfs_flag & (VFS_MLOCK|VFS_MWANT)) {
                         	ASSERT(vfsp->vfs_flag & VFS_MWANT ||
                                		vfsp->vfs_busycnt == 0);
@@ -968,8 +982,15 @@ loop:
                         	}
                         	goto loop;
 			} else {
+#endif /* REDWOOD */
+
 #ifndef SIM
+#ifdef REDWOOD
+				/* for redwood vfs locking protocol */
+				vfsp->vfs_flag |= VFS_MPBUSY;
+#else
 				vfsp->vfs_busycnt++;
+#endif /* REDWOOD */
 				spunlock(vfslock, s);
 #endif
 
@@ -981,6 +1002,18 @@ loop:
 
 #ifndef SIM
 				s = splock(vfslock);
+#ifdef REDWOOD
+				/* for redwood vfs locking protocol */
+
+				ASSERT(vfsp->vfs_flag & VFS_MPBUSY);
+				vfsp->vfs_flag &= ~VFS_MPBUSY;
+
+				if (vfsp->vfs_flag & VFS_MPWAIT) {
+					vfsp->vfs_flag &= ~VFS_MPWAIT;
+					while (cvsema(&vfsp->vfs_mbusy))
+						;
+				}
+#else
 			        ASSERT(!(vfsp->vfs_flag & (VFS_MLOCK|VFS_OFFLINE)));
         			ASSERT(vfsp->vfs_busycnt > 0);
         			if (--vfsp->vfs_busycnt == 0) {
@@ -1003,6 +1036,7 @@ loop:
         				}
 
 				}
+#endif /* REDWOOD */
 				
 #endif
 			}
