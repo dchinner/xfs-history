@@ -32,11 +32,10 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.18 $"
 
 struct xfs_mount;
 struct xfs_trans;
-struct xfs_growfs_rt;
 
 /* Min and max rt extent sizes, specified in bytes */
 #define	XFS_MAX_RTEXTSIZE	(1024 * 1024 * 1024)	/* 1GB */
@@ -89,14 +88,6 @@ struct xfs_growfs_rt;
  */
 
 #ifndef SIM
-/*
- * Grow the realtime area of the filesystem.
- */
-int
-xfs_growfs_rt(
-	struct xfs_mount	*mp,	/* mount point for filesystem */
-	struct xfs_growfs_rt	*in);	/* growfs rt input struct */
-
 /*
  * Allocate an extent in the realtime subvolume, with the usual allocation
  * parameters.  The length units are all in realtime extents, as is the
