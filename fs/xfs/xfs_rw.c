@@ -699,7 +699,15 @@ xfs_read(vnode_t	*vp,
 		ASSERT((ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS) ||
 		       (ip->i_d.di_format == XFS_DINODE_FMT_BTREE));
 
-		id.pid = u.u_procp->p_pid;
+#ifdef SIM
+		/*
+		 * Need pid of client not of simulator process.
+		 * This may not always be correct.
+		 */
+		id.pid = MAKE_REQ_PID(u.u_procp->p_pid - 1, 0);
+#else
+		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
+#endif
 		id.ino = ip->i_ino;
 		error  = xfs_grio_req(ip, &id, uiop, ioflag, credp, UIO_READ);
 
@@ -1343,7 +1351,15 @@ xfs_write(vnode_t	*vp,
 			resid = 0;
 		}
 
-		id.pid = u.u_procp->p_pid;
+#ifdef SIM
+		/*
+		 * Need pid of client not of simulator process.
+		 * This may not always be correct.
+		 */
+		id.pid = MAKE_REQ_PID(u.u_procp->p_pid - 1, 0);
+#else
+		id.pid = MAKE_REQ_PID(u.u_procp->p_pid, 0);
+#endif
 		id.ino = ip->i_ino;
 		error = xfs_grio_req( ip, &id, uiop, ioflag, credp, UIO_WRITE);
 
@@ -1352,6 +1368,7 @@ xfs_write(vnode_t	*vp,
 		 * uio_limit.
 		 */
 		uiop->uio_resid += resid;
+
 
 		/*
 		 * We've done at least a partial write, so don't
@@ -2068,21 +2085,20 @@ xfs_diostrat( buf_t *bp)
 	ssize_t		bytes_this_req, resid, count, totxfer;
 	off_t		offset, offset_this_req;
 	int		i, j, error, writeflag, reccount;
-	int		end_of_file, windex, wreccount, bufsissued, totresid;
-
-	int t1, t2, t3;
-
+	int		end_of_file, bufsissued, totresid;
+	int		ioflag, blk_algn;
 
 	dp        = (struct dio_s *)bp->b_private;
 	vp        = dp->vp;
 	ip        = XFS_VTOI(vp); 
 	mp 	  = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
 	sbp 	  = &mp->m_sb;
-	base      = bp->b_un.b_addr;
-	error     = resid = totxfer = end_of_file = firstfsb = windex = 0;
+	base	  = bp->b_un.b_addr;
+	error     = resid = totxfer = end_of_file = firstfsb = 0;
+	ioflag	  = dp->ioflag;
 	offset    = BBTOB(bp->b_blkno);
+	blk_algn  = 0;
 	totresid  = count  = bp->b_bcount;
-	wreccount = 0;
 
 	ASSERT(!(bp->b_flags & B_DONE));
         ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
@@ -2095,12 +2111,16 @@ xfs_diostrat( buf_t *bp)
 		writeflag = 0;
 	} else {
 		writeflag = XFS_BMAPI_WRITE;
+	}
 
+	/*
+ 	 * Check if the request is on a file system block boundary.
+	 */
+	if ( (offset % sbp->sb_blocksize) != 0 ) {
 		/*
-		 * This is protected by the iolock.
-	 	 */
-		if ((offset + count) > (ip->i_d.di_size))
-			ip->i_new_size = offset + count;
+ 		 * The request is NOT on a file system block boundary.
+		 */
+		blk_algn =  BTOBB(offset % sbp->sb_blocksize);
 	}
 
 	/*
@@ -2122,28 +2142,24 @@ xfs_diostrat( buf_t *bp)
 			 * the read flag set first to determine the existing 
 			 * extents. This is done so that the correct amount
 			 * of space can be reserved in the transaction 
-			 * structure. To avoid calling bmapi() unnecessarily,
-			 * keep track of the extents returned from the last
-			 * call to bmapi().
+			 * structure. 
 			 */
-			if (windex >= wreccount) {
-				windex = 0;
-				wreccount = XFS_BMAP_MAX_NMAP;
-				firstfsb = xfs_bmapi( tp, ip, offset_fsb, 
-					count_fsb, 0, firstfsb, 0, imaps, 
-					&wreccount, &free_list);
-			}
+			reccount = XFS_BMAP_MAX_NMAP;
+			xfs_ilock( ip, XFS_ILOCK_EXCL );
+			firstfsb = xfs_bmapi( tp, ip, offset_fsb, 
+				count_fsb, 0, firstfsb, 0, imaps, 
+				&reccount, 0);
 			/*
  			 * Get a pointer to the current extent map.
 			 * Writes will always be issued one at a time.
 			 */
 			reccount = 1;
-			imapp = &imaps[windex++];
+			imapp = &imaps[0];
 			count_fsb = imapp->br_blockcount;
+
 			/*
  			 * Setup transactions.
  			 */
-			xfs_ilock( ip, XFS_ILOCK_EXCL );
 			tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
 			error = xfs_trans_reserve( tp, count_fsb, 
 						   XFS_DEFAULT_LOG_RES(sbp),
@@ -2172,6 +2188,7 @@ xfs_diostrat( buf_t *bp)
 			 */
 			reccount = XFS_BMAP_MAX_NMAP;
 			imapp = &imaps[0];
+			xfs_ilock( ip, XFS_ILOCK_SHARED);
 		}
 
 		/*
@@ -2189,32 +2206,26 @@ xfs_diostrat( buf_t *bp)
 			xfs_bmap_finish( &tp, &free_list, firstfsb, 0 );
 			xfs_trans_commit(tp , 0 );
 			xfs_iunlock( ip, XFS_ILOCK_EXCL);
+		} else {
+			xfs_iunlock( ip, XFS_ILOCK_SHARED);
 		}
 
 		/*
    		 * Run through each extent.
 		 */
 		bufsissued = 0;
-		for (i = 0; (i < reccount) && (!end_of_file) && (count); i++) {
-			if (writeflag) {
-				/*
-				 * In the write case, imapp already points
-				 * at the one and only extent to be processed.
-				 */
-				ASSERT(reccount == 1);
-			} else {
-				imapp = &imaps[i];
-			}
+		for (i = 0; (i < reccount) && (!end_of_file) && (count); i++){
+			imapp = &imaps[i];
 
 			bytes_this_req  = xfs_fsb_to_b(sbp,
-						imapp->br_blockcount);
+				imapp->br_blockcount) - BBTOB(blk_algn);
 			offset_this_req = xfs_fsb_to_b(sbp,
-						imapp->br_startoff); 
+				imapp->br_startoff) + BBTOB(blk_algn); 
 
 			/*
 			 * Check if this is the end of the file.
 			 */
-			if (offset_this_req + bytes_this_req >ip->i_d.di_size) {
+			if (offset_this_req +bytes_this_req >ip->i_d.di_size){
 				if ( writeflag ) {
 					/*
 					 * File is being extended on a
@@ -2222,7 +2233,7 @@ xfs_diostrat( buf_t *bp)
 					 */
 			         	ASSERT((vp->v_flag & VISSWAP) == 0);
 					xfs_ilock(ip, XFS_ILOCK_EXCL);
-				 	ip->i_d.di_size = offset + 
+				 	ip->i_d.di_size = offset_this_req + 
 							bytes_this_req;
 					ip->i_update_core = 1;
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -2232,7 +2243,7 @@ xfs_diostrat( buf_t *bp)
  				 	 * file, shorten the request size.
 					 */
 					bytes_this_req = ip->i_d.di_size - 
-							offset_this_req;
+						offset_this_req;
 					end_of_file = 1;
 				}
 			}
@@ -2254,11 +2265,16 @@ xfs_diostrat( buf_t *bp)
 				 */
 	     			bps[bufsissued++]= nbp = getphysbuf();
 	     			nbp->b_flags     = bp->b_flags;
+	     			nbp->b_flags2    = bp->b_flags2;
+
+				if (ioflag & IO_GRIO)
+					nbp->b_flags2 |= B_GR_BUF;
+
 	     			nbp->b_error     = 0;
 	     			nbp->b_proc      = bp->b_proc;
 	     			nbp->b_edev      = bp->b_edev;
 	     			nbp->b_blkno     = xfs_fsb_to_daddr(sbp,
-							imapp->br_startblock);
+					imapp->br_startblock) + blk_algn;
 	     			nbp->b_bcount    = bytes_this_req;
 	     			nbp->b_un.b_addr = base;
 
@@ -2268,7 +2284,7 @@ xfs_diostrat( buf_t *bp)
 				bdstrat( bmajor(nbp->b_edev), nbp );
 	
 		    		if (error = geterror(nbp)) {
-					biowait( nbp );
+					iowait( nbp );
 					nbp->b_flags = 0;
 		     			nbp->b_un.b_addr = 0;
 					putphysbuf( nbp );
@@ -2298,6 +2314,7 @@ xfs_diostrat( buf_t *bp)
 	     		base   += bytes_this_req;
 	     		offset += bytes_this_req;
 	     		count  -= bytes_this_req;
+			blk_algn= 0;
 
 		} /* end of for loop */
 
@@ -2306,7 +2323,7 @@ xfs_diostrat( buf_t *bp)
 		 */
 		for ( j = 0; j < bufsissued ; j++) {
 	  		nbp = bps[j];
-	    		biowait( nbp );
+	    		iowait( nbp );
 
 	     		if (!error)
 				error = geterror( nbp );
@@ -2317,6 +2334,7 @@ xfs_diostrat( buf_t *bp)
 			} 
 	    	 	nbp->b_flags = 0;
 	     		nbp->b_un.b_addr = 0;
+	     		nbp->b_bcount = 0;
 	    	 	putphysbuf( nbp );
 	     	}
 	} /* end of while loop */
@@ -2333,14 +2351,13 @@ xfs_diostrat( buf_t *bp)
 		timestruc_t tv;
 
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0) {
+		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0){
 			ip->i_d.di_mode &= ~ISUID;
 			if (ip->i_d.di_mode & (IEXEC >> 3))
 				ip->i_d.di_mode &= ~ISGID;
 		}
 		nanotime( &tv );
 		ip->i_d.di_mtime.t_sec = ip->i_d.di_ctime.t_sec = tv.tv_sec;
-		ip->i_d.di_mtime.t_nsec = ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
 		ip->i_update_core = 1;
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
@@ -2349,8 +2366,7 @@ xfs_diostrat( buf_t *bp)
 	 * Issue completion on the original buffer.
 	 */
 	bioerror( bp, error);
-	biodone( bp );
-
+	iodone( bp );
 	return(0);
 }
 
