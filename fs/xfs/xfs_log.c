@@ -70,6 +70,8 @@ xfs_log_done(xfs_mount_t	*mp,
 int
 xfs_log_mount(xfs_mount_t	*mp,
 	      dev_t		log_dev,
+	      int		start_block,
+	      int		num_bblocks,
 	      uint		flags)
 {
 	return 0;
@@ -86,20 +88,23 @@ xfs_log_mount(xfs_mount_t	*mp,
 
 
 /* Local function prototypes */
-STATIC void log_alloc(xfs_mount_t *mp, dev_t log_dev);
+STATIC void	 log_alloc(xfs_mount_t *mp, dev_t log_dev, int start_block,
+			   int num_bblocks);
 STATIC xfs_lsn_t log_commit_record(xfs_mount_t *mp, log_ticket_t *ticket);
-STATIC void log_push_buffers_to_disk(log_t *log);
-STATIC void log_sync(log_t *log, log_in_core_t *iclog, uint flags);
-STATIC void log_unalloc(void);
-STATIC int  log_write(xfs_mount_t *mp, xfs_log_iovec_t	region[], int nentries,
-		      xfs_log_ticket_t	tic, xfs_lsn_t *start_lsn, int commit);
+STATIC void	 log_push_buffers_to_disk(log_t *log);
+STATIC void	 log_sync(log_t *log, log_in_core_t *iclog, uint flags);
+STATIC void	 log_unalloc(void);
+STATIC int	 log_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
+			   int nentries, xfs_log_ticket_t tic,
+			   xfs_lsn_t *start_lsn, int commit);
 
 /* local state machine functions */
 STATIC void log_state_done_syncing(log_in_core_t *iclog);
 STATIC void log_state_finish_copy(log_t *log, log_in_core_t *iclog,
 				  int first_write, int bytes);
 STATIC int  log_state_get_iclog_space(log_t *log, int len,
-				      log_in_core_t **iclog, int *last_write);
+				      log_in_core_t **iclog,
+				      int *continued_write);
 STATIC xfs_log_ticket_t log_state_get_ticket(log_t *log, int len,
 					     char log_client);
 STATIC int  log_state_lsn_is_synced(log_t *log, xfs_lsn_t lsn,
@@ -117,7 +122,8 @@ STATIC void		log_relticket(log_ticket_t *ticket);
 
 STATIC int	log_recover(struct xfs_mount *mp, dev_t log_dev);
 
-STATIC void	log_verify_iclog(log_in_core_t *iclog, int count);
+STATIC void	log_verify_dest_ptr(log_t *log, psint ptr);
+STATIC void	log_verify_iclog(log_t *log, log_in_core_t *iclog, int count);
 
 #ifdef DEBUG
 int bytes_of_ticket_used;
@@ -287,21 +293,6 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 }	/* xfs_log_reserve */
 
 
-#ifdef SIM
-#include <sys/stat.h>
-int
-log_findlogsize(dev_t log_dev)
-{
-	struct stat buf;
-	
-	if (fstat(bmajor(log_dev), &buf) == -1)
-		return -1;
-	
-	return buf.st_size;
-}
-#endif /* SIM */
-
-
 /*
  * Mount a log filesystem.
  *
@@ -313,6 +304,8 @@ log_findlogsize(dev_t log_dev)
 int
 xfs_log_mount(xfs_mount_t	*mp,
 	      dev_t		log_dev,
+	      int		start_block,
+	      int		num_bblocks,
 	      uint		flags)
 {
 	log_t *log;
@@ -320,7 +313,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	if ((flags & XFS_LOG_RECOVER) && log_recover(mp, log_dev) != 0) {
 		return XFS_ERECOVER;
 	}
-	log_alloc(mp, log_dev);
+	log_alloc(mp, log_dev, start_block, num_bblocks);
 	return 0;
 }	/* xfs_log_mount */
 
@@ -355,7 +348,9 @@ xfs_log_write(xfs_mount_t *	mp,
  */
 void
 log_alloc(xfs_mount_t	*mp,
-	  dev_t		log_dev)
+	  dev_t		log_dev,
+	  int		start_block,
+	  int		num_bblocks)
 {
 	log_t			*log;
 	log_rec_header_t	*head;
@@ -375,22 +370,22 @@ log_alloc(xfs_mount_t	*mp,
 /*	log->l_logreserved = 0; done with kmem_zalloc()*/
 /*	log->l_curr_block  = 0; done with kmem_zalloc()*/
 	log->l_prev_block  = -1;
-	log->l_sync_lsn    = 0x100000000LL;  /* cycle=1;current block=0*/
+	log->l_sync_lsn    = 0x100000000LL;  /* cycle = 1; current block = 0 */
 	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
 	log->l_xbuf	   = getrbuf(0);
 	psema(&log->l_xbuf->b_lock, PINOD);	/* it's mine */
 	initnlock(&log->l_icloglock, "iclog");
 	initnsema(&log->l_flushsema, LOG_NUM_ICLOGS, "iclog-flush");
 
-	if ((log->l_logsize = log_findlogsize(log_dev)) == -1)
-		log_panic("log_findlogsize");
-	
-	log->l_logBBsize = BTOBB(log->l_logsize);
+	log->l_logsize     = BBTOB(num_bblocks);
+	log->l_logstart    = start_block;
+	log->l_logBBsize   = BTOBB(log->l_logsize);
 	iclogp = &log->l_iclog;
 	for (i=0; i < LOG_NUM_ICLOGS; i++) {
 		unaligned = kmem_zalloc(sizeof(log_in_core_t)+4096, 0);
 		*iclogp =(log_in_core_t *)(((psint)unaligned+4095) & ~0xfff);
 		iclog = *iclogp;
+		log->l_iclog_bak[i] = iclog;
 
 		head = &iclog->ic_header;
 		head->h_magicno = LOG_HEADER_MAGIC_NUM;
@@ -414,6 +409,8 @@ log_alloc(xfs_mount_t	*mp,
 
 		iclogp = &iclog->ic_next;
 	}
+	log->l_iclog_bak[i] = 0;
+	log->l_iclog_size = LOG_RECORD_BSIZE;
 	*iclogp = log->l_iclog;		/* complete ring */
 }	/* log_alloc */
 
@@ -525,7 +522,7 @@ log_sync(log_t		*log,
 
 #ifdef DEBUG
 	if (log_debug)
-		log_verify_iclog(iclog, count);
+		log_verify_iclog(log, iclog, count);
 #endif
 
 	bwrite(bp);
@@ -569,6 +566,13 @@ log_unalloc(void)
  *
  * ERRORS:
  *	Return error at any time if reservation is overrun.
+ * NOTES:
+ * 1.  The LOG_END_TRANS & LOG_CONTINUE_TRANS flags are passed down to the
+ *	syncing routine.  When a single log_write region needs to span
+ *	multiple in-core logs, the LOG_CONTINUE_TRANS bit should be set
+ *	on all log operation writes which don't contain the end of the
+ *	region.  The LOG_END_TRANS bit is used for the in-core log
+ *	operation which contains the end of the continued log_write region.
  */
 int
 log_write(xfs_mount_t *		mp,
@@ -578,139 +582,141 @@ log_write(xfs_mount_t *		mp,
 	  xfs_lsn_t		*start_lsn,
 	  int			commit)
 {
-	log_t		*log	= mp->m_log;
-	log_ticket_t	*ticket = (log_ticket_t *)tic;
-	log_op_header_t	*logop_head;	/* ptr to log operation header */
-	log_in_core_t	*iclog;		/* ptr to current in-core log */
-	caddr_t		ptr;		/* copy address into data region */
-	int		len;		/* len of bytes to still copy */
-	int		index;		/* region index currently copying */
-	int		log_offset;	/* offset (from 0) into data region */
-	int		start_rec_copy;	/* # of bytes to copy for start rec */
-	int		remains_to_copy;/* remainder to copy if split region */
-	int		need_copy;	/* # of bytes needed to bcopy */
-	int		copy_len;	/* # of bytes actually bcopy'ing */
-	int		copy_off;	/* # of bytes from entry start */
-	int		lastwr;		/* last write of in-core log? */
-	int		firstwr=0;	/* first write of transaction */
-
-	/* Calculate potential maximum space.  Each region gets its own
-	 * log_op_header_t and may need to be double word aligned.
+    log_t		*log	= mp->m_log;
+    log_ticket_t	*ticket = (log_ticket_t *)tic;
+    log_op_header_t	*logop_head;	/* ptr to log operation header */
+    log_in_core_t	*iclog;		/* ptr to current in-core log */
+    psint		ptr;		/* copy address into data region */
+    int			len;		/* # log_write() bytes to still copy */
+    int			index;		/* region index currently copying */
+    int			log_offset;	/* offset (from 0) into data region */
+    int			start_rec_copy;	/* # bytes to copy for start record */
+    int			partial_copy=0; /* # bytes copied if split region */
+    int			need_copy;	/* # bytes need to bcopy this region */
+    int			copy_len;	/* # bytes actually bcopy'ing */
+    int			copy_off;	/* # bytes from entry start */
+    int			continuedwr;	/* continued write of in-core log? */
+    int			firstwr = 0;	/* first write of transaction */
+    
+    /* Calculate potential maximum space.  Each region gets its own
+     * log_op_header_t and may need to be double word aligned.
+     */
+    len = 0;
+    if (ticket->t_flags & LOG_TIC_INITED)	/* acct for start rec of xact */
+	len += sizeof(log_op_header_t);
+    
+    for (index = 0; index < nentries; index++) {
+	len += sizeof(log_op_header_t);		/* each region gets >= 1 */
+	len += reg[index].i_len;
+    }
+    *start_lsn = 0;
+    
+    if (ticket->t_curr_reserv < len)
+	log_panic("xfs_log_write: reservation ran out.  Need to up reservation")
+    else if ((ticket->t_flags & LOG_TIC_PERM_RESERV) == 0)
+	ticket->t_curr_reserv -= len;
+    
+    for (index = 0; index < nentries; ) {
+	log_offset = log_state_get_iclog_space(log, len, &iclog, &continuedwr);
+	
+	ptr = (psint) &iclog->ic_data[log_offset];
+	
+	/* start_lsn is the first lsn written to. That's all we need. */
+	if (! *start_lsn)
+	    *start_lsn = iclog->ic_header.h_lsn;
+	
+	/* This loop writes out as many regions as can fit in the amount
+	 * of space which was allocated by log_state_get_iclog_space().
 	 */
-	len = 0;
-	if (ticket->t_flags & LOG_TIC_INITED)	/* acct 4 start rec of xact */
-		len += sizeof(log_op_header_t);
-
-	for (index=0; index < nentries; index++) {
-		len += sizeof(log_op_header_t);
-		len += reg[index].i_len;
-	}
-	*start_lsn = 0;
-
-	if (ticket->t_curr_reserv < len)
-		log_panic("xfs_log_write: reservation ran out")
-	else if ((ticket->t_flags & LOG_TIC_PERM_RESERV) == 0)
-		ticket->t_curr_reserv -= len;
-
-	start_rec_copy = remains_to_copy = 0;
-	for (index = 0; index < nentries; ) {
-	    log_offset = log_state_get_iclog_space(log, len, &iclog, &lastwr);
-
-	    ptr = &iclog->ic_data[log_offset];
-
-	    /* start_lsn is the first lsn written to. That's all we need. */
-	    if (! *start_lsn)
-		    *start_lsn = iclog->ic_header.h_lsn;
-
-	    for ( ;index < nentries; ) {
-		ASSERT(reg[index].i_len % sizeof(long) == 0);
-		ASSERT((psint)ptr % sizeof(long) == 0);
-
-		/*
-		 * If first write for transaction, insert start record.
-		 * We can't be trying to commit if we are inited.  We
-		 * can't have any "remains_to_copy" if we are inited.
-		 */
-		if (ticket->t_flags & LOG_TIC_INITED) {
-		    logop_head		    = (log_op_header_t *)ptr;
-		    logop_head->oh_tid	    = ticket->t_tid;
-		    logop_head->oh_clientid = ticket->t_clientid;
-		    logop_head->oh_len	    = 0;
-		    logop_head->oh_flags    = LOG_START_TRANS;
-		    ticket->t_flags	    &= ~LOG_TIC_INITED;	/* clear bit */
-		    firstwr++;		/* increment log ops below */
-
-		    start_rec_copy = sizeof(log_op_header_t);
-		    log_write_adv_cnt(ptr, len, log_offset, start_rec_copy);
-		}
-
-		/* Copy log operation header directly into data section */
+	while (index < nentries) {
+	    ASSERT(reg[index].i_len % sizeof(long) == 0);
+	    ASSERT((psint)ptr % sizeof(long) == 0);
+	    start_rec_copy = 0;
+	    
+	    /*
+	     * If first write for transaction, insert start record.
+	     * We can't be trying to commit if we are inited.  We can't
+	     * have any "partial_copy" if we are inited.
+	     */
+	    if (ticket->t_flags & LOG_TIC_INITED) {
 		logop_head		= (log_op_header_t *)ptr;
 		logop_head->oh_tid	= ticket->t_tid;
-		logop_head->oh_clientid	= ticket->t_clientid;
+		logop_head->oh_clientid = ticket->t_clientid;
+		logop_head->oh_len	= 0;
+		logop_head->oh_flags    = LOG_START_TRANS;
+		ticket->t_flags		&= ~LOG_TIC_INITED;	/* clear bit */
+		firstwr++;			  /* increment log ops below */
+		
+		start_rec_copy = sizeof(log_op_header_t);
+		log_write_adv_cnt(ptr, len, log_offset, start_rec_copy);
+	    }
+	    
+	    /* Copy log operation header directly into data section */
+	    logop_head			= (log_op_header_t *)ptr;
+	    logop_head->oh_tid		= ticket->t_tid;
+	    logop_head->oh_clientid	= ticket->t_clientid;
+	    
+	    /* header copied directly */
+	    log_write_adv_cnt(ptr, len, log_offset, sizeof(log_op_header_t));
+	    
+	    /* commit record? */
+	    logop_head->oh_flags = (commit ? LOG_COMMIT_TRANS : 0);
+	    
+	    /* Partial write last time? => (partial_copy != 0)
+	     * need_copy is the amount we'd like to copy if everything could
+	     * fit in the current bcopy.
+	     */
+	    need_copy =	reg[index].i_len - partial_copy;
+	    
+	    copy_off = partial_copy;
+	    if (need_copy <= iclog->ic_size - log_offset) {  /*complete write */
+		logop_head->oh_len = copy_len = need_copy;
+		if (partial_copy)
+		    logop_head->oh_flags |= LOG_END_TRANS;
+		partial_copy = 0;
+	    } else { 					     /* partial write */
+		copy_len = logop_head->oh_len =	iclog->ic_size - log_offset;
+		partial_copy += copy_len;
+	        logop_head->oh_flags |= LOG_CONTINUE_TRANS;
+		len += sizeof(log_op_header_t);   /* from splitting of region */
+	    }
 
-		/* header copied directly */
-		log_write_adv_cnt(ptr,len, log_offset, sizeof(log_op_header_t));
+#ifdef DEBUG
+	    if (log_debug) {
+		ASSERT(copy_len >= 0);
+		log_verify_dest_ptr(log, ptr);
+	    }
+#endif
+	    /* copy region */
+	    bcopy(reg[index].i_addr + copy_off, (caddr_t)ptr, copy_len);
+	    log_write_adv_cnt(ptr, len, log_offset, copy_len);
 
-		/* commit record? */
-		logop_head->oh_flags = (commit ? LOG_COMMIT_TRANS : 0);
+	    /* make copy_len total bytes copied, including headers */
+	    copy_len += start_rec_copy + sizeof(log_op_header_t);
+	    log_state_finish_copy(log, iclog, firstwr,
+				  (continuedwr ? copy_len : 0));
 
-		/* Partial write last time? => (remains_to_copy != 0) */
-		need_copy =
-		   reg[index].i_len - remains_to_copy;
-
-		/* what type of write */
-		/*
-		 * XXXajs This doesn't yet handle the case where
-		 * remains_to_copy is > 0 and need_copy doesn't
-		 * fit again.
-		 */
-		if (need_copy <= iclog->ic_size - log_offset) {/*comple write */
-		    logop_head->oh_len = need_copy;
-		    copy_len = reg[index].i_len - remains_to_copy;
-		    copy_off = remains_to_copy;
-		    if (remains_to_copy)
-			logop_head->oh_flags |= LOG_END_TRANS;
-		    remains_to_copy = 0;
-	        } else 
-#if 0
-if (iclog->ic_size - log_offset < BBSIZE) { /* no room */
+	    firstwr = 0;
+	    if (partial_copy) {			/* copied partial region */
+		/* already marked WANT_SYNC */
+		log_state_release_iclog(log, iclog);
+		break;				     /* don't increment index */
+	    } else {				/* copied entire region */
+		index++;
+		partial_copy = 0;
+		if (iclog->ic_size - log_offset <= sizeof(log_op_header_t)) {
 		    log_state_want_sync(log, iclog);
 		    log_state_release_iclog(log, iclog);
-		    remains_to_copy = 0;
-		    break;			      /* break to outer loop */
-	        } else
-#endif
- {				/* partial write */
-		    remains_to_copy = copy_len = logop_head->oh_len =
-			  iclog->ic_size - log_offset;
-		    copy_off = 0;
-		    logop_head->oh_flags |= LOG_CONTINUE_TRANS;
-	        }
-
-		/* copy region */
-		bcopy(reg[index].i_addr + copy_off, ptr, copy_len);
-		log_write_adv_cnt(ptr, len, log_offset, copy_len);
-		log_state_finish_copy(log, iclog, firstwr,
-			(lastwr ?
-			 copy_len + start_rec_copy + sizeof(log_op_header_t) :
-			 0));
-
-		firstwr = start_rec_copy = 0;
-		if (remains_to_copy) {		/* copied partial region */
-		    /* already marked WANT_SYNC */
-		    log_state_release_iclog(log, iclog);
 		    break;
-	        } else {		/* copied entire region */
-		    index++;
 		}
 	    }
 	}
-
-
-	log_state_want_sync(log, iclog);   /* not needed for kernel XXXmiken */
-
-	log_state_release_iclog(log, iclog);
+    }
+    
+    
+    log_state_want_sync(log, iclog);   /* not needed for kernel XXXmiken */
+    
+    log_state_release_iclog(log, iclog);
 }	/* log_write */
 
 
@@ -832,7 +838,7 @@ log_state_finish_copy(log_t		*log,
  *	* log_offset where log_write() can start writing into the in-core
  *		log's data space.
  *	* in-core log pointer to which log_write() should write.
- *	* boolean indicating whether this is the last write to an in-core log.
+ *	* boolean indicating this is a continued write to an in-core log.
  *		If this is the last write, then the in-core log's offset field
  *		needs to be incremented, depending on the amount of data which
  *		is copied.
@@ -841,7 +847,7 @@ int
 log_state_get_iclog_space(log_t		*log,
 			  int		len,
 			  log_in_core_t **iclogp,
-			  int		*last_write)
+			  int		*continued_write)
 {
 	int		 spl;
 	int		 log_offset;
@@ -879,13 +885,15 @@ restart:
 
 	/* If there is enough room to write everything, then do it.  Otherwise,
 	 * claim the rest of the region and make sure the LOG_STATE_WANT_SYNC
-	 * bit is on, so this will get flushed out.
+	 * bit is on, so this will get flushed out.  Don't update ic_offset
+	 * until you know exactly how many bytes get copied.  Therefore, wait
+	 * until later to update ic_offset.
 	 */
-	if (len < iclog->ic_size - iclog->ic_offset) {
+	if (len <= iclog->ic_size - iclog->ic_offset) {
 	    iclog->ic_offset += len;
-	    *last_write = 0;
+	    *continued_write = 0;
 	} else {
-	    *last_write = 1;
+	    *continued_write = 1;
 	    if (iclog->ic_state != LOG_STATE_WANT_SYNC) {
 		iclog->ic_state = LOG_STATE_WANT_SYNC;
 		iclog->ic_header.h_prev_offset = log->l_prev_block;
@@ -902,7 +910,7 @@ restart:
 		log->l_iclog = iclog->ic_next;
 		psema(&log->l_flushsema, PINOD);
 	    }
-		
+
 	    /* log_write() algorithm assumes that at least 2
 	     * log_op_header_t's can fit into remaining data section.
 	     */
@@ -1070,8 +1078,7 @@ log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags)
 	iclog = log->l_iclog;
 	do {
 		if (iclog->ic_header.h_lsn != lsn) {
-			iclog = iclog->ic_next;
-			continue;
+		    iclog = iclog->ic_next;
 		} else {
 		    if (iclog->ic_state == LOG_STATE_ACTIVE) {
 			iclog->ic_state = LOG_STATE_WANT_SYNC;
@@ -1258,12 +1265,31 @@ log_end(struct xfs_mount *mp, dev_t log_dev)
  ******************************************************************************
  */
 void
-log_verify_iclog(log_in_core_t *iclog, int count)
+log_verify_dest_ptr(log_t *log,
+		    psint ptr)
+{
+	int i;
+	int good_ptr = 0;
+
+	for (i=0; i < LOG_NUM_ICLOGS; i++) {
+		if (ptr >= (psint)log->l_iclog_bak[i] &&
+		    ptr <= (psint)log->l_iclog_bak[i]+log->l_iclog_size)
+			good_ptr++;
+	}
+	if (! good_ptr)
+		log_panic("log_verify_dest_ptr: invalid ptr");
+}	/* log_verify_dest_ptr */
+
+
+void
+log_verify_iclog(log_t		*log,
+		 log_in_core_t	*iclog,
+		 int		count)
 {
 	log_op_header_t  *ophead;
 	log_rec_header_t *rec;
+	log_in_core_t	 *icptr;
 	log_tid_t	 tid;
-	log_t		 *log;
 	caddr_t		 ptr;
 	char		 clientid;
 	char		 buf[LOG_HEADER_SIZE];
@@ -1272,6 +1298,16 @@ log_verify_iclog(log_in_core_t *iclog, int count)
 	int		 i;
 	int		 op_len;
 	int		 cycle_no;
+
+	/* check validity of iclog pointers */
+	icptr = log->l_iclog;
+	for (i=0; i < LOG_NUM_ICLOGS; i++) {
+		if (icptr == 0)
+			log_panic("log_verify_iclog: illegal ptr");
+		icptr = icptr->ic_next;
+	}
+	if (icptr != log->l_iclog)
+		log_panic("log_verify_iclog: corrupt iclog ring");
 
 	/* check log magic numbers */
 	ptr = (caddr_t) iclog;
@@ -1303,6 +1339,8 @@ log_verify_iclog(log_in_core_t *iclog, int count)
 			tid = ophead->oh_tid;
 		else
 			tid = (log_tid_t)iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_tid - (psint)iclog->ic_data)];
+
+		/* This is a user space check */
 		if ((psint)tid < 0x10000000 || (psint)tid > 0x20000000)
 			log_panic("log_verify_iclog: illegal tid");
 
@@ -1311,8 +1349,7 @@ log_verify_iclog(log_in_core_t *iclog, int count)
 			op_len = ophead->oh_len;
 		else
 			op_len = iclog->ic_header.h_cycle_data[BTOBB((psint)&ophead->oh_len - (psint)iclog->ic_data)];
-		len -= op_len;
-		len -= sizeof(log_op_header_t);
+		len -= sizeof(log_op_header_t) + op_len;
 		ptr += sizeof(log_op_header_t) + op_len;
 	}
 	if (len != 0)
@@ -1321,7 +1358,6 @@ log_verify_iclog(log_in_core_t *iclog, int count)
 	/* check wrapping log */
 	if (BLOCK_LSN(iclog->ic_header.h_lsn) < 5) {
 		cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn);
-		log = iclog->ic_log;
 		fd = bmajor(log->l_dev);
 		if (lseek(fd, 0, SEEK_SET) < 0)
 			log_panic("log_verify_iclog: lseek 0 failed");
@@ -1384,6 +1420,9 @@ log_print_head(log_rec_header_t *head, int *len)
 	printf("length of Log Record: %d	prev offset: %d		num ops: %d\n",
 	       head->h_len, head->h_prev_offset, head->h_num_logops);
 	
+	if (head->h_lsn == 0xd00000f9e) {
+		i = 9;
+	}
 	printf("cycle num overwrites: ");
 	for (i=0; i< LOG_RECORD_BSIZE/BBSIZE; i++) {
 		printf("%d  ", head->h_cycle_data[i]);
@@ -1555,7 +1594,11 @@ log_find_head(int fd, int log_size)
 /*
  * XXXmiken: code assumes log starts at block 0
  */
-void xfs_log_print(xfs_mount_t *mp, dev_t log_dev, uint flags)
+void xfs_log_print(xfs_mount_t	*mp,
+		   dev_t	log_dev,
+		   int		start_block,
+		   int		num_bblocks,
+		   uint		flags)
 {
     int  fd = bmajor(log_dev);
     char hbuf[LOG_HEADER_SIZE];
@@ -1568,7 +1611,7 @@ void xfs_log_print(xfs_mount_t *mp, dev_t log_dev, uint flags)
     int  partial_read = -1;
     caddr_t partial_buf;
 
-    log_size = log_findlogsize(log_dev);
+    log_size = BBTOB(num_bblocks);
 
 #ifdef LOG_BREAD
     block_start = log_find_head(log_dev, log_size);
