@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.114 $"
+#ident	"$Revision: 1.115 $"
 
 /*
  * High level interface routines for log manager
@@ -528,8 +528,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	spl = LOG_LOCK(log);
 	if (!(iclog->ic_state == XLOG_STATE_ACTIVE ||
 	      iclog->ic_state == XLOG_STATE_DIRTY))
-		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
-				  &iclog->ic_forcesema, 0);
+		sv_wait(&iclog->ic_forcesema, PMEM, &log->l_icloglock, spl);
 	else
 		LOG_UNLOCK(log, spl);
 	xlog_state_put_ticket(log, tic);
@@ -601,7 +600,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 			if (free_bytes < tic->t_unit_res)
 				break;
 			free_bytes -= tic->t_unit_res;
-			cvsema(&tic->t_sema);
+			sv_signal(&tic->t_sema);
 			tic = tic->t_next;
 		} while (tic != log->l_write_headq);
 	}
@@ -621,7 +620,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 			if (free_bytes < need_bytes)
 				break;
 			free_bytes -= need_bytes;
-			cvsema(&tic->t_sema);
+			sv_signal(&tic->t_sema);
 			tic = tic->t_next;
 		} while (tic != log->l_reserve_headq);
 	}
@@ -883,8 +882,8 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	bp->b_fsprivate2   = (void *)((unsigned long)1);
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
-	initnlock(&log->l_icloglock, "iclog");
-	initnlock(&log->l_grant_lock, "grhead_iclog");
+	mutex_init(&log->l_icloglock, MUTEX_SPIN, "iclog");
+	mutex_init(&log->l_grant_lock, MUTEX_SPIN, "grhead_iclog");
 	initnsema(&log->l_flushsema, 0, "ic-flush");
 	xlog_state_ticket_alloc(log);  /* wait until after icloglock inited */
 	
@@ -927,7 +926,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 		ASSERT(iclog->ic_bp->b_flags & B_BUSY);
 		ASSERT(valusema(&iclog->ic_bp->b_lock) <= 0);
-		initnsema(&iclog->ic_forcesema, 0, "iclog-force");
+		sv_init(&iclog->ic_forcesema, SV_DEFAULT, "iclog-force");
 
 		iclogp = &iclog->ic_next;
 	}
@@ -977,7 +976,7 @@ xlog_grant_push_ail(xfs_mount_t *mp)
     int		free_blocks;		/* free blocks left to write to */
     int		free_bytes;		/* free bytes left to write to */
     int		threshhold_block;	/* block in lsn we'd like to be at */
-    int		spl;			/* last spl level */
+    int		spl;
 
     spl = GRANT_LOCK(log);
     free_bytes = xlog_space_left(log,
@@ -1148,7 +1147,7 @@ xlog_unalloc_log(xlog_t *log)
 
 	iclog = log->l_iclog;
 	for (i=0; i<log->l_iclog_bufs; i++) {
-		freesema(&iclog->ic_forcesema);
+		sv_destroy(&iclog->ic_forcesema);
 		freerbuf(iclog->ic_bp);
 		if (iclog->ic_trace != NULL) {
 			ktrace_free(iclog->ic_trace);
@@ -1158,8 +1157,8 @@ xlog_unalloc_log(xlog_t *log)
 		iclog = next_iclog;
 	}
 	freesema(&log->l_flushsema);
-	freesplock(log->l_icloglock);
-	freesplock(log->l_grant_lock);
+	mutex_destroy(&log->l_icloglock);
+	mutex_destroy(&log->l_grant_lock);
 	if (log->l_ticket_cnt != log->l_ticket_tcnt) {
 		cmn_err(CE_WARN,
 			"xlog_unalloc_log: (cnt: %d, total: %d)",
@@ -1470,7 +1469,7 @@ xlog_state_do_callback(xlog_t *log)
 		iclog->ic_state = XLOG_STATE_DIRTY;
 
 		/* wake up threads waiting in xfs_log_force() */
-		while (cvsema(&iclog->ic_forcesema));
+		sv_broadcast(&iclog->ic_forcesema);
 
 		iclog = iclog->ic_next;
 	} while (first_iclog != iclog);
@@ -1529,7 +1528,7 @@ xlog_state_done_syncing(xlog_in_core_t	*iclog)
 	 * iclog buffer out.  See xlog_state_sync() for more details.
 	 */
 	if (iclog->ic_next->ic_state == XLOG_STATE_ACTIVE)
-		cvsema(&iclog->ic_next->ic_forcesema);
+		sv_signal(&iclog->ic_next->ic_forcesema);
 	LOG_UNLOCK(log, spl);
 	xlog_state_do_callback(log);	/* also cleans log */
 }	/* xlog_state_done_syncing */
@@ -1701,7 +1700,7 @@ xlog_grant_log_space(xlog_t	   *log,
 		XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 1");
-		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
+		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: wake 1");
 		spl = GRANT_LOCK(log);
@@ -1719,7 +1718,7 @@ redo:
 			XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 2");
-		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
+		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: wake 2");
 		xlog_grant_push_ail(log->l_mp);
@@ -1784,7 +1783,7 @@ redo:
 	if (free_bytes < need_bytes) {
 		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
 			XLOG_INS_TICKETQ(log->l_write_headq, tic);
-		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
+		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: wake 1");
 		xlog_grant_push_ail(log->l_mp);
@@ -2121,8 +2120,7 @@ xlog_state_sync_all(xlog_t *log, uint flags)
 	 */
 maybe_sleep:		
 	if (flags & XFS_LOG_SYNC) {
-		spunlockspl_psema(log->l_icloglock, spl,	/* sleep */
-				  &iclog->ic_forcesema, PINOD);
+		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
 	} else {
 
 no_sleep:
@@ -2170,16 +2168,15 @@ try_again:
 		if (!already_slept &&
 		    (iclog->ic_prev->ic_state == XLOG_STATE_WANT_SYNC ||
 		    iclog->ic_prev->ic_state == XLOG_STATE_SYNCING)) {
-		    spunlockspl_psema(log->l_icloglock, spl,
-				      &iclog->ic_forcesema, 0);
+		    sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 		    already_slept = 1;
 		    goto try_again;
 		} else {
 		    iclog->ic_refcnt++;
 		    xlog_state_switch_iclogs(log, iclog, 0);
-		    spunlockspl(log->l_icloglock, spl);
+		    LOG_UNLOCK(log, spl);
 		    xlog_state_release_iclog(log, iclog);
-		    spl = splockspl(log->l_icloglock, splhi);
+		    spl = LOG_LOCK(log);
 		}
 	    } else if (iclog->ic_state == XLOG_STATE_DIRTY) {
 		LOG_UNLOCK(log, spl);
@@ -2188,8 +2185,7 @@ try_again:
 	    if ((flags & XFS_LOG_SYNC) && /* sleep */
 		!(iclog->ic_state == XLOG_STATE_ACTIVE ||
 		  iclog->ic_state == XLOG_STATE_DIRTY)) {
-		spunlockspl_psema(log->l_icloglock, spl,
-				  &iclog->ic_forcesema, 0);
+		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 	    } else {		/* just return */
 		LOG_UNLOCK(log, spl);
 	    }
@@ -2210,7 +2206,7 @@ void
 xlog_state_want_sync(xlog_t *log, xlog_in_core_t *iclog)
 {
 	int spl;
-	
+
 	spl = LOG_LOCK(log);
 	
 	if (iclog->ic_state == XLOG_STATE_ACTIVE)
@@ -2290,7 +2286,7 @@ STATIC void
 xlog_ticket_put(xlog_t		*log,
 		xlog_ticket_t	*ticket)
 {
-	freesema(&ticket->t_sema);
+	sv_destroy(&ticket->t_sema);
 
 	/*
 	 * Don't think caching will make that much difference.  It's
@@ -2370,7 +2366,7 @@ xlog_ticket_get(xlog_t		*log,
 	tic->t_flags		= XLOG_TIC_INITED;
 	if (xflags & XFS_LOG_PERM_RESERV)
 		tic->t_flags |= XLOG_TIC_PERM_RESERV;
-	initnsema(&(tic->t_sema), 0, "logtick");
+	sv_init(&(tic->t_sema), SV_DEFAULT, "logtick");
 
 	return (xfs_log_ticket_t)tic;
 }	/* xlog_ticket_get */
