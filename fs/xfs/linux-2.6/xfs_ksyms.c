@@ -145,6 +145,9 @@ EXPORT_SYMBOL(xfs_bmbt_disk_get_all);
 extern struct list_head pbd_delwrite_queue;
 EXPORT_SYMBOL(pbd_delwrite_queue);
 
+EXPORT_SYMBOL(xfs_fileoff_max);
+EXPORT_SYMBOL(xfs_bhvtom);
+EXPORT_SYMBOL(xfs_fsb_to_agno);
 EXPORT_SYMBOL(xfs_fsb_to_agbno);
 EXPORT_SYMBOL(xfs_dir2_data_unused_tag_p_arch);
 EXPORT_SYMBOL(xfs_attr_leaf_name_remote);
