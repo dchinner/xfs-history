@@ -108,10 +108,10 @@
 #define EXIT(x)  printk("Exiting  %s\n",x);
 
 #ifdef __KERNEL__
-#ifndef KDB_REASON_ENTER
+#ifndef __KDB_H
 struct pt_regs;
-extern int   kdb(int reason, int error_code, struct pt_regs *);
-#define KDB_REASON_ENTER    1
+extern int   kdb(int reason, int error_code, void *);
+#define KDB_REASON_ENTER    0
 #endif
 #define debug(str)	printk("%s\n", str); kdb(1, 0, NULL)
 extern int get_thread_id(void);
