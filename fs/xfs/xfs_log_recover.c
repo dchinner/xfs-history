@@ -3445,7 +3445,7 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {
 		cmn_err(CE_DEBUG,
-			"!Ending clean XFS mount for filesystem: %s",
+			"!Ending clean XFS mount for filesystem: %s\n",
 			log->l_mp->m_fsname);
 	}
 	return 0;
