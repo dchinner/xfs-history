@@ -89,7 +89,7 @@ xfs_attr_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp)
 
 	ifp = dp->i_afp;
 	ASSERT(ifp != NULL);
-	ASSERT(i_afp->if_bytes == 0);
+	ASSERT(ifp->if_bytes == 0);
 	if (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS) {
 		ifp->if_flags &= ~XFS_IFEXTENTS;	/* just in case */
 		dp->i_d.di_aformat = XFS_DINODE_FMT_LOCAL;
