@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.27 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -67,7 +67,7 @@
 
 typedef struct xfs_log_iovec {
 	caddr_t		i_addr;		/* beginning address of region */
-	uint		i_len;		/* length in bytes of region */
+	int		i_len;		/* length in bytes of region */
 } xfs_log_iovec_t;
 
 typedef void* xfs_log_ticket_t;
