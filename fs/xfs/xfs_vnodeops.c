@@ -1,4 +1,4 @@
-#ident "$Revision: 1.243 $"
+#ident "$Revision: 1.244 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2386,12 +2386,10 @@ xfs_bumplink(
 		ASSERT(ip->i_d.di_projid == 0);
 
 		mp = tp->t_mountp;
-		if (mp->m_sb.sb_versionnum < XFS_SB_VERSION_HASNLINK) {
+		if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
 			s = XFS_SB_LOCK(mp);
-			if (mp->m_sb.sb_versionnum <
-			    XFS_SB_VERSION_HASNLINK) {
-				mp->m_sb.sb_versionnum =
-					XFS_SB_VERSION_HASNLINK;
+			if (!XFS_SB_VERSION_HASNLINK(&mp->m_sb)) {
+				XFS_SB_VERSION_ADDNLINK(&mp->m_sb);
 				XFS_SB_UNLOCK(mp, s);
 				xfs_mod_sb(tp, XFS_SB_VERSIONNUM);
 			} else {
