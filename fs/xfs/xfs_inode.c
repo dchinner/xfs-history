@@ -1,4 +1,4 @@
-#ident "$Revision: 1.159 $"
+#ident "$Revision: 1.160 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -805,7 +805,6 @@ xfs_ialloc(
 	ip->i_d.di_extsize = 0;
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_dmstate = 0;
-	ip->i_dmevents = 0;
 	ip->i_d.di_flags = 0;
 	flags = XFS_ILOG_CORE;
 	switch (mode & IFMT) {
@@ -1302,7 +1301,8 @@ xfs_itruncate_finish(
 	ASSERT(*tp != NULL);
 	ASSERT((*tp)->t_flags & XFS_TRANS_PERM_LOG_RES);
 	ASSERT(ip->i_transp == *tp);
-	ASSERT(ip->i_item.ili_flags & XFS_ILI_HOLD);
+	ASSERT(ip->i_itemp != NULL);
+	ASSERT(ip->i_itemp->ili_flags & XFS_ILI_HOLD);
 
 
 	ntp = *tp;
@@ -2282,6 +2282,8 @@ xfs_idestroy(
 	ktrace_free(ip->i_rwtrace);
 	ktrace_free(ip->i_strat_trace);
 #endif
+	if (ip->i_itemp)
+		kmem_zone_free(xfs_ili_zone, ip->i_itemp);
 	kmem_zone_free(xfs_inode_zone, ip);
 }
 
@@ -2499,6 +2501,8 @@ xfs_iflush_fork(
 	static int		extflag[2] =
 		{ XFS_ILOG_DEXT, XFS_ILOG_AEXT };
 
+	if (iip == NULL)
+		return;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	cp = XFS_DFORK_PTR(dip, whichfork);
 	mp = ip->i_mount;
@@ -2582,7 +2586,7 @@ xfs_iflush(
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
 	ASSERT(valusema(&ip->i_flock) <= 0);
 
-	iip = &ip->i_item;
+	iip = ip->i_itemp;
 	mp = ip->i_mount;
 
 	/*
@@ -2590,7 +2594,7 @@ xfs_iflush(
 	 * flush lock and do nothing.
 	 */
 	if ((ip->i_update_core == 0) &&
-	    !(iip->ili_format.ilf_fields & XFS_ILOG_ALL)) {
+	    ((iip == NULL) || !(iip->ili_format.ilf_fields & XFS_ILOG_ALL))) {
 		xfs_ifunlock(ip);
 		return 0;
 	}
@@ -2665,7 +2669,7 @@ xfs_iflush(
 	 * In order to read the lsn we need the AIL lock, because
 	 * it is a 64 bit value that cannot be read atomically.
 	 */
-	if (iip->ili_format.ilf_fields != 0) {
+	if (iip != NULL && iip->ili_format.ilf_fields != 0) {
 		iip->ili_last_fields = iip->ili_format.ilf_fields;
 		iip->ili_format.ilf_fields = 0;
 		iip->ili_logged = 1;
@@ -2717,9 +2721,11 @@ xfs_iflush(
 		 * because we've already locked the buffer and to do anything
 		 * you really need both.
 		 */
-		ASSERT(iip->ili_logged == 0);
-		ASSERT(iip->ili_last_fields == 0);
-		ASSERT((iip->ili_item.li_flags & XFS_LI_IN_AIL) == 0);
+		if (iip != NULL) {
+			ASSERT(iip->ili_logged == 0);
+			ASSERT(iip->ili_last_fields == 0);
+			ASSERT((iip->ili_item.li_flags & XFS_LI_IN_AIL) == 0);
+		}
 		xfs_ifunlock(ip);
 		switch (flags) {
 		case XFS_IFLUSH_DELWRI_ELSE_SYNC:

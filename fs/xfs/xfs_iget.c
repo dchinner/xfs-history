@@ -235,7 +235,6 @@ again:
 	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
 	sv_init(&ip->i_pinsema, SV_DEFAULT,
 		makesname(name, "pino", vp->v_number));
-	xfs_inode_item_init(ip, mp);
 	if (lock_flags != 0) {
 		xfs_ilock(ip, lock_flags);
 	}
@@ -269,7 +268,6 @@ again:
 	ip->i_prevp = &ih->ih_next;
 	ih->ih_next = ip;
 	ih->ih_version++;
-	ip->i_dmevents = ip->i_d.di_dmevmask;	/* FIX: OR in vfs mask */
 	XFS_IHUNLOCK(ih);
 
 	/*
@@ -654,9 +652,9 @@ xfs_iunlock(xfs_inode_t	*ip,
 	 * it is in the AIL and anyone is waiting on it.  Don't do
 	 * this if the caller has asked us not to.
 	 */
-	if (!(lock_flags & XFS_IUNLOCK_NONOTIFY)) {
+	if (!(lock_flags & XFS_IUNLOCK_NONOTIFY) && ip->i_itemp != NULL) {
 		xfs_trans_unlocked_item(ip->i_mount,
-					(xfs_log_item_t*)&(ip->i_item));
+					(xfs_log_item_t*)(ip->i_itemp));
 	}
 }
 
