@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.165 $"
+#ident  "$Revision: 1.166 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -1213,6 +1213,15 @@ xfs_unmount(
 	 * and free the super block buffer & mount structures.
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
+
+	/*
+	 * If we're forcing a shutdown, typically because of a media error,
+	 * we want to make sure we invalidate dirty pages that belong to
+	 * referenced vnodes as well.
+	 */
+	if (XFS_FORCED_SHUTDOWN(mp))
+		xfs_sync(&mp->m_bhv,
+			 (SYNC_WAIT | SYNC_CLOSE), credp);
 	xfs_unmountfs(mp, vfs_flags, credp);	
 out:
 	if (sendunmountevent) {
@@ -1525,7 +1534,9 @@ xfs_sync(
 
 	mp = XFS_BHVTOM(bdp);
 
-	if (mp->m_flags & (XFS_MOUNT_FS_IS_CLEAN|XFS_MOUNT_FS_SHUTDOWN))
+	if ((mp->m_flags & XFS_MOUNT_FS_IS_CLEAN) ||
+	    ((mp->m_flags & XFS_MOUNT_FS_SHUTDOWN) &&
+	     (flags & SYNC_CLOSE) == 0))
 		return 0;
 
 	error = 0;
@@ -1687,6 +1698,15 @@ xfs_sync(
 			}
 			pflushinvalvp(vp, 0, last_byte);
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
+#ifdef XFSERRORDEBUG
+			/* XXXsup VREMAPPING ... ? */
+			if (VN_DIRTY(vp) ||
+			    ip->i_queued_bufs ||
+			    vp->v_buf || vp->v_pgcnt) {
+				printf("VNODE SYNC_CLOSE 0x%x\n",
+				       vp);	
+			}
+#endif			
 
 		} else if (flags & SYNC_DELWRI) {
 			if (VN_DIRTY(vp)) {
