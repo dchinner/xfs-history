@@ -41,11 +41,6 @@
 #include "time.h"
 #include "kmem.h"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,6)
-#define SLAB_NOFS       SLAB_BUFFER
-#define GFP_NOFS        GFP_BUFFER
-#endif
-
 #define DEF_PRIORITY	(6)
 #define MAX_SLAB_SIZE	0x10000
 

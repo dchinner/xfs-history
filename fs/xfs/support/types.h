@@ -78,9 +78,7 @@ typedef __s32	xfs32_off_t;
 typedef __u64	xfs_ino_t;	/* <inode> type */
 typedef __s64	xfs_daddr_t;	/* <disk address> type */
 typedef char *	xfs_caddr_t;	/* <core address> type */
-typedef off_t	linux_off_t;
-typedef __kernel_ino_t	linux_ino_t;
-typedef __uint32_t	xfs_dev_t;
+typedef __u32	xfs_dev_t;
 
 typedef struct {
         unsigned char   __u_bits[16];
