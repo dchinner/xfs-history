@@ -360,7 +360,8 @@ xfs_cmountfs(
 		if (ap->flags & XFSMNT_OSYNCISOSYNC)
 			mp->m_flags |= XFS_MOUNT_OSYNCISOSYNC;
 
-		if (ap->flags & XFSMNT_32BITINODES)
+		/* Default on Linux */
+		if ( 1 || ap->flags & XFSMNT_32BITINODES)
 			mp->m_flags |= XFS_MOUNT_32BITINODES;
 
 		if (ap->flags & XFSMNT_IRIXSGID)

@@ -4412,7 +4412,11 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		"NORECVR",	/* 0x0400 */
 		"SHRD",		/* 0x0800 */
 		"IOSZ",		/* 0x1000 */
-		"DSYNC",	/* 0x2000 */
+		"OSYNC",	/* 0x2000 */
+		"NOUUID",	/* 0x4000 */
+		"32BIT",	/* 0x8000 */
+		"IRIXSGID",	/* 0x10000 */
+		"NOLOGFLUSH",	/* 0x20000 */
 		0
 	};
 
