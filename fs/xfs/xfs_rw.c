@@ -1,4 +1,4 @@
-#ident "$Revision: 1.202 $"
+#ident "$Revision: 1.203 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5528,12 +5528,12 @@ xfs_diordwr(
 	 */
 	bp = getphysbuf();
 	bp->b_private = &dp;
-	if (ioflag & IO_PRIORITY) {
-		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
-			bp->b_edev = mp->m_rtdev;
-		else
-			bp->b_edev = mp->m_dev;
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME)
+		bp->b_edev = mp->m_rtdev;
+	else
+		bp->b_edev = mp->m_dev;
 
+	if (ioflag & IO_PRIORITY) {
 		/*
  	 	 * Check if this is a guaranteed rate I/O
 	 	 */
@@ -5557,7 +5557,6 @@ xfs_diordwr(
 			bp->b_flags2 &= ~B_PRIO_BUF;
 		}
 	} else {
-		bp->b_edev = mp->m_dev;
 		bp->b_grio_private = NULL;
 		bp->b_flags2 &= ~B_GR_BUF;
 		bp->b_flags2 &= ~B_PRIO_BUF;
