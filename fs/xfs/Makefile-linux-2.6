@@ -89,6 +89,10 @@ ifneq ($(CONFIG_FS_POSIX_ACL),)
   obj-y				+= xfs_acl.o
 endif
 
+ifneq ($(CONFIG_FS_POSIX_MAC),)
+  obj-y				+= xfs_mac.o
+endif
+
 obj-y				+= xfs_alloc.o \
 				   xfs_alloc_btree.o \
 				   xfs_attr.o \
@@ -134,8 +138,7 @@ obj-y				+= xfs_alloc.o \
 				   xfs_utils.o \
 				   xfs_vfsops.o \
 				   xfs_vnodeops.o \
-				   xfs_rw.o \
-				   macstubs.o
+				   xfs_rw.o
 
 # Objects not built in this directory
 obj-y				+= pagebuf/pagebuf.o linux/linux_xfs.o

@@ -30,18 +30,10 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-/*
- *  fs/xfs/linux/xfs_iops.c
- *     This file would be called xfs_inode.c, but that is already taken
- *     in the standard XFS code.
- *
- */
-
 #include <xfs.h>
 #include <linux/mm.h>
 #include <linux/locks.h>
 #include <linux/xfs_iops.h>
-#include <linux/attributes.h>
 
 
 /*
@@ -466,124 +458,6 @@ int linvfs_follow_link(struct dentry *dentry,
 	return error;
 }
 
-#ifdef CONFIG_HAVE_ATTRCTL
-/*
- * Implement attrctl(2) functions.
- * Returns -ve on error (ie -ENOMEM).
- * Updates ops[?].error fields with a +ve errno (ie +ENOMEM).
- */
-int linvfs_attrctl(
-		   struct inode	*inode,
-		   void		*oparray,
-		   int		count)
-{
-	int	i;
-	int	error = 0;
-	vnode_t	*vp;
-	attr_op_t *ops = (attr_op_t *)oparray;
-
-	for (i = 0; i < count; i++) {
-		int flags = ops[i].flags;
-		/* common flags */
-		flags &= ~(ATTR_ROOT | ATTR_DONTFOLLOW);
-		/* command specific */
-		if (ops[i].opcode == ATTR_OP_SET)
-			flags &= ~(ATTR_CREATE | ATTR_REPLACE);
-		if (flags != 0x0)
-			return -EINVAL;
-
-		/* permissions */
-		if ((ops[i].flags & ATTR_ROOT) && ! capable(CAP_SYS_ADMIN))
-			return -EPERM;
-
-		vp = LINVFS_GET_VP(inode);
-
-		switch (ops[i].opcode) {
-		case ATTR_OP_GET:
-			VOP_ATTR_GET(vp,
-				     ops[i].name,
-				     ops[i].value,
-				     &ops[i].length,
-				     ops[i].flags,
-				     (struct cred *) NULL,
-				     ops[i].error);	/* +ve return val */
-			break;
-
-		case ATTR_OP_SET:
-			VOP_ATTR_SET(vp,
-				     ops[i].name,
-				     ops[i].value,
-				     ops[i].length,
-				     ops[i].flags,
-				     (struct cred *) NULL,
-				     ops[i].error);
-			VMODIFY(vp);
-			break;
-
-		case ATTR_OP_REMOVE:
-			VOP_ATTR_REMOVE(vp,
-					ops[i].name,
-					ops[i].flags,
-					(struct cred *) NULL,
-					ops[i].error);
-			VMODIFY(vp);
-			break;
-					
-		case ATTR_OP_IRIX_LIST:
-			VOP_ATTR_LIST(vp,
-				      ops[i].value,
-				      ops[i].length,
-				      ops[i].flags,
-				      ops[i].aux,
-				      (struct cred *) NULL,
-				      ops[i].error);
-			break;
-
-		case ATTR_OP_LIST:
-		default:
-			error = ENOSYS;
-		}
-
-	}
-			
-	return -error;
-}
-#endif	/* CONFIG_HAVE_ATTRCTL */
-
-#ifdef CONFIG_FS_POSIX_ACL
-
-int linvfs_acl_get(
-		struct dentry	*dentry,
-		void		*acl,
-		void		*dacl)
-{
-	int	error = 0;
-	vnode_t	*vp;
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
-
-	VOP_ACL_GET(vp, (xfs_acl_t *)acl, (xfs_acl_t *)dacl, error);
-	return -error;
-}
-
-
-int linvfs_acl_set(
-		struct dentry	*dentry,
-		void		*acl,
-		void		*dacl)
-{
-	int	error = 0;
-	vnode_t	*vp;
-
-	vp = LINVFS_GET_VP(dentry->d_inode);
-
-	VOP_ACL_SET(vp, (xfs_acl_t *)acl, (xfs_acl_t *)dacl, error);
-	VMODIFY(vp);
-	return -error;
-}
-
-#endif
-
 int linvfs_permission(struct inode *ip, int mode)
 {
 	vnode_t	*vp;
@@ -778,63 +652,54 @@ STATIC int linvfs_prepare_write(
 
 
 struct address_space_operations linvfs_aops = {
-  readpage:		linvfs_read_full_page,
-  writepage:		linvfs_write_full_page,
-  sync_page:		block_sync_page,
-  bmap:			linvfs_bmap,
-  prepare_write:	linvfs_prepare_write,
-  commit_write:		pagebuf_commit_write,
+	readpage:		linvfs_read_full_page,
+	writepage:		linvfs_write_full_page,
+	sync_page:		block_sync_page,
+	bmap:			linvfs_bmap,
+	prepare_write:		linvfs_prepare_write,
+	commit_write:		pagebuf_commit_write,
 };
 
 struct inode_operations linvfs_file_inode_operations =
 {
-  permission:		linvfs_permission,
-  revalidate:		linvfs_revalidate,
-  setattr:		linvfs_setattr,
-#ifdef CONFIG_HAVE_ATTRCTL
-  attrctl:		linvfs_attrctl,
-#endif
-#ifdef CONFIG_FS_POSIX_ACL
-  acl_get:		linvfs_acl_get,
-  acl_set:		linvfs_acl_set,
-#endif
+	permission:		linvfs_permission,
+	revalidate:		linvfs_revalidate,
+	setattr:		linvfs_setattr,
+	setxattr:		linvfs_setxattr,
+	getxattr:		linvfs_getxattr,
+	listxattr:		linvfs_listxattr,
+	removexattr:		linvfs_removexattr,
 };
 
 struct inode_operations linvfs_dir_inode_operations =
 {
-  create:		linvfs_create,
-  lookup:		linvfs_lookup,
-  link:			linvfs_link,	
-  unlink:		linvfs_unlink,	
-  symlink:		linvfs_symlink,	
-  mkdir:		linvfs_mkdir,	
-  rmdir:		linvfs_rmdir,	
-  mknod:		linvfs_mknod,	
-  rename:		linvfs_rename,	
-  permission:		linvfs_permission,
-  revalidate:		linvfs_revalidate,
-  setattr:		linvfs_setattr,
-#ifdef CONFIG_HAVE_ATTRCTL
-  attrctl:		linvfs_attrctl,
-#endif
-#ifdef CONFIG_FS_POSIX_ACL
-  acl_get:		linvfs_acl_get,
-  acl_set:		linvfs_acl_set,
-#endif
+	create:			linvfs_create,
+	lookup:			linvfs_lookup,
+	link:			linvfs_link,	
+	unlink:			linvfs_unlink,	
+	symlink:		linvfs_symlink,	
+	mkdir:			linvfs_mkdir,	
+	rmdir:			linvfs_rmdir,	
+	mknod:			linvfs_mknod,	
+	rename:			linvfs_rename,	
+	permission:		linvfs_permission,
+	revalidate:		linvfs_revalidate,
+	setattr:		linvfs_setattr,
+	setxattr:		linvfs_setxattr,
+	getxattr:		linvfs_getxattr,
+	listxattr:		linvfs_listxattr,
+	removexattr:		linvfs_removexattr,
 };
 
 struct inode_operations linvfs_symlink_inode_operations =
 {
-  readlink:		linvfs_readlink,
-  follow_link:		linvfs_follow_link,
-  permission:		linvfs_permission,
-  revalidate:		linvfs_revalidate,
-  setattr:		linvfs_setattr,
-#ifdef CONFIG_HAVE_ATTRCTL
-  attrctl:		linvfs_attrctl,
-#endif
-#ifdef CONFIG_FS_POSIX_ACL
-  acl_get:		linvfs_acl_get,
-  acl_set:		linvfs_acl_set,
-#endif
+	readlink:		linvfs_readlink,
+	follow_link:		linvfs_follow_link,
+	permission:		linvfs_permission,
+	revalidate:		linvfs_revalidate,
+	setattr:		linvfs_setattr,
+	setxattr:		linvfs_setxattr,
+	getxattr:		linvfs_getxattr,
+	listxattr:		linvfs_listxattr,
+	removexattr:		linvfs_removexattr,
 };

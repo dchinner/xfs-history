@@ -44,9 +44,6 @@ struct super_block;
 struct fid;
 struct dm_fcntl_vector;
 
-enum whymountroot { ROOT_INIT, ROOT_REMOUNT, ROOT_UNMOUNT };
-typedef enum whymountroot whymountroot_t;
-
 typedef struct vfs {
 	u_int		vfs_flag;	/* flags */
 	dev_t		vfs_dev;	/* device of mounted VFS */
@@ -146,8 +143,6 @@ typedef struct vfsops {
                                         /* flush files */
 	int	(*vfs_vget)(bhv_desc_t *, struct vnode **, struct fid *);
 					/* get vnode from fid */
-        int     (*vfs_mountroot)(bhv_desc_t *, enum whymountroot);
-                                        /* mount the root filesystem */
         int     (*vfs_get_vnode)(bhv_desc_t *, struct vnode **, xfs_ino_t);
                                         /* get vnode using an ino_t */
 	int	(*vfs_dmapi_mount)(struct vfs *, struct vnode *,
@@ -198,12 +193,6 @@ typedef struct vfsops {
         rv = (*(VFS_FOPS(vfsp)->vfs_vget))((vfsp)->vfs_fbhv, vpp, fidp);  \
         BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
-#define VFS_MOUNTROOT(vfsp, why, rv) \
-{       \
-        BHV_READ_LOCK(&(vfsp)->vfs_bh); \
-        rv = (*(VFS_FOPS(vfsp)->vfs_mountroot))((vfsp)->vfs_fbhv, why); \
-        BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
-}
 #define VFS_GET_VNODE(vfsp, vpp, ino, rv) \
 {       \
         BHV_READ_LOCK(&(vfsp)->vfs_bh); \
@@ -222,8 +211,6 @@ typedef struct vfsops {
         rv = (*(vfs_op)->vfs_dmapi_mount)(vfsp, mvp, dir_name, fsname)
 #define VFSOPS_MOUNT(vfs_op, vfsp, mvp, uap, attrs, cr, rv) \
         rv = (*(vfs_op)->vfs_mount)(vfsp, mvp, uap, attrs, cr)
-#define VFSOPS_ROOTINIT(vfs_op, vfsp, rv) \
-        rv = (*(vfs_op)->vfs_rootinit)(vfsp)
 
 #define VFS_REMOVEBHV(vfsp, bdp)\
 {	\

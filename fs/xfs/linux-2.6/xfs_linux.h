@@ -52,7 +52,6 @@
 #include <asm/param.h>
 #include <asm/uaccess.h>
 #include <asm/byteorder.h>
-#include <linux/xqm.h>
 #include <linux/xfs_cred.h>
 #include <linux/xfs_stats.h>
 #include <linux/xfs_sysctl.h>
@@ -60,10 +59,9 @@
 #include <linux/xfs_globals.h>
 #include <linux/xfs_behavior.h>
 #include <linux/xfs_fs_subr.h>
+#include <linux/xfs_xattr.h>
 #include <linux/dmapi.h>
 #include <linux/dmapi_kern.h>
-#include <linux/attributes.h>
-#include <linux/attr_kern.h>
 
 #ifndef STATIC
 #define STATIC static
@@ -229,6 +227,7 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define ENOTSUP		ENOTSUPP	/* Not supported (POSIX 1003.1b) */
 #endif
 
+/* Note: EWRONGFS never visible outside the kernel */
 #define	EWRONGFS	EINVAL		/* Mount with wrong filesystem type */
 
 /*
@@ -239,7 +238,7 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define EFSCORRUPTED    990		/* Filesystem is corrupted */
 
 #ifndef ENOATTR
-#define ENOATTR         ENODATA 	/* Attribute not found */
+#edfine ENOATTR		ENODATA		/* Attribute not found */
 #endif
 
 #define SYNCHRONIZE()	barrier()
@@ -253,10 +252,15 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 /* IRIX uses a dynamic sizing algorithm (ndquot = 200 + numprocs*2) */
 /* we may well need to fine-tune this if it ever becomes an issue.  */
 #define DQUOT_MAX_HEURISTIC	1024	/* NR_DQUOTS */
+#define ndquot			DQUOT_MAX_HEURISTIC
 
 /* IRIX uses the current size of the name cache to guess a good value */
 /* - this isn't the same but is a good enough starting point for now. */
 #define DQUOT_HASH_HEURISTIC	files_stat.nr_files
+
+/* IRIX inodes maintain the project ID also, zero this field on Linux */
+#define DEFAULT_PROJID	0
+#define dfltprid	DEFAULT_PROJID
 
 #define MAXNAMELEN      256
 #define	MAXPATHLEN	1024

@@ -58,7 +58,8 @@ extern int cxfs_parseargs(char *, int, struct xfs_args *);
 #endif
 
 #ifdef CONFIG_FS_POSIX_ACL
-# define set_posix_acl(sb)	((sb)->s_posix_acl_flag = 1)
+# define set_posix_acl(sb)	((sb)->s_ext_attr_flags |= \
+					EXT_ATTR_FLAG_POSIX_ACL)
 #else
 # define set_posix_acl(sb)	do { } while (0)
 #endif
@@ -510,6 +511,8 @@ linvfs_fill_super(
 	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
 	set_blocksize(sb->s_dev, BBSIZE);
 	set_posix_acl(sb);
+	sb->s_ext_attr_flags |= EXT_ATTR_FLAG_EXT_ATTR;
+	sb->s_ext_attr_flags |= EXT_ATTR_FLAG_EXT_ATTR_USER;
 	set_max_bytes(sb);
 	set_quota_ops(sb);
 	sb->s_op = &linvfs_sops;
@@ -774,6 +777,8 @@ linvfs_remount(
 	cvp = LINVFS_GET_CVP(sb);
 
 	set_posix_acl(sb);
+	sb->s_ext_attr_flags |= EXT_ATTR_FLAG_EXT_ATTR;
+	sb->s_ext_attr_flags |= EXT_ATTR_FLAG_EXT_ATTR_USER;
 
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;

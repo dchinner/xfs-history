@@ -39,12 +39,6 @@
 # define XFS_ACL_STRING
 #endif
 
-#ifdef CONFIG_HAVE_ATTRCTL
-# define XFS_EA_STRING		"EAs, "
-#else
-# define XFS_EA_STRING
-#endif
-
 #ifdef CONFIG_HAVE_XFS_DMAPI
 # define XFS_DMAPI_STRING	"DMAPI, "
 #else
@@ -81,10 +75,10 @@
 # define XFS_DBG_STRING		"no debug"
 #endif
 
-#define XFS_BUILD_OPTIONS	XFS_ACL_STRING XFS_EA_STRING XFS_DMAPI_STRING \
+#define XFS_BUILD_OPTIONS	XFS_ACL_STRING XFS_DMAPI_STRING \
 				XFS_GRIO_STRING XFS_RT_STRING \
 				XFS_QUOTA_STRING XFS_VNTRACE_STRING \
-				XFS_DBG_STRING /* must be last */
+				XFS_DBG_STRING /* DBG must be last */
 
 struct buftarg;
 struct xfs_args;
