@@ -44,11 +44,13 @@ typedef struct xfs_log_item {
 /*
  * Log item types.
  */
-#define	XFS_LI_BUF	0x1234
-#define	XFS_LI_INODE	0x1235
+#define	XFS_LI_OBUF	0x1234
+#define	XFS_LI_OINODE	0x1235
 #define	XFS_LI_EFI	0x1236
 #define	XFS_LI_EFD	0x1237
 #define	XFS_LI_IUNLINK	0x1238
+#define	XFS_LI_INODE	0x1239
+#define	XFS_LI_BUF	0x123a
 
 /*
  * Transaction types.  Used to distinguish types of buffers.
