@@ -1577,6 +1577,8 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 	int error, w, entno, level, dead_level;
 	xfs_da_blkinfo_t *dead_info, *sib_info;
 	xfs_da_intnode_t *par_node, *dead_node;
+	xfs_dir_leafblock_t *dead_leaf;
+	xfs_dahash_t dead_hash;
 
 	dead_buf = *dead_bufp;
 	dead_blkno = *dead_blknop;
@@ -1595,9 +1597,16 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		mp->m_sb.sb_blocksize);
 	xfs_trans_log_buf(tp, dead_buf, 0, mp->m_sb.sb_blocksize - 1);
 	dead_info = (xfs_da_blkinfo_t *)dead_buf->b_un.b_addr;
-	dead_node = (xfs_da_intnode_t *)dead_info;
-	dead_level = dead_info->magic == XFS_DIR_LEAF_MAGIC ?
-			0 : dead_node->hdr.level;
+	if (dead_info->magic == XFS_DIR_LEAF_MAGIC) {
+		dead_leaf = (xfs_dir_leafblock_t *)dead_info;
+		dead_level = 0;
+		dead_hash =
+			dead_leaf->entries[dead_leaf->hdr.count - 1].hashval;
+	} else {
+		dead_node = (xfs_da_intnode_t *)dead_info;
+		dead_level = dead_node->hdr.level;
+		dead_hash = dead_node->btree[dead_node->hdr.count - 1].hashval;
+	}
 	if (sib_blkno = dead_info->back) {
 		if (error = xfs_da_read_buf(tp, ip, sib_blkno, -1, &sib_buf, w))
 			return error;
@@ -1624,9 +1633,6 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 					sizeof(sib_info->back)));
 		xfs_trans_brelse(tp, sib_buf);
 	}
-	/*
-	 * Clearly room for improvement here, just get it to work for now.
-	 */
 	for (par_blkno = 0, level = -1; ; ) {
 		if (error = xfs_da_read_buf(tp, ip, par_blkno, -1, &par_buf, w))
 			return error;
@@ -1636,13 +1642,20 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		if (level >= 0 && level != par_node->hdr.level + 1)
 			return XFS_ERROR(EFSCORRUPTED);
 		level = par_node->hdr.level;
+		for (entno = 0;
+		     entno < par_node->hdr.count &&
+		     par_node->btree[entno].hashval < dead_hash;
+		     entno++)
+			continue;
+		if (entno == par_node->hdr.count)
+			return XFS_ERROR(EFSCORRUPTED);
+		par_blkno = par_node->btree[entno].before;
 		if (level == dead_level + 1)
 			break;
-		par_blkno = par_node->btree[0].before;
 		xfs_trans_brelse(tp, par_buf);
 	}
 	for (;;) {
-		for (entno = 0;
+		for (;
 		     entno < par_node->hdr.count &&
 		     par_node->btree[entno].before != last_blkno;
 		     entno++)
@@ -1659,6 +1672,7 @@ xfs_da_swap_lastblock(xfs_da_args_t *args, xfs_dablk_t *dead_blknop,
 		if (par_node->hdr.level != level ||
 		    par_node->hdr.info.magic != XFS_DA_NODE_MAGIC)
 			return XFS_ERROR(EFSCORRUPTED);
+		entno = 0;
 	}
 	par_node->btree[entno].before = dead_blkno;
 	xfs_trans_log_buf(tp, par_buf,
