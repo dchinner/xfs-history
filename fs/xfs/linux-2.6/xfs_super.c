@@ -318,7 +318,7 @@ spectodevs(
 {
 	int		rval = 0;
 
-	*ddevp = *logdevp = sb->s_dev;
+	*ddevp = *logdevp = to_kdev_t(sb->s_dev);
 	if (args->logname[0])
 		rval = spectodev(args->logname, "log", logdevp);
 	if (args->rtname[0] && !rval)
@@ -542,6 +542,7 @@ fail_unmount:
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
+	return -error;
 }
 
 void

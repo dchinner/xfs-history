@@ -61,6 +61,8 @@
 #include <linux/xfs_xattr.h>
 #include <linux/dmapi.h>
 #include <linux/dmapi_kern.h>
+#include <linux/major.h>
+#include <linux/root_dev.h>
 
 #ifndef STATIC
 #define STATIC static
@@ -161,7 +163,7 @@ typedef struct xfs_dirent {		/* data from readdir() */
 
 #define SYNCHRONIZE()	barrier()
 #define lbolt		jiffies
-#define rootdev		ROOT_DEV
+#define rootdev		to_kdev_t(ROOT_DEV)
 #define __return_address __builtin_return_address(0)
 #define LONGLONG_MAX	9223372036854775807LL	/* max "long long int" */
 #define nopkg()		( ENOSYS )
