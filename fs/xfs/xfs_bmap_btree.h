@@ -9,12 +9,21 @@ struct xfs_btree_cur;
 struct xfs_btree_lblock;
 
 /*
+ * Bmap root header, on-disk form only.
+ */
+typedef struct xfs_bmdr_block_t
+{
+	__uint16_t	bb_level;	/* 0 is a leaf */
+	__uint16_t	bb_numrecs;	/* current # of data records */
+} xfs_bmdr_block_t;
+
+/*
  * Bmap btree record and extent descriptor.
  */
 typedef struct xfs_bmbt_rec
 {
 	__uint32_t	l0, l1, l2, l3;
-} xfs_bmbt_rec_t;
+} xfs_bmbt_rec_t, xfs_bmdr_rec_t;
 
 /*
  * l0:0-31 and l1:9-31 are startoff.
@@ -73,9 +82,11 @@ typedef struct xfs_bmbt_irec
 typedef struct xfs_bmbt_key
 {
 	xfs_fsblock_t	br_startoff;	/* starting file offset */
-} xfs_bmbt_key_t;
+} xfs_bmbt_key_t, xfs_bmdr_key_t;
 
-typedef xfs_fsblock_t xfs_bmbt_ptr_t;	/* btree pointer type */
+typedef xfs_fsblock_t xfs_bmbt_ptr_t, xfs_bmdr_ptr_t;	/* btree pointer type */
+					/* btree block header type */
+typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 
 #ifndef XFSDEBUG
 
@@ -296,6 +307,13 @@ xfs_bmbt_get_block(
  * Prototypes for xfs_bmap.c to call.
  */
 
+void
+xfs_bmdr_to_bmbt(
+	xfs_bmdr_block_t *,
+	int,
+	xfs_bmbt_block_t *,
+	int);
+
 int
 xfs_bmbt_decrement(
 	struct xfs_btree_cur *,
@@ -363,6 +381,13 @@ xfs_bmbt_rcheck(
 #else
 #define	xfs_bmbt_rcheck(a)
 #endif
+
+void
+xfs_bmbt_to_bmdr(
+	xfs_bmbt_block_t *,
+	int,
+	xfs_bmdr_block_t *,
+	int);
 
 int
 xfs_bmbt_update(

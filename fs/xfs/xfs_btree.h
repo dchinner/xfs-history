@@ -32,8 +32,8 @@ typedef struct xfs_btree_lblock
 	__uint32_t	bb_magic;	/* magic number for block type */
 	__uint16_t	bb_level;	/* 0 is a leaf */
 	__uint16_t	bb_numrecs;	/* current # of data records */
-	xfs_fsblock_t	bb_leftsib;	/* left sibling block or NULLAGBLOCK */
-	xfs_fsblock_t	bb_rightsib;	/* right sibling block or NULLAGBLOCK */
+	xfs_fsblock_t	bb_leftsib;	/* left sibling block or NULLFSBLOCK */
+	xfs_fsblock_t	bb_rightsib;	/* right sibling block or NULLFSBLOCK */
 } xfs_btree_lblock_t;
 
 /*
@@ -73,16 +73,16 @@ typedef struct xfs_btree_block
 #define	XFS_BB_ALL_BITS		((1 << XFS_BB_NUM_BITS) - 1)
 
 #define	XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf)	\
-	((((int)(bsz)) - (int)(sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t))) / ((lf) ? sizeof(t ## _rec_t) : (sizeof(t ## _key_t) + sizeof(t ## _ptr_t))))
+	((((int)(bsz)) - (int)(sizeof(t ## _block_t))) / ((lf) ? sizeof(t ## _rec_t) : (sizeof(t ## _key_t) + sizeof(t ## _ptr_t))))
 #define	XFS_BTREE_BLOCK_MINRECS(bsz,t,lf)	\
 	(XFS_BTREE_BLOCK_MAXRECS(bsz,t,lf) / 2)
 
 #define	XFS_BTREE_REC_ADDR(bsz,t,bb,i)	\
-	((t ## _rec_t *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t) + ((i) - 1) * sizeof(t ## _rec_t)))
+	((t ## _rec_t *)((char *)(bb) + sizeof(t ## _block_t) + ((i) - 1) * sizeof(t ## _rec_t)))
 #define	XFS_BTREE_KEY_ADDR(bsz,t,bb,i)	\
-	((t ## _key_t *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t) + ((i) - 1) * sizeof(t ## _key_t)))
+	((t ## _key_t *)((char *)(bb) + sizeof(t ## _block_t) + ((i) - 1) * sizeof(t ## _key_t)))
 #define	XFS_BTREE_PTR_ADDR(bsz,t,bb,i)	\
-	((t ## _ptr_t *)((char *)(bb) + sizeof(xfs_btree_hdr_t) + 2 * sizeof(t ## _ptr_t) + XFS_BTREE_BLOCK_MAXRECS(bsz,t,0) * sizeof(t ## _key_t) + ((i) - 1) * sizeof(t ## _ptr_t)))
+	((t ## _ptr_t *)((char *)(bb) + sizeof(t ## _block_t) + XFS_BTREE_BLOCK_MAXRECS(bsz,t,0) * sizeof(t ## _key_t) + ((i) - 1) * sizeof(t ## _ptr_t)))
 
 #define	XFS_BTREE_MAXLEVELS	8	/* max of all btrees */
 typedef struct xfs_btree_cur

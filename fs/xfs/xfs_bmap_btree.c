@@ -1577,6 +1577,35 @@ xfs_bmbt_updkey(
 }
 
 /*
+ * Convert on-disk form of btree root to in-memory form.
+ */
+void
+xfs_bmdr_to_bmbt(
+	xfs_bmdr_block_t	*dblock,
+	int			dblocklen,
+	xfs_bmbt_block_t	*rblock,
+	int			rblocklen)
+{
+	xfs_bmbt_key_t		*fkp;
+	xfs_bmbt_ptr_t		*fpp;
+	int			i;
+	xfs_bmbt_key_t		*tkp;
+	xfs_bmbt_ptr_t		*tpp;
+
+	rblock->bb_magic = XFS_BMAP_MAGIC;
+	rblock->bb_level = dblock->bb_level;
+	ASSERT(rblock->bb_level > 0);
+	rblock->bb_numrecs = dblock->bb_numrecs;
+	rblock->bb_leftsib = rblock->bb_rightsib = NULLFSBLOCK;
+	fkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	tkp = XFS_BMAP_BROOT_KEY_ADDR(rblock, 1, rblocklen);
+	fpp = XFS_BTREE_PTR_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	tpp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, rblocklen);
+	bcopy(fkp, tkp, sizeof(*fkp) * dblock->bb_numrecs);
+	bcopy(fpp, tpp, sizeof(*fpp) * dblock->bb_numrecs);
+}
+
+/*
  * Decrement cursor by one record at the level.
  * For nonzero levels the leaf-ward information is untouched.
  */
@@ -1874,6 +1903,36 @@ xfs_bmbt_rcheck(
 	}
 }
 #endif	/* XFSDEBUG */
+
+/*
+ * Convert in-memory form of btree root to on-disk form.
+ */
+void
+xfs_bmbt_to_bmdr(
+	xfs_bmbt_block_t	*rblock,
+	int			rblocklen,
+	xfs_bmdr_block_t	*dblock,
+	int			dblocklen)
+{
+	xfs_bmbt_key_t		*fkp;
+	xfs_bmbt_ptr_t		*fpp;
+	int			i;
+	xfs_bmbt_key_t		*tkp;
+	xfs_bmbt_ptr_t		*tpp;
+
+	ASSERT(rblock->bb_magic == XFS_BMAP_MAGIC);
+	ASSERT(rblock->bb_leftsib == NULLFSBLOCK);
+	ASSERT(rblock->bb_rightsib == NULLFSBLOCK);
+	ASSERT(rblock->bb_level > 0);
+	dblock->bb_level = rblock->bb_level;
+	dblock->bb_numrecs = rblock->bb_numrecs;
+	fkp = XFS_BMAP_BROOT_KEY_ADDR(rblock, 1, rblocklen);
+	tkp = XFS_BTREE_KEY_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	fpp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, rblocklen);
+	tpp = XFS_BTREE_PTR_ADDR(dblocklen, xfs_bmdr, dblock, 1);
+	bcopy(fkp, tkp, sizeof(*fkp) * dblock->bb_numrecs);
+	bcopy(fpp, tpp, sizeof(*fpp) * dblock->bb_numrecs);
+}
 
 /*
  * Update the record to the passed values.
