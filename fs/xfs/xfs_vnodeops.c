@@ -1,4 +1,4 @@
-#ident "$Revision: 1.330 $"
+#ident "$Revision: 1.331 $"
 
 
 #ifdef SIM
@@ -269,7 +269,7 @@ STATIC int
 xfs_pathconf(
 	bhv_desc_t	*bdp,
 	int		cmd,
-	u_long		*valp,
+	long		*valp,
 	struct cred 	*credp);
 
 STATIC int
@@ -4856,12 +4856,15 @@ STATIC int
 xfs_pathconf(
 	bhv_desc_t	*bdp,
 	int		cmd,
-	u_long		*valp,
+	long		*valp,
 	struct cred 	*credp)
 {
 	int error = 0;
 
 	switch (cmd) {
+	case _PC_LINK_MAX:
+		*valp = XFS_MAXLINK;
+		break;
 	case _PC_FILESIZEBITS:
 		*valp = 64;
 		break;
