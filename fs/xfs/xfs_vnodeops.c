@@ -1,4 +1,4 @@
-#ident "$Revision: 1.244 $"
+#ident "$Revision: 1.245 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -472,8 +472,9 @@ xfs_getattr(
 #if XFS_BIG_FILESYSTEMS
 	vap->va_nodeid += mp->m_inoadd;
 #endif
+        vap->va_nlink = ip->i_d.di_nlink;
 
-        if (vap->va_mask == (AT_FSID|AT_NODEID)) {
+        if (vap->va_mask == (AT_FSID|AT_NODEID|AT_NLINK)) {
 		xfs_iunlock(ip, XFS_ILOCK_SHARED);
                 return 0;
 	}
@@ -486,7 +487,6 @@ xfs_getattr(
         vap->va_uid = ip->i_d.di_uid;
         vap->va_gid = ip->i_d.di_gid;
 	vap->va_projid = ip->i_d.di_projid;
-        vap->va_nlink = ip->i_d.di_nlink;
         vap->va_vcode = 0L;
 	/*
 	 * Minor optimization, check the common cases first.
