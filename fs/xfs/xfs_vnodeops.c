@@ -1,4 +1,4 @@
-#ident "$Revision: 1.368 $"
+#ident "$Revision: 1.369 $"
 
 
 #ifdef SIM
@@ -1403,6 +1403,11 @@ xfs_fsync(
 		 */
 		VOP_FLUSH_PAGES(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : B_ASYNC,
 				FI_NONE, error2);
+	}
+
+	if (error2) {
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+		return XFS_ERROR(error2);
 	}
 
 	/*
@@ -5460,6 +5465,144 @@ xfs_fspe_dioinfo(
 #endif /* DATAPIPE */
 
 /*
+ * xfs_get_uiosize - get uio size info
+ */
+int
+xfs_get_uiosize(
+	xfs_mount_t	*mp, 
+	xfs_inode_t	*ip, 
+	struct biosize	*bs,
+	cred_t		*credp)
+{
+	int error;
+
+	if (error = xfs_iaccess(ip, IREAD, credp))
+		return error;
+
+	xfs_ilock(ip, XFS_ILOCK_SHARED);
+
+	bs->biosz_flags = (ip->i_flags & XFS_IUIOSZ) ? 1 : 0;
+	bs->biosz_read = ip->i_readio_log;
+	bs->biosz_write = ip->i_writeio_log;
+	bs->dfl_biosz_read = mp->m_readio_log;
+	bs->dfl_biosz_write = mp->m_writeio_log;
+
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+
+	return 0;
+}
+
+/*
+ * xfs_set_biosize
+ *
+ */
+int
+xfs_set_uiosize(
+	xfs_mount_t	*mp, 
+	xfs_inode_t	*ip, 
+	uint		flags,
+	int		read_iosizelog,
+	int		write_iosizelog,
+	cred_t		*credp)
+{
+	int	max_iosizelog;
+	int	min_iosizelog;
+	int	memlimit;
+	int	error;
+
+	if (error = xfs_iaccess(ip, IWRITE, credp))
+		return error;
+
+	memlimit = NBPP;
+
+	switch (memlimit) {
+	case 4096:
+		memlimit = 12;
+		break;
+	case 16384:
+		memlimit = 14;
+		break;
+	default:
+		return XFS_ERROR(EINVAL);
+	}
+
+	if (flags == 2) {
+		/*
+		 * reset the io sizes to the filesystem default values
+		 */
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+		ip->i_readio_log = mp->m_readio_log;
+		ip->i_writeio_log = mp->m_writeio_log;
+		ip->i_flags &= ~XFS_IUIOSZ;
+
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+		return 0;
+	}
+
+	/*
+	 * set iosizes to specified values -- screen out bogus values
+	 */
+	max_iosizelog = MAX(read_iosizelog, write_iosizelog);
+	min_iosizelog = MIN(read_iosizelog, write_iosizelog);
+
+	/*
+	 * new values can't be less than a page, less than the filesystem
+	 * blocksize, or out of the range of tested values
+	 */
+	if (max_iosizelog < mp->m_sb.sb_blocklog ||
+	    max_iosizelog < memlimit ||
+	    min_iosizelog < mp->m_sb.sb_blocklog ||
+	    min_iosizelog < memlimit ||
+	    min_iosizelog < XFS_MIN_IO_LOG ||
+	    max_iosizelog > XFS_MAX_IO_LOG ||
+	    flags > 2)
+		return XFS_ERROR(EINVAL);
+
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+
+	if (!(ip->i_flags & XFS_IUIOSZ)) {
+		ip->i_readio_log = (uchar_t) read_iosizelog;
+		ip->i_readio_blocks = 1 << (int) (ip->i_readio_log -
+						mp->m_sb.sb_blocklog);
+		ip->i_writeio_log = (uchar_t) write_iosizelog;
+		ip->i_writeio_blocks = 1 << (int) (ip->i_writeio_log -
+						mp->m_sb.sb_blocklog);
+		ip->i_flags |= XFS_IUIOSZ;
+		ip->i_max_io_log = MAX(ip->i_max_io_log,
+					MAX(mp->m_readio_log,
+					    ip->i_readio_log));
+	} else {
+		/*
+		 * if inode already has non-default values set,
+		 * only allow the values to get smaller unless
+		 * explictly overridden
+		 */
+		if (read_iosizelog < ip->i_readio_log || flags == 1) {
+			ip->i_readio_log = (uchar_t) read_iosizelog;
+			ip->i_readio_blocks = 1 << (int) (ip->i_readio_log -
+							mp->m_sb.sb_blocklog);
+			ip->i_max_io_log = MAX(ip->i_max_io_log,
+						MAX(mp->m_readio_log,
+						    ip->i_readio_log));
+		}
+		if (write_iosizelog < ip->i_writeio_log || flags == 1) {
+			ip->i_writeio_log = (uchar_t) write_iosizelog;
+			ip->i_writeio_blocks = 1 << (int) (ip->i_writeio_log -
+							mp->m_sb.sb_blocklog);
+			ip->i_max_io_log = MAX(ip->i_max_io_log,
+						MAX(mp->m_writeio_log,
+						    ip->i_writeio_log));
+		}
+	}
+
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+	return 0;
+}
+
+/*
  * xfs_fcntl
  */
 /*ARGSUSED*/
@@ -5479,6 +5622,7 @@ xfs_fcntl(
 	struct irix5_flock	i5_bf;
 	vnode_t 		*vp;
 	xfs_inode_t		*ip;
+	struct biosize		bs;
 	struct dioattr		da;
 	struct fsxattr		fa;
 	vattr_t			va;
@@ -5707,6 +5851,24 @@ xfs_fcntl(
 		error = xfs_dm_fcntl(bdp, arg, flags, offset, credp, rvalp);
 		break;
 #endif
+
+	case F_SETBIOSIZE:
+		if (copyin(arg, &bs, sizeof(struct biosize))) {
+			error = XFS_ERROR(EFAULT);
+			break;
+		}
+		error = xfs_set_uiosize(mp, ip, bs.biosz_flags, bs.biosz_read,
+					bs.biosz_write, credp);
+		break;
+
+	case F_GETBIOSIZE:
+		error = xfs_get_uiosize(mp, ip, &bs, credp);
+		if (copyout(&bs, arg, sizeof(struct biosize))) {
+			error = XFS_ERROR(EFAULT);
+			break;
+		}
+		break;
+
 	default:
 		error = XFS_ERROR(EINVAL);
 		break;
