@@ -26,6 +26,7 @@
 #include "xfs_bmap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
+#include "xfs_inode_item.h"
 #include "xfs_inode.h"
 
 #ifdef SIM
@@ -172,6 +173,8 @@ again:
 #endif
 
 	mrinit(&ip->i_lock, makesname(name, "xino", (int)vp->v_number));
+	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
+	xfs_inode_item_init(ip, mp);
 	xfs_ilock(ip, (int)flags);
 
 	/*
@@ -224,6 +227,54 @@ out:
 	return ip;
 }
 
+/*
+ * Look for the inode corresponding to the given ino in the hash table.
+ * If it is there and its i_transp pointer matches tp, return it.
+ * Otherwise, return NULL.
+ */
+xfs_inode_t *
+xfs_inode_incore(xfs_mount_t *mp, xfs_ino_t ino, xfs_trans_t *tp)
+{
+	xfs_ihash_t	*ih;
+	xfs_inode_t	*ip;
+	xfs_inode_t	*iq;
+	vnode_t		*vp;
+	ulong		version;
+	vmap_t		vmap;
+	int		s;
+
+	ih = XFS_IHASH(mp, ino);
+	XFS_IHLOCK(ih);
+	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
+		if (ip->i_ino == ino) {
+			/*
+			 * If we find it and tp matches, return it.
+			 * Also move it to the front of the hash list
+			 * if we find it and it is not already there.
+			 * Otherwise break from the loop and return
+			 * NULL.
+			 */
+			if (ip->i_transp == tp) {
+				if (ip->i_prevp != &ih->ih_next) {
+					if (iq = ip->i_next) {
+						iq->i_prevp = ip->i_prevp;
+					}
+					*ip->i_prevp = iq;
+					iq = ih->ih_next;
+					iq->i_prevp = &ip->i_next;
+					ip->i_next = iq;
+					ip->i_prevp = &ih->ih_next;
+					ih->ih_next = ip;
+				}
+				XFS_IHUNLOCK(ih);
+				return (ip);
+			}
+			break;
+		}
+	}	
+	XFS_IHUNLOCK(ih);
+	return (NULL);
+}
 
 /*
  * Decrement reference count of an inode structure and unlock it.
@@ -333,4 +384,27 @@ void
 xfs_iunlock(xfs_inode_t *ip)
 {
 	mrunlock(&ip->i_lock);
+}
+
+/*
+ * The following three routines simply manage the i_flock
+ * semaphore embedded in the inode.  This semaphore synchronizes
+ * processes attempting to flush the in-core inode back to disk.
+ */
+void
+xfs_iflock(xfs_inode_t *ip)
+{
+	psema(&ip->i_flock, PINOD);
+}
+
+int
+xfs_iflock_nowait(xfs_inode_t *ip)
+{
+	return (cpsema(&ip->i_flock));
+}
+
+void
+xfs_ifunlock(xfs_inode_t *ip)
+{
+	vsema(&ip->i_flock);
 }
