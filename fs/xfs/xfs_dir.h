@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_H
 #define	_FS_XFS_DIR_H
 
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 /*
  * xfs_dir.h
@@ -79,5 +79,8 @@ int	xfs_dir_getdents(struct xfs_trans *tp, struct xfs_inode *dp,
 int	xfs_dir_replace(struct xfs_trans *tp, struct xfs_inode *dp,
 			       char *name_string, int name_length,
 			       xfs_ino_t inode_number);
+
+int	xfs_dir_canenter(struct xfs_trans *tp, struct xfs_inode *dp,
+				char *name_string);
 
 #endif	/* !_FS_XFS_DIR_H */
