@@ -1,4 +1,4 @@
-#ident "$Revision: 1.20 $"
+#ident "$Revision: 1.21 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -718,7 +718,7 @@ xfs_qm_idtodq(
 				       XFS_TRANS_PERM_LOG_RES,
 				       XFS_WRITE_LOG_COUNT)) {
 			cancelflags = 0;
-			goto error_return;
+			goto error0;
 		}
 		cancelflags = XFS_TRANS_RELEASE_LOG_RES;
 	}
@@ -735,20 +735,22 @@ xfs_qm_idtodq(
 		 */
 		xfs_dqtrace_entry(dqp, "DQREAD FAIL");
 		cancelflags |= XFS_TRANS_ABORT;
-		goto error_return;
+		goto error0;
 	}
 	if (tp) {
-		(void) xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES);
+		if (error = xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES))
+			goto error1;
 	}
 	
 	*O_dqpp = dqp;
 	ASSERT(! XFS_DQ_IS_LOCKED(dqp));
 	return (0);
 
- error_return:
+ error0:
 	ASSERT(error);
 	if (tp)
 		xfs_trans_cancel(tp, cancelflags);
+ error1:
 	xfs_qm_dqdestroy(dqp);
 	*O_dqpp = NULL;
 	return (error);
