@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.103 $"
+#ident	"$Revision: 1.104 $"
 
 /*
  * Free space allocation for XFS.
@@ -2303,7 +2303,9 @@ xfs_alloc_read_agf(
 		pag->pagf_levels[XFS_BTNUM_CNTi] =
 			agf->agf_levels[XFS_BTNUM_CNTi];
 		pag->pagf_init = 1;
-	} else {
+	} 
+#ifdef DEBUG
+	else if (!XFS_FORCED_SHUTDOWN(mp)) {
 		ASSERT(pag->pagf_freeblks == agf->agf_freeblks);
 		ASSERT(pag->pagf_flcount == agf->agf_flcount);
 		ASSERT(pag->pagf_longest == agf->agf_longest);
@@ -2312,6 +2314,7 @@ xfs_alloc_read_agf(
 		ASSERT(pag->pagf_levels[XFS_BTNUM_CNTi] ==
 		       agf->agf_levels[XFS_BTNUM_CNTi]);
 	}
+#endif
 	bp->b_ref = XFS_AGF_REF;
 	*bpp = bp;
 	return 0;
