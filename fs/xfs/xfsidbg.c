@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.144 $"
+#ident	"$Revision: 1.145 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -2040,8 +2040,8 @@ static char *xfs_fmtsize(size_t i);
 static char *xfs_fmtuuid(uuid_t *);
 static void xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary);
 static void xfs_inodebuf(xfs_buf_t *bp);
-static void xfs_prdinode(xfs_dinode_t *di, int coreonly);
-static void xfs_prdinode_core(xfs_dinode_core_t *dip);
+static void xfs_prdinode(xfs_dinode_t *di, int coreonly, int convert);
+static void xfs_prdinode_core(xfs_dinode_core_t *dip, int convert);
 static void xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary);
 static void xfs_xexlist_fork(xfs_inode_t *ip, int whichfork);
 static void xfs_xnode_fork(char *name, xfs_ifork_t *f);
@@ -2539,6 +2539,9 @@ xfs_inode_item_print(xfs_inode_log_item_t *ilip, int summary)
 	kdb_printf(" last fields: ");
 	printflags(ilip->ili_last_fields, ilf_fields, "lastfield");
 	kdb_printf("\n");
+	kdb_printf(" flush lsn %s last lsn %s\n",
+		xfs_fmtlsn(&(ilip->ili_flush_lsn)),
+		xfs_fmtlsn(&(ilip->ili_last_lsn)));
 	kdb_printf("dsize %d, asize %d, rdev 0x%x\n",
 		ilip->ili_format.ilf_dsize,
 		ilip->ili_format.ilf_asize,
@@ -2579,7 +2582,6 @@ xfs_qoff_item_print(xfs_qoff_logitem_t *lip, int summary)
 static void
 xfs_inodebuf(xfs_buf_t *bp)
 {
-#ifndef __linux__
 	xfs_dinode_t *di;
 	int n, i;
 	vfs_t *vfsp;
@@ -2587,18 +2589,17 @@ xfs_inodebuf(xfs_buf_t *bp)
 	xfs_mount_t *mp;
 	extern int  xfs_fstype;
 
-	vfsp = vfs_devsearch_nolock(bp->b_edev, xfs_fstype);
+	vfsp = LINVFS_GET_VFS(bp->pb_target->i_sb);
 	if (!vfsp)
 		return;
-	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	bdp = VFS_BHVHEAD(vfsp)->bh_first;
 	mp = XFS_BHVTOM(bdp);
 	n = XFS_BUF_COUNT(bp) >> mp->m_sb.sb_inodelog;
 	for (i = 0, di = (xfs_dinode_t *)XFS_BUF_PTR(bp);
 	     i < n;
 	     i++, di = (xfs_dinode_t *)((char *)di + mp->m_sb.sb_inodesize)) {
-		xfs_prdinode(di, 0);
+		xfs_prdinode(di, 0, ARCH_CONVERT);
 	}
-#endif
 }
 
 
@@ -2606,11 +2607,12 @@ xfs_inodebuf(xfs_buf_t *bp)
  * Print disk inode.
  */
 static void
-xfs_prdinode(xfs_dinode_t *di, int coreonly)
+xfs_prdinode(xfs_dinode_t *di, int coreonly, int convert)
 {
-	xfs_prdinode_core(&di->di_core);
+	xfs_prdinode_core(&di->di_core, convert);
 	if (!coreonly)
-		kdb_printf("next_unlinked 0x%x u@0x%p\n", di->di_next_unlinked,
+		kdb_printf("next_unlinked 0x%x u@0x%p\n",
+			INT_GET(di->di_next_unlinked, convert),
 			&di->di_u);
 }
 
@@ -2618,7 +2620,7 @@ xfs_prdinode(xfs_dinode_t *di, int coreonly)
  * Print disk inode core.
  */
 static void
-xfs_prdinode_core(xfs_dinode_core_t *dip)
+xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 {
 	static char *diflags[] = {
 		"realtime",		/* XFS_DIFLAG_REALTIME */
@@ -2627,26 +2629,40 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
 	};
 
 	kdb_printf("magic 0x%x mode 0%o (%s) version 0x%x format 0x%x (%s)\n",
-		dip->di_magic, dip->di_mode, xfs_fmtmode(dip->di_mode),
-		dip->di_version, dip->di_format,
-		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_format));
+		INT_GET(dip->di_magic, convert),
+		INT_GET(dip->di_mode, convert),
+		xfs_fmtmode(INT_GET(dip->di_mode, convert)),
+		INT_GET(dip->di_version, convert),
+		INT_GET(dip->di_format, convert),
+		xfs_fmtformat(
+		    (xfs_dinode_fmt_t)INT_GET(dip->di_format, convert)));
 	kdb_printf("nlink 0x%x uid 0x%x gid 0x%x projid 0x%x\n",
-		dip->di_nlink, dip->di_uid, dip->di_gid,
-		(uint)dip->di_projid);
+		INT_GET(dip->di_nlink, convert),
+		INT_GET(dip->di_uid, convert),
+		INT_GET(dip->di_gid, convert),
+		(uint)INT_GET(dip->di_projid, convert));
 	kdb_printf("atime 0x%x:%x mtime 0x%x:%x ctime 0x%x:%x\n",
-		dip->di_atime.t_sec, dip->di_atime.t_nsec,
-		dip->di_mtime.t_sec, dip->di_mtime.t_nsec,
-		dip->di_ctime.t_sec, dip->di_ctime.t_nsec);
-	kdb_printf("size 0x%Lx ", dip->di_size);
+		INT_GET(dip->di_atime.t_sec, convert),
+		INT_GET(dip->di_atime.t_nsec, convert),
+		INT_GET(dip->di_mtime.t_sec, convert),
+		INT_GET(dip->di_mtime.t_nsec, convert),
+		INT_GET(dip->di_ctime.t_sec, convert),
+		INT_GET(dip->di_ctime.t_nsec, convert));
+	kdb_printf("size 0x%Lx ", INT_GET(dip->di_size, convert));
 	kdb_printf("nblocks %Ld extsize 0x%x nextents 0x%x anextents 0x%x\n",
-		dip->di_nblocks, dip->di_extsize,
-		dip->di_nextents, dip->di_anextents);
+		INT_GET(dip->di_nblocks, convert),
+		INT_GET(dip->di_extsize, convert),
+		INT_GET(dip->di_nextents, convert),
+		INT_GET(dip->di_anextents, convert));
 	kdb_printf("forkoff %d aformat 0x%x (%s) dmevmask 0x%x dmstate 0x%x ",
-		dip->di_forkoff, dip->di_aformat,
-		xfs_fmtformat((xfs_dinode_fmt_t)dip->di_aformat),
-		dip->di_dmevmask, dip->di_dmstate);
-	printflags(dip->di_flags, diflags, "flags");
-	kdb_printf("gen 0x%x\n", dip->di_gen);
+		INT_GET(dip->di_forkoff, convert),
+		INT_GET(dip->di_aformat, convert),
+		xfs_fmtformat(
+		    (xfs_dinode_fmt_t)INT_GET(dip->di_aformat, convert)),
+		INT_GET(dip->di_dmevmask, convert),
+		INT_GET(dip->di_dmstate, convert));
+	printflags(INT_GET(dip->di_flags, convert), diflags, "flags");
+	kdb_printf("gen 0x%x\n", INT_GET(dip->di_gen, convert));
 }
 
 /*
@@ -4370,7 +4386,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	xfs_xnode_fork("data", &ip->i_df);
 	xfs_xnode_fork("attr", ip->i_afp);
 	kdb_printf("\n");
-	xfs_prdinode_core(&ip->i_d);
+	xfs_prdinode_core(&ip->i_d, ARCH_NOCONVERT);
 }
 
 static void
