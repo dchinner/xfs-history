@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_TYPES_H
 #define	_FS_XFS_TYPES_H
 
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 /*
  * xFS types
@@ -19,7 +19,7 @@
  */
 
 #ifndef XFS_BIG_FILES
-#if defined(_K32U32) || defined(_K32U64)
+#if defined(_K32U32) || defined(_K32U64) || defined(_K64U64)
 #define	XFS_BIG_FILES		0
 #else
 #define	XFS_BIG_FILES		1
@@ -27,7 +27,7 @@
 #endif
 
 #ifndef XFS_BIG_FILESYSTEMS
-#if defined(_K32U32) || defined(_K32U64)
+#if defined(_K32U32) || defined(_K32U64) || defined(_K64U64)
 #define	XFS_BIG_FILESYSTEMS	0
 #else
 #define	XFS_BIG_FILESYSTEMS	1
