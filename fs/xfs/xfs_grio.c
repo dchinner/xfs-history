@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.29 1994/07/26 23:02:22 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.30 1994/07/29 23:15:53 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -365,7 +365,7 @@ xfs_grio_req( xfs_inode_t *ip,
 	off_t	offset,
 	int rw)
 {
-	int 		sz, ret = 0, remainingio, thisioreq, set_size, s; 
+	int 		sz, ret = 0, remainingio, thisioreq, set_size, s, eof = 0; 
 	int		which_disk, current_disk, num_sec, sec, delay_ticks;
 	time_t		snap_lbolt;
 	vnode_t 	*vp;
@@ -446,7 +446,7 @@ retry_request:
 		ret = 0;
 		remainingio = uiop->uio_resid;
 		uiop->uio_resid = 0;
-		while ((remainingio) && (!ret)) {
+		while ((remainingio) && (!ret) && (!eof)) {
 
 	       		/*
          		 * Check if the request is within the time limits
@@ -505,12 +505,11 @@ retry_request:
 					uiop, ioflag, credp, rw);
 
 				/*
-			 	 * Check for errors.
+			 	 * Check for end of file.
 			 	 */
-				if (ret || (uiop->uio_resid != 0)) {
-					ret = -1;
+				if ((uiop->uio_resid != 0)) {
+					eof = 1;
 				}
-
 			} else {
                 		/*
                  		 * The user issued the next request too soon, 
@@ -540,16 +539,12 @@ retry_request:
 		 	 */
 			if (( ticket = xfs_io_is_guaranteed(ip,id,&s)) == NULL){
        				ticket_unlock(ip, s);
-				if (ret) {
-		        		uiop->uio_resid += remainingio;
-				} else {
-                			uiop->uio_resid          = remainingio;
-					uiop->uio_iov[0].iov_len = remainingio;
-					if (uiop->uio_resid) {
-						vp = XFS_ITOV(ip);
-						xfs_grio_issue_io(vp, uiop, 
-							ioflag, credp, rw);
-					}
+		        	uiop->uio_resid += remainingio;
+				uiop->uio_iov[0].iov_len = uiop->uio_resid;
+				if (uiop->uio_resid) {
+					vp = XFS_ITOV(ip);
+					ret = xfs_grio_issue_io(vp, uiop, 
+						ioflag, credp, rw);
 				}
 				return(ret);
 			}
@@ -558,12 +553,9 @@ retry_request:
 		/*
 		 * Add unperformed I/O back into resid.
 		 */
-		if (ret) {
-		        uiop->uio_resid += remainingio;
-		} else {
-                	uiop->uio_resid = remainingio;
-			uiop->uio_iov[0].iov_len = remainingio;
-		}
+		uiop->uio_resid += remainingio;
+		uiop->uio_iov[0].iov_len = uiop->uio_resid;
+
        		ticket_unlock(ip, s);
 	} else {
        		ticket_unlock(ip, s);
