@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.220 $"
+#ident	"$Revision: 1.221 $"
 
 /*
  * High level interface routines for log manager
@@ -531,17 +531,19 @@ xfs_log_mount(xfs_mount_t	*mp,
 	 * skip log recovery on a norecovery mount.  pretend it all
 	 * just worked.
 	 */
-	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY)) {
-		if ((error = xlog_recover(log,
-				XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)) != 0) {
-                        cmn_err(CE_WARN, "XFS: log mount/recovery failed\n");
-			xlog_unalloc_log(log);
-		}
-	} else
+	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
+		error = xlog_recover(log,
+			XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY);
+	else
 		error = 0;
-
-	/* Normal transactions can now occur */
-	log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+        
+        if (error) {
+                cmn_err(CE_WARN, "XFS: log mount/recovery failed\n");
+		xlog_unalloc_log(log);
+        } else {
+	        /* Normal transactions can now occur */
+	        log->l_flags &= ~XLOG_ACTIVE_RECOVERY;
+        }
 
 	/* End mounting message in xfs_log_mount_finish */
 	return error;
