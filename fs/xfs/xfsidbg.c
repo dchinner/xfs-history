@@ -31,7 +31,8 @@
  */
 #ident	"$Revision$"
 
-#define FSID_T
+#include <xfs_os_defs.h>
+
 #include <sys/types.h>
 #include <linux/version.h>
 #include <linux/module.h>
@@ -39,10 +40,9 @@
 #include <linux/kdbprivate.h>
 
 #include <linux/xfs_to_linux.h>
-#include <linux/slab.h>
+#include <linux/mm.h>
 #include <linux/linux_to_xfs.h>
 
-#include <xfs_os_defs.h>
 
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -3696,6 +3696,8 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	int		*hist;
 	int		hist_bytes = mp->m_ihsize * sizeof(int);
 	int		hist2[21];
+	void		*kmalloc(size_t, int);
+	void		kfree_s(void *, size_t);
 
 	hist = (int *) kmalloc(hist_bytes, GFP_KERNEL);
         ASSERT(hist);
