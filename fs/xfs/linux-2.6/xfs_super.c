@@ -876,7 +876,7 @@ static int __init init_xfs_fs(void)
 		KERN_INFO "SGI XFS with " XFS_BUILD_OPTIONS " enabled\n";
 
 	si_meminfo(&si);
-	physmem = si.totalram;
+	xfs_physmem = si.totalram;
 
 	printk(message);
 

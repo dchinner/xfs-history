@@ -645,9 +645,9 @@ xfs_mountfs(
 	 * Set the number of readahead buffers to use based on
 	 * physical memory size.
 	 */
-	if (physmem <= 4096)		/* <= 16MB */
+	if (xfs_physmem <= 4096)		/* <= 16MB */
 		mp->m_nreadaheads = XFS_RW_NREADAHEAD_16MB;
-	else if (physmem <= 8192)	/* <= 32MB */
+	else if (xfs_physmem <= 8192)	/* <= 32MB */
 		mp->m_nreadaheads = XFS_RW_NREADAHEAD_32MB;
 	else
 		mp->m_nreadaheads = XFS_RW_NREADAHEAD_K32;
@@ -669,7 +669,7 @@ xfs_mountfs(
 	 * size.  This may still be overridden by the file system
 	 * block size if it is larger than the chosen cluster size.
 	 */
-	if (physmem <= btoc(32 * 1024 * 1024)) { /* <= 32 MB */
+	if (xfs_physmem <= btoc(32 * 1024 * 1024)) { /* <= 32 MB */
 		mp->m_inode_cluster_size = XFS_INODE_SMALL_CLUSTER_SIZE;
 	} else {
 		mp->m_inode_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;

@@ -1064,7 +1064,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	 * Special case machines that have less than 32MB of memory.
 	 * All machines with more memory use 32KB buffers.
 	 */
-	if (physmem <= btoc(32*1024*1024)) {
+	if (xfs_physmem <= btoc(32*1024*1024)) {
 		/* Don't change; min configuration */
 		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 16k */
 		log->l_iclog_size_log = XLOG_RECORD_BSHIFT;

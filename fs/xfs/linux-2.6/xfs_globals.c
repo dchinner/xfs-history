@@ -45,5 +45,5 @@ uint64_t	xfs_panic_mask;		/* set to cause more panics */
 int             restricted_chown = 0;
 int     	scache_linemask = 0x1f;       /* second level cache line size mask */
 prid_t		dfltprid;
-unsigned long   physmem;
+unsigned long   xfs_physmem;
 int		ndquot;
