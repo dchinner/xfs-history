@@ -69,7 +69,7 @@ xfs_mount_init(void)
 }
 	
 xfs_mount_t *
-xfs_mount(dev_t dev)
+xfs_mount(dev_t dev, dev_t rtdev)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
@@ -84,6 +84,7 @@ xfs_mount(dev_t dev)
 	mp->m_vfsp = vfsp;
 	vfsp->vfs_data = mp;
 	mp->m_dev = dev;
+	mp->m_rtdev = rtdev;
 	vfsp->vfs_dev = dev;
 
 	/*
@@ -116,6 +117,16 @@ xfs_mount(dev_t dev)
 	mp->m_bsize = xfs_btod(sbp, 1);
 	mp->m_agrotor = 0;
 
+	/*
+	 * Initialize realtime fields in the mount structure
+	 */
+	if (sbp->sb_rblocks) {
+		mp->m_rsumlevels = sbp->sb_rextslog + 1;
+		mp->m_rsumsize = sizeof(xfs_suminfo_t) * mp->m_rsumlevels * sbp->sb_rbmblocks;
+		mp->m_rsumsize = roundup(mp->m_rsumsize, sbp->sb_blocksize);
+		mp->m_rbmip = mp->m_rsumip = NULL;
+	}
+
 	vsema(&bp->b_lock);
 	ASSERT(valusema(&bp->b_lock) > 0);
 
@@ -124,6 +135,17 @@ xfs_mount(dev_t dev)
 	 * file system.
 	 */
 	xfs_ihash_init(mp);
+
+	/*
+	 * Initialize realtime inode pointers in the mount structure
+	 */
+	if (sbp->sb_rbmino != NULLFSINO) {
+		mp->m_rbmip = xfs_iget(mp, NULL, sbp->sb_rbmino, XFS_ILOCK_SHARED);
+		xfs_iunlock(mp->m_rbmip, XFS_ILOCK_SHARED);
+		ASSERT(sbp->sb_rsumino != NULLFSINO);
+		mp->m_rsumip = xfs_iget(mp, NULL, sbp->sb_rsumino, XFS_ILOCK_SHARED);
+		xfs_iunlock(mp->m_rsumip, XFS_ILOCK_SHARED);
+	}
 
 	return mp;
 }
@@ -143,6 +165,7 @@ xfs_umount(xfs_mount_t *mp)
 	error = iowait(bp);
 	ASSERT(error == 0);	
 	freerbuf(bp);
+	/* what do we do for m_rsumip, mp_rbmip? */
 }
 
 /*
@@ -166,12 +189,14 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 		offsetof(xfs_sb_t, sb_blocksize),
 		offsetof(xfs_sb_t, sb_magicnum),
 		offsetof(xfs_sb_t, sb_rblocks),
-		offsetof(xfs_sb_t, sb_rbitmap),
-		offsetof(xfs_sb_t, sb_rsummary),
+		offsetof(xfs_sb_t, sb_rextents),
 		offsetof(xfs_sb_t, sb_rootino),
+		offsetof(xfs_sb_t, sb_rbmino),
+		offsetof(xfs_sb_t, sb_rsumino),
 		offsetof(xfs_sb_t, sb_rextsize),
 		offsetof(xfs_sb_t, sb_agblocks),
 		offsetof(xfs_sb_t, sb_agcount),
+		offsetof(xfs_sb_t, sb_rbmblocks),
 		offsetof(xfs_sb_t, sb_versionnum),
 		offsetof(xfs_sb_t, sb_sectsize),
 		offsetof(xfs_sb_t, sb_inodesize),
@@ -183,6 +208,7 @@ xfs_mod_sb(xfs_trans_t *tp, int fields)
 		offsetof(xfs_sb_t, sb_inodelog),
 		offsetof(xfs_sb_t, sb_inopblog),
 		offsetof(xfs_sb_t, sb_agblklog),
+		offsetof(xfs_sb_t, sb_rextslog),
 		offsetof(xfs_sb_t, sb_icount),
 		offsetof(xfs_sb_t, sb_ifree),
 		offsetof(xfs_sb_t, sb_fdblocks),
@@ -246,12 +272,12 @@ _xfs_mod_incore_sb(xfs_mount_t *mp, uint field, int delta)
 		mp->m_sb.sb_fdblocks = lcounter;
 		return (0);
 	case XFS_SB_FREXTENTS:
-		scounter = mp->m_sb.sb_frextents;
-		scounter += delta;
-		if (scounter < 0) {
+		lcounter = mp->m_sb.sb_frextents;
+		lcounter += delta;
+		if (lcounter < 0) {
 			return (EINVAL);
 		}
-		mp->m_sb.sb_frextents = scounter;
+		mp->m_sb.sb_frextents = lcounter;
 		return (0);
 	default:
 		ASSERT(0);
