@@ -318,18 +318,18 @@ xfs_ialloc_ag_alloc(
 		error = xfs_inobt_lookup_eq(cur, thisino, XFS_INODES_PER_CHUNK,
 					   XFS_INOBT_ALL_FREE, &i);
 		if (error) {
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		ASSERT(i == 0);
 		error = xfs_inobt_insert(cur, &i);
 		if (error) {
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		ASSERT(i == 1);
 	}
-	xfs_btree_del_cursor(cur);
+	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	/*
 	 * Log allocation group header fields
 	 */
@@ -620,14 +620,14 @@ nextag:
 
 		error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
 		if (error) {
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
 			freecount += rec.ir_freecount;
 			error = xfs_inobt_increment(cur, 0, &i);
 			if (error) {
-				xfs_btree_del_cursor(cur);
+				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				return error;
 			}
 		}
@@ -640,7 +640,7 @@ nextag:
 	if (pagno == agno) {
 		error = xfs_inobt_lookup_le(cur, pagino, 0, 0, &i);
 		if (error) {
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		if ((i != 0) &&
@@ -671,8 +671,8 @@ nextag:
 			 */
 			error = xfs_inobt_decrement(tcur, 0, &i);
 			if (error) {
-				xfs_btree_del_cursor(tcur);
-				xfs_btree_del_cursor(cur);
+				xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
+				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				return error;
 			}
 			doneleft = !i;
@@ -687,8 +687,8 @@ nextag:
 			 */
 			error = xfs_inobt_increment(cur, 0, &i);
 			if (error) {
-				xfs_btree_del_cursor(tcur);
-				xfs_btree_del_cursor(cur);
+				xfs_btree_del_cursor(tcur, XFS_BTREE_ERROR);
+				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				return error;
 			}
 			doneright = !i;
@@ -727,7 +727,8 @@ nextag:
 					 * Yes, set it up as the chunk to use.
 					 */
 					rec = trec;
-					xfs_btree_del_cursor(cur);
+					xfs_btree_del_cursor(cur,
+						XFS_BTREE_NOERROR);
 					cur = tcur;
 					break;
 				}
@@ -739,7 +740,8 @@ nextag:
 					/*
 					 * Yes, it's already set up.
 					 */
-					xfs_btree_del_cursor(tcur);
+					xfs_btree_del_cursor(tcur,
+						XFS_BTREE_NOERROR);
 					break;
 				}
 				/*
@@ -750,8 +752,10 @@ nextag:
 					error = xfs_inobt_decrement(tcur, 0,
 								    &i);
 					if (error) {
-						xfs_btree_del_cursor(tcur);
-						xfs_btree_del_cursor(cur);
+						xfs_btree_del_cursor(tcur,
+							XFS_BTREE_ERROR);
+						xfs_btree_del_cursor(cur,
+							XFS_BTREE_ERROR);
 						return error;
 					}
 					doneleft = !i;
@@ -771,8 +775,10 @@ nextag:
 					error = xfs_inobt_increment(cur, 0,
 								    &i);
 					if (error) {
-						xfs_btree_del_cursor(tcur);
-						xfs_btree_del_cursor(cur);
+						xfs_btree_del_cursor(tcur,
+							XFS_BTREE_ERROR);
+						xfs_btree_del_cursor(cur,
+							XFS_BTREE_ERROR);
 						return error;
 					}
 					doneright = !i;
@@ -795,7 +801,7 @@ nextag:
 	else if (agi->agi_newino != NULLAGINO) {
 		error = xfs_inobt_lookup_eq(cur, agi->agi_newino, 0, 0, &i);
 		if (error) {
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		if ((i != 0) &&
@@ -813,7 +819,7 @@ nextag:
 		else {
 			error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
 			if (error) {
-				xfs_btree_del_cursor(cur);
+				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				return error;
 			}
 			ASSERT(i == 1);
@@ -825,7 +831,8 @@ nextag:
 					break;
 				error = xfs_inobt_increment(cur, 0, &i);
 				if (error) {
-					xfs_btree_del_cursor(cur);
+					xfs_btree_del_cursor(cur,
+						XFS_BTREE_ERROR);
 					return error;
 				}
 				ASSERT(i == 1);
@@ -851,21 +858,21 @@ nextag:
 
 		error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i);
 		if (error) {
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		while (xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount, &rec.ir_free)) {
 			freecount += rec.ir_freecount;
 			error = xfs_inobt_increment(cur, 0, &i);
 			if (error) {
-				xfs_btree_del_cursor(cur);
+				xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 				return error;
 			}
 		}
 		ASSERT(freecount == agi->agi_freecount);
 	}
 #endif
-	xfs_btree_del_cursor(cur);
+	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	*inop = ino;
@@ -990,13 +997,13 @@ xfs_difree(
 		ASSERT(freecount == agi->agi_freecount);
 	}
 #endif
-	xfs_btree_del_cursor(cur);
+	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 	return 0;
 
  error0:
-	xfs_btree_del_cursor(cur);
+	xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 	return error;
 }
 #endif	/* !SIM */
@@ -1070,7 +1077,7 @@ xfs_dilocate(
 		error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i);
 		if (error) {
 			xfs_trans_brelse(tp, agbp);
-			xfs_btree_del_cursor(cur);
+			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
 			return error;
 		}
 		if (!xfs_inobt_get_rec(cur, &chunk_agino, &chunk_cnt,
@@ -1093,7 +1100,7 @@ xfs_dilocate(
 			*len = blks_per_cluster;
 		}
 		xfs_trans_brelse(tp, agbp);
-		xfs_btree_del_cursor(cur);		
+		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);		
 	}
 
 	return error;
