@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_GROW_H
 #define	_FS_XFS_GROW_H
 
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
 
 /*
  * File system growth interfaces
@@ -12,7 +12,9 @@
 #define	XFS_GROWFS_LOG		2	/* grow log, new log is internal */
 #define	XFS_GROWFS_RT		3	/* grow realtime area */
 #define	XFS_FS_COUNTS		4	/* get filesystem dynamic counts */
-#define	XFS_FSOPS_COUNT		5	/* count of operations */
+#define	XFS_SET_RESBLKS		5	/* set reserved block count */
+#define	XFS_GET_RESBLKS		6	/* get reserved block counts */
+#define	XFS_FSOPS_COUNT		7	/* count of operations */
 
 /*
  * Minimum and maximum sizes need for growth checks
@@ -55,6 +57,13 @@ typedef struct xfs_fsop_counts
 	__uint64_t	freeino;	/* free inodes */
 	__uint64_t	allocino;	/* total allocated inodes */
 } xfs_fsop_counts_t;
+
+/* Output for XFS_GET_RESBLKS */
+typedef struct xfs_fsop_get_resblks
+{
+	__uint64_t  resblks;
+	__uint64_t  resblks_avail;
+} xfs_fsops_getblks_t;
 
 /* Input for growfs data op */
 typedef struct xfs_growfs_data

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.30 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -364,6 +364,75 @@ xfs_fs_counts(
 	return 0;
 }
 
+
+/*
+ * xfs_reserve_blocks is called to set m_resblks
+ * in the in-core mount table. The number of unused reserved blocks
+ * is kept in m_resbls_avail.
+ *
+ * Reserve the requested number of blocks if available. Otherwise return
+ * as many as possible to satisfy the request. The actual number
+ * reserved are returned in outval
+ *
+ * A null inval pointer indicates that only the current reserved blocks
+ * available  should  be returned no settings are changed.
+ */
+
+STATIC int
+xfs_reserve_blocks(
+	xfs_mount_t *mp, 
+	__uint64_t *inval, 
+	xfs_fsops_getblks_t *outval)
+{
+	long long lcounter, delta;
+	__uint64_t request;
+	int s;
+
+	/* If inval is null, report current values and return */
+
+	if (inval == (__uint64_t *)NULL) {
+		outval->resblks = mp->m_resblks;
+		outval->resblks_avail = mp->m_resblks_avail;
+		return(0);
+	}
+	
+	request = *inval;
+	s = XFS_SB_LOCK(mp);
+
+	/*
+	 * If our previous reservation was larger than the current value, 
+	 * then move any unused blocks back to the free pool.
+	 */
+
+	if (mp->m_resblks > request) { 
+		lcounter = mp->m_resblks_avail - request;
+		if (lcounter  > 0) {		/* release unused blocks */
+			mp->m_sb.sb_fdblocks += lcounter;
+			mp->m_resblks_avail -= lcounter;
+		}
+		mp->m_resblks = request;
+	} else {
+		delta = request - mp->m_resblks;
+		lcounter = mp->m_sb.sb_fdblocks;
+		lcounter -= delta;
+		if (lcounter < 0) {
+			/* We can't satisfy the request, just get what we can */
+			mp->m_resblks += mp->m_sb.sb_fdblocks;
+			mp->m_resblks_avail += mp->m_sb.sb_fdblocks;
+			mp->m_sb.sb_fdblocks = 0;
+		} else {
+			mp->m_sb.sb_fdblocks = lcounter;
+			mp->m_resblks = request;
+			mp->m_resblks_avail += delta;
+		}
+	}
+
+	outval->resblks = mp->m_resblks;
+	outval->resblks_avail = mp->m_resblks_avail;
+	XFS_SB_UNLOCK(mp, s);
+	return(0);
+}
+
 int					/* error status */
 xfs_fsoperations(
 	int		fd,		/* file descriptor for fs */
@@ -382,14 +451,18 @@ xfs_fsoperations(
 		sizeof(xfs_growfs_log_t),	/* XFS_GROWFS_LOG */
 		sizeof(xfs_growfs_rt_t),	/* XFS_GROWFS_RT */
 		0,				/* XFS_FS_COUNTS */
+		sizeof(__uint64_t),			/* XFS_SET_RESBLKS */
+		0							/* XFS_GET_RESBLKS */
 	};
 	static const short	cosize[XFS_FSOPS_COUNT] =
 	{
-		sizeof(xfs_fsop_geom_t),	/* XFS_FS_GEOMETRY */
-		0,				/* XFS_GROWFS_DATA */
-		0,				/* XFS_GROWFS_LOG */
-		0,				/* XFS_GROWFS_RT */
-		sizeof(xfs_fsop_counts_t),	/* XFS_FS_COUNTS */
+		sizeof(xfs_fsop_geom_t),			/* XFS_FS_GEOMETRY */
+		0,									/* XFS_GROWFS_DATA */
+		0,									/* XFS_GROWFS_LOG */
+		0,									/* XFS_GROWFS_RT */
+		sizeof(xfs_fsop_counts_t),			/* XFS_FS_COUNTS */
+		sizeof(xfs_fsops_getblks_t),		/* XFS_SET_RESBLKS */
+		sizeof(xfs_fsops_getblks_t)			/* XFS_GET_RESBLKS */
 	};
 	static const short	wperm[XFS_FSOPS_COUNT] =
 	{
@@ -398,7 +471,10 @@ xfs_fsoperations(
 		1,	/* XFS_GROWFS_LOG */
 		1,	/* XFS_GROWFS_RT */
 		0,	/* XFS_FS_COUNTS */
+		1,	/* XFS_SET_RESBLKS */
+		0,  /* XFS_GET_RESBLKS */
 	};
+
 
 	if (opcode < 0 || opcode >= XFS_FSOPS_COUNT)
 		return XFS_ERROR(EINVAL);
@@ -444,6 +520,14 @@ xfs_fsoperations(
 		break;
 	case XFS_FS_COUNTS:
 		error = xfs_fs_counts(mp, (xfs_fsop_counts_t *)outb);
+		break;
+	case XFS_SET_RESBLKS:
+		error = xfs_reserve_blocks(mp, (__uint64_t *)inb, 
+					(xfs_fsops_getblks_t *)outb);
+		break;
+	case XFS_GET_RESBLKS:
+		error = xfs_reserve_blocks(mp, (__uint64_t *)NULL, 
+					(xfs_fsops_getblks_t *)outb);
 		break;
 	default:
 		error = XFS_ERROR(EINVAL);
