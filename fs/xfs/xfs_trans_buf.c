@@ -377,7 +377,9 @@ xfs_trans_read_buf(
 			if (xfs_error_dev == target->dev) {
 				if (((xfs_req_num++) % xfs_error_mod) == 0) {
 					xfs_buf_relse(bp);
+#ifndef SIM
 					printk("Returning error!\n");
+#endif
 					return XFS_ERROR(EIO);
 				}
 			}
@@ -486,7 +488,9 @@ xfs_trans_read_buf(
 				xfs_force_shutdown(tp->t_mountp, 
 						   XFS_METADATA_IO_ERROR);
 				xfs_buf_relse(bp);
+#ifndef SIM
 				printk("Returning error in trans!\n");
+#endif
 				return XFS_ERROR(EIO);
 			}
 		}
