@@ -1327,6 +1327,7 @@ xfs_write_file(
 	int		error;
 	int		eof_zeroed;
 	xfs_fsize_t	isize;
+	xfs_fsize_t	new_size;
 
 	ip = XFS_VTOI(vp);
 	error = 0;
@@ -1339,10 +1340,10 @@ xfs_write_file(
 	 * cache code calls back into the file system through
 	 * xfs_bmap().  This way we can tell where the end of
 	 * file is going to be even though we haven't yet updated
-	 * ip->i_d.di_size.  This is guarded by the iolock which
-	 * is held exclusively through here.
+	 * ip->i_d.di_size.  This is guarded by the iolock and the
+	 * inode lock.  Either is sufficient for reading the value.
 	 */
-	ip->i_new_size = uiop->uio_offset + uiop->uio_resid;
+	new_size = uiop->uio_offset + uiop->uio_resid;
 
 	/*
 	 * Loop until uiop->uio_resid, which is the number of bytes the
@@ -1353,8 +1354,8 @@ xfs_write_file(
 	do {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		isize = ip->i_d.di_size;
-		if (ip->i_new_size < isize) {
-			ip->i_new_size = isize;
+		if (new_size > isize) {
+			ip->i_new_size = new_size;
 		}
 
 		/*
@@ -1463,13 +1464,18 @@ xfs_write_file(
 		}
 	} while ((uiop->uio_resid > 0) && !error);
 
-#ifdef DEBUG
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
+	/*
+	 * XXXajs
+	 * Regrettably, we need the inode lock held exclusively
+	 * in order to clear i_new_size.  This needs more thought.
+	 * Could it simply be left set and only cleared when the
+	 * file is truncated since it only matters if new_size > size?
+	 */
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_isize_check(ip->i_mount, ip, ip->i_d.di_size);
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-#endif
-
 	ip->i_new_size = 0;
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
 	kmem_zone_free(xfs_bmap_zone, bmaps);
 	return error;
 }
