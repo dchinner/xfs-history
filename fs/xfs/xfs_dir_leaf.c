@@ -146,6 +146,7 @@ xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 	xfs_dir_shortform_t	*sf;
 	xfs_dir_sf_entry_t	*sfe;
 	int			i;
+#endif
 
 	if ((dp->i_d.di_mode & IFMT) != IFDIR) {
 		return;
@@ -158,6 +159,7 @@ xfs_dir_shortform_validate(xfs_mount_t *mp, xfs_inode_t *dp)
 	}
 
 	return;
+#if 0
 	/*
 	 * rcc - We can never look at the fork because we don't
 	 * log the fork on rmdir's.  So it's possible that
