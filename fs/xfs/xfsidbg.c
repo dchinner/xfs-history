@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.143 $"
+#ident	"$Revision: 1.144 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -297,7 +297,7 @@ static void	xfsidbg_xqm_htab(void);
 static void	xfsidbg_xqm_mplist(xfs_mount_t *);
 static void	xfsidbg_xqm_qinfo(xfs_mount_t *mp);
 static void	xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp);
-static void	xfsidbg_xsb(xfs_sb_t *);
+static void	xfsidbg_xsb(xfs_sb_t *, int convert);
 static void	xfsidbg_xtp(xfs_trans_t *);
 static void	xfsidbg_xtrans_res(xfs_mount_t *);
 
@@ -1372,17 +1372,24 @@ static int	kdbm_xfs_xsb(
 	struct pt_regs *regs)
 {
 	unsigned long addr;
+        unsigned long convert=0;
 	int nextarg = 1;
 	long offset = 0;
 	int diag;
 
-	if (argc != 1)
+	if (argc != 1 && argc!=2)
 		return KDB_ARGCOUNT;
 	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
 	if (diag)
 		return diag;
+        if (argc==2) {
+            /* extra argument - conversion flag */
+	    diag = kdbgetaddrarg(argc, argv, &nextarg, &convert, &offset, NULL, regs);
+	    if (diag)
+		    return diag;
+        }
 
-	xfsidbg_xsb((xfs_sb_t *) addr);
+	xfsidbg_xsb((xfs_sb_t *) addr, (int)convert);
 	return 0;
 }
 
@@ -1971,7 +1978,7 @@ static struct xif {
 				"Dump XFS hashtable of dquots"},
   {  "xqmplist",kdbm_xfs_xqm_mplist,	"<xfs_mount_t>",
 				"Dump XFS all dquots of a f/s"},
-  {  "xsb",	kdbm_xfs_xsb,		"<xfs_sb_t>",
+  {  "xsb",	kdbm_xfs_xsb,		"<xfs_sb_t> <cnv>",
 				"Dump XFS superblock"},
   {  "xtp",	kdbm_xfs_xtp,		"<xfs_trans_t>",
 				"Dump XFS transaction structure"},
@@ -2463,20 +2470,22 @@ xfs_fmtsize(size_t i)
 }
 
 /*
- * Format a uuid into a static buffer & return it.  This doesn't
- * use the formatted value, it probably should (see C library).
+ * Format a uuid into a static buffer & return it. 
  */
 static char *
 xfs_fmtuuid(uuid_t *uu)
 {
 	static char rval[40];
-	uint *ip = (uint *)uu;
-
-	if (sizeof(*uu) != 16)
-		sprintf(rval, "(sizeof(*uu) != 16) @ line # %d", __LINE__);
-	else
-		sprintf(rval, "%32x:%32x:%32x:%32x",
-						ip[0], ip[1], ip[2], ip[3]);
+        char        *o          = rval;
+        char        *i          = (unsigned char*)uu;
+        int         b;
+        
+        for (b=0;b<16;b++) {
+            o+=sprintf(o, "%02x", *i++);
+            if (b==3||b==5||b==7||b==9) *o++='-';
+        }
+        *o='\0';
+        
 	return rval;
 }
 
@@ -3158,7 +3167,8 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 			kdb_printf("Superblock (at 0x%p)\n", sb);
 		} else {
 			kdb_printf("buf 0x%p sb 0x%p\n", bp, sb);
-			xfsidbg_xsb(sb);
+                        /* SB in a buffer - we need to convert */
+			xfsidbg_xsb(sb, 1); 
 		}
 	} else if ((dqb = d)->d_magic == XFS_DQUOT_MAGIC) {
 #define XFSIDBG_DQTYPESTR(d)     (((d)->d_flags & XFS_DQ_USER) ? "USR" : \
@@ -4716,54 +4726,58 @@ xfsidbg_xqm_tpdqinfo(xfs_trans_t *tp)
  * Print xfs superblock.
  */
 static void
-xfsidbg_xsb(xfs_sb_t *sbp)
+xfsidbg_xsb(xfs_sb_t *sbp, int convert)
 {
+        xfs_arch_t arch=convert?ARCH_CONVERT:ARCH_NOCONVERT;
+        
+        kdb_printf(convert?"<converted>\n":"<unconverted>\n");
+        
 	kdb_printf("magicnum 0x%x blocksize 0x%x dblocks %Ld rblocks %Ld\n",
-		sbp->sb_magicnum, sbp->sb_blocksize,
-		sbp->sb_dblocks, sbp->sb_rblocks);
+		INT_GET(sbp->sb_magicnum, arch), INT_GET(sbp->sb_blocksize, arch),
+		INT_GET(sbp->sb_dblocks, arch), INT_GET(sbp->sb_rblocks, arch));
 	kdb_printf("rextents %Ld uuid %s logstart %s\n",
-		sbp->sb_rextents,
+		INT_GET(sbp->sb_rextents, arch),
 		xfs_fmtuuid(&sbp->sb_uuid),
-		xfs_fmtfsblock(sbp->sb_logstart, NULL));
+		xfs_fmtfsblock(INT_GET(sbp->sb_logstart, arch), NULL));
 	kdb_printf("rootino %s ",
-		xfs_fmtino(sbp->sb_rootino, NULL));
+		xfs_fmtino(INT_GET(sbp->sb_rootino, arch), NULL));
 	kdb_printf("rbmino %s ",
-		xfs_fmtino(sbp->sb_rbmino, NULL));
+		xfs_fmtino(INT_GET(sbp->sb_rbmino, arch), NULL));
 	kdb_printf("rsumino %s\n",
-		xfs_fmtino(sbp->sb_rsumino, NULL));
+		xfs_fmtino(INT_GET(sbp->sb_rsumino, arch), NULL));
 	kdb_printf("rextsize 0x%x agblocks 0x%x agcount 0x%x rbmblocks 0x%x\n",
-		sbp->sb_rextsize,
-		sbp->sb_agblocks,
-		sbp->sb_agcount,
-		sbp->sb_rbmblocks);
+		INT_GET(sbp->sb_rextsize, arch),
+		INT_GET(sbp->sb_agblocks, arch),
+		INT_GET(sbp->sb_agcount, arch),
+		INT_GET(sbp->sb_rbmblocks, arch));
 	kdb_printf("logblocks 0x%x versionnum 0x%x sectsize 0x%x inodesize 0x%x\n",
-		sbp->sb_logblocks,
-		sbp->sb_versionnum,
-		sbp->sb_sectsize,
-		sbp->sb_inodesize);
+		INT_GET(sbp->sb_logblocks, arch),
+		INT_GET(sbp->sb_versionnum, arch),
+		INT_GET(sbp->sb_sectsize, arch),
+		INT_GET(sbp->sb_inodesize, arch));
 	kdb_printf("inopblock 0x%x blocklog 0x%x sectlog 0x%x inodelog 0x%x\n",
-		sbp->sb_inopblock,
-		sbp->sb_blocklog,
-		sbp->sb_sectlog,
-		sbp->sb_inodelog);
+		INT_GET(sbp->sb_inopblock, arch),
+		INT_GET(sbp->sb_blocklog, arch),
+		INT_GET(sbp->sb_sectlog, arch),
+		INT_GET(sbp->sb_inodelog, arch));
 	kdb_printf("inopblog %d agblklog %d rextslog %d inprogress %d imax_pct %d\n",
-		sbp->sb_inopblog,
-		sbp->sb_agblklog,
-		sbp->sb_rextslog,
-		sbp->sb_inprogress,
-		sbp->sb_imax_pct);
+		INT_GET(sbp->sb_inopblog, arch),
+		INT_GET(sbp->sb_agblklog, arch),
+		INT_GET(sbp->sb_rextslog, arch),
+		INT_GET(sbp->sb_inprogress, arch),
+		INT_GET(sbp->sb_imax_pct, arch));
 	kdb_printf("icount %Lx ifree %Lx fdblocks %Lx frextents %Lx\n",
-		sbp->sb_icount,
-		sbp->sb_ifree,
-		sbp->sb_fdblocks,
-		sbp->sb_frextents);
-	kdb_printf("uquotino %s ", xfs_fmtino(sbp->sb_uquotino, NULL));
-	kdb_printf("pquotino %s ", xfs_fmtino(sbp->sb_pquotino, NULL));
+		INT_GET(sbp->sb_icount, arch),
+		INT_GET(sbp->sb_ifree, arch),
+		INT_GET(sbp->sb_fdblocks, arch),
+		INT_GET(sbp->sb_frextents, arch));
+	kdb_printf("uquotino %s ", xfs_fmtino(INT_GET(sbp->sb_uquotino, arch), NULL));
+	kdb_printf("pquotino %s ", xfs_fmtino(INT_GET(sbp->sb_pquotino, arch), NULL));
 	kdb_printf("qflags 0x%x flags 0x%x shared_vn %d inoaligmt %d\n",
-		sbp->sb_qflags, sbp->sb_flags, sbp->sb_shared_vn,
-		sbp->sb_inoalignmt);
+		INT_GET(sbp->sb_qflags, arch), INT_GET(sbp->sb_flags, arch), INT_GET(sbp->sb_shared_vn, arch),
+		INT_GET(sbp->sb_inoalignmt, arch));
 	kdb_printf("unit %d width %d dirblklog %d\n",
-		sbp->sb_unit, sbp->sb_width, sbp->sb_dirblklog);
+		INT_GET(sbp->sb_unit, arch), INT_GET(sbp->sb_width, arch), INT_GET(sbp->sb_dirblklog, arch));
 }
 
 
