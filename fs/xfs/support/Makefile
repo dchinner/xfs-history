@@ -37,8 +37,7 @@
 # unless it's something special (ie not a .c file).
 #
 
-EXTRA_INCLUDE_DIRECTORIES = -I..
-EXTRA_CFLAGS += $(EXTRA_INCLUDE_DIRECTORIES)
+EXTRA_CFLAGS += -I..
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
@@ -57,8 +56,7 @@ else
   obj-$(CONFIG_XFS_SUPPORT)	:= xfs_support.o
 endif
 
-export-objs			:= support.o qsort.o kmem.o ktrace.o debug.o \
-				   mrlock.o sv.o mutex.o move.o uuid.o
+export-objs			:= debug.o kmem.o ktrace.o move.o mrlock.o mutex.o qsort.o sv.o uuid.o
 
 xfs_support-objs		:= support.o qsort.o kmem.o ktrace.o debug.o \
 				   mrlock.o sv.o mutex.o move.o uuid.o
