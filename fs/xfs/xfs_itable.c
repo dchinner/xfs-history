@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.55 $"
+#ident	"$Revision$"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -232,7 +232,16 @@ xfs_bulkstat(
 	buf_t			*bp;	/* ptr to on-disk inode cluster buf */
 	xfs_dinode_t		*dip;	/* ptr into bp for specific inode */
 	xfs_inode_t		*ip;	/* ptr to in-core inode struct */
+	vfs_t			*vfsp;
 
+	/*
+	 * Check that the device is valid/mounted and mark it busy
+	 * for the duration of this call.
+	 */
+	vfsp = XFS_MTOVFS(mp);
+	if (error = vfs_busy(vfsp))
+		return error;
+	
 	/*
 	 * Get the last inode value, see if there's nothing to do.
 	 */
@@ -244,6 +253,7 @@ xfs_bulkstat(
 	    ino != XFS_AGINO_TO_INO(mp, agno, agino)) {
 		*done = 1;
 		*ubcountp = 0;
+		vfs_unbusy(vfsp);
 		return 0;
 	}
 	ubcount = ubleft = *ubcountp;
@@ -262,8 +272,10 @@ xfs_bulkstat(
 	 */
 	if (ubuffer &&
 	    (error = useracc(ubuffer, ubcount * statstruct_size,
-			(B_READ|B_PHYS), NULL)))
+			(B_READ|B_PHYS), NULL))) {
+		vfs_unbusy(vfsp);
 		return error;
+	}
 	/*
 	 * Allocate a page-sized buffer for inode btree records.
 	 * We could try allocating something smaller, but for normal
@@ -473,8 +485,10 @@ xfs_bulkstat(
 						error = xfs_itobp(mp, tp, ip,
 						                  &dip, &bp, bno);
 						kmem_zone_free(xfs_inode_zone, ip);
-						if (error != 0) 
+						if (error != 0) {
+							vfs_unbusy(vfsp);
 							return error;
+						}
 						clustidx = 0;  
 					}
 				}
@@ -558,6 +572,7 @@ xfs_bulkstat(
 		*done = 1;
 	} else
 		*lastinop = (ino64_t)lastino;
+	vfs_unbusy(vfsp);
 	return rval;
 }
 
