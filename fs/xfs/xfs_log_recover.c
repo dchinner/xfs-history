@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.26 $"
+#ident	"$Revision: 1.27 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -45,6 +45,7 @@
 #include "xfs_error.h"
 #include "xfs_log_priv.h"	/* depends on all above */
 #include "xfs_buf_item.h"
+#include "xfs_alloc_btree.h"
 #include "xfs_log_recover.h"
 #include "xfs_extfree_item.h"
 #include "xfs_trans_priv.h"
