@@ -1941,11 +1941,11 @@ xfs_dir_leaf_getdents_int(
 	int			entno, want_entno, i, nextentno;
 	xfs_mount_t		*mp;
 	xfs_dahash_t		cookhash;
-	xfs_dahash_t		nexthash=0;
-#if (XFS_64 == 0)
-	xfs_dahash_t		lasthash;
+	xfs_dahash_t		nexthash = 0;
+#if (BITS_PER_LONG == 32)
+	xfs_dahash_t		lasthash = XFS_DA_MAXHASH;
 #endif
-	xfs_dir_put_args_t p;
+	xfs_dir_put_args_t	p;
 
 	mp = dp->i_mount;
 	leaf = bp->data;
@@ -2018,12 +2018,7 @@ xfs_dir_leaf_getdents_int(
 	/*
 	 * We're synchronized, start copying entries out to the user.
 	 */
-	for (
-#if (XFS_64 == 0)
-		lasthash = XFS_DA_MAXHASH
-#endif
-	     ;
-		     entno >= 0 && i < INT_GET(leaf->hdr.count, ARCH_CONVERT);
+	for (; entno >= 0 && i < INT_GET(leaf->hdr.count, ARCH_CONVERT);
 			     entry++, i++, (entno = nextentno)) {
 		int lastresid=0, retval;
 		xfs_dircook_t lastoffset;
@@ -2116,18 +2111,19 @@ xfs_dir_leaf_getdents_int(
 		 * that share the same hashval.  Hopefully the buffer 
 		 * provided is big enough to handle it (see pv763517).
 		 */
-#if (XFS_64 == 0)
+#if (BITS_PER_LONG == 32)
 		if (INT_GET(entry->hashval, ARCH_CONVERT) != lasthash) {
-#endif
 			XFS_PUT_COOKIE(lastoffset, mp, bno, entno, thishash);
 			lastresid = uio->uio_resid;
-#if (XFS_64 == 0)
 			lasthash = thishash;
 		} else {
 			xfs_dir_trace_g_duc("leaf: DUP COOKIES, skipped",
 						   dp, uio, p.cook.o);
 		}
-#endif
+#else
+		XFS_PUT_COOKIE(lastoffset, mp, bno, entno, thishash);
+		lastresid = uio->uio_resid;
+#endif /* BITS_PER_LONG == 32 */
 
 		/*
 		 * Put the current entry into the outgoing buffer.  If we fail
