@@ -585,8 +585,8 @@ xfs_setattr(vnode_t	*vp,
                                 code = XFS_ERROR(EPERM);
                                 goto error_return;
                         }
-
-                        /* Check for WRITE access */
+			if (code = xfs_iaccess(ip, IWRITE, credp))
+				goto error_return;
                 }
         }
 
