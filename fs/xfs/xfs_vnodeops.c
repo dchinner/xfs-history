@@ -1,4 +1,4 @@
-#ident "$Revision: 1.343 $"
+#ident "$Revision: 1.347 $"
 
 
 #ifdef SIM
@@ -1397,10 +1397,10 @@ xfs_fsync(
 	 * and we don't want to force it to acquire the I/O
 	 * lock unnecessarily.
 	 */
-	/*ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
+	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
 	       syncall == 0 ||
 	       (!VN_DIRTY(vp) && (ip->i_queued_bufs == 0)));
-	       */
+
 	/*
 	 * We always need to make sure that the required inode state
 	 * is safe on disk.  The vnode might be clean but because
@@ -6003,7 +6003,7 @@ vnodeops_t xfs_vnodeops = {
 	fs_invalfree_pages,
 	fs_pages_sethole,
 	(vop_commit_t)fs_nosys,
-	(vop_readbuf_t)fs_nosys,
+	(vop_readbuf_t)xfs_vop_readbuf,
 	fs_strgetmsg,
 	fs_strputmsg,
 };
