@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.25 $"
 
 /*
  * Allocation group header
@@ -13,6 +13,8 @@
 #define	XFS_AGI_MAGIC	0x58414749	/* 'XAGI' */
 #define	XFS_AGF_VERSION	1
 #define	XFS_AGI_VERSION	1
+#define XFS_AGF_GOOD_VERSION(v)		((v) == XFS_AGF_VERSION)
+#define XFS_AGI_GOOD_VERSION(v)		((v) == XFS_AGI_VERSION)
 
 /*
  * Btree number 0 is bno, 1 is cnt.  This value gives the size of the
