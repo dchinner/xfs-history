@@ -1009,7 +1009,8 @@ xfs_fsync(vnode_t	*vp,
 		(ip->i_queued_bufs == 0)));
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	xfs_iflock(ip);
-	xfs_iflush(ip, (flag & FSYNC_WAIT) ? 0 : B_ASYNC);
+	xfs_iflush(ip, (flag & FSYNC_WAIT) ? XFS_IFLUSH_SYNC :
+		   XFS_IFLUSH_ASYNC);
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_SHARED);
 	return 0;
 }
@@ -4118,14 +4119,20 @@ xfs_reclaim(vnode_t	*vp,
 	dnlc_purge_vp(vp);
 #endif	/* !SIM */
 	/*
-	 * If the inode is still dirty, then flush it out synchronously.
+	 * If the inode is still dirty, then flush it out.  If the inode
+	 * is not in the AIL, then it will be OK to flush it delwri as
+	 * long as xfs_iflush() does not keep any references to the inode.
+	 * We leave that decision up to xfs_iflush() since it has the
+	 * knowledge of whether it's OK to simply do a delwri flush of
+	 * the inode or whether we need to wait until the inode is
+	 * pulled from the AIL.
 	 * We get the flush lock regardless, though, just to make sure
 	 * we don't free it while it is being flushed.
 	 */
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	xfs_iflock(ip);
 	if (ip->i_update_core || (ip->i_item.ili_format.ilf_fields != 0)) {
-		xfs_iflush(ip, 0);
+		xfs_iflush(ip, XFS_IFLUSH_DELWRI_ELSE_SYNC);
 	}
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	ASSERT(ip->i_update_core == 0);
