@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.78 $"
+#ident	"$Revision: 1.79 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -304,14 +304,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 			vmap_t vmap;
 
 			VMAP(rvp, vmap);
-			VN_RELE(rvp);
-			vn_purge(rvp, &vmap);
-
 			prdev("Root inode %d is not a directory",
 			      rip->i_dev, rip->i_ino);
-
-			error = XFS_ERROR(EINVAL);
 			xfs_iunlock(rip, XFS_ILOCK_EXCL);
+			VN_RELE(rvp);
+			vn_purge(rvp, &vmap);
+			error = XFS_ERROR(EINVAL);
 			return (error);
 		}
 		s = VN_LOCK(rvp);
