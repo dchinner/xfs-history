@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.152 $"
+#ident	"$Revision: 1.153 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -894,7 +894,7 @@ xfs_mount_partial(dev_t dev, dev_t logdev, dev_t rtdev)
 int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-	buf_t		*bp;
+	buf_t		*sbp;
 	/* REFERENCED */
 	int		error;
 	/* REFERENCED */
@@ -925,6 +925,16 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 * will skip pinned buffers.
 	 */
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
+	
+	/*
+	 * If there were any DELWRI buffers hanging around as a result of
+	 * a forced shutdown, relse them now. At this point, we can afford to
+	 * wait on the buffer locks and unpins, if any.
+	 */
+#ifndef SIM
+	if (XFS_FORCED_SHUTDOWN(mp))
+	    incore_delwri_relse(mp->m_dev, 1); /* synchronous */
+#endif
 	binval(mp->m_dev);
 	bflushed(mp->m_dev);
 	if (mp->m_rtdev) {
@@ -934,16 +944,15 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 * skip superblock write if fs is truly read-only, or
 	 * if we are doing a forced umount.
 	 */
+	sbp = xfs_getsb(mp, 0);
 	if (!(mp->m_flags & (XFS_MOUNT_FS_IS_CLEAN|XFS_MOUNT_FS_SHUTDOWN)))  {
-		bp = xfs_getsb(mp, 0);
-		bp->b_flags &= ~(B_DONE | B_READ);
-		bp->b_flags |= B_WRITE;
-		bwait_unpin(bp);
-		ASSERT(bp->b_edev == mp->m_dev);
-		xfsbdstrat(mp, bp);
+		sbp->b_flags &= ~(B_DONE | B_READ);
+		sbp->b_flags |= B_WRITE;
+		bwait_unpin(sbp);
+		ASSERT(sbp->b_edev == mp->m_dev);
+		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
-		(void) iowait(bp);
-		
+		(void) iowait(sbp);
 	}
 	
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
@@ -961,8 +970,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		VN_RELE(mp->m_logdevp);
 	}
 
-	if (!(mp->m_flags & (XFS_MOUNT_FS_IS_CLEAN|XFS_MOUNT_FS_SHUTDOWN)))
-		nfreerbuf(bp);
+	nfreerbuf(sbp);
 
 	/*
 	 * All inodes from this mount point should be freed.
