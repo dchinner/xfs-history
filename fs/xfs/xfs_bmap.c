@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.121 $"
+#ident	"$Revision: 1.123 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3301,7 +3301,8 @@ xfs_getbmap(
 	}
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	if (ip->i_delayed_blks) {
-		last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
+		last_byte = XFS_ISIZE_MAX(ip);
+		last_byte = XFS_B_TO_FSB(mp, last_byte);
 		last_byte = XFS_FSB_TO_B(mp, last_byte);
 		if (VN_MAPPED(vp)) {
 			/*
