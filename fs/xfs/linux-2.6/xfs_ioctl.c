@@ -394,6 +394,7 @@ xfs_open_by_handle(
 		dentry = list_entry(lp,struct dentry, d_alias);
 		if (! (dentry->d_flags & DCACHE_NFSD_DISCONNECTED)) {
 			dget_locked(dentry);
+			dentry->d_vfs_flags |= DCACHE_REFERENCED;
 			spin_unlock(&dcache_lock);
 			iput(inode);
 			goto found;
@@ -415,11 +416,6 @@ xfs_open_by_handle(
 	 * Keep nfsd happy.
 	 */
 	dentry->d_flags |= DCACHE_NFSD_DISCONNECTED;
-
-	/*
-	 * Make sure dput can find this dcache entry.
-	 */
-	d_rehash(dentry);
 
  found:
 	/*
