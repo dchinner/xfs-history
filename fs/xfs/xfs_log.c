@@ -378,8 +378,9 @@ log_alloc(xfs_mount_t	*mp,
 	log->l_prev_block  = -1;
 	log->l_sync_lsn    = 0x100000000LL;  /* cycle = 1; current block = 0 */
 	log->l_curr_cycle  = 1;	      /* 0 is bad since this is initial value */
-	log->l_xbuf	   = getrbuf(0);
-	psema(&log->l_xbuf->b_lock, PINOD);	/* it's mine */
+	log->l_xbuf	   = getrbuf(0);	/* get my locked buffer */
+	ASSERT(log->l_xbuf->b_flags & B_BUSY);
+	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	initnlock(&log->l_icloglock, "iclog");
 	initnsema(&log->l_flushsema, LOG_NUM_ICLOGS, "iclog-flush");
 
@@ -409,9 +410,9 @@ log_alloc(xfs_mount_t	*mp,
 		iclog->ic_log = log;
 /*		iclog->ic_refcnt = 0;	*/
 /*		iclog->ic_callback = 0;	*/
-		iclog->ic_bp = getrbuf(0);
-		psema(&iclog->ic_bp->b_lock, PINOD);	/* it's mine */
-
+		iclog->ic_bp = getrbuf(0);		/* my locked buffer */
+		ASSERT(iclog->ic_bp->b_flags & B_BUSY);
+		ASSERT(valusema(&iclog->ic_bp->b_lock) <= 0);
 		initnsema(&iclog->ic_forcesema, 0, "iclog-force");
 
 		iclogp = &iclog->ic_next;
