@@ -272,7 +272,7 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	/*
 	 * Hit the inode change time.
 	 */
-	if (retval == 0) {
+	if ((retval == 0) && ((flags & ATTR_KERNOTIME) == 0)) {
 		xfs_ichgtime(dp, XFS_ICHGTIME_CHG);
 	}
 
@@ -359,7 +359,7 @@ xfs_attr_remove(vnode_t *vp, char *name, int flags, struct cred *cred)
 	/*
 	 * Hit the inode change time.
 	 */
-	if (error == 0) {
+	if ((error == 0) && ((flags & ATTR_KERNOTIME) == 0)) {
 		xfs_ichgtime(dp, XFS_ICHGTIME_CHG);
 	}
 
@@ -422,6 +422,27 @@ xfs_attr_list(vnode_t *vp, char *buffer, int bufsize, int flags,
 
 	return(error);
 }
+
+int								/* error */
+xfs_attr_inactive(xfs_inode_t *dp)
+{
+	int error;
+
+	xfsda_t_reinit("attr_inactive", __FILE__, __LINE__);
+
+	/*
+	 * Decide on what work routines to call based on the inode size.
+	 */
+	if ((XFS_IFORK_Q(dp) == 0) ||
+	    (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL)) {
+		error = 0;
+	} else {
+		error = xfs_attr_root_inactive(dp);
+	}
+
+	return(error);
+}
+
 
 
 /*========================================================================
@@ -950,7 +971,6 @@ restart:
 		 * Check to see if the tree needs to be collapsed.
 		 */
 		if (retval && (state->path.active > 1)) {
-/* GROT: deal with INCOMPLETE entries, don't copy them */
 			error = xfs_da_join(state);
 			if (error)
 				goto out;
@@ -1094,7 +1114,6 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 	 * Check to see if the tree needs to be collapsed.
 	 */
 	if (retval && (state->path.active > 1)) {
-/* GROT: deal with INCOMPLETE entries, don't copy them */
 		error = xfs_da_join(state);
 		if (error)
 			goto out1;
@@ -1283,18 +1302,17 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 	xfs_bmbt_irec_t map[ATTR_RMTVALUE_MAPSIZE];
 	xfs_fsblock_t firstblock;
 	xfs_mount_t *mp;
-	daddr_t dblkno, radblkno;
+	daddr_t dblkno;
 	caddr_t dst;
 	buf_t *bp;
-	int nmap, error, tmp, valuelen, lblkno, blkcnt, bbsperblk, i, j;
+	int nmap, error, tmp, valuelen, lblkno, blkcnt, i;
 
 	mp = args->dp->i_mount;
-	bbsperblk = XFS_FSB_TO_BB(mp, 1);
 	dst = args->value;
 	valuelen = args->valuelen;
 	lblkno = args->rmtblkno;
 	while (valuelen > 0) {
-		firstblock = NULLFSBLOCK;	/* GROT: is this right? */
+		firstblock = NULLFSBLOCK;
 		nmap = ATTR_RMTVALUE_MAPSIZE;
 		error = xfs_bmapi(NULL, args->dp, lblkno, args->rmtblkcnt,
 				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
@@ -1307,30 +1325,19 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 			ASSERT((map[i].br_startblock != DELAYSTARTBLOCK) &&
 			       (map[i].br_startblock != HOLESTARTBLOCK));
 			dblkno = XFS_FSB_TO_DADDR(mp, map[i].br_startblock);
-			radblkno = XFS_FSB_TO_DADDR(mp, map[i].br_startblock+1);
-			blkcnt = map[i].br_blockcount;
-			for (j = 0; j < blkcnt; j++) {
-				if (j < blkcnt-1) {
-					bp = breada(mp->m_dev,
-						    dblkno, bbsperblk,
-						    radblkno, bbsperblk);
-				} else {
-					bp = bread(mp->m_dev,
-						   dblkno, bbsperblk);
-				}
-				if (error = geterror(bp))
-					return(error);
+			blkcnt = XFS_FSB_TO_BB(mp, map[i].br_blockcount);
+			bp = read_buf(mp->m_dev, dblkno, blkcnt, 0);
+			if (error = geterror(bp))
+				return(error);
 
-				tmp = (valuelen < bp->b_bufsize)
-					? valuelen : bp->b_bufsize;
-				bcopy(bp->b_un.b_addr, dst, tmp);
-				brelse(bp);
-				dst += tmp;
-				valuelen -= tmp;
-				dblkno += bbsperblk;
-				radblkno += bbsperblk;
-			}
-			lblkno += blkcnt;
+			tmp = (valuelen < bp->b_bufsize)
+				? valuelen : bp->b_bufsize;
+			bcopy(bp->b_un.b_addr, dst, tmp);
+			brelse(bp);
+			dst += tmp;
+			valuelen -= tmp;
+
+			lblkno += map[i].br_blockcount;
 		}
 	}
 	ASSERT(valuelen == 0);
@@ -1353,7 +1360,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 	caddr_t src;
 	buf_t *bp;
 	xfs_fileoff_t lblkno;
-	int blkcnt, bbsperblk, valuelen, nmap, error, tmp, committed, j;
+	int blkcnt, valuelen, nmap, error, tmp, committed;
 
 	mp = args->dp->i_mount;
 	src = args->value;
@@ -1372,7 +1379,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 					      XFS_SETATTR_LOG_RES(mp),
 					      0, XFS_TRANS_PERM_LOG_RES,
 					      XFS_SETATTR_LOG_COUNT)) {
-			goto out2;
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
 		}
 		xfs_trans_ijoin(trans, args->dp, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(trans, args->dp);
@@ -1399,8 +1407,11 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 				  XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA |
 					XFS_BMAPI_WRITE,
 				  &firstblock, blkcnt, &map, &nmap, &flist);
-		if (error)
-			goto out1;
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
 		ASSERT(nmap == 1);
 		ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
 		       (map.br_startblock != HOLESTARTBLOCK));
@@ -1411,18 +1422,20 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		 * Commit the current transaction.
 		 */
 		error = xfs_bmap_finish(&trans, &flist, firstblock, &committed);
-		if (error)
-			goto out1;
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
 		xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 	}
 
 	/*
 	 * Roll through the "value", copying the attribute value to the
-	 * already-allocated blocks.  Start/commit transactions as required
-	 * to keep the number of blocks logged in a single transaction to a
-	 * small value.
+	 * already-allocated blocks.  Blocks are written synchronously
+	 * so that we can know they are all on disk before the turn off
+	 * the INCOMPLETE flag.
 	 */
-	bbsperblk = XFS_FSB_TO_BB(mp, 1);
 	lblkno = args->rmtblkno;
 	valuelen = args->valuelen;
 	while (valuelen > 0) {
@@ -1435,72 +1448,30 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
 					&firstblock, 0, &map, &nmap, NULL);
 		if (error)
-			goto out3;
+			return(error);
 		ASSERT(nmap == 1);
 		ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
 		       (map.br_startblock != HOLESTARTBLOCK));
 
-		/*
-		 * Loop over all filesystem blocks dedicated to the
-		 * "value".  They must all be logged separately so
-		 * that we know what block size to use when we
-		 * invalidate them on a "remove" operation.
-		 */
 		dblkno = XFS_FSB_TO_DADDR(mp, map.br_startblock),
 		blkcnt = XFS_FSB_TO_BB(mp, map.br_blockcount);
-		while (blkcnt > 0){
-			/*
-			 * Start a new transaction.
-			 */
-			trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
-			if (error = xfs_trans_reserve(trans, 0,
-				      XFS_FSB_TO_B(mp, ATTR_RMTVALUE_TRANSBLKS),
-				      0, XFS_TRANS_PERM_LOG_RES,
-				      XFS_SETATTR_LOG_COUNT)) {
-				goto out2;
-			}
 
-			/*
-			 * Copy the value into the buffers, one at a time.
-			 * We do this so that VOP_INACTIVE() will work.
-			 */
-			for (j = 0; (j < ATTR_RMTVALUE_TRANSBLKS) &&
-				    (blkcnt > 0); j++){
-				bp = xfs_trans_get_buf(trans, mp->m_dev, dblkno,
-							      bbsperblk, 0);
-				ASSERT(bp);
-				ASSERT(!geterror(bp));
+		bp = get_buf(mp->m_dev, dblkno, blkcnt, 0);
+		ASSERT(bp);
+		ASSERT(!geterror(bp));
 
-				tmp = (valuelen < bp->b_bufsize)
-						? valuelen : bp->b_bufsize;
-				bcopy(src, bp->b_un.b_addr, tmp);
-				if (tmp < bp->b_bufsize)
-					bzero(bp->b_un.b_addr + tmp,
-					      bp->b_bufsize - tmp);
-				xfs_trans_log_buf(trans, bp, 0,
-							 XFS_FSB_TO_B(mp, 1)-1);
-				src += tmp;
-				valuelen -= tmp;
-				dblkno += bbsperblk;
-				blkcnt -= bbsperblk;
-			}
+		tmp = (valuelen < bp->b_bufsize) ? valuelen : bp->b_bufsize;
+		bcopy(src, bp->b_un.b_addr, tmp);
+		if (tmp < bp->b_bufsize)
+			bzero(bp->b_un.b_addr + tmp, bp->b_bufsize - tmp);
+		bwrite(bp);		/* NOTE: synchronous write */
+		src += tmp;
+		valuelen -= tmp;
 
-			/*
-			 * Commit the current transaction.
-			 */
-			xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
-		}
 		lblkno += map.br_blockcount;
 	}
 	ASSERT(valuelen == 0);
 	return(0);
-
-out1:
-	xfs_bmap_cancel(&flist);
-out2:
-	xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
-out3:
-	return(error);
 }
 
 /*
@@ -1517,17 +1488,14 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 	xfs_bmap_free_t flist;
 	buf_t *bp;
 	daddr_t dblkno;
-	int blkcnt, nmap, error, done, committed, j;
-	int bbsperblk, lblkno, valuelen;
+	int lblkno, valuelen, blkcnt, nmap, error, done, committed;
 
 	mp = args->dp->i_mount;
 
 	/*
 	 * Roll through the "value", invalidating the attribute value's
-	 * blocks. Start/commit transactions are required in order to keep
-	 * the number of blocks logged in a single transaction small.
+	 * blocks.
 	 */
-	bbsperblk = XFS_FSB_TO_BB(mp, 1);
 	lblkno = args->rmtblkno;
 	valuelen = args->rmtblkcnt;
 	while (valuelen > 0) {
@@ -1540,53 +1508,27 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
 					&firstblock, 0, &map, &nmap, &flist);
 		if (error)
-			goto out3;
+			return(error);
 		ASSERT(nmap == 1);
 		ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
 		       (map.br_startblock != HOLESTARTBLOCK));
 
-		/*
-		 * Loop over all filesystem blocks dedicated to the
-		 * "value".  They must all be logged separately as they
-		 * were created that way.
-		 */
 		dblkno = XFS_FSB_TO_DADDR(mp, map.br_startblock),
 		blkcnt = XFS_FSB_TO_BB(mp, map.br_blockcount);
-		while (blkcnt > 0){
-			/*
-			 * Start a new transaction.
-			 */
-			trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
-			if (error = xfs_trans_reserve(trans,
-				      ATTR_RMTVALUE_TRANSBLKS,
-				      XFS_FSB_TO_B(mp, ATTR_RMTVALUE_TRANSBLKS),
-				      0, XFS_TRANS_PERM_LOG_RES,
-				      XFS_SETATTR_LOG_COUNT)) {
-				goto out2;
-			}
 
-			/*
-			 * Invalidate the value into the buffers, one at a
-			 * time.  We do this so that VOP_INACTIVE() will work.
-			 */
-			for (j = 0; (j < ATTR_RMTVALUE_TRANSBLKS) &&
-				    (blkcnt > 0); j++){
-				bp = xfs_trans_get_buf(trans, mp->m_dev, dblkno,
-							      bbsperblk, 0);
-				ASSERT(bp);
-				ASSERT(!geterror(bp));
-
-				xfs_trans_binval(trans, bp);
-				valuelen -= bbsperblk;
-				dblkno += bbsperblk;
-				blkcnt -= bbsperblk;
-			}
-
-			/*
-			 * Commit the current transaction.
-			 */
-			xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+		/*
+		 * If the "remote" value is in the cache, remove it.
+		 */
+		bp = incore(mp->m_dev, dblkno, blkcnt, 1);
+		if (bp) {
+			bp->b_flags |= B_STALE;
+			bp->b_flags &= ~B_DELWRI;
+			brelse(bp);
+			bp = NULL;
 		}
+
+		valuelen -= map.br_blockcount;
+
 		lblkno += map.br_blockcount;
 	}
 
@@ -1602,7 +1544,8 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 					      XFS_RMATTR_LOG_RES(mp),
 					      0, XFS_TRANS_PERM_LOG_RES,
 					      XFS_RMATTR_LOG_COUNT)) {
-			goto out2;
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
 		}
 		xfs_trans_ijoin(trans, args->dp, XFS_ILOCK_EXCL);
 		xfs_trans_ihold(trans, args->dp);
@@ -1611,20 +1554,19 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 		error = xfs_bunmapi(trans, args->dp, lblkno, blkcnt,
 				    XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
 				    1, &firstblock, &flist, &done);
-		if (error)
-			goto out1;
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
 
 		error = xfs_bmap_finish(&trans, &flist, firstblock, &committed);
-		if (error)
-			goto out1;
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
 		xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 	}
 	return(0);
-
-out1:
-	xfs_bmap_cancel(&flist);
-out2:
-	xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
-out3:
-	return(error);
 }

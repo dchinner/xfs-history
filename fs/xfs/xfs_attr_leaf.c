@@ -1946,6 +1946,10 @@ xfs_attr_put_listent(attrlist_t *alist, char *name, int namelen, int valuelen,
 	return(0);
 }
 
+/*========================================================================
+ * Manage the INCOMPLETE flag in a leaf entry
+ *========================================================================*/
+
 /*
  * Clear the INCOMPLETE flag on an entry in a leaf block.
  */
@@ -2192,4 +2196,353 @@ xfs_attr_leaf_flipflags(xfs_da_args_t *args)
 
 	xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
 	return(error);
+}
+
+/*========================================================================
+ * Indiscriminately delete the entire attribute fork
+ *========================================================================*/
+
+/*
+ * Recurse (gasp!) through the attribute nodes until we find leaves.
+ * We're doing a depth-first traversal in order to bunmap() everything.
+ */
+int
+xfs_attr_root_inactive(xfs_inode_t *dp)
+{
+	xfs_trans_t *trans;
+	xfs_fsblock_t firstblock;
+	xfs_bmap_free_t flist;
+	xfs_da_blkinfo_t *info;
+	int error, retval, tmp;
+	buf_t *bp;
+
+	/*
+	 * Read block 0 to see what we have to work with.
+	 */
+	error = xfs_da_read_buf(NULL, dp, 0, &bp, XFS_ATTR_FORK);
+	if (error)
+		return(error);
+	if (error = geterror(bp))
+		return(error);
+
+	/*
+	 * Remove the tree, even if the "tree" is only a single leaf block.
+	 */
+	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
+	if (info->magic == XFS_DA_NODE_MAGIC) {
+		retval = xfs_attr_node_inactive(dp, bp, 1);
+	} else if (info->magic == XFS_ATTR_LEAF_MAGIC) {
+		retval = xfs_attr_leaf_inactive(dp, bp);
+	} else {
+		brelse(bp);
+		return(XFS_ERROR(EIO));
+	}
+
+	/*
+	 * Free up our root block, then remove it from the cache and the log.
+	 */
+	trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_RM);
+	if (error = xfs_trans_reserve(trans, 16,
+/* GROT: should be smaller */	      XFS_RMATTR_LOG_RES(dp->i_mount),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_RMATTR_LOG_COUNT)) {
+		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+		if (!retval)
+			retval = error;
+		return(retval);
+	}
+	xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
+	xfs_trans_ihold(trans, dp);
+	XFS_BMAP_INIT(&flist, &firstblock);
+	error = xfs_bunmapi(trans, dp, 0, 1,
+			    XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
+			    1, &firstblock, &flist, &tmp);
+	if (error) {
+		xfs_bmap_cancel(&flist);
+		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+		if (!retval)
+			retval = error;
+		return(retval);
+	}
+	error = xfs_bmap_finish(&trans, &flist, firstblock, &tmp);
+	if (error) {
+		xfs_bmap_cancel(&flist);
+		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+		if (!retval)
+			retval = error;
+		return(retval);
+	}
+	xfs_trans_bjoin(trans, bp);
+	xfs_trans_set_sync(trans);	/* GROT: is this req'd */
+	xfs_trans_binval(trans, bp);
+	xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+
+	return(retval);	
+}
+
+/*
+ * Recurse (gasp!) through the attribute nodes until we find leaves.
+ * We're doing a depth-first traversal in order to bunmap() everything.
+ */
+int
+xfs_attr_node_inactive(xfs_inode_t *dp, buf_t *bp, int level)
+{
+	xfs_trans_t *trans;
+	xfs_fsblock_t firstblock;
+	xfs_bmap_free_t flist;
+	xfs_da_blkinfo_t *info;
+	xfs_da_intnode_t *node;
+	xfs_da_node_entry_t *btree;
+	int error, retval, tmp, i;
+	buf_t *bp2;
+
+	/*
+	 * Since this code is recursive (gasp!) we must protect ourselves.
+	 */
+	if (level > XFS_DA_NODE_MAXDEPTH) {
+		return(XFS_ERROR(EIO));
+	}
+
+	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
+	ASSERT(node->hdr.info.magic == XFS_DA_NODE_MAGIC);
+
+	/*
+	 * If this is the node level just above the leaves, simply loop
+	 * over the leaves removing all of them.  If this is higher up
+	 * in the tree, recurse downward.
+	 */
+	for (btree = node->btree, i = 0; i < node->hdr.count; i++, btree++) {
+		/*
+		 * If we have restarted this code, then we may see already
+		 * removed sections of the tree.
+		 */
+		if (btree->before == 0)
+			continue;
+
+		/*
+		 * Read the subsidiary block to see what we have to work with.
+		 */
+		error = xfs_da_read_buf(NULL, dp, btree->before, &bp2,
+					      XFS_ATTR_FORK);
+		if (error)
+			return(error);
+		if (error = geterror(bp))
+			return(error);
+
+		/*
+		 * Remove the subtree, however we have to.
+		 */
+		info = (xfs_da_blkinfo_t *)bp2->b_un.b_addr;
+		if (info->magic == XFS_DA_NODE_MAGIC) {
+			error = xfs_attr_node_inactive(dp, bp2, level+1);
+		} else if (info->magic == XFS_ATTR_LEAF_MAGIC) {
+			error = xfs_attr_leaf_inactive(dp, bp2);
+		} else {
+			brelse(bp2);
+			return(XFS_ERROR(EIO));
+		}
+		if (!retval)
+			retval = error;
+
+		/*
+		 * Set up so that we can get rid of the subsidiary block
+		 */
+		trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_RM);
+		if (error = xfs_trans_reserve(trans, 16,
+					      XFS_RMATTR_LOG_RES(dp->i_mount),
+					      0, XFS_TRANS_PERM_LOG_RES,
+					      XFS_RMATTR_LOG_COUNT)) {
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			if (!retval)
+				retval = error;
+			continue;
+		}
+
+		/*
+		 * Free the subsidiary block.
+		 */
+		xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
+		xfs_trans_ihold(trans, dp);
+		XFS_BMAP_INIT(&flist, &firstblock);
+		error = xfs_bunmapi(trans, dp, btree->before, 1,
+				    XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
+				    1, &firstblock, &flist, &tmp);
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			if (!retval)
+				retval = error;
+			continue;
+		}
+		error = xfs_bmap_finish(&trans, &flist, firstblock, &tmp);
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			if (!retval)
+				retval = error;
+			continue;
+		}
+
+		/*
+		 * Remove the subsidiary block from the cache and from the log.
+		 */
+		xfs_trans_bjoin(trans, bp2);
+		xfs_trans_set_sync(trans);	/* GROT: is this req'd */
+		xfs_trans_binval(trans, bp2);
+
+		/*
+		 * Remove the pointer to the block being freed.
+		 */
+		xfs_trans_bjoin(trans, bp);
+		xfs_trans_bhold(trans, bp);
+		btree->hashval = 0;
+		btree->before = 0;
+		xfs_trans_log_buf(trans, bp,
+				  XFS_DA_LOGRANGE(node, btree, sizeof(*btree)));
+
+		/*
+		 * Atomically commit the whole unmap and de-reference stuff.
+		 */
+		xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+	}
+
+	return(retval);	
+}
+
+/*
+ * Free all of the "remote" value regions pointed to by a particular
+ * leaf block.  We do not bother to log changes to the leaf block as we
+ * free up each remote region, bunmapi() can be called on a logical file
+ * address range that does not have any associated disk space without a
+ * problem so we just avoid that log traffic.  If we restart this because
+ * of a system crash, then we will do a bit more work but would have saved
+ * lots of cycles under the normal case.
+ */
+int
+xfs_attr_leaf_inactive(xfs_inode_t *dp, buf_t *bp)
+{
+	xfs_attr_leafblock_t *leaf;
+	xfs_attr_leaf_entry_t *entry;
+	xfs_attr_leaf_name_remote_t *name_rmt;
+	int error, retval, i;
+
+	leaf = (xfs_attr_leafblock_t *)bp->b_un.b_addr;
+	ASSERT(leaf->hdr.info.magic == XFS_ATTR_LEAF_MAGIC);
+
+	/*
+	 * Remove each of the "remote" value extents.
+	 */
+	retval = 0;
+	entry = &leaf->entries[0];
+	for (i = 0; i < leaf->hdr.count; entry++, i++) {
+		if (entry->nameidx && ((entry->flags & XFS_ATTR_LOCAL) == 0)) {
+			name_rmt = XFS_ATTR_LEAF_NAME_REMOTE(leaf, i);
+			if (name_rmt->valueblk == 0)
+				continue;	/* skip if already cleared */
+
+			/*
+			 * Free up the "remote" value extent(s).
+			 */
+			error = xfs_attr_leaf_freextent(dp,
+						(int)name_rmt->valueblk,
+						(int)name_rmt->valuelen);
+			if (!retval)
+				retval = error;
+		}
+	}
+
+	return(retval);
+}
+
+/*
+ * Keep de-allocating extents until the remote-value region is gone,
+ * invalidate any buffers that happen to be incore.
+ */
+int
+xfs_attr_leaf_freextent(xfs_inode_t *dp, int blkno, int blkcnt)
+{
+	xfs_bmbt_irec_t map;
+	xfs_fsblock_t firstblock;
+	xfs_bmap_free_t flist;
+	xfs_trans_t *trans;
+	int tblkno, tblkcnt, dblkcnt, nmap, done, error, committed;
+	daddr_t dblkno;
+	buf_t *bp;
+
+	/*
+	 * Roll through the "value", invalidating the attribute value's
+	 * blocks.
+	 */
+	tblkno = blkno;
+	tblkcnt = blkcnt;
+	while (tblkcnt > 0) {
+		/*
+		 * Try to remember where we decided to put the value.
+		 */
+		XFS_BMAP_INIT(&flist, &firstblock);
+		nmap = 1;
+		error = xfs_bmapi(NULL, dp, tblkno, tblkcnt,
+					XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
+					&firstblock, 0, &map, &nmap, &flist);
+		if (error)
+			return(error);
+		ASSERT(nmap == 1);
+		ASSERT((map.br_startblock != DELAYSTARTBLOCK) &&
+		       (map.br_startblock != HOLESTARTBLOCK));
+
+		dblkno = XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock),
+		dblkcnt = XFS_FSB_TO_BB(dp->i_mount, map.br_blockcount);
+
+		/*
+		 * If the "remote" value is in the cache, remove it.
+		 */
+		bp = incore(dp->i_mount->m_dev, dblkno, dblkcnt, 1);
+		if (bp) {
+			bp->b_flags |= B_STALE;
+			bp->b_flags &= ~B_DELWRI;
+			brelse(bp);
+			bp = NULL;
+		}
+
+		tblkno += map.br_blockcount;
+		tblkcnt -= map.br_blockcount;
+	}
+
+
+	/*
+	 * Keep deallocating extents in the "remote" value region until 
+	 * all of them are gone.
+	 */
+	done = 0;
+	while (!done) {
+		trans = xfs_trans_alloc(dp->i_mount, XFS_TRANS_ATTR_RM);
+		if (error = xfs_trans_reserve(trans, 16,
+					      XFS_RMATTR_LOG_RES(dp->i_mount),
+					      0, XFS_TRANS_PERM_LOG_RES,
+					      XFS_RMATTR_LOG_COUNT)) {
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
+		xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
+		xfs_trans_ihold(trans, dp);
+
+		XFS_BMAP_INIT(&flist, &firstblock);
+		error = xfs_bunmapi(trans, dp, blkno, blkcnt,
+				    XFS_BMAPI_ATTRFORK | XFS_BMAPI_METADATA,
+				    1, &firstblock, &flist, &done);
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
+
+		error = xfs_bmap_finish(&trans, &flist, firstblock, &committed);
+		if (error) {
+			xfs_bmap_cancel(&flist);
+			xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
+			return(error);
+		}
+		xfs_trans_commit(trans, XFS_TRANS_RELEASE_LOG_RES);
+	}
+	return(0);
 }
