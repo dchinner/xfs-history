@@ -93,6 +93,7 @@ static struct export_operations linvfs_export_ops;
 #define MNTOPT_BIOSIZE  "biosize"       /* log2 of preferred buffered io size */
 #define MNTOPT_WSYNC    "wsync"         /* safe-mode nfs compatible mount */
 #define MNTOPT_NOATIME  "noatime"       /* don't modify access times on reads */
+#define MNTOPT_INO64    "ino64"         /* force inodes into 64-bit range */
 #define MNTOPT_NOALIGN  "noalign"       /* turn off stripe alignment */
 #define MNTOPT_SUNIT    "sunit"         /* data volume stripe unit */
 #define MNTOPT_SWIDTH   "swidth"        /* data volume stripe width */
@@ -203,6 +204,13 @@ xfs_parseargs(
 			args->flags |= XFSMNT_OSYNCISOSYNC;
 		} else if (!strcmp(this_char, MNTOPT_NORECOVERY)) {
 			args->flags |= XFSMNT_NORECOVERY;
+		} else if (!strcmp(this_char, MNTOPT_INO64)) {
+#ifdef XFS_BIG_FILESYSTEMS
+			args->flags |= XFSMNT_INO64;
+#else
+			printk("XFS: ino64 option not allowed on this system\n");
+			return rval;
+#endif
 		} else if (!strcmp(this_char, MNTOPT_UQUOTA)) {
 			args->flags |= XFSMNT_UQUOTA | XFSMNT_UQUOTAENF;
 		} else if (!strcmp(this_char, MNTOPT_QUOTA)) {

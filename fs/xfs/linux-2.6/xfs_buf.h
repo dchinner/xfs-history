@@ -236,20 +236,6 @@ typedef struct page_buf_s {
 } page_buf_t;
 
 
-/* 
- *	Page_buf_apply_t
- *
- *	Type of function pointer supplied to pagebuf_segment_apply.
- */
-
-typedef int (*page_buf_apply_t)(	/* function to apply to segment	*/
-		page_buf_t *,		/* buffer to examine		*/
-		loff_t,			/* offset in file of segment	*/
-		struct page *,		/* page (NULL if not in mem_map[]) */
-		size_t,			/* offset in page		*/
-		size_t,			/* length of segment		*/
-		int);			/* true if last page in pagebuf */ 
-
 /*
  * page_buf module entry points
  */
@@ -422,10 +408,6 @@ extern int pagebuf_iomove(		/* move data in/out of pagebuf  */
 		size_t,			/* length in buffer		*/
 		caddr_t,		/* data pointer			*/
 		page_buf_rw_t);		/* direction			*/
-
-extern int pagebuf_segment_apply(	/* apply function to segments	*/
-		page_buf_apply_t,	/* function to call		*/
-		page_buf_t *);		/* buffer to examine		*/
 
 /* Pinning Buffer Storage in Memory */
 

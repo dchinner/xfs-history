@@ -222,8 +222,7 @@ xfs_zero_last_block(
 	 * If the block underlying isize is just a hole, then there
 	 * is nothing to zero.
 	 */
-	if (imap.br_startblock == HOLESTARTBLOCK)
-	{
+	if (imap.br_startblock == HOLESTARTBLOCK) {
 		return 0;
 	}
 	/*
@@ -367,8 +366,7 @@ xfs_zero_eof(
 		}
 		ASSERT(nimaps > 0);
 
-		if (imap.br_startblock == HOLESTARTBLOCK)
-		{
+		if (imap.br_startblock == HOLESTARTBLOCK) {
 			/* 
 			 * This loop handles initializing pages that were
 			 * partially initialized by the code below this 
@@ -606,6 +604,9 @@ retry:
 			(io->io_flags & XFS_IOCORE_RT)?
 			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
 			filp, buf, size, offsetp, linvfs_pb_bmap);
+#if 0
+	ret = generic_file_write(filp, buf, size, offsetp);
+#endif
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((ret == -ENOSPC) &&
@@ -1203,8 +1204,6 @@ xfs_iomap_write(
 {
 	int		maps;
 	int		error = 0;
-
-#define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 	int		found; 
 	int		flags = 0;
 
@@ -1410,9 +1409,6 @@ xfs_iomap_write_delay(
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_WRITE_IMAPS];
 	int		aeof;
-#ifdef DELALLOC_BUG
-	unsigned int	writing_bytes;
-#endif
 
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE) != 0);
 
