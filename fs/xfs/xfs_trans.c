@@ -136,12 +136,22 @@ xfs_trans_callback(xfs_trans_t *tp, xfs_trans_callback_t callback, void *arg)
  * If we don't already own the buffer, use xfs_getblk() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
+ *
+ * If the transaction pointer is NULL, make this just a normal
+ * getblk() call.
  */
 buf_t *
 xfs_trans_getblk(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
+
+	/*
+	 * Default to a normal getblk() call if the tp is NULL.
+	 */
+	if (tp == NULL) {
+		return (getblk(dev, blkno, len));
+	}
 
 	/*
 	 * If we find the buffer in the cache with this transaction
@@ -201,12 +211,22 @@ xfs_trans_getblk(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
  * If we don't already own the buffer, use xfs_bread() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
+ *
+ * If the transaction pointer is NULL, make this just a normal
+ * bread() call.
  */
 buf_t *
 xfs_trans_bread(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
+
+	/*
+	 * Default to a normal bread() call if the tp is NULL.
+	 */
+	if (tp == NULL) {
+		return (bread(dev, blkno, len));
+	}
 
 	/*
 	 * If we find the buffer in the cache with this transaction
@@ -285,6 +305,9 @@ xfs_trans_bread(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
  * If we don't already own the buffer, use xfs_getchunk() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
+ *
+ * If the transaction pointer is NULL, make this just a normal
+ * getchunk() call.
  */
 #ifndef SIM
 buf_t *
@@ -293,6 +316,13 @@ xfs_trans_getchunk(xfs_trans_t *tp, vnode_t *vp,
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
+
+	/*
+	 * Default to a normal getchunk() call if the tp is NULL.
+	 */
+	if (tp == NULL) {
+		return (getchunk(vp, bmap, cred));
+	}
 
 	/*
 	 * If we find the buffer in the cache with this transaction
@@ -353,6 +383,9 @@ xfs_trans_getchunk(xfs_trans_t *tp, vnode_t *vp,
  * If we don't already own the buffer, use xfs_chunkread() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
+ *
+ * If the transaction pointer is NULL, make this just a normal
+ * chunkread() call.
  */
 #ifndef SIM
 buf_t *
@@ -362,6 +395,12 @@ xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 
+	/*
+	 * Default to a normal chunkread() call if the tp is NULL.
+	 */
+	if (tp == NULL) {
+		return (chunkread(vp, bmap, 1, cred));
+	}
 	/*
 	 * If we find the buffer in the cache with this transaction
 	 * pointer in its b_fsprivate2 field, then we know we already
@@ -429,15 +468,18 @@ xfs_trans_chunkread(xfs_trans_t *tp, vnode_t *vp,
 
 /*
  * Release the buffer bp which was previously acquired with one of the
- * xfs_trans_... buffer allocation routines. This will decrement the lock
- * recursion count of the buffer item.  If the count goes to less than 0,
- * the buffer will be unlocked and disassociated from the transaction. 
+ * xfs_trans_... buffer allocation routines if the buffer has not
+ * been modified within this transaction.  If the buffer is modified
+ * within this transaction, do decrement the recursion count but do
+ * not release the buffer even if the count goes to 0.  If the buffer is not
+ * modified within the transaction, decrement the recursion count and
+ * release the buffer if the recursion count goes to 0.
  *
- * The buffer must not have been modified within this transaction,
- * because we have no way to put it back to its previous state.
+ * If the buffer is to be released and it was not modified before
+ * this transaction began, then free the buf_log_item associated with it.
  *
- * If the buffer was not modified before this transaction began,
- * then free the buf_log_item associated with it.
+ * If the transaction pointer is NULL, make this just a normal
+ * brelse() call.
  */
 void
 xfs_trans_brelse(xfs_trans_t *tp, buf_t *bp)
@@ -445,16 +487,22 @@ xfs_trans_brelse(xfs_trans_t *tp, buf_t *bp)
 	xfs_buf_log_item_t	*bip;
 	xfs_log_item_desc_t	*lidp;
 
+	/*
+	 * Default to a normal brelse() call if the tp is NULL.
+	 */
+	if (tp == NULL) {
+		brelse(bp);
+		return;
+	}
+
 	ASSERT(bp->b_fsprivate2 == tp);
 	bip = (xfs_buf_log_item_t*)bp->b_fsprivate;	
 	/*
 	 * Find the item descriptor pointing to this buffer's
-	 * log item.  It must be there, and it must not be
-	 * dirty.
+	 * log item.  It must be there.
 	 */
 	lidp = xfs_trans_find_item(tp, (xfs_log_item_t*)bip);
 	ASSERT(lidp != NULL);
-	ASSERT(!(lidp->lid_flags & XFS_LID_DIRTY));
 
 	/*
 	 * If the release is just for a recursive lock,
@@ -462,6 +510,14 @@ xfs_trans_brelse(xfs_trans_t *tp, buf_t *bp)
 	 */
 	if (bip->bli_recur > 0) {
 		bip->bli_recur--;
+		return;
+	}
+
+	/*
+	 * If the buffer is dirty within this transaction, we can't
+	 * release it until we commit.
+	 */
+	if (lidp->lid_flags & XFS_LID_DIRTY) {
 		return;
 	}
 
