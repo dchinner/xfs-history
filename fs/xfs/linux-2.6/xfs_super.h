@@ -32,6 +32,8 @@
 #ifndef __XFS_SUPER_H__
 #define __XFS_SUPER_H__
 
+struct xfs_args;
+
 void
 linvfs_release_inode(
 	struct inode	*inode);

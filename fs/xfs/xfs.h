@@ -38,39 +38,12 @@
 
 #include <linux/xfs_linux.h>
 
-#include <linux/fs.h>
-#include <linux/xfs_fs.h>
-#include <linux/kernel.h>
-#include <linux/stddef.h>
-#include <linux/stat.h>
-#include <linux/xfs_cred.h>
-#include <linux/page_buf.h>
-#include <linux/file.h>
-#include <linux/attributes.h>
-#include <linux/acl.h>
-
 #include <xfs_buf.h>
-#include <linux/xqm.h>
-#include <linux/xfs_stats.h>
-#include <linux/xfs_globals.h>
-#include <linux/xfs_behavior.h>
-#include <linux/xfs_vfs.h>
-#include <linux/xfs_vnode.h>
-#include <linux/xfs_fs_subr.h>
-
-#include <linux/slab.h>
-#include <linux/errno.h>
-#include <linux/config.h>
-#include <linux/module.h>
-#include <linux/dmapi.h>
-#include <linux/dmapi_kern.h>
-
 #include <xfs_macros.h>
 #include <xfs_inum.h>
 #include <xfs_log.h>
 #include <xfs_cxfs.h>
 #include <xfs_clnt.h>
-
 #include <xfs_trans.h>
 #include <xfs_sb.h>
 #include <xfs_ag.h>
@@ -121,6 +94,5 @@
 #include <xfs_grio.h>
 
 #include <linux/xfs_lrw.h>
-#include <linux/xfs_super.h>
 
 #endif	/* __XFS_H__ */
