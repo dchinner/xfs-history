@@ -1,10 +1,11 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.11 $"
 
 struct xfs_mount;
 struct xfs_trans;
+struct xfs_growfs_rt;
 
 /* Min and max rt extent sizes, specified in bytes */
 #define	XFS_MAX_RTEXTSIZE	(1024 * 1024 * 1024)	/* 1GB */
@@ -57,6 +58,14 @@ struct xfs_trans;
 
 #ifndef SIM
 /*
+ * Grow the realtime area of the filesystem.
+ */
+int
+xfs_growfs_rt(
+	struct xfs_mount	*mp,	/* mount point for filesystem */
+	struct xfs_growfs_rt	*in);	/* growfs rt input struct */
+
+/*
  * Allocate an extent in the realtime subvolume, with the usual allocation
  * parameters.  The length units are all in realtime extents, as is the
  * result block number.
@@ -83,6 +92,21 @@ xfs_rtfree_extent(
 	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_rtblock_t		bno,	/* starting block number to free */
 	xfs_extlen_t		len);	/* length of extent freed */
+
+/*
+ * Initialize realtime fields in the mount structure.
+ */
+int					/* error */
+xfs_rtmount_init(
+	struct xfs_mount	*mp);	/* file system mount structure */
+
+/*
+ * Get the bitmap and summary inodes into the mount structure 
+ * at mount time.
+ */
+int					/* error */
+xfs_rtmount_inodes(
+	struct xfs_mount	*mp);	/* file system mount structure */
 
 #ifdef XFSDEBUG
 /*
