@@ -52,14 +52,11 @@
 #include <linux/stddef.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <asm/uaccess.h>
-#include <linux/string.h>
 #include <linux/pagemap.h>
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
 #include <linux/bio.h>
-#include <linux/swap.h>
 #include <asm/softirq.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
@@ -171,10 +168,10 @@ STATIC void pagebuf_daemon_wakeup(int);
  * /proc/sys/vm/pagebuf
  */
 
-unsigned long pagebuf_min[P_PARAM] = {  HZ/2,   1*HZ,    1, 0, 0 };
-unsigned long pagebuf_max[P_PARAM] = { HZ*30, HZ*300, 4096, 1, 1 };
+unsigned long pagebuf_min[P_PARAM] = {  HZ/2,   1*HZ, 0, 0 };
+unsigned long pagebuf_max[P_PARAM] = { HZ*30, HZ*300, 1, 1 };
 
-pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 256, 0, 0 }};
+pagebuf_param_t pb_params = {{ HZ, 15 * HZ, 0, 0 }};
 
 /*
  * Pagebuf statistics variables
@@ -402,7 +399,7 @@ void _pagebuf_free_object(
  *	read in from disk) are assigned for any pages which are not found.
  */
 
-int
+STATIC int
 _pagebuf_lookup_pages(
 	page_buf_t		*pb,
 	struct address_space	*aspace,
@@ -410,7 +407,7 @@ _pagebuf_lookup_pages(
 {
 	loff_t			next_buffer_offset;
 	unsigned long		page_count, pi, index;
-	struct page		*cp, *cached_page;
+	struct page		*page, *cached_page;
 	int			gfp_mask, retry_count = 0, rval = 0;
 	int			all_mapped, good_pages, nbytes;
 	size_t			blocksize, size, offset;
@@ -467,8 +464,8 @@ _pagebuf_lookup_pages(
 	for (all_mapped = 1; pi < page_count; pi++, index++) {
 		if (pb->pb_pages[pi] == 0) {
 		      retry:
-			cp = find_lock_page(aspace, index);
-			if (!cp) {
+			page = find_lock_page(aspace, index);
+			if (!page) {
 				PB_STATS_INC(pbstats.pb_page_alloc);
 				if (!cached_page) {
 					/* allocate a new page */
@@ -487,20 +484,20 @@ _pagebuf_lookup_pages(
 						continue;
 					}
 				}
-				cp = cached_page;
-				if (add_to_page_cache_unique(cp,
+				page = cached_page;
+				if (add_to_page_cache_unique(page,
 					aspace, index))
 					goto retry;
 				cached_page = NULL;
 			} else {
 				PB_STATS_INC(pbstats.pb_page_found);
-				mark_page_accessed(cp);
+				mark_page_accessed(page);
 			}
 
-			pb->pb_pages[pi] = cp;
+			pb->pb_pages[pi] = page;
 		} else {
-			cp = pb->pb_pages[pi];
-			lock_page(cp);
+			page = pb->pb_pages[pi];
+			lock_page(page);
 		}
 
 		nbytes = PAGE_CACHE_SIZE - offset;
@@ -523,14 +520,12 @@ _pagebuf_lookup_pages(
 		 * thinking they all have uptodate (different) data. :(
 		 * We'll have to use a different approach for that case.
 		 */
-		if (!PageUptodate(cp)) {
-			if (blocksize == PAGE_CACHE_SIZE) {
-				if ((pb->pb_buffer_length < PAGE_CACHE_SIZE) &&
-				    (flags & PBF_READ) && !PageSlab(cp)) {
-					pb->pb_locked = 1;
-				}
+		if (!PageUptodate(page)) {
+			if ((blocksize == PAGE_CACHE_SIZE) &&
+			    (flags & PBF_READ)) {
+				pb->pb_locked = 1;
 				good_pages--;
-			} else if (!PagePrivate(cp)) {
+			} else if (!PagePrivate(page)) {
 				unsigned long i, range = (offset + nbytes) >> SECTOR_SHIFT;
 
 				assert(blocksize < PAGE_CACHE_SIZE);
@@ -540,17 +535,16 @@ _pagebuf_lookup_pages(
 				 * of uptodate sectors (512) within the page
 				 */
 				for (i = offset >> SECTOR_SHIFT; i < range; i++)
-					if (!test_bit(i, &cp->private))
+					if (!test_bit(i, &page->private))
 						break;
 				if (i != range)
 					good_pages--;
-			}
-			else {
+			} else {
 				good_pages--;
 			}
 		}
 		if (!pb->pb_locked)
-			unlock_page(cp);
+			unlock_page(page);
 		offset = 0;
 	}
 	if (cached_page)
@@ -1869,10 +1863,6 @@ static ctl_table pagebuf_table[] = {
 	{PB_FLUSH_AGE, "flush_age", &pb_params.data[1],
 	sizeof(int), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
 	&sysctl_intvec, NULL, &pagebuf_min[1], &pagebuf_max[1]},
-
-	{PB_DIO_MAX, "max_dio_pages", &pb_params.data[2],
-	sizeof(int), 0644, NULL, &proc_doulongvec_minmax, &sysctl_intvec, NULL,
-	&pagebuf_min[2], &pagebuf_max[2]},
 
 	{PB_STATS_CLEAR, "stats_clear", &pb_params.data[3],
 	sizeof(int), 0644, NULL, &pb_stats_clear_handler,

@@ -590,7 +590,7 @@ xfs_ioctl(
 		 * avoid having to do block zeroing on short writes.
 		 */
 		da.d_maxiosz = XFS_FSB_TO_B(mp,
-				XFS_B_TO_FSBT(mp, pagebuf_max_direct()));
+				XFS_B_TO_FSBT(mp, KIO_MAX_ATOMIC_IO << 10));
 
 		if (copy_to_user((struct dioattr *)arg, &da, sizeof(da)))
 			return -XFS_ERROR(EFAULT);

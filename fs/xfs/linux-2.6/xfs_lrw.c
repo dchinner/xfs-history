@@ -632,19 +632,7 @@ retry:
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 
-	/*
-	 * pagebuf_generic_file_write will return positive if bytes
-	 * written, negative if error.  We'll live with (-) error
-	 * for the moment, but flip error sign before we pass it up
-	 */
-
-	ret = pagebuf_generic_file_write(
-			(io->io_flags & XFS_IOCORE_RT)?
-			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			file, buf, size, offset, linvfs_pb_bmap);
-#if 0
-	ret = generic_file_write(file, buf, size, offset);
-#endif
+	ret = do_generic_file_write(file, buf, size, offset);
 
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
@@ -680,12 +668,6 @@ retry:
 	/* Handle various SYNC-type writes */
 	if ((file->f_flags & O_SYNC) || IS_SYNC(file->f_dentry->d_inode)) {
 
-		/* Flush all inode data buffers */
-
-		error = -filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
-		if (error)
-			goto out;
-		
 		/* 
 		 * If we're treating this as O_DSYNC and we have not updated the
 		 * size, force the log.
@@ -763,8 +745,6 @@ retry:
 			}
 		}
 	} /* (ioflags & O_SYNC) */
-
-out:
 
 	/*
 	 * If we are coming from an nfsd thread then insert into the

@@ -567,11 +567,18 @@ linvfs_setattr(
 	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET))
 		flags = ATTR_UTIME;
 
-	VOP_SETATTR(vp, &vattr, flags, sys_cred, error);
+	VOP_SETATTR(vp, &vattr, flags, NULL, error);
 	if (error)
 		return(-error);	/* Positive error up from XFS */
+	if (ia_valid & ATTR_SIZE) {
+		error = vmtruncate(inode, attr->ia_size);
+	}
 
-	return inode_setattr(inode, attr);
+	if (!error) {
+		vn_revalidate(vp, 0);
+		mark_inode_dirty_sync(inode);
+	}
+	return error;
 }
 
 STATIC int
@@ -628,17 +635,11 @@ linvfs_get_block_core(
 	if (pbmap.pbm_flags & PBMF_DELAY) {
 		if (unlikely(direct))
 			BUG();
-		if (!create) {
-			struct page	*page = bh_result->b_page;
-			unsigned int	poffset = offset & ~PAGE_CACHE_MASK;
-
-			memset(kmap(page) + poffset, 0, bh_result->b_size);
-			flush_dcache_page(page);
-			kunmap(page);
+		if (create) {
+			set_buffer_mapped(bh_result);
+			set_buffer_uptodate(bh_result);
 		}
 		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
-		set_buffer_mapped(bh_result);
-		set_buffer_uptodate(bh_result);
 		set_buffer_delay(bh_result);
 	}
 
@@ -832,6 +833,15 @@ linvfs_prepare_write(
 	}
 }
 
+STATIC void
+linvfs_truncate(
+	struct inode	*inode)
+{
+	block_truncate_page(inode->i_mapping, inode->i_size,
+						linvfs_get_block);
+}
+
+
 /* Initiate I/O on a kiobuf of user memory */
 STATIC int
 linvfs_direct_IO(
@@ -974,6 +984,7 @@ struct inode_operations linvfs_file_inode_operations =
 {
 	permission:		linvfs_permission,
 	getattr:		linvfs_getattr,
+	truncate:		linvfs_truncate,
 	setattr:		linvfs_setattr,
 	setxattr:		linvfs_setxattr,
 	getxattr:		linvfs_getxattr,

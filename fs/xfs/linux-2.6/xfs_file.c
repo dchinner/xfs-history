@@ -63,7 +63,6 @@ linvfs_write(
 	loff_t		*ppos)
 {
 	struct inode	*inode = file->f_dentry->d_inode;
-	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	loff_t		pos;
 	vnode_t		*vp;
 	int		err;	/* Use negative errors in this f'n */
@@ -73,8 +72,6 @@ linvfs_write(
 
 	if (!access_ok(VERIFY_READ, buf, count))
 		return -EFAULT;
-
-	down(&inode->i_sem);
 
 	pos = *ppos;
 	err = -EINVAL;
@@ -87,94 +84,21 @@ linvfs_write(
 		goto out;
 	}
 
-	if (!S_ISBLK(inode->i_mode) && file->f_flags & O_APPEND)
-		pos = inode->i_size;
-
-	/*
-	 * Check whether we've reached the file size limit.
-	 */
-	err = -EFBIG;
-	
-	if (limit != RLIM_INFINITY) {
-		if (pos >= limit) {
-			send_sig(SIGXFSZ, current, 0);
-			goto out;
-		}
-		if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			count = limit - (u32)pos;
-		}
-	}
-
-	/*
-	 *	LFS rule 
-	 */
-	if ( pos + count > MAX_NON_LFS && !(file->f_flags&O_LARGEFILE)) {
-		if (pos >= MAX_NON_LFS) {
-			send_sig(SIGXFSZ, current, 0);
-			goto out;
-		}
-		if (count > MAX_NON_LFS - (u32)pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			count = MAX_NON_LFS - (u32)pos;
-		}
-	}
-
-	/*
-	 *	Are we about to exceed the fs block limit ?
-	 *
-	 *	If we have written data it becomes a short write
-	 *	If we have exceeded without writing data we send
-	 *	a signal and give them an EFBIG.
-	 *
-	 *	Linus frestrict idea will clean these up nicely..
-	 */
-	 
-	if (!S_ISBLK(inode->i_mode)) {
-		if (pos >= inode->i_sb->s_maxbytes)
-		{
-			if (count || pos > inode->i_sb->s_maxbytes) {
-				send_sig(SIGXFSZ, current, 0);
-				err = -EFBIG;
-				goto out;
-			}
-			/* zero-length writes at ->s_maxbytes are OK */
-		}
-
-		if (pos + count > inode->i_sb->s_maxbytes)
-			count = inode->i_sb->s_maxbytes - pos;
-	} else {
-		if (is_read_only(inode->i_rdev)) {
-			err = -EPERM;
-			goto out;
-		}
-		if (pos >= inode->i_size) {
-			if (count || pos > inode->i_size) {
-				err = -ENOSPC;
-				goto out;
-			}
-		}
-
-		if (pos + count > inode->i_size)
-			count = inode->i_size - pos;
-	}
-
-	err = 0;
-	if (count == 0)
-		goto out;
-
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
-        
+
+	/* We allow multiple direct writers in, there is no
+	 * potential call to vmtruncate in that path.
+	 */
+	if (!(file->f_flags & O_DIRECT))
+		down(&inode->i_sem);
+ 
 	VOP_WRITE(vp, file, buf, count, &pos, NULL, err);
 	*ppos = pos;
-out:
-	up(&inode->i_sem);
 
-	/*
-	 * If we got an error return that.
-	 * Otherwise, return bytes actually written
-	 */
+	if (!(file->f_flags & O_DIRECT))
+		up(&inode->i_sem);
+out:
 
 	return(err);
 }
