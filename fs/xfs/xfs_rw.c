@@ -1,4 +1,4 @@
-#ident "$Revision: 1.167 $"
+#ident "$Revision: 1.168 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3531,12 +3531,6 @@ xfs_check_rbp(
 		pfdp = getnextpg(rbp, pfdp);
 		ASSERT(pfdp != NULL);
 		ASSERT(dtopt(rbp->b_offset) == pfdp->pf_pageno);
-#ifdef	KLEGO_USE_JUNK_BUS
-		/* wd93 Driver needs some fix to make this work. */
-		if (dpoff(rbp->b_offset)) {
-			ASSERT(rbp->b_flags & B_MAPPED);
-		}
-#endif	/* KLEG_USE_JUNK_BUS */
 	}
 
 	if (rbp->b_flags & B_MAPPED) {
@@ -3573,12 +3567,9 @@ xfs_check_bp(
 		pfdp = getnextpg(bp, pfdp);
 		ASSERT(pfdp != NULL);
 		ASSERT(dtopt(bp->b_offset) == pfdp->pf_pageno);
-#ifndef	KLEGO_USE_JUNK_BUS
-		/* wd93 Driver needs some fix to make this work. */
 		if (dpoff(bp->b_offset)) {
 			ASSERT(bp->b_flags & B_MAPPED);
 		}
-#endif	/* KLEG_USE_JUNK_BUS */
 	}
 
 	if (bp->b_flags & B_MAPPED) {
