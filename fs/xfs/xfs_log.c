@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.70 $"
+#ident	"$Revision: 1.73 $"
 
 /*
  * High level interface routines for log manager
@@ -1064,8 +1064,6 @@ xlog_state_clean_log(xlog_t *log)
 			bzero(iclog->ic_header.h_cycle_data,
 			      sizeof(iclog->ic_header.h_cycle_data));
 			iclog->ic_header.h_lsn = 0;
-			xlog_trace_iclog(iclog, XLOG_TRACE_REL_FLUSH);
-			vsema(&log->l_flushsema);
 		} else if (iclog->ic_state == XLOG_STATE_ACTIVE)
 			/* do nothing */;
 		else
