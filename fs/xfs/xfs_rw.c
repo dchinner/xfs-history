@@ -1,4 +1,4 @@
-#ident "$Revision: 1.188 $"
+#ident "$Revision: 1.190 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1164,10 +1164,13 @@ xfs_read(
 	count = uiop->uio_resid;
 
 #ifndef SIM
-	if (MANDLOCK(vp, ip->i_d.di_mode) &&
-	    (error = fs_checklock(vp, FREAD, offset, count, uiop->uio_fmode,
-				credp, fl))) {
-		goto out;
+	/* check for locks if some exist and mandatory locking is enabled */
+	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
+	    (VENF_LOCKING|VFRLOCKS)) {
+		error = fs_checklock(vp, FREAD, offset, count, uiop->uio_fmode,
+				     credp, fl);
+		if (error)
+			goto out;
 	}
 #endif
 
@@ -2462,10 +2465,13 @@ start:
 	count = uiop->uio_resid;
 
 #ifndef SIM
-	if (MANDLOCK(vp, ip->i_d.di_mode) &&
-	    (error = fs_checklock(vp, FWRITE, offset, count, uiop->uio_fmode,
-				credp, fl))) {
-		goto out;
+	/* check for locks if some exist and mandatory locking is enabled */
+	if ((vp->v_flag & (VENF_LOCKING|VFRLOCKS)) == 
+	    (VENF_LOCKING|VFRLOCKS)) {
+		error = fs_checklock(vp, FWRITE, offset, count, 
+				     uiop->uio_fmode, credp, fl);	
+		if (error)
+			goto out;
 	}
 #endif
 
