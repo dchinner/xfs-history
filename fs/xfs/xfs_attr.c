@@ -133,8 +133,13 @@ int								/* error */
 xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp, 
 	     int flags, struct cred *cred)
 {
-	xfs_da_args_t args;
-	int error;
+	xfs_da_args_t   args;
+	int             error;
+        int             namelen;
+        
+        ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
+        namelen=strlen(name);
+        if (namelen>=MAXNAMELEN) return EFAULT; /* match irix behaviour */
 
 	XFS_STATS_INC(xs_attr_get);
 
@@ -143,7 +148,7 @@ xfs_attr_get(bhv_desc_t *bdp, char *name, char *value, int *valuelenp,
 	 */
 	bzero((char *)&args, sizeof(args));
 	args.name = name;
-	args.namelen = strlen(name);
+	args.namelen = namelen;
 	args.value = value;
 	args.valuelen = *valuelenp;
 	args.flags = flags;
@@ -203,8 +208,13 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	int		local, size;
 	uint	      	nblks;
 	xfs_mount_t	*mp;
-	int rsvd = (flags & ATTR_ROOT) != 0;
+	int             rsvd = (flags & ATTR_ROOT) != 0;
+        int             namelen;
 
+        ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
+        namelen=strlen(name);
+        if (namelen>=MAXNAMELEN) return EFAULT; /* match irix behaviour */
+        
 	XFS_STATS_INC(xs_attr_set);
 	/*
 	 * Do we answer them, or ignore them?
@@ -244,7 +254,7 @@ xfs_attr_set(bhv_desc_t *bdp, char *name, char *value, int valuelen, int flags,
 	 */
 	bzero((char *)&args, sizeof(args));
 	args.name = name;
-	args.namelen = strlen(name);
+	args.namelen = namelen;
 	args.value = value;
 	args.valuelen = valuelen;
 	args.flags = flags;
@@ -450,13 +460,18 @@ out:
 int								/* error */
 xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 {
-	xfs_da_args_t args;
-	xfs_inode_t *dp;
-	xfs_fsblock_t firstblock;
-	xfs_bmap_free_t flist;
-	int error;
-	xfs_mount_t *mp;
+	xfs_da_args_t       args;
+	xfs_inode_t         *dp;
+	xfs_fsblock_t       firstblock;
+	xfs_bmap_free_t     flist;
+	int                 error;
+	xfs_mount_t         *mp;
+        int                 namelen;
 
+        ASSERT(MAXNAMELEN-1<=0xff); /* length is stored in uint8 */
+        namelen=strlen(name);
+        if (namelen>=MAXNAMELEN) return EFAULT; /* match irix behaviour */
+        
 	XFS_STATS_INC(xs_attr_remove);
 
 	/*
@@ -484,7 +499,7 @@ xfs_attr_remove(bhv_desc_t *bdp, char *name, int flags, struct cred *cred)
 	 */
 	bzero((char *)&args, sizeof(args));
 	args.name = name;
-	args.namelen = strlen(name);
+	args.namelen = namelen;
 	args.flags = flags;
 	args.hashval = xfs_da_hashname(args.name, args.namelen);
 	args.dp = dp;

@@ -119,7 +119,13 @@
 #ifndef SIM
 #define ENOTSUP		1008	/* Not supported (POSIX 1003.1b) */
 #endif
-#define ENOATTR         1009    /* Attribute not found */
+
+/*
+ * XXX these need real values in errno.h. asm-i386/errno.h won't 
+ * return errnos out of its known range in errno.
+ */
+
+#define ENOATTR         ENODATA /* Attribute not found */
 #define EFSCORRUPTED    1010    /* Filesystem is corrupted */
 #define	EWRONGFS	1011	/* Mount with wrong filesystem type */
 
