@@ -1,4 +1,4 @@
-#ident "$Revision: 1.245 $"
+#ident "$Revision: 1.246 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4110,42 +4110,42 @@ xfs_strat_write_bp_trace(
 	}
 
 	ktrace_enter(ip->i_strat_trace,
-		     (void*)((unsigned long)tag),
+		     (void*)((__psunsigned_t)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size >> 32) &
+		     (void*)((__psunsigned_t)((ip->i_d.di_size >> 32) &
 					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((unsigned long)((bp->b_offset >> 32) &
+		     (void*)((__psunsigned_t)((bp->b_offset >> 32) &
 					     0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
-		     (void*)((unsigned long)(bp->b_bcount)),
-		     (void*)((unsigned long)(bp->b_bufsize)),
+		     (void*)((__psunsigned_t)(bp->b_bcount)),
+		     (void*)((__psunsigned_t)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)(__psint_t)(bp->b_flags),
+		     (void*)(__psunsigned_t)((bp->b_flags >> 32) & 0xffffffff),
+		     (void*)(bp->b_flags & 0xffffffff),
 		     (void*)(bp->b_pages),
 		     (void*)(bp->b_pages->pf_pageno),
-		     (void*)0,
 		     (void*)0,
 		     (void*)0);
 
 	ktrace_enter(xfs_strat_trace_buf,
-		     (void*)((unsigned long)tag),
+		     (void*)((__psunsigned_t)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size >> 32) &
+		     (void*)((__psunsigned_t)((ip->i_d.di_size >> 32) &
 					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
-		     (void*)((unsigned long)((bp->b_offset >> 32) &
+		     (void*)((__psunsigned_t)((bp->b_offset >> 32) &
 					     0xffffffff)),
 		     (void*)(bp->b_offset & 0xffffffff),
-		     (void*)((unsigned long)(bp->b_bcount)),
-		     (void*)((unsigned long)(bp->b_bufsize)),
+		     (void*)((__psunsigned_t)(bp->b_bcount)),
+		     (void*)((__psunsigned_t)(bp->b_bufsize)),
 		     (void*)(bp->b_blkno),
-		     (void*)(__psint_t)(bp->b_flags),
+		     (void*)(__psunsigned_t)((bp->b_flags >> 32) & 0xffffffff),
+		     (void*)(bp->b_flags & 0xffffffff),
 		     (void*)(bp->b_pages),
 		     (void*)(bp->b_pages->pf_pageno),
-		     (void*)0,
 		     (void*)0,
 		     (void*)0);
 }
@@ -4178,7 +4178,7 @@ xfs_strat_write_subbp_trace(
 		     (void*)(rbp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
-		     (void*)((unsigned long)(rbp->b_flags)),
+		     (void*)((__psunsigned_t)(rbp->b_flags)), /* lower 32 flags only */
 		     (void*)(rbp->b_un.b_addr),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
@@ -4188,17 +4188,17 @@ xfs_strat_write_subbp_trace(
 	ktrace_enter(xfs_strat_trace_buf,
 		     (void*)((unsigned long)tag),
 		     (void*)ip,
-		     (void*)((unsigned long)((ip->i_d.di_size > 32) &
+		     (void*)((unsigned long)((ip->i_d.di_size >> 32) &
 					     0xffffffff)),
 		     (void*)(ip->i_d.di_size & 0xffffffff),
 		     (void*)bp,
 		     (void*)rbp,
-		     (void*)((unsigned long)((rbp->b_offset > 32) &
+		     (void*)((unsigned long)((rbp->b_offset >> 32) &
 					     0xffffffff)),
 		     (void*)(rbp->b_offset & 0xffffffff),
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
-		     (void*)((unsigned long)(rbp->b_flags)),
+		     (void*)((__psunsigned_t)(rbp->b_flags)), /* lower 32 flags only */
 		     (void*)(rbp->b_un.b_addr),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
