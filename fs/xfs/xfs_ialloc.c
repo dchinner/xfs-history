@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision: 1.8 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>		/* should really? */
@@ -16,6 +16,7 @@
 #include "xfs_bmap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
+#include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #ifdef SIM
 #include "sim.h"
