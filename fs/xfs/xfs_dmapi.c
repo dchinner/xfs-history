@@ -2690,6 +2690,8 @@ xfs_dm_set_fileattr(
 	}
 
 	VOP_SETATTR(vp, &vat, ATTR_DMI, NULL, error);
+	if (!error)
+		vn_revalidate(vp);	/* update Linux inode flags */
 	return(-error); /* Return negative error to DMAPI */
 }
 
