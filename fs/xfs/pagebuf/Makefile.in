@@ -32,9 +32,9 @@
 # Makefile for the linux pagebuf routines.
 #
 
-expsyms(page_buf.o page_buf_io.o page_buf_locking.o)
-objlink(pagebuf.o avl.o page_buf.o page_buf_io.o page_buf_locking.o)
-# No select() for xfs/pagebuf in this directory.  It is a sub-component of XFS,
+expsyms(page_buf.o)
+objlink(pagebuf.o page_buf.o page_buf_io.o page_buf_locking.o)
+# No select() for pagebuf.o in this directory.  It is a sub-component of XFS,
 # see fs/xfs/Makefile.in for the objlink.
 
 # Debug options:
@@ -45,3 +45,6 @@ objlink(pagebuf.o avl.o page_buf.o page_buf_io.o page_buf_locking.o)
 ifsel(CONFIG_PAGEBUF_DEBUG)
 	extra_cflags_all(-g -DSTATIC="" -DPAGEBUF_DEBUG -DPAGEBUF_TRACKING -DPAGEBUF_TRACE)
 endif
+
+# FIXME: page_buf.c does #include <support/xxx.h>
+extra_cflags(page_buf.o $(src_includelist /fs/xfs))

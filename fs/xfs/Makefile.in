@@ -32,15 +32,16 @@
 # Makefile for XFS on Linux.
 #
 
-objlink( CONFIG_HAVE_XFS_DMAPI xfs.o xfs_dmapi.o)
-objlink(!CONFIG_HAVE_XFS_DMAPI xfs.o xfsdmapistubs.o)
+objlink( CONFIG_HAVE_XFS_DMAPI	xfs.o xfs_dmapi.o)
+objlink(!CONFIG_HAVE_XFS_DMAPI	xfs.o xfsdmapistubs.o)
 
-objlink(CONFIG_FS_POSIX_ACL xfs.o xfs_acl.o)
-objlink(CONFIG_FS_POSIX_CAP xfs.o xfs_cap.o)
-objlink(CONFIG_FS_POSIX_MAC xfs.o xfs_mac.o)
-objlink(CONFIG_XFS_RT xfs.o xfs_rtalloc.o)
-objlink(CONFIG_XFS_QUOTA xfs.o xfs_qm.o xfs_qm_syscalls.o xfs_dquot.o
-	xfs_dquot_item.o xfs_trans_dquot.o)
+objlink(CONFIG_XFS_RT		xfs.o xfs_rtalloc.o)
+
+objlink(CONFIG_XFS_QUOTA	xfs.o xfs_dquot.o xfs_dquot_item.o xfs_trans_dquot.o xfs_qm_syscalls.o xfs_qm.o)
+
+objlink(CONFIG_FS_POSIX_ACL	xfs.o xfs_acl.o)
+# objlink(CONFIG_FS_POSIX_CAP	xfs.o xfs_cap.o) No source for xfs_cap
+objlink(CONFIG_FS_POSIX_MAC	xfs.o xfs_mac.o)
 
 objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
 	xfs_attr_leaf.o xfs_bit.o xfs_bmap.o xfs_bmap_btree.o xfs_btree.o
@@ -51,8 +52,10 @@ objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
 	xfs_inode_item.o xfs_iocore.o xfs_itable.o xfs_dfrag.o xfs_log.o
 	xfs_log_recover.o xfs_macros.o xfs_mount.o xfs_rename.o xfs_trans.o
 	xfs_trans_ail.o xfs_trans_buf.o xfs_trans_extfree.o xfs_trans_inode.o
-	xfs_trans_item.o xfs_utils.o xfs_vfsops.o xfs_vnodeops.o xfs_rw.o
-	pagebuf/pagebuf.o linux/linux_xfs.o support/support_xfs.o)
+	xfs_trans_item.o xfs_utils.o xfs_vfsops.o xfs_vnodeops.o xfs_rw.o)
+
+# Objects not built in this directory
+objlink(xfs.o pagebuf/pagebuf.o linux/linux_xfs.o support/support_xfs.o)
 
 select(CONFIG_XFS_FS xfs.o)
 
@@ -69,7 +72,7 @@ ifsel(CONFIG_KDB_MODULES)
   endif
 endif
 
-XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs)
+XFS_EXTRA_CFLAGS	:= $(src_includelist /fs/xfs) -funsigned-char
 ifsel(CONFIG_XFS_DEBUG)
   XFS_EXTRA_CFLAGS	+= -g -DSTATIC="" -DDEBUG -DXFSDEBUG
 endif
@@ -79,3 +82,7 @@ endif
 extra_cflags_all($(XFS_EXTRA_CFLAGS))
 
 extra_cflags(xfsidbg.o $(src_includelist /arch/$(ARCH)/kdb))
+
+# FIXME: xfsidbg includes "pagebuf/page_buf_internal.h" which includes
+# "page_buf.h" and "page_buf_trace.h"
+extra_cflags(xfsidbg.o $(src_includelist pagebuf))

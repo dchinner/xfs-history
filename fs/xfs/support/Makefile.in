@@ -30,9 +30,10 @@
 # http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
 #
 
-extra_cflags_all($(XFS_EXTRA_CFLAGS))
-objlink(support_xfs.o debug.o kmem.o ktrace.o mrlock.o mutex.o move.o
-	qsort.o sv.o uuid.o)
+expsyms(ktrace.o)
+objlink(support_xfs.o debug.o kmem.o ktrace.o move.o mrlock.o qsort.o uuid.o)
 
-# No select() for xfs/support in this directory.  It is a sub-component of XFS,
+# No select() for support_xfs.o in this directory.  It is a sub-component of XFS,
 # see fs/xfs/Makefile.in for the objlink.
+
+extra_cflags_all($(XFS_EXTRA_CFLAGS))
