@@ -282,8 +282,10 @@
     ((reference) code)
 #define INT_MOD(reference,arch,delta) \
     INT_MODX(reference,arch,+=(delta))
-#define INT_COPY(srcref,srcarch,dstref,dstarch) \
-    ((dstref) = (srcref))
+#define INT_COPY(buf,mem,dir,arch) {\
+    ASSERT(dir); \
+    if (dir>0) (mem)=(buf); else (buf)=(mem); \
+}
 #define INT_ISZERO(reference,arch) \
     ((reference) == 0)
 #define INT_ZERO(reference,arch) \
@@ -378,15 +380,14 @@
 #define INT_MOD(reference,arch,delta) \
     INT_MODX(reference,arch,+=(delta))
     
-#define INT_COPY(srcref,srcarch,dstref,dstarch) \
-    if ((dstarch) == ARCH_NOCONVERT) { \
-        (dstref) = INT_GET(srcref,srcarch); \
-    } else if ((srcarch) == ARCH_NOCONVERT) { \
-        INT_SET(dstref,dstarch,srcref); \
+#define INT_COPY(buf,mem,dir,arch) {\
+    ASSERT(dir); \
+    if (dir>0) { \
+        (mem)=INT_GET(buf, arch); \
     } else { \
-        (dstref) = INT_GET(srcref,srcarch); \
-        INT_SET(dstref,dstarch,dstref); \
-    }
+        INT_SET(buf, arch, mem); \
+    } \
+}
 
 #define INT_ISZERO(reference,arch) \
     ((reference) == 0)

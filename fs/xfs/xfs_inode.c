@@ -796,64 +796,61 @@ static void
 xfs_xlate_dinode_core(caddr_t buf, xfs_dinode_core_t *dip, 
     int dir, xfs_arch_t arch)
 {
-    xfs_dinode_core_t   *src;
-    xfs_dinode_core_t   *dst;
-    xfs_arch_t      src_arch;
-    xfs_arch_t      dst_arch;
+    xfs_dinode_core_t   *buf_core;
+    xfs_dinode_core_t   *mem_core;
     
     ASSERT(dir);
+    ASSERT(ARCH_SUPPORTED(arch));
     
-    if (dir<0) {
-        src=(xfs_dinode_core_t*)dip;
-        dst=(xfs_dinode_core_t*)buf;   
-        src_arch=ARCH_NOCONVERT;
-        dst_arch=arch;         
-    } else {
-        src=(xfs_dinode_core_t*)buf;               
-        dst=(xfs_dinode_core_t*)dip;
-        src_arch=arch;
-        dst_arch=ARCH_NOCONVERT;         
-    }
+    buf_core=(xfs_dinode_core_t*)buf;
+    mem_core=(xfs_dinode_core_t*)dip;
     
-    if (src_arch == dst_arch) {
-        bcopy((caddr_t)src, (caddr_t)dst, sizeof(xfs_dinode_core_t));
+    if (arch == ARCH_NOCONVERT) {
+        if (dir>0) {
+            bcopy((caddr_t)buf_core, (caddr_t)mem_core, sizeof(xfs_dinode_core_t));
+        } else {
+            bcopy((caddr_t)mem_core, (caddr_t)buf_core, sizeof(xfs_dinode_core_t));
+        }
         return;
     }
     
+    INT_COPY(buf_core->di_magic,       mem_core->di_magic,        dir, arch);
+    INT_COPY(buf_core->di_mode,        mem_core->di_mode,         dir, arch);
+    INT_COPY(buf_core->di_version,     mem_core->di_version,      dir, arch);
+    INT_COPY(buf_core->di_format,      mem_core->di_format,       dir, arch);
+    INT_COPY(buf_core->di_onlink,      mem_core->di_onlink,       dir, arch);
+    INT_COPY(buf_core->di_uid,         mem_core->di_uid,          dir, arch);
+    INT_COPY(buf_core->di_gid,         mem_core->di_gid,          dir, arch);
+    INT_COPY(buf_core->di_nlink,       mem_core->di_nlink,        dir, arch);
+    INT_COPY(buf_core->di_projid,      mem_core->di_projid,       dir, arch);
     
-    INT_COPY(src->di_magic,       src_arch, dst->di_magic,        dst_arch);
-    INT_COPY(src->di_mode,        src_arch, dst->di_mode,         dst_arch);
-    INT_COPY(src->di_version,     src_arch, dst->di_version,      dst_arch);
-    INT_COPY(src->di_format,      src_arch, dst->di_format,       dst_arch);
-    INT_COPY(src->di_onlink,      src_arch, dst->di_onlink,       dst_arch);
-    INT_COPY(src->di_uid,         src_arch, dst->di_uid,          dst_arch);
-    INT_COPY(src->di_gid,         src_arch, dst->di_gid,          dst_arch);
-    INT_COPY(src->di_nlink,       src_arch, dst->di_nlink,        dst_arch);
-    INT_COPY(src->di_projid,      src_arch, dst->di_projid,       dst_arch);
+    if (dir>0) {
+        bcopy(buf_core->di_pad, mem_core->di_pad, sizeof(buf_core->di_pad));
+    } else {
+        bcopy(mem_core->di_pad, buf_core->di_pad, sizeof(buf_core->di_pad));
+    }
     
-    bcopy(src->di_pad, dst->di_pad, sizeof(src->di_pad));
+    INT_COPY(buf_core->di_atime.t_sec, mem_core->di_atime.t_sec,  dir, arch);
+    INT_COPY(buf_core->di_atime.t_nsec,mem_core->di_atime.t_nsec, dir, arch);
     
-    INT_COPY(src->di_atime.t_sec, src_arch, dst->di_atime.t_sec,  dst_arch);
-    INT_COPY(src->di_atime.t_nsec,src_arch, dst->di_atime.t_nsec, dst_arch);
+    INT_COPY(buf_core->di_mtime.t_sec, mem_core->di_mtime.t_sec,  dir, arch);
+    INT_COPY(buf_core->di_mtime.t_nsec,mem_core->di_mtime.t_nsec, dir, arch);
     
-    INT_COPY(src->di_mtime.t_sec, src_arch, dst->di_mtime.t_sec,  dst_arch);
-    INT_COPY(src->di_mtime.t_nsec,src_arch, dst->di_mtime.t_nsec, dst_arch);
+    INT_COPY(buf_core->di_ctime.t_sec, mem_core->di_ctime.t_sec,  dir, arch);
+    INT_COPY(buf_core->di_ctime.t_nsec,mem_core->di_ctime.t_nsec, dir, arch);
     
-    INT_COPY(src->di_ctime.t_sec, src_arch, dst->di_ctime.t_sec,  dst_arch);
-    INT_COPY(src->di_ctime.t_nsec,src_arch, dst->di_ctime.t_nsec, dst_arch);
+    INT_COPY(buf_core->di_size,        mem_core->di_size,         dir, arch);
+    INT_COPY(buf_core->di_nblocks,     mem_core->di_nblocks,      dir, arch);
+    INT_COPY(buf_core->di_extsize,     mem_core->di_extsize,      dir, arch);
     
-    INT_COPY(src->di_size,        src_arch, dst->di_size,         dst_arch);
-    INT_COPY(src->di_nblocks,     src_arch, dst->di_nblocks,      dst_arch);
-    INT_COPY(src->di_extsize,     src_arch, dst->di_extsize,      dst_arch);
-    
-    INT_COPY(src->di_nextents,    src_arch, dst->di_nextents,     dst_arch);
-    INT_COPY(src->di_anextents,   src_arch, dst->di_anextents,    dst_arch);
-    INT_COPY(src->di_forkoff,     src_arch, dst->di_forkoff,      dst_arch);
-    INT_COPY(src->di_aformat,     src_arch, dst->di_aformat,      dst_arch);
-    INT_COPY(src->di_dmevmask,    src_arch, dst->di_dmevmask,     dst_arch);
-    INT_COPY(src->di_dmstate,     src_arch, dst->di_dmstate,      dst_arch);
-    INT_COPY(src->di_flags,       src_arch, dst->di_flags,        dst_arch);
-    INT_COPY(src->di_gen,         src_arch, dst->di_gen,          dst_arch);
+    INT_COPY(buf_core->di_nextents,    mem_core->di_nextents,     dir, arch);
+    INT_COPY(buf_core->di_anextents,   mem_core->di_anextents,    dir, arch);
+    INT_COPY(buf_core->di_forkoff,     mem_core->di_forkoff,      dir, arch);
+    INT_COPY(buf_core->di_aformat,     mem_core->di_aformat,      dir, arch);
+    INT_COPY(buf_core->di_dmevmask,    mem_core->di_dmevmask,     dir, arch);
+    INT_COPY(buf_core->di_dmstate,     mem_core->di_dmstate,      dir, arch);
+    INT_COPY(buf_core->di_flags,       mem_core->di_flags,        dir, arch);
+    INT_COPY(buf_core->di_gen,         mem_core->di_gen,          dir, arch);
     
 }
 

@@ -343,9 +343,8 @@ STATIC void
 xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch, 
             __int64_t fields)
 {
-    caddr_t src,dst;
-    xfs_arch_t      src_arch;
-    xfs_arch_t      dst_arch;
+    caddr_t     buf_ptr;
+    caddr_t     mem_ptr;
            
     ASSERT(ARCH_SUPPORTED(arch));
     ASSERT(dir);
@@ -354,17 +353,8 @@ xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch,
     if (!fields)
         return;
     
-    if (dir>0) {
-        src=XFS_BUF_PTR(buf);
-        dst=(caddr_t)sb;
-        src_arch=arch;
-        dst_arch=ARCH_NOCONVERT;  
-    } else {
-        src=(caddr_t)sb;
-        dst=XFS_BUF_PTR(buf);
-        src_arch=ARCH_NOCONVERT;
-        dst_arch=arch;  
-    }
+    buf_ptr=XFS_BUF_PTR(buf);
+    mem_ptr=(caddr_t)sb;
     
     while (fields) {
 	xfs_sb_field_t	f;
@@ -375,33 +365,30 @@ xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch,
 	first = xfs_sb_info[f].offset;
 	size = xfs_sb_info[f + 1].offset - first;
         
-        if (src_arch == dst_arch) {
-	    bcopy(src + first, dst + first, size);
-        } else {
-            if (xfs_sb_info[f].type==0) {
-                switch (size) {
-                    case 1: 
-                       *(__uint8_t*)(dst+first)=*(__uint8_t*)(src+first);
-                       break;
-                    case 2:  
-                        INT_COPY(*(__uint16_t*)(src+first),src_arch,
-                                 *(__uint16_t*)(dst+first), dst_arch);
-                        break;
-                    case 4:  
-                        INT_COPY(*(__uint32_t*)(src+first), src_arch,
-                                 *(__uint32_t*)(dst+first), dst_arch);
-                        break;
-                    case 8:  
-                        INT_COPY(*(__uint64_t*)(src+first), src_arch,
-                                 *(__uint64_t*)(dst+first), dst_arch);
-                        break;
-                    default: 
-                        ASSERT(0);
-                }
-            } else if (xfs_sb_info[f].type==1) {
-                bcopy(src + first, dst + first, size);
+        ASSERT(xfs_sb_info[f].type==0 || xfs_sb_info[f].type==1);
+        
+        if (arch == ARCH_NOCONVERT || size==1 || xfs_sb_info[f].type==1) {
+            if (dir>0) {
+   	        bcopy(buf_ptr + first, mem_ptr + first, size);
             } else {
-                ASSERT(0);
+   	        bcopy(mem_ptr + first, buf_ptr + first, size);
+            }
+        } else {
+            switch (size) {
+                case 2:  
+                    INT_COPY(*(__uint16_t*)(buf_ptr+first),
+                             *(__uint16_t*)(mem_ptr+first), dir, arch);
+                    break;
+                case 4:  
+                    INT_COPY(*(__uint32_t*)(buf_ptr+first),
+                             *(__uint32_t*)(mem_ptr+first), dir, arch);
+                    break;
+                case 8:  
+                    INT_COPY(*(__uint64_t*)(buf_ptr+first),
+                             *(__uint64_t*)(mem_ptr+first), dir, arch);
+                    break;
+                default: 
+                    ASSERT(0);
             }
         }
 	fields &= ~(1LL << f);
