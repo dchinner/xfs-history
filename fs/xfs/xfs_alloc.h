@@ -1,7 +1,9 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.27 $"
+#ident	"$Revision: 1.30 $"
+
+struct xfs_perag;
 
 /*
  * Freespace allocation types.  Argument to xfs_alloc_[v]extent.
@@ -26,7 +28,7 @@ typedef enum xfs_alloctype
 #define	XFS_ALLOCTYPE_THIS_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_THIS_BNOi)
 
 /*
- * Flags for xfs_alloc_ag_freeblks, xfs_alloc_fix_freelist
+ * Flags for xfs_alloc_fix_freelist.
  */
 #define	XFS_ALLOC_FLAG_TRYLOCK	0x00000001  /* use trylock for buffer locking */
 
@@ -53,6 +55,7 @@ typedef struct xfs_alloc_arg {
 	short		wasdel;		/* set if allocation was prev delayed */
 	char		isfl;		/* set if is freelist blocks - !actg */
 	char		userdata;	/* set if this is user data */
+	struct xfs_perag *pag;		/* per-ag struct for this agno */
 } xfs_alloc_arg_t;
 
 extern struct zone	*xfs_alloc_arg_zone;	/* zone for alloc args */
@@ -67,21 +70,11 @@ extern struct zone	*xfs_alloc_arg_zone;	/* zone for alloc args */
 /*
  * Allocation tracing buffer size.
  */
-#define	XFS_ALLOC_TRACE_SIZE	10240
+#define	XFS_ALLOC_TRACE_SIZE	4096
 
 /*
  * Prototypes for visible xfs_alloc.c routines
  */
-
-/*
- * Return the number of free blocks left in the allocation group.
- */
-xfs_extlen_t				/* number of remaining free blocks */
-xfs_alloc_ag_freeblks(
-	xfs_mount_t	*mp,		/* file system mount structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_agnumber_t	agno,		/* allocation group number */
-	int		flags);		/* XFS_ALLOC_FLAG_... */
 
 /*
  * Allocate an alloc_arg structure.
@@ -115,7 +108,8 @@ xfs_alloc_fix_freelist(
 	xfs_extlen_t	minlen,	/* minimum extent length, else reject */
 	xfs_extlen_t	total,	/* total free blocks, else reject */
 	xfs_extlen_t	minleft,/* min blocks must be left afterwards */
-	int		flags);	/* XFS_ALLOC_FLAG_... */
+	int		flags,	/* XFS_ALLOC_FLAG_... */
+	struct xfs_perag *pag);	/* per allocation group data */
 
 /*
  * Get a block from the freelist.
@@ -134,6 +128,16 @@ xfs_alloc_log_agf(
 	xfs_trans_t	*tp,	/* transaction pointer */
 	buf_t		*bp,	/* buffer for a.g. freelist header */
 	int		fields);/* mask of fields to be logged (XFS_AGF_...) */
+
+/*
+ * Interface for inode allocation to force the pag data to be initialized.
+ */
+void
+xfs_alloc_pagf_init(
+	xfs_mount_t	*mp,	/* file system mount structure */
+	xfs_trans_t	*tp,	/* transaction pointer */
+	xfs_agnumber_t	agno,	/* allocation group number */
+	int		flags);	/* XFS_ALLOC_FLAGS_... */
 
 /*
  * Put the block on the freelist for the allocation group.

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -149,13 +149,22 @@ xfs_ialloc_read_agi(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno)		/* allocation group number */
 {
+	xfs_agi_t	*agi;		/* allocation group header */
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
+	xfs_perag_t	*pag;		/* per allocation group data */
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
 	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
 	ASSERT(bp && !geterror(bp));
+	pag = &mp->m_perag[agno];
+	agi = XFS_BUF_TO_AGI(bp);
+	if (!pag->pagi_init) {
+		pag->pagi_freecount = agi->agi_freecount;
+		pag->pagi_init = 1;
+	} else
+		ASSERT(pag->pagi_freecount == agi->agi_freecount);
 	return bp;
 }
 
@@ -262,6 +271,7 @@ xfs_ialloc_ag_alloc(
 			agi->agi_freecount++;
 		}
 	}
+	args->mp->m_perag[agi->agi_seqno].pagi_freecount += newlen;
 	ASSERT(thisino == newino);
 	agi->agi_newino = newino;
 	/*
@@ -305,6 +315,7 @@ xfs_ialloc_ag_select(
 	int		flags;		/* alloc buffer locking flags */
 	xfs_mount_t	*mp;		/* mount point structure */
 	int		needspace;	/* file mode implies space allocated */
+	xfs_perag_t	*pag;		/* per allocation group data */
 	xfs_agnumber_t	pagno;		/* parent (starting) ag number */
 
 	/*
@@ -329,24 +340,34 @@ xfs_ialloc_ag_select(
 	agno = pagno;
 	flags = XFS_ALLOC_FLAG_TRYLOCK;
 	while (1) {
-		agbp = xfs_ialloc_read_agi(mp, tp, agno);
-		agi = XFS_BUF_TO_AGI(agbp);
-		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+		pag = &mp->m_perag[agno];
+		if (!pag->pagi_init)
+			agbp = xfs_ialloc_read_agi(mp, tp, agno);
+		else
+			agbp = NULL;
+		if (!pag->pagf_init) {
+			if (agbp == NULL)
+				agbp = xfs_ialloc_read_agi(mp, tp, agno);
+			xfs_alloc_pagf_init(mp, tp, agno, flags);
+		}
 		/*
 		 * Is there enough free space for the file plus a block
 		 * of inodes (if we need to allocate some)?
 		 * Note, this is just a guess, if we need to allocate inodes
 		 * then the space will have to be contiguous.
 		 */
-		if (xfs_alloc_ag_freeblks(mp, tp, agno, flags) >=
-		    needspace +
-		    (agi->agi_freecount ? 0 : XFS_IALLOC_BLOCKS(mp))) {
+		if (pag->pagf_init &&
+		    pag->pagf_freeblks >= needspace +
+		    (pag->pagi_freecount ? 0 : XFS_IALLOC_BLOCKS(mp))) {
+			if (agbp == NULL)
+				agbp = xfs_ialloc_read_agi(mp, tp, agno);
 			if (S_ISDIR(mode))
 				mp->m_agirotor =
 					agno + 1 == agcount ? 0 : agno + 1;
 			return agbp;
 		}
-		xfs_trans_brelse(tp, agbp);
+		if (agbp)
+			xfs_trans_brelse(tp, agbp);
 		agno++;
 		if (agno == agcount)
 			agno = 0;
@@ -643,6 +664,7 @@ xfs_dialloc(
 	xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free);
 	xfs_btree_del_cursor(cur);
 	agi->agi_freecount--;
+	mp->m_perag[tagno].pagi_freecount--;
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
 	return ino;
@@ -718,6 +740,7 @@ xfs_difree(
 	 * Change the inode free counts and log the ag/sb changes.
 	 */
 	agi->agi_freecount++;
+	mp->m_perag[agno].pagi_freecount++;
 	xfs_ialloc_log_agi(tp, agbp, XFS_AGI_FREECOUNT);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
 }

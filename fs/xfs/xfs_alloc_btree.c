@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * Free space allocation for xFS.
@@ -328,6 +328,8 @@ xfs_alloc_delrec(
 		 */
 		else
 			agf->agf_longest = 0;
+		cur->bc_mp->m_perag[agf->agf_seqno].pagf_longest =
+			agf->agf_longest;
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_LONGEST);
 	}
@@ -356,6 +358,7 @@ xfs_alloc_delrec(
 			bno = agf->agf_roots[cur->bc_btnum];
 			agf->agf_roots[cur->bc_btnum] = *lpp;
 			agf->agf_levels[cur->bc_btnum]--;
+			cur->bc_mp->m_perag[agf->agf_seqno].pagf_levels[cur->bc_btnum]--;
 			/*
 			 * Put this buffer/block on the ag's freelist.
 			 */
@@ -808,7 +811,8 @@ xfs_alloc_insrec(
 		 * is no right sibling block and this block is bigger
 		 * than the previous longest block, update it.
 		 */
-		agf->agf_longest = recp->ar_blockcount;
+		cur->bc_mp->m_perag[agf->agf_seqno].pagf_longest = 
+			agf->agf_longest = recp->ar_blockcount;
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_LONGEST);
 	}
@@ -1370,6 +1374,7 @@ xfs_alloc_newroot(
 		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
 		agf->agf_roots[cur->bc_btnum] = nbno;
 		agf->agf_levels[cur->bc_btnum]++;
+		cur->bc_mp->m_perag[agf->agf_seqno].pagf_levels[cur->bc_btnum]++;
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_ROOTS | XFS_AGF_LEVELS);
 	}
@@ -2237,7 +2242,8 @@ xfs_alloc_update(
 		xfs_agf_t	*agf;	/* a.g. freespace header */
 
 		agf = XFS_BUF_TO_AGF(cur->bc_private.a.agbp);
-		agf->agf_longest = len;
+		cur->bc_mp->m_perag[agf->agf_seqno].pagf_longest =
+			agf->agf_longest = len;
 		xfs_alloc_log_agf(cur->bc_tp, cur->bc_private.a.agbp,
 			XFS_AGF_LONGEST);
 	}

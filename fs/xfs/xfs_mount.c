@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.62 $"
+#ident	"$Revision: 1.63 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -218,6 +218,12 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_ihash_init(mp);
 
 	/*
+	 * Allocate and initialize the per-ag data.
+	 */
+	mp->m_perag = kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t),
+		KM_SLEEP);
+
+	/*
 	 * Call the log's mount-time initialization.
 	 * xfs_log_mount() always does XFS_LOG_RECOVER.
 	 */
@@ -375,6 +381,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 
 	nfreerbuf(bp);
 	xfs_ihash_free(mp);
+	kmem_free(mp->m_perag, sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
 
 	freesplock(mp->m_ail_lock);
 	freesplock(mp->m_async_lock);
