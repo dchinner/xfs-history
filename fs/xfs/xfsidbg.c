@@ -1822,18 +1822,18 @@ static int	kdbm_vn(
 
 #ifdef	CONFIG_XFS_VNODE_TRACING
 
-	kdb_printf("--> Vntrace @ 0x%p/0x%p\n", vp, vp->v_trace);
+	kdb_printf("--> Vntrace @ 0x%x/0x%p\n", addr, vp.v_trace);
 
-	if (vp->v_trace == NULL)
+	if (vp.v_trace == NULL)
 		return 0;
 
-	ktep = ktrace_first(vp->v_trace, &kts);
+	ktep = ktrace_first(vp.v_trace, &kts);
 
 	while (ktep != NULL) {
 		if (vn_trace_pr_entry(ktep))
 			kdb_printf("\n");
 
-		ktep = ktrace_next(vp->v_trace, &kts);
+		ktep = ktrace_next(vp.v_trace, &kts);
 	}
 #endif	/* CONFIG_XFS_VNODE_TRACING */
 
