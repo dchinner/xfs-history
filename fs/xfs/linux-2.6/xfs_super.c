@@ -596,7 +596,6 @@ int __init init_xfs_fs(void)
 
 
 #ifdef MODULE
-EXPORT_NO_SYMBOLS;
 
 int init_module(void)
 {
