@@ -3911,8 +3911,10 @@ xfs_fcntl(vnode_t	*vp,
 	  rval_t	*rvalp)
 {
 	int		error = 0;
+	xfs_mount_t	*mp;
 
 	vn_trace_entry(vp, "xfs_fcntl");
+	mp = XFS_VFSTOM( vp->v_vfsp );
 	switch (cmd) {
 	case F_DIOINFO: {
 		struct dioattr	da;
@@ -3923,8 +3925,10 @@ xfs_fcntl(vnode_t	*vp,
 			break;
 		}
 		da.d_mem = BBSIZE;
-		da.d_miniosz = BBSIZE;
-		da.d_maxiosz = ctob(v.v_maxdmasz);
+		da.d_miniosz = mp->m_sb.sb_blocksize;
+		da.d_maxiosz = XFS_FSB_TO_B( mp,
+			XFS_B_TO_FSBT( mp, ctob(v.v_maxdmasz) ) );
+
 		if (copyout(&da, arg, sizeof(da)))
 			error = XFS_ERROR(EFAULT);
 		break;
