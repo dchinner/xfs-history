@@ -1922,7 +1922,11 @@ xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 		 * then restore the UIO to the first entry in the current
 		 * run of equal-hashval entries (probably one 1 entry long).
 		 */
+#if XFS_BIG_FILESYSTEMS
+		p.ino = XFS_GET_DIR_INO(mp, namest->inumber) + mp->m_inoadd;
+#else
 		p.ino = XFS_GET_DIR_INO(mp, namest->inumber);
+#endif
 		p.name = (char *)namest->name;
 		p.namelen = entry->namelen;
 		retval = p.put(&p);
