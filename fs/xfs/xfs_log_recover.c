@@ -1499,9 +1499,15 @@ xlog_recover_check_summary(xlog_t	*log)
 	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_icount %lld itotal %lld\n", sbp->sb_icount, itotal);
 	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_ifree %lld itotal %lld\n", sbp->sb_ifree, ifree);
 	cmn_err(CE_WARN, "xlog_recover_check_summary: sb_fdblocks %lld freeblks %lld\n", sbp->sb_fdblocks, freeblks);
+#if 0
+	/*
+	 * This is turned off until I account for the allocation
+	 * btree blocks which live in free space.
+	 */
 	ASSERT(sbp->sb_icount == itotal);
 	ASSERT(sbp->sb_ifree == ifree);
 	ASSERT(sbp->sb_fdblocks == freeblks);
+#endif
 	brelse(sbbp);
 }
 #endif
