@@ -360,30 +360,33 @@ xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
 	ip = iip->ili_inode;
 
 	/*
-	 * We only want to pull the item from the AIL if its
-	 * location in the log has not changed since we started
-	 * the flush.  Thus, we only bother if the inode's lsn
-	 * has not changed.  First we check outside the lock since
-	 * it's cheaper, and then we recheck while holding the
-	 * lock before removing the inode from the AIL.
+	 * We only want to pull the item from the AIL if it is
+	 * actually there and its location in the log has not
+	 * changed since we started the flush.  Thus, we only bother
+	 * if the ili_logged flag is set and the inode's lsn has not
+	 * changed.  First we check the lsn outside
+	 * the lock since it's cheaper, and then we recheck while
+	 * holding the lock before removing the inode from the AIL.
 	 */
-	if (iip->ili_item.li_lsn == iip->ili_flush_lsn) {
+	if (iip->ili_logged &&
+	    (iip->ili_item.li_lsn == iip->ili_flush_lsn)) {
 		s = AIL_LOCK(ip->i_mount);
 		if (iip->ili_item.li_lsn == iip->ili_flush_lsn) {
-			xfs_trans_delete_ail(ip->i_mount, (xfs_log_item_t*)iip);
+			xfs_trans_delete_ail(ip->i_mount,
+					     (xfs_log_item_t*)iip);
 		}
 		AIL_UNLOCK(ip->i_mount, s);
 	}
 
 	/*
 	 * Check to see if we should drop the reference taken by
-	 * xfs_trans_log_inode() by looking at ili_ref.  ili_ref
+	 * xfs_trans_log_inode() by looking at ili_logged.  ili_logged
 	 * is guarded by the i_flock, so check and clear it before
 	 * unlocking the i_flock.
 	 */
-	if (iip->ili_ref != 0) {
+	if (iip->ili_logged != 0) {
 		drop_ref = 1;
-		iip->ili_ref = 0;
+		iip->ili_logged = 0;
 	} else {
 		drop_ref = 0;
 	}
