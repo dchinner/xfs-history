@@ -4304,7 +4304,7 @@ xfs_rw_enter_trace_entry(ktrace_entry_t *ktep)
 		ktep->val[1],
 		(unsigned int)(long)ktep->val[2],
 		(unsigned int)(long)ktep->val[3],
-		(unsigned int)(long)ktep->val[4],
+		ktep->val[4],
 		(unsigned long)ktep->val[5]);
 	qprintf("io offset 0x%x%x ioflags 0x%x new size 0x%x%x\n",
 		(unsigned int)(long)ktep->val[6],
