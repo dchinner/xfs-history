@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.56 $"
+#ident	"$Revision: 1.57 $"
 
 /*
  * High level interface routines for log manager
@@ -283,7 +283,9 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	}
 
 	if ((tail_lsn = xfs_trans_tail_ail(mp)) != 0)
-	    log->l_tail_lsn = tail_lsn;
+		log->l_tail_lsn = tail_lsn;
+	else
+		log->l_tail_lsn = log->l_last_sync_lsn;
 	xlog_push_buffers_to_disk(mp, log);
 
 	if ((int)(*ticket = xlog_state_get_ticket(log,len,client,flags)) == -1)
@@ -904,6 +906,7 @@ xlog_find_tail(xlog_t  *log,
 	log->l_curr_block = *head_blk;
 	log->l_curr_cycle = rhead->h_cycle;
 	log->l_tail_lsn = rhead->h_tail_lsn;
+	log->l_last_sync_lsn = log->l_tail_lsn;
 	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
 		xlog_bread(log, i+1, 1, bp);
 		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
@@ -911,6 +914,12 @@ xlog_find_tail(xlog_t  *log,
 			log->l_tail_lsn =
 			     ((long long)log->l_curr_cycle << 32)|((uint)(i+2));
 		}
+	}
+	if (BLOCK_LSN(log->l_tail_lsn) <= *head_blk) {
+		log->l_logreserved = BBTOB(*head_blk-BLOCK_LSN(log->l_tail_lsn));
+	} else {
+		log->l_logreserved =
+		    log->l_logsize - BBTOB(BLOCK_LSN(log->l_tail_lsn)-*head_blk);
 	}
 exit:
 	xlog_put_bp(bp);
@@ -1403,7 +1412,7 @@ xlog_state_do_callback(xlog_t *log)
 
 		spl = splockspl(log->l_icloglock, splhi);
 		iclog->ic_state = XLOG_STATE_DIRTY;
-		log->l_my_tail_lsn = iclog->ic_header.h_lsn;
+		log->l_last_sync_lsn = iclog->ic_header.h_lsn;
 
 		/* wake up threads waiting in xfs_log_force() */
 		while (cvsema(&iclog->ic_forcesema));
@@ -1701,7 +1710,8 @@ xlog_state_release_iclog(xlog_t		*log,
 	iclog->ic_state = XLOG_STATE_SYNCING;
 	
 	if ((tail_lsn = xfs_trans_tail_ail(log->l_mp)) == 0)
-	    tail_lsn = iclog->ic_header.h_tail_lsn = log->l_tail_lsn;
+	    tail_lsn = iclog->ic_header.h_tail_lsn =
+		    log->l_tail_lsn = log->l_last_sync_lsn;
 	else
 	    iclog->ic_header.h_tail_lsn = log->l_tail_lsn = tail_lsn;
 
@@ -1959,36 +1969,6 @@ xlog_maketicket(xlog_t		*log,
  ******************************************************************************
  */
 
-typedef struct xlog_recover_item {
-	struct xlog_recover_item *ri_next;
-	struct xlog_recover_item *ri_prev;
-	int			 ri_type;
-	int			 ri_cnt;
-	int			 ri_total;	/* total regions */
-	void *			 ri_desc;
-	int			 ri_desc_len;
-	void *			 ri_buf1;
-	int			 ri_buf1_len;
-	void *			 ri_buf2;
-	int			 ri_buf2_len;
-} xlog_recover_item_t;
-
-typedef struct xlog_recover {
-	struct xlog_recover *r_next;
-	xlog_tid_t	    r_tid;
-	uint		    r_type;
-	int		    r_items;		/* number of items */
-	uint		    r_state;		/* not needed */
-	xlog_recover_item_t *r_transq;
-} xlog_recover_t;
-
-
-#define XLOG_RHASH_BITS  4
-#define XLOG_RHASH_SIZE	16
-#define XLOG_RHASH_SHIFT 2
-#define XLOG_RHASH(tid)	\
-	((((uint)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1<<XLOG_RHASH_SHIFT))
-
 static xlog_recover_t *
 xlog_recover_find_tid(xlog_recover_t *q,
 		      xlog_tid_t     tid)
@@ -1996,8 +1976,9 @@ xlog_recover_find_tid(xlog_recover_t *q,
 	xlog_recover_t *p = q;
 
 	while (p != NULL) {
-		if (p->r_tid != tid)
-			p = p->r_next;
+		if (p->r_tid == tid)
+		    break;
+		p = p->r_next;
 	}
 	return p;
 }	/* xlog_recover_find_tid */
@@ -2025,7 +2006,7 @@ xlog_recover_add_item(xlog_recover_item_t **ihead)
 	} else {
 		item->ri_next		= *ihead;
 		item->ri_prev		= (*ihead)->ri_prev;
-		(*ihead)->ri_prev		= item;
+		(*ihead)->ri_prev	= item;
 		item->ri_prev->ri_next	= item;
 	}
 }	/* xlog_recover_add_item */
@@ -2066,28 +2047,41 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 {
 	xfs_inode_log_format_t	 *in_f;			/* any will do */
 	xlog_recover_item_t	 *item;
+	xfs_trans_header_t	 *thead;
 	caddr_t			 ptr;
 	int			 total;
 
 	ptr = kmem_alloc(len, 0);
-	bcopy(ptr, dp, len);
+	bcopy(dp, ptr, len);
 	
 	in_f = (xfs_inode_log_format_t *)ptr;
 	item = trans->r_transq;
-	if (item == 0 ||
-	    (item->ri_prev->ri_total != 0 &&
-	     item->ri_prev->ri_total == item->ri_prev->ri_cnt)) {
+	if (item == 0) {
+		xlog_recover_add_item(&trans->r_transq);
+		ASSERT(*(uint *)dp == XFS_TRANS_HEADER_MAGIC);
+		thead			= (xfs_trans_header_t *)dp;
+		trans->r_type		= thead->th_type;
+		trans->r_items		= thead->th_num_items;
+		trans->r_trans_tid	= thead->th_tid;
+		return;
+	}
+	if (item->ri_prev->ri_total != 0 &&
+	     item->ri_prev->ri_total == item->ri_prev->ri_cnt) {
 		xlog_recover_add_item(&trans->r_transq);
 	}
+	item = trans->r_transq;
 	item = item->ri_prev;
 
-	if (item->ri_total == 0) {
+	if (item->ri_total == 0) {		/* first region to be added */
 		item->ri_total	= in_f->ilf_size;
-		item->ri_cnt	= 1;
+		item->ri_cnt	= 1;			/* first region */
 		item->ri_desc	= ptr;
 		item->ri_desc_len = len;
 	} else {
 		ASSERT(item->ri_total > item->ri_cnt);
+		/* XXXmiken: this may need to be generalized;
+		 * we aren't guaranteed only <= 3 regions per item
+		 */
 		if (item->ri_cnt == 1) {
 			item->ri_buf1	  = ptr;
 			item->ri_buf1_len = len;
@@ -2102,7 +2096,7 @@ xlog_recover_add_to_trans(xlog_recover_t	*trans,
 
 static void
 xlog_recover_new_tid(xlog_recover_t	**q,
-		     xlog_tid_t	tid)
+		     xlog_tid_t		tid)
 {
 	xlog_recover_t	*trans;
 
@@ -2116,19 +2110,74 @@ xlog_recover_new_tid(xlog_recover_t	**q,
 }	/* xlog_recover_new_tid */
 
 
+static void
+xlog_recover_delete_tid(xlog_recover_t	**q,
+			xlog_recover_t	*trans)
+{
+	xlog_recover_t	*tp;
+	int		found = 0;
+
+	ASSERT(trans != 0);
+	if (trans == *q) {
+		*q = (*q)->r_next;
+	} else {
+		tp = *q;
+		while (tp != 0) {
+			if (tp->r_next == trans) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+			xlog_panic("xlog_recover_delete_tid: trans not found");
+		tp->r_next = tp->r_next->r_next;
+	}
+}	/* xlog_recover_new_tid */
+
+
+static void
+xlog_recover_do_trans(xlog_recover_t *trans)
+{
+}	/* xlog_recover_do_trans */
+
+
+static void
+xlog_recover_free_trans(xlog_recover_t *trans)
+{
+}	/* xlog_recover_free_trans */
+
+
+static void
+xlog_recover_commit_trans(xlog_recover_t **q,
+			  xlog_recover_t *trans)
+{
+	xlog_recover_delete_tid(q, trans);
+	xlog_recover_do_trans(trans);
+	xlog_recover_free_trans(trans);
+}	/* xlog_recover_commit_trans */
+
+
+static void
+xlog_recover_unmount_trans(xlog_recover_t *trans)
+{
+}	/* xlog_recover_unmount_trans */
+
+
 /*
  * There are two valid states of the r_state field.  0 indicates that the
  * transaction structure is in a normal state.  We have either seen the
  * start of the transaction or the last operation we added was not a partial
  * operation.  If the last operation we added to the transaction was a 
- * partial operation, we need to mark r_state with LOG_CONTINUE_TRANS.
+ * partial operation, we need to mark r_state with XLOG_WAS_CONT_TRANS.
+ *
+ * NOTE: skip LRs with 0 data length.
  */
 static void
 xlog_recover_process_data(xlog_recover_t    *rhash[],
 			  xlog_rec_header_t *rhead,
 			  caddr_t	    dp)
 {
-    caddr_t		lp = dp+rhead->h_len;
+    caddr_t		lp	   = dp+rhead->h_len;
     int			num_logops = rhead->h_num_logops;
     xlog_op_header_t	*ohead;
     xlog_recover_t	*trans;
@@ -2139,23 +2188,42 @@ xlog_recover_process_data(xlog_recover_t    *rhash[],
 	ASSERT(dp + sizeof(xlog_op_header_t) <= lp);
 	ohead = (xlog_op_header_t *)dp;
 	dp += sizeof(xlog_op_header_t);
-	if (ohead->oh_clientid != XFS_TRANSACTION)
+	if (ohead->oh_clientid != XFS_TRANSACTION &&
+	    ohead->oh_clientid != XFS_LOG)
 	    xlog_panic("xlog_recover_process_data: bad clientid ");
 	tid = ohead->oh_tid;
 	hash = XLOG_RHASH(tid);
 	trans = xlog_recover_find_tid(rhash[hash], tid);
-	if (trans == NULL) {
-	    if ((ohead->oh_flags & XLOG_SKIP_TRANS) == 0)
+	if (trans == NULL) {			    /* not found; add new tid */
+	    if ((ohead->oh_flags & XLOG_START_TRANS) != 0)
 		xlog_recover_new_tid(&rhash[hash], tid);
 	} else {
 	    ASSERT(dp+ohead->oh_len <= lp);
-	    if ((ohead->oh_flags &XLOG_WAS_CONT_TRANS) != XLOG_WAS_CONT_TRANS) {
-		xlog_recover_add_to_trans(trans, dp, ohead->oh_len);
-	    } else {
-		xlog_recover_add_to_cont_trans(trans, dp, ohead->oh_len);
+	    switch (ohead->oh_flags) {
+		case XLOG_COMMIT_TRANS: {
+		    xlog_recover_commit_trans(&rhash[hash], trans);
+		    break;
+		}
+		case XLOG_UNMOUNT_TRANS: {
+		    xlog_recover_unmount_trans(trans);
+		    break;
+		}
+		case XLOG_WAS_CONT_TRANS: {
+		    xlog_recover_add_to_cont_trans(trans, dp, ohead->oh_len);
+		    break;
+		}
+		case XLOG_START_TRANS : {
+		    xlog_panic("xlog_recover_process_data: bad transaction");
+		    break;
+		}
+		default: {
+		    xlog_recover_add_to_trans(trans, dp, ohead->oh_len);
+		    break;
+		}
 	    }
 	}
 	dp += ohead->oh_len;
+	num_logops--;
     }
 }	/* xlog_recover_process_data */
 
@@ -2211,14 +2279,17 @@ xlog_do_recover(xlog_t	*log,
 			rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
 			ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
 			bblks = BTOBB(rhead->h_len);
-			xlog_bread(log, blk_no+1, bblks, dbp);
-			xlog_unpack_data(rhead, dbp->b_dmaaddr);
-			xlog_recover_process_data(rhash, rhead, dbp->b_dmaaddr);
+			if (bblks > 0) {
+				xlog_bread(log, blk_no+1, bblks, dbp);
+				xlog_unpack_data(rhead, dbp->b_dmaaddr);
+				xlog_recover_process_data(rhash, rhead,
+							  dbp->b_dmaaddr);
+			}
 			blk_no += (bblks+1);
 		}
 	} else {
 	}
-	}	/* xlog_do_recover */
+}	/* xlog_do_recover */
 
 
 int
@@ -2228,7 +2299,7 @@ xlog_recover(xlog_t *log)
 
 	tail_blk = xlog_find_tail(log, &head_blk);
 	if (tail_blk != head_blk) {
-		/* do it */
+		xlog_do_recover(log, head_blk, tail_blk);
 	}
 	return 0;
 }
