@@ -1,4 +1,4 @@
-#ident "$Revision: 1.207 $"
+#ident "$Revision: 1.208 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3550,11 +3550,6 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 				}
 				ip = NULL;
 			}
-#if defined(DEBUG) && defined(PRIO_DEBUG)
-			if (!ip)
-				printf("xfs_get failed on %d \n",ino);
-#endif /* PRIO_DEBUG */
-
 		}
 
 		/*
@@ -3568,9 +3563,6 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 	}
 #endif
 
-#if defined(DEBUG) && defined(PRIO_DEBUG)
-	printf("xfs_get_inode returns: %lx\n", ip);
-#endif /* PRIO_DEBUG */
 	return( ip );
 }
 #endif /* SIM */
