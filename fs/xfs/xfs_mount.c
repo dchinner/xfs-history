@@ -1,5 +1,5 @@
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.121 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -664,6 +664,7 @@ int
 xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
 	buf_t		*bp;
+	/* REFERENCED */
 	int		error;
 	/* REFERENCED */
 	int		unused;

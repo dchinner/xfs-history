@@ -1,4 +1,4 @@
-#ident "$Revision: 1.76 $"
+#ident "$Revision: 1.77 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -460,6 +460,7 @@ xfs_trans_unreserve_and_mod_sb(
 {
 	xfs_mod_sb_t	msb[9];		/* If you add cases, add entries */
 	xfs_mod_sb_t	*msbp;
+	/* REFERENCED */
 	int		error;
 
 	msbp = msb;
@@ -549,6 +550,7 @@ xfs_trans_commit(
 	int			nvec;
 	xfs_mount_t		*mp;
 	xfs_lsn_t		commit_lsn;
+	/* REFERENCED */
 	int			error;
 	int			log_flags;
 	int			sync;

@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.125 $"
+#ident  "$Revision: 1.126 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -697,6 +697,7 @@ xfs_vfsmount(
 		error = dm_namesp_event(DM_MOUNT, (vnode_t *) vfsp, mvp,
 					uap->dir, uap->spec, 0, 0);
 		if (error) {
+			/* REFERENCED */
 			int	errcode;
 
 			vfsp->vfs_flag &= ~VFS_DMI;

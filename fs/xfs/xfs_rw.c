@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.162 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3688,6 +3688,7 @@ xfs_strat_write(
 	xfs_extlen_t	last_rbp_bcount;
 	daddr_t		last_rbp_blkno;
 #endif
+	/* REFERENCED */
 	int		rbp_count;
 	buf_t		*rbp;
 	xfs_mount_t	*mp;
@@ -3700,6 +3701,7 @@ xfs_strat_write(
 	int		rbp_len;
 	int		set_lead;
 	int		s;
+	/* REFERENCED */
 	int		loops;
 	int		imap_index;
 	int		nimaps;

@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.231 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1173,6 +1173,7 @@ xfs_itruncate_cleanup(
 	int		fork)
 {
 	xfs_mount_t	*mp;
+	/* REFERENCED */
 	int		error;
 
 	mp = ip->i_mount;
