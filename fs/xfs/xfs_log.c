@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.97 $"
+#ident	"$Revision: 1.98 $"
 
 /*
  * High level interface routines for log manager
@@ -34,6 +34,7 @@
 #include <sys/proc.h>
 #include <sys/pda.h>		/* depends on proc.h */
 #include <sys/sema.h>
+#include <sys/sysmacros.h>
 #include <sys/vfs.h>
 
 #include "xfs_inum.h"
@@ -136,7 +137,8 @@ STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
  * 1 => enable log manager
  * 2 => enable log manager and log debugging
  */
-int xlog_debug = 1;
+int   xlog_debug = 1;
+dev_t xlog_devt  = 0;
 
 
 #if defined(DEBUG) && !defined(SIM)
@@ -254,7 +256,7 @@ xfs_log_done(xfs_mount_t	*mp,
 	xlog_ticket_t	*ticket = (xfs_log_ticket_t) xtic;
 	xfs_lsn_t	lsn	= 0;
 	
-	if (! xlog_debug)
+	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 
 	/* If nothing was ever written, don't write out commit record */
@@ -304,7 +306,7 @@ xfs_log_force(xfs_mount_t *mp,
 {
 	xlog_t *log = mp->m_log;
 
-	if (! xlog_debug)
+	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 	if (flags & XFS_LOG_FORCE) {
 		return(xlog_state_sync(log, lsn, flags));
@@ -331,7 +333,7 @@ xfs_log_notify(xfs_mount_t	  *mp,		/* mount of partition */
 {
 	xlog_t *log = mp->m_log;
 
-	if (! xlog_debug)
+	if (! xlog_debug && xlog_devt == log->l_dev)
 		return;
 	cb->cb_next = 0;
 	if (xlog_state_lsn_is_synced(log, lsn, cb))
@@ -371,7 +373,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 {
 	xlog_t	  *log = mp->m_log;
 	
-	if (! xlog_debug)
+	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 
 	if (client != XFS_TRANSACTION && client != XFS_LOG)
@@ -440,15 +442,18 @@ xfs_log_mount(xfs_mount_t	*mp,
 	xlog_t *log;
 	int    error;
 	
-	if (! xlog_debug)
-		return 0;
 
 	log = xlog_alloc_log(mp, log_dev, blk_offset, num_bblks);
+
+	if (! xlog_debug) {
+		cmn_err(CE_NOTE, "log dev: 0x%x", log_dev);
+		return 0;
+	}
+
 	if ((error = xlog_recover(log)) != NULL) {
 		xlog_unalloc_log(log);
-		return error;
 	}
-	return 0;
+	return error;
 }	/* xfs_log_mount */
 
 
@@ -468,7 +473,7 @@ xfs_log_unmount(xfs_mount_t *mp)
 	int		 error;
 	int		 spl;
 
-	if (! xlog_debug)
+	if (! xlog_debug && xlog_devt == log->l_dev)
 		return 0;
 
 	if (xfs_log_force(mp, 0, XFS_LOG_FORCE|XFS_LOG_SYNC))
@@ -521,7 +526,9 @@ xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_ticket_t	tic,
 	      xfs_lsn_t		*start_lsn)
 {
-	if (! xlog_debug) {
+	xlog_t *log = mp->m_log;
+	
+	if (! xlog_debug && xlog_devt == log->l_dev) {
 		*start_lsn = 0;
 		return 0;
 	}
@@ -539,7 +546,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	xlog_t		*log = mp->m_log; 
 	int		need_bytes, free_bytes, cycle, bytes, spl;
 
-	if (!xlog_debug)
+	if (!xlog_debug && xlog_devt == log->l_dev)
 		return;
 	if (tail_lsn == 0) {
 		/* needed since sync_lsn is 64 bits */
@@ -557,6 +564,10 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 		log->l_tail_lsn = tail_lsn;
 
 	if (tic = log->l_write_headq) {
+#ifdef DEBUG
+		if (log->l_flags & XLOG_ACTIVE_RECOVERY)
+			panic("Recovery problem");
+#endif
 		cycle = log->l_grant_write_cycle;
 		bytes = log->l_grant_write_bytes;
 		free_bytes = xlog_space_left(log, cycle, bytes);
@@ -571,6 +582,10 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 		} while (tic != log->l_write_headq);
 	}
 	if (tic = log->l_reserve_headq) {
+#ifdef DEBUG
+		if (log->l_flags & XLOG_ACTIVE_RECOVERY)
+			panic("Recovery problem");
+#endif
 		cycle = log->l_grant_reserve_cycle;
 		bytes = log->l_grant_reserve_bytes;
 		free_bytes = xlog_space_left(log, cycle, bytes);
@@ -669,6 +684,58 @@ xlog_iodone(buf_t *bp)
 
 
 /*
+ * Return size of each in-core log record buffer.
+ *
+ * Low memory machines only get 4 8KB buffers.  We don't want to waste
+ * memory here.  However, all other machines get at least 4 16KB buffers.
+ * The number is hard coded because we don't care about the minimum
+ * memory size, just 16MB systems.
+ *
+ * If the filesystem blocksize is too large, we may need to choose a
+ * larger size since the directory code currently logs entire blocks.
+ * XXXmiken XXXcurtis
+ */
+int xlogs = 0;
+int xlogsize = 0;
+int xloglog = 0;
+
+STATIC void
+xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
+			   xlog_t	*log)
+{
+	uint buf_size;
+
+	log->l_iclog_bufs = XLOG_NUM_ICLOGS;
+	if (physmem <= btoc(16*1024*1024)) {
+		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 8k */
+		log->l_iclog_size_log = XLOG_RECORD_BSHIFT;
+	} else {
+		log->l_iclog_size = XLOG_RECORD_BSIZE * 2;	/* 16k */
+		log->l_iclog_size_log = XLOG_RECORD_BSHIFT+2;
+	}
+
+	/*
+	 * We can't allow 64k log record sizes because there isn't enough
+	 * room in the log record header for all the cycle numbers.
+	 */
+	ASSERT(XLOG_MAX_RECORD_BSIZE == 32*1024);
+
+	if (mp->m_sb.sb_blocksize >= XLOG_MAX_RECORD_BSIZE) {
+		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
+		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
+		if (mp->m_sb.sb_blocksize > XLOG_MAX_RECORD_BSIZE) {
+			log->l_iclog_bufs = XLOG_NUM_ICLOGS*2;
+		}
+	}
+	if (xlogs != 0) {
+		log->l_iclog_bufs = xlogs;
+		log->l_iclog_size = xlogsize;
+		log->l_iclog_size_log = xloglog;
+	}
+}	/* xlog_get_iclog_buffer_size */
+
+
+/*
  * This routine initializes some of the log structure for a given mount point.
  * Its primary purpose is to fill in enough, so recovery can occur.  However,
  * some other stuff may be filled in too.
@@ -684,6 +751,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	xlog_in_core_t		**iclogp;
 	xlog_in_core_t		*iclog, *prev_iclog;
 	buf_t			*bp;
+	uint			buf_size;
 	int			i;
 
 	log = mp->m_log = (void *)kmem_zalloc(sizeof(xlog_t), 0);
@@ -693,7 +761,8 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_logsize     = BBTOB(num_bblks);
 	log->l_logBBstart  = blk_offset;
 	log->l_logBBsize   = num_bblks;
-	log->l_roundoff= 0;
+	log->l_roundoff	   = 0;
+	log->l_flags	   |= XLOG_ACTIVE_RECOVERY;
 
 	log->l_prev_block  = -1;
 	log->l_tail_lsn    = 0x100000000LL; /* cycle = 1; current block = 0 */
@@ -705,23 +774,24 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_grant_write_bytes = 0;
 	log->l_grant_write_cycle = 1;
 
-	/* XLOG_RECORD_BSIZE must be mult of BBSIZE; see xlog_rec_header_t */
-	ASSERT((XLOG_RECORD_BSIZE & BBMASK) == 0);
-
+	xlog_get_iclog_buffer_size(mp, log);
 	bp = log->l_xbuf   = getrbuf(0);	/* get my locked buffer */
 	bp->b_edev	   = log_dev;
-	bp->b_bufsize	   = XLOG_RECORD_BSIZE;
+	bp->b_bufsize	   = log->l_iclog_size;
 	bp->b_iodone	   = xlog_iodone;
 	bp->b_fsprivate2   = (void *)1;
 	ASSERT(log->l_xbuf->b_flags & B_BUSY);
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	initnlock(&log->l_icloglock, "iclog");
 	initnlock(&log->l_grant_lock, "grhead_iclog");
-	initnsema(&log->l_flushsema, XLOG_NUM_ICLOGS, "ic-flush");
+	initnsema(&log->l_flushsema, log->l_iclog_bufs, "ic-flush");
 	xlog_state_ticket_alloc(log);  /* wait until after icloglock inited */
 	
+	/* log record size must be multiple of BBSIZE; see xlog_rec_header_t */
+	ASSERT((bp->b_bufsize & BBMASK) == 0);
+
 	iclogp = &log->l_iclog;
-	for (i=0; i < XLOG_NUM_ICLOGS; i++) {
+	for (i=0; i < log->l_iclog_bufs; i++) {
 		*iclogp = (xlog_in_core_t *)
 			kmem_zalloc(sizeof(xlog_in_core_t), VM_CACHEALIGN);
 
@@ -739,7 +809,13 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		head->h_lsn = 0;
 		head->h_tail_lsn = 0;
 
-		iclog->ic_size = XLOG_RECORD_BSIZE - XLOG_HEADER_SIZE;
+		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
+		bp->b_edev = log_dev;
+		bp->b_bufsize = log->l_iclog_size;
+		bp->b_iodone = xlog_iodone;
+		bp->b_fsprivate2 = (void *)1;
+
+		iclog->ic_size = bp->b_bufsize - XLOG_HEADER_SIZE;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
 		iclog->ic_log = log;
 		iclog->ic_refcnt = 0;
@@ -748,11 +824,6 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		iclog->ic_callback = 0;
 		iclog->ic_callback_tail = &(iclog->ic_callback);
 
-		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
-		bp->b_edev = log_dev;
-		bp->b_bufsize = XLOG_RECORD_BSIZE;
-		bp->b_iodone = xlog_iodone;
-		bp->b_fsprivate2 = (void *)1;
 		ASSERT(iclog->ic_bp->b_flags & B_BUSY);
 		ASSERT(valusema(&iclog->ic_bp->b_lock) <= 0);
 		initnsema(&iclog->ic_forcesema, 0, "iclog-force");
@@ -760,7 +831,6 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		iclogp = &iclog->ic_next;
 	}
 	log->l_iclog_bak[i] = 0;
-	log->l_iclog_size = XLOG_RECORD_BSIZE;
 	*iclogp = log->l_iclog;			/* complete ring */
 	log->l_iclog->ic_prev = prev_iclog;	/* re-write 1st prev ptr */
 	
@@ -977,7 +1047,7 @@ xlog_unalloc_log(xlog_t *log)
 	int		i;
 
 	iclog = log->l_iclog;
-	for (i=0; i<XLOG_NUM_ICLOGS; i++) {
+	for (i=0; i<log->l_iclog_bufs; i++) {
 		freesema(&iclog->ic_forcesema);
 		freerbuf(iclog->ic_bp);
 		next_iclog = iclog->ic_next;
@@ -1485,6 +1555,11 @@ xlog_grant_log_space(xlog_t	   *log,
 	int		 need_bytes;
 	int		 spl;
 
+#ifdef DEBUG
+	if (log->l_flags & XLOG_ACTIVE_RECOVERY)
+		panic("regrant Recovery problem");
+#endif
+
 	/* Is there space or do we need to sleep? */
 	spl = GRANT_LOCK(log);
 	xlog_trace_loggrant(log, tic, "xlog_grant_log_space: enter");
@@ -1545,6 +1620,11 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 
 	if (tic->t_cnt > 0)
 		return;
+
+#ifdef DEBUG
+	if (log->l_flags & XLOG_ACTIVE_RECOVERY)
+		panic("regrant Recovery problem");
+#endif
 
 	spl = GRANT_LOCK(log);
 	xlog_trace_loggrant(log, tic, "xlog_regrant_write_log_space: enter");
@@ -2146,7 +2226,7 @@ xlog_verify_dest_ptr(xlog_t     *log,
 	int i;
 	int good_ptr = 0;
 
-	for (i=0; i < XLOG_NUM_ICLOGS; i++) {
+	for (i=0; i < log->l_iclog_bufs; i++) {
 		if (ptr >= (__psint_t)log->l_iclog_bak[i] &&
 		    ptr <= (__psint_t)log->l_iclog_bak[i]+log->l_iclog_size)
 			good_ptr++;
@@ -2256,7 +2336,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	/* check validity of iclog pointers */
 	spl = LOG_LOCK(log);
 	icptr = log->l_iclog;
-	for (i=0; i < XLOG_NUM_ICLOGS; i++) {
+	for (i=0; i < log->l_iclog_bufs; i++) {
 		if (icptr == 0)
 			xlog_panic("xlog_verify_iclog: illegal ptr");
 		icptr = icptr->ic_next;
