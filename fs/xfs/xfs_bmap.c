@@ -1996,7 +1996,6 @@ xfs_bmap_finish(
 	xfs_efi_log_item_t	*efi;
 	xfs_agnumber_t		firstag;
 	xfs_bmap_free_item_t	*free;
-	int			i;
 	unsigned int		logres;
 	xfs_mount_t		*mp;
 	xfs_bmap_free_item_t	*next;
@@ -2019,8 +2018,8 @@ xfs_bmap_finish(
 	if (flist->xbf_count == 0)
 		return 0;
 	efi = xfs_trans_get_efi(ntp, flist->xbf_count);
-	for (free = flist->xbf_first, i = 0; free; free = free->xbfi_next, i++)
-		xfs_trans_log_efi_extent(ntp, efi + i, free->xbfi_startblock,
+	for (free = flist->xbf_first; free; free = free->xbfi_next)
+		xfs_trans_log_efi_extent(ntp, efi, free->xbfi_startblock,
 			free->xbfi_blockcount);
 	logres = ntp->t_log_res;
 	blkres = ntp->t_blk_res - ntp->t_blk_res_used;
@@ -2028,11 +2027,11 @@ xfs_bmap_finish(
 	ntp = xfs_trans_alloc(mp, 0);
 	xfs_trans_reserve(ntp, blkres, logres, 0, 0);
 	efd = xfs_trans_get_efd(ntp, efi, flist->xbf_count);
-	for (free = flist->xbf_first, i = 0; free != NULL; free = next, i++) {
+	for (free = flist->xbf_first; free != NULL; free = next) {
 		next = free->xbfi_next;
 		xfs_free_extent(ntp, free->xbfi_startblock,
 			free->xbfi_blockcount);
-		xfs_trans_log_efd_extent(ntp, efd + i, free->xbfi_startblock,
+		xfs_trans_log_efd_extent(ntp, efd, free->xbfi_startblock,
 			free->xbfi_blockcount);
 		xfs_bmap_del_free(flist, NULL, free);
 	}
