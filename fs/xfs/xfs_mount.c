@@ -218,7 +218,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
 	error = xfs_log_mount(mp, mp->m_logdev,
 			      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
-			      XFS_BTOD(mp, sbp->sb_logblocks), 0);
+			      XFS_BTOD(mp, sbp->sb_logblocks));
 	if (error > 0) {
 		/*
 		 * XXX	log recovery failure - What action should be taken?

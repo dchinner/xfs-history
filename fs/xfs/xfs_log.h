@@ -95,8 +95,7 @@ int	  xfs_log_init(void);
 int	  xfs_log_mount(struct xfs_mount *mp,
 			dev_t		 log_dev,
 			daddr_t		 start_block,
-			int		 num_bblocks,
-			uint		 flags);
+			int		 num_bblocks);
 void	  xfs_log_notify(struct xfs_mount   *mp,
 			 xfs_lsn_t	    lsn,
 			 xfs_log_callback_t *callback_entry);

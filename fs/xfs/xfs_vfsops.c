@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.26 $"
+#ident  "$Revision: 1.27 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -137,8 +137,7 @@ STATIC int	xfs_cmountfs(struct vfs	*vfsp,
 			     dev_t		rtdev,
 			     whymount_t		why,
 			     struct xfs_args	*ap,
-			     struct cred	*cr,
-			     int		lflags);
+			     struct cred	*cr);
 
 STATIC xfs_mount_t *_xfs_get_vfsmount(struct vfs	*vfsp,
 				      dev_t		ddev,
@@ -227,8 +226,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	     dev_t		rtdev,
 	     whymount_t		why,
 	     struct xfs_args	*ap,
-	     struct cred	*cr,
-	     int		lflags)
+	     struct cred	*cr)
 {
 	xfs_mount_t	*mp;
 	struct vnode 	*ddevvp, *rdevvp, *ldevvp;
@@ -426,7 +424,6 @@ xfs_vfsmount(vfs_t		*vfsp,
 	dev_t		logdev;
 	dev_t		rtdev;
 	int		error;
-	int		lflags;
 
 	if (!suser())
 		return XFS_ERROR(EPERM);
@@ -442,10 +439,6 @@ xfs_vfsmount(vfs_t		*vfsp,
 	bzero(&args, sizeof args);
 	if (copyin(uap->dataptr, &args, MIN(uap->datalen, sizeof args)))
 		return XFS_ERROR(EFAULT);
-
-	lflags = 0;
-	if (args.flags & XFSMNT_CHKLOG)
-		lflags |= XFS_LOG_RECOVER;
 
 	/*
 	 * Resolve path name of special file being mounted.
@@ -496,7 +489,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 	}
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
-			     &args, credp, lflags);
+			     &args, credp);
 
 	return error;
 
@@ -604,7 +597,7 @@ xfs_mountroot(vfs_t		*vfsp,
 	error = vfs_lock(vfsp);
 	if (error)
 		goto bad;
-	error = xfs_cmountfs(vfsp, rootdev, rootdev, 0, why, NULL, cr, NULL);
+	error = xfs_cmountfs(vfsp, rootdev, rootdev, 0, why, NULL, cr);
 	if (error) {
 		vfs_unlock(vfsp);
 		goto bad;
