@@ -1,4 +1,4 @@
-#ident "$Revision: 1.54 $"
+#ident "$Revision: 1.55 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -23,6 +23,7 @@
 #include <sys/errno.h>
 #ifdef SIM
 #include <bstring.h>
+#include <stdio.h>
 #else
 #include <sys/systm.h>
 #endif
@@ -1181,7 +1182,9 @@ xfs_buf_error_iodone(
 	bioerror(bp, EIO);
 	bp->b_flags |= B_STALE;
 	bp->b_flags &= ~(B_DELWRI);
+#ifndef SIM
 	buftrace("BUF_IODONE ERROR", bp);
+#endif
 	/*
 	 * We have to unpin the pinned buffers, 
 	 * so we have to do the callbacks.
@@ -1221,7 +1224,9 @@ xfs_buf_iodone_callbacks(
 			bioerror(bp, EIO);
 			bp->b_flags |= B_STALE;
 			bp->b_flags &= ~(B_DONE|B_BDFLUSH|B_DELWRI);
+#ifndef SIM
 			buftrace("BUF_IODONE_CB", bp);
+#endif
 			xfs_buf_do_callbacks(bp, lip);
 			bp->b_fsprivate = NULL;
 			bp->b_iodone = NULL;
@@ -1308,7 +1313,9 @@ xfs_buf_error_relse(
 		bioerror(bp, EIO);
 		bp->b_flags |= B_STALE;
 		bp->b_flags &= ~(B_DELWRI);
+#ifndef SIM
 		buftrace("BUF_ERROR_RELSE", bp);
+#endif
 		/*
 		 * We have to unpin the pinned buffers so do the
 		 * callbacks.
