@@ -26,7 +26,6 @@
 #include <sys/conf.h>
 #endif
 
-#include <sys/cmn_err.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/sema.h>
@@ -67,7 +66,9 @@ STATIC void	 xlog_unalloc(void);
 STATIC int	 xlog_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			    int nentries, xfs_log_ticket_t tic,
 			    xfs_lsn_t *start_lsn, uint flags);
-STATIC void	xlog_verify_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
+STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
+STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
+				     xfs_lsn_t tail_lsn);
 
 /* local state machine functions */
 STATIC void		xlog_state_done_syncing(xlog_in_core_t *iclog);
@@ -1294,21 +1295,7 @@ xlog_state_release_iclog(xlog_t		*log,
 	    iclog->ic_header.h_tail_lsn = log->l_tail_lsn = tail_lsn;
 
 #ifdef DEBUG
-	/* check if it will fit */
-	if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
-		blocks =
-			log->l_logBBsize - (log->l_prev_block -BLOCK_LSN(tail_lsn));
-		if (blocks < BTOBB(iclog->ic_offset)+1)
-			xlog_panic("ran out of log space");
-	} else {
-		ASSERT(CYCLE_LSN(tail_lsn)+1 == log->l_prev_cycle);
-		if (BLOCK_LSN(tail_lsn) == log->l_prev_block)
-			xlog_panic("ran out of log space");
-		
-		blocks = BLOCK_LSN(tail_lsn) - log->l_prev_block;
-		if (blocks < BTOBB(iclog->ic_offset) + 1)
-			xlog_panic("ran out of log space");
-	}
+	xlog_verify_tail_lsn(log, iclog, tail_lsn);
 #endif /* DEBUG */
 
 	/* cycle incremented when incrementing curr_block */
@@ -1571,8 +1558,8 @@ xlog_verify_dest_ptr(xlog_t *log,
 
 /* check split LR write */
 static void
-xlog_verify_cycle_no(xlog_t	    *log,
-		     xlog_in_core_t *iclog)
+xlog_verify_disk_cycle_no(xlog_t	    *log,
+			  xlog_in_core_t *iclog)
 {
 	buf_t	*bp;
 	uint	cycle_no;
@@ -1588,7 +1575,33 @@ xlog_verify_cycle_no(xlog_t	    *log,
 		}
 		xlog_put_bp(bp);
 	}
-}	/* xlog_verify_cycle_no */
+}	/* xlog_verify_disk_cycle_no */
+
+
+/* check if it will fit */
+static void
+xlog_verify_tail_lsn(xlog_t	    *log,
+		     xlog_in_core_t *iclog,
+		     xfs_lsn_t	    tail_lsn)
+{
+	int blocks;
+
+	if (CYCLE_LSN(tail_lsn) == log->l_prev_cycle) {
+		blocks =
+		    log->l_logBBsize - (log->l_prev_block -BLOCK_LSN(tail_lsn));
+		if (blocks < BTOBB(iclog->ic_offset)+1)
+			xlog_panic("ran out of log space");
+	} else {
+		ASSERT(CYCLE_LSN(tail_lsn)+1 == log->l_prev_cycle);
+
+		if (BLOCK_LSN(tail_lsn) == log->l_prev_block)
+			xlog_panic("ran out of log space");
+		
+		blocks = BLOCK_LSN(tail_lsn) - log->l_prev_block;
+		if (blocks < BTOBB(iclog->ic_offset) + 1)
+			xlog_panic("ran out of log space");
+	}
+}	/* xlog_verify_tail_lsn */
 
 
 /*
@@ -1686,5 +1699,5 @@ xlog_verify_iclog(xlog_t	 *log,
 	if (len != 0)
 		xlog_panic("xlog_verify_iclog: illegal iclog");
 
-	xlog_verify_cycle_no(log, iclog);
+	xlog_verify_disk_cycle_no(log, iclog);
 }	/* xlog_verify_iclog */
