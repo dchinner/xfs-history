@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.52 $"
+#ident  "$Revision: 1.55 $"
 
 #include <strings.h>
 #include <sys/types.h>
@@ -864,10 +864,10 @@ xfs_unmount(vfs_t	*vfsp,
 	xfs_unmountfs(mp, vfs_flags, credp);	
 
 	/*
-	 * XXX Later when xfs_unmount()'s inode freeing is implemented, do:
-	 * ASSERT(mp->m_inodes == NULL);
+	 * The mp structure is freed in xfs_unmountfs(), this assert
+	 * has been moved to xfs_unmountfs().
+	 * 	ASSERT(mp->m_inodes == NULL);
 	 */
-	ASSERT(mp->m_inodes == NULL);
 
 	return 0;	/* XXX Must determine unmount return value. */
 }
