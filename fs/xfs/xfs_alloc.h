@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.30 $"
+#ident	"$Revision: 1.34 $"
 
 struct xfs_perag;
 
@@ -59,8 +59,6 @@ typedef struct xfs_alloc_arg {
 	struct xfs_perag *pag;		/* per-ag struct for this agno */
 } xfs_alloc_arg_t;
 
-extern struct zone	*xfs_alloc_arg_zone;	/* zone for alloc args */
-
 /*
  * Types for alloc tracing.
  */
@@ -76,19 +74,6 @@ extern struct zone	*xfs_alloc_arg_zone;	/* zone for alloc args */
 /*
  * Prototypes for visible xfs_alloc.c routines
  */
-
-/*
- * Allocate an alloc_arg structure.
- */
-xfs_alloc_arg_t *
-xfs_alloc_arg_alloc(void);
-
-/*
- * Free an alloc_arg structure.
- */
-void
-xfs_alloc_arg_free(
-	xfs_alloc_arg_t	*args);		/* alloc argument structure */
 
 /*
  * Compute and fill in value of m_ag_maxlevels.

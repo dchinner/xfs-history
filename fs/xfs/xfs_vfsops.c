@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.83 $"
+#ident  "$Revision: 1.84 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -192,9 +192,6 @@ xfs_init(vfssw_t	*vswp,
 	extern zone_t	*xfs_btree_cur_zone;
 	extern zone_t	*xfs_inode_zone;
 	extern zone_t	*xfs_trans_zone;
-	extern zone_t	*xfs_bmbt_locals_zone;
-	extern zone_t	*xfs_bmalloca_zone;
-	extern zone_t	*xfs_bmapi_locals_zone;
 #ifndef SIM
 	extern lock_t	xfs_strat_lock;
 	extern lock_t	xfsd_lock;
@@ -240,16 +237,8 @@ xfs_init(vfssw_t	*vswp,
 					      "xfs_strat_write");
 	xfs_gap_zone = kmem_zone_init(sizeof(xfs_gap_t), "xfs_gap");
 #endif
-	xfs_alloc_arg_zone =
-		kmem_zone_init(sizeof(xfs_alloc_arg_t), "xfs_alloc_arg");
 	xfs_dir_state_zone =
 		kmem_zone_init(sizeof(struct xfs_dir_state), "xfs_dir_state");
-	xfs_bmbt_locals_zone =
-		kmem_zone_init(sizeof(xfs_bmbt_locals_t), "xfs_bmbt_locals");
-	xfs_bmalloca_zone =
-		kmem_zone_init(sizeof(xfs_bmalloca_t), "xfs_bmalloca");
-	xfs_bmapi_locals_zone =
-		kmem_zone_init(sizeof(xfs_bmapi_locals_t), "xfs_bmapi_locals");
 
 	/*
 	 * Allocate global trace buffers.

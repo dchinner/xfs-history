@@ -177,50 +177,6 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 #define	XFS_BMBT_KTRACE_SIZE	32	/* size of per-inode trace buffer */
 
 /*
- * Local variables for some of the routines in xfs_bmap_btree.c
- */
-typedef struct xfs_bmbt_locals
-{
-	xfs_bmbt_block_t	*block;		/* bmap btree block */
-	xfs_fsblock_t		bno;		/* fs-relative block number */
-	buf_t			*bp;		/* buffer for block */
-	xfs_bmbt_block_t	*cblock;	/* child btree block */
-	xfs_bmbt_key_t		*ckp;		/* child key pointer */
-	xfs_bmbt_ptr_t		*cpp;		/* child ptr pointer */
-	xfs_bmbt_rec_t		*crp;		/* child record pointer */
-	daddr_t			d;		/* disk address for bno */
-	xfs_bmbt_key_t		key;		/* bmap btree key */
-	xfs_bmbt_key_t		*kp;		/* pointer to bmap btree key */
-	xfs_fsblock_t		lbno;		/* left sibling block number */
-	buf_t			*lbp;		/* left buffer pointer */
-	xfs_bmbt_block_t	*left;		/* left btree block */
-	xfs_bmbt_key_t		*lkp;		/* left btree key */
-	xfs_bmbt_ptr_t		*lpp;		/* left address pointer */
-	int			lrecs;		/* left record count */
-	xfs_bmbt_rec_t		*lrp;		/* left record pointer */
-	xfs_mount_t		*mp;		/* file system mount point */
-	xfs_fsblock_t		nbno;		/* new block number */
-	struct xfs_btree_cur	*ncur;		/* new btree cursor */
-	xfs_bmbt_key_t		nkey;		/* new btree key value */
-	xfs_bmbt_rec_t		nrec;		/* new record count */
-	int			optr;		/* old key/record index */
-	xfs_bmbt_ptr_t		*pp;		/* pointer to bmap block addr */
-	int			ptr;		/* key/record index */
-	xfs_fsblock_t		rbno;		/* right sibling block number */
-	buf_t			*rbp;		/* right buffer pointer */
-	xfs_bmbt_rec_t		rec;		/* bmap btree record */
-	xfs_bmbt_block_t	*right;		/* right btree block */
-	xfs_bmbt_key_t		*rkp;		/* right btree key */
-	xfs_bmbt_rec_t		*rp;		/* pointer to bmap btree rec */
-	xfs_bmbt_ptr_t		*rpp;		/* right address pointer */
-	xfs_bmbt_block_t	*rrblock;	/* right-right btree block */
-	buf_t			*rrbp;		/* right-right buffer pointer */
-	int			rrecs;		/* right record count */
-	xfs_bmbt_rec_t		*rrp;		/* right record pointer */
-	struct xfs_btree_cur	*tcur;		/* temporary btree cursor */
-} xfs_bmbt_locals_t;
-
-/*
  * Prototypes for xfs_bmap.c to call.
  */
 

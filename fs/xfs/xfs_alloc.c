@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.74 $"
+#ident	"$Revision: 1.75 $"
 
 /*
  * Free space allocation for xFS.
@@ -50,8 +50,6 @@
  * Allocation tracing.
  */
 ktrace_t	*xfs_alloc_trace_buf;
-
-zone_t		*xfs_alloc_arg_zone;
 
 /*
  * Prototypes for internal functions.
@@ -1642,25 +1640,6 @@ xfs_free_ag_extent(
  */
 
 /*
- * Allocate an alloc_arg structure.
- */
-xfs_alloc_arg_t *
-xfs_alloc_arg_alloc(void)
-{
-	return kmem_zone_alloc(xfs_alloc_arg_zone, KM_SLEEP);
-}
-
-/*
- * Free an alloc_arg structure.
- */
-void
-xfs_alloc_arg_free(
-	xfs_alloc_arg_t	*args)
-{
-	kmem_zone_free(xfs_alloc_arg_zone, args);
-}
-
-/*
  * Compute and fill in value of m_ag_maxlevels.
  */
 void
@@ -1700,7 +1679,7 @@ xfs_alloc_fix_freelist(
 	buf_t		*agbp;
 	xfs_agf_t	*agf;
 	buf_t		*agflbp;
-	xfs_alloc_arg_t	*args;
+	xfs_alloc_arg_t	args;
 	xfs_agblock_t	bno;
 	xfs_extlen_t	longest;
 	xfs_mount_t	*mp;
@@ -1789,41 +1768,39 @@ xfs_alloc_fix_freelist(
 	}
 #endif	/* SIM */
 	/*
-	 * Allocate and initialize the args structure.
+	 * Initialize the args structure.
 	 */
-	args = xfs_alloc_arg_alloc();
-	args->tp = tp;
-	args->mp = mp;
-	args->agbp = agbp;
-	args->agno = agno;
-	args->mod = args->minleft = args->wasdel = args->userdata = 0;
-	args->minlen = args->prod = args->isfl = 1;
-	args->type = XFS_ALLOCTYPE_THIS_AG;
-	args->pag = pag;
+	args.tp = tp;
+	args.mp = mp;
+	args.agbp = agbp;
+	args.agno = agno;
+	args.mod = args.minleft = args.wasdel = args.userdata = 0;
+	args.minlen = args.prod = args.isfl = 1;
+	args.type = XFS_ALLOCTYPE_THIS_AG;
+	args.pag = pag;
 	agflbp = xfs_alloc_read_agfl(mp, tp, agno);
 	/*
 	 * Make the freelist longer if it's too short.
 	 */
 	while (agf->agf_flcount < need) {
-		args->agbno = 0;
-		args->maxlen = need - agf->agf_flcount;
+		args.agbno = 0;
+		args.maxlen = need - agf->agf_flcount;
 		/*
 		 * Allocate as many blocks as possible at once.
 		 */
-		xfs_alloc_ag_vextent(args);
+		xfs_alloc_ag_vextent(&args);
 		/*
 		 * Stop if we run out.  Won't happen if callers are obeying
 		 * the restrictions correctly.
 		 */
-		if (args->agbno == NULLAGBLOCK)
+		if (args.agbno == NULLAGBLOCK)
 			break;
 		/*
 		 * Put each allocated block on the list.
 		 */
-		for (bno = args->agbno; bno < args->agbno + args->len; bno++)
+		for (bno = args.agbno; bno < args.agbno + args.len; bno++)
 			xfs_alloc_put_freelist(tp, agbp, agflbp, bno);
 	}
-	xfs_alloc_arg_free(args);
 	return agbp;
 }
 

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.71 $"
+#ident	"$Revision: 1.72 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -159,7 +159,7 @@ xfs_ialloc_ag_alloc(
 	buf_t		*agbp)		/* alloc group buffer */
 {
 	xfs_agi_t	*agi;		/* allocation group header */
-	xfs_alloc_arg_t	*args;		/* allocation argument structure */
+	xfs_alloc_arg_t	args;		/* allocation argument structure */
 	int		blks_per_cluster;  /* fs blocks per inode cluster */
 	xfs_btree_cur_t	*cur;		/* inode btree cursor */
 	daddr_t		d;		/* disk addr of buffer */
@@ -175,67 +175,63 @@ xfs_ialloc_ag_alloc(
 	static xfs_timestamp_t ztime;	/* zero xfs timestamp */
 	static uuid_t	zuuid;		/* zero uuid */
 
-	args = xfs_alloc_arg_alloc();
-	args->tp = tp;
-	args->mp = tp->t_mountp;
+	args.tp = tp;
+	args.mp = tp->t_mountp;
 	agi = XFS_BUF_TO_AGI(agbp);
 	/*
 	 * Locking will ensure that we don't have two callers in here
 	 * at one time.
 	 */
-	newlen = XFS_IALLOC_INODES(args->mp);
-	args->minlen = args->maxlen = XFS_IALLOC_BLOCKS(args->mp);
+	newlen = XFS_IALLOC_INODES(args.mp);
+	args.minlen = args.maxlen = XFS_IALLOC_BLOCKS(args.mp);
 	/*
 	 * Need to figure out where to allocate the inode blocks.
 	 * Ideally they should be spaced out through the a.g.
 	 * For now, just allocate blocks up front.
 	 */
-	args->agbno = agi->agi_root;
-	args->fsbno = XFS_AGB_TO_FSB(args->mp, agi->agi_seqno, args->agbno);
+	args.agbno = agi->agi_root;
+	args.fsbno = XFS_AGB_TO_FSB(args.mp, agi->agi_seqno, args.agbno);
 	/*
 	 * Allocate a fixed-size extent of inodes.
 	 */
-	args->type = XFS_ALLOCTYPE_NEAR_BNO;
-	args->mod = args->total = args->wasdel = args->isfl =
-		args->userdata = 0;
-	args->prod = 1;
+	args.type = XFS_ALLOCTYPE_NEAR_BNO;
+	args.mod = args.total = args.wasdel = args.isfl = args.userdata = 0;
+	args.prod = 1;
 	/*
 	 * Allow space for the inode btree to split.
 	 */
-	args->minleft = XFS_IN_MAXLEVELS(args->mp) - 1;
-	xfs_alloc_vextent(args);
-	if (args->fsbno == NULLFSBLOCK) {
-		xfs_alloc_arg_free(args);
+	args.minleft = XFS_IN_MAXLEVELS(args.mp) - 1;
+	xfs_alloc_vextent(&args);
+	if (args.fsbno == NULLFSBLOCK)
 		return 0;
-	}
-	ASSERT(args->len == args->minlen);
+	ASSERT(args.len == args.minlen);
 	/*
 	 * Convert the results.
 	 */
-	newino = XFS_OFFBNO_TO_AGINO(args->mp, args->agbno, 0);
+	newino = XFS_OFFBNO_TO_AGINO(args.mp, args.agbno, 0);
 	/*
 	 * Loop over the new block(s), filling in the inodes.
 	 * For small block sizes, manipulate the inodes in buffers
 	 * which are multiples of the blocks size.
 	 */
-	if (args->mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE) {
+	if (args.mp->m_sb.sb_blocksize >= XFS_INODE_CLUSTER_SIZE) {
 		blks_per_cluster = 1;
-		nbufs = (int)args->len;
-		ninodes = args->mp->m_sb.sb_inopblock;
+		nbufs = (int)args.len;
+		ninodes = args.mp->m_sb.sb_inopblock;
 	} else {
 		blks_per_cluster = XFS_INODE_CLUSTER_SIZE /
-			           args->mp->m_sb.sb_blocksize;
-		nbufs = (int)args->len / blks_per_cluster;
-		ninodes = blks_per_cluster * args->mp->m_sb.sb_inopblock;
+			           args.mp->m_sb.sb_blocksize;
+		nbufs = (int)args.len / blks_per_cluster;
+		ninodes = blks_per_cluster * args.mp->m_sb.sb_inopblock;
 	}
 	for (j = 0; j < nbufs; j++) {
 		/*
 		 * Get the block.
 		 */
-		d = XFS_AGB_TO_DADDR(args->mp, agi->agi_seqno,
-				     args->agbno + (j * blks_per_cluster));
-		fbuf = xfs_trans_get_buf(tp, args->mp->m_dev, d,
-					 args->mp->m_bsize * blks_per_cluster,
+		d = XFS_AGB_TO_DADDR(args.mp, agi->agi_seqno,
+				     args.agbno + (j * blks_per_cluster));
+		fbuf = xfs_trans_get_buf(tp, args.mp->m_dev, d,
+					 args.mp->m_bsize * blks_per_cluster,
 					 0);
 		ASSERT(fbuf);
 		ASSERT(!geterror(fbuf));		
@@ -243,7 +239,7 @@ xfs_ialloc_ag_alloc(
 		 * Loop over the inodes in this buffer.
 		 */
 		for (i = 0; i < ninodes; i++) {
-			free = XFS_MAKE_IPTR(args->mp, fbuf, i);
+			free = XFS_MAKE_IPTR(args.mp, fbuf, i);
 			free->di_core.di_magic = XFS_DINODE_MAGIC;
 			free->di_core.di_mode = 0;
 			free->di_core.di_version = XFS_DINODE_VERSION;
@@ -274,16 +270,15 @@ xfs_ialloc_ag_alloc(
 	}
 	agi->agi_count += newlen;
 	agi->agi_freecount += newlen;
-	mrlock(&args->mp->m_peraglock, MR_ACCESS, PINOD);
-	args->mp->m_perag[agi->agi_seqno].pagi_freecount += newlen;
-	mrunlock(&args->mp->m_peraglock);
+	mrlock(&args.mp->m_peraglock, MR_ACCESS, PINOD);
+	args.mp->m_perag[agi->agi_seqno].pagi_freecount += newlen;
+	mrunlock(&args.mp->m_peraglock);
 	agi->agi_newino = newino;
 	/*
 	 * Insert records describing the new inode chunk into the btree.
 	 */
-	cur = xfs_btree_init_cursor(args->mp, tp, agbp, agi->agi_seqno,
+	cur = xfs_btree_init_cursor(args.mp, tp, agbp, agi->agi_seqno,
 		XFS_BTNUM_INO, (xfs_inode_t *)0);
-	xfs_alloc_arg_free(args);
 	for (thisino = newino;
 	     thisino < newino + newlen;
 	     thisino += XFS_INODES_PER_CHUNK) {

@@ -1,4 +1,3 @@
-
 #ident	"$Revision: 1.131 $"
 
 #ifdef SIM
@@ -64,8 +63,6 @@
 ktrace_t	*xfs_bmap_trace_buf;
 
 zone_t		*xfs_bmap_free_item_zone;
-zone_t		*xfs_bmalloca_zone;
-zone_t		*xfs_bmapi_locals_zone;
 
 /*
  * Prototypes for internal bmap routines.
@@ -1477,74 +1474,72 @@ xfs_bmap_alloc(
 	 * Normal allocation, done through xfs_alloc_vextent.
 	 */
 	else {
-		xfs_alloc_arg_t	*args;
+		xfs_alloc_arg_t	args;
 
-		args = xfs_alloc_arg_alloc();
-		args->tp = ap->tp;
-		args->mp = mp;
-		args->fsbno = ap->rval;
-		args->maxlen = ap->alen;
+		args.tp = ap->tp;
+		args.mp = mp;
+		args.fsbno = ap->rval;
+		args.maxlen = ap->alen;
 		if (nullfb) {
-			args->type = XFS_ALLOCTYPE_START_BNO;
-			args->total = ap->total;
-			args->minlen = ap->alen;
+			args.type = XFS_ALLOCTYPE_START_BNO;
+			args.total = ap->total;
+			args.minlen = ap->alen;
 		} else if (ap->low) {
-			args->type = XFS_ALLOCTYPE_FIRST_AG;
-			args->total = 1;
+			args.type = XFS_ALLOCTYPE_FIRST_AG;
+			args.total = 1;
 			ASSERT(ap->minlen == 1);
-			args->minlen = 1;
+			args.minlen = 1;
 		} else {
-			args->type = XFS_ALLOCTYPE_NEAR_BNO;
-			args->total = ap->total;
-			args->minlen = ap->minlen;
+			args.type = XFS_ALLOCTYPE_NEAR_BNO;
+			args.total = ap->total;
+			args.minlen = ap->minlen;
 		}
 		if (ap->ip->i_d.di_extsize) {
-			args->prod = ap->ip->i_d.di_extsize;
-			if (args->mod = ap->off % args->prod)
-				args->mod = args->prod - args->mod;
+			args.prod = ap->ip->i_d.di_extsize;
+			if (args.mod = ap->off % args.prod)
+				args.mod = args.prod - args.mod;
 		} else if (mp->m_sb.sb_blocksize >= NBPP) {
-			args->prod = 1;
-			args->mod = 0;
+			args.prod = 1;
+			args.mod = 0;
 		} else {
-			args->prod = NBPP >> mp->m_sb.sb_blocklog;
-			if (args->mod = ap->off % args->prod)
-				args->mod = args->prod - args->mod;
+			args.prod = NBPP >> mp->m_sb.sb_blocklog;
+			if (args.mod = ap->off % args.prod)
+				args.mod = args.prod - args.mod;
 		}
-		args->minleft = ap->minleft;
-		args->wasdel = ap->wasdel;
-		args->isfl = 0;
-		args->userdata = ap->userdata;
-		xfs_alloc_vextent(args);
-		if (args->fsbno == NULLFSBLOCK && nullfb &&
+		args.minleft = ap->minleft;
+		args.wasdel = ap->wasdel;
+		args.isfl = 0;
+		args.userdata = ap->userdata;
+		xfs_alloc_vextent(&args);
+		if (args.fsbno == NULLFSBLOCK && nullfb &&
 		    ap->alen > ap->minlen) {
-			args->minlen = ap->minlen;
-			args->type = XFS_ALLOCTYPE_START_BNO;
-			args->fsbno = ap->rval;
-			xfs_alloc_vextent(args);
+			args.minlen = ap->minlen;
+			args.type = XFS_ALLOCTYPE_START_BNO;
+			args.fsbno = ap->rval;
+			xfs_alloc_vextent(&args);
 		}
-		if (args->fsbno == NULLFSBLOCK && nullfb) {
-			args->fsbno = 0;
-			args->minlen = 1;
-			args->type = XFS_ALLOCTYPE_FIRST_AG;
-			args->total = 1;
-			args->minleft = 0;
-			xfs_alloc_vextent(args);
+		if (args.fsbno == NULLFSBLOCK && nullfb) {
+			args.fsbno = 0;
+			args.minlen = 1;
+			args.type = XFS_ALLOCTYPE_FIRST_AG;
+			args.total = 1;
+			args.minleft = 0;
+			xfs_alloc_vextent(&args);
 			ap->low = 1;
 		}
-		if (args->fsbno != NULLFSBLOCK) {
-			ap->firstblock = ap->rval = args->fsbno;
-			ASSERT(nullfb || fb_agno == args->agno ||
-			       (ap->low && fb_agno < args->agno));
-			ap->alen = args->len;
-			ap->ip->i_d.di_nblocks += args->len;
+		if (args.fsbno != NULLFSBLOCK) {
+			ap->firstblock = ap->rval = args.fsbno;
+			ASSERT(nullfb || fb_agno == args.agno ||
+			       (ap->low && fb_agno < args.agno));
+			ap->alen = args.len;
+			ap->ip->i_d.di_nblocks += args.len;
 			xfs_trans_log_inode(ap->tp, ap->ip, XFS_ILOG_CORE);
 			if (ap->wasdel)
-				ap->ip->i_delayed_blks -= args->len;
+				ap->ip->i_delayed_blks -= args.len;
 		} else {
 			ap->rval = NULLFSBLOCK;
 			ap->alen = 0;
 		}
-		xfs_alloc_arg_free(args);
 	}
 	kmem_check();
 }
@@ -1917,7 +1912,7 @@ xfs_bmap_extents_to_btree(
 {
 	xfs_bmbt_block_t	*ablock;
 	buf_t			*abp;
-	xfs_alloc_arg_t		*args;
+	xfs_alloc_arg_t		args;
 	xfs_bmbt_rec_t		*arp;
 	xfs_bmbt_block_t	*block;
 	xfs_btree_cur_t		*cur;
@@ -1956,34 +1951,33 @@ xfs_bmap_extents_to_btree(
 	 * Convert to a btree with two levels, one record in root.
 	 */
 	ip->i_d.di_format = XFS_DINODE_FMT_BTREE;
-	args = xfs_alloc_arg_alloc();
-	args->tp = tp;
-	args->mp = mp;
+	args.tp = tp;
+	args.mp = mp;
 	if (*firstblock == NULLFSBLOCK) {
-		args->type = XFS_ALLOCTYPE_START_BNO;
-		args->fsbno = XFS_INO_TO_FSB(mp, ip->i_ino);
+		args.type = XFS_ALLOCTYPE_START_BNO;
+		args.fsbno = XFS_INO_TO_FSB(mp, ip->i_ino);
 	} else if (lowspace) {
-		args->type = XFS_ALLOCTYPE_START_BNO;
-		args->fsbno = *firstblock;
+		args.type = XFS_ALLOCTYPE_START_BNO;
+		args.fsbno = *firstblock;
 	} else {
-		args->type = XFS_ALLOCTYPE_NEAR_BNO;
-		args->fsbno = *firstblock;
+		args.type = XFS_ALLOCTYPE_NEAR_BNO;
+		args.fsbno = *firstblock;
 	}
-	args->minlen = args->maxlen = args->prod = 1;
-	args->total = args->minleft = args->mod = args->isfl = 0;
-	args->wasdel = wasdel;
-	xfs_alloc_vextent(args);
+	args.minlen = args.maxlen = args.prod = 1;
+	args.total = args.minleft = args.mod = args.isfl = 0;
+	args.wasdel = wasdel;
+	xfs_alloc_vextent(&args);
 	/*
 	 * Allocation can't fail, the space was reserved.
 	 */
-	ASSERT(args->fsbno != NULLFSBLOCK);
+	ASSERT(args.fsbno != NULLFSBLOCK);
 	ASSERT(*firstblock == NULLFSBLOCK ||
-	       args->agno == XFS_FSB_TO_AGNO(mp, *firstblock) ||
-	       (lowspace && args->agno > XFS_FSB_TO_AGNO(mp, *firstblock)));
-	*firstblock = cur->bc_private.b.firstblock = args->fsbno;
+	       args.agno == XFS_FSB_TO_AGNO(mp, *firstblock) ||
+	       (lowspace && args.agno > XFS_FSB_TO_AGNO(mp, *firstblock)));
+	*firstblock = cur->bc_private.b.firstblock = args.fsbno;
 	cur->bc_private.b.allocated++;
 	ip->i_d.di_nblocks++;
-	abp = xfs_btree_get_bufl(mp, tp, args->fsbno, 0);
+	abp = xfs_btree_get_bufl(mp, tp, args.fsbno, 0);
 	/*
 	 * Fill in the child block.
 	 */
@@ -2008,8 +2002,7 @@ xfs_bmap_extents_to_btree(
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	kp->br_startoff = xfs_bmbt_get_startoff(arp);
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
-	*pp = args->fsbno;
-	xfs_alloc_arg_free(args);
+	*pp = args.fsbno;
 	/*
 	 * Do all this logging at the end so that 
 	 * the root is at the right level.
@@ -2069,48 +2062,46 @@ xfs_bmap_local_to_extents(
 
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
 	if (ip->i_bytes) {
-		xfs_alloc_arg_t	*args;
+		xfs_alloc_arg_t	args;
 		buf_t		*bp;
 		xfs_bmbt_rec_t	*ep;
 
-		args = xfs_alloc_arg_alloc();
-		args->tp = tp;
-		args->mp = ip->i_mount;
+		args.tp = tp;
+		args.mp = ip->i_mount;
 		ASSERT(ip->i_flags & XFS_IINLINE);
 		/*
 		 * Allocate a block.  We know we need only one, since the
 		 * file currently fits in an inode.
 		 */
 		if (*firstblock == NULLFSBLOCK) {
-			args->fsbno = XFS_INO_TO_FSB(args->mp, ip->i_ino);
-			args->type = XFS_ALLOCTYPE_START_BNO;
+			args.fsbno = XFS_INO_TO_FSB(args.mp, ip->i_ino);
+			args.type = XFS_ALLOCTYPE_START_BNO;
 		} else {
-			args->fsbno = *firstblock;
-			args->type = XFS_ALLOCTYPE_NEAR_BNO;
+			args.fsbno = *firstblock;
+			args.type = XFS_ALLOCTYPE_NEAR_BNO;
 		}
-		args->total = total;
-		args->mod = args->minleft = args->wasdel = args->isfl = 0;
-		args->minlen = args->maxlen = args->prod = 1;
-		xfs_alloc_vextent(args);
+		args.total = total;
+		args.mod = args.minleft = args.wasdel = args.isfl = 0;
+		args.minlen = args.maxlen = args.prod = 1;
+		xfs_alloc_vextent(&args);
 		/* 
 		 * Can't fail, the space was reserved.
 		 */
-		ASSERT(args->fsbno != NULLFSBLOCK);
-		ASSERT(args->len == 1);
-		*firstblock = args->fsbno;
-		bp = xfs_btree_get_bufl(args->mp, tp, args->fsbno, 0);
+		ASSERT(args.fsbno != NULLFSBLOCK);
+		ASSERT(args.len == 1);
+		*firstblock = args.fsbno;
+		bp = xfs_btree_get_bufl(args.mp, tp, args.fsbno, 0);
 		bcopy(ip->i_u1.iu_data, (char *)bp->b_un.b_addr, ip->i_bytes);
 		xfs_idata_realloc(ip, -ip->i_bytes);
 		xfs_iext_realloc(ip, 1);
 		ep = ip->i_u1.iu_extents;
 		xfs_bmbt_set_startoff(ep, 0);
-		xfs_bmbt_set_startblock(ep, args->fsbno);
+		xfs_bmbt_set_startblock(ep, args.fsbno);
 		xfs_bmbt_set_blockcount(ep, 1);
 		xfs_bmap_trace_post_update(fname, "new", ip, 0);
 		ip->i_d.di_nextents = 1;
 		ip->i_d.di_nblocks = 1;
 		flags |= XFS_ILOG_EXT;
-		xfs_alloc_arg_free(args);
 	} else
 		ASSERT(ip->i_d.di_nextents == 0);
 	ip->i_flags &= ~XFS_IINLINE;
@@ -2772,247 +2763,264 @@ xfs_bmap_validate_ret(
  */
 xfs_fsblock_t					/* first allocated block */
 xfs_bmapi(
-	xfs_trans_t		*tp,		/* transaction pointer */
-	xfs_inode_t		*ip,		/* incore inode */
-	xfs_fileoff_t		bno,		/* starting file offs. mapped */
-	xfs_filblks_t		len,		/* length to map in file */
-	int			flags,		/* XFS_BMAPI_... */
-	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
-	xfs_extlen_t		total,		/* total blocks needed */
-	xfs_bmbt_irec_t		*mval,		/* output: map values */
-	int			*nmap,		/* i/o: mval size/count */
-	xfs_bmap_free_t		*flist)		/* i/o: list extents to free */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_inode_t	*ip,		/* incore inode */
+	xfs_fileoff_t	bno,		/* starting file offs. mapped */
+	xfs_filblks_t	len,		/* length to map in file */
+	int		flags,		/* XFS_BMAPI_... */
+	xfs_fsblock_t	firstblock,	/* controls a.g. for allocs */
+	xfs_extlen_t	total,		/* total blocks needed */
+	xfs_bmbt_irec_t	*mval,		/* output: map values */
+	int		*nmap,		/* i/o: mval size/count */
+	xfs_bmap_free_t	*flist)		/* i/o: list extents to free */
 {
-	xfs_bmalloca_t		*bma;		/* args for xfs_bmap_alloc */
-	xfs_bmapi_locals_t	*l;		/* rest of our locals */
-
-	l = kmem_zone_alloc(xfs_bmapi_locals_zone, KM_SLEEP);
+	xfs_fsblock_t	abno;		/* allocated block number */
+	xfs_extlen_t	alen;		/* allocated extent length */
+	xfs_fileoff_t	aoff;		/* allocated file offset */
+	xfs_bmalloca_t	bma;		/* args for xfs_bmap_alloc */
+	xfs_btree_cur_t	*cur;		/* bmap btree cursor */
+	char		delay;		/* this request is for delayed alloc */
+	xfs_fileoff_t	end;		/* end of mapped file region */
+	int		eof;		/* we've hit the end of extent list */
+	xfs_bmbt_rec_t	*ep;		/* extent list entry pointer */
+	char		exact;		/* don't do all of wasdelayed extent */
+	xfs_bmbt_irec_t	got;		/* current extent list record */
+	xfs_extlen_t	indlen;		/* indirect blocks length */
+	char		inhole;		/* current location is hole in file */
+	xfs_extnum_t	lastx;		/* last useful extent number */
+	int		logflags;	/* flags for transaction logging */
+	char		lowspace;	/* using the low-space algorithm */
+	xfs_extlen_t	minleft;	/* min blocks left after allocation */
+	xfs_extlen_t	minlen;		/* min allocation size */
+	int		n;		/* current extent index */
+	int		nallocs;	/* number of extents alloc\'d */
+	xfs_extnum_t	nextents;	/* number of extents in file */
+	xfs_fileoff_t	obno;		/* old block number (offset) */
+	xfs_bmbt_irec_t	prev;		/* previous extent list record */
+	char		trim;		/* output trimmed to match range */
+	char		userdata;	/* allocating non-metadata */
+	char		wasdelay;	/* old extent was delayed */
+	char		wr;		/* this is a write request */
 #ifdef DEBUG
-	l->orig_bno = bno;
-	l->orig_len = len;
-	l->orig_flags = flags;
-	l->orig_mval = mval;
-	l->orig_nmap = *nmap;
+	xfs_fileoff_t	orig_bno;	/* original block number value */
+	int		orig_flags;	/* original flags arg value */
+	xfs_filblks_t	orig_len;	/* original value of len arg */
+	xfs_bmbt_irec_t	*orig_mval;	/* original value of mval */
+	int		orig_nmap;	/* original value of *nmap */
+
+	orig_bno = bno;
+	orig_len = len;
+	orig_flags = flags;
+	orig_mval = mval;
+	orig_nmap = *nmap;
 #endif
 	ASSERT(*nmap >= 1);
 	ASSERT(*nmap <= XFS_BMAP_MAX_NMAP || !(flags & XFS_BMAPI_WRITE));
 	ASSERT(ip->i_d.di_format == XFS_DINODE_FMT_BTREE ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS ||
 	       ip->i_d.di_format == XFS_DINODE_FMT_LOCAL);
-	if (l->wr = (flags & XFS_BMAPI_WRITE) != 0)
+	if (wr = (flags & XFS_BMAPI_WRITE) != 0)
 		XFSSTATS.xs_blk_mapw++;
 	else
 		XFSSTATS.xs_blk_mapr++;
-	l->delay = (flags & XFS_BMAPI_DELAY) != 0;
-	l->trim = (flags & XFS_BMAPI_ENTIRE) == 0;
-	l->userdata = (flags & XFS_BMAPI_METADATA) == 0;
-	l->exact = (flags & XFS_BMAPI_EXACT) != 0;
-	ASSERT(l->wr || !l->delay);
-	l->logflags = 0;
-	l->lowspace = 0;
-	l->nallocs = 0;
-	bma = NULL;
+	delay = (flags & XFS_BMAPI_DELAY) != 0;
+	trim = (flags & XFS_BMAPI_ENTIRE) == 0;
+	userdata = (flags & XFS_BMAPI_METADATA) == 0;
+	exact = (flags & XFS_BMAPI_EXACT) != 0;
+	ASSERT(wr || !delay);
+	logflags = 0;
+	lowspace = 0;
+	nallocs = 0;
 	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
-		if (!l->wr) {
+		if (!wr) {
 			/* change to assert later */
 			*nmap = 0;
-			kmem_zone_free(xfs_bmapi_locals_zone, l);
 			kmem_check();
 			return firstblock;
 		}
-		l->logflags |= xfs_bmap_local_to_extents(tp, ip, &firstblock,
+		logflags |= xfs_bmap_local_to_extents(tp, ip, &firstblock,
 			total);
 	}
 	if (firstblock == NULLFSBLOCK) {
-		l->type = XFS_ALLOCTYPE_START_BNO;
 		if (ip->i_d.di_format == XFS_DINODE_FMT_BTREE)
-			l->minleft = ip->i_broot->bb_level + 1;
+			minleft = ip->i_broot->bb_level + 1;
 		else
-			l->minleft = 1;
+			minleft = 1;
 	} else {
-		l->type = XFS_ALLOCTYPE_NEAR_BNO;
-		l->minleft = 0;
+		minleft = 0;
 	}
 	if (!(ip->i_flags & XFS_IEXTENTS))
 		xfs_iread_extents(tp, ip);
-	l->ep = xfs_bmap_search_extents(ip, bno, &l->eof, &l->lastx, &l->got,
-		&l->prev);
-	l->nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
-	l->n = 0;
-	l->end = bno + len;
-	l->cur = NULL;
-	l->obno = bno;
-	while (bno < l->end && l->n < *nmap) {
+	ep = xfs_bmap_search_extents(ip, bno, &eof, &lastx, &got, &prev);
+	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+	n = 0;
+	end = bno + len;
+	cur = NULL;
+	obno = bno;
+	bma.ip = NULL;
+	while (bno < end && n < *nmap) {
 		/*
 		 * Reading past eof, act as though there's a hole
 		 * up to end.
 		 */
-		if (l->eof && !l->wr)
-			l->got.br_startoff = l->end;
-		l->inhole = l->eof || l->got.br_startoff > bno;
-		l->wasdelay = !l->inhole && !l->delay &&
-			ISNULLSTARTBLOCK(l->got.br_startblock);
+		if (eof && !wr)
+			got.br_startoff = end;
+		inhole = eof || got.br_startoff > bno;
+		wasdelay = !inhole && !delay &&
+			ISNULLSTARTBLOCK(got.br_startblock);
 		/*
 		 * First, deal with the hole before the allocated space 
 		 * that we found, if any.
 		 */
-		if ((l->inhole || l->wasdelay) && l->wr) {
+		if ((inhole || wasdelay) && wr) {
 			/*
 			 * For the wasdelay case, we could also just
 			 * allocate the stuff asked for in this bmap call
 			 * but that wouldn't be as good.
 			 */
-			if (l->wasdelay && !l->exact) {
-				l->alen = l->got.br_blockcount;
-				l->aoff = l->got.br_startoff;
-			} else if (l->wasdelay) {
-				l->alen = XFS_FILBLKS_MIN(len,
-					(l->got.br_startoff +
-					 l->got.br_blockcount) - bno); 
-				l->aoff = bno;
+			if (wasdelay && !exact) {
+				alen = got.br_blockcount;
+				aoff = got.br_startoff;
+			} else if (wasdelay) {
+				alen = XFS_FILBLKS_MIN(len, (got.br_startoff +
+					got.br_blockcount) - bno);
+				aoff = bno;
 			} else {
-				l->alen = XFS_FILBLKS_MIN(len, MAXEXTLEN);
-				if (!l->eof)
-					l->alen = XFS_FILBLKS_MIN(l->alen,
-						l->got.br_startoff - bno);
-				l->aoff = bno;
+				alen = XFS_FILBLKS_MIN(len, MAXEXTLEN);
+				if (!eof)
+					alen = XFS_FILBLKS_MIN(alen,
+						got.br_startoff - bno);
+				aoff = bno;
 			}
-			l->minlen = 1;
-			if (l->delay) {
-				l->indlen = xfs_bmap_worst_indlen(ip, l->alen);
-				ASSERT(l->indlen > 0);
+			minlen = 1;
+			if (delay) {
+				indlen = xfs_bmap_worst_indlen(ip, alen);
+				ASSERT(indlen > 0);
 				if (xfs_mod_incore_sb(ip->i_mount,
 						XFS_SB_FDBLOCKS,
-						-(l->alen + l->indlen)))
+						-(alen + indlen)))
 					break;
-				ip->i_delayed_blks += l->alen;
-				l->abno = NULLSTARTBLOCK(l->indlen);
+				ip->i_delayed_blks += alen;
+				abno = NULLSTARTBLOCK(indlen);
 			} else {
 				/*
 				 * If first time, allocate and fill in
 				 * once-only bma fields.
 				 */
-				if (bma == NULL) {
-					bma = kmem_zone_alloc(xfs_bmalloca_zone,
-						KM_SLEEP);
-					bma->tp = tp;
-					bma->ip = ip;
-					bma->prevp = &l->prev;
-					bma->gotp = &l->got;
-					bma->total = total;
-					bma->userdata = l->userdata;
+				if (bma.ip == NULL) {
+					bma.tp = tp;
+					bma.ip = ip;
+					bma.prevp = &prev;
+					bma.gotp = &got;
+					bma.total = total;
+					bma.userdata = userdata;
 				}
 				/*
 				 * Fill in changeable bma fields.
 				 */
-				bma->eof = l->eof;
-				bma->firstblock = firstblock;
-				bma->alen = l->alen;
-				bma->off = l->aoff;
-				bma->wasdel = l->wasdelay;
-				bma->minlen = l->minlen;
-				bma->low = l->lowspace;
-				bma->minleft = l->minleft;
+				bma.eof = eof;
+				bma.firstblock = firstblock;
+				bma.alen = alen;
+				bma.off = aoff;
+				bma.wasdel = wasdelay;
+				bma.minlen = minlen;
+				bma.low = lowspace;
+				bma.minleft = minleft;
 				/*
 				 * Call allocator.
 				 */
-				xfs_bmap_alloc(bma);
+				xfs_bmap_alloc(&bma);
 				/*
 				 * Copy out result fields.
 				 */
-				l->abno = bma->rval;
-				if (l->lowspace = bma->low)
-					l->minleft = 0;
-				l->alen = bma->alen;
+				abno = bma.rval;
+				if (lowspace = bma.low)
+					minleft = 0;
+				alen = bma.alen;
 				ASSERT(firstblock == NULLFSBLOCK ||
 				       XFS_FSB_TO_AGNO(ip->i_mount,
 					       firstblock) ==
 				       XFS_FSB_TO_AGNO(ip->i_mount,
-					       bma->firstblock) ||
-				       (l->lowspace &&
+					       bma.firstblock) ||
+				       (lowspace &&
 				        XFS_FSB_TO_AGNO(ip->i_mount,
 						firstblock) <
 					XFS_FSB_TO_AGNO(ip->i_mount,
-						bma->firstblock)));
-				firstblock = bma->firstblock;
-				if (l->cur)
-					l->cur->bc_private.b.firstblock =
+						bma.firstblock)));
+				firstblock = bma.firstblock;
+				if (cur)
+					cur->bc_private.b.firstblock =
 						firstblock;
-				if (l->abno == NULLFSBLOCK)
+				if (abno == NULLFSBLOCK)
 					break;
-				if ((ip->i_flags & XFS_IBROOT) && !l->cur) {
-					l->cur =
-					    xfs_btree_init_cursor(ip->i_mount,
-						    tp, NULL, 0,
-						    XFS_BTNUM_BMAP, ip);
-					l->cur->bc_private.b.firstblock =
+				if ((ip->i_flags & XFS_IBROOT) && !cur) {
+					cur = xfs_btree_init_cursor(ip->i_mount,
+						tp, NULL, 0,
+						XFS_BTNUM_BMAP, ip);
+					cur->bc_private.b.firstblock =
 						firstblock;
-					l->cur->bc_private.b.flist = flist;
+					cur->bc_private.b.flist = flist;
 				}
 				/*
 				 * Bump the number of extents we've allocated
 				 * in this call.
 				 */
-				l->nallocs++;
+				nallocs++;
 			}
-			if (l->cur)
-				l->cur->bc_private.b.flags =
-					(l->wasdelay ?
-						XFS_BTCUR_BPRV_WASDEL : 0) |
-					(l->lowspace ?
-						XFS_BTCUR_BPRV_LOWSPC : 0);
-			l->got.br_startoff = l->aoff;
-			l->got.br_startblock = l->abno;
-			l->got.br_blockcount = l->alen;
-			l->logflags |= xfs_bmap_add_extent(ip, l->lastx,
-				&l->cur, &l->got, &firstblock, flist,
-				l->lowspace);
-			l->lastx = ip->i_lastex;
-			l->ep = &ip->i_u1.iu_extents[l->lastx];
-			l->nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
-			xfs_bmbt_get_all(l->ep, &l->got);
-			ASSERT(l->got.br_startoff <= l->aoff);
-			ASSERT(l->got.br_startoff + l->got.br_blockcount >=
-				l->aoff + l->alen);
+			if (cur)
+				cur->bc_private.b.flags =
+					(wasdelay ? XFS_BTCUR_BPRV_WASDEL : 0) |
+					(lowspace ? XFS_BTCUR_BPRV_LOWSPC : 0);
+			got.br_startoff = aoff;
+			got.br_startblock = abno;
+			got.br_blockcount = alen;
+			logflags |= xfs_bmap_add_extent(ip, lastx, &cur, &got,
+				&firstblock, flist, lowspace);
+			lastx = ip->i_lastex;
+			ep = &ip->i_u1.iu_extents[lastx];
+			nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
+			xfs_bmbt_get_all(ep, &got);
+			ASSERT(got.br_startoff <= aoff);
+			ASSERT(got.br_startoff + got.br_blockcount >=
+				aoff + alen);
 #ifdef DEBUG
-			if (l->delay) {
-				ASSERT(ISNULLSTARTBLOCK(l->got.br_startblock));
-				ASSERT(STARTBLOCKVAL(l->got.br_startblock) > 0);
+			if (delay) {
+				ASSERT(ISNULLSTARTBLOCK(got.br_startblock));
+				ASSERT(STARTBLOCKVAL(got.br_startblock) > 0);
 			}
 #endif
 			/*
 			 * Fall down into the found allocated space case.
 			 */
-		} else if (l->inhole) {
+		} else if (inhole) {
 			/*
 			 * Reading in a hole.
 			 */
 			mval->br_startoff = bno;
 			mval->br_startblock = HOLESTARTBLOCK;
 			mval->br_blockcount =
-				XFS_FILBLKS_MIN(len, l->got.br_startoff - bno);
+				XFS_FILBLKS_MIN(len, got.br_startoff - bno);
 			bno += mval->br_blockcount;
 			len -= mval->br_blockcount;
 			mval++;
-			l->n++;
+			n++;
 			continue;
 		}
 		/*
 		 * Then deal with the allocated space we found.
 		 */
-		ASSERT(l->ep != NULL);
-		if (l->trim &&
-		    (l->got.br_startoff + l->got.br_blockcount > l->obno)) {
-			bno = XFS_FILEOFF_MAX(bno, l->obno);
-			ASSERT((bno >= l->obno) || (l->n == 0));
-			ASSERT(bno < l->end);
+		ASSERT(ep != NULL);
+		if (trim && (got.br_startoff + got.br_blockcount > obno)) {
+			bno = XFS_FILEOFF_MAX(bno, obno);
+			ASSERT((bno >= obno) || (n == 0));
+			ASSERT(bno < end);
 			mval->br_startoff = bno;
-			if (ISNULLSTARTBLOCK(l->got.br_startblock)) {
-				ASSERT(!l->wr || l->delay);
+			if (ISNULLSTARTBLOCK(got.br_startblock)) {
+				ASSERT(!wr || delay);
 				mval->br_startblock = DELAYSTARTBLOCK;
 			} else
-				mval->br_startblock = l->got.br_startblock +
-					(bno - l->got.br_startoff);
+				mval->br_startblock = got.br_startblock +
+					(bno - got.br_startoff);
 			/*
 			 * Return the minimum of what we got and what we
 			 * asked for for the length.  We can use the len
@@ -3022,28 +3030,27 @@ xfs_bmapi(
 			 * didn't overlap what was asked for.
 			 */
 			mval->br_blockcount =
-				XFS_FILBLKS_MIN(l->end - bno,
-					l->got.br_blockcount -
-					(bno - l->got.br_startoff));
+				XFS_FILBLKS_MIN(end - bno, got.br_blockcount -
+					(bno - got.br_startoff));
 			ASSERT(mval->br_blockcount <= len);
 		} else {
-			*mval = l->got;
+			*mval = got;
 			if (ISNULLSTARTBLOCK(mval->br_startblock)) {
-				ASSERT(!l->wr || l->delay);
+				ASSERT(!wr || delay);
 				mval->br_startblock = DELAYSTARTBLOCK;
 			}
 		}
-		ASSERT(!l->trim ||
-		       ((mval->br_startoff + mval->br_blockcount) <= l->end));
-		ASSERT(!l->trim || (mval->br_blockcount <= len) ||
-		       (mval->br_startoff < l->obno));
+		ASSERT(!trim ||
+		       ((mval->br_startoff + mval->br_blockcount) <= end));
+		ASSERT(!trim || (mval->br_blockcount <= len) ||
+		       (mval->br_startoff < obno));
 		bno = mval->br_startoff + mval->br_blockcount;
-		len = l->end - bno;
-		if (l->n > 0 && mval->br_startoff == mval[-1].br_startoff) {
+		len = end - bno;
+		if (n > 0 && mval->br_startoff == mval[-1].br_startoff) {
 			ASSERT(mval->br_startblock == mval[-1].br_startblock);
 			ASSERT(mval->br_blockcount > mval[-1].br_blockcount);
 			mval[-1].br_blockcount = mval->br_blockcount;
-		} else if (l->n > 0 && mval->br_startblock != DELAYSTARTBLOCK &&
+		} else if (n > 0 && mval->br_startblock != DELAYSTARTBLOCK &&
 			   mval[-1].br_startblock != DELAYSTARTBLOCK &&
 			   mval[-1].br_startblock != HOLESTARTBLOCK &&
 			   mval->br_startblock ==
@@ -3051,73 +3058,70 @@ xfs_bmapi(
 			ASSERT(mval->br_startoff ==
 			       mval[-1].br_startoff + mval[-1].br_blockcount);
 			mval[-1].br_blockcount += mval->br_blockcount;
-		} else if (l->n > 0 &&
+		} else if (n > 0 &&
 			   mval->br_startblock == DELAYSTARTBLOCK &&
 			   mval[-1].br_startblock == DELAYSTARTBLOCK &&
 			   mval->br_startoff ==
 			   mval[-1].br_startoff + mval[-1].br_blockcount) {
 			mval[-1].br_blockcount += mval->br_blockcount;
-		} else if (!((l->n == 0) &&
+		} else if (!((n == 0) &&
 			     ((mval->br_startoff + mval->br_blockcount) <=
-			      l->obno))) {
+			      obno))) {
 			mval++;
-			l->n++;
+			n++;
 		}
 		/*
 		 * If we're done, stop now.  Stop when we've allocated
 		 * XFS_BMAP_MAX_NMAP extents no matter what.  Otherwise
 		 * the transaction may get too bit.
 		 */
-		if (bno >= l->end || l->n >= *nmap || l->nallocs >= *nmap)
+		if (bno >= end || n >= *nmap || nallocs >= *nmap)
 			break;
 		/*
 		 * Else go on to the next record.
 		 */
-		l->ep++;
-		l->lastx++;
-		if (l->lastx >= l->nextents) {
-			l->eof = 1;
-			l->prev = l->got;
+		ep++;
+		lastx++;
+		if (lastx >= nextents) {
+			eof = 1;
+			prev = got;
 		} else
-			xfs_bmbt_get_all(l->ep, &l->got);
+			xfs_bmbt_get_all(ep, &got);
 	}
-	if (bma)
-		kmem_zone_free(xfs_bmalloca_zone, bma);
-	ip->i_lastex = l->lastx;
-	*nmap = l->n;
+	ip->i_lastex = lastx;
+	*nmap = n;
 	/*
 	 * Transform from btree to extents, give it cur.
 	 */
 	if (ip->i_d.di_format == XFS_DINODE_FMT_BTREE &&
 		 ip->i_d.di_nextents <= XFS_BMAP_EXT_MAXRECS(ip->i_mount))
-		l->logflags |= xfs_bmap_btree_to_extents(tp, ip, l->cur);
+		logflags |= xfs_bmap_btree_to_extents(tp, ip, cur);
 	/*
 	 * Log everything.  Do this after conversion, there's no point in
 	 * logging the extent list if we've converted to btree format.
 	 */
-	if ((l->logflags & XFS_ILOG_EXT) &&
+	if ((logflags & XFS_ILOG_EXT) &&
 	    ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS)
-		l->logflags &= ~XFS_ILOG_EXT;
-	else if ((l->logflags & XFS_ILOG_BROOT) &&
+		logflags &= ~XFS_ILOG_EXT;
+	else if ((logflags & XFS_ILOG_BROOT) &&
 		 ip->i_d.di_format != XFS_DINODE_FMT_BTREE)
-		l->logflags &= ~XFS_ILOG_BROOT;
-	if (l->logflags)
-		xfs_trans_log_inode(tp, ip, l->logflags);
-	if (l->cur) {
+		logflags &= ~XFS_ILOG_BROOT;
+	if (logflags)
+		xfs_trans_log_inode(tp, ip, logflags);
+	if (cur) {
 		ASSERT(firstblock == NULLFSBLOCK ||
 		       XFS_FSB_TO_AGNO(ip->i_mount, firstblock) ==
 		       XFS_FSB_TO_AGNO(ip->i_mount,
-			       l->cur->bc_private.b.firstblock) ||
-		       (l->lowspace &&
+			       cur->bc_private.b.firstblock) ||
+		       (lowspace &&
 			XFS_FSB_TO_AGNO(ip->i_mount, firstblock) < 
 			XFS_FSB_TO_AGNO(ip->i_mount,
-				l->cur->bc_private.b.firstblock)));
-		firstblock = l->cur->bc_private.b.firstblock;
-		xfs_btree_del_cursor(l->cur);
+				cur->bc_private.b.firstblock)));
+		firstblock = cur->bc_private.b.firstblock;
+		xfs_btree_del_cursor(cur);
 	}
-	xfs_bmap_validate_ret(l->orig_bno, l->orig_len, l->orig_flags,
-		l->orig_mval, l->orig_nmap, *nmap);
-	kmem_zone_free(xfs_bmapi_locals_zone, l);
+	xfs_bmap_validate_ret(orig_bno, orig_len, orig_flags, orig_mval,
+		orig_nmap, *nmap);
 	kmem_check();
 	return firstblock;
 }
