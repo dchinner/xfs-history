@@ -1,9 +1,9 @@
 
-#include "types.h"
+#include <sys/types.h>
+#include <sys/sema.h>
+#include <sys/buf.h>
+#include <sys/vnode.h>
 #include "xfs.h"
-#include "sema.h"
-#include "buf.h"
-#include "vnode.h"
 #include "xfs_trans.h"
 
 int

@@ -1,11 +1,12 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision$"
 
+#include <sys/types.h>
+#include <sys/pfdat.h>
+#include <sys/buf.h>
 #include "xfs_types.h"
-#include "pfdat.h"
-#include "buf.h"
 #include "xfs.h"
 #include "xfs_trans.h"
 

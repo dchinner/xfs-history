@@ -1,9 +1,10 @@
 
-#include "types.h"
+#include <sys/param.h>
+#define _KERNEL
 #include <sys/sema.h>
-#include "buf.h"
-#include "vnode.h"
-#include "param.h"
+#undef _KERNEL
+#include <sys/buf.h>
+#include <sys/vnode.h>
 #include <sys/debug.h>
 #include "xfs.h"
 #include "xfs_trans.h"

@@ -1,14 +1,15 @@
 #ifndef _FS_XFS_ALLOC_H
 #define	_FS_XFS_ALLOC_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision$"
 
+#include <sys/types.h>
+#include <sys/pfdat.h>
+#include <sys/uio.h>
+#include <sys/buf.h>
+#include <sys/vnode.h>
 #include "xfs_types.h"
-#include "pfdat.h"
-#include "sys/uio.h"
-#include "buf.h"
 #include "xfs.h"
-#include "sys/vnode.h"
 #include "xfs_trans.h"
 
 /*

@@ -1,10 +1,11 @@
 
-#include "types.h"
+#include <sys/param.h>
+#define _KERNEL
 #include <sys/sema.h>
-#include "buf.h"
-#include "vnode.h"
-#include "sysmacros.h"
-#include "param.h"
+#include <sys/buf.h>
+#include <sys/sysmacros.h>
+#undef _KERNEL
+#include <sys/vnode.h>
 #include <sys/debug.h>
 #include "xfs.h"
 #include "xfs_trans.h"
@@ -13,7 +14,9 @@
 #include "xfs_inode.h"
 #include "xfs_bio.h"
 #include "xfs_log.h"
+#ifdef SIM
 #include "sim.h"
+#endif
 
 #define	XFS_TRANS_LOG_CHUNK	8192
 
@@ -1189,7 +1192,7 @@ xfs_trans_free(xfs_trans_t *tp)
 
 	kmem_zone_free(xfs_trans_zone, tp);
 #else
-	free(tp);
+	kmem_free(tp, sizeof(*tp));
 #endif
 }
 

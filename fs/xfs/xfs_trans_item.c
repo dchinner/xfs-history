@@ -1,12 +1,15 @@
 
-#include "types.h"	
+#include <sys/param.h>
 #include <sys/sema.h>
-#include "buf.h"
-#include "vnode.h"
-#include "param.h"
+#include <sys/buf.h>
+#include <sys/vnode.h>
 #include <sys/debug.h>
 #include "xfs.h"
 #include "xfs_trans.h"
+
+#ifdef SIM
+#include "sim.h"
+#endif
 
 STATIC int	xfs_trans_unlock_chunk(xfs_log_item_chunk_t *, int);
 

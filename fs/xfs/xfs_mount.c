@@ -1,5 +1,9 @@
 #ident	"$Revision$"
 
+#include <sys/types.h>
+#define _KERNEL
+#include <sys/buf.h>
+#undef _KERNEL
 #include "xfs_sb.h"
 #include "xfs_ag.h"
 #include "xfs_alloc.h"

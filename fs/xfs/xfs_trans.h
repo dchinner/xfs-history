@@ -223,4 +223,10 @@ extern void		xfs_trans_commit(xfs_trans_t *trans, uint flags);
 void			xfs_trans_commit_async(struct xfs_mount *mp);
 extern void		xfs_trans_cancel(xfs_trans_t *trans);
 
+/*
+ * Not necessarily exported, but used outside a single file.
+ */
+void			xfs_trans_delete_ail(struct xfs_mount *, xfs_log_item_t *);
+int			xfs_trans_lsn_danger(struct xfs_mount *, xfs_lsn_t);
+
 #endif	/* _XFS_TRANS_H */

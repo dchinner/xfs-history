@@ -7,21 +7,29 @@
  */
 
 
-#include "types.h"
+#include <sys/param.h>
+#define _KERNEL
 #include <sys/sema.h>
-#include "buf.h"
-#include "vnode.h"	
-#include "param.h"
+#include <sys/buf.h>
+#undef _KERNEL
+#include <sys/vnode.h>
 #include <sys/debug.h>
 #include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
+#include "xfs_bio.h"
+#ifdef SIM
+#include <bstring.h>
 #include "sim.h"
+#else
+#include <sys/systm.h>
+#endif
 
 #define	ROUNDUP32(x)		(((x) + 31) & ~31)
 #define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~NBWORD)
 
 
+STATIC int	xfs_buf_item_bits(uint *, int, int);
 STATIC void	xfs_buf_item_set_bit(uint *, int, int);
 STATIC int	xfs_buf_item_next_bit(uint *, int, int);
 
@@ -56,7 +64,7 @@ xfs_buf_item_size(xfs_buf_log_item_t *bip)
 	 * Each bit corresponds to XFS_BLI_CHUNK bytes of data which
 	 * need to be logged.
 	 */
-	dirty_chunks = xfs_buf_item_bits(&bip->bli_dirty_map,
+	dirty_chunks = xfs_buf_item_bits((uint *)&bip->bli_dirty_map,
 					 bip->bli_map_size, 0);
 
 	/*
@@ -498,7 +506,7 @@ xfs_buf_item_log(xfs_buf_log_item_t *bip, uint first, uint last)
  * byte_to_bits[0] == 0, byte_to_bits[1] == 1, byte_to_bits[2] == 1,
  * byte_to_bits[3] == 2, etc.
  */
-int
+STATIC int
 xfs_buf_item_bits(uint *map, int size, int start_bit)
 {
 	register int	bits;
@@ -693,7 +701,7 @@ xfs_buf_iodone(buf_t *bp)
 
 	mp = bip->bli_mountp;
 	s = AIL_LOCK(mp);
-	xfs_trans_delete_ail(bip->bli_mountp, bip);
+	xfs_trans_delete_ail(bip->bli_mountp, (xfs_log_item_t *)bip);
 	AIL_UNLOCK(mp, s);
 
 	kmem_free(bip, sizeof(xfs_buf_log_item_t) +
