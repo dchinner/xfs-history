@@ -3,6 +3,7 @@
 #include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include <sys/uuid.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
