@@ -33,6 +33,13 @@
 #include <xfs.h>
 #include <xfs_dfrag.h>
 
+#ifdef CELL_CAPABLE
+extern __uint64_t cfs_start_defrag(
+		struct vnode		*vp);
+extern void	cfs_end_defrag(
+		struct vnode		*vp,
+		__uint64_t		handle);
+#endif
 
 /*
  * Syssgi interface for swapext
