@@ -145,6 +145,7 @@ typedef struct xlog_in_core {
 	struct log		*ic_log;
 	xfs_log_callback_t	*ic_callback;
 	xfs_log_callback_t	**ic_callback_tail;
+	ktrace_t		*ic_trace;
 	int	  		ic_size;
 	int	  		ic_offset;
 	int	  		ic_refcnt;
@@ -163,6 +164,7 @@ typedef struct xlog_in_core_core {
 	xfs_log_callback_t	**ic_callback_tail;
 	int	  		ic_size;
 	int	  		ic_offset;
+	ktrace_t		*ic_trace;
 	int	  		ic_refcnt;
 	int			ic_bwritecnt;
 	uchar_t	  		ic_state;
@@ -179,7 +181,7 @@ typedef struct log {
     xlog_in_core_t	*l_iclog;       /* head log queue	*/
     sema_t		l_flushsema;    /* iclog flushing semaphore */
     lock_t		l_icloglock;    /* grab to change iclog state */
-    xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflushed buffers */
+    xfs_lsn_t		l_tail_lsn;     /* lsn of 1st LR w/ unflush buffers */
     xfs_lsn_t		l_last_sync_lsn;/* lsn of last LR on disk */
     xfs_mount_t		*l_mp;	        /* mount point */
     buf_t		*l_xbuf;        /* extra buffer for log wrapping */
@@ -192,8 +194,8 @@ typedef struct log {
     int			l_curr_block;   /* current logical block of log */
     int			l_prev_block;   /* previous logical block of log */
     int			l_logreserved;  /* log space reserved */
-    struct xlog_recover_item *l_recover_extq;        /* recovery q for extents */
-    struct xlog_recover_item *l_recover_iunlinkq; /* recover q 4 unlink inodes */
+    struct xlog_recover_item *l_recover_extq;       /* recover q for extents */
+    struct xlog_recover_item *l_recover_iunlinkq; /* rec q 4 unlink inde */
     xlog_in_core_t	*l_iclog_bak[XLOG_NUM_ICLOGS];/* for debuggin */
     int			l_iclog_size;   /* size of log in bytes; repeat */
 } xlog_t;
@@ -207,6 +209,11 @@ extern void	xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
 extern buf_t *	xlog_get_bp(int);
 extern void	xlog_put_bp(buf_t *);
 extern void	xlog_bread(xlog_t *, daddr_t blkno, int bblks, buf_t *bp);
+
+#define XLOG_TRACE_GRAB_FLUSH  1
+#define XLOG_TRACE_REL_FLUSH   2
+#define XLOG_TRACE_SLEEP_FLUSH 3
+#define XLOG_TRACE_WAKE_FLUSH  4
 
 
 #endif	/* _XFS_LOG_PRIV_H */
