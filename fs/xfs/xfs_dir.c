@@ -217,6 +217,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.total = total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
+	args.justcheck = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -243,6 +244,54 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 				retval = xfs_dir_node_addname(&args);
 			}
 		}
+	} else {
+		retval = xfs_dir_node_addname(&args);
+	}
+	return(retval);
+}
+
+/*
+ * Generic handler routine to check if a name can be added to a directory,
+ * without adding any blocks to the directory.
+ */
+int							/* error */
+xfs_dir_canenter(xfs_trans_t *trans, xfs_inode_t *dp, char *name)
+{
+	xfs_da_args_t args;
+	int retval, newsize, namelen;
+
+	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
+	namelen = strlen(name);
+	if (namelen >= MAXNAMELEN) {
+		return(XFS_ERROR(EINVAL));
+	}
+
+	/*
+	 * Fill in the arg structure for this request.
+	 */
+	args.name = name;
+	args.namelen = namelen;
+	args.hashval = xfs_da_hashname(name, namelen);
+	args.inumber = 0;
+	args.dp = dp;
+	args.firstblock = NULL;
+	args.flist = NULL;
+	args.total = 0;
+	args.whichfork = XFS_DATA_FORK;
+	args.trans = trans;
+	args.justcheck = 1;
+
+	/*
+	 * Decide on what work routines to call based on the inode size.
+	 */
+	if (dp->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
+		newsize = XFS_DIR_SF_ENTSIZE_BYNAME(args.namelen);
+		if ((dp->i_d.di_size + newsize) <= XFS_IFORK_DSIZE(dp))
+			retval = 0;
+		else
+			retval = XFS_ERROR(ENOSPC);
+	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
+		retval = xfs_dir_leaf_addname(&args);
 	} else {
 		retval = xfs_dir_node_addname(&args);
 	}
@@ -281,6 +330,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.total = total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
+	args.justcheck = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -334,6 +384,7 @@ xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	args.total = total;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
+	args.justcheck = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -381,6 +432,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.total = 0;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
+	args.justcheck = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -499,6 +551,7 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	args.total = 0;
 	args.whichfork = XFS_DATA_FORK;
 	args.trans = trans;
+	args.justcheck = 0;
 
 	/*
 	 * Decide on what work routines to call based on the inode size.
@@ -692,7 +745,8 @@ xfs_dir_node_addname(xfs_da_args_t *args)
 		/*
 		 * Addition succeeded, update Btree hashvals.
 		 */
-		xfs_da_fixhashpath(state, &state->path);
+		if (!args->justcheck)
+			xfs_da_fixhashpath(state, &state->path);
 	} else {
 		/*
 		 * Addition failed, split as many Btree elements as required.
