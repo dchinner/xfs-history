@@ -40,7 +40,6 @@
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/fs_subr.h>
-#include <sys/uthread.h>
 #include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>

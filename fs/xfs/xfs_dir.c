@@ -11,7 +11,6 @@
 #endif /* SIM */
 #include <sys/errno.h>
 #include <sys/vnode.h>
-#include <sys/uthread.h>
 #include <sys/kabi.h>
 #include <sys/kmem.h>
 #include <sys/uio.h>
