@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.61 $"
+#ident "$Revision: 1.62 $"
 
 struct getbmap;
 struct xfs_bmbt_irec;
@@ -104,6 +104,7 @@ typedef struct xfs_bmalloca {
 	int			wasdel;	/* replacing a delayed allocation */
 	int			userdata;/* set if is user data */
 	int			low;	/* low on space, using seq'l ags */
+	int			aeof;   /* allocated space at eof */
 } xfs_bmalloca_t;
 
 /*
@@ -289,5 +290,29 @@ xfs_getbmap(
 	void			*ap,		/* pointer to user's array */
 	int			whichfork);	/* data or attr fork */
 #endif	/* !SIM */
+
+/*
+ * Check the last inode extent to determine whether this allocation will result
+ * in blocks being allocated at the end of the file. When we allocate new data
+ * blocks at the end of the file which do not start at the previous data block,
+ * we will try to align the new blocks at stripe unit boundaries.
+ */
+int
+xfs_bmap_isaeof(
+        struct xfs_inode	*ip,
+        xfs_fileoff_t   	off,
+        int             	whichfork,
+        int             	*aeof);
+
+/*
+ * Check if the endoff is outside the last extent. If so the caller will grow 
+ * the allocation to a stripe unit boundary
+ */
+int
+xfs_bmap_eof(
+        struct xfs_inode        *ip,
+        xfs_fileoff_t           endoff,
+        int                     whichfork,
+        int                     *eof);
 
 #endif	/* _FS_XFS_BMAP_H */
