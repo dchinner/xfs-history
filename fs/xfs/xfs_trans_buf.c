@@ -43,24 +43,28 @@
  * Use the buffer cache routine incore_match() to find the buffer
  * if it is already owned by this transaction.
  *
- * If we don't already own the buffer, use xfs_getblk() to get it.
+ * If we don't already own the buffer, use xfs_get_buf() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
  *
  * If the transaction pointer is NULL, make this just a normal
- * getblk() call.
+ * get_buf() call.
  */
 buf_t *
-xfs_trans_getblk(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
+xfs_trans_get_buf(xfs_trans_t	*tp,
+		  dev_t		dev,
+		  daddr_t	blkno,
+		  int		len,
+		  uint		lock_flags)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 
 	/*
-	 * Default to a normal getblk() call if the tp is NULL.
+	 * Default to a normal get_buf() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
-		return (getblk(dev, blkno, len));
+		return (get_buf(dev, blkno, len, lock_flags));
 	}
 
 	/*
@@ -76,7 +80,10 @@ xfs_trans_getblk(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
 		return (bp);
 	}
 
-	bp = xfs_getblk(dev, blkno, len);
+	bp = xfs_get_buf(dev, blkno, len, lock_flags);
+	if (bp == NULL) {
+		return NULL;
+	}
 
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
@@ -183,24 +190,28 @@ xfs_trans_getsb(xfs_trans_t *tp)
  * Use the buffer cache routine incore_match() to find the buffer
  * if it is already owned by this transaction.
  *
- * If we don't already own the buffer, use xfs_bread() to get it.
+ * If we don't already own the buffer, use xfs_read_buf() to get it.
  * If it doesn't yet have an associated xfs_buf_log_item structure,
  * then allocate one and add the item to this transaction.
  *
  * If the transaction pointer is NULL, make this just a normal
- * bread() call.
+ * read_buf() call.
  */
 buf_t *
-xfs_trans_bread(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
+xfs_trans_read_buf(xfs_trans_t	*tp,
+		   dev_t	dev,
+		   daddr_t	blkno,
+		   int		len,
+		   uint		lock_flags)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 
 	/*
-	 * Default to a normal bread() call if the tp is NULL.
+	 * Default to a normal read_buf() call if the tp is NULL.
 	 */
 	if (tp == NULL) {
-		return (bread(dev, blkno, len));
+		return (read_buf(dev, blkno, len, lock_flags));
 	}
 
 	/*
@@ -236,7 +247,10 @@ xfs_trans_bread(xfs_trans_t *tp, dev_t dev, daddr_t blkno, int len)
 		return (bp);
 	}
 
-	bp = xfs_bread(dev, blkno, len);
+	bp = xfs_read_buf(dev, blkno, len, lock_flags);
+	if (bp == NULL) {
+		return NULL;
+	}
 
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
@@ -551,7 +565,7 @@ xfs_trans_bjoin(xfs_trans_t *tp, buf_t *bp)
 
 	/*
 	 * Initialize b_fsprivate2 so we can find it with incore_match()
-	 * in xfs_trans_getblk() and friends above.
+	 * in xfs_trans_get_buf() and friends above.
 	 */
 	bp->b_fsprivate2 = tp;
 }

@@ -120,13 +120,13 @@ int xfs_btree_maxrecs(xfs_btree_cur_t *, xfs_btree_block_t *);
 #define	xfs_btree_check_sptr(a,b,c)
 #endif
 
-buf_t *xfs_btree_breadl(xfs_mount_t *, xfs_trans_t *, xfs_fsblock_t);
-buf_t *xfs_btree_breads(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t);
+buf_t *xfs_btree_read_bufl(xfs_mount_t *, xfs_trans_t *, xfs_fsblock_t, uint);
+buf_t *xfs_btree_read_bufs(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t, uint);
 void xfs_btree_del_cursor(xfs_btree_cur_t *);
 xfs_btree_cur_t *xfs_btree_dup_cursor(xfs_btree_cur_t *);
 int xfs_btree_firstrec(xfs_btree_cur_t *, int);
-buf_t *xfs_btree_getblkl(xfs_mount_t *, xfs_trans_t *, xfs_fsblock_t);
-buf_t *xfs_btree_getblks(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t);
+buf_t *xfs_btree_get_bufl(xfs_mount_t *, xfs_trans_t *, xfs_fsblock_t, uint);
+buf_t *xfs_btree_get_bufs(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t, uint);
 xfs_btree_cur_t *xfs_btree_init_cursor(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_btnum_t, struct xfs_inode *);
 int xfs_btree_islastblock(xfs_btree_cur_t *, int);
 int xfs_btree_lastrec(xfs_btree_cur_t *, int);

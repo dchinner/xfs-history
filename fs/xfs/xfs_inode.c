@@ -78,11 +78,11 @@ xfs_itobp(xfs_mount_t	*mp,
 	xfs_imap(mp, tp, ip->i_ino, &imap);
 
 	/*
-	 * Read in the buffer.  If tp is NULL, xfs_trans_bread() will
-	 * default to just a bread() call.
+	 * Read in the buffer.  If tp is NULL, xfs_trans_read_buf() will
+	 * default to just a read_buf() call.
 	 */
 	dev = mp->m_dev;
-	bp = xfs_trans_bread(tp, dev, imap.im_blkno, (int)imap.im_len);
+	bp = xfs_trans_read_buf(tp, dev, imap.im_blkno, (int)imap.im_len, 0);
 
 	/*
 	 * We need to come up with a disk error handling policy.
@@ -312,7 +312,7 @@ xfs_iread(xfs_mount_t	*mp,
 
 	/*
 	 * Use xfs_trans_brelse() to release the buffer containing the
-	 * on-disk inode, because it was acquired with xfs_trans_bread()
+	 * on-disk inode, because it was acquired with xfs_trans_read_buf()
 	 * in xfs_itobp() above.  If tp is NULL, this is just a normal
 	 * brelse().  If we're within a transaction, then xfs_trans_brelse()
 	 * will only release the buffer if it is not dirty within the

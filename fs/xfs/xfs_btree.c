@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -50,7 +50,8 @@ __uint32_t xfs_magics[XFS_BTNUM_MAX] =
  * Get a buffer for the block, return it read in.
  */
 buf_t *
-xfs_btree_breadl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno)
+xfs_btree_read_bufl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno,
+		    uint lock_flag)
 {
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
@@ -58,15 +59,15 @@ xfs_btree_breadl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno)
 	ASSERT(fsbno != NULLFSBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_fsb_to_daddr(sbp, fsbno);
-	return xfs_trans_bread(tp, mp->m_dev, d, mp->m_bsize);
+	return xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 }
 
 /*
  * Get a buffer for the block, return it read in.
  */
 buf_t *
-xfs_btree_breads(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
-		 xfs_agblock_t agbno)
+xfs_btree_read_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
+		 xfs_agblock_t agbno, uint lock_flag)
 {
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
@@ -75,7 +76,7 @@ xfs_btree_breads(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 	ASSERT(agbno != NULLAGBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_agb_to_daddr(sbp, agno, agbno);
-	return xfs_trans_bread(tp, mp->m_dev, d, mp->m_bsize);
+	return xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 }
 
 #ifdef XFSDEBUG
@@ -252,7 +253,7 @@ xfs_btree_dup_cursor(xfs_btree_cur_t *cur)
 	for (i = 0; i < newcur->bc_nlevels; i++) {
 		newcur->bc_ptrs[i] = cur->bc_ptrs[i];
 		if (buf = cur->bc_bufs[i])
-			newcur->bc_bufs[i] = xfs_trans_bread(tp, mp->m_dev, buf->b_blkno, mp->m_bsize);
+			newcur->bc_bufs[i] = xfs_trans_read_buf(tp, mp->m_dev, buf->b_blkno, mp->m_bsize, 0);
 		else
 			newcur->bc_bufs[i] = 0;
 	}
@@ -280,7 +281,8 @@ xfs_btree_firstrec(xfs_btree_cur_t *cur, int level)
  * Get a buffer for the block, return it with no data read.
  */
 buf_t *
-xfs_btree_getblkl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno)
+xfs_btree_get_bufl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno,
+		   uint lock_flag)
 {
 	daddr_t d;
 	xfs_sb_t *sbp;
@@ -288,14 +290,15 @@ xfs_btree_getblkl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno)
 	ASSERT(fsbno != NULLFSBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_fsb_to_daddr(sbp, fsbno);
-	return xfs_trans_getblk(tp, mp->m_dev, d, mp->m_bsize);
+	return xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 }
 
 /*
  * Get a buffer for the block, return it with no data read.
  */
 buf_t *
-xfs_btree_getblks(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblock_t agbno)
+xfs_btree_get_bufs(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
+		  xfs_agblock_t agbno, uint lock_flag)
 {
 	daddr_t d;
 	xfs_sb_t *sbp;
@@ -304,7 +307,7 @@ xfs_btree_getblks(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agb
 	ASSERT(agbno != NULLAGBLOCK);
 	sbp = &mp->m_sb;
 	d = xfs_agb_to_daddr(sbp, agno, agbno);
-	return xfs_trans_getblk(tp, mp->m_dev, d, mp->m_bsize);
+	return xfs_trans_get_buf(tp, mp->m_dev, d, mp->m_bsize, lock_flag);
 }
 
 /*
