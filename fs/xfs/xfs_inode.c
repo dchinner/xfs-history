@@ -1,4 +1,4 @@
-#ident "$Revision: 1.201 $"
+#ident "$Revision: 1.202 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -193,16 +193,27 @@ xfs_inobp_bwcheck(buf_t *bp)
 	dip = (xfs_dinode_t *) bp->b_un.b_addr;
 
 	for (i = 0; i < j; i++)  {
-		if (dip->di_core.di_magic != XFS_DINODE_MAGIC)
-			cmn_err(CE_PANIC,
-		"Bad magic 0x%x in XFS inode buffer 0x%x, offset 0x%x\n",
-				dip->di_core.di_magic, bp, (__psint_t) dip -
-						(__psint_t) bp->b_un.b_addr);
-		if (dip->di_next_unlinked == 0)
-			cmn_err(CE_PANIC,
-	"Bad next_unlinked field (0) in XFS inode buffer 0x%x, offset 0x%x\n",
-				bp,
+		if (dip->di_core.di_magic != XFS_DINODE_MAGIC)  {
+			cmn_err(CE_WARN,
+"Bad magic # 0x%x in XFS inode buffer 0x%llx, starting blockno %lld, offset 0x%x\n",
+				dip->di_core.di_magic,
+				(__uint64_t)(__psunsigned_t) bp,
+				(__int64_t) bp->b_blkno,
 				(__psint_t) dip - (__psint_t) bp->b_un.b_addr);
+			cmn_err(CE_WARN,
+			"%s filesystem is corrupt, unmount and run xfs_repair\n",
+				mp->m_fsname);
+		}
+		if (dip->di_next_unlinked == 0)  {
+			cmn_err(CE_WARN,
+"Bad next_unlinked field (0) in XFS inode buffer 0x%x, starting blockno %lld, offset 0x%x\n",
+				(__uint64_t)(__psunsigned_t) bp,
+				(__int64_t) bp->b_blkno,
+				(__psint_t) dip - (__psint_t) bp->b_un.b_addr);
+			cmn_err(CE_WARN,
+			"%s filesystem is corrupt, unmount and run xfs_repair\n",
+				mp->m_fsname);
+		}
 		
 		dip = (xfs_dinode_t *)((__psint_t) dip + mp->m_sb.sb_inodesize);
 	}
