@@ -339,7 +339,6 @@ linvfs_read_inode(
 }
 
 
-#ifdef	CONFIG_XFS_VNODE_TRACING
 
 /*
  * The put method maps onto a real VN_RELE, the write method is only used to
@@ -358,6 +357,7 @@ linvfs_put_inode(
 	}
 }
 
+#ifdef	CONFIG_XFS_VNODE_TRACING
 
 void
 linvfs_write_inode(
@@ -578,8 +578,8 @@ linvfs_remount(
 
 static struct super_operations linvfs_sops = {
 	read_inode:		linvfs_read_inode,
-#ifdef	CONFIG_XFS_VNODE_TRACING
 	put_inode:		linvfs_put_inode,
+#ifdef	CONFIG_XFS_VNODE_TRACING
 	write_inode:		linvfs_write_inode,
 #endif
 	delete_inode:		linvfs_delete_inode,
