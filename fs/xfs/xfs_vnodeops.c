@@ -716,6 +716,7 @@ try_again:
 
 		ASSERT (ismrlocked (&ip->i_lock, MR_UPDATE));
 
+		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 		/*
 		 * XXX Need to sanity check namelen.
 		 */
@@ -725,8 +726,6 @@ try_again:
 		}
 
 		dnlc_enter(dir_vp, name, XFS_ITOV(ip), NOCRED);
-
-		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
 	}
 	else {
@@ -1252,13 +1251,13 @@ xfs_link(vnode_t	*target_dir_vp,
         if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
                 goto error_return;
 
-	if (error = xfs_dir_createname (tp, tdp, target_name, sip->i_ino)) {
-		xfs_trans_cancel (tp);
-		goto error_return;
-	}
-
 	xfs_trans_ijoin (tp, sip, XFS_ILOCK_EXCL);
         xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
+
+	if (error = xfs_dir_createname (tp, tdp, target_name, sip->i_ino)) {
+		xfs_trans_cancel (tp);
+		return error;
+	}
 
 	tdp->i_gen++;
 	xfs_trans_log_inode (tp, tdp, XFS_ILOG_CORE);
@@ -1830,6 +1829,140 @@ xfs_symlink(vnode_t	*dir_vp,
 	    char	*target_path,
 	    cred_t	*credp)
 {
+	xfs_trans_t	*tp = NULL;
+	xfs_mount_t	*mp;
+	xfs_inode_t	*dp, *ip;
+        int 		error = 0, pathlen;
+        struct pathname cpn, ccpn;
+	xfs_ino_t	e_inum;
+	dev_t		rdev;
+
+	/*
+	 * Check component lengths of the target path name.
+         */
+        pathlen = strlen(target_path);
+        if (pathlen >= MAXPATHLEN)      /* total string too long */
+                return ENAMETOOLONG;
+        if (pathlen >= MAXNAMELEN) {    /* is any component too long? */
+                pn_alloc(&cpn);
+                pn_alloc(&ccpn);
+                bcopy(target_path, cpn.pn_path, pathlen);
+                cpn.pn_pathlen = pathlen;
+                while (cpn.pn_pathlen > 0 && !error) {
+                        if (error = pn_getcomponent(&cpn, ccpn.pn_path, 0)) {
+                                pn_free(&cpn);
+                                pn_free(&ccpn);
+                                if (error == ENAMETOOLONG)
+                                        return error;
+                        } else if (cpn.pn_pathlen) {    /* advance past slash */                                cpn.pn_path++;
+                                cpn.pn_pathlen--;
+                        }
+                }
+                pn_free(&cpn);
+                pn_free(&ccpn);
+        }
+
+        dp = XFS_VTOI(dir_vp);
+	xfs_ilock (dp, XFS_ILOCK_EXCL);
+
+        if (error = xfs_dir_lookup_int(NULL, dir_vp, 0, link_name, NULL,
+                                       &e_inum, NULL))
+                goto error_return;
+
+	mp = XFS_VFSTOM(dir_vp->v_vfsp);
+	tp = xfs_trans_alloc (mp, XFS_TRANS_WAIT);
+	if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
+		goto error_return;
+
+	/*
+	 * Allocate an inode for the symlink.
+	 */
+	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
+
+	error = xfs_dir_ialloc(&tp, dp, IFLNK | (vap->va_mode&~IFMT),
+		1, rdev, credp, &ip);
+	if (error)
+		goto error_return;
+
+	/*
+	 * If the symlink is short, write it inline.
+	 */
+	if (pathlen <= sizeof(ip->i_u2.iu_inline_data)) {	/* 32 bytes? */
+		xfs_idata_realloc (ip, pathlen);
+		bcopy(target_path, ip->i_u1.iu_data, pathlen);
+		ip->i_flags |= XFS_IINLINE;
+
+		xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+		xfs_trans_log_inode (tp, ip, XFS_ILOG_DATA | XFS_ILOG_CORE);
+	}
+#if 0
+	else {
+		xfs_sb_t        *sbp;
+		xfs_fsblock_t   first_fsb, last_fsb;
+		int		nmap;
+		xfs_fsblock_t	first_block;
+		xfs_extlen_t	blocks;
+		xfs_bmbt_irec_t mval;
+		unsigned int	pathlen_in_blocks;
+		xfs_bmap_free_t	flist;
+
+		sbp = &mp->m_sb;
+		first_fsb = xfs_b_to_fsbt(sbp, 0);
+
+		pathlen_in_blocks = pathlen / sbp->sb_blocksize;
+		if (pathlen % sbp->sb_blocksize)
+			pathlen_in_blocks++;
+		last_fsb = xfs_b_to_fsb(sbp, blocks);
+		nmaps = 1;
+		blocks = (xfs_extlen_t)(last_fsb - first_fsb);
+		bzero (&flist, sizeof(xfs_bmap_free_t));
+
+		first_block = xfs_bmapi(tp, ip, first_fsb, blocks,
+                         XFS_BMAPI_WRITE, NULLFSBLOCK, blocks, &mval,
+                         &nmap, &flist);
+
+			??? xfs_btree_get_bufl 
+			??? xfs_dir_get_buf/ read_get_buf?:
+
+		if (bmv.pbsize == bmv.bsize) {
+			bp = xfs_trans_get_buf(tp, mval.pbdev, 
+				mval.br_startblock,
+			       mval.br_blockcount, 0);
+		}
+		else {
+			bp = xfs_trans_bread(tp, mval.pbdev, mval.bn,
+                                       mval.length, 0);
+		}
+
+		bp = xfs_trans_get_buf(tp, mval.pbdev, mval.bn,
+				       mval.length, 0);
+
+		xfs_bmap_finish (&tp, &flist, first_block);
+	}
+
+#endif
+
+	/*
+	 * Create the directory entry for the symlink.
+	 */
+	if (error = xfs_dir_createname (tp, dp, link_name, ip->i_ino))
+                ASSERT (0);
+        dnlc_enter (dir_vp, link_name, XFS_ITOV(ip), NOCRED);
+
+	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin (tp, ip, XFS_ILOCK_EXCL);
+
+	xfs_trans_commit (tp, 0);
+
+	return 0;
+
+error_return:
+	if (tp)
+		xfs_trans_cancel (tp);
+
+	xfs_iunlock (dp, XFS_ILOCK_EXCL);
+	return error;
+
 	return 0;
 }
 
