@@ -2494,8 +2494,8 @@ print_pagebuf(
 		   pb->pb_target, pb->pb_hold.counter,
 		   list_entry(pb->pb_list.next, xfs_buf_t, pb_list),
 		   list_entry(pb->pb_list.prev, xfs_buf_t, pb_list));
-	kdb_printf("  pb_hash_index %d pb_hash_next 0x%p pb_hash_prev 0x%p\n",
-		   pb->pb_hash_index,
+	kdb_printf("  pb_hash 0x%p pb_hash_next 0x%p pb_hash_prev 0x%p\n",
+		   pb->pb_hash,
 		   list_entry(pb->pb_hash_list.next, xfs_buf_t, pb_hash_list),
 		   list_entry(pb->pb_hash_list.prev, xfs_buf_t, pb_hash_list));
 	kdb_printf("  pb_file_offset 0x%llx pb_buffer_length 0x%llx pb_addr 0x%p\n",
