@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.107 $"
+#ident "$Revision: 1.108 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -71,6 +71,7 @@
 #include "xfs_trans_priv.h"
 #include "xfs_rw.h" 
 #include "xfs_bit.h"
+#include "xfs_error.h"
 
 #ifdef SIM
 #include "sim.h"

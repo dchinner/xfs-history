@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.299 $"
+#ident "$Revision: 1.300 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -448,8 +448,9 @@ xfs_itobp(
 		if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
 				 XFS_RANDOM_ITOBP_INOTOBP)) {
 #ifdef DEBUG
-			prdev("bad inode magic/vsn daddr 0x%Lx #%d", 
-				mp->m_dev, imap.im_blkno, i);
+			prdev("bad inode magic/vsn daddr 0x%Lx #%d (magic=%x)", 
+				mp->m_dev, imap.im_blkno, i,
+                                INT_GET(dip->di_core.di_magic, ARCH_CONVERT));
 #endif
 			xfs_trans_brelse(tp, bp);
 			return XFS_ERROR(EFSCORRUPTED);

@@ -34,6 +34,11 @@
 
 #ident "$Revision: 1.13 $"
 
+#ifndef SIM
+#define prdev(fmt,dev,args...) \
+     printk("XFS: device 0x%x- " fmt "\n", dev, ## args)
+#endif
+
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
 #define XFS_ENOLOGSPACE	3	/* Reservation too large */
