@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 3
-SUBLEVEL = 40
+SUBLEVEL = 41
 EXTRAVERSION =
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -207,7 +207,7 @@ DRIVERS := $(DRIVERS) drivers/macintosh/macintosh.a
 endif
 
 ifeq ($(CONFIG_ISAPNP),y)
-DRIVERS := $(DRIVERS) drivers/pnp/isa-pnp.o
+DRIVERS := $(DRIVERS) drivers/pnp/pnp.o
 endif
 
 ifdef CONFIG_SGI
@@ -448,6 +448,10 @@ mrproper: clean archmrproper
 	rm -f drivers/net/hamradio/soundmodem/gentbl
 	rm -f drivers/char/hfmodem/gentbl drivers/char/hfmodem/tables.h
 	rm -f drivers/sound/*_boot.h drivers/sound/.*.boot
+	rm -f drivers/sound/msndinit.c
+	rm -f drivers/sound/msndperm.c
+	rm -f drivers/sound/pndsperm.c
+	rm -f drivers/sound/pndspini.c
 	rm -f .version .config* config.in config.old
 	rm -f scripts/tkparse scripts/kconfig.tk scripts/kconfig.tmp
 	rm -f scripts/lxdialog/*.o scripts/lxdialog/lxdialog
