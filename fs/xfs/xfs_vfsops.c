@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision$"
+#ident  "$Revision: 1.118 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -512,19 +512,19 @@ xfs_cmountfs(
 
  error3:
 	if (ldevvp) {
-		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr);
+		VOP_CLOSE(ldevvp, vfs_flags, L_TRUE, 0, cr, NULL);
 		binval(logdev);
 		VN_RELE(ldevvp);
 	}
  error2:
 	if (rdevvp) {
-		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr);
+		VOP_CLOSE(rdevvp, vfs_flags, L_TRUE, 0, cr, NULL);
 		binval(rtdev);
 		VN_RELE(rdevvp);
 	}
  error1:
 	if (ddevvp) {
-		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr);
+		VOP_CLOSE(ddevvp, vfs_flags, L_TRUE, 0, cr, NULL);
 		binval(ddev);
 		VN_RELE(ddevvp);
 	}
@@ -1174,7 +1174,7 @@ xfs_statdevvp(
 		error = EINVAL;
 	}
 	brelse(bp);
-	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, get_current_cred());
+	(void) VOP_CLOSE(devvp, FREAD, L_TRUE, 0, get_current_cred(), NULL);
 	return error;
 }
 
