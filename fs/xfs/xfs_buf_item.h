@@ -32,6 +32,10 @@ typedef struct xfs_buf_log_item {
 	buf_t			*bli_buf;	/* real buffer pointer */
 	unsigned int		bli_flags;	/* misc flags */
 	unsigned int		bli_recur;	/* lock recursion count */
+#ifdef XFSDEBUG
+	char			*bli_orig;	/* original buffer copy */
+	char			*bli_logged;	/* bytes to be logged */
+#endif
 	xfs_buf_log_format_t	bli_format;	/* in-log header */
 } xfs_buf_log_item_t;
 
@@ -41,14 +45,13 @@ typedef struct xfs_buf_log_item {
 #define	XFS_BLI_HOLD	0x1
 #define	XFS_BLI_DIRTY	0x2
 
-extern void	xfs_buf_item_init(buf_t *, struct xfs_mount *);
-extern void	xfs_buf_item_relse(buf_t *);
-extern void	xfs_buf_item_log(xfs_buf_log_item_t *, uint, uint);
-extern uint	xfs_buf_item_dirty(xfs_buf_log_item_t *);
-extern void	xfs_buf_attach_iodone(buf_t *,
-				      void(*)(buf_t*, xfs_log_item_t *),
-				      xfs_log_item_t *);
-extern void	xfs_buf_iodone_callbacks(buf_t *);
-extern void	xfs_buf_iodone(buf_t *, xfs_buf_log_item_t *);
+void	xfs_buf_item_init(buf_t *, struct xfs_mount *);
+void	xfs_buf_item_relse(buf_t *);
+void	xfs_buf_item_log(xfs_buf_log_item_t *, uint, uint);
+uint	xfs_buf_item_dirty(xfs_buf_log_item_t *);
+void	xfs_buf_attach_iodone(buf_t *, void(*)(buf_t*, xfs_log_item_t *),
+			      xfs_log_item_t *);
+void	xfs_buf_iodone_callbacks(buf_t *);
+void	xfs_buf_iodone(buf_t *, xfs_buf_log_item_t *);
 
 #endif	/* _XFS_BUF_ITEM_H */
