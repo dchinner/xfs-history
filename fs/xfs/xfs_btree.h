@@ -209,24 +209,6 @@ xfs_btree_check_key(
 	void			*ak2);	/* pointer to right (higher) key */
 
 /*
- * Debug routine: check that long form block header is ok.
- */
-void
-xfs_btree_check_lblock(
-	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
-	int			level);	/* level of the btree block */
-
-/*
- * Debug routine: check that (long) pointer is ok.
- */
-void
-xfs_btree_check_lptr(
-	xfs_btree_cur_t		*cur,	/* btree cursor */
-	xfs_dfsbno_t		ptr,	/* btree block disk address */
-	int			level);	/* btree block level */
-
-/*
  * Debug routine: check that records are in the right order.
  */
 void
@@ -234,33 +216,47 @@ xfs_btree_check_rec(
 	xfs_btnum_t		btnum,	/* btree identifier */
 	void			*ar1,	/* pointer to left (lower) record */
 	void			*ar2);	/* pointer to right (higher) record */
+#else
+#define	xfs_btree_check_block(a,b,c)
+#define	xfs_btree_check_key(a,b,c)
+#define	xfs_btree_check_rec(a,b,c)
+#endif	/* DEBUG */
 
 /*
- * Debug routine: check that short form block header is ok.
+ * Checking routine: check that long form block header is ok.
  */
-void
+int					/* error (0 or EFSCORRUPTED) */
+xfs_btree_check_lblock(
+	xfs_btree_cur_t		*cur,	/* btree cursor */
+	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
+	int			level);	/* level of the btree block */
+
+/*
+ * Checking routine: check that (long) pointer is ok.
+ */
+int					/* error (0 or EFSCORRUPTED) */
+xfs_btree_check_lptr(
+	xfs_btree_cur_t		*cur,	/* btree cursor */
+	xfs_dfsbno_t		ptr,	/* btree block disk address */
+	int			level);	/* btree block level */
+
+/*
+ * Checking routine: check that short form block header is ok.
+ */
+int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_sblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_sblock_t	*block,	/* btree short form block pointer */
 	int			level);	/* level of the btree block */
 
 /*
- * Debug routine: check that (short) pointer is ok.
+ * Checking routine: check that (short) pointer is ok.
  */
-void
+int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_sptr(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_agblock_t		ptr,	/* btree block disk address */
 	int			level);	/* btree block level */
-#else
-#define	xfs_btree_check_block(a,b,c)
-#define	xfs_btree_check_key(a,b,c)
-#define	xfs_btree_check_lblock(a,b,c)
-#define	xfs_btree_check_lptr(a,b,c)
-#define	xfs_btree_check_rec(a,b,c)
-#define	xfs_btree_check_sblock(a,b,c)
-#define	xfs_btree_check_sptr(a,b,c)
-#endif	/* DEBUG */
 
 /*
  * Delete the btree cursor.
@@ -379,7 +375,8 @@ xfs_btree_read_bufl(
 	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_fsblock_t		fsbno,	/* file system block number */
 	uint			lock,	/* lock flags for read_buf */
-	struct buf		**bpp);	/* buffer for fsbno */
+	struct buf		**bpp,	/* buffer for fsbno */
+	int			refval);/* ref count value for buffer */
 
 /*
  * Get a buffer for the block, return it read in.
@@ -392,7 +389,8 @@ xfs_btree_read_bufs(
 	xfs_agnumber_t		agno,	/* allocation group number */
 	xfs_agblock_t		agbno,	/* allocation group block number */
 	uint			lock,	/* lock flags for read_buf */
-	struct buf		**bpp); /* buffer for agno/agbno */
+	struct buf		**bpp,	/* buffer for agno/agbno */
+	int			refval);/* ref count value for buffer */
 
 /*
  * Read-ahead the block, don't wait for it, don't return a buffer.
@@ -504,5 +502,34 @@ xfs_filblks_t xfs_filblks_max(xfs_filblks_t a, xfs_filblks_t b);
 	((xfs_filblks_t)(a) > (xfs_filblks_t)(b) ? \
 	 (xfs_filblks_t)(a) : (xfs_filblks_t)(b))
 #endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_FSB_SANITY_CHECK)
+int xfs_fsb_sanity_check(struct xfs_mount *mp, xfs_fsblock_t fsb);
+#define	XFS_FSB_SANITY_CHECK(mp,fsb)	xfs_fsb_sanity_check(mp,fsb)
+#else
+#define	XFS_FSB_SANITY_CHECK(mp,fsb)	\
+	(XFS_FSB_TO_AGNO(mp, fsb) < mp->m_sb.sb_agcount && \
+	 XFS_FSB_TO_AGBNO(mp, fsb) < mp->m_sb.sb_agblocks)
+#endif
+
+/*
+ * Macros to set EFSCORRUPTED & return/branch.
+ */
+#define	XFS_WANT_CORRUPTED_GOTO(x,l)	\
+	{ \
+		int fs_is_ok = (x); \
+		ASSERT(fs_is_ok); \
+		if (!fs_is_ok) { \
+			error = XFS_ERROR(EFSCORRUPTED); \
+			goto l; \
+		} \
+	}
+
+#define	XFS_WANT_CORRUPTED_RETURN(x)	\
+	{ \
+		int fs_is_ok = (x); \
+		ASSERT(fs_is_ok); \
+		if (!fs_is_ok) \
+			return XFS_ERROR(EFSCORRUPTED); \
+	}
 
 #endif	/* !_FS_XFS_BTREE_H */

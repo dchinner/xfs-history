@@ -16,6 +16,7 @@
 #ifdef SIM
 #undef _KERNEL
 #endif
+#include <sys/errno.h>
 #include <sys/kmem.h>
 #ifdef SIM
 #include <bstring.h>
@@ -40,6 +41,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_bit.h"
+#include "xfs_error.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -61,46 +63,39 @@ const __uint32_t xfs_magics[XFS_BTNUM_MAX] =
  * Prototypes for internal routines.
  */
 
-#ifdef DEBUG
 /*
- * Debug routine: return maxrecs for the block.
+ * Checking routine: return maxrecs for the block.
  */
 STATIC int				/* number of records fitting in block */
 xfs_btree_maxrecs(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block);/* generic btree block pointer */
-#endif	/* DEBUG */
 
 /*
  * Internal routines.
  */
 
-#ifdef DEBUG
 /*
- * Debug routine: return maxrecs for the block.
+ * Checking routine: return maxrecs for the block.
  */
 STATIC int				/* number of records fitting in block */
 xfs_btree_maxrecs(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_block_t	*block)	/* generic btree block pointer */
 {
-	int			maxrecs;
-
 	switch (cur->bc_btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
-		maxrecs = XFS_ALLOC_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
-		break;
+		return XFS_ALLOC_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
 	case XFS_BTNUM_BMAP:
-		maxrecs = XFS_BMAP_BLOCK_IMAXRECS(block->bb_h.bb_level, cur);
-		break;
+		return XFS_BMAP_BLOCK_IMAXRECS(block->bb_h.bb_level, cur);
 	case XFS_BTNUM_INO:
-		maxrecs = XFS_INOBT_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
-		break;
+		return XFS_INOBT_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
+	default:
+		ASSERT(0);
+		return 0;
 	}
-	return maxrecs;
 }
-#endif	/* DEBUG */
 
 /*
  * External routines.
@@ -172,11 +167,12 @@ xfs_btree_check_key(
 	    }
 	}
 }
+#endif	/* DEBUG */
 
 /*
- * Debug routine: check that long form block header is ok.
+ * Checking routine: check that long form block header is ok.
  */
-void
+int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_lblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_lblock_t	*block,	/* btree long form block pointer */
@@ -185,24 +181,24 @@ xfs_btree_check_lblock(
 	xfs_mount_t		*mp;	/* file system mount point */
 
 	mp = cur->bc_mp;
-	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
-	ASSERT(block->bb_level == level);
-	ASSERT(block->bb_numrecs <=
-	       xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
-	ASSERT(block->bb_leftsib == NULLDFSBNO || 
-	       (XFS_FSB_TO_AGNO(mp, block->bb_leftsib) < mp->m_sb.sb_agcount &&
-		XFS_FSB_TO_AGBNO(mp, block->bb_leftsib) <
-		mp->m_sb.sb_agblocks));
-	ASSERT(block->bb_rightsib == NULLDFSBNO || 
-	       (XFS_FSB_TO_AGNO(mp, block->bb_rightsib) < mp->m_sb.sb_agcount &&
-		XFS_FSB_TO_AGBNO(mp, block->bb_rightsib) <
-		mp->m_sb.sb_agblocks));
+	XFS_WANT_CORRUPTED_RETURN(
+		block->bb_magic == xfs_magics[cur->bc_btnum] &&
+		block->bb_level == level &&
+		block->bb_numrecs <=
+			xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block) &&
+		block->bb_leftsib != 0 &&
+		(block->bb_leftsib == NULLDFSBNO ||
+			XFS_FSB_SANITY_CHECK(mp, block->bb_leftsib)) &&
+		block->bb_rightsib != 0 &&
+		(block->bb_rightsib == NULLDFSBNO ||
+			XFS_FSB_SANITY_CHECK(mp, block->bb_rightsib)));
+	return 0;
 }
 
 /*
- * Debug routine: check that (long) pointer is ok.
+ * Checking routine: check that (long) pointer is ok.
  */
-void
+int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_lptr(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	xfs_dfsbno_t	ptr,		/* btree block disk address */
@@ -210,13 +206,15 @@ xfs_btree_check_lptr(
 {
 	xfs_mount_t	*mp;		/* file system mount point */
 
-	ASSERT(level > 0);
 	mp = cur->bc_mp;
-	ASSERT(ptr != NULLDFSBNO);
-	ASSERT(XFS_FSB_TO_AGNO(mp, ptr) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, ptr) < mp->m_sb.sb_agblocks);
+	XFS_WANT_CORRUPTED_RETURN(
+		level > 0 &&
+		ptr != NULLDFSBNO &&
+		XFS_FSB_SANITY_CHECK(mp, ptr));
+	return 0;
 }
 
+#ifdef DEBUG
 /*
  * Debug routine: check that records are in the right order.
  */
@@ -271,11 +269,12 @@ xfs_btree_check_rec(
 	    }
 	}
 }
+#endif	/* DEBUG */
 
 /*
- * Debug routine: check that block header is ok.
+ * Checking routine: check that block header is ok.
  */
-void
+int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_sblock(
 	xfs_btree_cur_t		*cur,	/* btree cursor */
 	xfs_btree_sblock_t	*block,	/* btree short form block pointer */
@@ -284,24 +283,26 @@ xfs_btree_check_sblock(
 	buf_t			*agbp;	/* buffer for ag. freespace struct */
 	xfs_agf_t		*agf;	/* ag. freespace structure */
 
-	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
-	ASSERT(block->bb_level == level);
-	ASSERT(block->bb_numrecs <=
-	       xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
-	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
-	       block->bb_leftsib < agf->agf_length);
-	ASSERT(block->bb_leftsib != 0);
-	ASSERT(block->bb_rightsib == NULLAGBLOCK || 
-	       block->bb_rightsib < agf->agf_length);
-	ASSERT(block->bb_rightsib != 0);
+	XFS_WANT_CORRUPTED_RETURN(
+		block->bb_magic == xfs_magics[cur->bc_btnum] &&
+		block->bb_level == level &&
+		block->bb_numrecs <=
+			xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block) &&
+		(block->bb_leftsib == NULLAGBLOCK ||
+			block->bb_leftsib < agf->agf_length) &&
+		block->bb_leftsib != 0 &&
+		(block->bb_rightsib == NULLAGBLOCK ||
+			block->bb_rightsib < agf->agf_length) &&
+		block->bb_rightsib != 0);
+	return 0;
 }
 
 /*
- * Debug routine: check that (short) pointer is ok.
+ * Checking routine: check that (short) pointer is ok.
  */
-void
+int					/* error (0 or EFSCORRUPTED) */
 xfs_btree_check_sptr(
 	xfs_btree_cur_t	*cur,		/* btree cursor */
 	xfs_agblock_t	ptr,		/* btree block disk address */
@@ -310,14 +311,13 @@ xfs_btree_check_sptr(
 	buf_t		*agbp;		/* buffer for ag. freespace struct */
 	xfs_agf_t	*agf;		/* ag. freespace structure */
 
-	ASSERT(level > 0);
 	agbp = cur->bc_private.a.agbp;
 	agf = XFS_BUF_TO_AGF(agbp);
-	ASSERT(ptr != NULLAGBLOCK);
-	ASSERT(ptr != 0);
-	ASSERT(ptr < agf->agf_length);
+	XFS_WANT_CORRUPTED_RETURN(
+		level > 0 &&
+		ptr != NULLAGBLOCK && ptr != 0 && ptr < agf->agf_length);
+	return 0;
 }
-#endif	/* DEBUG */
 
 /*
  * Delete the btree cursor.
@@ -695,7 +695,8 @@ xfs_btree_read_bufl(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_fsblock_t	fsbno,		/* file system block number */
 	uint		lock,		/* lock flags for read_buf */
-	buf_t		**bpp)		/* buffer for fsbno */
+	buf_t		**bpp,		/* buffer for fsbno */
+	int		refval)		/* ref count value for buffer */
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
@@ -708,7 +709,7 @@ xfs_btree_read_bufl(
 		return error;
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL)
-		bp->b_ref = XFS_GEN_LBTREE_REF;
+		bp->b_ref = refval;
 	*bpp = bp;
 	return 0;
 }
@@ -724,7 +725,8 @@ xfs_btree_read_bufs(
 	xfs_agnumber_t	agno,		/* allocation group number */
 	xfs_agblock_t	agbno,		/* allocation group block number */
 	uint		lock,		/* lock flags for read_buf */
-	buf_t		**bpp)		/* buffer for agno/agbno */
+	buf_t		**bpp,		/* buffer for agno/agbno */
+	int		refval)		/* ref count value for buffer */
 {
 	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* real disk block address */
@@ -738,7 +740,7 @@ xfs_btree_read_bufs(
 		return error;
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL)
-		bp->b_ref = XFS_GEN_SBTREE_REF;
+		bp->b_ref = refval;
 	*bpp = bp;
 	return 0;
 }

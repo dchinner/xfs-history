@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_BTREE_H
 #define	_FS_XFS_IALLOC_BTREE_H
 
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * Inode map on-disk structures
@@ -208,24 +208,15 @@ xfs_inobt_delete(
 #endif	/* _NOTYET_ */
 
 /*
- * Get the data from the next record after the pointed-to one.
- */
-int					/* success/failure */
-xfs_inobt_get_nextrec(
-	struct xfs_btree_cur	*cur,	/* btree cursor */
-	xfs_agino_t		*ino,	/* output: starting inode of chunk */
-	__int32_t		*fcnt,	/* output: number of free inodes */
-	xfs_inofree_t		*free);	/* output: free inode mask */
-
-/*
  * Get the data from the pointed-to record.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_get_rec(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	xfs_agino_t		*ino,	/* output: starting inode of chunk */
 	__int32_t		*fcnt,	/* output: number of free inodes */
-	xfs_inofree_t		*free);	/* output: free inode mask */
+	xfs_inofree_t		*free,	/* output: free inode mask */
+	int			*stat);	/* output: success/failure */
 
 /*
  * Increment cursor by one record at the level.
@@ -284,8 +275,9 @@ xfs_inobt_lookup_le(
 /*
  * Update the record referred to by cur, to the value given
  * by [ino, fcnt, free].
+ * This either works (return 0) or gets an EFSCORRUPTED error.
  */
-int					/* success/failure */
+int					/* error */
 xfs_inobt_update(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	xfs_agino_t		ino,	/* starting inode of chunk */

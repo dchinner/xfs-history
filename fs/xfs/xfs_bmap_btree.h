@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_BTREE_H
 #define	_FS_XFS_BMAP_BTREE_H
 
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.33 $"
 
 #define	XFS_BMAP_MAGIC	0x424d4150	/* 'BMAP' */
 
@@ -39,8 +39,7 @@ typedef struct xfs_bmdr_block
 	(BMBT_STARTBLOCK_BITOFF + BMBT_STARTBLOCK_BITLEN)
 #define	BMBT_BLOCKCOUNT_BITLEN	(BMBT_TOTAL_BITLEN - BMBT_BLOCKCOUNT_BITOFF)
 
-#define	BMBT_USE_64	(_MIPS_SZLONG == 64)
-typedef	unsigned long	xfs_bmbt_rec_base_t;	/* use this for casts */
+#define	BMBT_USE_64	(_MIPS_SIM == _ABI64 || _MIPS_SIM == _ABIN32)
 
 typedef struct xfs_bmbt_rec_32
 {
@@ -52,8 +51,10 @@ typedef struct xfs_bmbt_rec_64
 } xfs_bmbt_rec_64_t;
 
 #if BMBT_USE_64
+typedef	__uint64_t	xfs_bmbt_rec_base_t;	/* use this for casts */
 typedef xfs_bmbt_rec_64_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
 #else	/* !BMBT_USE_64 */
+typedef	__uint32_t	xfs_bmbt_rec_base_t;	/* use this for casts */
 typedef xfs_bmbt_rec_32_t xfs_bmbt_rec_t, xfs_bmdr_rec_t;
 #endif	/* BMBT_USE_64 */
 
@@ -330,6 +331,19 @@ int xfs_bm_maxlevels(struct xfs_mount *mp, int w);
 #define	XFS_BM_MAXLEVELS(mp,w)			xfs_bm_maxlevels(mp,w)
 #else
 #define	XFS_BM_MAXLEVELS(mp,w)		((mp)->m_bm_maxlevels[w])
+#endif
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_SANITY_CHECK)
+int xfs_bmap_sanity_check(struct xfs_mount *mp, xfs_bmbt_block_t *bb,
+	int level);
+#define	XFS_BMAP_SANITY_CHECK(mp,bb,level)	\
+	xfs_bmap_sanity_check(mp,bb,level)
+#else
+#define	XFS_BMAP_SANITY_CHECK(mp,bb,level)	\
+	((bb)->bb_magic == XFS_BMAP_MAGIC && \
+	 (bb)->bb_level == level && \
+	 (bb)->bb_numrecs > 0 && \
+	 (bb)->bb_numrecs <= (mp)->m_bmap_dmxr[(level) != 0])
 #endif
 
 /*

@@ -1620,6 +1620,7 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	xfs_fsblock_t fsb;
 	xfs_da_blkinfo_t *info;
 	int error;
+	buf_t *bp;
 #ifdef DEBUG
 	xfs_bmbt_irec_t map;
 	int nmap = 1;
@@ -1655,21 +1656,25 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	}
 	error = xfs_trans_read_buf(dp->i_mount, trans, 
 				   dp->i_mount->m_dev, mappedbno,
-				   dp->i_mount->m_bsize, 0, bpp);
+				   dp->i_mount->m_bsize, 0, &bp);
 	if (error)
 		return error;
-	ASSERT(*bpp != NULL && !geterror(*bpp));
-	(*bpp)->b_ref = XFS_GEN_LBTREE_REF;
-	info = (xfs_da_blkinfo_t *)((*bpp)->b_un.b_addr);
+	ASSERT(bp != NULL && !geterror(bp));
+	if (whichfork == XFS_ATTR_FORK)
+		bp->b_ref = XFS_ATTR_BTREE_REF;
+	else
+		bp->b_ref = XFS_DIR_BTREE_REF;
+	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
 	if ((info->magic != XFS_DA_NODE_MAGIC) &&
 	    (info->magic != XFS_DIR_LEAF_MAGIC) &&
 	    (info->magic != XFS_ATTR_LEAF_MAGIC)) {
-		(*bpp)->b_flags |= B_ERROR;
-		xfs_trans_brelse(trans, *bpp);
+		bp->b_flags |= B_ERROR;
+		xfs_trans_brelse(trans, bp);
 		*bpp = NULL;
 		return XFS_ERROR(EFSCORRUPTED);
 	}
-	return(0);
+	*bpp = bp;
+	return 0;
 }
 
 #ifndef SIM

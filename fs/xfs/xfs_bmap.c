@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.188 $"
+#ident	"$Revision: 1.189 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1998,12 +1998,17 @@ xfs_bmap_btree_to_extents(
 	ASSERT(XFS_BMAP_BROOT_MAXRECS(ifp->if_broot_bytes) == 1);
 	mp = ip->i_mount;
 	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, ifp->if_broot_bytes);
-	xfs_btree_check_lptr(cur, *pp, 1);
+#ifdef DEBUG
+	if (error = xfs_btree_check_lptr(cur, *pp, 1))
+		return error;
+#endif
 	cbno = *pp;
-	if (error = xfs_btree_read_bufl(mp, tp, cbno, 0, &cbp))
+	if (error = xfs_btree_read_bufl(mp, tp, cbno, 0, &cbp,
+			XFS_BMAP_BTREE_REF))
 		return error;
 	cblock = XFS_BUF_TO_BMBT_BLOCK(cbp);
-	ASSERT(cblock->bb_level == 0);
+	if (error = xfs_btree_check_lblock(cur, cblock, 0))
+		return error;
 	xfs_bmap_add_free(cbno, 1, cur->bc_private.b.flist, mp);
 	if (!async)
 		xfs_trans_set_sync(tp);
@@ -3379,17 +3384,18 @@ xfs_bmap_read_extents(
 	 * pointer (leftmost) at each level.
 	 */
 	while (level-- > 0) {
-		if (error = xfs_btree_read_bufl(mp, tp, bno, 0, &bp))
+		if (error = xfs_btree_read_bufl(mp, tp, bno, 0, &bp,
+				XFS_BMAP_BTREE_REF))
 			return error;
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
-		ASSERT(block->bb_level == level);
+		XFS_WANT_CORRUPTED_GOTO(
+			XFS_BMAP_SANITY_CHECK(mp, block, level),
+			error0);
 		if (level == 0)
 			break;
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-		ASSERT(*pp != NULLDFSBNO);
-		ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
-		ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
+		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, *pp), error0);
 		bno = *pp;
 		xfs_trans_brelse(tp, bp);
 	}
@@ -3407,6 +3413,9 @@ xfs_bmap_read_extents(
 		xfs_fsblock_t	nextbno;
 
 		ASSERT(i + block->bb_numrecs <= room);
+		XFS_WANT_CORRUPTED_GOTO(
+			XFS_BMAP_SANITY_CHECK(mp, block, 0),
+			error0);
 		/*
 		 * Read-ahead the next leaf block, if any.
 		 */
@@ -3428,7 +3437,8 @@ xfs_bmap_read_extents(
 		 */
 		if (bno == NULLFSBLOCK)
 			break;
-		if (error = xfs_btree_read_bufl(mp, tp, bno, 0, &bp))
+		if (error = xfs_btree_read_bufl(mp, tp, bno, 0, &bp,
+				XFS_BMAP_BTREE_REF))
 			return error;
 		block = XFS_BUF_TO_BMBT_BLOCK(bp);
 	}
@@ -3436,6 +3446,9 @@ xfs_bmap_read_extents(
 	ASSERT(i == XFS_IFORK_NEXTENTS(ip, whichfork));
 	xfs_bmap_trace_exlist(fname, ip, i, whichfork);
 	return 0;
+error0:
+	xfs_trans_brelse(tp, bp);
+	return XFS_ERROR(EFSCORRUPTED);
 }
 
 #ifdef XFS_BMAP_TRACE

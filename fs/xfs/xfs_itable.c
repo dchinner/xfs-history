@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.49 $"
+#ident	"$Revision: 1.50 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -241,7 +241,9 @@ xfs_bulkstat(
 			if (!error &&	/* no I/O error */
 			    tmp &&	/* lookup succeeded */
 					/* got the record, should always work */
-			    xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree) &&
+			    !(error = xfs_inobt_get_rec(cur, &gino, &gcnt,
+				    &gfree, &i)) &&
+			    i == 1 &&
 					/* this is the right chunk */
 			    agino < gino + XFS_INODES_PER_CHUNK &&
 					/* lastino was not last in chunk */
@@ -308,7 +310,9 @@ xfs_bulkstat(
 			 * or the normal way, set end and stop collecting.
 			 */
 			if (error ||
-			    !xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree)) {
+			    (error = xfs_inobt_get_rec(cur, &gino, &gcnt,
+				    &gfree, &i)) ||
+			    i == 0) {
 				end_of_ag = 1;
 				break;
 			}
@@ -503,6 +507,7 @@ xfs_inumbers(
 	__int32_t	gcnt;
 	xfs_inofree_t	gfree;
 	xfs_agino_t	gino;
+	int		i;
 	xfs_ino_t	ino;
 	int		left;
 	int		tmp;
@@ -550,7 +555,9 @@ xfs_inumbers(
 				continue;
 			}
 		}
-		if (!xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree)) {
+		if ((error = xfs_inobt_get_rec(cur, &gino, &gcnt, &gfree,
+			&i)) ||
+		    i == 0) {
 			xfs_trans_brelse(tp, agbp);
 			agbp = NULL;
 			xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ALLOC_BTREE_H
 #define	_FS_XFS_ALLOC_BTREE_H
 
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 
 /*
  * Freespace on-disk structures
@@ -151,11 +151,12 @@ xfs_alloc_delete(
 /*
  * Get the data from the pointed-to record.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_get_rec(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	xfs_agblock_t		*bno,	/* output: starting block of extent */
-	xfs_extlen_t		*len);	/* output: length of extent */
+	xfs_extlen_t		*len,	/* output: length of extent */
+	int			*stat);	/* output: success/failure */
 
 /*
  * Increment cursor by one record at the level.
@@ -210,8 +211,9 @@ xfs_alloc_lookup_le(
  
 /*
  * Update the record referred to by cur, to the value given by [bno, len].
+ * This either works (return 0) or gets an EFSCORRUPTED error.
  */
-int					/* success/failure */
+int					/* error */
 xfs_alloc_update(
 	struct xfs_btree_cur	*cur,	/* btree cursor */
 	xfs_agblock_t		bno,	/* starting block of extent */

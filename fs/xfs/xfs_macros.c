@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 #define	XFS_MACRO_C
 
@@ -488,6 +488,14 @@ xfs_bmap_iblock_size(int lev, xfs_btree_cur_t *cur)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_INIT)
+void
+xfs_bmap_init(xfs_bmap_free_t *flp, xfs_fsblock_t *fbp)
+{
+	XFS_BMAP_INIT(flp, fbp);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_KEY_DADDR)
 /*ARGSUSED3*/
 xfs_bmbt_key_t *
@@ -558,19 +566,19 @@ xfs_bmap_rec_iaddr(xfs_bmbt_block_t *bb, int i, xfs_btree_cur_t *cur)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_SANITY_CHECK)
+int
+xfs_bmap_sanity_check(xfs_mount_t *mp, xfs_bmbt_block_t *bb, int level)
+{
+	return XFS_BMAP_SANITY_CHECK(mp, bb, level);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAPI_AFLAG)
 int
 xfs_bmapi_aflag(int w)
 {
 	return XFS_BMAPI_AFLAG(w);
-}
-#endif
-
-#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_BMAP_INIT)
-void
-xfs_bmap_init(xfs_bmap_free_t *flp, xfs_fsblock_t *fbp)
-{
-	XFS_BMAP_INIT(flp, fbp);
 }
 #endif
 
@@ -1076,6 +1084,14 @@ xfs_fileoff_t
 xfs_fileoff_min(xfs_fileoff_t a, xfs_fileoff_t b)
 {
 	return XFS_FILEOFF_MIN(a, b);
+}
+#endif
+
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_FSB_SANITY_CHECK)
+int
+xfs_fsb_sanity_check(xfs_mount_t *mp, xfs_fsblock_t fsbno)
+{
+	return XFS_FSB_SANITY_CHECK(mp, fsbno);
 }
 #endif
 

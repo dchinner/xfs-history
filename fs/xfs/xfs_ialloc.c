@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.100 $"
+#ident	"$Revision: 1.101 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -643,16 +643,20 @@ nextag:
 		pagino = agi->agi_newino;
 #ifdef DEBUG
 	if (cur->bc_nlevels == 1) {
-		int freecount = 0;
+		int	freecount = 0;
 
 		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
 			goto error0;
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
-				&rec.ir_freecount, &rec.ir_free)) {
+		XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
+		do {
+			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
+					&rec.ir_freecount, &rec.ir_free, &i))
+				goto error0;
+			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
-		}
+		} while (i == 1);
 		ASSERT(freecount == agi->agi_freecount);
 	}
 #endif
@@ -662,9 +666,10 @@ nextag:
 	if (pagno == agno) {
 		if (error = xfs_inobt_lookup_le(cur, pagino, 0, 0, &i))
 			goto error0;
-		if ((i != 0) &&
-		    (j = xfs_inobt_get_rec(cur, &rec.ir_startino,
-					   &rec.ir_freecount, &rec.ir_free)) &&
+		if (i != 0 &&
+		    (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
+			    &rec.ir_freecount, &rec.ir_free, &j)) == 0 &&
+		    j == 1 &&
 		    rec.ir_freecount > 0) {
 			/*
 			 * Found a free inode in the same chunk
@@ -678,6 +683,8 @@ nextag:
 			int	doneleft;	/* done, to the left */
 			int	doneright;	/* done, to the right */
 
+			if (error)
+				goto error0;
 			ASSERT(i == 1);
 			ASSERT(j == 1);
 			/*
@@ -693,10 +700,12 @@ nextag:
 				goto error1;
 			doneleft = !i;
 			if (!doneleft) {
-				i = xfs_inobt_get_rec(tcur, &trec.ir_startino,
-						      &trec.ir_freecount,
-						      &trec.ir_free);
-				ASSERT(i);
+				if (error = xfs_inobt_get_rec(tcur,
+						&trec.ir_startino,
+						&trec.ir_freecount,
+						&trec.ir_free, &i))
+					goto error1;
+				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
 			/* 
 			 * Search right with cur, go forward 1 record.
@@ -705,10 +714,12 @@ nextag:
 				goto error1;
 			doneright = !i;
 			if (!doneright) {
-				i = xfs_inobt_get_rec(cur, &rec.ir_startino,
-						      &rec.ir_freecount,
-						      &rec.ir_free);
-				ASSERT(i);
+				if (error = xfs_inobt_get_rec(cur,
+						&rec.ir_startino,
+						&rec.ir_freecount,
+						&rec.ir_free, &i))
+					goto error1;
+				XFS_WANT_CORRUPTED_GOTO(i == 1, error1);
 			}
 			/*
 			 * Loop until we find the closest inode chunk
@@ -766,11 +777,14 @@ nextag:
 						goto error1;
 					doneleft = !i;
 					if (!doneleft) {
-						i = xfs_inobt_get_rec(tcur,
-						      &trec.ir_startino,
-						      &trec.ir_freecount,
-						      &trec.ir_free);
-						ASSERT(i);
+						if (error = xfs_inobt_get_rec(
+							    tcur,
+							    &trec.ir_startino,
+							    &trec.ir_freecount,
+							    &trec.ir_free, &i))
+							goto error1;
+						XFS_WANT_CORRUPTED_GOTO(i == 1,
+							error1);
 					}
 				}
 				/*
@@ -783,11 +797,14 @@ nextag:
 						goto error1;
 					doneright = !i;
 					if (!doneright) {
-						i = xfs_inobt_get_rec(cur,
-						      &rec.ir_startino,
-						      &rec.ir_freecount,
-						      &rec.ir_free);
-						ASSERT(i);
+						if (error = xfs_inobt_get_rec(
+							    cur,
+							    &rec.ir_startino,
+							    &rec.ir_freecount,
+							    &rec.ir_free, &i))
+							goto error1;
+						XFS_WANT_CORRUPTED_GOTO(i == 1,
+							error1);
 					}
 				}
 			}
@@ -801,9 +818,10 @@ nextag:
 	else if (agi->agi_newino != NULLAGINO) {
 		if (error = xfs_inobt_lookup_eq(cur, agi->agi_newino, 0, 0, &i))
 			goto error0;
-		if ((i != 0) &&
-		    xfs_inobt_get_rec(cur, &rec.ir_startino,
-				      &rec.ir_freecount, &rec.ir_free) &&
+		if (i == 1 &&
+		    (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
+			    &rec.ir_freecount, &rec.ir_free, &j)) == 0 &&
+		    j == 1 &&
 		    rec.ir_freecount > 0) {
 			/*
 			 * The last chunk allocated in the group still has
@@ -814,19 +832,23 @@ nextag:
 		 * None left in the last group, search the whole a.g.
 		 */
 		else {
+			if (error)
+				goto error0;
 			if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
 				goto error0;
 			ASSERT(i == 1);
 			for (;;) {
-				i = xfs_inobt_get_rec(cur, &rec.ir_startino,
-						      &rec.ir_freecount,
-						      &rec.ir_free);
-				ASSERT(i == 1);
+				if (error = xfs_inobt_get_rec(cur,
+						&rec.ir_startino,
+						&rec.ir_freecount, &rec.ir_free,
+						&i))
+					goto error0;
+				XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 				if (rec.ir_freecount > 0)
 					break;
 				if (error = xfs_inobt_increment(cur, 0, &i))
 					goto error0;
-				ASSERT(i == 1);
+				XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 			}
 		}
 	}
@@ -838,7 +860,9 @@ nextag:
 	ino = XFS_AGINO_TO_INO(mp, agno, rec.ir_startino + offset);
 	XFS_INOBT_CLR_FREE(&rec, offset);
 	rec.ir_freecount--;
-	xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free);
+	if (error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount,
+			rec.ir_free))
+		goto error0;
 	agi->agi_freecount--;
 	mraccess(&mp->m_peraglock);
 	mp->m_perag[tagno].pagi_freecount--;
@@ -849,12 +873,15 @@ nextag:
 
 		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
 			goto error0;
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
-				&rec.ir_freecount, &rec.ir_free)) {
+		do {
+			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
+					&rec.ir_freecount, &rec.ir_free, &i))
+				goto error0;
+			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
-		}
+		} while (i == 1);
 		ASSERT(freecount == agi->agi_freecount);
 	}
 #endif
@@ -936,12 +963,15 @@ xfs_difree(
 
 		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
 			goto error0;
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
-				&rec.ir_freecount, &rec.ir_free)) {
+		do {
+			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
+					&rec.ir_freecount, &rec.ir_free, &i))
+				goto error0;
+			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
-		}
+		} while (i == 1);
 		ASSERT(freecount == agi->agi_freecount);
 	}
 #endif
@@ -950,10 +980,11 @@ xfs_difree(
 	 */
 	if (error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i))
 		goto error0;
-	ASSERT(i == 1);
-	i = xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
-		&rec.ir_free);
-	ASSERT(i == 1);
+	XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
+	if (error = xfs_inobt_get_rec(cur, &rec.ir_startino, &rec.ir_freecount,
+			&rec.ir_free, &i))
+		goto error0;
+	XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 	/*
 	 * Get the offset in the inode chunk.
 	 */
@@ -965,9 +996,8 @@ xfs_difree(
 	 */
 	XFS_INOBT_SET_FREE(&rec, off);
 	rec.ir_freecount++;
-	i = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount,
-		rec.ir_free);
-	ASSERT(i == 1);
+	if (error = xfs_inobt_update(cur, rec.ir_startino, rec.ir_freecount, rec.ir_free))
+		goto error0;
 	/*
 	 * Change the inode free counts and log the ag/sb changes.
 	 */
@@ -981,12 +1011,15 @@ xfs_difree(
 
 		if (error = xfs_inobt_lookup_ge(cur, 0, 0, 0, &i))
 			goto error0;
-		while (xfs_inobt_get_rec(cur, &rec.ir_startino,
-				&rec.ir_freecount, &rec.ir_free)) {
+		do {
+			if (error = xfs_inobt_get_rec(cur, &rec.ir_startino,
+					&rec.ir_freecount, &rec.ir_free, &i))
+				goto error0;
+			XFS_WANT_CORRUPTED_GOTO(i == 1, error0);
 			freecount += rec.ir_freecount;
 			if (error = xfs_inobt_increment(cur, 0, &i))
 				goto error0;
-		}
+		} while (i == 1);
 		ASSERT(freecount == agi->agi_freecount);
 	}
 #endif
@@ -1071,13 +1104,12 @@ xfs_dilocate(
 			return error;
 		cur = xfs_btree_init_cursor(mp, tp, agbp, agno, XFS_BTNUM_INO,
 			(xfs_inode_t *)0, 0);
-		if (error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i)) {
-			xfs_trans_brelse(tp, agbp);
-			xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
-			return error;
-		}
-		if (!xfs_inobt_get_rec(cur, &chunk_agino, &chunk_cnt,
-				&chunk_free))
+		if (error = xfs_inobt_lookup_le(cur, agino, 0, 0, &i))
+			goto error0;
+		if (error = xfs_inobt_get_rec(cur, &chunk_agino, &chunk_cnt,
+				&chunk_free, &i))
+			goto error0;
+		if (i == 0)
 			error = XFS_ERROR(EINVAL);
 		xfs_trans_brelse(tp, agbp);
 		xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);		
@@ -1095,6 +1127,10 @@ xfs_dilocate(
 	*off = offset;
 	*len = blks_per_cluster;
 	return 0;
+error0:
+	xfs_trans_brelse(tp, agbp);
+	xfs_btree_del_cursor(cur, XFS_BTREE_ERROR);
+	return error;
 }
 
 /*
