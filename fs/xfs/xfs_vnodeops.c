@@ -1,4 +1,4 @@
-#ident "$Revision: 1.389 $"
+#ident "$Revision: 1.390 $"
 
 
 #ifdef SIM
@@ -2968,8 +2968,8 @@ xfs_create_broken(
 
 /*
  * xfs_create_exists (create on top of an existing vnode).
- *   *vpp has vnode found by a lookup.
- *	But *vpp might go away.
+ * 	*vpp has vnode found by a lookup and the caller must
+ *	have a reference on the vnode.
  */
 /* ARGSUSED */
 STATIC int
@@ -2991,6 +2991,7 @@ xfs_create_exists(
         xfs_mount_t	        *mp;
         int                     error = 0;
 	uint			cancel_flags;
+	void			oplock_fs_create(vnode_t *);
 
         dp = XFS_BHVTOI(dir_bdp);
 	vp = *vpp;
@@ -3037,6 +3038,16 @@ xfs_create_exists(
 
 	if (error)
 		goto error_return;
+
+	/*
+	 * if the create will lead to a truncate of a regular file,
+	 * have to check to see if an oplock is set.
+	 */
+	if (vp->v_type == VREG && vap->va_mask & AT_SIZE &&
+	    vp->v_flag & VOPLOCK) {
+#pragma mips_frequency_hint NEVER
+		oplock_fs_create(vp);
+	}
 
 	/*
 	 * All that is left is a possible truncate.
