@@ -1,4 +1,4 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.6 $"
 
 #include <sys/param.h>
 #define _KERNEL
@@ -14,6 +14,11 @@
 #include "xfs_mount.h"
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
+#include "xfs_bmap.h"
+#include "xfs_btree.h"
+#include "xfs_dinode.h"
+#include "xfs_inode_item.h"
+#include "xfs_inode.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -32,6 +37,7 @@ xfs_mount_init(void)
 
 	initnlock(&mp->m_ail_lock, "xfs_ail");
 	initnlock(&mp->m_async_lock, "xfs_async");
+	initnlock(&mp->m_ilock, "xfs_ilock");
 
 	return (mp);
 }
@@ -49,6 +55,7 @@ xfs_mount(xfs_mount_t *mp, dev_t dev)
 	mp->m_bsize = xfs_btod(sbp, 1);
 	mp->m_agrotor = 0;
 	brelse(buf);
+	xfs_ihash_init(mp);
 }
 
 void
