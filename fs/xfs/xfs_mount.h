@@ -162,6 +162,13 @@ typedef struct xfs_mount {
 #define	XFS_WRITEIO_LOG_LARGE	16
 
 /*
+ * max and min values for UIO defined I/O sizes
+ */
+#define	XFS_UIO_MAX_WRITEIO_LOG	16
+#define	XFS_UIO_MIN_WRITEIO_LOG	13
+#define	XFS_UIO_MAX_READIO_LOG	16
+#define	XFS_UIO_MIN_READIO_LOG	13
+/*
  * Synchronous read and write sizes.  This should be
  * better for NFS.
  */
