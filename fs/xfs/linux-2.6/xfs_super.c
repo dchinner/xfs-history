@@ -112,6 +112,7 @@ static struct super_operations linvfs_sops;
 #define MNTOPT_RO       "ro"            /* read only */
 #define MNTOPT_RW       "rw"            /* read/write */
 #define MNTOPT_NOUUID   "nouuid"	/* Ignore FS uuid */
+#define MNTOPT_IRIXSGID "irixsgid"	/* Irix-style sgid inheritance */
 
 STATIC int
 xfs_parseargs(
@@ -230,6 +231,8 @@ xfs_parseargs(
 			args->flags |= MS_NOSUID;
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
 			args->flags |= XFSMNT_NOUUID; 
+		} else if (!strcmp(this_char, MNTOPT_IRIXSGID)) {
+			args->flags |= XFSMNT_IRIXSGID;
 		} else {
 			printk("XFS: unknown mount option [%s].\n", this_char);
 			return rval;
