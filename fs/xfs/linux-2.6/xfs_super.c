@@ -139,8 +139,9 @@ linvfs_make_inode(kdev_t kdev, struct super_block *sb)
 void
 linvfs_release_inode(struct inode *inode)
 {
+    int pincount; /* not used here */
 	if (inode) {
-		pagebuf_delwri_flush(inode, 1);
+		pagebuf_delwri_flush(inode, PBDF_WAIT,&pincount);
 		pagebuf_lock_disable(inode);
 		truncate_inode_pages(&inode->i_data, 0L, TRUNC_NO_TOSS);
 		iput(inode);
@@ -483,6 +484,9 @@ linvfs_write_super(
  	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
  	int		error; 
 
+	if	(sb->s_flags & MS_RDONLY){
+	  return;
+	}
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
 		sys_cred, error);
 
@@ -557,10 +561,17 @@ linvfs_remount(
 		sb->s_flags |= MS_RDONLY;
 		printk("XFS: Flushing for read-only remount\n");
 		
-		PVFS_SYNC(vfsp->vfs_fbhv, SYNC_ATTR|SYNC_DELWRI|
-				  SYNC_WAIT|SYNC_CLOSE,
+		PVFS_SYNC(vfsp->vfs_fbhv,
+				  SYNC_ATTR|SYNC_DELWRI|SYNC_NOWAIT,
 				  sys_cred, error);
-		
+		if (error) {
+		  sb->s_flags=save;
+		  printk("XFS: Failed to sync for read-only remount\n");
+		}
+
+		XFS_log_write_unmount_ro(vfsp->vfs_fbhv);
+
+
 		if (error) {
 		  sb->s_flags=save;
 		  printk("XFS: Failed to sync for read-only remount\n");

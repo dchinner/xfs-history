@@ -573,10 +573,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 #define xfs_iowait(pb)              \
 	    pagebuf_iowait(pb)
 
-#define xfs_binval(buftarg)  /* hmm this is going to be tricky binval
-			      * wants to flush all delay write buffers
-			      * on device...  how do we do this with pagebuf? */
-
+#define xfs_binval(buftarg) /* NOT used with pagebufs... do nothing */
 
 extern void XFS_bflush(buftarg_t);
 

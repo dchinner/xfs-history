@@ -31,9 +31,9 @@
  */
 /*
  *
- * $Header$
- * $Author$
- * $Id$
+ * $Header: /ptools/plroot/slinx/2.4.0-test1-xfs/.RCS/PL/linux/fs/xfs/linux/RCS/xfs_lrw.h,v 1.10 2000/06/09 06:40:03 ananth Exp $
+ * $Author: ananth $
+ * $Id: xfs_lrw.h,v 1.10 2000/06/09 06:40:03 ananth Exp $
  *
  */
 
@@ -52,6 +52,7 @@ extern int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int,
 extern int xfs_iomap_write(xfs_iocore_t	*,loff_t,size_t,pb_bmap_t *,int *,int,struct pm *);
 
 extern int xfs_is_read_only(xlog_t *);
+extern void XFS_log_write_unmount_ro(bhv_desc_t	*);
 /*
  * Needed by xfs_rw.c
  */
