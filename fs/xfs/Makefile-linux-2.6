@@ -202,4 +202,5 @@ include $(TOPDIR)/Rules.make
 # multiple subdirs. It'll go away when we switch to the new dependencies,
 # though
 
-cmd_fastdep       = $(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS] pagebuf/*.[chS] linux/*.[chS] support/*.[chS]) > .depend
+fastdep: FORCE
+	$(TOPDIR)/scripts/mkdep $(CFLAGS) $(EXTRA_CFLAGS) -- $(wildcard *.[chS] pagebuf/*.[chS] linux/*.[chS] support/*.[chS]) > .depend
