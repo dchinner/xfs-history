@@ -2212,7 +2212,7 @@ xfs_alloc_get_freelist(
 	pag->pagf_flcount--;
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLFIRST | XFS_AGF_FLCOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FLFIRST | XFS_AGF_FLCOUNT);
-	*bnop = bno;
+	*bnop = INT_GET(bno, arch);
 	return 0;
 }
 
@@ -2302,11 +2302,13 @@ xfs_alloc_put_freelist(
 	pag->pagf_flcount++;
 	ASSERT(INT_GET(agf->agf_flcount, arch) <= XFS_AGFL_SIZE);
 	blockp = &agfl->agfl_bno[INT_GET(agf->agf_fllast, arch)];
-	*blockp = bno;
+	INT_SET(*blockp, arch, bno);
 	TRACE_MODAGF(NULL, agf, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
 	xfs_alloc_log_agf(tp, agbp, XFS_AGF_FLLAST | XFS_AGF_FLCOUNT);
-	xfs_trans_log_buf(tp, agflbp, (int)((caddr_t)blockp - (caddr_t)agfl),
-		(int)((caddr_t)blockp - (caddr_t)agfl + sizeof(*blockp) - 1));
+	xfs_trans_log_buf(tp, agflbp,
+		(int)((caddr_t)blockp - (caddr_t)agfl),
+		(int)((caddr_t)blockp - (caddr_t)agfl +
+			sizeof(xfs_agblock_t) - 1));
 	return 0;
 }
 
