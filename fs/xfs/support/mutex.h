@@ -32,12 +32,6 @@
 #ifndef __XFS_SUPPORT_MUTEX_H__
 #define __XFS_SUPPORT_MUTEX_H__
 
-/* semaphore.h pulls in kernel.h which has a linux version of sysinfo 
- * in our sysinfo we define sysinfo to be xfs_sysinfo 
- * we must now undef it so we can actually avoid the conflict we are 
- * trying to solve 
- */
-#undef sysinfo 
 #include <linux/version.h>
 #include <linux/time.h>
 #include <linux/wait.h>
