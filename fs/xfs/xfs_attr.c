@@ -7,6 +7,7 @@
 #include <sys/debug.h>
 #include <sys/vnode.h>
 #include <sys/dirent.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/ktrace.h>
 #include <sys/sysinfo.h>
@@ -1674,7 +1675,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 	return(0);
 }
 
-#if defined(DEBUG)
+#if defined(XFS_ATTR_TRACE)
 /*
  * Add a trace buffer entry for an attr_list context structure.
  */
@@ -1809,4 +1810,4 @@ xfs_attr_trace_enter(int type, char *where,
 					 (void *)a11, (void *)a12, (void *)a13,
 					 (void *)a14, (void *)a15);
 }
-#endif	/* DEBUG */
+#endif	/* XFS_ATTR_TRACE */
