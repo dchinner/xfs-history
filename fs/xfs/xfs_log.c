@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.139 $"
+#ident	"$Revision: 1.140 $"
 
 /*
  * High level interface routines for log manager
@@ -493,6 +493,7 @@ xfs_log_mount_finish(xfs_mount_t *mp)
 	int	error;
 	int	clean;
 
+	clean = 0;
 	error = xlog_recover_finish(mp->m_log, &clean);
 
 	/*
