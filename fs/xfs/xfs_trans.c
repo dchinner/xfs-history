@@ -68,6 +68,7 @@
 #include "xfs_quota.h"
 #include "xfs_dqblk.h" /* XFS_DQUOT_LOGRES(mp) */
 #include "xfs_trans_space.h"
+#include "xfs_arch.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -463,9 +464,12 @@ xfs_trans_apply_sb_deltas(
 	xfs_sb_t	*sbp;
 	xfs_buf_t		*bp;
 	int		whole = 0;
+        int             arch;
 
 	bp = xfs_trans_getsb(tp, tp->t_mountp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
+        
+        arch=sbp->sb_arch;
 
 	/*
 	 * Check that superblock mods match the mods made to AGF counters.
@@ -475,53 +479,53 @@ xfs_trans_apply_sb_deltas(
 		tp->t_ag_btree_delta));
 
 	if (tp->t_icount_delta != 0) {
-		sbp->sb_icount += tp->t_icount_delta;
+                INT_MOD(sbp->sb_icount, arch, tp->t_icount_delta);
 	}
 	if (tp->t_ifree_delta != 0) {
-		sbp->sb_ifree += tp->t_ifree_delta;
+                INT_MOD(sbp->sb_ifree, arch, tp->t_ifree_delta);
 	}
 
 	if (tp->t_fdblocks_delta != 0) {
-		sbp->sb_fdblocks += tp->t_fdblocks_delta;
+                INT_MOD(sbp->sb_fdblocks, arch, tp->t_fdblocks_delta);
 	}
 	if (tp->t_res_fdblocks_delta != 0) {
-		sbp->sb_fdblocks += tp->t_res_fdblocks_delta;
+		INT_MOD(sbp->sb_fdblocks, arch, tp->t_res_fdblocks_delta);
 	}
 
 	if (tp->t_frextents_delta != 0) {
-		sbp->sb_frextents += tp->t_frextents_delta;
+		INT_MOD(sbp->sb_frextents, arch, tp->t_frextents_delta);
 	}
 	if (tp->t_dblocks_delta != 0) {
-		sbp->sb_dblocks += tp->t_dblocks_delta;
-		whole = 1;
+		INT_MOD(sbp->sb_dblocks, arch, tp->t_dblocks_delta);
+	        whole = 1;
 	}
 	if (tp->t_agcount_delta != 0) {
-		sbp->sb_agcount += tp->t_agcount_delta;
-		whole = 1;
+                INT_MOD(sbp->sb_agcount, arch, tp->t_agcount_delta);
+	        whole = 1;
 	}
 	if (tp->t_imaxpct_delta != 0) {
-		sbp->sb_imax_pct += tp->t_imaxpct_delta;
-		whole = 1;
+		INT_MOD(sbp->sb_imax_pct, arch, tp->t_imaxpct_delta);
+	        whole = 1;
 	}
 	if (tp->t_rextsize_delta != 0) {
-		sbp->sb_rextsize += tp->t_rextsize_delta;
-		whole = 1;
+		INT_MOD(sbp->sb_rextsize, arch, tp->t_rextsize_delta);
+	        whole = 1;
 	}
 	if (tp->t_rbmblocks_delta != 0) {
-		sbp->sb_rbmblocks += tp->t_rbmblocks_delta;
-		whole = 1;
+		INT_MOD(sbp->sb_rbmblocks, arch, tp->t_rbmblocks_delta);
+	        whole = 1;
 	}
 	if (tp->t_rblocks_delta != 0) {
-		sbp->sb_rblocks += tp->t_rblocks_delta;
-		whole = 1;
+		INT_MOD(sbp->sb_rblocks, arch, tp->t_rblocks_delta);
+	    	whole = 1;
 	}
 	if (tp->t_rextents_delta != 0) {
-		sbp->sb_rextents += tp->t_rextents_delta;
-		whole = 1;
+		INT_MOD(sbp->sb_rextents, arch, tp->t_rextents_delta);
+	        whole = 1;
 	}
 	if (tp->t_rextslog_delta != 0) {
-		sbp->sb_rextslog += tp->t_rextslog_delta;
-		whole = 1;
+		INT_MOD(sbp->sb_rextslog, arch, tp->t_rextslog_delta);
+	        whole = 1;
 	}
 
 	if (whole)

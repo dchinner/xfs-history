@@ -55,6 +55,7 @@
 #include "xfs_quota.h"
 #include "xfs_fsops.h"
 #include "xfs_cxfs.h"
+#include "xfs_arch.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -74,6 +75,61 @@ STATIC uuid_t	*xfs_uuidtab;
 
 void	xfs_uuid_unmount(xfs_mount_t *);
 #endif	/* !SIM */
+
+STATIC void xfs_xlatesb(buf_t *, xfs_sb_t *, int, xfs_arch_t, __int64_t);
+
+static struct {
+    short offset;
+    short type;     /* 0 = integer
+                     * 1 = binary / string (no translation)
+                     */
+} xfs_sb_info[] = {
+    { offsetof(xfs_sb_t, sb_magicnum),   0 },
+    { offsetof(xfs_sb_t, sb_blocksize),  0 },
+    { offsetof(xfs_sb_t, sb_dblocks),    0 },
+    { offsetof(xfs_sb_t, sb_rblocks),    0 },
+    { offsetof(xfs_sb_t, sb_rextents),   0 },
+    { offsetof(xfs_sb_t, sb_uuid),       1 },
+    { offsetof(xfs_sb_t, sb_logstart),   0 },
+    { offsetof(xfs_sb_t, sb_rootino),    0 },
+    { offsetof(xfs_sb_t, sb_rbmino),     0 },
+    { offsetof(xfs_sb_t, sb_rsumino),    0 },
+    { offsetof(xfs_sb_t, sb_rextsize),   0 },
+    { offsetof(xfs_sb_t, sb_agblocks),   0 },
+    { offsetof(xfs_sb_t, sb_agcount),    0 },
+    { offsetof(xfs_sb_t, sb_rbmblocks),  0 },
+    { offsetof(xfs_sb_t, sb_logblocks),  0 },
+    { offsetof(xfs_sb_t, sb_versionnum), 0 },
+    { offsetof(xfs_sb_t, sb_sectsize),   0 },
+    { offsetof(xfs_sb_t, sb_inodesize),  0 },
+    { offsetof(xfs_sb_t, sb_inopblock),  0 },
+    { offsetof(xfs_sb_t, sb_fname[0]),   1 },
+    { offsetof(xfs_sb_t, sb_fpack[0]),   1 },
+    { offsetof(xfs_sb_t, sb_blocklog),   0 },
+    { offsetof(xfs_sb_t, sb_sectlog),    0 },
+    { offsetof(xfs_sb_t, sb_inodelog),   0 },
+    { offsetof(xfs_sb_t, sb_inopblog),   0 },
+    { offsetof(xfs_sb_t, sb_agblklog),   0 },
+    { offsetof(xfs_sb_t, sb_rextslog),   0 },
+    { offsetof(xfs_sb_t, sb_inprogress), 0 },
+    { offsetof(xfs_sb_t, sb_imax_pct),   0 },
+    { offsetof(xfs_sb_t, sb_icount),     0 },
+    { offsetof(xfs_sb_t, sb_ifree),      0 },
+    { offsetof(xfs_sb_t, sb_fdblocks),   0 },
+    { offsetof(xfs_sb_t, sb_frextents),  0 },
+    { offsetof(xfs_sb_t, sb_uquotino),   0 },
+    { offsetof(xfs_sb_t, sb_pquotino),   0 },
+    { offsetof(xfs_sb_t, sb_qflags),     0 },
+    { offsetof(xfs_sb_t, sb_flags),      0 },
+    { offsetof(xfs_sb_t, sb_shared_vn),  0 },
+    { offsetof(xfs_sb_t, sb_inoalignmt), 0 },
+    { offsetof(xfs_sb_t, sb_unit),       0 },
+    { offsetof(xfs_sb_t, sb_width),      0 },
+    { offsetof(xfs_sb_t, sb_dirblklog),  0 },
+    { offsetof(xfs_sb_t, sb_arch),       0 },
+    { offsetof(xfs_sb_t, sb_dummy),      1 },
+    { sizeof(xfs_sb_t),                  0 }
+};
 
 /*
  * Return a pointer to an initialized xfs_mount structure.
@@ -206,6 +262,19 @@ xfs_mount_validate_sb(
 #endif
 
 #ifndef SIM
+        printk(KERN_NOTICE "XFS Mode = " XFS_MODE ", arch=%d\n",
+                (int)(sbp->sb_arch));
+#endif
+        /* check that architecture is supported */
+        if (!ARCH_SUPPORTED(sbp->sb_arch)) {
+            /* XXX should really identify architecture type if we know it */
+            cmn_err(CE_WARN,
+"XFS: Filesystems with architecture %d are not supported on this system.\n",
+                    sbp->sb_arch);
+            return XFS_ERROR(EINVAL);
+        }
+        
+#ifndef SIM
 	/*
 	 * Except for from mkfs, don't let partly-mkfs'ed filesystems mount.
 	 */
@@ -214,6 +283,87 @@ xfs_mount_validate_sb(
 #endif	
 	return (0);
 }
+
+/*
+ * xfs_xlatesb
+ *
+ *     buf    - a buffer
+ *     sb     - a superblock
+ *     dir    - conversion direction: <0 - convert sb to buf
+ *                                    >0 - convert buf to sb
+ *     arch   - architecture to read/write from/to buf
+ *     fields - which fields to copy (bitmask)
+ */
+STATIC void
+xfs_xlatesb(buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch, 
+            __int64_t fields)
+{
+    caddr_t src,dst;
+    xfs_arch_t      src_arch;
+    xfs_arch_t      dst_arch;
+           
+    ASSERT(ARCH_SUPPORTED(arch));
+    ASSERT(dir);
+    ASSERT(fields);
+
+    if (!fields)
+        return;
+    
+    if (dir>0) {
+        src=(caddr_t)(buf->b_un.b_addr);
+        dst=(caddr_t)sb;
+        src_arch=arch;
+        dst_arch=XFS_ARCH_NATIVE;  
+    } else {
+        src=(caddr_t)sb;
+        dst=(caddr_t)(buf->b_un.b_addr);
+        src_arch=XFS_ARCH_NATIVE;
+        dst_arch=arch;  
+    }
+    
+    while (fields) {
+	xfs_sb_field_t	f;
+	int		first;
+	int		size;
+
+	f = (xfs_sb_field_t)xfs_lowbit64((__uint64_t)fields);
+	first = xfs_sb_info[f].offset;
+	size = xfs_sb_info[f + 1].offset - first;
+        
+        if (src_arch == dst_arch) {
+	    bcopy(src + first, dst + first, size);
+        } else {
+            if (xfs_sb_info[f].type==0) {
+                switch (size) {
+                    case 1: 
+                       *(__uint8_t*)(dst+first)=*(__uint8_t*)(src+first);
+                       break;
+                    case 2:  
+                        INT_COPY(*(__uint16_t*)(src+first),src_arch,
+                                 *(__uint16_t*)(dst+first), dst_arch);
+                        break;
+                    case 4:  
+                        INT_COPY(*(__uint32_t*)(src+first), src_arch,
+                                 *(__uint32_t*)(dst+first), dst_arch);
+                        break;
+                    case 8:  
+                        INT_COPY(*(__uint64_t*)(src+first), src_arch,
+                                 *(__uint64_t*)(dst+first), dst_arch);
+                        break;
+                    default: 
+                        ASSERT(0);
+                }
+            } else if (xfs_sb_info[f].type==1) {
+                bcopy(src + first, dst + first, size);
+            } else {
+                ASSERT(0);
+            }
+        }
+	fields &= ~(1LL << f);
+    }
+    
+}
+
 
 /*
  * xfs_readsb 
@@ -258,12 +408,13 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 * But first do some basic consistency checking.
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
-	if (error = xfs_mount_validate_sb(mp, sbp)) {
+        mp->m_arch=sbp->sb_arch; /* set architecture first */
+        xfs_xlatesb(bp, &(mp->m_sb), 1, mp->m_arch, XFS_SB_ALL_BITS);
+	if (error = xfs_mount_validate_sb(mp, &(mp->m_sb))) {
 		goto err;
 	}
 
 	mp->m_sb_bp = bp;
-	mp->m_sb = *sbp;				/* bcopy structure */
 	xfs_buf_relse(bp);
 	ASSERT(XFS_BUF_VALUSEMA(bp) > 0);
 	return 0;
@@ -1122,51 +1273,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 	int		last;
 	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
-	static const short offsets[] = {
-		offsetof(xfs_sb_t, sb_magicnum),
-		offsetof(xfs_sb_t, sb_blocksize),
-		offsetof(xfs_sb_t, sb_dblocks),
-		offsetof(xfs_sb_t, sb_rblocks),
-		offsetof(xfs_sb_t, sb_rextents),
-		offsetof(xfs_sb_t, sb_uuid),
-		offsetof(xfs_sb_t, sb_logstart),
-		offsetof(xfs_sb_t, sb_rootino),
-		offsetof(xfs_sb_t, sb_rbmino),
-		offsetof(xfs_sb_t, sb_rsumino),
-		offsetof(xfs_sb_t, sb_rextsize),
-		offsetof(xfs_sb_t, sb_agblocks),
-		offsetof(xfs_sb_t, sb_agcount),
-		offsetof(xfs_sb_t, sb_rbmblocks),
-		offsetof(xfs_sb_t, sb_logblocks),
-		offsetof(xfs_sb_t, sb_versionnum),
-		offsetof(xfs_sb_t, sb_sectsize),
-		offsetof(xfs_sb_t, sb_inodesize),
-		offsetof(xfs_sb_t, sb_inopblock),
-		offsetof(xfs_sb_t, sb_fname[0]),
-		offsetof(xfs_sb_t, sb_fpack[0]),
-		offsetof(xfs_sb_t, sb_blocklog),
-		offsetof(xfs_sb_t, sb_sectlog),
-		offsetof(xfs_sb_t, sb_inodelog),
-		offsetof(xfs_sb_t, sb_inopblog),
-		offsetof(xfs_sb_t, sb_agblklog),
-		offsetof(xfs_sb_t, sb_rextslog),
-		offsetof(xfs_sb_t, sb_inprogress),
-		offsetof(xfs_sb_t, sb_imax_pct),
-		offsetof(xfs_sb_t, sb_icount),
-		offsetof(xfs_sb_t, sb_ifree),
-		offsetof(xfs_sb_t, sb_fdblocks),
-		offsetof(xfs_sb_t, sb_frextents),
-		offsetof(xfs_sb_t, sb_uquotino),
-		offsetof(xfs_sb_t, sb_pquotino),
-		offsetof(xfs_sb_t, sb_qflags),
-		offsetof(xfs_sb_t, sb_flags),
-		offsetof(xfs_sb_t, sb_shared_vn),
-		offsetof(xfs_sb_t, sb_inoalignmt),
-		offsetof(xfs_sb_t, sb_unit),
-		offsetof(xfs_sb_t, sb_width),
-		offsetof(xfs_sb_t, sb_dirblklog),
-		sizeof(xfs_sb_t)
-	};
+        xfs_sb_field_t	f;
  
 	ASSERT(fields);
 	if (!fields)
@@ -1176,23 +1283,21 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
 	sbp = XFS_BUF_TO_SBP(bp);
 	first = sizeof(xfs_sb_t);
 	last = 0;
-	while (fields) {
-		xfs_sb_field_t	f;
-		int		first1;
-		int		last1;
+        
+        /* translate/copy */
+        
+        xfs_xlatesb(bp, &(mp->m_sb), -1, sbp->sb_arch, fields);
 
-		f = (xfs_sb_field_t)xfs_lowbit64((__uint64_t)fields);
-		ASSERT((1LL << f) & XFS_SB_MOD_BITS);
-		first1 = offsets[f];
-		last1 = offsets[f + 1] - 1;
-		bcopy((caddr_t)&mp->m_sb + first1, (caddr_t)sbp + first1,
-			last1 - first1 + 1);
-		if (first1 < first)
-			first = first1;
-		if (last1 > last)
-			last = last1;
-		fields &= ~(1LL << f);
-	}
+        /* find modified range */
+
+        f = (xfs_sb_field_t)xfs_lowbit64((__uint64_t)fields);
+        ASSERT((1LL << f) & XFS_SB_MOD_BITS);
+        first = xfs_sb_info[f].offset;
+
+        f = (xfs_sb_field_t)xfs_highbit64((__uint64_t)fields);
+        ASSERT((1LL << f) & XFS_SB_MOD_BITS);
+	last = xfs_sb_info[f + 1].offset - 1;
+        
 	xfs_trans_log_buf(tp, bp, first, last);
 }
 
