@@ -418,7 +418,7 @@ extern void xfs_pb_nfreer(page_buf_t *);
 
 #define XFS_BUF_ISPINNED(bp)   pagebuf_ispin(bp)
 
-#define XFS_BUF_VALUSEMA(bp) 	pagebuf_is_locked(bp)
+#define XFS_BUF_VALUSEMA(bp) 	pagebuf_lock_value(bp)
 #define XFS_BUF_CPSEMA(bp)   	pagebuf_cond_lock(bp)
 #define XFS_BUF_VSEMA(bp)   	pagebuf_unlock(bp)
 #define XFS_BUF_PSEMA(bp,x)	pagebuf_lock(bp)

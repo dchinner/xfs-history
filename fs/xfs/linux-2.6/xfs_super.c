@@ -69,7 +69,10 @@
 
 #undef sysinfo
 
-#if !CONFIG_PAGE_BUF_META
+
+#if CONFIG_PAGE_BUF_META
+extern pagebuf_daemon_t *pb_daemon;
+#else
 /* xfs_fs_bio.c */
 void binit(void);
 #endif
@@ -209,6 +212,15 @@ linvfs_read_super(
 	u_int		disk, partition;
 
 	MOD_INC_USE_COUNT;
+
+#if CONFIG_PAGE_BUF_META
+	if (!pb_daemon){
+		/* first mount pagebuf delayed write daemon not running yet */
+		if (pagebuf_daemon_start() < 0) {
+			goto fail_vnrele;
+		}
+	}
+#endif
 
 	/*  Setup the uap structure  */
 
@@ -560,7 +572,7 @@ int __init init_xfs_fs(void)
   ENTER("init_xfs_fs"); 
   si_meminfo(&si);
 
-  physmem = btoc(si.totalram);
+  physmem = si.totalram;
 
   cred_init();
 #if !CONFIG_PAGE_BUF_META
@@ -584,6 +596,11 @@ int init_module(void)
 
 void cleanup_module(void)
 {
+	extern void xfs_cleanup(void);
+	extern void vn_cleanup();
+
+	xfs_cleanup();
+	vn_cleanup();
         unregister_filesystem(&xfs_fs_type);
 }
 

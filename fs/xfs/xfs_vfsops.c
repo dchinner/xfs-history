@@ -426,6 +426,44 @@ xfs_init(int	fstype)
 	return 0;
 }
 
+#ifdef __linux__
+#ifndef SIM
+extern int	kmem_cache_destroy(zone_t *);
+
+void
+xfs_cleanup()
+{
+	extern zone_t	*xfs_bmap_free_item_zone;
+	extern zone_t	*xfs_btree_cur_zone;
+	extern zone_t	*xfs_inode_zone;
+	extern zone_t	*xfs_trans_zone;
+	extern zone_t	*xfs_gap_zone;
+	extern zone_t	*xfs_da_state_zone;
+	extern zone_t	*xfs_dabuf_zone;
+	extern zone_t	*xfs_efd_zone;
+	extern zone_t	*xfs_efi_zone;
+	extern zone_t	*xfs_buf_item_zone;
+	extern zone_t	*xfs_chashlist_zone;
+
+	kmem_cache_destroy(xfs_bmap_free_item_zone);
+	kmem_cache_destroy(xfs_btree_cur_zone);
+	kmem_cache_destroy(xfs_inode_zone);
+	kmem_cache_destroy(xfs_trans_zone);
+	kmem_cache_destroy(xfs_gap_zone);
+	kmem_cache_destroy(xfs_da_state_zone);
+	kmem_cache_destroy(xfs_dabuf_zone);
+	kmem_cache_destroy(xfs_buf_item_zone);
+	kmem_cache_destroy(xfs_efd_zone);
+	kmem_cache_destroy(xfs_efi_zone);
+	kmem_cache_destroy(xfs_ifork_zone);
+	kmem_cache_destroy(xfs_ili_zone);
+	kmem_cache_destroy(xfs_chashlist_zone);
+
+}
+
+#endif
+#endif
+
 
 #ifndef SIM
 #ifndef __linux__
@@ -1585,8 +1623,9 @@ xfs_ibusy(
 			
 #ifdef DEBUG
 #ifdef __linux__
-			printk("busy vp=0x%x ip=0x%x inum %d count=%d\n",
-				vp, ip, ip->i_ino & 0xffffffff, vp->v_count);
+			printk("busy vp=0x%p ip=0x%p inum %u count=%d\n",
+				vp, ip, (unsigned int)ip->i_ino & 0xffffffff,
+				vp->v_count);
 #else
 			printf("busy vp=0x%x count=%d\n", vp, vp->v_count);
 #endif /* __linux__ */

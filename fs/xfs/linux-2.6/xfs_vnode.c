@@ -225,6 +225,31 @@ vn_init(void)
 	vn_minvn = ncsize;
 }
 
+void
+vn_cleanup(void)
+{
+	extern int	kmem_cache_destroy(zone_t *);
+	vnlist_t *vlist;
+	vnode_t	*vp, *nvp;
+	int	list, s;
+
+	s = LOCK_VFP(vfreelist);
+	list = 0;
+	vlist = VFREELIST(list);
+	vp = vlist->vl_next;
+	while (vp != (struct vnode *)vlist) {
+		nvp = vp->v_next;
+		vn_unlink(vp);
+		kmem_zone_free(vn_zone, vp);
+		vp = nvp;
+	}
+	UNLOCK_VFREELIST(list, s);
+
+	kmem_cache_destroy(vn_zone);
+	kmem_free(vhash, (VHASHMASK+1) * sizeof(vhash_t));
+	kmem_free(vfreelist, (vfreelistmask + 1) * sizeof(vfreelist_t));
+}
+
 vnode_t *
 vn_find(vnumber_t number)
 {
