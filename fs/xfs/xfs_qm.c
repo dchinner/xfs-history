@@ -1,4 +1,4 @@
-#ident "$Revision: 1.40 $"
+#ident "$Revision: 1.41 $"
 
 
 #include <sys/param.h>
@@ -1596,7 +1596,7 @@ xfs_qm_reset_dqcounts(
 	ASSERT(XFS_QM_DQPERBLK(mp) == 
 	       XFS_FSB_TO_B(mp, XFS_DQUOT_CLUSTER_SIZE_FSB) / 
 	       sizeof(xfs_dqblk_t));
-	ddq = (xfs_disk_dquot_t *)bp->b_un.b_addr;
+	ddq = (xfs_disk_dquot_t *)XFS_BUF_PTR(bp);
 	for (j = 0; j < XFS_QM_DQPERBLK(mp); j++) {
 		/*
 		 * Do a sanity check, and if needed, repair the dqblk. Don't

@@ -57,7 +57,7 @@ typedef	struct xfs_btree_sblock xfs_inobt_block_t;
 xfs_inobt_block_t *xfs_buf_to_inobt_block(struct xfs_buf *bp);
 #define	XFS_BUF_TO_INOBT_BLOCK(bp)	xfs_buf_to_inobt_block(bp)
 #else
-#define	XFS_BUF_TO_INOBT_BLOCK(bp) ((xfs_inobt_block_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_INOBT_BLOCK(bp) ((xfs_inobt_block_t *)(XFS_BUF_PTR(bp)))
 #endif
 
 /*

@@ -344,7 +344,7 @@ void xfs_dfork_next_set(xfs_dinode_t *dip, int w, int n);
 xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);
 #define	XFS_BUF_TO_DINODE(bp)	xfs_buf_to_dinode(bp)
 #else
-#define	XFS_BUF_TO_DINODE(bp)	((xfs_dinode_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_DINODE(bp)	((xfs_dinode_t *)(XFS_BUF_PTR(bp)))
 #endif
 
 /*

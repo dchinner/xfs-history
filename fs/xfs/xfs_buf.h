@@ -88,6 +88,15 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)	\
 			(buf)->b_fsprivate3 = (void *)(value)
 
+#define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
+#define XFS_BUF_SET_VTYPE_REF(bp, type, ref)	\
+			(bp)->b_bvtype = (type); \
+			(bp)->b_ref = (ref)
+#define XFS_BUF_SET_VTYPE(bp, type)		\
+			(bp)->b_bvtype = (type)
+#define XFS_BUF_SET_REF(bp, ref)		\
+			(bp)->b_ref = (ref)
+
 int
 xfs_bdstrat_cb(struct xfs_buf *bp);
 
@@ -97,6 +106,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define xfs_bawrite(mp, bp) \
 	{ ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
 		(bp)->b_fsprivate3 = (mp); bawrite(bp);}
+
 
 #endif /* _USING_BUF_T */
 
@@ -139,8 +149,13 @@ typedef struct buftarg {
 			((type)(buf)->pb_target.i_sb)
 #define XFS_BUF_SET_FSPRIVATE3(buf, value)
 
-#define xfs_bdwrite(mp, bp) pagebuf_dwrite(bp)
-#define xfs_bawrite(mp, bp) pagebuf_awrite(bp)
+#define XFS_BUF_PTR(bp)	((bp)->pb_addr)
+#define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
+#define XFS_BUF_SET_VTYPE(bp, type)
+#define XFS_BUF_SET_REF(bp, ref)
+
+#define xfs_bdwrite(mp, bp) pagebuf_iostart(bp, PBF_DELWRI)
+#define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
 #endif /* _USING_PAGEBUF_T */
 

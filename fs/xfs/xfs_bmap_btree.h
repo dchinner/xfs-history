@@ -167,7 +167,7 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 xfs_bmbt_block_t *xfs_buf_to_bmbt_block(struct xfs_buf *bp);
 #define	XFS_BUF_TO_BMBT_BLOCK(bp)		xfs_buf_to_bmbt_block(bp)
 #else
-#define	XFS_BUF_TO_BMBT_BLOCK(bp) ((xfs_bmbt_block_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_BMBT_BLOCK(bp) ((xfs_bmbt_block_t *)(XFS_BUF_PTR(bp)))
 #endif
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BMAP_RBLOCK_DSIZE)

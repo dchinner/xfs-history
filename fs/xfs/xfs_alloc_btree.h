@@ -37,7 +37,7 @@ typedef	struct xfs_btree_sblock xfs_alloc_block_t;
 xfs_alloc_block_t *xfs_buf_to_alloc_block(struct xfs_buf *bp);
 #define	XFS_BUF_TO_ALLOC_BLOCK(bp)	xfs_buf_to_alloc_block(bp)
 #else
-#define	XFS_BUF_TO_ALLOC_BLOCK(bp) ((xfs_alloc_block_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_ALLOC_BLOCK(bp) ((xfs_alloc_block_t *)(XFS_BUF_PTR(bp)))
 #endif
 
 /*

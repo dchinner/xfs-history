@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.140 $"
+#ident	"$Revision: 1.141 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -240,7 +240,7 @@ xlog_find_cycle_start(xlog_t	*log,
 	while (mid_blk != first_blk && mid_blk != *last_blk) {
 		if (error = xlog_bread(log, mid_blk, 1, bp))
 			return error;
-		mid_cycle = GET_CYCLE(bp->b_dmaaddr);
+		mid_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
 		if (mid_cycle == cycle) {
 			*last_blk = mid_blk;
 			/* last_half_cycle == mid_cycle */
@@ -385,12 +385,12 @@ xlog_find_head(xlog_t  *log,
     bp = xlog_get_bp(1);
     if (error = xlog_bread(log, 0, 1, bp))
 	goto bp_err;
-    first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+    first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
 
     last_blk = head_blk = log_bbnum-1;		/* get cycle # of last block */
     if (error = xlog_bread(log, last_blk, 1, bp))
 	goto bp_err;
-    last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+    last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
     ASSERT(last_half_cycle != 0);
 
     /*
@@ -473,7 +473,7 @@ xlog_find_head(xlog_t  *log,
 	start_blk = head_blk - num_scan_bblks;
 	if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
 	    goto big_bp_err;
-	ba = big_bp->b_dmaaddr;
+	ba = XFS_BUF_PTR(big_bp);
 	new_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks,
 					 stop_on_cycle);
 	if (new_blk != -1)
@@ -509,7 +509,7 @@ xlog_find_head(xlog_t  *log,
 	if (error = xlog_bread(log, start_blk,
 			num_scan_bblks-(int)head_blk, big_bp))
 	    goto big_bp_err;
-	ba = big_bp->b_dmaaddr;
+	ba = XFS_BUF_PTR(big_bp);
 	new_blk= xlog_find_verify_cycle(&ba, start_blk,
 		     num_scan_bblks-(int)head_blk, (stop_on_cycle - 1));
 	if (new_blk != -1) {
@@ -526,7 +526,7 @@ xlog_find_head(xlog_t  *log,
 	ASSERT(head_blk <= INT_MAX);
 	if (error = xlog_bread(log, start_blk, (int) head_blk, big_bp))
 	    goto big_bp_err;
-	ba = big_bp->b_dmaaddr;
+	ba = XFS_BUF_PTR(big_bp);
 	new_blk = xlog_find_verify_cycle(&ba, start_blk, (int) head_blk,
 					 stop_on_cycle);
 	if (new_blk != -1)
@@ -545,7 +545,7 @@ bad_blk:
 	    goto big_bp_err;
 
 	/* start ptr at last block ptr before head_blk */
-	ba = big_bp->b_dmaaddr + XLOG_MAX_RECORD_BSIZE;
+	ba = XFS_BUF_PTR(big_bp) + XLOG_MAX_RECORD_BSIZE;
 	if ((error = xlog_find_verify_log_record(ba,
 						 start_blk,
 						 &head_blk,
@@ -559,7 +559,7 @@ bad_blk:
 	ASSERT(head_blk <= INT_MAX);
 	if (error = xlog_bread(log, start_blk, (int)head_blk, big_bp))
 	    goto big_bp_err;
-	ba = big_bp->b_dmaaddr + BBTOB(head_blk);
+	ba = XFS_BUF_PTR(big_bp) + BBTOB(head_blk);
 	if ((error = xlog_find_verify_log_record(ba,
 						 start_blk,
 						 &head_blk,
@@ -571,7 +571,7 @@ bad_blk:
 	    if (error = xlog_bread(log, start_blk, log_bbnum - (int)start_blk,
 				   big_bp))
 		goto big_bp_err;
-	    ba = big_bp->b_dmaaddr + BBTOB(log_bbnum - start_blk);
+	    ba = XFS_BUF_PTR(big_bp) + BBTOB(log_bbnum - start_blk);
 	    ASSERT(head_blk <= INT_MAX);
 	    if ((error = xlog_find_verify_log_record(ba,
 						     start_blk,
@@ -656,7 +656,7 @@ xlog_find_tail(xlog_t  *log,
 	if (*head_blk == 0) {				/* special case */
 		if (error = xlog_bread(log, 0, 1, bp))
 			goto bread_err;
-		if (GET_CYCLE(bp->b_dmaaddr) == 0) {
+		if (GET_CYCLE(XFS_BUF_PTR(bp)) == 0) {
 			*tail_blk = 0;
 			/* leave all other log inited values alone */
 			goto exit;
@@ -670,7 +670,7 @@ xlog_find_tail(xlog_t  *log,
 	for (i=(int)(*head_blk)-1; i>=0; i--) {
 		if (error = xlog_bread(log, i, 1, bp))
 			goto bread_err;
-		if (*(uint *)(bp->b_dmaaddr) == XLOG_HEADER_MAGIC_NUM) {
+		if (*(uint *)(XFS_BUF_PTR(bp)) == XLOG_HEADER_MAGIC_NUM) {
 			found = 1;
 			break;
 		}
@@ -685,7 +685,7 @@ xlog_find_tail(xlog_t  *log,
 		for (i=log->l_logBBsize-1; i>=(int)(*head_blk); i--) {
 			if (error = xlog_bread(log, i, 1, bp))
 				goto bread_err;
-			if (*(uint*)(bp->b_dmaaddr) == XLOG_HEADER_MAGIC_NUM) {
+			if (*(uint*)(XFS_BUF_PTR(bp)) == XLOG_HEADER_MAGIC_NUM) {
 				found = 2;
 				break;
 			}
@@ -698,7 +698,7 @@ xlog_find_tail(xlog_t  *log,
 	}
 
 	/* find blk_no of tail of log */
-	rhead = (xlog_rec_header_t *)bp->b_dmaaddr;
+	rhead = (xlog_rec_header_t *)XFS_BUF_PTR(bp);
 	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
 
 	/*
@@ -741,7 +741,7 @@ xlog_find_tail(xlog_t  *log,
 		if (error = xlog_bread(log, umount_data_blk, 1, bp)) {
 			goto bread_err;
 		}
-		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
+		op_head = (xlog_op_header_t *)XFS_BUF_PTR(bp);
 		if (op_head->oh_flags & XLOG_UNMOUNT_TRANS) {
 			/*
 			 * Set tail and last sync so that newly written
@@ -812,7 +812,7 @@ xlog_find_zeroed(struct log	*log,
 	bp = xlog_get_bp(1);
 	if (error = xlog_bread(log, 0, 1, bp))
 		goto bp_err;
-	first_cycle = GET_CYCLE(bp->b_dmaaddr);
+	first_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
 	if (first_cycle == 0) {		/* completely zeroed log */
 		*blk_no = 0;
 		xlog_put_bp(bp);
@@ -822,7 +822,7 @@ xlog_find_zeroed(struct log	*log,
 	/* check partially zeroed log */
 	if (error = xlog_bread(log, log_bbnum-1, 1, bp))
 		goto bp_err;
-	last_cycle = GET_CYCLE(bp->b_dmaaddr);
+	last_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
 	if (last_cycle != 0) {		/* log completely written to */
 		xlog_put_bp(bp);
 		return 0;
@@ -855,7 +855,7 @@ xlog_find_zeroed(struct log	*log,
 	start_blk = last_blk - num_scan_bblks;
 	if (error = xlog_bread(log, start_blk, (int)num_scan_bblks, big_bp))
 		goto big_bp_err;
-	ba = big_bp->b_dmaaddr;
+	ba = XFS_BUF_PTR(big_bp);
 	/*
 	 * We search for any instances of cycle number 0 that occur before
 	 * our current estimate of the head.  What we're trying to detect is
@@ -905,7 +905,7 @@ xlog_write_log_records(
 	int			curr_block;
 	int			error;
 
-	recp = (xlog_rec_header_t*)(bp->b_un.b_addr);
+	recp = (xlog_rec_header_t*)(XFS_BUF_PTR(bp));
 	curr_block = start_block;
 	for (i = 0; i < blocks; i++) {
 		recp->h_magicno = XLOG_HEADER_MAGIC_NUM;
@@ -1618,7 +1618,7 @@ xlog_recover_do_inode_buffer(xfs_mount_t		*mp,
 			return XFS_ERROR(EFSCORRUPTED);
 		}
 
-		buffer_nextp = (xfs_agino_t *)((char *)(bp->b_un.b_addr) +
+		buffer_nextp = (xfs_agino_t *)((char *)(XFS_BUF_PTR(bp)) +
 					      next_unlinked_offset);
 		*buffer_nextp = *logged_nextp;
 	}
@@ -1686,7 +1686,7 @@ xlog_recover_do_reg_buffer(xfs_mount_t		*mp,
 		}
 		if (!error)
 		    bcopy(item->ri_buf[i].i_addr,	           /* source */
-		      bp->b_un.b_addr+((uint)bit << XFS_BLI_SHIFT),  /* dest */
+		      XFS_BUF_PTR(bp)+((uint)bit << XFS_BLI_SHIFT),  /* dest */
 		      nbits<<XFS_BLI_SHIFT);			   /* length */
 		i++;
 		bit += nbits;
@@ -1856,7 +1856,7 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	 * overlap with future reads of those inodes.
 	 */
 	error = 0;
-	if ((*((__uint16_t *)(bp->b_un.b_addr)) == XFS_DINODE_MAGIC) &&
+	if ((*((__uint16_t *)(XFS_BUF_PTR(bp))) == XFS_DINODE_MAGIC) &&
 	    (bp->b_bcount != MAX(log->l_mp->m_sb.sb_blocksize,
 							 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
 	  XFS_BUF_STALE(bp);
@@ -1927,7 +1927,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	error = 0;
 	xfs_inobp_check(mp, bp);
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
-	dip = (xfs_dinode_t *)(bp->b_un.b_addr+imap.im_boffset);
+	dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp)+imap.im_boffset);
 
 	/*
 	 * Make sure the place we're flushing out to really looks
@@ -1992,7 +1992,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <= bp->b_dmaaddr+bp->b_bcount);
+	ASSERT((caddr_t)dip+item->ri_buf[1].i_len <= XFS_BUF_PTR(bp)+bp->b_bcount);
 	bcopy(item->ri_buf[1].i_addr, dip, item->ri_buf[1].i_len);
 
 	if (in_f->ilf_size == 2)
@@ -2008,7 +2008,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	switch (fields & (XFS_ILOG_DFORK | XFS_ILOG_DEV | XFS_ILOG_UUID)) {
 	case XFS_ILOG_DDATA:
 	case XFS_ILOG_DEXT:
-		ASSERT((caddr_t)&dip->di_u+len <= bp->b_dmaaddr+bp->b_bcount);
+		ASSERT((caddr_t)&dip->di_u+len <= XFS_BUF_PTR(bp)+bp->b_bcount);
 		bcopy(src, &dip->di_u, len);
 		break;
 
@@ -2056,7 +2056,7 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 		case XFS_ILOG_ADATA:
 		case XFS_ILOG_AEXT:
 			dest = XFS_DFORK_APTR(dip);
-			ASSERT(dest+len <= bp->b_dmaaddr+bp->b_bcount);
+			ASSERT(dest+len <= XFS_BUF_PTR(bp)+bp->b_bcount);
 			ASSERT(len <= XFS_DFORK_ASIZE(dip, mp));
 			bcopy(src, dest, len);
 			break;
@@ -2208,7 +2208,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		return error;
 	}
 	ASSERT(bp);
-	ddq = (xfs_disk_dquot_t *) ((char *)bp->b_un.b_addr + 
+	ddq = (xfs_disk_dquot_t *) ((char *)XFS_BUF_PTR(bp) + 
 				    dq_f->qlf_boffset);
 	
 	/* 
@@ -2222,7 +2222,7 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 		return XFS_ERROR(EIO);
 	}
 	ASSERT((caddr_t)ddq + item->ri_buf[1].i_len <=
-	       bp->b_dmaaddr + bp->b_bcount);
+	       XFS_BUF_PTR(bp) + bp->b_bcount);
 
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
 
@@ -2990,16 +2990,16 @@ xlog_do_recovery_pass(xlog_t	*log,
 	for (blk_no = tail_blk; blk_no < head_blk; ) {
 	    if (error = xlog_bread(log, blk_no, 1, hbp))
 		goto bread_err;
-	    rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
+	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
 	    ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
 	    ASSERT(BTOBB(rhead->h_len <= INT_MAX));
 	    bblks = (int) BTOBB(rhead->h_len);	/* blocks in data section */
 	    if (bblks > 0) {
 		if (error = xlog_bread(log, blk_no+1, bblks, dbp))
 		    goto bread_err;
-		xlog_unpack_data(rhead, dbp->b_dmaaddr, log);
+		xlog_unpack_data(rhead, XFS_BUF_PTR(dbp), log);
 		if (error = xlog_recover_process_data(log, rhash,
-						      rhead, dbp->b_dmaaddr,
+						      rhead, XFS_BUF_PTR(dbp),
 						      pass))
 			goto bread_err;
 	    }
@@ -3017,7 +3017,7 @@ xlog_do_recovery_pass(xlog_t	*log,
 	    /* Read header of one block */
 	    if (error = xlog_bread(log, blk_no, 1, hbp))
 		goto bread_err;
-	    rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
+	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
 	    ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
 	    ASSERT(BTOBB(rhead->h_len <= INT_MAX));
 	    bblks = (int) BTOBB(rhead->h_len);
@@ -3051,15 +3051,15 @@ xlog_do_recovery_pass(xlog_t	*log,
 		    if (error = xlog_bread(log, blk_no, split_bblks, dbp))
 			goto bread_err;
 		}
-		bufaddr = dbp->b_dmaaddr;
-		dbp->b_dmaaddr += BBTOB(split_bblks);
+		bufaddr = XFS_BUF_PTR(dbp);
+		XFS_BUF_PTR(dbp) += BBTOB(split_bblks);
 		if (error = xlog_bread(log, 0, bblks - split_bblks, dbp))
 		    goto bread_err;
-		dbp->b_dmaaddr = bufaddr;
+		XFS_BUF_PTR(dbp) = bufaddr;
 	    }
-	    xlog_unpack_data(rhead, dbp->b_dmaaddr, log);
+	    xlog_unpack_data(rhead, XFS_BUF_PTR(dbp), log);
 	    if (error = xlog_recover_process_data(log, rhash,
-						  rhead, dbp->b_dmaaddr,
+						  rhead, XFS_BUF_PTR(dbp),
 						  pass))
 		goto bread_err;
 	    blk_no += bblks;
@@ -3072,16 +3072,16 @@ xlog_do_recovery_pass(xlog_t	*log,
 	while (blk_no < head_blk) {
 	    if (error = xlog_bread(log, blk_no, 1, hbp))
 		goto bread_err;
-	    rhead = (xlog_rec_header_t *)hbp->b_dmaaddr;
+	    rhead = (xlog_rec_header_t *)XFS_BUF_PTR(hbp);
 	    ASSERT(rhead->h_magicno == XLOG_HEADER_MAGIC_NUM);
 	    ASSERT(BTOBB(rhead->h_len <= INT_MAX));
 	    bblks = (int) BTOBB(rhead->h_len);
 	    ASSERT(bblks > 0);
 	    if (error = xlog_bread(log, blk_no+1, bblks, dbp))
 		goto bread_err;
-	    xlog_unpack_data(rhead, dbp->b_dmaaddr, log);
+	    xlog_unpack_data(rhead, XFS_BUF_PTR(dbp), log);
 	    if (error = xlog_recover_process_data(log, rhash,
-						  rhead, dbp->b_dmaaddr,
+						  rhead, XFS_BUF_PTR(dbp),
 						  pass))
 		goto bread_err;
 	    blk_no += (bblks+1);

@@ -1338,7 +1338,7 @@ xfs_readlink(
                                 byte_cnt = pathlen;
                         pathlen -= byte_cnt;
 
-                        error = uiomove(bp->b_un.b_addr, byte_cnt,
+                        error = uiomove(XFS_BUF_PTR(bp), byte_cnt,
 					 UIO_READ, uiop);
 			brelse (bp);
                 }
@@ -5061,7 +5061,7 @@ xfs_symlink(
 			}
 			pathlen -= byte_cnt;
 
-			bcopy(cur_chunk, bp->b_un.b_addr, byte_cnt);
+			bcopy(cur_chunk, XFS_BUF_PTR(bp), byte_cnt);
 			cur_chunk += byte_cnt;
 
 			xfs_trans_log_buf(tp, bp, 0, byte_cnt - 1);
@@ -6561,7 +6561,7 @@ xfs_zero_remaining_bytes(
 		xfsbdstrat(mp, bp); 
 		if (error = iowait(bp))
 			break;
-		bzero(bp->b_un.b_addr +
+		bzero(XFS_BUF_PTR(bp) +
 			(offset - XFS_FSB_TO_B(mp, imap.br_startoff)),
 		      lastoffset - offset + 1);
 		bp->b_flags &= ~(B_DONE | B_READ);

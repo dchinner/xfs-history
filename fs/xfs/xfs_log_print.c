@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.6 $"
+#ident	"$Revision: 1.7 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -102,10 +102,10 @@ xlog_print_find_oldest(
 	first_blk = 0;		/* read first block */
 	bp = xlog_get_bp(1);
 	xlog_bread(log, 0, 1, bp);
-	first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+	first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
 	*last_blk = log->l_logBBsize-1;	/* read last block */
 	xlog_bread(log, *last_blk, 1, bp);
-	last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
+	last_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp));
 	ASSERT(last_half_cycle != 0);
 
 	if (first_half_cycle == last_half_cycle) { /* all cycle nos are same */

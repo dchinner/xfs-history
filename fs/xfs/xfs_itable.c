@@ -527,7 +527,7 @@ xfs_bulkstat(
 							return error;
 						}
 						clustidx = ((caddr_t)dip - 
-						          bp->b_un.b_addr)/
+						          XFS_BUF_PTR(bp))/
 						          mp->m_sb.sb_inodesize;
 					}
 				}
@@ -544,7 +544,7 @@ xfs_bulkstat(
 				ino = XFS_AGINO_TO_INO(mp, agno, agino);
 				bno = XFS_AGB_TO_DADDR(mp, agno, agbno);
 				if (flags & BULKSTAT_FG_QUICK) {
-					dip = (xfs_dinode_t *)(bp->b_un.b_addr + 
+					dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + 
 					      (clustidx << mp->m_sb.sb_inodelog));
 
 					if (dip->di_core.di_magic 

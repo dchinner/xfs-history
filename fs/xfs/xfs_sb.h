@@ -452,7 +452,7 @@ daddr_t xfs_fsb_to_daddr(struct xfs_mount *mp, xfs_fsblock_t fsbno);
 xfs_sb_t *xfs_buf_to_sbp(struct xfs_buf *bp);
 #define	XFS_BUF_TO_SBP(bp)	xfs_buf_to_sbp(bp)
 #else
-#define	XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)(bp)->b_un.b_addr)
+#define	XFS_BUF_TO_SBP(bp)	((xfs_sb_t *)XFS_BUF_PTR(bp))
 #endif
 
 #endif	/* !_FS_XFS_SB_H */

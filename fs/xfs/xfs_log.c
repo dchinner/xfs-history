@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.177 $"
+#ident	"$Revision: 1.178 $"
 
 /*
  * High level interface routines for log manager
@@ -1415,7 +1415,7 @@ xlog_sync(xlog_t		*log,
 	} else {
 		iclog->ic_bwritecnt = 1;
 	}
-	bp->b_dmaaddr	= (caddr_t) &(iclog->ic_header);
+	XFS_BUF_PTR(bp)	= (caddr_t) &(iclog->ic_header);
 	bp->b_bcount	= count;
 	XFS_BUF_SET_FSPRIVATE(bp, iclog);	/* save for later */
 	if (flags & XFS_LOG_SYNC){
@@ -1449,12 +1449,12 @@ xlog_sync(xlog_t		*log,
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
 		bp->b_blkno	= 0;		     /* logical 0 */
 		bp->b_bcount	= split;
-		bp->b_dmaaddr	= (caddr_t)((__psint_t)&(iclog->ic_header)+
+		XFS_BUF_PTR(bp)	= (caddr_t)((__psint_t)&(iclog->ic_header)+
 					    (__psint_t)count);
 		XFS_BUF_SET_FSPRIVATE(bp, iclog);
 		XFS_BUF_BUSY(bp);
 		XFS_BUF_ASYNC(bp);
-		dptr = bp->b_dmaaddr;
+		dptr = XFS_BUF_PTR(bp);
 		/*
 		 * Bump the cycle numbers at the start of each block
 		 * since this part of the buffer is at the start of
@@ -3207,7 +3207,7 @@ xlog_verify_disk_cycle_no(xlog_t	 *log,
 	bp = xlog_get_bp(1);
 	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn); i++) {
 	    xlog_bread(log, i, 1, bp);
-	    if (GET_CYCLE(bp->b_dmaaddr) != cycle_no)
+	    if (GET_CYCLE(XFS_BUF_PTR(bp)) != cycle_no)
 		xlog_warn("XFS: xlog_verify_disk_cycle_no: bad cycle no");
 	}
 	xlog_put_bp(bp);

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_RTALLOC_H
 #define	_FS_XFS_RTALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.15 $"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -33,7 +33,7 @@ struct xfs_growfs_rt;
 #define	XFS_SUMOFFSTOBLOCK(mp,s)	\
 	(((s) * (uint)sizeof(xfs_suminfo_t)) >> (mp)->m_sb.sb_blocklog)
 #define	XFS_SUMPTR(mp,bp,so)	\
-	((xfs_suminfo_t *)((char *)bp->b_un.b_addr + \
+	((xfs_suminfo_t *)((char *)XFS_BUF_PTR(bp) + \
 		(((so) * (uint)sizeof(xfs_suminfo_t)) & XFS_BLOCKMASK(mp))))
 
 #define	XFS_BITTOBLOCK(mp,bi)	((bi) >> (mp)->m_blkbit_log)

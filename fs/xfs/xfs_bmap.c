@@ -3427,7 +3427,7 @@ xfs_bmap_local_to_extents(
 		ASSERT(args.len == 1);
 		*firstblock = args.fsbno;
 		bp = xfs_btree_get_bufl(args.mp, tp, args.fsbno, 0);
-		bcopy(ifp->if_u1.if_data, (char *)bp->b_un.b_addr,
+		bcopy(ifp->if_u1.if_data, (char *)XFS_BUF_PTR(bp),
 			ifp->if_bytes);
 		xfs_trans_log_buf(tp, bp, 0, ifp->if_bytes - 1);
 		xfs_idata_realloc(ip, -ifp->if_bytes, whichfork);

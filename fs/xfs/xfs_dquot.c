@@ -1,4 +1,4 @@
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.35 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include "xfs_buf.h"
@@ -378,7 +378,7 @@ xfs_qm_init_dquot_blk(
 	ASSERT(XFS_BUF_ISBUSY(bp));
 	ASSERT(valusema(&bp->b_lock) <= 0);
 
-	d = (xfs_dqblk_t *)bp->b_un.b_addr;
+	d = (xfs_dqblk_t *)bp->b_addr;
 
 	/* 
 	 * ID of the first dquot in the block - id's are zero based.
@@ -603,7 +603,7 @@ xfs_qm_dqtobp(
 	/* 
 	 * calculate the location of the dquot inside the buffer.
 	 */
-	ddq = (xfs_disk_dquot_t *)((char *)bp->b_un.b_addr + dqp->q_bufoffset);
+	ddq = (xfs_disk_dquot_t *)((char *)bp->b_addr + dqp->q_bufoffset);
 
 	/*
 	 * A simple sanity check in case we got a corrupted dquot...
@@ -666,8 +666,7 @@ xfs_qm_dqread(
 	dqp->q_res_rtbcount = ddqp->d_rtbcount;
 
 	/* Mark the buf so that this will stay incore a little longer */
-	bp->b_ref = XFS_DQUOT_REF;
-	bp->b_bvtype = B_FS_DQUOT;
+	XFS_BUF_SET_VTYPE_REF(bp, B_FS_DQUOT, XFS_DQUOT_REF);
 
 	/* 
 	 * We got the buffer with a xfs_trans_read_buf() (in dqtobp())

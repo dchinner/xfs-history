@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.118 $"
+#ident	"$Revision: 1.119 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1290,8 +1290,7 @@ xfs_ialloc_read_agi(
 	for (i = 0; i < XFS_AGI_UNLINKED_BUCKETS; i++)
 		ASSERT(agi->agi_unlinked[i] != 0);
 #endif
-	bp->b_ref = XFS_AGI_REF;
-	bp->b_bvtype = B_FS_AGI;
+	XFS_BUF_SET_VTYPE_REF(bp, B_FS_AGI, XFS_AGI_REF);
 	*bpp = bp;
 	return 0;
 }

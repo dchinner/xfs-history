@@ -2194,11 +2194,11 @@ xfs_da_do_buf(
 			continue;
 		if (caller == 1) {
 			if (whichfork == XFS_ATTR_FORK) {
-				bp->b_ref = XFS_ATTR_BTREE_REF;
-				bp->b_bvtype = B_FS_ATTR_BTREE;
+				XFS_BUF_SET_VTYPE_REF(bp, B_FS_ATTR_BTREE, 
+						XFS_ATTR_BTREE_REF);
 			} else {
-				bp->b_ref = XFS_DIR_BTREE_REF;
-				bp->b_bvtype = B_FS_DIR_BTREE;
+				XFS_BUF_SET_VTYPE_REF(bp, B_FS_DIR_BTREE,
+						XFS_DIR_BTREE_REF);
 			}
 		}
 		if (bplist) {
@@ -2441,7 +2441,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 		dabuf->nbuf = 1;
 		bp = bps[0];
 		dabuf->bbcount = (short)BTOBB(bp->b_bcount);
-		dabuf->data = bp->b_un.b_addr;
+		dabuf->data = XFS_BUF_PTR(bp);
 		dabuf->bps[0] = bp;
 	} else {
 		dabuf->nbuf = nbuf;
@@ -2452,7 +2452,7 @@ xfs_da_buf_make(int nbuf, xfs_buf_t **bps, inst_t *ra)
 		dabuf->data = kmem_alloc(BBTOB(dabuf->bbcount), KM_SLEEP);
 		for (i = off = 0; i < nbuf; i++, off += bp->b_bcount) {
 			bp = bps[i];
-			bcopy(bp->b_un.b_addr, (char *)dabuf->data + off,
+			bcopy(XFS_BUF_PTR(bp), (char *)dabuf->data + off,
 				bp->b_bcount);
 		}
 	}
@@ -2492,7 +2492,7 @@ xfs_da_buf_clean(xfs_dabuf_t *dabuf)
 		dabuf->dirty = 0;
 		for (i = off = 0; i < dabuf->nbuf; i++, off += bp->b_bcount) {
 			bp = dabuf->bps[i];
-			bcopy((char *)dabuf->data + off, bp->b_un.b_addr,
+			bcopy((char *)dabuf->data + off, XFS_BUF_PTR(bp),
 				bp->b_bcount);
 		}
 	}
@@ -2544,7 +2544,7 @@ xfs_da_log_buf(xfs_trans_t *tp, xfs_dabuf_t *dabuf, uint first, uint last)
 
 	ASSERT(dabuf->nbuf && dabuf->data && dabuf->bbcount && dabuf->bps[0]);
 	if (dabuf->nbuf == 1) {
-		ASSERT(dabuf->data == (void *)dabuf->bps[0]->b_un.b_addr);
+		ASSERT(dabuf->data == (void *)XFS_BUF_PTR(dabuf->bps[0]));
 		xfs_trans_log_buf(tp, dabuf->bps[0], first, last);
 		return;
 	}

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.76 $"
+#ident "$Revision: 1.77 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -225,13 +225,13 @@ xfs_buf_item_format(
 		 */
 		if (next_bit == -1) {
 			buffer_offset = first_bit * XFS_BLI_CHUNK;
-			vecp->i_addr = bp->b_un.b_addr + buffer_offset;
+			vecp->i_addr = XFS_BUF_PTR(bp) + buffer_offset;
 			vecp->i_len = nbits * XFS_BLI_CHUNK;
 			nvecs++;
 			break;
 		} else if (next_bit != last_bit + 1) {
 			buffer_offset = first_bit * XFS_BLI_CHUNK;
-			vecp->i_addr = bp->b_un.b_addr + buffer_offset;
+			vecp->i_addr = XFS_BUF_PTR(bp) + buffer_offset;
 			vecp->i_len = nbits * XFS_BLI_CHUNK;
 			nvecs++;
 			vecp++;
@@ -669,7 +669,7 @@ xfs_buf_item_init(
 	 * to have logged.
 	 */
 	bip->bli_orig = (char *)kmem_alloc(bp->b_bcount, KM_SLEEP);
-	bcopy(bp->b_un.b_addr, bip->bli_orig, bp->b_bcount);
+	bcopy(XFS_BUF_PTR(bp), bip->bli_orig, bp->b_bcount);
 	bip->bli_logged = (char *)kmem_zalloc(bp->b_bcount / NBBY, KM_SLEEP);
 #endif
 
@@ -861,9 +861,9 @@ xfs_buf_item_log_check(
 
 	bp = bip->bli_buf;
 	ASSERT(bp->b_bcount > 0);
-	ASSERT(bp->b_un.b_addr != NULL);
+	ASSERT(XFS_BUF_PTR(bp) != NULL);
 	orig = bip->bli_orig;
-	buffer = bp->b_un.b_addr;
+	buffer = XFS_BUF_PTR(bp);
 	for (x = 0; x < bp->b_bcount; x++) {
 		if (orig[x] != buffer[x] && !btst(bip->bli_logged, x))
 			cmn_err(CE_PANIC,

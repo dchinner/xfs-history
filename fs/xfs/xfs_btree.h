@@ -177,19 +177,19 @@ typedef struct xfs_btree_cur
 xfs_btree_block_t *xfs_buf_to_block(struct xfs_buf *bp);
 #define	XFS_BUF_TO_BLOCK(bp)	xfs_buf_to_block(bp)
 #else
-#define	XFS_BUF_TO_BLOCK(bp)	((xfs_btree_block_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_BLOCK(bp)	((xfs_btree_block_t *)(XFS_BUF_PTR(bp)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_LBLOCK)
 xfs_btree_lblock_t *xfs_buf_to_lblock(struct xfs_buf *bp);
 #define	XFS_BUF_TO_LBLOCK(bp)	xfs_buf_to_lblock(bp)
 #else
-#define	XFS_BUF_TO_LBLOCK(bp)	((xfs_btree_lblock_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_LBLOCK(bp)	((xfs_btree_lblock_t *)(XFS_BUF_PTR(bp)))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_SBLOCK)
 xfs_btree_sblock_t *xfs_buf_to_sblock(struct xfs_buf *bp);
 #define	XFS_BUF_TO_SBLOCK(bp)	xfs_buf_to_sblock(bp)
 #else
-#define	XFS_BUF_TO_SBLOCK(bp)	((xfs_btree_sblock_t *)((bp)->b_un.b_addr))
+#define	XFS_BUF_TO_SBLOCK(bp)	((xfs_btree_sblock_t *)(XFS_BUF_PTR(bp)))
 #endif
 
 #ifdef DEBUG

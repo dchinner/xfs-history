@@ -289,19 +289,19 @@ daddr_t xfs_ag_daddr(struct xfs_mount *mp, xfs_agnumber_t agno, daddr_t d);
 xfs_agf_t *xfs_buf_to_agf(struct xfs_buf *bp);
 #define	XFS_BUF_TO_AGF(bp)		xfs_buf_to_agf(bp)
 #else
-#define	XFS_BUF_TO_AGF(bp)	((xfs_agf_t *)(bp)->b_un.b_addr)
+#define	XFS_BUF_TO_AGF(bp)	((xfs_agf_t *)XFS_BUF_PTR(bp))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_AGI)
 xfs_agi_t *xfs_buf_to_agi(struct xfs_buf *bp);
 #define	XFS_BUF_TO_AGI(bp)		xfs_buf_to_agi(bp)
 #else
-#define	XFS_BUF_TO_AGI(bp)	((xfs_agi_t *)(bp)->b_un.b_addr)
+#define	XFS_BUF_TO_AGI(bp)	((xfs_agi_t *)XFS_BUF_PTR(bp))
 #endif
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_AGFL)
 xfs_agfl_t *xfs_buf_to_agfl(struct xfs_buf *bp);
 #define	XFS_BUF_TO_AGFL(bp)		xfs_buf_to_agfl(bp)
 #else
-#define	XFS_BUF_TO_AGFL(bp)	((xfs_agfl_t *)(bp)->b_un.b_addr)
+#define	XFS_BUF_TO_AGFL(bp)	((xfs_agfl_t *)XFS_BUF_PTR(bp))
 #endif
 
 /*

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.255 $"
+#ident "$Revision: 1.256 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -175,7 +175,7 @@ xfs_inobp_check(
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
 
 	for (i = 0; i < j; i++) {
-		dip = (xfs_dinode_t *)((char *)bp->b_un.b_addr +
+		dip = (xfs_dinode_t *)((char *)XFS_BUF_PTR(bp) +
 				       (i * mp->m_sb.sb_inodesize));
 		if (dip->di_next_unlinked == 0)  {
 			xfs_fs_cmn_err(CE_ALERT, mp,
@@ -199,13 +199,12 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 	int		j;
 	xfs_dinode_t	*dip;
 
-	ASSERT(bp->b_bvtype == B_FS_INO);
 	ASSERT(XFS_BUF_FSPRIVATE3(bp, void *) != NULL);
 
 	mp = XFS_BUF_FSPRIVATE3(bp, xfs_mount_t *);
 
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
-	dip = (xfs_dinode_t *) bp->b_un.b_addr;
+	dip = (xfs_dinode_t *) XFS_BUF_PTR(bp);
 
 	for (i = 0; i < j; i++)  {
 		if (dip->di_core.di_magic != XFS_DINODE_MAGIC)  {
@@ -214,7 +213,7 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 				dip->di_core.di_magic,
 				(__uint64_t)(__psunsigned_t) bp,
 				(__int64_t) bp->b_blkno,
-				(__psint_t) dip - (__psint_t) bp->b_un.b_addr);
+				(__psint_t) dip - (__psint_t) XFS_BUF_PTR(bp));
 			xfs_fs_cmn_err(CE_WARN, mp,
 				"corrupt, unmount and run xfs_repair");
 		}
@@ -223,7 +222,7 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 "Bad next_unlinked field (0) in XFS inode buffer 0x%x, starting blockno %lld, offset 0x%x",
 				(__uint64_t)(__psunsigned_t) bp,
 				(__int64_t) bp->b_blkno,
-				(__psint_t) dip - (__psint_t) bp->b_un.b_addr);
+				(__psint_t) dip - (__psint_t) XFS_BUF_PTR(bp));
 			xfs_fs_cmn_err(CE_WARN, mp,
 				"corrupt, unmount and run xfs_repair");
 		}
@@ -294,7 +293,7 @@ xfs_inotobp(
 	if (error) {
 		return error;
 	}
-	dip = (xfs_dinode_t *)(bp->b_un.b_addr);
+	dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp));
 	di_ok =
 		dip->di_core.di_magic == XFS_DINODE_MAGIC &&
 		XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
@@ -309,7 +308,7 @@ xfs_inotobp(
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.
 	 */
-	*dipp = (xfs_dinode_t *)(bp->b_un.b_addr + imap.im_boffset);
+	*dipp = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + imap.im_boffset);
 	*bpp = bp;
 	return 0;
 }
@@ -418,7 +417,7 @@ xfs_itobp(
 		int		di_ok;
 		xfs_dinode_t	*dip;
 
-		dip = (xfs_dinode_t *)(bp->b_un.b_addr +
+		dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) +
 					(i << mp->m_sb.sb_inodelog));
 		di_ok = dip->di_core.di_magic == XFS_DINODE_MAGIC &&
 			XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
@@ -439,12 +438,12 @@ xfs_itobp(
 	/*
 	 * Mark the buffer as an inode buffer now that it looks good
 	 */
-	bp->b_bvtype = B_FS_INO;
+	XFS_BUF_SET_VTYPE(bp, B_FS_INO);
 
 	/*
 	 * Set *dipp to point to the on-disk inode in the buffer.
 	 */
-	*dipp = (xfs_dinode_t *)(bp->b_un.b_addr + imap.im_boffset);
+	*dipp = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + imap.im_boffset);
 	*bpp = bp;
 	return 0;
 }
@@ -879,7 +878,7 @@ xfs_iread(
 	 * around for a while.  This helps to keep recently accessed
 	 * meta-data in-core longer.
 	 */
-	bp->b_ref = XFS_INO_REF;
+	 XFS_BUF_SET_REF(bp, XFS_INO_REF);
 
 	/*
 	 * Use xfs_trans_brelse() to release the buffer containing the
@@ -1822,7 +1821,7 @@ xfs_iunlink(
 		ASSERT(dip->di_next_unlinked == NULLAGINO);
 		ASSERT(dip->di_next_unlinked != 0);
 		dip->di_next_unlinked = agi->agi_unlinked[bucket_index];
-		offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
+		offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
 			offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_inode_buf(tp, ibp);
 		xfs_trans_log_buf(tp, ibp, offset,
@@ -1922,7 +1921,7 @@ xfs_iunlink_remove(
 		ASSERT(next_agino != 0);
 		if (next_agino != NULLAGINO) {
 			dip->di_next_unlinked = NULLAGINO;
-			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
+			offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_inode_buf(tp, ibp);
 			xfs_trans_log_buf(tp, ibp, offset,
@@ -1979,7 +1978,7 @@ xfs_iunlink_remove(
 		ASSERT(next_agino != agino);
 		if (next_agino != NULLAGINO) {
 			dip->di_next_unlinked = NULLAGINO;
-			offset = ((char *)dip - (char *)(ibp->b_un.b_addr)) +
+			offset = ((char *)dip - (char *)(XFS_BUF_PTR(ibp))) +
 				offsetof(xfs_dinode_t, di_next_unlinked);
 			xfs_trans_inode_buf(tp, ibp);
 			xfs_trans_log_buf(tp, ibp, offset,
@@ -1994,7 +1993,7 @@ xfs_iunlink_remove(
 		last_dip->di_next_unlinked = next_agino;
 		ASSERT(next_agino != 0);
 		offset = ((char *)last_dip -
-			  (char *)(last_ibp->b_un.b_addr)) +
+			  (char *)(XFS_BUF_PTR(last_ibp))) +
 			 offsetof(xfs_dinode_t, di_next_unlinked);
 		xfs_trans_inode_buf(tp, last_ibp);
 		xfs_trans_log_buf(tp, last_ibp, offset,
@@ -2776,7 +2775,7 @@ xfs_iflush_fork(
 			ASSERT(ifp->if_bytes <= XFS_IFORK_SIZE(ip, whichfork));
 			bcopy(ifp->if_u1.if_data, cp, ifp->if_bytes);
 #ifdef XFS_TRANS_DEBUG
-			first = cp - bp->b_un.b_addr;
+			first = cp - XFS_BUF_PTR(bp);
 			xfs_buf_item_flush_log_debug(bp, first,
 				(first + ifp->if_bytes - 1));
 #endif
@@ -2803,7 +2802,7 @@ xfs_iflush_fork(
 			 * Just give up and assume we wrote over the entire
 			 * fork.
 			 */
-			first = cp - bp->b_un.b_addr;
+			first = cp - XFS_BUF_PTR(bp);
 			xfs_buf_item_flush_log_debug(bp, first,
 				(first + XFS_IFORK_SIZE(ip, whichfork) - 1));
 #endif
@@ -2825,7 +2824,7 @@ xfs_iflush_fork(
 			 * Just give up and assume we wrote over the entire
 			 * fork.
 			 */
-			first = cp - bp->b_un.b_addr;
+			first = cp - XFS_BUF_PTR(bp);
 			xfs_buf_item_flush_log_debug(bp, first,
 				(first + XFS_IFORK_SIZE(ip, whichfork) - 1));
 #endif
@@ -2838,7 +2837,7 @@ xfs_iflush_fork(
 			dip->di_u.di_dev = ip->i_df.if_u2.if_rdev;
 #ifdef XFS_TRANS_DEBUG
 			first = (char*)&(dip->di_u.di_dev) -
-				bp->b_un.b_addr;
+				XFS_BUF_PTR(bp);
 			xfs_buf_item_flush_log_debug(bp, first,
 				(first + sizeof(dip->di_u.di_dev) - 1));
 #endif
@@ -2851,7 +2850,7 @@ xfs_iflush_fork(
 			dip->di_u.di_muuid = ip->i_df.if_u2.if_uuid;
 #ifdef XFS_TRANS_DEBUG
 			first = (char*)&(dip->di_u.di_muuid) -
-				bp->b_un.b_addr;
+				XFS_BUF_PTR(bp);
 			xfs_buf_item_flush_log_debug(bp, first,
 				(first + sizeof(dip->di_u.di_muuid) - 1));
 #endif
@@ -3188,7 +3187,7 @@ xfs_iflush_int(
 	}
 
 	/* set *dip = inode's place in the buffer */
-	dip = (xfs_dinode_t *)(bp->b_un.b_addr + ip->i_boffset);
+	dip = (xfs_dinode_t *)(XFS_BUF_PTR(bp) + ip->i_boffset);
 
 	/*
 	 * Clear i_update_core before copying out the data.
@@ -3267,7 +3266,7 @@ xfs_iflush_int(
 	 */
 	bcopy(&(ip->i_d), &(dip->di_core), sizeof(xfs_dinode_core_t));
 #ifdef XFS_TRANS_DEBUG
-	first = (char*)&(dip->di_core) - bp->b_un.b_addr;
+	first = (char*)&(dip->di_core) - XFS_BUF_PTR(bp);
 	xfs_buf_item_flush_log_debug(bp, first,
 				     (first + sizeof(xfs_dinode_core_t) - 1));
 #endif

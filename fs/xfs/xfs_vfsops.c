@@ -1884,7 +1884,7 @@ devvptoxfs(
 			return XFS_ERROR(EIO);
 		}
 		bp = ngeteblkdev(dev, BBSIZE);
-		fs = (xfs_sb_t *)bp->b_un.b_addr;
+		fs = (xfs_sb_t *)XFS_BUF_PTR(bp);
 		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
 	} else {
 		/*
@@ -1910,7 +1910,7 @@ devvptoxfs(
 			brelse(bp);
 			bp = NULL;
 		} else
-			fs = (xfs_sb_t *)bp->b_un.b_addr;
+			fs = (xfs_sb_t *)XFS_BUF_PTR(bp);
 	}
 	VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);
 	*bpp = bp;

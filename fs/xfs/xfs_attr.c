@@ -1,4 +1,4 @@
-#ident "$Revision: 1.60 $"
+#ident "$Revision: 1.61 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1864,7 +1864,7 @@ xfs_attr_rmtval_get(xfs_da_args_t *args)
 
 			tmp = (valuelen < bp->b_bufsize)
 				? valuelen : bp->b_bufsize;
-			bcopy(bp->b_un.b_addr, dst, tmp);
+			bcopy(XFS_BUF_PTR(bp), dst, tmp);
 			brelse(bp);
 			dst += tmp;
 			valuelen -= tmp;
@@ -1993,9 +1993,9 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		bp->b_target = mp->m_ddev_targp;
 
 		tmp = (valuelen < bp->b_bufsize) ? valuelen : bp->b_bufsize;
-		bcopy(src, bp->b_un.b_addr, tmp);
+		bcopy(src, XFS_BUF_PTR(bp), tmp);
 		if (tmp < bp->b_bufsize)
-			bzero(bp->b_un.b_addr + tmp, bp->b_bufsize - tmp);
+			bzero(XFS_BUF_PTR(bp) + tmp, bp->b_bufsize - tmp);
 		if (error = xfs_bwrite(mp, bp)) {/* GROT: NOTE: synchronous write */
 			return (error);
 		}

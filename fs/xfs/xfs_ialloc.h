@@ -43,7 +43,7 @@ struct xfs_dinode *xfs_make_iptr(struct xfs_mount *mp, struct xfs_buf *b, int o)
 #define	XFS_MAKE_IPTR(mp,b,o) 		xfs_make_iptr(mp,b,o)
 #else
 #define	XFS_MAKE_IPTR(mp,b,o) \
-	((xfs_dinode_t *)((b)->b_un.b_addr + ((o) << (mp)->m_sb.sb_inodelog)))
+	((xfs_dinode_t *)(XFS_BUF_PTR(b) + ((o) << (mp)->m_sb.sb_inodelog)))
 #endif
 
 /*

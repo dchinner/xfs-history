@@ -1443,7 +1443,7 @@ xfs_inodebuf(xfs_buf_t *bp)
 	bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfsp), &xfs_vfsops);
 	mp = XFS_BHVTOM(bdp);
 	n = bp->b_bcount >> mp->m_sb.sb_inodelog;
-	for (i = 0, di = (xfs_dinode_t *)bp->b_un.b_addr;
+	for (i = 0, di = (xfs_dinode_t *)XFS_BUF_PTR(bp);
 	     i < n;
 	     i++, di = (xfs_dinode_t *)((char *)di + mp->m_sb.sb_inodesize)) {
 		xfs_prdinode(di, 0);
@@ -2569,7 +2569,7 @@ xfsidbg_xbuf_real(xfs_buf_t *bp, int summary)
 	xfs_dir2_leaf_t *d2leaf;
 	xfs_dir2_free_t *d2free;
 
-	d = bp->b_un.b_addr;
+	d = XFS_BUF_PTR(bp);
 	if ((agf = d)->agf_magicnum == XFS_AGF_MAGIC) {
 		if (summary) {
 			qprintf("freespace hdr for AG %d (at 0x%x)\n",

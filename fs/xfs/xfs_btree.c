@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.65 $"
+#ident	"$Revision: 1.66 $"
 
 /*
  * This file contains common code for the space manager's btree implementations.
@@ -751,8 +751,7 @@ xfs_btree_read_bufl(
 	}
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL) {
-		bp->b_ref = refval;
-		bp->b_bvtype = B_FS_MAP;
+		XFS_BUF_SET_VTYPE_REF(bp, B_FS_MAP, refval);
 	}
 	*bpp = bp;
 	return 0;
@@ -786,13 +785,12 @@ xfs_btree_read_bufs(
 	}
 	ASSERT(!bp || !geterror(bp));
 	if (bp != NULL)
-		bp->b_ref = refval;
 		switch (refval) {
 		case XFS_ALLOC_BTREE_REF:
-			bp->b_bvtype = B_FS_MAP;
+			XFS_BUF_SET_VTYPE_REF(bp, B_FS_MAP, refval);
 			break;
 		case XFS_INO_BTREE_REF:
-			bp->b_bvtype = B_FS_INOMAP;
+			XFS_BUF_SET_VTYPE_REF(bp, B_FS_INOMAP, refval);
 			break;
 		}
 	*bpp = bp;

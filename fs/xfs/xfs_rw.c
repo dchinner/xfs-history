@@ -1,4 +1,4 @@
-#ident "$Revision: 1.279 $"
+#ident "$Revision: 1.280 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -2855,7 +2855,7 @@ xfs_zero_eof(
 #endif
 		{	
 			bp_mapin(bp);
-			bzero(bp->b_un.b_addr, bp->b_bcount);
+			bzero(XFS_BUF_PTR(bp), bp->b_bcount);
 	        }
 		ASSERT(bp->b_vp);
 		buftrace("XFS ZERO EOF", bp);
@@ -4402,7 +4402,7 @@ xfs_overlap_bp(
 		 * The real buffer is already mapped, so just use
 		 * its virtual memory for ourselves.
 		 */
-		rbp->b_un.b_addr = bp->b_un.b_addr + rbp_offset;
+		XFS_BUF_PTR(rbp) = XFS_BUF_PTR(bp) + rbp_offset;
 		rbp->b_bcount = rbp_len;
 		rbp->b_bufsize = rbp_len;
 	} else {
@@ -4461,7 +4461,7 @@ xfs_zero_bp(
 	int	len;
 
 	if (BP_ISMAPPED(bp)) {
-		bzero(bp->b_un.b_addr + data_offset, data_len);
+		bzero(XFS_BUF_PTR(bp) + data_offset, data_len);
 		return;
 	}
 
@@ -5169,7 +5169,7 @@ xfs_strat_write_subbp_trace(
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
 		     (void*)((__psunsigned_t)(rbp->b_flags)), /* lower 32 flags only */
-		     (void*)(rbp->b_un.b_addr),
+		     (void*)(XFS_BUF_PTR(rbp)),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
 		     (void*)((unsigned long)(last_bcount)),
@@ -5189,7 +5189,7 @@ xfs_strat_write_subbp_trace(
 		     (void*)((unsigned long)(rbp->b_bcount)),
 		     (void*)(rbp->b_blkno),
 		     (void*)((__psunsigned_t)(rbp->b_flags)), /* lower 32 flags only */
-		     (void*)(rbp->b_un.b_addr),
+		     (void*)(XFS_BUF_PTR(rbp)),
 		     (void*)(bp->b_pages),
 		     (void*)(last_off),
 		     (void*)((unsigned long)(last_bcount)),
@@ -5605,7 +5605,7 @@ xfs_check_rbp(
 	}
 
 	if (rbp->b_flags & B_MAPPED) {
-		ASSERT(BTOBB(poff(rbp->b_un.b_addr)) ==
+		ASSERT(BTOBB(poff(XFS_BUF_PTR(rbp))) ==
 		       dpoff(rbp->b_offset));
 	}
 #endif
@@ -5650,7 +5650,7 @@ xfs_check_bp(
 	}
 
 	if (bp->b_flags & B_MAPPED) {
-		ASSERT(BTOBB(poff(bp->b_un.b_addr)) ==
+		ASSERT(BTOBB(poff(XFS_BUF_PTR(bp))) ==
 		       dpoff(bp->b_offset));
 	}
 #endif
@@ -7345,7 +7345,7 @@ xfs_dio_write_zero_rtarea(
 						/* b_iopri */
      	nbp->b_error     = 0;
 	nbp->b_edev	 = bp->b_edev;
-	nbp->b_un.b_addr = buf;
+	XFS_BUF_PTR(nbp) = buf;
 	my_bdevsw	 = get_bdevsw(nbp->b_edev);
 	ASSERT(my_bdevsw != NULL);
 
@@ -7384,7 +7384,7 @@ xfs_dio_write_zero_rtarea(
 	/* Clean up for the exit */
 	nbp->b_flags		= 0;
 	nbp->b_bcount		= 0;
-	nbp->b_un.b_addr	= 0;
+	XFS_BUF_PTR(nbp)	= 0;
 	nbp->b_grio_private	= 0;	/* b_iopri */
  	putphysbuf( nbp );
 	kmem_free(buf, bufsize);
@@ -7431,7 +7431,7 @@ xfs_dio_read(
 	io = diop->xd_io;
 	mp = io->io_mount;
 	blk_algn = diop->xd_blkalgn;
-	base = bp->b_un.b_addr;
+	base = XFS_BUF_PTR(bp);
 	
 	error = resid = totxfer = end_of_file = 0;
 	offset = BBTOOFF((off_t)bp->b_blkno);
@@ -7594,7 +7594,7 @@ retry:
 				}
 				ASSERT(bytes_this_req);
 	     			nbp->b_bcount    = bytes_this_req;
-	     			nbp->b_un.b_addr = base;
+	     			XFS_BUF_PTR(nbp) = base;
 				/*
  				 * Issue I/O request.
 				 */
@@ -7604,7 +7604,7 @@ retry:
 		    		if (error = geterror(nbp)) {
 					biowait(nbp);
 					nbp->b_flags = 0;
-		     			nbp->b_un.b_addr = 0;
+		     			XFS_BUF_PTR(nbp) = 0;
 					nbp->b_grio_private = 0; /* b_iopri */
 					putphysbuf( nbp );
 					bps[bufsissued--] = 0;
@@ -7649,7 +7649,7 @@ retry:
 			} 
 	    	 	nbp->b_flags		= 0;
 	     		nbp->b_bcount		= 0;
-	     		nbp->b_un.b_addr	= 0;
+	     		XFS_BUF_PTR(nbp)	= 0;
 	     		nbp->b_grio_private	= 0; /* b_iopri */
 	    	 	putphysbuf( nbp );
 	     	}
@@ -7712,7 +7712,7 @@ xfs_dio_write(
 	mp = io->io_mount;
 	ip = XFS_IO_INODE(io);
 
-	base = bp->b_un.b_addr;
+	base = XFS_BUF_PTR(bp);
 	error = resid = totxfer = end_of_file = ioexcl = 0;
 	offset = BBTOOFF((off_t)bp->b_blkno);
 	numrtextents = iprtextsize = sbrtextsize = 0;
@@ -7981,7 +7981,7 @@ retry:
 				   blk_algn;
 		ASSERT(bytes_this_req);
 	     	nbp->b_bcount    = bytes_this_req;
-	     	nbp->b_un.b_addr = base;
+	     	XFS_BUF_PTR(nbp) = base;
 		/*
  		 * Issue I/O request.
 		 */
@@ -8019,7 +8019,7 @@ retry:
 		} 
  		nbp->b_flags		= 0;
 		nbp->b_bcount		= 0;
-		nbp->b_un.b_addr	= 0;
+		XFS_BUF_PTR(nbp)	= 0;
 		nbp->b_grio_private	= 0;	/* b_iopri */
  		putphysbuf( nbp );
 		if (error)
@@ -8391,7 +8391,7 @@ xfs_diordwr(
 
 	ASSERT((bp->b_flags & B_MAPPED) == 0);
 	bp->b_flags = 0;
-	bp->b_un.b_addr = 0;
+	XFS_BUF_PTR(bp) = 0;
 	putphysbuf(bp);
 
 	/* CXFS needs the unwritten range covered by the write */
