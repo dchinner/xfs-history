@@ -176,11 +176,11 @@ pagebuf_lock_enable(
 {
 	struct block_device *bdev;
 	pb_target_t	*target;
-	int		error;
+	int		error = -ENOMEM;
 
 	target = kmalloc(sizeof(pb_target_t), GFP_KERNEL);
 	if (unlikely(!target))
-		return NULL;
+		return ERR_PTR(error);
 
 	bdev = bdget(dev);
 	if (unlikely(!bdev))
@@ -208,7 +208,7 @@ pagebuf_lock_enable(
 
 fail:
 	kfree(target);
-	return NULL;
+	return ERR_PTR(error);
 }
 
 void
