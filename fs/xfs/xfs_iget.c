@@ -217,7 +217,7 @@ again:
 				goto finish_inode;
 
 			} else if (vp != inode_vp) {
-				struct inode *inode = inode_vp->v_inode;
+				struct inode *inode = LINVFS_GET_IP(inode_vp);
 
 				if (inode->i_state & (I_FREEING | I_CLEAR)) {
 					mrunlock(&ih->ih_lock);

@@ -730,7 +730,7 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	if (xfs_refcache_count) {
 		del_timer(&xfs_refcache_sbdirty_timer);
 		xfs_refcache_sbdirty_timer.data = 
-			(int)XFS_ITOV(mp->m_rootip)->v_inode->i_sb;
+			(int)LINVFS_GET_IP(XFS_ITOV(mp->m_rootip))->i_sb;
 		xfs_refcache_sbdirty_timer.expires = jiffies + 2*HZ;
 		add_timer(&xfs_refcache_sbdirty_timer);
 	}

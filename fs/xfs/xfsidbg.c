@@ -1333,7 +1333,7 @@ static void	printvnode(vnode_t *vp)
 
 	if ((bh = vp->v_bh.bh_first)) {
 		kdb_printf("   v_inode 0x%p v_bh->bh_first 0x%p pobj 0x%p\n",
-						vp->v_inode, bh, bh->bd_pdata);
+					LINVFS_GET_IP(vp), bh, bh->bd_pdata);
 
 		if (kdbnearsym((unsigned long)bh->bd_ops, &symtab))
 			kdb_printf("   ops %s ", symtab.sym_name);
@@ -1342,7 +1342,7 @@ static void	printvnode(vnode_t *vp)
 						"???", (void *)bh->bd_ops);
 	} else {
 		kdb_printf("   v_inode 0x%p v_bh->bh_first = NULLBHV ",
-						vp->v_inode);
+					LINVFS_GET_IP(vp));
 	}
 
 	printflags((__psunsigned_t)vp->v_flag, tab_vflags, "flag =");
@@ -1584,7 +1584,6 @@ static int	kdbm_vntraceaddr(
 
 static void	printinode(struct inode *ip)
 {
-	unsigned char *iaddr;
 	unsigned long	addr;
 
 
@@ -1615,10 +1614,7 @@ static void	printinode(struct inode *ip)
 					addr + offsetof(struct inode, i_data),
 					ip->i_data.nrpages);
 
-	iaddr  = (char *)ip;
-	iaddr += offsetof(struct inode, u.xfs_i.vnode);
-
-	kdb_printf("  vnode ptr 0x%p\n", iaddr);
+	kdb_printf("  vnode ptr 0x%p\n", LINVFS_GET_VN_ADDRESS(ip));
 }
 
 
@@ -1651,7 +1647,7 @@ static int	kdbm_vn(
 
 	vp = (vnode_t *)addr;
 
-	ip = vp->v_inode;
+	ip = LINVFS_GET_IP(vp);
 
 	kdb_printf("--> Inode @ 0x%p\n", ip);
 	printinode(ip);

@@ -3591,7 +3591,7 @@ xfs_ichgtime(xfs_inode_t *ip,
 {
 	timespec_t	tv;
 	vnode_t		*vp = XFS_ITOV(ip);
-	struct inode	*inode = vp->v_inode;
+	struct inode	*inode = LINVFS_GET_IP(vp);
 
 	/*
 	 * We're not supposed to change timestamps in readonly-mounted
