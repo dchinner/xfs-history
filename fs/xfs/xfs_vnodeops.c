@@ -236,9 +236,9 @@ extern struct igetstats XFS_IGETINFO;
 
 sema_t xfs_ancestormon;		/* initialized in xfs_init */
 
-#define IRELE(ip)	(vn_trace_rele(XFS_ITOV(ip), fname, __LINE__), VN_RELE(XFS_ITOV(ip)))
-#define IHOLD(ip)	(VN_HOLD(XFS_ITOV(ip)), vn_trace_hold(XFS_ITOV(ip), fname, __LINE__))
-
+#define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
+#define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
+#define	ITRACE(ip)	vn_trace_ref(XFS_ITOV(ip), __FILE__, __LINE__)
 
 
 /*
@@ -266,6 +266,7 @@ xfs_close(vnode_t	*vp,
 	struct file	*fp;
 	int		i, vpcount, ret;
 
+	vn_trace_entry(vp, "xfs_close");
         ip = XFS_VTOI(vp);
 
 	/*
@@ -331,6 +332,7 @@ xfs_getattr(vnode_t	*vp,
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
 
+	vn_trace_entry(vp, "xfs_getattr");
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
 
@@ -440,10 +442,8 @@ xfs_setattr(vnode_t	*vp,
 	timestruc_t 	tv;
 	uid_t		uid;
 	gid_t		gid;
-#ifdef DEBUG
-	static char	fname[] = "xfs_setattr";
-#endif
 
+	vn_trace_entry(vp, "xfs_setattr");
 	/*
 	 * Cannot set certain attributes.
          */
@@ -776,6 +776,7 @@ xfs_access(vnode_t	*vp,
 	xfs_inode_t	*ip;
 	int		error;
 
+	vn_trace_entry(vp, "xfs_access");
 	ip = XFS_VTOI(vp);
 	xfs_ilock (ip, XFS_ILOCK_SHARED);
 	error = xfs_iaccess(ip, mode, credp);
@@ -807,6 +808,7 @@ xfs_readlink(vnode_t	*vp,
 	timestruc_t     tv;
         int             error = 0;
 
+	vn_trace_entry(vp, "xfs_readlink");
 	if (vp->v_type != VLNK)
                 return XFS_ERROR(EINVAL);
 
@@ -900,6 +902,7 @@ xfs_fsync(vnode_t	*vp,
 {
 	xfs_inode_t *ip;
 
+	vn_trace_entry(vp, "xfs_fsync");
 	ip = XFS_VTOI(vp);
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	if (flag & FSYNC_INVAL) {
@@ -941,6 +944,7 @@ xfs_inactive(vnode_t	*vp,
 	xfs_fsblock_t	first_block;
 	xfs_bmap_free_t	free_list;
 
+	vn_trace_entry(vp, "xfs_inactive");
 	ip = XFS_VTOI(vp);
 
 	/*
@@ -1131,10 +1135,8 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 	int		   name_len;
 	int		   code = 0;
 	boolean_t	   do_iget;
-#ifdef DEBUG
-	static char	   fname[] = "xfs_dir_lookup_int";
-#endif
 
+	vn_trace_entry(dir_vp, "xfs_dir_lookup_int");
 	do_iget = flag & DLF_IGET;
 
 	/*
@@ -1156,10 +1158,8 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 		if (do_iget) {
 			*ip = XFS_VTOI(vp);
 			ASSERT((*ip)->i_d.di_mode != 0);
-		} else {
-			vn_trace_rele(vp, fname, __LINE__);
+		} else
 			VN_RELE (vp);
-		}
 		return 0;
         }
 
@@ -1183,7 +1183,6 @@ xfs_dir_lookup_int (xfs_trans_t  *tp,
 			ASSERT((name[0] == '.') &&
 			       (name[1] == '.') &&
 			       (name[2] == 0));
-			vn_trace_rele(vp, fname, __LINE__);
 			VN_RELE (vp);
 			code = ENOENT;
 		}
@@ -1212,10 +1211,8 @@ xfs_lookup(vnode_t	*dir_vp,
 	xfs_ino_t		e_inum;
 	int			code = 0;
 	uint			lock_mode;
-#ifdef DEBUG
-	static char		fname[] = "xfs_lookup";
-#endif
 
+	vn_trace_entry(dir_vp, "xfs_lookup");
 	dp = XFS_VTOI(dir_vp);
 	lock_mode = xfs_ilock_map_shared(dp);
 
@@ -1230,6 +1227,7 @@ xfs_lookup(vnode_t	*dir_vp,
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return code;
 	}
+	ITRACE(ip);
 
 	xfs_iunlock_map_shared(dp, lock_mode);
 
@@ -1240,7 +1238,6 @@ xfs_lookup(vnode_t	*dir_vp,
          */
         if (ISVDEV(vp->v_type)) {
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
-		vn_trace_rele(vp, fname, __LINE__);
                 VN_RELE(vp);
                 if (newvp == NULL)
                         return XFS_ERROR(ENOSYS);
@@ -1440,10 +1437,8 @@ xfs_create(vnode_t	*dir_vp,
 	int			committed;
 	uint			truncate_flag;
 	timestruc_t		tv;
-#ifdef DEBUG
-	static char		fname[] = "xfs_create";
-#endif
 
+	vn_trace_entry(dir_vp, "xfs_create");
 
 try_again:
 
@@ -1490,6 +1485,7 @@ try_again:
 			commit_flags = 0;
 		if (error)
 			goto error_return;
+		ITRACE(ip);
 
 		/*
 		 * At this point, we've gotten a newly allocated inode.
@@ -1506,7 +1502,6 @@ try_again:
 		 */
 
 		VN_HOLD (dir_vp);
-		vn_trace_hold(dir_vp, fname, __LINE__);
 		xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 		dp_joined_to_trans = B_TRUE;
 
@@ -1524,6 +1519,7 @@ try_again:
 	}
 	else {
 		ASSERT (ip != NULL);
+		ITRACE(ip);
 
 		/* Now lock the inode also, in the right order. */
 		if (dp->i_ino < ip->i_ino) {
@@ -1679,7 +1675,6 @@ try_again:
          */
         if (ISVDEV(vp->v_type)) {
                 newvp = specvp(vp, vp->v_rdev, vp->v_type, credp);
-		vn_trace_rele(vp, fname, __LINE__);
                 VN_RELE(vp);
                 if (newvp == NULL)
                         return XFS_ERROR(ENOSYS);
@@ -1729,9 +1724,6 @@ xfs_lock_dir_and_entry (xfs_inode_t	*dp,
 	xfs_ino_t	e_inum;
 	unsigned long	dir_generation;
 	int		error;
-#ifdef DEBUG
-	static char	fname[] = "xfs_lock_dir_and_entry";
-#endif
 
 again:
 
@@ -1746,6 +1738,7 @@ again:
         }
 
         ASSERT ((e_inum != 0) && ip);
+	ITRACE(ip);
 
         /*
          * We want to lock in increasing inum. Since we've already
@@ -1774,6 +1767,7 @@ again:
                 if (dp->i_gen != dir_generation) {
 			error = xfs_dir_lookup_int (NULL, XFS_ITOV(dp),
 				DLF_IGET, name, NULL, &e_inum, &new_ip);
+			ITRACE(new_ip);
 			IRELE (new_ip); /* ref from xfs_dir_lookup_int */
                         if (error) {
 				xfs_iunlock (dp, XFS_ILOCK_EXCL);
@@ -1837,14 +1831,11 @@ xfs_lock_for_rename(
 	int		num_inodes;
 	int		i, j;
 	uint		lock_mode;
-#ifdef DEBUG
-	static char	fname[] = "xfs_lock_for_rename";
-#endif
 
 	ip2 = NULL;
 
 	/*
-	 * Frst, find out the current inums of the entries so that we
+	 * First, find out the current inums of the entries so that we
 	 * can determine the initial locking order.  We'll have to 
 	 * sanity check stuff after all the locks have been acquired
 	 * to see if we still have the right inodes, directories, etc.
@@ -1864,6 +1855,7 @@ xfs_lock_for_rename(
         if (error)
                 return error;
 	ASSERT (ip1);
+	ITRACE(ip1);
 
         lock_mode = xfs_ilock_map_shared (dp2);
         error = xfs_dir_lookup_int(NULL, XFS_ITOV(dp2), DLF_IGET,
@@ -1877,6 +1869,8 @@ xfs_lock_for_rename(
 		IRELE (ip1);
                 return error;
 	}
+	else
+		ITRACE(ip2);
 
 	/*
 	 * i_tab contains a list of pointers to inodes.  We initialize
@@ -1992,10 +1986,8 @@ xfs_remove(vnode_t	*dir_vp,
 	unsigned long		dir_generation;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
-#ifdef DEBUG
-	static char		fname[] = "xfs_remove";
-#endif
 
+	vn_trace_entry(dir_vp, "xfs_remove");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, 0);
         if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(mp), 0,0)) 
@@ -2035,7 +2027,7 @@ xfs_remove(vnode_t	*dir_vp,
                         error = XFS_ERROR(EBUSY);
 			goto error_return;
 	}
-	if ((ip->i_d.di_mode & IFMT) == IFDIR && !crsuser(credp)) {
+	if ((ip->i_d.di_mode & IFMT) == IFDIR) {
                         error = XFS_ERROR(EPERM);
 			goto error_return;
 	}
@@ -2106,16 +2098,15 @@ xfs_link(vnode_t	*target_dir_vp,
 	int			error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
-#ifdef DEBUG
-	static char		fname[] = "xfs_link";
-#endif
 
+	vn_trace_entry(target_dir_vp, "xfs_link");
 	/*
 	 * Get the real vnode.
 	 */
 	if (VOP_REALVP(src_vp, &realvp) == 0)
                 src_vp = realvp;
-        if (src_vp->v_type == VDIR && !crsuser(credp))
+	vn_trace_entry(src_vp, "xfs_link");
+        if (src_vp->v_type == VDIR)
                 return XFS_ERROR(EPERM);
 
 	mp = XFS_VFSTOM(target_dir_vp->v_vfsp);
@@ -2135,9 +2126,7 @@ xfs_link(vnode_t	*target_dir_vp,
 	 * decrement the associated ref counts.
 	 */
 	VN_HOLD(src_vp);
-	vn_trace_hold(src_vp, fname, __LINE__);
 	VN_HOLD(target_dir_vp);
-	vn_trace_hold(target_dir_vp, fname, __LINE__);
 	xfs_trans_ijoin (tp, sip, XFS_ILOCK_EXCL);
         xfs_trans_ijoin (tp, tdp, XFS_ILOCK_EXCL);
 
@@ -2214,9 +2203,6 @@ xfs_ancestor_check (xfs_inode_t *src_dp,
 	xfs_inode_t	*ip;
 	xfs_ino_t	root_ino;
 	int		error = 0;
-#ifdef DEBUG
-	static char	fname[] = "xfs_ancestor_check";
-#endif
 
 	mp = src_dp->i_mount;
 	root_ino = mp->m_sb.sb_rootino;
@@ -2394,10 +2380,9 @@ xfs_rename(vnode_t	*src_dir_vp,
 	int		error;		
         xfs_bmap_free_t free_list;
         xfs_fsblock_t   first_block;
-#ifdef DEBUG
-	static char	fname[] = "xfs_rename";
-#endif
 
+	vn_trace_entry(src_dir_vp, "xfs_rename");
+	vn_trace_entry(target_dir_vp, "xfs_rename");
 
 start_over:
 
@@ -2442,11 +2427,9 @@ start_over:
 	 * not to add an inode to the transaction more than once.
 	 */
         VN_HOLD (src_dir_vp);
-	vn_trace_hold(src_dir_vp, fname, __LINE__);
         xfs_trans_ijoin (tp, src_dp, XFS_ILOCK_EXCL);
         if (new_parent) {
                 VN_HOLD (target_dir_vp);
-		vn_trace_hold(target_dir_vp, fname, __LINE__);
                 xfs_trans_ijoin (tp, target_dp, XFS_ILOCK_EXCL);
         }
 	if ((src_ip != src_dp) && (src_ip != target_dp)) {
@@ -2746,11 +2729,9 @@ xfs_mkdir(vnode_t	*dir_vp,
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
 	boolean_t		dp_joined_to_trans = B_FALSE;
-#ifdef DEBUG
-	static char		fname[] = "xfs_mkdir";
-#endif
 
 
+	vn_trace_entry(dir_vp, "xfs_mkdir");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
         tp = xfs_trans_alloc (mp, 0);
         if (code = xfs_trans_reserve (tp, XFS_IALLOC_BLOCKS(mp) + 10,
@@ -2796,6 +2777,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 	code = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, &cdp, 0, NULL);
 	if (code)
 		goto error_return;
+	ITRACE(cdp);
 
 	/*
 	 * Now we add the directory inode to the transaction.
@@ -2804,7 +2786,6 @@ xfs_mkdir(vnode_t	*dir_vp,
 	 * earlier, the locks might have gotten released.
 	 */
 	VN_HOLD (dir_vp);
-	vn_trace_hold(dir_vp, fname, __LINE__);
         xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 	dp_joined_to_trans = B_TRUE;
 
@@ -2865,10 +2846,8 @@ xfs_rmdir(vnode_t	*dir_vp,
         int                     error;
         xfs_bmap_free_t         free_list;
         xfs_fsblock_t           first_block;
-#ifdef DEBUG
-	static char		fname[] = "xfs_rmdir";
-#endif
 
+	vn_trace_entry(dir_vp, "xfs_rmdir");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
 	tp = xfs_trans_alloc (mp, 0);
         if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(mp), 0, 0))
@@ -2879,7 +2858,6 @@ xfs_rmdir(vnode_t	*dir_vp,
 	cdp = NULL;
 
 	VN_HOLD (dir_vp);
-	vn_trace_hold(dir_vp, fname, __LINE__);
         xfs_ilock (dp, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 
@@ -2890,6 +2868,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 				       &e_inum, &cdp))
 		goto error_return;
 
+	ITRACE(cdp);
 	xfs_ilock (cdp, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin (tp, cdp, XFS_ILOCK_EXCL);
 
@@ -2977,6 +2956,7 @@ xfs_readdir(vnode_t	*dir_vp,
 	int			status;
 	uint			lock_mode;
 
+	vn_trace_entry(dir_vp, "xfs_readdir");
         dp = XFS_VTOI(dir_vp);
         lock_mode = xfs_ilock_map_shared (dp);
 
@@ -3032,10 +3012,8 @@ xfs_symlink(vnode_t	*dir_vp,
 	xfs_bmap_free_t free_list;
 	xfs_fsblock_t   first_block;
 	boolean_t	dp_joined_to_trans = B_FALSE;
-#ifdef DEBUG
-	static char	fname[] = "xfs_symlink";
-#endif
 
+	vn_trace_entry(dir_vp, "xfs_symlink");
 	/*
 	 * Check component lengths of the target path name.
          */
@@ -3097,9 +3075,9 @@ xfs_symlink(vnode_t	*dir_vp,
 			       1, rdev, credp, &ip, 0, NULL);
 	if (error)
 		goto error_return;
+	ITRACE(ip);
 
 	VN_HOLD (dir_vp);
-	vn_trace_hold(dir_vp, fname, __LINE__);
         xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
         dp_joined_to_trans = B_TRUE;
 
@@ -3204,6 +3182,7 @@ xfs_fid(vnode_t	*vp,
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
 
+	vn_trace_entry(vp, "xfs_fid");
 	mp = XFS_VFSTOM(vp->v_vfsp);
 	if (XFS_INO_BITS(mp) > (NBBY * sizeof(xfs_fid_ino_t))) {
 		/*
@@ -3298,6 +3277,7 @@ xfs_frlock(vnode_t	*vp,
 	xfs_inode_t	*ip;
 	int		error;
 
+	vn_trace_entry(vp, "xfs_frlock");
 	ip = XFS_VTOI(vp);
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	error = fs_frlock(vp, cmd, flockp, flag, offset, credp);
@@ -3434,6 +3414,7 @@ xfs_allocstore(vnode_t	*vp,
 	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];
 	xfs_bmbt_irec_t	orig_imap[NDPP];
 	
+	vn_trace_entry(vp, "xfs_allocstore");
 	/*
 	 * This code currently only works for a single page.
 	 */
@@ -3544,6 +3525,7 @@ xfs_reclaim(vnode_t	*vp,
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
 
+	vn_trace_entry(vp, "xfs_reclaim");
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
@@ -3600,6 +3582,7 @@ xfs_fcntl(vnode_t	*vp,
 {
 	int		error = 0;
 
+	vn_trace_entry(vp, "xfs_fcntl");
 	switch (cmd) {
 	case F_DIOINFO: {
 		struct dioattr	da;

@@ -331,13 +331,8 @@ void
 xfs_iput(xfs_inode_t	*ip,
 	 uint		lock_flags)
 {
-#ifdef DEBUG
-	static char	fname[] = "xfs_iput";
-#endif
-
 	xfs_iunlock(ip, lock_flags);
-	vn_trace_rele(XFS_ITOV(ip), fname, __LINE__);
-	vn_rele(XFS_ITOV(ip));
+	VN_RELE(XFS_ITOV(ip));
 }
 
 /*
