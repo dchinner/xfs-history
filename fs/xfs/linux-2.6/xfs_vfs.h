@@ -42,6 +42,7 @@ struct vnode;
 struct cred;
 struct super_block;
 struct fid;
+struct dm_fcntl;
 
 enum whymountroot { ROOT_INIT, ROOT_REMOUNT, ROOT_UNMOUNT };
 typedef enum whymountroot whymountroot_t;
@@ -152,6 +153,8 @@ typedef struct vfsops {
 	int	(*vfs_dmapi_mount)(struct vfs *, struct vnode *,
 				   char *, char *);
 					/* send dmapi mount event */
+	int	(*vfs_dmapi_fsys_vector)(bhv_desc_t *, struct dm_fcntl *);
+					/* get fsys-specific dmapi hooks */
 #ifdef CELL_CAPABLE
         int     vfs_ops_magic;          /* magic number for intfc extensions */
         __uint64_t   vfs_ops_version;   /* interface version number */
@@ -207,6 +210,13 @@ typedef struct vfsops {
         rv = (*(VFS_FOPS(vfsp)->vfs_get_vnode))((vfsp)->vfs_fbhv, vpp, ino);        \
         BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
 }
+#define VFS_DMAPI_FSYS_VECTOR(vfsp, df, rv) \
+{       \
+        BHV_READ_LOCK(&(vfsp)->vfs_bh); \
+        rv = (*(VFS_FOPS(vfsp)->vfs_dmapi_fsys_vector))((vfsp)->vfs_fbhv, df);        \
+        BHV_READ_UNLOCK(&(vfsp)->vfs_bh); \
+}
+
 
 #define VFSOPS_DMAPI_MOUNT(vfs_op, vfsp, mvp, dir_name, fsname, rv) \
         rv = (*(vfs_op)->vfs_dmapi_mount)(vfsp, mvp, dir_name, fsname)
