@@ -1,4 +1,4 @@
-#ident "$Revision: 1.35 $"
+#ident "$Revision: 1.36 $"
 
 
 #include <sys/param.h>
@@ -2206,6 +2206,7 @@ xfs_qm_shake_freelist(
 #ifndef _IRIX62_XFS_ONLY
 			XFSSTATS.xs_qm_dqinact_reclaims++;
 #endif
+			nextdqp = dqp->dq_flnext;
 			goto off_freelist;
 		}
 
