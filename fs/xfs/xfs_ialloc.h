@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.31 $"
 
 struct buf;
 struct xfs_dinode;
@@ -87,6 +87,7 @@ xfs_dialloc(
 	struct xfs_trans *tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	mode_t		mode,		/* mode bits for new inode */
+	int		okalloc,	/* ok to allocate more space */
 	struct buf	**agbp,		/* buf for a.g. inode header */
 	boolean_t	*alloc_done,	/* an allocation was done to replenish
 					   the free inodes */

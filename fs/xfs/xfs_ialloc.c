@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.103 $"
+#ident	"$Revision: 1.105 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -82,7 +82,8 @@ STATIC buf_t *				/* allocation group buffer */
 xfs_ialloc_ag_select(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent directory inode number */
-	mode_t		mode);		/* bits set to indicate file type */
+	mode_t		mode,		/* bits set to indicate file type */
+	int		okalloc);	/* ok to allocate more space */
 
 /*
  * Internal functions.
@@ -386,7 +387,8 @@ STATIC buf_t *				/* allocation group buffer */
 xfs_ialloc_ag_select(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent directory inode number */
-	mode_t		mode)		/* bits set to indicate file type */
+	mode_t		mode,		/* bits set to indicate file type */
+	int		okalloc)	/* ok to allocate more space */
 {
 	buf_t		*agbp;		/* allocation group header buffer */
 	xfs_agnumber_t	agcount;	/* number of ag's in the filesystem */
@@ -431,33 +433,32 @@ xfs_ialloc_ag_select(
 			}
 		} else
 			agbp = NULL;
-		if (!pag->pagf_init) {
-			if (agbp == NULL) {
-				if (xfs_ialloc_read_agi(mp, tp, agno, &agbp)) {
-					agbp = NULL;
-					mraccunlock(&mp->m_peraglock);
-					goto nextag;
-				}
-			}
-			(void)xfs_alloc_pagf_init(mp, tp, agno, flags);
-		}
 		/*
 		 * Is there enough free space for the file plus a block
 		 * of inodes (if we need to allocate some)?
 		 */
 		ineed = pag->pagi_freecount ? 0 : XFS_IALLOC_BLOCKS(mp);
-		if (pag->pagf_init) {
-			if (!(longest = pag->pagf_longest))
+		if (ineed && !pag->pagf_init) {
+			if (agbp == NULL &&
+			    xfs_ialloc_read_agi(mp, tp, agno, &agbp)) {
+				agbp = NULL;
+				mraccunlock(&mp->m_peraglock);
+				goto nextag;
+			}
+			(void)xfs_alloc_pagf_init(mp, tp, agno, flags);
+		}
+		if (!ineed || pag->pagf_init) {
+			if (ineed && !(longest = pag->pagf_longest))
 				longest = pag->pagf_flcount > 0;
-			if (pag->pagf_freeblks >= needspace + ineed &&
-			    longest >= ineed) {
-				if (agbp == NULL) {
-					if (xfs_ialloc_read_agi(mp, tp, agno,
-							&agbp)) {
-						agbp = NULL;
-						mraccunlock(&mp->m_peraglock);
-						goto nextag;
-					}
+			if (!ineed ||
+			    (pag->pagf_freeblks >= needspace + ineed &&
+			     longest >= ineed &&
+			     okalloc)) {
+				if (agbp == NULL &&
+				    xfs_ialloc_read_agi(mp, tp, agno, &agbp)) {
+					agbp = NULL;
+					mraccunlock(&mp->m_peraglock);
+					goto nextag;
 				}
 				mraccunlock(&mp->m_peraglock);
 				if (S_ISDIR(mode))
@@ -480,11 +481,11 @@ nextag:
 		agno++;
 		if (agno == agcount)
 			agno = 0;
-		if (agno == pagno)
-			if (flags)
-				flags = 0;
-			else
+		if (agno == pagno) {
+			if (flags == 0)
 				return (buf_t *)0;
+			flags = 0;
+		}
 	}
 }
 
@@ -522,6 +523,7 @@ xfs_dialloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	mode_t		mode,		/* mode bits for new inode */
+	int		okalloc,	/* ok to allocate more space */
 	buf_t		**IO_agbp,	/* in/out ag header's buffer */
 	boolean_t	*alloc_done,	/* true if we needed to replenish
 					   inode freelist */
@@ -552,7 +554,7 @@ xfs_dialloc(
 		 * We do not have an agbp, so select an initial allocation
 		 * group for inode allocation.
 		 */
-		agbp = xfs_ialloc_ag_select(tp, parent, mode);
+		agbp = xfs_ialloc_ag_select(tp, parent, mode, okalloc);
 		/*
 		 * Couldn't find an allocation group satisfying the 
 		 * criteria, give up.
@@ -589,6 +591,7 @@ xfs_dialloc(
 		/*
 		 * Try to allocate some new inodes in the allocation group.
 		 */
+		ASSERT(okalloc);
 		if (error = xfs_ialloc_ag_alloc(tp, agbp, &ialloced)) {
 			xfs_trans_brelse(tp, agbp);
 			if (error == ENOSPC) {
