@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.68 $"
+#ident	"$Revision: 1.69 $"
 
 struct buf;
 struct cred;
@@ -10,6 +10,8 @@ struct vnode;
 struct xfs_ihash;
 struct xfs_inode;
 struct xfs_perag;
+struct xfs_qm;
+struct xfs_quotainfo;
 
 typedef struct xfs_trans_reservations {
 	uint	tr_write;	/* extent alloc trans */
@@ -67,6 +69,7 @@ typedef struct xfs_mount {
 	struct xfs_inode	*m_rbmip;	/* pointer to bitmap inode */
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
 	struct xfs_inode	*m_rootip;	/* pointer to root directory */
+	struct xfs_quotainfo	*m_quotainfo;	/* disk quota information */
 	struct vnode 		*m_ddevp;	/* ptr to data dev vnode */
 	struct vnode 		*m_logdevp;	/* ptr to log dev vnode */
 	struct vnode 		*m_rtdevp;	/* prt to rt dev vnode   */
@@ -115,6 +118,22 @@ typedef struct xfs_mount {
 #if XFS_BIG_FILESYSTEMS
 #define	XFS_MOUNT_INO64	0x00000002
 #endif
+/* 
+ * disk quotas status in m_flags, and also sb_qflags.
+ */
+#define XFS_MOUNT_UDQ_ACCT	0x00000004  /* user quota accounting ON */
+#define XFS_MOUNT_UDQ_ENFD	0x00000008  /* user quota limits enforced */
+#define XFS_MOUNT_UDQ_CHKD	0x00000010  /* quotacheck run on usr quotas */
+#define XFS_MOUNT_PDQ_ACCT	0x00000020  /* project quota accounting ON */
+#define XFS_MOUNT_PDQ_ENFD	0x00000040  /* proj quota limits enforced */
+#define XFS_MOUNT_PDQ_CHKD	0x00000080  /* quotacheck run on prj quotas */
+
+/* 
+ * incore only flags for quotaoff - these bits get cleared when quota(s)
+ * are in the process of getting turned off.
+ */
+#define XFS_MOUNT_UDQ_ACTIVE	0x00000100  /* uquotas are being turned off */
+#define XFS_MOUNT_PDQ_ACTIVE	0x00000200  /* pquotas are being turned off */
 
 /*
  * Default minimum read and write sizes.
