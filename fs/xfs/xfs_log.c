@@ -164,7 +164,7 @@ xlog_trace_loggrant(xlog_t *log, xlog_ticket_t *tic, xfs_caddr_t string)
 		     (void *)((unsigned long)log->l_curr_cycle),
 		     (void *)((unsigned long)log->l_curr_block),
 		     (void *)((unsigned long)CYCLE_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
-		     (void *)((unsigned long)BLOCK_LSN(log->l_tail_lsn, ARCH_NOCONVER)),
+		     (void *)((unsigned long)BLOCK_LSN(log->l_tail_lsn, ARCH_NOCONVERT)),
 		     (void *)string,
 		     (void *)((unsigned long)13),
 		     (void *)((unsigned long)14),
