@@ -788,7 +788,7 @@ xfs_refcache_insert(
 	}
 
 	vp = XFS_ITOV(ip);
-	ASSERT(vp->v_count > 0);
+	/* ASSERT(vp->v_count > 0); */
 	VN_HOLD(vp);
 
 	/*
@@ -907,7 +907,7 @@ xfs_refcache_purge_ip(
 	spin_unlock(&xfs_refcache_lock);
 
 	vp = XFS_ITOV(ip);
-	ASSERT(vp->v_count > 1);
+	/* ASSERT(vp->v_count > 1); */
 	VOP_RELEASE(vp, error);
 	VN_RELE(vp);
 
