@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.120 $"
+#ident	"$Revision: 1.121 $"
 
 /*
  * High level interface routines for log manager
@@ -677,21 +677,45 @@ xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog)
  * with the reserve head.  Of course, if the write head were to ever
  * wrap the tail, we should blow up.  Rather than catch this case here,
  * we depend on other ASSERTions in other parts of the code.   XXXmiken
+ *
+ * This code also handles the case where the reservation head is behind
+ * the tail.  The details of this case are described below, but the end
+ * result is that we return the size of the log as the amount of space left.
  */
 int
 xlog_space_left(xlog_t *log, int cycle, int bytes)
 {
 	int free_bytes;
+	int tail_bytes;
+	int tail_cycle;
 
-	if (CYCLE_LSN(log->l_tail_lsn) == cycle) {
-		free_bytes =
-			log->l_logsize -
-			(bytes - BBTOB(BLOCK_LSN(log->l_tail_lsn)));
-	} else if (CYCLE_LSN(log->l_tail_lsn)+1 < cycle) {
+	tail_bytes = BBTOB(BLOCK_LSN(log->l_tail_lsn));
+	tail_cycle = CYCLE_LSN(log->l_tail_lsn);
+	if ((tail_cycle == cycle) && (bytes >= tail_bytes)) {
+		free_bytes = log->l_logsize - (bytes - tail_bytes);
+	} else if ((tail_cycle + 1) < cycle) {
 		return 0;
+	} else if (tail_cycle < cycle) {
+		ASSERT(tail_cycle == (cycle - 1));
+		free_bytes = tail_bytes - bytes;
 	} else {
-		free_bytes =
-			BBTOB(BLOCK_LSN(log->l_tail_lsn)) - bytes;
+		/*
+		 * The reservation head is behind the tail.
+		 * This can only happen when the AIL is empty so the tail
+		 * is equal to the head and the l_roundoff value in the
+		 * log structure is taking up the difference between the
+		 * reservation head and the tail.  The bytes accounted for
+		 * by the l_roundoff field are temporarily 'lost' to the
+		 * reservation mechanism, but they are cleaned up when the
+		 * log buffers that created them are reused.  These lost
+		 * bytes are what allow the reservation head to fall behind
+		 * the tail in the case that the log is 'empty'.
+		 * In this case we just want to return the size of the
+		 * log as the amount of space left.
+		 */
+		ASSERT((tail_cycle == (cycle + 1)) ||
+		       ((bytes + log->l_roundoff) >= tail_bytes));
+		free_bytes = log->l_logsize;
 	}
 	return free_bytes;
 }	/* xlog_space_left */
