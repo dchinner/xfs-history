@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.36 $"
+#ident	"$Revision: 1.37 $"
 
 #include <xfs_os_defs.h>
 
@@ -777,7 +777,7 @@ vn_trace_entry(vnode_t *vp, char *func, inst_t *ra)
 /*  0 */		(void *)(__psint_t)VNODE_KTRACE_ENTRY,
 /*  1 */		(void *)func,
 /*  2 */		0,
-/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  3 */		(void *)(vp->v_inode ? vn_count(vp): -9),
 /*  4 */		(void *)ra,
 /*  5 */		(void *)(__psunsigned_t)vp->v_flag,
 /*  6 */		(void *)(__psint_t)cpuid(),
@@ -793,7 +793,7 @@ vn_trace_exit(vnode_t *vp, char *func, inst_t *ra)
 /*  0 */		(void *)(__psint_t)VNODE_KTRACE_EXIT,
 /*  1 */		(void *)func,
 /*  2 */		0,
-/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
 /*  4 */		(void *)ra,
 /*  5 */		(void *)(__psunsigned_t)vp->v_flag,
 /*  6 */		(void *)(__psint_t)cpuid(),
@@ -809,7 +809,7 @@ vn_trace_hold(vnode_t *vp, char *file, int line, inst_t *ra)
 /*  0 */		(void *)(__psint_t)VNODE_KTRACE_HOLD,
 /*  1 */		(void *)file,
 /*  2 */		(void *)(__psint_t)line,
-/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
 /*  4 */		(void *)ra,
 /*  5 */		(void *)(__psunsigned_t)vp->v_flag,
 /*  6 */		(void *)(__psint_t)cpuid(),
@@ -825,7 +825,7 @@ vn_trace_ref(vnode_t *vp, char *file, int line, inst_t *ra)
 /*  0 */		(void *)(__psint_t)VNODE_KTRACE_REF,
 /*  1 */		(void *)file,
 /*  2 */		(void *)(__psint_t)line,
-/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
 /*  4 */		(void *)ra,
 /*  5 */		(void *)(__psunsigned_t)vp->v_flag,
 /*  6 */		(void *)(__psint_t)cpuid(),
@@ -841,7 +841,7 @@ vn_trace_rele(vnode_t *vp, char *file, int line, inst_t *ra)
 /*  0 */		(void *)(__psint_t)VNODE_KTRACE_RELE,
 /*  1 */		(void *)file,
 /*  2 */		(void *)(__psint_t)line,
-/*  3 */		(void *)(vp->v_inode ? vp->v_inode->i_count : -9),
+/*  3 */		(void *)(vp->v_inode ? vn_count(vp) : -9),
 /*  4 */		(void *)ra,
 /*  5 */		(void *)(__psunsigned_t)vp->v_flag,
 /*  6 */		(void *)(__psint_t)cpuid(),
