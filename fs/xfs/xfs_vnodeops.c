@@ -1,4 +1,4 @@
-#ident "$Revision: 1.249 $"
+#ident "$Revision: 1.250 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -45,6 +45,7 @@
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <sys/pathname.h>
+#include <ksys/vproc.h>
 #include <sys/proc.h>
 #include <sys/sema.h>
 #include <sys/statvfs.h>

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.135 $"
+#ident	"$Revision: 1.136 $"
 
 /*
  * High level interface routines for log manager
@@ -35,6 +35,7 @@
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/uuid.h>
+#include <ksys/vproc.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
