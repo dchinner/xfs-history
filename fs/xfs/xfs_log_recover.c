@@ -30,7 +30,7 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#ident	"$Revision: 1.187 $"
+#ident	"$Revision: 1.188 $"
 
 #include <xfs_os_defs.h>
 
@@ -150,7 +150,6 @@ xlog_get_bp(int num_bblks,xfs_mount_t *mp)
 
 	ASSERT(num_bblks > 0);
 	bp = XFS_ngetrbuf(BBTOB(num_bblks),mp);
-        ASSERT(bp);
 	return bp;
 }	/* xlog_get_bp */
 
@@ -159,7 +158,7 @@ void
 xlog_put_bp(xfs_buf_t *bp)
 {
 	XFS_nfreerbuf(bp);
-}	/* xlog_get_bp */
+}	/* xlog_put_bp */
 
 
 /*
@@ -413,6 +412,8 @@ xlog_find_head(xlog_t  *log,
 
     first_blk = 0;				/* get cycle # of 1st block */
     bp = xlog_get_bp(1,log->l_mp);
+    if (!bp)
+        return -ENOMEM;
     if (error = xlog_bread(log, 0, 1, bp))
 	goto bp_err;
     first_half_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
@@ -494,7 +495,12 @@ xlog_find_head(xlog_t  *log,
      * we actually look at the block size of the filesystem.
      */
     num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
-	big_bp = xlog_get_bp(num_scan_bblks,log->l_mp);
+    big_bp = xlog_get_bp(num_scan_bblks,log->l_mp);
+    if (!big_bp) {
+        error = -ENOMEM;
+        goto bp_err;
+    }
+        
     if (head_blk >= num_scan_bblks) {
 	/*
 	 * We are guaranteed that the entire check can be performed
@@ -663,6 +669,8 @@ xlog_test_footer(xlog_t *log)
         return 0;
 
     bp = xlog_get_bp(1, log->l_mp);
+    if (!bp)
+        return -ENOMEM;
 
     /* Read in the last physical block of the log and check its
      * magic goo. */
@@ -747,6 +755,8 @@ xlog_find_tail(xlog_t  *log,
 		return error;
 
 	bp = xlog_get_bp(1,log->l_mp);
+        if (!bp) 
+            return -ENOMEM;
 	if (*head_blk == 0) {				/* special case */
 		if (error = xlog_bread(log, 0, 1, bp))
 			goto bread_err;
@@ -907,6 +917,8 @@ xlog_find_zeroed(struct log	*log,
 	error = 0;
 	/* check totally zeroed log */
 	bp = xlog_get_bp(1,log->l_mp);
+        if (!bp)
+            return -ENOMEM;
 	if (error = xlog_bread(log, 0, 1, bp))
 		goto bp_err;
 	first_cycle = GET_CYCLE(XFS_BUF_PTR(bp), ARCH_CONVERT);
@@ -947,6 +959,10 @@ xlog_find_zeroed(struct log	*log,
 	num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
 	ASSERT(num_scan_bblks <= INT_MAX);
 	big_bp = xlog_get_bp((int)num_scan_bblks,log->l_mp);
+        if (!big_bp) {
+            error = -ENOMEM;
+            goto bp_err;
+        }
         ASSERT(big_bp);
         
 	if (last_blk < num_scan_bblks)
@@ -1112,6 +1128,8 @@ xlog_clear_stale_blocks(
 	 */
 	max_distance = MIN(max_distance, tail_distance);
 	bp = xlog_get_bp(max_distance,log->l_mp);
+        if (!bp)
+            return -ENOMEM;
 	
 	if ((head_block + max_distance) <= log->l_logBBsize) {
 		/*
@@ -3116,7 +3134,13 @@ xlog_do_recovery_pass(xlog_t	*log,
 
     error = 0;
     hbp = xlog_get_bp(1,log->l_mp);
+    if (!hbp)
+        return -ENOMEM;
     dbp = xlog_get_bp(BTOBB(XLOG_MAX_RECORD_BSIZE),log->l_mp);
+    if (!dbp) {
+        xlog_put_bp(hbp);
+        return -ENOMEM;
+    }
     bzero(rhash, sizeof(rhash));
     if (tail_blk <= head_blk) {
 	for (blk_no = tail_blk; blk_no < head_blk; ) {
