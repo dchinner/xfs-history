@@ -1,4 +1,4 @@
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -22,11 +22,11 @@
 #include <sys/atomic_ops.h>
 #include <sys/systm.h>
 #include <sys/ktrace.h>
+#include <sys/quota.h>
 #include <limits.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
-#include <sys/quota.h>
 #include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
@@ -77,7 +77,9 @@ STATIC void	xfs_qm_export_dquot(xfs_mount_t *, xfs_disk_dquot_t *,
 				    struct fs_disk_quota *);
 STATIC void	xfs_qm_dqrele_all_inodes(xfs_mount_t *, uint);
 
-
+/*
+ * The main distribution switch of all XFS quotactl system calls.
+ */
 int
 xfs_qm_sysent(
 	struct	vfs	*vfsp,
@@ -88,7 +90,6 @@ xfs_qm_sysent(
 	xfs_mount_t	*mp;
 	int 		error;
 #ifndef _BANYAN_XFS
-	/* TEMP: XXX to keep various trees from getting out of sync */
 	bhv_desc_t 	*bdp;
 
 	ASSERT(vfsp);
@@ -101,7 +102,9 @@ xfs_qm_sysent(
 #endif
 
 #ifdef DEBUG		
-	/* Internal quota accounting check for debugging */
+	/*
+	 * Internal quota accounting check for debugging
+	 */
 	if (cmd == 50) 
 		return (xfs_qm_internalqcheck(mp));
 #endif
@@ -162,7 +165,7 @@ xfs_qm_sysent(
 		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_USER,
 					     addr);
 		break;
-#ifndef _BANYAN_XFS
+#ifndef _NOPROJQUOTAS
 	       case Q_XSETPQLIM:
 		error = xfs_qm_scall_setqlim(mp, (xfs_dqid_t)id, XFS_DQ_PROJ,
 					     addr);
@@ -286,7 +289,7 @@ xfs_qm_scall_quotaon(
 
 	rootfs = (boolean_t) (mp->m_dev == rootdev);
 	delay = (boolean_t) ((flags & XFS_ALL_QUOTA_ACCT) != 0);
-#ifdef _BANYAN_XFS
+#ifdef _NOPROJQUOTAS
 	flags &= (XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_UDQ_ENFD);
 #else
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
@@ -677,8 +680,9 @@ xfs_qm_scall_quotaoff(
 	if (mp->m_dev != rootdev && (mp->m_flags & flags) == 0)
 		return (EEXIST);
 	ASSERT(mp->m_quotainfo);
+	error = 0;
 
-#ifdef _BANYAN_XFS
+#ifdef _NOPROJQUOTAS
 	flags &= (XFS_MOUNT_UDQ_ACCT | XFS_MOUNT_UDQ_ENFD);
 #else
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
@@ -699,7 +703,6 @@ xfs_qm_scall_quotaoff(
 		s = XFS_SB_LOCK(mp);
 		sbflags = mp->m_sb.sb_qflags;
 		if ((mp->m_flags & flags) == 0) {
-			error = 0;
 			mp->m_sb.sb_qflags &= flags;
 			newflags = mp->m_sb.sb_qflags;
 			XFS_SB_UNLOCK(mp, s);
