@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.81 $"
+#ident	"$Revision: 1.91 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -48,7 +48,6 @@
 #define	kmem_check()	/* dummy for memory-allocation checking */
 #endif
 
-#define	XFS_BMAP_TRACE_SIZE	4096
 ktrace_t	*xfs_bmap_trace_buf;
 
 zone_t *xfs_bmap_free_item_zone;
@@ -2160,8 +2159,6 @@ xfs_bmap_trace_addentry(
 {
 	xfs_bmbt_rec_t	tr2;
 
-	if (xfs_bmap_trace_buf == NULL)
-		xfs_bmap_trace_buf = ktrace_alloc(XFS_BMAP_TRACE_SIZE);
 	ASSERT(cnt == 1 || cnt == 2);
 	ASSERT(r1 != NULL);
 	if (cnt == 1) {
@@ -2316,8 +2313,7 @@ xfs_bmap_add_free(
 	ASSERT(agno < mp->m_sb.sb_agcount);
 	ASSERT(agbno < mp->m_sb.sb_agblocks);
 #endif
-	if (!xfs_bmap_free_item_zone)
-		xfs_bmap_free_item_zone = kmem_zone_init(sizeof(*cur), "xfs_bmap_free_item");
+	ASSERT(xfs_bmap_free_item_zone != NULL);
 	new = kmem_zone_alloc(xfs_bmap_free_item_zone, KM_SLEEP);
 	new->xbfi_startblock = bno;
 	new->xbfi_blockcount = len;
