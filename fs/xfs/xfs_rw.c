@@ -1,4 +1,4 @@
-#ident "$Revision: 1.232 $"
+#ident "$Revision: 1.233 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5157,6 +5157,7 @@ xfs_start_daemons(void)
 	int	num_daemons;
 	int	i;
 	int	num_pages;
+	extern int xfsd_pri;
 
 	num_daemons = 4;
 #if _MIPS_SIM != _ABI64
@@ -5181,7 +5182,7 @@ xfs_start_daemons(void)
 
 #define XFSD_SSIZE	(2*KTHREAD_DEF_STACKSZ)
 	for (i = 0; i < num_daemons; i++) {
-		sthread_create("xfsd", 0, XFSD_SSIZE, 0, 174, KT_PS,
+		sthread_create("xfsd", 0, XFSD_SSIZE, 0, xfsd_pri, KT_PS,
 				(st_func_t *)xfsd, 0, 0, 0, 0);
 	}
 #undef XFSD_SSIZE
