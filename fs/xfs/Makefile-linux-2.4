@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
-SUBLEVEL = 18
-EXTRAVERSION = -xfs
+SUBLEVEL = 19
+EXTRAVERSION = -pre9-xfs
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -14,7 +14,7 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 TOPDIR	:= $(shell /bin/pwd)
 
 HPATH   	= $(TOPDIR)/include
-FINDHPATH	= $(HPATH)/asm $(HPATH)/linux $(HPATH)/scsi $(HPATH)/net
+FINDHPATH	= $(HPATH)/asm $(HPATH)/linux $(HPATH)/scsi $(HPATH)/net $(HPATH)/math-emu
 
 HOSTCC  	= gcc
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
@@ -166,9 +166,8 @@ DRIVERS-$(CONFIG_AGP) += drivers/char/agp/agp.o
 DRIVERS-$(CONFIG_DRM_NEW) += drivers/char/drm/drm.o
 DRIVERS-$(CONFIG_DRM_OLD) += drivers/char/drm-4.0/drm.o
 DRIVERS-$(CONFIG_NUBUS) += drivers/nubus/nubus.a
-DRIVERS-$(CONFIG_ISDN) += drivers/isdn/isdn.a
 DRIVERS-$(CONFIG_NET_FC) += drivers/net/fc/fc.o
-DRIVERS-$(CONFIG_APPLETALK) += drivers/net/appletalk/appletalk.o
+DRIVERS-$(CONFIG_DEV_APPLETALK) += drivers/net/appletalk/appletalk.o
 DRIVERS-$(CONFIG_TR) += drivers/net/tokenring/tr.o
 DRIVERS-$(CONFIG_WAN) += drivers/net/wan/wan.o
 DRIVERS-$(CONFIG_ARCNET) += drivers/net/arcnet/arcnetdrv.o
@@ -194,7 +193,7 @@ DRIVERS-$(CONFIG_DIO) += drivers/dio/dio.a
 DRIVERS-$(CONFIG_SBUS) += drivers/sbus/sbus_all.o
 DRIVERS-$(CONFIG_ZORRO) += drivers/zorro/driver.o
 DRIVERS-$(CONFIG_FC4) += drivers/fc4/fc4.a
-DRIVERS-$(CONFIG_ALL_PPC) += drivers/macintosh/macintosh.o
+DRIVERS-$(CONFIG_PPC) += drivers/macintosh/macintosh.o
 DRIVERS-$(CONFIG_MAC) += drivers/macintosh/macintosh.o
 DRIVERS-$(CONFIG_ISAPNP) += drivers/pnp/pnp.o
 DRIVERS-$(CONFIG_SGI_IP22) += drivers/sgi/sgi.a
@@ -211,6 +210,7 @@ DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
 DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
 DRIVERS-$(CONFIG_BLUEZ) += drivers/bluetooth/bluetooth.o
 DRIVERS-$(CONFIG_HOTPLUG_PCI) += drivers/hotplug/vmlinux-obj.o
+DRIVERS-$(CONFIG_ISDN_BOOL) += drivers/isdn/vmlinux-obj.o
 
 DRIVERS := $(DRIVERS-y)
 
@@ -227,10 +227,15 @@ CLEAN_FILES = \
 	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
 	drivers/sound/bin2hex drivers/sound/hex2hex \
 	drivers/atm/fore200e_mkfirm drivers/atm/{pca,sba}*{.bin,.bin1,.bin2} \
-	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
-	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
-	drivers/scsi/aic7xxx/aicasm/y.tab.h \
 	drivers/scsi/aic7xxx/aicasm/aicasm \
+	drivers/scsi/aic7xxx/aicasm/aicasm_gram.c \
+	drivers/scsi/aic7xxx/aicasm/aicasm_gram.h \
+	drivers/scsi/aic7xxx/aicasm/aicasm_macro_gram.c \
+	drivers/scsi/aic7xxx/aicasm/aicasm_macro_gram.h \
+	drivers/scsi/aic7xxx/aicasm/aicasm_macro_scan.c \
+	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
+	drivers/scsi/aic7xxx/aicasm/aicdb.h \
+	drivers/scsi/aic7xxx/aicasm/y.tab.h \
 	drivers/scsi/53c700_d.h \
 	net/khttpd/make_times_h \
 	net/khttpd/times.h \
@@ -295,7 +300,7 @@ Version: dummy
 boot: vmlinux
 	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
-LD_VMLINUX	:= $(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o \
+LD_VMLINUX	:= $(LD) $(LINKFLAGS) $(HEAD) init/main.o init/version.o init/do_mounts.o \
 			--start-group \
 			$(CORE_FILES) \
 			$(DRIVERS) \
@@ -308,7 +313,7 @@ else
 LD_VMLINUX_KALLSYMS	:=
 endif
 
-vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o linuxsubdirs
+vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o init/do_mounts.o linuxsubdirs
 	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" kallsyms
 
 .PHONY:	kallsyms
@@ -401,13 +406,16 @@ init/version.o: init/version.c include/linux/compile.h include/config/MARKER
 init/main.o: init/main.c include/config/MARKER
 	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o $*.o $<
 
+init/do_mounts.o: init/do_mounts.c include/config/MARKER
+	$(CC) $(CFLAGS) $(CFLAGS_KERNEL) $(PROFILING) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c -o $*.o $<
+
 fs lib mm ipc kernel drivers net: dummy
 	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" $(subst $@, _dir_$@, $@)
 
 TAGS: dummy
-	etags `find include/asm-$(ARCH) -name '*.h'`
-	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print | xargs etags -a
-	find $(SUBDIRS) init -name '*.[ch]' | xargs etags -a
+	{ find include/asm-${ARCH} -name '*.h' -print ; \
+	find include -type d \( -name "asm-*" -o -name config \) -prune -o -name '*.h' -print ; \
+	find $(SUBDIRS) init -name '*.[ch]' ; } | grep -v SCCS | etags -
 
 # Exuberant ctags works better with -I
 tags: dummy
@@ -514,6 +522,11 @@ pdfdocs: sgmldocs
 
 htmldocs: sgmldocs
 	$(MAKE) -C Documentation/DocBook html
+
+mandocs:
+	chmod 755 $(TOPDIR)/scripts/kernel-doc
+	chmod 755 $(TOPDIR)/scripts/split-man
+	$(MAKE) -C Documentation/DocBook man
 
 sums:
 	find . -type f -print | sort | xargs sum > .SUMS
