@@ -355,6 +355,8 @@ xfs_inobt_delrec(
 			ASSERT(!geterror(agfbp));
 			xfs_trans_bhold_until_committed(cur->bc_tp, agfbp);
 		}
+		if (level > 0)
+			xfs_inobt_decrement(cur, level);
 		xfs_inobt_rcheck(cur);
 		kmem_check();
 		return 1;
@@ -366,17 +368,12 @@ xfs_inobt_delrec(
 	if (ptr == 1)
 		xfs_inobt_updkey(cur, kp, level + 1);
 	/*
-	 * If we get here for a non-leaf block,
-	 * we just did a join at the previous level.
-	 * Make the cursor point to the good (left) key.
-	 */
-	if (level > 0)
-		xfs_inobt_decrement(cur, level);
-	/*
 	 * If the number of records remaining in the block is at least
 	 * the minimum, we're done.
 	 */
 	if (block->bb_numrecs >= XFS_INOBT_BLOCK_MINRECS(level, cur)) {
+		if (level > 0)
+			xfs_inobt_decrement(cur, level);
 		kmem_check();
 		xfs_inobt_rcheck(cur);
 		return 1;
@@ -428,6 +425,8 @@ xfs_inobt_delrec(
 			ASSERT(block->bb_numrecs >=
 			       XFS_INOBT_BLOCK_MINRECS(level, cur));
 			xfs_btree_del_cursor(tcur);
+			if (level > 0)
+				xfs_inobt_decrement(cur, level);
 			kmem_check();
 			return 1;
 		}
@@ -475,7 +474,6 @@ xfs_inobt_delrec(
 			ASSERT(block->bb_numrecs >=
 			       XFS_INOBT_BLOCK_MINRECS(level, cur));
 			xfs_btree_del_cursor(tcur);
-			cur->bc_ptrs[level]++;
 			kmem_check();
 			return 1;
 		}
@@ -533,6 +531,8 @@ xfs_inobt_delrec(
 	 * Just return.  This is probably a logic error, but it's not fatal.
 	 */
 	else {
+		if (level > 0)
+			xfs_inobt_decrement(cur, level);
 		xfs_inobt_rcheck(cur);
 		kmem_check();
 		return 1;
@@ -600,7 +600,7 @@ xfs_inobt_delrec(
 	xfs_trans_binval(cur->bc_tp, rbp);
 	/*
 	 * To ensure that the freed block is not used for
-	 * user data until this transactin is permanent,
+	 * user data until this transaction is permanent,
 	 * we lock the agf buffer for this ag until the
 	 * transaction record makes it to the on-disk log.
 	 */
@@ -624,6 +624,14 @@ xfs_inobt_delrec(
 	 */
 	else if (level + 1 < cur->bc_nlevels)
 		xfs_inobt_increment(cur, level + 1);
+	/*
+	 * Readjust the ptr at this level if it's not a leaf, since it's
+	 * still pointing at the deletion point, which makes the cursor
+	 * inconsistent.  If this makes the ptr 0, the caller fixes it up.
+	 * We can't use decrement because it would change the next level up.
+	 */
+	if (level > 0)
+		cur->bc_ptrs[level]--;
 	xfs_inobt_rcheck(cur);
 	kmem_check();
 	/* 
@@ -1937,6 +1945,14 @@ xfs_inobt_delete(
 	 */
 	for (level = 0, i = 2; i == 2; level++)
 		i = xfs_inobt_delrec(cur, level);
+	if (i == 0) {
+		for (level = 1; level < cur->bc_nlevels; level++) {
+			if (cur->bc_ptrs[level] == 0) {
+				xfs_inobt_decrement(cur, level);
+				break;
+			}
+		}
+	}
 	xfs_inobt_kcheck(cur);
 	return i;
 }

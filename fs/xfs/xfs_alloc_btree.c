@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 /*
  * Free space allocation for xFS.
@@ -366,6 +366,8 @@ xfs_alloc_delrec(
 			xfs_btree_setbuf(cur, level, 0);
 			cur->bc_nlevels--;
 		}
+		if (level > 0)
+			xfs_alloc_decrement(cur, level);
 		xfs_alloc_rcheck(cur);
 		kmem_check();
 		return 1;
@@ -377,17 +379,12 @@ xfs_alloc_delrec(
 	if (ptr == 1)
 		xfs_alloc_updkey(cur, lkp, level + 1);
 	/*
-	 * If we get here for a non-leaf block,
-	 * we just did a join at the previous level.
-	 * Make the cursor point to the good (left) key.
-	 */
-	if (level > 0)
-		xfs_alloc_decrement(cur, level);
-	/*
 	 * If the number of records remaining in the block is at least
 	 * the minimum, we're done.
 	 */
 	if (block->bb_numrecs >= XFS_ALLOC_BLOCK_MINRECS(level, cur)) {
+		if (level > 0)
+			xfs_alloc_decrement(cur, level);
 		kmem_check();
 		xfs_alloc_rcheck(cur);
 		return 1;
@@ -439,6 +436,8 @@ xfs_alloc_delrec(
 			ASSERT(block->bb_numrecs >=
 			       XFS_ALLOC_BLOCK_MINRECS(level, cur));
 			xfs_btree_del_cursor(tcur);
+			if (level > 0)
+				xfs_alloc_decrement(cur, level);
 			kmem_check();
 			return 1;
 		}
@@ -486,7 +485,6 @@ xfs_alloc_delrec(
 			ASSERT(block->bb_numrecs >=
 			       XFS_ALLOC_BLOCK_MINRECS(level, cur));
 			xfs_btree_del_cursor(tcur);
-			cur->bc_ptrs[level]++;
 			kmem_check();
 			return 1;
 		}
@@ -544,6 +542,8 @@ xfs_alloc_delrec(
 	 * Just return.  This is probably a logic error, but it's not fatal.
 	 */
 	else {
+		if (level > 0)
+			xfs_alloc_decrement(cur, level);
 		xfs_alloc_rcheck(cur);
 		kmem_check();
 		return 1;
@@ -625,6 +625,13 @@ xfs_alloc_delrec(
 	xfs_trans_agbtree_delta(cur->bc_tp, -1);
 	xfs_alloc_rcheck(cur);
 	kmem_check();
+	/*
+	 * Adjust the current level's cursor so that we're left referring
+	 * to the right node, after we're done.
+	 * If this leaves the ptr value 0 our caller will fix it up.
+	 */
+	if (level > 0)
+		cur->bc_ptrs[level]--;
 	/* 
 	 * Return value means the next level up has something to do.
 	 */
@@ -1967,6 +1974,14 @@ xfs_alloc_delete(
 	 */
 	for (level = 0, i = 2; i == 2; level++)
 		i = xfs_alloc_delrec(cur, level);
+	if (i == 0) {
+		for (level = 1; level < cur->bc_nlevels; level++) {
+			if (cur->bc_ptrs[level] == 0) {
+				xfs_alloc_decrement(cur, level);
+				break;
+			}
+		}
+	}
 	xfs_alloc_kcheck(cur);
 	return i;
 }

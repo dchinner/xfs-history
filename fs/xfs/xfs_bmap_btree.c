@@ -404,21 +404,20 @@ xfs_bmbt_delrec(
 	if (level == cur->bc_nlevels - 1) {
 		xfs_iroot_realloc(cur->bc_private.b.ip, -1);
 		i = xfs_bmbt_killroot(cur);
+		if (level > 0)
+			xfs_bmbt_decrement(cur, level);
 		xfs_bmbt_locals_free(l);
+		xfs_bmbt_rcheck(cur);
 		xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit2", cur);
 		return i;
 	}
 	if (l->ptr == 1)
 		xfs_bmbt_updkey(cur, l->kp, level + 1);
-	/*
-	 * We just did a join at the previous level.
-	 * Make the cursor point to the good (left) key.
-	 */
-	if (level > 0)
-		xfs_bmbt_decrement(cur, level);
-	xfs_bmbt_rcheck(cur);
 	if (l->block->bb_numrecs >= XFS_BMAP_BLOCK_IMINRECS(level, cur)) {
+		if (level > 0)
+			xfs_bmbt_decrement(cur, level);
 		xfs_bmbt_locals_free(l);
+		xfs_bmbt_rcheck(cur);
 		xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit3", cur);
 		return 1;
 	}
@@ -432,14 +431,16 @@ xfs_bmbt_delrec(
 	if (l->lbno == NULLFSBLOCK && l->rbno == NULLFSBLOCK &&
 	    level == cur->bc_nlevels - 2) {
 		i = xfs_bmbt_killroot(cur);
+		if (level > 0)
+			xfs_bmbt_decrement(cur, level);
 		xfs_bmbt_locals_free(l);
+		xfs_bmbt_rcheck(cur);
 		xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit4", cur);
 		return i;
 	}
 	ASSERT(l->rbno != NULLFSBLOCK || l->lbno != NULLFSBLOCK);
 	l->tcur = xfs_btree_dup_cursor(cur);
 	l->bno = NULLFSBLOCK;
-	l->bp = cur->bc_bufs[level];
 	if (l->rbno != NULLFSBLOCK) {
 		xfs_btree_lastrec(l->tcur, level);
 		xfs_bmbt_increment(l->tcur, level);
@@ -452,7 +453,10 @@ xfs_bmbt_delrec(
 			if (xfs_bmbt_lshift(l->tcur, level)) {
 				ASSERT(l->block->bb_numrecs >= XFS_BMAP_BLOCK_IMINRECS(level, l->tcur));
 				xfs_btree_del_cursor(l->tcur);
+				if (level > 0)
+					xfs_bmbt_decrement(cur, level);
 				xfs_bmbt_locals_free(l);
+				xfs_bmbt_rcheck(cur);
 				xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit5",
 					cur);
 				return 1;
@@ -477,7 +481,7 @@ xfs_bmbt_delrec(
 				ASSERT(l->block->bb_numrecs >= XFS_BMAP_BLOCK_IMINRECS(level, l->tcur));
 				xfs_btree_del_cursor(l->tcur);
 				xfs_bmbt_locals_free(l);
-				cur->bc_ptrs[level]++;
+				xfs_bmbt_rcheck(cur);
 				xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit6",
 					cur);
 				return 1;
@@ -505,6 +509,8 @@ xfs_bmbt_delrec(
 		l->lrecs = l->left->bb_numrecs;
 		xfs_btree_check_lblock(cur, l->right, level);
 	} else {
+		if (level > 0)
+			xfs_bmbt_decrement(cur, level);
 		xfs_bmbt_locals_free(l);
 		xfs_bmbt_rcheck(cur);
 		xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit7", cur);
@@ -547,9 +553,11 @@ xfs_bmbt_delrec(
 	if (l->bp != l->lbp) {
 		cur->bc_bufs[level] = l->lbp;
 		cur->bc_ptrs[level] += l->lrecs;
-	} else if (level + 1 < cur->bc_nlevels)
+	} else
 		xfs_bmbt_increment(cur, level + 1);
 	xfs_bmbt_locals_free(l);
+	if (level > 0)
+		cur->bc_ptrs[level]--;
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit8", cur);
 	return 2;
@@ -1801,6 +1809,14 @@ xfs_bmbt_delete(
 	xfs_bmbt_trace_cursor("xfs_bmbt_delete entry", cur);
 	for (level = 0, i = 2; i == 2; level++)
 		i = xfs_bmbt_delrec(cur, level);
+	if (i == 0) {
+		for (level = 1; level < cur->bc_nlevels; level++) {
+			if (cur->bc_ptrs[level] == 0) {
+				xfs_bmbt_decrement(cur, level);
+				break;
+			}
+		}
+	}
 	xfs_bmbt_kcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_delete exit", cur);
 	return i;
