@@ -519,7 +519,8 @@ extern int pagebuf_iozero(		/* zero contents of buffer	*/
 		page_buf_t *,		/* buffer to zero		*/
 		off_t,			/* offset in buffer		*/
 		size_t, 		/* size of data to zero		*/
-		loff_t);		/* last permissible isize value */
+		loff_t,			/* last permissible isize value */
+		pb_bmap_t *);		/* pointer to pagebuf bmap	*/
 
 extern caddr_t	pagebuf_offset(page_buf_t *, off_t);
 

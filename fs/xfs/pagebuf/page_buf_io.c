@@ -280,13 +280,15 @@ int pagebuf_iozero(		/* zero contents of buffer      */
     page_buf_t * pb,		/* buffer to zero               */
     off_t boff,			/* offset in buffer             */
     size_t bsize,		/* size of data to zero         */
-    loff_t end_size)		/* maximum file size to set	*/
+    loff_t end_size,		/* maximum file size to set	*/
+    pb_bmap_t *pbmapp)		/* pointer to pagebuf bmap	*/
 {
 	loff_t cboff;
 	size_t cpoff;
 	size_t csize;
 	struct page *page;
 	loff_t pos;
+	int at_eof;
 
 	cboff = boff;
 	boff += bsize; /* last */
@@ -301,6 +303,13 @@ int pagebuf_iozero(		/* zero contents of buffer      */
 		}
 		assert(((csize + cpoff) <= PAGE_CACHE_SIZE));
 		lock_page(page);
+		SetPageUptodate(page);
+
+		at_eof = page->index >= (ip->i_size >> PAGE_CACHE_SHIFT);
+
+		__pb_block_prepare_write_async(ip, page,
+			cpoff, cpoff+csize, at_eof, NULL,
+			pbmapp, PBF_WRITE);
 		memset((void *) (kmap(page) + cpoff), 0, csize);
 		pagebuf_commit_write_core(ip, page, cpoff, cpoff + csize);
 		pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) +
