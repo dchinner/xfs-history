@@ -39,10 +39,6 @@
 #include <linux/dcache.h>
 
 
-extern int xfs_get_uiosize(xfs_mount_t *, xfs_inode_t *,
-			struct biosize *, cred_t *);
-extern int xfs_set_uiosize(xfs_mount_t *, xfs_inode_t *,
-			uint, int, int, cred_t *);
 extern int xfs_change_file_space(bhv_desc_t *, int,
 			xfs_flock64_t *, xfs_off_t, cred_t *, int);
 extern int xfs_set_dmattrs(bhv_desc_t *, u_int, u_int16_t, cred_t *);
@@ -750,31 +746,6 @@ xfs_ioctl(
 
 		if (copy_to_user((struct fsxattr *)arg, &fa, sizeof(fa)))
 			return -XFS_ERROR(EFAULT);
-		return 0;
-	}
-
-	case XFS_IOC_GETBIOSIZE: {
-		struct biosize	bs;
-
-		error = xfs_get_uiosize(mp, ip, &bs, &cred);
-		if (error)
-			return -error;
-
-		if (copy_to_user((struct biosize *)arg, &bs, sizeof(bs)))
-			return -XFS_ERROR(EFAULT);
-		return 0;
-	}
-
-	case XFS_IOC_SETBIOSIZE: {
-		struct biosize	bs;
-
-		if (copy_from_user(&bs, (struct biosize *)arg, sizeof(bs)))
-			return -XFS_ERROR(EFAULT);
-
-		error = xfs_set_uiosize(mp, ip, bs.biosz_flags, bs.biosz_read,
-						bs.biosz_write, &cred);
-		if (error)
-			return -error;
 		return 0;
 	}
 

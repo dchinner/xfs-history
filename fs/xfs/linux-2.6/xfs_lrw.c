@@ -40,8 +40,8 @@
 #include <linux/xfs_iops.h>
 
 
-#define XFS_WRITEIO_ALIGN(io,off)       (((off) >> io->io_writeio_log) \
-                                                << io->io_writeio_log)
+#define XFS_WRITEIO_ALIGN(mp,off)       (((off) >> mp->m_writeio_log) \
+                                                << mp->m_writeio_log)
 #define	XFS_STRAT_WRITE_IMAPS	2
 
 STATIC int xfs_iomap_read(xfs_iocore_t *, loff_t, size_t, int, pb_bmap_t *,
@@ -509,7 +509,7 @@ xfs_zero_eof(
 		 * is simple and this path should not be exercised often.
 		 */
 		buf_len_fsb = XFS_FILBLKS_MIN(imap.br_blockcount,
-					      io->io_writeio_blocks);
+					      mp->m_writeio_blocks);
 		/*
 		 * Drop the inode lock while we're doing the I/O.
 		 * We'll still have the iolock to protect us.
@@ -701,7 +701,6 @@ start:
 	 */
 	
 	if (!direct && (*offsetp > isize && isize)) {
-		io->io_writeio_blocks = mp->m_writeio_blocks;
 		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
 			isize, *offsetp + size, NULL);
 		if (error) {
@@ -1579,7 +1578,7 @@ xfs_iomap_write_delay(
 	if (!(ioflag & PBF_SYNC) && ((offset + count) > XFS_SIZE(mp, io))) {
 		start_fsb = XFS_B_TO_FSBT(mp,
 				  ((xfs_ufsize_t)(offset + count - 1)));
-		count_fsb = io->io_writeio_blocks;
+		count_fsb = mp->m_writeio_blocks;
 		while (count_fsb > 0) {
 			nimaps = XFS_WRITE_IMAPS;
 			firstblock = NULLFSBLOCK;
@@ -1599,8 +1598,8 @@ xfs_iomap_write_delay(
 				ASSERT(count_fsb < 0xffff000);
 			}
 		}
-		iosize = io->io_writeio_blocks;
-		aligned_offset = XFS_WRITEIO_ALIGN(io, (offset + count - 1));
+		iosize = mp->m_writeio_blocks;
+		aligned_offset = XFS_WRITEIO_ALIGN(mp, (offset + count - 1));
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		last_fsb = ioalign + iosize;
 		aeof = 1;
@@ -1648,13 +1647,13 @@ xfs_iomap_write_delay(
 	}
 
 	if (!(ioflag & PBF_SYNC) ||
-	    ((last_fsb - offset_fsb) >= io->io_writeio_blocks)) {
+	    ((last_fsb - offset_fsb) >= mp->m_writeio_blocks)) {
 		/*
 		 * For normal or large sync writes, align everything
 		 * into i_writeio_blocks sized chunks.
 		 */
-		iosize = io->io_writeio_blocks;
-		aligned_offset = XFS_WRITEIO_ALIGN(io, offset);
+		iosize = mp->m_writeio_blocks;
+		aligned_offset = XFS_WRITEIO_ALIGN(mp, offset);
 		ioalign = XFS_B_TO_FSBT(mp, aligned_offset);
 		small_write = 0;
 		/* XXX - Are we shrinking? XXXXX  */
