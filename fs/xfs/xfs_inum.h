@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_INUM_H
 #define	_FS_XFS_INUM_H
 
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 /*
  * Inode number format:
@@ -120,6 +120,12 @@ xfs_agino_t xfs_offbno_to_agino(struct xfs_mount *mp, xfs_agblock_t b, int o);
 #else
 #define	XFS_OFFBNO_TO_AGINO(mp,b,o)	\
 	((xfs_agino_t)(((b) << XFS_INO_OFFSET_BITS(mp)) | (o)))
+#endif
+
+#if XFS_BIG_FILESYSTEMS
+#define	XFS_MAXINUMBER	((xfs_ino_t)((1ULL << 56) - 1ULL))
+#else
+#define	XFS_MAXINUMBER	((xfs_ino_t)((1ULL << 32) - 1ULL))
 #endif
 
 #endif	/* !_FS_XFS_INUM_H */
