@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.38 $"
+#ident "$Revision: 1.39 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -247,9 +247,9 @@ open_by_handle (
 	curuthread->ut_openfp = fp;
 
 	if ((filemode & FWRITE) == 0)
-		_SAT_PNALLOC(SAT_OPEN_RO);
+		_SAT_PN_BOOK(SAT_OPEN_RO, curuthread);
 	else
-		_SAT_PNALLOC(SAT_OPEN);
+		_SAT_PN_BOOK(SAT_OPEN, curuthread);
 
 	error = vp_open (vp, filemode, get_current_cred());
 
