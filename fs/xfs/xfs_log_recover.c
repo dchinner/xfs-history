@@ -1392,7 +1392,7 @@ xlog_do_recover(xlog_t	*log,
 	xlog_put_bp(dbp);
 	xlog_put_bp(hbp);
     }
-    bflush(log->l_dev);
+    bflush(log->l_mp->m_dev);
 
     /*
      * Now that we've finished replaying all buffer and inode
