@@ -780,60 +780,45 @@ void linvfs_file_read(
 	return;
 }
 
+
 STATIC
 int linvfs_bmap(struct address_space *mapping, long block)
 {
-	struct inode *inode = (struct inode *)mapping->host;
-	xfs_bmbt_irec_t mval;
-	int error, nmaps = 1;
-	xfs_fsblock_t output;
-	xfs_fsblock_t firstblock;
-	xfs_fileoff_t xfsblock;
-	xfs_mount_t *mp;
-
-	vnode_t *vp = LINVFS_GET_VP(inode);
-	xfs_inode_t *ip;
+	struct inode        *inode          = (struct inode *)mapping->host;
+	vnode_t             *vp             = LINVFS_GET_VP(inode);
+        pb_bmap_t           bmap            = {0};
+        int                 nbm             = 1;
+	int                 error;
+        
+        /* block             - linux disk blocks    512b */
+        /* bmap input offset - bytes                  1b */
+        /* bmap outut bn     - xfs BBs              512b */
+        /* bmap outut delta  - bytes                  1b */
 
 	ASSERT(vp);
 
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
-	ip = XFS_BHVTOI(vp->v_fbhv);
-	mp = ip->i_mount;
-
-	/* If we want to report disk addresses then make sure we
-	 * have allocated disk addresses!
-	 */
-	if (ip->i_delayed_blks) {
+	if (inode->i_data.nrpages)
 		VOP_FLUSH_PAGES(vp, (xfs_off_t)0, 0, FI_REMAPF, error);
-	}
+	if (error)
+	return -1;
 
-	/* The blockno passed is in terms of basic blocks */
-	xfsblock = XFS_BB_TO_FSBT(mp, block);
+	VOP_BMAP(vp, block << 9, 1, PBF_READ|PBF_BMAP_TRY_ILOCK, 
+		&bmap, &nbm, error);
+	if (error)
+	return -1;
 
-	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(NULL, ip, xfsblock, (xfs_filblks_t)1,
-			XFS_BMAPI_IGSTATE, &firstblock, 0, &mval, &nmaps, NULL);
+	/*        
+	printk("%Ld -> (%Ld,%Ld) %Ld\n", 
+	(long long)block, 
+	(long long)bmap.pbm_bn, (long long)(bmap.pbm_delta >> 9), 
+	(long long)(bmap.pbm_bn + (bmap.pbm_delta >> 9)));
+	*/
 
-	if (error) {
-		printk("error (%d)!\n", error);
-		return -1;
-	}
-
-	if (mval.br_startblock == HOLESTARTBLOCK) {
-		return -1;
-	} else {
-		output = XFS_FSB_TO_DB(ip, mval.br_startblock) + block -
-			 XFS_FSB_TO_BB(mp, mval.br_startoff);
-
-		/* For when XFS really does use something other than 512 here 
-		output <<= inode->i_sb->i_blocksize_bits  - 9;
-		*/
-
-		return (int)output;
-	}
+	return (int)(bmap.pbm_bn + (bmap.pbm_delta >> 9));
 }
-
+ 
 
 struct address_space_operations linvfs_aops = {
   readpage:		linvfs_read_full_page,
