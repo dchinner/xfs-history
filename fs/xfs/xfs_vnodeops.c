@@ -1222,7 +1222,6 @@ xfs_inactive(
 	int		done;
 	int		committed;
 	int		commit_flags;
-	int		unlink_synced;
 	xfs_fsblock_t	first_block;
 	xfs_bmap_free_t	free_list;
 	xfs_fileoff_t	end_fsb;
@@ -1265,16 +1264,6 @@ xfs_inactive(
 	ASSERT(ip->i_d.di_nlink >= 0);
 	mp = ip->i_mount;
 	if (ip->i_d.di_nlink == 0) {
-		/*
-		 * Keep track of whether or not we know that the unlink
-		 * has been synced to the on disk log so that we can
-		 * avoid multiple sync transactions below.
-		 */
-		if (mp->m_flags & XFS_MOUNT_WSYNC) {
-			unlink_synced = 1;
-		} else {
-			unlink_synced = 0;
-		}
 		tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 
 		if (truncate) {
@@ -1313,13 +1302,6 @@ xfs_inactive(
 				xfs_itruncate_cleanup(&tp, ip, commit_flags,
 						      XFS_DATA_FORK);
 				commit_flags = 0;
-			} else {
-				/*
-				 * We know for sure that the unlink has been
-				 * synced out because we do it in
-				 * xfs_itruncate_finish().
-				 */
-				unlink_synced = 1;
 			}
 		} else if ((ip->i_d.di_mode & IFMT) == IFLNK) {
 
@@ -1410,7 +1392,6 @@ xfs_inactive(
 					       0, XFS_TRANS_PERM_LOG_RES,
 					       XFS_ITRUNCATE_LOG_COUNT);
 				ASSERT(error == 0);
-				unlink_synced = 1;
 
 			} else {
 				/*
@@ -1497,8 +1478,7 @@ xfs_inactive(
 			xfs_trans_ihold(tp, ip);
 
 			error = xfs_itruncate_finish(&tp, ip, 0,
-						     XFS_ATTR_FORK,
-						     unlink_synced);
+						     XFS_ATTR_FORK, 0);
 			commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 
 			if (error) {
