@@ -1,4 +1,4 @@
-#ident "$Revision: 1.192 $"
+#ident "$Revision: 1.193 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1476,7 +1476,6 @@ xfs_inactive(
 		} else if (ip->i_afp)
 			xfs_idestroy_fork(ip, XFS_ATTR_FORK);
 				
- free_inode:
 		/*
 		 * Free the inode.
 		 */
