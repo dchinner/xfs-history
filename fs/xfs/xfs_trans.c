@@ -200,6 +200,8 @@ xfs_trans_dup(
 	tp->t_blk_res = tp->t_blk_res_used;
 	ntp->t_rtx_res = tp->t_rtx_res - tp->t_rtx_res_used;
 	tp->t_rtx_res = tp->t_rtx_res_used;
+	ntp->t_pflags = tp->t_pflags;
+	PFLAGS_CLEAR_FSTRANS(&tp->t_pflags);
 
 	XFS_TRANS_DUP_DQINFO(tp->t_mountp, tp, ntp);
 
