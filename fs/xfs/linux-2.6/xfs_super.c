@@ -924,7 +924,7 @@ STATIC struct dentry *linvfs_fh_to_dentry(
 	spin_lock(&dcache_lock);
 	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
 		result = list_entry(lp,struct dentry, d_alias);
-		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+		if (! (result->d_flags & DCACHE_DISCONNECTED)) {
 			dget_locked(result);
 			result->d_vfs_flags |= DCACHE_REFERENCED;
 			spin_unlock(&dcache_lock);
@@ -938,7 +938,7 @@ STATIC struct dentry *linvfs_fh_to_dentry(
 		iput(inode);
 		return ERR_PTR(-ENOMEM);
 	}
-	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+	result->d_flags |= DCACHE_DISCONNECTED;
 	return result;
 }
 #endif
