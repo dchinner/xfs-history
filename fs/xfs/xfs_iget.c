@@ -1,4 +1,4 @@
-#ident "$Revision: 1.91 $"
+#ident "$Revision: 1.92 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -153,7 +153,6 @@ xfs_iget(
 again:
 	mraccess(&ih->ih_lock);
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
-#pragma mips_frequency_hint FREQUENT
 		if (ip->i_ino == ino) {
 			vp = XFS_ITOV(ip);
 			VMAP(vp, vmap);
@@ -189,7 +188,9 @@ again:
 			 * least look.
 			 */
 			if (!(vp = vn_get(vp, &vmap, 0))) {
+#ifndef SIM
 #pragma mips_frequency_hint NEVER
+#endif
 				XFSSTATS.xs_ig_frecycle++;
 				goto again;
 			}
@@ -324,7 +325,6 @@ xfs_inode_incore(xfs_mount_t	*mp,
 	ih = XFS_IHASH(mp, ino);
 	mraccess(&ih->ih_lock);
 	for (ip = ih->ih_next; ip != NULL; ip = ip->i_next) {
-#pragma mips_frequency_hint FREQUENT
 		if (ip->i_ino == ino) {
 			/*
 			 * If we find it and tp matches, return it.
