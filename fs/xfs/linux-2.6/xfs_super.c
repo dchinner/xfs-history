@@ -293,37 +293,13 @@ spectodevs(
 	return 0;
 }
 
-static struct inode_operations linvfs_meta_ops = {
-};
-
-static struct address_space_operations linvfs_meta_aops = {
-	sync_page:		block_sync_page,
-};
-
-struct inode *
-linvfs_make_inode(kdev_t kdev, struct super_block *sb)
-{
-	struct inode *inode = get_empty_inode();
-
-	inode->i_dev = kdev;
-	inode->i_op = &linvfs_meta_ops;
-	inode->i_mapping->a_ops = &linvfs_meta_aops;
-	inode->i_sb = sb;
-
-
-	pagebuf_lock_enable(inode);
-
-	return inode;
-}
 
 void
-linvfs_release_inode(struct inode *inode)
+linvfs_release_target(struct pb_target *target)
 {
-	if (inode) {
-		pagebuf_delwri_flush(inode, PBDF_WAIT, NULL);
-		pagebuf_lock_disable(inode);
-		truncate_inode_pages(&inode->i_data, 0L);
-		iput(inode);
+	if (target) {
+		pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
+		pagebuf_lock_disable(target);
 	}
 }
 

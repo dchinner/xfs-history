@@ -35,13 +35,8 @@
 struct xfs_args;
 
 void
-linvfs_release_inode(
-	struct inode	*inode);
-
-struct inode *
-linvfs_make_inode(
-	kdev_t		dev,
-	struct super_block *sb);
+linvfs_release_target(
+	struct pb_target *target);
 
 int
 fs_dounmount(

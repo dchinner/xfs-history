@@ -330,7 +330,7 @@ xfs_zero_last_block(
 	/*
 	 * Realtime needs work here
 	 */
-	pb = pagebuf_get(ip, loff, lsize, 0);
+	pb = pagebuf_lookup(ip, loff, lsize, PBF_ENTER_PAGES);
 	if (!pb) {
 		error = ENOMEM;
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
@@ -517,7 +517,7 @@ xfs_zero_eof(
 		 * real-time files need work here
 		 */
 
-		pb = pagebuf_get(ip, loff, lsize, 0);
+		pb = pagebuf_lookup(ip, loff, lsize, PBF_ENTER_PAGES);
 		if (!pb) {
 			error = ENOMEM;
 			goto out_lock;
@@ -1696,6 +1696,65 @@ xfs_iomap_write_delay(
 	return 0;
 }
 
+/*
+ * This is called to convert all delayed allocation blocks in the given
+ * range back to 'holes' in the file.  It is used when a user's write will not
+ * be able to be written out due to disk errors in the allocation calls.
+ */
+STATIC void
+xfs_delalloc_cleanup(
+	xfs_inode_t	*ip,
+	xfs_fileoff_t	start_fsb,
+	xfs_filblks_t	count_fsb)
+{
+	xfs_fsblock_t	first_block;
+	int		nimaps;
+	int		done;
+	int		error;
+	int		n;
+#define	XFS_CLEANUP_MAPS	4
+	xfs_bmbt_irec_t	imap[XFS_CLEANUP_MAPS];
+
+	ASSERT(count_fsb < 0xffff000);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	while (count_fsb != 0) {
+		first_block = NULLFSBLOCK;
+		nimaps = XFS_CLEANUP_MAPS;
+		error = xfs_bmapi(NULL, ip, start_fsb, count_fsb, 0,
+				  &first_block, 1, imap, &nimaps, NULL);
+		if (error) {
+			xfs_iunlock(ip, XFS_ILOCK_EXCL);
+			return;
+		}
+
+		ASSERT(nimaps > 0);
+		n = 0;
+		while (n < nimaps) {
+			if (imap[n].br_startblock == DELAYSTARTBLOCK) {
+				if (!XFS_FORCED_SHUTDOWN(ip->i_mount))
+					xfs_force_shutdown(ip->i_mount,
+						XFS_METADATA_IO_ERROR);
+				error = xfs_bunmapi(NULL, ip,
+						    imap[n].br_startoff,
+						    imap[n].br_blockcount,
+						    0, 1, &first_block, NULL,
+						    &done);
+				if (error) {
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
+					return;
+				}
+				ASSERT(done);
+			}
+			start_fsb += imap[n].br_blockcount;
+			count_fsb -= imap[n].br_blockcount;
+			ASSERT(count_fsb < 0xffff000);
+			n++;
+		}
+	}
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+}
+
+
 STATIC int
 xfs_iomap_write_direct(
 	xfs_iocore_t	*io,
@@ -1909,25 +1968,7 @@ error_out:
 out:	/* Just return error and any tracing at end of routine */
 	return XFS_ERROR(error);
 }
-int
-_xfs_incore_relse(buftarg_t *targ,
-				  int	delwri_only,
-				  int	wait)
-{
-	truncate_inode_pages(&targ->inode->i_data, 0LL);
-	return 0;
-} 
 
-xfs_buf_t *
-_xfs_incore_match(buftarg_t     *targ,
-			 xfs_daddr_t		blkno,
-			 int 			len,
-			 int			field,
-			 void			*value)
-{
-  printk("_xfs_incore_match not implemented\n");
-  return NULL;
-}
 
 /*
  * All xfs metadata buffers except log state machine buffers
@@ -1939,10 +1980,8 @@ int
 xfs_bdstrat_cb(struct xfs_buf *bp)
 {
 	xfs_mount_t	*mp;
-	vfs_t *vfsp;
 	
-	vfsp = LINVFS_GET_VFS(bp->pb_target->i_sb);
-	mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+	mp = XFS_BUF_FSPRIVATE3(bp, xfs_mount_t *);
 	if (!XFS_FORCED_SHUTDOWN(mp)) {
 		pagebuf_iorequest(bp);
 		return 0;
@@ -1987,32 +2026,10 @@ xfsbdstrat(
 }
 
 
-page_buf_t *
-xfs_pb_getr(int sleep, xfs_mount_t *mp){
-	return pagebuf_get_empty(sleep,mp->m_ddev_targ.inode);
-}
-
-page_buf_t *
-xfs_pb_ngetr(int len, xfs_mount_t *mp){
-	page_buf_t *bp;
-	bp = pagebuf_get_no_daddr(len,mp->m_ddev_targ.inode);
-	return bp;
-}
-
-void
-xfs_pb_freer(page_buf_t *bp) {
-	pagebuf_free(bp);
-}
-
-void
-xfs_pb_nfreer(page_buf_t *bp){
-	pagebuf_free(bp);
-}
-
 void
 XFS_bflush(buftarg_t target)
 {
-	pagebuf_delwri_flush(target.inode, PBDF_WAIT, NULL);
+	pagebuf_delwri_flush(target.pb_targ, PBDF_WAIT, NULL);
 }
 
 
@@ -2038,7 +2055,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
   
 	do {
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-		pagebuf_delwri_flush(mp->m_ddev_targ.inode,
+		pagebuf_delwri_flush(mp->m_ddev_targ.pb_targ,
 				PBDF_WAIT, &pincount);
 		if (pincount == 0) {delay(50); count++;}
 	}  while (count < 2);
@@ -2053,7 +2070,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 
 	do {
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-		pagebuf_delwri_flush(mp->m_ddev_targ.inode,
+		pagebuf_delwri_flush(mp->m_ddev_targ.pb_targ,
 			PBDF_WAIT, &pincount);
 	}  while (pincount);
  

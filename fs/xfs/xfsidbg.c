@@ -2370,19 +2370,11 @@ xfs_inodebuf(xfs_buf_t *bp)
 {
 	xfs_dinode_t *di;
 	int n, i;
-	vfs_t *vfsp;
-	bhv_desc_t *bdp;
-	xfs_mount_t *mp;
 
-	vfsp = LINVFS_GET_VFS(bp->pb_target->i_sb);
-	if (!vfsp)
-		return;
-	bdp = VFS_BHVHEAD(vfsp)->bh_first;
-	mp = XFS_BHVTOM(bdp);
-	n = XFS_BUF_COUNT(bp) >> mp->m_sb.sb_inodelog;
+	n = XFS_BUF_COUNT(bp) >> 8;
 	for (i = 0; i < n; i++) {
 		di = (xfs_dinode_t *)xfs_buf_offset(bp,
-					i * mp->m_sb.sb_inodesize);
+					i * 256);
 		xfs_prdinode(di, 0, ARCH_CONVERT);
 	}
 }

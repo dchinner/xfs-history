@@ -1051,15 +1051,15 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 void
 xfs_unmountfs_close(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 {
-	if (mp->m_ddev_targ.inode) {
-		linvfs_release_inode(mp->m_ddev_targ.inode);
+	if (mp->m_ddev_targ.pb_targ) {
+		linvfs_release_target(mp->m_ddev_targ.pb_targ);
 	}
-	if (mp->m_rtdev_targ.inode) {
-		linvfs_release_inode(mp->m_rtdev_targ.inode);
+	if (mp->m_rtdev_targ.pb_targ) {
+		linvfs_release_target(mp->m_rtdev_targ.pb_targ);
 	}
-	if (mp->m_logdev_targ.inode &&
-	    mp->m_logdev_targ.inode != mp->m_ddev_targ.inode) {
-		linvfs_release_inode(mp->m_logdev_targ.inode);
+	if (mp->m_logdev_targ.pb_targ &&
+	    mp->m_logdev_targ.pb_targ != mp->m_ddev_targ.pb_targ) {
+		linvfs_release_target(mp->m_logdev_targ.pb_targ);
 	}
 }
 

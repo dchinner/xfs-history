@@ -190,7 +190,7 @@ STATIC
 void
 xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 {
-	btp->inode = linvfs_make_inode(dev, sb);
+	btp->pb_targ = pagebuf_lock_enable(dev, sb);
 	btp->dev    = dev;
 }
 
@@ -507,14 +507,14 @@ xfs_cmountfs(
  error3:
 	/* It's impossible to get here before buftargs are filled */
 	xfs_binval(mp->m_ddev_targ);
-	linvfs_release_inode(mp->m_ddev_targ.inode);
+	linvfs_release_target(mp->m_ddev_targ.pb_targ);
 	if (logdev && logdev != ddev) {
 		xfs_binval(mp->m_logdev_targ);
-		linvfs_release_inode(mp->m_logdev_targ.inode);
+		linvfs_release_target(mp->m_logdev_targ.pb_targ);
 	}
 	if (rtdev != 0) {
 		xfs_binval(mp->m_rtdev_targ);
-		linvfs_release_inode(mp->m_rtdev_targ.inode);
+		linvfs_release_target(mp->m_rtdev_targ.pb_targ);
 	}
 	if (error) {
 #ifdef CELL_CAPABLE
