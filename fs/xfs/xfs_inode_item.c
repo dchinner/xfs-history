@@ -331,7 +331,12 @@ xfs_inode_item_trylock(xfs_inode_log_item_t *iip)
 	}
 
 	if (!xfs_iflock_nowait(ip)) {
-		xfs_iunlock(ip, XFS_ILOCK_SHARED);
+		/*
+		 * Make sure to set the no notify flag so iunlock
+		 * doesn't call back into the AIL code on the unlock.
+		 * That would double trip on the AIL lock.
+		 */
+		xfs_iunlock(ip, (XFS_ILOCK_SHARED | XFS_IUNLOCK_NONOTIFY));
 		return XFS_ITEM_FLUSHING;
 	}
 
