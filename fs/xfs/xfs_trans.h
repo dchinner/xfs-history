@@ -7,15 +7,18 @@ struct xfs_log_item_desc;
 struct xfs_mount;
 
 typedef struct xfs_log_item {
-	xfs_lsn_t			li_lsn;
-	struct xfs_log_item		*li_parent;
-	struct xfs_log_item		*li_left;
-	struct xfs_log_item		*li_right;
-	struct xfs_log_item_desc	*li_desc;
-	struct xfs_mount		*li_mountp;
-	uint				li_type;
-	uint				li_flags;
-	struct xfs_item_ops		*li_ops;
+	xfs_lsn_t			li_lsn;		/* last on-disk lsn */
+	struct xfs_log_item		*li_forw;	/* AIL pointer */
+	struct xfs_log_item		*li_back;	/* AIL pointer */
+	struct xfs_log_item_desc	*li_desc;	/* ptr to current desc*/
+	struct xfs_mount		*li_mountp;	/* ptr to fs mount */
+	uint				li_type;	/* item type */
+	uint				li_flags;	/* misc flags */
+	struct xfs_log_item		*li_bio_list;	/* buffer item list */
+	void				(*li_cb)(buf_t*, struct xfs_log_item*); 
+							/* buffer item iodone */
+							/* callback func */
+	struct xfs_item_ops		*li_ops;	/* function list */
 } xfs_log_item_t;
 
 #define	XFS_LI_IN_AIL	0x1
