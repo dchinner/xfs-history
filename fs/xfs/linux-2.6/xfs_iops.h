@@ -29,8 +29,8 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ifndef XFS_LINUX_OPS_INODE_DOT_H
-#define XFS_LINUX_OPS_INODE_DOT_H
+#ifndef __XFS_IOPS_H__
+#define __XFS_IOPS_H__
 
 extern struct inode_operations linvfs_file_inode_operations;
 extern struct inode_operations linvfs_dir_inode_operations;
@@ -47,6 +47,4 @@ extern void linvfs_set_inode_ops(struct inode *);
 extern int linvfs_pb_bmap(struct inode *, loff_t, ssize_t, page_buf_bmap_t *,
 			   int, int *, int);
 
-#endif  /*  XFS_LINUX_OPS_INODE_DOT_H  */
-
-
+#endif /* __XFS_IOPS_H__ */

@@ -128,10 +128,10 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		mark_inode_dirty(ip);
 	}
 
-        if (!error && have_default_acl) {
+	if (!error && have_default_acl) {
 		error = _ACL_INHERIT(vp, &va, &pdacl);
 		VMODIFY(vp);
-        }
+	}
 
 	return -error;
 }
@@ -213,15 +213,13 @@ int linvfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *den
 
 int linvfs_unlink(struct inode *dir, struct dentry *dentry)
 {
-	int		error;
+	int		error = 0;
 	struct inode	*inode;
 	vnode_t		*dvp;	/* directory containing name to remove */
 
 	inode = dentry->d_inode;
 
 	dvp = LINVFS_GET_VN_ADDRESS(dir);
-
-	error = 0;
 
 	VOP_REMOVE(dvp, (char *)dentry->d_name.name, NULL, error);
 
@@ -245,7 +243,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 	int		error;
 	vnode_t		*dvp;	/* directory containing name to remove */
 	vnode_t		*cvp;	/* used to lookup symlink to put in dentry */
-        vattr_t		va;
+	vattr_t		va;
 	struct inode	*ip = NULL;
 
 	dvp = LINVFS_GET_VN_ADDRESS(dir);
@@ -420,18 +418,19 @@ int linvfs_follow_link(struct dentry *dentry,
 	iovec_t	iov;
 	int	error = 0;
 	char	*link;
-                
-        ASSERT(dentry);
-        ASSERT(nd);
-        
-        link = (char *)kmalloc(MAXNAMELEN+1, GFP_KERNEL);
-        if (!link) return -ENOMEM;
-        
-        uio = (uio_t*)kmalloc(sizeof(uio_t), GFP_KERNEL);
-        if (!uio) {
-	        kfree(link);
-                return -ENOMEM;
-        }
+
+	ASSERT(dentry);
+	ASSERT(nd);
+
+	link = (char *)kmalloc(MAXNAMELEN+1, GFP_KERNEL);
+	if (!link)
+		return -ENOMEM;
+
+	uio = (uio_t*)kmalloc(sizeof(uio_t), GFP_KERNEL);
+	if (!uio) {
+		kfree(link);
+		return -ENOMEM;
+	}
 
 	vp = LINVFS_GET_VN_ADDRESS(dentry->d_inode);
 
@@ -454,7 +453,7 @@ int linvfs_follow_link(struct dentry *dentry,
 	kfree(uio);
 
 	/* vfs_follow_link returns (-) errors */
-        error = vfs_follow_link(nd, link);
+	error = vfs_follow_link(nd, link);
 	kfree(link);
 	return error;
 }
@@ -579,15 +578,12 @@ int linvfs_acl_set(
 
 int linvfs_permission(struct inode *ip, int mode)
 {
-        vnode_t *vp;
+	vnode_t	*vp;
 	int	error;
 
 	mode <<= 6;		/* convert from linux to vnode access bits */
-
-        vp = LINVFS_GET_VN_ADDRESS(ip);
-
+	vp = LINVFS_GET_VN_ADDRESS(ip);
 	VOP_ACCESS(vp, mode, NULL, error);
-
 	return -error;
 }
 
@@ -597,9 +593,9 @@ int linvfs_permission(struct inode *ip, int mode)
  */
 int linvfs_revalidate_core(struct inode *inode, int flags)
 {
-        vnode_t *vp;
+	vnode_t *vp;
 
-        vp = LINVFS_GET_VP(inode);
+	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
 	/* vn_revalidate returns (-) error so this is ok */
 	return vn_revalidate(vp, flags);
@@ -607,9 +603,9 @@ int linvfs_revalidate_core(struct inode *inode, int flags)
 
 STATIC int linvfs_revalidate(struct dentry *dentry)
 {
-        vnode_t *vp;
+	vnode_t *vp;
 
-        vp = LINVFS_GET_VP(dentry->d_inode);
+	vp = LINVFS_GET_VP(dentry->d_inode);
 	if (vp->v_flag & VMODIFIED) {
 		return linvfs_revalidate_core(dentry->d_inode, 0);
 	}
@@ -631,13 +627,10 @@ linvfs_notify_change(
 
 	inode = dentry->d_inode;
 	error = inode_change_ok(inode, attr);
-	if (error){
+	if (error)
 		return(error);
-	}
 
 	memset(&vattr, 0, sizeof(vattr_t));
-
-
 	if (ia_valid & ATTR_UID) {
 		vattr.va_mask |= AT_UID; 
 		vattr.va_uid = attr->ia_uid;
@@ -671,7 +664,6 @@ linvfs_notify_change(
 		if (!in_group_p(inode->i_gid) && !capable(CAP_FSETID))
 			inode->i_mode &= ~S_ISGID;
 	}
-
 
 	VOP_SETATTR(vp, &vattr, 0, sys_cred, error);
 
@@ -719,11 +711,11 @@ int linvfs_bmap(struct address_space *mapping, long block)
         pb_bmap_t           bmap            = {0};
         int                 nbm             = 1;
 	int                 error;
-        
-        /* block             - linux disk blocks    512b */
-        /* bmap input offset - bytes                  1b */
-        /* bmap outut bn     - xfs BBs              512b */
-        /* bmap outut delta  - bytes                  1b */
+
+	/* block             - linux disk blocks    512b */
+	/* bmap input offset - bytes                  1b */
+	/* bmap outut bn     - xfs BBs              512b */
+	/* bmap outut delta  - bytes                  1b */
 
 	vn_trace_entry(vp, "linvfs_bmap", (inst_t *)__return_address);
 
@@ -828,4 +820,3 @@ struct inode_operations linvfs_symlink_inode_operations =
   acl_set:		linvfs_acl_set,
 #endif
 };
-
