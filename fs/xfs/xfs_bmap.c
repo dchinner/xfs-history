@@ -2829,10 +2829,10 @@ xfs_bmap_btree_to_extents(
 	pp = XFS_BMAP_BROOT_PTR_ADDR(rblock, 1, ifp->if_broot_bytes);
 	*logflagsp = 0;
 #ifdef DEBUG
-	if (error = xfs_btree_check_lptr(cur, *pp, 1))
+	if (error = xfs_btree_check_lptr(cur, INT_GET(*pp, ARCH_UNKNOWN), 1))
 		return error;
 #endif
-	cbno = *pp;
+	cbno = INT_GET(*pp, ARCH_UNKNOWN);
 	if (error = xfs_btree_read_bufl(mp, tp, cbno, 0, &cbp,
 			XFS_BMAP_BTREE_REF))
 		return error;
@@ -3367,7 +3367,7 @@ xfs_bmap_extents_to_btree(
 	arp = XFS_BMAP_REC_IADDR(ablock, 1, cur);
 	kp->br_startoff = xfs_bmbt_get_startoff(arp);
 	pp = XFS_BMAP_PTR_IADDR(block, 1, cur);
-	*pp = args.fsbno;
+	INT_SET(*pp, ARCH_UNKNOWN, args.fsbno);
 	/*
 	 * Do all this logging at the end so that 
 	 * the root is at the right level.
@@ -4496,10 +4496,10 @@ xfs_bmap_read_extents(
 	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
 	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
-	ASSERT(*pp != NULLDFSBNO);
-	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
-	bno = *pp;
+	ASSERT(INT_GET(*pp, ARCH_UNKNOWN) != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agblocks);
+	bno = INT_GET(*pp, ARCH_UNKNOWN);
 	/*
 	 * Go down the tree until leaf level is reached, following the first
 	 * pointer (leftmost) at each level.
@@ -4516,8 +4516,8 @@ xfs_bmap_read_extents(
 			break;
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, *pp), error0);
-		bno = *pp;
+		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_UNKNOWN)), error0);
+		bno = INT_GET(*pp, ARCH_UNKNOWN);
 		xfs_trans_brelse(tp, bp);
 	}
 	/*
@@ -6064,9 +6064,9 @@ xfs_check_block(
 				thispa = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize,
 					xfs_bmbt, block, j, dmxr);
 			}
-			if (*thispa == *pp) {
+			if (INT_GET(*thispa, ARCH_UNKNOWN) == INT_GET(*pp, ARCH_UNKNOWN)) {
 				printk("xfs_check_block: thispa(%d) == pp(%d) %Ld\n",
-						j, i, *thispa);
+						j, i, INT_GET(*thispa, ARCH_UNKNOWN));
 				panic("xfs_check_block: ptrs are equal in node\n");
 			}
 		}
@@ -6111,10 +6111,10 @@ xfs_bmap_check_leaf_extents(
 	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
 	xfs_check_block(block, mp, 1, ifp->if_broot_bytes);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
-	ASSERT(*pp != NULLDFSBNO);
-	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
-	bno = *pp;
+	ASSERT(INT_GET(*pp, ARCH_UNKNOWN) != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agblocks);
+	bno = INT_GET(*pp, ARCH_UNKNOWN);
 	/*
 	 * Go down the tree until leaf level is reached, following the first
 	 * pointer (leftmost) at each level.
@@ -6145,8 +6145,8 @@ xfs_bmap_check_leaf_extents(
 		xfs_check_block(block, mp, 0, 0);
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, xfs_bmbt, block,
 			1, mp->m_bmap_dmxr[1]);
-		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, *pp), error0);
-		bno = *pp;
+		XFS_WANT_CORRUPTED_GOTO(XFS_FSB_SANITY_CHECK(mp, INT_GET(*pp, ARCH_UNKNOWN)), error0);
+		bno = INT_GET(*pp, ARCH_UNKNOWN);
 		if (bp_release) {
 			bp_release = 0;
 			xfs_trans_brelse(NULL, bp);
@@ -6270,10 +6270,10 @@ xfs_bmap_count_blocks(
 	ASSERT(INT_GET(block->bb_level, ARCH_UNKNOWN) > 0);
 	level = INT_GET(block->bb_level, ARCH_UNKNOWN);
 	pp = XFS_BMAP_BROOT_PTR_ADDR(block, 1, ifp->if_broot_bytes);
-	ASSERT(*pp != NULLDFSBNO);
-	ASSERT(XFS_FSB_TO_AGNO(mp, *pp) < mp->m_sb.sb_agcount);
-	ASSERT(XFS_FSB_TO_AGBNO(mp, *pp) < mp->m_sb.sb_agblocks);
-	bno = *pp;
+	ASSERT(INT_GET(*pp, ARCH_UNKNOWN) != NULLDFSBNO);
+	ASSERT(XFS_FSB_TO_AGNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agcount);
+	ASSERT(XFS_FSB_TO_AGBNO(mp, INT_GET(*pp, ARCH_UNKNOWN)) < mp->m_sb.sb_agblocks);
+	bno = INT_GET(*pp, ARCH_UNKNOWN);
 
 	if (xfs_bmap_count_tree(mp, tp, bno, level, count) < 0)
 		return XFS_ERROR(EFSCORRUPTED);
@@ -6324,7 +6324,7 @@ xfs_bmap_count_tree(
 		/* Dive to the next level */
 		pp = XFS_BTREE_PTR_ADDR(mp->m_sb.sb_blocksize, 
 			xfs_bmbt, block, 1, mp->m_bmap_dmxr[1]);
-		bno = *pp;
+		bno = INT_GET(*pp, ARCH_UNKNOWN);
 		if ((error = 
 		     xfs_bmap_count_tree(mp, tp, bno, level, count)) < 0) {
 			xfs_trans_brelse(tp, bp);
