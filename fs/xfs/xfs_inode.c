@@ -1,4 +1,4 @@
-#ident "$Revision: 1.144 $"
+#ident "$Revision: 1.145 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -695,6 +695,7 @@ xfs_ialloc(
 	ip->i_d.di_extsize = 0;
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_dmstate = 0;
+	ip->i_dmevents = 0;
 	ip->i_d.di_flags = 0;
 	flags = XFS_ILOG_CORE;
 	switch (mode & IFMT) {
@@ -1497,6 +1498,7 @@ xfs_ifree(
 	}
 	ip->i_d.di_mode = 0;		/* mark incore inode as free */
 	ip->i_d.di_flags = 0;
+	ip->i_d.di_dmevmask = 0;
 
 	/*
 	 * Bump the generation count so no one will be confused
