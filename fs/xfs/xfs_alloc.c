@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.1 $"
 
 #include "xfs_sb.h"
 #include "xfs_ag.h"
@@ -16,7 +16,7 @@ xfs_alloc_cur_t *xfs_alloc_curalllist;
 int xfs_alloc_curallcount;
 #endif
 
-u_int32_t xfs_magics[XFS_BTNUM_MAX] =
+__uint32_t xfs_magics[XFS_BTNUM_MAX] =
 {
 	XFS_ABTB_MAGIC, XFS_ABTC_MAGIC, XFS_IBT_MAGIC
 };

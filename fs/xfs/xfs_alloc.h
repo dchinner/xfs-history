@@ -3,12 +3,11 @@
 
 #ident	"$Revision$"
 
-#include <sys/types.h>
+#include "xfs_types.h"
 #include <sys/pfdat.h>
 #include <sys/uio.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
-#include "xfs_types.h"
 #include "xfs.h"
 #include "xfs_trans.h"
 
@@ -31,9 +30,9 @@
 #define	XFS_ABTC_MAGIC	0x41425443	/* 'ABTC' for cnt tree */
 typedef struct xfs_alloc_block
 {
-	u_int32_t	magic;		/* XFS_ABT?_MAGIC */
-	u_int16_t	level;		/* 0 is a leaf */
-	u_int16_t	numrecs;	/* current # of data records */
+	__uint32_t	magic;		/* XFS_ABT?_MAGIC */
+	__uint16_t	level;		/* 0 is a leaf */
+	__uint16_t	numrecs;	/* current # of data records */
 	xfs_agblock_t	leftsib;	/* left sibling block */
 	xfs_agblock_t	rightsib;	/* right sibling block */
 					/* maxrecs data records (recs) */
@@ -114,6 +113,6 @@ xfs_fsblock_t xfs_alloc_extent(xfs_trans_t *, xfs_fsblock_t, xfs_extlen_t, xfs_a
 xfs_fsblock_t xfs_alloc_vextent(xfs_trans_t *, xfs_fsblock_t, xfs_extlen_t, xfs_extlen_t, xfs_extlen_t *, xfs_alloctype_t);
 int xfs_free_extent(xfs_trans_t *, xfs_fsblock_t, xfs_extlen_t);
 
-extern u_int32_t xfs_magics[];
+extern __uint32_t xfs_magics[];
 
 #endif	/* !_FS_XFS_ALLOC_H */

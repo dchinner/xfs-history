@@ -19,16 +19,16 @@ typedef enum
 
 typedef struct xfs_aghdr
 {
-	u_int32_t	xfsag_magic;	/* magic number == XFS_AGH_MAGIC */
-	u_int16_t	xfsag_version;	/* header version == XFS_AGH_VERSION */
-	u_int16_t	xfsag_seqno;	/* sequence # starting from 0 */
+	__uint32_t	xfsag_magic;	/* magic number == XFS_AGH_MAGIC */
+	__uint16_t	xfsag_version;	/* header version == XFS_AGH_VERSION */
+	__uint16_t	xfsag_seqno;	/* sequence # starting from 0 */
 	xfs_agblock_t	xfsag_length;	/* size in blocks of a.g. */
 	/*
 	 * Freespace information
 	 */
 	xfs_agblock_t	xfsag_roots[XFS_BTNUM_MAX - 1];
 	xfs_agblock_t	xfsag_freelist;	/* free blocks */
-	u_int16_t	xfsag_levels[XFS_BTNUM_MAX - 1];
+	__uint16_t	xfsag_levels[XFS_BTNUM_MAX - 1];
 	xfs_extlen_t	xfsag_flist_count;	/* #blocks */
 	xfs_extlen_t	xfsag_freeblks;	/* total free blocks */
 	xfs_extlen_t	xfsag_longest;	/* longest free space */
@@ -39,7 +39,7 @@ typedef struct xfs_aghdr
 	 */
 	xfs_agblock_t	xfsag_iroot;	/* root block of B-tree for inode map */
 	xfs_agino_t	xfsag_icount;	/* count of allocated inodes */
-	u_int16_t	xfsag_ilevels;	/* # levels in the B-tree */
+	__uint16_t	xfsag_ilevels;	/* # levels in the B-tree */
 	xfs_agino_t	xfsag_iflist;	/* first free inode */
 	xfs_agino_t	xfsag_ifcount;	/* number of free inodes */
 } xfs_aghdr_t;
