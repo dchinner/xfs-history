@@ -1,4 +1,4 @@
-#ident "$Revision: 1.309 $"
+#ident "$Revision: 1.310 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -107,9 +107,6 @@
 extern	int fspe_get_ops(void *);
 int         xfs_fspe_dioinfo(struct vnode *, struct dioattr *);
 #endif
-
-extern	int xfs_prio_set_bw(void *);
-extern	int xfs_prio_get_bw(void *);
 
 #if _MIPS_SIM == _ABI64
 int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
@@ -4756,12 +4753,6 @@ xfs_fcntl(
 		fspe_get_ops(arg);
 		break;
 #endif
-	case F_SETBW:
-		error = xfs_prio_set_bw(arg);
-		break;
-	case F_GETBW:
-		error = xfs_prio_get_bw(arg);
-		break;
 
 	case F_DIOINFO:
                 /*
