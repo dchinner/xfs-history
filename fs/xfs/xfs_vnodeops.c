@@ -278,9 +278,6 @@ xfs_close(vnode_t	*vp,
 	shaddr_t	*sa = p->p_shaddr;
 	int		isshd, nofiles;
 	int		i, vpcount, ret;
-#ifdef REDWOOD
-	int		err;
-#endif
 
 	vn_trace_entry(vp, "xfs_close");
         ip = XFS_VTOI(vp);
@@ -323,8 +320,7 @@ xfs_close(vnode_t	*vp,
 #ifdef REDWOOD
 			/* ufgetfast depends on the 5.3 shfd handling */
 
-			err = ufget(i, nofiles, &ufp, &fp);
-			ASSERT(err == 0);
+			ufget(i, nofiles, &ufp, &fp);
 
 			if (fp)  {
 #else
