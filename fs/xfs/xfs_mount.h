@@ -6,6 +6,21 @@
 struct cred;
 struct xfs_ihash;
 
+typedef struct xfs_trans_reservations {
+	uint	tr_write;	/* extent alloc trans */
+	uint	tr_itruncate;	/* truncate trans */
+	uint	tr_rename;	/* rename trans */
+	uint	tr_link;	/* link trans */
+	uint	tr_remove;	/* unlink trans */
+	uint	tr_symlink;	/* symlink trans */
+	uint	tr_create;	/* create trans */
+	uint	tr_mkdir;	/* mkdir trans */
+	uint	tr_ifree;	/* inode free trans */
+	uint	tr_ichange;	/* inode update trans */
+	uint	tr_growdata;	/* fs data section grow trans */
+	uint	tr_swrite;	/* sync write inode trans */
+} xfs_trans_reservations_t;
+
 typedef struct xfs_mount {
 	struct vfs		*m_vfsp;	/* ptr to vfs */
 	xfs_tid_t		m_tid;		/* next unused tid for fs */
@@ -70,6 +85,7 @@ typedef struct xfs_mount {
 	int			m_fixedfsid[2];	/* unchanged for life of FS */
 	uint			m_dmevmask;	/* DMI events for this FS */
 	uint			m_flags;	/* global mount flags */
+	xfs_trans_reservations_t m_reservations; /* precomputed res values */
 } xfs_mount_t;
 
 /*
@@ -82,6 +98,13 @@ typedef struct xfs_mount {
  */
 #define	XFS_READIO_LOG	16
 #define	XFS_WRITEIO_LOG	16
+
+/*
+ * Synchronous read and write sizes.  This should be
+ * better for NFS.
+ */
+#define	XFS_WSYNC_READIO_LOG	15
+#define	XFS_WSYNC_WRITEIO_LOG	13
 
 /*
  * Macros for getting from mount to vfs and back.
