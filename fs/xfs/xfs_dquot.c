@@ -1,4 +1,4 @@
-#ident "$Revision: 1.29 $"
+#ident "$Revision: 1.30 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -1571,9 +1571,9 @@ xfs_qm_dqcheck(
 	 */
 	if (ddq->d_magic != XFS_DQUOT_MAGIC) {
 		if (flags & XFS_QMOPT_DOWARN)
-			cmn_err(CE_ALERT, 
-				"%s : XFS dquot ID 0x%x, magic 0x%x != 0x%x",
-				str, id, ddq->d_magic, XFS_DQUOT_MAGIC);
+			cmn_err_tag(78,CE_ALERT, 
+			"%s : XFS dquot ID 0x%x, magic 0x%x != 0x%x",
+			str, id, ddq->d_magic, XFS_DQUOT_MAGIC);
 		errs++;
 	}
 	if (ddq->d_version != XFS_DQUOT_VERSION) {
@@ -1594,7 +1594,7 @@ xfs_qm_dqcheck(
 	
 	if (id != -1 && id != ddq->d_id) {
 		if (flags & XFS_QMOPT_DOWARN)
-			cmn_err(CE_ALERT, 
+			cmn_err_tag(79,CE_ALERT, 
 			"%s : ondisk-dquot 0x%x, ID mismatch: "
 			"0x%x expected, found id 0x%x",
 			str, ddq, id, ddq->d_id);
@@ -1606,7 +1606,7 @@ xfs_qm_dqcheck(
 		    ddq->d_bcount >= ddq->d_blk_softlimit) {
 			if (ddq->d_btimer == 0 && ddq->d_id != 0) {
 				if (flags & XFS_QMOPT_DOWARN)
-					cmn_err(CE_ALERT,
+					cmn_err_tag(80,CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%x) "
 					"BLK TIMER NOT STARTED", 
 					str, (int) ddq->d_id, ddq);
@@ -1617,7 +1617,7 @@ xfs_qm_dqcheck(
 		    ddq->d_icount >= ddq->d_ino_softlimit) {
 			if (ddq->d_itimer == 0 && ddq->d_id != 0) {
 				if (flags & XFS_QMOPT_DOWARN)
-					cmn_err(CE_ALERT,
+					cmn_err_tag(81,CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%x) "
 					"INODE TIMER NOT STARTED", 
 					str, (int) ddq->d_id, ddq);
@@ -1630,7 +1630,7 @@ xfs_qm_dqcheck(
 		return (errs);
 
 	if (flags & XFS_QMOPT_DOWARN)
-	    cmn_err(CE_NOTE, "Re-initializing dquot ID 0x%x", id);
+	    cmn_err_tag(82,CE_NOTE, "Re-initializing dquot ID 0x%x", id);
 
 	/*
 	 * Typically, a repair is only requested by quotacheck.
