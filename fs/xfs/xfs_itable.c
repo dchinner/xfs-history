@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.37 $"
+#ident	"$Revision: 1.38 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -184,9 +184,12 @@ xfs_bulkstat(
 	nimask = ~(nicluster - 1);
 	nbcluster = nicluster >> mp->m_sb.sb_inopblog;
 	/* 
-	 * Lock down the user's buffer.
+	 * Lock down the user's buffer. If a buffer was not sent, as in the case
+	 * disk quota code calls here, we skip this.
 	 */
-	if (error = useracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS), NULL))
+	if (ubuffer)
+		if (error = useracc(ubuffer, ubcount * statstruct_size, 
+				    (B_READ|B_PHYS), NULL))
 		return error;
 	/*
 	 * Allocate a page-sized buffer for inode btree records.
@@ -388,7 +391,8 @@ xfs_bulkstat(
 				 */
 				if (!(*formatter)(mp, tp, ino, ubufp, bno))
 					continue;
-				ubufp += statstruct_size; 
+				if (ubufp)
+					ubufp += statstruct_size; 
 				ubleft--;
 				lastino = ino;
 			}
@@ -409,7 +413,8 @@ xfs_bulkstat(
 	 * Done, we're either out of filesystem or space to put the data.
 	 */
 	kmem_free(irbuf, NBPC);
-	unuseracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS));
+	if (ubuffer)
+		unuseracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS));
 	*ubcountp = ubcount - ubleft;
 	if (agno >= mp->m_sb.sb_agcount) {
 		/*
