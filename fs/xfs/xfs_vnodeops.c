@@ -159,7 +159,7 @@ xfs_getattr(
 	}
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-        vap->va_fsid = ip->i_dev;
+        vap->va_fsid = mp->m_dev;
 #if XFS_BIG_FILESYSTEMS
 	vap->va_nodeid = ip->i_ino + mp->m_inoadd;
 #else
@@ -1162,7 +1162,7 @@ xfs_fsync(
 	 * lock unnecessarily.
 	 */
 	ASSERT(!(flag & (FSYNC_INVAL | FSYNC_WAIT)) ||
-	       syncall == 0 || (ip->i_iocore.io_queued_bufs == 0));
+	       syncall == 0);
 
 	/*
 	 * We always need to make sure that the required inode state
@@ -4879,7 +4879,6 @@ xfs_reclaim(
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_BHVTOI(bdp);
 
-	ASSERT(ip->i_iocore.io_queued_bufs >= 0);
 	locked = 0;
 	
 	/*
@@ -4914,7 +4913,7 @@ xfs_reclaim(
 	 * reclaim enough.  The vnode cache then grows far too large.
 	 */
 	if (!(flag & FSYNC_INVAL)) {
-		if (VN_DIRTY(vp) || ip->i_iocore.io_queued_bufs > 0) {
+		if (VN_DIRTY(vp)) {
 			return XFS_ERROR(EAGAIN);
 		}
 		if (!xfs_ilock_nowait(ip, XFS_ILOCK_EXCL)) {
@@ -4970,8 +4969,7 @@ xfs_reclaim(
 				VOP_TOSS_PAGES(vp, 0, -1, FI_NONE);
 			}
 			
-			ASSERT((ip->i_iocore.io_queued_bufs == 0) &&
-			       (VN_CACHED(vp) == 0));
+			ASSERT(VN_CACHED(vp) == 0);
 			ASSERT(XFS_FORCED_SHUTDOWN(ip->i_mount) ||
 			       ip->i_delayed_blks == 0);
 			xfs_iunlock(ip, XFS_IOLOCK_EXCL);
@@ -4981,8 +4979,7 @@ xfs_reclaim(
 			 * shutting down.
 			 */
 			VOP_TOSS_PAGES(vp, 0, -1, FI_NONE);
-			ASSERT((ip->i_iocore.io_queued_bufs == 0) &&
-			       (VN_CACHED(vp) == 0));
+			ASSERT(VN_CACHED(vp) == 0);
 		}
 	}
 
@@ -5073,7 +5070,6 @@ xfs_finish_reclaim(
 		ASSERT(ip->i_update_core == 0);
 		ASSERT(ip->i_itemp == NULL || 
 		       ip->i_itemp->ili_format.ilf_fields == 0);
-		ASSERT(ip->i_iocore.io_queued_bufs == 0);
 	} else {
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	}
@@ -5453,7 +5449,7 @@ xfs_free_file_space(
 	if (ilen & (rounding - 1))
 		ilen = (ilen + rounding) & ~(rounding - 1);
 	xfs_inval_cached_pages(XFS_ITOV(ip), &(ip->i_iocore),
-				ioffset, ilen, NULL);
+				ioffset, ilen, NULL, 0);
 	/*
 	 * Need to zero the stuff we're not freeing, on disk.
 	 * If its specrt (realtime & can't use unwritten extents) then

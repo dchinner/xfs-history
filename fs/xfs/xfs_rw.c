@@ -371,10 +371,10 @@ xfs_inval_cached_pages(
 	xfs_iocore_t	*io,
 	xfs_off_t	offset,
 	xfs_off_t	len,
-	void		*dio)		    
+	void		*dio,
+	int		relock)
 {
 	xfs_dio_t	*diop = (xfs_dio_t *)dio;
-	int		relock;
 	__uint64_t	flush_end;
 	xfs_mount_t	*mp;
 
@@ -388,7 +388,6 @@ xfs_inval_cached_pages(
 	 * We need to get the I/O lock exclusively in order
 	 * to safely invalidate pages and mappings.
 	 */
-	relock = ismrlocked(io->io_iolock, MR_ACCESS);
 	if (relock) {
 		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 		XFS_ILOCK(mp, io, XFS_IOLOCK_EXCL);

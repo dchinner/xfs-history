@@ -801,7 +801,6 @@ xfs_iread(
 
 	ip = kmem_zone_zalloc(xfs_inode_zone, KM_SLEEP);
 	ip->i_ino = ino;
-	ip->i_dev = mp->m_dev;
 	ip->i_mount = mp;
 
 	/*
@@ -1397,7 +1396,6 @@ xfs_itruncate_start(
 
 #ifdef DEBUG
 	if (new_size == 0) {
-		ASSERT(ip->i_iocore.io_queued_bufs == 0);
 		ASSERT(VN_CACHED(vp) == 0);
 	}
 #endif
@@ -1687,8 +1685,7 @@ xfs_itruncate_finish(
 	xfs_trans_log_inode(ntp, ip, XFS_ILOG_CORE);
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||
-	       ((ip->i_delayed_blks == 0) &&
-		(ip->i_iocore.io_queued_bufs == 0)));
+	       (ip->i_delayed_blks == 0));
 	ASSERT((new_size != 0) ||
 	       (fork == XFS_ATTR_FORK) ||
 	       (ip->i_d.di_nextents == 0));
@@ -2521,8 +2518,6 @@ xfs_idestroy(
 	mutex_destroy(&ip->i_range_lock.r_spinlock);
 #endif /* NOTYET */
 	freesema(&ip->i_flock);
-	sv_destroy(&ip->i_pinsema);
-	spinlock_destroy(&ip->i_ipinlock);
 #ifdef XFS_BMAP_TRACE
 	ktrace_free(ip->i_xtrace);
 #endif
@@ -2560,13 +2555,9 @@ void
 xfs_ipin(
 	xfs_inode_t	*ip)
 {
-	int		s;
-
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 
-	s = mutex_spinlock(&ip->i_ipinlock);
-	ip->i_pincount++;
-	mutex_spinunlock(&ip->i_ipinlock, s);
+	atomic_inc(&ip->i_pincount);
 }
 
 /*
@@ -2578,16 +2569,11 @@ void
 xfs_iunpin(
 	xfs_inode_t	*ip)
 {
-	int		s;
+	ASSERT(atomic_read(&ip->i_pincount) > 0);
 
-	ASSERT(ip->i_pincount > 0);
-
-	s = mutex_spinlock(&ip->i_ipinlock);
-	ip->i_pincount--;
-	if (ip->i_pincount == 0) {
-		sv_broadcast(&ip->i_pinsema);
+	if (atomic_dec_and_test(&ip->i_pincount)) {
+		wake_up(&ip->i_ipin_wait);
 	}
-	mutex_spinunlock(&ip->i_ipinlock, s);
 }
 
 /*
@@ -2598,14 +2584,7 @@ unsigned int
 xfs_ipincount(
 	xfs_inode_t	*ip)
 {
-	int		s;
-	unsigned int	cnt;
-
-	s = mutex_spinlock(&ip->i_ipinlock);
-	cnt = ip->i_pincount;
-	mutex_spinunlock(&ip->i_ipinlock, s);
-
-	return cnt;
+	return atomic_read(&ip->i_pincount);
 }
 
 /*
@@ -2614,22 +2593,18 @@ xfs_ipincount(
  * inode locked in at least shared mode so that the buffer cannot
  * be subsequently pinned once someone is waiting for it to be
  * unpinned.
- *
- * The ipinlock in the mount structure is used to guard the pincount
- * values of all inodes in a file system.  The i_pinsema is used to
- * sleep until the inode is unpinned.
  */
 void
 xfs_iunpin_wait(
 	xfs_inode_t	*ip)
 {
-	int		s;
 	xfs_inode_log_item_t	*iip;
 	xfs_lsn_t	lsn;
+	DECLARE_WAITQUEUE(wait, current);
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE | MR_ACCESS));
 
-	if (ip->i_pincount == 0) {
+	if (atomic_read(&ip->i_pincount) == 0) {
 		return;
 	}
 
@@ -2645,13 +2620,15 @@ xfs_iunpin_wait(
 	 */
 	xfs_log_force(ip->i_mount, lsn, XFS_LOG_FORCE);
 
-	s = mutex_spinlock(&ip->i_ipinlock);
-	if (ip->i_pincount == 0) {
-		mutex_spinunlock(&ip->i_ipinlock, s);
-		return;
+	add_wait_queue(&ip->i_ipin_wait, &wait);
+repeat:
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	if (atomic_read(&ip->i_pincount)) {
+		schedule();
+		goto repeat;
 	}
-	sv_wait(&(ip->i_pinsema), PINOD, &ip->i_ipinlock, s);
-	return;
+	remove_wait_queue(&ip->i_ipin_wait, &wait);
+	current->state = TASK_RUNNING;
 }
 
 
@@ -3008,7 +2985,7 @@ xfs_iflush(
 		if ((iq->i_update_core == 0) &&
 		    ((iip == NULL) ||
 		     !(iip->ili_format.ilf_fields & XFS_ILOG_ALL)) &&
-		    iq->i_pincount == 0) {
+		      xfs_ipincount(iq) == 0) {
 			continue;
 		}
 

@@ -553,7 +553,7 @@ xfs_inode_item_trylock(
 
 	ip = iip->ili_inode;
 
-	if (ip->i_pincount > 0) {
+	if (xfs_ipincount(ip) > 0) {
 		return XFS_ITEM_PINNED;
 	}
 

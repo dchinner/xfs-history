@@ -138,8 +138,10 @@ xfs_iocore_inode_init(
 	xfs_mount_t	*mp = ip->i_mount;
 
 	io->io_mount = mp;
+#ifdef DEBUG
 	io->io_lock = &ip->i_lock;
 	io->io_iolock = &ip->i_iolock;
+#endif
 
 	io->io_obj = (void *)ip;
 

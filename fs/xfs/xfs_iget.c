@@ -477,6 +477,7 @@ retry:
 
 		vp = LINVFS_GET_VN_ADDRESS(inode);
 		if (inode->i_state & I_NEW) {
+			XFS_STATS_INC(xfsstats.vn_alloc);
 			vn_initialize(XFS_MTOVFS(mp), inode, 0);
 			error = xfs_iget_core(vp, mp, tp, ino,
 							lock_flags, ipp, bno);
@@ -548,9 +549,9 @@ xfs_inode_lock_init(
 #ifdef NOTYET
 	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
 #endif /* NOTYET */
+	init_waitqueue_head(&ip->i_ipin_wait);
+	atomic_set(&ip->i_pincount, 0);
 	init_sema(&ip->i_flock, 1, "xfsfino", vp->v_number);
-	init_sv(&ip->i_pinsema, SV_DEFAULT, "xfspino", vp->v_number);
-	spinlock_init(&ip->i_ipinlock, "xfs_ipin");
 }
 
 /*

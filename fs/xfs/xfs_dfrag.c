@@ -172,7 +172,7 @@ xfs_swapext(
 
 	if (VN_CACHED(tvp) != 0)
 		xfs_inval_cached_pages(XFS_ITOV(tip), &(tip->i_iocore),
-						0, tip->i_d.di_size, NULL);
+						0, tip->i_d.di_size, NULL, 0);
 
 	/* Verify O_DIRECT for ftmp */
 	if (VN_CACHED(tvp) != 0) {

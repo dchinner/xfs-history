@@ -376,7 +376,7 @@ xfs_ip_to_stat(
 	vnode_t		*vp = XFS_ITOV(ip);
 
 	buf->dt_size = ip->i_d.di_size;
-	buf->dt_dev = ip->i_dev;
+	buf->dt_dev = ip->i_mount->m_dev;
 
 	buf->dt_ino = ip->i_ino;
 #if XFS_BIG_FILESYSTEMS

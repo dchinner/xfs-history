@@ -4591,7 +4591,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_mprev,
 		XFS_ITOV_NULL(ip));
 	kdb_printf("dev %x ino %s\n",
-		ip->i_dev,
+		ip->i_mount->m_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
 	kdb_printf("blkno 0x%llx len 0x%x boffset 0x%x\n",
 		(long long) ip->i_blkno,
@@ -4600,14 +4600,12 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("transp 0x%p &itemp 0x%p\n",
 		ip->i_transp,
 		ip->i_itemp);
-	kdb_printf("&lock 0x%p &iolock 0x%p ni_lock_ra",
+	kdb_printf("&lock 0x%p &iolock 0x%p",
 		&ip->i_lock,
 		&ip->i_iolock);
-	kdb_printf("&flock 0x%p (%d) &pinlock 0x%p pincount 0x%x &pinsema 0x%p\n",
+	kdb_printf("&flock 0x%p (%d) pincount 0x%x\n",
 		&ip->i_flock, valusema(&ip->i_flock),
-		&ip->i_ipinlock,
-		ip->i_pincount,
-		&ip->i_pinsema);
+		xfs_ipincount(ip));
 	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
 		ip->i_udquot, ip->i_gdquot);
 	kdb_printf("new_size %Lx\n", ip->i_iocore.io_new_size);
@@ -4615,9 +4613,8 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("\n");
 	kdb_printf("update_core 0x%x update size 0x%x\n",
 		(int)(ip->i_update_core), (int) ip->i_update_size);
-	kdb_printf("gen 0x%x qbufs %d delayed blks %d",
+	kdb_printf("gen 0x%x delayed blks %d",
 		ip->i_gen,
-		ip->i_iocore.io_queued_bufs,
 		ip->i_delayed_blks);
 	kdb_printf("\n");
 	kdb_printf("chash 0x%p cnext 0x%p cprev 0x%p\n",
@@ -4640,9 +4637,6 @@ xfsidbg_xcore(xfs_iocore_t *io)
 		kdb_printf("io_obj 0x%p (dcxvn) io_mount 0x%p\n",
 			io->io_obj, io->io_mount);
 	}
-	kdb_printf("&lock 0x%p &iolock 0x%p &flock 0x%p\n",
-		io->io_lock, io->io_iolock,
-		io->io_flock);
 	kdb_printf("new_size %Lx\n", io->io_new_size);
 }
 

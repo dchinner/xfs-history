@@ -1120,7 +1120,7 @@ xfs_syncsub(
 			    !(ip->i_itemp->ili_format.ilf_fields & XFS_ILOG_ALL))) {
 				if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0) {
 					ip = ip->i_mnext;
-				} else if ((ip->i_pincount == 0) &&
+				} else if ((xfs_ipincount(ip) == 0) &&
 				    xfs_iflock_nowait(ip)) {
 					IPOINTER_INSERT(ip, mp);
 
@@ -1331,7 +1331,7 @@ xfs_syncsub(
 				 * expect it to still be there when we go
 				 * for it again in xfs_iflush().
 				 */
-				if ((ip->i_pincount == 0) &&
+				if ((xfs_ipincount(ip) == 0) &&
 				    xfs_iflock_nowait(ip)) {
 
 					xfs_ifunlock(ip);
@@ -1400,7 +1400,7 @@ xfs_syncsub(
 						 */
 						lock_flags &= ~XFS_ILOCK_SHARED;
 						IPOINTER_REMOVE(ip_next, mp);
-					} else if ((ip->i_pincount == 0) &&
+					} else if ((xfs_ipincount(ip) == 0) &&
 						   xfs_iflock_nowait(ip)) {
 						ASSERT(ip->i_mount == mp);
 						/*

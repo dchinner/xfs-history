@@ -146,13 +146,13 @@ typedef struct xfs_iocore {
 	void			*io_obj;	/* pointer to container
 						 * inode or dcxvn structure */
 	struct xfs_mount	*io_mount;	/* fs mount struct ptr */
-	mrlock_t		*io_lock;	/* inode lock */
+#ifdef DEBUG
+	mrlock_t		*io_lock;	/* inode IO lock */
 	mrlock_t		*io_iolock;	/* inode IO lock */
-	sema_t			*io_flock;	/* inode flush lock */
+#endif
 
 	/* I/O state */
 	xfs_fsize_t		io_new_size;	/* sz when write completes */
-	int			io_queued_bufs;	/* count of xfsd queued bufs*/
 
 	/* Miscellaneous state. */
 	unsigned int		io_flags;	/* IO related flags */
@@ -275,7 +275,6 @@ typedef struct xfs_inode {
 	/* Inode location stuff */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino)*/
 	xfs_daddr_t		i_blkno;	/* blkno of inode buffer */
-	dev_t			i_dev;		/* dev for this inode */
 	ushort			i_len;		/* len of inode buffer */
 	ushort			i_boffset;	/* off of inode in buffer */
 
@@ -289,9 +288,8 @@ typedef struct xfs_inode {
 	mrlock_t		i_lock;		/* inode lock */
 	mrlock_t		i_iolock;	/* inode IO lock */
 	sema_t			i_flock;	/* inode flush lock */
-	unsigned int		i_pincount;	/* inode pin count */
-	sv_t			i_pinsema;	/* inode pin sema */
-	lock_t			i_ipinlock;	/* inode pinning mutex */
+	atomic_t		i_pincount;	/* inode pin count */
+	wait_queue_head_t	i_ipin_wait;	/* inode pinning wait queue */
 	struct xfs_inode	**i_refcache;	/* ptr to entry in ref cache */
 	struct xfs_inode	*i_release;	/* inode to unref */
 
