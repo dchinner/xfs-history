@@ -1,4 +1,4 @@
-#ident "$Revision: 1.198 $"
+#ident "$Revision: 1.199 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -195,11 +195,12 @@ xfs_inobp_bwcheck(buf_t *bp)
 			cmn_err(CE_PANIC,
 		"Bad magic 0x%x in XFS inode buffer 0x%x, offset 0x%x\n",
 				dip->di_core.di_magic, bp, (__psint_t) dip -
-							(__psint_t) bp);
+						(__psint_t) bp->b_un.b_addr);
 		if (dip->di_next_unlinked == 0)
 			cmn_err(CE_PANIC,
 	"Bad next_unlinked field (0) in XFS inode buffer 0x%x, offset 0x%x\n",
-				bp, (__psint_t) dip - (__psint_t) bp);
+				bp,
+				(__psint_t) dip - (__psint_t) bp->b_un.b_addr);
 		
 		dip = (xfs_dinode_t *)((__psint_t) dip + mp->m_sb.sb_inodesize);
 	}
@@ -1313,6 +1314,7 @@ xfs_atruncate_start(
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return error;
 }
+
 
 /*
  * Start the truncation of the file to new_size.  The new size
