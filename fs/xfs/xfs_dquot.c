@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 #include <sys/param.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
@@ -1734,6 +1734,7 @@ xfs_qm_dqflock_pushbuf_wait(
 					      (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);
 			}
+			XFS_UNDELAY_WRITE(bp);
 			xfs_bawrite(dqp->q_mount, bp);
 		} else {
 			xfs_buf_relse(bp);

@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.41 $"
 
 /*
  * This file contains the implementation of the xfs_efi_log_item
@@ -369,7 +369,7 @@ xfs_efi_init(xfs_mount_t	*mp,
 	efip->efi_item.li_ops = &xfs_efi_item_ops;
 	efip->efi_item.li_mountp = mp;
 	efip->efi_format.efi_nextents = nextents;
-	efip->efi_format.efi_id = (long)efip;
+	efip->efi_format.efi_id = (unsigned long long)efip;
 
 	return (efip);
 }

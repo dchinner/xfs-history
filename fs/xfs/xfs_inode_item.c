@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision$"
+#ident "$Revision: 1.90 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -814,6 +814,7 @@ xfs_inode_item_pushbuf(
 					      XFS_LOG_FORCE);
 			}
 			if (dopush) {
+				XFS_BUF_UNDELAYWRITE(bp);
 				xfs_bawrite(mp, bp);
 			} else {
 				xfs_buf_relse(bp);
@@ -967,7 +968,7 @@ xfs_inode_item_destroy(
 /*ARGSUSED*/
 void
 xfs_iflush_done(
-	xfs_buf_t			*bp,
+	xfs_buf_t		*bp,
 	xfs_inode_log_item_t	*iip)
 {
 	xfs_inode_t	*ip;
