@@ -100,8 +100,18 @@ typedef __uint64_t __psunsigned_t;
  * the limiting factor.
  */
 
-#ifndef XFS_BIG_FILESYSTEMS
-#define XFS_BIG_FILESYSTEMS	0
+#ifndef HAVE_SECTOR_T
+typedef long		sector_t;	/* offset- or number- of disk blocks */
+#endif
+
+#if defined(CONFIG_LBD) || (defined(HAVE_SECTOR_T) && (BITS_PER_LONG == 64))
+#  ifndef XFS_BIG_FILESYSTEMS
+#  define XFS_BIG_FILESYSTEMS	1
+#  endif
+#else
+#  ifndef XFS_BIG_FILESYSTEMS
+#  define XFS_BIG_FILESYSTEMS	0
+#  endif
 #endif
 
 typedef __uint32_t	xfs_agblock_t;	/* blockno in alloc. group */
