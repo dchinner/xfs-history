@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_SF_H
 #define	_FS_XFS_ATTR_SF_H
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision$"
 
 /*
  * xfs_attr_sf.h
@@ -31,6 +31,17 @@ typedef struct xfs_attr_shortform {
 } xfs_attr_shortform_t;
 typedef struct xfs_attr_sf_hdr xfs_attr_sf_hdr_t;
 typedef struct xfs_attr_sf_entry xfs_attr_sf_entry_t;
+
+/*
+ * We generate this then sort it, attr_list() must return things in hash-order.
+ */
+typedef struct xfs_attr_sf_sort {
+	__uint8_t	entno;		/* entry number in original list */
+	__uint8_t	namelen;	/* length of name value (no null) */
+	__uint8_t	valuelen;	/* length of value */
+	xfs_dahash_t	hash;		/* this entry's hash value */
+	char		*name;		/* name value, pointer into buffer */
+} xfs_attr_sf_sort_t;
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_ATTR_SF_ENTSIZE_BYNAME)
 int xfs_attr_sf_entsize_byname(int nlen, int vlen);
@@ -64,5 +75,47 @@ int xfs_attr_sf_totsize(struct xfs_inode *dp);
 #define XFS_ATTR_SF_TOTSIZE(dp)			/* total space in use */ \
 	(((xfs_attr_shortform_t *)((dp)->i_afp->if_u1.if_data))->hdr.totsize)
 #endif
+
+
+#if defined(DEBUG) && !defined(SIM)
+/*
+ * Kernel tracing support for attribute lists
+ */
+struct xfs_attr_list_context;
+struct xfs_da_intnode;
+struct xfs_da_node_entry;
+struct xfs_attr_leafblock;
+
+#define	XFS_ATTR_TRACE_SIZE	4096	/* size of global trace buffer */     
+
+/*
+ * Trace record types.
+ */
+#define	XFS_ATTR_KTRACE_L_C	1	/* context */
+#define	XFS_ATTR_KTRACE_L_CN	2	/* context, node */
+#define	XFS_ATTR_KTRACE_L_CB	3	/* context, btree */
+#define	XFS_ATTR_KTRACE_L_CL	4	/* context, leaf */
+
+void xfs_attr_trace_l_c(char *where, struct xfs_attr_list_context *context);
+void xfs_attr_trace_l_cn(char *where, struct xfs_attr_list_context *context,
+			      struct xfs_da_intnode *node);
+void xfs_attr_trace_l_cb(char *where, struct xfs_attr_list_context *context,
+			      struct xfs_da_node_entry *btree);
+void xfs_attr_trace_l_cl(char *where, struct xfs_attr_list_context *context,
+			      struct xfs_attr_leafblock *leaf);
+void xfs_attr_trace_enter(int type, char *where,
+			     __psunsigned_t a2, __psunsigned_t a3,
+			     __psunsigned_t a4, __psunsigned_t a5,
+			     __psunsigned_t a6, __psunsigned_t a7,
+			     __psunsigned_t a8, __psunsigned_t a9,
+			     __psunsigned_t a10, __psunsigned_t a11,
+			     __psunsigned_t a12, __psunsigned_t a13,
+			     __psunsigned_t a14, __psunsigned_t a15);
+#else
+#define	xfs_attr_trace_l_c(w,c)
+#define	xfs_attr_trace_l_cn(w,c,n)
+#define	xfs_attr_trace_l_cb(w,c,b)
+#define	xfs_attr_trace_l_cl(w,c,l)
+#endif /* DEBUG && !SIM */
 
 #endif	/* !FS_XFS_ATTR_SF_H */
