@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.23 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -1584,8 +1584,12 @@ xfs_bmbt_insert(
 			cur->bc_private.b.allocated +=
 				pcur->bc_private.b.allocated;
 			pcur->bc_private.b.allocated = 0;
-			ASSERT(cur->bc_private.b.firstblock != NULLFSBLOCK &&
-			       cur->bc_private.b.firstblock ==
+
+			ASSERT((cur->bc_private.b.firstblock != NULLFSBLOCK) ||
+					(cur->bc_private.b.ip->i_d.di_flags & 
+					XFS_DIFLAG_REALTIME));
+
+			ASSERT(cur->bc_private.b.firstblock ==
 			       pcur->bc_private.b.firstblock);
 			ASSERT(cur->bc_private.b.flist ==
 			       pcur->bc_private.b.flist);
