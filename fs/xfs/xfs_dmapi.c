@@ -3200,7 +3200,7 @@ xfs_dm_send_unmount_event(
 	int		retcode,	/* errno, if unmount failed */
 	int		flags)
 {
-	dm_send_unmount_event(vfsp->vfs_super, LINVFS_GET_IP(vp),
+	dm_send_unmount_event(vfsp->vfs_super, vp ? LINVFS_GET_IP(vp) : NULL,
 			      vfsp_right, mode, retcode, flags);
 }
 
