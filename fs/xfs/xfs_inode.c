@@ -1,4 +1,4 @@
-#ident "$Revision: 1.139 $"
+#ident "$Revision: 1.141 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2310,6 +2310,9 @@ xfs_iflush(
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 	}
 
+#ifdef SIM
+	error = bwrite(bp);
+#else
 	if (flags & B_DELWRI) {
 		bdwrite(bp);
 	} else if (flags & B_ASYNC) {
@@ -2317,6 +2320,7 @@ xfs_iflush(
 	} else {
 		error = bwrite(bp);
 	}
+#endif
 
 	return error;
 }
