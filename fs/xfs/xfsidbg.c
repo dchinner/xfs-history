@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.82 $"
+#ident	"$Revision: 1.83 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3588,11 +3588,6 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		
 }
 
-#define XFS_BUCKETS 256
-#define XFS_IHLOCK(ih)          mp_mutex_lock(&(ih)->ih_lock, PINOD)
-#define XFS_IHUNLOCK(ih)        mp_mutex_unlock(&(ih)->ih_lock)
-
-
 static void
 xfsidbg_xihash(xfs_mount_t *mp)
 {
@@ -3602,18 +3597,18 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	int		total;
 	int		numzeros;
 	xfs_inode_t	*ip;
-	int		hist[XFS_BUCKETS];
+	int		hist[2048]; /* variable? */
 	int		hist2[21];
 
-	for (i = 0; i < XFS_BUCKETS; i++) {
+	for (i = 0; i < mp->m_ihsize; i++) {
 		ih = mp->m_ihash + i;
-		XFS_IHLOCK(ih);
+		mraccess(&ih->ih_lock);
 
 		j = 0;
 		for (ip = ih->ih_next; ip != NULL; ip = ip->i_next)
 			j++;
 
-		XFS_IHUNLOCK(ih);
+		mr_unlock(&ih->ih_lock);
 
 		hist[i] = j;
 	}
@@ -3623,7 +3618,7 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	for (i = 0; i < 21; i++)
 		hist2[i] = 0;
 
-	for (i = 0; i < XFS_BUCKETS; i++)  {
+	for (i = 0; i < mp->m_ihsize; i++)  {
 		qprintf("%d ", hist[i]);
 		total += hist[i];
 		numzeros += hist[i] == 0 ? 1 : 0;
@@ -3638,7 +3633,8 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	qprintf("\n");
 
 	qprintf("total inodes = %d, average length = %d, adjusted average = %d \n",
-		total, total / XFS_BUCKETS, total / (XFS_BUCKETS - numzeros));
+		total, total / mp->m_ihsize,
+		total / (mp->m_ihsize - numzeros));
 
 	for (i = 0; i < 21; i++)  {
 		qprintf("%d - %d , ", i, hist2[i]);
