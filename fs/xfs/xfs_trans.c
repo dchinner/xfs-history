@@ -57,8 +57,8 @@ STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
 STATIC uint	xfs_trans_count_vecs(xfs_trans_t *);
 STATIC void	xfs_trans_fill_vecs(xfs_trans_t *, xfs_log_iovec_t *);
 STATIC void	xfs_trans_uncommit(xfs_trans_t *, uint);
-STATIC void	xfs_trans_committed(xfs_trans_t *);
-STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t);
+STATIC void	xfs_trans_committed(xfs_trans_t *, int);
+STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t, int);
 STATIC void	xfs_trans_free(xfs_trans_t *);
 
 zone_t		*xfs_trans_zone;
@@ -589,6 +589,7 @@ xfs_trans_commit(
 #if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 	static xfs_lsn_t	trans_lsn = 1;
 #endif
+	int			shutdown;
 
 	/*
 	 * Determine whether this commit is releasing a permanent
@@ -609,7 +610,8 @@ xfs_trans_commit(
 	 * Also make sure to return any reserved blocks to
 	 * the free pool.
 	 */
-	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
+	shutdown = XFS_FORCED_SHUTDOWN(mp) ? EIO : 0;
+	if (!(tp->t_flags & XFS_TRANS_DIRTY) || shutdown) {
 		xfs_trans_unreserve_and_mod_sb(tp);
 		/*
 		 * It is indeed possible for the transaction to be
@@ -623,12 +625,15 @@ xfs_trans_commit(
 #endif
 		}
 		if (tp->t_ticket) {
-			xfs_log_done(mp, tp->t_ticket, log_flags);
+			if (error = xfs_log_done(mp, tp->t_ticket, log_flags)) {
+				if (!shutdown)
+					shutdown = error;
+			}
 		}
-		xfs_trans_free_items(tp, 0);
+		xfs_trans_free_items(tp, shutdown? XFS_TRANS_ABORT : 0);
 		xfs_trans_free(tp);
 		XFSSTATS.xs_trans_empty++;
-		return 0;
+		return (shutdown);
 	}
 #if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 	ASSERT(!xlog_debug || tp->t_ticket != NULL);
@@ -669,23 +674,26 @@ xfs_trans_commit(
 	 * then write the transaction to the log.
 	 */
 	xfs_trans_fill_vecs(tp, log_vector);
-	error = xfs_log_write(mp, log_vector, nvec, tp->t_ticket,
-				      &(tp->t_lsn));
 	
-	if (!error) {
+	/*
+	 * Ignore errors here. xfs_log_done would do the right thing.
+	 * We need to put the ticket, etc. away.
+	 */
+	error = xfs_log_write(mp, log_vector, nvec, tp->t_ticket,
+			     &(tp->t_lsn));
+	
 #if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
-		if (xlog_debug) {
-			commit_lsn = xfs_log_done(mp, tp->t_ticket,
-						  log_flags);
-		} else {
-			commit_lsn = 0;
-			tp->t_lsn = trans_lsn++;
-		}
-#else
-		/* This is the regular case */
-		commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
-#endif
+	if (xlog_debug) {
+		commit_lsn = xfs_log_done(mp, tp->t_ticket,
+					  log_flags);
+	} else {
+		commit_lsn = 0;
+		tp->t_lsn = trans_lsn++;
 	}
+#else
+	/* This is the regular case */
+	commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
+#endif
 	
 	if (nvec > XFS_TRANS_LOGVEC_COUNT) {
 		kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
@@ -696,7 +704,7 @@ xfs_trans_commit(
 	 * had pinned, clean up, free trans structure, and return error.
 	 */
 	if (error || commit_lsn == -1) { 
-		xfs_trans_uncommit(tp, flags);
+		xfs_trans_uncommit(tp, flags|XFS_TRANS_ABORT);
 		return XFS_ERROR(EIO);
 	}
 	
@@ -727,11 +735,11 @@ xfs_trans_commit(
 	 */
 #if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 	if (xlog_debug) {
-		tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
+		tp->t_logcb.cb_func = (void(*)(void*, int))xfs_trans_committed;
 		tp->t_logcb.cb_arg = tp;
 		xfs_log_notify(mp, commit_lsn, &(tp->t_logcb));
 	} else {
-		xfs_trans_committed(tp);
+		xfs_trans_committed(tp, 0);
 	}
 #else
 	tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
@@ -743,12 +751,13 @@ xfs_trans_commit(
 	 * log out now and wait for it.
 	 */
 	if (sync) {
-		xfs_log_force(mp, commit_lsn, XFS_LOG_FORCE | XFS_LOG_SYNC);
+		error = xfs_log_force(mp, commit_lsn, 
+				      XFS_LOG_FORCE | XFS_LOG_SYNC);
 		XFSSTATS.xs_trans_sync++;
 	} else {
 		XFSSTATS.xs_trans_async++;
 	}
-	return 0;
+	return (error);
 }
 
 
@@ -897,7 +906,16 @@ xfs_trans_cancel(
 	xfs_log_item_t		*lip;
 	int			i;
 #endif
-
+	
+	/*
+	 * This really shouldn't be happening.
+	 */
+	if ((tp->t_flags & XFS_TRANS_DIRTY) &&
+	    !(XFS_FORCED_SHUTDOWN(tp->t_mountp))) {
+		ASSERT(XFS_FORCED_SHUTDOWN(tp->t_mountp));
+		/* debug(""); */
+		xfs_force_shutdown(tp->t_mountp, XFS_METADATA_IO_ERROR); 
+	}
 #ifdef DEBUG
 	if (!(flags & XFS_TRANS_ABORT)) {
 		licp = &(tp->t_items);
@@ -915,18 +933,10 @@ xfs_trans_cancel(
 		}
 	}
 #endif
-	/*
-	 * Don't bother about unreserving block reservations,
-	 * if we're shutting down. Just take care of the log reservations
-	 * because the log may be functional still.
-	 * XXXsup why bother? bloat, bloat.
-	 */
-	if (!XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
-		xfs_trans_unreserve_and_mod_sb(tp);
+	xfs_trans_unreserve_and_mod_sb(tp);
 		
-		if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY))
-			xfs_trans_unreserve_and_mod_dquots(tp);
-	}
+	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY))
+		xfs_trans_unreserve_and_mod_dquots(tp);
 
 	if (tp->t_ticket) {
 		if (flags & XFS_TRANS_RELEASE_LOG_RES) {
@@ -959,17 +969,20 @@ xfs_trans_free(
 /*
  * THIS SHOULD BE REWRITTEN TO USE xfs_trans_next_item().
  *
- * This is called by the LM when a transaction has been fully
+ * This is typically called by the LM when a transaction has been fully
  * committed to disk.  It needs to unpin the items which have
  * been logged by the transaction and update their positions
  * in the AIL if necessary.
+ * This also gets called when the transactions didn't get written out
+ * because of an I/O error. Abortflag & XFS_LI_ABORTED is set then.
  *
  * Call xfs_trans_chunk_committed() to process the items in
  * each chunk.
  */
 STATIC void
 xfs_trans_committed(
-	xfs_trans_t	*tp)
+	xfs_trans_t	*tp,
+	int		abortflag)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_chunk_t	*next_licp;
@@ -987,7 +1000,7 @@ xfs_trans_committed(
 	 */
 	licp = &(tp->t_items);
 	if (!(XFS_LIC_ARE_ALL_FREE(licp))) {
-		xfs_trans_chunk_committed(licp, tp->t_lsn);
+		xfs_trans_chunk_committed(licp, tp->t_lsn, abortflag);
 	}
 
 	/*
@@ -996,7 +1009,7 @@ xfs_trans_committed(
 	licp = licp->lic_next;
 	while (licp != NULL) {
 		ASSERT(!XFS_LIC_ARE_ALL_FREE(licp));
-		xfs_trans_chunk_committed(licp, tp->t_lsn);
+		xfs_trans_chunk_committed(licp, tp->t_lsn, abortflag);
 		next_licp = licp->lic_next;
 		kmem_free(licp, sizeof(xfs_log_item_chunk_t));
 		licp = next_licp;
@@ -1032,7 +1045,8 @@ xfs_trans_committed(
 STATIC void
 xfs_trans_chunk_committed(
 	xfs_log_item_chunk_t	*licp,
-	xfs_lsn_t		lsn)
+	xfs_lsn_t		lsn,
+	int			aborted)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_log_item_t		*lip;
@@ -1048,11 +1062,18 @@ xfs_trans_chunk_committed(
 		}
 
 		lip = lidp->lid_item;
+		if (aborted)
+			lip->li_flags |= XFS_LI_ABORTED;
 
 		if (lidp->lid_flags & XFS_LID_SYNC_UNLOCK) {
 			IOP_UNLOCK(lip);
 		}
 
+		/*
+		 * Send in the ABORTED flag to the COMMITTED routine
+		 * so that it knows whether the transaction was aborted
+		 * or not.
+		 */
 		item_lsn = IOP_COMMITTED(lip, lsn);
 
 		/*
