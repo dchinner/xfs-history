@@ -287,7 +287,7 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_INCORE_TRYLOCK	PBF_TRYLOCK
 
 #define XFS_BUF_BFLAGS(x)        ((x)->pb_flags)  /* debugging routines might need this */
-#define XFS_BUF_ZEROFLAGS(x)     ((x)->pb_flags = 0) 
+#define XFS_BUF_ZEROFLAGS(x)     /* ((x)->pb_flags = 0) */
 
 #define XFS_BUF_STALE(x)	     ((x)->pb_flags |= XFS_B_STALE)
 #define XFS_BUF_UNSTALE(x)	     ((x)->pb_flags &= ~XFS_B_STALE)
