@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision$"
+#ident	"$Revision: 1.1 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -39,9 +39,9 @@
 #include "xfs_extfree_item.h"
 #include "xfs_inode_item.h"
 #include "xfs_bmap.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
-#include "xfs_dir.h"
 #include "xfs_dir_btree.h"
 #include "xfs_log_priv.h"
 #include "xfs_log_recover.h"
@@ -99,11 +99,11 @@ void	idbg_xbxitrace(xfs_inode_t *);
 void	idbg_xbxstrace(xfs_inode_t *);
 #endif
 void 	idbg_xchksum(uint *);
-void	idbg_xdirlf(struct xfs_dir_leafblock *);
-void	idbg_xdirnd(struct xfs_dir_intnode *);
-void	idbg_xdirsf(struct xfs_dir_shortform *);
-void	idbg_xdname(struct xfs_dir_name *);
-void	idbg_xdstate(struct xfs_dir_state *);
+void	idbg_xdirlf(xfs_dir_leafblock_t *);
+void	idbg_xdirnd(xfs_dir_intnode_t *);
+void	idbg_xdirsf(xfs_dir_shortform_t *);
+void	idbg_xdname(xfs_dir_name_t *);
+void	idbg_xdstate(xfs_dir_state_t *);
 void	idbg_xexlist(xfs_inode_t *);
 void	idbg_xflist(xfs_bmap_free_t *);
 void	idbg_xgaplist(xfs_inode_t *);
@@ -277,7 +277,7 @@ static void xfs_iomap_map_trace_entry(ktrace_entry_t *ktep);
 #endif
 static void xfs_prdinode(xfs_dinode_t *di, int coreonly);
 static void xfs_prdinode_core(xfs_dinode_core_t *dip);
-static void xfs_prdir_state_path(char *f, struct xfs_dir_state_path *p);
+static void xfs_prdir_state_path(char *f, xfs_dir_state_path_t *p);
 #ifdef DEBUG
 static void xfs_rw_enter_trace_entry(ktrace_entry_t *ktep);
 static int xfs_rw_trace_entry(ktrace_entry_t *ktep);
@@ -955,7 +955,7 @@ xfs_prdinode_core(xfs_dinode_core_t *dip)
  * Print an xfs_dir_state_path structure.
  */
 static void
-xfs_prdir_state_path(char *f, struct xfs_dir_state_path *p)
+xfs_prdir_state_path(char *f, xfs_dir_state_path_t *p)
 {
 	int i;
 
@@ -1635,8 +1635,8 @@ idbg_xbuf(buf_t *bp)
 	xfs_alloc_block_t *bta;
 	xfs_bmbt_block_t *btb;
 	xfs_inobt_block_t *bti;
-	struct xfs_dir_leafblock *leaf;
-	struct xfs_dir_intnode *node;
+	xfs_dir_leafblock_t *leaf;
+	xfs_dir_intnode_t *node;
 	xfs_dinode_t *di;
 
 	d = bp->b_un.b_addr;
@@ -1795,13 +1795,13 @@ idbg_xchksum(uint *addr)
  * Print a directory leaf block.
  */
 void
-idbg_xdirlf(struct xfs_dir_leafblock *leaf)
+idbg_xdirlf(xfs_dir_leafblock_t *leaf)
 {
-	struct xfs_dir_leaf_hdr *h;
-	struct xfs_dir_blkinfo *i;
-	struct xfs_dir_leaf_map *m;
-	struct xfs_dir_leaf_entry *e;
-	struct xfs_dir_leaf_name *n;
+	xfs_dir_leaf_hdr_t *h;
+	xfs_dir_blkinfo_t *i;
+	xfs_dir_leaf_map_t *m;
+	xfs_dir_leaf_entry_t *e;
+	xfs_dir_leaf_name_t *n;
 	int j, k;
 	xfs_ino_t ino;
 
@@ -1831,11 +1831,11 @@ idbg_xdirlf(struct xfs_dir_leafblock *leaf)
  * Print a directory internal node block.
  */
 void
-idbg_xdirnd(struct xfs_dir_intnode *node)
+idbg_xdirnd(xfs_dir_intnode_t *node)
 {
-	struct xfs_dir_node_hdr *h;
-	struct xfs_dir_blkinfo *i;
-	struct xfs_dir_node_entry *e;
+	xfs_dir_node_hdr_t *h;
+	xfs_dir_blkinfo_t *i;
+	xfs_dir_node_entry_t *e;
 	int j;
 
 	h = &node->hdr;
@@ -1854,10 +1854,10 @@ idbg_xdirnd(struct xfs_dir_intnode *node)
  * Print a shortform directory.
  */
 void
-idbg_xdirsf(struct xfs_dir_shortform *s)
+idbg_xdirsf(xfs_dir_shortform_t *s)
 {
-	struct xfs_dir_sf_hdr *sfh;
-	struct xfs_dir_sf_entry *sfe;
+	xfs_dir_sf_hdr_t *sfh;
+	xfs_dir_sf_entry_t *sfe;
 	xfs_ino_t ino;
 	int i, j;
 
@@ -1880,7 +1880,7 @@ idbg_xdirsf(struct xfs_dir_shortform *s)
  * Print an xfs_dir_name structure.
  */
 void
-idbg_xdname(struct xfs_dir_name *n)
+idbg_xdname(xfs_dir_name_t *n)
 {
 	int i;
 
@@ -1897,7 +1897,7 @@ idbg_xdname(struct xfs_dir_name *n)
  * Print an xfs_dir_state_blk structure.
  */
 void
-idbg_xdstate(struct xfs_dir_state *s)
+idbg_xdstate(xfs_dir_state_t *s)
 {
 	qprintf("args 0x%x mp 0x%x trans 0x%x blocksize %d inleaf %d\n",
 		s->args, s->mp, s->trans, s->blocksize, s->inleaf);
