@@ -431,7 +431,7 @@ xfs_ialloc_ag_select(
 		 * Is there enough free space for the file plus a block
 		 * of inodes (if we need to allocate some)?
 		 */
-		if (xfs_alloc_ag_freeblks(mp, tp, agno, 1) >=
+		if (xfs_alloc_ag_freeblks(mp, tp, agno, 0) >=
 		    needspace + (agi->agi_freecount == 0))
 			return agbuf;
 		xfs_trans_brelse(tp, agbuf);
