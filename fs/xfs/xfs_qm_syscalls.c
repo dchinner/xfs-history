@@ -1406,9 +1406,9 @@ xfs_qm_internalqcheck(
 		return XFS_ERROR(ESRCH);
 
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	XFS_bflush(mp->m_ddev_targ);
+	XFS_bflush(mp->m_ddev_targp);
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	XFS_bflush(mp->m_ddev_targ);
+	XFS_bflush(mp->m_ddev_targp);
 
 	mutex_lock(&qcheck_lock, PINOD);
 	/* There should be absolutely no quota activity while this

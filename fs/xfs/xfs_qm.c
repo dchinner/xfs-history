@@ -577,7 +577,7 @@ again:
 			if (++niters == XFS_QM_MAX_DQCLUSTER_LOGSZ) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE | XFS_LOG_SYNC);
-				XFS_bflush(mp->m_ddev_targ);
+				XFS_bflush(mp->m_ddev_targp);
 				niters = 0;
 			}
 		}
@@ -1603,7 +1603,7 @@ xfs_qm_dqiter_bufs(
 			if (++notcommitted == incr) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE | XFS_LOG_SYNC);
-				XFS_bflush(mp->m_ddev_targ);
+				XFS_bflush(mp->m_ddev_targp);
 				notcommitted = 0;
 			}
 		}
@@ -1989,7 +1989,7 @@ xfs_qm_quotacheck(
 	 * quotacheck'd stamp on the superblock. So, here we do a synchronous
 	 * flush.
 	 */
-	XFS_bflush(mp->m_ddev_targ);
+	XFS_bflush(mp->m_ddev_targp);
 
 	/*
 	 * If one type of quotas is off, then it will lose its
@@ -2185,7 +2185,7 @@ xfs_qm_shake_freelist(
 				if (!(++nflushes % XFS_QM_MAX_DQCLUSTER_LOGSZ)){
 					xfs_log_force(dqp->q_mount, (xfs_lsn_t)0,
 						 XFS_LOG_FORCE | XFS_LOG_SYNC);
-					XFS_bflush(dqp->q_mount->m_ddev_targ);
+					XFS_bflush(dqp->q_mount->m_ddev_targp);
 				}
 			}
 			/*
@@ -2369,7 +2369,7 @@ xfs_qm_dqreclaim_one(void)
 				if (!(++nflushes % XFS_QM_MAX_DQCLUSTER_LOGSZ)) {
 					xfs_log_force(dqp->q_mount, (xfs_lsn_t)0,
 						XFS_LOG_FORCE | XFS_LOG_SYNC);
-					XFS_bflush(dqp->q_mount->m_ddev_targ);
+					XFS_bflush(dqp->q_mount->m_ddev_targp);
 				}
 			}
 

@@ -161,17 +161,18 @@ void
 pagebuf_lock_disable(			/* disable buffer locking	*/
 		     pb_target_t *target)  /* inode for buffers		*/
 {
+	pagebuf_delwri_flush(target, PBDF_WAIT, NULL);
 	blkdev_put(target->pbr_bdev, BDEV_FS);
 	kfree(target);
 }
+
 /*
  *	pagebuf_lock_enable
  */
-
 pb_target_t *
 pagebuf_lock_enable(
-	dev_t		dev,
-	struct super_block *sb)
+	dev_t			dev,
+	struct super_block	*sb)
 {
 	struct block_device *bdev;
 	pb_target_t	*target;
@@ -189,6 +190,7 @@ pagebuf_lock_enable(
 	if (unlikely(error))
 		goto fail;
 
+	target->pbr_dev = dev;
 	target->pbr_kdev = to_kdev_t(dev);
 	target->pbr_bdev = bdev;
 	target->pbr_mapping = bdev->bd_inode->i_mapping;

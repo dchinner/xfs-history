@@ -1924,7 +1924,7 @@ xfs_growfs_rt(
 	/*
 	 * Read in the last block of the device, make sure it exists.
 	 */
-	error = xfs_read_buf(mp, &mp->m_rtdev_targ,
+	error = xfs_read_buf(mp, mp->m_rtdev_targp,
 		XFS_FSB_TO_BB(mp, in->newblocks) - 1, 1, 0, &bp);
 	if (error)
 		return error;
@@ -2285,7 +2285,7 @@ xfs_rtmount_init(
 			(unsigned long long) mp->m_sb.sb_rblocks);
 		return XFS_ERROR(E2BIG);
 	}
-	error = xfs_read_buf(mp, m_rtdev_targp(mp), d - 1, 1, 0, &bp);
+	error = xfs_read_buf(mp, mp->m_rtdev_targp, d - 1, 1, 0, &bp);
 	if (error) {
 		printk(KERN_WARNING
 			"XFS: RT mount - xfs_read_buf returned %d\n", error);

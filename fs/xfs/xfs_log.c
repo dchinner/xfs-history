@@ -1165,7 +1165,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 
 	bp = log->l_xbuf   = XFS_getrbuf(0,mp); /* get my locked buffer */ /* mp needed for pagebuf/linux only */
 
-	XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
+	XFS_BUF_SET_TARGET(bp, mp->m_logdev_targp);
 	XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 	XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 	XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
@@ -1212,7 +1212,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		memcpy(&head->h_fs_uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t));
 
 		bp = iclog->ic_bp = XFS_getrbuf(0,mp);		/* my locked buffer */ /* mp need for pagebuf/linux only */
-		XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
+		XFS_BUF_SET_TARGET(bp, mp->m_logdev_targp);
 		XFS_BUF_SET_SIZE(bp, log->l_iclog_size);
 		XFS_BUF_SET_IODONE_FUNC(bp, xlog_iodone);
 		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);

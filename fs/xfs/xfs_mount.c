@@ -771,7 +771,7 @@ xfs_mountfs(
 			error = XFS_ERROR(E2BIG);
 			goto error1;
 		}
-		error = xfs_read_buf(mp, &mp->m_logdev_targ, d - 1, 1, 0, &bp);
+		error = xfs_read_buf(mp, mp->m_logdev_targp, d - 1, 1, 0, &bp);
 		if (!error) {
 			xfs_buf_relse(bp);
 		} else {
@@ -1106,9 +1106,9 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	 */
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 
-	xfs_binval(mp->m_ddev_targ);
-	if (mp->m_rtdev) {
-		xfs_binval(mp->m_rtdev_targ);
+	xfs_binval(mp->m_ddev_targp);
+	if (mp->m_rtdev_targp) {
+		xfs_binval(mp->m_rtdev_targp);
 	}
 
 	xfs_unmountfs_writesb(mp);
@@ -1116,7 +1116,6 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
 	xfs_freesb(mp);
-
 
 	/*
 	 * All inodes from this mount point should be freed.
@@ -1129,8 +1128,9 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 	 * does a two pass iteration thru the bufcache.
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-		(void)xfs_incore_relse(&mp->m_ddev_targ, 0, 1); /* synchronous*/
+		(void)xfs_incore_relse(mp->m_ddev_targp, 0, 1); /* synchronous*/
 	}
+
 	xfs_unmountfs_close(mp, cr);
 	if ((mp->m_flags & XFS_MOUNT_NOUUID) == 0)
 		xfs_uuid_unmount(mp);
@@ -1150,13 +1150,20 @@ xfs_unmountfs(xfs_mount_t *mp, struct cred *cr)
 void
 xfs_unmountfs_close(xfs_mount_t *mp, struct cred *cr)
 {
-	if (mp->m_ddev_targ.pb_targ)
-		linvfs_release_buftarg(&mp->m_ddev_targ);
-	if (mp->m_rtdev_targ.pb_targ)
-		linvfs_release_buftarg(&mp->m_rtdev_targ);
-	if (mp->m_logdev_targ.pb_targ &&
-	    mp->m_logdev_targ.pb_targ != mp->m_ddev_targ.pb_targ)
-		linvfs_release_buftarg(&mp->m_logdev_targ);
+	int		have_logdev = (mp->m_logdev_targp != mp->m_ddev_targp);
+
+	if (mp->m_ddev_targp) {
+		pagebuf_lock_disable(mp->m_ddev_targp);
+		mp->m_ddev_targp = NULL;
+	}
+	if (mp->m_rtdev_targp) {
+		pagebuf_lock_disable(mp->m_rtdev_targp);
+		mp->m_rtdev_targp = NULL;
+	}
+	if (mp->m_logdev_targp && have_logdev) {
+		pagebuf_lock_disable(mp->m_logdev_targp);
+		mp->m_logdev_targp = NULL;
+	}
 }
 
 int

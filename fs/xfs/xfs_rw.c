@@ -256,7 +256,7 @@ xfs_ioerror_alert(
 int
 xfs_read_buf(
 	struct xfs_mount *mp,
-	buftarg_t	 *target,
+	xfs_buftarg_t	 *target,
 	xfs_daddr_t	 blkno,
 	int		 len,
 	uint		 flags,

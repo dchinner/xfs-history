@@ -233,23 +233,27 @@ xfs_cmountfs(
 	/*
 	 * Open data, real time, and log devices now - order is important.
 	 */
-	linvfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super, 1);
-	if (rtdev != 0 &&
-		(error = linvfs_fill_buftarg(
-			&mp->m_rtdev_targ, rtdev, vfsp->vfs_super, 0))) {
-		linvfs_release_buftarg(&mp->m_ddev_targ);
+	mp->m_ddev_targp = pagebuf_lock_enable(ddev, vfsp->vfs_super);
+	if (!mp->m_ddev_targp)
 		goto error2;
-	}
-	if (logdev != ddev &&
-		(error = linvfs_fill_buftarg(
-			&mp->m_logdev_targ, logdev, vfsp->vfs_super, 0))) {
-		linvfs_release_buftarg(&mp->m_ddev_targ);
-		if (mp->m_rtdev_targ.pb_targ)
-			linvfs_release_buftarg(&mp->m_rtdev_targ);
-		goto error2;
+
+	if (rtdev != 0) {
+		mp->m_rtdev_targp = pagebuf_lock_enable(rtdev, vfsp->vfs_super);
+		if (!mp->m_rtdev_targp) {
+			pagebuf_lock_disable(mp->m_ddev_targp);
+			goto error2;
+		}
 	}
 
-	mp->m_ddev_targp = &mp->m_ddev_targ;
+	if (logdev != ddev) {
+		mp->m_logdev_targp = pagebuf_lock_enable(logdev, vfsp->vfs_super);
+		if (!mp->m_logdev_targp) {
+			pagebuf_lock_disable(mp->m_ddev_targp);
+			if (mp->m_rtdev_targp)
+				pagebuf_lock_disable(mp->m_rtdev_targp);
+			goto error2;
+		}
+	}
 
 	/* Values are in BBs */
 	if ((ap->flags & XFSMNT_NOALIGN) != XFSMNT_NOALIGN) {
@@ -268,7 +272,7 @@ xfs_cmountfs(
 
 	if (logdev != 0) {
 		if (logdev == ddev) {
-			mp->m_logdev_targ = mp->m_ddev_targ;
+			mp->m_logdev_targp = mp->m_ddev_targp;
 		} else {
 			/* Set the log device's block size */
 			set_blocksize(logdev, 512);
@@ -416,11 +420,11 @@ xfs_cmountfs(
 		}
 	}
 
-	linvfs_bsize_buftarg(&mp->m_ddev_targ, mp->m_sb.sb_blocksize);
+	pagebuf_target_blocksize(mp->m_ddev_targp, mp->m_sb.sb_blocksize);
 	if (logdev != 0 && logdev != ddev)
-		linvfs_bsize_buftarg(&mp->m_logdev_targ, mp->m_sb.sb_blocksize);
+		pagebuf_target_blocksize(mp->m_logdev_targp, mp->m_sb.sb_blocksize);
 	if (rtdev != 0)
-		linvfs_bsize_buftarg(&mp->m_rtdev_targ, mp->m_sb.sb_blocksize);
+		pagebuf_target_blocksize(mp->m_rtdev_targp, mp->m_sb.sb_blocksize);
 
 	/*
 	 * prohibit r/w mounts of read-only filesystems
@@ -478,15 +482,15 @@ xfs_cmountfs(
 	 */
  error3:
 	/* It's impossible to get here before buftargs are filled */
-	xfs_binval(mp->m_ddev_targ);
-	linvfs_release_buftarg(&mp->m_ddev_targ);
+	xfs_binval(mp->m_ddev_targp);
+	pagebuf_lock_disable(mp->m_ddev_targp);
 	if (logdev && logdev != ddev) {
-		xfs_binval(mp->m_logdev_targ);
-		linvfs_release_buftarg(&mp->m_logdev_targ);
+		xfs_binval(mp->m_logdev_targp);
+		pagebuf_lock_disable(mp->m_logdev_targp);
 	}
 	if (rtdev != 0) {
-		xfs_binval(mp->m_rtdev_targ);
-		linvfs_release_buftarg(&mp->m_rtdev_targ);
+		xfs_binval(mp->m_rtdev_targp);
+		pagebuf_lock_disable(mp->m_rtdev_targp);
 	}
  error2:
 	if (error) {
@@ -515,9 +519,6 @@ xfs_get_vfsmount(
 	 * Allocate VFS private data (xfs mount structure).
 	 */
 	mp = xfs_mount_init();
-	mp->m_dev    = ddev;
-	mp->m_logdev = logdev;
-	mp->m_rtdev  = rtdev;
 
 	vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
 	/* vfsp->vfs_bsize filled in later from superblock */
@@ -657,7 +658,7 @@ xfs_unmount(
 		goto out;
 	}
 
-	XFS_bflush(mp->m_ddev_targ);
+	XFS_bflush(mp->m_ddev_targp);
 	error = xfs_unmount_flush(mp, 0);
 	if (error)
 		goto out;
@@ -1614,9 +1615,9 @@ xfs_syncsub(
 	 * to disk or the filesystem can appear corrupt from the PROM.
 	 */
 	if ((flags & (SYNC_CLOSE|SYNC_WAIT)) == (SYNC_CLOSE|SYNC_WAIT)) {
-		XFS_bflush(mp->m_ddev_targ);
+		XFS_bflush(mp->m_ddev_targp);
 		if (mp->m_rtdev != 0) {
-			XFS_bflush(mp->m_rtdev_targ);
+			XFS_bflush(mp->m_rtdev_targp);
 		}
 	}
 

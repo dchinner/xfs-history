@@ -33,9 +33,9 @@
 #include <xfs.h>
 
 
-STATIC xfs_buf_t *xfs_trans_buf_item_match(xfs_trans_t *, buftarg_t *,
+STATIC xfs_buf_t *xfs_trans_buf_item_match(xfs_trans_t *, xfs_buftarg_t *,
 		xfs_daddr_t, int);
-STATIC xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, buftarg_t *,
+STATIC xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, xfs_buftarg_t *,
 		xfs_daddr_t, int);
 
 
@@ -58,7 +58,7 @@ STATIC xfs_buf_t *xfs_trans_buf_item_match_all(xfs_trans_t *, buftarg_t *,
  */
 xfs_buf_t *
 xfs_trans_get_buf(xfs_trans_t	*tp,
-		  buftarg_t	*target_dev,
+		  xfs_buftarg_t	*target_dev,
 		  xfs_daddr_t	blkno,
 		  int		len,
 		  uint		flags)
@@ -278,7 +278,7 @@ int
 xfs_trans_read_buf(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
-	buftarg_t	*target,
+	xfs_buftarg_t	*target,
 	xfs_daddr_t	blkno,
 	int		len,
 	uint		flags,
@@ -308,7 +308,7 @@ xfs_trans_read_buf(
 		}
 #ifdef DEBUG
 		if (xfs_do_error && (bp != NULL)) {
-			if (xfs_error_dev == target->dev) {
+			if (xfs_error_dev == target->pbr_dev) {
 				if (((xfs_req_num++) % xfs_error_mod) == 0) {
 					xfs_buf_relse(bp);
 					printk("Returning error!\n");
@@ -411,7 +411,7 @@ xfs_trans_read_buf(
 	}
 #ifdef DEBUG
 	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
-		if (xfs_error_dev == target->dev) {
+		if (xfs_error_dev == target->pbr_dev) {
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
 				xfs_force_shutdown(tp->t_mountp,
 						   XFS_METADATA_IO_ERROR);
@@ -984,7 +984,7 @@ xfs_trans_dquot_buf(
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match(
 	xfs_trans_t	*tp,
-	buftarg_t	*target,
+	xfs_buftarg_t	*target,
 	xfs_daddr_t	blkno,
 	int		len)
 {
@@ -1013,7 +1013,7 @@ xfs_trans_buf_item_match(
 			}
 
 			bp = blip->bli_buf;
-			if ((XFS_BUF_TARGET_DEV(bp) == target->dev) &&
+			if ((XFS_BUF_TARGET_DEV(bp) == target->pbr_dev) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
@@ -1037,7 +1037,7 @@ xfs_trans_buf_item_match(
 STATIC xfs_buf_t *
 xfs_trans_buf_item_match_all(
 	xfs_trans_t	*tp,
-	buftarg_t	*target,
+	xfs_buftarg_t	*target,
 	xfs_daddr_t	blkno,
 	int		len)
 {
@@ -1070,7 +1070,7 @@ xfs_trans_buf_item_match_all(
 			}
 
 			bp = blip->bli_buf;
-			if ((XFS_BUF_TARGET_DEV(bp) == target->dev) &&
+			if ((XFS_BUF_TARGET_DEV(bp) == target->pbr_dev) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*

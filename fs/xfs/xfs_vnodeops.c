@@ -5051,7 +5051,7 @@ xfs_zero_remaining_bytes(
 	ASSERT(!XFS_BUF_GETERROR(bp));
 
 	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
-		XFS_BUF_SET_TARGET(bp, &mp->m_rtdev_targ);
+		XFS_BUF_SET_TARGET(bp, mp->m_rtdev_targp);
 	} else {
 		XFS_BUF_SET_TARGET(bp, mp->m_ddev_targp);
 	}

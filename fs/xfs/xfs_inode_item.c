@@ -748,7 +748,7 @@ xfs_inode_item_pushbuf(
 	}
 
 	mp = ip->i_mount;
-	bp = xfs_incore(mp->m_ddev_targ, iip->ili_format.ilf_blkno,
+	bp = xfs_incore(mp->m_ddev_targp, iip->ili_format.ilf_blkno,
 		    iip->ili_format.ilf_len, XFS_INCORE_TRYLOCK);
 
 	if (bp != NULL) {

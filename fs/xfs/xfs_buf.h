@@ -115,10 +115,8 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 typedef struct page_buf_s xfs_buf_t;
 #define xfs_buf page_buf_s
 
-typedef struct buftarg {
-	struct pb_target	*pb_targ;
-	dev_t			dev;
-} buftarg_t;
+typedef struct pb_target xfs_buftarg_t;
+#define xfs_buftarg pb_target
 
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_iodone
 #define XFS_BUF_SET_IODONE_FUNC(buf, func)	\
@@ -182,25 +180,25 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target)	\
-	(bp)->pb_target = (target)->pb_targ
+	(bp)->pb_target = (target)
 
-#define XFS_BUF_TARGET_DEV(bp)	((bp)->pb_target->pbr_bdev->bd_dev)
+#define XFS_BUF_TARGET_DEV(bp)	((bp)->pb_target->pbr_dev)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
 #define xfs_buf_read(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno), (len), \
+		pagebuf_get((target), (blkno), (len), \
 			PBF_LOCK | PBF_READ | PBF_MAPPED | PBF_MAPPABLE)
 #define xfs_buf_get(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno), (len), \
+		pagebuf_get((target), (blkno), (len), \
 			PBF_LOCK | PBF_MAPPED | PBF_MAPPABLE)
 
 #define xfs_buf_read_flags(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno), (len), \
+		pagebuf_get((target), (blkno), (len), \
 			PBF_READ | PBF_MAPPABLE | flags)
 #define xfs_buf_get_flags(target, blkno, len, flags) \
-		pagebuf_get((target)->pb_targ, (blkno), (len), \
+		pagebuf_get((target), (blkno), (len), \
 			PBF_MAPPABLE | flags)
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
@@ -241,7 +239,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 	    pagebuf_iodone(pb)
 
 #define xfs_incore(buftarg,blkno,len,lockit) \
-	    pagebuf_find(buftarg.pb_targ, blkno ,len, lockit)
+	    pagebuf_find(buftarg, blkno ,len, lockit)
 
 
 #define xfs_biomove(pb, off, len, data, rw) \
@@ -300,21 +298,21 @@ static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
  * of its metadata.
  */
 
-extern void XFS_bflush(buftarg_t);
+extern void XFS_bflush(xfs_buftarg_t *);
 #define xfs_binval(buftarg) XFS_bflush(buftarg)
 
 #define xfs_incore_relse(buftarg,delwri_only,wait)	\
-       pagebuf_target_clear((buftarg)->pb_targ)
+       pagebuf_target_clear(buftarg)
 
 
 #define xfs_baread(target, rablkno, ralen)  \
-	pagebuf_readahead((target)->pb_targ, (rablkno), \
+	pagebuf_readahead((target), (rablkno), \
 			  (ralen), PBF_DONT_BLOCK)
 
 #define XFS_getrbuf(sleep,mp)	\
-	pagebuf_get_empty((mp)->m_ddev_targ.pb_targ)
+	pagebuf_get_empty((mp)->m_ddev_targp)
 #define XFS_ngetrbuf(len,mp)	\
-	pagebuf_get_no_daddr(len,(mp)->m_ddev_targ.pb_targ)
+	pagebuf_get_no_daddr(len,(mp)->m_ddev_targp)
 #define XFS_freerbuf(bp)	pagebuf_free(bp)
 #define XFS_nfreerbuf(bp)	pagebuf_free(bp)
 

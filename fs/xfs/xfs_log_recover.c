@@ -88,7 +88,7 @@ xlog_bread(xlog_t	*log,
 	XFS_BUF_READ(bp);
 	XFS_BUF_BUSY(bp);
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
-	XFS_BUF_SET_TARGET(bp, &log->l_mp->m_logdev_targ);
+	XFS_BUF_SET_TARGET(bp, log->l_mp->m_logdev_targp);
 
 	xfsbdstrat(log->l_mp, bp);
 	if ((error = xfs_iowait(bp))) {
@@ -123,7 +123,7 @@ xlog_bwrite(
 	XFS_BUF_HOLD(bp);
 	XFS_BUF_PSEMA(bp, PRIBIO);
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
-	XFS_BUF_SET_TARGET(bp, &log->l_mp->m_logdev_targ);
+	XFS_BUF_SET_TARGET(bp, log->l_mp->m_logdev_targp);
 
 	if ((error = xfs_bwrite(log->l_mp, bp)))
 		xfs_ioerror_alert("xlog_bwrite", log->l_mp,
@@ -3442,7 +3442,7 @@ xlog_do_recover(xlog_t	*log,
 		return error;
 	}
 
-	XFS_bflush(log->l_mp->m_ddev_targ);
+	XFS_bflush(log->l_mp->m_ddev_targp);
 
 	/*
 	 * If IO errors happened during recovery, bail out.

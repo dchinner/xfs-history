@@ -233,7 +233,7 @@ xfs_qm_dquot_logitem_pushbuf(
 		return;
 	}
 	mp = dqp->q_mount;
-	bp = xfs_incore(mp->m_ddev_targ, qip->qli_format.qlf_blkno,
+	bp = xfs_incore(mp->m_ddev_targp, qip->qli_format.qlf_blkno,
 		    XFS_QI_DQCHUNKLEN(mp),
 		    XFS_INCORE_TRYLOCK);
 	if (bp != NULL) {

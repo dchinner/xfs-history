@@ -1641,7 +1641,7 @@ xfs_qm_dqflock_pushbuf_wait(
 	 * out immediately.  We'll be able to acquire
 	 * the flush lock when the I/O completes.
 	 */
-	bp = xfs_incore(dqp->q_mount->m_ddev_targ, dqp->q_blkno,
+	bp = xfs_incore(dqp->q_mount->m_ddev_targp, dqp->q_blkno,
 		    XFS_QI_DQCHUNKLEN(dqp->q_mount),
 		    XFS_INCORE_TRYLOCK);
 	if (bp != NULL) {

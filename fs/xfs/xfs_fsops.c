@@ -576,9 +576,9 @@ xfs_fs_freeze(
 	VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, NULL, error);
 
 	/* Push all buffers out to disk */
-	xfs_binval(mp->m_ddev_targ);
+	xfs_binval(mp->m_ddev_targp);
 	if (mp->m_rtdev != 0) {
-		xfs_binval(mp->m_rtdev_targ);
+		xfs_binval(mp->m_rtdev_targp);
 	}
 
 	/* Push the superblock and write an unmount record */
