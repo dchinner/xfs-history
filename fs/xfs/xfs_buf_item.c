@@ -482,13 +482,23 @@ xfs_buf_item_committed(
 
 /*
  * This is called when the transaction holding the buffer is aborted.
- * The buffer must not have been dirtied within this transaction.  Just
- * behave as if the transaction had been cancelled.
+ * Just behave as if the transaction had been cancelled. If we're shutting down
+ * and have aborted this transaction, we'll trap this buffer when it tries to
+ * get written out.
  */
 void
 xfs_buf_item_abort(
 	xfs_buf_log_item_t	*bip)
 {
+/* XXXsup - we should be doing this I believe, or we'll end up brelse'ing
+   B_STALE|B_DELWRI bufs. */
+#if 0
+	buf_t 	*bp;
+
+	bp = bip->bli_buf;
+	bp->b_flags &= ~(B_DELWRI|B_DONE);
+	bp->b_flags |= B_STALE;
+#endif	
 	xfs_buf_item_unlock(bip);
 	return;
 }
@@ -558,6 +568,10 @@ xfs_buf_item_init(
 	 * the first.  If we do already have one, there is
 	 * nothing to do here so return.
 	 */
+	if (bp->b_fsprivate3 != mp)
+		bp->b_fsprivate3 = mp;
+	if (bp->b_bdstrat == NULL)
+		bp->b_bdstrat = xfs_bdstrat_cb;
 	if (bp->b_fsprivate != NULL) {
 		lip = (xfs_log_item_t *)bp->b_fsprivate;
 		if (lip->li_type == XFS_LI_BUF) {
@@ -1150,7 +1164,7 @@ xfs_buf_do_callbacks(
 		lip = nlip;
 	}
 }
-	
+		       
 /*
  * This is the iodone() function for buffers which have had callbacks
  * attached to them by xfs_buf_attach_iodone().  It should remove each
@@ -1165,7 +1179,8 @@ xfs_buf_iodone_callbacks(
 	xfs_log_item_t	*lip;
 	static time_t	lasttime;
 	static dev_t	lastdev;
-	
+	xfs_mount_t	*mp;
+
 	ASSERT(bp->b_fsprivate != NULL);
 	lip = (xfs_log_item_t *)bp->b_fsprivate;
 
@@ -1175,8 +1190,9 @@ xfs_buf_iodone_callbacks(
 		 * because of IO errors, there's no point in giving this
 		 * a retry.
 		 */ 
-		if (XFS_FORCED_SHUTDOWN(lip->li_mountp)) {
-			ASSERT(bp->b_edev == lip->li_mountp->m_dev);
+		mp = lip->li_mountp;
+		if (XFS_FORCED_SHUTDOWN(mp)) {
+			ASSERT(bp->b_edev == mp->m_dev);
 			bp->b_flags |= B_STALE;
 			bp->b_flags &= ~(B_DONE|B_DELWRI);
 #ifndef SIM
@@ -1202,16 +1218,12 @@ xfs_buf_iodone_callbacks(
 			
 			return;
 		}
-#ifdef XFSERRORDEBUG
-		printf("Error bp 0x%x, flags 0x%x, mp 0x%x\n",
-		       bp, bp->b_flags, 
-		       lip->li_mountp);
-#endif
+
 		if ((bp->b_edev != lastdev) || ((lbolt - lasttime) > 500)) {
 			prdev("XFS write error in file system meta-data "
 			      "block 0x%x in %s",
 			      (int)bp->b_edev, bp->b_blkno, 
-			      lip->li_mountp->m_fsname);
+			      mp->m_fsname);
 			lasttime = lbolt;
 		}
 		lastdev = bp->b_edev;
@@ -1221,13 +1233,21 @@ xfs_buf_iodone_callbacks(
 			 * If the write was asynchronous then noone will be
 			 * looking for the error.  Clear the error state
 			 * and write the buffer out again delayed write.
+			 *
+			 * XXXsup This is OK, so long as we catch these
+			 * before we start the umount; we don't want these
+			 * DELWRI metadata bufs to be hanging around.
 			 */
 			bp->b_error = 0;
-			bp->b_flags &= ~B_ERROR;
+			bp->b_flags &= ~(B_ERROR);
 			if (!(bp->b_flags & B_STALE)) {
 				bp->b_flags |= B_DELWRI | B_DONE;
 				bp->b_start = lbolt;
 			}
+			ASSERT(bp->b_iodone);
+#ifndef SIM
+			buftrace("BUF_IODONE ASYNC", bp);
+#endif
 			brelse(bp);
 		} else {
 			/*
@@ -1241,14 +1261,18 @@ xfs_buf_iodone_callbacks(
 			 * set the buffer to be written out again after
 			 * some delay.
 			 */
-			ASSERT(bp->b_relse == NULL);
+			/* We actually overwrite the existing b-relse
+			   function at times, but we're gonna be shutting down
+			   anyway. */
 			bp->b_relse = xfs_buf_error_relse;
 			bp->b_flags |= B_DONE;
 			vsema(&bp->b_iodonesema);
 		}
 		return;
 	}
-
+#ifdef XFSERRORDEBUG
+	buftrace("XFS BUFCB NOERR", bp);
+#endif
 	xfs_buf_do_callbacks(bp, lip);
 	bp->b_fsprivate = NULL;
 	bp->b_iodone = NULL;
@@ -1264,10 +1288,11 @@ xfs_buf_error_relse(
 	buf_t	*bp)
 {
 	xfs_log_item_t 	*lip;
+	xfs_mount_t	*mp;
 
 	lip = (xfs_log_item_t *)bp->b_fsprivate;
-
-	ASSERT(bp->b_edev == lip->li_mountp->m_dev);
+	mp = (xfs_mount_t *)lip->li_mountp;
+	ASSERT(bp->b_edev == mp->m_dev);
 
 	bp->b_flags |= B_STALE|B_DONE;
 	bp->b_flags &= ~(B_DELWRI|B_ERROR);
@@ -1275,12 +1300,15 @@ xfs_buf_error_relse(
 #ifndef SIM
 	buftrace("BUF_ERROR_RELSE", bp);
 #endif
+	if (! XFS_FORCED_SHUTDOWN(mp)) 		
+		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	/*
 	 * We have to unpin the pinned buffers so do the
 	 * callbacks.
 	 */
 	xfs_buf_do_callbacks(bp, lip);
 	bp->b_fsprivate = NULL;
+	bp->b_iodone = NULL;
 	bp->b_relse = NULL;
 	brelse(bp);
 	return;
@@ -1307,16 +1335,14 @@ xfs_buf_iodone(
 	ASSERT(bip->bli_buf == bp);
 
 	mp = bip->bli_item.li_mountp;
-#ifdef XFSERRORDEBUG
-	if (!(((xfs_log_item_t *)bip)->li_flags & XFS_LI_IN_AIL)) {
-		printf("Not in AIL, bip 0x%x\n", bip);
-	}
-#endif
+
 	/*
 	 * If we are forcibly shutting down, this may well be
 	 * off the AIL already. That's because we simulate the
-	 * log-committed callbacks to unpin these buffers.
-	 * xfs_trans_delete_ail() checks for that.
+	 * log-committed callbacks to unpin these buffers. Or we may never
+	 * have put this item on AIL because of the transaction was
+	 * aborted forcibly. xfs_trans_delete_ail() takes care of these.
+	 *
 	 * Either way, AIL is useless if we're forcing a shutdown.
 	 */
 	AIL_LOCK(mp,s);
