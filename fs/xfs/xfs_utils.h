@@ -79,5 +79,27 @@ xfs_bump_ino_vers2(
 	struct xfs_trans	*tp,
 	struct xfs_inode	*ip);
 
+#if defined(DEBUG) || defined(INDUCE_IO_ERROR)
+extern int
+xfs_get_fsinfo(
+	int		fd,
+	char		**fsname,
+	int64_t		*fsid);
+#endif
+
+extern int
+xfs_mk_sharedro(
+	int		fd);
+
+extern int
+xfs_clear_sharedro(
+	int		fd);
+
+#ifdef DEBUG
+extern int
+xfs_isshutdown(
+	struct bhv_desc	*bhv);
+#endif
+
 #endif /* XFS_UTILS_H */
 
