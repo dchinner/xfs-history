@@ -839,7 +839,7 @@ extern void	vn_rele(struct vnode *);
 
 static __inline__ void vn_flagset(struct vnode *vp, uint flag)
 {
-	long flags;
+	unsigned long flags;
 	spin_lock_irqsave(&vp->v_lock, flags);
 	vp->v_flag |= flag;
 	spin_unlock_irqrestore(&vp->v_lock, flags);
@@ -847,7 +847,7 @@ static __inline__ void vn_flagset(struct vnode *vp, uint flag)
 
 static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 {
-	long flags;
+	unsigned long flags;
 	spin_lock_irqsave(&vp->v_lock, flags);
 	vp->v_flag &= ~flag;
 	spin_unlock_irqrestore(&vp->v_lock, flags);
