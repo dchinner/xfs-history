@@ -121,10 +121,6 @@
 #include <xfs_dmapi.h>
 #include <xfs_grio.h>
 
-#if defined(XFSDEBUG) && defined(CONFIG_KDB)
-#include <asm/kdb.h>
-#endif
-
 #include <linux/xfs_lrw.h>
 #include <linux/xfs_super.h>
 #include <linux/xfs_globals.h>

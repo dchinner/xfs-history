@@ -34,6 +34,7 @@
 
 
 #if defined(XFSDEBUG) && defined(CONFIG_KDB)
+#include <asm/kdb.h>
 
 #undef xfs_buftrace
 #define xfs_buftrace(A,B) \
