@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.86 $"
+#ident	"$Revision$"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2213,8 +2213,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	 */
 
 	if ((*((__uint16_t *)(bp->b_un.b_addr)) == XFS_DINODE_MAGIC) &&
-		bp->b_bcount != MAX(log->l_mp->m_sb.sb_blocksize,
-					XFS_INODE_CLUSTER_SIZE))  { 
+	    (bp->b_bcount != MAX(log->l_mp->m_sb.sb_blocksize,
+				 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
 		bp->b_flags |= B_STALE;
 		bwrite(bp);
 	} else {
