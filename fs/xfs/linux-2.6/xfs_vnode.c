@@ -150,11 +150,10 @@ vn_initialize(vfs_t *vfsp, struct inode *inode)
 	spinlock_init(&vp->v_lock, "v_lock");
 
 	spin_lock(&vnumber_lock);
-	vn_generation += 1;
+	if (!++vn_generation)	/* v_number shouldn't be zero */
+		vn_generation++;
 	vp->v_number = vn_generation;
 	spin_unlock(&vnumber_lock);
-
-	ASSERT(vp->v_number);
 
 	ASSERT(VN_CACHED(vp) == 0);
 
