@@ -3178,21 +3178,41 @@ STATIC int
 xfs_reclaim(vnode_t	*vp,
 	    int		flag)
 {
-	xfs_inode_t	*ip;
+	xfs_inode_t		*ip;
+	xfs_mount_t		*mp;
 
 	ASSERT(!VN_MAPPED(vp));
 	ip = XFS_VTOI(vp);
 
-/*
-	This part of the EFS code needs to be ported once
-	we have a page cache and file I/O.
-
-	if (ip->i_flags & IINCORE && ip->i_numextents > 0) {
-		struct extent *ex = &ip->i_extents[ip->i_numextents - 1];
-		pflushinvalvp(vp, 0, BBTOB(ex->ex_offset+ex->ex_length));
+	/*
+	 * Flush and invalidate any data left around that is
+	 * a part of this file.
+	 * XXXajs - Is this enough of a test?
+	 */
+	if (ip->i_d.di_size > 0) {
+		/*
+		 * Get the inode's i/o lock so that buffers are pushed
+		 * out while holding the proper lock.  We can't hold
+		 * the inode lock here since flushing out buffers may
+		 * cause us to try to get the lock in xfs_strategy().
+		 */
+	 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
+		mp = ip->i_mount;
+		pflushinvalvp(vp, 0,
+			      (ip->i_d.di_size + (1 << mp->m_writeio_log)));
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 	}
-*/
+
 	dnlc_purge_vp(vp);
+	/*
+	 * If the inode is still dirty, then flush it out synchronously.
+	 */
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	if (ip->i_update_core || (ip->i_item.ili_format.ilf_fields != 0)) {
+		xfs_iflock(ip);
+		xfs_iflush(ip, 0);
+	}
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	ASSERT(ip->i_update_core == 0);
 	ASSERT(ip->i_item.ili_format.ilf_fields == 0);
 	xfs_ireclaim(ip);
