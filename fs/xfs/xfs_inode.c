@@ -1,4 +1,4 @@
-#ident "$Revision: 1.232 $"
+#ident "$Revision: 1.233 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -241,6 +241,7 @@ xfs_inotobp(
 	xfs_dinode_t	**dipp,
 	buf_t		**bpp)
 {
+	int		di_ok;
 	xfs_imap_t	imap;
 	buf_t		*bp;
 	dev_t		dev;
@@ -279,11 +280,13 @@ xfs_inotobp(
 		return error;
 	}
 	dip = (xfs_dinode_t *)(bp->b_un.b_addr);
-	if ((dip->di_core.di_magic != XFS_DINODE_MAGIC) ||
-	    !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
-		bp->b_flags |= B_ERROR;
+	di_ok =
+		dip->di_core.di_magic == XFS_DINODE_MAGIC &&
+		XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
+	if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
+			XFS_RANDOM_ITOBP_INOTOBP)) {
 		xfs_trans_brelse(tp, bp);
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	xfs_inobp_check(mp, bp);
@@ -328,6 +331,7 @@ xfs_itobp(
 {
 	buf_t		*bp;
 	dev_t		dev;
+	int		di_ok;
 	xfs_dinode_t	*dip;
 	int		error;
 	int		i;
@@ -397,13 +401,15 @@ xfs_itobp(
 	for (i = 0; i < ni; i++) {
 		 dip = (xfs_dinode_t *)(bp->b_un.b_addr +
 					(i << mp->m_sb.sb_inodelog));
-		 if (dip->di_core.di_magic != XFS_DINODE_MAGIC ||
-		     !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
+		 di_ok =
+			 dip->di_core.di_magic == XFS_DINODE_MAGIC &&
+			 XFS_DINODE_GOOD_VERSION(dip->di_core.di_version);
+		 if (XFS_TEST_ERROR(!di_ok, mp, XFS_ERRTAG_ITOBP_INOTOBP,
+				 XFS_RANDOM_ITOBP_INOTOBP)) {
 #ifdef DEBUG
 			prdev("bad inode magic/vsn daddr 0x%x #%d", (int)dev,
 			      imap.im_blkno, i);
 #endif
-			bp->b_flags |= B_ERROR;
 			xfs_trans_brelse(tp, bp);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
@@ -449,18 +455,18 @@ xfs_iformat(
 	if (dip->di_core.di_nextents + dip->di_core.di_anextents >
 	    dip->di_core.di_nblocks) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-			"corrupt dinode %lld, extent total = %d, nblocks = %ld.  Unmount and run xfs_repair.",
+			"corrupt dinode %llu, extent total = %d, nblocks = %lld.  Unmount and run xfs_repair.",
 			ip->i_ino,
 			dip->di_core.di_nextents + dip->di_core.di_anextents,
 			dip->di_core.di_nblocks);
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	if (dip->di_core.di_forkoff > ip->i_mount->m_sb.sb_inodesize) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-			"corrupt dinode %lld, forkoff = 0x%x.  Unmount and run xfs_repair.",
+			"corrupt dinode %llu, forkoff = 0x%x.  Unmount and run xfs_repair.",
 			ip->i_ino, dip->di_core.di_forkoff);
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	switch (ip->i_d.di_mode & IFMT) {
@@ -469,7 +475,7 @@ xfs_iformat(
 	case IFBLK:
 	case IFSOCK:
 		if (dip->di_core.di_format != XFS_DINODE_FMT_DEV)
-			return XFS_ERROR(EINVAL);
+			return XFS_ERROR(EFSCORRUPTED);
 		ip->i_d.di_size = 0;
 		ip->i_df.if_u2.if_rdev = dip->di_u.di_dev;
 		break;
@@ -484,16 +490,16 @@ xfs_iformat(
 			 */
 			if ((dip->di_core.di_mode & IFMT) == IFREG) {
 				xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-					"corrupt inode (local format for regular file) %lld.  Unmount and run xfs_repair.",
+					"corrupt inode (local format for regular file) %llu.  Unmount and run xfs_repair.",
 					ip->i_ino);
-				return XFS_ERROR(EINVAL);
+				return XFS_ERROR(EFSCORRUPTED);
 			}
 			if (dip->di_core.di_size >
 			    XFS_DFORK_DSIZE(dip, ip->i_mount)) {
 				xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-					"corrupt inode %lld (bad size %lld for local inode).  Unmount and run xfs_repair.",
+					"corrupt inode %llu (bad size %lld for local inode).  Unmount and run xfs_repair.",
 					ip->i_ino, dip->di_core.di_size);
-				return XFS_ERROR(EIO);
+				return XFS_ERROR(EFSCORRUPTED);
 			}
 			size = (int)dip->di_core.di_size;
 			error = xfs_iformat_local(ip, dip, XFS_DATA_FORK, size);
@@ -505,16 +511,15 @@ xfs_iformat(
 			error = xfs_iformat_btree(ip, dip, XFS_DATA_FORK);
 			break;
 		default:
-			return XFS_ERROR(EINVAL);
+			return XFS_ERROR(EFSCORRUPTED);
 		}
 		break;
 
 	default:
-		return XFS_ERROR(EINVAL);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
-	if (error) {
-		return XFS_ERROR(error);
-	}
+	if (error)
+		return error;
 	if (!XFS_DFORK_Q(dip))
 		return 0;
 	ASSERT(ip->i_afp == NULL);
@@ -534,7 +539,8 @@ xfs_iformat(
 		error = xfs_iformat_btree(ip, dip, XFS_ATTR_FORK);
 		break;
 	default:
-		error = XFS_ERROR(EINVAL);
+		error = XFS_ERROR(EFSCORRUPTED);
+		break;
 	}
 	if (error) {
 		kmem_zone_free(xfs_ifork_zone, ip->i_afp);
@@ -571,10 +577,10 @@ xfs_iformat_local(
 	 */
 	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-			"corrupt inode %lld (bad size %d for local fork, size = %d).  Unmount and run xfs_repair.",
+			"corrupt inode %llu (bad size %d for local fork, size = %d).  Unmount and run xfs_repair.",
 			ip->i_ino, size,
 			XFS_DFORK_SIZE(dip, ip->i_mount, whichfork));
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	real_size = 0;
@@ -626,9 +632,9 @@ xfs_iformat_extents(
 	 */
 	if (size > XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-			"corrupt inode %lld ((a)extents = %d).  Unmount and run xfs_repair.",
+			"corrupt inode %llu ((a)extents = %d).  Unmount and run xfs_repair.",
 			ip->i_ino, nex);
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	real_size = 0;
@@ -637,12 +643,8 @@ xfs_iformat_extents(
 	else if (nex <= XFS_INLINE_EXTS)
 		ifp->if_u1.if_extents = ifp->if_u2.if_inline_ext;
 	else {
-		if ((ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP)) == 0) {
-			xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-"couldn't allocate memory to read inode %lld ext list.",
-				ip->i_ino);
-			return XFS_ERROR(EIO);
-		}
+		ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
+		ASSERT(ifp->if_u1.if_extents != NULL);
 		real_size = size;
 	}
 	ifp->if_bytes = size;
@@ -697,14 +699,14 @@ xfs_iformat_btree(
 			XFS_DFORK_SIZE(dip, ip->i_mount, whichfork)
 	    || XFS_IFORK_NEXTENTS(ip, whichfork) > ip->i_d.di_nblocks) {
 		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-			"corrupt inode %lld (btree).  Unmount and run xfs_repair.",
+			"corrupt inode %llu (btree).  Unmount and run xfs_repair.",
 			ip->i_ino);
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
 
 	ifp->if_broot_bytes = size;
-	if ((ifp->if_broot = kmem_alloc(size, KM_SLEEP)) == 0)
-		return XFS_ERROR(EIO);
+	ifp->if_broot = kmem_alloc(size, KM_SLEEP);
+	ASSERT(ifp->if_broot != NULL);
 	/*
 	 * Copy and convert from the on-disk structure
 	 * to the in-memory structure.
@@ -896,18 +898,14 @@ xfs_iread_extents(
 	size_t		size;
 
 	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	size = XFS_IFORK_NEXTENTS(ip, whichfork) * sizeof(xfs_bmbt_rec_t);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	/*
 	 * We know that the size is legal (it's checked in iformat_btree)
 	 */
-	if ((ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP)) == 0) {
-		xfs_fs_cmn_err(CE_WARN, ip->i_mount,
-"cannot read in inode %lld btree.  Couldn't allocate kernel virtual memory for extents.",
-			ip->i_ino);
-		return XFS_ERROR(EIO);
-	}
+	ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
+	ASSERT(ifp->if_u1.if_extents != NULL);
 	ifp->if_lastex = NULLEXTNUM;
 	ifp->if_bytes = ifp->if_real_bytes = size;
 	ifp->if_flags |= XFS_IFEXTENTS;
@@ -1022,7 +1020,7 @@ xfs_ialloc(
 	    ip->i_d.di_version == XFS_DINODE_VERSION_1) {
 		ip->i_d.di_version = XFS_DINODE_VERSION_2;
 		/*
-		 * We've alredy zeroed the old link count, the projid field,
+		 * We've already zeroed the old link count, the projid field,
 		 * and the pad field.
 		 */
 	}
@@ -1568,7 +1566,7 @@ xfs_itruncate_finish(
 		ntp = *tp;
 		if (error) {
 			/*
-			 * If the bmap finish  call encounters an error,
+			 * If the bmap finish call encounters an error,
 			 * return to the caller where the transaction
 			 * can be properly aborted.  We just need to
 			 * make sure we're not holding any resources
@@ -1740,6 +1738,7 @@ xfs_iunlink(
 	short		bucket_index;
 	int		offset;
 	int		error;
+	int		agi_ok;
 	
 	ASSERT(ip->i_d.di_nlink == 0);
 	ASSERT(ip->i_d.di_mode != 0);
@@ -1761,14 +1760,14 @@ xfs_iunlink(
 	 * Validate the magic number of the agi block.
 	 */
 	agi = XFS_BUF_TO_AGI(agibp);
-	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
-	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
-		agibp->b_flags |= B_ERROR;
+	agi_ok =
+		agi->agi_magicnum == XFS_AGI_MAGIC &&
+		XFS_AGI_GOOD_VERSION(agi->agi_versionnum);
+	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IUNLINK,
+			XFS_RANDOM_IUNLINK)) {
 		xfs_trans_brelse(tp, agibp);
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
-	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
-
 	/*
 	 * Get the index into the agi hash table for the
 	 * list this inode will go on.
@@ -1837,6 +1836,7 @@ xfs_iunlink_remove(
 	short		bucket_index;
 	int		offset;
 	int		error;
+	int		agi_ok;
 
 	/*
 	 * First pull the on-disk inode from the AGI unlinked list.
@@ -1857,14 +1857,14 @@ xfs_iunlink_remove(
 	 * Validate the magic number of the agi block.
 	 */
 	agi = XFS_BUF_TO_AGI(agibp);
-	if ((agi->agi_magicnum != XFS_AGI_MAGIC) ||
-	    !XFS_AGI_GOOD_VERSION(agi->agi_versionnum)) {
-		agibp->b_flags |= B_ERROR;
+	agi_ok =
+		agi->agi_magicnum == XFS_AGI_MAGIC &&
+		XFS_AGI_GOOD_VERSION(agi->agi_versionnum);
+	if (XFS_TEST_ERROR(!agi_ok, mp, XFS_ERRTAG_IUNLINK_REMOVE,
+			XFS_RANDOM_IUNLINK_REMOVE)) {
 		xfs_trans_brelse(tp, agibp);
-		return XFS_ERROR(EIO);
+		return XFS_ERROR(EFSCORRUPTED);
 	}
-	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
-
 	/*
 	 * Get the index into the agi hash table for the
 	 * list this inode will go on.
@@ -2614,6 +2614,9 @@ xfs_iextents_copy(
 	int			copied;
 	xfs_bmbt_rec_32_t	*dest_ep;
 	xfs_bmbt_rec_t		*ep;
+#ifdef XFS_BMAP_TRACE
+	static char		fname[] = "xfs_iextents_copy";
+#endif
 	int			i;
 	xfs_ifork_t		*ifp;
 	int			nrecs;
@@ -2624,7 +2627,7 @@ xfs_iextents_copy(
 	ASSERT(ifp->if_bytes > 0);
 
 	nrecs = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
-	xfs_bmap_trace_exlist("xfs_extents_copy", ip, nrecs, whichfork);
+	xfs_bmap_trace_exlist(fname, ip, nrecs, whichfork);
 	ASSERT(nrecs > 0);
 	if (nrecs == XFS_IFORK_NEXTENTS(ip, whichfork)) {
 		/*
@@ -2709,6 +2712,14 @@ xfs_iflush_fork(
 	if (iip == NULL)
 		return 0;
 	ifp = XFS_IFORK_PTR(ip, whichfork);
+	/*
+	 * This can happen if we gave up in iformat in an error path,
+	 * for the attribute fork.
+	 */
+	if (ifp == NULL) {
+		ASSERT(whichfork == XFS_ATTR_FORK);
+		return 0;
+	}
 	cp = XFS_DFORK_PTR(dip, whichfork);
 	mp = ip->i_mount;
 	switch (XFS_IFORK_FORMAT(ip, whichfork)) {
@@ -2726,7 +2737,7 @@ xfs_iflush_fork(
 		}
 		if (whichfork == XFS_DATA_FORK) {
 			if (xfs_dir_shortform_validate_ondisk(mp, dip)) {
-				return EIO;
+				return XFS_ERROR(EFSCORRUPTED);
 			}
 		}
 		break;
@@ -2878,7 +2889,7 @@ xfs_iflush(
 	error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
 	if (error != 0) {
 		xfs_ifunlock(ip);
-		return XFS_ERROR(error);
+		return error;
 	}
 
 	/*
@@ -2897,16 +2908,16 @@ xfs_iflush(
 	SYNCHRONIZE();
 
 	if (XFS_TEST_ERROR(dip->di_core.di_magic != XFS_DINODE_MAGIC,
-				mp, XFS_ERRTAG_IFLUSH_1)) {
+				mp, XFS_ERRTAG_IFLUSH_1, XFS_RANDOM_IFLUSH_1)) {
 		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
-		    "xfs_iflush: Bad dinode %lld magic number 0x%x, ptr 0x%p",
+		    "xfs_iflush: Bad inode %llu magic number 0x%x, ptr 0x%p",
 			ip->i_ino, (int) dip->di_core.di_magic, dip);
 		goto corrupt_out;
 	}
 	if (XFS_TEST_ERROR(ip->i_d.di_magic != XFS_DINODE_MAGIC,
-				mp, XFS_ERRTAG_IFLUSH_2)) {
+				mp, XFS_ERRTAG_IFLUSH_2, XFS_RANDOM_IFLUSH_2)) {
 		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
-			"xfs_iflush: Bad inode %lld, ptr 0x%p, magic number 0x%x",
+			"xfs_iflush: Bad inode %llu, ptr 0x%p, magic number 0x%x",
 			ip->i_ino, ip, ip->i_d.di_magic);
 		goto corrupt_out;
 	}
@@ -2914,9 +2925,9 @@ xfs_iflush(
 		if (XFS_TEST_ERROR(
 		    (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE),
-		    mp, XFS_ERRTAG_IFLUSH_3)) {
+		    mp, XFS_ERRTAG_IFLUSH_3, XFS_RANDOM_IFLUSH_3)) {
 			xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
-				"xfs_iflush: Bad regular inode %lld, ptr 0x%p",
+				"xfs_iflush: Bad regular inode %llu, ptr 0x%p",
 				ip->i_ino, ip);
 			goto corrupt_out;
 		}
@@ -2925,17 +2936,18 @@ xfs_iflush(
 		    (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (ip->i_d.di_format != XFS_DINODE_FMT_BTREE) &&
 		    (ip->i_d.di_format != XFS_DINODE_FMT_LOCAL),
-		    mp, XFS_ERRTAG_IFLUSH_4)) {
+		    mp, XFS_ERRTAG_IFLUSH_4, XFS_RANDOM_IFLUSH_4)) {
 			xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
-				"xfs_iflush: Bad directory inode %lld, ptr 0x%p",
+				"xfs_iflush: Bad directory inode %llu, ptr 0x%p",
 				ip->i_ino, ip);
 			goto corrupt_out;
 		}
 	}
 	if (XFS_TEST_ERROR(ip->i_d.di_nextents + ip->i_d.di_anextents >
-				ip->i_d.di_nblocks, mp, XFS_ERRTAG_IFLUSH_5)) {
+				ip->i_d.di_nblocks, mp, XFS_ERRTAG_IFLUSH_5,
+				XFS_RANDOM_IFLUSH_5)) {
 		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
-			"xfs_iflush: detected corrupt incore inode %lld, total extents = %d, nblocks = %ld, ptr 0x%p",
+			"xfs_iflush: detected corrupt incore inode %llu, total extents = %d, nblocks = %ld, ptr 0x%p",
 			ip->i_ino,
 			ip->i_d.di_nextents + ip->i_d.di_anextents,
 			ip->i_d.di_nblocks,
@@ -2943,9 +2955,9 @@ xfs_iflush(
 		goto corrupt_out;
 	}
 	if (XFS_TEST_ERROR(ip->i_d.di_forkoff > mp->m_sb.sb_inodesize,
-				mp, XFS_ERRTAG_IFLUSH_6)) {
+				mp, XFS_ERRTAG_IFLUSH_6, XFS_RANDOM_IFLUSH_6)) {
 		xfs_cmn_err(XFS_PTAG_IFLUSH, CE_ALERT, mp,
-			"xfs_iflush: bad inode %lld, forkoff 0x%x, ptr 0x%p",
+			"xfs_iflush: bad inode %llu, forkoff 0x%x, ptr 0x%p",
 			ip->i_ino, ip->i_d.di_forkoff, ip);
 		goto corrupt_out;
 	}
@@ -3129,7 +3141,7 @@ xfs_iflush(
 	}
 #endif /* SIM */
 
-	return XFS_ERROR(error);
+	return error;
 
 corrupt_out:
 	brelse(bp);
