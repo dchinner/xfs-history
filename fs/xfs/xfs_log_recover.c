@@ -2864,8 +2864,21 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	int		bucket;
 	int		error;
 	xfs_ino_t	last_ino;
+#if CONFIG_XFS_DMAPI
+	uint		mp_dmevmask;
+#endif /* CONFIG_XFS_DMAPI */
 
 	mp = log->l_mp;
+
+#if CONFIG_XFS_DMAPI
+	/*
+	 * Prevent any DMAPI event from being while in this function.
+	 * Not a problem for xfs since the file system isn't mounted
+	 * yet.  It is a problem for cxfs.
+	 */
+	mp_dmevmask = mp->m_dmevmask;
+	mp->m_dmevmask = 0;
+#endif /* CONFIG_XFS_DMAPI */
 
 	last_ino = 0;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
@@ -2898,6 +2911,16 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 
 			ino = XFS_AGINO_TO_INO(mp, agno, agino);
 			error = xfs_iget(mp, NULL, ino, 0, &ip, 0);
+
+#ifdef CONFIG_XFS_DMAPI
+			/*
+			 * Prevent any DMAPI event from being sent when
+			 * the reference on the inode is dropped.  Not
+			 * a problem for xfs since the file system isn't
+			 * mounted yet.  It is a problem for cxfs.
+			 */
+			ip->i_d.di_dmevmask = 0;
+#endif /* CONFIG_XFS_DMAPI */
 
 			/*
 			 * This inode is messed up.  Just
@@ -2955,6 +2978,11 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		 */
 		xfs_buf_relse(agibp);
 	}
+
+#ifdef CONFIG_XFS_DMAPI
+	mp->m_dmevmask = mp_dmevmask;
+#endif /* CONFIG_XFS_DMAPI */
+
 }	/* xlog_recover_process_iunlinks */
 
 
