@@ -93,7 +93,7 @@ xfs_bulkstat_one(
 	xfs_dinode_t	*dip;		/* dinode inode pointer */
 	xfs_dinode_core_t *dic;		/* dinode core info pointer */
 	xfs_inode_t	*ip = NULL;	/* incore inode pointer */
-        xfs_arch_t  arch;           /* these are set according to      */
+        xfs_arch_t      arch;           /* these are set according to      */
         __uint16_t      di_flags;       /* temp */
 
 	buf = (xfs_bstat_t *)buffer;
@@ -122,7 +122,7 @@ xfs_bulkstat_one(
 			return XFS_ERROR(ENOENT);
 		}
 		dic = &ip->i_d;
-                arch=XFS_ARCH_NATIVE; /* in-core dinode_core is NATIVE */
+                arch=ARCH_NOCONVERT; /* in-core! */
 		ASSERT(dic != NULL);
 
 		/* xfs_iget returns the following without needing

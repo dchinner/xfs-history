@@ -806,13 +806,13 @@ xfs_xlate_dinode_core(caddr_t buf, xfs_dinode_core_t *dip,
     if (dir<0) {
         src=(xfs_dinode_core_t*)dip;
         dst=(xfs_dinode_core_t*)buf;   
-        src_arch=XFS_ARCH_NATIVE;
+        src_arch=ARCH_NOCONVERT;
         dst_arch=arch;         
     } else {
         src=(xfs_dinode_core_t*)buf;               
         dst=(xfs_dinode_core_t*)dip;
         src_arch=arch;
-        dst_arch=XFS_ARCH_NATIVE;         
+        dst_arch=ARCH_NOCONVERT;         
     }
     
     if (src_arch == dst_arch) {

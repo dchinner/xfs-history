@@ -345,11 +345,11 @@ xfs_xlatesb(xfs_buf_t *buf, xfs_sb_t *sb, int dir, xfs_arch_t arch,
         src=XFS_BUF_PTR(buf);
         dst=(caddr_t)sb;
         src_arch=arch;
-        dst_arch=XFS_ARCH_NATIVE;  
+        dst_arch=ARCH_NOCONVERT;  
     } else {
         src=(caddr_t)sb;
         dst=XFS_BUF_PTR(buf);
-        src_arch=XFS_ARCH_NATIVE;
+        src_arch=ARCH_NOCONVERT;
         dst_arch=arch;  
     }
     

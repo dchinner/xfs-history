@@ -35,15 +35,16 @@
 
 #ident "$Id$"
 
+/* includes */
+
+#include <asm/byteorder.h>
+#include <linux/autoconf.h>
+
 /* supported architecures */
   
 #define ARCH_MIPS	0
 #define ARCH_INTEL_IA32	1
-
-/* possible future architectures */
-
-#define ARCH_INTEL_IA64	2
-#define ARCH_ALPHA	3
+#define ARCH_UNKNOWN    127
 
 /*
  * exactly one of these three options should be enabled:
@@ -55,19 +56,46 @@
  *  #ifdef CONFIG_XFS_ARCH_MULTI
  *     - support other architectures
  */
- 
-#include <linux/autoconf.h>
+
+/* ugly hack for development purposes */
+
+#ifdef OVERRIDE_ARCH_INTEL
+#error define OVERRIDE_ARCH_NATIVE not OVERRIDE_ARCH_INTEL
+#endif
+
+#if defined(OVERRIDE_ARCH_MIPS) || defined(OVERRIDE_ARCH_MULTI) || \
+    defined(OVERRIDE_ARCH_NATIVE)
+    
+#undef CONFIG_XFS_ARCH_MIPS
+#undef CONFIG_XFS_ARCH_MULTI
+#undef CONFIG_XFS_ARCH_NATIVE
+
+#ifdef OVERRIDE_ARCH_MIPS
+#define CONFIG_XFS_ARCH_MIPS
+#endif
+
+#ifdef OVERRIDE_ARCH_MULTI
+#define CONFIG_XFS_ARCH_MULTI
+#endif
+
+#ifdef OVERRIDE_ARCH_NATIVE
+#define CONFIG_XFS_ARCH_NATIVE
+#endif
+
+#else
+
+#ifdef CONFIG_XFS_ARCH_MULTI
+#error xfs architecture mode "multi" not currently supported
+#endif
+
+#endif
 
 /* select native architecture */
   
 #ifdef CONFIG_X86
-#define XFS_ARCH_NATIVE ARCH_INTEL_IA32
+#define ARCH_NOCONVERT ARCH_INTEL_IA32
 #else
 #error support for XFS on non X86 architectures not yet implemented
-#endif
-
-#ifdef CONFIG_XFS_ARCH_MULTI
-#error xfs architecture mode "multi" not currently supported
 #endif
 
 /* check for multiple defines */
@@ -99,18 +127,47 @@
 #endif
 
 #ifdef CONFIG_XFS_ARCH_NATIVE
-#define ARCH_SUPPORTED(A) ((A)==XFS_ARCH_NATIVE)
-#define XFS_ARCH_DEFAULT (XFS_ARCH_NATIVE)
+#define ARCH_SUPPORTED(A) ((A)==ARCH_NOCONVERT)
+#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
 #define XFS_MODE "NATIVE"
 #endif
 
 #ifdef CONFIG_XFS_ARCH_MULTI
 #define ARCH_SUPPORTED(A) ((A)==ARCH_MIPS || (A)==ARCH_INTEL_IA32)
-#define XFS_ARCH_DEFAULT (XFS_ARCH_NATIVE)
+#define XFS_ARCH_DEFAULT (ARCH_NOCONVERT)
 #define XFS_MODE "MULTI"
 #endif
 
-/* generic */
+/* ugly hack for development purposes */
+
+#ifdef OVERRIDE_ARCH_MIPS
+#undef XFS_MODE
+#define XFS_MODE "O-MIPS"
+#endif
+
+#ifdef OVERRIDE_ARCH_MULTI
+#undef XFS_MODE
+#define XFS_MODE "O-MULTI"
+#endif
+
+#ifdef OVERRIDE_ARCH_NATVE
+#undef XFS_MODE
+#define XFS_MODE "O-NATIVE"
+#endif
+
+/* generic swapping macros */
+
+
+#define INT_SWAP16(A) ((typeof(A))(__swab16((__u16)A)))
+#define INT_SWAP32(A) ((typeof(A))(__swab32((__u32)A)))
+#define INT_SWAP64(A) ((typeof(A))(__swab64((__u64)A)))
+
+#define INT_SWAP(type, var) \
+    ((sizeof(type) == 8) ? INT_SWAP64(var) : \
+    ((sizeof(type) == 4) ? INT_SWAP32(var) : \
+    ((sizeof(type) == 2) ? INT_SWAP16(var) : \
+    (var))))
+  
 
 #define INT_SWAP_UNALIGNED_32(from,to) \
     { \
@@ -127,24 +184,34 @@
     }
 
 /* 
- * get a 16/32/64 bit unsigned number from a potentially unaligned address 
- * both little and big endian versions
+ * get and set integers from potentially unaligned locations
  */
         
 #define INT_GET_UNALIGNED_16_LE(pointer) \
    ((__u16)((((__u8*)(pointer))[0]      ) | (((__u8*)(pointer))[1] << 8 )))
+#define INT_GET_UNALIGNED_16_BE(pointer) \
+   ((__u16)((((__u8*)(pointer))[0] << 8) | (((__u8*)(pointer))[1])))
+#define INT_SET_UNALIGNED_16_LE(pointer,value) \
+    { \
+        ((__u8*)(pointer))[0] = (((value)     ) & 0xff); \
+        ((__u8*)(pointer))[1] = (((value) >> 8) & 0xff); \
+    }
+#define INT_SET_UNALIGNED_16_BE(pointer,value) \
+    { \
+        ((__u8*)(pointer))[0] = (((value) >> 8) & 0xff); \
+        ((__u8*)(pointer))[1] = (((value)     ) & 0xff); \
+    }
+   
 #define INT_GET_UNALIGNED_32_LE(pointer) \
    ((__u32)((((__u8*)(pointer))[0]      ) | (((__u8*)(pointer))[1] << 8 ) \
            |(((__u8*)(pointer))[2] << 16) | (((__u8*)(pointer))[3] << 24)))
-#define INT_GET_UNALIGNED_64_LE(pointer) \
-   (((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))+4)) << 32 ) \
-   |((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))  ))       ))
-   
-#define INT_GET_UNALIGNED_16_BE(pointer) \
-   ((__u16)((((__u8*)(pointer))[0] << 8) | (((__u8*)(pointer))[1])))
 #define INT_GET_UNALIGNED_32_BE(pointer) \
    ((__u32)((((__u8*)(pointer))[0] << 24) | (((__u8*)(pointer))[1] << 16) \
            |(((__u8*)(pointer))[2] << 8)  | (((__u8*)(pointer))[3]      )))
+    
+#define INT_GET_UNALIGNED_64_LE(pointer) \
+   (((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))+4)) << 32 ) \
+   |((__u64)(INT_GET_UNALIGNED_32_LE(((__u8*)(pointer))  ))       ))
 #define INT_GET_UNALIGNED_64_BE(pointer) \
    (((__u64)(INT_GET_UNALIGNED_32_BE(((__u8*)(pointer))  )) << 32  ) \
    |((__u64)(INT_GET_UNALIGNED_32_BE(((__u8*)(pointer))+4))        ))
@@ -154,39 +221,15 @@
  */
    
 #ifdef __LITTLE_ENDIAN 
-#define INT_GET_UNALIGNED_16_NATIVE(pointer) INT_GET_UNALIGNED_16_LE(pointer)
-#define INT_GET_UNALIGNED_32_NATIVE(pointer) INT_GET_UNALIGNED_32_LE(pointer)
-#define INT_GET_UNALIGNED_64_NATIVE(pointer) INT_GET_UNALIGNED_64_LE(pointer)
+#define INT_GET_UNALIGNED_16(pointer)       INT_GET_UNALIGNED_16_LE(pointer)
+#define INT_SET_UNALIGNED_16(pointer,value) INT_SET_UNALIGNED_16_LE(pointer,value)
+#define INT_GET_UNALIGNED_32(pointer)       INT_GET_UNALIGNED_32_LE(pointer)
+#define INT_GET_UNALIGNED_64(pointer)       INT_GET_UNALIGNED_64_LE(pointer)
 #else
-#define INT_GET_UNALIGNED_16_NATIVE(pointer) INT_GET_UNALIGNED_16_BE(pointer)
-#define INT_GET_UNALIGNED_32_NATIVE(pointer) INT_GET_UNALIGNED_32_BE(pointer)
-#define INT_GET_UNALIGNED_64_NATIVE(pointer) INT_GET_UNALIGNED_64_BE(pointer)
-#endif
-
-/*
- * put a 16 bit unsigned number to a potentially unaligned address
- * both little and big versions
- */
- 
-#define INT_SET_UNALIGNED_16_BE(pointer,value) \
-    { \
-        ((__u8*)(pointer))[0] = (((value) >> 8) & 0xff); \
-        ((__u8*)(pointer))[1] = (((value)     ) & 0xff); \
-    }
-#define INT_SET_UNALIGNED_16_LE(pointer,value) \
-    { \
-        ((__u8*)(pointer))[0] = (((value)     ) & 0xff); \
-        ((__u8*)(pointer))[1] = (((value) >> 8) & 0xff); \
-    }
- 
-/*
- * now pick the right ones for our MACHINE ARCHITECTURE
- */
-   
-#ifdef __LITTLE_ENDIAN 
-#define INT_SET_UNALIGNED_16_NATIVE(pointer,value) INT_SET_UNALIGNED_16_LE(pointer,value)
-#else
-#define INT_SET_UNALIGNED_16_NATIVE(pointer,value) INT_SET_UNALIGNED_16_BE(pointer,value)
+#define INT_GET_UNALIGNED_16(pointer)       INT_GET_UNALIGNED_16_BE(pointer)
+#define INT_SET_UNALIGNED_16(pointer,value) INT_SET_UNALIGNED_16_BE(pointer,value)
+#define INT_GET_UNALIGNED_32(pointer)       INT_GET_UNALIGNED_32_BE(pointer)
+#define INT_GET_UNALIGNED_64(pointer)       INT_GET_UNALIGNED_64_BE(pointer)
 #endif
 
 /*
@@ -199,11 +242,10 @@
  *                specified architecture(s) require it.
  */
 
-
 #ifdef CONFIG_XFS_ARCH_NATIVE
 
 /*
- *  case 1 - fast path - all macros support NATIVE architecture only
+ *  case 1 - fast path - all macros support NATIVE MACHINE architecture only
  */
 
 #define INT_GET(reference,arch) \
@@ -218,107 +260,51 @@
     ((reference) == 0)
 #define INT_ZERO(reference,arch) \
     ((reference) = 0)
-   
-#define DIRINO4_GET(pointer,arch) \
-    INT_GET_UNALIGNED_32_NATIVE(pointer)
+    
+#define DIRINO4_GET_ARCH(pointer,arch) \
+    (INT_GET_UNALIGNED_32(pointer))
     
 #ifdef XFS_BIG_FILESYSTEMS
-#define DIRINO_GET(pointer,arch) \
-    INT_GET_UNALIGNED_64_NATIVE(pointer)
+#define DIRINO_GET_ARCH(pointer,arch) \
+    INT_GET_UNALIGNED_64(pointer)
 #else
-#define DIRINO_GET(pointer,arch) \
-    DIRINO4_GET(pointer,arch)
+#define DIRINO_GET_ARCH(pointer,arch) \
+    DIRINO4_GET_ARCH(pointer,arch)
 #endif    
 
-#define DIRINO_COPY(from,to,arch) \
+#define DIRINO_COPY_ARCH(from,to,arch) \
     bcopy(from,to,sizeof(xfs_dir_ino_t))
-#define DIRINO4_COPY(from,to,arch) \
+#define DIRINO4_COPY_ARCH(from,to,arch) \
     bcopy(from,to,sizeof(xfs_dir2_ino4_t))
     
-#define INT_GET_UNALIGNED_16(pointer,arch) \
-    INT_GET_UNALIGNED_16_NATIVE(pointer)
-#define INT_SET_UNALIGNED_16(pointer,value,arch) \
-    INT_SET_UNALIGNED_16_NATIVE(pointer,value)
+#define INT_GET_UNALIGNED_16_ARCH(pointer,arch) \
+    INT_GET_UNALIGNED_16(pointer)
+#define INT_SET_UNALIGNED_16_ARCH(pointer,value,arch) \
+    INT_SET_UNALIGNED_16(pointer,value)
 
-#else
-
-/* if we're not NATIVE, we need the INT_SWAP macro */
-
-/* include endian swap macros */
-
-#include <asm/byteorder.h>
-
-#define INT_SWAP16(A) ((typeof(A))(__swab16((__u16)A)))
-#define INT_SWAP32(A) ((typeof(A))(__swab32((__u32)A)))
-#define INT_SWAP64(A) ((typeof(A))(__swab64((__u64)A)))
-
-#define INT_SWAP(type, var) \
-    ((sizeof(type) == 8) ? INT_SWAP64(var) : \
-    ((sizeof(type) == 4) ? INT_SWAP32(var) : \
-    ((sizeof(type) == 2) ? INT_SWAP16(var) : \
-    (var))))
-  
 #endif
 
 /*
  *  case 2 - support only MIPS XFS on X86. 
  *           Therefore we always endian swap and ignore the architectures
- */
-#ifdef CONFIG_XFS_ARCH_MIPS
- 
-#define INT_GET(reference,arch) \
-    INT_SWAP((reference),(reference))
-    
-#define INT_SET(reference,arch,valueref) \
-    ( \
-        ((reference) = (valueref)), \
-        ((reference) = INT_SWAP((reference),(reference))), \
-        (valueref) \
-    )
-#define INT_MOD(reference,arch,delta) \
-    ( \
-        ((reference) = INT_GET((reference),arch)) , \
-        ((reference) += (delta)) , \
-        INT_SET(reference, arch, reference) \
-    )
-#define INT_COPY(srcref,srcarch,dstref,dstarch) \
-    (dstref) = INT_GET(srcref,srcarch)
-#define INT_ISZERO(reference,arch) \
-    ((reference) == 0)
-#define INT_ZERO(reference,arch) \
-    ((reference) = 0)
-        
-#define DIRINO4_GET(pointer,arch) \
-    INT_GET_UNALIGNED_32_BE(pointer)
-    
-#ifdef XFS_BIG_FILESYSTEMS
-#define DIRINO_GET(pointer,arch) \
-    INT_GET_UNALIGNED_64_BE(pointer)
-#else
-#define DIRINO_GET(pointer,arch) \
-    DIRINO4_GET(pointer,arch)
-#endif    
-
-#define DIRINO_COPY(from,to,arch) \
-    INT_SWAP_UNALIGNED_64(from,to)
-#define DIRINO4_COPY(from,to,arch) \
-    INT_SWAP_UNALIGNED_32(from,to)
-    
-#define INT_GET_UNALIGNED_16(pointer,arch) \
-    INT_GET_UNALIGNED_16_BE(pointer)
-#define INT_SET_UNALIGNED_16(pointer,value,arch) \
-    INT_SET_UNALIGNED_16_BE(pointer,value)
- 
-#endif       
-
-/*
+ *
  *   case 3 - support multiple architectures
  *            we have to check architectures and swap accordinly
+ *
+ * assumptions:
+ *   - only two architectures, ARCH_MIPS and ARCH_INTEL_IA32
+ *   - ARCH_NOCONVERT == ARCH_INTEL_IA32
+ *   - ARCH_UNKNOWN implies ARCH_MIPS
+ *
+ * given only two architectures, and since we _must_ check against
+ * ARCH_NOCONVERT in both cases, we can use the same macros here
+ *
  */
-#ifdef CONFIG_XFS_ARCH_MULTI
+ 
+#if defined(CONFIG_XFS_ARCH_MIPS) || defined(CONFIG_XFS_ARCH_MULTI)
  
 #define INT_GET(reference,arch) \
-    (((arch) == XFS_ARCH_NATIVE) \
+    (((arch) == ARCH_NOCONVERT) \
         ? \
             (reference) \
         : \
@@ -329,7 +315,7 @@
     ( \
         ((reference) = (valueref)), \
         ( \
-           ((arch) != XFS_ARCH_NATIVE) ? \
+           ((arch) != ARCH_NOCONVERT) ? \
                (reference) = INT_SWAP((reference),(reference)) \
            : 0 \
         ), \
@@ -337,7 +323,7 @@
     )
 
 #define INT_MOD(reference,arch,delta) \
-    (((arch) == XFS_ARCH_NATIVE) \
+    (((arch) == ARCH_NOCONVERT) \
         ? \
             ((reference) += (delta)) \
         : \
@@ -349,9 +335,9 @@
     )
     
 #define INT_COPY(srcref,srcarch,dstref,dstarch) \
-    if ((dstarch) == XFS_ARCH_NATIVE) { \
+    if ((dstarch) == ARCH_NOCONVERT) { \
         (dstref) = INT_GET(srcref,srcarch); \
-    } else if ((srcarch) == XFS_ARCH_NATIVE) { \
+    } else if ((srcarch) == ARCH_NOCONVERT) { \
         INT_SET(dstref,dstarch,srcref); \
     } else { \
         (dstref) = INT_GET(srcref,srcarch); \
@@ -364,52 +350,52 @@
 #define INT_ZERO(reference,arch) \
     ((reference) = 0)
     
-#define DIRINO4_GET(pointer,arch) \
-    ( ((arch) == ARCH_MIPS) \
+#define DIRINO4_GET_ARCH(pointer,arch) \
+    ( ((arch) == ARCH_NOCONVERT) \
         ? \
-            (INT_GET_UNALIGNED_32_BE(pointer)) \
+            (INT_GET_UNALIGNED_32(pointer)) \
         : \
-            (INT_GET_UNALIGNED_32_LE(pointer)) \
+            (INT_GET_UNALIGNED_32_BE(pointer)) \
     )
     
 #ifdef XFS_BIG_FILESYSTEMS
-#define DIRINO_GET(pointer,arch) \
-    ( ((arch) == ARCH_MIPS) \
+#define DIRINO_GET_ARCH(pointer,arch) \
+    ( ((arch) == ARCH_NOCONVERT) \
         ? \
-            (INT_GET_UNALIGNED_64_BE(pointer)) \
+            (INT_GET_UNALIGNED_64(pointer)) \
         : \
-            (INT_GET_UNALIGNED_64_LE(pointer)) \
+            (INT_GET_UNALIGNED_64_BE(pointer)) \
     )
 #else
-#define DIRINO_GET(pointer,arch) \
-    DIRINO4_GET(pointer,arch)
+#define DIRINO_GET_ARCH(pointer,arch) \
+    DIRINO4_GET_ARCH(pointer,arch)
 #endif    
 
-#define DIRINO_COPY(from,to,arch) \
-    if ((arch) == XFS_ARCH_NATIVE) { \
+#define DIRINO_COPY_ARCH(from,to,arch) \
+    if ((arch) == ARCH_NOCONVERT) { \
         bcopy(from,to,sizeof(xfs_ino_t)); \
     } else { \
         INT_SWAP_UNALIGNED_64(from,to); \
     }
-#define DIRINO4_COPY(from,to,arch) \
-    if ((arch) == XFS_ARCH_NATIVE) { \
+#define DIRINO4_COPY_ARCH(from,to,arch) \
+    if ((arch) == ARCH_NOCONVERT) { \
         bcopy(from,to,sizeof(xfs_dir2_ino4_t)); \
     } else { \
         INT_SWAP_UNALIGNED_32(from,to); \
     }
     
-#define INT_GET_UNALIGNED_16(pointer,arch) \
-    ( ((arch) == ARCH_MIPS) \
+#define INT_GET_UNALIGNED_16_ARCH(pointer,arch) \
+    ( ((arch) == ARCH_NOCONVERT) \
         ? \
-            (INT_GET_UNALIGNED_16_BE(pointer)) \
+            (INT_GET_UNALIGNED_16(pointer)) \
         : \
-            (INT_GET_UNALIGNED_16_LE(pointer)) \
+            (INT_GET_UNALIGNED_16_BE(pointer)) \
     )
-#define INT_SET_UNALIGNED_16(pointer,value,arch) \
-    if ((arch) == ARCH_MIPS) { \
-        INT_SET_UNALIGNED_16_BE(pointer,value); \
+#define INT_SET_UNALIGNED_16_ARCH(pointer,value,arch) \
+    if ((arch) == ARCH_NOCONVERT) { \
+        INT_SET_UNALIGNED_16(pointer,value); \
     } else { \
-        INT_SET_UNALIGNED_16_LE(pointer,value); \
+        INT_SET_UNALIGNED_16_BE(pointer,value); \
     }
 
 #endif
