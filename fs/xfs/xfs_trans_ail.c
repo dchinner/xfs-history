@@ -1,4 +1,4 @@
-#ident "$Revision: 1.32 $"
+#ident "$Revision: 1.33 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -105,12 +105,9 @@ xfs_trans_push_ail(
 	int			restarts;
 	int			lock_result;
 	int			flush_log;
-	int			ntries;
 	SPLDECL(s);
 
 #define	XFS_TRANS_PUSH_AIL_RESTARTS	10
-#define XFS_TRANS_PUSH_AIL_NTRIES	200
-#define XFS_TRANS_ITEM_FLUSH_INCRS	10
 
 	AIL_LOCK(mp,s);
 	lip = xfs_trans_first_ail(mp, &gen);
@@ -134,7 +131,6 @@ xfs_trans_push_ail(
 	 */
 	flush_log = 0;
 	restarts = 0;
-	ntries = 0;
 	while (((restarts < XFS_TRANS_PUSH_AIL_RESTARTS) &&
 		(XFS_LSN_CMP(lip->li_lsn, threshold_lsn) < 0))) {
 		/*
@@ -156,52 +152,31 @@ xfs_trans_push_ail(
 		      case XFS_ITEM_SUCCESS:
 			AIL_UNLOCK(mp, s);
 			IOP_PUSH(lip);
-			ntries = 0;
+			AIL_LOCK(mp,s);
+			break;
+
+		      case XFS_ITEM_PUSHBUF:
+			AIL_UNLOCK(mp, s);
+#ifdef XFSRACEDEBUG
+			delay_for_intr();
+			delay(300);
+#endif
+			ASSERT(lip->li_ops->iop_pushbuf);
+			ASSERT(lip);
+			IOP_PUSHBUF(lip);
 			AIL_LOCK(mp,s);
 			break;
 
 		      case XFS_ITEM_PINNED:
 			flush_log = 1;
-			ntries++;
 			break;
 
 		      case XFS_ITEM_LOCKED:
-			ntries += 2;
-			break;
-
 		      case XFS_ITEM_FLUSHING:
-#ifdef NOTYET
-			/*
-			 * Flush the log in this case just in case the
-			 * item is being flushed but got stuck on a
-			 * pinned object (like flushing an inode on a
-			 * pinned buffer).
-			 */
-			flush_log = 1;
-#endif
-			/*
-			 * We may have spent a long time in buffercache 
-			 * trying to figure out if this item is being 
-			 * flushed or not. The relatively larger increment
-			 * here 'heuristically' compensates for that.
-			 */
-			ntries += XFS_TRANS_ITEM_FLUSH_INCRS;
 			break;
 
 		      default:
 			ASSERT(0);
-			break;
-		}
-
-		/*
-		 * If we have been holding the AIL_LOCK (thereby holding off
-		 * interrupts) for 'too long', let go. The other alternative
-		 * was to drop the lock, re-aquire it and keep going; 
-		 * but, there wasn't enough justification for that, except
-		 * under some 'unreasonably' heavy log-bound traffic. This seems
-		 * to perform fine in most 'regular loads'.
-		 */
-		if (ntries > XFS_TRANS_PUSH_AIL_NTRIES) {
 			break;
 		}
 
@@ -232,6 +207,7 @@ xfs_trans_push_ail(
 	AIL_UNLOCK(mp, s);
 	return lsn;
 }	/* xfs_trans_push_ail */
+
 
 /*
  * This is to be called when an item is unlocked that may have
