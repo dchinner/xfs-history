@@ -37,6 +37,8 @@
 
 #ifdef CONFIG_FS_POSIX_ACL
 
+#include <linux/posix_acl.h>
+
 struct vattr;
 struct vnode;
 struct xfs_inode;
@@ -59,6 +61,9 @@ extern int posix_acl_access_exists(vnode_t *);
 extern int posix_acl_default_exists(vnode_t *);
 
 #else
+
+#define ACL_TYPE_ACCESS		/* unused */
+#define ACL_TYPE_DEFAULT	/* unused */
 
 #define xfs_acl_vset(v,p,sz,t)	(-ENOTSUP)
 #define xfs_acl_vget(v,p,sz,t)	(-ENOTSUP)
