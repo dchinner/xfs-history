@@ -1485,8 +1485,7 @@ xfs_da_shrink_inode(xfs_trans_t *trans, xfs_da_args_t *args,
 	xfs_trans_binval(trans, dead_buf);
 	if (args->whichfork == XFS_DATA_FORK) {
 		error = xfs_bmap_last_offset(trans, dp, &bno, args->whichfork);
-		if (error)
-			return(error);
+		ASSERT(error == 0);
 		dp->i_d.di_size = XFS_FSB_TO_B(dp->i_mount, bno);
 	}
 
