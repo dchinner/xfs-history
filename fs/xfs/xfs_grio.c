@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.76 1997/06/24 07:01:27 sup Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.77 1998/03/24 22:27:49 kanoj Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -53,11 +53,6 @@
 #define IRELE(ip)		VN_RELE(XFS_ITOV(ip))
 
 extern xfs_inode_t 			*xfs_get_inode ( dev_t, xfs_ino_t);
-#if 0
-extern grio_stream_info_t 	* grio_find_stream_with_proc_dev_inum( 
-					pid_t, dev_t, xfs_ino_t);
-#endif
-extern grio_stream_info_t	* grio_find_stream_with_fp(vfile_t *);
 
 
 /*
@@ -269,28 +264,6 @@ xfs_get_block_size(
 }
 
 
-
-/*
- * xfs_io_is_guaranteed()
- *
- * RETURNS:
- *	0 if there is no guarantee
- *	non-zero if there is a guarantee
- */
-int
-xfs_io_is_guaranteed( vfile_t *fp, stream_id_t *stream_id)
-{
-	extern grio_stream_info_t *grio_find_associated_stream_with_fp(vfile_t *);
-	grio_stream_info_t	*griosp;
-
-	griosp = grio_find_associated_stream_with_fp(fp);
-	if (griosp) {
-		COPY_STREAM_ID( griosp->stream_id, (*stream_id) );
-		return (1);
-	} else {
-		return (0);
-	}
-}
 
 /*
  * xfs_grio_get_inumber
