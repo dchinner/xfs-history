@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.90 $"
+#ident	"$Revision: 1.91 $"
 
 #include <xfs_os_defs.h>
 #include <sys/sysmacros.h>
@@ -238,11 +238,11 @@ int					/* error status */
 xfs_bulkstat(
 	xfs_mount_t		*mp,	/* mount point for filesystem */
 	xfs_trans_t		*tp,	/* transaction pointer */
-	xfs_ino_t			*lastinop, /* last inode returned */
+	xfs_ino_t		*lastinop, /* last inode returned */
 	int			*ubcountp, /* size of buffer/count returned */
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
 	size_t			statstruct_size, /* sizeof struct filling */
-	xfs_caddr_t			ubuffer, /* buffer with inode stats */
+	xfs_caddr_t		ubuffer, /* buffer with inode stats */
 	int			flags, 	/* defined in xfs_itable.h */
 	int			*done)	/* 1 if there're more stats to get */
 {
@@ -632,8 +632,8 @@ xfs_bulkstat(
 	 * Done, we're either out of filesystem or space to put the data.
 	 */
 	kmem_free(irbuf, NBPC);
-	if (ubuffer)
 #if defined(HAVE_USERACC)
+	if (ubuffer)
 		unuseracc(ubuffer, ubcount * statstruct_size, (B_READ|B_PHYS));
 #endif
 	*ubcountp = ubcount - ubleft;
