@@ -1,4 +1,4 @@
-#ident "$Revision: 1.96 $"
+#ident "$Revision: 1.97 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -226,6 +226,8 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		if ((dp->i_d.di_size + newsize) <= XFS_IFORK_DSIZE(dp)) {
 			retval = xfs_dir_shortform_addname(&args);
 		} else {
+			if (total == 0)
+				return XFS_ERROR(ENOSPC);
 			retval = xfs_dir_shortform_to_leaf(&args);
 			if (retval == 0) {
 				retval = xfs_dir_leaf_addname(&args);
@@ -234,6 +236,8 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	} else if (xfs_bmap_one_block(dp, XFS_DATA_FORK)) {
 		retval = xfs_dir_leaf_addname(&args);
 		if (retval == ENOSPC) {
+			if (total == 0)
+				return XFS_ERROR(ENOSPC);
 			retval = xfs_dir_leaf_to_node(&args);
 			if (retval == 0) {
 				retval = xfs_dir_node_addname(&args);
@@ -679,11 +683,8 @@ xfs_dir_node_addname(xfs_da_args_t *args)
 	error = xfs_da_node_lookup_int(state, &retval);
 	if (error)
 		retval = error;
-	if (retval != ENOENT) {
-		xfs_da_state_free(state);
-		return(retval);
-	}
-		
+	if (retval != ENOENT)
+		goto error;
 	blk = &state->path.blk[ state->path.active-1 ];
 	ASSERT(blk->magic == XFS_DIR_LEAF_MAGIC);
 	retval = xfs_dir_leaf_add(blk->bp, args, blk->index);
@@ -696,8 +697,13 @@ xfs_dir_node_addname(xfs_da_args_t *args)
 		/*
 		 * Addition failed, split as many Btree elements as required.
 		 */
+		if (args->total == 0) {
+			ASSERT(retval == ENOSPC);
+			goto error;
+		}
 		retval = xfs_da_split(state);
 	}
+error:
 	xfs_da_state_free(state);
 
 	return(retval);
