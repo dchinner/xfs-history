@@ -83,8 +83,15 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 	va.va_mask = AT_TYPE|AT_MODE;
 	va.va_type = tp;
 	have_default_acl = _ACL_GET_DEFAULT(dvp, &pdacl);
+/* FIXME: This is a temporary fix for the XFS/NFS ACL/umask problem.  Review it
+ * when we agree with Andreas G. how ACLs are to be handled.
+ * It is wrapped in CONFIG_FS_POSIX_ACL so this code can compile without
+ * applying the split-acl-extattr patch.  KAO
+ */
+#ifdef	CONFIG_FS_POSIX_ACL
 	if (IS_POSIX_ACL(dir) && !have_default_acl)
 		mode &= ~current->fs->umask;
+#endif
 	va.va_mode = mode;	
 	va.va_size = 0;
 
