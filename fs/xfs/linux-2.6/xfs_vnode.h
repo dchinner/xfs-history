@@ -198,7 +198,7 @@ typedef ssize_t (*vop_sendfile_t)(bhv_desc_t *, struct file *,
 				loff_t *, int, size_t, read_actor_t,
 				void *, struct cred *);
 typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *,
-				unsigned int, unsigned long);
+				int, unsigned int, unsigned long);
 typedef int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
 typedef int	(*vop_setattr_t)(bhv_desc_t *, struct vattr *, int,
@@ -378,8 +378,8 @@ typedef struct vnodeops {
  */
 #define VOP_FLUSH_PAGES(vp, first, last, flags, fiopt, rv)		\
 	rv = _VOP_(vop_flush_pages, vp)((vp)->v_fbhv,first,last,flags,fiopt)
-#define VOP_IOCTL(vp, inode, filp, cmd, arg, rv)			\
-	rv = _VOP_(vop_ioctl, vp)((vp)->v_fbhv,inode,filp,cmd,arg)
+#define VOP_IOCTL(vp, inode, filp, fl, cmd, arg, rv)			\
+	rv = _VOP_(vop_ioctl, vp)((vp)->v_fbhv,inode,filp,fl,cmd,arg)
 #define VOP_IFLUSH(vp, flags, rv)					\
 	rv = _VOP_(vop_iflush, vp)((vp)->v_fbhv, flags)
 

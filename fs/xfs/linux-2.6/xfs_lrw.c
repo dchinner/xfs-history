@@ -257,7 +257,6 @@ xfs_sendfile(
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
 	vnode_t			*vp;
-	int			invisible = (filp->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -279,7 +278,8 @@ xfs_sendfile(
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !invisible) {
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+	    (!(ioflags & IO_INVIS))) {
 		vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
@@ -539,7 +539,6 @@ xfs_write(
 	vnode_t			*vp;
 	unsigned long		seg;
 	int			iolock;
-	int			invisible = (file->f_mode & FINVIS);
 	int			eventsent = 0;
 	vrwlock_t		locktype;
 
@@ -652,7 +651,7 @@ start:
 	 *
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
-	if (size && !invisible)
+	if (size && !(ioflags & IO_INVIS))
 		xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	/*

@@ -58,23 +58,20 @@
 static struct vm_operations_struct linvfs_file_vm_ops;
 
 
-STATIC ssize_t
-linvfs_read(
+STATIC inline ssize_t
+__linvfs_read(
 	struct kiocb		*iocb,
 	char __user		*buf,
+	int			ioflags,
 	size_t			count,
 	loff_t			pos)
 {
 	struct iovec		iov = {buf, count};
 	struct file		*file = iocb->ki_filp;
 	vnode_t			*vp;
-	int			ioflags = 0;
 	int			error;
 
 	BUG_ON(iocb->ki_pos != pos);
-
-	if (unlikely(file->f_mode & FINVIS))
-		ioflags |= IO_INVIS;
 
 	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
@@ -85,9 +82,31 @@ linvfs_read(
 
 
 STATIC ssize_t
-linvfs_write(
+linvfs_read(
+	struct kiocb		*iocb,
+	char __user		*buf,
+	size_t			count,
+	loff_t			pos)
+{
+	return __linvfs_read(iocb, buf, 0, count, pos);
+}
+
+STATIC ssize_t
+linvfs_read_invis(
+	struct kiocb		*iocb,
+	char __user		*buf,
+	size_t			count,
+	loff_t			pos)
+{
+	return __linvfs_read(iocb, buf, IO_INVIS, count, pos);
+}
+
+
+STATIC inline ssize_t
+__linvfs_write(
 	struct kiocb	*iocb,
 	const char 	*buf,
+	int		ioflags,
 	size_t		count,
 	loff_t		pos)
 {
@@ -95,11 +114,7 @@ linvfs_write(
 	struct file	*file = iocb->ki_filp;
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
-	int		ioflags = 0;
 	int		error;
-
-	if (unlikely(file->f_mode & FINVIS))
-		ioflags |= IO_INVIS;
 
 	BUG_ON(iocb->ki_pos != pos);
 	if (unlikely(file->f_flags & O_DIRECT)) {
@@ -117,26 +132,98 @@ linvfs_write(
 
 
 STATIC ssize_t
-linvfs_readv(
+linvfs_write(
+	struct kiocb		*iocb,
+	const char __user	*buf,
+	size_t			count,
+	loff_t			pos)
+{
+	return __linvfs_write(iocb, buf, 0, count, pos);
+}
+
+STATIC ssize_t
+linvfs_write_invis(
+	struct kiocb		*iocb,
+	const char __user	*buf,
+	size_t			count,
+	loff_t			pos)
+{
+	return __linvfs_write(iocb, buf, IO_INVIS, count, pos);
+}
+
+
+STATIC inline ssize_t
+__linvfs_readv(
 	struct file		*file,
 	const struct iovec 	*iov,
+	int			ioflags,
 	unsigned long		nr_segs,
 	loff_t			*ppos)
 {
 	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	struct		kiocb kiocb;
-	int		ioflags = 0;
 	int		error;
 
 	init_sync_kiocb(&kiocb, file);
 	kiocb.ki_pos = *ppos;
-	if (unlikely(file->f_mode & FINVIS))
-		ioflags |= IO_INVIS;
 
 	if (unlikely(file->f_flags & O_DIRECT))
 		ioflags |= IO_ISDIRECT;
 	VOP_READ(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos, ioflags, NULL, error);
+	if (-EIOCBQUEUED == error)
+		error = wait_on_sync_kiocb(&kiocb);
+	*ppos = kiocb.ki_pos;
+
+	return error;
+}
+
+STATIC ssize_t
+linvfs_readv(
+	struct file		*file,
+	const struct iovec 	*iov,
+	unsigned long		nr_segs,
+	loff_t			*ppos)
+{
+	return __linvfs_readv(file, iov, 0, nr_segs, ppos);
+}
+
+STATIC ssize_t
+linvfs_readv_invis(
+	struct file		*file,
+	const struct iovec 	*iov,
+	unsigned long		nr_segs,
+	loff_t			*ppos)
+{
+	return __linvfs_readv(file, iov, IO_INVIS, nr_segs, ppos);
+}
+
+
+STATIC inline ssize_t
+__linvfs_writev(
+	struct file		*file,
+	const struct iovec 	*iov,
+	int			ioflags,
+	unsigned long		nr_segs,
+	loff_t			*ppos)
+{
+	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+	struct		kiocb kiocb;
+	int		error;
+
+	init_sync_kiocb(&kiocb, file);
+	kiocb.ki_pos = *ppos;
+	if (unlikely(file->f_flags & O_DIRECT)) {
+		ioflags |= IO_ISDIRECT;
+		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
+				ioflags, NULL, error);
+	} else {
+		down(&inode->i_sem);
+		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
+				ioflags, NULL, error);
+		up(&inode->i_sem);
+	}
 	if (-EIOCBQUEUED == error)
 		error = wait_on_sync_kiocb(&kiocb);
 	*ppos = kiocb.ki_pos;
@@ -152,34 +239,18 @@ linvfs_writev(
 	unsigned long		nr_segs,
 	loff_t			*ppos)
 {
-	struct inode	*inode = file->f_dentry->d_inode->i_mapping->host;
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-	struct		kiocb kiocb;
-	int		ioflags = 0;
-	int		error;
-
-	if (unlikely(file->f_mode & FINVIS))
-		ioflags |= IO_INVIS;
-
-	init_sync_kiocb(&kiocb, file);
-	kiocb.ki_pos = *ppos;
-	if (unlikely(file->f_flags & O_DIRECT)) {
-		ioflags |= IO_ISDIRECT;
-		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
-				ioflags, NULL, error);
-	} else {
-		down(&inode->i_sem);
-		VOP_WRITE(vp, &kiocb, iov, nr_segs, &kiocb.ki_pos,
-				ioflags, NULL, error);
-		up(&inode->i_sem);
-	}
-	if (-EIOCBQUEUED == error)
-		error = wait_on_sync_kiocb(&kiocb);
-	*ppos = kiocb.ki_pos;
-
-	return error;
+	return __linvfs_writev(file, iov, 0, nr_segs, ppos);
 }
 
+STATIC ssize_t
+linvfs_writev_invis(
+	struct file		*file,
+	const struct iovec 	*iov,
+	unsigned long		nr_segs,
+	loff_t			*ppos)
+{
+	return __linvfs_writev(file, iov, IO_INVIS, nr_segs, ppos);
+}
 
 STATIC ssize_t
 linvfs_sendfile(
@@ -370,7 +441,30 @@ linvfs_ioctl(
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	ASSERT(vp);
-	VOP_IOCTL(vp, inode, filp, cmd, arg, error);
+	VOP_IOCTL(vp, inode, filp, 0, cmd, arg, error);
+	VMODIFY(vp);
+
+	/* NOTE:  some of the ioctl's return positive #'s as a
+	 *	  byte count indicating success, such as
+	 *	  readlink_by_handle.  So we don't "sign flip"
+	 *	  like most other routines.  This means true
+	 *	  errors need to be returned as a negative value.
+	 */
+	return error;
+}
+
+STATIC int
+linvfs_ioctl_invis(
+	struct inode	*inode,
+	struct file	*filp,
+	unsigned int	cmd,
+	unsigned long	arg)
+{
+	int		error;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+
+	ASSERT(vp);
+	VOP_IOCTL(vp, inode, filp, IO_INVIS, cmd, arg, error);
 	VMODIFY(vp);
 
 	/* NOTE:  some of the ioctl's return positive #'s as a
@@ -419,6 +513,23 @@ struct file_operations linvfs_file_operations = {
 	.release	= linvfs_release,
 	.fsync		= linvfs_fsync,
 };
+
+struct file_operations linvfs_invis_file_operations = {
+	.llseek		= generic_file_llseek,
+	.read		= do_sync_read,
+	.write		= do_sync_write,
+	.readv		= linvfs_readv_invis,
+	.writev		= linvfs_writev_invis,
+	.aio_read	= linvfs_read_invis,
+	.aio_write	= linvfs_write_invis,
+	.sendfile	= linvfs_sendfile,
+	.ioctl		= linvfs_ioctl_invis,
+	.mmap		= linvfs_file_mmap,
+	.open		= linvfs_open,
+	.release	= linvfs_release,
+	.fsync		= linvfs_fsync,
+};
+
 
 struct file_operations linvfs_dir_operations = {
 	.read		= generic_read_dir,
