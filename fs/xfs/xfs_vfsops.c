@@ -35,7 +35,6 @@
 #include <xfs.h>
 #include <linux/xfs_iops.h>
 
-STATIC xfs_mount_t *xfs_get_vfsmount(vfs_t *, dev_t, dev_t, dev_t);
 STATIC int xfs_ibusy(xfs_mount_t *);
 STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
@@ -216,7 +215,13 @@ xfs_cmountfs(
 	xfs_mount_t	*mp;
 	int		error = 0;
 
-	mp = xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
+
+	/*
+	 * Allocate VFS private data (xfs mount structure).
+	 */
+	mp = xfs_mount_init();
+
+	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
 
 	/*
 	 * Open data, real time, and log devices now - order is important.
@@ -491,33 +496,6 @@ xfs_cmountfs(
 		xfs_mount_free(mp, 1);
 	}
 	return error;
-}
-
-
-/*
- * xfs_get_vfsmount() ensures that the given vfs struct has an
- * associated mount struct. If a mount struct doesn't exist, as
- * is the case during the initial mount, a mount structure is
- * created and initialized.
- */
-STATIC xfs_mount_t *
-xfs_get_vfsmount(
-	vfs_t		*vfsp,
-	dev_t		ddev,
-	dev_t		logdev,
-	dev_t		rtdev)
-{
-	xfs_mount_t	*mp;
-
-	/*
-	 * Allocate VFS private data (xfs mount structure).
-	 */
-	mp = xfs_mount_init();
-
-	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	/* vfsp->vfs_fsid is filled in later from superblock */
-
-	return mp;
 }
 
 /*
