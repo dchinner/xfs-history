@@ -466,6 +466,7 @@ xlog_alloc(xlog_t *log)
 		iclog->ic_state = XLOG_STATE_ACTIVE;
 		iclog->ic_log = log;
 /*		iclog->ic_refcnt = 0;	*/
+		iclog->ic_bwritecnt = 0;
 /*		iclog->ic_callback = 0; */
 		iclog->ic_callback_tail = &(iclog->ic_callback);
 		bp = iclog->ic_bp = getrbuf(0);		/* my locked buffer */
@@ -1172,22 +1173,28 @@ xlog_write(xfs_mount_t *	mp,
 	   xfs_lsn_t		*start_lsn,
 	   int			commit)
 {
-    xlog_t		*log	= mp->m_log;
-    xlog_ticket_t	*ticket = (xlog_ticket_t *)tic;
-    xlog_op_header_t	*logop_head;	/* ptr to log operation header */
-    xlog_in_core_t	*iclog;		/* ptr to current in-core log */
-    psint		ptr;		/* copy address into data region */
-    int			len;		/* # xlog_write() bytes 2 still copy */
-    int			index;		/* region index currently copying */
-    int			log_offset;	/* offset (from 0) into data region */
-    int			start_rec_copy;	/* # bytes to copy for start record */
-    int			partial_copy=0; /* # bytes copied if split region */
-    int			need_copy;	/* # bytes need to bcopy this region */
-    int			copy_len;	/* # bytes actually bcopy'ing */
-    int			copy_off;	/* # bytes from entry start */
-    int			continuedwr;	/* continued write of in-core log? */
-    int			firstwr = 0;	/* first write of transaction */
+    xlog_t	     *log    = mp->m_log;
+    xlog_ticket_t    *ticket = (xlog_ticket_t *)tic;
+    xlog_op_header_t *logop_head;    /* ptr to log operation header */
+    xlog_in_core_t   *iclog;	     /* ptr to current in-core log */
+    psint	     ptr;	     /* copy address into data region */
+    int		     len;	     /* # xlog_write() bytes 2 still copy */
+    int		     index;	     /* region index currently copying */
+    int		     log_offset;     /* offset (from 0) into data region */
+    int		     start_rec_copy; /* # bytes to copy for start record */
+    int		     partial_copy;   /* did we split a region? */
+    int		     partial_copy_len;/* # bytes copied if split region */
+    int		     need_copy;      /* # bytes need to bcopy this region */
+    int		     copy_len;	     /* # bytes actually bcopy'ing */
+    int		     copy_off;	     /* # bytes from entry start */
+    int		     continuedwr;    /* continued write of in-core log? */
+    int		     firstwr = 0;    /* first write of transaction */
+#ifdef XFSDEBUG
+    static int			this_log_offset, last_log_offset;
+#endif
     
+    partial_copy_len = partial_copy = 0;
+
     /* Calculate potential maximum space.  Each region gets its own
      * xlog_op_header_t and may need to be double word aligned.
      */
@@ -1208,8 +1215,11 @@ xlog_write(xfs_mount_t *	mp,
     
     for (index = 0; index < nentries; ) {
 	log_offset = xlog_state_get_iclog_space(log, len, &iclog, &continuedwr);
+#ifdef XFSDEBUG
+	last_log_offset = this_log_offset;
+	this_log_offset = log_offset;
+#endif
 	ASSERT(log_offset <= iclog->ic_size - 1);
-	
 	ptr = (psint) &iclog->ic_data[log_offset];
 	
 	/* start_lsn is the first lsn written to. That's all we need. */
@@ -1224,16 +1234,11 @@ xlog_write(xfs_mount_t *	mp,
 	    ASSERT((psint)ptr % sizeof(long) == 0);
 	    start_rec_copy = 0;
 	    
-	    /*
-	     * If first write for transaction, insert start record.
+	    /* If first write for transaction, insert start record.
 	     * We can't be trying to commit if we are inited.  We can't
 	     * have any "partial_copy" if we are inited.
 	     */
 	    if (ticket->t_flags & XLOG_TIC_INITED) {
-		if (xlog_debug > 1) {
-		    iclog->ic_header.h_len = log_offset;
-		    xlog_verify_iclog(log, iclog, log_offset, B_FALSE);
-	        }
 		logop_head		= (xlog_op_header_t *)ptr;
 		logop_head->oh_tid	= ticket->t_tid;
 		logop_head->oh_clientid = ticket->t_clientid;
@@ -1256,27 +1261,28 @@ xlog_write(xfs_mount_t *	mp,
 	    /* header copied directly */
 	    xlog_write_adv_cnt(ptr, len, log_offset, sizeof(xlog_op_header_t));
 	    
-	    /* commit record? */
+	    /* are we copying a commit record? */
 	    logop_head->oh_flags = (commit ? XLOG_COMMIT_TRANS : 0);
 	    
 	    /* Partial write last time? => (partial_copy != 0)
 	     * need_copy is the amount we'd like to copy if everything could
 	     * fit in the current bcopy.
 	     */
-	    need_copy =	reg[index].i_len - partial_copy;
-	    
-	    copy_off = partial_copy;
+	    need_copy =	reg[index].i_len - partial_copy_len;
+
+	    copy_off = partial_copy_len;
 	    if (need_copy <= iclog->ic_size - log_offset) { /*complete write */
 		logop_head->oh_len = copy_len = need_copy;
 		if (partial_copy)
 		    logop_head->oh_flags|= (XLOG_END_TRANS|XLOG_WAS_CONT_TRANS);
-		partial_copy = 0;
+		partial_copy_len = partial_copy = 0;
 	    } else { 					    /* partial write */
 		copy_len = logop_head->oh_len =	iclog->ic_size - log_offset;
 	        logop_head->oh_flags |= XLOG_CONTINUE_TRANS;
 		if (partial_copy)
 			logop_head->oh_flags |= XLOG_WAS_CONT_TRANS;
-		partial_copy += copy_len;
+		partial_copy_len += copy_len;
+		partial_copy++;
 		len += sizeof(xlog_op_header_t); /* from splitting of region */
 	    }
 
@@ -1301,7 +1307,7 @@ xlog_write(xfs_mount_t *	mp,
 		break;				/* don't increment index */
 	    } else {				/* copied entire region */
 		index++;
-		partial_copy = 0;
+		partial_copy_len = partial_copy = 0;
 
 		if (iclog->ic_size - log_offset <= sizeof(xlog_op_header_t)) {
 		    xlog_state_want_sync(log, iclog);
@@ -1312,9 +1318,13 @@ xlog_write(xfs_mount_t *	mp,
 			    break;
 		}
 	    } /* if (partial_copy) */
+		if (xlog_debug > 1) {
+		    iclog->ic_header.h_len = log_offset;
+		    xlog_verify_iclog(log, iclog, log_offset, B_FALSE);
+	        }
 	} /* while (index < nentries) */
     } /* for (index = 0; index < nentries; ) */
-    
+    ASSERT(len == 0);
     
 #ifndef _KERNEL
     xlog_state_want_sync(log, iclog);   /* not needed for kernel XXXmiken */
@@ -1337,6 +1347,8 @@ xlog_write(xfs_mount_t *	mp,
  * is SYNCING.  This is also required to maintain the notion that we use
  * a counting semaphore to hold off would be writers to the log when every
  * iclog is trying to sync to disk.
+ *
+ * State Change: DIRTY -> ACTIVE
  */
 void
 xlog_state_clean_log(xlog_t *log)
@@ -1363,6 +1375,44 @@ xlog_state_clean_log(xlog_t *log)
 }	/* xlog_state_clean_log */
 
 
+static void
+xlog_state_do_callback(xlog_t *log)
+{
+	xlog_in_core_t	   *iclog, *first_iclog;
+	xfs_log_callback_t *cb, *cb_next;
+	int		   spl;
+
+	spl = splockspl(log->l_icloglock, splhi);
+	first_iclog = iclog = log->l_iclog;
+
+	do {
+		if (iclog->ic_state != XLOG_STATE_DONE_SYNC) {
+			/* XXXmiken: should I skip the first and continue? */
+			goto clean;
+		}
+		iclog->ic_state = XLOG_STATE_CALLBACK;
+		spunlockspl(log->l_icloglock, spl);
+
+		for (cb = iclog->ic_callback; cb != 0; cb = cb_next) {
+			cb_next = cb->cb_next;
+			cb->cb_func(cb->cb_arg);
+		}
+
+		spl = splockspl(log->l_icloglock, splhi);
+		iclog->ic_state = XLOG_STATE_DIRTY;
+
+		/* wake up threads waiting in xfs_log_force() */
+		while (cvsema(&iclog->ic_forcesema));
+
+		iclog = iclog->ic_next;
+	} while (first_iclog != iclog);
+
+clean:
+	xlog_state_clean_log(log);
+	spunlockspl(log->l_icloglock, spl);
+}	/* xlog_state_do_callback */
+
+
 /*
  * Finish transitioning this iclog to the dirty state.
  *
@@ -1382,8 +1432,6 @@ xlog_state_done_syncing(xlog_in_core_t	*iclog)
 {
 	int		   spl;
 	xlog_t		   *log = iclog->ic_log;
-	xlog_in_core_t	   *iclogp;
-	xfs_log_callback_t *cb, *cb_next;
 
 	spl = splockspl(log->l_icloglock, splhi);
 
@@ -1396,28 +1444,9 @@ xlog_state_done_syncing(xlog_in_core_t	*iclog)
 		return;
 	}
 
-	iclog->ic_state = XLOG_STATE_CALLBACK;
+	iclog->ic_state = XLOG_STATE_DONE_SYNC;
 	spunlockspl(log->l_icloglock, spl);
-
-	/* perform callbacks XXXmiken */
-	for (cb = iclog->ic_callback; cb != 0; cb = cb_next) {
-		cb_next = cb->cb_next;
-		cb->cb_func(cb->cb_arg);
-	}
-
-	spl = splockspl(log->l_icloglock, splhi);
-
-	ASSERT(iclog->ic_state == XLOG_STATE_CALLBACK);
-
-	iclog->ic_state		= XLOG_STATE_DIRTY;
-
-	/* wake up threads waiting in xfs_log_force() */
-	while (cvsema(&iclog->ic_forcesema));
-
-	xlog_state_clean_log(log);
-
-	spunlockspl(log->l_icloglock, spl);
-
+	xlog_state_do_callback(log);
 }	/* xlog_state_done_syncing */
 
 
@@ -1475,6 +1504,8 @@ xlog_state_get_iclog_space(xlog_t	 *log,
 	xlog_rec_header_t *head;
 	xlog_in_core_t	  *iclog;
 
+	xlog_state_do_callback(log);
+
 restart:
 	spl = splockspl(log->l_icloglock, splhi);
 
@@ -1487,7 +1518,9 @@ restart:
 		goto restart;
 	}
 
+#if XXXmiken
 	xlog_state_clean_log(log);
+#endif
 	head = &iclog->ic_header;
 
 	iclog->ic_refcnt++;			/* prevents sync */
