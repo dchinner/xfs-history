@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.24 $"
+#ident	"$Revision: 1.36 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -47,7 +47,6 @@
 #endif
 
 ktrace_t	*xfs_bmbt_trace_buf;
-#define	XFS_BMBT_TRACE_SIZE	4096
 
 /*
  * Prototypes for internal btree functions.
@@ -1683,8 +1682,6 @@ xfs_bmbt_trace_enter(
 {
 	xfs_inode_t	*ip;
 
-	if (xfs_bmbt_trace_buf == NULL)
-		xfs_bmbt_trace_buf = ktrace_alloc(XFS_BMBT_TRACE_SIZE);
 	ip = cur->bc_private.b.ip;
 	ktrace_enter(xfs_bmbt_trace_buf,
 		(void *)type, (void *)name, (void *)ip, (void *)cur,

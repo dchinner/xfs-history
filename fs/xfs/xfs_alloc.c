@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.43 $"
+#ident	"$Revision: 1.53 $"
 
 /*
  * Free space allocation for xFS.
@@ -47,7 +47,6 @@
 /*
  * Allocation tracing.
  */
-#define	XFS_ALLOC_TRACE_SIZE	10240
 ktrace_t	*xfs_alloc_trace_buf;
 
 /*
@@ -350,8 +349,6 @@ xfs_alloc_trace_addentry(
 	int		wasdel,		/* set if allocation was prev delayed */
 	int		isfl)		/* set if is freelist allocation/free */
 {
-	if (xfs_alloc_trace_buf == NULL)
-		xfs_alloc_trace_buf = ktrace_alloc(XFS_ALLOC_TRACE_SIZE);
 	ktrace_enter(xfs_alloc_trace_buf,
 		(void *)tag, (void *)name, (void *)str, (void *)mp,
 		(void *)agno, (void *)agbno, (void *)minlen, (void *)maxlen,
