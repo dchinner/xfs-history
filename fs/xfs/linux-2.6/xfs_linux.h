@@ -70,12 +70,6 @@
 #define kdev_val(dev)	(unsigned)(dev)
 #endif
 
-typedef struct pathname {
-	char	*pn_path;	/* remaining pathname */
-	u_long	pn_hash;	/* last component's hash */
-	u_short	pn_complen;	/* last component length */
-} pathname_t;
-
 typedef struct statvfs {
 	ulong_t	f_bsize;	/* fundamental file system block size */
 	ulong_t	f_frsize;	/* fragment size */

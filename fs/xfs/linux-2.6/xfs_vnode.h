@@ -171,7 +171,6 @@ union rval;
 struct uio;
 struct file;
 struct vattr;
-struct pathname;
 struct page_buf_bmap_s;
 struct attrlist_cursor_kern;
 
@@ -195,8 +194,7 @@ typedef	int	(*vop_remove_t)(bhv_desc_t *, struct dentry *, struct cred *);
 typedef	int	(*vop_link_t)(bhv_desc_t *, vnode_t *, struct dentry *,
 				struct cred *);
 typedef	int	(*vop_rename_t)(bhv_desc_t *, struct dentry *, vnode_t *,
-				struct dentry *,
-				struct pathname *npnp, struct cred *);
+				struct dentry *, struct cred *);
 typedef	int	(*vop_mkdir_t)(bhv_desc_t *, struct dentry *, struct vattr *,
 				vnode_t **, struct cred *);
 typedef	int	(*vop_rmdir_t)(bhv_desc_t *, struct dentry *, vnode_t *,
@@ -374,10 +372,10 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_link, tdvp)((tdvp)->v_fbhv,fvp,d,cr);		\
 	VN_BHV_READ_UNLOCK(&(tdvp)->v_bh);				\
 }
-#define	VOP_RENAME(fvp,fnm,tdvp,tnm,tpnp,cr,rv) 			\
+#define	VOP_RENAME(fvp,fnm,tdvp,tnm,cr,rv) 				\
 {									\
 	VN_BHV_READ_LOCK(&(fvp)->v_bh);					\
-	rv = _VOP_(vop_rename, fvp)((fvp)->v_fbhv,fnm,tdvp,tnm,tpnp,cr);\
+	rv = _VOP_(vop_rename, fvp)((fvp)->v_fbhv,fnm,tdvp,tnm,cr);	\
 	VN_BHV_READ_UNLOCK(&(fvp)->v_bh);				\
 }
 #define	VOP_MKDIR(dp,d,vap,vpp,cr,rv) 					\

@@ -370,7 +370,7 @@ linvfs_rename(
 
 	new_inode = ndentry->d_inode;
 
-	VOP_RENAME(fvp, odentry, tvp, ndentry, NULL, NULL, error);
+	VOP_RENAME(fvp, odentry, tvp, ndentry, NULL, error);
 	if (error)
 		return -error;
 
