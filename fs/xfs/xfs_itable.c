@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.48 $"
+#ident	"$Revision: 1.49 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -678,6 +678,9 @@ xfs_itable(
 
 	if (error = xfs_fd_to_mp(fd, 0, &mp))
 		return error;
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return (EIO);
+
 	if (copyin((void *)lastip, &inlast, sizeof(inlast)))
 		return XFS_ERROR(EFAULT);
 	if ((count = icount) <= 0)

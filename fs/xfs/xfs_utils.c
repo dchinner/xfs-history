@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 #include <sys/types.h>
 #include <sys/buf.h>
@@ -411,7 +411,7 @@ xfs_dir_ialloc(
 			*ipp = NULL;
 			return code;
 		}
-		(void) xfs_trans_reserve(tp, 0, log_res, 0,
+		code = xfs_trans_reserve(tp, 0, log_res, 0,
 					 XFS_TRANS_PERM_LOG_RES, log_count);
 		/*
 		 * Re-attach the quota info that we detached from prev trx.
@@ -419,6 +419,13 @@ xfs_dir_ialloc(
 		if (dqinfo) {
 			tp->t_dqinfo = dqinfo;
 			tp->t_flags |= tflags;
+		}
+		
+		if (code) {
+			brelse(ialloc_context);
+			*tpp = ntp;
+			*ipp = NULL;
+			return code;
 		}
 		xfs_trans_bjoin (tp, ialloc_context);
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.82 $"
+#ident "$Revision: 1.83 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -56,6 +56,7 @@
 STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
 STATIC uint	xfs_trans_count_vecs(xfs_trans_t *);
 STATIC void	xfs_trans_fill_vecs(xfs_trans_t *, xfs_log_iovec_t *);
+STATIC void	xfs_trans_unpin_items(xfs_trans_t *);
 STATIC void	xfs_trans_committed(xfs_trans_t *);
 STATIC void	xfs_trans_chunk_committed(xfs_log_item_chunk_t *, xfs_lsn_t);
 STATIC void	xfs_trans_free(xfs_trans_t *);
@@ -570,6 +571,14 @@ xfs_trans_commit(
 	static xfs_lsn_t	trans_lsn = 1;
 
 	/*
+	 * XFS disk error handling mechanism is not based on a transaction
+	 * abort mechanism. We may let the commit succeed knowing full well
+	 * that the buffer will not reach the disk...
+	 *
+	 * Hence, this routine always returns SUCCESS.
+	 */
+
+	/*
 	 * Determine whether this commit is releasing a permanent
 	 * log reservation or not.
 	 */
@@ -648,17 +657,31 @@ xfs_trans_commit(
 	xfs_trans_fill_vecs(tp, log_vector);
 	error = xfs_log_write(mp, log_vector, nvec, tp->t_ticket,
 			      &(tp->t_lsn));
-	ASSERT(error == 0);
-	if (xlog_debug) {
-		commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
-	} else {
-		tp->t_lsn = trans_lsn++;
+	if (!error) {
+		if (xlog_debug) {
+			commit_lsn = xfs_log_done(mp, tp->t_ticket, log_flags);
+		} else {
+			commit_lsn = 0;
+			tp->t_lsn = trans_lsn++;
+		}
 	}
-
+	
 	if (nvec > XFS_TRANS_LOGVEC_COUNT) {
 		kmem_free(log_vector, nvec * sizeof(xfs_log_iovec_t));
 	}
 
+	/*
+	 * If we got a log write error. Unpin the logitems that we
+	 * had pinned, clean up, but return success. Transaction
+	 * commit failures are opaque to outsiders.(!)
+	 */
+	if (error || commit_lsn == -1) { 
+		xfs_trans_unpin_items(tp);
+		xfs_trans_free_items(tp, flags);
+		xfs_trans_free(tp);
+		return (0);
+	}
+	
 	/*
 	 * Once all the items of the transaction have been copied
 	 * to the in core log we can release them.  Do that here.
@@ -736,6 +759,23 @@ xfs_trans_count_vecs(
 	}
 
 	return nvecs;
+}
+
+STATIC void
+xfs_trans_unpin_items(
+	xfs_trans_t		*tp)
+{
+	xfs_log_item_desc_t	*lidp;
+
+	for (lidp = xfs_trans_first_item(tp); 
+	     lidp != NULL;
+	     lidp = xfs_trans_next_item(tp, lidp)) {
+		/*
+		 * Unpin all but those that aren't dirty.
+		 */
+		if (lidp->lid_flags & XFS_LID_DIRTY)
+			IOP_UNPIN(lidp->lid_item);
+	}
 }
 
 /*
@@ -821,8 +861,15 @@ xfs_trans_cancel(
 #endif
 
 	if (tp->t_flags & XFS_TRANS_DIRTY) {
-		cmn_err(CE_PANIC, "XFS aborting dirty transaction 0x%x\n",
-			tp);
+		/* cmn_err(CE_PANIC, "XFS aborting dirty transaction 0x%x\n",
+			tp); */
+		ASSERT(XFS_FORCED_SHUTDOWN(tp->t_mountp));
+		/*
+		 * Don't bother about unreserving'n'stuff.
+		 */
+		xfs_trans_free_items(tp, flags);
+		xfs_trans_free(tp);
+		return;
 	}
 
 #ifdef DEBUG

@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.58 $"
+#ident	"$Revision: 1.60 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2892,7 +2892,8 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 		"DONE_SYNC",	/* 0X08 */
 		"CALLBACK",	/* 0X10 */
 		"DIRTY",	/* 0X20 */
-		"NOTUSED",	/* 0X40 */
+		"IOERROR",	/* 0X40 */
+		"NOTUSED",	/* 0X80 */
 		0
 	};
 
@@ -3419,6 +3420,9 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	static char *xmount_flags[] = {
 		"WSYNC",	/* 0x1 */
 		"INO64",	/* 0x2 */
+		"RQCHK",        /* 0x4 */
+		"FSCLEAN",	/* 0x8 */
+		"FSSHUTDN",	/* 0x10*/
 		0
 	};
 

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.22 $"
+#ident	"$Revision: 1.23 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -29,6 +29,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_fsops.h"
 #include "xfs_itable.h"
+#include "xfs_rw.h"
 
 /*
  * File system operations
@@ -86,13 +87,13 @@ xfs_growfs_data(
 	if (nb < mp->m_sb.sb_dblocks || pct < 0 || pct > 100)
 		return XFS_ERROR(EINVAL);
 	dpct = pct - mp->m_sb.sb_imax_pct;
-	bp = read_buf(mp->m_dev, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0);
-	if (bp == NULL)
-		return XFS_ERROR(EINVAL);
-	error = geterror(bp);
-	brelse(bp);
+	error = xfs_read_buf(mp, mp->m_dev, XFS_FSB_TO_BB(mp, nb) - 1, 1, 0, 
+			     &bp);
 	if (error)
 		return XFS_ERROR(error);
+	ASSERT(bp);
+	brelse(bp);
+
 	nagcount = (nb / mp->m_sb.sb_agblocks) +
 		   ((nb % mp->m_sb.sb_agblocks) != 0);
 	if (nb % mp->m_sb.sb_agblocks &&
@@ -124,7 +125,8 @@ xfs_growfs_data(
 		/*
 		 * AG freelist header block
 		 */
-		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR), sectbb, 0);
+		bp = get_buf(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR),
+			     sectbb, 0);
 		agf = XFS_BUF_TO_AGF(bp);
 		bzero(agf, mp->m_sb.sb_sectsize);
 		agf->agf_magicnum = XFS_AGF_MAGIC;
@@ -144,7 +146,7 @@ xfs_growfs_data(
 		agf->agf_flcount = 0;
 		agf->agf_freeblks = agf->agf_length - XFS_PREALLOC_BLOCKS(mp);
 		agf->agf_longest = agf->agf_freeblks;
-		error = bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
 		}
@@ -166,7 +168,7 @@ xfs_growfs_data(
 		agi->agi_dirino = NULLAGINO;
 		for (bucket = 0; bucket < XFS_AGI_UNLINKED_BUCKETS; bucket++)
 			agi->agi_unlinked[bucket] = NULLAGINO;
-		error = bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
 		}
@@ -186,7 +188,7 @@ xfs_growfs_data(
 			mp->m_alloc_mxr[0]);
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
-		error = bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
 		}
@@ -207,7 +209,7 @@ xfs_growfs_data(
 		arec->ar_startblock = XFS_PREALLOC_BLOCKS(mp);
 		arec->ar_blockcount = agsize - arec->ar_startblock;
 		nfree += arec->ar_blockcount;
-		error = bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
 		}
@@ -223,7 +225,7 @@ xfs_growfs_data(
 		block->bb_level = 0;
 		block->bb_numrecs = 0;
 		block->bb_leftsib = block->bb_rightsib = NULLAGBLOCK;
-		error = bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 		if (error) {
 			goto error0;
 		}		
@@ -283,9 +285,15 @@ xfs_growfs_data(
 	else
 		mp->m_maxicount = 0;
 	for (agno = 1; agno < nagcount; agno++) {
-		bp = read_buf(mp->m_dev,
-			XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
-			BTOBB(bsize), 0);
+	        error = xfs_read_buf(mp, mp->m_dev,
+				  XFS_AGB_TO_DADDR(mp, agno, XFS_SB_BLOCK(mp)),
+				  BTOBB(bsize), 0, &bp);
+		if (error) {
+			cmn_err(CE_WARN,
+"filesystem %s - error %d reading secondary superblock for ag %d\n",
+				mp->m_fsname, error, agno);
+			break;
+		}
 		sbp = XFS_BUF_TO_SBP(bp);
 		*sbp = mp->m_sb;
 		/*
@@ -293,12 +301,14 @@ xfs_growfs_data(
 		 * just issue a warning and continue.  The real work is
 		 * already done and committed.
 		 */
-		if (!(error = bwrite(bp)))
+		if (!(error = xfs_bwrite(mp, bp))) {
 			continue;
-		else
+		} else {
 			cmn_err(CE_WARN,
 "filesystem %s - write error %d updating secondary superblock for ag %d\n",
 				mp->m_fsname, error, agno);
+			break; /* no point in continuing */
+		}
 	}
 	return 0;
 
@@ -405,6 +415,9 @@ xfs_fsoperations(
 		return XFS_ERROR(EINVAL);
 	if (error = xfs_fd_to_mp(fd, wperm[opcode], &mp))
 		return error;
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return (EIO);
+
 	if (cisize[opcode]) {
 		inb = kmem_alloc(cisize[opcode], KM_SLEEP);
 		if (copyin(in, inb, cisize[opcode])) {

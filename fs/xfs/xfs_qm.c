@@ -1,4 +1,4 @@
-#ident "$Revision: 1.20 $"
+#ident "$Revision: 1.21 $"
 
 
 #include <sys/param.h>
@@ -57,6 +57,7 @@
 #include "xfs_quota_priv.h"
 #include "xfs_itable.h"
 #include "xfs_utils.h"
+#include "xfs_rw.h"
 
 extern int      ncsize;
 struct xfs_qm	*G_xqm = NULL;
@@ -548,11 +549,11 @@ xfs_qm_dqflush_all(
 	int		recl;
 	xfs_dquot_t	*dqp;
 	int		niters;
+	int		error;
 
 	if (mp->m_quotainfo == NULL)	
 		return (0);
 	niters = 0;
-
 again:
 	xfs_qm_mplist_lock(mp);
 	FOREACH_DQUOT_IN_MP(dqp, mp) {
@@ -576,11 +577,14 @@ again:
 		}
 		/*
 		 * Let go of the mplist lock. We don't want to hold it
-		 * across a disk write
+		 * across a disk write.
 		 */
 		xfs_qm_mplist_unlock(mp);
-		xfs_qm_dqflush(dqp, flags); 
+		error = xfs_qm_dqflush(dqp, flags);
 		xfs_dqunlock(dqp);
+		if (error)
+			return (error);
+
 		/*
 		 * If this is the root filesystem doing a quotacheck,
 		 * we should do periodic bflushes. This is because there's
@@ -602,7 +606,7 @@ again:
 			goto again;
 		}
 	}
-
+ 
 	xfs_qm_mplist_unlock(mp);
 	/* return ! busy */
 	return (0);
@@ -1104,7 +1108,7 @@ xfs_qm_unmount(
  * umountroot : SYNC_WAIT | SYNC_CLOSE | SYNC_ATTR | SYNC_FSDATA
  */
 
-void
+int
 xfs_qm_sync(
 	xfs_mount_t	*mp,
 	short		flags)
@@ -1113,6 +1117,7 @@ xfs_qm_sync(
 	xfs_dquot_t	*dqp;
 	uint		flush_flags;
 	boolean_t	nowait;
+	int		error;
 
 	restarts = 0;
 	/*
@@ -1120,7 +1125,7 @@ xfs_qm_sync(
 	 */
 	nowait = (boolean_t)(flags & SYNC_BDFLUSH || (flags & SYNC_WAIT) == 0);
 	
-      again:
+  again:
 	xfs_qm_mplist_lock(mp);
 	/*
 	 * dqpurge_all() also takes the mplist lock and iterate thru all dquots
@@ -1130,7 +1135,7 @@ xfs_qm_sync(
 	 */
 	if (! XFS_IS_QUOTA_ON(mp)) { 
 		xfs_qm_mplist_unlock(mp);
-		return;
+		return (0);
 	}
 	FOREACH_DQUOT_IN_MP(dqp, mp) {
 		/*
@@ -1187,8 +1192,10 @@ xfs_qm_sync(
 		flush_flags = (nowait) ? XFS_QMOPT_DELWRI : XFS_QMOPT_SYNC;
 		xfs_qm_mplist_unlock(mp);
 		xfs_dqtrace_entry(dqp, "XQM_SYNC: DQFLUSH");
-		xfs_qm_dqflush(dqp, flush_flags);
+		error = xfs_qm_dqflush(dqp, flush_flags);
 		xfs_dqunlock(dqp);
+		if (error)
+			return (error);
 
 		xfs_qm_mplist_lock(mp);
 		if (recl != XFS_QI_MPLRECLAIMS(mp)) {
@@ -1201,6 +1208,7 @@ xfs_qm_sync(
 	}
 	
 	xfs_qm_mplist_unlock(mp);
+	return (0);
 }
 
 
@@ -1610,7 +1618,7 @@ xfs_qm_dqiter_bufs(
 		(void) xfs_qm_reset_dqcounts(mp, bp, firstid,
 					     flags & XFS_QMOPT_UQUOTA ?
 					     XFS_DQ_USER : XFS_DQ_PROJ);
-		bdwrite(bp);
+		xfs_bdwrite(mp, bp);
 		/*
 		 * When quotachecking the root filesystem,
 		 * we may not have bdflush, and we may fill

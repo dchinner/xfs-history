@@ -1,4 +1,4 @@
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.35 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -323,25 +323,31 @@ _xfs_trans_delete_ail(
 	xfs_log_item_t		*dlip;
 	xfs_log_item_t		*mlip;
 
-	ASSERT(lip->li_flags & XFS_LI_IN_AIL);
-
-	ailp = &(mp->m_ail);
-	mlip = xfs_ail_min(ailp);
-	dlip = xfs_ail_delete(ailp, lip);
-	ASSERT(dlip == lip);
-
-
-	lip->li_flags &= ~XFS_LI_IN_AIL;
-	lip->li_lsn = 0;
-	mp->m_ail_gen++;
-
-	if (mlip == dlip) {
-		mlip = xfs_ail_min(&(mp->m_ail));
-		AIL_UNLOCK(mp, s);
-		xfs_log_move_tail(mp, (mlip ? mlip->li_lsn : 0));
-	} else {
+	if (lip->li_flags & XFS_LI_IN_AIL) {
+		ailp = &(mp->m_ail);
+		mlip = xfs_ail_min(ailp);
+		dlip = xfs_ail_delete(ailp, lip);
+		ASSERT(dlip == lip);
+		
+		
+		lip->li_flags &= ~XFS_LI_IN_AIL;
+		lip->li_lsn = 0;
+		mp->m_ail_gen++;
+		
+		if (mlip == dlip) {
+			mlip = xfs_ail_min(&(mp->m_ail));
+			AIL_UNLOCK(mp, s);
+			xfs_log_move_tail(mp, (mlip ? mlip->li_lsn : 0));
+		} else {
+			AIL_UNLOCK(mp, s);
+		}
+	}
+#ifdef DEBUG
+	else {
+		ASSERT(XFS_FORCED_SHUTDOWN(mp));
 		AIL_UNLOCK(mp, s);
 	}
+#endif
 }
 
 

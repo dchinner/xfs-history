@@ -1,4 +1,4 @@
-#ident "$Revision: 1.9 $"
+#ident "$Revision: 1.10 $"
 
 #include "sys/types.h"
 #include "sys/pda.h"
@@ -13,7 +13,7 @@
 #include "xfs_error.h"
 
 #ifdef DEBUG
-int	xfs_etrap[XFS_ERROR_NTRAP] = { EIO };
+int	xfs_etrap[XFS_ERROR_NTRAP] = { 0 }; /* We used to trap { EIO } */
 
 int
 xfs_error_trap(int e)

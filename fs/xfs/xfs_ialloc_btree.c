@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.29 $"
+#ident	"$Revision: 1.32 $"
 
 /*
  * Inode allocation management for XFS.
@@ -330,7 +330,7 @@ xfs_inobt_delrec(
 			agfbno = XFS_AG_DADDR(cur->bc_mp,
 					      cur->bc_private.i.agno,
 					      XFS_AGF_DADDR);
-			error = xfs_trans_read_buf(cur->bc_tp,
+			error = xfs_trans_read_buf(cur->bc_mp, cur->bc_tp,
 						   cur->bc_mp->m_dev,
 						   agfbno, 1, 0, &agfbp);
 			if (error) {
@@ -644,8 +644,8 @@ xfs_inobt_delrec(
 	 */
 	agfbno = XFS_AG_DADDR(cur->bc_mp, cur->bc_private.i.agno,
 			      XFS_AGF_DADDR);
-	error = xfs_trans_read_buf(cur->bc_tp, cur->bc_mp->m_dev, agfbno,
-				   1, 0, &agfbp);
+	error = xfs_trans_read_buf(cur->bc_mp, cur->bc_tp, cur->bc_mp->m_dev, 
+				   agfbno, 1, 0, &agfbp);
 	if (error) {
 		return error;
 	}
@@ -1038,7 +1038,7 @@ xfs_inobt_lookup(
 			 * Need to get a new buffer.  Read it, then 
 			 * set it in the cursor, releasing the old one.
 			 */
-			error = xfs_trans_read_buf(cur->bc_tp, mp->m_dev, d,
+			error = xfs_trans_read_buf(mp, cur->bc_tp, mp->m_dev, d,
 						   mp->m_bsize, 0, &bp);
 			if (error) {
 				return error;

@@ -1,7 +1,7 @@
 #ifndef	_XFS_LOG_H
 #define _XFS_LOG_H
 
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision: 1.34 $"
 
 #define	XFS_LSN_CMP(x,y)	((x) - (y))
 #define	XFS_LSN_DIFF(x,y)	((x) - (y))
@@ -115,6 +115,7 @@ int	  xfs_log_write(struct xfs_mount *mp,
 			xfs_log_ticket_t ticket,
 			xfs_lsn_t	 *start_lsn);
 int	  xfs_log_unmount(struct xfs_mount *mp);
+void	  xfs_log_force_umount(struct xfs_mount *mp);
 
 /* Log manager utility interfaces */
 void xfs_log_print(struct xfs_mount *mp,

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.67 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -45,6 +45,7 @@
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
+#include "xfs_rw.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -735,7 +736,7 @@ xfs_inode_item_pushbuf(
 				delay_for_intr();
 				delay(300);
 #endif						
-				bawrite(bp);
+				xfs_bawrite(mp, bp);
 			} else {
 				brelse(bp);
 			}

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.76 $"
+#ident	"$Revision: 1.77 $"
 
 struct buf;
 struct cred;
@@ -140,6 +140,10 @@ typedef struct xfs_mount {
 #endif
 #define XFS_MOUNT_ROOTQCHECK	0x00000004
 #define XFS_MOUNT_FS_IS_CLEAN	0x00000008	/* fs is truly read-only */
+#define XFS_MOUNT_FS_SHUTDOWN	0x00000010	/* atomic stop of all filesystem
+						   operations, typically for
+						   disk errors in metadata */
+#define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 
 /*
  * Default minimum read and write sizes.
@@ -185,7 +189,6 @@ typedef struct xfs_mod_sb {
 #define	XFS_SB_LOCK(mp)		mutex_spinlock(&(mp)->m_sb_lock)
 #define	XFS_SB_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_sb_lock,(s))
 
-
 #ifdef SIM
 xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
 xfs_mount_t	*xfs_mount_partial(dev_t, dev_t, dev_t);
@@ -200,5 +203,6 @@ int		xfs_unmountfs(xfs_mount_t *, int, struct cred *);
 int		xfs_mod_incore_sb(xfs_mount_t *, xfs_sb_field_t, int);
 int		xfs_mod_incore_sb_batch(xfs_mount_t *, xfs_mod_sb_t *, uint);
 struct buf	*xfs_getsb(xfs_mount_t *, int);
+void		xfs_force_shutdown(struct xfs_mount *mp);
 extern	struct vfsops xfs_vfsops;
 #endif	/* !_FS_XFS_MOUNT_H */

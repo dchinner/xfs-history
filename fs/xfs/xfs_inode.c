@@ -1,4 +1,4 @@
-#ident "$Revision: 1.202 $"
+#ident "$Revision: 1.203 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -279,7 +279,7 @@ xfs_inotobp(
 	 * default to just a read_buf() call.
 	 */
 	dev = mp->m_dev;
-	error = xfs_trans_read_buf(tp, dev, imap.im_blkno,
+	error = xfs_trans_read_buf(mp, tp, dev, imap.im_blkno,
 				   (int)imap.im_len, 0, &bp);
 
 	if (error) {
@@ -386,7 +386,7 @@ xfs_itobp(
 	 * default to just a read_buf() call.
 	 */
 	dev = mp->m_dev;
-	error = xfs_trans_read_buf(tp, dev, imap.im_blkno, (int)imap.im_len,
+	error = xfs_trans_read_buf(mp, tp, dev, imap.im_blkno, (int)imap.im_len,
 				   0, &bp);
 
 	if (error) {
@@ -407,8 +407,8 @@ xfs_itobp(
 		 if (dip->di_core.di_magic != XFS_DINODE_MAGIC ||
 		     !XFS_DINODE_GOOD_VERSION(dip->di_core.di_version)) {
 #ifdef DEBUG
-			prdev("bad inode magic/vsn daddr %lld #%d", (int)dev,
-				(long long)imap.im_blkno, i);
+			prdev("bad inode magic/vsn daddr 0x%x #%d", (int)dev,
+			      imap.im_blkno, i);
 #endif
 			bp->b_flags |= B_ERROR;
 			xfs_trans_brelse(tp, bp);
@@ -1638,10 +1638,18 @@ xfs_itruncate_finish(
 		ntp = xfs_trans_dup(ntp);
 		xfs_trans_commit(*tp, 0);
 		*tp = ntp;
-		xfs_trans_reserve(ntp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
-				  XFS_TRANS_PERM_LOG_RES,
-				  XFS_ITRUNCATE_LOG_COUNT);
-
+		error = xfs_trans_reserve(ntp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
+					  XFS_TRANS_PERM_LOG_RES,
+					  XFS_ITRUNCATE_LOG_COUNT);
+		if (error) {
+			ASSERT(XFS_FORCED_SHUTDOWN(mp));
+			/* xfs_trans_cancel(ntp, XFS_TRANS_RELEASE_LOG_RES);
+			   xfs_iunlock(ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL); */
+			xfs_trans_ijoin(ntp, ip,
+					XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+			xfs_trans_ihold(ntp, ip);
+			return (error);
+		}
 		/*
 		 * Add the inode being truncated to the next chained
 		 * transaction.
@@ -1771,7 +1779,7 @@ xfs_iunlink(
 	 * Get the agi buffer first.  It ensures lock ordering
 	 * on the list.
 	 */
-	error = xfs_trans_read_buf(tp, mp->m_dev, agdaddr, 1, 0, &agibp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, agdaddr, 1, 0, &agibp);
 	if (error) {
 		return error;
 	}
@@ -1867,7 +1875,7 @@ xfs_iunlink_remove(
 	 * Get the agi buffer first.  It ensures lock ordering
 	 * on the list.
 	 */
-	error = xfs_trans_read_buf(tp, mp->m_dev, agdaddr, 1, 0, &agibp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, agdaddr, 1, 0, &agibp);
 	if (error != 0) {
 		return error;
 	}
@@ -2851,6 +2859,19 @@ xfs_iflush(
 	xfs_iunpin_wait(ip);
 
 	/*
+	 * This may have been unpinned because the filesystem is shutting
+	 * down forcibly. If that's the case we must not write this inode
+	 * to disk, because the log record didn't make it to disk!
+	 */
+	if (XFS_FORCED_SHUTDOWN(mp)) {
+		ip->i_update_core = 0;
+		if (iip)
+			iip->ili_format.ilf_fields = 0;
+		xfs_ifunlock(ip);
+		return (EIO);
+	}
+
+	/*
 	 * Get the buffer containing the on-disk inode.
 	 */
 	error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
@@ -3074,7 +3095,7 @@ xfs_iflush(
 	}
 
 #ifdef SIM
-	error = bwrite(bp);
+	error = xfs_bwrite(mp, bp);
 #else
 #ifndef NO_XFS_PARANOIA
 	/*
@@ -3093,11 +3114,11 @@ xfs_iflush(
 	}
 #endif /* !NO_XFS_PARANOIA */
 	if (flags & B_DELWRI) {
-		bdwrite(bp);
+		xfs_bdwrite(mp, bp);
 	} else if (flags & B_ASYNC) {
-		bawrite(bp);
+		xfs_bawrite(mp, bp);
 	} else {
-		error = bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 	}
 #endif /* SIM */
 

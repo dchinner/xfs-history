@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.97 $"
+#ident	"$Revision: 1.98 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -1213,7 +1213,7 @@ xfs_ialloc_read_agi(
 
 	ASSERT(agno != NULLAGNUMBER);
 	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-	error = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, 1, 0, &bp);
 	if (error) {
 		return error;
 	}

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.114 $"
+#ident	"$Revision: 1.115 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -66,6 +66,7 @@
 #include <sys/fs/xfs_dquot_item.h>
 #include <sys/fs/xfs_dquot.h>
 #include <sys/fs/xfs_qm.h>
+#include <sys/fs/xfs_rw.h>
 
 #ifdef SIM
 #include "sim.h"		/* must be last include file */
@@ -78,9 +79,7 @@ int		xlog_find_cycle_start(struct log *log,
 				      daddr_t	*last_blk,
 				      uint	cycle);
 
-#ifndef SIM
 STATIC int	xlog_clear_stale_blocks(xlog_t	*log, xfs_lsn_t tail_lsn);
-#endif /* !SIM */
 STATIC void	xlog_recover_insert_item_backq(xlog_recover_item_t **q,
 					       xlog_recover_item_t *item);
 STATIC void	xlog_recover_print_trans(xlog_recover_t	    *trans,
@@ -134,7 +133,7 @@ xlog_bread(xlog_t	*log,
 	   int		nbblks,
 	   buf_t	*bp)
 {
-	struct bdevsw *my_bdevsw;
+	int error;
 
 	ASSERT(nbblks > 0);
 	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
@@ -147,18 +146,13 @@ xlog_bread(xlog_t	*log,
 #ifndef SIM
 	bp_dcache_wbinval(bp);
 #endif
-	my_bdevsw = get_bdevsw(bp->b_edev);
-	ASSERT(my_bdevsw != NULL);
-	bdstrat(my_bdevsw, bp);
-	iowait(bp);
-
-	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_ALERT, "XFS: error reading log blkno 0x%x, dev 0x%x",
-			bp->b_blkno, bp->b_edev);
-		ASSERT(0);
-		return bp->b_error;
+	xfsbdstrat(log->l_mp, bp);
+	if (error = iowait(bp)) {
+		xfs_ioerror_alert("xlog_bread", log->l_mp, 
+				  bp->b_edev, bp->b_blkno);
+		return (error);
 	}
-	return 0;
+	return error;
 }	/* xlog_bread */
 
 
@@ -174,6 +168,8 @@ xlog_bwrite(
 	int	nbblks,
 	buf_t	*bp)
 {
+	int 	error;
+
 	ASSERT(nbblks > 0);
 	ASSERT(BBTOB(nbblks) <= bp->b_bufsize);
 
@@ -182,16 +178,32 @@ xlog_bwrite(
 	bp->b_bcount	= BBTOB(nbblks);
 	bp->b_edev	= log->l_dev;
 
-	(void) bwrite(bp);
-
-	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_ALERT, "XFS: error writing log blkno 0x%x, dev 0x%x",
-			bp->b_blkno, bp->b_edev);
-		ASSERT(0);
-		return bp->b_error;
-	}
-	return 0;
+	if (error = xfs_bwrite(log->l_mp, bp)) 
+		xfs_ioerror_alert("xlog_bwrite", log->l_mp, 
+				  bp->b_edev, bp->b_blkno);
+	
+	return (error);
 }	/* xlog_bwrite */
+
+STATIC void
+xlog_recover_iodone(
+	struct buf 	*bp)
+{
+	xfs_mount_t	*mp;
+	ASSERT(bp->b_fsprivate);
+	
+	if (geterror(bp)) {
+		/*
+		 * We're not going to bother about retrying 
+		 * this during recovery. One strike!
+		 */
+		mp = (xfs_mount_t *)bp->b_fsprivate;
+		xfs_force_shutdown(mp);
+	}
+	bp->b_fsprivate = NULL;
+	bp->b_iodone = NULL;
+	biodone(bp);
+}
 
 /*
  * This routine finds (to an approximation) the first block in the physical
@@ -600,9 +612,6 @@ bp_err:
  * We could speed up search by using current head_blk buffer, but it is not
  * available.
  */
-#ifdef SIM
-/* ARGSUSED */
-#endif
 int
 xlog_find_tail(xlog_t  *log,
 	       daddr_t *head_blk,
@@ -612,16 +621,9 @@ xlog_find_tail(xlog_t  *log,
 	xlog_rec_header_t	*rhead;
 	xlog_op_header_t	*op_head;
 	buf_t			*bp;
-	int			error, i, found;
-#ifdef SIM
-	/* REFERENCED */
-#endif
-	int			clean;
+	int			error, i, found, clean;
 	daddr_t			umount_data_blk;
 	daddr_t			after_umount_blk;
-#ifdef SIM
-	/* REFERENCED */
-#endif
 	xfs_lsn_t		tail_lsn;
 	
 	clean = found = error = 0;
@@ -738,7 +740,6 @@ xlog_find_tail(xlog_t  *log,
 		}
 	}
 
-#ifndef SIM
 	/*
 	 * Make sure that there are no blocks in front of the head
 	 * with the same cycle number as the head.  This can happen
@@ -752,7 +753,6 @@ xlog_find_tail(xlog_t  *log,
 	 */
 	if (!clean || !readonly)
 		error = xlog_clear_stale_blocks(log, tail_lsn);
-#endif /* !SIM */
 
 bread_err:
 exit:
@@ -866,7 +866,7 @@ bp_err:
 	return -1;
 }	/* xlog_find_zeroed */
 
-#ifndef SIM
+
 /*
  * This is simply a subroutine used by xlog_clear_stale_blocks() below
  * to initialize a buffer full of empty log record headers and write
@@ -1047,7 +1047,6 @@ xlog_clear_stale_blocks(
 
 	return 0;
 }
-#endif /* !SIM */
 
 /******************************************************************************
  *
@@ -1798,10 +1797,8 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	mp = log->l_mp;
 	bp = bread(mp->m_dev, blkno, len);
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_ALERT,
-			"XFS: xlog_recover_do_buffer_trans: bread error (blkno 0x%x, "
-			"dev 0x%x)", blkno, mp->m_dev);
-		ASSERT(0);
+		xfs_ioerror_alert("xlog_recover_do..(read)", log->l_mp, 
+				  mp->m_dev, blkno);
 		error = bp->b_error;
 		brelse(bp);
 		return error;
@@ -1830,23 +1827,20 @@ xlog_recover_do_buffer_trans(xlog_t		 *log,
 	 * the buffer out of the buffer cache so that the buffer won't
 	 * overlap with future reads of those inodes.
 	 */
-
+	error = 0;
 	if ((*((__uint16_t *)(bp->b_un.b_addr)) == XFS_DINODE_MAGIC) &&
 	    (bp->b_bcount != MAX(log->l_mp->m_sb.sb_blocksize,
 				 XFS_INODE_CLUSTER_SIZE(log->l_mp)))) { 
 		bp->b_flags |= B_STALE;
-		bwrite(bp);
+	        error = xfs_bwrite(mp, bp);
 	} else {
-		bdwrite(bp);
+		ASSERT(bp->b_fsprivate == NULL || bp->b_fsprivate == mp);
+		bp->b_fsprivate = mp;
+		bp->b_iodone = xlog_recover_iodone;
+		xfs_bdwrite(mp, bp);
 	}
 
-	/*
-	 * Once bdwrite() is called, we lose track of the buffer.  Therefore,
-	 * if we want to keep track of buffer errors, we need to add a
-	 * release function which sets some variable which gets looked at
-	 * after calling bflush() on the device.  XXXmiken
-	 */
-	return 0;
+	return (error);
 }	/* xlog_recover_do_buffer_trans */
 
 STATIC int
@@ -1893,15 +1887,13 @@ xlog_recover_do_inode_trans(xlog_t		*log,
 	}
 	bp = bread(mp->m_dev, imap.im_blkno, imap.im_len);
 	if (bp->b_flags & B_ERROR) {
-		cmn_err(CE_ALERT,
-			"XFS: xlog_recover_do_inode_trans: bread error (blkno 0x%x, "
-			"dev 0x%x)",
-			bp->b_blkno, mp->m_dev);
-		ASSERT(0);
+		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
+				  mp->m_dev, imap.im_blkno);
 		error = bp->b_error;
 		brelse(bp);
 		return error;
 	}
+	error = 0;
 	xfs_inobp_check(mp, bp);
 	ASSERT(in_f->ilf_fields & XFS_ILOG_CORE);
 	dip = (xfs_dinode_t *)(bp->b_un.b_addr+imap.im_boffset);
@@ -2048,19 +2040,16 @@ write_inode_buffer:
 #endif
 	xfs_inobp_check(mp, bp);
 	if (ITEM_TYPE(item) == XFS_LI_INODE) {
-		bdwrite(bp);
+		ASSERT(bp->b_fsprivate == NULL || bp->b_fsprivate == mp);
+		bp->b_fsprivate = mp;
+		bp->b_iodone = xlog_recover_iodone;
+		xfs_bdwrite(mp, bp);
 	} else {
 		bp->b_flags |= B_STALE;
-		bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 	}
 
-	/*
-	 * Once bdwrite() is called, we lose track of the buffer.  Therefore,
-	 * if we want to keep track of buffer errors, we need to add a
-	 * release function which sets some variable which gets looked at
-	 * after calling bflush() on the device.  XXXmiken
-	 */
-	return 0;
+	return (error);
 }	/* xlog_recover_do_inode_trans */
 
 
@@ -2156,21 +2145,18 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	}
 	ASSERT(dq_f->qlf_len == 1);
 	
-	bp = read_buf(mp->m_dev, 
-		      dq_f->qlf_blkno, 
-		      XFS_FSB_TO_BB(mp, dq_f->qlf_len),
-		      0);
-	if (bp == NULL || bp->b_flags & B_ERROR) {
-		cmn_err(CE_WARN,
-			"XFS: xlog_recover_do_dquot_trans: bread error (blkno 0x%x, "
-			"dev 0x%x)",
-			dq_f->qlf_blkno, mp->m_dev);
-		ASSERT(0);
-		error = bp->b_error;
-		brelse(bp);
+	error = xfs_read_buf(mp, mp->m_dev, 
+			     dq_f->qlf_blkno, 
+			     XFS_FSB_TO_BB(mp, dq_f->qlf_len),
+			     0, &bp);
+	if (error) {
+		xfs_ioerror_alert("xlog_recover_do..(read)", mp, 
+				  mp->m_dev, dq_f->qlf_blkno);
 		return error;
 	}
-	ddq = (xfs_disk_dquot_t *) ((char *)bp->b_un.b_addr + dq_f->qlf_boffset);
+	ASSERT(bp);
+	ddq = (xfs_disk_dquot_t *) ((char *)bp->b_un.b_addr + 
+				    dq_f->qlf_boffset);
 	
 	/* 
 	 * At least the magic num portion should be on disk because this
@@ -2188,7 +2174,10 @@ xlog_recover_do_dquot_trans(xlog_t		*log,
 	bcopy(recddq, ddq, item->ri_buf[1].i_len);
 
 	ASSERT(dq_f->qlf_size == 2);
-	bdwrite(bp);
+	ASSERT(bp->b_fsprivate == NULL || bp->b_fsprivate == mp);
+	bp->b_fsprivate = mp;
+	bp->b_iodone = xlog_recover_iodone;
+	xfs_bdwrite(mp, bp);
 
 	return (0);
 }	/* xlog_recover_do_dquot_trans */
@@ -2702,7 +2691,7 @@ xlog_recover_clear_agi_bucket(
 	xfs_trans_reserve(tp, 0, XFS_CLEAR_AGI_BUCKET_LOG_RES(mp), 0, 0, 0);
 
 	agidaddr = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-	error = xfs_trans_read_buf(tp, mp->m_dev, agidaddr, 1, 0, &agibp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, agidaddr, 1, 0, &agibp);
 	if (error) {
 		xfs_trans_cancel(tp, XFS_TRANS_ABORT);
 		return;
@@ -3108,7 +3097,6 @@ xlog_do_recover(xlog_t	*log,
 #ifdef _KERNEL
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
-	struct bdevsw	*my_bdevsw;
 #endif
 	int		error;
 
@@ -3122,6 +3110,12 @@ xlog_do_recover(xlog_t	*log,
 
 #ifdef _KERNEL
 	bflush(log->l_mp->m_dev);    /* Flush out the delayed write buffers */
+	/*
+	 * If IO errors happened during recovery, bail out.
+	 */
+	if (XFS_FORCED_SHUTDOWN(log->l_mp)) {
+		return (EIO);
+	}
 
 	/*
 	 * We now update the tail_lsn since much of the recovery has completed
@@ -3144,9 +3138,7 @@ xlog_do_recover(xlog_t	*log,
 #ifndef SIM
 	bp_dcache_wbinval(bp);
 #endif
-	my_bdevsw = get_bdevsw(bp->b_edev);
-	ASSERT(my_bdevsw != NULL);
-	bdstrat(my_bdevsw, bp);
+	xfsbdstrat(log->l_mp, bp);
 	if (error = iowait(bp)) {
 		ASSERT(0);
 		brelse(bp);

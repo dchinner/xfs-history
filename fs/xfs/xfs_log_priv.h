@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.53 $"
+#ident	"$Revision: 1.54 $"
 
 #include <sys/cmn_err.h>
 
@@ -145,8 +145,9 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define XLOG_STATE_DONE_SYNC 0x08 /* Done syncing to disk */
 #define XLOG_STATE_CALLBACK  0x10 /* Callback functions now */
 #define XLOG_STATE_DIRTY     0x20 /* Dirty IC log, not ready for ACTIVE status*/
-#define XLOG_STATE_ALL	     0x3F /* All possible valid flags */
-#define XLOG_STATE_NOTUSED   0x40 /* This IC log not being used */
+#define XLOG_STATE_IOERROR   0x40 /* IO error happened in sync'ing log */
+#define XLOG_STATE_ALL	     0x7F /* All possible valid flags */
+#define XLOG_STATE_NOTUSED   0x80 /* This IC log not being used */
 
 /*
  * Flags to log operation header

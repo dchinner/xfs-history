@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.158 $"
+#ident  "$Revision: 1.159 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -884,8 +884,6 @@ xfs_mountroot(
 	xfs_mount_t	*mp;
 	buf_t		*bp;
 	extern dev_t	rootdev;		/* from sys/systm.h */
-	struct bdevsw	*my_bdevsw;
-
 
 	/*
 	 * Check that the root device holds an XFS file system.
@@ -979,9 +977,8 @@ xfs_mountroot(
 			if (bp->b_pincount == 0) {
 				bp->b_flags &= ~(B_DONE | B_READ);
 				bp->b_flags |= B_WRITE;
-				my_bdevsw = get_bdevsw(mp->m_dev);
-				ASSERT(my_bdevsw != NULL);
-				bdstrat(my_bdevsw, bp);
+				ASSERT(mp->m_dev == bp->b_edev);
+				xfsbdstrat(mp, bp);
 				(void) iowait(bp);
 			}
 			return XFS_ERROR(EBUSY);
@@ -1520,7 +1517,7 @@ xfs_sync(
 
 	mp = XFS_BHVTOM(bdp);
 
-	if (mp->m_flags & XFS_MOUNT_FS_IS_CLEAN)
+	if (mp->m_flags & (XFS_MOUNT_FS_IS_CLEAN|XFS_MOUNT_FS_SHUTDOWN))
 		return 0;
 
 	error = 0;
@@ -1955,9 +1952,17 @@ xfs_sync(
 	/*
 	 * Get the Quota Manager to flush the dquots in a similar manner.
 	 */
-	if (XFS_IS_QUOTA_ON(mp))
-		xfs_qm_sync(mp, flags);
-
+	if (XFS_IS_QUOTA_ON(mp)) {
+		if (error = xfs_qm_sync(mp, flags)) {
+			/*
+			 * If we got an IO error, we will be shutting down.
+			 * So, there's nothing more for us to do here.
+			 */
+			ASSERT(error != EIO || XFS_FORCED_SHUTDOWN(mp));
+			if (XFS_FORCED_SHUTDOWN(mp))
+				return (error);
+		}
+	}
 	/*
 	 * Flushing out dirty data above probably generated more
 	 * log activity, so if this isn't vfs_sync() then flush
@@ -1984,7 +1989,7 @@ xfs_sync(
 				    xfs_buf_item_dirty(bip)) {
 					if (bp->b_pincount == 0) {
 						bp->b_flags |= B_ASYNC;
-						error = bwrite(bp);
+						error = xfs_bwrite(mp, bp);
 					} else {
 						brelse(bp);
 					}
@@ -2008,7 +2013,7 @@ xfs_sync(
 					      XFS_LOG_FORCE);
 			}
 			bp->b_flags |= fflag;
-			error = bwrite(bp);
+			error = xfs_bwrite(mp, bp);
 		}
 		if (error) {
 			last_error = error;

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.34 $"
+#ident	"$Revision: 1.36 $"
 
 /*
  * Free realtime space allocation for XFS.
@@ -986,7 +986,7 @@ xfs_rtbuf_get(
 	/*
 	 * Read the buffer.
 	 */
-	error = xfs_trans_read_buf(tp, mp->m_dev, d, mp->m_bsize, 0, &bp);
+	error = xfs_trans_read_buf(mp, tp, mp->m_dev, d, mp->m_bsize, 0, &bp);
 	if (error) {
 		return error;
 	}

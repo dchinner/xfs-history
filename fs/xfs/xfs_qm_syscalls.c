@@ -1,4 +1,4 @@
-#ident "$Revision: 1.22 $"
+#ident "$Revision: 1.23 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -950,12 +950,11 @@ xfs_qm_log_quotaoff_end(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_QUOTAOFF_END);
 
-	/* XXX can this ever fail ??? */
-	(void) xfs_trans_reserve(tp, 0, sizeof(xfs_qoff_logitem_t) * 2,
-			  0,
-			  0, 
-			  XFS_DEFAULT_LOG_COUNT);
-	
+	if (error = xfs_trans_reserve(tp, 0, sizeof(xfs_qoff_logitem_t) * 2,
+				      0, 0, XFS_DEFAULT_LOG_COUNT)) {
+		xfs_trans_cancel(tp, 0);
+		return (error);
+	}
 
 	qoffi = xfs_trans_get_qoff_item(tp, startqoff,
 					flags & XFS_ALL_QUOTA_ACCT);
@@ -1014,7 +1013,7 @@ xfs_qm_log_quotaoff(
  
 error0:
 	if (error) {
-		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		xfs_trans_cancel(tp, 0);
 		/*
 		 * No one else is modifying sb_qflags, so this is OK.
 		 * We still hold the quotaofflock.

@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.147 $"
+#ident	"$Revision: 1.148 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -167,7 +167,6 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	int		writeio_log;
 	vmap_t		vmap;
 	daddr_t		d;
-	struct bdevsw	*my_bdevsw;
 	int		clean;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 #ifndef SIM
@@ -197,11 +196,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	bp->b_relse = xfs_sb_relse;
 	bp->b_blkno = XFS_SB_DADDR;		
 	bp->b_flags |= B_READ;
-	my_bdevsw = get_bdevsw(dev);
-	ASSERT(my_bdevsw != NULL);
-	bdstrat(my_bdevsw, bp);
+	xfsbdstrat(mp, bp);
 	if (error = iowait(bp)) {
-		ASSERT(error == 0);
 		goto error0;
 	}
 
@@ -428,11 +424,10 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		error = XFS_ERROR(E2BIG);
 		goto error1;
 	}
-	bp = read_buf(mp->m_dev, d - 1, 1, 0);
-	ASSERT(bp);
-	error = geterror(bp);
-	brelse(bp);
-	if (error) {
+	error = xfs_read_buf(mp, mp->m_dev, d - 1, 1, 0, &bp);
+	if (!error) {
+		brelse(bp);
+	} else {
 		if (error == ENOSPC) {
 			error = XFS_ERROR(E2BIG);
 		}
@@ -445,11 +440,10 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			error = XFS_ERROR(E2BIG);
 			goto error1;
 		}
-		bp = read_buf(mp->m_logdev, d - 1, 1, 0);
-		ASSERT(bp);
-		error = geterror(bp);
-		brelse(bp);
-		if (error) {
+		error = xfs_read_buf(mp, mp->m_logdev, d - 1, 1, 0, &bp);
+		if (!error) {
+			brelse(bp);
+		} else {
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
 			}
@@ -472,11 +466,10 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			error = XFS_ERROR(E2BIG);
 			goto error1;
 		}
-		bp = read_buf(mp->m_rtdev, d - 1, 1, 0);
-		ASSERT(bp);
-		error = geterror(bp);
-		brelse(bp);
-		if (error) {
+		error = xfs_read_buf(mp, mp->m_rtdev, d - 1, 1, 0, &bp);
+		if (!error) {
+			brelse(bp);
+		} else {
 			if (error == ENOSPC) {
 				error = XFS_ERROR(E2BIG);
 			}
@@ -807,7 +800,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	int		error;
 	/* REFERENCED */
 	int		unused;
-	struct bdevsw	*my_bdevsw;
 #ifndef SIM
 	int		ndquots;
 #endif
@@ -824,7 +816,6 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 						  XFS_QMOPT_UQUOTA|
 						  XFS_QMOPT_PQUOTA|
 						  XFS_QMOPT_UMOUNTING)) {
-			ASSERT(0);
 			delay(ndquots * 10);
 		}
 	}
@@ -841,18 +832,19 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		binval(mp->m_rtdev);
 	}
 	/*
-	 * skip superblock write if fs is truly read-only
+	 * skip superblock write if fs is truly read-only, or
+	 * if we are doing a forced umount.
 	 */
-	if (!(mp->m_flags & XFS_MOUNT_FS_IS_CLEAN))  {
+	if (!(mp->m_flags & (XFS_MOUNT_FS_IS_CLEAN|XFS_MOUNT_FS_SHUTDOWN)))  {
 		bp = xfs_getsb(mp, 0);
 		bp->b_flags &= ~(B_DONE | B_READ);
 		bp->b_flags |= B_WRITE;
 		bwait_unpin(bp);
-		my_bdevsw = get_bdevsw(mp->m_dev);
-		ASSERT(my_bdevsw != NULL);
-		bdstrat(my_bdevsw, bp);
-		error = iowait(bp);
-		ASSERT(error == 0);
+		ASSERT(bp->b_edev == mp->m_dev);
+		xfsbdstrat(mp, bp);
+		/* Nevermind errors we might get here. */
+		(void) iowait(bp);
+		
 	}
 	
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
@@ -870,7 +862,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		VN_RELE(mp->m_logdevp);
 	}
 
-	if (!(mp->m_flags & XFS_MOUNT_FS_IS_CLEAN))
+	if (!(mp->m_flags & (XFS_MOUNT_FS_IS_CLEAN|XFS_MOUNT_FS_SHUTDOWN)))
 		nfreerbuf(bp);
 
 	/*

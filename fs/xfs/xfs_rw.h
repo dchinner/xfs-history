@@ -1,9 +1,10 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.27 $"
+#ident "$Revision: 1.28 $"
 
 struct bhv_desc;
+struct bdevsw;
 struct bmapval;
 struct buf;
 struct cred;
@@ -74,7 +75,25 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 		 XFS_FSB_TO_BB((ip)->i_mount, (fsb)) : \
 		 XFS_FSB_TO_DADDR((ip)->i_mount, (fsb)))
 #endif
-     
+
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BDWRITE)
+void	xfs_bdelwri(struct xfs_mount *, struct buf *);
+#define xfs_bdwrite(mp, bp)	xfs_bdelwri(mp, bp)
+#else
+#define	xfs_bdwrite(mp, bp) \
+          ((!XFS_FORCED_SHUTDOWN(mp)) ? \
+	  ((bp)->b_bdstrat = xfs_bdstrat, bdwrite(bp)) : (void) xfs_bioerror(bp))
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BAWRITE)
+void	xfs_basyncwri(struct xfs_mount *, struct buf *);
+#define xfs_bawrite(mp, bp)	xfs_basyncwri(mp, bp)
+#else
+#define	xfs_bawrite(mp, bp) \
+	  ((!XFS_FORCED_SHUTDOWN(mp)) ? \
+	  ((bp)->b_bdstrat = xfs_bdstrat, bawrite(bp)) : (void) xfs_bioerror(bp))
+
+#endif
+
 /*
  * Defines for the trace mechanisms in xfs_rw.c.
  */
@@ -134,6 +153,15 @@ xfs_write(struct bhv_desc	*bdp,
 	  struct cred		*credp,
 	  struct flid		*fl);
 
+int 
+xfs_bwrite(
+	struct xfs_mount 	*mp,
+	struct buf		*bp);
+int
+xfsbdstrat(
+	struct xfs_mount 	*mp,
+	struct buf		*bp);
+
 void
 xfs_strategy(struct bhv_desc	*bdp,
 	     struct buf		*bp);
@@ -175,6 +203,9 @@ xfs_refcache_purge_mp(
 void
 xfs_refcache_purge_some(void);
 
+int
+xfs_bioerror(struct buf *b);
+
 /*
  * Needed by xfs_rw.c
  */
@@ -188,5 +219,23 @@ xfs_rwunlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	write_lock);
 
+int
+xfs_read_buf(
+	struct xfs_mount *mp,
+	dev_t		 dev,
+        daddr_t 	 blkno,
+        int              len,
+        uint             flags,
+	struct buf	 **bpp);
 
+int
+xfs_bdstrat(struct buf *bp);
+
+void
+xfs_ioerror_alert(
+	char 			*func,
+	struct xfs_mount	*mp,
+	dev_t			dev,
+	daddr_t			blkno);
+	  
 #endif /* _XFS_RW_H */

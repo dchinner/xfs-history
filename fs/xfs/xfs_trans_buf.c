@@ -1,4 +1,4 @@
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -37,6 +37,7 @@
 #include "xfs_mount.h"
 #include "xfs_trans_priv.h"
 #include "xfs_error.h"
+#include "xfs_rw.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -132,6 +133,11 @@ xfs_trans_get_buf(xfs_trans_t	*tp,
 	if (bp == NULL) {
 		return NULL;
 	}
+	
+	/*
+	 * XXXsup we should get errors here, when FORCED_SHUTDOWN is on.
+	 */
+	ASSERT(!geterror(bp));
 
 	/*
 	 * The xfs_buf_log_item pointer is stored in b_fsprivate.  If
@@ -278,17 +284,21 @@ int	xfs_error_mod = 33;
  * read_buf() call.
  */
 int
-xfs_trans_read_buf(xfs_trans_t	*tp,
-		   dev_t	dev,
-		   daddr_t	blkno,
-		   int		len,
-		   uint		flags,
-		   buf_t	**bpp)
+xfs_trans_read_buf(
+	xfs_mount_t	*mp,
+	xfs_trans_t	*tp,
+	dev_t		dev,
+	daddr_t		blkno,
+	int		len,
+	uint		flags,
+	buf_t		**bpp)
 {
 	buf_t			*bp;
 	xfs_buf_log_item_t	*bip;
 	int			error;
-	struct bdevsw		*my_bdevsw;
+	
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return XFS_ERROR(EIO);
 
 	/*
 	 * Default to a normal get_buf() call if the tp is NULL.
@@ -307,7 +317,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		bp = read_buf(dev, blkno, len, flags | BUF_BUSY);
 #endif
 		if ((bp != NULL) && (geterror(bp) != 0)) {
-			prdev("XFS read error in file system meta-data block %ld", (int)bp->b_edev, bp->b_blkno);
+			xfs_ioerror_alert("xfs_trans_read_buf", mp, dev, blkno);
 			error = geterror(bp);
 			brelse(bp);
 			return error;
@@ -343,6 +353,7 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 	if (bp != NULL) {
 		ASSERT(bp->b_fsprivate2 == tp);
 		ASSERT(bp->b_fsprivate != NULL);
+		ASSERT((bp->b_flags & B_ERROR) == 0);
 		if (!(bp->b_flags & B_DONE)) {
 			ASSERT(0);
 #ifndef SIM
@@ -351,10 +362,8 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 
 			ASSERT(!(bp->b_flags & B_ASYNC));
 			bp->b_flags |= B_READ;
-			my_bdevsw = get_bdevsw(dev);
-			ASSERT(my_bdevsw != NULL);
-			bdstrat(my_bdevsw, bp);
-
+			ASSERT(bp->b_edev == dev);
+			xfsbdstrat(tp->t_mountp, bp);
 #ifndef SIM
 			KTOP_UPDATE_CURRENT_INBLOCK(1);
 			SYSINFO.bread += len;
@@ -362,9 +371,18 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 
 			iowait(bp);
 			if (geterror(bp) != 0) {
-				prdev("XFS read error in file system meta-data block %ld", (int)bp->b_edev, bp->b_blkno);
+				xfs_ioerror_alert("xfs_trans_read_buf", mp, 
+						  dev, blkno);
 				error = geterror(bp);
 				brelse(bp);
+				/*
+				 * We can gracefully recover from most
+				 * read errors. Ones we can't are those
+				 * that happen after the transaction's
+				 * already dirty.
+				 */
+				if (tp->t_flags & XFS_TRANS_DIRTY)
+					xfs_force_shutdown(tp->t_mountp);
 				return error;
 			}
 		}
@@ -396,15 +414,24 @@ xfs_trans_read_buf(xfs_trans_t	*tp,
 		return 0;
 	}
 	if (geterror(bp) != 0) {
-			prdev("XFS read error in file system meta-data block %ld", (int)bp->b_edev, bp->b_blkno);
-			error = geterror(bp);
-			brelse(bp);
-			return error;
+		bp->b_flags |= B_DONE|B_STALE|B_ERROR;
+		if (error = geterror(bp)) {
+			xfs_ioerror_alert("xfs_trans_read_buf", mp, 
+					  dev, blkno);
+			if (tp->t_flags & XFS_TRANS_DIRTY)
+				xfs_force_shutdown(tp->t_mountp);
+		} else {
+			error = bp->b_error = EIO;
+		}
+		
+		brelse(bp);
+		return error;
 	}
 #ifdef DEBUG
 	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
 		if (xfs_error_dev == bp->b_edev) {
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
+				xfs_force_shutdown(tp->t_mountp);
 				brelse(bp);
 				printf("Returning error in trans!\n");
 				return XFS_ERROR(EIO);

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.6 $"
+#ident "$Revision: 1.7 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -43,6 +43,7 @@
 #include "xfs_dquot.h"
 #include "xfs_qm.h"
 #include "xfs_quota_priv.h"
+#include "xfs_rw.h"
 
 STATIC uint		xfs_qm_dquot_logitem_size(xfs_dq_logitem_t *logitem);
 STATIC void		xfs_qm_dquot_logitem_format(xfs_dq_logitem_t *logitem,
@@ -275,7 +276,7 @@ xfs_qm_dquot_logitem_pushbuf(
 				delay_for_intr();
 				delay(300);
 #endif				
-				bawrite(bp);
+				xfs_bawrite(mp, bp);
 			} else {
 				brelse(bp);
 			}

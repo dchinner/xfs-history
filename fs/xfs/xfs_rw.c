@@ -1,4 +1,4 @@
-#ident "$Revision: 1.190 $"
+#ident "$Revision: 1.191 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1028,6 +1028,8 @@ xfs_read_file(
 
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
+		return XFS_ERROR(EIO);
 	error = 0;
 	buffer_bytes_ok = 0;
 	XFSSTATS.xs_read_calls++;
@@ -1512,6 +1514,7 @@ xfs_zero_last_block(
 	if (bp->b_flags & B_ERROR) {
 		error = geterror(bp);
 		brelse(bp);
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		return error;
 	}
 	zero_offset = isize_fsb_offset;
@@ -1524,9 +1527,9 @@ xfs_zero_last_block(
 	 * allocated so it's faster anyway.
 	 */
 	if (imap.br_startblock == DELAYSTARTBLOCK) {
-		bdwrite(bp);
+		xfs_bdwrite(mp, bp);
 	} else {
-		error = bwrite(bp);
+		error = xfs_bwrite(mp, bp);
 	}
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1573,6 +1576,8 @@ xfs_zero_eof(
 	 */
 	error = xfs_zero_last_block(ip, offset, isize, credp, pmp);
 	if (error) {
+		ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE));
+		ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE));
 		return error;
 	}
 
@@ -1604,6 +1609,8 @@ xfs_zero_eof(
 		error = xfs_bmapi(NULL, ip, start_zero_fsb, zero_count_fsb,
 				  0, &firstblock, 0, &imap, &nimaps, NULL);
 		if (error) {
+			ASSERT(ismrlocked(&(ip->i_lock), MR_UPDATE));
+			ASSERT(ismrlocked(&(ip->i_iolock), MR_UPDATE));
 			return error;
 		}
 		ASSERT(nimaps > 0);
@@ -1661,9 +1668,9 @@ xfs_zero_eof(
 	        }
 
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
-			bdwrite(bp);
+			xfs_bdwrite(mp, bp);
 		} else {
-			error = bwrite(bp);
+			error = xfs_bwrite(mp, bp);
 			if (error) {
 				xfs_ilock(ip, XFS_ILOCK_EXCL);
 				return error;
@@ -2079,6 +2086,8 @@ xfs_write_file(
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return XFS_ERROR(EIO);
 
 	/*
 	 * If the file has fixed size extents or is a real time file, 
@@ -2267,7 +2276,7 @@ xfs_write_file(
 			 */
 			if (error != 0) {
 				bp->b_flags |= B_STALE;
-				bwrite(bp);
+				(void) xfs_bwrite(mp, bp);
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -2298,7 +2307,7 @@ xfs_write_file(
 					chunkreread(bp);
 				}
 				bp->b_flags |= B_STALE;
-				bwrite(bp);
+				(void) xfs_bwrite(mp, bp);
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -2343,9 +2352,9 @@ xfs_write_file(
 				    bmapp->bsize) {
 					bp->b_relse = chunkrelse;
 				}
-				bwrite(bp);
+				error = xfs_bwrite(mp, bp);
 			} else {
-				bdwrite(bp);
+				xfs_bdwrite(mp, bp);
 			}
 
 			XFSSTATS.xs_write_bufs++;
@@ -2436,6 +2445,8 @@ xfs_write(
 	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
 	eventsent = 0;
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
+		return (EIO);
 
 	if (!(ioflag & IO_ISLOCKED))
 		xfs_rwlock(bdp, (ioflag & IO_DIRECT) ?
@@ -2680,6 +2691,8 @@ xfs_bmap(
 	ip = XFS_BHVTOI(bdp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT((flags == B_READ) || (flags == B_WRITE));
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount))
+		return (EIO);
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 
@@ -3187,7 +3200,6 @@ xfs_strat_read(
 	int		error;
 #define	XFS_STRAT_READ_IMAPS	XFS_BMAP_MAX_NMAP
 	xfs_bmbt_irec_t	imap[XFS_STRAT_READ_IMAPS];
-	struct bdevsw	*my_bdevsw;
 	
 	ASSERT(bp->b_blkno == -1);
 	ip = XFS_BHVTOI(bdp);
@@ -3381,16 +3393,12 @@ xfs_strat_read(
 				rbp->b_flags &= ~B_ASYNC;
 
 				xfs_check_rbp(ip, bp, rbp, 1);
-				my_bdevsw = get_bdevsw(rbp->b_edev);
-				ASSERT(my_bdevsw != NULL);
-				bdstrat(my_bdevsw, rbp);
-				iowait(rbp);
-
-				if (rbp->b_flags & B_ERROR) {
+				(void) xfsbdstrat(mp, rbp);
+				error = iowait(rbp);
+				if (error) {
 					bp->b_flags |= B_ERROR;
-					bp->b_error = XFS_ERROR(rbp->b_error);
+					bp->b_error = error;
 					ASSERT(bp->b_error != EINVAL);
-					error = bp->b_error;
 				}
 
 				/*
@@ -3809,11 +3817,6 @@ xfs_delalloc_cleanup(
 		error = xfs_bmapi(NULL, ip, start_fsb, count_fsb, 0,
 				  &first_block, 1, imap, &nimaps, NULL);
 		if (error) {
-			/*
-			 * We should never get errors in this case, but if
-			 * we do then just bail out.
-			 */
-			ASSERT(0);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			return;
 		}
@@ -3828,12 +3831,6 @@ xfs_delalloc_cleanup(
 						    0, 1, &first_block, NULL,
 						    &done);
 				if (error) {
-					/*
-					 * We should never get errors in
-					 * this case, but if
-					 * we do then just bail out.
-					 */
-					ASSERT(0);
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 					return;
 				}
@@ -3885,7 +3882,7 @@ xfs_strat_write(
 	int		committed;
 	xfs_bmbt_irec_t	imap[XFS_BMAP_MAX_NMAP];
 #define	XFS_STRAT_WRITE_IMAPS	2
-	struct bdevsw	*my_bdevsw;
+
 	/*
 	 * If XFS_STRAT_WRITE_IMAPS is changed then the definition
 	 * of XFS_STRATW_LOG_RES in xfs_trans.h must be changed to
@@ -3911,12 +3908,18 @@ xfs_strat_write(
 	atomicAddInt(&(ip->i_queued_bufs), -1);
 	ASSERT(ip->i_queued_bufs >= 0);
 
+	/*
+	 * Don't proceed if we're forcing a shutdown.
+	 * We may not have bmap'd all the blocks needed.
+	 */
+	if (XFS_FORCED_SHUTDOWN(mp)) {
+		return xfs_bioerror(bp);
+	}
+
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0)) {
-				bp->b_flags |= B_ERROR;
-				bp->b_error = error;
-				goto error0;
+				return xfs_bioerror(bp);
 			}
 		}
 	}
@@ -3965,6 +3968,7 @@ xfs_strat_write(
 				bp->b_error = error;
 				goto error0;
 			}
+
 			ASSERT(error == 0);
 			xfs_ilock(ip, XFS_ILOCK_EXCL);
 			xfs_trans_ijoin(tp, ip,
@@ -4048,13 +4052,11 @@ xfs_strat_write(
 			xfs_strat_write_bp_trace(XFS_STRAT_FAST,
 						 ip, bp);
 			xfs_check_bp(ip, bp);
-			my_bdevsw = get_bdevsw(bp->b_edev);
-			ASSERT(my_bdevsw != NULL);
 #ifdef XFSRACEDEBUG
 			delay_for_intr();
 			delay(100);
 #endif
-			bdstrat(my_bdevsw, bp);
+			xfsbdstrat(mp, bp);
 
 			XFSSTATS.xs_xstrat_quick++;
 			return 0;
@@ -4154,13 +4156,11 @@ xfs_strat_write(
 			rbp->b_relse = xfs_strat_write_relse;
 			rbp->b_flags |= B_ASYNC;
 
-			my_bdevsw = get_bdevsw(rbp->b_edev);
-			ASSERT(my_bdevsw != NULL);
 #ifdef XFSRACEDEBUG
 			delay_for_intr();
 			delay(100);
 #endif
-			bdstrat(my_bdevsw, rbp);
+			xfsbdstrat(mp, rbp);
 			map_start_fsb +=
 				imapp->br_blockcount;
 			count_fsb -= imapp->br_blockcount;
@@ -4205,17 +4205,248 @@ xfs_strat_write(
 			bp->b_flags &= ~(B_PARTIAL | B_LEADER);
 			mutex_spinunlock(&xfs_strat_lock, s);
 
-			iodone(bp);
+			biodone(bp);
 			return error;
 		}
 
 		bp->b_flags &= ~B_PARTIAL;
 		mutex_spinunlock(&xfs_strat_lock, s);
 	} else {
+		/* XXXsup, we might have to call biodone if error, all the time */
 		biodone(bp);
 	}
 	return error;
 }
+
+dev_t xfserrordev = 0;	/* temp */
+
+/*
+ * Force a shutdown of the filesystem instantly while keeping
+ * the filesystem consistent. We don't do an unmount here; just shutdown
+ * the shop, make sure that absolutely nothing persistent happens to
+ * this filesystem after this point. 
+ */
+void
+xfs_force_shutdown(
+	struct xfs_mount	*mp)
+{
+	/*
+	 * No need to duplicate efforts.
+	 */
+	if (XFS_FORCED_SHUTDOWN(mp))
+		return;
+
+	cmn_err(CE_NOTE,
+		"I/O Error Detected. Shutting down filesystem: %s",
+		mp->m_fsname);
+	cmn_err(CE_NOTE,
+		"Please umount the filesystem, and rectify the problem(s)");
+#if 0
+	/*
+         * Wait for sync to finish, and lock vfsp.
+         * Also sets VFS_OFFLINE flag.
+	 * This isn't enuf to stop threads from racing to
+	 * shutdown the system.XXXsup
+         */
+	vfslocked = B_TRUE;
+	if (vfs_lock_badblock(XFS_MTOVFS(mp))) {
+		/* XXXsup */
+		debug("badblock");
+		vfslocked = B_FALSE;
+	}
+#endif		
+	/*
+	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
+	 * queue up anybody new on the log reservations, and wakes up everybody
+	 * who's sleeping on log reservations and tells them the bad news.
+	 */
+	xfs_log_force_umount(mp);
+	xfserrordev = mp->m_dev;
+#if 0
+	/* 
+	 * Clears VFS_OFFLINE flag, unlocks VFS. Filesystem is left marked
+	 * VFS_BADBLOCK.
+	 */
+	if (vfslocked)
+		vfs_unlock(XFS_MTOVFS(mp));  
+#endif
+	/* binval(mp->m_dev); */
+}
+
+/*
+ * Called when we want to stop a buffer from getting written or read.
+ * We attach the EIO error, muck with its flags, and call biodone
+ * so that the proper iodone callbacks get called.
+ */
+int
+xfs_bioerror(
+	buf_t *bp)
+{
+	/*
+	 * No need to wait until the buffer is unpinned.
+	 * We aren't flushing it.
+	 */
+	buftrace("XFS IOERROR", bp);
+	bioerror(bp, EIO);
+	/*
+	 * XXXXsup chunkhold expects B_DONE to be there, so
+	 * dont delete that from the flags. OTOH, if we're
+	 * calling biodone, delete it. Either way we have to
+	 * call the iodone callback, and calling biodone
+	 * probably is the best way since it takes care of
+	 * GRIO as well.
+	 */
+	bp->b_flags &= ~(B_READ|B_DELWRI|B_DONE);
+	bp->b_flags |= B_STALE;
+
+	bp->b_bdstrat = NULL;
+	biodone(bp);
+	return (EIO);
+}
+
+/*
+ * Prints out an ALERT message about I/O error. 
+ */
+void
+xfs_ioerror_alert(
+	char 			*func,
+	struct xfs_mount	*mp,
+	dev_t			dev,
+	daddr_t			blkno)
+{
+	cmn_err(CE_ALERT,
+ "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%x (\"%s\")",
+		mp->m_fsname, 
+		dev,
+		blkno,
+		func);
+}
+
+/*
+ * This isn't an absolute requirement, but it is
+ * just a good idea to call xfs_read_buf instead of
+ * directly doing a read_buf call. For one, we shouldn't
+ * be doing this disk read if we are in SHUTDOWN state anyway,
+ * so this stops that from happening. Secondly, this does all
+ * the error checking stuff and the brelse if appropriate for
+ * the caller, so the code can be a little leaner.
+ */
+int
+xfs_read_buf(
+	struct xfs_mount *mp,
+	dev_t		 dev,
+        daddr_t 	 blkno,
+        int              len,
+        uint             flags,
+	buf_t		 **bpp)
+{
+	buf_t		 *bp;
+	int 		 error;
+	
+	if (!XFS_FORCED_SHUTDOWN(mp)) {
+		bp = read_buf(dev, blkno, len, flags);
+		error = geterror(bp);
+		if (bp && !error) {
+			*bpp = bp;
+		} else {
+			*bpp = NULL;
+			if (bp)
+				brelse(bp);
+		}
+	} else {
+		error = EIO;
+		*bpp = NULL;
+	}
+
+	return (error);
+}
+	
+/*
+ * Wrapper around bwrite() so that we can trap 
+ * write errors, and act accordingly.
+ */
+int
+xfs_bwrite(
+	struct xfs_mount *mp,
+	struct buf	 *bp)
+{
+	int	error;
+	int	flag;
+
+	if (!XFS_FORCED_SHUTDOWN(mp)) {
+		bp->b_bdstrat = xfs_bdstrat;
+		if (error = bwrite(bp)) {
+#ifdef DEBUG
+			printf("------- xfs_bwrite HIT ------- 0x%x\n", bp);
+#endif	
+			ASSERT(mp);
+			buftrace("XFSBWRITE IOERROR", bp);
+			xfs_force_shutdown(mp);
+		}
+	} else {
+		flag = bp->b_flags;
+		buftrace("XFSBWRITE (SHUTDOWN)", bp);
+		(void) xfs_bioerror(bp);	
+		if (flag & B_ASYNC) {
+			if (!(flag & B_DELWRI)) {
+				error = geterror(bp);
+			} else {
+				error = 0;
+			}
+		} else {
+			error = biowait(bp);
+			if (!(bp->b_flags & B_HOLD)) {
+				brelse(bp);
+			}
+		}
+ 
+	}
+	return (error);
+}
+
+/*
+ * All xfs buffers except for log buffers, get this attached as their
+ * b_bdstrat callback function. This is so that we can catch a buffer
+ * after prematurely unpinning it to forcibly shutdown the filesystem.
+ */
+int
+xfs_bdstrat(struct buf *bp)
+{
+	extern dev_t xfserrordev;
+	struct bdevsw	*my_bdevsw;
+	
+	/* tempXXX - we need to get access to mp here */
+	if (xfserrordev != bp->b_edev) {
+		my_bdevsw = get_bdevsw(bp->b_edev);
+		ASSERT(my_bdevsw != NULL);
+		return (bdstrat(my_bdevsw, bp));
+	} else { 
+		buftrace("XFS__BDSTRAT IOERROR", bp);
+		return (xfs_bioerror(bp));
+	}
+}
+
+/*
+ * Wrapper around bdstrat so that we can stop data
+ * from going to disk in case we are shutting down the filesystem.
+ */
+int
+xfsbdstrat(
+	struct xfs_mount 	*mp,
+	struct buf		*bp)
+{
+	struct bdevsw	*my_bdevsw;
+
+	ASSERT(mp);
+	my_bdevsw = get_bdevsw(bp->b_edev);
+	ASSERT(my_bdevsw != NULL);
+	if (!XFS_FORCED_SHUTDOWN(mp))
+		return (bdstrat(my_bdevsw, bp));	
+
+	buftrace("XFSBDSTRAT IOERROR", bp);
+	return (xfs_bioerror(bp));
+}
+
 
 /*
  * xfs_strategy
@@ -4235,17 +4466,15 @@ xfs_strategy(
 {
 	int		s;
 	xfs_inode_t	*ip;
-	struct bdevsw	*my_bdevsw;
 
+	ip = XFS_BHVTOI(bdp);
 	/*
 	 * If this is just a buffer whose underlying disk space
 	 * is already allocated, then just do the requested I/O.
 	 */
 	if (bp->b_blkno >= 0) {
-		xfs_check_bp(XFS_BHVTOI(bdp), bp);
-		my_bdevsw = get_bdevsw(bp->b_edev);
-		ASSERT(my_bdevsw != NULL);
-		bdstrat(my_bdevsw, bp);
+		xfs_check_bp(ip, bp);
+		(void) xfsbdstrat(ip->i_mount, bp);
 		return;
 	}
 
@@ -4259,13 +4488,16 @@ xfs_strategy(
 		return;
 	}
 
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
+		xfs_bioerror(bp);
+		return;
+	}
 	/*
 	 * Here we're writing the file and probably need to allocate
 	 * some underlying disk space. If the buffer is being written
 	 * asynchronously by bdflush() then we queue if for the xfsds
 	 * so that we won't put bdflush() to sleep.
 	 */
-	ip = XFS_BHVTOI(bdp);
 	if ((bp->b_flags & (B_ASYNC | B_BDFLUSH)) == (B_ASYNC | B_BDFLUSH) &&
 	    (xfsd_count > 0)) {
 		s = mp_mutex_spinlock(&xfsd_lock);
@@ -4521,7 +4753,6 @@ xfs_diostrat(
 	int		committed;
 	uint		lock_mode;
 	xfs_fsize_t	new_size;
-	struct bdevsw	*my_bdevsw;
 
 	CHECK_GRIO_TIMESTAMP(bp, 40);
 
@@ -4681,7 +4912,8 @@ retry:
 					 * Ran out of file system space.
 					 * Free the transaction structure.
 					 */
-					ASSERT(error == ENOSPC);
+					ASSERT(error == ENOSPC || 
+					       XFS_FORCED_SHUTDOWN(mp));
 					xfs_trans_cancel(tp, 0);
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
 					break;
@@ -4883,10 +5115,8 @@ retry:
  				 * Issue I/O request.
 				 */
 				CHECK_GRIO_TIMESTAMP(nbp, 40);
-				my_bdevsw = get_bdevsw(nbp->b_edev);
-				ASSERT(my_bdevsw != NULL);
-				bdstrat(my_bdevsw, nbp);
-	
+				(void) xfsbdstrat(mp, nbp);
+				
 		    		if (error = geterror(nbp)) {
 					biowait(nbp);
 					nbp->b_flags = 0;
