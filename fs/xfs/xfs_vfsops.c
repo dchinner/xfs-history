@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.170 $"
+#ident  "$Revision: 1.172 $"
 
 
 #include <limits.h>
@@ -1298,10 +1298,18 @@ devvptoxfs(
 		 * about racing with unmount.  Hold devvp's lock to
 		 * block unmount here.
 		 */
-		bp = ngeteblk(BBSIZE);
-		fs = (xfs_sb_t *)bp->b_un.b_addr;
 		vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vfs_devsearch(dev)),
 					      &xfs_vfsops);
+		/*
+		 * If the filesystem is shutting down, typically because of
+		 * an I/O error, the SB may be inconsistent. Get outta here.
+		 */
+		if (XFS_FORCED_SHUTDOWN(XFS_BHVTOM(vfs_bdp))) {
+			VOP_RWUNLOCK(devvp, VRWLOCK_WRITE);	
+			return XFS_ERROR(EIO);
+		}
+		bp = ngeteblk(BBSIZE);
+		fs = (xfs_sb_t *)bp->b_un.b_addr;
 		bcopy(&XFS_BHVTOM(vfs_bdp)->m_sb, fs, sizeof(*fs));
 	} else {
 #endif  /* !UNIKERNEL */
@@ -1324,6 +1332,7 @@ devvptoxfs(
 		if (bp->b_flags & B_ERROR) {
 			error = bp->b_error;
 			brelse(bp);
+			bp = NULL;
 		} else
 			fs = (xfs_sb_t *)bp->b_un.b_addr;
 #if     !UNIKERNEL
@@ -1750,6 +1759,8 @@ xfs_sync(
 							  &dip, &bp, 0);
 					if (!error) {
 						brelse(bp);
+					} else {
+						return (0);
 					}
 
 					/*
