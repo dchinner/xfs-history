@@ -165,14 +165,14 @@ xfs_dm_send_data_event(
 	 * so we go straight to XFS.
 	 */
 	ASSERT(BHV_IS_XFS(bdp));
-	VN_BHV_READ_LOCK(&vp->v_bh);
+/*	VN_BHV_READ_LOCK(&vp->v_bh);   cell-only */
 	if (locktype)
 		xfs_rwunlock(bdp, *locktype);
 	error = dm_send_data_event(event, bdp, DM_RIGHT_NULL,
 			offset, length, flags);
 	if (locktype)
 		xfs_rwlock(bdp, *locktype);
-	VN_BHV_READ_UNLOCK(&vp->v_bh);
+/*	VN_BHV_READ_UNLOCK(&vp->v_bh);  cell-only */
 
 	return error;
 }
@@ -935,6 +935,34 @@ xfs_dm_direct_ok(
 }
 
 
+/* get a well-connected dentry.  borrowed from nfsd_iget() */
+static struct dentry *dmapi_dget(struct inode *inode)
+{
+	struct list_head *lp;
+	struct dentry *result;
+
+	spin_lock(&dcache_lock);
+	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+		result = list_entry(lp,struct dentry, d_alias);
+		if (! (result->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+			dget_locked(result);
+			spin_unlock(&dcache_lock);
+			/*iput(inode);*/
+			return result;
+		}
+	}
+	spin_unlock(&dcache_lock);
+	result = d_alloc_root(inode);
+	if (result == NULL) {
+		/*iput(inode);*/
+		return NULL;
+	}
+	result->d_flags |= DCACHE_NFSD_DISCONNECTED;
+	d_rehash(result); /* so a dput won't loose it */
+	return result;
+}
+
+
 /* This routine started as a copy of routines rwv() and rdwr(), and then all
    unnecessary code was removed.  The copy was required because we need to
    be able to select various combinations of FINVIS, FNONBLOCK, FDIRECT, and
@@ -953,22 +981,18 @@ xfs_dm_rdwr(
 	void		*bufp,
 	int		*rvp)
 {
-	printk("*** xfs_dm_rdwr not implemented\n");
-	return(ENOSYS);
-#if 0
-
 	int		error;
-	struct uio	uio;
-	struct iovec	iov;
-	int		ioflag;
+	int		oflags;
 	ssize_t		count, xfer;
-#if 0
-	uthread_t	*ut = curuthread;
-#endif
 	vnode_t		*vp = BHV_TO_VNODE(bdp);
+	struct file	file;
+	ssize_t		ret;
+	struct inode	*ip;
+	struct dentry	*dentry;
 
 	if (off < 0 || vp->v_type != VREG)
 		return(EINVAL);
+
 
 	/*
 	 * Disallow outsiders reading/writing swap.  Not worried about data
@@ -979,16 +1003,12 @@ xfs_dm_rdwr(
 	if (vp->v_flag & VISSWAP && vp->v_type == VREG)
 		return EACCES;
 
-	if (fflag & FREAD) {
-/*		SYSINFO.sysread++;
-		ut->ut_acct.ua_syscr++;
-*/
+	if (fflag & FMODE_READ) {
 	        XFS_STATS_INC(xs_read_calls);
+		oflags = O_RDONLY;
 	} else {
-/*		SYSINFO.syswrite++;
-		ut->ut_acct.ua_syscw++;
-*/
 	        XFS_STATS_INC(xs_write_calls);
+		oflags = O_WRONLY;
 	}
 
 	/* Build file descriptor flags and I/O flags.  FNONBLOCK is needed so
@@ -996,84 +1016,67 @@ xfs_dm_rdwr(
 	   that we don't change any file timestamps.
 	*/
 
-	fflag |= FINVIS|FNONBLOCK;
+	oflags |= O_INVISIBLE | O_NONBLOCK;
 	if (xfs_dm_direct_ok(bdp, off, len, bufp))
-/* XXX */
-/*		fflag |= FDIRECT;*/
-		/* nop */;
+		oflags |= O_DIRECT;
 
-	ioflag = IO_INVIS;
-#if 0
-/* XXX */
+/* XXX 
 	if (fflag & FSYNC)
-		ioflag |= IO_SYNC;
-	if (fflag & FDIRECT)
-		ioflag |= IO_DIRECT;
-#endif
+		fflags |= FSYNC;
+*/
 
-	/* Build the I/O request. */
+	ip = LINVFS_GET_IP(vp);
+	if( ip->i_fop == NULL ){
+printk("%s/%d: ip->i_fop is null\n", __FUNCTION__, __LINE__);
+		return(EINVAL);
+	}
+printk("%s/%d: inode is %lu\n", __FUNCTION__, __LINE__, ip->i_ino);
 
-	iov.iov_base = bufp;
-	iov.iov_len = len;
-
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	uio.uio_fmode = fflag;
-	uio.uio_offset = off;
-	uio.uio_segflg = UIO_USERSPACE;
-#if 0
-	uio.uio_pio = 0;
-	uio.uio_sigpipe = 0;
-	uio.uio_readiolog = 0;
-	uio.uio_writeiolog = 0;
-#endif
-	uio.uio_resid = iov.iov_len;
-#if 0
-	uio.uio_limit = getfsizelimit();
-	uio.uio_pmp = NULL;
-	uio.uio_pbuf = NULL;
-	uio.uio_fp = NULL;	
-#endif
-
-	count = uio.uio_resid;
-
-	if (fflag & FREAD) {
-/*		VOP_READ(vp, &uio, ioflag, get_current_cred(),
-				&ut->ut_flid, error);*/
-		VOP_READ(vp, filp, bufp, len, off, error);
-	} else {
-/*		VOP_WRITE(vp, &uio, ioflag, get_current_cred(),
-				&ut->ut_flid, error);*/
-		VOP_WRITE(vp, filp, bufp, len, off, error);
+	dentry = dmapi_dget(ip);
+	if( dentry == NULL ){
+printk("%s/%d: dmapi_dget failed\n", __FUNCTION__, __LINE__);
+		return(ENOMEM);
 	}
 
-	xfer = count - uio.uio_resid;
-	if (error == EINTR && xfer != 0)
-		error = 0;
+	if( ip->i_ino != dentry->d_inode->i_ino ){
+printk("%s/%d: dentry did not match inode\n", __FUNCTION__, __LINE__);
+		dput(dentry);
+		return(EINVAL);
+	}
 
-/*	rvp->r_val1 = xfer;*/
-	*rvp = xfer;
+	error = init_private_file( &file, dentry,
+				  (fflag&FMODE_READ ? FMODE_READ:FMODE_WRITE));
+	if(error){
+printk("%s/%d: init_private_file failed\n", __FUNCTION__, __LINE__);
+		dput(dentry);
+		return(EINVAL);
+	}
+	file.f_flags = oflags;
 
-/*	UPDATE_IOCH(ut, ((u_long) xfer));*/
+	if (fflag & FMODE_READ) {
+		VOP_READ(vp, &file, bufp, len, &off, ret);
+	} else {
+		VOP_WRITE(vp, &file, bufp, len, &off, ret);
+	}
 
-	if (fflag & FREAD) {
-/*		SYSINFO.readch += xfer;
-		ut->ut_acct.ua_bread += xfer;
-*/
+	dput(dentry);
+
+	error = 0;
+	if( ret < 0 )
+		error = ret;
+
+	*rvp = xfer = ret;
+
+
+	if (fflag & FMODE_READ) {
 	        XFS_STATS64_ADD(xs_read_bytes, xfer);
 	} else {
-/*		SYSINFO.writech += xfer;
-		ut->ut_acct.ua_bwrit += xfer;
-*/
 	        XFS_STATS64_ADD(xs_write_bytes, xfer);
 	}
-#if 0
-	if (vp->v_vfsp != NULL)
-/*		vp->v_vfsp->vfs_bcount += xfer >> SCTRSHFT;*/
-		vp->v_vfsp->vfs_bcount += xfer >> BBSHIFT;
-#endif
+
+printk("%s/%d: back to you\n", __FUNCTION__, __LINE__);
+
 	return error;
-#endif
 }
 
 /* ARGSUSED */
@@ -2302,7 +2305,7 @@ xfs_dm_read_invis_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-	fflag = FREAD;
+	fflag = FMODE_READ;
 	return(xfs_dm_rdwr(bdp, fflag, off, len, bufp, rvp));
 }
 
@@ -2686,11 +2689,10 @@ xfs_dm_write_invis_rvp(
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
 
-	fflag = FWRITE;
-	if (flags & DM_WRITE_SYNC) {
-/* XXX */
+	fflag = FMODE_WRITE;
+	if (flags & DM_WRITE_SYNC){
 /*		fflag |= FSYNC;*/
-		printk("*** xfs_dm_write_invis_rvp(), FSYNC not implemented yet\n");
+		printk("%s/%d: xfs FSYNC not implemented yet\n", __FUNCTION__, __LINE__);
 	}
 	return(xfs_dm_rdwr(bdp, fflag, off, len, bufp, rvp));
 }
