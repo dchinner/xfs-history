@@ -71,39 +71,6 @@ xfs_delalloc_cleanup(
 	xfs_fileoff_t	start_fsb,
 	xfs_filblks_t	count_fsb);
 
-ssize_t
-xfs_rdwr(
-	bhv_desc_t	*bdp,
-	struct file	*filp,
-	char 		*buf,
-	size_t		size,
-	loff_t		*offsetp,
-	int		read)	/* set if read, otherwise this is write */
-{
-	ssize_t		ret;
-	struct xfs_inode *xip;
-
-	xip = XFS_BHVTOI(bdp);
-	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
-		ret = -EIO;
-		goto out;
-	}
-
-	ret = 0;
-	if (size == 0) {
-		goto out;
-	}
-
-	if (read) {
-		ret = pagebuf_generic_file_read(filp, buf, size, offsetp); 
-		if (!(filp->f_flags & O_INVISIBLE))
-			xfs_ichgtime(xip, XFS_ICHGTIME_ACC);
-	} else {
-		ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
-	}
-out:
-	return(ret);
-}
 
 ssize_t
 xfs_read(
@@ -116,10 +83,7 @@ xfs_read(
 {
 	ssize_t		ret;
 	xfs_fsize_t	n;
-#ifdef CONFIG_XFS_DMAPI
-	vnode_t		*vp;
 	xfs_inode_t	*ip;
-#endif
         
 	struct file	*filp;
 	char 		*buf;
@@ -136,17 +100,18 @@ xfs_read(
         offsetp = &uiop->uio_offset;
 
 	n = XFS_MAX_FILE_OFFSET - *offsetp;
-	if (n <= 0)
+	if ((n <= 0) || (size == 0))
 		return 0;
 
 	if (n < size)
 		size = n;
 
-#ifdef CONFIG_XFS_DMAPI
-	vp = BHV_TO_VNODE(bdp);
 	ip = XFS_BHVTOI(bdp);
-
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
+		return -EIO;
+	}
+#ifdef CONFIG_XFS_DMAPI
+	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
 	    !(filp->f_flags & (O_INVISIBLE))) {
 
 		/* linux does not hold a lock across reads */
@@ -161,7 +126,10 @@ xfs_read(
 	}
 #endif /* CONFIG_XFS_DMAPI */
 
-	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 1);
+	ret = pagebuf_generic_file_read(filp, buf, size, offsetp); 
+	if (!(filp->f_flags & O_INVISIBLE))
+		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+
 	return(ret);
 }
 
@@ -655,11 +623,18 @@ xfs_write(
         ASSERT(uiop->uio_iovcnt == 1);  /* iov in a uio on linux      */
         ASSERT(uiop->uio_iov);      
         
-        buf = uiop->uio_iov->iov_base;
-        size = uiop->uio_iov->iov_len;
-        
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
+	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
+		return -EIO;
+	}
+
+        buf = uiop->uio_iov->iov_base;
+        size = uiop->uio_iov->iov_len;
+
+	if (size == 0)
+		return 0;
+
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 	xfs_ilock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
@@ -745,7 +720,7 @@ start:
 #ifdef CONFIG_XFS_DMAPI
 retry:
 #endif
-	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 0);
+	ret = pagebuf_generic_file_write(filp, buf, size, offsetp);
 
 #ifdef CONFIG_XFS_DMAPI
 	if ((ret == -ENOSPC) &&
