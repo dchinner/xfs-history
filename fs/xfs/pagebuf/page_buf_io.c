@@ -169,14 +169,14 @@ pagebuf_iozero(
  */
 
 
-size_t
+STATIC size_t
 _pb_direct_io(
 	struct pb_target	*target,
 	struct inode		*inode,
 	loff_t			rounded_offset,
 	size_t			pb_size,
 	page_buf_bmap_t		*mp,
-	void			*user_addr,
+	const void		*user_addr,
 	int			rdwr)
 {
 	page_buf_t	*pb;
@@ -241,7 +241,7 @@ STATIC int
 _pagebuf_file_write(
 	struct pb_target	*target,
 	struct file		*filp,	/* file to write                */
-	char			*buf,	/* buffer address               */
+	const char		*buf,	/* buffer address               */
 	size_t			len,	/* size of buffer               */
 	loff_t			*lp,	/* file offset to use and update */
 	pagebuf_bmap_fn_t	bmap,	/* bmap function */
@@ -334,7 +334,7 @@ ssize_t
 pagebuf_generic_file_write(
 	pb_target_t		*target,
 	struct file		*filp,	/* file to write                */
-	char			*buf,	/* buffer address               */
+	const char		*buf,	/* buffer address               */
 	size_t			len,	/* size of buffer               */
 	loff_t			*lp,	/* file offset to use and update */
 	pagebuf_bmap_fn_t	bmap)	/* bmap function */
