@@ -67,6 +67,13 @@ zone_t *xfs_inode_zone;
 #define	XFS_ITRUNC_MAX_EXTENTS	2
 
 STATIC void
+xfs_iflush_fork(
+	xfs_inode_t		*ip,
+	xfs_dinode_t		*dip,
+	xfs_inode_log_item_t	*iip,
+	int			whichfork);
+
+STATIC void
 xfs_iformat(
 	xfs_inode_t	*ip,
 	xfs_dinode_t	*dip);
@@ -100,6 +107,7 @@ STATIC void
 xfs_validate_extents(
 	xfs_bmbt_rec_32_t	*ep,
 	int			nrecs);
+
 STATIC void
 xfs_itrunc_trace(
 	int		tag,
@@ -323,10 +331,11 @@ xfs_itobp(
  */
 STATIC void
 xfs_iformat(
-	xfs_inode_t	*ip,
-	xfs_dinode_t	*dip)
+	xfs_inode_t		*ip,
+	xfs_dinode_t		*dip)
 {
-	register int		size;
+	xfs_attr_shortform_t	*atp;
+	int			size;
 
 	ip->i_df.if_ext_max =
 		XFS_IFORK_DSIZE(ip) / sizeof(xfs_bmbt_rec_t);
@@ -370,7 +379,8 @@ xfs_iformat(
 		XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	switch (dip->di_core.di_aformat) {
 	case XFS_DINODE_FMT_LOCAL:
-		/* get size from di_sfattr.totsize */
+		atp = (xfs_attr_shortform_t *)XFS_DFORK_PTR(dip, XFS_ATTR_FORK);
+		size = (int)atp->hdr.totsize;
 		xfs_iformat_local(ip, dip, XFS_ATTR_FORK, size);
 		break;
 	case XFS_DINODE_FMT_EXTENTS:
@@ -460,7 +470,7 @@ xfs_iformat_extents(
 			nex);
 		bcopy(XFS_DFORK_PTR(dip, whichfork), ifp->if_u1.if_extents,
 		      size);
-		xfs_bmap_trace_exlist("xfs_iformat", ip, nex);
+		xfs_bmap_trace_exlist("xfs_iformat_extents", ip, nex);
 	}
 	ifp->if_flags |= XFS_IFEXTENTS;
 }
@@ -481,13 +491,11 @@ xfs_iformat_btree(
 {
 	xfs_bmdr_block_t	*dfp;
 	xfs_ifork_t		*ifp;
-	xfs_mount_t		*mp;
 	int			nrecs;
 	int			size;
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	dfp = (xfs_bmdr_block_t *)XFS_DFORK_PTR(dip, whichfork);
-	mp = ip->i_mount;
 	size = XFS_BMAP_BROOT_SPACE(dfp);
 	nrecs = XFS_BMAP_BROOT_NUMRECS(dfp);
 	ASSERT(nrecs > 0);
@@ -497,7 +505,7 @@ xfs_iformat_btree(
 	 * Copy and convert from the on-disk structure
 	 * to the in-memory structure.
 	 */
-	xfs_bmdr_to_bmbt(dfp, XFS_DFORK_SIZE(dip, mp, whichfork),
+	xfs_bmdr_to_bmbt(dfp, XFS_DFORK_SIZE(dip, ip->i_mount, whichfork),
 		ifp->if_broot, size);
 	ifp->if_flags &= ~XFS_IFEXTENTS;
 	ifp->if_flags |= XFS_IFBROOT;
@@ -1577,6 +1585,7 @@ xfs_ifree(
 	ASSERT(ip->i_transp == tp);
 	ASSERT(ip->i_d.di_nlink == 0);
 	ASSERT(ip->i_d.di_nextents == 0);
+	ASSERT(ip->i_d.di_anextents == 0);
 	ASSERT((ip->i_d.di_size == 0) ||
 	       ((ip->i_d.di_mode & IFMT) != IFREG));
 
@@ -1675,7 +1684,6 @@ xfs_iroot_realloc(
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(ifp->if_broot, 1,
 						      new_size);
 		ifp->if_broot_bytes = new_size;
-		/* FIX ME */
 		ASSERT(ifp->if_broot_bytes <=
 			XFS_IFORK_SIZE(ip, whichfork) + XFS_BROOT_SIZE_ADJ);
 		/*
@@ -1732,7 +1740,6 @@ xfs_iroot_realloc(
 	kmem_free(ifp->if_broot, ifp->if_broot_bytes);
 	ifp->if_broot = new_broot;
 	ifp->if_broot_bytes = new_size;
-	/* FIX ME */
 	ASSERT(ifp->if_broot_bytes <=
 		XFS_IFORK_SIZE(ip, whichfork) + XFS_BROOT_SIZE_ADJ);
 	return;
@@ -2169,7 +2176,7 @@ xfs_iextents_copy(
 	ASSERT(ifp->if_bytes > 0);
 
 	nrecs = ifp->if_bytes / sizeof(xfs_bmbt_rec_t);
-	xfs_bmap_trace_exlist("xfs_iflush", ip, nrecs);
+	xfs_bmap_trace_exlist("xfs_extents_copy", ip, nrecs);
 	ASSERT(nrecs > 0);
 	if (nrecs == XFS_IFORK_NEXTENTS(ip, whichfork)) {
 		/*
@@ -2220,6 +2227,92 @@ xfs_iextents_copy(
 }		  
 
 /*
+ * Each of the following cases stores data into the same region
+ * of the on-disk inode, so only one of them can be valid at
+ * any given time. While it is possible to have conflicting formats
+ * and log flags, e.g. having XFS_ILOG_?DATA set when the fork is
+ * in EXTENTS format, this can only happen when the fork has
+ * changed formats after being modified but before being flushed.
+ * In these cases, the format always takes precedence, because the
+ * format indicates the current state of the fork.
+ */
+STATIC void
+xfs_iflush_fork(
+	xfs_inode_t		*ip,
+	xfs_dinode_t		*dip,
+	xfs_inode_log_item_t	*iip,
+	int			whichfork)
+{
+	char			*cp;
+	xfs_ifork_t		*ifp;
+	xfs_mount_t		*mp;
+	static int		brootflag[2] =
+		{ XFS_ILOG_DBROOT, XFS_ILOG_ABROOT };
+	static int		dataflag[2] =
+		{ XFS_ILOG_DDATA, XFS_ILOG_ADATA };
+	static int		extflag[2] =
+		{ XFS_ILOG_DEXT, XFS_ILOG_AEXT };
+
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	cp = XFS_DFORK_PTR(dip, whichfork);
+	mp = ip->i_mount;
+	switch (XFS_IFORK_FORMAT(ip, whichfork)) {
+	case XFS_DINODE_FMT_LOCAL:
+		if ((iip->ili_format.ilf_fields & dataflag[whichfork]) &&
+		    (ifp->if_bytes > 0)) {
+			ASSERT(ifp->if_u1.if_data != NULL);
+			ASSERT(ifp->if_bytes <= XFS_IFORK_SIZE(ip, whichfork));
+			bcopy(ifp->if_u1.if_data, cp, ifp->if_bytes);
+		}
+		break;
+
+	case XFS_DINODE_FMT_EXTENTS:
+		ASSERT((ifp->if_flags & XFS_IFEXTENTS) ||
+		       !(iip->ili_format.ilf_fields & extflag[whichfork]));
+		ASSERT((ifp->if_u1.if_extents != NULL) || (ifp->if_bytes == 0));
+		ASSERT((ifp->if_u1.if_extents == NULL) || (ifp->if_bytes > 0));
+		if ((iip->ili_format.ilf_fields & extflag[whichfork]) &&
+		    (ifp->if_bytes > 0)) {
+			ASSERT(XFS_IFORK_NEXTENTS(ip, whichfork) > 0);
+			(void)xfs_iextents_copy(ip, (xfs_bmbt_rec_32_t *)cp,
+				whichfork);
+		}
+		break;
+
+	case XFS_DINODE_FMT_BTREE:
+		if ((iip->ili_format.ilf_fields & brootflag[whichfork]) &&
+		    (ifp->if_broot_bytes > 0)) {
+			ASSERT(ifp->if_broot != NULL);
+			ASSERT(ifp->if_broot_bytes <=
+			       (XFS_IFORK_SIZE(ip, whichfork) +
+				XFS_BROOT_SIZE_ADJ));
+			xfs_bmbt_to_bmdr(ifp->if_broot, ifp->if_broot_bytes,
+				(xfs_bmdr_block_t *)cp,
+				XFS_DFORK_SIZE(dip, mp, whichfork));
+		}
+		break;
+
+	case XFS_DINODE_FMT_DEV:
+		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
+			ASSERT(whichfork == XFS_DATA_FORK);
+			dip->di_u.di_dev = ip->i_df.if_u2.if_rdev;
+		}
+		break;
+		
+	case XFS_DINODE_FMT_UUID:
+		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
+			ASSERT(whichfork == XFS_DATA_FORK);
+			dip->di_u.di_muuid = ip->i_df.if_u2.if_uuid;
+		}
+		break;
+
+	default:
+		ASSERT(0);
+		break;
+	}
+}
+
+/*
  * xfs_iflush() will write a modified inode's changes out to the
  * inode's on disk home.  The caller must have the inode lock held
  * in at least shared mode and the inode flush semaphore must be
@@ -2230,8 +2323,8 @@ xfs_iextents_copy(
  */
 int
 xfs_iflush(
-	xfs_inode_t	*ip,
-	uint		flags)
+	xfs_inode_t		*ip,
+	uint			flags)
 {
 	xfs_inode_log_item_t	*iip;
 	buf_t			*bp;
@@ -2293,68 +2386,9 @@ xfs_iflush(
 	 */
 	bcopy(&(ip->i_d), &(dip->di_core), sizeof(xfs_dinode_core_t));
 
-	/*
-	 * Each of the following cases stores data into the same region
-	 * of the on-disk inode, so only one of them can be valid at
-	 * any given time. While it is possible to have conflicting formats
-	 * and log flags, e.g. having XFS_ILOG_?DATA set when the inode is
-	 * in EXTENTS format, this can only happen when the inode has
-	 * changed formats after being modified but before being flushed.
-	 * In these cases, the format always takes precedence, because the
-	 * format indicates the current state of the inode.
-	 */
-	/* FIX ME: REPLICATE FOR ATTR FORK */
-	switch (ip->i_d.di_format) {
-	case XFS_DINODE_FMT_LOCAL:
-		if ((iip->ili_format.ilf_fields & XFS_ILOG_DDATA) &&
-		    (ip->i_df.if_bytes > 0)) {
-			ASSERT(ip->i_df.if_u1.if_data != NULL);
-			ASSERT(ip->i_df.if_bytes <= XFS_IFORK_DSIZE(ip));
-			bcopy(ip->i_df.if_u1.if_data, dip->di_u.di_c, ip->i_df.if_bytes);
-		}
-		break;
-	case XFS_DINODE_FMT_EXTENTS:
-		ASSERT((ip->i_df.if_flags & XFS_IFEXTENTS) ||
-		       !(iip->ili_format.ilf_fields & XFS_ILOG_DEXT));
-		ASSERT((ip->i_df.if_u1.if_extents != NULL) || (ip->i_df.if_bytes == 0));
-		ASSERT((ip->i_df.if_u1.if_extents == NULL) || (ip->i_df.if_bytes > 0));
-		if ((iip->ili_format.ilf_fields & XFS_ILOG_DEXT) &&
-		    (ip->i_df.if_bytes > 0)) {
-			ASSERT(ip->i_d.di_nextents > 0);
-			/* FIXME */
-			(void) xfs_iextents_copy(ip, dip->di_u.di_bmx, XFS_DATA_FORK);
-		}
-		break;
-	case XFS_DINODE_FMT_BTREE:
-		if ((iip->ili_format.ilf_fields & XFS_ILOG_DBROOT) &&
-		    (ip->i_df.if_broot_bytes > 0)) {
-			ASSERT(ip->i_df.if_broot != NULL);
-			/* FIX ME */
-			ASSERT(ip->i_df.if_broot_bytes <= XFS_IFORK_DSIZE(ip) + XFS_BROOT_SIZE_ADJ);
-			xfs_bmbt_to_bmdr(ip->i_df.if_broot,
-				ip->i_df.if_broot_bytes,
-				&(dip->di_u.di_bmbt),
-				XFS_DFORK_DSIZE(dip, mp));
-		}
-		break;
-
-	case XFS_DINODE_FMT_DEV:
-		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
-			dip->di_u.di_dev = ip->i_df.if_u2.if_rdev;
-		}
-		break;
-		
-	case XFS_DINODE_FMT_UUID:
-		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
-			dip->di_u.di_muuid = ip->i_df.if_u2.if_uuid;
-		}
-		break;
-
-	default:
-		ASSERT(0);
-		break;
-	}
-
+	xfs_iflush_fork(ip, dip, iip, XFS_DATA_FORK);
+	if (XFS_IFORK_Q(ip))
+		xfs_iflush_fork(ip, dip, iip, XFS_ATTR_FORK);
 	xfs_inobp_check(mp, bp);
 	
 	/*
@@ -2563,7 +2597,7 @@ xfs_iflush_all(
 	return !busy;
 }
 
-#ifdef SIM
+#if defined(SIM) && defined(DEBUG)
 void
 xfs_iprint(
 	xfs_inode_t	*ip)
@@ -2633,7 +2667,7 @@ xfs_iprint(
 	printf("   di_flags %x\n", dip->di_flags);
 	printf("   di_nblocks %lld\n", dip->di_nblocks);
 }
-#endif	/* SIM */
+#endif	/* SIM && DEBUG */
 
 /*
  * xfs_iaccess: check accessibility of inode/cred for mode.
