@@ -31,7 +31,6 @@
  */
 
 #include "xfs.h"
-#include "pagebuf/page_buf_internal.h"
 
 #include <linux/ctype.h>
 #include <linux/kdb.h>
@@ -2621,99 +2620,36 @@ kdbm_iomap(int argc, const char **argv, const char **envp,
 }
 
 #ifdef PAGEBUF_TRACE
-# ifdef __PAGEBUF_TRACE__
-# undef __PAGEBUF_TRACE__
-# undef PB_DEFINE_TRACES
-# undef PB_TRACE_START
-# undef PB_TRACE_REC
-# undef PB_TRACE_END
-# endif
-#include "pagebuf/page_buf_trace.h"
-
-#define EV_SIZE (sizeof(event_names)/sizeof(char *))
-
-void
-pb_trace_core(
-	unsigned long match,
-	char	*event_match,
-	unsigned long long offset,
-	long long mask)
+static int pagebuf_trace_entry(ktrace_entry_t *ktep)
 {
-	extern struct pagebuf_trace_buf pb_trace;
-	int	i, total, end;
-	pagebuf_trace_t	*trace;
-	char	*event;
-	char	value[10];
+	unsigned long long daddr;
 
-	end = pb_trace.start - 1;
-	if (end < 0)
-		end = PB_TRACE_BUFSIZE - 1;
+	daddr = ((unsigned long long)(unsigned long)ktep->val[8] << 32)
+		| ((unsigned long long)(unsigned long)ktep->val[9]);
 
-	if (match && (match < PB_TRACE_BUFSIZE)) {
-		for (i = pb_trace.start, total = 0; i != end; i = CIRC_INC(i)) {
-			trace = &pb_trace.buf[i];
-			if (trace->pb == 0)
-				continue;
-			total++;
-		}
-		total = total - match;
-		for (i = pb_trace.start; i != end && total; i = CIRC_INC(i)) {
-			trace = &pb_trace.buf[i];
-			if (trace->pb == 0)
-				continue;
-			total--;
-		}
-		match = 0;
-	} else
-		i = pb_trace.start;
-	for ( ; i != end; i = CIRC_INC(i)) {
-		trace = &pb_trace.buf[i];
-
-		if (offset) {
-			if ((trace->offset & ~mask) != offset)
-				continue;
-		}
-
-		if (trace->pb == 0)
-			continue;
-
-		if ((match != 0) && (trace->pb != match))
-			continue;
-
-		if ((trace->event < EV_SIZE-1) && event_names[trace->event]) {
-			event = event_names[trace->event];
-		} else if (trace->event == EV_SIZE-1) {
-			event = (char *)trace->misc;
-		} else {
-			event = value;
-			sprintf(value, "%8d", trace->event);
-		}
-
-		if (event_match && strcmp(event, event_match)) {
-			continue;
-		}
-
-
-		kdb_printf("pb 0x%lx [%s] (hold %u lock %d) misc 0x%p",
-			   trace->pb, event,
-			   trace->hold, trace->lock_value,
-			   trace->misc);
-		kdb_symbol_print((unsigned long)trace->ra, NULL,
-			KDB_SP_SPACEB|KDB_SP_PAREN|KDB_SP_NEWLINE);
-		kdb_printf("    offset 0x%Lx size 0x%lx task 0x%p\n",
-			   trace->offset, (long)trace->size, trace->task);
-		kdb_printf("    flags: %s\n",
-			   pb_flags(trace->flags));
-	}
+	kdb_printf("pb 0x%p [%s] (hold %lu lock %ld) data 0x%p",
+		ktep->val[0],
+		(char *)ktep->val[1],
+		(unsigned long)ktep->val[3],
+		(long)ktep->val[4],
+		ktep->val[6]);
+	kdb_symbol_print((unsigned long)ktep->val[7], NULL,
+		KDB_SP_SPACEB|KDB_SP_PAREN|KDB_SP_NEWLINE);
+	kdb_printf("    offset 0x%llx size 0x%lx task 0x%p\n",
+		daddr, (long)ktep->val[10], ktep->val[5]);
+	kdb_printf("    flags: %s\n", pb_flags((int)(long)ktep->val[2]));
+	return 1;
 }
 
 static int
 kdbm_pbtrace_offset(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
-	long mask = 0;
-	unsigned long offset = 0;
-	int diag;
+	long		mask = 0;
+	unsigned long	offset = 0;
+	int		diag;
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
 
 	if (argc > 2)
 		return KDB_ARGCOUNT;
@@ -2725,13 +2661,23 @@ kdbm_pbtrace_offset(int argc, const char **argv, const char **envp,
 	}
 
 	if (argc > 1) {
-		diag = kdbgetularg(argv[1], &mask);
+		diag = kdbgetularg(argv[1], &mask);	/* sign extent mask */
 		if (diag)
 			return diag;
 	}
 
-	pb_trace_core(0, NULL, (unsigned long long)offset,
-			       (long long)mask);	/* sign extent mask */
+	ktep = ktrace_first(pagebuf_trace_buf, &kts);
+	while (ktep != NULL) {
+		unsigned long long daddr;
+
+		daddr = ((unsigned long long)(unsigned long)ktep->val[8] << 32)
+			| ((unsigned long long)(unsigned long)ktep->val[9]);
+		if (offset && ((daddr & ~mask) != offset))
+			continue;
+		if (pagebuf_trace_entry(ktep))
+			kdb_printf("\n");
+		ktep = ktrace_next(pagebuf_trace_buf, &kts);
+	}
 	return 0;
 }
 
@@ -2739,10 +2685,12 @@ static int
 kdbm_pbtrace(int argc, const char **argv, const char **envp,
 	struct pt_regs *regs)
 {
-	unsigned long addr = 0;
-	int diag, nextarg;
-	long offset = 0;
-	char	*event_match = NULL;
+	unsigned long	addr = 0;
+	int		diag, nextarg;
+	long		offset = 0;
+	char		*event_match = NULL;
+	ktrace_entry_t	*ktep;
+	ktrace_snap_t	kts;
 
 	if (argc > 1)
 		return KDB_ARGCOUNT;
@@ -2750,20 +2698,29 @@ kdbm_pbtrace(int argc, const char **argv, const char **envp,
 	if (argc == 1) {
 		if (isupper(argv[1][0]) || islower(argv[1][0])) {
 			event_match = (char *)argv[1];
-			printk("event match on \"%s\"\n", event_match);
+			kdb_printf("event match on \"%s\"\n", event_match);
 			argc = 0;
 		} else {
 			nextarg = 1;
-			diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs);
+			diag = kdbgetaddrarg(argc, argv,
+					&nextarg, &addr, &offset, NULL, regs);
 			if (diag) {
-				printk("failed to parse %s as a number\n",
-								argv[1]);
+				kdb_printf("non-numeric arg: %s\n", argv[1]);
 				return diag;
 			}
 		}
 	}
 
-	pb_trace_core(addr, event_match, 0LL, 0LL);
+	ktep = ktrace_first(pagebuf_trace_buf, &kts);
+	while (ktep != NULL) {
+		if (addr && (ktep->val[0] != (void *)addr))
+			continue;
+		if (event_match && strcmp((char *)ktep->val[1], event_match))
+			continue;
+		if (pagebuf_trace_entry(ktep))
+			qprintf("\n");
+		ktep = ktrace_next(pagebuf_trace_buf, &kts);
+	}
 	return 0;
 }
 #endif
@@ -2985,7 +2942,7 @@ static struct xif pb_funcs[] = {
   {  "pbdelay",	kdbm_pbdelay,	"0|1",		"Display delwri pagebufs" },
 #ifdef PAGEBUF_TRACE
   {  "pbtrace",	kdbm_pbtrace,	"<vaddr>|<count>",	"page_buf_t trace" },
-  {  "pboffset",kdbm_pbtrace_offset,	"<addr> [<mask>]", "page_buf_t trace" },
+  {  "pboffset",kdbm_pbtrace_offset, "<daddr> [<mask>]","page_buf_t trace" },
 #endif
   {  0,		0,	0 }
 };

@@ -326,6 +326,32 @@ extern void pagebuf_delwri_dequeue(
 extern int pagebuf_init(void);
 extern void pagebuf_terminate(void);
 
+
+#ifdef PAGEBUF_TRACE
+extern ktrace_t *pagebuf_trace_buf;
+extern void pagebuf_trace(
+		page_buf_t *,		/* buffer being traced		*/
+		char *,			/* description of operation	*/
+		void *,			/* arbitrary diagnostic value	*/
+		void *);		/* return address		*/
+#else
+# define pagebuf_trace(pb, id, ptr, ra)	do { } while (0)
+#endif
+
+
+/*
+ * Kernel version compatibility macros
+ */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,9)
+#define page_buffers(page)	((page)->buffers)
+#define page_has_buffers(page)	((page)->buffers)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,12)
+#define PageUptodate(x)		Page_Uptodate(x)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,17)
 /*
  * macro tricks to expand the set_buffer_foo() and clear_buffer_foo()
@@ -360,5 +386,14 @@ BUFFER_FNS(Sync, sync)
 #endif /* kernel >= 2.4.22 */
 BUFFER_FNS(Delay, delay)
 #endif /* kernel < 2.5.17 */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,67)
+#define blk_run_queues()	run_task_queue(&tq_disk)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define i_size_read(inode)	((inode)->i_size)
+#define i_size_write(inode, sz)	((inode)->i_size = (sz))
+#endif
 
 #endif /* __PAGE_BUF_H__ */
