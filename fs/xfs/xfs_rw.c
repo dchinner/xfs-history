@@ -3250,6 +3250,7 @@ xfs_diostrat( buf_t *bp)
 		count_fsb  = XFS_B_TO_FSB( mp, count);
 		blocks     = (xfs_extlen_t)(last_fsb - offset_fsb);
 
+		tp = NULL;
 		exist = 1;
 		XFS_BMAP_INIT(&free_list, &firstfsb);
 
@@ -3263,7 +3264,7 @@ xfs_diostrat( buf_t *bp)
 			 */
 			reccount = XFS_BMAP_MAX_NMAP;
 			xfs_ilock( ip, XFS_ILOCK_EXCL );
-			firstfsb = xfs_bmapi( tp, ip, offset_fsb, 
+			firstfsb = xfs_bmapi( NULL, ip, offset_fsb, 
 				count_fsb, 0, firstfsb, 0, imaps, 
 				&reccount, 0);
 			/*
@@ -3316,8 +3317,6 @@ xfs_diostrat( buf_t *bp)
 					xfs_trans_ijoin(tp,ip,XFS_ILOCK_EXCL);
 					xfs_trans_ihold( tp, ip);
 				}
-			} else {
-				tp = NULL;
 			}
 		} else {
 			/*
