@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.135 $"
+#ident  "$Revision: 1.136 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -96,6 +96,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
 #include "xfs_dir.h"
+#include "xfs_quota.h"
 
 #ifdef SIM
 #include "sim.h"
@@ -513,6 +514,10 @@ xfs_cmountfs(
 			mp->m_inoadd = XFS_INO64_OFFSET;
 		}
 #endif
+		
+		if (ap->flags & (XFSMNT_UQUOTA | XFSMNT_PQUOTA)) 
+			xfs_qm_mount_quotainit(mp, ap->flags);
+		
 	}
 
 	if (error = xfs_mountfs(vfsp, mp, ddev)) {
@@ -853,6 +858,10 @@ xfs_mountroot(
 				 cr);
 			xfs_iflush_all(mp, XFS_FLUSH_ALL);
 
+			xfs_qm_dqflush_all(mp, XFS_QMOPT_SYNC);
+			xfs_qm_dqpurge_all(mp, 
+					   XFS_QMOPT_UQUOTA|XFS_QMOPT_PQUOTA|
+					   XFS_QMOPT_UMOUNTING);
 			/*
 			 * Force the log to unpin as many buffers as
 			 * possible and then sync them out.
@@ -989,6 +998,17 @@ xfs_ibusy(
 				ip = ip->i_mnext;
 				continue;
 			}
+			if (mp->m_quotainfo &&
+			    ip->i_ino == mp->m_sb.sb_uquotino) {
+				ip = ip->i_mnext;
+				continue;
+			}
+			if (mp->m_quotainfo &&
+			   ip->i_ino == mp->m_sb.sb_pquotino) {
+				ip = ip->i_mnext;
+				continue;
+			}
+			
 #ifdef DEBUG
 			printf("busy vp=0x%x count=%d\n", vp, vp->v_count);
 #endif
@@ -1081,6 +1101,11 @@ xfs_unmount(
 		error = XFS_ERROR(EBUSY);
 		goto out;
 	}
+	/*
+	 * Release dquot that rootinode, rbmino and rsumino might be holding,
+	 * flush and purge the quota inodes.
+	 */
+	xfs_qm_unmount_quotas(mp);
 
 	if (rbmip) {
 		VN_RELE(XFS_ITOV(rbmip));
@@ -1807,6 +1832,13 @@ xfs_sync(
 		mp->m_inodes = ip;
 	}
 	XFS_MOUNT_IUNLOCK(mp);
+
+	
+	/*
+	 * Get the Quota Manager to flush the dquots in a similar manner.
+	 */
+	if (XFS_IS_QUOTA_ON(mp))
+		xfs_qm_sync(mp, flags);
 
 	/*
 	 * Flushing out dirty data above probably generated more
