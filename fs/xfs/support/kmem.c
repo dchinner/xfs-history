@@ -41,25 +41,6 @@
 #define DEF_PRIORITY	(6)
 #define MAX_SLAB_SIZE	0x10000
 
-static __inline unsigned int flag_convert(int flags)
-{
-#if DEBUG
-	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS))) {
-		printk(KERN_WARNING
-		    "XFS: memory allocation with wrong flags (%x)\n", flags);
-		BUG();
-	}
-#endif
-
-	if (flags & KM_NOSLEEP)
-		return GFP_ATOMIC;
-	/* If we're in a transaction, FS activity is not ok */
-	else if ((current->flags & PF_FSTRANS) || (flags & KM_NOFS))
-		return GFP_NOFS;
-	else
-		return GFP_KERNEL;
-}
-
 #define MAX_SHAKE 8
 
 static kmem_shake_func_t	shake_list[MAX_SHAKE];
@@ -113,18 +94,20 @@ static __inline__ void kmem_shake(void)
 void *
 kmem_alloc(size_t size, int flags)
 {
-	int	shrink = DEF_PRIORITY;	/* # times to try to shrink cache */
+	int	shrink  = DEF_PRIORITY;	/* # times to try to shrink cache */
+        int     lflags  = kmem_flags_convert(flags);
+        int     nosleep = flags & KM_NOSLEEP;
 	void	*rval;
 
 repeat:
 	if (MAX_SLAB_SIZE < size) {
 		/* Avoid doing filesystem sensitive stuff to get this */
-		rval = __vmalloc(size, flag_convert(flags), PAGE_KERNEL);
+		rval = __vmalloc(size, lflags, PAGE_KERNEL);
 	} else {
-		rval = kmalloc(size, flag_convert(flags));
+		rval = kmalloc(size, lflags);
 	}
 
-	if (rval || (flags & KM_NOSLEEP))
+	if (rval || nosleep)
 		return rval;
 
 	/*
@@ -137,8 +120,8 @@ repeat:
 		goto repeat;
 	}
 
-	rval = __vmalloc(size, flag_convert(flags), PAGE_KERNEL);
-	if (!rval && (flags & KM_SLEEP))
+	rval = __vmalloc(size, lflags, PAGE_KERNEL);
+	if (!rval && !nosleep)
 		panic("kmem_alloc: NULL memory on KM_SLEEP request!");
 
 	return rval;
@@ -197,7 +180,7 @@ kmem_zone_alloc(kmem_zone_t *zone, int flags)
 	void	*ptr = NULL;
 
 repeat:
-	ptr = kmem_cache_alloc(zone, flag_convert(flags));
+	ptr = kmem_cache_alloc(zone, kmem_flags_convert(flags));
 
 	if (ptr || (flags & KM_NOSLEEP))
 		return ptr;
@@ -225,7 +208,7 @@ kmem_zone_zalloc(kmem_zone_t *zone, int flags)
 	void	*ptr = NULL;
 
 repeat:
-	ptr = kmem_cache_alloc(zone, flag_convert(flags));
+	ptr = kmem_cache_alloc(zone, kmem_flags_convert(flags));
 
 	if (ptr) {
 		memset(ptr, 0, kmem_cache_size(zone));

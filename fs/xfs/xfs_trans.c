@@ -238,7 +238,7 @@ xfs_trans_reserve(
 	rsvd = (tp->t_flags & XFS_TRANS_RESERVE) != 0;
 
 	/* Mark this thread as being in a transaction */
-	current->flags |= PF_FSTRANS;
+        PFLAGS_SET_FSTRANS(&tp->t_pflags);
 
 	/*
 	 * Attempt to reserve the needed disk blocks by decrementing
@@ -249,7 +249,7 @@ xfs_trans_reserve(
 		error = xfs_mod_incore_sb(tp->t_mountp, XFS_SBS_FDBLOCKS,
 					  -blocks, rsvd);
 		if (error != 0) {
-			current->flags &= ~PF_FSTRANS;
+                        PFLAGS_RESTORE(&tp->t_pflags);
 			return (XFS_ERROR(ENOSPC));
 		}
 		tp->t_blk_res += blocks;
@@ -322,7 +322,7 @@ undo_blocks:
 		tp->t_blk_res = 0;
 	}
 
-	current->flags &= ~PF_FSTRANS;
+        PFLAGS_RESTORE(&tp->t_pflags);
 
 	return (error);
 }
@@ -740,7 +740,7 @@ shut_us_down:
 		XFS_STATS_INC(xfsstats.xs_trans_empty);
 		if (commit_lsn_p)
 			*commit_lsn_p = commit_lsn;
-		current->flags &= ~PF_FSTRANS;
+                PFLAGS_RESTORE(&tp->t_pflags);
 		return (shutdown);
 	}
 #if defined(XLOG_NOLOG) || defined(DEBUG)
@@ -824,7 +824,7 @@ shut_us_down:
 	 */
 	if (error || commit_lsn == -1) {
 		xfs_trans_uncommit(tp, flags|XFS_TRANS_ABORT);
-		current->flags &= ~PF_FSTRANS;
+                PFLAGS_RESTORE(&tp->t_pflags);
 		return XFS_ERROR(EIO);
 	}
 
@@ -897,7 +897,7 @@ shut_us_down:
 	}
 
 	/* mark this thread as no longer being in a transaction */
-	current->flags &= ~PF_FSTRANS;
+        PFLAGS_RESTORE(&tp->t_pflags);
 
 	return (error);
 }
@@ -1103,7 +1103,7 @@ xfs_trans_cancel(
 	xfs_trans_free(tp);
 
 	/* mark this thread as no longer being in a transaction */
-	current->flags &= ~PF_FSTRANS;
+        PFLAGS_RESTORE(&tp->t_pflags);
 }
 
 

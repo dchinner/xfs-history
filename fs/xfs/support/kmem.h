@@ -44,6 +44,46 @@
 #define	kmem_zone	kmem_cache_s
 #define kmem_zone_t	kmem_cache_t
 
+typedef unsigned long xfs_pflags_t;
+
+#define PFLAGS_TEST_NOIO()              (current->flags & PF_NOIO)
+#define PFLAGS_TEST_FSTRANS()           (current->flags & PF_FSTRANS)
+
+#define PFLAGS_SET_NOIO(STATEP) do {    \
+	*(STATEP) = current->flags;     \
+        current->flags |= PF_NOIO;      \
+} while (0)
+
+#define PFLAGS_SET_FSTRANS(STATEP) do { \
+	*(STATEP) = current->flags;     \
+        current->flags |= PF_FSTRANS;   \
+} while (0)
+
+#define PFLAGS_RESTORE(STATEP) do {     \
+	current->flags = *(STATEP);     \
+} while (0)
+
+static __inline unsigned int kmem_flags_convert(int flags)
+{
+        int lflags;
+        
+#if DEBUG
+	if (unlikely(flags & ~(KM_SLEEP|KM_NOSLEEP|KM_NOFS))) {
+		printk(KERN_WARNING
+		    "XFS: memory allocation with wrong flags (%x)\n", flags);
+		BUG();
+	}
+#endif
+        
+        lflags = (flags & KM_NOSLEEP) ? GFP_ATOMIC : GFP_KERNEL;
+        
+        /* avoid recusive callbacks to filesystem during transactions */
+	if (PFLAGS_TEST_FSTRANS())
+		lflags &= ~__GFP_FS;
+        
+        return lflags;
+}
+
 extern kmem_zone_t  *kmem_zone_init(int, char *);
 extern void	    *kmem_zone_zalloc(kmem_zone_t *, int);
 extern void	    *kmem_zone_alloc(kmem_zone_t *, int);
