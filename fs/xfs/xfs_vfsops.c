@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.223 $"
+#ident  "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -291,6 +291,7 @@ xfs_init(
 	extern sv_t	xfsc_wait;
 	extern mutex_t	xfs_ancestormon;
 	extern mutex_t	xfs_uuidtabmon;
+	extern mutex_t	xfs_Gqm_lock;
 	extern zone_t	*xfs_gap_zone;
 #ifdef DEBUG
 	extern ktrace_t	*xfs_alloc_trace_buf;
@@ -319,6 +320,7 @@ xfs_init(
 	sv_init(&xfsd_wait, SV_DEFAULT, "xfsd");
 	spinlock_init(&xfsc_lock, "xfsc");
 	sv_init(&xfsc_wait, SV_DEFAULT, "xfsc");
+	mutex_init(&xfs_Gqm_lock, MUTEX_DEFAULT, "xfs_qmlock");
 
 	/*
 	 * Initialize the inode reference cache.

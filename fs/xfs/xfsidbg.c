@@ -4331,22 +4331,22 @@ xfsidbg_xperag(xfs_mount_t *mp)
 static void
 xfsidbg_xqm()
 {
-	extern xfs_qm_t	*G_xqm;
+	extern xfs_qm_t	*xfs_Gqm;
 
-	if (G_xqm == NULL) {
+	if (xfs_Gqm == NULL) {
 		qprintf("NULL XQM!!\n");
 		return;
 	}
 
 	qprintf("usrhtab 0x%x\tprjhtab 0x%x\tndqfree 0x%x\thashmask 0x%x\n",
-		G_xqm->qm_usr_dqhtable,
-		G_xqm->qm_prj_dqhtable,
-		G_xqm->qm_dqfreelist.qh_nelems,
-		G_xqm->qm_dqhashmask);
+		xfs_Gqm->qm_usr_dqhtable,
+		xfs_Gqm->qm_prj_dqhtable,
+		xfs_Gqm->qm_dqfreelist.qh_nelems,
+		xfs_Gqm->qm_dqhashmask);
 	qprintf("&freelist 0x%x, totaldquots 0x%x nrefs 0x%x\n",
-		&G_xqm->qm_dqfreelist,
-		G_xqm->qm_totaldquots,
-		G_xqm->qm_nrefs);
+		&xfs_Gqm->qm_dqfreelist,
+		xfs_Gqm->qm_totaldquots,
+		xfs_Gqm->qm_nrefs);
 }
 
 static void
@@ -4469,9 +4469,9 @@ xfsidbg_xqm_freelist_print(xfs_frlist_t *qlist, char *title)
 static void	
 xfsidbg_xqm_freelist(void)
 {
-	extern xfs_qm_t	*G_xqm;
-	if (G_xqm) {
-		xfsidbg_xqm_freelist_print(&(G_xqm->qm_dqfreelist), "Freelist");
+	extern xfs_qm_t	*xfs_Gqm;
+	if (xfs_Gqm) {
+		xfsidbg_xqm_freelist_print(&(xfs_Gqm->qm_dqfreelist), "Freelist");
 	} else
 		qprintf("NULL XQM!!\n");
 }
@@ -4491,23 +4491,23 @@ xfsidbg_xqm_mplist(xfs_mount_t *mp)
 static void
 xfsidbg_xqm_htab(void)
 {
-	extern xfs_qm_t	*G_xqm;
+	extern xfs_qm_t	*xfs_Gqm;
 	int		i;
 	xfs_dqhash_t	*h;
 
-	if (G_xqm == NULL) {
+	if (xfs_Gqm == NULL) {
 		qprintf("NULL XQM!!\n");
 		return;
 	}
-	for (i = 0; i <= G_xqm->qm_dqhashmask; i++) {
-		h = &G_xqm->qm_usr_dqhtable[i];
+	for (i = 0; i <= xfs_Gqm->qm_dqhashmask; i++) {
+		h = &xfs_Gqm->qm_usr_dqhtable[i];
 		if (h->qh_next) {
 			qprintf("USR %d: ", i);
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);
 		}
 	}
-	for (i = 0; i <= G_xqm->qm_dqhashmask; i++) {
-		h = &G_xqm->qm_prj_dqhtable[i];
+	for (i = 0; i <= xfs_Gqm->qm_dqhashmask; i++) {
+		h = &xfs_Gqm->qm_prj_dqhtable[i];
 		if (h->qh_next) {
 			qprintf("PRJ %d: ", i);
 			XQMIDBG_LIST_PRINT(h, HL_NEXT);

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.31 $"
+#ident "$Revision: 1.32 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -176,8 +176,8 @@ xfs_qm_dqdestroy(
 	     ktrace_free(dqp->q_trace);
 	dqp->q_trace = NULL;
 #endif
-	kmem_zone_free(G_xqm->qm_dqzone, dqp);
-	atomicAddUint(&G_xqm->qm_totaldquots, -1);
+	kmem_zone_free(xfs_Gqm->qm_dqzone, dqp);
+	atomicAddUint(&xfs_Gqm->qm_totaldquots, -1);
 }
 
 /*
@@ -802,7 +802,7 @@ xfs_qm_dqlookup(
 			xfs_dqlock(dqp);
 			if (dqp->q_nrefs == 0) {
 				ASSERT (XFS_DQ_IS_ON_FREELIST(dqp));
-				if (! xfs_qm_freelist_lock_nowait(G_xqm)) {
+				if (! xfs_qm_freelist_lock_nowait(xfs_Gqm)) {
 					xfs_dqtrace_entry(dqp, "DQLOOKUP: WANT");
 					
 					/*
@@ -812,7 +812,7 @@ xfs_qm_dqlookup(
 					 */
 					dqp->dq_flags |= XFS_DQ_WANT;
 					xfs_dqunlock(dqp);
-					xfs_qm_freelist_lock(G_xqm);
+					xfs_qm_freelist_lock(xfs_Gqm);
 					xfs_dqlock(dqp);
 					dqp->dq_flags &= ~(XFS_DQ_WANT);
 				} 
@@ -827,7 +827,7 @@ xfs_qm_dqlookup(
 
 			if (flist_locked) {
 				if (dqp->q_nrefs != 0) {
-					xfs_qm_freelist_unlock(G_xqm);
+					xfs_qm_freelist_unlock(xfs_Gqm);
 					flist_locked = B_FALSE;
 				} else {
 					/*
@@ -836,7 +836,7 @@ xfs_qm_dqlookup(
 					xfs_dqtrace_entry(dqp, 
 							"DQLOOKUP: TAKEOFF FL");
 					XQM_FREELIST_REMOVE(dqp);
-				        /* xfs_qm_freelist_print(&(G_xqm->
+				        /* xfs_qm_freelist_print(&(xfs_Gqm->
 							qm_dqfreelist),
 							"after removal"); */
 				}
@@ -848,7 +848,7 @@ xfs_qm_dqlookup(
 			XFS_DQHOLD(dqp);
 
 			if (flist_locked) 
-				xfs_qm_freelist_unlock(G_xqm);
+				xfs_qm_freelist_unlock(xfs_Gqm);
 			/* 
 			 * move the dquot to the front of the hashchain
 			 */
@@ -1117,10 +1117,10 @@ xfs_qm_dqput(
 	 * drop the dqlock and acquire the freelist and dqlock
 	 * in the right order; but try to get it out-of-order first
 	 */
-	if (! xfs_qm_freelist_lock_nowait(G_xqm)) {
+	if (! xfs_qm_freelist_lock_nowait(xfs_Gqm)) {
 		xfs_dqtrace_entry(dqp, "DQPUT: FLLOCK-WAIT");
 		xfs_dqunlock(dqp);
-		xfs_qm_freelist_lock(G_xqm);
+		xfs_qm_freelist_lock(xfs_Gqm);
 		xfs_dqlock(dqp);
 	}
 
@@ -1133,7 +1133,7 @@ xfs_qm_dqput(
 			/*
 			 * insert at end of the freelist.
 			 */
-			XQM_FREELIST_INSERT(&(G_xqm->qm_dqfreelist), dqp);
+			XQM_FREELIST_INSERT(&(xfs_Gqm->qm_dqfreelist), dqp);
 
 			/* 
 			 * If we just added a udquot to the freelist, then
@@ -1149,7 +1149,7 @@ xfs_qm_dqput(
 				dqp->q_pdquot = NULL;
 			}
 		
-			/* xfs_qm_freelist_print(&(G_xqm->qm_dqfreelist),
+			/* xfs_qm_freelist_print(&(xfs_Gqm->qm_dqfreelist),
 			   "@@@@@++ Free list (after append) @@@@@+");
 			   */
 		}
@@ -1165,7 +1165,7 @@ xfs_qm_dqput(
 		dqp = pdqp;
 		
 	}
-	xfs_qm_freelist_unlock(G_xqm);
+	xfs_qm_freelist_unlock(xfs_Gqm);
 }
 
 /*

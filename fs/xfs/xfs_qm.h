@@ -1,7 +1,7 @@
 #ifndef __XFS_QM_H__
 #define __XFS_QM_H__
 
-#ident "$Revision: 1.10 $"
+#ident "$Revision: 1.11 $"
 
 struct  xfs_dqhash;
 struct  xfs_inode;
@@ -14,7 +14,8 @@ struct  xfs_qm;
  * quota functionality, including maintaining the freelist and hash
  * tables of dquots.
  */
-extern	struct xfs_qm		*G_xqm;		
+extern	struct xfs_qm		*xfs_Gqm;		
+extern	mutex_t			xfs_Gqm_lock;
 
 /*
  * Used in xfs_qm_sync called by xfs_sync to count the max times that it can
@@ -154,8 +155,10 @@ typedef struct xfs_dquot_acct {
 #define XFS_QM_BWARNLIMIT	5
 #define XFS_QM_IWARNLIMIT	5
 
-#define XFS_QM_HOLD(xqm)	(atomicAddUint(&(xqm)->qm_nrefs, 1))
-#define XFS_QM_RELE(xqm)	(atomicAddUint(&(xqm)->qm_nrefs, -1))
+#define XFS_QM_LOCK(xqm)	(mutex_lock(&xqm##_lock, PINOD))
+#define XFS_QM_UNLOCK(xqm)	(mutex_unlock(&xqm##_lock))
+#define XFS_QM_HOLD(xqm)	((xqm)->qm_nrefs++)
+#define XFS_QM_RELE(xqm)	((xqm)->qm_nrefs--)
 
 #if DEBUG
 extern int 		xfs_quotadebug;

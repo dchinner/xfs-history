@@ -57,11 +57,11 @@ struct xfs_dquotblk;
  */
 #define XFS_DQ_HASHVAL(mp, id) (((__psunsigned_t)(mp) + \
 				 (__psunsigned_t)(id)) & \
-				(G_xqm->qm_dqhashmask - 1))
+				(xfs_Gqm->qm_dqhashmask - 1))
 #define XFS_DQ_HASH(mp, id, type)   (type == XFS_DQ_USER ? \
-				     (G_xqm->qm_usr_dqhtable + \
+				     (xfs_Gqm->qm_usr_dqhtable + \
 				      XFS_DQ_HASHVAL(mp, id)) : \
-				     (G_xqm->qm_prj_dqhtable + \
+				     (xfs_Gqm->qm_prj_dqhtable + \
 				      XFS_DQ_HASHVAL(mp, id)))
 #define XFS_IS_DQTYPE_ON(mp, type)   (type == XFS_DQ_USER ? \
 				      XFS_IS_UQUOTA_ON(mp):XFS_IS_PQUOTA_ON(mp))

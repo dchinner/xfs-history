@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -965,13 +965,13 @@ void
 xfs_trans_alloc_dqinfo(
 	xfs_trans_t	*tp)
 {
-	(tp)->t_dqinfo = kmem_zone_zalloc(G_xqm->qm_dqtrxzone, KM_SLEEP);
+	(tp)->t_dqinfo = kmem_zone_zalloc(xfs_Gqm->qm_dqtrxzone, KM_SLEEP);
 }
 
 void
 xfs_trans_free_dqinfo(
 	xfs_trans_t	*tp)
 {
-	kmem_zone_free(G_xqm->qm_dqtrxzone, (tp)->t_dqinfo);
+	kmem_zone_free(xfs_Gqm->qm_dqtrxzone, (tp)->t_dqinfo);
 	(tp)->t_dqinfo = NULL;
 }
