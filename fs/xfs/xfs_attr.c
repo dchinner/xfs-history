@@ -196,7 +196,6 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 		xfs_trans_cancel(trans, XFS_TRANS_RELEASE_LOG_RES);
 		return(error);
 	}
-	VN_HOLD(vp);
 	xfs_ilock(dp, XFS_ILOCK_EXCL);
 	xfs_trans_ijoin(trans, dp, XFS_ILOCK_EXCL);
 	xfs_trans_ihold(trans, dp);
