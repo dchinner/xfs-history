@@ -1,4 +1,4 @@
-#ident "$Revision: 1.1 $"
+#ident "$Revision: 1.2 $"
 
 /*
  * XFS bit manipulation routines, used only in realtime code.
@@ -35,7 +35,7 @@ int
 xfs_highbit64(
 	__uint64_t	v)
 {
-#if (_MIPS_SZLONG == 64)
+#if (_MIPS_SIM == _ABIN32 || _MIPS_SIM == _ABI64)
 	if (v & 0xffffffff00000000)
 		if (v & 0xffff000000000000)
 			if (v & 0xff00000000000000)
