@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.102 $"
+#ident  "$Revision: 1.103 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -572,7 +572,7 @@ irix5_to_xfs_args(
  * The file system configurations are:
  *	(1) device (partition) with data and internal log
  *	(2) logical volume with data and log subvolumes.
- *	(3) logical volude with data, log, and realtime subvolumes.
+ *	(3) logical volume with data, log, and realtime subvolumes.
  *
  */ 
 STATIC int
@@ -702,6 +702,8 @@ xfs_isdev(
 	buf_t	 *bp;
 	int	 error;
 
+	if (!bdvalid(bmajor(dev)))
+		return 1;
 	bp = bread(dev, XFS_SB_DADDR, BTOBB(sizeof(xfs_sb_t)));
 	error = (bp->b_flags & B_ERROR);
 
