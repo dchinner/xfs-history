@@ -20,8 +20,8 @@
  */
 typedef struct xfs_alloc_rec
 {
-	xfs_agblock_t	startblock;	/* starting block number */
-	xfs_extlen_t	blockcount;	/* count of free blocks */
+	xfs_agblock_t	ar_startblock;	/* starting block number */
+	xfs_extlen_t	ar_blockcount;	/* count of free blocks */
 } xfs_alloc_rec_t;
 
 /*
@@ -47,11 +47,11 @@ typedef struct xfs_alloc_rec
 #define	XFS_CNT_BLOCK	((xfs_agblock_t)(XFS_BNO_BLOCK + 1))
 
 #define	XFS_ALLOC_REC_ADDR(bb,i,bl,cur)	\
-	XFS_BTREE_REC_ADDR(XFS_ALLOC_BLOCK_SIZE(bl,(bb)->level,cur), \
+	XFS_BTREE_REC_ADDR(XFS_ALLOC_BLOCK_SIZE(bl,(bb)->bb_level,cur), \
 			   xfs_alloc_rec_t, bb, i)
 
 #define	XFS_ALLOC_PTR_ADDR(bb,i,bl,cur)	\
-	XFS_BTREE_PTR_ADDR(XFS_ALLOC_BLOCK_SIZE(bl,(bb)->level,cur), \
+	XFS_BTREE_PTR_ADDR(XFS_ALLOC_BLOCK_SIZE(bl,(bb)->bb_level,cur), \
 			   xfs_alloc_rec_t, bb, i)
 
 typedef enum xfs_alloctype
@@ -62,23 +62,6 @@ typedef enum xfs_alloctype
 	XFS_ALLOCTYPE_NEAR_BNO,
 	XFS_ALLOCTYPE_THIS_BNO
 } xfs_alloctype_t;
-
-#define	XFS_ALLOC_MAXLEVELS	5
-typedef struct xfs_alloc_cur
-{
-	xfs_trans_t	*tp;		/* links cursors on freelist */
-	buf_t		*agbuf;
-	xfs_agnumber_t	agno;
-	xfs_alloc_rec_t	rec;
-	buf_t		*bufs[XFS_ALLOC_MAXLEVELS];
-	int		ptrs[XFS_ALLOC_MAXLEVELS];	
-	int		nlevels;
-	xfs_btnum_t	btnum;
-#ifdef XFSADEBUG
-	int		lineno;
-	struct xfs_alloc_cur *next;	/* on all cursors list */
-#endif
-} xfs_alloc_cur_t;
 
 /*
  * Prototypes for per-ag allocation routines
@@ -95,7 +78,5 @@ int xfs_free_ag_extent(xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_agblock_t, xf
 xfs_fsblock_t xfs_alloc_extent(xfs_trans_t *, xfs_fsblock_t, xfs_extlen_t, xfs_alloctype_t);
 xfs_fsblock_t xfs_alloc_vextent(xfs_trans_t *, xfs_fsblock_t, xfs_extlen_t, xfs_extlen_t, xfs_extlen_t *, xfs_alloctype_t);
 int xfs_free_extent(xfs_trans_t *, xfs_fsblock_t, xfs_extlen_t);
-
-extern __uint32_t xfs_magics[];
 
 #endif	/* !_FS_XFS_ALLOC_H */

@@ -10,8 +10,9 @@
  */
 typedef struct xfs_extdesc
 {
-	xfs_fsblock_t	ed_start;	/* starting block number */
-	xfs_extlen_t	ed_len;		/* number of blocks */
+	xfs_fsblock_t	ed_startoff;	/* starting file offset */
+	xfs_fsblock_t	ed_startblock;	/* starting block number */
+	xfs_extlen_t	ed_blockcount;	/* number of blocks */
 } xfs_extdesc_t;
 
 /*
@@ -26,48 +27,30 @@ typedef struct xfs_bmx
 /*
  * Bmap btree record.
  */
-typedef struct xfs_bmap_rec
+typedef struct xfs_bmbt_rec
 {
 	/* should be off_t if it were 64 bits, fix soon */
-	xfs_fsblock_t	startoff;	/* starting file offset */
-	xfs_fsblock_t	startblock;	/* starting block number */
-	xfs_extlen_t	blockcount;	/* number of blocks */
-} xfs_bmap_rec_t;
+	xfs_fsblock_t	br_startoff;	/* starting file offset */
+	xfs_fsblock_t	br_startblock;	/* starting block number */
+	xfs_extlen_t	br_blockcount;	/* number of blocks */
+} xfs_bmbt_rec_t;
 
-#define	XFS_BMAP_RBLOCK_SIZE(bl,lev,cur) ((cur)->inodesize - offsetof(xfs_dinode_t, di_u))
+#define	XFS_BMAP_RBLOCK_SIZE(bl,lev,cur) ((cur)->bc_private.b.inodesize - offsetof(xfs_dinode_t, di_u))
 #define	XFS_BMAP_IBLOCK_SIZE(bl,lev,cur) (1 << (bl))
-#define	XFS_BMAP_BLOCK_SIZE(bl,lev,cur) ((lev) == (cur)->nlevels - 1 ? XFS_BMAP_RBLOCK_SIZE(bl,lev,cur) : XFS_BMAP_IBLOCK_SIZE(bl,lev,cur))
+#define	XFS_BMAP_BLOCK_SIZE(bl,lev,cur) ((lev) == (cur)->bc_nlevels - 1 ? XFS_BMAP_RBLOCK_SIZE(bl,lev,cur) : XFS_BMAP_IBLOCK_SIZE(bl,lev,cur))
 
-#define	XFS_BMAP_BLOCK_MAXRECS(bl,lev,cur) XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_BLOCK_SIZE(bl,lev,cur), xfs_bmap_rec_t, lev)
-#define	XFS_BMAP_BLOCK_MINRECS(bl,lev,cur) XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_BLOCK_SIZE(bl,lev,cur), xfs_bmap_rec_t, lev)
+#define	XFS_BMAP_BLOCK_MAXRECS(bl,lev,cur) XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_BLOCK_SIZE(bl,lev,cur), xfs_bmbt_rec_t, lev)
+#define	XFS_BMAP_BLOCK_MINRECS(bl,lev,cur) XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_BLOCK_SIZE(bl,lev,cur), xfs_bmbt_rec_t, lev)
 
-#define	XFS_BMAP_REC_ADDR(bb,i,bl,cur) XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_SIZE(bl,(bb)->level,cur), xfs_bmap_rec_t, bb, i)
+#define	XFS_BMAP_REC_ADDR(bb,i,bl,cur) XFS_BTREE_REC_ADDR(XFS_BMAP_BLOCK_SIZE(bl,(bb)->bb_level,cur), xfs_bmbt_rec_t, bb, i)
 
-#define	XFS_BMAP_PTR_ADDR(bb,i,bl,cur) XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_SIZE(bl,(bb)->level,cur), xfs_bmap_rec_t, bb, i)
+#define	XFS_BMAP_PTR_ADDR(bb,i,bl,cur) XFS_BTREE_PTR_ADDR(XFS_BMAP_BLOCK_SIZE(bl,(bb)->bb_level,cur), xfs_bmbt_rec_t, bb, i)
 
 #define	XFS_BMAP_MAXLEVELS	5	/* ??? */
 
-typedef struct xfs_bmap_cur
-{
-	xfs_trans_t		*tp;	/* links cursors on freelist */
-	buf_t			*agbuf;
-	xfs_agnumber_t		agno;	/* xfs_buf_to_agp(agbuf)->xfsag_seqno */
-	xfs_bmap_rec_t		rec;
-	buf_t			*bufs[XFS_BMAP_MAXLEVELS];
-	int			ptrs[XFS_BMAP_MAXLEVELS];
-	int			nlevels;
-	xfs_btnum_t		btnum;	/* == XFS_BTNUM_BMAP */
-	int			inodesize;	/* tp->t_mountp->m_sb->xfsb_inodesize */
-	struct xfs_inode	*ip;
-#ifdef XFSBMDEBUG
-	int			lineno;
-	struct xfs_bmap_cur	*next;	/* on all cursors list */
-#endif
-} xfs_bmap_cur_t;
-
-#define	xfs_bmap_get_block(cur, level)	\
-	((level) == (cur)->nlevels - 1 ? \
-	 xfs_buf_to_block((cur)->bufs[level]) : \
-	 &(cur)->ip->i_d.di_u.di_bmbt)
+#define	xfs_bmbt_get_block(cur, level)	\
+	((level) < (cur)->bc_nlevels - 1 ? \
+	 xfs_buf_to_block((cur)->bc_bufs[level]) : \
+	 &(cur)->bc_private.b.ip->i_d.di_u.di_bmbt)
 
 #endif	/* _FS_XFS_BMAP_H */
