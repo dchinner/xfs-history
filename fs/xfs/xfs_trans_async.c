@@ -8,6 +8,7 @@
 #include <sys/debug.h>
 #include "xfs.h"
 #include "xfs_trans.h"
+#include "xfs_mount.h"
 
 #ifdef SIM
 #include "sim.h"

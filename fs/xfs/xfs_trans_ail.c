@@ -7,6 +7,7 @@
 #include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_trans_priv.h"
+#include "xfs_mount.h"
 
 #ifdef SIM
 #include "sim.h"
