@@ -337,6 +337,7 @@ xfs_zero_last_block(
 			printk("xfs_zero_last_block: unwritten?\n");
 		}
 	} else {
+		pb->pb_bn = PAGE_BUF_DADDR_NULL;
 		error = pagebuf_iozero(pb, zero_offset, zero_len);
 		pagebuf_rele(pb);
 		goto out_lock;
@@ -520,6 +521,7 @@ xfs_zero_eof(
 		}
 
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
+			pb->pb_bn = PAGE_BUF_DADDR_NULL;
 			error = pagebuf_iozero(pb, 0, lsize);
 			pagebuf_rele(pb);
 		} else {
