@@ -1,4 +1,4 @@
-#ident "$Revision: 1.167 $"
+#ident "$Revision: 1.168 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -597,7 +597,8 @@ xfs_setattr(vnode_t	*vp,
 		commit_flags = 0;
 
 	} else {
-		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_TRUNCATE)) {
+		if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_TRUNCATE) &&
+		    !(flags & ATTR_DMI)) {
 			code = dm_data_event (vp, DM_TRUNCATE, vap->va_size, 0);
 			if (code)
 				return code;
@@ -903,9 +904,9 @@ xfs_setattr(vnode_t	*vp,
 
 	/*
 	 * Send out timestamp changes that need to be set to the
-	 * current time.
+	 * current time.  Not done when called by a DMI function.
 	 */
-	if (timeflags)
+	if (timeflags && !(flags & ATTR_DMI))
 		xfs_ichgtime(ip, timeflags);
 
 	XFSSTATS.xs_ig_attrchg++;
@@ -930,7 +931,8 @@ xfs_setattr(vnode_t	*vp,
 		return XFS_ERROR(code);
 	}
 
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_ATTRIBUTE)) {
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_ATTRIBUTE) &&
+	    !(flags & ATTR_DMI)) {
 		(void) dm_namesp_event (DM_ATTRIBUTE, vp, NULL, NULL, NULL,
 			0, 0);
 	}
