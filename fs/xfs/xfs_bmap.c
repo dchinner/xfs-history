@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.146 $"
+#ident	"$Revision: 1.147 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -2800,12 +2800,13 @@ xfs_bmap_add_attrfork(
 		return 0;
 	mp = ip->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_ADDAFORK);
-	if (error =
-	    xfs_trans_reserve(tp, 1, XFS_ADDAFORK_LOG_RES(mp), 0, 0, 0))
+	if (error = xfs_trans_reserve(tp, 1, XFS_ADDAFORK_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_ADDAFORK_LOG_COUNT))
 		goto error0;
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	if (XFS_IFORK_Q(ip))
 		goto error1;
+	VN_HOLD(XFS_ITOV(ip));
 	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
 	ip->i_d.di_forkoff = mp->m_attroffset >> 3;
 	logflags = XFS_ILOG_CORE;
@@ -2849,7 +2850,7 @@ xfs_bmap_add_attrfork(
 	error = xfs_bmap_finish(&tp, &flist, firstblock, &committed);
 	if (error)
 		goto error2;
-	error = xfs_trans_commit(tp, 0);
+	error = xfs_trans_commit(tp, XFS_TRANS_PERM_LOG_RES);
 	return error;
 
 error2:
