@@ -78,7 +78,7 @@ STATIC void
 xfs_qm_dquot_logitem_pin(
 	xfs_dq_logitem_t *logitem)
 {
-	int 	s;
+	unsigned long 	s;
 	xfs_dquot_t *dqp;
 	
 	dqp = logitem->qli_dquot;
@@ -97,7 +97,7 @@ STATIC void
 xfs_qm_dquot_logitem_unpin(
 	xfs_dq_logitem_t *logitem)
 {
-	int 	s;
+	unsigned long 	s;
 	xfs_dquot_t *dqp;
 
 	dqp = logitem->qli_dquot;
