@@ -1732,7 +1732,7 @@ static int	kdbm_vn(
 static char	*pb_flag_vals[] = {
 /*  0 */ "READ", "WRITE", "MAPPED", "PARTIAL", "ASYNC",
 /*  5 */ "NONE", "DELWRI", "FREED", "SYNC", "MAPPABLE",
-/* 10 */ "STALE", "FS_MANAGED", "INVALID12", "LOCK", "TRYLOCK",
+/* 10 */ "STALE", "FS_MANAGED", "FS_DATAIOD", "LOCK", "TRYLOCK",
 /* 15 */ "FILE_ALLOCATE", "DONT_BLOCK", "DIRECT", "INVALID18", "LOCKABLE",
 /* 20 */ "PRIVATE_BH", "ALL_PAGES_MAPPED", "ADDR_ALLOCATED", "MEM_ALLOCATED",
 	 "FORCEIO",
