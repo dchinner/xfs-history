@@ -116,10 +116,11 @@ typedef struct xfs_inode {
 /*
  * Flags for inode locking.
  */
-#define	XFS_IOLOCK_EXCL		0x1
-#define	XFS_IOLOCK_SHARED	0x2
-#define	XFS_ILOCK_EXCL		0x4
-#define	XFS_ILOCK_SHARED	0x8
+#define	XFS_IOLOCK_EXCL		0x01
+#define	XFS_IOLOCK_SHARED	0x02
+#define	XFS_ILOCK_EXCL		0x04
+#define	XFS_ILOCK_SHARED	0x08
+#define	XFS_IUNLOCK_NONOTIFY	0x10
 
 /*
  * Flags for xfs_iflush_all.
