@@ -297,7 +297,8 @@ xfs_cmountfs(
 		}
 
 		if (ap->logbufs != 0 && ap->logbufs != -1 &&
-		    (ap->logbufs < 2 || ap->logbufs > 8)) {
+		    (ap->logbufs < XLOG_NUM_ICLOGS ||
+		     ap->logbufs > XLOG_MAX_ICLOGS)) {
 			cmn_err(CE_WARN, "XFS: invalid logbufs value");
 			error = XFS_ERROR(EINVAL);
 			goto error3;
