@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.42 $"
+#ident	"$Revision: 1.43 $"
 
 #include <sys/param.h>
 #include <sys/vnode.h>
@@ -502,6 +502,7 @@ xfs_bmbt_delrec(
 		l->lbp = l->bp;
 		l->rbp = xfs_btree_read_bufl(l->mp, cur->bc_tp, l->rbno, 0);
 		l->right = XFS_BUF_TO_BMBT_BLOCK(l->rbp);
+		l->lrecs = l->left->bb_numrecs;
 		xfs_btree_check_lblock(cur, l->right, level);
 	} else {
 		xfs_bmbt_locals_free(l);
@@ -545,7 +546,7 @@ xfs_bmbt_delrec(
 	xfs_trans_binval(cur->bc_tp, l->rbp);
 	if (l->bp != l->lbp) {
 		cur->bc_bufs[level] = l->lbp;
-		cur->bc_ptrs[level] += l->left->bb_numrecs;
+		cur->bc_ptrs[level] += l->lrecs;
 	} else if (level + 1 < cur->bc_nlevels)
 		xfs_bmbt_increment(cur, level + 1);
 	xfs_bmbt_locals_free(l);

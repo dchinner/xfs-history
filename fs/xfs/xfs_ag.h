@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.20 $"
 
 /*
  * Allocation group header
@@ -13,6 +13,12 @@
 #define	XFS_AGI_MAGIC	0x58414749	/* 'XAGI' */
 #define	XFS_AGF_VERSION	1
 #define	XFS_AGI_VERSION	1
+
+/*
+ * The second word of agf_levels in the first a.g. overlaps the EFS
+ * superblock's magic number.  Since the magic numbers valid for EFS
+ * are > 64k, our value cannot be confused for an EFS superblock's.
+ */
 
 typedef struct xfs_agf
 {
@@ -26,8 +32,8 @@ typedef struct xfs_agf
 	/*
 	 * Freespace information
 	 */
-	xfs_agblock_t	agf_roots[XFS_BTNUM_MAX - 1];
-	__uint32_t	agf_levels[XFS_BTNUM_MAX - 1];
+	xfs_agblock_t	agf_roots[XFS_BTNUM_MAX - 1];	/* root blocks */
+	__uint32_t	agf_levels[XFS_BTNUM_MAX - 1];	/* btree levels */
 	__uint32_t	agf_flfirst;	/* first freelist block's index */
 	__uint32_t	agf_fllast;	/* last freelist block's index */
 	__uint32_t	agf_flcount;	/* count of blocks in freelist */
@@ -77,6 +83,7 @@ typedef struct xfs_agi
 	__uint32_t	agi_level;	/* levels in inode btree */
 	xfs_agino_t	agi_freecount;	/* number of free inodes */
 	xfs_agino_t	agi_newino;	/* new inode just allocated */
+	xfs_agino_t	agi_dirino;	/* last directory inode chunk */
 	/*
 	 * Hash table of inodes which have been unlinked but are
 	 * still being referenced.
@@ -93,8 +100,9 @@ typedef struct xfs_agi
 #define	XFS_AGI_LEVEL		0x00000040
 #define	XFS_AGI_FREECOUNT	0x00000080
 #define	XFS_AGI_NEWINO		0x00000100
-#define	XFS_AGI_UNLINKED	0x00000200
-#define	XFS_AGI_NUM_BITS	10
+#define	XFS_AGI_DIRINO		0x00000200
+#define	XFS_AGI_UNLINKED	0x00000400
+#define	XFS_AGI_NUM_BITS	11
 #define	XFS_AGI_ALL_BITS	((1 << XFS_AGI_NUM_BITS) - 1)
 
 /* disk block (daddr_t) in the AG */

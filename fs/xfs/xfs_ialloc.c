@@ -826,6 +826,7 @@ xfs_ialloc_log_agi(
 		offsetof(xfs_agi_t, agi_level),
 		offsetof(xfs_agi_t, agi_freecount),
 		offsetof(xfs_agi_t, agi_newino),
+		offsetof(xfs_agi_t, agi_dirino),
 		offsetof(xfs_agi_t, agi_unlinked),
 		sizeof(xfs_agi_t)
 	};
