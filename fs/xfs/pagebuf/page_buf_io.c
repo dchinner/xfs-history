@@ -1430,12 +1430,7 @@ allocate:
 		printk("PCD: pbm_delta not page aligned mp 0x%p\n", &maps[0]);
 		return -EIO;
 	}
-	if ((maps[0].pbm_flags & PBMF_DELAY) && (flags & PBF_DIRECT)) {
-		flags = PBF_WRITE | PBF_FILE_ALLOCATE;
-		printk("Redoing allocate for delalloc on page 0x%p\n",
-			page);
-		goto allocate;
-	}
+
 	/*
 	 * page needs to be setup as though find_page(...) returned it,
 	 * which is a locked page with an extra reference.
