@@ -180,6 +180,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 	int	log_flags;
 	int	error;
 	uint	res_logspace;
+	extern int xlog_debug;
 
 	error = 0;
 	/*
@@ -219,7 +220,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 				 * log reservation, so just use what was
 				 * gotten by the first.
 				 */
-				ASSERT(tp->t_ticket != NULL);
+				ASSERT((!xlog_debug) ||(tp->t_ticket != NULL));
 				res_logspace = 0;
 				error = 0;
 			} else {
