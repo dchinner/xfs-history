@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.13 $"
+#ident	"$Revision: 1.14 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -6,7 +6,7 @@
 #include <sys/vnode.h>
 #include <sys/systm.h>
 #include <sys/sema.h>
-#include <fs/specfs/snode.h>
+#include <specfs/snode.h>
 #include <sys/immu.h>
 #include <sys/kmem.h>
 #include <sys/time.h>
@@ -25,6 +25,7 @@
 #include "xfs_bmap_btree.h"
 #include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_dir.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
