@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision$"
+#ident "$Revision: 1.78 $"
 
 struct buf;
 struct cred;
@@ -95,7 +95,7 @@ typedef struct xfs_inode {
 	mrlock_t		i_iolock;	/* inode IO lock */
 	sema_t			i_flock;	/* inode flush lock */
 	unsigned int		i_pincount;	/* inode pin count */
-	sema_t			i_pinsema;	/* inode pin sema */
+	sv_t			i_pinsema;	/* inode pin sema */
 #ifdef NOTYET
 	xfs_range_lock_t	i_range_lock;	/* range lock base */
 #endif /* NOTYET */

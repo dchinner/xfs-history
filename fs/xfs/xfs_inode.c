@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.138 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1685,7 +1685,7 @@ xfs_idestroy(
 	freesplock(ip->i_range_lock.r_splock);
 #endif /* NOTYET */
 	freesema(&ip->i_flock);
-	freesema(&ip->i_pinsema);
+	sv_destroy(&ip->i_pinsema);
 #ifndef SIM
 	ktrace_free(ip->i_btrace);
 	ktrace_free(ip->i_xtrace);
@@ -1710,9 +1710,9 @@ xfs_ipin(
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE));
 
 	mp = ip->i_mount;
-	s = splockspl(mp->m_ipinlock, splhi);
+	s = mutex_spinlock(&mp->m_ipinlock);
 	ip->i_pincount++;
-	spunlockspl(mp->m_ipinlock, s);	
+	mutex_spinunlock(&mp->m_ipinlock, s);
 	return;
 }
 
@@ -1731,14 +1731,12 @@ xfs_iunpin(
 	ASSERT(ip->i_pincount > 0);
 
 	mp = ip->i_mount;
-	s = splockspl(mp->m_ipinlock, splhi);
+	s = mutex_spinlock(&mp->m_ipinlock);
 	ip->i_pincount--;
 	if (ip->i_pincount == 0) {
-		while (cvsema(&(ip->i_pinsema)) != 0) {
-			;
-		}
+		sv_broadcast(&ip->i_pinsema);
 	}
-	spunlockspl(mp->m_ipinlock, s);
+	mutex_spinunlock(&mp->m_ipinlock, s);
 	return;
 }
 
@@ -1772,12 +1770,12 @@ xfs_iunpin_wait(
 	 */
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 
-	s = splockspl(mp->m_ipinlock, splhi);
+	s = mutex_spinlock(&mp->m_ipinlock);
 	if (ip->i_pincount == 0) {
-		spunlockspl(mp->m_ipinlock, s);
+		mutex_spinunlock(&mp->m_ipinlock, s);
 		return;
 	}
-	spunlockspl_psema(mp->m_ipinlock, s, &(ip->i_pinsema), PINOD);
+	sv_wait(&(ip->i_pinsema), PINOD, &mp->m_ipinlock, s);
 	return;
 }
 
