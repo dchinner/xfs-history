@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_H
 #define	_FS_XFS_ATTR_H
 
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
 
 /*
  * xfs_attr.h
@@ -32,6 +32,7 @@ struct cred;
 struct vnode;
 struct xfs_inode;
 struct attrlist_cursor_kern;
+struct xfs_ext_attr;
 struct xfs_da_args;
 
 /*
