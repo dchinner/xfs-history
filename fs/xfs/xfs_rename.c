@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -651,8 +651,6 @@ xfs_rename(
 	int		src_dp_dropped = 0;	/* dropped src_dp link? */
 	vnode_t 	*src_dir_vp;
 	bhv_desc_t	*target_dir_bdp;
-	bhv_head_t	*target_dir_bhp;
-	
 
 	src_dir_vp = BHV_TO_VNODE(src_dir_bdp);
 	vn_trace_entry(src_dir_vp, "xfs_rename", (inst_t *)__return_address);
@@ -662,8 +660,8 @@ xfs_rename(
 	 * Find the XFS behavior descriptor for the target directory
 	 * vnode since it was not handed to us.
 	 */
-	target_dir_bhp = VN_BHV_HEAD(target_dir_vp);
-	target_dir_bdp = bhv_lookup_unlocked(target_dir_bhp, &xfs_vnodeops);
+	target_dir_bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(target_dir_vp), 
+						&xfs_vnodeops);
 	if (target_dir_bdp == NULL) {
 		return XFS_ERROR(EXDEV);
 	}

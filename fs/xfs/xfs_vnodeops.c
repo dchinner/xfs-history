@@ -1,4 +1,4 @@
-#ident "$Revision: 1.313 $"
+#ident "$Revision: 1.314 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -3320,7 +3320,6 @@ xfs_link(
 	int			committed;
 	vnode_t 		*target_dir_vp;
 	bhv_desc_t		*src_bdp;
-	bhv_head_t		*src_bhp;
 
 	target_dir_vp = BHV_TO_VNODE(target_dir_bdp);
 	vn_trace_entry(target_dir_vp, "xfs_link", (inst_t *)__return_address);
@@ -3343,8 +3342,7 @@ xfs_link(
 	 * Eventually we need to figure out how link is going to
 	 * work in the face of stacked vnodes.
 	 */
-	src_bhp = VN_BHV_HEAD(src_vp);
-	src_bdp = bhv_lookup_unlocked(src_bhp, &xfs_vnodeops);
+	src_bdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(src_vp), &xfs_vnodeops);
 	if (src_bdp == NULL) {
 		return XFS_ERROR(EXDEV);
 	}

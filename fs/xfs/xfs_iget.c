@@ -1,4 +1,4 @@
-#ident "$Revision: 1.79 $"
+#ident "$Revision: 1.80 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -231,7 +231,7 @@ again:
 	vp = vn_alloc(XFS_MTOVFS(mp), IFTOVT(ip->i_d.di_mode),
 		      ip->i_df.if_u2.if_rdev);
 	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
-	bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
 	if (ISVDEV(vp->v_type))
 		VN_NOCELL_SUPPORT(vp);
 	else
@@ -257,7 +257,8 @@ again:
 		for (iq = ih->ih_next; iq != NULL; iq = iq->i_next) {
 			if (iq->i_ino == ino) {
 				XFS_IHUNLOCK(ih);
-				bhv_remove(&(vp->v_bh), &(ip->i_bhv_desc));
+				vn_bhv_remove(VN_BHV_HEAD(vp), 
+					      &(ip->i_bhv_desc));
 				vn_free(vp);
 				xfs_idestroy(ip);
 				XFSSTATS.xs_ig_dup++;
@@ -452,7 +453,7 @@ xfs_ireclaim(xfs_inode_t *ip)
 	 * Pull our behavior descriptor from the vnode chain.
 	 */
 	vp = XFS_ITOV(ip);
-	bhv_remove(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	vn_bhv_remove(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
  
 	/*
 	 * Free all memory associated with the inode.

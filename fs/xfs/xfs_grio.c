@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.73 1997/03/20 23:54:32 singal Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.74 1997/03/25 19:07:50 pjr Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -309,7 +309,7 @@ xfs_grio_get_inumber( int fdes )
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
 	bhv_desc_t	*bdp;
-	bhv_head_t	*bhp;
+	vn_bhv_head_t	*bhp;
 	xfs_ino_t	ino;
 
 	if ( getf( fdes, &fp ) != 0 ) {
@@ -321,15 +321,15 @@ xfs_grio_get_inumber( int fdes )
 	}
 	vp = VF_TO_VNODE(fp);
 	bhp = VN_BHV_HEAD(vp);
-	BHV_READ_LOCK(bhp);
-	bdp = bhv_lookup(bhp, &xfs_vnodeops);
+	VN_BHV_READ_LOCK(bhp);
+	bdp = vn_bhv_lookup(bhp, &xfs_vnodeops);
 	if (bdp == NULL) {
 		ino = (xfs_ino_t)0;
 	} else {
 		ip = XFS_BHVTOI(bdp);
 		ino = ip->i_ino;
 	}
-	BHV_READ_UNLOCK(bhp);
+	VN_BHV_READ_UNLOCK(bhp);
 	return( ino );
 }
 
@@ -351,7 +351,7 @@ xfs_grio_get_fs_dev( int fdes )
 	vnode_t	*vp;
 	xfs_inode_t	*ip;
 	bhv_desc_t	*bdp;
-	bhv_head_t	*bhp;
+	vn_bhv_head_t	*bhp;
 	dev_t		dev;
 
 	if ( getf( fdes, &fp ) != 0 ) {
@@ -363,15 +363,15 @@ xfs_grio_get_fs_dev( int fdes )
 	}
 	vp = VF_TO_VNODE(fp);
 	bhp = VN_BHV_HEAD(vp);
-	BHV_READ_LOCK(bhp);
-	bdp = bhv_lookup(bhp, &xfs_vnodeops);
+	VN_BHV_READ_LOCK(bhp);
+	bdp = vn_bhv_lookup(bhp, &xfs_vnodeops);
 	if (bdp == NULL) {
 		dev = 0;
 	} else {
 		ip = XFS_BHVTOI(bdp);
 		dev = ip->i_dev;
 	}
-	BHV_READ_UNLOCK(bhp);
+	VN_BHV_READ_UNLOCK(bhp);
 	return( dev );
 }
 
