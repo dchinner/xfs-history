@@ -1772,6 +1772,12 @@ xfs_remove(vnode_t	*dir_vp,
 		release_res = B_FALSE;
 	}
 
+	/*
+	 * Take an extra ref on the inode so that it doesn't
+	 * go to xfs_inactive() from within the commit.
+	 */
+	IHOLD(ip);
+
 	if (release_res) {
 		commit_flag = XFS_TRANS_RELEASE_LOG_RES;
 	} else {
@@ -1789,6 +1795,7 @@ xfs_remove(vnode_t	*dir_vp,
 		commit_flag = 0;
 	}
 	xfs_trans_commit (tp, commit_flag);
+	IRELE(ip);
 
 	return 0;
 
@@ -2187,6 +2194,15 @@ xfs_rename(vnode_t	*src_dir_vp,
                 xfs_trans_log_inode (tp, target_dp, XFS_ILOG_CORE);
 	}
 
+	/*
+	 * If there was a target inode, take an extra reference on
+	 * it here so that it doesn't go to xfs_inactive() from
+	 * within the commit.
+	 */
+	if (target_ip != NULL) {
+		IHOLD(target_ip);
+	}
+
 	if (release_res) {
 		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 	} else {
@@ -2209,6 +2225,9 @@ xfs_rename(vnode_t	*src_dir_vp,
 	 * the vnode references.
 	 */
 	xfs_trans_commit (tp, commit_flags);
+	if (target_ip != NULL) {
+		IRELE(target_ip);
+	}
 
 	return 0;
 
@@ -2439,6 +2458,12 @@ xfs_rmdir(vnode_t	*dir_vp,
 		release_res = B_FALSE;
 	}
 
+	/*
+	 * Take an extra ref on the child vnode so that it
+	 * does not go to xfs_inactive() from within the commit.
+	 */
+	IHOLD(cdp);
+
 	if (release_res) {
 		commit_flags = XFS_TRANS_RELEASE_LOG_RES;
 	} else {
@@ -2455,6 +2480,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 		commit_flags = 0;
 	}
 	xfs_trans_commit (tp, commit_flags);
+	IRELE(cdp);
 
 	return 0;
 
