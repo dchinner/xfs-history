@@ -1,9 +1,8 @@
 
-#ident	"$Revision: 1.115 $"
+#ident	"$Revision: 1.118 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
-#include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
@@ -18,6 +17,7 @@
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/grio.h>
 #include <sys/pfdat.h>
