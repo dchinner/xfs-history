@@ -1,4 +1,4 @@
-#ident "$Revision: 1.49 $"
+#ident "$Revision: 1.50 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -647,6 +647,7 @@ xfs_inode_item_push(
 	 * and write it out here.
 	 */
 	bp = iip->ili_bp;
+	ip = iip->ili_inode;
 	if ((bp != NULL) && (iip->ili_bp_owner == u.u_procp)) {
 		ASSERT(iip->ili_bp->b_flags & B_BUSY);
 		iip->ili_bp = NULL;
@@ -654,6 +655,15 @@ xfs_inode_item_push(
 #ifndef SIM
 		buftrace("INODE ITEM PUSH", bp);
 #endif
+		/*
+		 * If the buffer is pinned then push on the log so we won't
+		 * deadlock waiting for the buffer to be unpinned while we
+		 * hold other locks.
+		 */
+		if (bp->b_pincount > 0) {
+			xfs_log_force(ip->i_mount, (xfs_lsn_t)0,
+				      XFS_LOG_FORCE);
+		}
 		bawrite(bp);
 		return;
 	}
@@ -667,7 +677,6 @@ xfs_inode_item_push(
 	 * lock without sleeping, then there must not have been
 	 * anyone in the process of flushing the inode.
 	 */
-	ip = iip->ili_inode;
 	ASSERT(iip->ili_format.ilf_fields != 0);
 
 	/*
