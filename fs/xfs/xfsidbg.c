@@ -2611,7 +2611,7 @@ xfsidbg_xdirleaf(xfs_dir_leafblock_t *leaf)
 	}
 	for (j = 0, e = leaf->entries; j < h->count; j++, e++) {
 		n = XFS_DIR_LEAF_NAMESTRUCT(leaf, e->nameidx);
-		*(xfs_dir_ino_t *)&ino = n->inumber;
+		XFS_DIR_SF_GET_DIRINO(&n->inumber, &ino);
 		qprintf("leaf %d hashval 0x%x nameidx %d inumber %lld ",
 			j, e->hashval, e->nameidx, ino);
 		qprintf("namelen %d name \"", e->namelen);
@@ -2633,11 +2633,11 @@ xfsidbg_xdirsf(xfs_dir_shortform_t *s)
 	int i, j;
 
 	sfh = &s->hdr;
-	*(xfs_dir_ino_t *)&ino = sfh->parent;
+	XFS_DIR_SF_GET_DIRINO(&sfh->parent, &ino);
 	qprintf("hdr parent %lld", ino);
 	qprintf(" count %d\n", sfh->count);
 	for (i = 0, sfe = s->list; i < sfh->count; i++) {
-		*(xfs_dir_ino_t *)&ino = sfe->inumber;
+		XFS_DIR_SF_GET_DIRINO(&sfe->inumber, &ino);
 		qprintf("entry %d inumber %lld", i, ino);
 		qprintf(" namelen %d name \"", sfe->namelen);
 		for (j = 0; j < sfe->namelen; j++)
@@ -3701,7 +3701,7 @@ xfsidbg_xtp(xfs_trans_t *tp)
 			chunk++;
 			continue;
 		}
-		for (i = 0; i <= XFS_LIC_MAX_SLOT; i++) {
+		for (i = 0; i < licp->lic_unused; i++) {
 			if (XFS_LIC_ISFREE(licp, i)) {
 				continue;
 			}
