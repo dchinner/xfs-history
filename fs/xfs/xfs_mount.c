@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.161 $"
+#ident	"$Revision: 1.162 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -305,8 +305,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 		 * If stripe unit and stripe width are not multiples
 		 * of the fs blocksize turn off alignment.
 		 */
-		if ((BBTOB(mp->m_dalign) % sbp->sb_blocksize) ||
-		    (BBTOB(mp->m_swidth) % sbp->sb_blocksize)) {
+		if ((BBTOB(mp->m_dalign) & mp->m_blockmask) ||
+		    (BBTOB(mp->m_swidth) & mp->m_blockmask)) {
 			if (mp->m_flags & XFS_MOUNT_RETERR) {
 				error = XFS_ERROR(EINVAL);
 				goto error1;
@@ -492,19 +492,18 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	if (XFS_SB_VERSION_HASALIGN(&mp->m_sb) &&
 	    mp->m_sb.sb_inoalignmt >=
 	    XFS_B_TO_FSBT(mp, mp->m_inode_cluster_size))
-		mp->m_inoalign = mp->m_sb.sb_inoalignmt;
+		mp->m_inoalign_mask = mp->m_sb.sb_inoalignmt - 1;
 	else
-		mp->m_inoalign = 0;
-
+		mp->m_inoalign_mask = 0;
 	/*
 	 * If we are using stripe alignment, check whether
 	 * the stripe unit is a multiple of the inode alignment
 	 */
-	if (mp->m_dalign && mp->m_inoalign && !(mp->m_dalign % mp->m_inoalign)) 
+	if (mp->m_dalign && mp->m_inoalign_mask &&
+	    !(mp->m_dalign & mp->m_inoalign_mask))
 		mp->m_sinoalign = mp->m_dalign;
 	else
 		mp->m_sinoalign = 0;
-
 	/*
 	 * Check that the data (and log if separate) are an ok size.
 	 */
@@ -563,6 +562,11 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	 */
 	vfsp->vfs_altfsid = (fsid_t *)mp->m_fixedfsid;
 	mp->m_dmevmask = 0;	/* not persistent; set after each mount */
+
+	/*
+	 * Initialize directory manager's entries.
+	 */
+	xfs_dir_mount(mp);
 
 	/*
 	 * Allocate and initialize the inode hash table for this
@@ -727,11 +731,6 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	}
 #endif
 #endif /* !SIM */
-
-	/*
-	 * Initialize directory manager's entries.
-	 */
-	xfs_dir_mount(mp);
 
 #ifdef QUOTADEBUG
 	if (XFS_IS_QUOTA_ON(mp)) {
