@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.32 $
+# $Revision: 1.33 $
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -109,6 +109,7 @@ $(KCOMMONPREF)default:$(TARGETS)
 
 $(KCOMMONPREF)install: $(KCOMMONPREF)default
 	${KINSTALL} ${XFS_NAME}
+	${KINSTALL} ${XIDBG_NAME}
 	${KDEVINSTALL} ${TARGETS}
 
 headers!
