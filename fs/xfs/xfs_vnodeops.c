@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.455 $"
+#ident "$Revision: 1.456 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -932,7 +932,8 @@ xfs_setattr(
 		if (vap->va_size > ip->i_d.di_size) {
 			xfs_igrow_finish(tp, ip, vap->va_size,
 			    !(flags & ATTR_DMI));
-		} else if (vap->va_size < ip->i_d.di_size) {
+		} else if ((vap->va_size < ip->i_d.di_size) ||
+			   ((vap->va_size == 0) && ip->i_d.di_nextents)) {
 			/*
 			 * signal a sync transaction unless
 			 * we're truncating an already unlinked
