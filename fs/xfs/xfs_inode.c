@@ -455,7 +455,7 @@ xfs_ialloc(
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
 	uint		flags;
-	error_status_t	status;
+	uint_t		status;
 	__int32_t	curr_time;
 
 	/*
