@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.54 $"
+#ident	"$Revision: 1.58 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -49,15 +49,6 @@ xfs_ialloc_log_di(
 	buf_t		*bp,		/* inode buffer */
 	int		off,		/* index of inode in buffer */
 	int		fields);	/* bitmask of fields to log */
-
-/*
- * Read in the allocation group header (inode allocation section)
- */
-STATIC buf_t *				/* allocation group hdr buf */
-xfs_ialloc_read_agi(
-	xfs_mount_t	*mp,		/* file system mount structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_agnumber_t	agno);		/* allocation group number */
 
 /*
  * Prototypes for per-allocation group routines.
@@ -139,34 +130,6 @@ xfs_ialloc_log_di(
 	first += ioffset;
 	last += ioffset;
 	xfs_trans_log_buf(tp, bp, first, last);
-}
-
-/*
- * Read in the allocation group header (inode allocation section)
- */
-STATIC buf_t *				/* allocation group hdr buf */
-xfs_ialloc_read_agi(
-	xfs_mount_t	*mp,		/* file system mount structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_agnumber_t	agno)		/* allocation group number */
-{
-	xfs_agi_t	*agi;		/* allocation group header */
-	buf_t		*bp;		/* return value */
-	daddr_t		d;		/* disk block address */
-	xfs_perag_t	*pag;		/* per allocation group data */
-
-	ASSERT(agno != NULLAGNUMBER);
-	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
-	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
-	ASSERT(bp && !geterror(bp));
-	pag = &mp->m_perag[agno];
-	agi = XFS_BUF_TO_AGI(bp);
-	if (!pag->pagi_init) {
-		pag->pagi_freecount = agi->agi_freecount;
-		pag->pagi_init = 1;
-	} else
-		ASSERT(pag->pagi_freecount == agi->agi_freecount);
-	return bp;
 }
 
 /*
@@ -844,4 +807,32 @@ xfs_ialloc_log_agi(
 	 * Log the allocation group inode header buffer.
 	 */
 	xfs_trans_log_buf(tp, bp, first, last);
+}
+
+/*
+ * Read in the allocation group header (inode allocation section)
+ */
+buf_t *					/* allocation group hdr buf */
+xfs_ialloc_read_agi(
+	xfs_mount_t	*mp,		/* file system mount structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_agnumber_t	agno)		/* allocation group number */
+{
+	xfs_agi_t	*agi;		/* allocation group header */
+	buf_t		*bp;		/* return value */
+	daddr_t		d;		/* disk block address */
+	xfs_perag_t	*pag;		/* per allocation group data */
+
+	ASSERT(agno != NULLAGNUMBER);
+	d = XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR);
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
+	ASSERT(bp && !geterror(bp));
+	pag = &mp->m_perag[agno];
+	agi = XFS_BUF_TO_AGI(bp);
+	if (!pag->pagi_init) {
+		pag->pagi_freecount = agi->agi_freecount;
+		pag->pagi_init = 1;
+	} else
+		ASSERT(pag->pagi_freecount == agi->agi_freecount);
+	return bp;
 }

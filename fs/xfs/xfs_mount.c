@@ -333,7 +333,6 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
 
 
         error = xfs_mountfs(vfsp, dev);
-	ASSERT(error == 0);
 	if (error) {
 		kmem_free(mp, sizeof(*mp));
 		return 0;

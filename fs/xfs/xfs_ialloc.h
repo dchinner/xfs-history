@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision: 1.19 $"
+#ident	"$Revision: 1.22 $"
 
 /*
  * Allocation parameters for inode allocation.
@@ -94,5 +94,14 @@ xfs_ialloc_log_agi(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	buf_t		*bp,		/* allocation group header buffer */
 	int		fields);	/* bitmask of fields to log */
+
+/*
+ * Read in the allocation group header (inode allocation section)
+ */
+buf_t *					/* allocation group hdr buf */
+xfs_ialloc_read_agi(
+	xfs_mount_t	*mp,		/* file system mount structure */
+	xfs_trans_t	*tp,		/* transaction pointer */
+	xfs_agnumber_t	agno);		/* allocation group number */
 
 #endif	/* !_FS_XFS_IALLOC_H */
