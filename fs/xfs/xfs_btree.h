@@ -71,6 +71,7 @@ buf_t *xfs_btree_bread(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock
 void xfs_btree_del_cursor(xfs_btree_cur_t *);
 xfs_btree_cur_t *xfs_btree_dup_cursor(xfs_btree_cur_t *);
 int xfs_btree_firstrec(xfs_btree_cur_t *, int);
+buf_t *xfs_btree_getblk(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agblock_t);
 xfs_btree_cur_t *xfs_btree_init_cursor(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_btnum_t, struct xfs_inode *);
 int xfs_btree_islastblock(xfs_btree_cur_t *, int);
 int xfs_btree_lastrec(xfs_btree_cur_t *, int);

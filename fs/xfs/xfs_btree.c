@@ -29,21 +29,28 @@
 #include "sim.h"
 #endif
 
+/*
+ * Cursor freelist.
+ */
 STATIC xfs_btree_cur_t *xfs_btree_curfreelist;
 
+/*
+ * Btree magic numbers.
+ */
 __uint32_t xfs_magics[XFS_BTNUM_MAX] =
 {
 	XFS_ABTB_MAGIC, XFS_ABTC_MAGIC, XFS_BMAP_MAGIC
 };
 
 /*
- * Get a buffer for the block, return it.
+ * Get a buffer for the block, return it read in.
  */
 buf_t *
-xfs_btree_bread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblock_t agbno)
+xfs_btree_bread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
+		xfs_agblock_t agbno)
 {
-	daddr_t d;
-	xfs_sb_t *sbp;
+	daddr_t		d;		/* disk block address */
+	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(agno != NULLAGNUMBER);
 	ASSERT(agbno != NULLAGBLOCK);
@@ -177,6 +184,22 @@ xfs_btree_firstrec(xfs_btree_cur_t *cur, int level)
 		return 0;
 	cur->bc_ptrs[level] = 1;
 	return 1;
+}
+
+/*
+ * Get a buffer for the block, return it with no data read.
+ */
+buf_t *
+xfs_btree_getblk(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblock_t agbno)
+{
+	daddr_t d;
+	xfs_sb_t *sbp;
+
+	ASSERT(agno != NULLAGNUMBER);
+	ASSERT(agbno != NULLAGBLOCK);
+	sbp = &mp->m_sb;
+	d = xfs_agb_to_daddr(sbp, agno, agbno);
+	return xfs_trans_getblk(tp, mp->m_dev, d, mp->m_bsize);
 }
 
 /*
