@@ -823,7 +823,11 @@ xfs_iflush(xfs_inode_t *ip, uint flags)
 {
 	xfs_inode_log_item_t	*iip;
 	buf_t			*bp;
+	int			brsize;
 	xfs_dinode_t		*dip;
+	int			nr;
+	char			*pd;
+	char			*pi;
 	int			s;
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE|MR_ACCESS));
@@ -894,8 +898,29 @@ xfs_iflush(xfs_inode_t *ip, uint flags)
 		if ((iip->ili_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
+			/*
+			 * First copy over the btree block header.
+			 */
 			bcopy(ip->i_broot, &(dip->di_u.di_bmbt),
-			      ip->i_broot_bytes);
+			      sizeof(xfs_btree_block_t));
+			/*
+			 * Now copy records and pointers, if there are any.
+			 */
+			if (nr = ip->i_broot->bb_numrecs) {
+				brsize = XFS_BMAP_BROOT_SIZE(ip->i_mount->m_sb.sb_inodesize);
+				/*
+				 * First copy the records.
+				 */
+				pi = (char *)XFS_BMAP_BROOT_REC_ADDR(ip->i_broot, 1, ip->i_broot_bytes);
+				pd = (char *)XFS_BMAP_BROOT_REC_ADDR(&dip->di_u.di_bmbt, 1, brsize);
+				bcopy(pi, pd, nr * sizeof(xfs_bmbt_rec_t));
+				/*
+				 * Next copy the pointers.
+				 */
+				pi = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1, ip->i_broot_bytes);
+				pd = (char *)XFS_BMAP_BROOT_PTR_ADDR(&dip->di_u.di_bmbt, 1, brsize);
+				bcopy(pi, pd, nr * sizeof(xfs_agblock_t));
+			}
 		}
 		break;
 	case XFS_DINODE_FMT_DEV:
