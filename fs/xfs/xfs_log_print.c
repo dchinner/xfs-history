@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 /*
  * This is meant to be used by only the user level log-print code, and
@@ -154,12 +154,15 @@ xlog_recover_print_trans_head(
 		"ATTR_FLAG",
 		"CLEAR_AGI_BUCKET",
 		"QM_SBCHANGE",
+		"",
+		"",
 		"QM_QUOTAOFF",
 		"QM_DQALLOC",
 		"QM_SETQLIM",
 		"QM_DQCLUSTER",
 		"QM_QINOCREATE",
-		"QM_QUOTAOFF_END"
+		"QM_QUOTAOFF_END",
+		"SB_UNIT"
 	};
 
 	printf("TRANS: tid:0x%x  type:%s  #items:%d  trans:0x%x  q:0x%x\n",
@@ -251,6 +254,9 @@ xlog_recover_print_buffer(
 			printf("fdblks:%lld  frext:%lld\n",
 			       *(long long *)(p+16),
 			       *(long long *)(p+24));
+			printf("		sunit:%u  swidth:%u\n", 
+			       *(uint *)(p+56),
+			       *(uint *)(p+60));
 		} else if (*(uint *)p == XFS_AGI_MAGIC) {
 			agi = (xfs_agi_t *)p;
 			printf("	AGI Buffer: (XAGI)\n");
