@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.11 $"
+#ident	"$Revision: 1.12 $"
 
 struct xfs_ihash;
 
@@ -9,7 +9,7 @@ typedef struct xfs_mount {
 	struct vfs		*m_vfsp;	/* ptr to vfs */
 	xfs_tid_t		m_tid;		/* next unused tid for fs */
 	lock_t			m_ail_lock;	/* fs AIL mutex */
-	xfs_log_item_t		*m_ail;		/* fs active log item list */
+	xfs_ail_entry_t		m_ail;		/* fs active log item list */
 	uint			m_ail_gen;	/* fs AIL generation count */
 	xfs_lsn_t		m_ail_lsn;	/* lsn of 1st elmt in AIL */
 	uint			m_log_thresh;	/* log head/tail separation */
