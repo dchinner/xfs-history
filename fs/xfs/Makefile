@@ -59,6 +59,7 @@ xfs-cmds:
 
 clean:
 	rm -rf RPMS SRPMS BUILD SOURCES/linux-2.4.0-test5-xfs-alpha.patch
+	cd $(WORKAREA)/cmd/xfs && make clean
 
 realclean: clean
 	rm -rf linux-2.4.0
@@ -70,5 +71,5 @@ realclean: clean
 		mv SPECS/kernel-2.4.spec.old SPECS/kernel-2.4.spec; \
 	fi
 	rm -f $(WORKAREA)/linux/include/asm
-	cd $(WORKAREA)/cmd/xfs && make clean
+	cd $(WORKAREA)/cmd/xfs && make realclean
 
