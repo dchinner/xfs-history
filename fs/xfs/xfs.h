@@ -56,9 +56,7 @@
 #include <linux/xfs_vfs.h>
 #include <linux/xfs_vnode.h>
 #include <linux/xfs_fs_subr.h>
-#include <pseudo-inc/sys/dirent.h>
 #include <pseudo-inc/sys/acl.h>
-#include <pseudo-inc/sys/kabi.h>
 
 #include <linux/slab.h>
 #include <linux/errno.h>

@@ -69,6 +69,42 @@ typedef struct statvfs {
 	char	f_fstr[32];	/* filesystem-specific string */
 } statvfs_t;
 
+typedef struct dirent {		/* data from readdir() */
+	xfs_ino_t d_ino;	/* inode number of entry */
+	xfs_off_t d_off;	/* offset of disk directory entry */
+	unsigned short d_reclen;/* length of this record */
+	char d_name[1];		/* name of file */
+} dirent_t;
+
+typedef struct irix5_dirent {	/* Irix5 view of dirent structure */
+	app32_ulong_t d_ino;	/* inode number of entry */
+	xfs32_off_t d_off;	/* offset of disk directory entry */
+	unsigned short d_reclen;/* length of this record */
+	char d_name[1];		/* name of file */
+} irix5_dirent_t;
+
+#define GETDENTS_ABI(abi, uiop)	1
+#define DIRENTBASESIZE		(((dirent_t *)0)->d_name - (char *)0)
+#define DIRENTSIZE(namelen)	\
+	((DIRENTBASESIZE + (namelen) + \
+		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
+#define IRIX5_DIRENTBASESIZE	(((irix5_dirent_t *)0)->d_name - (char *)0)
+#define IRIX5_DIRENTSIZE(namelen) \
+	((IRIX5_DIRENTBASESIZE + (namelen) + \
+		sizeof(xfs32_off_t)) & ~(sizeof(xfs32_off_t) - 1))
+
+#define ABI_IRIX5	0x02	/* an IRIX5/SVR4 ABI binary */
+#define ABI_IRIX5_64	0x04	/* an IRIX5-64 bit binary */
+#define ABI_IRIX5_N32	0x08	/* an IRIX5-32 bit binary (new abi) */
+
+#define ABI_IS(set,abi)		(((set) & (abi)) != 0)
+#define ABI_IS_IRIX5(abi)	(ABI_IS(ABI_IRIX5, abi))
+#define ABI_IS_IRIX5_N32(abi)	(ABI_IS(ABI_IRIX5_N32, abi))
+#define ABI_IS_IRIX5_64(abi)	(ABI_IS(ABI_IRIX5_64, abi))
+#define ABI_IS_IRIX5_N32(abi)	(ABI_IS(ABI_IRIX5_N32, abi))
+/* try 64 bit first */
+#define get_current_abi()	ABI_IRIX5_64
+
 #define _PAGESZ		PAGE_SIZE
 #define NBPP		PAGE_SIZE 
 #define DPPSHFT		(PAGE_SHIFT - 9)
