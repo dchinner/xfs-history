@@ -1,4 +1,4 @@
-#ident "$Revision: 1.13 $"
+#ident "$Revision: 1.14 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -79,10 +79,13 @@ xfs_error_test_init(void)
 
 int
 xfs_error_test(int error_tag, int *fsidp, char *expression,
-	       int line, char *file)
+	       int line, char *file, unsigned long randfactor)
 {
 	int i;
 	int64_t fsid;
+
+	if (random() % randfactor)
+		return 0;
 
 	bcopy(fsidp, &fsid, sizeof(fsid_t));
 
