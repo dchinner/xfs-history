@@ -26,7 +26,7 @@ typedef struct xfs_log_item {
  * Log item types.
  */
 #define	XFS_LI_BUF	0x1
-#define	XFS_LI_INODE	0x1
+#define	XFS_LI_INODE	0x2
 
 
 
