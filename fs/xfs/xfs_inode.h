@@ -209,6 +209,9 @@ typedef struct xfs_inode {
  * Maximum file size.
  * if XFS_BIG_FILES 2^63 - 1 (largest positive value of xfs_fsize_t)
  * else 2^40 - 1 (40=31+9) (might be an int holding a block #)
+ * Note, we allow seeks to this offset, although you can't read or write.
+ * For the not XFS_BIG_FILES case, the value could be 1 higher but we don't
+ * do that, for symmetry.
  */
 #if XFS_BIG_FILES
 #define XFS_MAX_FILE_OFFSET	((long long)((1ULL<<63)-1ULL))
