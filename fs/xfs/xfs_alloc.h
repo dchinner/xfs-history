@@ -51,7 +51,8 @@ typedef struct xfs_alloc_arg {
 	xfs_extlen_t	len;		/* output: actual size of extent */
 	xfs_alloctype_t	type;		/* allocation type XFS_ALLOCTYPE_... */
 	short		wasdel;		/* set if allocation was prev delayed */
-	short		isfl;		/* set if is freelist blocks - !actg */
+	char		isfl;		/* set if is freelist blocks - !actg */
+	char		userdata;	/* set if this is user data */
 } xfs_alloc_arg_t;
 
 extern struct zone	*xfs_alloc_arg_zone;	/* zone for alloc args */

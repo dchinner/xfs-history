@@ -547,6 +547,7 @@ xfs_bmbt_delrec(
 	}
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(l->mp, l->rbp->b_blkno), 1,
 		cur->bc_private.b.flist, l->mp);
+	xfs_trans_binval(cur->bc_tp, l->rbp);
 	xfs_bmbt_locals_free(l);
 	xfs_bmbt_rcheck(cur);
 	xfs_bmbt_trace_cursor("xfs_bmbt_delrec exit8", cur);
@@ -639,7 +640,8 @@ xfs_bmbt_insrec(
 			args->tp = cur->bc_tp;
 			args->mp = l->mp;
 			args->fsbno = cur->bc_private.b.firstblock;
-			args->mod = args->minleft = args->total = args->isfl = 0;
+			args->mod = args->minleft = args->total = args->isfl =
+				args->userdata = 0;
 			args->minlen = args->maxlen = args->prod = 1;
 			args->wasdel =
 				cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
@@ -884,6 +886,7 @@ xfs_bmbt_killroot(
 	bcopy((caddr_t)cpp, (caddr_t)pp, block->bb_numrecs * (int)sizeof(*pp));
 	xfs_bmap_add_free(XFS_DADDR_TO_FSB(cur->bc_mp, cbp->b_blkno), 1,
 		cur->bc_private.b.flist, cur->bc_mp);
+	xfs_trans_binval(cur->bc_tp, cbp);
 	block->bb_level--;
 	xfs_trans_log_inode(cur->bc_tp, ip, XFS_ILOG_BROOT);
 	xfs_btree_setbuf(cur, level - 1, 0);
@@ -1394,7 +1397,8 @@ xfs_bmbt_split(
 		args->type = XFS_ALLOCTYPE_FIRST_AG;
 	else
 		args->type = XFS_ALLOCTYPE_NEAR_BNO;
-	args->mod = args->minleft = args->total = args->isfl = 0;
+	args->mod = args->minleft = args->total = args->isfl =
+		args->userdata = 0;
 	args->minlen = args->maxlen = args->prod = 1;
 	args->wasdel = cur->bc_private.b.flags & XFS_BTCUR_BPRV_WASDEL;
 	xfs_alloc_vextent(args);

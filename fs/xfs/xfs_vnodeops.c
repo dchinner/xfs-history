@@ -3075,8 +3075,8 @@ xfs_symlink(vnode_t	*dir_vp,
 		nmaps = SYMLINK_MAPS;
 
 		first_block = xfs_bmapi (tp, ip, first_fsb, fs_blocks,
-                         XFS_BMAPI_WRITE, first_block, fs_blocks+dir_needs, 
-			 mval, &nmaps, &free_list);
+                         XFS_BMAPI_WRITE | XFS_BMAPI_METADATA, first_block,
+			 fs_blocks+dir_needs, mval, &nmaps, &free_list);
 
 		ip->i_d.di_size = pathlen;
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);

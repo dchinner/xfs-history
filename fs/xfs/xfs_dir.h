@@ -208,7 +208,7 @@ buf_t	*xfs_dir_node_create(xfs_trans_t *trans, xfs_inode_t *dp,
 int	xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 				xfs_fsblock_t *new_logblock);
 int	xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
-				xfs_fsblock_t dead_logblock);
+				xfs_fsblock_t dead_logblock, buf_t *dead_buf);
 buf_t	*xfs_dir_get_buf(xfs_trans_t *trans, xfs_inode_t *dp,
 				xfs_fsblock_t bno);
 buf_t	*xfs_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *dp,

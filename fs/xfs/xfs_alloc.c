@@ -640,6 +640,7 @@ xfs_alloc_ag_vextent_near(
 {
 	xfs_btree_cur_t	*bno_cur_gt;	/* cursor for bno btree, right side */
 	xfs_btree_cur_t	*bno_cur_lt;	/* cursor for bno btree, left side */
+	buf_t		*bp;		/* buffer for freelist block */
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for count btree */
 #if defined(DEBUG) && !defined(SIM)
 	static char	fname[] = "xfs_alloc_ag_vextent_near";
@@ -681,7 +682,9 @@ xfs_alloc_ag_vextent_near(
 		 */
 		else if (args->minlen == 1 && !args->isfl &&
 			 (ltbno = xfs_alloc_get_freelist(args->tp, args->agbp,
-				 NULL)) != NULLAGBLOCK) {
+				 &bp)) != NULLAGBLOCK) {
+			if (!args->userdata)
+				xfs_trans_binval(args->tp, bp);
 			xfs_btree_del_cursor(cnt_cur);
 			args->len = 1;
 			args->agbno = ltbno;
@@ -1249,6 +1252,7 @@ xfs_alloc_ag_vextent_size(
 	xfs_alloc_arg_t	*args)	/* allocation argument structure */
 {
 	xfs_btree_cur_t	*bno_cur;	/* cursor for bno btree */
+	buf_t		*bp;		/* buffer for freelist block */
 	xfs_btree_cur_t	*cnt_cur;	/* cursor for cnt btree */
 	xfs_agblock_t	fbno;		/* start of found freespace */
 	xfs_extlen_t	flen;		/* length of found freespace */
@@ -1274,8 +1278,10 @@ xfs_alloc_ag_vextent_size(
 		 * Nothing in the btree, try the freelist.
 		 */
 		else if (args->minlen == 1 && !args->isfl &&
-		  (fbno = xfs_alloc_get_freelist(args->tp, args->agbp, NULL)) !=
+		  (fbno = xfs_alloc_get_freelist(args->tp, args->agbp, &bp)) !=
 			  NULLAGBLOCK) {
+			if (!args->userdata)
+				xfs_trans_binval(args->tp, bp);
 			xfs_btree_del_cursor(cnt_cur);
 			args->len = 1;
 			args->agbno = fbno;
@@ -1655,6 +1661,7 @@ xfs_alloc_fix_freelist(
 	xfs_agf_t	*agf;
 	xfs_alloc_arg_t	*args;
 	xfs_agblock_t	bno;
+	buf_t		*bp;
 	xfs_mount_t	*mp;
 	xfs_extlen_t	need;
 
@@ -1687,8 +1694,9 @@ xfs_alloc_fix_freelist(
 	 * Make the freelist shorter if it's too long.
 	 */
 	while (agf->agf_freecount > need) {
-		bno = xfs_alloc_get_freelist(tp, agbp, NULL);
+		bno = xfs_alloc_get_freelist(tp, agbp, &bp);
 		xfs_free_ag_extent(tp, agbp, agno, bno, 1, 1);
+		xfs_trans_binval(tp, bp);
 	}
 	/*
 	 * Allocate and initialize the args structure.
@@ -1698,7 +1706,7 @@ xfs_alloc_fix_freelist(
 	args->mp = mp;
 	args->agbp = agbp;
 	args->agno = agno;
-	args->mod = args->minleft = args->wasdel = 0;
+	args->mod = args->minleft = args->wasdel = args->userdata = 0;
 	args->minlen = args->prod = args->isfl = 1;
 	args->type = XFS_ALLOCTYPE_THIS_AG;
 	/*

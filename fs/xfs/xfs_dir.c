@@ -914,7 +914,7 @@ xfs_dir_leaf_to_shortform(xfs_trans_t *trans, struct xfs_dir_name *iargs)
 			entry->nameidx = 0;
 		}
 	}
-	retval = xfs_dir_shrink_inode(trans, iargs, 0);
+	retval = xfs_dir_shrink_inode(trans, iargs, 0, bp);
 	if (retval)
 		goto out;
 	retval = xfs_dir_shortform_create(trans, dp, parent);
@@ -1391,9 +1391,9 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 	bno = xfs_bmap_first_unused(trans, dp);
 	nmap = 1;
 	ASSERT(args->firstblock != NULL);
-	*(args->firstblock) = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_WRITE,
-					*(args->firstblock), args->total, &map,
-					&nmap, args->flist);
+	*(args->firstblock) = xfs_bmapi(trans, dp, bno, 1,
+		XFS_BMAPI_WRITE | XFS_BMAPI_METADATA, *(args->firstblock),
+		args->total, &map, &nmap, args->flist);
 	if (nmap < 1)
 		return(XFS_ERROR(ENOSPC));
 	*new_blkno = bno;
@@ -1406,7 +1406,7 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 
 int
 xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
-			xfs_fsblock_t dead_blkno)
+			xfs_fsblock_t dead_blkno, buf_t *dead_buf)
 {
 	xfs_inode_t *dp;
 	xfs_mount_t *mp;
@@ -1418,6 +1418,7 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 					  *(args->firstblock), args->flist,
 					  &done);
 	ASSERT(done);
+	xfs_trans_binval(trans, dead_buf);
 	dp->i_d.di_size = XFS_FSB_TO_B(mp, xfs_bmap_last_offset(trans, dp));
 
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.31 $"
+#ident "$Revision: 1.32 $"
 
 struct xfs_inode;
 
@@ -33,6 +33,7 @@ typedef	struct xfs_bmap_free
 #define	XFS_BMAPI_WRITE		0x1	/* write operation: allocate space */
 #define	XFS_BMAPI_DELAY		0x2	/* delayed write operation */
 #define	XFS_BMAPI_ENTIRE	0x4	/* return entire extent, not trimmed */
+#define	XFS_BMAPI_METADATA	0x8	/* mapping metadata not user data */
 
 /*
  * Special values for xfs_bmbt_irec_t br_startblock field.

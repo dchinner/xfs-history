@@ -986,7 +986,7 @@ xfs_dir_join(struct xfs_dir_state *state)
 		}
 		xfs_dir_blk_unlink(state, drop_blk, save_blk);
 		retval = xfs_dir_shrink_inode(state->trans, state->args,
-			drop_blk->blkno);
+			drop_blk->blkno, drop_blk->bp);
 		xfs_dir_fixhashpath(state, &state->altpath, i);
 	}
 out:
@@ -1040,7 +1040,7 @@ xfs_dir_root_join(struct xfs_dir_state *state,
 	}
 	bcopy(bp->b_un.b_addr, drop_blk->bp->b_un.b_addr, state->blocksize);
 	xfs_trans_log_buf(state->trans, drop_blk->bp, 0, state->blocksize - 1);
-	retval = xfs_dir_shrink_inode(state->trans, state->args, blkno);
+	retval = xfs_dir_shrink_inode(state->trans, state->args, blkno, bp);
 	return(retval);
 }
 

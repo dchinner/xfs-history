@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.51 $"
+#ident	"$Revision: 1.52 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -207,7 +207,8 @@ xfs_ialloc_ag_alloc(
 	 * Allocate a fixed-size extent of inodes.
 	 */
 	args->type = XFS_ALLOCTYPE_NEAR_BNO;
-	args->mod = args->minleft = args->total = args->wasdel = args->isfl = 0;
+	args->mod = args->minleft = args->total = args->wasdel = args->isfl =
+		args->userdata = 0;
 	args->prod = 1;
 	xfs_alloc_vextent(args);
 	if (args->fsbno == NULLFSBLOCK) {

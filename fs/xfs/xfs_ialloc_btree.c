@@ -338,6 +338,7 @@ xfs_inobt_delrec(
 			 * Free the block.
 			 */
 			xfs_free_extent(cur->bc_tp, bno, 1);
+			xfs_trans_binval(cur->bc_tp, bp);
 			xfs_ialloc_log_agi(cur->bc_tp, agbp,
 				XFS_AGI_ROOT | XFS_AGI_LEVEL);
 			/*
@@ -595,6 +596,7 @@ xfs_inobt_delrec(
 	 * Free the deleting block.
 	 */
 	xfs_free_extent(cur->bc_tp, rbno, 1);
+	xfs_trans_binval(cur->bc_tp, rbp);
 	xfs_inobt_rcheck(cur);
 	kmem_check();
 	/* 
@@ -1304,7 +1306,8 @@ xfs_inobt_newroot(
 	args->mp = cur->bc_mp;
 	args->fsbno = XFS_AGB_TO_FSB(args->mp, cur->bc_private.i.agno,
 		agi->agi_root);
-	args->mod = args->minleft = args->total = args->wasdel = args->isfl = 0;
+	args->mod = args->minleft = args->total = args->wasdel = args->isfl =
+		args->userdata = 0;
 	args->minlen = args->maxlen = args->prod = 1;
 	args->type = XFS_ALLOCTYPE_NEAR_BNO;
 	xfs_alloc_vextent(args);
@@ -1674,7 +1677,8 @@ xfs_inobt_split(
 	 * If we can't do it, we're toast.  Give up.
 	 */
 	args->fsbno = XFS_AGB_TO_FSB(args->mp, cur->bc_private.i.agno, lbno);
-	args->mod = args->minleft = args->total = args->wasdel = args->isfl = 0;
+	args->mod = args->minleft = args->total = args->wasdel = args->isfl =
+		args->userdata = 0;
 	args->minlen = args->maxlen = args->prod = 1;
 	args->type = XFS_ALLOCTYPE_NEAR_BNO;
 	xfs_alloc_vextent(args);
