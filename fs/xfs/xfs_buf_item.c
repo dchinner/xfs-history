@@ -24,6 +24,7 @@
 #include <sys/systm.h>
 #endif
 #include <sys/ktrace.h>
+#include <sys/cmn_err.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -409,10 +410,20 @@ xfs_buf_item_unlock(xfs_buf_log_item_t *bip)
 /*
  * This is called to find out where the oldest active copy of the
  * buf log item in the on disk log resides now that the last log
- * write of it completed at the given lsn.  Since we always re-log
- * all dirty data in a buffer, the latest copy in the on disk log
- * is the only one that matters.  Therefore, simply return the
- * given lsn.
+ * write of it completed at the given lsn.
+ * We always re-log all the dirty data in a buffer, so usually the
+ * latest copy in the on disk log is the only one that matters.  For
+ * those cases we simply return the given lsn.
+ * 
+ * The one exception to this is for buffers full of newly allocated
+ * inodes.  These buffers are only relogged with the XFS_BLI_INODE_BUF
+ * flag set, indicating that only the di_next_unlinked fields from the
+ * inodes in the buffers will be replayed during recovery.  If the
+ * origianal newly allocated inode images have not yet been flushed
+ * when the buffer is so relogged, then we need to make sure that we
+ * keep the old images in the 'active' portion of the log.  We do this
+ * by returning the original lsn of that transaction here rather than
+ * the current one.
  */
 xfs_lsn_t
 xfs_buf_item_committed(xfs_buf_log_item_t	*bip,
@@ -420,6 +431,10 @@ xfs_buf_item_committed(xfs_buf_log_item_t	*bip,
 /* ARGSUSED */
 {
 	xfs_buf_item_trace("COMMITTED", bip);
+	if ((bip->bli_flags & XFS_BLI_INODE_ALLOC_BUF) &&
+	    (bip->bli_item.li_lsn != 0)) {
+		return bip->bli_item.li_lsn;
+	}
 	return (lsn);
 }
 
@@ -1035,6 +1050,9 @@ xfs_buf_iodone_callbacks(buf_t *bp)
 	xfs_log_item_t	*nlip;
 
 	ASSERT(bp->b_fsprivate != NULL);
+	if (geterror(bp) != 0) {
+		cmn_err(CE_PANIC, "XFS dev 0x%x: write error in file system meta-data", bp->b_edev);
+	}
 
 	lip = (xfs_log_item_t *)bp->b_fsprivate;
 	while (lip != NULL) {

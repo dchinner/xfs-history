@@ -57,10 +57,11 @@ typedef struct xfs_buf_log_item {
 /*
  * buf log item flags
  */
-#define	XFS_BLI_HOLD	0x1
-#define	XFS_BLI_DIRTY	0x2
-#define	XFS_BLI_STALE	0x4
-#define	XFS_BLI_LOGGED	0x8
+#define	XFS_BLI_HOLD		0x01
+#define	XFS_BLI_DIRTY		0x02
+#define	XFS_BLI_STALE		0x04
+#define	XFS_BLI_LOGGED		0x08
+#define	XFS_BLI_INODE_ALLOC_BUF	0x10
 
 /*
  * This structure is used during recovery to record the buf log
