@@ -39,7 +39,6 @@
 #include <linux/init.h>
 
 /* xfs_vfs[ops].c */
-extern void vfsinit(void);
 extern int  xfs_init(int fstype);
 extern void xfs_cleanup(void);
 
@@ -457,7 +456,7 @@ linvfs_fill_super(
 	struct inode	*ip, *cip;
 	struct mounta	ap;
 	struct xfs_args	args;
-	statvfs_t	statvfs;
+	struct statfs	statvfs;
 	int		error;
 
 	if (xfs_parseargs((char *)data, sb->s_flags, &args))
@@ -708,28 +707,14 @@ linvfs_write_super(
 int
 linvfs_statfs(
 	struct super_block *sb,
-	struct statfs	*buf)
+	struct statfs	*statp)
 {
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
-	statvfs_t	stat;
 	int		error;
 
-	VFS_STATVFS(vfsp, &stat, NULL, error);
-	if (error)
-		return(-error);
+	VFS_STATVFS(vfsp, statp, NULL, error);
 
-	buf->f_type = XFS_SB_MAGIC;
-	buf->f_bsize = stat.f_bsize;
-	buf->f_blocks = stat.f_blocks;
-	buf->f_bfree = stat.f_bfree;
-	buf->f_bavail = stat.f_bavail;
-	buf->f_files = stat.f_files;
-	buf->f_ffree = stat.f_ffree;
-	buf->f_fsid.val[0] = stat.f_fsid;
-	buf->f_fsid.val[1] = 0;
-	buf->f_namelen = stat.f_namemax;
-
-	return 0;
+	return error;
 }
 
 int
@@ -913,7 +898,7 @@ static int __init init_xfs_fs(void)
 	printk(message);
 
 	cred_init();
-	vfsinit();
+	vn_init();
 	xfs_init(0);
 
 	error = register_filesystem(&xfs_fs_type);

@@ -34,10 +34,7 @@
 #include <linux/smp_lock.h>
 
 
-/*
- * VFS global data.
- */
-STATIC spinlock_t	vfslock;	/* spinlock protecting rootvfs and vfs_flag */
+STATIC spinlock_t	vfslock = SPIN_LOCK_UNLOCKED; /* protecting vfs_flag */
 
 #define		vfsp_wait(V,P,S)        sv_wait(&(V)->vfs_wait,P,&vfslock,S)
 #define		vfsp_waitsig(V,P,S)     sv_wait_sig(&(V)->vfs_wait,P,&vfslock,S)
@@ -259,20 +256,6 @@ vfs_unbusy(struct vfs *vfsp)
 	if (--vfsp->vfs_busycnt == 0)
 		vfs_unbusy_wakeup(vfsp);
 	spin_unlock(&vfslock);
-}
-
-void
-vfsinit(void)
-{
-	/*
-	 * Initialize vfs stuff.
-	 */
-	spin_lock_init(&vfslock);
-
-	/*
-	 * Initialize vnode stuff.
-	 */
-	vn_init();
 }
 
 /*

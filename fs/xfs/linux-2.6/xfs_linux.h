@@ -70,21 +70,6 @@
 #define kdev_val(dev)	(unsigned)(dev)
 #endif
 
-typedef struct statvfs {
-	ulong_t	f_bsize;	/* fundamental file system block size */
-	ulong_t	f_frsize;	/* fragment size */
-	__uint64_t f_blocks;	/* total # of blocks of f_frsize on fs */
-	__uint64_t f_bfree;	/* total # of free blocks of f_frsize */
-	__uint64_t f_bavail;	/* # of free blocks avail to non-superuser */
-	__uint64_t f_files;	/* total # of file nodes (inodes) */
-	__uint64_t f_ffree;	/* total # of free file nodes */
-	__uint64_t f_favail;	/* # of free nodes avail to non-superuser */
-	ulong_t	f_namemax;	/* maximum file name length */
-	ulong_t	f_fsid;		/* file system id (dev for now) */
-	char	f_basetype[16];	/* target fs type name, null-terminated */
-	char	f_fstr[32];	/* filesystem-specific string */
-} statvfs_t;
-
 typedef struct xfs_dirent {		/* data from readdir() */
 	xfs_ino_t d_ino;	/* inode number of entry */
 	xfs_off_t d_off;	/* offset of disk directory entry */

@@ -34,7 +34,7 @@
 
 #include <linux/vfs.h>
 
-struct statvfs;
+struct statfs;
 struct vnode;
 struct cred;
 struct super_block;
@@ -130,7 +130,7 @@ typedef struct vfsops {
                                         /* unmount file system */
         int     (*vfs_root)(bhv_desc_t *, struct vnode **);
                                         /* get root vnode */
-        int     (*vfs_statvfs)(bhv_desc_t *, struct statvfs *, struct vnode *);
+        int     (*vfs_statvfs)(bhv_desc_t *, struct statfs *, struct vnode *);
                                         /* get file system statistics */
         int     (*vfs_sync)(bhv_desc_t *, int, struct cred *);
                                         /* flush files */
