@@ -276,7 +276,6 @@ include arch/$(ARCH)/Makefile
 
 kbuild_2_4_nostdinc     := -nostdinc $(shell $(CC) -print-search-dirs | sed -ne 's/install: \(.*\)/-I \1include/gp')
 export kbuild_2_4_nostdinc
-dummy := $(shell echo kbuild_2_4_nostdinc := $(kbuild_2_4_nostdinc) >&2)
 
 export	CPPFLAGS CFLAGS CFLAGS_KERNEL AFLAGS AFLAGS_KERNEL
 
