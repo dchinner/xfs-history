@@ -670,8 +670,9 @@ xfs_setattr(vnode_t	*vp,
 		 */
 		if ((mask & AT_XFLAGS) &&
 		    (vap->va_xflags & XFS_DIFLAG_REALTIME)) {
-			if ((mp->m_sb.sb_rextsize == 0)  ||
-			    (ip->i_d.di_extsize % mp->m_sb.sb_rextsize)) {
+			if ( (mp->m_sb.sb_rblocks == 0)  ||
+			     (mp->m_sb.sb_rextsize == 0)  ||
+			     (ip->i_d.di_extsize % mp->m_sb.sb_rextsize) ) {
 
 				code = XFS_ERROR(EINVAL);	/* ??? */
 				goto error_return;
