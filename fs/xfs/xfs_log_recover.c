@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.116 $"
+#ident	"$Revision: 1.117 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -301,17 +301,16 @@ xlog_find_verify_log_record(caddr_t	ba,	     /* update ptr as we go */
 
     ba -= BBSIZE;
     for (i=(*last_blk)-1; i>=0; i--) {
+	if (i < start_blk) {
+	    /* legal log record not found */
+	    xlog_warn("XFS: xlog_find_verify_log_record: need to backup");
+	    ASSERT(0);
+	    return XFS_ERROR(EIO);
+	}
 	if (*(uint *)ba == XLOG_HEADER_MAGIC_NUM) {
 	    break;
-	} else {
-	    if (i < start_blk) {
-		/* legal log record not found */
-		xlog_warn("XFS: xlog_find_verify_log_record: need to backup");
-		ASSERT(0);
-		return XFS_ERROR(EIO);
-	    }
-	    ba -= BBSIZE;
 	}
+	ba -= BBSIZE;
     }
 
     /*
