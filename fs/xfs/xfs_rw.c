@@ -1,4 +1,4 @@
-#ident "$Revision: 1.137 $"
+#ident "$Revision: 1.142 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4206,6 +4206,8 @@ xfs_diostrat( buf_t *bp)
 	uint		lock_mode;
 	xfs_fsize_t	new_size;
 
+	CHECK_GRIO_TIMESTAMP( bp, 40 );
+
 	dp        = (struct dio_s *)bp->b_private;
 	vp        = dp->vp;
 	ip        = XFS_VTOI(vp); 
@@ -4213,7 +4215,8 @@ xfs_diostrat( buf_t *bp)
 	base	  = bp->b_un.b_addr;
 	error     = resid = totxfer = end_of_file = 0;
 	offset    = BBTOOFF((off_t)bp->b_blkno);
-	blk_algn  = 0;
+	blk_algn  = rt = 0;
+	numrtextents = iprtextsize = sbrtextsize = 0;
 	totresid  = count  = bp->b_bcount;
 
 	/*
@@ -4221,15 +4224,10 @@ xfs_diostrat( buf_t *bp)
 	 */
 	if ( ip->i_d.di_flags & XFS_DIFLAG_REALTIME )  {
 		rt = 1;
-		sbrtextsize = mp->m_sb.sb_rextsize;
-		iprtextsize = sbrtextsize;
+		iprtextsize = sbrtextsize = mp->m_sb.sb_rextsize;
 		if ( ip->i_d.di_extsize ) {
 			iprtextsize = ip->i_d.di_extsize;
 		}
-	} else {
-		numrtextents = 0;
-		iprtextsize = sbrtextsize = 0;
-		rt = 0;
 	}
 
 	ASSERT(!(bp->b_flags & B_DONE));
@@ -4279,26 +4277,33 @@ xfs_diostrat( buf_t *bp)
 			 * structure. 
 			 */
 			reccount = XFS_BMAP_MAX_NMAP;
+
 			xfs_ilock( ip, XFS_ILOCK_EXCL );
+
 			error = xfs_bmapi( NULL, ip, offset_fsb, 
 				count_fsb, 0, &firstfsb, 0, imaps, 
 				&reccount, 0);
+
 			if (error) {
 				xfs_iunlock( ip, XFS_ILOCK_EXCL );
 				break;
 			}
+
 			/*
  			 * Get a pointer to the current extent map.
-			 * Writes will always be issued one at a time.
 			 */
-			reccount = 1;
 			imapp = &imaps[0];
-			count_fsb = imapp->br_blockcount;
 
+			/*
+			 * Check if the file extents already exist
+			 */
 			if ((imapp->br_startblock == DELAYSTARTBLOCK) ||
 			    (imapp->br_startblock == HOLESTARTBLOCK)) {
 				exist = 0;
 			}
+
+			reccount = 1;
+			count_fsb = imapp->br_blockcount;
 
                         /*
                          * If blocks are not yet allocated for this part of
@@ -4358,7 +4363,11 @@ xfs_diostrat( buf_t *bp)
 			 */
 			reccount = XFS_BMAP_MAX_NMAP;
 			imapp = &imaps[0];
+			CHECK_GRIO_TIMESTAMP( bp, 40);
+
 			lock_mode = xfs_ilock_map_shared( ip);
+
+			CHECK_GRIO_TIMESTAMP( bp, 40);
 		}
 
 		/*
@@ -4366,8 +4375,10 @@ xfs_diostrat( buf_t *bp)
  		 * In the case of write requests this call does the
 		 * actual file space allocation.
 		 */
+		CHECK_GRIO_TIMESTAMP( bp, 40);
 		error = xfs_bmapi( tp, ip, offset_fsb, count_fsb, 
 			writeflag, &firstfsb, 0, imapp, &reccount, &free_list);
+		CHECK_GRIO_TIMESTAMP( bp, 40);
 
 		if ( writeflag ) {
 			if (error) {
@@ -4393,7 +4404,7 @@ xfs_diostrat( buf_t *bp)
 				    break;
 			    }
 			    xfs_trans_commit(tp, XFS_TRANS_RELEASE_LOG_RES );
-			}
+			} 
 			xfs_iunlock( ip, XFS_ILOCK_EXCL);
 		} else {
 			xfs_iunlock_map_shared( ip, lock_mode);
@@ -4488,7 +4499,10 @@ xfs_diostrat( buf_t *bp)
 				/*
  				 * Setup I/O request for this extent.
 				 */
+				CHECK_GRIO_TIMESTAMP( bp, 40 );
 	     			bps[bufsissued++]= nbp = getphysbuf();
+				CHECK_GRIO_TIMESTAMP( bp, 40 );
+
 	     			nbp->b_flags     = bp->b_flags;
 	     			nbp->b_flags2    = bp->b_flags2;
 
@@ -4511,6 +4525,7 @@ xfs_diostrat( buf_t *bp)
 				/*
  				 * Issue I/O request.
 				 */
+				CHECK_GRIO_TIMESTAMP( nbp, 40 );
 				bdstrat( bmajor(nbp->b_edev), nbp );
 	
 		    		if (error = geterror(nbp)) {
@@ -4598,7 +4613,8 @@ xfs_diostrat( buf_t *bp)
 	/*
  	 *  Update the inode timestamp if file was written.
  	 */
-	if ( writeflag ) {
+	if ( writeflag) {
+
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0){
 			ip->i_d.di_mode &= ~ISUID;
@@ -4714,6 +4730,7 @@ xfs_diordwr(vnode_t	*vp,
 	 	 */
 		if ( xfs_io_is_guaranteed( ip, &stream_id ) ) {
 			bp->b_flags2 |= B_GR_BUF;
+
 			ASSERT( bp->b_grio_private == NULL );
 			bp->b_grio_private = 
 				kmem_zone_alloc( grio_buf_data_zone, KM_SLEEP );
@@ -4721,6 +4738,7 @@ xfs_diordwr(vnode_t	*vp,
 			COPY_STREAM_ID(stream_id,BUF_GRIO_PRIVATE(bp)->grio_id);
 			iosize =  uiop->uio_iov[0].iov_len;
 			index = grio_monitor_io_start( &stream_id, iosize );
+			INIT_GRIO_TIMESTAMP( bp );
 		} else {
 			bp->b_grio_private = NULL;
 			bp->b_flags2 &= ~B_GR_BUF;
@@ -4743,9 +4761,12 @@ xfs_diordwr(vnode_t	*vp,
  	 */
 	bp->b_flags = 0;
 
-	if ( bp->b_flags2 & B_GR_BUF ) {
-		grio_monitor_io_end( &stream_id, index );
+	if ( BUF_IS_GRIO(bp) ) {
 
+		grio_monitor_io_end( &stream_id, index );
+#ifdef GRIO_DEBUG
+		CHECK_GRIO_TIMESTAMP( bp, 400 );
+#endif
 		ASSERT( BUF_GRIO_PRIVATE(bp) );
 		kmem_zone_free( grio_buf_data_zone, BUF_GRIO_PRIVATE(bp));
 		bp->b_grio_private = NULL;
