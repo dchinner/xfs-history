@@ -1,4 +1,4 @@
-#ident "$Revision: 1.302 $"
+#ident "$Revision: 1.303 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -937,7 +937,6 @@ xfs_setattr(
         if (mask & AT_MODE) {
 		/* determine whether mandatory locking mode changes */
 		mandlock_before = MANDLOCK(vp, ip->i_d.di_mode);
-		mandlock_after = mandlock_before;  /* for check at end */
 
                 ip->i_d.di_mode &= IFMT;
                 ip->i_d.di_mode |= vap->va_mode & ~IFMT;
