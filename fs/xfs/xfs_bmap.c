@@ -2758,6 +2758,7 @@ xfs_bmapi(
 	ASSERT(l->wr || !l->delay);
 	l->logflags = 0;
 	l->lowspace = 0;
+	l->nallocs = 0;
 	bma = NULL;
 	if (ip->i_d.di_format == XFS_DINODE_FMT_LOCAL) {
 		if (!l->wr) {
@@ -2812,27 +2813,19 @@ xfs_bmapi(
 			if (l->wasdelay && !l->exact) {
 				l->alen = l->got.br_blockcount;
 				l->aoff = l->got.br_startoff;
-				if (l->lowspace)
-					l->minlen = 1;
-				else {
-					l->minlen =
-					    (XFS_FILEOFF_MAX(bno, l->obno) -
-					     l->aoff) + 1;
-				}
 			} else if (l->wasdelay) {
 				l->alen = XFS_EXTLEN_MIN(len,
 					(l->got.br_startoff +
 					 l->got.br_blockcount) - bno); 
 				l->aoff = bno;
-				l->minlen = 1;
 			} else {
 				l->alen = XFS_EXTLEN_MIN(len, MAXEXTLEN);
 				if (!l->eof)
 					l->alen = XFS_EXTLEN_MIN(l->alen,
 						l->got.br_startoff - bno);
 				l->aoff = bno;
-				l->minlen = 1;
 			}
+			l->minlen = 1;
 			if (l->delay) {
 				l->indlen = xfs_bmap_worst_indlen(ip, l->alen);
 				ASSERT(l->indlen > 0);
@@ -2904,6 +2897,11 @@ xfs_bmapi(
 						firstblock;
 					l->cur->bc_private.b.flist = flist;
 				}
+				/*
+				 * Bump the number of extents we've allocated
+				 * in this call.
+				 */
+				l->nallocs++;
 			}
 			if (l->cur)
 				l->cur->bc_private.b.flags =
@@ -3014,9 +3012,11 @@ xfs_bmapi(
 			l->n++;
 		}
 		/*
-		 * If we're done, stop now.
+		 * If we're done, stop now.  Stop when we've allocated
+		 * XFS_BMAP_MAX_NMAP extents no matter what.  Otherwise
+		 * the transaction may get too bit.
 		 */
-		if (bno >= l->end || l->n >= *nmap)
+		if (bno >= l->end || l->n >= *nmap || l->nallocs >= *nmap)
 			break;
 		/*
 		 * Else go on to the next record.
