@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.87 $"
+#ident	"$Revision: 1.88 $"
 
 struct buf;
 struct cred;
@@ -71,7 +71,6 @@ typedef struct xfs_mount {
 	xfs_agnumber_t		m_agfrotor;	/* last ag where space found */
 	xfs_agnumber_t		m_agirotor;	/* last ag dir inode alloced */
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
-	uint			m_ihashmask;	/* fs inode hash size - 1 */
 	struct xfs_inode	*m_inodes;	/* active inode list */
 	mutex_t			m_ilock;	/* inode list mutex */
 	uint			m_ireclaims;	/* count of calls to reclaim*/

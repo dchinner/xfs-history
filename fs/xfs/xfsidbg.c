@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.77 $"
+#ident	"$Revision: 1.78 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -3518,8 +3518,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	qprintf("bsize %d agfrotor %d agirotor %d ihash 0x%x\n",
 		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
 		mp->m_ihash);
-	qprintf("ihashmask 0x%x inodes 0x%x ilock 0x%x ireclaims 0x%x\n",
-		mp->m_ihashmask, mp->m_inodes, mp->m_ilock, mp->m_ireclaims);
+	qprintf("inodes 0x%x ilock 0x%x ireclaims 0x%x\n",
+		mp->m_inodes, mp->m_ilock, mp->m_ireclaims);
 	qprintf("readio_log 0x%x readio_blocks 0x%x ",
 		mp->m_readio_log, mp->m_readio_blocks);
 	qprintf("writeio_log 0x%x writeio_blocks 0x%x\n",
