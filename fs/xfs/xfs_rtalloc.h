@@ -24,7 +24,7 @@
 /*
  * Summary and bit manipulation macros.
  */
-#define	XFS_SUMOFFS(sbp,ls,bb)	((ls) + (sbp)->sb_rbmblocks * (bb))
+#define	XFS_SUMOFFS(sbp,ls,bb)	((ls) * (sbp)->sb_rbmblocks + (bb))
 #define	XFS_SUMOFFSTOBLOCK(sbp,s)	\
 	(((s) * sizeof(xfs_suminfo_t)) >> (sbp)->sb_blocklog)
 #define	XFS_SUMPTR(sbp,bp,so)	\
@@ -43,7 +43,6 @@
 
 xfs_rtblock_t
 xfs_rtallocate_extent(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	minlen,
@@ -54,7 +53,6 @@ xfs_rtallocate_extent(
 
 void
 xfs_rtfree_extent(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	len);
@@ -70,7 +68,7 @@ xfs_rtprint_range(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
-	xfs_rtbit_t	len);
+	xfs_extlen_t	len);
 
 void
 xfs_rtprint_summary(
