@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.152 $"
+#ident	"$Revision: 1.153 $"
 
 /*
  * High level interface routines for log manager
@@ -2563,6 +2563,11 @@ maybe_sleep:
 			return (EIO);
 		}
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
+		/*
+		 * No need to grab the log lock here since we're
+		 * only deciding whether or not to return EIO
+		 * and the memory read should be atomic.
+		 */
 		if (iclog->ic_state & XLOG_STATE_IOERROR)
 			return (EIO);
 		
@@ -2665,7 +2670,9 @@ try_again:
 		}
 		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 		/*
-		 * No need to hold the LOG_LOCK to look at this value here.
+		 * No need to grab the log lock here since we're
+		 * only deciding whether or not to return EIO
+		 * and the memory read should be atomic.
 		 */
 		if (iclog->ic_state & XLOG_STATE_IOERROR)
 			return XFS_ERROR(EIO);
