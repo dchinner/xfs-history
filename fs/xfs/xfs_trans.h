@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.69 $"
+#ident "$Revision: 1.70 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -680,6 +680,7 @@ void		xfs_trans_ihold_release(xfs_trans_t *, struct xfs_inode *);
 void		xfs_trans_log_buf(xfs_trans_t *, struct buf *, uint, uint);
 void		xfs_trans_log_inode(xfs_trans_t *, struct xfs_inode *, uint);
 struct xfs_efi_log_item	*xfs_trans_get_efi(xfs_trans_t *, uint);
+void		xfs_efi_release(struct xfs_efi_log_item *, uint);
 void		xfs_trans_log_efi_extent(xfs_trans_t *,
 					 struct xfs_efi_log_item *,
 					 xfs_fsblock_t,
