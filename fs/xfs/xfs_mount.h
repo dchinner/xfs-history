@@ -1,8 +1,8 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.57 $"
-#ident	"$Revision: 1.57 $"
+#ident	"$Revision: 1.58 $"
+#ident	"$Revision: 1.58 $"
 
 struct buf;
 struct cred;
@@ -76,6 +76,7 @@ typedef struct xfs_mount {
 	__uint8_t		m_blkbit_log;	/* blocklog + NBBY */
 	__uint8_t		m_blkbb_log;	/* blocklog - BBSHIFT */
 	__uint8_t		m_agno_log;	/* log #ag's */
+	__uint8_t		m_agino_log;	/* #bits for agino in inum */
 	uint			m_blockmask;	/* sb_blocksize-1 */
 	uint			m_blockwsize;	/* sb_blocksize in words */
 	uint			m_blockwmask;	/* blockwsize-1 */
@@ -96,6 +97,10 @@ typedef struct xfs_mount {
 	uint			m_dmevmask;	/* DMI events for this FS */
 	uint			m_flags;	/* global mount flags */
 	uint			m_attroffset;	/* inode attribute offset */
+	int			m_da_node_ents;	/* how many entries in danode */
+	int			m_ialloc_inos;	/* inodes in inode allocation */
+	int			m_ialloc_blks;	/* blocks in inode allocation */
+	int			m_litino;	/* size of inode union area */
 	xfs_trans_reservations_t m_reservations; /* precomputed res values */
 } xfs_mount_t;
 
@@ -122,9 +127,18 @@ typedef struct xfs_mount {
 /*
  * Macros for getting from mount to vfs and back.
  */
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_MTOVFS)
+struct vfs *xfs_mtovfs(xfs_mount_t *mp);
+#define	XFS_MTOVFS(mp)		xfs_mtovfs(mp)
+#else
 #define	XFS_MTOVFS(mp)		((mp)->m_vfsp)
+#endif
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_VFSTOM)
+xfs_mount_t *xfs_vfstom(struct vfs *vfsp);
+#define	XFS_VFSTOM(vfsp)	xfs_vfstom(vfsp)
+#else
 #define	XFS_VFSTOM(vfsp)	((xfs_mount_t *) (vfsp)->vfs_data)
-
+#endif
  
 /*
  * This structure is for use by the xfs_mod_incore_sb_batch() routine.
@@ -142,8 +156,13 @@ typedef struct xfs_mod_sb {
 #define	AIL_LOCK(mp)		mutex_spinlock(&(mp)->m_ail_lock)
 #define	AIL_UNLOCK(mp,s)	mutex_spinunlock(&(mp)->m_ail_lock, s)
 
+#if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_HAS_ATTRIBUTES)
+int xfs_has_attributes(xfs_mount_t *mp);
+#define	XFS_HAS_ATTRIBUTES(mp)	xfs_has_attributes(mp)
+#else
 #define	XFS_HAS_ATTRIBUTES(mp)	\
 	((mp)->m_sb.sb_versionnum >= XFS_SB_VERSION_HASATTR)
+#endif
 
 #ifdef SIM
 xfs_mount_t	*xfs_mount(dev_t, dev_t, dev_t);
