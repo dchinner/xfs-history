@@ -1,4 +1,4 @@
-#ident "$Revision: 1.35 $"
+#ident "$Revision: 1.36 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -110,7 +110,7 @@ xfs_trans_push_ail(
 
 	AIL_LOCK(mp,s);
 	lip = xfs_trans_first_ail(mp, &gen);
-	if (lip == NULL) {
+	if (lip == NULL || XFS_FORCED_SHUTDOWN(mp)) {
 		/*
 		 * Just return if the AIL is empty.
 		 */
@@ -224,7 +224,14 @@ xfs_trans_unlocked_item(
 	xfs_log_item_t	*min_lip;
 	SPLDECL(s);
 
-	if (!(lip->li_flags & XFS_LI_IN_AIL)) {
+	/*
+	 * If we're forcibly shutting down, we may have
+	 * unlocked log items arbitrarily. The last thing
+	 * we want to do is to move the tail of the log
+	 * over some potentially valid data.
+	 */
+	if (!(lip->li_flags & XFS_LI_IN_AIL) ||
+	    XFS_FORCED_SHUTDOWN(mp)) {
 		return;
 	}
 
