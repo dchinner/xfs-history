@@ -844,11 +844,13 @@ DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);
 static int __init init_xfs_fs(void)
 {
 	struct sysinfo	si;
+	static char message[] __initdata =
+		KERN_INFO "SGI XFS with " XFS_BUILD_OPTIONS " enabled\n";
 
 	si_meminfo(&si);
 	physmem = si.totalram;
 
-	printk(KERN_INFO "SGI XFS with " XFS_BUILD_OPTIONS " enabled\n");
+	printk(message);
 
 	cred_init();
 	vfsinit();
@@ -862,7 +864,6 @@ static int __init init_xfs_fs(void)
 #endif
 	return register_filesystem(&xfs_fs_type);
 }
-
 
 
 static void __exit exit_xfs_fs(void)
