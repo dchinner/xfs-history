@@ -154,17 +154,24 @@ xfs_iformat(xfs_mount_t		*mp,
 			 * it there, otherwise allocate a buffer for it
 			 * and copy the data there.  Either way, set
 			 * iu_data to point at the data.
+			 * If we allocate a buffer for the data, make
+			 * sure that its size is a multiple of 4 and
+			 * record the real size in i_real_bytes.
 			 */
 			size = (int) ip->i_d.di_size;
+			real_size = 0;
 			if (size == 0) {
 				ip->i_u1.iu_data = NULL;
 			} else if (size <= sizeof(ip->i_u2.iu_inline_data)) {
 				ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
 			} else {
-				ip->i_u1.iu_data = (char*)kmem_alloc(size,
-								     KM_SLEEP);
+				real_size = (((size + 3) >> 2) << 2);
+				ip->i_u1.iu_data =
+					(char*)kmem_alloc(real_size,
+							  KM_SLEEP);
 			}
 			ip->i_bytes = size;
+			ip->i_real_bytes = real_size;
 			if (size)
 				bcopy(dip->di_u.di_c, ip->i_u1.iu_data, size);
 			ip->i_flags |= XFS_IINLINE;
@@ -698,6 +705,7 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 		  int		byte_diff)
 {
 	int	new_size;
+	int	real_size;
 
 	if (byte_diff == 0) {
 		return;
@@ -708,9 +716,10 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 
 	if (new_size == 0) {
 		if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
-			kmem_free(ip->i_u1.iu_data, ip->i_bytes);
+			kmem_free(ip->i_u1.iu_data, ip->i_real_bytes);
 		}
 		ip->i_u1.iu_data = NULL;
+		ip->i_real_bytes = 0;
 	} else if (new_size <= sizeof(ip->i_u2.iu_inline_data)) {
 		/*
 		 * If the valid extents/data can fit in iu_inline_ext/data,
@@ -719,25 +728,42 @@ xfs_idata_realloc(xfs_inode_t	*ip,
 		if (ip->i_u1.iu_data == NULL) {
 			ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
 		} else if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
+			ASSERT(ip->i_real_bytes != 0);
 			bcopy(ip->i_u1.iu_data, ip->i_u2.iu_inline_data,
-			      ip->i_bytes);
-			kmem_free(ip->i_u1.iu_data, ip->i_bytes);
+			      new_size);
+			kmem_free(ip->i_u1.iu_data, ip->i_real_bytes);
 			ip->i_u1.iu_data = ip->i_u2.iu_inline_data;
 		}
+		ip->i_real_bytes = 0;
 	} else {
 		/*
 		 * Stuck with malloc/realloc.
+		 * For inline data, the underlying buffer must be
+		 * a multiple of 4 bytes in size so that it can be
+		 * logged and stay on word boundaries.  We enforce
+		 * that here.
 		 */
+		real_size = (((new_size + 3) >> 2) << 2);
 		if (ip->i_u1.iu_data == NULL) {
-			ip->i_u1.iu_data = kmem_alloc(new_size, KM_SLEEP);
+			ASSERT(ip->i_real_bytes == 0);
+			ip->i_u1.iu_data = kmem_alloc(real_size, KM_SLEEP);
 		} else if (ip->i_u1.iu_data != ip->i_u2.iu_inline_data) {
-			ip->i_u1.iu_data = kmem_realloc(ip->i_u1.iu_data,
-							new_size, KM_SLEEP);
+			/*
+			 * Only do the realloc if the underlying size
+			 * is really changing.
+			 */
+			if (ip->i_real_bytes != real_size) {
+				ip->i_u1.iu_data =
+					kmem_realloc(ip->i_u1.iu_data,
+						     real_size, KM_SLEEP);
+			}
 		} else {
-			ip->i_u1.iu_data = kmem_alloc(new_size, KM_SLEEP);
+			ASSERT(ip->i_real_bytes == 0);
+			ip->i_u1.iu_data = kmem_alloc(real_size, KM_SLEEP);
 			bcopy(ip->i_u2.iu_inline_data, ip->i_u1.iu_data,
 			      ip->i_bytes);
 		}
+		ip->i_real_bytes = real_size;
 	}
 	ip->i_bytes = new_size;
 }
