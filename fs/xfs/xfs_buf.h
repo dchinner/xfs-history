@@ -419,7 +419,7 @@ extern void xfs_pb_nfreer(page_buf_t *);
 #define XFS_BUF_ISPINNED(bp)   pagebuf_ispin(bp)
 
 #define XFS_BUF_VALUSEMA(bp) 	pagebuf_lock_value(bp)
-#define XFS_BUF_CPSEMA(bp)   	pagebuf_cond_lock(bp)
+#define XFS_BUF_CPSEMA(bp)   	(pagebuf_cond_lock(bp) == 0)
 #define XFS_BUF_VSEMA(bp)   	pagebuf_unlock(bp)
 #define XFS_BUF_PSEMA(bp,x)	pagebuf_lock(bp)
 #define XFS_BUF_V_IODONESEMA(bp) 
@@ -473,9 +473,23 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 #define xfs_incore(buftarg,blkno,len,lockit) \
             pagebuf_find(buftarg.inode,blkno,len,lockit)
 
-#define XFS_bwrite(pb)			\
-	    pagebuf_iostart(pb,		\
-		(pb->pb_flags & (PBF_WRITE|PBF_DELWRI|PBF_ASYNC)) | PBF_SYNC)
+static inline int	XFS_bwrite(page_buf_t *pb)
+{
+	int	sync = (pb->pb_flags & PBF_ASYNC) == 0;
+	int	error;
+
+	pb->pb_flags |= PBF_SYNC;
+	pagebuf_iorequest(pb);
+	if (sync) {
+		error = pagebuf_iowait(pb);
+		xfs_buf_relse(pb);
+	} else {
+		error = 0;
+	}
+
+	return error;
+}
+
 
 #define XFS_bdwrite(pb)              \
             pagebuf_iostart(pb, PBF_DELWRI | PBF_ASYNC)
@@ -489,7 +503,13 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 			      * wants to flush all delay write buffers
 			      * on device...  how do we do this with pagebuf? */
 
+/* This is debug only - lets not bother for now */
+
+#ifdef DEBUG
 #define xfs_bflushed(buftarg) printk("XFS_bflushed not implemented\n")
+#else
+#define xfs_bflushed(buftarg)
+#endif
 /* assert the buffers for dev are really flushed */
 
 extern void XFS_bflush(buftarg_t);

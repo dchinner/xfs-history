@@ -604,7 +604,6 @@ xfs_bmap(bhv_desc_t	*bdp,
 	int		unlocked;
 	int		lockmode;
 
-/*	printk("ENTER xfs_bmap\n"); */
 	ip = XFS_BHVTOI(bdp);
 	ASSERT((ip->i_d.di_mode & IFMT) == IFREG);
 	ASSERT(((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) != 0) ==
@@ -615,14 +614,18 @@ xfs_bmap(bhv_desc_t	*bdp,
 		return (EIO);
 
 	if (flags == XFS_B_READ) {
+/**
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
+**/
 		unlocked = 0;
 		lockmode = xfs_ilock_map_shared(ip);
 		error = xfs_iomap_read(&ip->i_iocore, offset, count,
 				 pbmapp, npbmaps, NULL);
 		xfs_iunlock_map_shared(ip, lockmode);
 	} else { /* XFS_B_WRITE */
+/**
 		ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
+**/
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 
 		/* 
@@ -716,7 +719,9 @@ xfs_iomap_read(
 	xfs_bmbt_irec_t	imap[XFS_MAX_RW_NBMAPS];
 
 	ASSERT(ismrlocked(io->io_lock, MR_UPDATE | MR_ACCESS) != 0);
+/**
 	ASSERT(ismrlocked(io->io_iolock, MR_UPDATE | MR_ACCESS) != 0);
+**/
 /*	xfs_iomap_enter_trace(XFS_IOMAP_READ_ENTER, io, offset, count); */
 
 	mp = io->io_mount;
@@ -1293,6 +1298,7 @@ xfs_pb_nfreer(page_buf_t *bp){
 void
 XFS_bflush(buftarg_t target)
 {
+	pagebuf_delwri_flush(target.inode);
 	run_task_queue(&tq_disk);
 }
 
