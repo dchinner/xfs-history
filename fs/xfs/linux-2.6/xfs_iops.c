@@ -542,6 +542,71 @@ int linvfs_revalidate(struct dentry *dentry)
 }
 
 int
+linvfs_notify_change(
+	struct dentry	*dentry,
+	struct iattr	*attr)
+{
+	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);
+	vattr_t		vattr;
+
+	unsigned int	ia_valid = attr->ia_valid;
+	int		error;
+	struct inode	*inode;
+
+	inode = dentry->d_inode;
+	error = inode_change_ok(inode, attr);
+	if (error){
+	  return(error);
+	}
+
+	memset(&vattr, 0, sizeof(vattr_t));
+
+
+	if (ia_valid & ATTR_UID) {
+		vattr.va_mask |= AT_UID; 
+		vattr.va_uid = attr->ia_uid;
+	}
+	if (ia_valid & ATTR_GID) {
+		vattr.va_mask |= AT_GID;
+		vattr.va_gid = attr->ia_gid;
+	}
+	if (ia_valid & ATTR_SIZE) {
+		vattr.va_mask |= AT_SIZE;
+		vattr.va_size = attr->ia_size;
+	}
+	if (ia_valid & ATTR_ATIME) {
+		vattr.va_mask |= AT_ATIME;
+		vattr.va_atime.tv_sec = attr->ia_atime;
+		vattr.va_atime.tv_nsec = 0;
+	}
+	if (ia_valid & ATTR_MTIME) {
+		vattr.va_mask |= AT_MTIME;
+		vattr.va_mtime.tv_sec = attr->ia_mtime;
+		vattr.va_mtime.tv_nsec = 0;
+	}
+	if (ia_valid & ATTR_CTIME) {
+		vattr.va_mask |= AT_CTIME;
+		vattr.va_ctime.tv_sec = attr->ia_ctime;
+		vattr.va_ctime.tv_nsec = 0;
+	}
+	if (ia_valid & ATTR_MODE) {
+		vattr.va_mask |= AT_MODE;
+		vattr.va_mode = attr->ia_mode;
+		if (!in_group_p(inode->i_gid) && !capable(CAP_FSETID))
+			inode->i_mode &= ~S_ISGID;
+	}
+
+
+	VOP_SETATTR(vp, &vattr, 0, sys_cred, error);
+
+	if (!error) {
+		inode_setattr(inode, attr);
+	}
+
+	return(-error);
+}
+
+int
 linvfs_pb_bmap(struct inode *inode, 
 			   loff_t offset,
 			   size_t count,
@@ -599,6 +664,7 @@ struct inode_operations linvfs_file_inode_operations =
 {
   permission:		linvfs_permission,
   revalidate:		linvfs_revalidate,
+  setattr:		linvfs_notify_change,
   pagebuf_bmap:		linvfs_pb_bmap,
   pagebuf_fileread:	pagebuf_file_read,
 };
@@ -615,7 +681,8 @@ struct inode_operations linvfs_dir_inode_operations =
   mknod:		linvfs_mknod,	
   rename:		linvfs_rename,	
   permission:		linvfs_permission,
-  revalidate:		linvfs_revalidate
+  revalidate:		linvfs_revalidate,
+  setattr:		linvfs_notify_change
 };
 
 struct inode_operations linvfs_symlink_inode_operations =
