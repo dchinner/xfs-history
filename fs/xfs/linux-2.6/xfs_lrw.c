@@ -122,7 +122,8 @@ xfs_read(
 	xfs_mount_t		*mp;
 	vnode_t			*vp;
 	unsigned long		seg;
-	int			direct = filp->f_flags & O_DIRECT;
+	int			direct = (filp->f_flags & O_DIRECT);
+	int			invisible = (filp->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -182,13 +183,12 @@ xfs_read(
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
-	    !(filp->f_mode & FINVIS)) {
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !invisible) {
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
-		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, *offp,
-				size, FILP_DELAY_FLAG(filp), &locktype);
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offp, size,
+				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
 			if (!(ioflags & IO_ISLOCKED))
 				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -202,7 +202,7 @@ xfs_read(
 
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
 
-	if (!(filp->f_mode & FINVIS))
+	if (!invisible)
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
 	return ret;
@@ -222,11 +222,13 @@ xfs_sendfile(
 	ssize_t			ret;
 	xfs_fsize_t		n;
 	xfs_inode_t		*ip;
+	xfs_mount_t		*mp;
 	vnode_t			*vp;
 	int			invisible = (filp->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
+	mp = ip->i_mount;
 	vn_trace_entry(vp, "xfs_sendfile", (inst_t *)__return_address);
 
 	XFS_STATS_INC(xfsstats.xs_read_calls);
@@ -248,8 +250,8 @@ xfs_sendfile(
 		vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
-		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp, *offp,
-				count, FILP_DELAY_FLAG(filp), &locktype);
+		error = XFS_SEND_DATA(mp, DM_EVENT_READ, bdp, *offp, count,
+				      FILP_DELAY_FLAG(filp), &locktype);
 		if (error) {
 			if (!(ioflags & IO_ISLOCKED))
 				xfs_iunlock(ip, XFS_IOLOCK_SHARED);
@@ -503,7 +505,8 @@ xfs_write(
 	vnode_t			*vp;
 	unsigned long		seg;
 	int			iolock;
-	int			direct = file->f_flags & O_DIRECT;
+	int			direct = (file->f_flags & O_DIRECT);
+	int			invisible = (file->f_mode & FINVIS);
 	int			eventsent = 0;
 	vrwlock_t		locktype;
 
@@ -587,13 +590,13 @@ start:
 	}
 
 	if ((DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_WRITE) &&
-	    !(file->f_mode & FINVIS) && !eventsent)) {
+	    !invisible && !eventsent)) {
 		loff_t		savedsize = *offset;
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
-		error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
-				*offset, size,
-				FILP_DELAY_FLAG(file), &locktype);
+		error = XFS_SEND_DATA(xip->i_mount, DM_EVENT_WRITE, bdp,
+				      *offset, size,
+				      FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
 			if (iolock) xfs_iunlock(xip, iolock);
 			return -error;
@@ -602,12 +605,11 @@ start:
 		eventsent = 1;
 
 		/*
-		 * The iolock was dropped and reaquired in
-		 * xfs_dm_send_data_event so we have to recheck the size
-		 *  when appending.  We will only "goto start;" once,
-		 *  since having sent the event prevents another call
-		 *  to xfs_dm_send_data_event, which is what
-		 *  allows the size to change in the first place.
+		 * The iolock was dropped and reaquired in XFS_SEND_DATA
+		 * so we have to recheck the size when appending.
+		 * We will only "goto start;" once, since having sent the
+		 * event prevents another call to XFS_SEND_DATA, which is
+		 * what allows the size to change in the first place.
 		 */
 		if ((file->f_flags & O_APPEND) &&
 		    savedsize != xip->i_d.di_size) {
@@ -622,10 +624,8 @@ start:
 	 *
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
-	if (size) {
-		if (!(file->f_mode & FINVIS))
-			xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-	}
+	if (size && !invisible)
+		xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	/*
 	 * If the offset is beyond the size of the file, we have a couple
@@ -672,11 +672,10 @@ retry:
 	ret = generic_file_write_nolock(file, iovp, segs, offset);
 
 	if ((ret == -ENOSPC) &&
-	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
-	    !(file->f_mode & FINVIS)) {
+	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) && !invisible) {
 
 		xfs_rwunlock(bdp, locktype);
-		error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
+		error = XFS_SEND_NAMESP(xip->i_mount, DM_EVENT_NOSPACE, bdp,
 				DM_RIGHT_NULL, bdp, DM_RIGHT_NULL, NULL, NULL,
 				0, 0, 0); /* Delay flag intentionally  unused */
 		if (error)

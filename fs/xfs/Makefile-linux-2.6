@@ -43,9 +43,7 @@ endif
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
-xfs-$(CONFIG_XFS_DMAPI)		+= xfs_dmapi.o \
-				   xfs_dmops.o \
-				   $(addprefix dmapi/, \
+xfs-$(CONFIG_XFS_DMAPI)		+= $(addprefix dmapi/, \
 				   dmapi_sysent.o \
 				   dmapi_attr.o \
 				   dmapi_config.o \
@@ -59,21 +57,30 @@ xfs-$(CONFIG_XFS_DMAPI)		+= xfs_dmapi.o \
 				   dmapi_region.o \
 				   dmapi_register.o \
 				   dmapi_right.o \
-				   dmapi_session.o)
+				   dmapi_session.o \
+				   dmapi_xfs.o)
+ifneq ($(CONFIG_XFS_DMAPI),y)
+xfs-y				+= xfs_dmops.o
+endif
 
-
-xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
-
-xfs-$(CONFIG_XFS_QUOTA)		+= xfs_dquot.o \
+xfs-$(CONFIG_XFS_QUOTA)		+= $(addprefix quota/, \
+				   xfs_dquot.o \
 				   xfs_dquot_item.o \
 				   xfs_trans_dquot.o \
 				   xfs_qm_syscalls.o \
-				   xfs_qmops.o \
-				   xfs_qm.o
+				   xfs_qm_bhv.o \
+				   xfs_qm.o)
+ifneq ($(CONFIG_XFS_QUOTA),y)
+xfs-y				+= xfs_qmops.o
+else
+xfs-$(CONFIG_PROC_FS)		+= quota/xfs_qm_stats.o
+endif
+
+xfs-$(CONFIG_XFS_RT)		+= xfs_rtalloc.o
 
 xfs-$(CONFIG_XFS_POSIX_ACL)	+= xfs_acl.o
-xfs-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
-xfs-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
+obj-$(CONFIG_XFS_POSIX_CAP)	+= xfs_cap.o
+obj-$(CONFIG_XFS_POSIX_MAC)	+= xfs_mac.o
 xfs-$(CONFIG_PROC_FS)		+= linux/xfs_stats.o
 xfs-$(CONFIG_SYSCTL)		+= linux/xfs_sysctl.o
 

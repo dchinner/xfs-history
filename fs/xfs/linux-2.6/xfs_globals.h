@@ -43,7 +43,4 @@ extern unsigned long	xfs_physmem;
 
 extern struct cred *sys_cred;
 
-extern struct xfs_qm	*xfs_Gqm;
-extern mutex_t		xfs_Gqm_lock;
-
 #endif	/* __XFS_GLOBALS_H__ */
