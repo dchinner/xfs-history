@@ -226,7 +226,7 @@
     }
 #define DIRINO4_COPY_ARCH(from,to,arch) \
     if ((arch) == ARCH_NOCONVERT) { \
-        bcopy(from,to,sizeof(xfs_dir2_ino4_t)); \
+        bcopy((((__u8*)from+4)),to,sizeof(xfs_dir2_ino4_t)); \
     } else { \
         INT_SWAP_UNALIGNED_32(from,to); \
     }
