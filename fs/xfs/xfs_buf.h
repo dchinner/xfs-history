@@ -118,7 +118,7 @@ typedef struct page_buf_s xfs_buf_t;
 typedef struct buftarg {
 	struct pb_target	*pb_targ;
 	struct block_device	*bd_targ;
-	kdev_t			dev;
+	dev_t			dev;
 } buftarg_t;
 
 #define XFS_BUF_IODONE_FUNC(buf)	(buf)->pb_iodone
@@ -185,7 +185,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, off_t offset)
 #define XFS_BUF_SET_TARGET(bp, target)	\
 	(bp)->pb_target = (target)->pb_targ
 
-#define XFS_BUF_TARGET_DEV(bp)	((bp)->pb_target->pbr_device)
+#define XFS_BUF_TARGET_DEV(bp)	((bp)->pb_target->pbr_bdev->bd_dev)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)

@@ -1557,7 +1557,7 @@ _page_buf_page_apply(
 	int			last)
 {
 	page_buf_daddr_t	bn = pb->pb_bn;
-	kdev_t			dev = pb->pb_target->pbr_device;
+	kdev_t			dev = pb->pb_target->pbr_kdev;
 	size_t			blocksize = pb->pb_target->pbr_blocksize;
 	loff_t			pb_offset;
 	size_t			ret_len = pg_length;

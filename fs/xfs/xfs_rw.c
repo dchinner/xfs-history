@@ -111,7 +111,7 @@ _xfs_force_shutdown(
 	if (XFS_FORCED_SHUTDOWN(mp) && !logerror)
 		return;
 
-	if (XFS_MTOVFS(mp)->vfs_dev == kdev_t_to_nr(rootdev))
+	if (XFS_MTOVFS(mp)->vfs_dev == rootdev)
 		cmn_err(CE_PANIC, "Fatal error on root filesystem");
 
 	/*
@@ -263,7 +263,7 @@ xfs_ioerror_alert(
  "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%llx\n"
  "	 (\"%s\") error %d buf count %u",
 		(!mp || !mp->m_fsname) ? "(fs name not set)" : mp->m_fsname,
-		kdev_t_to_nr(XFS_BUF_TARGET_DEV(bp)),
+		XFS_BUF_TARGET_DEV(bp),
 		(__uint64_t)blkno,
 		func,
 		XFS_BUF_GETERROR(bp),

@@ -986,7 +986,7 @@ xfs_buf_iodone_callbacks(
 {
 	xfs_log_item_t	*lip;
 	static time_t	lasttime;
-	static kdev_t	lastdev;
+	static dev_t	lastdev;
 	xfs_mount_t	*mp;
 
 	ASSERT(XFS_BUF_FSPRIVATE(bp, void *) != NULL);
@@ -1000,7 +1000,7 @@ xfs_buf_iodone_callbacks(
 		 */
 		mp = lip->li_mountp;
 		if (XFS_FORCED_SHUTDOWN(mp)) {
-			ASSERT(kdev_same(XFS_BUF_TARGET_DEV(bp), mp->m_dev));
+			ASSERT(XFS_BUF_TARGET_DEV(bp) == mp->m_dev);
 			XFS_BUF_SUPER_STALE(bp);
 			xfs_buftrace("BUF_IODONE_CB", bp);
 			xfs_buf_do_callbacks(bp, lip);
@@ -1024,7 +1024,7 @@ xfs_buf_iodone_callbacks(
 			return;
 		}
 
-		if ((!kdev_same(XFS_BUF_TARGET_DEV(bp), lastdev)) ||
+		if ((XFS_BUF_TARGET_DEV(bp) != lastdev) ||
 		    ((lbolt - lasttime) > 500)) {
 			prdev("XFS write error in file system meta-data "
 			      "block 0x%Lx in %s",
@@ -1097,7 +1097,7 @@ xfs_buf_error_relse(
 
 	lip = XFS_BUF_FSPRIVATE(bp, xfs_log_item_t *);
 	mp = (xfs_mount_t *)lip->li_mountp;
-	ASSERT(kdev_same(XFS_BUF_TARGET_DEV(bp), mp->m_dev));
+	ASSERT(XFS_BUF_TARGET_DEV(bp) == mp->m_dev);
 
 	XFS_BUF_STALE(bp);
 	XFS_BUF_DONE(bp);

@@ -577,7 +577,7 @@ xfs_fs_freeze(
 
 	/* Push all buffers out to disk */
 	xfs_binval(mp->m_ddev_targ);
-	if (!kdev_none(mp->m_rtdev)) {
+	if (mp->m_rtdev != 0) {
 		xfs_binval(mp->m_rtdev_targ);
 	}
 

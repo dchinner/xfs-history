@@ -114,7 +114,7 @@ __pb_map_buffer_at_offset(
 
 	lock_buffer(bh);
 	bh->b_blocknr = bn;
-	bh->b_dev = mp->pbm_target->pbr_device;
+	bh->b_dev = mp->pbm_target->pbr_kdev;
 	set_bit(BH_Mapped, &bh->b_state);
 	clear_bit(BH_Delay, &bh->b_state);
 }

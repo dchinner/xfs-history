@@ -209,13 +209,12 @@ xfs_mount_validate_sb(
 		return XFS_ERROR(EWRONGFS);
 	}
 
-	if (sbp->sb_logstart == 0 && kdev_same(mp->m_logdev, mp->m_dev)) {
+	if (sbp->sb_logstart == 0 && mp->m_logdev == mp->m_dev) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an external log; specify logdev on the\nmount command line.");
 		return XFS_ERROR(EFSCORRUPTED);
 	}
 
-	if (sbp->sb_logstart != 0 && !kdev_none(mp->m_logdev) &&
-	    !kdev_same(mp->m_logdev, mp->m_dev)) {
+	if (sbp->sb_logstart != 0 && mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		cmn_err(CE_WARN, "XFS: filesystem is marked as having an internal log; don't specify logdev on\nthe mount command line.");
 		return XFS_ERROR(EFSCORRUPTED);
 	}
@@ -558,7 +557,7 @@ int
 xfs_mountfs(
 	vfs_t		*vfsp,
 	xfs_mount_t	*mp,
-	kdev_t		dev,
+	dev_t 		dev, 
 	int		mfsi_flags)
 {
 	xfs_buf_t	*bp;
@@ -578,7 +577,7 @@ xfs_mountfs(
 	int		agno, noio;
 	int		uuid_mounted = 0;
 
-	noio = kdev_none(dev) && mp->m_sb_bp != NULL;
+	noio = dev == 0 && mp->m_sb_bp != NULL;
 	if (mp->m_sb_bp == NULL) {
 		if ((error = xfs_readsb(mp))) {
 			return (error);
@@ -781,7 +780,7 @@ xfs_mountfs(
 	}
 
 	if (!noio && ((mfsi_flags & XFS_MFSI_CLIENT) == 0) &&
-	    !kdev_none(mp->m_logdev) && !kdev_same(mp->m_logdev, mp->m_dev)) {
+	    mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		d = (xfs_daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
 			cmn_err(CE_WARN, "XFS: size check 3 failed");
@@ -899,7 +898,7 @@ xfs_mountfs(
 	 * log's mount-time initialization. Perform 1st part recovery if needed
 	 */
 	if (sbp->sb_logblocks > 0) {		/* check for volume case */
-		error = xfs_log_mount(mp, kdev_t_to_nr(mp->m_logdev),
+		error = xfs_log_mount(mp, mp->m_logdev,
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error) {
@@ -994,7 +993,7 @@ xfs_mountfs(
 	 * The requirements are a little different depending on whether
 	 * this fs is root or not.
 	 */
-	rootqcheck = (kdev_same(mp->m_dev, rootdev) && quotaondisk &&
+	rootqcheck = (mp->m_dev == rootdev && quotaondisk && 
 		      ((mp->m_sb.sb_qflags & XFS_UQUOTA_ACCT &&
 			(mp->m_sb.sb_qflags & XFS_UQUOTA_CHKD) == 0) ||
 		       (mp->m_sb.sb_qflags & XFS_GQUOTA_ACCT &&
@@ -1045,7 +1044,7 @@ xfs_mountfs(
 		ASSERT(mp->m_qflags == 0);
 		mp->m_qflags = quotaflags;
 		rootqcheck = ((XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY) &&
-			      kdev_same(mp->m_dev, rootdev) && needquotacheck);
+				mp->m_dev == rootdev && needquotacheck);
 		if (rootqcheck && (error = xfs_quotacheck_read_only(mp)))
 			goto error2;
 		if (xfs_qm_mount_quotas(mp))
@@ -1124,7 +1123,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 
 	xfs_binval(mp->m_ddev_targ);
-	if (!kdev_none(mp->m_rtdev)) {
+	if (mp->m_rtdev) {
 		xfs_binval(mp->m_rtdev_targ);
 	}
 
@@ -1208,7 +1207,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		XFS_BUF_UNDELAYWRITE(sbp);
 		XFS_BUF_WRITE(sbp);
 		XFS_BUF_UNASYNC(sbp);
-		ASSERT(kdev_same(XFS_BUF_TARGET_DEV(sbp), mp->m_dev));
+		ASSERT(XFS_BUF_TARGET_DEV(sbp) == mp->m_dev);
 		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
 		error = xfs_iowait(sbp);

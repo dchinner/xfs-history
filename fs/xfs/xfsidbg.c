@@ -4432,8 +4432,8 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	kdb_printf("ail_gen 0x%x &sb 0x%p\n",
 		mp->m_ail_gen, &mp->m_sb);
 	kdb_printf("sb_lock 0x%p sb_bp 0x%p dev 0x%x logdev 0x%x rtdev 0x%x\n",
-		&mp->m_sb_lock, mp->m_sb_bp, kdev_t_to_nr(mp->m_dev),
-		kdev_t_to_nr(mp->m_logdev), kdev_t_to_nr(mp->m_rtdev));
+		&mp->m_sb_lock, mp->m_sb_bp, mp->m_dev, mp->m_logdev,
+		mp->m_rtdev);
 	kdb_printf("bsize %d agfrotor %d agirotor %d ihash 0x%p ihsize %d\n",
 		mp->m_bsize, mp->m_agfrotor, mp->m_agirotor,
 		mp->m_ihash, mp->m_ihsize);
@@ -4604,7 +4604,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		ip->i_mprev,
 		XFS_ITOV_NULL(ip));
 	kdb_printf("dev %x ino %s\n",
-		kdev_t_to_nr(ip->i_mount->m_dev),
+		ip->i_mount->m_dev,
 		xfs_fmtino(ip->i_ino, ip->i_mount));
 	kdb_printf("blkno 0x%llx len 0x%x boffset 0x%x\n",
 		(long long) ip->i_blkno,

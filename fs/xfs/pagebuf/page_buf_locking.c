@@ -74,15 +74,15 @@ pb_hash_t	pbhash[NHASH];
  */
 
 static int
-_bhash(kdev_t d, loff_t b)
+_bhash(dev_t d, loff_t b)
 {
 	int bit, hval;
 
 	b >>= 9;
 	/*
-	 * dev_t is 32 bits, daddr_t is always 64 bits
+	 * dev_t is 16 bits, daddr_t is always 64 bits
 	 */
-	b ^= kdev_val(d);
+	b ^= d;
 	for (bit = hval = 0; b != 0 && bit < sizeof(b) * 8; bit += NBITS) {
 		hval ^= (int)b & (NHASH-1);
 		b >>= NBITS;
@@ -114,11 +114,14 @@ _pagebuf_find_lockable_buffer(pb_target_t *target,
 			     page_buf_t **pb_p,
 			     page_buf_t *new_pb)
 {
-	int			hval = _bhash(target->pbr_device, range_base);
-	pb_hash_t		*h = &pbhash[hval];
+	int			hval;
+	pb_hash_t		*h;
 	struct list_head	*p;
 	page_buf_t		*pb;
 	int			not_locked;
+
+	hval = _bhash(target->pbr_bdev->bd_dev, range_base);
+	h = &pbhash[hval];
 
 	spin_lock(&h->pb_hash_lock);
 	list_for_each(p, &h->pb_hash) {
@@ -338,22 +341,22 @@ pagebuf_lock_disable(			/* disable buffer locking	*/
 
 pb_target_t *
 pagebuf_lock_enable(
-	kdev_t kdev,
+	dev_t dev,
 	struct super_block *sb)
 {
 	pb_target_t	*target;
 
 	target = kmalloc(sizeof(pb_target_t), GFP_KERNEL);
 	if (target) {
-		target->pbr_bdev = bdget(kdev_t_to_nr(kdev));
+		target->pbr_kdev = to_kdev_t(dev);
+		target->pbr_bdev = bdget(dev);
 		if (!target->pbr_bdev)
 			goto fail;
-		target->pbr_device = kdev;
 		pagebuf_target_blocksize(target, PAGE_CACHE_SIZE);
 		target->pbr_mapping = target->pbr_bdev->bd_inode->i_mapping;
-		if ((major(kdev) == MD_MAJOR) || (major(kdev) == EVMS_MAJOR)) 
+		if ((MAJOR(dev) == MD_MAJOR) || (MAJOR(dev) == EVMS_MAJOR)) 
 			target->pbr_flags = PBR_ALIGNED_ONLY;
-		else if (major(kdev) == LVM_BLK_MAJOR)
+		else if (MAJOR(dev) == LVM_BLK_MAJOR)
 			target->pbr_flags = PBR_SECTOR_ONLY;
 		else
 			target->pbr_flags = 0;
@@ -379,7 +382,7 @@ int
 pagebuf_target_clear(
 	pb_target_t	*target)
 {
-	destroy_buffers(target->pbr_device);
+	destroy_buffers(target->pbr_kdev);
 	truncate_inode_pages(PBT_ADDR_SPACE(target), 0LL);
 	return 0;
 }

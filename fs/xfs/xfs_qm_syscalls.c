@@ -99,7 +99,7 @@ linvfs_setxstate(
 		return -xfs_qm_scall_quotaon(mp, qflags);
 	case Q_XQUOTAOFF:
 		qflags = xfs_qm_import_flags(flags);
-		if (kdev_same(mp->m_dev, rootdev))
+		if (mp->m_dev == rootdev)
 			return -xfs_qm_scall_quotaoff(mp, qflags, B_FALSE);
 		if (!XFS_IS_QUOTA_ON(mp))
 			return -ESRCH;
@@ -179,7 +179,7 @@ xfs_qm_scall_quotaoff(
 	 * in core. Note that quota utilities (like quotaoff) _expect_
 	 * errno == EEXIST here.
 	 */
-	if (!kdev_same(mp->m_dev, rootdev) && (mp->m_qflags & flags) == 0)
+	if (mp->m_dev != rootdev && (mp->m_qflags & flags) == 0)
 		return XFS_ERROR(EEXIST);
 	error = 0;
 
@@ -191,7 +191,7 @@ xfs_qm_scall_quotaoff(
 	 * critical thing.
 	 * If quotaoff, then we must be dealing with the root filesystem.
 	 */
-	ASSERT(mp->m_quotainfo || kdev_same(mp->m_dev, rootdev));
+	ASSERT(mp->m_quotainfo || mp->m_dev == rootdev);
 	if (mp->m_quotainfo)
 		mutex_lock(&(XFS_QI_QOFFLOCK(mp)), PINOD);
 
@@ -199,7 +199,7 @@ xfs_qm_scall_quotaoff(
 	 * Root file system may or may not have quotas on in core.
 	 * We have to perform the quotaoff accordingly.
 	 */
-	if (kdev_same(mp->m_dev, rootdev)) {
+	if (mp->m_dev == rootdev) {
 		s = XFS_SB_LOCK(mp);
 		sbflags = mp->m_sb.sb_qflags;
 		if ((mp->m_qflags & flags) == 0) {
@@ -428,7 +428,7 @@ xfs_qm_scall_quotaon(
 	if (!capable(CAP_SYS_ADMIN))
 		return XFS_ERROR(EPERM);
 
-	rootfs = (boolean_t) kdev_same(mp->m_dev, rootdev);
+	rootfs = (boolean_t) (mp->m_dev == rootdev);
 
 	flags &= (XFS_ALL_QUOTA_ACCT | XFS_ALL_QUOTA_ENFD);
 	/*
@@ -566,7 +566,7 @@ xfs_qm_scall_getqstat(
 	 * root filesystem's quotas are being turned on, return them in the
 	 * HI 8 bits.
 	 */
-	if (kdev_same(mp->m_dev, rootdev)) {
+	if (mp->m_dev == rootdev) {
 		sbflags = (__uint16_t) xfs_qm_export_flags(mp->m_sb.sb_qflags &
 							   (XFS_ALL_QUOTA_ACCT|
 							    XFS_ALL_QUOTA_ENFD));

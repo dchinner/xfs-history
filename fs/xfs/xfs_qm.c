@@ -344,7 +344,7 @@ xfs_qm_mount_quotas(
 		}
 	}
 	if (! XFS_IS_QUOTA_ON(mp) &&
-	    (!kdev_same(mp->m_dev, rootdev)) &&
+	    (mp->m_dev != rootdev) &&
 	    (mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT))) {
 		mp->m_qflags = 0;
 		goto write_changes;
@@ -370,7 +370,7 @@ xfs_qm_mount_quotas(
 	 * We couldn't do this earlier because we didn't have the superblock
 	 * read in.
 	 */
-	if (kdev_same(mp->m_dev, rootdev)) {
+	if (mp->m_dev == rootdev) {
 		ASSERT(XFS_SB_VERSION_HASQUOTA(&mp->m_sb));
 		ASSERT(mp->m_sb.sb_qflags &
 		       (XFS_UQUOTA_ACCT|XFS_GQUOTA_ACCT));
@@ -1452,7 +1452,7 @@ xfs_qm_qino_alloc(
 	}
 	bzero(&zerocr, sizeof(zerocr));
 
-	if ((error = xfs_dir_ialloc(&tp, mp->m_rootip, IFREG, 1, 0,
+	if ((error = xfs_dir_ialloc(&tp, mp->m_rootip, IFREG, 1, mp->m_dev,
 				   &zerocr, 0, 1, ip, &committed))) {
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES |
 				 XFS_TRANS_ABORT);

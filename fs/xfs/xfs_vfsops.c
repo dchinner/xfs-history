@@ -35,7 +35,7 @@
 #include <xfs.h>
 #include <linux/xfs_iops.h>
 
-STATIC xfs_mount_t *xfs_get_vfsmount(vfs_t *, kdev_t, kdev_t, kdev_t);
+STATIC xfs_mount_t *xfs_get_vfsmount(vfs_t *, dev_t, dev_t, dev_t);
 STATIC int xfs_ibusy(xfs_mount_t *);
 STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 STATIC int xfs_unmount(bhv_desc_t *, int, cred_t *);
@@ -234,9 +234,9 @@ xfs_cleanup(void)
 STATIC int
 xfs_cmountfs(
 	vfs_t		*vfsp,
-	kdev_t		ddev,
-	kdev_t		logdev,
-	kdev_t		rtdev,
+	dev_t		ddev,
+	dev_t		logdev,
+	dev_t		rtdev,
 	struct xfs_mount_args *ap,
 	struct cred	*cr)
 {
@@ -252,13 +252,13 @@ xfs_cmountfs(
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	linvfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super, 1);
-	if (!kdev_none(rtdev) &&
+	if (rtdev != 0 &&
 		(error = linvfs_fill_buftarg(
 			&mp->m_rtdev_targ, rtdev, vfsp->vfs_super, 0))) {
 		linvfs_release_buftarg(&mp->m_ddev_targ);
 		goto error2;
 	}
-	if (!kdev_same(logdev, ddev) &&
+	if (logdev != ddev &&
 		(error = linvfs_fill_buftarg(
 			&mp->m_logdev_targ, logdev, vfsp->vfs_super, 0))) {
 		linvfs_release_buftarg(&mp->m_ddev_targ);
@@ -284,8 +284,8 @@ xfs_cmountfs(
 		mp->m_swidth = 0;
 	}
 
-	if (!kdev_none(logdev)) {
-		if (kdev_same(logdev, ddev)) {
+	if (logdev != 0) {
+		if (logdev == ddev) {
 			mp->m_logdev_targ = mp->m_ddev_targ;
 		} else {
 			/* Set the log device's block size */
@@ -315,8 +315,8 @@ xfs_cmountfs(
 		mp->m_fsname = kmem_alloc(mp->m_fsname_len, KM_SLEEP);
 		strcpy(mp->m_fsname, ap->fsname);
 	}
-	if (!kdev_none(rtdev)) {
-		if (kdev_same(rtdev, ddev) || kdev_same(rtdev, logdev)) {
+	if (rtdev != 0) {
+		if (rtdev == ddev || rtdev == logdev) {
 			cmn_err(CE_WARN,
 	"XFS: Cannot mount filesystem with identical rtdev and logdev.");
 			error = XFS_ERROR(EINVAL);
@@ -419,9 +419,9 @@ xfs_cmountfs(
 	}
 
 	linvfs_bsize_buftarg(&mp->m_ddev_targ, mp->m_sb.sb_blocksize);
-	if (!kdev_none(logdev) && !kdev_same(logdev, ddev))
+	if (logdev != 0 && logdev != ddev)
 		linvfs_bsize_buftarg(&mp->m_logdev_targ, mp->m_sb.sb_blocksize);
-	if (!kdev_none(rtdev))
+	if (rtdev != 0)
 		linvfs_bsize_buftarg(&mp->m_rtdev_targ, mp->m_sb.sb_blocksize);
 
 	/*
@@ -493,11 +493,11 @@ xfs_cmountfs(
 	/* It's impossible to get here before buftargs are filled */
 	xfs_binval(mp->m_ddev_targ);
 	linvfs_release_buftarg(&mp->m_ddev_targ);
-	if (!kdev_none(logdev) && !kdev_same(logdev, ddev)) {
+	if (logdev && logdev != ddev) {
 		xfs_binval(mp->m_logdev_targ);
 		linvfs_release_buftarg(&mp->m_logdev_targ);
 	}
-	if (!kdev_none(rtdev)) {
+	if (rtdev != 0) {
 		xfs_binval(mp->m_rtdev_targ);
 		linvfs_release_buftarg(&mp->m_rtdev_targ);
 	}
@@ -519,9 +519,9 @@ xfs_cmountfs(
 STATIC xfs_mount_t *
 xfs_get_vfsmount(
 	vfs_t		*vfsp,
-	kdev_t		ddev,
-	kdev_t		logdev,
-	kdev_t		rtdev)
+	dev_t		ddev,
+	dev_t		logdev,
+	dev_t		rtdev)
 {
 	xfs_mount_t	*mp;
 
@@ -537,7 +537,7 @@ xfs_get_vfsmount(
 	/* vfsp->vfs_bsize filled in later from superblock */
 	vfsp->vfs_fstype = xfs_fstype;
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	vfsp->vfs_dev = kdev_t_to_nr(ddev);
+	vfsp->vfs_dev = ddev;
 	/* vfsp->vfs_fsid is filled in later from superblock */
 
 	return mp;
@@ -557,9 +557,9 @@ xfs_mount(
 	struct xfs_mount_args	*args,
 	cred_t			*credp)
 {
-	kdev_t		ddev;
-	kdev_t		logdev;
-	kdev_t		rtdev;
+	dev_t		ddev;
+	dev_t		logdev;
+	dev_t		rtdev;
 	int		error;
 
 	vfs_lock(vfsp);
@@ -877,7 +877,7 @@ xfs_statvfs(
 	statp->f_ffree = statp->f_files - (sbp->sb_icount - sbp->sb_ifree);
 	XFS_SB_UNLOCK(mp, s);
 
-	statp->f_fsid.val[0] = kdev_val(mp->m_dev);
+	statp->f_fsid.val[0] = mp->m_dev;
 	statp->f_fsid.val[1] = 0;
 	statp->f_namelen = MAXNAMELEN - 1;
 
@@ -1634,7 +1634,7 @@ xfs_syncsub(
 	 */
 	if ((flags & (SYNC_CLOSE|SYNC_WAIT)) == (SYNC_CLOSE|SYNC_WAIT)) {
 		XFS_bflush(mp->m_ddev_targ);
-		if (!kdev_none(mp->m_rtdev)) {
+		if (mp->m_rtdev != 0) {
 			XFS_bflush(mp->m_rtdev_targ);
 		}
 	}

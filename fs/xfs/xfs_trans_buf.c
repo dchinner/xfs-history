@@ -250,7 +250,7 @@ xfs_trans_getsb(xfs_trans_t	*tp,
 }
 
 #ifdef DEBUG
-kdev_t	xfs_error_dev = NODEV;
+dev_t	xfs_error_dev = 0;
 int	xfs_do_error;
 int	xfs_req_num;
 int	xfs_error_mod = 33;
@@ -308,7 +308,7 @@ xfs_trans_read_buf(
 		}
 #ifdef DEBUG
 		if (xfs_do_error && (bp != NULL)) {
-			if (kdev_same(xfs_error_dev, target->dev)) {
+			if (xfs_error_dev == target->dev) {
 				if (((xfs_req_num++) % xfs_error_mod) == 0) {
 					xfs_buf_relse(bp);
 					printk("Returning error!\n");
@@ -411,7 +411,7 @@ xfs_trans_read_buf(
 	}
 #ifdef DEBUG
 	if (xfs_do_error && !(tp->t_flags & XFS_TRANS_DIRTY)) {
-		if (kdev_same(xfs_error_dev, target->dev)) {
+		if (xfs_error_dev == target->dev) {
 			if (((xfs_req_num++) % xfs_error_mod) == 0) {
 				xfs_force_shutdown(tp->t_mountp,
 						   XFS_METADATA_IO_ERROR);
@@ -1013,7 +1013,7 @@ xfs_trans_buf_item_match(
 			}
 
 			bp = blip->bli_buf;
-			if ((kdev_same(XFS_BUF_TARGET_DEV(bp), target->dev)) &&
+			if ((XFS_BUF_TARGET_DEV(bp) == target->dev) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
@@ -1070,7 +1070,7 @@ xfs_trans_buf_item_match_all(
 			}
 
 			bp = blip->bli_buf;
-			if ((kdev_same(XFS_BUF_TARGET_DEV(bp), target->dev)) &&
+			if ((XFS_BUF_TARGET_DEV(bp) == target->dev) &&
 			    (XFS_BUF_ADDR(bp) == blkno) &&
 			    (XFS_BUF_COUNT(bp) == len)) {
 				/*
