@@ -573,7 +573,6 @@ xfs_fs_freeze(
 	/* Push the superblock and write an unmount record */
 	xfs_log_unmount_write(mp);
 	xfs_unmountfs_writesb(mp);
-	xfs_fs_log_dummy(mp);
 
 	return 0;
 }
