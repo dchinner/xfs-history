@@ -566,6 +566,7 @@ xfs_setattr(
 	vnode_t 	*vp;
 	xfs_prid_t	projid, iprojid;
 	int		privileged;
+	int 		mandlock_before, mandlock_after;
 	uint		qflags;
 	struct xfs_dquot *udqp, *pdqp, *olddquot1, *olddquot2;
 
@@ -914,6 +915,10 @@ xfs_setattr(
          * Change file access modes.
          */
         if (mask & AT_MODE) {
+		/* determine whether mandatory locking mode changes */
+		mandlock_before = MANDLOCK(vp, ip->i_d.di_mode);
+		mandlock_after = mandlock_before;  /* for check at end */
+
                 ip->i_d.di_mode &= IFMT;
                 ip->i_d.di_mode |= vap->va_mode & ~IFMT;
                 /*
@@ -929,6 +934,8 @@ xfs_setattr(
                 }
 		xfs_trans_log_inode (tp, ip, XFS_ILOG_CORE);
 		timeflags |= XFS_ICHGTIME_CHG;
+
+		mandlock_after = MANDLOCK(vp, ip->i_d.di_mode);
         }
 
 	/*
@@ -1058,6 +1065,15 @@ xfs_setattr(
 		xfs_qm_dqrele(udqp);
 	if (pdqp)
 		xfs_qm_dqrele(pdqp);
+
+	/*
+	 * If the (regular) file's mandatory locking mode changed, then
+	 * notify the vnode.
+	 */
+	if ((mask & AT_MODE) && mandlock_before != mandlock_after) {
+		VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_ENF_LOCKING, 
+				 mandlock_after);
+	}
 
 	if (code) {
 		return code;
