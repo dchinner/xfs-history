@@ -224,7 +224,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 }
 
 struct vnode *
-vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type, int flags)
+vn_alloc(struct vfs *vfsp, __uint64_t ino, enum vtype type)
 {
 	struct inode	*inode;
 	struct vnode	*vp;

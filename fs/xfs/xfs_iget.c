@@ -217,8 +217,7 @@ again:
 				} else {
 					mrunlock(&ih->ih_lock);
 					vp = vn_alloc(XFS_MTOVFS(mp), ino,
-						      IFTOVT(ip->i_d.di_mode),
-						      tp != NULL);
+						      IFTOVT(ip->i_d.di_mode));
 
 					preallocated_vnode = vp;
 					if (!vp && vn_alloc_used)
@@ -354,8 +353,7 @@ finish_inode:
 
 		xfs_iget_vnode_init(mp, vp, ip);
 	} else {
-		while (!(vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode),
-			      tp != NULL)))
+		while (!(vp = vn_alloc(XFS_MTOVFS(mp), ino, IFTOVT(ip->i_d.di_mode))))
 		{
 			delay(1);
 		}

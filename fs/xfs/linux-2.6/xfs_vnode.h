@@ -747,7 +747,7 @@ extern void	vn_init(void);
 extern void	vn_free(struct vnode *);
 extern vnode_t  *vn_address(struct inode *);
 extern vnode_t  *vn_initialize(struct vfs *, struct inode *, int);
-extern vnode_t  *vn_alloc(struct vfs *, __uint64_t, enum vtype, int flags);
+extern vnode_t  *vn_alloc(struct vfs *, __uint64_t, enum vtype);
 extern void	vn_insert_in_linux_hash(struct vnode *);
 
 /*
