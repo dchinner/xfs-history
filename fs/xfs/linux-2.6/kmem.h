@@ -49,6 +49,10 @@
 
 typedef struct kmem_cache_s kmem_zone_t;
 
+/* alias kmem zones for xfs */
+#define xfs_zone_t kmem_zone_t
+#define xfs_zone   kmem_cache_s
+
 extern kmem_zone_t  *kmem_zone_init(int, char *);
 extern void	    *kmem_zone_zalloc(kmem_zone_t *, int);
 extern void	    *kmem_zone_alloc(kmem_zone_t *, int);

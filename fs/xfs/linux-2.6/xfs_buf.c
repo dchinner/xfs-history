@@ -61,8 +61,8 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 
-#include <support/types.h>
-#include <support/time.h>
+#include <xfs_types.h>
+
 #include <support/kmem.h>
 
 #include "page_buf_internal.h"
