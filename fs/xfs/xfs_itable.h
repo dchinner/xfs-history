@@ -74,6 +74,7 @@ typedef struct xfs_inogrp
 int					/* error status */
 xfs_fd_to_mp(
 	int			fd,	/* file descriptor */
+	int			wperm,	/* need write perm on device fd */
 	struct xfs_mount	**mpp);	/* output: mount structure pointer */
 
 /*

@@ -14,6 +14,7 @@
 #include <sys/file.h>
 #include <sys/vfs.h>
 #include <sys/syssgi.h>
+#include <sys/capability.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -424,8 +425,11 @@ xfs_inumbers(
  * Convert file descriptor of a file in the filesystem to
  * a mount structure pointer.
  */
-int
-xfs_fd_to_mp(int fd, xfs_mount_t **mpp)
+int						/* error status */
+xfs_fd_to_mp(
+	int		fd,			/* file descriptor to convert */
+	int		wperm,			/* need write perm on device */
+	xfs_mount_t	**mpp)			/* return mount pointer */
 {
 	int		error;
 	file_t		*fp;
@@ -436,7 +440,19 @@ xfs_fd_to_mp(int fd, xfs_mount_t **mpp)
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);
 	vp = fp->f_vnode;
-	vfsp = vp->v_vfsp;
+	if (vp->v_type == VBLK || vp->v_type == VCHR) {
+		if (wperm && !(fp->f_flag & FWRITE))
+			return XFS_ERROR(EPERM);
+		for (vfsp = rootvfs; vfsp; vfsp = vfsp->vfs_next)
+			if (vfsp->vfs_dev == vp->v_rdev)
+				break;
+		if (vfsp == NULL)
+			return XFS_ERROR(ENOTBLK);
+	} else {
+		if (!_CAP_ABLE(CAP_DEVICE_MGT))
+			return XFS_ERROR(EPERM);
+		vfsp = vp->v_vfsp;
+	}
 	if (vfsp->vfs_op != &xfs_vfsops)
 		return XFS_ERROR(EINVAL);
 	*mpp = vfsp->vfs_data;
@@ -464,7 +480,7 @@ xfs_itable(
 					   again. This is unused in syssgi
 					   but used in dmi */
 
-	if (error = xfs_fd_to_mp(fd, &mp))
+	if (error = xfs_fd_to_mp(fd, 0, &mp))
 		return error;
 	if (copyin((void *)lastip, &inlast, sizeof(inlast)))
 		return XFS_ERROR(EFAULT);

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.12 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -367,10 +367,18 @@ xfs_fsoperations(
 		0,				/* XFS_GROWFS_RT */
 		sizeof(xfs_fsop_counts_t),	/* XFS_FS_COUNTS */
 	};
+	static int	wperm[XFS_FSOPS_COUNT] =
+	{
+		0,	/* XFS_FS_GEOMETRY */
+		1,	/* XFS_GROWFS_DATA */
+		1,	/* XFS_GROWFS_LOG */
+		1,	/* XFS_GROWFS_RT */
+		0,	/* XFS_FS_COUNTS */
+	};
 
 	if (opcode < 0 || opcode >= XFS_FSOPS_COUNT)
 		return XFS_ERROR(EINVAL);
-	if (error = xfs_fd_to_mp(fd, &mp))
+	if (error = xfs_fd_to_mp(fd, wperm[opcode], &mp))
 		return error;
 	if (cisize[opcode]) {
 		inb = kmem_alloc(cisize[opcode], KM_SLEEP);
