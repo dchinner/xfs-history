@@ -1,4 +1,4 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -16,7 +16,6 @@
 #include <sys/errno.h>
 #include <sys/systm.h>
 #include <sys/ktrace.h>
-#include <sys/quota.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
