@@ -82,6 +82,7 @@ static struct super_operations linvfs_sops;
 STATIC int
 mountargs_xfs(
 	char		*options,
+	int		flags,
 	struct xfs_args	*args)
 {
 	char	*this_char, *value, *eov;
@@ -94,6 +95,9 @@ mountargs_xfs(
 	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
 	memset(args, 0, sizeof(*args));
 	args->version = 3;
+	args->flags = flags & MS_RDONLY;
+	if (flags & MS_NOATIME)
+		args->flags |= XFSMNT_NOATIME;
 	for (this_char = strtok (options, ",");
 	     this_char != NULL;
 	     this_char = strtok (NULL, ",")) {
@@ -337,8 +341,7 @@ linvfs_read_super(
 
 	uap->flags = MS_DATA;
 
-	memset(args, 0, sizeof(struct xfs_args));
-	if (mountargs_xfs((char *)data, args) != 0) {
+	if (mountargs_xfs((char *)data, sb->s_flags, args) != 0) {
 		return NULL;
 	}
 
@@ -697,7 +700,7 @@ linvfs_remount(
 	if ((*flags & MS_RDONLY) == (sb->s_flags & MS_RDONLY))
 		return 0;
 
-	if (mountargs_xfs(options, &args) != 0)
+	if (mountargs_xfs(options, *flags, &args) != 0)
                 return -ENOSPC;
 
 	if (*flags & MS_RDONLY || args.flags & MS_RDONLY) {
