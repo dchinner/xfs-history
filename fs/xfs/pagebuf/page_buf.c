@@ -1645,7 +1645,7 @@ request:
 				BUG();	/* Ugh - out of memory condition here */
 			psync->pb = pb;
 			psync->locking = locking;
-			atomic_set(&psync->remain, 0);
+			atomic_set(&psync->remain, cnt);
 
 			callback = public_bh ?
 				   _end_io_multi_part : _end_io_multi_full;
@@ -1667,7 +1667,6 @@ request:
 			/* Complete the buffer_head, then submit the IO */
 			if (psync) {
 				init_buffer(bh, callback, psync);
-				atomic_inc(&psync->remain);
 			} else {
 				init_buffer(bh, callback, pb);
 			}
