@@ -1714,12 +1714,14 @@ xfs_write_file(
 
 	ip = XFS_VTOI(vp);
 	mp = ip->i_mount;
+
 	/*
-	 * If the file has fixed size extents, buffered 
-	 * I/O cannot be performed.
+	 * If the file has fixed size extents or is a real time file, 
+	 * buffered I/O cannot be performed.
 	 * This check will be removed in the future.
 	 */
-	if (ip->i_d.di_extsize) {
+	if ( 	(ip->i_d.di_extsize) || 
+		(ip->i_d.di_flags & XFS_DIFLAG_REALTIME))  {
 		return( EINVAL );
 	}
 
