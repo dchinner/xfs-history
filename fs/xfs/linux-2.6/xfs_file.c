@@ -112,8 +112,9 @@ static ssize_t linvfs_write(
 	loff_t *offset)
 {
 	struct inode *inode;
+	loff_t	pos;
 	vnode_t *vp;
-	int rv;
+	int	err;
 	
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
@@ -122,11 +123,30 @@ static ssize_t linvfs_write(
 	}
 
 	inode = filp->f_dentry->d_inode;
+	down(&inode->i_sem);
+
+	err = -EINVAL;
+	pos = *offset;
+	if (pos < 0)
+		goto out;
+
+	err = filp->f_error;
+	if (err) {
+		filp->f_error = 0;
+		goto out;
+	}
+
+	if (filp->f_flags & O_APPEND)
+		pos = inode->i_size;
+
 	vp = LINVFS_GET_VP(inode);
 
-	VOP_WRITE(vp, (void *)filp, buf, size, offset, rv);
+	VOP_WRITE(vp, (void *)filp, buf, size, &pos, err);
 
-	return(rv);
+	*offset = pos;
+out:
+	up(&inode->i_sem);
+	return(err);
 }
 
 

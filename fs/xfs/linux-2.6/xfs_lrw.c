@@ -670,11 +670,11 @@ xfs_write(
 	xfs_fsize_t     isize;
 	xfs_iocore_t    *io;
 
-	xfs_rwlockf(bdp, VRWLOCK_WRITE, 0);
 	xip = XFS_BHVTOI(bdp);
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
-	isize = XFS_SIZE(mp, io); /* JIMJIM do we need to lock for this? */
+	xfs_ilock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
+	isize = xip->i_d.di_size;
 
 	dprintk(xfsw_debug,
 	     ("xfsw: ip 0x%p(is 0x%Lx) offset 0x%Lx size 0x%x\n",
@@ -700,16 +700,15 @@ xfs_write(
 	 */
 	
 	if (*offsetp > isize && isize) {
-		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_RD);
 		io->io_writeio_blocks = mp->m_writeio_blocks;
 		ret = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
 			isize, NULL);
-		XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL | XFS_EXTSIZE_RD);
 		if (ret) {
-			xfs_rwunlock(bdp, VRWLOCK_WRITE);
+			xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
 			return(ret); /* JIMJIM should this be negative? */
 		}
 	}
+	xfs_iunlock(xip, XFS_ILOCK_EXCL);
 
 	ret = xfs_rdwr(bdp, filp, buf, size, offsetp, 0);
 
@@ -729,7 +728,7 @@ xfs_write(
 			XFS_SETSIZE(mp, io, *offsetp);
 		}
 	}
-	xfs_rwunlock(bdp, VRWLOCK_WRITE);
+	xfs_iunlock(xip, XFS_IOLOCK_EXCL);
 	return(ret);
 }
 
@@ -1531,6 +1530,8 @@ xfs_iomap_write_convert(
 	if (is_xfs && XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0)) {
+				XFS_IUNLOCK(mp, io, XFS_ILOCK_EXCL |
+						    XFS_EXTSIZE_WR);
 				return error;
 			}
 		}
