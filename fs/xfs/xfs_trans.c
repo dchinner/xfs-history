@@ -1255,10 +1255,6 @@ xfs_trans_chunk_committed(
 		if (aborted)
 			lip->li_flags |= XFS_LI_ABORTED;
 
-		if (lidp->lid_flags & XFS_LID_SYNC_UNLOCK) {
-			IOP_UNLOCK(lip);
-		}
-
 		/*
 		 * Send in the ABORTED flag to the COMMITTED routine
 		 * so that it knows whether the transaction was aborted
