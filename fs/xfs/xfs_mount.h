@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.78 $"
+#ident	"$Revision: 1.79 $"
 
 struct buf;
 struct cred;
@@ -147,6 +147,10 @@ typedef struct xfs_mount {
 						   disk errors in metadata */
 #define XFS_MOUNT_NOATIME	0x00000020	/* don't modify inode access
 						   times on reads */
+#define XFS_MOUNT_RETERR	0x00000040      /* return alignment errors to
+                                                   user */
+#define XFS_MOUNT_NOALIGN	0x00000080	/* turn off stripe alignment 
+						   allocations */
 #define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 
 /*
