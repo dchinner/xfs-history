@@ -1,4 +1,4 @@
-#ident "$Revision$"
+#ident "$Revision: 1.47 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -224,7 +224,8 @@ again:
 	initnlock(&ip->i_range_lock.r_splock, "xrange");
 #endif /* NOTYET */
 	initnsema(&ip->i_flock, 1, makesname(name, "fino", vp->v_number));
-	initnsema(&ip->i_pinsema, 0, makesname(name, "pino", vp->v_number));
+	sv_init(&ip->i_pinsema, SV_DEFAULT,
+		makesname(name, "pino", vp->v_number));
 	xfs_inode_item_init(ip, mp);
 	if (lock_flags != 0)
 		xfs_ilock(ip, lock_flags);
