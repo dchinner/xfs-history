@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.147 $"
+#ident	"$Revision: 1.148 $"
 
 #undef	DEBUG
 #undef	XFSDEBUG
@@ -1776,7 +1776,7 @@ static void	printinode(struct inode *ip)
 		return;
 
 	kdb_printf(" i_ino = %lu i_count = %u i_dev = 0x%x i_size %Ld\n",
-					ip->i_ino, ip->i_count,
+					ip->i_ino, atomic_read(&ip->i_count),
 					ip->i_dev, ip->i_size);
 
 	kdb_printf(
@@ -4262,6 +4262,7 @@ xfsidbg_xihash(xfs_mount_t *mp)
 	int		hist_bytes = mp->m_ihsize * sizeof(int);
 	int		hist2[21];
 	void		*kmalloc(size_t, int);
+	void		kfree(void *);
 
 	hist = (int *) kmalloc(hist_bytes, GFP_KERNEL);
 
