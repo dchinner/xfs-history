@@ -506,6 +506,7 @@ linvfs_setattr(
 
 	unsigned int	ia_valid = attr->ia_valid;
 	int		error;
+	int		flags = 0;
 	struct inode	*inode;
 
 	inode = dentry->d_inode;
@@ -545,7 +546,10 @@ linvfs_setattr(
 			inode->i_mode &= ~S_ISGID;
 	}
 
-	VOP_SETATTR(vp, &vattr, 0, sys_cred, error);
+	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET))
+		flags = ATTR_UTIME;
+
+	VOP_SETATTR(vp, &vattr, flags, sys_cred, error);
 	if (error)
 		return(-error);	/* Positive error up from XFS */
 
