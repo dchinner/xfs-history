@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.15 $"
 
 #define	XFS_MACRO_C
 
@@ -1791,21 +1791,5 @@ void
 xlog_grant_sub_space(xlog_t *log, int bytes, int type)
 {
 	XLOG_GRANT_SUB_SPACE(log, bytes, type);
-}
-#endif
-
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE_C && XFSSO_XFS_BDWRITE)
-void
-xfs_bdelwri(struct xfs_mount *mp, struct buf *bp)
-{
-	xfs_bdwrite(mp, bp);
-}
-#endif
-
-#if XFS_WANT_FUNCS || (XFS_WANT_SPACE_C && XFSSO_XFS_BAWRITE)
-void
-xfs_basyncwri(struct xfs_mount *mp, struct buf *bp)
-{
-	xfs_bawrite(mp, bp);
 }
 #endif

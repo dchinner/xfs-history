@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MACROS_H
 #define	_FS_XFS_MACROS_H
 
-#ident 	"$Revision: 1.7 $"
+#ident 	"$Revision: 1.8 $"
 
 /*
  * Set for debug kernels and simulation, and 32-bit kernels,
@@ -59,8 +59,6 @@
 #define	XFSSO_XFS_FILBLKS_MIN 1
 #define	XFSSO_XFS_FSB_TO_DADDR 1
 #define	XFSSO_XFS_FSB_TO_DB 1
-#define XFSSO_XFS_BDWRITE 1
-#define XFSSO_XFS_BAWRITE 1
 #define	XFSSO_XFS_IFORK_DSIZE 1
 #define	XFSSO_XFS_IFORK_FORMAT 1
 #define	XFSSO_XFS_IFORK_NEXT_SET 1
