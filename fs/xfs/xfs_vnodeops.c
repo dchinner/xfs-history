@@ -1,4 +1,4 @@
-#ident "$Revision: 1.258 $"
+#ident "$Revision: 1.259 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -94,6 +94,11 @@
 #ifdef SIM
 #include "sim.h"
 #endif
+
+/* data pipe functions */
+extern int fspe_store_cookie(void *);
+extern int fspe_destroy_cookie(void *);
+extern int fspe_get_ops(void *);
 
 #if _MIPS_SIM == _ABI64
 int irix5_to_flock(enum xlate_mode, void *, int, xlate_info_t *);
@@ -6062,6 +6067,15 @@ xfs_fcntl(
 	ip = XFS_BHVTOI(bdp);
 	mp = ip->i_mount;
 	switch (cmd) {
+	case F_GETOPS:
+		fspe_get_ops(arg);
+		break;
+	case F_SETTRANSFER:
+		fspe_store_cookie(arg);
+		break;
+	case F_DESTROYTRANSFER:
+		fspe_destroy_cookie(arg);
+		break;
 	case F_DIOINFO:
                 /*
 		 * We align to the secondary cache line size so that we
