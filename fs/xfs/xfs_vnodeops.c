@@ -3976,9 +3976,7 @@ xfs_rmdir(
 	xfs_trans_ijoin(tp, cdp, XFS_ILOCK_EXCL);
 
 	if ((error = _MAC_XFS_IACCESS(cdp, MACWRITE, credp))) {
-		xfs_trans_cancel(tp, cancel_flags);
-		IRELE(cdp);
-		goto std_return;
+		goto error_return;
 	}
 
 	if ((cdp == dp) || (XFS_ITOV(cdp) == current_dir_vp)) {
