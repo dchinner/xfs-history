@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.7 1994/03/24 15:53:54 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.8 1994/03/29 23:06:01 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -621,14 +621,16 @@ xfs_get_file_extents(dev_t fsdev,
 	xfs_inode_t *ip;
 	xfs_bmbt_rec_t *ep;
 	xfs_bmbt_irec_t *rec;
-	int	i, recsize, num_extents, ret = 0;
+	int	i, recsize, num_extents = 0, ret = 0;
 
 	/*
  	 * get inode
 	 */
 	if (!(ip = xfs_get_inode( fsdev, ino ))) {
+		if (copyout( &num_extents, count, sizeof( num_extents))) {
+			ret = EFAULT;
+		}
 		return( 1 );
-
 	}
 
 	recsize = sizeof(xfs_bmbt_irec_t) * XFS_MAX_INCORE_EXTENTS;
@@ -659,6 +661,34 @@ xfs_get_file_extents(dev_t fsdev,
 	xfs_iunlock( ip, XFS_ILOCK_EXCL );
 	return( ret );
 }
+
+xfs_get_file_rt( dev_t fsdev, int ino, int *rt)
+{
+	xfs_inode_t *ip;
+	int inodert = 0, ret = 0;
+
+	/*
+ 	 * get inode
+	 */
+	if (!(ip = xfs_get_inode( fsdev, ino ))) {
+		if (copyout( &inodert, rt, sizeof( rt))) {
+			ret = EFAULT;
+		}
+		return( 1 );
+	}
+	if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
+		inodert = 1;
+	}
+
+	if (copyout( &inodert, rt, sizeof( rt))) {
+		ret = EFAULT;
+	}
+
+	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	return( ret );
+
+}
+
 
 xfs_get_block_size(dev_t fsdev, int *fs_size)
 {
