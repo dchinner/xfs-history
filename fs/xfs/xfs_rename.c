@@ -1,4 +1,4 @@
-#ident "$Revision: 1.13 $"
+#ident "$Revision$"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1276,7 +1276,7 @@ xfs_rename(
 	 * Let interposed file systems know about removed links.
 	 */
 	if (target_ip_dropped) {
-		FSC_NOTIFY_LINK_REMOVED(XFS_ITOV(target_ip), target_dir_vp, 
+		VOP_LINK_REMOVED(XFS_ITOV(target_ip), target_dir_vp, 
 					target_link_zero);
 
 		if (src_is_directory) {

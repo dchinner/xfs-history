@@ -4714,7 +4714,7 @@ xfs_rmdir(
 	/*
 	 * Let interposed file systems know about removed links.
 	 */
-	FSC_NOTIFY_LINK_REMOVED(XFS_ITOV(cdp), dir_vp, last_cdp_link);
+	VOP_LINK_REMOVED(XFS_ITOV(cdp), dir_vp, last_cdp_link);
 
 	/* Now do any generic cleanup which might be necessary */
 	xfs_post_rmdir(XFS_ITOV(cdp), last_cdp_link);
