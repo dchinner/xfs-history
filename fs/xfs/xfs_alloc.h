@@ -108,7 +108,9 @@ xfs_alloc_vextent(
 	xfs_extlen_t	*len,	/* output: actual allocated length */
 	xfs_alloctype_t	type,	/* allocation type, see above definition */
 	xfs_extlen_t	total,	/* total blocks needed in transaction */
-	int		wasdel);/* extent was previously delayed-allocated */
+	int		wasdel,	/* extent was previously delayed-allocated */
+	xfs_extlen_t	mod,	/* length should be k * prod + mod unless */
+	xfs_extlen_t	prod);	/* there's nothing as big as mod */
 
 /*
  * Free an extent.

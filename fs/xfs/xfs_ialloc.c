@@ -254,12 +254,11 @@ xfs_ialloc_ag_alloc(
 	newfsbno = xfs_agb_to_fsb(sbp, agi->agi_seqno, newbno);
 	/*
 	 * Allocate a variable-sized extent.
-	 * We 
 	 */
 	for (;;) {
-		newfsbno = xfs_alloc_vextent(tp, newfsbno, minnewblocks, maxnewblocks,
-					     &newblocks, XFS_ALLOCTYPE_NEAR_BNO,
-					     maxnewblocks, 0);
+		newfsbno = xfs_alloc_vextent(tp, newfsbno, minnewblocks,
+			maxnewblocks, &newblocks, XFS_ALLOCTYPE_NEAR_BNO,
+			maxnewblocks, 0, 0, 1);
 		if (newfsbno != NULLFSBLOCK)
 			break;
 		maxnewblocks >>= 1;
