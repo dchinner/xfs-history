@@ -104,7 +104,8 @@ typedef struct vfile {
 #define VPURGE		0x40000000	/* In the linux 'put' thread	*/
 
 typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
-			  VRWLOCK_WRITE, VRWLOCK_WRITE_DIRECT } vrwlock_t;
+			  VRWLOCK_WRITE, VRWLOCK_WRITE_DIRECT,
+			  VRWLOCK_TRY_READ, VRWLOCK_TRY_WRITE } vrwlock_t;
 
 /*
  * flags for vn_create/VOP_CREATE/vn_open
@@ -209,7 +210,7 @@ typedef	int	(*vop_fsync_t)(bhv_desc_t *, int, struct cred *, xfs_off_t, xfs_off_
 typedef	int	(*vop_inactive_t)(bhv_desc_t *, struct cred *);
 typedef int     (*vop_fid2_t)(bhv_desc_t *, struct fid *);
 typedef	int	(*vop_release_t)(bhv_desc_t *);
-typedef	void	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
+typedef	int	(*vop_rwlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	void	(*vop_rwunlock_t)(bhv_desc_t *, vrwlock_t);
 typedef	int	(*vop_seek_t)(bhv_desc_t *, xfs_off_t, xfs_off_t*);
 typedef	int	(*vop_realvp_t)(bhv_desc_t *, vnode_t **);
@@ -420,6 +421,9 @@ typedef struct vnodeops {
 	(void)_VOP_(vop_rwlock, vp)((vp)->v_fbhv, i); 			\
 	/* "allow" is done by rwunlock */				\
 }
+#define VOP_RWLOCK_TRY(vp,i)						\
+	_VOP_(vop_rwlock, vp)((vp)->v_fbhv, i)
+
 #define	VOP_RWUNLOCK(vp,i) 						\
 {	/* "prevent" was done by rwlock */    				\
 	(void)_VOP_(vop_rwunlock, vp)((vp)->v_fbhv, i);			\

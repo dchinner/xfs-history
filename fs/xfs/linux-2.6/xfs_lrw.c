@@ -783,6 +783,11 @@ xfs_bmap(bhv_desc_t	*bdp,
 	if (XFS_FORCED_SHUTDOWN(ip->i_iocore.io_mount))
 		return XFS_ERROR(EIO);
 
+	if (flags & PBF_BMAP_TRY_ILOCK) {
+		if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL))
+			return EAGAIN;
+	}
+
 	if (flags & PBF_READ) {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		unlocked = 0;
@@ -805,7 +810,7 @@ xfs_bmap(bhv_desc_t	*bdp,
 			if (XFS_NOT_DQATTACHED(ip->i_mount, ip)) {
 				if (error = xfs_qm_dqattach(ip, XFS_QMOPT_ILOCKED)) {
 					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					return XFS_ERROR(error);
+					goto unlock;
 				}
 			}
 		}
@@ -847,6 +852,10 @@ retry:
 			}
 		}
 	}
+unlock:
+	if (flags & PBF_BMAP_TRY_ILOCK)
+		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+
 	return XFS_ERROR(error);
 }	
 

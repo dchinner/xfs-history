@@ -4736,37 +4736,31 @@ xfs_fid2(
 /*
  * xfs_rwlock
  */
-void
+int
 xfs_rwlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	locktype)
-{
-	xfs_rwlockf(bdp, locktype, 0);
-}
-
-/*
- * currently the only supported flag is XFS_IOLOCK_RECURSIVE
- */
-void
-xfs_rwlockf(
-	bhv_desc_t	*bdp,
-	vrwlock_t	locktype,
-	int		flags)
 {
 	xfs_inode_t	*ip;
 	vnode_t 	*vp;
 
 	vp = BHV_TO_VNODE(bdp);
 	if (vp->v_type == VDIR)
-		return;
+		return 1;
 	ip = XFS_BHVTOI(bdp);
 	if (locktype == VRWLOCK_WRITE) {
-		xfs_ilock(ip, XFS_IOLOCK_EXCL|flags);
+		xfs_ilock(ip, XFS_IOLOCK_EXCL);
+	} else if (locktype == VRWLOCK_TRY_READ) {
+		return (xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED));
+	} else if (locktype == VRWLOCK_TRY_WRITE) {
+		return (xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL));
 	} else {
 		ASSERT((locktype == VRWLOCK_READ) ||
 		       (locktype == VRWLOCK_WRITE_DIRECT));
-		xfs_ilock(ip, XFS_IOLOCK_SHARED|flags);
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	}
+
+	return 1;
 }
 
 
@@ -4777,18 +4771,6 @@ void
 xfs_rwunlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	locktype)
-{
-	xfs_rwunlockf(bdp, locktype, 0);
-}
-
-/*
- * xfs_rwunlockf
- */
-void
-xfs_rwunlockf(
-	bhv_desc_t	*bdp,
-	vrwlock_t	locktype,
-	int		flags)
 {
         xfs_inode_t     *ip;
 	xfs_inode_t	*release_ip;
@@ -4808,7 +4790,7 @@ xfs_rwunlockf(
 		 */
 		release_ip = ip->i_release;
 		ip->i_release = NULL;
-        	xfs_iunlock (ip, XFS_IOLOCK_EXCL|flags);
+        	xfs_iunlock (ip, XFS_IOLOCK_EXCL);
 		
 		if (release_ip != NULL) {
 			VN_RELE(XFS_ITOV(release_ip));
@@ -4816,7 +4798,7 @@ xfs_rwunlockf(
 	} else {
 		ASSERT((locktype == VRWLOCK_READ) ||
 		       (locktype == VRWLOCK_WRITE_DIRECT));
-        	xfs_iunlock(ip, XFS_IOLOCK_SHARED|flags);
+        	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 	}
         return;
 }

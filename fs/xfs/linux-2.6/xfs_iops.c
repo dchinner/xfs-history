@@ -140,8 +140,6 @@ struct dentry * linvfs_lookup(struct inode *dir, struct dentry *dentry)
 	pathname_t	pn;
 	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
-	/* should this be linux_ino_t ??? */
-	xfs_ino_t		ino;
 
 	vp = LINVFS_GET_VP(dir);
 	ASSERT(vp);
@@ -242,8 +240,6 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 	pathname_t	pn;
 	pathname_t      *pnp = &pn;
 	struct inode	*ip = NULL;
-	/* should be linux_ino_t ??? */
-	xfs_ino_t		ino;
 
 	dvp = LINVFS_GET_VP(dir);
 	ASSERT(dvp);
@@ -258,7 +254,7 @@ int linvfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname
 							&cvp, NULL, error);
 	if (!error) {
 		ASSERT(cvp);
-		ASSERT(ino && (cvp->v_type == VLNK));
+		ASSERT(cvp->v_type == VLNK);
 		ip = LINVFS_GET_IP(cvp);
 		if (!ip) {
 			error = -ENOMEM;
@@ -563,7 +559,7 @@ int linvfs_permission(struct inode *ip, int mode)
         vnode_t *vp;
 	int	error;
 
-	mode <<= 6;		/* convert from linux to xfs access bits */
+	mode <<= 6;		/* convert from linux to vnode access bits */
 
         vp = LINVFS_GET_VP(ip);
 	ASSERT(vp);
@@ -676,36 +672,17 @@ linvfs_pb_bmap(struct inode *inode,
 	int		npbmaps = 1;
 	int		error;
 	long		blockno;
-	xfs_inode_t	*ip;
 
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
 
 	*retpbbm = maxpbbm;
 
-	if (flags & PBF_BMAP_TRY_ILOCK) {
-		bhv_desc_t	*bdp;
-
-		vp = LINVFS_GET_VP(inode);
-		ASSERT(vp);
-		bdp = VNODE_TO_FIRST_BHV(vp);
-		ASSERT(bdp);
-		ip = XFS_BHVTOI(bdp);
-
-		if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL))
-			return EAGAIN;
-	}
-
 	VOP_BMAP(vp, offset, count, flags,
 			(struct page_buf_bmap_s *) pbmapp, retpbbm, error);
 
-	if (flags & PBF_BMAP_TRY_ILOCK)
-		xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-
 	return -error;
 }
-
-int xfs_hit_full_page, xfs_hit_nowait, xfs_hit_nowait_done;
 
 int
 linvfs_read_full_page(
@@ -715,35 +692,27 @@ linvfs_read_full_page(
 	vnode_t		*vp;
 	struct inode	*inode = (struct inode*)page->mapping->host;
 	int		error;
-	bhv_desc_t	*bdp;
-	xfs_inode_t	*ip;
 
 	if (!PageLocked(page))
 		BUG();
 
-	xfs_hit_full_page++;
-
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
 
-	bdp = VNODE_TO_FIRST_BHV(vp);
-	ASSERT(bdp);
-	ip = XFS_BHVTOI(bdp);
-	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED)) {
-		xfs_hit_nowait++;
-		ASSERT(atomic_read(&page->count));
+	VN_BHV_READ_LOCK(&(vp)->v_bh);
+	if (!VOP_RWLOCK_TRY(vp, VRWLOCK_TRY_READ)) {
+		VN_BHV_READ_UNLOCK(&(vp)->v_bh);
 		UnlockPage(page);
-		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+		VOP_RWLOCK(vp, VRWLOCK_READ);
 		lock_page(page); /* We can wait for the page with inode I/O lock */
 		if (Page_Uptodate(page)) {
 			UnlockPage(page);
-			xfs_hit_nowait_done++;
-			xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+			VOP_RWUNLOCK(vp, VRWLOCK_READ);
 			return 0;
 		}
 	}
 	error = pagebuf_read_full_page(filp, page);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	return error;
 }
 
@@ -759,26 +728,22 @@ linvfs_write_full_page(
 	bhv_desc_t	*bdp;
 	xfs_inode_t	*ip;
 
-	xfs_hit_full_page++;
-
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
 
-	bdp = VNODE_TO_FIRST_BHV(vp);
-	ASSERT(bdp);
-	ip = XFS_BHVTOI(bdp);
-	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_EXCL)) {
+	VN_BHV_READ_LOCK(&(vp)->v_bh);
+	if (!VOP_RWLOCK_TRY(vp, VRWLOCK_TRY_WRITE)) {
+		VN_BHV_READ_UNLOCK(&(vp)->v_bh);
 		if (!wait)
 			return -EBUSY;
 
-		xfs_hit_nowait++;
 		ASSERT(atomic_read(&page->count));
 		UnlockPage(page);
-		xfs_ilock(ip, XFS_IOLOCK_EXCL);
+		VOP_RWLOCK(vp, VRWLOCK_WRITE);
 		lock_page(page); /* Wait for the page with inode I/O lock */
 	}
 	error = pagebuf_write_full_page(filp, page);
-	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
+	VOP_RWUNLOCK(vp, VRWLOCK_WRITE);
 	return error;
 }
 
@@ -802,8 +767,7 @@ void linvfs_file_read(
 	struct file *filp,
 	void * desc)
 {
-	struct dentry *dentry = filp->f_dentry;
-	struct inode *inode = dentry->d_inode;
+	struct inode *inode = filp->f_dentry->d_inode;
 	vnode_t		*vp;
 	int error;
 

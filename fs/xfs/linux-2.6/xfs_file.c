@@ -213,12 +213,6 @@ STATIC int linvfs_fsync(
 	return 0;
 }
 
-STATIC ssize_t linvfs_dir_read (struct file * filp, char * buf,
-				size_t count, loff_t *ppos)
-{
-	return -EISDIR;
-}
-
 /*
  * linvfs_readdir maps to VOP_READDIR().
  * We need to build a uio, cred, ...
@@ -325,11 +319,9 @@ struct file_operations linvfs_file_operations =
 };
 
 struct file_operations linvfs_dir_operations = {
-	llseek:		linvfs_file_lseek,
-	read:		linvfs_dir_read,
+	read:		generic_read_dir,
 	readdir:	linvfs_readdir,
 	ioctl:		linvfs_ioctl,
-	open:		linvfs_open,
 	fsync:		linvfs_fsync,
 };
 

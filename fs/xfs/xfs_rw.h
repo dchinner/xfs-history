@@ -165,27 +165,15 @@ extern int xfs_bioerror_relse(struct xfs_buf *);
 /*
  * Needed by xfs_rw.c
  */
-void
+int
 xfs_rwlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	write_lock);
 
 void
-xfs_rwlockf(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock,
-	int		flags);
-
-void
 xfs_rwunlock(
 	bhv_desc_t	*bdp,
 	vrwlock_t	write_lock);
-
-void
-xfs_rwunlockf(
-	bhv_desc_t	*bdp,
-	vrwlock_t	write_lock,
-	int		flags);
 
 int
 xfs_read_buf(
