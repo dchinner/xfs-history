@@ -1,4 +1,4 @@
-#ident "$Revision: 1.161 $"
+#ident "$Revision: 1.162 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -29,6 +29,7 @@
 #include <sys/systm.h>
 #endif
 #include <stddef.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -52,6 +53,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_rw.h"
 #include "xfs_error.h"
+#include "xfs_bit.h"
 
 #ifdef SIM
 #include "sim.h"

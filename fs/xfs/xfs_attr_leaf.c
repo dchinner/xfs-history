@@ -12,9 +12,10 @@
 #include <sys/debug.h>
 #include <sys/systm.h>
 #include <sys/attributes.h>
+#include <sys/grio.h>
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include <sys/grio.h>
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -35,6 +36,7 @@
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
 #include "xfs_error.h"
+#include "xfs_bit.h"
 
 /*
  * xfs_attr_leaf.c

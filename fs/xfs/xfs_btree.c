@@ -22,6 +22,7 @@
 #else
 #include <sys/systm.h>
 #endif
+#include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -38,6 +39,7 @@
 #include "xfs_dir_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
+#include "xfs_bit.h"
 #ifdef SIM
 #include "sim.h"
 #endif

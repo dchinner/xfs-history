@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.121 $"
+#ident	"$Revision: 1.122 $"
 
 /*
  * High level interface routines for log manager
@@ -37,8 +37,9 @@
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 
-#include "xfs_inum.h"
+#include "xfs_macros.h"
 #include "xfs_types.h"
+#include "xfs_inum.h"
 #include "xfs_ag.h"		/* needed by xfs_sb.h */
 #include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
 #include "xfs_log.h"
@@ -49,6 +50,7 @@
 #include "xfs_buf_item.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_log_recover.h"
+#include "xfs_bit.h"
 
 
 #ifdef SIM
