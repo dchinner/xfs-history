@@ -32,11 +32,10 @@
 #ifndef __XFS_H__
 #define __XFS_H__
 
-#include <xfs_os_defs.h>
+#include <linux/xfs_linux.h>
+#include <xfs_arch.h>
 
 #define FSID_T
-#include <pseudo-inc/sys/types.h>
-#include <pseudo-inc/sys/param.h>
 
 #include <linux/fs.h>
 #include <linux/xfs_fs.h>
@@ -46,6 +45,7 @@
 #include <linux/stddef.h>
 #include <linux/stat.h>
 #include <linux/xfs_cred.h>
+#include <linux/xfs_uuid.h>
 #include <linux/page_buf.h>
 #include <linux/file.h>
 #include <asm/uaccess.h>
@@ -54,22 +54,17 @@
 #include <xfs_buf.h>
 #include <pseudo-inc/ksys/cell_config.h>
 #include <pseudo-inc/ksys/behavior.h>
-#include <pseudo-inc/sys/vfs.h>
-#include <pseudo-inc/sys/vnode.h>
-#include <pseudo-inc/sys/pvfs.h>
-#include <pseudo-inc/sys/fs_subr.h>
+#include <linux/xfs_vfs.h>
+#include <linux/xfs_vnode.h>
+#include <linux/xfs_fs_subr.h>
 #include <pseudo-inc/sys/ktrace.h>
-#include <pseudo-inc/sys/cmn_err.h>
-#include <pseudo-inc/sys/pathname.h>
 #include <pseudo-inc/sys/sysmacros.h>
-#include <pseudo-inc/sys/uio.h>
+#include <linux/xfs_move.h>
 #include <pseudo-inc/sys/quota.h>
-#include <pseudo-inc/sys/systm.h>
 #include <pseudo-inc/sys/dirent.h>
 #include <pseudo-inc/sys/statvfs.h>
 #include <pseudo-inc/sys/attributes.h>
 #include <pseudo-inc/sys/acl.h>
-#include <pseudo-inc/sys/uuid.h>
 #include <pseudo-inc/sys/kabi.h>
 #include <pseudo-inc/sys/mode.h>
 #include <pseudo-inc/sys/file.h>

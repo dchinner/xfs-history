@@ -810,7 +810,6 @@ xfs_fd_to_mp(
 	vnode_t		*vp;
 	bhv_desc_t 	*bdp;
 	extern int	xfs_fstype;
-	extern int	getf(int, struct vfile **);
 
 	if (error = getf(fd, &fp))
 		return XFS_ERROR(error);
