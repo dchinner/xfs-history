@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.164 $"
+#ident	"$Revision: 1.165 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -228,6 +228,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	bp->b_relse = xfs_sb_relse;
 	bp->b_blkno = XFS_SB_DADDR;		
 	bp->b_flags |= B_READ;
+	bp->b_target = mp->m_ddev_targp;
 	xfsbdstrat(mp, bp);
 	if (error = iowait(bp)) {
 		goto err;
@@ -275,11 +276,16 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
  *		before any real xfs filesystem code can be run against
  *		the filesystem.  This flag is used only by simulation
  *		code for fixing up the filesystem btrees.
+ *
+ *	- if cxfs_mount is set to 1 then we are actually importing an
+ *		already mounted filesystem into a cell. We do not go
+ *		near the log, and do not mess with a bunch of stuff.
  */
-STATIC int
-xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
+int
+xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos,
+	int cxfs_mount)
 {
-	buf_t		*bp = mp->m_sb_bp;
+	buf_t		*bp;
 	xfs_sb_t	*sbp = &(mp->m_sb);
 	int		error = 0;
 	int		i;
@@ -301,6 +307,13 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
 		return 0;
 
+	if (mp->m_sb_bp == NULL) {
+		if (error = xfs_readsb(mp, dev)) {
+			return (error);
+		}
+	}
+	bp = mp->m_sb_bp;
+
 	mp->m_agfrotor = mp->m_agirotor = 0;
 	mp->m_blkbit_log = sbp->sb_blocklog + XFS_NBBYLOG;
 	mp->m_blkbb_log = sbp->sb_blocklog - BBSHIFT;
@@ -321,7 +334,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 #ifndef SIM
 	update_flags = 0LL;
 #endif
-	if (mp->m_dalign) {
+	if (mp->m_dalign && !cxfs_mount) {
 		/*
 		 * If stripe unit and stripe width are not multiples
 		 * of the fs blocksize turn off alignment.
@@ -439,9 +452,11 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 	 * partition volume/filesystem.
 	 */
 #ifndef SIM
-	xfs_uuid_mount(mp);	/* make sure it's really unique */
-	ret64 = uuid_hash64(&sbp->sb_uuid, (uint *)&i);
-	bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
+	if (!cxfs_mount) {
+		xfs_uuid_mount(mp);	/* make sure it's really unique */
+		ret64 = uuid_hash64(&sbp->sb_uuid, (uint *)&i);
+		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
+	}
 #endif
 
 	/*
@@ -533,7 +548,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 		error = XFS_ERROR(E2BIG);
 		goto error1;
 	}
-	error = xfs_read_buf(mp, mp->m_dev, d - 1, 1, 0, &bp);
+	error = xfs_read_buf(mp, mp->m_ddev_targp, d - 1, 1, 0, &bp);
 	if (!error) {
 		brelse(bp);
 	} else {
@@ -543,13 +558,13 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 		goto error1;
 	}
 
-	if (mp->m_logdev && mp->m_logdev != mp->m_dev) {
+	if (!cxfs_mount && mp->m_logdev && mp->m_logdev != mp->m_dev) {
 		d = (daddr_t)XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) {
 			error = XFS_ERROR(E2BIG);
 			goto error1;
 		}
-		error = xfs_read_buf(mp, mp->m_logdev, d - 1, 1, 0, &bp);
+		error = xfs_read_buf(mp, &mp->m_logdev_targ, d - 1, 1, 0, &bp);
 		if (!error) {
 			brelse(bp);
 		} else {
@@ -565,6 +580,13 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 	 */
 	if (error = xfs_rtmount_init(mp))
 		goto error1;
+
+	/*
+	 * For cxfs case we are done now
+	 */
+	if (cxfs_mount) {
+		return(0);
+	}
 
 	/*
 	 *  Copies the low order bits of the timestamp and the randomly
@@ -762,7 +784,13 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
 #endif
 
 	/* Make superblock exportable in cellular case */
-	VFS_EXPINFO(vfsp, &mp->m_sb, sizeof(xfs_sb_t));
+#if CELL_IRIX
+	{
+		extern	void	cxfs_export(vfs_t *, xfs_mount_t *);
+
+		cxfs_export(vfsp, mp);
+	}
+#endif
 	return (0);
 
  error2:
@@ -780,9 +808,9 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, int read_rootinos)
  * wrapper routine for the kernel
  */
 int
-xfs_mountfs(vfs_t *vfsp, xfs_mount_t *mp)
+xfs_mountfs(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev)
 {
-	return(xfs_mountfs_int(vfsp, mp, 1));
+	return(xfs_mountfs_int(vfsp, mp, dev, 1, 0));
 }
 
 #ifdef SIM
@@ -801,11 +829,10 @@ xfs_mount_int(dev_t dev, dev_t logdev, dev_t rtdev, int read_rootinos)
 	mp->m_dev = dev;
 	mp->m_rtdev = rtdev;
 	mp->m_logdev = logdev;
+	mp->m_ddev_targp = &mp->m_ddev_targ;
 	vfsp->vfs_dev = dev;
 
-	error = xfs_readsb(mp, dev);
-	if (error == 0)
-        	error = xfs_mountfs_int(vfsp, mp, read_rootinos);
+	error = xfs_mountfs_int(vfsp, mp, dev, read_rootinos, 0);
 	if (error) {
 		kmem_free(mp, sizeof(*mp));
 		return 0;
