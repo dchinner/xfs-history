@@ -388,6 +388,7 @@ xfs_inactive(vnode_t	*vp,
  */
 
 #define IRELE(ip)	VN_RELE(XFS_ITOV(ip))
+#define IHOLD(ip)	VN_HOLD(XFS_ITOV(ip))
 
 /*
  * xfs_dir_lookup_int flags.
@@ -1396,6 +1397,13 @@ xfs_rename(vnode_t	*src_dir_vp,
         if (error = xfs_trans_reserve (tp, 10, 10, 0, 0))
                 goto error_return;
 
+	xfs_trans_ijoin (tp, src_dp, XFS_ILOCK_EXCL);
+	if (new_parent)
+		xfs_trans_ijoin (tp, target_dp, XFS_ILOCK_EXCL);
+        xfs_trans_ijoin (tp, src_ip, XFS_ILOCK_EXCL);
+	if (target_ip != NULL)
+		xfs_trans_ijoin (tp, target_ip, XFS_ILOCK_EXCL);
+
 	/*
 	 * Set up the target.
 	 */
@@ -1410,7 +1418,7 @@ xfs_rename(vnode_t	*src_dir_vp,
 
 		if (error = xfs_dir_createname (tp, target_dp,
 				target_name, src_ip->i_ino))
-			goto error_return;
+			goto trans_error_return;
 			
 		if (new_parent && src_is_directory)
 			xfs_bumplink(tp, target_dp);
@@ -1431,7 +1439,7 @@ xfs_rename(vnode_t	*src_dir_vp,
 			if (! (xfs_dir_isempty(target_dp)) || 
 			    (target_ip->i_d.di_nlink > 2)) {
 				error = EEXIST;
-                                goto error_return;
+                                goto trans_error_return;
                         }
 
 			/*
@@ -1439,13 +1447,13 @@ xfs_rename(vnode_t	*src_dir_vp,
 			 */
 			if (! src_is_directory) {
 				error = EISDIR;
-				goto error_return;
+				goto trans_error_return;
 			}
 
 			if (ABI_IS_SVR4(u.u_procp->p_abi) &&
                             XFS_ITOV(target_ip)->v_vfsmountedhere) {
                                 error = EBUSY;
-                                goto error_return;
+                                goto trans_error_return;
                         }
 
 
@@ -1453,7 +1461,7 @@ xfs_rename(vnode_t	*src_dir_vp,
 		else {
 			if (src_is_directory) {
 				error = ENOTDIR;
-				goto error_return;
+				goto trans_error_return;
 			}
 		}
 
@@ -1477,14 +1485,6 @@ xfs_rename(vnode_t	*src_dir_vp,
 		dnlc_enter (src_dir_vp, target_name, XFS_ITOV(src_ip), credp);
 
 		/*
-		 * We join the inode to the transaction only after we
-		 * are sure that we can commit. This allows our cleanup
-		 * code to explicitly control which locks and vnode
-		 * references to release.
-		 */
-		xfs_trans_ijoin (tp, target_ip, XFS_ILOCK_EXCL);
-
-		/*
 		 * Decrement the link count on the target since the target
 		 * dir no longer points to it.
 		 */
@@ -1499,6 +1499,7 @@ xfs_rename(vnode_t	*src_dir_vp,
 
 
 	} /* target_ip != NULL */
+
 
 
 	/*
@@ -1519,20 +1520,13 @@ xfs_rename(vnode_t	*src_dir_vp,
 		xfs_droplink(tp, src_dp);
 
 	}
+
+
 	error = xfs_dir_removename (tp, src_dp, src_name);
 	ASSERT (! error);
 
 	dnlc_remove (src_dir_vp, src_name);
 
-	/*
-         * We join the inodes to the transaction only after we
-	 * are sure that we can commit.
-	 */
-        xfs_trans_ijoin (tp, src_dp, XFS_ILOCK_EXCL);
-        if (new_parent)
-                xfs_trans_ijoin (tp, target_dp, XFS_ILOCK_EXCL);
-
-        xfs_trans_ijoin (tp, src_ip, XFS_ILOCK_EXCL);
 
 	/*
 	 * Update the generation counts on all the directory inodes
@@ -1589,6 +1583,22 @@ error_return:
 	if (target_ip)
 		IRELE (target_ip);
 
+	return error;
+
+trans_error_return:
+
+	/*
+	 * We come here after we've ijoined the inodes to the 
+	 * transaction.
+	 *
+	 * We want to control how the inodes are unlocked and
+	 * their reference counts decremented. So we explicitly
+	 * do iholds on them across the cancel.
+	 */
+	IHOLD (src_dp);
+	if (src_dp != target_dp)
+		IHOLD (src_dp);
+	xfs_trans_cancel (tp);
 	return error;
 }
 
