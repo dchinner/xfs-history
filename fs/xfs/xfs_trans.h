@@ -543,7 +543,6 @@ typedef struct xfs_trans {
 #define	XFS_WRITEID_LOG_RES(mp)	((mp)->m_reservations.tr_swrite)
      
 /*
-/*
  * Various log count values.
  */
 #define	XFS_DEFAULT_LOG_COUNT		1
