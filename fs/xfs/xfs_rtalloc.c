@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.24 $"
 
 /*
  * Free realtime space allocation for xFS.
@@ -413,7 +413,8 @@ xfs_rtallocate_extent_near(
 					return error;
 				}
 				if (r != NULLRTBLOCK) {
-					return r;
+					*rtblock = r;
+					return 0;
 				}
 			} else if (i < 0) {
 				for (j = -1; j > i; j--) {
