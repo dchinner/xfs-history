@@ -1,21 +1,31 @@
 #ifndef	_XFS_LOG_RECOVER_H
 #define _XFS_LOG_RECOVER_H
 
+#ident	"$Revision: 1.2 $"
+
 /*
  * Macros, structures, prototypes for internal log manager use.
+ */
+
+#define XLOG_RHASH_BITS  4
+#define XLOG_RHASH_SIZE	16
+#define XLOG_RHASH_SHIFT 2
+#define XLOG_RHASH(tid)	\
+	((((uint)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1))
+
+#define XLOG_MAX_REGIONS_IN_ITEM	(NBPP / XFS_BLI_CHUNK / 2 + 1)
+
+
+/*
+ * item headers are in ri_buf[0].  Additional buffers follow.
  */
 typedef struct xlog_recover_item {
 	struct xlog_recover_item *ri_next;
 	struct xlog_recover_item *ri_prev;
 	int			 ri_type;
-	int			 ri_cnt;
+	int			 ri_cnt;	/* count of regions found */
 	int			 ri_total;	/* total regions */
-	void *			 ri_desc;
-	int			 ri_desc_len;
-	void *			 ri_buf1;
-	int			 ri_buf1_len;
-	void *			 ri_buf2;
-	int			 ri_buf2_len;
+	xfs_log_iovec_t		 ri_buf[XLOG_MAX_REGIONS_IN_ITEM];
 } xlog_recover_item_t;
 
 typedef struct xlog_recover {
@@ -28,11 +38,5 @@ typedef struct xlog_recover {
 	xlog_recover_item_t *r_transq;
 } xlog_recover_t;
 
-
-#define XLOG_RHASH_BITS  4
-#define XLOG_RHASH_SIZE	16
-#define XLOG_RHASH_SHIFT 2
-#define XLOG_RHASH(tid)	\
-	((((uint)tid)>>XLOG_RHASH_SHIFT) & (XLOG_RHASH_SIZE-1))
 
 #endif /* _XFS_LOG_RECOVER_H */
