@@ -1217,8 +1217,26 @@ xfs_zero_last_block(
 
 	mp = ip->i_mount;
 	vp = XFS_ITOV(ip);
-	isize_fsb_offset = XFS_B_FSB_OFFSET(mp, isize);
 
+	/*
+	 * If the file system block size is less than the page size,
+	 * then there could be bytes in the last page after the last
+	 * fsblock containing isize which have not been initialized.
+	 * Since if such a page is in memory it will be marked P_DONE
+	 * and my now be fully accessible, we need to zero any part of
+	 * it which is beyond the old file size.  We don't need to send
+	 * this out to disk, we're just iniitializing it to zeroes like
+	 * we would have done in xfs_strat_read() had the size been bigger.
+	 */
+	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
+		pfdp = pfind(XFS_ITOV(ip), offtoct(isize), VM_ATTACH);
+		if (pfdp != NULL) {
+			page_zero(pfdp, NOCOLOR, i, (NBPP - i));
+			pagefree(pfdp);
+		}
+	}
+
+	isize_fsb_offset = XFS_B_FSB_OFFSET(mp, isize);
 	if (isize_fsb_offset == 0) {
 		/*
 		 * There are not extra bytes in the last block to
@@ -1279,23 +1297,6 @@ xfs_zero_last_block(
 		bwrite(bp);
 	}
 
-	/*
-	 * If the file system block size is less than the page size,
-	 * then there could be bytes in the last page after the last
-	 * fsblock containing isize which have not been initialized.
-	 * Since if such a page is in memory it will be marked P_DONE
-	 * and my now be fully accessible, we need to zero any part of
-	 * it which is beyond the old file size.  We don't need to send
-	 * this out to disk, we're just iniitializing it to zeroes like
-	 * we would have done in xfs_strat_read() had the size been bigger.
-	 */
-	if ((mp->m_sb.sb_blocksize < NBPP) && ((i = poff(isize)) != 0)) {
-		pfdp = pfind(XFS_ITOV(ip), offtoct(isize), VM_ATTACH);
-		if (pfdp != NULL) {
-			page_zero(pfdp, NOCOLOR, i, (NBPP - i));
-			pagefree(pfdp);
-		}
-	}
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	return;
 }
@@ -1693,6 +1694,17 @@ xfs_write_file(
 	new_size = uiop->uio_offset + uiop->uio_resid;
 
 	/*
+	 * i_write_offset is used by xfs_strat_read() when the chunk
+	 * cache code calls back into the file system through
+	 * xfs_strategy() to initialize a buffer.  We use it there
+	 * to know how much of the buffer needs to be zeroed and how
+	 * much will be initialize here by the write or not need to
+	 * be initialized because it will be beyond the inode size.
+	 * This is protected by the io lock.
+	 */
+	ip->i_write_offset = uiop->uio_offset;
+
+	/*
 	 * Loop until uiop->uio_resid, which is the number of bytes the
 	 * caller has requested to write, goes to 0 or we get an error.
 	 * Each call to xfs_iomap_write() tries to map as much of the
@@ -1884,6 +1896,7 @@ xfs_write_file(
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	ip->i_new_size = 0;
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	ip->i_write_offset = 0;
 
 	kmem_zone_free(xfs_bmap_zone, bmaps);
 	return error;
@@ -2216,6 +2229,7 @@ xfs_strat_read(
 	xfs_fsize_t	isize;
 	off_t		offset;
 	off_t		end_offset;
+	off_t		init_limit;
 	int		x;
 	caddr_t		datap;
 	buf_t		*rbp;
@@ -2235,16 +2249,45 @@ xfs_strat_read(
 	mp = XFS_VFSTOM(vp->v_vfsp);
 	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 	/*
-	 * Only read up to the EOF.
+	 * Only read up to the EOF or the current write offset.
+	 * The idea here is to avoid initializing pages which are
+	 * going to be immediately overwritten in xfs_write_file().
+	 * The most important case is the sequential write case, where
+	 * the new pages at the end of the file are sent here by
+	 * chunk_patch().  We don't want to zero them since they
+	 * are about to be overwritten.
+	 *
+	 * The ip->i_write_off tells us the offset of any write in
+	 * progress.  If it is 0 then we assume that no write is
+	 * in progress.  If the write offset is within the file size,
+	 * the the file size is the upper limit.  If the write offset
+	 * is beyond the file size, then we only want to initialize the
+	 * buffer up to the write offset.  Beyond that will either be
+	 * overwritten or be beyond the new EOF.
 	 */
 	isize = ip->i_d.di_size;
 	offset = BBTOB(bp->b_offset);
 	end_offset = offset + bp->b_bcount;
-	if ((offset < isize) && (end_offset > isize)) {
-		count = isize - offset;
+
+	if (ip->i_write_offset == 0) {
+		init_limit = isize;
+	} else if (ip->i_write_offset <= isize) {
+		init_limit = isize;
 	} else {
-		count = bp->b_bcount;
+		init_limit = ip->i_write_offset;
 	}
+
+	if (end_offset <= init_limit) {
+		count = bp->b_bcount;
+	} else {
+		count = init_limit - offset;
+	}
+
+	if (count <= 0) {
+		iodone(bp);
+		return;
+	}
+
 	/*
 	 * Since the buffer may not be file system block aligned, we
 	 * can't do a simple shift to find the number of blocks underlying
