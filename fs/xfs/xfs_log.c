@@ -47,11 +47,11 @@
 	  (off) += (bytes);}
 
 
-/* Local function prototypes */
+/* Local miscellaneous function prototypes */
 STATIC void	 log_alloc(xfs_mount_t *mp, dev_t log_dev, int start_block,
 			   int num_bblocks);
 STATIC xfs_lsn_t log_commit_record(xfs_mount_t *mp, log_ticket_t *ticket);
-STATIC void	 log_push_buffers_to_disk(log_t *log);
+STATIC void	 log_push_buffers_to_disk(xfs_mount_t *mp, log_t *log);
 STATIC void	 log_sync(log_t *log, log_in_core_t *iclog, uint flags);
 STATIC void	 log_unalloc(void);
 STATIC int	 log_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
@@ -59,20 +59,21 @@ STATIC int	 log_write(xfs_mount_t *mp, xfs_log_iovec_t region[],
 			   xfs_lsn_t *start_lsn, int commit);
 
 /* local state machine functions */
-STATIC void log_state_done_syncing(log_in_core_t *iclog);
-STATIC void log_state_finish_copy(log_t *log, log_in_core_t *iclog,
-				  int first_write, int bytes);
-STATIC int  log_state_get_iclog_space(log_t *log, int len,
-				      log_in_core_t **iclog,
-				      int *continued_write);
+STATIC void		log_state_done_syncing(log_in_core_t *iclog);
+STATIC void		log_state_finish_copy(log_t *log, log_in_core_t *iclog,
+					      int first_write, int bytes);
+STATIC int		log_state_get_iclog_space(log_t *log, int len,
+						  log_in_core_t **iclog,
+						  int *continued_write);
 STATIC xfs_log_ticket_t log_state_get_ticket(log_t *log, int len,
-					     char log_client);
-STATIC int  log_state_lsn_is_synced(log_t *log, xfs_lsn_t lsn,
-				    xfs_log_callback_t *cb);
-STATIC void log_state_put_ticket(log_t *log, log_ticket_t *tic);
-STATIC void log_state_release_iclog(log_t *log,	log_in_core_t *iclog);
-STATIC int  log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags);
-STATIC void log_state_want_sync(log_t *log, log_in_core_t *iclog);
+					     char log_client, uint flags);
+STATIC int		log_state_lsn_is_synced(log_t *log, xfs_lsn_t lsn,
+						xfs_log_callback_t *cb);
+STATIC void		log_state_put_ticket(log_t *log, log_ticket_t *tic);
+STATIC void		log_state_release_iclog(log_t *log,
+						log_in_core_t *iclog);
+STATIC int		log_state_sync(log_t *log, xfs_lsn_t lsn, uint flags);
+STATIC void		log_state_want_sync(log_t *log, log_in_core_t *iclog);
 
 /* local ticket functions */
 STATIC xfs_log_ticket_t *log_maketicket(log_t *log, int len, char clientid);
@@ -85,7 +86,14 @@ STATIC int	log_recover(struct xfs_mount *mp, dev_t log_dev);
 STATIC void	log_verify_dest_ptr(log_t *log, psint ptr);
 STATIC void	log_verify_iclog(log_t *log, log_in_core_t *iclog, int count);
 
+
+/*
+ * 0 => disable log manager
+ * 1 => enable log manager
+ * 2 => enable log manager and log debugging
+ */
 int log_debug = 0;
+
 
 #ifdef DEBUG
 int bytes_of_ticket_used;
@@ -221,7 +229,7 @@ int
 xfs_log_reserve(xfs_mount_t	 *mp,
 		uint		 len,
 		xfs_log_ticket_t *ticket,
-		char		 log_client,
+		char		 client,
 		uint		 flags)
 {
 	log_t *log = mp->m_log;
@@ -229,7 +237,7 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 	if (! log_debug)
 		return 0;
 
-	if (log_client != XFS_TRANSACTION_MANAGER)
+	if (client != XFS_TRANSACTION_MANAGER)
 		return -1;
 	
 	if (flags & XFS_LOG_SLEEP) {
@@ -250,12 +258,15 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 			((len+LOG_RECORD_BSIZE-1) >> LOG_RECORD_BSHIFT);
 	}
 
-	*ticket = log_state_get_ticket(log, len, log_client);
+	log->l_sync_lsn = xfs_trans_tail_ail(mp);
+	log_push_buffers_to_disk(mp, log);
+
+	if ((int)(*ticket =log_state_get_ticket(log, len, client, flags)) == -1)
+		return XFS_ENOLOGSPACE;
 
 	if (flags & XFS_LOG_PERM_RESERV)
 		((log_ticket_t *)ticket)->t_flags |= LOG_TIC_PERM_RESERV;
 
-	log_push_buffers_to_disk(log);
 	return 0;
 }	/* xfs_log_reserve */
 
@@ -292,6 +303,8 @@ int
 xfs_log_unmount(xfs_mount_t *mp)
 {
 	log_unalloc();
+
+	return 0;
 }
 
 int
@@ -353,7 +366,7 @@ log_alloc(xfs_mount_t	*mp,
 	initnsema(&log->l_flushsema, LOG_NUM_ICLOGS, "iclog-flush");
 
 	log->l_logsize     = BBTOB(num_bblocks);
-	log->l_logstart    = start_block;
+	log->l_logBBstart  = start_block;
 	log->l_logBBsize   = BTOBB(log->l_logsize);
 	iclogp = &log->l_iclog;
 	for (i=0; i < LOG_NUM_ICLOGS; i++) {
@@ -410,9 +423,9 @@ log_commit_record(xfs_mount_t  *mp,
 
 
 /*
- * purpose: Function which is called when an io completes.  The log manager
- *	needs its own routine, in order to control what happens with the buffer
- *	after the write completes.
+ * Function which is called when an io completes.  The log manager
+ * needs its own routine, in order to control what happens with the buffer
+ * after the write completes.
  */
 void
 log_iodone(buf_t *bp)
@@ -427,25 +440,66 @@ log_iodone(buf_t *bp)
 }	/* log_iodone */
 
 
+/*
+ * Push on the buffer cache code if we ever use more than 75% of the on-disk
+ * log space.  This code pushes on the lsn which would supposedly free up
+ * the 25% which we want to leave free.  We may need to adopt a policy which
+ * pushes on an lsn which is further along in the log once we reach the high
+ * water mark.  In this manner, we would be creating a low water mark.
+ */
 void
-log_push_buffers_to_disk(log_t *log)
+log_push_buffers_to_disk(xfs_mount_t *mp, log_t *log)
 {
+    int		blocks;		/* valid blocks left to write to */
+    xfs_lsn_t	sync_lsn;
+    xfs_lsn_t	threshhold_lsn;
+    int		threshhold_block;
+
+    sync_lsn = log->l_sync_lsn;
+    if (CYCLE_LSN(sync_lsn) == log->l_curr_cycle) {
+	blocks = log->l_logBBsize - (log->l_curr_block - BLOCK_LSN(sync_lsn));
+    } else {
+	ASSERT(CYCLE_LSN(sync_lsn) + 1 == log->l_curr_cycle);
+	blocks = BLOCK_LSN(sync_lsn) - log->l_curr_block;
+    }
+
+    if (blocks < (log->l_logBBsize >> 2)) {
+	threshhold_block = BLOCK_LSN(sync_lsn) + (log->l_logBBsize >> 2);
+	if (threshhold_block >= log->l_logBBsize) {
+	    threshhold_block -= log->l_logBBsize;
+	    ((uint *)&(threshhold_lsn))[0] = CYCLE_LSN(sync_lsn) +1;
+	} else {
+	    ((uint *)&(threshhold_lsn))[0] = CYCLE_LSN(sync_lsn);
+	}
+	((uint *)&(threshhold_lsn))[1] = threshhold_block;
+	xfs_trans_push_ail(mp, threshhold_lsn);
+    }
 }	/* log_push_buffers_to_disk */
 
 
 /*
- * purpose: Flush out the in-core log to the on-disk log in a synchronous or
- *	asynchronous fashion.  The current log to write out should always be
- *	l_iclog.  The two logs are switched, so another thread can begin
- *	writing to the non-syncing in-core log.  Before an in-core log can
- *	be written out, the data section must be scanned to make sure there
- *	are no occurrences of the log header magic number at log block
- *	boundaries.
+ * Flush out the in-core log (iclog) to the on-disk log in a synchronous or
+ * asynchronous fashion.  Previously, we should have moved the current iclog
+ * ptr in the log to point to the next available iclog.  This allows further
+ * write to continue while this code syncs out an iclog ready to go.
+ * Before an in-core log can be written out, the data section must be scanned
+ * to save away the 1st word of each BBSIZE block into the header.  We replace
+ * it with the current cycle count.  Each BBSIZE block is tagged with the
+ * cycle count because there in an implicit assumption that drives will
+ * guarantee that entire 512 byte blocks get written at once.  In other words,
+ * we can't have part of a 512 byte block written and part not written.  By
+ * tagging each block, we will know which blocks are valid when recovering
+ * after an unclean shutdown.
  *
  * This routine is single threaded on the iclog.  No other thread can be in
  * this routine with the same iclog.  Changing contents of iclog can there-
  * fore be done without grabbing the state machine lock.  Updating the global
  * log will require grabbing the lock though.
+ *
+ * The entire log manager uses a logical block numbering scheme.  Only
+ * log_sync (and then only bwrite()) know about the fact that the log may
+ * not start with block zero on a given device.  The log block start offset
+ * is added immediately before calling bwrite().
  */
 void
 log_sync(log_t		*log,
@@ -495,10 +549,11 @@ log_sync(log_t		*log,
 	ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 	ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
 
-#ifdef DEBUG
-	if (log_debug)
+	if (log_debug > 1)
 		log_verify_iclog(log, iclog, count);
-#endif
+
+	/* account for log which don't start at block #0 */
+	bp->b_blkno += log->l_logBBstart;
 
 	bwrite(bp);
 
@@ -520,6 +575,9 @@ log_sync(log_t		*log,
 
 		ASSERT(bp->b_blkno <= log->l_logBBsize-1);
 		ASSERT(bp->b_blkno + BTOBB(count) <= log->l_logBBsize);
+
+		/* account for log which don't start at block #0 */
+		bp->b_blkno += log->l_logBBstart;
 
 		bwrite(bp);
 
@@ -656,12 +714,11 @@ log_write(xfs_mount_t *		mp,
 		len += sizeof(log_op_header_t);   /* from splitting of region */
 	    }
 
-#ifdef DEBUG
-	    if (log_debug) {
+	    if (log_debug > 1) {
 		ASSERT(copy_len >= 0);
 		log_verify_dest_ptr(log, ptr);
 	    }
-#endif
+
 	    /* copy region */
 	    bcopy(reg[index].i_addr + copy_off, (caddr_t)ptr, copy_len);
 	    log_write_adv_cnt(ptr, len, log_offset, copy_len);
@@ -745,6 +802,7 @@ log_state_done_syncing(log_in_core_t	*iclog)
 	spl = splockspl(log->l_icloglock, splhi);
 
 	ASSERT(iclog->ic_state == LOG_STATE_SYNCING);
+	ASSERT(iclog->ic_refcnt >= 0);
 
 	if (iclog->ic_refcnt > 0) {
 		if (--iclog->ic_refcnt > 0) {
@@ -905,7 +963,8 @@ restart:
 xfs_log_ticket_t
 log_state_get_ticket(log_t	*log,
 		     int	len,
-		     char	log_client)
+		     char	log_client,
+		     uint	flags)
 {
 	int		 spl;
 	xfs_log_ticket_t tic;
@@ -913,8 +972,12 @@ log_state_get_ticket(log_t	*log,
 	spl = splockspl(log->l_icloglock, splhi);
 
 	/* Eventually force out buffers */
-	if (log->l_logreserved + len > log->l_logsize)
-		log_panic("log_state_get_ticket: over reserved");
+	if (log->l_logreserved + len > log->l_logsize) {
+		if (flags & XFS_LOG_NOSLEEP)
+			return (xfs_log_ticket_t)-1;
+		else
+			log_panic("log_state_get_ticket: over reserved");
+	}
 	log->l_logreserved += len;
 	tic = log_maketicket(log, len, log_client);
 	spunlockspl(log->l_icloglock, spl);
@@ -1011,19 +1074,23 @@ log_state_release_iclog(log_t		*log,
 	    iclog->ic_header.h_sync_lsn = log->l_sync_lsn = sync_lsn;
 
 	/* check if it will fit */
-	if (CYCLE_LSN(sync_lsn) == log->l_prev_cycle) {
-	    blocks = log->l_logBBsize - (log->l_prev_block-BLOCK_LSN(sync_lsn));
-	    if (blocks < BTOBB(iclog->ic_offset)+1)
-		log_panic("ran out of log space");
-	} else {
-	    ASSERT(CYCLE_LSN(sync_lsn)+1 == log->l_prev_cycle);
-	    if (BLOCK_LSN(sync_lsn) == log->l_prev_block)
-		log_panic("ran out of log space");
+	if (log_debug > 1) {
+	    if (CYCLE_LSN(sync_lsn) == log->l_prev_cycle) {
+		blocks =
+		    log->l_logBBsize - (log->l_prev_block -BLOCK_LSN(sync_lsn));
+		if (blocks < BTOBB(iclog->ic_offset)+1)
+		    log_panic("ran out of log space");
+	    } else {
+		ASSERT(CYCLE_LSN(sync_lsn)+1 == log->l_prev_cycle);
+		if (BLOCK_LSN(sync_lsn) == log->l_prev_block)
+		    log_panic("ran out of log space");
 		
-	    blocks = BLOCK_LSN(sync_lsn) - log->l_prev_block;
-	    if (blocks < BTOBB(iclog->ic_offset) + 1)
-		log_panic("ran out of log space");
+		blocks = BLOCK_LSN(sync_lsn) - log->l_prev_block;
+		if (blocks < BTOBB(iclog->ic_offset) + 1)
+		    log_panic("ran out of log space");
+	    }
 	}
+
 	/* cycle incremented when incrementing curr_block */
     }
     
@@ -1207,7 +1274,7 @@ uint
 xfs_log_end(struct xfs_mount *, dev_t);
 
 int
-	log_recover(struct xfs_mount *mp, dev_t log_dev)
+log_recover(struct xfs_mount *mp, dev_t log_dev)
 {
 	return 0;
 #if XXXmiken
@@ -1503,17 +1570,17 @@ log_print_record(int		  fd,
  * Code needs to look at cycle # at start of block  XXXmiken
  */
 int
-#ifdef LOG_BREAD
-log_find_head(dev_t log_dev, int log_size)
-#else
+#ifdef LOG_LSEEK
 log_find_head(int fd, int log_size)
+#else
+log_find_head(dev_t log_dev, int log_size)
 #endif
 {
     log_rec_header_t	*head;
     int			block_start = 0;
     int			block_no = 0;
     int			cycle_no = 0;
-#ifndef LOG_BREAD
+#ifdef LOG_LSEEK
     char		hbuf[LOG_HEADER_SIZE];
 
     if (lseek(fd, 0, SEEK_SET) < 0)		/* start reading from 0 */
@@ -1597,12 +1664,12 @@ void xfs_log_print(xfs_mount_t	*mp,
 
     log_size = BBTOB(num_bblocks);
 
-#ifdef LOG_BREAD
+#ifdef LOG_LSEEK
+    block_start = log_find_head(fd, log_size);
+#else
     block_start = log_find_head(log_dev, log_size);
     if (lseek(fd, block_start*LOG_HEADER_SIZE, SEEK_SET) < 0)
 	log_panic("log_find_head: lseek block # failed");
-#else
-    block_start = log_find_head(fd, log_size);
 #endif
     block_no    = block_start;
 
