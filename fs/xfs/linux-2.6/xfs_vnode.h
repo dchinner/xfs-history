@@ -101,12 +101,6 @@ typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
 
 
 /*
- * FROM_VN_KILL is a special 'kill' flag to VOP_CLOSE to signify a call
- * from vn_kill. This is passed as the lastclose field
- */
-typedef enum { L_FALSE, L_TRUE, FROM_VN_KILL } lastclose_t;
-
-/*
  * Return values for VOP_INACTIVE.  A return value of
  * VN_INACTIVE_NOCACHE implies that the file system behavior
  * has disassociated its state and bhv_desc_t from the vnode.
@@ -159,7 +153,6 @@ struct page_buf_bmap_s;
 struct attrlist_cursor_kern;
 
 typedef int	(*vop_open_t)(bhv_desc_t *, vnode_t **, mode_t, struct cred *);
-typedef int	(*vop_close_t)(bhv_desc_t *, int, lastclose_t, struct cred *);
 typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct file *, char *, size_t,
 				loff_t *, struct cred *);
 typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct file *, const char *, size_t,
@@ -224,7 +217,6 @@ typedef struct vnodeops {
 	bhv_position_t	vn_position;	/* position within behavior chain */
 #endif
 	vop_open_t		vop_open;
-	vop_close_t		vop_close;
 	vop_read_t		vop_read;
 	vop_write_t		vop_write;
 	vop_ioctl_t		vop_ioctl;
@@ -307,12 +299,6 @@ typedef struct vnodeops {
 	ASSERT(&(vp) != vpp);						\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
 	rv = _VOP_(vop_open, vp)((vp)->v_fbhv, vpp, mode, cr);		\
-	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
-}
-#define VOP_CLOSE(vp,f,c,cr,rv)						\
-{									\
-	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
-	rv = _VOP_(vop_close, vp)((vp)->v_fbhv,f,c,cr);			\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
 #define VOP_GETATTR(vp, vap, f, cr, rv)					\
