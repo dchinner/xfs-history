@@ -73,7 +73,8 @@ typedef struct xfs_inode {
 	unsigned long		i_gen;		/* generation count */
 
 	/* File incore extent information. */
-	size_t			i_bytes; 	/* bytes in i_u1 */	
+	size_t			i_bytes; 	/* bytes in i_u1 */
+	size_t			i_real_bytes;	/* bytes allocated in i_u1 */
 	xfs_extnum_t		i_lastex;	/* last iu_extents used */
 	union {
 		xfs_bmbt_rec_t	*iu_extents;	/* linear map of file exts */
