@@ -3164,10 +3164,22 @@ xfs_dm_send_mmap_event(
 	}
 
 	xfs_ilock(ip, iolock);
-	if(DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
+	/* If write possible, try a DMAPI write event */
+	if ((max_event == DM_EVENT_WRITE) &&
+	    DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
 		error = xfs_dm_send_data_event(max_event, vp, offset,
 					       evsize, 0, &locktype);
+		goto out_unlock;
 	}
+
+	/* Try a read event if max_event was != DM_EVENT_WRITE or if it
+	 * was DM_EVENT_WRITE but the WRITE event was not enabled.
+	 */
+	if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_READ)) {
+		error = xfs_dm_send_data_event(DM_EVENT_READ, vp, offset,
+					       evsize, 0, &locktype);
+	}
+out_unlock:
 	xfs_iunlock(ip, iolock);
 
 	return -error; /* Return negative error to linvfs layer */
