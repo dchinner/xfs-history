@@ -6,6 +6,7 @@
 #endif
 #include <sys/buf.h>
 #include <sys/sysmacros.h>
+#include <sys/vfs.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -63,12 +64,23 @@ xfs_mount_init(void)
 	return (mp);
 }
 	
-void
-xfs_mount(xfs_mount_t *mp, dev_t dev)
+xfs_mount_t *
+xfs_mount(dev_t dev)
 {
 	buf_t		*bp;
 	xfs_sb_t	*sbp;
 	int		error;
+	xfs_mount_t	*mp;
+	vfs_t		*vfsp;
+	extern vfsops_t	xfs_vfsops;
+
+	mp = xfs_mount_init();
+	vfsp = kmem_zalloc(sizeof(vfs_t), KM_SLEEP);
+	VFS_INIT(vfsp, &xfs_vfsops, NULL);
+	mp->m_vfsp = vfsp;
+	vfsp->vfs_data = mp;
+	mp->m_dev = dev;
+	vfsp->vfs_dev = dev;
 
 	/*
 	 * Allocate a buffer to hold the superblock.
@@ -95,7 +107,6 @@ xfs_mount(xfs_mount_t *mp, dev_t dev)
 	 * Initialize the mount structure from the superblock.
 	 */
 	sbp = xfs_buf_to_sbp(bp);
-	mp->m_dev = dev;
 	mp->m_sb_bp = bp;
 	mp->m_sb = *sbp;
 	mp->m_bsize = xfs_btod(sbp, 1);
@@ -109,6 +120,8 @@ xfs_mount(xfs_mount_t *mp, dev_t dev)
 	 * file system.
 	 */
 	xfs_ihash_init(mp);
+
+	return mp;
 }
 
 void
