@@ -1406,8 +1406,7 @@ xlog_sync(xlog_t		*log,
 	} else {
 		iclog->ic_bwritecnt = 1;
 	}
-	XFS_BUF_PTR(bp)	= (caddr_t) &(iclog->ic_header);
-	XFS_BUF_SET_COUNT(bp, count);
+	XFS_BUF_SET_PTR(bp, (caddr_t) &(iclog->ic_header), count);
 	XFS_BUF_SET_FSPRIVATE(bp, iclog);	/* save for later */
 	if (flags & XFS_LOG_SYNC){
 		XFS_BUF_BUSY(bp);
@@ -1440,9 +1439,8 @@ xlog_sync(xlog_t		*log,
 							(unsigned long)1);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
 		XFS_BUF_SET_ADDR(bp, 0);	     /* logical 0 */
-		XFS_BUF_SET_COUNT(bp, split);
-		XFS_BUF_PTR(bp)	= (caddr_t)((__psint_t)&(iclog->ic_header)+
-					    (__psint_t)count);
+		XFS_BUF_SET_PTR(bp, (caddr_t)((__psint_t)&(iclog->ic_header)+
+					    (__psint_t)count), split);
 		XFS_BUF_SET_FSPRIVATE(bp, iclog);
 		XFS_BUF_BUSY(bp);
 		XFS_BUF_ASYNC(bp);

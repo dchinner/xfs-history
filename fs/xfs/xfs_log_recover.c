@@ -173,9 +173,6 @@ xlog_bread(xlog_t	*log,
 	XFS_BUF_SET_COUNT(bp, BBTOB(nbblks));
 	XFS_BUF_SET_TARGET(bp, &log->l_mp->m_logdev_targ);
 
-#ifndef SIM
-	bp_dcache_wbinval(bp);
-#endif
 	xfsbdstrat(log->l_mp, bp);
 	if (error = xfs_iowait(bp)) {
 		xfs_ioerror_alert("xlog_bread", log->l_mp, 
@@ -3075,10 +3072,11 @@ xlog_do_recovery_pass(xlog_t	*log,
 			goto bread_err;
 		}
 		bufaddr = XFS_BUF_PTR(dbp);
-		XFS_BUF_PTR(dbp) += BBTOB(split_bblks);
+		XFS_BUF_SET_PTR(dbp, bufaddr + BBTOB(split_bblks),
+			BBTOB(bblks - split_bblks));
 		if (error = xlog_bread(log, 0, bblks - split_bblks, dbp))
 		    goto bread_err;
-		XFS_BUF_PTR(dbp) = bufaddr;
+		XFS_BUF_SET_PTR(dbp, bufaddr, XLOG_MAX_RECORD_BSIZE);
 	    }
 	    xlog_unpack_data(rhead, XFS_BUF_PTR(dbp), log);
 	    if (error = xlog_recover_process_data(log, rhash,
@@ -3199,7 +3197,9 @@ xlog_do_recover(xlog_t	*log,
 	}
 
 #ifdef _KERNEL
-#if 0
+#ifdef __linux__
+	XFS_bflush(log->l_mp->m_ddev_targ);
+#else
 	bfid.bfid_dev = log->l_mp->m_dev;
 	bfid.bfid_flags = BFID_NOVNBUF;
 	bflush_dev(&bfid);    /* Flush out the delayed write buffers */

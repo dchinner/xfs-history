@@ -147,7 +147,6 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_SET_BRELSE_FUNC(buf, value) \
             (buf)->b_relse = value
 
-#define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
 #define XFS_BUF_ADDR(bp)	((bp)->b_blkno)
 #define XFS_BUF_OFFSET(bp)	((bp)->b_offset)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
@@ -155,6 +154,10 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_COUNT(bp)	((bp)->b_bcount)
 #define XFS_BUF_SET_COUNT(bp, cnt)		\
 			((bp)->b_bcount = cnt)
+#define XFS_BUF_PTR(bp)	((bp)->b_un.b_addr)
+#define XFS_BUF_SET_PTR(bp, val, count)		\
+			((bp)->b_un.b_addr = (val)) \
+			XFS_BUF_SET_COUNT(bp, count)
 
 #define XFS_BUF_SIZE(bp)	((bp)->b_bufsize)
 #define XFS_BUF_SET_SIZE(bp, cnt)		\
@@ -410,6 +413,8 @@ extern void xfs_pb_nfreer(page_buf_t *);
 
 
 #define XFS_BUF_PTR(bp)		(caddr_t)((bp)->pb_addr)
+#define XFS_BUF_SET_PTR(bp, val, count)		\
+				pagebuf_associate_memory(bp, val, count)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
 #define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset >> 9)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
