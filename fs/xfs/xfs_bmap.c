@@ -3812,6 +3812,7 @@ ASSERT( 0 );
 	 */
 	if (XFS_IFORK_FORMAT(ip, whichfork) == XFS_DINODE_FMT_BTREE &&
 		 XFS_IFORK_NEXTENTS(ip, whichfork) <= ifp->if_ext_max) {
+		ASSERT(wr);
 		error = xfs_bmap_btree_to_extents(tp, ip, cur, &tmp_logflags,
 			whichfork);
 		if (error) {
@@ -3834,8 +3835,10 @@ ASSERT( 0 );
 	else if ((logflags & XFS_ILOG_FBROOT(whichfork)) &&
 		 XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		logflags &= ~XFS_ILOG_FBROOT(whichfork);
-	if (logflags)
+	if (logflags) {
+		ASSERT(wr);
 		xfs_trans_log_inode(tp, ip, logflags);
+	}
 	if (cur) {
 		ASSERT(*firstblock == NULLFSBLOCK ||
 		       XFS_FSB_TO_AGNO(ip->i_mount, *firstblock) ==
@@ -4085,7 +4088,8 @@ int						/* error code */
 xfs_getbmap(
 	vnode_t			*vp,		/* vnode pointer */
 	struct getbmap		*bmv,		/* user bmap structure */
-	void			*ap)		/* pointer to user's array */
+	void			*ap,		/* pointer to user's array */
+	int			whichfork)	/* data or attr fork */
 {
 	__int64_t		bmvend;		/* last block requested */
 	int			error;		/* return value */
@@ -4098,25 +4102,31 @@ xfs_getbmap(
 	xfs_mount_t		*mp;		/* file system mount point */
 	int			nex;		/* # of extents can do */
 	int			nmap;		/* number of map entries */
+	struct getbmap		out;		/* output structure */
 	int			prealloced;	/* this is a file with
 						 * preallocated data space */
-	struct getbmap		out;		/* output structure */
 
 	ip = XFS_VTOI(vp);
-	if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&
-	    ip->i_d.di_format != XFS_DINODE_FMT_BTREE)
+	if (XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_EXTENTS &&
+	    XFS_IFORK_FORMAT(ip, whichfork) != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EINVAL);
 	mp = ip->i_mount;
-	if (ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) {
+	if (whichfork == XFS_DATA_FORK &&
+	    ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) {
 		prealloced = 1;
 		if (bmv->bmv_length == -1)
 			bmv->bmv_length = XFS_FSB_TO_BB(mp,
 				XFS_B_TO_FSB(mp, XFS_MAX_FILE_OFFSET));
-	} else {
+	} else if (whichfork == XFS_DATA_FORK) {
 		prealloced = 0;
 		if (bmv->bmv_length == -1)
 			bmv->bmv_length = XFS_FSB_TO_BB(mp,
 				XFS_B_TO_FSB(mp, ip->i_d.di_size));
+	} else {
+		prealloced = 0;
+		if (bmv->bmv_length == -1)
+			bmv->bmv_length = XFS_FSB_TO_BB(mp,
+				XFS_B_TO_FSB(mp, 1LL << 32));
 	}
 
 	bmvend = bmv->bmv_offset + bmv->bmv_length;
@@ -4129,7 +4139,7 @@ xfs_getbmap(
 		return 0;
 	}
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
-	if (ip->i_delayed_blks) {
+	if (whichfork == XFS_DATA_FORK && ip->i_delayed_blks) {
 		last_byte = xfs_file_last_byte(ip);
 		if (VN_MAPPED(vp)) {
 			/*
@@ -4141,14 +4151,14 @@ xfs_getbmap(
 		}
 		pflushvp(vp, (off_t)last_byte, 0);
 	}
-	ASSERT(ip->i_delayed_blks == 0);
+	ASSERT(whichfork == XFS_ATTR_FORK || ip->i_delayed_blks == 0);
 	lock = xfs_ilock_map_shared(ip);
 	/*
 	 * Don't let nex be bigger than the number of extents
 	 * we can have assuming alternating holes and real extents.
 	 */
-	if (nex > ip->i_d.di_nextents * 2 + 1)
-		nex = ip->i_d.di_nextents * 2 + 1;
+	if (nex > XFS_IFORK_NEXTENTS(ip, whichfork) * 2 + 1)
+		nex = XFS_IFORK_NEXTENTS(ip, whichfork) * 2 + 1;
 	/*
 	 * This is potentially a lot of memory.
 	 * We need to put this whole thing in a loop, to limit the memory.
@@ -4158,7 +4168,8 @@ xfs_getbmap(
 	nmap = nex;
 	firstblock = NULLFSBLOCK;
 	error = xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(mp, bmv->bmv_offset),
-			XFS_BB_TO_FSB(mp, bmv->bmv_length), 0, &firstblock,
+			XFS_BB_TO_FSB(mp, bmv->bmv_length),
+			XFS_BMAPI_AFLAG(whichfork), &firstblock,
 			0, map, &nmap, NULL);
 	xfs_iunlock_map_shared(ip, lock);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
