@@ -2,7 +2,7 @@
 #
 # Makefile for SGI xFS
 #
-# $Revision: 1.35 $
+# $Revision$
 DEPTH?=../..
 include ${DEPTH}/kcommondefs
 KPATH=$(TOP)/fs/xfs
@@ -132,6 +132,6 @@ headers!
 	$(INSTALL) -m 444 -F /usr/include/sys/fs $(HFILES)
 
 xfsidbg.o: xfsidbg.c
-	$(CCF) -c $(JALR) -G 0 -common $(KPATH)/xfsidbg.c && \
+	$(CCF) -c $(JALR) -g -G 0 $(KPATH)/xfsidbg.c && \
 	$(LDF) $(PRODOBJECT) -r $(.TARGET:T) -o $$$$.o && \
 	mv $$$$.o $(.TARGET:T)
