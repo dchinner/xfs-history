@@ -10,7 +10,7 @@
  *                                                                        *
  **************************************************************************/
 
-#ident "$Revision: 1.16 $"
+#ident "$Revision: 1.17 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -18,13 +18,13 @@
 #include <sys/errno.h>
 #include <sys/cred.h>
 #include <sys/file.h>
-#include <sys/proc.h>
+#include <sys/kabi.h>
+#include <sys/kmem.h>
 #include <sys/user.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/sat.h>
 #include "xfs_handle.h"
-#include <sys/kmem.h>
 #include <sys/debug.h>
 
 
@@ -36,7 +36,7 @@
  */
 
 
-int	vp_open ( vnode_t *vp, int filemode );
+int	vp_open ( vnode_t *vp, int filemode, struct cred * );
 
 
 STATIC int
@@ -49,17 +49,16 @@ copyout_handle (
 	if (copyout (handle, hbuf, (int) hsize))
 		return EFAULT;
 #ifdef _K64U64
-	if (ABI_IS_64BIT(curprocp->p_abi)) {
-		if (copyout (&hsize, hlen, sizeof *hlen))
+	if (ABI_IS_64BIT(get_current_abi())) {
+		if (copyout(&hsize, hlen, sizeof *hlen))
 			return EFAULT;
 		return 0;
 	}
 #endif
-	if (suword (hlen, (int) hsize))
+	if (suword(hlen, (int) hsize))
 		return EFAULT;
 	return 0;
 }
-
 
 /*
  *  Return the handle for the object named by path.
@@ -175,7 +174,7 @@ readlink_by_handle (
 	auio.uio_offset	= 0;
 	auio.uio_segflg	= UIO_USERSPACE;
 	auio.uio_resid	= bufsiz;
-	error = VOP_READLINK (vp, &auio, curprocp->p_cred);
+	error = VOP_READLINK (vp, &auio, get_current_cred());
 out:
 	VN_RELE (vp);
 	rvp->r_val1 = bufsiz - auio.uio_resid;
@@ -245,7 +244,7 @@ open_by_handle (
 	else
 		_SAT_PNALLOC(SAT_OPEN);
 
-	error = vp_open (vp, filemode);
+	error = vp_open (vp, filemode, get_current_cred());
 
 	u.u_openfp = NULL;
 	if (error) {
@@ -275,7 +274,8 @@ out:
 int
 vp_open (
 	vnode_t		*vp,
-	int		filemode)
+	int		filemode,
+	cred_t		*crp)
 {
 	struct vnode *tvp;
 	register int mode;
@@ -292,7 +292,7 @@ vp_open (
 	tvp = vp;
 	VN_HOLD (tvp);
 
-	if (error = VOP_SETFL (vp, 0, filemode, curprocp->p_cred))
+	if (error = VOP_SETFL (vp, 0, filemode, crp))
 		goto out;
 
 	/*
@@ -314,13 +314,13 @@ vp_open (
 		}
 	}
 	/* Check discretionary permissions. */
-	if (error = VOP_ACCESS (vp, mode, 0, curprocp->p_cred))
+	if (error = VOP_ACCESS (vp, mode, 0, crp))
 		goto out;
 
 	/*
 	 * Do opening protocol.
 	 */
-	if ((error = VOP_OPEN (&vp, filemode, curprocp->p_cred)) == 0) {
+	if ((error = VOP_OPEN (&vp, filemode, crp)) == 0) {
 		if (tvp)
 			VN_RELE (tvp);
 	}
