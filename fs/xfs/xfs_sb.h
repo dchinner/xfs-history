@@ -1,10 +1,12 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision: 1.7 $"
+#ident	"$Revision$"
 
 /*
  * Super block
+ * Fits into a 512-byte buffer at daddr_t 0 of each allocation group.
+ * Only the first of these is ever updated except during growfs.
  */
 
 #define	XFS_SB_MAGIC	0x58465342	/* 'XFSB' */
@@ -81,15 +83,15 @@ typedef struct xfs_sb
 #define	XFS_SB_NUM_BITS		26
 #define	XFS_SB_ALL_BITS		((1 << XFS_SB_NUM_BITS) - 1)
 
-#define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem */
-#define	XFS_SB_FSB	((xfs_fsblock_t)0)	/* fsblock in filesystem */
-#define	XFS_SB_BLOCK	((xfs_agblock_t)0)	/* block number in the AG */
+#define	XFS_SB_DADDR	((daddr_t)0)		/* daddr in filesystem/ag */
+#define	XFS_SB_BLOCK(s)	xfs_hdr_block(s, XFS_SB_DADDR)
 
+#define	xfs_hdr_block(s,d)	((xfs_agblock_t)(xfs_dtobt(s,d)))
 #define	xfs_daddr_to_fsb(s,d) \
 	xfs_agb_to_fsb(s, xfs_daddr_to_agno(s,d), xfs_daddr_to_agbno(s,d))
 #define	xfs_fsb_to_daddr(s,fsbno) \
 	xfs_agb_to_daddr(s, xfs_fsb_to_agno(s,fsbno), xfs_fsb_to_agbno(s,fsbno))
-#define	xfs_btod(s,l)	((l) << ((s)->sb_blocklog - BBSHIFT))
+#define	xfs_btod(s,l)	((daddr_t)((l) << ((s)->sb_blocklog - BBSHIFT)))
 #define	xfs_dtobt(s,l)	((l) >> ((s)->sb_blocklog - BBSHIFT))
 
 #define	xfs_buf_to_sbp(buf)	((xfs_sb_t *)(buf)->b_un.b_addr)

@@ -1,5 +1,9 @@
 #ident	"$Revision: 1.5 $"
 
+/*
+ * This file contains common code for the space manager's btree implementations.
+ */
+
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/vnode.h>
@@ -67,17 +71,17 @@ void
 xfs_btree_check_block(xfs_btree_cur_t *cur, xfs_btree_block_t *block, int level)
 {
 	buf_t *agbuf;
-	xfs_aghdr_t *agp;
+	xfs_agf_t *agf;
 
 	agbuf = cur->bc_agbuf;
-	agp = xfs_buf_to_agp(agbuf);
+	agf = xfs_buf_to_agf(agbuf);
 	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
 	ASSERT(block->bb_level == level);
 	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, block));
 	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
-	       block->bb_leftsib < agp->ag_length);
+	       block->bb_leftsib < agf->agf_length);
 	ASSERT(block->bb_rightsib == NULLAGBLOCK || 
-	       block->bb_rightsib < agp->ag_length);
+	       block->bb_rightsib < agf->agf_length);
 }
 
 /*
@@ -87,12 +91,12 @@ void
 xfs_btree_check_ptr(xfs_btree_cur_t *cur, xfs_agblock_t ptr, int level)
 {
 	buf_t *agbuf;
-	xfs_aghdr_t *agp;
+	xfs_agf_t *agf;
 
 	ASSERT(level > 0);
 	agbuf = cur->bc_agbuf;
-	agp = xfs_buf_to_agp(agbuf);
-	ASSERT(ptr != NULLAGBLOCK && ptr < agp->ag_length);
+	agf = xfs_buf_to_agf(agbuf);
+	ASSERT(ptr != NULLAGBLOCK && ptr < agf->agf_length);
 }
 
 /*
@@ -157,7 +161,8 @@ xfs_btree_dup_cursor(xfs_btree_cur_t *cur)
 
 	tp = cur->bc_tp;
 	mp = cur->bc_mp;
-	newcur = xfs_btree_init_cursor(mp, tp, cur->bc_agbuf, cur->bc_agno, cur->bc_btnum, cur->bc_private.b.ip);
+	newcur = xfs_btree_init_cursor(mp, tp, cur->bc_agbuf, cur->bc_agno,
+				       cur->bc_btnum, cur->bc_private.b.ip);
 	newcur->bc_rec = cur->bc_rec;
 	for (i = 0; i < newcur->bc_nlevels; i++) {
 		newcur->bc_ptrs[i] = cur->bc_ptrs[i];
@@ -208,7 +213,7 @@ xfs_btree_getblk(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agbl
 xfs_btree_cur_t *
 xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumber_t agno, xfs_btnum_t btnum, xfs_inode_t *ip)
 {
-	xfs_aghdr_t *agp;
+	xfs_agf_t *agf;
 	xfs_btree_cur_t *cur;
 	int nlevels;
 	xfs_sb_t *sbp;
@@ -222,11 +227,11 @@ xfs_btree_init_cursor(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf, xfs_agnumb
 	cur->bc_mp = mp;
 	cur->bc_agbuf = agbuf;
 	cur->bc_agno = agno;
-	agp = xfs_buf_to_agp(agbuf);
+	agf = xfs_buf_to_agf(agbuf);
 	switch (btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
-		nlevels = agp->ag_levels[btnum];
+		nlevels = agf->agf_levels[btnum];
 		break;
 	case XFS_BTNUM_BMAP:
 		nlevels = ip->i_broot->bb_level + 1;
@@ -274,34 +279,6 @@ xfs_btree_lastrec(xfs_btree_cur_t *cur, int level)
 		return 0;
 	cur->bc_ptrs[level] = block->bb_numrecs;
 	return 1;
-}
-
-void
-xfs_btree_log_ag(xfs_trans_t *tp, buf_t *buf, int fields)
-{
-	int first;
-	int last;
-	static const int offsets[] = {
-		offsetof(xfs_aghdr_t, ag_magic),
-		offsetof(xfs_aghdr_t, ag_version),
-		offsetof(xfs_aghdr_t, ag_seqno),
-		offsetof(xfs_aghdr_t, ag_length),
-		offsetof(xfs_aghdr_t, ag_roots[0]),
-		offsetof(xfs_aghdr_t, ag_freelist),
-		offsetof(xfs_aghdr_t, ag_levels[0]),
-		offsetof(xfs_aghdr_t, ag_flist_count),
-		offsetof(xfs_aghdr_t, ag_freeblks),
-		offsetof(xfs_aghdr_t, ag_longest),
-		offsetof(xfs_aghdr_t, ag_icount),
-		offsetof(xfs_aghdr_t, ag_ifirst),
-		offsetof(xfs_aghdr_t, ag_ilast),
-		offsetof(xfs_aghdr_t, ag_iflist),
-		offsetof(xfs_aghdr_t, ag_ifcount),
-		sizeof(xfs_aghdr_t)
-	};
-
-	xfs_btree_offsets(fields, offsets, XFS_AG_NUM_BITS, &first, &last);
-	xfs_trans_log_buf(tp, buf, first, last);
 }
 
 /*

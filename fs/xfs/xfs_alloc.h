@@ -43,9 +43,9 @@ typedef struct xfs_alloc_rec
 #define	XFS_MAX_BLOCKSIZE	(1 << XFS_MAX_BLOCKSIZE_LOG)
 
 /* block numbers in the AG; SB is block 0, AGH is block 1 */
-#define	XFS_BNO_BLOCK	((xfs_agblock_t)(XFS_AGH_BLOCK + 1))
-#define	XFS_CNT_BLOCK	((xfs_agblock_t)(XFS_BNO_BLOCK + 1))
-#define	XFS_PREALLOC_BLOCKS	((xfs_agblock_t)(XFS_CNT_BLOCK + 1))
+#define	XFS_BNO_BLOCK(s)	((xfs_agblock_t)(XFS_AGI_BLOCK(s) + 1))
+#define	XFS_CNT_BLOCK(s)	((xfs_agblock_t)(XFS_BNO_BLOCK(s) + 1))
+#define	XFS_PREALLOC_BLOCKS(s)	((xfs_agblock_t)(XFS_CNT_BLOCK(s) + 1))
 
 #define	XFS_ALLOC_REC_ADDR(bb,i,cur)	\
 	XFS_BTREE_REC_ADDR(XFS_ALLOC_BLOCK_SIZE((bb)->bb_level,cur), \
@@ -68,6 +68,7 @@ typedef enum xfs_alloctype
  * Prototypes for per-ag allocation routines
  */
 xfs_agblock_t xfs_alloc_ag_extent(xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_agblock_t, xfs_extlen_t, xfs_alloctype_t);
+xfs_extlen_t xfs_alloc_ag_freeblks(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t);
 xfs_agblock_t xfs_alloc_ag_vextent(xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_agblock_t, xfs_extlen_t, xfs_extlen_t, xfs_extlen_t *, xfs_alloctype_t);
 buf_t *xfs_alloc_fix_freelist(xfs_trans_t *, xfs_agnumber_t);
 int xfs_free_ag_extent(xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_agblock_t, xfs_extlen_t);

@@ -31,12 +31,12 @@ typedef struct xfs_btree_block
 #define	XFS_BTREE_PTR_ADDR(bsz,t,bb,i)	((xfs_agblock_t *)((char *)(bb) + sizeof(xfs_btree_block_t) + XFS_BTREE_BLOCK_MAXRECS(bsz,t,(bb)->bb_level) * sizeof(t) + ((i) - 1) * sizeof(xfs_agblock_t)))
 #define	XFS_BTREE_ROOT_PTR_ADDR(bsz,t,bb,i)	((xfs_agblock_t *)((char *)(bb) + sizeof(xfs_btree_block_t) + XFS_BTREE_BLOCK_MAXRECS(bsz,t,1) * sizeof(t) + ((i) - 1) * sizeof(xfs_agblock_t)))
 
-#define	XFS_BTREE_MAXLEVELS	5	/* should be max of all */
+#define	XFS_BTREE_MAXLEVELS	9	/* max of all btrees */
 typedef struct xfs_btree_cur
 {
 	xfs_trans_t	*bc_tp;	/* links cursors on freelist */
 	xfs_mount_t	*bc_mp;		/* mount struct */
-	buf_t		*bc_agbuf;	/* ag buffer */
+	buf_t		*bc_agbuf;	/* agf buffer */
 	xfs_agnumber_t	bc_agno;	/* ag number */
 	union {
 		xfs_alloc_rec_t		a;
@@ -75,7 +75,6 @@ buf_t *xfs_btree_getblk(xfs_mount_t *, xfs_trans_t *, xfs_agnumber_t, xfs_agbloc
 xfs_btree_cur_t *xfs_btree_init_cursor(xfs_mount_t *, xfs_trans_t *, buf_t *, xfs_agnumber_t, xfs_btnum_t, struct xfs_inode *);
 int xfs_btree_islastblock(xfs_btree_cur_t *, int);
 int xfs_btree_lastrec(xfs_btree_cur_t *, int);
-void xfs_btree_log_ag(xfs_trans_t *, buf_t *, int);
 void xfs_btree_log_block(xfs_trans_t *, buf_t *, int);
 int xfs_btree_maxrecs(xfs_btree_cur_t *, xfs_btree_block_t *);
 void xfs_btree_offsets(int, const int *, int, int *, int *);

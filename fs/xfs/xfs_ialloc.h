@@ -8,9 +8,9 @@
 #define	XFS_IALLOC_MAX_EVER(s,a)	xfs_extlen_min(XFS_IALLOC_MAX_EVER_BLOCKS, XFS_IALLOC_MAX_EVER_INODES >> (s)->sb_inopblog)
 #define	XFS_IALLOC_MIN_ALLOC(s,a)	1
 #define XFS_IALLOC_MAX_ALLOC(s,a)	\
-	(((a)->ag_icount >> (s)->sb_inopblog) >= XFS_IALLOC_MAX_EVER(s,a) ? \
+	(((a)->agi_count >> (s)->sb_inopblog) >= XFS_IALLOC_MAX_EVER(s,a) ? \
 		XFS_IALLOC_MAX_EVER(s,a) : \
-		((a)->ag_icount ? ((a)->ag_icount >> (s)->sb_inopblog) : 1))
+		((a)->agi_count ? ((a)->agi_count >> (s)->sb_inopblog) : 1))
 
 /*
  * Structures for inode mapping
@@ -51,3 +51,4 @@ xfs_agino_t xfs_difree(xfs_trans_t *, xfs_ino_t);
 int xfs_dilocate(xfs_mount_t *, xfs_trans_t *, xfs_ino_t, xfs_fsblock_t *, int *);
 
 #endif	/* !_FS_XFS_IALLOC_H */
+void xfs_btree_log_agi(xfs_trans_t *, buf_t *, int);

@@ -27,6 +27,12 @@ typedef	__int32_t	xfs_tid_t;	/* transaction identifier */
 #define	NULLAGNUMBER	((xfs_agnumber_t)-1)
 #define	NULLEXTNUM	((xfs_extnum_t)-1)
 
-typedef enum { XFS_LOOKUP_EQ, XFS_LOOKUP_LE, XFS_LOOKUP_GE } xfs_lookup_t;
+typedef enum {
+	XFS_LOOKUP_EQ, XFS_LOOKUP_LE, XFS_LOOKUP_GE
+} xfs_lookup_t;
+
+typedef enum {
+	XFS_BTNUM_BNO, XFS_BTNUM_CNT, XFS_BTNUM_BMAP, XFS_BTNUM_MAX
+} xfs_btnum_t;
 
 #endif	/* !_FS_XFS_TYPES_H */
