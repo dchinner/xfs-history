@@ -1800,14 +1800,13 @@ xfs_showargs(
 	if (mp->m_logbsize > 0)
 		seq_printf(m, "," MNTOPT_LOGBSIZE "=%d", mp->m_logbsize);
 
-	if (mp->m_ddev_targp->pbr_dev != mp->m_logdev_targp->pbr_dev)
+	if (mp->m_ddev_targp != mp->m_logdev_targp)
 		seq_printf(m, "," MNTOPT_LOGDEV "=%s",
-				bdevname(mp->m_logdev_targp->pbr_dev));
+				XFS_BUFTARG_NAME(mp->m_logdev_targp));
 
-	if (mp->m_rtdev_targp &&
-	    mp->m_ddev_targp->pbr_dev != mp->m_rtdev_targp->pbr_dev)
+	if (mp->m_rtdev_targp && mp->m_ddev_targp != mp->m_rtdev_targp)
 		seq_printf(m, "," MNTOPT_RTDEV "=%s",
-				bdevname(mp->m_rtdev_targp->pbr_dev));
+				XFS_BUFTARG_NAME(mp->m_rtdev_targp));
 
 	if (mp->m_dalign > 0)
 		seq_printf(m, "," MNTOPT_SUNIT "=%d",
