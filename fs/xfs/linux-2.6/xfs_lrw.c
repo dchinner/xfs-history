@@ -667,19 +667,21 @@ start:
 			return error;
 		}
 		eventsent = 1;
+
+		/*
+		 * The iolock was dropped and reaquired in
+		 * xfs_dm_send_data_event so we have to recheck the size
+		 *  when appending.  We will only "goto start;" once,
+		 *  since having sent the event prevents another call
+		 *  to xfs_dm_send_data_event, which is what
+		 *  allows the size to change in the first place.
+		 */
+		if ((ioflags & O_APPEND) && savedsize != xip->i_d.di_size) {
+			*offsetp = isize = xip->i_d.di_size;
+			goto start;
+		}
 	}
-	/*
-	 * The iolock was dropped and reaquired in
-	 * xfs_dm_send_data_event so we have to recheck the size
-	 *  when appending.  We will only "goto start;" once,
-	 *  since having sent the event prevents another call
-	 *  to xfs_dm_send_data_event, which is what
-	 *  allows the size to change in the first place.
-	 */
-	if ((ioflags & O_APPEND) && savedsize != xip->i_d.di_size) {
-		*offsetp = isize = xip->i_d.di_size;
-		goto start;
-	}
+
 #endif /* CONFIG_XFS_DMAPI */
 
 	/*
