@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision: 1.36 $"
 
 struct cred;
 struct xfs_ihash;
@@ -61,6 +61,7 @@ typedef struct xfs_mount {
 	uint			m_bm_maxlevels;	/* XFS_BM_MAXLEVELS */
 	uint			m_in_maxlevels;	/* XFS_IN_MAXLEVELS */
 	struct xfs_perag	*m_perag;	/* per-ag accounting info */
+	mrlock_t		m_peraglock;	/* lock for m_perag (pointer) */
 } xfs_mount_t;
 
 /*

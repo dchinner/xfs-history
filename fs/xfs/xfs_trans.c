@@ -291,7 +291,7 @@ void
 xfs_trans_mod_sb(
 	xfs_trans_t	*tp,
 	uint		field,
-	int		delta)
+	long		delta)
 {
 	xfs_sb_t	*sbp;
 
@@ -346,6 +346,14 @@ xfs_trans_mod_sb(
 		ASSERT(delta < 0);
 		tp->t_res_frextents_delta += delta;
 		break;
+	case XFS_TRANS_SB_DBLOCKS:
+		ASSERT(delta > 0);
+		tp->t_dblocks_delta += delta;
+		break;
+	case XFS_TRANS_SB_AGCOUNT:
+		ASSERT(delta > 0);
+		tp->t_agcount_delta += delta;
+		break;
 	default:
 		ASSERT(0);
 		return;
@@ -368,6 +376,7 @@ xfs_trans_apply_sb_deltas(
 {
 	xfs_sb_t	*sbp;
 	buf_t		*bp;
+	int		whole = 0;
 
 	bp = xfs_trans_getsb(tp, 0);
 	sbp = XFS_BUF_TO_SBP(bp);
@@ -394,14 +403,28 @@ xfs_trans_apply_sb_deltas(
 	if (tp->t_frextents_delta != 0) {
 		sbp->sb_frextents += tp->t_frextents_delta;
 	}
+	if (tp->t_dblocks_delta != 0) {
+		sbp->sb_dblocks += tp->t_dblocks_delta;
+		whole = 1;
+	}
+	if (tp->t_agcount_delta != 0) {
+		sbp->sb_agcount += tp->t_agcount_delta;
+		whole = 1;
+	}
 
-	/*
-	 * Since all the modifiable fields are contiguous, we
-	 * can get away with this.
-	 */
-	xfs_trans_log_buf(tp, bp, offsetof(xfs_sb_t, sb_icount),
-			  offsetof(xfs_sb_t, sb_frextents) +
-			  sizeof(sbp->sb_frextents) - 1);
+	if (whole)
+		/*
+		 * Log the whole thing, the fields are discontiguous.
+		 */
+		xfs_trans_log_buf(tp, bp, 0, sizeof(xfs_sb_t) - 1);
+	else
+		/*
+		 * Since all the modifiable fields are contiguous, we
+		 * can get away with this.
+		 */
+		xfs_trans_log_buf(tp, bp, offsetof(xfs_sb_t, sb_icount),
+				  offsetof(xfs_sb_t, sb_frextents) +
+				  sizeof(sbp->sb_frextents) - 1);
 }
 
 /*
@@ -415,7 +438,7 @@ void
 xfs_trans_unreserve_and_mod_sb(
 	xfs_trans_t	*tp)
 {
-	xfs_mod_sb_t	msb[5];		/* If you add cases, add entries */
+	xfs_mod_sb_t	msb[8];		/* If you add cases, add entries */
 	xfs_mod_sb_t	*msbp;
 	int		n;
 	int		error;
@@ -473,6 +496,18 @@ xfs_trans_unreserve_and_mod_sb(
 		if (tp->t_frextents_delta != 0) {
 			msbp->msb_field = XFS_SB_FREXTENTS;
 			msbp->msb_delta = tp->t_frextents_delta;
+			msbp++;
+			n++;
+		}
+		if (tp->t_dblocks_delta != 0) {
+			msbp->msb_field = XFS_SB_DBLOCKS;
+			msbp->msb_delta = tp->t_dblocks_delta;
+			msbp++;
+			n++;
+		}
+		if (tp->t_agcount_delta != 0) {
+			msbp->msb_field = XFS_SB_AGCOUNT;
+			msbp->msb_delta = tp->t_agcount_delta;
 			msbp++;
 			n++;
 		}

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.73 $"
+#ident	"$Revision: 1.74 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -89,9 +89,11 @@ xfs_mount_free(xfs_mount_t *mp)
 	if (mp->m_ihashmask)
 		xfs_ihash_free(mp);
 
-	if (mp->m_perag)
+	if (mp->m_perag) {
+		mrfree(&mp->m_peraglock);
 		kmem_free(mp->m_perag,
 			  sizeof(xfs_perag_t) * mp->m_sb.sb_agcount);
+	}
 	
 	freesplock(mp->m_ail_lock);
 	freesplock(mp->m_async_lock);
@@ -248,6 +250,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	/*
 	 * Allocate and initialize the per-ag data.
 	 */
+	mrinit(&mp->m_peraglock, "xperag");
 	mp->m_perag =
 		kmem_zalloc(sbp->sb_agcount * sizeof(xfs_perag_t), KM_SLEEP);
 
@@ -543,6 +546,24 @@ xfs_mod_incore_sb_unlocked(xfs_mount_t *mp, uint field, int delta)
 			return (XFS_ERROR(ENOSPC));
 		}
 		mp->m_sb.sb_frextents = lcounter;
+		return (0);
+	case XFS_SB_DBLOCKS:
+		lcounter = mp->m_sb.sb_dblocks;
+		lcounter += delta;
+		if (lcounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_dblocks = lcounter;
+		return (0);
+	case XFS_SB_AGCOUNT:
+		scounter = mp->m_sb.sb_agcount;
+		scounter += delta;
+		if (scounter < 0) {
+			ASSERT(0);
+			return (XFS_ERROR(EINVAL));
+		}
+		mp->m_sb.sb_agcount = scounter;
 		return (0);
 	default:
 		ASSERT(0);
