@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.15 $"
 
 /*
  * Allocation group header
@@ -121,5 +121,16 @@ typedef struct xfs_agi
 
 #define	XFS_BUF_TO_AGF(bp)	((xfs_agf_t *)(bp)->b_un.b_addr)
 #define	XFS_BUF_TO_AGI(bp)	((xfs_agi_t *)(bp)->b_un.b_addr)
+
+/*
+ * For checking for bad ranges of daddr_t's, covering multiple
+ * allocation groups or a single daddr_t that's a superblock copy.
+ */
+#define	XFS_AG_CHECK_DADDR(mp,d,len)	\
+	((len) == 1 ? \
+	    ASSERT((d) == XFS_SB_DADDR || \
+		   XFS_DADDR_TO_AGBNO(mp, d) != XFS_SB_DADDR) : \
+	    ASSERT(XFS_DADDR_TO_AGNO(mp, d) == \
+	           XFS_DADDR_TO_AGNO(mp, (d) + (len) - 1)))
 
 #endif	/* !_FS_XFS_AG_H */
