@@ -54,10 +54,12 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_error.h"
+#include "xfs_rw.h"
 
 #ifdef SIM
 #include "sim.h"
 #endif
+
 
 /*
  * This lock is used by xfs_strat_write().
@@ -75,6 +77,25 @@ static buf_t	*xfsd_list;
 static int	xfsd_bufcount;
 lock_t		xfsd_lock;
 sema_t		xfsd_wait;
+
+/*
+ * Zone allocator for arrays of xfs_bmbt_irec_t used
+ * for calls to xfs_bmapi().
+ */
+zone_t		*xfs_irec_zone;
+
+/*
+ * Zone allocator for arrays of bmapval structures
+ * used in calls to xfs_iomap_XXX routines.
+ */
+zone_t		*xfs_bmap_zone;
+
+/*
+ * Zone allocator for local variables in xfs_strat_write().
+ * This routine is a real problem so we take extreme measures.
+ */
+zone_t		*xfs_strat_write_zone;
+
 
 STATIC void
 xfs_zero_bp(
@@ -390,8 +411,8 @@ xfs_iomap_read(
 	struct bmapval	*next_read_ahead_bmapp;
 	xfs_bmbt_irec_t	*curr_imapp;
 	xfs_bmbt_irec_t	*last_imapp;
+	xfs_bmbt_irec_t	*imap;
 #define	XFS_READ_IMAPS	XFS_BMAP_MAX_NMAP
-	xfs_bmbt_irec_t	imap[XFS_READ_IMAPS];
 
 	mp = ip->i_mount;
 	nisize = ip->i_new_size;
@@ -415,6 +436,7 @@ xfs_iomap_read(
 		xfs_iomap_extra(ip, offset, count, bmapp, nbmaps);
 		return;
 	}
+	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
 	(void)xfs_bmapi(NULL, ip, offset_fsb,
 			(xfs_extlen_t)(last_fsb - offset_fsb),
 			XFS_BMAPI_ENTIRE, NULLFSBLOCK, 0, imap,
@@ -668,6 +690,7 @@ xfs_iomap_read(
 				XFS_FSB_TO_DADDR(mp, curr_bmapp->bn);
 		}
 	}
+	kmem_zone_free(xfs_irec_zone, imap);
 	return;
 }				
 			
@@ -679,8 +702,8 @@ xfs_read_file(
 	int	ioflag,
 	cred_t	*credp)
 {
-#define	XFS_READ_BMAPS	4
-	struct bmapval	bmaps[XFS_READ_BMAPS];
+#define	XFS_READ_BMAPS	XFS_ZONE_NBMAPS
+	struct bmapval	*bmaps;
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	buf_t		*bp;
@@ -693,6 +716,8 @@ xfs_read_file(
 	ip = XFS_VTOI(vp);
 	error = 0;
 	buffer_bytes_ok = 0;
+	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
+
 	/*
 	 * Loop until uio->uio_resid, which is the number of bytes the
 	 * caller has requested, goes to 0 or we get an error.  Each
@@ -769,6 +794,7 @@ xfs_read_file(
 
 	} while (!error && (uiop->uio_resid != 0) && buffer_bytes_ok);
 
+	kmem_zone_free(xfs_bmap_zone, bmaps);
 	return error;
 }
 
@@ -784,7 +810,7 @@ xfs_read_file(
  */
 int
 xfs_read(
-	vnode_t	*vp,
+	vnode_t		*vp,
 	uio_t		*uiop,
 	int		ioflag,
 	cred_t		*credp)
@@ -1040,8 +1066,8 @@ xfs_iomap_write(
 	struct bmapval	*last_bmapp;
 	xfs_bmbt_irec_t	*curr_imapp;
 	xfs_bmbt_irec_t	*last_imapp;
+	xfs_bmbt_irec_t	*imap;
 #define	XFS_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
-	xfs_bmbt_irec_t	imap[XFS_WRITE_IMAPS];
 
 	ASSERT(ismrlocked(&ip->i_lock, MR_UPDATE) != 0);
 
@@ -1049,6 +1075,7 @@ xfs_iomap_write(
 	isize = ip->i_d.di_size;
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
 	nimaps = XFS_WRITE_IMAPS;
+	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
 	last_fsb = XFS_B_TO_FSB(mp, offset + count);
 	(void) xfs_bmapi(NULL, ip, offset_fsb,
 			 (xfs_extlen_t)(last_fsb - offset_fsb),
@@ -1234,6 +1261,7 @@ xfs_iomap_write(
 	 * have made it invalid.
 	 */
 	XFS_INODE_CLEAR_READ_AHEAD(ip);
+	kmem_zone_free(xfs_irec_zone, imap);
 }
 
 
@@ -1244,8 +1272,8 @@ xfs_write_file(
 	int	ioflag,
 	cred_t	*credp)
 {
-#define	XFS_WRITE_BMAPS	4
-	struct bmapval	bmaps[XFS_WRITE_BMAPS];
+#define	XFS_WRITE_BMAPS	XFS_ZONE_NBMAPS
+	struct bmapval	*bmaps;
 	struct bmapval	*bmapp;
 	int		nbmaps;
 	buf_t		*bp;
@@ -1259,6 +1287,8 @@ xfs_write_file(
 	error = 0;
 	buffer_bytes_ok = 0;
 	eof_zeroed = 0;
+	bmaps = (struct bmapval *)kmem_zone_alloc(xfs_bmap_zone, KM_SLEEP);
+
 	/*
 	 * i_new_size is used by xfs_iomap_read() when the chunk
 	 * cache code calls back into the file system through
@@ -1389,6 +1419,7 @@ xfs_write_file(
 	} while ((uiop->uio_resid > 0) && !error);
 
 	ip->i_new_size = 0;
+	kmem_zone_free(xfs_bmap_zone, bmaps);
 	return error;
 }
 
@@ -1695,8 +1726,8 @@ xfs_strat_read(
 	int		data_offset;
 	int		data_len;
 	int		nimaps;
-#define	XFS_STRAT_READ_IMAPS	4
-        xfs_bmbt_irec_t	imap[XFS_STRAT_READ_IMAPS];
+	xfs_bmbt_irec_t	*imap;
+#define	XFS_STRAT_READ_IMAPS	XFS_BMAP_MAX_NMAP
 	
 	ASSERT(bp->b_blkno == -1);
 	ip = XFS_VTOI(vp);
@@ -1714,6 +1745,7 @@ xfs_strat_read(
 		count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
 	}
 	map_start_fsb = offset_fsb;
+	imap = (xfs_bmbt_irec_t *)kmem_zone_alloc(xfs_irec_zone, KM_SLEEP);
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	while (count_fsb != 0) {
 		nimaps = XFS_STRAT_READ_IMAPS;
@@ -1784,6 +1816,7 @@ xfs_strat_read(
 	}
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	iodone(bp);
+	kmem_zone_free(xfs_irec_zone, imap);
 }
 
 
@@ -1921,85 +1954,78 @@ xfs_strat_write(
 	vnode_t	*vp,
 	buf_t	*bp)
 {
-	xfs_fileoff_t	offset_fsb;
-	xfs_fileoff_t   map_start_fsb;
-	xfs_fileoff_t	imap_offset;
-	xfs_fsblock_t	first_block;
-	xfs_extlen_t	count_fsb;
-	xfs_extlen_t	imap_blocks;
-	int		x;
-	caddr_t		datap;
-	buf_t		*rbp;
-	xfs_mount_t	*mp;
-	xfs_inode_t	*ip;
-	xfs_trans_t	*tp;
-	int		error;
-	xfs_bmap_free_t	free_list;
-	xfs_bmbt_irec_t	*imapp;
-	int		rbp_offset;
-	int		rbp_len;
-	int		set_lead = 0;
-	int		s;
-	int		imap_index;
-	int		nimaps;
-#define	XFS_STRAT_WRITE_IMAPS	4
-	xfs_bmbt_irec_t	imap[XFS_STRAT_WRITE_IMAPS];
+	xfs_strat_write_locals_t	*locals;
+#define	XFS_STRAT_WRITE_IMAPS	XFS_BMAP_MAX_NMAP
 	
-	ip = XFS_VTOI(vp);
-	mp = ip->i_mount;
+	locals = (xfs_strat_write_locals_t *)
+		kmem_zone_alloc(xfs_strat_write_zone, KM_SLEEP);
+
+	locals->ip = XFS_VTOI(vp);
+	locals->mp = locals->ip->i_mount;
+	locals->set_lead = 0;
 	bp->b_flags |= B_STALE;
 
 	ASSERT(bp->b_blkno == -1);
-	offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
-	count_fsb = XFS_B_TO_FSB(mp, bp->b_bcount);
-	xfs_strat_write_check(ip, offset_fsb, count_fsb, imap,
+	locals->offset_fsb = XFS_BB_TO_FSBT(locals->mp, bp->b_offset);
+	locals->count_fsb = XFS_B_TO_FSB(locals->mp, bp->b_bcount);
+	xfs_strat_write_check(locals->ip, locals->offset_fsb,
+			      locals->count_fsb, locals->imap,
 			      XFS_STRAT_WRITE_IMAPS);
-	map_start_fsb = offset_fsb;
-	while (count_fsb != 0) {
+	locals->map_start_fsb = locals->offset_fsb;
+	while (locals->count_fsb != 0) {
 		/*
 		 * Set up a transaction with which to allocate the
 		 * backing store for the file.
 		 */
-		tp = xfs_trans_alloc(mp, XFS_TRANS_FILE_WRITE);
-		error = xfs_trans_reserve(tp, 0, XFS_DEFAULT_LOG_RES(mp),
-					  0, 0);
-		ASSERT(error == 0);
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-		xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
-		xfs_trans_ihold(tp, ip);
+		locals->tp = xfs_trans_alloc(locals->mp,
+					     XFS_TRANS_FILE_WRITE);
+		locals->error = xfs_trans_reserve(locals->tp, 0,
+					XFS_DEFAULT_LOG_RES(locals->mp),
+					0, 0);
+		ASSERT(locals->error == 0);
+		xfs_ilock(locals->ip, XFS_ILOCK_EXCL);
+		xfs_trans_ijoin(locals->tp, locals->ip, XFS_ILOCK_EXCL);
+		xfs_trans_ihold(locals->tp, locals->ip);
 
 		/*
 		 * Allocate the backing store for the file.
 		 */
-		XFS_BMAP_INIT(&free_list, &first_block);
-		nimaps = XFS_STRAT_WRITE_IMAPS;
-		first_block = xfs_bmapi(tp, ip, map_start_fsb, count_fsb,
-					XFS_BMAPI_WRITE, first_block, 1,
-					imap, &nimaps, &free_list);
-		ASSERT(nimaps > 0);
-		(void) xfs_bmap_finish(&tp, &free_list, first_block, 0);
+		XFS_BMAP_INIT(&(locals->free_list), &(locals->first_block));
+		locals->nimaps = XFS_STRAT_WRITE_IMAPS;
+		locals->first_block = xfs_bmapi(locals->tp, locals->ip,
+						locals->map_start_fsb,
+						locals->count_fsb,
+						XFS_BMAPI_WRITE,
+						locals->first_block, 1,
+						locals->imap,
+						&(locals->nimaps),
+						&(locals->free_list));
+		ASSERT(locals->nimaps > 0);
+		(void) xfs_bmap_finish(&(locals->tp), &(locals->free_list),
+				       locals->first_block, 0);
 
-		xfs_trans_commit(tp, 0);
+		xfs_trans_commit(locals->tp, 0);
 
 		/*
 		 * Before dropping the lock, clear any read-ahead state
 		 * since in allocating space here we may have made it
 		 * invalid.
 		 */
-		XFS_INODE_CLEAR_READ_AHEAD(ip);
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		XFS_INODE_CLEAR_READ_AHEAD(locals->ip);
+		xfs_iunlock(locals->ip, XFS_ILOCK_EXCL);
 
 		/*
 		 * This is a quick check to see if the first time through
 		 * was able to allocate a single extent over which to
 		 * write
 		 */
-		if ((map_start_fsb == offset_fsb) &&
-		    (imap[0].br_blockcount == count_fsb)) {
-			ASSERT(nimaps == 1);
-			bp->b_blkno = XFS_FSB_TO_DADDR(mp,
-						     imap[0].br_startblock);
-			bp->b_bcount = XFS_FSB_TO_B(mp, count_fsb);
+		if ((locals->map_start_fsb == locals->offset_fsb) &&
+		    (locals->imap[0].br_blockcount == locals->count_fsb)) {
+			ASSERT(locals->nimaps == 1);
+			bp->b_blkno = XFS_FSB_TO_DADDR(locals->mp,
+					    locals->imap[0].br_startblock);
+			bp->b_bcount = XFS_FSB_TO_B(locals->mp,
+						    locals->count_fsb);
 			bdstrat(bmajor(bp->b_edev), bp);
 			return;
 		}
@@ -2014,24 +2040,30 @@ xfs_strat_write(
 		 * deal with marking our bp as done when they have
 		 * ALL completed.
 		 */
-		imap_index = 0;
-		if (!set_lead) {
+		locals->imap_index = 0;
+		if (!locals->set_lead) {
 			bp->b_flags |= B_LEADER | B_PARTIAL;
-			set_lead = 1;
+			locals->set_lead = 1;
 		}
-		while (imap_index < nimaps) {
-			rbp = getrbuf(KM_SLEEP);
+		while (locals->imap_index < locals->nimaps) {
+			locals->rbp = getrbuf(KM_SLEEP);
 
-			imapp = &imap[imap_index];
-			ASSERT((imapp->br_startblock != DELAYSTARTBLOCK) &&
-			       (imapp->br_startblock != HOLESTARTBLOCK));
-			imap_offset = imapp->br_startoff;
-			rbp_offset = XFS_FSB_TO_B(mp, imap_offset - offset_fsb);
-			imap_blocks = imapp->br_blockcount;
-			rbp_len = XFS_FSB_TO_B(mp, imap_blocks);
-			xfs_overlap_bp(bp, rbp, rbp_offset, rbp_len);
-			rbp->b_blkno = XFS_FSB_TO_DADDR(mp,
-							imapp->br_startblock);
+			locals->imapp = &(locals->imap[locals->imap_index]);
+			ASSERT((locals->imapp->br_startblock !=
+				DELAYSTARTBLOCK) &&
+			       (locals->imapp->br_startblock !=
+				HOLESTARTBLOCK));
+			locals->imap_offset = locals->imapp->br_startoff;
+			locals->rbp_offset = XFS_FSB_TO_B(locals->mp,
+						  locals->imap_offset -
+						  locals->offset_fsb);
+			locals->imap_blocks = locals->imapp->br_blockcount;
+			locals->rbp_len = XFS_FSB_TO_B(locals->mp,
+						       locals->imap_blocks);
+			xfs_overlap_bp(bp, locals->rbp, locals->rbp_offset,
+				       locals->rbp_len);
+			locals->rbp->b_blkno = XFS_FSB_TO_DADDR(locals->mp,
+					       locals->imapp->br_startblock);
 			
 			/*
 			 * Link the buffer into the list of subordinate
@@ -2044,26 +2076,27 @@ xfs_strat_write(
 			 * fields until it finds the buffer marked with
 			 * B_LEADER.
 			 */
-			s = splockspl(xfs_strat_lock, splhi);
-			rbp->b_fsprivate = bp;
-			rbp->b_fsprivate2 = bp->b_fsprivate2;
+			locals->s = splockspl(xfs_strat_lock, splhi);
+			locals->rbp->b_fsprivate = bp;
+			locals->rbp->b_fsprivate2 = bp->b_fsprivate2;
 			if (bp->b_fsprivate2 != NULL) {
 				((buf_t*)(bp->b_fsprivate2))->b_fsprivate =
-									rbp;
+								locals->rbp;
 			}
-			bp->b_fsprivate2 = rbp;
-			spunlockspl(xfs_strat_lock, s);
+			bp->b_fsprivate2 = locals->rbp;
+			spunlockspl(xfs_strat_lock, locals->s);
 
-			rbp->b_relse = xfs_strat_write_relse;
-			rbp->b_flags |= B_ASYNC;
+			locals->rbp->b_relse = xfs_strat_write_relse;
+			locals->rbp->b_flags |= B_ASYNC;
 
-			bdstrat(bmajor(rbp->b_edev), rbp);
+			bdstrat(bmajor(locals->rbp->b_edev), locals->rbp);
 
-			map_start_fsb += imapp->br_blockcount;
-			count_fsb -= imapp->br_blockcount;
-			ASSERT(count_fsb >= 0);
+			locals->map_start_fsb +=
+				locals->imapp->br_blockcount;
+			locals->count_fsb -= locals->imapp->br_blockcount;
+			ASSERT(locals->count_fsb >= 0);
 
-			imap_index++;
+			locals->imap_index++;
 		}
 	}
 
@@ -2074,7 +2107,7 @@ xfs_strat_write(
 	 * indicate that the last subordinate buffer to complete should
 	 * mark the buffer done.
 	 */
-	s = splockspl(xfs_strat_lock, splhi);
+	locals->s = splockspl(xfs_strat_lock, splhi);
 	ASSERT((bp->b_flags & (B_DONE | B_PARTIAL)) == B_PARTIAL);
 	ASSERT(bp->b_flags & B_LEADER);
 
@@ -2084,14 +2117,14 @@ xfs_strat_write(
 		 * Call iodone() to note that the I/O has completed.
 		 */
 		bp->b_flags &= ~(B_PARTIAL | B_LEADER);
-		spunlockspl(xfs_strat_lock, s);
+		spunlockspl(xfs_strat_lock, locals->s);
 
 		iodone(bp);
 		return;
 	}
 
 	bp->b_flags &= ~B_PARTIAL;
-	spunlockspl(xfs_strat_lock, s);
+	spunlockspl(xfs_strat_lock, locals->s);
 	return;
 }
 
