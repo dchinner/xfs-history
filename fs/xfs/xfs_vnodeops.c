@@ -1,4 +1,4 @@
-#ident "$Revision: 1.195 $"
+#ident "$Revision: 1.196 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5036,7 +5036,7 @@ xfs_fcntl(
 			 * o32 flock64 structure. So the copyin_xlate
 			 * with irix5_n32_to_flock works here.
 			 */
-			if (copyin_xlate((caddr_t)arg, &bf, sizeof bf,
+			if (COPYIN_XLATE((caddr_t)arg, &bf, sizeof bf,
 					 irix5_n32_to_flock,
 					 u.u_procp->p_abi, 1)) {
 				error = XFS_ERROR(EFAULT);
