@@ -1105,9 +1105,9 @@ _xfs_imap_to_bmap(
 		nisize = io->io_new_size;
 
 	for (im=0, pbm=0; im < imaps && pbm < pbmaps; im++,pbmapp++,imap++,pbm++) {
-		pbmapp->pbm_bdev = io->io_flags & XFS_IOCORE_RT ?
-			mp->m_rtdev_targ.pb_targ->pbr_bdev :
-			mp->m_ddev_targ.pb_targ->pbr_bdev;
+		pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
+			mp->m_rtdev_targ.pb_targ :
+			mp->m_ddev_targ.pb_targ;
 		pbmapp->pbm_offset = XFS_FSB_TO_B(mp, imap->br_startoff);
 		pbmapp->pbm_delta = offset - pbmapp->pbm_offset;
 		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
@@ -1362,9 +1362,9 @@ xfs_write_bmap(
 		pbmapp->pbm_bn = PAGE_BUF_DADDR_NULL;
 		pbmapp->pbm_flags = PBMF_DELAY|PBMF_NEW;
 	}
-	pbmapp->pbm_bdev = io->io_flags & XFS_IOCORE_RT ?
-		mp->m_rtdev_targ.pb_targ->pbr_bdev :
-		mp->m_ddev_targ.pb_targ->pbr_bdev;
+	pbmapp->pbm_target = io->io_flags & XFS_IOCORE_RT ?
+		mp->m_rtdev_targ.pb_targ :
+		mp->m_ddev_targ.pb_targ;
 	length = iosize;
 
 	/*

@@ -104,17 +104,6 @@ typedef enum {
 	PBMF_NEW =		0x40	/* we just allocated this space	*/
 } bmap_flags_t;
 
-typedef struct page_buf_bmap_s {
-	page_buf_daddr_t	pbm_bn;	/* block number in file system 	    */
-	struct block_device	*pbm_bdev;
-	loff_t 		pbm_offset; /* byte offset of mapping in file   */
-	size_t		pbm_delta;	/* offset of request into bmap	    */
-	size_t		pbm_bsize;	/* size of this mapping in bytes    */
-	bmap_flags_t	pbm_flags;	/* options flags for mapping	    */
-} page_buf_bmap_t;
-
-typedef page_buf_bmap_t pb_bmap_t;
-
 /*
  *	page_buf_t:  Buffer structure for page cache-based buffers
  *
@@ -190,6 +179,17 @@ typedef struct pb_target {
 } pb_target_t;
 
 #define PB_ADDR_SPACE(pb)  ((pb)->pb_target->pbr_inode->i_mapping)
+
+typedef struct page_buf_bmap_s {
+	page_buf_daddr_t pbm_bn;	/* block number in file system 	    */
+	pb_target_t	*pbm_target;	/* device to do I/O to		    */
+	loff_t 		pbm_offset;	/* byte offset of mapping in file   */
+	size_t		pbm_delta;	/* offset of request into bmap	    */
+	size_t		pbm_bsize;	/* size of this mapping in bytes    */
+	bmap_flags_t	pbm_flags;	/* options flags for mapping	    */
+} page_buf_bmap_t;
+
+typedef page_buf_bmap_t pb_bmap_t;
 
 struct page_buf_s;
 

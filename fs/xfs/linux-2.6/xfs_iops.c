@@ -630,7 +630,7 @@ linvfs_get_block_core(
 		bn += delta;
 
 		bh_result->b_blocknr = bn;
-		bh_result->b_bdev = pbmap.pbm_bdev;
+		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
 		set_bit(BH_Mapped, &bh_result->b_state);
 	}
 
@@ -645,7 +645,7 @@ linvfs_get_block_core(
 			flush_dcache_page(page);
 			kunmap(page);
 		}
-		bh_result->b_bdev = pbmap.pbm_bdev;
+		bh_result->b_bdev = pbmap.pbm_target->pbr_bdev;
 		set_bit(BH_Mapped, &bh_result->b_state);
 		set_bit(BH_Uptodate, &bh_result->b_state);
 		set_bit(BH_Delay, &bh_result->b_state);
@@ -844,6 +844,7 @@ linvfs_prepare_write(
 	}
 }
 
+/* Initiate I/O on a kiobuf of user memory */
 STATIC int
 linvfs_direct_IO(
 	int		rw,
@@ -852,8 +853,90 @@ linvfs_direct_IO(
 	unsigned long	blocknr,
 	int		blocksize)
 {
-	return generic_direct_IO(rw, inode, iobuf, blocknr,
-				blocksize, linvfs_get_block_direct);
+	struct page	**maplist;
+	size_t		page_offset;
+	page_buf_t	*pb;
+	page_buf_bmap_t	map;
+	int		error = 0, nmap;
+	int		pb_flags, map_flags, pg_index = 0;
+	size_t		length, total;
+	loff_t		offset;
+	size_t		map_size, size;
+
+	total = length = iobuf->length;
+	offset = blocknr;
+	offset <<= inode->i_blkbits;
+
+	maplist = iobuf->maplist;
+	page_offset = iobuf->offset;
+
+	map_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_DIRECT;
+	pb_flags = (rw ? PBF_WRITE : PBF_READ) | PBF_FORCEIO | _PBF_LOCKABLE;
+	while (length) {
+		error = linvfs_pb_bmap(inode, offset, length, &map,
+				1, &nmap, map_flags);
+		if (error)
+			break;
+
+		map_size = map.pbm_bsize - map.pbm_delta;
+		size = min(map_size, length);
+		if (map.pbm_flags & PBMF_HOLE) {
+			size_t	zero_len = size;
+
+			if (rw == WRITE)
+				break;
+
+			/* Need to zero it all */
+			while (zero_len) {
+				struct page *page;
+				size_t	pg_len;
+
+				pg_len = min((size_t)(PAGE_CACHE_SIZE - page_offset),
+								zero_len);
+
+				page = maplist[pg_index];
+
+				memset(kmap(page) + page_offset, 0, pg_len);
+				flush_dcache_page(page);
+				kunmap(page);
+
+				zero_len -= pg_len;
+				if ((pg_len + page_offset) == PAGE_CACHE_SIZE) {
+					pg_index++;
+					page_offset = 0;
+				} else {
+					page_offset = (page_offset + pg_len) &
+							~PAGE_CACHE_MASK;
+				}
+			}
+		} else {
+			int	pg_count;
+
+			pg_count = (size + page_offset + PAGE_CACHE_SIZE - 1)
+					>> PAGE_CACHE_SHIFT;
+			pb = pagebuf_lookup(map.pbm_target, inode, offset,
+							size, pb_flags);
+			/* Need to hook up pagebuf to kiobuf pages */
+			pb->pb_pages = &maplist[pg_index];
+			pb->pb_offset = page_offset;
+			pb->pb_page_count = pg_count;
+
+			pb->pb_bn = map.pbm_bn + (map.pbm_delta >> 9);
+			pagebuf_iostart(pb, pb_flags);
+			pb->pb_flags &= ~_PBF_LOCKABLE;
+			pagebuf_rele(pb);
+
+			page_offset = (page_offset + size) & ~PAGE_CACHE_MASK;
+			if (page_offset)
+				pg_count--;
+			pg_index += pg_count;
+		}
+
+		offset += size;
+		length -= size;
+	}
+
+	return error ? error : total - length;
 }
 
 /*

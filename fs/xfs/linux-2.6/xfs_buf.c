@@ -419,7 +419,7 @@ _pagebuf_lookup_pages(
 {
 	loff_t			next_buffer_offset;
 	unsigned long		page_count, pi, index;
-	struct page		*cp, **hash, *cached_page;
+	struct page		*cp, *cached_page;
 	int			gfp_mask, retry_count = 0, rval = 0;
 	int			all_mapped, good_pages;
 	size_t			blocksize;
