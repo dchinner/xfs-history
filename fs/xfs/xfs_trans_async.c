@@ -17,7 +17,6 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_mount.h"

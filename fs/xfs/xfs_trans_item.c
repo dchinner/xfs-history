@@ -7,8 +7,8 @@
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
 #endif
+#include "xfs_types.h"
 #include "xfs_inum.h"
-#include "xfs.h"
 #include "xfs_trans.h"
 
 #ifdef SIM

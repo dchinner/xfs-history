@@ -25,7 +25,6 @@
 #endif
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_buf_item.h"
 #include "xfs_bio.h"

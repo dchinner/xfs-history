@@ -24,7 +24,6 @@
 #include <sys/vnode.h>
 
 #include "xfs_inum.h"
-#include "xfs.h"
 #include "xfs_types.h"
 #include "xfs_sb.h"		/* depends on xfs_types.h & xfs_inum.h */
 #include "xfs_trans.h"

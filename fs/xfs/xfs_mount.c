@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -23,7 +23,6 @@
 #include <stddef.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
-#include "xfs.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
