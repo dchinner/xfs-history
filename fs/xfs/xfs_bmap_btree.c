@@ -215,7 +215,10 @@ XFS_BMAP_BLOCK_DMAXRECS(
 	int		rval;
 
 	dsize = XFS_BMAP_BLOCK_DSIZE(lev, cur);
-	rval = XFS_BTREE_BLOCK_MAXRECS(dsize, xfs_bmbt, lev == 0);
+	if (lev == cur->bc_nlevels - 1)
+		rval = XFS_BTREE_BLOCK_MAXRECS(dsize, xfs_bmdr, lev == 0);
+	else
+		rval = XFS_BTREE_BLOCK_MAXRECS(dsize, xfs_bmbt, lev == 0);
 	return rval;
 }
 
@@ -241,7 +244,10 @@ XFS_BMAP_BLOCK_DMINRECS(
 	int		rval;
 
 	dsize = XFS_BMAP_BLOCK_DSIZE(lev, cur);
-	rval = XFS_BTREE_BLOCK_MINRECS(dsize, xfs_bmbt, lev == 0);
+	if (lev == cur->bc_nlevels - 1)
+		rval = XFS_BTREE_BLOCK_MINRECS(dsize, xfs_bmdr, lev == 0);
+	else
+		rval = XFS_BTREE_BLOCK_MINRECS(dsize, xfs_bmbt, lev == 0);
 	return rval;
 }
 

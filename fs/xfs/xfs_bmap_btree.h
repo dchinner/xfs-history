@@ -103,14 +103,20 @@ typedef	struct xfs_btree_lblock xfs_bmbt_block_t;
 		XFS_BMAP_RBLOCK_ISIZE(lev,cur) : XFS_BMAP_IBLOCK_SIZE(lev,cur))
 
 #define	XFS_BMAP_BLOCK_DMAXRECS(lev,cur) \
+	((lev) == (cur)->bc_nlevels - 1 ? \
+	XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_BLOCK_DSIZE(lev,cur), xfs_bmdr, \
+				lev == 0) : \
 	XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_BLOCK_DSIZE(lev,cur), xfs_bmbt, \
-				lev == 0)
+				lev == 0))
 #define	XFS_BMAP_BLOCK_IMAXRECS(lev,cur) \
 	XFS_BTREE_BLOCK_MAXRECS(XFS_BMAP_BLOCK_ISIZE(lev,cur), xfs_bmbt, \
 				lev == 0)
 #define	XFS_BMAP_BLOCK_DMINRECS(lev,cur) \
+	((lev) == (cur)->bc_nlevels - 1 ? \
+	XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_BLOCK_DSIZE(lev,cur), xfs_bmdr, \
+				lev == 0) : \
 	XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_BLOCK_DSIZE(lev,cur), xfs_bmbt, \
-				lev == 0)
+				lev == 0))
 #define	XFS_BMAP_BLOCK_IMINRECS(lev,cur) \
 	XFS_BTREE_BLOCK_MINRECS(XFS_BMAP_BLOCK_ISIZE(lev,cur), xfs_bmbt, \
 				lev == 0)
