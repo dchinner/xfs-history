@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.84 $"
+#ident	"$Revision: 1.85 $"
 
 #include <limits.h>
 #include <sys/param.h>
@@ -456,6 +456,12 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	int	error;
 
 	xfs_iflush_all(mp, 0);
+	/*
+	 * Flush out the log synchronously so that we know for sure
+	 * that nothing is pinned.  This is important because bflush()
+	 * will skip pinned buffers.
+	 */
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 	bflush(mp->m_dev);
 	if (mp->m_rtdev)
 		bflush(mp->m_rtdev);
