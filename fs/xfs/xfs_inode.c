@@ -18,6 +18,7 @@
 #include <sys/uuid.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
@@ -334,6 +335,16 @@ xfs_iread(
 #endif
 
 	/*
+	 * If we got something that isn't an inode we're in deep
+	 * trouble.
+	 */
+	if (dip->di_core.di_magic != XFS_DINODE_MAGIC) {
+		cmn_err(CE_PANIC,
+			"xfs_iread: bad inode magic number dip 0x%x",
+			dip);
+	}
+
+	/*
 	 * If the on-disk inode is already linked to a directory
 	 * entry, copy all of the inode into the in-core inode.
 	 * xfs_iformat() handles copying in the inode format
@@ -477,6 +488,10 @@ xfs_ialloc(
 
 	vp = XFS_ITOV(ip); 
 	vp->v_type = IFTOVT(mode);
+	if (vp->v_type == VXNAM) {
+		cmn_err(CE_PANIC, "xfs_ialloc: inode type VXNAM ip 0x%x",
+			ip);
+	}
 	vp->v_rdev = rdev;
 	ip->i_d.di_mode = (__uint16_t)mode;
 	ip->i_d.di_nlink = (__int16_t)nlink;

@@ -1466,8 +1466,10 @@ xfs_dir_grow_inode(xfs_trans_t *trans, struct xfs_dir_name *args,
 				       XFS_BMAPI_WRITE | XFS_BMAPI_METADATA,
 				       *(args->firstblock), args->total,
 				       &map, &nmap, args->flist);
-	if (nmap < 1)
+	if (nmap < 1) {
+		ASSERT(0);
 		return(XFS_ERROR(ENOSPC));
+	}
 	*new_blkno = bno;
 	dp->i_d.di_size = XFS_FSB_TO_B(dp->i_mount,
 				       xfs_bmap_last_offset(trans, dp));
