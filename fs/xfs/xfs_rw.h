@@ -36,7 +36,6 @@ struct bhv_desc;
 struct bmapval;
 struct xfs_buf;
 struct cred;
-struct flid;
 struct uio;
 struct vnode;
 struct xfs_inode;
