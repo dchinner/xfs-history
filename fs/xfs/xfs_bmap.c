@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.100 $"
+#ident	"$Revision: 1.101 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -6,22 +6,25 @@
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #include <sys/ktrace.h>
-#include <stddef.h>
+#include <sys/fcntl.h>
+#include <sys/errno.h>
 #ifdef SIM
+#include <stddef.h>
 #include <bstring.h>
 #else
 #include <sys/systm.h>
 #endif
-#include "xfs_types.h"
-#include "xfs_inum.h"
 #ifdef SIM
 #define _KERNEL
 #endif
-#include "sys/uuid.h"
-#include "sys/grio.h"
+#include <sys/uuid.h>
+#include <sys/grio.h>
+#include <sys/pfdat.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
+#include "xfs_types.h"
+#include "xfs_inum.h"
 #include "xfs_log.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
@@ -39,6 +42,7 @@
 #include "xfs_bmap.h"
 #include "xfs_alloc.h"
 #include "xfs_rtalloc.h"
+#include "xfs_error.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -3066,4 +3070,85 @@ xfs_bunmapi(
 	}
 	kmem_check();
 	return firstblock;
+}
+
+/*
+ * Fcntl interface to xfs_bmapi.
+ */
+int						/* error code */
+xfs_getbmap(
+	vnode_t			*vp,		/* vnode pointer */
+	struct getbmap		*bmv,		/* user bmap structure */
+	void			*ap)		/* pointer to user's array */
+{
+	__int64_t		bmvend;		/* last block requested */
+	int			error;		/* return value */
+	int			i;		/* extent number */
+	xfs_inode_t		*ip;		/* xfs incore inode pointer */
+	int			lock;		/* lock state */
+	xfs_bmbt_irec_t		*map;		/* buffer for user's data */
+	int			nex;		/* # of extents can do */
+	int			nmap;		/* number of map entries */
+	struct getbmap		out;		/* output structure */
+	xfs_trans_t		*tp;		/* transaction pointer */
+
+	ip = XFS_VTOI(vp);
+	if (ip->i_d.di_format != XFS_DINODE_FMT_EXTENTS &&
+	    ip->i_d.di_format != XFS_DINODE_FMT_BTREE)
+		return XFS_ERROR(EINVAL);
+	if (bmv->bmv_length == -1)
+		bmv->bmv_length = OFFTOBB(ip->i_d.di_size);
+	bmvend = bmv->bmv_offset + bmv->bmv_length;
+	nex = bmv->bmv_count - 1;
+	ASSERT(nex > 0);
+	if (bmv->bmv_length < 0)
+		return XFS_ERROR(EINVAL);
+	if (bmv->bmv_length == 0) {
+		bmv->bmv_entries = 0;
+		return 0;
+	}
+	xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	if (ip->i_delayed_blks)
+		pflushvp(vp, (off_t)ip->i_d.di_size, 0);
+	lock = xfs_ilock_map_shared(ip);
+	/*
+	 * Don't let nex be bigger than the number of extents
+	 * we can have assuming alternating holes and real extents.
+	 */
+	if (nex > ip->i_d.di_nextents * 2 + 1)
+		nex = ip->i_d.di_nextents * 2 + 1;
+	/*
+	 * This is potentially a lot of memory.
+	 * We need to put this whole thing in a loop, to limit the memory.
+	 */
+	map = kmem_alloc(nex * sizeof(*map), KM_SLEEP);
+	bmv->bmv_entries = 0;
+	nmap = nex;
+	(void)xfs_bmapi(NULL, ip, XFS_BB_TO_FSBT(ip->i_mount, bmv->bmv_offset),
+		XFS_BB_TO_FSB(ip->i_mount, bmv->bmv_length), 0, NULLFSBLOCK, 0,
+		map, &nmap, NULL);
+	xfs_iunlock_map_shared(ip, lock);
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
+	ASSERT(nmap <= nex);
+	for (error = i = 0; i < nmap; i++) {
+		out.bmv_offset = XFS_FSB_TO_BB(ip->i_mount, map[i].br_startoff);
+		out.bmv_length =
+			XFS_FSB_TO_BB(ip->i_mount, map[i].br_blockcount);
+		ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
+		if (map[i].br_startblock == HOLESTARTBLOCK)
+			out.bmv_block = -1;
+		else
+			out.bmv_block = XFS_FSB_TO_BB(ip->i_mount,
+				map[i].br_startblock);
+		if (copyout(&out, ap, sizeof(out))) {
+			error = XFS_ERROR(EFAULT);
+			break;
+		}
+		bmv->bmv_offset = out.bmv_offset + out.bmv_length;
+		bmv->bmv_length = bmvend - bmv->bmv_offset;
+		bmv->bmv_entries++;
+		ap = (void *)((struct getbmap *)ap + 1);
+	}
+	kmem_free(map, nex * sizeof(*map));
+	return error;
 }

@@ -1,9 +1,10 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.33 $"
+#ident "$Revision: 1.34 $"
 
 struct xfs_inode;
+struct getbmap;
 
 /*
  * List of extents to be free "later".
@@ -173,5 +174,14 @@ xfs_bunmapi(
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
 	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
 	int			*done);		/* set if not done yet */
+
+/*
+ * Fcntl interface to xfs_bmapi.
+ */
+int						/* error code */
+xfs_getbmap(
+	vnode_t			*vp,		/* vnode pointer */
+	struct getbmap		*bmv,		/* user bmap structure */
+	void			*ap);		/* pointer to user's array */
 
 #endif	/* _FS_XFS_BMAP_H */
