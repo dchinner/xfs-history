@@ -1,4 +1,4 @@
-#ident "$Revision: 1.13 $"
+#ident "$Revision: 1.14 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -252,7 +252,6 @@ xfs_qm_scall_quotaoff(
 	 */
 	if (mp->m_dev != rootdev && (mp->m_qflags & flags) == 0)
 		return (EEXIST);
-	ASSERT(mp->m_quotainfo);
 	error = 0;
 
 #ifdef _NOPROJQUOTAS
@@ -264,8 +263,11 @@ xfs_qm_scall_quotaoff(
 	 * We don't want to deal with two quotaoffs messing up each other,
 	 * so we're going to serialize it. quotaoff isn't exactly a performance
 	 * critical thing. XXXcurrently, we also take the vfslock.
+	 * If quotaoff, then we must be dealing with the root filesystem.
 	 */
-	mutex_lock(&mp->QI_QOFFLOCK, PINOD);
+	ASSERT(mp->m_quotainfo || mp->m_dev == rootdev);
+	if (mp->m_quotainfo)
+		mutex_lock(&mp->QI_QOFFLOCK, PINOD);
 
 	/*
 	 * Root file system may or may not have quotas on in core.
@@ -278,7 +280,8 @@ xfs_qm_scall_quotaoff(
 			mp->m_sb.sb_qflags &= ~(flags);
 			newflags = mp->m_sb.sb_qflags;
 			XFS_SB_UNLOCK(mp, s);
-			mutex_unlock(&mp->QI_QOFFLOCK);
+			if (mp->m_quotainfo)
+				mutex_unlock(&mp->QI_QOFFLOCK);
 			if (sbflags != newflags)
 			      error = xfs_qm_write_sb_changes(mp, XFS_SB_QFLAGS);
 			return (error);
@@ -304,6 +307,8 @@ xfs_qm_scall_quotaoff(
 			return (EINVAL);
 		}
 	}
+	ASSERT(mp->m_quotainfo);
+
 	/*
 	 * if we're just turning off quota enforcement, change mp and go.
 	 */
@@ -582,7 +587,7 @@ xfs_qm_scall_quotaon(
 	/*
 	 * There's nothing to change if it's the same.
 	 */
-	if (qf == flags && sbflags == 0) 
+	if ((qf & flags) == flags && sbflags == 0) 
 		return (EEXIST);
 	sbflags |= XFS_SB_QFLAGS;
 
@@ -743,8 +748,6 @@ xfs_qm_scall_setqlim(
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
 		mutex_unlock(&mp->QI_QOFFLOCK);
 		ASSERT(error != ENOENT);
-		if (error != ESRCH)
-			xfs_qm_force_quotaoff(mp);
 		return (error);	    
 	}
 	xfs_dqtrace_entry(dqp, "Q_SETQLIM: AFT DQGET");
@@ -889,8 +892,6 @@ xfs_qm_scall_getquota(
 	 * exist, we'll get ENOENT back.
 	 */
 	if (error = xfs_qm_dqget(mp, NULL, id, type, 0, &dqp)) {
-		if (error != ESRCH && error != ENOENT)
-			xfs_qm_force_quotaoff(mp);
 		return (error);
 	}
 
@@ -1160,7 +1161,7 @@ xfs_qm_dqrele_all_inodes(
 	uint		flags)
 {
 	vmap_t 		vmap;
-	xfs_inode_t	*ip;
+	xfs_inode_t	*ip, *topino;
 	uint		ireclaims;
 	vnode_t		*vp;
 	ASSERT(mp->m_quotainfo);
@@ -1172,8 +1173,7 @@ again:
 		goto out;
         do {		
 		/*
-		 * Rootinode has blocks associated with it. How about
-		 * rbmip and rsumip ??? XXX
+		 * Rootinode, rbmip and rsumip have blocks associated with it.
 		 */
 		if (ip == mp->QI_UQIP || ip == mp->QI_PQIP) {
 			ASSERT(ip->i_udquot == NULL);
@@ -1190,6 +1190,7 @@ again:
 			 */
 			VMAP(vp, vmap);
 			ireclaims = mp->m_ireclaims;
+			topino = mp->m_inodes;
 			XFS_MOUNT_IUNLOCK(mp);
 #ifndef _IRIX62_XFS_ONLY
 			if (!(vp = vn_get(vp, &vmap, 0)))
@@ -1203,6 +1204,7 @@ again:
 			VN_RELE(vp);
 		} else {
 			ireclaims = mp->m_ireclaims;
+			topino = mp->m_inodes;
 			XFS_MOUNT_IUNLOCK(mp);
 		}
 
@@ -1222,7 +1224,11 @@ again:
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
 		XFS_MOUNT_ILOCK(mp);
-		if (mp->m_ireclaims != ireclaims) {
+		/*
+		 * If an inode was inserted or removed, we gotta
+		 * start over again.
+		 */
+		if (topino != mp->m_inodes || mp->m_ireclaims != ireclaims) {
 			/* XXX use a sentinel */
 			XFS_MOUNT_IUNLOCK(mp);
 			goto again;
@@ -1352,8 +1358,7 @@ xfs_dqtest_cmp2(
 		if (dqp->q_core.d_btimer == 0 &&
 		    dqp->q_core.d_id != 0) {
 			printf("%d [%s] [0x%x] BLK TIMER NOT STARTED\n", 
-			       (int) d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "PRJ", 
-			       d->q_mount);
+			       (int) d->d_id, DQFLAGTO_TYPESTR(d), d->q_mount);
 			err++;
 		}
 	}
@@ -1362,7 +1367,7 @@ xfs_dqtest_cmp2(
 		if (dqp->q_core.d_itimer == 0 &&
 		    dqp->q_core.d_id != 0) {
 			printf("%d [%s] [0x%x] INO TIMER NOT STARTED\n", 
-			       (int) d->d_id, XFS_QM_ISUDQ(d) ? "USR" : "PRJ", 
+			       (int) d->d_id, DQFLAGTO_TYPESTR(d), 
 			       d->q_mount);
 			err++;
 		}
@@ -1461,11 +1466,9 @@ xfs_qm_internalqcheck_adjust(
 	extern	dev_t		rootdev;
 	boolean_t		ipreleased;
 
-	ASSERT(XFS_IS_QUOTA_ON(mp));
+	ASSERT(XFS_IS_QUOTA_RUNNING(mp));
 
-	/* XXX */
-	if (ino == mp->m_sb.sb_rbmino || ino == mp->m_sb.sb_rsumino ||
-	    ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino)
+	if (ino == mp->m_sb.sb_uquotino || ino == mp->m_sb.sb_pquotino)
                 return (0);
 	ipreleased = B_FALSE;
  again:
@@ -1519,7 +1522,7 @@ xfs_qm_internalqcheck(
 	int		i;
 	xfs_dqtest_t	*d, *e;
 	xfs_dqhash_t	*h1;
-
+	int 		error;
 
 	lastino = 0;
 	qmtest_hashmask = 32;
@@ -1527,6 +1530,9 @@ xfs_qm_internalqcheck(
 	done = 0;
 	qmtest_nfails = 0;
 	
+	if (! XFS_IS_QUOTA_ON(mp))
+		return (ESRCH);
+
 	mutex_lock(&qcheck_lock, PINOD);
 	/* There should be absolutely no quota activity while this
 	   is going on. */
@@ -1539,14 +1545,16 @@ xfs_qm_internalqcheck(
 		 * Iterate thru all the inodes in the file system,
 		 * adjusting the corresponding dquot counters
 		 */
-		if (xfs_bulkstat(mp, NULL, &lastino, &count, 
-					 xfs_qm_internalqcheck_adjust,
-					 0, 
-					 NULL,
-					 &done))
+		if (error = xfs_bulkstat(mp, NULL, &lastino, &count, 
+				 xfs_qm_internalqcheck_adjust,
+				 0, NULL, &done)) {
 			break;
+		}
 	} while (! done);
-
+	if (error) {
+		printf("Bulkstat returned error 0x%x\n", 
+		       error);
+	}
 	printf("Checking results against system dquots\n");
 	for (i = 0; i < qmtest_hashmask; i++) {
 		h1 = &qmtest_udqtab[i];
