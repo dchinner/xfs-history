@@ -1,4 +1,4 @@
-#ident "$Revision: 1.142 $"
+#ident "$Revision: 1.143 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -4677,11 +4677,14 @@ xfs_diordwr(vnode_t	*vp,
 	 * This enforces the alignment restrictions indicated by 
  	 * the F_DIOINFO fcntl call.
 	 *
-	 * We make an exception for swap I/O.  This will always be
-	 * page aligned and all the blocks will already be allocated,
-	 * so we don't need to worry about read/modify/write stuff.
+	 * We make an exception for swap I/O and trusted clients like
+	 * cachefs.  Swap I/O will always be page aligned and all the
+	 * blocks will already be allocated, so we don't need to worry
+	 * about read/modify/write stuff.  Cachefs ensures that it only
+	 * reads back data which it has written, so we don't need to
+	 * worry about block zeroing and such.
  	 */
-	if (!(vp->v_flag & VISSWAP) &&
+	if (!(vp->v_flag & VISSWAP) && !(ioflag & IO_TRUSTEDDIO) &&
 	    ((((long)(uiop->uio_iov->iov_base)) & scache_linemask) ||
 	     (uiop->uio_offset & mp->m_blockmask) ||
 	     (uiop->uio_resid & mp->m_blockmask))) {
@@ -4698,6 +4701,11 @@ xfs_diordwr(vnode_t	*vp,
 		return XFS_ERROR(EINVAL);
 #endif
 	}
+	/*
+	 * This ASSERT should catch bad addresses being passed in by
+	 * trusted callers.
+	 */
+	ASSERT(!(((long)(uiop->uio_iov->iov_base)) & scache_linemask));
 
 	/*
  	 * Do maxio check.
