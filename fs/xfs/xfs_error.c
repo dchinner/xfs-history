@@ -1,38 +1,41 @@
-#ident "$Revision: 1.12 $"
+#ident "$Revision: 1.13 $"
 
 #ifdef SIM
 #define	_KERNEL 1
 #endif
-#include "sys/types.h"
-#include "sys/uuid.h"
+#include <sys/types.h>
+#include <sys/uuid.h>
 #include <sys/vfs.h>
+#include <sys/kmem.h>
+#include <sys/cmn_err.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
-#include "sys/pda.h"
-#include "sys/errno.h"
-#include "sys/debug.h"
+#include <sys/pda.h>
+#include <sys/errno.h>
+#include <sys/debug.h>
 #ifdef SIM
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include "sim.h"
 #else
-#include "sys/systm.h"
-#include "sys/kmem.h"
+#include <sys/systm.h>
 #endif
-#include "sys/cmn_err.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
+#ifndef SIM
 #include "xfs_cxfs.h"
+#endif
 #include "xfs_sb.h"
 #include "xfs_trans.h"
 #include "xfs_mount.h"
+#include "xfs_utils.h"
 #include "xfs_error.h"
 
 #ifdef DEBUG
 int	xfs_etrap[XFS_ERROR_NTRAP] = { 0 }; /* We used to trap { EIO } */
-
 
 int
 xfs_error_trap(int e)
@@ -203,23 +206,29 @@ xfs_errortag_clearall(int fd)
 }
 #endif /* DEBUG || INDUCE_IO_ERROR */
 
-void
-xfs_fs_cmn_err(int level, xfs_mount_t *mp, char *fmt, ...)
+#ifndef SIM
+static void
+xfs_fs_vcmn_err(int level, xfs_mount_t *mp, char *fmt, va_list ap)
 {
-	va_list ap;
 	char	*newfmt;
 	int	len = 16 + mp->m_fsname_len + strlen(fmt);
 
 	newfmt = kmem_alloc(len, KM_SLEEP);
 	sprintf(newfmt, "Filesystem \"%s\": %s", mp->m_fsname, fmt);
-	va_start(ap, fmt);
 	icmn_err(level, newfmt, ap);
-	va_end(ap);
 	kmem_free(newfmt, len);
 }
 
+void
+xfs_fs_cmn_err(int level, xfs_mount_t *mp, char *fmt, ...)
+{
+	va_list ap;
 
-#ifndef SIM
+	va_start(ap, fmt);
+	xfs_fs_vcmn_err(level, mp, fmt, ap);
+	va_end(ap);
+}
+
 void
 xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 {
@@ -232,10 +241,8 @@ xfs_cmn_err(uint64_t panic_tag, int level, xfs_mount_t *mp, char *fmt, ...)
 		cmn_err(CE_ALERT|CE_SYNC,
 			"Transforming an alert into a panic.");
 	}
-
-
 	va_start(ap, fmt);
-	xfs_fs_cmn_err(level, mp, fmt, ap);
+	xfs_fs_vcmn_err(level, mp, fmt, ap);
 	va_end(ap);
 }
 #endif
