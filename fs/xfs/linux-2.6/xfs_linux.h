@@ -209,10 +209,10 @@ typedef struct irix5_dirent {	/* Irix5 view of dirent structure */
  * XXX these need real values in errno.h. asm-i386/errno.h won't 
  * return errnos out of its known range in errno.
  */
-#define ENOTSUP		1008	/* Not supported (POSIX 1003.1b) */
+#define ENOTSUP		ENOTSUPP	/* Not supported (POSIX 1003.1b) */
 #define ENOATTR         ENODATA /* Attribute not found */
-#define EFSCORRUPTED    1010    /* Filesystem is corrupted */
-#define	EWRONGFS	1011	/* Mount with wrong filesystem type */
+#define EFSCORRUPTED    EIO     /* Filesystem is corrupted */
+#define	EWRONGFS	ENOSYS	/* Mount with wrong filesystem type */
 
 #define SYNCHRONIZE()	((void)0)
 #define lbolt		jiffies
