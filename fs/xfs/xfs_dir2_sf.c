@@ -1033,6 +1033,8 @@ xfs_dir2_sf_replace(
 	int			i;		/* entry index */
 #if XFS_BIG_FILESYSTEMS || defined(DEBUG)
 	xfs_ino_t		ino=0;		/* entry old inode number */
+#endif
+#if XFS_BIG_FILESYSTEMS
 	int			i8elevated;	/* sf_toino8 set i8count=1 */
 #endif
 	xfs_dir2_sf_entry_t	*sfep;		/* shortform directory entry */
