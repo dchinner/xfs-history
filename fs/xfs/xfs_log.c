@@ -711,11 +711,11 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 
 	log->l_iclog_bufs = XLOG_NUM_ICLOGS;
 	if (physmem <= btoc(16*1024*1024)) {
-		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 8k */
+		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 16k */
 		log->l_iclog_size_log = XLOG_RECORD_BSHIFT;
 	} else {
-		log->l_iclog_size = XLOG_RECORD_BSIZE * 2;	/* 16k */
-		log->l_iclog_size_log = XLOG_RECORD_BSHIFT+2;
+		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;	/* 32k */
+		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
 	}
 
 	/*
@@ -724,12 +724,14 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	 */
 	ASSERT(XLOG_MAX_RECORD_BSIZE == 32*1024);
 
-	if (mp->m_sb.sb_blocksize >= XLOG_MAX_RECORD_BSIZE) {
+	if (mp->m_sb.sb_blocksize == XLOG_MAX_RECORD_BSIZE) {		/* 32k */
 		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
 		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
-		if (mp->m_sb.sb_blocksize > XLOG_MAX_RECORD_BSIZE) {
-			log->l_iclog_bufs = XLOG_NUM_ICLOGS*2;
-		}
+		log->l_iclog_bufs = XLOG_NUM_ICLOGS*2;			/* 4 */
+	} else if (mp->m_sb.sb_blocksize > XLOG_MAX_RECORD_BSIZE) {	/* 64k */
+		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
+		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
+		log->l_iclog_bufs = XLOG_MAX_ICLOGS;			/* 8 */
 	}
 	if (xlogs != 0) {
 		log->l_iclog_bufs = xlogs;
@@ -788,7 +790,10 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	ASSERT(valusema(&log->l_xbuf->b_lock) <= 0);
 	initnlock(&log->l_icloglock, "iclog");
 	initnlock(&log->l_grant_lock, "grhead_iclog");
+	initnsema(&log->l_flushsema, 0, "ic-flush");
+/*
 	initnsema(&log->l_flushsema, log->l_iclog_bufs, "ic-flush");
+*/
 	xlog_state_ticket_alloc(log);  /* wait until after icloglock inited */
 	
 	/* log record size must be multiple of BBSIZE; see xlog_rec_header_t */
@@ -1319,6 +1324,7 @@ xlog_state_do_callback(xlog_t *log)
 	xlog_in_core_t	   *iclog, *first_iclog;
 	xfs_log_callback_t *cb, *cb_next;
 	int		   spl;
+	int		   flushcnt = 0;
 
 	spl = LOG_LOCK(log);
 	first_iclog = iclog = log->l_iclog;
@@ -1368,8 +1374,16 @@ xlog_state_do_callback(xlog_t *log)
 
 clean:
 	xlog_state_clean_log(log);
+	if (log->l_iclog->ic_state == XLOG_STATE_ACTIVE) {
+		flushcnt = log->l_flushcnt;
+		log->l_flushcnt = 0;
+	}
 	LOG_UNLOCK(log, spl);
+	while (flushcnt--)
+		vsema(&log->l_flushsema);
+#if 0
 	while (cvsema(&log->l_flushsema));
+#endif
 }	/* xlog_state_do_callback */
 
 
@@ -1472,8 +1486,10 @@ restart:
 
 	iclog = log->l_iclog;
 	if (! (iclog->ic_state == XLOG_STATE_ACTIVE)) {
+		log->l_flushcnt++;
 		LOG_UNLOCK(log, spl);
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
+		XFSSTATS.xs_log_noiclogs++;
 		psema(&log->l_flushsema, PINOD);
 		goto restart;
 	}
