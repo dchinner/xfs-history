@@ -16,7 +16,8 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.167 $"
+#ident  "$Revision: 1.168 $"
+
 
 #include <limits.h>
 #ifdef SIM
@@ -1528,17 +1529,12 @@ xfs_sync(
 	int		i;
 	xfs_dinode_t	*dip;
 	xfs_buf_log_item_t	*bip;
-
 #define	RESTART_LIMIT	10
 #define PREEMPT_MASK	0x7f
 
 	mp = XFS_BHVTOM(bdp);
-
-	if ((mp->m_flags & XFS_MOUNT_FS_IS_CLEAN) ||
-	    ((mp->m_flags & XFS_MOUNT_FS_SHUTDOWN) &&
-	     (flags & SYNC_CLOSE) == 0))
+	if (mp->m_flags & XFS_MOUNT_FS_IS_CLEAN)
 		return 0;
-
 	error = 0;
 	last_error = 0;
 	preempt = 0;
@@ -1590,6 +1586,11 @@ xfs_sync(
 		if (vp->v_flag & VISSWAP) {
 			ip = ip->i_mnext;
 			continue;
+		}
+
+		if (XFS_FORCED_SHUTDOWN(mp) && !(flags & SYNC_CLOSE)) {
+			XFS_MOUNT_IUNLOCK(mp);
+			return 0;
 		}
 
 		/*
@@ -1696,18 +1697,12 @@ xfs_sync(
 			if (VN_MAPPED(vp)) {
 				remapf(vp, 0, 1);
 			}
-			pflushinvalvp(vp, 0, last_byte);
-			xfs_ilock(ip, XFS_ILOCK_SHARED);
-#ifdef XFSERRORDEBUG
-			/* XXXsup VREMAPPING ... ? */
-			if (VN_DIRTY(vp) ||
-			    ip->i_queued_bufs ||
-			    vp->v_buf || vp->v_pgcnt) {
-				printf("VNODE SYNC_CLOSE 0x%x\n",
-				       vp);	
+			if (XFS_FORCED_SHUTDOWN(mp)) {
+				ptossvp(vp, 0, last_byte);
+			} else {
+				pflushinvalvp(vp, 0, last_byte);
 			}
-#endif			
-
+			xfs_ilock(ip, XFS_ILOCK_SHARED);
 		} else if (flags & SYNC_DELWRI) {
 			if (VN_DIRTY(vp)) {
 				if (mount_locked) {
