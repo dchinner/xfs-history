@@ -1,4 +1,4 @@
-#ident "$Revision: 1.217 $"
+#ident "$Revision: 1.218 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5079,7 +5079,7 @@ xfs_start_daemons(void)
 
 #define XFSD_SSIZE	(2*KTHREAD_DEF_STACKSZ)
 	for (i = 0; i < num_daemons; i++) {
-		sthread_create("xfsd", 0, XFSD_SSIZE, 0, 174, KT_PS|KT_PRMPT,
+		sthread_create("xfsd", 0, XFSD_SSIZE, 0, 174, KT_PS,
 				(st_func_t *)xfsd, 0, 0, 0, 0);
 	}
 #undef XFSD_SSIZE
