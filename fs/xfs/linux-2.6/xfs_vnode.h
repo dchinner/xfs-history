@@ -233,6 +233,9 @@ typedef	void	(*vop_sethole_t)(bhv_desc_t *, void *, int, int, xfs_off_t);
 typedef	int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *, unsigned int, unsigned long);
 
 typedef struct vnodeops {
+#ifdef CELL_CAPABLE
+        bhv_position_t  vn_position;    /* position within behavior chain */
+#endif
 	vop_open_t		vop_open;
 	vop_close_t		vop_close;
 	vop_read_t		vop_read;
@@ -553,6 +556,20 @@ typedef struct vnodeops {
 				   used by paging to indicate that fs can
 				   return EAGAIN if this would deadlock. */
 
+#ifdef CELL_CAPABLE
+#define IO_PFUSE_SAFE   0x20000 /* VOP_WRITE/VOP_READ: vnode can take addr's,
+                                   kvatopfdat them, bump pf_use, and continue
+                                   to reference data after return from VOP_.
+                                   If IO_SYNC, only concern is kvatopfdat
+                                   returns legal pfdat. */
+#define IO_PAGE_DIRTY   0x40000 /* Pageing I/O writing to page */
+#define IO_TOKEN_MASK  0xF80000 /* Mask for CXFS to encode tokens in ioflag */
+#define IO_TOKEN_SHIFT  19
+#define IO_TOKEN_SET(i) (((i) & IO_TOKEN_MASK) >> IO_TOKEN_SHIFT)
+#define IO_NESTEDLOCK  0x1000000 /* Indicates that XFS_IOLOCK_NESTED was used*/
+#define IO_LOCKED_EXCL 0x2000000 /* Indicates that iolock is held EXCL */
+#endif
+
 /*
  * Flush/Invalidate options for VOP_TOSS_PAGES, VOP_FLUSHINVAL_PAGES and
  * 	VOP_FLUSH_PAGES.
@@ -625,9 +642,21 @@ typedef struct vattr {
 #define	AT_SIZE_NOPERM	0x08000000
 #define	AT_GENCOUNT	0x10000000
 
+#ifdef CELL_CAPABLE
+#define AT_ALL  (AT_TYPE|AT_MODE|AT_UID|AT_GID|AT_FSID|AT_NODEID|\
+                AT_NLINK|AT_SIZE|AT_ATIME|AT_MTIME|AT_CTIME|AT_RDEV|\
+                AT_BLKSIZE|AT_NBLOCKS|AT_VCODE|AT_MAC|AT_ACL|AT_CAP|\
+                AT_INF|AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS|\
+                AT_PROJID|AT_GENCOUNT)
+#endif
+                
 #define	AT_STAT	(AT_TYPE|AT_MODE|AT_UID|AT_GID|AT_FSID|AT_NODEID|AT_NLINK|\
 		AT_SIZE|AT_ATIME|AT_MTIME|AT_CTIME|AT_RDEV|AT_BLKSIZE|\
  		AT_NBLOCKS|AT_PROJID)
+                
+#ifdef CELL_CAPABLE         
+#define AT_TIMES (AT_ATIME|AT_MTIME|AT_CTIME)
+#endif
 
 #define	AT_UPDTIMES (AT_UPDATIME|AT_UPDMTIME|AT_UPDCTIME)
 

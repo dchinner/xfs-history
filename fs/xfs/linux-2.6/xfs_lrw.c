@@ -138,7 +138,7 @@ xfs_read(
 
 		ret = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
 					     *offsetp, size,
-					     UIO_DELAY_FLAG(filp),
+					     FILP_DELAY_FLAG(filp),
 					     NULL /*&locktype*/);
 		if (ret)
 			return -ret;
@@ -660,7 +660,7 @@ start:
 
 		ret = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 				*offsetp, size,
-				UIO_DELAY_FLAG(filp), &locktype);
+				FILP_DELAY_FLAG(filp), &locktype);
 		if (ret) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL);
 			return -ret;
