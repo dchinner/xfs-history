@@ -14,6 +14,8 @@
 #include "xfs_inode.h"
 #include "xfs_bio.h"
 #include "xfs_log.h"
+#include "xfs_mount.h"
+
 #ifdef SIM
 #include "sim.h"
 #endif
