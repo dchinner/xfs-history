@@ -321,8 +321,11 @@ xfs_zero_last_block(
 	 * If the block underlying isize is just a hole, then there
 	 * is nothing to zero.
 	 */
+/**
 	if ((imap.br_startblock == HOLESTARTBLOCK) ||
 	    (imap.br_startblock == DELAYSTARTBLOCK))
+***/
+	if (imap.br_startblock == HOLESTARTBLOCK)
 	{
 		return 0;
 	}
@@ -352,7 +355,7 @@ xfs_zero_last_block(
 		XFS_ILOCK(mp, io, XFS_ILOCK_EXCL|XFS_EXTSIZE_RD);
 		return error;
 	}
-	if ((imap.br_startblock > 0) ||
+	if ((imap.br_startblock > 0) &&
 	    (imap.br_startblock != DELAYSTARTBLOCK)) {
 		pb->pb_bn = XFS_FSB_TO_DB_IO(io, imap.br_startblock);
 		if (imap.br_state == XFS_EXT_UNWRITTEN) {
