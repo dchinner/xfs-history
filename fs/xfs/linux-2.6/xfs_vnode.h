@@ -88,7 +88,6 @@ typedef struct vnode {
  * Vnode to Linux inode mapping.
  */
 #define LINVFS_GET_VP(inode)	((vnode_t *)list_entry(inode, vnode_t, v_inode))
-#define LINVFS_GET_VPTR(inode)	LINVFS_GET_VP(inode)
 #define LINVFS_GET_IP(vp)	(&(vp)->v_inode)
 
 /*

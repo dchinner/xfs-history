@@ -141,7 +141,7 @@ vn_wait(struct vnode *vp)
 struct vnode *
 vn_initialize(vfs_t *vfsp, struct inode *inode)
 {
-	struct vnode	*vp = LINVFS_GET_VPTR(inode);
+	struct vnode	*vp = LINVFS_GET_VP(inode);
 
 	XFS_STATS_INC(xfsstats.vn_active);
 

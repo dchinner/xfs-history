@@ -50,7 +50,7 @@ STATIC void
 validate_fields(
 	struct inode	*ip)
 {
-	vnode_t		*vp = LINVFS_GET_VPTR(ip);
+	vnode_t		*vp = LINVFS_GET_VP(ip);
 	vattr_t		va;
 	int		error;
 
@@ -82,7 +82,7 @@ linvfs_mknod(
 {
 	struct inode	*ip;
 	vattr_t		va;
-	vnode_t		*vp = NULL, *dvp = LINVFS_GET_VPTR(dir);
+	vnode_t		*vp = NULL, *dvp = LINVFS_GET_VP(dir);
 	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
 	int		have_default_acl = 0;
 	int		error = EINVAL;
@@ -187,7 +187,7 @@ linvfs_lookup(
 		return ERR_PTR(-ENAMETOOLONG);
 
 	cvp = NULL;
-	vp = LINVFS_GET_VPTR(dir);
+	vp = LINVFS_GET_VP(dir);
 	VOP_LOOKUP(vp, dentry, &cvp, 0, NULL, NULL, error);
 	if (!error) {
 		ASSERT(cvp);
@@ -219,7 +219,6 @@ linvfs_link(
 		return -EPERM;
 
 	tdvp = LINVFS_GET_VP(dir);
-
 	vp = LINVFS_GET_VP(ip);
 
 	error = 0;
@@ -245,7 +244,7 @@ linvfs_unlink(
 
 	inode = dentry->d_inode;
 
-	dvp = LINVFS_GET_VPTR(dir);
+	dvp = LINVFS_GET_VP(dir);
 
 	VOP_REMOVE(dvp, dentry, NULL, error);
 
@@ -271,7 +270,7 @@ linvfs_symlink(
 	vattr_t		va;
 	struct inode	*ip = NULL;
 
-	dvp = LINVFS_GET_VPTR(dir);
+	dvp = LINVFS_GET_VP(dir);
 
 	bzero(&va, sizeof(va));
 	va.va_type = VLNK;
@@ -306,7 +305,7 @@ linvfs_rmdir(
 	struct dentry	*dentry)
 {
 	struct inode	*inode = dentry->d_inode;
-	vnode_t		*dvp = LINVFS_GET_VPTR(dir);
+	vnode_t		*dvp = LINVFS_GET_VP(dir);
 	int		error;
 
 	VOP_RMDIR(dvp, dentry, NULL, error);
@@ -331,8 +330,8 @@ linvfs_rename(
 	vnode_t		*tvp;	/* target directory */
 	struct inode	*new_inode = NULL;
 
-	fvp = LINVFS_GET_VPTR(odir);
-	tvp = LINVFS_GET_VPTR(ndir);
+	fvp = LINVFS_GET_VP(odir);
+	tvp = LINVFS_GET_VP(ndir);
 
 	new_inode = ndentry->d_inode;
 
@@ -362,7 +361,7 @@ linvfs_readlink(
 	iovec_t		iov;
 	int		error;
 
-	vp = LINVFS_GET_VPTR(dentry->d_inode);
+	vp = LINVFS_GET_VP(dentry->d_inode);
 
 	iov.iov_base = buf;
 	iov.iov_len = size;
@@ -411,7 +410,7 @@ linvfs_follow_link(
 		return -ENOMEM;
 	}
 
-	vp = LINVFS_GET_VPTR(dentry->d_inode);
+	vp = LINVFS_GET_VP(dentry->d_inode);
 
 	iov.iov_base = link;
 	iov.iov_len = MAXNAMELEN;
@@ -443,7 +442,7 @@ linvfs_permission(
 	struct inode	*inode,
 	int		mode)
 {
-	vnode_t		*vp = LINVFS_GET_VPTR(inode);
+	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error;
 
 	mode <<= 6;		/* convert from linux to vnode access bits */
@@ -490,7 +489,7 @@ linvfs_setattr(
 	struct iattr	*attr)
 {
 	struct inode	*inode = dentry->d_inode;
-	vnode_t		*vp = LINVFS_GET_VPTR(inode);
+	vnode_t		*vp = LINVFS_GET_VP(inode);
 	vattr_t		vattr;
 	unsigned int	ia_valid = attr->ia_valid;
 	int		error;
@@ -557,7 +556,7 @@ linvfs_get_block_core(
 	int			direct,
 	page_buf_flags_t	flags)
 {
-	vnode_t			*vp = LINVFS_GET_VPTR(inode);
+	vnode_t			*vp = LINVFS_GET_VP(inode);
 	page_buf_bmap_t		pbmap;
 	int			retpbbm = 1;
 	int			error;
@@ -666,7 +665,7 @@ linvfs_pb_bmap(
 	int		*retpbbm,
 	int		flags)
 {
-	vnode_t		*vp = LINVFS_GET_VPTR(inode);
+	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error;
 
 	*retpbbm = maxpbbm;
@@ -696,7 +695,7 @@ linvfs_bmap(
 	long			block)
 {
 	struct inode		*inode = (struct inode *)mapping->host;
-	vnode_t			*vp = LINVFS_GET_VPTR(inode);
+	vnode_t			*vp = LINVFS_GET_VP(inode);
 	xfs_inode_t		*ip = XFS_BHVTOI(vp->v_fbhv);
 	int			error;
 

@@ -295,7 +295,7 @@ linvfs_mprotect(
 	struct vm_area_struct *vma,
 	unsigned int	newflags)
 {
-	vnode_t		*vp = LINVFS_GET_VPTR(vma->vm_file->f_dentry->d_inode);
+	vnode_t		*vp = LINVFS_GET_VP(vma->vm_file->f_dentry->d_inode);
 	int		error = 0;
 
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {

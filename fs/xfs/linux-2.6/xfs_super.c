@@ -548,9 +548,7 @@ void
 linvfs_set_inode_ops(
 	struct inode	*inode)
 {
-	vnode_t		*vp;
-
-	vp = LINVFS_GET_VPTR(inode);
+	vnode_t		*vp = LINVFS_GET_VP(inode);
 
 	inode->i_mode = VTTOIF(vp->v_type);
 

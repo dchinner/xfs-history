@@ -534,7 +534,7 @@ xfs_ioctl(
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
 
-	vp = LINVFS_GET_VPTR(inode);
+	vp = LINVFS_GET_VP(inode);
 
 	vn_trace_entry(vp, "xfs_ioctl", (inst_t *)__return_address);
 
