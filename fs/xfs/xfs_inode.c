@@ -3082,7 +3082,7 @@ xfs_iflush(
 	 * If the buffer is pinned then push on the log so we won't
 	 * get stuck waiting in the write for too long.
 	 */
-	if (bp->b_pincount > 0) {
+	if (XFS_BUF_ISPINNED(bp)){
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 	}
 

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.83 $"
+#ident "$Revision: 1.84 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -270,7 +270,7 @@ xfs_buf_item_pin(
 	       (bip->bli_flags & XFS_BLI_STALE));
 	xfs_buf_item_trace("PIN", bip);
 	buftrace("XFS_PIN", bp);
-	bpin(bp);
+	xfs_bpin(bp);
 }
 
 
@@ -301,7 +301,7 @@ xfs_buf_item_unpin(
 
 	refcount = atomicAddInt(&bip->bli_refcount, -1);
 	mp = bip->bli_item.li_mountp;
-	bunpin(bp);
+	xfs_bunpin(bp);
 	if ((refcount == 0) && (bip->bli_flags & XFS_BLI_STALE)) {
 		ASSERT(valusema(&bp->b_lock) <= 0);
 		ASSERT(!(XFS_BUF_ISDELAYWRITE(bp)));
@@ -385,7 +385,7 @@ xfs_buf_item_trylock(
 
 	bp = bip->bli_buf;
 
-	if (bp->b_pincount > 0) {
+	if (XFS_BUF_ISPINNED(bp)) {
 		return XFS_ITEM_PINNED;
 	}
 

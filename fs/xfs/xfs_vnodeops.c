@@ -1418,7 +1418,7 @@ xfs_fsync(
 		 * flush all the dirty mmap'd pages.  That requires a
 		 * call to msync().
 		 */
-		VOP_FLUSH_PAGES(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : B_ASYNC,
+		VOP_FLUSH_PAGES(vp, start, stop, (flag & FSYNC_WAIT) ? 0 : XFS_B_ASYNC,
 				FI_NONE, error2);
 	}
 

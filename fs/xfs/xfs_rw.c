@@ -2878,7 +2878,7 @@ xfs_zero_eof(
 		} else
 #endif
 		{	
-			bp_mapin(bp);
+			xfs_bp_mapin(bp);
 			bzero(XFS_BUF_PTR(bp), XFS_BUF_COUNT(bp));
 	        }
 		ASSERT(bp->b_vp);
@@ -4376,7 +4376,7 @@ xfs_bmap(
 		return (EIO);
 	}
 
-	if (flags == B_READ) {
+	if (flags == XFS_B_READ) {
 		ASSERT(ismrlocked(&ip->i_iolock, MR_ACCESS | MR_UPDATE) != 0);
 		unlocked = 0;
 		lockmode = xfs_ilock_map_shared(ip);
@@ -6527,8 +6527,8 @@ xfs_bioerror_relse(
 	XFS_BUF_DONE(bp);
 	XFS_BUF_STALE(bp);
 	bp->b_iodone = NULL;
-	bp->b_bdstrat = NULL;
-	if (!(fl & B_ASYNC)) {
+ 	bp->b_bdstrat = NULL;
+	if (!(fl & XFS_B_ASYNC)) {
 		/*
 		 * Mark b_error and B_ERROR _both_.
 		 * Lot's of chunkcache code assumes that.
@@ -6584,7 +6584,7 @@ xfs_read_buf(
 	int 		 error;
 	
 	bp = xfs_buf_read(target, blkno, len, flags);
-	error = geterror(bp);
+	error = XFS_BUF_GETERROR(bp);
 	if (bp && !error && !XFS_FORCED_SHUTDOWN(mp)) {
 		*bpp = bp;
 	} else {

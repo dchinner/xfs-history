@@ -1460,7 +1460,7 @@ xfs_mountroot(
 			 * because of the log flushes above.
 			 */
 			bp = xfs_getsb(mp, 0);
-			if (bp->b_pincount == 0) {
+			if (!(XFS_BUF_ISPINNED(bp))) {
 				XFS_BUF_UNDONE(bp);
 				XFS_BUF_UNREAD(bp);
 				XFS_BUF_WRITE(bp);
@@ -2411,7 +2411,7 @@ xfs_syncsub(
 				ASSERT(vp->v_type == VREG);
 				if (vp->v_type == VREG) {
 					xfs_iunlock(ip, XFS_ILOCK_SHARED);
-					pdflush(vp, B_DELWRI);
+					pdflush(vp, XFS_B_DELWRI);
 					xfs_ilock(ip, XFS_ILOCK_SHARED);
 				}
 			}
@@ -2666,7 +2666,7 @@ xfs_syncsub(
 				bip = XFS_BUF_FSPRIVATE(bp,xfs_buf_log_item_t*);
 				if ((bip != NULL) &&
 				    xfs_buf_item_dirty(bip)) {
-					if (bp->b_pincount == 0) {
+					if (!(XFS_BUF_ISPINNED(bp))) {
 						XFS_BUF_ASYNC(bp);
 						error = xfs_bwrite(mp, bp);
 					} else {
@@ -2687,7 +2687,7 @@ xfs_syncsub(
 			 * that point so it can become pinned in between
 			 * there and here.
 			 */
-			if (bp->b_pincount > 0) {
+			if (XFS_BUF_ISPINNED(bp)) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);
 			}

@@ -351,7 +351,7 @@ xfs_trans_read_buf(
 		if ((bp != NULL) && (XFS_BUF_GETERROR(bp) != 0)) {
 			xfs_ioerror_alert("xfs_trans_read_buf", mp,
 					  target->dev, blkno);
-			error = geterror(bp);
+			error = XFS_BUF_GETERROR(bp);
 			xfs_buf_relse(bp);
 			return error;
 		}

@@ -783,7 +783,7 @@ xfs_inode_item_pushbuf(
 			iip->ili_pushbuf_flag = 0;
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 			buftrace("INODE ITEM PUSH", bp);
-			if (bp->b_pincount > 0) {
+			if (XFS_BUF_ISPINNED(bp)) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
 					      XFS_LOG_FORCE);
 			}

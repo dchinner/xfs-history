@@ -961,7 +961,7 @@ xlog_iodone(xfs_buf_t *bp)
 	/*
 	 * Race to shutdown the filesystem if we see an error.
 	 */
-	if (geterror(bp)) {
+	if (XFS_BUF_GETERROR(bp)) {
 #ifdef DEBUG
 		xfs_fs_cmn_err(CE_ALERT, iclog->ic_log->l_mp,
 			"xlog_iodone: log write error buf 0x%p", bp);

@@ -18,8 +18,9 @@ typedef struct buf xfs_buf_t;
 /* These are just for xfs_syncsub... it sets an internal variable 
  * then passes it to VOP_FLUSH_PAGES or adds the flags to a newly gotten buf_t
  */
-#define XFS_B_ASYNC B_ASYNC
+#define XFS_B_ASYNC  B_ASYNC
 #define XFS_B_DELWRI B_DELWRI
+#define XFS_B_READ   B_READ
 
 #define XFS_BUF_BFLAGS(x)            ((x)->b_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)            ((x)->b_flags = 0) 
@@ -139,6 +140,8 @@ typedef struct buf xfs_buf_t;
 #define XFS_BUF_SET_REF(bp, ref)		\
 			(bp)->b_ref = (ref)
 
+#define XFS_BUF_ISPINNED(bp) ((bp)->b_pincount > 0)
+
 int
 xfs_bdstrat_cb(struct xfs_buf *bp);
 
@@ -158,6 +161,16 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define xfs_buf_relse(bp)			\
 		brelse(bp)
 
+#define xfs_bpin(bp)                 \
+            bpin(bp)
+
+#define xfs_bunpin(bp)               \
+            bunpin(bp)
+#define	xfs_bwait_unpin(bp)          \
+            bwait_unpin(bp)
+#define xfs_bp_mapin(bp)             \
+            bp_mapin(bp)
+
 #endif /* _USING_BUF_T */
 
 #ifdef _USING_PAGEBUF_T
@@ -166,8 +179,9 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 /* These are just for xfs_syncsub... it sets an internal variable 
  * then passes it to VOP_FLUSH_PAGES or adds the flags to a newly gotten buf_t
  */
-#define XFS_B_ASYNC B_ASYNC
-#define XFS_B_DELWRI B_DELWRI
+#define XFS_B_ASYNC  PBF_ASYNC
+#define XFS_B_DELWRI PBF_DELWRI
+#define XFS_B_READ   PBF_READ
 #define XFS_B_STALE (1 << 31)
 #define XFS_BUF_BFLAGS(x)        ((x)->pb_flags)  /* debugging routines might need this */
 #define XFS_BUF_ZEROFLAGS(x)     ((x)->pb_flags = 0) 
@@ -283,6 +297,8 @@ typedef struct buftarg {
 #define XFS_BUF_SET_VTYPE(bp, type)
 #define XFS_BUF_SET_REF(bp, ref)
 
+#define XFS_BUF_ISPINNED(bp) 0 /* ERROR implement me */ 
+
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target) 
 /* return the dev_t being used */
@@ -299,12 +315,23 @@ typedef struct buftarg {
 				PBF_LOCK)
 #define xfs_bdwrite(mp, bp)			\
 			bp->pb_flags |= PBF_DELWRI; \
-			pagebuf_relse(bp)
+			pagebuf_rele(bp)
 
 #define xfs_bawrite(mp, bp) pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC)
 
 #define xfs_buf_relse(bp)	\
 			pagebuf_rele(bp)
+
+#define xfs_bpin(bp)                 \
+     pagebuf_pin(bp)
+
+#define xfs_bunpin(bp)               \
+     pagebuf_unpin(bp)
+#define	xfs_bwait_unpin(bp)          \
+     pagebuf_wait_unpin(bp)
+
+#define xfs_bp_mapin(bp)             \
+        pagebuf_mapin(bp)
 
 #endif /* _USING_PAGEBUF_T */
 

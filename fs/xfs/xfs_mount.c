@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.190 $"
+#ident	"$Revision: 1.191 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1072,7 +1072,7 @@ xfs_unmountfs_writesb(xfs_mount_t *mp)
 		XFS_BUF_UNDONE(sbp);
 		XFS_BUF_UNREAD(sbp);
 		XFS_BUF_WRITE(sbp);
-		bwait_unpin(sbp);
+		xfs_bwait_unpin(sbp);
 		ASSERT(XFS_BUF_TARGET(sbp) == mp->m_dev);
 		xfsbdstrat(mp, sbp);
 		/* Nevermind errors we might get here. */
