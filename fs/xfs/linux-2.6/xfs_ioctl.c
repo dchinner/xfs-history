@@ -351,6 +351,7 @@ xfs_open_by_handle(
 	 */
 	error = linvfs_revalidate_core(inode);
 	if (error) {
+		iput(inode);
 		return -XFS_ERROR(error);
 	}
 
@@ -417,6 +418,7 @@ xfs_open_by_handle(
 	 */
      	filp = dentry_open(dentry, parfilp->f_vfsmnt, hreq.oflags);
 	if (IS_ERR(filp)) {
+		dput(dentry);
 	     	put_unused_fd(new_fd);
 		return -XFS_ERROR(-PTR_ERR(filp));
 	}
