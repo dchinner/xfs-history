@@ -852,10 +852,8 @@ struct inode_operations linvfs_file_inode_operations =
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,1)
   linvfs_updatepage,  /*  updatepage  */
 #endif
-  linvfs_revalidate
-#if defined(_USING_BUF_T)
-  , linvfs_pb_bmap
-#endif
+  linvfs_revalidate,
+  linvfs_pb_bmap
 };
 
 struct inode_operations linvfs_dir_inode_operations =
