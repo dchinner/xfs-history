@@ -295,8 +295,16 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_BUF_SUPER_STALE(x)   (x)->pb_flags & XFS_B_STALE;\
                                  (x)->pb_flags &= ~(PBF_DELWRI|PBF_PARTIAL|PBF_NONE)
 
+static inline void xfs_buf_undelay(page_buf_t *pb)
+{
+	if (pb->pb_list.next != &pb->pb_list) {
+		pagebuf_delwri_dequeue(pb);
+		pagebuf_rele(pb);
+	}
+}
+
 #define XFS_BUF_DELAYWRITE(x)	 ((x)->pb_flags |= PBF_DELWRI)
-#define XFS_BUF_UNDELAYWRITE(x)	 ((x)->pb_flags &= ~PBF_DELWRI)
+#define XFS_BUF_UNDELAYWRITE(x)	 xfs_buf_undelay(x)
 #define XFS_BUF_ISDELAYWRITE(x)	 ((x)->pb_flags & PBF_DELWRI)
 
 
