@@ -206,7 +206,7 @@ xfs_dm_send_create_event(
 	xfs_ino_t	inum;
 	vnode_t		*dir_vp;
 	bhv_desc_t	*bdp;
-#if 0
+#ifdef __sgi
 	struct ncfastdata fd;
 #endif
 	int		error;
@@ -227,7 +227,7 @@ xfs_dm_send_create_event(
 	 * Handle degenerate pathname component.
 	 */
 
-#if 0
+#ifdef __sgi
         /*
          * Try the directory name lookup cache.
          */
@@ -270,15 +270,16 @@ prohibited_mr_events(bhv_desc_t	*bdp)
 {
 	int	prohibited;
 	int	s;
-/* XXX */
-/*	preg_t	*preg;*/
+#ifdef __sgi
+	preg_t	*preg;
+#endif
 	vnode_t	*vp = BHV_TO_VNODE(bdp);
 
 	if (!VN_MAPPED(vp))
 		return 0;
 
 	prohibited = 1 << DM_EVENT_READ;
-#if 0
+#ifdef __sgi
 	s = mutex_spinlock(&mreg_lock);
 	for (preg = vp->v_mreg; preg; preg = preg->p_vchain) {
 		if ((preg->p_maxprots & PROT_WRITE) &&
@@ -316,8 +317,11 @@ xfs_bdp_to_hexhandle(
 	if (type == DM_FSYS_OBJ) {	/* a filesystem handle */
 		length = FSHSIZE;
 	} else {
-/*		length = HSIZE(handle);*/
+#ifdef __sgi
+		length = HSIZE(handle);
+#else
 		length = XFS_HSIZE(handle);
+#endif
 	}
 	for (ip = (u_char *)&handle, i = 0; i < length; i++) {
 		*buffer++ = "0123456789abcdef"[ip[i] >> 4];
@@ -329,7 +333,7 @@ xfs_bdp_to_hexhandle(
 #endif  /* DEBUG_RIGHTS */
 
 
-#if 0
+#ifdef __sgi
 /*
  *  Copy out a size_t possibly adjusting its size according to the abi.
  */
@@ -365,7 +369,7 @@ xfs_copyin_attrname(
 
 	strcpy(to->dan_chars, dmattr_prefix);
 
-#if 0
+#ifdef __sgi
 	error = copyinstr((char *)from, &to->dan_chars[DMATTR_PREFIXLEN],
 		DM_ATTR_NAME_SIZE + 1, NULL);
 #else
@@ -587,7 +591,7 @@ xfs_get_dirents(
 	aiov.iov_len = bufsz;
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-#if 0
+#ifdef __sgi
 	auio.uio_pio = 0;
 	auio.uio_pbuf = 0;
 #endif
@@ -892,10 +896,7 @@ xfs_dm_direct_ok(
 	dm_size_t	len,
 	void		*bufp)
 {
-/* XXX */
-	printk("*** xfs_dm_direct_ok(), direct I/O not implemented yet\n");
-	return 0;
-#if 0
+#ifdef __sgi
 
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
@@ -931,6 +932,8 @@ xfs_dm_direct_ok(
 	/* A valid direct I/O candidate. */
 
 	return(1);
+#else
+	return 0;
 #endif
 }
 
@@ -1020,26 +1023,22 @@ xfs_dm_rdwr(
 	if (xfs_dm_direct_ok(bdp, off, len, bufp))
 		oflags |= O_DIRECT;
 
-/* XXX 
+/* XXX  when will this be available in linux/XFS?
 	if (fflag & FSYNC)
 		fflags |= FSYNC;
 */
 
 	ip = LINVFS_GET_IP(vp);
 	if( ip->i_fop == NULL ){
-printk("%s/%d: ip->i_fop is null\n", __FUNCTION__, __LINE__);
 		return(EINVAL);
 	}
-printk("%s/%d: inode is %lu\n", __FUNCTION__, __LINE__, ip->i_ino);
 
 	dentry = dmapi_dget(ip);
 	if( dentry == NULL ){
-printk("%s/%d: dmapi_dget failed\n", __FUNCTION__, __LINE__);
 		return(ENOMEM);
 	}
 
 	if( ip->i_ino != dentry->d_inode->i_ino ){
-printk("%s/%d: dentry did not match inode\n", __FUNCTION__, __LINE__);
 		dput(dentry);
 		return(EINVAL);
 	}
@@ -1047,7 +1046,6 @@ printk("%s/%d: dentry did not match inode\n", __FUNCTION__, __LINE__);
 	error = init_private_file( &file, dentry,
 				  (fflag&FMODE_READ ? FMODE_READ:FMODE_WRITE));
 	if(error){
-printk("%s/%d: init_private_file failed\n", __FUNCTION__, __LINE__);
 		dput(dentry);
 		return(EINVAL);
 	}
@@ -1073,8 +1071,6 @@ printk("%s/%d: init_private_file failed\n", __FUNCTION__, __LINE__);
 	} else {
 	        XFS_STATS64_ADD(xs_write_bytes, xfer);
 	}
-
-printk("%s/%d: back to you\n", __FUNCTION__, __LINE__);
 
 	return error;
 }
@@ -1155,17 +1151,25 @@ xfs_dm_get_allocinfo_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-/*	if (copyin(offp, &startoff, sizeof(startoff)))*/
+#ifdef __sgi
+	if (copyin(offp, &startoff, sizeof(startoff)))
+		return(EFAULT);
+#else
 	if (copy_from_user( &startoff, offp, sizeof(startoff)))
 		return(EFAULT);
+#endif
 
 	if (startoff > XFS_MAX_FILE_OFFSET)
 		return(EINVAL);
 
 	if (nelem == 0) {
-/*		if (suword(nelemp, 1))*/
+#ifdef __sgi
+		if (suword(nelemp, 1))
+			return(EFAULT);
+#else
 		if (put_user(1, nelemp))
 			return(EFAULT);
+#endif
 		return(E2BIG);
 	}
 
@@ -1227,9 +1231,13 @@ xfs_dm_get_allocinfo_rvp(
 			}
 			startoff = extent.ex_offset + extent.ex_length;
 
-/*			if (copyout(&extent, extentp, sizeof(extent)))*/
+#ifdef __sgi
+			if (copyout(&extent, extentp, sizeof(extent)))
+				return(EFAULT);
+#else
 			if (copy_to_user( extentp, &extent, sizeof(extent)))
 				return(EFAULT);
+#endif
 
 			fsb_bias = fsb_offset - bmp[i].br_startoff;
 			fsb_offset += bmp[i].br_blockcount - fsb_bias;
@@ -1241,16 +1249,27 @@ xfs_dm_get_allocinfo_rvp(
 	if (fsb_length == 0) {
 		startoff = 0;
 	}
-/*	if (copyout(&startoff, offp, sizeof(startoff)))*/
+#ifdef __sgi
+	if (copyout(&startoff, offp, sizeof(startoff)))
+		return(EFAULT);
+#else
 	if (copy_to_user( offp, &startoff, sizeof(startoff)))
 		return(EFAULT);
+#endif
 
-/*	if (copyout(&elem, nelemp, sizeof(elem)))*/
+#ifdef __sgi
+	if (copyout(&elem, nelemp, sizeof(elem)))
+		return(EFAULT);
+#else
 	if (copy_to_user( nelemp, &elem, sizeof(elem)))
 		return(EFAULT);
+#endif
 
-/*	rvp->r_val1 = (fsb_length == 0 ? 0 : 1);*/
+#ifdef __sgi
+	rvp->r_val1 = (fsb_length == 0 ? 0 : 1);
+#else
 	*rvp = (fsb_length == 0 ? 0 : 1);
+#endif
 
 	return(0);
 }
@@ -1296,9 +1315,13 @@ xfs_dm_get_bulkattr_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-/*	if (copyin(locp, &loc, sizeof(loc)))*/
+#ifdef __sgi
+	if (copyin(locp, &loc, sizeof(loc)))
+		return(EFAULT);
+#else
 	if (copy_from_user( &loc, locp, sizeof(loc)))
 		return(EFAULT);
+#endif
 
 	/* Because we will write directly to the user's buffer, make sure that
 	   the buffer is properly aligned.
@@ -1314,9 +1337,13 @@ xfs_dm_get_bulkattr_rvp(
 
 	nelems = buflen / statstruct_sz; 
 	if (! nelems) {
-/*		if (xfs_cpoutsizet(rlenp, statstruct_sz))*/
+#ifdef __sgi
+		if (xfs_cpoutsizet(rlenp, statstruct_sz))
+			return(EFAULT);
+#else
 		if (put_user( statstruct_sz, rlenp ))
 			return(EFAULT);
+#endif
 		return(E2BIG);
 	} 
 
@@ -1335,26 +1362,40 @@ xfs_dm_get_bulkattr_rvp(
 	if (error)
 		return(error);
 	if (!done) {
-/*		rvalp->r_val1 = 1;*/
+#ifdef __sgi
+		rvalp->r_val1 = 1;
+#else
 		*rvalp = 1;
+#endif
 	} else {
-/*		rvalp->r_val1 = 0;*/
+#ifdef __sgi
+		rvalp->r_val1 = 0;
+#else
 		*rvalp = 0;
+#endif
 	}
-/*	if (xfs_cpoutsizet(rlenp, statstruct_sz * nelems))*/
+#ifdef __sgi
+	if (xfs_cpoutsizet(rlenp, statstruct_sz * nelems))
+		return(EFAULT);
+#else
 	if (put_user( statstruct_sz * nelems, rlenp ))
 		return(EFAULT);
+#endif
 
-/*	if (copyout(&loc, locp, sizeof(loc)))*/
+#ifdef __sgi
+	if (copyout(&loc, locp, sizeof(loc)))
+		return(EFAULT);
+#else
 	if (copy_to_user( locp, &loc, sizeof(loc)))
 		return(EFAULT);
+#endif
 	/*
 	 *  If we didn't do any, we must not have any more to do.
 	 */
 	if (nelems < 1)
 		return(0);
 	/* set _link in the last struct to zero */
-#if 0
+#ifdef __sgi
 	if (suword(
 	    &((dm_stat_t *)((char *)bufp + statstruct_sz*(nelems-1)))->_link,
 		   0)
@@ -1425,9 +1466,13 @@ xfs_dm_get_config(
 
 	/* Copy the results back to the user. */
 
-/*	if (copyout(&retval, retvalp, sizeof(retval)))*/
+#ifdef __sgi
+	if (copyout(&retval, retvalp, sizeof(retval)))
+		return(EFAULT);
+#else
 	if (copy_to_user( retvalp, &retval, sizeof(retval)))
 		return(EFAULT);
+#endif
 	return(0);
 }
 
@@ -1456,13 +1501,21 @@ xfs_dm_get_config_events(
 		nelem = DM_EVENT_MAX;
 	eventset &= (1 << nelem) - 1;
 
-/*	if (copyout(&eventset, eventsetp, sizeof(eventset)))*/
+#ifdef __sgi
+	if (copyout(&eventset, eventsetp, sizeof(eventset)))
+		return(EFAULT);
+#else
 	if (copy_to_user( eventsetp, &eventset, sizeof(eventset)))
 		return(EFAULT);
+#endif
 
-/*	if (suword(nelemp, nelem))*/
+#ifdef __sgi
+	if (suword(nelemp, nelem))
+		return(EFAULT);
+#else
 	if (put_user(nelem, nelemp))
 		return(EFAULT);
+#endif
 	return(0);
 }
 
@@ -1563,12 +1616,7 @@ xfs_dm_get_dioinfo(
 	dm_dioinfo_t	dio;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
-
-/* XXX */
-	printk("*** xfs_dm_get_dioinfo(), direct I/O not implemented yet\n");
-	return ENOSYS;
-
-#if 0
+#ifdef __sgi
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
@@ -1617,10 +1665,16 @@ xfs_dm_get_dioinfo(
 		dio.d_dio_only = DM_FALSE;
 	}
 
-/*	if (copyout(&dio, diop, sizeof(dio)))*/
+#ifdef __sgi
+	if (copyout(&dio, diop, sizeof(dio)))
+		return(EFAULT);
+#else
 	if (copy_to_user(diop, &dio, sizeof(dio)))
 		return(EFAULT);
+#endif
 	return(0);
+#else
+	return ENOSYS;
 #endif
 }
 
@@ -1649,14 +1703,22 @@ xfs_dm_get_dirattrs_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-/*	if (copyin(locp, &loc, sizeof(loc)))*/
+#ifdef __sgi
+	if (copyin(locp, &loc, sizeof(loc)))
+		return(EFAULT);
+#else
 	if (copy_from_user( &loc, locp, sizeof(loc)))
 		return(EFAULT);
+#endif
 
 	if ((buflen / DM_STAT_SIZE(MAXNAMLEN)) == 0) {
-/*		if (xfs_cpoutsizet(rlenp, DM_STAT_SIZE(MAXNAMLEN)))*/
+#ifdef __sgi
+		if (xfs_cpoutsizet(rlenp, DM_STAT_SIZE(MAXNAMLEN)))
+			return(EFAULT);
+#else
 		if (put_user( DM_STAT_SIZE(MAXNAMLEN), rlenp ))
 			return(EFAULT);
+#endif
 		return(E2BIG);
 	}
 
@@ -1723,8 +1785,11 @@ xfs_dm_get_dirattrs_rvp(
 		}
 
 		if (nwritten) {
-/*			if (copyout(statbufp, bufp, nwritten)) {*/
+#ifdef __sgi
+			if (copyout(statbufp, bufp, nwritten)) {
+#else
 			if (copy_to_user( bufp, statbufp, nwritten)) {
+#endif
 				error = EFAULT;
 				break;
 			}
@@ -1737,23 +1802,38 @@ xfs_dm_get_dirattrs_rvp(
 	 *  (Doesn't matter either way if there was an error.)
 	 */
 	if (nread) {
-/*		rvp->r_val1 = 1;*/
+#ifdef __sgi
+		rvp->r_val1 = 1;
+#else
 		*rvp = 1;
+#endif
 	} else {
-/*		rvp->r_val1 = 0;*/
+#ifdef __sgi
+		rvp->r_val1 = 0;
+#else
 		*rvp = 0;
+#endif
 	}
 
 	kmem_free(statbufp, statbufsz);
 	kmem_free(direntp, direntbufsz);
-	if (!error)
-/*		if (xfs_cpoutsizet(rlenp, buflen - spaceleft))*/
+	if (!error){
+#ifdef __sgi
+		if (xfs_cpoutsizet(rlenp, buflen - spaceleft))
+			return(EFAULT);
+#else
 		if (put_user( buflen - spaceleft, rlenp))
 			return(EFAULT);
+#endif
+	}
 
-/*	if (!error && copyout(&loc, locp, sizeof(loc)))*/
+#ifdef __sgi
+	if (!error && copyout(&loc, locp, sizeof(loc)))
+		error = EFAULT;
+#else
 	if (!error && copy_to_user(locp, &loc, sizeof(loc)))
 		error = EFAULT;
+#endif
 	return(error);
 }
 
@@ -1814,13 +1894,21 @@ xfs_dm_get_dmattr(
 		error = ENOENT;
 	if (!error && value_len > buflen)
 		error = E2BIG;
-/*	if (!error && copyout(value, bufp, value_len))*/
+#ifdef __sgi
+	if (!error && copyout(value, bufp, value_len))
+		error = EFAULT;
+#else
 	if (!error && copy_to_user(bufp, value, value_len))
 		error = EFAULT;
+#endif
 	if (!error || error == E2BIG) {
-/*		if (xfs_cpoutsizet(rlenp, value_len))*/
+#ifdef __sgi
+		if (xfs_cpoutsizet(rlenp, value_len))
+			error = EFAULT;
+#else
 		if (put_user(value_len, rlenp))
 			error = EFAULT;
+#endif
 	}
 
 	kmem_free(value, alloc_size);
@@ -1873,9 +1961,13 @@ xfs_dm_get_fileattr(
 	xfs_ip_to_stat(mp, &stat, ip);
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
-/*	if (copyout(&stat, statp, sizeof(stat)))*/
+#ifdef __sgi
+	if (copyout(&stat, statp, sizeof(stat)))
+		return(EFAULT);
+#else
 	if (copy_to_user( statp, &stat, sizeof(stat)))
 		return(EFAULT);
+#endif
 	return(0);
 }
 
@@ -1921,14 +2013,22 @@ xfs_dm_get_region(
 
 	elem = (region.rg_flags ? 1 : 0);
 
-/*	if (copyout(&elem, nelemp, sizeof(elem)))*/
+#ifdef __sgi
+	if (copyout(&elem, nelemp, sizeof(elem)))
+		return(EFAULT);
+#else
 	if (copy_to_user( nelemp, &elem, sizeof(elem)))
 		return(EFAULT);
+#endif
 	if (elem > nelem)
 		return(E2BIG);
-/*	if (elem && copyout(&region, regbufp, sizeof(region)))*/
+#ifdef __sgi
+	if (elem && copyout(&region, regbufp, sizeof(region)))
+		return(EFAULT);
+#else
 	if (elem && copy_to_user(regbufp, &region, sizeof(region)))
 		return(EFAULT);
+#endif
 	return(0);
 }
 
@@ -1966,9 +2066,7 @@ xfs_dm_getall_dmattr(
 	buflen &= ~alignment;		/* round down the alignment */
 
 #if defined(HAVE_USERACC)
-/* XXX */
-/*	if ((error = useracc(bufp, buflen, B_READ, NULL)) != 0)*/
-	if ((error = useracc(bufp, buflen, XFS_B_READ, NULL)) != 0)
+	if ((error = useracc(bufp, buflen, B_READ, NULL)) != 0)
 		return error;
 #endif
 
@@ -2070,15 +2168,17 @@ xfs_dm_getall_dmattr(
 	if (!error && total_size > buflen)
 		error = E2BIG;
 	if (!error || error == E2BIG) {
-/*		if (xfs_cpoutsizet(rlenp, total_size))*/
+#ifdef __sgi
+		if (xfs_cpoutsizet(rlenp, total_size))
+			error = EFAULT;
+#else
 		if (put_user(total_size, rlenp))
 			error = EFAULT;
+#endif
 	}
 
 #if defined(HAVE_USERACC)
-/* XXX */
-/*	unuseracc(bufp, buflen, B_READ);*/
-	unuseracc(bufp, buflen, XFS_B_READ);
+	unuseracc(bufp, buflen, B_READ);
 #endif
 	kmem_free(attrlist, list_size);
 	return(error);
@@ -2117,9 +2217,13 @@ xfs_dm_init_attrloc(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-/*	if (copyout(&loc, locp, sizeof(loc)))*/
+#ifdef __sgi
+	if (copyout(&loc, locp, sizeof(loc)))
+		return(EFAULT);
+#else
 	if (copy_to_user( locp, &loc, sizeof(loc)))
 		return(EFAULT);
+#endif
 	return(0);
 }
 
@@ -2174,12 +2278,20 @@ xfs_dm_probe_hole(
 
 	roff = (off + bsize-1) & ~(bsize-1);
 	rlen = 0;		/* Only support punches to EOF for now */
-/*	if (copyout(&roff, roffp, sizeof(roff)))*/
+#ifdef __sgi
+	if (copyout(&roff, roffp, sizeof(roff)))
+		return(EFAULT);
+#else
 	if (copy_to_user( roffp, &roff, sizeof(roff)))
 		return(EFAULT);
-/*	if (copyout(&rlen, rlenp, sizeof(rlen)))*/
+#endif
+#ifdef __sgi
+	if (copyout(&rlen, rlenp, sizeof(rlen)))
+		return(EFAULT);
+#else
 	if (copy_to_user( rlenp, &rlen, sizeof(rlen)))
 		return(EFAULT);
+#endif
 	return(0);
 }
 
@@ -2416,8 +2528,11 @@ xfs_dm_set_dmattr(
 
 	alloc_size = (buflen == 0) ? 1 : buflen;
 	value = kmem_alloc(alloc_size, KM_SLEEP);
-/*	if (copyin(bufp, value, buflen)) {*/
+#ifdef __sgi
+	if (copyin(bufp, value, buflen)) {
+#else
 	if (copy_from_user( value, bufp, buflen)) {
+#endif
 		error = EFAULT;
 	} else {
 		VOP_ATTR_SET(vp, name.dan_chars, value, buflen, 
@@ -2466,9 +2581,13 @@ xfs_dm_set_fileattr(
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
 
-/*	if (copyin(statp, &stat, sizeof(stat)))*/
+#ifdef __sgi
+	if (copyin(statp, &stat, sizeof(stat)))
+		return(EFAULT);
+#else
 	if (copy_from_user( &stat, statp, sizeof(stat)))
 		return(EFAULT);
+#endif
 
 	vat.va_mask = 0;
 
@@ -2566,9 +2685,13 @@ xfs_dm_set_region(
 
 	new_mask = 0;
 	if (nelem == 1) {
-/*		if (copyin(regbufp, &region, sizeof(region)))*/
+#ifdef __sgi
+		if (copyin(regbufp, &region, sizeof(region)))
+			return(EFAULT);
+#else
 		if (copy_from_user( &region, regbufp, sizeof(region)))
 			return(EFAULT);
+#endif
 		if (region.rg_flags & ~(DM_REGION_READ|DM_REGION_WRITE|DM_REGION_TRUNCATE))
 			return(EINVAL);
 		if (region.rg_flags & DM_REGION_READ)
@@ -2615,9 +2738,13 @@ xfs_dm_set_region(
 	} else {
 		exactflag = DM_TRUE;	/* user region was unchanged */
 	}
-/*	if (copyout(&exactflag, exactflagp, sizeof(exactflag)))*/
+#ifdef __sgi
+	if (copyout(&exactflag, exactflagp, sizeof(exactflag)))
+		return(EFAULT);
+#else
 	if (copy_to_user( exactflagp, &exactflag, sizeof(exactflag)))
 		return(EFAULT);
+#endif
 	return(0);
 }
 
@@ -2691,6 +2818,7 @@ xfs_dm_write_invis_rvp(
 
 	fflag = FMODE_WRITE;
 	if (flags & DM_WRITE_SYNC){
+/* XXX when will this be available in linux/XFS? */
 /*		fflag |= FSYNC;*/
 		printk("%s/%d: xfs FSYNC not implemented yet\n", __FUNCTION__, __LINE__);
 	}
@@ -2949,9 +3077,13 @@ xfs_dm_fcntl(
 {
 	dm_fcntl_t	*dmfcntlp;
 
-/*	if (!cap_able_cred(credp, CAP_DEVICE_MGT))*/
+#ifdef __sgi
+	if (!cap_able_cred(credp, CAP_DEVICE_MGT))
+		return(EPERM);
+#else
 	if (!capable(CAP_MKNOD))
 		return(EPERM);
+#endif
 
 	dmfcntlp = (dm_fcntl_t *)arg;
 
