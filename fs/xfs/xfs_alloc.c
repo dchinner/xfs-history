@@ -1642,20 +1642,29 @@ xfs_alloc_vextent(
 		/* FALLTHROUGH */
 	case XFS_ALLOCTYPE_ANY_AG:
 	case XFS_ALLOCTYPE_START_AG:
+	case XFS_ALLOCTYPE_FIRST_AG:
 		/*
 		 * Rotate through the allocation groups looking for a winner.
 		 */
-		flags = XFS_ALLOC_FLAG_TRYLOCK;
-		if (type == XFS_ALLOCTYPE_ANY_AG)
+		if (type == XFS_ALLOCTYPE_ANY_AG) {
 			/*
 			 * Start with the last place we left off.
 			 */
 			tagno = agno = mp->m_agrotor;
-		else
+			flags = XFS_ALLOC_FLAG_TRYLOCK;
+		} else if (type == XFS_ALLOCTYPE_FIRST_AG) {
+			/*
+			 * Start with allocation group given by bno.
+			 */
+			tagno = agno = xfs_fsb_to_agno(sbp, bno);
+			flags = 0;
+		} else {
 			/*
 			 * Start with the given allocation group.
 			 */
 			tagno = agno = xfs_fsb_to_agno(sbp, bno);
+			flags = XFS_ALLOC_FLAG_TRYLOCK;
+		}
 		/*
 		 * Loop over allocation groups twice; first time with
 		 * trylock set, second time without.

@@ -9,7 +9,8 @@
  */
 typedef enum xfs_alloctype
 {
-	XFS_ALLOCTYPE_ANY_AGi,		/* allocate anywhere */
+	XFS_ALLOCTYPE_ANY_AGi,		/* allocate anywhere, use rotor */
+	XFS_ALLOCTYPE_FIRST_AGi,	/* ... start at ag 0 */
 	XFS_ALLOCTYPE_START_AGi,	/* anywhere, start in this a.g. */
 	XFS_ALLOCTYPE_THIS_AGi,		/* anywhere in this a.g. */
 	XFS_ALLOCTYPE_START_BNOi,	/* near this block else anywhere */
@@ -17,6 +18,7 @@ typedef enum xfs_alloctype
 	XFS_ALLOCTYPE_THIS_BNOi		/* at exactly this block */
 } xfs_alloctype_t;
 #define	XFS_ALLOCTYPE_ANY_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_ANY_AGi)
+#define	XFS_ALLOCTYPE_FIRST_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_FIRST_AGi)
 #define	XFS_ALLOCTYPE_START_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_START_AGi)
 #define	XFS_ALLOCTYPE_THIS_AG	((xfs_alloctype_t)XFS_ALLOCTYPE_THIS_AGi)
 #define	XFS_ALLOCTYPE_START_BNO	((xfs_alloctype_t)XFS_ALLOCTYPE_START_BNOi)
