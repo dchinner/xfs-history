@@ -298,6 +298,7 @@ static void xfs_strat_enter_trace_entry(ktrace_entry_t *ktep);
 static void xfs_strat_sub_trace_entry(ktrace_entry_t *ktep);
 static int xfs_strat_trace_entry(ktrace_entry_t *ktep);
 #endif
+static void xfs_xexlist_fork(xfs_inode_t *ip, int whichfork);
 static void xfs_xnode_fork(char *name, xfs_ifork_t *f);
 
 /*
@@ -1187,6 +1188,34 @@ xfs_strat_trace_entry(ktrace_entry_t *ktep)
 	return 1;
 }
 #endif	/* DEBUG */
+
+/*
+ * Print xfs extent list for a fork.
+ */
+static void
+xfs_xexlist_fork(xfs_inode_t *ip, int whichfork)
+{
+	int nextents, i;
+	xfs_dfiloff_t o;
+	xfs_dfsbno_t s;
+	xfs_dfilblks_t c;
+	xfs_ifork_t *ifp;
+
+	ifp = XFS_IFORK_PTR(ip, whichfork);
+	if (ifp->if_flags & XFS_IFEXTENTS) {
+		nextents = ifp->if_bytes / sizeof(xfs_bmbt_rec_32_t);
+		qprintf("inode 0x%x %cf extents 0x%x nextents 0x%x\n",
+			ip, "da"[whichfork], ifp->if_u1.if_extents, nextents);
+		for (i = 0; i < nextents; i++) {
+			xfs_convert_extent(
+				(xfs_bmbt_rec_32_t *)&ifp->if_u1.if_extents[i],
+				&o, &s, &c);
+			qprintf(
+			"%d: startoff %lld startblock %s blockcount %lld\n",
+				i, o, xfs_fmtfsblock(s, ip->i_mount), c);
+		}
+	}
+}
 
 static void
 xfs_xnode_fork(char *name, xfs_ifork_t *f)
@@ -2141,22 +2170,9 @@ idbg_xdastate(xfs_da_state_t *s)
 void
 idbg_xexlist(xfs_inode_t *ip)
 {
-	int nextents, i;
-	xfs_dfiloff_t o;
-	xfs_dfsbno_t s;
-	xfs_dfilblks_t c;
-
-	if (!(ip->i_df.if_flags & XFS_IFEXTENTS))
-		return;
-	nextents = ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_32_t);
-	qprintf("inode 0x%x extents 0x%x nextents 0x%x\n",
-		ip, ip->i_df.if_u1.if_extents, nextents);
-	for (i = 0; i < nextents; i++) {
-		xfs_convert_extent((xfs_bmbt_rec_32_t *)&ip->i_df.if_u1.if_extents[i],
-			&o, &s, &c);
-		qprintf("%d: startoff %lld startblock %s blockcount %lld\n",
-			i, o, xfs_fmtfsblock(s, ip->i_mount), c);
-	}
+	xfs_xexlist_fork(ip, XFS_DATA_FORK);
+	if (XFS_IFORK_Q(ip))
+		xfs_xexlist_fork(ip, XFS_ATTR_FORK);
 }
 
 /*
