@@ -1018,7 +1018,7 @@ void pagebuf_hold(page_buf_t * pb)
 
 	if (pb != NULL) {
 		spin_lock_irqsave(&PBP(pb)->pb_lock, flags);
-		assert((pb->pb_hold > 0) || (pb->flags & PB_FS_MANAGED));
+		assert((pb->pb_hold > 0) || (pb->pb_flags & PBF_FS_MANAGED));
 		pb->pb_hold++;
 		spin_unlock_irqrestore(&PBP(pb)->pb_lock, flags);
 
