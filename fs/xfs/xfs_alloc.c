@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.65 $"
+#ident	"$Revision: 1.66 $"
 
 /*
  * Free space allocation for xFS.
@@ -423,7 +423,8 @@ xfs_alloc_trace_alloc(
 		(int)args->agno, (int)args->agbno, (int)args->minlen,
 		(int)args->maxlen, (int)args->mod, (int)args->prod,
 		(int)args->minleft, (int)args->total, (int)args->len,
-		(int)args->type, args->wasdel, args->isfl);
+		(((int)args->type) << 16) | (int)args->otype,
+		args->wasdel, args->isfl);
 }
 
 /*
@@ -2001,12 +2002,15 @@ xfs_alloc_vextent(
 {
 	xfs_agblock_t	agsize;	/* allocation group size */
 	int		flags;	/* XFS_ALLOC_FLAG_... locking flags */
+#if defined(DEBUG) && !defined(SIM)
+	static char	fname[] = "xfs_alloc_vextent";
+#endif
 	xfs_mount_t	*mp;	/* mount structure pointer */
 	xfs_agnumber_t	sagno;	/* starting allocation group number */
 	xfs_alloctype_t	type;	/* input allocation type */
 
 	mp = args->mp;
-	type = args->type;
+	type = args->otype = args->type;
 	args->agbno = NULLAGBLOCK;
 	/*
 	 * Just fix this up, for the case where the last a.g. is shorter
@@ -2025,6 +2029,7 @@ xfs_alloc_vextent(
 	    args->minlen > args->maxlen || args->minlen > agsize ||
 	    args->mod >= args->prod) {
 		args->fsbno = NULLFSBLOCK;
+		xfs_alloc_trace_alloc(fname, "badargs", args);
 		return;
 	}
 	switch (type) {
@@ -2097,6 +2102,7 @@ xfs_alloc_vextent(
 				ASSERT(args->agbno != NULLAGBLOCK);
 				break;
 			}
+			xfs_alloc_trace_alloc(fname, "loopfailed", args);
 			/*
 			 * Didn't work, figure out the next iteration.
 			 */
@@ -2112,11 +2118,16 @@ xfs_alloc_vextent(
 			if (args->agno == sagno) {
 				if (flags == 0) {
 					args->agbno = NULLAGBLOCK;
+					xfs_alloc_trace_alloc(fname,
+						"allfailed", args);
 					break;
 				}
 				flags = 0;
-				if (type == XFS_ALLOCTYPE_START_BNO)
+				if (type == XFS_ALLOCTYPE_START_BNO) {
+					args->agbno = XFS_FSB_TO_AGBNO(mp,
+						args->fsbno);
 					args->type = XFS_ALLOCTYPE_NEAR_BNO;
+				}
 			}
 		}
 		mp->m_agfrotor = (args->agno + 1) % mp->m_sb.sb_agcount;
