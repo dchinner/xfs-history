@@ -12,6 +12,7 @@
 #include <sys/pfdat.h>
 #include <sys/proc.h>
 #include <sys/user.h>
+#include <sys/uuid.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
