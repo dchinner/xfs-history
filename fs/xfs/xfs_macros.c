@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.18 $"
+#ident	"$Revision: 1.19 $"
 
 #define	XFS_MACRO_C
 
@@ -1722,6 +1722,14 @@ xfs_sb_version_addnlink(xfs_sb_t *sbp)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_ADDSHARED)
+void
+xfs_sb_version_addshared(xfs_sb_t *sbp)
+{
+	XFS_SB_VERSION_ADDSHARED(sbp);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_ADDQUOTA)
 void
 xfs_sb_version_addquota(xfs_sb_t *sbp)
@@ -1762,6 +1770,14 @@ xfs_sb_version_hasnlink(xfs_sb_t *sbp)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASSHARED)
+int
+xfs_sb_version_hasshared(xfs_sb_t *sbp)
+{
+	return XFS_SB_VERSION_HASSHARED(sbp);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_HASQUOTA)
 int
 xfs_sb_version_hasquota(xfs_sb_t *sbp)
@@ -1786,6 +1802,13 @@ xfs_sb_version_subalign(xfs_sb_t *sbp)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_SUBSHARED)
+void
+xfs_sb_version_subshared(xfs_sb_t *sbp)
+{
+	XFS_SB_VERSION_SUBSHARED(sbp);
+}
+#endif
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_SB_VERSION_TONEW)
 unsigned
 xfs_sb_version_tonew(unsigned v)
