@@ -3260,7 +3260,6 @@ xfs_link(
 	struct dentry	*dentry,
 	cred_t		*credp)
 {
-	vnode_t			*realvp;
 	xfs_inode_t		*tdp, *sip;
 	xfs_ino_t		e_inum;
 	xfs_trans_t		*tp;
@@ -3284,13 +3283,6 @@ xfs_link(
 	target_namelen = dentry->d_name.len;
 	if (target_namelen >= MAXNAMELEN)
 		return XFS_ERROR(ENAMETOOLONG);
-	/*
-	 * Get the real vnode.
-	 */
-	VOP_REALVP(src_vp, &realvp, error);
-	if (!error) {
-		src_vp = realvp;
-	}
 
 	vn_trace_entry(src_vp, "xfs_link", (inst_t *)__return_address);
 
@@ -4618,182 +4610,6 @@ eagain:
 }
 
 
-#ifdef CELL_CAPABLE
-/*
- * xfs_allocstore
- *
- * This is called to reserve or allocate space for the given range.
- * Currently, this only supports reserving the space for a single
- * page.  By using NDPP (number of BBs per page) bmbt_irec structures,
- * we ensure that the entire page can be mapped in a single bmap call.
- * This simplifies the back out code in that all the information we need
- * to back out is in the single bmbt_irec array orig_imap.
- */
-/*ARGSUSED*/
-STATIC int
-xfs_allocstore(
-	bhv_desc_t	*bdp,
-	xfs_off_t	offset,
-	size_t		count,
-	cred_t		*credp)
-{
-	xfs_mount_t	*mp;
-	xfs_inode_t	*ip;
-	xfs_off_t	isize;
-	xfs_fileoff_t	offset_fsb;
-	xfs_fileoff_t	last_fsb;
-	xfs_fileoff_t	curr_off_fsb;
-	xfs_fileoff_t	unmap_offset_fsb;
-	xfs_filblks_t	count_fsb;
-	xfs_filblks_t	unmap_len_fsb;
-	xfs_fsblock_t	firstblock;
-	xfs_bmbt_irec_t *imapp;
-	xfs_bmbt_irec_t *last_imapp;
-	int		i;
-	int		nimaps;
-	int		orig_nimaps;
-	int		error;
-	xfs_bmbt_irec_t imap[XFS_BMAP_MAX_NMAP];
-	xfs_bmbt_irec_t orig_imap[NDPP];
-
-
-	vn_trace_entry(BHV_TO_VNODE(bdp), "xfs_allocstore",
-					       (inst_t *)__return_address);
-	/*
-	 * This code currently only works for a single page.
-	 */
-/***
-	ASSERT(poff(offset) == 0);
-***/
-	ASSERT(count == NBPP);
-	ip = XFS_BHVTOI(bdp);
-	mp = ip->i_mount;
-
-	if (XFS_FORCED_SHUTDOWN(mp))
-		return XFS_ERROR(EIO);
-
-	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-
-	/*
-	 * Make sure that the dquots exist, and that they are attached to
-	 * the inode. XXXwhy do we DQALLOC here? sup
-	 */
-	if (XFS_IS_QUOTA_ON(mp)) {
-		if (XFS_NOT_DQATTACHED(mp, ip)) {
-			if ((error = xfs_qm_dqattach(ip, XFS_QMOPT_DQALLOC |
-						    XFS_QMOPT_ILOCKED))) {
-				xfs_iunlock(ip, XFS_ILOCK_EXCL);
-				return (error);
-			}
-		}
-	}
-	isize = ip->i_d.di_size;
-	if (offset >= isize) {
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		return XFS_ERROR(EINVAL);
-	}
-	if ((offset + count) > isize) {
-		count = isize - offset;
-	}
-	last_fsb = XFS_B_TO_FSB(mp, offset + count);
-	count_fsb = (xfs_filblks_t)(last_fsb - offset_fsb);
-	orig_nimaps = NDPP;
-	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(NULL, ip, offset_fsb, count_fsb, 0, &firstblock, 0,
-			  orig_imap, &orig_nimaps, NULL);
-	if (error) {
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		return error;
-	}
-	ASSERT(orig_nimaps > 0);
-
-	curr_off_fsb = offset_fsb;
-	while (count_fsb > 0) {
-		nimaps = XFS_BMAP_MAX_NMAP;
-		firstblock = NULLFSBLOCK;
-		error = xfs_bmapi(NULL, ip, curr_off_fsb,
-				  (xfs_filblks_t)(last_fsb - curr_off_fsb),
-				  XFS_BMAPI_DELAY | XFS_BMAPI_WRITE,
-				  &firstblock, 1, imap, &nimaps, NULL);
-		if (error || (nimaps == 0)) {
-			/*
-			 * If we didn't get anything back, we must be
-			 * out of space (or quota).  Break out of the loop and
-			 * back out whatever we've done so far.
-			 * bmapi with BMAPI_DELAY can return EDQUOT.
-			 */
-			break;
-		}
-
-		/*
-		 * Count up the amount of space returned.
-		 */
-		for (i = 0; i < nimaps; i++) {
-			ASSERT(imap[i].br_startblock != HOLESTARTBLOCK);
-			count_fsb -= imap[i].br_blockcount;
-			ASSERT(count_fsb >= 0LL);
-			curr_off_fsb += imap[i].br_blockcount;
-			ASSERT(curr_off_fsb <= last_fsb);
-		}
-	}
-
-	if (count_fsb == 0) {
-		/*
-		 * We go it all, so get out of here.
-		 */
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		return 0;
-	}
-
-	/*
-	 * We didn't get it all, so back out anything new that we did
-	 * create.  What we do is unmap all of the holes in the original
-	 * map.	 This will do at least one unnecessary unmap, but it's
-	 * much simpler than being exact and it still works fine since
-	 * we hold the inode lock all along.
-	 *
-	 * We know we can't get errors here, since the extent list has
-	 * already been read in and we're only removing delayed allocation
-	 * extents.
-	 */
-	unmap_offset_fsb = offset_fsb;
-	imapp = &orig_imap[0];
-	last_imapp = &orig_imap[orig_nimaps - 1];
-	while (imapp <= last_imapp) {
-		if (unmap_offset_fsb != imapp->br_startoff) {
-			unmap_len_fsb = imapp->br_startoff - unmap_offset_fsb;
-			firstblock = NULLFSBLOCK;
-			(void) xfs_bunmapi(NULL, ip, unmap_offset_fsb,
-					    unmap_len_fsb, 0, 1, &firstblock,
-					    NULL, NULL);
-		}
-		unmap_offset_fsb = imapp->br_startoff + imapp->br_blockcount;
-		if (imapp == last_imapp) {
-			if (unmap_offset_fsb < (offset_fsb + count_fsb)) {
-				/*
-				 * There is a hole after the last original
-				 * imap, so unmap it as well.
-				 */
-				unmap_len_fsb = (offset_fsb + count_fsb) -
-						unmap_offset_fsb;
-				firstblock = NULLFSBLOCK;
-				(void) xfs_bunmapi(NULL, ip,
-						   unmap_offset_fsb,
-						   unmap_len_fsb, 0, 1,
-						   &firstblock, NULL, NULL);
-			}
-		}
-		imapp++;
-	}
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-	if (!error) {
-		error = XFS_ERROR(ENOSPC);
-	}
-	return error;
-}
-#endif
-
 int
 xfs_set_dmattrs (
 	bhv_desc_t	*bdp,
@@ -5735,9 +5551,6 @@ xfs_change_file_space(
 }
 
 vnodeops_t xfs_vnodeops = {
-#ifdef CELL_CAPABLE
-	vop_open:	BHV_IDENTITY_INIT(VN_BHV_XFS,VNODE_POSITION_BASE),
-#endif
 	vop_open:		xfs_open,
 	vop_read:		xfs_read,
 	vop_write:		xfs_write,
@@ -5761,19 +5574,15 @@ vnodeops_t xfs_vnodeops = {
 	vop_rwlock:		xfs_rwlock,
 	vop_rwunlock:		xfs_rwunlock,
 	vop_seek:		xfs_seek,
-	vop_realvp:		(vop_realvp_t)fs_nosys,
 	vop_bmap:		(vop_bmap_t)xfs_bmap,
 	vop_strategy:		(vop_strategy_t)xfs_strategy,
-#ifdef CELL_CAPABLE
-	vop_allocstore:		xfs_allocstore,
-#endif
 	vop_reclaim:		xfs_reclaim,
 	vop_attr_get:		xfs_attr_get,
 	vop_attr_set:		xfs_attr_set,
 	vop_attr_remove:	xfs_attr_remove,
 	vop_attr_list:		xfs_attr_list,
 	vop_link_removed:	(vop_link_removed_t)fs_noval,
-	vop_vnode_change:	fs_vnode_change,
+	vop_vnode_change:	(vop_vnode_change_t)fs_noval,
 	vop_tosspages:		fs_tosspages,
 	vop_flushinval_pages:	fs_flushinval_pages,
 	vop_flush_pages:	fs_flush_pages,

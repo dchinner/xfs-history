@@ -116,12 +116,6 @@ typedef xfs_fsize_t	(*xfs_size_t)(void *);
 typedef xfs_fsize_t	(*xfs_setsize_t)(void *, xfs_off_t);
 typedef xfs_fsize_t	(*xfs_lastbyte_t)(void *);
 
-#ifdef CELL_CAPABLE
-typedef int		(*xfs_checklock_t)(bhv_desc_t *, struct vnode *,
-				int, off_t, off_t, int, struct cred *,
-				struct flid *, vrwlock_t, int);
-#endif
-
 typedef struct xfs_ioops {
 	xfs_dio_write_t		xfs_dio_write_func;
 	xfs_dio_read_t		xfs_dio_read_func;
@@ -138,9 +132,6 @@ typedef struct xfs_ioops {
 	xfs_size_t		xfs_size_func;
 	xfs_setsize_t		xfs_setsize_func;
 	xfs_lastbyte_t		xfs_lastbyte;
-#ifdef CELL_CAPABLE
-	xfs_checklock_t		xfs_checklock;
-#endif
 } xfs_ioops_t;
 
 

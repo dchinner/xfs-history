@@ -347,9 +347,6 @@ xfs_dir2_getdents(
 	 */
 	alignment = sizeof(xfs_off_t) - 1;
 	if ((uio->uio_iovcnt == 1) &&
-#if CELL_CAPABLE
-	    !KT_CUR_ISXTHREAD() &&
-#endif
 	    (((__psint_t)uio->uio_iov[0].iov_base & alignment) == 0) &&
 	    ((uio->uio_iov[0].iov_len & alignment) == 0)) {
 		dbp = NULL;
