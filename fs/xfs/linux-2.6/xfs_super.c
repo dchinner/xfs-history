@@ -202,8 +202,6 @@ printk("XFS: osyncisdsync is now the default, and will soon be deprecated.\n");
 		} else if (!strcmp(this_char, MNTOPT_QUOTANOENF)) {
 			args->flags |= XFSMNT_UQUOTA;
 			args->flags &= ~XFSMNT_UQUOTAENF;
-		} else if (!strcmp(this_char, MNTOPT_MRQUOTA)) {
-			args->flags |= XFSMNT_QUOTAMAYBE;
 		} else if (!strcmp(this_char, MNTOPT_GQUOTA)) {
 			args->flags |= XFSMNT_GQUOTA | XFSMNT_GQUOTAENF;
 		} else if (!strcmp(this_char, MNTOPT_GQUOTANOENF)) {
