@@ -33,9 +33,6 @@
 #define __XFS_VFS_H__
 
 #include <linux/vfs.h>
-#ifdef __KERNEL_STRICT_NAMES
-typedef __kernel_fsid_t fsid_t;
-#endif
 
 struct statvfs;
 struct vnode;

@@ -71,47 +71,36 @@ xfs_strat_write_check(
 ssize_t				/* error (positive) */
 xfs_read(
         bhv_desc_t      *bdp,
-        uio_t           *uiop,
-        int             ioflag,
+        struct file	*file,
+	char		*buf,
+	size_t		size,
+	loff_t		*offset,
         cred_t          *credp)
 {
 	ssize_t		ret;
-	int		error = 0;
 	xfs_fsize_t	n;
 	xfs_inode_t	*ip;
-	struct file	*filp = uiop->uio_fp;
-	struct inode	*linux_ip = filp->f_dentry->d_inode;
-	char 		*buf;
-	size_t		size;
-	loff_t		*offsetp;
+	struct inode	*linux_ip = file->f_dentry->d_inode;
 	xfs_iocore_t	*io;
 	xfs_mount_t	*mp;
         
-	ASSERT(uiop);			/* we only support exactly 1  */
-	ASSERT(uiop->uio_iovcnt == 1);	/* iov in a uio on linux      */
-	ASSERT(uiop->uio_iov);
-
-	buf = uiop->uio_iov->iov_base;
-	size = uiop->uio_iov->iov_len;
-	offsetp = (loff_t *)&uiop->uio_offset;
-
 	ip = XFS_BHVTOI(bdp);
 	io = &(ip->i_iocore);
 	mp = io->io_mount;
 
-	if (filp->f_flags & O_DIRECT) {
+	if (file->f_flags & O_DIRECT) {
 		if (((__psint_t)buf & (linux_ip->i_sb->s_blocksize - 1)) ||
-		    (uiop->uio_offset & mp->m_blockmask) ||
+		    (*offset & mp->m_blockmask) ||
 		    (size & mp->m_blockmask)) {
-			if (uiop->uio_offset == XFS_SIZE(mp, io)) {
+			if (*offset == XFS_SIZE(mp, io)) {
 				return (0);
 			}
-			return XFS_ERROR(EINVAL);
+			return -XFS_ERROR(EINVAL);
 		}
 	}
 
 
-	n = XFS_MAX_FILE_OFFSET - *offsetp;
+	n = XFS_MAX_FILE_OFFSET - *offset;
 	if ((n <= 0) || (size == 0))
 		return 0;
 
@@ -119,52 +108,36 @@ xfs_read(
 		size = n;
 
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-		return EIO;
+		return -EIO;
 	}
 
 	XFS_ILOCK(mp, io, XFS_IOLOCK_SHARED);
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if (DM_EVENT_ENABLED(BHV_TO_VNODE(bdp)->v_vfsp, ip, DM_EVENT_READ) &&
-	    !(filp->f_mode & FINVIS)) {
-
+	    !(file->f_mode & FINVIS)) {
+		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
 		error = xfs_dm_send_data_event(DM_EVENT_READ, bdp,
-					     *offsetp, size,
-					     FILP_DELAY_FLAG(filp),
+					     *offset, size,
+					     FILP_DELAY_FLAG(file),
 					     &locktype);
 		if (error) {
 			XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
-			return error;
+			return -error;
 		}
 	}
 #endif /* CONFIG_HAVE_XFS_DMAPI */
 
-	ret = generic_file_read(filp, buf, size, offsetp);
+	ret = generic_file_read(file, buf, size, offset);
 	XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 
-	/*
-	 * In either case above, ret >= 0 is num bytes read
-	 * ret < 0 is an error.
-	 */
-	if (ret > 0) {
-		uiop->uio_resid = size - ret;
-	} else {
-		/* return positive error */
-		error = -(int)ret;
-	}
-	
-	if (!(filp->f_mode & FINVIS))
+	if (!(file->f_mode & FINVIS))
 		XFS_CHGTIME(mp, io, XFS_ICHGTIME_ACC);
 
-	ASSERT (error >= 0);
-	return error;
+	return ret;
 }
-
-/* We don't want the IRIX poff */
-#undef poff
-#define poff(x) ((x) & (PAGE_CACHE_SIZE - 1))
 
 /*
  * This routine is called to handle zeroing any space in the last
@@ -443,14 +416,14 @@ out_lock:
 ssize_t				/* error (positive) */
 xfs_write(
         bhv_desc_t      *bdp,
-        uio_t           *uiop,
-        int             ioflags,
+        struct file	*file,
+	char		*buf,
+	size_t		size,
+	loff_t		*offset,
         cred_t          *credp)
 {
 	xfs_inode_t	*xip;
-	struct file	*filp = uiop->uio_fp;
-	struct inode	*ip = filp->f_dentry->d_inode;
-        loff_t          *offsetp = (loff_t *)&uiop->uio_offset;   
+	struct inode	*ip = file->f_dentry->d_inode;
 	xfs_mount_t	*mp;
 	xfs_trans_t	*tp;
 	ssize_t		ret;
@@ -460,14 +433,12 @@ xfs_write(
 	xfs_iocore_t    *io;
 	vnode_t		*vp;
 	int		iolock;
-	int		direct = ioflags & O_DIRECT;
+	int		direct = file->f_flags & O_DIRECT;
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	int		eventsent = 0;
-	loff_t		savedsize = *offsetp;
+	loff_t		savedsize = *offset;
 #endif
 	vrwlock_t	locktype;
-	char 		*buf;
-	size_t		size;
 	unsigned int	mode;
 
 
@@ -478,16 +449,13 @@ xfs_write(
 	vp = BHV_TO_VNODE(bdp);
 	xip = XFS_BHVTOI(bdp);
 
-	buf = uiop->uio_iov->iov_base;
-	size = uiop->uio_iov->iov_len;
-
 	if (size == 0)
 		return 0;
 
 	io = &(xip->i_iocore);
 	mp = io->io_mount;
 
-	xfs_check_frozen(mp, bdp, ioflags, XFS_FREEZE_WRITE);
+	xfs_check_frozen(mp, bdp, file->f_flags, XFS_FREEZE_WRITE);
 
 	if (XFS_FORCED_SHUTDOWN(xip->i_mount)) {
 		return EIO;
@@ -495,7 +463,7 @@ xfs_write(
 
 	if (direct) {
 		if (((__psint_t)buf & (ip->i_sb->s_blocksize - 1)) ||
-		    (uiop->uio_offset & mp->m_blockmask) ||
+		    (*offset & mp->m_blockmask) ||
 		    (size  & mp->m_blockmask)) {
 			return XFS_ERROR(EINVAL);
 		}
@@ -512,7 +480,7 @@ xfs_write(
 #ifdef CONFIG_HAVE_XFS_DMAPI
 start:
 #endif
-	n = limit - *offsetp;
+	n = limit - *offset;
 	if (n <= 0) {
 		xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 		return EFBIG;
@@ -520,18 +488,18 @@ start:
 	if (n < size)
 		size = n;
 
-	new_size = *offsetp + size;
+	new_size = *offset + size;
 	if (new_size > isize) {
 		io->io_new_size = new_size;
 	}
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
-	    !(filp->f_mode & FINVIS) && !eventsent)) {
+	    !(file->f_mode & FINVIS) && !eventsent)) {
 
 		error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
-				*offsetp, size,
-				FILP_DELAY_FLAG(filp), &locktype);
+				*offset, size,
+				FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 			return error;
@@ -546,8 +514,9 @@ start:
 		 *  to xfs_dm_send_data_event, which is what
 		 *  allows the size to change in the first place.
 		 */
-		if ((ioflags & O_APPEND) && savedsize != xip->i_d.di_size) {
-			*offsetp = isize = xip->i_d.di_size;
+		if ((file->f_flags & O_APPEND) &&
+		    savedsize != xip->i_d.di_size) {
+			*offset = isize = xip->i_d.di_size;
 			goto start;
 		}
 	}
@@ -561,7 +530,7 @@ start:
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
 	if (size) {
-		if (!(filp->f_mode & FINVIS))
+		if (!(file->f_mode & FINVIS))
 			xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 	}
 
@@ -574,9 +543,9 @@ start:
 	 * to zero it out up to the new size.
 	 */
 	
-	if (!direct && (*offsetp > isize && isize)) {
-		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offsetp,
-			isize, *offsetp + size, NULL);
+	if (!direct && (*offset > isize && isize)) {
+		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offset,
+			isize, *offset + size, NULL);
 		if (error) {
 			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
 			return(error);
@@ -588,7 +557,7 @@ start:
 retry:
 #endif
 	if (direct) {
-		xfs_inval_cached_pages(vp, &xip->i_iocore, *offsetp,
+		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset,
 			(xfs_off_t) size, (void *)vp, 1);
 	}
 
@@ -601,15 +570,15 @@ retry:
 	ret = pagebuf_generic_file_write(
 			(io->io_flags & XFS_IOCORE_RT)?
 			mp->m_rtdev_targ.pb_targ : mp->m_ddev_targ.pb_targ,
-			filp, buf, size, offsetp, linvfs_pb_bmap);
+			file, buf, size, offset, linvfs_pb_bmap);
 #if 0
-	ret = generic_file_write(filp, buf, size, offsetp);
+	ret = generic_file_write(file, buf, size, offset);
 #endif
 
 #ifdef CONFIG_HAVE_XFS_DMAPI
 	if ((ret == -ENOSPC) &&
 	    DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_NOSPACE) &&
-	    !(filp->f_mode & FINVIS)) {
+	    !(file->f_mode & FINVIS)) {
 
 		xfs_rwunlock(bdp, locktype);
 		error = dm_send_namesp_event(DM_EVENT_NOSPACE, bdp,
@@ -618,7 +587,7 @@ retry:
 		xfs_rwlock(bdp, locktype);
 		if (error)
 			return error;
-		*offsetp = ip->i_size;
+		*offset = ip->i_size;
 		goto retry;
 		
 	}
@@ -630,16 +599,13 @@ retry:
 			 * then bail out...
 			 */
 		xfs_rwunlock(bdp, locktype);
-		error = -(int)ret;
-		return(error);
+		return ret;
 	}
 
 	/*
 	 * ret > 0 == number of bytes written by pagebuf_generic_file_write()
 	 * Keep track of any unwritten bytes in uio_resid.
 	 */
-
-	uiop->uio_resid = size - ret;
 
 	/* JIMJIM Lock? around the stuff below if Linux doesn't lock above */
 		
@@ -652,12 +618,12 @@ retry:
 		ip->i_mode &= ~mode;
 		xfs_write_clear_setuid(xip);
 	}
-	if (*offsetp > xip->i_d.di_size) {
-		XFS_SETSIZE(mp, io, *offsetp);
+	if (*offset > xip->i_d.di_size) {
+		XFS_SETSIZE(mp, io, *offset);
 	}
 	
 	/* Handle various SYNC-type writes */
-	if (ioflags & O_SYNC) {
+	if (file->f_flags & O_SYNC) {
 
 		/* Flush all inode data buffers */
 
@@ -754,8 +720,7 @@ out:
 	/* Drop lock this way - the old refcache release is in here */
 	xfs_rwunlock(bdp, locktype);
 
-	ASSERT(ret >= 0);
-	return(error);
+	return(ret);
 }
 
 /*

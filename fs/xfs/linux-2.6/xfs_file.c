@@ -44,32 +44,22 @@ linvfs_read(
 	loff_t		*offset)
 {
 	vnode_t		*vp;
-	int		err;
-	uio_t		uio;
-	iovec_t		iov;
+	int		error;
 
 	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	ASSERT(vp);
 
-	uio.uio_iov = &iov;
-	uio.uio_offset = *offset;
-	uio.uio_fp = filp;
-	uio.uio_iovcnt = 1;
-	uio.uio_iov->iov_base = buf;
-	uio.uio_iov->iov_len = uio.uio_resid = size;
-
 	XFS_STATS_INC(xfsstats.xs_read_calls);
 	XFS_STATS_ADD(xfsstats.xs_read_bytes, size);
         
-	VOP_READ(vp, &uio, 0, NULL, err);
-        *offset = uio.uio_offset;
-        
+	VOP_READ(vp, filp, buf, size, offset, NULL, error);
+
 	/*
 	 * If we got a return value, it was an error
 	 * Flip to negative & return that
 	 * Otherwise, return bytes actually read
 	 */
-	return(err ? -err : size-uio.uio_resid);
+	return(error);
 }
 
 
@@ -85,8 +75,6 @@ linvfs_write(
 	loff_t		pos;
 	vnode_t		*vp;
 	int		err;	/* Use negative errors in this f'n */
-	uio_t		uio;
-	iovec_t		iov;
 
 	if ((ssize_t) count < 0)
 		return -EINVAL;
@@ -189,18 +177,7 @@ linvfs_write(
 	vp = LINVFS_GET_VP(inode);
 	ASSERT(vp);
         
-	uio.uio_iov = &iov;
-	uio.uio_offset = pos;
-	uio.uio_fp = file;
-	uio.uio_iovcnt = 1;
-	uio.uio_iov->iov_base = (void *)buf;
-	uio.uio_iov->iov_len = uio.uio_resid = count;
-        
-	VOP_WRITE(vp, &uio, file->f_flags, NULL, err);
-	/* xfs_write returns positive errors */
-	err = -err;	/* if it's 0 this is harmless */
-	*ppos = pos = uio.uio_offset;
-	count -= uio.uio_resid;
+	VOP_WRITE(vp, file, buf, count, ppos, NULL, err);
 out:
 	up(&inode->i_sem);
 
@@ -209,7 +186,7 @@ out:
 	 * Otherwise, return bytes actually written
 	 */
 
-	return(err ? err : count);
+	return(err);
 }
 
 
