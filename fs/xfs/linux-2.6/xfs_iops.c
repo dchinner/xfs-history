@@ -74,11 +74,15 @@ linvfs_common_create(
 	struct inode	*ip;
 	vattr_t		va;
 	vnode_t		*vp = NULL, *dvp = LINVFS_GET_VPTR(dir);
-	int		have_default_acl = (int)posix_acl_default_exists(dvp);
+	xattr_exists_t	test_default_acl = _ACL_DEFAULT_EXISTS;
+	int		have_default_acl = 0;
 	int		error = 0;
 
+	if (test_default_acl)
+		have_default_acl = test_default_acl(dvp);
+
 #ifdef CONFIG_FS_POSIX_ACL
-	/* FIXME: This is a temporary fix for the XFS/NFS ACL/umask problem.
+	/* FIXME: This is a workaround for the XFS/NFS ACL/umask problem.
 	 * Review once we discuss with Andreas how the mask is to be handled.
 	 * Its wrapped in CONFIG_FS_POSIX_ACL so this code can compile without
 	 * applying the ACL patch.
