@@ -588,6 +588,7 @@ xfs_buf_item_push(
 	bp = bip->bli_buf;
 
 	if (XFS_BUF_ISDELAYWRITE(bp)) {
+		XFS_BUF_UNDELAYWRITE(bp);
 		xfs_bawrite(bip->bli_item.li_mountp, bp);
 	} else {
 		xfs_buf_relse(bp);
