@@ -451,8 +451,8 @@ linvfs_read_super(
 	vfsp->vfs_super = sb;
 
 	sb->s_blocksize = 512;
-	sb->s_blocksize_bits = 9;
-	set_blocksize(sb->s_dev, PAGE_SIZE);
+	sb->s_blocksize_bits = ffs(sb->s_blocksize) - 1;
+	set_blocksize(sb->s_dev, 512);
 	set_posix_acl(sb);
 	set_max_bytes(sb);
 	set_quota_ops(sb);
@@ -634,6 +634,8 @@ linvfs_put_super(
 	struct super_block *sb)
 {
 	int		error;
+	int		sector_size = 512;
+	kdev_t		dev = sb->s_dev;
 	vfs_t 		*vfsp = LINVFS_GET_VFS(sb);
 	vnode_t		*cvp;
 
@@ -652,6 +654,13 @@ linvfs_put_super(
 	cvp->v_trace = NULL;
 #endif  /* CONFIG_XFS_VNODE_TRACING */
 	kfree(cvp->v_inode);
+
+	/*  Do something to get rid of the VNODE/VFS layer here  */
+
+	/* Reset device block size */
+	if (hardsect_size[MAJOR(dev)])
+		sector_size = hardsect_size[MAJOR(dev)][MINOR(dev)];
+	set_blocksize(dev, sector_size);
 }
 
 void
