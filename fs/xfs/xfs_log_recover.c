@@ -632,6 +632,69 @@ bp_err:
 	return error;
 }	/* xlog_find_head */
 
+/*
+ * If we're mounting a device with an external log, check its magic bits to
+ * make sure that we're mounting (a) a real log, and (b) the log associated
+ * with this filesystem.
+ *
+ * It was added to support external logs on Linux, but could be used to support
+ * non-volume-managed external logs on other OSes.
+ */
+static int
+xlog_test_footer(xlog_t *log)
+{
+	int error;
+	xfs_buf_t *bp;
+
+	bp = xlog_get_bp(1, log->l_mp);
+
+	if (log->l_mp->m_sb.sb_logstart == 0) {
+		uuid_t magic;
+		uint_t status;
+		xlog_volume_footer_t *rfoot;
+
+		((unsigned int *)(magic.__u_bits))[0] = 0x7068696c;
+		((unsigned int *)(magic.__u_bits))[1] = 0x266d6b70;
+		((unsigned int *)(magic.__u_bits))[2] = 0x77657265;
+		((unsigned int *)(magic.__u_bits))[3] = 0x68657265;
+
+		/* Read in the last physical block of the log and check its
+		 * magic goo. */
+		if (error = xlog_bread(log, log->l_logBBsize - 1, 1, bp))
+			goto exit;
+		rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
+
+		if (uuid_compare(&(rfoot->f_magic), &magic, &status) == 0) {
+			/* This has the magic number--it is an external log.
+			 * Now make sure that it's associated with the
+			 * filesystem that we're trying to mount. */
+			xfs_sb_t *super = &log->l_mp->m_sb;
+
+			if (uuid_compare(&(super->sb_uuid), &(rfoot->f_uuid),
+					 &status) != 0) {
+				xlog_warn("XFS: This is not the log you're looking for.  Are you sure that this is the\n right device?\n");
+				error = XFS_ERROR(EINVAL);
+				goto exit;
+			}
+			/* Since the last block of the log is this magic data,
+			 * decrease the effective size. */
+			/* FIXME: is this the right thing to do? */
+			log->l_logsize -= BBSIZE;
+			log->l_iclog_size -= BBSIZE;
+			log->l_logBBsize -= 1;
+		} else {
+			xlog_warn("XFS: invalid log magic number.  Did you use mkfs to create this log?");
+			error = XFS_ERROR(EINVAL);
+			goto exit;
+		}
+	}
+
+ exit:
+	xlog_put_bp(bp);
+
+	return error;
+}
+
 
 /*
  * Find the sync block number or the tail of the log.
@@ -659,7 +722,6 @@ xlog_find_tail(xlog_t  *log,
 	       int readonly)
 {
 	xlog_rec_header_t	*rhead;
-	xlog_volume_footer_t	*rfoot;
 	xlog_op_header_t	*op_head;
 	xfs_buf_t			*bp;
 	int			error, i, found;
@@ -671,6 +733,11 @@ xlog_find_tail(xlog_t  *log,
 	xfs_lsn_t		tail_lsn;
 	
 	found = error = 0;
+
+	/* Look for an external log signature, and adjust the log's length if
+	 * found. */
+	xlog_test_footer(log);
+
 	/*
 	 * Find previous log record 
 	 */
@@ -724,43 +791,8 @@ xlog_find_tail(xlog_t  *log,
 
 	/* find blk_no of tail of log */
 	rhead = (xlog_rec_header_t *)XFS_BUF_PTR(bp);
-	rfoot = (xlog_volume_footer_t *)XFS_BUF_PTR(bp);
 	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
 
-	if (log->l_mp->m_sb.sb_logstart == 0) { /* external log */
-		uuid_t magic;
-		uint_t status;
-
-		(unsigned int)(magic.__u_bits)[0] = 0x7068696c;
-		(unsigned int)(magic.__u_bits)[1] = 0x266d6b70;
-		(unsigned int)(magic.__u_bits)[2] = 0x77657265;
-		(unsigned int)(magic.__u_bits)[3] = 0x68657265;
-
-		if (uuid_compare(&(rfoot->f_magic), &magic, &status) == 0) {
-			/* This has the magic number--it is an external log.
-			 * Now make sure that it's associated with the
-			 * filesystem that we're trying to mount. */
-			xfs_sb_t *super;
-
-			super = &log->l_mp->m_sb;
-			if (uuid_compare(&(super->sb_uuid), &(rfoot->f_uuid),
-					 &status) != 0) {
-				xlog_warn("xfs_log_recover: This Is Not The Log You're Looking For.\nAre you sure that this is the right device?\n");
-				error = XFS_ERROR(EINVAL);
-				goto exit;
-			}
-			/* Since the last block of the log is this magic data,
-			 * decrease the effective size. */
-			/* FIXME: is this the right thing to do? */
-			log->l_logsize -= BBSIZE;
-			log->l_iclog_size -= BBSIZE;
-			log->l_logBBsize -= BBSIZE / 512;
-		} else {
-			xlog_warn("xfs_log_recover: invalid log magic number.  Did you use mkfs to create this\nlog?");
-			error = XFS_ERROR(EINVAL);
-			goto exit;
-		}
-	}
 	/*
 	 * Reset log values according to the state of the log when we
 	 * crashed.  In the case where head_blk == 0, we bump curr_cycle

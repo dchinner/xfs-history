@@ -453,7 +453,7 @@ extern void xfs_pb_nfreer(page_buf_t *);
 #define XFS_BUF_V_IODONESEMA(bp) 
 
 /* setup the buffer target from a buftarg structure */
-#define XFS_BUF_SET_TARGET(bp, target) 
+#define XFS_BUF_SET_TARGET(bp, target) (bp)->pb_target = (target)->inode;
 /* return the dev_t being used */
 extern dev_t	XFS_pb_target(page_buf_t *);
 
