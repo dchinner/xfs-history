@@ -249,6 +249,7 @@ struct file_operations linvfs_dir_operations = {
 	read:		linvfs_dir_read,
 	readdir:	linvfs_readdir,
 	ioctl:		linvfs_ioctl,
+	open:		linvfs_open,
 	fsync:		linvfs_fsync,
 };
 
