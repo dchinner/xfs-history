@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.89 $"
+#ident	"$Revision: 1.91 $"
 
 /*
  * High level interface routines for log manager
@@ -401,11 +401,11 @@ xfs_log_stat(caddr_t mnt_pt, int *log_BBstart, int *log_BBsize)
 	xfs_mount_t *xmp;
 	vnode_t *vp;
 	int error, start, size;
-	extern int xfs_type;
+	extern int xfs_fstype;
 
 	if (error = lookupname(mnt_pt, UIO_USERSPACE, NO_FOLLOW, NULLVPP, &vp))
 		return error;
-	if (vp->v_vfsp->vfs_fstype != xfs_type) {
+	if (vp->v_vfsp->vfs_fstype != xfs_fstype) {
 		error = XFS_ENOTXFS;
 	} else {
 		xmp = (xfs_mount_t *)vp->v_vfsp->vfs_data;

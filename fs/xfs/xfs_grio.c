@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.27 1994/07/08 23:24:03 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.28 1994/07/20 00:30:14 doucette Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -920,7 +920,7 @@ xfs_remove_all_tickets()
 	vfs_t		*vfsp;
 	extern vfs_t	*rootvfs;
 	extern lock_t	vfslock;
-	extern int	xfs_type;
+	extern int	xfs_fstype;
 
 	/*
  	 * For each file system on the machine.
@@ -932,7 +932,7 @@ xfs_remove_all_tickets()
 		/*
  		 * If this is an xfs file system ...
 		 */
-		if (vfsp->vfs_fstype == xfs_type) {
+		if (vfsp->vfs_fstype == xfs_fstype) {
 			/*
  	 		 * Remove the tickets from the inodes.
  	 		 */
