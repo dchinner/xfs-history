@@ -40,7 +40,7 @@
 #include <linux/xfs_cred.h>
 #include <sys/vnode.h>
 
-static long long linvfs_file_lseek(
+STATIC long long linvfs_file_lseek(
 	struct file *file,
 	long long offset,
 	int origin)
@@ -81,7 +81,7 @@ static long long linvfs_file_lseek(
 	return offset;
 }
 
-static ssize_t linvfs_read(
+STATIC ssize_t linvfs_read(
 	struct file *filp,
 	char *buf,
 	size_t size,
@@ -105,7 +105,7 @@ static ssize_t linvfs_read(
 }
 
 
-static ssize_t linvfs_write(
+STATIC ssize_t linvfs_write(
 	struct file *filp,
 	const char *buf,
 	size_t size,
@@ -123,9 +123,11 @@ static ssize_t linvfs_write(
 	}
 
 	inode = filp->f_dentry->d_inode;
+
 	down(&inode->i_sem);
 
 	err = -EINVAL;
+
 	pos = *offset;
 	if (pos < 0)
 		goto out;
@@ -150,7 +152,7 @@ out:
 }
 
 
-static int linvfs_open(
+STATIC int linvfs_open(
 	struct inode *inode,
 	struct file *filp)
 {
@@ -164,7 +166,7 @@ static int linvfs_open(
 }
 
 
-static int linvfs_release(
+STATIC int linvfs_release(
 	struct inode *inode,
 	struct file *filp)
 {
@@ -179,7 +181,7 @@ static int linvfs_release(
 }
 
 
-static int linvfs_fsync(
+STATIC int linvfs_fsync(
 	struct file *filp,
 	struct dentry *dentry)
 {
@@ -196,7 +198,7 @@ static int linvfs_fsync(
 	return 0;
 }
 
-static ssize_t linvfs_dir_read (struct file * filp, char * buf,
+STATIC ssize_t linvfs_dir_read (struct file * filp, char * buf,
 				size_t count, loff_t *ppos)
 {
 	return -EISDIR;
@@ -207,7 +209,7 @@ static ssize_t linvfs_dir_read (struct file * filp, char * buf,
  * We need to build a uio, cred, ...
  */
 
-static int linvfs_readdir(
+STATIC int linvfs_readdir(
 	struct file *filp,
 	void *dirent,
 	filldir_t filldir)
@@ -256,6 +258,7 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 
 		vap = &va;
 		vap->va_mask = AT_UPDATIME;
+
 		vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 		VOP_SETATTR(vp, vap, AT_UPDATIME, NULL, ret);
 	}
@@ -263,7 +266,7 @@ int linvfs_generic_file_mmap(struct file *filp, struct vm_area_struct *vma)
 }
 
 
-static int linvfs_ioctl(
+STATIC int linvfs_ioctl(
 	struct inode	*inode,
 	struct file	*filp,
 	unsigned int	cmd,

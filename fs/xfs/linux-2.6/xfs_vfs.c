@@ -102,7 +102,7 @@ vfs_deallocate(vfs_t *vfsp)
  *
  * Accessors include: vfs_syncall, traverse, VFS_STATVFS, and quota checking.
  */
-static int
+STATIC int
 vfs_lock_flags(struct vfs *vfsp, int flags)
 {
 	register int error;
@@ -352,7 +352,6 @@ vfs_devsearch_nolock(dev_t dev, int fstype)
 void
 vfsinit(void)
 {
-/* 	register int i; */
 	/*
 	 * Initialize vfs stuff.
 	 */
@@ -362,7 +361,6 @@ vfsinit(void)
 	 * Initialize vnode stuff.
 	 */
 	vn_init();
-
 }
 
 /*
