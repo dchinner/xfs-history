@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.24 1994/05/23 16:46:49 tap Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.25 1994/05/26 17:04:58 tap Exp $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -53,8 +53,8 @@
  */
 
 #define LESS_THAN_ONE_SECOND(tv, nexttv)	\
-      (( tv.tv_sec < nexttv.tv_sec) ||	\
-  ((tv.tv_sec == nexttv.tv_sec) && (tv.tv_nsec < nexttv.tv_nsec)))
+      	(( tv.tv_sec < nexttv.tv_sec) ||	\
+	       ((tv.tv_sec == nexttv.tv_sec) && (tv.tv_nsec < nexttv.tv_nsec)))
 
 #if defined(DEBUG) && !defined(SIM)
 extern int	grio_debug;
@@ -70,16 +70,15 @@ extern int	grio_debug;
 
 int xfs_grio_add_ticket( file_id_t *, int, char *);
 int xfs_grio_remove_ticket( file_id_t *, char *);
-xfs_inode_t *xfs_get_inode ( dev_t, int);
 int xfs_add_ticket_to_inode( xfs_inode_t *, int, struct reservation_id *);
 void xfs_remove_ticket_from_inode( xfs_inode_t *, struct reservation_id *);
-grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *);
-STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
-STATIC int xfs_crack_file_id(file_id_t *, dev_t *, xfs_ino_t *);
-
 void ticket_lock_shared( xfs_inode_t *);
 void ticket_lock_exclusive( xfs_inode_t *);
 void ticket_unlock( xfs_inode_t *);
+xfs_inode_t *xfs_get_inode ( dev_t, int);
+grio_ticket_t *xfs_io_is_guaranteed( xfs_inode_t *, struct reservation_id *);
+STATIC int xfs_grio_issue_io( vnode_t *, uio_t *,int, cred_t *,int);
+STATIC int xfs_crack_file_id(file_id_t *, dev_t *, xfs_ino_t *);
 
 
 extern int xfs_read_file(vnode_t *, uio_t *, int, cred_t *);
@@ -137,11 +136,6 @@ xfs_get_inode(  dev_t fs_dev, int ino)
         return( ip );
 }
 
-#ifdef ROTATE_DEBUG
-int grio_rotate = 0;
-int grio_rotate_count = 0;
-int grio_rotate_set	= 6;
-#endif
 
 /*
  * xfs_add_ticket_to_inode()
@@ -167,31 +161,10 @@ xfs_add_ticket_to_inode( xfs_inode_t *ip, int sz, struct reservation_id *id )
 			ticket->type = NON_ROTATE_TYPE;
 			ticket->id.ino = id->ino;
 			ticket->id.pid = id->pid;
-			ticket->lastreq.tv_sec  = 0;
-			ticket->lastreq.tv_nsec = 0;
-			ticket->iothissecond    = 0;
 			if (id->vod_rotate_slot != NULL_VOD_SLOT) {
 				ticket->rotator_slot = id->vod_rotate_slot;
 				ticket->rotator_group_size = id->vod_group_size;
 			}
-#ifdef ROTATE_DEBUG
-			if (grio_rotate) {
-				ticket->type = ROTATE_TYPE;
-
-				if (grio_rotate_count < grio_rotate_set) 
-					ticket->rotator_slot = 0;
-				else if (grio_rotate_count < (2*grio_rotate_set)) 
-					ticket->rotator_slot = 1;
-				else if (grio_rotate_count < (3*grio_rotate_set)) 
-					ticket->rotator_slot = 2;
-				else
-					ticket->rotator_slot = 3;
-
-				grio_rotate_count++;
-
-				ticket->rotator_group_size = 4;
-			}
-#endif
 
 			if (ip->i_ticket) 
 				ticket->nextticket = ip->i_ticket;
@@ -421,7 +394,7 @@ xfs_grio_req( xfs_inode_t *ip,
 	off_t	offset,
 	int rw)
 {
-	int 		sz, ret = 0, remainingio, thisioreq, r_size; 
+	int 		sz, ret = 0, remainingio, thisioreq, set_size; 
 	int		which_disk, current_disk, num_sec, sec, delay_ticks;
 	vnode_t 	*vp;
 	time_t		snap_lbolt;
@@ -446,23 +419,25 @@ retry_request:
 			ASSERT(uiop->uio_resid == ticket->sz);
 
 			snap_lbolt 	= lbolt;
-			r_size 		= ticket->rotator_group_size;
-			sec 		= (snap_lbolt / HZ) % r_size;
+			set_size 	= ticket->rotator_group_size;
+			sec 		= (snap_lbolt / HZ) % set_size;
 
-			which_disk 	= (offset / ticket->sz) % r_size;
-			current_disk 	= (sec + ticket->rotator_slot) % r_size;
+			which_disk 	= (offset / ticket->sz) % set_size;
+			current_disk 	= (sec + ticket->rotator_slot) % 
+						set_size;
 
 			if (which_disk == current_disk) {
 				/*
 				 * Fall thru and issue the request.
-				 * This is the correct disk.
+				 * This is the correct disk at this time
+				 * for a request in this slot.
 				 */
 				;
 			} else {
 
 #ifdef CLOSER_TIMING
 				if (current_disk > which_disk) {
-					num_sec =  r_size - 1 - 
+					num_sec =  set_size - 1 - 
 						current_disk + which_disk;
 				} else {
 					ASSERT( which_disk > current_disk );
@@ -473,7 +448,7 @@ retry_request:
 				delay_ticks += ( num_sec * HZ);
 
 #else
-				delay_ticks = 2;
+				delay_ticks = 1;
 #endif
 
                         	ticket_unlock(ip);
@@ -522,6 +497,7 @@ retry_request:
 			 	 * It has been less than 1 second 
 			 	 * since the last request.
 			 	 */
+				;
 			} else {
 				/*
 			 	 * If has been more than 1 second	
@@ -532,18 +508,10 @@ retry_request:
 				ticket->lastreq.tv_nsec = tv.tv_nsec;
 			}
 
-#ifdef NOTNOW
-                	/*
-			 * Determine if the user can issue more I/O 
-			 * this second.
-                 	 */
-                	if ((ticket->sz - ticket->iothissecond) > 0) {
-#else
 			/*
-			 * Only allow a single request each second.
+			 * Only allow a single request per process each second.
 			 */
                 	if (ticket->iothissecond ==  0) {
-#endif
 
                         	/*
                          	 * Issue the largest I/O possible. 
