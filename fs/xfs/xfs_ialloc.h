@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_IALLOC_H
 #define	_FS_XFS_IALLOC_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 1.13 $"
 
 /*
  * Allocation parameters.
@@ -34,13 +34,29 @@
  * it is a directory.
  * The sameag flag is used by mkfs only, to force the root directory
  * inode into the first allocation group.
+ *
+ * To work within the constraint of one allocation per transaction,
+ * xfs_dialloc() is designed to be called twice if it has to do an
+ * allocation to replenish the inode freelist.  If an inode is 
+ * available without an allocation, agbuf would be set to NULL and
+ * alloc_done set to false.
+ * If an allocation needed to be done, agbuf would be set to the
+ * header of the freelist and alloc_done set to true.  The caller
+ * should then commit the current transaction and allocate a new
+ * transaction.  xfs_dialloc() should then be called again with
+ * the agbuf value returned from the previous call.
+ *
+ * agbuf should be set to NULL on the first call.
  */
 xfs_ino_t				/* inode number allocated */
 xfs_dialloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	int		sameag,		/* 1 => must be in same a.g. */
-	mode_t		mode);		/* mode bits for new inode */
+	mode_t		mode,		/* mode bits for new inode */
+	buf_t		**agbuf,	/* buf for ag.inode freelist header */
+	boolean_t	*alloc_done);	/* an allocation was done to replenish
+					   the inode freelist. */
 
 /*
  * Return the next (past agino) inode on the freelist for this allocation group

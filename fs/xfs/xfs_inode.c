@@ -352,10 +352,26 @@ xfs_iread_extents(xfs_trans_t	*tp,
  * appropriately within the inode.  The uid and gid for the inode are
  * set according to the contents of the given cred structure.
  *
- * Use xfs_dialloc() to allocate the on-disk inode and xfs_iget()
+ * Use xfs_dialloc() to allocate the on-disk inode. If xfs_dialloc()
+ * has a free inode available on its freelist, call xfs_iget()
  * to obtain the in-core version of the allocated inode.  Finally,
  * hand the in-core inode off to xfs_iinit() to fill in the proper
- * values and log the initial contents of the inode.
+ * values and log the initial contents of the inode.  In this case,
+ * ialloc_context would be set to NULL and call_again set to false.
+ *
+ * If xfs_dialloc() does not have an available inode on the freelist,
+ * it will replenish the freelist by doing an allocation. Since we can
+ * only do one allocation within a transaction without deadlocks, we 
+ * must commit the current transaction before returning the inode itself.
+ * In this case, therefore, we will set call_again to true and return.
+ * The caller should then commit the current transaction, start a new
+ * transaction, and call xfs_ialloc() again to actually get the inode.
+ *
+ * To ensure that some other process does not grab the inode that
+ * was allocated during the first call to xfs_ialloc(), this routine
+ * also returns the [locked] bp pointing to the head of the freelist
+ * as ialloc_context.  The caller should hold this buffer across
+ * the commit and pass it back into this routine on the second call.
  */
 xfs_inode_t *
 xfs_ialloc(xfs_trans_t	*tp,
@@ -363,7 +379,9 @@ xfs_ialloc(xfs_trans_t	*tp,
 	   mode_t	mode,
 	   ushort	nlink,
 	   dev_t	rdev,
-	   struct cred	*cr)
+	   struct cred	*cr,
+	   buf_t	**ialloc_context,
+	   boolean_t	*call_again)
 {
 	xfs_ino_t	ino;
 	xfs_inode_t	*ip;
@@ -376,7 +394,11 @@ xfs_ialloc(xfs_trans_t	*tp,
 	 * Call the space management code to allocate
 	 * the on-disk inode.
 	 */
-	ino = xfs_dialloc(tp, pip ? pip->i_ino : 0, pip == NULL, mode);
+	ino = xfs_dialloc(tp, pip ? pip->i_ino : 0, pip == NULL, mode,
+			  ialloc_context, call_again);
+	if (*call_again) {
+                return NULL;
+        }
 	ASSERT(ino != NULLFSINO);
 
 	/*

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision: 1.29 $"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -442,13 +442,32 @@ xfs_ialloc_ag_select(
  * it is a directory.
  * The sameag flag is used by mkfs only, to force the root directory
  * inode into the first allocation group.
+ *
+ * The arguments IO_agbuf and alloc_done are defined to work within
+ * the constraint of one allocation per transaction,
+ * xfs_dialloc() is designed to be called twice if it has to do an
+ * allocation to replenish the inode freelist.  On the first call,
+ * IO_agbuf should be set to NULL. If the freelist is not empty,
+ * i.e., xfs_dialloc() did not need to do an allocation, an inode
+ * number is returned.  In this case, IO_agbuf would be set to NULL and
+ * alloc_done set to false.
+ * If an allocation needed to be done, xfs_dialloc would return
+ * the current ag_buf in IO_agbuf and set alloc_done to true.
+ * The caller should then commit the current transaction, allocate a new
+ * transaction, and call xfs_dialloc() again, passing in the previous
+ * value of IO_agbuf.  IO_agbuf should be held across the transactions.
+ * Since the agbuf is locked across the two calls, the second call is
+ * guaranteed to have something on the freelist.
  */
 xfs_ino_t				/* inode number allocated */
 xfs_dialloc(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_ino_t	parent,		/* parent inode (directory) */
 	int		sameag,		/* 1 => must be in same a.g. */
-	mode_t		mode)		/* mode bits for new inode */
+	mode_t		mode,		/* mode bits for new inode */
+	buf_t		**IO_agbuf,	/* allocation group header's buffer */
+	boolean_t	*alloc_done)	/* true if we needed to replenish
+					   inode freelist */
 {
 	xfs_agblock_t	agbno;		/* starting block number of inodes */
 	xfs_agnumber_t	agcount;	/* number of allocation groups */
@@ -464,15 +483,31 @@ xfs_dialloc(
 	xfs_sb_t	*sbp;		/* superblock structure */
 	xfs_agnumber_t	tagno;		/* testing allocation group number */
 
-	/*
-	 * Select an initial allocation group for the inode allocation.
-	 */
-	agbuf = xfs_ialloc_ag_select(tp, parent, sameag, mode);
-	/*
-	 * Couldn't find an allocation group satisfying the criteria, give up.
-	 */
-	if (!agbuf)
-		return NULLFSINO;
+
+	if (*IO_agbuf == NULL) {
+
+		/*
+		 * We do not have an agbuf, so select an initial allocation
+		 * group for inode allocation.
+		 */
+		agbuf = xfs_ialloc_ag_select(tp, parent, sameag, mode);
+
+		/*
+		 * Couldn't find an allocation group satisfying the 
+		 * criteria, give up.
+		 */
+		if (!agbuf)
+			return NULLFSINO;
+		}
+	else {
+
+		/*
+		 * Continue where we left off before.  In this case, we 
+		 * know that the allocation group's freelist is nonempty.
+		 */
+		agbuf = *IO_agbuf;
+	}
+
 	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	agcount = sbp->sb_agcount;
@@ -484,12 +519,23 @@ xfs_dialloc(
 	 * or in which we can allocate some inodes.  Iterate through the
 	 * allocation groups upward, wrapping at the end.
 	 */
+	*alloc_done = B_FALSE;
 	while (agi->agi_freecount == 0) {
 		/*
 		 * Try to allocate some new inodes in the allocation group.
 		 */
-		if (xfs_ialloc_ag_alloc(tp, agbuf))
-			break;
+		if (xfs_ialloc_ag_alloc(tp, agbuf)) {
+			/*
+			 * We successfully allocated some inodes, return
+			 * the current context to the caller so that it
+			 * can commit the current transaction and call
+			 * us again where we left off.
+			 */
+			*alloc_done = B_TRUE;
+			*IO_agbuf = agbuf;
+			return 0;
+		}
+
 		/*
 		 * If it failed, give up on this ag.
 		 */
