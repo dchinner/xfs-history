@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.35 $"
+#ident	"$Revision: 1.36 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -17,6 +17,7 @@
 #include <sys/errno.h>
 #include <sys/kmem.h>
 #include <sys/open.h>
+#include <sys/cred.h>
 #ifdef SIM
 #include <bstring.h>
 #else
@@ -93,8 +94,6 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	xfs_mount_t	*mp;
 	xfs_inode_t	*rip;
 	vnode_t		*rvp = 0;
-
-	bdopen(bmajor(dev), &dev,   0, OTYP_MNT, 0);
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)
 		return 0;
@@ -279,7 +278,7 @@ xfs_mount(dev_t dev, dev_t logdev, dev_t rtdev)
  * xfs_unmountfs
  */
 int
-xfs_unmountfs(xfs_mount_t *mp)
+xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr )
 {
 	buf_t	*bp;
 	dev_t	dev;
@@ -302,7 +301,14 @@ xfs_unmountfs(xfs_mount_t *mp)
 	
 	xfs_log_unmount(mp);			/* Done! No more fs ops. */
 
-	bdclose(bmajor(dev), dev, 0, OTYP_MNT, 0);
+	if (mp->m_ddevp) {
+		VOP_CLOSE(mp->m_ddevp, vfs_flags, 1, 0, cr);
+		VN_RELE(mp->m_ddevp);
+	}
+	if (mp->m_rtdevp) {
+		VOP_CLOSE(mp->m_rtdevp, vfs_flags, 1, 0, cr);
+		VN_RELE(mp->m_rtdevp);
+	}
 
 	brelse(bp);
 	freerbuf(bp);
@@ -336,7 +342,7 @@ xfs_umount(xfs_mount_t *mp)
 	XFS_MOUNT_IUNLOCK(mp, s);
 
 	if (error == 0)
-		error = xfs_unmountfs(mp);
+		error = xfs_unmountfs(mp, 0, NULL);
 }
 #endif
 
