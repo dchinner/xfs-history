@@ -257,6 +257,10 @@ xfs_attr_shortform_getvalue(xfs_da_args_t *args)
 		if (((args->flags & ATTR_ROOT) != 0) !=
 		    ((sfe->flags & XFS_ATTR_ROOT) != 0))
 			continue;
+		if (args->valuelen < sfe->valuelen) {
+			args->valuelen = sfe->valuelen;
+			return(XFS_ERROR(E2BIG));
+		}
 		args->valuelen = sfe->valuelen;
 		bcopy(&sfe->nameval[args->namelen], args->value,
 						    args->valuelen);
