@@ -45,13 +45,15 @@ typedef struct xfs_inode_log_item {
 #define	XFS_ILOG_EXT	0x004	/* log iu_extents */
 #define	XFS_ILOG_BROOT	0x008	/* log i_broot */
 #define	XFS_ILOG_DEV	0x010	/* log the dev field */
+#define	XFS_ILOG_UUID	0x020	/* log the uuid field */
 
 #define	XFS_ILOG_NONCORE	(XFS_ILOG_DATA | XFS_ILOG_EXT | \
-				 XFS_ILOG_BROOT | XFS_ILOG_DEV)
+				 XFS_ILOG_BROOT | XFS_ILOG_DEV | \
+				 XFS_ILOG_UUID)
 
 #define	XFS_ILOG_ALL		(XFS_ILOG_CORE | XFS_ILOG_DATA | \
 				 XFS_ILOG_EXT | XFS_ILOG_BROOT | \
-				 XFS_ILOG_DEV)
+				 XFS_ILOG_DEV | XFS_ILOG_UUID)
 
 	
 void	xfs_inode_item_init(struct xfs_inode *, xfs_mount_t *);

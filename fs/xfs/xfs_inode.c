@@ -465,6 +465,8 @@ xfs_ialloc(xfs_trans_t	*tp,
 		break;
 	case IFMNT:
 		ip->i_d.di_format = XFS_DINODE_FMT_UUID;
+		uuid_create(&ip->i_u2.iu_uuid, &status);
+		flags |= XFS_ILOG_UUID;
 		break;
 	default:
 		ASSERT(0);
@@ -1229,12 +1231,19 @@ xfs_iflush(xfs_inode_t	*ip,
 			}
 		}
 		break;
+
 	case XFS_DINODE_FMT_DEV:
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
 			dip->di_u.di_dev = ip->i_u2.iu_rdev;
 		}
 		break;
 		
+	case XFS_DINODE_FMT_UUID:
+		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
+			dip->di_u.di_muuid = ip->i_u2.iu_uuid;
+		}
+		break;
+
 	case XFS_DINODE_FMT_AGINO:
 		/*
 		 * The pointer to the next free inode is maintained

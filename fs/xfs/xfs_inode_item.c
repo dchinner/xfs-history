@@ -105,8 +105,8 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 
 	switch (ip->i_d.di_format) {
 	case XFS_DINODE_FMT_EXTENTS:
-		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DATA | XFS_ILOG_BROOT | XFS_ILOG_DEV);
+		iip->ili_format.ilf_fields &= ~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
+			XFS_ILOG_DEV | XFS_ILOG_UUID);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_EXT) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_extents != NULL);
@@ -122,8 +122,8 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 		break;
 
 	case XFS_DINODE_FMT_BTREE:
-		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DATA | XFS_ILOG_EXT | XFS_ILOG_DEV);
+		iip->ili_format.ilf_fields &= ~(XFS_ILOG_DATA | XFS_ILOG_EXT |
+			XFS_ILOG_DEV | XFS_ILOG_UUID);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_BROOT) &&
 		    (ip->i_broot_bytes > 0)) {
 			ASSERT(ip->i_broot != NULL);
@@ -138,8 +138,8 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 		break;
 
 	case XFS_DINODE_FMT_LOCAL:
-		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_EXT | XFS_ILOG_BROOT | XFS_ILOG_DEV);
+		iip->ili_format.ilf_fields &= ~(XFS_ILOG_EXT | XFS_ILOG_BROOT |
+			XFS_ILOG_DEV | XFS_ILOG_UUID);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_DATA) &&
 		    (ip->i_bytes > 0)) {
 			ASSERT(ip->i_u1.iu_data != NULL);
@@ -164,10 +164,18 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 		break;
 
 	case XFS_DINODE_FMT_DEV:
-		iip->ili_format.ilf_fields &=
-			~(XFS_ILOG_DATA | XFS_ILOG_BROOT | XFS_ILOG_EXT);
+		iip->ili_format.ilf_fields &= ~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
+			XFS_ILOG_EXT | XFS_ILOG_UUID);
 		if (iip->ili_format.ilf_fields & XFS_ILOG_DEV) {
 			iip->ili_format.ilf_u.ilfu_rdev = ip->i_u2.iu_rdev;
+		}
+		break;
+
+	case XFS_DINODE_FMT_UUID:
+		iip->ili_format.ilf_fields &= ~(XFS_ILOG_DATA | XFS_ILOG_BROOT |
+			XFS_ILOG_EXT | XFS_ILOG_DEV);
+		if (iip->ili_format.ilf_fields & XFS_ILOG_UUID) {
+			iip->ili_format.ilf_u.ilfu_uuid = ip->i_u2.iu_uuid;
 		}
 		break;
 

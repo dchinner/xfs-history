@@ -2,7 +2,6 @@
 
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <sys/buf.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
@@ -12,6 +11,7 @@
 #ifdef SIM
 #define _KERNEL
 #endif
+#include <sys/buf.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
@@ -195,13 +195,16 @@ xfs_ialloc_read_agi(
 	xfs_trans_t	*tp,		/* transaction pointer */
 	xfs_agnumber_t	agno)		/* allocation group number */
 {
+	buf_t		*bp;		/* return value */
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
 
 	ASSERT(agno != NULLAGNUMBER);
 	sbp = &mp->m_sb;
 	d = xfs_ag_daddr(sbp, agno, XFS_AGI_DADDR);
-	return xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
+	bp = xfs_trans_read_buf(tp, mp->m_dev, d, 1, 0);
+	ASSERT(bp && !geterror(bp));
+	return bp;
 }
 
 /*
@@ -404,7 +407,7 @@ xfs_ialloc_ag_select(
 	for (agoff = S_ISDIR(mode) != 0 && !sameag, doneleft = doneright = 0,
 	     flags = sameag ? 0 : XFS_ALLOC_FLAG_TRYLOCK;
 	     !doneleft || !doneright;
-	     agoff = -agoff + (agoff >= 0)) {
+	     agoff = -agoff + (agoff <= 0)) {
 		/*
 		 * Skip this if we're already done going in that direction.
 		 */
@@ -439,6 +442,7 @@ xfs_ialloc_ag_select(
 		agno = pagno + agoff;
 		agbuf = xfs_ialloc_read_agi(mp, tp, agno);
 		agi = xfs_buf_to_agi(agbuf);
+		ASSERT((agi->agi_freecount == 0) == (agi->agi_freelist == NULLAGINO));
 		/*
 		 * Is there enough free space for the file plus a block
 		 * of inodes (if we need to allocate some)?
@@ -512,27 +516,28 @@ xfs_dialloc(
 		 * group for inode allocation.
 		 */
 		agbuf = xfs_ialloc_ag_select(tp, parent, sameag, mode);
-
 		/*
 		 * Couldn't find an allocation group satisfying the 
 		 * criteria, give up.
 		 */
 		if (!agbuf)
 			return NULLFSINO;
-		}
-	else {
-
+		agi = xfs_buf_to_agi(agbuf);
+		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+	} else {
 		/*
 		 * Continue where we left off before.  In this case, we 
 		 * know that the allocation group's freelist is nonempty.
 		 */
 		agbuf = *IO_agbuf;
+		agi = xfs_buf_to_agi(agbuf);
+		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
+		ASSERT(agi->agi_freecount > 0);
+		ASSERT(agi->agi_freelist != NULLAGINO);
 	}
-
 	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	agcount = sbp->sb_agcount;
-	agi = xfs_buf_to_agi(agbuf);
 	agno = agi->agi_seqno;
 	tagno = agno;
 	/*
@@ -552,6 +557,8 @@ xfs_dialloc(
 			 * can commit the current transaction and call
 			 * us again where we left off.
 			 */
+			ASSERT(agi->agi_freecount > 0 &&
+			       agi->agi_freelist != NULLAGINO);
 			*alloc_done = B_TRUE;
 			*IO_agbuf = agbuf;
 			return 0;
@@ -575,12 +582,14 @@ xfs_dialloc(
 			return NULLFSINO;
 		agbuf = xfs_ialloc_read_agi(mp, tp, tagno);
 		agi = xfs_buf_to_agi(agbuf);
+		ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	}
 	/*
 	 * Here with an allocation group that has a free inode.
 	 */
 	agno = tagno;
 	agino = agi->agi_freelist;
+	ASSERT(agino != NULLAGINO);
 	agbno = xfs_agino_to_agbno(sbp, agino);
 	off = xfs_agino_to_offset(sbp, agino);
 	/*
@@ -594,7 +603,14 @@ xfs_dialloc(
 	/*
 	 * Remove the inode from the freelist, and decrement the counts.
 	 */
+	ASSERT((free->di_u.di_next == NULLAGINO) == (agi->agi_freecount == 1));
 	agi->agi_freelist = free->di_u.di_next;
+	/*
+	 * Mark the inode in-buffer as free by setting its di_next to
+	 * a reserved value.
+	 */
+	free->di_u.di_next = NULLAGINO_ALLOC;
+	xfs_ialloc_log_di(tp, fbuf, off, XFS_DI_U);
 	agi->agi_freecount--;
 	xfs_ialloc_log_agi(tp, agbuf, XFS_AGI_FREECOUNT | XFS_AGI_FREELIST);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, -1);
@@ -674,11 +690,13 @@ xfs_difree(
 	agbno = xfs_ino_to_agbno(sbp, inode);
 	off = xfs_ino_to_offset(sbp, inode);
 	agino = xfs_offbno_to_agino(sbp, agbno, off);
+	ASSERT(agino != NULLAGINO);
 	/*
 	 * Get the allocation group header.
 	 */
 	agbuf = xfs_ialloc_read_agi(mp, tp, agno);
 	agi = xfs_buf_to_agi(agbuf);
+	ASSERT(agi->agi_magicnum == XFS_AGI_MAGIC);
 	ASSERT(agbno < agi->agi_length);
 	/*
 	 * Get the inode into a buffer
@@ -687,7 +705,7 @@ xfs_difree(
 	free = xfs_make_iptr(sbp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
 	/*
-	 * Look at other inodes in the same block; if there are any
+	 * Look at other inodes in the same block; if there are any free
 	 * then insert this one after.  This increases the locality
 	 * in the inode free list.
 	 */
@@ -696,7 +714,8 @@ xfs_difree(
 	     i++, ip = xfs_make_iptr(sbp, fbuf, i)) {
 		if (ip == free)
 			continue;
-		if (ip->di_core.di_format != XFS_DINODE_FMT_AGINO) 
+		if (ip->di_u.di_next == NULLAGINO_ALLOC ||
+		    ip->di_core.di_format != XFS_DINODE_FMT_AGINO)
 			continue;
 		free->di_u.di_next = ip->di_u.di_next;
 		ip->di_u.di_next = agino;
@@ -709,6 +728,7 @@ xfs_difree(
 	 */
 	if (!found) {
 		free->di_u.di_next = agi->agi_freelist;
+		ASSERT(agino != NULLAGINO);
 		agi->agi_freelist = agino;
 		flags |= XFS_AGI_FREELIST;
 	}
@@ -730,7 +750,6 @@ xfs_difree(
 	flags |= XFS_AGI_FREECOUNT;
 	xfs_ialloc_log_agi(tp, agbuf, flags);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_IFREE, 1);
-	return;
 }
 
 /*
@@ -738,11 +757,11 @@ xfs_difree(
  */
 void
 xfs_dilocate(
-	xfs_mount_t	*mp,		/* file system mount structure */
-	xfs_trans_t	*tp,		/* transaction pointer */
-	xfs_ino_t	ino,		/* inode to locate */
-	xfs_fsblock_t	*bno,		/* output: block containing inode */
-	int		*off)		/* output: index in block of inode */
+	xfs_mount_t	*mp,	/* file system mount structure */
+	xfs_trans_t	*tp,	/* transaction pointer */
+	xfs_ino_t	ino,	/* inode to locate */
+	xfs_fsblock_t	*bno,	/* output: block containing inode */
+	int		*off)	/* output: index in block of inode */
 {
 	xfs_agblock_t	agbno;	/* block number of inode in the alloc group */
 	xfs_agnumber_t	agno;	/* allocation group number */
