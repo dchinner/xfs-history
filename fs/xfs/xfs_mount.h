@@ -233,9 +233,6 @@ typedef struct xfs_mount {
 	buftarg_t		m_logdev_targ;	/* ptr to log device */
 	buftarg_t		m_rtdev_targ;	/* ptr to rt device */
 	buftarg_t		*m_ddev_targp;	/* saves taking the address */
-#define m_ddevp		m_ddev_targ.specvp
-#define m_logdevp	m_logdev_targ.specvp
-#define m_rtdevp	m_rtdev_targ.specvp
 #define m_dev		m_ddev_targ.dev
 #define m_logdev	m_logdev_targ.dev
 #define m_rtdev		m_rtdev_targ.dev
