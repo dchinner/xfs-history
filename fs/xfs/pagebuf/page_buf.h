@@ -414,7 +414,9 @@ BUFFER_FNS(New, new)
 BUFFER_FNS(Async, async)
 BUFFER_FNS(Wait_IO, wait_io)
 BUFFER_FNS(Launder, launder)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22)
 BUFFER_FNS(Sync, sync)
+#endif /* kernel >= 2.4.22 */
 BUFFER_FNS(Delay, delay)
 #endif /* kernel < 2.5.17 */
 
