@@ -2822,8 +2822,8 @@ xfs_strat_read(
 				xfs_overlap_bp(bp, rbp, data_offset,
 					       data_bytes);
 				rbp->b_blkno = XFS_FSB_TO_DB(mp, ip,
-						     (imap[x].br_startblock +
-						      block_off));
+						   imap[x].br_startblock) +
+					       block_off;
 				rbp->b_offset = XFS_FSB_TO_BB(mp,
 							      imap_offset) +
 						block_off;
