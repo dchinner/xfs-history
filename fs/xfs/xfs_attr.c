@@ -1221,7 +1221,9 @@ xfs_attr_node_removename(xfs_da_args_t *args)
 	if (error || (retval != EEXIST)) {
 		if (error == 0)
 			error = retval;
+#ifdef DEBUG	/* avoid compile error when DEBUG is not defined */
 		XFS_ERROR(error);
+#endif /* DEBUG */
 		goto out;
 	}
 
