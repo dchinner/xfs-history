@@ -1736,6 +1736,12 @@ xfs_bmap_alloc(
 			ap->alen = (ap->alen + mp->m_sb.sb_rextsize - 1) /
 				mp->m_sb.sb_rextsize;
 		}
+		/*
+		 * If the old value was close enough to MAXEXTLEN that
+		 * we rounded up to it, cut it back so it's legal again.
+		 */
+		if (ap->alen * mp->m_sb.sb_rextsize >= MAXEXTLEN)
+			ap->alen = MAXEXTLEN / mp->m_sb.sb_rextsize;
 		ap->rval /= mp->m_sb.sb_rextsize;
 		if (error = xfs_rtallocate_extent(ap->tp, ap->rval, 1, ap->alen,
 				&ralen, type, ap->wasdel, prod, &ap->rval))
