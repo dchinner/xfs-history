@@ -4586,13 +4586,6 @@ xfsidbg_xnode(xfs_inode_t *ip)
 	kdb_printf("udquotp 0x%p gdquotp 0x%p\n",
 		ip->i_udquot, ip->i_gdquot);
 	kdb_printf("new_size %Lx\n", ip->i_iocore.io_new_size);
-	kdb_printf(
-"readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
-		(unsigned int) ip->i_iocore.io_readio_log,
-		ip->i_iocore.io_readio_blocks,
-		(unsigned int) ip->i_iocore.io_writeio_log,
-		ip->i_iocore.io_writeio_blocks,
-		(unsigned int) ip->i_iocore.io_max_io_log);
 	printflags((int)ip->i_flags, tab_flags, "flags");
 	kdb_printf("\n");
 	kdb_printf("update_core 0x%x update size 0x%x\n",
@@ -4626,13 +4619,6 @@ xfsidbg_xcore(xfs_iocore_t *io)
 		io->io_lock, io->io_iolock,
 		io->io_flock);
 	kdb_printf("new_size %Lx\n", io->io_new_size);
-	kdb_printf(
-"readiolog %u, readioblocks %u, writeiolog %u, writeioblocks %u, maxiolog %u\n",
-		(unsigned int) io->io_readio_log,
-		io->io_readio_blocks,
-		(unsigned int) io->io_writeio_log,
-		io->io_writeio_blocks,
-		(unsigned int) io->io_max_io_log);
 }
 
 /*

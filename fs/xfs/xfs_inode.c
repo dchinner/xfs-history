@@ -1274,7 +1274,7 @@ xfs_file_last_byte(
 	if (last_byte < 0) {
 		return XFS_MAX_FILE_OFFSET;
 	}
-	last_byte += (1 << ip->i_iocore.io_max_io_log);
+	last_byte += (1 << mp->m_writeio_log);
 	if (last_byte < 0) {
 		return XFS_MAX_FILE_OFFSET;
 	}

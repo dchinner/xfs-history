@@ -34,14 +34,6 @@
 
 
 /*
- * Round the given file offset down to the nearest read/write
- * size boundary.
- */
-#define	XFS_READIO_ALIGN(io,off)	(((off) >> io->io_readio_log) \
-					        << io->io_readio_log)
-#define	XFS_WRITEIO_ALIGN(io,off)	(((off) >> io->io_writeio_log) \
-					        << io->io_writeio_log)
-/*
  * This is a subroutine for xfs_write() and other writers (xfs_ioctl)
  * which clears the setuid and setgid bits when a file is written.
  */

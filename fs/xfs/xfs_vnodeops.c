@@ -208,8 +208,8 @@ xfs_getattr(
                                  * buffers causes buffers to be decommissioned.
                                  * The value returned is in bytes.
                                  */
-                                (1 << (int)MAX(ip->i_iocore.io_readio_log,
-                                               ip->i_iocore.io_writeio_log));
+                                (1 << (int)MAX(mp->m_readio_log,
+                                               mp->m_writeio_log));
 
 		} else {
 
@@ -4834,143 +4834,6 @@ xfs_allocstore(
 	return error;
 }
 #endif
-
-/*
- * xfs_get_uiosize - get uio size info
- */
-int
-xfs_get_uiosize(
-	xfs_mount_t	*mp, 
-	xfs_inode_t	*ip, 
-	struct biosize	*bs,
-	cred_t		*credp)
-{
-	int error;
-
-	if ((error = xfs_iaccess(ip, IREAD, credp)))
-		return error;
-
-	xfs_ilock(ip, XFS_ILOCK_SHARED);
-
-	bs->biosz_flags = (ip->i_iocore.io_flags & XFS_IOCORE_UIOSZ) ? 1 : 0;
-	bs->biosz_read = ip->i_iocore.io_readio_log;
-	bs->biosz_write = ip->i_iocore.io_writeio_log;
-	bs->dfl_biosz_read = mp->m_readio_log;
-	bs->dfl_biosz_write = mp->m_writeio_log;
-
-	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
-	return 0;
-}
-
-/*
- * xfs_set_biosize
- *
- */
-int
-xfs_set_uiosize(
-	xfs_mount_t	*mp, 
-	xfs_inode_t	*ip, 
-	uint		flags,
-	int		read_iosizelog,
-	int		write_iosizelog,
-	cred_t		*credp)
-{
-	int	max_iosizelog;
-	int	min_iosizelog;
-	int	memlimit;
-	int	error;
-
-	if ((error = xfs_iaccess(ip, IWRITE, credp)))
-		return error;
-
-	memlimit = NBPP;
-
-	switch (memlimit) {
-	case 4096:
-		memlimit = 12;
-		break;
-	case 16384:
-		memlimit = 14;
-		break;
-	default:
-		return XFS_ERROR(EINVAL);
-	}
-
-	if (flags == 2) {
-		/*
-		 * reset the io sizes to the filesystem default values.
-		 * leave the maxio size alone since it won't have changed.
-		 */
-		xfs_ilock(ip, XFS_ILOCK_EXCL);
-
-		ip->i_iocore.io_readio_log = mp->m_readio_log;
-		ip->i_iocore.io_readio_blocks = 1 << (int) (ip->i_iocore.io_readio_log -
-						mp->m_sb.sb_blocklog);
-		ip->i_iocore.io_writeio_log = mp->m_writeio_log;
-		ip->i_iocore.io_writeio_blocks = 1 << (int) (ip->i_iocore.io_writeio_log -
-						mp->m_sb.sb_blocklog);
-		ip->i_iocore.io_flags &= ~XFS_IOCORE_UIOSZ;
-
-		xfs_iunlock(ip, XFS_ILOCK_EXCL);
-
-		return 0;
-	}
-
-	/*
-	 * set iosizes to specified values -- screen out bogus values
-	 */
-	max_iosizelog = MAX(read_iosizelog, write_iosizelog);
-	min_iosizelog = MIN(read_iosizelog, write_iosizelog);
-
-	/*
-	 * new values can't be less than a page, less than the filesystem
-	 * blocksize, or out of the range of tested values
-	 */
-	if (max_iosizelog < mp->m_sb.sb_blocklog ||
-	    max_iosizelog < memlimit ||
-	    min_iosizelog < mp->m_sb.sb_blocklog ||
-	    min_iosizelog < memlimit ||
-	    min_iosizelog < XFS_MIN_IO_LOG ||
-	    max_iosizelog > XFS_MAX_IO_LOG ||
-	    flags >= 2)
-		return XFS_ERROR(EINVAL);
-
-	xfs_ilock(ip, XFS_ILOCK_EXCL);
-
-	if (!(ip->i_iocore.io_flags & XFS_IOCORE_UIOSZ)) {
-		ip->i_iocore.io_readio_log = (uchar_t) read_iosizelog;
-		ip->i_iocore.io_readio_blocks = 1 << (int) (ip->i_iocore.io_readio_log -
-						mp->m_sb.sb_blocklog);
-		ip->i_iocore.io_writeio_log = (uchar_t) write_iosizelog;
-		ip->i_iocore.io_writeio_blocks = 1 << (int) (ip->i_iocore.io_writeio_log -
-						mp->m_sb.sb_blocklog);
-		ip->i_iocore.io_flags |= XFS_IOCORE_UIOSZ;
-		ip->i_iocore.io_max_io_log = MAX((uchar_t)max_iosizelog, ip->i_iocore.io_max_io_log);
-	} else {
-		/*
-		 * if inode already has non-default values set,
-		 * only allow the values to get smaller unless
-		 * explictly overridden (flags == 1)
-		 */
-		if (read_iosizelog < ip->i_iocore.io_readio_log || flags == 1) {
-			ip->i_iocore.io_readio_log = (uchar_t) read_iosizelog;
-			ip->i_iocore.io_readio_blocks = 1 << (int) (ip->i_iocore.io_readio_log -
-							mp->m_sb.sb_blocklog);
-			ip->i_iocore.io_max_io_log = MAX((uchar_t)max_iosizelog, ip->i_iocore.io_max_io_log);
-		}
-		if (write_iosizelog < ip->i_iocore.io_writeio_log || flags == 1) {
-			ip->i_iocore.io_writeio_log = (uchar_t) write_iosizelog;
-			ip->i_iocore.io_writeio_blocks = 1 << (int) (ip->i_iocore.io_writeio_log -
-							mp->m_sb.sb_blocklog);
-			ip->i_iocore.io_max_io_log = MAX((uchar_t)max_iosizelog, ip->i_iocore.io_max_io_log);
-		}
-	}
-
-	xfs_iunlock(ip, XFS_ILOCK_EXCL);
-
-	return 0;
-}
 
 int
 xfs_set_dmattrs (

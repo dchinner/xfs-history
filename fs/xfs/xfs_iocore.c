@@ -152,19 +152,8 @@ void
 xfs_iocore_reset(
 	xfs_iocore_t	*io)
 {
-	xfs_mount_t	*mp = io->io_mount;
-
-	/*
-	 * initialize read/write io sizes
-	 */
-	ASSERT(mp->m_readio_log <= 0xff);
-	ASSERT(mp->m_writeio_log <= 0xff);
-
-	io->io_readio_log = (uchar_t) mp->m_readio_log;
-	io->io_writeio_log = (uchar_t) mp->m_writeio_log;
-	io->io_max_io_log = (uchar_t) mp->m_writeio_log;
-	io->io_readio_blocks = mp->m_readio_blocks;
-	io->io_writeio_blocks = mp->m_writeio_blocks;
+	ASSERT(io->io_mount->m_readio_log <= 0xff);
+	ASSERT(io->io_mount->m_writeio_log <= 0xff);
 }
 
 void
