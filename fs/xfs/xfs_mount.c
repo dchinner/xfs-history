@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.135 $"
+#ident	"$Revision: 1.136 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -64,6 +64,7 @@
 STATIC int	xfs_mod_incore_sb_unlocked(xfs_mount_t *, xfs_sb_field_t, int);
 STATIC void	xfs_sb_relse(buf_t *);
 #ifndef SIM
+STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_uuid_mount(xfs_mount_t *);
 STATIC void	xfs_uuid_unmount(xfs_mount_t *);
 
@@ -168,7 +169,8 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	__uint64_t	ret64;
 	daddr_t		d;
 	struct bdevsw	*my_bdevsw;
-	uint		quotaflags;
+	uint		quotaflags, quotaondisk;
+	boolean_t	needquotamount;
 	extern dev_t	rootdev;		/* from sys/systm.h */
 
 	if (vfsp->vfs_flag & VFS_REMOUNT)   /* Can't remount XFS filesystems */
@@ -572,23 +574,26 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 	
 #ifndef SIM 
 	quotaflags = 0;
-	if (XFS_IS_QUOTA_ON(mp) ||
-	    (XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
-	     mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT))) {
+	quotaondisk = XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
+		mp->m_sb.sb_qflags & (XFS_UQUOTA_ACCT|XFS_PQUOTA_ACCT);
+	needquotamount = B_FALSE;
+	if (XFS_IS_QUOTA_ON(mp) || quotaondisk) {
 		/*
 		 * Call mount_quotas at this point only if we won't have to do
 		 * a quotacheck.
 		 */
-		if (XFS_IS_QUOTA_ON(mp) && 
-		    XFS_SB_VERSION_HASQUOTA(&mp->m_sb) &&
+		if (XFS_IS_QUOTA_ON(mp) && quotaondisk &&
 		    (! XFS_QM_NEED_QUOTACHECK(mp))) {
-			(void) xfs_qm_mount_quotas(mp);
 			/*
-			 * If error occured, qm_mount_quotas code
+			 * If xfsquotas pkg isn't not installed,
+			 * we have to reset the quotachk'd bit.
+			 * If an error occured, qm_mount_quotas code
 			 * has already disabled quotas. So, just finish
 			 * mounting, and get on with the boring life 
 			 * without disk quotas.
 			 */
+			if (xfs_qm_mount_quotas(mp) == ENOPKG)
+				xfs_mount_reset_sbqflags(mp);
 		} else {
 			/*
 			 * Clear the quota flags, but remember them. This 
@@ -599,6 +604,7 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 			 */
 			quotaflags = mp->m_qflags;
 			mp->m_qflags = 0;
+			needquotamount = B_TRUE;
 		}
 	}
 #endif		
@@ -616,10 +622,11 @@ xfs_mountfs_int(vfs_t *vfsp, xfs_mount_t *mp, dev_t dev, int read_rootinos)
 
 
 #ifndef SIM 
-	if (quotaflags) {
+	if (needquotamount) {
 		ASSERT(mp->m_qflags == 0);
 		mp->m_qflags = quotaflags; 
-		(void) xfs_qm_mount_quotas(mp);
+		if (xfs_qm_mount_quotas(mp) == ENOPKG)
+			xfs_mount_reset_sbqflags(mp);
 	}
 
 #ifdef DEBUG
@@ -1184,4 +1191,42 @@ xfs_uuid_unmount(xfs_mount_t *mp)
 	ASSERT(i < xfs_uuidtab_size);
 	mutex_unlock(&xfs_uuidtabmon);
 }
+
+/*
+ * When xfsquotas isn't installed and the superblock had quotas, we need to
+ * clear the quotaflags from superblock.
+ */
+STATIC void
+xfs_mount_reset_sbqflags(
+	xfs_mount_t	*mp)
+{
+	xfs_trans_t	*tp;
+	int		s;
+
+	mp->m_qflags = 0;
+	/*
+	 * It is OK to look at sb_qflags here in mount path,
+	 * without SB_LOCK.
+	 */
+	if (mp->m_sb.sb_qflags == 0)
+		return;
+	s = XFS_SB_LOCK(mp);
+	mp->m_sb.sb_qflags = 0;
+	XFS_SB_UNLOCK(mp, s);
+		
+#ifdef QUOTADEBUG	
+	cmn_err(CE_NOTE, 	
+		"Writing superblock quota changes :%s\n",
+		mp->m_fsname);
+#endif
+	tp = xfs_trans_alloc(mp, XFS_TRANS_QM_SBCHANGE);
+	if (xfs_trans_reserve(tp, 0, mp->m_sb.sb_sectsize + 128, 0, 0, 
+				      XFS_DEFAULT_LOG_COUNT)) {
+		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES);
+		return;
+	}
+	xfs_mod_sb(tp, XFS_SB_QFLAGS);
+	(void)xfs_trans_commit(tp, 0);
+}	
+
 #endif /* !SIM */
