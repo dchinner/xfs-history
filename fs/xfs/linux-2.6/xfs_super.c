@@ -347,13 +347,13 @@ destroy_inodecache( void )
  * at the point when it is unpinned after a log write,
  * since this is when the inode itself becomes flushable. 
  */
-STATIC void
+STATIC int
 linvfs_write_inode(
 	struct inode		*inode,
 	int			sync)
 {
 	vnode_t			*vp = LINVFS_GET_VP(inode);
-	int			error, flags = FLUSH_INODE;
+	int			error = 0, flags = FLUSH_INODE;
 
 	if (vp) {
 		vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
@@ -361,6 +361,8 @@ linvfs_write_inode(
 			flags |= FLUSH_SYNC;
 		VOP_IFLUSH(vp, flags, error);
 	}
+
+	return -error;
 }
 
 STATIC void
