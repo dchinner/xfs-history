@@ -136,7 +136,7 @@ xfs_dir2_block_sfsize(
         xfs_arch_t              arch;
 
 	mp = dp->i_mount;
-        arch = mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 	count = i8count = namelen = 0;
 	btp = XFS_DIR2_BLOCK_TAIL_P(mp, block);
 	blp = XFS_DIR2_BLOCK_LEAF_P(btp);
@@ -220,7 +220,7 @@ xfs_dir2_block_to_sf(
 	xfs_dir2_trace_args_sb("block_to_sf", args, size, bp);
 	dp = args->dp;
 	mp = dp->i_mount;
-        arch = mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 	/*
 	 * Make a copy of the block data, so we can shrink the inode
 	 * and add local data.
@@ -442,7 +442,7 @@ xfs_dir2_sf_addname_easy(
         xfs_arch_t              arch;
 
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	byteoff = (int)((char *)sfep - (char *)sfp);
 	/*
@@ -508,7 +508,7 @@ xfs_dir2_sf_addname_hard(
 	 * Copy the old directory to the stack buffer.
 	 */
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	old_isize = (int)dp->i_d.di_size;
 	oldsfp = (xfs_dir2_sf_t *)buf;
@@ -598,7 +598,7 @@ xfs_dir2_sf_addname_pick(
 
 	dp = args->dp;
 	mp = dp->i_mount;
-        arch = mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	size = XFS_DIR2_DATA_ENTSIZE(args->namelen);
 	offset = XFS_DIR2_DATA_FIRST_OFFSET;
@@ -672,7 +672,7 @@ xfs_dir2_sf_check(
         xfs_arch_t              arch;
 
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	sfp = (xfs_dir2_sf_t *)dp->i_df.if_u1.if_data;
 	offset = XFS_DIR2_DATA_FIRST_OFFSET;
 	ino = XFS_DIR2_SF_GET_INUMBER_ARCH(sfp, &sfp->hdr.parent, arch);
@@ -716,7 +716,7 @@ xfs_dir2_sf_create(
 
 	xfs_dir2_trace_args_i("sf_create", args, pino);
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	ASSERT(dp != NULL);
 	ASSERT(dp->i_d.di_size == 0);
 	/*
@@ -773,7 +773,7 @@ xfs_dir2_sf_getdents(
         xfs_arch_t              arch;
 
 	mp = dp->i_mount;
-        arch = mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	/*
 	 * Give up if the directory is way too short.
@@ -910,7 +910,7 @@ xfs_dir2_sf_lookup(
 	xfs_dir2_trace_args("sf_lookup", args);
 	xfs_dir2_sf_check(args);
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	/*
 	 * Bail out if the directory is way too short.
@@ -981,7 +981,7 @@ xfs_dir2_sf_removename(
 
 	xfs_dir2_trace_args("sf_removename", args);
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	oldsize = (int)dp->i_d.di_size;
 	/*
@@ -1076,7 +1076,7 @@ xfs_dir2_sf_replace(
 
 	xfs_dir2_trace_args("sf_replace", args);
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
 	/*
 	 * Bail out if the shortform directory is way too small.
@@ -1208,7 +1208,7 @@ xfs_dir2_sf_toino4(
 
 	xfs_dir2_trace_args("sf_toino4", args);
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	/*
 	 * Copy the old directory to the buffer.
 	 * Then nuke it from the inode, and add the new buffer to the inode.
@@ -1287,7 +1287,7 @@ xfs_dir2_sf_toino8(
 
 	xfs_dir2_trace_args("sf_toino8", args);
 	dp = args->dp;
-        arch = dp->i_mount->m_arch;
+        arch = ARCH_GET(dp->i_mount->m_arch);
 	/*
 	 * Copy the old directory to the buffer.
 	 * Then nuke it from the inode, and add the new buffer to the inode.

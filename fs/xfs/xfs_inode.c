@@ -233,7 +233,7 @@ xfs_inobp_bwcheck(xfs_buf_t *bp)
 	ASSERT(XFS_BUF_FSPRIVATE3(bp, void *) != NULL);
 
 	mp = XFS_BUF_FSPRIVATE3(bp, xfs_mount_t *);
-        arch=mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 
 	j = mp->m_inode_cluster_size >> mp->m_sb.sb_inodelog;
 	dip = (xfs_dinode_t *) XFS_BUF_PTR(bp);
@@ -292,7 +292,7 @@ xfs_inotobp(
 	xfs_buf_t	*bp;
 	int		error;
 	xfs_dinode_t	*dip;
-        xfs_arch_t  arch = mp->m_arch;
+        xfs_arch_t      arch = ARCH_GET(mp->m_arch);
 
 	/*
 	 * Call the space managment code to find the location of the
@@ -381,7 +381,7 @@ xfs_itobp(
 	int		i;
 	int		ni;
 #endif
-        xfs_arch_t  arch = mp->m_arch;
+        xfs_arch_t      arch = ARCH_GET(mp->m_arch);
 
 	if (ip->i_blkno == (daddr_t)0) {
 		/*
@@ -496,7 +496,7 @@ xfs_iformat(
 	int			size;
 	int			error;
         xfs_fsize_t             di_size;
-        xfs_arch_t          arch=ip->i_mount->m_arch;
+        xfs_arch_t              arch        = ARCH_GET(ip->i_mount->m_arch);
 	ip->i_df.if_ext_max =
 		XFS_IFORK_DSIZE(ip) / (uint)sizeof(xfs_bmbt_rec_t);
 	error = 0;
@@ -623,7 +623,7 @@ xfs_iformat_local(
 {
 	xfs_ifork_t	*ifp;
 	int		real_size;
-        xfs_arch_t  arch=ip->i_mount->m_arch;
+        xfs_arch_t      arch        = ARCH_GET(ip->i_mount->m_arch);
 
 	/*
 	 * If the size is unreasonable, then something
@@ -675,7 +675,7 @@ xfs_iformat_extents(
 	int		nex;
 	int		real_size;
 	int		size;
-        xfs_arch_t  arch=ip->i_mount->m_arch;
+        xfs_arch_t      arch        = ARCH_GET(ip->i_mount->m_arch);
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	nex = XFS_DFORK_NEXTENTS_ARCH(dip, whichfork, arch);
@@ -742,7 +742,7 @@ xfs_iformat_btree(
 	/* REFERENCED */
 	int			nrecs;
 	int			size;
-        xfs_arch_t          arch=ip->i_mount->m_arch;
+        xfs_arch_t              arch        = ARCH_GET(ip->i_mount->m_arch);
 
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	dfp = (xfs_bmdr_block_t *)XFS_DFORK_PTR_ARCH(dip, whichfork, arch);
@@ -873,11 +873,11 @@ xfs_iread(
 	xfs_inode_t	**ipp,
 	daddr_t		bno)
 {
-	xfs_buf_t		*bp;
+	xfs_buf_t	*bp;
 	xfs_dinode_t	*dip;
 	xfs_inode_t	*ip;
 	int		error;
-        xfs_arch_t  arch=mp->m_arch;
+        xfs_arch_t      arch        = ARCH_GET(mp->m_arch);
 
 	ASSERT(xfs_inode_zone != NULL);
 
@@ -2863,7 +2863,7 @@ xfs_iflush_fork(
 		{ XFS_ILOG_DDATA, XFS_ILOG_ADATA };
 	static const short	extflag[2] =
 		{ XFS_ILOG_DEXT, XFS_ILOG_AEXT };
-        xfs_arch_t          arch=ip->i_mount->m_arch;
+        xfs_arch_t              arch        = ARCH_GET(ip->i_mount->m_arch);
 
 	if (iip == NULL)
 		return 0;
@@ -3287,7 +3287,7 @@ xfs_iflush_int(
 
 	iip = ip->i_itemp;
 	mp = ip->i_mount;
-        arch=mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 
 	/*
 	 * If the inode isn't dirty, then just release the inode

@@ -441,7 +441,7 @@ xfs_readsb(xfs_mount_t *mp, dev_t dev)
 	 */
 	sbp = XFS_BUF_TO_SBP(bp);
         mp->m_arch=sbp->sb_arch; /* set architecture first */
-        xfs_xlatesb(bp, &(mp->m_sb), 1, mp->m_arch, XFS_SB_ALL_BITS);
+        xfs_xlatesb(bp, &(mp->m_sb), 1, ARCH_GET(mp->m_arch), XFS_SB_ALL_BITS);
 	if (error = xfs_mount_validate_sb(mp, &(mp->m_sb))) {
 		goto err;
 	}
@@ -1318,7 +1318,7 @@ xfs_mod_sb(xfs_trans_t *tp, __int64_t fields)
         
         /* translate/copy */
         
-        xfs_xlatesb(bp, &(mp->m_sb), -1, sbp->sb_arch, fields);
+        xfs_xlatesb(bp, &(mp->m_sb), -1, ARCH_GET(sbp->sb_arch), fields);
 
         /* find modified range */
 

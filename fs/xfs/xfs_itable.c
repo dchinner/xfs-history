@@ -134,7 +134,9 @@ xfs_bulkstat_one(
 	} else {
 		dic = &dip->di_core;
 		ASSERT(dic != NULL);
-                arch = mp->m_arch; /* buffer dinode_core is in on-disk arch */
+                
+                /* buffer dinode_core is in on-disk arch */
+                arch = ARCH_GET(mp->m_arch); 
 
 		/*
 		 * The inode format changed when we moved the link count and
@@ -280,7 +282,7 @@ xfs_bulkstat(
 	int			vfs_unbusy_needed = 0;
         xfs_arch_t  arch;
         
-        arch=mp->m_arch;
+        arch=ARCH_GET(mp->m_arch);
 
 	/*
 	 * Check that the device is valid/mounted and mark it busy

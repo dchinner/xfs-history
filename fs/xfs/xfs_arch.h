@@ -247,6 +247,8 @@
 /*
  *  case 1 - fast path - all macros support NATIVE MACHINE architecture only
  */
+ 
+#define ARCH_GET(REF) (ARCH_NOCONVERT)
 
 #define INT_GET(reference,arch) \
     (reference)
@@ -281,7 +283,7 @@
     INT_GET_UNALIGNED_16(pointer)
 #define INT_SET_UNALIGNED_16_ARCH(pointer,value,arch) \
     INT_SET_UNALIGNED_16(pointer,value)
-
+    
 #endif
 
 /*
@@ -302,6 +304,14 @@
  */
  
 #if defined(CONFIG_XFS_ARCH_MIPS) || defined(CONFIG_XFS_ARCH_MULTI)
+
+#ifdef CONFIG_XFS_ARCH_MIPS 
+#define ARCH_GET(REF) (ARCH_MIPS)
+#endif
+    
+#ifdef CONFIG_XFS_ARCH_MULTI
+#define ARCH_GET(REF) (REF)
+#endif
  
 #define INT_GET(reference,arch) \
     (((arch) == ARCH_NOCONVERT) \
@@ -399,7 +409,7 @@
     }
 
 #endif
-        
+            
 #endif /* __XFS_ARCH_H__ */
 
 

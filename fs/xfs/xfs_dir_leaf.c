@@ -174,7 +174,7 @@ xfs_dir_shortform_create(xfs_da_args_t *args, xfs_ino_t parent)
 {
 	xfs_dir_sf_hdr_t *hdr;
 	xfs_inode_t *dp;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	dp = args->dp;
 	ASSERT(dp != NULL);
@@ -208,7 +208,7 @@ xfs_dir_shortform_addname(xfs_da_args_t *args)
 	xfs_dir_sf_entry_t *sfe;
 	int i, offset, size;
 	xfs_inode_t *dp;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	dp = args->dp;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
@@ -316,7 +316,7 @@ xfs_dir_shortform_lookup(xfs_da_args_t *args)
 	xfs_dir_sf_entry_t *sfe;
 	int i;
 	xfs_inode_t *dp;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	dp = args->dp;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
@@ -370,7 +370,7 @@ xfs_dir_shortform_to_leaf(xfs_da_args_t *iargs)
 	int retval, i, size;
 	xfs_dablk_t blkno;
 	xfs_dabuf_t *bp;
-        xfs_arch_t arch=iargs->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(iargs->dp->i_mount->m_arch);
 
 	dp = iargs->dp;
 	/*
@@ -480,7 +480,7 @@ xfs_dir_shortform_getdents(xfs_inode_t *dp, uio_t *uio, int *eofp,
 	xfs_dahash_t cookhash, hash;
 	xfs_dir_put_args_t p;
 	xfs_dir_sf_sort_t *sbuf, *sbp;
-        xfs_arch_t arch=dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(dp->i_mount->m_arch);
 
 	mp = dp->i_mount;
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
@@ -625,7 +625,7 @@ xfs_dir_shortform_replace(xfs_da_args_t *args)
 	xfs_dir_sf_entry_t *sfe;
 	xfs_inode_t *dp;
 	int i;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	dp = args->dp;
 	ASSERT(dp->i_df.if_flags & XFS_IFINLINE);
@@ -682,7 +682,7 @@ xfs_dir_leaf_to_shortform(xfs_da_args_t *iargs)
 	char *tmpbuffer;
 	int retval, i;
 	xfs_dabuf_t *bp;
-        xfs_arch_t arch=iargs->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(iargs->dp->i_mount->m_arch);
 
 	dp = iargs->dp;
 	tmpbuffer = kmem_alloc(XFS_LBSIZE(dp->i_mount), KM_SLEEP);
@@ -990,7 +990,7 @@ xfs_dir_leaf_add_work(xfs_dabuf_t *bp, xfs_da_args_t *args, int index,
 	/* REFERENCED */
 	xfs_mount_t *mp;
 	int tmp, i;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	leaf = bp->data;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -1748,7 +1748,7 @@ xfs_dir_leaf_lookup_int(xfs_dabuf_t *bp, xfs_da_args_t *args, int *index)
 	xfs_dir_leaf_name_t *namest;
 	int probe, span;
 	xfs_dahash_t hashval;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	leaf = bp->data;
 	ASSERT(leaf->hdr.info.magic == XFS_DIR_LEAF_MAGIC);
@@ -1991,7 +1991,7 @@ xfs_dir_leaf_getdents_int(xfs_dabuf_t *bp, xfs_inode_t *dp, xfs_dablk_t bno,
 	xfs_dahash_t lasthash;
 #endif
 	xfs_dir_put_args_t p;
-        xfs_arch_t arch=dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(dp->i_mount->m_arch);
 
 	mp = dp->i_mount;
 	leaf = bp->data;

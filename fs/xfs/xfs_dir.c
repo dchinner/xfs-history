@@ -718,9 +718,9 @@ xfs_dir_shortform_validate_ondisk(xfs_mount_t *mp, xfs_dinode_t *dp)
 	xfs_dir_shortform_t	*sf;
 	xfs_dir_sf_entry_t	*sfe;
 	int			i;
-        xfs_arch_t          arch;
+        xfs_arch_t              arch;
         
-        arch=mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 
 	if ((INT_GET(dp->di_core.di_mode, arch) & IFMT) != IFDIR) {
 		return 0;
@@ -893,7 +893,7 @@ xfs_dir_leaf_replace(xfs_da_args_t *args)
 	xfs_dir_leafblock_t *leaf;
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	inum = args->inumber;
 	retval = xfs_da_read_buf(args->trans, args->dp, 0, -1, &bp,
@@ -1229,7 +1229,7 @@ xfs_dir_node_replace(xfs_da_args_t *args)
 	xfs_ino_t inum;
 	int retval, error, i;
 	xfs_dabuf_t *bp;
-        xfs_arch_t arch=args->dp->i_mount->m_arch;
+        xfs_arch_t arch = ARCH_GET(args->dp->i_mount->m_arch);
 
 	state = xfs_da_state_alloc();
 	state->args = args;

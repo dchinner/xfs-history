@@ -167,13 +167,13 @@ xfs_ialloc_log_di(
 		offsetof(xfs_dinode_t, di_a),
 		sizeof(xfs_dinode_t)
 	};
-        xfs_arch_t  arch;
+        xfs_arch_t              arch;
         
 
 	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
 	ASSERT((fields & (XFS_DI_U|XFS_DI_A)) == 0);
 	mp = tp->t_mountp;
-        arch = mp->m_arch;
+        arch = ARCH_GET(mp->m_arch);
 	/*
 	 * Get the inode-relative first and last bytes for these fields
 	 */
@@ -223,9 +223,9 @@ xfs_ialloc_ag_alloc(
 					/* boundary */
         xfs_dinode_core_t dic;          /* a dinode_core to copy to new */
                                         /* inodes */
-        xfs_arch_t  arch;
+        xfs_arch_t      arch;
         
-        arch=tp->t_mountp->m_arch;
+        arch = ARCH_GET(tp->t_mountp->m_arch);
         
 	args.tp = tp;
 	args.mp = tp->t_mountp;
