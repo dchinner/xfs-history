@@ -40,6 +40,7 @@
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
 #include <linux/mm.h>
+#include <linux/init.h>
 
 MODULE_AUTHOR("SGI <sgi.com>");
 MODULE_DESCRIPTION("Additional kdb commands for debugging XFS");
@@ -1805,8 +1806,8 @@ static struct xif {
   {  0,		0,	0 }
 };
 
-int
-init_module(void)
+static int
+__init xfsidbg_init(void)
 {
 	struct xif	*p;
 
@@ -1815,8 +1816,8 @@ init_module(void)
 	return 0;
 }
 
-void
-cleanup_module(void)
+static void
+__exit xfsidbg_exit(void)
 {
 	struct xif	*p;
 
@@ -4749,3 +4750,5 @@ xfsidbg_xtrans_res(
 		xtrp->tr_growrtalloc, xtrp->tr_growrtzero, xtrp->tr_growrtfree);
 }
 
+module_init(xfsidbg_init) 
+module_exit(xfsidbg_exit)
