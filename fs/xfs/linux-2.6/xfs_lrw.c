@@ -149,12 +149,10 @@ xfs_read(
 		fs_flush_pages(bdp, *offsetp, *offsetp + size, 0, FI_NONE);
 		ret = pagebuf_direct_file_read(filp, buf, size, offsetp,
 				linvfs_pb_bmap); 
-		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 	} else {
-		/* Page locking protects this case */
-		XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 		ret = generic_file_read(filp, buf, size, offsetp);
 	}
+	XFS_IUNLOCK(mp, io, XFS_IOLOCK_SHARED);
 
 	/*
 	 * In either case above, ret >= 0 is num bytes read
