@@ -50,7 +50,6 @@
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_block(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bbno,
 	xfs_extlen_t	minlen,
@@ -62,7 +61,6 @@ xfs_rtallocate_extent_block(
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_exact(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	minlen,
@@ -73,7 +71,6 @@ xfs_rtallocate_extent_exact(
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_near(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	minlen,
@@ -84,7 +81,6 @@ xfs_rtallocate_extent_near(
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_size(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_extlen_t	minlen,
 	xfs_extlen_t	maxlen,
@@ -94,7 +90,6 @@ xfs_rtallocate_extent_size(
 
 STATIC void
 xfs_rtallocate_range(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
 	xfs_extlen_t	len,
@@ -164,7 +159,6 @@ xfs_rtfind_forw(
 
 STATIC void
 xfs_rtfree_range(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
 	xfs_extlen_t	len,
@@ -192,7 +186,6 @@ xfs_rtlobit(
 
 STATIC void
 xfs_rtmodify_range(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
 	xfs_extlen_t	len,
@@ -200,7 +193,6 @@ xfs_rtmodify_range(
 
 STATIC void
 xfs_rtmodify_summary(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	int		log,
 	xfs_rtblock_t	bbno,
@@ -214,7 +206,6 @@ xfs_rtmodify_summary(
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_block(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bbno,
 	xfs_extlen_t	minlen,
@@ -229,16 +220,18 @@ xfs_rtallocate_extent_block(
 	xfs_rtbit_t	bestlen;
 	xfs_rtbit_t	end;
 	xfs_rtbit_t	i;
+	xfs_mount_t	*mp;
 	xfs_rtbit_t	next;
 	xfs_sb_t	*sbp;
 	xfs_rtbit_t	thislen;
 
+	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	base = XFS_BLOCKTOBIT(sbp, bbno);
 	end = XFS_BLOCKTOBIT(sbp, bbno + 1) - 1;
 	for (i = base; i <= end; i++) {
 		if (xfs_rtcheck_range(mp, tp, i, maxlen, 1, &next)) {
-			xfs_rtallocate_range(mp, tp, i, maxlen, rbuf, rsb);
+			xfs_rtallocate_range(tp, i, maxlen, rbuf, rsb);
 			*len = maxlen;
 			return i;
 		}
@@ -255,7 +248,7 @@ xfs_rtallocate_extent_block(
 			break;
 	}
 	if (minlen < maxlen && besti != -1) {
-		xfs_rtallocate_range(mp, tp, besti, bestlen, rbuf, rsb);
+		xfs_rtallocate_range(tp, besti, bestlen, rbuf, rsb);
 		*len = bestlen;
 		return besti;
 	}
@@ -265,7 +258,6 @@ xfs_rtallocate_extent_block(
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_exact(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	minlen,
@@ -275,17 +267,19 @@ xfs_rtallocate_extent_exact(
 	xfs_fsblock_t	*rsb)
 {
 	xfs_rtbit_t	base;
+	xfs_mount_t	*mp;
 	xfs_rtbit_t	next;
 
+	mp = tp->t_mountp;
 	base = bno;
 	if (xfs_rtcheck_range(mp, tp, base, maxlen, 1, &next)) {
-		xfs_rtallocate_range(mp, tp, base, maxlen, rbuf, rsb);
+		xfs_rtallocate_range(tp, base, maxlen, rbuf, rsb);
 		*len = maxlen;
 		return bno;
 	}
 	if (minlen < maxlen && next - base >= minlen) {
 		*len = next - base;
-		xfs_rtallocate_range(mp, tp, base, *len, rbuf, rsb);
+		xfs_rtallocate_range(tp, base, *len, rbuf, rsb);
 		return bno;
 	}
 	return NULLFSBLOCK;
@@ -293,7 +287,6 @@ xfs_rtallocate_extent_exact(
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_near(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	minlen,
@@ -307,27 +300,32 @@ xfs_rtallocate_extent_near(
 	int		j;
 	int		l;
 	int		log2len;
+	xfs_mount_t	*mp;
 	xfs_rtbit_t	n;
 	xfs_rtblock_t	r;
 	xfs_sb_t	*sbp;
 
+	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	if (bno >= sbp->sb_rextents)
 		bno = sbp->sb_rextents - 1;
+	r = xfs_rtallocate_extent_exact(tp, bno, minlen, maxlen, len, rbuf, rsb);
+	if (r != NULLFSBLOCK)
+		return r;
 	bbno = XFS_BITTOBLOCK(sbp, bno);
 	i = 0;
 	log2len = xfs_rthibit(minlen);
 	while (1) {
 		if (xfs_rtany_summary(mp, tp, log2len, mp->m_rsumlevels - 1, bbno + i, rbuf, rsb)) {
-			if (i >= 0 && (r = xfs_rtallocate_extent_block(mp, tp, bbno + i, minlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
+			if (i >= 0 && (r = xfs_rtallocate_extent_block(tp, bbno + i, minlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
 				return r;
 			else if (i < 0) {
 				for (j = -1; j > i; j--) {
 					if (!xfs_rtany_summary(mp, tp, log2len, mp->m_rsumlevels - 1, bbno + j, rbuf, rsb)) {
-						if ((r = xfs_rtallocate_extent_block(mp, tp, bbno + j, minlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
+						if ((r = xfs_rtallocate_extent_block(tp, bbno + j, minlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
 							return r;
 					}
-					if ((r = xfs_rtallocate_extent_block(mp, tp, bbno + i, minlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
+					if ((r = xfs_rtallocate_extent_block(tp, bbno + i, minlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
 						return r;
 				}
 			}
@@ -348,7 +346,6 @@ xfs_rtallocate_extent_near(
 
 STATIC xfs_rtblock_t
 xfs_rtallocate_extent_size(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_extlen_t	minlen,
 	xfs_extlen_t	maxlen,
@@ -358,16 +355,18 @@ xfs_rtallocate_extent_size(
 {
 	int		i;
 	int		l;
+	xfs_mount_t	*mp;
 	xfs_rtbit_t	n;
 	xfs_rtblock_t	r;
 	xfs_sb_t	*sbp;
 
+	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	for (l = xfs_rthibit(maxlen); l < mp->m_rsumlevels; l++) {
 		for (i = 0; i < sbp->sb_rbmblocks; i++) {
 			if (!xfs_rtget_summary(mp, tp, l, i, rbuf, rsb))
 				continue;
-			if ((r = xfs_rtallocate_extent_block(mp, tp, i, maxlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
+			if ((r = xfs_rtallocate_extent_block(tp, i, maxlen, maxlen, len, &n, rbuf, rsb)) != NULLFSBLOCK)
 				return r;
 			if (XFS_BITTOBLOCK(sbp, n) > i + 1)
 				i = XFS_BITTOBLOCK(sbp, n) - 1;
@@ -379,7 +378,7 @@ xfs_rtallocate_extent_size(
 		for (i = 0; i < sbp->sb_rbmblocks; i++) {
 			if (!xfs_rtget_summary(mp, tp, l, i, rbuf, rsb))
 				continue;
-			if ((r = xfs_rtallocate_extent_block(mp, tp, i, XFS_RTMAX(minlen, 1 << l), XFS_RTMIN(maxlen, (1 << (l + 1)) - 1), len, &n, rbuf, rsb)) != NULLFSBLOCK)
+			if ((r = xfs_rtallocate_extent_block(tp, i, XFS_RTMAX(minlen, 1 << l), XFS_RTMIN(maxlen, (1 << (l + 1)) - 1), len, &n, rbuf, rsb)) != NULLFSBLOCK)
 				return r;
 			if (XFS_BITTOBLOCK(sbp, n) > i + 1)
 				i = XFS_BITTOBLOCK(sbp, n) - 1;
@@ -390,7 +389,6 @@ xfs_rtallocate_extent_size(
 
 STATIC void
 xfs_rtallocate_range(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
 	xfs_extlen_t	len,
@@ -398,20 +396,22 @@ xfs_rtallocate_range(
 	xfs_fsblock_t	*rsb)
 {
 	xfs_rtbit_t	end;
+	xfs_mount_t	*mp;
 	xfs_rtbit_t	postblock;
 	xfs_rtbit_t	preblock;
 	xfs_sb_t	*sbp;
 
+	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	end = start + len - 1;
 	preblock = xfs_rtfind_back(mp, tp, start, 0);
 	postblock = xfs_rtfind_forw(mp, tp, end, sbp->sb_rextents - 1);
-	xfs_rtmodify_summary(mp, tp, xfs_rthibit(postblock + 1 - preblock), XFS_BITTOBLOCK(sbp, preblock), -1, rbuf, rsb);
+	xfs_rtmodify_summary(tp, xfs_rthibit(postblock + 1 - preblock), XFS_BITTOBLOCK(sbp, preblock), -1, rbuf, rsb);
 	if (preblock < start)
-		xfs_rtmodify_summary(mp, tp, xfs_rthibit(start - preblock), XFS_BITTOBLOCK(sbp, preblock), 1, rbuf, rsb);
+		xfs_rtmodify_summary(tp, xfs_rthibit(start - preblock), XFS_BITTOBLOCK(sbp, preblock), 1, rbuf, rsb);
 	if (postblock > end)
-		xfs_rtmodify_summary(mp, tp, xfs_rthibit(postblock - end), XFS_BITTOBLOCK(sbp, end + 1), 1, rbuf, rsb);
-	xfs_rtmodify_range(mp, tp, start, len, 0);
+		xfs_rtmodify_summary(tp, xfs_rthibit(postblock - end), XFS_BITTOBLOCK(sbp, end + 1), 1, rbuf, rsb);
+	xfs_rtmodify_range(tp, start, len, 0);
 }
 
 STATIC int
@@ -486,10 +486,10 @@ xfs_rtcheck_bit(
 	int		word;
 	xfs_rtword_t	wval;
 
+	sbp = &mp->m_sb;
 	block = XFS_BITTOBLOCK(sbp, start);
 	buf = xfs_rtbuf_get(mp, tp, block, 0);
 	bufp = (xfs_rtword_t *)buf->b_un.b_addr;
-	sbp = &mp->m_sb;
 	word = XFS_BITTOWORD(sbp, start);
 	bit = start & (XFS_NBWORD - 1);
 	wval = bufp[word];
@@ -746,7 +746,6 @@ xfs_rtfind_forw(
 
 STATIC void
 xfs_rtfree_range(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
 	xfs_extlen_t	len,
@@ -754,20 +753,22 @@ xfs_rtfree_range(
 	xfs_fsblock_t	*rsb)
 {
 	xfs_rtbit_t	end;
+	xfs_mount_t	*mp;
 	xfs_rtbit_t	postblock;
 	xfs_rtbit_t	preblock;
 	xfs_sb_t	*sbp;
 
+	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	end = start + len - 1;
-	xfs_rtmodify_range(mp, tp, start, len, 1);
+	xfs_rtmodify_range(tp, start, len, 1);
 	preblock = xfs_rtfind_back(mp, tp, start, 0);
 	postblock = xfs_rtfind_forw(mp, tp, end, sbp->sb_rextents - 1);
 	if (preblock < start)
-		xfs_rtmodify_summary(mp, tp, xfs_rthibit(start - preblock), XFS_BITTOBLOCK(sbp, preblock), -1, rbuf, rsb);
+		xfs_rtmodify_summary(tp, xfs_rthibit(start - preblock), XFS_BITTOBLOCK(sbp, preblock), -1, rbuf, rsb);
 	if (postblock > end)
-		xfs_rtmodify_summary(mp, tp, xfs_rthibit(postblock - end), XFS_BITTOBLOCK(sbp, end + 1), -1, rbuf, rsb);
-	xfs_rtmodify_summary(mp, tp, xfs_rthibit(postblock + 1 - preblock), XFS_BITTOBLOCK(sbp, preblock), 1, rbuf, rsb);
+		xfs_rtmodify_summary(tp, xfs_rthibit(postblock - end), XFS_BITTOBLOCK(sbp, end + 1), -1, rbuf, rsb);
+	xfs_rtmodify_summary(tp, xfs_rthibit(postblock + 1 - preblock), XFS_BITTOBLOCK(sbp, preblock), 1, rbuf, rsb);
 }
 
 STATIC xfs_suminfo_t
@@ -938,7 +939,6 @@ xfs_rtlobit(
 
 STATIC void
 xfs_rtmodify_range(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
 	xfs_extlen_t	len,
@@ -953,30 +953,30 @@ xfs_rtmodify_range(
 	int		i;
 	int		lastbit;
 	int		mask;
+	xfs_mount_t	*mp;
 	xfs_sb_t	*sbp;
 	int		word;
 	int		wval;
 
+	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	block = XFS_BITTOBLOCK(sbp, start);
 	buf = xfs_rtbuf_get(mp, tp, block, 0);
 	bufp = (xfs_rtword_t *)buf->b_un.b_addr;
 	word = XFS_BITTOWORD(sbp, start);
-	bp = &bufp[word];
+	first = bp = &bufp[word];
 	bit = start & (XFS_NBWORD - 1);
 	val = -val;
 	if (bit) {
 		lastbit = XFS_RTMIN(bit + len, XFS_NBWORD);
 		mask = ((1 << (lastbit - bit)) - 1) << bit;
-		first = bp;
 		if (val)
 			*bp |= mask;
 		else
 			*bp &= ~mask;
 		i = lastbit - bit;
 		if (++word == XFS_BLOCKWSIZE(sbp) && i < len) {
-			if (tp)
-				xfs_trans_log_buf(tp, buf, first - bufp, bp - bufp);
+			xfs_trans_log_buf(tp, buf, (char *)first - (char *)bufp, (char *)bp - (char *)bufp);
 			buf = xfs_rtbuf_get(mp, tp, ++block, 0);
 			first = bp = bufp = (xfs_rtword_t *)buf->b_un.b_addr;
 			word = 0;
@@ -988,8 +988,7 @@ xfs_rtmodify_range(
 		*bp = val;
 		i += XFS_NBWORD;
 		if (++word == XFS_BLOCKWSIZE(sbp) && i < len) {
-			if (tp)
-				xfs_trans_log_buf(tp, buf, first - bufp, bp - bufp);
+			xfs_trans_log_buf(tp, buf, (char *)first - (char *)bufp, (char *)bp - (char *)bufp);
 			buf = xfs_rtbuf_get(mp, tp, ++block, 0);
 			first = bp = bufp = (xfs_rtword_t *)buf->b_un.b_addr;
 			word = 0;
@@ -1003,14 +1002,14 @@ xfs_rtmodify_range(
 			*bp |= mask;
 		else
 			*bp &= ~mask;
+		bp++;
 	}
-	if (tp)
-		xfs_trans_log_buf(tp, buf, first - bufp, bp - bufp);
+	if (bp > first)
+		xfs_trans_log_buf(tp, buf, (char *)first - (char *)bufp, (char *)bp - (char *)bufp - 1);
 }
 
 STATIC void
 xfs_rtmodify_summary(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	int		log,
 	xfs_rtblock_t	bbno,
@@ -1019,11 +1018,13 @@ xfs_rtmodify_summary(
 	xfs_fsblock_t	*rsb)
 {
 	buf_t		*buf;
+	xfs_mount_t	*mp;
 	xfs_fsblock_t	sb;
 	xfs_sb_t	*sbp;
 	int		so;
 	xfs_suminfo_t	*sp;
 
+	mp = tp->t_mountp;
 	sbp = &mp->m_sb;
 	so = XFS_SUMOFFS(sbp, log, bbno);
 	sb = XFS_SUMOFFSTOBLOCK(sbp, so);
@@ -1040,8 +1041,7 @@ xfs_rtmodify_summary(
 	}
 	sp = XFS_SUMPTR(sbp, buf, so);
 	*sp += delta;
-	if (tp)
-		xfs_trans_log_buf(tp, buf, (char *)sp - (char *)buf->b_un.b_addr, (char *)sp - (char *)buf->b_un.b_addr + sizeof(*sp) - 1);
+	xfs_trans_log_buf(tp, buf, (char *)sp - (char *)buf->b_un.b_addr, (char *)sp - (char *)buf->b_un.b_addr + sizeof(*sp) - 1);
 }
 
 /* 
@@ -1050,7 +1050,6 @@ xfs_rtmodify_summary(
 
 xfs_rtblock_t
 xfs_rtallocate_extent(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	minlen,
@@ -1059,21 +1058,23 @@ xfs_rtallocate_extent(
 	xfs_alloctype_t	type,
 	int		wasdel) 
 {
+	xfs_mount_t	*mp;
 	xfs_rtblock_t	r;
 	xfs_fsblock_t	sb;
 	buf_t		*sumbuf = 0;
 
 	ASSERT(minlen > 0 && minlen <= maxlen);
+	mp = tp->t_mountp;
 	xfs_ilock(mp->m_rbmip, XFS_ILOCK_EXCL);
 	switch (type) {
 	case XFS_ALLOCTYPE_ANY_AG:
-		r = xfs_rtallocate_extent_size(mp, tp, minlen, maxlen, len, &sumbuf, &sb);
+		r = xfs_rtallocate_extent_size(tp, minlen, maxlen, len, &sumbuf, &sb);
 		break;
 	case XFS_ALLOCTYPE_NEAR_BNO:
-		r = xfs_rtallocate_extent_near(mp, tp, bno, minlen, maxlen, len, &sumbuf, &sb);
+		r = xfs_rtallocate_extent_near(tp, bno, minlen, maxlen, len, &sumbuf, &sb);
 		break;
 	case XFS_ALLOCTYPE_THIS_BNO:
-		r = xfs_rtallocate_extent_exact(mp, tp, bno, minlen, maxlen, len, &sumbuf, &sb);
+		r = xfs_rtallocate_extent_exact(tp, bno, minlen, maxlen, len, &sumbuf, &sb);
 		break;
 	}
 	xfs_iunlock(mp->m_rbmip, XFS_ILOCK_EXCL);
@@ -1091,17 +1092,18 @@ xfs_rtallocate_extent(
 
 void
 xfs_rtfree_extent(
-	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtblock_t	bno,
 	xfs_extlen_t	len)
 {
+	xfs_mount_t	*mp;
 	xfs_fsblock_t	sb;
 	buf_t		*sumbuf = 0;
 
+	mp = tp->t_mountp;
 	xfs_ilock(mp->m_rbmip, XFS_ILOCK_EXCL);
 	ASSERT(xfs_rtcheck_alloc_range(mp, tp, bno, len));
-	xfs_rtfree_range(mp, tp, bno, len, &sumbuf, &sb);
+	xfs_rtfree_range(tp, bno, len, &sumbuf, &sb);
 	xfs_iunlock(mp->m_rbmip, XFS_ILOCK_EXCL);
 	xfs_trans_mod_sb(tp, XFS_TRANS_SB_FREXTENTS, (int)len);
 }
@@ -1111,11 +1113,11 @@ xfs_rtprint_range(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
 	xfs_rtbit_t	start,
-	xfs_rtbit_t	len)
+	xfs_extlen_t	len)
 {
-	xfs_rtbit_t	i;
+	xfs_extlen_t	i;
 
-	printf("%d: ", start);
+	printf("%lld: ", start);
 	for (i = 0; i < len; i++)
 		printf("%d", xfs_rtcheck_bit(mp, tp, start + i, 1));
 	printf("\n");
@@ -1126,7 +1128,7 @@ xfs_rtprint_summary(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp)
 {
-	int		c;
+	xfs_suminfo_t	c;
 	xfs_rtblock_t	i;
 	int		l;
 	int		p;
@@ -1139,10 +1141,10 @@ xfs_rtprint_summary(
 		for (p = 0, i = 0; i < sbp->sb_rbmblocks; i++) {
 			if (c = xfs_rtget_summary(mp, tp, l, i, &sumbuf, &sb)) {
 				if (!p) {
-					printf("%d-%d:", 1 << l, XFS_RTMIN((1 << l) + ((1 << l) - 1), sbp->sb_rextents));
+					printf("%lld-%lld:", 1LL << l, XFS_RTMIN((1LL << l) + ((1LL << l) - 1LL), sbp->sb_rextents));
 					p = 1;
 				}
-				printf(" %d:%d", i, c);
+				printf(" %lld:%d", i, c);
 			}
 		}
 		if (p)
