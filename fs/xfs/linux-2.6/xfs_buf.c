@@ -114,11 +114,6 @@ pb_trace_func(
 	pb_trace.buf[j].offset = pb->pb_file_offset;
 	pb_trace.buf[j].size = pb->pb_buffer_length;
 }
-#define ENTER(x)	printk("Entering " #x "\n")
-#define EXIT(x)		printk("Exiting	 " #x "\n")
-#else
-#define ENTER(x)	do { } while (0)
-#define EXIT(x)		do { } while (0)
 #endif	/* PAGEBUF_TRACE */
 
 #ifdef PAGEBUF_TRACKING
