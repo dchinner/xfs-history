@@ -193,7 +193,6 @@ extern void 		xfs_qm_destroy_quotainfo(xfs_mount_t *);
 extern void		xfs_qm_dqunlink(xfs_dquot_t *);
 extern boolean_t	xfs_qm_dqalloc_incore(xfs_dquot_t **);
 extern int 		xfs_qm_write_sb_changes(xfs_mount_t *, __int64_t);
-extern int		xfs_qm_scall_quotaoff(xfs_mount_t *, uint, boolean_t);
 
 /* list stuff */
 extern void		xfs_qm_freelist_init(xfs_frlist_t *);
@@ -204,6 +203,12 @@ extern void		xfs_qm_freelist_unlink(xfs_dquot_t *);
 extern int		xfs_qm_freelist_lock_nowait(xfs_qm_t *);
 extern int		xfs_qm_mplist_nowait(xfs_mount_t *);
 extern int		xfs_qm_dqhashlock_nowait(xfs_dquot_t *);
+
+/* system call interface */
+extern int linvfs_getxstate(struct super_block *, struct fs_quota_stat *);
+extern int linvfs_setxstate(struct super_block *, unsigned int, int);
+extern int linvfs_getxquota(struct super_block *, short, qid_t, struct fs_disk_quota *);
+extern int linvfs_setxquota(struct super_block *, short, qid_t, struct fs_disk_quota *);
 
 #ifdef DEBUG
 extern int		xfs_qm_internalqcheck(xfs_mount_t *);
