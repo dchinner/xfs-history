@@ -295,8 +295,10 @@ linvfs_set_inode_ops(
 		inode->i_op = &linvfs_symlink_inode_operations;
 		if (inode->i_blocks)
 			inode->i_mapping->a_ops = &linvfs_aops;
-	} else
+	} else {
+		inode->i_op = &linvfs_file_inode_operations;
 		init_special_inode(inode, inode->i_mode, inode->i_rdev);
+	}
 }
 
 void
