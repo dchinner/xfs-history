@@ -39,7 +39,6 @@
 #endif
 
 STATIC void	xfs_trans_apply_sb_deltas(xfs_trans_t *);
-STATIC void	xfs_trans_do_commit(xfs_trans_t *, uint);
 STATIC uint	xfs_trans_count_vecs(xfs_trans_t *);
 STATIC void	xfs_trans_fill_vecs(xfs_trans_t *, xfs_log_iovec_t *);
 STATIC void	xfs_trans_committed(xfs_trans_t *);
@@ -49,7 +48,8 @@ STATIC void	xfs_trans_free(xfs_trans_t *);
 zone_t		*xfs_trans_zone;
 
 xfs_tid_t	
-xfs_trans_id_alloc(xfs_mount_t *mp)
+xfs_trans_id_alloc(
+	xfs_mount_t	*mp)
 {
 	/*
 	 * XXXajs
@@ -61,8 +61,9 @@ xfs_trans_id_alloc(xfs_mount_t *mp)
 
 
 int
-xfs_trans_lsn_danger(xfs_mount_t	*mp,
-		     xfs_lsn_t		lsn)
+xfs_trans_lsn_danger(
+	xfs_mount_t	*mp,
+	xfs_lsn_t	lsn)
 /* ARGSUSED */
 {
 	/*
@@ -81,8 +82,9 @@ xfs_trans_lsn_danger(xfs_mount_t	*mp,
  * zone, initialize it, and return it to the caller.
  */
 xfs_trans_t *
-xfs_trans_alloc(xfs_mount_t	*mp,
-		uint		type)
+xfs_trans_alloc(
+	xfs_mount_t	*mp,
+	uint		type)
 {
 	xfs_trans_t	*tp;
 
@@ -95,7 +97,7 @@ xfs_trans_alloc(xfs_mount_t	*mp,
 	tp->t_tid = xfs_trans_id_alloc(mp);
 	tp->t_type = type;
 	tp->t_mountp = mp;
-	tp->t_flags = XFS_TRANS_FIRST;
+	tp->t_flags = 0;
 	initnsema(&(tp->t_sema), 0, "xfs_trans");
 	tp->t_items_free = XFS_LIC_NUM_SLOTS;
 	XFS_LIC_INIT(&(tp->t_items));
@@ -112,7 +114,8 @@ xfs_trans_alloc(xfs_mount_t	*mp,
  * be added to the new transaction explicitly.
  */
 xfs_trans_t *
-xfs_trans_dup(xfs_trans_t *tp)
+xfs_trans_dup(
+	xfs_trans_t	*tp)
 {
 	xfs_trans_t	*ntp;
 
@@ -138,24 +141,6 @@ xfs_trans_dup(xfs_trans_t *tp)
 	tp->t_rtx_res = tp->t_rtx_res_used;
 	ntp->t_log_res = 0;
 
-	/*
-	 * Differentiate the first dup from any subsequent dups.
-	 * These flags are looked at in xfs_trans_reserve().
-	 */
-	if (tp->t_flags & XFS_TRANS_FIRST) {
-		ASSERT(!(tp->t_flags &
-			 (XFS_TRANS_SECOND | XFS_TRANS_CONTINUED)));
-		ntp->t_flags &= ~XFS_TRANS_FIRST;
-		ntp->t_flags |= XFS_TRANS_SECOND;
-	} else if (tp->t_flags & XFS_TRANS_SECOND) {
-		ASSERT(!(tp->t_flags &
-			 (XFS_TRANS_FIRST | XFS_TRANS_CONTINUED)));
-		ntp->t_flags &= ~XFS_TRANS_SECOND;
-		ntp->t_flags |= XFS_TRANS_CONTINUED;
-	} else {
-		ntp->t_flags |= XFS_TRANS_CONTINUED;
-	}
-
 	return ntp;
 }
 
@@ -171,16 +156,16 @@ xfs_trans_dup(xfs_trans_t *tp)
  * fails then they will all be backed out.
  */
 int
-xfs_trans_reserve(xfs_trans_t	*tp,
-		  uint		blocks,
-		  uint		logspace,
-		  uint		rtextents,
-		  uint		flags)
+xfs_trans_reserve(
+	xfs_trans_t	*tp,
+	uint		blocks,
+	uint		logspace,
+	uint		rtextents,
+	uint		flags,
+	uint		logcount)
 {
-	int	log_flags;
-	int	error;
-	uint	res_logspace;
-	extern int xlog_debug;
+	int		log_flags;
+	int		error;
 
 	error = 0;
 	/*
@@ -204,47 +189,15 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		if (flags & XFS_TRANS_PERM_LOG_RES) {
 			log_flags = XFS_LOG_PERM_RESERV;
 			tp->t_flags |= XFS_TRANS_PERM_LOG_RES;
-			if (tp->t_flags & XFS_TRANS_FIRST) {
-				/*
-				 * This is the first of the chain of
-				 * transactions using the permanent
-				 * log reservation, so get 2 times what
-				 * we need for one.
-				 */
-				ASSERT(tp->t_ticket == NULL);
-				res_logspace = logspace * 2;
-			} else if (tp->t_flags & XFS_TRANS_SECOND) {
-				/*
-				 * This is the second in the chain of
-				 * transactions using the permanent
-				 * log reservation, so just use what was
-				 * gotten by the first.
-				 */
-				ASSERT((!xlog_debug) ||(tp->t_ticket != NULL));
-				res_logspace = 0;
-				error = 0;
-			} else {
-				/*
-				 * We are the third or beyond xact in the
-				 * chain, so reclaim the space used and
-				 * released by the first.
-				 */
-				ASSERT(tp->t_flags & XFS_TRANS_CONTINUED);
-				res_logspace = logspace;
-			}
 		} else {
-			ASSERT(tp->t_flags & XFS_TRANS_FIRST);
 			ASSERT(tp->t_ticket == NULL);
 			ASSERT(!(tp->t_flags & XFS_TRANS_PERM_LOG_RES));
 			log_flags = 0;
-			res_logspace = logspace;
 		}
 
-		if (res_logspace) {
-			error = xfs_log_reserve(tp->t_mountp, res_logspace, 1,
-						&tp->t_ticket,
-						XFS_TRANSACTION, log_flags);
-		}
+		error = xfs_log_reserve(tp->t_mountp, logspace, logcount,
+					&tp->t_ticket,
+					XFS_TRANSACTION, log_flags);
 #ifdef SIM
 		if (error != 0) {
 			printf("Log reservation failed\n");
@@ -255,6 +208,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 			goto undo_blocks;
 		}
 		tp->t_log_res = logspace;
+		tp->t_log_count = logcount;
 	}
 
 	/*
@@ -310,9 +264,10 @@ undo_blocks:
  * Only one callback can be associated with any single transaction.
  */
 void
-xfs_trans_callback(xfs_trans_t		*tp,
-		   xfs_trans_callback_t	callback,
-		   void			*arg)
+xfs_trans_callback(
+	xfs_trans_t		*tp,
+	xfs_trans_callback_t	callback,
+	void			*arg)
 {
 	ASSERT(tp->t_callback == NULL);
 	tp->t_callback = callback;
@@ -329,11 +284,12 @@ xfs_trans_callback(xfs_trans_t		*tp,
  * needs to be updated before committing.
  */
 void
-xfs_trans_mod_sb(xfs_trans_t	*tp,
-		 uint		field,
-		 int		delta)
+xfs_trans_mod_sb(
+	xfs_trans_t	*tp,
+	uint		field,
+	int		delta)
 {
-	xfs_sb_t		*sbp;
+	xfs_sb_t	*sbp;
 
 	switch (field) {
 	case XFS_TRANS_SB_ICOUNT:
@@ -403,7 +359,8 @@ xfs_trans_mod_sb(xfs_trans_t	*tp,
  * it if necessary.
  */
 STATIC void
-xfs_trans_apply_sb_deltas(xfs_trans_t *tp)
+xfs_trans_apply_sb_deltas(
+	xfs_trans_t	*tp)
 {
 	xfs_sb_t	*sbp;
 	buf_t		*bp;
@@ -444,7 +401,8 @@ xfs_trans_apply_sb_deltas(xfs_trans_t *tp)
  * This is done efficiently with a single call to xfs_mod_incore_sb_batch().
  */
 void
-xfs_trans_unreserve_and_mod_sb(xfs_trans_t *tp)
+xfs_trans_unreserve_and_mod_sb(
+	xfs_trans_t	*tp)
 {
 	xfs_mod_sb_t	msb[5];		/* If you add cases, add entries */
 	xfs_mod_sb_t	*msbp;
@@ -524,92 +482,17 @@ xfs_trans_unreserve_and_mod_sb(xfs_trans_t *tp)
  * Return the unique transaction id of the given transaction.
  */
 xfs_trans_id_t
-xfs_trans_id(xfs_trans_t *tp)
+xfs_trans_id(
+	xfs_trans_t	*tp)
 {
 	return (tp->t_tid);
 }
 
 
-/*
- * This routine is called to commit a transaction to the incore log.
- * xfs_trans_do_commit() does the real work.  If the flags include
- * XFS_TRANS_NOSLEEP, then the commit will take place asynchronously.
- * If this flag is not set, then any async transactions which are
- * pending will be committed by our lucky caller and then the given
- * transaction will be committed.
- *
- * If the flags include XFS_TRANS_SYNC, then the log will be flushed
- * right away.  If the flags include XFS_TRANS_NOSLEEP, then the commit
- * will be asynchronous.  If the flags include XFS_TRANS_WAIT, then
- * the caller will sleep until the transaction is committed.  Obviously,
- * XFS_TRANS_NOSLEEP and XFS_TRANS_WAIT cannot be set simultaneously.
- */
 void
-xfs_trans_commit(xfs_trans_t	*tp,
-		 uint		flags)
-{
-	uint		async;
-
-	async = flags & XFS_TRANS_NOSLEEP;
-
-	/*
-	 * If the transaction is not asynchronous and there are
-	 * no asynch transactions to commit, then just do it.
-	 */
-	if (!(async) && !(xfs_trans_any_async(tp->t_mountp))) {
-		xfs_trans_do_commit(tp, flags);
-		return;
-	}
-
-	/*
-	 * If the transaction is asynchronous, put it on the list.
-	 */
-	if (async) {
-		xfs_trans_add_async(tp);
-		return;
-	}	
-
-	/*
-	 * If we are not asynchronous and there are async transactions
-	 * that need to be committed, we get volunteered to commit
-	 * them.  The async transactions may be gone by the time we
-	 * check again, but in that case we just won't do anything.
-	 */
-	xfs_trans_commit_async(tp->t_mountp);
-
-	/*
-	 * Now that we've processed any async transactions, do our
-	 * own.
-	 */
-	xfs_trans_do_commit(tp, flags);
-} 
-
-
-/*
- * This is called to commit all of the transactions which are
- * currently hung on the list in the given mount structure.
- * Each transaction should be committed in turn.  This is called
- * by both xfs_trans_commit() and the xfs_sync routine.
- */
-void
-xfs_trans_commit_async(xfs_mount_t *mp)
-{
-	xfs_trans_t	*async_list;
-	xfs_trans_t	*atp;
-
-	async_list = xfs_trans_get_async(mp);
-	atp = async_list;
-	while (atp != NULL) {
-		async_list = atp->t_forw;
-		atp->t_forw = NULL;
-		xfs_trans_do_commit(atp, 0);
-		atp = async_list;
-	}
-}
-
-STATIC void
-xfs_trans_do_commit(xfs_trans_t	*tp,
-		    uint	flags)
+xfs_trans_commit(
+	xfs_trans_t	*tp,
+	uint		flags)
 /* ARGSUSED */
 {
 	char			*trans_headerp;
@@ -737,7 +620,8 @@ xfs_trans_do_commit(xfs_trans_t	*tp,
  * it needs to get the total.
  */
 STATIC uint
-xfs_trans_count_vecs(xfs_trans_t *tp)
+xfs_trans_count_vecs(
+	xfs_trans_t	*tp)
 {
 	int			nvecs;
 	xfs_log_item_desc_t	*lidp;
@@ -771,8 +655,9 @@ xfs_trans_count_vecs(xfs_trans_t *tp)
  * so that it cannot be flushed out until the log write completes.
  */
 STATIC void
-xfs_trans_fill_vecs(xfs_trans_t		*tp,
-		    xfs_log_iovec_t	*log_vector)
+xfs_trans_fill_vecs(
+	xfs_trans_t		*tp,
+	xfs_log_iovec_t		*log_vector)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_log_iovec_t		*vecp;
@@ -831,8 +716,9 @@ xfs_trans_fill_vecs(xfs_trans_t		*tp,
  * it as well.
  */
 void
-xfs_trans_cancel(xfs_trans_t	*tp,
-		 int		flags)
+xfs_trans_cancel(
+	xfs_trans_t	*tp,
+	int		flags)
 {
 	int	log_flags;
 
@@ -858,7 +744,8 @@ xfs_trans_cancel(xfs_trans_t	*tp,
  * to do when the structure is freed, add it here.
  */
 STATIC void
-xfs_trans_free(xfs_trans_t *tp)
+xfs_trans_free(
+	xfs_trans_t	*tp)
 {
 	freesema(&(tp->t_sema));
 	kmem_zone_free(xfs_trans_zone, tp);
@@ -877,7 +764,8 @@ xfs_trans_free(xfs_trans_t *tp)
  * each chunk.
  */
 STATIC void
-xfs_trans_committed(xfs_trans_t *tp)
+xfs_trans_committed(
+	xfs_trans_t	*tp)
 {
 	xfs_log_item_chunk_t	*licp;
 	xfs_log_item_chunk_t	*next_licp;
@@ -938,8 +826,9 @@ xfs_trans_committed(xfs_trans_t *tp)
  * with the flusher trying to pull the item from the AIL as we add it.
  */
 STATIC void
-xfs_trans_chunk_committed(xfs_log_item_chunk_t	*licp,
-			  xfs_lsn_t		lsn)
+xfs_trans_chunk_committed(
+	xfs_log_item_chunk_t	*licp,
+	xfs_lsn_t		lsn)
 {
 	xfs_log_item_desc_t	*lidp;
 	xfs_log_item_t		*lip;

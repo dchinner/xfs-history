@@ -1082,7 +1082,6 @@ xfs_iomap_write(
 			 XFS_BMAPI_DELAY | XFS_BMAPI_WRITE |
 			 XFS_BMAPI_ENTIRE, NULLFSBLOCK, 1, imap,
 			 &nimaps, NULL);
-
 	/*
 	 * If bmapi returned us nothing, then we must have run out of space.
 	 */
@@ -1991,7 +1990,8 @@ xfs_strat_write(
 					     XFS_TRANS_FILE_WRITE);
 		locals->error = xfs_trans_reserve(locals->tp, 0,
 					XFS_DEFAULT_LOG_RES(locals->mp),
-					0, 0);
+					0, XFS_TRANS_PERM_LOG_RES,
+					XFS_WRITE_LOG_COUNT);
 		ASSERT(locals->error == 0);
 		xfs_ilock(locals->ip, XFS_ILOCK_EXCL);
 		xfs_trans_ijoin(locals->tp, locals->ip, XFS_ILOCK_EXCL);
@@ -2012,9 +2012,9 @@ xfs_strat_write(
 						&(locals->free_list));
 		ASSERT(locals->nimaps > 0);
 		(void) xfs_bmap_finish(&(locals->tp), &(locals->free_list),
-				       locals->first_block, 0);
+				       locals->first_block);
 
-		xfs_trans_commit(locals->tp, 0);
+		xfs_trans_commit(locals->tp, XFS_TRANS_RELEASE_LOG_RES);
 
 		/*
 		 * Before dropping the lock, clear any read-ahead state
@@ -2459,7 +2459,9 @@ xfs_diostrat( buf_t *bp)
 				error = xfs_trans_reserve( tp, 
 					   XFS_BM_MAXLEVELS(mp) + count_fsb, 
 					   XFS_DEFAULT_LOG_RES(mp),
-					   numrtextents, 0 );
+					   numrtextents,
+					   XFS_TRANS_PERM_LOG_RES,
+					   XFS_WRITE_LOG_COUNT );
 
 				if (error) {
 					/*
@@ -2501,8 +2503,9 @@ xfs_diostrat( buf_t *bp)
  			 * Complete the bmapi() transactions.
 			 */
 			if (!exist) {
-				xfs_bmap_finish( &tp, &free_list, firstfsb, 0 );
-				xfs_trans_commit(tp , 0 );
+				xfs_bmap_finish( &tp, &free_list, firstfsb );
+				xfs_trans_commit(tp ,
+						 XFS_TRANS_RELEASE_LOG_RES );
 			}
 			xfs_iunlock( ip, XFS_ILOCK_EXCL);
 		} else {

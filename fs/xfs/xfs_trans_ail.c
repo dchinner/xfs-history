@@ -37,7 +37,12 @@ STATIC void
 xfs_ail_ticket_wakeup(
 	xfs_mount_t	*mp,
 	xfs_lsn_t	lsn,
-	int		wakeup_equal);		      
+	int		wakeup_equal);
+
+STATIC void
+xfs_ail_moved_item(
+	xfs_mount_t	*mp,
+	xfs_log_item_t	*lip);
 
 STATIC void
 xfs_ail_insert(
@@ -116,9 +121,7 @@ xfs_trans_tail_ail(
 xfs_lsn_t
 xfs_trans_push_ail(
 	xfs_mount_t		*mp,
-	xfs_ail_ticket_t	*ticketp,
-	xfs_lsn_t		threshold_lsn,
-	xfs_lsn_t		minimum_lsn)		   
+	xfs_lsn_t		threshold_lsn)
 {
 	xfs_lsn_t		lsn;
 	xfs_log_item_t		*lip;
@@ -131,14 +134,6 @@ xfs_trans_push_ail(
 	int			ail_was_unlocked;
 #define	XFS_TRANS_PUSH_AIL_RESTARTS	10
 
-/*
-	ASSERT(ticketp != NULL);
-*/
-	ASSERT(XFS_LSN_CMP(minimum_lsn, threshold_lsn) <= 0);
-
-	if (ticketp != NULL) {
-		initnsema(&(ticketp->at_sema), 0, "ailtick");
-	}
 	flushed_log = 0;
 
  startover:
@@ -151,12 +146,8 @@ xfs_trans_push_ail(
 		 * Just return if the AIL is empty.
 		 */
 		AIL_UNLOCK(mp, s);
-		if (ticketp != NULL) {
-			freesema(&(ticketp->at_sema));
-		}
 		return (xfs_lsn_t)0;
 	}
-
 
 	/*
 	 * While the item we are looking at is below the given threshold
@@ -169,8 +160,7 @@ xfs_trans_push_ail(
 	 */
 	flush_log = 0;
 	restarts = 0;
-	while ((XFS_LSN_CMP(lip->li_lsn, minimum_lsn) < 0) ||
-	       ((restarts < XFS_TRANS_PUSH_AIL_RESTARTS) &&
+	while (((restarts < XFS_TRANS_PUSH_AIL_RESTARTS) &&
 		(XFS_LSN_CMP(lip->li_lsn, threshold_lsn) < 0))) {
 		/*
 		 * If we can lock the item without sleeping, unlock
@@ -229,7 +219,7 @@ xfs_trans_push_ail(
 		goto startover;
 	}
 
-	if (ail_was_unlocked) {
+	if (ail_was_unlocked) {		/* XXXmiken: needed? */
 		/*
 		 * We need a pass through the AIL where we don't
 		 * unlock the AIL and we decide whether or not to
@@ -246,40 +236,15 @@ xfs_trans_push_ail(
 	}
 
 	lip = xfs_ail_min(&(mp->m_ail));
-	if ((lip != NULL) && (XFS_LSN_CMP(lip->li_lsn, minimum_lsn) < 0)) {
-		/*
-		 * The tail is still too close.  Go to sleep until
-		 * it is moved forward enough.  We may also be awakened
-		 * just to see if anything has changed, so when we wake
-		 * up just start over again.  The AIL lock will not be
-		 * held when we return.  Before starting over, we also
-		 * reset flushed_log so we'll really be starting clean.
-		 */
-		if (ticketp != NULL) {
-			xfs_ail_ticket_wait(mp, ticketp, minimum_lsn, s);
-			flushed_log = 0;
-			goto startover;
-		}
-	}
-
 	if (lip == NULL) {
 		lsn = (xfs_lsn_t)0;
 	} else {
 		lsn = lip->li_lsn;
 	}
 	
-	/*
-	 * Now that we've pushed on the AIL, wake up anyone who was
-	 * waiting for the AIL to reach its current state.
-	 */
-	xfs_ail_ticket_wakeup(mp, lsn, 0);
-
 	AIL_UNLOCK(mp, s);
-	if (ticketp != NULL) {
-		freesema(&(ticketp->at_sema));
-	}
 	return lsn;
-}
+}	/* xfs_trans_push_ail */
 
 /*
  * Insert the ticket into the list of tickets sorted by lsn
@@ -397,7 +362,7 @@ xfs_ail_ticket_wakeup(
 
 		head = forw;
 	}
-}
+}	/* xfs_ail_ticket_wakeup */
 
 /*
  * This is to be called when an item is unlocked that may have
@@ -412,7 +377,8 @@ xfs_trans_unlocked_item(
 	xfs_mount_t	*mp,
 	xfs_log_item_t	*lip)
 {
-	int	s;
+	int		s;
+	xfs_log_item_t	*min_lip;
 
 	if (!(lip->li_flags & XFS_LI_IN_AIL)) {
 		return;
@@ -427,16 +393,59 @@ xfs_trans_unlocked_item(
 		return;
 	}
 
+	min_lip = xfs_ail_min(&mp->m_ail);
+	if (min_lip == lip)
+		xfs_log_move_tail(mp, 1);
+#if 0
 	if (XFS_LSN_CMP(lip->li_lsn, mp->m_ail_wait->at_lsn) <= 0) {
 		xfs_ail_ticket_wakeup(mp, lip->li_lsn, 1);
 	}
+#endif
 	AIL_UNLOCK(mp, s);
-}			
+}	/* xfs_trans_unlocked_item */
+
+/*
+ * This is called when an item is deleted from or moved forward
+ * in the AIL.  It will wake up the first member of the AIL
+ * wait list if this item's unlocking might allow it to progress.
+ * The caller must be holding the AIL lock.
+ */
+STATIC void
+xfs_ail_moved_item(
+	xfs_mount_t	*mp,
+	xfs_log_item_t	*lip)
+{
+	xfs_log_item_t *min_lip;
+
+	if (!(lip->li_flags & XFS_LI_IN_AIL)) {
+		return;
+	}
+
+	if (mp->m_ail_wait == NULL) {
+		/*
+		 * Noone is asleep, so there is nothing to do.
+		 */
+		return;
+	}
+
+	min_lip = xfs_ail_min(&mp->m_ail);
+	if (min_lip == lip)
+		xfs_log_move_tail(mp, 1);
+#if 0
+	if (XFS_LSN_CMP(lip->li_lsn, mp->m_ail_wait->at_lsn) <= 0) {
+		xfs_ail_ticket_wakeup(mp, lip->li_lsn, 1);
+	}
+#endif
+}	/* xfs_ail_moved_item */
 
 /*
  * Update the position of the item in the AIL with the new
  * lsn.  If it is not yet in the AIL, add it.  Otherwise, move
  * it to its new position by removing it and re-adding it.
+ *
+ * Wakeup anyone with an lsn less than the item's lsn.  If the item
+ * we move in the AIL is the minimum one, update the tail lsn in the
+ * log manager.
  *
  * Increment the AIL's generation count to indicate that the tree
  * has changed.
@@ -449,8 +458,11 @@ xfs_trans_update_ail(
 {
 	xfs_ail_entry_t		*ailp;
 	xfs_log_item_t		*dlip;
+	xfs_log_item_t		*mlip;	/* ptr to minimum lip */
 
 	ailp = &(mp->m_ail);
+	mlip = xfs_ail_min(ailp);
+
 	if (lip->li_flags & XFS_LI_IN_AIL) {
 		dlip = xfs_ail_delete(ailp, lip);
 		ASSERT(dlip == lip);
@@ -461,12 +473,23 @@ xfs_trans_update_ail(
 	lip->li_lsn = lsn;
 
 	xfs_ail_insert(ailp, lip);
+	xfs_ail_moved_item(mp, lip);
+	if (mlip == dlip) {
+		mlip = xfs_ail_min(&(mp->m_ail));
+		xfs_log_move_tail(mp, mlip->li_lsn);
+	}
+
 	mp->m_ail_gen++;
-}
+
+}	/* xfs_trans_update_ail */
 
 /*
  * Delete the given item from the AIL.  It must already be in
  * the AIL.
+ *
+ * Wakeup anyone with an lsn less than item's lsn.    If the item
+ * we delete in the AIL is the minimum one, update the tail lsn in the
+ * log manager.
  *
  * Clear the IN_AIL flag from the item, reset its lsn to 0, and
  * bump the AIL's generation count to indicate that the tree
@@ -478,12 +501,20 @@ xfs_trans_delete_ail(xfs_mount_t	*mp,
 {
 	xfs_ail_entry_t		*ailp;
 	xfs_log_item_t		*dlip;
+	xfs_log_item_t		*mlip;
 
 	ASSERT(lip->li_flags & XFS_LI_IN_AIL);
 
 	ailp = &(mp->m_ail);
+	mlip = xfs_ail_min(ailp);
 	dlip = xfs_ail_delete(ailp, lip);
 	ASSERT(dlip == lip);
+
+	xfs_ail_moved_item(mp, lip);
+	if (mlip == dlip) {
+		mlip = xfs_ail_min(&(mp->m_ail));
+		xfs_log_move_tail(mp, (mlip ? mlip->li_lsn : 0));
+	}
 
 	lip->li_flags &= ~XFS_LI_IN_AIL;
 	lip->li_lsn = 0;

@@ -190,7 +190,8 @@ typedef struct xfs_trans {
 	struct xfs_trans	*t_forw;	/* async list pointers */
 	struct xfs_trans	*t_back;	/* async list pointers */
 	unsigned int		t_type;		/* transaction type */
-	unsigned int		t_log_res;	/* amt of log space resvd */	
+	unsigned int		t_log_res;	/* amt of log space resvd */
+	unsigned int		t_log_count;	/* count for perm log res */
 	unsigned int		t_blk_res;	/* # of blocks resvd */
 	unsigned int		t_blk_res_used;	/* # of resvd blocks used */
 	unsigned int		t_rtx_res;	/* # of rt extents resvd */
@@ -219,10 +220,7 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_DIRTY		0x01	/* something needs to be logged */
 #define	XFS_TRANS_SB_DIRTY	0x02	/* superblock is modified */
 #define	XFS_TRANS_PERM_LOG_RES	0x04	/* xact took a permanent log res */
-#define	XFS_TRANS_FIRST		0x08	/* original xact in a dup chain */
-#define	XFS_TRANS_SECOND	0x10	/* second xact in a dup chain */
-#define	XFS_TRANS_CONTINUED	0x20	/* third+ xact in a dup chain */
-#define	XFS_TRANS_SYNC		0x40	/* make commit synchronous */
+#define	XFS_TRANS_SYNC		0x08	/* make commit synchronous */
 
 /*
  * Values for call flags parameter.
@@ -266,6 +264,19 @@ typedef struct xfs_trans {
 
 
 /*
+ * Various log count values.
+ */
+#define	XFS_DEFAULT_LOG_COUNT		1
+#define	XFS_DEFAULT_PERM_LOG_COUNT	2     
+#define	XFS_ITRUNCATE_LOG_COUNT		2
+#define	XFS_MKDIR_LOG_COUNT		3
+#define	XFS_SYMLINK_LOG_COUNT		3
+#define	XFS_REMOVE_LOG_COUNT		2
+#define	XFS_LINK_LOG_COUNT		2
+#define	XFS_RENAME_LOG_COUNT		2
+#define	XFS_WRITE_LOG_COUNT		2     
+     
+/*
  * Transaction types to be passed to xfs_trans_alloc().
  */
 #define	XFS_TRANS_FILE_WRITE	1
@@ -280,6 +291,7 @@ struct xfs_efd_log_item;
  * actually macros.
  */
 #define	xfs_trans_get_log_res(tp)	((tp)->t_log_res)
+#define	xfs_trans_get_log_count(tp)	((tp)->t_log_count)
 #define	xfs_trans_get_block_res(tp)	((tp)->t_blk_res)
 
 /*
@@ -287,7 +299,8 @@ struct xfs_efd_log_item;
  */
 xfs_trans_t	*xfs_trans_alloc(struct xfs_mount *, uint);
 xfs_trans_t	*xfs_trans_dup(xfs_trans_t *);
-int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint, uint);
+int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint,
+				  uint, uint);
 void		xfs_trans_callback(xfs_trans_t *,
 				   void(*)(xfs_trans_t*, void*), void *);
 void		xfs_trans_mod_sb(xfs_trans_t *, uint, int);
@@ -325,8 +338,7 @@ void		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *, int);
 void		xfs_trans_ail_init(struct xfs_mount *);
-xfs_lsn_t	xfs_trans_push_ail(struct xfs_mount *, xfs_ail_ticket_t *,
-				   xfs_lsn_t, xfs_lsn_t);
+xfs_lsn_t	xfs_trans_push_ail(struct xfs_mount *, xfs_lsn_t);
 xfs_lsn_t	xfs_trans_tail_ail(struct xfs_mount *);
 void		xfs_trans_unlocked_item(struct xfs_mount *,
 					xfs_log_item_t *);
