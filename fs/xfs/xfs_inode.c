@@ -330,8 +330,7 @@ xfs_iread(xfs_mount_t	*mp,
  * Allocate and fill in iu_extents.  Real work is done in xfs_bmap.c.
  */
 void
-xfs_iread_extents(xfs_mount_t	*mp,
-		  xfs_trans_t	*tp,
+xfs_iread_extents(xfs_trans_t	*tp,
 		  xfs_inode_t	*ip)
 {
 	size_t size;
@@ -342,7 +341,7 @@ xfs_iread_extents(xfs_mount_t	*mp,
 	ip->i_lastex = NULLEXTNUM;
 	ip->i_bytes = size;
 	ip->i_flags |= XFS_IEXTENTS;
-	xfs_bmap_read_extents(mp, tp, ip);
+	xfs_bmap_read_extents(tp, ip);
 }
 
 /*
