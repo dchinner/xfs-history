@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_SB_H
 #define	_FS_XFS_SB_H
 
-#ident	"$Revision$"
+#ident	"$Revision: 6.0 $"
 
 /*
  * Super block
@@ -16,11 +16,14 @@ struct xfs_mount;
 #define	XFS_SB_VERSION_1	1		/* 5.3, 6.0.1, 6.1 */
 #define	XFS_SB_VERSION_2	2		/* 6.2 - attributes */
 #define	XFS_SB_VERSION_3	3		/* 6.2 - new inode version */
+#define	XFS_SB_VERSION_4	4		/* 6.2 - disk quotas version */
 #define	XFS_SB_VERSION_LOW	XFS_SB_VERSION_1
-#define	XFS_SB_VERSION_HIGH	XFS_SB_VERSION_3
+#define	XFS_SB_VERSION_HIGH	XFS_SB_VERSION_4
 #define	XFS_SB_VERSION_HASATTR	XFS_SB_VERSION_2
 #define	XFS_SB_VERSION_HASNLINK	XFS_SB_VERSION_3
-#define	XFS_SB_VERSION		XFS_SB_VERSION_3
+#define XFS_SB_VERSION_HASQUOTA XFS_SB_VERSION_4
+#define	XFS_SB_VERSION		XFS_SB_VERSION_4
+
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_SB_GOOD_VERSION)
 int xfs_sb_good_version(unsigned v);
 #define	XFS_SB_GOOD_VERSION(v)	xfs_sb_good_version(v)
@@ -70,6 +73,14 @@ typedef struct xfs_sb
 	__uint64_t	sb_ifree;	/* free inodes */
 	__uint64_t	sb_fdblocks;	/* free data blocks */
 	__uint64_t	sb_frextents;	/* free realtime extents */
+	
+	/*
+	 * XFS_SB_VERSION_4 - quota support
+	 */
+	xfs_ino_t	sb_uquotino;	/* user quota inode */
+	xfs_ino_t	sb_pquotino;	/* project quota inode */
+	__uint16_t	sb_qflags;	/* quota flags */
+	__uint8_t	sb_padding[37]; /* padding for posterity */
 } xfs_sb_t;
 
 /*
@@ -84,7 +95,8 @@ typedef enum {
 	XFS_SBS_INOPBLOCK, XFS_SBS_FNAME, XFS_SBS_FPACK, XFS_SBS_BLOCKLOG,
 	XFS_SBS_SECTLOG, XFS_SBS_INODELOG, XFS_SBS_INOPBLOG, XFS_SBS_AGBLKLOG,
 	XFS_SBS_REXTSLOG, XFS_SBS_INPROGRESS, XFS_SBS_IMAX_PCT, XFS_SBS_ICOUNT,
-	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS,
+	XFS_SBS_IFREE, XFS_SBS_FDBLOCKS, XFS_SBS_FREXTENTS, 
+	XFS_SBS_USRQINO, XFS_SBS_PRJQINO, XFS_SBS_QFLAGS, XFS_SBS_PADDING,
 	XFS_SBS_FIELDCOUNT
 } xfs_sb_field_t;
 
@@ -92,11 +104,15 @@ typedef enum {
  * Mask values, defined based on the xfs_sb_field_t values.
  * Only define the ones we're using.
  */
-#define	XFS_SB_MVAL(x)	(1LL << XFS_SBS_ ## x)
+#define	XFS_SB_MVAL(x)		(1LL << XFS_SBS_ ## x)
 #define	XFS_SB_ROOTINO		XFS_SB_MVAL(ROOTINO)
 #define	XFS_SB_RBMINO		XFS_SB_MVAL(RBMINO)
 #define	XFS_SB_RSUMINO		XFS_SB_MVAL(RSUMINO)
 #define	XFS_SB_VERSIONNUM	XFS_SB_MVAL(VERSIONNUM)
+#define XFS_SB_USRQINO		XFS_SB_MVAL(USRQINO)
+#define XFS_SB_PRJQINO		XFS_SB_MVAL(PRJQINO)
+#define XFS_SB_QFLAGS		XFS_SB_MVAL(QFLAGS)
+#define XFS_SB_PADDING		XFS_SB_MVAL(PADDING)
 #define	XFS_SB_NUM_BITS		((int)XFS_SBS_FIELDCOUNT)
 #define	XFS_SB_ALL_BITS		((1LL << XFS_SB_NUM_BITS) - 1)
 
