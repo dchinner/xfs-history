@@ -932,6 +932,7 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args, int delta,
 	xfs_inode_t *dp;
 	xfs_fsblock_t oldsize, newsize;
 	xfs_sb_t *sbp;
+	int done;
 
 	dp = args->dp;
 	sbp = &dp->i_mount->m_sb;
@@ -942,9 +943,10 @@ xfs_dir_shrink_inode(xfs_trans_t *trans, struct xfs_dir_name *args, int delta,
 
 	if (oldsize > 0) {
 		*(args->firstblock) = xfs_bunmapi(trans, dp, newsize,
-						  oldsize - newsize,
+						  oldsize - newsize, 1,
 						  *(args->firstblock),
-						  args->flist);
+						  args->flist, &done);
+		ASSERT(done);
 		*new_blkno = newsize - 1;
 	} else {
 		*new_blkno = 0;

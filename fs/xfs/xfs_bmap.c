@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.41 $"
+#ident	"$Revision: 1.43 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1784,6 +1784,9 @@ xfs_bmapi(
 
 /*
  * Unmap (remove) blocks from a file.
+ * If nexts is nonzero then the number of extents to remove is limited to
+ * that value.  If not all extents in the block range can be removed then
+ * *done is set.
  */
 xfs_fsblock_t					/* first allocated block */
 xfs_bunmapi(
@@ -1791,13 +1794,16 @@ xfs_bunmapi(
 	struct xfs_inode	*ip,		/* incore inode */
 	xfs_fsblock_t		bno,		/* starting offset to unmap */
 	xfs_extlen_t		len,		/* length to unmap in file */
+	xfs_extnum_t		nexts,		/* number of extents max */
 	xfs_fsblock_t		firstblock,	/* controls a.g. for allocs */
-	xfs_bmap_free_t		*flist)		/* i/o: list extents to free */
+	xfs_bmap_free_t		*flist,		/* i/o: list extents to free */
+	int			*done)		/* set if not done yet */
 {
 	xfs_btree_cur_t		*cur;
 	xfs_bmbt_irec_t		del;
 	int			eof;
 	xfs_bmbt_rec_t		*ep;
+	xfs_extnum_t		extno;
 	xfs_bmbt_irec_t		got;
 	xfs_extnum_t		i;
 	xfs_extnum_t		lastx;
@@ -1813,15 +1819,16 @@ xfs_bunmapi(
 	if (!(ip->i_flags & XFS_IEXTENTS))
 		xfs_iread_extents(tp, ip);
 	nextents = ip->i_bytes / sizeof(xfs_bmbt_rec_t);
-	if (nextents == 0)
+	if (nextents == 0) {
+		*done = 1;
 		return firstblock;
+	}
 	start = bno;
 	bno = start + len - 1;
 	ep = xfs_bmap_search_extents(ip, bno, &eof, &lastx, &got, &prev);
 	/*
 	 * Check to see if the given block number is past the end of the
 	 * file, back up to the last block if so...
-	 * Do we want to reject this instead?
 	 */
 	if (eof) {
 		lastx--;
@@ -1838,7 +1845,8 @@ xfs_bunmapi(
 		cur->bc_private.b.flist = flist;
 	} else
 		cur = NULL;
-	while (bno >= start && lastx >= 0) {
+	extno = 0;
+	while (bno >= start && lastx >= 0 && (nexts == 0 || extno < nexts)) {
 		/*
 		 * Is the found extent after a hole in which bno lives?
 		 * Just back up to the previous extent, if so.
@@ -1877,9 +1885,11 @@ xfs_bunmapi(
 		if (bno >= start && --lastx >= 0) {
 			ep--;
 			xfs_bmbt_get_all(ep, got);
+			extno++;
 		}
 	}
 	ip->i_lastex = lastx;
+	*done = bno < start || lastx < 0;
 	/*
 	 * Convert to a btree if necessary.
 	 */
