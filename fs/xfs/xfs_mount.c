@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.45 $"
+#ident	"$Revision: 1.52 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -34,9 +34,10 @@
 #include "xfs_ag.h"
 #include "xfs_mount.h"
 #include "xfs_alloc_btree.h"
-#include "xfs_ialloc.h"
 #include "xfs_bmap_btree.h"
+#include "xfs_ialloc_btree.h"
 #include "xfs_btree.h"
+#include "xfs_ialloc.h"
 #include "xfs_dinode.h"
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
@@ -153,22 +154,29 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 		mp->m_alloc_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
 			xfs_alloc, i == 0);
 	}
-	brsize = XFS_BMAP_BROOT_SIZE(sbp->sb_inodesize);
-	mp->m_bmap_ext_mxr = brsize / sizeof(xfs_bmbt_rec_t);
 	for (i = 0; i < 2; i++) {
 		mp->m_bmap_dmxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
 			xfs_bmbt, i == 0);
 		mp->m_bmap_dmnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
 			xfs_bmbt, i == 0);
 	}
+	brsize = XFS_BMAP_BROOT_SIZE(sbp->sb_inodesize);
 	for (i = 0; i < 2; i++) {
 		mp->m_bmap_dmxr[i + 2] = XFS_BTREE_BLOCK_MAXRECS(brsize,
 			xfs_bmdr, i == 0);
 		mp->m_bmap_dmnr[i + 2] = XFS_BTREE_BLOCK_MINRECS(brsize,
 			xfs_bmdr, i == 0);
 	}
+	mp->m_bmap_ext_mxr = brsize / sizeof(xfs_bmbt_rec_t);
+	for (i = 0; i < 2; i++) {
+		mp->m_inobt_mxr[i] = XFS_BTREE_BLOCK_MAXRECS(sbp->sb_blocksize,
+			xfs_inobt, i == 0);
+		mp->m_inobt_mnr[i] = XFS_BTREE_BLOCK_MINRECS(sbp->sb_blocksize,
+			xfs_inobt, i == 0);
+	}
 	xfs_alloc_compute_maxlevels(mp);
 	xfs_bmap_compute_maxlevels(mp);
+	xfs_ialloc_compute_maxlevels(mp);
 	mp->m_bsize = XFS_BTOD(mp, 1);
 	vfsp->vfs_bsize = XFS_FSB_TO_B(mp, 1);
 
