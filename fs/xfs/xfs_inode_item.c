@@ -346,9 +346,8 @@ xfs_inode_item_init(xfs_inode_t	*ip,
  * This is the inode flushing I/O completion routine.  It is called
  * from interrupt level when the buffer containing the inode is
  * flushed to disk.  It is responsible for removing the inode item
- * from the AIL if it has not been re-logged, unlocking the inode's
- * flush lock, and releasing the vnode reference taken by the
- * inode transaction code if there is one.
+ * from the AIL if it has not been re-logged, and unlocking the inode's
+ * flush lock.
  */
 void
 xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
@@ -356,7 +355,6 @@ xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
 	xfs_lsn_t	lsn;
 	xfs_inode_t	*ip;
 	int		s;
-	int		drop_ref;
 
 	ip = iip->ili_inode;
 
@@ -378,33 +376,14 @@ xfs_iflush_done(buf_t *bp, xfs_inode_log_item_t *iip)
 		}
 		AIL_UNLOCK(ip->i_mount, s);
 	}
-
-	/*
-	 * Check to see if we should drop the reference taken by
-	 * xfs_trans_log_inode() by looking at ili_logged.  ili_logged
-	 * is guarded by the i_flock, so check and clear it before
-	 * unlocking the i_flock.
-	 */
-	if (iip->ili_logged != 0) {
-		drop_ref = 1;
-		iip->ili_logged = 0;
-	} else {
-		drop_ref = 0;
-	}
 	
+	iip->ili_logged = 0;
+
 	/*
 	 * Release the inode's flush lock since we're done with it.
 	 */
 	xfs_ifunlock(ip);
 
-	/*
-	 * Here we release the inode reference made by the transaction
-	 * code if we have one.
-	 */
-	if (drop_ref) {
-		vn_rele(XFS_ITOV(ip));
-	}
-		
 	return;
 }
 
