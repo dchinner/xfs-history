@@ -1415,15 +1415,18 @@ xfs_bmap_del_extent(
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 			xfs_sb_t	*sbp;	/* superblock of filesystem */
 			xfs_extlen_t	len;
+			xfs_fsblock_t	bno;
 
 	
 			sbp = &ip->i_mount->m_sb;
 
 			ASSERT((del->br_blockcount % sbp->sb_rextsize) == 0);
+			ASSERT((del->br_startblock % sbp->sb_rextsize) == 0);
+			
+			bno = del->br_startblock / sbp->sb_rextsize;
 			len = del->br_blockcount / sbp->sb_rextsize;
 
-			xfs_rtfree_extent(ip->i_transp, del->br_startblock,
-				len);
+			xfs_rtfree_extent(ip->i_transp, bno, len);
 			ip->i_d.di_nblocks -=
 				del->br_blockcount * sbp->sb_rextsize;
 		}
