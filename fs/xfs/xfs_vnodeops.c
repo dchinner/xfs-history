@@ -1,4 +1,4 @@
-#ident "$Revision: 1.303 $"
+#ident "$Revision: 1.304 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -5511,9 +5511,8 @@ xfs_change_file_space(
 	/*
 	 * must be a regular file and have write permission
 	 */
-	if (vp->v_type != VREG) {
+	if (vp->v_type != VREG)
 		return XFS_ERROR(EINVAL);
-	}
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
 	if (error = xfs_iaccess(ip, IWRITE, credp)) {
@@ -5521,30 +5520,10 @@ xfs_change_file_space(
 		return error;
 	}
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
-
+	if (error = convoff(vp, bf, 0, offset, XFS_MAX_FILE_OFFSET, credp))
+		return error;
+	startoffset = bf->l_start;
 	fsize = ip->i_d.di_size;
-	/*
-	 * determine how much to allocate/free starting from where
-	 */
-	if (bf->l_whence == 1) {
-		/*
-		 * relative to current offset
-		 */
-		startoffset = bf->l_start + offset;
-	} else if (bf->l_whence == 2) {
-		/*
-		 * relative to end of file
-		 */
-		startoffset = bf->l_start + fsize;
-	} else if (bf->l_whence == 0) {
-		/*
-		 * relative to start of file. 
-		 */
-		startoffset = bf->l_start;
-	} else {
-		return XFS_ERROR(EINVAL);
-	}
-
 	/*
 	 * F_RESVSP and F_UNRESVSP will reserve or unreserve file space.
 	 * these calls do NOT zero the data space allocated
@@ -5558,31 +5537,26 @@ xfs_change_file_space(
 	switch (cmd) {
 	case F_RESVSP:
 	case F_RESVSP64:
-		error = xfs_alloc_file_space(ip, startoffset, bf->l_len);
-		if (error)
+		if (error = xfs_alloc_file_space(ip, startoffset, bf->l_len))
 			return error;
 		setprealloc = 1;
 		break;
 	case F_UNRESVSP:
 	case F_UNRESVSP64:
-		error = xfs_free_file_space(ip, startoffset, bf->l_len);
-		if (error)
+		if (error = xfs_free_file_space(ip, startoffset, bf->l_len))
 			return error;
 		break;
 	case F_ALLOCSP:
 	case F_ALLOCSP64:
 	case F_FREESP:
 	case F_FREESP64:
-		if (startoffset > fsize) {
-			error = xfs_alloc_file_space(ip, fsize,
-					startoffset - fsize);
-			if (error)
-				break;
-		}
+		if (startoffset > fsize &&
+		    (error = xfs_alloc_file_space(ip, fsize,
+			    startoffset - fsize)))
+			break;
 		va.va_mask = AT_SIZE;
 		va.va_size = startoffset;
-		error = xfs_setattr(bdp, &va, 0, credp);
-		if (error)
+		if (error = xfs_setattr(bdp, &va, 0, credp))
 			return error;
 		clrprealloc = 1;
 		break;
