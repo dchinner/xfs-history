@@ -92,8 +92,6 @@ struct xfs_mount;
 struct pb_target;
 struct block_device;
 
-extern int  xfs_parseargs(bhv_desc_t *, char *, struct xfs_mount_args *, int);
-extern int  xfs_showargs(bhv_desc_t *, struct seq_file *);
 extern struct inode *xfs_get_inode(bhv_desc_t *, xfs_ino_t, int);
 extern void xfs_initialize_vnode(bhv_desc_t *, vnode_t *, bhv_desc_t *, int);
 
