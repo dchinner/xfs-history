@@ -497,13 +497,15 @@ start:
 	if ((DM_EVENT_ENABLED_IO(vp->v_vfsp, io, DM_EVENT_WRITE) &&
 	    !(file->f_mode & FINVIS) && !eventsent)) {
 
+		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 		error = xfs_dm_send_data_event(DM_EVENT_WRITE, bdp,
 				*offset, size,
 				FILP_DELAY_FLAG(file), &locktype);
 		if (error) {
-			xfs_iunlock(xip, XFS_ILOCK_EXCL|iolock);
+			xfs_iunlock(xip, iolock);
 			return error;
 		}
+		xfs_ilock(xip, XFS_ILOCK_EXCL);
 		eventsent = 1;
 
 		/*
