@@ -810,8 +810,9 @@ static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 /*
  * Some useful predicates.
  */
-#define	VN_MAPPED(vp)	((LINVFS_GET_IP(vp)->i_mapping->i_mmap != NULL) || \
-			 (LINVFS_GET_IP(vp)->i_mapping->i_mmap_shared != NULL))
+#define	VN_MAPPED(vp)	\
+	(!list_empty(&(LINVFS_GET_IP(vp)->i_mapping->i_mmap)) || \
+	(!list_empty(&(LINVFS_GET_IP(vp)->i_mapping->i_mmap_shared))))
 #define	VN_CACHED(vp)	(LINVFS_GET_IP(vp)->i_mapping->nrpages)
 #define VN_DIRTY(vp)	(!list_empty(&(LINVFS_GET_IP(vp)->i_dirty_buffers)))
 #define VMODIFY(vp)	{ VN_FLAGSET(vp, VMODIFIED); \
