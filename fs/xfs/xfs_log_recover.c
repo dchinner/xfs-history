@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.94 $"
+#ident	"$Revision: 1.95 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2522,9 +2522,9 @@ xlog_recover_do_quotaoff_trans(xlog_t			*log,
 	 * The logitem format's flag tells us if this was user quotaoff, 
 	 * project quotaoff or both. 
 	 */
-	if (qoff_f->qf_flags & XFS_MOUNT_UDQ_ACCT) 
+	if (qoff_f->qf_flags & XFS_UQUOTA_ACCT) 
 		log->l_quotaoffs_flag |= XFS_DQ_USER;
-	if (qoff_f->qf_flags & XFS_MOUNT_PDQ_ACCT)
+	if (qoff_f->qf_flags & XFS_PQUOTA_ACCT)
 		log->l_quotaoffs_flag |= XFS_DQ_PROJ;
 	
 	return (0);
