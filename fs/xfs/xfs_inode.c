@@ -1,4 +1,4 @@
-#ident "$Revision: 1.165 $"
+#ident "$Revision$"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -799,6 +799,7 @@ xfs_ialloc(
 
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
+	ASSERT(ip->i_d.di_nblocks == 0);
 	xfs_ichgtime(ip, XFS_ICHGTIME_CHG|XFS_ICHGTIME_ACC|XFS_ICHGTIME_MOD);
 	uuid_create(&ip->i_d.di_uuid, &status);
 	/*
@@ -1481,6 +1482,10 @@ xfs_itruncate_finish(
 		(ip->i_delayed_blks == 0) &&
 		(ip->i_queued_bufs == 0) &&
 		(ip->i_vnode->v_buf == NULL)));
+	ASSERT((new_size != 0) ||
+	       (fork == XFS_ATTR_FORK) ||
+	       ((ip->i_d.di_nblocks == 0) &&	
+		(ip->i_d.di_nextents == 0)));
 	xfs_itrunc_trace(XFS_ITRUNC_FINISH2, ip, 0, new_size, 0, 0);
 	return 0;
 }
@@ -1831,6 +1836,7 @@ xfs_ifree(
 	ASSERT(ip->i_d.di_anextents == 0);
 	ASSERT((ip->i_d.di_size == 0) ||
 	       ((ip->i_d.di_mode & IFMT) != IFREG));
+	ASSERT(ip->i_d.di_nblocks == 0);
 
 	/*
 	 * Pull the on-disk inode from the AGI unlinked list.
@@ -2860,6 +2866,7 @@ xfs_iflush_all(
 					continue;
 				}
 				if (!(flag & XFS_FLUSH_ALL)) {
+					ASSERT(0);
 					busy = 1;
 					done = 1;
 					break;
