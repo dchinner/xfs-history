@@ -90,6 +90,7 @@ typedef struct xfs_inode {
 	unsigned int		i_last_req_sz;	/* last read size */
 	unsigned int		i_num_readaheads; /* # read ahead bufs */
 	xfs_fsize_t		i_new_size;	/* sz when write completes */
+	off_t			i_write_offset;	/* start off of curr write */
 
 	/* Miscellaneous state. */
 	unsigned short		i_flags;	/* see defined flags below */
