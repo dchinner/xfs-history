@@ -1113,8 +1113,6 @@ xlog_recover_process_efi(xfs_mount_t		*mp,
 
 	for (i = 0; i < efip->efi_format.efi_nextents; i++) {
 		extp = &(efip->efi_format.efi_extents[i]);
-		printf("process_efi: start %x len %x\n",
-		       (uint)extp->ext_start, (uint)extp->ext_len);
 		xfs_free_extent(tp, extp->ext_start, extp->ext_len);
 		xfs_trans_log_efd_extent(tp, efdp, extp->ext_start,
 					 extp->ext_len);
@@ -1145,7 +1143,6 @@ xlog_recover_process_efis(xlog_t	*log)
 	xfs_mount_t		*mp;
 	int			spl;
 
-	printf("xlog_recover_process_efis start\n");
 	mp = log->l_mp;
 	spl = AIL_LOCK(mp);
 	efip = (xfs_efi_log_item_t *)xfs_trans_first_ail(mp, &gen);
@@ -1161,7 +1158,6 @@ xlog_recover_process_efis(xlog_t	*log)
 			continue;
 		}
 
-		printf("xlog_recover_process_efis do %x\n", efip);
 		AIL_UNLOCK(mp, spl);
 		xlog_recover_process_efi(mp, efip);
 		spl = AIL_LOCK(mp);
@@ -1170,7 +1166,6 @@ xlog_recover_process_efis(xlog_t	*log)
 					   &gen, NULL);
 	}
 	AIL_UNLOCK(mp, spl);
-	printf("recover_efis complete\n");
 }	/* xlog_recover_process_efis */
 
 
@@ -1199,7 +1194,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 	xfs_ino_t	ino;
 	int		bucket;
 
-	printf("xlog_recover_process_iunlinks start\n");
 	mp = log->l_mp;
 	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
 		/*
@@ -1229,8 +1223,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 			 */
 			brelse(agibp);
 
-			printf("recover_iunlinks do agno %x agino %x\n",
-			       agno, agino);
 			ino = XFS_AGINO_TO_INO(mp, agno, agino);
 			ip = xfs_iget(mp, NULL, ino, 0);
 			ASSERT(ip->i_d.di_nlink == 0);
@@ -1261,7 +1253,6 @@ xlog_recover_process_iunlinks(xlog_t	*log)
 		 */
 		brelse(agibp);
 	}
-	printf("recover_iunlinks done\n");
 }	/* xlog_recover_process_iunlinks */
 
 
