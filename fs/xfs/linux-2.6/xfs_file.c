@@ -310,26 +310,26 @@ linvfs_mprotect(
 
 
 struct file_operations linvfs_file_operations = {
-	llseek:		generic_file_llseek,
-	read:		linvfs_read,
-	write:		linvfs_write,
-	ioctl:		linvfs_ioctl,
-	mmap:		linvfs_file_mmap,
-	open:		linvfs_open,
-	release:	linvfs_release,
-	fsync:		linvfs_fsync,
+	.llseek		= generic_file_llseek,
+	.read		= linvfs_read,
+	.write		= linvfs_write,
+	.ioctl		= linvfs_ioctl,
+	.mmap		= linvfs_file_mmap,
+	.open		= linvfs_open,
+	.release	= linvfs_release,
+	.fsync		= linvfs_fsync,
 };
 
 struct file_operations linvfs_dir_operations = {
-	read:		generic_read_dir,
-	readdir:	linvfs_readdir,
-	ioctl:		linvfs_ioctl,
-	fsync:		linvfs_fsync,
+	.read		= generic_read_dir,
+	.readdir	= linvfs_readdir,
+	.ioctl		= linvfs_ioctl,
+	.fsync		= linvfs_fsync,
 };
 
 static struct vm_operations_struct linvfs_file_vm_ops = {
-	nopage:		filemap_nopage,
+	.nopage		= filemap_nopage,
 #ifdef HAVE_VMOP_MPROTECT
-	mprotect:	linvfs_mprotect,
+	.mprotect	= linvfs_mprotect,
 #endif
 };

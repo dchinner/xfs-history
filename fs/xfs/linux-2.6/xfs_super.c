@@ -51,10 +51,10 @@ extern void xfs_cleanup(void);
 
 #ifdef CONFIG_XFS_QUOTA
 static struct quotactl_ops linvfs_qops = {
-	get_xstate:		linvfs_getxstate,
-	set_xstate:		linvfs_setxstate,
-	get_xquota:		linvfs_getxquota,
-	set_xquota:		linvfs_setxquota,
+	.get_xstate		= linvfs_getxstate,
+	.set_xstate		= linvfs_setxstate,
+	.get_xquota		= linvfs_getxquota,
+	.set_xquota		= linvfs_setxquota,
 };
 # define set_quota_ops(sb)	((sb)->s_qcop = &linvfs_qops)
 #else
@@ -474,7 +474,7 @@ linvfs_fill_super(
 
 	LINVFS_SET_VFS(sb, vfsp);
 
-	VFSOPS_MOUNT(vfsops, vfsp, args, sys_cred, error);
+	VFSOPS_MOUNT(vfsops, vfsp, args, NULL, error);
 	if (error)
 		goto fail_vfsop;
 
@@ -529,8 +529,7 @@ fail_vnrele:
 	}
 
 fail_unmount:
-	VFS_UNMOUNT(vfsp, 0, sys_cred, error);
-	/*  We need to do something here to shut down the VNODE/VFS layer.  */
+	VFS_UNMOUNT(vfsp, 0, NULL, error);
 
 fail_vfsop:
 	vfs_deallocate(vfsp);
@@ -636,7 +635,7 @@ linvfs_put_super(
 	int		sector_size;
 	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
 
-	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error);
+	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
 		printk("linvfs_put_super: vfsp/0x%p left dangling!\n", vfsp);
@@ -661,7 +660,7 @@ linvfs_write_super(
 	if (sb->s_flags & MS_RDONLY)
 		return;
 	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_BDFLUSH|SYNC_NOWAIT|SYNC_ATTR,
-		sys_cred, error);
+		NULL, error);
 }
 
 int
@@ -794,17 +793,17 @@ static struct export_operations linvfs_export_ops = {
 };
 
 static struct super_operations linvfs_sops = {
-	alloc_inode:		linvfs_alloc_inode,
-	destroy_inode:		linvfs_destroy_inode,
-	write_inode:		linvfs_write_inode,
-	put_inode:		linvfs_put_inode,
-	clear_inode:		linvfs_clear_inode,
-	put_super:		linvfs_put_super,
-	write_super:		linvfs_write_super,
-	write_super_lockfs:	linvfs_freeze_fs,
-	unlockfs:		linvfs_unfreeze_fs,
-	statfs:			linvfs_statfs,
-	remount_fs:		linvfs_remount,
+	.alloc_inode		= linvfs_alloc_inode,
+	.destroy_inode		= linvfs_destroy_inode,
+	.write_inode		= linvfs_write_inode,
+	.put_inode		= linvfs_put_inode,
+	.clear_inode		= linvfs_clear_inode,
+	.put_super		= linvfs_put_super,
+	.write_super		= linvfs_write_super,
+	.write_super_lockfs	= linvfs_freeze_fs,
+	.unlockfs		= linvfs_unfreeze_fs,
+	.statfs			= linvfs_statfs,
+	.remount_fs		= linvfs_remount,
 };
 
 static struct super_block *linvfs_get_sb(struct file_system_type *fs_type,

@@ -1819,7 +1819,7 @@ XFS_log_write_unmount_ro(bhv_desc_t	*bdp)
 
 	do {
 		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-		VFS_SYNC(XFS_MTOVFS(mp), SYNC_ATTR|SYNC_WAIT, sys_cred, error);
+		VFS_SYNC(XFS_MTOVFS(mp), SYNC_ATTR|SYNC_WAIT, NULL, error);
 		pagebuf_delwri_flush(mp->m_ddev_targ.pb_targ,
 				PBDF_WAIT, &pincount);
 		if (pincount == 0) {delay(50); count++;}
