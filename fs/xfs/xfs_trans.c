@@ -11,6 +11,7 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/debug.h>
+#include <sys/errno.h>
 #include <sys/uuid.h>
 #include <sys/kmem.h>
 #include <stddef.h>
@@ -161,7 +162,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		status = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FDBLOCKS,
 					   -blocks);
 		if (status != 0) {
-			return (status);
+			return (ENOSPC);
 		}
 		tp->t_blk_res = blocks;
 	}
@@ -199,7 +200,7 @@ xfs_trans_reserve(xfs_trans_t	*tp,
 		status = xfs_mod_incore_sb(tp->t_mountp, XFS_SB_FREXTENTS,
 					   -rtextents);
 		if (status != 0) {
-			return (status);
+			return (ENOSPC);
 		}
 		tp->t_rtx_res = rtextents;
 	}
