@@ -118,7 +118,6 @@ xfs_iget_vnode_init(
 	xfs_inode_t	*ip)
 {
 	vp->v_vfsp  = XFS_MTOVFS(mp);
-	vp->v_inode = LINVFS_GET_IP(vp);
 	vp->v_type  = IFTOVT(ip->i_d.di_mode);
 
 	/* If we have a real type for an on-disk inode, we can set ops(&unlock)
@@ -452,8 +451,7 @@ xfs_iget(
 retry:
 	XFS_STATS_INC(xfsstats.xs_ig_attempts);
 
-	if ((inode = icreate(XFS_MTOVFS(mp)->vfs_super, ino,
-			tp ? SLAB_NOFS : SLAB_KERNEL))) {
+	if ((inode = iget_locked(XFS_MTOVFS(mp)->vfs_super, ino))) {
 		bhv_desc_t	*bdp;
 		xfs_inode_t	*ip;
 		int		newnode;
