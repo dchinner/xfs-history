@@ -2535,6 +2535,7 @@ xfs_bunmapi(
 		xfs_trans_log_inode(tp, ip, logflags);
 	if (cur) {
 		firstblock = cur->bc_private.b.firstblock;
+		cur->bc_private.b.allocated = 0;
 		xfs_btree_del_cursor(cur);
 	}
 	kmem_check();
