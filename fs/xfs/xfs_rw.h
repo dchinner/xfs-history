@@ -1,7 +1,7 @@
 #ifndef	_XFS_RW_H
 #define	_XFS_RW_H
 
-#ident "$Revision: 1.36 $"
+#ident "$Revision: 1.37 $"
 
 struct bhv_desc;
 struct bdevsw;
@@ -33,6 +33,19 @@ typedef struct xfs_gap {
 	xfs_fileoff_t	xg_offset_fsb;
 	xfs_extlen_t	xg_count_fsb;
 } xfs_gap_t;
+
+/*
+ * This structure is used to hold common pieces of the buffer
+ * and file for xfs_dio_write and xfs_dio_read.
+ */
+typedef	struct xfs_dio {
+	buf_t		*xd_bp;
+	struct dio_s	*xd_dp;
+	struct vnode	*xd_vp;
+	struct xfs_inode *xd_ip;
+	xfs_mount_t	*xd_mp;
+	int		xd_blkalgn;
+} xfs_dio_t;
 
 /*
  * Maximum count of bmaps used by read and write paths.
