@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.104 $"
+#ident	"$Revision: 1.105 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2414,11 +2414,9 @@ xfs_bmap_finish(
 			free->xbfi_blockcount);
 	logres = ntp->t_log_res;
 	logcount = ntp->t_log_count;
-	blkres = ntp->t_blk_res - ntp->t_blk_res_used;
-	rtblkres = ntp->t_rtx_res - ntp->t_rtx_res_used;
 	ntp = xfs_trans_dup(*tp);
 	xfs_trans_commit(*tp, 0);
-	xfs_trans_reserve(ntp, blkres, logres, rtblkres,
+	xfs_trans_reserve(ntp, 0, logres, 0,
 			  XFS_TRANS_PERM_LOG_RES, logcount);
 	efd = xfs_trans_get_efd(ntp, efi, flist->xbf_count);
 	for (free = flist->xbf_first; free != NULL; free = next) {
