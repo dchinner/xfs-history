@@ -554,10 +554,15 @@ linvfs_write_super(
 {
  	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
  	int		error; 
+	extern void bflush_bufs(dev_t);
+	irix_dev_t	dev;
 
 
-	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_DELWRI|SYNC_NOWAIT,
+	VFS_SYNC(vfsp, SYNC_FSDATA|SYNC_DELWRI|SYNC_NOWAIT|SYNC_ATTR,
 		sys_cred, error);
+
+	bflush_bufs(vfsp->vfs_dev);/* Pretend a bdflush is going off for XFS
+					specific buffers from xfs_fs_bio.c */
 
 	sb->s_dirt = 1;  /*  Keep the syncs coming.  */
 }

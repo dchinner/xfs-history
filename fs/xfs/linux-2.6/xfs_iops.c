@@ -462,7 +462,7 @@ _linvfs_set_blocks(
 				return;
 			} else if (pbmap->pbm_offset) {
 				if ( pbmap->pbm_offset % blocksize) {
-					printk("this shouldn't happen %lld %lld!\n",
+					printk("_linvfs_set_blocks: this shouldn't happen %lld %d!\n",
 					   pbmap->pbm_offset, blocksize);
 				}
 				blockno += pbmap->pbm_offset >> block_bits;
@@ -562,7 +562,7 @@ int linvfs_get_block(struct inode *inode, long block, struct buffer_head *bh_res
 	if (blockno < 0) return 0;
 	if (pbmap.pbm_offset) {
 		if ( pbmap.pbm_offset % count) {
-			printk("this shouldn't happen %lld %d!\n",
+			printk("linvfs_bmap: this shouldn't happen %lld %d!\n",
 				pbmap.pbm_offset,
 				count);
 		}
@@ -604,15 +604,15 @@ linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
 	int		npbmaps = 2;
 	long		blockno;
 
-	printk("linvfs_updatepage(%s/%s %d@%ld, sync=%d)\n",
+	/* printk("linvfs_updatepage(%s/%s %d@%ld, sync=%d)\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
-		bytes, page->offset+offset, sync);
+		bytes, page->offset+offset, sync); */
 	
 	vp = LINVFS_GET_VP(inode);
 
 	VOP_RWLOCK(vp, VRWLOCK_READ);
-	VOP_BMAP(vp, offset, bytes, B_WRITE,(struct page_buf_bmap_s *) &pbmap,
-				&npbmaps, error);
+	VOP_BMAP(vp, page->offset, offset+bytes, B_WRITE,
+		(struct page_buf_bmap_s *) &pbmap, &npbmaps, error);
 	VOP_RWUNLOCK(vp, VRWLOCK_READ);
 	if (error)
 		return -EIO;
@@ -628,11 +628,9 @@ linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
 	/* bytes can't be more than one page. */
 	ASSERT(bytes <= PAGE_CACHE_SIZE);
 
-	printk("linvfs_updatepage: before copy %d\n", bytes);
 	/* Copy down the user's data */
-	bytes -= copy_from_user((unsigned long *)page_address(page) + offset,
-							buf, bytes);
-	printk("linvfs_updatepage: after copy %d\n", bytes);
+	bytes -= copy_from_user((unsigned long *)(page_address(page) + offset),
+						buf, bytes);
 
 	if (!bytes) {
 		wrote = -EFAULT;
@@ -644,8 +642,6 @@ linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
 	/* set_bit(PG_uptodate, &page->flags); who set's this? */
 
 	/* Now, write out the page to the right spot */
-	printk("linvfs_updatepage: before brw_page bs=%ld nr=%x\n",
-		inode->i_sb->s_blocksize, nr);
 	status = brw_page(WRITE, page, inode->i_dev, nr, inode->i_sb->s_blocksize, 1);
 
 	if (status < 0) /* Return error below if this failed */
@@ -655,8 +651,6 @@ linvfs_updatepage(struct file *filp, struct page *page, const char *buf,
 
 out:
 	wake_up(&page->wait);
-	printk("linvfs_updatepage: done writing %d\n", wrote);
-
 	return(wrote); /* The amount written */
 }
 

@@ -104,8 +104,6 @@ static ssize_t linvfs_write(
 	vnode_t *vp;
 	int rv;
 	
-	printk("ENTER linvfs_write\n");
-
 	if (!filp || !filp->f_dentry ||
 			!(inode = filp->f_dentry->d_inode)) {
 		printk("EXIT linvfs_write -EBADF\n");
@@ -117,7 +115,6 @@ static ssize_t linvfs_write(
 
 	VOP_WRITE(vp, (void *)filp, buf, size, offset, rv);
 
-	printk("EXIT  linvfs_write %d\n", rv);
 	return(rv);
 }
 

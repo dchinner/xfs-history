@@ -1,10 +1,13 @@
 /*
  *
- * $Header: $
- * $Author: $
- * $Id: $
+ * $Header: /ptools/plroot/pingu/slinx-xfs/kern/fs/xfs/linux/RCS/xfs_lrw.h,v 1.1 1999/12/29 21:14:01 cattelan Exp $
+ * $Author: cattelan $
+ * $Id: xfs_lrw.h,v 1.1 1999/12/29 21:14:01 cattelan Exp $
  *
- * $Log: $
+ * $Log: xfs_lrw.h,v $
+ * Revision 1.1  1999/12/29 21:14:01  cattelan
+ * new file
+ *
  */
 
 
@@ -18,7 +21,7 @@
 #define	XFS_MAX_RW_NBMAPS	4
 
 extern int xfs_bmap(bhv_desc_t *,off_t,ssize_t,int,pb_bmap_t *,int *);
-extern int xfs_iomap_read(xfs_iocore_t *,off_t,size_t,pb_bmap_t *,int *,struct pm *,int  *,unsigned int);
+extern int xfs_iomap_read(xfs_iocore_t *,off_t,size_t,pb_bmap_t *,int *,struct pm *);
 STATIC int xfs_iomap_write(xfs_iocore_t	*,off_t,size_t,pb_bmap_t *,int *,int,struct pm *);
 STATIC int xfs_iomap_extra(xfs_iocore_t	*,off_t,size_t,pb_bmap_t *,int *,struct pm	*);
 #endif /* _XFS_LRW_H */
