@@ -42,6 +42,7 @@
 #include "xfs_inode.h"
 #include "xfs_alloc.h"
 #include "xfs_bmap.h"
+#include "xfs_bit.h"
 #include "xfs_rtalloc.h"
 #ifdef SIM
 #include "sim.h"
@@ -180,16 +181,6 @@ xfs_rtget_summary(
 	xfs_rtblock_t	bbno,
 	buf_t		**rbpp,
 	xfs_fsblock_t	*rsb);
-
-#ifndef SIM
-STATIC int
-xfs_rthibit(
-	xfs_rtword_t	w);
-#endif
-
-STATIC int
-xfs_rtlobit(
-	xfs_rtword_t	w);
 
 STATIC void
 xfs_rtmodify_range(
@@ -336,7 +327,7 @@ xfs_rtallocate_extent_near(
 		return r;
 	bbno = XFS_BITTOBLOCK(mp, bno);
 	i = 0;
-	log2len = xfs_rthibit(minlen);
+	log2len = xfs_highbit32(minlen);
 	while (1) {
 		if (xfs_rtany_summary(mp, tp, log2len, mp->m_rsumlevels - 1,
 			bbno + i, rbpp, rsb)) {
@@ -389,7 +380,7 @@ xfs_rtallocate_extent_size(
 
 	ASSERT(minlen % prod == 0 && maxlen % prod == 0);
 	mp = tp->t_mountp;
-	for (l = xfs_rthibit(maxlen); l < mp->m_rsumlevels; l++) {
+	for (l = xfs_highbit32(maxlen); l < mp->m_rsumlevels; l++) {
 		for (i = 0; i < mp->m_sb.sb_rbmblocks; i++) {
 			if (!xfs_rtget_summary(mp, tp, l, i, rbpp, rsb))
 				continue;
@@ -401,7 +392,7 @@ xfs_rtallocate_extent_size(
 	}
 	if (minlen > --maxlen)
 		return NULLRTBLOCK;
-	for (l = xfs_rthibit(maxlen); l >= xfs_rthibit(minlen); l--) {
+	for (l = xfs_highbit32(maxlen); l >= xfs_highbit32(minlen); l--) {
 		for (i = 0; i < mp->m_sb.sb_rbmblocks; i++) {
 			if (!xfs_rtget_summary(mp, tp, l, i, rbpp, rsb))
 				continue;
@@ -431,11 +422,11 @@ xfs_rtallocate_range(
 	end = start + len - 1;
 	preblock = xfs_rtfind_back(mp, tp, start, 0);
 	postblock = xfs_rtfind_forw(mp, tp, end, mp->m_sb.sb_rextents - 1);
-	xfs_rtmodify_summary(tp, xfs_rthibit(postblock + 1 - preblock), XFS_BITTOBLOCK(mp, preblock), -1, rbpp, rsb);
+	xfs_rtmodify_summary(tp, XFS_RTBLOCKLOG(postblock + 1 - preblock), XFS_BITTOBLOCK(mp, preblock), -1, rbpp, rsb);
 	if (preblock < start)
-		xfs_rtmodify_summary(tp, xfs_rthibit(start - preblock), XFS_BITTOBLOCK(mp, preblock), 1, rbpp, rsb);
+		xfs_rtmodify_summary(tp, XFS_RTBLOCKLOG(start - preblock), XFS_BITTOBLOCK(mp, preblock), 1, rbpp, rsb);
 	if (postblock > end)
-		xfs_rtmodify_summary(tp, xfs_rthibit(postblock - end), XFS_BITTOBLOCK(mp, end + 1), 1, rbpp, rsb);
+		xfs_rtmodify_summary(tp, XFS_RTBLOCKLOG(postblock - end), XFS_BITTOBLOCK(mp, end + 1), 1, rbpp, rsb);
 	xfs_rtmodify_range(tp, start, len, 0);
 }
 
@@ -518,7 +509,7 @@ xfs_rtcheck_bit(
 	bit = start & (XFS_NBWORD - 1);
 	wval = bufp[word];
 	xfs_trans_brelse(tp, bp);
-	wdiff = (wval ^ -val) & (1 << bit);
+	wdiff = (wval ^ -val) & ((xfs_rtword_t)1 << bit);
 	return !wdiff;
 }
 
@@ -563,10 +554,10 @@ xfs_rtcheck_range(
 	val = -val;
 	if (bit) {
 		lastbit = XFS_RTMIN(bit + len, XFS_NBWORD);
-		mask = ((1 << (lastbit - bit)) - 1) << bit;
+		mask = (((xfs_rtword_t)1 << (lastbit - bit)) - 1) << bit;
 		if (wdiff = (*b ^ val) & mask) {
 			xfs_trans_brelse(tp, bp);
-			i = xfs_rtlobit(wdiff) - bit;
+			i = XFS_RTLOBIT(wdiff) - bit;
 			*new = start + i;
 			return 0;
 		}
@@ -583,7 +574,7 @@ xfs_rtcheck_range(
 	while (len - i >= XFS_NBWORD) {
 		if (wdiff = *b ^ val) {
 			xfs_trans_brelse(tp, bp);
-			i += xfs_rtlobit(wdiff);
+			i += XFS_RTLOBIT(wdiff);
 			*new = start + i;
 			return 0;
 		}
@@ -597,10 +588,10 @@ xfs_rtcheck_range(
 			b++;
 	}
 	if (lastbit = len - i) {
-		mask = (1 << lastbit) - 1;
+		mask = ((xfs_rtword_t)1 << lastbit) - 1;
 		if (wdiff = (*b ^ val) & mask) {
 			xfs_trans_brelse(tp, bp);
-			i += xfs_rtlobit(wdiff);
+			i += XFS_RTLOBIT(wdiff);
 			*new = start + i;
 			return 0;
 		} else
@@ -638,13 +629,13 @@ xfs_rtfind_back(
 	b = &bufp[word];
 	bit = start & (XFS_NBWORD - 1);
 	len = start - limit + 1;
-	want = (*b & (1 << bit)) ? -1 : 0;
+	want = (*b & ((xfs_rtword_t)1 << bit)) ? -1 : 0;
 	if (bit < XFS_NBWORD - 1) {
 		firstbit = XFS_RTMAX(bit - len + 1, 0);
-		mask = ((1 << (bit - firstbit + 1)) - 1) << firstbit;
+		mask = (((xfs_rtword_t)1 << (bit - firstbit + 1)) - 1) << firstbit;
 		if (wdiff = (*b ^ want) & mask) {
 			xfs_trans_brelse(tp, bp);
-			i = bit - xfs_rthibit(wdiff);
+			i = bit - XFS_RTHIBIT(wdiff);
 			return start - i + 1;
 		}
 		i = bit - firstbit + 1;
@@ -661,7 +652,7 @@ xfs_rtfind_back(
 	while (len - i >= XFS_NBWORD) {
 		if (wdiff = *b ^ want) {
 			xfs_trans_brelse(tp, bp);
-			i += XFS_NBWORD - 1 - xfs_rthibit(wdiff);
+			i += XFS_NBWORD - 1 - XFS_RTHIBIT(wdiff);
 			return start - i + 1;
 		}
 		i += XFS_NBWORD;
@@ -676,10 +667,10 @@ xfs_rtfind_back(
 	}
 	if (len - i) {
 		firstbit = XFS_NBWORD - (len - i);
-		mask = ((1 << (len - i)) - 1) << firstbit;
+		mask = (((xfs_rtword_t)1 << (len - i)) - 1) << firstbit;
 		if (wdiff = (*b ^ want) & mask) {
 			xfs_trans_brelse(tp, bp);
-			i += XFS_NBWORD - 1 - xfs_rthibit(wdiff);
+			i += XFS_NBWORD - 1 - XFS_RTHIBIT(wdiff);
 			return start - i + 1;
 		} else
 			i = len;
@@ -714,14 +705,14 @@ xfs_rtfind_forw(
 	word = XFS_BITTOWORD(mp, start);
 	b = &bufp[word];
 	bit = start & (XFS_NBWORD - 1);
-	want = (*b & (1 << bit)) ? -1 : 0;
+	want = (*b & ((xfs_rtword_t)1 << bit)) ? -1 : 0;
 	len = limit - start + 1;
 	if (bit) {
 		lastbit = XFS_RTMIN(bit + len, XFS_NBWORD);
-		mask = ((1 << (lastbit - bit)) - 1) << bit;
+		mask = (((xfs_rtword_t)1 << (lastbit - bit)) - 1) << bit;
 		if (wdiff = (*b ^ want) & mask) {
 			xfs_trans_brelse(tp, bp);
-			i = xfs_rtlobit(wdiff) - bit;
+			i = XFS_RTLOBIT(wdiff) - bit;
 			return start + i - 1;
 		}
 		i = lastbit - bit;
@@ -737,7 +728,7 @@ xfs_rtfind_forw(
 	while (len - i >= XFS_NBWORD) {
 		if (wdiff = *b ^ want) {
 			xfs_trans_brelse(tp, bp);
-			i += xfs_rtlobit(wdiff);
+			i += XFS_RTLOBIT(wdiff);
 			return start + i - 1;
 		}
 		i += XFS_NBWORD;
@@ -750,10 +741,10 @@ xfs_rtfind_forw(
 			b++;
 	}
 	if (lastbit = len - i) {
-		mask = (1 << lastbit) - 1;
+		mask = ((xfs_rtword_t)1 << lastbit) - 1;
 		if (wdiff = (*b ^ want) & mask) {
 			xfs_trans_brelse(tp, bp);
-			i += xfs_rtlobit(wdiff);
+			i += XFS_RTLOBIT(wdiff);
 			return start + i - 1;
 		} else
 			i = len;
@@ -781,10 +772,10 @@ xfs_rtfree_range(
 	preblock = xfs_rtfind_back(mp, tp, start, 0);
 	postblock = xfs_rtfind_forw(mp, tp, end, mp->m_sb.sb_rextents - 1);
 	if (preblock < start)
-		xfs_rtmodify_summary(tp, xfs_rthibit(start - preblock), XFS_BITTOBLOCK(mp, preblock), -1, rbpp, rsb);
+		xfs_rtmodify_summary(tp, XFS_RTBLOCKLOG(start - preblock), XFS_BITTOBLOCK(mp, preblock), -1, rbpp, rsb);
 	if (postblock > end)
-		xfs_rtmodify_summary(tp, xfs_rthibit(postblock - end), XFS_BITTOBLOCK(mp, end + 1), -1, rbpp, rsb);
-	xfs_rtmodify_summary(tp, xfs_rthibit(postblock + 1 - preblock), XFS_BITTOBLOCK(mp, preblock), 1, rbpp, rsb);
+		xfs_rtmodify_summary(tp, XFS_RTBLOCKLOG(postblock - end), XFS_BITTOBLOCK(mp, end + 1), -1, rbpp, rsb);
+	xfs_rtmodify_summary(tp, XFS_RTBLOCKLOG(postblock + 1 - preblock), XFS_BITTOBLOCK(mp, preblock), 1, rbpp, rsb);
 }
 
 STATIC xfs_suminfo_t
@@ -822,135 +813,6 @@ xfs_rtget_summary(
 	return rval;
 }
 
-#ifndef SIM
-STATIC		/* make this external for mkfs */
-#endif
-int
-xfs_rthibit(
-	xfs_rtword_t	w)
-{
-#define	M(s,l)	(((1L<<(l))-1L)<<(s))
-
-	if (w & M(16,16)) {
-		if (w & M(24,8)) {
-			if (w & M(28,4)) {
-				if (w & M(30,2))
-					return w & M(31,1) ? 31 : 30;
-				else
-					return w & M(29,1) ? 29 : 28;
-			} else {
-				if (w & M(26,2))
-					return w & M(27,1) ? 27 : 26;
-				else
-					return w & M(25,1) ? 25 : 24;
-			}
-		} else {
-			if (w & M(20,4)) {
-				if (w & M(22,2))
-					return w & M(23,1) ? 23 : 22;
-				else
-					return w & M(21,1) ? 21 : 20;
-			} else {
-				if (w & M(18,2))
-					return w & M(19,1) ? 19 : 18;
-				else
-					return w & M(17,1) ? 17 : 16;
-			}
-		}
-	} else {
-		if (w & M(8,8)) {
-			if (w & M(12,4)) {
-				if (w & M(14,2))
-					return w & M(15,1) ? 15 : 14;
-				else
-					return w & M(13,1) ? 13 : 12;
-			} else {
-				if (w & M(10,2))
-					return w & M(11,1) ? 11 : 10;
-				else
-					return w & M(9,1) ? 9 : 8;
-			}
-		} else {
-			if (w & M(4,4)) {
-				if (w & M(6,2))
-					return w & M(7,1) ? 7 : 6;
-				else
-					return w & M(5,1) ? 5 : 4;
-			} else {
-				if (w & M(2,2))
-					return w & M(3,1) ? 3 : 2;
-				else
-					return w & M(1,1) ? 1 : 0;
-			}
-		}
-	}
-	return -1;
-#undef M
-}
-
-STATIC int
-xfs_rtlobit(
-	xfs_rtword_t	w)
-{
-#define	M(s,l)	(((1L<<(l))-1L)<<(s))
-
-	if (w & M(0,16)) {
-		if (w & M(0,8)) {
-			if (w & M(0,4)) {
-				if (w & M(0,2))
-					return w & M(0,1) ? 0 : 1;
-				else
-					return w & M(2,1) ? 2 : 3;
-			} else {
-				if (w & M(4,2))
-					return w & M(4,1) ? 4 : 5;
-				else
-					return w & M(6,1) ? 6 : 7;
-			}
-		} else {
-			if (w & M(8,4)) {
-				if (w & M(8,2))
-					return w & M(8,1) ? 8 : 9;
-				else
-					return w & M(10,1) ? 10 : 11;
-			} else {
-				if (w & M(12,2))
-					return w & M(12,1) ? 12 : 13;
-				else
-					return w & M(14,1) ? 14 : 15;
-			}
-		}
-	} else {
-		if (w & M(16,8)) {
-			if (w & M(16,4)) {
-				if (w & M(16,2))
-					return w & M(16,1) ? 16 : 17;
-				else
-					return w & M(18,1) ? 18 : 19;
-			} else {
-				if (w & M(20,2))
-					return w & M(20,1) ? 20 : 21;
-				else
-					return w & M(22,1) ? 22 : 23;
-			}
-		} else {
-			if (w & M(24,4)) {
-				if (w & M(24,2))
-					return w & M(24,1) ? 24 : 25;
-				else
-					return w & M(26,1) ? 26 : 27;
-			} else {
-				if (w & M(28,2))
-					return w & M(28,1) ? 28 : 29;
-				else
-					return w & M(30,1) ? 30 : 31;
-			}
-		}
-	}
-	return -1;
-#undef M
-}
-
 STATIC void
 xfs_rtmodify_range(
 	xfs_trans_t	*tp,
@@ -958,15 +820,15 @@ xfs_rtmodify_range(
 	xfs_extlen_t	len,
 	int		val)
 {
-	int		*b;
+	xfs_rtword_t	*b;
 	int		bit;
 	xfs_rtblock_t	block;
 	buf_t		*bp;
-	int		*bufp;
-	int		*first;
+	xfs_rtword_t	*bufp;
+	xfs_rtword_t	*first;
 	int		i;
 	int		lastbit;
-	int		mask;
+	xfs_rtword_t	mask;
 	xfs_mount_t	*mp;
 	int		word;
 	int		wval;
@@ -981,7 +843,7 @@ xfs_rtmodify_range(
 	val = -val;
 	if (bit) {
 		lastbit = XFS_RTMIN(bit + len, XFS_NBWORD);
-		mask = ((1 << (lastbit - bit)) - 1) << bit;
+		mask = (((xfs_rtword_t)1 << (lastbit - bit)) - 1) << bit;
 		if (val)
 			*b |= mask;
 		else
@@ -1009,7 +871,7 @@ xfs_rtmodify_range(
 	}
 	if (lastbit = len - i) {
 		bit = 0;
-		mask = (1 << lastbit) - 1;
+		mask = ((xfs_rtword_t)1 << lastbit) - 1;
 		if (val)
 			*b |= mask;
 		else

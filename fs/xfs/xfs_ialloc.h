@@ -19,6 +19,11 @@
 	((xfs_dinode_t *)((b)->b_un.b_addr + ((o) << (mp)->m_sb.sb_inodelog)))
 
 /*
+ * Find a free (set) bit in the inode bitmask.
+ */
+#define	XFS_IALLOC_FIND_FREE(fp)	xfs_lowbit64(*(fp))
+
+/*
  * Prototypes for visible xfs_ialloc.c routines.
  */
 
@@ -83,13 +88,6 @@ xfs_dilocate(
 void
 xfs_ialloc_compute_maxlevels(
 	xfs_mount_t	*mp);		/* file system mount structure */
-
-/*
- * Find a free inode in the bitmask for the inode chunk.
- */
-int
-xfs_ialloc_find_free(
-	xfs_inofree_t	*fp);		/* free inode mask */
 
 /*
  * Log specified fields for the ag hdr (inode section)

@@ -31,6 +31,7 @@
 #include "xfs_inode_item.h"
 #include "xfs_inode.h"
 #include "xfs_alloc.h"
+#include "xfs_bit.h"
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -528,7 +529,7 @@ xfs_dialloc(
 			ASSERT(i == 1);
 		}
 	}
-	offset = xfs_ialloc_find_free(&rec.ir_free);
+	offset = XFS_IALLOC_FIND_FREE(&rec.ir_free);
 	ASSERT(offset >= 0);
 	ASSERT(XFS_AGINO_TO_OFFSET(mp, rec.ir_startino) == 0);
 	ino = XFS_AGINO_TO_INO(mp, tagno, rec.ir_startino + offset);
@@ -673,25 +674,6 @@ xfs_ialloc_compute_maxlevels(
 	for (level = 1; maxblocks > 1; level++)
 		maxblocks = (maxblocks + minnoderecs - 1) / minnoderecs;
 	mp->m_in_maxlevels = level;
-}
-
-/* 
- * Find a free inode in the bitmask for the inode chunk.
- * Rewrite this for speed later.
- */
-int
-xfs_ialloc_find_free(
-	xfs_inofree_t	*fp)		/* free inode mask pointer */
-{
-	xfs_inofree_t	f;		/* free inode mask */
-	int		i;		/* return value */
-	xfs_inofree_t	m;		/* loop mask */
-
-	f = *fp;
-	for (i = 0, m = 1; i < XFS_INODES_PER_CHUNK; i++, m <<= 1)
-		if (f & m)
-			return i;
-	return -1;
 }
 
 /*
