@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.107 $"
+#ident "$Revision: 1.109 $"
 
 struct bhv_desc;
 struct buf;
@@ -167,6 +167,7 @@ typedef struct xfs_inode {
 	struct ktrace		*i_btrace;	/* inode bmap btree trace */
 	struct ktrace		*i_rwtrace;	/* inode read/write trace */
 	struct ktrace		*i_strat_trace;	/* inode strat_write trace */
+	struct ktrace		*i_lock_trace;	/* inode lock/unlock trace */
 #endif /* DEBUG */
 } xfs_inode_t;
 
@@ -443,5 +444,11 @@ extern struct zone	*xfs_ifork_zone;
 extern struct zone	*xfs_inode_zone;
 extern struct zone	*xfs_ili_zone;
 extern struct vnodeops	xfs_vnodeops;
+
+#ifdef XFS_ILOCK_TRACE
+#define XFS_ILOCK_KTRACE_SIZE	256
+void	xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, 
+			inst_t *ra);
+#endif
 
 #endif	/* _XFS_INODE_H */
