@@ -604,9 +604,7 @@ xfs_fd_to_mp(
 	if (vp->v_type == VBLK || vp->v_type == VCHR) {
 		if (wperm && !(fp->f_flag & FWRITE))
 			return XFS_ERROR(EPERM);
-		for (vfsp = rootvfs; vfsp; vfsp = vfsp->vfs_next)
-			if (vfsp->vfs_dev == vp->v_rdev)
-				break;
+		vfsp = vfs_devsearch(vp->v_rdev);
 		if (vfsp == NULL)
 			return XFS_ERROR(ENOTBLK);
 	} else {
