@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.12 $"
+#ident	"$Revision: 1.13 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -10,6 +10,7 @@
 #include <sys/systm.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/cmn_err.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs_log.h"
@@ -270,10 +271,16 @@ xfs_growfs_data(
 		sbp = XFS_BUF_TO_SBP(bp);
 		*sbp = mp->m_sb;
 		/*
-		 * Don't worry about errors in writing out the alternate
-		 * superblocks.  The real work is already done and committed.
+		 * If we get an error writing out the alternate superblocks,
+		 * just issue a warning and continue.  The real work is
+		 * already done and committed.
 		 */
-		bwrite(bp);
+		if (!(error = bwrite(bp)))
+			continue;
+		else
+			cmn_err(CE_WARN,
+"filesystem %s - write error %d updating secondary superblock for ag %d\n",
+				mp->m_fsname, error, agno);
 	}
 	return 0;
 
