@@ -97,21 +97,43 @@ xfs_qm_dquot_logitem_format(
 }
 
 /*
- * pin dquot associated with the given logitem
+ * Increment the pin count of the given dquot.
+ * This value is protected by pinlock spinlock in the xQM structure.
  */
 STATIC void
 xfs_qm_dquot_logitem_pin(
 	xfs_dq_logitem_t *logitem)
 {
-	ASSERT(XFS_DQ_IS_LOCKED(logitem->qli_dquot));
-	xfs_qm_dqpin(logitem->qli_dquot);
+	int 	s;
+	xfs_dquot_t *dqp;
+	
+	dqp = logitem->qli_dquot;
+	ASSERT(XFS_DQ_IS_LOCKED(dqp));
+	s = XFS_DQ_PINLOCK(dqp);
+	dqp->q_pincount++;
+	XFS_DQ_PINUNLOCK(dqp, s);
 }
 
+/*
+ * Decrement the pin count of the given dquot, and wake up
+ * anyone in xfs_dqwait_unpin() if the count goes to 0.  The
+ * dquot must have been previously pinned with a call to xfs_dqpin().
+ */
 STATIC void
 xfs_qm_dquot_logitem_unpin(
 	xfs_dq_logitem_t *logitem)
 {
-	xfs_qm_dqunpin(logitem->qli_dquot);
+	int 	s;
+	xfs_dquot_t *dqp;
+
+	dqp = logitem->qli_dquot;
+	ASSERT(dqp->q_pincount > 0);
+	s = XFS_DQ_PINLOCK(dqp);
+	dqp->q_pincount--;
+	if (dqp->q_pincount == 0) {
+		sv_broadcast(&dqp->q_pinwait);
+	}
+	XFS_DQ_PINUNLOCK(dqp, s);
 }
 
 /*
@@ -194,44 +216,6 @@ xfs_qm_dquot_logitem_committed(
 
 
 /*
- * Increment the pin count of the given dquot.
- * This value is protected by pinlock spinlock in the xQM structure.
- */
-void
-xfs_qm_dqpin(
-	xfs_dquot_t 	*dqp)
-{
-	int 	s;
-
-	ASSERT(XFS_DQ_IS_LOCKED(dqp));
-	s = XFS_DQ_PINLOCK(dqp);
-	dqp->q_pincount++;
-	XFS_DQ_PINUNLOCK(dqp, s);
-}
-
-
-/*
- * XXX why have two _qm_ and _item_ interfaces ???
- * Decrement the pin count of the given dquot, and wake up
- * anyone in xfs_dqwait_unpin() if the count goes to 0.  The
- * dquot must have been previously pinned with a call to xfs_dqpin().
- */
-void
-xfs_qm_dqunpin(
-	xfs_dquot_t 	*dqp)
-{
-	int 	s;
-
-	ASSERT(dqp->q_pincount > 0);
-	s = XFS_DQ_PINLOCK(dqp);
-	dqp->q_pincount--;
-	if (dqp->q_pincount == 0) {
-		sv_broadcast(&dqp->q_pinwait);
-	}
-	XFS_DQ_PINUNLOCK(dqp, s);
-}
-
-/*
  * This is called to wait for the given dquot to be unpinned.
  * Most of these pin/unpin routines are plagiarized from inode code.
  */
@@ -304,7 +288,7 @@ xfs_qm_dquot_logitem_trylock(
                 if (qip->qli_bp == NULL) {
                         mp = dqp->q_mount;
                         bp = incore(mp->m_dev, dqp->q_blkno, 
-				    XFS_FSB_TO_BB(mp, 1),
+				    mp->QI_DQCHUNKLEN,
 				    INCORE_TRYLOCK);
                         if (bp != NULL) {
                                 if (bp->b_flags & B_DELWRI) {
@@ -529,11 +513,11 @@ xfs_qm_qoff_logitem_push(xfs_qoff_logitem_t *qf)
 STATIC xfs_lsn_t
 xfs_qm_qoffend_logitem_committed(xfs_qoff_logitem_t *qfe, xfs_lsn_t lsn)
 {
-	int			s;
 	xfs_qoff_logitem_t 	*qfs;
+	SPLDECL(s);
 	
 	qfs = qfe->qql_start_lip;
-	s = AIL_LOCK(qfs->qql_item.li_mountp);
+	AIL_LOCK(qfs->qql_item.li_mountp,s);
 	/*
 	 * Delete the qoff-start logitem from the AIL.
 	 * xfs_trans_delete_ail() drops the AIL lock.
