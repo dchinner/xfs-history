@@ -55,7 +55,7 @@ typedef struct xfs_btree_cur
 	}		bc_private;
 } xfs_btree_cur_t;
 
-#define	xfs_buf_to_block(buf)	((xfs_btree_block_t *)(buf->b_un.b_addr))
+#define	xfs_buf_to_block(buf)	((xfs_btree_block_t *)((buf)->b_un.b_addr))
 
 #ifdef XFSDEBUG
 void xfs_btree_check_block(xfs_btree_cur_t *, xfs_btree_block_t *, int);
