@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.56 1995/06/08 18:35:43 doucette Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.57 1995/06/12 15:40:15 tap Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -101,8 +101,7 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 #endif
 		{
                 	error = xfs_iget( XFS_VFSTOM( vfsp ), 
-					NULL, ino, XFS_ILOCK_EXCL, &ip, 0);
-
+					NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
 
 			if ( error ) {
 				ip = NULL;
@@ -110,7 +109,7 @@ xfs_get_inode(  dev_t fs_dev, xfs_ino_t ino)
 
 			if ( (ip == NULL) || (ip->i_d.di_mode == 0) ) {
 				if (ip) {
-					xfs_iunlock( ip, XFS_ILOCK_EXCL );
+					xfs_iunlock( ip, XFS_ILOCK_SHARED );
 				}
 				ip = NULL;
 			}
@@ -243,7 +242,7 @@ xfs_get_file_extents(
 	}
 
  out:
-	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	xfs_iunlock( ip, XFS_ILOCK_SHARED );
 	IRELE( ip );
 	return( error );
 }
@@ -302,7 +301,7 @@ xfs_get_file_rt(
 		error = XFS_ERROR(EFAULT);
 	}
 
-	xfs_iunlock( ip, XFS_ILOCK_EXCL );
+	xfs_iunlock( ip, XFS_ILOCK_SHARED );
 	IRELE( ip );
 	return( error );
 
