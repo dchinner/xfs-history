@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -97,8 +97,7 @@ xfs_growfs_data(
 		mrunlock(&mp->m_peraglock);
 	}
 	tp = xfs_trans_alloc(mp, XFS_TRANS_GROWFS);
-	if (error = xfs_trans_reserve(tp,
-			2 * XFS_FSB_TO_B(mp, XFS_AG_MAXLEVELS(mp)),
+	if (error = xfs_trans_reserve(tp, 2 * XFS_AG_MAXLEVELS(mp),
 			XFS_GROWDATA_LOG_RES(mp), 0, 0, 0)) {
 		xfs_trans_cancel(tp, 0);
 		return error;
