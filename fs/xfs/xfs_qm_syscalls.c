@@ -1,4 +1,4 @@
-#ident "$Revision: 1.7 $"
+#ident "$Revision: 1.8 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -8,17 +8,13 @@
 #include <sys/pfdat.h>
 #include <sys/uuid.h>
 #include <sys/capability.h>
-#include <sys/param.h>
 #include <sys/cred.h>
 #include <sys/errno.h>
-#include <sys/buf.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/proc.h>
-#include <sys/vnode.h>
 #include <sys/cmn_err.h>
 #include <sys/vfs.h>
-#include <sys/uuid.h>
 #include <sys/atomic_ops.h>
 #include <sys/systm.h>
 #include <sys/ktrace.h>
@@ -223,7 +219,7 @@ xfs_qm_scall_trunc_qfiles(
 	if (!_CAP_ABLE(CAP_QUOTA_MGT))
 		return XFS_ERROR(EPERM);
 	error = 0;
-	if ((! XFS_QM_SB_HAS_QUOTA(mp)) ||
+	if ((!XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) ||
 	    flags == 0)
 		return XFS_ERROR(EINVAL);
 
@@ -333,20 +329,21 @@ xfs_qm_scall_quotaon(
 	/*
 	 * Change superblock version (if needed) for the root filesystem
 	 */
-	if (rootfs && 
-	    (! XFS_QM_SB_HAS_QUOTA(mp))) {
+	if (rootfs && !XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, 
-			"Old superblock version %d.0, converting to %d.0\n",
-			(int) mp->m_sb.sb_versionnum,
-			(int) XFS_SB_VERSION);
+		unsigned oldv = mp->m_sb.sb_versionnum;
 #endif
 		s = XFS_SB_LOCK(mp);
-		mp->m_sb.sb_versionnum = XFS_SB_VERSION;    
+		XFS_SB_VERSION_ADDQUOTA(&mp->m_sb);
 		mp->m_sb.sb_uquotino = NULLFSINO;
 		mp->m_sb.sb_pquotino = NULLFSINO;
 		mp->m_sb.sb_qflags = 0;
 		XFS_SB_UNLOCK(mp, s);
+#ifdef DEBUG
+		cmn_err(CE_NOTE, 
+			"Old superblock version %x, converting to %x.",
+			oldv, mp->m_sb.sb_versionnum);
+#endif
 		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
 			    XFS_SB_PQUOTINO | XFS_SB_QFLAGS);
 	}
@@ -409,7 +406,7 @@ xfs_qm_scall_getqstat(
 	bzero(&out, sizeof(fs_quota_stat_t));
 
 	out.qs_version = FS_QSTAT_VERSION;
-	if (! XFS_QM_SB_HAS_QUOTA(mp)) {
+	if (!XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
 		out.qs_uquota.qfs_ino = NULLFSINO;
 		out.qs_pquota.qfs_ino = NULLFSINO;
 		goto done;

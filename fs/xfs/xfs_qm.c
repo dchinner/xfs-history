@@ -1,4 +1,4 @@
-#ident "$Revision: 1.5 $"
+#ident "$Revision: 1.6 $"
 
 #include <sys/param.h>
 #include <sys/sysinfo.h>
@@ -8,17 +8,13 @@
 #include <sys/pfdat.h>
 #include <sys/uuid.h>
 #include <sys/capability.h>
-#include <sys/param.h>
 #include <sys/errno.h>
-#include <sys/buf.h>
 #include <sys/kmem.h>
 #include <sys/debug.h>
 #include <sys/proc.h>
-#include <sys/vnode.h>
 #include <sys/cmn_err.h>
 #include <sys/cred.h>
 #include <sys/vfs.h>
-#include <sys/uuid.h>
 #include <sys/atomic_ops.h>
 #include <sys/systm.h>
 #include <sys/ktrace.h>
@@ -348,7 +344,7 @@ xfs_qm_mount_quotas(
 #ifdef ROOTFSHACK
 	/* This is a useful debugging hack, that is never normally enabled. */
 	/* if (mp->m_dev == rootdev && */
-	if (XFS_QM_SB_HAS_QUOTA(mp)) {
+	if (XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
 		mp->m_flags &= ~(XFS_MOUNT_QUOTA_MASK);
 		s = XFS_SB_LOCK(mp);
 		mp->m_sb.sb_qflags = 0;
@@ -376,7 +372,7 @@ xfs_qm_mount_quotas(
 	 * read in.
 	 */
 	if (mp->m_dev == rootdev) {
-		ASSERT(XFS_QM_SB_HAS_QUOTA(mp));
+		ASSERT(XFS_SB_VERSION_HASQUOTA(&mp->m_sb));
 		ASSERT(mp->m_sb.sb_qflags & 
 		       (XFS_MOUNT_UDQ_ACCT|XFS_MOUNT_PDQ_ACCT));
 		if (G_xqm == NULL) {
@@ -1985,7 +1981,7 @@ xfs_qm_init_quotainos(
 	/*
 	 * get the uquota and pquota inodes
 	 */
-	if (XFS_QM_SB_HAS_QUOTA(mp)) {
+	if (XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
 		if (XFS_IS_UQUOTA_ON(mp) && mp->m_sb.sb_uquotino != NULLFSINO) {
 			ASSERT(mp->m_sb.sb_uquotino > 0);
 			if (error = xfs_iget(mp, NULL, mp->m_sb.sb_uquotino, 
@@ -2001,8 +1997,8 @@ xfs_qm_init_quotainos(
 				return XFS_ERROR(error);
 			}
 		}
-	} 
-	
+	}
+
 	/*
 	 * Create the two inodes, if they don't exist already. The changes
 	 * made above will get added to a transaction and logged in one of
@@ -2030,22 +2026,23 @@ xfs_qm_init_quotainos(
 	 * (eg. sb_fdblocks) to the ondisk superblock, and the superblock
 	 * update mechanism won't appreciate that.
 	 */
-	if (XFS_IS_QUOTA_ON(mp) &&
-	    (! XFS_QM_SB_HAS_QUOTA(mp))) {
+	if (XFS_IS_QUOTA_ON(mp) && !XFS_SB_VERSION_HASQUOTA(&mp->m_sb)) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE, 
-			"Old superblock version %d.0, converting to %d.0\n",
-			(int) mp->m_sb.sb_versionnum,
-			(int) XFS_SB_VERSION);
+		unsigned oldv = mp->m_sb.sb_versionnum;
 #endif
 		s = XFS_SB_LOCK(mp);
-		mp->m_sb.sb_versionnum = XFS_SB_VERSION;    
+		XFS_SB_VERSION_ADDQUOTA(&mp->m_sb);
 		mp->m_sb.sb_uquotino = NULLFSINO;
 		mp->m_sb.sb_pquotino = NULLFSINO;
 
 		/* qflags will get updated _after_ quotacheck */
 		mp->m_sb.sb_qflags = 0;
 		XFS_SB_UNLOCK(mp, s);
+#ifdef DEBUG
+		cmn_err(CE_NOTE, 
+			"Old superblock version %x, converting to %x.",
+			oldv, mp->m_sb.sb_versionnum);
+#endif
 		sbflags |= (XFS_SB_VERSIONNUM | XFS_SB_UQUOTINO |
 			    XFS_SB_PQUOTINO | XFS_SB_QFLAGS);
 	}
