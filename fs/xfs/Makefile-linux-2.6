@@ -171,7 +171,7 @@ xfs.o: $(xfs-objs) $(patsubst %,_modsubdir_%,$(subdir-m))
   endif
 endif
 
-include $(TOPDIR)/Rules.make.new
+include $(TOPDIR)/Rules.make
 
 ifneq ($(wildcard .hdepend),)
 include .hdepend

@@ -74,4 +74,4 @@ xfs_support.o: $(xfs_support-objs)
   endif
 endif
 
-include $(TOPDIR)/Rules.make.new
+include $(TOPDIR)/Rules.make
