@@ -242,7 +242,7 @@ typedef struct xfs_dirent32 {	/* Irix5 view of dirent structure */
 #define ENOATTR         ENODATA 	/* Attribute not found */
 #endif
 
-#define SYNCHRONIZE()	((void)0)
+#define SYNCHRONIZE()	barrier()
 #define lbolt		jiffies
 #define rootdev		ROOT_DEV
 #define __return_address __builtin_return_address(0)
