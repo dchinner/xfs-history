@@ -216,8 +216,8 @@ xfs_dir_split(struct xfs_dir_state *state)
 	 */
 	node = (struct xfs_dir_intnode *)addblk->bp->b_un.b_addr;
 	node->hdr.info.back = oldblk->blkno;
-	xfs_trans_log_buf(state->trans, addblk->bp, 0,
-					sizeof(node->hdr.info) - 1);
+	xfs_trans_log_buf(state->trans, addblk->bp,
+	    XFS_DIR_LOGRANGE(node, &node->hdr.info, sizeof(node->hdr.info)));
 
 #ifdef XFSDIRDEBUG
 	if (xfsdir_debug && ((xfsdir_debug_cnt % xfsdir_debug) == 0))
@@ -425,6 +425,8 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 		tmp  = hdr->count - index;
 		tmp *= sizeof(struct xfs_dir_leaf_entry);
 		bcopy((char *)entry, (char *)(entry+1), tmp);
+		xfs_trans_log_buf(trans, bp,
+		    XFS_DIR_LOGRANGE(leaf, entry, tmp + sizeof(*entry)));
 	}
 	hdr->count++;
 
@@ -440,6 +442,8 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 	entry->nameidx = map->base + map->size;
 	entry->hashval = args->hashval;
 	entry->namelen = args->namelen;
+	xfs_trans_log_buf(trans, bp,
+	    XFS_DIR_LOGRANGE(leaf, entry, sizeof(*entry)));
 
 	/*
 	 * Copy the string and inode number into the new space.
@@ -447,6 +451,8 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 	namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
 	bcopy((char *)&args->inumber, namest->inumber, sizeof(xfs_ino_t));
 	bcopy(args->name, namest->name, args->namelen);
+	xfs_trans_log_buf(trans, bp,
+	    XFS_DIR_LOGRANGE(leaf, namest, XFS_DIR_LEAF_ENTSIZE_BYENTRY(entry)));
 
 	/*
 	 * Update the control info for this leaf node
@@ -464,8 +470,7 @@ xfs_dir_leaf_add_work(xfs_trans_t *trans, buf_t *bp,
 		}
 	}
 	hdr->namebytes += args->namelen;
-
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
+	xfs_trans_log_buf(trans, bp, XFS_DIR_LOGRANGE(leaf, hdr, sizeof(*hdr)));
 }
 
 /*
@@ -920,6 +925,7 @@ xfs_dir_node_add(struct xfs_dir_state *state,
 	/*
 	 * We may need to make some room before we insert the new node.
 	 */
+	tmp = 0;
 	btree = &node->btree[ oldblk->index ];
 	if (oldblk->index < node->hdr.count) {
 		tmp = (node->hdr.count - oldblk->index) * sizeof(*btree);
@@ -927,14 +933,16 @@ xfs_dir_node_add(struct xfs_dir_state *state,
 	}
 	btree->hashval = newblk->hashval;
 	btree->before = newblk->blkno;
+	xfs_trans_log_buf(state->trans, oldblk->bp,
+	    XFS_DIR_LOGRANGE(node, btree, tmp + sizeof(*btree)));
 	node->hdr.count++;
+	xfs_trans_log_buf(state->trans, oldblk->bp,
+	    XFS_DIR_LOGRANGE(node, &node->hdr, sizeof(node->hdr)));
 
 	/*
 	 * Copy the last hash value from the oldblk to propagate upwards.
 	 */
 	oldblk->hashval = node->btree[ node->hdr.count-1 ].hashval;
-
-	xfs_trans_log_buf(state->trans, oldblk->bp, 0, state->blocksize - 1);
 }
 
 /*========================================================================
@@ -1226,9 +1234,7 @@ xfs_dir_fixhashpath(struct xfs_dir_state *state,
 			break;
 		blk->hashval = btree->hashval = lasthash;
 		xfs_trans_log_buf(state->trans, blk->bp,
-					 XFS_DIR_LOGSTART(node, *btree),
-					 XFS_DIR_LOGSTART(node, *btree) +
-					 XFS_DIR_LOGSIZE(btree->hashval) - 1);
+		    XFS_DIR_LOGRANGE(node, btree, sizeof(*btree)));
 
 		lasthash = node->btree[ node->hdr.count-1 ].hashval;
 	}
@@ -1246,6 +1252,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	struct xfs_dir_leaf_hdr *hdr;
 	struct xfs_dir_leaf_map *map;
 	struct xfs_dir_leaf_entry *entry;
+	struct xfs_dir_leaf_name *namest;
 	int before, after, smallest, entsize;
 	int tablesize, tmp, i;
 	xfs_mount_t *mp;
@@ -1333,11 +1340,16 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	/*
 	 * Compress the remaining entries and zero out the removed stuff.
 	 */
+	namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+	bzero((char *)namest, entsize);
+	xfs_trans_log_buf(trans, bp, XFS_DIR_LOGRANGE(leaf, namest, entsize));
+
 	hdr->namebytes -= entry->namelen;
-	bzero((char *)XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx), entsize);
 	tmp = (hdr->count - index) * sizeof(struct xfs_dir_leaf_entry);
 	bcopy((char *)(entry+1), (char *)entry, tmp);
 	hdr->count--;
+	xfs_trans_log_buf(trans, bp,
+	    XFS_DIR_LOGRANGE(leaf, entry, tmp + sizeof(*entry)));
 	entry = &leaf->leaves[hdr->count];
 	bzero((char *)entry, sizeof(struct xfs_dir_leaf_entry));
 
@@ -1362,8 +1374,7 @@ xfs_dir_leaf_remove(xfs_trans_t *trans, buf_t *bp, int index)
 	} else {
 		hdr->holes = 1;		/* mark as needing compaction */
 	}
-
-	xfs_trans_log_buf(trans, bp, 0, XFS_LBSIZE(mp) - 1);
+	xfs_trans_log_buf(trans, bp, XFS_DIR_LOGRANGE(leaf, hdr, sizeof(*hdr)));
 
 	/*
 	 * Check if leaf is less than 50% full, caller may want to
@@ -1499,18 +1510,22 @@ xfs_dir_node_remove(struct xfs_dir_state *state,
 		tmp  = node->hdr.count - drop_blk->index - 1;
 		tmp *= sizeof(struct xfs_dir_node_entry);
 		bcopy((char *)(btree+1), (char *)btree, tmp);
+		xfs_trans_log_buf(state->trans, drop_blk->bp,
+		    XFS_DIR_LOGRANGE(node, btree, tmp));
 		btree = &node->btree[ node->hdr.count-1 ];
 	}
 	bzero((char *)btree, sizeof(struct xfs_dir_node_entry));
+	xfs_trans_log_buf(state->trans, drop_blk->bp,
+	    XFS_DIR_LOGRANGE(node, btree, sizeof(*btree)));
 	node->hdr.count--;
+	xfs_trans_log_buf(state->trans, drop_blk->bp,
+	    XFS_DIR_LOGRANGE(node, &node->hdr, sizeof(node->hdr)));
 
 	/*
 	 * Copy the last hash value from the block to propagate upwards.
 	 */
 	btree--;
 	drop_blk->hashval = btree->hashval;
-
-	xfs_trans_log_buf(state->trans, drop_blk->bp, 0, state->blocksize - 1);
 }
 
 /*
