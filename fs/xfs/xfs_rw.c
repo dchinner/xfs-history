@@ -1732,7 +1732,8 @@ xfs_strat_read(
 				data_len = XFS_FSB_TO_B(mp, imap_blocks);
 				xfs_overlap_bp(bp, rbp, data_offset,
 					       data_len);
-				
+				rbp->b_blkno = XFS_FSB_TO_DADDR(mp,
+						imap[x].br_startblock);
 				rbp->b_flags |= B_READ;
 				rbp->b_flags &= ~B_ASYNC;
 
