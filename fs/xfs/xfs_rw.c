@@ -703,13 +703,15 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	xfs_inode_t	*ip;
 	int		iplist_index;
 	xfs_inode_t	**iplist;
+	int		purge_count;
 
 	if ((xfs_refcache == NULL) || (xfs_refcache_count == 0)) {
 		return;
 	}
 
 	iplist_index = 0;
-	iplist = (xfs_inode_t **)kmem_zalloc(xfs_params.xfs_un.refcache_purge * 
+	purge_count = xfs_params.xfs_un.refcache_purge;
+	iplist = (xfs_inode_t **)kmem_zalloc(purge_count * 
 				          sizeof(xfs_inode_t *), KM_SLEEP);
 
 	spin_lock(&xfs_refcache_lock);
@@ -722,7 +724,7 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 	 * forward as we go so that we are sure to eventually clear
 	 * out the entire cache when the system goes idle.
 	 */
-	for (i = 0; i < xfs_params.xfs_un.refcache_purge; i++) {
+	for (i = 0; i < purge_count; i++) {
 		ip = xfs_refcache[xfs_refcache_index];
 		if (ip != NULL) {
 			xfs_refcache[xfs_refcache_index] = NULL;
@@ -762,7 +764,7 @@ xfs_refcache_purge_some(xfs_mount_t *mp)
 		VN_RELE(XFS_ITOV(iplist[i]));
 	}
 
-	kmem_free(iplist, xfs_params.xfs_un.refcache_purge *
+	kmem_free(iplist, purge_count *
 			  sizeof(xfs_inode_t *));
 }
 
