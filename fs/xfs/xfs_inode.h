@@ -265,6 +265,8 @@ void		xfs_ireclaim(xfs_inode_t *);
 /*
  * xfs_inode.c prototypes.
  */
+buf_t		*xfs_inotobp(xfs_mount_t *, xfs_trans_t *, xfs_ino_t,
+			     xfs_dinode_t **);
 xfs_inode_t	*xfs_iread(xfs_mount_t *, xfs_trans_t *, xfs_ino_t);
 void		xfs_iread_extents(xfs_trans_t *, xfs_inode_t *);
 xfs_inode_t	*xfs_ialloc(xfs_trans_t	*, xfs_inode_t *, mode_t, ushort,
