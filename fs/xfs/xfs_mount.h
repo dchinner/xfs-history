@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.96 $"
+#ident	"$Revision: 1.97 $"
 
 #include <sys/buf.h>	/* for buftarg_t */
 struct cred;
@@ -169,6 +169,8 @@ typedef struct xfs_mount {
                                                    cell logic */
 #define XFS_MOUNT_NORECOVERY   	0x00000400      /* no recovery - dirty fs */
 #define XFS_MOUNT_SHARED    	0x00000800      /* shared mount */
+#define XFS_MOUNT_DFLT_IOSIZE  	0x00001000      /* set default i/o size */
+#define XFS_MOUNT_OSYNCISDSYNC 	0x00002000      /* treat o_sync like o_dsync */
 
 #define XFS_FORCED_SHUTDOWN(mp)	((mp)->m_flags & XFS_MOUNT_FS_SHUTDOWN)
 
@@ -181,20 +183,22 @@ typedef struct xfs_mount {
 #define	XFS_WRITEIO_LOG_LARGE	16
 
 /*
- * max and min values for UIO defined I/O sizes
+ * max and min values for UIO and mount-option defined I/O sizes
  */
 #define	XFS_UIO_MAX_WRITEIO_LOG	16
 #define	XFS_UIO_MIN_WRITEIO_LOG	13
 #define	XFS_UIO_MAX_READIO_LOG	16
 #define	XFS_UIO_MIN_READIO_LOG	13
 
+#define XFS_MAX_IO_LOG		16	/* 64K */
+#define XFS_MIN_IO_LOG		13	/* 8K */
+
 /*
  * Synchronous read and write sizes.  This should be
- * better for NFS.
+ * better for NFSv2 wsync filesystems.
  */
-#define	XFS_WSYNC_READIO_LOG	15
-#define	XFS_WSYNC_WRITEIO_LOG	14
-
+#define	XFS_WSYNC_READIO_LOG	15	/* 32K */
+#define	XFS_WSYNC_WRITEIO_LOG	14	/* 16K */
 
 /* 
  * Flags sent to xfs_force_shutdown.
