@@ -1,4 +1,4 @@
-#ident "$Revision: 1.133 $"
+#ident "$Revision: 1.134 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -2362,8 +2362,11 @@ retry:
 		 * We'll have update the timestamp above, so here
 		 * we use a synchronous transaction to log the inode.
 		 * It's not fast, but it's necessary.
+		 *
+		 * If the vnode is a swap vnode, then don't do anything
+		 * which could require allocating memory.
 		 */
-		if (ioflag & IO_SYNC) {
+		if ((ioflag & IO_SYNC) && !(vp->v_flag & VISSWAP)) {
 			mp = ip->i_mount;
 			tp = xfs_trans_alloc(mp, XFS_TRANS_WRITE_SYNC);
 			if (error = xfs_trans_reserve(tp, 0,
@@ -2381,7 +2384,7 @@ retry:
 			error = xfs_trans_commit(tp, 0);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		}
-		if (ioflag & IO_DSYNC) {
+		if ((ioflag & IO_DSYNC) && !(vp->v_flag & VISSWAP)) {
 		    mp = ip->i_mount;
 		    xfs_log_force(mp, (xfs_lsn_t)0,
 				  XFS_LOG_FORCE | XFS_LOG_SYNC );
