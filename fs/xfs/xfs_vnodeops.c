@@ -195,6 +195,12 @@ xfs_getattr(
 
 		if (!(ip->i_d.di_flags & XFS_DIFLAG_REALTIME)) {
 
+#if 0
+			/* Large block sizes confuse various
+			 * user space programs, so letting the
+			 * stripe size through is not a good
+			 * idea for now.
+			 */
                         vap->va_blksize = mp->m_swidth ?
                                 /*
                                  * If the underlying volume is a stripe, then
@@ -211,6 +217,17 @@ xfs_getattr(
                                 (1 << (int)MAX(mp->m_readio_log,
                                                mp->m_writeio_log));
 
+#else
+                        vap->va_blksize = 
+                                /*
+                                 * Return the largest of the preferred buffer
+                                 * sizes since doing small I/Os into larger
+                                 * buffers causes buffers to be decommissioned.
+                                 * The value returned is in bytes.
+                                 */
+                                1 << (int)MAX(mp->m_readio_log,
+                                               mp->m_writeio_log);
+#endif
 		} else {
 
                         /*
