@@ -1,4 +1,4 @@
-#ident "$Revision: 1.48 $"
+#ident "$Revision: 1.49 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -149,8 +149,8 @@ xfs_inode_item_size(
 			~(XFS_ILOG_ADATA | XFS_ILOG_ABROOT);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_AEXT) &&
 		    (ip->i_d.di_anextents > 0) &&
-		    (ip->i_af.if_bytes > 0)) {
-			ASSERT(ip->i_af.if_u1.if_extents != NULL);
+		    (ip->i_afp->if_bytes > 0)) {
+			ASSERT(ip->i_afp->if_u1.if_extents != NULL);
 			nvecs++;
 		} else {
 			iip->ili_format.ilf_fields &= ~XFS_ILOG_AEXT;
@@ -161,8 +161,8 @@ xfs_inode_item_size(
 		iip->ili_format.ilf_fields &=
 			~(XFS_ILOG_ADATA | XFS_ILOG_AEXT);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_ABROOT) &&
-		    (ip->i_af.if_broot_bytes > 0)) {
-			ASSERT(ip->i_af.if_broot != NULL);
+		    (ip->i_afp->if_broot_bytes > 0)) {
+			ASSERT(ip->i_afp->if_broot != NULL);
 			nvecs++;
 		} else {
 			iip->ili_format.ilf_fields &= ~XFS_ILOG_ABROOT;
@@ -173,8 +173,8 @@ xfs_inode_item_size(
 		iip->ili_format.ilf_fields &=
 			~(XFS_ILOG_AEXT | XFS_ILOG_ABROOT);
 		if ((iip->ili_format.ilf_fields & XFS_ILOG_ADATA) &&
-		    (ip->i_af.if_bytes > 0)) {
-			ASSERT(ip->i_af.if_u1.if_data != NULL);
+		    (ip->i_afp->if_bytes > 0)) {
+			ASSERT(ip->i_afp->if_u1.if_data != NULL);
 			nvecs++;
 		} else {
 			iip->ili_format.ilf_fields &= ~XFS_ILOG_ADATA;
@@ -345,11 +345,11 @@ xfs_inode_item_format(
 		ASSERT(!(iip->ili_format.ilf_fields &
 			 (XFS_ILOG_ADATA | XFS_ILOG_ABROOT)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_AEXT) {
-			ASSERT(ip->i_af.if_bytes > 0);
-			ASSERT(ip->i_af.if_u1.if_extents != NULL);
+			ASSERT(ip->i_afp->if_bytes > 0);
+			ASSERT(ip->i_afp->if_u1.if_extents != NULL);
 			ASSERT(ip->i_d.di_anextents > 0);
 #ifdef DEBUG
-			nrecs = ip->i_af.if_bytes / sizeof(xfs_bmbt_rec_t);
+			nrecs = ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t);
 #endif
 			ASSERT(nrecs > 0);
 			ASSERT(nrecs == ip->i_d.di_anextents);
@@ -357,8 +357,8 @@ xfs_inode_item_format(
 			 * There are not delayed allocation extents
 			 * for attributes, so just point at the array.
 			 */
-			vecp->i_addr = (char *)(ip->i_af.if_u1.if_extents);
-			vecp->i_len = ip->i_af.if_bytes;
+			vecp->i_addr = (char *)(ip->i_afp->if_u1.if_extents);
+			vecp->i_len = ip->i_afp->if_bytes;
 			iip->ili_format.ilf_asize = vecp->i_len;
 			vecp++;
 			nvecs++;
@@ -369,13 +369,13 @@ xfs_inode_item_format(
 		ASSERT(!(iip->ili_format.ilf_fields &
 			 (XFS_ILOG_ADATA | XFS_ILOG_AEXT)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_ABROOT) {
-			ASSERT(ip->i_af.if_broot_bytes > 0);
-			ASSERT(ip->i_af.if_broot != NULL);
-			vecp->i_addr = (caddr_t)ip->i_af.if_broot;
-			vecp->i_len = ip->i_af.if_broot_bytes;
+			ASSERT(ip->i_afp->if_broot_bytes > 0);
+			ASSERT(ip->i_afp->if_broot != NULL);
+			vecp->i_addr = (caddr_t)ip->i_afp->if_broot;
+			vecp->i_len = ip->i_afp->if_broot_bytes;
 			vecp++;
 			nvecs++;
-			iip->ili_format.ilf_asize = ip->i_af.if_broot_bytes;
+			iip->ili_format.ilf_asize = ip->i_afp->if_broot_bytes;
 		}
 		break;
 
@@ -383,18 +383,18 @@ xfs_inode_item_format(
 		ASSERT(!(iip->ili_format.ilf_fields &
 			 (XFS_ILOG_ABROOT | XFS_ILOG_AEXT)));
 		if (iip->ili_format.ilf_fields & XFS_ILOG_ADATA) {
-			ASSERT(ip->i_af.if_bytes > 0);
-			ASSERT(ip->i_af.if_u1.if_data != NULL);
+			ASSERT(ip->i_afp->if_bytes > 0);
+			ASSERT(ip->i_afp->if_u1.if_data != NULL);
 
-			vecp->i_addr = (caddr_t)ip->i_af.if_u1.if_data;
+			vecp->i_addr = (caddr_t)ip->i_afp->if_u1.if_data;
 			/*
 			 * Round i_bytes up to a word boundary.
 			 * The underlying memory is guaranteed to
 			 * to be there by xfs_idata_realloc().
 			 */
-			data_bytes = roundup(ip->i_af.if_bytes, 4);
-			ASSERT((ip->i_af.if_real_bytes == 0) ||
-			       (ip->i_af.if_real_bytes == data_bytes));
+			data_bytes = roundup(ip->i_afp->if_bytes, 4);
+			ASSERT((ip->i_afp->if_real_bytes == 0) ||
+			       (ip->i_afp->if_real_bytes == data_bytes));
 			vecp->i_len = data_bytes;
 			vecp++;
 			nvecs++;

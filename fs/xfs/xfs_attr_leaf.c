@@ -84,16 +84,16 @@ xfs_attr_shortform_create(xfs_trans_t *trans, xfs_inode_t *dp)
 {
 	xfs_attr_sf_hdr_t *hdr;
 
-	ASSERT(dp->i_af.if_bytes == 0);
+	ASSERT(dp->i_afp->if_bytes == 0);
 	if (dp->i_d.di_aformat == XFS_DINODE_FMT_EXTENTS) {
-		dp->i_af.if_flags &= ~XFS_IFEXTENTS;	/* just in case */
+		dp->i_afp->if_flags &= ~XFS_IFEXTENTS;	/* just in case */
 		dp->i_d.di_aformat = XFS_DINODE_FMT_LOCAL;
 		xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE);
-		dp->i_af.if_flags |= XFS_IFINLINE;
+		dp->i_afp->if_flags |= XFS_IFINLINE;
 	}
-	ASSERT(dp->i_af.if_flags & XFS_IFINLINE);
+	ASSERT(dp->i_afp->if_flags & XFS_IFINLINE);
 	xfs_idata_realloc(dp, sizeof(*hdr), XFS_ATTR_FORK);
-	hdr = (xfs_attr_sf_hdr_t *)dp->i_af.if_u1.if_data;
+	hdr = (xfs_attr_sf_hdr_t *)dp->i_afp->if_u1.if_data;
 	hdr->count = 0;
 	hdr->totsize = sizeof(*hdr);
 	xfs_trans_log_inode(trans, dp, XFS_ILOG_CORE | XFS_ILOG_ADATA);
@@ -113,8 +113,8 @@ xfs_attr_shortform_add(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_inode_t *dp;
 
 	dp = args->dp;
-	ASSERT(dp->i_af.if_flags & XFS_IFINLINE);
-	sf = (xfs_attr_shortform_t *)dp->i_af.if_u1.if_data;
+	ASSERT(dp->i_afp->if_flags & XFS_IFINLINE);
+	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
 	sfe = &sf->list[0];
 	for (i = 0; i < sf->hdr.count; sfe = XFS_ATTR_SF_NEXTENTRY(sfe), i++) {
 		if (sfe->namelen != args->namelen)
@@ -130,7 +130,7 @@ xfs_attr_shortform_add(xfs_trans_t *trans, xfs_da_args_t *args)
 	offset = (char *)sfe - (char *)sf;
 	size = XFS_ATTR_SF_ENTSIZE_BYNAME(args->namelen, args->valuelen);
 	xfs_idata_realloc(dp, size, XFS_ATTR_FORK);
-	sf = (xfs_attr_shortform_t *)dp->i_af.if_u1.if_data;
+	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
 	sfe = (xfs_attr_sf_entry_t *)((char *)sf + offset);
 
 	sfe->namelen = args->namelen;
@@ -157,9 +157,9 @@ xfs_attr_shortform_removename(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_inode_t *dp;
 
 	dp = args->dp;
-	ASSERT(dp->i_af.if_flags & XFS_IFINLINE);
+	ASSERT(dp->i_afp->if_flags & XFS_IFINLINE);
 	base = sizeof(xfs_attr_sf_hdr_t);
-	sf = (xfs_attr_shortform_t *)dp->i_af.if_u1.if_data;
+	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
 	sfe = &sf->list[0];
 	for (i = 0; i < sf->hdr.count; sfe = XFS_ATTR_SF_NEXTENTRY(sfe),
 					base += size, i++) {
@@ -202,8 +202,8 @@ xfs_attr_shortform_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_inode_t *dp;
 
 	dp = args->dp;
-	ASSERT(dp->i_af.if_flags & XFS_IFINLINE);
-	sf = (xfs_attr_shortform_t *)dp->i_af.if_u1.if_data;
+	ASSERT(dp->i_afp->if_flags & XFS_IFINLINE);
+	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
 	sfe = &sf->list[0];
 	for (i = 0; i < sf->hdr.count; sfe = XFS_ATTR_SF_NEXTENTRY(sfe), i++) {
 		if (sfe->namelen != args->namelen)
@@ -232,7 +232,7 @@ xfs_attr_shortform_getvalue(xfs_trans_t *trans, xfs_da_args_t *args)
 
 	dp = args->dp;
 	ASSERT(XFS_IFORK_FORMAT(dp, XFS_ATTR_FORK) == XFS_IFINLINE);
-	sf = (xfs_attr_shortform_t *)dp->i_af.if_u1.if_data;
+	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
 	sfe = &sf->list[0];
 	for (i = 0; i < sf->hdr.count; sfe = XFS_ATTR_SF_NEXTENTRY(sfe), i++) {
 		if (sfe->namelen != args->namelen)
@@ -265,18 +265,18 @@ xfs_attr_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 	buf_t *bp;
 
 	dp = iargs->dp;
-	sf = (xfs_attr_shortform_t *)dp->i_af.if_u1.if_data;
+	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
 	size = sf->hdr.totsize;
 	tmpbuffer = kmem_alloc(size, KM_SLEEP);
 	ASSERT(tmpbuffer != NULL);
-	bcopy(dp->i_af.if_u1.if_data, tmpbuffer, size);
+	bcopy(dp->i_afp->if_u1.if_data, tmpbuffer, size);
 	sf = (xfs_attr_shortform_t *)tmpbuffer;
 
 	xfs_idata_realloc(dp, -size, XFS_ATTR_FORK);
 	retval = xfs_da_grow_inode(trans, iargs, 1, &blkno);
 	if (retval) {
 		xfs_idata_realloc(dp, size, XFS_ATTR_FORK);	/* try to put */
-		bcopy(tmpbuffer, dp->i_af.if_u1.if_data, size);	/* it back */
+		bcopy(tmpbuffer, dp->i_afp->if_u1.if_data, size);	/* it back */
 		goto out;
 	}
 
@@ -287,7 +287,7 @@ xfs_attr_shortform_to_leaf(xfs_trans_t *trans, xfs_da_args_t *iargs)
 		if (error)
 			goto out;
 		xfs_idata_realloc(dp, size, XFS_ATTR_FORK);	/* try to put */
-		bcopy(tmpbuffer, dp->i_af.if_u1.if_data, size);	/* it back */
+		bcopy(tmpbuffer, dp->i_afp->if_u1.if_data, size);	/* it back */
 		goto out;
 	}
 
@@ -330,7 +330,7 @@ xfs_attr_shortform_list(xfs_inode_t *dp, attrlist_t *alist, int flags,
 	xfs_attr_sf_entry_t *sfe;
 	int i;
 
-	sf = (xfs_attr_shortform_t *)dp->i_af.if_u1.if_data;
+	sf = (xfs_attr_shortform_t *)dp->i_afp->if_u1.if_data;
 	if (sf->hdr.count == 0)
 		return(0);
 	sfe = &sf->list[0];

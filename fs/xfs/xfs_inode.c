@@ -1,4 +1,4 @@
-#ident "$Revision: 1.153 $"
+#ident "$Revision: 1.154 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -57,7 +57,7 @@
 #include "sim.h"
 #endif
 
-
+zone_t *xfs_ifork_zone;
 zone_t *xfs_inode_zone;
 
 /*
@@ -375,7 +375,9 @@ xfs_iformat(
 	}
 	if (!XFS_DFORK_Q(dip))
 		return;
-	ip->i_af.if_ext_max =
+	ASSERT(ip->i_afp == NULL);
+	ip->i_afp = kmem_zone_zalloc(xfs_ifork_zone, KM_SLEEP);
+	ip->i_afp->if_ext_max =
 		XFS_IFORK_ASIZE(ip) / sizeof(xfs_bmbt_rec_t);
 	switch (dip->di_core.di_aformat) {
 	case XFS_DINODE_FMT_LOCAL:
@@ -389,6 +391,8 @@ xfs_iformat(
 	case XFS_DINODE_FMT_BTREE:
 		xfs_iformat_btree(ip, dip, XFS_ATTR_FORK);
 		break;
+	default:
+		ASSERT(0);
 	}
 }
 
@@ -828,9 +832,6 @@ xfs_ialloc(
 	 */
 	ip->i_d.di_aformat = XFS_DINODE_FMT_EXTENTS;
 	ip->i_d.di_anextents = 0;
-	ip->i_af.if_flags = XFS_IFEXTENTS;
-	ip->i_af.if_bytes = ip->i_af.if_real_bytes = 0;
-	ip->i_af.if_u1.if_extents = NULL;
 
 	/*
 	 * Log the new values stuffed into the inode.
@@ -2249,7 +2250,10 @@ xfs_idestroy(
 		xfs_idestroy_fork(ip, XFS_DATA_FORK);
 		break;
 	}
-	xfs_idestroy_fork(ip, XFS_ATTR_FORK);
+	if (ip->i_afp) {
+		xfs_idestroy_fork(ip, XFS_ATTR_FORK);
+		kmem_zone_free(xfs_ifork_zone, ip->i_afp);
+	}
 #ifdef NOTYET
 	if (ip->i_range_lock.r_sleep != NULL) {
 		freesema(ip->i_range_lock.r_sleep);

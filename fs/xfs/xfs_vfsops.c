@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.98 $"
+#ident  "$Revision: 1.100 $"
 
 #include <strings.h>
 #include <limits.h>
@@ -293,6 +293,7 @@ xfs_init(
 	xfs_efi_zone = kmem_zone_init((sizeof(xfs_efi_log_item_t) +
 				       (15 * sizeof(xfs_extent_t))),
 				      "xfs_efi_item");
+	xfs_ifork_zone = kmem_zone_init(sizeof(xfs_ifork_t), "xfs_ifork");
 
 	/*
 	 * Allocate global trace buffers.

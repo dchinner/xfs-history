@@ -204,7 +204,7 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 	/*
 	 * Decide on what work routines to call.
 	 */
-	if (dp->i_af.if_bytes == 0) {
+	if (dp->i_afp->if_bytes == 0) {
 		(void)xfs_attr_shortform_create(trans, dp);
 	}
 	if (dp->i_d.di_aformat == XFS_DINODE_FMT_LOCAL) {

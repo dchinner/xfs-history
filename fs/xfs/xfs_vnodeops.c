@@ -1,4 +1,4 @@
-#ident "$Revision: 1.181 $"
+#ident "$Revision: 1.184 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -493,8 +493,8 @@ xfs_getattr(
 			ip->i_df.if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_nextents;
 		vap->va_uuid = ip->i_d.di_uuid;
-		vap->va_anextents = (ip->i_af.if_flags & XFS_IFEXTENTS) ?
-			ip->i_af.if_bytes / sizeof(xfs_bmbt_rec_t) :
+		vap->va_anextents = (ip->i_afp->if_flags & XFS_IFEXTENTS) ?
+			ip->i_afp->if_bytes / sizeof(xfs_bmbt_rec_t) :
 			ip->i_d.di_anextents;
 	}
 

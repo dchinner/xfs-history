@@ -1,7 +1,7 @@
 #ifndef	_XFS_INODE_H
 #define	_XFS_INODE_H
 
-#ident "$Revision: 1.86 $"
+#ident "$Revision: 1.88 $"
 
 struct buf;
 struct cred;
@@ -146,7 +146,7 @@ typedef struct xfs_inode {
 
 	/* Extent information. */
 	xfs_ifork_t		i_df;		/* data fork */
-	xfs_ifork_t		i_af;		/* attribute fork */
+	xfs_ifork_t		*i_afp;		/* attribute fork pointer */
 
 	/* DMI state */
 	unsigned int		i_dmevents;	/* events enabled on file */
@@ -167,8 +167,7 @@ typedef struct xfs_inode {
 /*
  * Fork handling.
  */
-/* This knows that the data fork is first... */
-#define	XFS_IFORK_PTR(ip,w)		(&(ip)->i_df + (w))
+#define	XFS_IFORK_PTR(ip,w)   ((w) == XFS_DATA_FORK ? &(ip)->i_df : (ip)->i_afp)
 #define	XFS_IFORK_Q(ip)			XFS_CFORK_Q(&(ip)->i_d)
 #define	XFS_IFORK_DSIZE(ip)		XFS_CFORK_DSIZE(&ip->i_d, ip->i_mount)
 #define	XFS_IFORK_ASIZE(ip)		XFS_CFORK_ASIZE(&ip->i_d, ip->i_mount)
@@ -356,6 +355,7 @@ void		xfs_inobp_check(struct xfs_mount *, struct buf *);
 int		xfs_fast_fid(struct vnode *, xfs_fid_t *);
 
 extern int		xfs_do_fast_fid;
+extern struct zone	*xfs_ifork_zone;
 extern struct zone	*xfs_inode_zone;
 
 #endif	/* _XFS_INODE_H */

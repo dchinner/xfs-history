@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_ATTR_SF_H
 #define	_FS_XFS_ATTR_SF_H
 
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 /*
  * xfs_attr_sf.h
@@ -40,6 +40,6 @@ typedef struct xfs_attr_sf_entry xfs_attr_sf_entry_t;
 	((xfs_attr_sf_entry_t *) \
 		((char *)(SFEP) + XFS_ATTR_SF_ENTSIZE(SFEP)))
 #define XFS_ATTR_SF_TOTSIZE(DP)			/* total space in use */ \
-	(((xfs_attr_shortform_t *)((DP)->i_af.if_u1.if_data))->hdr.totsize)
+	(((xfs_attr_shortform_t *)((DP)->i_afp->if_u1.if_data))->hdr.totsize)
 
 #endif	/* !FS_XFS_ATTR_SF_H */

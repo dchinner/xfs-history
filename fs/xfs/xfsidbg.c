@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.16 $"
+#ident	"$Revision: 1.17 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -1226,7 +1226,12 @@ xfs_xnode_fork(char *name, xfs_ifork_t *f)
 	};
 	int *p;
 
-	qprintf("%s fork\n", name);
+	qprintf("%s fork", name);
+	if (f == NULL) {
+		qprintf(" empty\n");
+		return;
+	} else
+		qprintf("\n");
 	qprintf(" bytes %s ", xfs_fmtsize(f->if_bytes));
 	qprintf("real_bytes %s lastex 0x%x u1:%s 0x%x\n",
 		xfs_fmtsize(f->if_real_bytes), f->if_lastex,
@@ -1709,7 +1714,8 @@ idbg_xbroot(xfs_inode_t *ip)
 void
 idbg_xbroota(xfs_inode_t *ip)
 {
-	xfs_broot(ip, &ip->i_af);
+	if (ip->i_afp)
+		xfs_broot(ip, ip->i_afp);
 }
 
 /* 
@@ -2703,7 +2709,7 @@ idbg_xnode(xfs_inode_t *ip)
 		ip->i_queued_bufs,
 		ip->i_delayed_blks);
 	xfs_xnode_fork("data", &ip->i_df);
-	xfs_xnode_fork("attr", &ip->i_af);
+	xfs_xnode_fork("attr", ip->i_afp);
 	qprintf("dmevents 0x%x\n", ip->i_dmevents);
 	xfs_prdinode_core(&ip->i_d);
 }
