@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.135 $"
+#ident	"$Revision: 1.136 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -3345,6 +3345,8 @@ xfs_getbmap(
 	xfs_mount_t		*mp;		/* file system mount point */
 	int			nex;		/* # of extents can do */
 	int			nmap;		/* number of map entries */
+	int			prealloced;	/* this is a file with
+						 * preallocated data space */
 	struct getbmap		out;		/* output structure */
 
 	ip = XFS_VTOI(vp);
@@ -3352,9 +3354,18 @@ xfs_getbmap(
 	    ip->i_d.di_format != XFS_DINODE_FMT_BTREE)
 		return XFS_ERROR(EINVAL);
 	mp = ip->i_mount;
-	if (bmv->bmv_length == -1)
-		bmv->bmv_length = XFS_FSB_TO_BB(mp,
-			XFS_B_TO_FSB(mp, ip->i_d.di_size));
+	if ( ip->i_d.di_flags & XFS_DIFLAG_PREALLOC ) {
+		prealloced = 1;
+		if (bmv->bmv_length == -1)
+			bmv->bmv_length = XFS_FSB_TO_BB(mp,
+				XFS_B_TO_FSB(mp, XFS_MAX_FILE_OFFSET));
+	} else {
+		prealloced = 0;
+		if (bmv->bmv_length == -1)
+			bmv->bmv_length = XFS_FSB_TO_BB(mp,
+				XFS_B_TO_FSB(mp, ip->i_d.di_size));
+	}
+
 	bmvend = bmv->bmv_offset + bmv->bmv_length;
 	nex = bmv->bmv_count - 1;
 	ASSERT(nex > 0);
@@ -3403,19 +3414,28 @@ xfs_getbmap(
 		out.bmv_length =
 			XFS_FSB_TO_BB(mp, map[i].br_blockcount);
 		ASSERT(map[i].br_startblock != DELAYSTARTBLOCK);
-		if (map[i].br_startblock == HOLESTARTBLOCK)
-			out.bmv_block = -1;
-		else
-			out.bmv_block = XFS_FSB_TO_DADDR(mp,
-				map[i].br_startblock);
-		if (copyout(&out, ap, sizeof(out))) {
-			error = XFS_ERROR(EFAULT);
+		if ( 	prealloced && 
+			(map[i].br_startblock == HOLESTARTBLOCK)  &&
+			(out.bmv_offset + out.bmv_length == bmvend) ) {
+			/*
+			 * came to hole at end of file
+			 */
 			break;
+		} else {
+			if (map[i].br_startblock == HOLESTARTBLOCK)
+				out.bmv_block = -1;
+			else
+				out.bmv_block = XFS_FSB_TO_DADDR(mp,
+					map[i].br_startblock);
+			if (copyout(&out, ap, sizeof(out))) {
+				error = XFS_ERROR(EFAULT);
+				break;
+			}
+			bmv->bmv_offset = out.bmv_offset + out.bmv_length;
+			bmv->bmv_length = MAX(0, bmvend - bmv->bmv_offset);
+			bmv->bmv_entries++;
+			ap = (void *)((struct getbmap *)ap + 1);
 		}
-		bmv->bmv_offset = out.bmv_offset + out.bmv_length;
-		bmv->bmv_length = MAX(0, bmvend - bmv->bmv_offset);
-		bmv->bmv_entries++;
-		ap = (void *)((struct getbmap *)ap + 1);
 	}
 	kmem_free(map, nex * sizeof(*map));
 	return error;
