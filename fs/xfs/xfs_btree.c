@@ -9,7 +9,6 @@
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include <sys/debug.h>
-#include <stddef.h>
 #ifdef SIM
 #include <bstring.h>
 #else
@@ -50,8 +49,23 @@ __uint32_t xfs_magics[XFS_BTNUM_MAX] =
  * Get a buffer for the block, return it read in.
  */
 buf_t *
-xfs_btree_bread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
-		xfs_agblock_t agbno)
+xfs_btree_breadl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno)
+{
+	daddr_t		d;		/* disk block address */
+	xfs_sb_t	*sbp;		/* superblock structure */
+
+	ASSERT(fsbno != NULLFSBLOCK);
+	sbp = &mp->m_sb;
+	d = xfs_fsb_to_daddr(sbp, fsbno);
+	return xfs_trans_bread(tp, mp->m_dev, d, mp->m_bsize);
+}
+
+/*
+ * Get a buffer for the block, return it read in.
+ */
+buf_t *
+xfs_btree_breads(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
+		 xfs_agblock_t agbno)
 {
 	daddr_t		d;		/* disk block address */
 	xfs_sb_t	*sbp;		/* superblock structure */
@@ -70,14 +84,44 @@ xfs_btree_bread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno,
 void
 xfs_btree_check_block(xfs_btree_cur_t *cur, xfs_btree_block_t *block, int level)
 {
+	if (xfs_btree_long_ptrs(cur->bc_btnum))
+		xfs_btree_check_lblock(cur, (xfs_btree_lblock_t *)block, level);
+	else
+		xfs_btree_check_sblock(cur, (xfs_btree_sblock_t *)block, level);
+}
+
+/*
+ * Debug routine: check that block header is ok.
+ */
+void
+xfs_btree_check_lblock(xfs_btree_cur_t *cur, xfs_btree_lblock_t *block, int level)
+{
+	xfs_sb_t *sbp;
+
+	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
+	ASSERT(block->bb_level == level);
+	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
+	sbp = &cur->bc_mp->m_sb;
+	ASSERT(block->bb_leftsib == NULLFSBLOCK || 
+	       block->bb_leftsib < sbp->sb_dblocks);
+	ASSERT(block->bb_rightsib == NULLFSBLOCK || 
+	       block->bb_rightsib < sbp->sb_dblocks);
+}
+
+/*
+ * Debug routine: check that block header is ok.
+ */
+void
+xfs_btree_check_sblock(xfs_btree_cur_t *cur, xfs_btree_sblock_t *block, int level)
+{
 	buf_t *agbuf;
 	xfs_agf_t *agf;
 
-	agbuf = cur->bc_agbuf;
-	agf = xfs_buf_to_agf(agbuf);
 	ASSERT(block->bb_magic == xfs_magics[cur->bc_btnum]);
 	ASSERT(block->bb_level == level);
-	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, block));
+	ASSERT(block->bb_numrecs <= xfs_btree_maxrecs(cur, (xfs_btree_block_t *)block));
+	agbuf = cur->bc_agbuf;
+	agf = xfs_buf_to_agf(agbuf);
 	ASSERT(block->bb_leftsib == NULLAGBLOCK || 
 	       block->bb_leftsib < agf->agf_length);
 	ASSERT(block->bb_rightsib == NULLAGBLOCK || 
@@ -85,18 +129,16 @@ xfs_btree_check_block(xfs_btree_cur_t *cur, xfs_btree_block_t *block, int level)
 }
 
 /*
- * Debug routine: check that pointer is ok.
+ * Debug routine: check that (long) pointer is ok.
  */
 void
-xfs_btree_check_ptr(xfs_btree_cur_t *cur, xfs_agblock_t ptr, int level)
+xfs_btree_check_lptr(xfs_btree_cur_t *cur, xfs_fsblock_t ptr, int level)
 {
-	buf_t *agbuf;
-	xfs_agf_t *agf;
+	xfs_sb_t *sbp;
 
 	ASSERT(level > 0);
-	agbuf = cur->bc_agbuf;
-	agf = xfs_buf_to_agf(agbuf);
-	ASSERT(ptr != NULLAGBLOCK && ptr < agf->agf_length);
+	sbp = &cur->bc_mp->m_sb;
+	ASSERT(ptr != NULLFSBLOCK && ptr < sbp->sb_dblocks);
 }
 
 /*
@@ -124,6 +166,21 @@ xfs_btree_check_rec(xfs_btnum_t btnum, void *ar1, void *ar2)
 		break;
 	    }
 	}
+}
+
+/*
+ * Debug routine: check that (short) pointer is ok.
+ */
+void
+xfs_btree_check_sptr(xfs_btree_cur_t *cur, xfs_agblock_t ptr, int level)
+{
+	buf_t *agbuf;
+	xfs_agf_t *agf;
+
+	ASSERT(level > 0);
+	agbuf = cur->bc_agbuf;
+	agf = xfs_buf_to_agf(agbuf);
+	ASSERT(ptr != NULLAGBLOCK && ptr < agf->agf_length);
 }
 #endif
 
@@ -185,7 +242,7 @@ xfs_btree_firstrec(xfs_btree_cur_t *cur, int level)
 
 	block = xfs_btree_get_block(cur, level);
 	xfs_btree_check_block(cur, block, level);
-	if (!block->bb_numrecs)
+	if (!block->bb_h.bb_numrecs)
 		return 0;
 	cur->bc_ptrs[level] = 1;
 	return 1;
@@ -195,7 +252,22 @@ xfs_btree_firstrec(xfs_btree_cur_t *cur, int level)
  * Get a buffer for the block, return it with no data read.
  */
 buf_t *
-xfs_btree_getblk(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblock_t agbno)
+xfs_btree_getblkl(xfs_mount_t *mp, xfs_trans_t *tp, xfs_fsblock_t fsbno)
+{
+	daddr_t d;
+	xfs_sb_t *sbp;
+
+	ASSERT(fsbno != NULLFSBLOCK);
+	sbp = &mp->m_sb;
+	d = xfs_fsb_to_daddr(sbp, fsbno);
+	return xfs_trans_getblk(tp, mp->m_dev, d, mp->m_bsize);
+}
+
+/*
+ * Get a buffer for the block, return it with no data read.
+ */
+buf_t *
+xfs_btree_getblks(xfs_mount_t *mp, xfs_trans_t *tp, xfs_agnumber_t agno, xfs_agblock_t agbno)
 {
 	daddr_t d;
 	xfs_sb_t *sbp;
@@ -262,7 +334,10 @@ xfs_btree_islastblock(xfs_btree_cur_t *cur, int level)
 
 	block = xfs_btree_get_block(cur, level);
 	xfs_btree_check_block(cur, block, level);
-	return block->bb_rightsib == NULLAGBLOCK;
+	if (xfs_btree_long_ptrs(cur->bc_btnum))
+		return block->bb_u.l.bb_rightsib == NULLFSBLOCK;
+	else
+		return block->bb_u.s.bb_rightsib == NULLAGBLOCK;
 }
 
 /*
@@ -275,33 +350,13 @@ xfs_btree_lastrec(xfs_btree_cur_t *cur, int level)
 
 	block = xfs_btree_get_block(cur, level);
 	xfs_btree_check_block(cur, block, level);
-	if (!block->bb_numrecs)
+	if (!block->bb_h.bb_numrecs)
 		return 0;
-	cur->bc_ptrs[level] = block->bb_numrecs;
+	cur->bc_ptrs[level] = block->bb_h.bb_numrecs;
 	return 1;
 }
 
-/*
- * Log btree blocks (headers)
- */
-void
-xfs_btree_log_block(xfs_trans_t *tp, buf_t *buf, int fields)
-{
-	int first;
-	int last;
-	static const int offsets[] = {
-		offsetof(xfs_btree_block_t, bb_magic),
-		offsetof(xfs_btree_block_t, bb_level),
-		offsetof(xfs_btree_block_t, bb_numrecs),
-		offsetof(xfs_btree_block_t, bb_leftsib),
-		offsetof(xfs_btree_block_t, bb_rightsib),
-		sizeof(xfs_btree_block_t)
-	};
-
-	xfs_btree_offsets(fields, offsets, XFS_BB_NUM_BITS, &first, &last);
-	xfs_trans_log_buf(tp, buf, first, last);
-}
-
+#ifdef XFSDEBUG
 /*
  * Return maxrecs for the block.
  */
@@ -313,14 +368,15 @@ xfs_btree_maxrecs(xfs_btree_cur_t *cur, xfs_btree_block_t *block)
 	switch (cur->bc_btnum) {
 	case XFS_BTNUM_BNO:
 	case XFS_BTNUM_CNT:
-		maxrecs = XFS_ALLOC_BLOCK_MAXRECS(block->bb_level, cur);
+		maxrecs = XFS_ALLOC_BLOCK_MAXRECS(block->bb_h.bb_level, cur);
 		break;
 	case XFS_BTNUM_BMAP:
-		maxrecs = XFS_BMAP_BLOCK_IMAXRECS(block->bb_level, cur);
+		maxrecs = XFS_BMAP_BLOCK_IMAXRECS(block->bb_h.bb_level, cur);
 		break;
 	}
 	return maxrecs;
 }
+#endif	/* XFSDEBUG */
 
 /*
  * Compute byte offsets for the fields given.

@@ -68,7 +68,7 @@ typedef struct xfs_inode {
 		xfs_bmbt_rec_t	*iu_extents;	/* linear map of file extents */
 		char		*iu_data;	/* inline file data */
 	} i_u1;
-	xfs_btree_block_t	*i_broot;	/* file's incore btree root */
+	xfs_btree_lblock_t	*i_broot;	/* file's incore btree root */
 	size_t			i_broot_bytes;	/* bytes allocated for root */
 	union {
 		xfs_bmbt_rec_t	iu_inline_ext[XFS_INLINE_EXTS];

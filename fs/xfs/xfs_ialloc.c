@@ -243,7 +243,7 @@ xfs_ialloc_ag_alloc(xfs_trans_t *tp, buf_t *agbuf)
 		/*
 		 * Get the block.
 		 */
-		fbuf = xfs_btree_getblk(mp, tp, agi->agi_seqno, newbno + j);
+		fbuf = xfs_btree_getblks(mp, tp, agi->agi_seqno, newbno + j);
 		/*
 		 * Loop over the inodes in this buffer.
 		 */
@@ -453,7 +453,7 @@ xfs_dialloc(xfs_trans_t *tp, xfs_ino_t parent, int sameag, mode_t mode)
 	agino = agi->agi_freelist;
 	agbno = xfs_agino_to_agbno(sbp, agino);
 	off = xfs_agino_to_offset(sbp, agino);
-	fbuf = xfs_btree_bread(mp, tp, agno, agbno);
+	fbuf = xfs_btree_breads(mp, tp, agno, agbno);
 	free = xfs_make_iptr(sbp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
 	ASSERT(free->di_core.di_mode == 0);
@@ -490,7 +490,7 @@ xfs_dialloc_next_free(xfs_mount_t *mp, xfs_trans_t *tp, buf_t *agbuf,
 	agno = agi->agi_seqno;
 	agbno = xfs_agino_to_agbno(sbp, agino);
 	off = xfs_agino_to_offset(sbp, agino);
-	fbuf = xfs_btree_bread(mp, tp, agno, agbno);
+	fbuf = xfs_btree_breads(mp, tp, agno, agbno);
 	free = xfs_make_iptr(sbp, fbuf, off);
 	agino = free->di_u.di_next;
 	xfs_trans_brelse(tp, fbuf);
@@ -538,7 +538,7 @@ xfs_difree(xfs_trans_t *tp, xfs_ino_t inode)
 	/*
 	 * Get the inode into a buffer
 	 */
-	fbuf = xfs_btree_bread(mp, tp, agno, agbno);
+	fbuf = xfs_btree_breads(mp, tp, agno, agbno);
 	free = xfs_make_iptr(sbp, fbuf, off);
 	ASSERT(free->di_core.di_magic == XFS_DINODE_MAGIC);
 	/*

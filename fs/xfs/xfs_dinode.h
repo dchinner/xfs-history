@@ -53,7 +53,7 @@ typedef struct xfs_dinode
 		dev_t		di_dev;	/* device for IFCHR/IFBLK */
 		char		di_c[1];/* local contents */
 		xfs_bmbt_rec_t	di_bmx[1];/* extent list */
-		xfs_btree_block_t di_bmbt;/* btree root */
+		xfs_btree_lblock_t di_bmbt;/* btree root */
 		uuid_t		di_muuid;/* mount point value */
 	}		di_u;
 } xfs_dinode_t;

@@ -123,9 +123,9 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 	register int		nrecs;
 	register char		*cp;
 	int			csize;
-	xfs_btree_block_t	*rootbp;
+	xfs_btree_lblock_t	*rootbp;
 	xfs_bmbt_rec_t		*recp;
-	xfs_agblock_t		*ptrp;
+	xfs_fsblock_t		*ptrp;
 	int			dinode_size;
 
 	switch (ip->i_d.di_mode & IFMT) {
@@ -211,7 +211,7 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			 */
 			rootbp = &(dip->di_u.di_bmbt);
 			cp = (char *)ip->i_broot;
-			csize = sizeof(xfs_btree_block_t);
+			csize = sizeof(xfs_btree_lblock_t);
 			bcopy(rootbp, cp, csize);
 
 			/*
@@ -231,7 +231,7 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			ptrp = XFS_BMAP_BROOT_PTR_ADDR(rootbp, 1, dinode_size);
 			cp = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 							     size);
-			csize = nrecs * (int)sizeof(xfs_agblock_t);
+			csize = nrecs * (int)sizeof(*ptrp);
 			bcopy(ptrp, cp, csize);
 			ip->i_flags |= XFS_IBROOT;
 			return;
@@ -449,7 +449,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 	size_t			new_size;
 	char			*np;
 	char			*op;
-	xfs_btree_block_t	*new_broot;
+	xfs_btree_lblock_t	*new_broot;
 
 	/*
 	 * Handle the degenerate case quietly.
@@ -465,7 +465,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		 */
 		if (ip->i_broot_bytes == 0) {
 			new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(rec_diff);
-			ip->i_broot = (xfs_btree_block_t*)kmem_alloc(new_size,
+			ip->i_broot = (xfs_btree_lblock_t*)kmem_alloc(new_size,
 								     KM_SLEEP);
 			ip->i_broot_bytes = new_size;
 			return;
@@ -480,7 +480,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		cur_max = XFS_BMAP_BROOT_MAXRECS(ip->i_broot_bytes);
 		new_max = cur_max + rec_diff;
 		new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(new_max);
-		ip->i_broot = (xfs_btree_block_t *)
+		ip->i_broot = (xfs_btree_lblock_t *)
 			      kmem_realloc(ip->i_broot, new_size, KM_SLEEP);
 		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 						      ip->i_broot_bytes);
@@ -490,7 +490,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		/*
 		 * This depends on bcopy() handling overlapping buffers.
 		 */
-		bcopy(op, np, cur_max * (int)sizeof(xfs_agblock_t));
+		bcopy(op, np, cur_max * (int)sizeof(xfs_fsblock_t));
 		return;
 	}
 
@@ -505,11 +505,11 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 	new_max = cur_max + rec_diff;
 	new_size = (size_t)XFS_BMAP_BROOT_SPACE_CALC(new_max);
 	ASSERT(new_max >= 0);
-	new_broot = (xfs_btree_block_t *)kmem_alloc(new_size, KM_SLEEP);
+	new_broot = (xfs_btree_lblock_t *)kmem_alloc(new_size, KM_SLEEP);
 	/*
 	 * First copy over the btree block header.
 	 */
-	bcopy(ip->i_broot, new_broot, sizeof(xfs_btree_block_t));
+	bcopy(ip->i_broot, new_broot, sizeof(xfs_btree_lblock_t));
 
 	/*
 	 * Only copy the records and pointers if there are any.
@@ -529,7 +529,7 @@ xfs_iroot_realloc(xfs_inode_t *ip, int rec_diff)
 		op = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1,
 						     ip->i_broot_bytes);
 		np = (char *)XFS_BMAP_BROOT_PTR_ADDR(new_broot, 1, new_size);
-		bcopy(op, np, new_max * (int)sizeof(xfs_agblock_t));	
+		bcopy(op, np, new_max * (int)sizeof(xfs_fsblock_t));	
 	}
 	kmem_free(ip->i_broot, ip->i_broot_bytes);
 	ip->i_broot = new_broot;
@@ -902,7 +902,7 @@ xfs_iflush(xfs_inode_t *ip, uint flags)
 			 * First copy over the btree block header.
 			 */
 			bcopy(ip->i_broot, &(dip->di_u.di_bmbt),
-			      sizeof(xfs_btree_block_t));
+			      sizeof(xfs_btree_lblock_t));
 			/*
 			 * Now copy records and pointers, if there are any.
 			 */
@@ -919,7 +919,7 @@ xfs_iflush(xfs_inode_t *ip, uint flags)
 				 */
 				pi = (char *)XFS_BMAP_BROOT_PTR_ADDR(ip->i_broot, 1, ip->i_broot_bytes);
 				pd = (char *)XFS_BMAP_BROOT_PTR_ADDR(&dip->di_u.di_bmbt, 1, brsize);
-				bcopy(pi, pd, nr * sizeof(xfs_agblock_t));
+				bcopy(pi, pd, nr * sizeof(xfs_fsblock_t));
 			}
 		}
 		break;
