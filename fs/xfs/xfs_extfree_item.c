@@ -195,6 +195,7 @@ xfs_efi_init(xfs_mount_t	*mp,
 	efip->efi_item.li_ops = &xfs_efi_item_ops;
 	efip->efi_item.li_mountp = mp;
 	efip->efi_format.efi_nextents = nextents;
+	efip->efi_format.efi_id = (__uint64_t)efip;
 
 	return (efip);
 }
@@ -392,6 +393,7 @@ xfs_efd_init(xfs_mount_t	*mp,
 	efdp->efd_item.li_mountp = mp;
 	efdp->efd_efip = efip;
 	efdp->efd_format.efd_nextents = nextents;
+	efdp->efd_format.efd_efi_id = (__uint64_t)efip;
 
 	return (efdp);
 }
