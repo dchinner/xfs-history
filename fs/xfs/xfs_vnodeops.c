@@ -816,6 +816,15 @@ xfs_setattr(vnode_t	*vp,
 
 	if (!ip_held)
 		IHOLD (ip);
+
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * transaction goes to disk before returning to the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
+
 	xfs_trans_commit (tp, commit_flags);
 	if (ip_held) {
 		xfs_iunlock (ip, lock_flags);
@@ -1771,6 +1780,15 @@ try_again:
 		}
 		xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
+		/*
+		 * If this is a synchronous mount, make sure that the
+		 * create transaction goes to disk before returning to
+		 * the user.
+		 */
+		if (mp->m_flags & XFS_MOUNT_WSYNC) {
+			xfs_trans_set_sync(tp);
+		}
+
 		dp->i_gen++;
 		dnlc_enter_fast(dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
 
@@ -2432,6 +2450,15 @@ xfs_remove(vnode_t	*dir_vp,
 	 */
 	IHOLD(ip);
 
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * remove transaction goes to disk before returning to
+	 * the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
+
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -2546,6 +2573,15 @@ xfs_link(vnode_t	*target_dir_vp,
 
 
 	xfs_bumplink(tp, sip);
+
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * link transaction goes to disk before returning to
+	 * the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
 
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
@@ -3135,6 +3171,15 @@ start_over:
 		IHOLD(target_ip);
 	}
 
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * rename transaction goes to disk before returning to
+	 * the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
+
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 
 	/*
@@ -3281,6 +3326,15 @@ xfs_mkdir(vnode_t	*dir_vp,
 
 	IHOLD (cdp);
 
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * mkdir transaction goes to disk before returning to
+	 * the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
+
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
 
@@ -3414,6 +3468,15 @@ xfs_rmdir(vnode_t	*dir_vp,
 	 * does not go to xfs_inactive() from within the commit.
 	 */
 	IHOLD(cdp);
+
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * rmdir transaction goes to disk before returning to
+	 * the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
 
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 
@@ -3670,6 +3733,15 @@ xfs_symlink(vnode_t	*dir_vp,
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
         dnlc_enter_fast (dir_vp, &fastdata, XFS_ITOV(ip), NOCRED);
+
+	/*
+	 * If this is a synchronous mount, make sure that the
+	 * symlink transaction goes to disk before returning to
+	 * the user.
+	 */
+	if (mp->m_flags & XFS_MOUNT_WSYNC) {
+		xfs_trans_set_sync(tp);
+	}
 
 	(void) xfs_bmap_finish (&tp, &free_list, first_block);
 	xfs_trans_commit (tp, XFS_TRANS_RELEASE_LOG_RES);
