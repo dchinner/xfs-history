@@ -1,4 +1,4 @@
-#ident "$Revision: 1.87 $"
+#ident "$Revision: 1.89 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -296,13 +296,12 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 int							/* error */
 xfs_dir_bogus_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 		   xfs_fsblock_t *firstblock, xfs_bmap_free_t *flist,
-		   xfs_extlen_t total, xfs_dahash_t hashval)
+		   xfs_extlen_t total, xfs_dahash_t hashval, int namelen)
 {
 	xfs_da_args_t args;
-	int count, totallen, newsize, retval, namelen;
+	int count, totallen, newsize, retval;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	namelen = strlen(name);
 	if (namelen >= MAXNAMELEN) {
 		return(XFS_ERROR(EINVAL));
 	}
