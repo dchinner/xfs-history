@@ -1,4 +1,4 @@
-#ident "$Revision: 1.54 $"
+#ident "$Revision$"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -150,8 +150,11 @@ xfs_inode_item_size(
 	/*
 	 * If there are no attributes associated with this file,
 	 * then there cannot be anything more to log.
+	 * Clear all attribute-related log flags.
 	 */
 	if (!XFS_IFORK_Q(ip)) {
+		iip->ili_format.ilf_fields &=
+			~(XFS_ILOG_ADATA | XFS_ILOG_ABROOT | XFS_ILOG_AEXT);
 		return nvecs;
 	}
 
@@ -348,10 +351,13 @@ xfs_inode_item_format(
 	/*
 	 * If there are no attributes associated with the file,
 	 * then we're done.
+	 * Assert that no attribute-related log flags are set.
 	 */
 	if (!XFS_IFORK_Q(ip)) {
 		ASSERT(nvecs == iip->ili_item.li_desc->lid_size);
 		iip->ili_format.ilf_size = nvecs;
+		ASSERT(!(iip->ili_format.ilf_fields &
+			 (XFS_ILOG_ADATA | XFS_ILOG_ABROOT | XFS_ILOG_AEXT)));
 		return;
 	}
 
