@@ -1,4 +1,4 @@
-#ident "$Revision: 1.80 $"
+#ident "$Revision: 1.81 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -560,7 +560,9 @@ xfs_ilock(xfs_inode_t	*ip,
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
 		mraccess(&ip->i_lock);
 	}
-
+#ifdef XFS_ILOCK_TRACE
+	xfs_ilock_trace(ip, 1, lock_flags,  (inst_t *)__return_address);
+#endif
 }
 
 /*
@@ -626,6 +628,9 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			return 0;
 		}
 	}
+#ifdef XFS_ILOCK_TRACE
+	xfs_ilock_trace(ip, 2, lock_flags,  (inst_t *)__return_address);
+#endif
 	return 1;
 }
 
@@ -685,6 +690,9 @@ xfs_iunlock(xfs_inode_t	*ip,
 		xfs_trans_unlocked_item(ip->i_mount,
 					(xfs_log_item_t*)(ip->i_itemp));
 	}
+#ifdef XFS_ILOCK_TRACE
+	xfs_ilock_trace(ip, 3, lock_flags,  (inst_t *)__return_address);
+#endif
 }
 
 /*
