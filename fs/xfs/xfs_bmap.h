@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_BMAP_H
 #define	_FS_XFS_BMAP_H
 
-#ident "$Revision: 1.34 $"
+#ident "$Revision: 1.37 $"
 
 struct getbmap;
 struct xfs_bmbt_rec;
@@ -34,10 +34,11 @@ typedef	struct xfs_bmap_free
 /*
  * Flags for xfs_bmapi
  */
-#define	XFS_BMAPI_WRITE		0x1	/* write operation: allocate space */
-#define	XFS_BMAPI_DELAY		0x2	/* delayed write operation */
-#define	XFS_BMAPI_ENTIRE	0x4	/* return entire extent, not trimmed */
-#define	XFS_BMAPI_METADATA	0x8	/* mapping metadata not user data */
+#define	XFS_BMAPI_WRITE		0x01	/* write operation: allocate space */
+#define	XFS_BMAPI_DELAY		0x02	/* delayed write operation */
+#define	XFS_BMAPI_ENTIRE	0x04	/* return entire extent, not trimmed */
+#define	XFS_BMAPI_METADATA	0x08	/* mapping metadata not user data */
+#define	XFS_BMAPI_EXACT		0x10	/* allocate only to spec'd bounds */
 
 /*
  * Special values for xfs_bmbt_irec_t br_startblock field.
