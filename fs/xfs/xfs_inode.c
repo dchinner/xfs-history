@@ -1,5 +1,5 @@
 
-#include <sys/types.h>
+#include <sys/param.h>
 #define	_KERNEL
 #include <sys/buf.h>
 #undef _KERNEL
@@ -20,6 +20,7 @@
 #include "xfs_ialloc.h"
 #include "xfs_ag.h"
 #include "xfs_bmap.h"
+#include "xfs_imap.h"
 #include "xfs_btree.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
@@ -185,7 +186,7 @@ xfs_iformat(xfs_mount_t *mp, xfs_inode_t *ip, xfs_dinode_t *dip)
 			nrecs = XFS_BMAP_BROOT_NUMRECS(&(dip->di_u.di_bmbt));
 			ip->i_broot_bytes = size;
 			ip->i_broot = kmem_alloc(size, KM_SLEEP);
-			inode_size = mp->m_sb->sb_inodesize;
+			inode_size = mp->m_sb.sb_inodesize;
 
 			/*
 			 * Copy the btree block header first.
@@ -298,6 +299,27 @@ xfs_iread(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino)
 }
 
 /*
+ * Map inode to disk block and offset.
+ */
+int
+xfs_imap(xfs_mount_t *mp, xfs_trans_t *tp, xfs_ino_t ino, xfs_imap_t *imap)
+{
+	xfs_fsblock_t fsbno;
+	int off;
+	xfs_sb_t *sbp;
+
+	if (!xfs_dilocate(mp, tp, ino, &fsbno, &off))
+		return 0;
+	sbp = &mp->m_sb;
+	imap->im_blkno = xfs_fsb_to_daddr(sbp, fsbno);
+	imap->im_len = xfs_btod(sbp, 1);
+	imap->im_agblkno = xfs_fsb_to_agbno(sbp, fsbno);
+	imap->im_ioffset = off;
+	imap->im_boffset = off << sbp->sb_inodelog;
+	return 1;
+}
+
+/*
  * This is called free all the memory associated with an inode.
  * It must free the inode itself and any buffers allocated for
  * iu_extents/iu_data and i_broot.  It must also free the lock
@@ -332,19 +354,3 @@ xfs_idestroy(xfs_inode_t *ip)
 	kmem_free(ip, sizeof(xfs_inode_t));
 #endif
 }
-		
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
