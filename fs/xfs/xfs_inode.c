@@ -1,4 +1,4 @@
-#ident "$Revision: 1.181 $"
+#ident "$Revision: 1.183 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -54,7 +54,9 @@
 #include "xfs_rw.h"
 #include "xfs_error.h"
 #include "xfs_bit.h"
-
+#ifdef DEBUG
+#include "xfs_quota.h"
+#endif
 #ifdef SIM
 #include "sim.h"
 #endif
@@ -747,6 +749,7 @@ xfs_ialloc(
 	nlink_t		nlink,
 	dev_t		rdev,
 	cred_t		*cr,
+	xfs_prid_t	prid,   
 	buf_t		**ialloc_context,
 	boolean_t	*call_again,
 	xfs_inode_t	**ipp)	   
@@ -797,7 +800,7 @@ xfs_ialloc(
 	ASSERT(ip->i_d.di_nlink == nlink);
 	ip->i_d.di_uid = cr->cr_uid;
 	ip->i_d.di_gid = cr->cr_gid;
-	ip->i_d.di_projid = 0;
+	ip->i_d.di_projid = prid;
 	bzero(&(ip->i_d.di_pad[0]), sizeof(ip->i_d.di_pad));
 
 	/*
@@ -1358,6 +1361,8 @@ xfs_itruncate_finish(
 
 	ntp = *tp;
 	mp = (ntp)->t_mountp;
+	ASSERT(! XFS_NOT_DQATTACHED(mp, ip));
+
 	/*
 	 * We only support truncating the entire attribute fork.
 	 */
@@ -2972,12 +2977,17 @@ xfs_iflush_all(
 		}
 		do {
 			/*
-			 * It's up to our caller to purge the root (and
-			 * when implemented, quotas) vnodes later.
+			 * It's up to our caller to purge the root
+			 * and quota vnodes later.
 			 */
 			vp = XFS_ITOV(ip);
 			if (vp->v_count != 0) {
-				if (vp->v_count == 1 && ip == mp->m_rootip) {
+				if (vp->v_count == 1 && 
+				    (ip == mp->m_rootip ||
+				     (mp->m_quotainfo && 
+				      (ip->i_ino == mp->m_sb.sb_uquotino ||
+				       ip->i_ino == mp->m_sb.sb_pquotino)))) {
+
 					ip = ip->i_mnext;
 					continue;
 				}
