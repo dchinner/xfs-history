@@ -31,7 +31,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident  "$Revision: 1.273 $"
+#ident  "$Revision: 1.274 $"
 
 #include <xfs_os_defs.h>
 
@@ -2243,11 +2243,13 @@ vfsops_t xfs_vfsops = {
 	xfs_root,
 	xfs_statvfs,
 	xfs_sync,
+	fs_nosys,
 	xfs_vfsmountroot,
 	xfs_get_vnode,
 };
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
+	0,
 	0,
 	0,
 	0,

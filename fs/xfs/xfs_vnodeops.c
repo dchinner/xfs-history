@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident "$Revision: 1.460 $"
+#ident "$Revision: 1.461 $"
 
 #include <xfs_os_defs.h>
 #include <linux/xfs_cred.h>
@@ -6273,6 +6273,7 @@ vnodeops_t xfs_vnodeops = {
 	(vop_readlink_t)fs_nosys,
 	(vop_fsync_t)fs_nosys,
 	xfs_inactive,
+	(vop_fid2_t)fs_nosys,
 	(vop_release_t)fs_nosys,
 	(vop_rwlock_t)fs_nosys,
 	(vop_rwunlock_t)fs_nosys,
