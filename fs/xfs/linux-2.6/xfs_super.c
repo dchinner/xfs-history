@@ -191,10 +191,17 @@ linvfs_read_super(
 		MOD_DEC_USE_COUNT;
 		return NULL;
 	}
-    /* check to see if kio is suppose to be on for this mount */
-    if(args->flags & MS_KIOBUFIO){
-	  sb->s_flags |= MS_KIOBUFIO;
-	  printk("XFS (dev: %d/%d) mounting with KIOBUFIO\n",MAJOR(sb->s_dev),MINOR(sb->s_dev));
+	/* check to see if kio is suppose to be on for this mount */
+	if (args->flags & MS_KIOBUFIO){
+		sb->s_flags |= MS_KIOBUFIO;
+		printk("XFS (dev: %d/%d) mounting with KIOBUFIO%s\n",
+				MAJOR(sb->s_dev),MINOR(sb->s_dev),
+				(args->flags & MS_KIOCLUSTER) ? " (clustering)":
+				"");
+		/* Allow clustering under kiobuf I/O */
+		if (args->flags & MS_KIOCLUSTER){
+			sb->s_flags |= MS_KIOCLUSTER;
+		}
 	}
 
 	args->fsname = uap->spec;
