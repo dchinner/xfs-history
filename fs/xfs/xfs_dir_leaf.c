@@ -2235,7 +2235,7 @@ xfs_dir_put_dirent32_uio(xfs_dir_put_args_t *pa)
 
 	namelen = pa->namelen;
         retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-					pa->name, namelen, offset, ino);
+				pa->name, namelen, offset, ino, DT_UNKNOWN);
 
 	if (retval == -EINVAL) {
 		pa->done = 0;
@@ -2296,7 +2296,7 @@ xfs_dir_put_dirent64_uio(xfs_dir_put_args_t *pa)
         uio = pa->uio;
 
         retval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-					pa->name, namelen, offset, ino);
+				pa->name, namelen, offset, ino, DT_UNKNOWN);
 
 	if (retval == -EINVAL) {
 		pa->done = 0;

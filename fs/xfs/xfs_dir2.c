@@ -794,7 +794,7 @@ xfs_dir2_put_dirent32_uio(
 	reclen = IRIX5_DIRENTSIZE(namelen);
 	uio = pa->uio;
 	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-			pa->name, namelen, offset, ino);
+			pa->name, namelen, offset, ino, DT_UNKNOWN);
 	if (rval == -EINVAL) {
 		pa->done = 0;
 		return 0;
@@ -861,7 +861,7 @@ xfs_dir2_put_dirent64_uio(
 	uio = pa->uio;
 
 	rval = uio->uio_copy((void *)uio->uio_iov->iov_base,
-			pa->name, namelen, offset, ino);
+			pa->name, namelen, offset, ino, DT_UNKNOWN);
 	if (rval == -EINVAL) {
 		pa->done = 0;
 		return 0;
