@@ -3274,6 +3274,14 @@ xfs_getbmap(
 		mp = ip->i_mount;
 		last_byte = XFS_B_TO_FSB(mp, ip->i_d.di_size);
 		last_byte = XFS_FSB_TO_B(mp, last_byte);
+		if (VN_MAPPED(vp)) {
+			/*
+			 * Force any dirty mmap pages to be flushed as
+			 * well so that we eliminate all delayed allocation
+			 * extents.
+			 */
+			remapf(vp, 0, 1);
+		}
 		pflushvp(vp, (off_t)last_byte, 0);
 	}
 	ASSERT(ip->i_delayed_blks == 0);

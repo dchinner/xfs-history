@@ -598,6 +598,7 @@ xfs_itruncate_start(
 	xfs_extlen_t	unmap_len;
 	xfs_mount_t	*mp;
 	xfs_trans_t	*ntp;
+	vnode_t		*vp;
 	int		done;
 	xfs_bmap_free_t	free_list;
 	timestruc_t	tv;
@@ -608,6 +609,7 @@ xfs_itruncate_start(
 	       (flags == XFS_ITRUNC_MAYBE));
 
 	mp = ip->i_mount;
+	vp = XFS_ITOV(ip);
 	/*
 	 * Call ptossvp() or pflushinvalvp() to get rid of pages and buffers
 	 * overlapping the region being removed.  We have to use
@@ -619,6 +621,12 @@ xfs_itruncate_start(
 	 * block size. We round new_size up to a block boundary
 	 * so that we don't toss things on the same block as
 	 * new_size but before it.
+	 *
+	 * Before calling ptossvp() or pflushinvalvp(), make sure to
+	 * call remapf() over the same region if the file is mapped.
+	 * This frees up mapped file references to the pages in the
+	 * given range and for the pflushinvalvp() case it ensures
+	 * that we get the latest mapped changes flushed out.
 	 */
 	toss_start = XFS_B_TO_FSB(mp, new_size);
 	toss_start = XFS_FSB_TO_B(mp, toss_start);
@@ -626,16 +634,22 @@ xfs_itruncate_start(
 	last_byte = XFS_FSB_TO_B(mp, last_byte);
 	if (last_byte > toss_start) {
 		if (flags & XFS_ITRUNC_DEFINITE) {
-			ptossvp(XFS_ITOV(ip), toss_start, last_byte);
+			if (VN_MAPPED(vp)) {
+				remapf(vp, toss_start, 0);
+			}
+			ptossvp(vp, toss_start, last_byte);
 		} else {
-			pflushinvalvp(XFS_ITOV(ip), toss_start, last_byte);
+			if (VN_MAPPED(vp)) {
+				remapf(vp, toss_start, 1);
+			}
+			pflushinvalvp(vp, toss_start, last_byte);
 		}
 	}
 	ASSERT((new_size != 0) ||
-	       (!VN_DIRTY(ip->i_vnode) &&
+	       (!VN_DIRTY(vp) &&
 		(ip->i_queued_bufs == 0) &&
-		(ip->i_vnode->v_buf == NULL) &&
-		(ip->i_vnode->v_pgcnt == 0)));
+		(vp->v_buf == NULL) &&
+		(vp->v_pgcnt == 0)));
 }		    
 
 /*
