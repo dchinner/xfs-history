@@ -107,6 +107,7 @@ static struct export_operations linvfs_export_ops;
 #define MNTOPT_NOUUID   "nouuid"	/* Ignore FS uuid */
 #define MNTOPT_IRIXSGID "irixsgid"	/* Irix-style sgid inheritance */
 #define MNTOPT_NOLOGFLUSH	"nologflush"	/* Don't use hard flushes in log writing */
+#define MNTOPT_MTPT	"mtpt"		/* filesystem mount point */
 
 STATIC int
 xfs_parseargs(
@@ -124,6 +125,7 @@ xfs_parseargs(
 	iosize = dsunit = dswidth = vol_dsunit = vol_dswidth = 0;
 	memset(args, 0, sizeof(struct xfs_args));
 	args->slcount = args->stimeout = args->ctimeout = -1;
+	args->mtpt[0] = '\0';
 
 	/* Copy the already-parsed mount(2) flags we're interested in */
 	args->flags = flags & MS_RDONLY;
@@ -174,6 +176,8 @@ xfs_parseargs(
 			}
 		} else if (!strcmp(this_char, MNTOPT_LOGDEV)) {
 			strncpy(args->logname, value, MAXNAMELEN);
+		} else if (!strcmp(this_char, MNTOPT_MTPT)) {
+			strncpy(args->mtpt, value, MAXNAMELEN);
 		} else if (!strcmp(this_char, MNTOPT_DMAPI)) {
 			args->flags |= XFSMNT_DMAPI;
 		} else if (!strcmp(this_char, MNTOPT_XDSM)) {
@@ -525,8 +529,16 @@ linvfs_fill_super(
 	/* Don't set the VFS_DMI flag until here because we don't want
 	 * to send events while replaying the log.
 	 */
-	if (args.flags & XFSMNT_DMAPI)
+	if (args.flags & XFSMNT_DMAPI) {
 		vfsp->vfs_flag |= VFS_DMI;
+		VFSOPS_DMAPI_MOUNT(vfsops, vfsp, NULL, args.mtpt, args.fsname,
+				   NULL, error);
+		if (error) {
+			if (atomic_read(&sb->s_active) == 1)
+				vfsp->vfs_flag &= ~VFS_DMI;
+			goto fail_vnrele;
+		}
+	}
 
 	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
 
@@ -813,9 +825,6 @@ static struct super_operations linvfs_sops = {
 	alloc_inode:		linvfs_alloc_inode,
 	destroy_inode:		linvfs_destroy_inode,
 	write_inode:		linvfs_write_inode,
-#ifdef CONFIG_HAVE_XFS_DMAPI
-	dmapi_mount_event:	linvfs_dmapi_mount,
-#endif
 	put_inode:		linvfs_put_inode,
 	clear_inode:		linvfs_clear_inode,
 	put_super:		linvfs_put_super,
