@@ -858,7 +858,7 @@ static struct super_operations linvfs_sops = {
 
 DECLARE_FSTYPE_DEV(xfs_fs_type, XFS_NAME, linvfs_read_super);
 
-int __init init_xfs_fs(void)
+static int __init init_xfs_fs(void)
 {
 	struct sysinfo	si;
 
@@ -875,22 +875,14 @@ int __init init_xfs_fs(void)
         xfs_grio_init();
 #endif
 	dmapi_init();
+	printk(KERN_INFO 
+		"XFS filesystem Copyright (c) 2001 Silicon Graphics, Inc.\n");
 	return register_filesystem(&xfs_fs_type);
 }
 
 
-#ifdef MODULE
 
-EXPORT_NO_SYMBOLS;
-
-int init_module(void)
-{
-	printk(KERN_INFO 
-		"XFS filesystem Copyright (c) 2000 Silicon Graphics, Inc.\n");
-	return init_xfs_fs();
-}
-
-void cleanup_module(void)
+static void __exit exit_xfs_fs(void)
 {
         dmapi_uninit();
 #ifdef CONFIG_XFS_GRIO
@@ -900,4 +892,8 @@ void cleanup_module(void)
         unregister_filesystem(&xfs_fs_type);
 }
 
-#endif
+EXPORT_NO_SYMBOLS;
+
+module_init(init_xfs_fs);
+module_exit(exit_xfs_fs);
+
