@@ -1,7 +1,7 @@
 #ifndef	_XFS_TRANS_H
 #define	_XFS_TRANS_H
 
-#ident "$Revision: 1.68 $"
+#ident "$Revision: 1.69 $"
 
 struct buf;
 struct xfs_efd_log_item;
@@ -84,6 +84,9 @@ typedef struct xfs_log_item {
 #define	XFS_TRANS_ADDAFORK		19
 #define	XFS_TRANS_AINVAL		20
 #define	XFS_ATRUNCATE			21
+#define	XFS_TRANS_ATTR_SET		22
+#define	XFS_TRANS_ATTR_RM		23
+#define	XFS_TRANS_ATTR_FLAG		24
 
 
 typedef struct xfs_item_ops {
@@ -572,6 +575,27 @@ typedef struct xfs_trans {
 #define	XFS_AINVAL_LOG_RES(mp)	((mp)->m_reservations.tr_ainval)     
 
 /*
+ * Setting an attribute is the same as creating a new file.
+ */
+#define	XFS_CALC_SETATTR_LOG_RES(mp)	4*XFS_CREATE_LOG_RES(mp) /* GROT? */
+
+#define	XFS_SETATTR_LOG_RES(mp)	((mp)->m_reservations.tr_setattr)
+
+/*
+ * Removing an attribute is the same as creating a new file.
+ */
+#define	XFS_CALC_RMATTR_LOG_RES(mp)	4*XFS_REMOVE_LOG_RES(mp) /* GROT? */
+
+#define	XFS_RMATTR_LOG_RES(mp)	((mp)->m_reservations.tr_rmattr)
+
+/*
+ * Setting/clearing the INCOMPLETE flag on an attribute.
+ */
+#define	XFS_CALC_ATTRFLAG_LOG_RES(mp)	2*XFS_FSB_TO_B((mp), 1)	/* GROT? */
+
+#define	XFS_ATTRFLAG_LOG_RES(mp)	((mp)->m_reservations.tr_rmattr)
+
+/*
  * Various log count values.
  */
 #define	XFS_DEFAULT_LOG_COUNT		1
@@ -586,6 +610,9 @@ typedef struct xfs_trans {
 #define	XFS_WRITE_LOG_COUNT		2     
 #define	XFS_ADDAFORK_LOG_COUNT		2
 #define	XFS_AINVAL_LOG_COUNT		1     
+#define	XFS_SETATTR_LOG_COUNT		3     
+#define	XFS_RMATTR_LOG_COUNT		3     
+#define	XFS_ATTRFLAG_LOG_COUNT		1     
 
 
 /*
