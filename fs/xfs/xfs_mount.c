@@ -1514,7 +1514,6 @@ xfs_getsb(xfs_mount_t	*mp,
 	xfs_buf_t	*bp;
 	ASSERT(mp->m_sb_bp != NULL);
 	bp = mp->m_sb_bp;
-	XFS_BUF_HOLD(bp);
 	if (flags & XFS_BUF_TRYLOCK) {
 		if (!XFS_BUF_CPSEMA(bp)) {
 			return NULL;
@@ -1522,6 +1521,7 @@ xfs_getsb(xfs_mount_t	*mp,
 	} else {
 		XFS_BUF_PSEMA(bp, PRIBIO);
 	}
+	XFS_BUF_HOLD(bp);
 	ASSERT(XFS_BUF_ISDONE(bp));
 	return (bp);
 }

@@ -62,15 +62,7 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 {
 	if (pb->pb_list.next != &pb->pb_list) {
 		pagebuf_delwri_dequeue(pb);
-
-		/*
-		 * Usually the hold count would be at least 2
-		 * here, with the irritating exception of
-		 * the superblock case.
-		 */
-		if (pb->pb_hold > 1 )
-			pagebuf_rele(pb);
-
+		pagebuf_rele(pb);
 	} else {
 		pb->pb_flags &= ~PBF_DELWRI;
 	}

@@ -1849,7 +1849,7 @@ pagebuf_delwri_queue(page_buf_t *pb, int unlock)
 	if (pb->pb_list.next != &pb->pb_list) {
 		if (unlock) {
 			spin_lock(&PBP(pb)->pb_lock);
-			if (pb->pb_hold > 1) pb->pb_hold--;
+			pb->pb_hold--;
 			spin_unlock(&PBP(pb)->pb_lock);
 		}
 		list_del(&pb->pb_list);
