@@ -1,4 +1,4 @@
-#ident "$Revision: 1.197 $"
+#ident "$Revision: 1.199 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -20,7 +20,7 @@
 #endif
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
-#include <sys/errno.h>
+#include <sys/errno.h> 
 #include <sys/fcntl.h>
 #include <sys/var.h>
 #ifdef SIM
@@ -243,6 +243,10 @@ xfs_delalloc_cleanup(
 	xfs_inode_t	*ip,
 	xfs_fileoff_t	start_fsb,
 	xfs_filblks_t	count_fsb);
+
+extern void xfs_buf_iodone_callbacks(struct buf *);
+extern void xlog_iodone(struct buf *);
+int    xfs_bioerror_relse(buf_t *bp);
 
 /*
  * Round the given file offset down to the nearest read/write
@@ -1111,10 +1115,16 @@ xfs_read_file(
 			if (bp->b_flags & B_ERROR) {
 				error = geterror(bp);
 				ASSERT(error != EINVAL);
+				/*
+				 * b_relse functions like chunkhold
+				 * expect B_DONE to be there.
+				 */
+				bp->b_flags |= B_DONE|B_STALE;
 				brelse(bp);
 				break;
 			} else if (bp->b_resid != 0) {
 				buffer_bytes_ok = 0;
+				bp->b_flags |= B_DONE|B_STALE;
 				brelse(bp);
 				break;
 			} else {
@@ -1125,6 +1135,7 @@ xfs_read_file(
 						bmapp->pbsize, UIO_READ,
 						uiop);
 				if (error) {
+					bp->b_flags |= B_DONE|B_STALE;
 					brelse(bp);
 					break;
 				}
@@ -1584,6 +1595,7 @@ xfs_zero_last_block(
 	bp = chunkread(vp, &bmap, 1, credp);
 	if (bp->b_flags & B_ERROR) {
 		error = geterror(bp);
+		bp->b_flags |= B_DONE|B_STALE;
 		brelse(bp);
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 		return error;
@@ -2326,6 +2338,7 @@ xfs_write_file(
 			if (bp->b_flags & B_ERROR) {
 				error = geterror(bp);
 				ASSERT(error != EINVAL);
+				bp->b_flags |= B_DONE|B_STALE;
 				brelse(bp);
 				bmapp++;
 				nbmaps--;
@@ -2469,7 +2482,6 @@ xfs_write_clear_setuid(
 	if (error = xfs_trans_reserve(tp, 0,
 				      XFS_WRITEID_LOG_RES(mp),
 				      0, 0, 0)) {
-		ASSERT(0);
 		xfs_trans_cancel(tp, 0);
 		return error;
 	}
@@ -2734,7 +2746,6 @@ retry:
 			if (transerror = xfs_trans_reserve(tp, 0,
 						      XFS_SWRITE_LOG_RES(mp),
 						      0, 0, 0)) {
-				ASSERT(0);
 				xfs_trans_cancel(tp, 0);
 				error = transerror;
 				break;
@@ -3384,8 +3395,7 @@ xfs_strat_read(
 				  &firstblock, 0, imap, &nimaps, NULL);
 		if (error) {
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
-			bp->b_flags |= B_ERROR;
-			bp->b_error = error;
+			xfs_bioerror(bp);
 			return error;
 		}
 		ASSERT(nimaps >= 1);
@@ -4036,13 +4046,13 @@ xfs_strat_write(
 	 * We may not have bmap'd all the blocks needed.
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp)) {
-		return xfs_bioerror(bp);
+		return xfs_bioerror_relse(bp);
 	}
 
 	if (XFS_IS_QUOTA_ON(mp)) {
 		if (XFS_NOT_DQATTACHED(mp, ip)) {
 			if (error = xfs_qm_dqattach(ip, 0)) {
-				return xfs_bioerror(bp);
+				return xfs_bioerror_relse(bp);
 			}
 		}
 	}
@@ -4086,7 +4096,8 @@ xfs_strat_write(
 					XFS_WRITE_LOG_COUNT);
 			if (error) {
 				xfs_trans_cancel(tp,
-						 XFS_TRANS_RELEASE_LOG_RES);
+						 (XFS_TRANS_RELEASE_LOG_RES |
+						  XFS_TRANS_ABORT));
 				bp->b_flags |= B_ERROR;
 				bp->b_error = error;
 				goto error0;
@@ -4342,8 +4353,6 @@ xfs_strat_write(
 	return error;
 }
 
-dev_t xfserrordev = 0;	/* temp */
-
 /*
  * Force a shutdown of the filesystem instantly while keeping
  * the filesystem consistent. We don't do an unmount here; just shutdown
@@ -4365,37 +4374,38 @@ xfs_force_shutdown(
 		mp->m_fsname);
 	cmn_err(CE_NOTE,
 		"Please umount the filesystem, and rectify the problem(s)");
-#if 0
-	/*
-         * Wait for sync to finish, and lock vfsp.
-         * Also sets VFS_OFFLINE flag.
-	 * This isn't enuf to stop threads from racing to
-	 * shutdown the system.XXXsup
-         */
-	vfslocked = B_TRUE;
-	if (vfs_lock_badblock(XFS_MTOVFS(mp))) {
-		/* XXXsup */
-		debug("badblock");
-		vfslocked = B_FALSE;
-	}
-#endif		
 	/*
 	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
-	 * queue up anybody new on the log reservations, and wakes up everybody
-	 * who's sleeping on log reservations and tells them the bad news.
+	 * queue up anybody new on the log reservations, and wakes up
+	 * everybody who's sleeping on log reservations and tells
+	 * them the bad news.
 	 */
 	xfs_log_force_umount(mp);
-	xfserrordev = mp->m_dev;
-#if 0
-	/* 
-	 * Clears VFS_OFFLINE flag, unlocks VFS. Filesystem is left marked
-	 * VFS_BADBLOCK.
+
+	/*
+	 * Give a push to the log, so that the process of unpinning
+	 * will happen quickly. This'll help the delwri_relse
+	 * call below, since it can't relse pinned bufs. Doing so
+	 * on pinned bufs is at best ugly since that'd be going against
+	 * the natural flow of things.
 	 */
-	if (vfslocked)
-		vfs_unlock(XFS_MTOVFS(mp));  
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE|XFS_LOG_SYNC);
+
+	/*
+	 * Release all delayed write buffers for this device.
+	 */
+#ifdef DEBUG
+	{
+		int nbufs;
+		while (nbufs = incore_delwri_relse(mp->m_dev, EIO))
+			printf("XFS: released 0x%x bufs\n", nbufs);
+	}
+#else
+	while (incore_delwri_relse(mp->m_dev, EIO))
+		;
 #endif
-	/* binval(mp->m_dev); */
 }
+
 
 /*
  * Called when we want to stop a buffer from getting written or read.
@@ -4406,6 +4416,16 @@ int
 xfs_bioerror(
 	buf_t *bp)
 {
+	/* XXXsup bdflush seems to hit metadata bufs with iodone reset */
+	ASSERT((bp->b_flags & (B_BDFLUSH|B_READ)) || bp->b_iodone);
+
+	if (bp->b_iodone == NULL) {
+#ifdef XFSERRORDEBUG
+		printf("bp->b_iodone == NULL\n");
+#endif
+		return xfs_bioerror_relse(bp);
+	}
+
 	/*
 	 * No need to wait until the buffer is unpinned.
 	 * We aren't flushing it.
@@ -4413,10 +4433,8 @@ xfs_bioerror(
 	buftrace("XFS IOERROR", bp);
 	bioerror(bp, EIO);
 	/*
-	 * XXXXsup chunkhold expects B_DONE to be there, so
-	 * dont delete that from the flags. OTOH, if we're
-	 * calling biodone, delete it. Either way we have to
-	 * call the iodone callback, and calling biodone
+	 * We're calling biodone, so delete B_DONE flag. Either way
+	 * we have to call the iodone callback, and calling biodone
 	 * probably is the best way since it takes care of
 	 * GRIO as well.
 	 */
@@ -4425,6 +4443,46 @@ xfs_bioerror(
 
 	bp->b_bdstrat = NULL;
 	biodone(bp);
+	
+	return (EIO);
+}
+
+/*
+ * Same as xfs_bioerror, except that we are releasing the buffer
+ * here ourselves, and avoiding the biodone call.
+ * This is meant for userdata errors; metadata bufs come with
+ * iodone functions attached, so that we can track down errors.
+ */
+int
+xfs_bioerror_relse(
+	buf_t *bp)
+{
+	int fl;
+
+	ASSERT(bp->b_iodone != xfs_buf_iodone_callbacks);
+	ASSERT(bp->b_iodone != xlog_iodone);
+
+	buftrace("XFS IOERRELSE", bp);
+	fl = bp->b_flags;
+	/*
+	 * No need to wait until the buffer is unpinned.
+	 * We aren't flushing it.
+	 */    
+	bioerror(bp, EIO);
+	/*
+	 * chunkhold expects B_DONE to be there, whether
+	 * we actually finish the I/O or not. We don't want to
+	 * change that interface.
+	 */
+	bp->b_flags &= ~(B_READ|B_DELWRI);
+	bp->b_flags |= B_DONE|B_STALE;
+	bp->b_iodone = NULL;
+	bp->b_bdstrat = NULL;
+	if (!(fl & B_ASYNC))
+		vsema(&bp->b_iodonesema);
+	else
+		brelse(bp);
+
 	return (EIO);
 }
 
@@ -4474,8 +4532,10 @@ xfs_read_buf(
 			*bpp = bp;
 		} else {
 			*bpp = NULL;
-			if (bp)
+			if (bp) {
+				bp->b_flags |= B_DONE|B_STALE;
 				brelse(bp);
+			}
 		}
 	} else {
 		error = EIO;
@@ -4488,6 +4548,13 @@ xfs_read_buf(
 /*
  * Wrapper around bwrite() so that we can trap 
  * write errors, and act accordingly.
+ *
+ * Both metadata and userdata go through here.
+ * It's just a convenient place to make sure that the
+ * b_bdstrat and b_fsprivate3 fields are there.
+ * We don't bother to check if XFS_FORCED_SHUTDOWN here
+ * because then we'd have to distinguish between userdata
+ * and metadata.
  */
 int
 xfs_bwrite(
@@ -4495,54 +4562,57 @@ xfs_bwrite(
 	struct buf	 *bp)
 {
 	int	error;
-	int	flag;
 
-	if (!XFS_FORCED_SHUTDOWN(mp)) {
+	if (bp->b_vp == NULL) {
+#ifdef later
+		if (!(bp->b_flags & (B_FOUND|B_BDFLUSH))) {
+			if (bp->b_flags & B_ASYNC)
+				ASSERT(bp->b_iodone);
+		}
+#endif
 		bp->b_bdstrat = xfs_bdstrat_cb;
-		if (error = bwrite(bp)) {
+	}
+	bp->b_fsprivate3 = mp;
+
+	if (error = bwrite(bp)) {
 #ifdef DEBUG
-			printf("------- xfs_bwrite HIT ------- 0x%x\n", bp);
+		printf("------- xfs_bwrite HIT ------- 0x%x\n", bp);
 #endif	
-			ASSERT(mp);
-			buftrace("XFSBWRITE IOERROR", bp);
-			xfs_force_shutdown(mp);
-		}
-	} else {
-		flag = bp->b_flags;
-		buftrace("XFSBWRITE (SHUTDOWN)", bp);
-		(void) xfs_bioerror(bp);	
-		if (flag & B_ASYNC) {
-			if (!(flag & B_DELWRI)) {
-				error = geterror(bp);
-			} else {
-				error = 0;
-			}
-		} else {
-			error = biowait(bp);
-			if (!(bp->b_flags & B_HOLD)) {
-				brelse(bp);
-			}
-		}
- 
+		ASSERT(mp);
+		buftrace("XFSBWRITE IOERROR", bp);
+		xfs_force_shutdown(mp);
 	}
 	return (error);
 }
 
 /*
- * All xfs buffers except for log buffers, get this attached as their
- * b_bdstrat callback function. This is so that we can catch a buffer
+ * All xfs metadata buffers except log state machine buffers
+ * get this attached as their b_bdstrat callback function. 
+ * This is so that we can catch a buffer
  * after prematurely unpinning it to forcibly shutdown the filesystem.
  */
 int
 xfs_bdstrat_cb(struct buf *bp)
 {
-	extern dev_t xfserrordev;
 	struct bdevsw	*my_bdevsw;
-	
-	/* tempXXX - we need to get access to mp here */
-	if (xfserrordev != bp->b_edev) {
+	xfs_mount_t	*mp;
+
+	mp = bp->b_fsprivate3;
+	/*
+	 * b_iodone must be set unless its synchronous write.
+	 * XXXsup BDFLUSH thing is a hack. For some reason, bdflush
+	 * comes across metadata bufs w/o iodone attached.
+	 */
+#ifdef later
+	if (!(bp->b_flags & (B_FOUND|B_BDFLUSH))) {
+		if (bp->b_flags & B_ASYNC)
+			ASSERT(bp->b_iodone);
+	}
+#endif
+	if (!XFS_FORCED_SHUTDOWN(mp)) {
 		my_bdevsw = get_bdevsw(bp->b_edev);
 		ASSERT(my_bdevsw != NULL);
+		bp->b_bdstrat = NULL;
 		bdstrat(my_bdevsw, bp);
 		return 0;
 	} else { 
@@ -4554,6 +4624,8 @@ xfs_bdstrat_cb(struct buf *bp)
 /*
  * Wrapper around bdstrat so that we can stop data
  * from going to disk in case we are shutting down the filesystem.
+ * Typically user data goes thru this path; one of the exceptions
+ * is the superblock.
  */
 int
 xfsbdstrat(
@@ -4580,7 +4652,7 @@ xfsbdstrat(
 	}
 
 	buftrace("XFSBDSTRAT IOERROR", bp);
-	return (xfs_bioerror(bp));
+	return (xfs_bioerror_relse(bp));
 }
 
 
@@ -4610,6 +4682,12 @@ xfs_strategy(
 	 */
 	if (bp->b_blkno >= 0) {
 		xfs_check_bp(ip, bp);
+		/*
+		 * XXXsup We should probably ignore FORCED_SHUTDOWN
+		 * in this case. The disk space is already allocated,
+		 * and this seems like data loss that can be avoided.
+		 * But I need to test it first.
+		 */
 		(void) xfsbdstrat(ip->i_mount, bp);
 		return;
 	}
@@ -4625,7 +4703,7 @@ xfs_strategy(
 	}
 
 	if (XFS_FORCED_SHUTDOWN(ip->i_mount)) {
-		xfs_bioerror(bp);
+		xfs_bioerror_relse(bp);
 		return;
 	}
 	/*

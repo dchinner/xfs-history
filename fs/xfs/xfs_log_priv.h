@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.54 $"
+#ident	"$Revision: 1.55 $"
 
 #include <sys/cmn_err.h>
 
@@ -185,7 +185,8 @@ void xlog_grant_add_space(struct log *log, int bytes, int type);
 #define XLOG_CHKSUM_MISMATCH	0x1	/* used only during recovery */
 #define XLOG_ACTIVE_RECOVERY	0x2	/* in the middle of recovery */
 #define	XLOG_RECOVERY_NEEDED	0x4	/* log was recovered */     
-
+#define XLOG_IO_ERROR		0x8	/* log hit an I/O error, and being
+					   shutdown */
 
 typedef __uint32_t xlog_tid_t;
 

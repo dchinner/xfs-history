@@ -83,14 +83,11 @@ daddr_t xfs_fsb_to_db(struct xfs_inode *ip, xfs_fsblock_t fsb);
 #endif
 
 #define	xfs_bdwrite(mp, bp) \
-          (!XFS_FORCED_SHUTDOWN(mp) ? \
-	   ((bp)->b_bdstrat = xfs_bdstrat_cb, bdwrite(bp)) : \
-	   (void)xfs_bioerror(bp))
+          { ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
+		    (bp)->b_fsprivate3 = (mp); bdwrite(bp);}
 #define	xfs_bawrite(mp, bp) \
-	  (!XFS_FORCED_SHUTDOWN(mp) ? \
-	   ((bp)->b_bdstrat = xfs_bdstrat_cb, bawrite(bp)) : \
-	   (void)xfs_bioerror(bp))
-
+	  { ((bp)->b_vp == NULL) ? (bp)->b_bdstrat = xfs_bdstrat_cb: 0; \
+		    (bp)->b_fsprivate3 = (mp); bawrite(bp);}
 /*
  * Defines for the trace mechanisms in xfs_rw.c.
  */

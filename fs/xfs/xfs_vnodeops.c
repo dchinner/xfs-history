@@ -1,4 +1,4 @@
-#ident "$Revision: 1.316 $"
+#ident "$Revision: 1.317 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1422,7 +1422,6 @@ xfs_fsync(
 			if (error = xfs_trans_reserve(tp, 0,
 					XFS_FSYNC_TS_LOG_RES(ip->i_mount),
 					0, 0, 0))  {
-				ASSERT(0);
 				xfs_trans_cancel(tp, 0);
 				xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 				return error;
@@ -1492,7 +1491,6 @@ xfs_fsync(
 			if (error = xfs_trans_reserve(tp, 0,
 					XFS_FSYNC_TS_LOG_RES(ip->i_mount),
 					0, 0, 0))  {
-				ASSERT(0);
 				xfs_trans_cancel(tp, 0);
 				xfs_iunlock(ip, XFS_IOLOCK_EXCL);
 				return error;

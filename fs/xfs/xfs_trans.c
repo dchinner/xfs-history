@@ -1,4 +1,4 @@
-#ident "$Revision: 1.85 $"
+#ident "$Revision: 1.86 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -556,6 +556,22 @@ xfs_trans_unreserve_and_mod_sb(
 }
 
 
+/*
+ * xfs_trans_commit
+ *
+ * Commit the given transaction to the log a/synchronously.
+ * 
+ * XFS disk error handling mechanism is not based on a typical
+ * transaction abort mechanism. Logically after the filesystem
+ * gets marked 'SHUTDOWN', we can't let any new transactions
+ * be durable - ie. committed to disk. But the external interface
+ * to the transaction mechanism is different, since we can't
+ * implement a 'rollback' once we do a 'logical abort' of a trx.
+ * So, we may let the commit succeed knowing full well
+ * that the changes will never reach the disk. 
+ *
+ * Hence, this routine always returns 0 - SUCCESS.
+ */
 
 /*ARGSUSED*/
 int
@@ -576,13 +592,6 @@ xfs_trans_commit(
 #if defined(SIM) || defined(XLOG_NOLOG) || defined(DEBUG)
 	static xfs_lsn_t	trans_lsn = 1;
 #endif
-	/*
-	 * XFS disk error handling mechanism is not based on a transaction
-	 * abort mechanism. We may let the commit succeed knowing full well
-	 * that the buffer will not reach the disk...
-	 *
-	 * Hence, this routine always returns SUCCESS.
-	 */
 
 	/*
 	 * Determine whether this commit is releasing a permanent
@@ -603,7 +612,8 @@ xfs_trans_commit(
 	 * Also make sure to return any reserved blocks to
 	 * the free pool.
 	 */
-	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
+	if (!(tp->t_flags & XFS_TRANS_DIRTY) ||
+	    XFS_FORCED_SHUTDOWN(mp)) {
 		xfs_trans_unreserve_and_mod_sb(tp);
 		/*
 		 * It is indeed possible for the transaction to be
@@ -879,19 +889,16 @@ xfs_trans_cancel(
 	xfs_log_item_t		*lip;
 	int			i;
 #endif
-
+#if 0
 	if (tp->t_flags & XFS_TRANS_DIRTY) {
 		/* cmn_err(CE_PANIC, "XFS aborting dirty transaction 0x%x\n",
 			tp); */
 		ASSERT(XFS_FORCED_SHUTDOWN(tp->t_mountp));
-		/*
-		 * Don't bother about unreserving'n'stuff.
-		 */
 		xfs_trans_free_items(tp, flags);
 		xfs_trans_free(tp);
 		return;
 	}
-
+#endif
 #ifdef DEBUG
 	if (!(flags & XFS_TRANS_ABORT)) {
 		licp = &(tp->t_items);
@@ -909,11 +916,17 @@ xfs_trans_cancel(
 		}
 	}
 #endif
-
-	xfs_trans_unreserve_and_mod_sb(tp);
-	
-	if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY))
-		xfs_trans_unreserve_and_mod_dquots(tp);
+	/*
+	 * Don't bother about unreserving block reservations,
+	 * if we're shutting down. Just take care of the log reservations
+	 * because the log may be functional still.
+	 */
+	if (!XFS_FORCED_SHUTDOWN(tp->t_mountp)) {
+		xfs_trans_unreserve_and_mod_sb(tp);
+		
+		if (tp->t_dqinfo && (tp->t_flags & XFS_TRANS_DQ_DIRTY))
+			xfs_trans_unreserve_and_mod_dquots(tp);
+	}
 
 	if (tp->t_ticket) {
 		if (flags & XFS_TRANS_RELEASE_LOG_RES) {

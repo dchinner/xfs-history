@@ -65,7 +65,8 @@
 	  (off) += (bytes);}
 
 /* Local miscellaneous function prototypes */
-STATIC xfs_lsn_t xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket);
+STATIC int	 xlog_commit_record(xfs_mount_t *mp, xlog_ticket_t *ticket,
+				    xfs_lsn_t *);
 STATIC xlog_t *  xlog_alloc_log(xfs_mount_t	*mp,
 				dev_t		log_dev,
 				daddr_t		blk_offset,
@@ -87,7 +88,8 @@ STATIC int  xlog_state_get_iclog_space(xlog_t		*log,
 				       int		len,
 				       xlog_in_core_t	**iclog,
 				       xlog_ticket_t	*ticket,
-				       int		*continued_write);
+				       int		*continued_write,
+				       int		*logoffsetp);
 STATIC int  xlog_state_lsn_is_synced(xlog_t	 	*log,
 				     xfs_lsn_t		lsn,
 				     xfs_log_callback_t *cb);
@@ -101,7 +103,7 @@ STATIC void xlog_state_switch_iclogs(xlog_t		*log,
 STATIC int  xlog_state_sync(xlog_t *log, xfs_lsn_t lsn, uint flags);
 STATIC int  xlog_state_sync_all(xlog_t *log, uint flags);
 STATIC void xlog_state_want_sync(xlog_t	*log, xlog_in_core_t *iclog);
-
+STATIC void xlog_state_error(xfs_mount_t *mp);
 
 /* local functions to manipulate grant head */
 STATIC int  xlog_grant_log_space(xlog_t		*log,
@@ -151,6 +153,13 @@ int xlog_req_num  = 0;
 int xlog_error_mod = 33;
 #endif
 
+#ifndef DEBUG
+#define xlog_bwrite(bp)		bwrite(bp)
+#else
+STATIC int xlog_bwrite(buf_t *);
+#endif
+
+#ifdef DEBUG
 /*
  * Wrapper around bwrite for log writes. Useful for isolating log error
  * handling problems.
@@ -160,10 +169,16 @@ xlog_bwrite(
 	buf_t *bp)
 {
 	int error;
-
-#ifdef DEBUG
 	int flag = 0;
+	xlog_t	*log;
 
+	log = ((xlog_in_core_t *)bp->b_fsprivate)->ic_log;
+	if (XFS_FORCED_SHUTDOWN(log->l_mp)) {
+		printf("iclog 0x%x, buf 0x%x, bwritecnt 0x%x\n",
+		       bp->b_fsprivate, bp, 
+		       ((xlog_in_core_t *)bp->b_fsprivate)->ic_bwritecnt);
+		buftrace("XLOGBWRITE SHUTDOWN", bp);
+	}
 	ASSERT(!(((xlog_in_core_t *)bp->b_fsprivate)->ic_state &
 		 XLOG_STATE_IOERROR));
 	if (xlog_do_error &&
@@ -173,15 +188,10 @@ xlog_bwrite(
 		flag = bp->b_flags;
 		bioerror(bp, error);
 	} else
-#endif
 	{
 		error = bwrite(bp);
 	}
 	if (error) {
-		xfs_mount_t *mp;
-		mp = ((xlog_in_core_t *)bp->b_fsprivate)->ic_log->l_mp;
-		xfs_force_shutdown(mp);
-#ifdef DEBUG
 		/*
 		 * This is only for error recovery debugging.
 		 */
@@ -206,11 +216,10 @@ xlog_bwrite(
 			}
 #endif
 		}
-#endif
 	}
 	return (error);
-	
 }
+#endif
 
 /*
  * 0 => disable log manager
@@ -341,9 +350,14 @@ xfs_log_done(xfs_mount_t	*mp,
 		return 0;
 #endif
 
+	if (log->l_flags & XLOG_IO_ERROR)
+		return (0);
+
 	/* If nothing was ever written, don't write out commit record */
-	if ((ticket->t_flags & XLOG_TIC_INITED) == 0)
-		lsn = xlog_commit_record(mp, ticket);
+	if ((ticket->t_flags & XLOG_TIC_INITED) == 0) {
+		if (xlog_commit_record(mp, ticket, &lsn))
+			return (-1);
+	}
 
 	if ((ticket->t_flags & XLOG_TIC_PERM_RESERV) == 0 ||
 	    (flags & XFS_LOG_REL_PERM_RESERV)) {
@@ -393,7 +407,7 @@ xfs_log_force(xfs_mount_t *mp,
 		return 0;
 #endif
 	ASSERT(flags & XFS_LOG_FORCE);
-	if (log->l_iclog->ic_state != XLOG_STATE_IOERROR) {
+	if ((log->l_flags & XLOG_IO_ERROR) == 0) {
 		if (lsn == 0)
 			return (xlog_state_sync_all(log, flags));
 		else 
@@ -646,7 +660,12 @@ xfs_log_unmount(xfs_mount_t *mp)
 			/* remove inited flag */
 			((xlog_ticket_t *)tic)->t_flags = 0;	
 			error = xlog_write(mp, reg, 1, tic, &lsn, 
-					   XLOG_UNMOUNT_TRANS); 
+					   XLOG_UNMOUNT_TRANS);
+			/*
+			 * XXXsup At this point, we're umounting anyway,
+			 * so is there any point in transitioning log state
+			 * to IOERROR?
+			 */
 		}
 
 		if (error) {
@@ -695,6 +714,7 @@ xfs_log_write(xfs_mount_t *	mp,
 	      xfs_log_ticket_t	tic,
 	      xfs_lsn_t		*start_lsn)
 {
+	int	error;
 #if defined(SIM) || defined(DEBUG) || defined(XLOG_NOLOG)
 	xlog_t *log = mp->m_log;
 
@@ -703,8 +723,10 @@ xfs_log_write(xfs_mount_t *	mp,
 		return 0;
 	}
 #endif
-
-	return xlog_write(mp, reg, nentries, tic, start_lsn, 0);
+	if (error = xlog_write(mp, reg, nentries, tic, start_lsn, 0)) {
+		xlog_state_error(mp);
+	}
+	return (error);
 }	/* xfs_log_write */
 
 
@@ -877,42 +899,26 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 void
 xlog_iodone(buf_t *bp)
 {
-	xlog_in_core_t *iclog, *ic;
-	int		spl;
+	xlog_in_core_t *iclog;
 
 	iclog = (xlog_in_core_t *)(bp->b_fsprivate);
 	ASSERT(bp->b_fsprivate2 == (void *)((unsigned long)2));
 	bp->b_fsprivate2 = (void *)((unsigned long)1);
 
 	/*
-	 * XXXXsup Race to shutdown the filesystem if we see an error.
+	 * Race to shutdown the filesystem if we see an error.
 	 */
 	if (geterror(bp)) {
-		ASSERT(XFS_FORCED_SHUTDOWN(iclog->ic_log->l_mp) ||
-		       (bp->b_flags & B_ASYNC));
-		spl = LOG_LOCK(iclog->ic_log);
-		if (! XFS_FORCED_SHUTDOWN(iclog->ic_log->l_mp)) {	
-			LOG_UNLOCK(iclog->ic_log, spl);
-			xfs_force_shutdown(iclog->ic_log->l_mp);
-			spl = LOG_LOCK(iclog->ic_log);
-		}
-		if (iclog->ic_state != XLOG_STATE_IOERROR) {
 #ifdef DEBUG
-			cmn_err(CE_ALERT, 
-				"xlog_iodone: log write error 0x%x", bp);
+		cmn_err(CE_ALERT, 
+			"xlog_iodone: log write error buf 0x%x",
+			bp);
 #endif
-			/*
-			 * Mark all the incore logs IOERROR.
-			 * From now on, no log flushes will result.
-			 */
-			ic = iclog;
-			do {
-				ic->ic_state = XLOG_STATE_IOERROR;
-				ic = ic->ic_next;
-			} while (ic != iclog);
-		}
-		LOG_UNLOCK(iclog->ic_log, spl);
+		xlog_state_error(iclog->ic_log->l_mp);
 	}
+	/* XXXsup We've already done a xlog_state_do_callback in
+	   xlog_state_error. Do we have to do this?
+	   */
 	xlog_state_done_syncing(iclog);
 	if ( !(bp->b_flags & B_ASYNC) ) {
 		/* Corresponding psema() will be done in bwrite().  If we don't
@@ -936,9 +942,6 @@ xlog_iodone(buf_t *bp)
  * larger size since the directory code currently logs entire blocks.
  * XXXmiken XXXcurtis
  */
-int xlogs = 0;
-int xlogsize = 0;
-int xloglog = 0;
 
 STATIC void
 xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
@@ -1035,13 +1038,6 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 				break;
 			}
 		}
-	}
-
-	/* DEBUG code */
-	if (xlogs != 0) {
-		log->l_iclog_bufs = xlogs;
-		log->l_iclog_size = xlogsize;
-		log->l_iclog_size_log = xloglog;
 	}
 }	/* xlog_get_iclog_buffer_size */
 
@@ -1161,24 +1157,22 @@ xlog_alloc_log(xfs_mount_t	*mp,
  * Write out the commit record of a transaction associated with the given
  * ticket.  Return the lsn of the commit record.
  */
-STATIC xfs_lsn_t
+STATIC int
 xlog_commit_record(xfs_mount_t  *mp,
-		   xlog_ticket_t *ticket)
+		   xlog_ticket_t *ticket,
+		   xfs_lsn_t	*commitlsnp)
 {
 	int		error;
 	xfs_log_iovec_t	reg[1];
-	xfs_lsn_t	commit_lsn;
 	
 	reg[0].i_addr = 0;
 	reg[0].i_len = 0;
 
-	error = xlog_write(mp, reg, 1, ticket, &commit_lsn, XLOG_COMMIT_TRANS);
-	if (error) {
-		/* xlog_panic("xlog_commit_record: Can't commit transaction"); */
-		return (-1);
+	if (error = xlog_write(mp, reg, 1, ticket, commitlsnp, 
+			       XLOG_COMMIT_TRANS)) {
+		xlog_state_error(mp);
 	}
-
-	return commit_lsn;
+	return (error);
 }	/* xlog_commit_record */
 
 
@@ -1236,7 +1230,14 @@ xlog_grant_push_ail(xfs_mount_t	*mp,
 	    threshold_lsn = log->l_last_sync_lsn;
     }
     GRANT_UNLOCK(log, spl);
-    if (threshold_lsn)
+    
+    /*
+     * Get the transaction layer to kick the dirty buffers out to
+     * disk asynchronously. No point in trying to do this if
+     * the filesystem is shutting down.
+     */
+    if (threshold_lsn && 
+	!XFS_FORCED_SHUTDOWN(mp))
 	    xfs_trans_push_ail(mp, threshold_lsn);
 }	/* xlog_grant_push_ail */
 
@@ -1335,7 +1336,8 @@ xlog_sync(xlog_t		*log,
 	 * is shutting down.
 	 */
 	if (error = xlog_bwrite(bp)) {
-		xfs_ioerror_alert("xlog_sync", log->l_mp, bp->b_edev, bp->b_blkno);
+		xfs_ioerror_alert("xlog_sync", log->l_mp, bp->b_edev, 
+				  bp->b_blkno);
 		return (error);
 	}
 	if (split) {
@@ -1500,6 +1502,7 @@ xlog_write(xfs_mount_t *	mp,
     int		     copy_off;	     /* # bytes from entry start */
     int		     contwr;	     /* continued write of in-core log? */
     int		     firstwr = 0;    /* first write of transaction */
+    int		     error;
 
     partial_copy_len = partial_copy = 0;
 
@@ -1522,13 +1525,9 @@ xlog_write(xfs_mount_t *	mp,
 	ticket->t_curr_res -= len;
     
     for (index = 0; index < nentries; ) {
-	log_offset =
-		xlog_state_get_iclog_space(log, len, &iclog, ticket, &contwr);
-	/*
-	 * If an error happened, we should just get out of here.
-	 */
-	if (log_offset == -1)
-		return (EIO);
+	if (error = xlog_state_get_iclog_space(log, len, &iclog, ticket, 
+					       &contwr, &log_offset))
+		return (error);
 
 	ASSERT(log_offset <= iclog->ic_size - 1);
 	ptr = (__psint_t) &iclog->ic_data[log_offset];
@@ -1624,8 +1623,8 @@ xlog_write(xfs_mount_t *	mp,
 	    firstwr = 0;
 	    if (partial_copy) {			/* copied partial region */
 		    /* already marked WANT_SYNC */
-		    if (xlog_state_release_iclog(log, iclog))
-			    return (EIO);
+		    if (error = xlog_state_release_iclog(log, iclog))
+			    return (error);
 		    break;			/* don't increment index */
 	    } else {				/* copied entire region */
 		index++;
@@ -1633,8 +1632,8 @@ xlog_write(xfs_mount_t *	mp,
 
 		if (iclog->ic_size - log_offset <= sizeof(xlog_op_header_t)) {
 		    xlog_state_want_sync(log, iclog);
-		    if (xlog_state_release_iclog(log, iclog))
-			   return (EIO); 
+		    if (error = xlog_state_release_iclog(log, iclog))
+			   return (error); 
 		    if (index == nentries)
 			    return 0;		/* we are done */
 		    else
@@ -1788,7 +1787,7 @@ clean:
 	 * STATE_IOERROR.
 	 */
 	xlog_state_clean_log(log);
-	/* XXXsup, re-eval this */
+
 	if (log->l_iclog->ic_state & (XLOG_STATE_ACTIVE|XLOG_STATE_IOERROR)) {
 		flushcnt = log->l_flushcnt;
 		log->l_flushcnt = 0;
@@ -1831,10 +1830,6 @@ xlog_state_done_syncing(
 	ASSERT(iclog->ic_bwritecnt == 1 || iclog->ic_bwritecnt == 2);
 
 	
-	if (--iclog->ic_bwritecnt == 1) {
-		LOG_UNLOCK(log, spl);
-		return;
-	}
 	/*
 	 * If we got an error, either on the first buffer, or in the case of
 	 * split log writes, on the second, we mark ALL iclogs STATE_IOERROR,
@@ -1842,17 +1837,19 @@ xlog_state_done_syncing(
 	 * again.
 	 */
 	if (iclog->ic_state != XLOG_STATE_IOERROR) {
+		if (--iclog->ic_bwritecnt == 1) {
+			LOG_UNLOCK(log, spl);
+			return;
+		}
 		iclog->ic_state = XLOG_STATE_DONE_SYNC;
 	} 
 
 	/*
 	 * Someone could be sleeping on the next iclog even though it is
 	 * in the ACTIVE state.  We kick off one thread to force the
-	 * iclog buffer out.  See xlog_state_sync() for more details.
-	 * We shouldn't need to do this for STATE_IOERROR, because
-	 * xlog_state_do_callback() does an sv_broadcast.
+	 * iclog buffer out.
 	 */
-	if (iclog->ic_next->ic_state == XLOG_STATE_ACTIVE)
+	if (iclog->ic_next->ic_state == (XLOG_STATE_ACTIVE|XLOG_STATE_IOERROR))
 		sv_signal(&iclog->ic_next->ic_forcesema);
 	LOG_UNLOCK(log, spl);
 	xlog_state_do_callback(log);	/* also cleans log */
@@ -1862,6 +1859,7 @@ xlog_state_done_syncing(
 /*
  * Update counters atomically now that bcopy is done.
  */
+/* ARGSUSED */
 void
 xlog_state_finish_copy(xlog_t		*log,
 		       xlog_in_core_t	*iclog,
@@ -1907,12 +1905,14 @@ xlog_state_get_iclog_space(xlog_t	  *log,
 			   int		  len,
 			   xlog_in_core_t **iclogp,
 			   xlog_ticket_t  *ticket,
-			   int		  *continued_write)
+			   int		  *continued_write,
+			   int		  *logoffsetp)
 {
 	int		  spl;
 	int		  log_offset;
 	xlog_rec_header_t *head;
 	xlog_in_core_t	  *iclog;
+	int		  error;
 
 	xlog_state_do_callback(log);	/* also cleans log */
 
@@ -1922,7 +1922,7 @@ restart:
 	iclog = log->l_iclog;
 	if (iclog->ic_state & XLOG_STATE_IOERROR) {
 		LOG_UNLOCK(log, spl);
-		return (-1);
+		return XFS_ERROR(EIO);
 	}
 	if (! (iclog->ic_state == XLOG_STATE_ACTIVE)) {
 		log->l_flushcnt++;
@@ -1970,8 +1970,8 @@ restart:
 		/* If I'm the only one writing to this iclog, sync it to disk */
 		if (iclog->ic_refcnt == 1) {
 			LOG_UNLOCK(log, spl);
-			if (xlog_state_release_iclog(log, iclog))
-				return (-1);
+			if (error = xlog_state_release_iclog(log, iclog))
+				return (error);
 		} else {
 			iclog->ic_refcnt--;
 			LOG_UNLOCK(log, spl);
@@ -1996,7 +1996,9 @@ restart:
 
 	ASSERT(iclog->ic_offset <= iclog->ic_size);
 	LOG_UNLOCK(log, spl);
-	return log_offset;
+
+	*logoffsetp = log_offset;
+	return 0;
 }	/* xlog_state_get_iclog_space */
 
 /*
@@ -3029,6 +3031,14 @@ xfs_log_force_umount(
 
 	LOG_UNLOCK(log, spl2);
 
+	/*
+	 * We don't want anybody waiting for log reservations
+	 * after this. That means we have to wake up everybody
+	 * queued up on reserve_headq as well as write_headq.
+	 * In addition, we make sure in xlog_{re}grant_log_space
+	 * that we don't enqueue anything once the SHUTDOWN flag
+	 * is set, and this action is protected by the GRANTLOCK.
+	 */
 	if (tic = log->l_reserve_headq) {
 #ifdef DEBUG
 		printf("Waking up waitors on reserve_headq\n");
@@ -3049,15 +3059,66 @@ xfs_log_force_umount(
 		} while (tic != log->l_write_headq);
 	}
 	GRANT_UNLOCK(log, spl);
-
+	
 	xlog_state_sync_all(log, XFS_LOG_FORCE);
+	/* tmp */
+	xlog_state_error(mp);
+}
 
+/*
+ * This is called when we get a log I/O error.
+ * We request that the filesystem be shutdown, and transition the
+ * states of all the iclogs to IOERROR.
+*/
+STATIC void
+xlog_state_error(
+	xfs_mount_t	*mp)
+{
+	xlog_in_core_t 	*iclog, *ic;
+	int		spl;
+	xlog_t		*log;
+
+	log = (xlog_t *)mp->m_log;
+	spl = LOG_LOCK(log);
+	iclog = log->l_iclog;
+	
+	/*
+	 * We need to transition the iclogs to IOERROR state before
+	 * we attempt to mark the filesystem SHUTDOWN. We don't
+	 * want any more log forces to queue up, and xfs_force_shutdown
+	 * sends in  a xlog_state_sync_all(SYNC).
+	 */
+	if (!(log->l_flags & XLOG_IO_ERROR)) {
+#ifdef DEBUG
+		/* XXXsup We probably should print this properly, 
+		   even when NDEBUG */
+		cmn_err(CE_ALERT, 
+			"xlog_state_error: log write error in mp 0x%x",
+			mp);
+#endif
+		log->l_flags |= XLOG_IO_ERROR;
+		/*
+		 * Mark all the incore logs IOERROR.
+		 * From now on, no log flushes will result.
+		 */
+		ic = iclog;
+		do {
+			ic->ic_state = XLOG_STATE_IOERROR;
+			ic = ic->ic_next;
+		} while (ic != iclog);
+	}
+	LOG_UNLOCK(log, spl);
+
+	if (! XFS_FORCED_SHUTDOWN(mp))
+		xfs_force_shutdown(mp);
+	
 	/*
 	 * Wake up everybody waiting on xfs_log_force.
 	 * Callback all log item committed functions as if the
-	 * log writes were completed.
+	 * log writes were completed. We don't do this in log_force_umount
+	 * because we want to be able to continue doign log operations
+	 * even when the filesystem is shutting down so long as there aren't
+	 * any log write errors.
 	 */
 	xlog_state_do_callback(log);
-	
 }
-

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.209 $"
+#ident "$Revision: 1.212 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -1083,12 +1083,17 @@ xfs_isize_check(
 	nimaps = 2;
 	map_first = XFS_B_TO_FSB(mp, (xfs_ufsize_t)isize);
 	firstblock = NULLFSBLOCK;
-	(void) xfs_bmapi(NULL, ip, map_first,
+	/*
+	 * The filesystem could be shutting down, so bmapi may return
+	 * an error.
+	 */
+	if (xfs_bmapi(NULL, ip, map_first,
 			 (XFS_B_TO_FSB(mp,
 				       (xfs_ufsize_t)XFS_MAX_FILE_OFFSET) -
 			  map_first),
 			 XFS_BMAPI_ENTIRE, &firstblock, 0, imaps, &nimaps,
-			 NULL);
+			 NULL))
+	    return;
 	ASSERT(nimaps == 1);
 	ASSERT(imaps[0].br_startblock == HOLESTARTBLOCK);
 }

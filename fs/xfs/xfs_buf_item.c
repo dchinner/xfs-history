@@ -1,4 +1,4 @@
-#ident "$Revision: 1.55 $"
+#ident "$Revision: 1.56 $"
 
 /*
  * This file contains the implementation of the xfs_buf_log_item.
@@ -69,7 +69,6 @@ xfs_buf_item_log_check(
 #endif
 
 STATIC void	xfs_buf_error_relse(buf_t *bp);
-STATIC void	xfs_buf_error_iodone(buf_t *bp);
 
 /*
  * This returns the number of log iovecs needed to log the
@@ -1153,49 +1152,6 @@ xfs_buf_do_callbacks(
 }
 	
 /*
- * We've already given the last chance for a buffer error
- * to correct itself. If we get to this point and the buffer
- * still indicates an error, we shutdown the filesystem.
- */
-STATIC void
-xfs_buf_error_iodone(
-	buf_t 	*bp)
-{
-	ASSERT(bp->b_fsprivate);
-
-	bp->b_iodone = NULL;
-
-	/*
-	 * We got lucky!
-	 */
-	if (! geterror(bp)) {
-		biodone(bp);
-		return;
-	}
-
-#ifdef DEBUG
-	printf("Error IODONE bp 0x%x, flags 0x%x, mp 0x%x\n",
-	       bp, bp->b_flags, 
-	       ((xfs_log_item_t *)bp->b_fsprivate)->li_mountp);
-#endif	
-	xfs_force_shutdown(((xfs_log_item_t *)bp->b_fsprivate)->li_mountp);
-	bioerror(bp, EIO);
-	bp->b_flags |= B_STALE;
-	bp->b_flags &= ~(B_DELWRI);
-#ifndef SIM
-	buftrace("BUF_IODONE ERROR", bp);
-#endif
-	/*
-	 * We have to unpin the pinned buffers, 
-	 * so we have to do the callbacks.
-	 */
-	xfs_buf_do_callbacks(bp, (xfs_log_item_t *)bp->b_fsprivate);
-	bp->b_fsprivate = NULL;
-	ASSERT(bp->b_relse == NULL);	
-	brelse(bp);
-}
-
-/*
  * This is the iodone() function for buffers which have had callbacks
  * attached to them by xfs_buf_attach_iodone().  It should remove each
  * log item from the buffer's list and call the callback of each in turn.
@@ -1218,25 +1174,35 @@ xfs_buf_iodone_callbacks(
 		 * If we've already decided to shutdown the filesystem
 		 * because of IO errors, there's no point in giving this
 		 * a retry.
-		 */
+		 */ 
 		if (XFS_FORCED_SHUTDOWN(lip->li_mountp)) {
 			ASSERT(bp->b_edev == lip->li_mountp->m_dev);
-			bioerror(bp, EIO);
 			bp->b_flags |= B_STALE;
-			bp->b_flags &= ~(B_DONE|B_BDFLUSH|B_DELWRI);
+			bp->b_flags &= ~(B_DONE|B_DELWRI); 
 #ifndef SIM
 			buftrace("BUF_IODONE_CB", bp);
 #endif
 			xfs_buf_do_callbacks(bp, lip);
 			bp->b_fsprivate = NULL;
 			bp->b_iodone = NULL;
-			if (!(bp->b_flags & B_ASYNC))
-				vsema(&bp->b_iodonesema);
-			else
+
+			/*
+			 * XFS_SHUT flag gets set when we go thru the
+			 * entire buffer cache and deliberately start
+			 * throwing away delayed write buffers.
+			 * Since there's no biowait done on those,
+			 * we should just brelse them.
+			 */
+			if (bp->b_flags2 & B_XFS_SHUT) {
+				bp->b_flags2 &= ~B_XFS_SHUT;
 				brelse(bp);
+			} else {
+				biodone(bp);
+			}
+			
 			return;
 		}
-#ifdef DEBUG
+#ifdef XFSERRORDEBUG
 		printf("Error bp 0x%x, flags 0x%x, mp 0x%x\n",
 		       bp, bp->b_flags, 
 		       lip->li_mountp);
@@ -1258,8 +1224,10 @@ xfs_buf_iodone_callbacks(
 			 */
 			bp->b_error = 0;
 			bp->b_flags &= ~B_ERROR;
-			bp->b_flags |= B_DELWRI | B_DONE;
-			bp->b_start = lbolt;
+			if (!(bp->b_flags & B_STALE)) {
+				bp->b_flags |= B_DELWRI | B_DONE;
+				bp->b_start = lbolt;
+			}
 			brelse(bp);
 		} else {
 			/*
@@ -1298,48 +1266,27 @@ STATIC void
 xfs_buf_error_relse(
 	buf_t	*bp)
 {
-	xfs_mount_t 	*mp;
 	xfs_log_item_t 	*lip;
 
 	lip = (xfs_log_item_t *)bp->b_fsprivate;
-	mp = lip->li_mountp;
-	/*
-	 * If we've already decided to shutdown the filesystem
-	 * because of IO errors, there's no point in giving this
-	 * a retry.
-	 */
-	if (XFS_FORCED_SHUTDOWN(mp)) {
-		ASSERT(bp->b_edev == mp->m_dev);
-		bioerror(bp, EIO);
-		bp->b_flags |= B_STALE;
-		bp->b_flags &= ~(B_DELWRI);
-#ifndef SIM
-		buftrace("BUF_ERROR_RELSE", bp);
-#endif
-		/*
-		 * We have to unpin the pinned buffers so do the
-		 * callbacks.
-		 */
-		xfs_buf_do_callbacks(bp, lip);
-		bp->b_fsprivate = NULL;
-		bp->b_relse = NULL;
-		brelse(bp);
-		return;
-	}
-#ifdef DEBUG
-	printf("Error bp 0x%x, flags 0x%x, mp 0x%x\n",
-	       bp, bp->b_flags, mp);
-#endif
-	if (!(bp->b_flags & B_STALE)) {
-		bp->b_flags &= ~B_ERROR;
-		bp->b_error = 0;
-		bp->b_flags |= B_DELWRI | B_DONE;
-		bp->b_start = lbolt;
-		bp->b_iodone = xfs_buf_error_iodone;
-	}
 
+	ASSERT(bp->b_edev == lip->li_mountp->m_dev);
+	bioerror(bp, EIO);
+	bp->b_flags |= B_STALE|B_DONE;
+	bp->b_flags &= ~(B_DELWRI);
+#ifndef SIM
+	buftrace("BUF_ERROR_RELSE", bp);
+#endif
+	/*
+	 * We have to unpin the pinned buffers so do the
+	 * callbacks.
+	 */
+	xfs_buf_do_callbacks(bp, lip);
+	bp->b_fsprivate = NULL;
 	bp->b_relse = NULL;
 	brelse(bp);
+	return;
+
 }
 
 
@@ -1362,7 +1309,7 @@ xfs_buf_iodone(
 	ASSERT(bip->bli_buf == bp);
 
 	mp = bip->bli_item.li_mountp;
-#ifdef DEBUG
+#ifdef XFSERRORDEBUG
 	if (!(((xfs_log_item_t *)bip)->li_flags & XFS_LI_IN_AIL)) {
 		printf("Not in AIL, bip 0x%x\n", bip);
 	}

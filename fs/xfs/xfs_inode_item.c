@@ -1,4 +1,4 @@
-#ident "$Revision: 1.68 $"
+#ident "$Revision: 1.69 $"
 
 /*
  * This file contains the implementation of the xfs_inode_log_item.
@@ -588,10 +588,13 @@ xfs_inode_item_trylock(
 		}
 		/* NOTREACHED */
 	}
-	ASSERT(iip->ili_format.ilf_fields != 0);
-	ASSERT(iip->ili_logged == 0);
-	ASSERT(iip->ili_item.li_flags & XFS_LI_IN_AIL);
-	
+#ifdef DEBUG
+	if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
+		ASSERT(iip->ili_format.ilf_fields != 0);
+		ASSERT(iip->ili_logged == 0);
+		ASSERT(iip->ili_item.li_flags & XFS_LI_IN_AIL);
+	}
+#endif
 	return XFS_ITEM_SUCCESS;
 }
 
@@ -824,7 +827,8 @@ xfs_inode_item_push(
 	 * lock without sleeping, then there must not have been
 	 * anyone in the process of flushing the inode.
 	 */
-	ASSERT(iip->ili_format.ilf_fields != 0);
+	ASSERT(XFS_FORCED_SHUTDOWN(ip->i_mount) ||
+	       iip->ili_format.ilf_fields != 0);
 
 	/*
 	 * Write out the inode.  The completion routine ('iflush_done') will
