@@ -2836,7 +2836,7 @@ xfs_strat_write(
 		locals->loops = 0;
 		while (locals->nimaps == 0) {
 			locals->tp = xfs_trans_alloc(locals->mp,
-						     XFS_TRANS_FILE_WRITE);
+						     XFS_TRANS_STRAT_WRITE);
 			locals->error = xfs_trans_reserve(locals->tp, 0,
 					XFS_WRITE_LOG_RES(locals->mp),
 					0, XFS_TRANS_PERM_LOG_RES,
@@ -3375,7 +3375,7 @@ xfs_diostrat( buf_t *bp)
 				/*
  				 * Setup transactions.
  				 */
-				tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
+				tp = xfs_trans_alloc( mp, XFS_TRANS_DIOSTRAT);
 				error = xfs_trans_reserve( tp, 
 					   XFS_BM_MAXLEVELS(mp) + count_fsb, 
 					   XFS_WRITE_LOG_RES(mp),

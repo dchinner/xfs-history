@@ -1,6 +1,6 @@
 #ifndef	_XFS_LOG_PRIV_H
 #define _XFS_LOG_PRIV_H
-#ident	"$Revision: 1.33 $"
+#ident	"$Revision: 1.36 $"
 
 #include <sys/cmn_err.h>
 
@@ -286,6 +286,9 @@ typedef struct log {
 /* common routines */
 extern xfs_lsn_t xlog_assign_tail_lsn(xfs_mount_t *mp, xlog_in_core_t *iclog);
 extern int	 xlog_find_head(xlog_t *log, daddr_t *head_blk);
+extern int	 xlog_find_tail(xlog_t	*log,
+				daddr_t *head_blk,
+				daddr_t *tail_blk);
 extern int	 xlog_print_find_oldest(xlog_t *log, daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);

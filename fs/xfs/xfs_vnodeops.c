@@ -525,11 +525,11 @@ xfs_setattr(vnode_t	*vp,
 	lock_flags = XFS_ILOCK_EXCL;
 	ASSERT(!(mask & AT_SIZE) || (mask == AT_SIZE));
 	if (!(mask & AT_SIZE)) {
-		tp = xfs_trans_alloc (mp, 0);
-		if (code = xfs_trans_reserve (tp, 0,
-					      XFS_ICHANGE_LOG_RES(mp), 0,
-					      0, 0)) {
-			xfs_trans_cancel (tp, 0);
+		tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_NOT_SIZE);
+		if (code = xfs_trans_reserve(tp, 0,
+					     XFS_ICHANGE_LOG_RES(mp), 0,
+					     0, 0)) {
+			xfs_trans_cancel(tp, 0);
 			return code;
 		}
 		commit_flags = 0;
@@ -699,12 +699,12 @@ xfs_setattr(vnode_t	*vp,
 		} else {
 			xfs_iunlock (ip, XFS_ILOCK_EXCL);
 		}
-		tp = xfs_trans_alloc (mp, 0);
-		if (code = xfs_trans_reserve (tp, 0,
-					      XFS_ITRUNCATE_LOG_RES(mp), 0,
-					      XFS_TRANS_PERM_LOG_RES,
-					      XFS_ITRUNCATE_LOG_COUNT)) {
-			xfs_trans_cancel (tp, 0);
+		tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_SIZE);
+		if (code = xfs_trans_reserve(tp, 0,
+					     XFS_ITRUNCATE_LOG_RES(mp), 0,
+					     XFS_TRANS_PERM_LOG_RES,
+					     XFS_ITRUNCATE_LOG_COUNT)) {
+			xfs_trans_cancel(tp, 0);
 			xfs_iunlock (ip, XFS_IOLOCK_EXCL);
 			return code;
 		}
@@ -832,7 +832,7 @@ xfs_setattr(vnode_t	*vp,
 error_return:
 
 	if (tp) {
-		xfs_trans_cancel (tp, commit_flags);
+		xfs_trans_cancel(tp, commit_flags);
 	}
 	xfs_iunlock (ip, lock_flags);
 
@@ -1067,7 +1067,7 @@ xfs_inactive(vnode_t	*vp,
 	ASSERT(ip->i_d.di_nlink >= 0);
 	if (ip->i_d.di_nlink == 0) {
 		mp = ip->i_mount;
-		tp = xfs_trans_alloc(mp, 0);
+		tp = xfs_trans_alloc(mp, XFS_TRANS_INACTIVE);
 
 		if (truncate) {
 			/*
@@ -1482,9 +1482,9 @@ xfs_dir_ialloc(
 		if (committed != NULL)
 			*committed = 1;
 
-		if (code = xfs_trans_reserve (tp, 0, log_res, 0,
-					      XFS_TRANS_PERM_LOG_RES,
-					      log_count)) {
+		if (code = xfs_trans_reserve(tp, 0, log_res, 0,
+					     XFS_TRANS_PERM_LOG_RES,
+					     log_count)) {
 			ASSERT(0);
 			*tpp = NULL;
 			return code;
@@ -1616,7 +1616,7 @@ try_again:
 	dp_joined_to_trans = B_FALSE;
 	truncated = B_FALSE;
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	tp = xfs_trans_alloc(mp, 0);
+	tp = xfs_trans_alloc(mp, XFS_TRANS_CREATE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
 	/*
 	 * Initially assume that the file does not exist and
@@ -1733,7 +1733,7 @@ try_again:
 			xfs_itruncate_start(ip, XFS_ITRUNC_MAYBE, 0);
 		}
 
-		tp = xfs_trans_alloc(mp, 0);
+		tp = xfs_trans_alloc(mp, XFS_TRANS_CREATE_TRUNC);
 		if (error = xfs_trans_reserve(tp, 0,
 					      XFS_ITRUNCATE_LOG_RES(mp), 0,
 					      XFS_TRANS_PERM_LOG_RES,
@@ -2184,7 +2184,7 @@ xfs_truncate_file(
 	xfs_ilock(ip, XFS_IOLOCK_EXCL);
 	xfs_itruncate_start(ip, XFS_ITRUNC_DEFINITE, (xfs_fsize_t)0);
 
-	tp = xfs_trans_alloc(mp, 0);
+	tp = xfs_trans_alloc(mp, XFS_TRANS_TRUNCATE_FILE);
 	if (error = xfs_trans_reserve(tp, 0, XFS_ITRUNCATE_LOG_RES(mp), 0,
 				      XFS_TRANS_PERM_LOG_RES,
 				      XFS_ITRUNCATE_LOG_COUNT)) {
@@ -2231,11 +2231,11 @@ xfs_remove(vnode_t	*dir_vp,
 	vn_trace_entry(dir_vp, "xfs_remove");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
  retry:
-	tp = xfs_trans_alloc (mp, 0);
+	tp = xfs_trans_alloc(mp, XFS_TRANS_REMOVE);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(mp),
-				       0, XFS_TRANS_PERM_LOG_RES,
-				       XFS_REMOVE_LOG_COUNT)) {
+        if (error = xfs_trans_reserve(tp, 10, XFS_REMOVE_LOG_RES(mp),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_REMOVE_LOG_COUNT)) {
 		cancel_flags = 0;
 		/*
 		 * If we can't reserve the necessary amount of space,
@@ -2361,7 +2361,7 @@ xfs_remove(vnode_t	*dir_vp,
 	return 0;
 
 error_return:
-	xfs_trans_cancel (tp, cancel_flags);
+	xfs_trans_cancel(tp, cancel_flags);
 	return error;
 
 }
@@ -2399,11 +2399,11 @@ xfs_link(vnode_t	*target_dir_vp,
                 return XFS_ERROR(EPERM);
 
 	mp = XFS_VFSTOM(target_dir_vp->v_vfsp);
-        tp = xfs_trans_alloc (mp, 0);
+        tp = xfs_trans_alloc(mp, XFS_TRANS_LINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve (tp, 10, XFS_LINK_LOG_RES(mp),
-				       0, XFS_TRANS_PERM_LOG_RES,
-				       XFS_LINK_LOG_COUNT)) {
+        if (error = xfs_trans_reserve(tp, 10, XFS_LINK_LOG_RES(mp),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_LINK_LOG_COUNT)) {
 		cancel_flags = 0;
                 goto error_return;
 	}
@@ -2465,7 +2465,7 @@ xfs_link(vnode_t	*target_dir_vp,
 	return 0;
 
 error_return:
-	xfs_trans_cancel (tp, cancel_flags);
+	xfs_trans_cancel(tp, cancel_flags);
 
 	return error;
 }
@@ -2710,11 +2710,11 @@ xfs_rename(vnode_t	*src_dir_vp,
 start_over:
 
 	mp = XFS_VFSTOM(src_dir_vp->v_vfsp);
-	tp = xfs_trans_alloc (mp, 0);
+	tp = xfs_trans_alloc(mp, XFS_TRANS_RENAME);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve (tp, 10, XFS_RENAME_LOG_RES(mp),
-				       0, XFS_TRANS_PERM_LOG_RES,
-				       XFS_RENAME_LOG_COUNT)) {
+        if (error = xfs_trans_reserve(tp, 10, XFS_RENAME_LOG_RES(mp),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_RENAME_LOG_COUNT)) {
 		cancel_flags = 0;
                 goto error_return;
 	}
@@ -2861,7 +2861,7 @@ start_over:
 			goto error_return;
 
 			if (state_has_changed) {
-				xfs_trans_cancel (tp, 0);
+				xfs_trans_cancel(tp, 0);
 				goto start_over;
 			}
 		}
@@ -3046,7 +3046,7 @@ start_over:
 
 error_return:
 
-	xfs_trans_cancel (tp, cancel_flags);
+	xfs_trans_cancel(tp, cancel_flags);
 	return error;
 
 }
@@ -3079,12 +3079,12 @@ xfs_mkdir(vnode_t	*dir_vp,
 
 	vn_trace_entry(dir_vp, "xfs_mkdir");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-        tp = xfs_trans_alloc (mp, 0);
+        tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (code = xfs_trans_reserve (tp, XFS_IALLOC_BLOCKS(mp) + 10,
-				      XFS_MKDIR_LOG_RES(mp), 0,
-				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_MKDIR_LOG_COUNT)) {
+        if (code = xfs_trans_reserve(tp, XFS_IALLOC_BLOCKS(mp) + 10,
+				     XFS_MKDIR_LOG_RES(mp), 0,
+				     XFS_TRANS_PERM_LOG_RES,
+				     XFS_MKDIR_LOG_COUNT)) {
 		cancel_flags = 0;
 		dp = NULL;
 		goto error_return;
@@ -3171,7 +3171,7 @@ xfs_mkdir(vnode_t	*dir_vp,
 	return 0;
 
 error_return:
-	xfs_trans_cancel (tp, cancel_flags);
+	xfs_trans_cancel(tp, cancel_flags);
 
 	if (! dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock (dp, XFS_ILOCK_EXCL);
@@ -3205,11 +3205,11 @@ xfs_rmdir(vnode_t	*dir_vp,
 
 	vn_trace_entry(dir_vp, "xfs_rmdir");
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-	tp = xfs_trans_alloc (mp, 0);
+	tp = xfs_trans_alloc(mp, XFS_TRANS_RMDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES(mp),
-				       0, XFS_TRANS_PERM_LOG_RES,
-				       XFS_DEFAULT_LOG_COUNT)) {
+        if (error = xfs_trans_reserve(tp, 10, XFS_REMOVE_LOG_RES(mp),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_DEFAULT_LOG_COUNT)) {
 		cancel_flags = 0;
                 goto error_return;
 	}
@@ -3304,7 +3304,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 
 error_return:
 
-	xfs_trans_cancel (tp, cancel_flags);
+	xfs_trans_cancel(tp, cancel_flags);
 	return error;
 }
 
@@ -3413,12 +3413,12 @@ xfs_symlink(vnode_t	*dir_vp,
         }
 
 	mp = XFS_VFSTOM(dir_vp->v_vfsp);
-        tp = xfs_trans_alloc (mp, 0);
+        tp = xfs_trans_alloc(mp, XFS_TRANS_SYMLINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
-        if (error = xfs_trans_reserve (tp, XFS_IALLOC_BLOCKS(mp) + 12,
-				       XFS_SYMLINK_LOG_RES(mp), 0,
-				       XFS_TRANS_PERM_LOG_RES,
-				       XFS_SYMLINK_LOG_COUNT)) {
+        if (error = xfs_trans_reserve(tp, XFS_IALLOC_BLOCKS(mp) + 12,
+				      XFS_SYMLINK_LOG_RES(mp), 0,
+				      XFS_TRANS_PERM_LOG_RES,
+				      XFS_SYMLINK_LOG_COUNT)) {
 		cancel_flags = 0;
 		dp = NULL;
                 goto error_return;
@@ -3550,7 +3550,7 @@ xfs_symlink(vnode_t	*dir_vp,
 
 error_return:
 
-	xfs_trans_cancel (tp, cancel_flags);
+	xfs_trans_cancel(tp, cancel_flags);
 
 	if (! dp_joined_to_trans && (dp != NULL))
 		xfs_iunlock (dp, XFS_ILOCK_EXCL);
@@ -4025,10 +4025,10 @@ xfs_set_dmattrs (
 
         ip = XFS_VTOI (vp);
 	mp = ip->i_mount;
-	tp = xfs_trans_alloc (mp, 0);
-	error = xfs_trans_reserve (tp, 0, XFS_ICHANGE_LOG_RES (mp), 0, 0, 0);
+	tp = xfs_trans_alloc(mp, XFS_TRANS_SET_DMATTRS);
+	error = xfs_trans_reserve(tp, 0, XFS_ICHANGE_LOG_RES (mp), 0, 0, 0);
 	if (error) {
-		xfs_trans_cancel (tp, 0);
+		xfs_trans_cancel(tp, 0);
 		return error;
 	}
         xfs_ilock (ip, XFS_ILOCK_EXCL);

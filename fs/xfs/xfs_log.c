@@ -1571,6 +1571,8 @@ xlog_grant_log_space(xlog_t	   *log,
 	/* something is already sleeping; insert new transaction at end */
 	if (head = log->l_reserve_headq) {
 		XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
+		xlog_trace_loggrant(log, tic,
+				    "xlog_grant_log_space: sleep 1");
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: wake 1");
@@ -1587,6 +1589,8 @@ redo:
 	if (free_bytes < need_bytes) {
 		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
 			XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
+		xlog_trace_loggrant(log, tic,
+				    "xlog_grant_log_space: sleep 2");
 		spunlockspl_psema(log->l_grant_lock, spl, &tic->t_sema, PINOD);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: wake 2");

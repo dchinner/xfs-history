@@ -50,6 +50,25 @@ typedef struct xfs_log_item {
 #define	XFS_LI_EFD	0x1237
 #define	XFS_LI_IUNLINK	0x1238
 
+/*
+ * Transaction types.  Used to distinguish types of buffers.
+ */
+#define XFS_TRANS_SETATTR_NOT_SIZE	1
+#define XFS_TRANS_SETATTR_SIZE		2
+#define XFS_TRANS_INACTIVE		3
+#define XFS_TRANS_CREATE		4
+#define XFS_TRANS_CREATE_TRUNC		5
+#define XFS_TRANS_TRUNCATE_FILE		6
+#define XFS_TRANS_REMOVE		7
+#define XFS_TRANS_LINK			8
+#define XFS_TRANS_RENAME		9
+#define XFS_TRANS_MKDIR			10
+#define XFS_TRANS_RMDIR			11
+#define XFS_TRANS_SYMLINK		12
+#define XFS_TRANS_SET_DMATTRS		13
+#define XFS_TRANS_GROWFS		14
+#define XFS_TRANS_STRAT_WRITE		15
+#define XFS_TRANS_DIOSTRAT		16
 
 
 typedef struct xfs_item_ops {
@@ -492,11 +511,6 @@ typedef struct xfs_trans {
 #define	XFS_RENAME_LOG_COUNT		2
 #define	XFS_WRITE_LOG_COUNT		2     
      
-/*
- * Transaction types to be passed to xfs_trans_alloc().
- */
-#define	XFS_TRANS_FILE_WRITE	1
-
 struct xfs_inode;
 struct xfs_mount;
 struct xfs_efi_log_item;
