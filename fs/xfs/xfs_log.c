@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.163 $"
+#ident	"$Revision: 1.164 $"
 
 /*
  * High level interface routines for log manager
@@ -352,6 +352,7 @@ xfs_log_force(xfs_mount_t *mp,
 		return 0;
 #endif
 	ASSERT(flags & XFS_LOG_FORCE);
+	XFSSTATS.xs_log_force++;
 	if ((log->l_flags & XLOG_IO_ERROR) == 0) {
 		if (lsn == 0)
 			return (xlog_state_sync_all(log, flags));
@@ -434,6 +435,8 @@ xfs_log_reserve(xfs_mount_t	 *mp,
 
 	if (XLOG_FORCED_SHUTDOWN(log))
 		return XFS_ERROR(EIO);
+
+	XFSSTATS.xs_try_logspace++;
 
 	if (*ticket != NULL) {
 		ASSERT(flags & XFS_LOG_PERM_RESERV);
@@ -2226,6 +2229,7 @@ xlog_grant_log_space(xlog_t	   *log,
 		if (XLOG_FORCED_SHUTDOWN(log)) 
 			goto error_return;
 
+		XFSSTATS.xs_sleep_logspace++;
 		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 		/*
 		 * If we got an error, and the filesystem is shutting down,
@@ -2251,6 +2255,7 @@ redo:
 			XLOG_INS_TICKETQ(log->l_reserve_headq, tic);
 		xlog_trace_loggrant(log, tic,
 				    "xlog_grant_log_space: sleep 2");
+		XFSSTATS.xs_sleep_logspace++;
 		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 		
 		if (XLOG_FORCED_SHUTDOWN(log)) {
@@ -2361,6 +2366,7 @@ xlog_regrant_write_log_space(xlog_t	   *log,
 
 			xlog_trace_loggrant(log, tic,
 				    "xlog_regrant_write_log_space: sleep 1");
+			XFSSTATS.xs_sleep_logspace++;
 			sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl); 
 
 			/* If we're shutting down, this tic is already
@@ -2388,6 +2394,7 @@ redo:
 	if (free_bytes < need_bytes) {
 		if ((tic->t_flags & XLOG_TIC_IN_Q) == 0)
 			XLOG_INS_TICKETQ(log->l_write_headq, tic);
+		XFSSTATS.xs_sleep_logspace++;
 		sv_wait(&tic->t_sema, PINOD, &log->l_grant_lock, spl);
 
 		/* If we're shutting down, this tic is already off the queue */
@@ -2785,6 +2792,7 @@ maybe_sleep:
 			LOG_UNLOCK(log, spl);
 			return XFS_ERROR(EIO);
 		}
+		XFSSTATS.xs_log_force_sleep++;
 		sv_wait(&iclog->ic_forcesema, PINOD, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
@@ -2866,6 +2874,7 @@ try_again:
 		    (iclog->ic_prev->ic_state & (XLOG_STATE_WANT_SYNC |
 						 XLOG_STATE_SYNCING))) {
 			ASSERT(!(iclog->ic_state & XLOG_STATE_IOERROR));
+			XFSSTATS.xs_log_force_sleep++;
 			sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock,
 				spl);
 			already_slept = 1;
@@ -2891,6 +2900,7 @@ try_again:
 			LOG_UNLOCK(log, spl);
 			return XFS_ERROR(EIO);
 		}
+		XFSSTATS.xs_log_force_sleep++;
 		sv_wait(&iclog->ic_forcesema, PSWP, &log->l_icloglock, spl);
 		/*
 		 * No need to grab the log lock here since we're
