@@ -1,4 +1,7 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.62 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -14,11 +17,15 @@
 #include <ksys/fdt.h>
 #include <ksys/cell_config.h>
 #include <sys/vfs.h>
+#if defined(__sgi__)
 #include <sys/syssgi.h>
+#endif
 #include <sys/capability.h>
 #include <sys/kthread.h>
 #include <sys/uuid.h>
+#if defined(__sgi__)
 #include <sys/hwgraph.h>
+#endif
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -836,6 +843,7 @@ xfs_fd_to_mp(
 	return 0;
 }
 
+#if defined(__sgi__)
 /*
  * Syssgi interface for bulkstat and inode-table.
  */
@@ -897,3 +905,4 @@ xfs_itable(
 	}
 	return 0;
 }
+#endif /* sgi */

@@ -1,4 +1,7 @@
-#ident "$Id$"
+#ident "$Id: xfs_dfrag.c,v 1.5 1999/05/14 20:13:13 lord Exp $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -17,11 +20,15 @@
 #include <ksys/fdt.h>
 #include <ksys/cell_config.h>
 #include <sys/vfs.h>
+#if defined(__sgi__)
 #include <sys/syssgi.h>
+#endif
 #include <sys/mac_label.h>
 #include <sys/capability.h>
 #include <sys/uuid.h>
+#if defined(__sgi__)
 #include <sys/hwgraph.h>
+#endif
 #include <sys/mode.h>
 
 #include "xfs_macros.h"

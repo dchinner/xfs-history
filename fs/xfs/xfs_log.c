@@ -1,8 +1,11 @@
-#ident	"$Revision$"
+#ident	"$Revision: 1.170 $"
 
 /*
  * High level interface routines for log manager
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <sys/param.h>
 

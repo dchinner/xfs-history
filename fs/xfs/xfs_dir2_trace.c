@@ -1,9 +1,12 @@
-#ident "$Revision$"
+#ident "$Revision: 1.1 $"
 
 /*
  * xfs_dir2_trace.c
  * Tracing for xfs v2 directories.
  */
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/buf.h>

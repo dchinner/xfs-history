@@ -6,10 +6,60 @@
 # unless it's something special (ie not a .c file).
 #
 # Note 2! The CFLAGS definitions are now in the main makefile...
-
+EXTRA_CFLAGS += -I.
 O_TARGET := xfs.o
-O_OBJS   := xfs_linux_ops_file.o xfs_linux_ops_inode.o xfs_linux_ops_super.o
+LINO_OBJS   := xfs_linux_ops_file.o xfs_linux_ops_inode.o xfs_linux_ops_super.o
 M_OBJS   := $(O_TARGET)
+XFS_OBJS  :=   xfs_alloc.o \
+                xfs_alloc_btree.o \
+                xfs_attr.o \
+                xfs_attr_leaf.o \
+                xfs_bit.o \
+                xfs_bmap.o \
+                xfs_bmap_btree.o \
+                xfs_btree.o \
+                xfs_buf_item.o \
+                xfs_da_btree.o \
+                xfs_dir.o \
+                xfs_dir2.o \
+                xfs_dir2_block.o \
+                xfs_dir2_data.o \
+                xfs_dir2_leaf.o \
+                xfs_dir2_node.o \
+                xfs_dir2_sf.o \
+                xfs_dir2_trace.o \
+                xfs_dir_leaf.o \
+                xfs_error.o \
+                xfs_extfree_item.o \
+                xfs_fsops.o \
+                xfs_ialloc.o \
+                xfs_ialloc_btree.o \
+                xfs_icrash.o \
+                xfs_iget.o \
+                xfs_inode.o \
+                xfs_inode_item.o \
+                xfs_iocore.o \
+                xfs_itable.o \
+                xfs_dfrag.o \
+                xfs_log.o \
+                xfs_log_recover.o \
+                xfs_macros.o \
+                xfs_misc.o \
+                xfs_mount.o \
+                xfs_rename.o \
+                xfs_rpc_item.o \
+                xfs_rw.o \
+                xfs_trans.o \
+                xfs_trans_ail.o \
+                xfs_trans_buf.o \
+                xfs_trans_extfree.o \
+                xfs_trans_inode.o \
+                xfs_trans_item.o \
+                xfs_utils.o \
+                xfs_vfsops.o \
+                xfs_vnodeops.o
+
+O_OBJS :=  $(XFS_OBJS) $(LINO_OBJS)
 
 include $(TOPDIR)/Rules.make
 

@@ -1,4 +1,7 @@
-#ident	"$Revision: 1.9 $"
+#ident	"$Revision: 1.10 $"
+#if defined(__linux__)
+#include <xfs_linux.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/kmem.h>
