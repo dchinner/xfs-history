@@ -201,6 +201,9 @@ xfs_attr_set(vnode_t *vp, char *name, char *value, int valuelen, int flags,
 
 	/*
 	 * Decide on what work routines to call.
+	 *
+	 * GROT: make a pure replace not have a "hole" in the middle where
+	 * GROT: there is no attribute, do an atomic "rename".
 	 */
 	if (dp->i_afp->if_bytes == 0) {
 		(void)xfs_attr_shortform_create(trans, dp);
@@ -916,7 +919,7 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 		 * Start a new transaction.
 		 */
 		trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
-		if (error = xfs_trans_reserve(trans, 10+blkcnt,
+		if (error = xfs_trans_reserve(trans, 16+blkcnt,
 					      XFS_SETATTR_LOG_RES(mp),
 					      0, XFS_TRANS_PERM_LOG_RES,
 					      XFS_SETATTR_LOG_COUNT)) {
@@ -990,10 +993,10 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 			 */
 			trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
 			if (error = xfs_trans_reserve(trans,
-					  ATTR_RMTVALUE_TRANSBLKS,
-					  ATTR_RMTVALUE_TRANSBLKS * mp->m_bsize,
-					  0, XFS_TRANS_PERM_LOG_RES,
-					  XFS_SETATTR_LOG_COUNT)) {
+				      ATTR_RMTVALUE_TRANSBLKS,
+				      XFS_FSB_TO_B(mp, ATTR_RMTVALUE_TRANSBLKS),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_SETATTR_LOG_COUNT)) {
 				goto out2;
 			}
 
@@ -1014,7 +1017,8 @@ xfs_attr_rmtval_set(xfs_da_args_t *args)
 				if (tmp < bp->b_bufsize)
 					bzero(bp->b_un.b_addr + tmp,
 					      bp->b_bufsize - tmp);
-				xfs_trans_log_buf(trans, bp, 0, mp->m_bsize-1);
+				xfs_trans_log_buf(trans, bp, 0,
+							 XFS_FSB_TO_B(mp, 1)-1);
 				src += tmp;
 				valuelen -= tmp;
 				dblkno += bbsperblk;
@@ -1095,10 +1099,10 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 			 */
 			trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_SET);
 			if (error = xfs_trans_reserve(trans,
-					  ATTR_RMTVALUE_TRANSBLKS,
-					  ATTR_RMTVALUE_TRANSBLKS * mp->m_bsize,
-					  0, XFS_TRANS_PERM_LOG_RES,
-					  XFS_SETATTR_LOG_COUNT)) {
+				      ATTR_RMTVALUE_TRANSBLKS,
+				      XFS_FSB_TO_B(mp, ATTR_RMTVALUE_TRANSBLKS),
+				      0, XFS_TRANS_PERM_LOG_RES,
+				      XFS_SETATTR_LOG_COUNT)) {
 				goto out2;
 			}
 
@@ -1136,7 +1140,7 @@ xfs_attr_rmtval_remove(xfs_da_args_t *args)
 	while (!done) {
 		trans = xfs_trans_alloc(mp, XFS_TRANS_ATTR_RM);
 		if (error = xfs_trans_reserve(trans, 16,
-					      XFS_RMATTR_LOG_RES(mp),
+					      XFS_AINVAL_LOG_RES(mp),
 					      0, XFS_TRANS_PERM_LOG_RES,
 					      XFS_RMATTR_LOG_COUNT)) {
 			goto out2;
