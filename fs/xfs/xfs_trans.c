@@ -1,4 +1,4 @@
-#ident "$Revision: 1.86 $"
+#ident "$Revision: 1.89 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -742,7 +742,7 @@ xfs_trans_commit(
 		xfs_trans_committed(tp, 0);
 	}
 #else
-	tp->t_logcb.cb_func = (void(*)(void*))xfs_trans_committed;
+	tp->t_logcb.cb_func = (void(*)(void*, int))xfs_trans_committed;
 	tp->t_logcb.cb_arg = tp;
 	xfs_log_notify(mp, commit_lsn, &(tp->t_logcb));
 #endif
