@@ -135,6 +135,15 @@ xfs_inode_item_format(xfs_inode_log_item_t	*iip,
 		}
 		break;
 
+	case XFS_DINODE_FMT_AGINO:
+		/*
+		 * We don't mess with the next free pointer in freed
+		 * inodes, because this is managed at the disk buffer
+		 * level.  At the in-core inode level we just make sure
+		 * to never over-write the value in the disk buffer.
+		 */
+		break;
+
 	default:
 		ASSERT(0);
 		break;
@@ -214,9 +223,10 @@ xfs_inode_item_unlock(xfs_inode_log_item_t *iip)
 	uint	lock_flags;
 
 	ASSERT(ismrlocked(&(iip->ili_inode->i_lock), MR_UPDATE));
-	ASSERT((!(iip->ili_inode->i_item.ili_flags & XFS_ILI_IOLOCKED_EXCL)) ||
+	ASSERT((!(iip->ili_inode->i_item.ili_flags & XFS_ILI_IOLOCKED_EXCL))||
 	       ismrlocked(&(iip->ili_inode->i_iolock), MR_UPDATE));
-	ASSERT((!(iip->ili_inode->i_item.ili_flags & XFS_ILI_IOLOCKED_SHARED))||
+	ASSERT((!(iip->ili_inode->i_item.ili_flags &
+		  XFS_ILI_IOLOCKED_SHARED)) ||
 	       ismrlocked(&(iip->ili_inode->i_iolock), MR_ACCESS));
 	/*
 	 * Clear the transaction pointer in the inode.
