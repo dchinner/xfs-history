@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.10 $"
+#ident	"$Revision: 1.11 $"
 
 /*
  * Inode allocation management for xFS.
@@ -309,13 +309,6 @@ xfs_inobt_delrec(
 	block->bb_numrecs--;
 	xfs_inobt_log_block(cur->bc_tp, bp, XFS_BB_NUMRECS);
 	/*
-	 * If we get here for a non-leaf block,
-	 * we just did a join at the previous level.
-	 * Make the cursor point to the good (left) key.
-	 */
-	if (level > 0)
-		xfs_inobt_decrement(cur, level);
-	/*
 	 * Is this the root level?  If so, we're almost done.
 	 */
 	if (level == cur->bc_nlevels - 1) {
@@ -372,6 +365,13 @@ xfs_inobt_delrec(
 	 */
 	if (ptr == 1)
 		xfs_inobt_updkey(cur, kp, level + 1);
+	/*
+	 * If we get here for a non-leaf block,
+	 * we just did a join at the previous level.
+	 * Make the cursor point to the good (left) key.
+	 */
+	if (level > 0)
+		xfs_inobt_decrement(cur, level);
 	/*
 	 * If the number of records remaining in the block is at least
 	 * the minimum, we're done.

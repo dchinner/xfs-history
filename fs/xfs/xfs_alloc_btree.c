@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 /*
  * Free space allocation for xFS.
@@ -334,13 +334,6 @@ xfs_alloc_delrec(
 			XFS_AGF_LONGEST);
 	}
 	/*
-	 * If we get here for a non-leaf block,
-	 * we just did a join at the previous level.
-	 * Make the cursor point to the good (left) key.
-	 */
-	if (level > 0)
-		xfs_alloc_decrement(cur, level);
-	/*
 	 * Is this the root level?  If so, we're almost done.
 	 */
 	if (level == cur->bc_nlevels - 1) {
@@ -383,6 +376,13 @@ xfs_alloc_delrec(
 	 */
 	if (ptr == 1)
 		xfs_alloc_updkey(cur, lkp, level + 1);
+	/*
+	 * If we get here for a non-leaf block,
+	 * we just did a join at the previous level.
+	 * Make the cursor point to the good (left) key.
+	 */
+	if (level > 0)
+		xfs_alloc_decrement(cur, level);
 	/*
 	 * If the number of records remaining in the block is at least
 	 * the minimum, we're done.

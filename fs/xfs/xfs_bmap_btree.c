@@ -396,12 +396,6 @@ xfs_bmbt_delrec(
 	l->block->bb_numrecs--;
 	xfs_bmbt_log_block(cur, l->bp, XFS_BB_NUMRECS);
 	/*
-	 * We just did a join at the previous level.
-	 * Make the cursor point to the good (left) key.
-	 */
-	if (level > 0)
-		xfs_bmbt_decrement(cur, level);
-	/*
 	 * We're at the root level.
 	 * First, shrink the root block in-memory.
 	 * Try to get rid of the next level down.
@@ -416,6 +410,12 @@ xfs_bmbt_delrec(
 	}
 	if (l->ptr == 1)
 		xfs_bmbt_updkey(cur, l->kp, level + 1);
+	/*
+	 * We just did a join at the previous level.
+	 * Make the cursor point to the good (left) key.
+	 */
+	if (level > 0)
+		xfs_bmbt_decrement(cur, level);
 	xfs_bmbt_rcheck(cur);
 	if (l->block->bb_numrecs >= XFS_BMAP_BLOCK_IMINRECS(level, cur)) {
 		xfs_bmbt_locals_free(l);
