@@ -1,4 +1,4 @@
-#ident "$Revision: 1.203 $"
+#ident "$Revision: 1.204 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -1608,11 +1608,18 @@ xfs_zero_last_block(
 	 * push out a buffer over a delayed allocation extent.
 	 * Also, we can get away with it since the space isn't
 	 * allocated so it's faster anyway.
+	 *
+	 * We don't bother to call xfs_b*write here since this is
+	 * just userdata, and we don't want to bring the filesystem
+	 * down if they hit an error. Since these will go through
+	 * xfsstrategy anyway, we have control over whether to let the
+	 * buffer go thru or not, in case of a forced shutdown.
 	 */
+	ASSERT(bp->b_vp);
 	if (imap.br_startblock == DELAYSTARTBLOCK) {
-		xfs_bdwrite(mp, bp);
+		bdwrite(bp);
 	} else {
-		error = xfs_bwrite(mp, bp);
+		error = bwrite(bp);
 	}
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -1750,11 +1757,11 @@ xfs_zero_eof(
 		bp_mapin(bp);
 		bzero(bp->b_un.b_addr, bp->b_bcount);
 	        }
-
+		ASSERT(bp->b_vp);
 		if (imap.br_startblock == DELAYSTARTBLOCK) {
-			xfs_bdwrite(mp, bp);
+			bdwrite(bp);
 		} else {
-			error = xfs_bwrite(mp, bp);
+			error = bwrite(bp);
 			if (error) {
 				xfs_ilock(ip, XFS_ILOCK_EXCL);
 				return error;
@@ -2339,6 +2346,7 @@ xfs_write_file(
 				error = geterror(bp);
 				ASSERT(error != EINVAL);
 				bp->b_flags |= B_DONE|B_STALE;
+				bp->b_flags &= ~(B_DELWRI);
 				brelse(bp);
 				bmapp++;
 				nbmaps--;
@@ -2361,7 +2369,7 @@ xfs_write_file(
 			 */
 			if (error != 0) {
 				bp->b_flags |= B_STALE;
-				(void) xfs_bwrite(mp, bp);
+				(void) bwrite(bp);
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -2392,7 +2400,7 @@ xfs_write_file(
 					chunkreread(bp);
 				}
 				bp->b_flags |= B_STALE;
-				(void) xfs_bwrite(mp, bp);
+				(void) bwrite(bp);
 				bmapp++;
 				nbmaps--;
 				continue;
@@ -2432,15 +2440,15 @@ xfs_write_file(
 			xfs_delete_gap_list(ip,
 					    XFS_BB_TO_FSBT(mp, bp->b_offset),
 					    XFS_B_TO_FSBT(mp, bp->b_bcount));
-
+			ASSERT(bp->b_vp);
 			if ((ioflag & IO_SYNC) || (ioflag & IO_DSYNC)) {
 				if ((bmapp->pboff + bmapp->pbsize) ==
 				    bmapp->bsize) {
 					bp->b_relse = chunkrelse;
 				}
-				error = xfs_bwrite(mp, bp);
+				error = bwrite(bp);
 			} else {
-				xfs_bdwrite(mp, bp);
+				bdwrite(bp);
 			}
 
 			XFSSTATS.xs_write_bufs++;
@@ -4345,7 +4353,6 @@ xfs_strat_write(
 		bp->b_flags &= ~B_PARTIAL;
 		mutex_spinunlock(&xfs_strat_lock, s);
 	} else {
-		/* XXXsup, we might have to call biodone if error, all the time */
 		biodone(bp);
 	}
 	return error;
@@ -4359,12 +4366,28 @@ xfs_strat_write(
  */
 void
 xfs_force_shutdown(
-	struct xfs_mount	*mp)
+	struct xfs_mount	*mp,
+	int			flags)
 {
+	int ntries;
+	int logerror;
+
+#define XFS_MAX_DRELSE_RETRIES	10
+	logerror = flags & XFS_LOG_IO_ERROR;
+
 	/*
 	 * No need to duplicate efforts.
 	 */
-	if (XFS_FORCED_SHUTDOWN(mp))
+	if (XFS_FORCED_SHUTDOWN(mp) && !logerror)
+		return;
+
+	/*
+	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
+	 * queue up anybody new on the log reservations, and wakes up
+	 * everybody who's sleeping on log reservations and tells
+	 * them the bad news.
+	 */
+	if (xfs_log_force_umount(mp, logerror))
 		return;
 
 	cmn_err(CE_ALERT,
@@ -4372,35 +4395,33 @@ xfs_force_shutdown(
 		mp->m_fsname);
 	cmn_err(CE_ALERT,
 		"Please umount the filesystem, and rectify the problem(s)");
-	/*
-	 * This flags XFS_MOUNT_FS_SHUTDOWN, makes sure that we don't
-	 * queue up anybody new on the log reservations, and wakes up
-	 * everybody who's sleeping on log reservations and tells
-	 * them the bad news.
-	 */
-	xfs_log_force_umount(mp);
-
-	/*
-	 * Give a push to the log, so that the process of unpinning
-	 * will happen quickly. This'll help the delwri_relse
-	 * call below, since it can't relse pinned bufs. Doing so
-	 * on pinned bufs is at best ugly since that'd be going against
-	 * the natural flow of things.
-	 */
-	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE|XFS_LOG_SYNC);
 
 	/*
 	 * Release all delayed write buffers for this device.
+	 * It wouldn't be a fatal error if we couldn't release all
+	 * delwri bufs; in general they all get unpinned eventually.
 	 */
+	ntries = 0;
 #ifdef XFSERRORDEBUG
 	{
 		int nbufs;
-		while (nbufs = incore_delwri_relse(mp->m_dev, EIO))
+		while (nbufs = incore_delwri_relse(mp->m_dev, 0)) {
 			printf("XFS: released 0x%x bufs\n", nbufs);
+			if (ntries >= XFS_MAX_DRELSE_RETRIES) {
+				printf("XFS: ntries 0x%x\n", ntries);
+				debug("ntries");
+				break;
+			}
+			delay(++ntries * 5);
+		}
 	}
 #else
-	while (incore_delwri_relse(mp->m_dev, EIO))
-		;
+	while (incore_delwri_relse(mp->m_dev, 0)) {
+		if (ntries >= XFS_MAX_DRELSE_RETRIES)
+			break;
+		delay(++ntries * 5);
+	}
+
 #endif
 }
 
@@ -4416,17 +4437,7 @@ xfs_bioerror(
 {
 
 #ifdef XFSERRORDEBUG
-	/* XXXsup bdflush seems to hit metadata bufs with iodone reset */
-	ASSERT((bp->b_flags & (B_BDFLUSH|B_READ)) || bp->b_iodone);
-
-	if (bp->b_iodone == NULL) {
-		debug("");
-		printf("bp->b_iodone == NULL 0x%x\n", bp);
-		if ((bp->b_flags & B_READ) == 0) {
-			buftrace("XFS IOERR BIODONE NULL", bp);
-			return xfs_bioerror_relse(bp);
-		}
-	}
+	ASSERT(bp->b_flags & B_READ || bp->b_iodone);
 #endif
 
 	/*
@@ -4533,39 +4544,28 @@ xfs_read_buf(
 	buf_t		 *bp;
 	int 		 error;
 	
-	if (!XFS_FORCED_SHUTDOWN(mp)) {
-		bp = read_buf(dev, blkno, len, flags);
-		error = geterror(bp);
-		if (bp && !error) {
-			*bpp = bp;
-		} else {
-			*bpp = NULL;
-			if (bp) {
-				bp->b_flags |= B_DONE|B_STALE;
-				/* 
-				 * brelse clears B_ERROR and b_error
-				 */
-				brelse(bp);
-			}
-		}
+	bp = read_buf(dev, blkno, len, flags);
+	error = geterror(bp);
+	if (bp && !error && !XFS_FORCED_SHUTDOWN(mp)) {
+		*bpp = bp;
 	} else {
-		error = EIO;
 		*bpp = NULL;
+		error = XFS_ERROR(EIO);
+		if (bp) {	
+			bp->b_flags &= ~(B_DONE|B_DELWRI);
+			bp->b_flags |= B_STALE;
+			/* 
+			 * brelse clears B_ERROR and b_error
+			 */
+			brelse(bp);
+		}
 	}
-
 	return (error);
 }
 	
 /*
  * Wrapper around bwrite() so that we can trap 
  * write errors, and act accordingly.
- *
- * Both metadata and userdata go through here.
- * It's just a convenient place to make sure that the
- * b_bdstrat and b_fsprivate3 fields are there.
- * We don't bother to check if XFS_FORCED_SHUTDOWN here
- * because then we'd have to distinguish between userdata
- * and metadata.
  */
 int
 xfs_bwrite(
@@ -4577,15 +4577,14 @@ xfs_bwrite(
 	/*
 	 * XXXsup how does this work for quotas.
 	 */
-	if (bp->b_vp == NULL) {
-		bp->b_bdstrat = xfs_bdstrat_cb;
-	}
+	ASSERT(bp->b_vp == NULL);
+	bp->b_bdstrat = xfs_bdstrat_cb;
 	bp->b_fsprivate3 = mp;
 
 	if (error = bwrite(bp)) {
 		ASSERT(mp);
 		buftrace("XFSBWRITE IOERROR", bp);
-		xfs_force_shutdown(mp);
+		xfs_force_shutdown(mp, XFS_METADATA_IO_ERROR);
 	}
 	return (error);
 }
@@ -4612,7 +4611,16 @@ xfs_bdstrat_cb(struct buf *bp)
 		return 0;
 	} else { 
 		buftrace("XFS__BDSTRAT IOERROR", bp);
-		return (xfs_bioerror(bp));
+		/*
+		 * Metadata write that didn't get logged but 
+		 * written delayed anyway. These aren't associated
+		 * with a transaction, and can be ignored.
+		 */
+		if (bp->b_iodone == NULL &&
+		    (bp->b_flags & B_READ) == 0)
+			return (xfs_bioerror_relse(bp));
+		else
+			return (xfs_bioerror(bp));
 	}
 }
 
