@@ -2542,8 +2542,11 @@ xfs_create(
 	 */
 	if (cell_enabled) {
 #pragma mips_frequency_hint NEVER
-		if (inode_change == B_TRUE) 
+		if (inode_change == B_TRUE) {
 			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 0);
+		} else {
+			VOP_VNODE_CHANGE(vp, VCHANGE_FLAGS_TRUNCATED, 3);
+		}
 	}
 #endif	/* CELL_CAPABLE */
 
