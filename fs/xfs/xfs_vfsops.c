@@ -132,6 +132,7 @@ STATIC int	xfs_vget(vfs_t		*vfsp,
 
 STATIC int	xfs_cmountfs(struct vfs	*vfsp,
 			     dev_t		ddev,
+			     dev_t		logdev,
 			     dev_t		rtdev,
 			     whymount_t		why,
 			     struct xfs_args	*ap,
@@ -140,6 +141,7 @@ STATIC int	xfs_cmountfs(struct vfs	*vfsp,
 
 STATIC xfs_mount_t *_xfs_get_vfsmount(struct vfs	*vfsp,
 				      dev_t		ddev,
+				      dev_t		logdev,
 				      dev_t		rtdev);
 
 STATIC int	_spectodev(char *spec, dev_t *devp);
@@ -220,6 +222,7 @@ _spectodev(char	 *spec,
 STATIC int
 xfs_cmountfs(struct vfs 	*vfsp,
 	     dev_t		ddev,
+	     dev_t		logdev,
 	     dev_t		rtdev,
 	     whymount_t		why,
 	     struct xfs_args	*ap,
@@ -227,7 +230,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	     int		lflags)
 {
 	xfs_mount_t	*mp;
-	struct vnode 	*ddevvp, *rdevvp;
+	struct vnode 	*ddevvp, *rdevvp, *ldevvp;
 	int		error = 0;
 	int		s, vfs_flags;
 	xfs_sb_t	*sbp;
@@ -242,14 +245,14 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	if (vfsp->vfs_flag & VFS_REMOUNT)
 		return 0;
 	
-	mp = _xfs_get_vfsmount(vfsp, ddev, rtdev);
+	mp = _xfs_get_vfsmount(vfsp, ddev, logdev, rtdev);
 
 #ifndef SIM
 	/*
  	 * Open the data and real time devices now.
 	 */
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
-	if (ddev != NULL) {
+	if (ddev != 0) {
 		ddevvp = makespecvp( ddev, VBLK );
 		error = VOP_OPEN(&ddevvp, vfs_flags, cr);
 		if (error) {
@@ -257,13 +260,14 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			return(error);
 		}
 		mp->m_ddevp = ddevvp;
-	}
-	if (rtdev != NULL) {
+	} else
+		ddevvp = NULL;
+	if (rtdev != 0) {
 		rdevvp = makespecvp( rtdev, VBLK );
 		error = VOP_OPEN(&rdevvp, vfs_flags, cr);
 		if (error) {
 			VN_RELE(rdevvp);
-			if (ddev) {
+			if (ddevvp) {
 				VOP_CLOSE(ddevvp, vfs_flags, 1, 0, cr);
 				binval(ddev);
 				VN_RELE(ddevvp);
@@ -271,9 +275,36 @@ xfs_cmountfs(struct vfs 	*vfsp,
 			return(error);
 		}
 		mp->m_rtdevp = rdevvp;
-	}
+	} else
+		rdevvp = NULL;
+	if (logdev != 0) {
+		if (logdev == ddev) {
+			ldevvp = NULL;
+			mp->m_logdevp = ddevvp;
+		} else {
+			ldevvp = makespecvp( logdev, VBLK );
+			error = VOP_OPEN(&ldevvp, vfs_flags, cr);
+			if (error) {
+				VN_RELE(ldevvp);
+				if (rdevvp) {
+					VOP_CLOSE(rdevvp, vfs_flags, 1, 0, cr);
+					binval(rtdev);
+					VN_RELE(rdevvp);
+				}
+				if (ddevvp) {
+					VOP_CLOSE(ddevvp, vfs_flags, 1, 0, cr);
+					binval(ddev);
+					VN_RELE(ddevvp);
+				}
+				return(error);
+			}
+			mp->m_logdevp = ldevvp;
+		}
+	} else
+		ldevvp = NULL;
 #else
 	mp->m_rtdevp = NULL;
+	mp->m_logdevp = NULL;
 	mp->m_ddevp  = NULL;
 #endif
 
@@ -283,15 +314,20 @@ xfs_cmountfs(struct vfs 	*vfsp,
 		 * locking stuff.
 		 */
 		kmem_free(mp, sizeof(*mp));
-		if (mp->m_rtdevp) {
-			VOP_CLOSE(mp->m_rtdevp, vfs_flags, 1, 0, cr);
-			binval(rtdev);
-			VN_RELE(mp->m_rtdevp);
+		if (ldevvp) {
+			VOP_CLOSE(ldevvp, vfs_flags, 1, 0, cr);
+			binval(logdev);
+			VN_RELE(ldevvp);
 		}
-		if (mp->m_ddevp) {
-			VOP_CLOSE(mp->m_ddevp, vfs_flags, 1, 0, cr);
+		if (rdevvp) {
+			VOP_CLOSE(rdevvp, vfs_flags, 1, 0, cr);
+			binval(rtdev);
+			VN_RELE(rdevvp);
+		}
+		if (ddevvp) {
+			VOP_CLOSE(ddevvp, vfs_flags, 1, 0, cr);
 			binval(ddev);
-			VN_RELE(mp->m_ddevp);
+			VN_RELE(ddevvp);
 		}
 		return error;		/* error should be in errno.h */
 	}
@@ -317,8 +353,9 @@ xfs_cmountfs(struct vfs 	*vfsp,
 	 * xfs_log_mount() always does XFS_LOG_RECOVER.
 	 */
 	ASSERT(sbp->sb_logblocks > 0);		/* check for volume case */
-	error = xfs_log_mount(mp, ddev, XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
-			      XFS_BTOD(mp, sbp->sb_logblocks), lflags);
+	error = xfs_log_mount(mp, logdev,
+		XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
+		XFS_BTOD(mp, sbp->sb_logblocks), lflags);
 	if (error > 0) {
 		/*
 		 * XXX	log recovery failure - What action should be taken?
@@ -340,6 +377,7 @@ xfs_cmountfs(struct vfs 	*vfsp,
 STATIC xfs_mount_t *
 _xfs_get_vfsmount(struct vfs	*vfsp,
 		  dev_t		ddev,
+		  dev_t		logdev,
 		  dev_t		rtdev)
 {
 	xfs_mount_t *mp;
@@ -358,8 +396,10 @@ _xfs_get_vfsmount(struct vfs	*vfsp,
 		mp = xfs_mount_init();
 		mp->m_vfsp   = vfsp;
 		mp->m_dev    = ddev;
+		mp->m_logdev = logdev;
 		mp->m_rtdev  = rtdev;
 		mp->m_ddevp  = NULL;
+		mp->m_logdevp = NULL;
 		mp->m_rtdevp = NULL;
 
 		vfsp->vfs_flag |= VFS_NOTRUNC|VFS_LOCAL;
@@ -470,7 +510,7 @@ xfs_vfsmount(vfs_t		*vfsp,
 			return XFS_ERROR(EBUSY);
 	}
 
-	error = xfs_cmountfs(vfsp, ddev, rtdev, NONROOT_MOUNT,
+	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
 			     &args, credp, lflags);
 
 	return error;
@@ -579,7 +619,7 @@ xfs_mountroot(vfs_t		*vfsp,
 	error = vfs_lock(vfsp);
 	if (error)
 		goto bad;
-	error = xfs_cmountfs(vfsp, rootdev, NULL, why, NULL, cr, NULL);
+	error = xfs_cmountfs(vfsp, rootdev, rootdev, 0, why, NULL, cr, NULL);
 	if (error) {
 		vfs_unlock(vfsp);
 		goto bad;

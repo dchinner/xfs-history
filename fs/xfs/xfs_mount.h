@@ -17,6 +17,7 @@ typedef struct xfs_mount {
 	lock_t			m_sb_lock;	/* sb counter mutex */
 	buf_t			*m_sb_bp;	/* buffer for superblock */
 	dev_t			m_dev;		/* dev of fs meta-data */
+	dev_t			m_logdev;	/* dev of fs log data */
 	dev_t			m_rtdev;	/* dev of fs realtime data */
 	int			m_bsize;	/* fs logical block size */
 	xfs_agnumber_t		m_agrotor;	/* last ag where space found */
@@ -37,6 +38,7 @@ typedef struct xfs_mount {
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
 	struct xfs_inode	*m_rootip;	/* pointer to root directory */
 	struct vnode 		*m_ddevp;	/* ptr to data dev vnode */
+	struct vnode 		*m_logdevp;	/* ptr to log dev vnode */
 	struct vnode 		*m_rtdevp;	/* prt to rt dev vnode   */
 	__uint8_t		m_dircook_elog;	/* log d-cookie entry bits */
 	__uint8_t		m_blkbit_log;	/* blocklog + NBBY */
