@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.157 $"
+#ident	"$Revision: 1.158 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -878,15 +878,7 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	 */
 	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
 	
-	/*
-	 * If there were any DELWRI buffers hanging around as a result of
-	 * a forced shutdown, relse them now. At this point, we can afford to
-	 * wait on the buffer locks and unpins, if any.
-	 */
-#ifndef SIM
-	if (XFS_FORCED_SHUTDOWN(mp))
-	    incore_delwri_relse(mp->m_dev, 1); /* synchronous */
-#endif
+	
 	binval(mp->m_dev);
 	bflushed(mp->m_dev);
 	if (mp->m_rtdev) {
@@ -930,6 +922,14 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 	ASSERT(mp->m_inodes == NULL);
 
 #ifndef SIM
+	/*
+	 * We may have bufs that are in the process of getting written still.
+	 * We must wait for the I/O completion of those. The sync flag here
+	 * does a two pass iteration thru the bufcache.
+	 */
+	if (XFS_FORCED_SHUTDOWN(mp))
+	    incore_delwri_relse(mp->m_dev, 1); /* synchronous */
+
 	xfs_uuid_unmount(mp);
 #endif
 	xfs_mount_free(mp);
