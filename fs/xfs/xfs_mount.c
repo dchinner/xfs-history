@@ -29,7 +29,7 @@
  * 
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
-#ident	"$Revision: 1.235 $"
+#ident	"$Revision: 1.236 $"
 
 #include <xfs_os_defs.h>
 
@@ -579,6 +579,7 @@ xfs_mountfs_int(
 	__int64_t	update_flags;
 #endif
 	int		noio;
+        int             uuid_mounted = 0;
 
 	noio = dev == 0 && mp->m_sb_bp != NULL;
 	if (mp->m_sb_bp == NULL) {
@@ -710,6 +711,7 @@ xfs_mountfs_int(
 #ifndef SIM
 	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
 		uint	i;
+                uuid_mounted=1;
 		xfs_uuid_mount(mp);	/* make sure it's really unique */
 		ret64 = uuid_hash64(&sbp->sb_uuid, &i);
 		bcopy(&ret64, &vfsp->vfs_fsid, sizeof(ret64));
@@ -1111,7 +1113,8 @@ xfs_mountfs_int(
 	/* FALLTHROUGH */
  error1:
 #ifndef SIM
-	xfs_uuid_unmount(mp);
+        if (uuid_mounted)
+	    xfs_uuid_unmount(mp);
 #endif /* !SIM */
 	xfs_freesb(mp);
 	return error;
