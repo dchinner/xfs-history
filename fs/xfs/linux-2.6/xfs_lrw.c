@@ -233,7 +233,8 @@ xfs_read(
 	if (!(ioflags & IO_ISLOCKED))
 		xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
-	XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
+	if (ret > 0)
+		XFS_STATS_ADD(xfsstats.xs_read_bytes, ret);
 
 	if (!invisible)
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
