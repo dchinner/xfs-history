@@ -3,6 +3,7 @@
 
 #ident	"$Revision: 1.30 $"
 
+struct cred;
 struct xfs_ihash;
 
 typedef struct xfs_mount {

@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.57 $"
+#ident	"$Revision: 1.58 $"
 
 #include <sys/param.h>
 #ifdef SIM
@@ -163,6 +163,7 @@ xfs_mountfs(vfs_t *vfsp, dev_t dev)
 	for (i = 0; i < 2; i++) {
 		mp->m_bmap_dmxr[i + 2] = XFS_BTREE_BLOCK_MAXRECS(brsize,
 			xfs_bmdr, i == 0);
+		ASSERT(mp->m_bmap_dmxr[i + 2] >= 2);
 		mp->m_bmap_dmnr[i + 2] = XFS_BTREE_BLOCK_MINRECS(brsize,
 			xfs_bmdr, i == 0);
 	}
