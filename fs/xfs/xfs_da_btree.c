@@ -35,7 +35,9 @@
 
 #if defined(XFSDEBUG) && defined(CONFIG_KDB)
 #undef xfs_buftrace
-#define xfs_buftrace(A,B)	panic("    xfs_buftrace : %s (0x%p)\n", A, B);
+#define xfs_buftrace(A,B) \
+	printk("    xfs_buftrace : %s (0x%p)\n", A, B); \
+	BUG();
 #endif
 
 /*
