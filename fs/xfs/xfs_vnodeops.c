@@ -431,10 +431,6 @@ xfs_getattr(vnode_t	*vp,
         else
                 vap->va_rdev = 0;       /* not a b/c spec. */
 
-	/*
-	 * Note: Although we store 64 bit timestamps, the code 
-	 * currently only updates the upper 32 bits.
-	 */
         vap->va_atime.tv_sec = ip->i_d.di_atime.t_sec;
         vap->va_atime.tv_nsec = ip->i_d.di_atime.t_nsec;
         vap->va_mtime.tv_sec = ip->i_d.di_mtime.t_sec;
@@ -820,11 +816,13 @@ xfs_setattr(vnode_t	*vp,
         if (mask & (AT_ATIME|AT_MTIME)) {
                 if (mask & AT_ATIME) {
                         ip->i_d.di_atime.t_sec = vap->va_atime.tv_sec;
+                        ip->i_d.di_atime.t_nsec = vap->va_atime.tv_nsec;
 			ip->i_update_core = 1;
 			timeflags &= ~XFS_ICHGTIME_ACC;
 		}
                 if (mask & AT_MTIME) {
 			ip->i_d.di_mtime.t_sec = vap->va_mtime.tv_sec;
+			ip->i_d.di_mtime.t_nsec = vap->va_mtime.tv_nsec;
 			timeflags &= ~XFS_ICHGTIME_MOD;
 			timeflags |= XFS_ICHGTIME_CHG;
                 }

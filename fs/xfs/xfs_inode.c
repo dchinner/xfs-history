@@ -565,7 +565,6 @@ xfs_ialloc(
 	vnode_t		*vp;
 	uint		flags;
 	uint_t		status;
-	__int32_t	curr_time;
 
 	/*
 	 * Call the space management code to pick
@@ -631,10 +630,7 @@ xfs_ialloc(
 
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
-	curr_time = (__int32_t)time;
-	ip->i_d.di_atime.t_sec = curr_time;
-	ip->i_d.di_mtime.t_sec = curr_time;
-	ip->i_d.di_ctime.t_sec = curr_time;
+	xfs_ichgtime(ip, XFS_ICHGTIME_CHG|XFS_ICHGTIME_ACC|XFS_ICHGTIME_MOD);
 	uuid_create(&ip->i_d.di_uuid, &status);
 	/*
 	 * di_gen will have been taken care of in xfs_iread.
@@ -2394,11 +2390,17 @@ xfs_ichgtime(xfs_inode_t *ip,
 		return;
 
 	nanotime(&tv);
-	if (flags & XFS_ICHGTIME_MOD)
+	if (flags & XFS_ICHGTIME_MOD) {
 		ip->i_d.di_mtime.t_sec = tv.tv_sec;
-	if (flags & XFS_ICHGTIME_ACC)
+		ip->i_d.di_mtime.t_nsec = tv.tv_nsec;
+	}
+	if (flags & XFS_ICHGTIME_ACC) {
 		ip->i_d.di_atime.t_sec = tv.tv_sec;
-	if (flags & XFS_ICHGTIME_CHG)
+		ip->i_d.di_atime.t_nsec = tv.tv_nsec;
+	}
+	if (flags & XFS_ICHGTIME_CHG) {
 		ip->i_d.di_ctime.t_sec = tv.tv_sec;
+		ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
+	}
 	ip->i_update_core = 1;
 }
