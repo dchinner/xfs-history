@@ -5,6 +5,7 @@
 #define _KERNEL
 #endif
 #include <sys/buf.h>
+#include <sys/vfs.h>
 #ifdef SIM
 #undef _KERNEL
 #endif
@@ -29,7 +30,6 @@
 #include <sys/statvfs.h>
 #include <sys/uio.h>
 #include <sys/user.h>
-#include <sys/vfs.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
 #include "xfs_types.h"
