@@ -9,7 +9,7 @@
  *  in part, without the prior written consent of Silicon Graphics, Inc.  *
  *									  *
  **************************************************************************/
-#ident	"$Revision: 1.55 $"
+#ident	"$Revision: 1.56 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -2051,9 +2051,10 @@ xfsidbg_xattrtrace(int count)
 static void
 xfsidbg_xbirec(xfs_bmbt_irec_t *r)
 {
-	qprintf("startoff %lld ", r->br_startoff);
-	qprintf("startblock %llx ", r->br_startblock);
-	qprintf("blockcount %lld\n", r->br_blockcount);
+	qprintf("startoff %lld startblock %llx blockcount %lld\n",
+		(__uint64_t)r->br_startoff,
+		(__uint64_t)r->br_startblock,
+		(__uint64_t)r->br_blockcount);
 }
 
 #ifdef DEBUG
@@ -2240,9 +2241,7 @@ xfsidbg_xbrec(xfs_bmbt_rec_32_t *r)
 	xfs_dfilblks_t c;
 
 	xfs_convert_extent(r, &o, &s, &c);
-	qprintf("startoff %lld ", o);
-	qprintf("startblock %llx ", s);
-	qprintf("blockcount %lld\n", c);
+	qprintf("startoff %lld startblock %llx blockcount %lld\n", o, s, c);
 }
 
 /*
@@ -2833,8 +2832,8 @@ xfsidbg_xflist(xfs_bmap_free_t *flist)
 {
 	xfs_bmap_free_item_t	*item;
 
-	qprintf("flist@0x%x: first 0x%x count %d\n", flist,
-		flist->xbf_first, flist->xbf_count);
+	qprintf("flist@0x%x: first 0x%x count %d low %d\n", flist,
+		flist->xbf_first, flist->xbf_count, flist->xbf_low);
 	for (item = flist->xbf_first; item; item = item->xbfi_next) {
 		qprintf("item@0x%x: startblock %llx blockcount %d", item,
 			(xfs_dfsbno_t)item->xbfi_startblock,
