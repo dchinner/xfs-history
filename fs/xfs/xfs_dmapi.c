@@ -37,7 +37,11 @@
 
 #define MAXNAMLEN MAXNAMELEN
 
-STATIC int prohibited_mr_events(bhv_desc_t	*bdp);
+#define XFS_BHV_LOOKUP(vp, xbdp)  \
+	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops); \
+	ASSERT(xbdp);
+
+STATIC int prohibited_mr_events(vnode_t	*vp);
 
 /* Structure used to hold the on-disk version of a dm_attrname_t.  All
    on-disk attribute names start with the 8-byte string "SGI_DMI_".
@@ -196,13 +200,11 @@ xfs_dm_send_create_event(
  */
 
 STATIC int
-prohibited_mr_events(bhv_desc_t *bdp)
+prohibited_mr_events(vnode_t	*vp)
 {
 	int	prohibited;
 	struct address_space *mapping;
 	struct vm_area_struct *vma;
-
-	vnode_t *vp = BHV_TO_VNODE(bdp);
 
 	if(!VN_MAPPED(vp))
 		return 0;
@@ -843,7 +845,7 @@ xfs_dm_direct_ok(
 
 STATIC int
 xfs_dm_rdwr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	uint		fflag,
 	mode_t		fmode,
 	dm_off_t	off,
@@ -854,11 +856,11 @@ xfs_dm_rdwr(
 	int		error;
 	int		oflags;
 	ssize_t		xfer;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	struct file	file;
 	struct inode	*ip;
 	struct dentry	*dentry;
 	struct list_head *lp;
+	bhv_desc_t	*xbdp;
 
 	if (off < 0 || vp->v_type != VREG)
 		return(EINVAL);
@@ -878,7 +880,8 @@ xfs_dm_rdwr(
 
 	fmode |= FINVIS;
 	oflags |= O_NONBLOCK;
-	if (xfs_dm_direct_ok(bdp, off, len, bufp))
+	XFS_BHV_LOOKUP(vp, xbdp);
+	if (xfs_dm_direct_ok(xbdp, off, len, bufp))
 		oflags |= O_DIRECT;
 
 	if (fflag & O_SYNC)
@@ -972,7 +975,7 @@ found:
 /* ARGSUSED */
 STATIC int
 xfs_dm_clear_inherit(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_attrname_t	*attrnamep)
 {
@@ -983,7 +986,7 @@ xfs_dm_clear_inherit(
 /* ARGSUSED */
 STATIC int
 xfs_dm_create_by_handle(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	void		*hanp,
 	size_t		hlen,
@@ -996,12 +999,15 @@ xfs_dm_create_by_handle(
 /* ARGSUSED */
 STATIC int
 xfs_dm_downgrade_right(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		type)		/* DM_FSYS_OBJ or zero */
 {
 #ifdef	DEBUG_RIGHTS
 	char		buffer[sizeof(xfs_handle_t) * 2 + 1];
+	bhv_desc_t	*bdp;
+
+	XFS_BHV_LOOKUP(vp, bdp);
 
 	if (!xfs_bdp_to_hexhandle(bdp, type, buffer)) {
 		printf("dm_downgrade_right: old %d new %d type %d handle %s\n",
@@ -1027,7 +1033,7 @@ xfs_dm_downgrade_right(
 
 STATIC int
 xfs_dm_get_allocinfo_rvp(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_off_t	*offp,
 	u_int		nelem,
@@ -1041,6 +1047,7 @@ xfs_dm_get_allocinfo_rvp(
 	xfs_filblks_t	fsb_length;
 	dm_off_t	startoff;
 	int		elem;
+	bhv_desc_t	*xbdp;
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
@@ -1057,7 +1064,9 @@ xfs_dm_get_allocinfo_rvp(
 		return(E2BIG);
 	}
 
-	ip = XFS_BHVTOI(bdp);
+	XFS_BHV_LOOKUP(vp, xbdp);
+
+	ip = XFS_BHVTOI(xbdp);
 	mp = ip->i_mount;
 
 	/* Convert the caller's starting offset into filesystem allocation
@@ -1143,7 +1152,7 @@ xfs_dm_get_allocinfo_rvp(
 /* ARGSUSED */
 STATIC int
 xfs_dm_get_bulkall_rvp(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		mask,
 	dm_attrname_t	*attrnamep,
@@ -1160,7 +1169,7 @@ xfs_dm_get_bulkall_rvp(
 /* ARGSUSED */
 STATIC int
 xfs_dm_get_bulkattr_rvp(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		mask,
 	dm_attrloc_t	*locp,
@@ -1173,9 +1182,9 @@ xfs_dm_get_bulkattr_rvp(
 	int		nelems;
 	u_int		statstruct_sz;
 	dm_attrloc_t	loc;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
-	bhv_desc_t	*vfs_bdp = bhv_lookup_unlocked(VFS_BHVHEAD(vp->v_vfsp), &xfs_vfsops);
-	xfs_mount_t	*mp = XFS_BHVTOM (vfs_bdp);
+	bhv_desc_t	*mp_bdp;
+	xfs_mount_t	*mp;
+	vfs_t		*vfsp = vp->v_vfsp;
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
@@ -1201,6 +1210,11 @@ xfs_dm_get_bulkattr_rvp(
 			return(EFAULT);
 		return(E2BIG);
 	}
+
+	mp_bdp = bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	ASSERT(mp_bdp);
+	mp = XFS_BHVTOM(mp_bdp);
+	
 
 	/*
 	 * fill the buffer with dm_stat_t's
@@ -1245,7 +1259,7 @@ xfs_dm_get_bulkattr_rvp(
 /* ARGSUSED */
 STATIC int
 xfs_dm_get_config(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_config_t	flagname,
 	dm_size_t	*retvalp)
@@ -1306,7 +1320,7 @@ xfs_dm_get_config(
 /* ARGSUSED */
 STATIC int
 xfs_dm_get_config_events(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		nelem,
 	dm_eventset_t	*eventsetp,
@@ -1339,7 +1353,7 @@ xfs_dm_get_config_events(
 /* ARGSUSED */
 STATIC int
 xfs_dm_get_destroy_dmattr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_attrname_t	*attrnamep,
 	char		**valuepp,
@@ -1351,7 +1365,6 @@ xfs_dm_get_destroy_dmattr(
 	int		value_len;
 	char		*value;
 	int		error;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 
 	*vlenp = -1;		/* assume failure by default */
 
@@ -1440,18 +1453,21 @@ xfs_dm_get_destroy_dmattr(
 
 STATIC int
 xfs_dm_get_dioinfo(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_dioinfo_t	*diop)
 {
 	dm_dioinfo_t	dio;
 	xfs_mount_t	*mp;
 	xfs_inode_t	*ip;
+	bhv_desc_t	*xbdp;
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-	ip = XFS_BHVTOI(bdp);
+	XFS_BHV_LOOKUP(vp, xbdp);
+
+	ip = XFS_BHVTOI(xbdp);
 	mp = ip->i_mount;
 
 	/*
@@ -1479,7 +1495,7 @@ xfs_dm_get_dioinfo(
 /* ARGSUSED */
 STATIC int
 xfs_dm_get_dirattrs_rvp(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		mask,
 	dm_attrloc_t	*locp,
@@ -1496,6 +1512,9 @@ xfs_dm_get_dirattrs_rvp(
 	uint		lock_mode;
 	int		error;
 	dm_attrloc_t	loc;
+	bhv_desc_t	*xbdp;
+	bhv_desc_t	*mp_bdp;
+	vfs_t		*vfsp = vp->v_vfsp;
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
@@ -1509,8 +1528,13 @@ xfs_dm_get_dirattrs_rvp(
 		return(E2BIG);
 	}
 
-	dp = XFS_BHVTOI(bdp);
-	mp = dp->i_mount;
+	mp_bdp = bhv_lookup(VFS_BHVHEAD(vfsp), &xfs_vfsops);
+	ASSERT(mp_bdp);
+	xbdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
+	ASSERT(xbdp);
+
+	mp = XFS_BHVTOM(mp_bdp);
+	dp = XFS_BHVTOI(xbdp);
 	if ((dp->i_d.di_mode & IFMT) != IFDIR)
 		return(ENOTDIR);
 
@@ -1538,9 +1562,8 @@ xfs_dm_get_dirattrs_rvp(
 		/* See if the directory was removed after it was opened. */
 		if (dp->i_d.di_nlink <= 0) {
 			xfs_iunlock_map_shared(dp, lock_mode);
-			kmem_free(statbufp, statbufsz);
-			kmem_free(direntp, direntbufsz);
-			return(ENOENT);
+			error = ENOENT;
+			break;
 		}
 		if (dir_gen == 0)
 			dir_gen = dp->i_gen;
@@ -1607,7 +1630,7 @@ xfs_dm_get_dirattrs_rvp(
 
 STATIC int
 xfs_dm_get_dmattr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_attrname_t	*attrnamep,
 	size_t		buflen,
@@ -1619,7 +1642,6 @@ xfs_dm_get_dmattr(
 	int		value_len;
 	int		alloc_size;
 	int		error;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
@@ -1675,7 +1697,7 @@ xfs_dm_get_dmattr(
 
 STATIC int
 xfs_dm_get_eventlist(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		type,
 	u_int		nelem,
@@ -1683,12 +1705,15 @@ xfs_dm_get_eventlist(
 	u_int		*nelemp)
 {
 	int		error;
+	bhv_desc_t	*xbdp;
+
+	XFS_BHV_LOOKUP(vp, xbdp);
 
 	if (type == DM_FSYS_OBJ) {
-		error = xfs_dm_fs_get_eventlist(bdp, right, nelem,
+		error = xfs_dm_fs_get_eventlist(xbdp, right, nelem,
 			eventsetp, nelemp);
 	} else {
-		error = xfs_dm_f_get_eventlist(bdp, right, nelem,
+		error = xfs_dm_f_get_eventlist(xbdp, right, nelem,
 			eventsetp, nelemp);
 	}
 	return(error);
@@ -1698,7 +1723,7 @@ xfs_dm_get_eventlist(
 /* ARGSUSED */
 STATIC int
 xfs_dm_get_fileattr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		mask,		/* not used; always return everything */
 	dm_stat_t	*statp)
@@ -1706,13 +1731,16 @@ xfs_dm_get_fileattr(
 	dm_stat_t	stat;
 	xfs_inode_t	*ip;
 	xfs_mount_t	*mp;
+	bhv_desc_t	*xbdp;
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
+	XFS_BHV_LOOKUP(vp, xbdp);
+
 	/* Find the mount point. */
 
-	ip = XFS_BHVTOI(bdp);
+	ip = XFS_BHVTOI(xbdp);
 	mp = ip->i_mount;
 
 	xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -1733,7 +1761,7 @@ xfs_dm_get_fileattr(
 
 STATIC int
 xfs_dm_get_region(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		nelem,
 	dm_region_t	*regbufp,
@@ -1743,11 +1771,14 @@ xfs_dm_get_region(
 	dm_region_t	region;
 	xfs_inode_t	*ip;
 	u_int		elem;
+	bhv_desc_t	*xbdp;
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-	ip = XFS_BHVTOI(bdp);
+	XFS_BHV_LOOKUP(vp, xbdp);
+
+	ip = XFS_BHVTOI(xbdp);
 	evmask = ip->i_d.di_dmevmask;	/* read the mask "atomically" */
 
 	/* Get the file's current managed region flags out of the
@@ -1778,7 +1809,7 @@ xfs_dm_get_region(
 
 STATIC int
 xfs_dm_getall_dmattr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	size_t		buflen,
 	void		*bufp,
@@ -1792,7 +1823,6 @@ xfs_dm_getall_dmattr(
 	int		total_size;
 	int		list_size = 8192;	/* should be big enough */
 	int		error;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
@@ -1925,7 +1955,7 @@ xfs_dm_getall_dmattr(
 /* ARGSUSED */
 STATIC int
 xfs_dm_getall_inherit(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		nelem,
 	dm_inherit_t	*inheritbufp,
@@ -1945,7 +1975,7 @@ xfs_dm_getall_inherit(
 /* ARGSUSED */
 STATIC int
 xfs_dm_init_attrloc(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_attrloc_t	*locp)
 {
@@ -1963,7 +1993,7 @@ xfs_dm_init_attrloc(
 /* ARGSUSED */
 STATIC int
 xfs_dm_mkdir_by_handle(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	void		*hanp,
 	size_t		hlen,
@@ -1976,7 +2006,7 @@ xfs_dm_mkdir_by_handle(
 /* ARGSUSED */
 STATIC int
 xfs_dm_probe_hole(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_off_t	off,
 	dm_size_t	len,		/* we ignore this for now */
@@ -1990,11 +2020,14 @@ xfs_dm_probe_hole(
 	uint		lock_flags;
 	xfs_fsize_t	realsize;
 	u_int		bsize;
+	bhv_desc_t	*xbdp;
 
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-	ip = XFS_BHVTOI(bdp);
+	XFS_BHV_LOOKUP(vp, xbdp);
+
+	ip = XFS_BHVTOI(xbdp);
 	if ((ip->i_d.di_mode & IFMT) != IFREG)
 		return(EINVAL);
 
@@ -2020,7 +2053,7 @@ xfs_dm_probe_hole(
 
 STATIC int
 xfs_dm_punch_hole(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_off_t	off,
 	dm_size_t	len)
@@ -2029,12 +2062,12 @@ xfs_dm_punch_hole(
 	xfs_trans_t	*tp;
 	xfs_trans_t	*tp2;
 	xfs_mount_t	*mp;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	int		error;
 	uint		lock_flags;
 	uint		commit_flags;
 	xfs_fsize_t	realsize;
 	u_int		bsize;
+	bhv_desc_t	*xbdp;
 
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
@@ -2046,7 +2079,9 @@ xfs_dm_punch_hole(
 	if (VN_MAPPED(vp))
 		return(EBUSY);
 
-	ip = XFS_BHVTOI(bdp);
+	XFS_BHV_LOOKUP(vp, xbdp);
+
+	ip = XFS_BHVTOI(xbdp);
 	mp = ip->i_mount;
 	bsize = mp->m_sb.sb_blocksize;
 
@@ -2127,7 +2162,7 @@ xfs_dm_punch_hole(
 
 STATIC int
 xfs_dm_read_invis_rvp(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_off_t	off,
 	dm_size_t	len,
@@ -2137,19 +2172,22 @@ xfs_dm_read_invis_rvp(
 	if (right < DM_RIGHT_SHARED)
 		return(EACCES);
 
-	return(xfs_dm_rdwr(bdp, 0, FMODE_READ, off, len, bufp, rvp));
+	return(xfs_dm_rdwr(vp, 0, FMODE_READ, off, len, bufp, rvp));
 }
 
 
 /* ARGSUSED */
 STATIC int
 xfs_dm_release_right(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		type)		/* DM_FSYS_OBJ or zero */
 {
 #ifdef	DEBUG_RIGHTS
 	char		buffer[sizeof(xfs_handle_t) * 2 + 1];
+	bhv_desc_t	*bdp;
+
+	XFS_BHV_LOOKUP(vp, bdp);
 
 	if (!xfs_bdp_to_hexhandle(bdp, type, buffer)) {
 		printf("dm_release_right: old %d type %d handle %s\n",
@@ -2165,13 +2203,12 @@ xfs_dm_release_right(
 
 STATIC int
 xfs_dm_remove_dmattr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	int		setdtime,
 	dm_attrname_t	*attrnamep)
 {
 	dm_dkattrname_t name;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	int		error;
 
 	if (right < DM_RIGHT_EXCL)
@@ -2196,7 +2233,7 @@ xfs_dm_remove_dmattr(
 /* ARGSUSED */
 STATIC int
 xfs_dm_request_right(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		type,		/* DM_FSYS_OBJ or zero */
 	u_int		flags,
@@ -2204,6 +2241,9 @@ xfs_dm_request_right(
 {
 #ifdef	DEBUG_RIGHTS
 	char		buffer[sizeof(xfs_handle_t) * 2 + 1];
+	bhv_desc_t	*bdp;
+
+	XFS_BHV_LOOKUP(vp, bdp);
 
 	if (!xfs_bdp_to_hexhandle(bdp, type, buffer)) {
 		printf("dm_request_right: old %d new %d type %d flags 0x%x "
@@ -2219,7 +2259,7 @@ xfs_dm_request_right(
 
 STATIC int
 xfs_dm_set_dmattr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_attrname_t	*attrnamep,
 	int		setdtime,
@@ -2229,7 +2269,6 @@ xfs_dm_set_dmattr(
 	dm_dkattrname_t name;
 	char		*value;
 	int		alloc_size;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	int		error;
 
 	if (right < DM_RIGHT_EXCL)
@@ -2262,18 +2301,21 @@ xfs_dm_set_dmattr(
 
 STATIC int
 xfs_dm_set_eventlist(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		type,
 	dm_eventset_t	*eventsetp,	/* in kernel space! */
 	u_int		maxevent)
 {
 	int		error;
+	bhv_desc_t	*xbdp;
+
+	XFS_BHV_LOOKUP(vp, xbdp);
 
 	if (type == DM_FSYS_OBJ) {
-		error = xfs_dm_fs_set_eventlist(bdp, right, eventsetp, maxevent);
+		error = xfs_dm_fs_set_eventlist(xbdp, right, eventsetp, maxevent);
 	} else {
-		error = xfs_dm_f_set_eventlist(bdp, right, eventsetp, maxevent);
+		error = xfs_dm_f_set_eventlist(xbdp, right, eventsetp, maxevent);
 	}
 	return(error);
 }
@@ -2285,14 +2327,13 @@ xfs_dm_set_eventlist(
 
 STATIC int
 xfs_dm_set_fileattr(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		mask,
 	dm_fileattr_t	*statp)
 {
 	dm_fileattr_t	stat;
 	vattr_t		vat;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 	int		error;
 
 	if (right < DM_RIGHT_EXCL)
@@ -2353,7 +2394,7 @@ xfs_dm_set_fileattr(
 /* ARGSUSED */
 STATIC int
 xfs_dm_set_inherit(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	dm_attrname_t	*attrnamep,
 	mode_t		mode)
@@ -2364,7 +2405,7 @@ xfs_dm_set_inherit(
 
 STATIC int
 xfs_dm_set_region(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		nelem,
 	dm_region_t	*regbufp,
@@ -2378,6 +2419,7 @@ xfs_dm_set_region(
 	dm_eventset_t	mr_mask;
 	int		error;
 	u_int		exactflag;
+	bhv_desc_t	*xbdp;
 
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
@@ -2409,7 +2451,7 @@ xfs_dm_set_region(
 		if (region.rg_flags & DM_REGION_TRUNCATE)
 			new_mask |= 1 << DM_EVENT_TRUNCATE;
 	}
-	if ((new_mask & prohibited_mr_events(bdp)) != 0)
+	if ((new_mask & prohibited_mr_events(vp)) != 0)
 		return(EBUSY);
 	mr_mask = (1 << DM_EVENT_READ) | (1 << DM_EVENT_WRITE) | (1 << DM_EVENT_TRUNCATE);
 
@@ -2417,7 +2459,9 @@ xfs_dm_set_region(
 	   bits, add in the new ones, and update the file's mask.
 	*/
 
-	ip = XFS_BHVTOI(bdp);
+	XFS_BHV_LOOKUP(vp, xbdp);
+
+	ip = XFS_BHVTOI(xbdp);
 	mp = ip->i_mount;
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SET_DMATTRS);
 	error = xfs_trans_reserve(tp, 0, XFS_ICHANGE_LOG_RES (mp), 0, 0, 0);
@@ -2432,7 +2476,7 @@ xfs_dm_set_region(
 	ip->i_iocore.io_dmevmask = ip->i_d.di_dmevmask;
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-	VN_HOLD(BHV_TO_VNODE(bdp));
+	VN_HOLD(vp);
 	xfs_trans_commit(tp, 0, NULL);
 
 	/* Return the proper value for *exactflagp depending upon whether or not
@@ -2455,7 +2499,7 @@ xfs_dm_set_region(
 /* ARGSUSED */
 STATIC int
 xfs_dm_symlink_by_handle(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	void		*hanp,
 	size_t		hlen,
@@ -2468,11 +2512,10 @@ xfs_dm_symlink_by_handle(
 
 STATIC int
 xfs_dm_sync_by_handle (
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right)
 {
 	int		error;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
 
 	if (right < DM_RIGHT_EXCL)
 		return(EACCES);
@@ -2485,12 +2528,15 @@ xfs_dm_sync_by_handle (
 /* ARGSUSED */
 STATIC int
 xfs_dm_upgrade_right(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	u_int		type)		/* DM_FSYS_OBJ or zero */
 {
 #ifdef	DEBUG_RIGHTS
 	char		buffer[sizeof(xfs_handle_t) * 2 + 1];
+	bhv_desc_t	*bdp;
+
+	XFS_BHV_LOOKUP(vp, bdp);
 
 	if (!xfs_bdp_to_hexhandle(bdp, type, buffer)) {
 		printf("dm_upgrade_right: old %d new %d type %d handle %s\n",
@@ -2506,7 +2552,7 @@ xfs_dm_upgrade_right(
 
 STATIC int
 xfs_dm_write_invis_rvp(
-	bhv_desc_t	*bdp,
+	vnode_t		*vp,
 	dm_right_t	right,
 	int		flags,
 	dm_off_t	off,
@@ -2521,7 +2567,7 @@ xfs_dm_write_invis_rvp(
 
 	if (flags & DM_WRITE_SYNC)
 		fflag |= O_SYNC;
-	return(xfs_dm_rdwr(bdp, fflag, FMODE_WRITE, off, len, bufp, rvp));
+	return(xfs_dm_rdwr(vp, fflag, FMODE_WRITE, off, len, bufp, rvp));
 }
 
 
@@ -2531,7 +2577,7 @@ STATIC fsys_function_vector_t	xfs_fsys_vector[DM_FSYS_MAX];
 int
 xfs_dm_get_fsys_vector(
 	bhv_desc_t	*bdp,
-	dm_fcntl_vector_t *vecrq)
+	dm_fcntl_vector_t	*vecrq)
 {
 	static	int		initialized = 0;
 	fsys_function_vector_t *vecp;
@@ -2740,79 +2786,18 @@ xfs_dmapi_mmap_event(
 	/* Figure out how much of the file is being requested by the user. */
 	maprq.length = 0; /* whole file, for now */
 
-	bdp = bhv_base_unlocked(VN_BHV_HEAD(vp));
+	VN_BHV_READ_LOCK(VN_BHV_HEAD(vp));
+	XFS_BHV_LOOKUP(vp, bdp);
 	ip = XFS_BHVTOI(bdp);
 
 	if(DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
 		xfs_dm_mapevent(bdp, 0, 0, &maprq);
 		ret = maprq.error;
 	}
+	VN_BHV_READ_UNLOCK(VN_BHV_HEAD(vp));
 
 	return -ret;
 }
-
-
-#ifdef __sgi
-/*	xfs_dm_testevent() - test if events needed for a memory mapped file.
- *
- *	xfs_dm_testevent() is called when a page from a memory mapped
- *	file is about to be modified.  xfs_dm_testevent() will check if
- *	an event should be generated for the region specified.	If (at
- *	least) one should be generated, it is up to the caller to drop
- *	any critical locks held and then issue the events via a
- *	DM_FCNTL_MAPEVENT fcntl() call.
- *
- *	Returns 0 if xfs_dm_testevent() executed successfully.
- *	testevp->error = errno if an error detected.  otherwise,
- *	testevp->error = 0 and testevp->issue_event = The "highest"
- *	event to be issued - DM_EVENT_WRITE, DM_EVENT_READ, or
- *	DM_EVENT_INVALID (for no event to be issued).
- */
-
-/* ARGSUSED */
-STATIC int
-xfs_dm_testevent(
-	bhv_desc_t	*bdp,
-	int		flags,
-	off_t		offset,
-	dm_fcntl_t	*dmfcntlp)
-{
-	dm_fcntl_testevent_t  *testevp;
-	xfs_inode_t	*ip;
-	vnode_t		*vp = BHV_TO_VNODE(bdp);
-	struct vfs	*vfsp = vp->v_vfsp;
-
-	/* exit immediately if not regular file in a DMAPI file system */
-
-	testevp = &dmfcntlp->u_fcntl.testrq;
-	testevp->error = 0;			/* assume no error */
-	testevp->issue_event = DM_EVENT_INVALID; /* assume no event */
-
-	if ((vp->v_type != VREG) || !(vfsp->vfs_flag & VFS_DMI))
-		return 0;
-
-	if (testevp->max_event != DM_EVENT_WRITE &&
-		testevp->max_event != DM_EVENT_READ)
-			return 0;
-
-	ip = XFS_BHVTOI(bdp);
-
-	/* Set file size to work with. */
-
-	/* Return DM_EVENT_WRITE if write possible */
-	if (testevp->max_event == DM_EVENT_WRITE &&
-		DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_WRITE)) {
-		testevp->issue_event = DM_EVENT_WRITE;
-	} else if (DM_EVENT_ENABLED (vp->v_vfsp, ip, DM_EVENT_READ)) {
-
-	/* Read event needed if max_event was != DM_EVENT_WRITE or if it
-	 * was DM_EVENT_WRITE but the WRITE event was not enabled.
-	 */
-		testevp->issue_event = DM_EVENT_READ;
-	}
-	return 0;
-}
-#endif
 
 
 int
