@@ -2339,29 +2339,29 @@ xfs_dm_set_fileattr(
 	vat.va_mask = 0;
 
 	if (mask & DM_AT_MODE) {
-		vat.va_mask |= AT_MODE;
+		vat.va_mask |= XFS_AT_MODE;
 		vat.va_mode = stat.fa_mode;
 	}
 	if (mask & DM_AT_UID) {
-		vat.va_mask |= AT_UID;
+		vat.va_mask |= XFS_AT_UID;
 		vat.va_uid = stat.fa_uid;
 	}
 	if (mask & DM_AT_GID) {
-		vat.va_mask |= AT_GID;
+		vat.va_mask |= XFS_AT_GID;
 		vat.va_gid = stat.fa_gid;
 	}
 	if (mask & DM_AT_ATIME) {
-		vat.va_mask |= AT_ATIME;
+		vat.va_mask |= XFS_AT_ATIME;
 		vat.va_atime.tv_sec = stat.fa_atime;
 		vat.va_atime.tv_nsec = 0;
 	}
 	if (mask & DM_AT_MTIME) {
-		vat.va_mask |= AT_MTIME;
+		vat.va_mask |= XFS_AT_MTIME;
 		vat.va_mtime.tv_sec = stat.fa_mtime;
 		vat.va_mtime.tv_nsec = 0;
 	}
 	if (mask & DM_AT_CTIME) {
-		vat.va_mask |= AT_CTIME;
+		vat.va_mask |= XFS_AT_CTIME;
 		vat.va_ctime.tv_sec = stat.fa_ctime;
 		vat.va_ctime.tv_nsec = 0;
 	}
@@ -2371,12 +2371,12 @@ xfs_dm_set_fileattr(
 	*/
 
 	if ((mask & DM_AT_DTIME) && !(mask & DM_AT_CTIME)) {
-		vat.va_mask |= AT_CTIME;
+		vat.va_mask |= XFS_AT_CTIME;
 		vat.va_ctime.tv_sec = stat.fa_dtime;
 		vat.va_ctime.tv_nsec = 0;
 	}
 	if (mask & DM_AT_SIZE) {
-		vat.va_mask |= AT_SIZE;
+		vat.va_mask |= XFS_AT_SIZE;
 		vat.va_size = stat.fa_size;
 	}
 
