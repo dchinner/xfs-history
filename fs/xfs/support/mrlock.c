@@ -59,6 +59,7 @@ mrlock_init(mrlock_t *mrp, int lock_type, char *name, long sequence)
 	mrp->mr_count = 0;
 	mrp->mr_reads_waiting = 0;
 	mrp->mr_writes_waiting = 0;
+	mrp->owner = NULL;
 	init_waitqueue_head(&mrp->mr_readerq);
 	init_waitqueue_head(&mrp->mr_writerq);
 	mrp->mr_lock = SPIN_LOCK_UNLOCKED;
@@ -92,14 +93,6 @@ lock_wait(wait_queue_head_t *q, spinlock_t *lock, int rw)
 {
 	DECLARE_WAITQUEUE( wait, current );
 
-#if 0
-	if (rw) {
-		set_current_state(TASK_UNINTERRUPTIBLE | TASK_EXCLUSIVE);
-	} else {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-	}
-#endif 
-	/* TASK_EXCLUSIVE has gone away in test11 RMC */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 
 	wq_write_lock(&q->lock);
@@ -172,6 +165,7 @@ mrupdatef(mrlock_t *mrp, int flags)
 	}
 
 	mrp->mr_count = -1; /* writer on it */
+	mrp->owner = current;
 	MRUNLOCK(mrp);
 }
 
@@ -203,6 +197,7 @@ mrtrypromote(mrlock_t *mrp)
 
 	if(mrp->mr_count == 1) { /* We are the only thread with the lock */
 		mrp->mr_count = -1; /* writer on it */
+		mrp->owner = current;
 		MRUNLOCK_INT(mrp, s);
 		return 1;
 	}
@@ -223,6 +218,7 @@ mrtryupdate(mrlock_t *mrp)
 		return 0;
 	}
 
+	mrp->owner = current;
 	mrp->mr_count = -1; /* writer on it */
 	MRUNLOCK_INT(mrp, s);
 	return 1;
@@ -261,6 +257,7 @@ mrunlock(mrlock_t *mrp)
 	MRLOCK_INT(mrp, s);
 	if (mrp->mr_count < 0) {
 		mrp->mr_count = 0;
+		mrp->owner = NULL;
 	} else {
 		mrp->mr_count--;
 	}
@@ -292,6 +289,7 @@ mrdemote(mrlock_t *mrp)
 {
 	MRLOCK(mrp);
 	mrp->mr_count = 1;
+	mrp->owner = NULL;
 	if (mrp->mr_reads_waiting) {	/* Wakeup all readers waiting */
 		wake_up(&mrp->mr_readerq);
 	}

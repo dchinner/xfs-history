@@ -49,6 +49,7 @@ typedef struct mrlock_s {
 	int			mr_count;
 	uint			mr_reads_waiting;
 	uint			mr_writes_waiting;
+	void			*owner;
 	wait_queue_head_t	mr_readerq;
 	wait_queue_head_t	mr_writerq;
 	spinlock_t 		mr_lock;
