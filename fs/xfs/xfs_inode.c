@@ -1409,6 +1409,8 @@ void
 xfs_idestroy(
 	xfs_inode_t	*ip)
 {
+	extern void xfs_free_remaining_tickets( xfs_inode_t *);
+
 	switch (ip->i_d.di_mode & IFMT) {
 	case IFREG:
 	case IFDIR:
@@ -1451,6 +1453,7 @@ xfs_idestroy(
 	}
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
+	xfs_free_remaining_tickets( ip );
 	freesplock(ip->i_ticketlock);
 	freesplock(ip->i_range_lock.r_splock);
 	freesema(&ip->i_flock);
