@@ -1,4 +1,4 @@
-#ident "$Revision: 1.61 $"
+#ident "$Revision: 1.63 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -452,7 +452,7 @@ xfs_dir_leaf_addname(xfs_trans_t *trans, xfs_da_args_t *args)
 	int index, retval;
 	buf_t *bp;
 
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
+	retval = xfs_da_read_buf(trans, args->dp, 0, -1, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -478,7 +478,7 @@ xfs_dir_leaf_removename(xfs_trans_t *trans, xfs_da_args_t *args,
 	int index, retval;
 	buf_t *bp;
 
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
+	retval = xfs_da_read_buf(trans, args->dp, 0, -1, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -505,7 +505,7 @@ xfs_dir_leaf_lookup(xfs_trans_t *trans, xfs_da_args_t *args)
 	int index, retval;
 	buf_t *bp;
 
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
+	retval = xfs_da_read_buf(trans, args->dp, 0, -1, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -531,7 +531,7 @@ xfs_dir_leaf_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			return(0);
 		return(XFS_ERROR(ENOENT));
 	}
-	retval = xfs_da_read_buf(trans, dp, 0, &bp, XFS_DATA_FORK);
+	retval = xfs_da_read_buf(trans, dp, 0, -1, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -557,7 +557,7 @@ xfs_dir_leaf_replace(xfs_trans_t *trans, xfs_da_args_t *args)
 	xfs_dir_leaf_name_t *namest;
 
 	inum = args->inumber;
-	retval = xfs_da_read_buf(trans, args->dp, 0, &bp, XFS_DATA_FORK);
+	retval = xfs_da_read_buf(trans, args->dp, 0, -1, &bp, XFS_DATA_FORK);
 	if (retval)
 		return(retval);
 	ASSERT(bp != NULL);
@@ -737,6 +737,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 	__uint32_t bno, maxbno;
 	int retval, eob;
 	buf_t *bp;
+	daddr_t mappedbno;
 
 	mp = dp->i_mount;
 	if (uio->uio_offset == 0) {
@@ -745,7 +746,7 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			xfs_da_intnode_t *node;
 			xfs_da_node_entry_t *btree;
 
-			retval = xfs_da_read_buf(trans, dp, bno, &bp,
+			retval = xfs_da_read_buf(trans, dp, bno, -1, &bp,
 							XFS_DATA_FORK);
 			if (retval)
 				return(retval);
@@ -769,7 +770,8 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 			} else
 				return(XFS_ERROR(ENOENT));
 		}
-		retval = xfs_da_read_buf(trans, dp, bno, &bp, XFS_DATA_FORK);
+		retval = xfs_da_read_buf(trans, dp, bno, -1, &bp,
+						XFS_DATA_FORK);
 		if (retval)
 			return(retval);
 		if (bp == NULL)
@@ -781,19 +783,27 @@ xfs_dir_node_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 		}
 	}
 	for (;;) {
+		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
+		bno = leaf->hdr.info.forw;
+		if (bno != 0) {
+			if (XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset) == 0)
+				mappedbno = xfs_da_reada_buf(trans, dp, bno,
+								XFS_DATA_FORK);
+			else
+				mappedbno = -1;
+		}
 		retval = xfs_dir_leaf_getdents_int(bp, dp, uio, &eob, dbp);
 		if (!eob) {
 			*eofp = 0;
 			xfs_trans_brelse(trans, bp);
 			return(retval);
 		}
-		leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-		bno = leaf->hdr.info.forw;
 		xfs_trans_brelse(trans, bp);
 		if (bno == 0)
 			break;
 		uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, 0);
-		retval = xfs_da_read_buf(trans, dp, bno, &bp, XFS_DATA_FORK);
+		retval = xfs_da_read_buf(trans, dp, bno, mappedbno, &bp,
+						XFS_DATA_FORK);
 		if (retval)
 			return(retval);
 		ASSERT(bp != NULL);

@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DA_BTREE_H
 #define	_FS_XFS_DA_BTREE_H
 
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.20 $"
 
 /*
  * xfs_da_btree.h
@@ -198,9 +198,11 @@ int	xfs_da_get_buf(struct xfs_trans *trans, struct xfs_inode *dp,
 			      xfs_fileoff_t bno, struct buf **bp,
 			      int whichfork);
 int	xfs_da_read_buf(struct xfs_trans *trans, struct xfs_inode *dp,
-			       xfs_fileoff_t bno, struct buf **bpp,
-			       int whichfork);
+			       xfs_fileoff_t bno, daddr_t mappedbno,
+			       struct buf **bpp, int whichfork);
 #ifndef SIM
+daddr_t	xfs_da_reada_buf(struct xfs_trans *trans, struct xfs_inode *dp,
+				xfs_fileoff_t bno, int whichfork);
 int	xfs_da_shrink_inode(struct xfs_trans *trans, struct xfs_da_args *args,
 				   xfs_fileoff_t dead_blkno,
 				   int length, struct buf *dead_buf);

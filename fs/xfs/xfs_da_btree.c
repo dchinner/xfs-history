@@ -655,7 +655,7 @@ xfs_da_root_join(xfs_da_state_t *state, xfs_da_state_blk_t *root_blk)
 	 */
 	child = oldroot->btree[ 0 ].before;
 	ASSERT(child != 0);
-	error = xfs_da_read_buf(state->trans, state->args->dp, child, &bp,
+	error = xfs_da_read_buf(state->trans, state->args->dp, child, -1, &bp,
 					      state->args->whichfork);
 	if (error)
 		return(error);
@@ -750,7 +750,7 @@ xfs_da_node_toosmall(xfs_da_state_t *state, int *action)
 		if (blkno == 0)
 			continue;
 		error = xfs_da_read_buf(state->trans, state->args->dp,
-						      blkno, &bp,
+						      blkno, -1, &bp,
 						      state->args->whichfork);
 		if (error)
 			return(error);
@@ -981,7 +981,7 @@ xfs_da_node_lookup_int(xfs_da_state_t *state, int *result)
 		 */
 		blk->blkno = blkno;
 		error = xfs_da_read_buf(state->trans, state->args->dp,
-						      blkno, &blk->bp,
+						      blkno, -1, &blk->bp,
 						      state->args->whichfork);
 		if (error) {
 			blk->blkno = 0;
@@ -1144,7 +1144,7 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 		new_info->back = old_info->back;
 		if (old_info->back) {
 			error = xfs_da_read_buf(state->trans, state->args->dp,
-						      old_info->back, &bp,
+						      old_info->back, -1, &bp,
 						      state->args->whichfork);
 			if (error)
 				return(error);
@@ -1165,7 +1165,7 @@ xfs_da_blk_link(xfs_da_state_t *state, xfs_da_state_blk_t *old_blk,
 		new_info->back = old_blk->blkno;
 		if (old_info->forw) {
 			error = xfs_da_read_buf(state->trans, state->args->dp,
-						      old_info->forw, &bp,
+						      old_info->forw, -1, &bp,
 						      state->args->whichfork);
 			if (error)
 				return(error);
@@ -1257,7 +1257,7 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		save_info->back = drop_info->back;
 		if (drop_info->back) {
 			error = xfs_da_read_buf(state->trans, state->args->dp,
-						      drop_info->back, &bp,
+						      drop_info->back, -1, &bp,
 						      state->args->whichfork);
 			if (error)
 				return(error);
@@ -1273,7 +1273,7 @@ xfs_da_blk_unlink(xfs_da_state_t *state, xfs_da_state_blk_t *drop_blk,
 		save_info->forw = drop_info->forw;
 		if (drop_info->forw) {
 			error = xfs_da_read_buf(state->trans, state->args->dp,
-						      drop_info->forw, &bp,
+						      drop_info->forw, -1, &bp,
 						      state->args->whichfork);
 			if (error)
 				return(error);
@@ -1354,7 +1354,7 @@ xfs_da_path_shift(xfs_da_state_t *state, xfs_da_state_path_t *path,
 		 */
 		blk->blkno = blkno;
 		error = xfs_da_read_buf(state->trans, state->args->dp,
-						      blkno, &blk->bp,
+						      blkno, -1, &blk->bp,
 						      state->args->whichfork);
 		if (error)
 			return(error);
@@ -1529,35 +1529,36 @@ xfs_da_get_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 #endif /* XFSDADEBUG */
 int
 xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
-			    buf_t **bpp, int whichfork)
+			daddr_t mappedbno, buf_t **bpp, int whichfork)
 {
 	xfs_fsblock_t firstblock;
 	xfs_da_blkinfo_t *info;
 	xfs_bmbt_irec_t map;
 	int nmap, error;
 
-	nmap = 1;
-	firstblock = NULLFSBLOCK;
-	error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
-				 &firstblock, 0, &map, &nmap, 0);
-	if (error) {
-		return(error);
+	if (mappedbno == -1) {
+		nmap = 1;
+		firstblock = NULLFSBLOCK;
+		error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
+					 &firstblock, 0, &map, &nmap, NULL);
+		if (error) {
+			return(error);
+		}
+		if (nmap == 0) {
+			*bpp = NULL;
+			return(0);
+		}
+		ASSERT(nmap == 1);
+		ASSERT(map.br_startblock != DELAYSTARTBLOCK);
+		if (map.br_startblock == HOLESTARTBLOCK) {
+			*bpp = NULL;
+			return(0);
+		}
+		ASSERT(map.br_startblock != NULLFSBLOCK);
+		mappedbno = XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock);
 	}
-	if (nmap == 0) {
-		*bpp = NULL;
-		return(0);
-	}
-	ASSERT(nmap >= 1);
-	ASSERT(map.br_startblock != DELAYSTARTBLOCK);
-	if (map.br_startblock == HOLESTARTBLOCK) {
-		*bpp = NULL;
-		return(0);
-	}
-
-	ASSERT(map.br_startblock != NULLFSBLOCK);
 	error = xfs_trans_read_buf(trans, dp->i_mount->m_dev, 
-			      XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock),
-			      dp->i_mount->m_bsize, 0, bpp);
+			      mappedbno, dp->i_mount->m_bsize, 0, bpp);
 	if (error)
 		return error;
 	ASSERT(!*bpp || !geterror(*bpp));
@@ -1574,6 +1575,34 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
 	}
 	return(0);
 }
+
+#ifndef SIM
+daddr_t
+xfs_da_reada_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_fileoff_t bno,
+			     int whichfork)
+{
+	xfs_fsblock_t firstblock;
+	xfs_bmbt_irec_t map;
+	int nmap, error;
+	daddr_t rval = -1;
+
+	nmap = 1;
+	firstblock = NULLFSBLOCK;
+	error = xfs_bmapi(trans, dp, bno, 1, XFS_BMAPI_AFLAG(whichfork),
+				 &firstblock, 0, &map, &nmap, NULL);
+	if (error || nmap == 0)
+		return rval;
+	ASSERT(nmap == 1);
+	ASSERT(map.br_startblock != DELAYSTARTBLOCK);
+	if (map.br_startblock == HOLESTARTBLOCK)
+		return rval;
+	ASSERT(map.br_startblock != NULLFSBLOCK);
+	baread(dp->i_mount->m_dev,
+		(rval = XFS_FSB_TO_DADDR(dp->i_mount, map.br_startblock)),
+		dp->i_mount->m_bsize);
+	return rval;
+}
+#endif	/* !SIM */
 
 /*
  * Calculate the number of bits needed to hold i different values.
@@ -1698,7 +1727,7 @@ xfsda_t_dir_read_buf(xfs_trans_t *trans, xfs_inode_t *ip, xfs_fileoff_t bno,
 {
 	buf_t *bp;
 
-	(void) xfs_da_read_buf(trans, ip, bno, &bp, whichfork);
+	(void) xfs_da_read_buf(trans, ip, bno, -1, &bp, whichfork);
 	if (xfsda_debug) {
 		xfsda_tracebuf[ xfsda_trc_head ].which = 6;
 		xfsda_tracebuf[ xfsda_trc_head ].line = line;
@@ -1804,7 +1833,7 @@ xfsda_load_leaf(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork)
 	xfs_da_blkinfo_t *info;
 	buf_t *bp;
 
-	(void) xfs_da_read_buf(dp->i_transp, dp, blkno, &bp, whichfork);
+	(void) xfs_da_read_buf(dp->i_transp, dp, blkno, -1, &bp, whichfork);
 	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
 	printf("leaf[0x%x]  bp 0x%x  forw 0x%x  back 0x%x  ",
 			blkno, bp, info->forw, info->back);
@@ -1829,7 +1858,7 @@ xfsda_load_node(xfs_inode_t *dp, xfs_fileoff_t blkno, int whichfork)
 	int retval, i;
 	buf_t *bp;
 
-	(void) xfs_da_read_buf(dp->i_transp, dp, blkno, &bp, whichfork);
+	(void) xfs_da_read_buf(dp->i_transp, dp, blkno, -1, &bp, whichfork);
 	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
 	printf("node[0x%x]  bp 0x%x  forw 0x%x  back 0x%x  count %d  level %d\n",
 			    blkno, bp,
@@ -2041,7 +2070,7 @@ xfsda_leaf_check(xfsda_context_t *con, xfs_fileoff_t blkno, int firstlast)
 	/*
 	 * Read in the leaf block.
 	 */
-	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, &bp,
+	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
 						  con->whichfork);
 	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
 
@@ -2402,7 +2431,7 @@ xfsda_node_check(xfsda_context_t *con, xfs_fileoff_t blkno,
 	/*
 	 * Read the next node down in the tree.
 	 */
-	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, &bp,
+	(void) xfs_da_read_buf(con->dp->i_transp, con->dp, blkno, -1, &bp,
 						  con->whichfork);
 	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
 	node = (xfs_da_intnode_t *)bp->b_un.b_addr;
