@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.190 $"
+#ident  "$Revision: 1.191 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -197,6 +197,7 @@ xfs_cmountfs(
 	dev_t		rtdev,
 	whymount_t	why,
 	struct xfs_args	*ap,
+	struct mounta	*args,
 	struct cred	*cr);
 
 STATIC xfs_mount_t *
@@ -422,6 +423,7 @@ xfs_cmountfs(
 	dev_t		rtdev,
 	whymount_t	why,
 	struct xfs_args	*ap,
+	struct mounta	*args,
 	struct cred	*cr)
 {
 	xfs_mount_t	*mp;
@@ -589,6 +591,17 @@ xfs_cmountfs(
 
 		if (ap->flags & XFSMNT_NOALIGN)
 			mp->m_flags |= XFS_MOUNT_NOALIGN;
+
+		/*
+		 * no recovery flag requires a read-only mount
+		 */
+		if (ap->flags & XFSMNT_NORECOVERY) {
+			if (!(vfsp->vfs_flag & VFS_RDONLY)) {
+				error = EINVAL;
+				goto error3;
+			}
+			mp->m_flags |= XFS_MOUNT_NORECOVERY;
+		}
 	}
 #if TEST_UUID_STUFF
 	if (ap && (ap->flags & XFSMNT_TESTUUID)) {
@@ -600,6 +613,60 @@ xfs_cmountfs(
 	}
 	else
 #endif
+
+	/*
+	 * read in superblock to check read-only flags and shared
+	 * mount status
+	 */
+	if (error = xfs_readsb(mp, ddev)) {
+		goto error3;
+	}
+
+	/*
+	 * prohibit r/w mounts of read-only filesystems
+	 */
+	if (mp->m_sb.sb_flags & XFS_SBF_READONLY &&
+	    !(vfsp->vfs_flag & VFS_RDONLY)) {
+		error = EROFS;
+		xfs_freesb(mp);
+		goto error3;
+	}
+
+	/*
+	 * check for shared mount.
+	 */
+	if (ap && ap->flags & XFSMNT_SHARED) {
+		if (!XFS_SB_VERSION_HASSHARED(&mp->m_sb)) {
+			error = EINVAL;
+			xfs_freesb(mp);
+			goto error3;
+		}
+
+		/*
+		 * For 6.5, shared mounts must have
+		 * the shared version bit set, have the persistent readonly
+		 * field set, must be version 0 and can only be mounted
+		 * read-only.
+		 */
+		if (!(vfsp->vfs_flag & VFS_RDONLY) ||
+		    !(mp->m_sb.sb_flags & XFS_SBF_READONLY) ||
+		    mp->m_sb.sb_shared_vn != 0) {
+			error = EINVAL;
+			xfs_freesb(mp);
+			goto error3;
+		}
+
+		mp->m_flags |= XFS_MOUNT_SHARED;
+
+		/*
+		 * Shared XFS V0 can't deal with DMI.  Return EINVAL.
+		 */
+		if (mp->m_sb.sb_shared_vn == 0 && (args->flags & MS_DMI)) {
+			error = EINVAL;
+			xfs_freesb(mp);
+			goto error3;
+		}
+	}
 
 #if CELL || NOTYET
 	error = cxfs_mount(mp, ap, ddev, &client);
@@ -887,7 +954,7 @@ xfs_mount(
 	}
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, NONROOT_MOUNT,
-			     &args, credp);
+			     &args, uap, credp);
 	if (error) {
 		return error;
 	}
@@ -1132,7 +1199,7 @@ xfs_mountroot(
 	}
 	ASSERT(ddev && logdev);
 
-	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, why, NULL, cr);
+	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, why, NULL, NULL, cr);
 
 	if (error) {
 		vfs_unlock(vfsp);
@@ -1683,7 +1750,7 @@ xfs_sync(
 #define PREEMPT_MASK	0x7f
 
 	mp = XFS_BHVTOM(bdp);
-	if (mp->m_flags & XFS_MOUNT_FS_IS_CLEAN)
+	if (XFS_MTOVFS(mp)->vfs_flag & VFS_RDONLY)
 		return 0;
 	error = 0;
 	last_error = 0;
