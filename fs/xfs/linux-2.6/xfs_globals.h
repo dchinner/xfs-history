@@ -42,6 +42,8 @@ extern uint64_t xfs_panic_mask;		/* set to cause more panics */
 extern int	restricted_chown;
 extern unsigned long	xfs_physmem;
 
+extern struct cred *sys_cred;
+
 extern struct xfs_qm	*xfs_Gqm;
 extern mutex_t		xfs_Gqm_lock;
 

@@ -32,46 +32,19 @@
 #ifndef __XFS_CRED_H__
 #define __XFS_CRED_H__
 
-#include <xfs_cap.h>
-#include <xfs_mac.h>
-#include <asm/param.h>		/* For NGROUPS */
-#include <linux/capability.h>
-#include <linux/sched.h>
-
 /*
  * Credentials
  */
 typedef struct cred {
-	int	cr_ref;			/* reference count */
-	ushort	cr_ngroups;		/* number of groups in cr_groups */
-	uid_t	cr_uid;			/* effective user id */
-	gid_t	cr_gid;			/* effective group id */
-	uid_t	cr_ruid;		/* real user id */
-	gid_t	cr_rgid;		/* real group id */
-	uid_t	cr_suid;		/* "saved" user id (from exec) */
-	gid_t	cr_sgid;		/* "saved" group id (from exec) */
-	xfs_mac_label_t *cr_mac;	/* MAC label for B1 and beyond */
-	xfs_cap_set_t	cr_cap;		/* capability (privilege) sets */
-	gid_t	cr_groups[NGROUPS];	/* supplementary group list */
+	/* EMPTY */
 } cred_t;
 
-#define VREAD		00400
-#define VWRITE		00200
-#define VEXEC		00100
-#define MACEXEC		00100
-#define MACWRITE	00200
-#define MACREAD		00400
-
-extern void cred_init(void);
-/*
- * XXX: tes
- * This is a hack.
- * It assumes that if cred is not null then it is sys_cred which
- * has all capabilities.
- * One solution may be to implement capable_cred based on linux' capable()
- * and initialize all credentials in our xfs linvfs layer.
- */
-static __inline int capable_cred(cred_t *cr, int cid) { return (cr==NULL) ? capable(cid) : 1; }
 extern struct cred *sys_cred;
+
+/* this is a hack.. (assums sys_cred is the only cred_t in the system) */
+static __inline int capable_cred(cred_t *cr, int cid)
+{
+	return (cr == sys_cred) ? 1 : capable(cid);
+}
 
 #endif	/* __XFS_CRED_H__ */

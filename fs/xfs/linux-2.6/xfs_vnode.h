@@ -604,8 +604,10 @@ typedef struct vattr {
 		 AT_BLKSIZE|AT_NBLOCKS|AT_VCODE|AT_NEXTENTS|AT_ANEXTENTS|\
 		 AT_GENCOUNT)
 
-#define VSGID		02000		/* set group id on execution */
+#define VREAD		00400
+#define VWRITE		00200
 #define VEXEC		00100
+#define VSGID		02000		/* set group id on execution */
 #define MODEMASK	07777		/* mode bits plus permission bits */
 
 /*

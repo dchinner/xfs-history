@@ -785,7 +785,6 @@ static int __init init_xfs_fs(void)
 
 	printk(message);
 
-	cred_init();
 	vn_init();
 	xfs_init();
 	dmapi_init();
