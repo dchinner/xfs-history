@@ -211,7 +211,7 @@ vfs_busydev(dev_t dev, int type)
 {
 	long s;
 	struct vfs *vfsp;
-	kdev_t	kdev = MKDEV(MAJOR(dev), MINOR(dev));
+	kdev_t	kdev = mk_kdev(MAJOR(dev), MINOR(dev));
 	struct super_block *sb;
 
 	lock_kernel();
@@ -274,7 +274,7 @@ STATIC struct vfs *
 vfs_devsearch_nolock(dev_t dev, int fstype)
 {
         register struct vfs *vfsp;
-	kdev_t	kdev = MKDEV(MAJOR(dev), MINOR(dev));
+	kdev_t	kdev = mk_kdev(MAJOR(dev), MINOR(dev));
 	struct super_block *sb;
 
 	lock_kernel();

@@ -319,7 +319,8 @@ vn_revalidate(struct vnode *vp, int flags)
 		inode->i_nlink      = va.va_nlink;
 		inode->i_uid        = va.va_uid;
 		inode->i_gid        = va.va_gid;
-		inode->i_rdev       = va.va_rdev;
+		inode->i_rdev       = mk_kdev(MAJOR(va.va_rdev),
+						MINOR(va.va_rdev));
 		inode->i_blksize    = va.va_blksize;
 		inode->i_generation = va.va_gencount;
 		if ((flags & ATTR_COMM) ||

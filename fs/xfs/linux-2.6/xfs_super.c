@@ -291,7 +291,7 @@ STATIC int
 spectodev(
 	const char	*name,
 	const char	*id,
-	dev_t		*dev)
+	kdev_t		*dev)
 {
 	struct nameidata nd;
 	int		rval = 0;
@@ -313,9 +313,9 @@ int
 spectodevs(
 	struct super_block *sb,
 	struct xfs_args	*args,
-	dev_t		*ddevp,
-	dev_t		*logdevp,
-	dev_t		*rtdevp)
+	kdev_t		*ddevp,
+	kdev_t		*logdevp,
+	kdev_t		*rtdevp)
 {
 	int		rval = 0;
 
@@ -325,7 +325,7 @@ spectodevs(
 	if (args->rtname[0] && !rval)
 		rval = spectodev(args->rtname, "realtime", rtdevp);
 	else
-		*rtdevp = 0;
+		*rtdevp = NODEV;
 	return rval;
 }
 
@@ -345,7 +345,7 @@ spectodevs(
 int
 linvfs_fill_buftarg(
 	struct buftarg		*btp,
-	dev_t			dev,
+	kdev_t			dev,
 	struct super_block	*sb,
 	int			data)
 {
@@ -353,12 +353,13 @@ linvfs_fill_buftarg(
 	struct block_device	*bdev = NULL;
 
 	if (!data) {
-		bdev = bdget(dev);
+		bdev = bdget(kdev_t_to_nr(dev));
 		if (!bdev)
 			return -ENOMEM;
 		rval = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
 		if (rval) {
-			printk("XFS: blkdev_get failed on device %d\n", dev);
+			printk("XFS: blkdev_get failed on device %d\n",
+				kdev_t_to_nr(dev));
 			bdput(bdev);
 			return rval;
 		}
@@ -543,7 +544,8 @@ linvfs_set_inode_ops(
 			inode->i_mapping->a_ops = &linvfs_aops;
 	} else {
 		inode->i_op = &linvfs_file_inode_operations;
-		init_special_inode(inode, inode->i_mode, inode->i_rdev);
+		init_special_inode(inode, inode->i_mode,
+					kdev_t_to_nr(inode->i_rdev));
 	}
 }
 
