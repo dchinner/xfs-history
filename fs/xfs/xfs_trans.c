@@ -1,4 +1,4 @@
-#ident "$Revision: 1.66 $"
+#ident "$Revision: 1.67 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -91,6 +91,7 @@ xfs_trans_init(
 	resp->tr_setattr = XFS_CALC_SETATTR_LOG_RES(mp);
 	resp->tr_rmattr = XFS_CALC_RMATTR_LOG_RES(mp);
 	resp->tr_attrflag = XFS_CALC_ATTRFLAG_LOG_RES(mp);
+	resp->tr_clearagi = XFS_CALC_CLEAR_AGI_BUCKET_LOG_RES(mp);
 }
 
 /*
