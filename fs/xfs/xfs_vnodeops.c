@@ -523,7 +523,7 @@ xfs_setattr(
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			lock_flags &= ~XFS_ILOCK_EXCL;
 			if (mask & AT_CTIME)
-				xfs_ichgtime(ip, XFS_ICHGTIME_CHG);
+				xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 			code = 0;
 			goto error_return;
 		}
