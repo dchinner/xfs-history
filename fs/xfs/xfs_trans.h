@@ -212,6 +212,7 @@ typedef struct xfs_trans {
 	int			t_res_frextents_delta; /* on-disk only chg */
 	int			t_ag_freeblks_delta; /* debugging counter */
 	int			t_ag_flist_delta; /* debugging counter */
+	int			t_ag_btree_delta; /* debugging counter */
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
@@ -302,9 +303,11 @@ struct xfs_efd_log_item;
 #ifdef DEBUG
 #define	xfs_trans_agblocks_delta(tp, d)	((tp)->t_ag_freeblks_delta += d)
 #define	xfs_trans_agflist_delta(tp, d)	((tp)->t_ag_flist_delta += d)
+#define	xfs_trans_agbtree_delta(tp, d)	((tp)->t_ag_btree_delta += d)
 #else
 #define	xfs_trans_agblocks_delta(tp, d)
 #define	xfs_trans_agflist_delta(tp, d)
+#define	xfs_trans_agbtree_delta(tp, d)
 #endif
 
 /*
