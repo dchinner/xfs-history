@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.161 $"
+#ident	"$Revision: 1.162 $"
 
 /*
  * High level interface routines for log manager
@@ -53,6 +53,7 @@
 #include "xfs_log_recover.h"
 #include "xfs_bit.h"
 #include "xfs_rw.h"
+#include "xfs_trans_priv.h"
 
 #ifdef SIM
 #include "sim.h"		/* must be last include file */
@@ -147,6 +148,8 @@ STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
 #define xlog_verify_iclog(a,b,c,d)
 #define xlog_verify_tail_lsn(a,b,c)
 #endif
+
+int		xlog_iclogs_empty(xlog_t *log);
 
 #ifdef DEBUG
 int xlog_do_error = 0;
@@ -792,6 +795,34 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 	GRANT_UNLOCK(log, spl);
 }	/* xfs_log_move_tail */
 
+/*
+ * Determine if we have a transaction that has gone to disk
+ * that needs to be covered. Log activity needs to be idle (no AIL and
+ * nothing in the iclogs). And, we need to be in the right state indicating
+ * something has gone out.
+ */
+int
+xfs_log_need_covered(xfs_mount_t *mp)
+{
+	int 		spl, needed = 0, gen;
+	xlog_t		*log = mp->m_log; 
+
+	spl = LOG_LOCK(log);
+	if (((log->l_covered_state == XLOG_STATE_COVER_NEED) ||
+		(log->l_covered_state == XLOG_STATE_COVER_NEED2))
+			&& !xfs_trans_first_ail(mp, &gen)
+			&& xlog_iclogs_empty(log)) {
+		if (log->l_covered_state == XLOG_STATE_COVER_NEED)
+			log->l_covered_state = XLOG_STATE_COVER_DONE;
+		else {
+			ASSERT(log->l_covered_state == XLOG_STATE_COVER_NEED2);
+			log->l_covered_state = XLOG_STATE_COVER_DONE2;
+		}
+		needed = 1;
+	}
+	LOG_UNLOCK(log, spl);
+	return(needed);
+}
 
 /******************************************************************************
  *
@@ -1112,6 +1143,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_logBBstart  = blk_offset;
 	log->l_logBBsize   = num_bblks;
 	log->l_roundoff	   = 0;
+	log->l_covered_state = XLOG_STATE_COVER_IDLE;
 	log->l_flags	   |= XLOG_ACTIVE_RECOVERY;
 
 	log->l_prev_block  = -1;
@@ -1737,6 +1769,7 @@ void
 xlog_state_clean_log(xlog_t *log)
 {
 	xlog_in_core_t	*iclog;
+	int changed = 0;
 
 #ifdef DEBUG
 	int niclogws = 0;
@@ -1762,6 +1795,21 @@ xlog_state_clean_log(xlog_t *log)
 			iclog->ic_state	= XLOG_STATE_ACTIVE;
 			iclog->ic_offset       = 0;
 			iclog->ic_callback	= 0;   /* don't need to free */
+			/*
+			 * If the number of ops in this iclog indicate it just
+			 * contains the dummy transaction, we can
+			 * change state into IDLE (the second time around).
+			 * Otherwise we should change the state into NEED a dummy.
+			 * We don't need to cover the dummy.
+			 */
+			if (!changed &&
+			   (iclog->ic_header.h_num_logops == XLOG_COVER_OPS)) {
+				changed = 1;
+			} else {	/* we have two dirty iclogs so start over */
+					/* This could also be num of ops indicates
+						this is not the dummy going out. */
+				changed = 2;
+			}
 			iclog->ic_header.h_num_logops = 0;
 			bzero(iclog->ic_header.h_cycle_data,
 			      sizeof(iclog->ic_header.h_cycle_data));
@@ -1772,6 +1820,41 @@ xlog_state_clean_log(xlog_t *log)
 			break;	/* stop cleaning */
 		iclog = iclog->ic_next;
 	} while (iclog != log->l_iclog);
+	
+	/* log is locked when we are called */
+	/*
+	 * Change state for the dummy log recording.
+	 * We usually go to NEED. But we go to NEED2 if the changed indicates
+	 * we are done writing the dummy record.
+	 * If we are done with the second dummy recored (DONE2), then
+	 * we go to IDLE.
+	 */
+	if (changed) {
+		switch (log->l_covered_state) {
+		case XLOG_STATE_COVER_IDLE:
+		case XLOG_STATE_COVER_NEED:
+		case XLOG_STATE_COVER_NEED2:
+			log->l_covered_state = XLOG_STATE_COVER_NEED;
+			break;
+
+		case XLOG_STATE_COVER_DONE:
+			if (changed == 1)
+				log->l_covered_state = XLOG_STATE_COVER_NEED2;
+			else
+				log->l_covered_state = XLOG_STATE_COVER_NEED;
+			break;
+		
+		case XLOG_STATE_COVER_DONE2:
+			if (changed == 1)
+				log->l_covered_state = XLOG_STATE_COVER_IDLE;
+			else
+				log->l_covered_state = XLOG_STATE_COVER_NEED;
+			break;
+
+		default:
+			ASSERT(0);
+		}
+	}
 }	/* xlog_state_clean_log */
 
 
@@ -3364,3 +3447,16 @@ xfs_log_force_umount(
 	return (retval);
 }
 
+int
+xlog_iclogs_empty(xlog_t *log)
+{
+	xlog_in_core_t 	*iclog;
+
+	iclog = log->l_iclog;	
+	do {
+		if (iclog->ic_header.h_num_logops)
+			return(0);
+		iclog = iclog->ic_next;
+	} while (iclog != log->l_iclog);
+	return(1);
+}
