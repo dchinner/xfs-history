@@ -1,4 +1,3 @@
-
 #include <sys/param.h>
 #define	_KERNEL
 #include <sys/buf.h>
@@ -11,6 +10,7 @@
 #include <sys/mode.h>
 #include <sys/vnode.h>
 #include <sys/cred.h>
+#include <sys/uuid.h>
 #include "xfs_types.h"
 #include "xfs_inum.h"
 #include "xfs.h"
@@ -340,14 +340,14 @@ xfs_ialloc(xfs_trans_t	*tp,
 	vnode_t		*vp;
 #endif
 	uint		flags;
+	error_status_t	status;
 
 	/*
 	 * Call the space management code to allocate
-	 * the on-disk inode.  The 1 value for the
-	 * sameag parameter may not be quite correct
-	 * here.
+	 * the on-disk inode.
 	 */
-	ino = xfs_dialloc(tp, pip->i_ino, 1, mode);
+	ino = xfs_dialloc(tp, pip->i_ino, 0, mode);
+	ASSERT(ino != NULLFSINO);
 
 	/*
 	 * Get the in-core inode with the lock held exclusively.
@@ -368,15 +368,10 @@ xfs_ialloc(xfs_trans_t	*tp,
 	ip->i_d.di_gid = (__uint16_t)cr->cr_gid;
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
-#ifdef NOTYET
-	/*
-	 * Does this global actually exist?
-	 */
 	ip->i_d.di_atime = time;
 	ip->i_d.di_mtime = time;
 	ip->i_d.di_ctime = time;
-	ip->i_d.di_uuid = uuid_gen();	/* ????? */
-#endif
+	uuid_create(&ip->i_d.di_uuid, &status);
 	flags = XFS_ILOG_META;
 	switch (mode & IFMT) {
 	case IFIFO:
