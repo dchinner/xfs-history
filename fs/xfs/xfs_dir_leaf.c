@@ -341,80 +341,114 @@ xfs_dir_shortform_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio,
 				       int *eofp, dirent_t *dbp)
 {
 	xfs_dir_shortform_t *sf;
-	xfs_dir_sf_entry_t *sfe;
-	int entry, retval, done, i;
+	xfs_dir_sf_entry_t *sfe, *nextsfe;
+	int retval, done, first, i;
 	xfs_mount_t *mp;
 	xfs_ino_t ino;
-	__uint32_t bno;
+	__uint32_t cookhash, hash;
 	off_t nextcook;
 
 	mp = dp->i_mount;
 	sf = (xfs_dir_shortform_t *)dp->i_df.if_u1.if_data;
-	if (uio->uio_offset == XFS_DA_MAKE_COOKIE(mp, 0, sf->hdr.count + 2)) {
-		*eofp = 1;
-		return(0);
-	}
-	bno = (__uint32_t)XFS_DA_COOKIE_BNO(mp, uio->uio_offset);
-	if (bno != 0)
-		return(XFS_ERROR(ENOENT));
+	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
 
-	entry = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
-	if (entry >= sf->hdr.count + 2)
-		return(XFS_ERROR(ENOENT));
+	xfs_dir_trace_g_du("sf: start", dp, uio);
 
 	/*
 	 * Special case fakery for first 2 entries: "." and ".."
 	 */
-	if (entry == 0) {
-		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 1);
+	first = (uio->uio_offset == 0);
+	if (first || (cookhash == xfs_da_hashname(".", 1))) {
+		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0,
+						  xfs_da_hashname("..", 2));
 		retval = xfs_dir_put_dirent(mp, dbp, dp->i_ino, ".", 1,
-			nextcook, uio, &done);
-		if (!done)
+						nextcook, uio, &done);
+		if (!done) {
+			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0,
+						  xfs_da_hashname(".", 1));
+			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
 			return(retval);
-		entry++;
+		}
+		xfs_dir_trace_g_du("sf: added \".\"", dp, uio);
 	}
-	if (entry == 1) {
+	if (first || (cookhash == xfs_da_hashname("..", 2))) {
 		bcopy(sf->hdr.parent, (char *)&ino, sizeof(ino));
-		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 2);
+		sfe = &sf->list[0];
+		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0,
+					  xfs_da_hashname((char *)sfe->name,
+							  sfe->namelen));
 		retval = xfs_dir_put_dirent(mp, dbp, ino, "..", 2, nextcook,
 						uio, &done);
 		if (!done) {
-			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, entry);
+			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0,
+						  xfs_da_hashname("..", 2));
+			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
 			return(retval);
 		}
-		entry++;
+		xfs_dir_trace_g_du("sf: added \"..\"", dp, uio);
 	}
+
+	/*
+	 * Re-find our place.
+	 */
+	sfe = &sf->list[0];
+	for (i = 0; i < sf->hdr.count; i++) {
+		if (((char *)sfe < (char *)sf) ||
+		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
+		    (sfe->namelen >= MAXNAMELEN)) {
+			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
+			return XFS_ERROR(EDIRCORRUPTED);
+		}
+		hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
+		if (hash >= cookhash) {
+			break;
+		}
+		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
+	}
+	if (i == sf->hdr.count) {
+		xfs_dir_trace_g_du("sf: hash not found", dp, uio);
+		*eofp = 1;
+		return(XFS_ERROR(ENOENT));
+	}
+	ASSERT(cookhash != XFS_DA_MAXHASH);
+	xfs_dir_trace_g_du("sf: hash found", dp, uio);
 
 	/*
 	 * Collect the rest of the directory entries.
 	 */
-	sfe = &sf->list[0];
-	for (i = 0; i < entry - 2; i++) {
-		if ((char *)sfe < (char *)sf ||
-		    (char *)sfe >= ((char *)sf + dp->i_df.if_bytes))
+	for ( ; i < sf->hdr.count; i++) {
+		if (((char *)sfe < (char *)sf) ||
+		    ((char *)sfe >= ((char *)sf + dp->i_df.if_bytes)) ||
+		    (sfe->namelen >= MAXNAMELEN)) {
+			xfs_dir_trace_g_du("sf: corrupted", dp, uio);
 			return XFS_ERROR(EDIRCORRUPTED);
-		if (sfe->namelen >= MAXNAMELEN)
-			return XFS_ERROR(EDIRCORRUPTED);
-		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
-	}
-	for (; i < sf->hdr.count; i++, entry++) {
-		if ((char *)sfe < (char *)sf ||
-		    (char *)sfe >= ((char *)sf + dp->i_df.if_bytes))
-			return XFS_ERROR(EDIRCORRUPTED);
-		if (sfe->namelen >= MAXNAMELEN)
-			return XFS_ERROR(EDIRCORRUPTED);
+		}
 		bcopy(sfe->inumber, (char *)&ino, sizeof(ino));
-		nextcook = XFS_DA_MAKE_COOKIE(mp, 0, entry + 1);
+		if (i < sf->hdr.count-1) {
+			nextsfe = XFS_DIR_SF_NEXTENTRY(sfe);
+			hash = xfs_da_hashname((char *)nextsfe->name,
+					       nextsfe->namelen);
+			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, hash);
+			xfs_dir_trace_g_duc("SF: middle cookie",
+						 dp, uio, nextcook);
+		} else {
+			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+			xfs_dir_trace_g_duc("sf: last cookie  ",
+						 dp, uio, nextcook);
+		}
 		retval = xfs_dir_put_dirent(mp, dbp, ino, (char *)(sfe->name), 
-				sfe->namelen, nextcook, uio, &done);
+					    sfe->namelen, nextcook, uio, &done);
 		if (!done) {
-			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, entry);
+			hash = xfs_da_hashname((char *)sfe->name, sfe->namelen);
+			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, 0, hash);
+			xfs_dir_trace_g_du("sf: E-O-B", dp, uio);
 			return(retval);
 		}
 		sfe = XFS_DIR_SF_NEXTENTRY(sfe);
 	}
+	uio->uio_offset = nextcook;
 	*eofp = 1;
-	uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, 0, sf->hdr.count + 2);
+	xfs_dir_trace_g_du("sf: E-O-F", dp, uio);
 	return(0);
 }
 
@@ -1699,54 +1733,149 @@ xfs_dir_leaf_lasthash(buf_t *bp, int *count)
  * Copy out directory entries for getdents(), for leaf directories.
  */
 int
-xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, uio_t *uio, int *eobp,
-				dirent_t *dbp)
+xfs_dir_leaf_getdents_int(buf_t *bp, xfs_inode_t *dp, __uint32_t bno,
+				uio_t *uio, int *eobp, dirent_t *dbp)
 {
-	xfs_dir_leafblock_t *leaf;
+	xfs_dir_leafblock_t *leaf, *leaf2;
 	xfs_dir_leaf_entry_t *entry;
 	xfs_dir_leaf_name_t *namest;
 	int retval, done, entno, i;
 	xfs_mount_t *mp;
 	xfs_ino_t ino;
-	__uint32_t bno;
-	off_t nextcook;
+	__uint32_t cookhash, lasthash;
+	off_t nextcook, lastoffset;
+	int lastresid;
+	buf_t *bp2;
 
 	mp = dp->i_mount;
-	bno = (__uint32_t)XFS_DA_COOKIE_BNO(mp, uio->uio_offset);
-	entno = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
 	leaf = (xfs_dir_leafblock_t *)bp->b_un.b_addr;
-	if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC)
-		return(XFS_ERROR(ENOENT));
-	if (entno >= leaf->hdr.count) {
-		*eobp = 0;
+	if (leaf->hdr.info.magic != XFS_DIR_LEAF_MAGIC) {
+		*eobp = 1;
 		return(XFS_ERROR(ENOENT));
 	}
-	entry = &leaf->entries[entno];
-	for (i = entno; i < leaf->hdr.count; entry++, i++) {
+	entno = XFS_DA_COOKIE_ENTRY(mp, uio->uio_offset);
+	cookhash = XFS_DA_COOKIE_HASH(mp, uio->uio_offset);
+	xfs_dir_trace_g_dul("leaf: start", dp, uio, leaf);
+
+	/*
+	 * Re-find our place.
+	 */
+	entry = &leaf->entries[0];
+	for (i = 0; i < leaf->hdr.count; entry++, i++) {
 		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
-		if ((char *)namest < (char *)leaf ||
-		    (char *)namest >= (char *)leaf + bp->b_bcount ||
-		    entry->namelen >= MAXNAMELEN)
+		if (((char *)namest < (char *)leaf) ||
+		    ((char *)namest >= (char *)leaf + bp->b_bcount) ||
+		    (entry->namelen >= MAXNAMELEN)) {
+			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);
 			return XFS_ERROR(EDIRCORRUPTED);
+		}
+		if (entry->hashval >= cookhash) {
+			if ((entno > 0) && (entry->hashval == cookhash)) {
+				/*
+				 * Trying to get to a particular offset in a
+				 * run of equal-hashval entries.  Change the
+				 * UIO so that if we roll out of this block
+				 * the next block will know how many are left.
+				 */
+				entno--;
+				uio->uio_offset = XFS_DA_MAKE_COOKIE(mp,
+							     bno, entno,
+							     entry->hashval);
+			} else {
+				break;
+			}
+		}
+	}
+	if (i == leaf->hdr.count) {
+		xfs_dir_trace_g_du("leaf: hash not found", dp, uio);
+		return(XFS_ERROR(ENOENT));
+	}
+	xfs_dir_trace_g_due("leaf: hash found", dp, uio, entry);
+
+	/*
+	 * We're synchronized, start copying entries out to the user.
+	 */
+	lasthash = XFS_DA_MAXHASH;
+	for ( ; i < leaf->hdr.count; entry++, i++) {
+
+		/*
+		 * Check for a damaged directory leaf block and pick up
+		 * the inode number from this entry.
+		 */
+		namest = XFS_DIR_LEAF_NAMESTRUCT(leaf, entry->nameidx);
+		if (((char *)namest < (char *)leaf) ||
+		    ((char *)namest >= (char *)leaf + bp->b_bcount) ||
+		    (entry->namelen >= MAXNAMELEN)) {
+			xfs_dir_trace_g_du("leaf: corrupted", dp, uio);
+			return XFS_ERROR(EDIRCORRUPTED);
+		}
 		bcopy(namest->inumber, (char *)&ino, sizeof(ino));
-		if (i == leaf->hdr.count - 1) {
-			if (leaf->hdr.info.forw)
-				nextcook = XFS_DA_MAKE_COOKIE(mp, leaf->hdr.info.forw, 0);
-			else
-				nextcook = XFS_DA_MAKE_COOKIE(mp, XFS_B_TO_FSBT(mp, dp->i_d.di_size), 0);
-		} else
-			nextcook = XFS_DA_MAKE_COOKIE(mp, bno, i + 1);
+
+		/*
+		 * Find the next entry after this one (if there is one)
+		 * and calculate it's magic cookie (ie: directory offset).
+		 */
+		if (i < leaf->hdr.count-1) {
+			nextcook = XFS_DA_MAKE_COOKIE(mp, bno, 0,
+							  (entry+1)->hashval);
+			xfs_dir_trace_g_duc("leaf: middle cookie  ",
+						   dp, uio, nextcook);
+		} else if (leaf->hdr.info.forw) {
+			retval = xfs_da_read_buf(dp->i_transp, dp,
+					  (xfs_fileoff_t)leaf->hdr.info.forw,
+					  -1, &bp2, XFS_DATA_FORK);
+			if (retval)
+				return(retval);
+			ASSERT(bp2 != NULL);
+			leaf2 = (xfs_dir_leafblock_t *)bp2->b_un.b_addr;
+			if ((leaf2->hdr.info.magic != XFS_DIR_LEAF_MAGIC) ||
+			    (leaf2->hdr.info.back != bno)) {	/* GROT */
+				return(XFS_ERROR(EDIRCORRUPTED));
+			}
+			nextcook = XFS_DA_MAKE_COOKIE(mp, leaf->hdr.info.forw,
+						  0, leaf2->entries[0].hashval);
+			xfs_trans_brelse(dp->i_transp, bp2);
+			xfs_dir_trace_g_duc("leaf: next blk cookie",
+						   dp, uio, nextcook);
+		} else {
+			nextcook = XFS_DA_MAKE_COOKIE(mp, 0, 0, XFS_DA_MAXHASH);
+			xfs_dir_trace_g_duc("leaf: EOF cookie",
+						   dp, uio, nextcook);
+		}
+
+		/*
+		 * Save the first cookie in a run of equal-hashval entries
+		 * so that we can back them out if they don't all fit.
+		 */
+		if (entry->hashval != lasthash) {
+			lastoffset = XFS_DA_MAKE_COOKIE(mp, bno, 0,
+							    entry->hashval);
+			lastresid = uio->uio_resid;
+			lasthash = entry->hashval;
+		} else {
+			xfs_dir_trace_g_duc("leaf: DUP COOKIES, skipped",
+						   dp, uio, nextcook);
+		}
+
+		/*
+		 * Put the current entry into the ougoing buffer.  If we fail
+		 * then restore the UIO to the first entry in the current
+		 * run of equal-hashval entries (probably one 1 entry long).
+		 */
 		retval = xfs_dir_put_dirent(mp, dbp, ino, 
-				(char *)(namest->name), entry->namelen, 
-				nextcook, uio, &done);
+					(char *)(namest->name), entry->namelen, 
+					nextcook, uio, &done);
 		if (!done) {
-			uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, i);
-			*eobp = 0;
+			uio->uio_offset = lastoffset;
+			uio->uio_resid = lastresid;
+			*eobp = 1;
+			xfs_dir_trace_g_du("leaf: E-O-B", dp, uio);
 			return(retval);
 		}
 	}
-	uio->uio_offset = XFS_DA_MAKE_COOKIE(mp, bno, i);
-	*eobp = 1;
+	uio->uio_offset = nextcook;
+	*eobp = 0;
+	xfs_dir_trace_g_du("leaf: E-O-F", dp, uio);
 	return(0);
 }
 

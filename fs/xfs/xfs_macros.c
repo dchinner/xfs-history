@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.1 $"
+#ident	"$Revision: 1.2 $"
 
 #define	XFS_MACRO_C
 
@@ -736,6 +736,14 @@ xfs_cnt_block(xfs_mount_t *mp)
 }
 #endif
 
+#if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_HASH)
+__uint32_t
+xfs_da_cookie_hash(xfs_mount_t *mp, off_t cookie)
+{
+	return XFS_DA_COOKIE_HASH(mp, cookie);
+}
+#endif
+
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_COOKIE_BNO)
 __uint32_t
 xfs_da_cookie_bno(xfs_mount_t *mp, off_t cookie)
@@ -754,9 +762,9 @@ xfs_da_cookie_entry(xfs_mount_t *mp, off_t cookie)
 
 #if XFS_WANT_FUNCS_C || (XFS_WANT_SPACE_C && XFSSO_XFS_DA_MAKE_COOKIE)
 off_t
-xfs_da_make_cookie(xfs_mount_t *mp, __uint32_t bno, int entry)
+xfs_da_make_cookie(xfs_mount_t *mp, __uint32_t bno, int entry, __uint32_t hash)
 {
-	return XFS_DA_MAKE_COOKIE(mp, bno, entry);
+	return XFS_DA_MAKE_COOKIE(mp, bno, entry, hash);
 }
 #endif
 

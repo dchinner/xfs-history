@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_DIR_LEAF_H
 #define	_FS_XFS_DIR_LEAF_H
 
-#ident	"$Revision: 1.4 $"
+#ident	"$Revision: 1.5 $"
 
 /*
  * xfs_dir_leaf.h
@@ -159,7 +159,7 @@ int	xfs_dir_leaf_lookup_int(struct buf *leaf_buffer, struct xfs_da_args *args,
 int	xfs_dir_leaf_remove(struct xfs_trans *trans, struct buf *leaf_buffer,
 					int index_to_remove);
 int	xfs_dir_leaf_getdents_int(struct buf *bp, struct xfs_inode *dp,
-					struct uio *uio,
+					__uint32_t bno, struct uio *uio,
 					int *eobp, struct dirent *dbp);
 
 /*
@@ -179,5 +179,4 @@ int	xfs_dir_leaf_order(struct buf *leaf1_bp, struct buf *leaf2_bp);
 int	xfs_dir_put_dirent(struct xfs_mount *mp, struct dirent *dbp,
 				xfs_ino_t ino, char *name, int namelen,
 				off_t doff, struct uio *uio, int *done);
-
-#endif	/* !FS_XFS_DIR_BTREE_H */
+#endif /* !FS_XFS_DIR_LEAF_H */
