@@ -30,9 +30,6 @@
  * http://oss.sgi.com/projects/GenInfo/SGIGPLNoticeExplan/
  */
 
-#undef	DEBUG
-#undef	XFSDEBUG
-
 #include <xfs.h>
 #include <xfs_quota_priv.h>
 #include <xfs_log_recover.h>
@@ -3873,7 +3870,8 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 		0
 	};
 
-	kdb_printf("xlog_in_core/header at 0x%p\n", iclog);
+	kdb_printf("xlog_in_core/header at 0x%p/0x%p\n",
+		iclog, iclog->hic_data);
 	kdb_printf("magicno: %x  cycle: %d  version: %d  lsn: 0x%Lx\n",
 		INT_GET(iclog->ic_header.h_magicno, ARCH_CONVERT), INT_GET(iclog->ic_header.h_cycle, ARCH_CONVERT),
 		INT_GET(iclog->ic_header.h_version, ARCH_CONVERT), INT_GET(iclog->ic_header.h_lsn, ARCH_CONVERT));
@@ -3885,22 +3883,22 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 		kdb_printf("%x  ", INT_GET(iclog->ic_header.h_cycle_data[i], ARCH_CONVERT));
 	}
 	kdb_printf("\n");
+	kdb_printf("size: %d\n", INT_GET(iclog->ic_header.h_size, ARCH_CONVERT));
+	kdb_printf("\n");
 	kdb_printf("--------------------------------------------------\n");
 	kdb_printf("data: 0x%p  &forcesema: 0x%p  next: 0x%p bp: 0x%p\n",
-		iclog->ic_data, &iclog->ic_forcesema, iclog->ic_next,
+		iclog->ic_datap, &iclog->ic_forcesema, iclog->ic_next,
 		iclog->ic_bp);
 	kdb_printf("log: 0x%p  callb: 0x%p  callb_tail: 0x%p  roundoff: %d\n",
 		iclog->ic_log, iclog->ic_callback, iclog->ic_callback_tail,
 		iclog->ic_roundoff);
-	kdb_printf("size: %d  (OFFSET: %d) trace: 0x%p  refcnt: %d  bwritecnt: %d",
+	kdb_printf("size: %d (OFFSET: %d) refcnt: %d  bwritecnt: %d",
 		iclog->ic_size, iclog->ic_offset,
-		NULL,
 		iclog->ic_refcnt, iclog->ic_bwritecnt);
-	kdb_printf("  state: ");
 	if (iclog->ic_state & XLOG_STATE_ALL)
-		printflags(iclog->ic_state, ic_flags,"state");
+		printflags(iclog->ic_state, ic_flags, "state:");
 	else
-		kdb_printf("ILLEGAL");
+		kdb_printf("state: ILLEGAL 0x%x", iclog->ic_state);
 	kdb_printf("\n");
 }	/* xfsidbg_xiclog */
 
@@ -4073,12 +4071,14 @@ xfsidbg_xlog(xlog_t *log)
 	kdb_printf("  dev: 0x%x logBBstart: %lld logsize: %d logBBsize: %d\n",
 		log->l_dev, (long long) log->l_logBBstart,
 		log->l_logsize,log->l_logBBsize);
-     kdb_printf("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
+	kdb_printf("curr_cycle: %d  prev_cycle: %d  curr_block: %d  prev_block: %d\n",
 	     log->l_curr_cycle, log->l_prev_cycle, log->l_curr_block,
 	     log->l_prev_block);
 	kdb_printf("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
 		log->l_iclog_bak, log->l_iclog_size, log->l_iclog_size,
 		log->l_iclog_bufs);
+	kdb_printf("l_iclog_hsize %d l_iclog_heads %d\n",
+		log->l_iclog_hsize, log->l_iclog_heads);
 	kdb_printf("&grant_lock: 0x%p  resHeadQ: 0x%p  wrHeadQ: 0x%p\n",
 		&log->l_grant_lock, log->l_reserve_headq, log->l_write_headq);
 	kdb_printf("GResCycle: %d  GResBytes: %d  GWrCycle: %d  GWrBytes: %d\n",
@@ -4509,6 +4509,7 @@ xfsidbg_xmount(xfs_mount_t *mp)
 		(xfs_dfiloff_t)mp->m_dirfreeblk);
 	kdb_printf("chsize %d chash 0x%p\n",
 		mp->m_chsize, mp->m_chash);
+	kdb_printf("m_lstripemask %d\n", mp->m_lstripemask);
 	kdb_printf("m_frozen %d m_active_trans %d\n",
 		mp->m_frozen, mp->m_active_trans.counter);
 	if (mp->m_fsname != NULL)
@@ -5044,6 +5045,7 @@ xfsidbg_xsb(xfs_sb_t *sbp, int convert)
 		INT_GET(sbp->sb_inoalignmt, arch));
 	kdb_printf("unit %d width %d dirblklog %d\n",
 		INT_GET(sbp->sb_unit, arch), INT_GET(sbp->sb_width, arch), INT_GET(sbp->sb_dirblklog, arch));
+	kdb_printf("log sunit %d\n", INT_GET(sbp->sb_logsunit, arch));
 }
 
 

@@ -83,6 +83,12 @@ xfs_fs_geometry(
 		geo->rtsectsize = mp->m_sb.sb_sectsize;		/* XXX */
 		geo->dirblocksize = mp->m_dirblksize;
 	}
+	if (new_version >= 4) {
+		geo->flags |=
+			(XFS_SB_VERSION_HASLOGV2(&mp->m_sb) ?
+				XFS_FSOP_GEOM_FLAGS_LOGV2 : 0);
+		geo->logsunit = mp->m_sb.sb_logsunit;
+	}
 	return 0;
 }
 

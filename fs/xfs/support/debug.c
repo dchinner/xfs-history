@@ -96,6 +96,9 @@ cmn_err(register int level, char *fmt, ...)
 		break;
 	}
 	va_end(ap);
+
+	if (level == CE_PANIC)
+		BUG();
 }
 
 

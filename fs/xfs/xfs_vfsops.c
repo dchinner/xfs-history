@@ -307,7 +307,10 @@ xfs_cmountfs(
 		mp->m_logbufs = ap->logbufs;
 		if (ap->logbufsize != -1 &&
 		    ap->logbufsize != 16 * 1024 &&
-		    ap->logbufsize != 32 * 1024) {
+		    ap->logbufsize != 32 * 1024 &&
+		    ap->logbufsize != 64 * 1024 &&
+		    ap->logbufsize != 128 * 1024 &&
+		    ap->logbufsize != 256 * 1024) {
 			cmn_err(CE_WARN, "XFS: invalid logbufsize");
 			error = XFS_ERROR(EINVAL);
 			goto error3;
@@ -405,6 +408,19 @@ xfs_cmountfs(
 	 */
 	if ((error = xfs_readsb(mp)))
 		goto error3;
+
+	/* Fail a mount where the logbuf is smaller then the log stripe */
+	if (XFS_SB_VERSION_HASLOGV2(&mp->m_sb)) {
+		if (((ap->logbufsize == -1) &&
+		     (mp->m_sb.sb_logsunit > XLOG_BIG_RECORD_BSIZE)) ||
+		    (ap->logbufsize < mp->m_sb.sb_logsunit)) {
+			cmn_err(CE_WARN, "XFS: "
+				"logbuf size must be greater than or equal to log stripe size");
+			xfs_freesb(mp);
+			error = XFS_ERROR(EINVAL);
+			goto error3;
+		}
+	}
 
 	linvfs_bsize_buftarg(&mp->m_ddev_targ, mp->m_sb.sb_blocksize);
 	if (!kdev_none(logdev) && !kdev_same(logdev, ddev))

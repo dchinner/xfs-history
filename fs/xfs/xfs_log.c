@@ -906,8 +906,10 @@ xlog_space_left(xlog_t *log, int cycle, int bytes)
 		 * In this case we just want to return the size of the
 		 * log as the amount of space left.
 		 */
+/* This assert does not take into account padding from striped log writes *
 		ASSERT((tail_cycle == (cycle + 1)) ||
 		       ((bytes + log->l_roundoff) >= tail_bytes));
+*/
 		free_bytes = log->l_logsize;
 	}
 	return free_bytes;
@@ -1008,6 +1010,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 			   xlog_t	*log)
 {
 	int size;
+	int xhdrs;
 
 #if defined(DEBUG) || defined(XLOG_NOLOG)
 	/*
@@ -1044,12 +1047,6 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 	}
 
 	/*
-	 * We can't allow 64k log record sizes because there isn't enough
-	 * room in the log record header for all the cycle numbers.
-	 */
-	ASSERT(XLOG_MAX_RECORD_BSIZE == 32*1024);
-
-	/*
 	 * Buffer size passed in from mount system call.
 	 */
 	if (mp->m_logbsize != -1) {
@@ -1058,6 +1055,25 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 		while (size != 1) {
 			log->l_iclog_size_log++;
 			size >>= 1;
+		}
+
+		if (XFS_SB_VERSION_HASLOGV2(&mp->m_sb)) {
+			/* # headers = size / 32K
+			 * one header holds cycles from 32K of data
+			 */
+
+			xhdrs = mp->m_logbsize / XLOG_HEADER_CYCLE_SIZE;
+			if (mp->m_logbsize % XLOG_HEADER_CYCLE_SIZE)
+				xhdrs++;
+			log->l_iclog_hsize = xhdrs << BBSHIFT;
+			log->l_iclog_heads = xhdrs;
+		} else {
+			if (mp->m_logbsize > XLOG_BIG_RECORD_BSIZE) {
+				xlog_warn("xfs: log buffer size is too large.");
+				mp->m_logbsize = XLOG_BIG_RECORD_BSIZE;
+			}
+			log->l_iclog_hsize = BBSIZE;
+			log->l_iclog_heads = 1;
 		}
 		return;
 	}
@@ -1071,17 +1087,21 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 		log->l_iclog_size = XLOG_RECORD_BSIZE;		/* 16k */
 		log->l_iclog_size_log = XLOG_RECORD_BSHIFT;
 	} else {
-		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;	/* 32k */
-		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
+		log->l_iclog_size = XLOG_BIG_RECORD_BSIZE;	/* 32k */
+		log->l_iclog_size_log = XLOG_BIG_RECORD_BSHIFT;
 	}
+
+	/* the default log size is 16k or 32k which is one header sector */
+	log->l_iclog_hsize = BBSIZE;
+	log->l_iclog_heads = 1;
 
 	/*
 	 * For 16KB, we use 3 32KB buffers.  For 32KB block sizes, we use
 	 * 4 32KB buffers.  For 64KB block sizes, we use 8 32KB buffers.
 	 */
 	if (mp->m_sb.sb_blocksize >= 16*1024) {
-		log->l_iclog_size = XLOG_MAX_RECORD_BSIZE;
-		log->l_iclog_size_log = XLOG_MAX_RECORD_BSHIFT;
+		log->l_iclog_size = XLOG_BIG_RECORD_BSIZE;
+		log->l_iclog_size_log = XLOG_BIG_RECORD_BSHIFT;
 		if (mp->m_logbufs == -1) {
 			switch (mp->m_sb.sb_blocksize) {
 			    case 16*1024:			/* 16 KB */
@@ -1121,7 +1141,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	int			i;
 	int			iclogsize;
 
-	log = (void *)kmem_zalloc(sizeof(xlog_t), 0);
+	log = (void *)kmem_zalloc(sizeof(xlog_t), KM_SLEEP);
 	
 	log->l_mp	   = mp;
 	log->l_dev	   = log_dev;
@@ -1145,6 +1165,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	log->l_quotaoffs_flag = 0;      /* XFS_LI_QUOTAOFF logitems */
 
 	xlog_get_iclog_buffer_size(mp, log);
+
 	bp = log->l_xbuf   = XFS_getrbuf(0,mp);	/* get my locked buffer */ /* mp needed for pagebuf/linux only */
 	
 	XFS_BUF_SET_TARGET(bp, &mp->m_logdev_targ);
@@ -1174,20 +1195,21 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	ASSERT(log->l_iclog_size >= 4096);
 	for (i=0; i < log->l_iclog_bufs; i++) {
 		*iclogp = (xlog_in_core_t *)
-			  kmem_zalloc(sizeof(xlog_in_core_t), KM_CACHEALIGN);
+			  kmem_zalloc(sizeof(xlog_in_core_t), KM_SLEEP);
 		iclog = *iclogp;
 		iclog->hic_data = (xlog_in_core_2_t *)
-			  kmem_zalloc(iclogsize, KM_CACHEALIGN);
+			  kmem_alloc(iclogsize, KM_SLEEP);
 
 		iclog->ic_prev = prev_iclog;
 		prev_iclog = iclog;
 		log->l_iclog_bak[i] = (xfs_caddr_t)&(iclog->ic_header);
 
 		head = &iclog->ic_header;
+		memset(head, 0, sizeof(xlog_rec_header_t));
 		INT_SET(head->h_magicno, ARCH_CONVERT, XLOG_HEADER_MAGIC_NUM);
-		INT_SET(head->h_version, ARCH_CONVERT, 1);
-		INT_ZERO(head->h_lsn, ARCH_CONVERT);
-		INT_ZERO(head->h_tail_lsn, ARCH_CONVERT);
+		INT_SET(head->h_version, ARCH_CONVERT, 
+			XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb) ? 2 : 1);
+		INT_SET(head->h_size, ARCH_CONVERT, log->l_iclog_size);
                 /* new fields */
 		INT_SET(head->h_fmt, ARCH_CONVERT, XLOG_FMT);
                 memcpy(&head->h_fs_uuid, &mp->m_sb.sb_uuid, sizeof(uuid_t));
@@ -1199,14 +1221,11 @@ xlog_alloc_log(xfs_mount_t	*mp,
 		XFS_BUF_SET_BDSTRAT_FUNC(bp, xlog_bdstrat_cb);
 		XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)1);
 
-		iclog->ic_size = XFS_BUF_SIZE(bp) - XLOG_HEADER_SIZE;
+		iclog->ic_size = XFS_BUF_SIZE(bp) - log->l_iclog_hsize;
 		iclog->ic_state = XLOG_STATE_ACTIVE;
 		iclog->ic_log = log;
-		iclog->ic_refcnt = 0;
-		iclog->ic_roundoff = 0;
-		iclog->ic_bwritecnt = 0;
-		iclog->ic_callback = 0;
 		iclog->ic_callback_tail = &(iclog->ic_callback);
+		iclog->ic_datap = (char *)iclog->hic_data + log->l_iclog_hsize;
 
 		ASSERT(XFS_BUF_ISBUSY(iclog->ic_bp));
 		ASSERT(XFS_BUF_VALUSEMA(iclog->ic_bp) <= 0);
@@ -1216,7 +1235,7 @@ xlog_alloc_log(xfs_mount_t	*mp,
 	}
 	*iclogp = log->l_iclog;			/* complete ring */
 	log->l_iclog->ic_prev = prev_iclog;	/* re-write 1st prev ptr */
-	
+
 	return log;
 }	/* xlog_alloc_log */
 
@@ -1335,6 +1354,7 @@ xlog_grant_push_ail(xfs_mount_t	*mp,
  * not start with block zero on a given device.  The log block start offset
  * is added immediately before calling bwrite().
  */
+
 int
 xlog_sync(xlog_t		*log,
 	  xlog_in_core_t	*iclog,
@@ -1343,6 +1363,7 @@ xlog_sync(xlog_t		*log,
 	xfs_caddr_t	dptr;		/* pointer to byte sized element */
 	xfs_buf_t	*bp;
 	int		i;
+	uint		roundup;
 	uint		count;		/* byte count of bwrite */
 	int		split = 0;	/* split write into two regions */
 	int		error;
@@ -1354,7 +1375,32 @@ xlog_sync(xlog_t		*log,
 	if (flags != 0 && (flags & XFS_LOG_SYNC) )
 		xlog_panic("xlog_sync: illegal flag");
 #endif
-	
+
+	/* Round out the log write size */
+	if (iclog->ic_offset & BBMASK) {
+		/* count of 0 is already accounted for up in
+		 * xlog_state_sync_all().  Once in this routine,
+		 * operations on the iclog are single threaded.
+		 *
+		 * Difference between rounded up size and size
+		 */
+		count = iclog->ic_offset & BBMASK;
+		iclog->ic_roundoff += BBSIZE - count;
+	}
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
+		unsigned sunit = BTOBB(log->l_mp->m_sb.sb_logsunit);
+
+		count = BTOBB(log->l_iclog_hsize + iclog->ic_offset);
+		if (count & (sunit - 1)) {
+			roundup = sunit - (count & (sunit - 1));
+		} else {
+			roundup = 0;
+		}
+		iclog->ic_offset += BBTOB(roundup);
+	}
+
+	log->l_roundoff += iclog->ic_roundoff;
+
 	xlog_pack_data(log, iclog);       /* put cycle number in every block */
 	INT_SET(iclog->ic_header.h_len, ARCH_CONVERT, iclog->ic_offset);	/* real byte length */
 
@@ -1363,21 +1409,12 @@ xlog_sync(xlog_t		*log,
 	XFS_BUF_SET_FSPRIVATE2(bp, (unsigned long)2);
 	XFS_BUF_SET_ADDR(bp, BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT));
 
-	/* Round byte count up to a BBSIZE chunk */
-	count = BBTOB(BTOBB(iclog->ic_offset));
-	if (iclog->ic_offset != count) {
-		/* count of 0 is already accounted for up in
-		 * xlog_state_sync_all().  Once in this routine, operations
-		 * on the iclog are single threaded.
-		 *
-		 * Difference between rounded up size and size
-		 */
-		iclog->ic_roundoff = count - iclog->ic_offset;
-		log->l_roundoff += iclog->ic_roundoff;
-	}
+	/* Count is already rounded up to a BBSIZE above */
+	count = iclog->ic_offset + iclog->ic_roundoff;
+	ASSERT((count & BBMASK) == 0);
 
 	/* Add for LR header */
-	count += XLOG_HEADER_SIZE;
+	count += log->l_iclog_hsize;
 	XFS_STATS_ADD(xfsstats.xs_log_blocks, BTOBB(count));
 
 	/* Do we need to split this write into 2 parts? */
@@ -1419,6 +1456,7 @@ xlog_sync(xlog_t		*log,
 	 * is shutting down.
 	 */
 	XFS_BUF_WRITE(bp);
+
 	if ((error = XFS_bwrite(bp))) {
 		xfs_ioerror_alert("xlog_sync", log->l_mp, bp, 
 				  XFS_BUF_ADDR(bp));
@@ -1627,7 +1665,7 @@ xlog_write(xfs_mount_t *	mp,
 		return (error);
 
 	ASSERT(log_offset <= iclog->ic_size - 1);
-	ptr = (__psint_t) &iclog->ic_data[log_offset];
+	ptr = (__psint_t) ((char *)iclog->ic_datap+log_offset);
 	
 	/* start_lsn is the first lsn written to. That's all we need. */
 	if (! *start_lsn)
@@ -2213,7 +2251,7 @@ restart:
 	 * must be written.
 	 */
 	if (log_offset == 0) {
-		ticket->t_curr_res -= XLOG_HEADER_SIZE;
+		ticket->t_curr_res -= log->l_iclog_hsize;
 		INT_SET(head->h_cycle, ARCH_CONVERT, log->l_curr_cycle);
 		ASSIGN_LSN(head->h_lsn, log, ARCH_CONVERT);
 		ASSERT(log->l_curr_block >= 0);
@@ -2735,13 +2773,6 @@ xlog_state_release_iclog(xlog_t		*log,
 		switch (xlog_mode) {
 		case 0:
 			return xlog_sync(log, iclog, 0);
-/***
-		case 1:
-			if (current_is_keventd())
-				return (xlog_sync(log, iclog, 0));
-			schedule_task(&iclog->ic_write_sched);
-			break;
-***/
 		case 1:
 			pagebuf_queue_task(&iclog->ic_write_sched);
 		}
@@ -2763,6 +2794,8 @@ xlog_state_switch_iclogs(xlog_t		*log,
 			 xlog_in_core_t *iclog,
 			 int		eventual_size)
 {
+	uint roundup;
+
 	ASSERT(iclog->ic_state == XLOG_STATE_ACTIVE);
 	if (!eventual_size)
 		eventual_size = iclog->ic_offset;
@@ -2772,7 +2805,20 @@ xlog_state_switch_iclogs(xlog_t		*log,
 	log->l_prev_cycle = log->l_curr_cycle;
 	
 	/* roll log?: ic_offset changed later */
-	log->l_curr_block += BTOBB(eventual_size)+1;
+	log->l_curr_block += BTOBB(eventual_size)+BTOBB(log->l_iclog_hsize);
+
+	/* Round up to next log-sunit */
+	if (XFS_SB_VERSION_HASLOGV2(&log->l_mp->m_sb)) {
+		if (log->l_curr_block & (log->l_mp->m_lstripemask - 1)) {
+			roundup = log->l_mp->m_lstripemask -
+				(log->l_curr_block &
+				 (log->l_mp->m_lstripemask - 1));
+		} else {
+			roundup = 0;
+		}
+		log->l_curr_block += roundup;
+	}
+
 	if (log->l_curr_block >= log->l_logBBsize) {
 		log->l_curr_cycle++;
 		if (log->l_curr_cycle == XLOG_HEADER_MAGIC_NUM)
@@ -3190,7 +3236,7 @@ xlog_ticket_get(xlog_t		*log,
 	 * case it is separate from the rest of the transaction data and
 	 * will be charged for the log record header.
 	 */
-	unit_bytes += XLOG_HEADER_SIZE * (XLOG_BTOLRBB(unit_bytes) + 2);
+	unit_bytes += log->l_iclog_hsize * (XLOG_BTOLRBB(unit_bytes) + 2);
 
 	tic->t_unit_res		= unit_bytes;
 	tic->t_curr_res		= unit_bytes;
@@ -3285,7 +3331,7 @@ xlog_verify_tail_lsn(xlog_t	    *log,
     if (CYCLE_LSN(tail_lsn, ARCH_NOCONVERT) == log->l_prev_cycle) {
 	blocks =
 	    log->l_logBBsize - (log->l_prev_block - BLOCK_LSN(tail_lsn, ARCH_NOCONVERT));
-	if (blocks < BTOBB(iclog->ic_offset)+1)
+	if (blocks < BTOBB(iclog->ic_offset)+BTOBB(log->l_iclog_hsize))
 	    xlog_panic("xlog_verify_tail_lsn: ran out of log space");
     } else {
 	ASSERT(CYCLE_LSN(tail_lsn, ARCH_NOCONVERT)+1 == log->l_prev_cycle);
@@ -3326,9 +3372,14 @@ xlog_verify_iclog(xlog_t	 *log,
 	xfs_caddr_t		base_ptr;
 	__psint_t		field_offset;
 	__uint8_t		clientid;
-	int			len, i, op_len;
+	int			len, i, j, k, op_len;
 	int			idx;
 	SPLDECL(s);
+
+	union ich {
+		xlog_rec_ext_header_t	hic_xheader;
+		char			hic_sector[XLOG_HEADER_SIZE];
+	}*xhdr;
 
 	/* check validity of iclog pointers */
 	s = LOG_LOCK(log);
@@ -3354,11 +3405,12 @@ xlog_verify_iclog(xlog_t	 *log,
 	}
 	
 	/* check fields */
-	len = INT_GET(iclog->ic_header.h_len, ARCH_CONVERT);
-	ptr = iclog->ic_data;
+	len = INT_GET(iclog->ic_header.h_num_logops, ARCH_CONVERT);
+	ptr = iclog->ic_datap;
 	base_ptr = ptr;
 	ophead = (xlog_op_header_t *)ptr;
-	for (i=0; i<INT_GET(iclog->ic_header.h_num_logops, ARCH_CONVERT); i++) {
+	xhdr = (union ich*)&iclog->ic_header;
+	for (i = 0; i < len; i++) {
 		ophead = (xlog_op_header_t *)ptr;
 
 		/* clientid is only 1 byte */
@@ -3367,11 +3419,17 @@ xlog_verify_iclog(xlog_t	 *log,
 		if (syncing == B_FALSE || (field_offset & 0x1ff)) {
 			clientid = ophead->oh_clientid;
 		} else {
-			idx = BTOBB(&ophead->oh_clientid - iclog->ic_data);
-			clientid = GET_CLIENT_ID(iclog->ic_header.h_cycle_data[idx], ARCH_CONVERT);
+			idx = BTOBB((xfs_caddr_t)&(ophead->oh_clientid) - iclog->ic_datap);
+			if (idx > (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
+				j = idx / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
+				k = idx % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
+				clientid = GET_CLIENT_ID(xhdr[j].hic_xheader.xh_cycle_data[k], ARCH_CONVERT);
+			} else {
+				clientid = GET_CLIENT_ID(iclog->ic_header.h_cycle_data[idx], ARCH_CONVERT);
+			}
 		}
 		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
-			xlog_panic("xlog_verify_iclog: illegal client");
+			cmn_err(CE_WARN, "xlog_verify_iclog: illegal clientid %d op 0x%p offset 0x%x", clientid, ophead, field_offset);
 
 		/* check length */
 		field_offset = (__psint_t)
@@ -3380,15 +3438,17 @@ xlog_verify_iclog(xlog_t	 *log,
 			op_len = INT_GET(ophead->oh_len, ARCH_CONVERT);
 		} else {
 			idx = BTOBB((__psint_t)&ophead->oh_len - 
-				    (__psint_t)iclog->ic_data);
-			op_len = INT_GET(iclog->ic_header.h_cycle_data[idx], ARCH_CONVERT);
+				    (__psint_t)iclog->ic_datap);
+			if (idx > (XLOG_HEADER_CYCLE_SIZE / BBSIZE)) {
+				j = idx / (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
+				k = idx % (XLOG_HEADER_CYCLE_SIZE / BBSIZE);
+				op_len = INT_GET(xhdr[j].hic_xheader.xh_cycle_data[k], ARCH_CONVERT);
+			} else {
+				op_len = INT_GET(iclog->ic_header.h_cycle_data[idx], ARCH_CONVERT);
+			}
 		}
-		len -= sizeof(xlog_op_header_t) + op_len;
 		ptr += sizeof(xlog_op_header_t) + op_len;
 	}
-	if (len != 0)
-		xlog_panic("xlog_verify_iclog: illegal iclog");
-
 }	/* xlog_verify_iclog */
 #endif /* DEBUG && !XLOG_NOLOG */
 
