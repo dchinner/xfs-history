@@ -1,4 +1,4 @@
-#ident "$Revision: 1.222 $"
+#ident "$Revision: 1.223 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -91,11 +91,6 @@ int uiodbg_writeiolog[XFS_UIO_MAX_WRITEIO_LOG - XFS_UIO_MIN_WRITEIO_LOG + 1] =
 		{0, 0, 0, 0};
 int uiodbg_switch = 0;
 #endif
-
-/*
- * XXXrcc - temporary until I get a tunable in
-#define XFS_NFS_IO_UNITS	10
- */
 
 extern int xfs_nfs_io_units;
 
@@ -1095,11 +1090,12 @@ xfs_vop_readbuf(bhv_desc_t 	*bdp,
 
 	/*
 	 * prohibit iomap read from giving us back our data in
-	 * two buffers but let it set up read-ahead.  Shut read-ahead
-	 * off for NFSv2.  It's I/O sizes are too small to be of any
-	 * real benefit (8K reads, 32K read buffers).
+	 * two buffers but let it set up read-ahead.  Turn off
+	 * read-ahead for NFSv2.  It's I/O sizes are too small
+	 * to be of any real benefit (8K reads, 32K read buffers).
 	 */
 	nmaps = (ioflags & IO_NFS) ? 1 : 2;
+
 	error = xfs_iomap_read(ip, offset, len, bmaps, &nmaps, NULL);
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 
@@ -1359,8 +1355,10 @@ xfs_read(
 		if (ioflag & IO_SYNC) {
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
 			xfs_iflock(ip);
-			xfs_iflush(ip, XFS_IFLUSH_SYNC);
+			error = xfs_iflush(ip, XFS_IFLUSH_SYNC);
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
+			if (error == EFSCORRUPTED)
+				goto out;
 		} else {
 			if (ioflag & IO_DSYNC) {
 				mp = ip->i_mount;
@@ -1487,7 +1485,7 @@ xfs_read(
 		break;
 	}
 
- out:
+out:
 	if (!(ioflag & IO_ISLOCKED))
 		xfs_rwunlock(bdp, VRWLOCK_READ);
 	
@@ -2565,7 +2563,7 @@ xfs_write_file(
 			/*
 			 * zero the bytes up to the data being written
 			 * but don't overwrite data we read in.  This
-			 * zero-fills the buffers we set up for the NFS3
+			 * zero-fills the buffers we set up for the NFS
 			 * case to fill the holes between EOF and the new
 			 * write.
 			 */
@@ -2579,7 +2577,7 @@ xfs_write_file(
 
 			/*
 			 * biomove the data in the region to be written.
-			 * In the NFS3 hole-filling case, don't fill
+			 * In the NFS hole-filling case, don't fill
 			 * anything until we hit the first buffer with
 			 * data that we have to write.
 			 */
@@ -2589,7 +2587,7 @@ xfs_write_file(
 			else if (BBTOOFF(bmapp->offset) + bmapp->pboff +
 					bmapp->pbsize >= uiop->uio_offset)  {
 				/*
-				 * NFS3 - first buffer to be written.  biomove
+				 * NFS - first buffer to be written.  biomove
 				 * into the portion of the buffer that the
 				 * user originally asked to write to.
 				 */
@@ -2648,7 +2646,7 @@ xfs_write_file(
 				count = uiop->uio_resid;
 			} else  {
 				/*
-				 * NFS3 - set offset to the beginning
+				 * NFS - set offset to the beginning
 				 * of the next area in the file to be
 				 * copied or zero-filled.  Drop count
 				 * by the the amount we just zero-filled.
@@ -4676,9 +4674,14 @@ xfs_force_shutdown(
 	if (xfs_log_force_umount(mp, logerror))
 		return;
 
-	cmn_err(CE_ALERT,
-		"I/O Error Detected. Shutting down filesystem: %s",
-		mp->m_fsname);
+	if (flags & XFS_CORRUPT_INCORE)
+		cmn_err(CE_ALERT, "Corruption of in-memory data detected.  Shutting down filesystem: %s",
+			mp->m_fsname);
+	else
+		cmn_err(CE_ALERT,
+			"I/O Error Detected.  Shutting down filesystem: %s",
+			mp->m_fsname);
+
 	cmn_err(CE_ALERT,
 		"Please umount the filesystem, and rectify the problem(s)");
 
