@@ -906,8 +906,8 @@ xfs_iomap_read(
 		       ((bmapp[x - 1].offset + bmapp[x - 1].length) ==
 			curr_bmapp->offset));
 		if (curr_bmapp->bn != -1) {
-			curr_bmapp->bn =
-				XFS_FSB_TO_DADDR(mp, curr_bmapp->bn);
+			curr_bmapp->bn = XFS_FSB_TO_DB(mp, ip,
+						       curr_bmapp->bn);
 		}
 	}
 	kmem_zone_free(xfs_irec_zone, imap);
@@ -1309,7 +1309,7 @@ xfs_zero_last_block(
 	}
 	bmap.eof = BMAP_EOF;
 	if (imap.br_startblock != DELAYSTARTBLOCK) {
-		bmap.bn = XFS_FSB_TO_DADDR(mp, imap.br_startblock);
+		bmap.bn = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
 	} else {
 		bmap.bn = -1;
 		bmap.eof |= BMAP_DELAY;
@@ -1424,7 +1424,7 @@ xfs_zero_eof(
 					      mp->m_writeio_blocks);
 		bp = ngetrbuf(XFS_FSB_TO_B(mp, buf_len_fsb));
 		bzero(bp->b_un.b_addr, bp->b_bcount);
-		bp->b_blkno = XFS_FSB_TO_DADDR(mp, imap.br_startblock);
+		bp->b_blkno = XFS_FSB_TO_DB(mp, ip, imap.br_startblock);
 		if (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) {
 			bp->b_edev = mp->m_rtdev;
 		} else {
@@ -1676,8 +1676,8 @@ xfs_iomap_write(
 		       ((bmapp[x - 1].offset + bmapp[x - 1].length) ==
 			curr_bmapp->offset));
 		if (curr_bmapp->bn != -1) {
-			curr_bmapp->bn =
-				XFS_FSB_TO_DADDR(mp, curr_bmapp->bn);
+			curr_bmapp->bn = XFS_FSB_TO_DB(mp, ip,
+						       curr_bmapp->bn);
 		}
 	}
 
@@ -2821,9 +2821,9 @@ xfs_strat_read(
 				rbp = getrbuf(KM_SLEEP);
 				xfs_overlap_bp(bp, rbp, data_offset,
 					       data_bytes);
-				rbp->b_blkno = XFS_FSB_TO_DADDR(mp,
-						imap[x].br_startblock) +
-					       block_off;
+				rbp->b_blkno = XFS_FSB_TO_DB(mp, ip,
+						     (imap[x].br_startblock +
+						      block_off));
 				rbp->b_offset = XFS_FSB_TO_BB(mp,
 							      imap_offset) +
 						block_off;
@@ -3123,7 +3123,7 @@ xfs_check_rbp(
 
 	ASSERT(imap.br_startoff == rbp_offset_fsb);
 	ASSERT(imap.br_blockcount == rbp_len_fsb);
-	ASSERT((XFS_FSB_TO_DADDR(mp, imap.br_startblock) +
+	ASSERT((XFS_FSB_TO_DB(mp, ip, imap.br_startblock) +
 		XFS_BB_FSB_OFFSET(mp, rbp->b_offset)) ==
 	       rbp->b_blkno);
 
@@ -3196,7 +3196,7 @@ xfs_check_bp(
 	ASSERT(nimaps == 1);
 	ASSERT(imap.br_startoff == bp_offset_fsb);
 	ASSERT(imap.br_blockcount == bp_len_fsb);
-	ASSERT((XFS_FSB_TO_DADDR(mp, imap.br_startblock) +
+	ASSERT((XFS_FSB_TO_DB(mp, ip, imap.br_startblock) +
 		XFS_BB_FSB_OFFSET(mp, bp->b_offset)) ==
 	       bp->b_blkno);
 }
@@ -3301,7 +3301,7 @@ xfs_strat_write(
 		if ((locals->map_start_fsb == locals->offset_fsb) &&
 		    (locals->imap[0].br_blockcount == locals->count_fsb)) {
 			ASSERT(locals->nimaps == 1);
-			bp->b_blkno = XFS_FSB_TO_DADDR(locals->mp,
+			bp->b_blkno = XFS_FSB_TO_DB(locals->mp, locals->ip,
 					    locals->imap[0].br_startblock);
 			bp->b_bcount = XFS_FSB_TO_B(locals->mp,
 						    locals->count_fsb);
@@ -3353,8 +3353,9 @@ xfs_strat_write(
 						       locals->imap_blocks);
 			xfs_overlap_bp(bp, locals->rbp, locals->rbp_offset,
 				       locals->rbp_len);
-			locals->rbp->b_blkno = XFS_FSB_TO_DADDR(locals->mp,
-					       locals->imapp->br_startblock);
+			locals->rbp->b_blkno =
+				XFS_FSB_TO_DB(locals->mp, locals->ip,
+					      locals->imapp->br_startblock);
 			locals->rbp->b_offset = XFS_FSB_TO_BB(locals->mp,
 							locals->imap_offset);
 			xfs_strat_write_subbp_trace(XFS_STRAT_SUB,
