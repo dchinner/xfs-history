@@ -3324,7 +3324,7 @@ xfs_seek(vnode_t	*vp,
 	 off_t		old_offset,
 	 off_t		*new_offsetp)
 {
-	if ((*new_offsetp > XFS_MAX_FILE_OFFSET) ||
+	if ((*new_offsetp >= XFS_MAX_FILE_OFFSET) ||
 	    (*new_offsetp < 0)) {
 		return XFS_ERROR(EINVAL);
 	} else {
