@@ -1679,7 +1679,7 @@ xfs_alloc_fix_freelist(
 	    (agf->agf_longest ? agf->agf_longest : agf->agf_freecount > 0) ||
 	    (minleft &&
 	     (int)(agf->agf_freeblks + agf->agf_freecount - need - total) <
-	     minleft)) {
+	     (int)minleft)) {
 		xfs_trans_brelse(tp, agbp);
 		return NULL;
 	}
