@@ -597,7 +597,7 @@ xfs_dir_ialloc(
 		 * other allocations in this allocation group,
 		 * this call should always succeed.
 		 */
-		ip = xfs_ialloc (tp, dp, mode, 1, rdev, credp,
+		ip = xfs_ialloc (tp, dp, mode, nlink, rdev, credp,
 				 &ialloc_context, &call_again);
 
 		ASSERT ((! call_again) && (ip != NULL));
