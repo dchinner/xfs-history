@@ -470,7 +470,7 @@ xfs_blkdev_get(
 	struct nameidata	nd;
 	int			error;
 
-	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	error = path_lookup(name, LOOKUP_POSITIVE|LOOKUP_FOLLOW, &nd);
 	if (error) {
 		printk("XFS: Invalid device [%s], error=%d\n", name, error);
 		return -error;
