@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.99 $"
+#ident	"$Revision: 1.104 $"
 
 /*
  * High level interface routines for log manager
@@ -1071,6 +1071,9 @@ xlog_unalloc_log(xlog_t *log)
 	for (i=0; i<log->l_iclog_bufs; i++) {
 		freesema(&iclog->ic_forcesema);
 		freerbuf(iclog->ic_bp);
+		if (iclog->ic_trace != NULL) {
+			ktrace_free(iclog->ic_trace);
+		}
 		next_iclog = iclog->ic_next;
 		kmem_free(iclog, sizeof(xlog_in_core_t));
 		iclog = next_iclog;
@@ -1091,6 +1094,15 @@ xlog_unalloc_log(xlog_t *log)
 			tic = next_tic;
 		}
 	}
+	freerbuf(log->l_xbuf);
+	if (log->l_trace != NULL) {
+		ktrace_free(log->l_trace);
+	}
+	if (log->l_grant_trace != NULL) {
+		ktrace_free(log->l_grant_trace);
+	}
+	log->l_mp->m_log = NULL;
+	kmem_free(log, sizeof(xlog_t));
 }	/* xlog_unalloc_log */
 
 
