@@ -1057,11 +1057,11 @@ xfs_atruncate_invalidate(
 		count_bb = XFS_FSB_TO_BB(mp, imaps[n].br_blockcount);
 		while (count_bb > 0) {
 			if (tp == NULL) {
-				tp = xfs_trans_alloc(mp, XFS_TRANS_AINVAL);
+				tp = xfs_trans_alloc(mp, XFS_TRANS_ATTRINVAL);
 				error = xfs_trans_reserve(tp, 0,
-						  XFS_AINVAL_LOG_RES(mp),
+						  XFS_ATTRINVAL_LOG_RES(mp),
 						  0, 0,
-						  XFS_AINVAL_LOG_COUNT);
+						  XFS_ATTRINVAL_LOG_COUNT);
 				if (error) {
 					xfs_trans_cancel(tp, 0);
 					return error;
@@ -1091,7 +1091,7 @@ xfs_atruncate_invalidate(
 			 * be synced.
 			 */
 			cancelled_bufs++;
-			if (cancelled_bufs == XFS_ATRUNC_MAX_BUFS) {
+			if (cancelled_bufs == XFS_ATTRINVAL_MAX_BUFS) {
 				xfs_trans_set_sync(tp);
 				error = xfs_trans_commit(tp, 0);
 				if (error) {
