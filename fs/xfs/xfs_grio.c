@@ -1,4 +1,4 @@
-#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.74 1997/03/25 19:07:50 pjr Exp $"
+#ident "$Header: /home/cattelan/xfs_cvs/xfs-for-git/fs/xfs/Attic/xfs_grio.c,v 1.75 1997/04/29 00:59:14 singal Exp $"
 
 #include <sys/types.h>
 #include <string.h>
@@ -374,33 +374,3 @@ xfs_grio_get_fs_dev( int fdes )
 	VN_BHV_READ_UNLOCK(bhp);
 	return( dev );
 }
-
-#if 0
-/*
- * xfs_set_xfs_igrio_flag
- *	Set the XFS_IGRIO incore inode flag.
- *
- * RETURNS
- *	void
- */
-void
-xfs_set_xfs_igrio_flag(dev_t fs_dev, xfs_ino_t ino)
-{
-	xfs_inode_t	*ip;
-
-	/* get the inode */
-	if (!(ip = xfs_get_inode( fs_dev, ino ))) {
-		return;
-	}
-
-	ip->i_flags |= XFS_IGRIO;
-
-#ifdef GRIO_DEBUG
-	printf("Set XFS_IGRIO flag\n");
-#endif /* GRIO_DEBUG */
-
-	xfs_iunlock( ip, XFS_ILOCK_SHARED );
-	IRELE (ip);
-	return;
-}
-#endif

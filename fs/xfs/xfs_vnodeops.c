@@ -1,4 +1,4 @@
-#ident "$Revision: 1.323 $"
+#ident "$Revision: 1.324 $"
 
 
 #ifdef SIM
@@ -398,31 +398,12 @@ xfs_close(
 	lastclose_t	lastclose,
 	cred_t		*credp)
 {
-#if 0
-	extern int	grio_remove_reservations_with_proc_dev_inum(pid_t, dev_t, xfs_ino_t);
-        xfs_inode_t	*ip;
-#endif
 	/* REFERENCED */
 	vnode_t 	*vp;
 
 	vp = BHV_TO_VNODE(bdp);
 	vn_trace_entry(vp, "xfs_close", (inst_t *)__return_address);
-#if 0
-	ip = XFS_BHVTOI(bdp);
-	/*
-	 * If this is the last close of a file, and this process
-	 * no longer has the file open via another file descriptor, 
-	 * then remove any outstanding i/o rate guarantees.
-	 */
-	if ((ip->i_flags & XFS_IGRIO) && lastclose &&
-	    !fdt_vnode_isopen(vp)) {
-#ifdef GRIO_DEBUG
-	printf("Calling grio_remove_reservations_with_proc_dev_inum from xfs_close\n");
-#endif /* GRIO_DEBUG */
-		grio_remove_reservations_with_proc_dev_inum(current_pid(),
-				ip->i_dev, ip->i_ino);
-	}
-#endif
+
 	return 0;
 }
 
