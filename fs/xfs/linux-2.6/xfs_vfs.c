@@ -365,7 +365,7 @@ vfs_insertbhv(
 void
 vfs_setflag(vfs_t *vfsp, unsigned long f)
 {
-	long s = mp_mutex_spinlock(&vfslock);
+	unsigned long s = mutex_spinlock(&vfslock);
 	vfsp->vfs_flag |= f;
-	mp_mutex_spinunlock(&vfslock, s);
+	mutex_spinunlock(&vfslock, s);
 }

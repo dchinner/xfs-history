@@ -530,6 +530,12 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_flush_pages, vp)((vp)->v_fbhv,first,last,flags,fiopt);\
 	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
 }
+#define VOP_PAGES_SETHOLE(vp, pfd, cnt, doremap, remapoffset)		\
+{									\
+	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
+	_VOP_(vop_pages_sethole, vp)((vp)->v_fbhv,pfd,cnt,doremap,remapoffset);\
+	VN_BHV_READ_UNLOCK(&(vp)->v_bh);				\
+}
 #define VOP_IOCTL(vp, inode, filp, cmd, arg, rv)			\
 {									\
 	VN_BHV_READ_LOCK(&(vp)->v_bh);					\
@@ -789,18 +795,16 @@ extern void	vn_rele(struct vnode *);
 
 static __inline__ void vn_flagset(struct vnode *vp, uint flag)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&vp->v_lock, flags);
+	spin_lock(&vp->v_lock);
 	vp->v_flag |= flag;
-	spin_unlock_irqrestore(&vp->v_lock, flags);
+	spin_unlock(&vp->v_lock);
 }
 
 static __inline__ void vn_flagclr(struct vnode *vp, uint flag)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&vp->v_lock, flags);
+	spin_lock(&vp->v_lock);
 	vp->v_flag &= ~flag;
-	spin_unlock_irqrestore(&vp->v_lock, flags);
+	spin_unlock(&vp->v_lock);
 }
 
 /*

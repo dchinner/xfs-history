@@ -85,7 +85,6 @@ int
 vn_reclaim(struct vnode *vp, int flag)
 {
 	int error;
-	unsigned long s;
 
 	XFS_STATS_INC(xfsstats.vn_reclaim);
 
@@ -102,10 +101,10 @@ vn_reclaim(struct vnode *vp, int flag)
 	}
 	ASSERT(vp->v_fbhv == NULL);
 
-	s = VN_LOCK(vp);
+	VN_LOCK(vp);
 
 	vp->v_flag &= (VRECLM|VWAIT|VLOCK);
-	VN_UNLOCK(vp, s);
+	VN_UNLOCK(vp, 0);
 
 	vp->v_type = VNON;
 	vp->v_fbhv = NULL;
@@ -122,12 +121,12 @@ vn_reclaim(struct vnode *vp, int flag)
 STATIC void
 vn_wakeup(struct vnode *vp)
 {
-	unsigned long s = VN_LOCK(vp);
+	VN_LOCK(vp);
 	if (vp->v_flag & VWAIT) {
 		sv_broadcast(vptosync(vp));
 	}
 	vp->v_flag &= ~(VRECLM|VWAIT|VMODIFIED);
-	VN_UNLOCK(vp, s);
+	VN_UNLOCK(vp, 0);
 }
 
 int 
@@ -136,11 +135,8 @@ vn_wait(struct vnode *vp)
 	NESTED_VN_LOCK(vp);
 
 	if (vp->v_flag & (VINACT | VRECLM)) {
-		unsigned long	s;
-
-		local_irq_save(s);
 		vp->v_flag |= VWAIT;
-		sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
+		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
 		return 1;
 	}
 	NESTED_VN_UNLOCK(vp);
@@ -152,8 +148,6 @@ struct vnode *
 vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 {
 	struct vnode	*vp;
-	unsigned long	s = 0;
-
 	
 	XFS_STATS_INC(xfsstats.vn_active);
 
@@ -163,7 +157,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 
 	spinlock_init(&vp->v_lock, "v_lock");
 	if (from_readinode)
-		s = VN_LOCK(vp);
+		VN_LOCK(vp);
 
 	spin_lock(&vnumber_lock);
 	vn_generation += 1;
@@ -193,7 +187,7 @@ vn_initialize(vfs_t *vfsp, struct inode *inode, int from_readinode)
 		} else {
 			vn_revalidate(vp, ATTR_LAZY|ATTR_COMM);
 		}
-		VN_UNLOCK(vp, s);
+		VN_UNLOCK(vp, 0);
 	}
 
 	vn_trace_exit(vp, "vn_initialize", (inst_t *)__return_address);
@@ -317,12 +311,9 @@ again:
 	 * reclaim can fail.
 	 */
 	if (vp->v_flag & (VINACT | VRECLM)) {
-		unsigned long	s;
-
-		local_irq_save(s);
 		ASSERT(vn_count(vp) == 0);
 		vp->v_flag |= VWAIT;
-		sv_wait(vptosync(vp), PINOD, &vp->v_lock, s);
+		sv_wait(vptosync(vp), PINOD, &vp->v_lock, 0);
 		goto again;
 	}
 
@@ -359,17 +350,16 @@ again:
 struct vnode *
 vn_hold(struct vnode *vp)
 {
-	unsigned long s = VN_LOCK(vp);
 	struct inode *inode;
 
 	XFS_STATS_INC(xfsstats.vn_hold);
 
+	VN_LOCK(vp);
 	inode = LINVFS_GET_IP(vp);
 
 	inode = igrab(inode);
 
 	ASSERT(inode);
-
 	VN_UNLOCK(vp, s);
 
 	return vp;
@@ -381,7 +371,6 @@ vn_hold(struct vnode *vp)
 void
 vn_rele(struct vnode *vp)
 {
-	unsigned long s;
 	int	vcnt;
 	/* REFERENCED */
 	int cache;
@@ -389,7 +378,7 @@ vn_rele(struct vnode *vp)
 	XFS_STATS_INC(xfsstats.vn_rele);
 
 
-	s = VN_LOCK(vp);
+	VN_LOCK(vp);
 
 	vn_trace_entry(vp, "vn_rele", (inst_t *)__return_address);
 	vcnt = vn_count(vp);
@@ -412,7 +401,7 @@ vn_rele(struct vnode *vp)
 		 * until we turn off VINACT or VRECLM
 		 */
 		vp->v_flag |= VINACT;
-		VN_UNLOCK(vp, s);
+		VN_UNLOCK(vp, 0);
 
 		/*
 		 * Do not make the VOP_INACTIVE call if there
@@ -422,7 +411,7 @@ vn_rele(struct vnode *vp)
 			VOP_INACTIVE(vp, get_current_cred(), cache);
 		}
 
-		s = VN_LOCK(vp);
+		VN_LOCK(vp);
 		if (vp->v_flag & VWAIT) {
 			if (vp->v_flag & VWAIT) {
 				sv_broadcast(vptosync(vp));
@@ -433,7 +422,7 @@ vn_rele(struct vnode *vp)
 
 	}
 
-	VN_UNLOCK(vp, s);
+	VN_UNLOCK(vp, 0);
 
 	vn_trace_exit(vp, "vn_rele", (inst_t *)__return_address);
 }

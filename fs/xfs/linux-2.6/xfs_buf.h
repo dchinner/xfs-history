@@ -214,6 +214,7 @@ typedef struct page_buf_s {
 	size_t			pb_buffer_length; /* size of buffer in bytes */
 	size_t			pb_count_desired; /* desired transfer size */
 	void			*pb_addr;	/* virtual address of buffer */
+	struct tq_struct	pb_iodone_sched;
 	page_buf_iodone_t	pb_iodone;	/* I/O completion function */
 	page_buf_relse_t	pb_relse;	/* releasing function */
 	page_buf_bdstrat_t	pb_strat;	/* pre-write function */
@@ -357,6 +358,9 @@ extern void pagebuf_flushinval(		/* write and invalidate */
 /* Buffer Utility Routines */
 
 #define pagebuf_geterror(pb)    ((pb)->pb_error)
+
+extern void pagebuf_queue_task(
+		struct tq_struct *);
 
 extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 		page_buf_t *);		/* buffer to mark		*/
