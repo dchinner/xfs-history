@@ -1,4 +1,4 @@
-#ident "$Revision: 1.23 $"
+#ident "$Revision: 1.24 $"
 
 
 #include <sys/param.h>
@@ -1583,11 +1583,11 @@ xfs_qm_reset_dqcounts(
 
 STATIC int
 xfs_qm_dqiter_bufs(
-		   xfs_mount_t	*mp,
-		   xfs_dqid_t	firstid,
-		   xfs_fsblock_t	bno,   
-		   xfs_filblks_t	blkcnt,
-		   uint		flags)
+	xfs_mount_t	*mp,
+	xfs_dqid_t	firstid,
+	xfs_fsblock_t	bno,   
+	xfs_filblks_t	blkcnt,
+	uint		flags)
 {
 	buf_t		*bp;	
 	int		error;
@@ -1610,13 +1610,11 @@ xfs_qm_dqiter_bufs(
 	 * everything if we were to crash in the middle of this loop.
 	 */
 	while (blkcnt--) {
-		bp = read_buf(mp->m_dev,
+		error = xfs_trans_read_buf(mp, NULL, mp->m_dev,
 			      XFS_FSB_TO_DADDR(mp, bno),
-			      (int)XFS_QI_DQCHUNKLEN(mp), 0);
-		if (bp == NULL || (error = geterror(bp))) {
-			ASSERT(0);
+			      (int)XFS_QI_DQCHUNKLEN(mp), 0, &bp);
+		if (error)
 			break;
-		}
 		
 		(void) xfs_qm_reset_dqcounts(mp, bp, firstid,
 					     flags & XFS_QMOPT_UQUOTA ?
