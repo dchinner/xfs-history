@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_AG_H
 #define	_FS_XFS_AG_H
 
-#ident	"$Revision: 1.15 $"
+#ident	"$Revision: 1.16 $"
 
 /*
  * Allocation group header
@@ -51,6 +51,11 @@ typedef struct xfs_agf
 #define	XFS_AGF_DADDR		((daddr_t)1)
 #define	XFS_AGF_BLOCK(mp)	XFS_HDR_BLOCK(mp, XFS_AGF_DADDR)
 
+/*
+ * Size of the unlinked inode hash table in the agi.
+ */
+#define	XFS_AGI_UNLINKED_BUCKETS	64
+
 typedef struct xfs_agi
 {
 	/*
@@ -70,6 +75,11 @@ typedef struct xfs_agi
 	__uint32_t	agi_level;	/* levels in inode btree */
 	xfs_agino_t	agi_freecount;	/* number of free inodes */
 	xfs_agino_t	agi_newino;	/* new inode just allocated */
+	/*
+	 * Hash table of inodes which have been unlinked but are
+	 * still being referenced.
+	 */
+	xfs_agino_t	agi_unlinked[XFS_AGI_UNLINKED_BUCKETS];
 } xfs_agi_t;
 
 #define	XFS_AGI_MAGICNUM	0x00000001
@@ -81,7 +91,8 @@ typedef struct xfs_agi
 #define	XFS_AGI_LEVEL		0x00000040
 #define	XFS_AGI_FREECOUNT	0x00000080
 #define	XFS_AGI_NEWINO		0x00000100
-#define	XFS_AGI_NUM_BITS	9
+#define	XFS_AGI_UNLINKED	0x00000200
+#define	XFS_AGI_NUM_BITS	10
 #define	XFS_AGI_ALL_BITS	((1 << XFS_AGI_NUM_BITS) - 1)
 
 /* disk block (daddr_t) in the AG */
