@@ -98,10 +98,6 @@ STATIC int	xfs_access(vnode_t	*vp,
 			   int		flags,
 			   cred_t	*credp);
 
-STATIC int	xfs_readlink(vnode_t	*vp,
-			     uio_t	*uiop,
-			     cred_t	*credp);
-
 STATIC int	xfs_fsync(vnode_t	*vp,
 			  int		flag,
 			  cred_t	*credp);
