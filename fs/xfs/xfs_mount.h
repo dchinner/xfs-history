@@ -1,7 +1,7 @@
 #ifndef _FS_XFS_MOUNT_H
 #define	_FS_XFS_MOUNT_H
 
-#ident	"$Revision: 1.14 $"
+#ident	"$Revision: 1.16 $"
 
 struct xfs_ihash;
 
@@ -27,12 +27,22 @@ typedef struct xfs_mount {
 	ulong			m_ihashmask;	/* fs inode hash size - 1 */
 	struct xfs_inode	*m_inodes;	/* active inode list */
 	lock_t			m_ilock;	/* inode list mutex */
+	uint			m_readio_log;	/* min read size log bytes */
+	uint			m_readio_blocks; /* min read size blocks */
+	uint			m_writeio_log;	/* min write size log bytes */
+	uint			m_writeio_blocks; /* min write size blocks */
 	void			*m_log;		/* log specific stuff */
 	uint			m_rsumlevels;	/* rt summary levels */
 	uint			m_rsumsize;	/* size of rt summary, bytes */
 	struct xfs_inode	*m_rbmip;	/* pointer to bitmap inode */
 	struct xfs_inode	*m_rsumip;	/* pointer to summary inode */
 } xfs_mount_t;
+
+/*
+ * Default minimum read and write sizes.
+ */
+#define	XFS_READIO_LOG	15
+#define	XFS_WRITEIO_LOG	15
 
 /*
  * Macros for getting from mount to vfs and back.
