@@ -245,6 +245,7 @@ xfs_open_by_handle(
 	struct dentry		*dentry = NULL;
 	struct file		*filp = NULL;
 	struct inode		*inode = NULL;
+	struct list_head        *lp;
 	void			*hanp;
 	size_t			hlen;
 	ino_t                   ino;
@@ -252,6 +253,7 @@ xfs_open_by_handle(
 	xfs_handle_t		*handlep;
 	xfs_handle_t		handle;
 	xfs_fsop_handlereq_t	hreq;
+	xfs_inode_t		*ip;
 
 #ifndef	PERMISSIONS_BY_USER
 	/*
@@ -324,34 +326,25 @@ xfs_open_by_handle(
 	}
 
 	/*
-	 * Get the inode.
+	 * Get the XFS inode, building a vnode to go with it.
 	 */
-	inode = iget(parfilp->f_dentry->d_inode->i_sb, ino);
-	if (is_bad_inode(inode) ||
-	    igen != inode->i_generation) {
-	  	iput(inode);
+	error = xfs_iget(mp, NULL, ino, XFS_ILOCK_SHARED, &ip, 0);
+
+	if (error)
+		return -error;
+
+	if (ip == NULL)
+		return -XFS_ERROR(EIO);
+
+	if (ip->i_d.di_mode == 0 || ip->i_d.di_gen != igen) {
+
+		xfs_iput(ip, XFS_ILOCK_SHARED);
+
 		return -XFS_ERROR(ENOENT);
 	}
 
-
-	/*
- 	 * Why do we need to do this?
-	 * XFS_IOC_FSBULKSTAT_SINGLE  does a xfs_iget on the inode 
-	 * and puts it in the linux inode cache with out 
-	 * calling linvfs_set_inode_ops.  The next time
-	 * the linux iget is called on the inode it will find the inode in the linux
-	 * cache so read_inode is not called and the inode ops field is never
-	 * initialized.
-	 */
-	linvfs_set_inode_ops(inode);
-	/*
-	 * Fix the mode flags that linvfs_set_inode_ops bashes.
-	 */
-	error = linvfs_revalidate_core(inode, ATTR_COMM);
-	if (error) {
-		iput(inode);
-		return -XFS_ERROR(error);
-	}
+	inode = XFS_ITOV(ip)->v_inode;
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 	/*
 	 * Restrict handle operations to directories & regular files.
@@ -385,9 +378,24 @@ xfs_open_by_handle(
 	  	iput(inode);
 		return new_fd;
 	}
-    
+
+	/* now to find a dentry.
+	 * If possible, get a well-connected one
+	 */
+	spin_lock(&dcache_lock);
+	for (lp = inode->i_dentry.next; lp != &inode->i_dentry ; lp=lp->next) {
+		dentry = list_entry(lp,struct dentry, d_alias);
+		if (! (dentry->d_flags & DCACHE_NFSD_DISCONNECTED)) {
+			dget_locked(dentry);
+			spin_unlock(&dcache_lock);
+			iput(inode);
+			goto found;
+		}
+	}
+	spin_unlock(&dcache_lock);
+
 	/*
-	 * Create anonymous dcache entry.
+	 * ELSE didn't find dentry Create anonymous dcache entry.
 	 */
 	dentry = d_alloc_root(inode);
 	if (dentry == NULL) {
@@ -404,10 +412,11 @@ xfs_open_by_handle(
 	/*
 	 * Make sure dput can find this dcache entry.
 	 */
-        d_rehash(dentry);
+	d_rehash(dentry);
 
+ found:
 	/*
-         * Make sure umount returns an EBUSY on umounts while this file is open.
+	 * Make sure umount returns an EBUSY on umounts while this file is open.
 	 */
 	mntget(parfilp->f_vfsmnt);
 
