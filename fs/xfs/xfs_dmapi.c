@@ -3200,7 +3200,7 @@ xfs_dm_send_namesp_event(
 
 	/* Returns positive errors to XFS */
 
-	error = dm_send_namesp_event(event, vfsp->vfs_super,
+	error = dm_send_namesp_event(event, vfsp ? vfsp->vfs_super: NULL,
 				    LINVFS_GET_IP(vp1), vp1_right,
 				    LINVFS_GET_IP(vp2), vp2_right,
 				    name1, name2,
