@@ -1,4 +1,4 @@
-#ident "$Revision: 1.97 $"
+#ident "$Revision: 1.101 $"
 
 #ifdef SIM
 #define _KERNEL 1
@@ -177,12 +177,16 @@ int
 xfs_dir_init(xfs_trans_t *trans, xfs_inode_t *dir, xfs_inode_t *parent_dir)
 {
 	xfs_da_args_t args;
+	int error;
 
 	bzero((char *)&args, sizeof(args));
 	args.dp = dir;
 	args.trans = trans;
 
 	ASSERT((dir->i_d.di_mode & IFMT) == IFDIR);
+	if (error = xfs_dir_ino_validate(trans->t_mountp, parent_dir->i_ino))
+		return error;
+
 	return(xfs_dir_shortform_create(&args, parent_dir->i_ino));
 }
 
@@ -203,6 +207,9 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	if (namelen >= MAXNAMELEN) {
 		return(XFS_ERROR(EINVAL));
 	}
+
+	if (retval = xfs_dir_ino_validate(trans->t_mountp, inum))
+		return (retval);
 
 	XFSSTATS.xs_dir_create++;
 	/*
@@ -538,6 +545,9 @@ xfs_dir_replace(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 	if (namelen >= MAXNAMELEN) {
 		return(XFS_ERROR(EINVAL));
 	}
+
+	if (retval = xfs_dir_ino_validate(trans->t_mountp, inum))
+		return retval;
 
 	/*
 	 * Fill in the arg structure for this request.
