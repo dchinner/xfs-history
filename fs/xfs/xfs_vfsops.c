@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.204 $"
+#ident  "$Revision: 1.205 $"
 
 #include <limits.h>
 #ifdef SIM
@@ -2522,6 +2522,7 @@ vfsops_t xfs_vfsops = {
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
 	BHV_IDENTITY_INIT_POSITION(VFS_POSITION_BASE),
+	0,
 	0,
 	0,
 	0,
