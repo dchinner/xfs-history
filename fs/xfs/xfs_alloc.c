@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.106 $"
+#ident	"$Revision: 1.107 $"
 
 /*
  * Free space allocation for XFS.
@@ -573,6 +573,7 @@ xfs_alloc_read_agfl(
 	ASSERT(bp);
 	ASSERT(!geterror(bp));
 	bp->b_ref = XFS_AGFL_REF;
+	bp->b_bvtype = B_FS_AGFL;
 	*bpp = bp;
 	return 0;
 }
@@ -2317,6 +2318,7 @@ xfs_alloc_read_agf(
 	}
 #endif
 	bp->b_ref = XFS_AGF_REF;
+	bp->b_bvtype = B_FS_AGF;
 	*bpp = bp;
 	return 0;
 }

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.25 $"
+#ident "$Revision: 1.26 $"
 #include <sys/param.h>
 #include <sys/sysinfo.h>
 #include <sys/buf.h>
@@ -664,6 +664,7 @@ xfs_qm_dqread(
 
 	/* Mark the buf so that this will stay incore a little longer */
 	bp->b_ref = XFS_DQUOT_REF;
+	bp->b_bvtype = B_FS_DQUOT;
 
 	/* 
 	 * We got the buffer with a xfs_trans_read_buf() (in dqtobp())

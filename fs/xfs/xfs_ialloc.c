@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.112 $"
+#ident	"$Revision: 1.113 $"
 
 #ifdef SIM
 #define _KERNEL	1
@@ -1283,6 +1283,7 @@ xfs_ialloc_read_agi(
 		ASSERT(agi->agi_unlinked[i] != 0);
 #endif
 	bp->b_ref = XFS_AGI_REF;
+	bp->b_bvtype = B_FS_AGI;
 	*bpp = bp;
 	return 0;
 }

@@ -1821,10 +1821,13 @@ xfs_da_read_buf(xfs_trans_t *trans, xfs_inode_t *dp, xfs_dablk_t bno,
 	if (error)
 		return error;
 	ASSERT(bp != NULL && !geterror(bp));
-	if (whichfork == XFS_ATTR_FORK)
+	if (whichfork == XFS_ATTR_FORK) {
 		bp->b_ref = XFS_ATTR_BTREE_REF;
-	else
+		bp->b_bvtype = B_FS_ATTR_BTREE;
+	} else {
 		bp->b_ref = XFS_DIR_BTREE_REF;
+		bp->b_bvtype = B_FS_DIR_BTREE;
+	}
 	info = (xfs_da_blkinfo_t *)bp->b_un.b_addr;
 	if (XFS_TEST_ERROR((info->magic != XFS_DA_NODE_MAGIC) &&
 			   (info->magic != XFS_DIR_LEAF_MAGIC) &&
