@@ -7,7 +7,7 @@
 /*	The copyright notice above does not evidence any   	*/
 /*	actual or intended publication of such source code.	*/
 
-#ident	"$Revision: 1.3 $"
+#ident	"$Revision: 1.4 $"
 
 /*
  * Generic vnode operations.
@@ -116,10 +116,16 @@ fs_dounmount(
 	if (error) {
 		vfs_unlock(vfsp);	/* clears VFS_OFFLINE flag, too */
 	} else {
-		--coveredvp->v_vfsp->vfs_nsubmounts;
+		if (coveredvp) {
+			--coveredvp->v_vfsp->vfs_nsubmounts;
+		}
 		ASSERT(vfsp->vfs_nsubmounts == 0);
+/***
 		vfs_remove(vfsp);
-		VN_RELE(coveredvp);
+***/
+		if (coveredvp) {
+			VN_RELE(coveredvp);
+		}
 	}
 	return error;
 }

@@ -1,4 +1,4 @@
-#ident "$Revision: 1.274 $"
+#ident "$Revision: 1.275 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -5579,6 +5579,7 @@ xfs_check_rbp(
 		XFS_BB_FSB_OFFSET(mp, rbp->b_offset)) ==
 	       rbp->b_blkno);
 
+#ifndef __linux__
 	if (rbp->b_flags & B_PAGEIO) {
 		pfdp = NULL;
 		pfdp = getnextpg(rbp, pfdp);
@@ -5590,6 +5591,7 @@ xfs_check_rbp(
 		ASSERT(BTOBB(poff(rbp->b_un.b_addr)) ==
 		       dpoff(rbp->b_offset));
 	}
+#endif
 }
 
 /*
@@ -5619,6 +5621,7 @@ xfs_check_bp(
 
 	mp = io->io_mount;
 
+#ifndef __linux__
 	if (bp->b_flags & B_PAGEIO) {
 		pfdp = NULL;
 		pfdp = getnextpg(bp, pfdp);
@@ -5633,6 +5636,7 @@ xfs_check_bp(
 		ASSERT(BTOBB(poff(bp->b_un.b_addr)) ==
 		       dpoff(bp->b_offset));
 	}
+#endif
 
 	bp_offset_fsb = XFS_BB_TO_FSBT(mp, bp->b_offset);
 	bp_len_fsb = XFS_BB_TO_FSB(mp, bp->b_offset + BTOBB(bp->b_bcount)) -
@@ -6618,7 +6622,6 @@ xfsbdstrat(
 			struct bdevsw	*my_bdevsw;
 
 			my_bdevsw = bp->b_target->bdevsw;
-			ASSERT(my_bdevsw != NULL);
 			bdstrat(my_bdevsw, bp);
 		}
 		return 0;

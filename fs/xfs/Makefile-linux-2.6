@@ -8,7 +8,8 @@
 
 #CFLAGS := $(filter-out -Wall,$(CFLAGS))
 EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-unknown-pragmas -Wno-parentheses \
-                -Wno-uninitialized -I./linux -I./pseudo-inc -I. -D_KERNEL
+                -Wno-uninitialized -I./linux -I./pseudo-inc -I. -D_KERNEL \
+		-funsigned-char 
 
 ALL_SUB_DIRS = linux
 SUB_DIRS = ${ALL_SUB_DIRS}

@@ -30,7 +30,7 @@
  */
 
 /*#ident	"@(#)uts-comm:fs/vfs.c	1.18"*/
-#ident	"$Revision: 1.5 $"
+#ident	"$Revision: 1.6 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -167,10 +167,11 @@ vfs_remove(struct vfs *vfsp)
 	 * Clear covered vnode pointer.  No thread can traverse vfsp's
 	 * mount point while vfsp is locked.
 	 */
-	vp = vfsp->vfs_vnodecovered;
-	s = VN_LOCK(vp);
-	vp->v_vfsmountedhere = NULL;
-	VN_UNLOCK(vp, s);
+	if ((vp = vfsp->vfs_vnodecovered) != NULL) {
+		s = VN_LOCK(vp);
+		vp->v_vfsmountedhere = NULL;
+		VN_UNLOCK(vp, s);
+	}
 
 	/*
 	 * Unlink vfsp from the rootvfs list.

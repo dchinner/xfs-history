@@ -1,5 +1,5 @@
 
-#ident	"$Revision: 1.136 $"
+#ident	"$Revision: 1.137 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -747,12 +747,10 @@ xlog_find_tail(xlog_t  *log,
 			 * log records will point recovery to after the
 			 * current unmount record.
 			 */
-			log->l_tail_lsn =
-			     ((long long)log->l_curr_cycle << 32) |
-			     ((uint)(after_umount_blk));
-			log->l_last_sync_lsn =
-			     ((long long)log->l_curr_cycle << 32) |
-			     ((uint)(after_umount_blk));
+			ASSIGN_ANY_LSN(log->l_tail_lsn, log->l_curr_cycle,
+					after_umount_blk);
+			ASSIGN_ANY_LSN(log->l_last_sync_lsn, log->l_curr_cycle,
+					after_umount_blk);
 			*tail_blk = after_umount_blk;
 		}
 	}
@@ -3314,13 +3312,27 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 
 #endif /* _KERNEL */
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
+#ifndef __linux__
 		cmn_err(CE_NOTE,
 			"Ending XFS recovery for filesystem: %s (%V)",
 			log->l_mp->m_fsname, log->l_dev);
 #else
 		cmn_err(CE_NOTE,
+			"Ending XFS recovery on filesystem: %s (dev: %d/%d)",
+			log->l_mp->m_fsname, emajor(log->l_dev),
+			eminor(log->l_dev));
+#endif
+#else
+#ifndef __linux__
+		cmn_err(CE_NOTE,
 			"!Ending XFS recovery for filesystem: %s (%V)",
 			log->l_mp->m_fsname, log->l_dev);
+#else
+		cmn_err(CE_NOTE,
+			"!Ending XFS recovery on filesystem: %s (dev: %d/%d)",
+			log->l_mp->m_fsname, emajor(log->l_dev),
+			eminor(log->l_dev));
+#endif
 #endif
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {

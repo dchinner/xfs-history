@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.221 $"
+#ident  "$Revision: 1.223 $"
 #if defined(__linux__)
 #include <xfs_linux.h>
 #endif
@@ -1546,7 +1546,12 @@ xfs_ibusy(
 			}
 			
 #ifdef DEBUG
+#ifdef __linux__
+			printk("busy vp=0x%x ip=0x%x inum %d count=%d\n",
+				vp, ip, ip->i_ino & 0xffffffff, vp->v_count);
+#else
 			printf("busy vp=0x%x count=%d\n", vp, vp->v_count);
+#endif /* __linux__ */
 #endif
 			busy++;
 		}

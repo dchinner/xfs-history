@@ -83,6 +83,14 @@
 #define ENTER(x) printk("Entering %s\n",x);
 #define EXIT(x)  printk("Exiting  %s\n",x);
 
+#ifndef KDB_REASON_ENTER
+struct pt_regs;
+extern int   kdb(int reason, int error_code, struct pt_regs *);
+#define KDB_REASON_ENTER    1
+#endif
+#define debug(str)	printk("%s\n", str); kdb(1, 0, NULL)
+extern int get_thread_id(void);
+
 #if 0
 /* This is major wrong.... fix me FIX ME  RMC */
 #ifndef __ARCH_I386_POSIX_TYPES_H

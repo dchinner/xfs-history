@@ -1,4 +1,4 @@
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #if defined(__linux__)
 #include <xfs_linux.h>
@@ -15,6 +15,7 @@
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
 #include <sys/buf.h>
+#include <sys/debug.h>
 #ifdef SIM
 #undef _KERNEL
 #endif

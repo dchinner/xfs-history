@@ -378,12 +378,10 @@ void
 linvfs_put_inode(
 	struct inode	*inode)
 {
-  ENTER("linvfs_put_inode");
-/*
-   Does XFS do read-ahead stuff that needs to be thrown away every time the
-   file is closed?  If so, this function needs to do that.
-*/
-  EXIT("linvfs_put_indoe");
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+
+	if (vp)
+		VN_RELE(vp);
 }
 
 
@@ -464,6 +462,8 @@ linvfs_put_super(
 
 	ENTER("linvfs_put_super");
 	VFS_DOUNMOUNT(vfsp, 0, NULL, sys_cred, error); 
+	if (error)
+		printk("XFS unmount got error %d\n", error);
 
 	vfs_deallocate(vfsp);
 
@@ -552,11 +552,6 @@ void
 linvfs_clear_inode(
 	struct inode	*inode)
 {
-	vnode_t		*vp = LINVFS_GET_VP(inode);
-	ENTER("linvfs_clear_inode");
-	if (vp) 
-		VN_RELE(vp);
-	EXIT("linvfs_clear_inode");
 }
 
 

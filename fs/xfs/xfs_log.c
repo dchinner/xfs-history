@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.171 $"
+#ident	"$Revision: 1.172 $"
 
 /*
  * High level interface routines for log manager
@@ -1793,7 +1793,7 @@ xlog_state_clean_log(xlog_t *log)
 #endif
 	iclog = log->l_iclog;
 	do {
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(__linux__)
 		/*
 		 * This is to track down an elusive log bug
 		 * where processes sleeping on ic_forcesema don't
