@@ -1257,6 +1257,7 @@ pagebuf_iodone_sched(
 void
 pagebuf_iodone(
 	page_buf_t		*pb,
+	int			dataio,
 	int			schedule)
 {
 	pb->pb_flags &= ~(PBF_READ | PBF_WRITE);
@@ -1272,11 +1273,10 @@ pagebuf_iodone(
 
 			INIT_TQUEUE(&pb->pb_iodone_sched,
 				pagebuf_iodone_sched, (void *)pb);
-			queue_task(&pb->pb_iodone_sched,
-				(pb->pb_flags & PBF_FS_IODONED) ?
+			queue_task(&pb->pb_iodone_sched, dataio ?
 				&pagebuf_dataiodone_tq[daemon] :
 				&pagebuf_logiodone_tq[daemon]);
-			wake_up((pb->pb_flags & PBF_FS_IODONED) ?
+			wake_up(dataio ?
 				&pagebuf_dataiodone_wait[daemon] :
 				&pagebuf_logiodone_wait[daemon]);
 		} else {
@@ -1389,7 +1389,7 @@ _pagebuf_iodone(
 				unlock_page(page);
 		}
 		pb->pb_locked = 0;
-		pagebuf_iodone(pb, schedule);
+		pagebuf_iodone(pb, 0, schedule);
 	}
 }
 

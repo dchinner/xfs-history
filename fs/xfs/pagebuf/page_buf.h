@@ -96,7 +96,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_MAPPABLE = (1 << 9),/* use directly-addressable pages	   */
 	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
 	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
-	PBF_FS_IODONED = (1 << 12), /* complete I/O via fs data daemons    */
 
 	/* flags used only as arguments to access routines */
 	PBF_LOCK = (1 << 13),	/* lock requested			   */
@@ -311,6 +310,7 @@ static inline int pagebuf_geterror(page_buf_t *pb)
 
 extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
 		page_buf_t *,		/* buffer to mark		*/
+		int,			/* use data/log helper thread.	*/
 		int);			/* run completion locally, or in
 					 * a helper thread. 		*/
 
