@@ -1600,6 +1600,7 @@ xfs_bmapi(
 	xfs_mount_t		*mp;
 	int			n;
 	xfs_extnum_t		nextents;
+	xfs_fsblock_t		obno;
 	xfs_bmbt_irec_t		prev;
 	xfs_sb_t		*sbp;
 	int			trim;
@@ -1644,6 +1645,7 @@ xfs_bmapi(
 	logflags = n = 0;
 	end = bno + len;
 	cur = NULL;
+	obno = bno;
 	while (bno < end && n < *nmap) {
 		/*
 		 * Reading past eof, act as though there's a hole
@@ -1715,7 +1717,9 @@ xfs_bmapi(
 		 * Then deal with the allocated space we found.
 		 */
 		ASSERT(ep != NULL);
-		if (trim) {
+		if (trim && (got.br_startoff + got.br_blockcount > obno)) {
+			bno = MAX(bno, obno);
+			ASSERT((bno >= obno) || (n == 0));
 			mval->br_startoff = bno;
 			if (got.br_startblock == NULLSTARTBLOCK)
 				mval->br_startblock = DELAYSTARTBLOCK;
@@ -1746,7 +1750,9 @@ xfs_bmapi(
 			   mval->br_startoff ==
 			   mval[-1].br_startoff + mval[-1].br_blockcount) {
 			mval[-1].br_blockcount += mval->br_blockcount;
-		} else {
+		} else if (!((n == 0) &&
+			     ((mval->br_startoff + mval->br_blockcount) <=
+			      obno))) {
 			mval++;
 			n++;
 		}
