@@ -1,5 +1,4 @@
 
-
 #include <sys/types.h>
 #ifdef SIM
 #define _KERNEL 1
@@ -11,6 +10,8 @@
 #include <sys/cred.h>
 #include <sys/sysmacros.h>
 #include <sys/pfdat.h>
+#include <sys/proc.h>
+#include <sys/user.h>
 #include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
@@ -19,6 +20,7 @@
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/fcntl.h>
+#include <sys/var.h>
 #ifdef SIM
 #include <bstring.h>
 #include <stdio.h>
@@ -68,6 +70,14 @@ xfs_retrieved(int	available,
 	      uint	*total_retrieved,
 	      __int64_t	isize);
 
+int
+xfs_diordwr(vnode_t	*vp,
+	 uio_t		*uiop,
+	 int		ioflag,
+	 cred_t		*credp,
+	 int		rw);
+
+extern int xfs_grio_req(xfs_inode_t *,int,uio_t *,int,cred_t *,int);
 /*
  * Round the given file offset down to the nearest read/write
  * size boundary.
@@ -655,6 +665,7 @@ xfs_read(vnode_t	*vp,
 	off_t		offset;
 	size_t		count;
 	int		error;
+	int		id;
 
 
 	ip = XFS_VTOI(vp);
@@ -681,19 +692,14 @@ xfs_read(vnode_t	*vp,
 
 	switch (type) {
 	case IFREG:
-		if (ioflag & IO_DIRECT) {
-			error = EINVAL;
-			break;
-		}
-
 		/*
 		 * Not ready for in-line files yet.
 		 */
 		ASSERT((ip->i_d.di_format == XFS_DINODE_FMT_EXTENTS) ||
 		       (ip->i_d.di_format == XFS_DINODE_FMT_BTREE));
 
-
-		xfs_read_file(vp, uiop, ioflag, credp);
+		id = u.u_procp->p_pid;
+		error = xfs_grio_req(ip, id, uiop, ioflag, credp, UIO_READ);
 
 		break;
 
@@ -1230,6 +1236,7 @@ xfs_write(vnode_t	*vp,
 	int		n;
 	int		resid;
 	timestruc_t	tv;
+	int		id;
 
 
 	ip = XFS_VTOI(vp);
@@ -1278,12 +1285,8 @@ xfs_write(vnode_t	*vp,
 			resid = 0;
 		}
 
-		if (ioflag & IO_DIRECT) {
-			return EINVAL;
-		}
-
-		error = xfs_write_file(vp, uiop, ioflag, credp);
-
+		id = u.u_procp->p_pid;
+		error = xfs_grio_req( ip, id, uiop, ioflag, credp, UIO_WRITE);
 		/*
 		 * Add back whatever we refused to do because of
 		 * uio_limit.
@@ -1966,4 +1969,406 @@ xfs_strategy(vnode_t	*vp,
 	} else {
 		xfs_strat_write(vp, bp);
 	}
+}
+
+
+struct dio_s {
+	struct vnode *vp;
+	struct cred *cr;
+	int 	ioflag;
+};
+
+/*
+ * xfs_diostrat()
+ *	This routine issues the calls to the disk device strategy routine
+ *	for file system reads and writes made using direct I/O from user
+ *	space. In the case of a write request the I/Os are issued one 
+ *	extent at a time. In the case of a read request I/Os for each extent
+ *	involved are issued at once.
+ *
+ * RETURNS:
+ *	none
+ */
+int
+xfs_diostrat( buf_t *bp)
+{
+	struct dio_s	*dp;
+	xfs_inode_t 	*ip;
+	xfs_trans_t	*tp;
+	vnode_t		*vp;
+	xfs_sb_t	*sbp;
+	xfs_mount_t	*mp;
+	xfs_bmbt_irec_t	imaps[XFS_BMAP_MAX_NMAP], *imapp, *timapp;
+	buf_t		*bps[XFS_BMAP_MAX_NMAP], *nbp;
+	xfs_fsblock_t	offset_fsb, last_fsb, firstfsb;
+	xfs_extlen_t	blocks, count_fsb, total;
+	xfs_bmap_free_t free_list;
+	caddr_t		base;
+	ssize_t		bytes_this_req, resid, count, totxfer;
+	off_t		offset, offset_this_req;
+	int		i, j, error, writeflag, reccount;
+	int		end_of_file, windex, wreccount, bufsissued, totresid;
+
+	int t1, t2, t3;
+
+
+printf("xfs_diostrat \n");
+
+	dp        = (struct dio_s *)bp->b_private;
+	vp        = dp->vp;
+	ip        = XFS_VTOI(vp); 
+	mp 	  = XFS_VFSTOM(XFS_ITOV(ip)->v_vfsp);
+	sbp 	  = &mp->m_sb;
+	base      = bp->b_un.b_addr;
+	error     = resid = totxfer = end_of_file = firstfsb = windex = 0;
+	offset    = BBTOB(bp->b_blkno);
+	totresid  = count  = bp->b_bcount;
+	wreccount = 0;
+
+	ASSERT(!(bp->b_flags & B_DONE));
+        ASSERT(ismrlocked(&ip->i_iolock, MR_UPDATE) != 0);
+
+	/*
+	 * Alignment checks are done in xfs_diordwr().
+	 * Determine if the operation is a read or a write.
+	 */
+	if (bp->b_flags & B_READ) {
+		writeflag = 0;
+	} else {
+		writeflag = XFS_BMAPI_WRITE;
+
+		/*
+		 * This is protected by the iolock.
+	 	 */
+		if ((offset + count) > (ip->i_d.di_size))
+			ip->i_new_size = offset + count;
+	}
+
+	/*
+	 * Process the request until:
+	 * 1) an I/O error occurs
+	 * 2) end of file is reached.
+	 * 3) end of device (driver error) occurs
+	 * 4) request is completed.
+	 */
+	while ( !error && !end_of_file && !resid && count ) {
+		offset_fsb = xfs_b_to_fsbt( sbp, offset );
+		last_fsb   = xfs_b_to_fsb( sbp, offset + count);
+		count_fsb  = xfs_b_to_fsb( sbp, count);
+		blocks     = (xfs_extlen_t)(last_fsb - offset_fsb);
+
+		if ( writeflag ) {
+			/*
+ 			 * In the write case, need to call bmapi() with
+			 * the read flag set first to determine the existing 
+			 * extents. This is done so that the correct amount
+			 * of space can be reserved in the transaction 
+			 * structure. To avoid calling bmapi() unnecessarily,
+			 * keep track of the extents returned from the last
+			 * call to bmapi().
+			 */
+			if (windex >= wreccount) {
+				windex = 0;
+				wreccount = XFS_BMAP_MAX_NMAP;
+				firstfsb = xfs_bmapi( tp, ip, offset_fsb, 
+					count_fsb, 0, firstfsb, 0, imaps, 
+					&wreccount, &free_list);
+			}
+			/*
+ 			 * Get a pointer to the current extent map.
+			 * Writes will always be issued one at a time.
+			 */
+			reccount = 1;
+			imapp = &imaps[windex++];
+			count_fsb = imapp->br_blockcount;
+			/*
+ 			 * Setup transactions.
+ 			 */
+			xfs_ilock( ip, XFS_ILOCK_EXCL );
+			tp = xfs_trans_alloc( mp, XFS_TRANS_FILE_WRITE);
+			error = xfs_trans_reserve( tp, count_fsb, 
+							BBTOB(128), 0, 0 );
+
+			if (error) {
+				/*
+				 * Ran out of file system space.
+				 * Free the transaction structure.
+				 */
+				ASSERT( error == ENOSPC );
+				xfs_trans_cancel(tp, 0);
+				xfs_iunlock( ip, XFS_ILOCK_EXCL);
+printf("RAN OUT OF SPACE \n");
+				break;
+			} else {
+				xfs_trans_ijoin( tp, ip, XFS_ILOCK_EXCL);
+				xfs_trans_ihold( tp, ip);
+				free_list.xbf_first = NULL;
+				free_list.xbf_count = 0;
+			}
+		} else {
+			/*
+			 * Read case.
+			 * Read requests will be issued 
+			 * up to XFS_BMAP_MAX_MAP at a time.
+			 */
+			reccount = XFS_BMAP_MAX_NMAP;
+			imapp = &imaps[0];
+		}
+
+		/*
+ 		 * Issue the bmapi() call to get the extent info.
+ 		 * In the case of write requests this call does the
+		 * actual file space allocation.
+		 */
+		firstfsb = xfs_bmapi( tp, ip, offset_fsb, count_fsb, 
+			writeflag, firstfsb, 0, imapp, &reccount, &free_list);
+
+		if ( writeflag ) {
+			/*
+ 			 * Complete the bmapi() transactions.
+			 */
+			xfs_bmap_finish( &tp, &free_list, firstfsb, 0 );
+			xfs_trans_commit(tp , 0 );
+			xfs_iunlock( ip, XFS_ILOCK_EXCL);
+		}
+
+		/*
+   		 * Run through each extent.
+		 */
+		bufsissued = 0;
+		for (i = 0; (i < reccount) && (!end_of_file) && (count); i++) {
+			if (writeflag) {
+				/*
+				 * In the write case, imapp already points
+				 * at the one and only extent to be processed.
+				 */
+				ASSERT(reccount == 1);
+			} else {
+				imapp = &imaps[i];
+			}
+
+			bytes_this_req  = xfs_fsb_to_b(sbp,
+						imapp->br_blockcount);
+			offset_this_req = xfs_fsb_to_b(sbp,
+						imapp->br_startoff); 
+
+			/*
+			 * Check if this is the end of the file.
+			 */
+			if (offset_this_req + bytes_this_req >ip->i_d.di_size) {
+				if ( writeflag ) {
+					/*
+					 * File is being extended on a
+					 * write, update the file size.
+					 */
+			         	ASSERT((vp->v_flag & VISSWAP) == 0);
+					xfs_ilock(ip, XFS_ILOCK_EXCL);
+				 	ip->i_d.di_size = offset + 
+							bytes_this_req;
+					ip->i_update_core = 1;
+					xfs_iunlock(ip, XFS_ILOCK_EXCL);
+				} else {
+					/*
+ 				 	 * If trying to read past end of
+ 				 	 * file, shorten the request size.
+					 */
+					bytes_this_req = ip->i_d.di_size - 
+							offset_this_req;
+					end_of_file = 1;
+				}
+			}
+
+	     		/*
+ 	      		 * Reduce request size, if it 
+			 * is longer than user buffer.
+	      		 */
+	     		if ( bytes_this_req > count ) {
+	 			 bytes_this_req = count;
+			}
+
+			/*
+ 			 * Do not do I/O if there is a hole in the file.
+			 */
+			if (imapp->br_startblock != HOLESTARTBLOCK) {
+				/*
+ 				 * Setup I/O request for this extent.
+				 */
+	     			bps[bufsissued++]= nbp = getphysbuf();
+	     			nbp->b_flags     = bp->b_flags;
+	     			nbp->b_error     = 0;
+	     			nbp->b_proc      = bp->b_proc;
+	     			nbp->b_edev      = bp->b_edev;
+	     			nbp->b_blkno     = xfs_fsb_to_daddr(sbp,
+							imapp->br_startblock);
+	     			nbp->b_bcount    = bytes_this_req;
+	     			nbp->b_un.b_addr = base;
+
+				/*
+ 				 * Issue I/O request.
+				 */
+				bdstrat( bmajor(nbp->b_edev), nbp );
+	
+		    		if (error = geterror(nbp)) {
+					biowait( nbp );
+					nbp->b_flags = 0;
+		     			nbp->b_un.b_addr = 0;
+					putphysbuf( nbp );
+					bps[bufsissued--] = 0;
+					break;
+		     		}
+			} else {
+				/*
+ 				 * Hole in file can only happen on read case.
+				 */
+				ASSERT(!writeflag);
+				
+				/*
+ 				 * Physio() has already mapped user address.
+				 */
+				bzero(base, bytes_this_req);
+
+				/*
+				 * Bump the transfer count.
+				 */
+				totxfer += bytes_this_req;
+			}
+
+			/*
+			 * update pointers for next round.
+			 */
+	     		base   += bytes_this_req;
+	     		offset += bytes_this_req;
+	     		count  -= bytes_this_req;
+
+		} /* end of for loop */
+
+		/*
+		 * Wait for I/O completion and recover buffers.
+		 */
+		for ( j = 0; j < bufsissued ; j++) {
+	  		nbp = bps[j];
+	    		biowait( nbp );
+
+	     		if (!error)
+				error = geterror( nbp );
+
+	     		if (!error && !resid) {
+				resid = nbp->b_resid;
+				totxfer += (nbp->b_bcount - resid);
+			} 
+	    	 	nbp->b_flags = 0;
+	     		nbp->b_un.b_addr = 0;
+	    	 	putphysbuf( nbp );
+	     	}
+	} /* end of while loop */
+
+	/*
+ 	 * Fill in resid count for original buffer.
+	 */
+	bp->b_resid = totresid - totxfer;
+
+	/*
+ 	 *  Update the inode timestamp if file was written.
+ 	 */
+	if ( writeflag ) {
+		timestruc_t tv;
+
+		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		if ((ip->i_d.di_mode & (ISUID|ISGID)) && dp->cr->cr_uid != 0) {
+			ip->i_d.di_mode &= ~ISUID;
+			if (ip->i_d.di_mode & (IEXEC >> 3))
+				ip->i_d.di_mode &= ~ISGID;
+		}
+		nanotime( &tv );
+		ip->i_d.di_mtime.t_sec = ip->i_d.di_ctime.t_sec = tv.tv_sec;
+		ip->i_d.di_mtime.t_nsec = ip->i_d.di_ctime.t_nsec = tv.tv_nsec;
+		ip->i_update_core = 1;
+		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	}
+
+	/*
+	 * Issue completion on the original buffer.
+	 */
+	bioerror( bp, error);
+	biodone( bp );
+
+	return(0);
+}
+
+/*
+ * xfs_diordwr()
+ *	This routine sets up a buf structure to be used to perform 
+ * 	direct I/O operations to user space. The user specified 
+ *	paramters are checked for alignment and size limitations. A buf
+ *	structure is allocated an biophysio() is called.
+ *
+ * RETURNS:
+ * 	 0 on success
+ * 	errno on error
+ */
+int
+xfs_diordwr(vnode_t	*vp,
+	 uio_t		*uiop,
+	 int		ioflag,
+	 cred_t		*credp,
+	 int		rw)
+{
+	xfs_inode_t	*ip;
+	struct dio_s	dp;
+	buf_t		*bp;
+	int		error;
+
+	ip = XFS_VTOI(vp);
+
+	/*
+ 	 * Check that the user buffer address, file offset, and
+ 	 * request size are all multiples of BBSIZE. This prevents
+	 * the need for read/modify/write operations.
+ 	 */
+	if ((((int)(uiop->uio_iov->iov_base)) & BBMASK) ||
+	     (uiop->uio_offset & BBMASK) ||
+	     (uiop->uio_resid & BBMASK)) {
+#ifndef SIM
+		return EINVAL;
+#endif
+	}
+
+	/*
+ 	 * Do maxio check.
+ 	 */
+	if (uiop->uio_resid > ctob(v.v_maxdmasz)) {
+#ifndef SIM
+		return EINVAL;
+#endif
+	}
+
+	/*
+ 	 * Use dio_s structure to pass file/credential
+	 * information to file system strategy routine.
+	 */
+	dp.vp = vp;
+	dp.cr = credp;
+	dp.ioflag = ioflag;
+
+	/*
+ 	 * Allocate local buf structure.
+	 */
+	bp = getphysbuf();
+	bp->b_private = &dp;
+	bp->b_edev = ip->i_dev;
+
+	/*
+ 	 * Perform I/O operation.
+	 */
+	error = biophysio(xfs_diostrat, bp, bp->b_edev, rw, 
+		(daddr_t)BTOBB(uiop->uio_offset), uiop);
+
+	/*
+ 	 * Free local buf structure.
+ 	 */
+	bp->b_flags = 0;
+	bp->b_un.b_addr = 0;
+	putphysbuf(bp);
+
+	return( error );
 }
