@@ -204,15 +204,17 @@ typedef struct xfs_trans {
 	xfs_trans_callback_t	t_callback;	/* transaction callback */
 	void			*t_callarg;	/* callback arg */
 	unsigned int		t_flags;	/* misc flags */
-	int			t_icount_delta;	/* superblock icount change */
-	int			t_ifree_delta;	/* superblock ifree change */
-	int			t_fdblocks_delta; /* superblock fdblocks chg */
-	int			t_res_fdblocks_delta; /* on-disk only chg */
-	int			t_frextents_delta;/* superblock freextents chg*/
-	int			t_res_frextents_delta; /* on-disk only chg */
-	int			t_ag_freeblks_delta; /* debugging counter */
-	int			t_ag_flist_delta; /* debugging counter */
-	int			t_ag_btree_delta; /* debugging counter */
+	long			t_icount_delta;	/* superblock icount change */
+	long			t_ifree_delta;	/* superblock ifree change */
+	long			t_fdblocks_delta; /* superblock fdblocks chg */
+	long			t_res_fdblocks_delta; /* on-disk only chg */
+	long			t_frextents_delta;/* superblock freextents chg*/
+	long			t_res_frextents_delta; /* on-disk only chg */
+	long			t_ag_freeblks_delta; /* debugging counter */
+	long			t_ag_flist_delta; /* debugging counter */
+	long			t_ag_btree_delta; /* debugging counter */
+	long			t_dblocks_delta;/* superblock dblocks change */
+	long			t_agcount_delta;/* superblock agcount change */
 	unsigned int		t_items_free;	/* log item descs free */
 	xfs_log_item_chunk_t	t_items;	/* first log item desc chunk */
 	xfs_trans_header_t	t_header;	/* header for in-log trans */
@@ -243,6 +245,8 @@ typedef struct xfs_trans {
 #define	XFS_TRANS_SB_RES_FDBLOCKS	0x00000008
 #define	XFS_TRANS_SB_FREXTENTS		0x00000010
 #define	XFS_TRANS_SB_RES_FREXTENTS	0x00000020
+#define	XFS_TRANS_SB_DBLOCKS		0x00000040
+#define	XFS_TRANS_SB_AGCOUNT		0x00000080
 
 /*
  * Various log reservation values.
@@ -462,6 +466,17 @@ typedef struct xfs_trans {
 
 
 /*
+ * Growing the data section of the filesystem.
+ *	superblock
+ *	agi and agf
+ *	allocation btrees
+ */
+#define	XFS_GROWDATA_LOG_RES(mp) \
+	((mp)->m_sb.sb_sectsize * 3 + \
+	 (2 * XFS_FSB_TO_B((mp), XFS_AG_MAXLEVELS(mp))))
+
+
+/*
  * Various log count values.
  */
 #define	XFS_DEFAULT_LOG_COUNT		1
@@ -513,7 +528,7 @@ int		xfs_trans_reserve(xfs_trans_t *, uint, uint, uint,
 				  uint, uint);
 void		xfs_trans_callback(xfs_trans_t *,
 				   void(*)(xfs_trans_t*, void*), void *);
-void		xfs_trans_mod_sb(xfs_trans_t *, uint, int);
+void		xfs_trans_mod_sb(xfs_trans_t *, uint, long);
 buf_t		*xfs_trans_get_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
 buf_t		*xfs_trans_getsb(xfs_trans_t *, int);
 buf_t		*xfs_trans_read_buf(xfs_trans_t *, dev_t, daddr_t, int, uint);
