@@ -1002,7 +1002,7 @@ void pagebuf_unpin(		/* unpin buffered data          */
     page_buf_t * pb)		/* buffer to unpin                */
 {
 	if (atomic_dec_and_test(&PBP(pb)->pb_pin_count)) {
-		wake_up(&PBP(pb)->pb_waiters);
+		wake_up_all(&PBP(pb)->pb_waiters);
 	}
 	PB_TRACE(pb, PB_TRACE_REC(unpin), PBP(pb)->pb_pin_count.counter);
 }
@@ -1038,12 +1038,6 @@ static inline void	_pagebuf_wait_unpin(page_buf_t * pb)
 	}
 	remove_wait_queue(&PBP(pb)->pb_waiters, &wait);
 	current->state = TASK_RUNNING;
-}
-
-void pagebuf_wait_unpin(	/* wait for buffer to be unpinned */
-    page_buf_t * pb)		/* buffer for which to wait       */
-{
-	_pagebuf_wait_unpin(pb);
 }
 
 /*
