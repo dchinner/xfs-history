@@ -168,11 +168,10 @@ xfs_dm_send_create_event(
 	int		*good_event_sent);
 
 int
-xfs_dm_mapevent(
-	bhv_desc_t	*bdp,
-	int		flags,
-	xfs_off_t	offset,
-	dm_fcntl_mapevent_t *maprq);
+xfs_dmapi_mmap_event(
+	struct file	*filp,
+	struct vm_area_struct *vma,
+	unsigned int	wantflag);
 
 #endif	/* __KERNEL__ */
 

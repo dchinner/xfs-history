@@ -2631,7 +2631,7 @@ xfs_dm_get_fsys_vector(
  */
 
 /* ARGSUSED */
-int
+static int
 xfs_dm_mapevent(
 	bhv_desc_t	*bdp,
 	int		flags,
@@ -2697,6 +2697,56 @@ xfs_dm_mapevent(
 	return 0;
 }
 
+
+int
+xfs_dmapi_mmap_event(
+	struct file	*filp,
+	struct vm_area_struct *vma,
+	unsigned int	wantflag)
+{
+	vnode_t		*vp;
+	xfs_inode_t	*ip;
+	bhv_desc_t	*bdp;
+	int		ret = 0;
+	dm_fcntl_mapevent_t maprq;
+	dm_eventtype_t	max_event = DM_EVENT_READ;
+
+	vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
+	ASSERT(vp);
+
+	if ((vp->v_type != VREG) || !(vp->v_vfsp->vfs_flag & VFS_DMI))
+		return 0;
+
+	/* If they specifically asked for 'read', then give it to them.
+	 * Otherwise, see if it's possible to give them 'write'.
+	 */
+	if( wantflag & VM_READ ){
+		max_event = DM_EVENT_READ;
+	}
+	else if( ! (vma->vm_flags & VM_DENYWRITE) ) {
+		if((wantflag & VM_WRITE) || (vma->vm_flags & VM_WRITE))
+			max_event = DM_EVENT_WRITE;
+	}
+
+	if( (wantflag & VM_WRITE) && (max_event != DM_EVENT_WRITE) ){
+		return -EACCES;
+	}
+
+	maprq.max_event = max_event;
+
+	/* Figure out how much of the file is being requested by the user. */
+	maprq.length = 0; /* whole file, for now */
+
+	bdp = bhv_base_unlocked(VN_BHV_HEAD(vp));
+	ip = XFS_BHVTOI(bdp);
+
+	if(DM_EVENT_ENABLED(vp->v_vfsp, ip, max_event)){
+		xfs_dm_mapevent(bdp, 0, 0, &maprq);
+		ret = maprq.error;
+	}
+
+	return -ret;
+}
 
 
 #ifdef __sgi
