@@ -459,7 +459,7 @@ xfs_log_mount(xfs_mount_t	*mp,
 	xlog_t *log;
 	
 	if (!(mp->m_flags & XFS_MOUNT_NORECOVERY))
-		cmn_err(CE_NOTE,
+		cmn_err(CE_DEBUG,
 			"!Start mounting filesystem: %s", mp->m_fsname);
 	else {
 		cmn_err(CE_NOTE,
