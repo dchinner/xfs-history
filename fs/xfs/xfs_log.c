@@ -111,7 +111,7 @@ STATIC void		xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
  * 1 => enable log manager
  * 2 => enable log manager and log debugging
  */
-int xlog_debug = 0;
+int xlog_debug = 2;
 
 
 #ifdef DEBUG
