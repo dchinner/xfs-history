@@ -2352,9 +2352,14 @@ xfs_create(
 					goto abort_return;
 				}
 				truncated = B_TRUE;
+				xfs_ichgtime(ip,
+					XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
+				xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+			} else {
+				xfs_ichgtime(ip,
+					XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 			}
-			xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
-			xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+
 		}
 		xfs_ctrunc_trace(XFS_CTRUNC6, ip);
 	}
@@ -4926,6 +4931,11 @@ xfs_fid2(
 	xfid->fid_len = sizeof(xfs_fid2_t) - sizeof(xfid->fid_len);
 	xfid->fid_pad = 0;
 	xfid->fid_ino = ip->i_ino;
+	/*
+	 * use bcopy because the inode is a long long and there's no
+	 * assurance that xfid->fid_ino is properly aligned.
+	 */
+	bcopy(&ip->i_ino, &xfid->fid_ino, sizeof xfid->fid_ino);
 	xfid->fid_gen = ip->i_d.di_gen;	
 
 	return 0;
@@ -4943,6 +4953,8 @@ xfs_rwlock(
 {
 	xfs_inode_t	*ip;
 
+	if (vp->v_type == VDIR)
+		return;
 	ip = XFS_VTOI(vp);
 	if (locktype == VRWLOCK_WRITE) {
 		xfs_ilock(ip, XFS_IOLOCK_EXCL);
@@ -4951,7 +4963,6 @@ xfs_rwlock(
 		       (locktype == VRWLOCK_WRITE_DIRECT));
 		xfs_ilock(ip, XFS_IOLOCK_SHARED);
 	}
-	return;
 }
 
 
@@ -4967,6 +4978,8 @@ xfs_rwunlock(
         xfs_inode_t     *ip;
 	xfs_inode_t	*release_ip;
 
+	if (vp->v_type == VDIR)
+		return;
         ip = XFS_VTOI(vp);
 	if (locktype == VRWLOCK_WRITE) {
 		/*
