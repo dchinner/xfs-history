@@ -1183,8 +1183,7 @@ try_again:
 	if ((error != 0) && (error != ENOENT)) 
 		goto error_return;
 
-	first_block = NULLFSBLOCK;
-	bzero (&free_list, sizeof(free_list));
+	XFS_BMAP_INIT(&free_list, &first_block);
 
 	if (error == ENOENT) {
 
@@ -1678,8 +1677,7 @@ xfs_remove(vnode_t	*dir_vp,
 	/*
 	 * Entry must exist since we did a lookup in xfs_lock_dir_and_entry.
 	 */
-	first_block = NULLFSBLOCK;
-	bzero (&free_list, sizeof(free_list));
+	XFS_BMAP_INIT(&free_list, &first_block);
 	error = xfs_dir_removename (tp, dp, name, &first_block, &free_list, 0);
 	ASSERT (error == 0);
 
@@ -1780,9 +1778,7 @@ xfs_link(vnode_t	*target_dir_vp,
 		goto error_return;
 	}
 
-
-	first_block = NULLFSBLOCK;
-	bzero (&free_list, sizeof(free_list));
+	XFS_BMAP_INIT(&free_list, &first_block);
 
 	if (error = xfs_dir_createname (tp, tdp, target_name, sip->i_ino,
 					&first_block, &free_list,
@@ -1835,8 +1831,7 @@ xfs_rename(vnode_t	*src_dir_vp,
         if (error = xfs_trans_reserve (tp, 10, XFS_RENAME_LOG_RES, 0, 0))
                 goto error_return;
 
-	first_block = NULLFSBLOCK;
-	bzero (&free_list, sizeof(free_list));
+	XFS_BMAP_INIT(&free_list, &first_block);
 
 	/*
 	 * Lock all the participating inodes. Depending upon whether
@@ -2197,8 +2192,7 @@ xfs_mkdir(vnode_t	*dir_vp,
         xfs_trans_ijoin (tp, dp, XFS_ILOCK_EXCL);
 	dp_joined_to_trans = B_TRUE;
 
-	first_block = NULLFSBLOCK;
-	bzero (&free_list, sizeof(free_list));
+	XFS_BMAP_INIT(&free_list, &first_block);
 
 	if (code = xfs_dir_createname (tp, dp, dir_name, cdp->i_ino,
 				       &first_block, &free_list,
@@ -2258,8 +2252,7 @@ xfs_rmdir(vnode_t	*dir_vp,
 	tp = xfs_trans_alloc (XFS_VFSTOM(dir_vp->v_vfsp), XFS_TRANS_WAIT);
         if (error = xfs_trans_reserve (tp, 10, XFS_REMOVE_LOG_RES, 0, 0))
                 goto error_return;
-	first_block = NULLFSBLOCK;
-        bzero (&free_list, sizeof(free_list));
+	XFS_BMAP_INIT(&free_list, &first_block);
 
         dp = XFS_VTOI(dir_vp);
 	cdp = NULL;
@@ -2458,8 +2451,7 @@ xfs_symlink(vnode_t	*dir_vp,
 	 * Initialize the bmap freelist prior to calling either
 	 * bmapi or the directory create code.
 	 */
-	bzero (&free_list, sizeof(free_list));
-	first_block = NULLFSBLOCK;
+	XFS_BMAP_INIT(&free_list, &first_block);
 
 	/*
 	 * Allocate an inode for the symlink.
