@@ -295,6 +295,7 @@ struct xfs_efd_log_item;
 #define	xfs_trans_get_log_res(tp)	((tp)->t_log_res)
 #define	xfs_trans_get_log_count(tp)	((tp)->t_log_count)
 #define	xfs_trans_get_block_res(tp)	((tp)->t_blk_res)
+#define	xfs_trans_set_sync(tp)		((tp)->t_flags |= XFS_TRANS_SYNC)
 
 /*
  * xFS transaction mechanism exported interfaces.
