@@ -294,7 +294,7 @@ xfs_ioerror_alert(
 	xfs_daddr_t		blkno)
 {
         cmn_err(CE_ALERT,
- "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%x\n"
+ "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%llx\n"
  "       (\"%s\") error %d buf count %u",
                 (mp == NULL || mp->m_fsname == NULL) ? "(fs name not set)" : mp->m_fsname,
                 XFS_BUF_TARGET(bp),
