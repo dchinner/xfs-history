@@ -660,6 +660,8 @@ xfs_bulkstat_single(
 	return 0;
 }
 
+#ifdef NOTYET
+/* No callers of this on linux yet, lets not build it */
 /*
  * Return inode number table for the filesystem.
  */
@@ -791,6 +793,7 @@ xfs_inumbers(
 		xfs_trans_brelse(tp, agbp);
 	return error;
 }
+#endif
 
 /*
  * Convert file descriptor of a file in the filesystem to
