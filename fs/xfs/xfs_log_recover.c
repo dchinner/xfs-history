@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.17 $"
+#ident	"$Revision: 1.18 $"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -86,7 +86,7 @@ xlog_put_bp(buf_t *bp)
 /*
  * nbblks should be uint, but oh well.  Just want to catch that 32-bit length.
  */
-void
+int
 xlog_bread(xlog_t	*log,
 	   daddr_t	blk_no,
 	   int		nbblks,
@@ -104,8 +104,13 @@ xlog_bread(xlog_t	*log,
 	iowait(bp);
 
 	if (bp->b_flags & B_ERROR) {
+#if DEBUG
 		xlog_panic("xlog_bread: bread error");
+#else
+		return bp->b_error;
+#endif
 	}
+	return 0;
 }	/* xlog_bread */
 
 
@@ -212,28 +217,36 @@ xlog_find_verify_log_record(caddr_t	ba,	/* update ptr as we go */
  * from our current block number.
  *
  * Also called from xfs_log_print.c
+ *
+ * Return: zero if normal, non-zero if error.
  */
-daddr_t
-xlog_find_head(xlog_t *log)
+int
+xlog_find_head(xlog_t  *log,
+	       daddr_t *head_blk)
 {
 	buf_t	*bp, *big_bp;
 	daddr_t	first_blk, mid_blk, last_blk, num_scan_bblks;
 	daddr_t	start_blk, saved_last_blk;
 	uint	first_half_cycle, mid_cycle, last_half_cycle, cycle;
 	caddr_t	ba;
-	int	i, log_bbnum = log->l_logBBsize;
+	int	error, i, log_bbnum = log->l_logBBsize;
 
 	/* special case freshly mkfs'ed filesystem */
-	if (xlog_find_zeroed(log, &first_blk))
-		return first_blk;
+	if ((error = xlog_find_zeroed(log, &first_blk)) == -1) {
+		*head_blk = first_blk;
+		return 0;
+	} else if (error)
+		return error;
 
 	first_blk = 0;					/* read first block */
 	bp = xlog_get_bp(1);
-	xlog_bread(log, 0, 1, bp);
+	if (error = xlog_bread(log, 0, 1, bp))
+		goto bp_err;
 	first_half_cycle = GET_CYCLE(bp->b_dmaaddr);
 
 	last_blk = log->l_logBBsize-1;			/* read last block */
-	xlog_bread(log, last_blk, 1, bp);
+	if (error = xlog_bread(log, last_blk, 1, bp))
+		goto bp_err;
 	last_half_cycle = GET_CYCLE(bp->b_dmaaddr);
 	ASSERT(last_half_cycle != 0);
 
@@ -245,11 +258,12 @@ xlog_find_head(xlog_t *log)
 	}
 
 	/* Now validate the answer */
-	num_scan_bblks = BTOBB(XLOG_NUM_ICLOGS<<XLOG_RECORD_BSHIFT);
+	num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
 	big_bp = xlog_get_bp(num_scan_bblks);
 	if (last_blk >= num_scan_bblks) {
 		start_blk = last_blk - num_scan_bblks;
-		xlog_bread(log, start_blk, num_scan_bblks, big_bp);
+		if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
+			goto big_bp_err;
 		ba = big_bp->b_dmaaddr;
 		last_blk = xlog_find_verify_cycle(&ba, start_blk,
 						  num_scan_bblks,
@@ -257,7 +271,9 @@ xlog_find_head(xlog_t *log)
 	} else {	/* need to read 2 parts of log */
 		/* scan end of physical log */
 		start_blk = log_bbnum - num_scan_bblks + last_blk;
-		xlog_bread(log, start_blk, num_scan_bblks - last_blk, big_bp);
+		if (error = xlog_bread(log, start_blk,
+				       num_scan_bblks - last_blk, big_bp))
+			goto big_bp_err;
 		ba = big_bp->b_dmaaddr;
 		saved_last_blk = last_blk;
 		if ((last_blk =
@@ -268,7 +284,8 @@ xlog_find_head(xlog_t *log)
 
 		/* scan beginning of physical log */
 		start_blk = 0;
-		xlog_bread(log, start_blk, last_blk, big_bp);
+		if (error = xlog_bread(log, start_blk, last_blk, big_bp))
+			goto big_bp_err;
 		ba = big_bp->b_dmaaddr;
 		last_blk = xlog_find_verify_cycle(&ba, start_blk, last_blk,
 						  first_half_cycle);
@@ -280,10 +297,24 @@ bad_blk:
 	
 	xlog_put_bp(big_bp);
 	xlog_put_bp(bp);
-	return last_blk;
+	*head_blk = last_blk;
+	/*
+	 * When returning here, we have a good block number.  Bad block
+	 * means that during a previous crash, we didn't have a clean break
+	 * from cycle number N to cycle number N-1.  In this case, we need
+	 * to find the first block with cycle number N-1.
+	 */
+	return 0;
+
+big_bp_err:
+	xlog_put_bp(big_bp);
+bp_err:
+	xlog_put_bp(bp);
+	return error;
 }	/* xlog_find_head */
 
 
+#ifndef _KERNEL
 /*
  * Start is defined to be the block pointing to the oldest valid log record.
  * Used by log print code.  Don't put in xfs_log_print.c since most of the
@@ -319,6 +350,7 @@ xlog_print_find_oldest(xlog_t *log)
 	xlog_put_bp(bp);
 	return last_blk;
 }	/* xlog_print_find_oldest */
+#endif /* _KERNEL */
 
 
 /*
@@ -337,31 +369,34 @@ xlog_print_find_oldest(xlog_t *log)
  * We could speed up search by using current head_blk buffer, but it is not
  * available.
  */
-STATIC daddr_t
+STATIC int
 xlog_find_tail(xlog_t  *log,
-	       daddr_t *head_blk)
+	       daddr_t *head_blk,
+	       daddr_t *tail_blk)
 {
 	xlog_rec_header_t *rhead;
 	xlog_op_header_t  *op_head;
-	daddr_t		  tail_blk;
 	buf_t		  *bp;
-	int		  i, found = 0;
-	int		  zeroed_log = 0;
+	int		  error, i, found, zeroed_log;
 	
+	found = error = zeroed_log = 0;
 	/* find previous log record */
-	*head_blk = xlog_find_head(log);
+	if (error = xlog_find_head(log, head_blk))
+		return error;
 
 	bp = xlog_get_bp(1);
 	if (*head_blk == 0) {
-		xlog_bread(log, 0, 1, bp);
+		if (error = xlog_bread(log, 0, 1, bp))
+			goto exit;
 		if (GET_CYCLE(bp->b_dmaaddr) == 0) {
-			tail_blk = 0;
+			*tail_blk = 0;
 			/* leave all other log inited values alone */
 			goto exit;
 		}
 	}
 	for (i=(*head_blk)-1; i>=0; i--) {
-		xlog_bread(log, i, 1, bp);
+		if (error = xlog_bread(log, i, 1, bp))
+			goto exit;
 		if (*(uint *)(bp->b_dmaaddr) == XLOG_HEADER_MAGIC_NUM) {
 			found = 1;
 			break;
@@ -369,19 +404,21 @@ xlog_find_tail(xlog_t  *log,
 	}
 	if (!found) {		/* search from end of log */
 		for (i=log->l_logBBsize-1; i>=(*head_blk); i--) {
-			xlog_bread(log, i, 1, bp);
+			if (error = xlog_bread(log, i, 1, bp))
+				goto exit;
 			if (*(uint*)(bp->b_dmaaddr) == XLOG_HEADER_MAGIC_NUM) {
 				found = 1;
 				break;
 			}
 		}
 	}
-	if (!found)
+	if (!found) {
 		xlog_panic("xlog_find_tail: counldn't find sync record");
+	}
 
 	/* find blk_no of tail of log */
 	rhead = (xlog_rec_header_t *)bp->b_dmaaddr;
-	tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
+	*tail_blk = BLOCK_LSN(rhead->h_tail_lsn);
 
 	log->l_prev_block = i;
 	log->l_curr_block = *head_blk;
@@ -393,7 +430,8 @@ xlog_find_tail(xlog_t  *log,
 	log->l_grant_write_cycle = log->l_curr_cycle;
 	log->l_grant_write_bytes = BBTOB(log->l_curr_block);
 	if (*head_blk == i+2 && rhead->h_num_logops == 1) {
-		xlog_bread(log, i+1, 1, bp);
+		if (error = xlog_bread(log, i+1, 1, bp))
+			goto exit;
 		op_head = (xlog_op_header_t *)bp->b_dmaaddr;
 		if (op_head->oh_flags & XLOG_UNMOUNT_TRANS) {
 			log->l_tail_lsn =
@@ -403,7 +441,7 @@ xlog_find_tail(xlog_t  *log,
 exit:
 	xlog_put_bp(bp);
 
-	return tail_blk;
+	return error;
 }	/* xlog_find_tail */
 
 
@@ -417,6 +455,11 @@ exit:
  * If the log is partially zeroed, this routine will pass back the blkno
  * of the first block with cycle number 0.  It won't have a complete LR
  * preceding it.
+ *
+ * Return:
+ *	0  => the log is completely written to
+ *	-1 => use *blk_no as the first block of the log
+ *	>0 => error has occurred
  */
 STATIC int
 xlog_find_zeroed(xlog_t	 *log,
@@ -426,20 +469,23 @@ xlog_find_zeroed(xlog_t	 *log,
 	uint	first_cycle, mid_cycle, last_cycle, cycle;
 	daddr_t	first_blk, mid_blk, last_blk, start_blk, num_scan_bblks;
 	caddr_t	ba;
-	int	i, log_bbnum = log->l_logBBsize;
+	int	error, i, log_bbnum = log->l_logBBsize;
 
+	error = 0;
 	/* check totally zeroed log */
 	bp = xlog_get_bp(1);
-	xlog_bread(log, 0, 1, bp);
+	if (error = xlog_bread(log, 0, 1, bp))
+		goto bp_err;
 	first_cycle = GET_CYCLE(bp->b_dmaaddr);
 	if (first_cycle == 0) {		/* completely zeroed log */
 		*blk_no = 0;
 		xlog_put_bp(bp);
-		return 1;
+		return -1;
 	}
 
 	/* check partially zeroed log */
-	xlog_bread(log, log_bbnum-1, 1, bp);
+	if (error = xlog_bread(log, log_bbnum-1, 1, bp))
+		goto bp_err;
 	last_cycle = GET_CYCLE(bp->b_dmaaddr);
 	if (last_cycle != 0) {		/* log completely written to */
 		xlog_put_bp(bp);
@@ -450,13 +496,19 @@ xlog_find_zeroed(xlog_t	 *log,
 	/* we have a partially zeroed log */
 	last_blk = xlog_find_cycle_start(log, bp, 0, log_bbnum-1, 0);
 
-	/* Validate the answer */
-	num_scan_bblks = BTOBB(XLOG_NUM_ICLOGS<<XLOG_RECORD_BSHIFT);
+	/*
+	 * Validate the answer.  Because there is no way to guarantee that
+	 * the entire log is made up of log records which are the same size,
+	 * we scan over the defined maximum blocks.  At this point, the maximum
+	 * is not chosen to mean anything special.   XXXmiken
+	 */
+	num_scan_bblks = BTOBB(XLOG_MAX_ICLOGS<<XLOG_MAX_RECORD_BSHIFT);
 	big_bp = xlog_get_bp(num_scan_bblks);
 	if (last_blk < num_scan_bblks)
 		num_scan_bblks = last_blk;
 	start_blk = last_blk - num_scan_bblks;
-	xlog_bread(log, start_blk, num_scan_bblks, big_bp);
+	if (error = xlog_bread(log, start_blk, num_scan_bblks, big_bp))
+		goto big_bp_err;
 	ba = big_bp->b_dmaaddr;
 	last_blk = xlog_find_verify_cycle(&ba, start_blk, num_scan_bblks, 1);
 
@@ -464,9 +516,13 @@ xlog_find_zeroed(xlog_t	 *log,
 	last_blk = xlog_find_verify_log_record(ba, start_blk, last_blk);
 
 	*blk_no = last_blk;
+big_bp_err:
 	xlog_put_bp(big_bp);
+bp_err:
 	xlog_put_bp(bp);
-	return 1;
+	if (error)
+		return error;
+	return -1;
 }	/* xlog_find_zeroed */
 
 
@@ -1271,6 +1327,17 @@ xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog)
 {
 	int	i;
 	caddr_t dp;
+#ifdef DEBUG
+	uint	*up;
+	uint	chksum = 0;
+
+	up = (uint *)iclog->ic_data;
+	for (i=0; i<iclog->ic_offset >> 2; i++) {
+		chksum |= *up;
+		up++;
+	}
+	iclog->ic_header.h_chksum = chksum;
+#endif
 
 	dp = iclog->ic_data;
 	for (i = 0; i<BTOBB(iclog->ic_offset); i++) {
@@ -1312,6 +1379,7 @@ xlog_do_recover(xlog_t	*log,
     int		  	bblks, split_bblks;
     xlog_recover_t	*rhash[XLOG_RHASH_SIZE];
 
+    error = 0;
     /*
      * This first part of the routine will read in the part of the log
      * containing data to recover.  It will replay all committed buffer and
@@ -1431,13 +1499,17 @@ xlog_do_recover(xlog_t	*log,
 
 /*
  * Perform recovery and re-initialize some log variables in xlog_find_tail.
+ *
+ * Return error or zero.
  */
 int
 xlog_recover(xlog_t *log)
 {
 	daddr_t head_blk, tail_blk;
+	int error;
 
-	tail_blk = xlog_find_tail(log, &head_blk);
+	if (error = xlog_find_tail(log, &head_blk, &tail_blk))
+		return error;
 	if (tail_blk != head_blk) {
 		xlog_do_recover(log, head_blk, tail_blk);
 	}
