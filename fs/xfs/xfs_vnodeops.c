@@ -2415,11 +2415,14 @@ xfs_create(
 	 * the case we'll drop the one we have and get a more
 	 * appropriate transaction later.
 	 */
-	if (error = xfs_trans_reserve(tp,
-				      resblks,
-				      XFS_CREATE_LOG_RES(mp), 0,
-				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_CREATE_LOG_COUNT)) {
+	error = xfs_trans_reserve(tp, resblks, XFS_CREATE_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_CREATE_LOG_COUNT);
+	if (error == ENOSPC) {
+		resblks = 0;
+		error = xfs_trans_reserve(tp, 0, XFS_CREATE_LOG_RES(mp), 0,
+				XFS_TRANS_PERM_LOG_RES, XFS_CREATE_LOG_COUNT);
+	}
+	if (error) {
 		cancel_flags = 0;
 		dp = NULL;
 		goto error_return;
@@ -2483,12 +2486,16 @@ xfs_create(
 				goto error_return;
 			}
 		}
-
+		if (resblks == 0 && (error = xfs_dir_canenter(tp, dp, name)))
+			goto error_return;
 		rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 		error = xfs_dir_ialloc(&tp, dp, 
 				MAKEIMODE(vap->va_type,vap->va_mode), 1,
-				rdev, credp, prid, &ip, &committed);
+				rdev, credp, prid, resblks > 0,
+				&ip, &committed);
 		if (error) {
+			if (error == ENOSPC)
+				goto error_return;
 			goto abort_return;
 		}
 		ITRACE(ip);
@@ -2516,8 +2523,8 @@ xfs_create(
 		 */
 
 		error = xfs_dir_createname(tp, dp, name, ip->i_ino,
-					   &first_block, &free_list,
-					   resblks - XFS_IALLOC_SPACE_RES(mp));
+			&first_block, &free_list,
+			resblks ? resblks - XFS_IALLOC_SPACE_RES(mp) : 0);
 		if (error) {
 			ASSERT(error != ENOSPC);
 			goto abort_return;
@@ -3397,9 +3404,14 @@ xfs_link(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_LINK);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
 	resblks = XFS_LINK_SPACE_RES(mp, target_name);
-        if (error = xfs_trans_reserve(tp, resblks, XFS_LINK_LOG_RES(mp), 0,
-				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_LINK_LOG_COUNT)) {
+        error = xfs_trans_reserve(tp, resblks, XFS_LINK_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_LINK_LOG_COUNT);
+	if (error == ENOSPC) {
+		resblks = 0;
+		error = xfs_trans_reserve(tp, 0, XFS_LINK_LOG_RES(mp), 0,
+				XFS_TRANS_PERM_LOG_RES, XFS_LINK_LOG_COUNT);
+	}
+	if (error) {
 		cancel_flags = 0;
                 goto error_return;
 	}
@@ -3467,8 +3479,11 @@ xfs_link(
 	XFS_BMAP_INIT(&free_list, &first_block);
 
 	error = xfs_dir_createname(tp, tdp, target_name, sip->i_ino,
-				   &first_block, &free_list, resblks);
+				   &first_block, &free_list,
+				   resblks > 0 ? resblks : 0);
 	if (error) {
+		if (error == ENOSPC)
+			goto error_return;
 		goto abort_return;
 	}
 	xfs_ichgtime(tdp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -3591,9 +3606,15 @@ xfs_mkdir(
 	tp = xfs_trans_alloc(mp, XFS_TRANS_MKDIR);
 	cancel_flags = XFS_TRANS_RELEASE_LOG_RES;
         resblks = XFS_MKDIR_SPACE_RES(mp, dir_name);
-	if (error = xfs_trans_reserve(tp, resblks, XFS_MKDIR_LOG_RES(mp), 0,
-				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_MKDIR_LOG_COUNT)) {
+	error = xfs_trans_reserve(tp, resblks, XFS_MKDIR_LOG_RES(mp), 0,
+				  XFS_TRANS_PERM_LOG_RES, XFS_MKDIR_LOG_COUNT);
+	if (error == ENOSPC) {
+		resblks = 0;
+		error = xfs_trans_reserve(tp, 0, XFS_MKDIR_LOG_RES(mp), 0,
+					  XFS_TRANS_PERM_LOG_RES,
+					  XFS_MKDIR_LOG_COUNT);
+	}
+	if (error) {
 		cancel_flags = 0;
 		dp = NULL;
 		goto error_return;
@@ -3650,16 +3671,18 @@ xfs_mkdir(
 		}
 	} 
 
+	if (resblks == 0 && (error = xfs_dir_canenter(tp, dp, dir_name)))
+		goto error_return;
 	/*
 	 * create the directory inode.
 	 */
 	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
         mode = IFDIR | (vap->va_mode & ~IFMT);
-	error = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, prid, &cdp, NULL);
+	error = xfs_dir_ialloc(&tp, dp, mode, 2, rdev, credp, prid, resblks > 0,
+		&cdp, NULL);
 	if (error) {
-		if (error == ENOSPC) {
+		if (error == ENOSPC)
 			goto error_return;
-		}
 		goto abort_return;
 	}
 	ITRACE(cdp);
@@ -3676,10 +3699,10 @@ xfs_mkdir(
 
 	XFS_BMAP_INIT(&free_list, &first_block);
 
-	error = xfs_dir_createname(tp, dp, dir_name, cdp->i_ino,
-				   &first_block, &free_list, 
-				   resblks - XFS_IALLOC_SPACE_RES(mp));
+	error = xfs_dir_createname(tp, dp, dir_name, cdp->i_ino, &first_block,
+		&free_list, resblks ? resblks - XFS_IALLOC_SPACE_RES(mp) : 0);
 	if (error) {
+		ASSERT(error != ENOSPC);
 		goto error1;
 	}
 	xfs_ichgtime(dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -4206,11 +4229,14 @@ xfs_symlink(
 	else
 		fs_blocks = XFS_B_TO_FSB(mp, pathlen);
 	resblks = XFS_SYMLINK_SPACE_RES(mp, link_name, fs_blocks);
-        if (error = xfs_trans_reserve(tp,
-				      resblks,
-				      XFS_SYMLINK_LOG_RES(mp), 0,
-				      XFS_TRANS_PERM_LOG_RES,
-				      XFS_SYMLINK_LOG_COUNT)) {
+        error = xfs_trans_reserve(tp, resblks, XFS_SYMLINK_LOG_RES(mp), 0,
+			XFS_TRANS_PERM_LOG_RES, XFS_SYMLINK_LOG_COUNT);
+	if (error == ENOSPC && fs_blocks == 0) {
+		resblks = 0;
+		error = xfs_trans_reserve(tp, 0, XFS_SYMLINK_LOG_RES(mp), 0,
+				XFS_TRANS_PERM_LOG_RES, XFS_SYMLINK_LOG_COUNT);
+	}
+	if (error) {
 		cancel_flags = 0;
 		dp = NULL;
                 goto error_return;
@@ -4257,6 +4283,11 @@ xfs_symlink(
 	}
 	
 	/*
+	 * Check for ability to enter directory entry, if no space reserved.
+	 */
+	if (resblks == 0 && (error = xfs_dir_canenter(tp, dp, link_name)))
+		goto error_return;
+	/*
 	 * Initialize the bmap freelist prior to calling either
 	 * bmapi or the directory create code.
 	 */
@@ -4268,8 +4299,10 @@ xfs_symlink(
 	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : NODEV;
 
 	error = xfs_dir_ialloc(&tp, dp, IFLNK | (vap->va_mode&~IFMT),
-			       1, rdev, credp, prid, &ip, NULL);
+			       1, rdev, credp, prid, resblks > 0, &ip, NULL);
 	if (error) {
+		if (error == ENOSPC)
+			goto error_return;
 		goto error1;
 	}
 	ITRACE(ip);
@@ -4340,9 +4373,10 @@ xfs_symlink(
 	/*
 	 * Create the directory entry for the symlink.
 	 */
-	error = xfs_dir_createname(tp, dp, link_name, ip->i_ino,
-				   &first_block, &free_list, 
-				   resblks - fs_blocks);
+	error = xfs_dir_createname(tp, dp, link_name, ip->i_ino, &first_block,
+			&free_list,
+			resblks ? resblks - fs_blocks -
+				XFS_IALLOC_SPACE_RES(mp) : 0);
 	if (error) {
 		goto error1;
 	}
