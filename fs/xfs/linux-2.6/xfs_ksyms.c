@@ -225,7 +225,7 @@ EXPORT_SYMBOL(linvfs_file_operations);
 EXPORT_SYMBOL(linvfs_invis_file_operations);
 EXPORT_SYMBOL(linvfs_symlink_inode_operations);
 EXPORT_SYMBOL(pagebuf_delwri_dequeue);
-EXPORT_SYMBOL(pagebuf_find);
+EXPORT_SYMBOL(_pagebuf_find);
 EXPORT_SYMBOL(pagebuf_iostart);
 EXPORT_SYMBOL(pagebuf_ispin);
 EXPORT_SYMBOL(pagebuf_lock_value);
