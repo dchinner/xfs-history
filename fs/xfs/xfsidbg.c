@@ -3211,7 +3211,7 @@ xfsidbg_xaildump(xfs_mount_t *mp)
 		}
 	}
 }
-#endif /* DEBUG */
+#endif	/* DEBUG */
 
 /*
  * Print xfs mount structure.
@@ -3251,9 +3251,10 @@ xfsidbg_xmount(xfs_mount_t *mp)
 	qprintf("dircook_elog %d blkbit_log %d blkbb_log %d agno_log %d\n",
 		mp->m_dircook_elog, mp->m_blkbit_log, mp->m_blkbb_log,
 		mp->m_agno_log);
-	qprintf("agino_log %d blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
-		mp->m_agino_log, mp->m_blockmask, mp->m_blockwsize,
-		mp->m_blockwmask);
+	qprintf("agino_log %d nreadaheads %d\n",
+		mp->m_agino_log, mp->m_nreadaheads);
+	qprintf("blockmask 0x%x blockwsize 0x%x blockwmask 0x%x\n",
+		mp->m_blockmask, mp->m_blockwsize, mp->m_blockwmask);
 	qprintf("alloc_mxr[lf,nd] %d %d alloc_mnr[lf,nd] %d %d\n",
 		mp->m_alloc_mxr[0], mp->m_alloc_mxr[1],
 		mp->m_alloc_mnr[0], mp->m_alloc_mnr[1]);
