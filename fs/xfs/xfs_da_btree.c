@@ -799,10 +799,12 @@ xfs_dir_node_rebalance(struct xfs_dir_state *state,
 			      struct xfs_dir_state_blk *blk1,
 			      struct xfs_dir_state_blk *blk2)
 {
-	struct xfs_dir_intnode *node1, *node2;
+	struct xfs_dir_intnode *node1, *node2, *tmpnode;
 	struct xfs_dir_node_entry *btree_s, *btree_d;
 	int count, tmp;
 
+	node1 = (struct xfs_dir_intnode *)blk1->bp->b_un.b_addr;
+	node2 = (struct xfs_dir_intnode *)blk2->bp->b_un.b_addr;
 	/*
 	 * Figure out how many entries need to move, and in which direction.
 	 * Swap the nodes around if that makes it simpler.
@@ -811,11 +813,9 @@ xfs_dir_node_rebalance(struct xfs_dir_state *state,
 	    ((node2->btree[ 0 ].hashval < node1->btree[ 0 ].hashval) ||
 	     (node2->btree[ node2->hdr.count-1 ].hashval <
 	      node1->btree[ node1->hdr.count-1 ].hashval))) {
-		node1 = (struct xfs_dir_intnode *)blk2->bp->b_un.b_addr;
-		node2 = (struct xfs_dir_intnode *)blk1->bp->b_un.b_addr;
-	} else {
-		node1 = (struct xfs_dir_intnode *)blk1->bp->b_un.b_addr;
-		node2 = (struct xfs_dir_intnode *)blk2->bp->b_un.b_addr;
+		tmpnode = node1;
+		node1 = node2;
+		node2 = tmpnode;
 	}
 	ASSERT(node1->hdr.info.magic == XFS_DIR_NODE_MAGIC);
 	ASSERT(node2->hdr.info.magic == XFS_DIR_NODE_MAGIC);
