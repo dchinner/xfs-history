@@ -79,6 +79,8 @@ objlink(xfs.o xfs_alloc.o xfs_alloc_btree.o xfs_attr.o xfs_attr_fetch.o
         xfs_trans_item.o xfs_utils.o xfs_vfsops.o xfs_vnodeops.o xfs_rw.o
         macstubs.o linux/linux_xfs.o)
 
+select(CONFIG_XFS_FS xfs.o)
+
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to
 # follow xfs.  If xfs is built in then xfsidbg tracks the kdb module state.
@@ -91,7 +93,5 @@ ifsel(CONFIG_KDB_MODULES)
     select(CONFIG_XFS_FS xfsidbg.o)
   endif
 endif
-
-select(CONFIG_XFS_FS xfs.o)
 
 extra_cflags(xfsidbg.o $(src_includelist /arch/$(ARCH)/kdb))
