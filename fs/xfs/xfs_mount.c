@@ -10,8 +10,8 @@
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
-#include <sys/grio.h>
 #include <sys/uuid.h>
+#include <sys/grio.h>
 #ifdef SIM
 #undef _KERNEL
 #endif /* SIM */
