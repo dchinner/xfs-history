@@ -16,7 +16,7 @@
  * successor clauses in the FAR, DOD or NASA FAR Supplement. Unpublished -
  * rights reserved under the Copyright Laws of the United States.
  */
-#ident  "$Revision: 1.184 $"
+#ident  "$Revision: 1.185 $"
 
 
 #include <limits.h>
@@ -2229,6 +2229,18 @@ xfs_vget(
         return 0;
 }
 
+int
+xfs_force_pinned(bdp)
+bhv_desc_t	*bdp;
+{
+	xfs_mount_t	*mp;
+	
+	mp = XFS_BHVTOM(bdp);
+	xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+	return 0;
+}
+
+
 vfsops_t xfs_vfsops = {
 	BHV_IDENTITY_INIT_POSITION(VFS_POSITION_BASE),
 	xfs_vfsmount,
@@ -2244,10 +2256,12 @@ vfsops_t xfs_vfsops = {
 	fs_realvfsops,	
 	fs_import,	/* import */
 	xfs_quotactl,
+	xfs_force_pinned,
 };
 #else	/* SIM */
 vfsops_t xfs_vfsops = {
 	BHV_IDENTITY_INIT_POSITION(VFS_POSITION_BASE),
+	0,
 	0,
 	0,
 	0,
