@@ -161,8 +161,9 @@ typedef struct xfs_trans_header {
  */
 typedef struct xfs_trans {
 	xfs_trans_id_t		t_tid;		/* transaction id */
-	struct xfs_trans	*t_forw;	/* forw link ptr */
-	struct xfs_trans	*t_back;	/* back link ptr */
+	xfs_log_callback_t	t_logcb;	/* log callback struct */
+	struct xfs_trans	*t_forw;	/* async list pointers */
+	struct xfs_trans	*t_back;	/* async list pointers */
 	unsigned int		t_type;		/* transaction type */
 	unsigned int		t_log_res;	/* amt of log space resvd */	
 	unsigned int		t_blk_res;	/* # of blocks resvd */
@@ -245,6 +246,7 @@ void		xfs_trans_commit(xfs_trans_t *, uint flags);
 void		xfs_trans_commit_async(struct xfs_mount *);
 void		xfs_trans_cancel(xfs_trans_t *);
 void		xfs_trans_ail_init(struct xfs_mount *);
+xfs_lsn_t	xfs_trans_tail_ail(struct xfs_mount *);
 
 /*
  * Not necessarily exported, but used outside a single file.
