@@ -1,4 +1,4 @@
-#ident	"$Revision: 1.8 $"
+#ident	"$Revision: 1.9 $"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -65,7 +65,7 @@ xfs_bulkstat_one(
 	buf->bs_ctime.tv_sec = ip->i_d.di_ctime.t_sec;
 	buf->bs_ctime.tv_nsec = ip->i_d.di_ctime.t_nsec;
 	buf->bs_xflags = ip->i_d.di_flags;
-	buf->bs_extsize = ip->i_d.di_extsize;
+	buf->bs_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
 	buf->bs_extents = ip->i_d.di_nextents;
 	buf->bs_gen = ip->i_d.di_gen;
 	buf->bs_uuid = ip->i_d.di_uuid;
