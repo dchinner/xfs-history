@@ -1941,9 +1941,8 @@ xfsda_check(xfs_inode_t *dp, int whichfork)
 	int numblks, tmp, retval;
 
 	con = (xfsda_context_t *)kmem_zalloc(sizeof(*con), KM_SLEEP);
-	con->maxblockmap = numblks = (dp->i_d.di_size +
-					  XFS_LBSIZE(dp->i_mount) - 1) /
-				     XFS_LBSIZE(dp->i_mount);
+	numblks = 1000;	/* GROT: this should be a calculation, not a constant */
+	con->maxblockmap = numblks;
 	con->blockmap = (char *)
 		kmem_zalloc(numblks * sizeof(*con->blockmap), KM_SLEEP);
 	con->maxlinkmap = numblks;
