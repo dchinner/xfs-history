@@ -170,7 +170,6 @@ int		xlog_iclogs_empty(xlog_t *log);
 
 #ifdef DEBUG
 int xlog_do_error = 0;
-dev_t xlog_err_dev = 0x3000004;
 int xlog_req_num  = 0;
 int xlog_error_mod = 33;
 #endif
@@ -2164,6 +2163,8 @@ restart:
 		LOG_UNLOCK(log, spl);
 		xlog_trace_iclog(iclog, XLOG_TRACE_SLEEP_FLUSH);
 		XFSSTATS.xs_log_noiclogs++;
+		/* Ensure that log writes happen */
+		xfs_trigger_io();
 		psema(&log->l_flushsema, PINOD);
 		goto restart;
 	}

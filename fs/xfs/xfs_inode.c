@@ -4,9 +4,11 @@
 #include <linux/xfs_cred.h>
 
 #ifdef SIM
+#define __KERNEL__ 1
 #define	_KERNEL 1
 #endif
 #include <sys/param.h>
+#include <sys/sysmacros.h>
 #include "xfs_buf.h"
 #include <sys/vnode.h>
 #include <sys/uuid.h>
@@ -16,6 +18,7 @@
 #include <sys/mac_label.h>
 #include <sys/capability.h>
 #ifdef SIM
+#undef __KERNEL__
 #undef _KERNEL
 #endif
 #include <sys/vfs.h>
@@ -1167,7 +1170,7 @@ xfs_ialloc(
 	case IFBLK:
 	case IFSOCK:
 		ip->i_d.di_format = XFS_DINODE_FMT_DEV;
-		ip->i_df.if_u2.if_rdev = rdev;
+		ip->i_df.if_u2.if_rdev = makedev(MAJOR(rdev), MINOR(rdev));
 		ip->i_df.if_flags = 0;
 		flags |= XFS_ILOG_DEV;
 		break;

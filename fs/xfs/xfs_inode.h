@@ -238,7 +238,7 @@ typedef struct xfs_ifork {
 						/* very small file extents */
 		char		if_inline_data[XFS_INLINE_DATA];
 						/* very small file data */
-		dev_t		if_rdev;	/* dev number if special */
+		xfs_dev_t	if_rdev;	/* dev number if special */
 		uuid_t		if_uuid;	/* mount point value */
 	} if_u2;
 } xfs_ifork_t;

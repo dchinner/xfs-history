@@ -3311,13 +3311,13 @@ xlog_recover(xlog_t *log, int readonly)
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
 		cmn_err(CE_NOTE,
 			"Starting XFS recovery on filesystem: %s (dev: %d/%d)",
-			log->l_mp->m_fsname, emajor(log->l_dev),
-			eminor(log->l_dev));
+			log->l_mp->m_fsname, MAJOR(log->l_dev),
+			MAJOR(log->l_dev));
 #else
 		cmn_err(CE_NOTE,
 			"!Starting XFS recovery on filesystem: %s (dev: %d/%d)",
-			log->l_mp->m_fsname, emajor(log->l_dev),
-			eminor(log->l_dev));
+			log->l_mp->m_fsname, MAJOR(log->l_dev),
+			MAJOR(log->l_dev));
 #endif
 #endif
 		error = xlog_do_recover(log, head_blk, tail_blk);
@@ -3368,27 +3368,15 @@ xlog_recover_finish(xlog_t *log, int mfsi_flags)
 
 #endif /* _KERNEL */
 #if defined(DEBUG) && defined(XFS_LOUD_RECOVERY)
-#ifndef __linux__
-		cmn_err(CE_NOTE,
-			"Ending XFS recovery for filesystem: %s (%V)",
-			log->l_mp->m_fsname, log->l_dev);
-#else
 		cmn_err(CE_NOTE,
 			"Ending XFS recovery on filesystem: %s (dev: %d/%d)",
-			log->l_mp->m_fsname, emajor(log->l_dev),
-			eminor(log->l_dev));
-#endif
-#else
-#ifndef __linux__
-		cmn_err(CE_NOTE,
-			"!Ending XFS recovery for filesystem: %s (%V)",
-			log->l_mp->m_fsname, log->l_dev);
+			log->l_mp->m_fsname, MAJOR(log->l_dev),
+			MINOR(log->l_dev));
 #else
 		cmn_err(CE_NOTE,
 			"!Ending XFS recovery on filesystem: %s (dev: %d/%d)",
-			log->l_mp->m_fsname, emajor(log->l_dev),
-			eminor(log->l_dev));
-#endif
+			log->l_mp->m_fsname, MAJOR(log->l_dev),
+			MINOR(log->l_dev));
 #endif
 		log->l_flags &= ~XLOG_RECOVERY_NEEDED;
 	} else {

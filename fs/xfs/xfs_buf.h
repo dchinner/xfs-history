@@ -268,6 +268,8 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_nfreerbuf(bp) \
 		    nfreerbuf(bp)
 
+#define xfs_trigger_io()
+
 #endif /* _USING_BUF_T */
 
 #ifdef _USING_PAGEBUF_T
@@ -287,7 +289,8 @@ xfs_bdstrat_cb(struct xfs_buf *bp);
 #define XFS_INCORE_TRYLOCK	PBF_TRYLOCK
 
 #define XFS_BUF_BFLAGS(x)        ((x)->pb_flags)  /* debugging routines might need this */
-#define XFS_BUF_ZEROFLAGS(x)     /* ((x)->pb_flags = 0) */
+#define XFS_BUF_ZEROFLAGS(x)	\
+	((x)->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_DELWRI))
 
 #define XFS_BUF_STALE(x)	     ((x)->pb_flags |= XFS_B_STALE)
 #define XFS_BUF_UNSTALE(x)	     ((x)->pb_flags &= ~XFS_B_STALE)
@@ -372,7 +375,7 @@ struct inode;
 
 typedef struct buftarg {
 	struct inode	*inode;
-	irix_dev_t	dev;
+	dev_t		dev;
 } buftarg_t;
 
 typedef struct bfidev {
@@ -439,7 +442,7 @@ extern void xfs_pb_nfreer(page_buf_t *);
 /* setup the buffer target from a buftarg structure */
 #define XFS_BUF_SET_TARGET(bp, target) 
 /* return the dev_t being used */
-extern irix_dev_t	XFS_pb_target(page_buf_t *);
+extern dev_t	XFS_pb_target(page_buf_t *);
 
 #define XFS_BUF_TARGET(bp)  XFS_pb_target(bp)
 #define XFS_BUF_SET_VTYPE_REF(bp, type, ref)	
@@ -500,6 +503,9 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 	int	error;
 
 	pb->pb_flags |= PBF_SYNC;
+/**
+	pb->pb_flags &= ~PBF_ASYNC;
+**/
 	pagebuf_iorequest(pb);
 	if (sync) {
 		error = pagebuf_iowait(pb);
@@ -552,6 +558,7 @@ page_buf_t * xfs_pb_getr(int sleep, struct xfs_mount *mp);
 page_buf_t * xfs_pb_ngetr(int len, struct xfs_mount *mp); 
 void xfs_pb_freer(page_buf_t *bp);
 void xfs_pb_nfreer(page_buf_t *bp);
+void xfs_trigger_io(void);
 
 
 #define XFS_getrbuf(sleep,mp) xfs_pb_getr(sleep,mp)

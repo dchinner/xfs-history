@@ -88,7 +88,7 @@ int linvfs_common_cr(struct inode *dir, struct dentry *dentry, int mode,
 		/*
 		 * Get the real type from the mode
 		 */
-		va.va_rdev = makedev(MAJOR(rdev), MINOR(rdev));
+		va.va_rdev = rdev;
 		va.va_mask |= AT_RDEV;
 
 		va.va_type = IFTOVT(mode);
@@ -530,7 +530,7 @@ int linvfs_revalidate(struct dentry *dentry)
         inode->i_nlink = va.va_nlink;
         inode->i_uid = va.va_uid;
         inode->i_gid = va.va_gid;
-        inode->i_rdev = MKDEV(emajor(va.va_rdev), eminor(va.va_rdev));
+        inode->i_rdev = va.va_rdev;
         inode->i_size = va.va_size;
         inode->i_blocks = va.va_nblocks >> (PAGE_SHIFT - 9);
         inode->i_blksize = PAGE_SIZE;

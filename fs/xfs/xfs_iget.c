@@ -279,7 +279,8 @@ again:
 		return error;
 	}
 	vp = vn_alloc(XFS_MTOVFS(mp), IFTOVT(ip->i_d.di_mode),
-		      ip->i_df.if_u2.if_rdev);
+		      MKDEV(emajor(ip->i_df.if_u2.if_rdev),
+			    eminor(ip->i_df.if_u2.if_rdev)));
 	bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
 	vn_bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
 

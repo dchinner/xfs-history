@@ -19,7 +19,7 @@
 #ifndef _FS_XFS_ITABLE_H
 #define	_FS_XFS_ITABLE_H
 
-#ident	"$Revision: 1.23 $"
+#ident	"$Revision$"
 
 struct xfs_mount;
 struct xfs_trans;
@@ -45,7 +45,7 @@ typedef struct xfs_bstat
 	nlink_t		bs_nlink;	/* number of links */
 	uid_t		bs_uid;		/* user id */
 	gid_t		bs_gid;		/* group id */
-	dev_t		bs_rdev;	/* device value */
+	xfs_dev_t	bs_rdev;	/* device value */
 	__int32_t	bs_blksize;	/* block size */		
 	off64_t		bs_size;	/* file size */
 	xfs_bstime_t	bs_atime;	/* access time */

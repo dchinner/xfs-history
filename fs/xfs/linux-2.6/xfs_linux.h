@@ -151,8 +151,6 @@ extern ksa_t *ksaptr;
 #define findrawpath(x) x
 #define findblockpath(x) x
 
-#define dev_is_vertex(dev)	(emajor((dev_t)(dev)) == 0)
-
 #define	get_bdevsw(dev)	((struct bdevsw *)(__psint_t)(dev))
 
 

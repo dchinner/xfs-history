@@ -371,7 +371,6 @@ linvfs_write_super(
 {
  	vfs_t		*vfsp = LINVFS_GET_VFS(sb); 
  	int		error; 
-	irix_dev_t	dev;
 #if !CONFIG_PAGE_BUF_META
 	extern void bflush_bufs(dev_t);
 #endif

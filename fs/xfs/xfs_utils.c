@@ -33,7 +33,6 @@
 #include <sys/dmi_kern.h>
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
-#include <sys/major.h>
 
 #include "xfs_macros.h"
 #include "xfs_types.h"
@@ -737,10 +736,6 @@ xfs_mk_sharedro(int fd)
 	if (error = xfs_fd_to_mp(fd, 1, &mp, 1))
 		return XFS_ERROR(error);
 
-	if (emajor(mp->m_dev) != XLV_MAJOR) {
-		return XFS_ERROR(EINVAL);
-	}
-
 	mp->m_mk_sharedro = 1;
 
 	cmn_err(CE_NOTE,
@@ -758,10 +753,6 @@ xfs_clear_sharedro(int fd)
 
 	if (error = xfs_fd_to_mp(fd, 1, &mp, 1))
 		return XFS_ERROR(error);
-
-	if (emajor(mp->m_dev) != XLV_MAJOR) {
-		return XFS_ERROR(EINVAL);
-	}
 
 	mp->m_mk_sharedro = 0;
 

@@ -51,7 +51,6 @@
 #include <sys/systm.h>
 #include <sys/conf.h>
 #endif
-#include <sys/major.h>
 #include <sys/mount.h>
 #include <sys/param.h>
 #include <linux/xfs_sema.h>
@@ -402,7 +401,7 @@ xfs_fill_buftarg(buftarg_t *btp, dev_t dev, struct super_block *sb)
 {
 	extern struct inode *linvfs_make_inode(kdev_t, struct super_block *);
 
-	btp->inode = linvfs_make_inode(MKDEV(emajor(dev), eminor(dev)), sb);
+	btp->inode = linvfs_make_inode(dev, sb);
 	btp->dev    = dev;
 }
 
@@ -483,8 +482,12 @@ xfs_cmountfs(
 
 	vfs_flags = (vfsp->vfs_flag & VFS_RDONLY) ? FREAD : FREAD|FWRITE;
 	xfs_fill_buftarg(&mp->m_ddev_targ, ddev, vfsp->vfs_super);
-	xfs_fill_buftarg(&mp->m_logdev_targ, logdev, vfsp->vfs_super);
-	xfs_fill_buftarg(&mp->m_rtdev_targ, rtdev, vfsp->vfs_super);
+	if (logdev != ddev) {
+		xfs_fill_buftarg(&mp->m_logdev_targ, logdev, vfsp->vfs_super);
+	}
+	if (rtdev != 0) {
+		xfs_fill_buftarg(&mp->m_rtdev_targ, rtdev, vfsp->vfs_super);
+	}
 	mp->m_ddev_targp = &mp->m_ddev_targ;
 
 	/* Values are in BBs */
@@ -1110,12 +1113,12 @@ xfs_mountroot(
 	 *
 	 * If the device is an XLV volume, cannot check for an
 	 * XFS superblock because the device is not yet open.
-	 */
 	if ((why == ROOT_INIT) && 
-	     (emajor(rootdev) != XLV_MAJOR) &&
+	     (MAJOR(rootdev) != XLV_MAJOR) &&
 	     (xfs_isdev(rootdev))) {
 		return XFS_ERROR(ENOSYS);
 	}
+	 */
 	
 	switch (why) {
 	case ROOT_INIT:
@@ -1217,6 +1220,7 @@ xfs_mountroot(
 		goto bad;
 	}
 
+#if 0
 	if (emajor(rootdev) == XLV_MAJOR) {
 		/*
 		 * logical volume
@@ -1231,6 +1235,10 @@ xfs_mountroot(
 		ddev = logdev = rootdev;
 		rtdev = 0;
 	}
+#else
+	ddev = logdev = rootdev;
+	rtdev = 0;
+#endif
 	ASSERT(ddev && logdev);
 
 	error = xfs_cmountfs(vfsp, ddev, logdev, rtdev, why, NULL, NULL, cr);

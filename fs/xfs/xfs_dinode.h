@@ -95,7 +95,7 @@ typedef struct xfs_dinode
 		xfs_dir_shortform_t di_dirsf;	/* shortform directory */
 		xfs_dir2_sf_t	di_dir2sf;	/* shortform directory v2 */
 		char		di_c[1];	/* local contents */
-		dev_t		di_dev;		/* device for IFCHR/IFBLK */
+		xfs_dev_t	di_dev;		/* device for IFCHR/IFBLK */
 		uuid_t		di_muuid;	/* mount point value */
 		char		di_symlink[1];	/* local symbolic link */
 	}		di_u;

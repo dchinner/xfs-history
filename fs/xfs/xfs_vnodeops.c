@@ -66,7 +66,6 @@
 #include <sys/capability.h>
 #include <sys/dirent.h>
 #include <sys/attributes.h>
-#include <sys/major.h>
 #include <ksys/fdt.h>
 #include <ksys/fsc_notify.h>
 #include <ksys/cell_config.h>
@@ -457,7 +456,8 @@ xfs_getattr(
                                 (mp->m_sb.sb_rextsize << mp->m_sb.sb_blocklog);
 		}
 	} else {
-                vap->va_rdev = ip->i_df.if_u2.if_rdev;
+                vap->va_rdev = MKDEV(emajor(ip->i_df.if_u2.if_rdev),
+				     eminor(ip->i_df.if_u2.if_rdev));
                 vap->va_blksize = BLKDEV_IOSIZE;
 	}
 

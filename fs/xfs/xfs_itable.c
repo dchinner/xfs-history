@@ -838,10 +838,7 @@ xfs_fd_to_mp(
 	if (vp->v_type == VBLK || vp->v_type == VCHR) {
 		if (wperm && !(fp->vf_flag & FWRITE))
 			return XFS_ERROR(EPERM);
-		if (vp->v_type == VCHR && dev_is_vertex(vp->v_rdev))
-			dev = chartoblock(vp->v_rdev);
-		else
-			dev = vp->v_rdev;
+		dev = vp->v_rdev;
 		vfsp = vfs_devsearch(dev, xfs_fstype);
 		if (vfsp == NULL)
 			vfsp = vp->v_vfsp;

@@ -19,7 +19,7 @@
 #ifndef	_XFS_INODE_ITEM_H
 #define	_XFS_INODE_ITEM_H
 
-#ident "$Revision: 1.33 $"
+#ident "$Revision$"
 
 struct xfs_buf;
 struct proc;
@@ -60,7 +60,7 @@ typedef struct xfs_inode_log_format {
 	ushort			ilf_dsize;	/* size of data/ext/root */
 	xfs_ino_t		ilf_ino;	/* inode number */
 	union {
-		dev_t		ilfu_rdev;	/* rdev value for dev inode*/
+		xfs_dev_t	ilfu_rdev;	/* rdev value for dev inode*/
 		uuid_t		ilfu_uuid;	/* mount point value */
 	} ilf_u;
 	__int64_t		ilf_blkno;	/* blkno of inode buffer */
@@ -76,7 +76,7 @@ typedef struct xfs_inode_log_format_v1 {
 	uint			ilf_dsize;	/* size of data/ext/root */
 	xfs_ino_t		ilf_ino;	/* inode number */
 	union {
-		dev_t		ilfu_rdev;	/* rdev value for dev inode*/
+		xfs_dev_t	ilfu_rdev;	/* rdev value for dev inode*/
 		uuid_t		ilfu_uuid;	/* mount point value */
 	} ilf_u;
 } xfs_inode_log_format_t_v1;

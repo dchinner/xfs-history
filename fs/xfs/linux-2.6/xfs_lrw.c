@@ -41,7 +41,6 @@
 #include <ksys/behavior.h>
 #include <sys/vnode.h>
 #include <sys/uuid.h>
-#include <sys/major.h>
 #include "xfs_macros.h"
 #include "xfs_types.h"
 #include "xfs_inum.h"
@@ -77,6 +76,11 @@
                                                 << io->io_writeio_log)
 
 extern int xfs_write_clear_setuid(struct xfs_inode *);
+
+#if !defined(_USING_PAGEBUF_T)
+extern void bdstrat(struct bdevsw *, buf_t *);
+extern int xfs_bioerror_relse(xfs_buf_t *);
+#endif
 
 ssize_t
 xfs_rdwr(
@@ -586,7 +590,6 @@ xfs_write(
 		mode &= ip->i_mode;
 		if (mode && !capable(CAP_FSETID)) {
 			ip->i_mode &= ~mode;
-			mark_inode_dirty(ip);
 			xfs_write_clear_setuid(xip);
 		}
 		if (*offsetp > xip->i_d.di_size) {
@@ -684,7 +687,7 @@ _xfs_imap_to_bmap(
 			imap->br_blockcount, imap->br_state);  */
 
 		pbmapp->pbm_offset = offset - XFS_FSB_TO_B(mp, imap->br_startoff);
-		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp,imap->br_blockcount);
+		pbmapp->pbm_bsize = XFS_FSB_TO_B(mp, imap->br_blockcount);
 		pbmapp->pbm_flags = 0;
 
 		if (XFS_FSB_TO_B(mp, pbmapp->pbm_offset + pbmapp->pbm_bsize)
@@ -705,6 +708,7 @@ _xfs_imap_to_bmap(
 			if (imap->br_state == XFS_EXT_UNWRITTEN)
 				pbmapp->pbm_flags |= PBMF_UNWRITTEN;
 		}
+		offset += pbmapp->pbm_bsize;
 	}
 }
 
@@ -1236,7 +1240,7 @@ xfsbdstrat(
 	struct xfs_buf		*bp)
 {
 #if !defined(_USING_PAGEBUF_T)
-  	int		dev_major = emajor(bp->b_edev);
+  	int		dev_major = MAJOR(bp->b_edev);
 
 	ASSERT(bp->b_target);
 #endif
@@ -1250,8 +1254,8 @@ xfsbdstrat(
 		 * that, use griostrategy2.
 		 */
 #if !defined(_USING_PAGEBUF_T)
-		if ( (XFS_BUF_IS_GRIO(bp)) &&
-				(dev_major != XLV_MAJOR) ) {
+		if (XFS_BUF_IS_GRIO(bp)) {
+			extern void griostrategy(xfs_buf_t *);
 			griostrategy(bp);
 		} else
 			{
@@ -1306,12 +1310,18 @@ XFS_bflush(buftarg_t target)
 	run_task_queue(&tq_disk);
 }
 
-irix_dev_t
+dev_t
 XFS_pb_target(page_buf_t *bp) {
-	irix_dev_t	dev;
+	dev_t	dev;
 
-	dev = makedev(MAJOR(bp->pb_target->i_dev), MINOR(bp->pb_target->i_dev));
-	return dev;
+	return bp->pb_target->i_dev;
 }
+
+void
+xfs_trigger_io(void)
+{
+	run_task_queue(&tq_disk);
+}
+
 
 #endif

@@ -231,7 +231,7 @@ vfs_busydev(dev_t dev, int type)
 {
 	long s;
 	struct vfs *vfsp;
-	kdev_t	kdev = MKDEV(emajor(dev), eminor(dev));
+	kdev_t	kdev = MKDEV(MAJOR(dev), MAJOR(dev));
 	struct vfsmount *entry;
 
 	lock_kernel();
@@ -330,7 +330,7 @@ struct vfs *
 vfs_devsearch_nolock(dev_t dev, int fstype)
 {
         register struct vfs *vfsp;
-	kdev_t	kdev = MKDEV(emajor(dev), eminor(dev));
+	kdev_t	kdev = MKDEV(MAJOR(dev), MINOR(dev));
 	struct vfsmount *entry;
 
 	lock_kernel();

@@ -156,11 +156,11 @@ xfs_ialloc_log_di(
 	};
         xfs_arch_t  arch;
         
-        arch=XFS_BUF_FSPRIVATE(bp,xfs_mount_t *)->m_arch;
 
 	ASSERT(offsetof(xfs_dinode_t, di_core) == 0);
 	ASSERT((fields & (XFS_DI_U|XFS_DI_A)) == 0);
 	mp = tp->t_mountp;
+        arch = mp->m_arch;
 	/*
 	 * Get the inode-relative first and last bytes for these fields
 	 */

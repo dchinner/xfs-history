@@ -30,7 +30,6 @@
 #include <sys/vnode.h>
 #include <sys/sysmacros.h>
 #include <sys/uuid.h>
-#include <sys/major.h>
 #include <sys/grio.h>
 #include <sys/pda.h>
 #include <sys/dmi_kern.h>
