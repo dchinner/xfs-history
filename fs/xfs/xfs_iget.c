@@ -252,6 +252,13 @@ finish_inode:
 			if (newnode) {
 				xfs_iocore_inode_reinit(ip);
 			}
+
+			if (!list_empty(&ip->i_reclaim)) {
+				XFS_MOUNT_ILOCK(mp);
+				list_del(&ip->i_reclaim);
+				XFS_MOUNT_IUNLOCK(mp);
+			}
+
 			vn_trace_exit(vp, "xfs_iget.found",
 						(inst_t *)__return_address);
 			goto return_ip;
@@ -472,8 +479,10 @@ inode_allocate:
 			}
 
 			bdp = vn_bhv_lookup(VN_BHV_HEAD(vp), &xfs_vnodeops);
-			if (bdp == NULL)
+			if (bdp == NULL) {
+				XFS_STATS_INC(xfsstats.xs_ig_dup);
 				goto inode_allocate;
+			}
 			ip = XFS_BHVTOI(bdp);
 			if (lock_flags != 0)
 				xfs_ilock(ip, lock_flags);
@@ -725,6 +734,9 @@ xfs_iextract(
 			mp->m_inodes = iq;
 		}
 	}
+
+	/* Deal with the deleted inodes list */
+	list_del_init(&ip->i_reclaim);
 
 	mp->m_ireclaims++;
 	XFS_MOUNT_IUNLOCK(mp);

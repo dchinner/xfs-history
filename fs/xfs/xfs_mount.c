@@ -546,6 +546,7 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 	mp->m_blockmask = sbp->sb_blocksize - 1;
 	mp->m_blockwsize = sbp->sb_blocksize >> XFS_WORDLOG;
 	mp->m_blockwmask = mp->m_blockwsize - 1;
+	INIT_LIST_HEAD(&mp->m_del_inodes);
 
 
 	if (XFS_SB_VERSION_HASLOGV2(sbp)) {
@@ -601,8 +602,6 @@ xfs_mount_common(xfs_mount_t *mp, xfs_sb_t *sbp)
 					sbp->sb_inopblock);
 	mp->m_ialloc_blks = mp->m_ialloc_inos >> sbp->sb_inopblog;
 }
-
-extern void xfs_refcache_sbdirty(struct super_block*);
 
 /*
  * xfs_mountfs
@@ -877,13 +876,6 @@ xfs_mountfs(
 	if (mfsi_flags & XFS_MFSI_CLIENT) {
 		return(0);
 	}
-
-	/*
-	 * Set up timer list structure for nfs refcache
-	 */
-	init_timer(&mp->m_sbdirty_timer);
-	mp->m_sbdirty_timer.function =
-		(void (*)(unsigned long)) xfs_refcache_sbdirty;
 
 	/*
 	 *  Copies the low order bits of the timestamp and the randomly

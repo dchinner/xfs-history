@@ -571,7 +571,6 @@ xfs_unmount(
 	 * out of the reference cache, and delete the timer.
 	 */
 	xfs_refcache_purge_mp(mp);
-	del_timer_sync(&mp->m_sbdirty_timer);
 
 	XFS_bflush(mp->m_ddev_targp);
 	error = xfs_unmount_flush(mp, 0);
@@ -642,7 +641,7 @@ xfs_mntupdate(
 	if (*flags & MS_RDONLY) {
 		xfs_refcache_purge_mp(mp);
 		pagebuf_delwri_flush(mp->m_ddev_targp, 0, NULL);
-		xfs_finish_reclaim_all(mp);
+		xfs_finish_reclaim_all(mp, 0);
 
 		do {
 			VFS_SYNC(vfsp, SYNC_ATTR|SYNC_WAIT, NULL, error);
@@ -871,19 +870,14 @@ xfs_sync(
  * xfs sync routine for internal use
  *
  * This routine supports all of the flags defined for the generic VFS_SYNC
- * interface as explained above under xys_sync.  In the interests of not
+ * interface as explained above under xfs_sync.  In the interests of not
  * changing interfaces within the 6.5 family, additional internallly-
  * required functions are specified within a separate xflags parameter,
  * only available by calling this routine.
  *
- * xflags:
- *	XFS_XSYNC_RELOC - Sync for relocation.  Don't try to get behavior
- *                        locks as this will cause you to hang.  Not all
- *                        combinations of flags are necessarily supported
- *                        when this is specified.
  */
-int
-xfs_syncsub(
+STATIC int
+xfs_sync_inodes(
 	xfs_mount_t	*mp,
 	int		flags,
 	int             xflags,
@@ -899,12 +893,10 @@ xfs_syncsub(
 	uint64_t	fflag;
 	uint		lock_flags;
 	uint		base_lock_flags;
-	uint		log_flags;
 	boolean_t	mount_locked;
 	boolean_t	vnode_refed;
 	int		preempt;
 	xfs_dinode_t	*dip;
-	xfs_buf_log_item_t	*bip;
 	xfs_iptr_t	*ipointer;
 #ifdef DEBUG
 	boolean_t	ipointer_in = B_FALSE;
@@ -983,16 +975,6 @@ xfs_syncsub(
 		base_lock_flags |= XFS_IOLOCK_SHARED;
 	}
 
-	/*
-	 * Sync out the log.  This ensures that the log is periodically
-	 * flushed even if there is not enough activity to fill it up.
-	 */
-	if (flags & SYNC_WAIT) {
-		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE | XFS_LOG_SYNC);
-	} else {
-		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
-	}
-
 	XFS_MOUNT_ILOCK(mp);
 
 	ip = mp->m_inodes;
@@ -1038,27 +1020,23 @@ xfs_syncsub(
 				ip = ip->i_mnext;
 				continue;
 			}
-			if ((ip->i_update_core == 0) &&
-			    ((ip->i_itemp == NULL) ||
-			    !(ip->i_itemp->ili_format.ilf_fields & XFS_ILOG_ALL))) {
-				if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0) {
-					ip = ip->i_mnext;
-				} else if ((xfs_ipincount(ip) == 0) &&
+			if (xfs_ilock_nowait(ip, XFS_ILOCK_EXCL) == 0) {
+				ip = ip->i_mnext;
+			} else if ((xfs_ipincount(ip) == 0) &&
 				    xfs_iflock_nowait(ip)) {
-					IPOINTER_INSERT(ip, mp);
+				IPOINTER_INSERT(ip, mp);
 
-					xfs_finish_reclaim(ip, 1,
-						XFS_IFLUSH_DELWRI_ELSE_SYNC);
+				xfs_finish_reclaim(ip, 1,
+						XFS_IFLUSH_DELWRI_ELSE_ASYNC);
 
-					XFS_MOUNT_ILOCK(mp);
-					mount_locked = B_TRUE;
-					IPOINTER_REMOVE(ip, mp);
-				} else {
-					xfs_iunlock(ip, XFS_ILOCK_EXCL);
-					ip = ip->i_mnext;
-				}
-				continue;
+				XFS_MOUNT_ILOCK(mp);
+				mount_locked = B_TRUE;
+				IPOINTER_REMOVE(ip, mp);
+			} else {
+				xfs_iunlock(ip, XFS_ILOCK_EXCL);
+				ip = ip->i_mnext;
 			}
+			continue;
 		}
 
 		if (XFS_FORCED_SHUTDOWN(mp) && !(flags & SYNC_CLOSE)) {
@@ -1170,21 +1148,9 @@ xfs_syncsub(
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 
 			if (XFS_FORCED_SHUTDOWN(mp)) {
-				if (xflags & XFS_XSYNC_RELOC) {
-					fs_tosspages(XFS_ITOBHV(ip), 0, -1,
-						     FI_REMAPF);
-				}
-				else {
-					VOP_TOSS_PAGES(vp, 0, -1, FI_REMAPF);
-				}
+				VOP_TOSS_PAGES(vp, 0, -1, FI_REMAPF);
 			} else {
-				if (xflags & XFS_XSYNC_RELOC) {
-					fs_flushinval_pages(XFS_ITOBHV(ip),
-							    0, -1, FI_REMAPF);
-				}
-				else {
-					VOP_FLUSHINVAL_PAGES(vp, 0, -1, FI_REMAPF);
-				}
+				VOP_FLUSHINVAL_PAGES(vp, 0, -1, FI_REMAPF);
 			}
 
 			xfs_ilock(ip, XFS_ILOCK_SHARED);
@@ -1440,16 +1406,55 @@ xfs_syncsub(
 
 	ASSERT(ipointer_in == B_FALSE);
 
+	kmem_free(ipointer, sizeof(xfs_iptr_t));
+	return XFS_ERROR(last_error);
+}
+
+/*
+ * xfs sync routine for internal use
+ *
+ * This routine supports all of the flags defined for the generic VFS_SYNC
+ * interface as explained above under xfs_sync.  In the interests of not
+ * changing interfaces within the 6.5 family, additional internallly-
+ * required functions are specified within a separate xflags parameter,
+ * only available by calling this routine.
+ *
+ */
+int
+xfs_syncsub(
+	xfs_mount_t	*mp,
+	int		flags,
+	int             xflags,
+	int             *bypassed)
+{
+	int		error = 0;
+	int		last_error = 0;
+	uint		log_flags = XFS_LOG_FORCE;
+	xfs_buf_t	*bp;
+	xfs_buf_log_item_t	*bip;
+
+	/*
+	 * Sync out the log.  This ensures that the log is periodically
+	 * flushed even if there is not enough activity to fill it up.
+	 */
+	if (flags & SYNC_WAIT)
+		log_flags |= XFS_LOG_SYNC;
+
+	xfs_log_force(mp, (xfs_lsn_t)0, log_flags);
+
+	if (flags & (SYNC_ATTR|SYNC_DELWRI)) {
+		if (flags & SYNC_BDFLUSH)
+			xfs_finish_reclaim_all(mp, 1);
+		else
+			error = xfs_sync_inodes(mp, flags, xflags, bypassed);
+	}
+
 	/*
 	 * Flushing out dirty data above probably generated more
 	 * log activity, so if this isn't vfs_sync() then flush
-	 * the log again.  If SYNC_WAIT is set then do it synchronously.
+	 * the log again.
 	 */
-	if (!(flags & SYNC_BDFLUSH)) {
-		log_flags = XFS_LOG_FORCE;
-		if (flags & SYNC_WAIT) {
-			log_flags |= XFS_LOG_SYNC;
-		}
+	if (flags & SYNC_DELWRI) {
 		xfs_log_force(mp, (xfs_lsn_t)0, log_flags);
 	}
 
@@ -1485,11 +1490,10 @@ xfs_syncsub(
 			 * that point so it can become pinned in between
 			 * there and here.
 			 */
-			if (XFS_BUF_ISPINNED(bp)) {
-				xfs_log_force(mp, (xfs_lsn_t)0,
-					      XFS_LOG_FORCE);
-			}
-			XFS_BUF_BFLAGS(bp) |= fflag;
+			if (XFS_BUF_ISPINNED(bp))
+				xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
+			if (!(flags & SYNC_WAIT))
+				XFS_BUF_BFLAGS(bp) |= XFS_B_ASYNC;
 			error = xfs_bwrite(mp, bp);
 		}
 		if (error) {
@@ -1498,11 +1502,11 @@ xfs_syncsub(
 	}
 
 	/*
-	 * If this is the 30 second sync, then kick some entries out of
+	 * If this is the periodic sync, then kick some entries out of
 	 * the reference cache.  This ensures that idle entries are
 	 * eventually kicked out of the cache.
 	 */
-	if (flags & SYNC_BDFLUSH) {
+	if (flags & SYNC_REFCACHE) {
 		xfs_refcache_purge_some(mp);
 	}
 
@@ -1512,6 +1516,7 @@ xfs_syncsub(
 
 	if (xfs_log_need_covered(mp)) {
 		xfs_trans_t *tp;
+		xfs_inode_t *ip;
 
 		/*
 		 * Put a dummy transaction in the log to tell
@@ -1522,7 +1527,6 @@ xfs_syncsub(
 				XFS_ICHANGE_LOG_RES(mp),
 				0, 0, 0)))  {
 			xfs_trans_cancel(tp, 0);
-			kmem_free(ipointer, sizeof(xfs_iptr_t));
 			return error;
 		}
 
@@ -1534,6 +1538,7 @@ xfs_syncsub(
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 		error = xfs_trans_commit(tp, 0, NULL);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);
+		xfs_log_force(mp, (xfs_lsn_t)0, XFS_LOG_FORCE);
 	}
 
 	/*
@@ -1547,7 +1552,6 @@ xfs_syncsub(
 		}
 	}
 
-	kmem_free(ipointer, sizeof(xfs_iptr_t));
 	return XFS_ERROR(last_error);
 }
 

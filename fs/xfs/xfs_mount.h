@@ -296,6 +296,7 @@ typedef struct xfs_mount {
 	int			m_ihsize;	/* size of next field */
 	struct xfs_ihash	*m_ihash;	/* fs private inode hash table*/
 	struct xfs_inode	*m_inodes;	/* active inode list */
+	struct list_head	m_del_inodes;	/* inodes to reclaim */
 	mutex_t			m_ilock;	/* inode list mutex */
 	uint			m_ireclaims;	/* count of calls to reclaim*/
 	uint			m_readio_log;	/* min read size log bytes */
@@ -383,8 +384,6 @@ typedef struct xfs_mount {
 						 * snapshot */
 	sv_t			m_wait_unfreeze;/* waiting to unfreeze */
 	atomic_t		m_active_trans;	/* number trans frozen */
-	struct timer_list	m_sbdirty_timer;/* superblock dirty timer
-						 * for nfs refcache */
 } xfs_mount_t;
 
 /*
