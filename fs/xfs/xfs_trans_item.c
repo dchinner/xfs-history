@@ -1,4 +1,4 @@
-#ident "$Revision: 1.17 $"
+#ident "$Revision: 1.18 $"
 
 #ifdef SIM
 #define	_KERNEL 1
@@ -223,11 +223,11 @@ xfs_trans_first_item(xfs_trans_t *tp)
 		return (XFS_LIC_SLOT(licp, i));
 	}
 #ifndef SIM
-	cmn_err(CE_PANIC, "xfs_trans_first_item() -- no first item");
+	cmn_err(CE_WARN, "xfs_trans_first_item() -- no first item");
 #else
 	ASSERT(0);
 #endif
-	/* NOTREACHED */
+	return(NULL);
 }
 
 
