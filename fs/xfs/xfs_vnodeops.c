@@ -4427,6 +4427,7 @@ xfs_reclaim(
 {
 	xfs_inode_t	*ip;
 	vnode_t		*vp;
+	xfs_ihash_t	*ih;
 
 	vp = BHV_TO_VNODE(bdp);
 
@@ -4481,7 +4482,10 @@ xfs_reclaim(
 		}
 	}
 
+	ih = ip->i_hash;
+	write_lock(&ih->ih_lock); /* synchronizes but may still race? */
 	vn_bhv_remove(VN_BHV_HEAD(vp), XFS_ITOBHV(ip));
+	write_unlock(&ih->ih_lock);
 
 	if (!ip->i_update_core && (ip->i_itemp == NULL)) {
 		return xfs_finish_reclaim(ip, 0, 0);
@@ -4503,21 +4507,22 @@ xfs_finish_reclaim(
 	if (!locked) {
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
 	}
-	read_lock(&ih->ih_lock);
+	write_lock(&ih->ih_lock); /* Haven't worked this out yet */
+				  /* really not convinced :) */
 	if (XFS_ITOV_NULL(ip)) {
-		read_unlock(&ih->ih_lock);
+		write_unlock(&ih->ih_lock);
 		if (!locked)
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 		return(0);
 	}
 	if (ip->i_flags & XFS_IRECLAIM) {
-		if (!locked)
+		if (!locked) /* why iunlock first here? */
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
-		read_unlock(&ih->ih_lock);
+		write_unlock(&ih->ih_lock);
 		return(1);
 	}
 	ip->i_flags |= XFS_IRECLAIM;
-	read_unlock(&ih->ih_lock);
+	write_unlock(&ih->ih_lock);
 
 	sync_mode = from_umount ? XFS_IFLUSH_ASYNC :
 				XFS_IFLUSH_DELWRI_ELSE_SYNC;
