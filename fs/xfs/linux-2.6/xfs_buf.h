@@ -177,12 +177,13 @@ typedef enum page_buf_flags_e {
 typedef struct pb_target {
 	kdev_t			pbr_device;
 	struct block_device	*pbr_bdev;
+	struct address_space	*pbr_mapping;
 	unsigned int		pbr_blocksize;
-	unsigned int 		pbr_blocksize_bits;
-	struct inode	 	*pbr_inode;
+	unsigned int		pbr_blocksize_bits;
 } pb_target_t;
 
-#define PB_ADDR_SPACE(pb)  ((pb)->pb_target->pbr_inode->i_mapping)
+#define PBT_ADDR_SPACE(pbt)	((pbt)->pbr_mapping)
+#define PB_ADDR_SPACE(pb)  	PBT_ADDR_SPACE((pb)->pb_target)
 
 typedef struct page_buf_bmap_s {
 	page_buf_daddr_t pbm_bn;	/* block number in file system 	    */
@@ -194,7 +195,6 @@ typedef struct page_buf_bmap_s {
 } page_buf_bmap_t;
 
 typedef page_buf_bmap_t pb_bmap_t;
-
 struct page_buf_s;
 
 typedef void (*page_buf_iodone_t)(struct page_buf_s *);
