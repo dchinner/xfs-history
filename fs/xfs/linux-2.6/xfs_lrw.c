@@ -178,11 +178,6 @@ xfs_read(
  * size is being increased without writing anything to that block
  * and we don't want anyone to read the garbage on the disk.
  */
-
-/* We don' want the IRIX poff */
-#define poff(x) ((x) & (PAGE_CACHE_SIZE - 1))
-
-/* ARGSUSED */
 STATIC int				/* error (positive) */
 xfs_zero_last_block(
 	struct inode	*ip,
@@ -193,8 +188,6 @@ xfs_zero_last_block(
 	struct pm	*pmp)
 {
 	xfs_fileoff_t	last_fsb;
-	xfs_fileoff_t	next_fsb;
-	xfs_fileoff_t	end_fsb;
 	xfs_fsblock_t	firstblock;
 	xfs_mount_t	*mp;
 	page_buf_t	*pb;
@@ -202,9 +195,7 @@ xfs_zero_last_block(
 	int		zero_offset;
 	int		zero_len;
 	int		isize_fsb_offset;
-	int		i;
 	int		error = 0;
-	int		hole;
 	xfs_bmbt_irec_t	imap;
 	loff_t		loff;
 	size_t		lsize;
@@ -216,6 +207,21 @@ xfs_zero_last_block(
 
 	mp = io->io_mount;
 
+#ifndef linux
+	/* XXX:nathans - I think this case is now completely handled
+	 * within pagebuf.  I'll keep the code around in case theres
+	 * some other scenario which I haven't come across yet where
+	 * this is still needed.
+	 */
+
+/* We don' want the IRIX poff */
+#define poff(x) ((x) & (PAGE_CACHE_SIZE - 1))
+
+	{
+	xfs_fileoff_t	next_fsb;
+	xfs_fileoff_t	end_fsb;
+	int		hole;
+	int		i;
 	/*
 	 * If the file system block size is less than the page size,
 	 * then there could be bytes in the last page after the last
@@ -268,7 +274,6 @@ xfs_zero_last_block(
 			}
 			if (hole) {
 				printk("xfs_zero_last_block: hole found? need more implementation\n");
-#ifndef linux
 				/*
 				 * In order to make processes notice the
 				 * newly set P_HOLE flag, blow away any
@@ -284,12 +289,13 @@ xfs_zero_last_block(
 					XFS_ILOCK(mp, io, XFS_ILOCK_EXCL |
 							  XFS_EXTSIZE_RD);
 				}
-#endif
 			}
 			UnlockPage(page);
 			page_cache_release(page);
 		} 
 	}
+	}
+#endif
 
 	isize_fsb_offset = XFS_B_FSB_OFFSET(mp, isize);
 	if (isize_fsb_offset == 0) {
