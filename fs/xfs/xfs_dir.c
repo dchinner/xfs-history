@@ -391,7 +391,16 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 
 	XFSSTATS.xs_dir_getdents++;
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
+	/*
+	 * If our caller is already in the kernel and they've given
+	 * us a single, contiguous memory buffer, then just work
+	 * directly within that buffer.
+	 */
+	if ((uio->uio_segflg == UIO_SYSSPACE) && (uio->uio_iovcnt == 1)) {
+		dbp = NULL;
+	} else {
+		dbp = kmem_alloc(sizeof(*dbp) + MAXNAMELEN, KM_SLEEP);
+	}
 	*eofp = 0;
 
 	/*
@@ -404,7 +413,9 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	} else {
 		retval = xfs_dir_node_getdents(trans, dp, uio, eofp, dbp);
 	}
-	kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
+	if (dbp != NULL) {
+		kmem_free(dbp, sizeof(*dbp) + MAXNAMELEN);
+	}
 	return(retval);
 }
 
@@ -1584,6 +1595,8 @@ xfs_dir_put_dirent(
 	irix5_dirent_t	*i5_dbp;
 	int		retval;
 	int		target_abi;
+	int		reclen;
+	iovec_t		*iovp;
 
 	/*
 	 * If it's a kernel request, then the target abi is
@@ -1596,22 +1609,43 @@ xfs_dir_put_dirent(
 	}
 
 #ifdef REDWOOD
-	if (ABI_IS_IRIX5_64(target_abi))
+	if (ABI_IS_IRIX5_64(target_abi)) {
 #else
-	if (ABI_IS(ABI_IRIX5_64 | ABI_IRIX5_N32, target_abi))
+	if (ABI_IS(ABI_IRIX5_64 | ABI_IRIX5_N32, target_abi)) {
 #endif
-	{
-		if ((dbp->d_reclen = DIRENTSIZE(namelen)) > uio->uio_resid) {
+		reclen = DIRENTSIZE(namelen);
+		if (reclen > uio->uio_resid) {
 			*done = 0;
 			retval = 0;
 		} else {
-			dbp->d_ino = ino;
-			bcopy(name, dbp->d_name, namelen);
-			dbp->d_name[namelen] = '\0';
-			dbp->d_off = doff;
-			retval = uiomove((caddr_t)dbp, dbp->d_reclen,
-					 UIO_READ, uio);
-			*done = (retval == 0);
+			if (dbp != NULL) {
+				dbp->d_reclen = reclen;
+				dbp->d_ino = ino;
+				bcopy(name, dbp->d_name, namelen);
+				dbp->d_name[namelen] = '\0';
+				dbp->d_off = doff;
+				retval = uiomove((caddr_t)dbp, dbp->d_reclen,
+						 UIO_READ, uio);
+				*done = (retval == 0);
+			} else {
+				/*
+				 * Our caller is in the kernel, probably
+				 * NFS, so work directly in its buffer.
+				 */
+				ASSERT(uio->uio_segflg == UIO_SYSSPACE);
+				iovp = uio->uio_iov;
+				dbp = (dirent_t *)iovp->iov_base;
+				dbp->d_reclen = reclen;
+				dbp->d_ino = ino;
+				bcopy(name, dbp->d_name, namelen);
+				dbp->d_name[namelen] = '\0';
+				dbp->d_off = doff;
+				iovp->iov_base += reclen;
+				iovp->iov_len -= reclen;
+				uio->uio_resid -= reclen;
+				uio->uio_offset += reclen;
+				*done = retval = 0;
+			}
 		}
 	} else {
 		i5_dbp = (irix5_dirent_t *)dbp;
