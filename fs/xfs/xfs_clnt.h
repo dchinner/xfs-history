@@ -221,5 +221,6 @@ struct xfs_args_ver_3 {
 #define XFSMNT_GQUOTA		0x00400000	/* group quota accounting */
 #define XFSMNT_GQUOTAENF	0x00800000	/* group quota limit
 						 * enforcement */
+#define XFSMNT_NOUUID		0x01000000	/* Ignore fs uuid */
 
 #endif	/* __XFS_CLNT_H__ */

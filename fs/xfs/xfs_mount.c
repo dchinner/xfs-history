@@ -604,7 +604,7 @@ xfs_mountfs(
 	 * since a single partition filesystem is identical to a single
 	 * partition volume/filesystem.
 	 */
-	if ((mfsi_flags & XFS_MFSI_SECOND) == 0) {
+	if ((mfsi_flags & XFS_MFSI_SECOND) == 0 && (mp->m_flags & XFS_MOUNT_NOUUID) == 0) {
 		if (xfs_uuid_mount(mp)) {
 	                error = XFS_ERROR(EINVAL);
 	                goto error1;
@@ -1038,7 +1038,8 @@ xfs_unmountfs(xfs_mount_t *mp, int vfs_flags, struct cred *cr)
 		(void)xfs_incore_relse(&mp->m_ddev_targ, 0, 1); /* synchronous*/
 	}
 	xfs_unmountfs_close(mp, vfs_flags, cr);
-	xfs_uuid_unmount(mp);
+	if ((mp->m_flags & XFS_MOUNT_NOUUID) == 0)
+		xfs_uuid_unmount(mp);
 
 #if defined(DEBUG) || defined(INDUCE_IO_ERROR)
 	/*

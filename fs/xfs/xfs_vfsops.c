@@ -424,6 +424,9 @@ xfs_cmountfs(
 			}
 			mp->m_flags |= XFS_MOUNT_NORECOVERY;
 		}
+
+		if (ap->flags & XFSMNT_NOUUID) 
+			mp->m_flags |= XFS_MOUNT_NOUUID; 
 	}
 
 	/*

@@ -80,6 +80,7 @@ static struct super_operations linvfs_sops;
 #define MNTOPT_QUOTANOENF  "qnoenforce" /* same as uqnoenforce */
 #define MNTOPT_RO       "ro"            /* read only */
 #define MNTOPT_RW       "rw"            /* read/write */
+#define MNTOPT_NOUUID   "nouuid"	/* Ignore FS uuid */
 
 STATIC int
 mountargs_xfs(
@@ -227,6 +228,8 @@ mountargs_xfs(
 			args->flags |= MS_RDONLY;
 		} else if (!strcmp(this_char, MNTOPT_NOSUID)) {
 			args->flags |= MS_NOSUID;
+		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
+			args->flags |= XFSMNT_NOUUID; 
 		} else {
 			printk(
 			"mount: unknown mount option \"%s\".\n", this_char);
