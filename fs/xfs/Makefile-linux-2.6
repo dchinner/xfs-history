@@ -45,6 +45,9 @@ EXTRA_FIND_DIRECTORIES = linux pseudo-inc
 ifeq ($(CONFIG_XFS_GRIO),y)
 	EXTRA_FIND_DIRECTORIES += grio
 endif
+ifeq ($(CONFIG_XFS_DMAPI),y)
+	EXTRA_FIND_DIRECTORIES += dmapi
+endif
 EXTRA_INCLUDE_DIRECTORIES = -I./linux -I./pseudo-inc -I.
 
 EXTRA_CFLAGS += -g3 -Wno-unused  -Wno-parentheses \
@@ -58,12 +61,15 @@ ifeq ($(CONFIG_XFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG -DXFSDEBUG
 endif
 
+ALL_SUB_DIRS=linux
+SUB_DIRS=linux
 ifeq ($(CONFIG_XFS_GRIO),y)
-	ALL_SUB_DIRS = linux grio
-	SUB_DIRS = linux grio
-else
-	ALL_SUB_DIRS = linux
-	SUB_DIRS = linux
+	ALL_SUB_DIRS += grio
+	SUB_DIRS += grio
+endif
+ifeq ($(CONFIG_XFS_DMAPI),y)
+	ALL_SUB_DIRS += dmapi
+	SUB_DIRS += dmapi
 endif
 
 O_TARGET := xfs.o
@@ -91,9 +97,15 @@ ifeq ($(CONFIG_XFS_GRIO),y)
 else
 	XFS_GRIO_OBJS=
 endif
+ifeq ($(CONFIG_XFS_DMAPI),y)
+	XFS_DMAPI_OBJS=dmapi/dmapi.o
+else
+	XFS_DMAPI_OBJS=xfsdmapistubs.o
+endif
 
 XFS_OBJS  :=    $(XFS_RT_OBJS) \
 		$(XFS_GRIO_OBJS) \
+		$(XFS_DMAPI_OBJS) \
 		xfs_alloc.o \
                 xfs_alloc_btree.o \
                 xfs_attr.o \
@@ -139,7 +151,6 @@ XFS_OBJS  :=    $(XFS_RT_OBJS) \
                 xfs_vfsops.o \
                 xfs_vnodeops.o \
                 xfs_rw.o \
-		xfsdmapistubs.o \
 		xfsquotasstubs.o \
 		macstubs.o \
 		oplockstubs.o
@@ -148,9 +159,6 @@ XFS_OBJS  :=    $(XFS_RT_OBJS) \
 O_OBJS :=  $(XFS_OBJS) 
 
 O_OBJS += linux/linux_xfs.o
-ifeq ($(CONFIG_XFS_GRIO),y)
-	O_OBJS += grio/xfs_grio.o
-endif
 
 include $(TOPDIR)/Rules.make
 
